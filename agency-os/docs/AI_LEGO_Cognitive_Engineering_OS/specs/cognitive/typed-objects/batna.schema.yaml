@@ -1,0 +1,149 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/batna.schema.yaml"
+title: BATNA Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BatnaAnalysis` -- `stakeholders.batna`'s declared output
+  (methods/contracts/stakeholders.batna.contract.yaml, `outputs: [BatnaAnalysis]`). Atlas F07 table row (L492:
+  "BATNA｜談判失敗最佳替代｜列 alternatives→估值→改善 BATNA｜避免接受差交易") and §11.16 (L1565-1579, literal
+  5-step procedure: list alternatives -> estimate value/cost each -> choose best -> improve it -> derive
+  reservation point). `alternatives[]` holds steps 1-2; `best_alternative_id` is a bare reference into
+  `alternatives[].id` recording step 3's own SELECTION (never a duplicated, independently-typed object);
+  `reservation_point` is step 5's own COMPUTED derivation (value_estimate minus cost_estimate of the selected
+  alternative), never accepted as input. Step 4 ("先改善 BATNA，再進談判") is procedural guidance, not a stored
+  field -- see method contract's own open_questions (OQ-BATNA-1).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, BATNA row (L492)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.16 談判最佳替代方案／BATNA dedicated section (L1565-1579)"
+  - "methods/contracts/stakeholders.batna.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/pareto-frontier-record.schema.yaml -- option_id/objective_id bare-reference convention precedent, reused here for best_alternative_id"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L492/§11.16's own literal wording plus low-risk, disclosed compilation choices (the
+  flat shape, bare-reference `best_alternative_id`, record-level-only provenance).
+
+compilation_decisions:
+  - question: "best_alternative as a duplicated embedded object, or a bare reference id into alternatives[]?"
+    decision: "Bare string FK (best_alternative_id) -- same option_id/objective_id reference convention pareto-frontier-record.schema.yaml already establishes; a duplicated embedded copy could drift from its own alternatives[] source of truth, which JSON Schema alone cannot prevent (the actual referential-integrity check is a runtime invariant, see open_questions)."
+  - question: "Should reservation_point carry any schema-level constraint tying it to alternatives[]/best_alternative_id?"
+    decision: "No -- JSON Schema cannot express 'this number equals field X of the array entry whose id equals field Y', same disclosed gap class pareto-frontier-record.schema.yaml's own OQ-PARETOFRONTIERRECORD-1 documents for dominated_by. Enforced at the runtime layer only (stakeholders.batna.py's own evaluate_batna_integrity_gate re-derives and compares)."
+  - question: "Per-field or record-level provenance?"
+    decision: "Record-level only, one top-level `provenance` -- explicit F07-batch-wide decision (see method contract's own compilation_decisions), not this schema's own independent judgment call."
+  - question: "additionalProperties: false, at both the top level and each alternatives[] entry?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start."
+
+$defs:
+  alternative:
+    type: object
+    required: [id, label, value_estimate, cost_estimate]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Record-local identifier, referenced by best_alternative_id below. Uniqueness across alternatives[] is a runtime invariant (BATNA_DUPLICATE_ALTERNATIVE_ID), same class every sibling list-of-objects typed-object in this directory leaves to the runtime layer (JSON Schema cannot express cross-item uniqueness on a single field)."
+      label:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Human-readable name for this alternative, e.g. 'do nothing' / '找備案供應商'."
+      value_estimate:
+        type: number
+        description: "Step 2's own '估算每個 alternative 的價值' -- the estimated benefit/value of this alternative if pursued. REPORTED content (an analyst judgment call), not computed."
+      cost_estimate:
+        type: number
+        description: "Step 2's own '估算每個 alternative 的...成本' -- the estimated cost to pursue/realize this alternative. REPORTED content, not computed."
+
+type: object
+required: [id, version, provenance, subject, alternatives, best_alternative_id, reservation_point]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BATNA-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.batna"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What negotiation this BATNA supports, e.g. 'vendor contract renewal -- Q4'. Phase 3 compilation addition, same class every sibling typed-object's own `subject`/`context` field already establishes (Atlas gives no field-level shape for this method)."
+
+  alternatives:
+    type: array
+    minItems: 1
+    description: "Step 1's own '列出談不成時可做的 alternatives' -- at least one alternative is required for a BATNA to exist at all (a single, well-estimated fallback is a legitimate, complete BATNA -- Atlas's own plural wording describes the general case, not a floor of 2)."
+    items:
+      $ref: "#/$defs/alternative"
+
+  best_alternative_id:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Step 3's own '選最佳 BATNA' -- MUST equal a real alternatives[].id (referential integrity enforced at the runtime layer, BATNA_BEST_ALTERNATIVE_NOT_FOUND; JSON Schema cannot express this cross-array constraint, see compilation_decisions)."
+
+  reservation_point:
+    type: number
+    description: "Step 5's own '依 BATNA 推 reservation point' -- ALWAYS COMPUTED as the selected best_alternative's own value_estimate minus its own cost_estimate, never a constructor input. Independently re-derived and compared by evaluate_batna_integrity_gate, never trusted as a stored value (see method contract's own compilation_decisions)."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A BATNA analysis for a vendor contract renewal: 3 alternatives, 'switch to Vendor B' selected as best, reservation_point derived from its own net value"
+    value:
+      id: "BATNA-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.batna"
+      subject: "供應商合約續約談判 -- Q4"
+      alternatives:
+        - {id: "ALT-STATUS-QUO", label: "維持現狀，不續約也不換供應商", value_estimate: 20, cost_estimate: 5}
+        - {id: "ALT-SWITCH-VENDOR-B", label: "改用供應商 B（已完成初步報價）", value_estimate: 60, cost_estimate: 15}
+        - {id: "ALT-IN-HOUSE", label: "自建內部能力", value_estimate: 80, cost_estimate: 50}
+      best_alternative_id: "ALT-SWITCH-VENDOR-B"
+      reservation_point: 45
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - id: "OQ-BATNASCHEMA-1"
+    question: "best_alternative_id's own referential integrity (must equal a real alternatives[].id) and reservation_point's own genuine-compute correctness are both runtime-layer invariants only -- JSON Schema itself cannot express either cross-field constraint. Same disclosed gap class pareto-frontier-record.schema.yaml's own OQ-PARETOFRONTIERRECORD-1 documents. Left as a runtime invariant (evaluate_batna_integrity_gate re-derives and compares both)."
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BATNASCHEMA-2"
+    question: "No cross-reference from this record to a future stakeholders.zopa record exists (Atlas §11.17, the immediately next section, is a plausible consumer of reservation_point) -- should a future revision add a soft reference field once stakeholders.zopa lands and a real consumer needs one? Same open question the method contract's own OQ-BATNA-2 already discloses."
+    owner: "operator, or whoever next builds a consuming method against this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F07 table row (L492) and §11.16 (L1565-1579) directly. Grepped the whole Atlas file
+    case-insensitively for "batna" -- confirmed exactly these 2 real citations. Cross-checked against
+    methods/contracts/stakeholders.batna.contract.yaml's own outputs/preconditions/quality. Read
+    pareto-frontier-record.schema.yaml (bare-reference-id convention precedent) and jtbd-statement.schema.yaml
+    (record-level-only-provenance precedent) in full before writing this file. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "batna" before writing any of this method's own files -- zero pre-existing
+    implementation. Validated against jsonschema Draft202012Validator (required fields present, id pattern
+    satisfied, additionalProperties:false present at both the top level and the alternatives[] item level,
+    embedded examples resolved through their real $ref to epistemic-label.schema.yaml, negative controls for a
+    smuggled top-level key, an empty alternatives list, and a malformed alternative entry).
+  note: >
+    No mother document was modified. `subject`/`alternatives`/`best_alternative_id`/`reservation_point` are
+    transcribed directly from Atlas §11.16's own literal 5-step procedure and L492's own table row. The exact
+    field names, the bare-reference shape for `best_alternative_id`, the record-level-only provenance placement
+    (an explicit F07-batch-wide decision, not this file's own independent call), and the BATNA- prefix are this
+    suite's own compiled structure, disclosed above, not textually cited.

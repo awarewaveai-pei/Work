@@ -1,0 +1,114 @@
+$id: "ai-lego://methods/contracts/stakeholders.raci.contract.yaml"
+title: "RACI Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family (Atlas 利害關係人／權力／協商), OPENING member (F07 had zero
+  built methods before this batch -- grep-confirmed no `ai_lego/modules/stakeholders/` implementation existed at
+  batch start; 1 of 10 concurrent agents opening F07 in this same parallel batch). Atlas cites this method ONCE:
+  F07 table row (L491: "RACI｜明確 R/A/C/I｜每 task 指定責任｜降低責任模糊"). NOT the same method as
+  `method-inventory.yaml`'s own pending F22 pm-governance "RACI (delivery)" entry (L1365-1369, a different,
+  still-unbuilt delivery-task-execution method) -- disambiguated via `id`/`family`/record prefix (`SRACI-`,
+  deliberately not bare `RACI-`) so the two never collide once F22 is built. Core invariant, the real
+  industry-standard RACI discipline L491's own "降低責任模糊" benefit column names: every task has EXACTLY ONE
+  Accountable assignment (0 or 2+ is itself the responsibility ambiguity RACI exists to remove) and AT LEAST ONE
+  Responsible assignment.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, RACI row (L491)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.raci` mints a NEW machine_id AND a NEW `family: stakeholders`
+  (F07's first built member -- no prior `stakeholders.*` contract exists in this corpus, grep-confirmed; distinct
+  from the pre-existing `family: stakeholder` singular Lens contract, `stakeholder.regulator.contract.yaml` --
+  that file validates against `lens.schema.yaml#/lens`, a structurally different dimension-C object, not a
+  Method). The exactly-one-Accountable / at-least-one-Responsible invariant is this file's own compiled reading
+  of standard, industry-wide RACI practice (the real substance behind L491's own "降低責任模糊" benefit column,
+  not a literal internal rule L491's bare 3-column table row itself states), disclosed as such below.
+
+id: stakeholders.raci
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = breaking a piece of
+# work into individually-assignable tasks (L491's own "每 task"); CLASSIFY = assigning each stakeholder to
+# exactly one of the 4 closed RACI role categories per task.
+
+purpose:
+  - assign_unambiguous_responsibility_per_task_across_the_4_closed_raci_roles
+# Atlas L491 verbatim sense: 用途「明確 R/A/C/I」/ 使用方式「每 task 指定責任」/ 效益「降低責任模糊」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this batch takes; L491's own bare table row names no companion input type.
+
+outputs:
+  - RaciMatrix
+# NEW output type (see typed-objects/stakeholder-raci.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "tasks is a non-empty list -- a RACI matrix naming zero tasks has not actually '指定責任' for anything (L491's own defining purpose)"
+  - "every task has a non-empty task_name and a non-empty assignments list, each assignment a non-empty stakeholder_name with role in the closed set {R, A, C, I} (RACI_EMPTY_TASK_NAME / RACI_EMPTY_ASSIGNMENTS / RACI_EMPTY_STAKEHOLDER_NAME / RACI_INVALID_ROLE)"
+  - "every task has EXACTLY ONE Accountable (A) assignment (RACI_TASK_NOT_EXACTLY_ONE_ACCOUNTABLE) -- the real, standard RACI discipline L491's own '降低責任模糊' benefit names: 0 Accountable leaves nobody answerable, 2+ Accountable IS the responsibility ambiguity RACI exists to remove"
+  - "every task has AT LEAST ONE Responsible (R) assignment (RACI_TASK_MISSING_RESPONSIBLE) -- a task with zero people doing the work is not actually assigned"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same thin-bare-table-row reasoning strategy.ansoff/insight.persona's identical flags already
+  # establish: L491 is a single bare table row, no dedicated section, no explicit unevidenced-claim caution to
+  # mechanize; this method's real discipline (exactly-1-A / >=1-R) is a structural role-assignment invariant, not
+  # a claims-evidence-labeling concern.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L491 names no "最佳搭配" column for this method -- genuinely nothing to name, left empty rather than
+# inferring one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat per-task list of {stakeholder_name, role} assignments, or a wider stakeholder x task grid?"
+    decision: "Nested tasks[].assignments[] list -- matches L491's own 'each task' framing directly; a grid is a rendering choice, not a data-shape requirement."
+  - question: "Record-level-only provenance, or per-task/per-assignment?"
+    decision: "Record-level ONLY -- same batch-wide placement insight.jtbd/insight.persona's own record-level provenance already establishes for an adjacent family, not a per-item claim-provenance shape."
+  - question: "Record id prefix RACI- (bare) or SRACI-?"
+    decision: "SRACI- -- deliberate disambiguation from method-inventory.yaml's own pending F22 pm-governance 'RACI (delivery)' entry (L1365-1369), a different future method in a different namespace; avoids a record-id collision once F22 is built."
+  - question: "Enforce the exactly-one-Accountable / at-least-one-Responsible rule in the JSON Schema (via contains/minContains/maxContains) or only at the runtime builder+gate layer?"
+    decision: "Runtime builder+gate only -- same restraint bcg-matrix-analysis.schema.yaml's own OQ-BCGMATRIXANALYSIS-1 already applies to a cross-item computed invariant; the JSON Schema keeps the role enum closed, the cross-assignment count rule lives in ai_lego/modules/stakeholders/raci.py."
+
+open_questions:
+  - "OQ-RACI-1: cognitive_primitives [DECOMPOSE, CLASSIFY] is this file's own inference -- Atlas §4 gives no composition formula for this method (owner: operator)."
+  - "OQ-RACI-2: the exactly-1-A / >=1-R invariant is grounded in standard RACI management practice, not Atlas's own literal L491 text beyond '降低責任模糊' -- disclosed as a compiled reading (owner: operator)."
+  - "OQ-RACI-3: C (Consulted) and I (Informed) carry no minimum-count requirement -- a task may legitimately have zero of either; a future revision could require evidence a task with zero C/I was deliberately reviewed, not merely omitted (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L491) directly. Grepped the whole Atlas file case-insensitively for "raci" --
+    confirmed L491 is the only real hit, no dedicated section, no §4 composition formula, no §14.1 legal-chain
+    mention. Grepped `methods/registry/method-inventory.yaml` and `methods/registry/contract-backlog.yaml`
+    case-insensitively for "raci" before writing this file -- confirmed method-inventory.yaml's own L1365-1369
+    pending F22 "RACI (delivery)" entry is a DIFFERENT future method (pm-governance family, unbuilt, no
+    contract), and contract-backlog.yaml has no stakeholders.raci entry at all (out of this task's own scope).
+    Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "raci" before writing any of this
+    method's own files -- confirmed zero pre-existing `stakeholders.raci` implementation. Read
+    insight.jtbd.contract.yaml (record-level-only provenance, two-layer-invariant precedent) and
+    strategy.bcg_matrix.contract.yaml (nested-list, per-item-invariant, runtime-only cross-item-rule precedent)
+    in full before writing this contract. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The exactly-1-Accountable / at-least-1-Responsible rule is a compiled
+    reading of standard, industry-wide RACI practice (the real substance behind L491's own "降低責任模糊" benefit
+    column), not a literal Atlas-cited rule beyond the bare table row wording quoted above. The nested
+    tasks[].assignments[] shape, the SRACI- id prefix, record-level-only provenance, and the runtime-only (not
+    JSON-Schema-level) enforcement of the cross-assignment count rule are this file's own compilation decisions,
+    disclosed above.

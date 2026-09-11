@@ -1,0 +1,189 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/salience-model.schema.yaml"
+title: Salience Assessment
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SalienceAssessment` -- the declared `outputs` of
+  `stakeholders.salience_model`'s Method Contract (methods/contracts/stakeholders.salience_model.contract.yaml,
+  `outputs: [SalienceAssessment]`). Atlas cites this method ONCE: F07 tool table row (L489: "Salience Model｜
+  Power/Legitimacy/Urgency｜三維評分與分類｜加入正當性與急迫性"), no dedicated section. `power`/`legitimacy`/
+  `urgency` are Atlas's own 3 named dimensions (L489); each modeled as `{present: bool, justification}` --
+  `justification` is REQUIRED non-empty when `present` is true ("不能只打勾沒證據", task-mandated, not Atlas
+  text). `dimension_count`/`salience_class` are GENUINE_COMPUTE, mechanically derived from the 3
+  `*.present` booleans -- see `compilation_decisions` for why this suite deliberately does NOT adopt the
+  real external Mitchell-Agle-Wood (1997) 7-type stakeholder typology (dormant/discretionary/demanding/
+  dominant/dangerous/dependent/definitive) here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Salience Model row (L489)"
+  - "methods/contracts/stakeholders.salience_model.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/vrio-analysis.schema.yaml -- fixed-named-dimension + computation_provenance_ref precedent (read for shape contrast, not reused verbatim: VRIO's dimensions are a list of 4 interchangeable entries, this schema's 3 dimensions are individually-named top-level fields since a stakeholder always has exactly these 3 named axes, never a variable set)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: direct
+  transcription of Atlas L489's 3 dimension names plus disclosed, low-risk compilation choices below.
+
+compilation_decisions:
+  - question: "Should the 3 dimensions be a list (VRIO's questions[] shape) or 3 individually-named top-level fields?"
+    decision: "3 individually-named fields (power/legitimacy/urgency) -- unlike VRIO's 4 interchangeable list entries, a stakeholder always has exactly these 3 fixed, individually-meaningful axes; naming them directly is more auditable than a generic list."
+  - question: "Does justification apply the same 'null or non-empty, never empty string' discipline every other nullable content field in this corpus uses, plus a cross-field rule?"
+    decision: "Yes to both -- justification is null or a non-empty string (oneOf), AND (if/then) present:true additionally requires justification to satisfy the non-empty branch. present:false leaves justification free (null or a disclosed non-empty note), same one-directional-only precedent moscow-prioritization-record.schema.yaml's own bucket==WONT/reason if/then already establishes."
+  - question: "Should salience_class use the real external Mitchell-Agle-Wood (1997) 7-type stakeholder typology (dormant/discretionary/demanding/dominant/dangerous/dependent/definitive), the way strategy.vrio.contract.yaml adopts Barney's real external VRIO classification?"
+    decision: "No -- deliberately conservative. Atlas L489 names only the 3 dimensions, no classification table (unlike VRIO's own §12.13, which at least names the method by its full academic apparatus). Adopting the 7 academic type NAMES here would overstate what is actually grounded in either Atlas or this task. Instead: `dimension_count` (0-3, count of present dimensions) + `salience_class` (an 8-way named combination of which dimensions are present, e.g. POWER_LEGITIMACY_URGENCY) -- both real, deterministic, GENUINE_COMPUTE, but honestly disclosed as this suite's own naming, not Mitchell-Agle-Wood's."
+  - question: "additionalProperties: false at the top level and on each dimension object?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, stakeholder_name, power, legitimacy, urgency, dimension_count, salience_class, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SALNCE-"
+    description: "NEW DESIGN. Same id-prefix convention every sibling record schema uses."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.salience_model"
+
+  stakeholder_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      REQUIRED. Names the specific stakeholder under salience judgment -- a 3-dimension score with no named
+      subject cannot be audited against reality later (same reasoning strategy.vrio's `resource_description`
+      already establishes for a different fixed-subject method).
+
+  power:
+    $ref: "#/$defs/dimension"
+    description: "Atlas L489's own first dimension: does this stakeholder have the ABILITY to impose its will (formal authority, coercive, or resource control)?"
+
+  legitimacy:
+    $ref: "#/$defs/dimension"
+    description: "Atlas L489's own second dimension: is this stakeholder's claim/involvement socially or legally accepted as appropriate?"
+
+  urgency:
+    $ref: "#/$defs/dimension"
+    description: "Atlas L489's own third dimension: does this stakeholder's claim demand immediate attention (time-sensitivity or criticality)?"
+
+  dimension_count:
+    type: integer
+    minimum: 0
+    maximum: 3
+    description: >
+      REQUIRED. GENUINE_COMPUTE -- count of {power,legitimacy,urgency}.present that are true. NEVER
+      caller-supplied, mechanically derived by `ai_lego.modules.stakeholders.salience_model.derive_salience_outputs`
+      alongside `salience_class`. See `compilation_decisions`.
+
+  salience_class:
+    type: string
+    enum: [NONE, POWER_ONLY, LEGITIMACY_ONLY, URGENCY_ONLY, POWER_LEGITIMACY, POWER_URGENCY, LEGITIMACY_URGENCY, POWER_LEGITIMACY_URGENCY]
+    description: >
+      REQUIRED. GENUINE_COMPUTE -- a TOTAL, deterministic named combination of which of the 3 dimensions are
+      present (8 = 2^3 possible values), mechanically derived by the same function as `dimension_count`. NOT
+      the Mitchell-Agle-Wood (1997) 7-type academic labels -- see `compilation_decisions` for why this suite
+      does not adopt those names.
+
+  computation_provenance_ref:
+    type: string
+    description: >
+      Names the exact function that computed BOTH `dimension_count` and `salience_class`
+      (`ai_lego.modules.stakeholders.salience_model.derive_salience_outputs`), same audit-trail convention
+      vrio-analysis.schema.yaml's own `computation_provenance_ref` already establishes for a GENUINE_COMPUTE
+      derived value.
+
+  provenance:
+    description: >
+      Overall record provenance -- RECORD-LEVEL ONLY (no per-dimension provenance), a deliberate BATCH-WIDE
+      decision for this whole F07 build (matching insight.jtbd's own F06-batch-wide record-level placement).
+      Full provenance_record, same pattern every sibling typed-object schema in this directory uses.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  dimension:
+    type: object
+    required: [present, justification]
+    additionalProperties: false
+    if:
+      properties: { present: { const: true } }
+      required: [present]
+    then:
+      properties:
+        justification: { type: string, minLength: 1, pattern: "\\S" }
+    properties:
+      present:
+        type: boolean
+        description: "Disclosed judgment call, not a computed score."
+      justification:
+        description: >
+          Null or a non-empty string. REQUIRED to be the non-empty branch when `present` is true -- "不能只打勾
+          沒證據" (task-mandated): a dimension cannot be checked true with no disclosed evidence. Free when
+          `present` is false (null, or an optional disclosed note on why it was judged absent).
+        oneOf:
+          - type: "null"
+          - type: string
+            minLength: 1
+            pattern: "\\S"
+
+examples:
+  - description: "A regulator with all 3 dimensions present (highest salience combination)"
+    value:
+      id: "SALNCE-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.salience_model"
+      stakeholder_name: "主管機關（個資保護專責單位）"
+      power: { present: true, justification: "可直接開罰並強制下架產品，具法定強制力" }
+      legitimacy: { present: true, justification: "法規賦予的審查與裁罰權責，具正式法律地位" }
+      urgency: { present: true, justification: "個資新規上路倒數 60 天，逾期未合規即進入裁罰期" }
+      dimension_count: 3
+      salience_class: POWER_LEGITIMACY_URGENCY
+      computation_provenance_ref: "ai_lego.modules.stakeholders.salience_model.derive_salience_outputs"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+  - description: "A long-tail end user with only legitimacy present (no formal power, no urgent claim yet)"
+    value:
+      id: "SALNCE-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.salience_model"
+      stakeholder_name: "一般付費使用者（長尾群體）"
+      power: { present: false, justification: null }
+      legitimacy: { present: true, justification: "付費合約賦予服務使用權，是合法且被承認的利害關係人" }
+      urgency: { present: false, justification: null }
+      dimension_count: 1
+      salience_class: LEGITIMACY_ONLY
+      computation_provenance_ref: "ai_lego.modules.stakeholders.salience_model.derive_salience_outputs"
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-SALIENCEMODEL-1"
+    question: "salience_class uses this suite's own 8-way named combination, not Mitchell-Agle-Wood's 7-type academic labels -- should a future revision add a soft cross-reference field mapping each of the 8 combinations to its nearest academic type name (NONE has no MAW equivalent -- non-stakeholder)? (owner: operator)"
+  - id: "OQ-SALIENCEMODEL-2"
+    question: "No cross-reference from this record to a future stakeholders.stakeholder_map / stakeholders.power_interest record exists (both plausible upstream sources for stakeholder_name) -- should a future revision add a soft reference field once a real consumer needs one? (owner: operator, or whoever next builds a consuming method against this record)"
+
+verification:
+  method: >
+    Read Atlas F07 table row (L489) directly. Grepped the whole Atlas file case-insensitively for "salience" --
+    confirmed exactly this 1 real hit, no dedicated section, no §4 composition formula, no §14.1 legal-chain
+    mention, no §22.3 gate-table row. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "salience"/"SALNCE" before writing
+    any of this method's own files -- zero pre-existing implementation (only forward-reference mentions in
+    method-inventory.yaml and stakeholders.stakeholder_map.contract.yaml already disclosing this method as
+    unbuilt). Read strategy.vrio's own vrio-analysis.schema.yaml (fixed-dimension + computation_provenance_ref
+    precedent) and insight.jtbd's own jtbd-statement.schema.yaml (record-level-only-provenance precedent) in
+    full before writing this file. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_salience_model.py (required fields present, id pattern satisfied, additionalProperties:false
+    at both the top level and each dimension object, if/then justification requirement enforced, embedded
+    examples resolved through their real $ref to epistemic-label.schema.yaml).
+  note: >
+    No mother document was modified. `power`/`legitimacy`/`urgency` are transcribed directly from Atlas L489's
+    own 3-name table cell. The `{present, justification}` shape, the if/then justification requirement,
+    `dimension_count`, `salience_class`'s 8-way named-combination scheme (explicitly NOT the Mitchell-Agle-Wood
+    academic 7-type labels), the record-level-only provenance placement (an explicit F07-batch-wide decision,
+    not this file's own independent call), and the SALNCE- prefix are this suite's own compiled structure,
+    disclosed above, not textually cited from Atlas.

@@ -1,0 +1,115 @@
+$id: "ai-lego://methods/contracts/stakeholders.coalition_mapping.contract.yaml"
+title: "Coalition Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family, 1 of 10 concurrent agents opening this family's members in
+  the same parallel batch (family had 0 real methods built before this batch -- grep-confirmed no
+  `ai_lego/modules/stakeholders/` real module existed, only the orchestrator's own pre-created package-init
+  placeholder). Atlas cites this method ONCE: the F07 table row (L496: "Coalition Mapping｜找可能聯盟｜
+  interests/power/resources→coalition scenarios｜政策與治理特別重要") -- same thin single-table-row-citation
+  class `strategy.bcg_matrix.contract.yaml` already establishes. Core invariant: `stakeholder_profiles` is a
+  list of >=2 well-shaped entries each carrying non-empty `interests`/`power`/`resources` (the row's own
+  literal 3-field disclosure); `coalition_scenarios` is a non-empty list where every entry's `member_ids` has
+  >=2 UNIQUE entries and EVERY member id resolves to a real `stakeholder_profiles` id declared in the same
+  record (referential integrity -- a dangling reference is refused). This method does NOT run a coalition-
+  recommendation algorithm; `coalition_scenarios` is caller-supplied content, only its structural completeness
+  and referential integrity against the declared stakeholder pool are mechanically enforced. See
+  `ai_lego/modules/stakeholders/coalition_mapping.py` module docstring for the full field-by-field grounding.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Coalition Mapping row (L496)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.coalition_mapping` mints a NEW machine_id inside the NEW
+  `family: stakeholders` (F07's own family, this contract is 1 of 10 concurrent members opening it -- no prior
+  `stakeholders.*` contract exists in this corpus at batch start, grep-confirmed). Flat stakeholder-card +
+  scenario-list record shape, `coalition_scenarios` as caller-supplied (not computed) content, and
+  record-level-only provenance placement are this file's own compilation decisions -- see
+  `compilation_decisions`.
+
+id: stakeholders.coalition_mapping
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [MAP, GROUP, ASSOCIATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. MAP = the family's own row-verb
+# "Mapping"; GROUP = clustering stakeholders into candidate coalition scenarios; ASSOCIATE = linking members by
+# shared interests/power/resources, the row's own literal input chain.
+
+purpose:
+  - identify_plausible_stakeholder_coalitions_from_interests_power_and_resources
+# Atlas L496 verbatim sense: 用途「找可能聯盟」/ 使用方式「interests/power/resources→coalition scenarios」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position `insight.jtbd`'s own
+  # opening-member contract already takes; the row names no required input type, only the 3 profile fields.
+
+outputs:
+  - CoalitionMappingRecord
+# NEW output type (see typed-objects/coalition-mapping.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other single-row Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "stakeholder_profiles is a list of at least 2 well-shaped {id, name, interests, power, resources} entries with unique ids, each of interests/power/resources non-empty -- the row's own literal 3-field disclosure ('interests/power/resources'); 2 is the structural floor for any scenario to name a coalition of distinct members"
+  - "coalition_scenarios is a non-empty list of well-shaped {id, label, member_ids} entries with unique scenario ids -- the row's own '→coalition scenarios' output; a record naming zero scenarios would not exercise this method's own defining purpose ('找可能聯盟')"
+  - "every coalition_scenarios entry's member_ids has at least 2 UNIQUE entries -- a coalition is, by definition, at least two parties; one member does not constitute a coalition"
+  - "every coalition_scenarios member_ids entry resolves to a real id declared in this record's own stakeholder_profiles -- a dangling reference to a stakeholder who was never profiled is refused (referential integrity)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to "claims inside this method's outputs that
+  # originate from EvidenceSet input" (an upstream typed-object this method does not take: inputs.required: []).
+  # Same reasoning insight.jtbd.contract.yaml's own identical false already discloses for its own single-row-
+  # class sibling.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F07 table draws no chain arrow from Coalition Mapping to another row (it is the table's own last
+# row, no "最佳搭配" column exists on this table). Left empty rather than picking an arbitrary sibling F07
+# method (e.g. ZOPA, Interest-Based Negotiation) with no textual chain evidence. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat stakeholder-card list + scenario list, or a richer structured shape (e.g. numeric power/interest scores, a computed coalition-viability score)?"
+    decision: "Flat: stakeholder_profiles as {id, name, interests, power, resources} plain-string cards, coalition_scenarios as {id, label, member_ids} referencing them -- task-mandated exact shape; the row's own 'interests/power/resources→coalition scenarios' names exactly these 3 profile dimensions and 1 output artifact, with no further internal structure (no numeric scoring, no quadrant classification) cited for any of them."
+  - question: "Should this method itself GENERATE/score coalition_scenarios (a recommendation algorithm), or only validate caller-supplied scenarios?"
+    decision: "Validate-only. coalition_scenarios is caller-supplied content; this method mechanically enforces structural completeness and referential integrity against the declared stakeholder pool, but does not implement a coalition-formation or viability-scoring algorithm. Atlas's own row gives no algorithm, only the input->output shape ('interests/power/resources→coalition scenarios') -- inventing one here would fabricate content with no textual basis."
+  - question: "Per-field/per-profile/per-scenario provenance, or record-level only?"
+    decision: "Record-level ONLY, one top-level `provenance` field -- a deliberate BATCH-WIDE decision for this whole F07 build (matching `insight.jtbd.contract.yaml`'s own identical record-level placement for its F06 batch), made specifically to avoid the per-item/record-level ambiguity that hit both the F02 and F03 batches (see their own WORKLOG entries). A CoalitionMappingRecord's stakeholder pool and scenario set describe ONE coherent snapshot of one situation's stakeholder landscape, not a list of independently-sourced items each needing its own epistemic stamp."
+  - question: "Should evidence_labeling_required be true?"
+    decision: "false -- the flag's own schema definition (method.schema.yaml) scopes it to claims originating from an EvidenceSet INPUT, which this method does not take (inputs.required: []). Same reasoning insight.jtbd.contract.yaml's own identical compilation_decisions entry already discloses."
+  - question: "Minimum counts for stakeholder_profiles / coalition_scenarios / member_ids?"
+    decision: "stakeholder_profiles: minItems 2 (structural floor -- a scenario needs >=2 distinct members drawn from this pool, same reasoning association.concept_map.contract.yaml's own nodes:minItems 2 already establishes). coalition_scenarios: minItems 1 (a record with zero scenarios would not exercise this method's own defining purpose, same reasoning association.concept_map.contract.yaml's own edges:minItems 1 floor already establishes). member_ids: minItems 2 per scenario (a coalition is at least two parties by definition)."
+
+open_questions:
+  - "OQ-COALMAP-1: recommended_next is empty -- Atlas's F07 table draws no chain arrow from Coalition Mapping to another F07 row (unlike some other families' tables, this one has no 最佳搭配 column). A future pass could decide a canonical next step (e.g. stakeholders.zopa or stakeholders.interest_based_negotiation, both still unbuilt at this batch's start) once real chain evidence exists (owner: operator)."
+  - "OQ-COALMAP-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-COALMAP-3: coalition_scenarios is validated but not generated by this method (see compilation_decisions) -- a future revision could add a genuine coalition-formation/viability-scoring compute layer if a downstream consumer needs one, provided a real algorithm is cited rather than fabricated (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L496) directly. Grepped the whole Atlas file case-insensitively for "coalition"
+    -- confirmed exactly 1 real citation (no dedicated section, no §4 composition formula, no §14.1 legal-chain
+    mention, no §22.3 gate-table row). Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "coalition" before writing any of
+    this method's own files -- zero pre-existing implementation (only this row and the
+    `methods/registry/method-inventory.yaml` backlog entry at L531, `has_contract: false` / `contract_status:
+    pending`, both read, neither edited per this task's own boundary). Read `insight.jtbd` (record-level-only
+    provenance precedent, this batch's fixed placement decision) and `association.concept_map` (referential-
+    integrity + minItems-floor precedent, read for the closest structural analog) in full before writing this
+    contract. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `cognitive_primitives`, the flat stakeholder-card/scenario-list shape,
+    and the validate-only (not generate) scope are this file's own compilation decisions, disclosed above, not
+    presented as directly Atlas-cited beyond the literal table-row wording quoted verbatim. The
+    record-level-only provenance placement is an explicit F07-batch-wide decision, not this contract's own
+    independent judgment call -- disclosed as such per this task's own instruction.

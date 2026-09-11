@@ -1,0 +1,90 @@
+$id: "ai-lego://methods/contracts/stakeholders.incentive_mapping.contract.yaml"
+title: "Incentive Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family (Atlas 利害關係人／權力／協商), opening member (10
+  concurrent siblings open F07 in this same batch, none touched here). Atlas cites this method ONCE: F07
+  table row (L490: "Incentive Mapping｜Goals/Incentives/Constraints/Risks｜每 stakeholder 一張 incentive
+  card｜預測真實行為"). Core invariant: `incentive_cards` must be a non-empty list where every card carries
+  all 5 non-empty fields (stakeholder_name, goals, incentives, constraints, risks) -- an incomplete card has
+  not actually mapped that stakeholder's incentives.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Incentive Mapping row (L490)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.incentive_mapping` mints a NEW machine_id, `family:
+  stakeholders` mints a NEW family (F07's opening contract in this batch). Batch-wide decision (all 10
+  concurrent F07 members): record-level-ONLY provenance, matching the F06 batch's own precedent.
+
+id: stakeholders.incentive_mapping
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [OBSERVE, CLASSIFY, PREDICT]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. OBSERVE = gathering each
+# stakeholder's goals/incentives/constraints/risks; CLASSIFY = sorting them into the 4 co-equal fields;
+# PREDICT = Atlas L490's own stated benefit "預測真實行為" (predict real behavior).
+
+purpose:
+  - predict_real_stakeholder_behavior_via_per_stakeholder_incentive_cards
+# Atlas L490 verbatim sense: benefit "預測真實行為" via one incentive card per stakeholder.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L490 citation names no required input type, same
+  # "no hard upstream dependency" position insight.empathy_map.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - IncentiveMap
+# NEW output type (see typed-objects/incentive-mapping.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other thin-citation Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "incentive_cards is a non-empty list -- an incentive map with zero stakeholder cards has not mapped anyone"
+  - "every incentive_cards[] item carries all 5 non-empty fields (stakeholder_name, goals, incentives, constraints, risks) -- Atlas's own Goals/Incentives/Constraints/Risks IS the method's definition, a card missing any one of the 4 content fields or its own stakeholder_name has not actually completed that stakeholder's incentive card"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- cards carry no supporting_evidence_refs field at all, same "no evidence-citation field exists to
+  # check" reasoning insight.empathy_map.contract.yaml's own identical flag already establishes.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own L490 citation names no "最佳搭配" column for this method (grep-confirmed).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Per-card completeness floor (all 5 fields required on every card) or overall list-level floor (like empathy_map's cross-entry quadrant coverage)?"
+    decision: "Per-card completeness -- each incentive_cards[] item stands alone as one stakeholder's complete card, closer to insight.contextual_inquiry's per-entry 3-field completeness than insight.empathy_map's cross-entry quadrant floor."
+  - question: "Should incentive_cards carry per-card provenance, matching strategy.bcg_matrix's per-item provenance?"
+    decision: "No -- record-level provenance only, matching the F06 batch's own record-level-only precedent (insight.jtbd/insight.contextual_inquiry)."
+  - question: "Is stakeholder_name a required field or optional metadata?"
+    decision: "Required, non-empty -- Atlas's own '每 stakeholder 一張 incentive card' phrasing means an unnamed card cannot be attributed to any stakeholder."
+
+open_questions:
+  - "OQ-INCENTIVEMAPPING-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-INCENTIVEMAPPING-2: no stakeholder_name uniqueness constraint exists -- a caller may submit multiple cards for the same stakeholder (e.g. re-assessed over time); Atlas gives no citation either capping or requiring uniqueness (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L490) directly -- grepped the whole Atlas file case-insensitively for
+    "incentive" -- confirmed 2 hits, L490 (this method's own citation) and L4475 (a DIFFERENT recipe row
+    naming "Incentive / BATNA / ZOPA" as a companion concept for a different method, not this contract's own
+    citation). Grepped the whole `ai_lego` tree and this docs tree case-insensitively for
+    "incentive_mapping"/"IncentiveMap" before writing any of this method's own files: zero pre-existing
+    implementation. Read insight.contextual_inquiry.contract.yaml (per-entry completeness precedent) and
+    insight.empathy_map.contract.yaml (record-level-only-provenance precedent) in full before writing this
+    contract. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L490's own Goals/Incentives/Constraints/Risks vocabulary is
+    transcribed verbatim into `preconditions`. `cognitive_primitives` and the per-card-completeness shape are
+    compilation decisions, disclosed above, not presented as directly Atlas-cited.

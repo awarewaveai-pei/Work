@@ -1,0 +1,176 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/interest-based-negotiation.schema.yaml"
+title: Interest-Based Negotiation Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `InterestBasedNegotiationRecord` -- the declared `outputs` of
+  `stakeholders.interest_based_negotiation`'s Method Contract
+  (methods/contracts/stakeholders.interest_based_negotiation.contract.yaml, `outputs:
+  [InterestBasedNegotiationRecord]`). Atlas's ONLY citation is the F07 tool table row (L494: "Interest-Based
+  Negotiation｜從 position 轉 interests｜人與問題分離→interests→options→客觀標準｜創造可接受方案").
+
+  Field provenance:
+    * `separate_people_from_problem` -- stage 1 of the row's own literal chain, '人與問題分離'.
+    * `interests` -- stage 2, 'interests'. Plural list: a real negotiation typically surfaces more than one
+      underlying interest per party.
+    * `options` -- stage 3, 'options'. Plural list: the row's own benefit column ('創造可接受方案') presumes
+      multiple candidate options were generated, not a single foregone conclusion.
+    * `objective_criteria` -- stage 4, '客觀標準'. Plural list: independent, external standards (market
+      value, precedent, expert judgment) used to evaluate the options, not one arbitrary rule.
+    * `position` -- OPTIONAL, nullable. The row's own opening phrase, '從 position 轉 interests', implies a
+      starting position this method transforms away from; capturing it lets the record's own gate check that
+      the transformation is genuine (see compilation_decisions).
+    * `provenance` -- RECORD-LEVEL ONLY, matching `jtbd-statement.schema.yaml`'s own placement: this record's
+      fields describe one coherent negotiation analysis, not a list of independently-sourced items.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Interest-Based Negotiation row (L494)"
+  - "methods/contracts/stakeholders.interest_based_negotiation.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/jtbd-statement.schema.yaml -- record-level-only-provenance placement precedent, and the nullable-but-non-empty-if-present string field precedent (`workaround`), reused here for `position`"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L494's own literal 4-step chain plus low-risk, disclosed compilation choices
+  (the 4-named-field shape, `position` nullability, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Flat 4-field record (interview.py's own STAGE_FIELDS mixed-type precedent), or a uniform stages[] array (security.pasta's own shape)?"
+    decision: "Flat, 4 named fields -- the row's own chain names 4 semantically distinct steps (a narrative separation description, then 3 plural lists), not uniform same-shaped entries a stages[] array would fit."
+  - question: "Should `position` be `type: [\"string\", \"null\"]` with no further constraint (jtbd's own `workaround` precedent), or additionally require non-empty when present?"
+    decision: "Additionally require non-empty when present (`minLength: 1`, `pattern: \"\\\\S\"`, via `oneOf`) -- same reasoning jtbd's own `workaround` already applies: an empty string would misrepresent 'no position recorded' as 'genuinely disclosed, empty position'."
+  - question: "Per-field or record-level provenance?"
+    decision: "Record-level only, one top-level `provenance` -- matches jtbd-statement.schema.yaml/interview-study.schema.yaml's own placement, not this schema's own independent judgment call."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, provenance, separate_people_from_problem, interests, options, objective_criteria, position]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^IBN-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.interest_based_negotiation"
+
+  separate_people_from_problem:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      The row's own stage 1 verbatim: '人與問題分離' (separate the people from the problem). REPORTED
+      content -- how relationship/personality friction was addressed separately from the substantive issue
+      being negotiated.
+
+  interests:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      The row's own stage 2, 'interests'. The underlying needs/concerns/motivations behind whatever position
+      was stated -- the row's own core transformation target ('從 position 轉 interests').
+
+  options:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      The row's own stage 3, 'options'. Candidate options generated for mutual gain, derived from `interests`
+      -- the row's own benefit column, '創造可接受方案'.
+
+  objective_criteria:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+      pattern: "\\S"
+    description: >
+      The row's own stage 4, '客觀標準'. Independent, external standards (e.g. market value, precedent,
+      expert judgment) used to evaluate or select among `options`, rather than either side's raw will.
+
+  position:
+    description: >
+      NULLABLE. Either null (no stated position was recorded for this negotiation) or a non-empty string
+      capturing the position this negotiation started from -- the row's own opening phrase, '從 position 轉
+      interests'. An empty string is REFUSED -- see compilation_decisions.
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 1
+        pattern: "\\S"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A vendor-contract renewal negotiation, with a cited starting position genuinely transformed into 2 distinct interests"
+    value:
+      id: "IBN-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.interest_based_negotiation"
+      separate_people_from_problem: "供應商窗口對去年的延遲交貨仍有情緒，先花 10 分鐘單獨處理『這次合作關係還要不要繼續』的疑慮，再回到合約條款本身"
+      interests: ["需要現金流可預期，不希望月結天數拉長", "希望長期穩定訂單量，降低銷售不確定性"]
+      options: ["月結 45 天但簽 2 年長約鎖定訂單量", "維持月結 30 天但預付 20% 訂金換取價格折扣"]
+      objective_criteria: ["同業平均月結天數（產業公會 2026 年報）", "雙方過去 3 年實際交貨準時率數據"]
+      position: "供應商窗口一開始堅持『月結天數不能超過 30 天，否則不續約』"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null }
+  - description: "A negotiation record with no stated position captured (null is legal)"
+    value:
+      id: "IBN-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.interest_based_negotiation"
+      separate_people_from_problem: "兩位共同創辦人先各自說明對股權分配的感受，確認不是針對彼此，再回到股權數字本身"
+      interests: ["希望未來募資時不因股權結構卡關", "希望目前的貢獻程度被公平反映"]
+      options: ["依貢獻里程碑分階段調整股權，而非一次性分配", "設置未來 12 個月表現回顧再定案的條款"]
+      objective_criteria: ["同階段新創股權分配的產業慣例", "雙方各自投入的實際工時與資金紀錄"]
+      position: null
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null }
+
+open_questions:
+  - id: "OQ-IBNRECORD-1"
+    question: "position is a single plain string per this file's own compilation decision -- should a future revision support one position per party for multi-party negotiations? Same open question the method contract's own OQ-IBN-3 already discloses."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-IBNRECORD-2"
+    question: "No cross-reference from this record to a future stakeholders.batna / stakeholders.zopa record exists (§11.17's own 搭配 line names both as companions) -- should a future revision add a soft reference field once a real consumer needs one?"
+    owner: "operator, or whoever next builds a consuming method against this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F07 table row (L494) directly. Grepped the whole Atlas file case-insensitively for
+    "interest-based negotiation"/"interest based negotiation" -- confirmed exactly 1 real citation for THIS
+    method. Cross-checked against methods/contracts/stakeholders.interest_based_negotiation.contract.yaml's
+    own outputs/preconditions/quality. Read jtbd-statement.schema.yaml (record-level-only-provenance
+    precedent, `workaround`'s own nullable-but-non-empty-if-present shape reused for `position`) in full
+    before writing this file. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for
+    "interest_based_negotiation"/"InterestBasedNegotiation" before writing any of this method's own files --
+    zero pre-existing implementation. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_interest_based_negotiation.py (required fields present, id pattern satisfied,
+    additionalProperties:false present at the top level, embedded examples resolved through their real $ref
+    to epistemic-label.schema.yaml, negative controls for a smuggled top-level key, an empty
+    separate_people_from_problem string, an empty interests/options/objective_criteria list, a list entry
+    that is a blank string, an empty-string position, and a null position validating successfully).
+  note: >
+    No mother document was modified. `separate_people_from_problem`/`interests`/`options`/`objective_criteria`
+    are transcribed directly from Atlas L494's own literal 4-step chain. The exact field names, the `oneOf`
+    null-or-non-empty-string shape for `position`, the record-level-only provenance placement, and the IBN-
+    prefix are this suite's own compiled structure, disclosed above, not textually cited.

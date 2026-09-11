@@ -1,0 +1,108 @@
+$id: "ai-lego://methods/contracts/stakeholders.zopa.contract.yaml"
+title: "Zone of Possible Agreement (ZOPA) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family, OPENING member (F07 had zero built methods before this
+  batch -- grep-confirmed no `ai_lego/modules/stakeholders/` implementation existed at batch start; this is
+  1 of 10 concurrent agents opening F07 in the same parallel batch). Atlas cites this method TWICE: F07 tool
+  table row (L493: "ZOPA｜找可成交區間｜reservation points→重疊範圍｜提高談判效率") and dedicated §11.17
+  (L1583-1595, diagram "Seller minimum ---------[ ZOPA ]--------- Buyer maximum"). Core invariant:
+  `zopa_exists` is COMPUTED (`seller_minimum <= buyer_maximum`), never a caller-supplied value -- the
+  comparison IS the method's whole reason to exist (§11.17's own "找雙方 reservation point 是否有重疊"); when
+  true, `zopa_range` MUST be exactly `[seller_minimum, buyer_maximum]`, not independently authored numbers.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, ZOPA row (L493)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.17 可能達成協議區間／ZOPA dedicated section (L1583-1595)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.zopa` mints a NEW machine_id AND a NEW `family: stakeholders`
+  (F07's first built member -- no prior `stakeholders.*` METHOD contract exists in this corpus; the
+  pre-existing `stakeholder.regulator.contract.yaml` is a Lens, singular `family: stakeholder`, validated
+  against `lens.schema.yaml`, a structurally different LEGO dimension -- not reused or extended here). Flat
+  record shape and record-level-only provenance are this file's own compilation decisions -- see
+  `compilation_decisions`.
+
+id: stakeholders.zopa
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [COMPARE, ESTIMATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed). COMPARE = the
+# method's own core operation (comparing two reservation points for overlap, §11.17's own diagram); ESTIMATE =
+# both reservation points are themselves estimated inputs (BATNA-derived per L1595's own "搭配"), not measured
+# facts.
+
+purpose:
+  - determine_whether_seller_and_buyer_reservation_points_overlap
+# Atlas L493/§11.17 verbatim sense: 用途「找可成交區間」／「找雙方 reservation point 是否有重疊」。
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position insight.jtbd (F06's own
+  # opening-member precedent, this same batch's template) already takes; §11.17's own citation names no
+  # required input type. BATNA is a "搭配" (companion) per L1595, not a required input -- see
+  # compilation_decisions.
+
+outputs:
+  - ZopaAnalysis
+# NEW output type (see typed-objects/zopa.schema.yaml). Atlas names no PascalCase output type for this method.
+
+preconditions:
+  - "seller_minimum and buyer_maximum are each a finite real number -- §11.17's own diagram (L1587-1589) names exactly these two reservation points as the method's whole input"
+  - "zopa_exists is never caller-supplied -- it is COMPUTED as seller_minimum <= buyer_maximum, the comparison §11.17's own '找雙方 reservation point 是否有重疊' names as this method's entire purpose"
+  - "zopa_range is null when zopa_exists is false, and exactly [seller_minimum, buyer_maximum] when true -- never independently authored numbers"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to claims from an EvidenceSet input, which
+  # this method does not take (inputs.required: []). seller_minimum/buyer_maximum are direct numeric inputs
+  # (typically BATNA-derived per L1595), not EvidenceSet claims.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# §11.17's own "搭配" line (L1595, `BATNA + ZOPA + Interest-Based Negotiation`) names undirected companions,
+# not a directed chain (no "→" between them, unlike e.g. §12.3's "JTBD → HMW"). Left empty rather than picking
+# an arbitrary direction. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat record (seller_minimum/buyer_maximum/zopa_exists/zopa_range) or a richer shape carrying a BATNA cross-reference?"
+    decision: "Flat, 2 numeric inputs + 2 computed fields -- task-mandated exact shape; §11.17's own diagram names only these two reservation points, no BATNA cross-reference structure cited."
+  - question: "Should zopa_exists/zopa_range be constructor parameters, or always computed?"
+    decision: "Always computed, never a parameter -- the comparison is the method's only reason to exist; accepting a caller-supplied value would let a contradictory record (e.g. zopa_exists=true with non-overlapping points) be constructed legitimately."
+  - question: "Per-field provenance or record-level only?"
+    decision: "Record-level ONLY -- same F06/F07-batch-wide convention insight.jtbd already establishes; two numbers and their derived comparison are one coherent claim, not independently-sourced items."
+  - question: "Should seller_minimum/buyer_maximum be restricted to non-negative values?"
+    decision: "No restriction beyond 'finite real number' -- §11.17 gives no explicit sign constraint (reservation points are prices in the diagram's own example but the method itself is domain-agnostic)."
+
+open_questions:
+  - "OQ-ZOPA-1: recommended_next is empty -- §11.17's own 'BATNA + ZOPA + Interest-Based Negotiation' (L1595) names undirected companions, not a chain; a future pass could decide a canonical order once this asymmetry is resolved (owner: operator)."
+  - "OQ-ZOPA-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-ZOPA-3: seller_minimum/buyer_maximum carry no domain restriction beyond 'finite real number' (owner: operator, see compilation_decisions)."
+
+verification:
+  method: >
+    Read Atlas F07 tool table row (L493) and §11.17 (L1583-1595) directly. Grepped the whole Atlas file
+    case-insensitively for "zopa" -- confirmed exactly these 2 real citations plus one incidental mention
+    (L4475, a DIFFERENT method's own quick-tool-selection table row naming ZOPA as a companion tool, not a
+    second dedicated section for ZOPA itself). No §4 composition formula, no §14.1 legal-chain mention, no
+    §22.3 gate-table row. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "zopa" before writing any of this
+    method's own files -- zero pre-existing METHOD implementation (the only existing "stakeholder"-adjacent
+    file is `stakeholder.regulator.contract.yaml`, a Lens under the singular `family: stakeholder`, a
+    structurally different LEGO dimension, confirmed by direct read). Read insight.jtbd.contract.yaml (F06's
+    own opening-member precedent, this same batch's template) in full before writing this contract. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `cognitive_primitives` and the flat record shape are this file's own
+    compilation decisions, disclosed above. The record-level-only provenance placement follows the same
+    F06/F07-batch-wide convention insight.jtbd already establishes.

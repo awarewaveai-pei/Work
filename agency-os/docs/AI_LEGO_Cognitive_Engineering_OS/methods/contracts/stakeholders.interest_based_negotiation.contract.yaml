@@ -1,0 +1,114 @@
+$id: "ai-lego://methods/contracts/stakeholders.interest_based_negotiation.contract.yaml"
+title: "Interest-Based Negotiation Method Contract"
+status: ACTIVE
+
+description: >
+  stakeholders.interest_based_negotiation, F07 利害關係人／權力／協商 family opening member (F07 0/10 ->
+  1/10 this batch, 10 concurrent agents). Atlas's ONLY citation is the F07 table row (L494: "從 position
+  轉 interests｜人與問題分離→interests→options→客觀標準｜創造可接受方案") -- Fisher & Ury principled
+  negotiation, no dedicated §11.x/§12.x section (grep-confirmed). Not an EC §32 method (no security-change
+  surface -- grepped Global_Execution_Contract_v1.md, zero hits). Core invariant: the row's own literal
+  4-stage pipeline made real by requiring all 4 stages present and non-empty, plus (when the optional
+  `position` field is used) interests must not merely echo the stated position -- the row's own "轉"
+  (transform) verb is not satisfied by a verbatim restatement under a different field name.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Interest-Based Negotiation row (L494) -- the ONLY citation for this method's own field shape"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.17 ZOPA's own 搭配 line (L1595: 'BATNA + ZOPA + Interest-Based Negotiation') -- read, corroborating context only (names this method as a companion of two OTHER F07 siblings, adds no additional field structure for THIS method); not depended on, ZOPA/BATNA not imported"
+  - "specs/cognitive/typed-objects/interest-based-negotiation.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.interest_based_negotiation` mints a NEW machine_id AND a NEW
+  `family: stakeholders` (F07's opening member in this batch -- no prior `stakeholders.*` contract exists,
+  grep-confirmed). The 4-field flat record shape, the optional `position` field, and record-level-only
+  provenance are this file's own compilation decisions -- see compilation_decisions.
+
+id: stakeholders.interest_based_negotiation
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [FRAME, EXPAND, DECIDE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed). FRAME = the
+# row's own core verb ("從 position 轉 interests", reframing a stated position into an underlying interest,
+# plus "人與問題分離"). EXPAND = generating multiple options for mutual gain from those interests, same role
+# EXPAND plays in SCAMPER's own formula (L189: EXPAND + ASSOCIATE + TRANSFORM). DECIDE = converging on
+# options via objective, external criteria, same role DECIDE plays in AHP's own formula (L192: COMPARE +
+# WEIGHT + PRIORITIZE + DECIDE). All 3 are literal 24-member kernel tokens (primitive.schema.yaml), no
+# extended/inferred-token gap the way analogy_mapping's own INFER choice had to disclose.
+
+purpose:
+  - transform_stated_positions_into_underlying_interests_and_converge_on_a_mutually_acceptable_option_via_objective_criteria
+
+inputs:
+  required: []
+  optional: []
+# Atlas's own citation names no upstream typed-object dependency, same "no hard upstream dependency"
+# position every other opening-member Tier 1/2 contract in this corpus already takes.
+
+outputs: [InterestBasedNegotiationRecord]
+
+preconditions:
+  - "separate_people_from_problem is a non-empty string -- the row's own stage 1, '人與問題分離'"
+  - "interests is a non-empty list of non-empty strings -- the row's own stage 2, 'interests'"
+  - "options is a non-empty list of non-empty strings -- the row's own stage 3, 'options'"
+  - "objective_criteria is a non-empty list of non-empty strings -- the row's own stage 4, '客觀標準'"
+  - "all 4 stages above must be present -- none may be skipped (the row's own fixed 4-step chain, '人與問題分離→interests→options→客觀標準')"
+  - "position is either null or a non-empty string -- OPTIONAL capture of the stated position this negotiation started from; IF present, no entry in interests may be a case/whitespace-insensitive verbatim echo of position (the row's own '從 position 轉 interests' transform verb is not satisfied by restating position under a different field name)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+# false -- method.schema.yaml's own definition scopes this flag to claims originating from an EvidenceSet
+# input, which this method does not take (inputs.required: []). No evidence-labeling caution is cited for
+# this row.
+
+forbidden_transition: []
+# Atlas gives this method no forbidden_transition citation (no limitation-column text, no dedicated section,
+# no §22.3 gate row -- grep-confirmed).
+
+recommended_next: []
+# Atlas's own best-pairing context (§11.17 ZOPA's own 搭配 line, L1595) names this method as a companion of
+# BATNA/ZOPA, not a downstream next step this method's own row points to. Left empty rather than inventing a
+# direction the citation does not support.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "4 differently-shaped named fields (interview.py's own STAGE_FIELDS mixed-type precedent) or a uniform stages[] array?"
+    decision: "4 named fields (separate_people_from_problem: string; interests/options/objective_criteria: string lists) -- the row's own chain names 4 semantically distinct steps, not uniform same-shaped entries."
+  - question: "Capture the other side's original stated position as an optional field, given the row's own opening phrase is '從 position 轉 interests'?"
+    decision: "Yes -- optional, nullable `position`. Directly mechanizes the row's own transform verb via a real anti-echo invariant (see preconditions); omitting it would leave the row's own most distinctive phrase unenforced by anything."
+  - question: "Per-field or record-level provenance?"
+    decision: "Record-level only, one top-level `provenance` -- matches insight.jtbd/insight.interview's own F06-batch placement, avoiding the per-item/record-level ambiguity that hit the F02/F03 batches; applied here as this F07 batch's own equivalent decision."
+  - question: "Anti-echo check against every interests entry, or only a whole-list equality check?"
+    decision: "Per-entry -- any SINGLE interests entry echoing position is refused, not just a whole-list match. A whole-list-only check would let a caller bury one verbatim-restated position among several genuine interests and still pass."
+
+open_questions:
+  - "OQ-IBN-1: recommended_next is empty -- §11.17's own ZOPA 搭配 line names this method as a companion of BATNA/ZOPA, not a canonical next step of its own; a future pass could revisit once a real downstream consumer exists (owner: operator)."
+  - "OQ-IBN-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated §4 formula for this method)."
+  - "OQ-IBN-3: position is a plain nullable string per this file's own compilation decision -- a future revision could support multiple positions (one per party) if a downstream consumer needs multi-party negotiation modeling beyond this record's own 2-party assumption (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L494) directly. Grepped the whole Atlas file case-insensitively for
+    "interest-based negotiation"/"interest based negotiation" -- confirmed exactly 1 real citation for THIS
+    method (L494 table row itself); §11.17 ZOPA's own 搭配 line (L1595) and an unrelated generic
+    policy-checklist chain ('→ Conflict / Negotiation', L3390, a category label not a method-specific
+    citation) were both read and disclosed as non-structural context, not depended on. No dedicated §11.x/
+    §12.x section exists for this method (grep-reconfirmed), no §4 composition formula, no §22.3 gate-table
+    row, no EC §32 security-change surface (grepped
+    AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md case-insensitively for
+    "negotiation"/"interest-based" -- zero hits). Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "interest_based_negotiation"/"InterestBasedNegotiation" before writing any of this
+    method's own files -- zero pre-existing implementation. Read insight.jtbd.contract.yaml (record-level-
+    provenance precedent) and association.analogy_mapping.contract.yaml (lean-standard-era precedent, EC §32
+    disclosure pattern) in full before writing this contract. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator (see tests/unit/test_interest_based_negotiation.py).
+  note: >
+    No mother document was modified. The row's own "人與問題分離→interests→options→客觀標準" 4-step chain is
+    transcribed verbatim into preconditions/purpose. The field names, `position`'s optional/nullable shape and
+    its anti-echo invariant, and record-level-only provenance are this file's own compiled structure, not
+    Atlas-cited field-by-field -- disclosed above.

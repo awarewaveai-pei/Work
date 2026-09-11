@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/stakeholders.power_interest.contract.yaml"
+title: "Power–Interest Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family, OPENING member (F07 had zero built methods before this
+  batch -- grep-confirmed no `ai_lego/modules/stakeholders/` directory existed at batch start; 1 of 10
+  concurrent agents opening every F07 member in the same parallel batch). Atlas cites this method THREE times:
+  F07 table row (L488), an inline mermaid quadrantChart right after the F07 table (L498-507), and dedicated
+  §11.15 (L1547-1561, the identical chart plus an explicit caution). Core invariant: `quadrant` is
+  GENUINE_COMPUTE from each stakeholder's own `power_score`x`interest_score`, never caller-supplied; §11.15's
+  own caution ("不是判斷誰比較「重要的人」") is enforced structurally -- no importance-ranking field exists
+  anywhere. See `ai_lego/modules/stakeholders/power_interest.py` module docstring for the full mapping.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Power–Interest row (L488)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 table's own inline mermaid quadrantChart (L498-507)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.15 權力－關注矩陣 dedicated section (L1547-1561)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.power_interest` mints a NEW machine_id AND a NEW `family:
+  stakeholders` (F07's first built member -- no prior `stakeholders.*` contract exists in this corpus,
+  grep-confirmed; distinct from the pre-existing singular `stakeholder.regulator` lens contract, a different
+  family). Flat per-stakeholder record shape, the [1,10] integer score scale with a HIGH>=6 threshold, and
+  record-level-only provenance placement are this file's own compilation decisions -- see
+  `compilation_decisions`.
+
+id: stakeholders.power_interest
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [ESTIMATE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ESTIMATE = the per-stakeholder
+# power_score/interest_score judgment calls; CLASSIFY (same primitive strategy.bcg_matrix's own computed
+# quadrant already uses) = the mechanically-derived quadrant.
+
+purpose:
+  - decide_stakeholder_engagement_strategy_by_power_and_interest
+# Atlas L488/§11.15 verbatim sense: 用途「決定 stakeholder engagement strategy」, explicitly NOT「判斷誰比較
+# 「重要的人」」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other
+  # opening-member Tier 1 contract in this batch takes; Atlas's own citation names no required input type.
+
+outputs:
+  - PowerInterestMatrix
+# NEW output type (see typed-objects/power-interest-matrix.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "stakeholders is present and non-empty -- a Power-Interest Matrix classifying zero stakeholders has not actually mapped anything (Atlas's own L488 purpose: '評估→四象限→engagement')"
+  - "every stakeholders[] entry carries a non-empty stakeholder_name and disclosed power_score/interest_score (each an integer in [1,10]) with non-empty reasoning -- Atlas's own benefit ('決定溝通策略') presumes each stakeholder is actually assessed, not just listed"
+  - "stakeholders[].quadrant is GENUINE_COMPUTE, mechanically derived from that stakeholder's own power_score x interest_score via §11.15's own mermaid quadrantChart mapping (HIGH power+HIGH interest=MANAGE_CLOSELY, HIGH power+LOW interest=KEEP_SATISFIED, LOW power+HIGH interest=KEEP_INFORMED, LOW power+LOW interest=MONITOR) -- never caller-supplied, re-derived independently by the gate from each stakeholder's own raw fields"
+  - "no stakeholder-level importance/priority ranking field exists anywhere in the record -- §11.15's own explicit caution ('不是判斷誰比較「重要的人」') is enforced structurally, not just documented"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-citation reasoning strategy.bcg_matrix.contract.yaml's identical flag already
+  # establishes: Atlas's own §11.15 citation is a mermaid quadrantChart plus one caution line, no explicit
+  # unevidenced-claim misuse warning cited, no EvidenceSet input (inputs.required: []).
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own citations name no single downstream method for Power-Interest specifically. Left empty rather
+# than picking one arbitrarily.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed 4-name closed SET or an open-ended non-empty list of stakeholders?"
+    decision: "Open-ended non-empty list, same shape strategy.bcg_matrix's own portfolio_items[] establishes -- a stakeholder map can hold any number of stakeholders, not a fixed structural split."
+  - question: "power_score/interest_score: binary HIGH/LOW enum (bcg_matrix-style) or a numeric scale?"
+    decision: "Numeric integer scale [1,10] with a HIGH>=6/LOW<=5 threshold (even split, no tie value) -- not Atlas-cited (the mermaid chart names only a Low→High axis, no numeric scale); reuses decision.ice's own already-established 1-10 convention for corpus consistency, disclosed as a compilation decision, not an external citation the way ICE's own Sean-Ellis attribution is."
+  - question: "Should quadrant be a disclosed judgment call or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE -- §11.15's own mermaid quadrantChart is a mechanical function of the 2 disclosed HIGH/LOW score levels; builder has no `quadrant` parameter, gate re-derives from each stakeholder's own raw power_score/interest_score."
+  - question: "Add an importance/priority ranking field (ICE-style ranking[], or a synthesis field) across stakeholders?"
+    decision: "No, never -- §11.15's own explicit reverse caution ('不是判斷誰比較「重要的人」') directly forbids exactly this; the record has no field that could express a cross-stakeholder ranking, structurally, not just by convention."
+  - question: "Per-stakeholder provenance (bcg_matrix-style) or record-level only?"
+    decision: "Record-level ONLY -- a deliberate BATCH-WIDE decision for this whole F07 build (task-mandated), matching insight.jtbd/divergent.lotus_blossom's own record-level placement, not bcg_matrix's per-item pattern."
+
+open_questions:
+  - "OQ-POWINT-1: the mermaid quadrantChart's own quadrant-N position convention (quadrant-1=top-right, quadrant-2=top-left, quadrant-3=bottom-left, quadrant-4=bottom-right) is not spelled out in Atlas's own prose -- independently verified against mermaid-js's own published quadrantChart documentation before encoding the mapping (owner: operator, if Atlas is ever amended to spell this out explicitly)."
+  - "OQ-POWINT-2: the [1,10]/HIGH>=6 score scale is this file's own compilation decision, not Atlas-cited (owner: operator)."
+  - "OQ-POWINT-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L488), the inline mermaid quadrantChart right after the F07 table (L498-507),
+    and §11.15 (L1547-1561) directly. Grepped the whole Atlas file case-insensitively for "power" and
+    "interest" -- confirmed exactly these 3 real citations for this method (other hits are different F07
+    siblings -- Salience Model, Interest-Based Negotiation, Coalition Mapping -- or unrelated: PowerShell,
+    Porter's Supplier/Buyer Power, RCT/A-B test statistical power). Verified the mermaid quadrantChart's own
+    quadrant-N geometric convention (quadrant-1=top-right ... quadrant-4=bottom-right) against mermaid-js's
+    own published documentation (not spelled out in Atlas's own prose), then combined it with the chart's own
+    x/y axis labels (x=Interest Low→High, y=Power Low→High) to derive the 4-cell HIGH/LOW mapping. Read
+    strategy.bcg_matrix.contract.yaml (list-of-items, per-item GENUINE_COMPUTE, no-builder-parameter
+    precedent) and insight.jtbd.contract.yaml (record-level-only provenance, builder-validates-provenance
+    precedent) in full before writing this contract. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "power_interest"/"PowerInterestMatrix"/"POWINT" before writing any of this
+    method's own files -- zero pre-existing implementation. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas §11.15's own mermaid quadrantChart is expanded into an explicit
+    4-cell HIGH/LOW lookup table via the geometric quadrant-N convention independently verified against
+    mermaid-js's own documentation (not itself Atlas text) -- disclosed above as a compilation decision. The
+    [1,10] numeric score scale, the record-level-only provenance placement (an F07-batch-wide decision), and
+    the structural absence of any ranking field are this file's own compilation decisions, disclosed above.

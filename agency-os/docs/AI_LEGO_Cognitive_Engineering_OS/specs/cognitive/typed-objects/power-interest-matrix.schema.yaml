@@ -1,0 +1,197 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/power-interest-matrix.schema.yaml"
+title: Power-Interest Matrix
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `PowerInterestMatrix` -- the declared `outputs` of
+  `stakeholders.power_interest`'s Method Contract (methods/contracts/stakeholders.power_interest.contract.yaml,
+  `outputs: [PowerInterestMatrix]`). Atlas cites this method THREE times: F07 tool table row (L488:
+  "Power–Interest｜權力×關注分類｜評估→四象限→engagement｜決定溝通策略"), an inline mermaid quadrantChart right
+  after the F07 table (L498-507), and dedicated §11.15 (L1547-1561, the identical chart plus the explicit
+  caution "決定 stakeholder engagement strategy，不是判斷誰比較「重要的人」").
+
+  Field provenance:
+    * `stakeholders` -- Atlas's own "評估→四象限" framing: an open-ended, non-empty list of stakeholders under
+      review (NOT a fixed closed set -- see compilation_decisions).
+    * `stakeholders[].power_score` / `interest_score` -- the mermaid chart's own two axes (y=Power Low→High,
+      x=Interest Low→High), DISCLOSED per-stakeholder integer judgment calls in [1,10] (never computed -- no
+      citation supports a numeric power/interest formula), each with non-empty `reasoning`.
+    * `stakeholders[].quadrant` -- GENUINE_COMPUTE, mechanically derived from that stakeholder's own
+      `power_score`x`interest_score` via the mermaid chart's own quadrant-N mapping (independently verified
+      against mermaid-js's own quadrant-N geometric convention -- see
+      `ai_lego/modules/stakeholders/power_interest.py` module docstring): HIGH power+HIGH interest=
+      MANAGE_CLOSELY, HIGH power+LOW interest=KEEP_SATISFIED, LOW power+HIGH interest=KEEP_INFORMED, LOW
+      power+LOW interest=MONITOR.
+    * `provenance` -- RECORD-LEVEL ONLY, a deliberate BATCH-WIDE decision for this whole F07 build (matching
+      `jtbd-statement.schema.yaml`'s own record-level placement), NOT per-stakeholder the way
+      `bcg-matrix-analysis.schema.yaml`'s own per-item `provenance` is.
+    * No stakeholder-level importance/priority ranking field exists anywhere -- §11.15's own explicit reverse
+      caution ("不是判斷誰比較「重要的人」") is enforced structurally: this schema has no field, at any level,
+      that could express a cross-stakeholder ranking.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Power–Interest row (L488)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 table's own inline mermaid quadrantChart (L498-507)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.15 權力－關注矩陣 dedicated section (L1547-1561)"
+  - "methods/contracts/stakeholders.power_interest.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml -- open-ended non-empty list, per-item GENUINE_COMPUTE, no-builder-parameter precedent (this file's primary structural template)"
+  - "specs/cognitive/typed-objects/jtbd-statement.schema.yaml -- record-level-only-provenance precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L488/§11.15's own literal chart plus low-risk, disclosed compilation choices,
+  including the [1,10] numeric score scale and the quadrant-N geometric convention (independently verified
+  against mermaid-js documentation, not itself Atlas text).
+
+compilation_decisions:
+  - question: "Fixed-count closed array or open-ended non-empty array of stakeholders?"
+    decision: "Open-ended, minItems:1 only -- same shape bcg-matrix-analysis.schema.yaml's own non-empty `portfolio_items[]` already establishes; a stakeholder map can hold any number of stakeholders."
+  - question: "Should power_score/interest_score be a binary HIGH/LOW enum (bcg_matrix-style) or a numeric scale?"
+    decision: "Numeric integer [1,10] with a HIGH>=6/LOW<=5 threshold, task-mandated field naming (`power_score`/`interest_score`) -- not Atlas-cited (the mermaid chart names only a Low→High axis, no numeric scale); reuses decision.ice's own already-established 1-10 convention for corpus consistency. See method contract's own compilation_decisions."
+  - question: "Should quadrant be caller-supplied or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE, REQUIRED per stakeholder -- mechanically derived by ai_lego/modules/stakeholders/power_interest.py's `derive_power_interest_quadrant` from the stakeholder's own 2 disclosed scores via a closed, TOTAL 4-cell lookup table. Never a builder parameter, never caller-supplied; re-derived independently by an integrity gate from each stakeholder's own raw fields."
+  - question: "additionalProperties: false at the top level, and on the stakeholders[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "A top-level synthesis, priority, or ranking field across stakeholders?"
+    decision: "No, never -- §11.15's own explicit reverse caution ('不是判斷誰比較「重要的人」') directly forbids exactly this; deliberately no field anywhere in this schema could express a cross-stakeholder ranking."
+
+type: object
+required: [id, version, provenance, stakeholders]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^POWINT-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.power_interest"
+
+  stakeholders:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own "評估→四象限" framing: the stakeholders under engagement-strategy review. Open-ended (no
+      maxItems) -- genuine non-emptiness is the only count invariant this schema expresses; enforced by
+      ai_lego/modules/stakeholders/power_interest.py at both the builder and an independent gate (same
+      non-empty-list precedent bcg-matrix-analysis.schema.yaml's own `portfolio_items[]` already establishes).
+    items:
+      type: object
+      required: [stakeholder_name, power_score, power_reasoning, interest_score, interest_reasoning, quadrant]
+      additionalProperties: false
+      properties:
+        stakeholder_name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Names the specific stakeholder under review -- REPORTED content, not computed."
+        power_score:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: >
+            The mermaid chart's own y-axis (Low Power --> High Power). DISCLOSED judgment-call integer, not
+            Atlas-cited as a numeric scale -- see compilation_decisions. HIGH is score>=6, LOW is score<=5
+            (ai_lego/modules/stakeholders/power_interest.py's own threshold, not expressible in this schema).
+        power_reasoning:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual judgment content for power_score -- what makes this stakeholder's power this high or low."
+        interest_score:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: "The mermaid chart's own x-axis (Low Interest --> High Interest). Same [1,10]/HIGH>=6 scale as power_score."
+        interest_reasoning:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual judgment content for interest_score -- what makes this stakeholder's interest this high or low."
+        quadrant:
+          type: string
+          enum: [MANAGE_CLOSELY, KEEP_SATISFIED, MONITOR, KEEP_INFORMED]
+          description: >
+            REQUIRED. GENUINE_COMPUTE -- mechanically derived from this stakeholder's own power_score x
+            interest_score via the mermaid chart's own quadrant-N mapping (HIGH power+HIGH interest=
+            MANAGE_CLOSELY, HIGH power+LOW interest=KEEP_SATISFIED, LOW power+HIGH interest=KEEP_INFORMED, LOW
+            power+LOW interest=MONITOR). NEVER caller-supplied and NEVER computed by anything other than
+            ai_lego/modules/stakeholders/power_interest.py's `derive_power_interest_quadrant` -- see
+            compilation_decisions. This is an ENGAGEMENT STRATEGY label, not an importance ranking -- see this
+            file's own top-level description.
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A Power-Interest Matrix for a small SaaS company's product-launch stakeholders, covering all 4 real quadrants"
+    value:
+      id: "POWINT-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.power_interest"
+      stakeholders:
+        - stakeholder_name: "投資人董事會"
+          power_score: 9
+          power_reasoning: "掌握預算核准權與董事會席次，可直接否決重大決策"
+          interest_score: 8
+          interest_reasoning: "本次產品線是公司下一輪募資的主要故事，高度關注上市時程"
+          quadrant: MANAGE_CLOSELY
+        - stakeholder_name: "現有付費客戶社群"
+          power_score: 8
+          power_reasoning: "口碑與續約率直接影響營收，流失會立即反映在留存指標上"
+          interest_score: 3
+          interest_reasoning: "多數客戶只在乎自己現有功能穩定，對新產品線本身關注度低"
+          quadrant: KEEP_SATISFIED
+        - stakeholder_name: "外部 SEO 內容外包團隊"
+          power_score: 2
+          power_reasoning: "僅負責內容產出，無預算或時程決定權"
+          interest_score: 2
+          interest_reasoning: "只需按合約交付內容，對產品線走向沒有特別關注"
+          quadrant: MONITOR
+        - stakeholder_name: "內部客服團隊"
+          power_score: 3
+          power_reasoning: "無產品決策權，僅能回報客訴趨勢供參考"
+          interest_score: 7
+          interest_reasoning: "新產品線上線後第一線要直接承接客訴與教學需求，高度關注上線細節"
+          quadrant: KEEP_INFORMED
+      provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-POWERINTERESTMATRIX-1"
+    question: "stakeholders[].quadrant's agreement with its own power_score/interest_score is a runtime-only invariant (plain JSON Schema has no cross-field computed-value constraint) -- should a future pass add a JSON Schema if/then constraint instead of relying solely on the runtime gate? Same open question bcg-matrix-analysis.schema.yaml's own OQ-BCGMATRIXANALYSIS-1 already discloses for an identical shape. (owner: operator)"
+  - id: "OQ-POWERINTERESTMATRIX-2"
+    question: "No stakeholder_name uniqueness constraint exists (same absence bcg-matrix-analysis.schema.yaml's own item_name already discloses) -- should a future pass add one if a downstream consumer ever needs to reference a specific stakeholder? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F07 table row (L488), the inline mermaid quadrantChart (L498-507), and §11.15 (L1547-1561)
+    directly. Grepped the whole Atlas file case-insensitively for "power"/"interest" -- confirmed exactly
+    these 3 real citations for this method. Cross-checked against
+    methods/contracts/stakeholders.power_interest.contract.yaml's own outputs/preconditions/quality. Read
+    bcg-matrix-analysis.schema.yaml (open-ended non-empty list, per-item GENUINE_COMPUTE precedent) and
+    jtbd-statement.schema.yaml (record-level-only-provenance precedent) in full as shape precedent before
+    writing this file. Independently verified the mermaid quadrantChart's own quadrant-N geometric convention
+    (quadrant-1=top-right, quadrant-2=top-left, quadrant-3=bottom-left, quadrant-4=bottom-right) against
+    mermaid-js's own published documentation, confirmed TOTAL over all 4 HIGH/LOW combinations once combined
+    with the chart's own axis labels. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_power_interest.py (required fields present, id pattern satisfied, power_score/
+    interest_score/quadrant ranges and enum closed, additionalProperties:false present at both the top level
+    and the stakeholders[] item level, embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled stakeholders[]
+    item key, and an empty stakeholders array).
+  note: >
+    `stakeholders[].quadrant`'s 4 enum values and the 4-cell table that derives them are grounded in Atlas
+    §11.15's own mermaid quadrantChart PLUS the quadrant-N geometric convention independently verified against
+    mermaid-js documentation (not itself Atlas text) -- disclosed in compilation_decisions and the method
+    contract's own compilation_decisions, not presented as a single direct Atlas citation. The [1,10] numeric
+    score scale, the power_score/interest_score/reasoning field split, the open-ended non-empty list shape,
+    the record-level-only provenance, and the deliberate structural absence of any ranking field are
+    compilation decisions, disclosed above. No mother document was modified to produce this file.

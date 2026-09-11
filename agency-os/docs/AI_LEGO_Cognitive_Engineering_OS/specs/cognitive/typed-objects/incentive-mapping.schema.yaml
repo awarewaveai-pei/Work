@@ -1,0 +1,139 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/incentive-mapping.schema.yaml"
+title: Incentive Map
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `IncentiveMap` -- the declared `outputs` of
+  `stakeholders.incentive_mapping`'s Method Contract
+  (methods/contracts/stakeholders.incentive_mapping.contract.yaml, `outputs: [IncentiveMap]`). Atlas cites
+  this method ONCE: F07 table row (L490: "Incentive Mapping｜Goals/Incentives/Constraints/Risks｜每
+  stakeholder 一張 incentive card｜預測真實行為").
+
+  Field provenance:
+    * `incentive_cards[].stakeholder_name` -- who this card is about, REQUIRED non-empty (Atlas's own "每
+      stakeholder 一張 incentive card" phrasing).
+    * `incentive_cards[].goals`/`incentives`/`constraints`/`risks` -- Atlas L490 verbatim
+      "Goals/Incentives/Constraints/Risks", each REQUIRED non-empty on every card (per-card completeness, not
+      a cross-card floor -- see compilation_decisions).
+    * `provenance` (top-level only) -- record-level provenance; cards carry NO per-card provenance field, a
+      deliberate decision matching the F06 batch's own record-level-only precedent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Incentive Mapping row (L490)"
+  - "methods/contracts/stakeholders.incentive_mapping.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/contextual-inquiry-session.schema.yaml -- per-entry-completeness, record-level-only-provenance precedent this file's per-card shape follows"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L490's own cited vocabulary plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Per-card completeness (like contextual_inquiry's 3-field entries) or cross-card floor (like empathy_map's 4-quadrant coverage)?"
+    decision: "Per-card completeness -- each card is one stakeholder's own complete Goals/Incentives/Constraints/Risks disclosure, not a value drawn from a shared cross-card vocabulary."
+  - question: "Should incentive_cards[] carry per-card provenance, matching porter-five-forces-analysis.schema.yaml's forces[].provenance?"
+    decision: "No -- record-level provenance only, matching contextual-inquiry-session.schema.yaml's own identical shape."
+  - question: "additionalProperties: false at the top level, and on each incentive_cards[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, incentive_cards, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^INCMAP-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as empathy-map.schema.yaml's EMPATHY- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.incentive_mapping"
+
+  incentive_cards:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L490's own "每 stakeholder 一張 incentive card" -- one card per stakeholder. SHAPE-bounded here
+      to at least 1 item; per-card field completeness (all 5 fields non-empty on every item) is a
+      runtime-only invariant this schema cannot express alone -- enforced by
+      ai_lego/modules/stakeholders/incentive_mapping.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [stakeholder_name, goals, incentives, constraints, risks]
+      additionalProperties: false
+      properties:
+        stakeholder_name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Who this card is about -- REPORTED, not computed. An unnamed card cannot be attributed to any stakeholder."
+        goals:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L490's own 'Goals' field -- REPORTED, not computed."
+        incentives:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L490's own 'Incentives' field -- REPORTED, not computed."
+        constraints:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L490's own 'Constraints' field -- REPORTED, not computed."
+        risks:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L490's own 'Risks' field -- REPORTED, not computed."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole. Cards carry NO per-card provenance field -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An incentive map for a vendor-selection decision with two stakeholders"
+    value:
+      id: "INCMAP-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.incentive_mapping"
+      incentive_cards:
+        - stakeholder_name: "採購部主管"
+          goals: "在預算內完成年度供應商汰換，避免流程中斷"
+          incentives: "年度考核看的是成本降幅，換供應商省下的差額直接算他的績效"
+          constraints: "IT 部門要求新供應商必須通過資安稽核，時程只有 6 週"
+          risks: "若新供應商上線出包，第一個被究責的是他，不是提案的人"
+        - stakeholder_name: "IT 資安主管"
+          goals: "確保任何新系統上線前完成資安稽核，不留下未過稽核的例外"
+          incentives: "資安事故發生時他要負責，穩健比速度更符合他的利益"
+          constraints: "稽核團隊人手有限，6 週內只能排一次完整稽核"
+          risks: "若為了配合時程跳過稽核步驟，未來出事會直接指向他簽核放行"
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+
+open_questions:
+  - id: "OQ-INCENTIVEMAPPING-1"
+    question: "No stakeholder_name uniqueness constraint exists at the schema level -- should a future pass add one, or is re-assessing the same stakeholder over time (multiple cards, same name) a legitimate use case? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F07 table row (L490) directly -- grepped the whole Atlas file case-insensitively for
+    "incentive" -- confirmed 2 hits, L490 (this method's own citation) and L4475 (a different recipe row for
+    a different method). Cross-checked against methods/contracts/stakeholders.incentive_mapping.contract.yaml's
+    own outputs/preconditions/quality. Read contextual-inquiry-session.schema.yaml (per-entry-completeness,
+    record-level-only-provenance precedent) in full as shape precedent before writing this file. Validated
+    against jsonschema Draft202012Validator via a standalone script (required fields present, id pattern
+    satisfied, additionalProperties:false present at both the top level and the incentive_cards[] item level
+    from the start, embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative
+    controls for a smuggled top-level key, a smuggled incentive_cards[] item key, and an empty incentive_cards
+    array).
+  note: >
+    `incentive_cards[]`'s 5 required fields are transcribed/mechanized directly from Atlas L490 (Goals/
+    Incentives/Constraints/Risks plus stakeholder_name as the card's own identifier). The record-level-only
+    provenance decision is a compilation decision, disclosed above. No mother document was modified to
+    produce this file.

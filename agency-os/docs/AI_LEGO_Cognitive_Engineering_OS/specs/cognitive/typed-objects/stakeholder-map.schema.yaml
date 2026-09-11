@@ -1,0 +1,170 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/stakeholder-map.schema.yaml"
+title: Stakeholder Map
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StakeholderMap` -- the declared `outputs` of
+  `stakeholders.stakeholder_map`'s Method Contract (methods/contracts/stakeholders.stakeholder_map.contract.yaml,
+  `outputs: [StakeholderMap]`). Atlas cites this method via the F07 tool table row (L487: "Stakeholder Map｜
+  找所有影響與被影響者｜直接/間接/受益/承擔風險者→關係圖｜防止只看決策者") and §11.14 (L1516-1544). Each
+  `stakeholders[]` entry: `name` (required non-empty), `category` (free text, nullable -- §11.14's own 16-item
+  list, L1523-1540, is a reference checklist, not a mandatory closed set), `relationship_types` (non-empty
+  array, no duplicates, drawn only from the closed set {DIRECT, INDIRECT, BENEFICIARY, RISK_BEARER} --
+  table row L487's own literal 4 words, multi-select). The whole-map real invariant -- the union of
+  `relationship_types` across every entry must cover >=2 distinct values -- is enforced at RUNTIME by
+  `ai_lego/modules/stakeholders/stakeholder_map.py` (not schema-expressible as a JSON Schema constraint over
+  sibling array items).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Stakeholder Map row (L487)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.14 利害關係人地圖 dedicated section (L1516-1544)"
+  - "methods/contracts/stakeholders.stakeholder_map.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/jtbd-statement.schema.yaml -- record-level-only-provenance placement precedent (this F07 batch's fixed decision, disclosed above)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L487/§11.14's own literal wording plus low-risk, disclosed compilation
+  choices (flat entry shape, `category` free text, `relationship_types` closed set of 4, record-level-only
+  provenance).
+
+compilation_decisions:
+  - question: "Per-entry `id` field (a stable cross-reference identity) or `name`-only identity (bcg_matrix's own `item_name` precedent)?"
+    decision: "`name`-only -- task-mandated minimal shape ('每 entry 至少 name'); no cross-reference from another record needs a stable per-entry id yet. See open_questions."
+  - question: "`relationship_types` a single enum scalar or an array (multi-select)?"
+    decision: "Array, `minItems: 1`, `uniqueItems: true`, items from a 4-value enum -- task-mandated multi-select; a stakeholder is frequently BOTH e.g. a BENEFICIARY and a RISK_BEARER simultaneously."
+  - question: "`category` as `decision-journal-entry.schema.yaml`'s own any-string `decision_ref` precedent, or additionally require non-empty when present?"
+    decision: "Non-empty when present (`oneOf` null-or-non-empty-string, same shape `jtbd-statement.schema.yaml`'s own `workaround` already establishes) -- an empty-string category would misrepresent 'no category entered' as 'genuinely disclosed, empty category'."
+  - question: "`additionalProperties: false` at the top level and on each `stakeholders[]` entry?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, provenance, stakeholders]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^STKMAP-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.stakeholder_map"
+
+  stakeholders:
+    type: array
+    minItems: 1
+    description: >
+      Non-empty -- a stakeholder map naming zero stakeholders has not actually mapped anything (§11.14's own
+      "完整列出" purpose). The real whole-map coverage invariant (relationship_types union across all entries
+      must cover >=2 distinct values) is enforced at runtime, not expressed here.
+    items:
+      type: object
+      required: [name, category, relationship_types]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "REPORTED content -- who or what this stakeholder is (a person, a role, an organization, a group)."
+        category:
+          description: >
+            NULLABLE free text. Either null (no category assigned yet -- legitimate) or a non-empty string.
+            §11.14's own 16-item reference list (User, Buyer, Payer, Employee, Frontline Executor, Partner,
+            Vendor, Investor, Competitor, Regulator, Policy Maker, Local Government, Auditor, Community,
+            Minority Group, Media -- L1523-1540) is a checklist to consider for large global projects, NOT a
+            mandatory closed enum every record must satisfy -- see compilation_decisions.
+          oneOf:
+            - type: "null"
+            - type: string
+              minLength: 1
+              pattern: "\\S"
+        relationship_types:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: >
+            Table row L487's own literal 4-word closed set ("直接/間接/受益/承擔風險者"), multi-select
+            (a stakeholder frequently holds more than one simultaneously).
+          items:
+            type: string
+            enum: [DIRECT, INDIRECT, BENEFICIARY, RISK_BEARER]
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A stakeholder map for a municipal transit-fare pilot, covering 3 of the 4 relationship_types (not degenerated into 'only DIRECT')"
+    value:
+      id: "STKMAP-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.stakeholder_map"
+      stakeholders:
+        - name: "市府交通局長"
+          category: "Policy Maker"
+          relationship_types: [DIRECT]
+        - name: "每日通勤的市民"
+          category: "User"
+          relationship_types: [INDIRECT, BENEFICIARY]
+        - name: "公車司機工會"
+          category: "Employee"
+          relationship_types: [DIRECT, RISK_BEARER]
+        - name: "承包票證系統的廠商"
+          category: null
+          relationship_types: [BENEFICIARY, RISK_BEARER]
+      provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null }
+  - description: "A stakeholder map with a null category entry, still covering 2 distinct relationship_types"
+    value:
+      id: "STKMAP-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.stakeholder_map"
+      stakeholders:
+        - name: "早期採用該工具的內部團隊"
+          category: null
+          relationship_types: [DIRECT]
+        - name: "受該工具部署影響的下游部門"
+          category: null
+          relationship_types: [INDIRECT, RISK_BEARER]
+      provenance: { epistemic_type: ASSUMPTION, authorship_state: HUMAN_ORIGINAL, locked: null }
+
+open_questions:
+  - id: "OQ-STKMAP-SCHEMA-1"
+    question: "Per-entry `name`-only identity has no stable cross-reference id -- should a future revision add one (matching bcg_matrix's own item_name-only precedent, same open tension) once a downstream consumer needs to reference an individual stakeholder entry from another record?"
+    owner: "operator, or whoever next builds a consuming method against this record"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-STKMAP-SCHEMA-2"
+    question: "category is a plain nullable string with no closed set -- should §11.14's own 16-item reference list become a soft-reference enum in a future revision? Same open question the method contract's own OQ-STKMAP-2 already discloses."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F07 tool table (L483-507, Stakeholder Map row L487) and §11.14 (L1516-1544) directly. Grepped
+    the whole Atlas file case-insensitively for "stakeholder map"/"利害關係人地圖" -- confirmed exactly these
+    2 real citations for THIS method. Cross-checked against
+    methods/contracts/stakeholders.stakeholder_map.contract.yaml's own outputs/preconditions/quality. Read
+    `jtbd-statement.schema.yaml` (record-level-only-provenance and nullable-but-non-empty-if-present string
+    field precedent, reused here for `category`) in full before writing this file. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "stakeholder_map"/"StakeholderMap"/"stakeholder-map" before writing any of this
+    method's own files -- zero pre-existing implementation. Validated against jsonschema Draft202012Validator
+    via tests/unit/test_stakeholder_map.py (required fields present, id pattern satisfied,
+    additionalProperties:false present at both the top level and per-entry, embedded examples resolved
+    through their real $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level key,
+    a smuggled per-entry key, an empty name, an empty-string category, an empty relationship_types array, a
+    relationship_types value outside the 4-value enum, a duplicate relationship_types value, and a null
+    category validating successfully).
+  note: >
+    No mother document was modified. `name`/`category`/`relationship_types` are transcribed directly from
+    Atlas L487's own table row and §11.14's own literal wording. The exact field names, the `oneOf`
+    null-or-non-empty-string shape for `category`, the 4-value `relationship_types` enum, the
+    record-level-only provenance placement (an explicit F07-batch-wide decision, not this file's own
+    independent call), and the STKMAP- prefix are this suite's own compiled structure, disclosed above, not
+    textually cited.

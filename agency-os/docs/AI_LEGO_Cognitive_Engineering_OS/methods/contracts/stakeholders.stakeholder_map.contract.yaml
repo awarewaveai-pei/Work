@@ -1,0 +1,110 @@
+$id: "ai-lego://methods/contracts/stakeholders.stakeholder_map.contract.yaml"
+title: "Stakeholder Map Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family, OPENING member (F07 had zero built methods before this
+  batch; 1 of 10 concurrent agents opening every F07 member in the same parallel batch). Atlas cites this
+  method via the F07 tool table row (L487: "Stakeholder Map｜找所有影響與被影響者｜直接/間接/受益/承擔風險者→
+  關係圖｜防止只看決策者") and §11.14 (L1516-1544, a 16-item reference checklist of stakeholder categories,
+  L1523-1540). Core invariant: every entry needs a non-empty `name` plus >=1 `relationship_type` from the
+  table row's own closed set {DIRECT, INDIRECT, BENEFICIARY, RISK_BEARER}, AND the whole map's union of
+  relationship_types across all entries must cover >=2 distinct values -- structural enforcement of §11.14's
+  own 效益 ("防止「只看客戶」或「只看老闆」"): a map where every entry is tagged only DIRECT has degenerated
+  into exactly that failure mode.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Stakeholder Map row (L487)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.14 利害關係人地圖 dedicated section (L1516-1544)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.stakeholder_map` mints a NEW machine_id AND a NEW `family:
+  stakeholders` (F07's first built member -- no prior `stakeholders.*` contract exists in this corpus,
+  grep-confirmed). Flat per-entry shape, the 4-value relationship_types closed set, category as free text, and
+  record-level-only provenance are this file's own compilation decisions -- see `compilation_decisions`.
+
+id: stakeholders.stakeholder_map
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [CLASSIFY, MAP]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. CLASSIFY = assigning each
+# stakeholder its relationship_types (SWOT's own "CLASSIFY + COMPARE + CONTEXTUALIZE" formula already
+# establishes CLASSIFY as the kernel token for categorical assignment, L189); MAP = the table row's own
+# literal output shape ("→關係圖" / "→ relationship graph", L487).
+
+purpose:
+  - list_every_stakeholder_who_influences_or_is_affected_by_a_decision
+# Atlas L487/§11.14 verbatim sense: 用途「完整列出誰影響決策、誰被影響、誰付錢、誰執行、誰承擔風險」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other
+  # opening-member Tier 1 contract in this corpus (e.g. insight.jtbd, decomposition.problem_tree) already
+  # takes; this method's own citations name no required input type.
+
+outputs:
+  - StakeholderMap
+# NEW output type (see typed-objects/stakeholder-map.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "stakeholders is a non-empty list -- a stakeholder map with zero entries has not actually mapped anything (§11.14's own '完整列出' purpose)"
+  - "every stakeholders[] entry has a non-empty name and a non-empty relationship_types array drawn only from {DIRECT, INDIRECT, BENEFICIARY, RISK_BEARER} (table row L487's own literal 4 words '直接/間接/受益/承擔風險者', 可複選/multi-select) with no duplicate value within one entry's own array"
+  - "the whole map's union of relationship_types across every entry covers >=2 distinct values -- a map where every entry is tagged only DIRECT has degenerated into '只看決策者', the exact failure mode §11.14's own 效益 names ('防止「只看客戶」或「只看老闆」')"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same reasoning every sibling opening-member contract in this corpus discloses: this method takes
+  # no EvidenceSet input (inputs.required: []), so the flag's own schema-scoped meaning has nothing to check.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own citations name no single downstream method for Stakeholder Map specifically -- F07's own table
+# lists 9 sibling methods (Power-Interest, Salience Model, Incentive Mapping, RACI, BATNA, ZOPA,
+# Interest-Based Negotiation, plus 2 more) any of which could plausibly consume a stakeholder list, but none
+# is cited as THIS method's own canonical next step. Left empty rather than picking one arbitrarily. See
+# open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat per-entry shape (name/category/relationship_types) or a richer graph structure with cross-entry edges?"
+    decision: "Flat list of entries -- task-mandated shape; §11.14 gives no internal cross-entry structure beyond naming who and their relationship."
+  - question: "§11.14's own 16-item reference list (User..Media, L1523-1540) as a mandatory closed enum for `category`, or free text?"
+    decision: "Free text, nullable -- §11.14's own wording ('對大型全球計畫至少要考慮') is a reference checklist for large global projects, not a mandatory closed set every record must satisfy."
+  - question: "relationship_types a single enum scalar or an array (multi-select)?"
+    decision: "Array, minItems 1, no duplicates -- table row L487's own '直接/間接/受益/承擔風險者' phrasing names 4 independent dimensions a stakeholder can hold simultaneously (e.g. an Employee is frequently BOTH DIRECT and RISK_BEARER)."
+  - question: "Per-entry or record-level-only provenance?"
+    decision: "Record-level only -- explicit F07-batch-wide decision, same placement decomposition.functional_decomposition/insight.jtbd already use for their own batches."
+
+open_questions:
+  - "OQ-STKMAP-1: recommended_next is empty -- Atlas names no single canonical downstream method for Stakeholder Map specifically among F07's 9 sibling methods (owner: operator)."
+  - "OQ-STKMAP-2: category is free text with no closed set -- a future revision could promote §11.14's own 16-item list to a soft-reference enum if a downstream consumer needs structured category filtering (owner: operator)."
+  - "OQ-STKMAP-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F07 tool table (L483-507, Stakeholder Map row L487) and §11.14 (L1516-1544) directly. Grepped
+    the whole Atlas file case-insensitively for "stakeholder map"/"利害關係人地圖" -- confirmed these are the
+    only 2 real citations for THIS specific method (F07's other 9 table rows name 9 distinct sibling methods,
+    not a second section for this one). Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` trees case-insensitively for
+    "stakeholder_map"/"StakeholderMap"/"stakeholder-map" before writing any of this method's own files --
+    zero pre-existing implementation. Read `insight.jtbd.contract.yaml` (record-level-only-provenance
+    precedent) and `ai_lego/modules/strategy/bcg_matrix.py` (per-item non-empty-list + closed-set-item
+    precedent, read for contrast: this method's real invariant is a whole-map coverage check across items,
+    not a per-item computed field) in full before writing this contract. Validated against
+    `specs/cognitive/method.schema.yaml` with `jsonschema.Draft202012Validator`.
+  note: >
+    No mother document was modified. `cognitive_primitives` and the flat per-entry shape are this file's own
+    compilation decisions, disclosed above, not presented as directly Atlas-cited beyond the literal
+    table-row wording quoted verbatim. The record-level-only provenance placement and the 4-value
+    relationship_types closed set are explicit F07-batch-wide/task-mandated decisions, not this contract's
+    own independent judgment call.

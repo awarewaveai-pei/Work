@@ -1,0 +1,110 @@
+$id: "ai-lego://methods/contracts/stakeholders.game_theory.contract.yaml"
+title: "Game Theory Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family, OPENING member (grep-confirmed: no `stakeholders.*` contract
+  or `ai_lego/modules/stakeholders/` implementation existed before this batch). Atlas cites this method twice:
+  F07 table row (L495, "Game Theory｜建模互相反應｜players→strategies→payoffs→equilibria｜避免假設對手不動") and
+  §12.19 (L2777-2784, process "Players→Strategies→Payoffs→Information→Sequence→Equilibrium / sensitivity",
+  limitation "Payoff 設錯，模型再漂亮也無用"). Not in the Method-specific Gate table (§22.3, grep-confirmed
+  absent). Core invariant: `equilibrium` is refused at construction until `payoffs` covers every declared
+  (player, strategy) pair exactly once -- mechanizing §12.19's own limitation into a completeness gate, not a
+  prose caution. Solving for an actual equilibrium is explicitly out of scope -- see `open_questions`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Game Theory row (L495)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.19 賽局理論／Game Theory dedicated section (L2777-2784)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.game_theory` mints a NEW machine_id AND a NEW `family:
+  stakeholders` (F07's first built member -- no prior `stakeholders.*` contract exists in this corpus,
+  grep-confirmed). Flat players/strategies/payoffs/equilibrium record shape, per-(player,strategy) payoff
+  granularity, and record-level-only provenance placement are this file's own compilation decisions -- see
+  `compilation_decisions`.
+
+id: stakeholders.game_theory
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [SIMULATE, FORECAST]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. SIMULATE = Atlas's own stated
+# process ("建模互相反應", L495 -- modeling a multi-party interaction as a payoff structure); FORECAST = the
+# table row's own stated benefit ("避免假設對手不動" -- don't assume the counterparty stays static, i.e.
+# forecast a reactive response).
+
+purpose:
+  - model_strategic_interaction_where_counterparties_also_think_and_respond
+# Atlas L495/§12.19 verbatim sense: 用途「對手也會思考與回應時的策略分析」，效益「避免假設對手不動」。
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this corpus (e.g. insight.jtbd, decomposition.problem_tree) already takes.
+
+outputs:
+  - GameTheoryModel
+# NEW output type (see typed-objects/game-theory.schema.yaml). Atlas names no PascalCase output type for this
+# method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "players has at least 2 entries, each with a non-empty id and name, and no duplicate id -- Atlas L495's own 'players' stage requires at least two parties for a strategic interaction to exist"
+  - "strategies is non-empty and every players entry has at least one corresponding strategies entry (non-empty strategy set per player) -- a player with zero strategies cannot be modeled as making a choice"
+  - "every strategies entry's player_id references an existing players entry, and (player_id, strategy_id) pairs are unique -- referential integrity, no orphan or duplicate strategy"
+  - "payoffs covers every declared (player_id, strategy_id) pair exactly once, each with a numeric value -- §12.19's own explicit limitation ('Payoff 設錯，模型再漂亮也無用') mechanized as a completeness precondition, not a soft caution"
+  - "equilibrium is present and non-empty -- the pipeline's own final stage (L2782's 'Equilibrium / sensitivity'), refused until the payoff table above is complete"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to "claims inside this method's outputs that
+  # originate from EvidenceSet input" (an upstream typed-object this method does not take: inputs.required: []).
+  # §12.19's real caution ("Payoff 設錯，模型再漂亮也無用") is enforced structurally instead -- payoff
+  # completeness is a REQUIRED precondition (above), not a conditional per-claim label this flag governs.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own citations name no single downstream method for Game Theory specifically -- F07 table row and
+# §12.19 both stop at "Equilibrium / sensitivity" with no chain to a further method. Left empty rather than
+# picking one arbitrarily.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat per-(player, strategy) payoff list, or a full joint strategy-profile payoff matrix (every combination across ALL players' strategies)?"
+    decision: "Flat per-(player, strategy) list, one payoff per player's own strategy -- task-mandated exact shape; a joint strategy-profile matrix would require enumerating cross-player combinations, out of this slice's scope (see open_questions)."
+  - question: "Should the builder compute/verify the equilibrium itself, or accept it as caller-supplied?"
+    decision: "Caller-supplied conclusion string, verified only for the data-completeness that supports it (task boundary) -- no equilibrium-solving algorithm is implemented; see open_questions."
+  - question: "Payoff completeness: a schema-level array constraint, or a runtime cross-array invariant?"
+    decision: "Runtime invariant (builder + independent gate) -- same class of disclosed gap decision.mcda's own mcda-analysis.schema.yaml OQ-MCDAANALYSIS-1 already documents; JSON Schema draft 2020-12 cannot declaratively express 'every strategies[] entry has exactly one payoffs[] match'."
+  - question: "Per-field provenance or record-level only?"
+    decision: "Record-level only, one top-level `provenance` field -- same batch-wide F06/F07 decision insight.jtbd.contract.yaml's own compilation_decisions already establishes; a GameTheoryModel's fields describe one coherent strategic model, not a list of independently-sourced items."
+
+open_questions:
+  - "OQ-GAMETH-1: this record captures only Players/Strategies/Payoffs/Equilibrium -- Atlas §12.19's own pipeline also names Information and Sequence (L2782); a future revision could add them if a downstream consumer needs sequential/information-asymmetry modeling (owner: operator)."
+  - "OQ-GAMETH-2: no real equilibrium-solving algorithm is implemented -- equilibrium is caller-supplied and only its supporting payoff data is verified for completeness, not the equilibrium claim's own mathematical correctness (owner: operator)."
+  - "OQ-GAMETH-3: payoffs are a flat per-(player, strategy) list, not a full joint strategy-profile matrix -- a future revision could model cross-player payoff interdependence for true game-theoretic solving (owner: operator)."
+  - "OQ-GAMETH-4: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L495) and §12.19 (L2777-2784) directly. Grepped the whole Atlas file for
+    "Game Theory"/"賽局" -- confirmed exactly these 2 real citations, no §4 composition formula, no §14.1
+    legal-chain mention, no §22.3 gate-table row. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` trees for "game_theory"/"GAMETH"/"GameTheory" before writing
+    any of this method's own files -- zero pre-existing implementation, zero contract-backlog entry. Read
+    insight.jtbd.contract.yaml (record-level-only provenance precedent, this batch's fixed placement decision)
+    and decision.mcda / mcda-analysis.schema.yaml (per-item list-of-objects with cross-array referential
+    integrity left as a runtime invariant, OQ-MCDAANALYSIS-1 precedent for the same class of gap this file's own
+    payoff-completeness invariant has) in full before writing this contract. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `cognitive_primitives` and the flat players/strategies/payoffs shape are
+    this file's own compilation decisions, disclosed above, not presented as directly Atlas-cited beyond the
+    literal table-row/section wording quoted verbatim. The record-level-only provenance placement is an explicit
+    F06/F07-batch-wide decision, not this contract's own independent judgment call.

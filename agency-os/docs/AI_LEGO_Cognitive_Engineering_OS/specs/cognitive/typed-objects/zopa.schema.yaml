@@ -1,0 +1,134 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/zopa.schema.yaml"
+title: ZOPA Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ZopaAnalysis` -- the declared `outputs` of `stakeholders.zopa`'s
+  Method Contract (methods/contracts/stakeholders.zopa.contract.yaml, `outputs: [ZopaAnalysis]`). Atlas cites
+  this method TWICE: F07 tool table row (L493: "ZOPA｜找可成交區間｜reservation points→重疊範圍｜提高談判效率")
+  and dedicated §11.17 (L1583-1595, diagram "Seller minimum ---------[ ZOPA ]--------- Buyer maximum").
+  `zopa_exists`/`zopa_range` are COMPUTED fields (recomputed independently by the runtime gate from
+  `seller_minimum`/`buyer_maximum`, never trusted as stored) -- this schema enforces STRUCTURAL shape only
+  (correct types, closed keys); the cross-field derivation correctness (`zopa_exists == seller_minimum <=
+  buyer_maximum`, `zopa_range == [seller_minimum, buyer_maximum]` when true) is a runtime gate concern, not
+  expressible in JSON Schema without a non-standard `$data` extension.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, ZOPA row (L493)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.17 可能達成協議區間／ZOPA dedicated section (L1583-1595)"
+  - "methods/contracts/stakeholders.zopa.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/jtbd-statement.schema.yaml -- record-level-only-provenance placement precedent (this batch's template)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L493/§11.17's own diagram plus low-risk, disclosed compilation choices (flat shape,
+  record-level-only provenance).
+
+compilation_decisions:
+  - question: "Should zopa_range be a 2-element array, or an object {lower, upper}?"
+    decision: "2-element array [seller_minimum, buyer_maximum] -- mirrors §11.17's own diagram order (seller minimum first, buyer maximum second); no additional named-field structure cited."
+  - question: "Per-field provenance or record-level only?"
+    decision: "Record-level only -- same F06/F07-batch-wide convention jtbd-statement.schema.yaml already establishes."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+required: [id, version, provenance, seller_minimum, buyer_maximum, zopa_exists, zopa_range]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ZOPA-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.zopa"
+
+  seller_minimum:
+    type: number
+    description: >
+      §11.17's own diagram (L1587), "Seller minimum" -- the seller's own reservation point, the lowest price
+      the seller will accept. REPORTED content (typically BATNA-derived per L1595's own "搭配"), not computed.
+
+  buyer_maximum:
+    type: number
+    description: >
+      §11.17's own diagram (L1589), "Buyer maximum" -- the buyer's own reservation point, the highest price
+      the buyer will pay. REPORTED content, not computed.
+
+  zopa_exists:
+    type: boolean
+    description: >
+      COMPUTED, never a constructor parameter (see `ai_lego/modules/stakeholders/zopa.py` module docstring).
+      True iff `seller_minimum <= buyer_maximum` -- §11.17's own "找雙方 reservation point 是否有重疊" is
+      exactly this comparison. Recomputed independently by the runtime gate from the record's own raw
+      seller_minimum/buyer_maximum, never trusted as stored.
+
+  zopa_range:
+    description: >
+      COMPUTED, never a constructor parameter. Null when `zopa_exists` is false (no overlap). When
+      `zopa_exists` is true, MUST be exactly `[seller_minimum, buyer_maximum]` -- §11.17's own diagram shows
+      the range's two bounds ARE the two reservation points, nothing else. Recomputed independently by the
+      runtime gate; this schema enforces shape only (see file description).
+    oneOf:
+      - type: "null"
+      - type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: number
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A ZOPA analysis where the reservation points overlap (a real zone of possible agreement exists)"
+    value:
+      id: "ZOPA-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.zopa"
+      seller_minimum: 80000
+      buyer_maximum: 95000
+      zopa_exists: true
+      zopa_range: [80000, 95000]
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null }
+  - description: "A ZOPA analysis where the reservation points do NOT overlap (no zone of possible agreement)"
+    value:
+      id: "ZOPA-2026-09-11-002"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.zopa"
+      seller_minimum: 100000
+      buyer_maximum: 90000
+      zopa_exists: false
+      zopa_range: null
+      provenance: { epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - id: "OQ-ZOPASCHEMA-1"
+    question: "zopa_range is a plain 2-element array per the task-mandated flat shape -- should a future revision name the two elements ({lower, upper}) for readability? Same open question the method contract's own compilation_decisions already discloses."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F07 tool table row (L493) and §11.17 (L1583-1595) directly. Cross-checked against
+    methods/contracts/stakeholders.zopa.contract.yaml's own outputs/preconditions/quality. Read
+    jtbd-statement.schema.yaml (record-level-only-provenance precedent, this same batch's template) in full
+    before writing this file. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "zopa" before writing any of this
+    method's own files -- zero pre-existing implementation. Validated against jsonschema Draft202012Validator
+    via tests/unit/test_zopa.py (required fields present, id pattern satisfied, additionalProperties:false
+    present at the top level, embedded examples resolved through their real $ref to
+    epistemic-label.schema.yaml, negative controls for a smuggled top-level key and a malformed zopa_range).
+  note: >
+    No mother document was modified. `seller_minimum`/`buyer_maximum` are transcribed directly from Atlas
+    §11.17's own diagram. `zopa_exists`/`zopa_range`'s computed-field discipline, the oneOf null-or-array
+    shape, and the ZOPA- prefix are this suite's own compiled structure, disclosed above.

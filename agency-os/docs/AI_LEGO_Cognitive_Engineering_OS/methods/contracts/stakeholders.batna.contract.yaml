@@ -1,0 +1,115 @@
+$id: "ai-lego://methods/contracts/stakeholders.batna.contract.yaml"
+title: "BATNA (Best Alternative To a Negotiated Agreement) Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family, OPENING member (F07 had zero built methods before this
+  batch -- grep-confirmed no `ai_lego/modules/stakeholders/` directory with real content existed at batch start,
+  only a pre-created placeholder `__init__.py`; this is 1 of 10 concurrent agents opening ALL F07 members in the
+  same parallel batch). Atlas cites this method TWICE: F07 table row (L492: "BATNA｜談判失敗最佳替代｜列
+  alternatives→估值→改善 BATNA｜避免接受差交易") and dedicated §11.16 (L1565-1579, literal 5-step procedure).
+  Core invariants: `best_alternative_id` must reference a real `alternatives[].id` (step 3's own "選最佳" is a
+  SELECTION from step 1's own list, never an independently-typed string); `reservation_point` is ALWAYS computed
+  (value_estimate minus cost_estimate of the chosen alternative), never a constructor input -- mechanizes step
+  5's own causal "依 BATNA 推 reservation point". See `ai_lego/modules/stakeholders/batna.py` module docstring
+  for the full field-by-field grounding.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, BATNA row (L492)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.16 談判最佳替代方案／BATNA dedicated section (L1565-1579)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.batna` mints a NEW machine_id AND a NEW `family: stakeholders`
+  (F07's first built member -- no prior `stakeholders.*` contract exists in this corpus, grep-confirmed). Flat
+  4-content-field record shape, `best_alternative_id` as a bare reference (not a duplicated embedded object),
+  computed-only `reservation_point`, and record-level-only provenance are this file's own compilation decisions
+  -- see `compilation_decisions`.
+
+id: stakeholders.batna
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [ESTIMATE, COMPARE, CALCULATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ESTIMATE = step 2 ("估算每個
+# alternative 的價值與成本"). COMPARE = step 3 ("選最佳 BATNA" requires comparing alternatives against each
+# other). CALCULATE = step 5's own genuine arithmetic derivation of reservation_point. Deliberately excludes
+# DECIDE (this record makes no automatic/final negotiation decision, only identifies a walk-away reference
+# point -- same "no automatic authority" caution class decision.impact_effort/decision.pareto_frontier disclose
+# for their own outputs, though here it is structural: the record has no accept/reject field at all).
+
+purpose:
+  - identify_and_improve_the_walk_away_alternative_before_negotiating
+# Atlas L492/§11.16 verbatim sense: 用途「談判失敗最佳替代」，效益「讓談判不是靠情緒或 sunk cost」。
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this corpus takes; this method's own citation names no required input type.
+
+outputs:
+  - BatnaAnalysis
+# NEW output type (see typed-objects/batna.schema.yaml). Atlas names no PascalCase output type for this method,
+# same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "alternatives is a non-empty list of well-shaped entries (id/label non-empty strings; value_estimate/cost_estimate finite, non-boolean numbers), each id unique within the record -- step 1's own '列出談不成時可做的 alternatives' floor"
+  - "best_alternative_id is a non-empty string that equals a real id inside alternatives[] -- step 3's own '選最佳 BATNA' is a SELECTION from step 1's own list, never an independently-typed string not traceable to it"
+  - "reservation_point is NEVER a caller-supplied input -- it is always computed as the selected best_alternative's own value_estimate minus its own cost_estimate, mechanizing step 5's own causal '依 BATNA 推 reservation point' relationship rather than leaving it an independently-typed, unrelated number"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to claims originating from an EvidenceSet
+  # INPUT, which this method does not take (inputs.required: []). value_estimate/cost_estimate are the human
+  # analyst's own judgment calls at authoring time, not claims sourced from an evidence set this method ingests.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed), and no §22.3 gate-table
+# row either.
+
+recommended_next: []
+# See open_questions OQ-BATNA-2: Atlas §11.17 ZOPA (the immediately next section, L1583) is a plausible natural
+# consumer of this method's own reservation_point, but stakeholders.zopa is being built in this SAME parallel
+# batch by a different agent and had not landed when this contract was written -- left empty rather than
+# hard-coupling to a concurrently-authored sibling's still-unconfirmed shape (same file-write-ordering caution
+# specs/cognitive/primitive.schema.yaml's own soft-reference precedent already establishes).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat 4-content-field record, or also carry a step-4 ('先改善 BATNA，再進談判') improvement-actions field?"
+    decision: "Flat (subject/alternatives/best_alternative_id/reservation_point) -- step 4 is procedural guidance about WHEN to negotiate, not a data element; the task-mandated output boundary names only alternatives/best_alternative/reservation_point."
+  - question: "best_alternative as a duplicated embedded object, or a bare reference id?"
+    decision: "best_alternative_id, a bare string FK into alternatives[] -- same option_id/objective_id reference convention decision.pareto_frontier.contract.yaml already establishes; avoids a second copy of the same data that could drift from its own source of truth."
+  - question: "Should reservation_point be accepted as a caller-supplied input?"
+    decision: "No -- ALWAYS computed (value_estimate - cost_estimate of the chosen alternative), never a constructor parameter, independently re-derived at the gate. Mechanizes step 5's causal '依 BATNA 推' relationship structurally, matching the 'computed field never accepted as input' discipline decision.ice/decision.impact_effort/decision.pareto_frontier already establish for their own genuine-compute fields."
+  - question: "Isolate the reservation_point arithmetic in its own ai_lego/compute/batna/ package (decision.ice/decision.pareto_frontier's own convention for genuine-compute fields, with engine/computation_provenance_ref metadata)?"
+    decision: "No -- kept as a single inline arithmetic expression inside ai_lego/modules/stakeholders/batna.py's own builder AND gate (both independently applying the identical formula, neither trusting the other). This task's own file boundary fixes exactly 4 deliverable files; the underlying computation is a single subtraction with no cross-item aggregation, external methodology citation, or reuse need the heavier siblings' own packages exist to isolate. The 'never trust stored, always re-derive' discipline is unchanged -- only the packaging is lighter, disclosed here rather than silently diverging."
+  - question: "Per-field or record-level provenance?"
+    decision: "Record-level only -- F07-batch-wide decision (matching insight.jtbd/decomposition.functional_decomposition precedent), not this contract's own independent call."
+
+open_questions:
+  - "OQ-BATNA-1: step 4 ('先改善 BATNA，再進談判') has no schema field -- procedural guidance, not stored content; a future revision could add an optional improvement_actions[] if a real consumer needs to track it（owner: operator）."
+  - "OQ-BATNA-2: recommended_next is empty -- Atlas §11.17 ZOPA (L1583, the immediately next section) is a plausible natural downstream consumer of reservation_point, but stakeholders.zopa is being built in this same parallel batch and had not landed when this contract was written; revisit once both exist（owner: operator）."
+  - "OQ-BATNA-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method)（owner: operator）."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L492) and §11.16 (L1565-1579) directly. Grepped the whole Atlas file
+    case-insensitively for "batna" -- confirmed exactly these 2 real citations, no §4 composition formula, no
+    §14.1 legal-chain mention, no §22.3 gate-table row. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` trees case-insensitively for "batna" before writing any of
+    this method's own files -- zero pre-existing implementation (only `method-inventory.yaml`'s own
+    `has_contract: false` placeholder entry, F07 stakeholders). Read `insight.jtbd.contract.yaml` (record-level
+    provenance, opening-member precedent) and `decision.pareto_frontier.contract.yaml` (bare-id cross-reference
+    convention, genuine-compute-never-an-input convention) in full before writing this contract. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `cognitive_primitives`, the flat 4-field shape, `best_alternative_id`'s
+    bare-reference design, and the inline (not packaged) reservation_point computation are this file's own
+    compilation decisions, disclosed above, not presented as directly Atlas-cited beyond the literal table-row/
+    5-step wording quoted verbatim. The record-level-only provenance placement is an explicit F07-batch-wide
+    decision, not this contract's own independent judgment call.

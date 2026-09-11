@@ -1,0 +1,105 @@
+$id: "ai-lego://methods/contracts/stakeholders.salience_model.contract.yaml"
+title: "Salience Model Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F07 stakeholder/power/negotiation family (10 members, this batch; family `stakeholders` already
+  minted by concurrent sibling `stakeholders.stakeholder_map` in this same batch, not new here). Atlas cites
+  this method ONCE, table row only (L489: "Salience Model｜Power/Legitimacy/Urgency｜三維評分與分類｜加入正當性與
+  急迫性"), no dedicated section. Core invariant: `power`/`legitimacy`/`urgency` each `{present: bool,
+  justification}`, justification REQUIRED non-empty when present is true ("不能只打勾沒證據", task-mandated);
+  `dimension_count`/`salience_class` are GENUINE_COMPUTE from the 3 booleans -- deliberately NOT the real
+  external Mitchell-Agle-Wood (1997) 7-type typology (see `compilation_decisions`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Salience Model row (L489)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: stakeholders.salience_model` mints a NEW machine_id; `family: stakeholders`
+  reused (already minted by sibling `stakeholders.stakeholder_map` in this same F07 batch, grep-confirmed
+  before writing this file). Flat-named-dimension shape, boolean+justification, and the 8-way named
+  classification are this file's own compilation decisions -- see `compilation_decisions`.
+
+id: stakeholders.salience_model
+version: "1.0.0"
+family: stakeholders
+
+cognitive_primitives: [ESTIMATE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed). Maps directly
+# to L489's own usage cell "三維評分與分類" (three-dimension scoring AND classification): ESTIMATE = the 3
+# per-dimension present/absent judgment calls with disclosed justification; CLASSIFY (same primitive
+# strategy.vrio/strategy.bcg_matrix already use for their own GENUINE_COMPUTE table-lookup classification) =
+# the mechanically-derived salience_class.
+
+purpose:
+  - assess_stakeholder_salience_via_power_legitimacy_urgency
+# Atlas L489 verbatim sense: 用途「Power/Legitimacy/Urgency」/ 效益「加入正當性與急迫性」(adds legitimacy and
+# urgency dimensions beyond a power-only read).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own single citation (L489) names no required input type, same
+  # "no hard upstream dependency" position insight.jtbd.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - SalienceAssessment
+# NEW output type (see typed-objects/salience-model.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "power, legitimacy, and urgency are each present and shaped {present: <bool>, justification: <None or non-empty str>} -- Atlas L489's own 3 named dimensions; a record missing one has not actually run a salience assessment"
+  - "for each of the 3 dimensions, justification is a non-empty string whenever present is true -- task-mandated ('不能只打勾沒證據'): a dimension cannot be checked true with no disclosed evidence"
+  - "stakeholder_name is present and non-empty -- a 3-dimension score with no named subject cannot be audited against reality later"
+  - "dimension_count and salience_class are GENUINE_COMPUTE, mechanically derived from the 3 *.present values via derive_salience_outputs -- never caller-supplied, re-derived independently by the gate from raw fields"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to claims originating from an EvidenceSet
+  # INPUT, which this method does not take (inputs.required: []). Same reasoning insight.jtbd.contract.yaml's
+  # own quality block already establishes for an analogous no-EvidenceSet-input method.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own single citation names no downstream method for Salience Model specifically. Left empty rather
+# than guessing at a sibling F07 method's own id before confirming it exists with status ACTIVE.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "3 individually-named top-level dimensions (power/legitimacy/urgency) or a VRIO-style questions[] list?"
+    decision: "3 individually-named fields -- unlike VRIO's 4 interchangeable list entries, a stakeholder always has exactly these 3 fixed, individually-meaningful axes."
+  - question: "Boolean present/absent + optional justification, or a graded 1-5 score per dimension?"
+    decision: "Boolean present/absent (task-mandated) -- justification REQUIRED non-empty only when present is true, matching moscow-prioritization-record.schema.yaml's own one-directional if/then (bucket==WONT -> reason) precedent, not a bidirectional null-iff-false constraint."
+  - question: "Should salience_class adopt the real external Mitchell-Agle-Wood (1997) 7-type stakeholder typology (dormant/discretionary/demanding/dominant/dangerous/dependent/definitive), the way strategy.vrio adopts Barney's VRIO classification?"
+    decision: "No -- conservative choice. Atlas L489 names only the 3 dimensions with no classification table (thinner citation than VRIO's own §12.13). Adopting the 7 academic type NAMES would overstate what this citation actually grounds. Instead: dimension_count (0-3) + an 8-way named combination of which dimensions are present (e.g. POWER_LEGITIMACY_URGENCY), both GENUINE_COMPUTE, honestly disclosed as this suite's own naming."
+  - question: "Record-level-only provenance or per-dimension?"
+    decision: "Record-level ONLY -- a deliberate BATCH-WIDE decision for this whole F07 build, matching insight.jtbd's own F06-batch-wide record-level placement. A SalienceAssessment's fields are one coherent judgment about one stakeholder, not a list of independently-sourced items."
+
+open_questions:
+  - "OQ-SALIENCE-1: salience_class uses this suite's own 8-way named combination, not Mitchell-Agle-Wood's 7-type academic labels -- see compilation_decisions (owner: operator)."
+  - "OQ-SALIENCE-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-SALIENCE-3: recommended_next is empty -- Atlas's own single citation names no downstream method; a future pass could name a sibling F07 method (e.g. stakeholders.incentive_mapping) once confirmed to exist (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F07 table row (L489) directly. Grepped the whole Atlas file case-insensitively for "salience" --
+    confirmed exactly this 1 real hit, no dedicated section, no §4 composition formula, no §14.1 legal-chain
+    mention, no §22.3 gate-table row. Grepped the whole `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for "salience"/"SALNCE" before writing
+    any of this method's own files -- zero pre-existing implementation (only forward-references in
+    method-inventory.yaml and stakeholders.stakeholder_map.contract.yaml already disclosing this method as
+    unbuilt). Read insight.jtbd.contract.yaml (record-level-only provenance, thin single-citation precedent) and
+    strategy.vrio.contract.yaml (GENUINE_COMPUTE closed-lookup precedent, read for contrast: VRIO adopts a real
+    external classification by name, this file deliberately does not) in full before writing this contract.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. `cognitive_primitives`, the flat 3-named-dimension shape, the
+    boolean+justification invariant, and the 8-way (not 7-type-academic) classification scheme are this file's
+    own compilation decisions, disclosed above, not presented as directly Atlas-cited beyond the literal 3
+    dimension names and table-row wording quoted verbatim.

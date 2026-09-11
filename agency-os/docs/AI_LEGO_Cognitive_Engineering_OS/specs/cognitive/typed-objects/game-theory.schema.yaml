@@ -1,0 +1,207 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/game-theory.schema.yaml"
+title: Game Theory Model
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `GameTheoryModel` -- the declared `outputs` of
+  `stakeholders.game_theory`'s Method Contract (methods/contracts/stakeholders.game_theory.contract.yaml,
+  `outputs: [GameTheoryModel]`). Atlas cites this method TWICE: F07 tool table row (L495: "Game Theory｜建模互相
+  反應｜players→strategies→payoffs→equilibria｜避免假設對手不動") and dedicated §12.19 (L2777-2784: process
+  "Players→Strategies→Payoffs→Information→Sequence→Equilibrium / sensitivity", limitation "Payoff 設錯，模型再
+  漂亮也無用").
+
+  Field provenance:
+    * `players` -- L495/§12.19's own "Players" stage. At least 2 (a strategic interaction needs at least two
+      parties), each a non-empty `{id, name}` pair, unique `id`.
+    * `strategies` -- the "Strategies" stage. Each entry names one strategy available to ONE player
+      (`player_id` references `players[].id`); every player must have at least one strategy.
+    * `payoffs` -- the "Payoffs" stage, and where §12.19's own explicit limitation lives ("Payoff 設錯，模型再
+      漂亮也無用"). Flat, one numeric value per declared (player_id, strategy_id) pair -- NOT a joint
+      strategy-profile matrix across all players (see method contract's own compilation_decisions/OQ-GAMETH-3).
+      REQUIRED to cover every `strategies` entry exactly once -- a strategy with no payoff, or a payoff
+      referencing an undeclared strategy, is refused (enforced as a RUNTIME invariant by
+      `ai_lego/modules/stakeholders/game_theory.py`, not expressible as a declarative schema constraint across
+      two sibling arrays; same disclosed-gap class as `mcda-analysis.schema.yaml`'s own OQ-MCDAANALYSIS-1).
+    * `equilibrium` -- the pipeline's own final stage ("Equilibrium / sensitivity"). Caller-supplied conclusion
+      string -- this schema and its paired module verify the `payoffs` completeness that supports it, not the
+      equilibrium claim's own mathematical correctness (method contract's own OQ-GAMETH-2).
+    * `provenance` -- RECORD-LEVEL ONLY, the same batch-wide F06/F07 decision
+      `jtbd-statement.schema.yaml`'s own compilation_decisions already establishes. A GameTheoryModel's fields
+      describe one coherent strategic model, not a list of independently-sourced items.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F07 tool table, Game Theory row (L495)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.19 賽局理論／Game Theory dedicated section (L2777-2784)"
+  - "methods/contracts/stakeholders.game_theory.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/mcda-analysis.schema.yaml -- per-item list-of-objects shape and cross-array-referential-integrity-as-runtime-invariant precedent (OQ-MCDAANALYSIS-1)"
+  - "specs/cognitive/typed-objects/jtbd-statement.schema.yaml -- record-level-only-provenance placement precedent (this F06/F07 batch's fixed decision)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L495/§12.19's own literal pipeline plus low-risk, disclosed compilation choices (the
+  flat players/strategies/payoffs shape, GAMETH- prefix, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Should payoffs be a flat per-(player, strategy) list, or a full joint strategy-profile matrix across all players?"
+    decision: "Flat per-(player, strategy) list, task-mandated exact shape -- see method contract's own compilation_decisions and OQ-GAMETH-3 for the future-structured-matrix option."
+  - question: "Should payoff-completeness (every strategies[] entry has exactly one payoffs[] match) be enforced by a JSON Schema keyword, or left as a runtime invariant?"
+    decision: "Runtime invariant, enforced by ai_lego/modules/stakeholders/game_theory.py's builder and independent gate -- JSON Schema draft 2020-12 has no declarative way to cross-check two sibling arrays' referential completeness, same gap mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 already discloses for its structurally similar ranking[]/options[] relationship."
+  - question: "Should payoff `value` accept any JSON number including booleans (Python's bool is an int subclass)?"
+    decision: "No -- `type: number` at the schema level already excludes JSON booleans (a distinct JSON type from number); the paired module's own runtime checks additionally guard `isinstance(value, bool)` explicitly before accepting a payoff, so a hand-tampered Python dict with `True`/`False` as a payoff value is refused at the gate layer too, not just at schema validation."
+  - question: "additionalProperties: false at the top level and on every nested item object?"
+    decision: "Yes -- baseline hygiene this directory converges on (mcda-analysis.schema.yaml's own identical choice), set correctly from the start."
+
+type: object
+required: [id, version, players, strategies, payoffs, equilibrium, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^GAMETH-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "stakeholders.game_theory"
+
+  players:
+    type: array
+    minItems: 2
+    description: "Atlas L495/§12.19 pipeline stage 1: 'Players'. At least 2 -- a strategic interaction needs at least two parties."
+    items:
+      type: object
+      required: [id, name]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+
+  strategies:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L495/§12.19 pipeline stage 2: 'Strategies'. Each entry is ONE strategy available to ONE player
+      (`player_id` references `players[].id`). Cross-array constraints (every player has >=1 strategy, every
+      `player_id` references a real player, `(player_id, strategy_id)` pairs are unique) are RUNTIME invariants,
+      not expressed here -- see compilation_decisions.
+    items:
+      type: object
+      required: [player_id, strategy_id, name]
+      additionalProperties: false
+      properties:
+        player_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        strategy_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+
+  payoffs:
+    type: array
+    minItems: 1
+    description: >
+      Atlas L495/§12.19 pipeline stage 3: 'Payoffs', and where §12.19's own explicit limitation lives ("Payoff
+      設錯，模型再漂亮也無用"). One numeric value per declared (player_id, strategy_id) pair. REQUIRED to cover
+      every `strategies` entry exactly once -- a RUNTIME invariant (not expressible here), see
+      compilation_decisions.
+    items:
+      type: object
+      required: [player_id, strategy_id, value]
+      additionalProperties: false
+      properties:
+        player_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        strategy_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        value:
+          type: number
+          description: "Payoff estimate for this player choosing this strategy. Any real number (losses are legal, e.g. negative). JSON `number` excludes JSON `boolean` -- see compilation_decisions."
+
+  equilibrium:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      Atlas L495/§12.19 pipeline's own final stage: 'Equilibrium / sensitivity'. Caller-supplied conclusion --
+      NOT computed by this schema's paired module (method contract's own OQ-GAMETH-2). REFUSED at construction
+      until `payoffs` above is complete for every declared strategy (the real, mechanized version of §12.19's
+      own "Payoff 設錯，模型再漂亮也無用" limitation).
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two ride-hailing platforms deciding whether to keep subsidies or raise fares -- complete payoff table, stable-equilibrium conclusion"
+    value:
+      id: "GAMETH-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "stakeholders.game_theory"
+      players:
+        - {id: "P1", name: "平台 A"}
+        - {id: "P2", name: "平台 B"}
+      strategies:
+        - {player_id: "P1", strategy_id: "S1", name: "維持現有補貼"}
+        - {player_id: "P1", strategy_id: "S2", name: "調漲車資 10%"}
+        - {player_id: "P2", strategy_id: "S1", name: "維持現有補貼"}
+        - {player_id: "P2", strategy_id: "S2", name: "調漲車資 10%"}
+      payoffs:
+        - {player_id: "P1", strategy_id: "S1", value: 15}
+        - {player_id: "P1", strategy_id: "S2", value: -8}
+        - {player_id: "P2", strategy_id: "S1", value: 12}
+        - {player_id: "P2", strategy_id: "S2", value: -5}
+      equilibrium: "雙方皆維持現有補貼（S1）是穩定策略組合：任一方片面調漲車資（S2）預期 payoff 由正轉負，缺乏片面偏離誘因。"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - id: "OQ-GAMETHEORY-1"
+    question: "Atlas's own pipeline also names Information and Sequence stages (L2782) -- should a future revision add them for sequential-move or information-asymmetry games? Same open question the method contract's own OQ-GAMETH-1 already discloses."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-GAMETHEORY-2"
+    question: "payoffs are per-(player, strategy), not a joint strategy-profile matrix -- should a future revision model cross-player payoff interdependence (the payoff to P1 depends on BOTH P1's and P2's chosen strategy) for true game-theoretic equilibrium solving? Same open question the method contract's own OQ-GAMETH-3 already discloses."
+    owner: "operator, or whoever next builds a consuming method against this record"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F07 table row (L495) and §12.19 (L2777-2784) directly. Grepped the whole Atlas file for "Game
+    Theory"/"賽局" -- confirmed exactly these 2 real citations, no §4 composition formula, no §22.3 gate-table
+    row. Cross-checked against methods/contracts/stakeholders.game_theory.contract.yaml's own
+    outputs/preconditions/quality. Read mcda-analysis.schema.yaml (per-item list-of-objects shape,
+    cross-array-referential-integrity-left-as-runtime-invariant precedent) and jtbd-statement.schema.yaml
+    (record-level-only-provenance precedent) in full before writing this file. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees for
+    "game_theory"/"GAMETH"/"GameTheory" before writing any of this method's own files -- zero pre-existing
+    implementation. Validated against jsonschema Draft202012Validator via tests/unit/test_game_theory.py
+    (required fields present, id pattern satisfied, additionalProperties:false at the top level and every nested
+    item, the embedded example resolved through its real $ref to epistemic-label.schema.yaml, negative controls
+    for a smuggled top-level key, an empty players/strategies/payoffs array, and a non-numeric payoff value).
+  note: >
+    No mother document was modified. `players`/`strategies`/`payoffs`/`equilibrium` field names and stage
+    ordering are transcribed directly from Atlas L495 and §12.19's own literal pipeline. The nested item shapes,
+    the GAMETH- prefix, and the record-level-only provenance placement (an explicit F06/F07-batch-wide decision,
+    not this file's own independent call) are this suite's own compiled structure, disclosed above, not
+    textually cited.
