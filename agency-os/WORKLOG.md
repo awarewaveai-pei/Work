@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-09-11 第十二批（/ops/collect 三塊重排；執行失敗改成看得懂的話）
+
+操作者實際跑了一次「搜尋全網」，畫面回 `all_strategies_failed:ProviderCallError: provider_perplexity_http_401 — search://...`。**該有的資訊全在裡面，但是寫給寫 fetcher 的人看的。**
+
+- **版面照操作者指定重排**：來源目錄在左，這個客戶的來源＋試跑／正式抓取在右上，選中來源的設定表單在它下面。原本表單接在目錄下方同一欄，目錄夠高就會把抓取按鈕推出畫面外——「我要加什麼」與「我已經有什麼」永遠看不到同一眼。沒勾任何來源時表單位置直接寫「先在左邊勾一個或多個來源」，而不是留一個按了沒反應的輸入框。
+- **`explainReason()`**：把每一則拒絕先用人話講一次，原始字串留在下面（那是解釋不夠時拿去搜尋的東西，不能拿掉）。401／403 說「金鑰失效，要換 `PERPLEXITY_API_KEY`」、402 說「餘額不足」、429 說「限流，把取回筆數調小」——三種要做的事完全不同，混成一句「供應商錯誤」等於沒說。只映射管線真的會產生的 reason；為不可能發生的錯誤編友善文案，結果是訊息在描述另一個故障。
+- **測試改用語意定位**：原本用 `section:first-of-type`／`:last-of-type`，版面一改就紅兩條，但行為根本沒變。改成 `data-panel` 標記。**調版面不該讓行為測試失敗**，這是這批順手修掉的測試設計問題。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/(shell)/ops/collect/__tests__/CollectionSourcesPanel.test.tsx` | exit=0 | result=11/11 綠，含用**現場那一串真實 reason** 斷言會產出「換一把 `PERPLEXITY_API_KEY`」
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（把設定表單移到來源列表上方）| exit=0 | result=新的版面斷言 KILLED
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run && npx next build` | exit=0 | result=1023 test 綠、8 skipped；`✓ Compiled successfully`
+REVIEW_DONE: critic=Quick（純前端；風險是為不存在的錯誤寫解釋，已限制為管線實際產生的 reason 並對未映射者回 null）| verdict=pass | findings=0c/1m（m1：重排時多留一個 `</div>`，tsc 立刻擋下）
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`explainReason|data-panel|section:first-of-type|provider_.*_http_` | hits=`section:first-of-type`／`:last-of-type` 已無殘留；`provider_*_http_*` 的產生處只有 `net/providers.ts` 一處，與新映射的格式一致
+
+**金鑰仍然是壞的**：本機那把 `pplx-` 對 `/search` 與 `/chat/completions` 都回 401，且 repo 內沒有第二把可用的（perplexity MCP 是雲端連接器，不走本地金鑰）。換一把有效的進 `mcp/user-env.ps1` 即可，程式路徑已用 9 個單元測試與官方文件的回應格式驗過。
+**rollback**：`git revert`；純前端，無資料變動。
+
 ## 2026-09-11 短劇 Story Bible 真正接線：手動生成套用 Bible + 自動連續性檢查（操作者選「完整版」）
 
 上一條 worklog 誠實揭露了短劇模式的 Story Bible「套用」從沒真正接線（建立/核准可用，但腳本生成完全沒讀它）。操作者看到這條記錄後問「完成了嗎？」——回報還沒做，並用 AskUserQuestion 讓她選範圍（最小可行版 vs 完整版+自動連續性檢查 vs 先不做），她選**完整版**。
