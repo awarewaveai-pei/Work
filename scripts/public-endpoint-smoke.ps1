@@ -7,9 +7,14 @@ $ErrorActionPreference = "Stop"
 
 $checks = @(
     @{ Name = "uptime-dashboard"; Url = "https://uptime.aware-wave.com/dashboard"; Accept = @(200, 301, 302) },
-    @{ Name = "app-root"; Url = "https://app.aware-wave.com/"; Accept = @(200, 301, 302) },
+    # 307 added 2026-09-11 — observed as app-root's actual current redirect code (found incidentally
+    # while verifying the chatwoot check below; unrelated to Chatwoot, this Accept list was just stale).
+    @{ Name = "app-root"; Url = "https://app.aware-wave.com/"; Accept = @(200, 301, 302, 307) },
     @{ Name = "api-health"; Url = "https://api.aware-wave.com/health"; Accept = @(200) },
-    @{ Name = "n8n-healthz"; Url = "https://n8n.aware-wave.com/healthz"; Accept = @(200) }
+    @{ Name = "n8n-healthz"; Url = "https://n8n.aware-wave.com/healthz"; Accept = @(200) },
+    # Chatwoot ships no dedicated /health path; root redirects to /installation/onboarding pre-setup
+    # (confirmed live 2026-09-11 — real 302, not a guess).
+    @{ Name = "chatwoot-root"; Url = "https://chatwoot.aware-wave.com/"; Accept = @(200, 302) }
 )
 
 $failed = @()

@@ -23,6 +23,11 @@ export const CS_TIMEOUTS = {
   generateMs: 20_000,
   supervisorMs: 8_000,
   toolMs: 10_000,
+  /** Outbound Chatwoot Account API calls (send reply/draft, toggle status). Every other outbound
+   * fetch in lib/cs/ has a bound (see llm.ts); chatwoot-client.ts previously had none — an unreachable
+   * Chatwoot could hang the webhook handler past a platform timeout, past even the catch block's
+   * own Sentry capture. */
+  chatwootMs: 10_000,
 } as const;
 
 export const CS_THRESHOLDS = {

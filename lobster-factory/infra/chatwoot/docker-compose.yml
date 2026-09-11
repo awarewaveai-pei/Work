@@ -1,0 +1,156 @@
+# Chatwoot Community Edition (U6 carrier) — KS-AW-01 single-host deployment.
+# DEPLOYED COPY lives at /root/chatwoot/docker-compose.yml (with a sibling .env holding
+# SECRET_KEY_BASE / POSTGRES_PASSWORD / REDIS_PASSWORD — never committed, see .env.example). This
+# repo copy is the SSOT; keep the two in sync (same convention as ../postiz/docker-compose.yml).
+#
+# Structure follows Chatwoot's OWN official docker-compose.production.yaml (fetched 2026-09-11 from
+# github.com/chatwoot/chatwoot develop branch) — rails (web) + sidekiq (worker) share one image via
+# a YAML anchor, both depend on a DEDICATED postgres+redis (NOT the shared supabase-db/n8n/postiz
+# pattern) per the explicit capacity plan in agency-os/reports/decisions/2026-08-18-dedicated-host-
+# purchase-timing.md P5.1 ("Chatwoot 8G / PG 4G / Redis 1G", officially-based compose) — Chatwoot
+# conversations are the sole source of truth (D6, Customer_service_automation_plan.md §0) and get
+# their own isolated Postgres so a Chatwoot-side incident can never touch Supabase's data.
+#
+# mem_limit split: rails 5g + sidekiq 3g = the plan's combined "8G" (sidekiq is the smaller, more
+# volatile piece per KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md's Chatwoot section — "observe 30
+# days of real peaks before tuning further, don't guess-fix on day one").
+#
+# Redis pinned to 7.2 (>=7.0 required — <7.0 makes Sidekiq flap, same hardening-checklist section,
+# GitHub chatwoot/chatwoot discussion #10740). Postgres uses pgvector/pgvector:pg16 (Chatwoot's own
+# official image choice, not our Supabase's own image) since Chatwoot itself may use pgvector for
+# its own features independent of our cs_* tables.
+#
+# restart: unless-stopped (NOT "always", NOT "on-failure") per the hardening checklist's host-wide
+# rule — "always" fights a clean host shutdown, "on-failure" doesn't restart after one.
+#
+# FIRST-TIME BOOTSTRAP, not a patch: safe-infra-patch.sh (Auto-Repair 紅線) is a backup-apply-health-
+# rollback wrapper for EDITING an already-deployed compose file; its own precondition (`[[ -f
+# "$FILE_PATH" ]]`) means it cannot bootstrap a service that doesn't exist on the server yet. First
+# deploy is: copy this file + .env to /root/chatwoot/ → `docker compose up -d` → verify healthchecks
+# → THEN this file falls under safe-infra-patch.sh's patch-protection for every future edit.
+name: chatwoot
+
+services:
+  base: &base
+    image: chatwoot/chatwoot:v4.6.0
+    env_file: .env
+    volumes:
+      - chatwoot_storage:/app/storage
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "5"
+    networks:
+      - chatwoot_internal
+    depends_on:
+      chatwoot-postgres:
+        condition: service_healthy
+      chatwoot-redis:
+        condition: service_healthy
+
+  chatwoot-rails:
+    <<: *base
+    container_name: chatwoot-rails
+    mem_limit: 5g
+    cpus: "1.5"
+    ports:
+      - '127.0.0.1:4008:3000'
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    entrypoint: docker/entrypoints/rails.sh
+    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  chatwoot-sidekiq:
+    <<: *base
+    container_name: chatwoot-sidekiq
+    mem_limit: 3g
+    cpus: "1.0"
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
+    # No HTTP surface — Sidekiq's own "process is alive" is the ceiling of what's checkable here;
+    # queue-depth/stuck-job monitoring is a Chatwoot Super Admin UI concern, not a container gate.
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "sidekiq"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  chatwoot-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: chatwoot-postgres
+    restart: unless-stopped
+    mem_limit: 4g
+    cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # No host port mapping — only chatwoot-rails/chatwoot-sidekiq (same chatwoot_internal network)
+    # ever need to reach this; the official compose's `127.0.0.1:5432:5432` is unnecessary exposure
+    # we deliberately drop (same reasoning postiz-redis already applies in ../postiz/docker-compose.yml).
+    environment:
+      # MUST be chatwoot_production, not "chatwoot" — Rails' own config/database.yml names the
+      # production DB `chatwoot_production` unless POSTGRES_DATABASE overrides it, and we don't set
+      # that override (RAILS_ENV=production drives the name; POSTGRES_USER can differ freely, only
+      # the DATABASE name must match). First deploy attempt (2026-09-11) crash-looped on this exact
+      # mismatch — ActiveRecord::NoDatabaseError: "could not find your database: chatwoot_production"
+      # — confirmed by reading chatwoot-rails logs, not guessed.
+      - POSTGRES_DB=chatwoot_production
+      - POSTGRES_USER=chatwoot
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - chatwoot_postgres_data:/var/lib/postgresql/data
+    networks:
+      - chatwoot_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatwoot -d chatwoot_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chatwoot-redis:
+    image: redis:7.2-alpine
+    container_name: chatwoot-redis
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: ["sh", "-c", "redis-server --requirepass \"$$REDIS_PASSWORD\""]
+    env_file: .env
+    volumes:
+      - chatwoot_redis_data:/data
+    networks:
+      - chatwoot_internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  chatwoot_storage:
+  chatwoot_postgres_data:
+  chatwoot_redis_data:
+
+networks:
+  chatwoot_internal:
+    driver: bridge

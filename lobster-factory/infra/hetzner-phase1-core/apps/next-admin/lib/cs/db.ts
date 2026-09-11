@@ -142,7 +142,13 @@ export interface RecordReplyInput {
   metadata?: Record<string, unknown>;
 }
 
-/** Idempotent on (organization_id, chatwoot_message_id) — re-delivered webhooks don't double-write. */
+/**
+ * Writes the final decision for one message. Upserts WITHOUT ignoreDuplicates — this is deliberate:
+ * the webhook route (app/api/webhooks/chatwoot/route.ts) calls claimMessage() first, which inserts a
+ * 'handoff' PLACEHOLDER row to win the race against a concurrent redelivery; this call's job is to
+ * OVERWRITE that placeholder with the real decision once the pipeline finishes. If this ever used
+ * ignoreDuplicates again, every real decision would silently vanish behind its own placeholder claim.
+ */
 export async function recordReply(input: RecordReplyInput): Promise<void> {
   const sb = getSupabaseWriteClient();
   if (!sb) return;
@@ -160,7 +166,7 @@ export async function recordReply(input: RecordReplyInput): Promise<void> {
       reasoning_trace_ref: input.traceRef ?? null,
       model: input.model ?? null,
     },
-    { onConflict: "organization_id,chatwoot_message_id", ignoreDuplicates: true },
+    { onConflict: "organization_id,chatwoot_message_id" },
   );
 }
 
@@ -191,3 +197,61 @@ export async function recordAction(input: RecordActionInput): Promise<void> {
 // Knowledge store (insertSource / insertChunks / matchChunks* / listKnowledgeSources /
 // deleteKnowledgeSource) moved to lib/kb/db.ts in K0 (ADR 011 §決策 3). The cs engine now consumes
 // the KB through its public surface (@/lib/kb), like any other consumer.
+
+/**
+ * Resolve which organization a Chatwoot webhook belongs to, by the numeric Account id Chatwoot puts
+ * in every payload. No dedicated mapping table (0051 predates Chatwoot existing) — reuses the same
+ * `organizations.metadata.client_config.chatwoot.accountId` JSONB field cis.ts reads, queried
+ * unindexed. Fine at current scale (single-digit tenants); revisit with a real index/column once
+ * account count grows past a handful.
+ */
+export async function findOrganizationIdByChatwootAccountId(accountId: number): Promise<string | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("organizations")
+    .select("id")
+    .eq("metadata->client_config->chatwoot->>accountId", String(accountId))
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return typeof data.id === "string" ? data.id : null;
+}
+
+/**
+ * Atomic claim on (organization_id, chatwoot_message_id) via a plain INSERT against the existing
+ * unique constraint (0051_cs_core.sql) — NOT a check-then-act read. Two concurrent webhook deliveries
+ * for the same message (a realistic race: CS_TIMEOUTS allows the pipeline to run 30-60s+, comfortably
+ * longer than a typical webhook-sender retry window) race on this INSERT; Postgres's unique
+ * constraint guarantees exactly one wins. The loser gets `false` back immediately and must not run
+ * the pipeline or call Chatwoot at all — running it twice means the customer gets two replies.
+ *
+ * `action: 'handoff'` is a placeholder, not the real decision (which isn't known yet) — chosen
+ * because it's this system's universal fail-safe value (plan §8.4: never guess, default to human),
+ * so a row that's claimed-but-never-overwritten (process crash between claim and persist) still
+ * reads as "needs a human," never as a false "auto_sent". `recordReply` (above) OVERWRITES this row
+ * once the true decision is known — that upsert must stay non-ignoreDuplicates for that to work.
+ */
+export type ClaimResult = "claimed" | "duplicate" | "error";
+
+/**
+ * "duplicate" (Postgres 23505, the unique-violation code) means a concurrent delivery of the SAME
+ * message already won the race — correct to silently no-op. Any OTHER error (network blip, RLS
+ * misconfig, pool exhaustion) is NOT the same thing and must not be treated as one: collapsing both
+ * into a bare boolean would make the caller respond 200 "deduped" to what is actually a lost, never-
+ * retried customer message (Chatwoot only redelivers on 429/500, so 200 is final) — silently and
+ * permanently violating the "never guess, default to human" rule this whole engine is built on.
+ */
+export async function claimMessage(organizationId: string, conversationId: string, messageId: string): Promise<ClaimResult> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return "error"; // no DB ⇒ caller must fail loud, not silently pretend "duplicate"
+  const { error } = await sb.from("cs_ai_replies").insert({
+    organization_id: organizationId,
+    chatwoot_conversation_id: conversationId,
+    chatwoot_message_id: messageId,
+    action: "handoff",
+    retrieved_chunk_ids: [],
+  });
+  if (!error) return "claimed";
+  return error.code === "23505" ? "duplicate" : "error";
+}

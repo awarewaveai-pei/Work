@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-11（客服系統 U6：/verify-recent 全套跑完，1 個真 critical（另一並行 stash 機制吞掉我的腳本編輯）+ 3 個真 major 全修，準備 commit+deploy）
+
+**觸發**：commit 前 hook 擋下（`verify-gate-commit.js` 偵測 7 個 high-risk 檔案未走完整驗證），照規矩跑 `/verify-recent` 全套（非 `--trivial`/`--ack`）。
+
+**critic 找到 1 真 Critical**：`scripts/public-endpoint-smoke.ps1` 我先前加的 `chatwoot-root` 檢查項 + `app-root` 307 修正，**其實沒有真的落在工作樹上**——`git diff HEAD` 顯示該檔跟遠端一模一樣。根因：另一個並行 session 的 `git-align-main-aoresume-feature` 自動 stash-pop 機制把它連同別的 dirty 檔一起 stash 走（`stash@{2}`），之後沒有把這一份 pop 回來。用 `git show "stash@{2}:scripts/public-endpoint-smoke.ps1"` 取回原內容重新寫入,已確認恢復。**同一個機制**（`git-align-main-aoresume-*` 自動 stash）稍早也造成 `agency-os/WORKLOG.md` 出現未解的 git merge conflict markers（`<<<<<<< Updated upstream` / `=======` / `>>>>>>> Stashed changes`，夾住 HCI30 規則引擎條目 vs Reddit dev app 條目兩份不相關但都合法的內容）——本輪順手發現並解開（保留兩份,只是移除標記),未丟失任何一方內容。
+
+**critic 找到 3 真 Major，全修**：
+1. `db.ts` `claimMessage` 原本 `return !error` 把「唯一鍵衝突（真的重複）」跟「其他任何錯誤（DB 斷線/RLS 設錯）」當成同一件事,後者會讓 route 回 200 `deduped`,等於真實客訊被**永久且無聲**丟棄（Chatwoot 只在 429/500 才重送,回 200 之後不會再有第二次機會)。改回傳三態 `"claimed"|"duplicate"|"error"`,靠 Postgres `23505` code 精確分辨,`error` 時回 502 + `Sentry.captureException`。
+2. `route.ts` 原本 `claimMessage`/`reserveCsCredit` 都在 `handleInbound` 內部的靜音判斷**之前**執行——但「對話已被真人接手」（`conversationStatus==='open'`）是**每次**交接後的常態,不是邊界情況,原設計會讓每一則之後的客訊都留一筆假的 `handoff` 稽核列 + 對計費中的租戶白扣一點數,即使 AI 什麼都沒做。改成從原始 payload 提前算出 `isFromAgent`/`conversationStatus`,在 claim/計費之前就短路回覆,不留痕跡。
+3. `chatwoot-client.ts` 的 `chatwootRequest`（`fetch` 打 Chatwoot Account API）原本**沒有 timeout**,跟同資料夾 `llm.ts` 的既有慣例不一致——Chatwoot 掛掉時可能把整個 webhook handler 卡到平台函式逾時,連 `route.ts` catch block 裡本該負責告警的 `Sentry.captureException` 都來不及跑。`config.ts` 加 `CS_TIMEOUTS.chatwootMs=10000`,`fetch` 加 `signal: AbortSignal.timeout(...)`。
+
+**[已修改]**：見上四點（`db.ts`/`route.ts`/`chatwoot-client.ts`/`config.ts`/`public-endpoint-smoke.ps1`）+ `WORKLOG.md` merge conflict 解開
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（清掉 stale `tsconfig.tsbuildinfo` 後重跑,critic 指出的本機快取陷阱）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/cs` | exit=0 | result=4 檔/52 測試全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`（全專案）| exit=0 | result=107 檔/983 測試過,1 skip
+- REVIEW_DONE: critic=Deep（`critic` subagent,`/verify-recent` 強制,讀 7 個追蹤檔+呼叫端 orchestrator.ts+兩個 migration 全文,並對照 Chatwoot 官方原始碼驗證 retry/webhook 語義)| verdict=pass(修後)| findings=1c/3m/1n/2 建議,Critical+3 Major 全修,Minor(過期 comment)已在同一輪修掉
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`claimMessage\b` | hits=2（`route.ts` 呼叫端 + `db.ts` 定義本身,無孤兒舊呼叫)
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：critic 的 Suggestion 級別發現（`claimMessage` doc comment 對 Chatwoot 實際重送語義的描述不完全精確、`isFromAgent` 判斷條件在這條路徑上可能是防禦性 dead code）未修,不影響正確性,留待下次順手處理。
+
 ## 2026-09-11 HCI30 規則式評分引擎——操作者要求「系統自己讀證據、自己判斷」但用程式規則而非 LLM
 
 操作者確認方向後全權授權（「你做最完美的決定和規劃和設計」），包含第一版規則表的業務判斷（哪些指標、對應哪個維度、幾分）。前一輪誤判可接 Cognitive Engineering OS 的 Method Atlas 模組（`independent_judge` 等）當作分析引擎，查證後發現那是「驗證判斷格式對不對」的結構驗證層，不是「讀文字生出判斷」——已在對話中更正，本輪改為在 HCI-30 內部自建規則引擎，不依賴任何外部系統。
@@ -38,6 +61,29 @@ WORKLOG_DONE: 本條目
 
 [rollback]
 純新增兩個模組 + 兩個測試檔 + 一個 spec 文件，`server.mjs`/`index.html` 的改動是新增欄位與顯示區塊，對零規則命中的案件行為完全不變（單一人工評估餵進 combineMethodFindings 是文件明訂的 N=1 no-op）。`git revert` 本次 commit 即可完全還原，無 schema/資料需要處理。
+
+## 2026-09-11 Reddit dev app 建立卡住——平台流程已變更，非我方操作錯誤
+
+**觸發**：延續同日稍早的 Postiz VBC 複查，僅存的真待辦「Postiz Task 2 OAuth app 審核」，先挑 Reddit（原計畫記載「無需審核，立即可用」）動手，透過 Claude in Chrome 用操作者真實登入的 Reddit 帳號 `Successful_Move_5101` 在 `reddit.com/prefs/apps` 建立 app。
+
+**過程（3 次真實嘗試，逐次排除變因）**：
+1. 一般視窗：reCAPTCHA 勾選框點擊無反應。`read_network_requests` 過濾 `recaptcha` 為 0 筆——判斷是操作者 Chrome 的廣告/隱私擴充功能擋掉 Google recaptcha 網域腳本，非頁面本身問題。
+2. 操作者改用無痕視窗（預設不跑擴充功能）重試：reCAPTCHA 這次**成功打勾**（印證擴充功能是第一次失敗的根因），但按下 `create app` 後**直接跳回初始收合畫面**，無錯誤訊息、無新 app 出現在列表。
+3. 查 `reddit.com/wiki/api/`（表單本身連結的官方頁面）→ 確認 Reddit 已把舊版 `/prefs/apps` 免審流程改列為 **legacy**，新申請走「Reddit's Developer Platform」（`developers.reddit.com`，Devvit 架構的站內 app，非第三方 OAuth client）；legacy Data API 新 app 現在**需要「valid moderation use case」並提交客服工單申請**（`support.reddithelp.com/hc/requests/new?ticket_form_id=14868593862164`），不再是即時建立。`developers.reddit.com/app-registration` 頁面也證實只能「註冊已存在的 app」，無法憑空生一個新的。
+
+**結論（與 2026-06 原計畫的落差）**：`POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 與 `TASKS.md` 當時記載 Reddit「無需審核，立即可用」，這個假設**在 2026-09-11 已過時**——Reddit 平台方在原計畫制定後收緊了 legacy API app 建立流程，現在跟 Meta/LinkedIn 一樣要走人工申請/審核，不再是三平台裡最快的那個。第 2 次嘗試 captcha 過了卻仍建立失敗，合理懷疑是後端直接擋掉「非已核准的 moderation use case」的建立請求（silent reject，無錯誤訊息），與 TASKS.md 原有歷史備註「Reddit（後台一直出錯，待修穩或換時機）」（2026-06）互相印證，是同一個平台側限制，不是暫時性故障。
+
+**未做**：未提交 `support.reddithelp.com` 工單申請（需要操作者決定要不要花時間走這條路、以及如何描述「moderation use case」——Postiz 純屬社群排程工具，不是版主機器人，能否通過這個審核本身存疑，此為需要操作者判斷的產品/業務決策，非技術問題）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Claude in Chrome | 場景=3 次真實 `reddit.com/prefs/apps` 建立嘗試（一般視窗 1 次＋無痕視窗 1 次）+ `read_network_requests`/`read_console_messages` 排查 | 結果=均未成功建立 app；根因鎖定為 Reddit 平台流程變更而非操作失誤
+- REALTEST_EVIDENCE: tool=Claude in Chrome | cmd=`get_page_text` on `reddit.com/wiki/api/` + `developers.reddit.com/app-registration` | 結果=兩頁皆證實 legacy app 建立現需工單審核，非自助即時
+- REVIEW_WAIVED: NA -- 純調查/瀏覽器操作，未改任何 code/設定/資料
+- BUGHUNT_WAIVED: NA -- 本條目為外部平台流程調查記錄，無本地檔案改動需要交叉檢查
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 若操作者決定送工單申請 Reddit legacy API 存取，審核結果與時程不可控（非我方能加速）；若審核不過，Reddit 需從 v1 三平台承諾中移除，只剩 Meta(IG+FB)/LinkedIn 兩個真正可行路徑，`POSTIZ_SOCIAL_PUBLISHING_PLAN.md` D5「先送 Meta+Reddit+LinkedIn」的排序判斷需要重新檢視。
+[rollback] 無變更可回滾，純調查；Reddit 帳號上沒有任何殘留 app 或送出的申請。
 
 ## 2026-09-11 第六批（HEAD 曾經無法 build：共用工作目錄的機械閘缺口）
 

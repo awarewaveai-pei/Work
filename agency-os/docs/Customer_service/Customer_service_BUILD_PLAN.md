@@ -68,7 +68,7 @@ per-client hub  /ops/clients/[slug]   （既有 7 tab：內容工具/整合/佈�
 | **U3** | **客服 tab + 頂層「客服」section**（per-client config + 跨客戶營運中心）| 💻 next-admin UI | U0,U1 | P1–P2 | ✅ **建好+驗證**（tab+cs-config route+/ops/cs+sidebar；tsc 0 / critic 1C 修；kill-switch 接進 engine）|
 | **U4** | **headless widget**（Client API+WS+清新自然+互動類型）| 💻 next-admin embed | U1,U6 | P1 | 🟡 **程式碼完成+驗證**（6 檔；tsc 0/vitest 49/critic XSS-clean+4 Major 修）— **等 U6 接 live** |
 | **U5** | **eval/護欄 harness**（golden set runner + LLM-judge + 畢業 gate）| 💻 自架現有機 | U1 | P2 | ✅ **建好+驗證**（lib/cs/eval+route+7 測；tsc 0/vitest 42；critic 2C 修：跑真實 decideAnswerAction）|
-| **U6** | **Chatwoot 載體**（docker-compose Community + healthcheck/smoke/rollback）| 📦 EU 現可緊跑/本機測 → **搬大機** | — | P1 | ⛔（deploy gated）— **買機+接線+8月接手 SSOT：[`handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md`](../../handoffs/2026-06-27-customer-service-u6-chatwoot-handoff.md)** + runbook §0b |
+| **U6** | **Chatwoot 載體**（docker-compose Community + healthcheck/smoke/rollback）| 📦 ks-aw-01 | — | P1 | 🟡 **四容器 healthy，公開可訪問（2026-09-11）**——`https://chatwoot.aware-wave.com/` 經 Cloudflare→nginx→chatwoot-rails 全鏈路，真實回 302→onboarding；webhook 接線+billing bridge 已 commit 待 deploy。Account#1 已建（操作者親自完成，帳號/密碼建立不可由 AI 代做）+ API Inbox + AgentBot 已透過 API 接線完成。詳 WORKLOG 2026-09-11 各批。**剩**：next-admin deploy 完成後端到端重測 |
 
 **U1 cs-engine 子任務**（建時細分，仿 Cold Outreach T1–T12）：
 - U1a RAG 管線：切塊 + Contextual Retrieval + embeddings(可插拔) + pgvector 寫入/檢索 + hybrid(vector+BM25+RRF+rerank)
