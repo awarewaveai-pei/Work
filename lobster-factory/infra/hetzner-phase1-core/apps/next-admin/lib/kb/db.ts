@@ -12,6 +12,7 @@
 // Table names keep the cs_ prefix: renaming live tables is a migration, not a module move.
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { buildKeywordQuery } from "@/lib/kb/keyword-query";
 import { KB_DEFAULT_SPACE_ID } from "@/lib/kb/config";
 
 /** List knowledge sources for the ops UI, with per-source chunk counts. */
@@ -339,9 +340,11 @@ export interface KeywordMatch extends MatchAttribution {
 }
 
 /**
- * Keyword half of hybrid retrieval — cs_match_chunks_keyword RPC. Substring rather than Postgres
- * FTS because FTS tokenizes CJK poorly; the RPC uses strpos(), so the term needs no wildcard
- * escaping. Ordering feeds RRF; exact relevance is the vector half's job.
+ * Keyword half of hybrid retrieval — cs_match_chunks_keyword RPC (PGroonga, migration 0076).
+ *
+ * The question is turned into matchable terms first. It used to be sent whole, truncated to 80
+ * characters, and matched with strpos() — so it matched nothing for any real question and this half
+ * contributed nothing to the fusion. See lib/kb/keyword-query.ts.
  */
 export async function matchChunksKeyword(
   s: RetrievalScope,
@@ -350,7 +353,9 @@ export async function matchChunksKeyword(
 ): Promise<KeywordMatch[]> {
   const sb = getSupabaseWriteClient();
   if (!sb) return [];
-  const term = query.slice(0, 80).trim();
+  // Empty means the question had no usable terms (punctuation, one letter). Skip the call rather
+  // than send an empty PGroonga query, which is an error, not "no matches".
+  const term = buildKeywordQuery(query);
   if (!term) return [];
   const { data, error } = await sb.rpc("cs_match_chunks_keyword", {
     ...rpcArgs(s),

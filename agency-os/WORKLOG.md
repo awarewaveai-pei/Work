@@ -1,5 +1,65 @@
 # Worklog
 
+## 2026-09-12 第十五批（hybrid 的關鍵字半邊其實從來沒在運作；migration 0076）
+
+操作者給了 GPT 的《低成本高速 RAG 系統建議》要我評估並補缺。評估過程查證出一個不是「最佳化」而是「壞掉」的東西。
+
+**根因**：`lib/kb/rag.ts:107` 把**使用者的整句問題**當 `p_term` 傳進 `cs_match_chunks_keyword`，而 0075 的實作是 `strpos(lower(c.content), lower(btrim(p_term))) > 0`（還先 `query.slice(0,80)`）。沒有任何 chunk 會包含一整句問題，所以**關鍵字半邊對任何真實提問都回零筆**——hybrid 自 0051 起實質上只有向量在跑。外部完全看不出來：「沒有關鍵字命中」和「這一半是死的」長得一模一樣。就算命中，`ORDER BY last_modified` 排的是「最近改過」不是「最相關」。
+
+**修法（0076）**：
+- `pgroonga`（supabase/postgres 鏡像內建，先在 prod 容器開拋棄式 DB 實測：載得起來、索引建得成、中英文都排得出名次）負責**比對**；0051 當初留下 `bm25_tsv` 不用並寫明原因（Postgres FTS 切不好中文），這是那個懸了四個月的決定的收尾。
+- `lib/kb/keyword-query.ts` 負責把問題變成可比對的詞：CJK 出字元 bigram、拉丁保留整詞、剝掉 PGroonga 查詢語法字元（否則使用者的標點會變成運算子）。放在 app 側因為可單元測試，塞進 stored procedure 不行。
+- **排名不用 `pgroonga_score`**。第一版用了，本機驗證第一次跑就紅：那個函式只對「來自 PGroonga 索引掃描」的列有值，表小的時候 planner 一律走 seq scan，於是每列 0 分、排名靜默消失——線上只有一筆 chunk，永遠會是這個情況。改成在 SQL 裡算「命中幾個查詢詞」，與執行計畫無關，而且忠實還原探針結果（命中 3 個 bigram 時 pgroonga_score 正好是 3.0）。
+
+**連帶修掉的兩個測試設計問題**：
+- 本機驗證器原本用 `pgvector/pgvector:pg16`，沒有 pgroonga。換成 prod 實際鏡像 `supabase/postgres:15.8.1.085`——**驗證器跑不了的 migration 等於沒驗**，而且舊鏡像會讓一個在部署時才失敗的 migration 通過。
+- 換鏡像後發現就緒檢查是假的：`pg_isready` 說 ready，psql 卻連不上（socket 路徑不同），bootstrap 直接對著一台它以為開好的伺服器失敗。改成用同一條 TCP 路徑判斷就緒。
+- `kb-predicate-parity` 原本把 migration 檔名寫死在常數裡，靠註解提醒下一個人更新。0076 重定義其中一半，提醒照設計發作了——但**需要手改的守衛遲早會被改錯**，而且兩個半邊現在住在不同檔案。改成 `migration-source.ts` 自己找出「目前定義這個函式的最新 migration」，兩個測試共用。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/kb-local-verify.sh`（prod 鏡像，0051→0072→0075→0076→斷言→down→重套）| exit=0 | result=`KB_VERIFY_OK + CONSTRAINTS_OK + PROVENANCE_OK + KEYWORD_OK`；新斷言用**整句中文問題**而非單詞，因為單詞正是四個月來唯一會過的情況
+REALTEST_EVIDENCE: tool=SSH | cmd=prod 容器內三次拋棄式 DB 探針（運算子語意、join 後 score、bigram OR 排名）| exit=0 | result=`&@`／`&@~` 對整句皆回 0 筆、空白分隔才有效——這是設計依據，不是猜的
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（拿掉 `ORDER BY hit.n DESC`）| exit=1 | result=KILLED（`the most relevant document is not first`）
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=112 檔 1038 test 綠、8 skipped
+REVIEW_DONE: critic=Quick（單一 migration + 一個純函式；風險集中在排名是否真的生效，已由本機驗證器與突變各擋一層）| verdict=pass | findings=0c/2m（m1：`pgroonga_score` 依賴執行計畫，本機驗證器抓到；m2：新斷言的 fixture uuid 沒註冊進 `t_ids`，第一次跑即紅）
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`cs_match_chunks_keyword|p_term|bm25_tsv|PREDICATE_SOURCE` | hits=`p_term` 唯一呼叫端是 `matchChunksKeyword`，已改走 `buildKeywordQuery`；`PREDICATE_SOURCE` 常數已移除改為計算；`bm25_tsv` 仍未刪（刪欄位不可逆，已進 TASKS）
+
+**尚未套 prod**：0076 是 High-STOP。部署順序這次**兩邊都安全**：先套 migration → 舊程式送整句給 `&@~` → 0 筆（與今天相同，不更糟）；先部署 → 新程式送 OR 字串給舊的 `strpos` → 0 筆（同樣不更糟）。所以沒有「只做一半會壞」的窗口，與 0072／0075 不同。
+**rollback**：`scripts/0076_..._down.sql` 還原 0075 的函式並刪索引；不 DROP EXTENSION（會連帶刪掉所有 pgroonga 索引）。
+
+## 2026-09-12（164–171 號切片：F09 系統思考家族開局並收官 0/8→8/8，4 個平行 agent × 2 方法 + 1 critic）
+
+**觸發**：操作者指派 F09／F10／F13／F14／F15／F22／F23／F24 八個未開工家族（= TASKS.md 自己記錄的真實剩餘範圍），要求加快但不准用補丁。F09 為第一批。
+
+**做了什麼**：4 個平行 agent 各建 2 個方法（非 1 方法 1 agent——操作者明確要求不得無效益派 agent），派工時每個方法的真實不變量由主 agent 先設計好再交付，非讓 subagent 自行發明：
+- `causal_loop_diagram`：loop_type 為 GENUINE_COMPUTE，由邊極性奇偶獨立重算（奇數個「-」= BALANCING），caller 宣稱值不符即拒；edge_ids 必須構成真正閉合迴路。
+- `stock_and_flow`：flow 的 target_stock_id 必須指向真實 stock；每個 stock 至少被 1 條 flow 觸及（無 flow 的 stock 不是 stock-and-flow 模型，是常數）。
+- `iceberg_model`：由淺入深不可跳層——structures 非空要求 patterns 非空，mental_models 非空要求 structures 非空。
+- `behavior_over_time`：points 依 time 嚴格遞增（重複/亂序拒絕）、至少 2 點；混合不可排序型別 fail-closed 非 crash。
+- `systems_archetypes`：Atlas 自己用「等」截斷原型清單，補上業界標準 10 個封閉詞彙（明示為 compilation decision，非 Atlas 引用，比照 hazop 先例）；每個 match 至少 1 條 observed_symptoms。
+- `rich_picture`：至少 1 actor + 1 issue；issue 的 involves_actor_ids 非空且必須指向真實 actor。
+- `leverage_point_analysis`：tier_rank 為 GENUINE_COMPUTE，由 Atlas 自己的 5 層鏈（parameters→paradigm）機械映射，caller 不得傳入。
+- `agent_based_modeling`：每個 agent 至少 1 rule；run 的 agent_ids_involved 必須指向真實 agent。
+
+**critic 覆審**（1 輪，Standard tier，逐項 hand-tamper 驗證 + 對 16 個 gate 餵 9 類垃圾輸入共 144 次）：0 Critical／2 Major／1 Minor，全部當日修完才同步 registry：
+1. **Major｜nested-list aliasing**（`causal_loop_diagram.py:226`／`systems_archetypes.py:187`／`rich_picture.py:213`）：builder 回傳用 `[dict(x) for x in items]` 只淺複製每個 item dict，**沒有複製 item 自己的巢狀 list 欄位**（`edge_ids`／`observed_symptoms`／`involves_actor_ids`），所以「已驗證」的回傳記錄仍與 caller 輸入共用同一個 list 物件——caller 事後 append 就能在不觸發任何例外的情況下讓記錄失效。與 `stakeholders.game_theory` 當初同一種失效類別。修法：回傳時顯式重建巢狀 list（`{**lp, "edge_ids": list(lp["edge_ids"])}`）。同批 `agent_based_modeling.py`／`iceberg_model.py` 本來就寫對，證明 corpus 慣例存在，是這 3 個檔漏掉。341 條既有測試全綠仍抓不到（grep `alias`/`mutate`/`is not` 零命中＝根本沒測），修完以真實 mutation 腳本驗證。
+2. **Major｜registry 漂移**：本 session 第三次同類（前兩次已有 `fd99a9dd7`、`1b4debdb2` 兩個專門補救 commit）。本次改為**主 agent 自己收尾兩份 registry + `__init__.py`，subagent 一律不准碰共用檔**，從流程上斷掉併發覆寫的根因，非事後再補一個 commit。
+3. **Minor｜id prefix 撞名**：`systems.iceberg_model` 用 `ICE-`，與既有 `decision.ice` 相同。critic 以全 corpus RECORD_ID_PREFIX 掃描確認這是 ~130 個方法裡唯一一組碰撞。趁零筆記錄已存在時改為 `ICEBERG-`（4 檔同步），不留到有真實資料再改。
+
+**順帶修正**：`method-inventory.yaml` F09 全 8 列行號全部少 1（544 是表格分隔列 `|---|`，不是 Causal Loop Diagram）——與 F12 批次當初發現「全部少 3」同一種陳舊行號類別，已對 Atlas 原始檔逐行核對後訂正為 545–552。
+
+**已修改**：40 個新檔（8 方法 × 5 檔：contract／schema／module／CLI／test）＋ `ai_lego/modules/systems/__init__.py`（8/8 COMPLETE 並列出全部 8 個不變量）＋ `method-inventory.yaml`（8 列 has_contract/contract_status/machine_id/行號訂正）＋ `contract-backlog.yaml`（164–171 號 tier_1 entry）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_causal_loop_diagram.py tests/unit/test_stock_and_flow.py tests/unit/test_iceberg_model.py tests/unit/test_behavior_over_time.py tests/unit/test_systems_archetypes.py tests/unit/test_rich_picture.py tests/unit/test_leverage_point_analysis.py tests/unit/test_agent_based_modeling.py -q` | exit=0 | result=341 passed, 55 subtests（修 aliasing + 改 prefix 後重跑，數字不變）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c` 真實 mutation 腳本（建記錄→caller 事後 append 巢狀 list→斷言記錄未被污染）| exit=0 | result=aliasing 修復確認，記錄不受事後變更影響
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_<name>_slice`（8 支全跑，含 critic 獨立重跑）| exit=0 全數 PASS，每支各自展示至少 1 個真實拒絕案例 + 獨立 gate hand-tamper 攔截
+- REVIEW_DONE: critic=Standard | verdict=needs-fixes→已全修 | findings=0c/2m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`systems\.causal_loop_diagram\|systems\.stock_and_flow\|systems\.iceberg_model\|systems\.systems_archetypes\|systems\.rich_picture\|systems\.leverage_point_analysis\|systems\.behavior_over_time\|systems\.agent_based_modeling` | hits=206（全數為本批 40 新檔 + 兩份 registry，逐檔核對無非預期命中）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無已知風險。Method Atlas 真實剩餘：F10／F13／F14／F15／F22／F23／F24（7 個家族）。
+[rollback] `git revert` 本 commit；40 個新檔互相獨立，也可單獨刪除任一方法的 5 檔 + 還原兩份 registry 對應列。
+
 ## 2026-09-11（157–163 號切片：F12 挑戰／紅隊／風險家族收官 3/10→10/10，7 個平行 agent + 1 critic；順帶修復 F07 與 F12 兩處 registry SSOT 漂移）
 
 **觸發**：F07（`d3adeb65c`）收工後例行檢查 SSOT，發現 `method-inventory.yaml`／`contract-backlog.yaml` 兩份 F07 更新漏跑（見下方獨立記錄）；順藤摸瓜檢查 `ai_lego/modules/` 全目錄時發現 `challenge/` 資料夾（F12）早就存在 `red_team`/`blue_team`/`independent_judge` 三個方法，但從未被任一份 registry 登記過，也不在 TASKS.md 的「8 個未開工家族」清單裡——因為它有資料夾，不算「無對應目錄」，但其實只完成 3/10。
