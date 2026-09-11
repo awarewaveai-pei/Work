@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-11 第四批（來源選擇落地 + ops 操作台：蒐集器現在按得下去）
+
+前三批把引擎做完但沒人能按：seed 只能寫在程式裡，「這個客戶收哪些來源」不存在任何地方。
+
+- migration **0074** `collection_sources`：租戶 × 積木 × entry 唯一，`status` 為 `candidate`／`approved`／`disabled`。這張表同時就是 [ADR 013](docs/architecture/decisions/013-open-web-discovery-into-corpus.md) 要求的**核准面**——`approved` 那一列就是人說「這個來源可以代表這個租戶講話」。discovery 只能寫 `candidate`，程式裡沒有任何路徑能自己升級它。`collection_runs` 加 `source_id`（撤銷路徑的 run 層；document 層待 KB 能存來源參照）。
+- `sources-store.ts`：寫入前用目錄驗證（未知積木、收不到東西的設定當場退回），`approvedSeeds()` 只回 `approved`。`sourceToSeed()` 依 entry 形狀決定 scheme：query → `academic://`、path → `pathToFileURL`、url 保持原樣並鎖住 host scope。
+- `run.ts`：一個呼叫把「已核准的來源」跑成一次抓取。排程（C3）、webhook（C3b）與操作者按鈕共用**同一條路徑**——三個呼叫端各自組 budget 與 fetch 就是三個爬蟲共用一個名字。
+- API `/api/ops/clients/[slug]/collection-sources`（GET 目錄+來源／POST 新增或 `action:"run"`／PATCH 核准或停用／DELETE 一律軟停用）＋ ops 頁面 `/ops/collect`（側邊欄已加入口）。**試跑按鈕在正式抓取左邊**：新來源先對 `sink/null` 跑，看抓回來的是不是內文。不可用的來源在畫面上**顯示並寫出缺哪個變數**，不隱藏。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/collection-local-verify.sh`（真 Postgres，新增 0074 的 5 條斷言）| exit=0 | result=RUNS_OK + ALERT_OK + **SOURCES_OK** + DOWN_OK + 重套；含「同租戶同來源不得重複」「未知 status 被擋」「刪來源不會連帶刪掉 run 歷史」
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx next dev -p 3901` 後 `curl /ops/collect` | exit=0 | result=HTTP 200、37,551 bytes、頁面含「資料蒐集」「試跑」，Supabase 故意不設時正確顯示「沒有讀到任何客戶」空狀態
+REALTEST_EVIDENCE: tool=Bash | cmd=`curl /api/ops/clients/any/collection-sources` | exit=0 | result=無 session 回 401（middleware 閘正常）、帶 dev 通道回 `client_not_found` 404（org 查詢路徑正常）、無寫入權限回 403
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=106 檔 974 test 全綠（lib/collect 137）
+REVIEW_DONE: critic=Quick（新增檔為主；同日 C0/C1 Deep critic 的結論已全數修入）| verdict=pass | findings=0c/0m
+BUGHUNT_DONE: scope=lib/collect,app/api/ops,app/(shell)/ops,packages/db | grep=`collection_sources|collection-sources|runCollection|approvedSeeds` | hits=面板原本送 `x-ops-role` 這個**不存在的 header**（真正的是 middleware 由 session 注入的 `x-ops-claims-role`）——已移除，避免看起來像在做什麼其實沒有
+**已知限制（誠實）**：`next build` 目前被另一個 session 半完成的 `app/api/webhooks/chatwoot/route.ts` 擋住（`claimMessage` 尚未存在），所以整包 production build 尚未驗；我的頁面與 route 改用 dev server 逐路由編譯驗過。寫入路徑（新增／核准／抓取）在本機無法做完整端到端，因為需要真 session，且不應對 prod 發起真實寫入——這部分由 store 的單元測試與真 Postgres 的表層斷言覆蓋。
+**仍未做**：Apify 第二 driver、discovery（C6 的候選產生器）、排程（C3）、webhook（C3b）、HCI sink（C4，受 ADR-0029 拘束）、`0072`／`0073`／`0074` 三個 migration 都尚未套 prod（High-STOP）。
+
 ## 2026-09-11 ADR-012 提案→已接受；步驟1（kernel 契約層）動工前發現硬阻塞：HCI-30 仍在 Wave 1，未到 ADR-0013 授權的 Wave 3
 
 **觸發**：延續「剩下的去處理好」的第三項（ADR-012）。先驗證 ADR-012「脈絡」段的具體技術主張（`products.ts` 產品清單、`0062`/`0066`/`0043` migration 結構），逐項 Grep 對照原始碼確認屬實無誤，`decisions` §1-8 讀完是已推導完的設計而非待選項，於是問操作者要不要把狀態從「提案」拍板成「已接受」。操作者選「接受＋立刻啟動步驟1」。
