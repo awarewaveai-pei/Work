@@ -22,6 +22,8 @@ const addDays = (n: number): string => {
   return d.toISOString().slice(0, 10);
 };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Guard uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // POST { leadId, action, days?, date?, orgSlug? }
 //   action = set | snooze | complete | stop
@@ -42,6 +44,7 @@ export async function POST(req: Request): Promise<Response> {
   const leadId = str(body.leadId);
   const action = str(body.action);
   if (!leadId) return NextResponse.json({ ok: false, error: "leadId required" }, { status: 400 });
+  if (!UUID_RE.test(leadId)) return NextResponse.json({ ok: false, error: "leadId must be a uuid" }, { status: 400 });
   if (!action) return NextResponse.json({ ok: false, error: "action required" }, { status: 400 });
 
   // Verify caller owns this lead before mutating follow-up fields.

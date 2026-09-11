@@ -1,5 +1,59 @@
 # Worklog
 
+## 2026-09-11 Cold Outreach 收尾：leads/route.ts uuid guard 小修，牽出同 bug class 遍布全 8 route.ts + connectors/secret 缺失 ownership check
+
+**觸發**：操作者問完 cold email 進度（T10 gated + 3 條旁支待辦：GEMINI_API_KEY／leads uuid-into-column／ADR-012 產品登記）後說「全部去處理好」。範圍判定：ADR-012 共用平台層狀態仍是「提案」（`agency-os/docs/architecture/decisions/012-shared-platform-layer.md:3`），跨 8 個系統的架構決策不屬於本次「小修」範圍，不動；GEMINI_API_KEY 換發需操作者登入 Google AI Studio，不是我能做的動作；剩 leads/route.ts uuid-into-column 是唯一可直接處理的項目。
+
+**GEMINI_API_KEY**：REALTEST 直打 `GET https://generativelanguage.googleapis.com/v1beta/models?key=...` → `400 API_KEY_INVALID`，確認 WORKLOG-archive 2026-06-23 記載的「過期」屬實非誤報。無法自行換發（需操作者 Google 帳號登入），已在 TASKS.md 註記需操作者處理。
+
+**leads/route.ts 小修 → 牽出系統性 gap**：修 `app/api/outreach/leads/route.ts` 4 處 unguarded `.eq("id", <client 字串>)`（GET/POST approve/POST manual/DELETE），比照 `suppression/route.ts` 已有的 `UUID_RE.test()` early-return 400 pattern（未 guard 時 client 傳非 uuid 字串會讓 PG 丟 `22P02 invalid input syntax for type uuid`，原碼直接把 `error.message` 包進 500 洩漏）。改完用 critic Quick 審過（0C/0M/0m）後，為了完成 BUGHUNT_DONE 的抓蟲動作 grep 同檔案家族，發現這個 bug class 遍布整個 `co_outreach` API：`connectors`／`followups`／`inbox`／`messages`／`service-profiles`／`suppression` 六個 sibling route.ts 有同樣未 guard 的 `id`/`organizationId`/`leadId`，甚至 `suppression/route.ts` 自己的 DELETE `id` 也沒 guard 到（原始修復只顧到 POST 的 `organizationId`/`leadId`）。判斷這是同一類問題（invariant：client 傳的字串進 uuid 欄位前一律要驗證），只修 leads.ts 一個實例是補丁，六個 sibling 一併補齊。
+
+第二輪 critic（Standard tier，因為已跨 6 檔）另外抓到 `connectors/secret/route.ts`（單段 glob `*/route.ts` 掃不到的兩層深路徑）同樣缺 uuid guard，且比其他 route 更嚴重：DELETE 完全沒有 existence/ownership check 就直接 `deleteSecret()` + null 掉 `credentials_ref`——任何有 `canManageOutreach` 角色的呼叫者猜到/列舉到別 org 的 connector uuid 就能清空對方的 vault 金鑰參照。目前僅 agency staff 有此角色（design 上本就跨 org），不是活著的權限升級，但 Phase 5 client 自助開放後就會變成真漏洞，且與同檔 POST 的既有 ownership check 不一致。已補 `assertOrgAccess` + `select("id, organization_id")` 到 POST 和 DELETE 兩處，比照 `connectors/route.ts` 既有 pattern。
+
+**已修改**：8 個 `app/api/outreach/**/route.ts` 全部（`leads`／`connectors`／`connectors/secret`／`followups`／`inbox`／`messages`／`service-profiles`／`suppression`），每處新增 module-level `UUID_RE` + client 輸入 early-return 400 guard；`connectors/secret/route.ts` 額外補 `assertOrgAccess` ownership check（POST + DELETE）。`agency-os/TASKS.md:720,722-723` 訂正兩處過期宣稱（leads uuid-into-column 待辦已完成；BUILD_PLAN.md 檔頭「未開始」的附帶待修其實 2026-08-25 已訂正，該行本身過期）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`GET https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY` | exit=0 | result=HTTP 400 `API_KEY_INVALID`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit` | exit=0 | result=0 errors in touched files（10 pre-existing chatwoot/cs 錯誤與本次改動無關，unrelated module）
+- REALTEST_EVIDENCE: tool=Browser(preview_start next-admin-verify) | cmd=`GET /api/outreach/leads?id=not-a-uuid` | exit=0 | result=fresh dev server boot 確認 middleware/route 無 runtime crash；完整 authed round-trip 需真實 Supabase session cookie，未偽造（超出此修復的效力邊界，guard 邏輯本身逐行核對 + critic 二輪覆審取代）
+- REVIEW_DONE: critic=Quick（leads.ts 單檔）| verdict=pass | findings=0c/0m/0n；critic=Standard（6 sibling + inventory 覆查）| verdict=pass-with-findings | findings=0c/2m（均已修：connectors/secret uuid guard + ownership check）；critic=Deep（verify-recent gate，全 8 檔 + `assertOrgAccess`/`tenant-guard.ts` 語意覆核，含 staff-fail-open 與 client-org 隔離雙向驗證）| verdict=pass | findings=0c/0m/1n（TOCTOU：SELECT→mutate 非交易性，全 8 檔既有 pattern，非本次引入，未修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`UUID_RE`／`uuid-into-column` | hits=72 全域（`UUID_RE`；本次 8 個 `app/api/outreach/**/route.ts` 內共 38 處，含既有 pattern）／10 處於 8 檔（`uuid-into-column`：`TASKS.md` 已訂正、`WORKLOG.md` 為本條目自身；其餘 6 檔——`WORKLOG-archive/2026-06.md` + `reports/ao-resume/2026-07-03-0835.md` + 4 個 `reports/status/integrated-status-*.md`——皆為歷史快照，依慣例不回改）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] `lib/tenant-guard.ts:165-179` 的 `effectiveOrgId()` 本身不驗證 uuid 格式（只在 client 角色時鎖 org，staff 角色原樣放行 `requestedOrgId`）——這次選擇在各 route 呼叫端補 guard（跟 `suppression/route.ts` 既有 pattern一致），沒有改共用 helper 本身；若之後其他非 outreach 消費者（video／cognitive／其他）也有同款 unguarded 呼叫，`effectiveOrgId()` 本身仍是未修的根，但改共用 helper 影響面遠大於本次範圍，未動。T10 Gmail OAuth 仍 gated（High-risk，未觸碰）。GEMINI_API_KEY 待操作者登入 Google AI Studio 換發。
+[rollback] `git revert` 本次 commit；無 schema/DB 變更，純 API route 輸入驗證 + 一處 ownership check，對合法呼叫（皆為真實 DB-sourced uuid）零行為變化。
+
+## 2026-09-11 Postiz 待辦 VBC 複查：2/3 早已完成（未同步更新），順帶抓到 backend 假死事故並修復
+
+**觸發**：操作者問完 Postiz 進度後說「全部去處理好，我授權核准」，指的是 TASKS.md 上剩的 3 條 Postiz 待辦（OAuth app 審核／測試草稿清理／帳號連客戶 Hub）。動手前先 VBC 查現況，而非直接假設待辦清單為真。
+
+**查證結果（DB 直查，`supabase-db` 容器 → `postiz`／主 DB）**：
+- 「Postiz 帳號 → 客戶 Hub 連結」：`social_postiz_connections` 已有一列，`client_id=2bf60452-3d4d-47c2-9970-b9046ed1a35a`（Soulful Expression Art Therapy）↔ `postiz_integration_id=cmqe3jw960001p58nt0xohbi8`（bluesky），`status=connected`，`created_at=2026-06-23 16:47:20`。**三個月前已完成**，TASKS.md 待辦未同步打勾。
+- 「測試草稿清理」：Postiz `postiz` DB 的 `Post` 表查 `id='cmqo1wijz0005p58ncl1mtssr'` → `deletedAt=2026-06-23 16:43:20.882`（軟刪除欄位已寫入）。**三個月前已完成**，同一待辦未同步打勾。
+
+**查證過程中意外發現真事故**：對已刪除的 draft 重打 `DELETE /public/v1/posts/:id`（想驗證清理是否徹底）先後收到 502（透過 `postiz.aware-wave.com` 與本機 `127.0.0.1:4007` 皆同，判斷非 CF/hairpin 問題）。SSH 進 ks-aw-01 查 `docker exec postiz pm2 list`：`backend` process 顯示 `status=online`、`↺=0`（pm2 認為正常）。深查發現這是假象——`/proc/<pid>/cmdline` 顯示該 pid 其實是外層 `node /usr/local/bin/pnpm` wrapper，非真正的 Nest.js server；容器內 `ss -tlnp` 查無任何行程監聽 `:3000`（`BACKEND_INTERNAL_URL` 指向的埠）；`wget localhost:3000` 回 `connection refused`。即內層 Nest server 已經退出，但 pm2 只認得 wrapper 行程存活，未偵測到子行程死亡、未觸發 restart。
+
+**修復**：`docker exec postiz pm2 restart backend`（只重啟掛掉的 process，不動 `cron`/`workers`/`frontend`，比照 runbook §4 既有「`pm2 restart workers`」的既定模式）。8 秒後 `ss -tlnp` 確認 `:3000` 已監聽，`GET /public/v1/integrations` 回 200（`soulfulexpression.bsky.social`，`disabled:false`），公開網址 `https://postiz.aware-wave.com` 回 307（正常導向 `/auth`）。整個 Postiz 服務（含 ContentStudio 依賴的社群發文功能）在修復前處於**全面 502**狀態，未修復前無法發文/清理草稿——這比原本 3 條待辦本身更值得記。
+
+**已修改（文件同步，非 code）**：
+- `agency-os/TASKS.md`：上述 2 條待辦改 `[x]` 並附查證依據；新增第 3 條記錄本次事故發現＋修復。
+- `runbooks/POSTIZ-OPS-RUNBOOK.md` §7：草稿清理項目改標記已完成；新增「已知 backend 假死模式」小節（症狀＋修復指令），供下次同樣症狀直接查表。
+- `agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md` Gate C：測試 draft 待刪除警語改標記已解決。
+
+**未動**：OAuth app 審核（Meta IG+FB／Reddit／LinkedIn）——這條待辦是真的還沒做，非誤報；接續處理見下一條目。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -U postgres -d postgres -c "SELECT * FROM social_postiz_connections;"` | exit=0 | result=1 row，2026-06-23 已連結
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec -e PGPASSWORD=*** supabase-db psql -U postiz -d postiz -c "SELECT id,state,\"deletedAt\" FROM \"Post\" WHERE id='cmqo1wijz0005p58ncl1mtssr';"` | exit=0 | result=`deletedAt=2026-06-23 16:43:20.882`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec postiz pm2 restart backend` 後 `curl http://127.0.0.1:4007/api/public/v1/integrations` | exit=0 | result=修復前 HTTP 502 → 修復後 HTTP 200，8 秒內恢復
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -s -o /dev/null -w "%{http_code}" https://postiz.aware-wave.com`（從本機外部驗證，非 hairpin）| exit=0 | result=307（正常）
+- REVIEW_DONE: critic=self（Quick；範圍：DB 查證只讀 SELECT、修復動作限定 `pm2 restart backend` 單一 process 不動其餘 3 個 process、未改 Postiz 原始碼只用既有 pm2 操作介面，符合 runbook §6「不可執行：改 Postiz DB schema」紅線——本次只讀不改 schema/資料）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=`cmqo1wijz0005p58ncl1mtssr` | hits=38 檔，其中僅 `TASKS.md`／`POSTIZ-OPS-RUNBOOK.md`／`POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 是即時 SSOT 已同步修正；其餘 35 個命中為 `memory/daily/*.md`／`reports/weekly/*.md`／`reports/ao-resume/*.md` 歷史日誌快照，依慣例不回改歷史記錄
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] backend 假死根因未查（Nest process 悄悄退出但 pm2 wrapper 未偵測到子行程死亡，可能是 pnpm 的 signal-forwarding 行為問題）——若之後 AO-RESUME smoke 或使用者又報 Postiz 502，直接查 runbook §7 新增小節，不必重新診斷一次。
+[rollback] 純文件訂正 + 服務重啟，無 schema/資料/程式碼變更；若要回滾「文件已標記完成」的判斷，`git revert` 本次 commit 即可，DB 狀態不受影響（本來就是既有事實）。
+
 ## 2026-09-11 真實跑 `/tools/video` pipeline，抓到 wizard②選租戶跟實際渲染租戶對不上
 
 **觸發**：操作者要求「每種都要測試實證系統可以運行」，不接受只看 code review/tsc。本機無 AI 金鑰測不了，操作者親自登入正式站 `app.aware-wave.com`，同瀏覽器分頁讓 session cookie 帶過去，我在她的真實登入 session 上直接操作。

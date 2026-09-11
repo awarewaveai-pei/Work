@@ -39,6 +39,8 @@ export async function GET(req: Request): Promise<Response> {
 
   const id = url.searchParams.get("id");
   if (id) {
+    // Guard uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak.
+    if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
     const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
@@ -83,6 +85,7 @@ export async function POST(req: Request): Promise<Response> {
   // --- Approve-from-inbox path ---
   const fromInboxId = str(body.fromInboxId);
   if (fromInboxId) {
+    if (!UUID_RE.test(fromInboxId)) return NextResponse.json({ ok: false, error: "fromInboxId must be a uuid" }, { status: 400 });
     const { data: inbox, error: inErr } = await supabase.from("co_lead_inbox").select("*").eq("id", fromInboxId).maybeSingle();
     if (inErr) return NextResponse.json({ ok: false, error: inErr.message }, { status: 500 });
     if (!inbox) return NextResponse.json({ ok: false, error: "inbox row not found" }, { status: 404 });
@@ -133,6 +136,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // --- Manual create / update path ---
   const id = str(body.id);
+  if (id && !UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
   const name = str(body.name);
   if (!name) return NextResponse.json({ ok: false, error: "name required" }, { status: 400 });
 
@@ -203,6 +207,7 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
   const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });

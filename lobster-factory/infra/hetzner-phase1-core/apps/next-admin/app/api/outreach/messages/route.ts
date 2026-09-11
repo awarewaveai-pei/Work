@@ -20,6 +20,8 @@ export const dynamic = "force-dynamic";
 
 const TABLE = "co_messages";
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+// Guard uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface LeadRow {
   id: string;
@@ -66,8 +68,11 @@ export async function GET(req: Request): Promise<Response> {
   const supabase = await getOrgSupabaseWriteClient(params.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const leadId = params.get("leadId");
+  if (leadId && !UUID_RE.test(leadId)) return NextResponse.json({ ok: false, error: "leadId must be a uuid" }, { status: 400 });
+  const rawOrgId = params.get("organizationId");
+  if (rawOrgId && !UUID_RE.test(rawOrgId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
   let orgFilter: string | null;
-  try { orgFilter = effectiveOrgId(req, params.get("organizationId")); }
+  try { orgFilter = effectiveOrgId(req, rawOrgId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(100);
   if (leadId) query = query.eq("lead_id", leadId);
@@ -93,6 +98,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const leadId = str(body.leadId);
   if (!leadId) return NextResponse.json({ ok: false, error: "leadId required" }, { status: 400 });
+  if (!UUID_RE.test(leadId)) return NextResponse.json({ ok: false, error: "leadId must be a uuid" }, { status: 400 });
 
   const { data: leadData, error: leadErr } = await supabase.from("co_leads").select("*").eq("id", leadId).maybeSingle();
   if (leadErr) return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });
@@ -232,6 +238,7 @@ export async function PATCH(req: Request): Promise<Response> {
   const id = str(body.id);
   const status = str(body.status);
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
   if (!status || !ALLOWED_STATUS.has(status)) {
     return NextResponse.json({ ok: false, error: "valid status required (draft|approved|needs_edit|skipped)" }, { status: 400 });
   }
@@ -261,6 +268,7 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
   const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });

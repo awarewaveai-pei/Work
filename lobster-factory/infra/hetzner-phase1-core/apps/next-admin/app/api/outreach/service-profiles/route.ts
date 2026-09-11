@@ -17,6 +17,9 @@ const LIST_LIMIT = 200;
 const str = (v: unknown): string | null =>
   typeof v === "string" && v.trim() ? v.trim() : null;
 
+// Guard uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Accept either a real array of strings or a comma-separated string from a form field.
 const arr = (v: unknown): string[] | null => {
   if (Array.isArray(v)) {
@@ -40,6 +43,7 @@ export async function GET(req: Request): Promise<Response> {
 
   const id = params.get("id");
   if (id) {
+    if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
     const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
@@ -48,8 +52,10 @@ export async function GET(req: Request): Promise<Response> {
     return NextResponse.json({ ok: true, profile: data });
   }
 
+  const rawOrgId = params.get("organizationId");
+  if (rawOrgId && !UUID_RE.test(rawOrgId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
   let orgFilter: string | null;
-  try { orgFilter = effectiveOrgId(req, params.get("organizationId")); }
+  try { orgFilter = effectiveOrgId(req, rawOrgId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(LIST_LIMIT);
   if (orgFilter) query = query.eq("organization_id", orgFilter);
@@ -74,6 +80,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
   const id = str(body.id);
+  if (id && !UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
   const service_name = str(body.serviceName);
   if (!service_name) return NextResponse.json({ ok: false, error: "serviceName required" }, { status: 400 });
 
@@ -112,8 +119,12 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // INSERT — pin organization_id via effectiveOrgId (client → own org; staff → body value).
+  const rawInsertOrgId = str(body.organizationId);
+  if (rawInsertOrgId && !UUID_RE.test(rawInsertOrgId)) {
+    return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
+  }
   let insertOrgId: string | null;
-  try { insertOrgId = effectiveOrgId(req, str(body.organizationId)); }
+  try { insertOrgId = effectiveOrgId(req, rawInsertOrgId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const { data, error } = await supabase
     .from(TABLE)
@@ -135,6 +146,7 @@ export async function DELETE(req: Request): Promise<Response> {
 
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
 
   const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });

@@ -22,6 +22,8 @@ export const dynamic = "force-dynamic";
 const TABLE = "co_lead_inbox";
 const LIST_LIMIT = 200;
 const MAX_BATCH = 500;
+// Guard uuid-typed columns up front so a bad id returns a clean 400, not a raw PG 22P02 leak.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function classify(
   n: NormalizedLead,
@@ -42,8 +44,10 @@ export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const supabase = await getOrgSupabaseWriteClient(url.searchParams.get("orgSlug"));
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
+  const rawOrgId = url.searchParams.get("organizationId");
+  if (rawOrgId && !UUID_RE.test(rawOrgId)) return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
   let orgFilter: string | null;
-  try { orgFilter = effectiveOrgId(req, url.searchParams.get("organizationId")); }
+  try { orgFilter = effectiveOrgId(req, rawOrgId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const status = url.searchParams.get("status");
   let query = supabase.from(TABLE).select("*").order("created_at", { ascending: false }).limit(LIST_LIMIT);
@@ -70,12 +74,12 @@ export async function POST(req: Request): Promise<Response> {
   const supabase = await getOrgSupabaseWriteClient(orgSlug);
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
 
-  const rawOrgId = typeof body.organizationId === "string" && body.organizationId.trim() ? body.organizationId.trim() : null;
-  if (rawOrgId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawOrgId)) {
+  const rawBodyOrgId = typeof body.organizationId === "string" && body.organizationId.trim() ? body.organizationId.trim() : null;
+  if (rawBodyOrgId && !UUID_RE.test(rawBodyOrgId)) {
     return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });
   }
   let organizationId: string | null;
-  try { organizationId = effectiveOrgId(req, rawOrgId); }
+  try { organizationId = effectiveOrgId(req, rawBodyOrgId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const rawList: RawLead[] = Array.isArray(body.leads)
     ? (body.leads as RawLead[])
@@ -155,6 +159,7 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
   const id = params.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
+  if (!UUID_RE.test(id)) return NextResponse.json({ ok: false, error: "id must be a uuid" }, { status: 400 });
   const { data: cur, error: readErr } = await supabase.from(TABLE).select("organization_id").eq("id", id).maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!cur) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
