@@ -4162,6 +4162,198 @@ tier_1:
       for this batch (see WORKLOG 2026-09-11 F06 entry for the critic's
       actual verdict).
 
+  onehundredfortyseventh_concrete_entry:
+    # New F07 stakeholder/power/negotiation family, 10-agent parallel batch,
+    # 2026-09-11 (immediately following the F06 batch above). Provenance
+    # placement fixed batch-wide to record-level ONLY, same prescribed rule
+    # F06 used.
+    method_id: "stakeholders.stakeholder_map"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L487) + dedicated §11.14 (L1516-1544, a 16-item
+      reference checklist of stakeholder categories, explicitly scoped to
+      "對大型全球計畫至少要考慮" -- a reference list, not a mandatory closed
+      set). Real invariant: the UNION of relationship_types across every
+      entry in the whole map must cover >=2 of the table row's own 4
+      literal values (DIRECT/INDIRECT/BENEFICIARY/RISK_BEARER) -- a map
+      where every entry is tagged only DIRECT has degenerated into "只看
+      決策者", the exact failure §11.14's own 效益 line names.
+    source: "methods/contracts/stakeholders.stakeholder_map.contract.yaml + specs/cognitive/typed-objects/stakeholder-map.schema.yaml + ai_lego/modules/stakeholders/stakeholder_map.py"
+    note: "62 tests pass. F07 family opened by this batch. CLI PASS, empty-map + invalid-entry + relationship-coverage-too-narrow refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortyeighth_concrete_entry:
+    method_id: "stakeholders.power_interest"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L488) + inline mermaid quadrantChart (L498-507)
+      + dedicated §11.15 (L1547-1561). Real invariant, GENUINE_COMPUTE:
+      each stakeholder's quadrant is mechanically derived from its own
+      power_score x interest_score (1-10 scale, no constructor parameter
+      accepted for quadrant) via a TOTAL 4-cell lookup table -- the
+      mermaid chart's own quadrant-N geometry was independently verified
+      against mermaid-js's published docs before encoding, not guessed.
+      §11.15's own reverse caution ("不是判斷誰比較「重要的人」") is
+      enforced structurally: no importance/ranking field exists anywhere.
+    source: "methods/contracts/stakeholders.power_interest.contract.yaml + specs/cognitive/typed-objects/power-interest-matrix.schema.yaml + ai_lego/modules/stakeholders/power_interest.py"
+    note: "60 tests pass. CLI PASS, invalid-score + caller-supplied-quadrant refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfortyninth_concrete_entry:
+    method_id: "stakeholders.salience_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L489, sole citation -- no dedicated section).
+      Atlas cites only the 3 dimension names (Power/Legitimacy/Urgency);
+      the Mitchell-Agle-Wood (1997) academic model's own 7-type
+      classification is NOT Atlas-cited, so this contract deliberately
+      does NOT adopt those 7 labels (disclosed compilation decision).
+      Real invariants: each of power/legitimacy/urgency is
+      {present:bool, justification}, justification required iff
+      present=true ("不能只打勾沒證據"); dimension_count/salience_class
+      are GENUINE_COMPUTE (an 8-way named combination of the 3 booleans,
+      never a builder parameter).
+    source: "methods/contracts/stakeholders.salience_model.contract.yaml + specs/cognitive/typed-objects/salience-model.schema.yaml + ai_lego/modules/stakeholders/salience_model.py"
+    note: "58 tests pass (57 original + 1 added post-critic-review: forged computation_provenance_ref now caught by the gate, not just the schema). CLI PASS, missing-justification-when-present + caller-supplied-dimension_count refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftieth_concrete_entry:
+    method_id: "stakeholders.incentive_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L490, sole citation). Real invariant:
+      incentive_cards[] is a PER-CARD completeness check (contextual_
+      inquiry's per-entry shape, not empathy_map's cross-entry floor) --
+      every card's own 5 fields (stakeholder_name/goals/incentives/
+      constraints/risks) must each be non-empty; one incomplete card is
+      refused even when every other card in the same list is complete.
+    source: "methods/contracts/stakeholders.incentive_mapping.contract.yaml + specs/cognitive/typed-objects/incentive-mapping.schema.yaml + ai_lego/modules/stakeholders/incentive_mapping.py"
+    note: "48 tests pass. CLI PASS, empty-cards + incomplete-single-card refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftyfirst_concrete_entry:
+    method_id: "stakeholders.raci"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L491, sole citation). Real invariants (standard
+      RACI management practice, disclosed as an external convention, not
+      an Atlas-cited detail): exactly one Accountable per task (0 or 2+
+      is the exact "責任模糊" failure L491's own benefit column names);
+      at least one Responsible per task; role a closed {R,A,C,I} enum.
+      Deliberately disambiguated (SRACI- prefix, distinct method_id) from
+      method-inventory.yaml's still-unbuilt, pending F22 pm-governance
+      "RACI (delivery)" entry (L1365-1369) -- a different future
+      delivery-task-execution-scoped method, not this one.
+    source: "methods/contracts/stakeholders.raci.contract.yaml + specs/cognitive/typed-objects/stakeholder-raci.schema.yaml + ai_lego/modules/stakeholders/raci.py"
+    note: "60 tests pass (57 original + 3 added post-critic-review: a CRITICAL finding, RACI_DUPLICATE_TASK_NAME -- 2 tasks[] entries sharing one task_name, each with its own single Accountable, previously passed the per-entry check while silently reintroducing the exact 責任模糊 this method removes; fixed at both builder and gate). CLI PASS, zero-Accountable + two-Accountable + missing-Responsible + duplicate-task-name refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftysecond_concrete_entry:
+    method_id: "stakeholders.batna"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L492) + dedicated §11.16 (L1565-1579, literal
+      5-step procedure). Real invariants: best_alternative_id must equal
+      a real alternatives[].id (step 3's "選最佳 BATNA" is a selection
+      FROM step 1's list, never an independently-typed string);
+      reservation_point is GENUINE_COMPUTE (selected alternative's
+      value_estimate minus cost_estimate, no constructor parameter),
+      mechanizing step 5's causal "依 BATNA 推 reservation point".
+    source: "methods/contracts/stakeholders.batna.contract.yaml + specs/cognitive/typed-objects/batna.schema.yaml + ai_lego/modules/stakeholders/batna.py"
+    note: "54 tests pass (50 original + 4 added post-critic-review: a MAJOR finding -- best_alternative_id was checked for referential integrity only, not actual optimality; §11.16 step 3 is literally '選最佳 BATNA'. Naming a real-but-strictly-inferior alternative silently understated reservation_point, the number ZOPA is the named downstream consumer of. Fixed with BATNA_BEST_ALTERNATIVE_NOT_OPTIMAL at both builder and gate, ties legitimate). CLI PASS, best_alternative-not-found + best_alternative-not-optimal + tampered-reservation_point refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftythird_concrete_entry:
+    method_id: "stakeholders.zopa"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L493) + dedicated §11.17 (L1583-1595, literal
+      "Seller minimum---[ZOPA]---Buyer maximum" diagram). Real invariant,
+      GENUINE_COMPUTE, no constructor parameter for either: zopa_exists =
+      (seller_minimum <= buyer_maximum) -- §11.17's own "找雙方
+      reservation point 是否有重疊" IS this comparison, not a caution
+      about it; zopa_range is exactly [seller_minimum, buyer_maximum]
+      when zopa_exists, else null.
+    source: "methods/contracts/stakeholders.zopa.contract.yaml + specs/cognitive/typed-objects/zopa.schema.yaml + ai_lego/modules/stakeholders/zopa.py"
+    note: "51 tests pass. CLI PASS, non-finite-reservation-point + caller-supplied-zopa_exists refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftyfourth_concrete_entry:
+    method_id: "stakeholders.interest_based_negotiation"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L494, sole citation -- Fisher & Ury principled
+      negotiation). Real invariants: all 4 of the row's own literal
+      pipeline stages (separate_people_from_problem/interests/options/
+      objective_criteria) required non-empty, none skippable; IF the
+      optional position field is present, no interests entry may be a
+      case/whitespace-insensitive verbatim echo of it -- mechanizing the
+      row's own "從 position 轉 interests" transform (mirrors
+      framing.goal_statement's success_condition != goal echo-check
+      class, generalized to a per-list-entry check).
+    source: "methods/contracts/stakeholders.interest_based_negotiation.contract.yaml + specs/cognitive/typed-objects/interest-based-negotiation.schema.yaml + ai_lego/modules/stakeholders/interest_based_negotiation.py"
+    note: "57 tests pass (55 original + 2 added post-critic-review: a MAJOR finding -- the anti-echo check's `_normalize` used only casefold()+whitespace-collapse, so an NFD-decomposed or full-width-Latin restatement of position bypassed the invariant this method's own contract calls its distinctive contribution; fixed by running unicodedata.normalize('NFKC', ...) first). CLI PASS, missing-pipeline-stage + position-echoed-in-interests (incl. NFD/full-width variants) refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredfiftyfifth_concrete_entry:
+    method_id: "stakeholders.game_theory"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L495) + dedicated §12.19 (L2777-2784, literal
+      Players->Strategies->Payoffs->Information->Sequence->Equilibrium
+      pipeline plus the explicit limitation "Payoff 設錯，模型再漂亮也無
+      用"). Real invariant: every strategies[] entry must have exactly
+      one matching payoff BEFORE construction succeeds -- mechanizing
+      that limitation into a real completeness gate rather than a soft
+      caution. Scope-bounded: no Nash-equilibrium solver is implemented;
+      equilibrium is a caller-supplied conclusion string, only its
+      supporting payoff data is verified complete.
+    source: "methods/contracts/stakeholders.game_theory.contract.yaml + specs/cognitive/typed-objects/game-theory.schema.yaml + ai_lego/modules/stakeholders/game_theory.py"
+    note: "59 tests pass (51 original + 8 added post-critic-review: a CRITICAL finding -- _is_number_excluding_bool guarded bool but not math.isfinite, so NaN/+-inf payoff values passed builder+gate+schema, defeating the one invariant this method exists to enforce (payoff comparisons involving NaN are always False); fixed to match batna.py/zopa.py's own finiteness check. Also fixed 2 MAJOR findings in the same pass: the builder aliased the caller's nested player/strategy/payoff dicts (list() copied the outer list only, not each element -- every other builder in this batch already deep-copies), and the gate never checked for unknown/missing top-level keys despite defining _STORED_CONTENT_KEYS for exactly that purpose (dead code, now wired in)). CLI PASS, too-few-players + strategy-without-payoff + NaN/inf-payoff + unknown-key refusals + independent-gate hand-tamper proof + aliasing-immunity proof demonstrated."
+
+  onehundredfiftysixth_concrete_entry:
+    # Last of this 10-agent F07 batch -- F07 is 10/10 COMPLETE after this
+    # entry (independently confirmed via `ls methods/contracts/
+    # stakeholders.*.contract.yaml`: 10 files present).
+    method_id: "stakeholders.coalition_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F07 table row (Atlas L496, sole citation). Real invariants:
+      stakeholder_profiles[] requires >=2 well-shaped {id,name,interests,
+      power,resources} entries, unique ids; coalition_scenarios[]
+      requires every member_ids entry (>=2 unique members -- a coalition
+      needs at least 2 parties) to resolve to a real profiled
+      stakeholder id (dangling-reference refused, same referential-
+      integrity class association.concept_map's own edge-reference check
+      already establishes). No coalition-recommendation algorithm is run
+      -- coalition_scenarios is caller-supplied content, only structural
+      completeness and referential integrity are mechanically enforced.
+    source: "methods/contracts/stakeholders.coalition_mapping.contract.yaml + specs/cognitive/typed-objects/coalition-mapping.schema.yaml + ai_lego/modules/stakeholders/coalition_mapping.py"
+    note: >
+      59 tests pass (56 original + 3 added post-critic-review: a MAJOR
+      finding -- id uniqueness/referential-integrity used exact-string
+      comparison, so "eu" and "eu " counted as 2 distinct stakeholders,
+      letting member_ids:["eu","eu "] pass the >=2-unique-members floor
+      as a degenerate 1-party "coalition"; fixed with a shared
+      _normalize_id (strip) applied to profile-id dedup, member_ids
+      dedup, and the stakeholder_ids frozenset at both the builder and
+      the gate's own independent reconstruction). F07 stakeholder/
+      power/negotiation family: 10 of 10 COMPLETE as of this entry
+      (stakeholder_map/power_interest/salience_model/incentive_mapping/
+      raci/batna/zopa/interest_based_negotiation/game_theory all landed
+      via concurrent sibling agents in this same batch, entries
+      onehundredfortyseventh through onehundredfiftyfifth above). CLI
+      PASS, empty-scenarios + dangling-member-reference + too-few-members
+      + whitespace-variant-duplicate refusals + independent-gate
+      hand-tamper proof demonstrated. Provenance placement uniform
+      across all 10 methods (record-level only), same prescribed
+      batch-wide rule F06 established. 1 independent critic pass
+      (Standard tier) found 2 Critical + 5 Major + 3 Minor across the
+      batch, all fixed same-day before commit -- see WORKLOG 2026-09-11
+      F07 entry for the critic's full verdict and per-finding detail.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

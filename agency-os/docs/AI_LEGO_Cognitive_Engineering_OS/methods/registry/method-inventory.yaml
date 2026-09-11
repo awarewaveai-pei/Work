@@ -486,53 +486,63 @@ by_document:
       - name: "Stakeholder Map"
         line: 486
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.stakeholder_map"
       - name: "Power–Interest"
         line: 487
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.power_interest"
       - name: "Salience Model"
         line: 488
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.salience_model"
       - name: "Incentive Mapping"
         line: 489
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.incentive_mapping"
       - name: "RACI"
         line: 490
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.raci"
       - name: "BATNA"
         line: 491
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.batna"
       - name: "ZOPA"
         line: 492
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.zopa"
       - name: "Interest-Based Negotiation"
         line: 493
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.interest_based_negotiation"
       - name: "Game Theory"
         line: 494
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.game_theory"
       - name: "Coalition Mapping"
         line: 495
         category: "F07 stakeholders"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "stakeholders.coalition_mapping"
       - name: "PESTEL"
         line: 514
         category: "F08 strategy"
