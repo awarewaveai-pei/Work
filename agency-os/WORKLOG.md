@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-11 HCI30 案件詳情頁改版面順序——照系統實際分析流程重排，不是雷達圖美觀問題
+
+操作者這輪不是問排版好不好看，是問邏輯：「怎麼會是雷達圖在最上面? 那不是最後才會產出的東西嗎?」。查看 `Projects/internal/hci30/app/public/index.html` 的 `#detail` 區塊，原始順序是：案件標頭（含決策 banner）→ 信任構面（雷達圖+構面卡片，系統算出來的結果）→ 洞察 → 記錄決策表單 → 證據與主張（含新增證據表單，真正的輸入資料）。證據明明是所有計算的來源，卻排在整頁最後；雷達圖是證據算出來的結果，卻排在最前面——跟系統自己「這個系統怎麼運作？」說明頁畫的流程圖（開案件→記錄證據/主張/評估→系統自動算出信任構面→你做決策）完全相反。
+
+改法：把 `#detail` 內的區塊按實際流程重排為：案件標頭（標題/風險等級，案件層級設定）→ **證據與主張**（輸入）→ **信任構面**（雷達圖+構面卡片+嚴重警訊，證據算出來的結果）→ 洞察（優勢/風險/未知）→ **決策**（決策 banner + 記錄決策表單，人做的最終判斷）→ **產生報告**（最終產物）。所有 element id 完全不變（`d-decision-banner`／`d-risk-tier-wrap`／`d-reports-wrap`／`d-decision-form-wrap` 等），純粹是 HTML 區塊搬動位置，`refreshDetail()`／`loadReportHistory()` 等既有 JS 邏輯零改動。
+
+同一個順序問題在 `renderReportView()`（產生的凍結報告頁）獨立重複了一份——一併照同一個順序修正，避免只修活頁面、報告頁留著同款問題的半套修法（比照這輪稍早 CSS 修法時就已經定下的原則）。順帶修正 3 處提到「上方/下方證據」「上方/下方信任構面」的文案，讓文字描述跟改動後的實際版面位置對得上。
+
+真跑驗證：本機 dev server（`localhost:4030`，真實 Postgres，`hci30dev-db-1` container）開一個既有案件，用 `get_page_text` 讀出活頁面 DOM 文字順序＝證據與主張→信任構面→主要優勢/重大風險/未知構面→決策→產生報告，符合預期；接著實際按「產生信任評估報告」，讀出報告頁順序＝證據與主張→信任構面→決策→免責聲明，跟活頁面順序一致；全程 `read_console_messages` 零錯誤，風險等級按鈕、報告產生功能皆正常運作。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，讀取活頁面與報告頁的 DOM 文字順序，並實際觸發一次報告產生 | 結果=兩邊順序皆為 證據→信任構面→決策（報告頁多一段免責聲明），符合流程圖；console 零錯誤
+REVIEW_WAIVED: NA -- 純 HTML 區塊搬動（element id 不變）+ 3 處文案方向詞修正，無新邏輯、無 id 改動、無新端點；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=d-decision-banner|d-risk-tier-wrap|d-reports-wrap|d-decision-form-wrap | hits=0（4 個 id 只在 index.html 內部互相參照，跟 DOM 順序無關的既有機制）；另 grep=記錄決策 hits=5，皆為既有語句「尚未記錄決策...」或歷史 WORKLOG/TASKS/RUNNABLE_DEMOS 條目，無一引用被移除的 h2 標題文字本身
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`#detail` 區塊順序重排；`renderReportView()` 同步重排；3 處「上方/下方」文案修正）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過活頁面與報告頁順序一致，console 零錯誤
+
+[剩餘風險] 無新增風險；純版面順序調整，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到區塊搬動前的順序（雷達圖在證據之前）。
+
 ## 2026-09-11（157–163 號切片：F12 挑戰／紅隊／風險家族收官 3/10→10/10，7 個平行 agent + 1 critic；順帶修復 F07 與 F12 兩處 registry SSOT 漂移）
 
 **觸發**：F07（`d3adeb65c`）收工後例行檢查 SSOT，發現 `method-inventory.yaml`／`contract-backlog.yaml` 兩份 F07 更新漏跑（見下方獨立記錄）；順藤摸瓜檢查 `ai_lego/modules/` 全目錄時發現 `challenge/` 資料夾（F12）早就存在 `red_team`/`blue_team`/`independent_judge` 三個方法，但從未被任一份 registry 登記過，也不在 TASKS.md 的「8 個未開工家族」清單裡——因為它有資料夾，不算「無對應目錄」，但其實只完成 3/10。

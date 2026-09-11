@@ -324,29 +324,16 @@
       </div>
       <div id="d-reopen-wrap"></div>
     </div>
-    <div id="d-decision-banner"></div>
     <div id="d-risk-tier-wrap"></div>
-    <div id="d-reports-wrap"></div>
   </div>
   <div id="d-empty-cta"></div>
 
-  <h2>信任構面</h2>
-  <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
-  <div class="radar-wrap">
-    <div id="d-radar"></div>
-    <div class="domain-grid" id="d-domains"></div>
-  </div>
-  <div id="d-severity"></div>
-
-  <div class="insight-cols" style="margin-top:1.5rem">
-    <div class="insight-col strengths"><h3>主要優勢</h3><ul id="d-strengths"></ul></div>
-    <div class="insight-col risks"><h3>重大風險</h3><ul id="d-risks"></ul></div>
-    <div class="insight-col unknowns"><h3>未知構面</h3><ul id="d-unknowns"></ul></div>
-  </div>
-
-  <h2>記錄決策</h2>
-  <div id="d-decision-form-wrap"></div>
-
+  <!-- 版面順序比照系統實際分析流程排列（見「這個系統怎麼運作？」頁的流程
+       圖：開案件→記錄證據/主張/評估→系統自動算出信任構面→你做決策）：
+       證據是輸入，放最前面；信任構面是證據算出來的結果，放證據之後；決策
+       是人做的最終判斷，放最後；報告是決策定案後才產生的最終產物，排在
+       最末（2026-09-11，操作者：「雷達圖在最上面? 那不是最後才會產出的
+       東西嗎?」）。 -->
   <h2>證據與主張</h2>
   <div class="evidence-layout">
     <div>
@@ -373,7 +360,7 @@
         <button type="button" class="chip" data-value="ASSESSMENT" onclick="pickChip(this,'f-kind')">評估</button>
       </div>
       <input type="hidden" id="f-kind" value="EVIDENCE">
-      <p class="field-hint">上方的信任構面分數無法手動輸入——它是根據你新增的證據、主張與評估，由系統自動算出來的，確保每個分數都查得到根據。</p>
+      <p class="field-hint">下方的信任構面分數無法手動輸入——它是根據你新增的證據、主張與評估，由系統自動算出來的，確保每個分數都查得到根據。</p>
       <div id="f-kind-fields"></div>
       <button type="submit">送出紀錄</button>
       <div id="f-err" class="err"></div>
@@ -381,6 +368,27 @@
     </details>
     </div>
   </div>
+
+  <h2>信任構面</h2>
+  <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
+  <div class="radar-wrap">
+    <div id="d-radar"></div>
+    <div class="domain-grid" id="d-domains"></div>
+  </div>
+  <div id="d-severity"></div>
+
+  <div class="insight-cols" style="margin-top:1.5rem">
+    <div class="insight-col strengths"><h3>主要優勢</h3><ul id="d-strengths"></ul></div>
+    <div class="insight-col risks"><h3>重大風險</h3><ul id="d-risks"></ul></div>
+    <div class="insight-col unknowns"><h3>未知構面</h3><ul id="d-unknowns"></ul></div>
+  </div>
+
+  <h2>決策</h2>
+  <div id="d-decision-banner"></div>
+  <div id="d-decision-form-wrap"></div>
+
+  <h2>產生報告</h2>
+  <div id="d-reports-wrap"></div>
 </div>
 
 <div id="report" style="display:none">
@@ -778,7 +786,7 @@ async function refreshDetail() {
       <div class="when">記錄於 ${new Date(d.valid_from).toLocaleString('zh-TW')}</div>
     </div>`;
   } else {
-    bannerEl.innerHTML = `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策 — 請先檢視下方證據，再送出決策。</span></div>`;
+    bannerEl.innerHTML = `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策 — 請先檢視上方證據，再送出決策。</span></div>`;
   }
 
   const ctaEl = document.getElementById('d-empty-cta');
@@ -792,7 +800,7 @@ async function refreshDetail() {
 
   const qualityByDim = Object.fromEntries((body.evidenceQuality || []).map(q => [q.dimension, q.quality]));
   document.getElementById('d-domain-note').textContent = body.rollup.domains.length
-    ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。'
+    ? '根據上方評估紀錄即時運算 — 絕非人工填寫的分數。'
     : '';
   document.getElementById('d-radar').innerHTML = renderRadar(body.rollup.domains);
   const recordById = Object.fromEntries(body.records.map(r => [r.id, r]));
@@ -924,11 +932,13 @@ function renderReportView(row) {
     <div class="report-header" style="border-top:none;padding-top:0">
       <h1 style="margin:0">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}</h1>
       <p class="subtitle">${c.id} ．狀態 ${STATUS_LABELS[c.status] || c.status} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</p>
-      ${decisionHtml}
     </div>
 
+    <h2>證據與主張</h2>
+    <div>${recordsHtml}</div>
+
     <h2>信任構面</h2>
-    <p class="subtitle" style="margin-top:-0.5rem">${d.rollup.domains.length ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。' : ''}</p>
+    <p class="subtitle" style="margin-top:-0.5rem">${d.rollup.domains.length ? '根據上方評估紀錄即時運算 — 絕非人工填寫的分數。' : ''}</p>
     <div class="radar-wrap">
       <div>${renderRadar(d.rollup.domains)}</div>
       <div class="domain-grid">${domainGridHtml}</div>
@@ -941,8 +951,8 @@ function renderReportView(row) {
       <div class="insight-col unknowns"><h3>未知構面</h3><ul>${d.unknowns.length ? d.unknowns.map(u => `<li>${DOMAIN_LABELS[u] || u}</li>`).join('') : '<li class="empty">全部構面皆有證據</li>'}</ul></div>
     </div>
 
-    <h2>證據與主張</h2>
-    <div>${recordsHtml}</div>
+    <h2>決策</h2>
+    ${decisionHtml}
 
     <div class="report-legal">
       <p><b>免責聲明：</b>本報告可能包含尚未證實之指控、推論與主觀判讀，不構成事實認定。內容中標示為「主張」或「評估」者為判讀性質，唯有標示為「證據」者為直接查得之事實；使用本報告前應自行查證，不應逕自視為最終定論。</p>
@@ -1015,7 +1025,7 @@ function renderKindFields() {
       <input type="hidden" id="f-evref" value="${c.first}">`;
   } else if (kind === 'ASSESSMENT') {
     const c = citableChips();
-    el.innerHTML = `<p class="field-hint">評估：根據下方引用的證據，針對某個信任面向打出的等級分數，會直接影響上方的信任構面計算。</p>
+    el.innerHTML = `<p class="field-hint">評估：根據下方引用的證據，針對某個信任面向打出的等級分數，送出後會直接反映在信任構面的計算裡。</p>
       <label>評估構面</label>
       <div class="chip-group" id="f-dimension-chips">${DIMENSIONS.map((d, i) => `<button type="button" class="chip${i === 0 ? ' selected' : ''}" data-value="${d}" onclick="pickChip(this,'f-dimension')">${DIMENSION_LABELS[d]}</button>`).join('')}</div>
       <input type="hidden" id="f-dimension" value="${DIMENSIONS[0]}">
