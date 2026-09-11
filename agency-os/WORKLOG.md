@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-09-11（客服系統 U6：端到端真正跑通 —— deploy + nginx reload + token 輪替後重測，`cs_ai_replies` 真的多一列，Chatwoot 對話真的從 pending 轉 open）
+
+**觸發**：上一條目修完 auth + nginx log 洩漏後，deploy（commit `3a7d53ee6`）+ `docker exec lobster-nginx nginx -s reload`（bind-mount 設定檔，不需重建容器）+ 輪替 `cs:chatwoot:{orgId}:webhook_secret` 新值（`secret_put` 覆寫）+ 透過 Account API PATCH 把 Chatwoot Inbox `webhook_url` 與 AgentBot `outgoing_url` 都換成新 token，才重測。
+
+**REALTEST（三個獨立來源互相印證，非單一資料點）**：
+1. Supabase `cs_ai_replies` 新增一列：`conversation_id=3, message_id=4, action=handoff, intent_key=other, confidence=0.95`——`handleInbound` 真的跑了完整管線（分類→檢索→無知識庫命中→正確判斷轉真人，非硬答）。
+2. `chatwoot-sidekiq` log：無任何 401，`WebhookJob`/`EventDispatcherJob` 正常 Performed，且**獨立證實** `handoffToHuman` 真的被呼叫到——log 顯示該對話 `changed_attributes: [{"status": {previous_value:"pending", current_value:"open"}}]`，跟 `cs_ai_replies` 記錄的 `action=handoff` 完全對得上，不是巧合。
+3. `lobster-nginx` access log：對 `webhooks/chatwoot` 路徑完全沒有任何一行——`access_log off` 真的生效，新 token 沒有進 log。
+
+**結論**：U6 全鏈路（DNS→憑證→nginx→Chatwoot 四容器→webhook 認證→cs-engine 管線→Chatwoot 狀態回寫）第一次真正端到端跑通且三方證據互相印證。今天遇到的三個真 bug（migration 撞號、webhook 認證機制整個錯、認證改法本身又洩漏進 log）全部是靠實測抓到，不是靠讀程式碼猜出來的——印證 R0「REALTEST 不可只 grep -c」這條規則存在的理由。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SQL(supabase-awarewave-postgres MCP) | cmd=`select ... from cs_ai_replies order by created_at desc limit 5` | exit=0 | result=真實新增一列，欄位值合理（handoff/other/0.95）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker logs chatwoot-sidekiq --since 2m` | exit=0 | result=0 個 401；對話 status pending→open 有記錄且跟 DB 記錄一致
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker logs lobster-nginx --since 2m \| grep webhooks/chatwoot` | exit=0 | result=空（access_log off 生效）
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：測試留下 3 個測試 contact/conversation（id 1-3）在 Account#1，可由 Chatwoot UI 清除或留著不影響功能。子待辦（accountId 唯一性 index／rate limit／SMTP）仍未做，已在 TASKS.md 記錄。
+
 ## 2026-09-11（客服系統 U6：真送測試訊息才發現 webhook 認證機制整個錯了——Chatwoot 這條路徑不簽章；改用 URL token，連帶抓到並修 token 洩漏進 log 的真安全問題）
 
 **觸發**：deploy 完成後,真的透過 Chatwoot Client API 建 contact→conversation→送訊息,查 `cs_ai_replies` 應該多一列——結果 0 列。查 `lobster-nginx`/`lobster-next-admin` log 也是 0 筆,判斷 Chatwoot 根本沒打到 webhook。
