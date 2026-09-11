@@ -1,6 +1,24 @@
 # Worklog
 
 ## 2026-09-11 HCI30 版面第四次修正——真正根因：`<details>` 直接當 flex 子元素在部分瀏覽器算不對寬度
+## 2026-09-11 第十四批（同一條測試第二次在伺服器上紅：先寫不變量再修）
+
+`collect-block-hygiene` 的 scheme 路由測試在筆電綠、在 sg-deploy 的 test gate 紅，**第二次**。依 AGENTS.md §4，第三次修正前先寫不變量分析：
+
+- **這條測試驗的是路由**：每個操作者可選的查詢型來源，宣告的 scheme 必須是它 `match()` 認得的那個，且不得重複。
+- **不該影響它的**：這台機器有沒有金鑰。`match()` 刻意被金鑰閘住（無金鑰回 0），所以測試必須把該 block 宣告的憑證全部補上再驗。
+- **重複發生的根因**：測試按**欄位名稱**列舉憑證宣告（`requires`）。第十三批新增 `requiresAny` 後，那個列舉就看不到搜尋來源的金鑰了，環境依賴無聲地回來。**修法不能是再加一個欄位名**——那只會等下一種宣告方式再炸一次。
+
+**修法**：`declaredEnvKeys(describe)` 成為唯一定義，測試與 catalogue 共用。再加一條測試把它和真實可用性**行為上綁死**：宣告的金鑰全給 → 必須 available，全不給 → 必須 unavailable。未來若有人加第三種宣告欄位而只接上 `describeBlock`，這條會紅——紅在本機，而不是紅在部署閘。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`env -u PERPLEXITY_API_KEY -u BRAVE_SEARCH_API_KEY npx vitest run`（重現伺服器環境）| exit=0 | result=1031 test 綠；有金鑰時同樣 1031 綠——同一份程式在兩種環境給同一個答案，這正是前兩次失敗缺的性質
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（`declaredEnvKeys` 漏掉 `requiresAny`）| exit=0 | result=KILLED，且是在無金鑰條件下紅
+REVIEW_DONE: critic=Quick（測試基礎設施；本批唯一產出就是把環境依賴從測試裡拔掉）| verdict=pass | findings=0c/0m
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`declaredEnvKeys|requiresAny|describe!.requires` | hits=`describe!.requires` 的直接列舉已無殘留；`catalogue.ts` 的 `describeBlock` 仍需自行區分 all／any（語意不同，不能共用扁平清單），故改以行為測試綁定而非共用同一段程式
+
+**rollback**：`git revert`；純測試與一個 helper，無行為變更。
+
+## 2026-09-11 影片生成記錄面板版面調整 + 解開一場大型 WORKLOG.md 合併衝突（操作者截圖回報「影片在左, list 在右邊比較順」）
 
 前三輪反覆調整寬度數字/門檻，但操作者這輪截圖顯示：即使拿掉所有 px 數字後，「證據與主張」清單跟「新增調查發現」表單在操作者的瀏覽器裡仍然是上下疊放，而本 session 在 Chromium 環境裡三次直接量測（含這輪重現前）都得到並排的座標，兩邊結果矛盾。既然同一份 CSS 邏輯在不同瀏覽器給出不同結果，問題就不是邏輯本身，是瀏覽器相容性：`<details>` 元素直接當 flex 子元素在部分瀏覽器（已知含 Safari）有算不出正確寬度的相容性問題，這是 `<details>` 這個標籤本身的特殊渲染行為（原生可展開/收合），不是每個瀏覽器的 flex 實作都把它當一般 block 元素處理。
 

@@ -21,6 +21,18 @@ export interface CatalogueEntry extends SourceDescriptor {
   missing: string[];
 }
 
+/**
+ * Every environment variable a source declares, however it declares them.
+ *
+ * ONE definition on purpose. The hygiene test needs this list to neutralise the credential gate in
+ * match(), and when it enumerated the declaration fields by name instead, adding `requiresAny`
+ * silently reintroduced a dependency on whichever keys the running machine happened to hold — green
+ * on a laptop, red in the deploy gate, twice. A third mechanism must break both callers or neither.
+ */
+export function declaredEnvKeys(describe: SourceDescriptor): string[] {
+  return [...(describe.requires ?? []), ...(describe.requiresAny ?? [])];
+}
+
 export function describeBlock(
   block: CollectBlock,
   env: Record<string, string | undefined> = process.env,

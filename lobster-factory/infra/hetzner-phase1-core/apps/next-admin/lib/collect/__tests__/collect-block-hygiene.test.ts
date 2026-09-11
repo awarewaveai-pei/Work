@@ -12,6 +12,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { declaredEnvKeys } from "@/lib/collect/catalogue";
 
 const COLLECT_DIR = path.resolve(__dirname, "..");
 
@@ -142,7 +143,7 @@ describe("collection block hygiene", () => {
       // on a laptop holding PERPLEXITY_API_KEY and failed the deploy gate on the server without it.
       // The invariant is about ROUTING, so the required variables are supplied for the check.
       const saved = new Map<string, string | undefined>();
-      for (const key of b.describe!.requires ?? []) {
+      for (const key of declaredEnvKeys(b.describe!)) {
         saved.set(key, process.env[key]);
         if (!process.env[key]) process.env[key] = "test-placeholder";
       }
@@ -157,6 +158,26 @@ describe("collection block hygiene", () => {
       }
     }
     expect(new Set(schemes).size, `two query sources share a scheme: ${schemes.join(", ")}`).toBe(schemes.length);
+  });
+
+  it("binds declaredEnvKeys to what availability actually depends on", async () => {
+    // The bond the guard above relies on: supplying every key declaredEnvKeys() names must be
+    // enough to make a source available, and withholding them all must make it unavailable.
+    // A future declaration field that describeBlock consults but declaredEnvKeys forgets would
+    // break this test — which is the point, because otherwise it would instead break the deploy
+    // gate on a machine that happens to hold the missing key.
+    const { collectors } = await import("@/lib/collect/blocks");
+    const { describeBlock, declaredEnvKeys } = await import("@/lib/collect/catalogue");
+
+    const gated = collectors().filter((b) => b.describe && declaredEnvKeys(b.describe).length > 0);
+    expect(gated.length, "no credential-gated sources found to check").toBeGreaterThan(0);
+
+    for (const b of gated) {
+      const keys = declaredEnvKeys(b.describe!);
+      const all = Object.fromEntries(keys.map((k) => [k, "x"]));
+      expect([b.id, describeBlock(b, all)!.available]).toEqual([b.id, true]);
+      expect([b.id, describeBlock(b, {})!.available]).toEqual([b.id, false]);
+    }
   });
 
   it("keeps the knowledge base out of the collection core", () => {
