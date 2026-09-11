@@ -22,7 +22,11 @@ INSERT INTO t_ids (k, v) VALUES
   ('orgB', '22222222-2222-4222-8222-222222222222'),
   ('famA', '33333333-3333-4333-8333-333333333333'),
   ('famB', '44444444-4444-4444-8444-444444444444'),
-  ('space_other', '55555555-5555-4555-8555-555555555555');
+  ('space_other', '55555555-5555-4555-8555-555555555555'),
+  -- 0076 keyword-retrieval fixtures
+  ('kwfam1', '66666666-6666-4666-8666-666666666666'),
+  ('kwfam2', '77777777-7777-4777-8777-777777777777'),
+  ('kwfam3', '88888888-8888-4888-8888-888888888888');
 
 CREATE OR REPLACE FUNCTION pg_temp.uid(text) RETURNS uuid
 LANGUAGE sql STABLE AS $$ SELECT v FROM t_ids WHERE k = $1 $$;
@@ -268,6 +272,57 @@ BEGIN
   ASSERT rec.locked = 'LOCKED_FACT', 'retrieval does not report the lock, so no consumer can honour it';
 
   RAISE NOTICE 'KB_VERIFY_PROVENANCE_OK';
+END $$;
+
+-- ── 0076: the keyword half retrieves a real question, and ranks by relevance ──
+DO $$
+DECLARE
+  a       uuid := pg_temp.uid('orgA');
+  m       text := 'text-embedding-3-small';
+  fam1    uuid := pg_temp.uid('kwfam1');
+  fam2    uuid := pg_temp.uid('kwfam2');
+  q       text;
+  hits    int;
+  top     text;
+  topscore double precision;
+BEGIN
+  PERFORM pg_temp.add_doc(a, fam1, 1, 'active', 'returns',
+    '客製化商品除瑕疵外恕不退換，退貨運費由買方負擔，瑕疵品由本店負擔退貨運費。');
+  PERFORM pg_temp.add_doc(a, fam2, 1, 'active', 'hours',
+    '我們的營業時間是週一到週五早上九點到下午六點，例假日不營業。');
+
+  -- The bigram OR that lib/kb/keyword-query.ts builds from 「請問退貨運費要怎麼算」. Written out
+  -- rather than generated so this file states the contract the TypeScript side must keep.
+  q := '請問 OR 問退 OR 退貨 OR 貨運 OR 運費 OR 費要 OR 要怎 OR 怎麼 OR 麼算';
+
+  SELECT count(*) INTO hits
+  FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, q, 50);
+  -- Before 0076 this was 0: the whole question was matched as one literal string.
+  ASSERT hits > 0, 'the keyword half found nothing for a question a person would actually ask';
+
+  SELECT s.title, k.score INTO top, topscore
+  FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, q, 50) k
+  JOIN public.cs_knowledge_sources s ON s.id = k.source_id
+  LIMIT 1;
+  ASSERT top = 'returns', 'the most relevant document is not first: got ' || COALESCE(top, 'null');
+  -- The score must reflect how many query terms the chunk actually contains. This assertion caught
+  -- the first implementation, which used pgroonga_score() and returned 0 for every row whenever the
+  -- planner chose a sequential scan -- i.e. always, on a table this size.
+  ASSERT topscore >= 3, 'keyword ranking lost its score: got ' || COALESCE(topscore::text, 'null');
+
+  -- A question with no term in common returns nothing, rather than everything.
+  SELECT count(*) INTO hits
+  FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, '完全 OR 全無 OR 無關', 50);
+  ASSERT hits = 0, 'an unrelated question matched documents';
+
+  -- Latin still works: PGroonga keeps words whole, so this is not bigrammed.
+  PERFORM pg_temp.add_doc(a, pg_temp.uid('kwfam3'), 1, 'active', 'shipping',
+    'Shipping policy: orders ship within two business days worldwide.');
+  SELECT count(*) INTO hits
+  FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, 'shipping OR policy', 50);
+  ASSERT hits > 0, 'a Latin query found nothing';
+
+  RAISE NOTICE 'KB_VERIFY_KEYWORD_OK';
 END $$;
 
 ROLLBACK;

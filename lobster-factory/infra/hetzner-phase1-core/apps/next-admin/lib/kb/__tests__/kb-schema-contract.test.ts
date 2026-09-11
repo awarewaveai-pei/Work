@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { definerOf } from "./migration-source";
 
 const NEXT_ADMIN = path.resolve(__dirname, "../../..");
 const DB_PACKAGE = path.resolve(NEXT_ADMIN, "../../../../packages/db");
@@ -24,7 +25,8 @@ const MIGRATIONS = [
 ];
 const migrations = MIGRATIONS.map((f) => readFileSync(path.join(DB_PACKAGE, f), "utf8")).join("\n");
 // The RPC signatures live in whichever migration created them last.
-const rpcMigration = readFileSync(path.join(DB_PACKAGE, "migrations/0075_kb_provenance_and_citation.sql"), "utf8");
+// The RPC signatures live in whichever migration created them last — located, not named, because
+// the two halves are now defined in different files (0075 and 0076) and naming one was already wrong once.
 
 /** Columns a CREATE TABLE / ALTER TABLE … ADD COLUMN grants to one table. */
 function columnsOf(table: string): Set<string> {
@@ -85,7 +87,7 @@ describe("lib/kb/db.ts writes only columns that exist", () => {
     // empty result, so retrieval returns nothing and nothing anywhere says why. Neither the mocked
     // unit tests nor the SQL harness (which calls the functions positionally) can see it.
     const declared = (fn: string): string[] => {
-      const sig = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\(([\\s\\S]*?)\\)\\s*\\nRETURNS`).exec(rpcMigration); // earlier migrations declare same-named functions with older arities
+      const sig = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\(([\\s\\S]*?)\\)\\s*\\nRETURNS`).exec(definerOf(fn).sql);
       expect(sig, `signature of ${fn} not found in the K1 migration`).toBeTruthy();
       const names = [...sig![1].matchAll(/^\s*(p_[a-z_]+)\s/gm)].map((m) => m[1]);
       expect(names.length, `no parameters parsed out of ${fn}`).toBeGreaterThan(3);

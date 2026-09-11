@@ -12,7 +12,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DB_DIR="$(cd "$HERE/.." && pwd)"
 CONTAINER="kb-verify-$$"
-IMAGE="pgvector/pgvector:pg16"
+# The production image, not a generic pgvector one: migration 0076 needs pgroonga, and a harness
+# that cannot run a migration cannot verify it. Matching prod also means an extension that exists
+# here exists there -- the previous image would have passed a migration that fails on deploy.
+IMAGE="supabase/postgres:15.8.1.085"
 
 cleanup() { docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
@@ -20,13 +23,16 @@ trap cleanup EXIT
 echo "▶ starting $IMAGE as $CONTAINER"
 docker run -d --name "$CONTAINER" -e POSTGRES_PASSWORD=verify -e POSTGRES_DB=postgres "$IMAGE" >/dev/null
 
-for _ in $(seq 1 60); do
-  if docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+# Over TCP, not the unix socket: this image puts its socket somewhere pg_isready's default does not
+# look, so the old check reported "ready" while psql could not connect at all -- and the bootstrap
+# then failed against a server the harness believed was up.
+for _ in $(seq 1 120); do
+  if docker exec "$CONTAINER" psql -h 127.0.0.1 -U postgres -d postgres -c 'SELECT 1' >/dev/null 2>&1; then break; fi
   sleep 1
 done
-docker exec "$CONTAINER" pg_isready -U postgres >/dev/null
+docker exec "$CONTAINER" psql -h 127.0.0.1 -U postgres -d postgres -c 'SELECT 1' >/dev/null   || { echo "✗ postgres never became reachable in the container"; exit 1; }
 
-psql_run() { docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
+psql_run() { docker exec -i "$CONTAINER" psql -h 127.0.0.1 -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
 psql_file() { psql_run -f - < "$1"; }
 
 echo "▶ bootstrapping the dependencies 0051 assumes"
@@ -59,6 +65,9 @@ psql_file "$DB_DIR/migrations/0072_kb_versioning_and_retrieval_predicates.sql" >
 echo "▶ applying 0075 (provenance + citation on retrieval)"
 psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
 
+echo "▶ applying 0076 (ranked keyword retrieval via pgroonga)"
+psql_file "$DB_DIR/migrations/0076_kb_ranked_keyword_retrieval.sql" >/dev/null
+
 echo "▶ proving the harness can fail (a green run of a dead harness proves nothing)"
 # Captured first, then matched: under `set -o pipefail` psql's non-zero exit (which is the point of
 # this check) would make the whole pipeline non-zero even when grep found the message.
@@ -72,10 +81,11 @@ echo "▶ running behavioural assertions"
 VERIFY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1)" || { echo "$VERIFY_OUT" | grep -E 'ERROR' ; echo "✗ assertions failed"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ retrieval assertions did not report KB_VERIFY_OK"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_CONSTRAINTS_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ constraint assertions did not report KB_VERIFY_CONSTRAINTS_OK"; exit 1; }
-echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_PROVENANCE_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ provenance assertions did not pass"; exit 1; }
-echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK"
+echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_KEYWORD_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ behavioural assertions did not reach the last marker"; exit 1; }
+echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK + KB_VERIFY_KEYWORD_OK"
 
 echo "▶ applying the down migrations (newest first)"
+psql_file "$DB_DIR/scripts/0076_kb_ranked_keyword_retrieval_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0075_kb_provenance_and_citation_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0072_kb_versioning_and_retrieval_predicates_down.sql" >/dev/null
 DOWN_STATE="$(psql_run -tAc "
@@ -95,11 +105,12 @@ DOWN_STATE="$(psql_run -tAc "
 [ "$DOWN_STATE" = "DOWN_OK" ] || { echo "✗ down migration did not restore the 0051 state: $DOWN_STATE"; exit 1; }
 echo "  DOWN_OK"
 
-echo "▶ re-applying 0072 + 0075 (a migration you cannot re-apply is not a rollback path)"
+echo "▶ re-applying 0072 + 0075 + 0076 (a migration you cannot re-apply is not a rollback path)"
 psql_file "$DB_DIR/migrations/0072_kb_versioning_and_retrieval_predicates.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
+psql_file "$DB_DIR/migrations/0076_kb_ranked_keyword_retrieval.sql" >/dev/null
 REAPPLY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1 || true)"
-echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_PROVENANCE_OK' || {
+echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_KEYWORD_OK' || {
   echo "$REAPPLY_OUT" | grep -E 'ERROR' | head -3; echo "✗ assertions failed after re-apply"; exit 1;
 }
 
