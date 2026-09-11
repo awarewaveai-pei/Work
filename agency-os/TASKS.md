@@ -121,6 +121,14 @@
 - [ ] **【2026-09-11 開出｜KB K1】ops 知識庫刪除仍是硬刪，與稽核鏈不變量衝突** — `KNOWLEDGE_BASE_PLAN.md` §3-#4 訂「舊版只標 archived 不實體刪」，理由是 `cs_ai_replies.retrieved_chunk_ids` 是無 FK 的 uuid[]，實體刪 chunk 會讓稽核鏈懸空。但 `DELETE /api/ops/clients/[slug]/cs-knowledge` 仍走 `.delete()` + FK cascade，UI 每列都有刪除鈕。改成標 archived 會改變操作者對「刪除」的預期（列表消失但資料還在），需確認後再動。
 - [ ] **【2026-09-11 開出｜KB K1】per-model partial HNSW 是否真的被用到，未經 EXPLAIN 證實** — 0072 加了 `idx_cs_chunks_hnsw_te3s`（`WHERE embed_model = 'text-embedding-3-small'`），0051 的全表 `idx_cs_chunks_embedding` 仍在，兩個 HNSW 同時維護 = 雙倍寫入成本；而 `p_model` 是 bind parameter，partial index 未必會被選中。塞 ~2000 列跑 `EXPLAIN (ANALYZE)` 確認後再決定刪哪一個。順帶：0051 的 `bm25_tsv` 欄與 `idx_cs_chunks_bm25` 至今無人寫也無人讀（死欄位＋死索引），一併處置。
 
+- [ ] **【2026-09-11 開出｜影片｜待查】`/api/video/regenerate-image` 502，與 remotion-render 502 不同根因，未修**
+  - `🟠 未開始` · 開出 2026-09-11 · 不卡誰
+  - **一句話**：草稿審核「重新生成」單張圖會 502（HTML not JSON），跟同日修好的 remotion-render 502（見 WORKLOG 2026-09-11）症狀像但 code path 不同——這條走 `buildSceneAsset`→`generateTarotImage`（Flux/Replicate），非 remotion-service。
+  - **現在到哪**：只確認「reproducible，非本輪修的兩個 env 缺漏能解釋」，未深查。操作者明確說過重試會燒真錢，故本輪未再重現測試。
+  - **下一步**：比照 remotion-render 的查法——先查 `REPLICATE_API_TOKEN`／`PEXELS_API_KEY` 是否真的接進 `docker-compose.yml`（同一批 env 區塊，見 `docker-compose.yml:381-399`），SSH 直測 Replicate API 是否用同一把 token 能通。
+  - **完成定義**：草稿審核頁「重新生成」單張圖成功，真實 UI 操作驗證（非只測 API）。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-11「remotion-render 502」條目 [剩餘風險] ①。
+
 - [ ] **【2026-09-11 開出｜DB】資料庫沒有 migration 記錄表，「哪些已套」只能靠猜** —— 0072–0075 套 prod 時，pre-flight 只能查 schema 實況反推，且一度因為查錯目錄表（`pg_constraint` 而非 `pg_indexes`）誤判唱唯一約束缺失。重套也只在該檔寫成匑等時安全。方向：`schema_migrations` 表 + `scripts/apply-db-migration.mjs` 套完寫入。見 WORKLOG 2026-09-11 第七批。
 
 - [ ] **【⚠️ 逾期 69 天｜原排 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**

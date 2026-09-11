@@ -1,5 +1,48 @@
 # Worklog
 
+## 2026-09-11 remotion-render 502「Unexpected token '<'」根因 + 修復（操作者真實回報）
+
+操作者按 AGENTS.md R0/R4 明確要求：查證階段可直接做，實際改動前列方案給她看過。查證完成、方案列出後她說「你做最完美的決定...全部做好」，全權授權執行到底。
+
+[根本問題] `/api/video/remotion-render` 連續兩次真實 UI 操作回「渲染失敗 Unexpected token '<'」。`/api/video/regenerate-image` 也有獨立的 502（不同 code path，走 Flux/Replicate，本輪未動，另列待查）。
+
+[查證過程，非猜測]
+- 讀 `remotion-render/route.ts` 全部分支確認都回合法 JSON（含 catch）→ 排除「app 自己吐 HTML」的可能。
+- 瀏覽器內用已登入真實 session 直接 `fetch()` 重現（`javascript_tool`，debug-only，非用來繞過 UI 操作）：minimal payload 就 502，~400-900ms（非逾時），body 是 Cloudflare 品牌錯誤頁（`<!DOCTYPE...oldie...`，6425 bytes）不是 app JSON。
+- 一度誤判是 Cloudflare edge 主動擋（查了 WAF custom rules／rate-limit／managed ruleset／page rules，全部排除，方向錯誤但過程紀錄於此避免下次重查）。
+- SSH 進 ks-aw-01：host nginx access log 對同一請求記 `502 64`（小 body，不是 CF 品牌頁大小）→ 確認 **CF edge 對任何來源 502 一律換成自己的品牌錯誤頁**（不管 origin 回的是不是合法 JSON，這是固定行為，非本次要修的東西）。
+- 順藤查兩層 nginx（host nginx → `lobster-nginx` container → `next-admin:3000`），確認路由本身無誤。
+- **root cause #1**：`docker-compose.yml` 的 video-pipeline env 區塊只接了 `VIDEO_SERVICE_URL`/`VIDEO_SERVICE_SECRET`，從沒接過 `REMOTION_SERVICE_URL`——code fallback 用 `127.0.0.1:8733`（container 自己的 loopback，連不到宿主機）。修完（`97aa11e60`→`6324ca48d`，改用 `.env` 已有的 `https://remotion-svc.aware-wave.com`，跟 `VIDEO_SERVICE_URL` 同慣例）、部署後**仍然 502**。
+- **關鍵教訓**：`sg-deploy.sh` 的 git pull 只同步 app 程式碼到 `/root/Work`，**不會**把 `docker-compose.yml` 同步到實際 `docker compose up` 讀的 `/root/lobster-phase1/docker-compose.yml`（該檔是「machine-local」，sg-deploy.sh 自己的 header 註解就這樣寫）。第一次以為部署成功其實只是 app 程式碼更新，compose 檔沒變——白測一輪才發現。**日後任何 docker-compose.yml 改動都必須額外跑 `safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml <service>`，光 sg-deploy.sh 不夠。**
+- 加了診斷用 `console.error`（route.ts 的 submitRemotion 失敗分支＋finishJob 三處都包 try/catch，`603846ae3`）部署後重現，讀 next-admin log 抓到真正原因：`"renderer authentication is not configured"`。
+- 讀 `renderer-auth.ts:34`：`resolveRendererAuth("remotion")` 只認 `MEDIA_RENDER_AUTH_TOKEN`（canonical，未設）或 `REMOTION_AUTH_TOKEN`（legacy，也沒接進 compose）——**`VIDEO_SERVICE_SECRET` 只給 `"quick"` renderer 用，remotion 從沒讀過它**（先前 session 的假設是錯的）。
+- **root cause #2（真正主因）**：跟 root cause #1 同一類缺漏——`.env` 早就有 `REMOTION_AUTH_TOKEN`（跟 `lobster-remotion-service`／`lobster-video-service` 兩邊容器自己的 `RENDER_AUTH_TOKEN` 同一把密鑰，SSH 直測驗證過），docker-compose.yml 就是沒接這行。
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`：加 `REMOTION_SERVICE_URL`（`97aa11e60`，`6324ca48d` 改用外部 URL 慣例）+ `REMOTION_AUTH_TOKEN`（`ede260984`）兩行 env passthrough。
+- `app/api/video/remotion-render/route.ts`（`603846ae3`）：submitRemotion 兩個失敗分支＋三處 finishJob 補 console.error/try-catch（診斷用途，非本次主因，但屬永久性可觀測性補強——critic 指出 finishJob 目前不會 throw，此包裝暫時是防禦性 dead code，保留因無害且未來若 job-store.ts 改用 `.throwOnError()` 會生效）。
+- 兩次額外對 `/root/lobster-phase1/docker-compose.yml`（staging，git 不追蹤）跑 `safe-infra-patch.sh compose`，套用跟 git 版一致的兩行。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sudo -n /root/lobster-phase1/scripts/sg-deploy.sh next-admin`（×3 次，含中途撞另一 session 的 deploy lock，等其跑完＋順手 push 它留在本機未推的 `b82debe4c` fix commit 解鎖 tsc gate） | exit=0 | result=tsc pass、976 tests pass、4/4 smoke pass，`.deployed-commit` 依序 `b82debe4c`→`603846ae3`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin wget .../health` 與直接 `POST /render`（用真實 token） | exit=0 | result=container 內部連線、DNS、auth 全部個別驗證都成功（排除法找出問題不在連線本身）
+- REALTEST_EVIDENCE: tool=Browser(javascript_tool, 真實登入 session) | cmd=`fetch("/api/video/remotion-render", {method:"POST",...})` | exit=0 | result=修復前 502+CF品牌頁（reproducible ×5 次）；修復後 **`{"ok":true,"jobId":"0329f628-d3df-4501-833e-fa7bfcab6b5a"}` status 202**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker stats lobster-remotion-service` | exit=0 | result=修復後該 jobId 送出，remotion-service 容器 CPU 200%+、ffmpeg/chrome-headless 進程實際在跑（非卡死），證實不只是「接受請求」而是真的在渲染
+- REVIEW_DONE: critic=1 agent（Quick，範圍限縮於 route.ts 診斷用改動）| verdict=pass | findings=1 Major（finishJob 不會真的 throw，已在 commit message 誠實揭露非白吃）/0 minor blocking
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=finishJob\( | hits=8（其餘 7 處呼叫未變更契約，僅本檔加 try/catch 包裝）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+① `/api/video/regenerate-image` 的獨立 502（Flux/Replicate 路徑）本輪未查，仍是壞的——操作者先前提過「不要重試，會燒真錢」，故未在本輪重現測試，留待下次專門處理。
+② 本次驗證用的測試 job（`0329f628-...`）送出後 6+ 分鐘仍是 `rendering`（非 error，CPU 持續在跑，非卡死）——不確定是測試用的極簡 props（只給 backgroundImage+headline，沒給完整 scenes/duration）導致跑到非典型長度，還是這個 template 本來就慢；核心回報的「送出即失敗」症狀已確認修復，渲染耗時本身若操作者之後也覺得異常，需另開項目查。
+③ `finishJob()` 的 try/catch 包裝目前是防禦性 dead code（critic 指出 job-store.ts 沒有 `.throwOnError()`）——未來若改動 job-store.ts 的錯誤處理方式，記得這裡已經包了，勿重複包。
+④ `/root/lobster-phase1/docker-compose.yml` 現在跟 git 版本在 video-pipeline 這幾行一致，但其餘區塊仍有結構性差異（先前 diff 看到 `OPS_INBOX_*`／`NEXT_PUBLIC_TURNSTILE_SITE_KEY` 等多處不同）——staging compose 長期漂移未整體對齊，本次只動了必要的兩行，全面校準是更大的獨立任務，未在本輪處理。
+
+[rollback]
+- git：`git revert ede260984 6324ca48d 97aa11e60 603846ae3`（4 個 commit，各自獨立可單獨 revert）。
+- staging compose：`sudo -n cp /root/lobster-phase1/docker-compose.yml.bak.safe-patch-20260911-062506 /root/lobster-phase1/docker-compose.yml && cd /root/lobster-phase1 && sudo -n docker compose --env-file .env up -d --no-build next-admin`（safe-infra-patch.sh 每次都自動備份，兩次備份檔都在）。
+- next-admin container：sg-deploy.sh 自己有 snapshot-before-build，`ROLLBACK_SCRIPT restore next-admin` 可用。
+
 ## 2026-09-11 第七批（0072–0075 套上 prod，KB 與蒐集器兩套系統的 schema 落地）
 
 操作者明示 go-ahead。四支全部 COMMIT，next-admin 也已帶著對應程式上線，prod 檢索端到端實測通過。
