@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-11 第八批（C1 收掉 + /ops/collect 改多選 + 兩個被工具擋住的真缺口）
+
+C1 的最後一項 DoD 本來就只卡 prod migration，套完之後跑掉。順帶把操作者指名的下拉選單改掉，並補兩個機械閘。
+
+**C1 關閉**。新增 `lib/collect/__tests__/collect-c1-live.test.ts`（env gate `COLLECT_C1_LIVE=1`，預設不跑）：真 URL → `sink/kb` → prod 知識庫 → `retrieve()` 查得到且標成 `SOURCE_QUOTATION`；同一份再進一次 `written=0`；改內容產生第 2 版、第 1 版 `archived` 且**查詢查不到**。第三點刻意用查詢驗而不是看 `status` 欄——status 欄正確但檢索忽略它，在任何列表上都長得像對的。跑完 `afterAll` 刪乾淨，prod 回到原本 1 source / 1 chunk（已查證）。
+
+**兩個「工具說沒事，其實不能用」的缺口，各補了一個閘：**
+- **vitest 不讀 `.env.local`**。第一次跑 C1 live 時 Supabase 用戶端是 null，ingest 回 `ingest_failed`，看起來像知識庫壞了，實際是少一個憑證。測試改為自行載入 `.env.local`，並在 `beforeAll` 直接對 client 為 null 拋錯。
+- **`sourceCatalogue()` 在沒註冊 block 時回 `[]`，沒有錯誤**。寫目錄報表時撞到：畫面會顯示「零個來源」，讀起來像產品什麼都不支援。實際 UI 沒事（API route 有 `import "@/lib/collect/blocks"`），但沒有任何東西守著那行。`collect-block-hygiene.test.ts` 加一條：凡呼叫目錄 API 的檔案必須 import blocks。拔掉 route 那行 → 該測試變紅（已驗）。
+- **控制字元守衛有盲區**：它不掃 `__tests__`，而這次 `\b` 又被寫成 0x08 的地方**就在測試檔裡**（第三次了）。沒有加豁免——改成這個守衛自己不含控制字元（註解與字元類都改成 `\u` 寫法），然後連測試檔一起掃。在測試檔塞一個 0x08 → 變紅（已驗）。
+
+**`/ops/collect` 改多選**（操作者：「我不要下拉式選單 而且要可以多選」）：
+- 來源類型從 `<select>` 改成看得見的核取方格，八個同時在畫面上。勾 N 個、填一個入口，送 **N 個獨立請求**，每個各自驗證，成功與失敗**兩邊都報**——「已加入 3 個」而其中一個默默失敗，是來源消失一個月的標準劇本。不做批次端點，因為那就得發明一套部分成功的規則。
+- 選項表單改成 per-block（兩個來源都有 `itemsPath` 時，同一個扁平 bag 會讓其中一個悄悄變成另一個的值）。
+- 右邊已核准來源也可勾選，決定這次跑哪幾個。**API 早就收 `sourceIds`，畫面從來沒送**，所以每次抓取都是全部。按鈕旁固定顯示「只跑勾選的 N 個 / 全部 N 個」。
+- 新增 `app/(shell)/ops/collect/__tests__/CollectionSourcesPanel.test.tsx`：jsdom + react-dom 直接渲染，不引入 @testing-library（為了驗四個元素加一個依賴不划算）。同時 `vitest.config.ts` 開 `esbuild.jsx = "automatic"`，否則 JSX 編成 `React.createElement`，元件測試會死在「React is not defined」，那看起來像元件壞了。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_C1_LIVE=1 COLLECT_C1_ORG=<org> npx vitest run lib/collect/__tests__/collect-c1-live.test.ts` | exit=0 | result=3/3 綠、21.8 秒；跑後查 prod 為 1 source / 1 chunk、`canonical_url` 非空者 0 筆，清理確實乾淨
+REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_CATALOGUE_REPORT=1 npx vitest run ...collect-catalogue-live.test.ts` | exit=0 | result=8 個來源、6 可用；不可用兩個各自指名 `COLLECT_LOCAL_ROOTS`／`FIRECRAWL_API_KEY`
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試 ×4 | exit=0 | result=① 拿掉 route 的 blocks import → 註冊閘 KILLED ② 測試檔塞 0x08 → 控制字元閘 KILLED ③ addSource 只送第一個類型 → 多選測試 KILLED ④ run 不送 sourceIds → 勾選測試 KILLED
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=108 檔 987 test 綠、6 skipped（三支 live 測試預設關閉，正確）
+REVIEW_DONE: critic=Quick（UI 與測試基礎設施；四條新斷言都有突變證明，風險集中在測試設定而非線上邏輯）| verdict=pass | findings=0c/3m（m1 vitest 未載 env、m2 JSX transform、m3 手動設 `.checked` 不觸發 React onChange——React 會比對節點上的舊值而跳過；三項皆已修並記在對應檔頭）
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`sourceCatalogue|sourceIds|picked|chosen|RawDoc.author` | hits=`picked`／`chosen` 已無殘留單選路徑；`lib/collect/types.ts:56` 宣稱「知識庫沒有 author 欄位」自 0075 起不成立，已改寫；`RUNNABLE_DEMOS.md` 兩處 migration「未執行」宣稱已於本日前一 commit 修掉
+
+**剩餘風險**：`/ops/collect` 需登入，本機 dev server 會 307 轉 `/login`，所以畫面是用 jsdom 渲染驗的，不是真瀏覽器點的（本 session 的 Browser 工具因 MCP 名稱衝突不可用）。多選的兩條路徑都有 DOM 層斷言與突變證明，但版面在真實瀏覽器的觀感沒人看過。
+**rollback**：`git revert` 本批 commit；資料無變動（C1 測試自行清理），無 migration。
+
 ## 2026-09-11（客服系統 U6：端到端真正跑通 —— deploy + nginx reload + token 輪替後重測，`cs_ai_replies` 真的多一列，Chatwoot 對話真的從 pending 轉 open）
 
 **觸發**：上一條目修完 auth + nginx log 洩漏後，deploy（commit `3a7d53ee6`）+ `docker exec lobster-nginx nginx -s reload`（bind-mount 設定檔，不需重建容器）+ 輪替 `cs:chatwoot:{orgId}:webhook_secret` 新值（`secret_put` 覆寫）+ 透過 Account API PATCH 把 Chatwoot Inbox `webhook_url` 與 AgentBot `outgoing_url` 都換成新 token，才重測。

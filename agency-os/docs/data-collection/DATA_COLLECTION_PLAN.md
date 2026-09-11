@@ -208,7 +208,7 @@ run(seeds, { sink, budget, tenantRef, maxDepth, flushEvery }):
 | C | 交付的價值 | 內容 | DoD（缺一不算） | Rollback |
 |---|---|---|---|---|
 | **C0** ✅**已完成** 2026-09-11 | — | collect/sink **獨立 registry**（**不動 `BlockKind`**）；型別；編排器 + `ctx.fetch` + 預算 + 續傳 + 品質閘 + trust 標記與指令樣態掃描；`sink/null`；lint 禁止積木用全域 fetch | `npx tsc --noEmit` 綠；編排器測試涵蓋 **8 項**：深度上限、scope 擋外站、預算耗盡後**可續爬**、單點失敗不中斷、canonical 去重、SSRF redirect 擋、積木超量 fetch 被 ctx 拒、**植入指令樣態的頁面不自動入庫**（真餵一份含 `ignore previous instructions` + 零寬字元的 HTML） | 刪新目錄（**零既有檔改動**） |
-| **C1** ⏳**程式完成；migration 2026-09-11 已套 prod，剩一次真實跑批驗 DoD** | **客戶改官網 FAQ，KB 自動跟上**（今天靠人工貼，會靜默過期） | `collect/http-html` ＋ `sink/kb` | **依賴 KB 的 K1 完成**（版本化與檢索契約）；真 URL → KB → `search()` 查得到；同 URL 二次不產生新版；改內容後產生第二版 | 刪兩個積木 |
+| **C1** ✅**已完成** 2026-09-11 | **客戶改官網 FAQ，KB 自動跟上**（今天靠人工貼，會靜默過期） | `collect/http-html` ＋ `sink/kb` | **依賴 KB 的 K1 完成**（版本化與檢索契約）；真 URL → KB → `search()` 查得到；同 URL 二次不產生新版；改內容後產生第二版 | 刪兩個積木 |
 | **C2** ✅**已完成** 2026-09-11 | 整站而非單頁；抽不到內容的頁面**被看見**而非靜默入庫 | `collect/sitemap`（→discovered）、`collect/rss`（**只回 discovered，不回摘要 docs**）、`collect/pdf`；`collection_issues` 表 + 告警 | 真實站台 sitemap → N 頁入庫；12,000 URL 在預算內停止、**且下一輪從斷點續爬**（非重頭）；`dirty > 0` 時告警**實際觸發一次**（附證據行），非只寫 log | 刪積木整段 |
 | **C3** | 不用人記得去按 | Trigger.dev 排程（ADR 004）；per-host 令牌桶**持久化**；**增量抓取語意明訂**（§1.4） | 排程真跑過一輪；**兩個 run 併行時對同一 host 的合計 QPS 未超限**（實測，非推論）；第二輪對未變更來源**未重抓 body**（實測 304／hash 短路） | 停用 task |
 | **C3b** | 法規發布、產品改版當天就進庫，不用等下次排程 | **事件觸發入口**（webhook → 立即重抓指定 seed）；Domain Pack 的 `collect-sources.json` 消費 | 打一次 webhook 觸發真實抓取並落地（實測）；未知來源的 webhook 被拒（鑑權）；同一事件重送不重複入庫（冪等） | 關 webhook 入口 |

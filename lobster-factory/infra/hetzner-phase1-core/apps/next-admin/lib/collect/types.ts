@@ -54,9 +54,8 @@ export interface RawDoc {
   title: string | null;
   /**
    * Byline, when the page states one. Recorded at collection time because it is one of the things
-   * that cannot be recovered afterwards — and academic-grade citations (KB K2) need it. Nothing
-   * consumes it yet: the knowledge base has no column for it, tracked with the provenance gap in
-   * TASKS.md rather than left as a silent drop at the sink.
+   * that cannot be recovered afterwards. Consumed since migration 0075: sink/kb passes it to the
+   * knowledge base, retrieval returns it, and the customer-service prompt shows it as the source.
    */
   author: string | null;
   /**

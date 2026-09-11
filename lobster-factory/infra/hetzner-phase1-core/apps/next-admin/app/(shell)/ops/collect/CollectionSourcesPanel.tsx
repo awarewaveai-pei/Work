@@ -77,9 +77,14 @@ const ENTRY_LABEL: Record<string, string> = {
 export function CollectionSourcesPanel({ slug }: { slug: string }) {
   const [catalogue, setCatalogue] = useState<CatalogueEntry[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
-  const [picked, setPicked] = useState<string>("");
+  const [pickedIds, setPickedIds] = useState<string[]>([]);
   const [entry, setEntry] = useState("");
-  const [options, setOptions] = useState<Record<string, unknown>>({});
+  // Keyed by block id: two selected types can both have an `itemsPath`, and one flat bag would let
+  // one type's value silently become the other's.
+  const [options, setOptions] = useState<Record<string, Record<string, unknown>>>({});
+  // Empty means every approved source, which is what the button says. A non-empty selection is the
+  // operator narrowing the run deliberately.
+  const [runOnly, setRunOnly] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [run, setRun] = useState<RunResult | null>(null);
@@ -87,7 +92,11 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
   // No role header: the console's middleware injects the caller's real role from their session, and
   // a header set here would be a claim the browser makes about itself — ignored by design.
   const headers = { "Content-Type": "application/json" };
-  const chosen = catalogue.find((c) => c.id === picked) ?? null;
+  const chosenList = catalogue.filter((c) => pickedIds.includes(c.id));
+  // The entry field is one box for one address; when the ticked types disagree about what an entry
+  // is (a URL vs a search query), say so rather than labelling it with whichever came first.
+  const entryKinds = [...new Set(chosenList.map((c) => c.entry))];
+  const entryKind = entryKinds.length === 1 ? entryKinds[0] : "url";
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/ops/clients/${slug}/collection-sources`, { headers });
@@ -95,7 +104,6 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
     if (data.ok) {
       setCatalogue(data.catalogue ?? []);
       setSources(data.sources ?? []);
-      if (!picked && data.catalogue?.length) setPicked(data.catalogue[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
@@ -105,22 +113,38 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
   }, [load]);
 
   async function addSource() {
-    if (!chosen || !entry.trim()) return;
+    if (chosenList.length === 0 || !entry.trim()) return;
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/ops/clients/${slug}/collection-sources`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ blockId: chosen.id, entry: entry.trim(), options }),
-      });
-      const data = (await res.json()) as { ok?: boolean; errors?: string[] };
-      if (!data.ok) {
-        // The validation errors are shown verbatim: "missing_option:itemsPath" tells you exactly
-        // which field to fill, and a friendly "something went wrong" would not.
-        setMessage(`⚠ ${(data.errors ?? ["failed"]).join("、")}`);
-      } else {
-        setMessage("✓ 已加入");
+      // One request per type, not one request with a list: each type validates its own entry and
+      // options, and a sitemap URL that is not a valid feed URL must fail for the feed alone. A
+      // batch endpoint would have to invent a rule for partial success; this way there isn't one.
+      const results = await Promise.all(
+        chosenList.map(async (c) => {
+          const res = await fetch(`/api/ops/clients/${slug}/collection-sources`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ blockId: c.id, entry: entry.trim(), options: options[c.id] ?? {} }),
+          });
+          const data = (await res.json()) as { ok?: boolean; errors?: string[] };
+          return { title: c.title, ok: Boolean(data.ok), errors: data.errors ?? ["failed"] };
+        }),
+      );
+
+      const ok = results.filter((r) => r.ok);
+      const bad = results.filter((r) => !r.ok);
+      // Both halves reported. "3 added" while one type silently failed is how a source goes missing
+      // for a month; the validation errors stay verbatim ("missing_option:itemsPath" names the field).
+      setMessage(
+        [
+          ok.length ? `✓ 已加入 ${ok.length} 個：${ok.map((r) => r.title).join("、")}` : "",
+          ...bad.map((r) => `⚠ ${r.title}：${r.errors.join("、")}`),
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+      if (ok.length) {
         setEntry("");
         setOptions({});
         await load();
@@ -152,7 +176,7 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
       const res = await fetch(`/api/ops/clients/${slug}/collection-sources`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ action: "run", dryRun }),
+        body: JSON.stringify({ action: "run", dryRun, sourceIds: runOnly.length ? runOnly : undefined }),
       });
       const data = (await res.json()) as { ok?: boolean; result?: RunResult; errors?: string[] };
       if (data.ok && data.result) {
@@ -175,92 +199,128 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
       <section>
         <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>加入來源</h2>
         <div style={{ display: "grid", gap: 10 }}>
-          <select
-            value={picked}
-            onChange={(e) => {
-              setPicked(e.target.value);
-              setOptions({});
-            }}
-            style={inputStyle}
-          >
-            {catalogue.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.icon} {c.title}
-                {c.available ? "" : "（需要設定）"}
-              </option>
-            ))}
-          </select>
+          {/* Every source visible at once, ticked independently. A dropdown showed one line at a
+              time, so "what can this thing actually read" needed eight interactions to answer. */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 8 }}>
+            {catalogue.map((c) => {
+              const on = pickedIds.includes(c.id);
+              return (
+                <label
+                  key={c.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "auto minmax(0, 1fr)",
+                    gap: 8,
+                    alignItems: "start",
+                    border: `1px solid ${on ? "#111827" : "#e5e7eb"}`,
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    cursor: "pointer",
+                    background: on ? "#f9fafb" : "#fff",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(e) => {
+                      setPickedIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((i) => i !== c.id)));
+                      // Options belong to the type; unticking it must not leave its values behind to
+                      // be posted the next time it is ticked.
+                      if (!e.target.checked) setOptions((o) => ({ ...o, [c.id]: {} }));
+                    }}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: on ? 600 : 400 }}>
+                      {c.icon} {c.title}
+                    </span>
+                    <span style={{ display: "block", fontSize: 11, color: "#6b7280", lineHeight: 1.5 }}>{c.summary}</span>
+                    {c.metered ? <span style={{ display: "block", fontSize: 11, color: "#b45309" }}>按次計費</span> : null}
+                    {!c.available ? (
+                      // Shown, never hidden: the difference between "we cannot do this" and "one
+                      // environment variable is empty" matters.
+                      <span style={{ display: "block", fontSize: 11, color: "#b91c1c" }}>
+                        尚不可用，缺少：{c.missing.join("、")}
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
 
-          {chosen ? (
-            <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
-              {chosen.summary}
-              {chosen.metered ? <div style={{ color: "#b45309" }}>此來源按次計費。</div> : null}
-              {!chosen.available ? (
-                // Shown, never hidden: the difference between "we cannot do this" and "one
-                // environment variable is empty" matters.
-                <div style={{ color: "#b91c1c" }}>尚不可用，缺少：{chosen.missing.join("、")}</div>
-              ) : null}
+          {entryKinds.length > 1 ? (
+            <div style={{ fontSize: 11, color: "#b45309" }}>
+              選中的來源需要不同形式的入口（{entryKinds.map((k) => ENTRY_LABEL[k]).join("、")}）。下面只有一格，套不上的那幾個會在加入時個別報錯。
             </div>
           ) : null}
 
           <label style={labelStyle}>
-            {ENTRY_LABEL[chosen?.entry ?? "url"]}
+            {ENTRY_LABEL[entryKind]}
             <input
               value={entry}
               onChange={(e) => setEntry(e.target.value)}
-              placeholder={ENTRY_PLACEHOLDER[chosen?.entry ?? "url"]}
+              placeholder={ENTRY_PLACEHOLDER[entryKind]}
               style={inputStyle}
             />
           </label>
 
-          {(chosen?.options ?? []).map((opt) => (
-            <label key={opt.key} style={labelStyle}>
-              {opt.label}
-              {opt.type === "select" ? (
-                <select
-                  value={String(options[opt.key] ?? opt.default ?? "")}
-                  onChange={(e) => setOptions((o) => ({ ...o, [opt.key]: e.target.value }))}
-                  style={inputStyle}
-                >
-                  {(opt.choices ?? []).map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              ) : opt.type === "boolean" ? (
-                <input
-                  type="checkbox"
-                  checked={Boolean(options[opt.key] ?? opt.default)}
-                  onChange={(e) => setOptions((o) => ({ ...o, [opt.key]: e.target.checked }))}
-                />
-              ) : (
-                <input
-                  type={opt.type === "number" ? "number" : "text"}
-                  value={String(options[opt.key] ?? opt.default ?? "")}
-                  onChange={(e) =>
-                    setOptions((o) => ({
-                      ...o,
-                      [opt.key]: opt.type === "number" ? Number(e.target.value) : e.target.value,
-                    }))
-                  }
-                  style={inputStyle}
-                />
-              )}
-              {opt.help ? <span style={{ fontSize: 11, color: "#9ca3af" }}>{opt.help}</span> : null}
-            </label>
-          ))}
+          {chosenList
+            .filter((c) => (c.options ?? []).length > 0)
+            .map((c) => (
+              <fieldset key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px", display: "grid", gap: 8 }}>
+                <legend style={{ fontSize: 11, color: "#6b7280", padding: "0 4px" }}>
+                  {c.icon} {c.title}
+                </legend>
+                {(c.options ?? []).map((opt) => {
+                  const val = (options[c.id] ?? {})[opt.key];
+                  const set = (v: unknown) => setOptions((o) => ({ ...o, [c.id]: { ...(o[c.id] ?? {}), [opt.key]: v } }));
+                  return (
+                    <label key={opt.key} style={labelStyle}>
+                      {opt.label}
+                      {opt.type === "select" ? (
+                        <select value={String(val ?? opt.default ?? "")} onChange={(e) => set(e.target.value)} style={inputStyle}>
+                          {(opt.choices ?? []).map((ch) => (
+                            <option key={ch.value} value={ch.value}>
+                              {ch.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : opt.type === "boolean" ? (
+                        <input type="checkbox" checked={Boolean(val ?? opt.default)} onChange={(e) => set(e.target.checked)} />
+                      ) : (
+                        <input
+                          type={opt.type === "number" ? "number" : "text"}
+                          value={String(val ?? opt.default ?? "")}
+                          onChange={(e) => set(opt.type === "number" ? Number(e.target.value) : e.target.value)}
+                          style={inputStyle}
+                        />
+                      )}
+                      {opt.help ? <span style={{ fontSize: 11, color: "#9ca3af" }}>{opt.help}</span> : null}
+                    </label>
+                  );
+                })}
+              </fieldset>
+            ))}
 
-          <button onClick={addSource} disabled={busy || !entry.trim()} style={buttonStyle(false)}>
-            加入
+          <button onClick={addSource} disabled={busy || !entry.trim() || chosenList.length === 0} style={buttonStyle(false)}>
+            {chosenList.length > 1 ? `加入 ${chosenList.length} 個來源` : "加入"}
           </button>
-          {message ? <div style={{ fontSize: 12 }}>{message}</div> : null}
+          {message ? <div style={{ fontSize: 12, whiteSpace: "pre-line" }}>{message}</div> : null}
         </div>
       </section>
 
       <section>
-        <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>
-          這個客戶的來源（{approved.length} 個已核准）
+        <h2 style={{ fontSize: 15, margin: "0 0 10px", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+          <span>這個客戶的來源（{approved.length} 個已核准）</span>
+          {approved.length > 1 ? (
+            <button
+              onClick={() => setRunOnly((r) => (r.length ? [] : approved.map((s2) => s2.id)))}
+              style={{ ...buttonStyle(false), fontSize: 11 }}
+            >
+              {runOnly.length ? "清除選取" : "全選"}
+            </button>
+          ) : null}
         </h2>
 
         {candidates.length ? (
@@ -273,7 +333,16 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
         ) : null}
 
         {approved.map((s) => (
-          <SourceRow key={s.id} source={s} onDisable={() => patch(s.id, "disable")} busy={busy} />
+          <SourceRow
+            key={s.id}
+            source={s}
+            onDisable={() => patch(s.id, "disable")}
+            busy={busy}
+            selected={runOnly.includes(s.id)}
+            onToggle={() =>
+              setRunOnly((r) => (r.includes(s.id) ? r.filter((i) => i !== s.id) : [...r, s.id]))
+            }
+          />
         ))}
         {approved.length === 0 && candidates.length === 0 ? (
           <p style={{ fontSize: 13, color: "#6b7280" }}>還沒有任何來源。</p>
@@ -288,13 +357,18 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
           </details>
         ) : null}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+        {/* The count in the label is the whole point of the checkboxes: a run that quietly covered
+            everything when the operator had ticked two sources would spend budget they did not ask for. */}
+        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={() => collect(true)} disabled={busy || approved.length === 0} style={buttonStyle(false)}>
             試跑（不存）
           </button>
           <button onClick={() => collect(false)} disabled={busy || approved.length === 0} style={buttonStyle(true)}>
             正式抓取
           </button>
+          <span style={{ fontSize: 11, color: "#6b7280" }}>
+            {runOnly.length ? `只跑勾選的 ${runOnly.length} 個` : `全部 ${approved.length} 個已核准來源`}
+          </span>
         </div>
 
         {run ? <RunReport run={run} /> : null}
@@ -308,16 +382,33 @@ function SourceRow({
   onApprove,
   onDisable,
   busy,
+  selected,
+  onToggle,
 }: {
   source: Source;
   onApprove?: () => void;
   onDisable?: () => void;
   busy: boolean;
+  /** Omitted for candidate and disabled rows — neither is runnable, so neither is tickable. */
+  selected?: boolean;
+  onToggle?: () => void;
 }) {
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px", marginBottom: 6, fontSize: 13 }}>
+    <div
+      style={{
+        border: `1px solid ${selected ? "#111827" : "#e5e7eb"}`,
+        borderRadius: 8,
+        padding: "8px 10px",
+        marginBottom: 6,
+        fontSize: 13,
+        background: selected ? "#f9fafb" : "#fff",
+      }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ minWidth: 0 }}>
+        {onToggle ? (
+          <input type="checkbox" checked={Boolean(selected)} onChange={onToggle} style={{ marginTop: 3 }} />
+        ) : null}
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{source.entry}</div>
           <div style={{ color: "#6b7280", fontSize: 11 }}>
             {source.blockId}

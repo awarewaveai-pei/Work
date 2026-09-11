@@ -4,6 +4,8 @@
 
 | 日期 | 系統 | 指令（從 `D:\Work` 執行） | 你會看到什麼 | 誠實範圍 |
 |---|---|---|---|---|
+| 2026-09-11 | 資料蒐集 C1 — 真的寫進知識庫並驗版本化（C1 最後一項 DoD） | `cd lobster-factory\infra\hetzner-phase1-core\apps\next-admin && set COLLECT_C1_LIVE=1 && set COLLECT_C1_ORG=<org uuid> && npx vitest run lib/collect/__tests__/collect-c1-live.test.ts` | 三項各一個測試：真 URL 進 KB 且 `retrieve()` 查得到、標成 `SOURCE_QUOTATION`；同一份再進一次不產生新版；改了內容產生第 2 版且第 1 版**查不到**（用查詢驗，不是看 status 欄）。實測 21.8 秒三項全綠 | **會真的寫 prod 知識庫**，`afterAll` 自行刪除（失敗也刪，實測跑完回到原本 1 筆）；需 `.env.local` 的 Supabase 金鑰與機器環境的 `OPENAI_API_KEY`；每跑一次花少量 embedding 費用 |
+| 2026-09-11 | 資料蒐集 — 這台機器現在到底能抓哪些來源 | `cd lobster-factory\infra\hetzner-phase1-core\apps\next-admin && set COLLECT_CATALOGUE_REPORT=1 && npx vitest run lib/collect/__tests__/collect-catalogue-live.test.ts` | 印出全部 8 個來源與可用狀態，不可用的直接說缺哪個環境變數。2026-09-11 實測 6/8 可用，缺的是 `COLLECT_LOCAL_ROOTS`（本機檔案）與 `FIRECRAWL_API_KEY`（JS 渲染） | 純讀取，不連網、不寫入 |
 | 2026-09-11 | 資料蒐集操作台 — 選來源、試跑、正式抓取（蒐集器第一次有人按得下去的介面） | `cd lobster-factory\infra\hetzner-phase1-corepps
 ext-admin && npx next dev -p 3901`，瀏覽器開 `http://127.0.0.1:3901/ops/collect` | 左邊是來源目錄（網頁／Sitemap／RSS／學術論文／官方 API／影片／本機檔案／JS 渲染供應商），缺金鑰的來源會顯示「尚不可用，缺少：FIRECRAWL_API_KEY」而不是被藏起來；右邊是該客戶已核准的來源與「試跑（不存）」「正式抓取」兩顆按鈕；跑完直接列出抓到／入庫／被擋下幾筆與每筆原因 | 需要登入 session（middleware 會擋）；`collection_sources` 表需 migration 0074（2026-09-11 已套 prod）；試跑用 `sink/null`，一個位元組都不寫 |
 | 2026-09-11 | 資料蒐集 C0/C1 — 對真實網站跑一次完整蒐集管線（抓取→抽取→品質閘→注入掃描），一個位元組都不落地 | `cd lobster-factory\infra\hetzner-phase1-corepps
