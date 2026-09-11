@@ -43,7 +43,9 @@ if (nums.length === 0) {
 /** Resolve "0072" to exactly one file. Ambiguity is a mistake, not something to pick a winner for. */
 function resolveOne(num) {
   if (!/^\d{4}$/.test(num)) throw new Error(`not a 4-digit migration number: ${num}`);
-  const hits = fs.readdirSync(MIGRATIONS).filter((f) => f.startsWith(`${num}_`) && f.endsWith(".sql"));
+  // .endsWith(".sql") alone also matches that number's own *.down.sql sibling (0069, 0077, 0079 all
+  // have one) -- excluded explicitly, not by requiring callers to name down-files differently.
+  const hits = fs.readdirSync(MIGRATIONS).filter((f) => f.startsWith(`${num}_`) && f.endsWith(".sql") && !f.endsWith(".down.sql"));
   if (hits.length !== 1) throw new Error(`${num}: expected exactly 1 migration file, found ${hits.length}: ${hits.join(", ")}`);
   return path.join(MIGRATIONS, hits[0]);
 }
