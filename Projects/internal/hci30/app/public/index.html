@@ -52,6 +52,13 @@
   h1 { font-family: "Noto Serif TC", "PMingLiU", Georgia, "Times New Roman", serif; font-weight: 700; font-size: 2.05rem; margin: 0 0 0.4rem; letter-spacing: 0; line-height: 1.25; }
   h2 { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); margin: 2.6rem 0 1.1rem; text-transform: uppercase; }
 
+  /* 操作者兩輪都在問「這樣叫有主題性分區塊?」——光靠 h2 文字 + 上方細線
+     間距，滾動下去看不出這是彼此獨立的主題（證據/信任構面/決策/報告），
+     讀起來像同一塊內容一路流下去。每個分析流程的階段都包一層實心卡片
+     邊界，卡在頁面上一眼看得出物理上是分開的區塊。 */
+  .topic-block { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.6rem 1.8rem 1.8rem; margin: 1.8rem 0; }
+  .topic-block > h2:first-child { margin-top: 0; }
+
   /* Horizontal tab bar for the mutually-exclusive case-list views (+ the
      new-case action folded in as a third tab) -- underline indicator,
      matching the operator's reference layout. */
@@ -207,8 +214,14 @@
   form.inline-form { display: grid; gap: 0.5rem; max-width: 640px; margin-top: 1rem; }
   form.inline-form label { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-top: 0.4rem; }
   form.inline-form input, form.inline-form textarea {
-    padding: 0.55rem 0.7rem; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; color: var(--text); background: #fff;
+    width: 100%; padding: 0.55rem 0.7rem; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; color: var(--text); background: #fff;
   }
+  /* 操作者要求「textarea 寬要自動填滿, 不要還要填的人要去自己拉」——
+     <textarea> 的內建 cols=20 讓它在 grid 欄位裡只長出一個小方塊，不會自
+     動撐滿容器寬度；上面 width:100% 解決寬度，這裡另外關掉左右拖拉，只
+     留上下拉高（填的人可能需要多打幾行，但欄寬應該一開始就是滿的，不
+     該讓人自己去拉）。 */
+  form.inline-form textarea { resize: vertical; }
   form.inline-form input:focus, form.inline-form textarea:focus {
     outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(14,91,80,.14);
   }
@@ -340,6 +353,7 @@
        是人做的最終判斷，放最後；報告是決策定案後才產生的最終產物，排在
        最末（2026-09-11，操作者：「雷達圖在最上面? 那不是最後才會產出的
        東西嗎?」）。 -->
+  <section class="topic-block">
   <h2>證據與主張</h2>
   <div class="evidence-layout">
     <div>
@@ -374,7 +388,9 @@
     </div>
     </div>
   </div>
+  </section>
 
+  <section class="topic-block">
   <h2>信任構面</h2>
   <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
   <div class="radar-wrap">
@@ -388,13 +404,18 @@
     <div class="insight-col risks"><h3>重大風險</h3><ul id="d-risks"></ul></div>
     <div class="insight-col unknowns"><h3>未知構面</h3><ul id="d-unknowns"></ul></div>
   </div>
+  </section>
 
+  <section class="topic-block">
   <h2>決策</h2>
   <div id="d-decision-banner"></div>
   <div id="d-decision-form-wrap"></div>
+  </section>
 
+  <section class="topic-block">
   <h2>產生報告</h2>
   <div id="d-reports-wrap"></div>
+  </section>
 </div>
 
 <div id="report" style="display:none">
@@ -936,9 +957,12 @@ function renderReportView(row) {
       <p class="subtitle">${c.id} ．狀態 ${STATUS_LABELS[c.status] || c.status} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</p>
     </div>
 
+    <section class="topic-block">
     <h2>證據與主張</h2>
     <div>${recordsHtml}</div>
+    </section>
 
+    <section class="topic-block">
     <h2>信任構面</h2>
     <p class="subtitle" style="margin-top:-0.5rem">${d.rollup.domains.length ? '根據上方評估紀錄即時運算 — 絕非人工填寫的分數。' : ''}</p>
     <div class="radar-wrap">
@@ -952,9 +976,12 @@ function renderReportView(row) {
       <div class="insight-col risks"><h3>重大風險</h3><ul>${d.risks.length ? d.risks.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('') : '<li class="empty">尚無項目</li>'}</ul></div>
       <div class="insight-col unknowns"><h3>未知構面</h3><ul>${d.unknowns.length ? d.unknowns.map(u => `<li>${DOMAIN_LABELS[u] || u}</li>`).join('') : '<li class="empty">全部構面皆有證據</li>'}</ul></div>
     </div>
+    </section>
 
+    <section class="topic-block">
     <h2>決策</h2>
     ${decisionHtml}
+    </section>
 
     <div class="report-legal">
       <p><b>免責聲明：</b>本報告可能包含尚未證實之指控、推論與主觀判讀，不構成事實認定。內容中標示為「主張」或「評估」者為判讀性質，唯有標示為「證據」者為直接查得之事實；使用本報告前應自行查證，不應逕自視為最終定論。</p>

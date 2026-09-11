@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-11 HCI30 四個分析階段各包一層卡片邊界 + textarea 寬度自動填滿——操作者截圖回應：「這樣叫有主題性分區塊?」
+
+上一輪把「新增調查發現」拿掉手風琴、每則證據紀錄改卡片後，操作者截圖回應兩點：(1) 這樣還不算有「主題性分區塊」——四個分析階段（證據與主張/信任構面/決策/產生報告）彼此之間只靠 h2 文字加一點上緣間距分隔，滾動下去看起來還是同一塊內容一路流下去；(2) textarea 寬度沒有自動填滿容器，要填寫的人自己去拉才看得到完整寬度。
+
+改法：
+1. 四個階段各自用 `<section class="topic-block">` 把 h2 標題連同底下內容整個包起來，`.topic-block` 給實心卡片外觀（背景/邊框/圓角/內距），滾動下去一眼看得出這是四塊互相獨立的區塊，不是一路流下去的同一塊內容。同步套用到 `renderReportView()`（凍結報告頁），維持這兩輪以來「活頁面跟報告頁結構一致」的原則，不留只修一邊的半套修法。另加 `.topic-block > h2:first-child { margin-top: 0 }`，避免卡片自己的內距跟 h2 原本的上緣間距疊加變成雙重留白。
+2. `form.inline-form input, form.inline-form textarea` 補上 `width: 100%`——`<textarea>` 原生 `cols=20` 的內建尺寸不會像一般 block 元素一樣自動撐滿 CSS Grid 欄位，這是它變成小方塊、要人自己拉的根本原因；同時把 `resize` 限制成只能往下拉高（`resize: vertical`），因為欄寬本來就該一開始就是滿的，不該讓人自己去拉寬。
+
+真跑驗證：本機 dev server（`localhost:4030`，真實 Postgres）900px 寬視窗截圖看四個卡片邊界都清楚可見；用頁面內 JS 對 3 個 textarea（新增案件的委託背景說明、新增證據的內容、決策理由）量 `getBoundingClientRect().width`，全部等於各自表單容器的寬度，確認真的填滿；用 `getComputedStyle` 確認活頁面與報告頁的 `.topic-block` 都真的套到背景/邊框/圓角；全程 `read_console_messages` 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，900px 寬截圖確認卡片邊界，頁面內 JS 量測 textarea 寬度與 `.topic-block` computed style，並實際產生一次報告核對報告頁同款結構 | 結果=4 個卡片邊界皆確認套用；3 個 textarea 寬度皆等於容器寬度；報告頁 3 個 topic-block 存在；console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS（一個新 wrapper class + 一條 width/resize 規則）+ HTML `<section>` 包裹既有內容，無 id 改動、無 JS 邏輯改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=topic-block | hits=2：index.html（現況、正確）與 database/tests/wave1-negative-tests.sql（巧合命中一則無關的 SQL 註解「per-topic-block convention」，跟這個 CSS class 無關）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（四個分析階段包 `.topic-block` 卡片邊界，活頁面與報告頁同步；`form.inline-form` 的 input/textarea 補 `width:100%` 並限制 textarea 只能上下拉）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過卡片邊界與 textarea 寬度，console 零錯誤
+
+[剩餘風險] 無新增風險；純樣式調整，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到四階段無卡片邊界、textarea 未強制填滿寬度的上一版。
+
 ## 2026-09-11 HCI30 拿掉「新增調查發現」手風琴、證據紀錄改真卡片——操作者：不要合起來, 不要accordion, 每個主題區塊要像卡片
 
 操作者這輪盯著「證據與主張」區塊提兩點：(1)「新增調查發現」不要合起來、甚至不要用 accordion 這種互動模式；(2) 每個主題區塊要像卡片，才知道是分開的、不會混在一起。
