@@ -814,6 +814,53 @@ test('git-commit-scope-guard: --amend is skipped entirely (documented carve-out)
   assert.doesNotMatch(r.stderr, /with staged files, but this session never recorded/);
 });
 
+test('git-commit-scope-guard v6 fix: a genuine mid-merge (MERGE_HEAD present) is skipped entirely, even with a "foreign-looking" staged file this session never added', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.txt': 'shared base\n' } });
+  spawnSync('git', ['commit', '-q', '-m', 'base'], { cwd: repo });
+  spawnSync('git', ['branch', 'other'], { cwd: repo }); // both branches diverge from HERE
+  fs.writeFileSync(path.join(repo, 'fileA.txt'), 'main version\n');
+  spawnSync('git', ['commit', '-q', '-am', 'main change'], { cwd: repo });
+  spawnSync('git', ['checkout', '-q', 'other'], { cwd: repo });
+  fs.writeFileSync(path.join(repo, 'fileA.txt'), 'other branch version\n');
+  spawnSync('git', ['commit', '-q', '-am', 'other change'], { cwd: repo });
+  spawnSync('git', ['checkout', '-q', 'main'], { cwd: repo });
+  const merge = spawnSync('git', ['merge', 'other'], { cwd: repo, encoding: 'utf8' });
+  assert.match(merge.stderr + merge.stdout, /CONFLICT/); // real merge conflict, real MERGE_HEAD
+  assert.ok(fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD')), 'MERGE_HEAD must actually exist for this test to mean anything');
+  fs.writeFileSync(path.join(repo, 'fileA.txt'), 'resolved\n');
+  spawnSync('git', ['add', 'fileA.txt'], { cwd: repo }); // this session's own resolution
+  // this session's tracker is deliberately EMPTY — without the v6 fix this would BLOCK
+  // exactly like the "ANOTHER session's staged file" test above, on the very file this
+  // session itself just resolved.
+  writeGitStageTracker(sid, []);
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit --no-edit' } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git-commit-scope-guard v6 fix: CHERRY_PICK_HEAD present is also skipped (same structural class as MERGE_HEAD)', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main' });
+  fs.writeFileSync(path.join(repo, '.git', 'CHERRY_PICK_HEAD'), `${'a'.repeat(40)}\n`);
+  fs.writeFileSync(path.join(repo, 'foreign.md'), 'x');
+  spawnSync('git', ['add', 'foreign.md'], { cwd: repo });
+  writeGitStageTracker(sid, []);
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git-commit-scope-guard v6 fix regression guard: with NO merge/cherry-pick in progress, an unrelated foreign staged file still BLOCKS as before', () => {
+  const sid = freshSid('gcsg');
+  const repo = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
+  writeGitStageTracker(sid, ['fileA.md']);
+  fs.writeFileSync(path.join(repo, 'fileB.md'), 'b');
+  spawnSync('git', ['add', 'fileB.md'], { cwd: repo });
+  assert.ok(!fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD')));
+  const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repo });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /would include files this session never/);
+});
+
 test('git-commit-scope-guard: prose mention of "git commit" in a heredoc does NOT trip the gate (same false-positive class as ID-5)', () => {
   const sid = freshSid('gcsg');
   const heredoc = [

@@ -247,6 +247,34 @@ function extractPathspecTail(commitSegment, commandExpanded, shared) {
 // repo, which routed EVERY such commit into the full-index ownership check below
 // instead of the fast, correct "this commit is scoped, nothing to compare" path --
 // not a false negative on an unsafe commit, but a false block on a safe one.
+// v6 (2026-09-11, real block hit live finishing a legitimate `git pull` merge — not a
+// critic finding): this gate had no merge/cherry-pick awareness at all, unlike the
+// `--amend` exemption above. A real merge commit necessarily includes every path that
+// differs between the two parents -- git itself refuses `git commit -- <pathspec>` while
+// `MERGE_HEAD`/`CHERRY_PICK_HEAD` exists ("cannot do a partial commit during a merge"),
+// so the fix this gate's own error message suggests (a trailing pathspec) is not just
+// unhelpful here, it is impossible. Reproduced directly: mid-merge, exactly 2 files
+// staged (one this session's own conflict resolution, one a clean auto-merge from the
+// incoming commit — verified via `git diff HEAD` showing it as real incoming content, not
+// another session's uncommitted work), plain `git commit --no-edit` still BLOCKED citing
+// the auto-merged file as "unexpected". Fixed by exempting the whole check while a merge
+// or cherry-pick is genuinely in progress (`git rev-parse -q --verify MERGE_HEAD` /
+// `CHERRY_PICK_HEAD`, the standard worktree-safe way to ask — not reading `.git/MERGE_HEAD`
+// as a path, which breaks under worktrees/submodules), mirroring the existing --amend
+// early-return in shape and reasoning: some git operations are structurally exempt from
+// per-session pathspec scoping, not a hole to close.
+function isMidMergeOrCherryPick(cwd) {
+  try {
+    for (const ref of ['MERGE_HEAD', 'CHERRY_PICK_HEAD']) {
+      const r = spawnSync('git', ['rev-parse', '-q', '--verify', ref], { cwd, encoding: 'utf8', timeout: 10000 });
+      if (typeof r.status === 'number' && r.status === 0) return true;
+    }
+    return false;
+  } catch (_) {
+    return false; // can't tell -- fall through to the normal check rather than assume exempt
+  }
+}
+
 function isRealPathspec(tokens, cwd) {
   try {
     const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', ...tokens], { cwd, encoding: 'utf8', timeout: 10000 });
@@ -309,6 +337,7 @@ module.exports = {
     const { segment: commitSegment, index: commitIndex } = findCommitSegment(segments);
     if (!commitSegment) return null;
     if (/--amend\b/.test(ctx.commandExpanded)) return null;
+    if (isMidMergeOrCherryPick(ctx.cwd)) return null; // v6 — see isMidMergeOrCherryPick's own header
 
     // -C: check ONLY the commit segment's own captured flag region (v4 fix M1).
     const cRegionMatch = commitSegment.match(RE_GIT_COMMIT);
