@@ -40,9 +40,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
-  let body: { templateId?: string; props?: Record<string, unknown> };
+  let body: { templateId?: string; props?: Record<string, unknown>; organizationId?: string };
   try {
-    body = (await req.json()) as { templateId?: string; props?: Record<string, unknown> };
+    body = (await req.json()) as { templateId?: string; props?: Record<string, unknown>; organizationId?: string };
   } catch {
     return NextResponse.json({ ok: false, error: "無效 JSON" }, { status: 400 });
   }
@@ -51,9 +51,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "templateId 為必填" }, { status: 400 });
   }
 
+  // VideoPipeline wizard（② 選租戶）可覆蓋預設租戶——同 render-draft/route.ts 2026-09-11 修，理由同註解。
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const requestedOrgId = typeof body.organizationId === "string" && UUID_RE.test(body.organizationId)
+    ? body.organizationId
+    : undefined;
   const { resolveOrgId: resolveDefaultOrgId } = await import("@/lib/content/blocks/video-pipeline");
   let orgId: string | null;
-  try { orgId = effectiveOrgId(req, resolveDefaultOrgId()); }
+  try { orgId = effectiveOrgId(req, requestedOrgId ?? resolveDefaultOrgId()); }
   catch (error) { if (error instanceof OrgAccessError) return toOrgAccessResponse(error) as NextResponse; throw error; }
   if (!orgId) return NextResponse.json({ ok: false, error: "影片工作必須綁定組織" }, { status: 403 });
 

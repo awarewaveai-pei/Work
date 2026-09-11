@@ -144,11 +144,11 @@ export default function VideoPipeline() {
         <VideoStudio
           key={genKey}
           initial={scriptPrefill}
-          embedded={{ lockTab: "generate", onRenderComplete: () => { if (!quickRenderDone) { setQuickRenderDone(true); goto(5); } } }}
+          embedded={{ lockTab: "generate", organizationId: organizationId || undefined, onRenderComplete: () => { if (!quickRenderDone) { setQuickRenderDone(true); goto(5); } } }}
         />
       )}
       {step === 4 && mode === "remotion" && (
-        <VideoStudio key={genKey} remotionInitial={remotionPrefill} embedded={{ lockTab: "remotion" }} />
+        <VideoStudio key={genKey} remotionInitial={remotionPrefill} embedded={{ lockTab: "remotion", organizationId: organizationId || undefined }} />
       )}
       {step === 4 && mode === "remotion" && (
         <div style={{ padding: "0 28px 24px" }}>

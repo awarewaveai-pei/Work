@@ -200,6 +200,12 @@ interface VideoStudioEmbedded {
   lockTab: StudioTabId;
   /** 該次生成完成（草稿渲染完成）時通知外層 wizard，讓它可以自動前進到下一步。 */
   onRenderComplete?: () => void;
+  /**
+   * wizard②選的租戶，覆蓋 render-draft 的預設租戶解析。2026-09-11 修：之前這裡完全沒有欄位可傳，
+   * 渲染永遠落在伺服器端預設租戶，跟 wizard 選的不是同一個 → ⑦字幕/⑧QA/⑨Release 都找不到剛
+   * 渲染好的素材（真實跑過一次才發現：wizard 選 E2E-Verify-0704，影片卻記在 AwareWave Ops）。
+   */
+  organizationId?: string;
 }
 
 export default function VideoStudio({ initial, remotionInitial, embedded }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill; embedded?: VideoStudioEmbedded } = {}) {
@@ -561,6 +567,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           formats: draftFormats,
           r2Keys: draftR2Keys,
           title: draftTitle,
+          ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
           ...parseVoiceModel(voiceModelId),
         }),
       });
@@ -1205,7 +1212,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       )}
 
       {/* ── Remotion 模板／實拍剪輯／Release 交付／營運 tab（孤兒面板接線，零 props，掛載點變動不影響其內部邏輯）── */}
-      {studioTab === "remotion" && <RemotionStudio scriptPrefill={remotionInitial} />}
+      {studioTab === "remotion" && <RemotionStudio scriptPrefill={remotionInitial} organizationId={embedded?.organizationId} />}
       {studioTab === "footage" && <FootageEditor />}
       {studioTab === "release" && <ReleaseDeliveryPanel />}
       {studioTab === "timeline" && <TimelineValidationPanel />}
@@ -1795,7 +1802,7 @@ function aspectToFormat(aspect: string): string {
   return "16x9";
 }
 
-function RemotionStudio({ scriptPrefill }: { scriptPrefill?: ScriptRemotionPrefill }) {
+function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: ScriptRemotionPrefill; organizationId?: string }) {
   const [selectedId, setSelectedId] = useState(REMOTION_TEMPLATES[0].id);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<RemotionStatus>("idle");
@@ -1900,7 +1907,7 @@ function RemotionStudio({ scriptPrefill }: { scriptPrefill?: ScriptRemotionPrefi
       const r = await fetch("/api/video/remotion-render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId: selectedId, props }),
+        body: JSON.stringify({ templateId: selectedId, props, ...(organizationId ? { organizationId } : {}) }),
       });
       const j = (await r.json()) as { ok: boolean; jobId?: string; error?: string };
       if (!j.ok || !j.jobId) { setStatus("error"); setError(j.error ?? "提交失敗"); return; }

@@ -35,6 +35,8 @@ interface RenderDraftBody {
   ttsVoice?: string;
   introTitle?: string;
   introDuration?: number;
+  /** VideoPipeline wizard 帶入的租戶（② 選租戶那步）。未帶時退回既有預設租戶解析，行為不變。 */
+  organizationId?: string;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -50,13 +52,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Request body must be valid JSON" }, { status: 400 });
   }
 
-  const { scenes, imageUrls, formatImageUrls, formats: bodyFormats, r2Keys: clientR2Keys = [], title = "影片" } = body;
+  const { scenes, imageUrls, formatImageUrls, formats: bodyFormats, r2Keys: clientR2Keys = [], title = "影片", organizationId: requestedOrganizationId } = body;
 
   // 租戶身分走 app 既有唯一解析器（同 generate route 與 designs/presets），非全域預設值。
   // 放在提交 EU 之前：無合法歸屬要在花掉渲染算力前擋下。
+  // VideoPipeline wizard（② 選租戶）可明確帶 organizationId 覆蓋這個預設——2026-09-11 修：之前完全
+  // 沒有這條路徑，wizard 選的租戶跟實際渲染落地的租戶對不上，導致⑦字幕/⑧QA/⑨Release 都找不到剛
+  // 渲染好的素材（找的是 wizard 選的租戶，渲染卻落在預設租戶）。client 帳號仍被 effectiveOrgId 內部
+  // 擋下、不能注入別人的租戶，只有 staff/operator/owner 才可能用 wizard 帶的值覆蓋預設。
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const requestedOrgId = typeof requestedOrganizationId === "string" && UUID_RE.test(requestedOrganizationId)
+    ? requestedOrganizationId
+    : undefined;
   const { resolveOrgId: resolveDefaultOrgId } = await import("@/lib/content/blocks/video-pipeline");
   let orgId: string | null;
-  try { orgId = effectiveOrgId(req, resolveDefaultOrgId()); }
+  try { orgId = effectiveOrgId(req, requestedOrgId ?? resolveDefaultOrgId()); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
 
   if (!Array.isArray(scenes) || scenes.length === 0) {

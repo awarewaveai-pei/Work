@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-09-11 真實跑 `/tools/video` pipeline，抓到 wizard②選租戶跟實際渲染租戶對不上
+
+**觸發**：操作者要求「每種都要測試實證系統可以運行」，不接受只看 code review/tsc。本機無 AI 金鑰測不了，操作者親自登入正式站 `app.aware-wave.com`，同瀏覽器分頁讓 session cookie 帶過去，我在她的真實登入 session 上直接操作。
+
+**真實測過、真的成功**：
+- 📖 短劇 Story Bible：選 E2E-Verify-0704 測試租戶 → 填前提/鉤子 → 儲存（真寫 DB，`series_1 r1` + 內容雜湊）→ 核准（直接打 `canApproveMediaRelease`，今天稍早修的函式）→ 200。
+- ✏️ 手動生成 → 快速影片全流程：①真呼叫 Claude Sonnet 4.6 生出腳本「凌晨三點，沒人知道我哭了」4 場 → ②選模式 → ③費用確認（NT$0，全免費素材）→ ④⑥真的在 EU 伺服器跑 TTS+ffmpeg → ⑤Timeline 自動放行 → 落到⑦字幕。渲染出的影片經 `curl -I` 確認 R2 上是真實 10MB mp4（`Content-Length: 10444661`），已下載傳給操作者本人驗看。
+
+**抓到的真 bug**：⑦字幕、⑧QA 顯示「此租戶尚無素材」——不是壞掉，是 SSH 查 `video_jobs`/`media_assets` 證實影片渲染落在 `39ad4149...`（AwareWave Ops，伺服器端預設租戶），不是 wizard②選的 `9e6e0993...`（E2E-Verify-0704）。根因：`VideoStudio.tsx`（快速影片/短劇/Remotion 共用引擎）過去完全沒有 `organizationId` 這個概念，渲染永遠用 `lib/content/blocks/video-pipeline.ts:resolveOrgId()` 的伺服器端預設值（`process.env.POD_DESIGNS_DEFAULT_ORG_ID`），wizard②選的租戶只有 `FootageEditor`（今天稍早已接）跟 Story Bible/Release/QA/Captions 這些獨立面板真的在用，Quick Engine/Remotion 這條線完全沒接上。
+
+**修法**：`app/api/video/render-draft/route.ts`、`app/api/video/remotion-render/route.ts` 各加 `organizationId` 選用欄位，UUID 格式驗證後傳給既有的 `effectiveOrgId(req, requestedOrgId ?? resolveDefaultOrgId())`——這個函式本來就設計成接受呼叫端覆蓋值（`lib/tenant-guard.ts:161` 文件註解本身就寫「staff: returns requestedOrgId if provided」），只是兩條 route 之前從沒把 body 裡的值傳進去。`client` 帳號仍被 `effectiveOrgId` 內部擋下、不能注入別的租戶，只有 staff/operator/owner 才可能覆蓋。`VideoStudio.tsx` 的 `embedded` prop 加 `organizationId?: string`，`RemotionStudio` 內層元件也加同名 prop 往下傳；`VideoPipeline.tsx` 把 wizard state 的 `organizationId` 接進兩個 `embedded={{...}}` 呼叫點。未帶 `embedded`（`VideoTabs.tsx` 既有 standalone 用法）或未選租戶時完全零改變，退回原本的伺服器端預設解析。
+
+REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql ... select ... from video_jobs/media_assets` | exit=0 | result=證實 bug 存在（org 不對）+ 證實影片真的渲染成功（10444661 bytes 真實 mp4，curl -I 200）
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（修完後） | exit=0 | 4 個改動檔案 0 error（另有 chatwoot 模組 10 個既有錯誤，跟本次改動無關，另一 session 進行中的客服系統功能，grep 確認不是本次觸碰的檔案）
+REVIEW_DONE: critic=self（範圍小：只加一個 UUID 驗證過的選用欄位、走既有 `effectiveOrgId` 的既有覆蓋機制，非自創；grep 確認四處串接無遺漏、無 client 帳號權限繞過風險）| verdict=pass
+BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`requestedOrganizationId\|requestedOrgId\|embedded\?\.organizationId` | hits=僅本次改動的 4 個檔案 + `lib/tenant-guard.ts` 既有文件註解（佐證用法正確），無遺漏呼叫點
+WORKLOG_DONE: 本條目
+
+[剩餘風險] 尚未驗證修復後 wizard 走一次「選租戶→渲染→字幕/QA 抓到正確素材」的完整迴圈（下一步要測）；`FootageEditor`/`ReleaseDeliveryPanel`/`Story Bible`/`QA`/`Captions` 這幾個本來就有 org 概念的面板不受影響。
+[rollback] `git revert` 本次 commit：4 個檔案的新增欄位全是選用（optional），退回後兩條 render route 恢復成只走伺服器端預設租戶，`VideoStudio`/`VideoPipeline` 恢復原狀，無 DB/schema 影響。
+
 ## 2026-09-11（115–118 號切片：F08 strategy 家族收官 10/14→14/14，4 agent，其中 2 個從 rate-limit 中斷點續建）
 
 bcg_matrix(54t)/blue_ocean(56t)/business_model_canvas(55t)/value_proposition_canvas(57t)。222 tests 零衝突，全 regression 6968→7190，golden 3276→3296。F08 causal & strategy 家族正式收官（14/14）：swot+13 個批次建置方法。
