@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LADDERS } from "@/lib/outreach/connectors/router";
 import type { ConnectorNeed } from "@/lib/outreach/connectors/types";
 import { useActiveOrg, withOrg } from "@/lib/outreach/use-active-org";
@@ -10,6 +11,7 @@ interface Connector {
   connector_type: string;
   is_enabled: boolean;
   credentials_ref: string | null;
+  settings: { email?: string } | null;
   created_at: string;
 }
 
@@ -43,6 +45,9 @@ export default function ConnectorsClient() {
   const [keyValue, setKeyValue] = useState("");
 
   const org = useActiveOrg();
+  const searchParams = useSearchParams();
+  const gmailStatus = searchParams.get("gmail"); // set by the OAuth callback redirect
+  const gmailDetail = searchParams.get("detail");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,6 +157,8 @@ export default function ConnectorsClient() {
   return (
     <div style={{ padding: 16, display: "grid", gap: 16 }}>
       {err && <div className="card-badge badge-red" role="alert">{err}</div>}
+      {gmailStatus === "connected" && <div className="card-badge badge-green">已連接 Gmail：{gmailDetail}</div>}
+      {gmailStatus === "error" && <div className="card-badge badge-red" role="alert">Gmail 連接失敗：{gmailDetail}</div>}
 
       <form className="card" onSubmit={add} style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <span className="card-label">新增 Connector：</span>
@@ -181,22 +188,36 @@ export default function ConnectorsClient() {
                     <span className={`card-badge ${c.is_enabled ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 8 }}>
                       {c.is_enabled ? "enabled" : "disabled"}
                     </span>
-                    <span className={`card-badge ${c.credentials_ref ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>
-                      {c.credentials_ref ? "🔑 已設金鑰" : "未設金鑰"}
-                    </span>
+                    {c.connector_name === "gmail" ? (
+                      <span className={`card-badge ${c.credentials_ref ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>
+                        {c.credentials_ref ? `✅ 已連接 ${c.settings?.email ?? ""}` : "未連接"}
+                      </span>
+                    ) : (
+                      <span className={`card-badge ${c.credentials_ref ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>
+                        {c.credentials_ref ? "🔑 已設金鑰" : "未設金鑰"}
+                      </span>
+                    )}
                   </span>
                   <span style={{ display: "flex", gap: 8 }}>
-                    <button type="button" className="btn-secondary" onClick={() => { setKeyingId(keyingId === c.id ? null : c.id); setKeyValue(""); }}>
-                      🔑 設定金鑰
-                    </button>
-                    {c.credentials_ref && (
-                      <button type="button" className="btn-secondary" onClick={() => void clearKey(c.id)}>清除金鑰</button>
+                    {c.connector_name === "gmail" ? (
+                      <a className="btn-secondary" href={`/api/outreach/connectors/gmail/authorize?connectorId=${encodeURIComponent(c.id)}`}>
+                        {c.credentials_ref ? "🔗 重新連接" : "🔗 連接 Google 帳號"}
+                      </a>
+                    ) : (
+                      <>
+                        <button type="button" className="btn-secondary" onClick={() => { setKeyingId(keyingId === c.id ? null : c.id); setKeyValue(""); }}>
+                          🔑 設定金鑰
+                        </button>
+                        {c.credentials_ref && (
+                          <button type="button" className="btn-secondary" onClick={() => void clearKey(c.id)}>清除金鑰</button>
+                        )}
+                      </>
                     )}
                     <button type="button" className="btn-secondary" onClick={() => void toggle(c)}>{c.is_enabled ? "停用" : "啟用"}</button>
                     <button type="button" className="btn-secondary" onClick={() => void remove(c.id)}>移除</button>
                   </span>
                 </div>
-                {keyingId === c.id && (
+                {keyingId === c.id && c.connector_name !== "gmail" && (
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input
                       type="password"

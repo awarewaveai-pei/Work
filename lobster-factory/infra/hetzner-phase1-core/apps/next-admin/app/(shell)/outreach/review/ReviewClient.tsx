@@ -17,6 +17,7 @@ interface Message {
 
 const LEADS_API = "/api/outreach/leads";
 const MSG_API = "/api/outreach/messages";
+const GMAIL_DRAFT_API = "/api/outreach/messages/gmail-draft";
 
 function gateBadge(s: string | null): string {
   if (s === "pass") return "badge-green";
@@ -97,6 +98,27 @@ export default function ReviewClient() {
     }
   }
 
+  async function createGmailDraft(messageId: string) {
+    setErr(null); setNotice(null); setBusy(true);
+    try {
+      const r = await fetch(GMAIL_DRAFT_API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messageId }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "建草稿失敗");
+      if (j.warning) { setErr(`⚠️ ${j.warning}`); } else {
+        setNotice(`已建 Gmail 草稿（寄件：${j.senderEmail}）— 草稿未寄出，請自行到 Gmail 確認並手動寄送`);
+      }
+      await loadMessages(leadId);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div style={{ padding: 16, display: "grid", gap: 16 }}>
       {err && <div className="card-badge badge-red" role="alert">{err}</div>}
@@ -140,6 +162,12 @@ export default function ReviewClient() {
                   )}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button type="button" className="btn-primary" disabled={m.quality_gate_status === "block"} onClick={() => void setStatus(m.id, "approved")}>Approve</button>
+                    {m.status === "approved" && (
+                      <button type="button" className="btn-primary" disabled={busy} onClick={() => void createGmailDraft(m.id)}>
+                        {busy ? "建立中…" : "建 Gmail 草稿"}
+                      </button>
+                    )}
+                    {m.status === "drafted" && <span className="card-badge badge-green">✅ 已建 Gmail 草稿（未寄出）</span>}
                     <button type="button" className="btn-secondary" onClick={() => void setStatus(m.id, "needs_edit")}>需修改</button>
                     <button type="button" className="btn-secondary" onClick={() => void navigator.clipboard?.writeText(m.body)}>複製</button>
                     <button type="button" className="btn-secondary" onClick={() => void setStatus(m.id, "skipped")}>跳過</button>

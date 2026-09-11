@@ -1,5 +1,39 @@
 # Worklog
 
+## 2026-09-11 T10 Gmail per-org OAuth 建草稿 code-complete（critic Deep 抓 1 Critical IDOR + 1 Major MIME bug，皆已修並補回歸測試）
+
+**觸發**：操作者取得 Google Cloud OAuth Client（`GOOGLE_OAUTH_CLIENT_ID`/`SECRET`，Testing 模式 100 人上限，scope 只給 `gmail.compose`）並要求「繼續完成 cold email 工具」——這是 Phase 1 唯一剩的 T10。憑證存入 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` §36 + `mcp/user-env.ps1`（已跑過同步，`GOOGLE_OAUTH_CLIENT_ID`/`SECRET` 確認寫入 Windows User 環境變數）。
+
+**架構決策（偏離 spec 字面但保留其精神）**：spec 寫「n8n「Gmail Draft」workflow」，本次改成 next-admin 自己的 API route 直接呼叫 Gmail API（不經 n8n）。理由：n8n 在這裡只會是純轉發（零業務邏輯），額外一層網路跳轉 + 我對這條特定流程的 n8n 除錯把握遠低於同語言 TS route（可直接 vitest，可 REALTEST），且不需要另外設計一套 n8n↔next-admin 的共享密鑰驗證機制。T10 acceptance criteria（真建一封草稿、擋 daily limit、只建 draft）本身不要求 n8n，屬實作細節。此決策記錄於此，若操作者認為需要走 n8n（例如未來要重用其重試/可觀測性），可再議。
+
+**已修改**：
+- `lib/outreach/google-oauth.ts`（新）：authorize URL builder、HMAC state 簽章/驗證（CSRF 防護）、code↔token 交換、access token refresh、RFC 2822 MIME 編碼器、Gmail drafts.create 封裝。
+- `app/api/outreach/connectors/gmail/authorize/route.ts`（新）：GET，ops-role 閘 + org 擁有權檢查，導向 Google 同意畫面。
+- `app/api/outreach/connectors/gmail/callback/route.ts`（新）：GET，Google 導回後交換 token、存 vault、更新 connector row、自動建 `co_sender_accounts`。
+- `app/api/outreach/messages/gmail-draft/route.ts`（新）：POST，approved 訊息 → 解析 org 的 Gmail connector（org-scoped 優先，退回 agency null-org 帳號）→ 查 sender 帳號 → 用 `co_sending_events` 當日 `draft_created` 計數擋 daily limit（Asia/Taipei 日界，自動歸零免 cron）→ refresh token → 建草稿 → 記事件 + 更新訊息狀態。
+- `app/(shell)/outreach/connectors/ConnectorsClient.tsx` + `app/(shell)/outreach/review/ReviewClient.tsx`：UI 接線（「連接 Google 帳號」連結、「建 Gmail 草稿」按鈕）。
+- `lib/outreach/__tests__/google-oauth.test.ts`（新，17 tests）+ `app/api/outreach/connectors/gmail/authorize/route.test.ts`（新，4 tests，含 IDOR 回歸測試）。
+
+**中途事故**：`ConnectorsClient.tsx`／`ReviewClient.tsx` 的 UI 接線第一次寫完後被另一個並行 session 的 `git reset → origin/main` 週期性同步機制吃掉（`git reflog` 證實：多次 `reset: moving to origin/main`／`checkout: moving from main to main` 循環）——未 commit 的既有追蹤檔案修改會被這類同步靜默丟棄，新增的 untracked 檔案不受影響。已重做兩檔案的編輯；本條經驗：**多 session 直接在 main 工作時，對已追蹤檔案的編輯要盡快 commit，不要囤積**。
+
+**critic Deep review（第一輪，含 Agent 429 rate-limit 失敗一次，`scripts/oracle-quota.ps1 -Action set -Hours 5` 按規則記錄後重試成功，重試後手動 `-Action clear`）抓到並修復**：
+1. **🔴 Critical — 跨租戶 IDOR**：`authorize/route.ts` 原本只查 `canManageOutreach(role)`，未驗 `assertOrgAccess`。任何有該角色的呼叫者（含未來 Phase-5 client 帳號）可用別 org 的 `connectorId` 重新走 OAuth，把自己的 Google 帳號覆蓋掉對方的 connector——RLS 對這張表是 `service_role USING(true)`，app 層是唯一防線。修法：`select` 加 `organization_id`，`assertOrgAccess` 檢查後才 `signState`，比照 `connectors/route.ts` 既有 pattern。已補回歸測試 + mutation test 證明（拔掉 guard → 測試變紅 307，還原 → 變綠 403）。
+2. **🟠 Major — `.eq("organization_id", null)` 對 uuid 欄位不等於 IS NULL**：agency-default（null-org）connector 這條路（"先用測試帳號"）會直接 500。發現同一 bug class 也存在 callback route 的 sender 存在性檢查，一併修（`.is()` 取代對 null 值的 `.eq()`）。
+3. **🟠 Major — MIME 缺 `Content-Transfer-Encoding`**：RFC 2045 §6.1 預設 `7bit`（純 ASCII），但這產品的信件內容固定是繁體中文。改為 base64 編碼 body + 宣告 CTE + 76 字元換行（RFC 2045）+ 補 `Date` header。
+4. 🟡 Minor 已修：兩個 `.update()` 錯誤原本靜默吞掉（草稿已建但狀態沒翻，UI 會誘使重複建草稿）→ 改用 `warning` 欄位回傳給前端；移除語意矛盾的 `daily_sent_count` 寫入（file 自己的設計說明是「用即時查詢避免手動歸零」，卻又寫入一個永不歸零的累計欄位，兩者互相矛盾，且目前無人讀取）；redirect_uri 改用 `NEXT_PUBLIC_APP_URL`（比照既有 `lib/repair-center/github.ts` 慣例）而非信任 request 自己的 origin。
+5. 🟡 TOCTOU（daily-limit count-then-insert 競態）— critic 判斷 Phase 1（人工單一操作、ops-role 閘）不構成可利用漏洞，未修，留註記；未來若自動化批次呼叫此 route 需改成原子 gate。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（全 next-admin）| exit=0 | result=0 錯誤
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（全 app）| exit=0 | result=111 test files / 1017 tests pass / 7 skipped（pre-existing），較本次改動前淨增 21 tests（google-oauth 17 + authorize route IDOR 4）
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation test：暫時註解掉 `authorize/route.ts` 的 `assertOrgAccess` 呼叫 → 對應測試從 403 變 307（紅）→ 還原 → 變回 403（綠）| exit=0 | result=證明回歸測試真的鎖住這個漏洞，非空跑
+- REVIEW_DONE: critic=Deep（4 個新 route/lib 檔 + 2 個 UI diff，含跨檔信任邊界追蹤：`ops-role.ts`／`middleware.ts`／`tenant-guard.ts`／RLS policy）| verdict=pass-with-findings（全部已修）| findings=1C/2M/4m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`GOOGLE_OAUTH_CLIENT`／`gmail-draft`／`connectors/gmail` | hits=本次新增檔案自身 + `mcp/user-env.ps1` + `AWARE_WAVE_CREDENTIALS.md`，無其他既有檔案引用這些新符號，無漏改
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] **尚未 REALTEST 真實 Gmail 帳號**——OAuth consent 畫面需要操作者本人（或有其登入權限的瀏覽器）點擊同意，我無法代為完成；T10 acceptance criteria「真建一封 Gmail 草稿」要等這步才算過。connector row 尚未在 DB 建立（`ConnectorsClient.tsx` 的「新增 Connector」流程需先手動跑一次選 gmail）。daily_limit TOCTOU 未修（已記錄為可接受風險，見上）。n8n 未使用（架構偏離，見上決策段）。
+[rollback] `git revert`；純新增 3 個 route + 1 個 lib 檔 + 2 個既有檔案的 UI 接線，未動 schema（T1 migration 早已預留 `co_messages.status` 的 `'drafted'` 值與 `co_sender_accounts`/`co_sending_events` 全部欄位，零 migration 需求）。
+
 ## 2026-09-11 第九批（補上「搜尋全網」這個來源，並修掉它暴露的路由寫死）
 
 操作者問「為什麼我沒看到搜尋全網的」。對的：原本八個來源**全部**要求你先知道位址——網址、sitemap、feed、或某個指定索引的查詢。沒有一個能從一句問題出發。那本來排在 C6，還沒做。
