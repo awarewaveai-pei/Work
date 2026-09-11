@@ -1,0 +1,171 @@
+$id: "ai-lego://methods/contracts/strategy.blue_ocean.contract.yaml"
+title: "Blue Ocean Strategy Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 `strategy` family, closing member (14th of 14). Atlas F08 table
+  row (L526: "Blue Ocean｜創造新價值曲線｜Strategy Canvas→ERRC｜擺脫直接競爭
+  ｜BMC") is this method's ONLY citation -- confirmed by grepping the whole
+  Atlas file for "Blue Ocean"/"ERRC"/"藍海"/"Strategy Canvas"/"價值曲線": 1
+  total hit, this row, no dedicated §12.x section (same thinness class as
+  `strategy.value_chain`'s own single-citation row). Core invariants:
+  `competing_factors` covers >=2 factors (a value curve needs >=2 points to
+  plot), each factor's `errc_action` is one of the 4 closed real Kim &
+  Mauborgne values, `industry_standard_level` is required for existing
+  factors (ELIMINATE/REDUCE/RAISE) and forbidden for `CREATE` (a genuinely
+  new factor has no industry standard to record), and `new_value_curve_summary`
+  is a required, disclosed conclusion (Atlas's own defining purpose IS "創造
+  新價值曲線").
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Blue Ocean row (L526: 'Blue Ocean｜創造新價值曲線｜Strategy Canvas→ERRC｜擺脫直接競爭｜BMC')"
+  - "methods/contracts/strategy.value_chain.contract.yaml -- same family, single-table-row-only citation precedent (no dedicated §12.x section) reused here"
+  - "methods/contracts/strategy.three_c.contract.yaml -- disclosure-only synthesis field precedent (new_value_curve_summary modeled on fit_summary) reused here"
+  - "methods/contracts/strategy.porter_five_forces.contract.yaml -- disclosed HIGH/MEDIUM/LOW ordinal level precedent (industry_standard_level modeled on intensity), never mechanically scored"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas's own single
+  citation into a 2-stage pipeline (Strategy Canvas produces
+  `competing_factors`, ERRC classifies each). The real, well-known Kim &
+  Mauborgne "Blue Ocean Strategy" framework (Strategy Canvas + Eliminate-
+  Reduce-Raise-Create grid) is the named external methodology grounding the
+  4-value `errc_action` enum, same "name the real external methodology, cite
+  it, restrict fields to what Atlas's own row literally names" discipline
+  `strategy.vrio.contract.yaml`'s own Barney 1991 citation already
+  establishes for a different method. `id: strategy.blue_ocean` mints a new
+  machine_id (no digits/spaces legal in the `<family>.<name>` grammar per
+  method.schema.yaml's own pattern). Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1`.
+
+id: strategy.blue_ocean
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY, COMPARE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for Blue Ocean,
+# no §4 entry exists for this method). Grounded word-for-word in the
+# citation's own 2-clause arrow: "Strategy Canvas" (identify/decompose the
+# industry's own competing factors) = DECOMPOSE; "→ERRC" (classify each
+# factor into one of 4 fixed actions) = CLASSIFY; the citation's own benefit
+# column "擺脫直接競爭" (escape direct competition) requires comparing the
+# resulting new value curve against the industry's existing one = COMPARE,
+# same 3-primitive inference class strategy.value_chain's own contract
+# already establishes for an analogous single-row citation.
+
+purpose:
+  - create_a_new_value_curve_that_escapes_direct_competition_via_strategy_canvas_and_errc_grid
+# Atlas L526 verbatim sense folded into one purpose label: "創造新價值曲線"
+# (create a new value curve, method column) + "擺脫直接競爭" (escape direct
+# competition, benefit column).
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own citation names no upstream typed-object dependency for Blue
+  # Ocean (contrast SWOT's own explicit §14.1 KnowledgeSet->SWOT chain) --
+  # same self-contained-method precedent strategy.three_c/strategy.value_chain
+  # already establish for an analogous thin, standalone citation.
+
+outputs:
+  - BlueOceanAnalysis
+# NEW output type (see typed-objects/blue-ocean-analysis.schema.yaml).
+# Neither the Atlas row nor any other Atlas section gives this method's
+# output a PascalCase name.
+
+preconditions:
+  - "competing_factors includes at least 2 entries -- Atlas's own 'Strategy Canvas' (L526) plots a value curve across multiple competing factors; a curve plotted through a single point is not a curve"
+  - "every competing_factors[] entry's errc_action is one of ELIMINATE, REDUCE, RAISE, CREATE -- Atlas's own '→ERRC' (L526) names this closed 4-value grid as the method's defining second stage"
+  - "every competing_factors[] entry with errc_action in {ELIMINATE, REDUCE, RAISE} discloses a non-null industry_standard_level, and every entry with errc_action CREATE discloses none -- ELIMINATE/REDUCE/RAISE apply to an EXISTING competing factor (there is an industry standard to record), CREATE introduces a factor the industry has never offered (there is no industry standard to record); see compilation_decisions"
+  - "new_value_curve_summary is a non-empty string -- Atlas's own '創造新價值曲線' (L526, method's own name) is Blue Ocean's whole stated purpose; a record that never states the resulting new curve has not delivered on it"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class strategy.value_chain.contract.yaml's own quality block
+  # establishes: the real risk this method's citation names is missing
+  # factor/ERRC coverage or missing new-curve disclosure (the 4 preconditions
+  # above), not a missing per-claim evidence citation -- Atlas's row carries
+  # no misuse warning about unevidenced claims (contrast SWOT's own explicit
+  # L1356 "沒有 Evidence 就寫...").
+
+forbidden_transition: []
+# Atlas's own citation for Blue Ocean gives no §14.1-style illegal-transition
+# example (that example, SWOT -> AutomaticProductionDeployment, is SWOT's own
+# field). Left empty and disclosed rather than applied to Blue Ocean by
+# unverified analogy.
+
+recommended_next:
+  - strategy.business_model_canvas
+# Atlas's own explicit pairing, L526 last column "BMC" (Business Model
+# Canvas). Re-grepped and confirmed strategy.business_model_canvas.contract.yaml
+# exists, parses as well-formed YAML, and status: ACTIVE before naming it
+# here -- same verified-before-citing discipline strategy.vrio.contract.yaml's
+# own recommended_next check already establishes for a different concurrent
+# sibling.
+
+rollback:
+  side_effect_free: true
+  # Pure analysis/knowledge-object production, no external side effect named
+  # by the citation -- same low-risk inference class every sibling F08
+  # contract's own rollback field already applies.
+
+compilation_decisions:
+  - question: "Free-form errc_action or closed 4-value enum?"
+    decision: "Closed enum {ELIMINATE, REDUCE, RAISE, CREATE} -- the citation's own '→ERRC' (L526) names this exact 4-letter grid; grounded additionally in the real, named, external Kim & Mauborgne Blue Ocean Strategy framework (Eliminate-Reduce-Raise-Create), same real-external-methodology-naming discipline strategy.vrio.contract.yaml's own Barney 1991 citation already establishes for a different method."
+  - question: "Is errc_action GENUINE_COMPUTE (mechanically derived) or a caller-disclosed judgment?"
+    decision: "Caller-disclosed judgment, validated only for closed-vocabulary membership at construction -- no citation, Atlas or external, supports mechanically deriving WHICH of the 4 actions fits a given competing factor; that is the strategist's own creative act, same disclosure-only-classification precedent strategy.three_c's own dimension field and strategy.value_chain's own category field already establish (there too the ENUM is validated, the ASSIGNMENT is caller-supplied)."
+  - question: "Does CREATE need different handling from ELIMINATE/REDUCE/RAISE?"
+    decision: "Yes -- ELIMINATE/REDUCE/RAISE all apply to a competing factor the industry ALREADY competes on (there is a real 'industry_standard_level' to record, i.e. where the current value curve sits before this method acts on it); CREATE introduces a factor the industry has NEVER offered (there is no industry standard, by definition, for something that does not yet exist). Enforced as a real invariant, not left as an unstated schema quirk: industry_standard_level is REQUIRED (non-null) for the first 3 actions and FORBIDDEN (must be entirely absent, not merely null) for CREATE. Investigated and confirmed this asymmetry is the real, well-known ERRC grid's own structure (Eliminate/Reduce/Raise all interrogate an existing factor's current level; Create has no 'current level' axis at all), not an invented rule."
+  - question: "industry_standard_level -- free text, or a closed ordinal enum?"
+    decision: "Closed 3-value ordinal enum {LOW, MEDIUM, HIGH}, disclosed judgment never mechanically scored -- same precedent strategy.porter_five_forces.contract.yaml's own `intensity` field already establishes for an analogous disclosed-ordinal-level shape, reused here rather than inventing a new numeric scale Atlas's own row does not cite."
+  - question: "Should each factor carry a disclosed rationale for its own errc_action?"
+    decision: "Yes, required non-empty `rationale` per factor -- same disclosed-judgment-needs-an-audit-trail precedent strategy.vrio.contract.yaml's own per-question `reasoning` field already establishes; an ERRC assignment with no stated reasoning is unauditable caller judgment, not a documented strategy decision."
+  - question: "Should competing_factors coverage require all 4 ERRC actions represented (completeness), matching strategy.three_c's dimension-coverage / strategy.value_chain's category-coverage precedent?"
+    decision: "No -- Atlas's own citation ('Strategy Canvas→ERRC') gives no completeness requirement across the 4 actions, unlike three_c's own explicit '三面向' (three dimensions, ALL required) or value_chain's own explicit 'primary/support' (BOTH required); a real Blue Ocean analysis may legitimately conclude, for a given competing factor set, that (for example) zero factors warrant CREATE. Inventing an all-4-required rule here would overstate this citation's own content by importing a different sibling method's own structural feature. Only the minItems:2 (>=2 factors to plot a curve at all) and the closed-vocabulary membership check apply."
+  - question: "inputs.required -- empty, or an upstream typed-object like SWOT's KnowledgeSet?"
+    decision: "Empty -- Atlas's own citation for Blue Ocean names no upstream typed-object dependency (unlike SWOT's own explicit §14.1 chain); same self-contained-method precedent strategy.three_c/strategy.value_chain already establish."
+
+open_questions:
+  - id: "OQ-BLUEOCEAN-1"
+    question: "cognitive_primitives [DECOMPOSE, CLASSIFY, COMPARE] is inferred word-for-word from the citation, not a cited Atlas §4 composition formula (no §4 entry exists for Blue Ocean)."
+    owner: "operator, or whoever adds a dedicated Atlas §4 formula for this method, if one is ever written"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BLUEOCEAN-2"
+    question: "forbidden_transition is left empty -- no §14.1-style illegal-transition example names Blue Ocean specifically."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BLUEOCEAN-3"
+    question: "industry_standard_level's 3-value LOW/MEDIUM/HIGH ordinal is borrowed from strategy.porter_five_forces's own intensity field, not independently cited by Atlas for Blue Ocean specifically -- should a future pass instead use a finer numeric scale (the real Strategy Canvas is often drawn with a continuous y-axis)?"
+    owner: "operator, or whoever next needs a finer-grained value curve plot"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F08 table (L511-528, Blue Ocean row L526) directly at the
+    cited line. Grepped the whole Atlas file for "Blue Ocean"/"ERRC"/"藍海"/
+    "Strategy Canvas"/"價值曲線" -- 1 total hit (L526 itself, no dedicated
+    §12.x section, no §4 composition formula, no §14.1 transition example).
+    Grepped the whole `ai_lego` tree and this docs tree case-insensitively
+    for "blue_ocean"/"ERRC" before writing any of this method's own files --
+    zero pre-existing implementation (one unrelated forward-reference mention
+    in `ai_lego/modules/strategy/__init__.py`'s own "Remaining 4" family
+    roadmap comment). Read strategy.three_c.contract.yaml and
+    strategy.value_chain.contract.yaml in full before writing this contract,
+    reusing their conventions rather than inventing new ones. Independently
+    verified the real Kim & Mauborgne Blue Ocean Strategy framework (Strategy
+    Canvas + Eliminate-Reduce-Raise-Create grid) before grounding
+    `errc_action`'s 4 values in it. Confirmed
+    `strategy.business_model_canvas.contract.yaml` exists, parses as
+    well-formed YAML via a standalone script, and has `status: ACTIVE` before
+    citing it in `recommended_next`. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator
+    via a standalone script.
+  note: >
+    No mother document was modified. Atlas's own single citation is
+    transcribed verbatim into `purpose`/`preconditions`/`recommended_next`.
+    The competing_factors/errc_action/industry_standard_level/
+    new_value_curve_summary shape, the CREATE-vs-existing-factor asymmetric
+    invariant, the LOW/MEDIUM/HIGH ordinal, and the minItems:2 threshold are
+    Phase 3 compilation choices, explicitly flagged above in
+    `compilation_decisions`, not presented as Atlas-cited.

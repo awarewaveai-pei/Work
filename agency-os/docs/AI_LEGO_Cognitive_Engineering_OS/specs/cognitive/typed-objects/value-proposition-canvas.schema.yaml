@@ -1,0 +1,210 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/value-proposition-canvas.schema.yaml"
+title: Value Proposition Canvas
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ValuePropositionCanvas` -- the declared `outputs` of
+  `strategy.value_proposition_canvas`'s Method Contract (methods/contracts/strategy.value_proposition_canvas.
+  contract.yaml, `outputs: [ValuePropositionCanvas]`). Atlas F08 L528 gives the real 3-stage arrow (Customer
+  profile→Value map→fit hypotheses); this schema's 6 flat arrays (jobs/pains/gains/products_and_services/
+  pain_relievers/gain_creators) plus `fit_hypotheses[]` are the contract's own disclosed compilation choices
+  (real, standard Osterwalder structure), not literal Atlas field names.
+
+  Field provenance:
+    * `jobs`/`pains`/`gains` -- Customer Profile side (Atlas's own "customer jobs/pains/gains", L528 col 2).
+    * `products_and_services`/`pain_relievers`/`gain_creators` -- Value Map side (Atlas's own "Value map"
+      blob, broken into the real 3-part Osterwalder structure per the method contract's own
+      `compilation_decisions`).
+    * `fit_hypotheses[]` -- the citation's own literal 3rd pipeline stage. Each entry's `fit_type` is
+      GENUINE_COMPUTE (never caller-supplied), derived from whether `reliever_or_creator_id` resolves into
+      `pain_relievers[]` or `gain_creators[]`, cross-checked against `pain_or_gain_id` resolving into the
+      matching `pains[]`/`gains[]` collection -- same referential-integrity-derived-field discipline
+      `tows-matrix.schema.yaml`'s own `pairing_type` and `stp-analysis.schema.yaml`'s own referential
+      `targeted_segment_id` check already establish.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 table, Value Proposition Canvas row (L528)"
+  - "methods/contracts/strategy.value_proposition_canvas.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/tows-matrix.schema.yaml -- GENUINE_COMPUTE cross-collection referential-integrity + additionalProperties:false-from-the-start precedent reused here for fit_type"
+  - "specs/cognitive/typed-objects/stp-analysis.schema.yaml -- referential_integrity_verified two-layer marker precedent reused here"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this directory
+  documents: direct transcription of the method contract's own declared shape plus low-risk, disclosed
+  compilation choices.
+
+compilation_decisions:
+  - question: "6 flat top-level arrays, or 2 nested customer_profile/value_map wrapper objects?"
+    decision: "Flat -- matches the method contract's own compilation_decisions and this family's established flat-field convention (tows-matrix.schema.yaml, stp-analysis.schema.yaml)."
+  - question: "Do pain_relievers[]/gain_creators[] items carry their own relieves_pain_id/creates_gain_id field, or does the reference live only in fit_hypotheses[]?"
+    decision: "Reference lives ONLY in fit_hypotheses[] -- mirrors tows-matrix.schema.yaml's own pairings[]-is-the-sole-cross-referencing-collection design, per the method contract's own compilation_decisions."
+  - question: "fit_type: a schema enum with 2 closed values, or an open string?"
+    decision: "Closed enum [PAIN_RELIEF, GAIN_CREATION] -- Atlas's own citation names exactly 2 Value Map sub-parts that pair against Customer Profile content (Pain Relievers -> Pains, Gain Creators -> Gains); a 3rd value would have no real-world referent under this method's own design."
+
+type: object
+required: [id, version, jobs, pains, gains, products_and_services, pain_relievers, gain_creators, fit_hypotheses, referential_integrity_verified, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^VPC-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as tows-matrix.schema.yaml's TOWS- / stp-analysis.schema.yaml's STP- prefixes."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.value_proposition_canvas"
+
+  jobs: {$ref: "#/$defs/labeled_item_list"}
+  pains: {$ref: "#/$defs/labeled_item_list"}
+  gains: {$ref: "#/$defs/labeled_item_list"}
+  products_and_services: {$ref: "#/$defs/labeled_item_list"}
+  pain_relievers: {$ref: "#/$defs/labeled_item_list"}
+  gain_creators: {$ref: "#/$defs/labeled_item_list"}
+
+  fit_hypotheses:
+    type: array
+    minItems: 1
+    description: >
+      One or more fit hypotheses, per Atlas L528's own literal 3rd pipeline stage ("→fit hypotheses"). A
+      canvas with a complete Customer Profile and Value Map but zero fit_hypotheses has not completed the
+      method its own citation promises.
+    items:
+      type: object
+      required: [id, reliever_or_creator_id, pain_or_gain_id, fit_type, fit_rationale]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this canvas (e.g. VPC-001-H1)."
+        reliever_or_creator_id:
+          type: string
+          description: >
+            Must resolve (runtime-layer referential-integrity check, ai_lego/modules/strategy/
+            value_proposition_canvas.py) to a real id in EITHER pain_relievers[] OR gain_creators[] of this
+            SAME record.
+        pain_or_gain_id:
+          type: string
+          description: >
+            Must resolve (same check) to a real id in EITHER pains[] OR gains[] of this SAME record. A
+            pain_reliever's pain_or_gain_id must resolve into pains[]; a gain_creator's must resolve into
+            gains[] (VPC_FIT_TYPE_MISMATCH otherwise).
+        fit_type:
+          type: string
+          enum: [PAIN_RELIEF, GAIN_CREATION]
+          description: >
+            GENUINE_COMPUTE -- derived from reliever_or_creator_id's real collection membership (pain_relievers
+            -> PAIN_RELIEF, gain_creators -> GAIN_CREATION) by
+            ai_lego.modules.strategy.value_proposition_canvas.derive_fit_type, never accepted as caller input.
+        fit_rationale:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: >
+            REQUIRED, non-empty, disclosed content -- a fit_type label with no disclosed reasoning has not
+            demonstrated real fit, only asserted a category (method contract's own precondition).
+
+  referential_integrity_verified:
+    const: true
+    description: >
+      Two-layer discipline mirroring tows-matrix.schema.yaml's own field of the same name: set True only after
+      every fit_hypotheses entry's id resolution + fit_type derivation pass at construction; independently
+      re-derived (not trusted) by evaluate_vpc_integrity_gate from raw fields.
+
+  computation_provenance_ref:
+    type: string
+    description: "Which function performed the fit_type computation. Same pattern tows-matrix.schema.yaml's own computation_provenance_ref establishes."
+
+  provenance:
+    description: >
+      Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in
+      this directory uses. No `const`: epistemic_type legitimately varies by whether this record documents an
+      AI-drafted or human-approved canvas.
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  labeled_item_list:
+    type: array
+    minItems: 1
+    description: >
+      Shared shape for jobs/pains/gains/products_and_services/pain_relievers/gain_creators -- each a non-empty
+      list of {id, statement} entries. Non-empty is a real invariant per array (VPC_EMPTY_<ARRAY>): the method
+      contract's own preconditions require all 6 sides be populated, not only the 2 stated Atlas-cited
+      "sides".
+    items:
+      type: object
+      required: [id, statement]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this array (e.g. VPC-001-J1)."
+        statement:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Non-empty disclosed content for this entry."
+
+examples:
+  - description: "A canvas with 1 job/pain/gain, 1 product/reliever/creator each, and 2 fit hypotheses (1 PAIN_RELIEF, 1 GAIN_CREATION)"
+    value:
+      id: "VPC-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.value_proposition_canvas"
+      jobs:
+        - {id: "VPC-2026-09-11-001-J1", statement: "獨立接案者需要在單一工作區內管理多個客戶的行銷活動"}
+      pains:
+        - {id: "VPC-2026-09-11-001-PA1", statement: "手動切換多個客戶帳號報表耗時且易出錯"}
+      gains:
+        - {id: "VPC-2026-09-11-001-GA1", statement: "希望能在一次登入內看到所有客戶的成效總覽"}
+      products_and_services:
+        - {id: "VPC-2026-09-11-001-PS1", statement: "多租戶白牌行銷報表平台"}
+      pain_relievers:
+        - {id: "VPC-2026-09-11-001-PR1", statement: "單一登入下的跨客戶帳號切換，零手動匯出"}
+      gain_creators:
+        - {id: "VPC-2026-09-11-001-GC1", statement: "跨客戶成效總覽儀表板，一次登入即可查看"}
+      fit_hypotheses:
+        - id: "VPC-2026-09-11-001-H1"
+          reliever_or_creator_id: "VPC-2026-09-11-001-PR1"
+          pain_or_gain_id: "VPC-2026-09-11-001-PA1"
+          fit_type: PAIN_RELIEF
+          fit_rationale: "單一登入直接消除手動匯出這個具體 pain，兩者一對一對應"
+        - id: "VPC-2026-09-11-001-H2"
+          reliever_or_creator_id: "VPC-2026-09-11-001-GC1"
+          pain_or_gain_id: "VPC-2026-09-11-001-GA1"
+          fit_type: GAIN_CREATION
+          fit_rationale: "跨客戶儀表板直接實現「一次登入看到全部成效」這個具體 gain"
+      referential_integrity_verified: true
+      computation_provenance_ref: "ai_lego.modules.strategy.value_proposition_canvas.derive_fit_type"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null}
+
+open_questions:
+  - id: "OQ-VPCANVAS-1"
+    question: "reliever_or_creator_id/pain_or_gain_id -> real collection-membership resolution is a runtime-only invariant, not schema-expressible (JSON Schema cannot cross-reference a sibling array's item ids) -- same class of disclosed gap tows-matrix.schema.yaml's own OQ-TOWSMATRIX-1 already documents."
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+  - id: "OQ-VPCANVAS-2"
+    question: "fit_hypotheses entries reference exactly one pain_or_gain_id each (no multi-pain/multi-gain hypothesis) -- matches the method contract's own referential design, disclosed as a scope restraint not an Atlas-cited limit."
+    owner: "operator, or whoever next needs multi-target fit hypotheses"
+
+verification:
+  method: >
+    Read Atlas F08 table row (L528) directly at the cited line (no dedicated §12.x section exists,
+    grep-confirmed by the method contract this schema implements). Read tows-matrix.schema.yaml and
+    stp-analysis.schema.yaml in full as shape precedent before writing this file. Validated against
+    jsonschema.Draft202012Validator via a standalone script (required fields present, id pattern satisfied,
+    additionalProperties:false present at the top level AND inside every labeled_item_list item AND inside
+    fit_hypotheses[] items, fit_type enum closed, embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml).
+  note: >
+    jobs/pains/gains/products_and_services/pain_relievers/gain_creators/fit_hypotheses field names, the
+    shared labeled_item_list $defs shape, and the 2-value fit_type enum are this schema's own naming (Atlas
+    gives no formal field labels, only the 3-stage arrow). The overall record shape, the
+    referential_integrity_verified/computation_provenance_ref pairing, and the always-computed (never
+    caller-supplied) treatment of fit_type are Phase-3-class compilation decisions, disclosed above and in
+    the inherited method contract's own compilation_decisions. No mother document was modified to produce
+    this file.

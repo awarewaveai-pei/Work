@@ -1,0 +1,204 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/blue-ocean-analysis.schema.yaml"
+title: Blue Ocean Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BlueOceanAnalysis` -- outputs of
+  `strategy.blue_ocean`'s Method Contract (outputs: [BlueOceanAnalysis]).
+  Atlas F08 row (L526) gives this method's whole real content: a Strategy
+  Canvas of competing factors, each classified into one of 4 ERRC actions
+  (Eliminate/Reduce/Raise/Create), synthesized into a new value curve.
+  `errc_action` is a closed 4-value enum (the citation's own "→ERRC");
+  `industry_standard_level` is required for ELIMINATE/REDUCE/RAISE (existing
+  factors have a current industry level) and forbidden for CREATE (a
+  never-before-offered factor has no industry standard); `rationale` is
+  required per factor (a disclosed, not computed, strategist judgment);
+  `new_value_curve_summary` is required and disclosed (not computed) --
+  Blue Ocean's own defining purpose IS "創造新價值曲線" (create a new value
+  curve).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Blue Ocean row (L526)"
+  - "methods/contracts/strategy.blue_ocean.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/value-chain-analysis.schema.yaml -- same family, sibling shape (flat array + closed action/category enum + contains/minContains-free minItems threshold) reused as this file's structural template"
+  - "specs/cognitive/typed-objects/three-c-analysis.schema.yaml -- disclosure-only synthesis field precedent (new_value_curve_summary modeled on fit_summary)"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- disclosed ordinal-level precedent (industry_standard_level modeled on intensity)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in
+  this directory documents: direct transcription of the 1 cited Atlas row
+  plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "additionalProperties: false at the top level and on each competing_factors[] item?"
+    decision: "Yes on both, from the first draft, per this batch's own explicit instruction and every sibling record schema's baseline hygiene."
+  - question: "Free-form errc_action or closed 4-value enum?"
+    decision: "Closed enum {ELIMINATE, REDUCE, RAISE, CREATE} -- transcription of the Atlas citation's own '→ERRC', same class three-c-analysis.schema.yaml's own dimension enum and value-chain-analysis.schema.yaml's own category enum."
+  - question: "How to encode the CREATE-vs-existing-factor asymmetry (no industry standard exists for a never-before-offered factor)?"
+    decision: "industry_standard_level is an OPTIONAL top-level key on each factor item, enforced by two item-level if/then branches: if errc_action is ELIMINATE/REDUCE/RAISE, industry_standard_level is REQUIRED; if errc_action is CREATE, industry_standard_level MUST be absent (not merely null -- additionalProperties:false plus no `type: [string, \"null\"]` escape hatch means the key cannot be present at all). Same key-presence-encodes-meaning technique value-chain-analysis.schema.yaml's own optional cost_driver/value_driver (item-level anyOf) already establishes, generalized here to an if/then conditional instead of anyOf because the condition is asymmetric (REQUIRED vs FORBIDDEN) rather than either/or."
+  - question: "industry_standard_level -- free text, or a closed ordinal enum?"
+    decision: "Closed 3-value enum {LOW, MEDIUM, HIGH}, same disclosed-ordinal-level precedent porter-five-forces-analysis.schema.yaml's own `intensity` field already establishes -- not mechanically scored, a caller-disclosed judgment constrained only for closed-vocabulary membership."
+  - question: "Should each factor carry a required rationale field?"
+    decision: "Yes -- non-empty required string, same disclosed-judgment-audit-trail precedent vrio-analysis.schema.yaml's own per-question `reasoning` field already establishes for a different method's own disclosed classification."
+  - question: "How to enforce >=2 factors at the schema layer (a value curve needs >=2 points to plot)?"
+    decision: "minItems: 2 directly on competing_factors -- no contains/minContains coverage constraint is used here (contrast three-c-analysis.schema.yaml's 3-way and value-chain-analysis.schema.yaml's 2-way category coverage), because ERRC completeness across all 4 actions is explicitly NOT required (see the method contract's own compilation_decisions) -- there is no fixed category set every analysis must cover, only a minimum count."
+  - question: "Should new_value_curve_summary carry a GENUINE_COMPUTE field (e.g. curve_score, engine)?"
+    decision: "No -- no algorithm here computes a 'new value curve' from qualitative ERRC judgments; omitting engine/computation_provenance_ref entirely is itself the honest disclosure, same convention three-c-analysis.schema.yaml's own fit_summary and value-chain-analysis.schema.yaml's own leverage_points already establish."
+  - question: "A separate record-level provenance field, matching rct-record.schema.yaml's single top-level provenance?"
+    decision: "No -- each competing_factors[] item already carries its own provenance (same per-item convention every sibling F08 schema uses); new_value_curve_summary is a synthesis OF those factors, not an independent new claim needing its own provenance slot."
+
+type: object
+required: [id, version, competing_factors, new_value_curve_summary]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BLUEOCEAN-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as value-chain-analysis.schema.yaml's VALUECHAIN- prefix and three-c-analysis.schema.yaml's 3C- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.blue_ocean"
+    description: "Which method produced this analysis."
+
+  competing_factors:
+    type: array
+    minItems: 2
+    description: >
+      The Strategy Canvas stage's own output -- the industry's competing
+      dimensions (e.g. price, features, service), each then classified by
+      the ERRC stage. >=2 required: a value curve plotted through a single
+      point is not a curve. No completeness requirement across the 4 ERRC
+      actions (see compilation_decisions) -- unlike three-c-analysis's
+      3-dimension coverage or value-chain-analysis's 2-category coverage,
+      there is no fixed set every analysis must cover here.
+    items:
+      type: object
+      required: [id, factor_name, errc_action, rationale, provenance]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this analysis (e.g. BLUEOCEAN-001-F1)."
+        factor_name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The competing factor/dimension itself (e.g. 'price', 'onboarding speed'), in natural language. Free-text -- Atlas's own citation names no fixed set of competing factors (industry-specific by nature)."
+        errc_action:
+          type: string
+          enum: [ELIMINATE, REDUCE, RAISE, CREATE]
+          description: "Atlas's own '→ERRC' (F08 L526), grounded in the real Kim & Mauborgne Blue Ocean Strategy ERRC grid. Caller-disclosed judgment, not computed -- see method contract's own compilation_decisions."
+        industry_standard_level:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+          description: "Where the CURRENT industry value curve sits on this factor, before this method acts on it. REQUIRED when errc_action is ELIMINATE/REDUCE/RAISE (an existing competing factor has a current level); MUST be absent when errc_action is CREATE (a never-before-offered factor has no industry standard) -- enforced by the if/then pair below, not left as an unstated convention."
+        rationale:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Disclosed strategist judgment for why this errc_action fits this factor. Same disclosed-judgment-audit-trail convention vrio-analysis.schema.yaml's own per-question reasoning field establishes."
+        provenance:
+          description: "Full provenance_record, same pattern every sibling typed-object schema in this directory uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+      allOf:
+        - if:
+            properties: { errc_action: { enum: [ELIMINATE, REDUCE, RAISE] } }
+            required: [errc_action]
+          then:
+            required: [industry_standard_level]
+        - if:
+            properties: { errc_action: { const: CREATE } }
+            required: [errc_action]
+          then:
+            not:
+              required: [industry_standard_level]
+
+  new_value_curve_summary:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: >
+      DISCLOSURE-ONLY, REPORTED synthesis of the resulting new value curve
+      across all `competing_factors` (Atlas's own "創造新價值曲線", L526,
+      the method's own name) -- not computed by this record (see method
+      contract's own compilation_decisions). Provenance for the underlying
+      claims is each factor's own `provenance` field; see
+      compilation_decisions for why there is no separate record-level
+      provenance field.
+
+examples:
+  - description: "A Blue Ocean analysis with 3 factors (one each of ELIMINATE/RAISE/CREATE), evidence-backed, concluding a new value curve"
+    value:
+      id: "BLUEOCEAN-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.blue_ocean"
+      competing_factors:
+        - id: "BLUEOCEAN-2026-09-11-001-F1"
+          factor_name: "業務員人力銷售據點數量"
+          errc_action: ELIMINATE
+          industry_standard_level: HIGH
+          rationale: "傳統據點成本高昂且與線上客群重疊率低，全數線上化可去除此成本而不損及目標客群體驗"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - id: "BLUEOCEAN-2026-09-11-001-F2"
+          factor_name: "結帳流程速度"
+          errc_action: RAISE
+          industry_standard_level: MEDIUM
+          rationale: "現有競品結帳流程平均 5 步驟，拉高至一鍵結帳可直接放大既有 A/B 測試框架優勢"
+          provenance: { epistemic_type: EVIDENCE, authorship_state: AI_SUGGESTED, locked: null }
+        - id: "BLUEOCEAN-2026-09-11-001-F3"
+          factor_name: "購後社群共創回饋機制"
+          errc_action: CREATE
+          rationale: "產業內尚無此功能，創造購後即時共創回饋可建立差異化黏著度，非既有競爭維度的延伸"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      new_value_curve_summary: "去除高成本實體據點、拉高結帳速度至業界之上、並創造購後共創回饋機制，三者共同構成一條脫離現有據點/速度紅海競爭的新價值曲線"
+
+open_questions:
+  - id: "OQ-BLUEOCEANANALYSIS-1"
+    question: "industry_standard_level is a closed 3-value LOW/MEDIUM/HIGH ordinal, not the real Strategy Canvas's more common continuous y-axis -- should a future pass support a finer-grained numeric scale?"
+    owner: "operator, or whoever next needs a finer-grained value curve plot"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BLUEOCEANANALYSIS-2"
+    question: "new_value_curve_summary is one flat string, not a structured per-factor projected curve; Atlas gives no field-level structure for the 'new value curve' itself."
+    owner: "operator, or whoever next needs a structured curve representation"
+    blocks: "nothing in this file's own validity"
+  - id: "OQ-BLUEOCEANANALYSIS-3"
+    question: "No completeness requirement across the 4 ERRC actions is enforced (a valid analysis may use only 1 or 2 of the 4 actions) -- disclosed as a deliberate compilation choice, not an oversight; see method contract's own compilation_decisions for why."
+    owner: "operator"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F08 table (L511-528) directly, Blue Ocean row L526. Read
+    value-chain-analysis.schema.yaml, three-c-analysis.schema.yaml, and
+    porter-five-forces-analysis.schema.yaml in full as shape precedent
+    before writing this file. Validated against jsonschema
+    Draft202012Validator via a standalone script (required fields present,
+    id pattern satisfied, errc_action enum closed, additionalProperties:false
+    present from the start on both the top level and competing_factors[]
+    items, the if/then industry_standard_level-required-for-existing-factors
+    constraint, the if/then industry_standard_level-forbidden-for-CREATE
+    constraint, a negative control confirming a single-factor array is
+    rejected [minItems:2], a negative control confirming an
+    ELIMINATE/REDUCE/RAISE factor missing industry_standard_level is
+    rejected, a negative control confirming a CREATE factor WITH
+    industry_standard_level present is rejected, a negative control
+    confirming an out-of-enum errc_action is rejected, a negative control
+    confirming a smuggled top-level and smuggled item-level key are both
+    rejected, and the embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml).
+  note: >
+    competing_factors[].errc_action's 4 values transcribed verbatim from
+    Atlas's own "→ERRC" citation, grounded in the real external Kim &
+    Mauborgne Blue Ocean Strategy ERRC grid. The overall object shape
+    (id/version/competing_factors[]/new_value_curve_summary), the
+    industry_standard_level LOW/MEDIUM/HIGH ordinal, the required rationale
+    field, the CREATE-vs-existing-factor if/then asymmetry, and the
+    minItems:2 threshold are Phase 3-class compilation decisions, explicitly
+    flagged above in compilation_decisions. No mother document was modified.

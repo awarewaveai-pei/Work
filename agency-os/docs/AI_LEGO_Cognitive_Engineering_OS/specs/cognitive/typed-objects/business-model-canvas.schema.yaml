@@ -1,0 +1,187 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/business-model-canvas.schema.yaml"
+title: Business Model Canvas
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BusinessModelCanvas` -- the declared `outputs` of
+  `strategy.business_model_canvas`'s Method Contract
+  (methods/contracts/strategy.business_model_canvas.contract.yaml, `outputs: [BusinessModelCanvas]`).
+  Atlas cites this method TWICE: the F08 tool table row (L527: "客群/價值/通路/關係/收益/資源/活動/
+  夥伴/成本｜完整描述商業運作｜Unit Economics") and a dedicated §12.15 section (L2715-2734) naming
+  the nine blocks explicitly by name (Osterwalder's Business Model Canvas) and giving the method's
+  own stated benefit ("完整描述商業運作" -- fully describe business operation) and limitation
+  ("business model hypothesis，不是經驗證的 business" -- it's a business-model hypothesis, not a
+  validated business).
+
+  Field provenance:
+    * `blocks[].block` (Atlas §12.15 L2721-2730 verbatim nine-line list, SCREAMING_SNAKE_CASE) -- a
+      CLOSED set of exactly 9 names, each REQUIRED to appear EXACTLY ONCE (see `blocks` field
+      description below and `ai_lego/modules/strategy/business_model_canvas.py` module docstring
+      for the full design-shape investigation, same class `porter_five_forces.py`/`vrio.py`
+      already establish, scaled to 9).
+    * `blocks[].content` -- Atlas's own benefit line ("完整描述商業運作") implies the method's point
+      is to actually DESCRIBE each block for this specific business, not just name it. Free-text
+      disclosed content, never templated or auto-filled.
+    * `validation_status` (top-level, required) -- Atlas §12.15's own stated LIMITATION, made
+      structural: a single-legal-value enum (`UNVALIDATED_HYPOTHESIS`) this schema and its runtime
+      builder never let a caller override to claim validation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Business Model Canvas row (L527)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.15 商業模式圖／商業模式畫布 (L2715-2734) -- the nine-block list, benefit, and limitation"
+  - "methods/contracts/strategy.business_model_canvas.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml -- same F08 family, closed-set-with-completeness precedent (see compilation_decisions for why this schema scales that shape from 5 to 9)"
+
+decided_by: >
+  No ADR governs this file. Same class of decision every sibling typed-object schema in this
+  directory documents: direct transcription of Atlas §12.15's cited nine-block list plus low-risk,
+  disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Closed set with completeness (porter_five_forces/vrio-style) or positional tuple (logic_model-style)?"
+    decision: "Closed set, completeness required, no position -- blocks: minItems 9, maxItems 9, each blocks[].block a value from the 9-name enum; genuine distinctness/completeness is runtime-only (see below), same limitation class porter-five-forces-analysis.schema.yaml already documents."
+  - question: "Should blocks[] carry an evaluative field (e.g. porter_five_forces's intensity)?"
+    decision: "No -- Atlas §12.15 cites no evaluative dimension for BMC blocks, only descriptive content; a bare `content` free-text field is the only per-block field beyond identity and provenance."
+  - question: "Should the §12.15 hypothesis-not-validated limitation be a required structural field or documentation only?"
+    decision: "Required structural field `validation_status`, single legal enum value `UNVALIDATED_HYPOTHESIS` -- unlike porter_five_forces's own digital-platform limitation (instance-dependent, no structural test possible), this limitation is unconditionally true of every record of this type, so JSON Schema CAN express it directly as a closed one-value enum."
+  - question: "additionalProperties: false at the top level, and on each blocks[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start (same discipline porter-five-forces-analysis.schema.yaml's own compilation_decisions already documents)."
+  - question: "Does JSON Schema itself express 'all 9 distinct block names present, order-independent'?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality operator. minItems:9/maxItems:9 plus the per-item enum bounds the SHAPE; genuine distinctness-and-completeness is a runtime-only invariant, enforced at construction AND independently re-derived by a gate in business_model_canvas.py -- same limitation-and-workaround class porter-five-forces-analysis.schema.yaml's own identical compilation_decision already documents."
+
+type: object
+required: [id, version, blocks, validation_status, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BMC-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as porter-five-forces-analysis.schema.yaml's PFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.business_model_canvas"
+
+  blocks:
+    type: array
+    minItems: 9
+    maxItems: 9
+    description: >
+      Atlas §12.15 L2721-2730's own nine-block list, transcribed verbatim. SHAPE-bounded here to
+      exactly 9 items; genuine completeness (all 9 distinct names present, order-independent -- no
+      duplicates, no unrecognized name) is a runtime-only invariant this schema cannot express (see
+      compilation_decisions) -- enforced by ai_lego/modules/strategy/business_model_canvas.py at
+      both the builder and an independent gate.
+    items:
+      type: object
+      required: [block, content, provenance]
+      additionalProperties: false
+      properties:
+        block:
+          type: string
+          enum: [CUSTOMER_SEGMENTS, VALUE_PROPOSITIONS, CHANNELS, CUSTOMER_RELATIONSHIPS, REVENUE_STREAMS, KEY_RESOURCES, KEY_ACTIVITIES, KEY_PARTNERS, COST_STRUCTURE]
+          description: "Atlas §12.15 L2721-2730's own nine-line list, SCREAMING_SNAKE_CASE, Osterwalder's Business Model Canvas verbatim block names."
+        content:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual disclosed content for this block, in natural language -- what this block contains for the specific business being modeled."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: >
+            Soft reference to real `evidence/evidence.schema.yaml` record ids. Same convention
+            porter-five-forces-analysis.schema.yaml#/properties/forces/items/properties/supporting_evidence_refs
+            already uses -- required in practice by the `evidence_labeling_required` gate whenever
+            `provenance.epistemic_type == EVIDENCE`, not by this schema itself.
+        provenance:
+          description: "Per-block provenance. Full provenance_record, same pattern porter-five-forces-analysis.schema.yaml's forces[].provenance already uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  validation_status:
+    type: string
+    enum: [UNVALIDATED_HYPOTHESIS]
+    default: UNVALIDATED_HYPOTHESIS
+    description: >
+      REQUIRED, single-legal-value enum. Atlas §12.15's own stated limitation ("它是 business model
+      hypothesis，不是經驗證的 business") is a categorical, always-true statement about ANY
+      BusinessModelCanvas record -- unlike strategy.porter_five_forces's own conditional
+      digital-platform limitation (instance-dependent, no structural test exists), this schema CAN
+      and DOES structurally enforce it: the enum's single legal value affirms the hypothesis status,
+      making it impossible to construct a record claiming this type IS a validated business.
+      ai_lego/modules/strategy/business_model_canvas.py's own builder does not expose this as a
+      caller-settable parameter at all (structural elimination, same class strategy.vrio's own
+      `competitive_implication` and strategy.tows's own `pairing_type` already establish).
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed Business Model Canvas for a regional SaaS subscription business"
+    value:
+      id: "BMC-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.business_model_canvas"
+      blocks:
+        - block: CUSTOMER_SEGMENTS
+          content: "中小型會計師事務所（5-50人），台灣市場"
+          supporting_evidence_refs: ["E-501"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - block: VALUE_PROPOSITIONS
+          content: "自動化帳務對帳，節省 70% 人工核對時間"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - block: CHANNELS
+          content: "會計師公會推薦、直接業務銷售、免費試用轉付費"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - block: CUSTOMER_RELATIONSHIPS
+          content: "專屬客戶成功經理 + 自助說明中心"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - block: REVENUE_STREAMS
+          content: "月費訂閱制，依帳戶數分級"
+          supporting_evidence_refs: ["E-502"]
+          provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null }
+        - block: KEY_RESOURCES
+          content: "核心對帳演算法、雲端基礎設施、會計專業團隊"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - block: KEY_ACTIVITIES
+          content: "產品研發、客戶導入、法規更新維護"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - block: KEY_PARTNERS
+          content: "雲端服務供應商、會計軟體整合夥伴、會計師公會"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - block: COST_STRUCTURE
+          content: "研發人力、雲端運算成本、業務與行銷費用"
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+      validation_status: UNVALIDATED_HYPOTHESIS
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-BUSINESSMODELCANVAS-1"
+    question: "Atlas §12.15's own limitation is fully mechanically enforced (validation_status), unlike most sibling methods' own instance-dependent limitations which stay disclosure-only -- should a future record type add a real validated transition path (e.g. once paired with evidence-tested Unit Economics) rather than this record type staying permanently UNVALIDATED_HYPOTHESIS? (owner: operator, or whoever builds a future strategy.unit_economics method this record could recommended_next into)."
+  - id: "OQ-BUSINESSMODELCANVAS-2"
+    question: "blocks[].block distinctness/completeness is a runtime-only invariant (see compilation_decisions) -- should a future pass add a JSON Schema if/then per-value-count constraint instead of relying solely on the runtime gate? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F08 table row (L527) and §12.15 (L2715-2734) directly. Cross-checked against
+    methods/contracts/strategy.business_model_canvas.contract.yaml's own outputs/preconditions/
+    quality. Read porter-five-forces-analysis.schema.yaml and vrio-analysis.schema.yaml in full as
+    shape precedent before writing this file. Validated against jsonschema Draft202012Validator via
+    a standalone script (required fields present, id pattern satisfied, blocks enum closed per
+    Atlas's own nine-way split, additionalProperties:false present at both the top level and the
+    blocks[] item level from the start, embedded example resolved through its real $ref to
+    epistemic-label.schema.yaml).
+  note: >
+    `block`'s nine enum values and `validation_status`'s single legal value are transcribed/derived
+    directly from Atlas §12.15. The `content` field, the flat-record-plus-array shape, and the
+    closed-set-without-position runtime invariant are compilation decisions, disclosed above. No
+    mother document was modified to produce this file.

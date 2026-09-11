@@ -3245,6 +3245,339 @@ tier_1:
     source: "methods/contracts/strategy.vrio.contract.yaml + specs/cognitive/typed-objects/vrio-analysis.schema.yaml + ai_lego/modules/strategy/vrio.py"
     note: "71 tests pass. F08 strategy family: 9 of 14 built before this entry (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces/ansoff/value_chain/stp, per onehundredthirteenth_concrete_entry's own count) -- this entry (strategy.vrio) is F08's 10th member and the LAST of this batch's 4 concurrent builds. F08 is 10/14 (NOT complete, 4 more F08 rows remain: BCG, Blue Ocean, Business Model Canvas, Value Proposition Canvas). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- now that all 4 of this batch (ansoff/value_chain/stp/vrio) are confirmed landed, the orchestrating session's turn to reconcile it. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- required fields present, id pattern satisfied, dimension/answer/competitive_implication enums closed, additionalProperties:false present at both the top level and the questions[] item level, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 11 negative controls (missing resource_description, missing a question's reasoning, invalid dimension enum, invalid answer enum, invalid competitive_implication enum, smuggled top-level key, smuggled questions[] item key, 3-item and 5-item questions arrays, invalid epistemic_type via the real $ref, missing id prefix) all correctly rejected, plus the unmodified valid example and a second independently-built record (different V/R/I/O combination, classifying as TEMPORARY_COMPETITIVE_ADVANTAGE) both correctly accepted -- 0 false negatives, 0 false positives. The classification table was independently re-derived from its own definition (not trusted from a single memorized source) and confirmed TOTAL over all 16 YES/NO combinations via a dedicated test class (`ClassificationTableTests`, itertools.product exhaustive check). CLI demo (python -m ai_lego.apps.cli.run_vrio_slice) prints PASS and exits 0, demonstrating 3 real construction-time refusals (VRIO_INCOMPLETE_QUESTION_SET on a question set missing ORGANIZATION, VRIO_EMPTY_REASONING, VRIO_EMPTY_RESOURCE_DESCRIPTION) plus 1 independent-gate hand-tamper catch (competitive_implication flipped to a different, still-schema-legal enum value on an already-valid record's raw dict, caught by recomputation from the 4 stored answers, not merely by enum membership). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'vrio' both before writing (zero pre-existing implementation -- one unrelated forward-reference mention in ai_lego/modules/strategy/__init__.py's own 'Remaining 8' family roadmap comment) and after (only this method's own 5 files plus strategy.value_chain's own docstring/contract and this registry's own onehundredeleventh/onehundredtwelfth/onehundredthirteenth_concrete_entry notes mentioning 'vrio' by name as a sibling citation -- no shared code, no collision with any of the other 3 concurrent sibling builds)."
 
+  onehundredfifteenth_concrete_entry:
+    # Independent concurrent batch closing F08 entirely (10/14 -> 14/14):
+    # strategy.bcg_matrix/strategy.blue_ocean/strategy.business_model_canvas/
+    # strategy.value_proposition_canvas land via 4 sibling agents, none read
+    # here beyond this file's own keys/notes; re-read this file's own tail
+    # immediately before appending per this batch's own instruction --
+    # onehundredfourteenth_concrete_entry (strategy.vrio) was the last entry
+    # present at read time, no other collision observed. This is the earlier
+    # attempt's partial work (contract/schema/module already existed,
+    # verified correct and consistent, not rebuilt) plus this session's own
+    # completion of the missing CLI demo + test suite.
+    method_id: "strategy.business_model_canvas"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot`/`pestel`/`steepv`/
+      `three_c`/`tows`/`porter_five_forces`/`ansoff`/`value_chain`/`stp`/`vrio`
+      already built, F08 was 10/14 before this entry). Atlas cites this method
+      TWICE: F08 table row (L527: "Business Model Canvas｜九格商模｜客群/價值/
+      通路/關係/收益/資源/活動/夥伴/成本｜完整描述商業運作｜Unit Economics")
+      and dedicated §12.15 (L2715-2734, the nine-block code block plus the
+      method's own stated benefit "完整描述商業運作" and stated limitation
+      "它是 business model hypothesis，不是經驗證的 business"). Real
+      invariants, all grounded in L527/§12.15, enforced at BOTH construction
+      AND independently re-derived by a gate from raw fields: (1) `blocks`
+      names EXACTLY the 9 Osterwalder blocks (CUSTOMER_SEGMENTS,
+      VALUE_PROPOSITIONS, CHANNELS, CUSTOMER_RELATIONSHIPS, REVENUE_STREAMS,
+      KEY_RESOURCES, KEY_ACTIVITIES, KEY_PARTNERS, COST_STRUCTURE), each
+      exactly once, in ANY order -- same closed-SET-with-completeness-
+      no-position shape `strategy.porter_five_forces`'s own `FORCE_NAMES` and
+      `strategy.vrio`'s own question set already establish, scaled to 9 (the
+      largest F08 fixed set); (2) every block entry carries a non-empty
+      `content` -- a block named but left empty has not described that part
+      of the business; (3) `validation_status` is ALWAYS exactly
+      `UNVALIDATED_HYPOTHESIS` -- unlike `strategy.porter_five_forces`'s own
+      instance-dependent digital-platform limitation (disclosure-only, no
+      structural test exists), Atlas §12.15's limitation is a CATEGORICAL,
+      always-true statement about every BMC record, so it is mechanically
+      enforced: `generate_business_model_canvas` has NO `validation_status`
+      parameter at all (structural elimination, same class `strategy.vrio`'s
+      `competitive_implication` and `strategy.tows`'s `pairing_type` already
+      establish), so no code path lets a caller construct a record claiming a
+      validated business.
+    source: "methods/contracts/strategy.business_model_canvas.contract.yaml + specs/cognitive/typed-objects/business-model-canvas.schema.yaml + ai_lego/modules/strategy/business_model_canvas.py + ai_lego/apps/cli/run_business_model_canvas_slice.py + tests/unit/test_business_model_canvas.py"
+    note: >
+      Inherited-and-verified, not rebuilt: an earlier attempt died mid-work
+      from a rate limit, leaving the contract, typed-object schema, and
+      module already written. This session independently re-verified all 3
+      against each other (field names/error codes/structure agree) and
+      against the Atlas at the cited lines (F08 table L527, §12.15
+      L2715-2734, both read directly) before trusting any of it -- found
+      correct and consistent, no fixes needed. Then built the 2 missing
+      deliverables: CLI demo and test suite (55 tests, 100% green). Contract
+      validated against method.schema.yaml and typed-object schema validated
+      against jsonschema.Draft202012Validator directly via a standalone
+      script (not only the test suite) -- required fields present, id
+      pattern satisfied, block/validation_status enums closed,
+      additionalProperties:false present at both the top level and the
+      blocks[] item level, embedded example resolved through its real $ref
+      to epistemic-label.schema.yaml -- 0 errors. CLI demo (python -m
+      ai_lego.apps.cli.run_business_model_canvas_slice) prints PASS and
+      exits 0, demonstrating 2 real construction-time refusals
+      (BMC_INCOMPLETE_BLOCK_SET on a block set missing KEY_PARTNERS,
+      BMC_EMPTY_CONTENT) plus 2 independent-gate hand-tamper catches
+      (validation_status spoofed to "VALIDATED_BUSINESS" on an already-valid
+      record's raw dict -- the builder never accepts this as a parameter so
+      only the gate can be exercised here; and a block dropped from an
+      already-valid record's raw dict). F08 is 11/14 after this entry (3
+      more F08 rows remain in this same batch: BCG, Blue Ocean, Value
+      Proposition Canvas -- NOT yet confirmed landed by this entry).
+      ai_lego/modules/strategy/__init__.py's own shared family docstring is
+      deliberately NOT edited here per this batch's own instruction --
+      orchestrating session's turn once all 4 of this batch are confirmed
+      landed. Grepped the whole ai_lego tree and this docs tree
+      case-insensitively for "business_model_canvas"/"BMC" after this
+      session's own work: only this method's own 5 files, plus
+      strategy.blue_ocean.contract.yaml's own pre-existing, correct
+      `recommended_next: [strategy.business_model_canvas]` citation (Atlas
+      L526's own "BMC" pairing column, not a collision -- a one-directional
+      reference from a sibling this batch is concurrently building) -- no
+      shared code, no collision with any of the other 3 concurrent sibling
+      builds.
+
+  onehundredsixteenth_concrete_entry:
+    # Independent concurrent batch closing F08 entirely (10/14 -> 14/14):
+    # strategy.bcg_matrix/strategy.blue_ocean/strategy.business_model_canvas/
+    # strategy.value_proposition_canvas land via 4 sibling agents, none read
+    # here beyond this file's own keys/notes; re-read this file's own tail
+    # immediately before appending per this batch's own instruction --
+    # onehundredfifteenth_concrete_entry (strategy.business_model_canvas) was
+    # the last entry present at read time, no other collision observed. This
+    # is the earlier attempt's partial work (contract.yaml already existed,
+    # independently re-verified correct and complete, not rebuilt) plus this
+    # session's own completion of the 4 missing deliverables (typed-object
+    # schema, module, CLI demo, test suite). This entry's own method is the
+    # LAST of this batch's 4 concurrent builds and the LAST of F08 itself.
+    method_id: "strategy.value_proposition_canvas"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot`/`pestel`/`steepv`/
+      `three_c`/`tows`/`porter_five_forces`/`ansoff`/`value_chain`/`stp`/
+      `vrio` already built, F08 was 10/14 before this entry). Atlas cites this
+      method ONCE, F08 table row ONLY (L528: "Value Proposition Canvas｜
+      customer jobs/pains/gains 對齊方案｜Customer profile→Value map→fit
+      hypotheses｜提高 product-market fit｜JTBD、Prototype") -- grep-confirmed
+      (both before writing any file and again for this entry) no dedicated
+      §12.x section exists; the only 2 other "Value Proposition"-family hits
+      in the whole Atlas file are L2711 (an unrelated strategy.stp §12.14
+      "搭配" mention) and L2723 (an unrelated cell inside §12.15 Business
+      Model Canvas's own 9-block list). Real, standard Osterwalder structure,
+      independently verified business-strategy knowledge (same discipline
+      every VRIO/Value-Chain/Ansoff-class method in this family already
+      applies for content the Atlas citation names only in brief): Customer
+      Profile side (jobs/pains/gains, 3 parts, Atlas's own literal words) +
+      Value Map side (products_and_services/pain_relievers/gain_creators, 3
+      parts, NOT Atlas-cited at this granularity, disclosed as such) +
+      `fit_hypotheses[]` as the citation's own literal 3rd pipeline stage.
+      Real invariants, enforced at BOTH construction AND independently
+      re-derived by a gate from raw fields: (1) all 6 arrays
+      (jobs/pains/gains/products_and_services/pain_relievers/gain_creators)
+      REQUIRED non-empty with every entry field-complete (id unique within
+      its own array, non-empty statement); (2) no id reused across
+      pains/gains, nor across pain_relievers/gain_creators -- otherwise a
+      fit_hypothesis reference would resolve ambiguously; (3)
+      `fit_hypotheses` REQUIRED non-empty (Atlas's own literal final stage);
+      (4) every fit_hypothesis's `reliever_or_creator_id`/`pain_or_gain_id`
+      MUST resolve to a real id in this same record; (5) `fit_type`
+      (PAIN_RELIEF/GAIN_CREATION) is GENUINE_COMPUTE, mechanically derived
+      from which collection `reliever_or_creator_id` resolves into, cross-
+      checked against `pain_or_gain_id`'s own collection (a pain_reliever may
+      only pair with a pain, a gain_creator only with a gain) -- same
+      structural-elimination discipline `strategy.tows`'s `pairing_type` and
+      `strategy.vrio`'s `competitive_implication` already establish;
+      `generate_value_proposition_canvas` has NO `fit_type` parameter at all,
+      so no code path lets a caller construct a record whose stored fit_type
+      disagrees with its own 2 referenced ids; (6) every fit_hypothesis's
+      `fit_rationale` REQUIRED non-empty -- a fit_type label with no
+      disclosed reasoning has not demonstrated real fit, only asserted a
+      category.
+    source: "methods/contracts/strategy.value_proposition_canvas.contract.yaml + specs/cognitive/typed-objects/value-proposition-canvas.schema.yaml + ai_lego/modules/strategy/value_proposition_canvas.py + ai_lego/apps/cli/run_value_proposition_canvas_slice.py + tests/unit/test_value_proposition_canvas.py"
+    note: >
+      Inherited-and-verified, not rebuilt: an earlier attempt died mid-work
+      from a rate limit, leaving only the contract.yaml already written
+      (valid YAML, confirmed parseable). This session independently
+      re-verified it before trusting it: confirmed its Atlas citation (L528)
+      matches the mother document exactly and no dedicated §12.x section
+      exists (direct read + grep, not trusting the file's own citation
+      claim); confirmed its described design (6-array flat shape, 3-part
+      Value Map breakdown, fit_hypotheses-only-referencing-pattern,
+      always-computed fit_type) is internally consistent with no
+      contradictions, unresolved TODOs, or gaps -- found sound and complete,
+      no rewrite needed. Then built all 4 missing deliverables (typed-object
+      schema, module, CLI demo, test suite; 57 tests, 100% green) to match
+      the inherited contract's own described design exactly. Contract
+      validated against method.schema.yaml (0 errors) and typed-object
+      schema validated against jsonschema.Draft202012Validator directly via
+      a standalone script (not only the test suite) -- required fields
+      present, id pattern satisfied, fit_type enum closed,
+      additionalProperties:false present at the top level AND inside every
+      labeled_item_list item AND inside fit_hypotheses[] items, embedded
+      example resolved through its real $ref to epistemic-label.schema.yaml,
+      and 8 negative controls (smuggled top-level key, smuggled jobs[] item
+      key, out-of-enum fit_type, missing referential_integrity_verified,
+      wrong id prefix, referential_integrity_verified=false, invalid
+      epistemic_type via the real $ref, empty jobs array) all correctly
+      rejected -- 0 false negatives, 0 false positives. CLI demo (python -m
+      ai_lego.apps.cli.run_value_proposition_canvas_slice) prints PASS and
+      exits 0, demonstrating 4 real construction-time refusals
+      (VPC_EMPTY_JOBS, VPC_ID_COLLISION_PAIN_GAIN,
+      VPC_FIT_TYPE_MUST_NOT_BE_CALLER_SUPPLIED, VPC_FIT_TYPE_MISMATCH) plus 1
+      independent-gate hand-tamper catch (a fit_hypothesis's pain_or_gain_id
+      corrupted to point at a gain instead of its original pain on an
+      already-valid canvas's raw dict, never going back through the
+      builder). F08 is 14/14 -- COMPLETE -- after this entry (this batch's
+      other 3 builds: strategy.bcg_matrix, strategy.blue_ocean,
+      strategy.business_model_canvas, each responsible for their own entry,
+      not verified here). ai_lego/modules/strategy/__init__.py's own shared
+      family docstring is deliberately NOT edited here per this batch's own
+      instruction -- orchestrating session's turn to reconcile it and
+      declare F08 complete once all 4 of this batch are confirmed landed
+      together. Grepped the whole ai_lego tree and this docs tree
+      case-insensitively for "value_proposition_canvas" after this session's
+      own work: only this method's own 5 files, plus 2 purely-descriptive
+      sibling citations (ai_lego/modules/strategy/blue_ocean.py's own family
+      docstring naming this batch's 4 concurrent builds by id, and this
+      registry file's own onehundredfifteenth_concrete_entry note naming the
+      same 4-build batch) -- no shared code, no collision with any of the
+      other 3 concurrent sibling builds.
+
+  onehundredseventeenth_concrete_entry:
+    # Independent concurrent batch of 4 F08 strategy-family builds --
+    # strategy.bcg_matrix/strategy.blue_ocean/strategy.business_model_canvas/
+    # strategy.value_proposition_canvas land concurrently via 4 sibling
+    # agents, none read here beyond this file's own keys/notes; re-read this
+    # file's own tail immediately before appending per this batch's own
+    # instruction -- onehundredfifteenth_concrete_entry
+    # (strategy.business_model_canvas) and onehundredsixteenth_concrete_entry
+    # (strategy.value_proposition_canvas) were already taken by the time this
+    # entry landed, no other collision observed. `ls
+    # methods/contracts/strategy.*.contract.yaml` confirms all 14 F08
+    # contract files now exist on disk (including this one) -- F08 is
+    # genuinely 14/14 COMPLETE as of this entry, not merely optimistic.
+    # Orchestrating session still reconciles exact numbering on any later
+    # collision and rewrites ai_lego/modules/strategy/__init__.py's own
+    # shared family docstring, same pattern ninetysixth_concrete_entry's own
+    # note already establishes.
+    method_id: "strategy.bcg_matrix"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family member (`strategy.swot`/`pestel`/`steepv`/
+      `three_c`/`tows`/`porter_five_forces`/`vrio`/`value_chain`/`stp`/
+      `ansoff` already built, F08 was 10/14 before this batch). Atlas cites
+      this method ONCE: F08 table row (L525: "BCG｜Portfolio 資源配置｜
+      growth×relative share｜快速產品組合討論｜GE-McKinsey") -- grep-confirmed
+      the ONLY real hit, no dedicated section (same thinnest-citation class
+      `strategy.ansoff` already established). Real invariants, both grounded
+      in L525, enforced at BOTH construction AND independently re-derived by
+      a gate from raw fields: (1) `portfolio_items` is a non-empty list (NOT
+      a fixed 4/5-name closed SET like porter_five_forces/ansoff/vrio -- an
+      open-ended portfolio of products/business units, same non-empty-list
+      shape `causal.process_tracing`'s own `evidence[]` already establishes)
+      -- a BCG analysis naming zero products has not actually allocated any
+      portfolio resources, the method's own defining purpose; (2) every item
+      carries a non-empty `item_name` and disclosed `growth_rate`/
+      `relative_share` (each HIGH/LOW) with non-empty reasoning -- never
+      computed, no citation supports a numeric growth/share formula; (3)
+      `quadrant` (STAR/CASH_COW/QUESTION_MARK/DOG) is GENUINE_COMPUTE,
+      mechanically derived from that item's own 2 disclosed axes via a
+      closed, TOTAL 4-cell lookup table -- the real, standard, independently
+      -verified BCG Growth-Share Matrix classification (HIGH growth+HIGH
+      share=Star, LOW+HIGH=Cash Cow, HIGH+LOW=Question Mark, LOW+LOW=Dog),
+      NOT an Atlas citation -- disclosed exactly like `strategy.vrio`'s own
+      Barney/VRIO disclosure establishes for a different table.
+      `generate_bcg_matrix`/`portfolio_item` have NO `quadrant` parameter at
+      all (structural elimination, same class `strategy.vrio`'s
+      `competitive_implication` and `causal.process_tracing`'s per-item
+      `implication` already establish), so no code path lets a caller
+      construct a record whose stored quadrant disagrees with its own item's
+      2 axes. This method's shape differs from every other F08 sibling built
+      so far: its object of analysis is a PORTFOLIO (many items, open-ended
+      count), not the company/market as a whole -- open-ended non-empty list
+      instead of a fixed-count closed set. `quality.evidence_labeling_
+      required: false` -- same thin-bare-table-row reasoning
+      `strategy.ansoff.contract.yaml`'s identical flag already establishes.
+      `recommended_next: []` -- Atlas L525's own "最佳搭配" column names
+      "GE-McKinsey", no such machine_id exists in this corpus yet
+      (grep-confirmed), left empty rather than naming a non-existent id.
+    source: "methods/contracts/strategy.bcg_matrix.contract.yaml + specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml + ai_lego/modules/strategy/bcg_matrix.py"
+    note: "54 tests pass. F08 strategy family: 10 of 14 built before this batch (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces/vrio/value_chain/stp/ansoff) -- this entry (strategy.bcg_matrix) is F08's 11th member counting all landed-so-far; strategy.blue_ocean/strategy.business_model_canvas already landed before this entry (grep-confirmed via this file's own onehundredfifteenth_concrete_entry key and an `ls methods/contracts/strategy.*.contract.yaml` directory listing, read but not modified), strategy.value_proposition_canvas landed via onehundredsixteenth_concrete_entry -- all 14 F08 contract files now exist on disk (verified via `ls`, not merely trusted from a sibling note), so F08 is genuinely 14/14 COMPLETE as of this entry. ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- schema is a valid Draft202012 schema (check_schema passed), required fields present, id pattern satisfied, growth_rate/relative_share/quadrant enums closed, additionalProperties:false present at both the top level and the portfolio_items[] item level, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 9 negative controls (smuggled top-level key, smuggled portfolio_items[] item key, empty portfolio_items, missing portfolio_items, missing item quadrant, invalid growth_rate enum, invalid quadrant enum, wrong id prefix, invalid epistemic_type via the real $ref) all correctly rejected, plus the unmodified valid example and a single-item-portfolio boundary case both correctly accepted -- 0 false negatives, 0 false positives. The classification table was independently re-derived from its own definition (not trusted from a single memorized source) and confirmed TOTAL over all 4 HIGH/LOW combinations via a dedicated test class (ClassificationTableTests, itertools.product exhaustive check). CLI demo (python -m ai_lego.apps.cli.run_bcg_matrix_slice) prints PASS and exits 0, demonstrating 2 real construction-time refusals (BCG_EMPTY_PORTFOLIO on a zero-item portfolio, BCG_INVALID_PORTFOLIO_ITEM on an item with empty growth_rate_reasoning) plus 1 independent-gate hand-tamper catch (quadrant flipped from STAR to DOG on an already-valid record's raw dict, caught by recomputation from the item's own 2 stored axes, not merely by enum membership). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'bcg' both before writing (zero pre-existing implementation) and after (only this method's own 5 files plus 2 purely-descriptive sibling citations -- strategy.blue_ocean.py's and strategy.value_proposition_canvas.py's own family docstrings naming strategy.bcg_matrix as a concurrent sibling by id -- no shared code, no collision with any of the other 3 concurrent sibling builds)."
+
+  onehundredeighteenth_concrete_entry:
+    # Independent concurrent batch of 4 F08 strategy-family builds --
+    # strategy.bcg_matrix/strategy.business_model_canvas/strategy.blue_ocean/
+    # strategy.value_proposition_canvas land concurrently via 4 sibling
+    # agents, none read here beyond this file's own keys/notes. Re-read this
+    # file's own tail immediately before appending per this batch's own
+    # instruction -- onehundredfifteenth_concrete_entry (strategy.
+    # business_model_canvas), onehundredsixteenth_concrete_entry (strategy.
+    # value_proposition_canvas), and onehundredseventeenth_concrete_entry
+    # (strategy.bcg_matrix) were all already taken by the time this entry
+    # landed, no other collision observed. This is the LAST of this batch's 4
+    # concurrent builds and the LAST of the whole F08 family -- F08 is 14/14
+    # COMPLETE after this entry (bcg_matrix's own onehundredseventeenth_
+    # concrete_entry note already verified all 14 contract files exist on
+    # disk via `ls`, this entry's own count below independently confirms the
+    # same total). Orchestrating session rewrites
+    # ai_lego/modules/strategy/__init__.py's own shared family docstring now
+    # that all 4 of this batch are confirmed landed, same pattern
+    # ninetysixth_concrete_entry's own note already establishes.
+    method_id: "strategy.blue_ocean"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F08 `strategy` family closing member (`strategy.swot`/`pestel`/
+      `steepv`/`three_c`/`tows`/`porter_five_forces`/`vrio`/`value_chain`/
+      `stp`/`ansoff` already built, F08 was 10/14 before this batch).
+      Atlas cites this method exactly ONCE: F08 table row (L526: "Blue Ocean
+      ｜創造新價值曲線｜Strategy Canvas→ERRC｜擺脫直接競爭｜BMC") -- no
+      dedicated §12.x section, no §4 composition formula, no §14.1
+      transition example (grep-confirmed: 1 total hit for "Blue Ocean"/
+      "ERRC"/"藍海"/"Strategy Canvas"/"價值曲線" across the whole Atlas
+      file), same single-row-only thinness class
+      `strategy.value_chain.contract.yaml`'s own citation already
+      establishes. Real invariants, all grounded in L526, enforced at BOTH
+      construction AND independently re-derived by a gate from raw fields:
+      (1) `competing_factors` has >=2 entries -- Atlas's own "Strategy
+      Canvas" plots a value curve across multiple factors, a curve through 1
+      point is not a curve; (2) each factor's `errc_action` is one of the 4
+      closed values ELIMINATE/REDUCE/RAISE/CREATE -- Atlas's own "→ERRC",
+      grounded additionally in the real, named, external Kim & Mauborgne
+      Blue Ocean Strategy ERRC grid (same real-external-methodology-naming
+      discipline `strategy.vrio.contract.yaml`'s own Barney 1991 citation
+      already establishes for a different method), caller-disclosed
+      judgment not GENUINE_COMPUTE; (3) CREATE-vs-existing-factor asymmetry
+      -- ELIMINATE/REDUCE/RAISE apply to an EXISTING competing factor and
+      REQUIRE a disclosed `industry_standard_level` (closed LOW/MEDIUM/HIGH
+      ordinal, same disclosed-never-mechanically-scored precedent
+      `strategy.porter_five_forces.contract.yaml`'s own `intensity` field
+      already establishes), CREATE introduces a factor the industry has
+      NEVER offered and FORBIDS one (there is no industry standard to
+      record) -- enforced by a real invariant at both the Python builder
+      (`BLUEOCEAN_MISSING_INDUSTRY_STANDARD_LEVEL` /
+      `BLUEOCEAN_UNEXPECTED_INDUSTRY_STANDARD_LEVEL_FOR_CREATE`) and the
+      schema layer (a pair of if/then conditionals, key-presence-encodes-
+      meaning technique generalized from
+      `value-chain-analysis.schema.yaml`'s own item-level anyOf); (4)
+      `new_value_curve_summary` (top-level, required, non-empty,
+      DISCLOSURE-ONLY) -- Atlas's own citation IS "創造新價值曲線" (the
+      method's own name), same disclosure-only-synthesis precedent
+      `strategy.three_c`'s own `fit_summary` / `strategy.value_chain`'s own
+      `leverage_points` already establish. Each factor also carries a
+      required non-empty `rationale` -- same disclosed-judgment-audit-trail
+      precedent `strategy.vrio`'s own per-question `reasoning` field already
+      establishes. Deliberately NOT required: completeness across all 4 ERRC
+      actions (unlike `strategy.three_c`'s 3-dimension coverage or
+      `strategy.value_chain`'s 2-category coverage) -- Atlas's own citation
+      gives no such completeness requirement, and a real Blue Ocean analysis
+      may legitimately use only a subset of the 4 actions for a given factor
+      set; inventing an all-4-required rule would overstate this citation's
+      own content by importing a different sibling method's own structural
+      feature (disclosed in the contract's own compilation_decisions rather
+      than silently applied). `recommended_next: [strategy.business_model_
+      canvas]` per L526's own "最佳搭配" column ("BMC") -- re-grepped and
+      confirmed `strategy.business_model_canvas.contract.yaml` exists,
+      parses as well-formed YAML, and has `status: ACTIVE` before naming it,
+      same verified-before-citing discipline `strategy.vrio.contract.yaml`'s
+      own `recommended_next` check already establishes for a different
+      concurrent sibling.
+    source: "methods/contracts/strategy.blue_ocean.contract.yaml + specs/cognitive/typed-objects/blue-ocean-analysis.schema.yaml + ai_lego/modules/strategy/blue_ocean.py"
+    note: "56 tests pass. F08 strategy family: 10 of 14 built before this batch (strategy.swot/pestel/steepv/three_c/tows/porter_five_forces/vrio/value_chain/stp/ansoff) -- strategy.business_model_canvas/strategy.value_proposition_canvas/strategy.bcg_matrix already landed before this entry (grep-confirmed via this file's own onehundredfifteenth/onehundredsixteenth/onehundredseventeenth_concrete_entry keys, read but not modified) -- this entry (strategy.blue_ocean) is F08's 14th and LAST member. F08 is 14/14 COMPLETE as of this entry (independently confirmed via `ls methods/contracts/strategy.*.contract.yaml`: 14 files present, matching bcg_matrix's own onehundredseventeenth_concrete_entry count). ai_lego/modules/strategy/__init__.py's own shared family docstring is deliberately NOT edited here per this batch's own instruction -- the orchestrating session rewrites it once all 4 of this batch are confirmed landed together. Contract validated against method.schema.yaml and typed-object schema validated against jsonschema.Draft202012Validator directly via a standalone script (not only the test suite) -- required fields present, id pattern satisfied, errc_action enum closed, additionalProperties:false present at both the top level and the competing_factors[] item level, the if/then industry_standard_level-required-for-ELIMINATE/REDUCE/RAISE constraint, the if/then industry_standard_level-forbidden-for-CREATE constraint, embedded example resolved through its real $ref to epistemic-label.schema.yaml, and 9 negative controls (fewer than 2 factors, smuggled top-level key, smuggled competing_factors[] item key, invalid errc_action enum, an existing-action factor missing industry_standard_level, a CREATE factor illegally carrying industry_standard_level, missing new_value_curve_summary, invalid epistemic_type via the real $ref, wrong id prefix) all correctly rejected, plus the unmodified valid example correctly accepted -- 0 false negatives, 0 false positives. CLI demo (python -m ai_lego.apps.cli.run_blue_ocean_slice) prints PASS and exits 0, demonstrating 4 real construction-time refusals (BLUEOCEAN_INSUFFICIENT_FACTORS on a single-factor set, BLUEOCEAN_INVALID_ERRC_ACTION on an out-of-enum action, BLUEOCEAN_UNEXPECTED_INDUSTRY_STANDARD_LEVEL_FOR_CREATE on a CREATE factor illegally carrying a level, BLUEOCEAN_EMPTY_NEW_VALUE_CURVE_SUMMARY on an unstated-curve attempt) plus 1 independent-gate hand-tamper catch (a CREATE factor's industry_standard_level smuggled onto an already-valid analysis' raw dict, caught by the industry_standard_level_consistency gate re-deriving from raw fields, never going back through the builder). Grepped the whole ai_lego tree and this docs tree case-insensitively for 'blue_ocean'/'ERRC' both before writing (zero pre-existing implementation -- one unrelated forward-reference mention in ai_lego/modules/strategy/__init__.py's own 'Remaining 4' family roadmap comment) and after (only this method's own 5 files plus this registry entry and strategy.value_proposition_canvas.py's own family docstring naming strategy.blue_ocean as a concurrent sibling by id -- no shared code, no collision with any of the other 3 concurrent sibling builds)."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

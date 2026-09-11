@@ -1,0 +1,133 @@
+$id: "ai-lego://methods/contracts/strategy.value_proposition_canvas.contract.yaml"
+title: "Value Proposition Canvas Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 context/strategy family, 14th and FINAL member. Atlas F08 table row ONLY (L528: "Value
+  Proposition Canvas｜customer jobs/pains/gains 對齊方案｜Customer profile→Value map→fit hypotheses｜提高
+  product-market fit｜JTBD、Prototype") -- no dedicated §12.x section exists (grep-confirmed). Real,
+  standard Osterwalder structure: Customer Profile side (jobs/pains/gains) + Value Map side
+  (products_and_services/pain_relievers/gain_creators) + `fit_hypotheses` as the citation's own literal
+  3rd pipeline stage. Core invariant: each `fit_hypotheses[]` entry's `fit_type` (PAIN_RELIEF/
+  GAIN_CREATION) is GENUINE_COMPUTE, referentially derived from real `pain_relievers`/`gain_creators`
+  and `pains`/`gains` ids -- never caller-supplied, same class `strategy.tows`'s `pairing_type` and
+  `strategy.stp`'s `targeted_segment_id` resolution already establish.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 table, Value Proposition Canvas row (L528)"
+  - "methods/contracts/strategy.tows.contract.yaml + ai_lego/modules/strategy/tows.py -- GENUINE_COMPUTE cross-collection referential-integrity pattern (pairing_type never caller-supplied, always derived + independently re-derived by a gate) reused here for fit_type"
+  - "methods/contracts/strategy.stp.contract.yaml + ai_lego/modules/strategy/stp.py -- single-record referential-integrity pattern (targeted_segment_id -> segments[]) reused here for pain_or_gain_id / reliever_or_creator_id resolution"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas L528's own 3-stage arrow
+  (Customer profile→Value map→fit hypotheses) into 6 completeness preconditions (2 per stated side, 3
+  labels each) plus a referentially-checked 3rd stage -- same standard every Tier 1 contract in this
+  directory applies. `id: strategy.value_proposition_canvas` mints a new machine_id. Registered in
+  `methods/registry/contract-backlog.yaml` `tier_1`.
+
+id: strategy.value_proposition_canvas
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [DECOMPOSE, RELATE, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. Customer Profile / Value
+# Map are each DECOMPOSE (breaking a customer or an offering into named jobs/pains/gains or
+# products/relievers/creators); fit_hypotheses is RELATE (pairing a reliever/creator against a real
+# pain/gain) + EXPLAIN (the disclosed fit_rationale content, same sense strategy.tows's own EXPLAIN
+# primitive already carries for its disclosed strategy_option).
+
+purpose:
+  - align_customer_jobs_pains_gains_with_a_solutions_value_map_to_improve_product_market_fit
+# Atlas L528 verbatim sense: "customer jobs/pains/gains 對齊方案" + benefit column "提高 product-market fit".
+
+inputs:
+  required: []
+  optional: []
+  # Atlas's own citation names JTBD/Prototype as the best-pairing column (L528, col 5), but grep-confirmed
+  # (this task, before writing any file) neither a `jtbd.*` nor a `prototype.*` contract/typed-object
+  # exists anywhere in this spec root -- same self-contained-method precedent strategy.stp's own
+  # inputs.required: [] already establishes for an analogous thin citation naming a not-yet-built companion.
+
+outputs:
+  - ValuePropositionCanvas
+# NEW output type (see typed-objects/value-proposition-canvas.schema.yaml). Atlas gives this method's
+# output no PascalCase name anywhere, same honesty gap every other thin-citation Tier 1 F08 contract
+# already discloses.
+
+preconditions:
+  - "jobs is non-empty -- Atlas's own literal 'customer jobs/pains/gains' (L528) names all 3 as the Customer Profile side's defining split; a canvas missing jobs has not built a Customer Profile (VPC_EMPTY_JOBS)"
+  - "pains is non-empty (VPC_EMPTY_PAINS) -- same citation, 2nd of the 3 named words"
+  - "gains is non-empty (VPC_EMPTY_GAINS) -- same citation, 3rd of the 3 named words"
+  - "products_and_services is non-empty (VPC_EMPTY_PRODUCTS_AND_SERVICES) -- real, standard Osterwalder Value Map sub-structure (see compilation_decisions); Atlas's own citation names 'Value map' only as one blob, not broken into 3 parts"
+  - "pain_relievers is non-empty (VPC_EMPTY_PAIN_RELIEVERS) -- same Value Map sub-structure, 2nd part"
+  - "gain_creators is non-empty (VPC_EMPTY_GAIN_CREATORS) -- same Value Map sub-structure, 3rd part"
+  - "every jobs/pains/gains/products_and_services/pain_relievers/gain_creators entry carries a non-empty id (unique within its own array) and a non-empty statement (VPC_*_MISSING_ID / VPC_DUPLICATE_*_ID / VPC_*_MISSING_STATEMENT)"
+  - "no id is reused across pains and gains (VPC_ID_COLLISION_PAIN_GAIN) -- fit_hypotheses.pain_or_gain_id must resolve unambiguously into exactly one of the two collections"
+  - "no id is reused across pain_relievers and gain_creators (VPC_ID_COLLISION_RELIEVER_CREATOR) -- same unambiguous-resolution requirement for fit_hypotheses.reliever_or_creator_id"
+  - "fit_hypotheses is non-empty -- Atlas's own citation's literal, final 3rd pipeline stage (L528: '→fit hypotheses') (VPC_EMPTY_FIT_HYPOTHESES)"
+  - "every fit_hypotheses entry's reliever_or_creator_id resolves to a real id in pain_relievers[] or gain_creators[] (VPC_UNKNOWN_RELIEVER_OR_CREATOR_ID)"
+  - "every fit_hypotheses entry's pain_or_gain_id resolves to a real id in pains[] or gains[] (VPC_UNKNOWN_PAIN_OR_GAIN_ID)"
+  - "fit_type is never caller-supplied (VPC_FIT_TYPE_MUST_NOT_BE_CALLER_SUPPLIED) -- always computed from the two referenced ids' real collection membership"
+  - "a pain_reliever may only pair with a pain, and a gain_creator may only pair with a gain (VPC_FIT_TYPE_MISMATCH) -- a reliever addressing a 'gain' or a creator addressing a 'pain' is not a coherent fit hypothesis"
+  - "fit_rationale is a non-empty disclosed string per hypothesis (VPC_EMPTY_FIT_RATIONALE) -- a fit_type label with no disclosed reasoning has not demonstrated real fit, only asserted a category"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # Same class decision strategy.tows/strategy.stp's own quality blocks already establish: the real risk
+  # this citation names is referentially-broken or mismatched fit claims (the preconditions above), not a
+  # missing per-claim evidence citation -- Atlas's L528 row carries no misuse warning about unevidenced
+  # jobs/pains/gains content.
+
+forbidden_transition: []
+# Atlas's own citation for this method gives no §14.1-style illegal-transition worked example (unlike
+# strategy.swot/tows's own AutomaticProductionDeployment chain). Left empty and disclosed rather than
+# applied by unverified analogy, same class strategy.stp's own empty forbidden_transition already applies.
+
+recommended_next: []
+# Atlas L528's own col-5 "JTBD、Prototype" names methods with no contract/typed-object anywhere in this
+# spec root yet (grep-confirmed) -- same gap strategy.stp's own OQ-STP-2 discloses for its own citation's
+# companion methods. Left genuinely empty rather than citing a nonexistent method id.
+
+rollback:
+  side_effect_free: true
+  # No mother document states this explicitly for this method. Same low-risk inference class every
+  # sibling F08 contract's own identical field already applies: a pure analysis/knowledge-object
+  # production method with no described external side effect in any mother document.
+
+compilation_decisions:
+  - question: "Flat 6 top-level arrays (jobs/pains/gains/products_and_services/pain_relievers/gain_creators), or 2 nested customer_profile/value_map objects?"
+    decision: "Flat -- matches this family's established flat-field convention (strategy.tows/strategy.stp), avoids a redundant additionalProperties:false layer on 2 wrapper objects that add no new invariant."
+  - question: "Should pain_relievers/gain_creators carry their own relieves_pain_id/creates_gain_id field directly, or should the reference live only in a separate fit_hypotheses[] collection?"
+    decision: "Reference lives ONLY in fit_hypotheses[] -- mirrors strategy.tows's own pairings[] design (SWOT factors carry no mutual cross-reference; TOWS's pairings[] is the sole cross-referencing collection), avoiding two reference paths that could silently drift."
+  - question: "Should Value Map be broken into products_and_services/pain_relievers/gain_creators (3 parts), matching Customer Profile's 3-part jobs/pains/gains, even though Atlas's own citation names 'Value map' as one blob?"
+    decision: "Yes -- real, standard Osterwalder Value Proposition Canvas structure (independently verified business-strategy knowledge, same discipline every VRIO/Ansoff-class method in this batch already applied), disclosed here as NOT Atlas-cited at this granularity rather than presented as transcribed."
+  - question: "Should fit_type be a caller-settable field (accept + validate + refuse on mismatch), or always computed?"
+    decision: "Always computed -- the fit_hypothesis() constructor has no fit_type parameter at all; generate_value_proposition_canvas derives it via derive_fit_type, an independent gate re-derives it from raw fields. Same structural elimination strategy.tows's own pairing_type treatment already establishes."
+  - question: "A separate top-level fit_summary disclosure field (matching strategy.three_c's own restraint), or the referential fit_hypotheses[] design?"
+    decision: "Referential fit_hypotheses[] design -- Atlas's own citation explicitly names 'fit hypotheses' as a distinct, final pipeline stage (not merely an implicit outcome, unlike 3C's bare '→找 fit'), making a real structural, checkable per-hypothesis design more faithful to this specific citation than a single free-prose summary field."
+
+open_questions:
+  - "OQ-VPC-1: cognitive_primitives [DECOMPOSE, RELATE, EXPLAIN] is this file's own inference -- Atlas §4 gives no composition formula for this method. (owner: operator)"
+  - "OQ-VPC-2: inputs.required / recommended_next are both empty: Atlas L528's own JTBD/Prototype companions have no contract/typed-object anywhere in this spec root yet. (owner: operator, or whoever next backfills JTBD/Prototype)"
+  - "OQ-VPC-3: fit_hypotheses only references pains/gains, never jobs or products_and_services directly -- matches real Osterwalder VPC theory (Pain Relievers/Gain Creators pair against Pains/Gains, not Jobs), but this is independently-verified domain knowledge, not a distinction Atlas's own thin citation itself draws. (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F08 table (L511-528, this row L528) directly at the cited line; grepped the whole Atlas
+    file for "Value Proposition"/"價值主張"/"Customer Profile"/"Value Map" -- confirmed L528 (this table
+    row) and L2723 (an unrelated "Value Propositions" cell inside §12.15 Business Model Canvas's own
+    9-block list) are the ONLY 2 hits, no dedicated §12.x section exists for this method. Read
+    strategy.three_c.contract.yaml, strategy.tows.contract.yaml (+ tows.py), and strategy.stp.contract.yaml
+    (+ stp.py) in full before writing this contract, reusing their conventions. Grepped the whole
+    `ai_lego` tree and this docs tree case-insensitively for "value_proposition_canvas" before writing any
+    of this method's own files -- zero pre-existing implementation. Grepped for "jtbd"/"prototype" contract
+    files before writing inputs/recommended_next -- confirmed neither exists in this spec root. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator via a standalone script.
+  note: >
+    No mother document was modified. Atlas L528's own 3-stage arrow (Customer profile→Value map→fit
+    hypotheses) is transcribed verbatim into the top-level structure. The 6-array flat shape, the
+    3-part Value Map breakdown, the fit_hypotheses-only-referencing-pattern, and the always-computed
+    fit_type are Phase 3 compilation choices, explicitly flagged above in `compilation_decisions`, not
+    presented as Atlas-cited beyond the table row itself.

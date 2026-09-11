@@ -1,0 +1,172 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/bcg-matrix-analysis.schema.yaml"
+title: BCG Matrix Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BcgMatrixAnalysis` -- the declared `outputs` of
+  `strategy.bcg_matrix`'s Method Contract (methods/contracts/strategy.bcg_matrix.contract.yaml,
+  `outputs: [BcgMatrixAnalysis]`). Atlas cites this method ONCE: F08 tool table row (L525: "BCG｜
+  Portfolio 資源配置｜growth×relative share｜快速產品組合討論｜GE-McKinsey") -- the thinnest possible
+  citation class, no dedicated section, same class strategy.ansoff's own citation already establishes.
+
+  Field provenance:
+    * `portfolio_items` -- Atlas's own "Portfolio 資源配置" framing: an open-ended, non-empty list of
+      products/business units (NOT a fixed closed set the way porter-five-forces/ansoff/vrio's own
+      fixed-name vocabularies are -- see compilation_decisions).
+    * `portfolio_items[].growth_rate`/`relative_share` -- Atlas's own "growth×relative share" method
+      description, DISCLOSED per-item HIGH/LOW judgment calls (never computed -- no citation supports a
+      numeric growth/share formula), each with non-empty `reasoning`.
+    * `portfolio_items[].quadrant` -- GENUINE_COMPUTE, mechanically derived from that item's own
+      `growth_rate`x`relative_share` via the real, standard BCG 2x2 classification (Stars/Cash Cows/
+      Question Marks/Dogs). NOT an Atlas citation -- grounded in real, well-known, independently-verified
+      business-strategy domain knowledge (see `ai_lego/modules/strategy/bcg_matrix.py` module docstring).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, BCG row (L525)"
+  - "methods/contracts/strategy.bcg_matrix.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/process-tracing-record.schema.yaml -- non-empty-list, per-item GENUINE_COMPUTE, no-builder-parameter precedent (this file's primary structural template)"
+  - "specs/cognitive/typed-objects/ansoff-matrix.schema.yaml -- same F08 family, no-top-level-synthesis-field precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a
+  direct transcription of Atlas L525's own bare method description plus low-risk, disclosed compilation
+  choices, including the real external BCG Growth-Share Matrix 2x2 classification table.
+
+compilation_decisions:
+  - question: "Fixed-count closed array (porter/ansoff/vrio-style, minItems==maxItems) or open-ended non-empty array?"
+    decision: "Open-ended, minItems:1 only -- same shape process-tracing-record.schema.yaml's own non-empty `evidence[]` already establishes; a portfolio can hold any number of products/business units, not a fixed structural split."
+  - question: "Should growth_rate/relative_share be a richer numeric scale instead of a binary HIGH/LOW enum?"
+    decision: "Binary HIGH/LOW per axis, task-mandated -- no Atlas citation supports a numeric scoring formula; mirrors strategy.vrio's identical binary-per-dimension precedent."
+  - question: "Should quadrant be caller-supplied (ansoff risk_level-style) or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE, REQUIRED per item -- mechanically derived by ai_lego/modules/strategy/bcg_matrix.py's `derive_bcg_quadrant` from the item's own 2 disclosed axes via a closed, TOTAL 4-cell lookup table (real external BCG Growth-Share Matrix methodology). Never a builder parameter, never caller-supplied; re-derived independently by an integrity gate from each item's own raw fields."
+  - question: "additionalProperties: false at the top level, and on the portfolio_items[] item schema?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "A top-level synthesis/recommendation field, matching porter-five-forces-analysis.schema.yaml's required overall_attractiveness?"
+    decision: "No -- Atlas's own benefit ('快速產品組合討論') is distributed per-item, not a single portfolio-level conclusion, same reasoning ansoff-matrix.schema.yaml's own identical absence already establishes."
+
+type: object
+required: [id, version, portfolio_items]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BCG-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as ansoff-matrix.schema.yaml's ANSOFF- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.bcg_matrix"
+
+  portfolio_items:
+    type: array
+    minItems: 1
+    description: >
+      Atlas's own "Portfolio 資源配置" framing: the products/business units under portfolio-allocation
+      review. Open-ended (no maxItems) -- genuine non-emptiness is the only count invariant this schema
+      expresses; enforced by ai_lego/modules/strategy/bcg_matrix.py at both the builder and an independent
+      gate (same non-empty-list precedent process-tracing-record.schema.yaml's own `evidence[]` already
+      establishes).
+    items:
+      type: object
+      required: [item_name, growth_rate, growth_rate_reasoning, relative_share, relative_share_reasoning, quadrant, provenance]
+      additionalProperties: false
+      properties:
+        item_name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Names the specific product/business unit under portfolio review -- REPORTED content, not computed."
+        growth_rate:
+          type: string
+          enum: [HIGH, LOW]
+          description: "DISCLOSED judgment-call enum (market growth rate for this item), not a computed score. See compilation_decisions."
+        growth_rate_reasoning:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual judgment content for growth_rate -- what makes this item's market growth HIGH or LOW."
+        relative_share:
+          type: string
+          enum: [HIGH, LOW]
+          description: "DISCLOSED judgment-call enum (this item's market share relative to its largest competitor), not a computed score."
+        relative_share_reasoning:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual judgment content for relative_share -- what makes this item's relative share HIGH or LOW."
+        quadrant:
+          type: string
+          enum: [STAR, CASH_COW, QUESTION_MARK, DOG]
+          description: >
+            REQUIRED. GENUINE_COMPUTE -- mechanically derived from this item's own growth_rate x
+            relative_share via the real, standard BCG 2x2 classification (HIGH+HIGH=STAR,
+            LOW+HIGH=CASH_COW, HIGH+LOW=QUESTION_MARK, LOW+LOW=DOG). NEVER caller-supplied and NEVER
+            computed by anything other than ai_lego/modules/strategy/bcg_matrix.py's
+            `derive_bcg_quadrant` -- see compilation_decisions.
+        provenance:
+          description: "Per-item provenance. Full provenance_record, same pattern vrio-analysis.schema.yaml's questions[].provenance already uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A BCG Growth-Share Matrix analysis for a 3-product SaaS portfolio"
+    value:
+      id: "BCG-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.bcg_matrix"
+      portfolio_items:
+        - item_name: "旗艦分析模組（既有核心產品）"
+          growth_rate: HIGH
+          growth_rate_reasoning: "所屬區域分析軟體市場年成長率約 22%，明顯高於公司整體平均"
+          relative_share: HIGH
+          relative_share_reasoning: "在既有客群中的市占率為同類模組最大競爭者的 2.3 倍"
+          quadrant: STAR
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - item_name: "傳統報表工具（早期成熟產品）"
+          growth_rate: LOW
+          growth_rate_reasoning: "報表工具品類成長已趨緩，市場年成長率低於 5%"
+          relative_share: HIGH
+          relative_share_reasoning: "長期市占率領先，穩定貢獻現金流"
+          quadrant: CASH_COW
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+        - item_name: "新推出的即時協作功能（剛上市）"
+          growth_rate: HIGH
+          growth_rate_reasoning: "協作類功能所屬品類正快速成長，年成長率超過 30%"
+          relative_share: LOW
+          relative_share_reasoning: "剛上市，市占率遠低於此品類的領先競爭者"
+          quadrant: QUESTION_MARK
+          provenance: { epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null }
+
+open_questions:
+  - id: "OQ-BCGMATRIXANALYSIS-1"
+    question: "portfolio_items[].quadrant's agreement with its own growth_rate/relative_share is a runtime-only invariant (plain JSON Schema has no cross-field computed-value constraint) -- should a future pass add a JSON Schema if/then constraint instead of relying solely on the runtime gate? Same open question vrio-analysis.schema.yaml's own OQ-VRIOANALYSIS-1 already discloses for an identical shape. (owner: operator)"
+  - id: "OQ-BCGMATRIXANALYSIS-2"
+    question: "No item_name/id uniqueness constraint exists (see method contract's own compilation_decisions) -- should a future pass add one if a downstream consumer ever needs to reference a specific portfolio item? (owner: operator)"
+
+verification:
+  method: >
+    Read Atlas F08 table row (L525) directly. Grepped the whole Atlas file case-insensitively for "bcg" --
+    confirmed exactly 1 real hit, no dedicated section. Cross-checked against
+    methods/contracts/strategy.bcg_matrix.contract.yaml's own outputs/preconditions/quality. Read
+    process-tracing-record.schema.yaml (non-empty-list, per-item GENUINE_COMPUTE, no-builder-parameter
+    precedent) and ansoff-matrix.schema.yaml (thin-citation, no-top-level-synthesis-field precedent) in
+    full as shape precedent before writing this file. Independently re-verified the real, standard BCG
+    Growth-Share Matrix 2x2 classification (Stars/Cash Cows/Question Marks/Dogs) against well-known
+    business-strategy domain knowledge, confirmed TOTAL over all 4 HIGH/LOW combinations. Validated against
+    jsonschema Draft202012Validator via a standalone script (required fields present, id pattern satisfied,
+    growth_rate/relative_share/quadrant enums closed, additionalProperties:false present at both the top
+    level and the portfolio_items[] item level from the start, embedded examples resolved through their
+    real $ref to epistemic-label.schema.yaml, negative controls for a smuggled top-level key, a smuggled
+    portfolio_items[] item key, and an empty portfolio_items array).
+  note: >
+    `portfolio_items[].quadrant`'s 4 enum values and the 2x2 table that derives them are grounded in real
+    external BCG Growth-Share Matrix methodology, NOT Atlas text -- disclosed in compilation_decisions and
+    the method contract's own compilation_decisions, not presented as an Atlas citation. The
+    growth_rate/relative_share/reasoning field split, the open-ended non-empty list shape, and the
+    deliberate absence of a top-level synthesis field are compilation decisions, disclosed above. No mother
+    document was modified to produce this file.

@@ -1,4 +1,4 @@
-"""F08 context & strategy family (Atlas L511-536) -- 10 of 14 built. Tenants:
+"""F08 context & strategy family (Atlas L511-536) -- COMPLETE, 14 of 14. Tenants:
 ``strategy.swot`` (internal S/W vs external O/T evidence-backed four-quadrant classification,
 forbidden_transition guards SWOT -> AutomaticProductionDeployment via the platform's own fail-closed
 method resolution, not a bespoke check), ``strategy.pestel`` (closed 6-dimension enum
@@ -36,6 +36,22 @@ as the method's own final required stage), ``strategy.ansoff`` (closed 4-quadran
 completeness required -- MARKET_PENETRATION/MARKET_DEVELOPMENT/PRODUCT_DEVELOPMENT/DIVERSIFICATION,
 disambiguated from Atlas's own bare "penetration/development/product/diversification" tokens via
 the real well-known Ansoff Growth Matrix; each quadrant carries a disclosed risk_level, never
-mechanically ranked, matching Atlas's own "顯示不同風險" benefit).
-
-Remaining 4 (Atlas L525-528): BCG, Blue Ocean, Business Model Canvas, Value Proposition Canvas."""
+mechanically ranked, matching Atlas's own "顯示不同風險" benefit), ``strategy.bcg_matrix`` (open-ended
+non-empty portfolio, not a fixed closed SET -- BCG classifies an unbounded number of products/business
+units; each item discloses growth_rate/relative_share [HIGH/LOW], ``quadrant`` [STAR/CASH_COW/
+QUESTION_MARK/DOG] is GENUINE_COMPUTE via a total 4-cell lookup table over the 2 disclosed axes,
+builder has no quadrant parameter), ``strategy.blue_ocean`` (Strategy Canvas -> ERRC Grid, closed
+4-value ELIMINATE/REDUCE/RAISE/CREATE action per factor; CREATE is structurally asymmetric from the
+other 3 -- ``industry_standard_level`` is REQUIRED for ELIMINATE/REDUCE/RAISE [an existing competing
+factor has a current industry level] and FORBIDDEN [key must be absent, not merely null] for CREATE
+[introduces a factor the industry never had, so no standard exists to record], enforced at both
+builder and schema-level if/then conditionals), ``strategy.business_model_canvas`` (closed 9-block
+SET with completeness required -- the largest fixed-set F08 method, Osterwalder's real named blocks
+verbatim from Atlas Section 12.15; Atlas's own explicitly-named limitation "business model hypothesis,
+not a validated business" is mechanically enforced, not just disclosed -- ``validation_status`` is a
+single-legal-value enum structurally eliminated from the builder's own parameters), ``strategy.
+value_proposition_canvas`` (Customer Profile [jobs/pains/gains] -> Value Map [products_and_services/
+pain_relievers/gain_creators] -> fit_hypotheses; ``fit_type`` [PAIN_RELIEF/GAIN_CREATION] is
+GENUINE_COMPUTE derived from which collection a referenced reliever_or_creator_id and pain_or_gain_id
+each resolve into, cross-checked against each other -- the third referential-integrity + GENUINE_COMPUTE
+design this session, after strategy.tows and strategy.stp)."""

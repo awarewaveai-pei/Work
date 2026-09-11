@@ -1,5 +1,60 @@
 # Worklog
 
+## 2026-09-11（115–118 號切片：F08 strategy 家族收官 10/14→14/14，4 agent，其中 2 個從 rate-limit 中斷點續建）
+
+bcg_matrix(54t)/blue_ocean(56t)/business_model_canvas(55t)/value_proposition_canvas(57t)。222 tests 零衝突，全 regression 6968→7190，golden 3276→3296。F08 causal & strategy 家族正式收官（14/14）：swot+13 個批次建置方法。
+
+**批次特殊狀況**：第一次派出的 4 agent 遇到帳號級 rate limit 全滅；操作者主動要求先寫交接包暫停（`agency-os/handoffs/2026-09-10-1737-f08-strategy-closeout.md`）。額度重置後檢查發現 2 個方法（business_model_canvas 3/5、value_proposition_canvas 1/5）留下**完整且格式正確**的部分產出（非殘破檔案——`bcg_matrix` 的部分檔案則有真實 YAML 語法錯誤，判定為壞檔直接刪除重建）。重派時明確要求 agent 先讀已存在檔案並**獨立驗證**是否正確（不可盲目信任也不可盲目丟棄），結果兩者皆確認品質良好、僅需補完缺少的 CLI+test，未發現需要修正之處——critic 事後獨立複驗這個「繼承並驗證」判斷本身也成立。
+
+`strategy.bcg_matrix` 的 `quadrant` 是 GENUINE_COMPUTE 4 格查表（growth×relative_share 兩軸 HIGH/LOW → STAR/CASH_COW/QUESTION_MARK/DOG，真實標準 BCG 矩陣），建構子無此參數。`strategy.blue_ocean` 的 CREATE 動作與既有競爭因素（ELIMINATE/REDUCE/RAISE）結構不對稱——`industry_standard_level` 對後三者必填、對 CREATE 則**鍵值本身不得出現**（非僅為 null），builder 與 schema if/then 雙層強制，critic 手造竄改測試證實兩層皆擋。`strategy.business_model_canvas` 是本家族最大的封閉 SET（Osterwalder 真實九宮格全覆蓋要求），Atlas 原文明訂的「business model hypothesis，非經驗證的 business」限制做成結構強制（`validation_status` 單一合法值列舉，建構子完全無此參數可傳，非僅文件揭露）。`strategy.value_proposition_canvas` 的 `fit_type` 是本 session 第三個 referential integrity + GENUINE_COMPUTE 設計（前兩個是 tows／stp）——由 `reliever_or_creator_id`／`pain_or_gain_id` 兩個真實引用各自解析到的集合交叉推導，critic 手造竄改（讓兩者不一致）證實獨立 gate 真的抓到。
+
+critic 覆審（0 Critical/0 Major/0 Minor，僅 1 個非程式碼 suggestion：提醒收工後記得關閉 TASKS.md 收件匣項目，已於本條目一併結案）。verdict=PASS，F08 家族連續第三批 0 Critical/0 Major。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_bcg_matrix tests.unit.test_blue_ocean tests.unit.test_business_model_canvas tests.unit.test_value_proposition_canvas` | exit=0 | result=222 tests OK
+REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit`（product-root 全 regression）| exit=0 | result=7190 tests OK，423s
+REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec-root）| exit=0 | result=PASSED 3296，ALL GOLDEN TESTS PASSED
+REALTEST_EVIDENCE: tool=Bash | cmd=4 個 `python -m ai_lego.apps.cli.run_{name}_slice` | exit=0 | result=4 個 CLI 全部 PASS，各自拒絕證明＋獨立 gate 抓包證明皆真跑
+REVIEW_DONE: critic=Standard（獨立 subagent，逐檔全讀 4 contract+4 schema+4 module+4 CLI+4 test+`strategy/__init__.py`，真跑 222 測試+4 CLI+全 regression(7190)+golden(3296)，親自手造 4 個 hand-tamper PoC（BCG 4 格查表手算、Blue Ocean CREATE 不對稱竄改、business_model_canvas「繼承驗證」主張獨立複驗、VPC fit_type 不匹配竄改）+全 schema additionalProperties 程式化掃描）| verdict=PASS | findings=0c/0m/0minor/1 非程式碼 suggestion
+BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`strategy\.bcg_matrix\|strategy\.blue_ocean\|strategy\.business_model_canvas\|strategy\.value_proposition_canvas\|BcgMatrixAnalysis\|BlueOceanAnalysis\|BusinessModelCanvas\|ValuePropositionCanvas` | hits=僅本批次新建檔案 20 個+registry+`strategy/__init__.py`+交接包+TASKS.md，critic 獨立複驗零孤兒引用零命名碰撞，14 個 `strategy.*.contract.yaml` 全數在磁碟上確認存在
+WORKLOG_DONE: 本條目
+
+[rollback]
+`git revert` 本次 commit：4 個新方法的 contract/schema/module/CLI/test（共 20 個新檔）+ `strategy/__init__.py`／`contract-backlog.yaml` 的追加內容全部移除。純新增，無 schema breaking change，可安全回滾。
+
+## 2026-09-11 第三批（客服系統 U6：Chatwoot webhook 接線 code-complete + 計費橋接 + critic 抓 1 Critical/5 Major 全修）
+
+**觸發**：延續本日早前「客服系統平台化」（組織層級 0073/0075 + 計費 ADR 012 衝突撤回，見上方條目）。操作者裁示 ADR 012 衝突處理方式後（"你把它處理好"），繼續往下做 U6 剩餘缺口：BUILD_PLAN 早就標記「剩工作：裝 Chatwoot + 接 chatwoot-webhook route + MockTransport 換 ChatwootTransport」，但 grep 後發現**連 webhook route 本身都不存在**——`lib/cs-widget/chatwoot-transport.ts`（widget 出站半邊）程式碼完成已久，但 AgentBot 進站半邊（Chatwoot→我方 handleInbound→送回 Chatwoot）完全沒建。
+
+**計費決策落地（承接上一條目「你把它處理好」）**：不正式採用仍是「提案」狀態的 ADR 012（8 系統範圍,非本次操作者拍板),改用橋接方案——`lib/cs/billing.ts` 直接重用既有 `media_credit_reserve`（0066),用 `reference_type='cs_reply'` 標記用量,**不建第二套 ledger**;org 沒有 `media_billing_accounts` 列 = 視為未開通計費,直接放行(避免現有金絲雀用量因為這次改動被靜默擋掉)。ADR 012 本身狀態不變,留給操作者或專門 session 決定是否正式採用。
+
+**新建**：`lib/cs/chatwoot-client.ts`(HMAC 驗簽+送出/私有草稿/轉真人 API)、`lib/cs/billing.ts`(計費橋接)、`app/api/webhooks/chatwoot/route.ts`(AgentBot webhook 進站)、`lib/cs/__tests__/chatwoot-client.test.ts`(7 測,純函式簽章驗證)。**改動**：`lib/cs/types.ts`+`cis.ts` 加 `ChatwootConfig`(client_config.chatwoot 讀取,沿用既有 brandKit/csVoice 慣例,無新表);`lib/cs/db.ts` 加 `findOrganizationIdByChatwootAccountId`(JSONB 路徑查詢,無獨立 mapping 表)+ `claimMessage`(原子 claim,取代原本的 `hasProcessedMessage` check-then-act)+ `recordReply` 的 upsert 移除 `ignoreDuplicates:true`(改為允許覆寫,見下方 critic 修復)。
+
+**critic Deep review（1 個 subagent,讀 4 新檔+相關既有檔全文)**：1 Critical + 5 Major + 3 Minor + 2 建議,**Critical 與 3 個 Major 已修,2 個 Major 記為後續（需新 migration/模組,非本次範圍)**：
+- **C1（已修)**：`billing.ts` 原把 Chatwoot 短數字 message id 直接當 `idempotency_key` 傳給 `media_credit_reserve`——0066 的 CHECK 要求長度 8-128,任何 <8 位數 id 必噴錯,而 `billing.ts` 自己的 fail-open 邏輯會把這個錯**完全吞掉**(回報 allowed=true,零信號)——等於「計費橋接從第一天就是完全無效的假計費」。同時裸 id 跨 org 會撞號(0066 對此有專門的跨租戶擋錯)。**修法**：idempotency_key 改成 `` `cs:${organizationId}:${messageId}` ``,一次解決長度+跨租戶碰撞。
+- **M1（已修)**：webhook route 原本是「先查 `hasProcessedMessage` 再跑 pipeline」的 check-then-act,`CS_TIMEOUTS` 允許 pipeline 跑 30-60 秒+,Chatwoot 重送很可能在這個窗口內發生,兩個並發請求都會通過檢查、各自呼叫 Chatwoot 送出→**客戶收到兩則(可能矛盾的)AI 回覆**。**修法**：改成 `claimMessage`——對既有 `cs_ai_replies` 唯一鍵做真正的 INSERT(非 upsert),靠 Postgres unique constraint 原子決勝負,輸的那個直接 return deduped、完全不跑 pipeline。副作用:`recordReply` 的 upsert 改成允許覆寫(移除 `ignoreDuplicates`),否則 claim 寫的 placeholder(`action:'handoff'`)永遠不會被真正決策覆寫過去。
+- **M2（已修)**：`loadWebhookSecret`→`getSecret`(vault)在簽章驗證**之前**呼叫,vault RPC 若瞬斷會直接 throw、繞過整個 try/catch,變成 uncaught 500——正是這個 route 檔頭宣稱要避免的「重送風暴」場景。**修法**:vault 邊界處(`chatwoot-client.ts`)自己 try/catch 吞掉,回 null,符合 `lib/cs/` 全部「degrade,never throw」的既有慣例。
+- **M3（已修,認證 oracle)**：原本「帳號不存在→404」vs「簽章錯誤→401」狀態碼可區分,讓沒有任何憑證的外部呼叫方可以枚舉哪些 Chatwoot account id 真的接了 tenant。**修法**:兩種情況統一回同一個 401,用 Sentry(非 HTTP 回應)區分除錯。
+- **M4（已修,連帶抓到的 minor)**：送出分支沒對到(理論上不會發生但沒有防線)時回應仍宣稱 `sent:true`——改成真正追蹤 `sent` 布林,對不到分支時 `Sentry.captureException` 而非假裝成功。連帶把「送出失敗但決策已寫入」的分支也接上 `Sentry.captureException`(原本只回 502 給 Chatwoot,沒有任何人類可見信號——本系統的安全故事「不確定就轉真人」建立在轉真人一定送達的前提上,送達失敗卻無聲正是這個故事要防的漏洞)。
+- **M5/剩餘風險（未修,記錄留後續)**：① `findOrganizationIdByChatwootAccountId` 的 JSONB 查詢沒有唯一性保證——兩個 org 誤設同一個 accountId 會讓流量無聲跑錯 tenant,修法需要一個 partial unique index(新 migration,超出本次範圍)②公開 webhook endpoint 完全沒有 rate limit(`middleware.ts` 排除了 `api/webhooks` 的 session 檢查,連帶也沒有既有的 5次/10分 rate limiter),需接 `lib/collect/net/rate-limit.ts`。兩項皆記入 TASKS.md 待辦。
+
+**[已修改]**：見上「新建」/「改動」清單。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (全專案) | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/cs` | exit=0 | result=4 files / 52 tests 全過(含新增 7 測)
+- REALTEST_WAIVED: NA -- 無法對真實 Chatwoot 實測(U6 尚未裝機,跟 U4 widget/`chatwoot-transport.ts` 當時同一個處境),等實機部署才能端到端驗證
+- REVIEW_DONE: critic=Deep(1 個獨立 subagent,讀 4 新檔+orchestrator/types/cis/config/middleware/secret-vault/readRequestBody/0051/0066 全文)| verdict=pass(修後,High risk on v1)| findings=1c/5m/3n,1 Critical+3 Major 已修,2 Major 記錄為後續(需新 migration/新模組)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`findOrganizationIdByChatwootAccountId\|reserveCsCredit\|verifyChatwootSignature\|hasProcessedMessage\|loadSecrets` | hits=新符號僅存在於新檔案本身(預期,無孤兒呼叫點);`hasProcessedMessage`/`loadSecrets`(已移除的舊名)全庫 0 殘留引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：
+- U6 實際裝機(docker-compose 上 ks-aw-01)完全還沒動工——這條目只完成「程式碼準備好接線」,不是「Chatwoot 已經在跑」。High-risk gate(部署)未變,仍需操作者 go-ahead。
+- `client_config.chatwoot`(accountId+baseUrl)+ vault 內 `cs:chatwoot:{org}:api_token`/`webhook_secret` 目前**沒有任何寫入介面**——只有讀取端(`cis.ts`/`chatwoot-client.ts`),要接線時得手動 SQL/vault CLI 寫入,或另建一個小的設定表單(未排入本次範圍)。
+- accountId 唯一性 + webhook endpoint rate limit 兩項 M5 待辦已記 TASKS.md。
+- 0073/0075(組織層級 migration)+ 本條目的 code 改動,兩者都還沒套用/部署到 prod——都在等操作者對「該不該現在動」的明確 go-ahead。
+
+**Rollback**：全部是新檔案 + `lib/cs/db.ts`/`types.ts`/`cis.ts` 的純新增(無刪除既有欄位/函式,`recordReply` 的 `ignoreDuplicates` 移除是唯一的既有行為變更,經 grep 確認唯一呼叫路徑是 orchestrator.persist,安全)。`git diff` 三個既有檔 + `rm` 三個新檔即可完全還原。
+
 ## 2026-09-11 第二批（ADR 013 + 降級階 + 蒐集 C2）
 
 操作者三項決定：discovery 進 Corpus 但走「候選來源→人核准」第三條路並寫進 ADR；降級階供應商由我決定；`author`／`content_type` 兩個欄位採納。

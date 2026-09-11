@@ -1,0 +1,107 @@
+$id: "ai-lego://methods/contracts/strategy.bcg_matrix.contract.yaml"
+title: "BCG Growth-Share Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 context/strategy family, 14th and final member (10/14 already built: swot/pestel/steepv/
+  three_c/tows/porter_five_forces/vrio/value_chain/stp/ansoff). Atlas cites this method ONCE: F08 table
+  row L525 ("BCG｜Portfolio 資源配置｜growth×relative share｜快速產品組合討論｜GE-McKinsey") -- grep-confirmed
+  the only hit, no dedicated section. Core invariant: `portfolio_items` non-empty (open-ended list, NOT a
+  fixed closed set like porter/ansoff/vrio); each item's `quadrant` (STAR/CASH_COW/QUESTION_MARK/DOG) is
+  GENUINE_COMPUTE from its own disclosed `growth_rate`x`relative_share`, never caller-supplied. See
+  `ai_lego/modules/strategy/bcg_matrix.py` module docstring for the real standard BCG 2x2 mapping.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, BCG row (L525)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: strategy.bcg_matrix` mints a NEW machine_id; `family: strategy` reused
+  as F08's 14th and final member. `portfolio_items[].quadrant` is a real, independently-verified standard
+  BCG Growth-Share Matrix classification (growth rate x relative market share, 2x2 -- Stars/Cash Cows/
+  Question Marks/Dogs), not an Atlas-cited formula -- see compilation_decisions.
+
+id: strategy.bcg_matrix
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [DECOMPOSE, ESTIMATE, CLASSIFY]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. DECOMPOSE = splitting the
+# portfolio into individual products/business units; ESTIMATE = per-item growth_rate/relative_share
+# judgment calls; CLASSIFY (same primitive strategy.vrio/causal.process_tracing already use for their own
+# GENUINE_COMPUTE classification) = the mechanically-derived quadrant.
+
+purpose:
+  - allocate_portfolio_resources_by_growth_and_relative_share
+# Atlas L525 verbatim sense: "Portfolio 資源配置" (portfolio resource allocation) / method "growth×relative
+# share" / benefit "快速產品組合討論" (fast product-portfolio discussion).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- Atlas's own L525 citation names no required input type, same
+  # "no hard upstream dependency" position strategy.ansoff.contract.yaml's own inputs.required: [] takes.
+
+outputs:
+  - BcgMatrixAnalysis
+# NEW output type (see typed-objects/bcg-matrix-analysis.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "portfolio_items is present and non-empty -- a BCG analysis with zero products has not actually allocated any portfolio resources (Atlas's own L525 purpose: 'Portfolio 資源配置')"
+  - "every portfolio_items[] entry carries a non-empty item_name and disclosed growth_rate/relative_share assessments (each HIGH or LOW) with non-empty reasoning -- Atlas's own benefit ('快速產品組合討論') presumes each item is actually assessed, not just listed"
+  - "portfolio_items[].quadrant is GENUINE_COMPUTE, mechanically derived from that item's own growth_rate x relative_share via the real, standard BCG 2x2 classification (HIGH+HIGH=STAR, LOW+HIGH=CASH_COW, HIGH+LOW=QUESTION_MARK, LOW+LOW=DOG) -- never caller-supplied, re-derived independently by the gate from each item's own raw fields"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false, same thin-bare-table-row reasoning strategy.ansoff.contract.yaml's identical flag already
+  # establishes: Atlas's L525 citation for this method is a single bare table row, no dedicated section,
+  # no explicit unevidenced-claim misuse warning cited. See open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice strategy.ansoff.contract.yaml's own field applies.
+
+recommended_next: []
+# Atlas L525's own "最佳搭配" (best combo) column names "GE-McKinsey" -- no strategy.ge_mckinsey /
+# GE-McKinsey-matrix machine_id exists anywhere in this corpus yet (grep-confirmed), so left empty rather
+# than naming a non-existent id. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Fixed 4-name closed SET (porter/ansoff/vrio-style, completeness required) or an open-ended non-empty list?"
+    decision: "Open-ended non-empty list, same shape causal.process_tracing's own non-empty `evidence[]` already establishes -- BCG classifies a PORTFOLIO of products/business units (an unbounded count per Atlas's own 'Portfolio 資源配置' framing), not a fixed structural split like Ansoff's 4 growth paths or Porter's 5 forces."
+  - question: "Should quadrant be a disclosed judgment call (ansoff risk_level-style) or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE -- the real, standard BCG 2x2 table is a mechanical function of the 2 disclosed HIGH/LOW axes (unlike Ansoff, whose 4 quadrant identities are fixed labels, not derived from other fields); builder has no `quadrant` parameter, gate re-derives from each item's own raw growth_rate/relative_share."
+  - question: "Top-level synthesis field (Porter's required overall_attractiveness-style)?"
+    decision: "No -- Atlas's own benefit ('快速產品組合討論') is distributed per-item (each product gets its own quadrant), not a single portfolio-level conclusion, same reasoning strategy.ansoff.contract.yaml's own identical absence already establishes."
+  - question: "Should portfolio_items[] require unique item_name or an id, matching process_tracing's evidence[] id-uniqueness?"
+    decision: "No -- not grounded in Atlas's own citation (no reference-integrity or cross-item lookup need exists for this method, unlike strategy.stp's targeted_segment_id or process_tracing's evidence ids, which are actually referenced elsewhere); inventing a uniqueness rule with nothing to enforce it against would overstate this citation."
+
+open_questions:
+  - "OQ-BCG-1: recommended_next should probably name a future GE-McKinsey-matrix machine_id (Atlas L525's own '最佳搭配' column) once such a contract exists -- left empty, no such contract exists yet (owner: operator, or whoever builds it)."
+  - "OQ-BCG-2: quality.evidence_labeling_required: false reflects this citation's own thinness (a single bare table row) rather than a positive Atlas statement that evidence labeling does not apply -- a future dedicated Atlas section for BCG, if one is ever added, could change this (owner: operator)."
+  - "OQ-BCG-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F08 table row (L525) directly. Grepped the whole Atlas file case-insensitively for "bcg" --
+    confirmed exactly 1 real hit (L525), no dedicated section, no §4 composition formula, no §14.1
+    legal-chain mention, no §22.3 gate-table row. Grepped the whole `ai_lego` tree case-insensitively for
+    "bcg" before writing any of this method's own files -- zero pre-existing implementation. Read
+    strategy.ansoff.contract.yaml (thin-citation, no-top-level-synthesis-field precedent) and
+    causal.process_tracing.py (GENUINE_COMPUTE per-item, non-empty-list, no-builder-parameter precedent)
+    in full before writing this contract. Independently re-verified the real, standard BCG Growth-Share
+    Matrix 2x2 classification (Stars/Cash Cows/Question Marks/Dogs) as well-known business-strategy domain
+    knowledge before encoding it, same discipline strategy.ansoff/strategy.vrio's own sibling contracts
+    already establish. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L525's own "growth×relative share" method description is
+    expanded into the real, standard 2x2 BCG quadrant mapping via independently-verified business-strategy
+    domain knowledge, disclosed above as a compilation decision, not presented as directly Atlas-cited.
+    `cognitive_primitives`, `evidence_labeling_required`'s grounding, and the open-ended-list-without-
+    completeness shape are compilation decisions, disclosed above.

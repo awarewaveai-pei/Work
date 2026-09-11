@@ -1,0 +1,109 @@
+$id: "ai-lego://methods/contracts/strategy.business_model_canvas.contract.yaml"
+title: "Business Model Canvas Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F08 context/strategy family, 11th member (10/14 built before this entry). Atlas cites
+  this method TWICE: F08 table row L527 and dedicated §12.15 (L2715-2734), naming the nine blocks
+  verbatim plus benefit ("完整描述商業運作") and limitation ("business model hypothesis，不是經驗證
+  的 business"). Core invariant: `blocks` must name EXACTLY the 9 Atlas-cited blocks, each once, no
+  position -- same closed-SET-with-completeness shape `strategy.porter_five_forces`/`strategy.vrio`
+  establish, scaled to 9 (largest F08 fixed set yet). Limitation structurally enforced via
+  `validation_status`, a single-legal-value enum the builder never exposes as a parameter.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F08 tool table, Business Model Canvas row (L527)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.15 商業模式圖／商業模式畫布 (L2715-2734) -- nine-block list, benefit, limitation"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Direct transcription of Atlas §12.15's nine-block list into
+  `blocks`'s closed set (see typed-objects/business-model-canvas.schema.yaml).
+  `id: strategy.business_model_canvas` mints a NEW machine_id; `family: strategy` reused as the
+  11th F08 member.
+
+id: strategy.business_model_canvas
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [DECOMPOSE, GROUP, CONTEXTUALIZE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method (grep-confirmed,
+# same absence class every Tier 1 contract with no §4 formula already discloses). DECOMPOSE =
+# splitting business operation into the 9 blocks; GROUP = organizing content under each block
+# (Atlas §9's own literal primitive vocabulary token); CONTEXTUALIZE = situating the canvas for
+# the specific business being modeled, including the disclosed hypothesis-not-validated limitation.
+
+purpose:
+  - describe_business_model_completely
+# Atlas L527 verbatim sense: "完整描述商業運作" (completely describe business operation).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position
+  # strategy.porter_five_forces.contract.yaml's own inputs.required: [] already takes.
+
+outputs:
+  - BusinessModelCanvas
+# NEW output type (see typed-objects/business-model-canvas.schema.yaml). Atlas names no PascalCase
+# output type for this method, same honesty gap every other Tier 1 contract discloses.
+
+preconditions:
+  - "blocks is present and names EXACTLY the 9 Atlas §12.15 blocks (CUSTOMER_SEGMENTS, VALUE_PROPOSITIONS, CHANNELS, CUSTOMER_RELATIONSHIPS, REVENUE_STREAMS, KEY_RESOURCES, KEY_ACTIVITIES, KEY_PARTNERS, COST_STRUCTURE), each exactly once, in any order -- a record missing even one of the 9 has not actually delivered '完整描述商業運作', Atlas's own stated benefit IS the completeness of this nine-way split"
+  - "every blocks[] entry carries non-empty disclosed content -- a block named but left empty has not described that part of the business"
+  - "validation_status is present and equals the single legal enum value UNVALIDATED_HYPOTHESIS -- Atlas §12.15's own stated limitation ('它是 business model hypothesis，不是經驗證的 business') is unconditionally true of every record this method produces, never caller-overridable"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+  # evidence_labeling_required is an INFERRED generalization (disclosed, not directly Atlas-cited
+  # for THIS method): §12.15 gives no explicit misuse warning. Grounded by same-family analogy to
+  # strategy.porter_five_forces.contract.yaml/strategy.vrio.contract.yaml's identical flag -- an
+  # unevidenced "our value proposition is X" claim is the same hazard class those methods already
+  # guard against, generalized to a 3rd F08 evidence-backed descriptive method. See open_questions.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed). Same
+# empty-and-disclosed choice several sibling F08 contracts' own field already takes.
+
+recommended_next: []
+# Atlas L527's own "最佳搭配" (best combo) column names "Unit Economics" -- no strategy.unit_economics
+# machine_id exists anywhere in this corpus yet (grep-confirmed), so left empty rather than naming a
+# non-existent id. Same disclosed-gap class strategy.porter_five_forces's own missing-Benchmark
+# disclosure already establishes. See open_questions.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Closed SET (porter_five_forces/vrio-style, completeness required, no position) or positional TUPLE (logic_model-style)?"
+    decision: "Closed set, completeness required, no position -- Atlas §12.15's own nine-block list is a flat block of text, not a cited pipeline sequence."
+  - question: "Should Atlas §12.15's own stated limitation ('business model hypothesis，不是經驗證的 business') be mechanically enforced or documentation-only?"
+    decision: "Mechanically enforced -- a required `validation_status` field with a single legal enum value (UNVALIDATED_HYPOTHESIS), structurally eliminated from the builder's parameters (same no-caller-settable-mismatch pattern strategy.vrio's `competitive_implication` and strategy.tows's `pairing_type` already establish). Unlike porter_five_forces's own digital-platform limitation (instance-dependent, no structural test exists), this limitation is unconditionally true of every BMC record, making it a good candidate for schema-level enforcement rather than disclosure-only."
+  - question: "Should each block carry an evaluative judgment (e.g. porter_five_forces's HIGH/MEDIUM/LOW intensity)?"
+    decision: "No -- Atlas §12.15 cites no evaluative dimension for BMC blocks, only descriptive content; inventing one would have no citation basis."
+
+open_questions:
+  - "OQ-BUSINESSMODELCANVAS-1: `recommended_next` should probably name a future `strategy.unit_economics` machine_id (Atlas L527's own '最佳搭配' column names \"Unit Economics\") once that method exists -- left empty, no such contract exists yet (owner: operator, or whoever builds strategy.unit_economics)."
+  - "OQ-BUSINESSMODELCANVAS-2: `quality.evidence_labeling_required: true` is an inferred same-family generalization from strategy.porter_five_forces/strategy.vrio's identical flag, not a direct Atlas citation for this method specifically (owner: operator)."
+  - "OQ-BUSINESSMODELCANVAS-3: `cognitive_primitives` is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F08 table row (L527) and §12.15 (L2715-2734) directly at the cited lines. Grepped the
+    whole Atlas file case-insensitively for "Business Model Canvas"/"商業模式" -- confirmed exactly
+    these 2 real hits (table row + dedicated section), no §4 composition formula, no §14.1 legal-chain
+    mention, no §22.3 gate-table row. Grepped the whole `ai_lego` tree and this docs tree
+    case-insensitively for "business_model_canvas"/"BMC" before writing any of this method's own
+    files: zero pre-existing implementation (only doc references -- architecture-inventory.yaml,
+    ADR-008, MOTHER_DOC_SECTION_INDEX.md, method-inventory.yaml, and
+    ai_lego/modules/strategy/__init__.py's own "Remaining 4" roadmap comment -- none is a real
+    contract/schema/module). Read strategy.porter_five_forces.contract.yaml and
+    strategy.vrio.contract.yaml in full before writing this contract, reusing their established
+    conventions. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas §12.15's nine-block list and stated benefit/limitation
+    are transcribed verbatim into `preconditions`/`quality`/`open_questions`. `cognitive_primitives`,
+    `evidence_labeling_required`'s grounding, and the structural enforcement of `validation_status`
+    are compilation decisions, disclosed above, not presented as directly Atlas-cited.
