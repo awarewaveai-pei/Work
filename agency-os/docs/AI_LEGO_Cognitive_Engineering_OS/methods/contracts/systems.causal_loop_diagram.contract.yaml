@@ -1,0 +1,100 @@
+$id: "ai-lego://methods/contracts/systems.causal_loop_diagram.contract.yaml"
+title: "Causal Loop Diagram Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F09 systems-thinking family (Atlas L309: "系統如何互相影響？"), OPENING member (grep-confirmed: no
+  `systems.*` contract or `ai_lego/modules/systems/` implementation existed before this batch). Covers the
+  family's opening tool-table row (L545: "Causal Loop Diagram｜找 feedback loops｜變數→+/- 因果箭頭→
+  reinforcing/balancing→delay｜揭露非線性與反直覺結果") plus the F09 section's own worked mermaid diagram
+  (L554-562). Core invariant: a loop's REINFORCING/BALANCING classification is never a caller-trusted label --
+  independently recomputed from the loop's own edge polarities (standard system-dynamics parity rule: odd count
+  of "-" edges = BALANCING, even = REINFORCING), same genuine-compute discipline `causal.dag`'s
+  `acyclic_verified` already established for a different structural graph property.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 index row (L309) and tool table, Causal Loop Diagram row (L545)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09's own worked mermaid diagram (L554-562)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: systems.causal_loop_diagram` mints a NEW machine_id AND a NEW `family:
+  systems` (F09's first built member -- no prior `systems.*` contract exists in this corpus, grep-confirmed).
+  Variables/edges/loops graph shape, the loop_type recompute rule, and record-level-only provenance placement
+  are this file's own compilation decisions -- see `compilation_decisions`.
+
+id: systems.causal_loop_diagram
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [MAP, RELATE, CAUSE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. MAP identifies the variables;
+# RELATE draws the +/- causal arrows between them; CAUSE classifies the resulting cycle's feedback character.
+
+purpose:
+  - identify_feedback_loops_in_a_system
+# Atlas L545 verbatim sense: find feedback loops via variables -> +/- causal arrows -> reinforcing/balancing
+# classification -> delay.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this corpus (e.g. stakeholders.game_theory, insight.jtbd) already takes; this method
+  # starts from a fresh system-mapping exercise.
+
+outputs:
+  - CausalLoopDiagram
+# NEW output type (see typed-objects/causal-loop-diagram.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "variables has at least 2 entries, each with a non-empty id and name, and no duplicate id -- a causal loop needs at least two variables to relate"
+  - "edges is non-empty, each with a valid polarity ('+' or '-') and from/to references that resolve to real variables entries, no duplicate id -- Atlas L545's own '+/- 因果箭頭' stage"
+  - "every loops entry's edge_ids reference real edges entries and form a genuinely closed cycle (each edge's to chains into the next edge's from, wrapping back to the first) -- a bag of edge ids that does not close is not a feedback loop"
+  - "every loops entry's claimed loop_type equals the value independently recomputed from its own edges' polarities -- the real invariant this method exists to enforce; loops itself may be empty (a diagram may map variables/edges without yet closing a cycle)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to "claims inside this method's outputs that
+  # originate from EvidenceSet input" (an upstream typed-object this method does not take: inputs.required: []).
+  # This method's real risk (a mislabeled loop_type) is enforced structurally instead -- see the dedicated
+  # loop_type_integrity gate, not a per-claim evidence label.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next:
+  - systems.stock_and_flow
+# Atlas L546's own next tool-table row: once feedback loops are qualitatively mapped, Stock & Flow is the
+# natural next step to enter dynamic simulation ("可進入動態模擬").
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should loop_type be a caller-set free value, or independently recomputed?"
+    decision: "Independently recomputed by the runtime module from the loop's own edges' polarities; a caller-claimed value that disagrees is refused before construction -- same genuine-compute discipline causal.dag's acyclic_verified already established."
+  - question: "Should edges/loops carry their own provenance, or only the overall record?"
+    decision: "Record-level only, one top-level `provenance` field -- same placement stakeholders.game_theory.contract.yaml's own compilation_decisions establishes; a CausalLoopDiagram's fields describe one coherent system model, not independently-sourced items."
+  - question: "Should loops reference edges by array position or by a stable edge id?"
+    decision: "Stable edge id (edges[].id), referenced by loops[].edge_ids -- position-based reference would silently break on any edges[] reorder."
+
+open_questions:
+  - "OQ-CLD-1: Atlas L545 names 'delay' as a fourth pipeline stage after reinforcing/balancing classification; this contract's output type has no delay field -- task-scoped exclusion, not an oversight (owner: operator, or whoever next revises causal-loop-diagram.schema.yaml)."
+  - "OQ-CLD-2: cognitive_primitives [MAP, RELATE, CAUSE] is this file's own inference, not a cited Atlas composition formula (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F09 index row (L309), tool table (L543-551), and the worked mermaid diagram (L554-562) directly
+    at the cited lines. Grepped the full spec root (specs/**, methods/**) and the runtime tree case-insensitively
+    for "causal loop"/"causal_loop"/"feedback loop"/"stock and flow"/"systems thinking" before writing this
+    contract: two incidental hits (decision.schema.yaml's unrelated "Decision Feedback Loop" lifecycle concept,
+    method-inventory.yaml's own pending placeholder row for this method) -- neither defines this method's own
+    output shape. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The tool-table pipeline and the worked diagram's exact edges/polarities are
+    transcribed verbatim from Atlas L543-551/L554-562. `cognitive_primitives`, the loop_type recompute rule, and
+    the record-level-only provenance placement are this file's own Phase 3-class compilation decisions,
+    disclosed above.

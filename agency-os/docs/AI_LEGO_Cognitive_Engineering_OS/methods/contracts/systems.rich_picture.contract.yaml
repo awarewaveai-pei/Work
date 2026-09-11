@@ -1,0 +1,95 @@
+$id: "ai-lego://methods/contracts/systems.rich_picture.contract.yaml"
+title: "Rich Picture Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F09 systems-thinking family (Atlas L549: "Rich Picture｜自由畫 actors/process/conflict｜問題尚無法
+  形式化時｜建立複雜問題共同理解"). Core invariant: at least 1 actor AND at least 1 issue -- an empty rich
+  picture captured nothing -- and every `issues[].involves_actor_ids` is non-empty and resolves to a real
+  declared `actors[]` id (referential integrity, dangling reference refused). See
+  `ai_lego/modules/systems/rich_picture.py` for the full two-layer enforcement.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 tool table, Rich Picture row (L549)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: systems.rich_picture` mints a NEW machine_id inside the NEW
+  `family: systems` (F09, 1 of 2 members this agent opens in a parallel batch alongside
+  `systems.systems_archetypes` -- no prior `systems.*` contract exists in this corpus at batch start,
+  grep-confirmed). The flat actors/issues shape and record-level-only provenance are this file's own
+  compilation decisions -- see `compilation_decisions`.
+
+id: systems.rich_picture
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [MAP, ASSOCIATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this method). MAP = the row's own defining
+# verb ("自由畫" -- freely draw/map actors, processes, conflicts); ASSOCIATE = linking issues to the actors
+# they involve. Both CANONICAL_KERNEL members.
+
+purpose:
+  - build_shared_understanding_of_an_unformalized_problem_via_actors_and_issues
+# Atlas L549 verbatim sense: 用途「自由畫 actors/process/conflict」/ 使用方式「問題尚無法形式化時」/ 效益「建立
+# 複雜問題共同理解」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- the row's own trigger is precisely "problem not yet formalized",
+  # i.e. no prior structured input exists.
+
+outputs:
+  - RichPictureRecord
+# NEW output type (see typed-objects/rich-picture.schema.yaml). Atlas names no PascalCase output type for
+# this method.
+
+preconditions:
+  - "actors is a list of at least 1 well-shaped {id, name} entry with unique ids -- an empty picture captured no one"
+  - "issues is a list of at least 1 well-shaped {id, description, involves_actor_ids} entry with unique ids -- an empty picture captured no tension"
+  - "every issues[] entry's involves_actor_ids has at least 1 entry, and every entry resolves to a real id declared in this record's own actors -- a dangling reference to an actor who was never drawn is refused (referential integrity)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- this method takes no EvidenceSet input (inputs.required: []), same reasoning
+  # stakeholders.coalition_mapping.contract.yaml's own identical false already discloses for its own
+  # no-input sibling.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's F09 table draws no chain arrow from Rich Picture to another row (no 最佳搭配 column on this
+# table). Left empty rather than picking an arbitrary sibling F09 method with no textual chain evidence.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should both actors and issues each require a structural floor of >=1, or may either be empty?"
+    decision: "Both >=1, required. Atlas's own row frames Rich Picture as capturing 'actors/process/conflict' when a problem is not yet formalized -- a record naming zero actors or zero issues did not actually build the shared understanding this method exists for, same 'floor tied to the method's own defining structural point' reasoning association.concept_map.contract.yaml's own edges:minItems 1 already establishes."
+  - question: "Should involves_actor_ids require >=2 unique members (a 'conflict' by definition involves multiple parties), matching coalition_mapping's own >=2 coalition-member floor?"
+    decision: "No -- >=1 is sufficient. Atlas's own row names 'conflict' as one example among 'actors/process/conflict', not the only content an issue may capture; a single-actor concern (e.g. one actor's own unmet need) is still a legitimate rich-picture issue. Task-mandated floor, not inferred from coalition_mapping's different (explicitly multi-party) semantics."
+  - question: "Should this method itself generate/layout the picture (e.g. spatial coordinates), or only validate caller-supplied actors/issues?"
+    decision: "Validate-only, same 'no invented algorithm' scope stakeholders.coalition_mapping.contract.yaml's own identical decision already discloses -- Atlas's row gives no layout algorithm, only a free-drawing activity."
+
+open_questions:
+  - "OQ-RICHPIC-1: recommended_next is empty -- Atlas's F09 table draws no chain arrow from Rich Picture to another row (owner: operator)."
+  - "OQ-RICHPIC-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-RICHPIC-3: Atlas's own 'process' element (actors/process/conflict) has no dedicated field in this record -- only actors and issues are modeled, per this task's own exact 2-object brief; a future revision could add a processes[] array if a real citation or downstream consumer needs one (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F09 table row (L549) directly. Grepped the whole Atlas file and the full spec root
+    case-insensitively for "rich picture"/"archetype" before writing any of this batch's files -- zero
+    pre-existing implementation (only the table row itself and the `method-inventory.yaml`/
+    `contract-backlog.yaml` backlog entries, both read, neither edited). Read
+    `stakeholders.coalition_mapping.contract.yaml` (closest referential-integrity precedent, actors/issues ==
+    profiles/scenarios shape) in full before writing this contract. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The flat actors/issues shape, the >=1-not->=2 involves_actor_ids floor,
+    and the validate-only scope are this file's own compilation decisions, disclosed above, not presented as
+    directly Atlas-cited beyond the literal table-row wording quoted verbatim.

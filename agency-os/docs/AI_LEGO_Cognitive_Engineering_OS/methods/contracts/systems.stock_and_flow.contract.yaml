@@ -1,0 +1,95 @@
+$id: "ai-lego://methods/contracts/systems.stock_and_flow.contract.yaml"
+title: "Stock & Flow Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F09 systems-thinking family (Atlas L309: "系統如何互相影響？"), second member this batch (after
+  `systems.causal_loop_diagram`). Covers the family's second tool-table row (L546: "Stock & Flow｜建模累積量與
+  流量｜stocks→in/out flows→rates→equations｜可進入動態模擬"). Core invariant: every declared stock must be
+  touched by at least one flow -- Atlas's own "stocks->in/out flows" sequence means a stock nothing flows into
+  or out of has not actually been modeled as a stock-and-flow element, not merely declared as a placeholder --
+  plus standard referential integrity (`flows[].target_stock_id` must resolve to a real `stocks[]` entry, same
+  `edges->nodes` pattern `causal.dag` already established).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 tool table, Stock & Flow row (L546)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: systems.stock_and_flow` mints a NEW machine_id in the `family: systems`
+  opened by `systems.causal_loop_diagram.contract.yaml` (same batch). Flat stocks/flows record shape, the
+  >=1-flow-per-stock completeness rule, and record-level-only provenance placement are this file's own
+  compilation decisions -- see `compilation_decisions`.
+
+id: systems.stock_and_flow
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [MAP, RELATE, SIMULATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. MAP identifies the stocks;
+# RELATE names the in/out flows connecting them; SIMULATE is the table row's own stated benefit ("可進入動態
+#模擬" -- can enter dynamic simulation).
+
+purpose:
+  - model_stocks_and_flows_for_dynamic_simulation
+# Atlas L546 verbatim sense: model accumulations and flows via stocks -> in/out flows -> rates -> equations,
+# enabling entry into dynamic simulation.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position systems.causal_loop_diagram
+  # and every other opening-member Tier 1 contract in this corpus already takes.
+
+outputs:
+  - StockAndFlowModel
+# NEW output type (see typed-objects/stock-and-flow-model.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "stocks is non-empty, each with a non-empty id and name and a finite real initial_value (bool excluded), no duplicate id -- Atlas L546's own 'stocks' stage"
+  - "flows is non-empty, each with a valid direction (IN or OUT), a non-empty rate_description, and a target_stock_id that resolves to a real stocks entry, no duplicate id -- Atlas L546's own 'in/out flows' and 'rates' stages plus referential integrity"
+  - "every stocks entry is referenced by at least one flows entry's target_stock_id -- the real invariant this method exists to enforce; a declared stock nothing flows into or out of is not a modeled stock-and-flow element"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to "claims inside this method's outputs that
+  # originate from EvidenceSet input" (an upstream typed-object this method does not take: inputs.required: []).
+  # This method's real risk (a dangling reference or a flow-less stock) is enforced structurally instead -- see
+  # the dedicated stock_flow_integrity gate, not a per-claim evidence label.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F09 tool table names no explicit downstream chain for Stock & Flow specifically (next row, Iceberg
+# Model, has no contract in this corpus yet -- left empty rather than citing an unbuilt method id, same
+# restraint stakeholders.game_theory.contract.yaml's own empty recommended_next already applies).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should a stock with zero associated flows be legal, e.g. as a placeholder?"
+    decision: "No -- refused at construction. Atlas's own stocks->in/out flows sequence names flows as what makes a stock a modeled stock-and-flow element at all, not an optional annotation."
+  - question: "Should flows[].rate_description be a structured rate expression, or free text?"
+    decision: "Free text. Atlas gives no rate-equation grammar for this method -- inventing one would be presenting a guess as a compiled fact, same restraint pareto-analysis.schema.yaml's undefaulted threshold already established."
+  - question: "Should stocks/flows carry their own provenance, or only the overall record?"
+    decision: "Record-level only, one top-level `provenance` field -- same placement systems.causal_loop_diagram.contract.yaml's own compilation_decisions establishes; a StockAndFlowModel's fields describe one coherent system model, not independently-sourced items."
+
+open_questions:
+  - "OQ-SNF-1: Atlas L546 names 'equations' as a pipeline stage after rates; this contract's output type has no equations/formula field -- task-scoped exclusion, not an oversight (owner: operator, or whoever next revises stock-and-flow-model.schema.yaml)."
+  - "OQ-SNF-2: cognitive_primitives [MAP, RELATE, SIMULATE] is this file's own inference, not a cited Atlas composition formula (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F09 tool table (L543-551), Stock & Flow row (L546), directly at the cited line. Grepped the full
+    spec root (specs/**, methods/**) and the runtime tree case-insensitively for "stock and flow"/"stock_and_flow"/
+    "SNF-" before writing this contract: zero pre-existing implementation, zero contract-backlog entry
+    (method-inventory.yaml's own F09 row for this method is a `contract_status: pending` placeholder, not a real
+    prior definition). Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The stocks->in/out flows->rates pipeline is a direct transcription of Atlas
+    L546. `cognitive_primitives`, the >=1-flow-per-stock completeness rule, and the record-level-only provenance
+    placement are this file's own Phase 3-class compilation decisions, disclosed above.

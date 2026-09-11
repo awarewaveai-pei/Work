@@ -1,0 +1,87 @@
+$id: "ai-lego://methods/contracts/systems.leverage_point_analysis.contract.yaml"
+title: "Leverage Point Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F09 systems-thinking family (Atlas L541-552), first built member. Atlas F09 table row (L550:
+  "Leverage Point Analysis｜找高槓桿干預點｜parameters→feedback→rules→goals→paradigm｜提升資源效益") -- a
+  simplification of Donella Meadows' leverage-points hierarchy into a 5-tier chain. Core invariant: `tier` is a
+  closed enum over that exact 5-tier chain, and `tier_rank` (1-5, shallower-to-deeper leverage) is
+  GENUINE_COMPUTE -- mechanically derived from `tier`, never caller-supplied -- so an `intervention_points[]`
+  entry can never claim a rank disagreeing with its own declared tier.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Leverage Point Analysis row (L550)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: systems.leverage_point_analysis` mints a NEW machine_id, first member of a
+  NEW `family: systems` (grep-confirmed no prior contract or implementation anywhere in this corpus). The
+  PARAMETERS/FEEDBACK/RULES/GOALS/PARADIGM tier enum and its 1-5 rank mapping are this file's own compilation
+  decisions -- see `compilation_decisions`.
+
+id: systems.leverage_point_analysis
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [PRIORITIZE, OPTIMIZE, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. PRIORITIZE = the method's own
+# purpose ("找高槓桿干預點" -- find the highest-leverage intervention points); OPTIMIZE = Atlas's own stated
+# benefit ("提升資源效益" -- improve resource efficiency by targeting deeper leverage); EXPLAIN = articulating
+# each intervention point's description, not a bare tier label.
+
+purpose:
+  - find_the_highest_leverage_intervention_points_in_a_system
+# Atlas L550 verbatim sense: find intervention points across parameters -> feedback -> rules -> goals ->
+# paradigm, to improve resource efficiency (higher tiers = deeper, more resource-efficient leverage).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this corpus takes; Atlas names no required input type for this method.
+
+outputs:
+  - LeveragePointAnalysis
+# NEW output type (see typed-objects/leverage-point-analysis.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "intervention_points has at least 1 entry, each with a non-empty description and a tier in {PARAMETERS, FEEDBACK, RULES, GOALS, PARADIGM} -- an analysis naming zero intervention points has not actually run the method"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no required input (inputs.required: []), so there is no upstream EvidenceSet to ground against.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F09 table row names no single downstream method for Leverage Point Analysis specifically.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should tier_rank be caller-supplied or mechanically derived from tier?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) via a fixed total mapping (PARAMETERS=1, FEEDBACK=2, RULES=3, GOALS=4, PARADIGM=5) -- same idiom challenge.fmea's own rpn and challenge.pre_mortem's own priority already establish; never an accepted builder parameter."
+  - question: "Should the 5-tier chain be a closed enum or free text?"
+    decision: "Closed enum, Atlas's own literal chain order (parameters→feedback→rules→goals→paradigm) transcribed verbatim -- the method's entire point is that these 5 tiers form an ordered hierarchy, not an open-ended list."
+
+open_questions:
+  - "OQ-LEVERAGEPOINT-1: Atlas gives no worked numeric example for this row (unlike causal-loop's own mermaid diagram) -- the 1-5 rank mapping is this file's own direct transcription of the tier chain's own left-to-right order, not independently Atlas-cited as numbers (owner: operator)."
+  - "OQ-LEVERAGEPOINT-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F09 table row (L550) directly at the cited line, plus the surrounding F09 section (L541-562) for
+    context. Grepped the whole Atlas file and the full spec root (specs/**, methods/**) case-insensitively for
+    "leverage point"/"leverage_point" before writing this contract -- one incidental hit
+    (value-chain-analysis.schema.yaml uses "leverage point(s)" generically in prose, not as a defined method
+    output shape; confirmed by reading that file, no collision). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-tier chain is transcribed verbatim from Atlas L550. `tier_rank`'s
+    1-5 mapping and `cognitive_primitives` are this file's own compilation decisions, disclosed above.

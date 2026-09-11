@@ -1,0 +1,114 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/iceberg-model-analysis.schema.yaml"
+title: Iceberg Model Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `IcebergModelAnalysis` -- the
+  declared `outputs` of `systems.iceberg_model`'s Method Contract
+  (methods/contracts/systems.iceberg_model.contract.yaml, `outputs:
+  [IcebergModelAnalysis]`). F09 systems-thinking family (Atlas L547:
+  "Event->Pattern->Structure->Mental Model / 由事件往下挖深層結構").
+
+  Four ordered levels, shallow to deep: `events[]` (required, >=1),
+  `patterns[]`, `structures[]`, `mental_models[]`. Atlas's own top-down dig
+  order is enforced as a RUNTIME invariant (not expressible declaratively
+  here across sibling arrays, same disclosed-gap class as game-theory.
+  schema.yaml's own payoff-completeness precedent): a deeper level may only
+  be non-empty if every shallower level already is --
+  `ai_lego/modules/systems/iceberg_model.py` enforces this at both
+  construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Iceberg Model row (L547)"
+  - "methods/contracts/systems.iceberg_model.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/game-theory.schema.yaml -- cross-array-referential-completeness-as-runtime-invariant precedent"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L547's own
+  four-level pipeline plus low-risk, disclosed compilation choices (the
+  ICEBERG- prefix, record-level-only provenance, runtime-invariant placement of
+  the top-down completeness rule).
+
+compilation_decisions:
+  - question: "Top-down completeness (a deeper level requires every shallower level non-empty): JSON Schema keyword or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot cross-check sibling array non-emptiness declaratively, same gap class as game-theory.schema.yaml's own payoff-completeness precedent."
+  - question: "Each level item: a closed structured object (e.g. {statement, confidence}), or a bare string?"
+    decision: "Bare string -- Atlas L547 gives no sub-structure for a level entry beyond a statement; inventing fields here would present a guess as a compiled fact."
+
+type: object
+additionalProperties: false
+required: [id, version, events, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ICEBERG-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.iceberg_model"
+
+  events:
+    type: array
+    minItems: 1
+    description: "Atlas L547 level 1 (shallowest): surface-visible events. Required, at least one (method contract precondition)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  patterns:
+    type: array
+    default: []
+    description: "Atlas L547 level 2: recurring patterns behind the events. May be empty even when events is not -- a run may stop at the event level."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  structures:
+    type: array
+    default: []
+    description: "Atlas L547 level 3: the systemic structures producing the patterns. RUNTIME invariant: may only be non-empty if patterns is also non-empty (see compilation_decisions)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  mental_models:
+    type: array
+    default: []
+    description: "Atlas L547 level 4 (deepest): the mental models/beliefs sustaining the structures. RUNTIME invariant: may only be non-empty if structures is also non-empty."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent analysis."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A support-ticket surge dug down through all four levels"
+    value:
+      id: "ICEBERG-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.iceberg_model"
+      events: ["本週客服工單量暴增 3 倍"]
+      patterns: ["每次新版本發布後一週內工單量都會上升"]
+      structures: ["QA 環境與 production 設定漂移，發布前測試涵蓋不到真實流量模式"]
+      mental_models: ["團隊認為「先上線、有問題再修」比「發布前完整驗證」更能維持交付速度"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-ICEBERGMODELANALYSIS-1: level entries carry no sub-structure beyond a bare statement (no {statement, confidence} or evidence refs) -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F09 table, Iceberg Model row (L547) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "iceberg"/"behavior over time"/"behavior-over-time" and every schema
+    title before writing -- zero pre-existing implementation or schema
+    title overlap found. Validated against jsonschema Draft202012Validator
+    via tests/unit/test_iceberg_model.py.
+  note: >
+    No mother document was modified. The four level field names are
+    transcribed directly from Atlas L547. The ICEBERG- prefix, bare-string item
+    shape, and runtime-invariant placement of top-down completeness are
+    this file's own compiled structure, disclosed above, not textually
+    cited.

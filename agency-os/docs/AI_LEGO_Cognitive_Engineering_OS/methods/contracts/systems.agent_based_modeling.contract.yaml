@@ -1,0 +1,91 @@
+$id: "ai-lego://methods/contracts/systems.agent_based_modeling.contract.yaml"
+title: "Agent-Based Modeling Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F09 systems-thinking family (Atlas L541-552), second built member (after
+  `systems.leverage_point_analysis`). Atlas F09 table row (L552: "Agent-Based Modeling｜由個體規則模擬群體現象｜
+  agents→rules→environment→runs｜處理 heterogeneity 與 emergent effects") -- simulate emergent group behavior
+  from individual agent rules. Core invariant: every declared `agents[]` entry must have >=1 `rules` (Atlas's
+  own "agents→rules" sequence made structural -- an agent with zero rules is not modeled), and every
+  `runs[].agent_ids_involved` entry must be non-empty and every id in it must resolve to a real declared
+  `agents[]` id (referential integrity, dangling reference refused before construction).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Agent-Based Modeling row (L552)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: systems.agent_based_modeling` mints a NEW machine_id, second member of
+  `family: systems` (grep-confirmed no prior contract or implementation anywhere in this corpus). The flat
+  agents/environment_description/runs record shape and the two structural invariants (>=1 rule per agent,
+  referential integrity on agent_ids_involved) are this file's own compilation decisions -- see
+  `compilation_decisions`.
+
+id: systems.agent_based_modeling
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [SIMULATE, INFER, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. SIMULATE = the method's own
+# defining action (Atlas L552: 由個體規則模擬群體現象 -- simulate group phenomena from individual rules); INFER =
+# deriving emergent effects from agent-rule interaction the modeler did not hand-specify; EXPLAIN = articulating
+# each run's summary as a real observation, not a bare label.
+
+purpose:
+  - simulate_emergent_group_behavior_from_individual_agent_rules
+# Atlas L552 verbatim sense: model individual agents with their own rules inside an environment, run the
+# simulation, to handle heterogeneity and emergent effects a single-aggregate model would miss.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this corpus takes; Atlas names no required input type for this method.
+
+outputs:
+  - AgentBasedModel
+# NEW output type (see typed-objects/agent-based-model.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "agents has at least 1 entry, each with >=1 rule -- Atlas L552's own 'agents→rules' sequence made structural; an agent with zero rules is not modeled"
+  - "environment_description is present and non-empty -- Atlas L552's own 'environment' stage"
+  - "runs has at least 1 entry, each with a non-empty agent_ids_involved list, and every id in it resolves to a real declared agents[] id -- Atlas L552's own 'rules→environment→runs' sequence; a run naming zero agents, or a dangling agent reference, has not actually run the method"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no required input (inputs.required: []), so there is no upstream EvidenceSet to ground against.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F09 table row names no single downstream method for Agent-Based Modeling specifically.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should an agent with zero rules be legal (rules discovered later) or refused at construction?"
+    decision: "Refused -- Atlas's own 'agents→rules' sequence (L552) names rules as intrinsic to what makes something a modeled agent, not an optional add-on; a rule-less agent is a name, not a model."
+  - question: "Should runs[].agent_ids_involved be validated against agents[] at the schema layer or the runtime layer?"
+    decision: "Runtime invariant (builder + independent gate) -- JSON Schema 2020-12 cannot declaratively express 'this array item's value must appear in that sibling array', same class of disclosed gap challenge.pre_mortem's own addresses_cause_id / causal.dag's own edge-node referential check already document."
+
+open_questions:
+  - "OQ-AGENTBASED-1: Atlas gives no worked numeric example for this row (no mermaid diagram, unlike F09's causal-loop row) -- agents[].rules is left as a flat list of free-text rule strings, not a further-structured object, since Atlas cites no rule syntax (owner: operator)."
+  - "OQ-AGENTBASED-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F09 table row (L552) directly at the cited line, plus the surrounding F09 section (L541-562) for
+    context. Grepped the whole Atlas file and the full spec root (specs/**, methods/**) case-insensitively for
+    "agent-based"/"agent based model"/"agent_based_modeling" before writing this contract -- zero pre-existing
+    hits beyond Atlas's own F09 table row itself. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The agents→rules→environment→runs shape is transcribed verbatim from Atlas
+    L552. The >=1-rule-per-agent and referential-integrity invariants, and `cognitive_primitives`, are this
+    file's own compilation decisions, disclosed above.

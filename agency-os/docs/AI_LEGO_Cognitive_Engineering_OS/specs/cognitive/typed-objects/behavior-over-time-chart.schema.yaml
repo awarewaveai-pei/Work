@@ -1,0 +1,120 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/behavior-over-time-chart.schema.yaml"
+title: Behavior Over Time Chart
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BehaviorOverTimeChart` -- the
+  declared `outputs` of `systems.behavior_over_time`'s Method Contract
+  (methods/contracts/systems.behavior_over_time.contract.yaml, `outputs:
+  [BehaviorOverTimeChart]`). F09 systems-thinking family (Atlas L551:
+  "Behavior-over-Time | 畫變數隨時間變化 | 歷史/預期曲線->轉折->延遲 | 迫使
+  分析時間維度").
+
+  A single tracked `variable_name` plotted across `points[]` ({time, value}
+  pairs). Atlas's own literal purpose ("畫變數隨時間變化") is mechanized as
+  a RUNTIME invariant (not expressible declaratively across the array here,
+  same disclosed-gap class as game-theory.schema.yaml's own payoff-
+  completeness precedent): `points[]` must be strictly increasing in `time`
+  (duplicate or out-of-order timestamps are refused, not silently accepted)
+  -- `ai_lego/modules/systems/behavior_over_time.py` enforces this at both
+  construction time and an independent gate. The minimum-of-2-points floor
+  (one point cannot show change) is additionally mirrored declaratively as
+  `minItems: 2` below, since array length IS expressible in JSON Schema.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Behavior-over-Time row (L551)"
+  - "methods/contracts/systems.behavior_over_time.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/game-theory.schema.yaml -- cross-array-referential-completeness-as-runtime-invariant precedent"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L551's own
+  purpose plus low-risk, disclosed compilation choices (the BOT- prefix,
+  record-level-only provenance, runtime-invariant placement of the strict-
+  ordering rule).
+
+compilation_decisions:
+  - question: "Should time be typed as a JSON Schema oneOf[string, number], or forced to one type?"
+    decision: "oneOf[string, number] -- Atlas L551 allows both historical timestamps/date-or-phase labels and abstract relative-time numbers ('t=0, t=1, ...'); forcing one type would reject a real, common usage."
+  - question: "Strict monotonic ordering: JSON Schema keyword or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 has no declarative 'array items strictly increasing across a mixed string/number field' keyword, same gap class as game-theory.schema.yaml's own payoff-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, variable_name, points, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^BOT-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.behavior_over_time"
+
+  variable_name:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The single variable being tracked over time (e.g. '客服工單量', 'error_rate')."
+
+  points:
+    type: array
+    minItems: 2
+    description: "Atlas L551's own literal purpose ('畫變數隨時間變化') requires at least 2 points to show change over time."
+    items:
+      type: object
+      additionalProperties: false
+      required: [time, value]
+      properties:
+        time:
+          description: "Timestamp label -- historical/expected date-or-phase string, or an abstract relative-time number. Strictly increasing across points[] is a RUNTIME invariant, see compilation_decisions."
+          oneOf:
+            - {type: string, minLength: 1, pattern: "\\S"}
+            - {type: number}
+        value:
+          type: number
+          description: "The tracked variable's value at this point in time."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent chart."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "客服工單量 across 5 weekly points, one visible turning point after a release"
+    value:
+      id: "BOT-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.behavior_over_time"
+      variable_name: "每週客服工單量"
+      points:
+        - {time: "2026-08-10", value: 42}
+        - {time: "2026-08-17", value: 45}
+        - {time: "2026-08-24", value: 138}
+        - {time: "2026-08-31", value: 120}
+        - {time: "2026-09-07", value: 95}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-BEHAVIOROVERTIMECHART-1: points[] carries no delay/lag annotation field despite Atlas L551 naming '延遲' (delay) as part of this method's own analysis flow -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F09 table, Behavior-over-Time row (L551) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "iceberg"/"behavior over time"/"behavior-over-time" and every schema
+    title before writing -- zero pre-existing implementation or schema
+    title overlap found. Validated against jsonschema Draft202012Validator
+    via tests/unit/test_behavior_over_time.py.
+  note: >
+    No mother document was modified. `variable_name`/`points[].time/value`
+    are transcribed directly from Atlas L551's own purpose. The BOT-
+    prefix, oneOf time typing, and runtime-invariant placement of strict
+    ordering are this file's own compiled structure, disclosed above, not
+    textually cited.

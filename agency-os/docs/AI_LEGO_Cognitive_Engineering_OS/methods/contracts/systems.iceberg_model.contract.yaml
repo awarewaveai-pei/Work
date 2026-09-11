@@ -1,0 +1,92 @@
+$id: "ai-lego://methods/contracts/systems.iceberg_model.contract.yaml"
+title: "Iceberg Model Method Contract"
+status: ACTIVE
+
+description: >
+  F09 systems-thinking family (Atlas L547: "Iceberg Model | Event->Pattern->
+  Structure->Mental Model | 由事件往下挖深層結構 | 避免只修表面"). Digs a
+  surface event down through recurring patterns and systemic structures to
+  the mental models sustaining them. Core invariant: a deeper level may only
+  be populated once every shallower level already is -- a run cannot claim a
+  structural or mental-model insight while skipping the pattern level,
+  mechanizing Atlas's own "由事件往下挖深層結構" (dig down level by level)
+  rather than leaving it as unenforced narrative order.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Iceberg Model row (L547)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L547 gives a real four-level pipeline
+  and effect ("避免只修表面") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: systems.iceberg_model
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [DECOMPOSE, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F09
+# members). DECOMPOSE breaks one surface event down into successively
+# deeper causal layers; EXPLAIN articulates each layer as a real statement
+# rather than a bare label. Both CANONICAL_KERNEL members.
+
+purpose:
+  - dig_from_surface_event_to_underlying_mental_model
+# Atlas L547 verbatim sense: 由事件往下挖深層結構 (dig from the event down
+# to the deep structure), effect 避免只修表面 (avoid fixing only the surface).
+
+inputs:
+  required:
+    - EventDescription
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is a free-text description of the observed event(s),
+  # same honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - IcebergModelAnalysis
+# NEW output type (see typed-objects/iceberg-model-analysis.schema.yaml).
+
+preconditions:
+  - "at least one event-level statement"
+  # NEW, structurally necessary -- an analysis that dug nowhere is not an
+  # Iceberg Model.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent analysis, same placement
+  # convention typed-objects/game-theory.schema.yaml's own batch already
+  # established for a structurally similar single-model record.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - systems.leverage_point_analysis
+# Atlas F09's own table ordering: once the deep structure/mental model is
+# identified, the natural next step is finding where to intervene. Soft
+# reference -- see open_questions for the sibling contract's build status.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an analysis has no external side effect.
+
+open_questions:
+  - "OQ-ICEBERGMODEL-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-ICEBERGMODEL-2: RESOLVED (F09 batch finalization, 2026-09-12) -- systems.leverage_point_analysis is ACTIVE; recommended_next reference confirmed valid."
+
+verification:
+  method: >
+    Read Atlas F09 table, Iceberg Model row (L547) directly. Grepped the
+    full spec root case-insensitively for "iceberg"/"behavior over time"/
+    "behavior-over-time" before writing -- zero pre-existing implementation
+    or schema title overlap found (see typed-objects/iceberg-model-
+    analysis.schema.yaml's own verification for the full grep record).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The four-level pipeline is transcribed
+    verbatim from Atlas L547. purpose/preconditions naming and the
+    EventDescription free-text input scope are Phase 3-class compilation
+    decisions, disclosed above.

@@ -1,0 +1,94 @@
+$id: "ai-lego://methods/contracts/systems.systems_archetypes.contract.yaml"
+title: "Systems Archetypes Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F09 systems-thinking family (Atlas L548: "Systems Archetypes｜辨識常見系統陷阱｜比對 Limits to
+  Growth / Fixes that Fail 等｜快速找到已知動態"). Core invariant: `archetype_matches[].archetype_name`
+  must be a member of a closed, literature-compiled 10-value vocabulary (Atlas's own row truncates its list
+  with "等"/etc -- see `compilation_decisions`), and every match must cite >=1 non-empty
+  `observed_symptoms` entry -- an archetype claimed with zero supporting observation is an unevidenced
+  pattern-match, refused at construction. See `ai_lego/modules/systems/systems_archetypes.py` for the full
+  two-layer enforcement.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 tool table, Systems Archetypes row (L548)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: systems.systems_archetypes` mints a NEW machine_id inside the NEW
+  `family: systems` (F09, 1 of 2 members this agent opens in a parallel batch alongside
+  `systems.rich_picture` -- no prior `systems.*` contract exists in this corpus at batch start,
+  grep-confirmed). The closed archetype-name vocabulary is this file's own compiled-from-literature
+  decision -- see `compilation_decisions`.
+
+id: systems.systems_archetypes
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [COMPARE, RELATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this method). COMPARE = the row's own
+# defining verb ("比對" -- compare observed symptoms against known patterns); RELATE = connecting those
+# symptoms to a named systemic dynamic. Both CANONICAL_KERNEL members.
+
+purpose:
+  - match_observed_symptoms_against_known_system_archetypes
+# Atlas L548 verbatim sense: 用途「辨識常見系統陷阱」/ 使用方式「比對...等」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- the row names no input type, only a comparison activity.
+
+outputs:
+  - SystemsArchetypeMatchSet
+# NEW output type (see typed-objects/systems-archetype-match.schema.yaml). Atlas names no PascalCase
+# output type for this method.
+
+preconditions:
+  - "every archetype_matches[] entry's archetype_name is a member of the closed 10-value vocabulary (see compilation_decisions) -- an unrecognized archetype name is refused, not silently accepted as free text"
+  - "every archetype_matches[] entry cites at least 1 non-empty observed_symptoms entry -- an archetype claimed with zero supporting observation is an unevidenced pattern-match"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- this method matches OBSERVED SYMPTOMS against a known-pattern vocabulary; it takes no
+  # EvidenceSet input (inputs.required: []), same reasoning stakeholders.coalition_mapping.contract.yaml's
+  # own identical false already discloses for its own no-input sibling.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's F09 table draws no chain arrow from Systems Archetypes to another row (no 最佳搭配 column on this
+# table). Left empty rather than picking an arbitrary sibling F09 method with no textual chain evidence.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "May archetype_matches[] legitimately be empty (a clean scan, no known pattern recognized), or must at least 1 match be required?"
+    decision: "Legal to be empty (minItems 0) -- same 'clean pass' legality challenge.red_team's own zero-findings state already establishes; the required, non-empty context field is the anchor proving a real system was actually examined."
+  - question: "What is the closed archetype_name vocabulary, given Atlas's own row truncates its list with '等' (etc)?"
+    decision: "A 10-member enum compiled from the standard Peter Senge / systems-thinking literature named archetypes (LIMITS_TO_GROWTH, FIXES_THAT_FAIL, SHIFTING_THE_BURDEN, TRAGEDY_OF_THE_COMMONS, SUCCESS_TO_THE_SUCCESSFUL, ESCALATION, ERODING_GOALS, GROWTH_AND_UNDERINVESTMENT, ACCIDENTAL_ADVERSARIES, DRIFTING_GOALS) -- same class of general-standard supplementation `challenge.hazop.contract.yaml`'s own guide-word vocabulary already establishes for Atlas's identically truncated HAZOP list, disclosed here rather than presented as directly Atlas-cited."
+  - question: "Should this method itself score/rank archetype fit, or only validate caller-asserted matches?"
+    decision: "Validate-only, same 'no invented algorithm' scope stakeholders.coalition_mapping.contract.yaml's own identical decision already discloses -- Atlas's row gives no scoring algorithm, only a comparison activity."
+
+open_questions:
+  - "OQ-SYSARCH-1: recommended_next is empty -- Atlas's F09 table draws no chain arrow from Systems Archetypes to another row (owner: operator)."
+  - "OQ-SYSARCH-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-SYSARCH-3: the closed archetype-name vocabulary is compiled from general systems-thinking literature, not cited verbatim from Atlas -- a future revision could tighten or extend it if Atlas or an ADR ever supplies its own explicit list beyond the '等'-truncated row (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F09 table row (L548) directly. Grepped the whole Atlas file and the full spec root
+    case-insensitively for "archetype"/"rich picture" before writing any of this batch's files -- zero
+    pre-existing implementation (only the table row itself and the `method-inventory.yaml`/
+    `contract-backlog.yaml` backlog entries, both read, neither edited). Read
+    `stakeholders.coalition_mapping.contract.yaml` and `challenge.hazop.contract.yaml` in full as the
+    closest referential-integrity and compiled-vocabulary precedents respectively. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The closed archetype-name vocabulary and the validate-only scope are
+    this file's own compilation decisions, disclosed above, not presented as directly Atlas-cited beyond
+    the literal table-row wording quoted verbatim.

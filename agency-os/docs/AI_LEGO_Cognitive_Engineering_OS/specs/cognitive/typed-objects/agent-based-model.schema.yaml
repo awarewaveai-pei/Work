@@ -1,0 +1,158 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/agent-based-model.schema.yaml"
+title: Agent-Based Model
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AgentBasedModel` -- the declared `outputs` of
+  `systems.agent_based_modeling`'s Method Contract (methods/contracts/systems.agent_based_modeling.contract.yaml,
+  `outputs: [AgentBasedModel]`). F09 systems-thinking family, second built member. Atlas F09 table row (L552:
+  "Agent-Based Modeling｜由個體規則模擬群體現象｜agents→rules→environment→runs｜處理 heterogeneity 與 emergent
+  effects").
+
+  Field provenance:
+    * `agents[]` -- Atlas's own "agents→rules" stage. Each carries `rules` (>=1 required -- an agent with zero
+      rules is not modeled, the method's own real invariant).
+    * `environment_description` -- Atlas's own "environment" stage, free text.
+    * `runs[]` -- Atlas's own "runs" stage. Each carries `agent_ids_involved` (>=1 required, every id a soft
+      reference to one `agents[].id` IN THIS SAME RECORD -- referential integrity checked at the runtime layer,
+      not expressible here).
+    * `provenance` (top-level only) -- record-level, matching this corpus's established batch precedent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Agent-Based Modeling row (L552)"
+  - "methods/contracts/systems.agent_based_modeling.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/pre-mortem-analysis.schema.yaml -- single-reference precedent this file's own array-of-references shape generalizes to a list (agent_ids_involved), and causal-dag-analysis.schema.yaml -- runtime-layer referential-integrity precedent"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L552's own agents→rules→environment→runs sequence plus low-risk, disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Should an agent be allowed zero rules?"
+    decision: "No -- rules minItems:1, mirroring the method contract's own precondition; Atlas's own 'agents→rules' sequence treats rules as intrinsic to what makes something a modeled agent."
+  - question: "Should runs[].agent_ids_involved referential integrity be enforced here or at the runtime layer?"
+    decision: "Runtime layer (builder + independent gate) -- JSON Schema 2020-12 cannot declaratively express 'every array item here must appear in that sibling array', same class of disclosed gap pre-mortem-analysis.schema.yaml's own addresses_cause_id already documents."
+  - question: "additionalProperties: false at the top level, and on each agents[]/runs[] item?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, agents, environment_description, runs, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ABM-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.agent_based_modeling"
+
+  agents:
+    type: array
+    minItems: 1
+    description: "Atlas L552's own 'agents→rules' stage. At least one required -- a model naming zero agents has not actually run the method."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, rules]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The agent's own label, e.g. its role/type in the simulation."
+        rules:
+          type: array
+          minItems: 1
+          description: "Atlas's own 'agents→rules' -- at least one rule required; an agent with zero rules is not modeled (this schema's own real invariant, transcribed as a structural minItems, not left advisory)."
+          items:
+            type: string
+            minLength: 1
+            pattern: "\\S"
+
+  environment_description:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L552's own 'environment' stage -- the shared context/constraints the agents operate within."
+
+  runs:
+    type: array
+    minItems: 1
+    description: "Atlas L552's own 'runs' stage. At least one required -- a model with zero runs has not actually been simulated."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, summary, agent_ids_involved]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        summary:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What happened/emerged in this run -- the observation this simulation stage exists to produce."
+        agent_ids_involved:
+          type: array
+          minItems: 1
+          description: "Must name only real agents[].id values IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference, or an empty list, is refused, not merely flagged."
+          items:
+            type: string
+            minLength: 1
+
+  provenance:
+    description: "Record-level only -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An agent-based model of a two-sided online marketplace: buyer and seller agent types, each with their own rules, one run showing an emergent price-convergence effect."
+    value:
+      id: "ABM-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.agent_based_modeling"
+      agents:
+        - id: "AGENT-BUYER"
+          name: "買家"
+          rules:
+            - "若商品價格低於自身預算上限則購買"
+            - "若同類商品有更低價則延後購買"
+        - id: "AGENT-SELLER"
+          name: "賣家"
+          rules:
+            - "若庫存過多則降價出清"
+            - "若近期售出速度快則調升價格"
+      environment_description: "一個模擬的線上市場，買家與賣家代理人每回合各自依規則決策，市場價格由供需即時結算"
+      runs:
+        - id: "RUN-001"
+          summary: "500 回合後，價格自發收斂到接近均衡點，即使沒有任何代理人被賦予『均衡』的全域知識 -- 典型 emergent effect"
+          agent_ids_involved: ["AGENT-BUYER", "AGENT-SELLER"]
+      provenance: {epistemic_type: SIMULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-AGENTBASEDMODEL-1: rules[] is a flat list of free-text strings, not a further-structured condition/action object -- Atlas cites no rule syntax for this row; a future revision could add structured rules if a downstream consumer needs to actually execute them (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F09 table row (L552) directly at the cited line. Grepped the full spec root (specs/**,
+    methods/**) case-insensitively for "agent-based"/"agent based model"/"AgentBasedModel" before writing this
+    file -- zero pre-existing hits beyond Atlas's own F09 table row. Validated against
+    jsonschema.Draft202012Validator, including a mutation check that a dangling agent_ids_involved reference and
+    a zero-rule agent are each caught by the runtime gate (not expressible here).
+  note: >
+    No mother document was modified. The agents→rules→environment→runs shape is transcribed verbatim from Atlas
+    L552. The >=1-rule-per-agent minItems and the referential-integrity scope decision are this file's own
+    compilation decisions, disclosed above.

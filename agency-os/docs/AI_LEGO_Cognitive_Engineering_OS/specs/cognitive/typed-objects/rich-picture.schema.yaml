@@ -1,0 +1,143 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/rich-picture.schema.yaml"
+title: Rich Picture Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RichPictureRecord` -- the declared `outputs` of
+  `systems.rich_picture`'s Method Contract (methods/contracts/systems.rich_picture.contract.yaml). Two
+  arrays, transcribed from Atlas F09 row L549's own "actors/process/conflict": `actors[]` (who is in the
+  picture) and `issues[]` (the tensions/conflicts, each referencing >=1 of the declared actors). The
+  referential-integrity invariant (every `issues[].involves_actor_ids` entry must resolve to a real
+  `actors[].id` in the SAME record) is a cross-array check JSON Schema cannot express natively -- runtime-
+  layer invariant, see `ai_lego/modules/systems/rich_picture.py`, which enforces it at construction AND
+  independently via a gate that re-derives from raw fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 tool table, Rich Picture row (L549)"
+  - "methods/contracts/systems.rich_picture.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Minimum actors/issues counts?"
+    decision: "actors: minItems 1, issues: minItems 1 -- an empty picture captured no one and no tension, same reasoning association.concept_map.contract.yaml's own edges:minItems 1 floor already establishes for its own defining-structural-point field."
+  - question: "involves_actor_ids minimum size -- >=1 or >=2 (matching coalition-mapping's own multi-party floor)?"
+    decision: ">=1 -- a single-actor issue is still a legitimate rich-picture entry (Atlas's own 'conflict' is one example among 'actors/process/conflict', not the only content), a deliberate departure from coalition-mapping.schema.yaml's own >=2 member_ids floor, which encodes a genuinely different multi-party-by-definition semantic."
+  - question: "Per-actor/per-issue provenance, or record-level only?"
+    decision: "Record-level only -- a RichPictureRecord describes one coherent snapshot of one situation, same reasoning coalition-mapping.schema.yaml's own record-level-only placement already establishes for its own batch-mate."
+
+type: object
+required: [id, version, context, actors, issues, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^RP-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as coalition-mapping.schema.yaml's COALMAP- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.rich_picture"
+
+  context:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The problem situation this picture captures -- un-cited-by-Atlas anchor field, same necessary-anchor precedent every sibling typed-object schema in this directory already establishes."
+
+  actors:
+    type: array
+    minItems: 1
+    description: "Atlas L549's own 'actors' element. See compilation_decisions for the minItems:1 floor."
+    items:
+      type: object
+      required: [id, name]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this record (e.g. RP-001-A1)."
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actor's name/role in the picture."
+
+  issues:
+    type: array
+    minItems: 1
+    description: "Atlas L549's own 'conflict' element, generalized to any tension/issue the picture surfaces. See compilation_decisions for the minItems:1 floor."
+    items:
+      type: object
+      required: [id, description, involves_actor_ids]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this record (e.g. RP-001-I1)."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The issue/tension/conflict itself, in natural language."
+        involves_actor_ids:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Must resolve to real actors[].id values declared in this SAME record (referential integrity, runtime-layer check -- see top-level description). See compilation_decisions for the >=1 (not >=2) floor."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A rich picture of a municipal zoning dispute: 3 actors, 2 issues each involving a subset of them"
+    value:
+      id: "RP-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.rich_picture"
+      context: "市中心停車格縮減案的利害關係人與衝突全貌"
+      actors:
+        - {id: "A1", name: "在地商圈協會"}
+        - {id: "A2", name: "自行車倡議團體"}
+        - {id: "A3", name: "都市計畫局"}
+      issues:
+        - id: "I1"
+          description: "商圈協會擔心縮減臨停格位會降低來客量，與自行車倡議團體的訴求直接衝突"
+          involves_actor_ids: ["A1", "A2"]
+        - id: "I2"
+          description: "都市計畫局需在不引發訴訟的前提下推動修法，時程壓力大"
+          involves_actor_ids: ["A3"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-RICHPICTURERECORD-1"
+    question: >
+      Atlas's own row names 'process' as a third picture element alongside actors/conflict -- this record
+      models only actors[] and issues[], per this task's own exact 2-object brief. Should a future revision
+      add a processes[] array if a real citation or downstream consumer needs one?
+    owner: "operator, or whoever next extends this record with a processes[] field"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F09 table row (L549) directly. Read coalition-mapping.schema.yaml in full as the closest
+    referential-integrity precedent (profiles/scenarios == actors/issues shape). Validated against
+    jsonschema Draft202012Validator, including a real mutation check that additionalProperties:false actually
+    rejects an unknown key at every level and that minItems:1 actually rejects an empty actors/issues/
+    involves_actor_ids array.
+  note: >
+    The actors/issues shape and the referential-integrity requirement are this suite's own compiled
+    structure, transcribed from Atlas L549's literal "actors/process/conflict" wording (minus the process
+    element, see open_questions) -- not presented as further mother-document content. No mother document was
+    modified to produce this file.

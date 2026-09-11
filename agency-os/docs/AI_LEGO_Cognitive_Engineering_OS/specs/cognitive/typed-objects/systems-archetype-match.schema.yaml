@@ -1,0 +1,115 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/systems-archetype-match.schema.yaml"
+title: Systems Archetype Match Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `SystemsArchetypeMatchSet` -- the declared `outputs` of
+  `systems.systems_archetypes`'s Method Contract (methods/contracts/systems.systems_archetypes.contract.yaml).
+  `archetype_matches[].archetype_name` is a closed, literature-compiled 10-value enum (Atlas F09 row L548
+  truncates its own list with "等"/etc); every match requires >=1 non-empty `observed_symptoms` entry --
+  the runtime layer (`ai_lego/modules/systems/systems_archetypes.py`) re-derives both invariants
+  independently of this schema's own `enum`/`minItems` constraints, same two-layer discipline every sibling
+  typed-object schema in this directory already uses.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 tool table, Systems Archetypes row (L548)"
+  - "methods/contracts/systems.systems_archetypes.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+compilation_decisions:
+  - question: "Should archetype_matches[] carry a minItems floor (>=1), or may it legitimately be empty?"
+    decision: "minItems 0 (may be empty) -- same 'clean pass' legality red-team-challenge.schema.yaml's own zero-findings state already establishes."
+  - question: "Per-match provenance, or record-level only?"
+    decision: "Record-level only -- a SystemsArchetypeMatchSet describes one coherent scan of one situation, same reasoning coalition-mapping.schema.yaml's own record-level-only placement already establishes for its own batch-mate."
+
+type: object
+required: [id, version, context, archetype_matches, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^ARCH-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as concept-map-record.schema.yaml's CONCEPTMAP- prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.systems_archetypes"
+
+  context:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The system/situation this scan examined -- un-cited-by-Atlas anchor field, same necessary-anchor precedent every sibling typed-object schema in this directory already establishes."
+
+  archetype_matches:
+    type: array
+    description: "Zero or more matches -- a scan may legitimately find no known archetype fits (see compilation_decisions)."
+    items:
+      type: object
+      required: [id, archetype_name, observed_symptoms, description]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this record (e.g. ARCH-001-M1)."
+        archetype_name:
+          type: string
+          enum: [LIMITS_TO_GROWTH, FIXES_THAT_FAIL, SHIFTING_THE_BURDEN, TRAGEDY_OF_THE_COMMONS, SUCCESS_TO_THE_SUCCESSFUL, ESCALATION, ERODING_GOALS, GROWTH_AND_UNDERINVESTMENT, ACCIDENTAL_ADVERSARIES, DRIFTING_GOALS]
+          description: "Closed, literature-compiled 10-value vocabulary. See methods/contracts/systems.systems_archetypes.contract.yaml compilation_decisions for the compilation source."
+        observed_symptoms:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "At least 1 non-empty observation grounding this match -- an archetype claimed with zero supporting observation is an unevidenced pattern-match."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Free text: why this archetype fits, in this situation's own terms."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A scan over a SaaS startup's growth-vs-support-quality tension: one archetype match, evidenced by two observed symptoms"
+    value:
+      id: "ARCH-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.systems_archetypes"
+      context: "SaaS 新創的成長與客服品質衝突分析"
+      archetype_matches:
+        - id: "ARCH-2026-09-11-001-M1"
+          archetype_name: LIMITS_TO_GROWTH
+          observed_symptoms: ["新用戶成長率連續三季下滑", "客服回應時間隨用戶數增加而惡化，未同步擴編"]
+          description: "早期成長引擎(口碑推薦)本身觸發了限制成長的條件(客服產能跟不上用戶數)，符合 Limits to Growth 的增強迴路撞上抑制迴路模式。"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-SYSTEMSARCHETYPEMATCHSET-1"
+    question: >
+      Should a future revision add a `related_archetype_matches` cross-reference field once this suite has
+      a real causal.dag or concept.map record to link a matched archetype's own feedback loop to (Atlas F09's
+      own Causal Loop Diagram row is a sibling, still unbuilt at this batch's start)?
+    owner: "operator, or whoever next builds a systems.causal_loop_diagram method"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F09 table row (L548) directly. Validated against jsonschema Draft202012Validator, including a
+    real mutation check that the archetype_name enum actually refuses an unrecognized value and that
+    observed_symptoms actually refuses an empty array.
+  note: >
+    The 10-value archetype_name enum is compiled from general systems-thinking literature (Peter Senge's
+    named archetypes), not transcribed verbatim from Atlas (Atlas's own row truncates its list with "等") --
+    disclosed as a compilation decision, same class every sibling schema in this directory discloses. No
+    mother document was modified to produce this file.

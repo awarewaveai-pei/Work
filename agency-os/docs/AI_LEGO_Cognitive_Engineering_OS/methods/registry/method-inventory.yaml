@@ -614,46 +614,58 @@ by_document:
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
+      # F09 line numbers corrected 2026-09-12 (all 8 were off by 1 -- 544 is the table's
+      # |---| separator row, not Causal Loop Diagram; same stale-line-number class the F12
+      # batch found and fixed, where its own 10 rows were off by 3). Verified against the
+      # Atlas source file's real line numbers, not carried forward from the Phase 0 value.
       - name: "Causal Loop Diagram"
-        line: 544
-        category: "F09 systems"
-        has_contract: false
-        contract_status: pending
-      - name: "Stock & Flow"
         line: 545
         category: "F09 systems"
-        has_contract: false
-        contract_status: pending
-      - name: "Iceberg Model"
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.causal_loop_diagram"
+      - name: "Stock & Flow"
         line: 546
         category: "F09 systems"
-        has_contract: false
-        contract_status: pending
-      - name: "Systems Archetypes"
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.stock_and_flow"
+      - name: "Iceberg Model"
         line: 547
         category: "F09 systems"
-        has_contract: false
-        contract_status: pending
-      - name: "Rich Picture"
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.iceberg_model"
+      - name: "Systems Archetypes"
         line: 548
         category: "F09 systems"
-        has_contract: false
-        contract_status: pending
-      - name: "Leverage Point Analysis"
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.systems_archetypes"
+      - name: "Rich Picture"
         line: 549
         category: "F09 systems"
-        has_contract: false
-        contract_status: pending
-      - name: "Behavior-over-Time"
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.rich_picture"
+      - name: "Leverage Point Analysis"
         line: 550
         category: "F09 systems"
-        has_contract: false
-        contract_status: pending
-      - name: "Agent-Based Modeling"
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.leverage_point_analysis"
+      - name: "Behavior-over-Time"
         line: 551
         category: "F09 systems"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.behavior_over_time"
+      - name: "Agent-Based Modeling"
+        line: 552
+        category: "F09 systems"
+        has_contract: true
+        contract_status: complete
+        machine_id: "systems.agent_based_modeling"
       - name: "Assumption Mapping"
         line: 569
         category: "F10 epistemic"

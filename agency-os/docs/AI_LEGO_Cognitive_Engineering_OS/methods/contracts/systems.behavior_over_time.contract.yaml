@@ -1,0 +1,94 @@
+$id: "ai-lego://methods/contracts/systems.behavior_over_time.contract.yaml"
+title: "Behavior Over Time Method Contract"
+status: ACTIVE
+
+description: >
+  F09 systems-thinking family (Atlas L551: "Behavior-over-Time | 畫變數隨時間
+  變化 | 歷史/預期曲線->轉折->延遲 | 迫使分析時間維度"). Plots one tracked
+  variable across a chronological series of points to force the analysis
+  onto the time dimension rather than a single snapshot. Core invariant: the
+  series must have at least 2 points and be strictly increasing in time --
+  a single point cannot show "change over time" (Atlas's own literal
+  purpose), and a duplicate/out-of-order timestamp is a real authoring
+  mistake this method exists to catch, not a stylistic nicety.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Behavior-over-Time row (L551)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L551 gives a real purpose and pipeline
+  ("歷史/預期曲線→轉折→延遲") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: systems.behavior_over_time
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [FORECAST, ESTIMATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F09
+# members). FORECAST covers the "預期曲線" (expected curve) half of Atlas's
+# own literal pipeline; ESTIMATE covers assigning a numeric value to each
+# point on the "歷史曲線" (historical curve) half. Both CANONICAL_KERNEL
+# members.
+
+purpose:
+  - plot_a_variable_across_time_to_force_the_time_dimension
+# Atlas L551 verbatim sense: 畫變數隨時間變化 (plot how a variable changes
+# over time), effect 迫使分析時間維度 (force the analysis onto the time axis).
+
+inputs:
+  required:
+    - VariableDescription
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is which variable to track, same honesty-gap class
+  # every sibling F-family contract already discloses.
+
+outputs:
+  - BehaviorOverTimeChart
+# NEW output type (see typed-objects/behavior-over-time-chart.schema.yaml).
+
+preconditions:
+  - "at least 2 chronologically-ordered points"
+  # NEW, structurally necessary -- Atlas's own literal purpose ("畫變數隨
+  # 時間變化") cannot be satisfied by a single snapshot.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent chart, same placement
+  # convention typed-objects/game-theory.schema.yaml's own batch already
+  # established for a structurally similar single-model record.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - systems.causal_loop_diagram
+# Atlas F09's own natural sequence: a visible turning point on a
+# Behavior-over-Time chart is what a Causal Loop Diagram investigation then
+# explains. Soft reference -- see open_questions for the sibling contract's
+# build status.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a chart has no external side effect.
+
+open_questions:
+  - "OQ-BEHAVIOROVERTIME-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-BEHAVIOROVERTIME-2: RESOLVED (F09 batch finalization, 2026-09-12) -- systems.causal_loop_diagram is ACTIVE; recommended_next reference confirmed valid."
+
+verification:
+  method: >
+    Read Atlas F09 table, Behavior-over-Time row (L551) directly. Grepped
+    the full spec root case-insensitively for "iceberg"/"behavior over
+    time"/"behavior-over-time" before writing -- zero pre-existing
+    implementation or schema title overlap found (see typed-objects/
+    behavior-over-time-chart.schema.yaml's own verification for the full
+    grep record). Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The purpose and pipeline are
+    transcribed verbatim from Atlas L551. purpose/preconditions naming and
+    the VariableDescription free-text input scope are Phase 3-class
+    compilation decisions, disclosed above.

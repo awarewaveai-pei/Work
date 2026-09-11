@@ -4477,6 +4477,161 @@ tier_1:
       Critical/0 Major/0 Minor across the batch -- cleanest batch
       reviewed in this repo to date. See WORKLOG 2026-09-11 F12 entry.
 
+  onehundredsixtyfourth_concrete_entry:
+    # F09 systems-thinking family opening batch, 2026-09-12. 0 of 8 existed
+    # before this batch (no ai_lego/modules/systems/ dir at all); 4 parallel
+    # agents built 2 methods each, then 1 Standard-tier critic pass.
+    method_id: "systems.causal_loop_diagram"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L545, sole citation: "變數→+/- 因果箭頭→
+      reinforcing/balancing→delay"). Real invariant: loop_type is
+      GENUINE_COMPUTE -- independently recomputed from the loop's own edge
+      polarities (odd count of "-" edges = BALANCING, even = REINFORCING,
+      the standard system-dynamics parity rule) and refused on mismatch,
+      never trusted as caller-supplied. edge_ids must additionally form a
+      verified closed cycle (each edge's to_variable_id equals the next
+      edge's from_variable_id, last closes to first), and every edge
+      endpoint must resolve to a declared variable.
+    source: "methods/contracts/systems.causal_loop_diagram.contract.yaml + specs/cognitive/typed-objects/causal-loop-diagram.schema.yaml + ai_lego/modules/systems/causal_loop_diagram.py"
+    note: "27 tests pass. CLI PASS, loop_type-mismatch + non-closed-cycle + dangling-variable-reference refusals + independent-gate hand-tamper proof demonstrated. Atlas's own 'delay' pipeline stage deliberately out of scope (disclosed, OQ-CLD-1)."
+
+  onehundredsixtyfifth_concrete_entry:
+    method_id: "systems.stock_and_flow"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L546, sole citation: "stocks→in/out flows→
+      rates→equations"). Real invariant: every flows[].target_stock_id
+      must resolve to a declared stocks[] id (referential integrity), and
+      every declared stock must be touched by >=1 flow -- a flow-less
+      stock is not a stock-and-flow model, it is a constant. initial_value
+      must be a real finite number (bool/NaN/inf excluded, matching the
+      corpus's established finiteness idiom).
+    source: "methods/contracts/systems.stock_and_flow.contract.yaml + specs/cognitive/typed-objects/stock-and-flow-model.schema.yaml + ai_lego/modules/systems/stock_and_flow.py"
+    note: "21 tests pass. CLI PASS, dangling-target-stock + flow-less-stock refusals + independent-gate hand-tamper proof demonstrated. rate_description stays free text (Atlas gives no rate-equation grammar)."
+
+  onehundredsixtysixth_concrete_entry:
+    method_id: "systems.iceberg_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L547, sole citation: "Event→Pattern→Structure→
+      Mental Model / 由事件往下挖深層結構"). Real invariant (top-down
+      completeness): a deeper level may only be non-empty if every
+      shallower level already is -- structures requires patterns,
+      mental_models requires structures. Operationalizes Atlas's own
+      dig-down-level-by-level instruction structurally: you cannot claim a
+      deep structural insight while skipping the pattern level.
+    source: "methods/contracts/systems.iceberg_model.contract.yaml + specs/cognitive/typed-objects/iceberg-model-analysis.schema.yaml + ai_lego/modules/systems/iceberg_model.py"
+    note: "33 tests pass. CLI PASS, ICE_STRUCTURE_WITHOUT_PATTERN + ICE_MENTAL_MODEL_WITHOUT_STRUCTURE refusals + independent-gate hand-tamper proof demonstrated. Record id prefix renamed ICE- -> ICEBERG- post-critic: ICE- collided with the pre-existing decision.ice method's own prefix (caught by the critic's corpus-wide RECORD_ID_PREFIX sweep; renamed while 0 records exist rather than left as a latent namespace collision)."
+
+  onehundredsixtyseventh_concrete_entry:
+    method_id: "systems.systems_archetypes"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L548: "比對 Limits to Growth / Fixes that Fail
+      等" -- Atlas truncates its own list with "等"). Real invariant:
+      archetype_name must be a member of a closed 10-value vocabulary
+      compiled from the standard systems-thinking (Senge) archetype set,
+      disclosed as a compilation decision, NOT presented as an Atlas
+      citation -- same disclosed-supplement class as challenge.hazop's
+      guide-word vocabulary. Every match must additionally cite >=1
+      non-empty observed_symptoms entry: an archetype claimed with zero
+      supporting observation is an unevidenced pattern-match.
+    source: "methods/contracts/systems.systems_archetypes.contract.yaml + specs/cognitive/typed-objects/systems-archetype-match.schema.yaml + ai_lego/modules/systems/systems_archetypes.py"
+    note: "48 tests pass. CLI PASS, invalid-archetype-name + empty-observed-symptoms refusals + independent-gate hand-tamper proof demonstrated. Empty archetype_matches is legal (a clean scan found no archetype), same zero-findings legality Red Team already establishes."
+
+  onehundredsixtyeighth_concrete_entry:
+    method_id: "systems.rich_picture"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L549, sole citation: "自由畫 actors/process/
+      conflict"). Real invariant: >=1 actor AND >=1 issue required (a rich
+      picture that captured neither captured nothing), and every
+      issues[].involves_actor_ids must be non-empty and resolve to a
+      declared actors[] id -- an issue grounded in no real actor is not
+      part of the picture. Deliberately >=1 involved actor, not
+      coalition_mapping's >=2 (disclosed departure: an issue may
+      legitimately concern a single actor; a coalition cannot).
+    source: "methods/contracts/systems.rich_picture.contract.yaml + specs/cognitive/typed-objects/rich-picture.schema.yaml + ai_lego/modules/systems/rich_picture.py"
+    note: "57 tests pass. CLI PASS, issue-with-no-actors + dangling-actor-reference refusals + independent-gate hand-tamper proof demonstrated. Atlas's third element ('process') deliberately out of scope, flagged in open_questions."
+
+  onehundredsixtyninth_concrete_entry:
+    method_id: "systems.leverage_point_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L550, sole citation: "parameters→feedback→
+      rules→goals→paradigm"). Real invariant: tier_rank is GENUINE_COMPUTE
+      -- mechanically derived from tier via a total 5-value map
+      (PARAMETERS=1 ... PARADIGM=5, Atlas's own literal chain order,
+      transcribed verbatim) and never accepted as a caller-supplied field;
+      a smuggled tier_rank key is refused by an exact-key-set shape check
+      at construction and independently re-derived by the gate. Same
+      idiom as challenge.fmea's rpn and challenge.pre_mortem's priority.
+    source: "methods/contracts/systems.leverage_point_analysis.contract.yaml + specs/cognitive/typed-objects/leverage-point-analysis.schema.yaml + ai_lego/modules/systems/leverage_point_analysis.py"
+    note: "49 tests pass. CLI PASS, smuggled-tier_rank + out-of-vocabulary-tier refusals + independent-gate and schema-layer hand-tamper proofs demonstrated."
+
+  onehundredseventieth_concrete_entry:
+    method_id: "systems.behavior_over_time"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L551, sole citation: "畫變數隨時間變化 /
+      歷史-預期曲線→轉折→延遲"). Real invariant: points[] must be strictly
+      increasing in time (duplicate or out-of-order timestamps refused --
+      a real authoring mistake this method exists to catch) and must
+      contain >=2 points, since a single point cannot show change over
+      time. value must be a real finite number; a mixed non-orderable
+      time type fails closed as BOT_TIME_NOT_ORDERABLE rather than
+      crashing.
+    source: "methods/contracts/systems.behavior_over_time.contract.yaml + specs/cognitive/typed-objects/behavior-over-time-chart.schema.yaml + ai_lego/modules/systems/behavior_over_time.py"
+    note: "46 tests pass. CLI PASS, out-of-order-points + too-few-points refusals + independent-gate hand-tamper proof demonstrated. Plain int deliberately skips math.isfinite, following the corpus's own OverflowError-avoidance idiom (10**400 confirmed non-crashing)."
+
+  onehundredseventyfirst_concrete_entry:
+    # Last of this 4-agent / 8-method F09 opening batch -- F09 is 8/8
+    # COMPLETE after this entry (independently confirmed via `ls
+    # methods/contracts/systems.*.contract.yaml`: 8 files present).
+    method_id: "systems.agent_based_modeling"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F09 table row (Atlas L552, sole citation: "agents→rules→environment→
+      runs"). Real invariant: every declared agent must carry >=1 rule
+      (Atlas's own agents->rules sequence made structural -- an agent with
+      zero rules is not modeled), and every runs[].agent_ids_involved must
+      be non-empty with every id resolving to a declared agents[] id
+      (referential integrity, dangling reference refused).
+    source: "methods/contracts/systems.agent_based_modeling.contract.yaml + specs/cognitive/typed-objects/agent-based-model.schema.yaml + ai_lego/modules/systems/agent_based_modeling.py"
+    note: >
+      60 tests pass. F09 systems-thinking family: 8 of 8 COMPLETE as of
+      this entry (causal_loop_diagram/stock_and_flow/iceberg_model/
+      behavior_over_time/systems_archetypes/rich_picture/
+      leverage_point_analysis landed via concurrent sibling agents in this
+      same batch, entries onehundredsixtyfourth through
+      onehundredseventieth above). CLI PASS, zero-rule-agent +
+      dangling-agent-reference refusals + independent-gate hand-tamper
+      proof demonstrated. Batch totals: 341 tests, 55 subtests, 0
+      failures. 1 independent critic pass (Standard tier, hand-tamper-
+      verified every invariant against the live gate functions plus 144
+      malformed-input checks across all 16 gates) found 0 Critical / 2
+      Major / 1 Minor, all fixed same-day before this registry sync: (a)
+      nested-list aliasing in causal_loop_diagram/systems_archetypes/
+      rich_picture's builders -- a shallow `dict(item)` copy left the
+      returned "validated" record sharing a mutable list object with the
+      caller's input, so a post-return caller mutation could silently
+      invalidate it (the same failure class found earlier in
+      stakeholders.game_theory); (b) this registry sync itself, which the
+      critic flagged as the third occurrence of an identical drift class
+      after commits fd99a9dd7 and 1b4debdb2; (c) the ICE- id-prefix
+      collision with decision.ice. F09's 8 method-inventory.yaml line
+      numbers were additionally found stale (all off by 1) and corrected
+      against the Atlas source. See WORKLOG 2026-09-12 F09 entry.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

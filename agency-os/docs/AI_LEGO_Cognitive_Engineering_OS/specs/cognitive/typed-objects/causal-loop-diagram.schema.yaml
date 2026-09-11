@@ -1,0 +1,194 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/causal-loop-diagram.schema.yaml"
+title: Causal Loop Diagram
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CausalLoopDiagram` -- the declared `outputs` of
+  `systems.causal_loop_diagram`'s Method Contract (methods/contracts/systems.causal_loop_diagram.contract.yaml,
+  `outputs: [CausalLoopDiagram]`). Atlas F09 tool table (L545: "Causal Loop Diagram｜找 feedback loops｜變數→+/-
+  因果箭頭→reinforcing/balancing→delay") plus the section's own worked mermaid diagram (L554-562).
+
+  Field provenance:
+    * `variables` -- L545's own "變數" (variables) stage. At least 2 (a causal loop needs at least two variables
+      to relate), each a non-empty `{id, name}` pair, unique `id`.
+    * `edges` -- the "+/- 因果箭頭" (signed causal arrows) stage. Directed, polarity-labeled arrows between two
+      declared variables (referential integrity, same `causal.dag` edges->nodes pattern).
+    * `loops` -- the "reinforcing/balancing" classification stage. Each names an ordered `edge_ids` chain that
+      must genuinely close into a cycle, and a `loop_type` REQUIRED to equal the value independently recomputed
+      from the chain's own edge polarities (standard system-dynamics parity rule) -- enforced as a RUNTIME
+      invariant by `ai_lego/modules/systems/causal_loop_diagram.py`, not expressible as a declarative schema
+      constraint (same disclosed-gap class as `mcda-analysis.schema.yaml`'s own OQ-MCDAANALYSIS-1). May be
+      empty -- a diagram may map variables/edges without yet closing a cycle.
+    * `provenance` -- RECORD-LEVEL ONLY, same placement `game-theory.schema.yaml`'s own compilation_decisions
+      already establishes for this "one coherent model" class of typed object.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 tool table, Causal Loop Diagram row (L545)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09's own worked mermaid diagram (L554-562)"
+  - "methods/contracts/systems.causal_loop_diagram.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml -- edges->nodes referential-integrity pattern precedent"
+  - "specs/cognitive/typed-objects/mcda-analysis.schema.yaml -- cross-array-referential-integrity-as-runtime-invariant precedent (OQ-MCDAANALYSIS-1)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L545/L554-562's own literal pipeline and worked diagram plus low-risk, disclosed
+  compilation choices (the variables/edges/loops shape, CLD- prefix, loop_type recompute rule, record-level-only
+  provenance).
+
+compilation_decisions:
+  - question: "Should loop_type be a caller-set free value, or independently recomputed?"
+    decision: "Independently recomputed by ai_lego/modules/systems/causal_loop_diagram.py's builder and independent gate -- JSON Schema draft 2020-12 has no declarative way to compute a cross-item arithmetic parity check, same gap class mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 already discloses; a caller-claimed value that disagrees is refused at construction."
+  - question: "Should edge_ids closure (each edge's to_variable_id chains into the next edge's from_variable_id, wrapping to the first) be a schema keyword or a runtime invariant?"
+    decision: "Runtime invariant -- same declarative-limit gap as the loop_type recompute above; no native JSON Schema construct expresses ordered cross-item chaining."
+  - question: "Should edges/loops carry their own provenance, or only the overall record?"
+    decision: "Record-level only -- matches game-theory.schema.yaml's identical 'one coherent model' placement, not cause-hypothesis-set.schema.yaml's independently-sourced-items placement."
+  - question: "additionalProperties: false at the top level and on every nested item object?"
+    decision: "Yes -- baseline hygiene this directory converges on (game-theory.schema.yaml/mcda-analysis.schema.yaml's own identical choice), set correctly from the start."
+
+type: object
+required: [id, version, variables, edges, loops, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CLD-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.causal_loop_diagram"
+
+  variables:
+    type: array
+    minItems: 2
+    description: "Atlas L545's own 'Variables' stage. minItems:2 is the structural floor -- a causal loop needs at least two variables to relate."
+    items:
+      type: object
+      required: [id, name]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this diagram (e.g. CLD-001-V1). Referenced by edges[].from_variable_id/to_variable_id."
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+
+  edges:
+    type: array
+    minItems: 1
+    description: "Atlas L545's own '+/- 因果箭頭' (signed causal arrow) stage."
+    items:
+      type: object
+      required: [id, from_variable_id, to_variable_id, polarity]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this diagram (e.g. CLD-001-E1). Referenced by loops[].edge_ids."
+        from_variable_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        to_variable_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        polarity:
+          type: string
+          enum: ["+", "-"]
+          description: "Atlas L545's own +/- causal-arrow vocabulary."
+
+  loops:
+    type: array
+    description: "Atlas L545's own 'reinforcing/balancing' classification stage. May be empty -- a diagram may name variables and edges without yet closing a cycle."
+    items:
+      type: object
+      required: [id, edge_ids, loop_type]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this diagram (e.g. CLD-001-L1)."
+        edge_ids:
+          type: array
+          minItems: 2
+          items:
+            type: string
+            minLength: 1
+            pattern: "\\S"
+          description: "Ordered edge ids forming a closed cycle. Structural closure (each edge's to_variable_id chains into the next edge's from_variable_id, wrapping back to the first) is a RUNTIME invariant, see compilation_decisions."
+        loop_type:
+          type: string
+          enum: [REINFORCING, BALANCING]
+          description: "REQUIRED to equal the value independently recomputed from edge_ids' own polarities by ai_lego/modules/systems/causal_loop_diagram.py -- never a trusted caller value. See compilation_decisions."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas's own F09 worked diagram (L554-562): price/demand/load/quality/economies-of-scale, 2 closed loops, both independently recomputed BALANCING (each contains exactly 1 negative edge)"
+    value:
+      id: "CLD-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.causal_loop_diagram"
+      variables:
+        - {id: "VA", name: "價格下降"}
+        - {id: "VB", name: "需求增加"}
+        - {id: "VC", name: "系統負載"}
+        - {id: "VD", name: "服務品質"}
+        - {id: "VE", name: "規模經濟"}
+      edges:
+        - {id: "E1", from_variable_id: "VA", to_variable_id: "VB", polarity: "+"}
+        - {id: "E2", from_variable_id: "VB", to_variable_id: "VC", polarity: "+"}
+        - {id: "E3", from_variable_id: "VC", to_variable_id: "VD", polarity: "-"}
+        - {id: "E4", from_variable_id: "VD", to_variable_id: "VB", polarity: "+"}
+        - {id: "E5", from_variable_id: "VB", to_variable_id: "VE", polarity: "+"}
+        - {id: "E6", from_variable_id: "VE", to_variable_id: "VA", polarity: "-"}
+      loops:
+        - {id: "L1", edge_ids: ["E2", "E3", "E4"], loop_type: BALANCING}
+        - {id: "L2", edge_ids: ["E1", "E5", "E6"], loop_type: BALANCING}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-CAUSALLOOPDIAGRAM-1"
+    question: "edge_ids closure and the loop_type recompute check are both RUNTIME invariants, not schema keywords (JSON Schema 2020-12 cannot express ordered cross-item chaining or cross-item arithmetic natively). Should a future revision add a verbose if/then construct despite the cost?"
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity -- ai_lego/modules/systems/causal_loop_diagram.py enforces both at construction time"
+  - id: "OQ-CAUSALLOOPDIAGRAM-2"
+    question: "Atlas L545 names 'delay' as a fourth pipeline stage after reinforcing/balancing classification -- should a future revision add a delay field to edges or loops? Same open question the method contract's own OQ-CLD-1 already discloses."
+    owner: "operator, or whoever next revises this schema"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F09 tool table (L543-551) and the worked mermaid diagram (L554-562) directly at the cited lines,
+    including the exact edges/polarities. Cross-checked against
+    methods/contracts/systems.causal_loop_diagram.contract.yaml's own outputs/preconditions/quality. Read
+    causal-dag-analysis.schema.yaml (edges->nodes referential-integrity precedent) and mcda-analysis.schema.yaml
+    (cross-array-referential-integrity-left-as-runtime-invariant precedent) before writing this file. Grepped the
+    full spec root and runtime tree case-insensitively for "causal loop"/"causal_loop"/"feedback loop"/"CLD-"
+    before writing any of this method's own files -- zero pre-existing implementation. Validated against
+    jsonschema Draft202012Validator via tests/unit/test_causal_loop_diagram.py (required fields present, id
+    pattern satisfied, additionalProperties:false at the top level and every nested item, a mismatched loop_type
+    and a non-closing edge_ids chain both refused BEFORE this schema is ever reached by the runtime layer, since
+    neither is expressible as a schema keyword here).
+  note: >
+    No mother document was modified. variables[]/edges[] shape and the worked example's exact labels/polarities
+    are transcribed verbatim from Atlas L554-562. The nested item shapes, the CLD- prefix, the loop_type
+    recompute rule, and the record-level-only provenance placement are this file's own Phase 3-class compilation
+    decisions, disclosed above, not textually cited.

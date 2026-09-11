@@ -1,0 +1,161 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/stock-and-flow-model.schema.yaml"
+title: Stock And Flow Model
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StockAndFlowModel` -- the declared `outputs` of
+  `systems.stock_and_flow`'s Method Contract (methods/contracts/systems.stock_and_flow.contract.yaml, `outputs:
+  [StockAndFlowModel]`). Atlas F09 tool table (L546: "Stock & Flow｜建模累積量與流量｜stocks→in/out flows→rates
+  →equations｜可進入動態模擬").
+
+  Field provenance:
+    * `stocks` -- L546's own "stocks" stage. Non-empty, each a `{id, name, initial_value}` triple with a finite
+      real `initial_value` (bool excluded), unique `id`.
+    * `flows` -- the "in/out flows" and "rates" stages. Each names a direction (IN/OUT), a `target_stock_id`
+      that must resolve to a real declared `stocks` entry (referential integrity, same `causal.dag` edges->nodes
+      pattern), and a free-text `rate_description`. REQUIRED to cover every `stocks` entry at least once -- a
+      declared stock nothing flows into or out of is not a modeled stock-and-flow element, enforced as a RUNTIME
+      invariant by `ai_lego/modules/systems/stock_and_flow.py`, not expressible as a declarative schema
+      constraint (same disclosed-gap class as `mcda-analysis.schema.yaml`'s own OQ-MCDAANALYSIS-1).
+    * `provenance` -- RECORD-LEVEL ONLY, same placement `causal-loop-diagram.schema.yaml`'s own
+      compilation_decisions already establishes for this "one coherent model" class of typed object.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 tool table, Stock & Flow row (L546)"
+  - "methods/contracts/systems.stock_and_flow.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml -- edges->nodes referential-integrity pattern precedent"
+  - "specs/cognitive/typed-objects/mcda-analysis.schema.yaml -- cross-array-referential-integrity-as-runtime-invariant precedent (OQ-MCDAANALYSIS-1)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L546's own literal pipeline plus low-risk, disclosed compilation choices (the
+  stocks/flows shape, SNF- prefix, >=1-flow-per-stock completeness rule, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Should a stock with zero associated flows be legal, e.g. as a placeholder?"
+    decision: "No -- refused at construction (ai_lego/modules/systems/stock_and_flow.py builder and independent gate). Atlas's own stocks->in/out flows sequence names flows as what makes a stock a modeled element at all, not an optional annotation. Not expressible as a schema keyword -- same runtime-invariant gap class mcda-analysis.schema.yaml's own OQ-MCDAANALYSIS-1 already discloses."
+  - question: "Should flows[].rate_description be a structured rate expression, or free text?"
+    decision: "Free text. Atlas gives no rate-equation grammar for this method -- inventing one would be presenting a guess as a compiled fact, same restraint pareto-analysis.schema.yaml's undefaulted threshold already established."
+  - question: "Should stocks/flows carry their own provenance, or only the overall record?"
+    decision: "Record-level only -- matches causal-loop-diagram.schema.yaml's identical 'one coherent model' placement."
+  - question: "additionalProperties: false at the top level and on every nested item object?"
+    decision: "Yes -- baseline hygiene this directory converges on (game-theory.schema.yaml/mcda-analysis.schema.yaml's own identical choice), set correctly from the start."
+
+type: object
+required: [id, version, stocks, flows, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^SNF-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.stock_and_flow"
+
+  stocks:
+    type: array
+    minItems: 1
+    description: "Atlas L546's own 'stocks' stage -- accumulated quantities."
+    items:
+      type: object
+      required: [id, name, initial_value]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this model (e.g. SNF-001-S1). Referenced by flows[].target_stock_id."
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        initial_value:
+          type: number
+          description: "Must be a finite real number. JSON Schema `type: number` already excludes NaN/+-inf as JSON literals and excludes JSON booleans (a distinct type); the paired module additionally guards a hand-tampered Python float NaN/inf and an int-subclass bool before accepting a value -- see compilation_decisions."
+
+  flows:
+    type: array
+    minItems: 1
+    description: "Atlas L546's own 'in/out flows' and 'rates' stages."
+    items:
+      type: object
+      required: [id, name, direction, target_stock_id, rate_description]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this model (e.g. SNF-001-F1)."
+        name:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+        direction:
+          type: string
+          enum: [IN, OUT]
+          description: "Atlas L546's own 'in/out' vocabulary."
+        target_stock_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Which stock this flow changes. REQUIRED to reference a real stocks[] id -- a RUNTIME invariant, see compilation_decisions."
+        rate_description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Atlas L546's own 'rates' stage, free text. See compilation_decisions."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses. RECORD-LEVEL ONLY, see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A minimal subscription-growth model: one stock (active subscribers) with an IN flow (new signups) and an OUT flow (churn), Atlas's own stocks->in/out flows->rates sequence"
+    value:
+      id: "SNF-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.stock_and_flow"
+      stocks:
+        - {id: "S1", name: "活躍訂閱數", initial_value: 10000}
+      flows:
+        - {id: "F1", name: "新註冊", direction: IN, target_stock_id: "S1", rate_description: "每週新註冊訂閱數,依行銷活動而異"}
+        - {id: "F2", name: "流失", direction: OUT, target_stock_id: "S1", rate_description: "每週取消訂閱數,約為活躍訂閱數的 1.2%"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - id: "OQ-STOCKANDFLOWMODEL-1"
+    question: "target_stock_id referential integrity and the >=1-flow-per-stock completeness rule are both RUNTIME invariants, not schema keywords (JSON Schema 2020-12 cannot natively express 'every array A item must be referenced by some array B item'). Should a future revision add one despite the verbosity?"
+    owner: "operator, or whoever next hardens this schema's cross-field guarantees"
+    blocks: "nothing in this file's own validity -- ai_lego/modules/systems/stock_and_flow.py enforces this at construction time"
+  - id: "OQ-STOCKANDFLOWMODEL-2"
+    question: "Atlas L546 names 'equations' as a pipeline stage after rates -- should a future revision add an equations/formula field for entering real dynamic simulation? Same open question the method contract's own OQ-SNF-1 already discloses."
+    owner: "operator, or whoever next revises this schema"
+    blocks: "nothing in this file's own validity"
+
+verification:
+  method: >
+    Read Atlas F09 tool table (L543-551), Stock & Flow row (L546), directly at the cited line. Cross-checked
+    against methods/contracts/systems.stock_and_flow.contract.yaml's own outputs/preconditions/quality. Read
+    causal-dag-analysis.schema.yaml (edges->nodes referential-integrity precedent) and mcda-analysis.schema.yaml
+    (cross-array-referential-integrity-left-as-runtime-invariant precedent) before writing this file. Grepped the
+    full spec root and runtime tree case-insensitively for "stock and flow"/"stock_and_flow"/"SNF-" before
+    writing any of this method's own files -- zero pre-existing implementation. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_stock_and_flow.py (required fields present, id pattern satisfied,
+    additionalProperties:false at the top level and every nested item, a dangling target_stock_id and a
+    flow-less stock both refused BEFORE this schema is ever reached by the runtime layer, since neither is
+    expressible as a schema keyword here).
+  note: >
+    No mother document was modified. stocks[]/flows[] shape is a direct transcription of Atlas L546's own
+    stocks->in/out flows->rates pipeline. The nested item shapes, the SNF- prefix, the >=1-flow-per-stock
+    completeness rule, and the record-level-only provenance placement are this file's own Phase 3-class
+    compilation decisions, disclosed above, not textually cited.

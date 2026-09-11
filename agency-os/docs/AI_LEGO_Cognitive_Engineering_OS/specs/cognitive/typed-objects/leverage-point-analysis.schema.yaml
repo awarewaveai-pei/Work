@@ -1,0 +1,113 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/leverage-point-analysis.schema.yaml"
+title: Leverage Point Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LeveragePointAnalysis` -- the declared `outputs` of
+  `systems.leverage_point_analysis`'s Method Contract (methods/contracts/systems.leverage_point_analysis.contract.yaml,
+  `outputs: [LeveragePointAnalysis]`). F09 systems-thinking family, first built member. Atlas F09 table row
+  (L550: "Leverage Point Analysis｜找高槓桿干預點｜parameters→feedback→rules→goals→paradigm｜提升資源效益").
+
+  Field provenance:
+    * `intervention_points[]` -- one per identified leverage point. `tier` is Atlas's own 5-value chain
+      (parameters→feedback→rules→goals→paradigm), transcribed verbatim as a closed enum. `tier_rank` --
+      GENUINE_COMPUTE, a fixed 1-5 mapping over `tier` (PARAMETERS=1 ... PARADIGM=5), NEVER caller-supplied
+      (see compilation_decisions).
+    * `provenance` (top-level only) -- record-level, matching this corpus's established batch precedent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F09 系統思考 table, Leverage Point Analysis row (L550)"
+  - "methods/contracts/systems.leverage_point_analysis.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L550's own 5-tier chain plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should tier_rank be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) from a fixed total (tier -> rank) 5-entry lookup, same discipline challenge.fmea's own rpn and challenge.pre_mortem's own priority already establish -- never an accepted builder parameter."
+  - question: "additionalProperties: false at the top level, and on each intervention_points[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+
+type: object
+required: [id, version, intervention_points, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^LPA-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "systems.leverage_point_analysis"
+
+  intervention_points:
+    type: array
+    minItems: 1
+    description: "Atlas L550's own leverage-point identification. At least one required -- an analysis naming zero intervention points has not actually run the method."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, tier, tier_rank]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The intervention point itself, in natural language -- what could be changed, and where in the system."
+        tier:
+          type: string
+          enum: [PARAMETERS, FEEDBACK, RULES, GOALS, PARADIGM]
+          description: "Atlas L550's own 5-tier chain, transcribed verbatim, in shallow-to-deep leverage order."
+        tier_rank:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: "GENUINE_COMPUTE -- mechanically derived from tier via a fixed total mapping (ai_lego/modules/systems/leverage_point_analysis.py `_TIER_RANK`). NEVER a builder parameter -- see compilation_decisions."
+
+  provenance:
+    description: "Record-level only -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A leverage-point analysis over a customer-support backlog problem: 2 intervention points spanning a shallow tier (a queue-size parameter) and a deep tier (the team's own paradigm about what 'support' means)."
+    value:
+      id: "LPA-2026-09-11-001"
+      version: "1.0.0"
+      generated_by_method: "systems.leverage_point_analysis"
+      intervention_points:
+        - id: "LP-001"
+          description: "調高客服工單佇列上限的緩衝參數，短期紓解積壓"
+          tier: PARAMETERS
+          tier_rank: 1
+        - id: "LP-002"
+          description: "改變團隊對『客服』角色的根本典範，從『滅火』轉為『從源頭消除工單成因』"
+          tier: PARADIGM
+          tier_rank: 5
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-LEVERAGEPOINTANALYSIS-1: intervention_points[] carries no explicit ranking/ordering field beyond tier_rank itself -- a future revision could add an explicit priority_order if a downstream consumer needs a total order across points that share the same tier (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F09 table row (L550) directly at the cited line. Grepped the full spec root (specs/**,
+    methods/**) case-insensitively for "leverage point"/"LeveragePointAnalysis" before writing this file -- one
+    incidental hit (value-chain-analysis.schema.yaml's own generic prose use of "leverage point(s)", not a
+    defined output shape; read in full to rule out collision). Validated against jsonschema.Draft202012Validator,
+    including a mutation check that a hand-crafted tier_rank disagreeing with its own tier is caught by the
+    runtime gate (not expressible here).
+  note: >
+    No mother document was modified. The 5-tier chain is transcribed verbatim from Atlas L550. The GENUINE_COMPUTE
+    tier_rank mapping is this file's own compilation decision, disclosed above.
