@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-09-11 regenerate-image 重測 + 實拍剪輯／短劇 Story Bible 真實測試（操作者要求）
+
+操作者：「還沒修的：regenerate-image...去修，還有你有測試以下兩個嗎？短劇...實拍剪輯」。
+
+[regenerate-image] 用真實登入 session + flux-schnell 真花錢送一次 → 200 OK，圖片正常產出（R2 URL 有效），next-admin log 無錯誤。**沒有改任何 code**——`REPLICATE_API_TOKEN` 本來就有接（跟本輪 remotion 的兩個缺漏不同類），SSH 直測 token 對 Replicate `/v1/account` 也早就通。原始 502 根因未查出（沒有可重現的失敗可供診斷），可能是暫時性或本輪 remotion 修復期間多次 `docker compose up -d next-admin` 重啟順手清掉某種殘留壞狀態——這是推測，非證實。TASKS.md 對應項標記完成（含此揭露）。
+
+[實拍剪輯 footage_edit] 真實 UI 全鏈測試：合成測試用 mp4（lobster-video-service 容器內 ffmpeg testsrc）→ 上傳→設切點→編譯 Timeline→送渲染。**第一輪出現真實 502**（`clip video trim failed...Could not open encoder before EOF`），第二輪同樣失敗，一度誤判為真 bug。深查後發現：本機端傳輸測試檔（透過 SFTP 讀出 base64 → 貼進 Write tool → 本機解 base64）中途遺失 96 bytes（22361→22265 bytes，sha256 不符）——**是我自己測試素材的傳輸損壞，不是 app 的 bug**。驗證方式：直接 SSH 進 `lobster-video-service` container 用 `python3 -c "import pipeline; pipeline._trim_clip_video(...)"` 對「已知完好」的原始檔案（sha256 核對過）直接呼叫核心 trim function，成功。同時比對 R2 上實際存的檔案 sha256，與我本機損壞版本一致（非 R2/download 端損壞）——三方交叉確認根因在我自己的傳輸步驟，footage_edit pipeline 本身沒問題。**沒有因此誤報 bug 給操作者**（VBC：先驗證，才下結論）。
+
+[短劇 short_drama] Story Bible workbench（`/tools/video?advanced=1` → 📖 短劇 Story Bible）真實測試：選租戶、填本集前提/結尾鉤子/節拍、新增一個角色、「儲存新草稿版本」→ 成功產生 `series_1 r1`（draft）；點「核准」→ 成功變 `approved`。**Story Bible 建立＋核准這段本身可用**。
+
+**但深查後發現重大缺口**：「手動生成」（實際腳本產出的表單）完全沒有 Story Bible 選取欄位；`grep storyBible/seriesId` 在 `ScriptForge.tsx` 和 `/api/tools/script-forge/route.ts` 都是 0 命中，`story_bible` 唯一出現處只是 nav tab 本身（`ScriptForge.tsx:114,939`，純粹渲染 `<StoryBibleWorkbench/>`）。**操作者描述的「短劇＝套用上一步建立的 Story Bible」這個核心差異化功能，前後端都沒有接線**——Story Bible 存在，但沒有任何程式碼路徑會在腳本生成時讀取它、影響角色/場景/連續性。目前選「短劇」模式跟選「快速影片」模式，實際跑的是同一條生成管線，唯一差別只是 wizard 上的標籤字。這不是一個「壞掉的功能」，是一個「從未真正建完」的功能——本輪如實揭露，未動手接線（產品範疇決定，非本輪授權範圍），列 TASKS.md 待操作者決定優先度。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Browser(javascript_tool, 真實登入 session) | cmd=`POST /api/video/regenerate-image`（flux-schnell，真實花費） | exit=0 | result=200，`{"ok":true,"imageUrl":"https://pub-.../716eb12b-....png"}`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sha256sum` 比對本機損壞版本／R2 實際檔案／原始完好版本三份檔案 | exit=0 | result=本機與 R2 一致（都損壞），與原始完好版不同——三方交叉confirm 根因在傳輸步驟
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-video-service python3 -c "import pipeline; pipeline._trim_clip_video('/tmp/test-clip.mp4', 0, 3000, ..., 1920, 1080, 30)"`（對已知完好檔案直呼叫核心函式） | exit=0 | result=SUCCESS，證明 footage_edit trim 邏輯本身無 bug
+- REALTEST_EVIDENCE: tool=Browser(真實登入 session, 真實點擊) | cmd=Story Bible 表單填寫＋「儲存新草稿版本」＋「核准」 | exit=0 | result=`series_1 r1` draft→approved 兩階段皆成功
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=storyBible\|story_bible\|seriesId | hits=2（`ScriptForge.tsx:114,939`，僅 nav tab 渲染，非資料流接線）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+① short_drama 的 Story Bible 套用邏輯完全未建（見上）——若操作者要真正的短劇連續性功能，這是一個新功能開發項目，不是修 bug，需要先決定：腳本生成 API 要不要接 seriesId/episodeId 參數、Claude prompt 要不要注入 Bible 的角色/場景/連續性規則、UI 要不要加選取欄位。
+② regenerate-image 原始 502 根因仍未確定（見上）——如果操作者之後再遇到，需要在**當下**重現＋立刻查 next-admin log，本輪的時間窗已經錯過，无法追溯。
+③ 本輪產生的測試 assets（R2 上的 test-clip.mp4 兩份、footage_edit 輸出、regenerate-image 測試圖、Story Bible `series_1 r1` 測試草稿）都是真實資料，未清理——如需要乾淨環境需手動清除，非自動化清理範圍內。
+
+[rollback] 本輪皆為只讀測試 + 一筆真實 Story Bible 草稿寫入（`series_1 r1`，可在 UI 刪除或忽略），無 code/infra 改動，無需 rollback。
+
 ## 2026-09-11（客服系統 U6：收尾三個子待辦——accountId 唯一性 index 已套 + SMTP 已接 Resend + 「rate limit 缺失」查出是誤報，nginx 早就有）
 
 **觸發**：延續前批 U6 端到端跑通後，處理 TASKS.md 記錄的 3 個 critic 子待辦。
@@ -22,6 +49,32 @@
 
 **[剩餘風險]** ①`.env.bak-20260911-smtp` 備份留在 ks-aw-01，未清（低風險，非 secrets 之外的新增暴露面）。②chatwoot-redis 因本次 env_file 變更被連帶 Recreate，佇列中若有進行中 job 會遺失（本次操作時段無真實客戶流量，未觀察到影響）。③Resend `RESEND_SENDER_EMAIL_ADDRESS`/`RESEND_REPLY_TO_EMAIL_ADDRESSES` 在 `mcp/user-env.ps1` 本機仍是空值（不影響本次 SMTP relay，因 Chatwoot 走自己的 `MAILER_SENDER_EMAIL`，非讀這兩個變數；但若未來其他系統要用這兩個值會發現是空的，非本次範圍）。
 **[rollback]** 0079：`node scripts/apply-db-migration.mjs`（若擴充支援 down）或手動 `docker exec ... psql -f 0079_..._.down.sql`。SMTP：還原 `.env.bak-20260911-smtp` 覆蓋 `.env` 後 `docker compose up -d chatwoot-rails chatwoot-sidekiq`。route.ts：無需 rollback，已是 0 diff。apply-db-migration.mjs：`git revert` 對應 commit。
+
+
+## 2026-09-11 HCI30 案件詳情頁改左右並排版面——操作者截圖回報「應該左右放 這樣UI/UX 比較好」
+
+操作者截圖指出兩處目前上下堆疊、浪費垂直空間的區塊：雷達圖疊在構面卡片上方、證據列表疊在新增紀錄表單上方。改成 CSS Grid 左右並排：
+- 信任構面：雷達圖固定寬度（260-380px）在左，7 個構面卡片在右，同一組 7 個構面資料的兩種呈現方式現在能同時看到，不用捲動對照
+- 證據與主張：既有證據列表＋系統建議在左，新增調查發現表單在右（`position: sticky`，捲動列表時表單保持在視野內）
+
+兩處都加 `@media (max-width: 780px)` 退回單欄，避免窄螢幕擠壓可讀性。`.radar-wrap` 這個 class 同時被案件詳情頁與凍結報告頁共用，改一次兩邊都套用，不用各自維護一份。
+
+真跑驗證：建立真實案件＋證據，用 `getComputedStyle` 直接核對兩處都是 `display:grid` 且欄寬確實分成兩欄（非只是視覺上看起來對但實際還是 block 堆疊）；報告頁面也核對過同樣是 grid。窄螢幕退回單欄的行為只用程式碼審查確認媒體查詢語法正確（標準 `max-width` 語法），**未能用瀏覽器實際窄螢幕渲染驗證**——本機這套瀏覽器分頁工具這次無法把 `window.innerWidth` 真的降到模擬寬度以下（試過 resize_window 的 mobile 預設與自訂 375px 寬度、也試過重新整理，`window.innerWidth` 始終回報桌面寬度），研判是工具本身的既知不穩定（本 session 稍早也遇過螢幕截圖失敗的同類狀況），不是程式碼問題，但誠實揭露這一段沒有真機驗證過。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=建立真實案件與證據，`getComputedStyle` 核對 `.radar-wrap`／`.evidence-layout` 在案件詳情頁與報告頁皆為 2 欄 CSS Grid（非僅視覺巧合）| 結果=兩處皆確認為真實 grid 版面，console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS/HTML 版面調整，element id 全部不變（`grep -c` 逐一核對 d-records/d-suggestions/record-add-panel 皆仍為 1，無重複/孤兒 id），JS 邏輯零改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=evidence-layout | hits=1（僅 index.html 本身）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（雷達圖+構面卡片、證據列表+新增表單，各自改 CSS Grid 左右並排，窄螢幕媒體查詢退回單欄）
+
+[驗證結果] 見上 REALTEST_EVIDENCE；窄螢幕退回單欄僅程式碼審查，未真機驗證（工具限制，已誠實揭露）
+
+[剩餘風險] 窄螢幕/手機版面的實際渲染效果未經真機驗證，媒體查詢語法本身正確但建議之後用真實手機或穩定的瀏覽器工具複驗一次
+
+[rollback]
+`git revert` 本次 commit：兩處 `display:grid` 樣式與包裹用的 `<div class="evidence-layout">` 容器一併移除，回到上下堆疊的上一版。純 CSS/HTML，無 JS/資料影響，可安全回滾。
 
 ## 2026-09-11 第十批（兩個東西按不到：蒐集器沒有入口，知識庫被標成 soon）
 
