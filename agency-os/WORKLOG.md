@@ -1,5 +1,80 @@
 # Worklog
 
+## 2026-09-11 短劇 Story Bible 真正接線：手動生成套用 Bible + 自動連續性檢查（操作者選「完整版」）
+
+上一條 worklog 誠實揭露了短劇模式的 Story Bible「套用」從沒真正接線（建立/核准可用，但腳本生成完全沒讀它）。操作者看到這條記錄後問「完成了嗎？」——回報還沒做，並用 AskUserQuestion 讓她選範圍（最小可行版 vs 完整版+自動連續性檢查 vs 先不做），她選**完整版**。
+
+[架構調查] `/api/tools/script-forge`（`route.ts`）是純轉發端點——client 端把完整 prompt 字串組好送進去，server 端固定 system prompt，不碰內容。ScriptForge.tsx 的 `claude(prompt)` 是全部 24 個模組共用的唯一呼叫點。這代表 Bible 套用完全不需要碰後端路由，只要在前端把 Bible 內容格式化成文字、塞進 `claude()` 送出的 prompt 字串即可——符合既有架構慣例，不是另開一條路。另發現 ScriptForge 元件本身完全沒有 organizationId 概念（在 wizard Step 2 才選租戶）；比照 `FootageEditor`/`StoryBibleWorkbench` 既有慣例（各自帶獨立 `OrganizationPicker` 實例，非全域 state），在 `ManualModule`（手動生成分頁）內建一個獨立的 org 選擇器，只為套用 Bible 用。
+
+[實作]（`ScriptForge.tsx`，91 行新增）
+- `storyBibleContextBlock(doc)`：把 Bible 的角色/場景/目前狀態/不可違反設定/未解線索/本集節拍格式化成中文區塊，插進 `doAngles`/`doScript` 現有 prompt 尾端。
+- `useStoryBibles(orgId)`：呼叫既有 `GET /api/video/story-bibles?organizationId=`，篩 `status==="approved"`，每個 series 只留最新一版（API 已按 series_id, revision desc 排序，取第一筆）。
+- `checkStoryBibleContinuity(script, doc)`：腳本生成完成後，若有套用 Bible，再呼叫一次 `claude()` 檢查腳本是否違反 Bible 的「不可違反的設定」（`continuity.prohibitions`），回傳結構化違反清單。**這是輔助提醒，不擋送去生產影片**——腳本品質判斷仍是人的工作，不做自動裁決式的假把關。
+- UI：手動生成分頁新增「📖 套用短劇 Story Bible（選填）」卡片（org 選擇器 + 已核准 Bible 下拉 + 角色/場景/不可違反預覽）；生成完成後若有套用 Bible，`ScriptResult`（既有 `extraTop` slot，之前沒用到）多顯示一張連續性檢查結果卡（檢查中／解析失敗／發現違反列表／✅ 通過）。
+- 刻意只接在「手動生成」一個模組，其餘 23 個模組（廣告A/B/C、產業模板…）不加——短劇連續性的真實使用場景就是這條路，複製 10 份選擇器多半用不到。
+
+[驗證]
+- `npx tsc --noEmit`：乾淨（兩輪，套用 critic 修正後重跑仍乾淨）。
+- critic 覆審（1 agent，Quick）：dedup 邏輯／org 隔離（`effectiveOrgId` 對 client-kind 使用者強制回自己租戶，query 參數傳別人 org 也沒用）／stale closure／continuity-check 例外處理，全部驗過乾淨。抓到 3 個 minor（`ok` 欄位缺失時誤判為通過、`sceneIndex` 缺失顯示 NaN、載入中無提示）已修。
+- `npx vitest run`：1019 tests pass（含既有全部 video pipeline 測試），無回歸。
+- BUGHUNT_DONE: scope=lobster-factory | grep=useStoryBibles\|storyBibleContextBlock\|checkStoryBibleContinuity | hits=僅本檔（新符號，預期無其他消費端）
+
+[剩餘風險]
+① 這輪只接「腳本內容套用 Bible」——沒有把 seriesId/episodeId 往下游帶（Step 2 選的租戶、最終渲染 job 的 record_params 都跟 Bible 無關聯），也就是「這支影片是哪個系列第幾集」目前只存在於腳本生成當下，沒有寫回任何持久化紀錄。這是刻意的範圍邊界（操作者選的是「連續性檢查」，不是「全鏈路集數追蹤」），如果之後要做集數管理／自動勾稽哪些集已經拍了，需要另外決定範圍。
+② 連續性檢查是一次額外的 LLM 呼叫（多一次真實花費），只在使用者主動選了 Bible 才會觸發——沒有 bible 選擇 = 行為與這功能存在之前完全一致，零額外成本。
+③ 尚未跑真實 UI 端對端測試（建 Bible → 套用 → 生腳本 → 看到連續性檢查結果）——下一步待做。
+
+[rollback] `git revert` 對應 commit；純前端新增區塊，沒有 schema/API 改動，回滾無副作用。
+
+## 2026-09-11 AwareWave Postiz Meta app：隱私政策頁補上 + 接進 App 設定（發現並清掉一個重複頁）
+
+**觸發**：延續同日稍早建立的 Meta app「AwareWave Postiz」，App Review 前置需要隱私政策網址；操作者確認走「先起草陽春版給她確認」路線，核准草稿結構後動手。
+
+**做了什麼**：
+1. 草稿內容（我們是誰／收集什麼資料／如何使用／保存與刪除／聯絡方式）寫成 HTML，經 base64+SSH 傳到 ks-aw-01 避開 CJK over SSH 的既知 mojibake 坑（`reference_cjk_bash_cron_encoding.md` 同款作法）。
+2. 原本用 `wp post create` 直接建新頁，結果撞見 **`aware-wave.com` 早就有一個 `privacy-policy` slug 的頁面**（id=3，標題「隱私權政策」，2026-04-17 建立、WordPress 預設範本內容、從未填寫、狀態 draft）——這就是稍早問「aware-wave.com/privacy-policy 存不存在」查到 404 的真正原因（draft 不公開顯示，但 slug 仍被佔用），我新建的頁因此被迫改名 `privacy-policy-2`，兩個 URL 並存會混淆。
+3. 改用 `wp post update 3` 把內容寫進**原本那個頁**（它本來就是 `wp_page_for_privacy_policy` 選項指到的頁面，只是從未發布），發布後刪掉重複的 `privacy-policy-2`。乾淨結果：`https://aware-wave.com/privacy-policy/` 直接 200，無 redirect。
+4. Meta 後台 `基本資料` 頁填入隱私政策網址 + 資料刪除指示網址（都指向同一頁，§4 已涵蓋刪除流程），存檔成功。
+5. App icon 上傳嘗試失敗——Claude in Chrome 的 `file_upload` 找不到真正的 `<input type=file>`（React 把它包在 `<label>` 底下，工具只抓得到外層 label/button），留給操作者自己手動拖檔上傳，非阻塞項。
+6. 服務條款網址刻意沒動（仍是 Meta 預設 `facebook.com` 佔位）——操作者只核准了隱私政策草稿，服務條款是另一份法律文件，不能未經同意就自己編一份發布。
+
+**已修改**：
+- ks-aw-01 `lobster-wordpress` 容器：WordPress post id 3（`aware-wave.com/privacy-policy/`）內容更新為隱私政策正文並發布；刪除本次誤建的重複頁 id 19。
+- `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`：Meta app 段落補上 redirect URI 已完成、隱私政策 URL、剩餘缺項訂正。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -sL -o /tmp/pp.html -w "%{http_code} %{url_effective}" https://aware-wave.com/privacy-policy/` | exit=0 | result=200，無 redirect，`<title>隱私權政策 – Aware Wave</title>`，內文含「聯絡方式」等 4 處
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp post list --post_type=page` 前後對照 | exit=0 | result=確認 id=3 狀態從 draft→publish、id=19 已刪除，無殘留重複頁
+- REALTEST_EVIDENCE: tool=Claude in Chrome | 場景=Meta 基本資料頁填 URL 後重新整理截圖確認欄位值持久化 | 結果=隱私政策 URL 與資料刪除 URL 皆正確保留
+- REVIEW_WAIVED: NA -- 純內容頁面發布 + 既有頁面內容替換（無 code/schema 變更），Meta 後台為純表單填寫
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`privacy-policy-2\|post id 19` | hits=0（本次產物僅存在於已刪除的暫時頁，無其他文件引用殘留）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 服務條款網址仍是 Meta 佔位值，App Review 正式送審前必須換成真實內容；App icon 尚未上傳。
+[rollback] `wp post update 3`（用 2026-04-17 前的預設範本內容還原，或 `--post_status=draft` 退回草稿）；Meta 後台兩個 URL 欄位可直接清空重存。
+
+## 2026-09-11（147–156 號切片：開新家族 F07 利害關係人／權力／協商 0/10→10/10，10 個平行 agent + 1 critic，2 Critical/5 Major/3 Minor 全數同日修復）
+
+**觸發**：緊接 F06 收官後，操作者「繼續完成系統！我全部同意核准，需要決定的事都你決定」全權授權，明訂 30 年工程紀律／零重工／完整閉環／最小爆炸半徑四準則，同時明訂「不准一次無效益派多 agent」。選型：F07（利害關係人／權力／協商，Atlas L483-507，10 個成員：Stakeholder Map/Power–Interest/Salience Model/Incentive Mapping/RACI/BATNA/ZOPA/Interest-Based Negotiation/Game Theory/Coalition Mapping）——F06 之後 Atlas 順序下一個未開工家族，`method-inventory.yaml` L486-535 全 10 列 `has_contract:false` 確認真的 0/10。沿用 F06 的預先防範模式：provenance record-level-only 直接寫進派工 brief；bool-is-int 陷阱點名 F03 `lotus_blossom.py` 真實案例要求同批預先防範。新增：`ai_lego/modules/stakeholders/__init__.py` 由主 session 先建立空殼，避免 10 個 agent 搶 package-init 檔案的 race（3 批批次首次採用此手法）。
+
+**建置**（10 個方法，各自獨立檔案零交叉引用）：stakeholder_map(62t，relationship_types 全 map 聯集須覆蓋≥2 種 DIRECT/INDIRECT/BENEFICIARY/RISK_BEARER，機械化「防止只看決策者」)/power_interest(60t，quadrant 從 power_score×interest_score 決定性 GENUINE_COMPUTE 推導，mermaid 象限幾何另外查證 mermaid-js 官方文件非用猜的，無 importance ranking 欄位機械化「不是判斷誰比較重要」)/salience_model(57t，Power/Legitimacy/Urgency 三維 present+justification，dimension_count/salience_class GENUINE_COMPUTE，刻意不採用 Atlas 未給的 Mitchell-Agle-Wood 7 類學術標籤，誠實揭露)/incentive_mapping(48t，incentive_cards 逐卡 5 欄位完整性)/raci(57t，恰一 Accountable+至少一 Responsible+封閉 R/A/C/I，`SRACI-` prefix 與未來 F22 delivery-RACI disambiguate)/batna(50t，best_alternative_id 參照完整性+reservation_point GENUINE_COMPUTE)/zopa(51t，zopa_exists/zopa_range 全決定性推導無可覆寫參數)/interest_based_negotiation(55t，固定 4 階段管線+position 反-echo)/game_theory(51t，payoff 完整性閘住 equilibrium 接受，不做真賽局求解)/coalition_mapping(56t，stakeholder_profiles≥2+coalition_scenarios referential integrity)。合計 537 tests，全 regression 首輪 9436 passed/918 subtests。
+
+**critic 覆審（1 個，Opus 模型，33 個自建 tamper 案例真跑對真實 gate function，非重用各方法自己的測試）**：verdict=fail｜2 Critical/5 Major/3 Minor。**Critical**：①`game_theory.py` 的 `_is_number_excluding_bool` 擋了 bool 但漏擋 `math.isfinite`——payoff `value=NaN/inf` 通過 builder+gate+schema 三層，NaN 比較恆 False 讓「payoff 設錯模型無用」這個核心不變量形同虛設（同批 batna/zopa 早有此檢查，game_theory 漏了）。②`raci.py` 的恰一 Accountable 是逐 task 計數，沒查 task_name 唯一性——兩個 task 都叫「Ship release」各自一個 A，各自通過檢查，但真實世界這個 task 現在有 2 個人自認 Accountable，正是 RACI 存在的目的要消滅的責任模糊，走正常 builder 路徑就能重現，不是要刻意 tamper。**Major**（5 個）：③`batna.py` 的 best_alternative_id 只查參照完整性沒查是否真的最優——§11.16 step 3 字面是「選最佳」，選中淨值較低的真實替代方案會讓 reservation_point（ZOPA 的下游依賴）悄悄失真。④`interest_based_negotiation.py` 的反-echo 只做 casefold+空白折疊，NFD 分解形式或全形拉丁字母改寫可繞過。⑤`game_theory.py` builder 對 players/strategies/payoffs 只淺拷貝外層 list，巢狀 dict 仍是呼叫端原物件的參照，建構後篡改呼叫端字典會悄悄改掉已過 gate 的記錄（本批其餘 9 個 builder 都有正確深拷貝，只有這個漏了）。⑥`coalition_mapping.py` 的 id 唯一性/參照完整性用精確字串比對，`"eu"` 與 `"eu "` 算 2 個不同 stakeholder，讓 `member_ids:["eu","eu "]` 通過「≥2 相異成員」下限，實際是退化成單一政黨的假聯盟。⑦commit 前 `contract-backlog.yaml` 尚無 F07 條目（批次進行中的中繼狀態被 critic 抓到，非最終遺漏）。**Minor**（3 個）：gate 層普遍沒做 record-level key-set 檢查（4 個方法，僅 schema 層擋，critic 明確判定「非真漏洞，defense-in-depth 仍在」）；`salience_model.py` gate 沒回頭核對 `computation_provenance_ref` 是否被偽造成別的方法；`game_theory.py` 的 `_STORED_CONTENT_KEYS` 定義了但從未使用（死碼）。**Verified Clean**：所有 gate 均不呼叫自己的 builder（獨立 re-derive 為真）、10 個方法互不 cross-import、GENUINE_COMPUTE 欄位用 `inspect.signature` 而非只信 docstring 逐一驗證無該參數、RACI/F22 disambiguation 為真、10 個 contract 皆能透過未修改的 resolver 正確 resolve。
+
+**修復（2 Critical + 4 Major 動手修，1 Major 記為批次中繼狀態已隨本次 commit 解決，3 Minor 挑低成本的修：salience 的 provenance_ref 回核＋game_theory 死碼順手接上關掉自己的 key-set 缺口；其餘 3 個方法的 gate key-set 缺口因 critic 已判定非真漏洞、且逐一補要動 4 個檔案，權衡後留 disclosed OQ 不補，非偷懶漏改）**：`game_theory.py`（`math.isfinite`＋builder 逐元素深拷貝＋`_STORED_CONTENT_KEYS` 接上 gate，+8t）/`raci.py`（`RACI_DUPLICATE_TASK_NAME`，builder+gate 兩層，+3t）/`batna.py`（`BATNA_BEST_ALTERNATIVE_NOT_OPTIMAL`，builder+gate 兩層，ties 合法，+4t，另修 2 個既有測試改用真實最優 id）/`interest_based_negotiation.py`（`_normalize` 先 `unicodedata.normalize("NFKC",...)` 再 casefold，+2t）/`coalition_mapping.py`（共用 `_normalize_id` strip，套進 profile-id 去重＋member_ids 去重＋兩處 `stakeholder_ids` frozenset 建構，+3t）/`salience_model.py`（gate 補 `computation_provenance_ref` 回核，+1t）。537→568 tests，全數修復後 6 個受影響檔案的測試套件 + 全 regression 重跑皆綠。
+
+**[已修改]**：10 個新 method（各 4-5 檔）+ `ai_lego/modules/stakeholders/__init__.py`（家族總覽）+ `contract-backlog.yaml`（10 筆新登記，含 critic 修復摘要）+ `method-inventory.yaml`（10 列 has_contract 翻正）+ `TASKS.md`（剩餘範圍訂正為 F09/F10/F13/F14/F15/F22/F23/F24 共 8 家族）+ 6 個檔案的 critic 後修復（game_theory/raci/batna/interest_based_negotiation/coalition_mapping/salience_model 的 module+test 各一）。
+
+**[驗證結果]**：`python -m pytest tests/`（Projects/internal/cognitive-engineering-os）首輪 9436 passed/918 subtests exit=0；critic 修復後受影響 6 檔重跑 347 passed/24 subtests exit=0；全套 regression 收工前再跑一次待確認（背景執行中）。10 個 CLI slice 批次建置時各自真跑 PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/`（Projects/internal/cognitive-engineering-os） | exit=0 | ms=862120
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_game_theory.py tests/unit/test_raci.py tests/unit/test_batna.py tests/unit/test_interest_based_negotiation.py tests/unit/test_coalition_mapping.py tests/unit/test_salience_model.py` | exit=0 | ms=60300
+- REVIEW_DONE: critic=Standard（1 個，Opus，33 個獨立 tamper 案例真跑對真實 gate function） | verdict=fail-then-fixed | findings=2c/5m/3n（2 Critical+4 Major 動手修，1 Major 為中繼狀態隨 commit 自然解決，3 Minor 部分修/部分 disclosed OQ）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=stakeholders\.(stakeholder_map\|power_interest\|salience_model\|incentive_mapping\|raci\|batna\|zopa\|interest_based_negotiation\|game_theory\|coalition_mapping) | hits=僅本批次自己的檔案，零殘留/零衝突
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：power_interest／zopa／interest_based_negotiation 3 個方法的 gate 仍無 record-level key-set 檢查（只有 schema 層擋，critic 判定非真漏洞、defense-in-depth 仍在，未補是權衡後的決定非遺漏，OQ 留待未來批次一次性補齊 4 個方法的 gate key-set 檢查——game_theory 已示範接法）；salience_model 的 7 類學術分類表刻意不採用；本次過程中兩度遇到另一個並行自動化機制（`git-align-main-aoresume-feature`／`pre-pull-multisession`）把本 session 對 3 個共用檔案（`contract-backlog.yaml`/`method-inventory.yaml`/`TASKS.md`）的未提交編輯連同其他並行 session 的髒狀態一起 stash+pull+merge，兩次都用 `git checkout stash@{N} -- <path>` 精準撈回，未動到 stash 裡其他 session 的內容、未造成任何遺失——確認 `scripts/git-stage-hunks.py` 記載的手法即使腳本本身沒直接用也適用於這個情境；F07 之後仍有 F09/F10/F13/F14/F15/F22/F23/F24 共 8 個家族完全未開工。
+**[rollback]**：`git revert` 本次 commit 即可，10 個方法彼此無交叉引用，互不影響其餘家族。
+
 ## 2026-09-11 實拍剪輯真實成品驗證 + 測試資料清理（操作者要求看到真的產出）
 
 操作者：「我沒看到成品，你可以拿生成記錄裡面的4支片子去做」——上一條 worklog 只證明了 trim function 本身沒 bug，沒有真的產出一支看得到的影片。本條補上真實成品。

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { chipStyle } from "@/components/tools/panel-primitives";
 import StoryBibleWorkbench from "./StoryBibleWorkbench";
+import OrganizationPicker from "./OrganizationPicker";
 
 // Palette mapped onto the GLOBAL theme CSS vars so ScriptForge matches the rest of the
 // app (was a bespoke coral/violet/jade palette) AND follows /tools/theme automatically.
@@ -54,6 +55,76 @@ const RemotionBridge = createContext<SendToRemotion | null>(null);
 // VideoStudio 只負責素材模式、模型、配音、輸出比例與渲染。
 const ScriptSettingsCtx = createContext<{ sceneCount: number; customScenes: number }>({ sceneCount: 6, customScenes: 3 });
 function pj(raw){return JSON.parse(raw.replace(/```json|```/g,"").trim());}
+
+/* ── 短劇 Story Bible 套用（2026-09-11）── 這是「手動生成」腳本生成的唯一接線點；其餘 23 個
+   模組（廣告A/B/C、產業模板…）刻意不加，避免同一顆選擇器複製 10 份卻多半用不到——短劇連續性
+   的真實使用場景就是「手動生成」+ Story Bible workbench 這條路。org 選擇器是 ManualModule 自己
+   帶的獨立 OrganizationPicker 實例（跟 FootageEditor/StoryBibleWorkbench 同 pattern，非全域
+   state），因為 ScriptForge 本身在此之前完全沒有 organizationId 概念（Step 2 才選租戶）。 */
+type StoryBibleDoc = {
+  seriesId: string; revision: number;
+  characters: { id: string; name: string; role?: string }[];
+  locations: { id: string; name: string }[];
+  continuity: { currentState: string[]; prohibitions: string[]; openThreads: string[] };
+  episode: { episodeId: string; premise: string; hook: string; beats: string[] };
+};
+type StoryBibleListItem = { id: string; series_id: string; revision: number; status: string; document_json: StoryBibleDoc };
+
+/** Bible 內容轉成可插進生成 prompt 的中文區塊；缺欄位一律顯示「（無）」，不留空字串造成 prompt 斷句怪異。 */
+function storyBibleContextBlock(doc: StoryBibleDoc): string {
+  const chars = (doc.characters || []).map((c) => c.role ? `${c.name}（${c.role}）` : c.name).join("、") || "（無）";
+  const locs = (doc.locations || []).map((l) => l.name).join("、") || "（無）";
+  const state = (doc.continuity?.currentState || []).join("；") || "（無）";
+  const forbid = (doc.continuity?.prohibitions || []).join("；") || "（無）";
+  const threads = (doc.continuity?.openThreads || []).join("；") || "（無）";
+  const beats = (doc.episode?.beats || []).filter(Boolean).join(" → ") || "（無）";
+  return `\n\n【短劇 Story Bible 設定 — 必須嚴格遵守，不可違反「不可違反的設定」任何一條】\n角色：${chars}\n場景／地點：${locs}\n目前狀態：${state}\n不可違反的設定：${forbid}\n尚未解開的線索（可延續但不可提前解開）：${threads}\n本集大綱節拍：${beats}\n本集前提：${doc.episode?.premise || "（無）"}\n本集結尾鉤子：${doc.episode?.hook || "（無）"}\n`;
+}
+
+type ContinuityCheck = { loading?: boolean; ok?: boolean | null; violations?: { rule: string; sceneIndex: number; reason: string }[]; error?: boolean };
+
+/** 生成完成後跑一次連續性檢查：不擋「送去生產影片」，只是誠實列出可能的違反供人判斷——
+   這是輔助審核，不是自動裁決（腳本品質判斷仍是人的工作）。 */
+async function checkStoryBibleContinuity(script: any, doc: StoryBibleDoc): Promise<ContinuityCheck> {
+  const forbid = doc.continuity?.prohibitions || [];
+  if (!forbid.length) return { ok: true, violations: [] };
+  const sceneText = (script.scenes || []).map((s: any, i: number) => `場景${i + 1}：${s.dialogue || s.narration || ""}`).join("\n");
+  try {
+    const raw = await claude(`你是短劇連續性審核員。請檢查以下腳本是否違反任何一條「不可違反的設定」。\n不可違反的設定：${forbid.join("；")}\n已知角色：${(doc.characters || []).map((c) => c.name).join("、") || "（無）"}\n已知場景：${(doc.locations || []).map((l) => l.name).join("、") || "（無）"}\n腳本內容：\n${sceneText}\n純JSON：{"ok":true或false,"violations":[{"rule":"違反了哪條規則","sceneIndex":0,"reason":"為什麼違反，30字內"}]}\n沒有違反就回 {"ok":true,"violations":[]}，不要無中生有。`);
+    const parsed = pj(raw);
+    // ok 欄位缺失（LLM 沒照格式回）視同解析失敗，不可默認當「通過」——否則格式錯誤會誤顯示綠色打勾。
+    if (typeof parsed.ok !== "boolean") return { ok: null, violations: [], error: true };
+    const violations = Array.isArray(parsed.violations)
+      ? parsed.violations.map((v: any) => ({ rule: String(v?.rule ?? "未說明"), sceneIndex: Number.isFinite(Number(v?.sceneIndex)) ? Number(v.sceneIndex) : -1, reason: String(v?.reason ?? "") }))
+      : [];
+    return { ok: parsed.ok, violations };
+  } catch {
+    return { ok: null, violations: [], error: true };
+  }
+}
+
+function useStoryBibles(organizationId: string) {
+  const [bibles, setBibles] = useState<StoryBibleListItem[]>([]);
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  useEffect(() => {
+    if (!organizationId) { setBibles([]); setStatus("idle"); return; }
+    let cancelled = false;
+    setStatus("loading");
+    fetch(`/api/video/story-bibles?organizationId=${encodeURIComponent(organizationId)}`)
+      .then((r) => r.json())
+      .then((j: { ok: boolean; items?: StoryBibleListItem[] }) => {
+        if (cancelled) return;
+        // GET 已按 series_id, revision desc 排序；每個 series 只留最新一筆 approved 版本。
+        const seen = new Set<string>();
+        const approved = (j.items || []).filter((it) => it.status === "approved" && !seen.has(it.series_id) && seen.add(it.series_id));
+        setBibles(approved);
+        setStatus("ready");
+      })
+      .catch(() => { if (!cancelled) setStatus("error"); });
+    return () => { cancelled = true; };
+  }, [organizationId]);
+  return { bibles, status };
+}
 
 function clampCustomScenes(n: number, sceneCount: number) {
   if (!Number.isFinite(n)) return 0;
@@ -617,12 +688,27 @@ function ManualModule({brand}){
   const {sceneCount}=useContext(ScriptSettingsCtx);
   const plat=PLATFORMS.find(p=>p.id===brief.platform)?.label||"";const bv=brand?.voice?`\n品牌語氣：${brand.voice}${brand.forbidden?`\n禁用：${brand.forbidden}`:""}`:""
   const EXAMPLES=[{topic:"新手如何開始學畫畫",platform:"reels",duration:"60秒",goal:"吸粉增長",tone:"溫柔親切",cta:"追蹤頻道",audience:"25-35歲想學創作的上班族"},{topic:"三個讓你睡更好的習慣",platform:"tiktok",duration:"30秒",goal:"教育受眾",tone:"專業權威",cta:"留言互動",audience:"睡眠品質差的上班族"}];
-  async function doAngles(){if(!brief.topic||!brief.platform){setErr("請填入主題並選擇平台");return;}setErr("");setLoading(true);setAngles(null);setSt("angles");try{const raw=await claude(`根據brief產生4個腳本角度。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}${bv}\n純JSON：{"angles":[{"id":1,"name":"","type":"反常識/故事/教學/爭議/情緒/銷售其一","hook":"","core":"","why":"(25字內)","risk":"(15字內)","score":8}]}`);setAngles(pj(raw).angles);}catch{setErr("失敗，請再試");setSt("brief");}setLoading(false);}
-  async function doScript(angle){setSt("script");setScript(null);setScore(null);setLoading(true);try{const raw=await claude(`生成完整影片腳本。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}|角度：${angle.name}|鉤子：${angle.hook}${bv}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["","",""],"edit_notes":""}\nscenes安排${sceneCount}個場景。`);const s=pj(raw);setScript(s);const sr=await claude(`評估腳本。鉤子：${s.hook}|場景：${s.scenes?.length}|CTA：${s.cta}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`);setScore(pj(sr));}catch{}setLoading(false);}
-  function reset(){setSt("brief");setAngles(null);setScript(null);setScore(null);setBrief({topic:"",platform:"",duration:"",goal:"",tone:"",cta:"",audience:""});}
-  if(st==="brief")return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>手動生成腳本</h2><p style={{fontSize:12.5,color:C.mid}}>填入需求，AI完成策略、分鏡、評分</p>{brand?.voice&&<div style={{marginTop:6,padding:"5px 11px",background:C.jadelt,borderRadius:6,fontSize:11.5,color:C.jade,fontWeight:700,display:"inline-block"}}>✅ 已套用品牌語氣：{brand.name||"我的品牌"}</div>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.mid,alignSelf:"center"}}>範例：</span>{EXAMPLES.map((ex,i)=><button key={i} onClick={()=>setBrief(ex)} style={{padding:"4px 10px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,cursor:"pointer",fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.coral} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>{ex.topic.slice(0,12)}...</button>)}</div><div><SL ch="主題 *"/><TA value={brief.topic} onChange={e=>setBrief({...brief,topic:e.target.value})} placeholder="例如：新手如何開始學畫畫..." rows={2}/></div><div><SL ch="平台 *"/><PlatGrid value={brief.platform} onChange={v=>setBrief({...brief,platform:v})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>{[["影片長度","duration",DURATIONS],["內容目的","goal",GOALS],["語氣風格","tone",TONES],["觀眾行動","cta",CTAS]].map(([l,k,opts]: any)=><div key={k}><SL ch={l}/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{opts.map(o=><Pill key={o} label={o} active={brief[k]===o} onClick={()=>setBrief({...brief,[k]:o})}/>)}</div></div>)}</div><div><SL ch="目標受眾"/><AudiencePicker value={brief.audience} onChange={(v)=>setBrief({...brief,audience:v})}/></div>{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}<PBtn ch="產生腳本角度 →" onClick={doAngles} disabled={!brief.topic||!brief.platform} full/></div>);
+  // 短劇 Story Bible（選填）：org 選了才去查已核准的 bible 清單；沒選 bible → sbDoc 是 undefined，
+  // 下面 prompt 注入與連續性檢查全部原樣跳過，行為與這功能存在之前完全一致（fail-closed，非預設開）。
+  const[sbOrgId,setSbOrgId]=useState("");const[sbSeriesId,setSbSeriesId]=useState("");const[continuityCheck,setContinuityCheck]=useState<ContinuityCheck|null>(null);
+  const{bibles:sbBibles,status:sbStatus}=useStoryBibles(sbOrgId);
+  const sbDoc=sbBibles.find(b=>b.series_id===sbSeriesId)?.document_json;
+  const sbBlock=sbDoc?storyBibleContextBlock(sbDoc):"";
+  async function doAngles(){if(!brief.topic||!brief.platform){setErr("請填入主題並選擇平台");return;}setErr("");setLoading(true);setAngles(null);setSt("angles");try{const raw=await claude(`根據brief產生4個腳本角度。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}${bv}${sbBlock}\n純JSON：{"angles":[{"id":1,"name":"","type":"反常識/故事/教學/爭議/情緒/銷售其一","hook":"","core":"","why":"(25字內)","risk":"(15字內)","score":8}]}`);setAngles(pj(raw).angles);}catch{setErr("失敗，請再試");setSt("brief");}setLoading(false);}
+  async function doScript(angle){setSt("script");setScript(null);setScore(null);setContinuityCheck(null);setLoading(true);try{const raw=await claude(`生成完整影片腳本。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}|角度：${angle.name}|鉤子：${angle.hook}${bv}${sbBlock}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["","",""],"edit_notes":""}\nscenes安排${sceneCount}個場景。`);const s=pj(raw);setScript(s);const sr=await claude(`評估腳本。鉤子：${s.hook}|場景：${s.scenes?.length}|CTA：${s.cta}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`);setScore(pj(sr));if(sbDoc){setContinuityCheck({loading:true});checkStoryBibleContinuity(s,sbDoc).then(setContinuityCheck);}}catch{}setLoading(false);}
+  function reset(){setSt("brief");setAngles(null);setScript(null);setScore(null);setContinuityCheck(null);setBrief({topic:"",platform:"",duration:"",goal:"",tone:"",cta:"",audience:""});}
+  const storyBiblePicker=(<Card style={{borderColor:sbDoc?C.violet:C.border,background:sbDoc?C.violetl:C.white}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:sbOrgId?8:0}}><SL ch="📖 套用短劇 Story Bible（選填，加強角色／場景連續性）"/></div><div style={{maxWidth:340,marginBottom:sbOrgId?8:0}}><OrganizationPicker value={sbOrgId} onChange={(v)=>{setSbOrgId(v);setSbSeriesId("");}}/></div>{sbOrgId&&sbStatus==="loading"&&<div style={{fontSize:11.5,color:C.mid}}>載入 Story Bible 清單…</div>}{sbOrgId&&sbStatus==="ready"&&sbBibles.length===0&&<div style={{fontSize:11.5,color:C.mid}}>此租戶還沒有已核准的 Story Bible——可到上方「📖 短劇 Story Bible」分頁建立。</div>}{sbOrgId&&sbBibles.length>0&&<select value={sbSeriesId} onChange={e=>setSbSeriesId(e.target.value)} style={{width:"100%",padding:"7px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:12,fontFamily:"inherit"}}><option value="">不套用 Story Bible</option>{sbBibles.map(b=><option key={b.id} value={b.series_id}>{b.series_id}（r{b.revision}，{b.document_json?.episode?.episodeId}）</option>)}</select>}{sbDoc&&<div style={{marginTop:8,fontSize:11.5,color:C.ink,lineHeight:1.6}}><div><b>角色：</b>{(sbDoc.characters||[]).map(c=>c.name).join("、")||"（無）"}</div><div><b>場景：</b>{(sbDoc.locations||[]).map(l=>l.name).join("、")||"（無）"}</div>{(sbDoc.continuity?.prohibitions||[]).length>0&&<div style={{color:C.rose}}><b>不可違反：</b>{sbDoc.continuity.prohibitions.join("；")}</div>}</div>}</Card>);
+  if(st==="brief")return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>手動生成腳本</h2><p style={{fontSize:12.5,color:C.mid}}>填入需求，AI完成策略、分鏡、評分</p>{brand?.voice&&<div style={{marginTop:6,padding:"5px 11px",background:C.jadelt,borderRadius:6,fontSize:11.5,color:C.jade,fontWeight:700,display:"inline-block"}}>✅ 已套用品牌語氣：{brand.name||"我的品牌"}</div>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.mid,alignSelf:"center"}}>範例：</span>{EXAMPLES.map((ex,i)=><button key={i} onClick={()=>setBrief(ex)} style={{padding:"4px 10px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,cursor:"pointer",fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.coral} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>{ex.topic.slice(0,12)}...</button>)}</div><div><SL ch="主題 *"/><TA value={brief.topic} onChange={e=>setBrief({...brief,topic:e.target.value})} placeholder="例如：新手如何開始學畫畫..." rows={2}/></div><div><SL ch="平台 *"/><PlatGrid value={brief.platform} onChange={v=>setBrief({...brief,platform:v})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>{[["影片長度","duration",DURATIONS],["內容目的","goal",GOALS],["語氣風格","tone",TONES],["觀眾行動","cta",CTAS]].map(([l,k,opts]: any)=><div key={k}><SL ch={l}/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{opts.map(o=><Pill key={o} label={o} active={brief[k]===o} onClick={()=>setBrief({...brief,[k]:o})}/>)}</div></div>)}</div><div><SL ch="目標受眾"/><AudiencePicker value={brief.audience} onChange={(v)=>setBrief({...brief,audience:v})}/></div>{storyBiblePicker}{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}<PBtn ch="產生腳本角度 →" onClick={doAngles} disabled={!brief.topic||!brief.platform} full/></div>);
   if(st==="angles")return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("brief")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>選擇腳本角度</h2></div>{loading&&!angles&&<Spin label="AI 正在生成角度..."/>}{angles&&<div style={{display:"grid",gap:11}}>{angles.map(a=><div key={a.id} onClick={()=>doScript(a)} style={{background:C.white,border:`2px solid ${C.border}`,borderRadius:13,overflow:"hidden",cursor:"pointer",transition:"all .2s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.coral;e.currentTarget.style.boxShadow="0 3px 14px color-mix(in srgb, var(--accent) 16%, transparent)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.boxShadow="none";}}><div style={{padding:"10px 15px",borderBottom:`1.5px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",alignItems:"center",gap:7}}><Tag ch={a.type} c={C.violet} bg={C.violetl}/><span style={{fontSize:13.5,fontWeight:800,color:C.black,fontFamily:"DM Serif Display,serif"}}>{a.name}</span></div><div style={{fontSize:15,fontWeight:900,color:C.coral}}>{a.score}<span style={{fontSize:9,color:C.mid}}>/10</span></div></div><div style={{padding:"12px 15px"}}><div style={{background:C.violetl,borderRadius:8,padding:"8px 11px",marginBottom:9}}><div style={{fontSize:9,color:C.violet,fontWeight:700,letterSpacing:1,marginBottom:3}}>開頭鉤子</div><div style={{fontSize:13,color:C.violet,fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{a.hook}」</div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>核心概念</div><div style={{fontSize:12,color:C.ink}}>{a.core}</div></div><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>為什麼有效</div><div style={{fontSize:12,color:C.ink}}>{a.why}</div></div></div><div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><Tag ch={`⚠ ${a.risk}`} c={C.rose} bg={C.roselt} small/><span style={{fontSize:11.5,color:C.coral,fontWeight:700}}>選擇此角度 →</span></div></div></div>)}</div>}</div>);
-  if(st==="script")return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("angles")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>完整腳本</h2></div>{loading&&!script&&<Spin label="AI 正在撰寫腳本..."/>}{script&&<ScriptResult script={script} score={score} onReset={reset} autoSaveTag="手動生成"/>}</div>);
+  if(st==="script"){
+    const ccPanel=continuityCheck&&(
+      continuityCheck.loading?<Card style={{borderColor:C.violet,background:C.violetl}}><SL ch="📖 Story Bible 連續性檢查中..."/></Card>:
+      continuityCheck.error?<Card style={{borderColor:C.mid}}><SL ch="📖 Story Bible 連續性檢查"/><div style={{fontSize:12,color:C.mid}}>檢查失敗（AI 回應格式錯誤），未影響腳本本身——請自行覆核連續性。</div></Card>:
+      continuityCheck.ok===false&&(continuityCheck.violations?.length??0)>0?<Card style={{borderColor:C.rose,background:C.roselt}}><SL ch={`⚠️ Story Bible 連續性檢查：發現 ${continuityCheck.violations!.length} 個可能違反`}/><div style={{display:"grid",gap:5,marginTop:6}}>{continuityCheck.violations!.map((v,i)=><div key={i} style={{fontSize:12,color:C.ink}}>{v.sceneIndex>=0?`場景${v.sceneIndex+1}：`:""}<b style={{color:C.rose}}>{v.rule}</b> — {v.reason}</div>)}</div><div style={{fontSize:11,color:C.mid,marginTop:6}}>這是輔助提醒，不會阻擋送去生產影片——請自行判斷是否需要調整。</div></Card>:
+      <Card style={{borderColor:C.jade,background:C.jadelt}}><SL ch="✅ Story Bible 連續性檢查通過"/></Card>
+    );
+    return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("angles")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>完整腳本</h2></div>{loading&&!script&&<Spin label="AI 正在撰寫腳本..."/>}{script&&<ScriptResult script={script} score={score} onReset={reset} autoSaveTag="手動生成" extraTop={ccPanel}/>}</div>);
+  }
 }
 
 /* ── OTHER MODULES (simplified stubs that call ScriptResult) ── */
