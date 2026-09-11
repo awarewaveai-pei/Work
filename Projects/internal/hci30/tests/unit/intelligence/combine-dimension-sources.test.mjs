@@ -53,6 +53,30 @@ test('rule-engine-only dimension (no human ASSESSMENT) is held out of dimensionS
   assert.equal(suggestions[0].dimension, 'INFORMATION_GOVERNANCE');
 });
 
+test('autoPromote=false (default): rule-engine-only dimension stays a suggestion, never enters dimensionScores', () => {
+  const { dimensionScores, suggestions, autoPromoted } = combineDimensionSources([], [ruleFinding('CONTEXT_STABILITY', 'LOW')]);
+  assert.deepEqual(dimensionScores, []);
+  assert.equal(suggestions.length, 1);
+  assert.deepEqual(autoPromoted, []);
+});
+
+test('autoPromote=true: a rule-engine-only dimension is admitted into dimensionScores directly and marked autoPromoted', () => {
+  const { dimensionScores, suggestions, autoPromoted } = combineDimensionSources([], [ruleFinding('CONTEXT_STABILITY', 'LOW', ['ev-x'])], true);
+  assert.deepEqual(dimensionScores, [{ dimension: 'CONTEXT_STABILITY', value: 'LOW', evidence_refs: ['ev-x'] }]);
+  assert.deepEqual(suggestions, []);
+  assert.deepEqual(autoPromoted, ['CONTEXT_STABILITY']);
+});
+
+test('autoPromote=true does not change a dimension that already has a human ASSESSMENT (still combined normally)', () => {
+  const { dimensionScores, autoPromoted } = combineDimensionSources(
+    [assessment('COMPETENCE', 'HIGH', ['ev-a'])],
+    [ruleFinding('COMPETENCE', 'MODERATE', ['ev-b'])],
+    true,
+  );
+  assert.equal(dimensionScores.length, 1);
+  assert.deepEqual(autoPromoted, []); // human+rule combination, not an auto-promotion
+});
+
 test('multiple dimensions are each handled independently (mixed human-only, combined, and suggestion-only)', () => {
   const { dimensionScores, suggestions, disagreements } = combineDimensionSources(
     [assessment('COMPETENCE', 'HIGH', ['ev-a']), assessment('INFORMATION_GOVERNANCE', 'HIGH', ['ev-c'])],

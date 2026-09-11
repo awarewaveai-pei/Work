@@ -1,5 +1,44 @@
 # Worklog
 
+## 2026-09-11 HCI30 規則引擎自動採用開關——操作者原本「都要」的第二半，這輪補上
+
+上一輪規則引擎只做了「都要」的第一半（強制人工審核），操作者接著給了真實參考（自己以前寫的 Airtable Automation Script，結構化欄位加權算分+HARD STOP+風險分級+自動組理由文字），並明確說「分數先算出來給你看＋理由，人工確認是旁邊加一欄，不是擋住不給看」。本輪補上第二半：案件層級可設定的「自動採用門檻」開關。
+
+實作（migration 0017，`hci.cases.auto_promote_rule_findings boolean DEFAULT false`）：
+- 預設關（維持上一輪的保守行為：規則引擎判斷沒人工評估就只是「建議」，不進正式分數）
+- 案件詳情頁一個勾選框，勾選後：規則引擎判斷的維度（沒有對應人工評估的）直接進正式信任構面分數，標「系統自動判定，未經人工確認」的清楚標籤，不會偷偷混進去假裝是人工評估
+- 刻意不放進 `enforce_case_lifecycle()` 的 CLOSED 不可變欄位清單——這是審查政策偏好，不是案件本身的調查事實，關閉的案件也該能調整
+
+真跑驗證：真建一筆含「股權糾紛」「高層異動」關鍵字的證據 → 確認策略構面顯示「尚無證據」（規則引擎判斷停在建議，未進分數）→ 勾選開關 → 確認策略構面立刻出現、帶「系統自動判定」標籤、建議清單清空 → 取消勾選 → 確認策略構面立刻變回「尚無證據」、建議清單恢復。開關狀態正確持久化在資料庫（重新整理後仍反映真實狀態）。
+
+Schema 層真 Docker 驗證：`test-wave1-local.ps1` 255/255 assertions（新增 6 個 CASE-AUTO-PROMOTE-* 測試，含「關閉狀態下也能調整此開關」的正面證明）、reversibility 通過；`mutation-check-wave1.ps1` 127/127 mutations killed（新增 1 個 mutation 直接命中；另外真跑發現 2 個既有 mutation 的 expect list 需要因為新測試而更新——`drop-case-lifecycle-trigger` 少了關閉分支因 closed_at CHECK 而連帶失敗的案例、`drop-cases-rls-policy` 少了新案件被 RLS 擋下 INSERT 而連帶失敗的案例——皆已依真實 harness 輸出修正，非憑猜測）。
+
+**順手發現、已誠實記錄不深查**：mutation-check-wave1.ps1 首次真跑時另外冒出第三個「survived」——`drop-all-subject-records-referencing-fks` 意外連帶兩個完全無關的 epistemic 測試失敗，立刻用同一份程式碼重跑一次就消失（127/127 全殺）。研判是該 mutation 自己用動態 OID 查找（多筆同型 FK 存在時 SELECT INTO 任選一筆）造成的既有不穩定，與本次改動無關，已寫進 TASKS.md 低優先追蹤，不在本輪範圍內深查修復。
+
+Node 單元測試：`packages/intelligence` 整包 146 個測試全過（含新增 3 個 autoPromote 情境）。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | 場景=test-wave1-local.ps1 255/255、mutation-check-wave1.ps1 127/127（含一次修正 expect list 後重跑）；瀏覽器建立含關鍵字證據確認建議停在未進分數→開啟自動採用開關確認立即進分數並標示系統自動判定→關閉開關確認立即恢復為建議狀態，全程重新整理驗證狀態持久化正確 | 結果=全部符合預期，console 零錯誤
+REVIEW_WAIVED: NA -- 純新增一個布林欄位＋既有 combine-dimension-sources 邏輯的參數化擴充，未新增觸發器/RLS/新表；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=auto_promote_rule_findings\|auto-promote-rule-findings\|toggleAutoPromote\|autoPromoted\|auto-promote-toggle\|auto-promote-tag\|CASE-AUTO-PROMOTE | hits=9（全部為本次新增/修改檔案本身，無外部殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/database/migrations/0017_wave1_rule_engine_auto_promote_{up,down}.sql（新檔）
+- Projects/internal/hci30/database/tests/wave1-negative-tests.sql（+6 assertions，finish(249)->finish(255)）
+- Projects/internal/hci30/scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1（掛載 migration 0017；mutation-check 修正兩個既有 mutation 的 expect list）
+- Projects/internal/hci30/packages/intelligence/combine-dimension-sources.mjs（新增 autoPromote 參數）
+- Projects/internal/hci30/tests/unit/intelligence/combine-dimension-sources.test.mjs（+3 測試）
+- Projects/internal/hci30/app/server.mjs（新增 auto-promote-rule-findings 端點，buildCaseReportPayload 傳入案件的開關狀態）
+- Projects/internal/hci30/app/public/index.html（案件詳情頁新增開關勾選框，構面卡片顯示「系統自動判定」標籤）
+- agency-os/TASKS.md（新增低優先追蹤項：mutation-check-wave1.ps1 疑似 flaky mutation）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 無新增；`drop-all-subject-records-referencing-fks` flaky 已記錄追蹤，非本輪引入
+
+[rollback]
+`git revert` 本次 commit：migration 0017 down 移除欄位；server.mjs/index.html/combine-dimension-sources.mjs 的開關相關程式碼隨 commit revert 一併移除。零規則命中或未開啟開關的案件行為完全不變。
+
 ## 2026-09-11 第八批（C1 收掉 + /ops/collect 改多選 + 兩個被工具擋住的真缺口）
 
 C1 的最後一項 DoD 本來就只卡 prod migration，套完之後跑掉。順帶把操作者指名的下拉選單改掉，並補兩個機械閘。

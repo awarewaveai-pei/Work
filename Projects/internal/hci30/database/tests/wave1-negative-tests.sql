@@ -1776,6 +1776,27 @@ SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-14',
   $q$DELETE FROM hci.case_report_snapshots WHERE id = 'aaaaaaaa-0000-0000-0000-000000000701'$q$,
   '42501');
 
+-- Rule-engine auto-promotion toggle (migrations/0017, operator-requested
+-- "都要" -- mandatory human review by default, plus an optional
+-- trust-threshold override).
+SELECT hci_test.expect_success('CASE-AUTO-PROMOTE-SETUP-01',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000231','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture')$q$);
+SELECT hci_test.expect_true('CASE-AUTO-PROMOTE-DEFAULT-01',
+  $q$SELECT auto_promote_rule_findings = false FROM hci.cases WHERE id = 'aaaaaaaa-0000-0000-0000-000000000231'$q$,
+  'auto_promote_rule_findings must default to false -- mandatory human review unless explicitly opted out of');
+SELECT hci_test.expect_success('CASE-AUTO-PROMOTE-UPDATE-01',
+  $q$UPDATE hci.cases SET auto_promote_rule_findings = true WHERE id = 'aaaaaaaa-0000-0000-0000-000000000231'$q$);
+-- Deliberately NOT guarded by the CLOSED-immutability tuple (see migration
+-- 0017's own header) -- proven directly, not just implied: close the case,
+-- then flip the setting again, expect success rather than H1007.
+SELECT hci_test.expect_success('CASE-AUTO-PROMOTE-CLOSED-SETUP-01',
+  $q$UPDATE hci.cases SET status = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000231'$q$);
+SELECT hci_test.expect_success('CASE-AUTO-PROMOTE-CLOSED-SETUP-02',
+  $q$UPDATE hci.cases SET status = 'CLOSED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000231'$q$);
+SELECT hci_test.expect_success('CASE-AUTO-PROMOTE-CLOSED-01',
+  $q$UPDATE hci.cases SET auto_promote_rule_findings = false WHERE id = 'aaaaaaaa-0000-0000-0000-000000000231'$q$);
+
 -- Restores the owner context hci_test.finish() requires below (that
 -- function's own EXECUTE grant list does not include hci_app_test_a/b --
 -- 00_test_harness.sql's final GRANT block only covers expect_sqlstate/
@@ -1787,4 +1808,4 @@ RESET ROLE;
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(249);
+SELECT hci_test.finish(255);

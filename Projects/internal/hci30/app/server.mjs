@@ -217,6 +217,26 @@ app.post('/api/hci/v1/cases/:caseId/risk-tier', async (req, res) => {
   }
 });
 
+// HCI_RULE_ENGINE_SPEC.md §Combination / operator's "都要": mandatory human
+// review by default (auto_promote_rule_findings defaults false, migrations/
+// 0017), with this endpoint as the explicit per-case opt-out into letting a
+// rule-engine-only dimension count toward the formal rollup without a
+// matching human ASSESSMENT.
+app.post('/api/hci/v1/cases/:caseId/auto-promote-rule-findings', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  const { auto_promote_rule_findings } = req.body || {};
+  if (typeof auto_promote_rule_findings !== 'boolean') return problem(res, 400, 'Bad Request', 'auto_promote_rule_findings must be a boolean');
+  try {
+    const { rowCount } = await queryAsTenant(t.role, 'UPDATE hci.cases SET auto_promote_rule_findings = $1 WHERE id = $2', [auto_promote_rule_findings, req.params.caseId]);
+    if (rowCount === 0) return problem(res, 404, 'Not Found', 'no case with that id visible to this tenant');
+    const { rows } = await queryAsTenant(t.role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at, auto_promote_rule_findings FROM hci.cases WHERE id = $1', [req.params.caseId]);
+    res.json(rows[0]);
+  } catch (err) {
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
 app.post('/api/hci/v1/persons', async (req, res) => {
   const t = resolveTenant(req, res);
   if (!t) return;
@@ -242,7 +262,7 @@ app.post('/api/hci/v1/persons', async (req, res) => {
 // what the live view actually showed, not a second, driftable
 // re-implementation of the same rollup.
 async function buildCaseReportPayload(role, caseId) {
-  const { rows: caseRows } = await queryAsTenant(role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at FROM hci.cases WHERE id = $1', [caseId]);
+  const { rows: caseRows } = await queryAsTenant(role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at, auto_promote_rule_findings FROM hci.cases WHERE id = $1', [caseId]);
   if (caseRows.length === 0) return null;
 
   const { rows: persons } = await queryAsTenant(role, 'SELECT id, display_label FROM hci.persons ORDER BY display_label');
@@ -269,8 +289,8 @@ async function buildCaseReportPayload(role, caseId) {
   const evidenceClaimRecords = records.filter(r => r.kind === 'EVIDENCE' || r.kind === 'CLAIM');
   const assessmentRecords = records.filter(r => r.kind === 'ASSESSMENT');
   const { findings: ruleEngineFindings, hitsByDimension: ruleEngineHits } = scoreRuleEngineFindings(evidenceClaimRecords);
-  const { dimensionScores, disagreements: dimensionDisagreements, suggestions: ruleEngineSuggestions } =
-    combineDimensionSources(assessmentRecords, ruleEngineFindings);
+  const { dimensionScores, disagreements: dimensionDisagreements, suggestions: ruleEngineSuggestions, autoPromoted: ruleEngineAutoPromoted } =
+    combineDimensionSources(assessmentRecords, ruleEngineFindings, caseRows[0].auto_promote_rule_findings);
 
   let rollup = { domains: [] };
   let evidenceQuality = [];
@@ -302,7 +322,7 @@ async function buildCaseReportPayload(role, caseId) {
 
   return {
     case: caseRows[0], persons, records, decisions, rollup, evidenceQuality, strengths, risks, unknowns,
-    ruleEngineSuggestions, ruleEngineHits, dimensionDisagreements, severityAlerts,
+    ruleEngineSuggestions, ruleEngineHits, dimensionDisagreements, severityAlerts, ruleEngineAutoPromoted,
   };
 }
 

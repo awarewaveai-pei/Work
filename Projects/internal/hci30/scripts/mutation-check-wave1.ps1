@@ -43,6 +43,7 @@ $upMig13  = Join-Path $root 'database/migrations/0013_wave1_key_issuance_up.sql'
 $upMig14  = Join-Path $root 'database/migrations/0014_wave1_decision_recording_up.sql'
 $upMig15  = Join-Path $root 'database/migrations/0015_wave1_case_reopen_up.sql'
 $upMig16  = Join-Path $root 'database/migrations/0016_wave1_case_report_snapshots_up.sql'
+$upMig17  = Join-Path $root 'database/migrations/0017_wave1_rule_engine_auto_promote_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -182,7 +183,12 @@ $mutations = @(
   # instead succeeds trivially with no trigger present at all to reject it.
   @{ id = 'drop-case-lifecycle-trigger'
      sql = 'DROP TRIGGER cases_lifecycle ON hci.cases;'
-     expect = @('CASE-LIFECYCLE-02','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-04','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-TRIGGER-01','CASE-REOPEN-SETUP-03','CASE-REOPEN-SETUP-04','CASE-REOPEN-SKIP-01') }
+     # CASE-AUTO-PROMOTE-CLOSED-SETUP-02 joined 2026-09-11 (migration 0017):
+     # without this trigger nothing ever sets closed_at, so the OPEN/ACTIVE
+     # transition to CLOSED trips the table's own
+     # `(status = 'CLOSED') = (closed_at IS NOT NULL)` CHECK instead --
+     # found by this exact mutation run, not assumed in advance.
+     expect = @('CASE-LIFECYCLE-02','CASE-LIFECYCLE-02b','CASE-LIFECYCLE-04','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-TRIGGER-01','CASE-REOPEN-SETUP-03','CASE-REOPEN-SETUP-04','CASE-REOPEN-SKIP-01','CASE-AUTO-PROMOTE-CLOSED-SETUP-02') }
 
   # Gate 2's "no direct UPDATE privilege on closed_at" is a grant-layer
   # control independent of the trigger above; this proves it is load-bearing
@@ -584,6 +590,13 @@ $mutations = @(
      sql = 'ALTER TABLE hci.case_report_snapshots NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.case_report_snapshots DISABLE ROW LEVEL SECURITY;'
      expect = @('RLS-LEAK-07','RLS-COMPLETENESS-01') }
 
+  # hci.cases.auto_promote_rule_findings (migrations/0017) -- a plain
+  # updatable column, no trigger/RLS control of its own beyond the grant
+  # itself, so the grant is the only real thing to mutate.
+  @{ id = 'revoke-case-auto-promote-grant'
+     sql = 'REVOKE UPDATE (auto_promote_rule_findings) ON hci.cases FROM hci_app_test_a, hci_app_test_b;'
+     expect = @('CASE-AUTO-PROMOTE-UPDATE-01','CASE-AUTO-PROMOTE-CLOSED-01') }
+
   # db-expert review (2026-09-05) findings C1/C2/C3/M2 - each mutation below
   # is a surgical CREATE OR REPLACE reproducing the current real function
   # minus only the one behaviour it targets, matching this file's own
@@ -883,7 +896,14 @@ $mutations = @(
      # CASE-REOPEN-CLOSEDAT-CLEARED-01/-SKIP-01 (both read/act on that same
      # nonexistent row) join the blast radius instead -- real-Docker
      # flagged all four, not assumed in advance.
-     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01','CASE-REOPEN-SETUP-01','CASE-REOPEN-CLOSEDAT-CLEARED-01','CASE-REOPEN-SKIP-01') }
+     # 2026-09-11 (migration 0017): CASE-AUTO-PROMOTE-SETUP-01 (its own INSERT
+     # rejected, same FORCE-RLS-denies-writes-too reasoning) and
+     # CASE-AUTO-PROMOTE-DEFAULT-01 (reads that same never-created row, finds
+     # zero rows, expect_true fails) join for the identical reason -- the
+     # CLOSED-SETUP/CLOSED-01 UPDATEs against that same nonexistent row match
+     # zero rows and succeed trivially instead, same as CASE-LIFECYCLE-03's
+     # own precedent above, so they do NOT join this list.
+     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01','CASE-REOPEN-SETUP-01','CASE-REOPEN-CLOSEDAT-CLEARED-01','CASE-REOPEN-SKIP-01','CASE-AUTO-PROMOTE-SETUP-01','CASE-AUTO-PROMOTE-DEFAULT-01') }
   # RLS-OWN-02 (db-expert M2): hci.tenants is scoped by `id`, not `tenant_id`,
   # so it is invisible to every mutation above. Dropping its own policy fails
   # CLOSED - RLS-LEAK-02 (tenant B invisible) stays green - which is exactly
@@ -984,6 +1004,7 @@ function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig14)  -ne 0) { throw 'mutation harness: 0014 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig15)  -ne 0) { throw 'mutation harness: 0015 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig16)  -ne 0) { throw 'mutation harness: 0016 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig17)  -ne 0) { throw 'mutation harness: 0017 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

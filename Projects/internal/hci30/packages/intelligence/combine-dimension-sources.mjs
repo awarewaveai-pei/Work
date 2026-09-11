@@ -13,6 +13,15 @@ const HUMAN_METHOD_ID = 'human_review';
 // fact" principle as 10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:45, applied
 // locally instead of across a system boundary.
 //
+// autoPromote (default false, migrations/0017's hci.cases.
+// auto_promote_rule_findings -- operator's own "都要": mandatory review by
+// default, with an explicit per-case opt-out): when true, a rule-engine-only
+// dimension is ALSO admitted into dimensionScores directly (tagged
+// method_id='rule_engine_v1' so it stays distinguishable from a real human
+// finding) instead of being held out as a suggestion. Still never silent:
+// the caller can tell an auto-promoted value apart from a human-reviewed
+// one via `autoPromoted`.
+//
 // assessmentRecords: subject_records already filtered to kind=ASSESSMENT
 // ({id, payload: {dimension, value, evidence_refs}}).
 // ruleEngineFindings: scoreRuleEngineFindings(...).findings
@@ -25,9 +34,12 @@ const HUMAN_METHOD_ID = 'human_review';
 //   through combineMethodFindings is a documented no-op, N=1 case).
 // - disagreements: dimensions where human and rule-engine findings existed
 //   AND diverged by >= 2 ranks (combineMethodFindings's own threshold).
-// - suggestions: rule-engine findings with no human ASSESSMENT yet for
-//   that dimension -- held out of dimensionScores entirely.
-export function combineDimensionSources(assessmentRecords, ruleEngineFindings) {
+// - suggestions: rule-engine findings with no human ASSESSMENT yet for that
+//   dimension, held out of dimensionScores -- empty whenever autoPromote is
+//   true, since every one of them is promoted instead.
+// - autoPromoted: which dimensions in dimensionScores came from an
+//   auto-promoted rule-engine finding rather than a human one.
+export function combineDimensionSources(assessmentRecords, ruleEngineFindings, autoPromote = false) {
   const humanByDimension = new Map(
     assessmentRecords.map((r) => [r.payload.dimension, { method_id: HUMAN_METHOD_ID, value: r.payload.value, evidence_refs: r.payload.evidence_refs }]),
   );
@@ -36,6 +48,7 @@ export function combineDimensionSources(assessmentRecords, ruleEngineFindings) {
   const dimensionScores = [];
   const disagreements = [];
   const suggestions = [];
+  const autoPromoted = [];
 
   for (const [dimension, human] of humanByDimension) {
     const rule = ruleByDimension.get(dimension);
@@ -49,8 +62,14 @@ export function combineDimensionSources(assessmentRecords, ruleEngineFindings) {
   }
 
   for (const [dimension, rule] of ruleByDimension) {
-    if (!humanByDimension.has(dimension)) suggestions.push(rule);
+    if (humanByDimension.has(dimension)) continue;
+    if (autoPromote) {
+      dimensionScores.push({ dimension, value: rule.value, evidence_refs: rule.evidence_refs });
+      autoPromoted.push(dimension);
+    } else {
+      suggestions.push(rule);
+    }
   }
 
-  return { dimensionScores, disagreements, suggestions };
+  return { dimensionScores, disagreements, suggestions, autoPromoted };
 }

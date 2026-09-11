@@ -550,6 +550,10 @@
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
+- [ ] **【2026-09-11 開出｜HCI30｜低優先】mutation-check-wave1.ps1 的 `drop-all-subject-records-referencing-fks` 疑似 flaky**
+  - `🟡 未開始` · `2026-09-11 開出` · `不卡誰`
+  - **一句話**：該 mutation 用動態 OID 查找刪 FK（`SELECT conname INTO c ... WHERE ...`，多筆同型 FK 存在時任選一筆），單次真跑出現過兩個無關測試（`EPISTEMIC-PROMOTE-01`／`EPISTEMIC-INHERIT-01` 等）意外失敗，同一份程式碼立刻重跑就消失（127/127 全殺）。未深查根因，僅記錄以免未來誤判為新回歸。細節見 WORKLOG 2026-09-11（規則式評分引擎條目）。
+
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
   - `🟠 未開始` · `2026-08-28 開出` · `可直接做`
   - **一句話**：`check-claude-sync.ps1` 的 H4 只能回答「產生器有沒有吐出 Claude 展不開的語法」；「這 24 支 server 實際上啟不啟得起來」沒有任何人在看。

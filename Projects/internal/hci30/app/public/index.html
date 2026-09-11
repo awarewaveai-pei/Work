@@ -103,6 +103,9 @@
   .risk-tier-submit { padding: 0.4rem 1rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
   .risk-tier-submit:hover { background: var(--teal-ink); }
   .reaudit-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: #f7ead0; color: var(--moderate); font-weight: 700; }
+  .auto-promote-toggle { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.8rem; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+  .auto-promote-toggle input { margin-top: 0.2rem; flex: none; }
+  .auto-promote-tag { display: inline-block; margin-left: 0.4rem; font-size: 0.68rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #ece6d6; color: var(--muted); font-weight: 700; }
 
   /* Report generation (operator-requested "產生信任評估報告", 2026-09-10) --
      a frozen, printable deliverable, distinct from the live editable case
@@ -560,6 +563,16 @@ async function submitRiskTier() {
   await refreshDetail();
 }
 
+async function toggleAutoPromote(checked) {
+  const res = await fetch(`/api/hci/v1/cases/${currentCaseId}/auto-promote-rule-findings?tenant=${currentTenant}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, auto_promote_rule_findings: checked }),
+  });
+  const body = await res.json();
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
+  await refreshDetail();
+}
+
 async function openCase(caseId) {
   currentCaseId = caseId;
   await refreshDetail();
@@ -587,11 +600,12 @@ function toggleDomainDetail(id) {
 // frozen report view so both show the identical derivation trail; `prefix`
 // keeps element ids unique between the two (both can exist in the DOM at
 // once, only one visible).
-function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dimensionDisagreements) {
+function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dimensionDisagreements, autoPromotedDimensions) {
   const byDomain = Object.fromEntries(rollupDomains.map(d => [d.domain, d]));
   const dimsByDomain = {};
   (evidenceQuality || []).forEach(q => { (dimsByDomain[q.domain] = dimsByDomain[q.domain] || []).push(q); });
   const disagreementByDimension = Object.fromEntries((dimensionDisagreements || []).map(x => [x.dimension, x]));
+  const autoPromotedSet = new Set(autoPromotedDimensions || []);
 
   return ALL_DOMAINS.map(name => {
     const d = byDomain[name];
@@ -604,7 +618,8 @@ function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dim
         return r ? `<li>${esc(KIND_LABELS[r.kind] || r.kind)}：${esc(shortRecordText(r))}（#${id.slice(0,8)}）</li>` : `<li>#${id.slice(0,8)}（此紀錄目前查不到，可能已被取代）</li>`;
       }).join('');
       const methodDisagreement = disagreementByDimension[q.dimension];
-      return `<div class="domain-dim-row"><div><b>${DIMENSION_LABELS[q.dimension] || q.dimension}</b>：${bandBadge(q.value)} ${QUALITY_LABELS[q.quality] || q.quality}</div>
+      const isAutoPromoted = autoPromotedSet.has(q.dimension);
+      return `<div class="domain-dim-row"><div><b>${DIMENSION_LABELS[q.dimension] || q.dimension}</b>：${bandBadge(q.value)} ${QUALITY_LABELS[q.quality] || q.quality}${isAutoPromoted ? '<span class="auto-promote-tag">系統自動判定，未經人工確認</span>' : ''}</div>
         <ul class="domain-dim-refs">${refs}</ul>
         ${methodDisagreement ? `<div class="domain-disagreement-note">⚠ 人工判斷（${BAND_LABELS[methodDisagreement.human_value] || methodDisagreement.human_value}）與規則引擎判斷（${BAND_LABELS[methodDisagreement.rule_engine_value] || methodDisagreement.rule_engine_value}）不一致，已如實混合計算，未互相蓋過。</div>` : ''}</div>`;
     }).join('');
@@ -729,7 +744,11 @@ async function refreshDetail() {
       <button type="button" class="risk-tier-submit" onclick="submitRiskTier()">更新風險等級</button>
     </div>
     <p class="field-hint">調高風險等級會把此案件下所有已核准的主張標記為需要重新審查；若某個主張已連結到一個定案的決策（繼續進行/附條件繼續/終止往來），調升會被擋下，須先線下處理。</p>
-    <div id="risk-tier-err" class="err"></div>`;
+    <div id="risk-tier-err" class="err"></div>
+    <label class="auto-promote-toggle">
+      <input type="checkbox" id="d-auto-promote" ${body.case.auto_promote_rule_findings ? 'checked' : ''} onchange="toggleAutoPromote(this.checked)">
+      允許規則引擎判斷在沒有人工評估時也直接計入信任構面分數（不需要另外建一筆評估才算數）
+    </label>`;
 
   const bannerEl = document.getElementById('d-decision-banner');
   if (body.decisions.length) {
@@ -758,7 +777,7 @@ async function refreshDetail() {
     : '';
   document.getElementById('d-radar').innerHTML = renderRadar(body.rollup.domains);
   const recordById = Object.fromEntries(body.records.map(r => [r.id, r]));
-  document.getElementById('d-domains').innerHTML = buildDomainGrid(body.rollup.domains, body.evidenceQuality, recordById, 'live', body.dimensionDisagreements);
+  document.getElementById('d-domains').innerHTML = buildDomainGrid(body.rollup.domains, body.evidenceQuality, recordById, 'live', body.dimensionDisagreements, body.ruleEngineAutoPromoted);
   document.getElementById('d-severity').innerHTML = renderSeverityAlerts(body.severityAlerts);
   document.getElementById('d-suggestions').innerHTML = renderRuleEngineSuggestions(body.ruleEngineSuggestions, body.ruleEngineHits, recordById);
 
@@ -866,7 +885,7 @@ function renderReportView(row) {
       </div>`; })()
     : `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策。</span></div>`;
 
-  const domainGridHtml = buildDomainGrid(d.rollup.domains, d.evidenceQuality, recordById, 'report', d.dimensionDisagreements);
+  const domainGridHtml = buildDomainGrid(d.rollup.domains, d.evidenceQuality, recordById, 'report', d.dimensionDisagreements, d.ruleEngineAutoPromoted);
   const severityHtml = renderSeverityAlerts(d.severityAlerts);
 
   const recordsHtml = d.records.length ? d.records.map(r => {
