@@ -4,6 +4,7 @@ import { useState, useEffect, type CSSProperties } from "react";
 import Link from "next/link";
 import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
+import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
 import type { SiteContentDefaults } from "@/app/api/content/sites/route";
@@ -1142,6 +1143,11 @@ function BrandIdentityTab({ org, cfg }: Pick<ClientHubTabsProps, "org" | "cfg">)
   );
 }
 
+/** Small coloured label. Pure presentation, shared by the knowledge and customer-service tabs. */
+const badge = (bg: string, fg: string, text: string) => (
+  <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, background: bg, color: fg, whiteSpace: "nowrap" }}>{text}</span>
+);
+
 // ── Customer service tab ──────────────────────────────────────────────────────
 
 type CsIntentRow = {
@@ -1153,12 +1159,8 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
   const [csEnabled, setCsEnabled] = useState(true);
   const [intents, setIntents] = useState<CsIntentRow[]>([]);
-  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }>>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  // new-knowledge form
-  const [kTitle, setKTitle] = useState(""); const [kBody, setKBody] = useState(""); const [kKind, setKKind] = useState("doc");
-  const [kSensitive, setKSensitive] = useState(false); const [kSaving, setKSaving] = useState(false); const [kMsg, setKMsg] = useState<string | null>(null);
   // new-intent form
   const [iKey, setIKey] = useState(""); const [iLabel, setILabel] = useState(""); const [iAns, setIAns] = useState("L1"); const [iAct, setIAct] = useState("A0");
   const [iSensitive, setISensitive] = useState(false); const [iSaving, setISaving] = useState(false); const [iMsg, setIMsg] = useState<string | null>(null);
@@ -1170,16 +1172,9 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
       if (data.ok) { setCsEnabled(data.csEnabled ?? true); setIntents(data.intents ?? []); }
     } catch { /* ignore */ }
   }
-  async function reloadSources() {
-    try {
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { headers: { ...roleHeader("admin") } });
-      const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }> };
-      if (data.ok && data.sources) setSources(data.sources);
-    } catch { /* ignore */ }
-  }
   useEffect(() => {
     let alive = true;
-    (async () => { await Promise.all([reloadConfig(), reloadSources()]); if (alive) setLoading(false); })();
+    (async () => { await reloadConfig(); if (alive) setLoading(false); })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org.slug]);
@@ -1199,6 +1194,104 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
       setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用（kill-switch）— AI 不再自動回覆此客戶");
     } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
   }
+
+  async function addIntent() {
+    setISaving(true); setIMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-intents`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ key: iKey, label: iLabel, answerLevel: iAns, actionLevel: iAct, isSensitive: iSensitive }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `failed_${res.status}`);
+      setIMsg("✓ 已新增意圖"); setIKey(""); setILabel(""); setISensitive(false);
+      await reloadConfig();
+    } catch (e) { setIMsg(`⚠ ${String(e)}`); } finally { setISaving(false); }
+  }
+  async function delIntent(key: string) {
+    await fetch(`/api/ops/clients/${org.slug}/cs-intents`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ key }) });
+    await reloadConfig();
+  }
+
+  const ansBadge = (l: string) =>
+    l === "L2" ? badge("var(--badge-green-bg)", "var(--green)", "L2 自動")
+      : l === "L1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "L1 草稿")
+        : badge("var(--bg-canvas)", "var(--text-muted)", "L0 關閉");
+  const actBadge = (l: string) =>
+    l === "A2" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A2 受閘寫")
+      : l === "A1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A1 唯讀")
+        : badge("var(--bg-canvas)", "var(--text-muted)", "A0 無動作");
+
+  return (
+    <>
+      <Card title={csEnabled ? "🟢 AI 客服：啟用中" : "🔴 AI 客服：已停用 (kill-switch)"}>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+          每租戶 kill-switch（停用後此客戶的對話一律轉真人，不自動回覆）。意圖層級與全域開關另在「客服營運中心」。
+        </p>
+        <button onClick={toggleKill} disabled={saving}
+          style={{ ...cisBtnStyle, background: csEnabled ? "var(--red)" : "var(--accent)", opacity: saving ? 0.6 : 1 }}>
+          {saving ? "處理中…" : csEnabled ? "停用 AI 客服" : "啟用 AI 客服"}
+        </button>
+        {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
+      </Card>
+
+      <Card title={`意圖與自動化分級（${loading ? "…" : intents.length}）`}>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+          雙軸：答覆 L0 關閉 / L1 草稿 / L2 自動 × 行動 A0 無 / A1 唯讀 / A2 受閘寫；勾「敏感」= money/身分/法律，永遠轉真人。
+        </p>
+        {!loading && intents.map((it) => (
+          <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+            <span style={{ flex: 1, fontWeight: 500 }}>{it.label}<span style={{ color: "var(--text-muted)", fontWeight: 400, marginLeft: 6, fontFamily: "monospace", fontSize: 10 }}>{it.key}</span></span>
+            {it.is_sensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感·轉真人")}
+            {ansBadge(it.answer_level)}
+            {actBadge(it.action_level)}
+            {it.canary_pct > 0 && it.canary_pct < 100 && badge("var(--bg-canvas)", "var(--text-secondary)", `canary ${it.canary_pct}%`)}
+            <button onClick={() => delIntent(it.key)} aria-label="刪除" style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
+          </div>
+        ))}
+        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10, marginTop: 4 }}>
+          <CisText label="代碼 key" value={iKey} onChange={setIKey} placeholder="order_status" mono />
+          <CisText label="名稱" value={iLabel} onChange={setILabel} placeholder="訂單狀態查詢" />
+          <CisSelect label="答覆" value={iAns} onChange={setIAns} options={[["L0", "L0 關閉"], ["L1", "L1 草稿"], ["L2", "L2 自動"]]} />
+          <CisSelect label="行動" value={iAct} onChange={setIAct} options={[["A0", "A0 無"], ["A1", "A1 唯讀"], ["A2", "A2 受閘寫"]]} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", padding: "4px 0 0 96px" }}>
+            <input type="checkbox" checked={iSensitive} onChange={(e) => setISensitive(e.target.checked)} /> 敏感（永遠轉真人）
+          </label>
+          <button onClick={addIntent} disabled={iSaving || !iKey || !iLabel} style={{ ...cisBtnStyle, opacity: iSaving || !iKey || !iLabel ? 0.5 : 1 }}>
+            {iSaving ? "新增中…" : "新增意圖"}
+          </button>
+          {iMsg && <div style={{ marginTop: 6, fontSize: 11, color: iMsg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{iMsg}</div>}
+        </div>
+      </Card>
+    </>
+  );
+}
+
+// ── Knowledge base tab ───────────────────────────────────────────────────────
+//
+// Its own tab, not a card inside 客服. The knowledge base is a product in its own right (ADR 011):
+// customer service is its first consumer, with SEO writing / cold outreach / research to follow.
+// Buried inside another tab it read as missing — reported twice by the operator.
+
+function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
+  const [loading, setLoading] = useState(true);
+  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }>>([]);
+  const [kTitle, setKTitle] = useState(""); const [kBody, setKBody] = useState(""); const [kKind, setKKind] = useState("doc");
+  const [kSensitive, setKSensitive] = useState(false); const [kSaving, setKSaving] = useState(false); const [kMsg, setKMsg] = useState<string | null>(null);
+
+  async function reloadSources() {
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }> };
+      if (data.ok && data.sources) setSources(data.sources);
+    } catch { /* ignore */ }
+  }
+  useEffect(() => {
+    let alive = true;
+    (async () => { await reloadSources(); if (alive) setLoading(false); })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org.slug]);
 
   async function addKnowledge() {
     setKSaving(true); setKMsg(null);
@@ -1222,49 +1315,9 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
     await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ sourceId: id }) });
     await reloadSources();
   }
-  async function addIntent() {
-    setISaving(true); setIMsg(null);
-    try {
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-intents`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
-        body: JSON.stringify({ key: iKey, label: iLabel, answerLevel: iAns, actionLevel: iAct, isSensitive: iSensitive }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? `failed_${res.status}`);
-      setIMsg("✓ 已新增意圖"); setIKey(""); setILabel(""); setISensitive(false);
-      await reloadConfig();
-    } catch (e) { setIMsg(`⚠ ${String(e)}`); } finally { setISaving(false); }
-  }
-  async function delIntent(key: string) {
-    await fetch(`/api/ops/clients/${org.slug}/cs-intents`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ key }) });
-    await reloadConfig();
-  }
-
-  const badge = (bg: string, fg: string, text: string) => (
-    <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, background: bg, color: fg, whiteSpace: "nowrap" }}>{text}</span>
-  );
-  const ansBadge = (l: string) =>
-    l === "L2" ? badge("var(--badge-green-bg)", "var(--green)", "L2 自動")
-      : l === "L1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "L1 草稿")
-        : badge("var(--bg-canvas)", "var(--text-muted)", "L0 關閉");
-  const actBadge = (l: string) =>
-    l === "A2" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A2 受閘寫")
-      : l === "A1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A1 唯讀")
-        : badge("var(--bg-canvas)", "var(--text-muted)", "A0 無動作");
 
   return (
     <>
-      <Card title={csEnabled ? "🟢 AI 客服：啟用中" : "🔴 AI 客服：已停用 (kill-switch)"}>
-        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          每租戶 kill-switch（停用後此客戶的對話一律轉真人，不自動回覆）。意圖層級與全域開關另在「客服營運中心」。
-        </p>
-        <button onClick={toggleKill} disabled={saving}
-          style={{ ...cisBtnStyle, background: csEnabled ? "var(--red)" : "var(--accent)", opacity: saving ? 0.6 : 1 }}>
-          {saving ? "處理中…" : csEnabled ? "停用 AI 客服" : "啟用 AI 客服"}
-        </button>
-        {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
-      </Card>
-
       <Card title={`知識庫（${loading ? "…" : sources.length} 筆來源）`}>
         <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
           餵給 AI 的資料（FAQ / SOP / 產品說明…）。新增後自動切塊 + 向量化（pgvector），AI 只根據這些內容回答，答不出來轉真人。
@@ -1300,35 +1353,23 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
         </div>
       </Card>
 
-      <Card title={`意圖與自動化分級（${loading ? "…" : intents.length}）`}>
-        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          雙軸：答覆 L0 關閉 / L1 草稿 / L2 自動 × 行動 A0 無 / A1 唯讀 / A2 受閘寫；勾「敏感」= money/身分/法律，永遠轉真人。
-        </p>
-        {!loading && intents.map((it) => (
-          <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-            <span style={{ flex: 1, fontWeight: 500 }}>{it.label}<span style={{ color: "var(--text-muted)", fontWeight: 400, marginLeft: 6, fontFamily: "monospace", fontSize: 10 }}>{it.key}</span></span>
-            {it.is_sensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感·轉真人")}
-            {ansBadge(it.answer_level)}
-            {actBadge(it.action_level)}
-            {it.canary_pct > 0 && it.canary_pct < 100 && badge("var(--bg-canvas)", "var(--text-secondary)", `canary ${it.canary_pct}%`)}
-            <button onClick={() => delIntent(it.key)} aria-label="刪除" style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
-          </div>
-        ))}
-        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10, marginTop: 4 }}>
-          <CisText label="代碼 key" value={iKey} onChange={setIKey} placeholder="order_status" mono />
-          <CisText label="名稱" value={iLabel} onChange={setILabel} placeholder="訂單狀態查詢" />
-          <CisSelect label="答覆" value={iAns} onChange={setIAns} options={[["L0", "L0 關閉"], ["L1", "L1 草稿"], ["L2", "L2 自動"]]} />
-          <CisSelect label="行動" value={iAct} onChange={setIAct} options={[["A0", "A0 無"], ["A1", "A1 唯讀"], ["A2", "A2 受閘寫"]]} />
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", padding: "4px 0 0 96px" }}>
-            <input type="checkbox" checked={iSensitive} onChange={(e) => setISensitive(e.target.checked)} /> 敏感（永遠轉真人）
-          </label>
-          <button onClick={addIntent} disabled={iSaving || !iKey || !iLabel} style={{ ...cisBtnStyle, opacity: iSaving || !iKey || !iLabel ? 0.5 : 1 }}>
-            {iSaving ? "新增中…" : "新增意圖"}
-          </button>
-          {iMsg && <div style={{ marginTop: 6, fontSize: 11, color: iMsg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{iMsg}</div>}
-        </div>
-      </Card>
     </>
+  );
+}
+
+// ── Data collection tab ──────────────────────────────────────────────────────
+//
+// The same panel as /ops/collect, bound to this client. Shared rather than reimplemented: a second
+// copy of the source picker would drift from the first the day a source is added.
+
+function CollectionTab({ org }: Pick<ClientHubTabsProps, "org">) {
+  return (
+    <div style={{ marginTop: -4 }}>
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 12px", lineHeight: 1.7 }}>
+        讓這個客戶的知識庫自己長出來：選來源、試跑、正式抓取。<strong>試跑不會存任何東西</strong>——新來源先試跑，看它抓回來的是不是內文。
+      </p>
+      <CollectionSourcesPanel slug={org.slug} />
+    </div>
   );
 }
 
@@ -2102,7 +2143,7 @@ function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "客服", "社群頻道", "憑證庫", "冷開發"] as const;
+const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "知識庫", "資料蒐集", "客服", "社群頻道", "憑證庫", "冷開發"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
@@ -2182,6 +2223,8 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "維護" && <MaintenanceTab org={org} cfg={cfg} wp={wp} runs={runs} installRuns={installRuns} />}
         {activeTab === "設定" && <SettingsTab org={org} cfg={cfg} wpSites={wpSites} />}
         {activeTab === "品牌識別" && <BrandIdentityTab org={org} cfg={cfg} />}
+        {activeTab === "知識庫" && <KnowledgeTab org={org} />}
+        {activeTab === "資料蒐集" && <CollectionTab org={org} />}
         {activeTab === "客服" && <CustomerServiceTab org={org} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
