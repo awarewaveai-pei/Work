@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-11 ADR-012 提案→已接受；步驟1（kernel 契約層）動工前發現硬阻塞：HCI-30 仍在 Wave 1，未到 ADR-0013 授權的 Wave 3
+
+**觸發**：延續「剩下的去處理好」的第三項（ADR-012）。先驗證 ADR-012「脈絡」段的具體技術主張（`products.ts` 產品清單、`0062`/`0066`/`0043` migration 結構），逐項 Grep 對照原始碼確認屬實無誤，`decisions` §1-8 讀完是已推導完的設計而非待選項，於是問操作者要不要把狀態從「提案」拍板成「已接受」。操作者選「接受＋立刻啟動步驟1」。
+
+**已完成**：`agency-os/docs/architecture/decisions/012-shared-platform-layer.md` 狀態改「已接受」（日期列加註接受日）；`ADR_INDEX.md` 同步（`verify-adr-index.ps1` 跑過 exit 0，13 ADR 全過）。
+
+**步驟1 動工前擋下**：ADR-012 §8 步驟1 = 「契約層（thin refs／epistemic_type／risk tier）— 純型別，零執行期風險。依 ADR-0013，Wave 3」。讀 HCI 命名空間 `ADR-0013-shared-foundation-kernel-extraction.md` 全文才發現：這不是「零風險就能現在做」的獨立工作，是 **HCI-30 自己的 Implementation Master Plan Wave 3**（`22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md:67-73`「Contract-first API/events」）底下的一個交付項，而 ADR-0013 原文明寫：「This ADR does **not** authorize: creating `Projects\shared\contracts\kernel\` **before Wave 3 begins**」。查 `D:\Work\Projects\internal\hci30\README.md:1` 標題就是「HCI-30 — **Wave 1** local skeleton」，全目錄 grep 無任何 Wave 2/Wave 3 已開始的痕跡，`D:\Work\Projects\shared\` 目錄本身也確認不存在（ADR-0013 本身禁止在 Wave 3 前預先建立）。HCI-30 Master Plan 的 Wave 順序是 0→1→2→3 依序關卡（Wave 3 段落路徑明寫 `packages\contracts\`，依賴 Wave 1 Domain foundation + Wave 2 Policy/security boundary 先關閉），現在跳去建 kernel package 會**直接違反 ADR-0013 本文的授權範圍**，不是風險偏好問題，是治理閘本身不允許。
+
+**判斷**：這屬於 R0「立即停止回報,不硬做：架構衝突／缺關鍵資訊」——我在問操作者「要不要立刻啟動步驟1」之前沒有先查 HCI-30 實際 Wave 進度就把它描述成「純型別零風險」，這是我的疏漏，非操作者誤判；應該在提供這個選項前就先查清楚。已誠實回報，未動 `Projects/shared/` 任何一個檔案。
+
+**改走 ADR-012 §8 步驟2（不依賴 HCI wave 狀態）**：「產品登記表 + 機械閘」——只讀 `lib/portal/products.ts`、新增 `scripts/verify-product-registry.ps1`，跟 HCI-30 進度無關，可以現在做。徵求操作者是否改做這項，見下一條目。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "product_key\|CHECK" 0062_organization_product_subscriptions.sql` 等 3 個 migration 檔逐一 grep | exit=0 | result=ADR「脈絡」段落 3 項技術主張全數屬實（`products.ts` 恰 2 產品／`0062` CHECK 恰 `('cognitive','hci')`／`0066` `idempotency_key unique`+`on delete restrict` 皆存在）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File agency-os/scripts/verify-adr-index.ps1` | exit=0 | result=`verify-adr-index: OK (13 ADR file(s))`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ls D:/Work/Projects/shared/` | exit=2（No such file or directory）| result=確認 kernel package 尚未存在，符合 ADR-0013 現況描述
+- REVIEW_DONE: DOC_ONLY（純文件狀態變更 + 阻塞發現，無 code 改動）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`012-shared-platform-layer` | hits=3（`ADR_INDEX.md` 已同步、`agency-os/TASKS.md` 無此條目本就不需改、本條目自身）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] ADR-012 步驟1 仍完全未動工，等 HCI-30 Wave 2 關閉、Wave 3 開始才能重新評估；若操作者想加速，需另外決定是否調整 HCI-30 自己的 Wave 排序（超出本 ADR 範圍）。步驟3（entitlement_ref 簽章）、步驟4（帳本泛化，High-risk）皆未動。
+[rollback] 純文件狀態欄位變更，`git revert` 即可；無 code/schema 變更。
+
 ## 2026-09-11 真跑正式站測完 4 種製作模式（操作者要求「每種都要測試實證」）
 
 **觸發**：org-threading 修復部署後，操作者要求短劇/Remotion/實拍剪輯也要真測，不能只看快速影片一種。操作者本人登入 `app.aware-wave.com`，同瀏覽器分頁讓 session cookie 帶過去，我直接在她的真實登入 session 操作，非模擬。

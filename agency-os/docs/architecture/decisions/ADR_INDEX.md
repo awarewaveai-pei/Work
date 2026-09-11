@@ -38,7 +38,7 @@
 | [009-ai-video-director-dual-engine.md](009-ai-video-director-dual-engine.md) | AI 影片導演：雙引擎共存 + 單一 composition 幀段平行渲染 | 2026-06-28 |
 | [010-wp-site-contract-provisioning-architecture.md](010-wp-site-contract-provisioning-architecture.md) | WP 站台 Site Contract 佈建架構（五層 registry/contract/reconciler/installer/drift-watcher） | 2026-06-29 |
 | [011-collection-ingestion-boundary.md](011-collection-ingestion-boundary.md) | 蒐集分 Signal/Corpus/Evidence 三類；KB 先模組化後服務化；collect/sink 積木 + 編排器（提案） | 2026-09-10 |
-| [012-shared-platform-layer.md](012-shared-platform-layer.md) | 共用平台層：QUOTA/RATE_LIMIT/SAFETY_GATE 三類上限、帳本泛化、上架機械閘、跨產品版本相容（提案） | 2026-09-10 |
+| [012-shared-platform-layer.md](012-shared-platform-layer.md) | 共用平台層：QUOTA/RATE_LIMIT/SAFETY_GATE 三類上限、帳本泛化、上架機械閘、跨產品版本相容（已接受） | 2026-09-10 |
 | [013-open-web-discovery-into-corpus.md](013-open-web-discovery-into-corpus.md) | 開放式 discovery 可進 Corpus，但只產生「候選來源」，經人核准才成為 seed；核准單位是來源不是文件（已接受） | 2026-09-11 |
 
 ## 本機檢查（可選）
