@@ -5,28 +5,32 @@
 // Live against a real Chatwoot instance (chatwoot.aware-wave.com, Account #1) since 2026-09-11 — this
 // is no longer a written-against-docs-only, unexercised module.
 
-import { createHmac, timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "crypto";
 import { getSecret } from "@/lib/secret-vault";
 import { CS_TIMEOUTS } from "@/lib/cs/config";
 import type { ChatwootConfig } from "@/lib/cs/types";
 
 /**
- * Verify X-Chatwoot-Signature per Chatwoot's documented webhook-signing scheme:
- *   sha256=HMAC-SHA256(secret, `${timestamp}.${rawBody}`)
- * KNOWN CAVEAT (chatwoot/chatwoot#13809, still open as of this writing): some Chatwoot versions sign
- * with an internal `hmac_token` that does NOT match the `secret` field the REST API returns for the
- * same webhook — i.e. the value you'd fetch via the API to configure this function may not be the
- * value actually used to sign. If verification fails 100% of the time once U6 is live, this is the
- * first thing to check: get the secret from the Chatwoot admin UI directly, not the API.
+ * CORRECTED 2026-09-11 after a real, deployed, signed-nowhere delivery: the ORIGINAL version of this
+ * function checked X-Chatwoot-Signature/X-Chatwoot-Timestamp — a real Chatwoot header scheme, but for
+ * a DIFFERENT feature (the general-purpose "Webhooks" resource under Settings > Integrations).
+ * Pattern A (D8, this integration's actual design) delivers via the inbox's `webhook_url` and the
+ * AgentBot's `outgoing_url`, both of which route through `Webhooks::Trigger#perform_request` — read
+ * directly from the deployed Chatwoot image (`/app/app/services/webhooks/trigger.rb`): the outbound
+ * POST sends only `{content_type: :json, accept: :json}`, no signature header, ever. The original
+ * function would reject 100% of real traffic on this path — confirmed live (every real delivery
+ * 401'd; `chatwoot-sidekiq` logs showed Chatwoot receiving and logging the 401 as a delivery failure).
+ *
+ * Fix: a shared token in the webhook URL's query string (`?token=...`), the standard workaround for
+ * this documented Chatwoot gap — Chatwoot POSTs to whatever URL string is configured, query string
+ * included, so this needs no cooperation from Chatwoot's own (nonexistent, for this path) signing.
+ * Same secret this app already stores as `cs:chatwoot:{orgId}:webhook_secret` (the inbox's hmac_token,
+ * reused as a shared secret rather than an HMAC key — value doesn't change, only how it's checked).
  */
-export function verifyChatwootSignature(rawBody: string, signatureHeader: string | null, timestampHeader: string | null, secret: string | undefined): boolean {
-  if (!secret || !signatureHeader || !timestampHeader) return false;
-  const prefix = "sha256=";
-  const stripped = signatureHeader.startsWith(prefix) ? signatureHeader.slice(prefix.length) : signatureHeader;
-  const provided = stripped.toLowerCase(); // tolerate an uppercase-hex sender; never widens what's accepted, only case
-  const computed = createHmac("sha256", secret).update(`${timestampHeader}.${rawBody}`, "utf8").digest("hex");
-  const a = Buffer.from(computed);
-  const b = Buffer.from(provided);
+export function verifyWebhookToken(providedToken: string | null, expectedToken: string | undefined): boolean {
+  if (!providedToken || !expectedToken) return false;
+  const a = Buffer.from(providedToken);
+  const b = Buffer.from(expectedToken);
   return a.length === b.length && timingSafeEqual(a, b);
 }
 

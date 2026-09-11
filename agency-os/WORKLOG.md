@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-09-11（客服系統 U6：真送測試訊息才發現 webhook 認證機制整個錯了——Chatwoot 這條路徑不簽章；改用 URL token，連帶抓到並修 token 洩漏進 log 的真安全問題）
+
+**觸發**：deploy 完成後,真的透過 Chatwoot Client API 建 contact→conversation→送訊息,查 `cs_ai_replies` 應該多一列——結果 0 列。查 `lobster-nginx`/`lobster-next-admin` log 也是 0 筆,判斷 Chatwoot 根本沒打到 webhook。
+
+**根因（讀 Chatwoot 部署映像原始碼證實,非猜測）**：SSH 進 `chatwoot-sidekiq` 容器讀 `/app/app/services/webhooks/trigger.rb`——Pattern A（D8,本整合實際設計）用的 inbox `webhook_url` + AgentBot `outgoing_url` 兩條路徑,底層都走 `Webhooks::Trigger#perform_request`,送出的 header **只有** `{content_type: :json, accept: :json}`,完全沒有簽章。我原本寫的 `X-Chatwoot-Signature` 驗證是真實存在的 Chatwoot 機制,但屬於**另一個功能**（Settings > Integrations > Webhooks 資源型),不是這條路徑會送的東西——查 `chatwoot-sidekiq` log 也直接證實：Chatwoot 自己把每次 401 記成送信失敗（`external_error: "401 Unauthorized"`）,對話 UI 上訊息會顯示「失敗」圖示。
+
+**修法**：驗證機制從「body 簽章 HMAC」改成「webhook URL 帶 `?token=` 共享密鑰」——這是社群對這個已知 Chatwoot 缺口的標準解法（Chatwoot 就是照設定的 URL 字串原樣呼叫,query string 帶什麼都會送）。`lib/cs/chatwoot-client.ts` 的 `verifyChatwootSignature` 整個刪除,改成 `verifyWebhookToken`（純字串比對,仍用 `timingSafeEqual`）。透過 API `PATCH` 把 Chatwoot 那邊 Inbox 的 `webhook_url` 與 AgentBot 的 `outgoing_url` 都改成帶 `?token=<既有 webhook_secret 值>`。
+
+**critic 覆審連帶抓到 1 個真 Critical（安全,非本次改動直接造成,但被這次改動觸發)**：query string 裡的 token 會被 `lobster-nginx` 預設 `combined` log format 記進 access log（`$request` 含完整 query string）,再被 promtail 送進 Loki,30 天保留,任何登入過 Grafana 的人都能查到——**這在 HMAC 舊機制下不可能發生**（舊機制只傳一次性 HMAC digest,原始密鑰從不上線)。修法：加一個更明確前綴的 `location /api/webhooks/chatwoot { access_log off; }`（nginx 用最長前綴匹配,跟宣告順序無關,不影響其他 `/api/webhooks/*` 路由的既有 log)。
+
+**critic 第三輪覆審再抓到：Sentry 補的 `beforeSend` 第一版只清 `event.request.url`,實際上 token 還會透過 `event.request.query_string`（另一個獨立欄位）+ OpenTelemetry HTTP span 的 `http.url`/`http.target` 屬性洩漏——直接讀 `node_modules/@sentry/*`/`@opentelemetry/*` 原始碼證實,不是猜的。已補上 `query_string` 清除 + `beforeSendSpan` + `event.contexts.trace.data`/`event.spans[].data` 三處都清。TASKS.md 記錄「Sentry 後台開 Data Scrubber 擋 token 欄位」為人工待辦（code 側清除仍有 SDK 版本耦合殘留風險,critic 明確指出,不敢宣稱 100% 覆蓋)。
+
+**[已修改]**：
+- `lib/cs/chatwoot-client.ts`：`verifyChatwootSignature`→`verifyWebhookToken`
+- `app/api/webhooks/chatwoot/route.ts`：驗證呼叫點改用 query token
+- `lib/cs/__tests__/chatwoot-client.test.ts`：測試改對應新函式
+- `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`：新增 `/api/webhooks/chatwoot` 專用 location + `access_log off`
+- `sentry.server.config.ts`/`sentry.edge.config.ts`：`beforeSend`/`beforeSendTransaction`/`beforeSendSpan` 三層清除 query string
+- `agency-os/TASKS.md`：U6 條目更新現況 + 記錄人工待辦
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=真送 Client API 訊息 + 查 `chatwoot-sidekiq` log | exit=0 | result=**先發現真 bug**（100% 401,`external_error` 證實)——這正是 REALTEST 存在的目的,不是形式
+- REALTEST_EVIDENCE: tool=SSH | cmd=讀 `/app/app/services/webhooks/trigger.rb` 部署映像原始碼 | exit=0 | result=證實不簽章,非猜測
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` + `npx vitest run lib/cs` + `npm test`（全專案） | exit=0 | result=tsc 0、107 檔/981 測試過
+- REVIEW_DONE: critic=Deep（3 輪,分別針對 auth 機制/query-token 實作/Sentry scrub 各自獨立審)| verdict=pass(修後)| findings=第 2 輪 1c(log 洩漏)+第 3 輪 1c(scrub 不完整)+1 Major,全修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`verifyChatwootSignature` | hits=0（全庫,含 node_modules 排除;確認無孤兒引用)
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：
+- 舊 token（`1wddWu78HQJnRUBGzk837aWk`）在 nginx log 修好**之前**已經送出過幾次真實請求,理論上可能已進 Loki——按 critic 建議待 nginx 修好部署後**輪替新 token**（本條目尚未做,下一步驟)。
+- Sentry Data Scrubber 後台設定（人工,已記 TASKS.md）尚未由操作者設定。
+- 端到端「訊息真的觸發 handleInbound 並在 `cs_ai_replies` 留下一列」尚未在 token 修好之後重新驗證過（下一步驟)。
+
+**Rollback**：`git revert` 本次 commit；Chatwoot 端 webhook_url/outgoing_url 可透過 API PATCH 改回無 token 版本（不建議,會重現 401)；nginx location 拿掉即回到原本共用 log 行為。
+
 ## 2026-09-11（128–137 號切片：開新家族 F03 發散式創意 0/10→10/10，10 個平行 agent + 1 critic + 2 個真 bug 修正）
 
 **觸發**：緊接 F02 收官後，操作者「還沒完成系統就繼續做下去」明確重申不停。選型：F03（發散式創意，Atlas L375-397，10 個成員：Classic Brainstorming/Brainwriting/6-3-5/Crazy 8s/SCAMPER/Lotus Blossom/Starbursting/Random Stimulus/Forced Connections/Synectics）——Atlas 順序中 F02 完工後的下一個家族，10 個方法彼此檔案完全不重疊，一次批次派出（同 F02 的 ≤10 例外）。

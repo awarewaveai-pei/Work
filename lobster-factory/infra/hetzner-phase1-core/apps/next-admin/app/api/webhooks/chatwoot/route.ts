@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { handleInbound } from "@/lib/cs/orchestrator";
 import { loadCis } from "@/lib/cs/cis";
 import { claimMessage, findOrganizationIdByChatwootAccountId } from "@/lib/cs/db";
-import { handoffToHuman, sendPrivateDraft, sendReply, verifyChatwootSignature, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
+import { handoffToHuman, sendPrivateDraft, sendReply, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import type { InboundMessage } from "@/lib/cs/types";
@@ -11,16 +11,21 @@ import type { InboundMessage } from "@/lib/cs/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Chatwoot AgentBot webhook (Pattern A, plan §3/§16). Verifies X-Chatwoot-Signature, maps the payload
-// to InboundMessage, runs the engine, and turns its decision into the matching Chatwoot API call.
+// Chatwoot AgentBot webhook (Pattern A, plan §3/§16). Verifies a shared `?token=` query-string secret
+// (see chatwoot-client.ts's verifyWebhookToken doc comment for why it's a query token and not a
+// signature header — Chatwoot's inbox-webhook/AgentBot delivery path sends no signature, confirmed
+// against its actual source), maps the payload to InboundMessage, runs the engine, and turns its
+// decision into the matching Chatwoot API call.
 // NEVER surfaces a 5xx for a processing failure — handleInbound already degrades to `handoff` inside
 // itself (plan §8.4: "no component failure may answer the customer with a guess"); this route's own
 // job is only to not let a webhook exception cause Chatwoot to retry-storm a message that was in fact
 // received and safely handed to a human.
 //
 // Body reading uses readWebhookBody (agency-os/reports/audit/auto-repair-2026-05-23.md §C3) — every
-// webhook route in this app shares the same 256KB cap + raw-bytes-preserved-for-HMAC convention; a
-// bespoke req.text()/req.json() here would be exactly the regression that audit flagged.
+// webhook route in this app shares the same 256KB cap; a bespoke req.text()/req.json() here would be
+// exactly the regression that audit flagged. (This route no longer needs the raw bytes specifically —
+// auth moved from a body-signing HMAC to a query-string token, see verifyWebhookToken's doc comment —
+// but the shared helper's size cap still applies to every webhook route regardless.)
 
 interface ChatwootMessageCreatedPayload {
   event?: string;
@@ -43,7 +48,6 @@ function isIncoming(p: ChatwootMessageCreatedPayload): boolean {
 export async function POST(req: Request): Promise<Response> {
   const body = await readWebhookBody(req);
   if (body.ok === false) return NextResponse.json({ ok: false, error: body.error }, { status: body.status });
-  const rawBody = body.raw;
   const payload = body.parsed as ChatwootMessageCreatedPayload;
 
   // Only "a customer said something" triggers the engine — agent replies, status/typing/other events
@@ -61,11 +65,12 @@ export async function POST(req: Request): Promise<Response> {
   const organizationId = await findOrganizationIdByChatwootAccountId(accountId);
   if (!organizationId) return new NextResponse("unauthorized", { status: 401 });
 
-  // Signature verified AFTER resolving which org's secret to check against (chicken-and-egg: the
-  // account id needed to pick the secret comes from the same untrusted payload) — safe, because a
-  // forged account id gains nothing without also knowing that account's own webhook_secret.
+  // Token verified AFTER resolving which org's secret to check against (chicken-and-egg: the account
+  // id needed to pick the secret comes from the same untrusted payload) — safe, because a forged
+  // account id gains nothing without also knowing that account's own webhook_secret/token value.
   const secret = await loadWebhookSecret(organizationId);
-  const ok = verifyChatwootSignature(rawBody, req.headers.get("x-chatwoot-signature"), req.headers.get("x-chatwoot-timestamp"), secret ?? undefined);
+  const providedToken = new URL(req.url).searchParams.get("token");
+  const ok = verifyWebhookToken(providedToken, secret ?? undefined);
   if (!ok) return new NextResponse("unauthorized", { status: 401 });
 
   const messageId = String(payload.id ?? "");

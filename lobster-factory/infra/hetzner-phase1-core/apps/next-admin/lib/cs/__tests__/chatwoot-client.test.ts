@@ -1,51 +1,32 @@
-import { createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
-import { verifyChatwootSignature } from "@/lib/cs/chatwoot-client";
+import { verifyWebhookToken } from "@/lib/cs/chatwoot-client";
 
-function sign(secret: string, timestamp: string, rawBody: string): string {
-  return `sha256=${createHmac("sha256", secret).update(`${timestamp}.${rawBody}`, "utf8").digest("hex")}`;
-}
+// Replaces the original HMAC-signature test suite (2026-09-11) — that scheme checked
+// X-Chatwoot-Signature/X-Chatwoot-Timestamp headers Chatwoot's inbox-webhook/AgentBot delivery path
+// never actually sends (confirmed by reading the deployed Chatwoot image's own
+// Webhooks::Trigger#perform_request, and by every real delivery 401'ing once this went live). The
+// real auth mechanism is a shared token in the webhook URL's query string.
+describe("verifyWebhookToken", () => {
+  const token = "1wddWu78HQJnRUBGzk837aWk";
 
-describe("verifyChatwootSignature", () => {
-  const secret = "test-webhook-secret";
-  const timestamp = "1700000000";
-  const rawBody = JSON.stringify({ event: "message_created", id: 1 });
-
-  it("accepts a correctly-signed payload", () => {
-    const sig = sign(secret, timestamp, rawBody);
-    expect(verifyChatwootSignature(rawBody, sig, timestamp, secret)).toBe(true);
+  it("accepts a matching token", () => {
+    expect(verifyWebhookToken(token, token)).toBe(true);
   });
 
-  it("rejects a tampered body (signature no longer matches)", () => {
-    const sig = sign(secret, timestamp, rawBody);
-    const tampered = JSON.stringify({ event: "message_created", id: 2 });
-    expect(verifyChatwootSignature(tampered, sig, timestamp, secret)).toBe(false);
+  it("rejects a wrong token", () => {
+    expect(verifyWebhookToken("wrong-token-value", token)).toBe(false);
   });
 
-  it("rejects when the timestamp used to verify differs from the one signed", () => {
-    const sig = sign(secret, timestamp, rawBody);
-    expect(verifyChatwootSignature(rawBody, sig, "1700000001", secret)).toBe(false);
+  it("rejects when the provided token is null (query param absent)", () => {
+    expect(verifyWebhookToken(null, token)).toBe(false);
   });
 
-  it("rejects when the secret is wrong", () => {
-    const sig = sign(secret, timestamp, rawBody);
-    expect(verifyChatwootSignature(rawBody, sig, timestamp, "wrong-secret")).toBe(false);
+  it("rejects when no expected token is configured for the org", () => {
+    expect(verifyWebhookToken(token, undefined)).toBe(false);
   });
 
-  it("accepts a signature with no sha256= prefix (bare hex)", () => {
-    const bare = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`, "utf8").digest("hex");
-    expect(verifyChatwootSignature(rawBody, bare, timestamp, secret)).toBe(true);
-  });
-
-  it("rejects when any of secret/signature/timestamp is missing", () => {
-    const sig = sign(secret, timestamp, rawBody);
-    expect(verifyChatwootSignature(rawBody, null, timestamp, secret)).toBe(false);
-    expect(verifyChatwootSignature(rawBody, sig, null, secret)).toBe(false);
-    expect(verifyChatwootSignature(rawBody, sig, timestamp, undefined)).toBe(false);
-  });
-
-  it("never throws on a garbage signature header of different length", () => {
-    expect(() => verifyChatwootSignature(rawBody, "not-a-real-signature", timestamp, secret)).not.toThrow();
-    expect(verifyChatwootSignature(rawBody, "not-a-real-signature", timestamp, secret)).toBe(false);
+  it("never throws on a garbage token of different length", () => {
+    expect(() => verifyWebhookToken("short", token)).not.toThrow();
+    expect(verifyWebhookToken("short", token)).toBe(false);
   });
 });
