@@ -91,11 +91,22 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     ],
   },
   {
+    // Collection feeds the knowledge base but is not part of customer service (ADR 011): it also
+    // feeds Signal / Content Studio. Its own group, so it is findable by what it does.
+    id: 'data-collection',
+    label: 'Data Collection',
+    items: [
+      { type: 'link', href: '/ops/collect', icon: '🛰', label: '資料蒐集', title: '選來源（網頁／Sitemap／RSS／學術／官方 API／影片／全網搜尋）、試跑、正式抓取' },
+    ],
+  },
+  {
     id: 'customer-service',
     label: 'Customer Service',
     items: [
       { type: 'link',     href: '/ops/cs', icon: '💬', label: '客服總覽', title: 'AI 客服營運中心：知識庫 / 意圖 / 成效 / kill-switch' },
-      { type: 'disabled', icon: '📚', label: '知識庫（soon）' },
+      // Not 'soon' — the knowledge base has been live since K1. It is per-client, so a global link
+      // cannot open "the" knowledge base; /ops/cs shows the counts and says which tab to open.
+      { type: 'link',     href: '/ops/knowledge', icon: '📚', label: '知識庫', title: '所有客戶的知識文件總覽（出處標籤、版本、切片數）；編輯在 客戶中心 →「客服」分頁' },
       { type: 'disabled', icon: '🎚', label: '意圖與分級（soon）' },
       { type: 'disabled', icon: '🧪', label: 'Eval / 模擬（soon）' },
     ],

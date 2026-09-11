@@ -24,6 +24,46 @@ WORKLOG_DONE: 本條目
 
 [rollback]
 `git revert` 本次 commit：兩處 `display:grid` 樣式與包裹用的 `<div class="evidence-layout">` 容器一併移除，回到上下堆疊的上一版。純 CSS/HTML，無 JS/資料影響，可安全回滾。
+## 2026-09-11 第十批（兩個東西按不到：蒐集器沒有入口，知識庫被標成 soon）
+
+操作者截圖：側邊欄「知識庫（soon）」是灰的按不下去，而且找不到資料蒐集器。兩個都屬實，而且是不同的毛病。
+
+- **`/ops/collect` 根本不在側邊欄**。頁面 2026-09-11 就上線了，但 `app/SidebarNav.tsx` 從頭到尾沒有它，唯一的到達方式是手打網址。新增獨立分組 `Data Collection`——不塞進 Customer Service，因為蒐集器同時餵 Signal／Content Studio，不是客服的附屬（ADR 011）。
+- **「知識庫（soon）」是 K1 之前留下的 `disabled` 佔位**。知識庫早就在跑，標籤卻寫著還沒做，操作者照字面理解完全合理。這不是改個字就好：知識庫是**每個客戶各自**的，編輯在客戶中心→「客服」分頁，所以全域側邊欄本來沒有誠實的去處。補上那個去處：**`/ops/knowledge`**，跨客戶列出所有現行知識文件。
+- 新頁面刻意**唯讀**。要編輯就得先選客戶，在這裡做等於開第二條寫入路徑進同一張表，版本與鎖的處理要再對一次。
+- 每一列都顯示**出處標籤**。爬蟲從別人網站抄來的字和操作者自己寫的政策存在同一張表，在標題清單裡長得一模一樣；0075 之前的舊列顯示「未標記」而不是默默算成我們寫的。切片數為 0 的列標紅——文件在、但檢索永遠回不了它。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_OPS_PAGE_LIVE=1 npx vitest run app/(shell)/ops/knowledge/__tests__/knowledge-page.test.tsx` | exit=0 | result=直接 render server component 打**真實資料庫**，印出「現行文件 = 1」，與 prod 實況相符
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（把 `epistemic_type` 改成 `epistemic_typo`）| exit=0 | result=KILLED。這條很重要：欄位名打錯時 Supabase 回 error、頁面走進「讀不到資料庫」分支並**正常渲染**，用 mock 的測試會一路綠
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=1017 test 綠、8 skipped（預設關閉的 live 測試）
+REVIEW_DONE: critic=Quick（一個唯讀頁面 + 導覽項目；風險在查詢正確性，已用真實資料庫渲染與突變證明）| verdict=pass | findings=0c/1m（m1：我先讓側邊欄指向 `/ops/cs#knowledge`，但那個錨點是我自己編的，頁面上不存在；改指真實頁面）
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`ops/collect|ops/knowledge|soon|disabled` | hits=`/ops/collect` 先前僅出現在 RUNNABLE_DEMOS 與頁面自身，導覽確實漏了；`意圖與分級`／`Eval` 兩個 soon 項目查證後確實尚未建，保留不動
+
+**仍未做**：`/ops/knowledge` 沒有版本檢視（K2 的「show versions」仍缺）、沒有搜尋框、沒有分頁（上限 500 列）。現況 1 筆文件，這三項都還不痛。
+**rollback**：`git revert`；唯讀頁面，無資料變動。
+
+## 2026-09-11（客服系統 U6：收尾三個子待辦——accountId 唯一性 index 已套 + SMTP 已接 Resend + 「rate limit 缺失」查出是誤報，nginx 早就有）
+
+**觸發**：延續前批 U6 端到端跑通後，處理 TASKS.md 記錄的 3 個 critic 子待辦。
+
+**① accountId 唯一性**：新 migration `0079_organizations_chatwoot_account_id_unique.sql`——`organizations.metadata.client_config.chatwoot.accountId` 上的 partial unique index。套用前先查 prod：5 個 org 僅 1 個設了 chatwoot 設定（accountId=1），零重複。套用時撞到 `scripts/apply-db-migration.mjs` 一個真 bug：它的檔名解析器 `f.startsWith(num_) && f.endsWith(".sql")` 同時比對到同號的 `.down.sql`（0069/0077/0079 皆有 down 檔），回報「found 2」拒絕解析——這支 runner 是今天早些時候另一批（0072-0075）新增的，當時沒有任何 down 檔存在故沒撞到。修法：filter 排除 `.down.sql`，重查 0069/0072/0077 三個既有號都仍正確解析（無回歸）。
+
+**② rate limit「缺失」是誤報**：先寫了一份 app 層 `RateLimiter`（重用既有 `lib/collect/net/rate-limit.ts`，未新建模組）掛在 `route.ts` 最前面，keyed by 來源 IP、`maxWaitMs:0` 讓超量請求立即 429。**送 critic 覆審才發現整段是多餘的**：`nginx/default.conf:254-256` 早在同日 `3a7d53ee6`（access_log 洩漏修復同批）就已對 `/api/webhooks/chatwoot` 這條路由套了 `limit_req zone=webhook burst=20 nodelay`（10r/s，burst 20），比我新寫的 app 層（burst 30）更嚴——兩層同速率洩流，nginx 的 bucket 一定先在第 21 個請求打 429，app 層在可達路徑上是死碼。critic 另外抓到：完全沒有 429 可觀測性（此路由其他每個丟棄客戶訊息的分支都呼叫 `Sentry.captureException`，這個沒有，且 nginx 這條路徑本身還 `access_log off`——真發生時三處都不會留下記錄）、裸 `catch {}` 會把未來換成 durable store 後的真連線錯誤也一併吞成假 429、`maxWaitMs:0` 這個唯一的邊界條件在整個 repo 零測試覆蓋。**判定**：TASKS.md 原記錄的「完全沒有 rate limit」在寫下那句話的當下是對的，但 `3a7d53ee6` 那次修復把 `limit_req` 一併帶上了（複製既有 `/api/webhooks/` catch-all 的既有寫法），此後這句話就是舊的，沒人回頭訂正——VBC 違規（先信了 TASKS.md 的字面描述，沒去查 nginx 現況）。修法：整段撤回 route.ts 的改動，`git diff` 對 HEAD 為 0（`verify-recent --ack` 記錄見 memory/daily/2026-09-11.md），只訂正 TASKS.md 文字。
+
+**③ SMTP**：`mcp/resend__list-domains` 確認 `aware-wave.com` 已驗證、可發信。查 Resend SMTP relay 規格（WebFetch resend.com/docs/send-with-smtp）：`smtp.resend.com:587`，帳號固定字串 `resend`，密碼 = API key。SSH 到 ks-aw-01，備份 `/root/chatwoot/.env`（`.env.bak-20260911-smtp`），透過 heredoc 追加 `SMTP_ADDRESS`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_PASSWORD`/`SMTP_AUTHENTICATION`/`SMTP_ENABLE_STARTTLS_AUTO`（`MAILER_SENDER_EMAIL`/`SMTP_DOMAIN` 已存在，未知何時由誰先寫入），`docker compose up -d chatwoot-rails chatwoot-sidekiq` 重建（redis 因共用 `env_file` 亦被連帶 Recreate，屬預期副作用，非本次目標）。四容器皆 healthy。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SQL(supabase-awarewave-postgres MCP) | cmd=`CREATE UNIQUE INDEX ... WHERE ... IS NOT NULL`（0079，透過 `apply-db-migration.mjs`） | exit=0 | result=`APPLY_OK 1/1`；`pg_indexes` 查詢確認索引存在且定義正確
+- REALTEST_EVIDENCE: tool=SQL(supabase-awarewave-postgres MCP) | cmd=對第二個 org UPDATE 相同 accountId=1 的 `client_config.chatwoot` | exit=1(預期) | result=`duplicate key value violates unique constraint "organizations_chatwoot_account_id_unique"` —— 真突變測試證明約束生效，非只讀 schema 檢查
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/apply-db-migration.mjs --check 0069 0072 0077 0079` | exit=0 | result=四個號皆正確解析各自唯一檔案（修 down-file 碰撞 bug 後的回歸檢查）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec chatwoot-rails bundle exec rails runner "ActionMailer::Base.mail(...).deliver_now"` | exit=0 | result=`DELIVER_OK`
+- REALTEST_EVIDENCE: tool=WebFetch(Resend MCP list-emails) | cmd=查最近 5 封信 | exit=0 | result=剛送的測試信 `Status: delivered`，獨立於 Rails 自己回報的成功——第三方送達記錄佐證，非單一資料源
+- REVIEW_DONE: critic=Standard（1 個 subagent，聚焦 route.ts 的 rate-limit 新增段 + 重用的 rate-limit.ts）| verdict=fail-then-fixed｜findings=0c/4m/2n(major: nginx 已覆蓋致死碼／零可觀測性／裸 catch 吞未來錯誤／maxWaitMs:0 零測試覆蓋；minor: `??` 對空字串 header 不 fallback／IP 可信賴性隱性依賴 nginx real_ip 鏈未寫成文件) —— 4 個 Major 中第 1 項（死碼）判定為根本設計錨點錯誤，直接整段撤回而非逐項小修；撤回後其餘 3 項隨之消失（不存在的程式碼沒有可觀測性/catch/測試缺口問題）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`organizations_chatwoot_account_id_unique\|apply-db-migration\|SMTP_ADDRESS` | hits=僅本次新增檔案與 TASKS.md 訂正處，無 stale 交叉引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]** ①`.env.bak-20260911-smtp` 備份留在 ks-aw-01，未清（低風險，非 secrets 之外的新增暴露面）。②chatwoot-redis 因本次 env_file 變更被連帶 Recreate，佇列中若有進行中 job 會遺失（本次操作時段無真實客戶流量，未觀察到影響）。③Resend `RESEND_SENDER_EMAIL_ADDRESS`/`RESEND_REPLY_TO_EMAIL_ADDRESSES` 在 `mcp/user-env.ps1` 本機仍是空值（不影響本次 SMTP relay，因 Chatwoot 走自己的 `MAILER_SENDER_EMAIL`，非讀這兩個變數；但若未來其他系統要用這兩個值會發現是空的，非本次範圍）。
+**[rollback]** 0079：`node scripts/apply-db-migration.mjs`（若擴充支援 down）或手動 `docker exec ... psql -f 0079_..._.down.sql`。SMTP：還原 `.env.bak-20260911-smtp` 覆蓋 `.env` 後 `docker compose up -d chatwoot-rails chatwoot-sidekiq`。route.ts：無需 rollback，已是 0 diff。apply-db-migration.mjs：`git revert` 對應 commit。
 
 ## 2026-09-11 T10 Gmail per-org OAuth 建草稿 code-complete（critic Deep 抓 1 Critical IDOR + 1 Major MIME bug，皆已修並補回歸測試）
 
