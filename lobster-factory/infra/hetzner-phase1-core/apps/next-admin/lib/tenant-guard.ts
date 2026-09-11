@@ -22,6 +22,7 @@ export interface TenantContext {
 
 const HEADER_USER_KIND = "x-ops-user-kind";
 const HEADER_ORG_ID = "x-ops-org-id";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Parse the tenant context from request headers set by middleware.
@@ -161,6 +162,17 @@ export function requireClientOrg(req: Request | { headers: Headers }): { userKin
  * - staff:  returns `requestedOrgId` if provided, otherwise null (query all orgs).
  *
  * Pass the value from body/query as `requestedOrgId`.
+ *
+ * A non-null, non-blank `requestedOrgId` that isn't uuid-shaped throws OrgAccessError rather
+ * than being passed through. Every one of the 22 real call sites of this function across the
+ * app already wraps it in `catch (e) { if (e instanceof OrgAccessError) return
+ * toOrgAccessResponse(e) / <local equivalent>; throw e; }` (grepped and read individually,
+ * 2026-09-11) — reusing this error class means the rejection reaches every call site with zero
+ * changes there, instead of a garbage id reaching `.eq("organization_id", ...)` and Postgres
+ * throwing `22P02 invalid input syntax for type uuid`, which several routes were previously
+ * leaking as a raw 500 (`error.message`). The status code is 403 rather than a more
+ * semantically-precise 400 — that's the one tradeoff of reusing the existing mechanism instead
+ * of adding a second error type every caller would need a new catch branch for.
  */
 export function effectiveOrgId(
   req: Request | { headers: Headers },
@@ -175,5 +187,15 @@ export function effectiveOrgId(
     }
     return ctx.orgId; // client cannot inject foreign org
   }
-  return requestedOrgId ?? null;
+  // Trim first (mirrors resolveTenant()'s own `.trim() || null` convention two lines up) so an
+  // empty/whitespace-only value returns null instead of skipping both the format check AND the
+  // `?? null` coalesce (critic Major, 2026-09-11: `""` is falsy so `requestedOrgId && ...` never
+  // ran, but `"" ?? null` still evaluates to `""`, not `null` — silently reopened the 22P02 leak
+  // for the one input shape easiest to trigger by accident, and rejected legitimately
+  // whitespace-padded valid uuids).
+  const trimmed = requestedOrgId?.trim() || null;
+  if (trimmed && !UUID_RE.test(trimmed)) {
+    throw new OrgAccessError("organizationId must be a uuid");
+  }
+  return trimmed;
 }

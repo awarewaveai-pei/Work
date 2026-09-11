@@ -106,6 +106,31 @@ BUGHUNT_DONE: scope=lib/collect,packages/db | grep=`[\x00-\x08\x0b\x0c\x0e-\x1f]
 
 **Rollback**：`sudo docker compose --project-directory /root/chatwoot -f /root/chatwoot/docker-compose.yml down -v` 完全移除四容器+三個 volume（目前零真實客服資料,零損失)。migration 0073/0075 rollback 見各自 `.down.sql`（0073 down 會刪掉已寫入的 org_level/parent 資料,目前全部是 backfill 預設值,無真實資料損失)。
 
+## 2026-09-11 tenant-guard.ts 根因修復：`effectiveOrgId()` 本身補 uuid 格式驗證（22 個呼叫點零改動）
+
+**觸發**：上一條 outreach uuid guard 修復的 WORKLOG 明寫「剩餘風險：`effectiveOrgId()` 本身不驗證 uuid 格式...未動」。操作者說「剩下的去處理好」，先問清楚 4 項候選（T10 Gmail OAuth／ADR-012／`effectiveOrgId()` 根因／都不要），操作者選「都要做」。本條記 `effectiveOrgId()` 這項。
+
+**可行性分析先行**：`effectiveOrgId()` 被 22 個真實呼叫點用到（grep + 逐一讀完確認，非原先誤估的 24——2 個 outreach 檔案其實呼叫的是 `assertOrgAccess`，不是這個函式），橫跨 video/content/onboarding/ops/outreach 五個模組。逐一讀完後發現**全部 22 個都已經用同一套 `catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e)／同義; throw e; }` pattern**（3 個 `page.tsx` 甚至永遠只傳 `null`，新分支結構上不可能觸發）——代表在 `effectiveOrgId()` 內部直接對非法格式 throw 既有的 `OrgAccessError`，可以零改動地讓所有呼叫點自動接住，不必比照 outreach 那樣逐檔補 guard。
+
+**修復**：`lib/tenant-guard.ts` 的 `effectiveOrgId()` 在 client 分支之後、回傳前新增：trim 後非空但不符 uuid 格式 → throw `OrgAccessError("organizationId must be a uuid")`。
+
+**critic Deep 抓到 1 Major**：第一版寫成 `if (requestedOrgId && !UUID_RE.test(requestedOrgId)) throw ...; return requestedOrgId ?? null;`——空字串 `""` 是 falsy，跳過格式檢查；`"" ?? null` 又不會把 `""` 轉成 `null`（只有 `??` 對 `null`/`undefined` 生效）。結果：空字串會直接繞過新 guard 原樣傳回，重新打開本來要關的洞；且合法但前後帶空白的 uuid 會被誤拒。改成比照 `resolveTenant()` 自己的 `.trim() || null` 慣例：`const trimmed = requestedOrgId?.trim() || null；trimmed 非空且不符格式才 throw；回傳 trimmed`。
+
+**已知、接受的副作用**：3 個既有 route（`video/projects`、`video/story-bibles`、`tools/designs`）先前各自土法煉鋼加了本地 `UUID.test()`/`isUuid()` 檢查，原本回 400；現在 `effectiveOrgId()` 內部搶先 throw，那 3 個檔案的本地檢查變成打不到的 dead code，狀態碼從 400 變 403。critic 確認這 3 個檔案的 `.test.ts` 都不存在，沒有任何測試斷言舊的 400，非 regression；`video/projects.ts` 的 GET 路徑先前甚至完全沒 guard（POST 才有），對它反而是淨修復。
+
+**已修改**：`lib/tenant-guard.ts`（`effectiveOrgId()` + 新 `UUID_RE` module const + docstring）；`lib/__tests__/tenant-guard.test.ts` 新增 `effectiveOrgId` 完整測試（staff 合法/null/undefined/空字串/純空白/前後空白/3 種非法格式各自斷言；client 分支 3 case 確認 IDOR guard 不受影響）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/__tests__/tenant-guard.test.ts` | exit=0 | result=22/22 pass（含 critic 抓到的 Major 修復後新增 3 case）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（全 app） | exit=0 | result=106 test files / 974 tests pass / 2 skipped（pre-existing），較修復前 963 tests 淨增 11、零 regression
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | result=10 pre-existing chatwoot 錯誤不變，0 個歸屬本次改動
+- REVIEW_DONE: critic=Deep（auth-adjacent 共用 helper，22 呼叫點逐一讀完 + 3 個既有本地 guard 檔案交叉核對 + `resolveTenant()` fail-open 互動核對）| verdict=pass-with-findings | findings=0c/1m（已修：空字串繞過 guard）/3n（inventory 24→22 已訂正；`toOrgAccessResponse` 硬編 403 不讀 `e.status`，未來若要細分 400/403 需一併改，未修，記錄；7 處重複手刻 uuid regex，建議未來以 `tenant-guard.ts` 的 `UUID_RE` 為 SSOT export，未修，記錄）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`effectiveOrgId\(` | hits=23（22 個真實呼叫點 + `tenant-guard.ts` 自身定義），全數已核對 catch pattern，無漏網
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] `video/projects`／`video/story-bibles`／`tools/designs` 三個 route 的 malformed-organizationId 回應從 400 變 403，無測試覆蓋此狀態碼、行為上無害但若前端曾依賴確切 400 需留意（grep 前端未發現任何依賴特定狀態碼的邏輯，僅檢查 `ok:false`）；`toOrgAccessResponse` 硬編 403，未讀 error 實例自己的 `.status`，未修；7 處重複 uuid regex 未整併成單一 export，未修。ADR-012／T10 Gmail OAuth 待續（另條處理）。
+[rollback] `git revert`；純函式內部邏輯 + 新增測試，無 schema/DB/API contract 變更（僅 3 個既有 route 的錯誤狀態碼從 400→403，且該 3 路徑原本就無測試鎖定 400）。
+
 ## 2026-09-11 Cold Outreach 收尾：leads/route.ts uuid guard 小修，牽出同 bug class 遍布全 8 route.ts + connectors/secret 缺失 ownership check
 
 **觸發**：操作者問完 cold email 進度（T10 gated + 3 條旁支待辦：GEMINI_API_KEY／leads uuid-into-column／ADR-012 產品登記）後說「全部去處理好」。範圍判定：ADR-012 共用平台層狀態仍是「提案」（`agency-os/docs/architecture/decisions/012-shared-platform-layer.md:3`），跨 8 個系統的架構決策不屬於本次「小修」範圍，不動；GEMINI_API_KEY 換發需操作者登入 Google AI Studio，不是我能做的動作；剩 leads/route.ts uuid-into-column 是唯一可直接處理的項目。
