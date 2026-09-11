@@ -129,6 +129,13 @@ export interface CsVoice {
   brandVoice?: BrandVoice;
 }
 
+/** Non-secret Chatwoot Account API wiring (client_config.chatwoot). Tokens/signing secrets live in
+ * secret-vault under `cs:chatwoot:{organizationId}:api_token` / `...:webhook_secret` — never here. */
+export interface ChatwootConfig {
+  accountId: number;
+  baseUrl: string;
+}
+
 /** Resolved CIS for one tenant (VI colours + BI/MI voice), loaded from org metadata. */
 export interface CisProfile {
   organizationId: string;
@@ -136,6 +143,7 @@ export interface CisProfile {
   csVoice?: CsVoice;
   /** Per-tenant kill-switch (client_config.csEnabled). Default ON; false = AI must not auto-reply. */
   csEnabled?: boolean;
+  chatwoot?: ChatwootConfig;
 }
 
 // ── Offline eval (golden set → graduation gate, plan §5.2) ────────────────────
