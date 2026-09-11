@@ -15907,3 +15907,25 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 
 [剩餘風險] ① `.env.video` 現由本次重建，若未來金鑰輪替，此檔需同步更新（獨立於本次改動的既有維運責任）；② video-service 容器名衝突根因未查（該容器為何脫離 compose 專案追蹤未深究，不影響本次部署結果，留待下次有人動 video-service 時若再現再查）；③ 舊 `lobster-video-service:rollback-20260909-*` 系列標籤未清，累積但無害（磁碟成本，非功能風險）。
 [rollback] video-service：`docker stop/rm lobster-video-service && docker run` 或改 compose 用 `lobster-video-service:rollback-20260910` 重新 `up -d` 即可回前一版；next-admin：`ROLLBACK_SCRIPT restore next-admin`（`rollback-phase1.sh`，sg-deploy.sh 自動快照過）。main 分支：`git revert` 對應 commit 範圍。
+
+## 2026-09-11（續）短劇 Story Bible 完整版接線 + 真實 UI 端對端驗證
+
+[任務] 操作者複述先前 gap 報告（「短劇模式的 Story Bible『套用』沒真正接起來」），經 `AskUserQuestion` 選「完整版：加自動連續性檢查」，要求做完不可半途。
+
+[做了什麼]
+- `apps/next-admin/app/(shell)/tools/video/ScriptForge.tsx`：`ManualModule` 新增 Story Bible 選取卡片（`OrganizationPicker` + 已核准 series 下拉，`useStoryBibles(organizationId)` hook 過濾 `status==="approved"` 並去重取每個 `series_id` 最新 revision）；新增 `storyBibleContextBlock(doc)` 把角色/場景/連續性規則序列化成文字區塊，注入 `doAngles`/`doScript` 的 prompt；新增 `checkStoryBibleContinuity(script, doc)`，腳本產生後另發一次 Claude 呼叫比對 `continuity.prohibitions`，結果傳給 `ScriptResult` 的既有 `extraTop` prop 顯示（loading／通過／違規清單／呼叫失敗四態）。API route（`/api/tools/script-forge/route.ts`）未改——本就是純 pass-through，client 端組完整 prompt。
+- 部署：純前端變更，走 next-admin 既有 build+部署（同批含 §video-history-layout 修正一起上線，見下條）。
+
+[驗證結果]（四動作）
+- REALTEST_EVIDENCE: tool=Bash（tsc） | cmd=`npx tsc --noEmit`（repo `apps/next-admin/`） | exit=0 | result=無錯誤
+- REALTEST_EVIDENCE: tool=Bash（vitest） | cmd=`npx vitest run` | exit=0 | result=全數通過，零迴歸
+- REALTEST_EVIDENCE: tool=Browser（真實瀏覽器操作，非 headless script） | cmd=`https://app.aware-wave.com/tools/video?advanced=1` → 選 org `soulful-expression` + series `series_1`（角色：小雨/畫家）→ 填主題「小雨在畫室整理舊畫，準備開始新的創作」→ 產生腳本角度 → 選第一個角度 → 產生完整腳本 | exit=n/a | result=角度內容正確反映 Bible 設定（提到「畫室」「自畫像」「老師」等既有角色/場景元素，非泛用範本）；完整腳本產生後面板顯示「✅ Story Bible 連續性檢查通過」（get_page_text 逐字確認，非目測猜測）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/3n（3 個 minor 已修：`ok` 欄位缺失誤判為通過→改判 error；`sceneIndex` 為 `NaN` 時顯示異常→加 guard；bible 清單載入無 loading 提示→補上）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=storyBibleContextBlock,checkStoryBibleContinuity,useStoryBibles | hits=符合預期（僅定義處+呼叫處，無孤兒引用）
+- WORKLOG_DONE: 本條目
+
+[過程中的操作失誤（誠實記錄）]：第一輪端對端測試點擊「產生腳本角度 →」用原始座標點擊（非 element ref）、實際點空未觸發，`read_network_requests` 確認當下只有背景 health-check request、無 script-forge 呼叫——誤以為功能沒接上，中途因瀏覽器 tab group 逾時斷線一度以為要重查。改用 `find`+ref 點擊後，第二輪完整重跑角度→選角度→腳本→連續性檢查全部真實觸發且驗證通過，非同一次僥倖。此為工具操作失誤，非程式邏輯缺陷。
+
+[剩餘風險] Bible 連續性檢查是額外一次 Claude 呼叫（成本+延遲各約 10-20 秒），未做快取；`prohibitions` 為空的 Bible 會恆為「通過」（尚未加「規則為空」的顯式提示，非阻塞）。
+
+[rollback] `git revert` 對應 ScriptForge.tsx 改動 commit；純前端，無 migration、無 route 變更。
