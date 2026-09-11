@@ -49,8 +49,14 @@ function looksLikeSitemap(uri: string): boolean {
 
 export const sitemapCollector: CollectBlock = {
   id: "collect/sitemap",
-  title: "Sitemap",
+  title: "Sitemap（整站目錄）",
   icon: "🗺️",
+
+  describe: {
+    kind: "sitemap",
+    summary: "讀網站自己的 sitemap.xml，把它列出的頁面全部收進來——包含選單連不到的頁。",
+    entry: "url",
+  },
 
   /**
    * 2 — above collect/http-html, so a sitemap is read AS a sitemap. Left to the HTML tier it would

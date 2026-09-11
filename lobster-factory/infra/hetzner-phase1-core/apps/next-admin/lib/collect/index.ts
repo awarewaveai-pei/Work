@@ -31,6 +31,14 @@ export {
   sinkById,
 } from "@/lib/collect/registry";
 export { createNullSink, type NullSink } from "@/lib/collect/sinks/null";
+export { createSignalSink, type SignalSink } from "@/lib/collect/sinks/signal";
+export {
+  sourceCatalogue,
+  catalogueEntry,
+  describeBlock,
+  validateSourceConfig,
+  type CatalogueEntry,
+} from "@/lib/collect/catalogue";
 export { persistRunReport, severityFor, type PersistArgs, type PersistResult } from "@/lib/collect/report-store";
 export { grade, MIN_TEXT_BYTES, MIN_DENSITY } from "@/lib/collect/quality";
 export { screenForInjection, stampProvenance, COLLECTED_PROVENANCE } from "@/lib/collect/provenance";
@@ -50,5 +58,8 @@ export type {
   SinkBlock,
   SinkCtx,
   SinkReport,
+  SourceDescriptor,
+  SourceKind,
+  SourceOption,
   Target,
 } from "@/lib/collect/types";

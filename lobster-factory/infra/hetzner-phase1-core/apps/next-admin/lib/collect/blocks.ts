@@ -8,10 +8,15 @@
 // must not drag the knowledge base (through sink/kb) into modules that only wanted the types.
 
 import "@/lib/collect/collectors/http-html";
+import "@/lib/collect/collectors/academic";
+import "@/lib/collect/collectors/local-file";
+import "@/lib/collect/collectors/video";
+import "@/lib/collect/collectors/http-api";
 import "@/lib/collect/collectors/sitemap";
 import "@/lib/collect/collectors/rss";
 import "@/lib/collect/collectors/extract-provider";
 import "@/lib/collect/sinks/null";
+import "@/lib/collect/sinks/signal";
 import "@/lib/collect/sinks/kb";
 
 export { collectors, sinks, collectorById, sinkById } from "@/lib/collect/registry";

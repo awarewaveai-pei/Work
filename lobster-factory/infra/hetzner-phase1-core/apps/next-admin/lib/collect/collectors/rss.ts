@@ -60,8 +60,14 @@ function looksLikeFeed(uri: string): boolean {
 
 export const rssCollector: CollectBlock = {
   id: "collect/rss",
-  title: "RSS / Atom feed",
+  title: "RSS / Atom 訂閱",
   icon: "📡",
+
+  describe: {
+    kind: "feed",
+    summary: "追一個訂閱源，有新文章就去抓全文。摘要本身不會進庫。",
+    entry: "url",
+  },
 
   /** 2 — like the sitemap tier, a feed must be read as a feed, not extracted as a page. */
   match(t: Target): number {

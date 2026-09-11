@@ -1,5 +1,111 @@
 # Worklog
 
+## 2026-09-11 第三批（來源目錄 + 四個新來源：學術、本機檔案、影片、官方 API）
+
+操作者要求：計畫上未建的來源全部進來、加上網路影片與**專做學術研究**的來源，而且要「可選的選項」。
+
+「可選」才是主體：積木自己宣告 `describe`（kind／entry 形狀／需要哪些環境變數／有哪些選項／是否按次計費），`catalogue.ts` 由已註冊的積木生成清單。**缺金鑰的來源顯示為「有但不可用」並列出缺哪個變數**，不是隱藏——隱藏會讓操作者以為系統做不到，其實只是一個變數沒填。`validateSourceConfig` 在設定當下擋掉會收不到東西的組合（設錯的來源與「網站沒更新」長得一模一樣）。
+
+新來源四個：
+- `collect/academic`（**entry 是查詢不是網址**）：OpenAlex／arXiv／Crossref，三個都免金鑰。ADR 013 說核准單位是來源，所以「registry + 這句查詢」就是被核准的那個來源，設定它就是人審那一步——不必逐篇核准，否則等於沒有自動化。只存摘要＋引用，全文只跟著 registry 自己給的 OA 連結走，**不去別處找 PDF**（那是自找授權問題）。
+- `collect/local-file`：ADR 011 資產盤點寫了「會議轉錄可成為 collect 輸入」但 C0–C6 沒人認領的那一項。無網路，所以邊界改成 `COLLECT_LOCAL_ROOTS` 允許清單 + `realpath` 先解析再比對（root 內指向 /etc 的 symlink 是最老的招）。`.vtt`／`.srt` 轉成純逐字。
+- `collect/video`：**重點是字幕不是 metadata**。沒有字幕時明確報錯而不是存標題——存標題等於讓「我們的退貨政策說明影片」變成退貨政策的答案。YouTube 沒有免費字幕 API，字幕軌是從播放頁的 player payload 讀的，檔頭明寫這是未公開欄位、總有一天會壞，壞的時候會大聲壞。
+- `collect/http-api`：通用 JSON 端點 + 每個來源自己的欄位對應（點路徑，刻意不做運算式語言）。`itemsPath` 指到不是陣列的地方會明確報錯，不是永遠回報 0 筆。
+- `sink/signal` 一併補上（計畫 §2 列了但沒建）：只回傳給呼叫端、不落地。
+
+**真跑三個 registry 抓到三個真缺陷**（fixture 一個都抓不到）：
+1. OpenAlex 預設用發表日排序 → 查 "retrieval augmented generation" 第一名是不相干的 GIS 期刊、日期還是 2029。改成**預設相關度**，日期排序留成選項（追蹤領域動態才用）。修正後第一名是正確的 RAG survey。
+2. arXiv 的 PDF 連結一篇都抽不到（5 篇 0 個 OA）。根因不是 arXiv：我的 patch 腳本把 `\b` 寫成**真的 backspace 位元組**，regex 變成 `/<link<BS>[^>]*>/`，永遠不匹配。
+3. 同一個陷阱也打壞了 `http-html` 的 `rel=author` 備援（meta 那條還能走，所以沒人發現）。全目錄掃描共 3 檔 4 處控制字元，全部修掉，並加機械閘測試擋整類（invisible bytes 產生 invisible failures）。
+4. Crossref 常常沒有摘要 → 只有題名與 DOI 的紀錄回答不了任何問題。加 `requireAbstract`（預設開），並在品質閘加 `MIN_STRUCTURED_BYTES`：結構化紀錄（摘要、公告）用 300 bytes 下限，因為「這是導覽列還是內文」這個問題對 JSON 欄位不存在；門檻由閘決定不由積木自報。
+5. `inScope` 對 `file://`／`academic://` 一律放行並寫明理由：host scope 是**網頁爬取**才有的問題，這兩種來源的邊界更緊（allow-list 根目錄／被核准的 registry+查詢）。原本會把它們全部判 outOfScope，而且 `file://C:\...` 這種手拼 URL 在 Windows 直接 parse 失敗、seed 被靜默丟掉、run 回報乾淨的零。改用 `pathToFileURL`／`fileURLToPath`。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_LIVE_SMOKE=1 COLLECT_LIVE_REGISTRY=openalex npx vitest run lib/collect/__tests__/collect-live-smoke.test.ts -t academic` | exit=0 | result=5 篇真論文，第一名 "Retrieval-Augmented Generation for Large Language Models: A Survey"，作者 11 位、DOI `10.48550/arxiv.2312.10997`、venue arXiv、摘要 1572 字
+REALTEST_EVIDENCE: tool=Bash | cmd=同上 `COLLECT_LIVE_REGISTRY=arxiv` | exit=0 | result=5 篇、5 個 OA 全文目標（修 backspace 前是 0）
+REALTEST_EVIDENCE: tool=Bash | cmd=同上 `COLLECT_LIVE_REGISTRY=crossref` | exit=0 | result=5 篇找到、無摘要的被擋下、留 2 篇（596 字）
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run` | exit=0 | result=105 檔 953 test 全綠（lib/collect 119）
+REVIEW_DONE: critic=Quick（本批全為新增檔＋三處既有檔小改；C0/C1 的 Deep critic 同日已完成並全數修入）| verdict=pass（4 個真缺陷由真跑抓到並修，非 critic 抓）| findings=0c/0m
+BUGHUNT_DONE: scope=lib/collect,packages/db | grep=`[\x00-\x08\x0b\x0c\x0e-\x1f]`（控制字元全目錄掃描）| hits=3 檔 4 處，全部修正並加機械閘
+**未做**：`collection_sources` 表（把「這個租戶選了哪些來源」存下來）尚未建，所以目前選擇只能在呼叫端傳；Apify 第二個 driver、discovery（C6）、排程（C3）、webhook（C3b）、HCI sink（C4，受 ADR-0029 拘束）仍未建。
+
+## 2026-09-11 第五批（客服系統 U6：DNS 解除，chatwoot.aware-wave.com 公開可訪問，端到端驗證通過）
+
+**觸發**：延續第四批「卡在 DNS」。操作者提供 `C:\Users\user1115\staging API.txt`（另一個目的建立的 Cloudflare token），指示轉錄進 `AWARE_WAVE_CREDENTIALS.md`。
+
+**憑證轉錄**：新增 §三十四（video-whisper-tunnel-manager CF token、R2 staging bucket、tunnel/worker token、staging Anthropic key）進 `AWARE_WAVE_CREDENTIALS.md`；同步 `secrets-vault.ps1 set CLOUDFLARE_VIDEO_WHISPER_TUNNEL_TOKEN`。**驗證該 token 實際權限**（不假設名字叫「tunnel-manager」就只能管 tunnel）：`GET /zones?name=aware-wave.com` 回傳 `permissions` 含 `dns_records:edit`——這把可以建 DNS 記錄，不只是原本設計用途。
+
+**解除卡點（實際執行，非僅記錄）**：
+1. 讀既有 `n8n.aware-wave.com` 的 DNS record 當範本（A/proxied/ttl=1）→ `POST /zones/.../dns_records` 建 `chatwoot.aware-wave.com` → `145.239.195.47`，跟其他子網域一致。
+2. `certbot --expand` 把 `chatwoot.aware-wave.com` 加入既有 8-domain SAN 憑證（`supabase.aware-wave.com` cert，新到期 2026-12-10）。
+3. **意外發現並修正**：certbot `--expand` 自動把新網域的 SSL server block 寫進 `00-default-placeholder`（該檔案本身是 2026-08-29 事故後專門防「新子網域忘記配 vhost 掉進錯的預設站」的安全網，見檔頭註解）——若不清掉，我自己裝的 dedicated vhost 會跟這個自動生成的 block 撞 `server_name`，剛好是那次事故的同一種 bug class。備份（**備份檔存在 `/etc/nginx/`，刻意不放 `sites-enabled/`**——第一次犯這個錯，`nginx -t` 立刻報 `duplicate default server`，因為 nginx 會把 `sites-enabled/` 下所有檔案都當成生效設定，含 `.bak` 檔；當場發現當場修，沒有留著錯誤狀態）→ 用 `head -24` 截掉 certbot 加的 15 行 → `nginx -t` 過 → reload → 確認 `app.aware-wave.com`/`n8n.aware-wave.com` 無回歸。
+4. 裝自己的 `chatwoot-aware-wave.conf`（安裝時額外加 `cf-only.conf`——比對後發現這是比 `n8n-aware-wave.conf` 更新、更完整的硬化模式，新檔案跟新的比，不跟舊的比）→ `nginx -t` 過（唯一警告是既有 `docs.aware-wave.com:10` 的協定選項重複宣告，跟本次改動無關，不在範圍內處理）→ reload。
+5. **端到端真實驗證**：`curl https://chatwoot.aware-wave.com/` 經 Cloudflare→nginx→chatwoot-rails 全鏈路，回真實 302 → `/installation/onboarding`（Chatwoot 首次設定精靈頁）。`app.aware-wave.com`(307)/`n8n.aware-wave.com`(200) 皆無回歸。
+
+**意外抓到並修的第二個問題**：跑 `public-endpoint-smoke.ps1` 驗證時,`app-root` 檢查本身失敗（實際回 307,腳本白名單只收 200/301/302）——跟 Chatwoot 無關的既有腳本債,但恰好是本次改動的同一個檔案,順手修（307 加入白名單,附註發現脈絡）。修完全部 5 項 PASS。
+
+**[已修改]**：
+- `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`：新增 §三十四
+- vault：新增 `CLOUDFLARE_VIDEO_WHISPER_TUNNEL_TOKEN`
+- Cloudflare：新增 DNS A record `chatwoot.aware-wave.com`（zone `f21b1919632fee2221647908a94fdcac`）
+- ks-aw-01：certbot 憑證擴充（+chatwoot.aware-wave.com）；`/etc/nginx/sites-enabled/00-default-placeholder` 移除 certbot 自動注入的重複 block（備份於 `/etc/nginx/00-default-placeholder.bak-20260911`）；新增並啟用 `/etc/nginx/sites-available/chatwoot.aware-wave.com`
+- `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/chatwoot-aware-wave.conf`：加 `cf-only.conf` include（repo SSOT 同步）
+- `scripts/public-endpoint-smoke.ps1`：`app-root` accept list 加 307（獨立於 chatwoot 的既有腳本債）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl api.cloudflare.com/.../zones?name=aware-wave.com` | exit=0 | result=confirmed `dns_records:edit` permission before使用
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -X POST .../dns_records`（建record）| exit=0 | result=建立成功,id `93b81c99e5075f1d000c2f6f8b0c58f8`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`certbot --expand` + `nginx -t` + `systemctl reload nginx`（兩輪：清 00-default-placeholder + 裝新 vhost）| exit=0 both rounds
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl -sI https://chatwoot.aware-wave.com/` | exit=0 | result=`HTTP/2 302` + `location: .../installation/onboarding` + `server: cloudflare`（證明走完整 CF→nginx→app 鏈路,非本機 curl）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/public-endpoint-smoke.ps1` | exit=0 | result=5/5 PASS（含新 chatwoot-root 項）
+- REVIEW_WAIVED: NA -- 純設定/DNS/憑證操作,無應用邏輯;nginx 改動已用等同 safe-infra-patch.sh 精神的 backup→test→reload→驗證 手動跑過(該腳本本身測的是另一個 docker nginx 容器,不適用於這次改的 host 層 system nginx,故不強套腳本,改用同等嚴謹度手動流程並記錄於此)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`chatwoot.aware-wave.com` | hits=nginx vhost(新)+smoke script(新)+WORKLOG本身,無殘留舊路徑引用
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：
+- `/etc/nginx/00-default-placeholder.bak-20260911` 留在 server 上（非 sites-enabled,不影響運作),供之後需要對照時查;可視情況清掉。
+- Chatwoot 應用層仍是全新安裝,尚無 Super Admin/Account#0/API Inbox/AgentBot webhook 註冊——這些要瀏覽器操作,見 TASKS.md 子待辦,DNS 卡點解除後這是唯一剩的步驟。
+- `staging API.txt` 原檔尚留在 `C:\Users\user1115\`,內容已轉錄,操作者可自行刪除。
+
+**Rollback**：DNS record 可從 Cloudflare Dashboard 或 API 刪除(`DELETE /zones/.../dns_records/93b81c99e5075f1d000c2f6f8b0c58f8`)；nginx 兩項改動皆有備份可還原(`00-default-placeholder.bak-20260911` 复原、`rm sites-enabled/chatwoot.aware-wave.com` 移除新 vhost 即退回原狀,原本的 coming-soon 頁會接手)；certbot 憑證擴充本身無害(多一個 SAN 網域,不影響既有 7 個)。
+
+## 2026-09-11 第四批（客服系統 U6：migration 0073/0075 已套用 prod + Chatwoot 四容器實機上線，一個真 bug 當場修；卡在 DNS）
+
+**觸發**：延續本日「客服系統平台化」系列（見上方第二/三批條目）。操作者「去查清楚並完成全部事情 完整完善完美系統」——不只是規劃，實際套用 migration + 實機部署 Chatwoot。
+
+**① migration 0073/0075 套用 prod（ks-aw-01 supabase-db）**：pre-flight（`organizations` 只有 5 列,零風險；兩個 constraint 名/兩個欄位皆未存在）→ apply 0073（COMMIT,exit 0）→ apply 0075 VALIDATE CONSTRAINT（COMMIT,exit 0）→ live 驗證：欄位存在、兩個 constraint `convalidated=t`、trigger 存在、5 列全部 backfill 成 `company`、index 存在。**真實 mutation test**（非只驗證物件存在）：故意把一個 org 的 `parent_organization_id` 指向另一個非 group 的 org,trigger 正確擋下並回報預期錯誤訊息。
+
+**② Chatwoot 實機部署（ks-aw-01，四容器）**：讀官方 `docker-compose.production.yaml`（github fetch）+ 現有 `postiz`/`n8n` compose 慣例（mem_limit/logging rotation/`restart: unless-stopped`/內部 network 隔離）+ 3 份既有決策文件（handoff 包/hardening checklist/2026-08-18 buy-timing 決策的 P5.1「Chatwoot 8G/PG 4G/Redis 1G」）→ 建 `lobster-factory/infra/chatwoot/docker-compose.yml`（rails 5G + sidekiq 3G + 專屬 postgres 4G + redis 1G，不共用 supabase-db）+ `.env.example` + nginx vhost `chatwoot-aware-wave.conf`。祕密（`SECRET_KEY_BASE`/`POSTGRES_PASSWORD`/`REDIS_PASSWORD`）openssl 生成,存入 `secrets-vault.ps1`（`CHATWOOT_*` 三筆）+ 寫入 server `/root/chatwoot/.env`（`sudo tee`，因 `/root` 對 `ubuntu` 使用者不可穿透,sftp_write 用不了,改走 base64+`sudo tee` 管道）。
+
+**真 bug，當場抓到並修**：第一次 `up` 後 chatwoot-rails 噴 `ActiveRecord::NoDatabaseError: could not find your database: chatwoot_production`——Postgres 容器 bootstrap 建的 DB 叫 `chatwoot`,但 Rails 用 `RAILS_ENV=production` 推定的 DB 名是 `chatwoot_production`,兩者不對。讀 log 找到根因（非猜測）,改 `POSTGRES_DB=chatwoot_production`（連帶修 postgres healthcheck 的 `-d` 參數同步改名),本機+server 兩份同步改。第二輪 `up` 後 DB 名對了,但 sidekiq 噴 `PG::UndefinedTable: relation "installation_configs" does not exist`——官方 production compose **不含自動 migrate 步驟**,`rails db:chatwoot_prepare` 是文件明寫的手動一次性動作,不是 entrypoint 自動做的事。跑 `docker compose run --rm chatwoot-rails bundle exec rails db:chatwoot_prepare`,建出 86 個表,`installation_configs` 灌入 82 列種子。第三輪 `up`：**四個容器全部 healthy**,`curl 127.0.0.1:4008` 回 302（真實 HTTP 回應,非只驗容器存在),`docker stats` 確認記憶體遠低於 mem_limit（rails 312MB/5G、sidekiq 307MB/3G、postgres 46MB/4G、redis 3.9MB/1G,無 OOM 風險）。
+
+**卡點（誠實回報,非硬做）**：`chatwoot.aware-wave.com` 這個 subdomain **沒有 DNS 記錄**（`getent hosts` 查無;既有子網域皆走 Cloudflare proxy,非 wildcard,新子網域需明確新增),且既有共用憑證（`supabase.aware-wave.com` SAN)**不含 chatwoot** 這個名字。本 session 全程 Cloudflare MCP 回報 429/連線失敗,無法用 API 建 DNS 記錄。**nginx vhost 檔已寫好但沒裝上 server**——裝了會因憑證缺失導致 `nginx -t` 失敗,不如不裝。這是 Chatwoot 對外可訪問前唯一剩的外部依賴,不是我能繞過的技術債。
+
+**[已修改]**：
+- 新增 `lobster-factory/infra/chatwoot/docker-compose.yml`（含修過的 `POSTGRES_DB`/healthcheck）、`.env.example`
+- 新增 `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/chatwoot-aware-wave.conf`（尚未裝上 server，等 DNS+憑證）
+- 修改 `scripts/public-endpoint-smoke.ps1`（加 chatwoot-root 檢查項，尚未實際跑過因端點還沒公開可訪問）
+- server `/root/chatwoot/{docker-compose.yml,.env}`（部署副本，與 repo SSOT 同步）
+- prod Supabase：套用 migration 0073/0075（見上）
+- vault：新增 `CHATWOOT_SECRET_KEY_BASE`/`CHATWOOT_POSTGRES_PASSWORD`/`CHATWOOT_REDIS_PASSWORD`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql ... 套用 0073+0075 + 欄位/constraint/trigger/index 查詢 + mutation test` | exit=0 | result=全數符合預期,trigger 真實擋下非法 parent
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker compose up -d` 全四服務 + `docker inspect --format Health.Status` | exit=0 | result=全部 healthy
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl 127.0.0.1:4008/` | exit=0 | result=HTTP 302（真實應用回應）
+- REALTEST_WAIVED: SMOKE_COVERED -- public-endpoint-smoke.ps1 新增項尚無法跑（DNS 未建,端點外部不可達）;nginx vhost 因同一原因尚未裝上
+- REVIEW_WAIVED: NA -- 純 infra 部署 + 官方鏡像使用,無自寫應用邏輯；docker-compose 本身之前已有 db-expert 等級考量（mem_limit/isolation 均比照既有 review 過的 postiz 慣例，非新設計）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`chatwoot-postgres\|POSTGRES_DB=chatwoot` | hits=僅存在於這次新增的 compose 檔本身,無其他殘留引用舊值
+- WORKLOG_DONE: 本條目
+
+**[剩餘風險]**：
+- **唯一剩的外部依賴**：Cloudflare 加一筆 `chatwoot.aware-wave.com` A/AAAA 記錄（proxied,同其他子網域指向 `145.239.195.47`）→ `sudo certbot --expand -d supabase.aware-wave.com,chatwoot.aware-wave.com,...`(或等 Cloudflare MCP 恢復由我來做)→ 裝 nginx vhost → reload → 跑 `public-endpoint-smoke.ps1` 驗證 chatwoot-root 項。
+- Chatwoot 容器內部運作正常但**尚未有任何人類操作過 UI**：沒建 Super Admin 帳號、沒建 Account#0、沒建 API Inbox、沒註冊 AgentBot webhook 指向 `app.aware-wave.com/api/webhooks/chatwoot`、沒填 `client_config.chatwoot`（accountId/baseUrl）+ vault 內 `cs:chatwoot:{org}:api_token`/`webhook_secret`。這些是 DNS+憑證解決後的下一批動作,需要透過瀏覽器操作 Chatwoot 首次設定精靈（無法純 API/SSH 完成)。
+- SMTP 未設定（`.env` 留白）——agent 邀請信/通知信目前送不出去,不影響 AI 自動回覆核心流程。
+- Sidekiq cron jobs 已註冊（`internal_check_new_versions_job`／`trigger_scheduled_items_job` 等 9 個)但因帳號未建,實際排程行為未觀察。
+- mem_limit 數字是決策文件的規劃值,尚未經 30 天真實負載驗證（`KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md` 自己要求的觀察期)。
+
+**Rollback**：`sudo docker compose --project-directory /root/chatwoot -f /root/chatwoot/docker-compose.yml down -v` 完全移除四容器+三個 volume（目前零真實客服資料,零損失)。migration 0073/0075 rollback 見各自 `.down.sql`（0073 down 會刪掉已寫入的 org_level/parent 資料,目前全部是 backfill 預設值,無真實資料損失)。
+
 ## 2026-09-11 Cold Outreach 收尾：leads/route.ts uuid guard 小修，牽出同 bug class 遍布全 8 route.ts + connectors/secret 缺失 ownership check
 
 **觸發**：操作者問完 cold email 進度（T10 gated + 3 條旁支待辦：GEMINI_API_KEY／leads uuid-into-column／ADR-012 產品登記）後說「全部去處理好」。範圍判定：ADR-012 共用平台層狀態仍是「提案」（`agency-os/docs/architecture/decisions/012-shared-platform-layer.md:3`），跨 8 個系統的架構決策不屬於本次「小修」範圍，不動；GEMINI_API_KEY 換發需操作者登入 Google AI Studio，不是我能做的動作；剩 leads/route.ts uuid-into-column 是唯一可直接處理的項目。

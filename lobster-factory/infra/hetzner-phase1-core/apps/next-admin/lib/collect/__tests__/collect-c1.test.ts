@@ -16,7 +16,7 @@ const { createCollectFetch } = await import("@/lib/collect/net/fetcher");
 const { createBudget } = await import("@/lib/collect/budget");
 const { RateLimiter } = await import("@/lib/collect/net/rate-limit");
 const { createKbSink } = await import("@/lib/collect/sinks/kb");
-const { httpHtmlCollector, extractText, extractTitle, extractLinks } = await import(
+const { httpHtmlCollector, extractText, extractTitle, extractLinks, extractAuthor } = await import(
   "@/lib/collect/collectors/http-html"
 );
 
@@ -88,6 +88,15 @@ describe("collect/http-html", () => {
     expect(text).not.toContain("Facebook");
     expect(text).not.toContain("window.__DATA__");
     expect(extractTitle(html)).toBe("退貨政策 | 範例商店");
+  });
+
+  it("reads a byline from a rel=author link, not only from a meta tag", () => {
+    // This path was dead for a while: the regex behind it had a literal backspace where a word
+    // boundary belonged, so it matched nothing and the author was simply null. The meta-tag path
+    // kept working, which is exactly why nobody noticed.
+    const html = `<html><head><title>退貨政策</title></head><body><main>
+      <a rel="author" href="/team/cs">客服中心</a><p>${FAQ_TEXT}</p></main></body></html>`;
+    expect(extractAuthor(html)).toBe("客服中心");
   });
 
   it("resolves links relative to the page it found them on", () => {

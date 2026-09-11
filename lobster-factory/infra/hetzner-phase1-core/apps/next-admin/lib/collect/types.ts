@@ -132,11 +132,54 @@ export interface SinkReport {
   errors?: string[];
 }
 
+/**
+ * What KIND of source a block reads. This is what an operator picks from — "a web page", "a feed",
+ * "an academic registry" — not the implementation behind it.
+ */
+export type SourceKind = "web" | "feed" | "sitemap" | "file" | "api" | "video" | "academic" | "rendered";
+
+/** One configurable knob a source exposes to whoever sets it up. */
+export interface SourceOption {
+  key: string;
+  label: string;
+  type: "string" | "number" | "boolean" | "select";
+  required?: boolean;
+  default?: string | number | boolean;
+  /** For `select` — the allowed values, each with a label. */
+  choices?: Array<{ value: string; label: string }>;
+  help?: string;
+}
+
+/**
+ * How a block presents itself in the source catalogue. Declared BY the block, so adding a source is
+ * still one file: a separate list of "sources we support" would be a second place to forget.
+ */
+export interface SourceDescriptor {
+  kind: SourceKind;
+  /** One line an operator reads when choosing. Plain language, not implementation. */
+  summary: string;
+  /**
+   * What the entry point looks like. `url` = the operator supplies an address; `query` = a search
+   * string (an academic registry, a discovery provider); `path` = a local file or folder.
+   *
+   * A `query` source is not a URL crawl: ADR 013 makes "this registry plus this query" the unit a
+   * human approves, and configuring it in the catalogue IS that approval.
+   */
+  entry: "url" | "query" | "path";
+  /** Environment variables without which this source cannot run. Empty ⇒ always available. */
+  requires?: string[];
+  options?: SourceOption[];
+  /** Set when the source costs money per call, so the catalogue can say so out loud. */
+  metered?: boolean;
+}
+
 export interface CollectBlock {
   id: string;
   title: string;
   icon?: string;
   enabled?: boolean;
+  /** Catalogue entry. Absent ⇒ the block is internal machinery, not an operator-selectable source. */
+  describe?: SourceDescriptor;
   /** 0 = cannot handle. Above 0 = candidate; the orchestrator tries candidates in descending order. */
   match: (t: Target) => number;
   /**

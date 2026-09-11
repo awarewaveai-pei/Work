@@ -97,3 +97,76 @@ describe.skipIf(!LIVE)("live smoke", () => {
     60_000,
   );
 });
+
+describe.skipIf(!LIVE)("live academic smoke", () => {
+  it(
+    "asks a real scholarly registry and gets citable papers back",
+    async () => {
+      // OpenAlex, arXiv and Crossref are free and need no key. This proves the three parsers against
+      // what the registries actually return today — the part no fixture can promise.
+      const { academicCollector } = await import("@/lib/collect/collectors/academic");
+      const { createBudget } = await import("@/lib/collect/budget");
+      const { canonicalize } = await import("@/lib/collect/canonical");
+      const { createCollectFetch } = await import("@/lib/collect/net/fetcher");
+      const { RateLimiter } = await import("@/lib/collect/net/rate-limit");
+
+      const registry = process.env.COLLECT_LIVE_REGISTRY ?? "openalex";
+      const query = process.env.COLLECT_LIVE_QUERY ?? "retrieval augmented generation";
+      const budget = createBudget({ fetches: 3, bytes: 5_000_000, ms: 60_000 });
+
+      const { docs, discovered } = await academicCollector.run(
+        {
+          uri: `academic://${encodeURIComponent(query)}`,
+          canonicalUri: "",
+          scope: { hosts: [] },
+          tier: 0,
+          depth: 0,
+          meta: { registry, limit: 5 },
+        },
+        {
+          fetch: createCollectFetch({
+            budget,
+            robots: null, // a documented public API, not a site being crawled
+            rateLimiter: new RateLimiter({ ratePerSecond: 1, burst: 2 }),
+          }),
+          canonicalize,
+          budget,
+          tenantRef: "live-smoke",
+          log: () => {},
+        },
+      );
+
+      // eslint-disable-next-line no-console -- the evidence is the point of this test
+      console.log(
+        JSON.stringify(
+          {
+            registry,
+            query,
+            papers: docs.length,
+            openAccessTargets: discovered.length,
+            first: docs[0]
+              ? {
+                  title: docs[0].title,
+                  author: docs[0].author,
+                  canonicalUrl: docs[0].canonicalUrl,
+                  publishedAt: docs[0].publishedAt,
+                  doi: docs[0].meta.doi,
+                  openAccessUrl: docs[0].meta.openAccessUrl,
+                  venue: docs[0].meta.venue,
+                  textChars: docs[0].text.length,
+                  head: docs[0].text.slice(0, 200),
+                }
+              : null,
+          },
+          null,
+          2,
+        ),
+      );
+
+      expect(docs.length).toBeGreaterThan(0);
+      expect(docs.every((d) => d.title && d.text.length > 0)).toBe(true);
+      expect(docs.every((d) => d.meta.isAbstractOnly === true)).toBe(true);
+    },
+    60_000,
+  );
+});

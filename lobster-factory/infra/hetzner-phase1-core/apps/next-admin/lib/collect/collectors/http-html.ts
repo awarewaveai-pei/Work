@@ -149,10 +149,10 @@ export function extractLinks(html: string, baseUrl: string): string[] {
   return [...out];
 }
 
-function authorOf(html: string): string | null {
+export function extractAuthor(html: string): string | null {
   const meta = metaContent(html, /^(author|article:author|dc\.creator|twitter:creator)$/i);
   if (meta) return meta.slice(0, 200);
-  const rel = /<a[^>]*rel\s*=\s*["']?author["']?[^>]*>([\s\S]*?)<\/a\s*>/i.exec(html);
+  const rel = /<a\b[^>]*\brel\s*=\s*["']?author["']?[^>]*>([\s\S]*?)<\/a\s*>/i.exec(html);
   return rel ? decodeEntities(rel[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 200) || null : null;
 }
 
@@ -170,8 +170,18 @@ function publishedAtOf(html: string): string | null {
 
 export const httpHtmlCollector: CollectBlock = {
   id: "collect/http-html",
-  title: "HTML page",
+  title: "網頁",
   icon: "🌐",
+
+  describe: {
+    kind: "web",
+    summary: "抓一個網址，抽出正文，並跟著同網域的連結繼續走。最常用的來源。",
+    entry: "url",
+    options: [
+      { key: "maxDepth", label: "跟著連結走幾層", type: "number", default: 2 },
+      { key: "pathPrefix", label: "只收這個路徑底下", type: "string", help: "例如 /faq，留空表示整個網域。" },
+    ],
+  },
 
   /**
    * Score 1: the baseline strategy, so anything more specialised (a sitemap reader, a headless
@@ -262,7 +272,7 @@ export const httpHtmlCollector: CollectBlock = {
       contentHash: createHash("sha256").update(text, "utf8").digest("hex"),
       mime: "text/html",
       title: extractTitle(html),
-      author: authorOf(html),
+      author: extractAuthor(html),
       contentType: metaContent(html, /^og:type$/i) === "article" ? "article" : "web_page",
       text,
       raw: { bytes, mime: "text/html" },

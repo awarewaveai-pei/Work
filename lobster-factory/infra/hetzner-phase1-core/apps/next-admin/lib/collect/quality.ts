@@ -21,6 +21,23 @@ import type { QualityVerdict, RawDoc } from "@/lib/collect/types";
 export const MIN_TEXT_BYTES = { cjk: 600, latin: 700 } as const;
 
 /**
+ * The same floor for documents that arrived as STRUCTURED RECORDS rather than as pages.
+ *
+ * The thresholds above answer one question: "is this the article, or the navigation around it?" A
+ * paper's abstract, a government notice from a JSON endpoint and a short FAQ record are complete
+ * documents of their kind, and the chrome failure cannot happen to them — there is no chrome in a
+ * JSON field. Judging them by a page's yardstick throws away real content, silently, which is the
+ * same class of error as letting chrome in.
+ *
+ * The floor is not zero: an empty or one-line record is still refused.
+ *
+ * Which documents count as structured is decided HERE, by content type, not by the block — a block
+ * that could lower its own bar would eventually lower it.
+ */
+export const MIN_STRUCTURED_BYTES = 300;
+const STRUCTURED_CONTENT_TYPES = new Set(["academic_paper", "api_record"]);
+
+/**
  * Extracted text as a fraction of the raw payload, both measured in UTF-8 bytes.
  *
  * Same unit on both sides is not a detail: counting UTF-16 code units on top of UTF-8 bytes puts
@@ -81,7 +98,8 @@ export interface GradeOptions {
 export function grade(doc: RawDoc, opts: GradeOptions = {}): QualityVerdict {
   const script = scriptOf(doc.text);
   const textBytes = utf8Bytes(doc.text);
-  const minTextBytes = MIN_TEXT_BYTES[script];
+  const structured = STRUCTURED_CONTENT_TYPES.has(doc.contentType);
+  const minTextBytes = structured ? MIN_STRUCTURED_BYTES : MIN_TEXT_BYTES[script];
 
   // raw === null (an API-shaped source with no payload of its own) means density is not computable.
   // Stated explicitly because `NaN >= x` is false, which would fail EVERY such document.

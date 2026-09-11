@@ -56,7 +56,17 @@ export function canonicalize(rawUrl: string): string {
   return u.toString();
 }
 
-/** Whether a target is inside the crawl boundary its seed declared. */
+/**
+ * Whether a target is inside the crawl boundary its seed declared.
+ *
+ * Host scoping answers a question that only exists for a WEB crawl: "this page links onward — may
+ * we follow it?". Sources whose entry is a query (an academic registry) or a path (a local folder)
+ * have no host and no link graph, and their boundary is enforced elsewhere and more tightly: the
+ * registry plus the query IS the approved source (ADR 013), and the local collector will only read
+ * inside its configured roots. Applying host scoping to them would reject every one of them —
+ * `new URL("file:///notes")` has an empty hostname, and `academic://退貨` has the query as its
+ * "host".
+ */
 export function inScope(uri: string, scope: { hosts: string[]; pathPrefix?: string }): boolean {
   let u: URL;
   try {
@@ -64,6 +74,7 @@ export function inScope(uri: string, scope: { hosts: string[]; pathPrefix?: stri
   } catch {
     return false;
   }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return true;
   const host = u.hostname.toLowerCase();
   const hostOk = scope.hosts.some((h) => {
     const allowed = h.toLowerCase();

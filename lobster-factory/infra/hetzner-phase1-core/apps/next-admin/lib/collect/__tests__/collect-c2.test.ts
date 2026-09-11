@@ -99,7 +99,7 @@ describe("collect/sitemap", () => {
 
   it("says plainly that it cannot read a gzipped sitemap", async () => {
     const transport = (async () =>
-      new Response(" binary", { status: 200, headers: { "content-type": "application/gzip" } })) as unknown as typeof fetch;
+      new Response("\u001f\u008b binary", { status: 200, headers: { "content-type": "application/gzip" } })) as unknown as typeof fetch;
     const r = await crawl([{ uri: `https://${HOST}/sitemap.xml.gz` }], crawlWith(transport));
     // Not silently "a sitemap with zero urls" — which is what a parser fed binary would report.
     expect(r.report.dirty[0].reason).toMatch(/compressed_sitemap_unsupported|all_strategies_failed/);

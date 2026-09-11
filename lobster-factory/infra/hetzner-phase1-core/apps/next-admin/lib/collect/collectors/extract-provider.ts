@@ -70,8 +70,16 @@ export function markdownToText(md: string): string {
 
 export const extractProviderCollector: CollectBlock = {
   id: "collect/extract-provider",
-  title: "Rendered page (provider)",
+  title: "JS 渲染網頁 / PDF（外部供應商）",
   icon: "🛰️",
+
+  describe: {
+    kind: "rendered",
+    summary: "便宜階讀不到的頁面（JavaScript 渲染、PDF）交給外部抽取供應商。按次計費。",
+    entry: "url",
+    requires: ["FIRECRAWL_API_KEY"],
+    metered: true,
+  },
 
   /**
    * 0.5 — below collect/http-html's 1, so the cheap tier always goes first and this one only ever
