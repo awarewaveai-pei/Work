@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-11 HCI30 版面第四次修正——真正根因：`<details>` 直接當 flex 子元素在部分瀏覽器算不對寬度
+
+前三輪反覆調整寬度數字/門檻，但操作者這輪截圖顯示：即使拿掉所有 px 數字後，「證據與主張」清單跟「新增調查發現」表單在操作者的瀏覽器裡仍然是上下疊放，而本 session 在 Chromium 環境裡三次直接量測（含這輪重現前）都得到並排的座標，兩邊結果矛盾。既然同一份 CSS 邏輯在不同瀏覽器給出不同結果，問題就不是邏輯本身，是瀏覽器相容性：`<details>` 元素直接當 flex 子元素在部分瀏覽器（已知含 Safari）有算不出正確寬度的相容性問題，這是 `<details>` 這個標籤本身的特殊渲染行為（原生可展開/收合），不是每個瀏覽器的 flex 實作都把它當一般 block 元素處理。
+
+修法：`<details class="add-panel">` 外面包一層普通 `<div>`，讓這層 `<div>` 當 flex 子元素（`flex:1; min-width:0`），`<details>` 退回單純的區塊內容，不再直接承擔 flex 排版計算。`.evidence-layout > div` 這個既有規則本來就是抓「直接子元素是 div」，包了一層之後兩個子元素都是 div，同一條規則自動套用到兩邊，不用再為 `.add-panel` 另外寫一條 flex 規則。
+
+真跑驗證：Chromium 環境下，兩個子元素都確認是 `DIV`（原本一個是 `DETAILS`），寬度各 305.6px（相等，符合 `flex:1` 平分）、同一行、`<details>` 確認還在裡面正常運作。**誠實揭露**：本機環境測不到 Safari，這個修法是根據瀏覽器相容性已知問題類別做的防禦性修正，不是在 Safari 上直接驗證過的——如果操作者能在 Safari 或原本出問題的瀏覽器上重新整理後看一次最準。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=Chromium 環境下建立真實案件，量測 `.evidence-layout` 兩個直接子元素，確認皆為 DIV、寬度相等、同一行、`<details>` 巢狀正常運作 | 結果=符合預期，console 零錯誤；Safari 相容性修正本身未能在本機環境直接驗證，已誠實揭露
+REVIEW_WAIVED: NA -- 純 HTML 結構調整（`<details>` 外包一層 div）+ 對應 CSS 選擇器簡化，element id 不變，JS 邏輯零改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=record-add-panel | hits=1（id 唯一，無重複/孤兒）；另核對 `</details>` 標籤數量與開始標籤一致
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`<details class="add-panel">` 外包一層 `<div>` 當 flex 子元素，CSS 對應簡化）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——Chromium 驗證過，Safari 相容性修正未能本機直接驗證
+
+[剩餘風險] Safari（或原本出問題的瀏覽器）上的實際效果尚未直接驗證，需操作者重新整理後回報
+
+[rollback]
+`git revert` 本次 commit 拿掉包裹的 `<div>`，回到 `<details>` 直接當 flex 子元素的上一版（如果操作者的瀏覽器並非受此相容性問題影響，這個回滾是安全的；但如果就是這個問題，回滾會重現 bug）。
+
 ## 2026-09-11 HCI30 版面第三次修正——操作者明講「不要設寬度」，拿掉所有像素數字
 ## 2026-09-11 第十二批（/ops/collect 三塊重排；執行失敗改成看得懂的話）
 
