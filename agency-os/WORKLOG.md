@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-09-11 HCI30 版面第三次修正——操作者明講「不要設寬度」，拿掉所有像素數字
+
+前一輪改成 flex-wrap + 像素 flex-basis（雷達圖 380px、構面卡片 420px 等），操作者截圖回報「信任構面」區塊看起來並排、但「證據與主張」區塊沒有，質疑兩者不一致。逐一用真實 DOM 節點複製到寬度受控容器裡重新測過（900/832/700px 等多個寬度點），結果兩個區塊的收合門檻其實完全一致（832px），程式邏輯本身沒有不一致——但操作者直接明講「不要設寬度」，點出真正的問題：**任何用像素數字判斷「多寬才並排」的做法，本身就是這一連串問題的根源**，不管數字設對設錯，都要求我準確猜中操作者的真實視窗寬度，而這件事我這幾輪都做不到。
+
+改法：拿掉全部像素門檻與 `flex-wrap`，`.radar-wrap`／`.evidence-layout`／`.insight-cols` 三處全部改成純 `display:flex`（不換行）+ `flex:1` 等比例分欄，欄寬永遠跟著容器等比縮放，**沒有任何寬度數字、沒有換行判斷、不可能收合回單欄**。這樣操作者要的「左右放」變成無條件成立，不再是「寬度夠才並排」。
+
+真跑驗證：真實案件頁面，把三個區塊的真實渲染節點複製到寬度受控容器，掃 1200px 到 250px（含比手機還窄的極端值）六個寬度點，三個區塊在**每一個寬度都並排**，無一次收合——這次驗證的重點不是找到正確的門檻，而是證明門檻已經不存在。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=真實案件頁面，三個區塊各自複製真實節點到 1200/900/700/500/320/250px 寬度容器量測子元素座標 | 結果=三區塊在全部 6 個寬度皆並排（true），無條件成立，console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS 屬性刪減（拿掉 flex-basis 像素值與 flex-wrap），element id 與 JS 零改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=flex: 0 0 auto | hits=1（僅 index.html 本身，`.radar-wrap`/`.evidence-layout`/`.insight-cols` 三處已無殘留 flex-wrap） | 另核對三處均無殘留像素 flex-basis
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`.radar-wrap`／`.evidence-layout`／`.insight-cols` 三處拿掉像素 flex-basis 與 flex-wrap，改純等比例 flex 分欄，永遠並排）
+
+[驗證結果] 見上 REALTEST_EVIDENCE
+
+[剩餘風險] 極窄寬度（如摺疊手機）下欄位會等比縮到很窄，操作者已明確選擇「永遠並排」優先於「窄螢幕可讀性」，不再自行加寬度判斷處理這個取捨
+
+[rollback]
+`git revert` 本次 commit 回到 flex-wrap+像素門檻版本（不建議，該版本正是本次要拿掉的根因）。
+
 ## 2026-09-11 第十二批（/ops/collect 三塊重排；執行失敗改成看得懂的話）
 
 操作者實際跑了一次「搜尋全網」，畫面回 `all_strategies_failed:ProviderCallError: provider_perplexity_http_401 — search://...`。**該有的資訊全在裡面，但是寫給寫 fetcher 的人看的。**

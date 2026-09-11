@@ -147,20 +147,16 @@
     .record-card, .domain-card { break-inside: avoid; }
   }
 
-  /* 操作者要求「左右放」(2026-09-11): radar 圖與構面卡片是同一組 7 個信任
-     構面的兩種呈現，並排比上下疊放省垂直空間、也讓兩者能對照著看。
-     2026-09-11 第二次修正：原本用固定 780px 中斷點在操作者真實視窗下沒有
-     正確收合（截圖回報「你搞砸了」），且本機瀏覽器分頁工具這次也證實無法
-     可靠模擬窄螢幕來驗證中斷點——改用 flex-wrap，讓瀏覽器依實際可用寬度
-     自動換行，不需要猜一個中斷點數字，也不需要能模擬窄螢幕才能驗證正確
-     性（flex-wrap 的換行行為本身是瀏覽器規格保證，不是需要在特定像素數
-     測過才敢信的東西）。 */
-  .radar-wrap { padding: 0.5rem 0 1.5rem; display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
-  #d-radar { flex: 0 1 380px; min-width: 260px; }
-  .evidence-layout { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
-  .evidence-layout > div { flex: 1 1 420px; min-width: 0; }
-  .evidence-layout .add-panel { flex: 1 1 380px; margin-top: 0; }
-  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0; margin-top: 1.5rem; border-top: 1px solid var(--border); flex: 1 1 420px; min-width: 0; }
+  /* 操作者要求「左右放」(2026-09-11)，多輪嘗試用像素門檻/flex-basis 判斷
+     何時收合都出問題（操作者明確說「不要設寬度」）——改成最單純的左右
+     分欄：不判斷、不收合，永遠並排，欄寬跟著容器等比縮放，不留任何像素
+     數字去猜多寬才該換行。 */
+  .radar-wrap { padding: 0.5rem 0 1.5rem; display: flex; gap: 2rem; align-items: flex-start; }
+  #d-radar { flex: 0 0 auto; }
+  .evidence-layout { display: flex; gap: 2rem; align-items: flex-start; }
+  .evidence-layout > div { flex: 1; min-width: 0; }
+  .evidence-layout .add-panel { flex: 1; min-width: 0; margin-top: 0; }
+  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0; margin-top: 1.5rem; border-top: 1px solid var(--border); flex: 1; min-width: 0; }
   .domain-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0.85rem 0.4rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .domain-card .domain-name { font-size: 0.85rem; font-weight: 700; color: var(--text); }
   .domain-card .domain-meta { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
@@ -180,11 +176,11 @@
   .suggestion-card .suggestion-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: var(--moderate); text-transform: uppercase; }
   .suggestion-hit { margin-top: 0.5rem; font-size: 0.85rem; line-height: 1.6; padding-left: 1rem; border-left: 2px solid var(--border); }
 
-  /* 2026-09-11: 原本固定 3 欄，窄視窗下無法收合（同一輪「你搞砸了」截圖裡
-     也看得到這個既有問題一起擠壓）——改用 flex-wrap 比照 .radar-wrap 同一次
-     修正，不留只修新增部分、放著舊有同款問題的半套修法。 */
-  .insight-cols { display: flex; flex-wrap: wrap; gap: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
-  .insight-cols > .insight-col { flex: 1 1 220px; min-width: 0; }
+  /* 2026-09-11: 原本固定 3 欄，窄視窗下會被擠壓（同一輪「你搞砸了」截圖裡
+     也看得到這個既有問題）——比照 .radar-wrap/.evidence-layout 同一次改成
+     單純的等比例左右分欄，不留只修新增部分、放著舊有同款問題的半套修法。 */
+  .insight-cols { display: flex; gap: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+  .insight-cols > .insight-col { flex: 1; min-width: 0; }
   .insight-col { background: transparent; border: none; padding: 0; }
   .insight-col h3 { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 0.7rem; }
   .insight-col ul { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; line-height: 1.7; }
