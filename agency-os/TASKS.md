@@ -247,11 +247,19 @@
 
 > 刷卡／登入第三方面板／瀏覽器點測／給截圖。多數每條只要幾分鐘，卻卡住下游。
 
-- [x] **【2026-09-11 開出→同日完成｜完整版】短劇模式的 Story Bible「套用」接線 + 自動連續性檢查**
-  - `✅ 已完成` · 操作者選「完整版：加自動連續性檢查」
+- [x] **【2026-09-11｜完整版・僅文字層】短劇模式的 Story Bible「套用」接線 + 自動連續性檢查**
+  - `✅ 文字層已完成` · 操作者選「完整版：加自動連續性檢查」；**同日操作者實測「影片看不出來有用這個工具」，查出這條只做到文字層** → 畫面層缺口見下一條（待操作者選範圍）
   - **做了什麼**：`ScriptForge.tsx` `ManualModule` 加 Story Bible 選取卡片（org+series）→ 角度/腳本 prompt 注入角色/場景/連續性規則 → 腳本產生後自動跑 `checkStoryBibleContinuity` 對照 Bible 的 `prohibitions`，結果以 `extraTop` 面板顯示在 `ScriptResult` 上方。純前端接線，API route 未改（script-forge 本就是 client 組 prompt 的 pass-through）。
-  - **真實 UI 端對端驗證**（非單元測試）：`soulful-expression` org + `series_1`（角色：小雨/畫家）→ 產生角度（角度內容正確反映「畫室」「自畫像」等 Bible 設定）→ 選角度產生完整腳本 → 面板顯示「✅ Story Bible 連續性檢查通過」。
-  - **證據**：`agency-os/WORKLOG.md` 2026-09-11「短劇 Story Bible 完整版接線」條目。
+  - **真實 UI 端對端驗證**（非單元測試）：`soulful-expression` org + `series_1`（角色：小雨/畫家）→ 產生角度（角度內容正確反映「畫室」「自畫像」等 Bible 設定）→ 選角度產生完整腳本 → 面板顯示「✅ Story Bible 連續性檢查通過」。**範圍局限（我原本驗證漏掉）**：這只證明文字有反映 Bible，沒驗證畫面（生成的圖/影片）有沒有角色連續性。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-11「短劇 Story Bible 完整版接線」+「Story Bible 畫面層缺口 + 字幕查證」兩條目。
+
+- [ ] **【2026-09-11 開出｜產品決策】Story Bible 角色/場景設定沒接到畫面層（生圖/選片），只到文字**
+  - `🟠 未開始` · 開出 2026-09-11 · 卡在你（產品範疇決定）
+  - **一句話**：`StoryBibleWorkbench.tsx` 沒有角色定裝照/reference image 欄位；`/api/video/draft` 生圖（Flux/Ideogram 等）沒有 seed/reference/character 參數；Pexels 模式（真實影片/照片動畫）更是純關鍵字搜圖，跟 Story Bible 零關聯。結果：套用 Story Bible 後旁白/腳本文字會提到角色設定，但同一角色在不同場景畫面長相不保證一致——這就是操作者看不出「影片有用到這個工具」的根因。
+  - **方案 A（最小）**：Story Bible workbench 每個角色存一張定裝照（上傳或用現有 flux 生一次）；`draft` 生圖時若場景有登場角色且該角色有定裝照，改用支援 reference image 的模型（`flux-kontext-*` 或 `ideogram-character`，兩者已在既有 `IMAGE_VENDOR_GROUPS` 名單內）取代純 text-to-image；Pexels 模式維持現狀不處理（本質是真實素材庫，非生成，誠實排除不假裝解決）。
+  - **方案 B（完整）**：A + 角色首次登場時自動生成定裝照存回 Bible（免操作者手動上傳）+ 用 vision 模型比對每場景圖跟定裝照相似度，異常時在既有連續性檢查面板一併顯示（跟現有 `extraTop` 面板同位置，不建新 UI）。
+  - **完成定義**：操作者選 A 或 B（或維持現狀不做）；選定後才排入 D 區實作。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-11「Story Bible 畫面層缺口 + 字幕查證」條目。
 
 - [x] **【✅ 2026-09-10 全部收尾】CF API token 401 監控盲點 + aware-wave.com SPF/CAA 補齊** — 操作者於 Cloudflare dashboard 重新產生兩把 token（`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_AUTH_BEARER_TOKEN`）並貼進個人筆記 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md:147-148`，已同步進 `mcp/user-env.ps1`（不進 git）。完成定義四項全滿足：① `check-cloudflare-security.ps1` 新增 `BLIND` 第四態＋逐檔案 check 精準歸因（401/403/網路失敗分開講，不誇大成「全部」）② `Overall: PASS` 已實測確認（bot=ON, rules=1, xmlrpc=True）③ 順手發現並修復一個獨立根因：CF 舊版 `/firewall/rules` API 對此 zone 永久回 400（error 10021,自 9/4 之後這 zone 的自訂 ruleset 混進了新版 Rulesets API 建立的規則）,遷移到 `/rulesets/phases/http_request_firewall_custom/entrypoint`，並修一個 PowerShell array-unwrap 陷阱（單元素陣列經 if-expression 賦值會被拆包成純量，`@()` 需包住整個 if/else 而非各分支內部）④ SPF TXT 已補 `include:_spf.resend.com`、CAA 6 筆（`letsencrypt.org`/`pki.goog`/`sectigo.com` 各 issue+issuewild）已建立，皆用外部 `dns.google` DNS-over-HTTPS 查詢驗證生效（非只信 CF API 自己的回應）；CAA 驗證時額外發現 Cloudflare 自動補了 6 筆自己的簽發 CA（ssl.com/comodoca.com/digicert.com），符合官方文件行為，不是異常。
   - 完整根因、逐步證據、critic 兩輪覆審發現與修復細節見 `agency-os/WORKLOG.md` 2026-09-10「CF API token 401 監控盲點」＋「aware-wave.com SPF/CAA 補齊 + firewall/rules API 遷移」兩條目。
@@ -1671,5 +1679,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-10 14:30:04 UTC_
+_Last synced: 2026-09-11 14:30:03 UTC_
 

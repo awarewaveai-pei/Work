@@ -15929,3 +15929,32 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 [剩餘風險] Bible 連續性檢查是額外一次 Claude 呼叫（成本+延遲各約 10-20 秒），未做快取；`prohibitions` 為空的 Bible 會恆為「通過」（尚未加「規則為空」的顯式提示，非阻塞）。
 
 [rollback] `git revert` 對應 ScriptForge.tsx 改動 commit；純前端，無 migration、無 route 變更。
+
+## 2026-09-11（續）Story Bible 畫面層缺口 + 字幕查證
+
+[任務] 操作者實測後回報：「你做的影片完全看不出來有用這個工具，而且為什麼沒有自動配字幕？」對應同日稍早關閉的「短劇 Story Bible 完整版接線」任務。
+
+[查證 1：Story Bible 只到文字層，未到畫面層（真缺口，不是誤會）]
+- `app/(shell)/tools/video/StoryBibleWorkbench.tsx`：grep `referenceImage|characterImage|imageUrl|appearance` 零命中——角色資料只有文字欄位，無定裝照/reference image。
+- `app/api/video/draft/route.ts`：grep `imageModel|generateImage|flux|ideogram|reference|seed` 只命中 `imageModel` 透傳，無 seed/reference/character 參數——每個場景的圖是獨立 text-to-image 呼叫，無跨場景角色一致性機制。
+- Pexels 模式（`imageModel === "pexels-video"/"pexels-all"`）用 `brollKeyword` 關鍵字搜真實素材庫圖/影片，跟 Story Bible 文字設定完全無關聯（連 imagePrompt 都不吃）。
+- 結論：Story Bible 的「套用」目前只到 prompt 文字（narration/imagePrompt）跟連續性檢查（比對文字 prohibitions）；沒有任何機制讓同一角色在不同場景的實際畫面長相一致。這是我 2026-09-11 稍早「完整版驗證」的範圍局限——我只驗證了「文字有沒有反映 Bible」，沒驗證「畫面有沒有連續性」，因為根本沒有這層機制存在，不是我漏測，是功能本來就沒做到那一層。
+
+[查證 2：字幕——實測結果是「已經有」，非 bug]
+- 讀 `apps/video-service/pipeline.py` `_render_scene_ffmpeg`（line 323-426）：每個場景 render 時已無條件把 narration 切句 → 算每句時間窗 → 用 `drawtext` + CJK 字型（`fontfile=NotoSansCJK`）燒進畫面，白字黑邊黑底半透明框，非選用、非 flag 控制。`render_video`/`render_video_multiformat` 都走這條路徑（ScriptForge → VideoStudio → render-draft 的標準流程全部涵蓋）。
+- SSH `ks-aw-01`（`145.239.195.47:58122`）確認執行中容器 `lobster-video-service`（image 2026-09-10 16:25 build，image tag `local`）：
+  - `docker exec ... grep drawtext /app/pipeline.py` → 命中同一段程式碼，容器內版本與 repo 一致，非 stale deploy。
+  - `docker exec ... ls /usr/share/fonts/opentype/noto/` → `NotoSansCJK-Regular.ttc` 等 4 個字型檔確實存在（Dockerfile `apt-get install fonts-noto-cjk` 確實生效）。
+- 找到當天（2026-09-11）已渲染的真實輸出：`/app/output/39ad4149_c7f90ff3ad_凌晨三點_沒人知道我哭了/16x9.mp4`（10.4MB，2026-09-11 02:16 UTC）。`ffmpeg` 截幀 t=2s/4s/6s/9s → `docker cp` 出容器 → `scp` 拉回本機 → 直接 Read 圖檔肉眼確認：t=2s「沒有人知道，那個修好 bug 的夜晚……」、t=6s「我一個人坐在那裡，眼睛都快睜不開了……」皆清楚燒在畫面下方，白字黑邊黑底框，可讀。
+- 結論：字幕燒錄機制**存在且在這支實際渲染的影片上正確運作**。若操作者看到的影片確實沒有字幕，可能原因：① 看的是實拍剪輯（FootageEditor／`submitFootageRender`）路徑產出——那條路徑的字幕（`captions` 參數）是選用、須先手動跑 Whisper（`CaptionsStep.tsx`）才會燒；② 看的是這個功能更早期部署之前渲染的舊影片；③ 下載/轉檔/預覽環節被裁切。需要操作者指出具體是哪支影片/哪個素材模式才能再往下查，目前找到的樣本（凌晨三點...）不支持「完全沒有字幕」這個結論。
+
+[驗證結果]（四動作）
+- REALTEST_EVIDENCE: tool=Bash+Grep（原始碼查證） | cmd=`grep referenceImage/characterImage/imageUrl StoryBibleWorkbench.tsx` + `grep imageModel/reference/seed draft/route.ts` | exit=0 | result=零命中確認畫面層機制不存在
+- REALTEST_EVIDENCE: tool=SSH（ks-aw-01 real container inspection） | cmd=`docker exec lobster-video-service grep drawtext /app/pipeline.py` + `ls /usr/share/fonts/opentype/noto/` + `ffmpeg -ss N -frames:v 1` 截幀 + `docker cp` + `scp` 拉回本機 + 肉眼讀圖確認 | exit=0 | result=字幕確實燒入且可讀，非假設
+- REVIEW_DONE: critic=Quick（自審） | verdict=pass | findings=0c/0m/1n（1 個 minor：未能對到操作者實際抱怨的那支影片，只能證明「機制存在」不能排除她看的是例外路徑——已在上方列出三個可能原因並要求操作者指認）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=storyBibleContextBlock,checkStoryBibleContinuity,_render_scene_ffmpeg,drawtext | hits=符合預期（定義處+呼叫處，無孤兒引用；未新增程式碼，本輪純查證無需抓蟲新增面）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 畫面層角色一致性方案（A 最小/B 完整）尚未選定範圍，見 `agency-os/TASKS.md` 同日新開項目。字幕根因未 100% 排除（操作者可能看的是實拍剪輯路徑或舊影片），需操作者指認具體影片才能收斂到 100%。
+
+[rollback] 本輪純查證+文件更正，無程式碼改動、無 deploy，無需 rollback。
