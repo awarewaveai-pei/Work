@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-09-11 實拍剪輯真實成品驗證 + 測試資料清理（操作者要求看到真的產出）
+
+操作者：「我沒看到成品，你可以拿生成記錄裡面的4支片子去做」——上一條 worklog 只證明了 trim function 本身沒 bug，沒有真的產出一支看得到的影片。本條補上真實成品。
+
+[真實測試] 從「生成記錄」取兩支真實生成過的影片（「凌晨三點，沒人知道我哭了」「不是身體累，是靈魂在喘氣」，皆為真實 Quick Engine 產出，非測試素材）→ 本機直接下載（Python urllib，非上次出包的 SFTP+base64 手動轉貼路徑）→ SSH 上 video-service 用 ffmpeg 各剪 4 秒／縮小到 480p（保持在 file_upload 10MB 限制內，同時是真實影像內容非合成 testsrc）→ 兩份都用 sha256 core 掉一輪驗證無誤 → 透過瀏覽器 `file_upload` 上傳進實拍剪輯→ 設定入點/出點/輸出起點串接兩段 → 編譯 Timeline → 送實拍渲染 → **真正拿到完成品**：`https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/tl_827ddc9a_ee5b_4ca1_bc73_822f5619a98a/16x9.mp4`（1920x1080，兩段真實素材接起來），已下載並透過 SendUserFile 交給操作者。
+
+**這次也順手修正了一個傳輸方法**：上次的 SFTP-read→貼進 Write tool→本機解 base64 這條路徑不可靠（會憑空遺失 bytes）。這次改用「ssh_exec 輸出過長時，SDK 自動把完整內容存成本機檔案」這個機制——直接用 Python 讀那個 JSON 檔案、解析、base64 decode，全程腳本化、不經過我手動轉貼——兩次都 sha256 全match。以後這類二進位檔案傳輸都該走這條路，不要再手動複製貼上大段 base64。
+
+[測試資料清理]（操作者同一輪要求）確認 org_id 皆為 `2bf60452-3d4d-47c2-9970-b9046ed1a35a`（Soulful Expression Art Therapy）後，刪除上一條 worklog 提到的兩份「損壞測試影片」：
+- R2 物件：`designs/2026-09/7dd2eb3f-7525-4e31-9db3-93e2ab561de0.mp4`、`designs/2026-09/32a87c4b-9f1a-4a6f-85df-9469aaf37de0.mp4`（Cloudflare R2 API DELETE，兩者皆 200）
+- `media_assets` 對應兩列（Supabase REST API DELETE，org_id 條件式，回傳確認兩列皆屬該 org 後刪除）
+- `video_jobs` 對應兩列失敗紀錄（`edf9688b-...`／`66c81b3a-...`，同樣 org 確認後刪除）
+
+**刻意保留、未刪除**：regenerate-image 測試圖（真實生成，可作範例）、remotion 測試影片（真實渲染成功範例）、本條新產出的 real1_trim/real2_trim 上傳素材與最終成品（操作者剛要求看到的東西，不該順手刪掉）、Story Bible 測試草稿 `series_1 r1`（無害，標記清楚是測試資料）。
+
+**Supabase MCP 連線問題**：`mcp__supabase-awarewave-postgres__query` 本輪持續 `ECONNREFUSED 127.0.0.1:5432`（本機無 tunnel process）——改用 next-admin container 內的 `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY` + `NEXT_PUBLIC_SUPABASE_URL` 直打 PostgREST API（`/rest/v1/<table>`），繞過失效的本機 MCP。**下次這個 MCP 又斷線，直接用這條路，不用等它自己好。**
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Browser(file_upload+javascript_tool, 真實登入 session) | cmd=上傳兩支真實 4 秒剪輯→編譯 Timeline→送實拍渲染→輪詢 `/api/video/status` | exit=0 | result=`status:"done"`，`16x9.mp4` 1920x1080 真實產出，已下載驗證可播放（2.6MB）
+- REALTEST_EVIDENCE: tool=SSH | cmd=Cloudflare R2 API `DELETE .../objects/<key>` ×2 | exit=0 | result=HTTP 200 ×2
+- REALTEST_EVIDENCE: tool=SSH | cmd=Supabase PostgREST `DELETE /rest/v1/media_assets?id=in.(...)&organization_id=eq....` | exit=0 | result=HTTP 200，回傳確認刪除的兩列皆屬正確 org
+- REALTEST_EVIDENCE: tool=SSH | cmd=Supabase PostgREST `DELETE /rest/v1/video_jobs?id=in.(...)&organization_id=eq....` | exit=0 | result=HTTP 200，回傳確認刪除的兩列皆屬正確 org
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無新增——本條目是上一條「實拍剪輯」測試的補強證據＋善後，無 code/infra 改動。
+
+[rollback] 刪除的都是本輪自產的測試資料（損壞素材＋失敗 job 紀錄），無 client 真實資料受影響，無需 rollback。
+
 ## 2026-09-11 HCI30 修正上一輪版面——固定中斷點在操作者真實視窗下沒收合，操作者截圖回報「你搞砸了」
 
 上一輪把雷達圖+構面卡片、證據列表+新增表單改成左右並排，用固定 `@media (max-width: 780px)` 中斷點收合成單欄，且誠實揭露過「窄螢幕退回單欄僅程式碼審查，未真機驗證」。操作者截圖證實這個沒驗證到的地方真的出問題：真實視窗下兩處都沒有收合，擠成很窄的兩欄，連同一頁裡更早就存在、從未響應式過的「主要優勢/重大風險/未知構面」三欄區塊，一起被截圖看到擠壓。
