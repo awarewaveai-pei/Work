@@ -83,6 +83,8 @@ export interface LiveVersion {
   id: string;
   version: number;
   contentHash: string | null;
+  /** Non-null ⇒ automation must leave this document alone (migration 0075). */
+  locked: string | null;
   /** Metadata that re-ingest can change without touching a single character of the body. */
   isSensitive: boolean;
   spaceId: string | null;
@@ -103,7 +105,7 @@ export async function getFamilyState(
   if (!sb) return { live: null, maxVersion: 0 };
   const { data, error } = await sb
     .from("cs_knowledge_sources")
-    .select("id,source_version,status,content_hash,is_sensitive,space_id,canonical_url,valid_from,valid_to")
+    .select("id,source_version,status,content_hash,is_sensitive,space_id,canonical_url,valid_from,valid_to,locked")
     .eq("organization_id", organizationId)
     .eq("doc_family_id", docFamilyId)
     .order("source_version", { ascending: false });
@@ -116,6 +118,7 @@ export async function getFamilyState(
           id: active.id as string,
           version: Number(active.source_version ?? 1),
           contentHash: (active.content_hash as string | null) ?? null,
+          locked: (active.locked as string | null) ?? null,
           isSensitive: active.is_sensitive === true,
           spaceId: (active.space_id as string | null) ?? null,
           canonicalUrl: (active.canonical_url as string | null) ?? null,
@@ -143,6 +146,13 @@ export interface SourceInput {
   docType?: string | null;
   authorityTier?: string | null;
   domainPack?: string | null;
+  epistemicType?: string;
+  authorshipState?: string;
+  locked?: string | null;
+  author?: string | null;
+  publishedAt?: string | null;
+  venue?: string | null;
+  doi?: string | null;
 }
 
 export async function insertSource(input: SourceInput): Promise<string | null> {
@@ -167,6 +177,13 @@ export async function insertSource(input: SourceInput): Promise<string | null> {
       doc_type: input.docType ?? null,
       authority_tier: input.authorityTier ?? null,
       domain_pack: input.domainPack ?? null,
+      epistemic_type: input.epistemicType ?? null,
+      authorship_state: input.authorshipState ?? null,
+      locked: input.locked ?? null,
+      author: input.author ?? null,
+      published_at: input.publishedAt ?? null,
+      venue: input.venue ?? null,
+      doi: input.doi ?? null,
     })
     .select("id")
     .single();
@@ -270,7 +287,20 @@ function rpcArgs(s: RetrievalScope): Record<string, unknown> {
   };
 }
 
-export interface VectorMatch {
+/** The citation and provenance columns both retrieval halves now return (migration 0075). */
+export interface MatchAttribution {
+  title: string | null;
+  canonical_url: string | null;
+  author: string | null;
+  published_at: string | null;
+  venue: string | null;
+  doi: string | null;
+  epistemic_type: string | null;
+  authorship_state: string | null;
+  locked: string | null;
+}
+
+export interface VectorMatch extends MatchAttribution {
   id: string;
   sourceId: string;
   content: string;
@@ -297,15 +327,12 @@ export async function matchChunksVector(
     return [];
   }
   if (!data) return [];
-  return (data as Array<{ id: string; source_id: string; content: string; similarity: number }>).map((r) => ({
-    id: r.id,
-    sourceId: r.source_id,
-    content: r.content,
-    similarity: Number(r.similarity),
-  }));
+  return (data as Array<MatchAttribution & { id: string; source_id: string; content: string; similarity: number }>).map(
+    (r) => ({ ...r, id: r.id, sourceId: r.source_id, content: r.content, similarity: Number(r.similarity) }),
+  );
 }
 
-export interface KeywordMatch {
+export interface KeywordMatch extends MatchAttribution {
   id: string;
   sourceId: string;
   content: string;
@@ -335,7 +362,8 @@ export async function matchChunksKeyword(
     return [];
   }
   if (!data) return [];
-  return (data as Array<{ id: string; source_id: string; content: string }>).map((r) => ({
+  return (data as Array<MatchAttribution & { id: string; source_id: string; content: string }>).map((r) => ({
+    ...r,
     id: r.id,
     sourceId: r.source_id,
     content: r.content,

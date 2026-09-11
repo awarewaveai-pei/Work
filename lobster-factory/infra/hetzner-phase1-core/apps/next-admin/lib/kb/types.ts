@@ -29,6 +29,50 @@ export interface KnowledgeInput {
   docType?: string | null;
   authorityTier?: string | null;
   domainPack?: string | null;
+
+  /**
+   * Absent ⇒ SOURCE_FACT / HUMAN_ORIGINAL, which is what a document typed into the ops console by
+   * an operator actually is. A collector MUST pass its own (EVIDENCE / SOURCE_QUOTATION):
+   * defaulting crawled text to "a fact we wrote" is the mislabelling this field exists to prevent.
+   */
+  provenance?: KnowledgeProvenance;
+  /** Citation fields. Unknowable later — a page that changed takes its byline and date with it. */
+  author?: string | null;
+  publishedAt?: string | null;
+  venue?: string | null;
+  doi?: string | null;
+}
+
+/**
+ * Where a document came from and what kind of claim it is (migration 0075).
+ *
+ * The vocabulary is NOT defined here — it is epistemic-label.schema.yaml (ADR-004), shared with
+ * HCI. Anything fetched from the web is EVIDENCE + SOURCE_QUOTATION: the page proves somebody SAID
+ * it, never that it is true. An operator's own policy is SOURCE_FACT + HUMAN_ORIGINAL.
+ */
+export interface KnowledgeProvenance {
+  epistemicType:
+    | "SOURCE_FACT" | "EVIDENCE" | "ASSUMPTION" | "HYPOTHESIS" | "AI_INFERENCE" | "AI_SUGGESTION"
+    | "HUMAN_OPINION" | "CALCULATED_RESULT" | "SIMULATED_RESULT" | "UNKNOWN" | "DECISION";
+  authorshipState:
+    | "HUMAN_ORIGINAL" | "AI_GENERATED" | "AI_SUGGESTED" | "HUMAN_EDITED" | "HUMAN_APPROVED"
+    | "SOURCE_QUOTATION";
+  /**
+   * Set by a human to mean "automation must not rewrite this". The failure it prevents is concrete:
+   * an operator writes the authoritative policy, the crawler finds an outdated copy on the public
+   * site, and the copy silently becomes the next version.
+   */
+  locked?: "LOCKED_FACT" | "LOCKED_DECISION" | null;
+}
+
+/** Everything needed to quote a passage back to somebody who wants to check it. */
+export interface Citation {
+  title: string | null;
+  url: string | null;
+  author: string | null;
+  publishedAt: string | null;
+  venue: string | null;
+  doi: string | null;
 }
 
 /** Pluggable embedding provider (OpenAI now; bge-m3 self-host later — D3). */
@@ -67,7 +111,19 @@ export interface RetrievedChunk {
   sourceId: string;
   content: string;
   score: number;
+  /**
+   * How this passage may be used. A consumer putting SOURCE_QUOTATION text into a prompt must wrap
+   * it as untrusted data rather than concatenating it with its own instructions
+   * (DATA_COLLECTION_PLAN.md §1.3b). Not optional: a passage without a label would have to be
+   * treated as the least trustworthy kind anyway, and nothing downstream would know to do that.
+   */
+  provenance: KnowledgeProvenance;
+  /** Enough to show a reader where this came from. */
+  citation: Citation;
 }
+
+/** Why an ingest refused to write. */
+export type IngestRefusal = "locked" | "promotion_forbidden";
 
 /** Result of an ingest. `unchanged` means the document was already stored exactly like this. */
 export interface IngestResult {
@@ -82,4 +138,6 @@ export interface IngestResult {
    * Surfaced rather than swallowed: the fix is to re-ingest, which retries the archive.
    */
   supersedeFailed?: boolean;
+  /** Set when the write was refused on purpose; `sourceId` is null and nothing changed. */
+  refused?: IngestRefusal;
 }

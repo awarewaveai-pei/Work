@@ -15,11 +15,16 @@ const NEXT_ADMIN = path.resolve(__dirname, "../../..");
 const DB_PACKAGE = path.resolve(NEXT_ADMIN, "../../../../packages/db");
 
 const dbSource = readFileSync(path.join(NEXT_ADMIN, "lib/kb/db.ts"), "utf8");
-const k1Migration = readFileSync(
-  path.join(DB_PACKAGE, "migrations/0072_kb_versioning_and_retrieval_predicates.sql"),
-  "utf8",
-);
-const migrations = [readFileSync(path.join(DB_PACKAGE, "migrations/0051_cs_core.sql"), "utf8"), k1Migration].join("\n");
+// Every migration that shapes these tables, in order. Leaving one out makes a column that exists
+// look missing, and the test then fails for a reason that has nothing to do with the code.
+const MIGRATIONS = [
+  "migrations/0051_cs_core.sql",
+  "migrations/0072_kb_versioning_and_retrieval_predicates.sql",
+  "migrations/0075_kb_provenance_and_citation.sql",
+];
+const migrations = MIGRATIONS.map((f) => readFileSync(path.join(DB_PACKAGE, f), "utf8")).join("\n");
+// The RPC signatures live in whichever migration created them last.
+const rpcMigration = readFileSync(path.join(DB_PACKAGE, "migrations/0075_kb_provenance_and_citation.sql"), "utf8");
 
 /** Columns a CREATE TABLE / ALTER TABLE … ADD COLUMN grants to one table. */
 function columnsOf(table: string): Set<string> {
@@ -80,7 +85,7 @@ describe("lib/kb/db.ts writes only columns that exist", () => {
     // empty result, so retrieval returns nothing and nothing anywhere says why. Neither the mocked
     // unit tests nor the SQL harness (which calls the functions positionally) can see it.
     const declared = (fn: string): string[] => {
-      const sig = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\(([\\s\\S]*?)\\)\\s*\\nRETURNS`).exec(k1Migration); // 0051 declares a same-named function with the OLD arity
+      const sig = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\(([\\s\\S]*?)\\)\\s*\\nRETURNS`).exec(rpcMigration); // earlier migrations declare same-named functions with older arities
       expect(sig, `signature of ${fn} not found in the K1 migration`).toBeTruthy();
       const names = [...sig![1].matchAll(/^\s*(p_[a-z_]+)\s/gm)].map((m) => m[1]);
       expect(names.length, `no parameters parsed out of ${fn}`).toBeGreaterThan(3);

@@ -60,12 +60,32 @@ export function createKbSink(opts: KbSinkOptions = {}): SinkBlock {
             canonicalUrl: doc.canonicalUrl,
             spaceId: opts.spaceId ?? null,
             language: typeof doc.meta.language === "string" ? doc.meta.language : null,
-            docType: "web_page",
+            docType: doc.contentType || "web_page",
+            // The label the orchestrator stamped, carried the whole way (DATA_COLLECTION_PLAN §1.3b).
+            // Without it a consumer cannot tell a vendor's claim scraped off the open web from a
+            // policy the operator wrote, and therefore cannot wrap the first one before it reaches
+            // a prompt. A locked document refuses this write outright — see lib/kb/rag.ts.
+            provenance: {
+              epistemicType: doc.provenance.epistemic_type,
+              authorshipState: doc.provenance.authorship_state,
+              locked: doc.provenance.locked,
+            },
+            author: doc.author,
+            publishedAt: doc.publishedAt,
+            venue: typeof doc.meta.venue === "string" ? doc.meta.venue : null,
+            doi: typeof doc.meta.doi === "string" ? doc.meta.doi : null,
             // publishedAt is when the source says the content became true. Recorded now because it
             // is unknowable later — nobody can reconstruct it after the fact.
             validFrom: doc.publishedAt,
           });
 
+          if (result.refused === "locked") {
+            // Not a failure: the operator marked this document as theirs. Reported so a crawl that
+            // silently stops updating one page does not look like a page that stopped changing.
+            report.skipped++;
+            report.errors!.push(`locked:${doc.canonicalUrl}`);
+            continue;
+          }
           if (result.unchanged) {
             report.skipped++;
             continue;
@@ -89,13 +109,6 @@ export function createKbSink(opts: KbSinkOptions = {}): SinkBlock {
       return report;
     },
 
-    // NOT PASSED, and it is a gap rather than a decision: `doc.provenance` (EVIDENCE /
-    // SOURCE_QUOTATION) stops here, because KnowledgeInput has no field for it. The plan's §1.3b
-    // "傳遞" row requires it to survive all the way to Passage, so that a consumer can wrap quoted
-    // web text before it reaches a prompt. Until the knowledge base carries the three axes, a
-    // consumer cannot tell a crawled vendor claim from an operator-written policy. Tracked in
-    // TASKS.md (KB K2e owns the schema side).
-    //
     // finalize (tombstoning pages that vanished from the site) is deliberately NOT implemented yet:
     // it needs "every canonical URL this tenant had before", which the knowledge base cannot answer
     // per source system today. Implementing it against an incomplete URL set would archive

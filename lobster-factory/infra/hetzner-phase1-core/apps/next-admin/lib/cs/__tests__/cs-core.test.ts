@@ -104,7 +104,16 @@ describe("topScore", () => {
     expect(topScore([])).toBe(0);
   });
   it("returns the max score", () => {
-    expect(topScore([{ id: "1", sourceId: "s", content: "x", score: 0.3 }, { id: "2", sourceId: "s", content: "y", score: 0.7 }])).toBe(0.7);
+    const attribution = {
+      provenance: { epistemicType: "EVIDENCE" as const, authorshipState: "SOURCE_QUOTATION" as const, locked: null },
+      citation: { title: null, url: null, author: null, publishedAt: null, venue: null, doi: null },
+    };
+    expect(
+      topScore([
+        { id: "1", sourceId: "s", content: "x", score: 0.3, ...attribution },
+        { id: "2", sourceId: "s", content: "y", score: 0.7, ...attribution },
+      ]),
+    ).toBe(0.7);
   });
 });
 

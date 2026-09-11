@@ -19,7 +19,16 @@ import {
   matchChunksVector,
   type RetrievalScope,
 } from "@/lib/kb/db";
-import type { EmbeddingProvider, IngestResult, KbContext, KnowledgeInput, RetrievedChunk } from "@/lib/kb/types";
+import type {
+  Citation,
+  EmbeddingProvider,
+  IngestResult,
+  KbContext,
+  KnowledgeInput,
+  KnowledgeProvenance,
+  RetrievedChunk,
+} from "@/lib/kb/types";
+import type { MatchAttribution } from "@/lib/kb/db";
 
 class OpenAIEmbeddingProvider implements EmbeddingProvider {
   id = KB_EMBEDDING.model;
@@ -98,18 +107,54 @@ export async function retrieve(ctx: KbContext, query: string): Promise<Retrieved
     matchChunksKeyword(s, query, KB_RETRIEVAL.keywordTopK),
   ]);
 
-  const byId = new Map<string, { sourceId: string; content: string; similarity: number }>();
-  for (const m of kw) byId.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: 0 });
-  for (const m of vec) byId.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: m.similarity });
+  const byId = new Map<string, { sourceId: string; content: string; similarity: number; attribution: MatchAttribution }>();
+  for (const m of kw) byId.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: 0, attribution: m });
+  for (const m of vec) byId.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: m.similarity, attribution: m });
 
   const fused = rrfFuse([vec.map((m) => m.id), kw.map((m) => m.id)]);
   return fused
     .slice(0, KB_RETRIEVAL.contextTopK)
     .map((f): RetrievedChunk => {
       const c = byId.get(f.id);
-      return { id: f.id, sourceId: c?.sourceId ?? "", content: c?.content ?? "", score: c?.similarity ?? 0 };
+      return {
+        id: f.id,
+        sourceId: c?.sourceId ?? "",
+        content: c?.content ?? "",
+        score: c?.similarity ?? 0,
+        provenance: provenanceOf(c?.attribution),
+        citation: citationOf(c?.attribution),
+      };
     })
     .filter((c) => c.content.length > 0);
+}
+
+/**
+ * What a passage's label is when the stored row has none.
+ *
+ * UNKNOWN, never a friendly guess. Rows written before migration 0075 genuinely have no label, and
+ * calling them SOURCE_FACT would promote every one of them — including anything a crawler stored —
+ * to "a fact we wrote". A consumer seeing UNKNOWN can decide to be careful; one seeing SOURCE_FACT
+ * cannot.
+ */
+export function provenanceOf(a: MatchAttribution | undefined): KnowledgeProvenance {
+  const epistemic = a?.epistemic_type as KnowledgeProvenance["epistemicType"] | null | undefined;
+  const authorship = a?.authorship_state as KnowledgeProvenance["authorshipState"] | null | undefined;
+  return {
+    epistemicType: epistemic ?? "UNKNOWN",
+    authorshipState: authorship ?? "SOURCE_QUOTATION",
+    locked: (a?.locked as KnowledgeProvenance["locked"]) ?? null,
+  };
+}
+
+export function citationOf(a: MatchAttribution | undefined): Citation {
+  return {
+    title: a?.title ?? null,
+    url: a?.canonical_url ?? null,
+    author: a?.author ?? null,
+    publishedAt: a?.published_at ?? null,
+    venue: a?.venue ?? null,
+    doi: a?.doi ?? null,
+  };
 }
 
 /**
@@ -172,6 +217,22 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
 
   const spaceId = input.spaceId ?? KB_DEFAULT_SPACE_ID;
   const { live, maxVersion } = await getFamilyState(input.organizationId, familyId);
+
+  // A locked document is the operator's answer, and AUTOMATION does not get to replace it. The
+  // sequence this prevents is concrete: someone writes the authoritative refund policy by hand, the
+  // crawler later finds last year's copy still published on the public site, and stores it as
+  // version 2 — no error, no alert, and the knowledge base now contradicts the company.
+  //
+  // A person editing their own locked document is not that: the lock stops machines, not authors.
+  // "Automation" here means the content is quoted or machine-written, which is exactly what a
+  // collector stamps and what an operator's own writing never is.
+  const fromAutomation =
+    input.provenance?.authorshipState === "SOURCE_QUOTATION" ||
+    input.provenance?.authorshipState === "AI_GENERATED" ||
+    input.provenance?.authorshipState === "AI_SUGGESTED";
+  if (live?.locked && fromAutomation) {
+    return { ...EMPTY_INGEST, docFamilyId: familyId, sourceId: live.id, version: live.version, refused: "locked" };
+  }
   // "Unchanged" has to mean the whole document, not just its text. Re-uploading the same body with
   // the sensitive flag newly ticked is a real change; treating it as a no-op would silently discard
   // a change the operator believes they made.
@@ -187,6 +248,13 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
   }
 
   const version = maxVersion + 1;
+  // Absent ⇒ an operator typed it in, which is exactly SOURCE_FACT / HUMAN_ORIGINAL. Collectors
+  // pass EVIDENCE / SOURCE_QUOTATION explicitly; see KnowledgeInput.provenance.
+  const provenance: KnowledgeProvenance = input.provenance ?? {
+    epistemicType: "SOURCE_FACT",
+    authorshipState: "HUMAN_ORIGINAL",
+    locked: null,
+  };
   const sourceId = await insertSource({
     organizationId: input.organizationId,
     kind: input.kind,
@@ -203,6 +271,13 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     docType: input.docType ?? null,
     authorityTier: input.authorityTier ?? null,
     domainPack: input.domainPack ?? null,
+    epistemicType: provenance.epistemicType,
+    authorshipState: provenance.authorshipState,
+    locked: provenance.locked ?? null,
+    author: input.author ?? null,
+    publishedAt: input.publishedAt ?? null,
+    venue: input.venue ?? null,
+    doi: input.doi ?? null,
   });
   if (!sourceId) return { ...EMPTY_INGEST, docFamilyId: familyId };
 

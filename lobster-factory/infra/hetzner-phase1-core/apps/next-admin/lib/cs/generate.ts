@@ -6,7 +6,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { CS_MODELS, CS_THRESHOLDS, CS_TIMEOUTS } from "@/lib/cs/config";
-import { buildSystemPrompt, buildUserContext } from "@/lib/cs/cis";
+import { buildSystemPrompt, buildUserContext, renderPassage } from "@/lib/cs/cis";
 import { claudeTurn, extractText, extractToolUses, generateText, parseJsonObject } from "@/lib/cs/llm";
 import { getToolHandler, resolveToolDecision } from "@/lib/cs/tools";
 import type { RetrievedChunk } from "@/lib/kb/types";
@@ -49,8 +49,11 @@ export async function superviseReply(opts: {
   chunks: RetrievedChunk[];
   organizationId: string;
 }): Promise<SupervisorVerdict> {
+  // The supervisor reads the same passages the writer did, wrapped the same way. Handing the
+  // reviewer un-fenced text would leave the one component whose job is to catch a bad draft as the
+  // one component still reading attacker-chosen sentences as prose.
   const knowledge = opts.chunks.length
-    ? opts.chunks.map((c, i) => `[${i + 1}] ${c.content}`).join("\n\n")
+    ? opts.chunks.map((c, i) => renderPassage(c, i + 1)).join("\n\n")
     : "（無）";
   const system =
     "你是一個獨立的客服品質審查員。判斷『回覆草稿』是否 (a) 完全由『知識』支撐、沒有編造，(b) 安全（沒有洩漏他人個資、沒有違規承諾）。只輸出 JSON，不要解釋。";

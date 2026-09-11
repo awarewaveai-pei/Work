@@ -56,6 +56,9 @@ psql_file "$DB_DIR/migrations/0051_cs_core.sql" >/dev/null
 echo "▶ applying 0072 (KB versioning + six retrieval predicates)"
 psql_file "$DB_DIR/migrations/0072_kb_versioning_and_retrieval_predicates.sql" >/dev/null
 
+echo "▶ applying 0075 (provenance + citation on retrieval)"
+psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
+
 echo "▶ proving the harness can fail (a green run of a dead harness proves nothing)"
 # Captured first, then matched: under `set -o pipefail` psql's non-zero exit (which is the point of
 # this check) would make the whole pipeline non-zero even when grep found the message.
@@ -69,9 +72,11 @@ echo "▶ running behavioural assertions"
 VERIFY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1)" || { echo "$VERIFY_OUT" | grep -E 'ERROR' ; echo "✗ assertions failed"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ retrieval assertions did not report KB_VERIFY_OK"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_CONSTRAINTS_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ constraint assertions did not report KB_VERIFY_CONSTRAINTS_OK"; exit 1; }
-echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK"
+echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_PROVENANCE_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ provenance assertions did not pass"; exit 1; }
+echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK"
 
-echo "▶ applying the down migration"
+echo "▶ applying the down migrations (newest first)"
+psql_file "$DB_DIR/scripts/0075_kb_provenance_and_citation_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0072_kb_versioning_and_retrieval_predicates_down.sql" >/dev/null
 DOWN_STATE="$(psql_run -tAc "
   SELECT CASE
@@ -90,10 +95,12 @@ DOWN_STATE="$(psql_run -tAc "
 [ "$DOWN_STATE" = "DOWN_OK" ] || { echo "✗ down migration did not restore the 0051 state: $DOWN_STATE"; exit 1; }
 echo "  DOWN_OK"
 
-echo "▶ re-applying 0072 (a migration you cannot re-apply is not a rollback path)"
+echo "▶ re-applying 0072 + 0075 (a migration you cannot re-apply is not a rollback path)"
 psql_file "$DB_DIR/migrations/0072_kb_versioning_and_retrieval_predicates.sql" >/dev/null
-psql_file "$HERE/kb-local-verify.sql" 2>&1 | grep -q 'KB_VERIFY_CONSTRAINTS_OK' || {
-  echo "✗ assertions failed after re-apply"; exit 1;
+psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
+REAPPLY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1 || true)"
+echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_PROVENANCE_OK' || {
+  echo "$REAPPLY_OUT" | grep -E 'ERROR' | head -3; echo "✗ assertions failed after re-apply"; exit 1;
 }
 
 echo "✅ KB K1 verified: retrieval predicates, versioning visibility, down migration, re-apply"

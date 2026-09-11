@@ -18,7 +18,9 @@ import { KB_DEFAULT_SPACE_ID } from "@/lib/kb/config";
 const PREDICATE_SOURCE = path.resolve(
   __dirname,
   // __tests__ → kb → lib → next-admin → apps → hetzner-phase1-core → infra → lobster-factory
-  "../../../../../../../packages/db/migrations/0072_kb_versioning_and_retrieval_predicates.sql",
+  // 0075 re-created both functions (it added the citation columns to their return shape), so this
+  // is where the live definitions now live. The drift test below is what forced this update.
+  "../../../../../../../packages/db/migrations/0075_kb_provenance_and_citation.sql",
 );
 
 function predicateBlocks(sql: string): string[] {
@@ -26,7 +28,7 @@ function predicateBlocks(sql: string): string[] {
   return [...sql.matchAll(re)].map((m) => m[1]);
 }
 
-describe("retrieval predicate parity (migration 0072)", () => {
+describe("retrieval predicate parity", () => {
   const sql = readFileSync(PREDICATE_SOURCE, "utf8");
   const blocks = predicateBlocks(sql);
 
@@ -53,7 +55,20 @@ describe("retrieval predicate parity (migration 0072)", () => {
   });
 
   it("removes the unfiltered 0051 signature instead of leaving it as an overload", () => {
-    expect(sql).toContain("DROP FUNCTION IF EXISTS public.cs_match_chunks(uuid, vector, integer);");
+    // That drop belongs to 0072, where the six-predicate pair replaced the original function.
+    const k1 = readFileSync(
+      path.join(path.dirname(PREDICATE_SOURCE), "0072_kb_versioning_and_retrieval_predicates.sql"),
+      "utf8",
+    );
+    expect(k1).toContain("DROP FUNCTION IF EXISTS public.cs_match_chunks(uuid, vector, integer);");
+  });
+
+  it("drops the previous signatures before re-creating them", () => {
+    // A changed RETURN shape requires a DROP — CREATE OR REPLACE cannot change one — and leaving
+    // the old signature alive would mean two retrieval functions, one of which returns no
+    // provenance at all.
+    expect(sql).toContain("DROP FUNCTION IF EXISTS public.cs_match_chunks(uuid[], uuid[], uuid, timestamptz, text, vector, int);");
+    expect(sql).toContain("DROP FUNCTION IF EXISTS public.cs_match_chunks_keyword(uuid[], uuid[], uuid, timestamptz, text, text, int);");
   });
 
   it("is still reading the migration that defines the live functions", () => {
@@ -63,7 +78,7 @@ describe("retrieval predicate parity (migration 0072)", () => {
     // whoever writes that migration point PREDICATE_SOURCE at it.
     const dir = path.dirname(PREDICATE_SOURCE);
     const later = readdirSync(dir)
-      .filter((f) => f.endsWith(".sql") && /^\d{4}/.test(f) && Number(f.slice(0, 4)) > 72)
+      .filter((f) => f.endsWith(".sql") && /^\d{4}/.test(f) && Number(f.slice(0, 4)) > 75)
       .filter((f) => readFileSync(path.join(dir, f), "utf8").includes("FUNCTION public.cs_match_chunks"));
     expect(later, `these migrations redefine the retrieval RPCs — update PREDICATE_SOURCE`).toEqual([]);
   });

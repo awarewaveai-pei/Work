@@ -208,4 +208,66 @@ BEGIN
   RAISE NOTICE 'KB_VERIFY_CONSTRAINTS_OK — versioning, tenancy and grant assertions passed';
 END $$;
 
+-- ── Provenance, citation and the lock (0075) ─────────────────────────────────
+DO $$
+DECLARE
+  a   uuid := pg_temp.uid('orgA');
+  m   text := 'text-embedding-3-small';
+  rec record;
+  ok  boolean;
+BEGIN
+  -- 12. A crawled document keeps its label all the way to retrieval. Without this, a consumer
+  --     cannot tell a vendor's marketing claim from a policy the operator wrote, and cannot wrap
+  --     the quoted one before it reaches a prompt.
+  UPDATE public.cs_knowledge_sources
+     SET epistemic_type = 'EVIDENCE', authorship_state = 'SOURCE_QUOTATION',
+         author = '客服中心', venue = 'shop.example.com', doi = NULL,
+         canonical_url = 'https://shop.example.com/faq/returns'
+   WHERE organization_id = a AND title = 'policy v2';
+
+  SELECT * INTO rec FROM public.cs_match_chunks(ARRAY[a], NULL, a, NULL, m, pg_temp.vec(), 50) mc
+  JOIN public.cs_knowledge_sources s ON s.id = mc.source_id
+  WHERE s.title = 'policy v2' LIMIT 1;
+  ASSERT rec.epistemic_type = 'EVIDENCE', 'retrieval lost the epistemic label';
+  ASSERT rec.authorship_state = 'SOURCE_QUOTATION', 'retrieval lost the authorship label';
+  ASSERT rec.author = '客服中心', 'retrieval lost the byline';
+  ASSERT rec.canonical_url = 'https://shop.example.com/faq/returns', 'retrieval lost the citation url';
+
+  -- 13. The keyword half returns the same attribution. One half that can quote and one that cannot
+  --     would make a passage's usability depend on how the question was phrased.
+  SELECT * INTO rec FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, 'kbmarker', 50) mc
+  JOIN public.cs_knowledge_sources s ON s.id = mc.source_id
+  WHERE s.title = 'policy v2' LIMIT 1;
+  ASSERT rec.epistemic_type = 'EVIDENCE', 'the keyword half returns no provenance';
+  ASSERT rec.author = '客服中心', 'the keyword half returns no byline';
+
+  -- 14. The vocabulary is enforced by the database, not by whoever is writing today.
+  BEGIN
+    UPDATE public.cs_knowledge_sources SET epistemic_type = 'PROBABLY_TRUE'
+     WHERE organization_id = a AND title = 'policy v2';
+    ok := false;
+  EXCEPTION WHEN check_violation THEN ok := true;
+  END;
+  ASSERT ok, 'an invented epistemic type was accepted';
+
+  -- 15. LOCKED_FACT is only meaningful on a SOURCE_FACT; the pairing is a constraint because the
+  --     thing it protects (a hand-written authoritative policy) is exactly what gets overwritten.
+  BEGIN
+    UPDATE public.cs_knowledge_sources SET locked = 'LOCKED_FACT'
+     WHERE organization_id = a AND title = 'policy v2';  -- still EVIDENCE
+    ok := false;
+  EXCEPTION WHEN check_violation THEN ok := true;
+  END;
+  ASSERT ok, 'a lock was accepted on a document that is not a SOURCE_FACT';
+
+  UPDATE public.cs_knowledge_sources
+     SET epistemic_type = 'SOURCE_FACT', authorship_state = 'HUMAN_ORIGINAL', locked = 'LOCKED_FACT'
+   WHERE organization_id = a AND title = 'policy v2';
+  SELECT * INTO rec FROM public.cs_match_chunks(ARRAY[a], NULL, a, NULL, m, pg_temp.vec(), 50) mc
+  JOIN public.cs_knowledge_sources s ON s.id = mc.source_id WHERE s.title = 'policy v2' LIMIT 1;
+  ASSERT rec.locked = 'LOCKED_FACT', 'retrieval does not report the lock, so no consumer can honour it';
+
+  RAISE NOTICE 'KB_VERIFY_PROVENANCE_OK';
+END $$;
+
 ROLLBACK;
