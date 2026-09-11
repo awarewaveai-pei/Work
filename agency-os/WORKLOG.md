@@ -1,5 +1,30 @@
 # Worklog
 
+## 2026-09-11 HCI30 案件詳情頁改左右並排版面——操作者截圖回報「應該左右放 這樣UI/UX 比較好」
+
+操作者截圖指出兩處目前上下堆疊、浪費垂直空間的區塊：雷達圖疊在構面卡片上方、證據列表疊在新增紀錄表單上方。改成 CSS Grid 左右並排：
+- 信任構面：雷達圖固定寬度（260-380px）在左，7 個構面卡片在右，同一組 7 個構面資料的兩種呈現方式現在能同時看到，不用捲動對照
+- 證據與主張：既有證據列表＋系統建議在左，新增調查發現表單在右（`position: sticky`，捲動列表時表單保持在視野內）
+
+兩處都加 `@media (max-width: 780px)` 退回單欄，避免窄螢幕擠壓可讀性。`.radar-wrap` 這個 class 同時被案件詳情頁與凍結報告頁共用，改一次兩邊都套用，不用各自維護一份。
+
+真跑驗證：建立真實案件＋證據，用 `getComputedStyle` 直接核對兩處都是 `display:grid` 且欄寬確實分成兩欄（非只是視覺上看起來對但實際還是 block 堆疊）；報告頁面也核對過同樣是 grid。窄螢幕退回單欄的行為只用程式碼審查確認媒體查詢語法正確（標準 `max-width` 語法），**未能用瀏覽器實際窄螢幕渲染驗證**——本機這套瀏覽器分頁工具這次無法把 `window.innerWidth` 真的降到模擬寬度以下（試過 resize_window 的 mobile 預設與自訂 375px 寬度、也試過重新整理，`window.innerWidth` 始終回報桌面寬度），研判是工具本身的既知不穩定（本 session 稍早也遇過螢幕截圖失敗的同類狀況），不是程式碼問題，但誠實揭露這一段沒有真機驗證過。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=建立真實案件與證據，`getComputedStyle` 核對 `.radar-wrap`／`.evidence-layout` 在案件詳情頁與報告頁皆為 2 欄 CSS Grid（非僅視覺巧合）| 結果=兩處皆確認為真實 grid 版面，console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS/HTML 版面調整，element id 全部不變（`grep -c` 逐一核對 d-records/d-suggestions/record-add-panel 皆仍為 1，無重複/孤兒 id），JS 邏輯零改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=evidence-layout | hits=1（僅 index.html 本身）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（雷達圖+構面卡片、證據列表+新增表單，各自改 CSS Grid 左右並排，窄螢幕媒體查詢退回單欄）
+
+[驗證結果] 見上 REALTEST_EVIDENCE；窄螢幕退回單欄僅程式碼審查，未真機驗證（工具限制，已誠實揭露）
+
+[剩餘風險] 窄螢幕/手機版面的實際渲染效果未經真機驗證，媒體查詢語法本身正確但建議之後用真實手機或穩定的瀏覽器工具複驗一次
+
+[rollback]
+`git revert` 本次 commit：兩處 `display:grid` 樣式與包裹用的 `<div class="evidence-layout">` 容器一併移除，回到上下堆疊的上一版。純 CSS/HTML，無 JS/資料影響，可安全回滾。
+
 ## 2026-09-11 T10 Gmail per-org OAuth 建草稿 code-complete（critic Deep 抓 1 Critical IDOR + 1 Major MIME bug，皆已修並補回歸測試）
 
 **觸發**：操作者取得 Google Cloud OAuth Client（`GOOGLE_OAUTH_CLIENT_ID`/`SECRET`，Testing 模式 100 人上限，scope 只給 `gmail.compose`）並要求「繼續完成 cold email 工具」——這是 Phase 1 唯一剩的 T10。憑證存入 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` §36 + `mcp/user-env.ps1`（已跑過同步，`GOOGLE_OAUTH_CLIENT_ID`/`SECRET` 確認寫入 Windows User 環境變數）。
