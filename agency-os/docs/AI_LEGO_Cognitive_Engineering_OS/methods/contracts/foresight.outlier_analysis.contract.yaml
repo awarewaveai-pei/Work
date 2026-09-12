@@ -1,0 +1,90 @@
+$id: "ai-lego://methods/contracts/foresight.outlier_analysis.contract.yaml"
+title: "Outlier Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  F13 foresight family (Atlas L678: "Outlier Analysis | 研究異常個案 |
+  identify→排除資料錯誤→深挖機制 | 發現新 segment/機制"). Core invariant: Atlas's
+  own three-step pipeline puts "排除資料錯誤" (rule out data error) BEFORE
+  "深挖機制" (dig into mechanism) -- ruling out data error is the MIDDLE
+  step, not skippable. A `mechanism_hypothesis` may only be present when
+  `data_error_ruled_out` is exactly `True` (a real bool, int 0/1 refused)
+  AND `data_error_assessment` is non-empty; digging into the mechanism of
+  what is actually a data error is the precise failure this ordering
+  exists to prevent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Outlier Analysis row (L678)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L678 gives a real 3-step ordered
+  pipeline -- direct transcription plus a disclosed compilation choice
+  (mechanism_hypothesis gated on the prior step's own completion, see
+  typed-objects/outlier-analysis.schema.yaml).
+
+id: foresight.outlier_analysis
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [INFER, VALIDATE, CAUSE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). INFER = identifying an anomalous case worth investigating;
+# VALIDATE = ruling out data error (confirming the anomaly is real, not an
+# artifact); CAUSE = digging into the underlying mechanism. All three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - investigate_anomalous_cases_after_ruling_out_data_error
+# Atlas L678 verbatim sense: 研究異常個案 (study anomalous individual cases),
+# pipeline identify→排除資料錯誤→深挖機制, benefit 發現新 segment/機制.
+
+inputs:
+  required:
+    - CandidateOutlierRefs
+# NEW DESIGN. Free-text references to the raw anomalous cases under
+# investigation -- same scope-limited free-text-reference pattern
+# challenge.red_team's own ProposalRef already establishes.
+
+outputs:
+  - OutlierAnalysisRecord
+# NEW output type (see typed-objects/outlier-analysis.schema.yaml).
+
+preconditions:
+  - "at least 1 outlier declared, and mechanism_hypothesis present only after data_error_ruled_out is True with a non-empty data_error_assessment"
+  # NEW, structurally necessary -- Atlas's own 3-step ordered pipeline
+  # (identify→排除資料錯誤→深挖機制) is not a suggestion, it is the method's
+  # entire reason for existing: skipping the data-error-rule-out step
+  # means "new segment/mechanism" findings may just be data artifacts.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- same placement convention epistemic.evidence_matrix.contract.yaml already established for a single-record batch.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas gives no explicit next-method pairing for Outlier Analysis.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an analysis record has no external side effect.
+
+open_questions:
+  - "OQ-OUTLIER-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-OUTLIER-2: near-miss disclosure -- data-quality-assessment-record.schema.yaml's own description cites Master Plan §35's ML checklist (which includes 'Outliers' as one of nine dataset-profiling dimensions), but that method profiles a WHOLE DATASET's fields, not an individual anomalous CASE's own mechanism; not a duplicate.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table Outlier Analysis row (L678) directly. Grepped the
+    full spec root case-insensitively for "outlier" before writing -- one
+    near-miss found and disclosed above (data-quality-assessment-record.schema.yaml),
+    no output-shape duplicate. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The identify→排除資料錯誤→深挖機制 pipeline
+    ordering is transcribed verbatim from Atlas L678. The
+    mechanism-hypothesis-gated-on-ruled-out-error structure is this file's
+    own compiled structure, disclosed above.

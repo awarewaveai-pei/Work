@@ -20,7 +20,18 @@ description: >
   without a second source of truth for the same fact. The `by_document` grouping,
   every `name`/`line`/`category`/`machine_id`/`has_contract`/`note` value, and
   the original line numbers (1-indexed into the hashed mother-doc snapshots) are
-  copied verbatim from the Phase 0 file -- including known inconsistencies such
+  copied verbatim from the Phase 0 file. **EXCEPTION, 2026-09-12**: every `line`
+  value under the Atlas document key was re-synced against the live Atlas file
+  (230 of 284 rows were stale, drifting in era-shaped bands -- +1 for the
+  primitives/F01-F08/F10 block, +3 for F11/F13-F21, -9 for F22-F24 and the
+  §11.29/lens entries, -18/-32 for the §13 recipes -- because this migration
+  froze a Phase 0 snapshot of an older Atlas revision and nothing ever re-synced
+  it). Successive family batches had each been correcting only their own rows
+  (F12 found its 10 off by 3; F09 its 8 off by 1), which never closed the class.
+  `tests/unit/test_method_inventory_line_numbers.py` now mechanically asserts
+  every citation lands on the line that defines its entry, so this cannot
+  silently drift again. Names/categories/machine_ids remain Phase 0 content --
+  only the stale coordinates were corrected. Known inconsistencies such
   as the "SWOT" entry's `machine_id: method.swot` predating
   docs/adr/ADR-005-db-migration-recipe-and-method-id-grammar.md's bare
   `<family>.<name>` grammar decision (that ADR's own worked example instead
@@ -84,162 +95,162 @@ by_document:
   "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md":
     methods:
       - name: "FRAME"
-        line: 158
-        category: "primitive"
-        has_contract: false
-        contract_status: pending
-      - name: "QUESTION"
         line: 159
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "EXPAND"
+      - name: "QUESTION"
         line: 160
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "ASSOCIATE"
+      - name: "EXPAND"
         line: 161
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "DECOMPOSE"
+      - name: "ASSOCIATE"
         line: 162
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "GROUP"
+      - name: "DECOMPOSE"
         line: 163
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "MAP"
+      - name: "GROUP"
         line: 164
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "COMPARE"
+      - name: "MAP"
         line: 165
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "RELATE"
+      - name: "COMPARE"
         line: 166
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "CAUSE"
+      - name: "RELATE"
         line: 167
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "INFER"
+      - name: "CAUSE"
         line: 168
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "CHALLENGE"
+      - name: "INFER"
         line: 169
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "IMAGINE"
+      - name: "CHALLENGE"
         line: 170
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "FORECAST"
+      - name: "IMAGINE"
         line: 171
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "ESTIMATE"
+      - name: "FORECAST"
         line: 172
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "CALCULATE"
+      - name: "ESTIMATE"
         line: 173
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "SIMULATE"
+      - name: "CALCULATE"
         line: 174
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "OPTIMIZE"
+      - name: "SIMULATE"
         line: 175
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "PRIORITIZE"
+      - name: "OPTIMIZE"
         line: 176
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "DECIDE"
+      - name: "PRIORITIZE"
         line: 177
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "VALIDATE"
+      - name: "DECIDE"
         line: 178
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "EXPLAIN"
+      - name: "VALIDATE"
         line: 179
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "REFLECT"
+      - name: "EXPLAIN"
         line: 180
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "LEARN"
+      - name: "REFLECT"
         line: 181
         category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "Goal Statement"
-        line: 333
-        category: "F01 framing"
+      - name: "LEARN"
+        line: 182
+        category: "primitive"
         has_contract: false
         contract_status: pending
-      - name: "SMART"
+      - name: "Goal Statement"
         line: 334
         category: "F01 framing"
         has_contract: false
         contract_status: pending
-      - name: "OKR"
+      - name: "SMART"
         line: 335
         category: "F01 framing"
         has_contract: false
         contract_status: pending
-      - name: "North Star Metric"
+      - name: "OKR"
         line: 336
         category: "F01 framing"
         has_contract: false
         contract_status: pending
-      - name: "Success Criteria"
+      - name: "North Star Metric"
         line: 337
         category: "F01 framing"
         has_contract: false
         contract_status: pending
-      - name: "Non-goals"
+      - name: "Success Criteria"
         line: 338
         category: "F01 framing"
         has_contract: false
         contract_status: pending
-      - name: "5W1H"
+      - name: "Non-goals"
         line: 339
         category: "F01 framing"
         has_contract: false
         contract_status: pending
-      - name: "Problem Statement"
+      - name: "5W1H"
         line: 340
+        category: "F01 framing"
+        has_contract: false
+        contract_status: pending
+      - name: "Problem Statement"
+        line: 341
         category: "F01 framing"
         has_contract: false
         contract_status: pending
@@ -259,145 +270,145 @@ by_document:
         has_contract: false
         contract_status: pending
       - name: "Issue Tree"
-        line: 362
-        category: "F02 decomposition"
-        has_contract: false
-        contract_status: pending
-      - name: "Logic Tree"
         line: 363
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "MECE"
+      - name: "Logic Tree"
         line: 364
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "Problem Tree"
+      - name: "MECE"
         line: 365
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "Objective Tree"
+      - name: "Problem Tree"
         line: 366
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "Functional Decomposition"
+      - name: "Objective Tree"
         line: 367
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "FAST"
+      - name: "Functional Decomposition"
         line: 368
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "Hierarchical Task Analysis"
+      - name: "FAST"
         line: 369
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "WBS"
+      - name: "Hierarchical Task Analysis"
         line: 370
         category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "Classic Brainstorming"
-        line: 378
-        category: "F03 ideation"
+      - name: "WBS"
+        line: 371
+        category: "F02 decomposition"
         has_contract: false
         contract_status: pending
-      - name: "Brainwriting"
+      - name: "Classic Brainstorming"
         line: 379
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "6-3-5"
+      - name: "Brainwriting"
         line: 380
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "Crazy 8s"
+      - name: "6-3-5"
         line: 381
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "SCAMPER"
+      - name: "Crazy 8s"
         line: 382
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "Lotus Blossom"
+      - name: "SCAMPER"
         line: 383
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "Starbursting"
+      - name: "Lotus Blossom"
         line: 384
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "Random Stimulus"
+      - name: "Starbursting"
         line: 385
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "Forced Connections"
+      - name: "Random Stimulus"
         line: 386
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
-      - name: "Synectics"
+      - name: "Forced Connections"
         line: 387
         category: "F03 ideation"
         has_contract: false
         contract_status: pending
+      - name: "Synectics"
+        line: 388
+        category: "F03 ideation"
+        has_contract: false
+        contract_status: pending
       - name: "Mind Map"
-        line: 410
+        line: 411
         category: "F04 association"
         has_contract: false
         contract_status: pending
         machine_id: "method.association.mind_map"
       - name: "Concept Map"
-        line: 411
-        category: "F04 association"
-        has_contract: false
-        contract_status: pending
-      - name: "Affinity Diagram"
         line: 412
         category: "F04 association"
         has_contract: false
         contract_status: pending
-      - name: "Morphological Analysis"
+      - name: "Affinity Diagram"
         line: 413
         category: "F04 association"
         has_contract: false
         contract_status: pending
-      - name: "Attribute Listing"
+      - name: "Morphological Analysis"
         line: 414
         category: "F04 association"
         has_contract: false
         contract_status: pending
-      - name: "Analogy Mapping"
+      - name: "Attribute Listing"
         line: 415
         category: "F04 association"
         has_contract: false
         contract_status: pending
+      - name: "Analogy Mapping"
+        line: 416
+        category: "F04 association"
+        has_contract: false
+        contract_status: pending
       - name: "Fishbone / Ishikawa"
-        line: 433
+        line: 434
         category: "F05 root_cause"
         has_contract: true
         contract_status: complete
         machine_id: "root_cause.fishbone"
       - name: "5 Whys"
-        line: 434
+        line: 435
         category: "F05 root_cause"
         has_contract: true
         contract_status: complete
         machine_id: "root_cause.five_whys"
       - name: "Pareto"
-        line: 435
+        line: 436
         category: "F05 root_cause"
         has_contract: true
         contract_status: complete
@@ -439,178 +450,178 @@ by_document:
         contract_status: complete
         machine_id: "root_cause.barrier_analysis"
       - name: "JTBD"
-        line: 460
-        category: "F06 human_insight"
-        has_contract: false
-        contract_status: pending
-      - name: "Persona"
         line: 461
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
-      - name: "Empathy Map"
+      - name: "Persona"
         line: 462
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
-      - name: "Journey Map"
+      - name: "Empathy Map"
         line: 463
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
-      - name: "Service Blueprint"
+      - name: "Journey Map"
         line: 464
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
-      - name: "Contextual Inquiry"
+      - name: "Service Blueprint"
         line: 465
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
-      - name: "Interview"
+      - name: "Contextual Inquiry"
         line: 466
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
-      - name: "Survey"
+      - name: "Interview"
         line: 467
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
-      - name: "Focus Group"
+      - name: "Survey"
         line: 468
         category: "F06 human_insight"
         has_contract: false
         contract_status: pending
+      - name: "Focus Group"
+        line: 469
+        category: "F06 human_insight"
+        has_contract: false
+        contract_status: pending
       - name: "Stakeholder Map"
-        line: 486
+        line: 487
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.stakeholder_map"
       - name: "Power–Interest"
-        line: 487
+        line: 488
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.power_interest"
       - name: "Salience Model"
-        line: 488
+        line: 489
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.salience_model"
       - name: "Incentive Mapping"
-        line: 489
+        line: 490
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.incentive_mapping"
       - name: "RACI"
-        line: 490
+        line: 491
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.raci"
       - name: "BATNA"
-        line: 491
+        line: 492
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.batna"
       - name: "ZOPA"
-        line: 492
+        line: 493
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.zopa"
       - name: "Interest-Based Negotiation"
-        line: 493
+        line: 494
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.interest_based_negotiation"
       - name: "Game Theory"
-        line: 494
+        line: 495
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.game_theory"
       - name: "Coalition Mapping"
-        line: 495
+        line: 496
         category: "F07 stakeholders"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholders.coalition_mapping"
       - name: "PESTEL"
-        line: 514
-        category: "F08 strategy"
-        has_contract: false
-        contract_status: pending
-      - name: "STEEPV"
         line: 515
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "3C"
+      - name: "STEEPV"
         line: 516
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "SWOT"
+      - name: "3C"
         line: 517
+        category: "F08 strategy"
+        has_contract: false
+        contract_status: pending
+      - name: "SWOT"
+        line: 518
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
         machine_id: "method.swot"
       - name: "TOWS"
-        line: 518
-        category: "F08 strategy"
-        has_contract: false
-        contract_status: pending
-      - name: "Porter Five Forces"
         line: 519
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "VRIO"
+      - name: "Porter Five Forces"
         line: 520
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "Value Chain"
+      - name: "VRIO"
         line: 521
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "STP"
+      - name: "Value Chain"
         line: 522
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "Ansoff"
+      - name: "STP"
         line: 523
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "BCG"
+      - name: "Ansoff"
         line: 524
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "Blue Ocean"
+      - name: "BCG"
         line: 525
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "Business Model Canvas"
+      - name: "Blue Ocean"
         line: 526
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
-      - name: "Value Proposition Canvas"
+      - name: "Business Model Canvas"
         line: 527
+        category: "F08 strategy"
+        has_contract: false
+        contract_status: pending
+      - name: "Value Proposition Canvas"
+        line: 528
         category: "F08 strategy"
         has_contract: false
         contract_status: pending
@@ -667,103 +678,113 @@ by_document:
         contract_status: complete
         machine_id: "systems.agent_based_modeling"
       - name: "Assumption Mapping"
-        line: 569
-        category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Assumption Registry"
         line: 570
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Ladder of Inference"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.assumption_mapping"
+      - name: "Assumption Registry"
         line: 571
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Argument Mapping"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.assumption_registry"
+      - name: "Ladder of Inference"
         line: 572
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Toulmin Model"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.ladder_of_inference"
+      - name: "Argument Mapping"
         line: 573
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Evidence Matrix"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.argument_mapping"
+      - name: "Toulmin Model"
         line: 574
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Evidence Hierarchy"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.toulmin_model"
+      - name: "Evidence Matrix"
         line: 575
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Bayesian Updating"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.evidence_matrix"
+      - name: "Evidence Hierarchy"
         line: 576
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Confidence Calibration"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.evidence_hierarchy"
+      - name: "Bayesian Updating"
         line: 577
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
-      - name: "Contradiction Detection"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.bayesian_updating"
+      - name: "Confidence Calibration"
         line: 578
         category: "F10 epistemic"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.confidence_calibration"
+      - name: "Contradiction Detection"
+        line: 579
+        category: "F10 epistemic"
+        has_contract: true
+        contract_status: complete
+        machine_id: "epistemic.contradiction_detection"
       - name: "Causal DAG"
-        line: 613
+        line: 616
         category: "F11 causal"
         has_contract: false
         contract_status: pending
         machine_id: "causal.dag"
       - name: "Counterfactual Reasoning"
-        line: 614
-        category: "F11 causal"
-        has_contract: false
-        contract_status: pending
-      - name: "Theory of Change"
-        line: 615
-        category: "F11 causal"
-        has_contract: false
-        contract_status: pending
-      - name: "Logic Model"
-        line: 616
-        category: "F11 causal"
-        has_contract: false
-        contract_status: pending
-      - name: "Process Tracing"
         line: 617
         category: "F11 causal"
         has_contract: false
         contract_status: pending
-      - name: "RCT"
+      - name: "Theory of Change"
         line: 618
         category: "F11 causal"
         has_contract: false
         contract_status: pending
-      - name: "Difference-in-Differences"
+      - name: "Logic Model"
         line: 619
         category: "F11 causal"
         has_contract: false
         contract_status: pending
-      - name: "Regression Discontinuity"
+      - name: "Process Tracing"
         line: 620
         category: "F11 causal"
         has_contract: false
         contract_status: pending
-      - name: "Instrumental Variables"
+      - name: "RCT"
         line: 621
         category: "F11 causal"
         has_contract: false
         contract_status: pending
-      - name: "Synthetic Control"
+      - name: "Difference-in-Differences"
         line: 622
+        category: "F11 causal"
+        has_contract: false
+        contract_status: pending
+      - name: "Regression Discontinuity"
+        line: 623
+        category: "F11 causal"
+        has_contract: false
+        contract_status: pending
+      - name: "Instrumental Variables"
+        line: 624
+        category: "F11 causal"
+        has_contract: false
+        contract_status: pending
+      - name: "Synthetic Control"
+        line: 625
         category: "F11 causal"
         has_contract: false
         contract_status: pending
@@ -828,237 +849,251 @@ by_document:
         contract_status: complete
         machine_id: "challenge.stress_testing"
       - name: "Horizon Scanning"
-        line: 669
-        category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Weak Signal Detection"
-        line: 670
-        category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Historical Analogy"
-        line: 671
-        category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Cross-industry Transfer"
         line: 672
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Cross-country Comparison"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.horizon_scanning"
+      - name: "Weak Signal Detection"
         line: 673
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Adjacent Discipline Search"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.weak_signal_detection"
+      - name: "Historical Analogy"
         line: 674
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Outlier Analysis"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.historical_analogy"
+      - name: "Cross-industry Transfer"
         line: 675
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Black Swan Exercise"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.cross_industry_transfer"
+      - name: "Cross-country Comparison"
         line: 676
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Wild Cards"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.cross_country_comparison"
+      - name: "Adjacent Discipline Search"
         line: 677
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Scenario Planning"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.adjacent_discipline_search"
+      - name: "Outlier Analysis"
         line: 678
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Futures Wheel"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.outlier_analysis"
+      - name: "Black Swan Exercise"
         line: 679
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Backcasting"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.black_swan_exercise"
+      - name: "Wild Cards"
         line: 680
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Delphi"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.wild_cards"
+      - name: "Scenario Planning"
         line: 681
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
-      - name: "Cross-impact Analysis"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.scenario_planning"
+      - name: "Futures Wheel"
         line: 682
         category: "F13 foresight"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.futures_wheel"
+      - name: "Backcasting"
+        line: 683
+        category: "F13 foresight"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.backcasting"
+      - name: "Delphi"
+        line: 684
+        category: "F13 foresight"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.delphi"
+      - name: "Cross-impact Analysis"
+        line: 685
+        category: "F13 foresight"
+        has_contract: true
+        contract_status: complete
+        machine_id: "foresight.cross_impact_analysis"
       - name: "TELOS"
-        line: 719
-        category: "F14 feasibility"
-        has_contract: false
-        contract_status: pending
-      - name: "Cost–Benefit Analysis"
-        line: 720
-        category: "F14 feasibility"
-        has_contract: false
-        contract_status: pending
-      - name: "Cost–Effectiveness"
-        line: 721
-        category: "F14 feasibility"
-        has_contract: false
-        contract_status: pending
-      - name: "TCO"
         line: 722
         category: "F14 feasibility"
         has_contract: false
         contract_status: pending
-      - name: "Unit Economics"
+      - name: "Cost–Benefit Analysis"
         line: 723
         category: "F14 feasibility"
         has_contract: false
         contract_status: pending
-      - name: "Break-even"
+      - name: "Cost–Effectiveness"
         line: 724
         category: "F14 feasibility"
         has_contract: false
         contract_status: pending
-      - name: "NPV"
+      - name: "TCO"
         line: 725
         category: "F14 feasibility"
         has_contract: false
         contract_status: pending
-      - name: "IRR"
+      - name: "Unit Economics"
         line: 726
         category: "F14 feasibility"
         has_contract: false
         contract_status: pending
-      - name: "Real Options"
+      - name: "Break-even"
         line: 727
         category: "F14 feasibility"
         has_contract: false
         contract_status: pending
+      - name: "NPV"
+        line: 728
+        category: "F14 feasibility"
+        has_contract: false
+        contract_status: pending
+      - name: "IRR"
+        line: 729
+        category: "F14 feasibility"
+        has_contract: false
+        contract_status: pending
+      - name: "Real Options"
+        line: 730
+        category: "F14 feasibility"
+        has_contract: false
+        contract_status: pending
       - name: "Prototype"
-        line: 735
-        category: "F15 validation"
-        has_contract: false
-        contract_status: pending
-      - name: "MVP"
-        line: 736
-        category: "F15 validation"
-        has_contract: false
-        contract_status: pending
-      - name: "Proof of Concept"
-        line: 737
-        category: "F15 validation"
-        has_contract: false
-        contract_status: pending
-      - name: "Technical Spike"
         line: 738
         category: "F15 validation"
         has_contract: false
         contract_status: pending
-      - name: "Concierge Test"
+      - name: "MVP"
         line: 739
         category: "F15 validation"
         has_contract: false
         contract_status: pending
-      - name: "Wizard of Oz"
+      - name: "Proof of Concept"
         line: 740
         category: "F15 validation"
         has_contract: false
         contract_status: pending
-      - name: "Fake Door"
+      - name: "Technical Spike"
         line: 741
         category: "F15 validation"
         has_contract: false
         contract_status: pending
-      - name: "Smoke Test"
+      - name: "Concierge Test"
         line: 742
         category: "F15 validation"
         has_contract: false
         contract_status: pending
-      - name: "A/B Test"
+      - name: "Wizard of Oz"
         line: 743
         category: "F15 validation"
         has_contract: false
         contract_status: pending
-      - name: "Pilot"
+      - name: "Fake Door"
         line: 744
         category: "F15 validation"
         has_contract: false
         contract_status: pending
-      - name: "Benchmark"
+      - name: "Smoke Test"
         line: 745
         category: "F15 validation"
         has_contract: false
         contract_status: pending
+      - name: "A/B Test"
+        line: 746
+        category: "F15 validation"
+        has_contract: false
+        contract_status: pending
+      - name: "Pilot"
+        line: 747
+        category: "F15 validation"
+        has_contract: false
+        contract_status: pending
+      - name: "Benchmark"
+        line: 748
+        category: "F15 validation"
+        has_contract: false
+        contract_status: pending
       - name: "Impact–Effort"
-        line: 757
-        category: "F16 decision"
-        has_contract: false
-        contract_status: pending
-      - name: "ICE"
-        line: 758
-        category: "F16 decision"
-        has_contract: false
-        contract_status: pending
-      - name: "RICE"
-        line: 759
-        category: "F16 decision"
-        has_contract: false
-        contract_status: pending
-      - name: "MoSCoW"
         line: 760
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "WSJF"
+      - name: "ICE"
         line: 761
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "Kano"
+      - name: "RICE"
         line: 762
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "Weighted Decision Matrix"
+      - name: "MoSCoW"
         line: 763
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "AHP"
+      - name: "WSJF"
         line: 764
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "MCDA"
+      - name: "Kano"
         line: 765
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "TOPSIS"
+      - name: "Weighted Decision Matrix"
         line: 766
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "Decision Tree"
+      - name: "AHP"
         line: 767
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "Expected Value"
+      - name: "MCDA"
         line: 768
         category: "F16 decision"
         has_contract: false
         contract_status: pending
-      - name: "Pareto Frontier"
+      - name: "TOPSIS"
         line: 769
+        category: "F16 decision"
+        has_contract: false
+        contract_status: pending
+      - name: "Decision Tree"
+        line: 770
+        category: "F16 decision"
+        has_contract: false
+        contract_status: pending
+      - name: "Expected Value"
+        line: 771
+        category: "F16 decision"
+        has_contract: false
+        contract_status: pending
+      - name: "Pareto Frontier"
+        line: 772
         category: "F16 decision"
         has_contract: false
         contract_status: pending
@@ -1099,7 +1134,7 @@ by_document:
         contract_status: complete
         machine_id: "learning.decision_journal"
       - name: "Reversal Criteria"
-        line: 804
+        line: 807
         category: "F17 learning"
         has_contract: false
         contract_status: pending
@@ -1110,7 +1145,7 @@ by_document:
         contract_status: complete
         machine_id: "learning.kill_criteria"
       - name: "Prediction Tracking"
-        line: 806
+        line: 809
         category: "F17 learning"
         has_contract: false
         contract_status: pending
@@ -1175,67 +1210,67 @@ by_document:
         contract_status: complete
         machine_id: "architecture.dependency_mapping"
       - name: "SLI/SLO/SLA"
-        line: 847
-        category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
-      - name: "Error Budget"
-        line: 848
-        category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
-      - name: "Capacity Model"
-        line: 849
-        category: "F19 devops-sre"
-        has_contract: false
-        contract_status: pending
-      - name: "Load Test"
         line: 850
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Stress Test"
+      - name: "Error Budget"
         line: 851
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Soak Test"
+      - name: "Capacity Model"
         line: 852
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Canary Deployment"
+      - name: "Load Test"
         line: 853
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Blue–Green Deployment"
+      - name: "Stress Test"
         line: 854
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Game Day"
+      - name: "Soak Test"
         line: 855
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Chaos Engineering"
+      - name: "Canary Deployment"
         line: 856
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "RTO/RPO"
+      - name: "Blue–Green Deployment"
         line: 857
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Runbook / Playbook"
+      - name: "Game Day"
         line: 858
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
-      - name: "Release Readiness Review"
+      - name: "Chaos Engineering"
         line: 859
+        category: "F19 devops-sre"
+        has_contract: false
+        contract_status: pending
+      - name: "RTO/RPO"
+        line: 860
+        category: "F19 devops-sre"
+        has_contract: false
+        contract_status: pending
+      - name: "Runbook / Playbook"
+        line: 861
+        category: "F19 devops-sre"
+        has_contract: false
+        contract_status: pending
+      - name: "Release Readiness Review"
+        line: 862
         category: "F19 devops-sre"
         has_contract: false
         contract_status: pending
@@ -1300,279 +1335,279 @@ by_document:
         contract_status: complete
         machine_id: "security.security_control_mapping"
       - name: "ERD"
-        line: 896
-        category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
-      - name: "Normalization"
-        line: 897
-        category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
-      - name: "Data Lineage"
-        line: 898
-        category: "F21 database-data"
-        has_contract: false
-        contract_status: pending
-      - name: "Data Contract"
         line: 899
         category: "F21 database-data"
         has_contract: false
         contract_status: pending
-      - name: "Schema Compatibility Analysis"
+      - name: "Normalization"
         line: 900
         category: "F21 database-data"
         has_contract: false
         contract_status: pending
-      - name: "Data Quality Dimensions"
+      - name: "Data Lineage"
         line: 901
         category: "F21 database-data"
         has_contract: false
         contract_status: pending
-      - name: "Backup/Restore Drill"
+      - name: "Data Contract"
         line: 902
         category: "F21 database-data"
         has_contract: false
         contract_status: pending
-      - name: "Retention / Deletion Model"
+      - name: "Schema Compatibility Analysis"
         line: 903
         category: "F21 database-data"
         has_contract: false
         contract_status: pending
-      - name: "Expand–Contract Migration"
+      - name: "Data Quality Dimensions"
         line: 904
         category: "F21 database-data"
         has_contract: false
         contract_status: pending
-      - name: "Reconciliation"
+      - name: "Backup/Restore Drill"
         line: 905
         category: "F21 database-data"
         has_contract: false
         contract_status: pending
+      - name: "Retention / Deletion Model"
+        line: 906
+        category: "F21 database-data"
+        has_contract: false
+        contract_status: pending
+      - name: "Expand–Contract Migration"
+        line: 907
+        category: "F21 database-data"
+        has_contract: false
+        contract_status: pending
+      - name: "Reconciliation"
+        line: 908
+        category: "F21 database-data"
+        has_contract: false
+        contract_status: pending
       - name: "RAID Log"
-        line: 927
+        line: 918
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Critical Path Method"
-        line: 928
+        line: 919
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Dependency Graph"
-        line: 929
+        line: 920
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Stage-Gate"
-        line: 930
+        line: 921
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Change Risk Matrix"
-        line: 931
+        line: 922
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Definition of Done"
-        line: 932
+        line: 923
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Decision Log"
-        line: 933
+        line: 924
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Outcome Roadmap"
-        line: 934
+        line: 925
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Risk Register"
-        line: 935
+        line: 926
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "RACI (delivery)"
-        line: 936
+        line: 927
         category: "F22 pm-governance"
         has_contract: false
         contract_status: pending
       - name: "Jurisdiction Resolver"
-        line: 944
+        line: 935
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Applicable Law Graph"
-        line: 945
+        line: 936
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Obligation-to-Control Mapping"
-        line: 946
+        line: 937
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Compliance Gap Analysis"
-        line: 947
+        line: 938
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Regulatory Horizon Scan"
-        line: 948
+        line: 939
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Localization Review"
-        line: 949
+        line: 940
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Cultural Context Review"
-        line: 950
+        line: 941
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Market Admission Control"
-        line: 951
+        line: 942
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Data Residency Assessment"
-        line: 952
+        line: 943
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Conflict-of-Law Review"
-        line: 953
+        line: 944
         category: "F23 jurisdiction"
         has_contract: false
         contract_status: pending
       - name: "Representation Switching"
-        line: 972
+        line: 963
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Text / Outline View"
-        line: 973
+        line: 964
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Table / Matrix View"
-        line: 974
+        line: 965
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Mind Map View"
-        line: 975
+        line: 966
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Concept Graph View"
-        line: 976
+        line: 967
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Timeline View"
-        line: 977
+        line: 968
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Causal View"
-        line: 978
+        line: 969
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Audio / Conversational View"
-        line: 979
+        line: 970
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Guided Mode"
-        line: 980
+        line: 971
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Expert LEGO Mode"
-        line: 981
+        line: 972
         category: "F24 representation"
         has_contract: false
         contract_status: pending
       - name: "Monte Carlo Simulation"
-        line: 1867
+        line: 1858
         category: "computation (uncataloged in F01–F24)"
         has_contract: false
         contract_status: pending
       - name: "stakeholder.regulator lens"
-        line: 1036
+        line: 1027
         category: "lens"
         has_contract: true
         contract_status: complete
         machine_id: "stakeholder.regulator"
       - name: "Simple Brainstorm Recipe"
-        line: 3228
+        line: 3210
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Professional Brainstorm Recipe"
-        line: 3252
+        line: 3234
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Research-grade Ideation Recipe"
-        line: 3280
+        line: 3262
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Board-grade Strategy Recipe"
-        line: 3309
+        line: 3291
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "New Product / Startup Recipe"
-        line: 3350
+        line: 3332
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Global Market Entry Recipe"
-        line: 3370
+        line: 3352
         category: "recipe"
         has_contract: false
         contract_status: pending
         machine_id: "MarketEntryRecipe"
       - name: "Public Policy Recipe"
-        line: 3396
+        line: 3378
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Production Incident Recipe"
-        line: 3425
+        line: 3407
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "High-risk Architecture Change Recipe"
-        line: 3453
+        line: 3435
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Database Migration Recipe"
-        line: 3484
+        line: 3466
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Security Review Recipe"
-        line: 3504
+        line: 3472
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "Decision Under Deep Uncertainty Recipe"
-        line: 3523
+        line: 3491
         category: "recipe"
         has_contract: false
         contract_status: pending
       - name: "validation.experiment"
-        line: 1027
+        line: 1017
         category: "method (referenced only in recommended_next)"
         has_contract: false
         contract_status: pending
@@ -1591,10 +1626,15 @@ by_document:
 # `methods/contracts/research.qualitative_coding.contract.yaml`'s own
 # exhaustive grep). Appending it into `by_document` would misrepresent it as
 # migrated content and would silently perturb this file's own verified
-# `verification.entry_count: 289` invariant (itself independently re-checked
-# by `tests/run_golden_tests.py`'s `run_registry_invariants`, which sums only
-# `by_document`'s own entries and asserts `total == 289` -- a hardcoded Phase
-# 0 migration fact this addition must not disturb). Same class of "kept
+# `verification.entry_count: 289` invariant (which this file's own header
+# claimed was independently re-checked by `tests/run_golden_tests.py`'s
+# `run_registry_invariants` -- CORRECTED 2026-09-12: no such file has ever
+# existed in this repo, so that count was never mechanically verified at all,
+# which is part of why 230 stale line numbers survived unnoticed. The real
+# guard built that day, `tests/unit/test_method_inventory_line_numbers.py`,
+# covers line-number correctness; the 289 entry count remains unverified by
+# any test and is a hardcoded Phase 0 migration fact this addition must not
+# disturb). Same class of "kept
 # separate, not silently folded into a count-locked block" design as
 # `methods/registry/contract-backlog.yaml`'s own `tier_2.explicit_entries`
 # mechanism (built for the identical reason: `finance.financial_assumptions`,
@@ -1613,9 +1653,12 @@ verification:
   method: "Read (full file, 1182 lines) + Grep against the Phase 0 source before migrating; Read-back of this file after writing"
   entry_count: 289
   entry_count_scope: >
-    Counts ONLY `by_document`'s Phase-0-migrated entries (the invariant
-    `tests/run_golden_tests.py`'s `run_registry_invariants` independently
-    re-checks) -- unchanged by this task. `phase_3_additions` above is a
+    Counts ONLY `by_document`'s Phase-0-migrated entries -- unchanged by this
+    task. (This line previously claimed `tests/run_golden_tests.py`'s
+    `run_registry_invariants` independently re-checked the count; corrected
+    2026-09-12 -- that file does not exist and never has. The count remains
+    unverified by any test; only line-number correctness is now guarded, by
+    `tests/unit/test_method_inventory_line_numbers.py`.) `phase_3_additions` above is a
     SEPARATE, additive block of 1 entry (`research.qualitative_coding`),
     bringing this file's true total to 290 -- deliberately not folded into
     the 289 figure, per that block's own header comment.

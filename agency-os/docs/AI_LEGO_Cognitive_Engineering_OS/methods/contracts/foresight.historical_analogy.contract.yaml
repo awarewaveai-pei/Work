@@ -1,0 +1,61 @@
+$id: "ai-lego://methods/contracts/foresight.historical_analogy.contract.yaml"
+title: "Historical Analogy Method Contract"
+status: ACTIVE
+
+description: >
+  foresight.historical_analogy, F13 (Unknown Unknowns & Foresight) family. Atlas table row L674 (sole
+  citation, no dedicated §11/§12 section): "用歷史機制比較｜相似/差異→抽機制→限制類比｜借歷史又避免表面類比".
+  Not an EC §32 method. Core invariant: every analogy requires >=1 similarity AND >=1 difference AND a
+  non-empty extracted_mechanism AND a non-empty analogy_limits -- an analogy with only similarities is the
+  surface-level analogy this method exists to prevent, per Atlas's own literal benefit column.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Historical Analogy row (L674)"
+  - "specs/cognitive/typed-objects/historical-analogy.schema.yaml"
+
+decided_by: "No ADR governs the content. Direct transcription of a table-row-only citation."
+
+id: foresight.historical_analogy
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [ASSOCIATE, INFER, EXPLAIN]
+# INFERRED, not cited. ASSOCIATE: comparing current situation to a historical case. INFER: extracting the
+# mechanism. EXPLAIN: articulating the limits of the analogy.
+
+purpose:
+  - compare_current_situation_to_historical_cases_while_limiting_the_analogy
+
+inputs:
+  required:
+    - SubjectRef
+  # Free-text reference, same scope-limited pattern challenge.red_team's ProposalRef already uses -- no single
+  # existing typed object is the universal "thing being compared to history".
+
+outputs:
+  - HistoricalAnalogySet
+
+preconditions:
+  - "at least one analogy declared"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - challenge.red_team
+# The extracted mechanism and its stated limits are a natural input to a subsequent challenge pass.
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-HISTORICALANALOGY-1: dedup grep found association.analogy_mapping.contract.yaml already anticipates this method (informs_historical_analogy_ref) and disambiguates it from analogy_mapping's own general transfer pipeline -- confirmed distinct, not merged.（owner: operator）"
+  - "OQ-HISTORICALANALOGY-2: cognitive_primitives is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table row L674 directly. Grepped the full spec root case-insensitively for "historical
+    analogy"/"analogy_limits" before writing. Validated against specs/cognitive/method.schema.yaml.
+  note: "No mother document was modified. Table row transcribed verbatim; the 4-field per-analogy invariant is this file's own compilation decision, disclosed above."

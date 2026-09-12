@@ -1,0 +1,105 @@
+$id: "ai-lego://methods/contracts/foresight.delphi.contract.yaml"
+title: "Delphi Method Contract"
+status: ACTIVE
+
+description: >
+  F13 unknown-unknowns/foresight family (Atlas L684: "Delphi | 匿名多輪專家
+  估計 | round1->summary->round2->dispersion | 降權威效應、保留分歧"), with a
+  dedicated section (§12.23, L2821-2828) that adds an explicit limitation
+  (L2827, verbatim): "限制：Consensus 不是 truth；應保存 minority range"
+  (limitation: consensus is not truth; the minority range must be
+  preserved). Structurally enforces THREE things Atlas states as this
+  method's own defining properties, not advisory prose: anonymity
+  (no identifying key may ever appear on a response), >=2 rounds each with
+  >=2 responses (Delphi is definitionally multi-round), and minority-range
+  preservation (a consensus_summary may never be recorded without either a
+  non-empty minority_positions[] or an explicit reason none was recorded).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 未知未知與前瞻 table, Delphi row (L684)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.23 德菲法／德爾菲法 (L2821-2828) -- limitation: consensus is not truth, minority range must be preserved"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L684 and §12.23 together give a real
+  four-stage pipeline, an explicit benefit (降權威效應、保留分歧), and an
+  explicit limitation (L2827) -- direct transcription plus low-risk,
+  disclosed compilation choices (the dispersion formula, most notably --
+  Atlas names the concept, gives no formula).
+
+id: foresight.delphi
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [ESTIMATE, AGGREGATE, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F13
+# members). ESTIMATE is each round's own act (expert numeric estimates);
+# AGGREGATE is the round1->summary->round2 synthesis step and the
+# dispersion computation; EXPLAIN articulates the consensus_summary and
+# minority_positions as real statements rather than bare labels.
+
+purpose:
+  - run_anonymous_multi_round_expert_estimation_preserving_dissent
+# Atlas L684 verbatim sense: anonymous multi-round expert estimation,
+# reducing authority effects while preserving disagreement (dispersion).
+
+inputs:
+  required:
+    - EstimationQuestion
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the question experts are estimating, same
+  # honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - DelphiStudy
+# NEW output type (see typed-objects/delphi-study.schema.yaml).
+
+preconditions:
+  - "at least 2 rounds, each with at least 2 responses"
+  - "every response carries only an opaque participant_id -- no identifying key"
+  - "a recorded consensus_summary is accompanied by a non-empty minority_positions[] or an explicit minority_positions_none_recorded_reason"
+  # NEW, structurally necessary. Delphi is definitionally multi-round
+  # (Atlas: round1->summary->round2); anonymity is Atlas's own stated
+  # mechanism for 降權威效應 (L684); minority-range preservation is
+  # §12.23's own explicit limitation (L2827), made structural.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent study, same placement
+  # convention every structurally similar single-record F13 sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - foresight.cross_impact_analysis
+# Atlas F13's own table ordering: a Delphi study's estimates are natural
+# inputs to a cross-impact matrix's event probabilities. Soft reference --
+# both built same batch.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a study has no external side effect.
+
+open_questions:
+  - "OQ-DELPHI-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-DELPHI-2: dispersion is computed as the population standard deviation of the FINAL round's estimates only (see schema compilation_decisions) -- should a future revision compute it across all rounds, or offer both?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table, Delphi row (L684), and §12.23 (L2821-2828)
+    directly at the cited lines, including the exact limitation wording.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "delphi"/"德菲"/"德爾菲" and every schema title before writing -- zero
+    pre-existing implementation or schema title overlap found (the only
+    hits were Atlas's own two sections above and method-inventory.yaml's
+    unstructured entry). Validated against specs/cognitive/method.schema.
+    yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The four-stage pipeline and the
+    consensus-is-not-truth limitation are transcribed verbatim from Atlas
+    L684 and L2827. The anonymity enforcement mechanism, round/response
+    minimums, and dispersion formula are this file's own compiled
+    structure, disclosed above, not textually cited.

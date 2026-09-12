@@ -1,0 +1,89 @@
+$id: "ai-lego://methods/contracts/foresight.scenario_planning.contract.yaml"
+title: "Scenario Planning Method Contract"
+status: ACTIVE
+
+description: >
+  F13 foresight family (Atlas L681: "Scenario Planning | 建多個合理未來 |
+  critical uncertainties->worlds->implications->signposts | 不依賴單一
+  forecast"). Atlas §11.27 (L1804-1836) gives this method a dedicated
+  section with a verbatim nine-element per-scenario checklist and a
+  two-axis quadrantChart. Core invariant: every scenario must carry all
+  nine §11.27 elements non-empty, over exactly 2 critical uncertainties and
+  exactly 4 scenarios (the literal quadrantChart, not an invented general
+  formula) -- "multiple plausible futures" with one scenario is exactly the
+  single-forecast dependency this method exists to break.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.27 情境規劃／情境分析（Scenario Planning）(L1804-1836)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 index row (L681)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.27 gives a real nine-element list
+  and a two-axis diagram -- direct transcription plus low-risk, disclosed
+  compilation choices.
+
+id: foresight.scenario_planning
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [DECOMPOSE, INFER, EXPLAIN]
+# INFERRED, not cited. DECOMPOSE breaks the future into named critical
+# uncertainties; INFER builds each world's own implications from those
+# uncertainties; EXPLAIN articulates each scenario's nine elements as real
+# statements. All three CANONICAL_KERNEL members.
+
+purpose:
+  - build_multiple_plausible_futures_over_named_critical_uncertainties
+
+inputs:
+  required:
+    - CriticalUncertaintyDescriptions
+  # NEW DESIGN. Atlas names no upstream typed-object input for this
+  # method -- a free-text description of the situation's own critical
+  # uncertainties is the honest starting point.
+
+outputs:
+  - ScenarioSet
+# NEW output type (see typed-objects/scenario-set.schema.yaml).
+
+preconditions:
+  - "exactly 2 critical uncertainties and exactly 4 scenarios, each scenario carrying all 9 of Atlas §11.27's own required elements non-empty"
+  # NEW, structurally necessary. See description and the schema's own
+  # compilation_decisions for why exact-2/exact-4 was chosen over an
+  # invented general 2**N rule.
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - foresight.futures_wheel
+# Same F13 table ordering (Atlas L681-682) -- once plausible worlds are
+# built, expanding a given world's own key change into 1st/2nd/3rd-order
+# effects is the natural next step.
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-SCENARIOPLANNING-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-SCENARIOPLANNING-2: exact-2/exact-4 count is a disclosed compilation choice, not a cited Atlas rule for N>2 uncertainties -- see typed-objects/scenario-set.schema.yaml's own compilation_decisions.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas §11.27 (L1804-1836) and the F13 index row (L681) directly.
+    Grepped the full spec root case-insensitively for "scenario
+    planning"/"scenario_planning" before writing -- see
+    ai_lego/modules/foresight/scenario_planning.py's own module docstring
+    for the full grep record; incidental table-row mentions only, no prior
+    definition of this method's own output shape. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The nine-element list and the
+    two-axis quadrantChart are transcribed verbatim from Atlas §11.27.
+    purpose/preconditions naming, the free-text input scope, and the
+    exact-2/exact-4 count rule are Phase 3-class compilation decisions,
+    disclosed above.

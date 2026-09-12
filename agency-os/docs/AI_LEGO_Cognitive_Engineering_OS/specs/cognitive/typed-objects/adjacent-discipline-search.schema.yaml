@@ -1,0 +1,104 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/adjacent-discipline-search.schema.yaml"
+title: Adjacent Discipline Search
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AdjacentDisciplineSearch` -- the declared `outputs` of
+  `foresight.adjacent_discipline_search`'s Method Contract
+  (methods/contracts/foresight.adjacent_discipline_search.contract.yaml). Atlas F13 table row L677 (verbatim):
+  "Adjacent Discipline Search | 從鄰近學科找 missing variables | current disciplines→adjacent fields→models |
+  降低單一專業盲點". Real invariant, enforced by `ai_lego/modules/foresight/adjacent_discipline_search.py`:
+  `adjacent_fields[]` disjoint from `current_disciplines[]` (normalized) and every
+  `imported_models[].field_ref` resolves to a declared `adjacent_fields[]` entry -- both cross-field checks
+  this schema itself cannot express; this schema's `required`/`minItems` are the structural floor.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Adjacent Discipline Search row (L677) -- sole citation, no dedicated §11/§12 section exists for this row"
+  - "methods/contracts/foresight.adjacent_discipline_search.contract.yaml"
+
+decided_by: >
+  No ADR governs this file. Table-row-only citation, same class of decision every sibling typed-object schema
+  built from a table-row-only Atlas citation already documents.
+
+compilation_decisions:
+  - question: "adjacent_fields[] as plain strings or {id, name} objects, given imported_models[] must reference them?"
+    decision: "Plain strings; imported_models[].field_ref references the field's own normalized text directly (same referencing convention epistemic.evidence_matrix's claim_id/evidence_id use, minus a separate id layer since field names are already the natural key here)."
+  - question: "Is >=1 imported_models[] entry required?"
+    decision: "No -- Atlas gives no such minimum; an empty imported_models[] is legal (fields searched, nothing yet imported)."
+
+type: object
+additionalProperties: false
+required: [id, version, current_disciplines, adjacent_fields, imported_models, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ADJDISC-"
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.adjacent_discipline_search"
+
+  current_disciplines:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1 }
+    description: "Atlas L677's own literal 'current disciplines' first stage -- the team's own existing expertise."
+
+  adjacent_fields:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1 }
+    description: "Atlas L677's own 'adjacent fields' second stage. Must be disjoint from current_disciplines (case/whitespace-insensitive normalized) -- runtime-layer check, see top-level description."
+
+  imported_models:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, field_ref, model_description]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        field_ref:
+          type: string
+          minLength: 1
+          description: "Must resolve (case/whitespace-insensitive normalized) to a declared adjacent_fields[] entry -- runtime-layer referential-integrity check."
+        model_description:
+          type: string
+          minLength: 1
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A backend engineering team importing epidemiological contact-tracing models to reason about cache-invalidation cascade blast radius"
+    value:
+      id: "ADJDISC-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.adjacent_discipline_search"
+      current_disciplines: ["distributed systems", "database engineering"]
+      adjacent_fields: ["epidemiology", "ecology"]
+      imported_models:
+        - id: "IM-1"
+          field_ref: "epidemiology"
+          model_description: "SIR 傳染模型的 R0 概念，用來估算一次快取失效在依賴圖上的連鎖擴散速度，找出目前架構圖沒建模的擴散變數"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - "OQ-ADJACENTDISCIPLINESEARCH-1: field_ref referencing by normalized text (not a separate id) means two adjacent_fields[] entries that normalize to the same text would collide -- not defended against with a separate uniqueness check here, same restraint disjointness's own normalized-set comparison already accepts.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table row L677 directly. Grepped the full spec root case-insensitively for "adjacent
+    discipline"/"adjacent field"/"missing variables" before writing -- only the F13 table row itself references
+    this method by name; other "adjacent" hits in the spec root are the unrelated English word (e.g. "adjacent
+    nodes"). No duplicate schema found. Validated against jsonschema Draft202012Validator.
+  note: "No mother document was modified."

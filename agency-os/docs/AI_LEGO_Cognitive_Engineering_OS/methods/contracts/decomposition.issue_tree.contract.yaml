@@ -80,7 +80,7 @@ compilation_decisions:
     decision: "Allow empty -- children is always a present key (never omitted), and an empty list IS a legal leaf node (a branch not yet further decomposed), distinct from mind_map's own optional-key-when-absent convention because this method's own recursive shape needs one uniform node type, not two (main_branch/sub_branch)."
 
 open_questions:
-  - "OQ-ISSUETREE-1: recommended_next should probably name future decomposition.mece / research.evidence_matrix machine_ids (Atlas L363's own '最佳搭配' column) once such contracts exist -- left empty, neither exists yet (owner: operator, or whoever builds them)."
+  - "OQ-ISSUETREE-1: PARTIALLY RESOLVED (2026-09-12) -- both methods Atlas L363's '最佳搭配' column points at now exist: decomposition.mece, and the evidence-matrix method, which landed as epistemic.evidence_matrix (F10), NOT under the research.* id this question originally guessed. recommended_next still left empty pending an operator decision on whether to wire it (owner: operator)."
   - "OQ-ISSUETREE-2: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
   - "OQ-ISSUETREE-3: no MECE-completeness check (Atlas's own '檢查遺漏' / 'MECE' best-combo hint) is enforced here -- this method only guarantees structural id-uniqueness and non-empty question text, not that a given tree's children are actually mutually-exclusive/collectively-exhaustive of their parent question (that is decomposition.mece's own future job, per the Atlas-cited best-combo pairing) (owner: operator, or whoever builds decomposition.mece)."
 

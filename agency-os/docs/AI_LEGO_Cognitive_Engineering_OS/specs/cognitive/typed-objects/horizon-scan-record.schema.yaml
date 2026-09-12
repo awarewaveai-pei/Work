@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/horizon-scan-record.schema.yaml"
+title: Horizon Scan Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `HorizonScanRecord` -- the
+  declared `outputs` of `foresight.horizon_scanning`'s Method Contract
+  (methods/contracts/foresight.horizon_scanning.contract.yaml, `outputs:
+  [HorizonScanRecord]`). F13 foresight family (Atlas L672 + dedicated
+  §12.22, L2811-2818).
+
+  Real invariant, mechanized as a RUNTIME invariant (JSON Schema 2020-12
+  cannot express cross-array referential integrity declaratively): every
+  `signals[]` entry carries all six of §12.22's own mandatory fields
+  (L2817 verbatim: "每個 signal 必須有 source、date、geography、status、
+  impact、confidence") non-empty, AND `signals[].domain`/`signals[].source`
+  each resolve to a declared `domains[]`/`sources[]` entry. Enforced by
+  `ai_lego/modules/foresight/horizon_scanning.py` at construction time and
+  independently re-derived by that module's own gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Horizon Scanning row (L672)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.22 地平線掃描／前瞻掃描 (L2811-2818), six-field engineering mandate L2817"
+  - "methods/contracts/foresight.horizon_scanning.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L2817's own
+  six-field mandate plus low-risk, disclosed compilation choices (the
+  HSCAN- prefix, domains[]/sources[] declaration shape, the `description`
+  field added below).
+
+compilation_decisions:
+  - question: "Should status/impact/confidence be closed enums, or free text?"
+    decision: "Free text, required non-empty. Atlas §12.22 names the six fields but gives no value scale for any of them -- same 'don't invent an ungrounded enum' posture as challenge.red_team's severity field."
+  - question: "Atlas's six named fields describe a signal's metadata, but none of them states WHAT was observed -- does the schema need a content field?"
+    decision: "Added `description` (required, free text) for the signal's own content. Not textually cited; disclosed here rather than silently assumed."
+
+type: object
+additionalProperties: false
+required: [id, version, domains, sources, signals, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^HSCAN-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.horizon_scanning"
+
+  domains:
+    type: array
+    minItems: 1
+    description: "Declared scan domains -- Atlas L672's own literal 'domains/sources→signals' pipeline start."
+    items:
+      type: object
+      additionalProperties: false
+      required: [domain_id, name]
+      properties:
+        domain_id: {type: string}
+        name: {type: string}
+
+  sources:
+    type: array
+    minItems: 1
+    description: "Declared scan sources -- same pipeline-start role as domains[]."
+    items:
+      type: object
+      additionalProperties: false
+      required: [source_id, name]
+      properties:
+        source_id: {type: string}
+        name: {type: string}
+
+  signals:
+    type: array
+    minItems: 1
+    description: "Detected signals. Each must resolve to a declared domain and source (cross-field invariant, checked by ai_lego/modules/foresight/horizon_scanning.py, not this schema) and carry all six of §12.22 L2817's mandatory fields."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, domain, source, description, date, geography, status, impact, confidence]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this record."
+        domain:
+          type: string
+          description: "Must resolve to a real domains[].domain_id."
+        source:
+          type: string
+          description: "§12.22 L2817's own 'source' field. Must resolve to a real sources[].source_id."
+        description:
+          type: string
+          description: "The signal's own content -- what was observed. See compilation_decisions."
+        date:
+          type: string
+          format: date
+          description: "§12.22 L2817's own 'date' field."
+        geography:
+          type: string
+          description: "§12.22 L2817's own 'geography' field. Free text (e.g. a region name)."
+        status:
+          type: string
+          description: "§12.22 L2817's own 'status' field. Free text -- see compilation_decisions."
+        impact:
+          type: string
+          description: "§12.22 L2817's own 'impact' field. Free text -- see compilation_decisions."
+        confidence:
+          type: string
+          description: "§12.22 L2817's own 'confidence' field. Free text -- see compilation_decisions."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention epistemic.evidence_matrix.contract.yaml already established for a single-record batch."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "1 domain, 1 source, 1 signal with all six mandatory fields present"
+    value:
+      id: "HSCAN-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.horizon_scanning"
+      domains: [{domain_id: "D-REGULATION", name: "AI 監管"}]
+      sources: [{source_id: "S-EUAIACT", name: "EU AI Act 官方公報"}]
+      signals:
+        - id: "SIG-1"
+          domain: "D-REGULATION"
+          source: "S-EUAIACT"
+          description: "高風險 AI 系統的合規期限提前"
+          date: "2026-09-01"
+          geography: "EU"
+          status: "CONFIRMING"
+          impact: "客戶合規產品線需提前 6 個月交付"
+          confidence: "MEDIUM"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-HSCAN-1: status/impact/confidence kept as free text -- see methods/contracts/foresight.horizon_scanning.contract.yaml's own OQ-HSCAN-2 for why.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table Horizon Scanning row (L672) and §12.22 (L2811-2818)
+    directly, including the exact six-field mandate (L2817). Validated
+    against jsonschema Draft202012Validator via
+    tests/unit/test_horizon_scanning.py, including real mutation checks
+    that a signal missing any one of the six mandatory fields, a dangling
+    domain ref, and a dangling source ref are each refused at the runtime
+    layer (this schema alone cannot express any of the three cross-array
+    constraints).
+  note: >
+    No mother document was modified. The six mandatory signal fields are
+    transcribed verbatim from Atlas L2817. The HSCAN- prefix,
+    domains[]/sources[] shape, and the `description` field are this file's
+    own compiled structure, disclosed above.

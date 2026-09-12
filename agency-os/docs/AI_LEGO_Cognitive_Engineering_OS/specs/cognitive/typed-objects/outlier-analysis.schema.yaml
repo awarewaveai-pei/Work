@@ -1,0 +1,122 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/outlier-analysis.schema.yaml"
+title: Outlier Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `OutlierAnalysisRecord` -- the
+  declared `outputs` of `foresight.outlier_analysis`'s Method Contract
+  (methods/contracts/foresight.outlier_analysis.contract.yaml, `outputs:
+  [OutlierAnalysisRecord]`). F13 foresight family (Atlas L678: "Outlier
+  Analysis | 研究異常個案 | identify→排除資料錯誤→深挖機制 | 發現新 segment/機制").
+
+  Real invariant, mechanized as a RUNTIME invariant (JSON Schema 2020-12's
+  `dependentRequired`/`if`/`then` could express the FORWARD direction --
+  `mechanism_hypothesis` requires `data_error_ruled_out: true` -- but not
+  the full cross-field content check that `data_error_assessment` is
+  ALSO non-empty at the same time, so both halves are enforced at the
+  runtime layer for one coherent error message): `mechanism_hypothesis`
+  may be present on an outlier ONLY when `data_error_ruled_out` is exactly
+  `true` (a real JSON boolean; a caller-supplied 0/1 is a schema type
+  violation, not a boolean) AND `data_error_assessment` is a non-empty
+  string. Atlas's own pipeline puts "排除資料錯誤" (rule out data error)
+  strictly BEFORE "深挖機制" (dig into mechanism) -- this is the precise
+  ordering that prevents mistaking a data artifact for a "new
+  segment/mechanism" discovery. Enforced by
+  `ai_lego/modules/foresight/outlier_analysis.py` at construction time and
+  independently re-derived by that module's own gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Outlier Analysis row (L678)"
+  - "methods/contracts/foresight.outlier_analysis.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L678's own
+  3-step ordered pipeline plus a low-risk, disclosed compilation choice
+  (the OUTLIER- prefix, mechanism_hypothesis gating structure).
+
+compilation_decisions:
+  - question: "Should the data-error-ruled-out -> mechanism-hypothesis ordering be a schema-declarative dependentRequired/if-then, or a runtime invariant?"
+    decision: "Runtime invariant. The full rule needs BOTH data_error_ruled_out:true AND a non-empty data_error_assessment before mechanism_hypothesis is legal -- a single coherent cross-field check, same placement convention epistemic.evidence_matrix.schema.yaml's own referential-integrity checks already establish for constraints JSON Schema 2020-12 cannot express declaratively in one place."
+  - question: "data_error_ruled_out -- boolean, or a 3-state enum (RULED_OUT/SUSPECTED/UNKNOWN)?"
+    decision: "Plain boolean. Atlas L678 gives a binary gate ('排除資料錯誤' is a yes/no checkpoint before proceeding to mechanism analysis), not a graded scale -- inventing a 3rd state would be presenting a guess as a compiled fact."
+
+type: object
+additionalProperties: false
+required: [id, version, outliers, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^OUTLIER-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.outlier_analysis"
+
+  outliers:
+    type: array
+    minItems: 1
+    description: "One or more investigated anomalous cases."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, data_error_ruled_out, data_error_assessment]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this record."
+        description:
+          type: string
+          description: "The anomalous case itself, in natural language -- Atlas L678's own 'identify' step."
+        data_error_ruled_out:
+          type: boolean
+          description: "Atlas L678's own '排除資料錯誤' (rule out data error) middle step. Must be true before mechanism_hypothesis may be set -- cross-field invariant, checked by ai_lego/modules/foresight/outlier_analysis.py, not this schema."
+        data_error_assessment:
+          type: string
+          description: "Free text explaining HOW data error was ruled out (or, if not yet ruled out, the current assessment). Required regardless of data_error_ruled_out's value -- the assessment itself, not just the boolean verdict, is the real audit trail."
+        mechanism_hypothesis:
+          type: string
+          description: "Atlas L678's own '深挖機制' (dig into mechanism) final step. Legal ONLY when data_error_ruled_out is true and data_error_assessment is non-empty -- see top-level description."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention epistemic.evidence_matrix.contract.yaml already established for a single-record batch."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "1 outlier, data error ruled out, mechanism hypothesis proposed"
+    value:
+      id: "OUTLIER-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.outlier_analysis"
+      outliers:
+        - id: "OUT-1"
+          description: "單一經銷商的月訂購量是同區其他經銷商的 8 倍"
+          data_error_ruled_out: true
+          data_error_assessment: "已核對原始出貨單與 ERP 紀錄，數字一致，非重複計算或系統錯誤"
+          mechanism_hypothesis: "該經銷商同時服務一個新開的跨境電商客戶，屬於新的批發通路，非零售異常"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-OUTLIER-1: data_error_ruled_out kept as a plain boolean, not a graded scale -- see methods/contracts/foresight.outlier_analysis.contract.yaml's own compilation_decisions.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table Outlier Analysis row (L678) directly, including
+    the exact 3-step pipeline ordering. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_outlier_analysis.py, including
+    real mutation checks that a `mechanism_hypothesis` present while
+    `data_error_ruled_out` is `false` (or int `1` instead of a real bool)
+    is refused at the runtime layer (this schema's own `type: boolean`
+    alone rejects int 0/1 at the JSON Schema layer; the ordering rule
+    itself is a runtime invariant).
+  note: >
+    No mother document was modified. The identify→排除資料錯誤→深挖機制
+    pipeline is transcribed verbatim from Atlas L678. The OUTLIER- prefix
+    and the mechanism_hypothesis gating structure are this file's own
+    compiled structure, disclosed above.

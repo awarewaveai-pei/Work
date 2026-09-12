@@ -1,0 +1,114 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/historical-analogy.schema.yaml"
+title: Historical Analogy Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `HistoricalAnalogySet` -- the declared `outputs` of
+  `foresight.historical_analogy`'s Method Contract (methods/contracts/foresight.historical_analogy.contract.yaml).
+  Atlas F13 table row L674 (verbatim): "Historical Analogy | 用歷史機制比較 | 相似/差異→抽機制→限制類比 | 借歷史又
+  避免表面類比". Real invariant: every `analogies[]` item requires >=1 similarity AND >=1 difference AND a
+  non-empty `extracted_mechanism` AND a non-empty `analogy_limits` -- an analogy with only similarities and no
+  stated differences/limits is the surface-level analogy this method exists to prevent, refused by
+  `ai_lego/modules/foresight/historical_analogy.py` at construction (this schema itself cannot express the
+  cross-field "differences must be present" rule beyond `required`, so the module is the primary enforcement
+  layer; this schema's own `minItems`/`required` are the structural floor).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Historical Analogy row (L674) -- sole citation, no dedicated §11/§12 section exists for this row"
+  - "methods/contracts/foresight.historical_analogy.contract.yaml"
+
+decided_by: >
+  No ADR governs this file. Table-row-only citation, same class of decision every sibling typed-object schema
+  built from a table-row-only Atlas citation already documents.
+
+compilation_decisions:
+  - question: "Free-text subject_ref (like challenge.red_team's proposal_ref) or a hard $ref to one typed object?"
+    decision: "Free-text subject_ref."
+  - question: "Local analogy id pattern -- fixed prefix or free string?"
+    decision: "Free non-empty string, unique within the record (no cross-record prefix pattern) -- same convention challenge.red_team's findings[].id already uses."
+
+type: object
+additionalProperties: false
+required: [id, version, subject_ref, analogies, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^HANALOGY-"
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.historical_analogy"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    description: "Free-text reference to the current situation/proposal being compared against history."
+
+  analogies:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, historical_case, similarities, differences, extracted_mechanism, analogy_limits]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        historical_case:
+          type: string
+          minLength: 1
+        similarities:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+        differences:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+          description: "Required non-empty, not merely permitted -- an analogy with similarities but no stated differences is the surface-level analogy Atlas L674 exists to prevent."
+        extracted_mechanism:
+          type: string
+          minLength: 1
+          description: "Atlas L674's own middle pipeline step (抽機制)."
+        analogy_limits:
+          type: string
+          minLength: 1
+          description: "Atlas L674's own final pipeline step (限制類比) -- where this analogy stops applying."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A platform-migration proposal compared to a historical infrastructure cutover"
+    value:
+      id: "HANALOGY-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.historical_analogy"
+      subject_ref: "PROP-2026-09-12-001: 把核心資料庫從單體搬到微服務"
+      analogies:
+        - id: "HA-1"
+          historical_case: "1990 年代電信業從類比交換機轉數位交換機的分階段切換"
+          similarities: ["都是核心基礎設施的不可逆轉換", "都要求新舊系統並行一段時間"]
+          differences: ["當年是硬體汰換，現在是純軟體重構", "當年監理框架強制分階段，現在無外部強制時程"]
+          extracted_mechanism: "並行雙軌 + 漸進流量切換，降低單點失敗風險"
+          analogy_limits: "電信轉換有明確法規時程與資金保障，本案沒有對應的外部強制與資金後盾，類比僅適用於技術切換節奏，不適用於時程與預算規劃"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - "OQ-HISTORICALANALOGY-1: severity/confidence of each analogy is not modeled -- Atlas L674 gives no scale.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table row L674 directly. Grepped the full spec root case-insensitively for "historical
+    analogy"/"analogy_limits" before writing -- only association.analogy_mapping's own forward soft-link
+    (informs_historical_analogy_ref) references this method; no duplicate schema found. Validated against
+    jsonschema Draft202012Validator.
+  note: "No mother document was modified."

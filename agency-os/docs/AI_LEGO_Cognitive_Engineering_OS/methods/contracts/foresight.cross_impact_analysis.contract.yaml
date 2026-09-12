@@ -1,0 +1,94 @@
+$id: "ai-lego://methods/contracts/foresight.cross_impact_analysis.contract.yaml"
+title: "Cross-impact Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  F13 unknown-unknowns/foresight family (Atlas L685: "Cross-impact Analysis
+  | 分析事件互相改變機率 | event pair matrix->scenario consistency | 避免把
+  趨勢當獨立"). Analyzes how declared events change each other's
+  probability. Core invariant: matrix completeness -- Atlas's own pipeline
+  says "event pair matrix", and the method's stated benefit (避免把趨勢當
+  獨立, avoid treating trends as independent) is exactly what a matrix
+  silently missing a pair would let back in. Every unordered pair of
+  declared events must be present exactly once.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 未知未知與前瞻 table, Cross-impact Analysis row (L685)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L685 gives a real two-stage pipeline
+  and effect ("避免把趨勢當獨立") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: foresight.cross_impact_analysis
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [DECOMPOSE, COMPARE, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F13
+# members). DECOMPOSE breaks the scenario into named events; COMPARE
+# builds the event-pair matrix itself; EXPLAIN articulates each pair's
+# conditional probability shift as a real statement rather than a bare
+# label. All three CANONICAL_KERNEL members.
+
+purpose:
+  - build_a_complete_event_pair_matrix_of_conditional_probability_shifts
+# Atlas L685 verbatim sense: analyze how events mutually change each
+# other's probability, via a complete event-pair matrix, checked for
+# scenario consistency.
+
+inputs:
+  required:
+    - EventSet
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the set of events under analysis, same
+  # honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - CrossImpactAnalysis
+# NEW output type (see typed-objects/cross-impact-analysis.schema.yaml).
+
+preconditions:
+  - "at least 2 declared events"
+  - "every unordered event pair present exactly once (matrix completeness)"
+  # NEW, structurally necessary. Atlas's own pipeline is "event pair
+  # matrix" -- a matrix silently missing a pair (or duplicating one) lets
+  # exactly the "把趨勢當獨立" (treat trends as independent) assumption
+  # this method exists to prevent back in through the gap.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent matrix, same placement
+  # convention every structurally similar single-record F13 sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F13's table ends at this row; no explicit next-step method named.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a matrix has no external side effect.
+
+open_questions:
+  - "OQ-XIMPACT-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-XIMPACT-2: conditional_probability_shift is modeled as a signed delta in [-1,1], not an absolute probability in [0,1] (see schema compilation_decisions) -- should a future revision support both framings?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table, Cross-impact Analysis row (L685) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "cross-impact"/"cross impact"/"event pair matrix" and every schema
+    title before writing -- zero pre-existing implementation or schema
+    title overlap found. Validated against specs/cognitive/method.schema.
+    yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The two-stage pipeline is
+    transcribed verbatim from Atlas L685. The matrix-completeness
+    precondition, event-count minimum, and probability-shift range are
+    this file's own compiled structure, disclosed above, not textually
+    cited.

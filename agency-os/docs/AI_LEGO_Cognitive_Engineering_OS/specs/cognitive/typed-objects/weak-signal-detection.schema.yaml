@@ -1,0 +1,121 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/weak-signal-detection.schema.yaml"
+title: Weak Signal Detection Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `WeakSignalDetectionRecord` --
+  the declared `outputs` of `foresight.weak_signal_detection`'s Method
+  Contract (methods/contracts/foresight.weak_signal_detection.contract.yaml,
+  `outputs: [WeakSignalDetectionRecord]`). F13 foresight family (Atlas L673:
+  "Weak Signal Detection | 找尚未成主流的訊號 |
+  anomalies/niche events→triangulate→monitor | 增加提前量").
+
+  Real invariant, mechanized as a RUNTIME invariant (JSON Schema 2020-12
+  cannot express "count of distinct-after-normalization array values"
+  declaratively): every `weak_signals[]` entry must carry >=2 DISTINCT
+  `corroborating_source_refs` (distinct after `.strip()` whitespace
+  normalization) -- Atlas's own pipeline word "triangulate" means a
+  single-source item has not been triangulated, it is an anecdote.
+  Enforced by `ai_lego/modules/foresight/weak_signal_detection.py` at
+  construction time and independently re-derived by that module's own
+  gates. Every `corroborating_source_refs` entry is a nested LIST field --
+  rebuilt via `copy.deepcopy`, never a shallow `dict(item)` copy (the same
+  F09-batch aliasing defect `epistemic.evidence_matrix`'s own module
+  docstring already documents and fixes proactively here).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Weak Signal Detection row (L673)"
+  - "methods/contracts/foresight.weak_signal_detection.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L673's own
+  triangulate pipeline word plus low-risk, disclosed compilation choices
+  (the WSIG- prefix, the >=2-distinct-source threshold, the monitor_status
+  vocabulary).
+
+compilation_decisions:
+  - question: "How many corroborating sources count as 'triangulated'?"
+    decision: ">=2 DISTINCT sources (after whitespace-normalized string comparison). Atlas gives no number; 2 is the textbook minimum for triangulation (a single source is an anecdote, not a corroborated signal)."
+  - question: "monitor_status -- closed vocabulary, or open string?"
+    decision: "Closed 5-value enum: MONITORING, ESCALATING, CONFIRMED, DISCONFIRMED, ARCHIVED. Atlas gives no vocabulary for this field; MONITORING is the method's own pipeline tail (L673: '→monitor'), the other four are this file's own disclosed compilation covering a weak signal's realistic lifecycle."
+
+type: object
+additionalProperties: false
+required: [id, version, weak_signals, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^WSIG-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.weak_signal_detection"
+
+  weak_signals:
+    type: array
+    minItems: 1
+    description: "One or more triangulated weak signals."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, corroborating_source_refs, monitor_status]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this record."
+        description:
+          type: string
+          description: "The weak signal itself, in natural language."
+        corroborating_source_refs:
+          type: array
+          minItems: 2
+          description: "Free-text source references. Must contain >=2 DISTINCT entries after whitespace normalization -- cross-field invariant, checked by ai_lego/modules/foresight/weak_signal_detection.py, not this schema (a schema-layer minItems:2 alone cannot catch two whitespace-variant duplicates of the same source)."
+          items:
+            type: string
+        monitor_status:
+          type: string
+          enum: [MONITORING, ESCALATING, CONFIRMED, DISCONFIRMED, ARCHIVED]
+          description: "Closed vocabulary compiled for this file -- see compilation_decisions."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention epistemic.evidence_matrix.contract.yaml already established for a single-record batch."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "1 weak signal triangulated by 2 distinct sources, being monitored"
+    value:
+      id: "WSIG-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.weak_signal_detection"
+      weak_signals:
+        - id: "WS-1"
+          description: "東南亞小型工廠開始詢問客製化 AI 品檢方案"
+          corroborating_source_refs: ["越南展會攤位訪談紀錄", "泰國經銷商季度回報"]
+          monitor_status: MONITORING
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-WSIG-1: monitor_status's 5-value vocabulary is this file's own compilation -- see methods/contracts/foresight.weak_signal_detection.contract.yaml's own OQ-WSIG-2.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table Weak Signal Detection row (L673) directly.
+    Validated against jsonschema Draft202012Validator via
+    tests/unit/test_weak_signal_detection.py, including a real mutation
+    check that a single-source (or whitespace-variant-duplicate-source)
+    weak signal is refused at the runtime layer (this schema's own
+    minItems:2 alone cannot detect a whitespace-variant duplicate), plus a
+    dedicated nested-list-aliasing regression test on
+    `corroborating_source_refs`.
+  note: >
+    No mother document was modified. The anomalies/niche-events→triangulate
+    →monitor pipeline word is transcribed from Atlas L673. The WSIG- prefix,
+    >=2-distinct-source threshold, and monitor_status vocabulary are this
+    file's own compiled structure, disclosed above.

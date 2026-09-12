@@ -1,0 +1,96 @@
+$id: "ai-lego://methods/contracts/foresight.cross_country_comparison.contract.yaml"
+title: "Cross-country Comparison Method Contract"
+status: ACTIVE
+
+description: >
+  F13 unknown-unknowns/foresight family (Atlas L676: "Cross-country
+  Comparison | 比較制度/市場差異 | comparable jurisdictions->normalize->
+  compare | 找 local variation"). Compares a metric across >=2 jurisdictions
+  under an explicitly declared normalization basis. Core invariant: every
+  comparison must declare a `normalization_basis` and every value must
+  resolve to a declared jurisdiction -- mechanizing Atlas's own middle
+  pipeline stage ("normalize") so raw cross-country figures can never be
+  compared without a stated basis, the exact error this method exists to
+  prevent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 未知未知與前瞻 table, Cross-country Comparison row (L676)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L676 gives a real three-stage pipeline
+  and effect ("找 local variation") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: foresight.cross_country_comparison
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [COMPARE, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F13
+# members). COMPARE is the method's own defining action (Atlas L676:
+# comparable jurisdictions -> normalize -> compare); EXPLAIN articulates
+# the normalization basis as a real stated fact rather than an implicit
+# assumption. Both CANONICAL_KERNEL members.
+
+purpose:
+  - compare_a_metric_across_jurisdictions_under_a_stated_normalization_basis
+# Atlas L676 verbatim sense: compare comparable jurisdictions after
+# normalizing, to find local variation.
+
+inputs:
+  required:
+    - JurisdictionSet
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the set of jurisdictions under comparison, same
+  # honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - CrossCountryComparison
+# NEW output type (see typed-objects/cross-country-comparison.schema.yaml).
+
+preconditions:
+  - "at least 2 jurisdictions declared"
+  - "every comparison declares a non-empty normalization_basis"
+  # NEW, structurally necessary. A "comparison" of one jurisdiction is not
+  # a comparison; comparing raw figures with no stated normalization basis
+  # is precisely the error Atlas's own "normalize" pipeline stage exists
+  # to prevent.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent comparison, same placement
+  # convention every structurally similar single-record F13 sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - foresight.cross_impact_analysis
+# Atlas F13's own table ordering: once local variation across jurisdictions
+# is understood, cross-impact analysis is a natural next foresight step.
+# Soft reference -- both built same batch.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a comparison has no external side effect.
+
+open_questions:
+  - "OQ-XCOUNTRY-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-XCOUNTRY-2: values[] is modeled as a list of {jurisdiction, value} objects rather than a dynamic-key object map (see schema compilation_decisions) -- should a future revision reconsider this shape?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table, Cross-country Comparison row (L676) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "cross-country"/"cross country"/"jurisdiction" and every schema title
+    before writing -- zero pre-existing implementation or schema title
+    overlap found. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The three-stage pipeline is
+    transcribed verbatim from Atlas L676. The normalization_basis
+    precondition, jurisdiction-count minimum, and values[] shape are this
+    file's own compiled structure, disclosed above, not textually cited.

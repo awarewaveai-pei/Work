@@ -1,0 +1,117 @@
+$id: "ai-lego://methods/contracts/foresight.black_swan_exercise.contract.yaml"
+title: "Black Swan Exercise Method Contract"
+status: ACTIVE
+
+description: >
+  F13 unknown-unknowns/foresight family (Atlas L668-685), Black Swan Exercise row (L679: "低機率高衝擊｜tail
+  events→exposure→survivability→hedges｜強化韌性"). No dedicated §11/§12 section exists -- the table row is the
+  sole citation (grep-confirmed, see verification). Core invariant: the 4-stage chain must be referentially
+  complete end to end -- every exposure resolves to a declared tail event, every survivability assessment and
+  every hedge resolves to a declared exposure, every declared tail event has >=1 exposure, and every declared
+  exposure has >=1 survivability assessment. An uncovered tail event or exposure is the pipeline stage silently
+  skipped, not a soft gap.
+
+  Distinct from `challenge.pre_mortem` (read in full before writing this contract) despite a superficially
+  similar "chain + coverage-invariant" shape: pre-mortem assumes ONE SPECIFIC project has already failed and
+  works backward from that single assumed failure to causes and controls; this method instead catalogues
+  MULTIPLE independent, low-probability tail events and asks a portfolio-level survivability/hedging
+  question per event ("if THIS happens, do we survive, and how do we hedge it") -- there is no single assumed
+  failure being explained, and no clustering/likelihood-impact-priority ranking step (Atlas L679 cites none).
+  Not a duplicate method under a different name.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 tool table, Black Swan Exercise row (L679)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: foresight.black_swan_exercise` mints a NEW machine_id and the FIRST member
+  of a NEW `family: foresight` (grep-confirmed: no prior foresight-family contract or implementation anywhere
+  in this corpus). The 4-array chain shape, per-stage single-reference fields, and record-level-only
+  provenance are this file's own compilation decisions -- see `compilation_decisions`.
+
+id: foresight.black_swan_exercise
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [IMAGINE, INFER, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. IMAGINE = positing a
+# low-probability/high-impact tail event (Atlas's own "低機率高衝擊" framing); INFER = deriving what it exposes
+# and whether the exposure is survivable; EXPLAIN = articulating a hedge as a real, actionable measure, not a
+# bare label. All three CANONICAL_KERNEL members.
+
+purpose:
+  - assess_survivability_of_low_probability_high_impact_tail_events_and_build_hedges
+# Atlas L679 verbatim sense: catalogue tail events, trace what they expose you to, assess whether that
+# exposure is survivable, then build hedges -- benefit "強化韌性" (strengthen resilience).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this corpus takes; Atlas's own citation names no required input type.
+
+outputs:
+  - BlackSwanExercise
+# NEW output type (see typed-objects/black-swan-exercise.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "tail_events has at least 1 entry, each with a non-empty description -- a black swan exercise naming zero tail events has not run the process"
+  - "every exposures[] entry's tail_event_id resolves to a declared tail_events[] id, and every declared tail_events[] id is referenced by >=1 exposures[] entry -- a tail event with no traced exposure is the first pipeline stage silently skipped"
+  - "every survivability_assessments[] entry's exposure_id resolves to a declared exposures[] id, and every declared exposures[] id is referenced by >=1 survivability_assessments[] entry -- Atlas L679's own 'exposure→survivability' step, mechanized; an exposure nobody assessed for survivability is the stage this method exists to force"
+  - "every hedges[] entry's exposure_id resolves to a declared exposures[] id -- referential integrity only; hedges[] itself may be empty (no per-exposure hedge-coverage requirement is cited by Atlas L679, see open_questions)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to claims grounded in a supplied EvidenceSet
+  # input; this method takes no required input (inputs.required: []), so there is no upstream EvidenceSet to
+  # label against, same reasoning challenge.pre_mortem's identical flag already documents.
+
+forbidden_transition: []
+# Atlas L679 gives no §14.1-style legal/illegal chain citation (grep-confirmed).
+
+recommended_next: []
+# Atlas's own citation names no single downstream method for this row specifically.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Is the tail-event/exposure/survivability/hedge chain a schema-level constraint or a runtime cross-array invariant?"
+    decision: "Runtime invariant (builder + independent gate) -- same class of disclosed gap challenge.pre_mortem's own cause-to-control coverage invariant and epistemic.evidence_matrix's own claim-to-link coverage invariant already document; JSON Schema 2020-12 cannot declaratively express multi-array referential completeness."
+  - question: "Does each exposures[]/survivability_assessments[]/hedges[] entry reference exactly one upstream id (tail_event_id / exposure_id), or a list?"
+    decision: "Exactly one (a single string reference) per entry -- an item covering multiple upstream entries is expressed as multiple entries, same one-reference-per-entry shape challenge.pre_mortem's own `addresses_cause_id` already establishes."
+  - question: "Per-field provenance (per-tail-event/exposure/etc.) or record-level only?"
+    decision: "Record-level ONLY, one top-level `provenance` field -- matching this corpus's established batch precedent (challenge.red_team, challenge.pre_mortem, stakeholders.game_theory); a BlackSwanExercise's 4 arrays are one coherent exercise's output, not independently-sourced items."
+  - question: "Must every exposure also have >=1 covering hedge (full 4-stage coverage), or only tail_event->exposure and exposure->survivability?"
+    decision: "Only the two coverage requirements named above. Atlas L679's own benefit column ('強化韌性') is served by the survivability-assessment stage forcing visibility into every exposure; a hedge is the resulting mitigation action, and a black swan exercise may legitimately conclude some exposures are accepted risk with no hedge built yet, without that making the exercise incomplete the way an unassessed exposure would. See open_questions."
+
+open_questions:
+  - "OQ-BSWAN-1: should a future revision also require every exposure to have >=1 covering hedge, making the chain fully complete end to end rather than complete through the survivability stage only? Left open per the compilation_decisions scope choice above (owner: operator)."
+  - "OQ-BSWAN-2: tail_events/exposures carry no closed severity/probability scale (e.g. Atlas's own '低機率高衝擊' is qualitative here) -- a future revision could add one if a downstream consumer needs ranking (owner: operator)."
+  - "OQ-BSWAN-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F13 index row (L668) and the Black Swan Exercise table row (L679) directly. Grepped the whole
+    Atlas file case-insensitively for "black swan"/"tail event" -- confirmed exactly this 1 table-row citation,
+    no dedicated §11/§12 section, no §4 composition formula, no §14.1 legal-chain mention. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "black swan"/"black_swan"/"tail_event" before writing any of this method's own
+    files -- only the Atlas table row and its own `.ai/research/phase-0/method-inventory.yaml` /
+    `methods/registry/method-inventory.yaml` name-only listings found, zero pre-existing implementation. Read
+    challenge.pre_mortem.py and epistemic.evidence_matrix.py (plus their own contracts) in full before writing
+    this contract -- both are this method's own closest structural precedent for a multi-array referential-
+    completeness invariant. Also read challenge.stress_testing.py in full to rule out a second collision
+    (Atlas's own "extreme scenarios" framing there vs "tail events" here): confirmed distinct -- stress_testing
+    runs a single plan/decision through extreme-but-plausible scenarios to test robustness against a
+    normal_range/extreme_value boundary, with no exposure/survivability/hedge chain and no multi-array
+    coverage invariant; not a duplicate. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The tail-event/exposure/survivability/hedge chain and the "強化韌性"
+    benefit are transcribed verbatim from Atlas L679. `cognitive_primitives`, the flat 4-array record shape,
+    and the coverage-scope choice (survivability required, hedge not required) are this file's own compilation
+    decisions, disclosed above, not presented as directly Atlas-cited beyond the literal table-row wording
+    quoted.

@@ -1,0 +1,60 @@
+$id: "ai-lego://methods/contracts/foresight.adjacent_discipline_search.contract.yaml"
+title: "Adjacent Discipline Search Method Contract"
+status: ACTIVE
+
+description: >
+  foresight.adjacent_discipline_search, F13 (Unknown Unknowns & Foresight) family. Atlas table row L677 (sole
+  citation, no dedicated §11/§12 section): "從鄰近學科找 missing variables｜current disciplines→adjacent
+  fields→models｜降低單一專業盲點". Not an EC §32 method. Core invariant: adjacent_fields must be disjoint from
+  current_disciplines (normalized) -- a field already in the team's current set is by definition not
+  adjacent, and listing it defeats the method's own stated purpose of reducing the single-discipline blind
+  spot; every imported_models[].field_ref must resolve to a declared adjacent field.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Adjacent Discipline Search row (L677)"
+  - "specs/cognitive/typed-objects/adjacent-discipline-search.schema.yaml"
+
+decided_by: "No ADR governs the content. Direct transcription of a table-row-only citation."
+
+id: foresight.adjacent_discipline_search
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [ASSOCIATE, MAP, INFER]
+# INFERRED, not cited.
+
+purpose:
+  - search_adjacent_disciplines_for_missing_variables_the_current_disciplines_cannot_see
+
+inputs:
+  required:
+    - CurrentDisciplines
+  # NEW DESIGN: a bare list-of-strings input, mirroring the output's own current_disciplines[] shape -- no
+  # existing typed object models "a team's set of current disciplines".
+
+outputs:
+  - AdjacentDisciplineSearch
+
+preconditions:
+  - "at least one current discipline and at least one adjacent field declared"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - challenge.red_team
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-ADJACENTDISCIPLINESEARCH-1: cognitive_primitives is this file's own inference, not a cited Atlas composition formula.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table row L677 directly. Grepped the full spec root case-insensitively for "adjacent
+    discipline"/"adjacent field"/"missing variables" before writing. Validated against
+    specs/cognitive/method.schema.yaml.
+  note: "No mother document was modified. Table row transcribed verbatim; the disjointness + referential-integrity invariant is this file's own compilation decision, disclosed above."

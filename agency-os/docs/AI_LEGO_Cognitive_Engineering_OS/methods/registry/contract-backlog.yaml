@@ -4632,6 +4632,515 @@ tier_1:
       numbers were additionally found stale (all off by 1) and corrected
       against the Atlas source. See WORKLOG 2026-09-12 F09 entry.
 
+  onehundredseventysecond_concrete_entry:
+    # F10 assumption/evidence/epistemic-quality family opening batch,
+    # 2026-09-12. 5 agents x 2 methods; 0 of 10 existed before this batch.
+    method_id: "epistemic.assumption_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L570) + the section's own quadrantChart
+      (L582-591). Real invariant: `quadrant` is GENUINE_COMPUTE from the
+      (impact, uncertainty) pair via a total 4-cell map transcribed from
+      that chart's own quadrant-1..4 labels (VALIDATE_FIRST /
+      KNOWN_CRITICAL / MONITOR / CHEAP_TESTS), never a caller-supplied
+      field -- a smuggled key is refused by an exact-key-set check and a
+      post-construction tamper is caught by the independent gate.
+    source: "methods/contracts/epistemic.assumption_mapping.contract.yaml + specs/cognitive/typed-objects/assumption-mapping.schema.yaml + ai_lego/modules/epistemic/assumption_mapping.py"
+    note: "53 tests pass. CLI PASS, smuggled-quadrant refusal + independent-gate hand-tamper proof demonstrated. Clean in the batch critic pass."
+
+  onehundredseventythird_concrete_entry:
+    method_id: "epistemic.assumption_registry"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L571, the literal field list "ID/statement/type/
+      evidence/confidence/validation/status/owner"). Composes (does not
+      redefine) specs/evidence/assumption.schema.yaml by real $ref. Real
+      invariants: `is_critical_assumption` is GENUINE_COMPUTE from
+      impact_if_wrong == "Critical" -- this method is the "consuming
+      engine" that schema's own L290-302 names but never had; entry id
+      uniqueness; and a status asserting validated/verified requires a
+      non-empty `validation` field (EC 116 L3132: an unverified status
+      must not pretend certainty).
+    source: "methods/contracts/epistemic.assumption_registry.contract.yaml + specs/cognitive/typed-objects/assumption-registry.schema.yaml + ai_lego/modules/epistemic/assumption_registry.py"
+    note: >
+      61 tests pass (60 original + 1 added post-critic). Critic found 3 of
+      this batch's findings here: the F09 nested-list-aliasing defect
+      recurred ONE LEVEL DEEPER (an evidence item's own
+      `quality_assessment` object stayed shared, so a caller could rewrite
+      a stored record's evidence quality after construction with every gate
+      still PASSing), its own "aliasing regression test" mutated only a
+      scalar and therefore passed against the shallow copy, and the
+      provenance gate iterated `entries` without a type check and crashed
+      on None/int. All fixed: genuine `copy.deepcopy`, a replacement test
+      that mutates a nested container and asserts object identity, and a
+      list guard.
+
+  onehundredseventyfourth_concrete_entry:
+    method_id: "epistemic.ladder_of_inference"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L572, sole citation: the data->meaning->
+      assumption->conclusion climb, "make every step explicit"). Real
+      invariant: ascending completeness -- a higher rung may only be
+      non-empty once every lower rung already is (assumptions require
+      meanings; conclusions require assumptions). A conclusion recorded
+      with no assumption rung beneath it IS the cognitive leap this method
+      exists to expose.
+    source: "methods/contracts/epistemic.ladder_of_inference.contract.yaml + specs/cognitive/typed-objects/ladder-of-inference-analysis.schema.yaml + ai_lego/modules/epistemic/ladder_of_inference.py"
+    note: "33 tests pass. CLI PASS, skip-rung refusal + independent-gate hand-tamper proof demonstrated. Critic found its gate did not check record id prefix/version (added) and its Atlas citations were off by one, inherited from this registry's own stale line numbers -- see the registry-wide re-sync noted in the 181st entry."
+
+  onehundredseventyfifth_concrete_entry:
+    method_id: "epistemic.toulmin_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L574, the literal six-column Claim/Grounds/
+      Warrant/Backing/Qualifier/Rebuttal list, whose effect column names
+      preventing a missing reasoning bridge). Real invariant: `warrant` --
+      that bridge -- must be non-blank whenever claim+grounds are present;
+      a claim+grounds pair with no warrant is a bare assertion wearing a
+      Toulmin costume. Second invariant: `backing` may only be non-empty
+      if `warrant` is, checked first so both error codes stay
+      independently reachable rather than one shadowing the other.
+    source: "methods/contracts/epistemic.toulmin_model.contract.yaml + specs/cognitive/typed-objects/toulmin-argument.schema.yaml + ai_lego/modules/epistemic/toulmin_model.py"
+    note: "45 tests pass. `claim` deliberately stays free text rather than $ref-ing specs/evidence/claim.schema.yaml; that schema's own open question MRSP-claim-1 anticipates a future wrapper, and epistemic.argument_mapping (this same batch) takes that role explicitly -- the critic verified the two files' reasoning agrees rather than one rationalising. Gate id/version check added post-critic; Atlas citations corrected off-by-one."
+
+  onehundredseventysixth_concrete_entry:
+    method_id: "epistemic.argument_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L573, "main claim->support->objection->rebuttal
+      ->evidence"). `main_claim` is a real $ref to specs/evidence/
+      claim.schema.yaml (the wrapper role MRSP-claim-1 anticipated);
+      supports/objections/rebuttals stay locally-scoped {id, text} roles,
+      not a second claim population. Real invariant: every
+      rebuttals[].objection_id must resolve to a declared objections[] id
+      (a rebuttal to an objection never raised is a dangling argument
+      node), >=1 support required, objection ids unique.
+    source: "methods/contracts/epistemic.argument_mapping.contract.yaml + specs/cognitive/typed-objects/argument-map.schema.yaml + ai_lego/modules/epistemic/argument_mapping.py"
+    note: "45 tests pass. Critic found its gate crashed (TypeError) sorting a mixed str/None set of objection ids, and its builder raised bare TypeError rather than InvariantViolation on non-list objections/rebuttals -- both fixed, plus the missing gate id/version check."
+
+  onehundredseventyseventh_concrete_entry:
+    method_id: "epistemic.evidence_matrix"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L575, "rows=claims, cols=evidence->quality/
+      diversity/recency", whose effect column names quickly surfacing the
+      weak claim). claims[] and evidence_items[] are real $refs to
+      specs/evidence/claim.schema.yaml and evidence.schema.yaml. Real
+      invariants: link referential integrity in both directions, no
+      duplicate (claim_id, evidence_id) cell, and no orphan claim -- that
+      effect column made structural, since a claim appearing in zero links
+      is exactly the weak claim the matrix exists to reveal.
+    source: "methods/contracts/epistemic.evidence_matrix.contract.yaml + specs/cognitive/typed-objects/evidence-matrix.schema.yaml + ai_lego/modules/epistemic/evidence_matrix.py"
+    note: >
+      49 tests pass. Carried the batch's most load-bearing critic finding:
+      the integrity gate never re-derived link SHAPE or the relation enum,
+      so it returned all-PASS on records its own builder refuses (e.g.
+      relation:"TOTALLY_MADE_UP", a link missing `relation` entirely, a
+      link carrying an extra key) -- the two layers had each spelled the
+      rule out separately and drifted. Fixed structurally rather than by
+      restating the checks a third time: a single `_link_problem` predicate
+      is now the one definition of a well-shaped link, called by both
+      `link()` and the gate. Three mixed-type `sorted()` crashes in the
+      same file fixed with key=repr, plus the non-list `links` guard and
+      the missing gate id/version check.
+
+  onehundredseventyeighth_concrete_entry:
+    method_id: "epistemic.evidence_hierarchy"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L576, "domain-specific hierarchy"). Real
+      invariant: hierarchy_levels[].rank values must be unique (a strict
+      total order -- two levels tied at one rank makes "which evidence is
+      stronger" unanswerable), and every evidence_assignments[].level_id
+      must resolve to a declared level. Deliberately per-domain
+      caller-declared levels, NOT a universal tier enum: specs/evidence/
+      evidence.schema.yaml L127-139 already leaves `hierarchy_tier`
+      untyped with exactly that reasoning, and inventing a universal
+      ranking here would have contradicted it.
+    source: "methods/contracts/epistemic.evidence_hierarchy.contract.yaml + specs/cognitive/typed-objects/evidence-hierarchy.schema.yaml + ai_lego/modules/epistemic/evidence_hierarchy.py"
+    note: "39 tests pass. Critic found the builder never validated provenance at all despite the contract's quality.provenance_required: true -- it returned records whose own provenance_required gate then reported FAIL, i.e. a 'validated' record it could not itself certify. Guard added."
+
+  onehundredseventyninth_concrete_entry:
+    method_id: "epistemic.contradiction_detection"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L579, "claims matching->support/contradict/
+      context"). Orthogonal to specs/evidence/claim.schema.yaml's existing
+      `contradicting_evidence` (that is claim-to-EVIDENCE; this is
+      claim-to-CLAIM) -- critic-verified as a genuine gap rather than a
+      redundant second mechanism, and claims[] here hold only soft id refs,
+      minting no second claim type. Real invariant: relation endpoints
+      resolve to declared claims, claim_id_a != claim_id_b (a self-relation
+      is not a contradiction between sources), and no duplicate UNORDERED
+      pair -- {A,B} then {B,A} is refused even when the two carry different
+      relation values.
+    source: "methods/contracts/epistemic.contradiction_detection.contract.yaml + specs/cognitive/typed-objects/contradiction-detection.schema.yaml + ai_lego/modules/epistemic/contradiction_detection.py"
+    note: "43 tests pass. Same missing-provenance-validation defect as evidence_hierarchy, found by the same critic pass and fixed identically."
+
+  onehundredeightieth_concrete_entry:
+    method_id: "epistemic.bayesian_updating"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L577, "prior->likelihood->posterior"). Real
+      invariant: `posterior` is GENUINE_COMPUTE via Bayes' rule
+      (LT*prior)/(LT*prior + LF*(1-prior)), never a builder parameter, and
+      the gate independently recomputes it within a 1e-9 tolerance against
+      round(x,8) storage -- one order tighter than the stored precision, so
+      it cannot mask a real tamper. A zero denominator raises its own
+      distinct BAYES_UNDEFINED_POSTERIOR rather than crashing or silently
+      returning 0. `likelihood_given_false` is a disclosed NEW_DESIGN
+      field: Atlas names only a singular "likelihood", but Bayes' rule
+      structurally requires both conditionals.
+    source: "methods/contracts/epistemic.bayesian_updating.contract.yaml + specs/cognitive/typed-objects/bayesian-update.schema.yaml + ai_lego/modules/epistemic/bayesian_updating.py"
+    note: "55 tests pass. Critic independently recomputed 6 input sets with fractions.Fraction and confirmed exact agreement, verified prior=0/prior=1/all-zero-denominator boundaries, and confirmed tamper sensitivity (+5e-10 PASS, +1e-9 FAIL). Clean -- no findings."
+
+  onehundredeightyfirst_concrete_entry:
+    # Last of this 5-agent / 10-method F10 opening batch -- F10 is 10/10
+    # COMPLETE after this entry (independently confirmed via `ls
+    # methods/contracts/epistemic.*.contract.yaml`: 10 files present).
+    method_id: "epistemic.confidence_calibration"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F10 table row (Atlas L578, "predictions->actuals->calibration
+      curve"). Real invariant: `brier_score` is GENUINE_COMPUTE = mean((
+      stated_confidence - outcome)^2), never a builder parameter; >=2
+      predictions required (a curve needs >=2 points, Atlas's own plural);
+      `actual_outcome` must be a real bool, with int 0/1 refused -- the
+      reverse direction of this corpus's usual bool-excluded-from-numeric
+      guard. The Brier formula itself is a disclosed compilation decision,
+      not an Atlas citation: Atlas names the technique and purpose but
+      supplies no formula (same class as challenge.hazop's guide-word
+      vocabulary).
+    source: "methods/contracts/epistemic.confidence_calibration.contract.yaml + specs/cognitive/typed-objects/confidence-calibration.schema.yaml + ai_lego/modules/epistemic/confidence_calibration.py"
+    note: >
+      60 tests pass. F10 assumption/evidence/epistemic-quality family: 10
+      of 10 COMPLETE as of this entry (assumption_mapping/
+      assumption_registry/ladder_of_inference/toulmin_model/
+      argument_mapping/evidence_matrix/evidence_hierarchy/
+      contradiction_detection/bayesian_updating landed via concurrent
+      sibling agents in this same batch, entries onehundredseventysecond
+      through onehundredeightieth above). Batch totals after fixes: 485
+      tests, 84 subtests, 0 failures. 1 independent critic pass (Standard
+      tier, hand-tamper-verified, 273 malformed-input checks across all 21
+      gates) found 0 Critical / 5 Major / 5 Minor, all fixed before this
+      registry sync -- detail on each sits in the affected method's own
+      entry above. The architectural constraint for this family
+      (composition over duplication against the pre-existing
+      specs/evidence/* types) was critic-verified as genuinely honoured:
+      real $refs throughout, no parallel claim/evidence/assumption record
+      shape minted. **Registry-wide correction made in this same batch**:
+      230 of method-inventory.yaml's 284 Atlas-sourced rows were found to
+      cite stale line numbers, drifting in era-shaped bands (+1 for the
+      primitives/F01-F08/F10 block, +3 for F11/F13-F21, -9 for F22-F24 and
+      the 11.29/lens entries, -18/-32 for the section 13 recipes) because
+      that file froze a Phase 0 snapshot of an older Atlas revision.
+      Successive family batches had each been correcting only their own
+      rows (F12 found its 10 off by 3, F09 its 8 off by 1), which never
+      closed the class; all 230 are now re-synced and
+      `tests/unit/test_method_inventory_line_numbers.py` asserts every
+      citation lands on the line that defines its entry, so it cannot
+      silently drift again. That file's own header had claimed
+      `tests/run_golden_tests.py` verified it -- no such file has ever
+      existed, which is why this survived unnoticed; the claim is now
+      corrected in place. See WORKLOG 2026-09-12 F10 entry.
+
+  onehundredeightysecond_concrete_entry:
+    # F13 unknown-unknowns/foresight family opening batch, 2026-09-12. 5
+    # agents (3+3+3+2+3 methods); 0 of 14 existed before this batch. Largest
+    # single family batch built this session.
+    method_id: "foresight.horizon_scanning"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L672) + dedicated section 12.22 (L2811-2818).
+      Real invariant: section 12.22's own explicit engineering mandate
+      (L2817, verbatim: every signal must have source/date/geography/
+      status/impact/confidence) made structural -- all 6 fields required
+      non-empty per signal, plus referential integrity to declared
+      domains/sources.
+    source: "methods/contracts/foresight.horizon_scanning.contract.yaml + specs/cognitive/typed-objects/horizon-scan-record.schema.yaml + ai_lego/modules/foresight/horizon_scanning.py"
+    note: "43 tests pass. CLI PASS, missing-field + dangling-domain-reference refusals + independent-gate hand-tamper proof demonstrated."
+
+  onehundredeightythird_concrete_entry:
+    method_id: "foresight.weak_signal_detection"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L673, sole citation: "anomalies/niche events->
+      triangulate->monitor"). Real invariant: >=2 DISTINCT corroborating
+      sources per signal (whitespace-normalized), operationalizing Atlas's
+      own "triangulate" -- a single-source signal is an anecdote, not a
+      triangulated weak signal.
+    source: "methods/contracts/foresight.weak_signal_detection.contract.yaml + specs/cognitive/typed-objects/weak-signal-detection.schema.yaml + ai_lego/modules/foresight/weak_signal_detection.py"
+    note: "42 tests pass. CLI PASS, whitespace-variant-duplicate-source refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredeightyfourth_concrete_entry:
+    method_id: "foresight.outlier_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L678, sole citation: "identify->rule out data
+      error->dig into mechanism"). Real invariant: `mechanism_hypothesis`
+      legal only when `data_error_ruled_out is True` (real bool, int 0/1
+      refused) AND `data_error_assessment` non-empty -- the middle step
+      made non-skippable.
+    source: "methods/contracts/foresight.outlier_analysis.contract.yaml + specs/cognitive/typed-objects/outlier-analysis.schema.yaml + ai_lego/modules/foresight/outlier_analysis.py"
+    note: "45 tests pass. CLI PASS, premature-mechanism-hypothesis refusal + independent-gate hand-tamper proof demonstrated."
+
+  onehundredeightyfifth_concrete_entry:
+    method_id: "foresight.historical_analogy"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L674, sole citation: "similarities/differences
+      ->extract mechanism->limit analogy", effect "borrow from history
+      while avoiding a surface-level analogy"). Real invariant: every
+      analogy requires >=1 similarity AND >=1 difference AND non-empty
+      extracted_mechanism AND non-empty analogy_limits -- an analogy
+      asserting only similarities is exactly the surface-level analogy
+      this method exists to prevent. Distinct from the pre-existing
+      `association.analogy_mapping` (general structural analogy, no
+      historical scoping, no mandatory limits field).
+    source: "methods/contracts/foresight.historical_analogy.contract.yaml + specs/cognitive/typed-objects/historical-analogy.schema.yaml + ai_lego/modules/foresight/historical_analogy.py"
+    note: >
+      18 tests pass (+ 2 added post-critic: a Major finding -- the gate
+      never re-derived the builder's own HANALOGY_DUPLICATE_ANALOGY_ID
+      check, so a hand-tampered record with two analogies sharing an id
+      passed all gates; fixed via inline re-derivation, same pattern 11
+      sibling gates in this batch already used). CLI PASS, surface-level-
+      analogy refusal + independent-gate hand-tamper proof demonstrated.
+
+  onehundredeightysixth_concrete_entry:
+    method_id: "foresight.cross_industry_transfer"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L675, sole citation: "find matching job/
+      constraint->adapt"). Real invariant: non-empty
+      shared_job_or_constraint AND non-empty adaptation AND
+      source_industry != target_industry (normalized) -- copying a
+      mechanism verbatim with no adaptation, or transferring an industry's
+      mechanism to itself, is refused.
+    source: "methods/contracts/foresight.cross_industry_transfer.contract.yaml + specs/cognitive/typed-objects/cross-industry-transfer.schema.yaml + ai_lego/modules/foresight/cross_industry_transfer.py"
+    note: >
+      17 tests pass (+ 2 added post-critic, same duplicate-id gate gap and
+      fix as historical_analogy above). CLI PASS, same-industry-transfer
+      refusal + independent-gate hand-tamper proof demonstrated.
+
+  onehundredeightyseventh_concrete_entry:
+    method_id: "foresight.adjacent_discipline_search"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L677, sole citation: "current disciplines->
+      adjacent fields->models", effect "reduce single-discipline blind
+      spot"). Real invariant: adjacent_fields disjoint from
+      current_disciplines (normalized) -- a field already in the team's
+      current set is by definition not adjacent -- plus referential
+      integrity from imported_models to a declared adjacent field.
+    source: "methods/contracts/foresight.adjacent_discipline_search.contract.yaml + specs/cognitive/typed-objects/adjacent-discipline-search.schema.yaml + ai_lego/modules/foresight/adjacent_discipline_search.py"
+    note: "20 tests pass. CLI PASS, non-adjacent-field refusal + independent-gate hand-tamper proof demonstrated. Clean in the batch critic pass."
+
+  onehundredeightyeighth_concrete_entry:
+    method_id: "foresight.scenario_planning"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L681) + dedicated section 11.27 (L1804-1836).
+      Real invariant: every scenario carries ALL 9 of section 11.27's own
+      required elements, transcribed verbatim from its "every Scenario
+      must have" list (L1822-1830): Drivers, Assumptions, Narrative,
+      Stakeholder responses, Competitor responses, 2nd/3rd-order effects,
+      Signposts, Strategy performance, Reversal condition. Second
+      invariant: exactly 2 critical_uncertainties and exactly 4 scenarios,
+      matching the section's own literal quadrantChart (L1809-1818) rather
+      than an invented general 2**N formula Atlas never states.
+    source: "methods/contracts/foresight.scenario_planning.contract.yaml + specs/cognitive/typed-objects/scenario-set.schema.yaml + ai_lego/modules/foresight/scenario_planning.py"
+    note: >
+      36 tests pass (+ 2 added post-critic: same duplicate-id gate gap as
+      historical_analogy/cross_industry_transfer above, load-bearing here
+      since the count gate alone cannot catch a duplicate id among exactly
+      4 scenarios). Also corrected 2 stale internal Atlas sub-line
+      citations found by the critic (the 9-element list's true location is
+      L1822-1830, not L1816-1826; the quadrantChart fence is L1809-1818,
+      not L1806-1814) -- content transcription itself was already
+      verbatim-correct, only the line pointers were stale. CLI PASS,
+      missing-element + wrong-scenario-count refusals + independent-gate
+      hand-tamper proof demonstrated.
+
+  onehundredeightyninth_concrete_entry:
+    method_id: "foresight.futures_wheel"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L682) + dedicated section 11.28 (L1837-1860).
+      Real invariant: strict order-parent fan-out consistency -- an
+      order-1 impact's parent_id must be the center-event sentinel; an
+      order-N (N>1) impact's parent_id must resolve to a declared
+      order-(N-1) impact. No orphans, no skipped orders, no cycles. >=1
+      order-1 impact required.
+    source: "methods/contracts/foresight.futures_wheel.contract.yaml + specs/cognitive/typed-objects/futures-wheel.schema.yaml + ai_lego/modules/foresight/futures_wheel.py"
+    note: >
+      36 tests pass. Critic corrected a stale internal citation: the
+      order-1 fan-out is actually at L1844-1847, not L1848-1850 (which is
+      the order-2 fan-out one tier deeper) -- the code's own error message
+      had pointed at the wrong tier of Atlas's own diagram. CLI PASS,
+      skipped-order + orphan-parent refusals + independent-gate hand-
+      tamper proof demonstrated.
+
+  onehundredninetieth_concrete_entry:
+    method_id: "foresight.backcasting"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L683, sole citation: "future state->milestones
+      backward->today actions", effect "long-term roadmap"). Real
+      invariant: milestones strictly decreasing in horizon (ordinal int,
+      no duplicates), and >=1 today_actions required -- a backcast that
+      stops at a distant milestone and never lands on a present-day action
+      is a wish, not a roadmap.
+    source: "methods/contracts/foresight.backcasting.contract.yaml + specs/cognitive/typed-objects/backcasting-plan.schema.yaml + ai_lego/modules/foresight/backcasting.py"
+    note: "43 tests pass. CLI PASS, out-of-order-milestone + zero-today-actions refusals + independent-gate hand-tamper proof demonstrated. Clean in the batch critic pass."
+
+  onehundredninetyfirst_concrete_entry:
+    method_id: "foresight.black_swan_exercise"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L679, sole citation: "tail events->exposure->
+      survivability->hedges", effect "strengthen resilience"). Real
+      invariant: 4-stage chain referential completeness -- every
+      exposure/survivability-assessment/hedge resolves to its declared
+      upstream entry, every tail event covered by >=1 exposure, every
+      exposure covered by >=1 survivability assessment. Distinct from
+      `challenge.pre_mortem` (one assumed-failed project, not multiple
+      independent tail events) and `challenge.stress_testing` (single-
+      scenario robustness check, no multi-stage chain).
+    source: "methods/contracts/foresight.black_swan_exercise.contract.yaml + specs/cognitive/typed-objects/black-swan-exercise.schema.yaml + ai_lego/modules/foresight/black_swan_exercise.py"
+    note: "58 tests pass. CLI PASS, uncovered-tail-event + uncovered-exposure refusals + independent-gate hand-tamper proof demonstrated. Clean in the batch critic pass."
+
+  onehundredninetysecond_concrete_entry:
+    method_id: "foresight.wild_cards"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L680, sole citation: "wild card->rerun
+      strategy", effect "test regime shift"). Real invariant: every wild
+      card requires a non-empty, well-formed strategy_rerun sub-object
+      ({strategy_ref, outcome_under_card, still_holds}) -- a wild card
+      recorded with no re-run result only listed a dramatic event, never
+      doing the one thing the method asks for.
+    source: "methods/contracts/foresight.wild_cards.contract.yaml + specs/cognitive/typed-objects/wild-card-set.schema.yaml + ai_lego/modules/foresight/wild_cards.py"
+    note: "54 tests pass. CLI PASS, missing-strategy-rerun refusal + independent-gate hand-tamper proof demonstrated. Clean in the batch critic pass."
+
+  onehundredninetythird_concrete_entry:
+    method_id: "foresight.cross_country_comparison"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L676, sole citation: "comparable jurisdictions
+      ->normalize->compare"). Real invariant: >=2 jurisdictions (one
+      jurisdiction is not a comparison), non-empty normalization_basis per
+      comparison (raw cross-country figures compared without a stated
+      basis is exactly the error the "normalize" step exists to prevent),
+      and referential integrity from each comparison's values to declared
+      jurisdictions.
+    source: "methods/contracts/foresight.cross_country_comparison.contract.yaml + specs/cognitive/typed-objects/cross-country-comparison.schema.yaml + ai_lego/modules/foresight/cross_country_comparison.py"
+    note: "37 tests pass. CLI PASS, missing-normalization-basis refusal + independent-gate hand-tamper proof demonstrated. Clean in the batch critic pass."
+
+  onehundredninetyfourth_concrete_entry:
+    method_id: "foresight.delphi"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L684) + dedicated section 12.23 (L2821-2828).
+      Most structurally ambitious method in this batch, three load-bearing
+      invariants: (1) anonymity is structural -- a response carrying any
+      identity-shaped key (name/author/affiliation/etc.) is refused both
+      at construction and independently by the schema's own
+      additionalProperties:false, same two-layer proof pattern
+      `challenge.red_team`'s no-final-authority rule established; (2)
+      minority-range preservation per section 12.23's own limitation
+      (L2827, verbatim: consensus is not truth, the minority range must be
+      preserved) -- a record with a consensus_summary must also carry
+      non-empty minority_positions or an explicit none-recorded reason;
+      (3) >=2 rounds each with >=2 responses. `dispersion` is
+      GENUINE_COMPUTE (population stdev of the final round, disclosed
+      compilation decision since Atlas gives no formula), gate-recomputed
+      within 1e-9 tolerance.
+    source: "methods/contracts/foresight.delphi.contract.yaml + specs/cognitive/typed-objects/delphi-study.schema.yaml + ai_lego/modules/foresight/delphi.py"
+    note: >
+      55 tests pass. The build agent found and fixed 2 real bugs during
+      its own testing before reporting: a response-rebuild helper that
+      silently dropped a smuggled identity key instead of refusing it
+      (defeating the anonymity guard), and a gate that vacuously PASSed on
+      `{}` input. The critic pass independently re-verified both fixes
+      hold, independently recomputed the dispersion formula by hand and
+      confirmed exact agreement, and confirmed the schema-layer anonymity
+      bypass proof is real. CLI PASS, identity-key-smuggling refusal
+      (construction + schema layers) + minority-range-omission refusal +
+      independent-gate hand-tamper proof demonstrated.
+
+  onehundredninetyfifth_concrete_entry:
+    # Last of this 5-agent F13 opening batch -- F13 is 14/14 COMPLETE
+    # after this entry (independently confirmed via `ls methods/contracts/
+    # foresight.*.contract.yaml`: 14 files present).
+    method_id: "foresight.cross_impact_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F13 table row (Atlas L685, sole citation: "event pair matrix->
+      scenario consistency", effect "avoid treating trends as
+      independent"). Real invariant: referential integrity, no self-pair,
+      and MATRIX COMPLETENESS -- every unordered pair of declared events
+      present exactly once (a missing pair, or a reversed-order duplicate
+      pair with a different shift value, both refused) -- Atlas's own
+      stated benefit made structural, since a matrix silently missing
+      pairs lets the independent-trends assumption back in through the
+      gap. `conditional_probability_shift` modeled as a signed delta in
+      [-1,1], disclosed compilation decision (the field is literally named
+      "shift").
+    source: "methods/contracts/foresight.cross_impact_analysis.contract.yaml + specs/cognitive/typed-objects/cross-impact-analysis.schema.yaml + ai_lego/modules/foresight/cross_impact_analysis.py"
+    note: >
+      43 tests pass. F13 unknown-unknowns/foresight family: 14 of 14
+      COMPLETE as of this entry (horizon_scanning/weak_signal_detection/
+      outlier_analysis/historical_analogy/cross_industry_transfer/
+      adjacent_discipline_search/scenario_planning/futures_wheel/
+      backcasting/black_swan_exercise/wild_cards/cross_country_comparison/
+      delphi landed via 5 concurrent sibling agents in this same batch,
+      entries onehundredeightysecond through onehundredninetyfourth
+      above). Batch totals after fixes: 563 tests, 229 subtests, 0
+      failures. 1 independent critic pass (Standard tier, hand-tamper-
+      verified, ~340 adversarial inputs across all 14 gate suites) found 0
+      Critical / 2 Major / 2 Minor, all fixed before this registry sync:
+      3 of 14 gate suites never re-derived their own builder's duplicate-
+      id check (historical_analogy/cross_industry_transfer/
+      scenario_planning, fixed via inline re-derivation); 11 of 14
+      builders returned the caller's own provenance dict by reference
+      instead of a deep copy, so a caller mutation after construction
+      silently rewrote the already-returned "validated" record (fixed
+      with copy.deepcopy, matching the 3 files that already did this
+      correctly); 2 stale internal Atlas sub-line citations corrected
+      (scenario_planning, futures_wheel). All findings now covered by
+      dedicated regression tests. CLI PASS, missing-pair + reversed-
+      duplicate-pair refusals + independent-gate hand-tamper proof
+      demonstrated. See WORKLOG 2026-09-12 F13 entry, and its own separate
+      entry documenting a concurrent-session git-index race that dropped
+      this file's and method-inventory.yaml's F10 entries from the
+      cb04e491f commit despite a clean pre-commit diff check -- both were
+      regenerated and re-verified in this same session before F13 landed.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

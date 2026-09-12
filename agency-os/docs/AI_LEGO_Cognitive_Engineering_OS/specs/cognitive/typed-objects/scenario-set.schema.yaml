@@ -1,0 +1,193 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/scenario-set.schema.yaml"
+title: Scenario Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ScenarioSet` -- the declared
+  `outputs` of `foresight.scenario_planning`'s Method Contract
+  (methods/contracts/foresight.scenario_planning.contract.yaml, `outputs:
+  [ScenarioSet]`). Atlas §11.27 (L1804-1836): multiple plausible futures,
+  not one forecast, each scenario carrying the section's own nine required
+  elements (L1822-1830), built over exactly two critical uncertainties per
+  the section's own quadrantChart (L1809-1818).
+
+  Per-scenario completeness (all nine elements non-empty) and the
+  2-uncertainty/4-scenario count are RUNTIME invariants (not expressible
+  declaratively across this many sibling fields) -- enforced at both
+  construction time and an independent gate by
+  `ai_lego/modules/foresight/scenario_planning.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.27 情境規劃／情境分析（Scenario Planning）, nine-element list and quadrantChart (L1804-1836)"
+  - "methods/contracts/foresight.scenario_planning.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §11.27's own
+  nine-element list plus low-risk, disclosed compilation choices (the
+  SCEN- prefix, list-vs-string typing per element, the exact-2/exact-4
+  count rule).
+
+compilation_decisions:
+  - question: "Exactly 2 critical_uncertainties / exactly 4 scenarios, or a general 2**N rule for N uncertainties?"
+    decision: "Exactly 2 / exactly 4, matching Atlas §11.27's own literal quadrantChart (L1809-1818) -- a general N-uncertainty formula is not written anywhere in Atlas and would present an invented generalization as a compiled fact."
+  - question: "Which of the nine per-scenario elements are lists vs a single string?"
+    decision: "drivers/assumptions/stakeholder_responses/competitor_responses/second_third_order_effects/signposts are lists (Atlas's own plural naming); narrative/strategy_performance/reversal_condition are single strings (Atlas's own singular naming)."
+
+type: object
+additionalProperties: false
+required: [id, version, critical_uncertainties, scenarios, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^SCEN-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.scenario_planning"
+
+  critical_uncertainties:
+    type: array
+    minItems: 2
+    maxItems: 2
+    description: "Atlas §11.27's own quadrantChart axes (L1809-1818) -- exactly two, e.g. 'Regulation Loose<->Strict', 'AI Cost High<->Low'. RUNTIME-enforced exact count (see compilation_decisions)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  scenarios:
+    type: array
+    minItems: 4
+    maxItems: 4
+    description: "Exactly four plausible worlds -- one per quadrant of the two critical_uncertainties (RUNTIME-enforced, see compilation_decisions)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, drivers, assumptions, narrative, stakeholder_responses, competitor_responses, second_third_order_effects, signposts, strategy_performance, reversal_condition]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this scenario set (e.g. SCEN-001-S1)."
+        drivers:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Atlas §11.27 L1818: the forces driving this world."
+        assumptions:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Atlas §11.27 L1819: what this world assumes to be true."
+        narrative:
+          type: string
+          minLength: 1
+          description: "Atlas §11.27 L1820: the world's own story, in prose."
+        stakeholder_responses:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Atlas §11.27 L1821: how stakeholders react in this world."
+        competitor_responses:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Atlas §11.27 L1822: how competitors react in this world."
+        second_third_order_effects:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Atlas §11.27 L1823: downstream effects beyond the immediate/direct one."
+        signposts:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1, pattern: "\\S"}
+          description: "Atlas §11.27 L1824: early observable indicators this world is emerging."
+        strategy_performance:
+          type: string
+          minLength: 1
+          description: "Atlas §11.27 L1825: how the current strategy performs if this world happens."
+        reversal_condition:
+          type: string
+          minLength: 1
+          description: "Atlas §11.27 L1826: what would have to happen for this world to no longer hold."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two critical uncertainties (regulation, AI cost) producing four scenarios, one shown in full"
+    value:
+      id: "SCEN-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.scenario_planning"
+      critical_uncertainties: ["Regulation: Loose<->Strict", "AI Cost: High<->Low"]
+      scenarios:
+        - id: "SCEN-2026-09-12-001-S1"
+          drivers: ["寬鬆監管持續", "AI 推論成本快速下降"]
+          assumptions: ["主要司法管轄區不祭出新的 AI 限制"]
+          narrative: "低成本、低監管的世界：AI 應用快速擴散，中小企業大量採用"
+          stakeholder_responses: ["中小企業加速導入", "大型企業擔心差異化消失"]
+          competitor_responses: ["新進者以低價策略搶市"]
+          second_third_order_effects: ["人力需求結構轉移", "既有 SaaS 毛利率下滑"]
+          signposts: ["主要雲端供應商連續三季調降推論定價"]
+          strategy_performance: "現行策略表現良好，價格優勢可持續"
+          reversal_condition: "任一主要司法管轄區通過強制 AI 稽核法規"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "SCEN-2026-09-12-001-S2"
+          drivers: ["寬鬆監管持續", "AI 推論成本維持高檔"]
+          assumptions: ["硬體供應鏈持續吃緊"]
+          narrative: "高成本、低監管的世界：只有資本雄厚的玩家能規模化部署"
+          stakeholder_responses: ["中小企業轉向委外/共享算力"]
+          competitor_responses: ["大型企業併購中小型 AI 團隊"]
+          second_third_order_effects: ["市場集中度上升", "算力即服務興起"]
+          signposts: ["主要 GPU 現貨價格連續兩季上漲"]
+          strategy_performance: "現行策略需調整成本結構才能維持毛利"
+          reversal_condition: "新一代晶片架構使推論成本大幅下降"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "SCEN-2026-09-12-001-S3"
+          drivers: ["嚴格監管上路", "AI 推論成本快速下降"]
+          assumptions: ["合規成本可被自動化工具吸收"]
+          narrative: "低成本、高監管的世界：合規即產品，AI 稽核工具本身成為市場"
+          stakeholder_responses: ["企業採購優先考慮合規認證供應商"]
+          competitor_responses: ["出現專門的 AI 合規工具新創"]
+          second_third_order_effects: ["合規標準逐漸成為事實上的技術規格"]
+          signposts: ["主要市場公布強制 AI 稽核細則"]
+          strategy_performance: "現行策略需補強合規能力才能維持市占"
+          reversal_condition: "監管機關撤回或大幅放寬稽核細則"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+        - id: "SCEN-2026-09-12-001-S4"
+          drivers: ["嚴格監管上路", "AI 推論成本維持高檔"]
+          assumptions: ["中小企業無力同時負擔算力與合規成本"]
+          narrative: "高成本、高監管的世界：只有具規模與合規能力的企業能存活"
+          stakeholder_responses: ["中小企業退出或被併購"]
+          competitor_responses: ["大型企業以合規壁壘鞏固市占"]
+          second_third_order_effects: ["產業集中度大幅上升", "創新速度放緩"]
+          signposts: ["連續兩季中小型 AI 新創退場數上升"]
+          strategy_performance: "現行策略在此世界表現最弱，需重新評估市場定位"
+          reversal_condition: "同時出現低成本算力與監管放寬"
+          provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-SCENARIOSET-1: exact-2/exact-4 count is this file's own disclosed compilation choice, not a cited general Atlas formula -- should a future revision support N>2 uncertainties?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas §11.27 (L1804-1836) directly, including the exact nine-element
+    list and the quadrantChart's two-axis structure. Grepped the full spec
+    root case-insensitively for "scenario planning"/"scenario_planning" and
+    every schema title before writing -- incidental table-row mentions only
+    (see ai_lego/modules/foresight/scenario_planning.py's own module
+    docstring for the full grep record); no prior definition of this
+    method's own output shape found. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_scenario_planning.py.
+  note: >
+    No mother document was modified. The nine-element list and the
+    two-uncertainty/four-scenario count are transcribed directly from Atlas
+    §11.27. The SCEN- prefix and per-element list-vs-string typing are this
+    file's own compiled structure, disclosed above.

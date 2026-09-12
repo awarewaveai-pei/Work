@@ -1,0 +1,103 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/cross-industry-transfer.schema.yaml"
+title: Cross-industry Transfer Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CrossIndustryTransferSet` -- the declared `outputs` of
+  `foresight.cross_industry_transfer`'s Method Contract
+  (methods/contracts/foresight.cross_industry_transfer.contract.yaml). Atlas F13 table row L675 (verbatim):
+  "Cross-industry Transfer | 移植其他產業機制 | 找相同 job/constraint→adapt | 降低 reinvent-the-wheel". Real
+  invariant per transfer, enforced by `ai_lego/modules/foresight/cross_industry_transfer.py`: `source_industry`
+  != `target_industry` (normalized), `shared_job_or_constraint` non-empty, `adaptation` non-empty -- this
+  schema's `required`/`minLength` are the structural floor; the cross-field industry-inequality check is a
+  runtime-layer invariant this schema cannot express directly.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Cross-industry Transfer row (L675) -- sole citation, no dedicated §11/§12 section exists for this row"
+  - "methods/contracts/foresight.cross_industry_transfer.contract.yaml"
+
+decided_by: >
+  No ADR governs this file. Table-row-only citation, same class of decision every sibling typed-object schema
+  built from a table-row-only Atlas citation already documents.
+
+compilation_decisions:
+  - question: "Local transfer id pattern -- fixed prefix or free string?"
+    decision: "Free non-empty string, unique within the record."
+
+type: object
+additionalProperties: false
+required: [id, version, transfers, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^XIND-"
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.cross_industry_transfer"
+
+  transfers:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, source_industry, target_industry, shared_job_or_constraint, source_mechanism, adaptation]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        source_industry:
+          type: string
+          minLength: 1
+        target_industry:
+          type: string
+          minLength: 1
+          description: "Must differ from source_industry after case/whitespace-insensitive normalization -- runtime-layer check, see top-level description."
+        shared_job_or_constraint:
+          type: string
+          minLength: 1
+          description: "Atlas L675's own '找相同 job/constraint' first half. Required non-empty -- without it this is cargo-culting a mechanism, not a transfer."
+        source_mechanism:
+          type: string
+          minLength: 1
+        adaptation:
+          type: string
+          minLength: 1
+          description: "Atlas L675's own '→adapt' second step. Required non-empty -- copying a mechanism verbatim with no recorded adaptation is refused."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Aviation's pre-flight checklist mechanism transferred to surgical operating rooms"
+    value:
+      id: "XIND-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.cross_industry_transfer"
+      transfers:
+        - id: "XT-1"
+          source_industry: "commercial aviation"
+          target_industry: "surgery"
+          shared_job_or_constraint: "多人團隊在高風險、不可逆操作前，需要在時間壓力下確認一致的前置狀態"
+          source_mechanism: "起飛前強制唸出的紙本檢查清單，由非機長角色複誦確認"
+          adaptation: "改為手術室團隊在切皮前口頭複誦病患身分/部位/器械清點，由非主刀醫師主導唸誦，保留角色制衡但拿掉機艙專屬術語"
+      provenance: { epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null }
+
+open_questions:
+  - "OQ-CROSSINDUSTRYTRANSFER-1: association.analogy_mapping.contract.yaml's OQ-ANALOGYMAPPING-2 flagged this row's near-identical benefit-column wording to F04's own 跨產業移植 term -- 3-way distinction (analogy_mapping general transfer / historical_analogy historical-case-scoped / this method industry-pair-scoped with shared-job-or-constraint + adaptation fields) confirmed by this schema's own required fields; no merge needed.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table row L675 directly. Grepped the full spec root case-insensitively for
+    "cross-industry"/"cross industry"/"shared_job_or_constraint" before writing -- only
+    association.analogy_mapping's own OQ-ANALOGYMAPPING-2 references this method by name; no duplicate schema
+    found. Validated against jsonschema Draft202012Validator.
+  note: "No mother document was modified."

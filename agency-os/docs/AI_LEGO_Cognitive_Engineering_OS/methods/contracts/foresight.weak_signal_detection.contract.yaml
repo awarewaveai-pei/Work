@@ -1,0 +1,96 @@
+$id: "ai-lego://methods/contracts/foresight.weak_signal_detection.contract.yaml"
+title: "Weak Signal Detection Method Contract"
+status: ACTIVE
+
+description: >
+  F13 foresight family (Atlas L673: "Weak Signal Detection | 找尚未成主流的
+  訊號 | anomalies/niche events→triangulate→monitor | 增加提前量"). Core
+  invariant: Atlas's own pipeline word is "triangulate" -- a weak signal
+  corroborated by only 1 source has not been triangulated, it is an
+  anecdote, and accepting it as a "weak signal" defeats the method's own
+  stated benefit (提前量 without false positives). Every declared weak
+  signal must carry >=2 DISTINCT corroborating source refs (distinct after
+  whitespace normalization -- " eu " and "eu" are the same source).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Weak Signal Detection row (L673)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L673 gives a real purpose and pipeline
+  ("anomalies/niche events→triangulate→monitor") -- direct transcription
+  plus a disclosed compilation choice (the >=2-distinct-source
+  triangulation threshold, and the closed `monitor_status` vocabulary --
+  see typed-objects/weak-signal-detection.schema.yaml).
+
+id: foresight.weak_signal_detection
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [COMPARE, VALIDATE, INFER]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). COMPARE = triangulating across independent sources; VALIDATE =
+# confirming a niche anomaly is a real corroborated signal, not noise;
+# INFER = drawing a weak signal out of anomalies/niche events. All three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - triangulate_niche_anomalies_into_monitored_weak_signals
+# Atlas L673 verbatim sense: 找尚未成主流的訊號 (find not-yet-mainstream
+# signals), pipeline anomalies/niche events→triangulate→monitor.
+
+inputs:
+  required:
+    - CandidateAnomalyRefs
+# NEW DESIGN. Free-text references to the raw anomalies/niche events being
+# triangulated -- same scope-limited free-text-reference pattern
+# challenge.red_team's own ProposalRef already establishes (no single
+# existing typed object is the universal "raw anomaly" this method starts
+# from).
+
+outputs:
+  - WeakSignalDetectionRecord
+# NEW output type (see typed-objects/weak-signal-detection.schema.yaml).
+
+preconditions:
+  - "at least 1 weak signal declared, each corroborated by >=2 distinct source refs"
+  # NEW, structurally necessary -- Atlas's own pipeline word "triangulate"
+  # requires >=2 independent corroborating sources per signal; a
+  # single-source "signal" has not been triangulated at all.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- same placement convention epistemic.evidence_matrix.contract.yaml already established for a single-record batch.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas gives no explicit next-method pairing for Weak Signal Detection.
+# foresight.horizon_scanning (this same batch) names it as ITS OWN
+# recommended_next (pipeline tail: an unconfirmed scan signal feeds
+# triangulation), not the reverse.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a detection record has no external side effect.
+
+open_questions:
+  - "OQ-WSIG-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-WSIG-2: monitor_status's 5-value closed vocabulary (MONITORING/ESCALATING/CONFIRMED/DISCONFIRMED/ARCHIVED) is this file's own compilation, disclosed in typed-objects/weak-signal-detection.schema.yaml's own compilation_decisions -- Atlas gives no vocabulary for it.（owner: operator）"
+  - "OQ-WSIG-3: near-miss disclosure -- evidence.triangulation.contract.yaml (evidence family, MP §9 Workflow IR) also uses the word 'triangulate', but cross-validates research themes/literature into a TriangulatedFindingSet with no built schema; this method's own >=2-distinct-source threshold and closed monitor_status vocabulary are genuinely new, not a duplicate.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table Weak Signal Detection row (L673) directly. Grepped
+    the full spec root case-insensitively for "weak signal"/"triangulat"
+    before writing -- one near-miss found and disclosed above
+    (evidence.triangulation.contract.yaml), no output-shape duplicate.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The anomalies/niche-events→triangulate
+    →monitor pipeline is transcribed verbatim from Atlas L673. The
+    >=2-distinct-source threshold and monitor_status vocabulary are this
+    file's own compiled structure, disclosed above.

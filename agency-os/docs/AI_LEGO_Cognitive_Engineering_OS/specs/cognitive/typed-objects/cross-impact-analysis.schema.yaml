@@ -1,0 +1,121 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/cross-impact-analysis.schema.yaml"
+title: Cross-impact Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CrossImpactAnalysis` -- the
+  declared `outputs` of `foresight.cross_impact_analysis`'s Method Contract
+  (methods/contracts/foresight.cross_impact_analysis.contract.yaml,
+  `outputs: [CrossImpactAnalysis]`). F13 foresight family (Atlas L685:
+  "event pair matrix->scenario consistency").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `game-theory.schema.yaml`'s own payoff-
+  completeness precedent): (a) referential integrity -- both
+  `impact_pairs[].event_a_id`/`event_b_id` resolve to declared `events[]`
+  entries; (b) no self-pair (`event_a_id != event_b_id`); (c) MATRIX
+  COMPLETENESS -- every unordered pair of declared events is present
+  exactly once (a missing pair OR a duplicate unordered pair -- {A,B} then
+  {B,A} -- is refused); (d) `conditional_probability_shift` is a finite
+  number in [-1, 1]. `ai_lego/modules/foresight/cross_impact_analysis.py`
+  enforces all four at both construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 未知未知與前瞻 table, Cross-impact Analysis row (L685)"
+  - "methods/contracts/foresight.cross_impact_analysis.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L685's own
+  two-stage pipeline plus low-risk, disclosed compilation choices (the
+  XIMPACT- prefix, record-level-only provenance, signed-shift range).
+
+compilation_decisions:
+  - question: "conditional_probability_shift: a signed delta in [-1,1], or an absolute probability in [0,1]?"
+    decision: "Signed delta in [-1,1]. The field is literally named a 'shift' (a change in probability caused by the OTHER event occurring), not the probability itself -- an absolute-probability framing would need a different field name."
+  - question: "Matrix completeness: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot cross-check that impact_pairs[] covers exactly every unordered combination of events[] declaratively, same gap class as game-theory.schema.yaml's own payoff-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, events, impact_pairs, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^XIMPACT-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.cross_impact_analysis"
+
+  events:
+    type: array
+    minItems: 2
+    description: "The events under analysis. RUNTIME invariant: >=2 required (method contract precondition) -- a cross-impact matrix over fewer than 2 events has no pairs to analyze."
+    items:
+      type: object
+      additionalProperties: false
+      required: [event_id, description]
+      properties:
+        event_id: {type: string, minLength: 1}
+        description: {type: string, minLength: 1}
+
+  impact_pairs:
+    type: array
+    description: "RUNTIME invariant: referential integrity, no self-pair, and MATRIX COMPLETENESS -- every unordered pair of declared events[] present exactly once (see module description)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [event_a_id, event_b_id, conditional_probability_shift]
+      properties:
+        event_a_id: {type: string, minLength: 1}
+        event_b_id: {type: string, minLength: 1}
+        conditional_probability_shift:
+          type: number
+          minimum: -1
+          maximum: 1
+          description: "Signed delta -- see compilation_decisions for why this is a shift, not an absolute probability."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent matrix."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 3-event cross-impact matrix (3 events -> exactly 3 unordered pairs)"
+    value:
+      id: "XIMPACT-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.cross_impact_analysis"
+      events:
+        - {event_id: "E1", description: "央行升息 1 碼"}
+        - {event_id: "E2", description: "主要出口市場需求下滑"}
+        - {event_id: "E3", description: "本國貨幣貶值 5%"}
+      impact_pairs:
+        - {event_a_id: "E1", event_b_id: "E2", conditional_probability_shift: 0.1}
+        - {event_a_id: "E1", event_b_id: "E3", conditional_probability_shift: -0.3}
+        - {event_a_id: "E2", event_b_id: "E3", conditional_probability_shift: 0.2}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-XIMPACTANALYSIS-1: impact_pairs[] carries no confidence/evidence sub-structure beyond the shift value itself -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table, Cross-impact Analysis row (L685) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "cross-impact"/"cross impact"/"event pair matrix" and every schema
+    title before writing -- zero pre-existing implementation or schema
+    title overlap found. Validated against jsonschema Draft202012Validator
+    via tests/unit/test_cross_impact_analysis.py.
+  note: >
+    No mother document was modified. The two-stage pipeline is transcribed
+    directly from Atlas L685. The XIMPACT- prefix, signed-shift range, and
+    runtime-invariant placement of matrix completeness are this file's own
+    compiled structure, disclosed above.

@@ -1,0 +1,100 @@
+$id: "ai-lego://methods/contracts/foresight.horizon_scanning.contract.yaml"
+title: "Horizon Scanning Method Contract"
+status: ACTIVE
+
+description: >
+  F13 foresight family (Atlas L672: "Horizon Scanning | 系統掃描新興變化 |
+  domains/sources→signals→impact→track | 提早發現外部變化"), with its own
+  dedicated §12.22 (L2811-2818). §12.22's own engineering mandate (L2817,
+  verbatim): "每個 signal 必須有 source、date、geography、status、impact、
+  confidence" -- transcribed here as a hard per-signal field requirement, not
+  advisory prose. Core invariant: every signal carries all six named fields
+  non-empty, AND `signal.domain`/`signal.source` resolve to a declared
+  `domains[]`/`sources[]` entry (Atlas's own literal "domains/sources→
+  signals" pipeline direction -- a signal cannot reference a domain or
+  source the scan never declared).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Horizon Scanning row (L672)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.22 地平線掃描／前瞻掃描 (L2811-2818), engineering mandate L2817"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §12.22 gives a real six-field engineering
+  mandate -- direct transcription plus low-risk, disclosed compilation
+  choices (domains/sources declaration shape, no invented value scales).
+
+id: foresight.horizon_scanning
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [MAP, INFER, FORECAST]
+# INFERRED, not cited (Atlas §4 gives no composition formula for this
+# method). MAP = attributing each signal to a declared domain/source; INFER
+# = drawing likely impact from a raw signal; FORECAST = Atlas's own
+# "早發現外部變化" (early detection of external change) purpose. All three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - scan_declared_domains_and_sources_for_emerging_signals_with_tracked_impact
+# Atlas L672 verbatim sense: 系統掃描新興變化 (systematically scan for
+# emerging change), pipeline domains/sources→signals→impact→track.
+
+inputs:
+  required:
+    - ScanDomains
+    - ScanSources
+# NEW DESIGN. Atlas's own literal pipeline starts from declared domains and
+# sources, not from signals directly -- a signal without a declared origin
+# domain/source has nothing to scan against.
+
+outputs:
+  - HorizonScanRecord
+# NEW output type (see typed-objects/horizon-scan-record.schema.yaml).
+
+preconditions:
+  - "at least 1 domain and at least 1 source declared, at least 1 signal, and every signal's six mandatory fields (source, date, geography, status, impact, confidence) present and non-empty"
+  # NEW, structurally necessary -- Atlas §12.22 L2817's own six-field mandate
+  # IS this method's engineering contract, not an optional nicety.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- same placement convention epistemic.evidence_matrix.contract.yaml already established for a single-record batch.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - foresight.weak_signal_detection
+# Atlas's own F13 table ordering (L672 immediately followed by L673) plus a
+# real conceptual link: a Horizon Scanning signal not yet corroborated by
+# >=2 independent sources is exactly the input Weak Signal Detection exists
+# to triangulate.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a scan record has no external side effect.
+
+open_questions:
+  - "OQ-HSCAN-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-HSCAN-2: status/impact/confidence are kept as free text -- Atlas §12.22 names the fields but gives no value scale for any of them (same 'don't invent an ungrounded enum' posture as challenge.red_team's severity field). A future revision could tighten one or more to a closed enum if a concrete textual mandate appears.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table Horizon Scanning row (L672) and §12.22 (L2811-2818)
+    directly at the cited lines, including the exact six-field engineering
+    mandate (L2817). Grepped the full spec root case-insensitively for
+    "horizon scan"/"weak signal"/"outlier" before writing any F13 contract --
+    no existing schema defines this method's own output shape (incidental
+    near-misses: data-quality-assessment-record.schema.yaml's own six DATA
+    QUALITY dimensions, Atlas §12.39, profile a whole dataset's fields, not
+    an external emerging-change signal; evidence.triangulation.contract.yaml
+    cross-validates research themes/literature, a different family with no
+    built output schema and no per-signal field mandate). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The six mandatory signal fields are
+    transcribed verbatim from Atlas L2817. domains[]/sources[] declaration
+    shape and the free-text status/impact/confidence/geography fields are
+    this file's own compiled structure, disclosed above.

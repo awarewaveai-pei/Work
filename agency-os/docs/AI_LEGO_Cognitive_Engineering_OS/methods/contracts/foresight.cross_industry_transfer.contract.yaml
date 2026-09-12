@@ -1,0 +1,61 @@
+$id: "ai-lego://methods/contracts/foresight.cross_industry_transfer.contract.yaml"
+title: "Cross-industry Transfer Method Contract"
+status: ACTIVE
+
+description: >
+  foresight.cross_industry_transfer, F13 (Unknown Unknowns & Foresight) family. Atlas table row L675 (sole
+  citation, no dedicated §11/§12 section): "移植其他產業機制｜找相同 job/constraint→adapt｜降低
+  reinvent-the-wheel". Not an EC §32 method. Core invariant: each transfer requires a non-empty
+  shared_job_or_constraint AND a non-empty adaptation AND source_industry != target_industry (normalized) --
+  otherwise the record is cargo-culting a mechanism or transferring an industry's mechanism to itself, not
+  performing a cross-industry transfer.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 table, Cross-industry Transfer row (L675)"
+  - "specs/cognitive/typed-objects/cross-industry-transfer.schema.yaml"
+  - "methods/contracts/association.analogy_mapping.contract.yaml OQ-ANALOGYMAPPING-2 (near-identical benefit-column wording, disambiguated: this method requires an explicit shared_job_or_constraint + adaptation pair analogy_mapping does not model)"
+
+decided_by: "No ADR governs the content. Direct transcription of a table-row-only citation."
+
+id: foresight.cross_industry_transfer
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [ASSOCIATE, MAP, ADAPT]
+# INFERRED, not cited. ADAPT is not a confirmed kernel/OBSERVED_EXTENSION token as of this write -- same
+# honesty-gap disclosure association.analogy_mapping's own cognitive_primitives note already makes for ABSTRACT.
+
+purpose:
+  - transplant_another_industrys_mechanism_via_a_shared_job_or_constraint_and_an_explicit_adaptation
+
+inputs:
+  required:
+    - SubjectRef
+  # Free-text reference, same scope-limited pattern challenge.red_team's ProposalRef already uses.
+
+outputs:
+  - CrossIndustryTransferSet
+
+preconditions:
+  - "at least one transfer declared"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - challenge.red_team
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-CROSSINDUSTRYTRANSFER-1: cognitive_primitives ADAPT is not a confirmed kernel/OBSERVED_EXTENSION token -- same disclosed gap association.analogy_mapping's own inference already flags for ABSTRACT.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table row L675 directly. Grepped the full spec root case-insensitively for
+    "cross-industry"/"cross industry"/"shared_job_or_constraint" before writing. Validated against
+    specs/cognitive/method.schema.yaml.
+  note: "No mother document was modified. Table row transcribed verbatim; the 3-part per-transfer invariant is this file's own compilation decision, disclosed above."

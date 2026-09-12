@@ -1,0 +1,118 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/futures-wheel.schema.yaml"
+title: Futures Wheel
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FuturesWheel` -- the declared
+  `outputs` of `foresight.futures_wheel`'s Method Contract
+  (methods/contracts/foresight.futures_wheel.contract.yaml, `outputs:
+  [FuturesWheel]`). Atlas §11.28 (L1837-1860): fan a single center event out
+  to 1st/2nd/3rd-order effects, forcing second/third-order thinking rather
+  than stopping at the direct benefit.
+
+  Order-parent consistency (an order-1 impact's parent is the center event;
+  an order-N impact's parent must be a declared order-(N-1) impact) is a
+  RUNTIME invariant (JSON Schema 2020-12 cannot express "this array item's
+  parent_id must resolve to a sibling item one order shallower" declaratively)
+  -- enforced at both construction time and an independent gate by
+  `ai_lego/modules/foresight/futures_wheel.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.28 未來輪／未來影響輪（Futures Wheel）, mermaid fan-out graph (L1837-1860)"
+  - "methods/contracts/foresight.futures_wheel.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §11.28's own
+  1/2/3-order fan-out structure plus low-risk, disclosed compilation choices
+  (the FWHEEL- prefix, the CENTER_EVENT_PARENT_ID sentinel, flat
+  impacts[] with order+parent_id rather than a nested tree shape).
+
+compilation_decisions:
+  - question: "How does an order-1 impact reference 'the center event' as its parent, given center_event is a bare description string with no id of its own?"
+    decision: "A reserved sentinel string CENTER_EVENT_PARENT_ID = \"CENTER\" that every order-1 impact's parent_id must equal -- disclosed in ai_lego/modules/foresight/futures_wheel.py, not a real impact id."
+  - question: "Nested tree shape (children embedded inside parent) or a flat impacts[] list with order+parent_id?"
+    decision: "Flat list -- matches this corpus's own referential-integrity convention (ids + parent/foreign-key references) used throughout, rather than inventing a second nested-tree shape for this one schema."
+
+type: object
+additionalProperties: false
+required: [id, version, center_event, impacts, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^FWHEEL-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.futures_wheel"
+
+  center_event:
+    type: string
+    minLength: 1
+    description: "Atlas §11.28's own center node (L1841: 'AI 成本下降' in the worked example) -- the change being fanned out."
+
+  impacts:
+    type: array
+    minItems: 1
+    description: "Atlas §11.28's own 1/2/3-order fan-out (L1842-1851), flattened into one referential list. RUNTIME-enforced: >=1 order-1 entry; every order-1 entry's parent_id is the CENTER_EVENT_PARENT_ID sentinel (\"CENTER\"); every order-N (N>1) entry's parent_id resolves to a declared order-(N-1) entry."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, order, parent_id, description]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this wheel (e.g. FWHEEL-001-B1)."
+        order:
+          type: integer
+          enum: [1, 2, 3]
+          description: "Atlas §11.28's own 1/2/3 階 (order) -- direct, indirect, structural."
+        parent_id:
+          type: string
+          description: "The CENTER_EVENT_PARENT_ID sentinel (\"CENTER\") if order=1, otherwise a declared impact id of order exactly one shallower. Cross-field resolution is a RUNTIME invariant, not expressible here."
+        description:
+          type: string
+          description: "The effect itself, in natural language."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas §11.28's own worked example (L1842-1851): AI cost decline fanned out to three order-1 and three order-2 effects"
+    value:
+      id: "FWHEEL-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.futures_wheel"
+      center_event: "AI 成本下降"
+      impacts:
+        - {id: "FWHEEL-2026-09-12-001-B1", order: 1, parent_id: "CENTER", description: "採用增加"}
+        - {id: "FWHEEL-2026-09-12-001-B2", order: 1, parent_id: "CENTER", description: "功能商品化"}
+        - {id: "FWHEEL-2026-09-12-001-B3", order: 1, parent_id: "CENTER", description: "算力需求增加"}
+        - {id: "FWHEEL-2026-09-12-001-C1", order: 2, parent_id: "FWHEEL-2026-09-12-001-B1", description: "工作角色改變"}
+        - {id: "FWHEEL-2026-09-12-001-C2", order: 2, parent_id: "FWHEEL-2026-09-12-001-B2", description: "價格競爭"}
+        - {id: "FWHEEL-2026-09-12-001-C3", order: 2, parent_id: "FWHEEL-2026-09-12-001-B3", description: "能源壓力"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-FUTURESWHEEL-1: CENTER_EVENT_PARENT_ID is a magic-string sentinel rather than center_event carrying its own real id -- should a future revision give center_event a real id field instead?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas §11.28 (L1837-1860) directly, including the mermaid fan-out
+    graph's exact node structure. Grepped the full spec root
+    case-insensitively for "futures wheel"/"futures_wheel" and every schema
+    title before writing -- zero pre-existing implementation or schema title
+    overlap found. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_futures_wheel.py.
+  note: >
+    No mother document was modified. The 1/2/3-order fan-out is transcribed
+    directly from Atlas §11.28's own mermaid graph. The FWHEEL- prefix, the
+    CENTER_EVENT_PARENT_ID sentinel, and the flat referential-list shape are
+    this file's own compiled structure, disclosed above.

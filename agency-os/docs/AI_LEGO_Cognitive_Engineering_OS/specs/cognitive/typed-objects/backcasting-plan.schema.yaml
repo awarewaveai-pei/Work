@@ -1,0 +1,118 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/backcasting-plan.schema.yaml"
+title: Backcasting Plan
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BackcastingPlan` -- the declared
+  `outputs` of `foresight.backcasting`'s Method Contract
+  (methods/contracts/foresight.backcasting.contract.yaml, `outputs:
+  [BackcastingPlan]`). Atlas F13 table row (L683): work backward from an
+  ideal future state, through milestones, to today's actions -- a long-term
+  roadmap. No dedicated Atlas section exists for this method beyond the
+  table row itself (disclosed).
+
+  Two RUNTIME invariants (JSON Schema 2020-12 cannot express strict
+  cross-item ordering or "the chain must reach a separate sibling array"
+  declaratively) -- enforced at both construction time and an independent
+  gate by `ai_lego/modules/foresight/backcasting.py`: (a) `milestones[]`
+  horizons strictly decreasing in list order (future state backward toward
+  today), (b) `today_actions[]` non-empty.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 前瞻 table, Backcasting row (L683)"
+  - "methods/contracts/foresight.backcasting.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L683's own
+  three-stage pipeline plus low-risk, disclosed compilation choices (the
+  BCAST- prefix, ordinal-int horizon representation, the separate
+  today_actions[] array).
+
+compilation_decisions:
+  - question: "Horizon representation: ordinal int or ISO date string?"
+    decision: "Ordinal int (larger = further in the future). Avoids a date-parsing dependency and keeps ordering a plain integer comparison; a non-int horizon is refused fail-closed rather than accepted as a second, non-orderable representation."
+  - question: "Should today_actions be milestones[0]-equivalent entries (horizon=0), or a separate array?"
+    decision: "Separate today_actions[] array of plain strings. Milestones and present-day actions are conceptually distinct in Atlas's own wording ('milestones backward->today actions' names two different pipeline stages, not one homogeneous list)."
+
+type: object
+additionalProperties: false
+required: [id, version, future_state, milestones, today_actions, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^BCAST-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.backcasting"
+
+  future_state:
+    type: string
+    minLength: 1
+    description: "The ideal future state being backcast from (Atlas L683's own 'future state')."
+
+  milestones:
+    type: array
+    minItems: 1
+    description: "Atlas L683's own 'milestones backward' stage. RUNTIME-enforced: horizon values strictly decreasing in list order (no duplicate or out-of-order horizon)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, horizon]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this plan (e.g. BCAST-001-M1)."
+        description:
+          type: string
+          description: "The milestone itself, in natural language."
+        horizon:
+          type: integer
+          description: "Ordinal position, larger = further in the future (see compilation_decisions). Must be strictly decreasing across milestones[] in list order -- RUNTIME invariant, not expressible here."
+
+  today_actions:
+    type: array
+    minItems: 1
+    description: "Atlas L683's own 'today actions' stage -- the present-day landing point. Required non-empty (see module docstring: 'a backcast that never lands on a present-day action is a wish, not a roadmap')."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 3-year carbon-neutral target backcast to 2 milestones and 2 today actions"
+    value:
+      id: "BCAST-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.backcasting"
+      future_state: "2029 年達成營運碳中和"
+      milestones:
+        - {id: "BCAST-2026-09-12-001-M1", description: "2028 年完成全數據中心改用再生能源", horizon: 2}
+        - {id: "BCAST-2026-09-12-001-M2", description: "2027 年完成碳排放全面盤查與基準線建立", horizon: 1}
+      today_actions: ["啟動碳排放盤查供應商評選", "指派專責碳中和專案負責人"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-BACKCASTINGPLAN-1: ordinal-int horizon cannot express a real calendar date directly -- should a future revision add an optional ISO-date companion field?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table, Backcasting row (L683) directly -- no dedicated
+    section exists beyond the row itself. Grepped the full spec root
+    case-insensitively for "backcasting" and every schema title before
+    writing -- zero pre-existing implementation or schema title overlap
+    found. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_backcasting.py.
+  note: >
+    No mother document was modified. The three-stage pipeline is transcribed
+    directly from Atlas L683. The BCAST- prefix, ordinal-int horizon
+    representation, and the separate today_actions[] array are this file's
+    own compiled structure, disclosed above.

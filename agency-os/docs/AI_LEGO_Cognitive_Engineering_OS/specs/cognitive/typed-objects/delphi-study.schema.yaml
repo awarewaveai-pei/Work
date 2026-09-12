@@ -1,0 +1,175 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/delphi-study.schema.yaml"
+title: Delphi Study
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DelphiStudy` -- the declared
+  `outputs` of `foresight.delphi`'s Method Contract (methods/contracts/
+  foresight.delphi.contract.yaml, `outputs: [DelphiStudy]`). F13 foresight
+  family (Atlas L684: "round1->summary->round2->dispersion"), with an
+  explicit limitation at §12.23 (L2827, verbatim): "限制：Consensus 不是
+  truth；應保存 minority range".
+
+  Three structural enforcements, same belt-and-suspenders discipline every
+  prior typed-object schema in this directory establishes:
+    * `responses[]` items set `additionalProperties: false` restricted to
+      `{participant_id, estimate, rationale}` -- the SECOND, independent,
+      exhaustive layer behind `ai_lego/modules/foresight/delphi.py`'s own
+      `assert_no_identity_claim` runtime guard (modeled directly on
+      `challenge.red_team`'s `FORBIDDEN_AUTHORITY_KEYS`/
+      `assert_no_authority_claim` pattern). No `name`/`expert_name`/
+      `author`/`affiliation`/`email`/`title` key can ever appear on a
+      response, at either layer.
+    * `rounds[]` has `minItems: 2`, each round's `responses[]` has
+      `minItems: 2` -- Delphi is definitionally multi-round.
+    * `dispersion` is GENUINE_COMPUTE -- never a builder parameter, always
+      derived from the FINAL round's numeric estimates and independently
+      re-derived by the gate within an explicit tolerance (see
+      compilation_decisions for the formula choice, since Atlas names the
+      concept but gives no formula).
+
+  RUNTIME invariant (not declaratively expressible here, same disclosed-gap
+  class as `iceberg-model-analysis.schema.yaml`'s own top-down-completeness
+  precedent): a record carrying `consensus_summary` (always required by
+  this schema) must ALSO carry a non-empty `minority_positions[]` OR a
+  non-empty `minority_positions_none_recorded_reason` -- §12.23's own
+  "consensus is not truth, preserve the minority range" rule, made
+  structural rather than left as advice.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 未知未知與前瞻 table, Delphi row (L684)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.23 德菲法／德爾菲法 (L2821-2828), limitation L2827"
+  - "methods/contracts/foresight.delphi.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/red-team-challenge.schema.yaml -- additionalProperties:false-as-structural-rule-enforcement precedent"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L684's own
+  four-stage pipeline and §12.23's own limitation, plus low-risk, disclosed
+  compilation choices (the DELPHI- prefix, dispersion formula, anonymity
+  mechanism).
+
+compilation_decisions:
+  - question: "What is dispersion, formally? Atlas names the concept (L684) but gives no formula anywhere in the corpus."
+    decision: "Population standard deviation of the numeric `estimate` values in the FINAL round only (highest round_number), rounded to 8 decimal places -- matching this corpus's `epistemic.bayesian_updating`-established 8dp storage convention. Final-round-only (not all rounds pooled) because dispersion measures the disagreement REMAINING after the round1->summary->round2 synthesis, not the raw spread before synthesis."
+  - question: "Should a response's estimate be range-restricted (e.g. [0,1] as a probability)?"
+    decision: "No range restriction beyond finite-real-number, bool excluded. Atlas L684 gives Delphi as a general expert-estimation method (a quantity, a date, a probability, anything), not a probability-only method -- restricting the range here would narrow the method beyond what Atlas states."
+  - question: "Anonymity enforcement: schema-only (additionalProperties:false), or also a runtime assertion?"
+    decision: "Both, same two-layer discipline as red-team-challenge.schema.yaml's no-final-authority rule -- `assert_no_identity_claim` (runtime, before construction) plus this schema's own `additionalProperties: false` (independent, exhaustive second layer against a hand-crafted bypass)."
+
+type: object
+additionalProperties: false
+required: [id, version, rounds, dispersion, consensus_summary, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DELPHI-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.delphi"
+
+  rounds:
+    type: array
+    minItems: 2
+    description: "Atlas L684's own 'round1->summary->round2' pipeline stage, mechanized as a hard minimum: Delphi is definitionally multi-round. RUNTIME invariant: round_number values must be exactly 1..N, unique, in order (enforced by ai_lego/modules/foresight/delphi.py, not expressible here)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [round_number, responses]
+      properties:
+        round_number:
+          type: integer
+          minimum: 1
+        responses:
+          type: array
+          minItems: 2
+          description: "At least 2 responses -- a dispersion computed across a single response is meaningless (method contract precondition)."
+          items:
+            type: object
+            additionalProperties: false
+            description: "STRUCTURALLY ANONYMOUS -- only these 3 keys are legal. No name/expert_name/author/affiliation/email/title key can be added; this is the schema-layer half of the two-layer anonymity enforcement (see module description)."
+            required: [participant_id, estimate]
+            properties:
+              participant_id:
+                type: string
+                minLength: 1
+                description: "Opaque identifier only -- never a real name (see anonymity enforcement above)."
+              estimate:
+                type: number
+                description: "The expert's numeric estimate. No range restriction (see compilation_decisions)."
+              rationale:
+                type: string
+                description: "Optional free-text rationale for this estimate -- content only, never identity."
+
+  dispersion:
+    type: number
+    minimum: 0
+    description: "GENUINE_COMPUTE -- population standard deviation of the final round's estimate values (see compilation_decisions for the formula choice). Never a builder parameter; independently re-derived by the gate within an explicit float tolerance."
+
+  minority_positions:
+    type: array
+    default: []
+    description: "§12.23 L2827's own 'preserve the minority range' rule. May be empty ONLY if minority_positions_none_recorded_reason is present and non-empty (RUNTIME invariant -- see module description)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  minority_positions_none_recorded_reason:
+    type: string
+    minLength: 1
+    description: "Required non-empty IF minority_positions is empty -- an explicit, disclosed reason, never a silent omission. Must NOT be present alongside a non-empty minority_positions[] (RUNTIME invariant -- a contradictory state)."
+
+  consensus_summary:
+    type: string
+    minLength: 1
+    description: "The synthesized consensus. §12.23's own limitation (L2827): this is NOT truth, and its presence structurally requires the minority range to be preserved alongside it (see minority_positions above)."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent study."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-round Delphi study on AI-adoption timeline, dissent preserved"
+    value:
+      id: "DELPHI-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.delphi"
+      rounds:
+        - round_number: 1
+          responses:
+            - {participant_id: "P1", estimate: 5, rationale: "現有法規框架尚未成熟"}
+            - {participant_id: "P2", estimate: 2, rationale: "技術已具備，採用速度取決於成本下降"}
+        - round_number: 2
+          responses:
+            - {participant_id: "P1", estimate: 4}
+            - {participant_id: "P2", estimate: 3}
+      dispersion: 0.5
+      minority_positions: ["P1 認為法規是主要瓶頸，時程應以最保守估計為準"]
+      consensus_summary: "多數專家估計 3-4 年內主流採用"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-DELPHISTUDY-1: dispersion uses only the final round's estimates -- should a future revision also store per-round dispersion to show convergence over rounds?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table, Delphi row (L684), and §12.23 (L2821-2828)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "delphi"/"德菲"/"德爾菲" and every schema title before writing -- zero
+    pre-existing implementation or schema title overlap found. Validated
+    against jsonschema Draft202012Validator via
+    tests/unit/test_delphi.py, including a real mutation check that
+    `additionalProperties: false` on a response actually refuses a
+    smuggled `name` key.
+  note: >
+    No mother document was modified. The four-stage pipeline and the
+    consensus-is-not-truth limitation are transcribed verbatim from Atlas
+    L684 and L2827. The DELPHI- prefix, dispersion formula, and anonymity
+    enforcement mechanism are this file's own compiled structure,
+    disclosed above.

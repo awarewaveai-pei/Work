@@ -1,5 +1,73 @@
 # Worklog
 
+## 2026-09-12（併發 git index race：F10 收工 commit 遺失 method-inventory.yaml／contract-backlog.yaml／2 個 issue_tree 檔的變更，commit 本身乾淨無誤但內容是空的）
+
+**觸發**：F13（182–195 號切片）收尾前照慣例做 registry 跨檔一致性檢查（contracts/registry/backlog/modules 四方比對筆數），F09／F13 三方都對得上，唯獨 F10 對不上——`method-inventory.yaml`／`contract-backlog.yaml` 完全沒有 epistemic 家族的任何欄位。往回查才發現：F10 收工 commit `cb04e491f`（"open AND close F10 epistemic family"）本身乾淨落地（52 個檔案、10455 行新增，`git log` 顯示存在），但 `git show cb04e491f -- method-inventory.yaml` 回傳空 diff——這兩份 registry 檔案、`agency-os/WORKLOG.md`／`TASKS.md`、以及 F10 收尾時順手修正的 `decomposition.issue_tree.contract.yaml`／`issue-tree.schema.yaml` 兩處陳舊指稱，全部沒有真的進那個 commit。
+
+**根因**：commit 當下的操作序列——`git add`（含這些檔案）→ 第一次 `git commit` 被 hook 擋（偵測到另一個並行 session 已 stage 的 2 個 `lobster-factory` 測試檔）→ `git restore --staged` 那 2 個外來檔案 → 第二次 `git commit`（無 pathspec，吃當下 index）。這個視窗期間，另一個並行 session 的自動同步機制（本 repo 已知模式：每 1-2 分鐘 stash→pull→merge，`agency-os/AGENTS.md` R1 與多筆既有 WORKLOG 記載）動到了共享 git index，導致我這幾個檔案的 staged 內容在第二次 commit 前被换回 HEAD 版本——但 code 檔（50 個新方法檔+`__init__.py`+新守衛測試）因為在 `Projects/internal/cognitive-engineering-os/` 底下，不受這次同步影響，順利進了 commit。`agency-os/WORKLOG.md`／`TASKS.md` 的內容則是被另一個 session 的 commit `2e81441fb`（KB critic 覆審修法）當附帶內容撿走，資料沒丟，只是進錯 commit。
+
+**這是同一個 bug class 的第三次發生**：`fd99a9dd7`（F07 registry 補跑）、`1b4debdb2`（F12 registry+`__init__.py` 補跑）都是同一種「code commit 乾淨、registry 沒跟上」，前兩次是漏 git add／漏編輯，這次是編輯+add都做了、commit 前也驗證過 staged 內容正確，仍被併發 race 抽掉——代表本次的防禦層級比前兩次更難防（AGENTS.md R1 現有機制不足以擋住 commit 執行瞬間的 race）。
+
+**已修復**（全部重新產生並重新驗證，非猜測性回填）：
+- `method-inventory.yaml`：230 列行號重新同步（腳本重跑，逐行比對確認與原修正完全一致）+ 10 列 F10 has_contract/contract_status/machine_id 重新套用 + header 兩處假宣稱訂正重新套用。
+- `contract-backlog.yaml`：172–181 號 F10 entry 重新產生（原始腳本仍在 scratchpad，內容逐字重跑，非重寫）。
+- `decomposition.issue_tree.contract.yaml`／`issue-tree.schema.yaml`：陳舊 `research.evidence_matrix` 指稱重新訂正。
+- `tests/unit/test_method_inventory_line_numbers.py`：確認本體從未遺失（該檔在 `Projects/` 底下，不受影響），重跑仍綠。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=四方交叉比對腳本（contracts 檔數 vs method-inventory.yaml machine_id 列數 vs contract-backlog.yaml method_id 列數 vs `ai_lego/modules/<family>/*.py` 檔數）| exit=0 | result=systems(8/8/8/8)、epistemic(10/10/10/10)、foresight(14/14/14/14) 三個家族四方全部一致
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_method_inventory_line_numbers.py -q` | exit=0 | result=2 passed（守衛在完整還原後仍正確判定 230 列全部落在真實定義行）
+- REVIEW_WAIVED: NA -- 純資料重建，內容逐字對照原始腳本/原始 Edit 內容重跑，非重新設計
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`research\.evidence_matrix` | hits=2（皆為 WORKLOG 歷史記錄本身，非任一 source 檔案，符合「舊檔案不回改」慣例）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 若這個 git index race 是系統性的（而非單次運氣不好），未來每一次「code commit 乾淨但 registry 沒跟上」都要靠人工四方交叉比對才會發現——目前沒有機械化的 post-commit 驗證步驟。**建議追蹤項**：在 `scripts/` 新增一個 commit 後自動跑的四方一致性檢查（比照本條目手動做的比對），列入 TASKS.md 待辦，非本次範圍內建置。
+[rollback] 不適用（本條目是資料復原，非新增風險變更）；若需要回溯到復原前狀態，`git log` 上沒有對應版本可回退（因為遺失的內容從未真正進過任何 commit）。
+
+## 2026-09-12（182–195 號切片：F13 未知未知與前瞻家族開張並收官 0/14→14/14，5 個平行 agent（3+3+3+2+3 方法）+ 1 critic；本 session 建置量最大的一批）
+
+**觸發**：F09／F10 收官後依序推進，F13 是操作者指定的 8 個家族中方法數最多的一個（14 個）。
+
+**做了什麼**：5 個平行 agent 建置，每個方法的真不變量由主 agent 先讀 Atlas 原文設計好再交付：
+- `horizon_scanning`：§12.22（L2811-2818）自己的工程化命令逐字轉成結構——每個 signal 必須有 source/date/geography/status/impact/confidence 六欄全非空。
+- `weak_signal_detection`：Atlas 自己的動詞是「triangulate」，做成 >=2 個相異（去空白正規化後）佐證來源。
+- `outlier_analysis`：Atlas 三步「identify→排除資料錯誤→深挖機制」，中間那步不可跳——`data_error_ruled_out` 為真（真 bool）之前不准填 mechanism_hypothesis。
+- `historical_analogy`：相似點/差異點/機制/限制四者缺一不可——只列相似點正是這方法要防的表面類比。
+- `cross_industry_transfer`：shared_job_or_constraint 與 adaptation 皆非空，來源產業≠目標產業。
+- `adjacent_discipline_search`：adjacent_fields 與 current_disciplines 正規化後不得重疊。
+- `scenario_planning`：§11.27（L1804-1836）自己寫死「每個 Scenario 要有」九項（Drivers/Assumptions/Narrative/Stakeholder responses/Competitor responses/2nd-3rd order effects/Signposts/Strategy performance/Reversal condition）全部逐字轉成必填；quadrantChart 本身建立在剛好 2 個關鍵不確定性、4 個情境，做成精確計數（非發明的 2^N 公式）。
+- `futures_wheel`：1/2/3 階扇出做成嚴格 parent-order 一致性——order-N 的 parent 必須是真實存在的 order-(N-1)。
+- `backcasting`：里程碑 horizon 嚴格遞減，且至少 1 個 today_actions——倒推到一半沒有落回今天的行動就只是願望不是路線圖。
+- `black_swan_exercise`：tail_event→exposure→survivability→hedges 四階鏈全參照完整性，每個 tail event 至少一個 exposure、每個 exposure 至少一個 survivability assessment。
+- `wild_cards`：每張牌必須真的「重跑 strategy」，只列事件沒有 rerun 結果一律拒。
+- `cross_country_comparison`：>=2 個管轄區，每筆比較必須有非空 normalization_basis。
+- `delphi`：本批架構最複雜——匿名結構強制（response 帶任何具名欄位在 runtime 與 schema 兩層都拒，比照 red_team 的無最終權威模式）；§12.23（L2821-2828）「Consensus 不是 truth，應保存 minority range」做成強制；dispersion 用 population stdev 真計算，gate 以 1e-9 容差獨立重算。
+- `cross_impact_analysis`：matrix completeness——每對事件的無序組合必須恰好出現一次，缺一對或重複一對（含相反順序、不同 shift 值）都拒。
+
+**critic 覆審**（1 輪，Standard tier，~340 組手動竄改）：0 Critical／2 Major／2 Minor，全部修完才進 registry：
+1. **3 個 gate（historical_analogy／cross_industry_transfer／scenario_planning）沒有重新推導 builder 自己的 duplicate-id 檢查**——手動竄改出兩個同 id 的 analogy/transfer/scenario，三個 gate 組全部 all-PASS，即使 builder 本身會拒絕。修法：比照本批其餘 11 個 gate 已經在用的寫法，補上內嵌 duplicate-id 重新推導。
+2. **11 個 builder 的 `provenance` 直接回傳呼叫者原始物件（引用，非拷貝）**——事後改呼叫者自己的 provenance dict 會悄悄改到已回傳的「已驗證」紀錄。同批另外 3 個檔案（historical_analogy／cross_industry_transfer／adjacent_discipline_search）已經用 `copy.deepcopy` 做對，證明修法便宜且已知，只是沒推廣到全部檔案。
+3. 兩處陳舊行號引用（scenario_planning 的 §11.27 子引用、futures_wheel 的 order-1/order-2 扇出引用）對照 Atlas 原文訂正。
+
+兩個 Major 缺陷類別現在都有專屬回歸測試（16 條新測試：3 條 duplicate-id gate 測試 + 1 條歷史類比自己補的 provenance 測試 + 10 條批次補的 provenance-aliasing 測試 + 2 條既有測試檔案順手修正行號）。
+
+**已修改**：
+- 70 個新檔（14 方法 × 5 檔：contract/schema/module/CLI/test）。
+- `ai_lego/modules/foresight/__init__.py`：14/14 COMPLETE 並列出全部方法不變量與 critic 結果。
+- `method-inventory.yaml`：F13 全 14 列補上 has_contract/contract_status/machine_id。
+- `contract-backlog.yaml`：新增 182–195 號 tier_1 entry。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_{14 個方法}.py -q` | exit=0 | result=563 passed, 229 subtests passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_<name>_slice`（14 支全跑）| exit=0 全數 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=四方一致性交叉比對 | exit=0 | result=contracts=14/registry=14/backlog=14/modules=14
+- REVIEW_DONE: critic=Standard | verdict=needs-fixes→全修 | findings=0c/2M/2m（皆已修並補測試，逐條見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,.claude | grep=`foresight\.(horizon_scanning|weak_signal_detection|outlier_analysis|historical_analogy|cross_industry_transfer|adjacent_discipline_search|scenario_planning|futures_wheel|backcasting|black_swan_exercise|wild_cards|cross_country_comparison|delphi|cross_impact_analysis)` | hits=73 檔（70 個本批自己的新檔 + 2 份 registry + `foresight/__init__.py`，逐一核對無非預期命中）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無已知風險；F13 家族正式收官。Method Atlas 全 24 家族真實剩餘：F14／F15／F22／F23／F24（5 個）。
+[rollback] `git revert` 本 commit；70 個新檔互相獨立，registry 兩份可單獨還原對應列。
+
 ## 2026-09-12 第八批（向量半邊排序修法：操作者「去做」授權，部署完成）
 
 上一批修好 `matchChunksVector` 排序（commit `d00d3b99c`）並問要不要部署，操作者回「去做」——視為對這個特定 commit 部署的明示 go-ahead。走既定路徑：目標機本機 `sg-deploy.sh next-admin`，不直接 git pull。

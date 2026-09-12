@@ -1,0 +1,130 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/cross-country-comparison.schema.yaml"
+title: Cross-country Comparison
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CrossCountryComparison` -- the
+  declared `outputs` of `foresight.cross_country_comparison`'s Method
+  Contract (methods/contracts/foresight.cross_country_comparison.contract.
+  yaml, `outputs: [CrossCountryComparison]`). F13 foresight family (Atlas
+  L676: "comparable jurisdictions->normalize->compare").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `game-theory.schema.yaml`'s own payoff-
+  completeness precedent): (a) `jurisdictions[]` has >=2 entries -- a
+  comparison of one jurisdiction is not a comparison; (b) every
+  `comparisons[]` entry's `normalization_basis` is non-empty; (c) every
+  `comparisons[].values[].jurisdiction` resolves to a declared
+  `jurisdictions[]` entry, with no duplicate jurisdiction within one
+  comparison's `values[]`. `ai_lego/modules/foresight/cross_country_
+  comparison.py` enforces all three at both construction time and an
+  independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 未知未知與前瞻 table, Cross-country Comparison row (L676)"
+  - "methods/contracts/foresight.cross_country_comparison.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L676's own
+  three-stage pipeline plus low-risk, disclosed compilation choices (the
+  XCOUNTRY- prefix, record-level-only provenance, values[]-as-list-of-
+  objects shape).
+
+compilation_decisions:
+  - question: "values[] keyed by jurisdiction: a dynamic-key object map, or a list of {jurisdiction, value} objects?"
+    decision: "List of {jurisdiction, value} objects -- matches this corpus's existing referential-integrity-as-runtime-invariant convention (evidence-matrix.schema.yaml links[], game-theory.schema.yaml payoffs[]) rather than introducing a dynamic-key object shape unused elsewhere in this directory."
+  - question: "Should normalization_basis be a closed enum (per-capita/PPP-adjusted/per-GDP/...)?"
+    decision: "Free text, required non-empty. Atlas L676 names no closed taxonomy -- inventing one here would present a guess as a compiled fact, same posture as red-team-challenge.schema.yaml's undefaulted severity field."
+
+type: object
+additionalProperties: false
+required: [id, version, jurisdictions, comparisons, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^XCOUNTRY-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.cross_country_comparison"
+
+  jurisdictions:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    description: "The jurisdictions under comparison. RUNTIME invariant: >=2 required -- a comparison of one jurisdiction is not a comparison (method contract precondition)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  comparisons:
+    type: array
+    minItems: 1
+    description: "At least one comparison. Each entry aligns one metric across jurisdictions under a stated normalization basis."
+    items:
+      type: object
+      additionalProperties: false
+      required: [metric, normalization_basis, values]
+      properties:
+        metric:
+          type: string
+          minLength: 1
+          description: "The metric being compared (free text -- Atlas L676 names no closed metric taxonomy)."
+        normalization_basis:
+          type: string
+          minLength: 1
+          description: "REQUIRED, non-empty -- Atlas L676's own 'normalize' pipeline stage, mechanized. See compilation_decisions for why this stays free text."
+        values:
+          type: array
+          minItems: 1
+          description: "RUNTIME invariant: every jurisdiction here must resolve to a declared jurisdictions[] entry (referential integrity), and no jurisdiction may appear twice within this one comparison's values (ambiguous duplicate)."
+          items:
+            type: object
+            additionalProperties: false
+            required: [jurisdiction, value]
+            properties:
+              jurisdiction: {type: string, minLength: 1}
+              value: {type: number}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent comparison."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Comparing minimum-wage-to-median-income ratio across three jurisdictions, PPP-adjusted"
+    value:
+      id: "XCOUNTRY-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.cross_country_comparison"
+      jurisdictions: ["TW", "JP", "KR"]
+      comparisons:
+        - metric: "minimum_wage_to_median_income_ratio"
+          normalization_basis: "PPP-adjusted, 2025 OECD basis"
+          values:
+            - {jurisdiction: "TW", value: 0.42}
+            - {jurisdiction: "JP", value: 0.38}
+            - {jurisdiction: "KR", value: 0.45}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-XCOUNTRYCOMPARISON-1: values[] entries carry no confidence/source sub-structure beyond {jurisdiction, value} -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F13 table, Cross-country Comparison row (L676) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "cross-country"/"cross country"/"jurisdiction" and every schema title
+    before writing -- zero pre-existing implementation or schema title
+    overlap found. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_cross_country_comparison.py.
+  note: >
+    No mother document was modified. The three-stage pipeline is
+    transcribed directly from Atlas L676. The XCOUNTRY- prefix, values[]
+    list-of-objects shape, and runtime-invariant placement of referential
+    integrity are this file's own compiled structure, disclosed above.

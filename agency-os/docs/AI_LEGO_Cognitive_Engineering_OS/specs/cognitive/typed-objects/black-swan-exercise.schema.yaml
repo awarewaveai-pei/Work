@@ -1,0 +1,179 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/black-swan-exercise.schema.yaml"
+title: Black Swan Exercise
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BlackSwanExercise` -- the declared `outputs` of
+  `foresight.black_swan_exercise`'s Method Contract (methods/contracts/foresight.black_swan_exercise.contract.yaml,
+  `outputs: [BlackSwanExercise]`). F13 unknown-unknowns/foresight family, FIRST built member (Atlas L679: "低機率
+  高衝擊｜tail events→exposure→survivability→hedges｜強化韌性"). A 4-array chain: `tail_events[]`,
+  `exposures[]`, `survivability_assessments[]`, `hedges[]`. Cross-array referential completeness (every
+  exposure resolves to a declared tail event, every survivability assessment and hedge resolves to a declared
+  exposure, every tail event covered by >=1 exposure, every exposure covered by >=1 survivability assessment)
+  is the real invariant -- checked at the runtime layer (`ai_lego/modules/foresight/black_swan_exercise.py`),
+  not expressible here.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 tool table, Black Swan Exercise row (L679)"
+  - "methods/contracts/foresight.black_swan_exercise.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+  - "specs/cognitive/typed-objects/pre-mortem-analysis.schema.yaml -- single-reference-per-entry precedent this file's `tail_event_id`/`exposure_id` fields follow"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L679's own 4-stage chain plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should each exposures[]/survivability_assessments[]/hedges[] entry reference exactly one upstream id, or a list?"
+    decision: "Exactly one (a single string reference) -- same one-reference-per-entry shape pre-mortem-analysis.schema.yaml's own `addresses_cause_id` already uses. An item covering multiple upstream entries is expressed as multiple entries."
+  - question: "additionalProperties: false at the top level, and on every array item?"
+    decision: "Yes, all -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "Must every exposure also have >=1 covering hedge?"
+    decision: "No -- only tail_event->exposure and exposure->survivability coverage is required. See the method contract's own compilation_decisions for the disclosed scope choice."
+
+type: object
+required: [id, version, tail_events, exposures, survivability_assessments, hedges, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BSWAN-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.black_swan_exercise"
+
+  tail_events:
+    type: array
+    minItems: 1
+    description: "Atlas L679 stage 1 ('tail events'). At least one tail event required -- an exercise naming zero tail events has not actually run the process."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The low-probability/high-impact event itself, e.g. Atlas's own '低機率高衝擊' framing applied to a specific scenario."
+
+  exposures:
+    type: array
+    description: "Atlas L679 stage 2 ('exposure'). What a tail event exposes you to. May be empty ONLY when tail_events is also empty -- since tail_events requires >=1 entry, the runtime-layer coverage invariant in practice requires >=1 exposure too."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, tail_event_id, description]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        tail_event_id:
+          type: string
+          minLength: 1
+          description: "Must name a real tail_events[].id IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference is refused, not merely flagged."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "What this tail event exposes -- the concrete risk/dependency it creates."
+
+  survivability_assessments:
+    type: array
+    description: "Atlas L679 stage 3 ('survivability'). May be empty ONLY when exposures is also empty -- the runtime-layer coverage invariant in practice requires >=1 assessment per declared exposure."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, exposure_id, description]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        exposure_id:
+          type: string
+          minLength: 1
+          description: "Must name a real exposures[].id IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference is refused, not merely flagged."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Whether, and why, this exposure is survivable -- the assessment itself, in natural language."
+
+  hedges:
+    type: array
+    description: "Atlas L679 stage 4 ('hedges'). May legitimately be empty even when every other array is non-empty -- no per-exposure hedge-coverage requirement is cited (see the method contract's own compilation_decisions)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, exposure_id, description]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        exposure_id:
+          type: string
+          minLength: 1
+          description: "Must name a real exposures[].id IN THIS SAME RECORD -- enforced at the runtime layer. A dangling reference is refused, not merely flagged."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The hedge/mitigation action itself."
+
+  provenance:
+    description: "Record-level only -- see the method contract's own compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A black swan exercise over a synthetic single-region cloud dependency: one tail event, one traced exposure, one survivability assessment, one hedge."
+    value:
+      id: "BSWAN-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.black_swan_exercise"
+      tail_events:
+        - id: "TE-001"
+          description: "唯一雲端區域發生連續 72 小時全區中斷，且該供應商官方溝通完全靜默"
+      exposures:
+        - id: "EXP-001"
+          tail_event_id: "TE-001"
+          description: "所有客戶資料與服務都部署在該單一區域，無跨區備援，中斷期間完全無法對外服務"
+      survivability_assessments:
+        - id: "SA-001"
+          exposure_id: "EXP-001"
+          description: "不可存活超過 24 小時 -- 目前無跨區備援與離線資料副本，客戶合約 SLA 將全數違約"
+      hedges:
+        - id: "HDG-001"
+          exposure_id: "EXP-001"
+          description: "建立第二區域的唯讀備援與每日離線快照，目標可承受 72 小時單區中斷"
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-BLACKSWANEXERCISE-1: hedges[] carries no per-exposure coverage requirement -- a future revision could add one if a downstream consumer needs the chain complete end to end (owner: operator, see the method contract's own OQ-BSWAN-1)."
+
+verification:
+  method: >
+    Read Atlas F13 index row (L668) and the Black Swan Exercise table row (L679) directly at the cited line.
+    Grepped the full spec root (specs/**, methods/**) case-insensitively for "black swan"/"black_swan"/
+    "tail_event" before writing this file -- zero pre-existing implementation (only Atlas's own table row and
+    the two `method-inventory.yaml` name-only listings found). Validated against jsonschema.Draft202012Validator,
+    including a mutation check that the 4-array cross-reference completeness invariant is caught by the runtime
+    gate (not expressible here).
+  note: >
+    No mother document was modified. The 4-stage chain and the "強化韌性" benefit are transcribed verbatim from
+    Atlas L679. The flat tail_events/exposures/survivability_assessments/hedges shape, the single-reference-
+    per-entry fields, and the hedge-coverage scope choice are this file's own compilation decisions, disclosed
+    above.

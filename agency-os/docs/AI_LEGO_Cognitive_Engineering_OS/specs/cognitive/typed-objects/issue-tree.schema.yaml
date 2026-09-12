@@ -126,8 +126,8 @@ examples:
 
 open_questions:
   - id: "OQ-ISSUETREE-1"
-    question: "Should a future revision add a soft, format-only-checked cross-reference from a leaf node to a decomposition.mece completeness-check result or a research.evidence_matrix record (Atlas L363's own '最佳搭配' column)? Neither machine_id exists yet at this schema's write time -- left unaddressed rather than inventing a forward field with no real consumer yet."
-    owner: "operator, or whoever next builds decomposition.mece / research.evidence_matrix"
+    question: "Should a future revision add a soft, format-only-checked cross-reference from a leaf node to a decomposition.mece completeness-check result or an evidence-matrix record (Atlas L363's own '最佳搭配' column)? UPDATED 2026-09-12: both now exist -- decomposition.mece, and the evidence-matrix method, which landed as epistemic.evidence_matrix (F10), not under the research.* id guessed here at write time. The forward field itself is still unbuilt, now as a real design choice rather than for want of a consumer."
+    owner: "operator, or whoever next wires issue-tree leaves to decomposition.mece / epistemic.evidence_matrix"
     blocks: "nothing in this file's own validity"
   - id: "OQ-ISSUETREE-2"
     question: "MAX_TREE_DEPTH=100 is a runtime-only bound (ai_lego/modules/decomposition/issue_tree.py), not expressible in plain JSON Schema recursion -- should a future pass document this gap the same way decision-tree-record.schema.yaml's own sibling schema does, or is this description sufficient disclosure?"

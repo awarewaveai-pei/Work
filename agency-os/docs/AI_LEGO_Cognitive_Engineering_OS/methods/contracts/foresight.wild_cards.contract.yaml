@@ -1,0 +1,111 @@
+$id: "ai-lego://methods/contracts/foresight.wild_cards.contract.yaml"
+title: "Wild Cards Method Contract"
+status: ACTIVE
+
+description: >
+  F13 unknown-unknowns/foresight family (Atlas L668-685), Wild Cards row (L680: "加入劇烈非主流事件｜wild
+  card→重跑 strategy｜測 regime shift"). No dedicated §11/§12 section exists -- the table row is the sole
+  citation (grep-confirmed, see verification). Core invariant: every declared wild card must carry a
+  non-empty ``strategy_rerun`` -- Atlas's own literal pipeline is "wild card→重跑 strategy", and the stated
+  benefit (測 regime shift) only holds if the strategy was actually re-run under the card, not merely listed
+  as a dramatic event.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 tool table, Wild Cards row (L680)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: foresight.wild_cards` mints a NEW machine_id, second built member of the
+  `family: foresight` opened this session by `foresight.black_swan_exercise` (grep-confirmed: no prior
+  `wild_cards` contract or implementation anywhere in this corpus). The `strategy_rerun` sub-structure
+  (`strategy_ref`/`outcome_under_card`/`still_holds`) and record-level-only provenance are this file's own
+  compilation decisions -- Atlas gives no sub-structure for "重跑 strategy" -- see `compilation_decisions`.
+
+id: foresight.wild_cards
+version: "1.0.0"
+family: foresight
+
+cognitive_primitives: [IMAGINE, INFER, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. IMAGINE = positing a dramatic,
+# non-mainstream event (Atlas's own "加入劇烈非主流事件" framing); INFER = deriving what the existing strategy's
+# outcome becomes under that card; EXPLAIN = articulating the re-run result as a real, actionable finding
+# rather than a bare label. All three CANONICAL_KERNEL members.
+
+purpose:
+  - stress_test_an_existing_strategy_against_a_dramatic_non_mainstream_event_by_re_running_it
+# Atlas L680 verbatim sense: inject a wild card, re-run the strategy under it, benefit "測 regime shift" (test
+# for a regime shift -- whether the strategy still holds when the operating environment changes abruptly).
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-
+  # member Tier 1 contract in this corpus takes; Atlas's own citation names no required input type. A
+  # `strategy_ref` is a free-text reference carried per wild card (see outputs), not a hard $ref to a single
+  # upstream Strategy type -- no single existing typed object in this spec root is the universal "the strategy
+  # being re-run."
+
+outputs:
+  - WildCardSet
+# NEW output type (see typed-objects/wild-card-set.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "wild_cards has at least 1 entry, each with a non-empty description -- a wild-card exercise naming zero cards has not run the process"
+  - "every wild_cards[] entry's strategy_rerun is present with non-empty strategy_ref/outcome_under_card and a genuine boolean still_holds -- Atlas L680's own 'wild card→重跑 strategy' step, mechanized; a card recorded with no re-run result did the one thing this method exists to force nothing more than list a dramatic event"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml's own definition scopes this flag to claims grounded in a supplied EvidenceSet
+  # input; this method takes no required input (inputs.required: []), same reasoning
+  # foresight.black_swan_exercise's identical flag already documents.
+
+forbidden_transition: []
+# Atlas L680 gives no §14.1-style legal/illegal chain citation (grep-confirmed).
+
+recommended_next: []
+# Atlas's own citation names no single downstream method for this row specifically.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should strategy_rerun be a bare string result, or a richer sub-structure?"
+    decision: >
+      A richer sub-structure: {strategy_ref, outcome_under_card, still_holds}. Atlas gives no sub-structure
+      for "重跑 strategy" at all -- a bare string would satisfy the literal citation but would not actually
+      capture WHICH strategy was re-run or WHETHER it survived the regime shift, both of which are needed for
+      the method's own stated benefit ("測 regime shift") to be checkable rather than asserted. Disclosed here
+      as this file's own compilation choice, not an Atlas-cited shape.
+  - question: "Is still_holds a caller-supplied boolean, or derived?"
+    decision: >
+      Caller-supplied (unlike foresight.black_swan_exercise's survivability_assessments, which carry no
+      derived field either) -- whether a strategy still holds under a wild card is itself the judgment this
+      method exists to elicit, not a mechanically computable function of other fields. Guarded against the
+      Python bool-is-int-subclass trap at both the builder and the gate (isinstance(..., bool) checked before
+      any int-shaped acceptance).
+  - question: "Per-field provenance (per-wild-card) or record-level only?"
+    decision: "Record-level ONLY, one top-level `provenance` field -- matching this corpus's established batch precedent (foresight.black_swan_exercise, challenge.pre_mortem, challenge.red_team)."
+
+open_questions:
+  - "OQ-WCARD-1: wild_cards[] carries no closed severity/plausibility scale -- Atlas L680 gives no scale for 'how wild' a card is (owner: operator)."
+  - "OQ-WCARD-2: strategy_ref is a free-text reference, not a hard $ref to a single Strategy typed object -- no single existing typed object in this spec root is the universal 'the strategy being re-run' (owner: operator, or whoever adds one)."
+  - "OQ-WCARD-3: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+
+verification:
+  method: >
+    Read Atlas F13 index row (L668) and the Wild Cards table row (L680) directly. Grepped the whole Atlas file
+    case-insensitively for "wild card" -- confirmed exactly this 1 table-row citation, no dedicated §11/§12
+    section, no §4 composition formula, no §14.1 legal-chain mention. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os` trees
+    case-insensitively for "wild card"/"wild_card"/"WildCardSet" before writing any of this method's own
+    files -- only Atlas's own table row and its own `.ai/research/phase-0/method-inventory.yaml` /
+    `methods/registry/method-inventory.yaml` name-only listings found, zero pre-existing implementation. Read
+    challenge.red_team.py and challenge.pre_mortem.py (plus their own contracts) in full before writing this
+    contract. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The "wild card→重跑 strategy" pipeline and the "測 regime shift" benefit
+    are transcribed verbatim from Atlas L680. `cognitive_primitives`, the flat wild_cards record shape, and the
+    strategy_rerun sub-structure are this file's own compilation decisions, disclosed above, not presented as
+    directly Atlas-cited beyond the literal table-row wording quoted.

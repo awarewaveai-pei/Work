@@ -1,0 +1,119 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/wild-card-set.schema.yaml"
+title: Wild Card Set
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `WildCardSet` -- the declared `outputs` of `foresight.wild_cards`'s
+  Method Contract (methods/contracts/foresight.wild_cards.contract.yaml, `outputs: [WildCardSet]`). F13
+  unknown-unknowns/foresight family, second built member (Atlas L680: "加入劇烈非主流事件｜wild card→重跑
+  strategy｜測 regime shift"). Each `wild_cards[]` entry MUST carry a non-empty `strategy_rerun` -- a card
+  recorded without one did not do the one thing Atlas's own pipeline asks for (re-run the strategy), it just
+  listed a dramatic event.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F13 tool table, Wild Cards row (L680)"
+  - "methods/contracts/foresight.wild_cards.contract.yaml (outputs, preconditions, quality -- the method contract this type's shape must satisfy)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L680's own 2-step pipeline plus low-risk, disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should strategy_rerun be a bare string, or a richer sub-structure?"
+    decision: "A richer sub-structure {strategy_ref, outcome_under_card, still_holds} -- see the method contract's own compilation_decisions for the full reasoning. Atlas gives no sub-structure for '重跑 strategy' at all; this shaping is disclosed, not presented as Atlas-cited."
+  - question: "additionalProperties: false at the top level, on each wild_cards[] item, and on strategy_rerun?"
+    decision: "Yes, all three -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "still_holds: boolean type strictness?"
+    decision: "type: boolean (JSON Schema's own strict boolean type, which already rejects 0/1/\"true\" at the schema layer) -- guards the Python bool-is-int-subclass trap at the runtime layer too (see ai_lego/modules/foresight/wild_cards.py)."
+
+type: object
+required: [id, version, wild_cards, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^WCARD-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "foresight.wild_cards"
+
+  wild_cards:
+    type: array
+    minItems: 1
+    description: "Atlas L680's own pipeline. At least one wild card required -- an exercise naming zero cards has not actually run the process."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, strategy_rerun]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Unique within this record -- enforced at the runtime layer, not here."
+        description:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The dramatic, non-mainstream event itself -- Atlas's own '加入劇烈非主流事件' framing applied to a specific scenario."
+        strategy_rerun:
+          type: object
+          additionalProperties: false
+          required: [strategy_ref, outcome_under_card, still_holds]
+          description: "Atlas L680's own 'wild card→重跑 strategy' step -- REQUIRED, non-empty. A card with no re-run result did not complete the pipeline (see the method contract's own preconditions)."
+          properties:
+            strategy_ref:
+              type: string
+              minLength: 1
+              pattern: "\\S"
+              description: "Free-text reference to the strategy being re-run -- see the method contract's own compilation_decisions for why this stays a free-text reference rather than a hard $ref to one arbitrarily-chosen type."
+            outcome_under_card:
+              type: string
+              minLength: 1
+              pattern: "\\S"
+              description: "What actually happens to the strategy's outcome when this wild card is injected -- the re-run result itself, in natural language."
+            still_holds:
+              type: boolean
+              description: "Whether the strategy still holds under this wild card -- Atlas's own '測 regime shift' benefit, mechanized as a checkable verdict rather than left implicit in outcome_under_card's prose."
+
+  provenance:
+    description: "Record-level only -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A wild-card exercise over a synthetic 'expand into 3 new markets next year' strategy: one dramatic regulatory wild card, re-run, and found to still hold with reduced margin."
+    value:
+      id: "WCARD-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "foresight.wild_cards"
+      wild_cards:
+        - id: "WC-001"
+          description: "三個目標市場的政府同時在同一季宣布全面禁止本產業的跨境資料傳輸"
+          strategy_rerun:
+            strategy_ref: "STRAT-2026-EXPAND-3-MARKETS"
+            outcome_under_card: "原計畫的集中式資料架構無法合規，需在地化資料儲存，擴張時程延後兩季、毛利率下降 8 個百分點"
+            still_holds: true
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-WILDCARDSET-1: wild_cards[] carries no closed severity/plausibility scale -- a future revision could add one if a downstream consumer needs ranking (owner: operator, see the method contract's own OQ-WCARD-1)."
+
+verification:
+  method: >
+    Read Atlas F13 index row (L668) and the Wild Cards table row (L680) directly at the cited line. Grepped
+    the full spec root (specs/**, methods/**) case-insensitively for "wild card"/"wild_card"/"WildCardSet"
+    before writing this file -- zero pre-existing implementation (only Atlas's own table row and the two
+    `method-inventory.yaml` name-only listings found). Validated against jsonschema.Draft202012Validator,
+    including a mutation check that an empty/missing strategy_rerun is refused, and that still_holds rejects a
+    non-boolean value (e.g. 1/0/"true").
+  note: >
+    No mother document was modified. The "wild card→重跑 strategy" pipeline and the "測 regime shift" benefit
+    are transcribed verbatim from Atlas L680. The strategy_rerun sub-structure and the flat wild_cards record
+    shape are this file's own compilation decisions, disclosed above.
