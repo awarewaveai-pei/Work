@@ -19,7 +19,7 @@ Single OVHcloud dedicated server, operational alias `ks-aw-01` (`145.239.195.47`
 | www | www.aware-wave.com | brand site | public | ks-aw-01 | host nginx | — | public | AwareWave | live |
 | api | api.aware-wave.com | unified API gateway | public/customer | ks-aw-01 | host nginx → lobster-nginx | node-api internal | public | AwareWave | live |
 | app | app.aware-wave.com | internal ops console (Lobster Factory) | internal operators only | ks-aw-01 | host nginx → lobster-nginx | Supabase (self-hosted) | internal-facing, not customer portal | AwareWave | live |
-| cognitive | cognitive.aware-wave.com | AI LEGO Cognitive Engineering OS | internal (building) | ks-aw-01 | host nginx | TBD | building | AwareWave | building — not yet a customer-facing service |
+| cognitive | cognitive.aware-wave.com | AI LEGO Cognitive Engineering OS (Phase 1: self-use) | internal (Phase 1 self-use only) | ks-aw-01 | host nginx → lobster-nginx | SQLite (`.runtime/identity.sqlite3`, container volume) | public (auth required beyond `/methods`) | AwareWave | live — deployed 2026-09-12 |
 | hci | hci.aware-wave.com | HCI-30 | future customer | not yet deployed | not yet reserved | not yet provisioned | none yet | AwareWave | **planned — DNS reservation deferred to Wave 7 per `03_AWARE_WAVE_DOMAIN_AND_SUBDOMAIN_MAP.md`** |
 | oracle | oracle.aware-wave.com | Ziwei Doushu app ("Oracle") | internal/product | ks-aw-01 | host nginx | — | internal | AwareWave | live |
 | studio / supabase | studio.aware-wave.com / supabase.aware-wave.com | self-hosted Supabase (DB/Auth/Storage) | internal (backing store for app/portal) | ks-aw-01 | host nginx | Supabase Postgres | internal | AwareWave | live |

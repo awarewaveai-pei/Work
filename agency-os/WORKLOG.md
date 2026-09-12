@@ -17256,3 +17256,31 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 3. Cloudflare MCP 連線失敗（insufficient scope: account:read），改用本機 vault 內 API token 直接呼叫 REST API 建立 DNS record——功能正常但繞過了原本走 MCP 的稽核路徑，需評估是否修正 MCP 權限範圍。
 
 [rollback] nginx 兩層：各自的 `.bak.safe-patch-*`/`.bak.safe-patch-*` 備份檔可還原。DNS：刪除 Cloudflare A record（不影響其他子網域）。憑證：certbot 只會擴充 SAN 不會撤銷既有網域，無需回滾。`/opt/cognitive-os`：整個目錄可直接刪除，未接上任何流量。程式碼 commit：`git revert` 安全（新檔案+一個新 endpoint，未部署前對其他服務零影響）。
+
+## 2026-09-12（續12）Cognitive OS Phase 1 部署完成——ks-aw-01 真實跑 deploy.sh + tenant bootstrap + 公開網域端對端驗證
+
+[任務] 續上一條目（續11）的部署腳手架，實際在 ks-aw-01 執行部署、bootstrap 真實 tenant、並對公開網域做端對端驗證，完成操作者授權的 `cognitive.aware-wave.com` 上線。
+
+[已執行]
+- `git push origin main`（07f76b279），`/opt/cognitive-os` 為 sparse+partial clone（`--filter=blob:none --sparse`，僅 checkout 兩個必要路徑）`git fetch && git reset --hard FETCH_HEAD` 取得最新 commit。
+- 發現主機 `python3` 無 pip（`pip3: command not found`，externally-managed environment）：`sudo apt-get install -y python3.12-venv` 後在 `/opt/cognitive-os/.deploy-venv` 建專用 venv（最小爆炸半徑，不動系統 Python），`pip install -e ".[test]"` + `pip install pytest`。
+- `PATH="/opt/cognitive-os/.deploy-venv/bin:$PATH" bash deploy/deploy.sh`：typecheck PASS → test-gate 73/73 PASS（64.91s）→ docker build（新 image，13.9s pip install 層）→ `docker compose up -d` → healthcheck 6 秒即 healthy（遠低於新調寬的 120s 上限）→ local smoke PASS → **public smoke PASS**（`https://cognitive.aware-wave.com/health` 首次上線即通，證明 nginx 兩層+TLS+DNS 全鏈路已正確接通）。
+- `bootstrap_phase1_tenant.py` 改在**容器內部**執行（`docker exec -i cognitive-os-api`，非本機 venv）——確保用的是容器實際跑的程式碼版本 + 正確掛載的 `.runtime/identity.sqlite3` volume，不是本機 checkout 的影子副本。密碼用 `openssl rand -base64 24` 產生（非本工具代打任何既有密碼），透過 stdin 餵給 `getpass` fallback（非-tty 環境下 `getpass.getpass()` 改讀 stdin 一行，非讀 `/dev/tty`），事後清除 shell history 中的明文。
+- 端對端真實 HTTP 驗證（**全程走公開網域**，非 localhost/container 內部）：`POST /auth/login`（tenant_id+email+password）→ 200 + session cookie；`GET /methods`（無 auth）→ 240 個方法；帶 session cookie `GET /methods/foresight.cross_impact_analysis/demo` → 200，真實 CLI slice 輸出 `PASS ... gates [... PASS]`；`POST /auth/logout` → 200。
+- 更新文件：`COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md`（Phase 1 五項全標記 DONE，含部署+驗證細節、Next action 改為操作說明）、`agency-os/docs/infrastructure/CURRENT_SERVICE_PLACEMENT.md`（cognitive 列 building→live）、`TASKS.md`（既有「另需操作者決策」行加刪除線+完成註記，不改寫歷史敘述本體）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`PATH=.../deploy-venv/bin bash deploy/deploy.sh` | exit=0 | result=typecheck+73 test 全過+build+healthcheck(6s)+local/public smoke 全 PASS，one-shot 無需除錯重跑
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`docker exec -i cognitive-os-api python -m ai_lego.apps.cli.bootstrap_phase1_tenant --email ... --display-name Operator`（stdin 餵密碼） | exit=0 | result=PASS，tenant/workspace/identity 三個真實 UUID 產生
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`curl https://cognitive.aware-wave.com/auth/login` + `/methods` + `/methods/.../demo`（帶 cookie）+ `/auth/logout` | exit=0 | result=200/200/200(240 methods)/200(真實 demo PASS 輸出)/200，全程走公開網域非內部位址
+- REVIEW_WAIVED: NA -- 本條目為純部署執行動作，程式碼本身已於續11完成 critic 覆審；部署腳本本身即該次 critic 審查標的
+- BUGHUNT_WAIVED: NA -- 純執行動作無新程式碼，續11已對本次會執行到的所有程式碼做過 BUGHUNT_DONE
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 主機新增 `python3.12-venv` 系統套件（`apt-get install`）——影響範圍僅 `/opt/cognitive-os/.deploy-venv`（獨立虛擬環境），未觸碰其他服務的 Python 依賴；此套件本身是標準 Ubuntu repo 套件，非第三方來源。
+2. Cloudflare MCP 連線失敗（`insufficient scope: account:read`）持續未解，DNS record 建立繞過 MCP 走本機 vault token 直接呼叫 REST API——同續11第 3 點，尚待評估修正 MCP 權限範圍（非本次部署阻塞項，功能已生效）。
+3. `encryption_root_key_ref` 仍是 local-dev placeholder（無真 KMS）——Phase 1 為自用、無第三方客戶資料，已在 blueprint 揭露為刻意延後到 Phase 2/3，非本次遺漏。
+4. 密碼未持久化於任何文件/程式碼/git 歷史——僅透過本次對話私下轉交操作者；若遺失需操作者自行透過（尚未建置的）密碼重設流程處理，或重跑 `bootstrap_phase1_tenant.py`（但目前無「更新既有 identity 密碼」路徑，只有「建立新 identity」——Phase 1 已知限制，未收錄進 blueprint 的 explicitly-out-of-scope 清單，補記於此）。
+
+[rollback] `docker compose -f docker-compose.yml down`（服務下線，不影響其他 ks-aw-01 服務，`lobster-net` 為外部共用網路不受影響）。nginx/DNS/憑證層 rollback 見續11條目。Tenant 資料在 named volume `cognitive-engineering-os_cognitive-os-identity-data` 中，`docker compose down` 預設不刪 volume（需要 `-v` 才會刪），故 rollback 不會遺失已 bootstrap 的 tenant。
