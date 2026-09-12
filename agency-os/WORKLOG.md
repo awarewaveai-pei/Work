@@ -1,5 +1,47 @@
 # Worklog
 
+## 2026-09-12（續12）/ops/collect【試跑】【正式抓取】按了沒反應 —— 根因 Cloudflare ~100s 邊緣逾時 kill 掉同步等待的長爬蟲請求，改成非同步+輪詢
+
+[任務] 操作者回報 app.aware-wave.com/ops/collect 按鈕沒反應。
+
+[根因，非猜測，SSH 進 ks-aw-01 查 production nginx access log 抓到]：`POST .../collection-sources`
+在操作者實際點擊的時間點連續四次 `499 0 bytes`(14:55:55/14:56:35/14:57:26/15:02:01)。499=遠端先掛斷。
+鏈路：①`route.ts` 舊寫法在同一個 HTTP request 裡 `await runCollection(...)` 等整個爬蟲跑完才回應，
+`run.ts` `DEFAULT_BUDGET.ms=10*60_000` 本來就允許跑到 10 分鐘 ②app.aware-wave.com 走 Cloudflare
+(`curl -I` 確認 `server: cloudflare`)，其邊緣對單一請求預設約 100 秒沒回應就自己斷線,與 nginx/
+Next.js 自己的 300s 設定無關,兩層都給了足夠時間但擋不住更前面那層 ③前端 `collect()`
+([CollectionSourcesPanel.tsx](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/collect/CollectionSourcesPanel.tsx))
+原本只有 `finally` 沒有 `catch`,請求失敗時整個 promise reject 被靜默吞掉,畫面上什麼訊息都不會跳。
+禮貌限速(續7-9 rate limiter)讓真實抓取更容易超過 100 秒門檻,量少時不會炸,量一多必炸。
+
+[修復，非治標加 timeout，是把長任務改成非同步]：
+- 新增 `lib/collect/run-jobs.ts`：單一 Node 行程內的記憶體 job tracker(`Map<orgId:runKey, job>`)。
+  刻意不落地 DB——試跑本來就設計成「不留任何痕跡」(run.ts 既有註解)，且 next-admin 是單一長駐
+  container 不是多實例/serverless，記憶體本身就是完整視角，行程重啟才會遺失(可接受，見檔頭註解)。
+- `route.ts` POST `action:"run"`：不再 await，`runCollection(...)` 丟進 `startRunJob()` 背景跑，
+  立刻回 `{ok:true, queued:true, runKey}`。GET 加 `?runKey=` 分支讀 job 狀態
+  (`running`/`done`/`error`)。
+- `CollectionSourcesPanel.tsx` 新增 `pollRun()`：POST 拿到 runKey 後每 2 秒(先查再等，不是先等再查，
+  第一次就查得到時零延遲)輪詢狀態，最終行為(畫面顯示什麼)跟修復前一樣，只是不再靠一個會被邊緣層
+  砍斷的長請求。
+- `run.ts` `defaultRunKey()` 抽成 export 並補隨機尾碼——因為 runKey 現在要在 route 層先產生出來
+  當 job tracker 的 key，原本秒級精度在「兩個分頁同秒各按一次同客戶」時會撞號(job 互相覆蓋，
+  A 分頁看到 B 分頁的結果)，順便也讓 `collection_runs` 表的 upsert key 更不容易撞。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`(next-admin，改動後重跑兩次)| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect "app/(shell)/ops/collect" app/api/ops/clients` | exit=0 | 212 passed / 7 skipped(既有需要真網路/金鑰的 live test)，含新增 `run-jobs.test.ts` 4 個測試(running→done、reject→error、跨 org 不互撞)
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep collection-sources /var/log/nginx/access.log*` + `grep proxy_read_timeout` + `curl -I` 確認 Cloudflare | exit=0 | 這是根因診斷的直接證據，不是修復後的驗證，但沒有這步就是在猜
+- REVIEW_DONE: critic=Quick(async subagent，尚未回報時本條目先落地；回報後若有 finding 另開條目修)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`collection-sources\|runCollection(\|defaultRunKey` | hits=10 檔，逐一核對：`run-due-schedules/route.ts`(Trigger.dev 排程呼叫端，未改動，範圍外)、`collect-run-rate-limit-wiring.test.ts`(直接測 runCollection，行為未變)、`RUNNABLE_DEMOS.md`(僅描述使用者可見結果「跑完列出抓到幾筆」，修復前後對使用者一致，不需改)，其餘皆為本次改動的檔案本身
+- 尚未部署到 prod——待 critic 回報 + 操作者 go-ahead
+
+[剩餘風險]
+1. Job tracker 記憶體型：next-admin 重啟/重新部署當下若剛好有人在等一個「正式抓取」，那個分頁的輪詢會收到 `run_not_found`，畫面會提示去看來源清單的 `lastRunAt` 確認——爬蟲本身不受影響，只是那個分頁看不到即時結果。
+2. `run-due-schedules/route.ts`(Trigger.dev 排程觸發的路徑)理論上有同一種「同步等待長爬蟲+同樣走 Cloudflare」的風險，本次刻意不動——那條路徑沒人在瀏覽器前面等結果，症狀不明顯，且改它是更大範圍的手術，超出這次「按鈕沒反應」的回報範圍，值得另開一條追蹤。
+
+[rollback] `git revert` 對應 commit；`run-jobs.ts`/`run-jobs.test.ts` 為新檔案，回退等於直接刪除；`route.ts`/`CollectionSourcesPanel.tsx`/`run.ts` 三檔案的變更彼此獨立可逐一回退，皆不改變既有 DB schema。
+
 ## 2026-09-12（續11）TTS 唸出舞台指示（「無台詞」「旁白/字幕」被逐字唸出）——加 prompt 規則 + 結構性過濾雙保險
 
 [任務] 承接續10。操作者實測看完完整成片後回報：場景 2 的「（無台詞，輕嘆氣聲）」跟場景 6 的「（旁白/字幕）」被 TTS 逐字唸出來，且沒有真的嘆氣聲音，問可否克服。
@@ -17367,6 +17409,19 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 [剩餘風險]
 1. `sg-stack.aware-wave.com` 這個外層 vhost 的 https 強制轉址是 Certbot 自動維護（`# managed by Certbot`），未來每簽一張新證書都會重寫這個檔案並可能再次改變 mtime/內容順序——不影響本次修復（smoke check 現在測對層了，不再依賴外層行為），純資訊記錄。
 2. `safe-infra-patch.sh` 的 nginx smoke check 現在只驗 `app.aware-wave.com` 一個網域（`/api/ops/summary`）——這次新增的 portal／cognitive 兩個網域沒有各自的機械 smoke 覆蓋，仍要靠人工/本條目手動 curl 驗證；若要更完整可考慮擴充 smoke check 逐網域驗證，但屬另一個獨立改動，未包含在本次 drift 修復範圍內，未開 TASKS 項（成本/效益需操作者判斷是否值得，暫記於此）。
-3. 兩份 `.bak.safe-patch-*` 與一份 `.bak.manual-*` 備份留在 live server 上（`default.conf.bak.safe-patch-20260912-150011`／`150440`、`safe-infra-patch.sh.bak.manual-20260912-*`）——按既有慣例不清理，供未來需要回滾時使用。
+3. 兩份 `.bak.safe-patch-*` 與兩份 `.bak.manual-*` 備份留在 live server 上（`default.conf.bak.safe-patch-20260912-150011`／`150440`／`151819`、`safe-infra-patch.sh.bak.manual-20260912-*` ×2）——按既有慣例不清理，供未來需要回滾時使用。
 
-[rollback] nginx 設定：`sudo cp /root/lobster-phase1/nginx/default.conf.bak.safe-patch-20260912-150440 /root/lobster-phase1/nginx/default.conf && docker exec lobster-nginx nginx -t && docker exec lobster-nginx nginx -s reload`。`safe-infra-patch.sh` 腳本：`sudo cp /root/lobster-phase1/scripts/safe-infra-patch.sh.bak.manual-<timestamp> /root/lobster-phase1/scripts/safe-infra-patch.sh`。Local repo 兩檔皆為一般 git 追蹤檔，`git revert` 或 `git checkout` 皆可安全回滾，無資料遺失風險。
+**追記（同日，critic 覆審後修正）**：`/verify-recent` 觸發 `critic=Deep` 對 `safe-infra-patch.sh` 的改動覆審，抓到 1 Major + 1 Minor（+1 style suggestion）：
+- 🟠 Major：我原本把 `8083`寫死，但 `docker-compose.yml` 用 `${NGINX_HOST_PORT:-80}:80` 決定 lobster-nginx 對外開哪個 port——`8083` 其實是 ks-aw-01 這台機器 `.env`（gitignored）裡的個別覆寫值，不是任何 repo 檔案裡的固定數字。若未來 `NGINX_HOST_PORT` 消失（例如 `KS-AW-01-HOST-SWITCH-RUNBOOK` 規劃中的換機、或 `.env` 從 `.env.example` 重建），compose 會退回 `:80`，寫死的 `8083` smoke check 會變成永遠打不通（`000`），每次 patch 都被誤判失敗自動回滾——等於重新複製了這次要修的同一種 bug（smoke check 測錯目標），只是從「靜默假陰性」換成「每次都真的擋下合法修改」。改為執行期用 `docker port lobster-nginx 80/tcp` 動態解析，解析不到才退回 80，徹底脫鉤對 `.env` 變數的隱性依賴。
+- 🟡 Minor：`curl -sf ... || echo "000"` 在任何非 2xx 情況下會雙重觸發（`-w` 已經印出狀態碼，`-f` 讓 exit code 非 0，bash 的 `||` 又追加一次）——連線被拒回傳 `000000`、HTTP 404 回傳 `404000`，導致 `safe-patch.log`（AGENTS.md R2 定義的「30 秒故障手冊」）記錄失真。移除 `-f`（`-w` 本身就夠拿來判斷分支，`-f` 是多餘的），改乾淨變數賦值 + `${http_code:-000}` fallback。
+- 🔵 Suggestion：新增註解原本寫了調查敘事（何時發現、為何長期沒暴露），依 AGENTS.md §9 書面產出原則應只留 1–3 行點出未來讀者會踩的坑，敘事進 WORKLOG——已裁剪註解，敘事保留在本條目原文。
+- 修復後重新對 live 跑一次完整 `safe-infra-patch.sh nginx`（backup→apply→nginx-t→reload→smoke），全綠；額外用真實 curl 對照驗證：連線被拒情境下舊寫法回 `000000`、新寫法乾淨回 `000`，證明 Minor 修復生效；`docker port lobster-nginx 80/tcp` 直接跑出 `127.0.0.1:8083`，證明 Major 修復的動態解析路徑跟原本寫死的值一致，行為不變但不再脆弱。Local repo 檔 md5 (`2d86828f...`) 與 live 修復後檔案逐位元組相同，無需額外回寫。
+
+[驗證結果（追記）]
+- REVIEW_DONE: critic=Deep | verdict=pass（覆審後修復） | findings=1Major(已修：8083 寫死改執行期 `docker port` 動態解析,避免未來 NGINX_HOST_PORT 換掉時整批 patch 假陰性回滾)/1Minor(已修：curl -f 與 -w 雙重觸發導致 log 記錄失真的碼如 404000/000000,改乾淨賦值)/1Suggestion(已採納：註解裁剪至 pitfall-only,調查敘事移回本條目)
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker port lobster-nginx 80/tcp` | exit=0 | result=`127.0.0.1:8083`，證明動態解析值與原寫死值一致
+- REALTEST_EVIDENCE: tool=SSH | cmd=修復後重跑 `safe-infra-patch.sh nginx` | exit=0 | result=`success | type=nginx`，backup/apply/nginx-t/reload/smoke 全過
+- REALTEST_EVIDENCE: tool=SSH | cmd=對照 `curl -sf...||echo 000` 舊寫法 vs 新寫法打連線被拒的 port | exit=0 | result=舊法印出 `000000`（污染 log）、新法印出乾淨 `000`，證明 Minor 修復生效
+- BUGHUNT_WAIVED: NA -- 本次追記僅修正同一檔案內的邏輯細節，未新增其他檔案改動，範圍已含在上方原條目的 BUGHUNT_DONE 兩筆內
+
+[rollback] nginx 設定：`sudo cp /root/lobster-phase1/nginx/default.conf.bak.safe-patch-20260912-151819 /root/lobster-phase1/nginx/default.conf && docker exec lobster-nginx nginx -t && docker exec lobster-nginx nginx -s reload`。`safe-infra-patch.sh` 腳本：`sudo cp /root/lobster-phase1/scripts/safe-infra-patch.sh.bak.manual-<最新timestamp>-v2 /root/lobster-phase1/scripts/safe-infra-patch.sh`。Local repo 兩檔皆為一般 git 追蹤檔，`git revert` 或 `git checkout` 皆可安全回滾，無資料遺失風險。

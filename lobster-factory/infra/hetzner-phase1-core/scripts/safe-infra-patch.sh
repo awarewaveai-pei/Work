@@ -89,8 +89,15 @@ case "$TYPE" in
     else
       docker exec lobster-nginx nginx -s reload
       sleep 2
-      http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
-        -H "Host: app.aware-wave.com" http://127.0.0.1/api/ops/summary 2>/dev/null || echo "000")
+      # Probe lobster-nginx itself, not the outer host-nginx (port 80, Certbot-managed,
+      # force-redirects several domains to HTTPS) -- resolved at runtime, not hardcoded,
+      # because the host port is NGINX_HOST_PORT-driven (docker-compose.yml) and varies
+      # by environment/host.
+      nginx_probe_port=$(docker port lobster-nginx 80/tcp 2>/dev/null | head -1 | sed 's/.*://')
+      nginx_probe_port="${nginx_probe_port:-80}"
+      http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Host: app.aware-wave.com" "http://127.0.0.1:${nginx_probe_port}/api/ops/summary" 2>/dev/null)
+      http_code="${http_code:-000}"
       if [[ "$http_code" != "200" ]]; then
         log "health-fail | reason=nginx smoke check returned $http_code"
         health_ok=0
