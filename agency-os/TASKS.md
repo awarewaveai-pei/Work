@@ -268,12 +268,12 @@
   - **過程中的真實插曲**：第一次部署後測試曾遇 Replicate 帳號 <$5 額度被限流導致 502（跟本次程式碼無關的既有帳務問題，操作者已處理）；程式碼曾在共用 worktree 中被並行 session 的 git 操作覆寫兩次，靠 `git diff --stat` 比對 HEAD 抓到並重做。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「Story Bible 畫面層缺口 + 字幕查證」+ 2026-09-12 兩條目（角色一致性實作、改最便宜模型+文件）。
 
-- [ ] **【2026-09-12 開出｜本機已完成，卡在你】AI 影片動態（image-to-video）取代 Ken Burns 縮放**
-  - `🟡 本機已完成，卡在你（deploy go-ahead + 第一次真實測試要花錢）` · 操作者實測後：「你所謂的短劇影片只是放照片...我是要真的像電影一樣」→ 選「Runway/Luma/Veo 3個都要，都用 Replicate，要可以勾選」
-  - **做了什麼**：新增 `lib/tarot/video-motion-gen.ts`（Runway Gen-4 Turbo $0.05/秒、Luma Ray Flash 2 $0.06/秒、Luma Ray 2 $0.18/秒、Veo 3.1 Fast $0.10/秒、Veo 3.1 $0.20/秒，皆走 Replicate，schema/定價 2026-09-12 直接查證非猜測）；只對主要輸出比例前 3 個自訂場景套用（固定併發 3，避免單次請求疊過 nginx 300s timeout）；`VideoStudio.tsx` 新增可勾選 chip 列。Critic 覆審抓到 2 個 Critical（逾時疊加雙重收費風險、場景數無上限）+ 4 個 Major 全部修復。commit `13d2303f0`。
-  - **下一步（需要你 go-ahead）**：① Deploy 是 High-risk，等你明示可以部署；② 部署後第一次真實測試**會花真錢**（最便宜 Runway 一次約 $0.25 起），目前 3 個 vendor 都還沒真的打過一次 API，只驗證過 schema/併發/成本估算邏輯。
-  - **2026-09-12 續**：操作者追加「成本要串接好」+「不能被重複收費」→ 真實花費已接上 `ai_call_logs`（/ops/costs 費率表+流水帳都看得到），critic 覆審抓到 2 個 Major（收費時機/流水帳可追溯性）已修，「不重複收費」路徑追蹤後 critic 標記 Verified Clean。commit `52abc8fff`。
-  - **證據**：`agency-os/WORKLOG.md` 2026-09-12「AI 影片動態」條目 + 續7「成本串接」條目。
+- [x] **【✅ 2026-09-12 部署 + 真實測試完成】AI 影片動態（image-to-video）取代 Ken Burns 縮放**
+  - 操作者實測後：「你所謂的短劇影片只是放照片...我是要真的像電影一樣」→ 選「Runway/Luma/Veo 3個都要，都用 Replicate，要可以勾選」→「成本要串接好」+「不能被重複收費」→「做好之後去部署 + 花 $0.25 測一次 Runway」。
+  - **做了什麼**：`lib/tarot/video-motion-gen.ts`（5 模型皆走 Replicate，schema/定價直接查證）；只對主要輸出比例前 3 個自訂場景套用；真實花費接上 `ai_call_logs`；critic 覆審 2 輪共抓到 2 Critical + 6 Major 全修。commit `13d2303f0`/`52abc8fff`。
+  - **部署 + 真實測試（commit `f372a6c93`）**：已部署上線（build+healthcheck+smoke 全過）；用她的真實 Chrome 對正式站跑一次 Runway，草稿頁 3 個場景確認全部是真實 `.mp4`（非縮放靜態圖）——動態生成本身沒問題。
+  - **測試中抓到並修復一個 Critical bug**：`ai_call_logs.job_id` 是 Postgres uuid 型別，續7新加的批次關聯 id 用 `randomBytes(8).toString("hex")`（非 UUID 格式）→ PostgREST 400 → `logImageCost` 靜默吞錯 → 這次真實測試的 3 筆 $0.25 花費完全沒進流水帳。已修（`randomUUID()`）、對 production DB 真實驗證、3 筆遺失花費已人工對帳補回並註明原因。commit `5a75ee78c`。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-12 續7（成本串接）+ 續8（部署+真實測試+bug 修復）兩條目。
 
 - [x] **【✅ 2026-09-10 全部收尾】CF API token 401 監控盲點 + aware-wave.com SPF/CAA 補齊** — 操作者於 Cloudflare dashboard 重新產生兩把 token（`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_AUTH_BEARER_TOKEN`）並貼進個人筆記 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md:147-148`，已同步進 `mcp/user-env.ps1`（不進 git）。完成定義四項全滿足：① `check-cloudflare-security.ps1` 新增 `BLIND` 第四態＋逐檔案 check 精準歸因（401/403/網路失敗分開講，不誇大成「全部」）② `Overall: PASS` 已實測確認（bot=ON, rules=1, xmlrpc=True）③ 順手發現並修復一個獨立根因：CF 舊版 `/firewall/rules` API 對此 zone 永久回 400（error 10021,自 9/4 之後這 zone 的自訂 ruleset 混進了新版 Rulesets API 建立的規則）,遷移到 `/rulesets/phases/http_request_firewall_custom/entrypoint`，並修一個 PowerShell array-unwrap 陷阱（單元素陣列經 if-expression 賦值會被拆包成純量，`@()` 需包住整個 if/else 而非各分支內部）④ SPF TXT 已補 `include:_spf.resend.com`、CAA 6 筆（`letsencrypt.org`/`pki.goog`/`sectigo.com` 各 issue+issuewild）已建立，皆用外部 `dns.google` DNS-over-HTTPS 查詢驗證生效（非只信 CF API 自己的回應）；CAA 驗證時額外發現 Cloudflare 自動補了 6 筆自己的簽發 CA（ssl.com/comodoca.com/digicert.com），符合官方文件行為，不是異常。
   - 完整根因、逐步證據、critic 兩輪覆審發現與修復細節見 `agency-os/WORKLOG.md` 2026-09-10「CF API token 401 監控盲點」＋「aware-wave.com SPF/CAA 補齊 + firewall/rules API 遷移」兩條目。
