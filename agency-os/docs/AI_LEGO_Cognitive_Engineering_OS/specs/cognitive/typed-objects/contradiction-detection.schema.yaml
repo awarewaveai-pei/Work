@@ -1,0 +1,133 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/contradiction-detection.schema.yaml"
+title: Contradiction Detection
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ContradictionDetection` -- the declared `outputs` of
+  `epistemic.contradiction_detection`'s Method Contract
+  (methods/contracts/epistemic.contradiction_detection.contract.yaml, `outputs: [ContradictionDetection]`).
+  F10 epistemic family, Contradiction Detection row (L579: "找來源/模型互相衝突｜claims matching→support/
+  contradict/context｜暴露不確定性").
+
+  Orthogonal to `specs/evidence/claim.schema.yaml`'s own `contradicting_evidence` field: that field links ONE
+  claim to contradicting EVIDENCE records (claim-to-evidence). This type instead holds a roster of CLAIMS
+  (soft `^C-[0-9]+$` id references into claim.schema.yaml, not a re-minted parallel claim type -- see
+  compilation_decisions) plus a set of pairwise CLAIM-to-CLAIM relations (SUPPORTS/CONTRADICTS/
+  CONTEXT_DEPENDENT), composing with claim.schema.yaml rather than duplicating it.
+
+  Field provenance:
+    * `claims[]` -- the roster of claims this run examined, each a soft `{claim_id}` reference.
+    * `relations[]` -- each names two claim ids from that roster and classifies their relation. Referential
+      integrity (`claim_id_a`/`claim_id_b` must resolve to a declared claim), no self-relation
+      (`claim_id_a != claim_id_b`), and unordered-pair uniqueness ({A,B} == {B,A}, so the same pair may not be
+      declared twice, even in reversed order or with a different relation value) are all cross-array/
+      cross-field checks JSON Schema 2020-12 cannot express here -- runtime-layer invariants, see
+      `ai_lego/modules/epistemic/contradiction_detection.py`, enforced at construction AND independently via a
+      gate that re-derives from raw fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Contradiction Detection row (L579)"
+  - "specs/evidence/claim.schema.yaml (claim_id's own ^C-[0-9]+$ id convention, reused not re-minted; contradicting_evidence field, cited as the orthogonal claim-to-evidence axis this type does not duplicate)"
+  - "methods/contracts/epistemic.contradiction_detection.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L579's own row, plus low-risk disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should claims[] embed the full Claim record (hard $ref to claim.schema.yaml), or stay a soft id reference?"
+    decision: "Soft id reference only (pattern ^C-[0-9]+$) -- this type detects relations BETWEEN existing claims, it does not own or duplicate their full record shape, same reasoning assumption-mapping.schema.yaml's own assumption_id already establishes for its sibling soft-reference field."
+  - question: "additionalProperties: false at the top level, and on each nested item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on."
+  - question: "Should the same unordered pair be allowed to appear twice (e.g. once per direction, or with two different relation values)?"
+    decision: "No -- refused at the runtime layer. {A,B} and {B,A} are the same pair; declaring it twice, even with conflicting relation values, would make the contradiction set self-inconsistent."
+
+type: object
+required: [id, version, claims, relations, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CDET-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.contradiction_detection"
+
+  claims:
+    type: array
+    minItems: 2
+    description: "The roster of claims this run examined -- at least 2 required, the structural floor for any relation to connect two DISTINCT claims (same reasoning concept-map-record.schema.yaml's own nodes: minItems: 2 already applies to its sibling graph shape)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [claim_id]
+      properties:
+        claim_id:
+          type: string
+          pattern: "^C-[0-9]+$"
+          description: "Soft reference to a real evidence/claim.schema.yaml record's own claim_id convention. Unique within this record -- enforced at the runtime layer, not here."
+
+  relations:
+    type: array
+    description: "May be empty -- a roster may be examined and found free of conflict (same 'zero findings is legal' legitimacy red-team-challenge.schema.yaml's own findings[] already establishes)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [claim_id_a, claim_id_b, relation]
+      properties:
+        claim_id_a:
+          type: string
+          pattern: "^C-[0-9]+$"
+        claim_id_b:
+          type: string
+          pattern: "^C-[0-9]+$"
+        relation:
+          type: string
+          enum: [SUPPORTS, CONTRADICTS, CONTEXT_DEPENDENT]
+          description: "Atlas L579's own 3-value classification ('support/contradict/context')."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "3 claims about the same market: 2 directly conflicting growth forecasts, 1 region-dependent claim that is neither a clean support nor a clean contradiction of the first."
+    value:
+      id: "CDET-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.contradiction_detection"
+      claims:
+        - {claim_id: "C-3001"}
+        - {claim_id: "C-3002"}
+        - {claim_id: "C-3003"}
+      relations:
+        - {claim_id_a: "C-3001", claim_id_b: "C-3002", relation: CONTRADICTS}
+        - {claim_id_a: "C-3001", claim_id_b: "C-3003", relation: CONTEXT_DEPENDENT}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CONTRADICTIONDETECTION-1: claim_id is not cross-checked against a real, existing Claim record at schema-validation time (JSON Schema has no cross-file existence check) -- only its id-pattern shape and in-roster membership are enforced (owner: operator, or whoever wires this method to a live claim registry)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L579) directly, and specs/evidence/claim.schema.yaml in full (including its own
+    contradicting_evidence field) before designing this schema, to confirm the claim-to-evidence vs
+    claim-to-claim distinction disclosed above. Grepped the full spec root (specs/**, methods/**)
+    case-insensitively for "contradict" before writing -- hits found in claim.schema.yaml's own
+    contradicting_evidence field (the orthogonal axis this type composes with, not duplicates) and several
+    unrelated method contracts naming "contradicting"/"contradiction" in free-text reasoning prose -- no
+    duplicate ContradictionDetection typed object found. Validated against jsonschema Draft202012Validator,
+    including a mutation check that additionalProperties:false actually rejects an unknown key at all three
+    levels (top, claims item, relations item), and that the relation enum rejects a non-member value.
+  note: >
+    No mother document was modified. The `claims[]` + `relations[]` shape is this file's own Phase 3
+    compilation choice, directly grounded in Atlas L579's own 'claims matching -> support/contradict/context'
+    wording. No mother document or sibling spec file was modified to produce this file.

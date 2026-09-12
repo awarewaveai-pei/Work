@@ -1,0 +1,156 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/evidence-matrix.schema.yaml"
+title: Evidence Matrix
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `EvidenceMatrix` -- the declared
+  `outputs` of `epistemic.evidence_matrix`'s Method Contract
+  (methods/contracts/epistemic.evidence_matrix.contract.yaml, `outputs:
+  [EvidenceMatrix]`). F10 epistemic-quality family (Atlas L575: "Evidence
+  Matrix | Claim × Evidence 對齊 | rows=claims、cols=evidence→quality/
+  diversity/recency | 快速看到薄弱 claim").
+
+  `claims[]`/`evidence_items[]` are real `$ref`s to
+  `specs/evidence/claim.schema.yaml`/`specs/evidence/evidence.schema.yaml`
+  (each schema's own minimal required set -- `claim_id`+`statement`+
+  `provenance` / `evidence_id`+`provenance` -- already permits a lightweight
+  stub) -- this file does NOT mint a second, parallel claim/evidence record
+  shape; it adds only the alignment layer (`links[]`), the same "real $ref,
+  minimal stub allowed" pattern `evidence-graph.schema.yaml#/claim_node`/
+  `#/evidence_node` already established.
+
+  Real invariant (referential integrity + no orphan claim), mechanized as a
+  RUNTIME invariant (same disclosed-gap class as
+  behavior-over-time-chart.schema.yaml's own strict-ordering precedent --
+  JSON Schema 2020-12 cannot express "every array item's field must appear
+  in that sibling array, AND every sibling-array item must be referenced at
+  least once" declaratively): every `links[].claim_id`/`links[].evidence_id`
+  must resolve to a declared `claims[]`/`evidence_items[]` entry (a dangling
+  reference is refused, both directions); every declared claim must appear
+  in >=1 link (Atlas's own benefit column, "快速看到薄弱 claim", is exactly
+  why an unlinked claim must never be silently accepted as a complete
+  matrix); no duplicate `(claim_id, evidence_id)` pair is permitted (the
+  same cell asserted twice, possibly with conflicting `relation` values, is
+  a real authoring error). All three enforced by
+  `ai_lego/modules/epistemic/evidence_matrix.py` at construction time and
+  independently re-derived by that module's own gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Evidence Matrix row (L575)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.20 Evidence Matrix worked example (L1657-1669) -- SUPPORTS/CONTRADICTS transcribed from the Supporting/Contradicting columns"
+  - "methods/contracts/epistemic.evidence_matrix.contract.yaml (outputs, preconditions, quality)"
+  - "specs/evidence/claim.schema.yaml / specs/evidence/evidence.schema.yaml (claims[]/evidence_items[], real $refs, composed not duplicated)"
+  - "specs/evidence/evidence-graph.schema.yaml#/claim_node, #/evidence_node -- real-$ref-with-minimal-stub precedent this file follows; #/edge.relation_type's SUPPORTS/CONTRADICTS values, same Atlas §11.20 grounding"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L575's own
+  rows=claims/cols=evidence structure plus low-risk, disclosed compilation
+  choices (the EVIDMATRIX- prefix, record-level-only provenance,
+  runtime-invariant placement of the referential-integrity/no-orphan-claim
+  rules).
+
+compilation_decisions:
+  - question: "Should claims[]/evidence_items[] mint their own record shape, or $ref the existing typed objects?"
+    decision: "Real $ref to claim.schema.yaml/evidence.schema.yaml -- see top-level description. This is the method's own explicit compose-not-duplicate mandate."
+  - question: "relation enum values -- SUPPORTS/CONTRADICTS/NEUTRAL, or an open string?"
+    decision: "Closed 3-value enum. SUPPORTS/CONTRADICTS are directly grounded (Atlas §11.20's own Supporting/Contradicting columns, L1663; already realized as claim.schema.yaml's supporting_evidence/contradicting_evidence field names). NEUTRAL is added for the real case of an evidence item examined and found neither supporting nor contradicting -- same 'a dimension may be examined and found clean' completeness posture challenge.red_team's own findings[] array already established for its own examined-but-clean case."
+  - question: "No-orphan-claim / referential-integrity / duplicate-pair: declarative JSON Schema keywords, or runtime invariants?"
+    decision: "Runtime invariants -- same gap class as behavior-over-time-chart.schema.yaml's own strict-ordering precedent (no native cross-array-coverage or array-level-uniqueness-of-a-composite-key keyword)."
+
+type: object
+additionalProperties: false
+required: [id, version, claims, evidence_items, links, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^EVIDMATRIX-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.evidence_matrix"
+
+  claims:
+    type: array
+    minItems: 1
+    description: "The matrix's own rows. Atlas L575's own literal 'rows=claims' requires at least 1 row for this to be a matrix."
+    items:
+      $ref: "ai-lego://specs/evidence/claim.schema.yaml"
+
+  evidence_items:
+    type: array
+    minItems: 1
+    description: "The matrix's own columns. Atlas L575's own literal 'cols=evidence' requires at least 1 column for this to be a matrix."
+    items:
+      $ref: "ai-lego://specs/evidence/evidence.schema.yaml"
+
+  links:
+    type: array
+    description: "Zero or more claim-evidence alignment cells. May be empty only when claims[] is also empty (a non-empty claims[] with zero links leaves every claim an orphan -- refused, see top-level description)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [claim_id, evidence_id, relation]
+      properties:
+        claim_id:
+          type: string
+          pattern: "^C-[0-9]+$"
+          description: "Must resolve to a real claims[].claim_id -- cross-field invariant, checked by ai_lego/modules/epistemic/evidence_matrix.py, not this schema."
+        evidence_id:
+          type: string
+          pattern: "^E-[0-9]+$"
+          description: "Must resolve to a real evidence_items[].evidence_id -- cross-field invariant, checked by ai_lego/modules/epistemic/evidence_matrix.py, not this schema."
+        relation:
+          type: string
+          enum: [SUPPORTS, CONTRADICTS, NEUTRAL]
+          description: "Atlas §11.20's own Supporting/Contradicting columns (L1663), plus NEUTRAL for an examined-but-neither case. See compilation_decisions."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling single-record typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "2 claims, 3 evidence items, 3 links -- every claim covered by at least 1 link"
+    value:
+      id: "EVIDMATRIX-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.evidence_matrix"
+      claims:
+        - {claim_id: "C-1", statement: "本產品在東南亞市場有成長潛力", provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}}
+        - {claim_id: "C-2", statement: "目標客群的價格敏感度高於預期", provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}}
+      evidence_items:
+        - {evidence_id: "E-1", content: "東南亞電商年成長報告", provenance: {epistemic_type: EVIDENCE, authorship_state: SOURCE_QUOTATION}}
+        - {evidence_id: "E-2", content: "客戶訪談紀錄顯示對價格敏感", provenance: {epistemic_type: EVIDENCE, authorship_state: SOURCE_QUOTATION}}
+        - {evidence_id: "E-3", content: "競品定價分析", provenance: {epistemic_type: EVIDENCE, authorship_state: SOURCE_QUOTATION}}
+      links:
+        - {claim_id: "C-1", evidence_id: "E-1", relation: SUPPORTS}
+        - {claim_id: "C-2", evidence_id: "E-2", relation: SUPPORTS}
+        - {claim_id: "C-2", evidence_id: "E-3", relation: CONTRADICTS}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-EVIDENCEMATRIX-1: Atlas L575's own 'quality/diversity/recency' column-dimension list is not modeled as per-link fields here -- see methods/contracts/epistemic.evidence_matrix.contract.yaml's own open_questions for why (already covered generally by evidence.schema.yaml's own quality_assessment, no line ties those three words to link-level structure specifically).（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Evidence Matrix row (L575) and §11.20's worked
+    example (L1657-1669) directly. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_evidence_matrix.py, including
+    real mutation checks that a dangling `links[]` reference (either
+    direction), an orphan claim, and a duplicate `(claim_id, evidence_id)`
+    pair are each refused at the runtime layer (this schema alone cannot
+    express any of the three cross-array constraints).
+  note: >
+    No mother document was modified. `claims`/`evidence_items`/`links` are
+    transcribed directly from Atlas L575's own rows/cols/alignment
+    structure; `SUPPORTS`/`CONTRADICTS` from §11.20's worked example. The
+    EVIDMATRIX- prefix, `NEUTRAL` relation value, and runtime-invariant
+    placement of referential-integrity/no-orphan-claim/no-duplicate-pair are
+    this file's own compiled structure, disclosed above, not textually
+    cited.

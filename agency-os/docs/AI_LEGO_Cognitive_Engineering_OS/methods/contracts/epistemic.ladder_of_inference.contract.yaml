@@ -1,0 +1,88 @@
+$id: "ai-lego://methods/contracts/epistemic.ladder_of_inference.contract.yaml"
+title: "Ladder of Inference Method Contract"
+status: ACTIVE
+
+description: >
+  F10 epistemic-quality family (Atlas L572: "Ladder of Inference | 追 data→
+  meaning→assumption→conclusion | 把每一步顯式化 | 找認知跳躍"). Climbs four
+  named rungs -- observed data, meaning assigned, assumption made, conclusion
+  drawn -- in that fixed ascending order. Core invariant: a higher rung may
+  only be populated once every lower rung already is; a conclusion recorded
+  with no assumption or meaning rung beneath it IS the cognitive leap this
+  method exists to expose (Atlas's own "找認知跳躍"), so it is refused, not
+  silently stored.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 假設／證據／認知品質 table, Ladder of Inference row (L572)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L572 gives a real four-rung pipeline and
+  effect ("找認知跳躍") -- direct transcription plus low-risk, disclosed
+  compilation choices, same class as systems.iceberg_model.contract.yaml's
+  own four-level analogue.
+
+id: epistemic.ladder_of_inference
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [DECOMPOSE, INFER, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F10
+# members). DECOMPOSE breaks the reasoning chain into its four named rungs;
+# INFER is the method's own defining action (climbing from data to
+# conclusion); EXPLAIN articulates each rung as a real statement rather than
+# a bare label. All three CANONICAL_KERNEL members.
+
+purpose:
+  - make_each_inferential_step_explicit
+# Atlas L572 verbatim sense: 把每一步顯式化 (make every step explicit), to
+# expose the cognitive leap (找認知跳躍) a run's own author would otherwise
+# skip silently.
+
+inputs:
+  required:
+    - ObservedDataDescription
+  # NEW DESIGN, same free-text-input scope limit systems.iceberg_model.
+  # contract.yaml's EventDescription already establishes -- Atlas gives no
+  # named input typed-object for this method's own starting rung.
+
+outputs:
+  - LadderOfInferenceAnalysis
+# NEW output type (see typed-objects/ladder-of-inference-analysis.schema.yaml).
+
+preconditions:
+  - "at least one observed_data statement"
+  # NEW, structurally necessary -- a ladder with nothing observed is not a
+  # Ladder of Inference.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same placement convention systems.iceberg_model.
+  # contract.yaml's own single-analysis precedent already establishes.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an analysis has no external side effect.
+
+open_questions:
+  - "OQ-LADDEROFINFERENCE-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-LADDEROFINFERENCE-2: RESOLVED (2026-09-12) -- epistemic.assumption_mapping and epistemic.assumption_registry (Atlas L570-571) were built by concurrent sibling agents in this same F10 batch, so the premise (\"not yet built\") was already false when written; the agents simply could not see each other. Wiring recommended_next to them remains an open design choice, not a blocked one.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Ladder of Inference row (L572) directly. Grepped
+    the full spec root case-insensitively for "ladder of inference"/
+    "ladder_of_inference" before writing -- zero pre-existing implementation
+    or schema title overlap found (see typed-objects/ladder-of-inference-
+    analysis.schema.yaml's own verification for the full grep record).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The four-rung pipeline is transcribed
+    verbatim from Atlas L572. purpose/preconditions naming and the
+    ObservedDataDescription free-text input scope are Phase 3-class
+    compilation decisions, disclosed above.

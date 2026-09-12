@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/toulmin-argument.schema.yaml"
+title: Toulmin Argument
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ToulminArgument` -- the declared
+  `outputs` of `epistemic.toulmin_model`'s Method Contract
+  (methods/contracts/epistemic.toulmin_model.contract.yaml, `outputs:
+  [ToulminArgument]`). F10 epistemic-quality family (Atlas L574: "Toulmin
+  Model | Claim/Grounds/Warrant/Backing/Qualifier/Rebuttal | 逐欄填寫 | 防止
+  缺推理橋梁").
+
+  Toulmin's own six named elements: `claim` (required), `grounds[]`
+  (required, >=1), `warrant` (required, non-blank), `backing[]`,
+  `qualifier`, `rebuttal`. `warrant` IS the reasoning bridge Atlas's own
+  effect column names ("防止缺推理橋梁") -- enforced as a RUNTIME invariant
+  (JSON Schema `required` only checks key presence, not blank-string
+  content, so `minLength`/`pattern` at the schema layer AND a runtime
+  builder+gate both apply, same belt-and-suspenders discipline every prior
+  slice in this corpus establishes). `ai_lego/modules/epistemic/
+  toulmin_model.py`'s own gate independently re-derives both the
+  missing-bridge rule and the backing-without-warrant rule from a raw
+  (possibly hand-tampered) dict, not just trusted from the builder.
+
+overlap_check_against_evidence_claim_types:
+  description: >
+    Checked before writing (task instruction): does an existing spec-root
+    type already carry this method's `claim` concept? `specs/evidence/
+    claim.schema.yaml` defines a PERSISTED Claim record (claim_id,
+    statement, supporting/contradicting evidence, quality, coverage,
+    confidence) for the Evidence Matrix worked example (Atlas §11.20) --
+    that file's own description and `open_questions.MRSP-claim-1` explicitly
+    flag that Toulmin's richer argument structure (Grounds/Warrant/Backing/
+    Qualifier) was DELIBERATELY left out of that record, and suggest a
+    future wrapper schema for method executions like this one rather than
+    extending the base record. This file IS that thin, self-contained
+    method-execution record -- `claim` here is free text (this run's own
+    assertion), not a hard `$ref` to `evidence/claim.schema.yaml`'s
+    persisted `claim_id`/`statement` pair, consistent with that file's own
+    disclosed intent. No duplicate definition: `claim.schema.yaml` defines a
+    long-lived, evidence-linked record; this file defines one run's six-
+    column argument fill-in.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Toulmin Model row (L574)"
+  - "methods/contracts/epistemic.toulmin_model.contract.yaml (outputs, preconditions, quality)"
+  - "specs/evidence/claim.schema.yaml (overlap check -- see overlap_check_against_evidence_claim_types above)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L574's own six
+  named elements plus low-risk, disclosed compilation choices (the TOULMIN-
+  prefix, record-level-only provenance, runtime-invariant placement of the
+  missing-bridge/backing-without-warrant rules, free-text claim rather than
+  a claim.schema.yaml $ref).
+
+compilation_decisions:
+  - question: "warrant non-blank (the missing-bridge rule): JSON Schema minLength/pattern, or runtime invariant?"
+    decision: "Both -- schema minLength:1 + pattern:\"\\S\" refuses a hand-crafted blank string at the schema layer; the runtime builder+gate is the independent second layer."
+  - question: "Should claim hard-$ref specs/evidence/claim.schema.yaml's persisted Claim record?"
+    decision: "No -- free text. See overlap_check_against_evidence_claim_types above; that file's own open_questions defers a richer wrapper to a future revision, not this one."
+  - question: "backing/qualifier/rebuttal: closed enum or free text?"
+    decision: "Free text, all optional except backing defaults to []. Atlas L574 gives no scale or sub-structure for any of the three beyond their column names."
+
+type: object
+additionalProperties: false
+required: [id, version, claim, grounds, warrant, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^TOULMIN-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.toulmin_model"
+
+  claim:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L574 column 1: the assertion being argued for. Free text -- see overlap_check_against_evidence_claim_types above for why this is not a $ref to evidence/claim.schema.yaml."
+
+  grounds:
+    type: array
+    minItems: 1
+    description: "Atlas L574 column 2: the data/reasons offered in support of the claim. Required, at least one (method contract precondition)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  warrant:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "Atlas L574 column 3: the reasoning bridge explaining WHY the grounds support the claim -- Atlas's own effect column names this method's entire point (防止缺推理橋梁/prevent a missing bridge). Required AND non-blank (schema layer); independently re-derived by the runtime gate from a raw dict, not just trusted."
+
+  backing:
+    type: array
+    default: []
+    description: "Atlas L574 column 4: support for the warrant itself. RUNTIME invariant: may only be non-empty if warrant is also non-blank -- backing supports the warrant; there is no warrant to back otherwise."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  qualifier:
+    type: [string, "null"]
+    default: null
+    description: "Atlas L574 column 5: the claim's own strength/scope limiter (e.g. 'usually', 'in most cases'). Optional free text."
+
+  rebuttal:
+    type: [string, "null"]
+    default: null
+    description: "Atlas L574 column 6: the known exception(s) under which the claim does not hold. Optional free text."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent analysis."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A staffing-plan argument with a real reasoning bridge and one exception"
+    value:
+      id: "TOULMIN-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.toulmin_model"
+      claim: "團隊應該在下一季增加兩名後端工程師"
+      grounds: ["過去兩季 API 平均回應時間從 200ms 上升到 800ms", "目前 on-call 輪值只有 3 人，低於建議下限"]
+      warrant: "回應時間變慢與 on-call 人力不足都是工程產能不足的直接徵兆，而產能不足會直接拖慢下一季的交付承諾"
+      backing: ["前兩次類似的人力擴編都在一季內讓回應時間恢復到 300ms 以下"]
+      qualifier: "假設下一季的流量成長率維持在目前的 +-20% 區間內"
+      rebuttal: "若下一季有大型功能凍結或流量預期萎縮，則不需要立即擴編"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-TOULMINARGUMENT-1: backing/qualifier/rebuttal carry no sub-structure beyond bare text -- should a future revision add evidence refs or a closed qualifier scale?（owner: operator）"
+  - "OQ-TOULMINARGUMENT-2: claim.schema.yaml's own MRSP-claim-1 remains open (should a richer argument-map.schema.yaml wrap persisted Claim records instead) -- unaffected by this file's own free-text choice, but flagged so a future reader sees both files' related open questions together.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Toulmin Model row (L574) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/
+    cognitive-engineering-os` case-insensitively for "toulmin"/"warrant"/
+    "argument" and every schema title before writing -- "warrant" hits are
+    all plain-English "warrants/warranted" (see the method contract's own
+    verification for the full file list), "argument" hits include
+    devils-advocate-position.schema.yaml's generic use of the word for a
+    critique viewpoint (unrelated structure). Only real hit: claim.
+    schema.yaml's own incidental citation of this same Atlas row, addressed
+    above in overlap_check_against_evidence_claim_types. Zero pre-existing
+    implementation or schema title overlap found. Validated against
+    jsonschema Draft202012Validator via tests/unit/test_toulmin_model.py,
+    including a real mutation check that a blank/whitespace-only warrant is
+    refused at both the schema layer and the independent runtime gate.
+  note: >
+    No mother document was modified. The six element field names are
+    transcribed directly from Atlas L574. The TOULMIN- prefix, free-text
+    claim (rather than a claim.schema.yaml $ref), and runtime-invariant
+    placement of the missing-bridge/backing-without-warrant rules are this
+    file's own compiled structure, disclosed above, not textually cited.

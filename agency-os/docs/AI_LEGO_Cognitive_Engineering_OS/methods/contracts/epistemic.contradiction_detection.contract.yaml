@@ -1,0 +1,99 @@
+$id: "ai-lego://methods/contracts/epistemic.contradiction_detection.contract.yaml"
+title: "Contradiction Detection Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F10 epistemic family (Atlas L566-600), built in the same 5-workstream batch as
+  epistemic.assumption_mapping/argument_mapping/ladder_of_inference/toulmin_model/evidence_hierarchy. Atlas F10
+  table row (L579: "Contradiction Detection｜找來源/模型互相衝突｜claims matching→support/contradict/context｜
+  暴露不確定性"). Not an EC §32 security-change method (no authn/crypto/secrets/tenant isolation in scope).
+  Core invariant: every relations[] entry's claim_id_a/claim_id_b must resolve to a declared claims[].claim_id
+  (dangling reference refused), claim_id_a != claim_id_b (no self-relation), and no two entries may declare the
+  same UNORDERED pair (the subtle case: {A,B} and {B,A} are the same pair). Orthogonal to claim.schema.yaml's
+  own contradicting_evidence field (claim-to-evidence) -- see typed-objects/contradiction-detection.schema.yaml's
+  own description for the full distinction; this contract does not re-litigate it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Contradiction Detection row (L579)"
+  - "specs/evidence/claim.schema.yaml (claim_id's own ^C-[0-9]+$ id convention, reused not re-minted; contradicting_evidence field, the orthogonal axis this method does not duplicate)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: epistemic.contradiction_detection` mints a new machine_id, a member of the
+  already-established `family: epistemic` (opened by epistemic.assumption_mapping, same batch). The
+  soft-claim-id-reference design is a direct application of that same sibling contract's own established
+  pattern for AssumptionRef, applied here to claims.
+
+id: epistemic.contradiction_detection
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [COMPARE, RELATE, CHALLENGE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. COMPARE = Atlas's own "claims
+# matching"; RELATE = classifying each matched pair as SUPPORTS/CONTRADICTS/CONTEXT_DEPENDENT; CHALLENGE =
+# Atlas's own benefit column "暴露不確定性" (expose uncertainty rather than hide it behind a false consensus),
+# same defining-action class challenge.red_team's own CHALLENGE primitive already establishes for a sibling
+# uncertainty-surfacing method.
+
+purpose:
+  - detect_support_contradiction_or_context_dependent_relations_between_claims
+# Atlas L579 verbatim sense: find where sources or models conflict, by matching claims and classifying each
+# pair's relation, so disagreement is exposed rather than silently averaged away.
+
+inputs:
+  required:
+    - ClaimRef
+  # Free-text/soft reference to existing specs/evidence/claim.schema.yaml records (by their own ^C-[0-9]+$ id)
+  # -- same class of scope-limited soft reference epistemic.assumption_mapping's own AssumptionRef already
+  # establishes. This method detects relations between claims that already exist; it does not mint new Claim
+  # records.
+
+outputs:
+  - ContradictionDetection
+# NEW output type (see typed-objects/contradiction-detection.schema.yaml). Atlas names no PascalCase output
+# type for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "claims has at least 2 entries, each with a real C-[0-9]+ claim_id -- a run examining fewer than 2 claims cannot detect any relation between them"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- this method takes no EvidenceSet input (only soft ClaimRef id references); method.schema.yaml
+  # scopes evidence_labeling_required to claims originating from a supplied EvidenceSet input, which has
+  # nothing to check here. Same reasoning epistemic.assumption_mapping's own evidence_labeling_required: false
+  # already establishes.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas gives no explicit next-step pairing for this method (grep-confirmed against F10's own section text).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should claims[] embed the full Claim record (hard $ref), or stay a soft id reference?"
+    decision: "Soft id reference (pattern ^C-[0-9]+$) only -- this method detects relations between claims, it does not own or duplicate the Claim record's own full shape."
+  - question: "Should the same unordered claim pair be allowed to appear twice in relations[]?"
+    decision: "No -- refused at the runtime layer. {A,B} and {B,A} are the same pair; declaring it twice (even with conflicting relation values) would make the contradiction set self-inconsistent."
+
+open_questions:
+  - "OQ-CONTRADICTIONDETECTION-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-CONTRADICTIONDETECTION-2: claim_id is not validated against a real, existing Claim record at construction time (no cross-record referential-integrity check is possible without a claim store lookup) -- only its id-pattern shape and in-roster membership are checked (owner: operator, or whoever wires this method to a live claim registry)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L579) directly at the cited line, and specs/evidence/claim.schema.yaml in full
+    (including its own contradicting_evidence field) before designing this contract, to confirm the
+    claim-to-evidence vs claim-to-claim distinction disclosed above. Grepped the full spec root (specs/**,
+    methods/**) case-insensitively for "contradict" before writing -- hits found in claim.schema.yaml's own
+    contradicting_evidence field (the orthogonal axis this method composes with, not duplicates) and several
+    unrelated method contracts naming "contradicting"/"contradiction" in free-text reasoning prose -- no
+    duplicate contract or typed object found. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The referential-integrity, no-self-relation, and unordered-pair-uniqueness
+    invariants are this file's own Phase 3 compilation choice, directly grounded in Atlas's own "claims
+    matching -> support/contradict/context" wording (L579).

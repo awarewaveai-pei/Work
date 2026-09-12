@@ -1,0 +1,149 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/evidence-hierarchy.schema.yaml"
+title: Evidence Hierarchy
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `EvidenceHierarchy` -- the declared `outputs` of
+  `epistemic.evidence_hierarchy`'s Method Contract (methods/contracts/epistemic.evidence_hierarchy.contract.yaml,
+  `outputs: [EvidenceHierarchy]`). F10 epistemic family, Evidence Hierarchy row (L576: "區分證據強度｜使用方式：
+  domain-specific hierarchy｜效益：避免來源等價化").
+
+  Closes a seam `specs/evidence/evidence.schema.yaml` (L127-139) deliberately left open: `hierarchy_tier` is
+  typed `[string, number, "null"]`, untyped BY DESIGN because Atlas's own row says the hierarchy varies per
+  domain. This schema does NOT invent a universal tier enum -- each run DECLARES its own ordered
+  `hierarchy_levels[]` for one `domain` and assigns evidence into those declared levels, operationalizing
+  `hierarchy_tier` instead of overriding evidence.schema.yaml's own reasoned decision.
+
+  Field provenance:
+    * `hierarchy_levels[]` -- one entry per declared strength tier, each with a unique `level_id`, a human
+      `label`, and a unique integer `rank` (the strict total order -- no two levels may tie).
+    * `evidence_assignments[]` -- soft reference pairs linking an existing `evidence.schema.yaml` record (by
+      its own `^E-[0-9]+$` id) to a declared `hierarchy_levels[].level_id`. `level_id` referential integrity
+      (must resolve to a declared level) is a cross-array check JSON Schema 2020-12 cannot express here --
+      runtime-layer invariant, see `ai_lego/modules/epistemic/evidence_hierarchy.py`, which enforces it at
+      construction AND independently via a gate that re-derives from raw fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Evidence Hierarchy row (L576)"
+  - "specs/evidence/evidence.schema.yaml:127-139 (hierarchy_tier -- the seam this schema closes, cited not duplicated)"
+  - "methods/contracts/epistemic.evidence_hierarchy.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct compilation from the F10 row plus evidence.schema.yaml:127-139's own
+  already-reasoned decision (domain-specific hierarchy, not a universal enum) -- this file operationalizes that
+  decision, it does not re-litigate it.
+
+compilation_decisions:
+  - question: "Universal tier enum (e.g. Weak/Medium/Strong), or per-domain declared ordering?"
+    decision: "Per-domain declared ordering (hierarchy_levels[] + integer rank) -- a universal enum would directly contradict evidence.schema.yaml:127-139's own already-ruled reasoning that the hierarchy varies per domain."
+  - question: "additionalProperties: false at the top level, and on each nested item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on."
+  - question: "Should evidence_assignments require minItems: 1?"
+    decision: "No -- a hierarchy may legitimately be declared before any evidence is assigned into it, same 'declare first, populate later' legitimacy red-team-challenge.schema.yaml's own zero-findings-is-legal precedent already establishes for a structurally analogous 'examined but not yet populated' state."
+
+type: object
+required: [id, version, domain, hierarchy_levels, evidence_assignments, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^EVHIER-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.evidence_hierarchy"
+
+  domain:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "e.g. 'clinical research', 'market research' -- Atlas's own row: the hierarchy is domain-specific, not universal (a medical RCT>cohort>case-report ladder is not a market-research one)."
+
+  hierarchy_levels:
+    type: array
+    minItems: 1
+    description: "The declared, ordered strength tiers for this one domain."
+    items:
+      type: object
+      additionalProperties: false
+      required: [level_id, label, rank]
+      properties:
+        level_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Local id, unique within this record (e.g. L-RCT). Uniqueness is a runtime-layer invariant, see top-level description."
+        label:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "e.g. 'Randomized Controlled Trial'."
+        rank:
+          type: integer
+          description: "Must be unique across hierarchy_levels[] (strict total order) -- runtime-layer invariant, see top-level description. No universal direction convention is asserted (whether rank 1 is strongest or weakest is left to each domain's own labels)."
+
+  evidence_assignments:
+    type: array
+    description: "May be empty -- a hierarchy may be declared before any evidence is assigned into it. See compilation_decisions."
+    items:
+      type: object
+      additionalProperties: false
+      required: [evidence_id, level_id]
+      properties:
+        evidence_id:
+          type: string
+          pattern: "^E-[0-9]+$"
+          description: "Soft reference to a real evidence/evidence.schema.yaml record id, same convention every other typed-object schema in this directory uses."
+        level_id:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "Must resolve to a declared hierarchy_levels[].level_id -- dangling reference refused. Runtime-layer invariant, see top-level description."
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A clinical-research evidence hierarchy: RCT > cohort study > case report, 3 evidence records assigned."
+    value:
+      id: "EVHIER-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.evidence_hierarchy"
+      domain: "clinical research"
+      hierarchy_levels:
+        - {level_id: "L-RCT", label: "Randomized Controlled Trial", rank: 1}
+        - {level_id: "L-COHORT", label: "Cohort Study", rank: 2}
+        - {level_id: "L-CASE", label: "Case Report", rank: 3}
+      evidence_assignments:
+        - {evidence_id: "E-2001", level_id: "L-RCT"}
+        - {evidence_id: "E-2002", level_id: "L-COHORT"}
+        - {evidence_id: "E-2003", level_id: "L-CASE"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-EVIDENCEHIERARCHY-1: evidence_id/level_id are not cross-checked against a real, existing Evidence record or a canonical domain registry at schema-validation time (JSON Schema has no cross-file existence check) -- only id-pattern shape and in-record referential integrity are enforced (owner: operator, or whoever wires this method to a live evidence store)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L576) directly, and specs/evidence/evidence.schema.yaml:127-139's own
+    hierarchy_tier field and its cited reasoning in full before designing this schema, per this method's own
+    explicit instruction not to override that reasoning. Grepped the full spec root (specs/**, methods/**)
+    case-insensitively for "hierarchy" and "evidence hierarchy" before writing -- hits found in unrelated
+    hierarchical-structure schemas (ahp-analysis, system-context-model, tenant, jurisdiction pack, workflow-ir,
+    hierarchical_task_analysis, etc.) and evidence.schema.yaml's own hierarchy_tier field itself (the seam this
+    file closes) -- no duplicate EvidenceHierarchy typed object found. Validated against jsonschema
+    Draft202012Validator, including a mutation check that additionalProperties:false actually rejects an
+    unknown key at all three levels (top, hierarchy_levels item, evidence_assignments item).
+  note: >
+    No mother document was modified. The `hierarchy_levels[]` + `evidence_assignments[]` shape and the decision
+    not to invent a universal tier enum are this file's own Phase 3 compilation choice, directly grounded in
+    evidence.schema.yaml's own already-disclosed reasoning (cited above, not duplicated). No mother document or
+    sibling spec file was modified to produce this file.

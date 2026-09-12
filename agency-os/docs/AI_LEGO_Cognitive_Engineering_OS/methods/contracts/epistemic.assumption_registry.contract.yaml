@@ -1,0 +1,102 @@
+$id: "ai-lego://methods/contracts/epistemic.assumption_registry.contract.yaml"
+title: "Assumption Registry Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F10 epistemic family (Atlas L566-571), 2nd of 2 members built this batch. Atlas F10 table row (L571:
+  "Assumption Registry｜正式保存假設｜ID/statement/type/evidence/confidence/validation/status/owner｜假設不再藏
+  在文字中"). Not an EC §32 security-change method (no authn/crypto/secrets/tenant isolation in scope). Core
+  invariant: `entries[]` compose (never redefine) `specs/evidence/assumption.schema.yaml` records; this method
+  IS the "consuming engine" that schema's own `is_critical_assumption` field (L290-302) names but leaves
+  unbuilt -- `is_critical_assumption` is GENUINE_COMPUTE, recomputed from `impact_if_wrong == "Critical"`, never
+  trusted from a stored value.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Assumption Registry row (L571)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §24 Assumption Registry (L1480-1502, CRITICAL ASSUMPTION auto-identification text at L1496-1502)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §116 Assumption Registry (L3117-3132, 'Critical assumption 未驗證時，final status 不能假裝 certainty' at L3132)"
+  - "specs/evidence/assumption.schema.yaml (entries[] $ref target; is_critical_assumption computed-field seam at L290-302)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: epistemic.assumption_registry` mints a NEW machine_id, 2nd member of
+  `family: epistemic`. The compose-not-duplicate `entries[]` $ref and the is_critical_assumption/validation
+  recompute rules are this file's own compilation decisions -- see `compilation_decisions`.
+
+id: epistemic.assumption_registry
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [ORGANIZE, INFER, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ORGANIZE = formally filing each
+# assumption so it is no longer "hidden in text" (Atlas's own benefit column, "假設不再藏在文字中"); INFER =
+# recomputing is_critical_assumption/validated-status consistency, not accepting either as an asserted claim;
+# EXPLAIN = a registry entry is only useful when its status/validation fields make the assumption's own
+# evidentiary state legible, not just its bare statement.
+
+purpose:
+  - formally_register_assumptions_so_they_are_not_hidden_in_prose
+# Atlas L571 verbatim sense: file every important assumption under a real ID/statement/type/evidence/
+# confidence/validation/status/owner record, per MP §24's own worked example.
+
+inputs:
+  required:
+    - AssumptionRef
+  # Same free-text soft-reference class as epistemic.assumption_mapping's own AssumptionRef (built same batch)
+  # -- this method registers assumptions that already exist as candidate statements; it composes
+  # specs/evidence/assumption.schema.yaml, it does not invent a second, parallel assumption shape.
+
+outputs:
+  - AssumptionRegistry
+# NEW output type (see typed-objects/assumption-registry.schema.yaml). A COLLECTION of
+# specs/evidence/assumption.schema.yaml records ($ref'd, not redefined) plus this method's own recomputed
+# is_critical_assumption layer. Atlas names no PascalCase output type for this method, same honesty gap every
+# other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "entries has at least 1 well-formed Assumption record (id/statement/status/provenance per assumption.schema.yaml's own required fields) -- a registry naming zero assumptions has not actually run the method"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method's own per-entry evidence[] is a direct $ref to specs/evidence/evidence.schema.yaml composed inside
+  # assumption.schema.yaml, not a separately supplied EvidenceSet input to THIS method.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next:
+  - epistemic.assumption_mapping
+# Atlas F10's own table groups these two rows adjacently (L570-571) -- a registered assumption is the natural
+# input to assumption_mapping's own quadrant prioritization (recommended_next is symmetric with
+# epistemic.assumption_mapping's own citation of this method).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should entries[] redefine its own per-assumption field set, or compose specs/evidence/assumption.schema.yaml?"
+    decision: "Compose -- entries[] items $ref ai-lego://specs/evidence/assumption.schema.yaml directly, adding no parallel field definitions. Minting a second per-assumption type would duplicate a file that already implements Atlas F10's own field list verbatim (id/statement/type/evidence/confidence/validation/status/owner)."
+  - question: "Is is_critical_assumption caller-supplied or GENUINE_COMPUTE?"
+    decision: "GENUINE_COMPUTE, always recomputed from impact_if_wrong == \"Critical\" (MP §24 L1490's own literal example value) at construction -- never accepted as a caller-supplied value that could disagree with its own entry's impact_if_wrong. assumption.schema.yaml L290-302 explicitly leaves this computation \"to the consuming engine\" -- this method IS that engine."
+  - question: "Does a registry entry claiming a validated status need a non-empty validation field?"
+    decision: "Yes -- an entry whose status case-insensitively equals {validated, verified} but carries an empty/missing validation field is refused. No mother document gives a status enum (only MP's single 'Unverified' example exists anywhere -- see assumption.schema.yaml's own open_questions.MRSP-assumption-1), so the affirmative wording set is this file's own minimal, disclosed invention: the direct English antonyms of MP's own 'Unverified' example and the direct verb form of the schema's own `validation` field name, deliberately NOT a broader invented enum. Grounded by EC §116 L3132's own prose rule: \"Critical assumption 未驗證時，final status 不能假裝 certainty\" (an unverified critical assumption's status must not pretend certainty) -- a status asserting validation with no recorded validation method is exactly that pretense."
+
+open_questions:
+  - "OQ-ASSUMPTIONREGISTRY-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-ASSUMPTIONREGISTRY-2: the validated-status wording set ({validated, verified}, case-insensitive) is this file's own disclosed invention, not a mother-document-supplied enum -- see assumption.schema.yaml's own open_questions.MRSP-assumption-1 (owner: operator, pending a future status-vocabulary ADR)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L571) directly at the cited line, plus MP §24 (L1480-1502) and EC §116
+    (L3117-3132) full text for the CRITICAL ASSUMPTION auto-identification behavior and the unverified-certainty
+    warning. Grepped the full spec root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for
+    "assumption registry"/"assumption_registry"/"is_critical_assumption" before writing this contract -- no
+    duplicate field-shape definition found (see typed-objects/assumption-registry.schema.yaml's own
+    verification note for the full grep record). Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The compose-not-duplicate entries[] $ref, the is_critical_assumption
+    recompute rule, and the validated-status wording set are this file's own compilation decisions, disclosed
+    above.

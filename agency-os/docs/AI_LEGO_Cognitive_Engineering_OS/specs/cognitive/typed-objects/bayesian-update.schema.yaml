@@ -1,0 +1,129 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/bayesian-update.schema.yaml"
+title: Bayesian Update
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BayesianUpdate` -- the declared `outputs` of
+  `epistemic.bayesian_updating`'s Method Contract (methods/contracts/epistemic.bayesian_updating.contract.yaml,
+  `outputs: [BayesianUpdate]`). F10 epistemic family, quantitative pair member 1/2 built this batch. Atlas F10
+  table row (L577): "Bayesian Updating｜新 evidence 更新 belief｜prior→likelihood→posterior｜信心可持續更新" --
+  textbook Bayes' rule, transcribed as a real structural invariant (full formula and the zero-denominator trap:
+  see `ai_lego/modules/epistemic/bayesian_updating.py` module docstring).
+
+  Field provenance:
+    * `hypothesis`/`evidence_ref` -- free text, Atlas gives no structured shape for either.
+    * `prior`/`likelihood_given_true`/`likelihood_given_false` -- Atlas's own 3-stage pipeline elements, each a
+      real finite number in [0,1] (bool excluded -- see compilation_decisions).
+    * `posterior` -- GENUINE_COMPUTE, Bayes' rule applied to the three fields above, NEVER caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Bayesian Updating row (L577)"
+  - "methods/contracts/epistemic.bayesian_updating.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Bayes' rule is a real, cited textbook formula (not this file's own invention); the
+  id-prefix, rounding, and additionalProperties choices below are low-risk disclosed compilation decisions, same
+  class every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should posterior be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) via Bayes' rule -- never an accepted builder parameter. See ai_lego/modules/epistemic/bayesian_updating.py compute_posterior."
+  - question: "How is the zero-denominator case (an undefined posterior) handled?"
+    decision: "Refused at construction with a distinct BAYES_UNDEFINED_POSTERIOR error -- never a ZeroDivisionError crash, never a silently-returned 0. A record can therefore never exist with an undefined posterior; this schema has no null/undefined posterior representation."
+  - question: "Round posterior, or store raw float precision?"
+    decision: "Round to 8 decimal places (round(x, 8)), matching prediction-tracking-record.schema.yaml's own error.value rounding convention -- avoids float-repr noise across serialize/deserialize round-trips. Gate re-derivation tolerance is 1e-9 (module docstring)."
+  - question: "Is likelihood_given_false a literal Atlas field, given Atlas's own pipeline text names only 'likelihood' (singular)?"
+    decision: "NEW_DESIGN, not itself Atlas-named -- disclosed. Bayes' rule structurally requires BOTH conditional likelihoods (given hypothesis true, given hypothesis false) to compute a posterior; a single likelihood_given_true alone is underspecified. Atlas's own pipeline text ('prior→likelihood→posterior') names the stage, not the exact field count."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+required: [id, version, hypothesis, prior, likelihood_given_true, likelihood_given_false, posterior, evidence_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BAYES-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.bayesian_updating"
+
+  hypothesis:
+    type: string
+    minLength: 1
+    description: "The belief being updated -- Atlas L577's own subject of prior/posterior. Free text; Atlas gives no structured shape."
+
+  prior:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Atlas L577 pipeline element 1 (prior). Real finite number in [0,1] -- bool excluded at the runtime layer (JSON Schema's `type: number` does not itself exclude JSON true/false; the builder/gate re-check independently, see method module docstring)."
+
+  likelihood_given_true:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Atlas L577 pipeline element 2 (likelihood): P(evidence | hypothesis true)."
+
+  likelihood_given_false:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "P(evidence | hypothesis false) -- see compilation_decisions for why this second conditional likelihood is required even though Atlas's own pipeline text names only one 'likelihood' stage."
+
+  posterior:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Atlas L577 pipeline element 3. GENUINE_COMPUTE -- Bayes' rule applied to prior/likelihood_given_true/likelihood_given_false, NEVER a builder parameter. See compilation_decisions for the zero-denominator refusal and rounding convention."
+
+  evidence_ref:
+    type: string
+    minLength: 1
+    description: "Free-text/soft reference to the new evidence that triggered this update (Atlas L577: '新 evidence 更新 belief'). Same free-text soft-reference convention challenge.red_team's own proposal_ref already establishes -- no single existing typed object is the universal 'piece of evidence that triggered this', so a free-text reference is the honest choice rather than a hard $ref to one arbitrarily-chosen type."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A hand-computed worked example: prior=0.3, likelihood_given_true=0.8, likelihood_given_false=0.2 -> posterior = (0.8*0.3)/(0.8*0.3+0.2*0.7) = 0.24/0.38 = 12/19 ~= 0.63157895 (rounded to 8dp)."
+    value:
+      id: "BAYES-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.bayesian_updating"
+      hypothesis: "生產環境延遲上升的根本原因是資料庫連線池耗盡"
+      prior: 0.3
+      likelihood_given_true: 0.8
+      likelihood_given_false: 0.2
+      posterior: 0.63157895
+      evidence_ref: "新觀測：連線池使用率在延遲升高的同一分鐘內衝到 98%"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-BAYESIANUPDATE-1: this schema models a single sequential update (one prior -> one posterior). Atlas L577's own '信心可持續更新' (belief can keep being updated) implies a chain where one update's posterior becomes the next update's prior -- left to the calling workflow (feed this record's own posterior back in as the next call's prior), not a structural field on this record itself (owner: operator, or whoever builds a future multi-step BayesianUpdateChain)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L577) directly at the cited line. Grepped the full spec root (specs/**,
+    methods/**) and the full ai_lego/ tree case-insensitively for "bayes"/"posterior"/"calibration"/"brier"
+    before writing this file: hits only in prediction-tracking-record.schema.yaml/
+    learning.prediction_tracking.contract.yaml (a single-record Brier score, explicitly deferring cross-record
+    aggregation to Atlas's own F10 row -- see that file's own OQ-PREDICTIONTRACKING-2) and this file's own
+    sibling epistemic.confidence_calibration (the OTHER F10 quantitative row, a genuinely different
+    aggregate-Brier-score method). No duplicate posterior/Bayes' rule definition found. Validated against
+    jsonschema.Draft202012Validator, including a real mutation check that additionalProperties:false refuses a
+    smuggled top-level key and that a hand-tampered posterior disagreeing with the stored prior/likelihoods is
+    caught by the runtime gate (not expressible in JSON Schema alone).
+  note: >
+    No mother document was modified. Bayes' rule itself is a real textbook citation, not this file's own
+    invention. The id-prefix, evidence_ref free-text scope, and rounding/tolerance choices are disclosed
+    compilation decisions above.

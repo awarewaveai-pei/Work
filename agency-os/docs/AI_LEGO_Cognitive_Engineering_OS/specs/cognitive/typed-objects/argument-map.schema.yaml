@@ -1,0 +1,165 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/argument-map.schema.yaml"
+title: Argument Map
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ArgumentMap` -- the declared
+  `outputs` of `epistemic.argument_mapping`'s Method Contract
+  (methods/contracts/epistemic.argument_mapping.contract.yaml, `outputs:
+  [ArgumentMap]`). F10 epistemic-quality family (Atlas L573: "Argument
+  Mapping | Claim/Reason/Objection 結構化 | main claim→support→objection→
+  rebuttal→evidence | 論證可檢查").
+
+  `main_claim` is a real `$ref` to `specs/evidence/claim.schema.yaml` (not a
+  duplicate `statement` field) -- Atlas's own row literally names this
+  method's first node "main claim", and that schema's own minimal required
+  set (`claim_id`+`statement`+`provenance`) already permits a lightweight
+  stub, the same "real $ref, minimal stub allowed" flexibility
+  `evidence-graph.schema.yaml#/claim_node` established. `supports[]`/
+  `objections[]`/`rebuttals[]` are deliberately NOT modeled as Claim records:
+  Atlas's own row names them Reason/Objection/Rebuttal, distinct argument-
+  graph ROLES rather than a second population of claims, and each needs a
+  locally-scoped `id` (unique within this one ArgumentMap) rather than the
+  globally-scoped `claim_id` grammar `claim.schema.yaml` already owns.
+
+  Real invariant (referential integrity over the argument graph), mechanized
+  as a RUNTIME invariant (same disclosed-gap class as
+  behavior-over-time-chart.schema.yaml's own strict-ordering precedent --
+  JSON Schema 2020-12 cannot express "this array item's field must appear
+  in that sibling array" declaratively): every `rebuttals[].objection_id`
+  must resolve to a real declared `objections[].id` -- a rebuttal answering
+  an objection that was never raised is a dangling argument node, refused at
+  construction (`ai_lego/modules/epistemic/argument_mapping.py`) and
+  independently re-derived by that module's own gate. `objections[].id`
+  values must additionally be unique within the array (an ambiguous
+  duplicate id makes referencing "the" objection impossible).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Argument Mapping row (L573)"
+  - "methods/contracts/epistemic.argument_mapping.contract.yaml (outputs, preconditions, quality)"
+  - "specs/evidence/claim.schema.yaml (main_claim, real $ref, composed not duplicated)"
+  - "specs/evidence/evidence-graph.schema.yaml#/claim_node -- real-$ref-with-minimal-stub precedent this file follows"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L573's own
+  quartet plus low-risk, disclosed compilation choices (the ARGMAP- prefix,
+  record-level-only provenance, runtime-invariant placement of the
+  referential-integrity rule).
+
+compilation_decisions:
+  - question: "Should main_claim be a free-text statement field, or a real $ref to claim.schema.yaml?"
+    decision: "Real $ref to claim.schema.yaml -- see top-level description; resolves that file's own open_questions.MRSP-claim-1 in the affirmative for this method."
+  - question: "Should supports[]/objections[]/rebuttals[] also be Claim records?"
+    decision: "No -- distinct local {id, text} node shapes, not a second claim population. See top-level description."
+  - question: "Referential integrity (rebuttals[].objection_id -> objections[].id): declarative JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- same gap class as behavior-over-time-chart.schema.yaml's own strict-ordering precedent (no native 'this item's field must appear in that sibling array' keyword)."
+
+type: object
+additionalProperties: false
+required: [id, version, main_claim, supports, objections, rebuttals, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ARGMAP-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.argument_mapping"
+
+  main_claim:
+    $ref: "ai-lego://specs/evidence/claim.schema.yaml"
+    description: "The argument's own main claim. Real $ref, minimal {claim_id, statement, provenance} stub is legal -- see compilation_decisions."
+
+  supports:
+    type: array
+    minItems: 1
+    description: "Reasons supporting the main claim. Atlas L573's own precondition -- a claim with zero supporting reason is not yet an argument (method contract precondition: at least 1)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, text]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this ArgumentMap (e.g. SUP-1)."
+        text:
+          type: string
+          description: "The reason itself, in natural language."
+
+  objections:
+    type: array
+    description: "Zero or more objections against the main claim -- an argument may legitimately have no objections raised yet."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, text]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this ArgumentMap's objections[] (e.g. OBJ-1). Must be unique (method-layer invariant, checked by ai_lego/modules/epistemic/argument_mapping.py, not this schema)."
+        text:
+          type: string
+          description: "The objection itself, in natural language."
+
+  rebuttals:
+    type: array
+    description: "Zero or more rebuttals, each answering a declared objection."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, objection_id, text]
+      properties:
+        id:
+          type: string
+          description: "Local id, unique within this ArgumentMap's rebuttals[] (e.g. REB-1)."
+        objection_id:
+          type: string
+          description: "Must resolve to a real objections[].id -- cross-field invariant, checked by ai_lego/modules/epistemic/argument_mapping.py, not this schema (see top-level description)."
+        text:
+          type: string
+          description: "The rebuttal itself, in natural language."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling single-record typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A main claim with 2 supports, 1 objection, and 1 rebuttal answering that objection"
+    value:
+      id: "ARGMAP-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.argument_mapping"
+      main_claim: {claim_id: "C-1", statement: "我們應該把客服知識庫遷移到向量搜尋", provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}}
+      supports:
+        - {id: "SUP-1", text: "關鍵字搜尋在同義詞查詢上命中率偏低"}
+        - {id: "SUP-2", text: "向量搜尋在既有 POC 中命中率提升 40%"}
+      objections:
+        - {id: "OBJ-1", text: "向量搜尋的維運成本與延遲可能高於現有方案"}
+      rebuttals:
+        - {id: "REB-1", objection_id: "OBJ-1", text: "POC 量測延遲增加不到 50ms，且可用既有快取層抵銷"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-ARGUMENTMAP-1: Atlas L573's pipeline tail names 'evidence' as a 5th stage (main claim→support→objection→rebuttal→evidence); this schema deliberately stops at rebuttal -- see methods/contracts/epistemic.argument_mapping.contract.yaml's own open_questions for why the evidence-alignment layer is epistemic.evidence_matrix's job instead.（owner: operator）"
+  - "OQ-ARGUMENTMAP-2: sibling toulmin-argument.schema.yaml (same F10 batch) deliberately kept its own `claim` field free-text rather than $ref-ing claim.schema.yaml, explicitly deferring that file's own MRSP-claim-1 wrapper question to argument-map.schema.yaml -- this file (the one MRSP-claim-1 itself names as the candidate wrapper) is that resolution; the two files' diverging claim-field treatment is intentional, not an oversight.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Argument Mapping row (L573) directly. Validated
+    against jsonschema Draft202012Validator via
+    tests/unit/test_argument_mapping.py, including a real mutation check
+    that a dangling `rebuttals[].objection_id` is refused at the runtime
+    layer (this schema alone cannot express that cross-array constraint).
+  note: >
+    No mother document was modified. `main_claim`/`supports`/`objections`/
+    `rebuttals` are transcribed directly from Atlas L573's own pipeline. The
+    ARGMAP- prefix, local id shapes for supports/objections/rebuttals, and
+    runtime-invariant placement of referential integrity are this file's own
+    compiled structure, disclosed above, not textually cited.

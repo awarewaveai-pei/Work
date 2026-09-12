@@ -1,0 +1,104 @@
+$id: "ai-lego://methods/contracts/epistemic.toulmin_model.contract.yaml"
+title: "Toulmin Model Method Contract"
+status: ACTIVE
+
+description: >
+  F10 epistemic-quality family (Atlas L574: "Toulmin Model | Claim/Grounds/
+  Warrant/Backing/Qualifier/Rebuttal | 逐欄填寫 | 防止缺推理橋梁"). Fills
+  Toulmin's six named argument elements column by column. Core invariant:
+  `warrant` IS the reasoning bridge Atlas's own effect column names ("防止缺
+  推理橋梁"/prevent a missing bridge) -- a record carrying a claim and
+  grounds but an empty/whitespace-only warrant is a bare assertion wearing a
+  Toulmin costume, refused at construction and independently gate-checked,
+  not silently stored. `backing` may only be non-empty if `warrant` is also
+  non-empty (backing supports the warrant; there is no warrant to back
+  otherwise).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 假設／證據／認知品質 table, Toulmin Model row (L574)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L574 gives Toulmin's own six named
+  elements and effect ("防止缺推理橋梁") -- direct transcription plus
+  low-risk, disclosed compilation choices.
+
+id: epistemic.toulmin_model
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [INFER, EXPLAIN, CHALLENGE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F10
+# members). INFER draws the claim from the grounds via the warrant; EXPLAIN
+# articulates the warrant as the bridge itself; CHALLENGE is what
+# qualifier/rebuttal exist to pre-empt (naming the exception the claim does
+# not cover). All three CANONICAL_KERNEL members.
+
+purpose:
+  - fill_the_six_toulmin_argument_elements_and_guard_the_reasoning_bridge
+# Atlas L574 verbatim sense: 逐欄填寫 (fill in column by column), to prevent
+# a missing reasoning bridge (防止缺推理橋梁).
+
+inputs:
+  required:
+    - ClaimDescription
+  # NEW DESIGN, same free-text-input scope limit systems.iceberg_model.
+  # contract.yaml's EventDescription already establishes. specs/evidence/
+  # claim.schema.yaml (built earlier, same spec root) deliberately did NOT
+  # fold Toulmin's richer structure in (see that file's own open_questions
+  # MRSP-claim-1), so this method's own six-element record stays a
+  # self-contained free-text structure rather than a hard $ref to the
+  # persisted Claim record -- see typed-objects/toulmin-argument.schema.yaml's
+  # own overlap_check_against_evidence_claim_types for the full reasoning.
+
+outputs:
+  - ToulminArgument
+# NEW output type (see typed-objects/toulmin-argument.schema.yaml).
+
+preconditions:
+  - "claim, at least one grounds statement, and a non-blank warrant"
+  # NEW, structurally necessary -- Toulmin's own point is the bridge between
+  # grounds and claim; a record missing any of the three is not an argument.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same placement convention systems.iceberg_model.
+  # contract.yaml's own single-analysis precedent already establishes.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an argument record has no external
+  # side effect.
+
+open_questions:
+  - "OQ-TOULMINMODEL-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-TOULMINMODEL-2: claim.schema.yaml's own MRSP-claim-1 asks whether a future argument-map.schema.yaml should wrap persisted Claim records for Argument Mapping/Toulmin Model executions -- this file keeps `claim` a free-text field instead of resolving that question.（owner: operator, still open in claim.schema.yaml too）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Toulmin Model row (L574) directly. Grepped the
+    full spec root case-insensitively for "toulmin"/"warrant"/"argument"
+    before writing -- "warrant" hits are all plain-English "warrants/
+    warranted" (causal.difference_in_differences.contract.yaml,
+    causal.logic_model.contract.yaml, strategy.blue_ocean.contract.yaml,
+    forbidden-actions.yaml, risk-tiers.yaml, primitive.schema.yaml,
+    execution/{audit,exception,result,rollback}.schema.yaml, an authority
+    golden fixture), none about a Toulmin warrant field. "argument" hits
+    include devils-advocate-position.schema.yaml's generic use of the word
+    for a critique viewpoint (unrelated structure, not this method's six
+    columns). Only real overlap: claim.schema.yaml's own incidental
+    citation of this same Atlas row (see typed-objects/toulmin-argument.
+    schema.yaml's own overlap_check_against_evidence_claim_types). Zero
+    pre-existing implementation or schema title overlap found (grep of
+    every schema title for "toulmin"/"ladder"/"warrant"/"claim"/"inference"
+    confirms only claim.schema.yaml matches). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The six named elements are transcribed
+    verbatim from Atlas L574. purpose/preconditions naming and the
+    ClaimDescription free-text input scope are Phase 3-class compilation
+    decisions, disclosed above.

@@ -1,0 +1,94 @@
+$id: "ai-lego://methods/contracts/epistemic.assumption_mapping.contract.yaml"
+title: "Assumption Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F10 epistemic family (Atlas L566-590), 1st of 2 members built this batch. Atlas F10 table row (L570:
+  "Assumption Mapping｜依重要性×不確定性排序｜assumptions→impact if wrong→uncertainty→四象限｜先驗證最危險假設")
+  plus the quadrantChart immediately following the F10 table (L582-590). Not an EC §32 security-change method
+  (no authn/crypto/secrets/tenant isolation in scope). Core invariant: `quadrant` is GENUINE_COMPUTE --
+  mechanically derived from (impact, uncertainty) via the quadrantChart's own 4-cell map, never caller-supplied
+  -- same idiom `systems.leverage_point_analysis`'s `tier_rank` already establishes.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Assumption Mapping row (L570)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 quadrantChart (L582-590, quadrant vocabulary)"
+  - "specs/evidence/assumption.schema.yaml (soft reference: assumption_id's own ^ASM-[0-9]+$ id convention)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: epistemic.assumption_mapping` mints a NEW machine_id, 1st member of a NEW
+  `family: epistemic`. The 4-cell (impact, uncertainty) -> quadrant map is a direct transcription of the
+  quadrantChart's own axis/quadrant labels -- see `compilation_decisions`.
+
+id: epistemic.assumption_mapping
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [INFER, GROUP, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. INFER = judging each
+# assumption's own impact/uncertainty; GROUP = bucketing into the 4 quadrants; EXPLAIN = the quadrant assignment
+# is only useful when it drives which assumptions get validated first (Atlas's own benefit column).
+
+purpose:
+  - prioritize_assumptions_by_impact_and_uncertainty
+# Atlas L570 verbatim sense: rank assumptions by importance x uncertainty into a 4-quadrant map, so the riskiest
+# assumptions get validated first ("先驗證最危險假設").
+
+inputs:
+  required:
+    - AssumptionRef
+  # Free-text soft reference to existing specs/evidence/assumption.schema.yaml records (by their own ^ASM-[0-9]+$
+  # id) -- same class of scope-limited free-text reference challenge.red_team's own ProposalRef already
+  # establishes. This method maps assumptions that already exist; it does not mint new Assumption records
+  # (epistemic.assumption_registry's own job, built same batch).
+
+outputs:
+  - AssumptionMapping
+# NEW output type (see typed-objects/assumption-mapping.schema.yaml). Atlas names no PascalCase output type for
+# this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "mapped_assumptions has at least 1 entry, each with a real ASM-[0-9]+ assumption_id, impact in {HIGH, LOW}, and uncertainty in {HIGH, LOW} -- a mapping naming zero assumptions has not actually run the method"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next:
+  - epistemic.assumption_registry
+# Atlas's own benefit column ("先驗證最危險假設") presupposes the mapped assumptions are formally tracked
+# somewhere -- assumption.schema.yaml's own is_critical_assumption flag (recomputed by
+# epistemic.assumption_registry) is the natural next step for a VALIDATE_FIRST/KNOWN_CRITICAL quadrant result.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should quadrant be caller-supplied or mechanically derived from (impact, uncertainty)?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) via a fixed total 4-cell map transcribed from the quadrantChart (HIGH impact + HIGH uncertainty = VALIDATE_FIRST, HIGH impact + LOW uncertainty = KNOWN_CRITICAL, LOW impact + LOW uncertainty = MONITOR, LOW impact + HIGH uncertainty = CHEAP_TESTS) -- never an accepted builder parameter, same idiom systems.leverage_point_analysis's own tier_rank already establishes."
+  - question: "Should impact/uncertainty be continuous scores or a closed HIGH/LOW enum?"
+    decision: "Closed HIGH/LOW enum, matching the quadrantChart's own 2x2 shape literally -- Atlas gives no continuous scale for either axis (contrast decision.impact_effort, which Atlas does give a continuous quadrantChart with numeric thresholds for)."
+  - question: "Should assumption_id embed the full Assumption record (hard $ref to assumption.schema.yaml), or stay a soft id reference?"
+    decision: "Soft id reference (pattern ^ASM-[0-9]+$) only -- this method maps assumptions, it does not own or duplicate their full record shape. Embedding the whole record here would duplicate epistemic.assumption_registry's own composition of assumption.schema.yaml."
+
+open_questions:
+  - "OQ-ASSUMPTIONMAPPING-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-ASSUMPTIONMAPPING-2: assumption_id is not validated against a real, existing Assumption record at construction time (no cross-record referential-integrity check is possible without a registry lookup) -- only its id-pattern shape is checked (owner: operator, or whoever wires this method to a live assumption registry)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L570) and the quadrantChart (L582-590) directly at the cited lines. Grepped the
+    full spec root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for "assumption
+    mapping"/"assumption_mapping"/"quadrant" before writing this contract -- no duplicate definition found (see
+    typed-objects/assumption-mapping.schema.yaml's own verification note for the full grep record). Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-cell quadrant map is transcribed verbatim from Atlas's own
+    quadrantChart labels (L586-589). `cognitive_primitives` and the soft-reference scope of `assumption_id` are
+    this file's own compilation decisions, disclosed above.

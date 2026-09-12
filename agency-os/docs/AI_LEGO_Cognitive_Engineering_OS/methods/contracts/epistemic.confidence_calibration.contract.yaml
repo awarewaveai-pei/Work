@@ -1,0 +1,90 @@
+$id: "ai-lego://methods/contracts/epistemic.confidence_calibration.contract.yaml"
+title: "Confidence Calibration Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F10 epistemic family (Atlas L566-609), quantitative pair member 2/2 built this batch (with
+  epistemic.bayesian_updating). Atlas F10 table row (L578: "Confidence Calibration｜檢查信心是否準確｜
+  predictions→actuals→calibration curve｜降低 overconfidence"). Not an EC §32 security-change method. Atlas
+  names the technique and purpose but gives NO formula -- `brier_score` is a DISCLOSED COMPILATION DECISION (the
+  standard proper scoring rule), not an Atlas citation, same class as challenge.hazop's own supplemented
+  guide-word vocabulary. See ai_lego/modules/epistemic/confidence_calibration.py module docstring for the
+  formula and tolerance rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Confidence Calibration row (L578)"
+  - "specs/cognitive/typed-objects/prediction-tracking-record.schema.yaml (single-record BRIER_SCORE precedent -- confirmed distinct scope from this method's own cross-record aggregate, see that file's OQ-PREDICTIONTRACKING-2)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: epistemic.confidence_calibration` mints a new machine_id in the `family:
+  epistemic` NEW family opened this batch (epistemic.assumption_mapping, epistemic.assumption_registry,
+  epistemic.ladder_of_inference, epistemic.argument_mapping, epistemic.toulmin_model, epistemic.evidence_matrix,
+  epistemic.evidence_hierarchy, epistemic.bayesian_updating, epistemic.contradiction_detection are its 9
+  siblings per Atlas's own 10-row F10 table). The Brier score formula is a low-risk, disclosed compilation
+  choice, not an ADR-level ruling.
+
+id: epistemic.confidence_calibration
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [CALCULATE, COMPARE, LEARN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. CALCULATE = brier_score is
+# GENUINE_COMPUTE; COMPARE = stated_confidence vs actual_outcome across many predictions; LEARN = Atlas's own
+# benefit column "降低 overconfidence". Verified against the real 24-value kernel
+# (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - measure_calibration_quality_of_many_stated_confidence_predictions_against_their_later_actual_outcomes
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied predictions[]), same class as epistemic.bayesian_updating/
+  # learning.prediction_tracking. Does NOT consume existing PredictionTrackingRecord instances by reference --
+  # predictions[] is a self-contained {id, stated_confidence, actual_outcome} list (see compilation_decisions).
+outputs: [ConfidenceCalibration]
+preconditions:
+  - "record_id (CALIB- prefix) is a non-empty string; version is a string"
+  - "predictions has at least 2 entries (Atlas L578's own plural 'predictions→actuals→calibration curve' -- a single point cannot draw a curve)"
+  - "each predictions[] entry is exactly {id, stated_confidence, actual_outcome}: id non-empty string unique within the record; stated_confidence a real finite number in [0,1] (bool excluded); actual_outcome a real bool (not an int 0/1)"
+  - "brier_score is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE as mean((stated_confidence - (1.0 if actual_outcome else 0.0))**2) over predictions[], independently re-derived by evaluate_confidence_calibration_content_integrity_gate on every call"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+recommended_next: []
+# Atlas gives no explicit pipeline link from this row to any other F10 row beyond shared family membership.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "What formula computes brier_score, since Atlas gives none?"
+    decision: "The standard Brier score (proper scoring rule): mean((stated_confidence - (1.0 if actual_outcome else 0.0))**2) -- textbook formula for exactly Atlas's own stated purpose, disclosed as a compilation decision, not an Atlas citation."
+  - question: "Should brier_score be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- the builder has no brier_score parameter at all; a caller attempting brier_score= gets a plain TypeError."
+  - question: "predictions[] as a self-contained list, or hard-$ref to existing PredictionTrackingRecord ids?"
+    decision: "Self-contained {id, stated_confidence, actual_outcome} list -- matches this task's own explicit output shape and Atlas's own plural cross-record aggregate framing (prediction-tracking-record.schema.yaml's own OQ-PREDICTIONTRACKING-2 anticipates a future consumer of MANY such records; this method satisfies that need without requiring every caller to have pre-existing PredictionTrackingRecord ids to reference)."
+  - question: "actual_outcome: real bool, or accept int 0/1 too?"
+    decision: "Real bool only -- silently accepting an int would still numerically compute a score but is a category error this method refuses rather than silently tolerates."
+  - question: "Round brier_score, and what gate tolerance?"
+    decision: "round(x, 8), same convention epistemic.bayesian_updating's own posterior uses. Gate re-derivation tolerance is 1e-9."
+
+open_questions:
+  - "OQ-CONFIDENCECALIBRATION-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-CONFIDENCECALIBRATION-2: distinct from learning.prediction_tracking's own single-record BRIER_SCORE (one prediction vs one later actual) -- this method aggregates MANY {stated_confidence, actual_outcome} pairs into one calibration score. Not a duplicate, confirmed by direct read of that contract's own OQ-PREDICTIONTRACKING-2 (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L578) directly at the cited line. Grepped the full spec root (specs/**,
+    methods/**) and the full ai_lego/ tree case-insensitively for "bayes"/"posterior"/"calibration"/"brier"
+    before writing this contract: hits only in prediction-tracking-record.schema.yaml/
+    learning.prediction_tracking.contract.yaml (single-record Brier score, explicitly deferring cross-record
+    aggregation to this Atlas row) and this contract's own sibling epistemic.bayesian_updating. No duplicate
+    found. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas names the technique and purpose only; the Brier score formula is a
+    disclosed compilation decision. cognitive_primitives, the self-contained predictions[] shape, and the
+    rounding/tolerance choices are disclosed compilation decisions above.

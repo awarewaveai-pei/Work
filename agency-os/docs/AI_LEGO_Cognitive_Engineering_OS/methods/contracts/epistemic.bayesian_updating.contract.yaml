@@ -1,0 +1,87 @@
+$id: "ai-lego://methods/contracts/epistemic.bayesian_updating.contract.yaml"
+title: "Bayesian Updating Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F10 epistemic family (Atlas L566-609), quantitative pair member 1/2 built this batch (with
+  epistemic.confidence_calibration). Atlas F10 table row (L577: "Bayesian Updating｜新 evidence 更新
+  belief｜prior→likelihood→posterior｜信心可持續更新"). Not an EC §32 security-change method. Core invariant:
+  `posterior` is GENUINE_COMPUTE via Bayes' rule -- never caller-supplied, and its zero-denominator case (an
+  undefined posterior) fails closed with a distinct error rather than crashing or silently returning 0. See
+  ai_lego/modules/epistemic/bayesian_updating.py module docstring for the full formula and tolerance rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Bayesian Updating row (L577)"
+  - "specs/cognitive/typed-objects/prediction-tracking-record.schema.yaml (single-record BRIER_SCORE precedent -- confirmed distinct scope from this method, see that file's OQ-PREDICTIONTRACKING-2)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: epistemic.bayesian_updating` mints a new machine_id in the `family: epistemic`
+  NEW family opened this batch (epistemic.assumption_mapping, epistemic.assumption_registry,
+  epistemic.ladder_of_inference, epistemic.argument_mapping, epistemic.toulmin_model, epistemic.evidence_matrix,
+  epistemic.evidence_hierarchy, epistemic.confidence_calibration, epistemic.contradiction_detection are its 9
+  siblings). Bayes' rule is a direct textbook transcription, not this file's own invention.
+
+id: epistemic.bayesian_updating
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [ESTIMATE, CALCULATE, INFER]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ESTIMATE = the prior/likelihood
+# inputs are themselves estimates; CALCULATE = the posterior is GENUINE_COMPUTE via Bayes' rule; INFER = updating
+# a belief given new evidence is the method's own defining inferential act. All three verified against the real
+# 24-value kernel (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - update_a_belief_via_bayes_rule_from_new_evidence
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content: hypothesis/prior/likelihoods/evidence_ref), same class as
+  # learning.prediction_tracking/learning.decision_journal.
+outputs: [BayesianUpdate]
+preconditions:
+  - "record_id (BAYES- prefix), hypothesis, evidence_ref are non-empty strings; version is a string"
+  - "prior, likelihood_given_true, likelihood_given_false are each a real finite number in [0,1] (bool excluded)"
+  - "posterior is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE via Bayes' rule (likelihood_given_true*prior)/(likelihood_given_true*prior+likelihood_given_false*(1-prior)), independently re-derived by evaluate_bayesian_content_integrity_gate on every call"
+  - "the denominator likelihood_given_true*prior+likelihood_given_false*(1-prior) must be nonzero -- a zero denominator raises BAYES_UNDEFINED_POSTERIOR (fail-closed), never a ZeroDivisionError crash and never a silently-returned 0"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input (evidence_ref is a free-text soft reference, not a formal EvidenceSet claim).
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+recommended_next: []
+# Atlas gives no explicit pipeline link from this row to any other F10 row beyond shared family membership; see
+# OQ-BAYESIANUPDATE-2 for how a caller chains repeated updates (this record's own posterior feeding the next
+# call's prior).
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should posterior be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) via Bayes' rule -- the builder has no posterior parameter at all; a caller attempting posterior= gets a plain TypeError, not a silently-accepted value."
+  - question: "How is the zero-denominator (undefined posterior) case handled?"
+    decision: "Raised as a distinct BAYES_UNDEFINED_POSTERIOR InvariantViolation, checked before the division ever runs -- never a crash, never a silent 0."
+  - question: "Round posterior, or store raw float precision, and what gate tolerance?"
+    decision: "round(x, 8), matching prediction-tracking-record.schema.yaml's own error.value convention. Gate re-derivation tolerance is 1e-9 -- one order of magnitude tighter than the 8th-decimal-place unit, absorbing float round-trip noise without masking a real tamper."
+  - question: "Should likelihood_given_false be its own field, given Atlas's own pipeline text names only 'likelihood' (singular)?"
+    decision: "Yes, NEW_DESIGN, disclosed -- Bayes' rule structurally requires BOTH conditional likelihoods (given true, given false); a single likelihood_given_true is mathematically underspecified for computing a posterior."
+
+open_questions:
+  - "OQ-BAYESIANUPDATE-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-BAYESIANUPDATE-2: repeated/chained updates (Atlas's own '信心可持續更新') are left to the calling workflow -- feed this record's own posterior back in as the next call's prior. No BayesianUpdateChain wrapper type exists yet (owner: operator, or whoever builds one)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L577) directly at the cited line. Grepped the full spec root (specs/**,
+    methods/**) and the full ai_lego/ tree case-insensitively for "bayes"/"posterior"/"calibration"/"brier"
+    before writing this contract: hits only in prediction-tracking-record.schema.yaml/
+    learning.prediction_tracking.contract.yaml (single-record Brier score, explicitly deferring cross-record
+    calibration aggregation -- distinct scope from this Bayes'-rule single-update method) and this contract's
+    own sibling epistemic.confidence_calibration. No duplicate found. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. Bayes' rule is a direct textbook transcription. cognitive_primitives, the
+    zero-denominator error code, and the rounding/tolerance choices are disclosed compilation decisions above.

@@ -1,0 +1,110 @@
+$id: "ai-lego://methods/contracts/epistemic.evidence_matrix.contract.yaml"
+title: "Evidence Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  F10 epistemic-quality family (Atlas L575: "Evidence Matrix | Claim ×
+  Evidence 對齊 | rows=claims、cols=evidence→quality/diversity/recency | 快速
+  看到薄弱 claim"). Aligns a set of claims against a set of evidence items via
+  an explicit links[] matrix so a weakly-supported claim is visible, not
+  hidden. Core invariant (two halves): (1) every link's `claim_id`/
+  `evidence_id` must resolve to a declared entry, both directions -- a
+  dangling reference is refused; (2) every declared claim must appear in
+  >=1 link -- Atlas's own benefit column ("快速看到薄弱 claim") is exactly
+  why an unlinked claim must never be silently accepted as a complete
+  matrix. Composes, does not duplicate: `claims[]`/`evidence_items[]` are
+  real `$ref`s to `specs/evidence/claim.schema.yaml` /
+  `specs/evidence/evidence.schema.yaml`, the same pattern
+  `specs/evidence/evidence-graph.schema.yaml#/claim_node`/`#/evidence_node`
+  already established -- this method adds only the alignment layer
+  (`links[]`), it does not mint a second claim/evidence record shape.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Evidence Matrix row (L575)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.20 Evidence Matrix worked example (L1657-1669) -- same Claim/Evidence field grounding claim.schema.yaml/evidence.schema.yaml already compiled"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L575 gives a real purpose and pipeline
+  ("rows=claims、cols=evidence→quality/diversity/recency") -- direct
+  transcription plus a compose-not-duplicate binding to the two already-
+  built typed objects that already carry `quality`/etc (see description).
+
+id: epistemic.evidence_matrix
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [COMPARE, RELATE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F10
+# members). COMPARE is the matrix's own rows×cols structure; RELATE is
+# labeling each claim-evidence pair SUPPORTS/CONTRADICTS/NEUTRAL; VALIDATE
+# is the method's own purpose (checking whether a claim's evidentiary
+# support actually holds up). All three CANONICAL_KERNEL members.
+
+purpose:
+  - align_claims_against_evidence_to_surface_weak_claims
+# Atlas L575 verbatim sense: Claim × Evidence 對齊 (align claims against
+# evidence), effect 快速看到薄弱 claim (quickly surface the weak claim).
+
+inputs:
+  required:
+    - ClaimRefs
+    - EvidenceRefs
+  # NEW DESIGN. The starting point is which claims and which evidence items
+  # are being aligned; each MAY be a full claim.schema.yaml/evidence.schema.yaml
+  # record or a minimal id+required-fields stub (see claims/evidence_items
+  # below).
+
+outputs:
+  - EvidenceMatrix
+# NEW output type (see typed-objects/evidence-matrix.schema.yaml).
+
+preconditions:
+  - "at least 1 claim and at least 1 evidence item declared"
+  # NEW, structurally necessary -- a matrix with zero rows or zero columns
+  # is not a matrix (Atlas's own literal "rows=claims、cols=evidence").
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent matrix, same placement
+  # convention systems.behavior_over_time.contract.yaml's own single-record
+  # batch already established.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas gives no explicit next-method pairing for Evidence Matrix (contrast
+# challenge.red_team's own Atlas §11.24-cited pairing). epistemic.argument_mapping
+# (this same batch) names Evidence Matrix as ITS OWN recommended_next
+# (pipeline tail), not the reverse -- Atlas's pipeline direction runs
+# argument→evidence, not evidence→argument.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a matrix has no external side effect.
+
+open_questions:
+  - "OQ-EVIDENCEMATRIX-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-EVIDENCEMATRIX-2: Atlas L575's own 'quality/diversity/recency' column-dimension list is not modeled as per-link fields here (no mother-document line ties those three words to link-level structure, only to the evidence axis generally, already covered by evidence.schema.yaml's own quality_assessment); a future revision could add them to links[] if a concrete textual mandate appears.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Evidence Matrix row (L575) and §11.20's worked
+    example (L1657-1669) directly. Grepped the full spec root case-
+    insensitively for "evidence matrix"/"argument map"/"claim"/"objection"/
+    "rebuttal" before writing -- every existing "Evidence Matrix" hit is
+    either this same row quoted inside claim.schema.yaml/evidence.schema.yaml's
+    own grounding narrative (the two typed objects this contract composes,
+    not duplicates), an opaque gate-id/checklist-item reference
+    (execution/risk-tier.schema.yaml, decomposition.issue_tree.contract.yaml),
+    or a Mandatory-Gate-Injection tool-checklist citation (ADR-001/ADR-004)
+    -- none defines this method's own output shape. No pre-existing
+    implementation overlap found. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The rows=claims/cols=evidence structure
+    is transcribed verbatim from Atlas L575. purpose/preconditions naming
+    and the ClaimRefs/EvidenceRefs input scope are Phase 3-class compilation
+    decisions, disclosed above.

@@ -1,0 +1,96 @@
+$id: "ai-lego://methods/contracts/epistemic.evidence_hierarchy.contract.yaml"
+title: "Evidence Hierarchy Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F10 epistemic family (Atlas L566-600), built in the same 5-workstream batch as
+  epistemic.assumption_mapping/argument_mapping/ladder_of_inference/toulmin_model. Atlas F10 table row (L576:
+  "Evidence Hierarchy｜區分證據強度｜domain-specific hierarchy｜避免來源等價化"). Not an EC §32 security-change
+  method (no authn/crypto/secrets/tenant isolation in scope). Core invariant: (a) hierarchy_levels[] rank values
+  must be unique (strict total order -- the exact 來源等價化/source-equivalence collapse this method exists to
+  prevent), and (b) every evidence_assignments[].level_id must resolve to a declared hierarchy_levels[].level_id
+  (dangling reference refused). Closes evidence.schema.yaml:127-139's own deliberately domain-specific
+  hierarchy_tier seam -- see typed-objects/evidence-hierarchy.schema.yaml's own description for the full
+  reasoning; this contract does not re-litigate it.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Evidence Hierarchy row (L576)"
+  - "specs/evidence/evidence.schema.yaml:127-139 (hierarchy_tier -- the seam this method closes, cited not duplicated)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: epistemic.evidence_hierarchy` mints a new machine_id, a member of the
+  already-established `family: epistemic` (opened by epistemic.assumption_mapping, same batch). The
+  declared-ordering-instead-of-universal-enum design is a direct operationalization of
+  evidence.schema.yaml:127-139's own already-ruled reasoning, not a new design decision.
+
+id: epistemic.evidence_hierarchy
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [GROUP, COMPARE, VALIDATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. GROUP = bucketing evidence into
+# declared strength tiers; COMPARE = the tiers exist to compare relative strength across evidence, not treat
+# sources as equivalent (Atlas's own benefit column); VALIDATE = the rank-uniqueness and referential-integrity
+# invariants this method's own real risk (來源等價化) requires.
+
+purpose:
+  - distinguish_evidence_strength_via_a_declared_domain_specific_hierarchy
+# Atlas L576 verbatim sense: 用途「domain-specific hierarchy」-- rank evidence by strength within one declared
+# domain, avoiding false equivalence between sources of different quality.
+
+inputs:
+  required:
+    - EvidenceRef
+  # Free-text/soft reference to existing specs/evidence/evidence.schema.yaml records (by their own
+  # ^E-[0-9]+$ id) -- same class of scope-limited soft reference epistemic.assumption_mapping's own
+  # AssumptionRef already establishes. This method ranks evidence that already exists; it does not mint new
+  # Evidence records.
+
+outputs:
+  - EvidenceHierarchy
+# NEW output type (see typed-objects/evidence-hierarchy.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "hierarchy_levels has at least 1 entry, each with a unique level_id and a unique rank -- a hierarchy with zero levels, or two levels tied at the same rank, cannot answer 'which evidence is stronger'"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- this method takes no EvidenceSet input (only soft EvidenceRef id references); method.schema.yaml
+  # scopes evidence_labeling_required to claims originating from a supplied EvidenceSet input, which has
+  # nothing to check here. Same reasoning epistemic.assumption_mapping's own evidence_labeling_required: false
+  # already establishes.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas gives no explicit next-step pairing for this method (grep-confirmed against F10's own section text).
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should hierarchy_levels be a fixed universal enum (e.g. Weak/Medium/Strong), or a per-domain declared ordering?"
+    decision: "Per-domain declared ordering -- a universal enum would directly contradict evidence.schema.yaml:127-139's own already-ruled reasoning that the hierarchy varies per domain (RCT>cohort>case-report is not a market-research hierarchy)."
+  - question: "Should evidence_id embed the full Evidence record (hard $ref), or stay a soft id reference?"
+    decision: "Soft id reference (pattern ^E-[0-9]+$) only -- this method ranks evidence, it does not own or duplicate the Evidence record's own full shape."
+
+open_questions:
+  - "OQ-EVIDENCEHIERARCHY-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator, or whoever adds a dedicated Atlas §4 formula for this method)."
+  - "OQ-EVIDENCEHIERARCHY-2: evidence_id is not validated against a real, existing Evidence record at construction time (no cross-record referential-integrity check is possible without an evidence store lookup) -- only its id-pattern shape is checked (owner: operator, or whoever wires this method to a live evidence store)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L576) directly at the cited line, and evidence.schema.yaml:127-139's own
+    hierarchy_tier field and cited reasoning in full before designing this contract. Grepped the full spec root
+    (specs/**, methods/**) case-insensitively for "hierarchy"/"evidence hierarchy" before writing -- hits found
+    in unrelated hierarchical-structure schemas and evidence.schema.yaml's own hierarchy_tier field itself (the
+    seam this method closes) -- no duplicate contract or typed object found. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The rank-uniqueness and referential-integrity invariants are this file's
+    own Phase 3 compilation choice, directly grounded in Atlas's own benefit column ("避免來源等價化") and
+    evidence.schema.yaml's own already-disclosed reasoning (cited above, not duplicated).

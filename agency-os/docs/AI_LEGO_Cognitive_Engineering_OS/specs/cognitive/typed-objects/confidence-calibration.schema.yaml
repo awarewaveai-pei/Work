@@ -1,0 +1,134 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/confidence-calibration.schema.yaml"
+title: Confidence Calibration
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ConfidenceCalibration` -- the declared `outputs` of
+  `epistemic.confidence_calibration`'s Method Contract
+  (methods/contracts/epistemic.confidence_calibration.contract.yaml, `outputs: [ConfidenceCalibration]`). F10
+  epistemic family, quantitative pair member 2/2 built this batch. Atlas F10 table row (L578): "Confidence
+  Calibration｜檢查信心是否準確｜predictions→actuals→calibration curve｜降低 overconfidence" -- Atlas names the
+  technique and its purpose but gives NO formula; `brier_score` is a DISCLOSED COMPILATION DECISION (the standard
+  proper scoring rule for exactly this purpose), not an Atlas citation -- see compilation_decisions and
+  `ai_lego/modules/epistemic/confidence_calibration.py` module docstring.
+
+  Field provenance:
+    * `predictions[]` -- Atlas's own plural "predictions→actuals" pipeline, >=2 entries (a calibration curve
+      cannot be drawn from one point). Each `{id, stated_confidence, actual_outcome}`.
+    * `brier_score` -- GENUINE_COMPUTE, mean squared error over predictions[], NEVER caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Confidence Calibration row (L578)"
+  - "methods/contracts/epistemic.confidence_calibration.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/prediction-tracking-record.schema.yaml (single-record BRIER_SCORE precedent -- this file's own aggregate formula reuses the same proper-scoring-rule shape at a different, cross-record, granularity)"
+
+decided_by: >
+  No ADR governs this file. Atlas gives this method a name and purpose but no formula -- the Brier score
+  supplementation is a disclosed compilation decision (same class as challenge.hazop's own guide-word
+  vocabulary), not a further mother-document citation. Other field/rounding/additionalProperties choices are
+  low-risk, same class every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "What formula computes brier_score, since Atlas gives none?"
+    decision: "The standard Brier score (proper scoring rule): mean((stated_confidence - (1.0 if actual_outcome else 0.0))**2) -- textbook formula for exactly Atlas's own stated purpose ('檢查信心是否準確', '降低 overconfidence'), disclosed as a compilation decision, not an Atlas citation."
+  - question: "Minimum predictions[] length?"
+    decision: "2 -- Atlas's own pipeline is explicitly plural (predictions→actuals→calibration curve); a single point cannot draw a curve."
+  - question: "Should brier_score be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- never an accepted builder parameter. See ai_lego/modules/epistemic/confidence_calibration.py compute_brier_score."
+  - question: "actual_outcome: real bool, or accept int 0/1 too?"
+    decision: "Real bool only -- silently accepting an int would still numerically compute a score (Python 0/1 behaves like False/True arithmetically) but represents a category error (an outcome is a boolean fact, not a number) this schema and the runtime layer both refuse rather than silently tolerate."
+  - question: "Round brier_score, or store raw float precision?"
+    decision: "Round to 8 decimal places (round(x, 8)), same convention epistemic.bayesian_updating's own posterior and prediction-tracking-record.schema.yaml's own error.value already establish. Gate re-derivation tolerance is 1e-9 (module docstring)."
+  - question: "additionalProperties: false at the top level, and on each predictions[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on."
+
+type: object
+required: [id, version, predictions, brier_score, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^CALIB-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.confidence_calibration"
+
+  predictions:
+    type: array
+    minItems: 2
+    description: "Atlas L578's own plural 'predictions→actuals' pipeline -- a calibration curve needs at least 2 points."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, stated_confidence, actual_outcome]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Local id, unique within this record."
+        stated_confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "The stated probability/confidence at prediction time."
+        actual_outcome:
+          type: boolean
+          description: "The later-observed realised outcome. Real boolean only -- NOT an int 0/1 (see compilation_decisions)."
+
+  brier_score:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "GENUINE_COMPUTE -- mean squared error over predictions[] (see compilation_decisions for the formula and its disclosed, non-Atlas-cited status). NEVER a builder parameter."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A hand-computed worked example: 3 predictions, stated_confidence 0.9/0.6/0.5, actual_outcome true/false/true -> squared errors 0.01/0.36/0.25 -> brier_score = 0.62/3 = 0.20666667 (rounded to 8dp)."
+    value:
+      id: "CALIB-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.confidence_calibration"
+      predictions:
+        - id: "P1"
+          stated_confidence: 0.9
+          actual_outcome: true
+        - id: "P2"
+          stated_confidence: 0.6
+          actual_outcome: false
+        - id: "P3"
+          stated_confidence: 0.5
+          actual_outcome: true
+      brier_score: 0.20666667
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CONFIDENCECALIBRATION-1: Atlas L578's own benefit column names a 'calibration curve' (a plotted, binned stated-confidence-vs-hit-rate visualization) -- this schema stores the raw predictions[] a curve would be plotted FROM, not a rendered/binned curve object itself (owner: operator, or whoever builds a future calibration-curve rendering/binning method consuming this record)."
+  - "OQ-CONFIDENCECALIBRATION-2: distinct from prediction-tracking-record.schema.yaml's own single-record BRIER_SCORE (learning.prediction_tracking) -- that method computes one Brier-like error for ONE prediction vs one later actual; this method aggregates MANY {stated_confidence, actual_outcome} pairs into one calibration-quality score. Not a duplicate -- different granularity, confirmed by direct read of that file's own OQ-PREDICTIONTRACKING-2 (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L578) directly at the cited line. Grepped the full spec root (specs/**,
+    methods/**) and the full ai_lego/ tree case-insensitively for "bayes"/"posterior"/"calibration"/"brier"
+    before writing this file: hits only in prediction-tracking-record.schema.yaml/
+    learning.prediction_tracking.contract.yaml (single-record Brier score, explicitly deferring cross-record
+    aggregation to this Atlas row) and this file's own sibling epistemic.bayesian_updating (the OTHER F10
+    quantitative row, a genuinely different single-belief-update method). No duplicate found. Validated against
+    jsonschema.Draft202012Validator, including a real mutation check that additionalProperties:false refuses a
+    smuggled key at both the top level and a predictions[] item, and that a hand-tampered brier_score
+    disagreeing with the stored predictions[] is caught by the runtime gate (not expressible in JSON Schema
+    alone).
+  note: >
+    No mother document was modified. Atlas names the technique and purpose only; the Brier score formula is a
+    disclosed compilation decision, not a further mother-document citation. The >=2 minItems, real-bool
+    actual_outcome, and rounding/tolerance choices are disclosed compilation decisions above.

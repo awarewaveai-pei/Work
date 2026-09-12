@@ -1,0 +1,115 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/ladder-of-inference-analysis.schema.yaml"
+title: Ladder of Inference Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LadderOfInferenceAnalysis` -- the
+  declared `outputs` of `epistemic.ladder_of_inference`'s Method Contract
+  (methods/contracts/epistemic.ladder_of_inference.contract.yaml, `outputs:
+  [LadderOfInferenceAnalysis]`). F10 epistemic-quality family (Atlas L572:
+  "Ladder of Inference | 追 data→meaning→assumption→conclusion | 把每一步顯式
+  化 | 找認知跳躍").
+
+  Four ordered rungs, lowest to highest: `observed_data[]` (required, >=1),
+  `meanings_assigned[]`, `assumptions_made[]`, `conclusions_drawn[]`. Atlas's
+  own climb order is enforced as a RUNTIME invariant (not expressible
+  declaratively here across sibling arrays, same disclosed-gap class as
+  `iceberg-model-analysis.schema.yaml`'s own top-down-completeness
+  precedent): a higher rung may only be non-empty if every lower rung
+  already is -- `ai_lego/modules/epistemic/ladder_of_inference.py` enforces
+  this at both construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Ladder of Inference row (L572)"
+  - "methods/contracts/epistemic.ladder_of_inference.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/iceberg-model-analysis.schema.yaml -- cross-array-referential-completeness-as-runtime-invariant precedent (structurally identical shape, ascending instead of descending)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L572's own
+  four-rung climb plus low-risk, disclosed compilation choices (the LADDER-
+  prefix, record-level-only provenance, runtime-invariant placement of the
+  ascending-completeness rule).
+
+compilation_decisions:
+  - question: "Ascending completeness (a higher rung requires every lower rung non-empty): JSON Schema keyword or runtime invariant?"
+    decision: "Runtime invariant -- same declarative gap as iceberg-model-analysis.schema.yaml's own top-down completeness."
+  - question: "Each rung item: a closed structured object, or a bare string?"
+    decision: "Bare string -- Atlas L572 gives no sub-structure for a rung entry beyond a statement."
+
+type: object
+additionalProperties: false
+required: [id, version, observed_data, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^LADDER-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.ladder_of_inference"
+
+  observed_data:
+    type: array
+    minItems: 1
+    description: "Atlas L572 rung 1 (lowest): raw data observed, before any meaning is assigned. Required, at least one (method contract precondition)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  meanings_assigned:
+    type: array
+    default: []
+    description: "Atlas L572 rung 2: meaning/interpretation assigned to the observed data. May be empty even when observed_data is not -- a run may stop at the data level. No separate runtime check needed for this rung against observed_data -- observed_data is already required non-empty by both the method contract's own precondition and this schema's own required+minItems above."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  assumptions_made:
+    type: array
+    default: []
+    description: "Atlas L572 rung 3: assumptions made on top of the assigned meaning. RUNTIME invariant: may only be non-empty if meanings_assigned is also non-empty."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  conclusions_drawn:
+    type: array
+    default: []
+    description: "Atlas L572 rung 4 (highest): conclusions drawn from the assumptions. RUNTIME invariant: may only be non-empty if assumptions_made is also non-empty -- a conclusion with no assumption or meaning rung beneath it IS the cognitive leap this method exists to expose (Atlas's own 找認知跳躍)."
+    items: {type: string, minLength: 1, pattern: "\\S"}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent analysis."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A customer-complaint ladder climbed all four rungs"
+    value:
+      id: "LADDER-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.ladder_of_inference"
+      observed_data: ["客戶在會議中遲到 10 分鐘且沒有事先通知"]
+      meanings_assigned: ["這代表他不重視這次合作"]
+      assumptions_made: ["假設準時等於重視程度，且遲到必然是故意的"]
+      conclusions_drawn: ["結論：這個客戶不值得投入更多資源"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-LADDEROFINFERENCEANALYSIS-1: rung entries carry no sub-structure beyond a bare statement (no {statement, confidence} or evidence refs) -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Ladder of Inference row (L572) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "ladder of inference"/"ladder_of_inference" and every schema title before
+    writing -- zero pre-existing implementation or schema title overlap
+    found. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_ladder_of_inference.py.
+  note: >
+    No mother document was modified. The four rung field names are
+    transcribed directly from Atlas L572. The LADDER- prefix, bare-string
+    item shape, and runtime-invariant placement of ascending completeness
+    are this file's own compiled structure, disclosed above, not textually
+    cited.

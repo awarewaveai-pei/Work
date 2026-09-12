@@ -1,0 +1,107 @@
+$id: "ai-lego://methods/contracts/epistemic.argument_mapping.contract.yaml"
+title: "Argument Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  F10 epistemic-quality family (Atlas L573: "Argument Mapping | Claim/Reason/
+  Objection 結構化 | main claim→support→objection→rebuttal→evidence | 論證可
+  檢查"). Structures one main claim plus its supporting reasons, objections,
+  and rebuttals into a checkable argument graph. Core invariant: every
+  rebuttal's `objection_id` must resolve to a real declared objection -- a
+  rebuttal answering an objection that was never raised is a dangling
+  argument node, refused at construction, same "referential integrity over a
+  graph" risk class this session's other F10/F12 slices already enforce.
+  Composes, does not duplicate: `main_claim` is a real `$ref` to
+  `specs/evidence/claim.schema.yaml` (Atlas's own row literally names this
+  method's first node "main claim"), the same "real $ref, minimal stub
+  allowed" pattern `specs/evidence/evidence-graph.schema.yaml#/claim_node`
+  already established -- this file's own `main_claim` field answers that
+  file's open question `MRSP-claim-1` (a richer Argument Mapping wrapper
+  around a base Claim record) in the affirmative.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Argument Mapping row (L573)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L573 gives a real pipeline
+  ("main claim→support→objection→rebuttal→evidence") -- direct transcription
+  of the claim/support/objection/rebuttal quartet plus low-risk, disclosed
+  compilation choices (the evidence tail is Toulmin/Evidence-Matrix territory
+  in this same F10 family, not duplicated here -- see open_questions).
+
+id: epistemic.argument_mapping
+version: "1.0.0"
+family: epistemic
+
+cognitive_primitives: [DECOMPOSE, CHALLENGE, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F10
+# members). DECOMPOSE structures the claim into support/objection/rebuttal
+# roles; CHALLENGE is objections attacking the main claim; EXPLAIN is what a
+# rebuttal must do (articulate why an objection does not hold, not just
+# label it dismissed). All three CANONICAL_KERNEL members.
+
+purpose:
+  - structure_a_claim_into_a_checkable_argument_graph
+# Atlas L573 verbatim sense: 論證可檢查 (the argument becomes checkable) via
+# main claim→support→objection→rebuttal structuring.
+
+inputs:
+  required:
+    - ClaimRef
+  # NEW DESIGN. The starting point is which claim is being argued for; a
+  # caller may supply a full claim.schema.yaml record or a minimal
+  # {claim_id, statement, provenance} stub (see main_claim below).
+
+outputs:
+  - ArgumentMap
+# NEW output type (see typed-objects/argument-map.schema.yaml).
+
+preconditions:
+  - "at least 1 support"
+  # NEW, structurally necessary -- a claim with zero supporting reason is
+  # not yet an argument (Atlas's own literal pipeline starts main
+  # claim→SUPPORT, not main claim→objection).
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent argument map, same placement
+  # convention systems.behavior_over_time.contract.yaml's own single-record
+  # batch already established.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - epistemic.evidence_matrix
+# Atlas L573's own pipeline tail ("...→evidence") -- an argument map's
+# claim/objections are exactly what an Evidence Matrix (this same F10
+# family, built same batch) then aligns against real evidence.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an argument map has no external
+  # side effect.
+
+open_questions:
+  - "OQ-ARGUMENTMAPPING-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-ARGUMENTMAPPING-2: Atlas L573's pipeline tail names 'evidence' as a 5th stage; this contract's outputs deliberately stop at rebuttal (the evidence-alignment layer is epistemic.evidence_matrix's own job, this same batch) rather than duplicating it here.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F10 table, Argument Mapping row (L573) directly. Grepped the
+    full spec root case-insensitively for "argument map"/"evidence matrix"/
+    "objection"/"rebuttal"/"toulmin" before writing -- prior hits are all
+    either this row's own literal text quoted inside
+    specs/evidence/claim.schema.yaml's own grounding narrative (no field-
+    shape overlap) or unrelated (a `objection` field on
+    specs/domain/knowledge-canvas.schema.yaml's own note-type enum, a
+    different concept). No pre-existing implementation or schema title
+    overlap for Argument Mapping itself. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The claim/support/objection/rebuttal
+    quartet is transcribed verbatim from Atlas L573. purpose/preconditions
+    naming and the ClaimRef input scope are Phase 3-class compilation
+    decisions, disclosed above.

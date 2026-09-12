@@ -1,0 +1,138 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/assumption-mapping.schema.yaml"
+title: Assumption Mapping
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AssumptionMapping` -- the declared `outputs` of
+  `epistemic.assumption_mapping`'s Method Contract (methods/contracts/epistemic.assumption_mapping.contract.yaml,
+  `outputs: [AssumptionMapping]`). F10 epistemic family, 1st of 2 members built this batch. Atlas F10 table row
+  (L570) plus the quadrantChart immediately following the F10 table (L582-590).
+
+  Field provenance:
+    * `mapped_assumptions[]` -- one per mapped assumption. `assumption_id` is a SOFT id reference (pattern
+      `^ASM-[0-9]+$`) to an existing `specs/evidence/assumption.schema.yaml` record, not the embedded record
+      itself (see compilation_decisions). `impact`/`uncertainty` are the quadrantChart's own 2 axes, each a
+      closed HIGH/LOW enum. `quadrant` -- GENUINE_COMPUTE, a fixed 4-cell mapping over (impact, uncertainty)
+      transcribed verbatim from the quadrantChart's own 4 quadrant labels, NEVER caller-supplied (see
+      compilation_decisions).
+    * `provenance` (top-level only) -- record-level, matching this corpus's established batch precedent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Assumption Mapping row (L570)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 quadrantChart (L582-590)"
+  - "methods/contracts/epistemic.assumption_mapping.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  transcription of Atlas L570's own row plus the quadrantChart's own labels, plus low-risk disclosed compilation
+  choices.
+
+compilation_decisions:
+  - question: "Should quadrant be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) from a fixed total (impact, uncertainty) -> quadrant 4-cell lookup transcribed from the quadrantChart's own labels -- never an accepted builder parameter."
+  - question: "additionalProperties: false at the top level, and on each mapped_assumptions[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, set correctly from the start."
+  - question: "Should assumption_id hard-$ref assumption.schema.yaml (embedding the whole record) or stay a soft id-pattern reference?"
+    decision: "Soft id-pattern reference only (^ASM-[0-9]+$) -- this type maps assumptions, it does not own or duplicate their full record shape. See method contract's own compilation_decisions for the same reasoning."
+
+type: object
+required: [id, version, mapped_assumptions, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^AMAP-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.assumption_mapping"
+
+  mapped_assumptions:
+    type: array
+    minItems: 1
+    description: "Atlas L570's own assumption->quadrant mapping. At least one required -- a mapping naming zero assumptions has not actually run the method."
+    items:
+      type: object
+      additionalProperties: false
+      required: [assumption_id, impact, uncertainty, quadrant]
+      properties:
+        assumption_id:
+          type: string
+          pattern: "^ASM-[0-9]+$"
+          description: "Soft id reference to an existing specs/evidence/assumption.schema.yaml record's own id convention. Unique within this record -- enforced at the runtime layer, not here."
+        impact:
+          type: string
+          enum: [HIGH, LOW]
+          description: "quadrantChart y-axis (L585: 'Low Impact --> High Impact'), transcribed verbatim as a closed 2-value enum."
+        uncertainty:
+          type: string
+          enum: [HIGH, LOW]
+          description: "quadrantChart x-axis (L584: 'Low Uncertainty --> High Uncertainty'), transcribed verbatim as a closed 2-value enum."
+        quadrant:
+          type: string
+          enum: [VALIDATE_FIRST, KNOWN_CRITICAL, MONITOR, CHEAP_TESTS]
+          description: >
+            GENUINE_COMPUTE -- mechanically derived from (impact, uncertainty) via a fixed total mapping
+            (ai_lego/modules/epistemic/assumption_mapping.py `_QUADRANT_BY_IMPACT_UNCERTAINTY`): HIGH impact +
+            HIGH uncertainty = VALIDATE_FIRST (quadrantChart quadrant-1, L586); HIGH impact + LOW uncertainty =
+            KNOWN_CRITICAL (quadrant-2, L587); LOW impact + LOW uncertainty = MONITOR (quadrant-3, L588); LOW
+            impact + HIGH uncertainty = CHEAP_TESTS (quadrant-4, L589). NEVER a builder parameter -- see
+            compilation_decisions.
+
+  provenance:
+    description: "Record-level only -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 4-assumption mapping over a university AI-platform-adoption proposal, one assumption landing in each of the 4 quadrants."
+    value:
+      id: "AMAP-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.assumption_mapping"
+      mapped_assumptions:
+        - assumption_id: "ASM-1"
+          impact: HIGH
+          uncertainty: HIGH
+          quadrant: VALIDATE_FIRST
+        - assumption_id: "ASM-2"
+          impact: HIGH
+          uncertainty: LOW
+          quadrant: KNOWN_CRITICAL
+        - assumption_id: "ASM-3"
+          impact: LOW
+          uncertainty: LOW
+          quadrant: MONITOR
+        - assumption_id: "ASM-4"
+          impact: LOW
+          uncertainty: HIGH
+          quadrant: CHEAP_TESTS
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-ASSUMPTIONMAPPING-1: assumption_id is not cross-checked against a real, existing Assumption record at schema-validation time (JSON Schema has no cross-file existence check) -- only its id-pattern shape is enforced here (owner: operator, or whoever wires this method to a live assumption registry)."
+  - "OQ-ASSUMPTIONMAPPING-2: quadrant must equal the real re-derivation from its own sibling impact/uncertainty fields -- enforced by the runtime module (ai_lego/modules/epistemic/assumption_mapping.py evaluate_assumption_mapping_integrity_gate), not this schema (a quadrant that disagrees with its own impact/uncertainty but is still one of the 4 legal enum values passes schema validation; same limitation red-team-challenge.schema.yaml's own OQ-REDTEAMCHALLENGE-1 discloses for dimensions_examined membership) (owner: operator, or whoever next hardens this schema's cross-field guarantees)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L570) and the quadrantChart (L582-590) directly at the cited lines. Grepped the
+    full spec root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for "assumption
+    mapping"/"assumption_mapping"/"quadrant" before writing this file: hits found in
+    ansoff-matrix.schema.yaml/porter-five-forces-analysis.schema.yaml/decision.impact_effort's own quadrant
+    concepts (all different, unrelated quadrant structures -- Ansoff's growth-strategy quadrants, Porter's
+    5-forces, Impact-Effort's continuous scale -- none define this method's own impact x uncertainty x
+    ASM-referencing shape) and method-inventory.yaml/contract-backlog.yaml's own "Assumption Mapping" NAME
+    entries (F10 row L569, `has_contract: false` before this file -- no prior field-shape definition). No
+    duplicate found. Validated against jsonschema.Draft202012Validator, including a mutation check that a
+    hand-crafted quadrant disagreeing with its own (impact, uncertainty) is caught by the runtime gate (not
+    expressible here).
+  note: >
+    No mother document was modified. The 4-value quadrant enum and the 2x2 map are transcribed verbatim from
+    Atlas's own quadrantChart labels. The GENUINE_COMPUTE quadrant mapping and assumption_id's soft-reference
+    scope are this file's own compilation decisions, disclosed above.

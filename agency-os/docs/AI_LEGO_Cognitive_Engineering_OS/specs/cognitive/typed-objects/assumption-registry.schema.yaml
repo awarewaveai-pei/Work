@@ -1,0 +1,119 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/assumption-registry.schema.yaml"
+title: Assumption Registry
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AssumptionRegistry` -- the declared `outputs` of
+  `epistemic.assumption_registry`'s Method Contract (methods/contracts/epistemic.assumption_registry.contract.yaml,
+  `outputs: [AssumptionRegistry]`). F10 epistemic family, 2nd of 2 members built this batch. Atlas F10 table row
+  (L571: "Assumption Registry｜正式保存假設｜ID/statement/type/evidence/confidence/validation/status/owner｜假設
+  不再藏在文字中").
+
+  Field provenance:
+    * `entries[]` -- a COLLECTION of real `specs/evidence/assumption.schema.yaml` records, `$ref`'d directly
+      (not redefined -- see compilation_decisions). This method composes that file rather than duplicating
+      Atlas F10's own field list, which `assumption.schema.yaml` already implements verbatim.
+    * `provenance` (top-level only) -- record-level, matching this corpus's established batch precedent. NOTE:
+      distinct from each entry's OWN `provenance`, which `assumption.schema.yaml` itself pins to
+      `epistemic_type: const ASSUMPTION`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F10 table, Assumption Registry row (L571)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §24 (L1480-1502)"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Execution_Contract_v1.md §116 (L3117-3132)"
+  - "specs/evidence/assumption.schema.yaml (entries[] $ref target)"
+  - "methods/contracts/epistemic.assumption_registry.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Same class every sibling typed-object schema in this directory documents: a direct
+  composition of an existing spec-root file plus low-risk disclosed compilation choices.
+
+compilation_decisions:
+  - question: "Should entries[] items $ref assumption.schema.yaml, or redefine the field list here?"
+    decision: "$ref ai-lego://specs/evidence/assumption.schema.yaml directly, zero redefined fields -- see method contract's own compilation_decisions for the full reasoning (that file already implements Atlas F10's own 8-field list verbatim; a second parallel definition would be the duplicate-module failure this project forbids)."
+  - question: "additionalProperties: false at the top level?"
+    decision: "No -- deliberately permissive by omission, same default every sibling schema in this directory except red-team-challenge.schema.yaml (which has an Atlas-cited explicit no-additional-properties rule this method has no equivalent of) already uses. entries[] items are NOT independently additionalProperties:false here either, because assumption.schema.yaml (the $ref target) does not declare that itself -- this file does not tighten a dependency it does not own."
+
+type: object
+required: [id, version, entries, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^AREG-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix. Deliberately distinct from the ^ASM-[0-9]+$ pattern each individual entries[] item's own id carries -- AREG- names the COLLECTION, ASM- names an individual assumption."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "epistemic.assumption_registry"
+
+  entries:
+    type: array
+    minItems: 1
+    description: "Atlas L571's own formally-filed assumption list. At least one required -- a registry naming zero assumptions has not actually run the method."
+    items:
+      $ref: "ai-lego://specs/evidence/assumption.schema.yaml"
+      description: >
+        Real Assumption record (see compilation_decisions). `is_critical_assumption` on each stored entry here
+        is GENUINE_COMPUTE -- always recomputed by this method from that same entry's own `impact_if_wrong`
+        (ai_lego/modules/epistemic/assumption_registry.py `derive_is_critical_assumption`), per
+        assumption.schema.yaml L290-302's own "left to the consuming engine" note. `id` must additionally be
+        unique across all of THIS registry's own `entries[]` -- enforced at the runtime layer, not expressible
+        here (JSON Schema 2020-12 has no native cross-item uniqueness-by-subfield keyword short of a verbose
+        `contains`/`uniqueItems`-on-projection construct this corpus does not use elsewhere).
+
+  provenance:
+    description: "Record-level only (the registry's own provenance, distinct from each entry's own ASSUMPTION-pinned provenance) -- see compilation_decisions."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-assumption registry over a university AI-platform-adoption proposal: one Critical/HUMAN-validated entry, one non-critical/unverified entry."
+    value:
+      id: "AREG-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "epistemic.assumption_registry"
+      entries:
+        - id: "ASM-1"
+          statement: "大學願意採用外部 AI 教育平台"
+          type: "Market Adoption"
+          impact_if_wrong: "Critical"
+          confidence: 0.62
+          validation: "Interview 30 universities"
+          status: "Validated"
+          owner: "product-research"
+          is_critical_assumption: true
+          provenance: {epistemic_type: ASSUMPTION, authorship_state: HUMAN_EDITED, locked: null}
+        - id: "ASM-2"
+          statement: "現有 IT 團隊有能力自行維運新平台"
+          type: "Technical Capability"
+          impact_if_wrong: "Moderate"
+          status: "Unverified"
+          owner: "engineering"
+          is_critical_assumption: false
+          provenance: {epistemic_type: ASSUMPTION, authorship_state: AI_GENERATED, locked: null}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-ASSUMPTIONREGISTRY-1: entries[] id-uniqueness across the registry is not expressible in this schema (no native cross-item subfield-uniqueness keyword) -- enforced by the runtime module only (owner: operator, or whoever next hardens this schema's cross-field guarantees)."
+  - "OQ-ASSUMPTIONREGISTRY-2: the validated-status wording this method's gate matches against ({validated, verified}, case-insensitive) is this file's own disclosed invention, not a mother-document-supplied status enum -- see assumption.schema.yaml's own open_questions.MRSP-assumption-1 and this file's own method contract compilation_decisions (owner: operator, pending a future status-vocabulary ADR)."
+
+verification:
+  method: >
+    Read Atlas F10 table row (L571) directly at the cited line, plus MP §24 (L1480-1502) and EC §116
+    (L3117-3132) full text. Grepped the full spec root (specs/**, methods/**) and the full ai_lego/ tree
+    case-insensitively for "assumption registry"/"assumption_registry"/"is_critical_assumption" before writing
+    this file: hits found in method-inventory.yaml/contract-backlog.yaml's own "Assumption Registry" NAME
+    entries (F10 row L570, `has_contract: false` before this file -- no prior field-shape definition) and
+    assumption.schema.yaml itself (the $ref target this file composes, not duplicates). No duplicate
+    field-shape definition found. Validated against jsonschema.Draft202012Validator, including a mutation check
+    that a hand-crafted entry with is_critical_assumption disagreeing with its own impact_if_wrong is caught by
+    the runtime gate (not expressible here).
+  note: >
+    No mother document was modified. entries[] composes specs/evidence/assumption.schema.yaml by $ref rather
+    than redefining its field list. The GENUINE_COMPUTE is_critical_assumption rule and the validated-status
+    wording set are this file's own compilation decisions, disclosed above.
