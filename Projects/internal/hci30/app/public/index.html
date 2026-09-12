@@ -50,7 +50,25 @@
   .cta-banner button:hover { background: var(--teal-ink); }
 
   h1 { font-family: "Noto Serif TC", "PMingLiU", Georgia, "Times New Roman", serif; font-weight: 700; font-size: 2.05rem; margin: 0 0 0.4rem; letter-spacing: 0; line-height: 1.25; }
-  h2 { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); margin: 2.6rem 0 1.1rem; text-transform: uppercase; }
+  /* 操作者：「這幾個字這麼小是怎麼樣? 用H2」——原本 h2 是小型大寫灰色
+     eyebrow-label 排版（0.8rem+uppercase+muted），現在每個 h2 都是卡片
+     裡的區塊主標題，太小、太不顯眼，看起來不像真正的標題。改成跟 h1
+     同一套襯線字體、更大字級、正常深色文字，讓它讀起來真的是一個標題，
+     不是小標籤。 */
+  h2 { font-family: "Noto Serif TC", "PMingLiU", Georgia, "Times New Roman", serif; font-size: 1.3rem; font-weight: 700; color: var(--ink); margin: 2.6rem 0 1.1rem; letter-spacing: 0; }
+  /* h2 放大成真正的標題後，卡片內原本借用 <h2> 當次級提示（嚴重警訊／
+     系統偵測到的風險指標）的兩處改用 <h3>，避免同一張卡片裡出現兩個
+     一樣大的標題；這裡給裸 h3 一個預設樣式（比 h2 小一階，但比純文字
+     明顯），`.insight-col h3`／`.add-panel-title` 既有的 class 選擇器
+     優先權更高，不受影響。 */
+  h3 { font-weight: 700; font-size: 0.95rem; color: var(--teal-ink); margin: 1.2rem 0 0.6rem; }
+
+  /* 操作者兩輪都在問「這樣叫有主題性分區塊?」——光靠 h2 文字 + 上方細線
+     間距，滾動下去看不出這是彼此獨立的主題（證據/信任構面/決策/報告），
+     讀起來像同一塊內容一路流下去。每個分析流程的階段都包一層實心卡片
+     邊界，卡在頁面上一眼看得出物理上是分開的區塊。 */
+  .topic-block { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.6rem 1.8rem 1.8rem; margin: 1.8rem 0; }
+  .topic-block > h2:first-child { margin-top: 0; }
 
   /* Horizontal tab bar for the mutually-exclusive case-list views (+ the
      new-case action folded in as a third tab) -- underline indicator,
@@ -99,7 +117,6 @@
   .decision-banner .when { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
 
   .risk-tier-editor { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
-  .risk-tier-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .risk-tier-submit { padding: 0.4rem 1rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
   .risk-tier-submit:hover { background: var(--teal-ink); }
   .reaudit-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: #f7ead0; color: var(--moderate); font-weight: 700; }
@@ -153,9 +170,6 @@
      數字去猜多寬才該換行。 */
   .radar-wrap { padding: 0.5rem 0 1.5rem; display: flex; gap: 2rem; align-items: flex-start; }
   #d-radar { flex: 0 0 auto; }
-  /* 兩個直接子元素都是純 <div>（<details> 包在裡面，不直接當 flex 子元素），
-     避開 <details> 在部分瀏覽器（如 Safari）當 flex item 時算不對寬度的
-     已知相容性問題。 */
   .evidence-layout { display: flex; gap: 2rem; align-items: flex-start; }
   .evidence-layout > div { flex: 1; min-width: 0; }
   .evidence-layout .add-panel { margin-top: 0; }
@@ -191,18 +205,33 @@
   .insight-col.risks h3 { color: var(--very-low); }
   .insight-col.unknowns h3 { color: var(--muted); }
 
-  .record-card { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 1rem 0.2rem; margin-bottom: 0; }
+  /* 操作者要求「不要合起來, 甚至不要用accordion... 每個主題區塊要像卡片,
+     才知道是分開的 不會混在一起」(2026-09-11) -- 每一則證據/主張/評估紀錄
+     原本只用底線分隔、背景透明，多筆排在一起時視覺上會糊成一長條列表；
+     改成跟下面 .add-panel 同一套實心卡片語彙（背景+邊框+圓角+彼此留白），
+     一眼就看得出這是互相獨立的一筆一筆，不是同一塊內容的延續。 */
+  .record-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1rem 1.2rem; margin-bottom: 0.8rem; }
   .record-card .kind-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: var(--teal-ink); text-transform: uppercase; }
   .record-card .content { margin-top: 0.4rem; font-size: 0.95rem; line-height: 1.6; }
   .record-card .quality-tag { display: inline-block; margin-top: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: var(--teal-tint); color: var(--teal-ink); }
 
-  details.add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1.2rem 1.4rem; margin-top: 1.2rem; }
-  details.add-panel summary { cursor: pointer; font-weight: 700; font-size: 0.95rem; color: var(--teal-ink); }
+  /* 「新增調查發現」原本是 <details>/<summary> 手風琴，預設收合，操作者
+     明確要求拿掉：不准合起來、不准用 accordion 這種互動模式，永遠攤開
+     顯示完整表單。改成純 <div> + 一個不可點擊的標題文字（.add-panel-title
+     取代原本可點的 <summary>），卡片外觀（背景/邊框/圓角）不變。 */
+  .add-panel { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1.2rem 1.4rem; margin-top: 1.2rem; }
+  .add-panel .add-panel-title { margin: 0; font-weight: 700; font-size: 0.95rem; color: var(--teal-ink); }
   form.inline-form { display: grid; gap: 0.5rem; max-width: 640px; margin-top: 1rem; }
   form.inline-form label { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-top: 0.4rem; }
   form.inline-form input, form.inline-form textarea {
-    padding: 0.55rem 0.7rem; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; color: var(--text); background: #fff;
+    width: 100%; padding: 0.55rem 0.7rem; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; color: var(--text); background: #fff;
   }
+  /* 操作者要求「textarea 寬要自動填滿, 不要還要填的人要去自己拉」——
+     <textarea> 的內建 cols=20 讓它在 grid 欄位裡只長出一個小方塊，不會自
+     動撐滿容器寬度；上面 width:100% 解決寬度，這裡另外關掉左右拖拉，只
+     留上下拉高（填的人可能需要多打幾行，但欄寬應該一開始就是滿的，不
+     該讓人自己去拉）。 */
+  form.inline-form textarea { resize: vertical; }
   form.inline-form input:focus, form.inline-form textarea:focus {
     outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(14,91,80,.14);
   }
@@ -324,29 +353,17 @@
       </div>
       <div id="d-reopen-wrap"></div>
     </div>
-    <div id="d-decision-banner"></div>
     <div id="d-risk-tier-wrap"></div>
-    <div id="d-reports-wrap"></div>
   </div>
   <div id="d-empty-cta"></div>
 
-  <h2>信任構面</h2>
-  <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
-  <div class="radar-wrap">
-    <div id="d-radar"></div>
-    <div class="domain-grid" id="d-domains"></div>
-  </div>
-  <div id="d-severity"></div>
-
-  <div class="insight-cols" style="margin-top:1.5rem">
-    <div class="insight-col strengths"><h3>主要優勢</h3><ul id="d-strengths"></ul></div>
-    <div class="insight-col risks"><h3>重大風險</h3><ul id="d-risks"></ul></div>
-    <div class="insight-col unknowns"><h3>未知構面</h3><ul id="d-unknowns"></ul></div>
-  </div>
-
-  <h2>記錄決策</h2>
-  <div id="d-decision-form-wrap"></div>
-
+  <!-- 版面順序比照系統實際分析流程排列（見「這個系統怎麼運作？」頁的流程
+       圖：開案件→記錄證據/主張/評估→系統自動算出信任構面→你做決策）：
+       證據是輸入，放最前面；信任構面是證據算出來的結果，放證據之後；決策
+       是人做的最終判斷，放最後；報告是決策定案後才產生的最終產物，排在
+       最末（2026-09-11，操作者：「雷達圖在最上面? 那不是最後才會產出的
+       東西嗎?」）。 -->
+  <section class="topic-block">
   <h2>證據與主張</h2>
   <div class="evidence-layout">
     <div>
@@ -354,8 +371,8 @@
       <div id="d-suggestions"></div>
     </div>
     <div>
-    <details class="add-panel" id="record-add-panel">
-    <summary>＋ 新增調查發現</summary>
+    <div class="add-panel" id="record-add-panel">
+    <h3 class="add-panel-title">＋ 新增調查發現</h3>
     <form class="inline-form" onsubmit="return submitRecord(event)">
       <label>當事人</label>
       <div class="chip-group" id="f-person-chips"></div>
@@ -373,14 +390,42 @@
         <button type="button" class="chip" data-value="ASSESSMENT" onclick="pickChip(this,'f-kind')">評估</button>
       </div>
       <input type="hidden" id="f-kind" value="EVIDENCE">
-      <p class="field-hint">上方的信任構面分數無法手動輸入——它是根據你新增的證據、主張與評估，由系統自動算出來的，確保每個分數都查得到根據。</p>
+      <p class="field-hint">下方的信任構面分數無法手動輸入——它是根據你新增的證據、主張與評估，由系統自動算出來的，確保每個分數都查得到根據。</p>
       <div id="f-kind-fields"></div>
       <button type="submit">送出紀錄</button>
       <div id="f-err" class="err"></div>
     </form>
-    </details>
+    </div>
     </div>
   </div>
+  </section>
+
+  <section class="topic-block">
+  <h2>信任構面</h2>
+  <p class="subtitle" id="d-domain-note" style="margin-top:-0.5rem"></p>
+  <div class="radar-wrap">
+    <div id="d-radar"></div>
+    <div class="domain-grid" id="d-domains"></div>
+  </div>
+  <div id="d-severity"></div>
+
+  <div class="insight-cols" style="margin-top:1.5rem">
+    <div class="insight-col strengths"><h3>主要優勢</h3><ul id="d-strengths"></ul></div>
+    <div class="insight-col risks"><h3>重大風險</h3><ul id="d-risks"></ul></div>
+    <div class="insight-col unknowns"><h3>未知構面</h3><ul id="d-unknowns"></ul></div>
+  </div>
+  </section>
+
+  <section class="topic-block">
+  <h2>決策</h2>
+  <div id="d-decision-banner"></div>
+  <div id="d-decision-form-wrap"></div>
+  </section>
+
+  <section class="topic-block">
+  <h2>產生報告</h2>
+  <div id="d-reports-wrap"></div>
+  </section>
 </div>
 
 <div id="report" style="display:none">
@@ -659,7 +704,7 @@ function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dim
 // domain average looks fine, side by side with its sibling dimension.
 function renderSeverityAlerts(alerts) {
   if (!alerts || !alerts.length) return '';
-  return `<h2>嚴重警訊</h2>` + alerts.map(a => `
+  return `<h3>嚴重警訊</h3>` + alerts.map(a => `
     <div class="severity-alert">
       <b>${DIMENSION_LABELS[a.dimension] || a.dimension}</b>（${DOMAIN_LABELS[a.domain] || a.domain}）評為 <b>極低</b>——這個構面所屬的信任構面平均分數可能因為另一個維度分數較高而看起來還好，但這一項本身是真的差，不會被平均蓋掉。
       ${a.siblings.map(s => `同構面另一維度「${DIMENSION_LABELS[s.dimension] || s.dimension}」：${s.value ? (BAND_LABELS[s.value] || s.value) : '尚無證據'}`).join('；')}
@@ -672,7 +717,7 @@ function renderSeverityAlerts(alerts) {
 // whether to create a matching ASSESSMENT.
 function renderRuleEngineSuggestions(suggestions, hitsByDimension, recordById) {
   if (!suggestions || !suggestions.length) return '';
-  return `<h2>系統偵測到的風險指標（尚未經人工確認）</h2>
+  return `<h3>系統偵測到的風險指標（尚未經人工確認）</h3>
     <p class="field-hint">以下是系統從證據／主張文字裡比對到的指標，統計後得出的建議等級——這不是正式評估，不會計入信任構面分數，除非你自己建立一筆對應的「評估」紀錄採用它。</p>
     ${suggestions.map(s => {
       const hits = (hitsByDimension && hitsByDimension[s.dimension]) || [];
@@ -756,8 +801,8 @@ async function refreshDetail() {
   // decision. Editable here (not just at case creation) so that mechanism
   // is actually reachable through the product, not dormant in the schema.
   document.getElementById('d-risk-tier-wrap').innerHTML = `
+    <h2>風險等級</h2>
     <div class="risk-tier-editor">
-      <span class="risk-tier-label">風險等級</span>
       <div class="chip-group" id="d-risk-chips">${CASE_RISK_TIERS.map(t => `<button type="button" class="chip${t === body.case.risk_tier ? ' selected' : ''}" data-value="${t}" onclick="pickChip(this,'d-risk-tier')">${RISK_TIER_LABELS[t]}</button>`).join('')}</div>
       <input type="hidden" id="d-risk-tier" value="${body.case.risk_tier}">
       <button type="button" class="risk-tier-submit" onclick="submitRiskTier()">更新風險等級</button>
@@ -778,21 +823,17 @@ async function refreshDetail() {
       <div class="when">記錄於 ${new Date(d.valid_from).toLocaleString('zh-TW')}</div>
     </div>`;
   } else {
-    bannerEl.innerHTML = `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策 — 請先檢視下方證據，再送出決策。</span></div>`;
+    bannerEl.innerHTML = `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策 — 請先檢視上方證據，再送出決策。</span></div>`;
   }
 
   const ctaEl = document.getElementById('d-empty-cta');
-  const recordPanel = document.getElementById('record-add-panel');
-  if (body.records.length === 0) {
-    ctaEl.innerHTML = `<div class="cta-banner"><p>案件已建立，目前還沒有任何證據——請先新增第一筆，系統才能開始計算信任分數。</p><button type="button" onclick="goToAddRecord()">立即新增證據</button></div>`;
-    recordPanel.open = true;
-  } else {
-    ctaEl.innerHTML = '';
-  }
+  ctaEl.innerHTML = body.records.length === 0
+    ? `<div class="cta-banner"><p>案件已建立，目前還沒有任何證據——請先新增第一筆，系統才能開始計算信任分數。</p><button type="button" onclick="goToAddRecord()">立即新增證據</button></div>`
+    : '';
 
   const qualityByDim = Object.fromEntries((body.evidenceQuality || []).map(q => [q.dimension, q.quality]));
   document.getElementById('d-domain-note').textContent = body.rollup.domains.length
-    ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。'
+    ? '根據上方評估紀錄即時運算 — 絕非人工填寫的分數。'
     : '';
   document.getElementById('d-radar').innerHTML = renderRadar(body.rollup.domains);
   const recordById = Object.fromEntries(body.records.map(r => [r.id, r]));
@@ -924,11 +965,16 @@ function renderReportView(row) {
     <div class="report-header" style="border-top:none;padding-top:0">
       <h1 style="margin:0">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}</h1>
       <p class="subtitle">${c.id} ．狀態 ${STATUS_LABELS[c.status] || c.status} ．風險 ${c.risk_tier} ．開立於 ${new Date(c.opened_at).toLocaleDateString('zh-TW')}</p>
-      ${decisionHtml}
     </div>
 
+    <section class="topic-block">
+    <h2>證據與主張</h2>
+    <div>${recordsHtml}</div>
+    </section>
+
+    <section class="topic-block">
     <h2>信任構面</h2>
-    <p class="subtitle" style="margin-top:-0.5rem">${d.rollup.domains.length ? '根據下方評估紀錄即時運算 — 絕非人工填寫的分數。' : ''}</p>
+    <p class="subtitle" style="margin-top:-0.5rem">${d.rollup.domains.length ? '根據上方評估紀錄即時運算 — 絕非人工填寫的分數。' : ''}</p>
     <div class="radar-wrap">
       <div>${renderRadar(d.rollup.domains)}</div>
       <div class="domain-grid">${domainGridHtml}</div>
@@ -940,9 +986,12 @@ function renderReportView(row) {
       <div class="insight-col risks"><h3>重大風險</h3><ul>${d.risks.length ? d.risks.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('') : '<li class="empty">尚無項目</li>'}</ul></div>
       <div class="insight-col unknowns"><h3>未知構面</h3><ul>${d.unknowns.length ? d.unknowns.map(u => `<li>${DOMAIN_LABELS[u] || u}</li>`).join('') : '<li class="empty">全部構面皆有證據</li>'}</ul></div>
     </div>
+    </section>
 
-    <h2>證據與主張</h2>
-    <div>${recordsHtml}</div>
+    <section class="topic-block">
+    <h2>決策</h2>
+    ${decisionHtml}
+    </section>
 
     <div class="report-legal">
       <p><b>免責聲明：</b>本報告可能包含尚未證實之指控、推論與主觀判讀，不構成事實認定。內容中標示為「主張」或「評估」者為判讀性質，唯有標示為「證據」者為直接查得之事實；使用本報告前應自行查證，不應逕自視為最終定論。</p>
@@ -952,9 +1001,7 @@ function renderReportView(row) {
 }
 
 function goToAddRecord() {
-  const panel = document.getElementById('record-add-panel');
-  panel.open = true;
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('record-add-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function togglePersonNew() {
@@ -1015,7 +1062,7 @@ function renderKindFields() {
       <input type="hidden" id="f-evref" value="${c.first}">`;
   } else if (kind === 'ASSESSMENT') {
     const c = citableChips();
-    el.innerHTML = `<p class="field-hint">評估：根據下方引用的證據，針對某個信任面向打出的等級分數，會直接影響上方的信任構面計算。</p>
+    el.innerHTML = `<p class="field-hint">評估：根據下方引用的證據，針對某個信任面向打出的等級分數，送出後會直接反映在信任構面的計算裡。</p>
       <label>評估構面</label>
       <div class="chip-group" id="f-dimension-chips">${DIMENSIONS.map((d, i) => `<button type="button" class="chip${i === 0 ? ' selected' : ''}" data-value="${d}" onclick="pickChip(this,'f-dimension')">${DIMENSION_LABELS[d]}</button>`).join('')}</div>
       <input type="hidden" id="f-dimension" value="${DIMENSIONS[0]}">

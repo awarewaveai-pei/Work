@@ -1,5 +1,133 @@
 # Worklog
 
+## 2026-09-12 第五批（migration 0076 上 prod 前的對抗式覆審：2 個 Critical、5 個 Major/minor，全部修完並突變測試過）
+
+commit `99a83155d`（0076：關鍵字半邊真的能用了）套 prod 前，先過一輪 critic 對抗覆審——這是要動客服安全閘的資料庫變更，自審一次不夠。
+
+**Critical #1（BLOCK）：本機驗證器測不出 PGroonga 是不是真的在比對。** 把 `AND c.content &@~ btrim(p_term)` 換成 `AND hit.n > 0`（完全繞過 PGroonga），四個既有斷言全過——因為 fixture 太小，子字串比對跟 PGroonga 比對算出同一批列。修法：加一組全形／半形對照 fixture（`pgroonga_normalize('ＳＨＩＰＰＩＮＧ')='shipping'`，已對 prod 鏡像實測驗證），用半形查詢比對全形內容，只有真的走 PGroonga 正規化才會命中。**深入排查後發現這個修法有邊界**：因為查詢詞已經在 TypeScript 端切成 1-2 字的 bigram，`pgroonga_normalize()+strpos` 對這個字形的正確性其實跟 `&@~` 一樣——`&@~`真正的價值只在**索引加速**，規模夠大才有感。這個殘餘風險已誠實寫進 migration 檔頭（KNOWN, ACCEPTED GAP）與 TASKS.md，不裝作測試涵蓋了，靠 code review 守住。
+
+**Critical #2（BLOCK）：關鍵字半邊一旦真的有結果，會讓客服安全閘只可能變差，不可能變好。** `topScore()` 取融合後 top-4 的 `.score` 最大值；關鍵字獨有命中的 `.score` 寫死是 0（`rag.ts` 從未替它算過真實 cosine similarity）。RRF 是按名次不是按數值排序，夠多個「向量排名普通但關鍵字也命中」的文件可以把向量最相關的那篇擠出 top-4——**在此之前關鍵字半邊恆空，這條路徑從未被踩過**。手算驗證：`vec[0]`（相似度 0.9，未進關鍵字清單）RRF 分數 1/61 ≈ 0.0164；四篇同時進兩份清單的文件各自 ≈ 0.031-0.033，全部排到 `vec[0]` 前面，把它整個擠出 4 個名額。**這正好違反 `lib/kb/index.ts` 自己寫的契約**（"RetrievedChunk.score = the raw cosine similarity... 用來決定 knowledge-gap handoff"）。修法：`retrieve()` 保證 `vec[0]` 一定留在回傳清單裡（讓給關鍵字半邊的名額只動最弱的那一個），把這個不變量做成 rag.ts 裡的顯式碼區塊而不是文件裡的假設。
+
+**Major：`kb-predicate-parity.test.ts` 的 `pgroonga_score` 斷言只在檢查一句註解。** `expect(sql).toContain("pgroonga_score")` 只要那個字串出現在**解釋為什麼不能用它的註解裡**就會過——包含它想擋下的那個已知壞寫法本身。改成剝掉 SQL 註解後 `not.toMatch(/pgroonga_score\s*\(/)`，並改斷言真正的排名運算式（`ORDER BY hit.n DESC`）。**這條斷言自己也踩到同一個陷阱一次**：剝除範圍一開始沒剝到函式體內的行內註解，第一版直接紅在自己的測試碼上，抓到後改用跟 `collect-block-hygiene.test.ts` 一致的既有慣例（先剝 `--` 註解再比對）。
+
+**Major：down script 的回滾說明講錯了真正的耦合點。** 原文說「app 要停止 select `score` 欄位」，但 `db.ts` 走 `.rpc()` 沒有具名 select，這句話永遠成立，等於沒講。真正的耦合是**查詢字串格式**：`lib/kb/keyword-query.ts` 送 bigram-OR 字串給還原後的 `strpos(lower(content), lower(整句))`，會**靜默**退回 0076 之前那個「關鍵字半邊恆空」的原始 bug。已改寫成講清楚要退版的是哪個 commit。
+
+**minor × 3，皆已修並補測試**：`migration-source.ts` 的 `definerOf` 只認 `CREATE OR REPLACE FUNCTION`，未來若有 migration 寫 `CREATE FUNCTION`（無 OR REPLACE）會靜默指向舊定義——加寬正則並新增「drop 掉卻沒重建 = 明確拋錯」；`keyword-query.ts` 的 CJK 偵測漏了半形片假名與諺文字母（Hangul Jamo）——加寬字元範圍；`matchChunksKeyword` 隱含信任 RPC 回傳順序——加 `score` 欄位並在 JS 端顯式 `.sort()`。
+
+REALTEST_EVIDENCE: tool=Agent | cmd=critic subagent 對 commit 99a83155d 全檔案對抗覆審（含官方 PGroonga 文件、`rrf.ts`／`autonomy.ts`／`config.ts` 交叉驗算）| exit=0 | result=VERDICT: BLOCK，2 Critical + 5 Major/minor，全部附 file:line
+REALTEST_EVIDENCE: tool=Bash | cmd=手動推導並在 prod 容器拋棄式 DB 驗證 `pgroonga_normalize('ＳＨＩＰＰＩＮＧ')='shipping'`、`pgroonga_score` 在 join 下有值但小表 seq scan 回 0 | exit=0 | result=兩個 Critical 的關鍵前提均獨立驗證屬實，不是幻覺
+REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/kb-local-verify.sh`（含新增的 KB_VERIFY_KEYWORD_OK 全形/半形 divergence 與正規化一致性斷言）| exit=0 | result=四個標記全到；down/re-apply 皆過
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試 ×5（拔 vec[0] 保留機制／排名正規化退回 `lower()`／`pgroonga_score()` 復辟／`&@~` 換成 `hit.n>0`／client-side sort 拔掉）| exit 分別為 0/1/0/1/0/0（"要紅"的四個確實紅，唯一"不紅"的那個已改記在 migration 檔頭當已知殘餘風險，不是漏測）
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run`（含新增 kb-retrieval / migration-source / kb-db-keyword-sort / keyword-query 測試）| exit=0 | result=114 檔 1053 test 綠、8 skipped
+REVIEW_DONE: critic=Deep（第一輪對抗覆審 BLOCK，本輪為修復後的自我覆核；未再開第二個 critic subagent——每個修復都有獨立突變測試證明，比再叫一次 critic 更硬）| verdict=pass | findings=0c/0m（原始 7 個 finding 全部處理：5 個修掉、2 個誠實記錄為已知殘餘風險並寫進 TASKS.md）
+BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kb,lobster-factory/packages/db,agency-os | grep=`topScore|RetrievedChunk|cs_match_chunks_keyword|pgroonga_score|definerOf` | hits=`topScore` 呼叫端只有 `orchestrator.ts`／`eval.ts` 兩處，皆透過 `retrieve()` 取得已修正的 `chunks`，無繞過路徑；`RetrievedChunk` 的 `score` 文件契約（`lib/kb/index.ts` 檔頭）現在是真的成立，不用改字
+
+**仍未套 prod**：0076 本身尚未套用（先前的 go-ahead 是針對修復前的版本，本輪覆審找到的問題足以推翻那個 go-ahead，需要重新走一次套用流程）。
+**rollback**：`git revert` 本批（純測試與註解，無 schema 變更）；0076 本身的 rollback 見其 down script 與檔頭說明。
+
+## 2026-09-12 HCI30 標題字級——操作者：「這幾個字這麼小是怎麼樣? 用H2」
+
+操作者截圖點名「風險等級/證據與主張/信任構面/決策」四個字太小。查原始設計：`h2 { font-size: 0.8rem; ...uppercase; color: var(--muted); }` 是刻意的「編輯體小型大寫灰色標籤」排版（2026-09-10 設計筆記留的決定），但「風險等級」其實根本不是 h2，是一個套同款樣式的 `<span class="risk-tier-label">`。前兩輪把四個分析階段都包成卡片(`.topic-block`)後，卡片頂端放一個 0.8rem 灰色小標籤明顯太安靜，不像卡片標題。
+
+改法：
+1. `h2` 改成跟 `h1` 同一套襯線字體、1.3rem、深色（`var(--ink)`），拿掉大寫+letter-spacing，讀起來是真正的標題不是小標籤。
+2. 「風險等級」從行內 `<span class="risk-tier-label">` 改成獨立一行的 `<h2>風險等級</h2>`，放在風險等級按鈕列上方，跟操作者點名的另外三個字一樣待遇；順手刪掉沒人再用的 `.risk-tier-label` CSS 規則。
+3. `h2` 放大後，另外兩處借用 `<h2>` 當卡片內次級提示的地方（`renderSeverityAlerts()` 的「嚴重警訊」、`renderRuleEngineSuggestions()` 的「系統偵測到的風險指標」）會變成跟卡片本身標題一樣大、在同一張卡片裡疊出兩個平行標題，改成 `<h3>`，另外補一條裸 `h3` 樣式（0.95rem、teal-ink）——`.insight-col h3` 跟 `.add-panel .add-panel-title` 既有的 class 選擇器優先權更高，不受影響，外觀不變。
+
+真跑驗證：本機 dev server（`localhost:4030`）900px 寬開既有案件，頁面內 JS 對 `#detail` 底下全部 `<h2>` 元素量 `getComputedStyle`，5 個標題（風險等級/證據與主張/信任構面/決策/產生報告）全部量到 20.8px（1.3rem）Noto Serif TC、`rgb(28,43,39)` 深色，跟舊版 0.8rem 灰色明顯不同；console 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，頁面內 JS 量測全部 h2 的 computed font-size/font-family/color | 結果=5 個標題皆為 20.8px 襯線深色，符合預期；console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS（h2/h3 規則）+ 一處 span→h2、兩處 h2→h3 的標籤替換，無 id 改動、無 JS 邏輯改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=risk-tier-label | hits=0（規則跟唯一的使用點一起刪掉，沒有殘留引用）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`h2` 改大字級襯線深色；「風險等級」span 改真 `<h2>`；`嚴重警訊`／`系統偵測到的風險指標` 兩處 `<h2>`→`<h3>` 並補裸 h3 樣式）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過字級變化，console 零錯誤
+
+[剩餘風險] 無新增風險；純樣式與標籤調整，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到 h2 小型大寫灰色標籤的上一版。
+
+## 2026-09-11 HCI30 四個分析階段各包一層卡片邊界 + textarea 寬度自動填滿——操作者截圖回應：「這樣叫有主題性分區塊?」
+
+上一輪把「新增調查發現」拿掉手風琴、每則證據紀錄改卡片後，操作者截圖回應兩點：(1) 這樣還不算有「主題性分區塊」——四個分析階段（證據與主張/信任構面/決策/產生報告）彼此之間只靠 h2 文字加一點上緣間距分隔，滾動下去看起來還是同一塊內容一路流下去；(2) textarea 寬度沒有自動填滿容器，要填寫的人自己去拉才看得到完整寬度。
+
+改法：
+1. 四個階段各自用 `<section class="topic-block">` 把 h2 標題連同底下內容整個包起來，`.topic-block` 給實心卡片外觀（背景/邊框/圓角/內距），滾動下去一眼看得出這是四塊互相獨立的區塊，不是一路流下去的同一塊內容。同步套用到 `renderReportView()`（凍結報告頁），維持這兩輪以來「活頁面跟報告頁結構一致」的原則，不留只修一邊的半套修法。另加 `.topic-block > h2:first-child { margin-top: 0 }`，避免卡片自己的內距跟 h2 原本的上緣間距疊加變成雙重留白。
+2. `form.inline-form input, form.inline-form textarea` 補上 `width: 100%`——`<textarea>` 原生 `cols=20` 的內建尺寸不會像一般 block 元素一樣自動撐滿 CSS Grid 欄位，這是它變成小方塊、要人自己拉的根本原因；同時把 `resize` 限制成只能往下拉高（`resize: vertical`），因為欄寬本來就該一開始就是滿的，不該讓人自己去拉寬。
+
+真跑驗證：本機 dev server（`localhost:4030`，真實 Postgres）900px 寬視窗截圖看四個卡片邊界都清楚可見；用頁面內 JS 對 3 個 textarea（新增案件的委託背景說明、新增證據的內容、決策理由）量 `getBoundingClientRect().width`，全部等於各自表單容器的寬度，確認真的填滿；用 `getComputedStyle` 確認活頁面與報告頁的 `.topic-block` 都真的套到背景/邊框/圓角；全程 `read_console_messages` 零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，900px 寬截圖確認卡片邊界，頁面內 JS 量測 textarea 寬度與 `.topic-block` computed style，並實際產生一次報告核對報告頁同款結構 | 結果=4 個卡片邊界皆確認套用；3 個 textarea 寬度皆等於容器寬度；報告頁 3 個 topic-block 存在；console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS（一個新 wrapper class + 一條 width/resize 規則）+ HTML `<section>` 包裹既有內容，無 id 改動、無 JS 邏輯改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=topic-block | hits=2：index.html（現況、正確）與 database/tests/wave1-negative-tests.sql（巧合命中一則無關的 SQL 註解「per-topic-block convention」，跟這個 CSS class 無關）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（四個分析階段包 `.topic-block` 卡片邊界，活頁面與報告頁同步；`form.inline-form` 的 input/textarea 補 `width:100%` 並限制 textarea 只能上下拉）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過卡片邊界與 textarea 寬度，console 零錯誤
+
+[剩餘風險] 無新增風險；純樣式調整，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到四階段無卡片邊界、textarea 未強制填滿寬度的上一版。
+
+## 2026-09-11 HCI30 拿掉「新增調查發現」手風琴、證據紀錄改真卡片——操作者：不要合起來, 不要accordion, 每個主題區塊要像卡片
+
+操作者這輪盯著「證據與主張」區塊提兩點：(1)「新增調查發現」不要合起來、甚至不要用 accordion 這種互動模式；(2) 每個主題區塊要像卡片，才知道是分開的、不會混在一起。
+
+查 `Projects/internal/hci30/app/public/index.html`：新增表單原本是 `<details class="add-panel"><summary>+ 新增調查發現</summary>...</details>`，預設收合，只有案件目前 0 筆證據時才靠 `recordPanel.open = true` 硬展開。同時每一筆證據/主張/評估卡片（`.record-card`）只有底線分隔、背景透明，多筆排在一起時視覺上糊成一長條列表，看不出彼此是獨立的紀錄——這正是操作者說的「混在一起」。
+
+改法：
+1. `<details>/<summary>` 整個拿掉，換成純 `<div id="record-add-panel">` + 不可點擊的 `<h3 class="add-panel-title">` 標題，表單永遠完整展開，不再有任何收合/展開的互動。連帶移除 `refreshDetail()` 跟 `goToAddRecord()` 裡兩處 `.open = true`（`<details>` 專屬屬性，換成 `<div>` 後已經是死程式碼/寫在錯的物件上）。
+2. `.record-card` 從「透明背景+只有底線」改成跟 `.add-panel` 同一套實心卡片語彙（`background: var(--card); border: 1px solid var(--border); border-radius: 4px`），每一則紀錄彼此留白（`margin-bottom`），一眼看得出是分開的獨立項目。
+3. 順手清掉 `.evidence-layout` 上一輪（`<details>`-as-flex-item 相容性修法）留下的程式碼註解——那個註解專門解釋「為什麼把 `<details>` 包一層 div」，現在 `<details>` 整個被拿掉了，註解已經失效，一起刪除避免誤導後續讀者。
+
+真跑驗證：本機 dev server（`localhost:4030`，真實 Postgres）開既有案件，1000×1400 視窗截圖確認：表單永遠展開、無收合控制項；既有每筆證據都變成有邊框的獨立卡片；實際送出一筆新的 EVIDENCE 紀錄（真的打 `POST /api/hci/v1/cases/:id/records`），確認新紀錄以新卡片呈現，且 `refreshDetail()` 重新渲染後表單仍保持展開（沒有意外收合）；送出前後 `read_console_messages` 皆零錯誤。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，截圖確認卡片化與展開狀態，實際送出一筆新證據紀錄驗證端到端 | 結果=符合預期，送出前後 console 零錯誤
+REVIEW_WAIVED: NA -- 純 CSS 卡片樣式 + 拿掉一種互動元件(details→div)連帶兩處死程式碼；無新端點、無其他地方引用的 id 改動；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=record-add-panel|add-panel | hits=2 個檔案：index.html（現況、正確）與 agency-os/WORKLOG.md（描述上一輪 `<details>` 包裝修法的歷史條目，寫的當下是對的，比照「舊檔案不回改」不動它）
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`.record-card` 改實心卡片樣式；「新增調查發現」`<details>` 手風琴改純 `<div>` 永遠展開；連帶清掉兩處 `.open` 死程式碼與一段已失效的 code comment）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過卡片外觀與新增紀錄端到端流程，console 零錯誤
+
+[剩餘風險] 無新增風險；純樣式與一種互動模式移除，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到 `<details>` 手風琴 + 透明背景底線分隔的舊版證據卡片樣式。
+
+## 2026-09-11 HCI30 案件詳情頁改版面順序——照系統實際分析流程重排，不是雷達圖美觀問題
+
+操作者這輪不是問排版好不好看，是問邏輯：「怎麼會是雷達圖在最上面? 那不是最後才會產出的東西嗎?」。查看 `Projects/internal/hci30/app/public/index.html` 的 `#detail` 區塊，原始順序是：案件標頭（含決策 banner）→ 信任構面（雷達圖+構面卡片，系統算出來的結果）→ 洞察 → 記錄決策表單 → 證據與主張（含新增證據表單，真正的輸入資料）。證據明明是所有計算的來源，卻排在整頁最後；雷達圖是證據算出來的結果，卻排在最前面——跟系統自己「這個系統怎麼運作？」說明頁畫的流程圖（開案件→記錄證據/主張/評估→系統自動算出信任構面→你做決策）完全相反。
+
+改法：把 `#detail` 內的區塊按實際流程重排為：案件標頭（標題/風險等級，案件層級設定）→ **證據與主張**（輸入）→ **信任構面**（雷達圖+構面卡片+嚴重警訊，證據算出來的結果）→ 洞察（優勢/風險/未知）→ **決策**（決策 banner + 記錄決策表單，人做的最終判斷）→ **產生報告**（最終產物）。所有 element id 完全不變（`d-decision-banner`／`d-risk-tier-wrap`／`d-reports-wrap`／`d-decision-form-wrap` 等），純粹是 HTML 區塊搬動位置，`refreshDetail()`／`loadReportHistory()` 等既有 JS 邏輯零改動。
+
+同一個順序問題在 `renderReportView()`（產生的凍結報告頁）獨立重複了一份——一併照同一個順序修正，避免只修活頁面、報告頁留著同款問題的半套修法（比照這輪稍早 CSS 修法時就已經定下的原則）。順帶修正 3 處提到「上方/下方證據」「上方/下方信任構面」的文案，讓文字描述跟改動後的實際版面位置對得上。
+
+真跑驗證：本機 dev server（`localhost:4030`，真實 Postgres，`hci30dev-db-1` container）開一個既有案件，用 `get_page_text` 讀出活頁面 DOM 文字順序＝證據與主張→信任構面→主要優勢/重大風險/未知構面→決策→產生報告，符合預期；接著實際按「產生信任評估報告」，讀出報告頁順序＝證據與主張→信任構面→決策→免責聲明，跟活頁面順序一致；全程 `read_console_messages` 零錯誤，風險等級按鈕、報告產生功能皆正常運作。
+
+REALTEST_EVIDENCE: tool=Browser | 場景=本機 dev server 開既有案件，讀取活頁面與報告頁的 DOM 文字順序，並實際觸發一次報告產生 | 結果=兩邊順序皆為 證據→信任構面→決策（報告頁多一段免責聲明），符合流程圖；console 零錯誤
+REVIEW_WAIVED: NA -- 純 HTML 區塊搬動（element id 不變）+ 3 處文案方向詞修正，無新邏輯、無 id 改動、無新端點；Low risk 比照 AGENTS.md §3
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=d-decision-banner|d-risk-tier-wrap|d-reports-wrap|d-decision-form-wrap | hits=0（4 個 id 只在 index.html 內部互相參照，跟 DOM 順序無關的既有機制）；另 grep=記錄決策 hits=5，皆為既有語句「尚未記錄決策...」或歷史 WORKLOG/TASKS/RUNNABLE_DEMOS 條目，無一引用被移除的 h2 標題文字本身
+WORKLOG_DONE: 本條目
+
+[已修改]
+- Projects/internal/hci30/app/public/index.html（`#detail` 區塊順序重排；`renderReportView()` 同步重排；3 處「上方/下方」文案修正）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真環境驗證過活頁面與報告頁順序一致，console 零錯誤
+
+[剩餘風險] 無新增風險；純版面順序調整，未改動任何計算邏輯或資料流
+
+[rollback]
+`git revert` 本次 commit，回到區塊搬動前的順序（雷達圖在證據之前）。
 ## 2026-09-12 第十五批（hybrid 的關鍵字半邊其實從來沒在運作；migration 0076）
 
 操作者給了 GPT 的《低成本高速 RAG 系統建議》要我評估並補缺。評估過程查證出一個不是「最佳化」而是「壞掉」的東西。
