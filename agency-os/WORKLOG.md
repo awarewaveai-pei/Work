@@ -76,6 +76,24 @@ WORKLOG_DONE: 本條目
 [rollback]
 `git revert` 本次 commit；或單獨對 migration 跑 `0018_wave1_evidence_hash_chain_down.sql`（已真跑驗證可逆）。
 
+## 2026-09-12 第十二批(蒐集器三項改善部署 prod：DB migration + 新密鑰 + next-admin 部署完成，Trigger.dev 部署交給專責 agent 進行中)
+
+操作者「去處理好」= 對上一輪提出的部署計畫明示 go-ahead。依序執行：
+
+1. **Migration 0080 + 0081 套 prod**：SSH 到 ks-aw-01，`docker exec supabase-db psql ... < 0080...sql` 再 `< 0081...sql`，皆 `COMMIT`。套用前先確認兩張表不存在（避免誤判已套過）。套用後查 `\d` 確認欄位/約束/RLS policy 都在，`enabled` 預設值確實是 `false`。
+2. **新密鑰 `COLLECT_SCHEDULE_INGEST_TOKEN`**：`openssl rand -hex 32` 產生，寫入 `/root/lobster-phase1/.env`（先備份舊檔）。刻意不共用 `OPS_INBOX_INGEST_TOKEN`。
+3. **伺服器端 `docker-compose.yml` 手動同步**：這份檔案不隨 `git pull`/`sg-deploy.sh` 更新（`sg-deploy.sh` 只 rsync `apps/<APP>` 子目錄）。先備份，用 `sed` 在 `OPS_INBOX_INGEST_TOKEN` 那行後面插入新的 `COLLECT_SCHEDULE_INGEST_TOKEN: ${COLLECT_SCHEDULE_INGEST_TOKEN:-}` 一行，`docker compose config --quiet` 驗證 YAML 語法沒壞掉才繼續。
+4. **next-admin 部署**：第一次 `sg-deploy.sh next-admin` 在 tsc typecheck 閘卡住——`node_modules missing` 判斷只認「完全不存在」，不認「package.json 加了新依賴但 node_modules 沒跟上」，所以裝過一次的 `node_modules` 缺了新加的 `undici` 套件，typecheck 直接炸掉，部署自動中止(閘有效攔下，不是缺陷)。手動在 `/root/Work/lobster-factory/.../next-admin` 跑 `npm install --include=dev` 補上 `undici` 後重跑 `sg-deploy.sh next-admin`，這次全過：typecheck 綠、docker build 成功、healthcheck 9 秒轉 healthy、smoke 全過。部署途中又被另一個並行 session 插了一個 commit(`70497a709`，HCI30 C7/C10，不相關)，用 `git merge-base --is-ancestor` 確認我的三個 commit 都在祖先鏈上，沒被蓋掉。
+5. **真實對 prod 驗證新端點**(不是假設部署成功就結束)：next-admin 內部埠是 **3002**，不是 3000(3000 是 Supabase Studio，第一次 curl 打錯埠打到它的 404 頁——找到 `sg-deploy.sh` 自己的 smoke check 用的埠位才發現)。對 `POST /api/internal/collect/run-due-schedules`：無 auth → 401；錯 token → 401；正確 token → `200 {"ok":true,"checked":0,"due":0,"results":[]}`(目前沒有租戶開排程，回應正確反映這件事)。對 `GET /api/ops/clients/soulful-expression/collection-schedule` 用假造的 role header 直接 curl 拿到 401`{"error":"unauthorized"}`——跟同目錄下既有的 `collection-sources` 端點打同樣的 curl 得到一模一樣的 401，證明是既有 middleware 認證層擋掉（不是我新端點的 bug），兩者行為一致。
+
+REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql ... < 0080...sql` + `< 0081...sql` | exit=0 | result=兩者皆 `COMMIT`；`\d` 確認欄位/約束/RLS/預設值全對
+REALTEST_EVIDENCE: tool=SSH | cmd=`docker compose config --quiet`(伺服器端 docker-compose.yml 手動編輯後) | exit=0 | result=`COMPOSE_YAML_VALID`
+REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`(第二次，補完 `npm install` 之後) | exit=0 | result=`deployed commit=70497a709`(含本次三個 commit)，healthcheck 9 秒、smoke 全過
+REALTEST_EVIDENCE: tool=SSH | cmd=`curl -X POST http://127.0.0.1:3002/api/internal/collect/run-due-schedules`(無 auth／錯 token／對 token 三種)| exit=0 | result=401／401／`200 {"ok":true,"checked":0,"due":0,"results":[]}`
+REALTEST_EVIDENCE: tool=SSH | cmd=`curl` 對 `collection-schedule` 與既有 `collection-sources` 兩個端點用同樣假 header | exit=0 | result=兩者皆 401 `{"error":"unauthorized"}`，行為一致，證明是既有認證層而非新端點的錯
+
+**進行中**：Trigger.dev workflows 部署交給 `trigger-deploy-agent`（AGENTS.md 規定 `.trigger` 路徑要用專責 agent，PAT 用 `tr_pat_*` 不是 `tr_prod_*`）——這是本次唯一開的 subagent，符合「不准無效益派多個 agents」，因為這是它唯一被設計要做的事。完成後另開一筆 WORKLOG。
+
 ## 2026-09-12 第十一批(蒐集器改善 3/3：排程自動化——scope 決策：架構做完整，UI 面板故意留白)
 
 **架構決策**（操作者授權「4 需要決定的事都你決定」）：排程邏輯全部放 next-admin（跟爬蟲、跟它的測試套件同一個 codebase），Trigger.dev 只當一個空腦袋的每小時心跳，不查表、不算日期。理由：如果邏輯放 Trigger.dev task 裡直接查 `collection_schedules`，就要在兩個 package（next-admin + workflows）各寫一份「這個 schedule 現在該不該跑」的判斷，兩份遲早不同步。現在只有 `lib/collect/schedule.ts` 一份。
