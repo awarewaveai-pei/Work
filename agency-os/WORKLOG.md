@@ -16562,3 +16562,42 @@ Prototype=保真度上限+iteration 可追溯；MVP=決策改變門檻+結果與
 [rollback] 全部為新增檔案（無既有檔案的破壞性修改，除 `ai_lego/modules/experiment/__init__.py` 為本批次新檔案的收斂重寫），`git revert` 對應 commit 即可完整回退，不影響其他 F01-F14 已建家族。
 
 [下一步] 依操作者指示不中途停頓，接續開 F22（PM/交付治理，10 方法）。
+
+## 2026-09-12（續3）AI 影片動態（image-to-video）—— 真實動態取代 Ken Burns 縮放
+
+[任務] 操作者實測後：「你所謂的短劇影片只是放照片...我是要真的像電影一樣」。查證屬實：`_render_scene_ffmpeg`（video-service pipeline.py）從來只有靜態圖 + zoompan 縮放，從未接過任何真實動態生成模型。跟操作者對齊方向後，她選「3 個都要（Runway/Luma/Veo），都用 Replicate，要可以勾選（非下拉選單）」。
+
+[技術查證]（非猜測，2026-09-12 直接查 Replicate 真實 API schema + 頁面定價）
+- curl 帶 REPLICATE_API_TOKEN 打 `api.replicate.com/v1/models/<slug>` 逐一確認三個 vendor 的真實 input schema：Runway `runwayml/gen4-turbo`（欄位 image）、Luma `luma/ray-2-720p` + `luma/ray-flash-2-720p`（欄位 start_image）、Google `google/veo-3.1` + `veo-3.1-fast`（欄位 image + generate_audio）。
+- 定價：curl replicate.com/<slug> 頁面 grep 內嵌 JSON（"or N seconds for $X"換算）：Runway Gen-4 Turbo $0.05/秒、Luma Ray Flash 2 $0.06/秒、Luma Ray 2 $0.18/秒、Veo 3.1 Fast $0.10/秒、Veo 3.1 $0.20/秒。
+- nginx：SSH 進 ks-aw-01 確認 app.aware-wave.com 的 sg-stack.aware-wave.com 站台已有 proxy_read_timeout 300s；Next.js 是自架 Docker（非 Vercel），maxDuration 對此部署無意義——結論是不需要改 nginx，只要生成邏輯本身控制在 300s 內。
+
+[做了什麼]
+- 新檔 lib/tarot/video-motion-gen.ts：三個 vendor 的 Replicate image-to-video 包裝（create prediction with Prefer: wait + poll，同 image-gen.ts 既有模式）+ generateVideoMotionBatch（固定併發 3）。
+- lib/content/blocks/video-pipeline.ts：新函式 applyVideoMotionToPrimaryFormat——只對主格式（formats[0]）的前 3 個自訂場景套用，一次全部併發送出（見下方 critic 修復）。
+- lib/ai/cost-model.ts / lib/content/video/video-cost.ts：新增 VIDEO_MOTION_RATES 表 + motion-per-custom-scene 成本步驟。
+- VideoStudio.tsx：新增「AI 影片動態」chip 選取列（不要／5 個模型，皆按鈕非下拉），成本預覽即時反映。
+
+[Critic 覆審（獨立 Agent）發現 + 修復 —— 整體判定 High risk，因為這是本次改動裡唯一真的動到大金額（$0.25-$1.60+/次）第三方 API 的部分]
+- C1 Critical：原設計是每個場景、每個動態相容格式（16:9+9:16）各自序列疊加呼叫，單一請求可能疊出超過 nginx 300s timeout——逾時後使用者重試，但伺服器端原本那次請求仍在跑、仍會計費，造成雙重收費。修復：動態生成移出 buildSceneAsset（原本 inline），改成 prepareScenes 跑完全部格式的靜態圖後唯一一次的後製步驟，只對主格式套用，只取前 3 個場景，MAX_MOTION_SCENES(3) 等於 generateVideoMotionBatch 併發上限(3)，保證一輪全部併發送出，總耗時約等於單次生成時間（≤280s 內部逾時），不隨場景數/格式數疊加。
+- C2 Critical：providedScenes（前製腳本深層接力路徑）完全沒有場景數上限，接上這次的貴+慢功能後，理論上可在一次請求內觸發數十甚至上百個併發 Replicate 影片生成（owner/admin/operator 皆可觸發，非單一信任個體）。修復：app/api/video/draft/route.ts 補 MAX_PROVIDED_SCENES=20，跟既有 Claude 生腳本路徑（video-script-core.ts 場景數 clamp 1-20）對齊，非新規則。
+- M1 Major：成本預估公式抄了「自訂場景數 × 格式數」，沒抄「動態只套用主格式+前3場」這條規則——選全部 3 個輸出比例時，畫面顯示的估價比實際貴 33%；只選 4:5 時顯示非零動態成本，實際是 $0。修復：改用 Math.min(3, customScenes) 乘 1（不乘 formatCount）。
+- M2 Major：動態生成用無上限 Promise.all，帳號額度不足時 Replicate burst=1（image-gen.ts 既有註解），無併發限制會讓多數場景 429 兩次後靜默降級回靜態圖，使用者以為套用了動態、實際大半沒生效。修復：加 runWithConcurrency（不新增套件，內建簡易 semaphore），固定併發 3，即為上面 MAX_MOTION_SCENES=3 的依據（兩者刻意設成同一個數字）。
+- M3 Major：影片下載沒有 image-gen.ts 既有的 SSRF host allowlist（只信 *.replicate.delivery）跟位元組上限（圖片是 20MB，影片沒設）。修復：補 isAllowedOutputUrl（從 image-gen.ts export 出來重用，非另立一套）+ 串流邊讀邊擋 80MB 上限（比圖片寬鬆，因為影片檔案天生較大）。
+- M4 Major：content-type 沒正規化就拿去給 buildDesignKey 精確字串比對——Replicate 若回帶參數的 content-type（如 "video/mp4; codecs=avc1"）會查無副檔名，導致已經付費生成成功的影片被丟棄、靜默退回靜態圖。修復：補正規化（split分號取第一段、trim、轉小寫），同 image-gen.ts 既有慣例。
+- N1 Minor：video/pipeline 積木（/api/video/generate、ContentStudio 消費）沒有把 ctx.videoMotionModel 往下傳，跟 video/prepare、draft route 不一致——目前無實際影響（UI 只送去 /api/video/draft），但補上一致性，避免將來變成又一個「靜默沒接上」的孤兒欄位。
+
+[驗證結果]（四動作）
+- REALTEST_EVIDENCE: tool=Bash（tsc，critic 修復前後各跑一次） | cmd=npx tsc --noEmit | exit=0（兩次皆是）
+- REALTEST_EVIDENCE: tool=Bash（vitest，修復後） | cmd=npx vitest run | exit=0 | result=1088/1088 通過，零迴歸
+- REALTEST_WAIVED: NA -- 實際呼叫 Runway/Luma/Veo 尚未做（單次真實呼叫成本 $0.25-$1.60，非免費；等操作者對「要不要先花錢測一次」表態，且部署到 production 前需 High-risk go-ahead，此功能尚未部署）
+- REVIEW_DONE: critic=Standard（獨立 Agent，非自審） | verdict=warn到pass（2 個 Critical + 4 個 Major 全部修復；未安排第二輪獨立覆審修復本身，時間/額度考量，只重跑 tsc/vitest 靜態確認未破壞既有邏輯）| findings=2c(已修)/4m(已修)/1n(已修)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateVideoMotion,videoMotionModel,VIDEO_MOTION_RATES,applyVideoMotionToPrimaryFormat,MAX_MOTION_SCENES,generateVideoMotionBatch | hits=40（next-admin，符合預期分散在 8 個改動檔+1 個新檔）+ agency-os 0 + scripts 0；額外確認 generateVideoMotion( 單一呼叫點只在 generateVideoMotionBatch 內部，無繞過併發限制的直呼點
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 尚未部署、尚未真實呼叫過任何一個 vendor——全部驗證止於本機 tsc/vitest + critic 書面覆審；Runway/Luma/Veo 三個 API 的真實回應形狀（尤其 Veo 的實際生成時間、Luma 的 aspect_ratio enum 實際合法值）只查了 schema 沒有真的送過一次請求。部署+第一次真實測試前，操作者需知道即使只測一次也要花 $0.25 起。
+2. 即使有 280s 內部逾時 + 3 併發上限，Veo（historically 較慢）仍可能在極端情況逼近或超過 nginx 300s——殘餘風險，未做客戶端 AbortSignal 級聯取消（critic 建議的更徹底修法，範圍更大，本輪未做）。
+3. Critic 修復本身沒有第二輪獨立驗證，只有原作者（我）自行核對每個 finding 對應的修復 + tsc/vitest 通過。
+
+[rollback] git revert 對應 commit；純新增能力（新檔+新選填欄位+新 UI chip 列），未改既有欄位語意；不選「AI 影片動態」時，整條路徑跟改動前逐位元相同（videoMotionModel 為 undefined 時 applyVideoMotionToPrimaryFormat 直接跳過）。

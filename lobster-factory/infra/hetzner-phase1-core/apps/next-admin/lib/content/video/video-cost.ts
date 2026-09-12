@@ -11,13 +11,14 @@
  *
  * 定價來源唯一：`lib/ai/cost-model.ts`（TEXT_FEATURES / IMAGE_RATES / TWD_RATE）。改價只動那檔。
  */
-import { TEXT_FEATURES, IMAGE_RATES, DEFAULT_IMAGE_MODEL } from "../../ai/cost-model";
+import { TEXT_FEATURES, IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "../../ai/cost-model";
 import { featureUnitCostUsd, imageCostUsd, usdToNtd } from "../../ai/cost-calculator";
 
 /** 一步的成本如何隨設定縮放。 */
 export type StepCostKind =
   | { kind: "text-feature"; featureKey: string }   // 一次性文字呼叫，用 cost-model 的 token profile
   | { kind: "image-per-custom-scene" }             // × 自訂(Flux)場景數，用選定 image model 單價
+  | { kind: "motion-per-custom-scene" }            // × 自訂場景數，用選定 AI 影片動態模型單價(每秒)×秒數；未選動態模型 = $0
   | { kind: "tts" }                                // Edge = free；OpenAI = per-character
   | { kind: "free" };                              // Pexels / Edge TTS / ffmpeg / wp-bridge = $0
 
@@ -39,6 +40,7 @@ export interface VideoPipelineStep {
 export const VIDEO_PIPELINE_STEPS: VideoPipelineStep[] = [
   { id: "script",  label: "腳本生成",     tool: "Claude Sonnet 4.6", vendor: "Anthropic",      icon: "📝", cost: { kind: "text-feature", featureKey: "video-script" }, enabled: true, note: "主題/文章 → 6 場景旁白 + 視覺提示" },
   { id: "image",   label: "自訂場景圖",   tool: "FLUX schnell",      vendor: "BFL/Replicate",  icon: "🎨", cost: { kind: "image-per-custom-scene" },                  enabled: true, note: "每個 custom 場景一張 AI 插圖" },
+  { id: "motion",  label: "AI 影片動態",  tool: "（未啟用）",        vendor: "—",              icon: "🎬", cost: { kind: "motion-per-custom-scene" },                 enabled: true, note: "選填：把自訂場景圖再過一次 image-to-video，換真實動態（非縮放特效）；未選則 $0" },
   { id: "broll",   label: "實拍 B-roll",  tool: "Pexels 影片庫",     vendor: "Pexels",         icon: "🎞️", cost: { kind: "free" },                                    enabled: true, note: "免費實拍素材（broll 場景）" },
   { id: "tts",     label: "旁白配音",     tool: "Edge TTS 神經語音", vendor: "Microsoft",      icon: "🔊", cost: { kind: "tts" },                                     enabled: true, note: "Edge 免費；OpenAI 依旁白字元數計費" },
   { id: "render",  label: "合成 + 多尺寸", tool: "ffmpeg（自架）",    vendor: "Hetzner",        icon: "🎬", cost: { kind: "free" },                                    enabled: true, note: "Ken Burns/字幕/4 平台尺寸；算力含在月固定基礎" },
@@ -73,6 +75,8 @@ export interface VideoCostConfig {
   ttsVoice?: string;
   /** 估算旁白字元數；前製接力可用實際 narration 長度，快速生成用場景/時長估算。 */
   ttsChars?: number;
+  /** AI 影片動態模型 id（cost-model VIDEO_MOTION_RATES 的鍵）；省略/undefined = 不啟用，維持縮放特效，$0。 */
+  videoMotionModel?: string;
 }
 
 export interface VideoCostLine {
@@ -121,6 +125,15 @@ export function computeVideoCost(
       unitUsd = imageCostUsd(imageModel);
       // 每格式各生一組原生 AI 圖 → 自訂場景數 × 格式數。
       count = Math.max(0, cfg.customScenes) * Math.max(1, cfg.formatCount ?? 1);
+    } else if (step.cost.kind === "motion-per-custom-scene") {
+      // 只套用主格式（formats[0]）的前 3 個自訂場景（lib/content/blocks/video-pipeline.ts
+      // applyVideoMotionToPrimaryFormat 的 MAX_MOTION_SCENES）——不是 customScenes × formatCount，
+      // 那是舊版估法，會把「其實只在一個格式跑、且最多 3 場」誤估成「每格式每場都跑」。
+      const MAX_MOTION_SCENES = 3;
+      const motion = cfg.videoMotionModel ? VIDEO_MOTION_RATES[cfg.videoMotionModel] : undefined;
+      unitUsd = motion ? motion.usdPerSec * motion.defaultDurationSec : 0;
+      count = Math.min(MAX_MOTION_SCENES, Math.max(0, cfg.customScenes));
+      if (motion) { tool = motion.label; vendor = motion.vendor; note = `僅主要輸出比例的前 ${MAX_MOTION_SCENES} 個自訂場景，每場 ${motion.defaultDurationSec}s，$${motion.usdPerSec}/秒`; }
     } else if (step.cost.kind === "tts") {
       if (cfg.ttsProvider === "openai") {
         const ttsModel = openAiTtsModelFromVoice(cfg.ttsVoice);

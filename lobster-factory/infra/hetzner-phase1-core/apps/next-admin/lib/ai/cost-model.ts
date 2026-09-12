@@ -83,6 +83,19 @@ export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: s
 export const DEFAULT_IMAGE_MODEL = "flux-schnell";
 
 /**
+ * AI 影片動態（image-to-video）每秒 USD 價格。keys = lib/tarot/video-motion-gen.ts VIDEO_MOTION_MODELS。
+ * 價格來源：2026-09-12 直接讀 replicate.com/<slug> 頁面內嵌 JSON 的 "or N seconds for $X" 換算，
+ * 非猜測（Runway/Luma/Google 官方直連 API 定價與 Replicate 轉售價不同，此表只適用走 Replicate）。
+ */
+export const VIDEO_MOTION_RATES: Record<string, { usdPerSec: number; label: string; vendor: string; defaultDurationSec: number }> = {
+  "runway-gen4-turbo":  { usdPerSec: 0.05, label: "Runway Gen-4 Turbo", vendor: "Runway/Replicate", defaultDurationSec: 5 },
+  "luma-ray-flash-2":   { usdPerSec: 0.06, label: "Luma Ray Flash 2",   vendor: "Luma/Replicate",   defaultDurationSec: 5 },
+  "luma-ray-2":         { usdPerSec: 0.18, label: "Luma Ray 2",         vendor: "Luma/Replicate",   defaultDurationSec: 5 },
+  "veo-3-1-fast":       { usdPerSec: 0.10, label: "Google Veo 3.1 Fast",vendor: "Google/Replicate", defaultDurationSec: 8 },
+  "veo-3-1":            { usdPerSec: 0.20, label: "Google Veo 3.1",     vendor: "Google/Replicate", defaultDurationSec: 8 },
+};
+
+/**
  * Per-run prices for the studio editing tools (Replicate compute-billed; values are typical-run
  * estimates — Replicate bills by GPU-seconds so actual varies). upscale runs up to 2 passes.
  */

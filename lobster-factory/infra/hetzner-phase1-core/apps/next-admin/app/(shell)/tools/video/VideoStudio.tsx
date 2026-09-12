@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VIDEO_PIPELINE_STEPS, computeVideoCost } from "@/lib/content/video/video-cost";
-import { IMAGE_RATES, DEFAULT_IMAGE_MODEL } from "@/lib/ai/cost-model";
+import { IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "@/lib/ai/cost-model";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import type { VideoHistoryItem } from "@/app/api/video/history/route";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
@@ -235,6 +235,9 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
     ? { ttsProvider: "edge", ttsVoice: "" }
     : voiceSelection;
   const isPexels = imageModel === "pexels-video" || imageModel === "pexels-all";
+  // AI 影片動態（image-to-video，換真實動態取代 Ken Burns 縮放）：空字串 = 不啟用（預設，最便宜）。
+  // 只對 AI 生圖場景有意義，Pexels 模式（本身已是真實影片或不走這條生成路徑）不顯示這個選項。
+  const [videoMotionModel, setVideoMotionModel] = useState("");
   // 輸出比例（預設只 16:9，WP/YouTube 用；需社群格式時手動勾選）。每比例各自原生生成 → 圖片成本/時間 ×已選數。
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set(["16x9"]));
   const orderedFormats = VIDEO_FORMAT_CHOICES.filter((f) => selectedFormats.has(f));
@@ -251,9 +254,9 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
   // 成本：前製腳本接力已經完成文字生成，影片區只估素材/配音/渲染；Pexels 模式不計 AI 圖。
   const costBreakdown = useMemo(
     () => providedScenes.length > 0
-      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: isPexels ? 0 : providedCustomScenes, brollScenes: isPexels ? providedScenes.length : providedBrollScenes, imageModel, formatCount: orderedFormats.length, includeScriptCost: false, ...costVoiceSelection, ttsChars: ttsCharEstimate })
-      : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel, formatCount: orderedFormats.length, ...costVoiceSelection, ttsChars: ttsCharEstimate }),
-    [providedScenes, providedCustomScenes, providedBrollScenes, isPexels, totalScenes, customScenes, brollScenes, imageModel, orderedFormats.length, costVoiceSelection, ttsCharEstimate],
+      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: isPexels ? 0 : providedCustomScenes, brollScenes: isPexels ? providedScenes.length : providedBrollScenes, imageModel, formatCount: orderedFormats.length, includeScriptCost: false, videoMotionModel: isPexels ? undefined : (videoMotionModel || undefined), ...costVoiceSelection, ttsChars: ttsCharEstimate })
+      : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel, formatCount: orderedFormats.length, videoMotionModel: isPexels ? undefined : (videoMotionModel || undefined), ...costVoiceSelection, ttsChars: ttsCharEstimate }),
+    [providedScenes, providedCustomScenes, providedBrollScenes, isPexels, totalScenes, customScenes, brollScenes, imageModel, orderedFormats.length, videoMotionModel, costVoiceSelection, ttsCharEstimate],
   );
 
   // ── Generate form ── (initial = 從 ScriptForge「送去生產」帶入的腳本預填)
@@ -430,6 +433,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           sceneCount: providedScenes.length === 0 ? totalScenes : undefined,
           customScenes: (providedScenes.length === 0 && imageModel !== "pexels-video" && imageModel !== "pexels-all") ? Math.min(customScenes, totalScenes) : undefined,
           outputFormats: orderedFormats,
+          videoMotionModel: isPexels ? undefined : (videoMotionModel || undefined),
           scenes: providedScenes.length > 0 ? providedScenes : undefined,
         }),
       });
@@ -921,6 +925,33 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {/* AI 影片動態 — 把場景圖再過一次 image-to-video，換真實動態（非縮放特效）；預設不啟用 = 最便宜 */}
+                {!isPexels && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+                      🎬 AI 影片動態 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（選填，讓場景真的動起來，不是縮放靜態圖；成本明顯較高）</span>
+                    </span>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      <button type="button" disabled={isBusy} onClick={() => setVideoMotionModel("")}
+                        style={chipStyle(!videoMotionModel)}>
+                        不要（維持縮放特效，最便宜）
+                      </button>
+                      {Object.entries(VIDEO_MOTION_RATES).map(([id, r]) => (
+                        <button key={id} type="button" onClick={() => setVideoMotionModel(id)} disabled={isBusy}
+                          style={chipStyle(videoMotionModel === id)} title={r.vendor}>
+                          {r.label}
+                          <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>${(r.usdPerSec * r.defaultDurationSec).toFixed(2)}/場（{r.defaultDurationSec}s）</span>
+                        </button>
+                      ))}
+                    </div>
+                    {videoMotionModel && (
+                      <div style={{ fontSize: 11, color: "var(--badge-red-text)", background: "var(--badge-red-bg)", padding: "4px 8px", borderRadius: 6, lineHeight: 1.6 }}>
+                        只套用在「主要輸出比例」（下方勾選的第一個比例）的前 3 個自訂場景，每場多花 ${(VIDEO_MOTION_RATES[videoMotionModel].usdPerSec * VIDEO_MOTION_RATES[videoMotionModel].defaultDurationSec).toFixed(2)}，且生成時間會拉長（單場景常見 30秒–3分鐘）；其餘場景與其他輸出比例維持縮放特效。4:5 不支援動態。這個限制是為了不讓單次生成超過伺服器逾時上限。
+                      </div>
+                    )}
                   </div>
                 )}
 

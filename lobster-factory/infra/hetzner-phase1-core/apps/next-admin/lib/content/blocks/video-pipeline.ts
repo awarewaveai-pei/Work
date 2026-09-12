@@ -21,6 +21,7 @@ import {
 } from "../../storage/r2";
 import { submitRender, type RenderOutputMeta, type RenderOutputs, type VideoServiceCapability } from "../video/render-client";
 import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
+import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-motion-gen";
 import { getSupabaseWriteClient } from "../../supabase-server";
 import { randomBytes } from "node:crypto";
 
@@ -365,6 +366,71 @@ export async function buildSceneAsset(
   return { ok: true, asset: put.publicUrl, r2Key: key, bytes: parsed.buffer, mime: parsed.mime };
 }
 
+/**
+ * AI 影片動態後製：把主格式已生成的靜態圖再過一次 image-to-video。獨立於 buildSceneAsset 之外
+ * （不是每個場景各自 inline 呼叫）是刻意設計——critic 2026-09-12 抓到的真實問題：inline 版本讓
+ * 「每場景 × 每個動態相容格式(16:9/9:16)」各自序列疊加等待，一次請求可能疊出 >nginx 300s
+ * proxy_read_timeout，逾時後使用者重試會讓已經在跑、會計費的 Replicate 呼叫變成雙重收費。
+ * 這裡改成：只對主格式（formats[0]）套用、只取前 MAX_MOTION_SCENES 個自訂場景、且
+ * MAX_MOTION_SCENES === generateVideoMotionBatch 的併發上限 → 保證這批呼叫一次全部併發送出、
+ * 一輪等完，總耗時 ≈ 單次生成時間（≤280s 內部逾時），不會隨場景數疊加。
+ * 失敗/超額的場景一律靜默維持原本靜態圖（動態是加分特效，不是必要條件）。
+ */
+const MAX_MOTION_SCENES = 3; // 必須 <= generateVideoMotionBatch 的併發上限，見上方註解
+export async function applyVideoMotionToPrimaryFormat(
+  scenes: Pick<import("../video/video-script-core").VideoScene, "id" | "image_prompt" | "visual">[],
+  formatAssets: Record<string, string[]>,
+  primaryFormat: string,
+  primaryAspectRatio: "16:9" | "9:16" | "4:5",
+  motionModel: string,
+): Promise<{ motionAppliedCount: number; r2Keys: string[] }> {
+  if (primaryAspectRatio !== "16:9" && primaryAspectRatio !== "9:16") {
+    console.warn(`[video-pipeline] motion requested but primary format ${primaryFormat} is 4:5 (unsupported by all 3 vendors) — all scenes stay static`);
+    return { motionAppliedCount: 0, r2Keys: [] };
+  }
+  if (!isVideoMotionModel(motionModel)) return { motionAppliedCount: 0, r2Keys: [] };
+  const assets = formatAssets[primaryFormat];
+  if (!assets) return { motionAppliedCount: 0, r2Keys: [] };
+
+  const eligible = scenes
+    .map((s, i) => ({ s, i }))
+    .filter(({ s, i }) => s.visual !== "broll" && assets[i]) // broll 場景走真實影片，不需要也不該套 AI 動態
+    .slice(0, MAX_MOTION_SCENES);
+  if (eligible.length === 0) return { motionAppliedCount: 0, r2Keys: [] };
+
+  const jobs = eligible.map(({ s, i }) => ({
+    imageUrl: assets[i],
+    motionPrompt: `${s.image_prompt}. Subtle natural motion, cinematic camera movement.`,
+    aspectRatio: primaryAspectRatio as "16:9" | "9:16",
+  }));
+  const results = await generateVideoMotionBatch(motionModel, jobs);
+
+  const r2Keys: string[] = [];
+  let motionAppliedCount = 0;
+  for (let k = 0; k < results.length; k++) {
+    const r = results[k];
+    const { i } = eligible[k];
+    if (!r.ok) {
+      console.error(`[video-pipeline] scene ${scenes[i].id} motion generation failed, keeping static image:`, "error" in r ? r.error : "unknown_error");
+      continue;
+    }
+    const videoKey = buildDesignKey(r.mime);
+    if (!videoKey) {
+      console.error(`[video-pipeline] scene ${scenes[i].id} motion output has unrecognized mime, keeping static image:`, r.mime);
+      continue;
+    }
+    const put = await putDesignObject(videoKey, r.buffer, r.mime);
+    if (!put.ok) {
+      console.error(`[video-pipeline] scene ${scenes[i].id} motion R2 upload failed, keeping static image:`, "error" in put ? put.error : "r2_put_failed");
+      continue;
+    }
+    assets[i] = put.publicUrl;
+    r2Keys.push(videoKey);
+    motionAppliedCount++;
+  }
+  return { motionAppliedCount, r2Keys };
+}
+
 /** 步驟 1+2：生腳本 + 生圖；不提交 EU 渲染。可獨立呼叫供草稿預覽。 */
 export async function prepareScenes(
   input: {
@@ -390,6 +456,8 @@ export async function prepareScenes(
     customScenes?: number;
     /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
     formats?: string[];
+    /** AI 影片動態模型 id（選填）；套用到全部 custom 場景（4x5 格式與 broll 場景不受影響）。 */
+    videoMotionModel?: string;
     /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
     providedScenes?: {
       narration: string;
@@ -474,6 +542,18 @@ export async function prepareScenes(
     }
     formatAssets[fmt] = results.map((r) => (r as { ok: true; asset: string }).asset);
   }
+
+  // AI 影片動態：僅主格式（formats[0]）+ 前 MAX_MOTION_SCENES 個自訂場景，見 applyVideoMotionToPrimaryFormat
+  // 註解——刻意不對每格式都套，避免多格式疊加把單次請求的總耗時推過 nginx proxy_read_timeout 300s。
+  if (input.videoMotionModel && formats.length > 0) {
+    const primaryFmt = formats[0];
+    const motionResult = await applyVideoMotionToPrimaryFormat(
+      scenes, formatAssets, primaryFmt, FORMAT_SPEC[primaryFmt].aspectRatio, input.videoMotionModel,
+    );
+    r2Keys.push(...motionResult.r2Keys);
+    input.onProgress?.(`AI 影片動態：${motionResult.motionAppliedCount} 個場景套用成功`);
+  }
+
   return { ok: true, scenes, formatAssets, formats, r2Keys, title };
 }
 
@@ -504,6 +584,7 @@ register({
         sceneCount: ctx.sceneCount as number | undefined,
         customScenes: ctx.customScenes as number | undefined,
         formats: ctx.outputFormats as string[] | undefined,
+        videoMotionModel: ctx.videoMotionModel as string | undefined,
         onProgress,
       },
       anthropicKey,

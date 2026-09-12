@@ -12,7 +12,7 @@
 import { getDesignsPublicBase } from "../storage/r2";
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
-const REPLICATE_POLL_MS = 2_500;
+export const REPLICATE_POLL_MS = 2_500;
 // flux-dev guidance scale. BFL recommends 1.5–5; >5 oversaturates. Higher = closer prompt adherence
 // which pushes art style onto figures. flux-schnell dropped guidance entirely (sending it may 422).
 const FLUX_DEV_GUIDANCE = 5;
@@ -299,7 +299,7 @@ function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null 
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
 
 // Only fetch generated images from Replicate's own delivery hosts (SSRF guard).
-function isAllowedOutputUrl(raw: string): boolean {
+export function isAllowedOutputUrl(raw: string): boolean {
   try {
     const u = new URL(raw);
     return u.protocol === "https:" && (u.hostname === "replicate.delivery" || u.hostname.endsWith(".replicate.delivery"));
@@ -378,7 +378,7 @@ async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
 
 // Retry once on Replicate 429 after honouring the retry_after window.
 // Account balance < $5 → burst=1, 6 req/min; retry_after is typically 3–12s.
-async function fetchWithRetry429(url: string, options: RequestInit & { signal?: AbortSignal }): Promise<Response> {
+export async function fetchWithRetry429(url: string, options: RequestInit & { signal?: AbortSignal }): Promise<Response> {
   const res = await fetch(url, options);
   if (res.status !== 429) return res;
   const bodyText = await res.text().catch(() => "");

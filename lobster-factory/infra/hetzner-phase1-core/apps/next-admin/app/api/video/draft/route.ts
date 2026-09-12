@@ -29,6 +29,8 @@ interface DraftBody {
   customScenes?: number;
   /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
   outputFormats?: string[];
+  /** AI 影片動態模型 id（選填，image-to-video 換真實動態；未知值一律忽略）。 */
+  videoMotionModel?: string;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
   scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
 }
@@ -52,10 +54,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 對齊 lib/storage/r2.ts isDesignsAsset 既有守則；非法值降級成「沒有定裝照」而非 400 硬擋，
   // 因為這欄位是選填加強，不該讓整個場景生成失敗）。
   const { isDesignsAsset } = await import("@/lib/storage/r2");
+  const { isVideoMotionModel } = await import("@/lib/tarot/video-motion-gen");
+  const videoMotionModel = isVideoMotionModel(body.videoMotionModel) ? body.videoMotionModel : undefined;
+  // 場景數上限 20，跟 video-script-core.ts 的 Claude 生腳本路徑（前端滑桿 clamp 1-20）對齊——
+  // 這條 providedScenes 深層接力路徑先前完全沒有上限，critic 2026-09-12 抓到：接上這次新的
+  // AI 影片動態（比純生圖貴很多、慢很多）後，無上限會讓單一請求的併發生成規模不可預期。
+  const MAX_PROVIDED_SCENES = 20;
   const providedScenes = Array.isArray(body.scenes)
     ? body.scenes
         .filter((s) => s && typeof s.narration === "string" && s.narration.trim())
         .map((s) => (isDesignsAsset(s.referenceImageUrl) ? s : { ...s, referenceImageUrl: undefined }))
+        .slice(0, MAX_PROVIDED_SCENES)
     : [];
   if (!topic && providedScenes.length === 0) {
     return NextResponse.json({ ok: false, error: "topic 或 scenes 為必填" }, { status: 400 });
@@ -91,6 +100,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
     customScenes: typeof body.customScenes === "number" ? body.customScenes : undefined,
     formats: Array.isArray(body.outputFormats) ? body.outputFormats : undefined,
+    videoMotionModel,
     providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
   })) as PrepResult;
 
