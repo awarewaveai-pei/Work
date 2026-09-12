@@ -16855,6 +16855,32 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 
 [下一步] 操作者另外詢問 Cognitive Engineering OS 系統部署（目前僅為後端 Python library，無 HTTP/API/前端），屬於獨立的 High-risk 新範疇，需另外走 R0 規劃流程，不併入本次 Method Atlas 收尾。
 
+## 2026-09-12（續7）Cognitive OS 部署規劃：採用 System Foundry v1.6 治理層（overlay-only，不跑腳手架）+ 三階段商業藍圖文件
+
+[任務] 操作者詢問 Cognitive Engineering OS「操作網址」，追問後確認：(1) 系統本來就設計為多租戶多利害關係人（Master Plan §3-4，ADR-003 Tenant 1:N Workspace）；(2) 商業模式為三階段：自用→訂閱+點數→企業銷售（對應 Master Plan §6）；(3) 操作者指出 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/` 是通用架構落地框架，要套用在本系統上。
+
+[決策與理由]
+- **不跑 `scripts/foundry_new.py` 腳手架**：該腳本假設從零建立 `src/`/`tests/`/`infra/`，但 `Projects/internal/cognitive-engineering-os` 已有成熟 `ai_lego/` 結構（41 個方法+完整測試），硬套會產生兩套平行骨架，違反零重工＋最小爆炸半徑（AGENTS.md R0 核心準則，跟 System Foundry 自己憲章的用詞幾乎一致）。
+- **改採 overlay 方式**：手動在 `Projects/internal/cognitive-engineering-os/.foundry/` 建立跟腳手架同形狀的治理層 JSON（project-profile／source-of-truth-map／decision-register／risk-classification），不搬動任何既有程式碼。
+- **archetypes 選定**：`ai_system`（對應 Method Atlas 執行層：provenance/human_oversight 已經是每個方法 gate 的結構性保證）+ `web_application`（對應尚未建的 Experience Plane：frontend/backend/api/iam/deploy）。`regulated_system`（compliance/audit）留到 Phase 3 企業銷售階段才正式採用，雖然 F23 jurisdiction 家族內容已存在。
+- **Phase 1 關鍵設計**：即使只給操作者自己用，也要建真的 Tenant/Workspace/Identity row（ADR-003 schema）+ 一個 entitlement-check seam（`check_entitlement()`，Phase 1 永遠回傳 True）——理由：`System_Foundry.../commercial/ENTITLEMENT_STANDARD.md` rule 2/8 + `EDITION_ARCHITECTURE.md` rule 6 明文禁止事後把 edition/plan 名稱寫死進 domain logic；現在就把呼叫點建好，Phase 2 訂閱+點數只是接上真正的 entitlement store，不必回頭改已出貨的程式碼。
+
+[已修改]
+- 新增 `Projects/internal/cognitive-engineering-os/.foundry/`：`project-profile.json`（profile=commercial, archetypes=[ai_system, web_application], multi_tenant=true）、`source-of-truth-map.json`（6 個 domain 的 SSOT 對照）、`decision-register.json`（2 筆決策：不跑腳手架、entitlement-seam 提前建）、`risk-classification.json`（執行層低風險/公開執行端點中風險/billing 尚不適用/多租戶隔離延後驗證）。
+- 新增 `Projects/internal/cognitive-engineering-os/docs/COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md`：整合 Master Plan 的 Tenant 模型 + System Foundry 的 Edition/Entitlement/Billing 標準成單一藍圖，含三階段對照表 + Phase 1 具體範圍（Tenant/Workspace/Identity 最小實作、entitlement seam、FastAPI 三端點、ks-aw-01 部署走 sg-deploy 六件套、Phase 1 明確排除項目）。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純新增治理 JSON + 規劃文件，無程式碼邏輯變動，四份 JSON 皆用 `json.load` 驗證解析成功
+- REVIEW_WAIVED: DOC_ONLY -- 規劃文件，尚未有程式碼可覆審
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=COGNITIVE_OS_DEPLOYMENT_BLUEPRINT | hits=0（新檔案，無其他檔案引用，符合預期）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 本條目純規劃+治理文件，無執行風險。Phase 1 實際動工（寫程式碼、部署 ks-aw-01）仍需操作者明確 go-ahead（High-risk gate，AGENTS.md §3）——本條目本身不構成該授權。
+
+[rollback] 全部為新增檔案，`git revert` 對應 commit 即可完整回退，不影響任何既有程式碼或已建的 41 個 Method Atlas 方法。
+
+[下一步] 等操作者對 `.foundry/` 治理層 + `COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md` 的 Phase 1 範圍給明確 go-ahead，屆時用 `planner` 拆解 Phase 1 任務清單（跨 domain/API/auth/deploy ≥3 模組）再動工。
+
 ## 2026-09-12（續6）HCI-30 C2/C3/C5 落地（規則引擎否定詞窗口+版本號、關鍵字堆疊偵測、auto-promote 稽核紀錄）+ critic 覆審 2 Major 全修
 
 [任務] 承接同日 C7/C10 條目與操作者「2、3、5」指示，把 `HCI_C1_C10_DECISIONS.md` 觸發的 C2/C3/C5 三項從 PLANNED 落地為 DONE。

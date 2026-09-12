@@ -1,0 +1,27 @@
+{
+  "foundry_kernel_version": "1.6.0",
+  "assessed_at": "2026-09-12T11:17:19Z",
+  "risks": [
+    {
+      "area": "execution_layer",
+      "level": "low",
+      "why": "All 41 Method Atlas builder/gate functions are pure (no DB writes, no network calls, no secrets). Method execution cannot itself cause a production incident -- confirmed by this session's own critic passes across F15/F22/F23/F24 (0 side-effect findings across ~4200 tests)."
+    },
+    {
+      "area": "public_execution_endpoint",
+      "level": "medium",
+      "why": "Once Phase 1 exposes POST /methods/{id}/invoke publicly, unbounded free calls are a compute-abuse/DoS surface even though individual calls are cheap and side-effect-free. Requires real Identity + entitlement-check seam (decision-register.json entry 2), not just network-level rate limiting.",
+      "mitigated_by": "Phase 1 Identity/Tenant gate; deferred rate-limit hardening tracked for Phase 1 build task list."
+    },
+    {
+      "area": "commercial_billing",
+      "level": "not_yet_applicable",
+      "why": "No payment processing exists in Phase 1. Billing/entitlement standards (commercial/BILLING_ARCHITECTURE.md) apply starting Phase 2 (subscription+credits) -- deferred, not skipped."
+    },
+    {
+      "area": "multi_tenant_isolation",
+      "level": "deferred",
+      "why": "Phase 1 has exactly one real Tenant row (self-use). ADR-003 CAS isolation guarantees are declared in the schema but not yet load-bearing until a 2nd tenant exists (Phase 2). Must be verified with a real 2-tenant isolation test before Phase 2 ships, not assumed from schema shape alone."
+    }
+  ]
+}

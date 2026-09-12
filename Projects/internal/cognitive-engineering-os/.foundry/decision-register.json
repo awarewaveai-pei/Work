@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "date": "2026-09-12",
+    "decision": "Adopt System Foundry v1.6 as governance overlay only; do NOT run scripts/foundry_new.py's greenfield scaffolder against this repo.",
+    "why": "foundry_new.py creates a fresh src/tests/infra skeleton assuming no prior code. This repo already has an established ai_lego/ layout with 41 complete Method Atlas methods and their tests. Running the scaffolder would create a second, competing directory tree -- violates zero-rework and minimal-blast-radius principles shared by both AGENTS.md and System Foundry's own constitution.",
+    "alternative_rejected": "Run foundry_new.py and migrate ai_lego/ into the generated src/ tree.",
+    "owner": "operator"
+  },
+  {
+    "id": 2,
+    "date": "2026-09-12",
+    "decision": "Phase 1 (self-use) build includes a real, always-evaluated entitlement-check seam (commercial/ENTITLEMENT_STANDARD.md rule 2) even though the single Phase-1 tenant's entitlements are trivially all-true. Phase 1 also creates one real Tenant/Workspace/Identity row (ADR-003 schema) instead of hardcoding a single-user bypass.",
+    "why": "ENTITLEMENT_STANDARD.md rule 8 (EDITION_ARCHITECTURE.md rule 6) prohibits hardcoding edition/plan names into domain logic later -- building the check point now, even trivially-always-true, means Phase 2 (subscription+credits) wires a real entitlement store behind an existing call site instead of retrofitting checks through already-shipped code.",
+    "confirmed_by": "operator, 2026-09-12 (three-phase commercial arc: self-use -> subscription+credits -> enterprise sale, matching Master Plan section 6)",
+    "owner": "operator"
+  }
+]

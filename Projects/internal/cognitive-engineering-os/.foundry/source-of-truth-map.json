@@ -1,0 +1,37 @@
+{
+  "foundry_kernel_version": "1.6.0",
+  "domains": [
+    {
+      "domain": "method_atlas_content",
+      "source_of_truth": "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md",
+      "registry": "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/contract-backlog.yaml",
+      "note": "41 Tier-1 methods complete as of 2026-09-12 (F15/F22/F23/F24). New methods follow METHOD_ATLAS_SLICE_LEAN_STANDARD.md."
+    },
+    {
+      "domain": "execution_runtime",
+      "source_of_truth": "ai_lego/ (this repo)",
+      "note": "Pure-function builder+gate modules per method, MethodCatalog resolver (ai_lego/platform/ai_execution/method_resolver.py). No HTTP/API layer exists yet -- Phase 1 scope."
+    },
+    {
+      "domain": "tenant_workspace_identity_model",
+      "source_of_truth": "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs/adr/ADR-003-tenant-model-and-cas-isolation.md",
+      "schema": "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/domain/tenant.schema.yaml",
+      "note": "Tenant 1:N Workspace, no cross-tenant Workspace sharing (ADR-003 sub-decision a). Not yet instantiated as running Identity/Tenant/Workspace tables -- Phase 1 scope."
+    },
+    {
+      "domain": "trust_fabric_gate",
+      "source_of_truth": "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md section 4",
+      "note": "\u300c\u4efb\u4f55 Capability \u57f7\u884c\u524d\u90fd\u5fc5\u9808\u5148\u901a\u904e Trust Fabric\u300d. Not yet implemented as a runtime gate -- Phase 1's entitlement-check seam (see decision-register.json entry 2) is the first concrete instance of this."
+    },
+    {
+      "domain": "commercial_model",
+      "source_of_truth": "D:/Work/agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/commercial/{EDITION_ARCHITECTURE,BILLING_ARCHITECTURE,ENTITLEMENT_STANDARD,CUSTOMER_LIFECYCLE,GROUP_STANDARD,ENTERPRISE_STANDARD}.md",
+      "note": "Operator-confirmed 3-phase commercial arc 2026-09-12: self-use -> subscription+credits -> enterprise sale. These standards are the SSOT for HOW to build billing/entitlement/editions when Phase 2/3 start; not built yet."
+    },
+    {
+      "domain": "foundry_governance_overlay",
+      "source_of_truth": "D:/Work/agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/",
+      "note": "Reference-only for standards/checklists. foundry_new.py scaffolder intentionally NOT run against this repo (decision-register.json entry 1) -- this .foundry/ directory is a hand-authored overlay of the same JSON shapes, not scaffolder output."
+    }
+  ]
+}

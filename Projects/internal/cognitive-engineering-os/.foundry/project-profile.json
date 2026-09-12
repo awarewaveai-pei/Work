@@ -1,0 +1,13 @@
+{
+  "project_id": "cognitive-engineering-os",
+  "foundry_kernel_version": "1.6.0",
+  "profile": "commercial",
+  "archetypes": ["ai_system", "web_application"],
+  "criticality": "medium",
+  "commercial": true,
+  "multi_tenant": true,
+  "regulated": false,
+  "created_at": "2026-09-12T11:17:19Z",
+  "updated_at": "2026-09-12T11:17:19Z",
+  "notes": "Overlay-only adoption of System Foundry v1.6 (see decision-register.json entry 1). foundry_new.py's greenfield scaffolder was NOT run -- this repo already has an established ai_lego/ layout (41 Method Atlas methods, tests/unit, apps/cli) predating this profile. archetypes=[ai_system, web_application]: ai_system covers the Method Atlas execution surface (model_provider N/A today -- methods are deterministic Python, not LLM calls; provenance/human_oversight already structural per every method's own gate discipline); web_application covers the not-yet-built Experience Plane (frontend/backend/api/iam/deploy). regulated_system NOT yet adopted -- F23 jurisdiction family (agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/contracts/jurisdiction.*) exists as Method Atlas content but no regulated-system operational controls (compliance/audit/segregation_of_duties) are wired into this project's own runtime yet; add when Phase 3 (enterprise) work starts."
+}
