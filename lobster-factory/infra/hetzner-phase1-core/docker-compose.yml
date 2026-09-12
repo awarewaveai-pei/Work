@@ -268,6 +268,11 @@ services:
       OPS_INBOX_NETDATA_TOKEN: ${OPS_INBOX_NETDATA_TOKEN:-}
       OPS_INBOX_UPTIME_KUMA_TOKEN: ${OPS_INBOX_UPTIME_KUMA_TOKEN:-}
       OPS_INBOX_POSTHOG_TOKEN: ${OPS_INBOX_POSTHOG_TOKEN:-}
+      # Collection scheduling heartbeat (migration 0081). Own dedicated token, never
+      # OPS_INBOX_INGEST_TOKEN — see verifyIngestToken.ts's M2 history for why a shared
+      # token across unrelated callers is a blast-radius mistake already paid for once.
+      # Empty = the endpoint fails closed (401 to every caller) until set.
+      COLLECT_SCHEDULE_INGEST_TOKEN: ${COLLECT_SCHEDULE_INGEST_TOKEN:-}
       # Migration window: accept the legacy shared token too while platforms are
       # re-pointed one at a time. Set "false" once every platform sends its own token.
       OPS_INBOX_DUAL_ACCEPT_LEGACY: ${OPS_INBOX_DUAL_ACCEPT_LEGACY:-}

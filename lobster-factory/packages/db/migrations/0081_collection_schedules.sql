@@ -4,15 +4,21 @@
 -- WHY A TABLE INSTEAD OF TRIGGER.DEV'S OWN DYNAMIC SCHEDULES: Trigger.dev can register a schedule
 -- per externalId (per organization), but that makes Trigger.dev's own schedule list the source of
 -- truth for "who is scheduled and at what cadence" -- a second copy of exactly the same fact this
--- table holds, with no mechanism to notice the two disagreeing. One fixed cron task reads this table
--- and fans out itself (packages/workflows/src/trigger/collect-scheduled-crawl.ts); adding a tenant
--- is one row, not an API call to a second system.
+-- table holds, with no mechanism to notice the two disagreeing. Adding a tenant is one row here, not
+-- an API call to a second system.
+--
+-- WHO ACTUALLY READS THIS: next-admin's POST /api/internal/collect/run-due-schedules (lib/collect/
+-- schedule-store.ts + lib/collect/schedule.ts's isDueNow) — NOT the Trigger.dev task. The task
+-- (packages/workflows/src/trigger/collect-scheduled-crawl.ts) is a bare hourly heartbeat with no
+-- scheduling logic of its own; it just calls that endpoint. Keeping the due-check in next-admin,
+-- next to the crawler and its own test suite, means one codebase to change, not two that can drift.
 --
 -- DEFAULT OFF (AGENTS.md §0 "自動化預設 OFF"): `enabled` defaults false. A row can exist
 -- (pre-configured cadence) without the crawl ever firing until an operator explicitly flips it.
 --
--- day_of_week_utc uses JS Date#getUTCDay() encoding (0=Sunday..6=Saturday) so the Trigger.dev task,
--- written in TypeScript, needs no translation table between what it reads here and what it computes.
+-- day_of_week_utc uses JS Date#getUTCDay() encoding (0=Sunday..6=Saturday) so lib/collect/
+-- schedule.ts, written in TypeScript, needs no translation table between what it reads here and
+-- what Date#getUTCDay() computes.
 --
 -- APPLY WITH (Medium risk -- additive only, no existing table/column touched):
 --   node scripts/apply-db-migration.mjs 0081
