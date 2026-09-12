@@ -306,7 +306,9 @@ export async function buildSceneAsset(
     framing?: string;
     /**
      * Story Bible 角色定裝照 URL——提供時（且非 Pexels 路徑）強制改用支援 reference image
-     * 的模型（flux-kontext-pro），忽略 opts.imageModel/fluxModel 的一般選型，換取跨場景角色一致性。
+     * 的模型（flux-kontext-dev，$0.045/張——同樣支援 input_image 的 flux-kontext-pro 是 $0.10/張，
+     * 兩者 buildInput 邏輯完全相同，操作者要求「盡量用最便宜的模型」故選 dev），忽略
+     * opts.imageModel/fluxModel 的一般選型，換取跨場景角色一致性。
      */
     referenceImageUrl?: string;
   },
@@ -347,7 +349,7 @@ export async function buildSceneAsset(
   // 有角色定裝照 → 強制走 reference-conditioned 模型（忽略一般選型），換角色跨場景一致性；
   // 沒有就照原本選型（使用者選的模型或預設 flux-schnell）。
   const referenceImageUrl = opts.referenceImageUrl?.trim() || undefined;
-  const safeModel = referenceImageUrl ? "flux-kontext-pro" : (isTarotModel(fluxModel) ? fluxModel : "flux-schnell");
+  const safeModel = referenceImageUrl ? "flux-kontext-dev" : (isTarotModel(fluxModel) ? fluxModel : "flux-schnell");
   const img = await generateTarotImage({
     model: safeModel,
     prompt: styledPrompt,

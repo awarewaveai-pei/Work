@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-12 第六批（0076 套上 prod：兩輪覆審之後，操作者明示「需要決定的事都你決定」，套用完成）
+
+上一批（`2e81441fb`）修完兩輪覆審找到的全部問題後，等待明示 go-ahead——操作者回「需要決定的事都你決定」，視為對本次套用的明確授權（直接回應我提出的套用計畫與爆炸半徑）。套用過程沒有再開任何 subagent：兩輪 critic 加上每個修法各自的突變測試已經足夠，套用本身是機械執行。
+
+**套用**：`docker exec -i supabase-db psql -U supabase_admin -v ON_ERROR_STOP=1 < 0076_kb_ranked_keyword_retrieval.sql`，`COMMIT`。extension、index、函式簽名（新增 `score` 欄位）、權限（僅 `supabase_admin`／`postgres`／`service_role`，`anon`／`authenticated` 沒有漏）全部驗證正確。
+
+**真實資料端到端驗證**：直接對 prod 那筆真實文件（「退貨政策」，`85679ef9-...`）用**部署程式碼實際會產生的那個查詢字串形狀**（`退貨 OR 貨運 OR 運費`——與 `keyword-query.test.ts:8-11` 對同一問句斷言的 bigram 輸出逐字對得上）呼叫 `cs_match_chunks_keyword`，回傳正確的 chunk 且 `score=3`（三個詞全部命中）。不相關查詢（`完全 OR 無關`）回 0 筆；跨租戶查詢（換一個不存在的 org）同樣回 0 筆——六謂詞的隔離在新函式上依然成立。
+
+**部署**：`sg-deploy.sh next-admin`，`deployed commit = 2e81441fb`，與剛推上 `origin/main` 的 commit 逐字相同（沒有被另一個並行 session 的 commit 插隊）。npm test（含新增的 8 個 kb 相關測試檔）全過，healthcheck 與 HTTP smoke 全過。
+
+REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec -i supabase-db psql -U supabase_admin -v ON_ERROR_STOP=1 < 0076...sql` | exit=0 | result=`COMMIT`；schema 查詢確認 `pgroonga_ext=1`、`idx_cs_chunks_pgroonga` 存在、函式簽名含 `score`、`proacl` 僅 3 個角色
+REALTEST_EVIDENCE: tool=SSH | cmd=用部署程式碼實際產生的 bigram-OR 字串直接呼叫 prod 上的 `cs_match_chunks_keyword`（真實文件，非測試 fixture）| exit=0 | result=正確 chunk、`score=3`；不相關查詢與跨租戶查詢皆正確回 0 筆
+REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | result=`deployed commit=2e81441fb`（與 push 的 commit 逐字相同）；smoke 全過
+REALTEST_EVIDENCE: tool=Bash | cmd=`curl` 對 `/ops/knowledge`／`/ops/collect` | exit=0 | result=皆 200
+
+**至此 KB K1 全部落地**：0072／0073／0074／0075／0076 五支 migration 均已套 prod，hybrid 檢索（向量＋真正有排名的關鍵字）與對應的程式碼、測試、rollback 腳本、本機驗證 harness 全部到位。
+**rollback**：`0076_kb_ranked_keyword_retrieval_down.sql` 反向套用＋next-admin 退回上一個 commit，必須同一維護窗口（down 腳本的函式簽名沒有 `score`，且退版後查詢字串格式跟舊函式不合，見該檔頭說明）。
+
 ## 2026-09-12（172–181 號切片：F10 假設／證據／認知品質家族開張並收官 0/10→10/10，5 個平行 agent × 2 方法 + 1 critic；順帶關掉 registry 行號漂移「整類」）
 
 **觸發**：操作者指定完成 F09／F10／F13／F14／F15／F22／F23／F24 八個家族。F09 已於本日稍早收官（commit `a95c7b53f`），本條目是 F10。
@@ -16281,3 +16299,29 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 ### Machine appendix (monthly-system-review)
 - 2026-09-12 12:03:16 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 47.23% (< 85%))
 
+
+## 2026-09-12（續）Story Bible 畫面層——改最便宜模型 + 網頁內操作說明
+
+[任務] 操作者確認 Replicate 額度已處理，接著說「盡量都用最便宜的模型」；另開一項要求把 Story Bible 生影片的操作流程寫進網頁裡。
+
+[做了什麼]
+- `buildSceneAsset` 有角色定裝照時強制模型從 `flux-kontext-pro`（$0.10/張）改 `flux-kontext-dev`（$0.045/張）——
+  兩者 `buildInput` 邏輯（`input_image` 帶參考圖）完全相同，純粹換便宜的 checkpoint，行為不變。
+- `generate-portrait/route.ts` 首次定裝照生成從 `flux-dev`（$0.025/張）改 `flux-schnell`（$0.003/張）——第一張
+  定裝照沒有參考圖可帶，純文字生圖，沒有理由用比 schnell 貴 8 倍的模型。
+- `StoryBibleWorkbench.tsx` 頂部說明卡片新增「從這裡到出片的完整流程」四步驟（建 Bible→核准→到手動生成套用
+  →自動定裝照/自動一致性比對），`ScriptForge.tsx` 的 Story Bible 選取卡片也加一段簡短提示＋指回這裡看完整說明。
+
+[驗證結果]（四動作）
+- REALTEST_EVIDENCE: tool=Bash（tsc） | cmd=`npx tsc --noEmit` | exit=0 | result=無錯誤（改動途中曾被共用 worktree
+  的並行 session 把 video-pipeline.ts／generate-portrait/route.ts 兩檔的模型改動覆寫回舊值——`git diff --stat`
+  比對出來後立刻重做並馬上 `git add` 進 index 避免二次被蓋，這是本次驗證迴圈的一部分不是事後補述）
+- REALTEST_EVIDENCE: tool=Bash（vitest） | cmd=`npx vitest run` | exit=0 | result=1053/1053 通過
+- REVIEW_WAIVED: DOC_ONLY -- 模型字串替換（同函式簽名/同 buildInput 分支）+ 純文案新增，無新邏輯分支
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=flux-kontext-pro,flux-kontext-dev | hits=0 個殘留
+  `flux-kontext-pro`字面量在改動的兩個檔案內（確認真的替換乾淨，非只改註解）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無新增；純降級模型版本 + 文案，未改資料流或介面契約。
+
+[rollback] `git revert` 對應 commit，模型字串改回 kontext-pro/flux-dev。

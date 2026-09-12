@@ -51,7 +51,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { buildSceneAsset } = await import("@/lib/content/blocks/video-pipeline");
   const result = await buildSceneAsset(
     { id: 0, image_prompt: prompt, broll_keyword: "", visual: "custom" },
-    { imageModel: "flux-dev", aspectRatio: "4:5", framing: "Portrait studio photography, sharp focus on face." },
+    // 首次定裝照沒有參考圖可帶（就是要生出這張參考圖），純文字生圖用最便宜的 flux-schnell（$0.003/張）
+    // 即可，不需要 flux-dev（$0.025/張）— 操作者要求「盡量用最便宜的模型」。
+    { imageModel: "flux-schnell", aspectRatio: "4:5", framing: "Portrait studio photography, sharp focus on face." },
   );
   if (!result.ok) {
     const err = result as { ok: false; status: number; error: string };
