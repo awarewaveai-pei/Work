@@ -305,6 +305,15 @@ export interface VectorMatch extends MatchAttribution {
   id: string;
   sourceId: string;
   content: string;
+  /**
+   * Cosine similarity from migration 0075's `ORDER BY c.embedding <=> p_embedding`. Sorted here
+   * explicitly (below), not left implicit in RPC row order — closing the same gap a critic review
+   * already found and fixed for matchChunksKeyword (see KeywordMatch.score above and
+   * kb-db-keyword-sort.test.ts): PostgREST/Supabase preserving a function's row order is real today
+   * but is nowhere a documented contract. This one matters more than the keyword copy did — rag.ts's
+   * retrieve() reads `vec[0]` directly to enforce the "best vector match is never evicted" invariant
+   * (the migration-0076 fix), so an unsorted vec[] would silently pick the wrong chunk as "best".
+   */
   similarity: number;
 }
 
@@ -328,9 +337,9 @@ export async function matchChunksVector(
     return [];
   }
   if (!data) return [];
-  return (data as Array<MatchAttribution & { id: string; source_id: string; content: string; similarity: number }>).map(
-    (r) => ({ ...r, id: r.id, sourceId: r.source_id, content: r.content, similarity: Number(r.similarity) }),
-  );
+  return (data as Array<MatchAttribution & { id: string; source_id: string; content: string; similarity: number }>)
+    .map((r) => ({ ...r, id: r.id, sourceId: r.source_id, content: r.content, similarity: Number(r.similarity) }))
+    .sort((a, b) => b.similarity - a.similarity);
 }
 
 export interface KeywordMatch extends MatchAttribution {

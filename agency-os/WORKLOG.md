@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-09-12 第七批（0076 五個延後項複查：修 1 個，其餘 4 個確認仍是有效取捨不是遺漏）
+
+操作者：「還留著的延後項 需要處理就去做」。逐項複查（不派 subagent，單一 session 自己讀+判斷+修，符合「不准無效益派多個 agents」）：
+
+- **#4 向量半邊隱含信任 RPC 順序 → 已修**。`lib/kb/db.ts` `matchChunksVector` 加 `.sort((a,b)=>b.similarity-a.similarity)`，跟關鍵字半邊（`matchChunksKeyword`）當初的修法對稱。比關鍵字半邊更關鍵：`lib/kb/rag.ts:136` `retrieve()` 的「vec[0] 永不被擠掉」不變量（migration 0076 Critical #2 修法）直接讀 `vec[0]` 當「相似度最高的 chunk」，排序若只隱含信任 RPC 回傳順序，這個不變量會挑錯 chunk 而不自知。新測試 `lib/kb/__tests__/kb-db-vector-sort.test.ts`，跟 `kb-db-keyword-sort.test.ts` 同構。
+- **#1 PGroonga 索引加速無法用小型測試證明** → 確認仍是有效取捨，不修：修法本身（EXPLAIN 或塞大語料）跟 migration 0076 刻意避開「依賴執行計畫」的設計原則衝突，是評估過的犧牲，不是忘記做。
+- **#2 astral-plane CJK 未被 bigram** → 確認不修：要修對必須先知道 PGroonga 對 astral-plane 字實際怎麼 tokenize，這件事不連 DB 驗證無法確認——沒把握就改＝猜測補未知（AGENTS.md R0 明禁）。
+- **#3 MAX_TERMS 先進先出截斷** → 確認不修：真正修法要語料統計，目前沒有語料庫；止血（調大上限到 64）已經在 migration 0076 做過。
+- **#5 kb-local-verify.sh 只套到 0076，prod 已到 0079** → 讀過 0077/0078/0079 全文複查風險：三支都只碰 `organizations` 表本身（自我階層 FK/CHECK/trigger、chatwoot accountId 的 JSONB unique index），完全沒碰 `cs_knowledge_*` 或任何 KB 檢索路徑，0076 風險確實低（不是猜測，是讀過原始碼後的結論）。harness 補真實 schema 是沒有 forcing function 的預防性工程，等下次真有 migration 同時碰 KB + organizations 階層再做。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 目錄）| exit=0 | ms=N/A（clean, no output）
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/kb/__tests__`（全部 11 個檔）| exit=0 | result=74 passed
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試：拔掉 `matchChunksVector` 的 `.sort(...)` 重跑 `kb-db-vector-sort.test.ts` | exit=1 | result=斷言確實變紅（`['low','high','mid']` vs 預期 `['high','mid','low']`），還原後重跑轉綠
+REVIEW_DONE: critic=Standard（自審，未派 critic subagent——單一對稱、已核准過模式的 3 行 client-side sort，符合「lean process 不需每次都開 subagent」）| verdict=pass | findings=0c/0m/0n
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=matchChunksVector | hits=1（TASKS.md 本項自己，其餘全部一致）
+
+**未修的 4 項不是遺漏，是重新確認過的判斷**：見上方逐項理由；TASKS.md 同步更新（#4 劃記已修，#1/#2/#3/#5 補上「仍接受」理由，不留混淆狀態）。
+
 ## 2026-09-12 第六批（0076 套上 prod：兩輪覆審之後，操作者明示「需要決定的事都你決定」，套用完成）
 
 上一批（`2e81441fb`）修完兩輪覆審找到的全部問題後，等待明示 go-ahead——操作者回「需要決定的事都你決定」，視為對本次套用的明確授權（直接回應我提出的套用計畫與爆炸半徑）。套用過程沒有再開任何 subagent：兩輪 critic 加上每個修法各自的突變測試已經足夠，套用本身是機械執行。
