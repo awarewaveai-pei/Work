@@ -67,15 +67,26 @@ def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, prove
     """Binds ``body``'s keys to ``builder``'s own parameter names (every builder in this corpus
     takes POSITIONAL_OR_KEYWORD params, so keyword-calling is always valid regardless of each
     method's own positional/keyword split), auto-supplying ``record_id``/``provenance`` unless the
-    caller already provided them. Always raises ``InvariantViolation`` on any failure -- both a
-    real builder refusal (a business-rule violation) AND a bad-argument-shape ``TypeError`` from
-    ``inspect.Signature.bind`` (missing/unexpected argument) are normalized to this one exception
-    type, so the API layer (``ai_lego/apps/api/main.py``) needs only one ``except`` clause to turn
-    either failure into an HTTP 400."""
+    caller already provided them -- but ONLY for the ~179 (of 245, 2026-09-13 count) builders that
+    actually declare parameters with those exact names. 66 builders use a domain-specific identity
+    param instead (e.g. ``strategy.swot``'s ``analysis_id``) and/or carry provenance per-item
+    instead of as a top-level param -- unconditionally injecting ``record_id``/``provenance`` into
+    ``call_kwargs`` for those made every one of their real production invokes fail with
+    DISPATCH_BAD_ARGUMENTS regardless of what the caller sent (found 2026-09-13 testing
+    strategy.swot for real against the live API -- see WORKLOG). For those builders, the caller
+    must supply whatever identity field the method's own contract actually names.
+
+    Always raises ``InvariantViolation`` on any failure -- both a real builder refusal (a
+    business-rule violation) AND a bad-argument-shape ``TypeError`` from ``inspect.Signature.bind``
+    (missing/unexpected argument) are normalized to this one exception type, so the API layer
+    (``ai_lego/apps/api/main.py``) needs only one ``except`` clause to turn either failure into an
+    HTTP 400."""
     call_kwargs: dict[str, Any] = dict(body)
-    call_kwargs.setdefault("record_id", record_id)
-    call_kwargs.setdefault("provenance", provenance)
     sig = inspect.signature(builder)
+    if "record_id" in sig.parameters:
+        call_kwargs.setdefault("record_id", record_id)
+    if "provenance" in sig.parameters:
+        call_kwargs.setdefault("provenance", provenance)
     try:
         bound = sig.bind(**call_kwargs)
     except TypeError as error:

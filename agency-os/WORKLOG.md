@@ -17499,3 +17499,31 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_WAIVED: NA -- 本次追記僅修正同一檔案內的邏輯細節，未新增其他檔案改動，範圍已含在上方原條目的 BUGHUNT_DONE 兩筆內
 
 [rollback] nginx 設定：`sudo cp /root/lobster-phase1/nginx/default.conf.bak.safe-patch-20260912-151819 /root/lobster-phase1/nginx/default.conf && docker exec lobster-nginx nginx -t && docker exec lobster-nginx nginx -s reload`。`safe-infra-patch.sh` 腳本：`sudo cp /root/lobster-phase1/scripts/safe-infra-patch.sh.bak.manual-<最新timestamp>-v2 /root/lobster-phase1/scripts/safe-infra-patch.sh`。Local repo 兩檔皆為一般 git 追蹤檔，`git revert` 或 `git checkout` 皆可安全回滾，無資料遺失風險。
+
+## 2026-09-13 Cognitive OS `/invoke` dispatch bug——27% 方法（66/245）從未能真正被呼叫，操作者堅持真資料實測抓到
+
+[任務] 操作者要求「你測試一個給我看」——挑一個真實方法（`strategy.swot`），用真實資料（對 Cognitive OS Phase 1 自己做 SWOT）直接打 production API `/invoke`，不是隨便講講。過程中連續抓到兩個先前完全沒被發現的真實 bug。
+
+[已執行]
+- 真實對 `https://cognitive.aware-wave.com` 打 `POST /methods/strategy.swot/invoke`，直接 500——`docker logs cognitive-os-api` 顯示 `ai_lego.modules.strategy.swot has no RECORD_ID_PREFIX constant`。根因：`main.py` 的 `invoke_method` 把 `record_id = f"{record_id_prefix(method_id)}..."` 寫在 `try/except MethodDispatchError` 區塊**外面**，導致這個例外沒被攔到，變成未捕捉的 500（本應是 501）。修法：把該行移進 try 區塊內（`ai_lego/apps/api/main.py:288-295`）。
+- 修完後改用測試 client 重跑，又噴 `DISPATCH_BAD_ARGUMENTS: got an unexpected keyword argument 'record_id'`——這次不是缺常數，是**架構層級的慣例衝突**：`dispatch.py` 的 `invoke_builder` 不管三七二十一，一律 `call_kwargs.setdefault("record_id", ...)` + `setdefault("provenance", ...)` 再綁定到 builder 簽章。但 `generate_swot_analysis` 的識別碼參數叫 `analysis_id`（不是 `record_id`），且完全沒有頂層 `provenance` 參數（provenance 掛在每個 factor/evidence 項目上，不是整包一個）。用 AST 掃過全部 245 個 `generate_*` builder：**66 個（27%）用不同慣例**，這些方法無論呼叫端傳什麼 body，只要走 `/invoke` 一定失敗——這個缺陷從 Phase 1 API 上線那天就存在，只是先前的測試（`test_api_main.py` 的既有 InvokeTests）剛好只挑了 2 個「湊巧」符合慣例的方法（`foresight.cross_impact_analysis`、`jurisdiction.market_admission_control`），從未真正驗證過第三種形狀。
+- 修法（治本，非只修 swot 一個）：`invoke_builder` 改成先 `sig = inspect.signature(builder)`，只在 `"record_id" in sig.parameters` / `"provenance" in sig.parameters` 為真時才 `setdefault`——對符合慣例的 179 個方法零行為改變，對 66 個不符合慣例的方法不再被強塞它們簽章不接受的參數，改由呼叫端自己照該方法真實的參數名餵資料（跟這次測試本來就是這樣打的做法一致）。同時補 `strategy.swot` 自己缺的 `RECORD_ID_PREFIX = "SWOT-"`（沿用 `run_swot_slice.py`／`run_tows_slice.py` 既有慣例，非新發明）。
+- critic 覆審（Deep）：0 Critical/0 Major/0 Minor，且做了真正的 mutation test（把兩個修復各自還原一次，重跑對應 regression test，證明真的會重現原始錯誤訊息；再還原修復，確認 37/37 測試通過）——不是只看程式碼順眼。過程中 critic 自己不慎跑 `git checkout --` 誤還原了尚未 commit 的修復檔案，當場自我偵測（`git diff HEAD` 變空）、用先前擷取的 diff 重建、逐位元組驗證後繼續，已在其報告誠實揭露（VBC 紀律）。
+- 新增 2 個 regression test（`tests/unit/test_api_main.py`）：`test_invoke_a_method_missing_record_id_prefix_is_501_not_500`（用 `architecture.adr`，ACTIVE 且符合標準慣例但缺 `RECORD_ID_PREFIX`，證明 501 而非 500）、`test_invoke_strategy_swot_end_to_end`（用真實 swot 資料證明現在能成功 200）。
+- 本機/production 端對端證據：用 `strategy.swot` 對 Cognitive OS Phase 1 自己真的跑一次 SWOT（四象限皆真實可查證事實：builder+gate 雙層驗證優勢、初版無 UI 的劣勢、portal.aware-wave.com 已存在的機會、無 KMS/無密碼重設的威脅），200 成功，兩個 gate（`provenance_required`／`evidence_labeling_required`）皆 PASS，已將完整 JSON 結果交給操作者查看。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=`POST https://cognitive.aware-wave.com/methods/strategy.swot/invoke`（修復前） | exit=0 | result=500，`docker logs` 證實 `MethodDispatchError` 未被攔截
+- REALTEST_EVIDENCE: tool=Bash | cmd=AST 掃描全部 245 個 `generate_*` builder 的參數名 | exit=0 | result=66 個缺 `record_id` 或 `provenance` 參數
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py tests/unit/test_api_dispatch.py tests/unit/test_swot.py -q` | exit=0 | result=48 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=修復後用 TestClient 對 `strategy.swot` 真實 invoke（analysis_id/knowledge_set/factors 皆真實 Cognitive OS Phase 1 資料） | exit=0 | result=200，兩個 gate 皆 PASS，record id 以 `SWOT-` 開頭
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0C/0Major/0Minor/1Suggestion(未來 ADR 建議，非阻塞)，含 mutation test 雙向證明（還原修復可重現原錯誤、套用修復可通過測試）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`call_kwargs.setdefault` | hits=2（皆為已修復處，無其他檔案有同類無條件 setdefault 樣式）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 尚未部署到 production——此修復目前只在本機驗證，需接續 `git push` + ks-aw-01 重跑 `deploy.sh`。
+2. `record_id`/`provenance` 參數命名慣例目前靠人工約定（grep 可查但無 schema 強制）——critic 建議未來開 ADR 讓這個慣例變成可機械驗證的契約而非隱性假設，非本次阻塞項，未開獨立 task（成本低、下次觸碰 dispatch.py 可順手處理）。
+3. 66 個「不符合標準慣例」的方法現在雖然不會再被強塞錯誤參數，但呼叫端仍需自己知道每個方法真正的參數名（無自動文件化這個差異）——`GET /methods/{id}` 目前只回 contract 描述檔，不含 builder 簽章本身；長期應該讓 dashboard 或文件揭露這個資訊，非本次範圍。
+
+[rollback] `git revert` 安全——`dispatch.py` 改動對 179 個既有相容方法零行為改變（mutation test 已證明）；`main.py` 一行搬移無副作用；`swot.py` 純新增常數。四檔皆為 additive/no-op-for-existing-callers 的修復，沒有破壞性風險。

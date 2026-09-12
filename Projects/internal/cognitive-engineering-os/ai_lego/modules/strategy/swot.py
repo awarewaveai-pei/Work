@@ -30,6 +30,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "strategy.swot"
+RECORD_ID_PREFIX = "SWOT-"
 VALID_CATEGORIES = frozenset({"STRENGTH", "WEAKNESS", "OPPORTUNITY", "THREAT"})
 INTERNAL_CATEGORIES = frozenset({"STRENGTH", "WEAKNESS"})
 

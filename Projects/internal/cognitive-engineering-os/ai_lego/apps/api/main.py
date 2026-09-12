@@ -288,10 +288,10 @@ def invoke_method(
     try:
         builder = resolve_builder(method_id)
         gate_runner = resolve_gate_runner(method_id)
+        record_id = f"{record_id_prefix(method_id)}{secrets.token_hex(8).upper()}"
     except MethodDispatchError as error:
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
 
-    record_id = f"{record_id_prefix(method_id)}{secrets.token_hex(8).upper()}"
     provenance = body.pop("provenance", None) or make_provenance("AI_INFERENCE", "AI_GENERATED")
 
     try:

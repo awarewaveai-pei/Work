@@ -148,6 +148,38 @@ class InvokeTests(ApiTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("XIMPACT_TOO_FEW_EVENTS", response.json()["detail"])
 
+    def test_invoke_a_method_missing_record_id_prefix_is_501_not_500(self):
+        """Regression test (2026-09-13): a real production invoke of strategy.swot crashed with a
+        raw 500 -- record_id_prefix() raised MethodDispatchError OUTSIDE the try/except that was
+        supposed to catch exactly that exception type, because it was called one line below the
+        block instead of inside it. architecture.adr is one of 45 modules (out of 254) that, like
+        swot.py was until this same fix, has no RECORD_ID_PREFIX constant -- this proves the API
+        itself no longer crashes for that whole class of gap, not just for the one module that
+        happened to get invoked first."""
+        self._login()
+        response = self.client.post("/methods/architecture.adr/invoke", json={})
+        self.assertEqual(response.status_code, 501, response.text)
+        self.assertIn("DISPATCH_UNAVAILABLE", response.json()["detail"])
+        self.assertIn("RECORD_ID_PREFIX", response.json()["detail"])
+
+    def test_invoke_strategy_swot_end_to_end(self):
+        """Regression test (2026-09-13): strategy.swot itself was missing RECORD_ID_PREFIX, which
+        is what surfaced the 500-instead-of-501 bug above during a real invoke against the
+        production API with real project data -- see WORKLOG 2026-09-13."""
+        self._login()
+        body = {
+            "analysis_id": "SWOT-TEST-001",
+            "knowledge_set_ref": "KS-TEST-001",
+            "knowledge_set": [{"evidence_id": "E-1", "content": "c", "source": "s", "provenance": {"epistemic_type": "EVIDENCE", "authorship_state": "HUMAN_APPROVED", "locked": None}}],
+            "factors": [
+                {"id": "F1", "category": "STRENGTH", "statement": "s1", "geography": "TW", "time": "2026-Q3", "source": "src", "provenance": {"epistemic_type": "EVIDENCE", "authorship_state": "HUMAN_APPROVED", "locked": None}, "supporting_evidence_refs": ["E-1"]},
+                {"id": "F2", "category": "WEAKNESS", "statement": "w1", "geography": "TW", "time": "2026-Q3", "source": "src", "provenance": {"epistemic_type": "EVIDENCE", "authorship_state": "HUMAN_APPROVED", "locked": None}, "supporting_evidence_refs": ["E-1"]},
+            ],
+        }
+        response = self.client.post("/methods/strategy.swot/invoke", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["record"]["id"].startswith("SWOT-"))
+
     def test_invoke_unknown_method_is_404(self):
         self._login()
         response = self.client.post("/methods/nonexistent.method/invoke", json={})
