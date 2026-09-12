@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-09-12（續11）TTS 唸出舞台指示（「無台詞」「旁白/字幕」被逐字唸出）——加 prompt 規則 + 結構性過濾雙保險
+
+[任務] 承接續10。操作者實測看完完整成片後回報：場景 2 的「（無台詞，輕嘆氣聲）」跟場景 6 的「（旁白/字幕）」被 TTS 逐字唸出來，且沒有真的嘆氣聲音，問可否克服。
+
+[根因] `ScriptForge.tsx` `productionSceneFromScriptScene()`（`narration = s.dialogue` 原封不動）→ Claude 在 `dialogue` 欄位寫了劇本慣例的舞台指示（screenplay convention），但這欄位是直接送 TTS 唸的欄位，不是給人看的劇本文件——Claude 沒被告知這個差異，寫出「(旁白/字幕)」這類完全合理的劇本標記，卻被系統當成台詞逐字唸出。
+
+[「沒有嘆氣聲音」為何無法簡單克服——如實說明，不打高空]：Edge TTS／OpenAI TTS 都是純文字轉語音引擎，沒有「唸出一個嘆氣聲效」的能力（不是模型參數可調，是能力本身不存在）；要做出真的嘆氣聲需要另外接音效庫 + 音軌混音時間點控制，是全新功能而非本次修復範圍。本次修復的正確目標改為：場景 2 這種純舞台指示、完全沒有真實台詞的場景，過濾後 narration 變空字串 → 沿用既有的 `if(!narration) return null` 邏輯，整個場景（含畫面）從影片中拿掉，而非唸出奇怪聲音；場景 6 這種「標籤+真的要唸的內容」的場景，過濾後保留真實內容正常唸出。純視覺無聲拍法（保留畫面但不唸東西）目前架構做不到——每個場景的時長是由 narration 的 TTS 長度反推的，沒有 narration 就沒有天然時長來源，屬於更大的架構延伸，非本次範圍，已在下方剩餘風險列出供之後評估。
+
+[修復（雙保險，非只加 prompt 賭 AI 聽話）]
+1. `doScript()` 的 Claude prompt 新增明確規則：`dialogue` 只能寫真的要被唸出的口語文字，禁止寫舞台指示/標籤（如「(旁白/字幕)」「(無台詞，輕嘆氣聲)」），純視覺場景 dialogue 留空字串。
+2. **結構性防線**（不論 prompt 有沒有生效都擋得住）：新增 `stripStageDirections()`，在 `productionSceneFromScriptScene()` 用正則 `/[（(][^）)]*[）)]/g` 濾掉全形/半形括號內容再判斷是否為空——這是這次要修的不變量：「narration 絕不能包含只給人看的舞台標記」，結構性濾掉比只改 prompt 更可靠（呼應本 repo R0 的補丁判準：關掉整類問題而非只補這個實例）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e`跑 `stripStageDirections()` 對 4 個真實案例（純舞台指示、標籤+真內容、正常台詞、句中夾雜舞台指示）| exit=0 | result=4/4 符合預期："（無台詞，輕嘆氣聲）"→""、"（旁白/字幕）那一晚..."→"那一晚..."（標籤濾掉、內容保留）、正常台詞不受影響、句中夾雜的括號也正確濾掉——不花錢的真實函式執行驗證，非只讀程式碼假設
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（於 next-admin）| exit=0（無輸出）
+- REVIEW_WAIVED: DOC_ONLY -- 純字串處理函式+prompt文字，無新資料流/無新外部呼叫，正則邏輯已用真實案例跑過
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`productionSceneFromScriptScene\|stripStageDirections` | hits=2（定義處+唯一呼叫處，無殘留舊引用）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 純視覺無聲場景（如嘆氣、沉默反應鏡頭）目前會被整個拿掉（含畫面），而非保留畫面只是不出聲——因為場景時長現由 narration TTS 長度反推，沒有 narration 就沒有天然時長。若操作者需要真的支援「有畫面無旁白」的沉默鏡頭，需要另外設計「場景可獨立指定固定時長」的架構，非本次範圍。
+2. 「嘆氣聲效」本身未實作（見上，能力缺口非本次範圍）。
+3. `stripStageDirections` 的正則會濾掉任何括號內容，若未來腳本真的需要台詞本身包含括號（少見，短影音口語台詞通常不會），會被誤濾——可接受的取捨，非本次已知會發生的案例。
+
+[rollback] `git revert` 對應 commit；純新增過濾函式+prompt文字，未改變其他行為。
+
 ## 2026-09-12（續10）完整流程真實測試 —— Story Bible 定裝照無外觀線索、性別猜錯，修復並完整跑完出片
 
 [任務] 承接續9。操作者要求走完整個 Story Bible → 影片生產 → 確認送出渲染的完整流程，每步講清楚、如實回報障礙。
