@@ -73,6 +73,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Liveness probe only (no DB/spec-root touch) -- matches this deployment's own
+    docker-compose healthcheck and every other aware-wave.com service's ``/api/health``
+    convention. Deliberately cheap: a slow spec-root scan or DB open here would make the
+    container healthcheck itself a load-bearing dependency on those subsystems being healthy,
+    which is backwards for a liveness probe."""
+    return {"status": "ok"}
+
+
 @app.get("/methods")
 def list_methods(catalog: MethodCatalog = Depends(get_catalog)) -> list[dict[str, Any]]:
     return [{"method_id": method_id, **{k: v for k, v in entry.items() if k != "content_sha256"}} for method_id, entry in sorted(catalog.contracts.items())]

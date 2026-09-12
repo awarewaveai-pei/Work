@@ -1,0 +1,43 @@
+# Cognitive OS Phase 1 API -- deployment config, matching this monorepo's own established
+# pattern for a standalone auxiliary service on ks-aw-01 (Projects/internal/ziwei-doushu's
+# "oracle-web" is the precedent this file follows: own compose project, joins lobster-net
+# externally so lobster-nginx can reverse-proxy to it by container name, host port bound to
+# 127.0.0.1 only for local health-check use, TLS/public exposure lives entirely in nginx).
+#
+# Build context is the MONOREPO ROOT (three levels up from this file), not this directory --
+# the Dockerfile COPYs both Projects/internal/cognitive-engineering-os/ (the runtime) and
+# agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/ (the read-only spec root), which live as
+# siblings at the repo root, not nested under this product's own directory.
+
+services:
+  cognitive-os-api:
+    build:
+      context: ../../..
+      dockerfile: Projects/internal/cognitive-engineering-os/Dockerfile
+    image: cognitive-os-api:latest
+    container_name: cognitive-os-api
+    restart: unless-stopped
+    environment:
+      - COGNITIVE_OS_DB_PATH=/app/Projects/internal/cognitive-engineering-os/.runtime/identity.sqlite3
+    volumes:
+      - cognitive-os-identity-data:/app/Projects/internal/cognitive-engineering-os/.runtime
+    ports:
+      - "127.0.0.1:8420:8420" # reserved for local health-check use, matching oracle-web's own :3010 convention
+    mem_limit: 512m
+    mem_reservation: 128m
+    networks:
+      - lobster-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8420/health', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cognitive-os-identity-data:
+
+networks:
+  lobster-net:
+    external: true
+    name: lobster-net

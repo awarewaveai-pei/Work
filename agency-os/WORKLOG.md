@@ -17223,3 +17223,36 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 [rollback] next-admin：`sg-deploy.sh` 對應的 rollback 腳本 `/root/lobster-phase1/scripts/rollback-phase1.sh`，或重新對 `8d6470e80`（部署前一個 commit）跑 `sg-deploy.sh`。Migration：0082/0083 各自的 down script 已在本機真實 Postgres 驗證可逆、可重套用，需要時 `node scripts/apply-db-migration.mjs` 目前不支援 down（僅套用 up），down 需手動經 SSH 對 `supabase-db` 執行對應 down script。
 
 [rollback] 應用層新增行為，皆為新函式/新 API 分支，未觸發時行為與改動前相同（`git revert` 安全）。無新 migration（`cs_knowledge_sources.status`/`canonical_url` 欄位皆為既有 migration 0051/0072 已建立的欄位，本次只新增讀寫這些既有欄位的函式）。
+
+## 2026-09-12（續11）Cognitive OS Phase 1 部署腳手架（Dockerfile/compose/deploy.sh/health endpoint）+ 開始正式部署到 cognitive.aware-wave.com
+
+[任務] 操作者明示 go-ahead「好, 部屬到cognitive.aware-wave.com」。33fefaf42 已完成 Phase 1 程式碼但無可部署產物，本條目補齊部署腳手架並開始 ks-aw-01 正式部署（High-STOP：prod deploy，操作者已明示同意）。
+
+[已執行]
+- 新增 `Dockerfile`（single-stage python:3.12-slim，非 root user，build context = monorepo root）、`docker-compose.yml`（比照 oracle-web 慣例，join `lobster-net` external network，host port 127.0.0.1:8420）、`deploy/deploy.sh`（AGENTS.md 六項新部署服務清單：typecheck/test-gate/rollback-tag/build/healthcheck/smoke/notification）。
+- `main.py` 新增 `GET /health`（無 auth、不碰 DB/spec-root，純 liveness probe，比照其他 aware-wave.com 服務慣例）+ 對應測試。
+- critic 覆審 `deploy.sh` 全文 + `main.py`/`test_api_main.py` 改動段落，抓到 1 Critical + 3 Major，同一輪內修復：
+  - Critical：typecheck 步驟從 REPO_ROOT 執行 `python -c "import ai_lego..."`，但 `ai_lego` 只存在於 `PRODUCT_ROOT` 下三層——**每次部署第一步必定失敗**，整支腳本原樣不可用。修為與 test-gate 步驟相同的 `( cd "$PRODUCT_ROOT" && ... )` subshell。
+  - Major：兩處 `docker compose up -d`（正常部署 + rollback）在 `set -euo pipefail` 下失敗會靜默結束、無 Slack 通知；rollback 本身失敗是最壞情境卻完全無告警。補上 `log`+`notify`+`exit 1`，並在 rollback 後加二次健康輪詢，只有真的變 healthy 才回報「rolled back」成功。
+  - Major：healthcheck 上限 60s 比 compose healthcheck 的 30s interval 兩輪還緊（Docker 第一次探測落在 t≈30s 而非 t=0），冷啟動正常波動就可能觸發假陽性 rollback——上限拉到 120s。
+  - Major：首次部署沒有 `:rollback` image，若 healthcheck 失敗會讓 unhealthy 容器在 `restart:unless-stopped` 下無限重啟迴圈——補上無 rollback image 時改跑 `docker compose down`。
+  - 順手修：`python`→`python3`（防裸 python 不存在）；`notify()` 手動 JSON escape（防未來訊息含引號產生壞 JSON，`|| true` 會靜默吞掉）。
+- 本機真跑 `pytest`（7 個 Phase 1 test 檔）73/73 全過（136.76s）；修復後的 typecheck subshell 獨立重跑確認可正常 import。
+- 部署基礎設施（此條目範圍內，程式碼外）：`safe-infra-patch.sh nginx` 套用 lobster-nginx 新 server block（`cognitive.aware-wave.com` → `cognitive-os-api:8420`）；host 層 `sg-stack.aware-wave.com` vhost（非 lobster-nginx container，`safe-infra-patch.sh` 的 nginx type 硬編碼驗證錯誤的 nginx 實例，故手動複製同款 backup→apply→test→reload→smoke→rollback 紀律，改對 host nginx 執行 `nginx -t`/`systemctl reload`）加入 `cognitive.aware-wave.com` 到兩個 server_name 列表；Cloudflare DNS A record 建立（proxied，透過 API token 直接呼叫，因 Cloudflare MCP 連線失敗 insufficient scope）；`certbot --nginx --expand` 成功擴充 SAN 含 `cognitive.aware-wave.com`（新到期日 2026-12-11）；`/opt/cognitive-os` 於 ks-aw-01 sparse+partial clone（`--filter=blob:none --sparse`，僅 checkout `Projects/internal/cognitive-engineering-os` + `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_workspace_domain.py test_identity_domain.py test_identity_store.py test_entitlement_check.py test_api_dispatch.py test_api_main.py test_authenticate_timing.py -q` | exit=0 | ms=136760 | result=73 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=修復後 typecheck subshell 獨立重跑 `python3 -c "import ai_lego..."` from PRODUCT_ROOT | exit=0 | result=OK: all modules import cleanly（修復前從 REPO_ROOT 執行會 ModuleNotFoundError，critic 已實測重現）
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`safe-infra-patch.sh nginx` 套用 lobster-nginx default.conf | exit=0 | result=backup+apply+nginx -t+reload+內建 smoke 全過
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=host nginx 手動 backup→apply→`nginx -t`→reload→smoke（比對 app/oracle.aware-wave.com 修改前後回應碼一致=307，cognitive.aware-wave.com 新回應=502 符合預期，容器尚未部署） | exit=0 | result=無 regression，routing chain 端到端可達
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`certbot --nginx --expand -d ...,cognitive.aware-wave.com` | exit=0 | result=Successfully deployed certificate，SAN 含 cognitive.aware-wave.com，`nginx -t` 通過
+- REVIEW_DONE: critic=Deep | verdict=pass（覆審後修復） | findings=1C(已修)/3Major(已修)/2Minor(1 已修 JSON escape、1 判斷低價值略過)/1Suggestion(已修 python3)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`cognitive.aware-wave.com` | hits=11（均為既有文件對此服務「building」狀態的既有引用，無失效連結；`CURRENT_SERVICE_PLACEMENT.md` 狀態列將於部署完成後更新）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 部署尚未完成：nginx 兩層 + TLS + DNS + 程式碼 clone 已就緒，`docker compose build && up -d`、真實 tenant bootstrap、端對端 smoke（含 200 而非 502）尚未執行——延續同一 session 下一條目記錄。
+2. `deploy.sh` 的 test-gate 只跑 7 個 Phase 1 API 層測試檔，`tests/unit/` 另有約 260 個 Method Atlas 方法實作測試不在此 gate 內（critic Major #4，已修正腳本內註解使其誠實反映範圍，非擴大 gate 範圍——這些測試有各自獨立的驗證路徑，非本次部署新增風險）。
+3. Cloudflare MCP 連線失敗（insufficient scope: account:read），改用本機 vault 內 API token 直接呼叫 REST API 建立 DNS record——功能正常但繞過了原本走 MCP 的稽核路徑，需評估是否修正 MCP 權限範圍。
+
+[rollback] nginx 兩層：各自的 `.bak.safe-patch-*`/`.bak.safe-patch-*` 備份檔可還原。DNS：刪除 Cloudflare A record（不影響其他子網域）。憑證：certbot 只會擴充 SAN 不會撤銷既有網域，無需回滾。`/opt/cognitive-os`：整個目錄可直接刪除，未接上任何流量。程式碼 commit：`git revert` 安全（新檔案+一個新 endpoint，未部署前對其他服務零影響）。

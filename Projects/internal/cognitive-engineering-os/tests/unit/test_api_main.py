@@ -47,6 +47,13 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
 
 
+class HealthTests(ApiTestCase):
+    def test_health_requires_no_auth_and_touches_no_store(self):
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+
+
 class UnauthenticatedAccessTests(ApiTestCase):
     def test_list_methods_requires_no_auth(self):
         """Browsing the Atlas is deliberately public -- only invoke/demo require a session."""
