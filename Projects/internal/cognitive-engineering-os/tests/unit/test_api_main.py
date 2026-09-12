@@ -54,6 +54,38 @@ class HealthTests(ApiTestCase):
         self.assertEqual(response.json(), {"status": "ok"})
 
 
+class DashboardTests(ApiTestCase):
+    def test_dashboard_requires_no_auth_and_serves_html(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.headers["content-type"])
+        self.assertIn("Cognitive OS", response.text)
+
+    def test_dashboard_sets_frame_options_to_block_clickjacking(self):
+        """This is the app's first page with a real login form -- an attacker iframing it to
+        overlay a fake UI (or clickjack the logout/demo buttons) is a newly-relevant risk that
+        didn't exist before this route (critic finding, 2026-09-12)."""
+        response = self.client.get("/")
+        self.assertEqual(response.headers.get("x-frame-options"), "DENY")
+
+    def test_dashboard_get_does_not_accept_query_string_credentials(self):
+        """GET / must not itself read/process credentials server-side -- that would be a second,
+        undocumented auth path alongside POST /auth/login."""
+        response = self.client.get("/", params={"tenant_id": "x", "email": "y", "password": "z"})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(api_main.SESSION_COOKIE, response.cookies)
+
+    def test_dashboard_never_interpolates_catalog_data_via_innerhtml(self):
+        """Regression guard (critic finding, 2026-09-12): method_id is free text from a YAML `id`
+        field with no format enforcement (contract_catalog.scan_contract_files only checks it's
+        truthy). Building a DOM row via `.innerHTML = \\`...${m.method_id}...\\`` would be a stored
+        XSS reachable by any unauthenticated visitor of / (since /methods is public). Rendering
+        must go through textContent/createElement instead -- assert the source never assigns
+        innerHTML to a template literal that interpolates a `m.` field."""
+        html = api_main._DASHBOARD_HTML
+        self.assertNotRegex(html, r"innerHTML\s*=\s*`[^`]*\$\{m\.")
+
+
 class UnauthenticatedAccessTests(ApiTestCase):
     def test_list_methods_requires_no_auth(self):
         """Browsing the Atlas is deliberately public -- only invoke/demo require a session."""

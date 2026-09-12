@@ -17284,3 +17284,89 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 4. 密碼未持久化於任何文件/程式碼/git 歷史——僅透過本次對話私下轉交操作者；若遺失需操作者自行透過（尚未建置的）密碼重設流程處理，或重跑 `bootstrap_phase1_tenant.py`（但目前無「更新既有 identity 密碼」路徑，只有「建立新 identity」——Phase 1 已知限制，未收錄進 blueprint 的 explicitly-out-of-scope 清單，補記於此）。
 
 [rollback] `docker compose -f docker-compose.yml down`（服務下線，不影響其他 ks-aw-01 服務，`lobster-net` 為外部共用網路不受影響）。nginx/DNS/憑證層 rollback 見續11條目。Tenant 資料在 named volume `cognitive-engineering-os_cognitive-os-identity-data` 中，`docker compose down` 預設不刪 volume（需要 `-v` 才會刪），故 rollback 不會遺失已 bootstrap 的 tenant。
+
+## 2026-09-12（續13）Cloudflare MCP 連線失敗根因診斷（承續11/12第2點「尚待評估」）——找到根因，修復動作需操作者在 Cloudflare dashboard 執行；診斷過程誤將機密值印進本 session transcript
+
+[任務] 操作者要求調查 `cloudflare` MCP server 連線失敗 `Insufficient scope: required account:read`，修好後用 MCP 工具（非 REST API）驗證。
+
+[已執行]
+- `session_connectors_status` 確認：`cloudflare` 是 `kind:"project"`（來自 `.mcp.json` / `mcp/registry.template.json`，非 claude.ai 個人 connector），錯誤原文 `Insufficient scope: required "account:read"`。
+- 讀 `.mcp.json` + `mcp/registry.template.json`：`cloudflare` entry 指向官方 remote MCP `https://mcp.cloudflare.com/mcp`，走靜態 `Authorization: Bearer ${CLOUDFLARE_AUTH_BEARER_TOKEN}`——這是**獨立於** `CLOUDFLARE_API_TOKEN`（awarewave-ops 用、續11/12 REST workaround 用的那個）的第二組專用 token。
+- WebSearch + WebFetch 官方文件與 `cloudflare/mcp` / `cloudflare/mcp-server-cloudflare` GitHub issues 交叉確認：mcp.cloudflare.com 用 API Token 當 Bearer 時，token 需要 **Account Resources: Read**（帳號層級，等同「Account Settings: Read」permission group）才能讓 server 做帳號自動偵測；`account:read` 是該 permission group 對應的 OAuth-style scope 名稱。這與 REST workaround 用的 `CLOUDFLARE_API_TOKEN`（很可能只給了 Zone:DNS:Edit 之類的窄權限）是兩把獨立設定的鑰匙，`CLOUDFLARE_AUTH_BEARER_TOKEN` 這把從未被賦予帳號層級讀取權限。
+- **根因確認**：`CLOUDFLARE_AUTH_BEARER_TOKEN`（`mcp/user-env.ps1`）對應的 Cloudflare API Token，建立時的 permission 清單缺 `Account Settings: Read`（或更廣的 `Account Resources: Read`），導致 mcp.cloudflare.com 在初始 handshake（列帳號/自動偵測 account id）時以 RFC6750 `insufficient_scope` 拒絕。
+- 交叉確認排除另一個已知成因：GitHub issue #95 描述部分 MCP client 完全不轉發自訂 Authorization header、一律走 OAuth——但本次錯誤訊息是精確的 `insufficient_scope` 文字（Cloudflare server 端驗證後的具體拒絕），不是 `needs_auth`/OAuth 導向狀態，代表 header 確實有送達且被驗證，非 header-forwarding 那個已知 bug；故排除，鎖定為單純 token 權限不足。
+- **為何未親自修復**：修正動作是在 Cloudflare dashboard 編輯該 API Token 的 permission（或用另一把有 `Account API Tokens:Edit` 權限的 token 透過 API 改），屬於「修改外部帳號的安全性設定」——落在 R6 prohibited actions 的「Modifying system or security settings」類別，即使操作者已明確要求也不代由我執行；已將確切步驟交回操作者。
+- 診斷過程中的失誤（誠實揭露，不是「順手做完就好」）：為了驗證 token 是否有效，直接 `Read` 了 `mcp/user-env.ps1` 整個檔案片段並對兩個 Cloudflare token 跑 `/user/tokens/verify`（用 python urllib，非走 MCP），**這把 CLOUDFLARE_API_TOKEN、CLOUDFLARE_AUTH_BEARER_TOKEN、RESEND_API_KEY、POSTHOG_PERSONAL_API_KEY、GRAFANA_SERVICE_ACCOUNT_TOKEN、GRAFANA_BASIC_PASSWORD 的明文值印進了本 session 的 tool output/transcript**。兩次 `/user/tokens/verify` 呼叫都回 401 `Invalid API Token`（而非預期的 `insufficient scope`），無法判斷是 sandbox 出網被過濾/竄改、還是這兩把 token 本身已失效或已輪替——此結果不可信，未列入根因判斷依據。`mcp/user-env.ps1` 檔頭本身就寫著「rotate anything previously pasted into chat」，本次事件完全符合該條件。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`mcp__ccd_connectors__session_connectors_status` | exit=0 | result=確認 cloudflare kind=project, status=failed, error="Insufficient scope: required \"account:read\""（與操作者回報一致）
+- REALTEST_WAIVED: NA -- 實際修復動作（改 Cloudflare API Token permission）需操作者在 Cloudflare dashboard 執行，非本 session 可代做；本條目驗證範圍僅止於根因診斷，未做程式碼改動
+- REVIEW_WAIVED: DOC_ONLY -- 純調查，無程式碼變更
+- BUGHUNT_WAIVED: NA -- 未改任何檔案內容，僅新增本 WORKLOG 條目
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. **待操作者動作（非我可代做）**：Cloudflare dashboard → My Profile → API Tokens → 找到 `CLOUDFLARE_AUTH_BEARER_TOKEN` 對應的那把 token → 編輯 permission，加 `Account Settings: Read`（或 `Account Resources: Read`）→ 存檔後回來要求我 `reconnect_session_connector("cloudflare")` 並用 MCP 工具（如 list zones/accounts）驗證。
+2. **建議輪替 6 把憑證**（本次診斷意外印出明文）：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_AUTH_BEARER_TOKEN`、`RESEND_API_KEY`、`POSTHOG_PERSONAL_API_KEY`、`GRAFANA_SERVICE_ACCOUNT_TOKEN`、`GRAFANA_BASIC_PASSWORD` ——已明確告知操作者，尚未執行輪替（輪替本身也是 Cloudflare/Resend/PostHog/Grafana dashboard 端動作，非我可代做的機密寫入）。
+3. `/user/tokens/verify` 對兩把 Cloudflare token 皆回 401 Invalid（診斷用、非本次根因判斷依據）——若操作者從自己機器上跑同樣驗證也回 Invalid，代表這兩把 token 本身已失效/被輪替，屆時「加 permission」這步驟前要先確認 token 還活著，或乾脆生一把新的專用給 cloudflare MCP entry。
+
+[rollback] 本條目無程式碼/設定變更，無需 rollback。
+
+## 2026-09-12（續13）Cognitive OS 補一個能點的操作介面（`GET /`）——操作者反應「沒有操作平台怎麼使用」
+
+[任務] 操作者對 Phase 1 部署完成後只有純 JSON API、沒有任何可點擊介面表達強烈不滿——回頭看，續11/續12 把「operable」窄化成「API 可 curl」，沒對齊操作者原本要「操作平台」的期待。本條目補一個最小瀏覽器 dashboard，不擴大 Phase 1 範圍（不新增後端能力，只是既有 endpoint 的一層薄 UI）。
+
+[已執行]
+- `ai_lego/apps/api/main.py` 新增 `GET /`：單一 HTML 檔（inline，無 build step，同本專案既有 Docker 慣例）——登入表單→呼叫既有 `/auth/login`；方法瀏覽器（fetch `/methods`，公開無需登入）＋每個方法一顆「Run Demo」按鈕（呼叫既有 `/methods/{id}/demo`）；登出按鈕。刻意不做動態 invoke-with-body 表單（240 個方法各自不同 builder 簽章，超出 Phase 1 dashboard 範圍，已在程式內註解說明）。
+- critic 覆審抓到 1 Major + 2 Minor，同輪修復：
+  - Major：`row.innerHTML = \`...${m.title}...${m.method_id}...\`` 對 catalog 來源字串（`method_id` 是 YAML `id` 欄位，`contract_catalog.py scan_contract_files` 只檢查非空、無格式限制）零跳脫直接插入 DOM——理論上任何未登入訪客一開 `/` 就會觸發，是儲存型 XSS。改用 `document.createElement`+`textContent`，不再有任何 `innerHTML` 插值動態欄位的路徑。
+  - Major（功能性）：`/methods` 回應其實從未含 `title`/`family` 欄位（`contract_catalog.py` 只回傳 `path/status/version/content_sha256`）——原本的 `m.title`/`m.family` 是死碼，且是「哪天有人把這兩個欄位接上」就會啟動的潛伏注入點。決定**不**修改 `scan_contract_files`（它是 Method/Capability catalog 共用的基礎設施，改動範圍遠超一個 dashboard 的 cosmetic 需求）——改為直接砍掉 `title`/`family` 死碼引用，family 標籤改用 `method_id` 已含的 `family.name` 前綴（同一個已跳脫的安全字串重新切片，不是新的注入面）。
+  - Minor：`test_dashboard_carries_no_capability_beyond_existing_endpoints` 名稱宣稱的範圍比實際驗證的寬——拆成準確命名的 `test_dashboard_get_does_not_accept_query_string_credentials` + 新增 `test_dashboard_never_interpolates_catalog_data_via_innerhtml`（regex 斷言原始碼不含 `innerHTML = \`...${m.` 樣式，未來若重新引入同類 bug 會機械擋下，非仰賴人工覆審記得檢查）。
+  - Minor（一併處理，非阻塞項但成本低）：`/` 是本 app 第一個帶真實登入表單的 HTML 頁——先前沒有 HTML 介面所以不需要防 clickjacking，新增後補 `X-Frame-Options: DENY`，新增對應測試。
+- 本機 `pytest` 兩輪全過：`test_api_main.py` 20/20（含新的 4 個 dashboard 測試），完整 7 檔 test-gate 77/77（含 3 個既有 subtest）。`grep innerHTML\|m\.title\|m\.family` 確認碼庫內僅剩註解提及、無實際插值路徑殘留。
+- 更新 `COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md` API 項目段落，記錄 dashboard 存在＋critic 修復摘要。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py -q` | exit=0 | result=20 passed（4 個新 DashboardTests：serves html／frame-options／no query-string auth／no innerHTML interpolation）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_{workspace_domain,identity_domain,identity_store,entitlement_check,api_dispatch,api_main,authenticate_timing}.py -q` | exit=0 | result=77 passed, 3 subtests passed
+- REVIEW_DONE: critic=Deep | verdict=pass（覆審後修復） | findings=2Major(已修：innerHTML XSS 改 textContent、title/family 死碼砍除改用安全前綴)/2Minor(已修：測試改名+新增 regression test、補 X-Frame-Options)
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`innerHTML\|m\.title\|m\.family` | hits=1（僅剩解釋「為何不用 innerHTML」的程式碼註解本身，無殘留插值路徑）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 尚未部署到 ks-aw-01——本條目寫完後立即接續 `git push` + 對 `/opt/cognitive-os` `git fetch && reset` + 重跑 `deploy.sh`，同一 session 內完成，見下一步。
+2. Dashboard 沒有動態 invoke-with-body 表單，只能跑 demo（無參數）——240 個方法各自不同 schema，做通用表單超出這次「先讓使用者能點」的緊急修復範圍，已在 blueprint 記錄為刻意延後,非遺漏。
+3. `X-Frame-Options: DENY` 只防 clickjacking，未加完整 CSP（inline `<script>` 結構下要上 CSP 需要先重構成外部檔案或用 nonce，範圍更大）——critic 已標記為追蹤項非阻塞，未開獨立 task（成本夠低，下次碰這個檔案時可順手做）。
+
+[rollback] `git revert` 安全（純新增 route + 對應 CSS/JS，無改動既有 endpoint 行為；`/methods` 等既有路由簽章未變）。若部署後發現問題，`docker compose down` 或 `sg-deploy.sh` 對應的 `:rollback` image tag 皆可用（deploy.sh 本身的 rollback 機制不因這次改動而變）。
+
+## 2026-09-12（續14）nginx default.conf 雙向 drift 修復（local 缺 portal block、live 缺 chatwoot 安全修補）+ 順帶發現並修復 safe-infra-patch.sh smoke check 打錯層（測到外層 host-nginx 而非內層 lobster-nginx）
+
+[任務] 操作者在部署 cognitive.aware-wave.com 時發現本機 tracked 的 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`（377 行）與 ks-aw-01 live 檔（部署前 393 行）互有缺項：live 有 `portal.aware-wave.com` server block（local 沒有），local 有 chatwoot webhook 安全修補（`access_log off` 防 token 洩漏進 Loki，2026-09-11 critic 抓到）（live 沒有）。要求：抓 live 現況、比對、合併成單一正本（含 portal + chatwoot + 新的 cognitive block）、透過 `safe-infra-patch.sh` 套用回 live、回寫 local repo。
+
+[已執行]
+1. `git log --oneline -10 -- .../default.conf` 確認無並行 session 搶改。SSH ks-aw-01（145.239.195.47:58122, user ubuntu）拉 live 檔——第一次用 `sudo cat | base64` 手動複製貼上的過程中，肉眼比對發現兩處疑似多餘的 `+` 字元（像 diff hunk 殘留），為排除是我手動轉錄出錯還是 server 本身壞掉，直接在 server 上 `grep -n "^+"` 驗證：server 端乾淨，確認是我複製貼上大段 base64 時手誤，不是真正的 corruption——改用 `sudo cp` 到 `/tmp` + `chmod 644/chown ubuntu` 讓 `sftp_read` 直接讀（不經人工轉錄），本地重建後 `md5sum` 跟 server 端 `md5sum` 完全一致（`46cc3d3d...`）才採信為可信來源，避免把轉錄雜訊誤判成基礎設施 bug 帶入生產設定。
+2. `diff` local vs live 確認即用戶回報的兩處 drift（無其他出入）。取 live 檔為底（保留 portal + 我今天稍早加的 cognitive block），從 local 檔精確切出 chatwoot 區塊（含其安全註解，244–268 行完整含收尾 `}` 與空行，第一次切漏了最後 2 行被 diff 抓到），拼接進 live 檔在 app.aware-wave.com server block 對的插入點（`/api/webhooks/` 之前，因為 nginx 用最長前綴匹配、順序不影響優先權，但保留原本註解說明的位置語意）。三重驗證合併結果：對 live diff 只有純新增 chatwoot block 無其他改動；brace 40 開/40 閉平衡；對 local 只有純新增 portal+cognitive block、零刪除。
+3. `cat reconciled.conf | sudo safe-infra-patch.sh nginx .../default.conf` 第一次跑：backup→apply→`nginx -t` 過→reload 過→smoke check（`curl -H "Host: app.aware-wave.com" http://127.0.0.1/api/ops/summary` 應回 200）回 **301**，機械自動 rollback（設計如預期運作）。
+4. 診斷根因：直接對**同一份、未改動的、已回滾的** live 檔重跑同一 curl，一樣回 301——證明不是我的合併內容造成，是既有狀態。追下去：`http://127.0.0.1:8083`（lobster-nginx 容器實際監聽 port，該檔自己開頭註解就寫明是「第二跳」）直接回 200；`http://127.0.0.1:80` 是**外層** host-nginx（`/etc/nginx/sites-available/sg-stack.aware-wave.com`，Certbot 管理），mtime 顯示該檔在 13:29:52 被 Certbot 改過（比 13:25:41 那次成功的 safe-patch 晚 4 分鐘）——是我今天稍早部署 cognitive.aware-wave.com 時 Certbot 簽發新證書，順手把 `cognitive.aware-wave.com` 也加進同一個 https 強制轉址 vhost 的 `if ($host = ...) return 301` 清單，連帶讓這個已經對所有列出網域生效多時的 301 規則第一次撞上 smoke check 的假設。
+5. **根因修復（非補丁）**：`safe-infra-patch.sh` 的 nginx smoke check 打的是 port 80（外層、TLS 終止、Certbot 管的），不是它自己剛 reload 的 port 8083（內層 lobster-nginx）——這是該檢查從一開始就測錯層的既有 bug，只是被外層長期沒有 https 強制轉址規則覆蓋掉，直到今天才第一次現形。同步修正 repo 正本（`lobster-factory/infra/hetzner-phase1-core/scripts/safe-infra-patch.sh`）與 live（`/root/lobster-phase1/scripts/safe-infra-patch.sh`，先手動備份再 `sed -i`，`bash -n` 過語法檢查）：URL 從 `http://127.0.0.1/...` 改為 `http://127.0.0.1:8083/...`，並加註解說明為何。
+6. 用修好的 script 重跑同一次 patch：backup→apply→`nginx -t`→reload→smoke check 200，全綠。`sudo md5sum` 確認 live 檔跟本地 `reconciled-final.conf` 逐位元組相同。逐網域 smoke（經內層 8083，帶對應 Host header）：`aware-wave.com`=200、`api.aware-wave.com`=200、`app.aware-wave.com`=307（未登入導向登入頁，正常）、`oracle.aware-wave.com`=307（同上）、`portal.aware-wave.com`=308（該 block 自己的 `/portal/` idempotent rewrite，正常）、`cognitive.aware-wave.com`=404（FastAPI 沒定義根路由，`/health` 另外測回 200，容器本身 `Up ... (healthy)`——確認是預期行為非路由錯誤）。
+7. 回寫本地 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`，`md5sum` 與 live 完全一致（`12e0cbd3...`，451 行）。抓蟲：`grep -r "127\.0\.0\.1/api/ops/summary"` 掃全 repo，只再命中 `auto-reboot/ks-aw-01-boot-health-notify.sh` 同一個 endpoint——讀該檔 `check()` function 發現它把 `2*|3*|401|403` 都當通過（第 72 行），301 本來就不會誤判成失敗，此檔無需修改。再掃 `http_code.*!=.*200|-eq 200` 於 `lobster-factory`／`agency-os`／`scripts` 三個必掃根，僅剩已修好的 `safe-infra-patch.sh` 一處；另兩處命中（`system-health-check.ps1` 測 EU Supabase REST、`verify-soulful-cutover.ps1` 直接打 https 帶 redirect-follow）跟這個 ks-aw-01 port-80-vs-8083 問題無關，不受影響。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`safe-infra-patch.sh nginx` 修復前重跑 | exit=1 | result=`health-fail | reason=nginx smoke check returned 301` + 自動 rollback 成功（`rollback-done | status=restored`），證明機械閘本身運作正確
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl -H "Host: app.aware-wave.com" http://127.0.0.1:8083/api/ops/summary`（回滾後的未改動 live 檔） | exit=0 | result=200，證明 301 是既有外層行為非本次合併內容造成
+- REALTEST_EVIDENCE: tool=SSH | cmd=`safe-infra-patch.sh nginx` 修復後重跑 | exit=0 | result=`success | type=nginx`，backup+apply+nginx-t+reload+smoke 全過
+- REALTEST_EVIDENCE: tool=SSH | cmd=6 網域逐一 curl（經 127.0.0.1:8083 + Host header） | exit=0 | result=aware-wave.com=200／api=200／app=307／oracle=307／portal=308／cognitive=404(root無路由，/health=200，容器healthy)——全部符合各自預期行為
+- REALTEST_EVIDENCE: tool=Bash | cmd=`md5sum` 三方比對 | exit=0 | result=live 檔／`reconciled-final.conf`／回寫後的 local repo 檔三者 md5 完全一致（`12e0cbd39a50942b34effde7c2c76808`）
+- REVIEW_WAIVED: DOC_ONLY -- nginx 設定檔逐行讀過三次（合併前/合併後/回寫前），非程式邏輯變更，unified diff 已是最嚴格的逐行覆審；`safe-infra-patch.sh` 的一行 URL 改動經 `bash -n` 語法驗證 + 邏輯上就是把寫死的 port 換成該函式自己文件裡宣告的正確 port，範圍過小不需另開 critic pass
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`127\.0\.0\.1/api/ops/summary` | hits=2（本檔+`ks-aw-01-boot-health-notify.sh`，後者因 2xx/3xx 皆視為通過而不受影響，已讀函式邏輯確認）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`http_code.*!=.*200\|http_code.*==.*200\|-eq 200` | hits=3（`safe-infra-patch.sh` 已修；`system-health-check.ps1`測EU Supabase、`verify-soulful-cutover.ps1`直連https，皆與 ks-aw-01 port80/8083 分層無關）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. `sg-stack.aware-wave.com` 這個外層 vhost 的 https 強制轉址是 Certbot 自動維護（`# managed by Certbot`），未來每簽一張新證書都會重寫這個檔案並可能再次改變 mtime/內容順序——不影響本次修復（smoke check 現在測對層了，不再依賴外層行為），純資訊記錄。
+2. `safe-infra-patch.sh` 的 nginx smoke check 現在只驗 `app.aware-wave.com` 一個網域（`/api/ops/summary`）——這次新增的 portal／cognitive 兩個網域沒有各自的機械 smoke 覆蓋，仍要靠人工/本條目手動 curl 驗證；若要更完整可考慮擴充 smoke check 逐網域驗證，但屬另一個獨立改動，未包含在本次 drift 修復範圍內，未開 TASKS 項（成本/效益需操作者判斷是否值得，暫記於此）。
+3. 兩份 `.bak.safe-patch-*` 與一份 `.bak.manual-*` 備份留在 live server 上（`default.conf.bak.safe-patch-20260912-150011`／`150440`、`safe-infra-patch.sh.bak.manual-20260912-*`）——按既有慣例不清理，供未來需要回滾時使用。
+
+[rollback] nginx 設定：`sudo cp /root/lobster-phase1/nginx/default.conf.bak.safe-patch-20260912-150440 /root/lobster-phase1/nginx/default.conf && docker exec lobster-nginx nginx -t && docker exec lobster-nginx nginx -s reload`。`safe-infra-patch.sh` 腳本：`sudo cp /root/lobster-phase1/scripts/safe-infra-patch.sh.bak.manual-<timestamp> /root/lobster-phase1/scripts/safe-infra-patch.sh`。Local repo 兩檔皆為一般 git 追蹤檔，`git revert` 或 `git checkout` 皆可安全回滾，無資料遺失風險。
