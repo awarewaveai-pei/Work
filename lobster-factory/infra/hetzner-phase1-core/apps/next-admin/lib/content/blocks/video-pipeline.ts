@@ -402,7 +402,10 @@ export async function applyVideoMotionToPrimaryFormat(
 
   const jobs = eligible.map(({ s, i }) => ({
     imageUrl: assets[i],
-    motionPrompt: `${s.image_prompt}. Subtle natural motion, cinematic camera movement.`,
+    // 2026-09-12 真實測試發現："Subtle" 這個字讓 Runway 選了幾乎看不出來的慢速鏡頭飄移，操作者
+    // 直接比對三個時間點截圖後回報「看起來像照片」。拿掉 Subtle，改成明確要求主體本身有動作
+    // （不只是運鏡飄移），讓生成結果更像操作者要的「真的像電影」而非過去 Ken Burns 那種死氣沉沉。
+    motionPrompt: `${s.image_prompt}. The subject moves naturally and visibly (gesture, expression, or action) — not just a slow camera drift. Cinematic camera movement.`,
     aspectRatio: primaryAspectRatio as "16:9" | "9:16",
   }));
   const results = await generateVideoMotionBatch(motionModel, jobs);

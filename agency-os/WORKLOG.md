@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-09-12（續9）動態提示詞加強 —— 拿掉 "Subtle"，操作者親自比對截圖後回報「像照片」
+
+[任務] 承接續8。操作者看了我送的 0s/1.5s/4.9s 三張截圖後回報：真的有動但幅度太小，「看起來像照片」；並指出上次測試場景（人在打字）沒有實質意義、浪費錢，且我沒真的用 Story Bible、也沒按到最後確認送出渲染（生成記錄裡沒有這支影片，直接查 `video_jobs` 表證實）。操作者同意重測，要求走完整流程、每步講清楚。
+
+[已修改] `video-pipeline.ts` `applyVideoMotionToPrimaryFormat` 的 `motionPrompt`：`"Subtle natural motion, cinematic camera movement."` → `"The subject moves naturally and visibly (gesture, expression, or action) — not just a slow camera drift. Cinematic camera movement."`。套用到所有未來影片（非單次測試參數），因為原本的字眼本身就是通用 prompt 的一部分。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（於 next-admin）| exit=0（無輸出）
+- REVIEW_WAIVED: DOC_ONLY -- 純字串內容修改，無邏輯/型別/資料流變動，沿用同一個既有函式的既有呼叫路徑（續7/續8已覆審過該函式其餘部分）
+- BUGHUNT_WAIVED: NA -- 字串常數僅一處定義、一處使用，無跨檔案引用
+- WORKLOG_DONE: 本條目（後續完整流程真實測試結果將追加同日條目）
+
+[剩餘風險] 新 prompt 是否真的產生更明顯動作，待下一次真實測試（Story Bible + 完整流程）驗證，尚未實測。
+
+[rollback] `git revert` 對應 commit；純字串改動。
+
 ## 2026-09-12（續8）AI 影片動態部署 + 真實 Runway 測試 —— 抓到並修復「成本串接」自己的一個 Critical bug（job_id 非 UUID 格式，靜默吞錯導致零記錄）
 
 [任務] 承接續7；操作者訊息含明示 go-ahead：「做好之後去部署 + 花 $0.25 測一次 Runway」。
