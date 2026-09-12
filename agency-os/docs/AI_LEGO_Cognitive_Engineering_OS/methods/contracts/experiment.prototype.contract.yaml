@@ -1,0 +1,88 @@
+$id: "ai-lego://methods/contracts/experiment.prototype.contract.yaml"
+title: "Prototype Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family, first member opened (Atlas L738:
+  "Prototype | 驗證概念/互動 | learning goal->低保真->user test->iterate |
+  低成本發現問題"). Tests an interaction/concept assumption via a low-
+  fidelity representation and real user observation. Core invariant: every
+  claimed iteration must trace to a real recorded observation (no
+  unfounded "iterated based on feedback" claim), and fidelity must stay
+  low/medium -- Atlas's own literal "低保真" step, not a full build.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Prototype row (L738)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L738 gives a real four-stage pipeline
+  and effect ("低成本發現問題") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: experiment.prototype
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [DECOMPOSE, TEST, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). DECOMPOSE breaks the concept into a falsifiable learning goal,
+# TEST is the user-test/iterate loop itself, EXPLAIN articulates why each
+# observation triggered its iteration.
+
+purpose:
+  - falsify_an_interaction_or_concept_assumption_via_a_low_fidelity_representation
+
+inputs:
+  required:
+    - LearningGoal
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting
+  # point is the falsifiable interaction/concept assumption under test.
+
+outputs:
+  - Prototype
+# NEW output type (see typed-objects/prototype-record.schema.yaml).
+
+preconditions:
+  - "fidelity level is LOW or MEDIUM, never HIGH (Atlas's own literal '低保真')"
+  - "at least 1 user_test observation and at least 1 iteration recorded"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F15's Prototype row names no explicit next-step method.
+
+rollback:
+  side_effect_free: true
+  # Producing a prototype record has no external side effect.
+
+open_questions:
+  - "OQ-PROTOTYPE-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-PROTOTYPE-2: fidelity is a 2-value LOW/MEDIUM enum (HIGH excluded by design) -- should a future revision add a sub-scale within LOW/MEDIUM?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Prototype row (L738) directly, plus the family's
+    stated core principle (L750-752) and the mother document's own
+    "validation.experiment" (a DIFFERENT, still-unbuilt family="validation"
+    id cited only in F9/causal recommended_next chains, e.g.
+    root_cause.fishbone.contract.yaml -- disclosed here as an adjacent but
+    non-overlapping name, not a collision). Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "experiment\.", "prototype", "family: experiment" before writing --
+    zero pre-existing `experiment.*` contract/module; "prototype" hits are
+    all narrative mentions in other families' contracts (e.g.
+    association.morphological_analysis.contract.yaml,
+    divergent.scamper.contract.yaml) explicitly noting no catalogued
+    Prototype method id existed until now. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The four-stage pipeline is
+    transcribed verbatim from Atlas L738. The fidelity enum, observation-
+    count minimum, and iteration-traceability precondition are this file's
+    own compiled structure, disclosed above, not textually cited.

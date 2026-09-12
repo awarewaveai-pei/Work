@@ -1,0 +1,91 @@
+$id: "ai-lego://methods/contracts/experiment.pilot.contract.yaml"
+title: "Pilot Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L747: "Pilot | 小規模真實試行 |
+  limited scope->criteria->monitor->review | 降 rollout 爆炸半徑"; dedicated
+  §12.31 L2945-2953 adds Atlas's own explicit 強制 (MANDATORY) rule:
+  "Pilot 開始前定義 Success / Stop / Rollback criteria"). Core invariant: that
+  強制 word made structural -- a Pilot record cannot be constructed at all
+  unless success_criteria, stop_criteria, AND rollback_criteria are each
+  declared non-empty. Strongest, least-diluted invariant in this F15 batch.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Pilot row (L747)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.31 試辦／試點計畫 (L2945-2953), MANDATORY Success/Stop/Rollback criteria rule"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L747 gives the 4-stage pipeline and
+  §12.31 gives the explicit 強制 rule -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: experiment.pilot
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [DECOMPOSE, VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). DECOMPOSE breaks the initiative into scope+criteria; VALIDATE
+# checks real-world monitoring data against the declared criteria; DECIDE
+# is the review stage's own continue/stop/rollback/expand verdict. All
+# three CANONICAL_KERNEL members.
+
+purpose:
+  - run_a_small_scope_real_world_trial_gated_by_predeclared_success_stop_rollback_criteria
+# Atlas L747 + §12.31 verbatim sense.
+
+inputs:
+  required:
+    - PilotScope
+# NEW DESIGN. Atlas gives no named input typed-object; the starting point
+# is the limited-scope definition itself, same honesty-gap class every
+# sibling F-family contract already discloses.
+
+outputs:
+  - PilotRecord
+# NEW output type (see typed-objects/pilot-record.schema.yaml).
+
+preconditions:
+  - "success_criteria, stop_criteria, and rollback_criteria are each declared and non-empty"
+  # STRUCTURAL, not merely recommended -- Atlas §12.31's own 強制 word. A
+  # Pilot record without all three cannot exist.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention every sibling single-record
+  # typed-object in this directory uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas F15's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Producing/recording a Pilot definition has no external side effect;
+  # distinct from the pilot's OWN rollback_criteria field, which governs
+  # the real-world initiative the record describes, not the record itself.
+
+open_questions:
+  - "OQ-PILOT-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-PILOT-2: monitoring_metrics/review are modeled as evolving fields on one record (declared at definition time, filled in as the pilot progresses) rather than splitting 'PilotDefinition' from 'PilotReview' as two typed objects -- should a future revision split them?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Pilot row (L747), and §12.31 (L2945-2953)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "experiment.pilot"/"pilot-record"/"PilotRecord"/"success criteria"/
+    "stop criteria"/"rollback criteria" before writing -- zero
+    pre-existing implementation or schema title overlap found (the only
+    pre-existing "pilot" hits were the mother-document table/section
+    headings and an unrelated EC policy-inventory summary line, not a
+    schema or module). Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-stage pipeline and the 強制
+    criteria mandate are transcribed verbatim from Atlas L747/§12.31. The
+    PILOT- id prefix, scope/monitoring/review field shapes, and the review
+    consistency rule (verdict+notes required only once conducted=true) are
+    this file's own compiled structure, disclosed above, not textually cited.

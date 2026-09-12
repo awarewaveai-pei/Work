@@ -1,0 +1,101 @@
+$id: "ai-lego://methods/contracts/experiment.wizard_of_oz.contract.yaml"
+title: "Wizard of Oz Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L743: "Wizard of Oz | 前台自動、
+  後台人工 | mock automation->human backend | 驗證互動而不先建完整系統").
+  Present an automated-looking front end while a human secretly operates
+  the backend, to validate the interaction before building the real
+  system. Core invariant: the record must be honest with ITSELF about the
+  fake -- `front_end.presented_as_automated` and `back_end.
+  actually_human_operated` must both be literally true (the defining
+  contrast this method exists to name), and `disclosure.faked_components`
+  must name at least one faked part -- a WoZ test that does not disclose
+  which parts are faked is indistinguishable from shipping a fake feature.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Wizard of Oz row (L743)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L743 gives a real two-stage pipeline
+  and effect (驗證互動而不先建完整系統) -- direct transcription plus
+  low-risk, disclosed compilation choices.
+
+id: experiment.wizard_of_oz
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [SIMULATE, VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). SIMULATE is the mocked automated front end; VALIDATE checks
+# the interaction assumption via the disclosed human backend; DECIDE is
+# the build-the-real-system-or-not call the method's own benefit column
+# names. All three CANONICAL_KERNEL members.
+
+purpose:
+  - validate_an_interaction_via_a_disclosed_fake_automated_front_with_a_human_backend
+# Atlas L743 verbatim sense: mock the automated front end, run the
+# backend by hand, to validate interaction before building the real
+# system.
+
+inputs:
+  required:
+    - InteractionDescription
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the candidate interaction under test, same
+  # honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - WizardOfOzRecord
+# NEW output type (see typed-objects/wizard-of-oz-record.schema.yaml).
+
+preconditions:
+  - "front_end.presented_as_automated is literally true"
+  - "back_end.actually_human_operated is literally true"
+  - "disclosure.faked_components names at least 1 faked component"
+  # NEW, structurally necessary. Atlas's own pipeline is "mock automation
+  # ->human backend" -- a record where the front end is not presented as
+  # automated, or the backend is not actually human, is not this method;
+  # a record that never names what is faked is indistinguishable from
+  # simply shipping a fake feature with no test attached to it.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent WoZ record, same placement
+  # convention every structurally similar single-record F-family sibling
+  # uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F15's table has no explicit next-step method named for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a WoZ record has no external side
+  # effect (the mocked interaction itself is outside this record's own
+  # scope).
+
+open_questions:
+  - "OQ-WOZ-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-WOZ-2: disclosure.disclosed_to is a 3-value enum (internal-only / disclosed-at-study-end / never-disclosed-to-user) -- should a future revision distinguish more disclosure timings?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Wizard of Oz row (L743) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "wizard of oz"/"wizard_of_oz"/"mock automation" before writing -- zero
+    pre-existing implementation or schema title overlap found. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. The two-stage pipeline is
+    transcribed verbatim from Atlas L743. The literal-true front/back
+    flags, the faked-component-disclosure requirement, and record id
+    prefix are this file's own compiled structure, disclosed above, not
+    textually cited.

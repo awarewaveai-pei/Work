@@ -1,0 +1,137 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/proof-of-concept-record.schema.yaml"
+title: Proof of Concept
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ProofOfConcept` -- the
+  declared `outputs` of `experiment.proof_of_concept`'s Method Contract
+  (methods/contracts/experiment.proof_of_concept.contract.yaml,
+  `outputs: [ProofOfConcept]`). F15 experiment & validation family (Atlas
+  L740: "technical success->isolated implementation->benchmark").
+
+  Real invariants (RUNTIME, same disclosed-gap class as
+  `cross-impact-analysis.schema.yaml`'s own matrix-completeness
+  precedent): (a) ISOLATION -- `implementation.isolated` must be true AND
+  `implementation.production_integration` must be false, Atlas's own
+  literal "isolated implementation" stage; (b) VERDICT CONSISTENCY --
+  `feasibility_verdict` must equal the mechanical recomputation of
+  `benchmark_result` against `success_criteria`, not an asserted
+  narrative claim. `ai_lego/modules/experiment/proof_of_concept.py`
+  enforces both at construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Proof of Concept row (L740)"
+  - "methods/contracts/experiment.proof_of_concept.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L740's own
+  three-stage pipeline plus low-risk, disclosed compilation choices (the
+  POC- prefix, record-level-only provenance, 5-value comparison enum).
+
+compilation_decisions:
+  - question: "How to make Atlas's 'isolated implementation' stage structural rather than a label?"
+    decision: "Require implementation.isolated == true AND implementation.production_integration == false as a hard pair, not a single free-text flag -- a PoC silently wired into production defeats '先去除技術未知' by committing before the unknown is resolved."
+  - question: "Verdict consistency: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot recompute a comparison across 3 sibling fields (measured_value/threshold/comparison) and check it against a 4th (feasibility_verdict) declaratively, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, technical_unknown, success_criteria, implementation, benchmark_result, feasibility_verdict, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^POC-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.proof_of_concept"
+
+  technical_unknown:
+    type: object
+    additionalProperties: false
+    required: [statement]
+    description: "The specific technical uncertainty under test -- Atlas's own '先去除技術未知'."
+    properties:
+      statement: {type: string, minLength: 1}
+
+  success_criteria:
+    type: object
+    additionalProperties: false
+    required: [metric, threshold, comparison]
+    description: "Defined BEFORE the benchmark runs (Atlas's own 'technical success' pipeline stage precedes 'benchmark')."
+    properties:
+      metric: {type: string, minLength: 1}
+      threshold: {type: number}
+      comparison: {type: string, enum: [GTE, LTE, GT, LT, EQ]}
+
+  implementation:
+    type: object
+    additionalProperties: false
+    required: [description, isolated, production_integration]
+    description: "RUNTIME invariant: isolated must be true AND production_integration must be false (see module description)."
+    properties:
+      description: {type: string, minLength: 1}
+      isolated: {type: boolean}
+      production_integration: {type: boolean}
+
+  benchmark_result:
+    type: object
+    additionalProperties: false
+    required: [measured_value, environment, methodology]
+    properties:
+      measured_value: {type: number}
+      environment: {type: string, minLength: 1}
+      methodology: {type: string, minLength: 1}
+
+  feasibility_verdict:
+    type: boolean
+    description: "RUNTIME invariant: must equal the mechanical recomputation of benchmark_result against success_criteria (see module description)."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An isolated benchmark that met its pre-defined success criterion"
+    value:
+      id: "POC-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.proof_of_concept"
+      technical_unknown:
+        statement: "向量檢索能否在 50ms 內回應 100 萬筆 embedding 的 top-10 查詢"
+      success_criteria: {metric: "p95 延遲 (ms)", threshold: 50, comparison: LTE}
+      implementation:
+        description: "獨立沙盒服務，讀唯讀快照，未接任何 production 流量"
+        isolated: true
+        production_integration: false
+      benchmark_result:
+        measured_value: 38
+        environment: "沙盒 VM, 1M 筆合成 embedding"
+        methodology: "1000 次查詢取 p95"
+      feasibility_verdict: true
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-POCRECORD-1: comparison operator is the same 5-value enum experiment.mvp uses -- should a future revision extract a shared typed-object for it?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Proof of Concept row (L740) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "proof-of-concept-record", "experiment.proof_of_concept" and this
+    schema's title before writing -- zero pre-existing implementation or
+    schema title overlap found. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_proof_of_concept.py.
+  note: >
+    No mother document was modified. The three-stage pipeline is
+    transcribed directly from Atlas L740. The POC- prefix, comparison
+    enum, and runtime-invariant placement of isolation + verdict-
+    consistency are this file's own compiled structure, disclosed above.

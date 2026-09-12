@@ -1,0 +1,133 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/ab-test-record.schema.yaml"
+title: A/B Test Experiment
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ABTestExperiment` -- the declared
+  `outputs` of `experiment.ab_test`'s Method Contract
+  (methods/contracts/experiment.ab_test.contract.yaml, `outputs:
+  [ABTestExperiment]`). F15 experiment & validation family (Atlas L746,
+  §12.30 L2924-2941). Real invariants (RUNTIME, not schema-expressible
+  cross-field checks): (a) `registered_at` strictly earlier than
+  `analyzed_at` (pre-registration, the structural defense against §12.30's
+  own named "peeking"); (b) `sample_size_per_arm` a positive integer; (c)
+  `primary_metric` (NFKC/case/whitespace-insensitive) distinct from every
+  `guardrail_metrics[]` entry. `ai_lego/modules/experiment/ab_test.py`
+  enforces all three at construction and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 table, A/B Test row (L746)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.30 A/B 測試／分流實驗 (L2924-2941)"
+  - "methods/contracts/experiment.ab_test.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §12.30's own
+  8-stage pipeline plus low-risk, disclosed compilation choices (the
+  ABTEST- prefix, record-level-only provenance, the timestamp-pair
+  pre-registration mechanism).
+
+compilation_decisions:
+  - question: "registered_at < analyzed_at: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 has no native cross-field timestamp-ordering keyword, same gap class cross-impact-analysis.schema.yaml's own matrix-completeness precedent discloses."
+  - question: "primary_metric vs guardrail_metrics[] distinctness: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant, NFKC/case/whitespace-normalized comparison -- same normalization idiom causal.rct.contract.yaml's own treatment_group/control_group distinctness check already establishes for a different pair of fields."
+  - question: "decision: closed enum, or free text?"
+    decision: "Closed enum [SHIP, DO_NOT_SHIP, INCONCLUSIVE] per Atlas §12.30's own final 'Decision' pipeline stage -- an unconstrained free-text decision would let the record assert an outcome outside the pipeline's own named terminal states."
+
+type: object
+additionalProperties: false
+required: [id, version, hypothesis, primary_metric, guardrail_metrics, sample_size_per_arm, randomization_unit, registered_at, analyzed_at, decision, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ABTEST-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.ab_test"
+
+  hypothesis:
+    type: string
+    minLength: 1
+    description: "Atlas §12.30's own pipeline stage 1: the causal claim under test."
+
+  primary_metric:
+    type: string
+    minLength: 1
+    description: "Atlas §12.30's own pipeline stage 2. RUNTIME invariant: must not (NFKC/case/whitespace-insensitive) equal any guardrail_metrics[] entry."
+
+  guardrail_metrics:
+    type: array
+    items: {type: string, minLength: 1}
+    description: "Atlas §12.30's own pipeline stage 3. May be empty -- Atlas does not mandate a minimum count, only that the pipeline stage exists."
+
+  sample_size_per_arm:
+    type: integer
+    minimum: 1
+    description: "Atlas §12.30's own pipeline stage 4 (Sample/Power), captured as a positive per-arm count. RUNTIME invariant: must be declared at registered_at, before analyzed_at."
+
+  randomization_unit:
+    type: string
+    minLength: 1
+    description: "Atlas §12.30's own pipeline stage 5, e.g. 'user_id' or 'session_id'."
+
+  registered_at:
+    type: string
+    minLength: 1
+    description: "ISO-8601 timestamp: when hypothesis/primary_metric/sample_size_per_arm were locked. RUNTIME invariant: strictly earlier than analyzed_at."
+
+  analyzed_at:
+    type: string
+    minLength: 1
+    description: "ISO-8601 timestamp: when the analysis (Atlas §12.30's own stage 7) was performed. RUNTIME invariant: strictly later than registered_at."
+
+  decision:
+    type: string
+    enum: [SHIP, DO_NOT_SHIP, INCONCLUSIVE]
+    description: "Atlas §12.30's own final pipeline stage (Decision)."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent record."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A pre-registered A/B test on a checkout-flow redesign that ships"
+    value:
+      id: "ABTEST-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.ab_test"
+      hypothesis: "新結帳流程（單頁式）能提升轉換率"
+      primary_metric: "checkout_conversion_rate"
+      guardrail_metrics: ["cart_abandonment_rate", "avg_page_load_ms"]
+      sample_size_per_arm: 5000
+      randomization_unit: "user_id"
+      registered_at: "2026-08-01T00:00:00Z"
+      analyzed_at: "2026-08-22T00:00:00Z"
+      decision: "SHIP"
+      provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-ABTESTRECORD-1: sample ratio mismatch (Atlas §12.30's own 3rd named anti-pattern) has no structural check on this record (no per-arm observed-N field) -- a future revision could add one.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, A/B Test row (L746), and §12.30 (L2924-2941)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "a/b test"/"a_b_test"/"ab_test"/"split test"/"split_test" and every
+    schema title before writing -- only hits were causal.rct.contract.yaml's
+    own disclosed distinction from this row and an unrelated example
+    scenario string in run_three_c_slice.py; zero pre-existing
+    implementation or schema title overlap. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_ab_test.py.
+  note: >
+    No mother document was modified. The ABTEST- prefix, the timestamp-pair
+    pre-registration mechanism, and the primary-metric/guardrail isolation
+    check are this file's own compiled structure, disclosed above.

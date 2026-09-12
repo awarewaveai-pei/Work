@@ -1,0 +1,159 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/pilot-record.schema.yaml"
+title: Pilot Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `PilotRecord` -- the declared
+  `outputs` of `experiment.pilot`'s Method Contract (methods/contracts/
+  experiment.pilot.contract.yaml, `outputs: [PilotRecord]`). F15 experiment
+  & validation family (Atlas L747: "limited scope->criteria->monitor->
+  review"; §12.31 L2945-2953: 強制 Success/Stop/Rollback criteria).
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) THE MANDATE -- `success_criteria`,
+  `stop_criteria`, and `rollback_criteria` are each present as a non-empty
+  list of non-empty strings (Atlas §12.31's own 強制 word, structural, not
+  a JSON Schema `minItems` alone would already partially cover this but the
+  cross-field "all three together, non-diluted" framing is this file's own
+  disclosed compilation choice); (b) `review.verdict`/`review.notes` are
+  required only once `review.conducted` is `true` (a review record cannot
+  claim "conducted" with no verdict). `ai_lego/modules/experiment/pilot.py`
+  enforces both at construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Pilot row (L747)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.31 試辦／試點計畫 (L2945-2953)"
+  - "methods/contracts/experiment.pilot.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L747's 4-stage
+  pipeline and §12.31's 強制 rule, plus low-risk, disclosed compilation
+  choices (the PILOT- prefix, record-level-only provenance, the
+  conducted/verdict/notes review-consistency coupling).
+
+compilation_decisions:
+  - question: "Criteria mandate: JSON Schema minItems alone, or a cross-field runtime invariant?"
+    decision: "Both. minItems:1 on each of the 3 arrays catches the single-field case declaratively; the cross-field 'all three together, no dilution' framing (and the non-empty-string check on every item) is enforced as a RUNTIME invariant re-derived independently by the builder AND a dedicated gate, so a schema-only consumer that skips the module still gets a partial (not zero) check."
+    decision_2: "review.conducted=true requiring verdict+notes: Runtime invariant. JSON Schema 2020-12 if/then could express it, but this file follows the same declared shape + runtime cross-field enforcement split every sibling typed-object schema in this directory already uses (e.g. matrix completeness in cross-impact-analysis.schema.yaml) rather than introducing conditional schema logic this corpus does not otherwise use."
+
+type: object
+additionalProperties: false
+required: [id, version, scope, success_criteria, stop_criteria, rollback_criteria, monitoring_metrics, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^PILOT-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.pilot"
+
+  scope:
+    type: object
+    additionalProperties: false
+    required: [description, boundaries]
+    description: "The 'limited scope' pipeline stage (Atlas L747)."
+    properties:
+      description: {type: string, minLength: 1}
+      boundaries:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1}
+        description: "What is explicitly excluded/bounded (population, geography, time window, feature flag, etc.)."
+
+  success_criteria:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+    description: "MANDATORY per Atlas §12.31's own 強制 word. Must be declared before the pilot starts (see module description)."
+
+  stop_criteria:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+    description: "MANDATORY per Atlas §12.31's own 強制 word."
+
+  rollback_criteria:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+    description: "MANDATORY per Atlas §12.31's own 強制 word."
+
+  monitoring_metrics:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+    description: "The 'monitor' pipeline stage (Atlas L747) -- what is measured while the pilot runs."
+
+  review:
+    type: object
+    additionalProperties: false
+    required: [conducted]
+    description: "The 'review' pipeline stage (Atlas L747). OPTIONAL top-level key -- absent means the pilot has not yet been reviewed."
+    properties:
+      conducted: {type: boolean}
+      verdict:
+        type: string
+        enum: [CONTINUE, STOP, ROLLBACK, EXPAND]
+        description: "RUNTIME invariant: required once conducted=true (see module description)."
+      notes: {type: string, minLength: 1}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A pre-launch Pilot definition (not yet reviewed)"
+    value:
+      id: "PILOT-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.pilot"
+      scope:
+        description: "New checkout flow, one region, opt-in cohort only"
+        boundaries: ["region=TW", "cohort=opt-in-beta", "duration<=30 days"]
+      success_criteria: ["conversion rate >= baseline + 2pp"]
+      stop_criteria: ["error rate > 1% for 2 consecutive hours"]
+      rollback_criteria: ["feature flag off within 15 minutes of a STOP trigger"]
+      monitoring_metrics: ["conversion_rate", "error_rate", "checkout_latency_p95"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A reviewed Pilot record"
+    value:
+      id: "PILOT-2026-09-12-002"
+      version: "1.0.0"
+      generated_by_method: "experiment.pilot"
+      scope:
+        description: "New checkout flow, one region, opt-in cohort only"
+        boundaries: ["region=TW", "cohort=opt-in-beta", "duration<=30 days"]
+      success_criteria: ["conversion rate >= baseline + 2pp"]
+      stop_criteria: ["error rate > 1% for 2 consecutive hours"]
+      rollback_criteria: ["feature flag off within 15 minutes of a STOP trigger"]
+      monitoring_metrics: ["conversion_rate", "error_rate", "checkout_latency_p95"]
+      review: {conducted: true, verdict: EXPAND, notes: "Success criteria met on day 21; no stop trigger fired."}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-PILOTRECORD-1: no explicit link back to the real-world rollout this record describes (e.g. a feature-flag id) -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Pilot row (L747), and §12.31 (L2945-2953)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "pilot-record"/"PilotRecord" and every schema title before writing --
+    zero pre-existing implementation or schema title overlap found.
+    Validated against jsonschema Draft202012Validator via
+    tests/unit/test_pilot.py.
+  note: >
+    No mother document was modified. The 4-stage pipeline and the 強制
+    criteria mandate are transcribed directly from Atlas L747/§12.31. The
+    PILOT- prefix, scope/monitoring/review field shapes, and the runtime-
+    invariant placement of the criteria mandate and review consistency are
+    this file's own compiled structure, disclosed above.

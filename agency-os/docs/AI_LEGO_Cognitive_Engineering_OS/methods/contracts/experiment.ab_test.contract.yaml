@@ -1,0 +1,98 @@
+$id: "ai-lego://methods/contracts/experiment.ab_test.contract.yaml"
+title: "A/B Test Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family. Atlas F15 table row (L746: "A/B Test｜
+  隨機比較版本｜hypothesis→metric→power→randomize→analyze｜較可靠因果證據")
+  PLUS dedicated §12.30 (L2924-2941): full pipeline Hypothesis->Primary
+  Metric->Guardrails->Sample/Power->Randomization->Run->Analyze->Decision,
+  explicit warning "避免 peeking、multiple testing、sample ratio mismatch".
+  3rd of 3 F15 methods opened this batch. Core invariant: primary_metric AND
+  sample_size_per_arm are declared (registered_at) strictly BEFORE
+  analyzed_at -- pre-registration, the real structural defense against the
+  peeking Atlas's own §12.30 warns about.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 table, A/B Test row (L746)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.30 A/B 測試／分流實驗 (L2924-2941)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §12.30 gives a full 8-stage pipeline and
+  an explicit anti-pattern warning (peeking/multiple testing/sample ratio
+  mismatch); direct transcription plus low-risk, disclosed compilation
+  choices.
+
+id: experiment.ab_test
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [COMPARE, ESTIMATE, VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). COMPARE = randomized version comparison; ESTIMATE = sample
+# size/power; VALIDATE = causal claim from the analysis; DECIDE = the ship/
+# no-ship call. All 4 CANONICAL_KERNEL members, one per Atlas §12.30's own
+# Hypothesis/Metric-Power/Analyze/Decision stage groups.
+
+purpose:
+  - obtain_reliable_causal_evidence_via_a_pre_registered_randomized_comparison
+# Atlas L746 verbatim sense: randomized version comparison for more reliable
+# causal evidence.
+
+inputs:
+  required: []
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # same honesty-gap class every thin-citation sibling contract in this
+  # directory already discloses.
+
+outputs:
+  - ABTestExperiment
+# NEW output type (see typed-objects/ab-test-record.schema.yaml).
+
+preconditions:
+  - "registered_at is strictly earlier than analyzed_at -- hypothesis, primary_metric, and sample_size_per_arm must be locked before results exist (pre-registration; the real defense against §12.30's own named 'peeking')"
+  - "sample_size_per_arm is a positive integer"
+  - "primary_metric does not (NFKC/case/whitespace-insensitive) equal any guardrail_metrics entry -- the metric that decides the outcome must not double as a guardrail, guarding against ambiguous multiple-testing on the decisive metric"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+recommended_next: []
+# Atlas §12.30 names no explicit next-step method id.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "How is Atlas §12.30's own 'avoid peeking' warning operationalized without a real statistics engine?"
+    decision: "Pre-registration timestamp ordering (registered_at < analyzed_at, strict), same idiom learning.ooda's own timestamp-monotonicity invariant establishes for a different family, plus a required, non-empty sample_size_per_arm captured AT registration time -- a sample size that could still be edited after peeking at interim results is not really pre-registered."
+  - question: "Does this method run real statistical significance testing (p-values, confidence intervals)?"
+    decision: "No -- explicitly out of scope, same restraint causal.rct.contract.yaml already establishes for a related but distinct method. All content fields (hypothesis/primary_metric/guardrail_metrics/analysis fields) are DISCLOSURE-ONLY; the record's own real invariant is the pre-registration STRUCTURE, not the statistical correctness of the analysis."
+  - question: "Is experiment.ab_test the same method as causal.rct?"
+    decision: "No -- different family and id, same as causal.rct.contract.yaml's own compilation_decisions already distinguish it from the Atlas §9-cited validation.experiment id. RCT emphasizes treatment/control study DESIGN; ab_test emphasizes the pre-registration/decision-tempo pipeline named at Atlas §12.30, specifically the peeking/multiple-testing guard."
+
+open_questions:
+  - "OQ-ABTEST-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-ABTEST-2: sample ratio mismatch (Atlas's own 3rd named anti-pattern) is not structurally checked -- this record has no per-arm observed-N field to compare against sample_size_per_arm. A future revision could add one.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table (L734-748), core principle (L750-752), and §12.30
+    (L2924-2941) directly -- confirmed §12.30's own content spans L2924-2941
+    (task brief cited L2924-2943; L2942-2943 are a blank line + the section's
+    trailing `---` divider, not additional pipeline content -- noted here per
+    R4). Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "a/b test"/"a_b_test"/"ab_test"/"split test"/"split_test" before writing
+    -- only hits were causal.rct.contract.yaml's own disclosed distinction
+    from this row and run_three_c_slice.py's unrelated example scenario text
+    ("checkout-flow A/B-testing opportunity"); zero pre-existing
+    implementation or schema title overlap. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The pre-registration/randomization/
+    decision pipeline is transcribed from Atlas §12.30. The timestamp-pair
+    pre-registration mechanism and the primary-metric/guardrail isolation
+    check are this file's own compiled structure, disclosed above.

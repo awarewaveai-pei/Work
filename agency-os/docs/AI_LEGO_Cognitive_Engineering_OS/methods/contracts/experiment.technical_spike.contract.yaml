@@ -1,0 +1,97 @@
+$id: "ai-lego://methods/contracts/experiment.technical_spike.contract.yaml"
+title: "Technical Spike Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L741: "Technical Spike | 限時
+  研究技術未知 | timebox->question->experiment/docs->decision note | 提升
+  估算可信度"). Time-boxed research into a technical unknown, ending in a
+  decision note. Core invariant: the record is bounded by construction --
+  a declared timebox the actual closure never exceeds, plus a decision note
+  grounded within that same window -- because an open-ended "spike" with
+  no bound or no decision falsifies nothing and cannot feed estimation
+  credibility (Atlas's own stated benefit).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Technical Spike row (L741)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L741 gives a real four-stage pipeline
+  and effect (提升估算可信度) -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: experiment.technical_spike
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [QUESTION, VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). QUESTION frames the technical unknown; VALIDATE is the
+# experiment/docs research stage checking it; DECIDE is the terminating
+# decision note. All three CANONICAL_KERNEL members.
+
+purpose:
+  - timebox_a_technical_unknown_into_a_decision_note
+# Atlas L741 verbatim sense: time-boxed research into a technical unknown,
+# via question->experiment/docs->decision note, to raise estimation
+# credibility.
+
+inputs:
+  required:
+    - ResearchQuestion
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the declared technical unknown under research,
+  # same honesty-gap class every sibling F-family contract already
+  # discloses.
+
+outputs:
+  - TechnicalSpikeRecord
+# NEW output type (see typed-objects/technical-spike-record.schema.yaml).
+
+preconditions:
+  - "declared timebox: deadline strictly after started_at"
+  - "closure occurs within the declared timebox and ends in a non-empty decision note grounded in that same window"
+  # NEW, structurally necessary. Atlas's own pipeline is
+  # "timebox->question->experiment/docs->decision note" -- a spike with no
+  # bound, or one whose closure/decision falls outside its own declared
+  # window, is unstructured exploration wearing the name, and produces no
+  # comparable estimate.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent spike record, same placement
+  # convention every structurally similar single-record F-family sibling
+  # uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F15's table has no explicit next-step method named for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a spike record has no external
+  # side effect.
+
+open_questions:
+  - "OQ-TECHSPIKE-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-TECHSPIKE-2: findings[] source_type is limited to EXPERIMENT/DOCS per Atlas's own 'experiment/docs' pipeline stage -- should a future revision allow other evidence kinds?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Technical Spike row (L741) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "technical spike"/"technical_spike"/"timebox" before writing -- zero
+    pre-existing implementation or schema title overlap found. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. The four-stage pipeline is
+    transcribed verbatim from Atlas L741. The timebox-bound/decision-
+    grounded runtime invariant, findings evidence-kind enum, and record id
+    prefix are this file's own compiled structure, disclosed above, not
+    textually cited.

@@ -1,0 +1,111 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/fake-door-record.schema.yaml"
+title: Fake Door Experiment
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `FakeDoorExperiment` -- the
+  declared `outputs` of `experiment.fake_door`'s Method Contract
+  (methods/contracts/experiment.fake_door.contract.yaml, `outputs:
+  [FakeDoorExperiment]`). F15 experiment & validation family (Atlas L744).
+  Real invariants (RUNTIME, not schema-const -- see contract
+  compilation_decisions): (a) disclosure_shown must be true AND
+  disclosure_text non-empty; (b) click_count<=impression_count, both
+  non-negative integers. `ai_lego/modules/experiment/fake_door.py` enforces
+  both at construction and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 table, Fake Door row (L744)"
+  - "methods/contracts/experiment.fake_door.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L744's own
+  disclosure+measurement pipeline plus low-risk, disclosed compilation
+  choices (the FAKEDOOR- prefix, record-level-only provenance).
+
+compilation_decisions:
+  - question: "disclosure_shown: schema `const: true`, or runtime invariant?"
+    decision: "Runtime invariant -- see contract yaml's own compilation_decisions for why the module stays the single enforcement point."
+  - question: "click_count<=impression_count: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 has no native cross-field <= comparison keyword, same gap class cross-impact-analysis.schema.yaml's own matrix-completeness precedent discloses."
+
+type: object
+additionalProperties: false
+required: [id, version, feature_under_test, cta_copy, disclosure_shown, disclosure_text, impression_count, click_count, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^FAKEDOOR-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.fake_door"
+
+  feature_under_test:
+    type: string
+    minLength: 1
+    description: "What feature's demand is being tested."
+
+  cta_copy:
+    type: string
+    minLength: 1
+    description: "The call-to-action text shown to the user before the click."
+
+  disclosure_shown:
+    type: boolean
+    description: "RUNTIME invariant: must be true -- see compilation_decisions. The user was told the feature is not yet available."
+
+  disclosure_text:
+    type: string
+    minLength: 1
+    description: "RUNTIME invariant: non-empty -- the actual 'not yet available' message shown after the click."
+
+  impression_count:
+    type: integer
+    minimum: 0
+    description: "Total CTA impressions/views."
+
+  click_count:
+    type: integer
+    minimum: 0
+    description: "RUNTIME invariant: <= impression_count -- the measured interest count (CTA clicks)."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent record."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A disclosed, measured Fake Door test on an 'export to Notion' feature"
+    value:
+      id: "FAKEDOOR-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.fake_door"
+      feature_under_test: "一鍵匯出到 Notion"
+      cta_copy: "立即匯出到 Notion"
+      disclosure_shown: true
+      disclosure_text: "此功能尚未開放，感謝您的興趣，我們已記錄下來"
+      impression_count: 1200
+      click_count: 87
+      provenance: {epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-FAKEDOORRECORD-1: no confidence/segment breakdown on click_count -- should a future revision support per-segment interest counts?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Fake Door row (L744) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "fake door"/"fakedoor" and every schema title before writing -- zero
+    pre-existing implementation or schema title overlap found. Validated
+    against jsonschema Draft202012Validator via tests/unit/test_fake_door.py.
+  note: >
+    No mother document was modified. The FAKEDOOR- prefix and the
+    runtime-invariant placement of both real invariants are this file's own
+    compiled structure, disclosed above.

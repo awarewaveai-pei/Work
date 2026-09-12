@@ -1,0 +1,139 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/prototype-record.schema.yaml"
+title: Prototype
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `Prototype` -- the declared
+  `outputs` of `experiment.prototype`'s Method Contract
+  (methods/contracts/experiment.prototype.contract.yaml,
+  `outputs: [Prototype]`). F15 experiment & validation family (Atlas L738:
+  "learning goal->低保真->user test->iterate").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) `fidelity.level` must be LOW or MEDIUM,
+  never HIGH -- Atlas's own literal "低保真"; (b) ITERATION TRACEABILITY --
+  every `iterations[].triggered_by_observation_index` must resolve to a
+  real index in `user_test.observations` (no unfounded "iterated based on
+  feedback" claim). `ai_lego/modules/experiment/prototype.py` enforces
+  both at construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Prototype row (L738)"
+  - "methods/contracts/experiment.prototype.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L738's own
+  four-stage pipeline plus low-risk, disclosed compilation choices (the
+  PROTO- prefix, record-level-only provenance, LOW/MEDIUM fidelity enum).
+
+compilation_decisions:
+  - question: "fidelity.level: a free-text string, or a bounded enum?"
+    decision: "Bounded 2-value enum [LOW, MEDIUM] -- Atlas's own text says '低保真' (low-fidelity); HIGH is excluded by design, not merely discouraged, matching the module's own runtime refusal."
+  - question: "Iteration traceability: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot cross-check an array index against a sibling array's length declaratively, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, learning_goal, fidelity, user_test, iterations, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^PROTO-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.prototype"
+
+  learning_goal:
+    type: object
+    additionalProperties: false
+    required: [statement, falsifiable_if]
+    description: "The interaction/concept assumption under test, made falsifiable."
+    properties:
+      statement: {type: string, minLength: 1}
+      falsifiable_if: {type: string, minLength: 1, description: "What observation would falsify this goal."}
+
+  fidelity:
+    type: object
+    additionalProperties: false
+    required: [level, rationale]
+    properties:
+      level:
+        type: string
+        enum: [LOW, MEDIUM]
+        description: "HIGH excluded by design -- see compilation_decisions."
+      rationale: {type: string, minLength: 1}
+
+  user_test:
+    type: object
+    additionalProperties: false
+    required: [method, participant_count, observations]
+    properties:
+      method: {type: string, minLength: 1}
+      participant_count: {type: integer, minimum: 1}
+      observations:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1}
+
+  iterations:
+    type: array
+    minItems: 1
+    description: "RUNTIME invariant: every triggered_by_observation_index must resolve to a real user_test.observations[] index (see module description)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [change, triggered_by_observation_index]
+      properties:
+        change: {type: string, minLength: 1}
+        triggered_by_observation_index: {type: integer, minimum: 0}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-observation, 2-iteration prototype test (both iterations trace to a real observation)"
+    value:
+      id: "PROTO-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.prototype"
+      learning_goal:
+        statement: "使用者能在低保真線框圖上找到『匯出報告』功能"
+        falsifiable_if: "多數受測者在 30 秒內找不到匯出入口"
+      fidelity: {level: LOW, rationale: "紙本線框圖，無互動邏輯"}
+      user_test:
+        method: "5-人可用性測試"
+        participant_count: 5
+        observations:
+          - "3/5 受測者先點了右上角選單而非左側工具列"
+          - "改版後 5/5 受測者在 10 秒內找到匯出入口"
+      iterations:
+        - {change: "把『匯出』移到右上角選單", triggered_by_observation_index: 0}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-PROTOTYPERECORD-1: observations[] carries no structured tag for which learning_goal it falsifies (free text only) -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Prototype row (L738) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "prototype-record", "experiment.prototype" and this schema's title
+    before writing -- zero pre-existing implementation or schema title
+    overlap found. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_prototype.py.
+  note: >
+    No mother document was modified. The four-stage pipeline is
+    transcribed directly from Atlas L738. The PROTO- prefix, fidelity
+    enum, and runtime-invariant placement of iteration traceability are
+    this file's own compiled structure, disclosed above.

@@ -1,0 +1,133 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/technical-spike-record.schema.yaml"
+title: Technical Spike Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TechnicalSpikeRecord` -- the
+  declared `outputs` of `experiment.technical_spike`'s Method Contract
+  (methods/contracts/experiment.technical_spike.contract.yaml, `outputs:
+  [TechnicalSpikeRecord]`). F15 experiment & validation family (Atlas L741:
+  "timebox->question->experiment/docs->decision note").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) TIMEBOX BOUNDED -- `timebox.deadline`
+  strictly after `timebox.started_at`; (b) TIMEBOX KEPT -- `timebox.
+  closed_at` falls within `[started_at, deadline]`; (c) DECISION GROUNDED
+  -- `decision_note.decided_at` falls within the spike's own actual
+  `[started_at, closed_at]` window. `ai_lego/modules/experiment/
+  technical_spike.py` enforces all three at both construction time and an
+  independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Technical Spike row (L741)"
+  - "methods/contracts/experiment.technical_spike.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L741's own
+  four-stage pipeline plus low-risk, disclosed compilation choices (the
+  SPIKE- prefix, record-level-only provenance, EXPERIMENT/DOCS finding
+  source-type enum).
+
+compilation_decisions:
+  - question: "findings[] source_type: an open string, or an enum limited to Atlas's own pipeline stage?"
+    decision: "Enum {EXPERIMENT, DOCS} -- Atlas L741's own pipeline literally names 'experiment/docs' as the evidence-gathering stage; an open string would let unrelated evidence kinds silently substitute for it."
+  - question: "Timebox/decision grounding: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 has no native date comparison across sibling fields, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, question, timebox, findings, decision_note, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^SPIKE-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.technical_spike"
+
+  question:
+    type: string
+    minLength: 1
+    description: "The technical unknown under time-boxed research. Atlas L741's own 'question' pipeline stage."
+
+  timebox:
+    type: object
+    additionalProperties: false
+    required: [started_at, deadline, closed_at]
+    description: "RUNTIME invariant: deadline strictly after started_at, and closed_at falls within [started_at, deadline] (see module description)."
+    properties:
+      started_at: {type: string, minLength: 1}
+      deadline: {type: string, minLength: 1}
+      closed_at: {type: string, minLength: 1}
+
+  findings:
+    type: array
+    minItems: 1
+    description: "Atlas L741's own 'experiment/docs' pipeline stage -- at least one recorded finding BEFORE the decision note."
+    items:
+      type: object
+      additionalProperties: false
+      required: [source_type, summary]
+      properties:
+        source_type: {type: string, enum: [EXPERIMENT, DOCS]}
+        summary: {type: string, minLength: 1}
+
+  decision_note:
+    type: object
+    additionalProperties: false
+    required: [decision, rationale, decided_at]
+    description: "Atlas L741's own 'decision note' pipeline stage. RUNTIME invariant: decided_at falls within the spike's own actual [started_at, closed_at] window."
+    properties:
+      decision: {type: string, minLength: 1}
+      rationale: {type: string, minLength: 1}
+      decided_at: {type: string, minLength: 1}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A bounded 3-day spike investigating a caching library's throughput, closing on schedule with a GO decision"
+    value:
+      id: "SPIKE-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.technical_spike"
+      question: "Can library X sustain 10k req/s with our data shape?"
+      timebox:
+        started_at: "2026-09-08T09:00:00Z"
+        deadline: "2026-09-11T09:00:00Z"
+        closed_at: "2026-09-11T08:30:00Z"
+      findings:
+        - {source_type: EXPERIMENT, summary: "Benchmarked 12k req/s sustained over 1h under production-shaped load"}
+        - {source_type: DOCS, summary: "Vendor docs confirm a horizontal-sharding path if load grows beyond this benchmark"}
+      decision_note:
+        decision: "GO -- adopt library X for the caching layer"
+        rationale: "Benchmark exceeds the 10k req/s target with headroom; sharding path covers future growth"
+        decided_at: "2026-09-11T08:30:00Z"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - "OQ-TECHSPIKE-1: findings[] carries no confidence/evidence sub-structure beyond source_type+summary -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Technical Spike row (L741) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "technical spike"/"technical_spike"/"timebox" before writing -- zero
+    pre-existing implementation or schema title overlap found. Validated
+    against jsonschema Draft202012Validator via tests/unit/test_technical_spike.py.
+  note: >
+    No mother document was modified. The four-stage pipeline is
+    transcribed directly from Atlas L741. The SPIKE- prefix, finding
+    source-type enum, and runtime-invariant placement of timebox/decision
+    grounding are this file's own compiled structure, disclosed above.

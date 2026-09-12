@@ -980,58 +980,69 @@ by_document:
       - name: "Prototype"
         line: 738
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.prototype"
       - name: "MVP"
         line: 739
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.mvp"
       - name: "Proof of Concept"
         line: 740
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.proof_of_concept"
       - name: "Technical Spike"
         line: 741
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.technical_spike"
       - name: "Concierge Test"
         line: 742
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.concierge_test"
       - name: "Wizard of Oz"
         line: 743
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.wizard_of_oz"
       - name: "Fake Door"
         line: 744
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.fake_door"
       - name: "Smoke Test"
         line: 745
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.smoke_test"
       - name: "A/B Test"
         line: 746
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.ab_test"
       - name: "Pilot"
         line: 747
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.pilot"
       - name: "Benchmark"
         line: 748
         category: "F15 validation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "experiment.benchmark"
       - name: "Impact–Effort"
         line: 760
         category: "F16 decision"

@@ -1,0 +1,89 @@
+$id: "ai-lego://methods/contracts/experiment.fake_door.contract.yaml"
+title: "Fake Door Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L744: "Fake Door｜測 feature
+  demand｜CTA→click→告知尚未開放→measure｜低成本量化需求"). 1st of 3 F15
+  methods opened this batch (fake_door/smoke_test/ab_test; family principle
+  Atlas L750-752: cheapest test that falsifies a Critical Assumption, not an
+  AI subjective score). Core invariant: disclosure_shown+disclosure_text
+  prove the "not yet available" step actually happened (a Fake Door that
+  doesn't disclose is dark-pattern deception, not an experiment), and
+  click_count<=impression_count is a real measured interest count.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 table, Fake Door row (L744)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L744 gives a real 3-stage pipeline
+  (CTA->click->disclose->measure) and effect (低成本量化需求); direct
+  transcription plus low-risk, disclosed compilation choices.
+
+id: experiment.fake_door
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [CHALLENGE, ESTIMATE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). CHALLENGE tests the demand assumption in the real world instead
+# of an opinion score; ESTIMATE quantifies interest via measured clicks;
+# VALIDATE confirms/refutes the assumption from real user behavior. All 3
+# CANONICAL_KERNEL members.
+
+purpose:
+  - measure_feature_demand_via_a_disclosed_not_yet_available_cta
+# Atlas L744 verbatim sense: measure feature demand via CTA->click->disclose
+# not-yet-available->measure.
+
+inputs:
+  required: []
+  # NEW DESIGN. Atlas gives no named input typed-object for this method (a
+  # single table row); same honesty-gap class every thin-citation sibling
+  # contract in this directory already discloses.
+
+outputs:
+  - FakeDoorExperiment
+# NEW output type (see typed-objects/fake-door-record.schema.yaml).
+
+preconditions:
+  - "disclosure_shown is true and disclosure_text is a non-empty string -- the record cannot exist without disclosing the feature is not yet available"
+  - "click_count and impression_count are both present, non-negative integers, with click_count <= impression_count"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F15's table row names no explicit next-step method.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Is disclosure_shown a schema `const: true`, or a runtime invariant?"
+    decision: "Runtime invariant, enforced by the builder and an independent gate -- keeps the module the single enforcement point, same choice framing.smart makes for its own date validity despite a schema `format` annotation existing too."
+  - question: "family: experiment -- does this collide with the Atlas §9-cited, still-unbuilt `validation.experiment` id?"
+    decision: "No collision. `validation.experiment` (named in causal.dag.contract.yaml's/causal.rct.contract.yaml's own recommended_next/compilation_decisions) is a different family (validation) and a different id; `family: experiment` is this task's own shared F15 namespace, mandated for 4 concurrent sibling agents opening F15 together."
+
+open_questions:
+  - "OQ-FAKEDOOR-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-FAKEDOOR-2: no upper bound relates click_count/impression_count to a go/no-go threshold (contrast experiment.smoke_test's own pre-registered threshold) -- Atlas L744's own effect column is 量化 (quantify), not 決策 (decide); a future revision could add one.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table (L734-748) and core principle (L750-752) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "fake door"/"fakedoor" and every schema title, and for "family: experiment"
+    (new shared namespace) before writing -- zero pre-existing implementation
+    or schema title overlap found. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 2-stage disclosure+measurement
+    pipeline is transcribed from Atlas L744. The click<=impression bound and
+    the runtime (not schema-const) placement of the disclosure invariant are
+    this file's own compiled structure, disclosed above.

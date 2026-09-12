@@ -1,0 +1,96 @@
+$id: "ai-lego://methods/contracts/experiment.benchmark.contract.yaml"
+title: "Benchmark Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L748: "Benchmark | 與 baseline/
+  competitor 比較 | fixed workload/metrics/environment | 避免憑印象選型").
+  Core invariant: "fixed" made structural, not merely a label -- workload
+  and environment are declared exactly ONCE at record level (no per-
+  candidate override field exists at all), and every candidate's reported
+  results must cover the declared metrics set EXACTLY (no missing, no
+  extra) -- a candidate scored on a different metric set is exactly the
+  "憑印象選型" (choosing by impression) Atlas's own benefit column exists
+  to prevent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Benchmark row (L748)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L748 gives the fixed-workload/metrics/
+  environment pipeline and effect ("避免憑印象選型") -- direct
+  transcription plus low-risk, disclosed compilation choices.
+
+id: experiment.benchmark
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [COMPARE, VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). COMPARE is the row's own verb ("與 baseline/competitor 比較");
+# VALIDATE checks every candidate's results against the fixed metric set;
+# DECIDE is the row's own stated effect (choosing a candidate on evidence,
+# not impression). All three CANONICAL_KERNEL members.
+
+purpose:
+  - compare_candidates_against_a_baseline_under_one_fixed_workload_metric_set_and_environment
+# Atlas L748 verbatim sense.
+
+inputs:
+  required:
+    - BenchmarkDesign
+# NEW DESIGN. Atlas gives no named input typed-object; the starting point
+# is the fixed workload/metrics/environment declaration itself, same
+# honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - BenchmarkRecord
+# NEW output type (see typed-objects/benchmark-record.schema.yaml).
+
+preconditions:
+  - "at least 2 candidates declared (a baseline plus at least one comparator)"
+  - "every candidate's results[] cover exactly the declared fixed metrics set -- no missing metric, no extra metric"
+  # STRUCTURAL. Atlas's own pipeline is "fixed workload/metrics/
+  # environment" -- a comparison where candidates are scored on different
+  # metric sets lets exactly the "憑印象選型" assumption back in.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention every sibling single-record
+  # typed-object in this directory uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas F15's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a benchmark record has no
+  # external side effect.
+
+open_questions:
+  - "OQ-BENCHMARK-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-BENCHMARK-2: results values are modeled as raw numbers with no declared unit/direction (higher-is-better vs lower-is-better) per metric -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Benchmark row (L748) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "experiment.benchmark"/"benchmark-record"/"BenchmarkRecord"/"fixed
+    workload"/"fixed metrics" before writing -- zero pre-existing
+    implementation or schema title overlap found (the only pre-existing
+    "benchmark" hits were the mother-document table row itself and an
+    unrelated devops_sre.load_test contract's citation of a different EC
+    §50 "不要用單次 benchmark" rule, not a schema or module). Validated
+    against specs/cognitive/method.schema.yaml with jsonschema.
+    Draft202012Validator.
+  note: >
+    No mother document was modified. The fixed-workload/metrics/
+    environment pipeline is transcribed directly from Atlas L748. The
+    BENCH- id prefix, the single-declaration-point design for workload/
+    environment (rather than a per-candidate override), and the exact-set
+    metric-coverage rule are this file's own compiled structure, disclosed
+    above, not textually cited.

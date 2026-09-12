@@ -1,0 +1,140 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/benchmark-record.schema.yaml"
+title: Benchmark Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BenchmarkRecord` -- the
+  declared `outputs` of `experiment.benchmark`'s Method Contract (methods/
+  contracts/experiment.benchmark.contract.yaml, `outputs:
+  [BenchmarkRecord]`). F15 experiment & validation family (Atlas L748:
+  "fixed workload/metrics/environment -> 避免憑印象選型").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) `workload`/`environment` are declared
+  exactly ONCE at record level -- structurally "fixed" because no per-
+  candidate override field exists in this schema at all, not merely
+  advised; (b) FIXED METRIC COVERAGE -- every `candidates[].results` object
+  covers EXACTLY the declared `metrics[]` set (no missing metric, no extra
+  metric); (c) at least 2 candidates declared; (d) no duplicate
+  `candidate_id`; (e) every `results[]` value is a finite real number
+  (`bool` excluded). `ai_lego/modules/experiment/benchmark.py` enforces
+  all five at both construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Benchmark row (L748)"
+  - "methods/contracts/experiment.benchmark.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L748's fixed-
+  workload/metrics/environment pipeline plus low-risk, disclosed
+  compilation choices (the BENCH- prefix, record-level-only provenance,
+  the single-declaration-point design).
+
+compilation_decisions:
+  - question: "How to make 'fixed workload/metrics/environment' structural rather than a naming convention?"
+    decision: "workload and environment each appear exactly once at record level, not per-candidate -- there is no schema field a candidate could use to override either, so they cannot vary between candidates by construction. metrics[] is likewise declared once; per-candidate FIXED coverage of that exact set is a RUNTIME cross-field invariant (JSON Schema 2020-12 cannot cross-check that every candidates[].results key set equals metrics[] declaratively), same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+  - question: "Should results[] values carry a declared direction (higher-is-better vs lower-is-better) per metric?"
+    decision: "No, out of scope -- disclosed as OQ-BENCHMARK-2 in the method contract. Atlas L748 names no such structure; adding one here would be inventing a richer schema with no textual basis."
+
+type: object
+additionalProperties: false
+required: [id, version, workload, environment, metrics, candidates, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^BENCH-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.benchmark"
+
+  workload:
+    type: object
+    additionalProperties: false
+    required: [description]
+    description: "The FIXED workload, declared exactly once for the whole record (Atlas L748)."
+    properties:
+      description: {type: string, minLength: 1}
+      parameters:
+        type: object
+        default: {}
+        description: "Free-form workload parameters (e.g. request rate, dataset size)."
+
+  environment:
+    type: object
+    additionalProperties: false
+    required: [description]
+    description: "The FIXED environment, declared exactly once for the whole record (Atlas L748)."
+    properties:
+      description: {type: string, minLength: 1}
+      parameters:
+        type: object
+        default: {}
+        description: "Free-form environment parameters (e.g. instance type, region, dataset version)."
+
+  metrics:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+    description: "The FIXED metric set every candidate below MUST be measured on -- identically, not a subset (see module-level RUNTIME invariant)."
+
+  candidates:
+    type: array
+    minItems: 2
+    description: "At least a baseline plus one comparator -- a benchmark of 1 candidate has nothing to compare against."
+    items:
+      type: object
+      additionalProperties: false
+      required: [candidate_id, label, results]
+      properties:
+        candidate_id: {type: string, minLength: 1}
+        label: {type: string, minLength: 1}
+        results:
+          type: object
+          description: "metric_name -> numeric result. RUNTIME invariant: keys MUST equal `metrics[]` exactly (see module description)."
+          additionalProperties: {type: number}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-candidate benchmark (baseline + 1 comparator), both scored on the identical fixed metric set"
+    value:
+      id: "BENCH-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.benchmark"
+      workload: {description: "10k synthetic checkout requests, fixed seed", parameters: {request_count: 10000, seed: 42}}
+      environment: {description: "single c6i.xlarge, us-east-1, cold cache", parameters: {instance_type: "c6i.xlarge", region: "us-east-1"}}
+      metrics: ["p95_latency_ms", "throughput_rps", "error_rate"]
+      candidates:
+        - {candidate_id: "baseline-v1", label: "Current production checkout", results: {p95_latency_ms: 420, throughput_rps: 180, error_rate: 0.004}}
+        - {candidate_id: "candidate-v2", label: "New checkout flow", results: {p95_latency_ms: 310, throughput_rps: 240, error_rate: 0.002}}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-BENCHMARKRECORD-1: no declared statistical-significance or repeat-run structure (single point-in-time results per candidate) -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Benchmark row (L748) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "benchmark-record"/"BenchmarkRecord" and every schema title before
+    writing -- zero pre-existing implementation or schema title overlap
+    found. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_benchmark.py.
+  note: >
+    No mother document was modified. The fixed-workload/metrics/
+    environment pipeline is transcribed directly from Atlas L748. The
+    BENCH- prefix, the single-declaration-point design, and the exact-set
+    metric-coverage rule as a runtime invariant are this file's own
+    compiled structure, disclosed above.

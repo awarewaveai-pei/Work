@@ -1,0 +1,81 @@
+$id: "ai-lego://methods/contracts/experiment.proof_of_concept.contract.yaml"
+title: "Proof of Concept Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L740: "Proof of Concept |
+  驗證技術可行 | technical success->isolated implementation->benchmark |
+  先去除技術未知"). Falsifies a technical-feasibility assumption via a
+  benchmark run against a pre-defined success criterion, in an
+  implementation explicitly isolated from production. Core invariant:
+  (a) the implementation must actually be isolated -- a PoC wired into
+  production defeats "先去除技術未知"; (b) the feasibility verdict must be
+  the recomputed benchmark-vs-criterion comparison, not an asserted claim.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Proof of Concept row (L740)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L740 gives a real three-stage pipeline
+  and effect ("先去除技術未知") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: experiment.proof_of_concept
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [DECOMPOSE, TEST, EVALUATE]
+# INFERRED, not cited. DECOMPOSE isolates the technical unknown into a
+# measurable success criterion, TEST is the isolated benchmark run,
+# EVALUATE is the mechanical criterion-vs-measurement verdict.
+
+purpose:
+  - falsify_a_technical_feasibility_assumption_via_an_isolated_benchmark
+
+inputs:
+  required:
+    - TechnicalUnknown
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting
+  # point is the technical unknown under test.
+
+outputs:
+  - ProofOfConcept
+# NEW output type (see typed-objects/proof-of-concept-record.schema.yaml).
+
+preconditions:
+  - "implementation.isolated is true AND implementation.production_integration is false"
+  - "feasibility_verdict equals the recomputed comparison of benchmark_result against success_criteria"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next: []
+# Atlas F15's Proof of Concept row names no explicit next-step method.
+
+rollback:
+  side_effect_free: true
+  # Producing a PoC record has no external side effect; the isolation
+  # precondition is precisely what keeps the underlying experiment itself
+  # side-effect-free with respect to production.
+
+open_questions:
+  - "OQ-POC-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-POC-2: comparison operator is the same 5-value GTE/LTE/GT/LT/EQ enum experiment.mvp uses -- should a future revision extract a shared typed-object for it?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Proof of Concept row (L740) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "experiment\.", "proof.of.concept", "\bpoc\b", "family: experiment"
+    before writing -- zero pre-existing `experiment.*` contract/module or
+    schema title overlap. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The three-stage pipeline is
+    transcribed verbatim from Atlas L740. The isolation precondition,
+    comparison enum, and verdict-consistency precondition are this file's
+    own compiled structure, disclosed above, not textually cited.

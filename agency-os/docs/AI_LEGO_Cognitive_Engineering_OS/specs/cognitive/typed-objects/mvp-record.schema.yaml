@@ -1,0 +1,142 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/mvp-record.schema.yaml"
+title: MVP Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MVPRecord` -- the declared
+  `outputs` of `experiment.mvp`'s Method Contract
+  (methods/contracts/experiment.mvp.contract.yaml, `outputs: [MVPRecord]`).
+  F15 experiment & validation family (Atlas L739 + §12.29 L2913-2922:
+  "最少做什麼，才能得到足以改變決策的 evidence？").
+
+  Real invariants (RUNTIME, same disclosed-gap class as
+  `cross-impact-analysis.schema.yaml`'s own matrix-completeness
+  precedent): (a) DECISION-CHANGING THRESHOLD -- `decision_threshold`'s
+  `decision_if_met` and `decision_if_not_met` must differ, or no real
+  usage result could ever change a decision; (b) DECISION CONSISTENCY --
+  `outcome.metric_met`/`outcome.decision_taken` must equal the mechanical
+  recomputation of `real_usage_result` against `decision_threshold`, not
+  an asserted narrative override. `ai_lego/modules/experiment/mvp.py`
+  enforces both at construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, MVP row (L739)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.29 最小可行產品 (L2913-2922)"
+  - "methods/contracts/experiment.mvp.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L739 + §12.29
+  plus low-risk, disclosed compilation choices (the MVP- prefix, record-
+  level-only provenance, 5-value comparison enum).
+
+compilation_decisions:
+  - question: "How to make §12.29's '足以改變決策的 evidence' structural rather than narrative?"
+    decision: "Require decision_if_met != decision_if_not_met -- a threshold whose two arms are identical evidence cannot change any decision by construction."
+  - question: "Decision consistency: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot recompute a comparison across 3 sibling fields (actual_value/target_value/comparison) and check it against a 4th (decision_taken) declaratively, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, critical_assumption, decision_threshold, real_usage_result, outcome, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^MVP-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.mvp"
+
+  critical_assumption:
+    type: object
+    additionalProperties: false
+    required: [statement, falsifiable_if]
+    description: "The critical VALUE assumption under test, made falsifiable -- §12.29's '最重要的 value assumption'."
+    properties:
+      statement: {type: string, minLength: 1}
+      falsifiable_if: {type: string, minLength: 1}
+
+  decision_threshold:
+    type: object
+    additionalProperties: false
+    required: [metric, target_value, comparison, decision_if_met, decision_if_not_met]
+    description: "Pre-registered BEFORE real usage. RUNTIME invariant: decision_if_met != decision_if_not_met (see module description)."
+    properties:
+      metric: {type: string, minLength: 1}
+      target_value: {type: number}
+      comparison: {type: string, enum: [GTE, LTE, GT, LT, EQ]}
+      decision_if_met: {type: string, minLength: 1}
+      decision_if_not_met: {type: string, minLength: 1}
+
+  real_usage_result:
+    type: object
+    additionalProperties: false
+    required: [actual_value, real_users_count, usage_context]
+    description: "REAL usage, not a simulated/lab result -- Atlas's own 'real usage' pipeline stage, distinct from experiment.prototype's 'user test'."
+    properties:
+      actual_value: {type: number}
+      real_users_count: {type: integer, minimum: 1}
+      usage_context: {type: string, minLength: 1}
+
+  outcome:
+    type: object
+    additionalProperties: false
+    required: [metric_met, decision_taken]
+    description: "RUNTIME invariant: must equal the mechanical recomputation of real_usage_result against decision_threshold (see module description)."
+    properties:
+      metric_met: {type: boolean}
+      decision_taken: {type: string, minLength: 1}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A decision-changing threshold where real usage met the bar"
+    value:
+      id: "MVP-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.mvp"
+      critical_assumption:
+        statement: "使用者願意為『一鍵報稅摘要』功能付費"
+        falsifiable_if: "付費轉換率低於 5%"
+      decision_threshold:
+        metric: "付費轉換率"
+        target_value: 0.05
+        comparison: GTE
+        decision_if_met: "投入完整開發"
+        decision_if_not_met: "砍掉此功能方向"
+      real_usage_result:
+        actual_value: 0.08
+        real_users_count: 120
+        usage_context: "真實付費牆，120 位候補名單使用者"
+      outcome: {metric_met: true, decision_taken: "投入完整開發"}
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-MVPRECORD-1: comparison operator is the same 5-value enum experiment.proof_of_concept uses -- should a future revision extract a shared typed-object for it?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, MVP row (L739), and §12.29 (L2913-2922)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively
+    for "mvp-record", "experiment.mvp" and this schema's title before
+    writing -- zero pre-existing implementation or schema title overlap
+    found (other "MVP" hits in the corpus are the Master Plan's own
+    product-development-phase sense of the word, not a catalogued method
+    id). Validated against jsonschema Draft202012Validator via
+    tests/unit/test_mvp.py.
+  note: >
+    No mother document was modified. The pipeline and §12.29's anti-
+    pattern/correct-question are transcribed directly. The MVP- prefix,
+    comparison enum, and runtime-invariant placement of decision-changing-
+    threshold + decision-consistency are this file's own compiled
+    structure, disclosed above.

@@ -1,0 +1,90 @@
+$id: "ai-lego://methods/contracts/experiment.smoke_test.contract.yaml"
+title: "Smoke Test Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L745: "Smoke Test｜建置前測市場｜
+  landing/ad/offer→signup/preorder threshold｜快速驗證需求"). 2nd of 3 F15
+  methods opened this batch (fake_door/smoke_test/ab_test; family principle
+  Atlas L750-752: cheapest test that falsifies a Critical Assumption).
+  DISAMBIGUATION: unrelated to this repo's own `scripts/smoke-test.ps1`/
+  `/smoke-test` infra-health-check skill -- naming coincidence only, no
+  cross-reference. Core invariant: signup_or_preorder_threshold is
+  pre-registered (declared strictly BEFORE measured_at) and decision is a
+  mechanical GO/NO_GO consequence of that threshold, not a separate assertion.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 table, Smoke Test row (L745)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L745 gives a real pipeline
+  (landing/ad/offer->signup/preorder threshold) and effect (快速驗證需求);
+  direct transcription plus low-risk, disclosed compilation choices.
+
+id: experiment.smoke_test
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [CHALLENGE, ESTIMATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). CHALLENGE tests the market-demand assumption pre-build;
+# ESTIMATE quantifies demand via measured signups; DECIDE renders the
+# pre-registered go/no-go call. All 3 CANONICAL_KERNEL members.
+
+purpose:
+  - test_market_demand_before_building_via_a_pre_registered_signup_threshold
+# Atlas L745 verbatim sense: test the market before building via a
+# landing/ad/offer, comparing measured signup/preorder count to a threshold.
+
+inputs:
+  required: []
+  # NEW DESIGN. Atlas gives no named input typed-object for this method (a
+  # single table row); same honesty-gap class every thin-citation sibling
+  # contract in this directory already discloses.
+
+outputs:
+  - SmokeTestExperiment
+# NEW output type (see typed-objects/smoke-test-record.schema.yaml).
+
+preconditions:
+  - "threshold_declared_at is strictly earlier than measured_at -- the go/no-go bar must be fixed before results exist, or it is not a decision instrument"
+  - "signup_or_preorder_threshold is a positive integer -- a threshold of zero or negative is not a real go/no-go bar"
+  - "decision equals GO iff measured_signups >= signup_or_preorder_threshold, else NO_GO -- the decision is a mechanical consequence of the pre-registered rule, not a separate hopeful assertion"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+recommended_next: []
+# Atlas F15's table row names no explicit next-step method.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "How is 'the threshold was declared before results existed' operationalized without a real clock?"
+    decision: "Two required ISO-8601 timestamps (threshold_declared_at, measured_at) with a strict < ordering, same idiom learning.ooda's own timestamp-monotonicity invariant already establishes for a different family."
+  - question: "Should `decision` be a free-text field, or a value structurally checked against measured_signups vs threshold?"
+    decision: "Structurally checked (GO iff measured_signups>=threshold else NO_GO) -- a smoke test's whole point is a decision instrument; an uncoupled decision label would let a caller assert GO regardless of the measured data."
+
+open_questions:
+  - "OQ-SMOKETEST-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-SMOKETEST-2: no field distinguishes signup vs preorder (Atlas's own row names both) -- a future revision could split them into 2 typed counts if a caller needs to report both simultaneously.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table (L734-748) and core principle (L750-752) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "smoke test"/"smoketest" before writing -- only hits were the repo's own
+    unrelated `scripts/smoke-test.ps1` governance skill and event-tree/
+    fault-tree/pdca typed-object mentions of "smoke test" as a generic
+    testing-strategy noun, none an implementation of this method; zero
+    pre-existing schema title overlap. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The threshold/decision pipeline is
+    transcribed from Atlas L745. The pre-registration timestamp pair and the
+    structurally-checked decision field are this file's own compiled
+    structure, disclosed above.

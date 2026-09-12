@@ -1,0 +1,86 @@
+$id: "ai-lego://methods/contracts/experiment.mvp.contract.yaml"
+title: "MVP Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L739: "MVP | 驗證核心價值 |
+  critical assumption->minimal product->real usage | 縮短 learning
+  cycle"; dedicated §12.29 L2913-2922: "不是把正式產品做爛一點"; "最少做
+  什麼，才能得到足以改變決策的 evidence？"). Core invariant: the pre-
+  registered decision threshold must actually be capable of changing a
+  decision (met-arm != not-met-arm), and the recorded decision must
+  mechanically follow the real-usage measurement, not a post-hoc override.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, MVP row (L739)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.29 最小可行產品 (L2913-2922)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L739 + §12.29 give a real pipeline,
+  an explicit anti-pattern, and an explicit "correct question" -- direct
+  transcription plus low-risk, disclosed compilation choices.
+
+id: experiment.mvp
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [DECOMPOSE, TEST, EVALUATE]
+# INFERRED, not cited. DECOMPOSE isolates the critical value assumption,
+# TEST is the real-usage measurement, EVALUATE is the mechanical
+# threshold-vs-outcome decision step §12.29 demands.
+
+purpose:
+  - falsify_a_critical_value_assumption_via_real_usage_against_a_pre_registered_decision_threshold
+
+inputs:
+  required:
+    - CriticalAssumption
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting
+  # point is the critical value assumption under test.
+
+outputs:
+  - MVPRecord
+# NEW output type (see typed-objects/mvp-record.schema.yaml).
+
+preconditions:
+  - "decision_threshold's met/not-met arms differ (the test can actually change a decision)"
+  - "real_usage_result comes from >=1 real user (not simulated)"
+  - "recorded outcome matches what the pre-registered threshold rule dictates given the measured value"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next: []
+# Atlas F15's MVP row names no explicit next-step method.
+
+rollback:
+  side_effect_free: true
+  # Producing an MVP record has no external side effect (the real-usage
+  # exposure itself is out of this record's scope, same as every sibling
+  # F-family contract's "no external side effect in the RECORD" framing).
+
+open_questions:
+  - "OQ-MVP-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-MVP-2: comparison operator is a 5-value GTE/LTE/GT/LT/EQ enum -- should a future revision add a tolerance band for EQ on floats?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, MVP row (L739), and dedicated §12.29 (L2913-2922)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "experiment\.", "\bmvp\b", "family: experiment" before writing -- zero
+    pre-existing `experiment.*` contract/module; existing "MVP" hits are
+    all narrative references to the Master Plan's own product-development
+    phase (a different sense of the word, e.g. architecture-inventory.yaml
+    "85. MVP 分階段", capability contracts' "pre-MVP core specs"), not a
+    catalogued method id. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The pipeline, the "不是把正式產品做
+    爛一點" anti-pattern, and the "正確問題" are transcribed from Atlas L739
+    and §12.29. The decision-threshold shape, comparison enum, and outcome-
+    consistency precondition are this file's own compiled structure,
+    disclosed above, not textually cited.

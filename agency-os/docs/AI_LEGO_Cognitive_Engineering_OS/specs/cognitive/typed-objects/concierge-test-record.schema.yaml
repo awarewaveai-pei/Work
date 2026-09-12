@@ -1,0 +1,128 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/concierge-test-record.schema.yaml"
+title: Concierge Test Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ConciergeTestRecord` -- the
+  declared `outputs` of `experiment.concierge_test`'s Method Contract
+  (methods/contracts/experiment.concierge_test.contract.yaml, `outputs:
+  [ConciergeTestRecord]`). F15 experiment & validation family (Atlas L742:
+  "manual service->measure use/pay").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `technical-spike-record.schema.yaml`'s own
+  timebox precedent): (a) ZERO AUTOMATION -- `manual_delivery.
+  automation_components` must be an empty array; (b) MEASURED SIGNAL
+  REQUIRED -- `measurements[]` must contain at least one well-shaped
+  entry, each with a real, finite, non-negative `value`, a positive
+  integer `sample_size`, and a parseable `measured_at`. `ai_lego/modules/
+  experiment/concierge_test.py` enforces both at construction time and an
+  independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Concierge Test row (L742)"
+  - "methods/contracts/experiment.concierge_test.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L742's own
+  two-stage pipeline plus low-risk, disclosed compilation choices (the
+  CONCIERGE- prefix, record-level-only provenance, measurement metric-type
+  enum).
+
+compilation_decisions:
+  - question: "manual_delivery.automation_components: a boolean 'is_manual' flag, or a declared list checked for emptiness?"
+    decision: "A declared list checked for emptiness. A bare boolean can be asserted without naming what (if anything) is automated; requiring the caller to enumerate automation components and then checking the list is empty makes 'zero automation' a falsifiable claim, not a label."
+  - question: "measurements[] metric_type: an open string, or an enum limited to Atlas's own 'use/pay' pipeline stage?"
+    decision: "Enum {USAGE_COUNT, WILLINGNESS_TO_PAY_AMOUNT} -- Atlas L742's own pipeline literally names 'use/pay' as the measured signal; an open string would let an unrelated metric silently substitute for it."
+
+type: object
+additionalProperties: false
+required: [id, version, service_description, manual_delivery, measurements, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CONCIERGE-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "experiment.concierge_test"
+
+  service_description:
+    type: string
+    minLength: 1
+    description: "The candidate service under manual delivery. Atlas L742's own 'manual service' pipeline stage."
+
+  manual_delivery:
+    type: object
+    additionalProperties: false
+    required: [delivered_by, automation_components]
+    description: "RUNTIME invariant: automation_components must be empty -- zero automation in the declared scope (see module description)."
+    properties:
+      delivered_by:
+        type: string
+        minLength: 1
+        description: "Who (a human role/name) actually delivers the service by hand."
+      automation_components:
+        type: array
+        items: {type: string}
+        description: "Declared automation components in scope. RUNTIME invariant: MUST be empty for a Concierge Test."
+
+  measurements:
+    type: array
+    minItems: 1
+    description: "Atlas L742's own 'measure use/pay' pipeline stage -- at least one recorded signal, not a claim."
+    items:
+      type: object
+      additionalProperties: false
+      required: [metric_type, value, unit, sample_size, measured_at]
+      properties:
+        metric_type: {type: string, enum: [USAGE_COUNT, WILLINGNESS_TO_PAY_AMOUNT]}
+        value: {type: number, minimum: 0}
+        unit: {type: string, minLength: 1}
+        sample_size: {type: integer, minimum: 1}
+        measured_at: {type: string, minLength: 1}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A manually-delivered meal-planning concierge service measuring both usage and willingness to pay, zero automation declared"
+    value:
+      id: "CONCIERGE-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "experiment.concierge_test"
+      service_description: "Weekly personalized meal plan, hand-assembled and emailed by a human nutritionist"
+      manual_delivery:
+        delivered_by: "founder acting as the nutritionist"
+        automation_components: []
+      measurements:
+        - {metric_type: USAGE_COUNT, value: 34, unit: "plans requested", sample_size: 40, measured_at: "2026-09-11T00:00:00Z"}
+        - {metric_type: WILLINGNESS_TO_PAY_AMOUNT, value: 19.99, unit: "USD/month median stated price", sample_size: 40, measured_at: "2026-09-11T00:00:00Z"}
+      provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-CONCIERGETEST-1: measurements[] carries no confidence-interval sub-structure beyond value+sample_size -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Concierge Test row (L742) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "concierge test"/"concierge_test"/"manual service" before writing --
+    zero pre-existing implementation or schema title overlap found.
+    Validated against jsonschema Draft202012Validator via
+    tests/unit/test_concierge_test.py.
+  note: >
+    No mother document was modified. The two-stage pipeline is
+    transcribed directly from Atlas L742. The CONCIERGE- prefix,
+    measurement metric-type enum, and runtime-invariant placement of the
+    zero-automation-scope and measured-signal-required checks are this
+    file's own compiled structure, disclosed above.

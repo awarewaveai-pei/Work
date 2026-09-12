@@ -1,0 +1,97 @@
+$id: "ai-lego://methods/contracts/experiment.concierge_test.contract.yaml"
+title: "Concierge Test Method Contract"
+status: ACTIVE
+
+description: >
+  F15 experiment & validation family (Atlas L742: "Concierge Test | 人工先
+  提供服務 | manual service->measure use/pay | 先驗證價值再自動化"). Deliver
+  the service by hand, before automating any of it, and measure a real
+  usage/willingness-to-pay signal. Core invariant: the declared scope must
+  contain ZERO automation components -- Atlas's own "人工" (manual) half --
+  and the record must carry at least one measured usage/pay signal, not a
+  claim -- a concierge test with no measurement proves nothing.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F15 實驗與驗證 table, Concierge Test row (L742)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L742 gives a real two-stage pipeline
+  and effect (先驗證價值再自動化) -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: experiment.concierge_test
+version: "1.0.0"
+family: experiment
+
+cognitive_primitives: [VALIDATE, ESTIMATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F15
+# members). VALIDATE checks the value assumption via manual delivery;
+# ESTIMATE is the measured use/pay signal; DECIDE is the automate-or-not
+# call the method's own benefit column names. All three CANONICAL_KERNEL
+# members.
+
+purpose:
+  - deliver_a_service_manually_and_measure_a_real_use_or_pay_signal
+# Atlas L742 verbatim sense: manually provide the service first, measure
+# real usage/willingness to pay, before investing in automation.
+
+inputs:
+  required:
+    - ServiceDescription
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the candidate service under manual delivery,
+  # same honesty-gap class every sibling F-family contract already
+  # discloses.
+
+outputs:
+  - ConciergeTestRecord
+# NEW output type (see typed-objects/concierge-test-record.schema.yaml).
+
+preconditions:
+  - "manual_delivery.automation_components is empty (zero automation in declared scope)"
+  - "at least 1 measured usage/willingness-to-pay signal is recorded"
+  # NEW, structurally necessary. Atlas's own pipeline is "manual service->
+  # measure use/pay" -- a record declaring any automation component is not
+  # "人工先提供" (manually-delivered first), and a record with no
+  # measurement never actually validated the value assumption it exists
+  # to test.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent concierge test record, same
+  # placement convention every structurally similar single-record
+  # F-family sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F15's table has no explicit next-step method named for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a concierge test record has no
+  # external side effect (the manually-delivered service itself is
+  # outside this record's own scope).
+
+open_questions:
+  - "OQ-CONCIERGE-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-CONCIERGE-2: measurements[] metric_type is limited to USAGE_COUNT/WILLINGNESS_TO_PAY_AMOUNT per Atlas's own 'use/pay' pipeline stage -- should a future revision allow other measured signals?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F15 table, Concierge Test row (L742) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "concierge test"/"concierge_test"/"manual service" before writing --
+    zero pre-existing implementation or schema title overlap found.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. The two-stage pipeline is
+    transcribed verbatim from Atlas L742. The zero-automation-scope and
+    measured-signal-required runtime invariants, the measurement
+    metric-type enum, and record id prefix are this file's own compiled
+    structure, disclosed above, not textually cited.

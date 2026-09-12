@@ -5141,6 +5141,256 @@ tier_1:
       cb04e491f commit despite a clean pre-commit diff check -- both were
       regenerated and re-verified in this same session before F13 landed.
 
+  onehundredninetysixth_concrete_entry:
+    # F15 experiment/validation family opening batch, 2026-09-12. 4 agents
+    # (3+3+3+2 methods); 0 of 11 existed before this batch.
+    method_id: "experiment.prototype"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L738, sole citation: "learning goal->低保真->
+      user test->iterate", effect "低成本發現問題"). Real invariant:
+      fidelity ceiling (LOW/MEDIUM only, HIGH refused -- Atlas's own
+      literal "低保真") and iteration traceability -- every claimed
+      iteration must trace to a real user_test.observations[] index,
+      refusing an "iterated based on feedback" claim with no observation
+      behind it.
+    source: "methods/contracts/experiment.prototype.contract.yaml + specs/cognitive/typed-objects/prototype-record.schema.yaml + ai_lego/modules/experiment/prototype.py"
+    note: >
+      35 tests pass. F15 experiment & validation family opened this batch
+      by 4 concurrent sibling agents (11 members total). CLI PASS:
+      well-formed record + PROTO_DANGLING_OBSERVATION_REF
+      construction-time refusal + independent iteration_traceability
+      gate hand-tamper catch.
+
+  onehundredninetyseventh_concrete_entry:
+    method_id: "experiment.mvp"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L739) + dedicated section 12.29 (L2913-2922:
+      "不是把正式產品做爛一點"; "最少做什麼，才能得到足以改變決策的
+      evidence？"). Real invariant: decision-changing threshold
+      (decision_if_met != decision_if_not_met, or no result could ever
+      change a decision) and decision consistency (outcome is
+      mechanically derived from real_usage_result against
+      decision_threshold, never an asserted narrative override).
+    source: "methods/contracts/experiment.mvp.contract.yaml + specs/cognitive/typed-objects/mvp-record.schema.yaml + ai_lego/modules/experiment/mvp.py"
+    note: >
+      37 tests pass. CLI PASS: well-formed record +
+      MVP_THRESHOLD_NOT_DECISION_CHANGING construction-time refusal +
+      independent decision_consistency gate hand-tamper catch.
+
+  onehundredninetyeighth_concrete_entry:
+    method_id: "experiment.proof_of_concept"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L740, sole citation: "technical success->
+      isolated implementation->benchmark", effect "先去除技術未知"). Real
+      invariant: isolation (implementation.isolated must be true AND
+      production_integration must be false -- a PoC wired into
+      production has already committed before the unknown is resolved)
+      and verdict consistency (feasibility_verdict is mechanically
+      derived from benchmark_result against success_criteria, never an
+      asserted claim).
+    source: "methods/contracts/experiment.proof_of_concept.contract.yaml + specs/cognitive/typed-objects/proof-of-concept-record.schema.yaml + ai_lego/modules/experiment/proof_of_concept.py"
+    note: >
+      36 tests pass. CLI PASS: well-formed record + POC_NOT_ISOLATED
+      construction-time refusal + independent verdict_consistency gate
+      hand-tamper catch. One real bug found and fixed during this
+      method's own verification: prototype.py's fidelity() (sibling
+      method, same batch) originally mis-tagged every invalid fidelity
+      level as PROTO_FIDELITY_TOO_HIGH instead of only HIGH -- caught by
+      that method's own test, fixed before closure.
+
+  onehundredninetyninth_concrete_entry:
+    method_id: "experiment.technical_spike"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L741, sole citation: "timebox->question->
+      experiment/docs->decision note", effect "提升估算可信度"). Real
+      invariant: the record is bounded by construction -- deadline
+      strictly after started_at, actual closed_at never exceeds the
+      declared deadline, and decision_note.decided_at falls within the
+      spike's own actual [started_at, closed_at] window.
+    source: "methods/contracts/experiment.technical_spike.contract.yaml + specs/cognitive/typed-objects/technical-spike-record.schema.yaml + ai_lego/modules/experiment/technical_spike.py"
+    note: >
+      37 tests + 8 subtests pass. CLI PASS: well-formed record +
+      SPIKE_TIMEBOX_EXCEEDED construction-time refusal + independent
+      decision_grounded gate hand-tamper catch.
+
+  twohundredth_concrete_entry:
+    method_id: "experiment.concierge_test"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L742, sole citation: "manual service->measure
+      use/pay", effect "先驗證價值再自動化"). Real invariant:
+      manual_delivery.automation_components must be an empty declared
+      list (zero automation, not a self-asserted label) AND at least one
+      well-shaped measured usage/willingness-to-pay signal is recorded.
+    source: "methods/contracts/experiment.concierge_test.contract.yaml + specs/cognitive/typed-objects/concierge-test-record.schema.yaml + ai_lego/modules/experiment/concierge_test.py"
+    note: >
+      38 tests + 8 subtests pass. CLI PASS: well-formed record +
+      CONCIERGE_NOT_MANUAL construction-time refusal + independent
+      measurement_integrity gate hand-tamper catch.
+
+  twohundredfirst_concrete_entry:
+    method_id: "experiment.wizard_of_oz"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L743, sole citation: "mock automation->human
+      backend", effect "驗證互動而不先建完整系統"). Real invariant:
+      front_end.presented_as_automated AND back_end.actually_human_
+      operated must both be literally true (the defining contrast vs
+      experiment.concierge_test), AND disclosure.faked_components must
+      name at least 1 faked component.
+    source: "methods/contracts/experiment.wizard_of_oz.contract.yaml + specs/cognitive/typed-objects/wizard-of-oz-record.schema.yaml + ai_lego/modules/experiment/wizard_of_oz.py"
+    note: >
+      34 tests + 8 subtests pass. CLI PASS: well-formed record +
+      WOZ_BACK_NOT_HUMAN construction-time refusal + independent
+      disclosure_integrity gate hand-tamper catch.
+
+  twohundredsecond_concrete_entry:
+    method_id: "experiment.fake_door"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L744, sole citation: "CTA->click->告知尚未開放
+      ->measure", effect "低成本量化需求"). Real invariant:
+      disclosure_shown must be exactly true AND disclosure_text
+      non-empty (Atlas's own "告知尚未開放" pipeline stage is mandatory,
+      not optional -- an omission is dark-pattern deception, not an
+      experiment), AND click_count<=impression_count is a real measured
+      interest count.
+    source: "methods/contracts/experiment.fake_door.contract.yaml + specs/cognitive/typed-objects/fake-door-record.schema.yaml + ai_lego/modules/experiment/fake_door.py"
+    note: >
+      40 tests pass. CLI PASS: well-formed record + FAKEDOOR_NOT_DISCLOSED
+      construction-time refusal + independent measurement_integrity gate
+      hand-tamper catch.
+
+  twohundredthird_concrete_entry:
+    method_id: "experiment.smoke_test"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L745, sole citation: "landing/ad/offer->
+      signup/preorder threshold", effect "快速驗證需求"). Real invariant:
+      threshold_declared_at strictly earlier than measured_at
+      (pre-registration -- a threshold fixed only after results exist is
+      a post-hoc rationalization, not a decision instrument), threshold
+      a positive int, and decision a mechanical GO/NO_GO consequence of
+      measured_signups vs threshold. Disambiguated from this repo's own
+      unrelated scripts/smoke-test.ps1 infra-health skill (naming
+      coincidence only, different domain).
+    source: "methods/contracts/experiment.smoke_test.contract.yaml + specs/cognitive/typed-objects/smoke-test-record.schema.yaml + ai_lego/modules/experiment/smoke_test.py"
+    note: >
+      42 tests pass. CLI PASS: well-formed record +
+      SMOKETEST_THRESHOLD_NOT_PREREGISTERED construction-time refusal +
+      independent decision_consistency gate hand-tamper catch.
+
+  twohundredfourth_concrete_entry:
+    method_id: "experiment.ab_test"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L746) PLUS dedicated section 12.30
+      (L2924-2941 -- corrected during this batch from the initially
+      assumed L2924-2943: L2942 is a blank line and L2943 is the
+      section's own trailing divider, not pipeline content): full
+      pipeline Hypothesis->Primary Metric->Guardrails->Sample/Power->
+      Randomization->Run->Analyze->Decision, explicit warning "避免
+      peeking、multiple testing、sample ratio mismatch". Real invariant:
+      registered_at strictly earlier than analyzed_at (pre-registration
+      -- the structural defense against the named "peeking"
+      anti-pattern), sample_size_per_arm a positive int, and
+      primary_metric distinct from every guardrail_metrics entry.
+    source: "methods/contracts/experiment.ab_test.contract.yaml + specs/cognitive/typed-objects/ab-test-record.schema.yaml + ai_lego/modules/experiment/ab_test.py"
+    note: >
+      46 tests pass. CLI PASS: well-formed record +
+      ABTEST_NOT_PREREGISTERED construction-time refusal + independent
+      primary_metric_isolation gate hand-tamper catch. Distinguished
+      from causal.rct (RCT emphasizes treatment/control study design;
+      ab_test emphasizes the section 12.30 pre-registration/peeking-guard
+      pipeline) and from the Atlas section 9-cited, still-unbuilt
+      validation.experiment id (different family and id, disclosed to
+      avoid future confusion).
+
+  twohundredfifth_concrete_entry:
+    method_id: "experiment.pilot"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L747, sole citation: "limited scope->
+      criteria->monitor->review", effect "降 rollout 爆炸半徑") PLUS
+      Atlas's own dedicated section 12.31 (L2945-2953), which adds an
+      explicit MANDATORY rule verbatim: "Pilot 開始前定義 Success / Stop
+      / Rollback criteria". Real invariant: that mandatory word made
+      structural -- a PilotRecord cannot be constructed at all unless
+      success_criteria, stop_criteria, AND rollback_criteria are each
+      declared as a non-empty list of non-empty strings. Strongest,
+      least-diluted invariant in this F15 batch (explicit Atlas mandate,
+      not an inferred structural gap).
+    source: "methods/contracts/experiment.pilot.contract.yaml + specs/cognitive/typed-objects/pilot-record.schema.yaml + ai_lego/modules/experiment/pilot.py"
+    note: >
+      47 tests pass. CLI PASS: well-formed record +
+      PILOT_CRITERIA_MANDATE_VIOLATION construction-time refusal +
+      independent criteria_mandate gate hand-tamper catch.
+
+  twohundredsixth_concrete_entry:
+    # Last of this 4-agent F15 opening batch -- F15 is 11/11 COMPLETE
+    # after this entry (independently confirmed via `ls
+    # ai_lego/modules/experiment/*.py`: 11 method modules present, and a
+    # full-family pytest run: 436 passed, 90 subtests, 0 failures).
+    method_id: "experiment.benchmark"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F15 table row (Atlas L748, sole citation: "fixed workload/metrics/
+      environment", effect "避免憑印象選型"). Real invariant: "fixed"
+      made structural, not a naming convention -- workload/environment
+      declared exactly once at record level (no per-candidate override
+      field exists at all), and every candidate's results[] must cover
+      the declared metrics[] set EXACTLY (no missing metric, no extra
+      metric). >=2 candidates required.
+    source: "methods/contracts/experiment.benchmark.contract.yaml + specs/cognitive/typed-objects/benchmark-record.schema.yaml + ai_lego/modules/experiment/benchmark.py"
+    note: >
+      44 tests pass. CLI PASS: well-formed record + BENCH_METRIC_MISMATCH
+      construction-time refusal + independent fixed_metric_coverage gate
+      hand-tamper catch. **F15 experiment & validation family: 11 of 11
+      COMPLETE as of this entry** (prototype/mvp/proof_of_concept/
+      technical_spike/concierge_test/wizard_of_oz/fake_door/smoke_test/
+      ab_test/pilot/benchmark landed via 4 concurrent sibling agents in
+      this same batch: 3+3+3+2 methods each). Batch totals: 436 tests,
+      90 subtests, 0 failures, full-family cross-check run confirms zero
+      collisions across the 4 agents sharing one `ai_lego/modules/
+      experiment/` package. Each of the 11 methods enforces the F15
+      shared core principle (Atlas L750-752, "cheapest test that
+      falsifies a Critical Assumption, not a subjective AI score") via
+      its OWN distinct structural invariant, not a copy-pasted check --
+      see each entry above. Registry files (this file +
+      method-inventory.yaml) were deliberately NOT touched by any of the
+      4 building agents, applied here serially by the orchestrating
+      session instead, to avoid repeating the concurrent-write
+      git-index race that lost F10 registry data (commit `67780546a`).
+      1 independent critic pass (Standard tier, hand-tamper-verified via
+      live mutation probes, not just static reading) found 0 Critical /
+      2 Major / 0 Minor, both Major fixed inline and re-verified:
+      mvp.decision_threshold() and proof_of_concept.implementation() both
+      mis-selected their specific error code on COMPOUND-invalid input
+      where an earlier-checked field was the real cause, not the named
+      invariant -- fixed by requiring all earlier-checked fields to
+      independently pass before applying the specific code, generic
+      fallback otherwise. Deep-copy/aliasing discipline (the exact bug
+      class the F10/F13 critic passes each found) was live-mutation-probe
+      checked against 5 of the 11 modules and found clean -- did not
+      recur in this batch. Full suite re-confirmed 436 passed / 90
+      subtests after the fix. Verdict PASS. See WORKLOG 2026-09-12 F15
+      entry.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================
