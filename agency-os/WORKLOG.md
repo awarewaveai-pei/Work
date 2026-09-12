@@ -17125,6 +17125,29 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 1. `restoreKnowledgeSource` 的家族-sibling 檢查是讀取後再寫入（非單一原子陳述式），極窄的殘留 race：兩個操作者同時對同一家族的兩個不同封存版本按下「取消封存」，理論上都可能通過檢查後才寫入。已判斷不需要資料庫層級解法（會破壞正常重新上傳流程），殘留風險機率極低（需要人工同時點擊）且後果比原 Critical 版本輕微很多（原版本零操作視窗即可重現）。
 2. 已封存文件的永久刪除仍會讓 `cs_ai_replies.retrieved_chunk_ids`（無 FK 的 uuid[]）產生懸空參照——critic 指出這個既有限制的時間窗因為新的「先封存後刪除」流程而變寬，非本次新增的 bug，未在此次修復（沒有 FK 可用，加 FK 需要另一個 migration）。已記入 TASKS.md 待評估是否要在永久刪除確認對話框加一句提示。
 3. 排程 UI 與 KB 封存 UI 尚未經過操作者真人肉眼確認畫面正確——已請操作者协助，回覆前不宣稱「畫面驗證完成」。
-4. 三項功能均尚未部署到 prod（`sg-deploy.sh`）。
+4. ~~三項功能均尚未部署到 prod~~ 已於同日部署，見下一條目。
+
+## 2026-09-12（續10）本輪三個 commit 部署到 prod（migration 0082/0083 + next-admin）
+
+[任務] 操作者「去把所有的事情處理好」——把本輪已完成、已驗證的三個 commit（`d39a47bae` rate-limiter、`c4ec76ae0` is_sensitive、`ce5be6183` KB 封存/刪除+FAQ backfill+排程 UI）部署到 prod。High-STOP（DB migration + prod deploy）取得操作者本輪明確、廣泛的 go-ahead。
+
+[已執行]
+- `node scripts/apply-db-migration.mjs --check 0082 0083` 先乾跑確認可解析，再 `node scripts/apply-db-migration.mjs 0082 0083` 正式套用——兩個 migration 同一次呼叫，皆回報 `APPLY_OK`。
+- 套用後直查 prod：`collection_rate_limit_take` 存在（5 參數）、`cs_match_chunks`/`cs_match_chunks_keyword` 皆為 8 參數（確認 `p_include_sensitive` 已生效、舊 7-arg signature 已被 DROP 不是重疊 overload）、`collection_rate_limit_buckets` 表存在。
+- `ssh ... sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin`：build 225 秒，healthcheck 9 秒後 healthy，內建 HTTP smoke 全過（`/login`、`/api/ops/summary`、nginx/wordpress、node-api health 皆 200）。`.deployed-commit` 從 `8d6470e80` 更新為 `ce5be6183`（本輪三個 commit 的最新一個，確認三者一次到位、無漏部署）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`node scripts/apply-db-migration.mjs 0082 0083` | exit=0 | result=APPLY_OK 2/2
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=直查 `pg_proc`/`to_regclass` | exit=0 | result=`collection_rate_limit_take`(5 arg)/`cs_match_chunks`(8 arg)/`cs_match_chunks_keyword`(8 arg)/`collection_rate_limit_buckets` 皆存在，與本輪 migration 內容一致
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`sg-deploy.sh next-admin` | exit=0 | result=deployed commit=ce5be6183，healthcheck healthy，4 項 smoke 全 200
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`curl .../cs-knowledge?status=archived`、`curl .../collection-schedule`（帶偽造 role header） | exit=0 | result=兩者皆 401——**這是正確行為**：`CollectionSourcesPanel.tsx` 自己的註解說明這個 console 的角色來自 middleware 真實 session，不是可偽造的 header（本機單元測試繞過 middleware 直呼 route handler 才用得到 header），401 證明權限沒有被繞過，不是部署壞掉
+- REVIEW_WAIVED: NA -- 純部署動作，程式碼本身已在各自的 commit 完成 critic 覆審
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 三項新功能的 UI 畫面（KB 封存按鈕、排程開關）仍待操作者肉眼確認——prod 上的行為與本機 dev server 完全一致（同一個 commit），故本機確認結果直接適用於 prod，不需要對 prod 重複一次瀏覽器驗證。
+2. Rate limiter／is_sensitive 閘門在真實流量下的行為尚未經過「真實一次抓取／真實一次客服對話」觀察（真實 Postgres 驗證已涵蓋邏輯正確性，但生產環境的第一次真實觸發尚未發生）——非阻擋項，兩者都是 fail-safe 設計（rate limiter 失敗退記憶體桶且會 log；is_sensitive 預設排除敏感內容，寧可少顯示不會多洩漏）。
+
+[rollback] next-admin：`sg-deploy.sh` 對應的 rollback 腳本 `/root/lobster-phase1/scripts/rollback-phase1.sh`，或重新對 `8d6470e80`（部署前一個 commit）跑 `sg-deploy.sh`。Migration：0082/0083 各自的 down script 已在本機真實 Postgres 驗證可逆、可重套用，需要時 `node scripts/apply-db-migration.mjs` 目前不支援 down（僅套用 up），down 需手動經 SSH 對 `supabase-db` 執行對應 down script。
 
 [rollback] 應用層新增行為，皆為新函式/新 API 分支，未觸發時行為與改動前相同（`git revert` 安全）。無新 migration（`cs_knowledge_sources.status`/`canonical_url` 欄位皆為既有 migration 0051/0072 已建立的欄位，本次只新增讀寫這些既有欄位的函式）。
