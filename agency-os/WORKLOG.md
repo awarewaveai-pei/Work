@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-09-12（續8）AI 影片動態部署 + 真實 Runway 測試 —— 抓到並修復「成本串接」自己的一個 Critical bug（job_id 非 UUID 格式，靜默吞錯導致零記錄）
+
+[任務] 承接續7；操作者訊息含明示 go-ahead：「做好之後去部署 + 花 $0.25 測一次 Runway」。
+
+[部署] `52abc8fff` 由另一並行 session 的 `sg-deploy.sh next-admin` 帶上線（本 session 嘗試時 lock 已被占用，等其跑完，用 sudo 正確權限重新等待後確認）——log 顯示 build+healthcheck(9s)+4 個 smoke endpoint 全過，`.deployed-commit=52abc8fffa40667754b6d852f655b434ca34ac0f`。額外用 `docker exec` 直接 grep 執行中容器的編譯產物確認 `video/motion`／「AI 影片動態」字串真的在跑的 bundle 裡（不只信部署 log）。
+
+[真實測試] 用 `claude-in-chrome`（她的真實 Chrome，非沙盒瀏覽器）登入 app.aware-wave.com/tools/video?advanced=1，填主題、選 Runway Gen-4 Turbo，點「生成草稿」。**過程中的瀏覽器操作插曲**：Runway chip 一直點不中——`getBoundingClientRect()` 查出該按鈕被 sticky 版面推到 `top:-20.7px`（只露出視窗外 3px），ref-click 算出的中心點落在畫面外，靜默沒反應；改用 `scroll_to` 先捲到該元素再點才成功。這是瀏覽器自動化的座標/捲動問題，不是 app 的 bug。
+
+[真實測試結果 —— 3 個 Runway 場景真的動起來了]：草稿審核頁 3 個場景全部是 `.mp4`（`https://pub-....r2.dev/designs/2026-09/*.mp4`，非 `.jpg/.png`），實測確認 image-to-video 真的生效，不是縮放靜態圖。
+
+[抓到的 Critical bug]：檢查 `ai_call_logs` 預期看到 3 筆 `route=video/motion` 新記錄——結果 0 筆。查詢整張表最新記錄卡在 2026-09-11（前一天），代表全站 logImageCost 寫入疑似整個停擺，不是本次新功能特有；直接對 Supabase REST 手動測試同款 insert 才定位真因：`ai_call_logs.job_id` 是 Postgres **uuid** 型別，續7新加的關聯 id `randomBytes(8).toString("hex")`（16 碼十六進位）不是合法 UUID 格式，PostgREST 回 400（`22P02 invalid input syntax for type uuid`）——**整列 insert 失敗**，而 `logImageCost` 是 fire-and-forget 全吞錯誤（`catch {}`），導致這 3 筆真實 $0.75 花費完全沒進流水帳，且沒有任何錯誤浮現。（其餘工具──`/cs/*` 等──近 24h 沒新記錄純粹是沒新呼叫，非同一 bug，已用「查全表最新時間」排除。）
+
+[修復]：`video-pipeline.ts` 的 `motionBatchJobId` 改用 `randomUUID()`（`node:crypto` 已有 `randomBytes` 就手動 import 補上，未動既有 `randomBytes(5)` 用途——那個是 R2 檔名亂數尾碼非 DB 欄位，不受影響）。修復後直接對 production Supabase 做真實 insert 測試（`randomUUID()` 格式）驗證 201 成功，非只信程式碼看起來對。
+
+[真實花費對帳]：這次真實測試的 3 筆 Runway 費用（$0.25×3=$0.75）因上述 bug 遺失，已手動補寫回 `ai_call_logs`（`metadata.backfill_reason` 註明是人工對帳、來源是「確認 3 個 .mp4 資產真實存在於 R2」，非憑空捏造金額）；4 筆診斷用假資料（`route=diagnostic/*`）測試後已刪除，不留在正式流水帳。
+
+[為什麼這是 REALTEST 而非只是 review]：續7的 critic 覆審只讀程式碼邏輯，沒有 DB schema 存取權限，抓不到「格式合法字串在 TypeScript 眼中沒問題、對到真實 Postgres 欄位型別卻是非法值」這類 runtime-only 缺陷；這正是操作者「不能被重複收費」「成本要串接好」兩個要求疊加後，唯一能揭露它的方法是跑一次真的付費呼叫再去查真的資料庫——驗證了她堅持要用瀏覽器真實測試、不接受只憑 code review 宣稱完成，是對的。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（於 next-admin）| exit=0（無輸出）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node -e '...fetch(ai_call_logs, POST, job_id=<16碼hex>)...'` | 結果=400 `22P02 invalid input syntax for type uuid`（重現真因）
+- REALTEST_EVIDENCE: tool=SSH | cmd=同上但 `job_id=crypto.randomUUID()` | 結果=201 成功（修復驗證）
+- REALTEST_EVIDENCE: tool=Browser(claude-in-chrome) | 對 app.aware-wave.com 正式站跑完整 `/api/video/draft`（主題「AI 影片動態測試：Runway 實戰體驗」、3 場景、Runway Gen-4 Turbo）| 結果=3 個 `.mp4` 場景全部生成成功，草稿審核頁可見
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`randomBytes\([0-9]+\)\.toString\("hex"\)` | hits=2（video-pipeline.ts:110 是 R2 檔名尾碼非 DB 欄位、outreach gmail authorize route 是簽章 state 內的 nonce 非 DB 欄位，皆非同一 bug class 的另一實例）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無新增；此修復本身把續7標示的殘留風險 3（`logImageCost` fire-and-forget 吞錯）從「理論風險」升級成「已證實發生過一次、已修復」。建議未來任何新增 `job_id` 欄位的呼叫端，寫的當下就該像本次一樣先對真實 schema 跑一次 insert，不要只靠型別檢查。
+
+[rollback] `git revert` 對應 commit；純改一行變數產生方式（`randomBytes(8).toString("hex")` → `randomUUID()`），無其他行為變更。
+
 ## 2026-09-12（續7）AI 影片動態成本串接到 /ops/costs + critic 驗證不會重複收費
 
 [任務] 承接同日「AI 影片動態」功能（commit 13d2303f0/ac8c0c695/604e5b822，尚未部署）。操作者提兩點：①「有一個頁面是寫成本的，要加進去，成本計算要去串接好」②「不能被重複收費」。

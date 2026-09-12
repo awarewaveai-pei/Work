@@ -25,7 +25,7 @@ import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-
 import { VIDEO_MOTION_RATES } from "../../ai/cost-model";
 import { logImageCost } from "../../ai/log-ai-call";
 import { getSupabaseWriteClient } from "../../supabase-server";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 /**
  * 輸出格式 → 生圖長寬比 + Pexels 取向 + 風格框景詞。
@@ -409,7 +409,13 @@ export async function applyVideoMotionToPrimaryFormat(
 
   // 這批（同一支影片、最多 MAX_MOTION_SCENES 個場景）共用一個關聯 id，讓 /ops/costs「⑤ 流水帳」
   // 能把同一支影片的多筆動態收費歸成一組，而非各自散落、事後對不回是哪支影片花的（critic 2026-09-12）。
-  const motionBatchJobId = randomBytes(8).toString("hex");
+  // 必須是合法 UUID：`ai_call_logs.job_id` 欄位是 Postgres uuid 型別，PostgREST 對非 UUID 字串回
+  // 400（22P02 invalid input syntax for type uuid），而 logImageCost 是 fire-and-forget 全吞錯誤
+  // ——這代表插入整列失敗、真實花費完全沒進流水帳，且不會有任何錯誤浮現。第一版用
+  // `randomBytes(8).toString("hex")`（16 碼十六進位、非 UUID 格式）就是這樣悄悄壞掉，2026-09-12
+  // 對 production 跑真實 Runway 測試時才用真的 DB insert 撞出來（curl 重現：22P02）。改用
+  // `randomUUID()` 從根本避免這整類「格式不合法→靜默吞錯→數字看起來正常其實是全空」的錯誤。
+  const motionBatchJobId = randomUUID();
   const r2Keys: string[] = [];
   let motionAppliedCount = 0;
   for (let k = 0; k < results.length; k++) {
