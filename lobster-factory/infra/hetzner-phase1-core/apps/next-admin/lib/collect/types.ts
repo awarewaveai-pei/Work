@@ -201,7 +201,20 @@ export interface CollectBlock {
    * a message-matching classifier reads the "404" in .../blog/404-explained as "page gone". A throw
    * with no status is treated as an extraction failure, so the next strategy gets a turn.
    */
-  run: (t: Target, ctx: CollectCtx) => Promise<{ docs: RawDoc[]; discovered: Target[] }>;
+  run: (
+    t: Target,
+    ctx: CollectCtx,
+  ) => Promise<{
+    docs: RawDoc[];
+    discovered: Target[];
+    /**
+     * True only for a 304 (or equivalent "confirmed unchanged") response. `docs`/`discovered` are
+     * empty either way on a 304 — a body-less response has neither — but the ORCHESTRATOR needs to
+     * tell that apart from "fetched a real page with zero links", because only the first case should
+     * replay a cached discoveredLinks list instead of recording an empty result (lib/collect/url-state.ts).
+     */
+    notModified?: boolean;
+  }>;
 }
 
 export interface SinkBlock {

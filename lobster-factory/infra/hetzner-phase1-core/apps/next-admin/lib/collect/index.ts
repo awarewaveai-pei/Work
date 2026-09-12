@@ -23,6 +23,13 @@ export { RateLimiter, MemoryRateLimitStore, type RateLimitStore } from "@/lib/co
 export { RobotsCache, parseRobots, isAllowed } from "@/lib/collect/net/robots";
 export { MemoryRunStore, NO_RUN_STORE } from "@/lib/collect/state";
 export {
+  MemoryUrlStateStore,
+  NO_URL_STATE,
+  createSupabaseUrlStateStore,
+  type UrlState,
+  type UrlStateStore,
+} from "@/lib/collect/url-state";
+export {
   registerCollector,
   registerSink,
   collectors,

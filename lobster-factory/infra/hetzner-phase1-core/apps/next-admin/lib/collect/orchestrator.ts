@@ -29,6 +29,7 @@ import { grade } from "@/lib/collect/quality";
 import { rawAsText, screenForInjection, stampProvenance } from "@/lib/collect/provenance";
 import { NO_RUN_STORE } from "@/lib/collect/state";
 import { CollectFetchError } from "@/lib/collect/net/fetcher";
+import { NO_URL_STATE, type UrlStateStore } from "@/lib/collect/url-state";
 
 export interface SeedInput {
   uri: string;
@@ -50,6 +51,12 @@ export interface CrawlOptions {
   /** Flush to the sink every N documents. Storing only at the end loses everything on a crash. */
   flushEvery?: number;
   store?: RunStore;
+  /**
+   * Cross-RUN cache of each URL's etag/last-modified/discovered-links (migration 0080). Omitted ⇒
+   * NO_URL_STATE, which behaves exactly like the code before this existed: no conditional GET ever
+   * fires, and a 304 (which nothing produces without a cached etag to send) never happens either.
+   */
+  urlState?: UrlStateStore;
   blocks?: CollectBlock[];
   maxAttemptsPerTarget?: number;
   log?: (msg: string) => void;
@@ -138,6 +145,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
   const blocks = opts.blocks ?? registeredCollectors();
   const maxAttempts = opts.maxAttemptsPerTarget ?? 3;
   const log = opts.log ?? (() => {});
+  const urlState = opts.urlState ?? NO_URL_STATE;
 
   const report: RunReport = {
     fetched: 0,
@@ -194,13 +202,24 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       report.stoppedBy = "budget";
       break;
     }
-    const target = frontier.shift()!;
+    let target = frontier.shift()!;
     if (seen.has(target.canonicalUri)) continue;
     if (!inScope(target.uri, target.scope)) {
       // The footer of a customer's site links to Wikipedia. Without this the crawl follows it.
       report.outOfScope++;
       seen.add(target.canonicalUri);
       continue;
+    }
+    // Hydrate from what the LAST successful fetch of this exact URL learned, so a block that reads
+    // meta.etag/lastModified (today: collect/http-html) can send a conditional GET. A fresh URL (or
+    // one urlState knows nothing about) gets undefined here, same as every fetch before this cache
+    // existed — this can only ever ADD information to a target, never remove any.
+    const cachedUrlState = await urlState.get(opts.tenantRef, target.canonicalUri);
+    if (cachedUrlState) {
+      target = {
+        ...target,
+        meta: { ...target.meta, etag: cachedUrlState.etag ?? undefined, lastModified: cachedUrlState.lastModified ?? undefined },
+      };
     }
     // The mark de-duplicates within this pass — and `seen` is PERSISTED, so anything that is not a
     // final answer for this target must remove it again. A target left marked after a temporary
@@ -228,11 +247,28 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       continue;
     }
 
+    // Shared by the live-discovery path below AND the 304-replay path: a link found just now and a
+    // link replayed from cache must be filtered by the exact same depth/seen/scope rules, or the
+    // cached path would silently behave more (or less) permissively than a live fetch ever does.
+    const enqueueDiscovered = (items: Array<Partial<Target> & { uri: string; depth: number }>) => {
+      for (const d of items) {
+        if (d.depth >= maxDepth) continue;
+        const canonicalUri = canonicalize(d.uri);
+        if (seen.has(canonicalUri)) continue;
+        const scope = d.scope ?? target.scope;
+        if (!inScope(d.uri, scope)) {
+          report.outOfScope++;
+          continue;
+        }
+        frontier.push({ ...d, canonicalUri, scope, tier: 0 });
+      }
+    };
+
     let handled = false;
     let lastError: string | null = null;
     for (let i = 0; i < candidates.length; i++) {
       const { block } = candidates[i];
-      let result: { docs: RawDoc[]; discovered: Target[] };
+      let result: { docs: RawDoc[]; discovered: Target[]; notModified?: boolean };
       try {
         result = await block.run(target, ctx);
       } catch (e) {
@@ -288,6 +324,28 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         continue; // extraction problem: fall through to the next strategy
       }
 
+      if (result.notModified) {
+        // Confirmed unchanged: nothing new to grade or store, but the LINKS this page had are not
+        // "gone" — a 304 simply cannot report them. Replay whatever the last successful fetch of
+        // this URL found, at THIS target's depth (not the depth they were originally discovered at,
+        // which may have been a different, now-irrelevant crawl run).
+        const cached = await urlState.get(opts.tenantRef, target.canonicalUri);
+        enqueueDiscovered((cached?.discoveredLinks ?? []).map((uri) => ({ uri, depth: target.depth + 1 })));
+        handled = true;
+        break;
+      }
+
+      // A genuine fetch happened (200, regardless of what the quality gate decides below) — cache
+      // what it learned so the NEXT run of this exact URL can send a conditional GET. Overwritten by
+      // whichever strategy ultimately succeeds if an earlier one degrades to a heavier one below;
+      // that is correct, the earlier strategy's etag belongs to a response nobody is keeping.
+      const firstDoc = result.docs[0];
+      await urlState.set(opts.tenantRef, target.canonicalUri, {
+        etag: typeof firstDoc?.meta.etag === "string" ? firstDoc.meta.etag : null,
+        lastModified: typeof firstDoc?.meta.lastModified === "string" ? firstDoc.meta.lastModified : null,
+        discoveredLinks: result.discovered.map((d) => d.uri),
+      });
+
       report.fetched++;
       const graded = result.docs.map((d) => ({
         doc: d,
@@ -319,17 +377,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         delivered.add(doc.canonicalUrl);
       }
 
-      for (const d of result.discovered) {
-        if (d.depth >= maxDepth) continue;
-        const canonicalUri = canonicalize(d.uri);
-        if (seen.has(canonicalUri)) continue;
-        const scope = d.scope ?? target.scope;
-        if (!inScope(d.uri, scope)) {
-          report.outOfScope++;
-          continue;
-        }
-        frontier.push({ ...d, canonicalUri, scope, tier: 0 });
-      }
+      enqueueDiscovered(result.discovered);
 
       handled = true;
       break;

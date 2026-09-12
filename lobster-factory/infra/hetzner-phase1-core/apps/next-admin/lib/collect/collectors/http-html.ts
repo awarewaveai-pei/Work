@@ -198,7 +198,7 @@ export const httpHtmlCollector: CollectBlock = {
     }
   },
 
-  async run(t: Target, ctx: CollectCtx): Promise<{ docs: RawDoc[]; discovered: Target[] }> {
+  async run(t: Target, ctx: CollectCtx): Promise<{ docs: RawDoc[]; discovered: Target[]; notModified?: boolean }> {
     const res = await ctx.fetch(t.uri, {
       headers: {
         // Conditional request: an unchanged page answers 304 and costs no body, no extraction and
@@ -216,7 +216,10 @@ export const httpHtmlCollector: CollectBlock = {
 
     if (res.status === 304) {
       ctx.log(`unchanged (304): ${t.uri}`);
-      return { docs: [], discovered: [] };
+      // No body ⇒ no links of our own to report. The orchestrator knows to replay ITS cached
+      // discoveredLinks for this URL instead of reading this as "a page with zero links" — that
+      // signal is `notModified`, not the empty arrays, which look identical either way.
+      return { docs: [], discovered: [], notModified: true };
     }
     // The orchestrator classifies these: 404/410 become tombstones, 429/503 become retries.
     // `status` as a FIELD, not as text in the message: the orchestrator classifies on it, and a

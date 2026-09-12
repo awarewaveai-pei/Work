@@ -252,6 +252,11 @@ describe("C1: crawl -> knowledge base", () => {
     expect(kb.ingestKnowledge).not.toHaveBeenCalled();
     expect(r.sink.written).toBe(0);
     expect(r.report.dirty).toHaveLength(0);
+    // A confirmed-unchanged response is not a fetch of new content — the orchestrator's own
+    // url-state replay path (collect-url-state-wiring.test.ts) is what this proves is reachable:
+    // httpHtmlCollector really does return `notModified: true` on 304, not a plain empty result
+    // that would look identical to "a real page with zero links".
+    expect(r.report.fetched).toBe(0);
   });
 
   it("reports a failed ingest instead of counting it as stored", async () => {

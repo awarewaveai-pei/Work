@@ -18,6 +18,7 @@ import { approvedSeeds, recordRunOutcome, type CollectionSource } from "@/lib/co
 import { persistRunReport } from "@/lib/collect/report-store";
 import { createKbSink } from "@/lib/collect/sinks/kb";
 import { createNullSink } from "@/lib/collect/sinks/null";
+import { createSupabaseUrlStateStore } from "@/lib/collect/url-state";
 import type { SinkBlock } from "@/lib/collect/types";
 import "@/lib/collect/blocks"; // registering the built-in sources is the point of calling this
 
@@ -85,6 +86,9 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
     flushEvery: 10,
     blocks: collectors(),
     log,
+    // "A dry run leaves no trace anywhere" (see below) — a cached etag IS a trace, so a dry run gets
+    // undefined here and falls back to the orchestrator's own NO_URL_STATE default instead.
+    urlState: opts.dryRun ? undefined : createSupabaseUrlStateStore(),
     fetch: createCollectFetch({ budget, log }),
     // Present only so a provider-backed tier CAN run; it still scores 0 without a key.
     callProvider: createProviderCall({ budget, log }),
