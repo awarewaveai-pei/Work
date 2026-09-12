@@ -12,7 +12,7 @@ import { crawl, type CrawlResult, type SeedInput } from "@/lib/collect/orchestra
 import { createBudget, type BudgetLimits } from "@/lib/collect/budget";
 import { createCollectFetch } from "@/lib/collect/net/fetcher";
 import { createProviderCall } from "@/lib/collect/net/providers";
-import { RateLimiter } from "@/lib/collect/net/rate-limit";
+import { RateLimiter, createSupabaseRateLimitStore } from "@/lib/collect/net/rate-limit";
 import { collectors } from "@/lib/collect/registry";
 import { approvedSeeds, recordRunOutcome, type CollectionSource } from "@/lib/collect/sources-store";
 import { persistRunReport } from "@/lib/collect/report-store";
@@ -77,6 +77,12 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
   const sink: SinkBlock = opts.dryRun ? createNullSink() : createKbSink();
   const seeds: SeedInput[] = chosen.map((p) => p.seed);
 
+  // A durable store here is WHY per-host politeness holds across two concurrently scheduled runs
+  // (DATA_COLLECTION_PLAN.md C3 DoD) — an omitted rateLimiter would make createCollectFetch fall
+  // back to `new RateLimiter()`, i.e. a fresh in-memory bucket THIS call alone can see, same gap a
+  // dry run already accepts on purpose (see the urlState comment just below).
+  const rateLimiter = new RateLimiter({ store: opts.dryRun ? undefined : createSupabaseRateLimitStore(log) });
+
   const result = await crawl(seeds, {
     sink,
     budget,
@@ -89,7 +95,7 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
     // "A dry run leaves no trace anywhere" (see below) — a cached etag IS a trace, so a dry run gets
     // undefined here and falls back to the orchestrator's own NO_URL_STATE default instead.
     urlState: opts.dryRun ? undefined : createSupabaseUrlStateStore(),
-    fetch: createCollectFetch({ budget, log }),
+    fetch: createCollectFetch({ budget, log, rateLimiter }),
     // Present only so a provider-backed tier CAN run; it still scores 0 without a key.
     callProvider: createProviderCall({ budget, log }),
   });

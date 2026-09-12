@@ -19,7 +19,12 @@ export {
 } from "@/lib/collect/net/providers";
 export { createBudget, type BudgetLimits } from "@/lib/collect/budget";
 export { canonicalize, inScope } from "@/lib/collect/canonical";
-export { RateLimiter, MemoryRateLimitStore, type RateLimitStore } from "@/lib/collect/net/rate-limit";
+export {
+  RateLimiter,
+  MemoryRateLimitStore,
+  createSupabaseRateLimitStore,
+  type RateLimitStore,
+} from "@/lib/collect/net/rate-limit";
 export { RobotsCache, parseRobots, isAllowed } from "@/lib/collect/net/robots";
 export { MemoryRunStore, NO_RUN_STORE } from "@/lib/collect/state";
 export {

@@ -16891,3 +16891,39 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 3. C4/C6/C8/C9 仍為 DEFERRED（業務判斷/High-risk STOP），本輪未動。
 
 [rollback] `git revert` 對應 commit。0019 為純新增 migration（新表+新函式），down script 已測（`test-wave1-local.ps1` 的 populated-schema down 流程涵蓋）；`server.mjs`/`index.html` 的改動皆為新增欄位/新增渲染分支，零案件命中規則引擎否定/堆疊時行為與改動前逐位元相同。
+
+## 2026-09-12（續7）蒐集 C3：per-host 令牌桶跨 run 持久化（migration 0082）+ critic 覆審 1 Major/2 Minor 全修
+
+[任務] 操作者問「per-host 限速跨 run 不共用狀態，process 內單例是否為最佳解」→ 全權決定並實作。答案：不是——`net/rate-limit.ts` 檔頭原註解早已把 `RateLimitStore.take()` 設計成單一原子操作正是為了讓人換成持久化實作（"C3 swaps the in-memory default for a durable one and nothing else changes"），process 單例只解決單一 instance 內的情境，不是原設計要關的那個洞（手動「立即執行」仍可能跟排程 sweep 同時發生，或未來多 instance 部署）。
+
+[已修改]
+- `lobster-factory/packages/db/migrations/0082_collection_rate_limit_buckets.sql`（新）：`collection_rate_limit_buckets` 表（host PK、tokens、last_refill_ms）+ PL/pgSQL `collection_rate_limit_take(p_host,p_rate_per_second,p_burst,p_min_interval_ms,p_now)`，逐分支重現 `nextBucket()`（refill/grant/wait 三段）。Keyed by **host 非 org**——要保護的是目標站台承載量，不是哪個租戶在打，兩個不同組織打同一 host 必須共用一個桶。原子性：`INSERT...ON CONFLICT DO NOTHING RETURNING host` 判斷「這次呼叫是否剛建立這一列」（不能只看 tokens/last_refill_ms 的值，全新列跟久未使用已回滿的舊列數值上無法區分），只有非首次分支才 `SELECT...FOR UPDATE` 鎖列；首次請求依 `nextBucket()` 語意永不等待 minIntervalMs。RLS service_role only，函式 SECURITY INVOKER（唯一呼叫端已有表權限）。
+- `lobster-factory/packages/db/scripts/0082_collection_rate_limit_buckets_down.sql`（新）。
+- `lib/collect/net/rate-limit.ts`：新增 `createSupabaseRateLimitStore(log?)`，走 `sb.rpc("collection_rate_limit_take",...)`；RPC 失敗或無 client 時退回 `MemoryRateLimitStore`（module-scoped，非每次呼叫重建）。
+- `lib/collect/run.ts`：`runCollection()` 非 dry-run 建 `new RateLimiter({store: createSupabaseRateLimitStore(log)})`，傳入 `createCollectFetch({budget,log,rateLimiter})`（原本未傳，`createCollectFetch` 因此每次都退回 `new RateLimiter()` 即全新記憶體桶，是這個洞的直接成因）；dry-run 維持省略（沿用既有「不留痕跡」承諾）。
+- `lib/collect/index.ts`：匯出 `createSupabaseRateLimitStore`。
+- `lib/collect/__tests__/collect-rate-limit-supabase-store.test.ts`（新，7 test）：RPC 呼叫參數形狀（host 小寫、`minIntervalMs` 缺省傳 `null` 非 `undefined`）、退回記憶體桶行為（無 client／RPC 錯誤兩種情境皆驗證仍會限速，非無條件放行）、退回時必呼叫 `log()`（critic Major，見下）、RPC 成功時不呼叫 `log()`。
+- `lib/collect/__tests__/collect-run-rate-limit-wiring.test.ts`（新，4 test，全 mock `runCollection` 依賴）：非 dry-run 建構 `RateLimiter` 時傳入持久化 store；`createCollectFetch` 收到 `rateLimiter`；dry-run 不碰持久化 store；`log` 確實從 `runCollection` 傳進 store（critic Major 修復後補的回歸測試）。
+- `apps/next-admin/scripts/collect-rate-limit-verify.ts`（新）：真實 Postgres（`supabase/postgres:15.8.1.085`，同 prod）驗證腳本，比照 `kb-local-verify.sh` 的「先證明 harness 能失敗」模式。225 組隨機請求序列（8 個 host 隨機 rate/burst/minIntervalMs + 1 個 host 釘死 `minIntervalMs=0` 邊界）與 in-process `nextBucket()` 逐一比對 `wait_ms`；2 個真實獨立 `docker exec psql` process 同時對一個全新 host（burst=1）搶第一個 token，斷言恰好 1 個獲准；down migration 執行後表確實消失、重套用後行為正常。
+- `agency-os/docs/data-collection/DATA_COLLECTION_PLAN.md` §3：C3 列由 🟡部分完成 改 ✅已完成，DoD 三項全部打勾。
+- `agency-os/TASKS.md`：2026-09-12 開出的 per-host 令牌桶項目關閉；`is_sensitive`／KB 硬刪兩項待決策項補上操作者 2026-09-12 的決定（受眾閘：加；刪除：預設封存，硬刪藏在封存之後的第二層），標記「已決策待實作」。
+
+[critic 覆審抓到並當場修復的 1 個 Major + 2 個 Minor]（`critic` agent，`ab0b24ceaab2ec229`）
+- **Major**：`createSupabaseRateLimitStore()` 對任何 RPC 錯誤或無 client 一律靜默退回記憶體桶，零 log／零告警。若 Supabase 環境永久失效（migration 未套用、grant 被改壞、`NOTIFY pgrst` 未生效），production 會無限期靜默退回這次要修的那個 bug 本身，且無從察覺，除非目標站又開始擋 IP。修法：`createSupabaseRateLimitStore(log)` 新增可選 `log` 參數，兩個退回分支各自呼叫（`rate_limit_rpc_unavailable_falling_back_to_memory`／`rate_limit_rpc_failed_falling_back_to_memory`），`run.ts` 傳入自己的 `log`。
+- **Minor**：SQL 的 `minIntervalMs` guard 用 `IS NOT NULL`，但 `nextBucket()` 是 `req.minIntervalMs && ...`（JS 裡 `0` 是 falsy）——顯式傳 `0` 在 JS 永不等待，SQL 原本會走「`since_last < 0`」分支。Critic 手推證明目前不可觸發（`last_refill_ms` 只有在同一分支寫入未來值時才會讓 `since_last` 為負，那個分支必然同時歸零 `tokens`，此時 `token_wait` 恆大於等於 `interval_wait`），但屬未來地雷——已加 `p_min_interval_ms <> 0` 對齊語意，並在驗證腳本補 `minIntervalMs=0` 專用邊界（225 組隨機案例即含此項）。
+- **Minor**：3 處註解／test 檔頭寫錯驗證腳本路徑（`packages/db/scripts/...`，實際在 `apps/next-admin/scripts/...`，因中途搬移檔案位置解決 tsx 無法解析 `@/*` alias 的問題）——已修正。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（`apps/next-admin`） | exit=0 | result=clean
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect` | exit=0 | result=181 passed, 7 skipped（既有 live-only 測試）, 0 failed，無既有測試回歸
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx scripts/collect-rate-limit-verify.ts`（真實 Postgres docker container，非模擬） | exit=0 | result=225 parity cases 全部與 `nextBucket()` 逐一比對零誤差；2-process 並發搶第一個 token 恰好 1 個獲准（`waits=[0,1000]`）；down migration 後表確實消失，重套用後首請求正常獲准
+- REVIEW_DONE: critic=Deep | verdict=pass（覆審後修復） | findings=0C/1m(已修)/2n(已修)——原子性/鎖定策略/SQL injection/RLS/grants/down migration 全數 Verified Clean，細節見 agent 輸出
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`RateLimiter\(\)\|createSupabaseRateLimitStore\|collection_rate_limit_take\|collection_rate_limit_buckets` | hits=12（全數為本次改動的檔案本身 + 已同步更新的 DATA_COLLECTION_PLAN.md/TASKS.md + 一份自動產生的 agent-dispatch log，無未同步的殘留引用）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. `collection_rate_limit_buckets` 表隨曾被爬過的 distinct host 數量增長，無過期清理機制——目前規模（客戶數與蒐集頻率）下無實際風險，未建是刻意不做預防性工程（零重工原則），規模真的成長到有感時再補。
+2. `collection_rate_limit_take()` 每次呼叫都對已存在的 host 列先跑一次注定失敗的 `INSERT...ON CONFLICT DO NOTHING`——熱門 host 的死 tuple churn 隨請求量而非 distinct host 數增長，屬 autovacuum 調校範疇，非本次改動範圍，critic 列為 Suggestion 未強制修。
+3. 尚未部署到 prod（migration 0082 需 `node scripts/apply-db-migration.mjs 0082`，next-admin 需重新 `sg-deploy.sh`）——本輪只決定授權範圍內的架構與實作，部署屬於下一個「去處理好」的動作，未經操作者當輪明確 go-ahead 前不主動部署（High-STOP：DB migration + prod deploy）。
+
+[rollback] 應用層改動（`rate-limit.ts`/`run.ts`/`index.ts`）為新增行為，未傳 store 時行為不變（`RateLimiter`/`createCollectFetch` 既有 default 全保留），`git revert` 即可。DB 側：`node scripts/apply-db-migration.mjs` 尚未對 prod 執行 0082；一旦執行，回滾走 `packages/db/scripts/0082_collection_rate_limit_buckets_down.sql`（已在真實 Postgres 驗證可逆、可重套用）。

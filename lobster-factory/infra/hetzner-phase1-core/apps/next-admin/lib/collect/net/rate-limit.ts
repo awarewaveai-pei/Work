@@ -13,6 +13,14 @@
 //
 // Classified as RATE_LIMIT, not QUOTA (ADR 012 §決策 1): the risk lands on a shared external
 // resource, so it must never become something a customer can buy their way past.
+//
+// createSupabaseRateLimitStore() (bottom of this file) is that durable implementation: migration
+// 0082's collection_rate_limit_take() does exactly the "single conditional UPDATE ... RETURNING"
+// the comment above promises, keyed by host (not by tenant) so two organizations' crawls of the
+// same target site share one bucket. Verified for arithmetic parity against nextBucket() below in
+// apps/next-admin/scripts/collect-rate-limit-verify.ts.
+
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 export interface BucketState {
   tokens: number;
@@ -77,6 +85,44 @@ export class MemoryRateLimitStore implements RateLimitStore {
     this.map.set(key, state);
     return { waitMs };
   }
+}
+
+/**
+ * Production store — migration 0082's collection_rate_limit_buckets, shared across every process
+ * and every run. Falls back to a per-process in-memory bucket (`fallback`) on any Supabase error:
+ * granting unconditionally on failure would silently defeat the limiter exactly when the target is
+ * least likely to tolerate it; a per-process bucket is strictly better than that, and is already
+ * what every run did before this store existed.
+ *
+ * `log` is REQUIRED to be wired to something visible (runCollection passes its own `log`) — a
+ * silent fallback here means production could revert to the exact per-run-bucket bug this store
+ * exists to close (a permanently misconfigured Supabase env, a revoked grant, migration 0082 never
+ * applied) with nothing to notice by except the target site starting to rate-limit again, which is
+ * the failure this whole change was built to stop being invisible.
+ */
+export function createSupabaseRateLimitStore(log: (msg: string) => void = () => {}): RateLimitStore {
+  const fallback = new MemoryRateLimitStore();
+  return {
+    async take(req: TakeRequest): Promise<TakeResult> {
+      const sb = getSupabaseWriteClient();
+      if (!sb) {
+        log("rate_limit_rpc_unavailable_falling_back_to_memory: no Supabase client configured");
+        return fallback.take(req);
+      }
+      const { data, error } = await sb.rpc("collection_rate_limit_take", {
+        p_host: req.host.toLowerCase(),
+        p_rate_per_second: req.ratePerSecond,
+        p_burst: req.burst,
+        p_min_interval_ms: req.minIntervalMs ?? null,
+        p_now: req.now,
+      });
+      if (error || typeof data !== "number") {
+        log(`rate_limit_rpc_failed_falling_back_to_memory: ${error ? JSON.stringify(error) : `unexpected_data_type_${typeof data}`}`);
+        return fallback.take(req);
+      }
+      return { waitMs: data };
+    },
+  };
 }
 
 export interface RateLimiterOptions {
