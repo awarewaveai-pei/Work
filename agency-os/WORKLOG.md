@@ -1,5 +1,18 @@
 # Worklog
 
+## 2026-09-12 第八批（向量半邊排序修法：操作者「去做」授權，部署完成）
+
+上一批修好 `matchChunksVector` 排序（commit `d00d3b99c`）並問要不要部署，操作者回「去做」——視為對這個特定 commit 部署的明示 go-ahead。走既定路徑：目標機本機 `sg-deploy.sh next-admin`，不直接 git pull。
+
+**部署過程遇到並確認無害的並行 session 插隊**：部署前 push 時 `d00d3b99c` 是 origin/main 最新；部署腳本 `git pull` 時另一個並行 session 已經在上面疊了一個新 commit `e5f0dc053`（Story Bible 視覺層任務收尾，純 `agency-os/TASKS.md`+`WORKLOG.md` 文件變更，`git diff --stat` 確認沒碰 `lib/kb`）。用 `git merge-base --is-ancestor d00d3b93c e5f0dc053` 確認 `d00d3b99c` 是 `e5f0dc053` 的祖先——我的修法確實包含在部署出去的版本裡，沒有被插隊蓋掉。
+
+REALTEST_EVIDENCE: tool=SSH | cmd=`sudo bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | result=`deployed commit=e5f0dc053`（含 `d00d3b99c`），healthcheck 9 秒後 healthy，內建 smoke 全過（`/login`→200、`/api/ops/summary`→200、nginx/wordpress→200、node-api health→200）
+REALTEST_EVIDENCE: tool=SSH | cmd=`git merge-base --is-ancestor d00d3b99c e5f0dc053` | exit=0 | result=confirmed ancestor（並行 commit 沒有蓋掉這次修法）
+REVIEW_WAIVED: NA -- 部署本身是機械執行（腳本內建 test gate/healthcheck/smoke/rollback），程式碼邏輯已在上一批做過突變測試+自審
+BUGHUNT_WAIVED: NA -- 純部署動作，沒有新程式碼；上一批已對 `matchChunksVector` 做過 BUGHUNT
+
+**現況**：`e5f0dc053`（含本次向量排序修法）已是 prod next-admin 的 `.deployed-commit`。
+
 ## 2026-09-12 第七批（0076 五個延後項複查：修 1 個，其餘 4 個確認仍是有效取捨不是遺漏）
 
 操作者：「還留著的延後項 需要處理就去做」。逐項複查（不派 subagent，單一 session 自己讀+判斷+修，符合「不准無效益派多個 agents」）：
