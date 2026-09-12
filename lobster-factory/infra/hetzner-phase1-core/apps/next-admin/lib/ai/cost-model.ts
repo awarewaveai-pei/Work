@@ -87,7 +87,10 @@ export const DEFAULT_IMAGE_MODEL = "flux-schnell";
  * 價格來源：2026-09-12 直接讀 replicate.com/<slug> 頁面內嵌 JSON 的 "or N seconds for $X" 換算，
  * 非猜測（Runway/Luma/Google 官方直連 API 定價與 Replicate 轉售價不同，此表只適用走 Replicate）。
  */
-export const VIDEO_MOTION_RATES: Record<string, { usdPerSec: number; label: string; vendor: string; defaultDurationSec: number }> = {
+// Record 鍵型別釘死 VideoMotionModel（非 string）：新增動態模型時，忘記在這裡補對應費率會直接
+// TS 編譯失敗，而不是靜默漏記那個模型的真實花費（IMAGE_RATES/TOOL_RATES 用 string 鍵的舊模式
+// 沒有這層保護，critic 2026-09-12 建議這張新的、金額較大的表從一開始就收緊）。
+export const VIDEO_MOTION_RATES: Record<import("../tarot/video-motion-gen").VideoMotionModel, { usdPerSec: number; label: string; vendor: string; defaultDurationSec: number }> = {
   "runway-gen4-turbo":  { usdPerSec: 0.05, label: "Runway Gen-4 Turbo", vendor: "Runway/Replicate", defaultDurationSec: 5 },
   "luma-ray-flash-2":   { usdPerSec: 0.06, label: "Luma Ray Flash 2",   vendor: "Luma/Replicate",   defaultDurationSec: 5 },
   "luma-ray-2":         { usdPerSec: 0.18, label: "Luma Ray 2",         vendor: "Luma/Replicate",   defaultDurationSec: 5 },

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { featureUnitCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
-import { TEXT_FEATURES, IMAGE_RATES, TOOL_RATES, INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
+import { TEXT_FEATURES, IMAGE_RATES, TOOL_RATES, VIDEO_MOTION_RATES, INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
 import { CostEstimator } from "./CostEstimator";
 import AiModelsClient from "@/app/(shell)/tools/ai-models/AiModelsClient";
 
@@ -259,9 +259,20 @@ function RatesTab({ monthlyInfraUsd }: { monthlyInfraUsd: number }) {
         </Card>
       </div>
 
+      <Card>
+        <CardHead title="AI 影片動態 — 每個場景" />
+        <Table
+          head={["模型", "廠商", "秒數", "NT$", "USD"]}
+          rows={Object.values(VIDEO_MOTION_RATES).map((r) => [
+            r.label, r.vendor, `${r.defaultDurationSec}s`,
+            NT(r.usdPerSec * r.defaultDurationSec), USD(r.usdPerSec * r.defaultDurationSec),
+          ])}
+        />
+      </Card>
+
       <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.7, margin: 0 }}>
         ※ 基建月費目前為估算值（<code>INFRA_MONTHLY</code>）；查 Hetzner / Cloudflare console 後改為實際帳單數字並把 <code>estimate</code> 設 false。
-        編修工具標 ※ 者為典型單次推估。所有費率 SSOT：<code>lib/ai/cost-model.ts</code>。
+        編修工具標 ※ 者為典型單次推估。AI 影片動態每支影片最多套 3 個場景（見 /tools/video）。所有費率 SSOT：<code>lib/ai/cost-model.ts</code>。
       </p>
     </div>
   );

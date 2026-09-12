@@ -1,5 +1,39 @@
 # Worklog
 
+## 2026-09-12（續7）AI 影片動態成本串接到 /ops/costs + critic 驗證不會重複收費
+
+[任務] 承接同日「AI 影片動態」功能（commit 13d2303f0/ac8c0c695/604e5b822，尚未部署）。操作者提兩點：①「有一個頁面是寫成本的，要加進去，成本計算要去串接好」②「不能被重複收費」。
+
+[已修改]
+- `lib/content/blocks/video-pipeline.ts` `applyVideoMotionToPrimaryFormat`：每個場景動態生成成功（`r.ok===true`）當下即 `logImageCost()` 記一筆到 `ai_call_logs`（route=`video/motion`），同批場景共用一個 `randomBytes(8)` 關聯 jobId（讓 /ops/costs「⑤ 流水帳」能歸成一組）。
+- `lib/ai/cost-model.ts` `VIDEO_MOTION_RATES` 鍵型別從 `string` 收緊成 `VideoMotionModel`（type-only import，無循環依賴）——以後漏填某模型費率會直接編譯失敗，不會靜默漏記金額較大的花費。
+- `app/(shell)/ops/costs/CostsTabs.tsx`「② 費率表」新增「AI 影片動態」卡片列 5 個模型單價。
+
+[為什麼放在 r.ok 之後、buildDesignKey/putDesignObject 之前]（critic Major #1，已修）Replicate 在 `r.ok===true` 那刻就已收費；原本 log 放在 R2 上傳成功後，代表 mime 辨識失敗或 R2 上傳失敗會讓已收費但沒留住片子的花費悄悄漏記，剛好發生在 infra 最不穩、最該被看見的時候。
+
+[為什麼要共用 jobId 而非 null]（critic Major #2，已修）`ops/costs/page.tsx:73` 的流水帳查詢 `.not("job_id","is",null)` — 傳 `null` 會讓每一筆動態花費永久從流水帳消失（仍算進總額，只是對不回是哪支影片）。
+
+[不重複收費 —— critic 全程追蹤確認]
+- `applyVideoMotionToPrimaryFormat` 在 `prepareScenes` 內只有一個呼叫點，不在格式迴圈內。
+- `prepareScenes` 只有兩個呼叫者：`/api/video/draft`（草稿預覽）與 `/api/video/generate`（一次到位路徑，其 `GenerateBody` 目前完全沒有 `videoMotionModel` 欄位，這條路徑今天還碰不到動態收費）；兩者都是單次 `await`，無迴圈無重試。
+- `/api/video/render-draft`（草稿之後的正式渲染）直接吃已生成的 `formatImageUrls` 送 ffmpeg，**不會**重跑 `prepareScenes`。
+- `fetchWithRetry429` 只在收到 429（Replicate 尚未建立 prediction）時重試，網路層失敗不重試，不會建立兩個 prediction。
+- 前端 `VideoStudio.tsx` 生成按鈕 `disabled={!canGenerate}`（`canGenerate` 含 `!draftLoading`）防雙擊送出。
+→ 每個場景的動態最多被真實計費一次，log 呼叫次數 = 真實收費次數。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（於 next-admin，2 輪：第一版 + critic 修復後）| exit=0（皆無輸出）
+- REVIEW_DONE: critic=Standard | verdict=pass（第二輪，修復後）| findings=0 Critical / 2 Major（已修，見上）/ 2 Minor（VIDEO_MOTION_RATES 型別已收緊；`defaultDurationSec` 在 `cost-model.ts` 與 `video-motion-gen.ts` 兩處重複——刻意保留，因 `cost-model.ts` 是零 import 的 client-safe 純資料層，`video-motion-gen.ts` 是 server-only 實作，兩者不可互相 import，重複是架構邊界的必要代價非偷懶）/ 1 個 Veo 定價無法用 web 工具獨立覆核（本 session 稍早已用 authenticated curl 對 Replicate API + 官網頁面 JSON 直接查證過，非本輪新增風險）；「不重複收費」與「不會資料遺失」兩項操作者最在意的主張，critic 逐路徑追蹤後標記 Verified Clean。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`VIDEO_MOTION_RATES` | hits=5（全部為預期引用：cost-model.ts 定義處 + video-pipeline.ts/VideoStudio.tsx/video-cost.ts/CostsTabs.tsx 四個呼叫端，無殘留舊引用）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 尚未部署，尚未對 3 個 vendor 中任何一個打過真實 API（下一步：部署 + 花 ~$0.25 測 Runway Gen-4 Turbo 一次）。
+2. 單張場景圖「重新生成」（`/api/video/regenerate-image`）會直接覆蓋掉已花錢生成的動態影片網址、不記警告——不是重複收費，是使用者可能在不知情下讓已花的 $0.25-$1.60 動態白費；未修，需操作者決定是否要加提示。
+3. `logImageCost` 本身是 fire-and-forget best-effort（Supabase 寫入失敗不拋錯，沿用全 repo既有慣例）——若 Supabase 當下不可用，該筆花費不會進流水帳但錢已經花了；跟其他所有既有 `logImageCost` 呼叫點風險等級一致，非本次新增。
+
+[rollback] `git revert` 對應 commit；純新增 log 呼叫 + 型別收緊 + UI 新增一張卡片，未改任何既有欄位語意或既有呼叫路徑行為。
+
 ## 2026-09-12 collect-scheduled-crawl deployed to Trigger.dev EU + fixed 3 ks-aw-01 root-hardening regressions in lobster-trigger-deploy.ps1
 
 任務：把上一輪新增的 `collect-scheduled-crawl`（hourly cron heartbeat -> next-admin

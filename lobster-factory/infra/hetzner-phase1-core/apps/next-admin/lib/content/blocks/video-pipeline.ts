@@ -22,6 +22,8 @@ import {
 import { submitRender, type RenderOutputMeta, type RenderOutputs, type VideoServiceCapability } from "../video/render-client";
 import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
 import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-motion-gen";
+import { VIDEO_MOTION_RATES } from "../../ai/cost-model";
+import { logImageCost } from "../../ai/log-ai-call";
 import { getSupabaseWriteClient } from "../../supabase-server";
 import { randomBytes } from "node:crypto";
 
@@ -405,6 +407,9 @@ export async function applyVideoMotionToPrimaryFormat(
   }));
   const results = await generateVideoMotionBatch(motionModel, jobs);
 
+  // 這批（同一支影片、最多 MAX_MOTION_SCENES 個場景）共用一個關聯 id，讓 /ops/costs「⑤ 流水帳」
+  // 能把同一支影片的多筆動態收費歸成一組，而非各自散落、事後對不回是哪支影片花的（critic 2026-09-12）。
+  const motionBatchJobId = randomBytes(8).toString("hex");
   const r2Keys: string[] = [];
   let motionAppliedCount = 0;
   for (let k = 0; k < results.length; k++) {
@@ -413,6 +418,28 @@ export async function applyVideoMotionToPrimaryFormat(
     if (!r.ok) {
       console.error(`[video-pipeline] scene ${scenes[i].id} motion generation failed, keeping static image:`, "error" in r ? r.error : "unknown_error");
       continue;
+    }
+    // 記真實花費到 ai_call_logs（/ops/costs 讀這張表）——沿用 tarot/studio 既有的單一慣例
+    // （每筆真實付費呼叫成功後 fire-and-forget 記一筆，見 log-ai-call.ts 呼叫端清單)。
+    // 刻意放在 r.ok 確認的當下就記，不等後面 buildDesignKey/putDesignObject 的結果：Replicate
+    // 在 r.ok===true 那刻就已經收費，之後 mime 辨識失敗或 R2 上傳失敗都只是「片子沒留住」，
+    // 不代表「沒被收費」——放在那些 continue 分支之後會讓真實花費在 infra 不穩時悄悄漏記
+    // （critic 2026-09-12 抓到：漏記剛好發生在最該被看見的時候）。
+    // 本函式只在 prepareScenes 呼叫一次、prepareScenes 本身每支影片的草稿→渲染流程只會跑一次
+    // （見 render-draft 直接吃已生成的 formatImageUrls、不重跑 prepareScenes）——log 呼叫次數
+    // = 真實收費次數，不會多記也不會漏記。
+    const rate = VIDEO_MOTION_RATES[motionModel];
+    if (rate) {
+      void logImageCost({
+        route: "video/motion",
+        model: motionModel,
+        vendor: rate.vendor,
+        costUsd: rate.usdPerSec * rate.defaultDurationSec,
+        jobId: motionBatchJobId,
+        tool: "video",
+      });
+    } else {
+      console.error(`[video-pipeline] scene ${scenes[i].id} motion billed but no VIDEO_MOTION_RATES entry for "${motionModel}" — cost NOT logged`);
     }
     const videoKey = buildDesignKey(r.mime);
     if (!videoKey) {
