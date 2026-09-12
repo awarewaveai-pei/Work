@@ -1,17 +1,40 @@
-// GET/POST/DELETE /api/ops/clients/[slug]/cs-knowledge — manage a client's RAG knowledge sources.
-// GET    — list sources (+ per-source chunk counts).
+// GET/POST/PATCH/DELETE /api/ops/clients/[slug]/cs-knowledge — manage a client's RAG knowledge sources.
+// GET    — list sources (+ per-source chunk counts). ?status=archived lists the archived view instead.
 // POST   — add one document: { title, kind?, body, isSensitive?, canonicalUrl? } → ingestKnowledge
 //          (chunk + embed + store) as a new VERSION of that document (K1): same title + new text
 //          supersedes the old version, same title + same text is a no-op. Needs OPENAI_API_KEY for
 //          embeddings; on failure returns a clear message.
-// DELETE — { sourceId } → remove source (chunks cascade). This deletes one VERSION row, so it is
-//          for removing a document, not for replacing one — reposting handles replacement.
+// PATCH  — { sourceId, action: "archive" | "restore" } → soft-remove from retrieval / undo that.
+//          Genuinely reversible: chunks and the row are untouched, only `status` flips.
+//        — { sourceId, action: "rebind", canonicalUrl } → pre-crawl FAQ-duplication fix (operator
+//          decision 2026-09-12, option A): point an existing MANUAL document at the real URL the
+//          crawler will later fetch, so ingest recognises it as the same document instead of
+//          creating a second, contradictory one. Only works on a source with no canonicalUrl yet.
+// DELETE — { sourceId } → PERMANENTLY remove source (chunks cascade). Archive and delete are two
+//          separate, real actions (operator decision 2026-09-12) — this one does not come back.
 // Writes gated by canWriteTenantConfig (owner/admin). Reads open to the internal ops console.
 
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { ingestKnowledge, listKnowledgeSources, deleteKnowledgeSource } from "@/lib/kb";
+import {
+  ingestKnowledge,
+  listKnowledgeSources,
+  listArchivedKnowledgeSources,
+  archiveKnowledgeSource,
+  restoreKnowledgeSource,
+  rebindManualDocumentUrl,
+  deleteKnowledgeSource,
+  type RebindError,
+} from "@/lib/kb";
+
+const REBIND_ERROR_HINT: Record<RebindError, string> = {
+  not_found: "找不到這份文件",
+  already_has_url: "這份文件已經有網址了，不是手動上傳的文件",
+  url_already_claimed: "這個網址已經被另一份文件使用——可能爬蟲已經抓過了，請改用一般的重新上傳來合併版本",
+  write_failed: "寫入失敗，請重試",
+  lost_race: "同時間有另一個操作搶先改了這份文件，請重新整理後再試一次",
+};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,8 +73,43 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
   const { slug } = await context.params;
   const orgId = await orgIdOf(slug);
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
-  const sources = await listKnowledgeSources(orgId);
+  const wantsArchived = new URL(request.url).searchParams.get("status") === "archived";
+  const sources = wantsArchived ? await listArchivedKnowledgeSources(orgId) : await listKnowledgeSources(orgId);
   return NextResponse.json({ ok: true, sources });
+}
+
+export async function PATCH(request: Request, context: { params: Promise<{ slug: string }> }) {
+  const resolved = resolveOpsRole(request);
+  if (!canWriteTenantConfig(resolved.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
+  const { slug } = await context.params;
+  let body: Record<string, unknown>;
+  try { body = (await request.json()) as Record<string, unknown>; } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
+  const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
+  const action = body.action === "archive" || body.action === "restore" || body.action === "rebind" ? body.action : null;
+  if (!sourceId || !action) return NextResponse.json({ ok: false, error: "sourceId_and_action_required" }, { status: 400 });
+
+  const orgId = await orgIdOf(slug);
+  if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+
+  if (action === "rebind") {
+    const url = canonicalUrlOf(body.canonicalUrl);
+    if (!url) return NextResponse.json({ ok: false, error: "valid_https_url_required" }, { status: 400 });
+    const result = await rebindManualDocumentUrl(orgId, sourceId, url);
+    if (result.ok === true) {
+      audit(orgId, resolved.role, resolved.source, "cs_knowledge_rebound", { sourceId, canonicalUrl: url });
+      return NextResponse.json({ ok: true });
+    }
+    const err: RebindError = result.error;
+    return NextResponse.json({ ok: false, error: err, hint: REBIND_ERROR_HINT[err] }, { status: err === "not_found" ? 404 : 409 });
+  }
+
+  const ok = action === "archive"
+    ? await archiveKnowledgeSource(orgId, sourceId)
+    : await restoreKnowledgeSource(orgId, sourceId);
+  if (ok) audit(orgId, resolved.role, resolved.source, action === "archive" ? "cs_knowledge_archived" : "cs_knowledge_restored", { sourceId });
+  return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, error: `${action}_failed` }, { status: 409 });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {

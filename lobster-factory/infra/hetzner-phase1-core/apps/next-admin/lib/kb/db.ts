@@ -14,6 +14,7 @@
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { buildKeywordQuery } from "@/lib/kb/keyword-query";
 import { KB_DEFAULT_SPACE_ID } from "@/lib/kb/config";
+import { docFamilyId } from "@/lib/kb/family";
 
 /** List knowledge sources for the ops UI, with per-source chunk counts. */
 export async function listKnowledgeSources(
@@ -27,6 +28,7 @@ export async function listKnowledgeSources(
     status: string;
     version: number;
     docFamilyId: string;
+    canonicalUrl: string | null;
     chunks: number;
   }>
 > {
@@ -37,7 +39,7 @@ export async function listKnowledgeSources(
   // explicit "show versions" view.
   const { data, error } = await sb
     .from("cs_knowledge_sources")
-    .select("id,title,kind,is_sensitive,status,source_version,doc_family_id")
+    .select("id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url")
     .eq("organization_id", organizationId)
     .neq("status", "archived")
     .order("created_at", { ascending: false });
@@ -63,15 +65,205 @@ export async function listKnowledgeSources(
     status: s.status as string,
     version: Number(s.source_version ?? 1),
     docFamilyId: s.doc_family_id as string,
+    canonicalUrl: (s.canonical_url as string | null) ?? null,
     chunks: counts.get(s.id as string) ?? 0,
   }));
 }
 
 /**
+ * Archived sources, same shape as listKnowledgeSources — the ops "已封存" view an operator opens to
+ * restore or permanently remove something they archived. A separate function rather than a filter
+ * argument on listKnowledgeSources: the two lists serve different actions (archive/delete vs.
+ * restore/purge), and a boolean parameter callers must remember to pass is how the wrong list ends
+ * up rendered with the wrong buttons.
+ */
+export async function listArchivedKnowledgeSources(
+  organizationId: string,
+): Promise<Array<{ id: string; title: string; kind: string; isSensitive: boolean; version: number; docFamilyId: string }>> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .select("id,title,kind,is_sensitive,source_version,doc_family_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "archived")
+    .order("updated_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map((s) => ({
+    id: s.id as string,
+    title: s.title as string,
+    kind: s.kind as string,
+    isSensitive: s.is_sensitive === true,
+    version: Number(s.source_version ?? 1),
+    docFamilyId: s.doc_family_id as string,
+  }));
+}
+
+/**
+ * The operator's "封存" action (KNOWLEDGE_BASE_PLAN.md §3-#4's own invariant: a document leaving
+ * retrieval should default to archived, not gone — `cs_ai_replies.retrieved_chunk_ids` is an FK-less
+ * uuid[], so hard-deleting a chunk a past reply cited orphans that reference). Only flips `status`;
+ * chunks and the row itself are untouched, so restoreKnowledgeSource is a plain reverse of this.
+ * Restricted to `status = 'active'` so archiving an already-superseded row (K1 versioning's own job,
+ * see archiveOtherVersions) is a no-op rather than a second writer racing the first.
+ */
+export async function archiveKnowledgeSource(organizationId: string, sourceId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  // `.select("id")` + length check (not just `!error`): Supabase/PostgREST returns error:null even
+  // when the WHERE clause matched zero rows, so a stale/foreign/already-archived sourceId would
+  // otherwise report success and log an audit event for a write that never happened (critic finding
+  // 2026-09-12) — same pattern archiveOtherVersions already uses, below, for the same reason.
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .update({ status: "archived", updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .eq("status", "active")
+    .select("id");
+  return !error && (data?.length ?? 0) > 0;
+}
+
+/**
+ * Undo archiveKnowledgeSource. Restricted to `status = 'archived'`, AND (critic finding 2026-09-12,
+ * Critical) refuses if any OTHER row in the same document family is currently `active` — without
+ * this check, restoring a version K1's own versioning already superseded resurrects a second "live"
+ * document: retrieval's `status = 'active'` predicate (migration 0072) has no version-recency
+ * concept, so both rows would be served side by side with no error anywhere, potentially serving a
+ * reversed/contradictory old policy alongside the current one. Deterministically reproducible with
+ * ONE operator (upload → re-upload same title → open 已封存 → restore the old version) before this
+ * fix, not merely a low-probability race.
+ *
+ * NOT enforced as a database constraint: migration 0072's own header explains why a UNIQUE index on
+ * (organization_id, doc_family_id) WHERE status='active' is deliberately absent — ingestKnowledge()
+ * inserts the new version BEFORE archiving the old one (the only protection against a failed embed
+ * call wiping a document's content, since supabase-js has no transactions), so two active rows exist
+ * for a moment BY DESIGN during every normal re-ingest. Adding that constraint would make ordinary
+ * re-versioning fail outright, trading a rare operator-triggered mistake for a routine ingest crash —
+ * the guard belongs here, on the one code path (an operator's explicit "restore") that has no
+ * legitimate reason to ever create the state K1's own versioning invariant forbids.
+ */
+export async function restoreKnowledgeSource(organizationId: string, sourceId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { data: target, error: readError } = await sb
+    .from("cs_knowledge_sources")
+    .select("doc_family_id")
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .eq("status", "archived")
+    .maybeSingle();
+  if (readError || !target) return false;
+
+  const { data: activeSibling } = await sb
+    .from("cs_knowledge_sources")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("doc_family_id", target.doc_family_id as string)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  if (activeSibling) return false; // a newer version is already live — do not create a second one
+
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .update({ status: "active", updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .eq("status", "archived")
+    .select("id");
+  return !error && (data?.length ?? 0) > 0;
+}
+
+export type RebindError = "not_found" | "already_has_url" | "url_already_claimed" | "write_failed" | "lost_race";
+
+/**
+ * The FAQ-duplication fix (TASKS.md 2026-09-11, operator-chosen option A, 2026-09-12): before a
+ * client's site is ever crawled, point each existing MANUAL document at the real URL the crawler
+ * will eventually see for the same content, so the crawl versions it up instead of creating a
+ * second, contradictory document.
+ *
+ * WHY THIS ISN'T JUST "SET canonical_url": `doc_family_id` (lib/kb/family.ts) is a hash of
+ * (organizationId, canonicalKey) computed ONCE at ingest and stored — changing the `canonical_url`
+ * column alone does not change the already-stored `doc_family_id`, so a later crawl of that URL
+ * would still compute a DIFFERENT family id and create a second document, silently reproducing the
+ * exact bug this function exists to close. Both columns move together.
+ *
+ * Refuses (rather than silently merging) when: the source already has a canonicalUrl (rebinding an
+ * already-URL-identified document is a different, unrelated operation — the button only appears on
+ * manual rows in the ops UI, but the guard holds even if called directly); or another row in this
+ * organization already occupies the target family (a crawl already reached this URL — merging two
+ * independently-written histories under one identity needs a human decision, not a silent rewrite).
+ */
+export async function rebindManualDocumentUrl(
+  organizationId: string,
+  sourceId: string,
+  canonicalUrl: string,
+): Promise<{ ok: true } | { ok: false; error: RebindError }> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return { ok: false, error: "write_failed" };
+  const url = canonicalUrl.trim();
+
+  const { data: existing, error: readError } = await sb
+    .from("cs_knowledge_sources")
+    .select("id,canonical_url")
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .maybeSingle();
+  if (readError || !existing) return { ok: false, error: "not_found" };
+  if (existing.canonical_url) return { ok: false, error: "already_has_url" };
+
+  const newFamilyId = docFamilyId(organizationId, url);
+  const { data: collision } = await sb
+    .from("cs_knowledge_sources")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("doc_family_id", newFamilyId)
+    .neq("id", sourceId)
+    .limit(1)
+    .maybeSingle();
+  if (collision) return { ok: false, error: "url_already_claimed" };
+
+  // Source row first: it is the one getFamilyState()/archiveOtherVersions() actually key off of, so
+  // a future crawl is correctly recognised as soon as this write lands. `.select("id")` + length
+  // check (critic finding 2026-09-12, Major) — not just `!error`: Supabase/PostgREST returns
+  // error:null even when the WHERE clause matched zero rows, which a lost race against a concurrent
+  // rebind of the SAME source (a different URL, or a second click) would otherwise report as success
+  // while `canonical_url`/`doc_family_id` silently keep their PREVIOUS values.
+  const { data: written, error: sourceError } = await sb
+    .from("cs_knowledge_sources")
+    .update({ canonical_url: url, doc_family_id: newFamilyId, updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .is("canonical_url", null) // re-check at write time, not just at the read above (TOCTOU)
+    .select("id");
+  if (sourceError) return { ok: false, error: "write_failed" };
+  if ((written?.length ?? 0) === 0) return { ok: false, error: "lost_race" };
+
+  // Best-effort cleanup of a column nothing currently reads for filtering (grep-verified: no
+  // retrieval predicate touches cs_knowledge_chunks.doc_family_id) — worth keeping consistent for
+  // whoever next reads this table directly, but not worth failing an already-confirmed source write
+  // over. Only reached once the source write above is KNOWN to have landed (guard above), so this
+  // never fires for a family id the source row does not actually have.
+  const { error: chunksError } = await sb
+    .from("cs_knowledge_chunks")
+    .update({ doc_family_id: newFamilyId })
+    .eq("organization_id", organizationId)
+    .eq("source_id", sourceId);
+  if (chunksError) {
+    console.error("kb_rebind_chunks_family_stale", { sourceId, newFamilyId, code: chunksError.code, message: chunksError.message });
+  }
+
+  return { ok: true };
+}
+
+/**
  * Delete a knowledge source row; its chunks cascade-delete via FK (migration 0051).
- * This is the operator's explicit delete and the rollback path for a failed ingest — it is NOT how
- * a document is superseded. Using it to replace a version would destroy the version history in the
- * same statement (see archiveOtherVersions).
+ * This is the operator's explicit, PERMANENT delete and the rollback path for a failed ingest — it
+ * is NOT how a document is superseded (see archiveOtherVersions) and, since archiveKnowledgeSource
+ * exists, is no longer the only way to remove a document from circulation. Kept as a genuinely
+ * separate, irreversible action rather than folded into archive: some deletes (a document ingested
+ * into the wrong tenant, a legal takedown) need to actually be gone, not merely hidden.
  */
 export async function deleteKnowledgeSource(organizationId: string, sourceId: string): Promise<boolean> {
   const sb = getSupabaseWriteClient();

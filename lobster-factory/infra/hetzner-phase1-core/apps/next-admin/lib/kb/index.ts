@@ -24,6 +24,14 @@
 //   one predicate text; a caller cannot widen one half. `ctx` with an empty scope returns nothing.
 
 export { ingestKnowledge, retrieve, defaultEmbedder } from "@/lib/kb/rag";
-export { listKnowledgeSources, deleteKnowledgeSource } from "@/lib/kb/db";
+export {
+  listKnowledgeSources,
+  listArchivedKnowledgeSources,
+  archiveKnowledgeSource,
+  restoreKnowledgeSource,
+  rebindManualDocumentUrl,
+  deleteKnowledgeSource,
+  type RebindError,
+} from "@/lib/kb/db";
 
 export type { KnowledgeInput, EmbeddingProvider, RetrievedChunk, KbContext, IngestResult } from "@/lib/kb/types";

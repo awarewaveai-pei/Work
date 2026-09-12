@@ -17057,3 +17057,74 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 [rollback] 應用層改動（`db.ts`/`types.ts`/`rag.ts`/`orchestrator.ts`/`eval.ts`）新增行為，省略 `includeSensitive` 時行為等同 fail-closed 排除敏感內容（比修復前更嚴格，不是更寬鬆，`git revert` 安全）。DB 側：尚未對 prod 執行 0083；一旦執行，回滾走 `packages/db/scripts/0083_kb_sensitive_audience_gate_down.sql`（已在真實 Postgres 驗證可逆、可重套用）。
 
 [rollback] `git revert` 對應 commit（純文件）。
+
+## 2026-09-12（續8）Cognitive OS Phase 1：Tenant/Workspace/Identity + entitlement seam + FastAPI 執行/瀏覽 API——程式碼完成，尚未部署
+
+[任務] 承接稍早的部署規劃條目；操作者確認「繼續做，不要停」，於是實作 Phase 1（自用階段）程式碼。明確約定：真正碰 ks-aw-01 部署那一步屬於 High-risk，會停下來另外確認，本條目只涵蓋「寫完+測完+覆審完」的範圍。
+
+[已修改]
+- 新增 domain schema：`specs/domain/workspace.schema.yaml`、`specs/domain/identity.schema.yaml`（既有的只有 `tenant.schema.yaml`，ADR-003 明文說 Workspace 尚未建）。
+- 新增 domain builder：`ai_lego/core/domain/{workspace,identity}.py`。
+- 新增 `ai_lego/platform/identity/store.py`：SQLite 真實持久化 Tenant/Workspace/Identity/session/entitlement_audit，PBKDF2-HMAC-SHA256 密碼雜湊（60萬次疊代，OWASP 2023+ 門檻）、真實 server-side session token（256-bit、可撤銷、12hr TTL）。
+- 新增 `ai_lego/platform/entitlement/check.py`：entitlement 檢查點（`check_entitlement()`），Phase 1 對存在且 active 的 tenant 一律放行，但每次呼叫都寫入稽核紀錄——Phase 2 訂閱制上線時只需替換判斷邏輯，不必事後補稽核。
+- 新增 `ai_lego/apps/api/{dispatch.py,main.py}`：FastAPI app，`GET /methods`、`GET /methods/{id}`、`POST /auth/login`、`POST /auth/logout`、`POST /methods/{id}/invoke`、`GET /methods/{id}/demo`。`dispatch.py` 用 introspection（找模組裡唯一的 `generate_*`/`evaluate_*_gates` 函式）而非手刻對照表分派，因為語料庫裡 builder 函式命名並非 100% 跟 method_id 一致（例如 `jurisdiction.market_admission_control` 的 builder 叫 `generate_market_admission`）。
+- 新增 `ai_lego/apps/cli/bootstrap_phase1_tenant.py`：一次性建立真實（非 synthetic）Phase 1 tenant/workspace/identity 的 CLI。
+- `pyproject.toml`：正式宣告 fastapi/uvicorn 為依賴（原本環境裡已裝但未宣告）。
+- 新增 7 個測試檔（`test_workspace_domain.py`/`test_identity_domain.py`/`test_identity_store.py`/`test_entitlement_check.py`/`test_api_dispatch.py`/`test_api_main.py`/`test_authenticate_timing.py`），72 tests。
+- `docs/COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md`：更新 Phase 1 段落為「程式碼完成，部署待授權」。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit/test_{workspace_domain,identity_domain,identity_store,entitlement_check,api_dispatch,api_main,authenticate_timing}.py -v` | exit=0 | result=72 passed, 3 subtests passed
+- REALTEST_EVIDENCE: tool=Bash（真實網路，非 TestClient）| cmd=啟動真實 `uvicorn`，用 `curl` 跑完整登入→執行 `foresight.cross_impact_analysis`→demo→登出流程，另用 `bootstrap_phase1_tenant.py` 建立真實 tenant | exit=0 | result=全鏈成功，gate 全 PASS，未登入呼叫正確回 401
+- REVIEW_DONE: critic=Standard（auth/crypto 等級：逐項獨立重新推導，非抽查）| verdict=warn→pass（修復後）| findings=0c/1m(已修)/1n(已修)/1 suggestion(記錄待辦)——**Major**：critic 用真實計時量測（非抽象推理）證實 `authenticate()` 有 timing side-channel：不存在的 email 幾乎瞬間回應，密碼錯誤的真實帳號要跑完整 PBKDF2（約 182ms 差距，730 倍），可被用來列舉合法 email。已修：兩個失敗分支都改為對固定 dummy salt 跑一次同成本的真實雜湊才回傳 None，新增 `test_authenticate_timing.py` 用真實計時量測回歸（不是只斷言回傳值）驗證修復生效。**Minor**：`bootstrap_phase1_tenant.py` 的 `--password` CLI 參數會留在 shell history/`ps`，已預設走 `getpass` 提示，補上使用該旗標時的 stderr 警告。其餘（密碼雜湊鹽值/比對、session 安全性、cookie 旗標、SQL injection、dispatch/demo 端點的程式碼執行面、跨 tenant 隔離、entitlement tenant_id 來源、dependency injection 正確性）critic 逐項用真實攻擊 payload/hand-tamper SQLite row 驗證過為真，非僅閱讀程式碼假設。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`ai_lego\.platform\.identity\|ai_lego\.platform\.entitlement\|ai_lego\.apps\.api` | hits=0 殘留
+- 全庫回歸測試（`pytest tests/unit`，含既有 245+ 個 Method Atlas 測試）背景執行中，通過後另行補記。
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. `encryption_root_key_ref` 為本機開發佔位字串，尚無真實 KMS 整合——Phase 1 不處理任何第三方客戶資料，此為刻意延後、已揭露的缺口，Phase 2/3 真正客戶資料進來前必須補上。
+2. `entitlement_audit` 表無保留/清理機制，每次 `/invoke` 都新增一列——critic 列為 Suggestion，非本次範圍，記入 Phase 2 blueprint 待辦。
+3. Rate limiting 僅止於「必須登入」，未做更細的流量限制——已在 blueprint 明確揭露為 Phase 1 已知缺口，非本次治理。
+
+[rollback] 全部為新增檔案（無既有 Method Atlas 程式碼被修改），`git revert` 對應 commit 即可完整回退。**尚未部署**，ks-aw-01 上沒有任何變動，本條目風險完全侷限在本機/repo 範圍。
+
+[下一步] 等操作者對「真正部署到 ks-aw-01」給明確 go-ahead（High-risk gate）；屆時走 `sg-deploy.sh` 六件套，在目標主機上跑 `bootstrap_phase1_tenant.py` 建立真實 tenant，部署後用真實網域跑一次登入+執行的真實 smoke test 才算完成。
+
+## 2026-09-12（續9）KB 刪除/封存並存 + FAQ 去重 pre-crawl backfill 工具 + critic 覆審 1 Critical/1 Major 全修
+
+[任務] 操作者三項確認：①「知識庫的『刪除』和『封存』，要並存，可以真正刪除和真正封存」→ 兩個動作都做成真的、各自獨立；②排程開關沒有 UI 面板 → 補上；③人工上傳 vs 爬蟲抓回同一份 FAQ 變兩份文件，操作者選定作法：開爬前用小工具把手動文件一份一份補上真實網址（選項 A，操作者親自描述機制）。
+
+[已修改]
+**KB 封存/刪除並存**
+- `lib/kb/db.ts`：新增 `archiveKnowledgeSource`（`status active→archived`）、`restoreKnowledgeSource`（反向）、`listArchivedKnowledgeSources`；既有 `deleteKnowledgeSource`（硬刪）不動；`listKnowledgeSources` 補回 `canonicalUrl` 欄位（FAQ 去重工具需要判斷哪些是手動文件）。
+- `app/api/ops/clients/[slug]/cs-knowledge/route.ts`：`GET ?status=archived` 讀封存清單；新 `PATCH {sourceId, action: archive|restore|rebind}`，同一套 owner/admin 權限閘。
+- `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`（KnowledgeTab）：每列加「封存」按鈕（跟刪除並列，非巢狀隱藏——操作者明確要求並存）；下方「已封存」可展開清單，內含「取消封存」+ 永久刪除。
+
+**排程 UI 開關**（TASKS.md 2026-09-12「排程沒有操作者可見的開關 UI」）
+- `app/(shell)/ops/collect/CollectionSourcesPanel.tsx`：新 `ScheduleControls` 元件，接既有 `PATCH /api/ops/clients/[slug]/collection-schedule`（此 API 本身已存在，只是沒有 UI）。啟用開關 + 每天/每週按鈕 + 星期按鈕（0-6）+ UTC 小時數字輸入，全部可見按鈕，無 `<select>`（照既有慣例）。
+
+**FAQ 去重 pre-crawl backfill 工具**（TASKS.md 2026-09-11，操作者選項 A）
+- `lib/kb/db.ts`：新增 `rebindManualDocumentUrl(orgId, sourceId, canonicalUrl)`。根因：`doc_family_id`（`lib/kb/family.ts`）是 ingest 當下算好存死的雜湊，只改 `canonical_url` 欄位不會讓它跟著變，未來爬蟲抓到同一網址時算出的 family id 還是不同，重現同一個重複問題——所以兩個欄位必須一起搬。拒絕（不靜默合併）情境：文件已經有網址（非手動文件）；目標網址的 family 已被別的來源佔用（爬蟲已經先抓到了，要合併需要人判斷，不是工具自動決定）。
+- `app/api/ops/clients/[slug]/cs-knowledge/route.ts`：`PATCH action:"rebind"`，錯誤碼對應中文提示。
+- `ClientHubTabs.tsx`：沒有網址的手動文件列，出現網址輸入框 +「設定真實網址」按鈕。
+
+[critic 覆審抓到並當場修復的 1 Critical + 1 Major]（`critic` agent，`ae68f6ad53b1e9664`）
+- **Critical**：`restoreKnowledgeSource` 原本沒檢查同一個文件家族是否已有別的 active 版本——單一操作者就能決定性重現：上傳「退貨政策」→ 改內容重新上傳（K1 版本化把舊版設 archived）→ 打開「已封存」→ 取消封存舊版 → 現在同一家族有兩個 active 版本，retrieval 的 `status='active'` 謂詞沒有版本新舊概念，兩版同時餵給 AI，無任何錯誤或告警。**沒有**用資料庫 UNIQUE constraint 解決——查證 migration 0072 檔頭已經明確記載這是刻意不做的決定：`ingestKnowledge()` 為了不讓失敗的 embedding 呼叫清空文件內容，一定是先插入新版本（active）才封存舊版本，正常重新上傳的過程中「暫時兩個 active」是設計本身要求的、非 bug；加 UNIQUE constraint 會讓每次正常重新上傳都失敗。修法改在 `restoreKnowledgeSource` 這一個沒有正當理由需要製造該狀態的操作路徑上做應用層檢查（讀目標列的 `doc_family_id` → 查同家族是否已有 active 列 → 有就拒絕），是「只關這個操作，不動全域不變量」的最小爆炸半徑修法。
+- **Major**：`rebindManualDocumentUrl` 的來源列 UPDATE 只檢查 `!error` 沒檢查實際命中列數——Supabase/PostgREST 對 WHERE 條件命中 0 列時 `error` 一樣是 `null`。兩個不同手動文件同時搶綁同一個網址時，其中一個的 UPDATE 會因為 `WHERE canonical_url IS NULL` 已經不成立而命中 0 列，卻回報成功；後續的 chunks 清理也沒有掛在「來源列真的寫成功」這個前提下，可能把 chunks 的 family id 設成來源列根本沒有的值。修法：來源列 UPDATE 補 `.select("id")` 檢查陣列長度，命中 0 列回傳新增的 `lost_race` 錯誤；chunks 清理改成只在來源列確認寫入成功後才執行。`archiveKnowledgeSource`/`restoreKnowledgeSource` 的寫入也一併補上同樣的命中列數檢查（Minor，同一個成因）。
+- UI 層 Minor：`archiveKnowledge`/`restoreKnowledge` 原本不檢查回應就直接當作成功，403/409 會靜默吞掉、畫面看起來像沒反應——已改為檢查 `res.ok && data.ok`，失敗時用既有的逐列訊息區顯示原因。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（`apps/next-admin`） | exit=0 | result=clean
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/kb lib/cs lib/collect app/api/ops` | exit=0 | result=337 passed（含本條目新增/改寫的 25 個 test：kb-archive 11 個含新的 Critical 回歸測試、kb-rebind 8 個含新的 lost_race 測試、route.test.ts 補 4 個 rebind case），0 regression
+- REVIEW_DONE: critic=Deep | verdict=pass（覆審後修復） | findings=1C(已修)/1Major(已修)/3Minor(已修 2、1 記入 TASKS 待評估)——role/auth gating、UI sourceId 綁定、archive 與 rebind 互相不干擾三項確認 Verified Clean，細節見 agent 輸出
+- REALTEST_WAIVED: SMOKE_COVERED -- 排程 UI/KB 封存 UI 兩處畫面因瀏覽器自動化工具當輪不穩定（點擊分頁按鈕無反應，非本次改動造成——preview_logs 確認 dev server 端零錯誤），改請操作者本人用真實登入 session 肉眼核對兩處畫面無跑版，尚未收到操作者回覆確認；typecheck + 完整單元測試覆蓋所有分支邏輯（含新修的 race condition）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`archiveKnowledgeSource\|restoreKnowledgeSource\|rebindManualDocumentUrl\|listArchivedKnowledgeSources\|RebindError` | hits=6，全數為本次改動檔案本身，無殘留
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. `restoreKnowledgeSource` 的家族-sibling 檢查是讀取後再寫入（非單一原子陳述式），極窄的殘留 race：兩個操作者同時對同一家族的兩個不同封存版本按下「取消封存」，理論上都可能通過檢查後才寫入。已判斷不需要資料庫層級解法（會破壞正常重新上傳流程），殘留風險機率極低（需要人工同時點擊）且後果比原 Critical 版本輕微很多（原版本零操作視窗即可重現）。
+2. 已封存文件的永久刪除仍會讓 `cs_ai_replies.retrieved_chunk_ids`（無 FK 的 uuid[]）產生懸空參照——critic 指出這個既有限制的時間窗因為新的「先封存後刪除」流程而變寬，非本次新增的 bug，未在此次修復（沒有 FK 可用，加 FK 需要另一個 migration）。已記入 TASKS.md 待評估是否要在永久刪除確認對話框加一句提示。
+3. 排程 UI 與 KB 封存 UI 尚未經過操作者真人肉眼確認畫面正確——已請操作者协助，回覆前不宣稱「畫面驗證完成」。
+4. 三項功能均尚未部署到 prod（`sg-deploy.sh`）。
+
+[rollback] 應用層新增行為，皆為新函式/新 API 分支，未觸發時行為與改動前相同（`git revert` 安全）。無新 migration（`cs_knowledge_sources.status`/`canonical_url` 欄位皆為既有 migration 0051/0072 已建立的欄位，本次只新增讀寫這些既有欄位的函式）。

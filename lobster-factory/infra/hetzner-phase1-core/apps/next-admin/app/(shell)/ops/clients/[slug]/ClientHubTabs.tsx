@@ -1275,15 +1275,29 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
 function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
-  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }>>([]);
+  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; canonicalUrl: string | null; chunks: number }>>([]);
+  const [archived, setArchived] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean }>>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [kTitle, setKTitle] = useState(""); const [kBody, setKBody] = useState(""); const [kKind, setKKind] = useState("doc");
   const [kSensitive, setKSensitive] = useState(false); const [kSaving, setKSaving] = useState(false); const [kMsg, setKMsg] = useState<string | null>(null);
+  // Per-row draft while typing a real URL to rebind a manual document to (FAQ-duplication fix,
+  // operator decision 2026-09-12) — keyed by source id so two rows' inputs never collide.
+  const [rebindDraft, setRebindDraft] = useState<Record<string, string>>({});
+  const [rebindMsg, setRebindMsg] = useState<Record<string, string>>({});
+  const [rebindBusy, setRebindBusy] = useState<string | null>(null);
 
   async function reloadSources() {
     try {
       const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { headers: { ...roleHeader("admin") } });
-      const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean; chunks: number }> };
+      const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean; canonicalUrl: string | null; chunks: number }> };
       if (data.ok && data.sources) setSources(data.sources);
+    } catch { /* ignore */ }
+  }
+  async function reloadArchived() {
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge?status=archived`, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean }> };
+      if (data.ok && data.sources) setArchived(data.sources);
     } catch { /* ignore */ }
   }
   useEffect(() => {
@@ -1311,9 +1325,60 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
       await reloadSources();
     } catch (e) { setKMsg(`⚠ ${String(e)}`); } finally { setKSaving(false); }
   }
+  async function archiveKnowledge(id: string) {
+    setRebindMsg((m) => ({ ...m, [id]: "" }));
+    const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { method: "PATCH", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ sourceId: id, action: "archive" }) });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    // Checked, not assumed: a 403 (wrong role) or 409 (e.g. the row already changed under us) must
+    // not look like "the click did nothing" — the operator needs to see WHY it did not archive.
+    if (!res.ok || !data.ok) { setRebindMsg((m) => ({ ...m, [id]: `⚠ 封存失敗：${data.error ?? res.status}` })); return; }
+    await reloadSources();
+    if (showArchived) await reloadArchived();
+  }
+  async function restoreKnowledge(id: string) {
+    setRebindMsg((m) => ({ ...m, [id]: "" }));
+    const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { method: "PATCH", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ sourceId: id, action: "restore" }) });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      // The one restore-specific failure worth naming: db.ts refuses when a newer version is
+      // already live, rather than silently creating two "current" documents side by side.
+      setRebindMsg((m) => ({ ...m, [id]: "⚠ 取消封存失敗：這個文件家族已經有其他生效中的版本，不能同時存在兩個" }));
+      return;
+    }
+    await reloadArchived();
+    await reloadSources();
+  }
+  async function rebindKnowledge(id: string) {
+    const url = (rebindDraft[id] ?? "").trim();
+    if (!url) return;
+    setRebindBusy(id);
+    setRebindMsg((m) => ({ ...m, [id]: "" }));
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, {
+        method: "PATCH", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ sourceId: id, action: "rebind", canonicalUrl: url }),
+      });
+      const data = (await res.json()) as { ok?: boolean; hint?: string; error?: string };
+      if (!res.ok || !data.ok) {
+        setRebindMsg((m) => ({ ...m, [id]: `⚠ ${data.hint ?? data.error ?? "失敗"}` }));
+        return;
+      }
+      setRebindDraft((d) => ({ ...d, [id]: "" }));
+      await reloadSources();
+    } finally {
+      setRebindBusy(null);
+    }
+  }
   async function delKnowledge(id: string) {
+    if (!confirm("永久刪除此文件？此操作無法恢復，資料會直接消失（不是封存）。")) return;
     await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ sourceId: id }) });
     await reloadSources();
+    await reloadArchived();
+  }
+  async function toggleArchived() {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (next) await reloadArchived();
   }
 
   return (
@@ -1325,12 +1390,64 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
         {sources.length > 0 && (
           <div style={{ marginBottom: 10 }}>
             {sources.map((s) => (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-                <span style={{ flex: 1, fontWeight: 500 }}>{s.title}</span>
-                {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
-                {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
-                <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
-                <button onClick={() => delKnowledge(s.id)} aria-label="刪除" style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
+              <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, fontWeight: 500 }}>{s.title}</span>
+                  {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
+                  {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
+                  <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
+                  <button onClick={() => archiveKnowledge(s.id)} title="封存（從 AI 檢索範圍移除，資料保留，可復原）"
+                    style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>
+                    封存
+                  </button>
+                  <button onClick={() => delKnowledge(s.id)} title="永久刪除（無法恢復）" aria-label="永久刪除"
+                    style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
+                </div>
+                {!s.canonicalUrl ? (
+                  //手動文件才會出現：開爬前先補上真實網址，爬蟲抓到同一網址時才會認成同一份文件的新版本，
+                  // 而不是多一份互相矛盾的內容（TASKS.md 2026-09-11「人工上傳 vs 爬蟲抓回」，操作者選項 A）。
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, paddingLeft: 4 }}>
+                    <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>手動文件，尚無網址</span>
+                    <input
+                      value={rebindDraft[s.id] ?? ""}
+                      onChange={(e) => setRebindDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                      placeholder="開爬前先補上這篇對應的真實網址（可留白）"
+                      style={{ flex: 1, fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }}
+                    />
+                    <button
+                      onClick={() => rebindKnowledge(s.id)}
+                      disabled={rebindBusy === s.id || !(rebindDraft[s.id] ?? "").trim()}
+                      style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4, flexShrink: 0, opacity: rebindBusy === s.id || !(rebindDraft[s.id] ?? "").trim() ? 0.5 : 1 }}
+                    >
+                      設定真實網址
+                    </button>
+                  </div>
+                ) : null}
+                {rebindMsg[s.id] ? <div style={{ fontSize: 10, color: "var(--red)", marginTop: 2, paddingLeft: 4 }}>{rebindMsg[s.id]}</div> : null}
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={toggleArchived} style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 11, padding: "0 0 8px", textDecoration: "underline" }}>
+          {showArchived ? "隱藏已封存" : `已封存文件${archived.length ? `（${archived.length}）` : ""}`}
+        </button>
+        {showArchived && (
+          <div style={{ marginBottom: 10, background: "var(--bg-canvas)", borderRadius: 6, padding: archived.length ? "4px 8px" : 0 }}>
+            {archived.length === 0 && <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>沒有已封存的文件。</p>}
+            {archived.map((s) => (
+              <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, fontWeight: 500, color: "var(--text-muted)" }}>{s.title}</span>
+                  {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
+                  {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
+                  <button onClick={() => restoreKnowledge(s.id)} title="取消封存（恢復進 AI 檢索範圍）"
+                    style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>
+                    取消封存
+                  </button>
+                  <button onClick={() => delKnowledge(s.id)} title="永久刪除（無法恢復）" aria-label="永久刪除"
+                    style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
+                </div>
+                {rebindMsg[s.id] ? <div style={{ fontSize: 10, color: "var(--red)", marginTop: 2, paddingLeft: 4 }}>{rebindMsg[s.id]}</div> : null}
               </div>
             ))}
           </div>
