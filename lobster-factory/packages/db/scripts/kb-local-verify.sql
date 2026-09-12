@@ -26,7 +26,8 @@ INSERT INTO t_ids (k, v) VALUES
   -- 0076 keyword-retrieval fixtures
   ('kwfam1', '66666666-6666-4666-8666-666666666666'),
   ('kwfam2', '77777777-7777-4777-8777-777777777777'),
-  ('kwfam3', '88888888-8888-4888-8888-888888888888');
+  ('kwfam3', '88888888-8888-4888-8888-888888888888'),
+  ('kwfam4', '99999999-9999-4999-8999-999999999999');
 
 CREATE OR REPLACE FUNCTION pg_temp.uid(text) RETURNS uuid
 LANGUAGE sql STABLE AS $$ SELECT v FROM t_ids WHERE k = $1 $$;
@@ -300,9 +301,14 @@ BEGIN
   -- Before 0076 this was 0: the whole question was matched as one literal string.
   ASSERT hits > 0, 'the keyword half found nothing for a question a person would actually ask';
 
+  -- ORDER BY here, not just trusted from the function: the exact same anti-pattern this batch
+  -- fixed in lib/kb/db.ts (matchChunksKeyword used to trust RPC row order instead of sorting
+  -- explicitly) -- a JOIN can reorder rows regardless of the function's own internal ORDER BY,
+  -- and this assertion is supposed to be proving ranking correctness, not planner behavior.
   SELECT s.title, k.score INTO top, topscore
   FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, q, 50) k
   JOIN public.cs_knowledge_sources s ON s.id = k.source_id
+  ORDER BY k.score DESC
   LIMIT 1;
   ASSERT top = 'returns', 'the most relevant document is not first: got ' || COALESCE(top, 'null');
   -- The score must reflect how many query terms the chunk actually contains. This assertion caught
@@ -321,6 +327,27 @@ BEGIN
   SELECT count(*) INTO hits
   FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, 'shipping OR policy', 50);
   ASSERT hits > 0, 'a Latin query found nothing';
+
+  -- The whole reason this file exists: prove PGroonga is actually doing the matching, not a
+  -- disguised substring scan that happens to produce the same rows on small fixtures. A half-width
+  -- query can only match this full-width content through PGroonga's normalizer (verified against
+  -- this exact image: pgroonga_normalize('ＳＨＩＰＰＩＮＧ') = 'shipping'); strpos()/ILIKE never
+  -- would. If someone quietly swaps `&@~` for a substring check, this goes to 0 and says so.
+  PERFORM pg_temp.add_doc(a, pg_temp.uid('kwfam4'), 1, 'active', 'fullwidth',
+    '訂單 ＳＨＩＰＰＩＮＧ 已出貨，感謝您的耐心等候。');
+  SELECT count(*) INTO hits
+  FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, 'shipping', 50);
+  ASSERT hits > 0, 'a half-width query missed full-width content -- PGroonga is not the one matching';
+
+  -- Ranking must use the SAME normalizer as matching. Isolated to just this one document (rather
+  -- than comparing rank against the 'shipping' fixture above) because both would score 1 under
+  -- EITHER normalizer -- "Shipping policy" is a plain ASCII substring even without folding, so that
+  -- comparison would pass for the wrong reason. This one can only score >0 via pgroonga_normalize().
+  SELECT k.score INTO topscore
+  FROM public.cs_match_chunks_keyword(ARRAY[a], NULL, a, NULL, m, 'shipping', 50) k
+  JOIN public.cs_knowledge_sources s ON s.id = k.source_id
+  WHERE s.title = 'fullwidth';
+  ASSERT topscore > 0, 'ranking used a different normalizer than matching -- a full-width-only match scored 0';
 
   RAISE NOTICE 'KB_VERIFY_KEYWORD_OK';
 END $$;

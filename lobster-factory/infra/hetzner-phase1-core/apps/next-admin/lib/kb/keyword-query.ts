@@ -17,8 +17,19 @@
 /** PGroonga query syntax. Left in place, user text would be read as operators, not as words. */
 const SYNTAX = /[()"'\\+\-|*:~<>=]/g;
 
-/** One CJK character (Han, kana, Hangul). Ranges chosen to match what PGroonga bigram-tokenises. */
-const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
+/**
+ * One CJK character (Han, kana, Hangul), on the Basic Multilingual Plane. Ranges chosen to match
+ * what PGroonga bigram-tokenises: Hangul Jamo, Hiragana/Katakana, halfwidth Katakana, Hangul
+ * syllables, CJK Unified + Extension A, CJK Compatibility Ideographs.
+ *
+ * KNOWN GAP: astral-plane CJK (Extension B and beyond, U+20000+ \u2014 rare personal-name characters)
+ * is not detected here and falls through to the Latin branch as a two-UTF-16-unit "word" instead of
+ * being bigrammed. Handling it correctly needs the regex `u` flag plus surrogate-pair-aware
+ * character-class ranges throughout this file; not done here because the character set is rare
+ * enough for a customer-service knowledge base that the cost didn't clear the bar for this pass.
+ * Tracked in TASKS.md.
+ */
+const CJK = /[\u1100-\u11ff\u3040-\u30ff\u3130-\u318f\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff65-\uff9f]/;
 
 /**
  * Words too common to narrow anything down. Deliberately tiny: a long stopword list is a language
@@ -27,8 +38,15 @@ const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]
  */
 const NOISE = new Set(["the", "and", "for", "with", "how", "what", "does", "can", "you", "your", "our"]);
 
-/** Longest sensible query. Beyond this the OR list stops helping and starts costing. */
-const MAX_TERMS = 32;
+/**
+ * Longest sensible query. An OR list growing does not hurt precision — it can only add candidate
+ * matches, not remove correct ones — so this is generous rather than tight. Deliberately not a
+ * smarter "keep the most distinctive terms" truncation: for a Chinese question long enough to hit
+ * even this ceiling, the discriminating word is as likely to be near the end as the start (bigrams
+ * are built left-to-right), and picking terms by actual discriminative power needs corpus
+ * statistics this function does not have. Tracked in TASKS.md.
+ */
+const MAX_TERMS = 64;
 
 /**
  * Build a PGroonga query-syntax string from a user's question.

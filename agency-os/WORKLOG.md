@@ -1,5 +1,47 @@
 # Worklog
 
+## 2026-09-12（172–181 號切片：F10 假設／證據／認知品質家族開張並收官 0/10→10/10，5 個平行 agent × 2 方法 + 1 critic；順帶關掉 registry 行號漂移「整類」）
+
+**觸發**：操作者指定完成 F09／F10／F13／F14／F15／F22／F23／F24 八個家族。F09 已於本日稍早收官（commit `a95c7b53f`），本條目是 F10。
+
+**做了什麼**：5 個平行 agent 各建 2 個方法，派工時每個方法的真不變量由主 agent 先設計好再交付（非讓 subagent 自己發明）：
+- `assumption_mapping`：`quadrant` 為 GENUINE_COMPUTE，由 (impact, uncertainty) 經 4 格全映射推出——該 4 格標籤逐字取自 Atlas 自己的 quadrantChart（L582-591 的 quadrant-1..4），非自創。
+- `assumption_registry`：真 `$ref` 既有 `specs/evidence/assumption.schema.yaml`，不另鑄型別；`is_critical_assumption` 正是那份 schema L290-302 自己寫「留給 consuming engine」卻一直沒人建的推導；status 宣稱 validated/verified 必須有非空 `validation`（EC §116 L3132）。
+- `ladder_of_inference`：上升完整性——高階梯非空前，所有低階梯必須先非空。沒有假設卻有結論，就是這個方法存在要抓的認知跳躍。
+- `toulmin_model`：`warrant`（推理橋樑）在 claim+grounds 存在時不得空白；`backing` 只能在有 warrant 時存在，且先檢查 backing 讓兩個錯誤碼各自可達，不互相遮蔽。
+- `argument_mapping`：`main_claim` 真 `$ref` claim.schema.yaml（正是該檔 `MRSP-claim-1` 預期的 wrapper 角色）；rebuttal 的 objection_id 必須指向真實 objection。
+- `evidence_matrix`：link 雙向參照完整性 + 不得重複 (claim, evidence) 格 + 不得有孤兒 claim（Atlas「快速看到薄弱 claim」做成結構強制）。
+- `evidence_hierarchy`：rank 唯一＝嚴格全序；**刻意不發明通用 tier enum**——`evidence.schema.yaml` L127-139 自己已寫明證據強度階層是 domain-specific 才不給型別，在這裡發明一套會直接牴觸它。
+- `contradiction_detection`：claim-to-claim，與 `claim.schema.yaml` 既有的 `contradicting_evidence`（claim-to-evidence）正交，非重複機制；無序對重複 {A,B}/{B,A} 一律拒。
+- `bayesian_updating`：`posterior` 為 GENUINE_COMPUTE 的貝氏公式，gate 以 1e-9 容差獨立重算（比 round(x,8) 儲存精度嚴一階，不可能遮蔽真竄改）；分母為零有自己的錯誤碼，不靜默回 0。
+- `confidence_calibration`：`brier_score` 為 GENUINE_COMPUTE；`actual_outcome` 必須是真 bool，int 0/1 拒絕。
+
+**critic 覆審**（1 輪，Standard tier，逐項 hand-tamper + 273 組畸形輸入打 21 個 gate）：0 Critical／5 Major／5 Minor，全部修完才同步 registry。真正吃重的是這三條——
+1. **`evidence_matrix` 的 gate 會放行 builder 拒絕的紀錄**：gate 從不重新推導 link 形狀與 relation enum，所以 `relation:"TOTALLY_MADE_UP"`、缺 `relation`、夾帶額外 key 的紀錄全數 all-PASS。根因是兩層各自把規則寫了一遍然後漂開。**沒有用第三次重述規則去補**，改成抽出單一 `_link_problem` predicate 當「什麼叫合法 link」的唯一定義，builder 與 gate 都呼叫它。
+2. **2 個 builder（`evidence_hierarchy`／`contradiction_detection`）根本沒驗 provenance**：contract 明寫 `quality.provenance_required: true`，但 builder 產出的紀錄，它自己的 provenance gate 隨後判 FAIL——等於發出一份自己認證不了的「已驗證」紀錄。
+3. **F09 的 aliasing 缺陷在 `assumption_registry` 深一層復發**，而且它自己那條「aliasing 回歸測試」只竄改純量，淺拷貝就能過，所以測試名稱對、深度不對，等於空跑。改成真 `copy.deepcopy`，測試改竄改巢狀容器並加 `assertIsNot` 身分比對。
+
+**registry 行號漂移：這次關掉整類，不再逐批補**。critic 指出 F10 的 Atlas 引用行號整批少 1。查下去發現不是 F10 的問題：`method-inventory.yaml` 284 個 Atlas 來源列裡有 **230 列**行號是錯的，且呈時代性分帶（primitives/F01-F08/F10 少 1；F11/F13-F21 少 3；F22-F24 與 §11.29/lens 多 9；§13 recipes 多 18/32）——因為這份檔案凍結的是舊版 Atlas 的 Phase 0 快照，之後從沒重新同步。F12 那批發現自己 10 列少 3、F09 那批發現自己 8 列少 1，各自只修自己碰到的列，所以這個類別一直沒關掉。這次全部 230 列機械重新同步，並新建 `tests/unit/test_method_inventory_line_numbers.py` 斷言每個引用都落在真正定義該條目的那一行。**該測試本身做過突變驗證**（故意注入一個 off-by-one，確認它會紅並指名那一列），沒有讓它變成第二個空跑的守衛。另外訂正該檔自己的假宣稱：它 header 寫「由 `tests/run_golden_tests.py` 獨立複查」——那個檔案從來不存在，這正是 230 個錯行號能一路無人發現的原因。
+
+**已修改**：
+- 50 個新檔（10 方法 × 5 檔：contract／schema／module／CLI／test）。
+- `ai_lego/modules/epistemic/__init__.py`：改為 10/10 COMPLETE 並列出全部 10 個方法的不變量與本批 critic 結果。
+- `method-inventory.yaml`：F10 全 10 列 `has_contract:true`／`contract_status:complete`／`machine_id`；**外加全檔 230 列行號重新同步**與 header 假宣稱訂正。
+- `contract-backlog.yaml`：新增 172–181 號 tier_1 entry。
+- `tests/unit/test_method_inventory_line_numbers.py`：新守衛。
+- `decomposition.issue_tree.contract.yaml`／`issue-tree.schema.yaml`：兩處陳舊前向指稱 `research.evidence_matrix`（實際落地為 `epistemic.evidence_matrix`）訂正；同一條點名的 `decomposition.mece` 其實也早已存在，一併更正。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_{assumption_mapping,assumption_registry,ladder_of_inference,toulmin_model,argument_mapping,evidence_matrix,evidence_hierarchy,contradiction_detection,bayesian_updating,confidence_calibration,method_inventory_line_numbers}.py -q` | exit=0 | result=485 passed, 84 subtests passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_<name>_slice`（10 支全跑）| exit=0 全數 PASS，含每個方法的構建期拒絕與獨立-gate hand-tamper 攔截展示
+- REALTEST_EVIDENCE: tool=Bash | cmd=故意注入 off-by-one 到 `method-inventory.yaml` 後跑新守衛測試 | exit=1（確認會紅並指名該列），還原後 exit=0 | 證明守衛非空跑
+- REVIEW_DONE: critic=Standard | verdict=needs-fixes→全修 | findings=0c/5M/5m（皆已修，逐條見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,.claude | grep=`epistemic\.(assumption_mapping|assumption_registry|ladder_of_inference|toulmin_model|argument_mapping|evidence_matrix|evidence_hierarchy|contradiction_detection|bayesian_updating|confidence_calibration)` | hits=56 檔（50 個本批自己的新檔 + 兩份 registry + issue_tree 兩處刻意訂正 + 1 個自動產生的 dispatch log，逐一核對無非預期命中）；另確認 `research.evidence_matrix` 陳舊指稱歸零
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] `method-inventory.yaml` 的 `entry_count: 289` 這個數字仍然沒有任何測試在驗（本次只建了行號守衛），已在該檔 header 誠實標注。F10 家族本身無已知風險。
+[rollback] `git revert` 本 commit；50 個新檔互相獨立，registry 兩份與行號同步可單獨還原（行號同步是純 metadata，還原不影響任何執行路徑）。
+
 ## 2026-09-12 第五批（migration 0076 上 prod 前的對抗式覆審：2 個 Critical、5 個 Major/minor，全部修完並突變測試過）
 
 commit `99a83155d`（0076：關鍵字半邊真的能用了）套 prod 前，先過一輪 critic 對抗覆審——這是要動客服安全閘的資料庫變更，自審一次不夠。
@@ -18,8 +60,10 @@ REALTEST_EVIDENCE: tool=Agent | cmd=critic subagent 對 commit 99a83155d 全檔�
 REALTEST_EVIDENCE: tool=Bash | cmd=手動推導並在 prod 容器拋棄式 DB 驗證 `pgroonga_normalize('ＳＨＩＰＰＩＮＧ')='shipping'`、`pgroonga_score` 在 join 下有值但小表 seq scan 回 0 | exit=0 | result=兩個 Critical 的關鍵前提均獨立驗證屬實，不是幻覺
 REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/kb-local-verify.sh`（含新增的 KB_VERIFY_KEYWORD_OK 全形/半形 divergence 與正規化一致性斷言）| exit=0 | result=四個標記全到；down/re-apply 皆過
 REALTEST_EVIDENCE: tool=Bash | cmd=突變測試 ×5（拔 vec[0] 保留機制／排名正規化退回 `lower()`／`pgroonga_score()` 復辟／`&@~` 換成 `hit.n>0`／client-side sort 拔掉）| exit 分別為 0/1/0/1/0/0（"要紅"的四個確實紅，唯一"不紅"的那個已改記在 migration 檔頭當已知殘餘風險，不是漏測）
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/kb/__tests__/kb-predicate-parity.test.ts`（第二輪 critic 找到的 finding 修好後，突變把 WHERE 子句的 `&@~` 拿掉、只留六處提到它的註解）| exit=1 | result=`×` 正確變紅——快速閘現在真的擋得住 finding #1 的原始情境，不再只靠慢的 docker harness
+REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/kb-local-verify.sh`（`kb-local-verify.sql` 補上 `ORDER BY k.score DESC` 後重跑，同一個「隱含信任列序」問題這次出現在驗證腳本自己身上）| exit=0 | result=四個標記全到，harness 現在跟它要驗證的 `db.ts` 修法採同一套紀律
 REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run`（含新增 kb-retrieval / migration-source / kb-db-keyword-sort / keyword-query 測試）| exit=0 | result=114 檔 1053 test 綠、8 skipped
-REVIEW_DONE: critic=Deep（第一輪對抗覆審 BLOCK，本輪為修復後的自我覆核；未再開第二個 critic subagent——每個修復都有獨立突變測試證明，比再叫一次 critic 更硬）| verdict=pass | findings=0c/0m（原始 7 個 finding 全部處理：5 個修掉、2 個誠實記錄為已知殘餘風險並寫進 TASKS.md）
+REVIEW_DONE: critic=Deep×2（第一輪 BLOCK 找 2 Critical+5 Major/minor；第二輪針對修復本身做驗證性覆審，找到 1 個真 Major——`kb-predicate-parity.test.ts` 的 `&@~` 斷言檢查整份檔案含註解，migration 檔頭恰好提到 `&@~` 六次，快速 vitest 閘因此對「WHERE 子句真的被拿掉」這個 finding #1 原始情境毫無防護，只剩慢的 docker harness 擋得住；已修成先剝註解再比對，並突變測試證明會紅）| verdict=pass | findings=0c/0m（兩輪 critic 共 8 個 finding，7 個修掉、1 個誠實記錄為索引加速層級的已知殘餘風險並寫進 migration 檔頭與 TASKS.md）
 BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kb,lobster-factory/packages/db,agency-os | grep=`topScore|RetrievedChunk|cs_match_chunks_keyword|pgroonga_score|definerOf` | hits=`topScore` 呼叫端只有 `orchestrator.ts`／`eval.ts` 兩處，皆透過 `retrieve()` 取得已修正的 `chunks`，無繞過路徑；`RetrievedChunk` 的 `score` 文件契約（`lib/kb/index.ts` 檔頭）現在是真的成立，不用改字
 
 **仍未套 prod**：0076 本身尚未套用（先前的 go-ahead 是針對修復前的版本，本輪覆審找到的問題足以推翻那個 go-ahead，需要重新走一次套用流程）。
@@ -16225,3 +16269,15 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 
 [rollback] `git revert` 對應 commit；純新增/透傳欄位 + 兩支新路由，未改資料庫 schema、未改既有欄位語意，
 舊呼叫路徑（不帶 `referenceImageUrl`）行為與改動前逐位元相同。
+
+## 2026-09-12
+
+### Machine appendix (monthly-system-review)
+- 2026-09-12 12:03:11 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 47.23% (< 85%))
+
+
+## 2026-09-12
+
+### Machine appendix (monthly-system-review)
+- 2026-09-12 12:03:16 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 47.23% (< 85%))
+

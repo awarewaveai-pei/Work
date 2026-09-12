@@ -112,12 +112,36 @@ export async function retrieve(ctx: KbContext, query: string): Promise<Retrieved
   for (const m of vec) byId.set(m.id, { sourceId: m.sourceId, content: m.content, similarity: m.similarity, attribution: m });
 
   const fused = rrfFuse([vec.map((m) => m.id), kw.map((m) => m.id)]);
-  return fused
-    .slice(0, KB_RETRIEVAL.contextTopK)
-    .map((f): RetrievedChunk => {
-      const c = byId.get(f.id);
+  let topIds = fused.slice(0, KB_RETRIEVAL.contextTopK).map((f) => f.id);
+
+  // INVARIANT (broken by activating the keyword arm in migration 0076, restored here): the single
+  // best vector match is never silently evicted from what this function returns.
+  //
+  // RRF ranks by reciprocal rank, not by magnitude, and a keyword-only chunk's score is forced to 0
+  // (real cosine similarity was never computed for it — see the map below). That means enough
+  // mediocre documents that happen to rank decently in BOTH lists can out-rank vec[0] in fused order
+  // and fill every context slot, even though vec[0] has the highest cosine similarity of anything
+  // retrieve() saw. Two things break at once if that happens: the LLM drafts from weaker evidence
+  // than what was available, and lib/kb/index.ts's documented contract ("RetrievedChunk.score = the
+  // raw cosine similarity... a consumer thresholds on it to decide a knowledge-gap handoff") no
+  // longer holds — CS_THRESHOLDS.minRetrievalScore (lib/cs/config.ts) can then only read LOWER than
+  // it would have pre-0076, never higher, because a displaced vec[0] is replaced by items whose
+  // score is provably ≤ vec[0]'s (vec-list members can't exceed the top vector rank's similarity;
+  // keyword-only members score 0) — a one-directional, hard-to-notice safety regression.
+  //
+  // Fixing this here (once, for every consumer) rather than in each consumer keeps the promise in
+  // the RETRIEVAL CONTRACT comment true without touching cs/autonomy.ts's already-tested threshold
+  // logic, and keeps the keyword arm's actual benefit — the other contextTopK-1 slots still come
+  // from fused ranking, so keyword-relevant documents the vector half ranked low still get in.
+  if (vec[0] && !topIds.includes(vec[0].id)) {
+    topIds = [vec[0].id, ...topIds.slice(0, KB_RETRIEVAL.contextTopK - 1)];
+  }
+
+  return topIds
+    .map((id): RetrievedChunk => {
+      const c = byId.get(id);
       return {
-        id: f.id,
+        id,
         sourceId: c?.sourceId ?? "",
         content: c?.content ?? "",
         score: c?.similarity ?? 0,

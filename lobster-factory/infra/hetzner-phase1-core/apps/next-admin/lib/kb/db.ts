@@ -337,6 +337,13 @@ export interface KeywordMatch extends MatchAttribution {
   id: string;
   sourceId: string;
   content: string;
+  /**
+   * Term-overlap count from migration 0076, used to sort the results explicitly below. Not left
+   * implicit in RPC row order: PostgREST/Supabase preserving a function's row order is real today
+   * but is nowhere a documented contract, and this is the same "ranking silently degrades without
+   * an error" failure class migration 0076 exists to fix in the SQL — closing it again here.
+   */
+  score: number;
 }
 
 /**
@@ -367,10 +374,17 @@ export async function matchChunksKeyword(
     return [];
   }
   if (!data) return [];
-  return (data as Array<MatchAttribution & { id: string; source_id: string; content: string }>).map((r) => ({
-    ...r,
-    id: r.id,
-    sourceId: r.source_id,
-    content: r.content,
-  }));
+  return (data as Array<MatchAttribution & { id: string; source_id: string; content: string; score: number }>)
+    .map((r) => ({
+      ...r,
+      id: r.id,
+      sourceId: r.source_id,
+      content: r.content,
+      score: Number(r.score), // matches matchChunksVector's Number(r.similarity) below
+    }))
+    // Sorted here rather than trusted from the RPC: the SQL side already has its own ORDER BY, but
+    // this call site is the one place lib/kb/rag.ts's rrfFuse() reads rank from, and it reads rank
+    // from ARRAY POSITION. Sorting explicitly makes that true by construction, not by an assumption
+    // about what PostgREST does with a function's row order.
+    .sort((a, b) => b.score - a.score);
 }

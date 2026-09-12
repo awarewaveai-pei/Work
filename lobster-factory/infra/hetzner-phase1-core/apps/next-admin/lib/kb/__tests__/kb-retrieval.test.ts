@@ -86,6 +86,42 @@ describe("retrieve", () => {
     expect(out.find((c) => c.id === "c2")?.sourceId).toBe("s2"); // keyword hits carry their source
   });
 
+  it("never lets keyword-boosted documents evict the single best vector match", async () => {
+    // The bug migration 0076 (which finally made the keyword half return real hits) exposed: RRF
+    // ranks by RECIPROCAL RANK, not by similarity magnitude. c0 has the highest cosine similarity of
+    // anything retrieve() saw, but is absent from the keyword list; c1..c4 each rank decently in
+    // BOTH lists. Hand-computed RRF (k=60): c0 = 1/61 ≈ 0.01639 (vector rank 0 only). c1 = 1/62
+    // (vector rank 1) + 1/61 (keyword rank 0) ≈ 0.03252. c2/c3/c4 land between those two. So plain
+    // fusion ranks all four ahead of c0 and fills every one of the 4 context slots without it —
+    // silently dropping the strongest evidence retrieve() found, and (via CS_THRESHOLDS.
+    // minRetrievalScore) a knowledge-gap handoff that should not fire, would.
+    db.matchChunksVector.mockResolvedValue([
+      { id: "c0", sourceId: "s0", content: "退貨期限為七天，需附發票。", similarity: 0.9 },
+      { id: "c1", sourceId: "s1", content: "退款作業流程說明。", similarity: 0.5 },
+      { id: "c2", sourceId: "s2", content: "換貨作業流程說明。", similarity: 0.4 },
+      { id: "c3", sourceId: "s3", content: "配送作業流程說明。", similarity: 0.3 },
+      { id: "c4", sourceId: "s4", content: "客訴處理流程說明。", similarity: 0.2 },
+    ]);
+    db.matchChunksKeyword.mockResolvedValue([
+      { id: "c1", sourceId: "s1", content: "退款作業流程說明。" },
+      { id: "c2", sourceId: "s2", content: "換貨作業流程說明。" },
+      { id: "c3", sourceId: "s3", content: "配送作業流程說明。" },
+      { id: "c4", sourceId: "s4", content: "客訴處理流程說明。" },
+    ]);
+
+    const out = await retrieve({ scope: [ORG], viewer: ORG, embedder }, "我要退錢");
+
+    expect(out).toHaveLength(4); // KB_RETRIEVAL.contextTopK — the guarantee costs a slot, not a cap raise
+    expect(out.map((c) => c.id)).toContain("c0");
+    // The whole point: the max score in what's returned is c0's real similarity, not whatever the
+    // best-ranked-but-lower-similarity keyword-boosted document happened to be.
+    expect(Math.max(...out.map((c) => c.score))).toBeCloseTo(0.9);
+    // The keyword arm's actual benefit is not thrown away: the strongest combined-signal document
+    // still made it in over c4, which the vector half alone ranked ahead of c1/c2/c3.
+    expect(out.map((c) => c.id)).toContain("c1");
+    expect(out.map((c) => c.id)).not.toContain("c4");
+  });
+
   it("tags the retrieval with the model the caller actually used", async () => {
     const other: EmbeddingProvider = { id: "bge-m3", dimensions: 3, embed: async (t) => t.map(() => [1, 0, 0]) };
     await retrieve({ scope: [ORG], viewer: ORG, embedder: other }, "退貨");

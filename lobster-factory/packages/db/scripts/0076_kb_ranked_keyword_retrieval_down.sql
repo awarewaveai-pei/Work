@@ -3,10 +3,15 @@
 -- The extension is NOT dropped: other work may come to depend on it, and DROP EXTENSION would take
 -- every PGroonga index with it. The index IS dropped, because this migration created it.
 --
--- Rolling this back means callers must stop selecting `score` — lib/kb/db.ts and the query builder
--- go back with it. Retrieval is not broken by the mismatch (PostgREST ignores unknown columns on
--- the way out, but a select of a column that no longer exists fails), so revert the app in the same
--- window, as with 0072/0075.
+-- The real app/DB coupling is NOT "app selects a column that stops existing" — lib/kb/db.ts calls
+-- this RPC with `.rpc()` and no named `.select()`, so a missing `score` column breaks nothing at
+-- the wire level. The coupling that matters is the QUERY STRING FORMAT: lib/kb/rag.ts sends
+-- `buildKeywordQuery()`'s bigram-OR string (e.g. "請問 OR 問退 OR 退貨 OR ..."), and this down
+-- migration's restored function matches with `strpos(lower(content), lower(btrim(p_term)))` — the
+-- SAME substring-of-the-whole-string check that returned zero rows for any real question before
+-- 0076 existed. Roll back the app to the commit before lib/kb/keyword-query.ts (which sent the raw
+-- question) in the SAME window as this script, or the keyword half goes silently back to zero
+-- results with no error anywhere — the original bug this migration was written to fix.
 
 BEGIN;
 

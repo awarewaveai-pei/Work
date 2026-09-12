@@ -44,9 +44,31 @@ describe("a question becomes matchable terms", () => {
     expect(buildKeywordQuery("a")).toBe(""); // one Latin letter narrows nothing
   });
 
-  it("does not repeat a term, and stops before the query grows unbounded", () => {
+  it("does not repeat a term", () => {
     expect(buildKeywordQuery("退貨 退貨 退貨")).toBe("退貨");
-    const long = buildKeywordQuery("字".repeat(200));
-    expect(long.split(" OR ").length).toBeLessThanOrEqual(32);
+  });
+
+  it("stops before the query grows unbounded", () => {
+    // Repeating ONE character was the original fixture here, but every bigram from a repeated
+    // character is identical, so `seen` collapses it to 1 term regardless of MAX_TERMS — the
+    // assertion passed without ever exercising the cap it claimed to test. 200 distinct characters
+    // produce 199 distinct bigrams, which does.
+    const distinctChars = Array.from({ length: 200 }, (_, i) => String.fromCharCode(0x4e00 + i)).join("");
+    const long = buildKeywordQuery(distinctChars);
+    expect(long.split(" OR ").length).toBe(64); // MAX_TERMS
+  });
+});
+
+describe("wider CJK coverage (critic-found gaps)", () => {
+  it("bigrams halfwidth Katakana instead of treating it as one Latin word", () => {
+    // U+FF65-FF9F. Previously fell into the Latin branch as a single opaque token, which PGroonga's
+    // own tokenizer would then have parsed with AND semantics across the whole word internally —
+    // the same failure mode as sending an un-bigrammed sentence.
+    const q = buildKeywordQuery("ｼｮｯﾋﾟﾝｸﾞ").split(" OR ");
+    expect(q.length).toBeGreaterThan(1);
+  });
+
+  it("bigrams Hangul Jamo, not just precomposed Hangul syllables", () => {
+    expect(buildKeywordQuery("ㅎㅏㄴㄱㅡㄹ").split(" OR ").length).toBeGreaterThan(1);
   });
 });

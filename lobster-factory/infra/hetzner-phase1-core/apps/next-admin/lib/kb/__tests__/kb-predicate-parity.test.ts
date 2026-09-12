@@ -61,7 +61,21 @@ describe("retrieval predicate parity", () => {
   it("keeps the keyword half on a ranked matcher, not a substring scan", () => {
     // The regression this prevents has no error attached: `strpos(content, <the whole question>)`
     // matched nothing for any real query, so hybrid was vector-only and looked healthy.
-    expect(definerOf("cs_match_chunks_keyword").sql).toContain("&@~");
-    expect(definerOf("cs_match_chunks_keyword").sql).toContain("pgroonga_score");
+    const sql = definerOf("cs_match_chunks_keyword").sql;
+    // Checked against a comment-stripped body, not the whole file: the migration's own header
+    // prose mentions "&@~" six times while explaining why it matters (caught in a second review
+    // pass — the fast vitest gate would otherwise stay green even if the real WHERE clause below
+    // dropped it entirely, which was the exact bug finding #1 exists to catch. The slow, docker-
+    // based kb-local-verify.sh fullwidth fixture would still catch a full removal, but that isn't
+    // the gate that runs on every commit).
+    const withoutComments = sql.replace(/--[^\n]*/g, "");
+    expect(withoutComments).toMatch(/AND\s+c\.content\s+&@~\s+btrim\(p_term\)/); // PGroonga does the matching
+    expect(withoutComments).toMatch(/ORDER BY\s+hit\.n\s+DESC/); // and the ranking expression, not a comment
+    // pgroonga_score() is explicitly banned, not merely absent: it only has a value for rows a
+    // PGroonga index scan produced, and the local harness proved that on a table this size the
+    // planner picks a sequential scan instead, silently scoring every row 0. Comments already
+    // stripped above — the function body explains in prose why pgroonga_score() must not be
+    // called, and a naive string check would fail on exactly that sentence (caught writing this).
+    expect(withoutComments).not.toMatch(/pgroonga_score\s*\(/);
   });
 });

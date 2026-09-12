@@ -21,6 +21,19 @@
 --
 -- `bm25_tsv` and `idx_cs_chunks_bm25` are NOT dropped here: dropping a column is irreversible and
 -- this migration is already changing how retrieval behaves. Tracked in TASKS.md for a later pass.
+--
+-- KNOWN, ACCEPTED GAP (found in critic review, kept deliberately open rather than chased with a
+-- fragile test): because query terms are pre-bigrammed to 1-2 characters by keyword-query.ts, a
+-- plain `strpos(pgroonga_normalize(content), pgroonga_normalize(term))` check is CORRECTNESS-
+-- EQUIVALENT to the `&@~` operator in WHERE for our specific term shape — both find the same rows.
+-- `&@~` earns its place on INDEX ACCELERATION alone: it lets `idx_cs_chunks_pgroonga` service the
+-- lookup instead of a full table scan, which matters once the corpus is large and does not matter
+-- at today's size. A future edit that quietly makes the WHERE clause redundant with the ranking
+-- CTE (e.g. replacing `&@~` with the ranking CTE's own `hit.n > 0`) would NOT be caught by any
+-- assertion here, because it would still return correct rows — only slower, at a scale this harness
+-- cannot reach without turning into exactly the plan-dependent, flaky assertion this migration's
+-- own header rejects pgroonga_score() for. Guard this one at code-review time: `&@~` belongs in the
+-- WHERE clause of `cs_match_chunks_keyword`, full stop.
 
 BEGIN;
 
@@ -63,7 +76,12 @@ LANGUAGE sql STABLE AS $fn$
   CROSS JOIN LATERAL (
     SELECT count(*)::double precision AS n
     FROM unnest(string_to_array(btrim(p_term), ' OR ')) AS q(term)
-    WHERE btrim(q.term) <> '' AND strpos(lower(c.content), lower(btrim(q.term))) > 0
+    -- pgroonga_normalize(), not lower(): matching (&@~ below) folds full-width Latin to half-width
+    -- and case via the same normalizer, so a chunk that only matches because of that folding (e.g.
+    -- full-width "ＳＨＩＰＰＩＮＧ" against a query for "shipping" -- verified against this image)
+    -- would satisfy the WHERE clause but score 0 under plain lower()+strpos, sorting the one chunk
+    -- that actually matched behind every chunk that didn't.
+    WHERE btrim(q.term) <> '' AND strpos(pgroonga_normalize(c.content), pgroonga_normalize(btrim(q.term))) > 0
   ) hit
 -- >>> KB_VISIBILITY_PREDICATE
   WHERE c.organization_id = ANY(p_scope)
