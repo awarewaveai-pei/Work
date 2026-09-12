@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-09-12（續14）續12+續13 兩個修復實際部署成功，prod 驗證
+
+[任務] 承接續13。清掉一個確認已死(root `kill -0` 驗證無此 PID)的殘留 deploy lock 後重跑
+`sg-deploy.sh next-admin`。
+
+[結果]：5 個 smoke 全過(含續13新加的 `nginx/api` 探針)，無 rollback。
+`.deployed-commit = 591358aec`(含續12的非同步 run-job 修復 + 續13的 smoke 探針修復)。
+
+REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | 結果=`smoke: all endpoints OK`，5/5(next-admin /login、/api/ops/summary、nginx/wordpress、node-api health、nginx/api)
+REALTEST_EVIDENCE: tool=SSH | cmd=`curl -X POST .../collection-sources -d '{"action":"run","dryRun":true}'`(無 auth)| 結果=401(既有 middleware 認證層正確擋下，非新回歸)
+REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin grep -rl 'queued.*runKey\|run-jobs' /app/.next/server/.../collection-sources/` | 結果=命中 `route.js`／`route.js.map`——直接查證正在跑的容器編譯產物確實含這次修復，不只信部署 log
+WORKLOG_DONE: 本條目
+
+[尚未驗證]：真實登入 session 點擊【正式抓取】/【試跑】按鈕的端到端瀏覽器體驗——這正是操作者最初回報的症狀，需要操作者本人的登入態才能測(跟本 session 稍早 KB 封存/排程 UI 兩個畫面同樣的限制)。已請操作者親自點擊確認。
+
+[rollback] 見續12/續13各自條目；`sg-deploy.sh` 本身的 auto-rollback 機制在這次真跑中沒有被觸發(全過)，維持待命。
+
 ## 2026-09-12（續13）部署續12的修復時被無關的 smoke check 假陽性自動 rollback 掉 —— sg-deploy.sh node-api 探針打錯 nginx 層，兩輪 critic 修正
 
 [任務] 承接續12。部署那個修復時，`sg-deploy.sh` 的 smoke check 自動把剛部署的正確版本 rollback 掉。
