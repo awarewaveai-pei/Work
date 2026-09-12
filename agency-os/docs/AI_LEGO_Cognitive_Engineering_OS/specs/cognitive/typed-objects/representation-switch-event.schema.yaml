@@ -1,0 +1,116 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/representation-switch-event.schema.yaml"
+title: Representation Switch Event
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RepresentationSwitchEvent` -- the
+  declared `outputs` of `representation.switching`'s Method Contract
+  (methods/contracts/representation.switching.contract.yaml, `outputs:
+  [RepresentationSwitchEvent]`). F24 representation family (Atlas L963,
+  §11.55 L2468-2489).
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `market-admission-record.schema.yaml`'s own
+  derived-decision precedent): (a) at least 2 `views[]` entries (a switch
+  needs something to switch between); (b) KNOWLEDGE-OBJECT CONSISTENCY --
+  every `views[].knowledge_object_id` must be identical; (c) PROVENANCE
+  CONSISTENCY, THE real invariant this method exists to enforce -- every
+  `views[].provenance` must be identical (deep-equal). `ai_lego/modules/
+  representation/switching.py` enforces all three at both construction time
+  and an independent gate that re-derives them from raw fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Representation Switching row (L963)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.55 (L2468-2489)"
+  - "methods/contracts/representation.switching.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/representation.schema.yaml#/definitions/representation_category -- REUSED verbatim for views[].category, not re-invented"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §11.55's own
+  8-view list plus disclosed compilation choices (the REPSWITCH- prefix,
+  the minimum-2-views bound, the record-level-vs-per-view provenance split).
+
+compilation_decisions:
+  - question: "Should views[].category use a NEW enum, or reuse the pre-existing representation.schema.yaml enum?"
+    decision: "Reuse specs/cognitive/representation.schema.yaml#/definitions/representation_category verbatim via a hard $ref. Inventing a second, parallel view-category enum for the same LEGO dimension H concept this same wave would recreate exactly the duplicate-vocabulary problem this suite's own ADR-004/CROSS-T-15 precedent exists to close."
+  - question: "Should knowledge_object_id and provenance live once at the record's top level, or once per view[] entry?"
+    decision: "Per view[] entry. The real invariant this method exists to enforce IS cross-view consistency of both fields -- a single top-level field would make the check vacuously true (nothing to compare against) and would not catch a hand-tampered record where one view silently diverges from the rest."
+
+type: object
+additionalProperties: false
+required: [id, version, views, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^REPSWITCH-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.switching"
+
+  views:
+    type: array
+    minItems: 2
+    description: >
+      RUNTIME invariant: every entry's knowledge_object_id must be identical
+      across the array, and every entry's provenance must be identical
+      (deep-equal) across the array -- not expressible as a bare JSON Schema
+      array constraint since it is a cross-item equality rule, not a
+      per-item shape rule (see module description).
+    items:
+      type: object
+      additionalProperties: false
+      required: [category, knowledge_object_id, provenance]
+      properties:
+        category:
+          $ref: "ai-lego://specs/cognitive/representation.schema.yaml#/definitions/representation_category"
+        knowledge_object_id:
+          type: string
+          minLength: 1
+          description: "Points at the single underlying Knowledge Object this view renders (Atlas §9 L1052, §15.1 L3644). Must be identical across every views[] entry -- see module description."
+        provenance:
+          description: "This view's own provenance as rendered. Must be identical (deep-equal) across every views[] entry -- Atlas §11.55 L2488's own 'Provenance 保持一致' benefit, made structural."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  provenance:
+    description: "Overall record provenance -- who/what generated this switch-event record itself, distinct from the per-view provenance above (see compilation_decisions)."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 3-way switch (Text -> Table -> Mind Map) over one Knowledge Object -- consistent knowledge_object_id and provenance throughout."
+    value:
+      id: "REPSWITCH-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.switching"
+      views:
+        - {category: text, knowledge_object_id: "KO-001", provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}}
+        - {category: table, knowledge_object_id: "KO-001", provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}}
+        - {category: mindmap, knowledge_object_id: "KO-001", provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-REPSWITCHEVENT-1: views[] carries no ordering/timestamp field distinguishing 'from' vs 'to' view in a 2-way switch -- should a future revision add one, or is the unordered set-of-views shape (already sufficient for the consistency invariant) the intended long-term semantics?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L963) and §11.55 (L2468-2489) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "representation switching"/"representation_switching"/
+    "RepresentationSwitchEvent" and every schema title before writing --
+    zero pre-existing implementation or schema-title overlap (pre-existing
+    representation.schema.yaml is the abstract View/state contract this file
+    reuses one enum from, not a collision). Validated against jsonschema
+    Draft202012Validator via tests/unit/test_switching.py.
+  note: >
+    No mother document was modified. The 8-view list is transcribed from
+    Atlas §11.55. The REPSWITCH- prefix, the minimum-2-views bound, and the
+    per-view (not record-level) placement of knowledge_object_id/provenance
+    are this file's own compiled structure, disclosed above.

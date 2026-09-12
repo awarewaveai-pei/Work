@@ -1,0 +1,83 @@
+$id: "ai-lego://methods/contracts/representation.causal_view.contract.yaml"
+title: "Causal View Method Contract"
+status: ACTIVE
+
+description: >
+  F24 representation family (Atlas L969: "Causal View | 專門呈現因果/feedback
+  | DAG/CLD＋assumptions | 避免一般圖誤當因果"). A RENDERING layer over an
+  existing causal.dag/systems.causal_loop_diagram record -- per the Atlas §9
+  Representation Contract (L1053) a View never copies Knowledge, so this
+  method references the source DAG/CLD by id and layers presentation state
+  on top. Core invariant, Atlas's own stated benefit made structural: every
+  edge this View renders must carry a non-empty `assumption` -- an edge with
+  no declared assumption IS the "一般圖誤當因果" failure, refused at
+  construction rather than left as documentation.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 呈現／認知偏好／協作 table, Causal View row (L969)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053) + §15.1 (L3606-3619)"
+
+decided_by: >
+  No ADR governs the content. Atlas L969 gives the two-stage pipeline and
+  effect ("避免一般圖誤當因果") directly; the Representation Contract
+  (L1053) is the shared law every F24 View method obeys.
+
+id: representation.causal_view
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [DECOMPOSE, EXPLAIN]
+# INFERRED (Atlas §4 gives no composition formula for F24). DECOMPOSE
+# selects which DAG/CLD edges to render; EXPLAIN attaches the causal
+# assumption behind each rendered edge as a real statement.
+
+purpose:
+  - render_a_causal_dag_or_cld_with_a_declared_assumption_per_edge
+
+inputs:
+  required:
+    - CausalDagAnalysis  # or SystemsCausalLoopDiagram -- either source-of-truth typed object this View renders (soft reference, same as every sibling contract's inputs)
+
+outputs:
+  - CausalViewRecord
+
+preconditions:
+  - "underlying causal.dag or systems.causal_loop_diagram record already exists and is referenced by knowledge_ref"
+  - "every rendered_edges[] entry carries a non-empty assumption"
+  # NEW, structurally necessary. Atlas's own benefit column ("避免一般圖誤當
+  # 因果") is exactly what a rendered edge with no declared assumption would
+  # let back in.
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+recommended_next: []
+
+rollback:
+  side_effect_free: true
+  # Rendering a View has no external side effect (same as every sibling
+  # F13/F23 contract's rollback).
+
+open_questions:
+  - "OQ-CVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-CVIEW-2: rendered_edges[] stores edge_id + assumption only, not source/target node ids, to avoid duplicating the source DAG's own body per the Representation Contract -- should a future revision add a referential-integrity check against the live DAG record?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table, Causal View row (L969, confirmed exact line number)
+    and the Representation Contract (§9 L1040-1053, §15.1 L3606-3619)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "causal view"/"causal_view"/"CVIEW-" before writing -- zero pre-existing
+    implementation or schema-title overlap. Confirmed this method does not
+    collide with the pre-existing `causal.dag` (ai_lego/modules/causal/dag.py,
+    CDA- prefix) or `systems.causal_loop_diagram` (CLD- prefix) modules --
+    those compute causal claims; this method only renders them. Validated
+    against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. The two-stage pipeline and benefit are
+    transcribed verbatim from Atlas L969. The rendered_edges[] shape and its
+    per-edge assumption requirement are this file's own compiled structure,
+    disclosed above.

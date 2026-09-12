@@ -16790,3 +16790,33 @@ Jurisdiction Resolver=宣告 2+ 維度時解析結果必須可追溯到至少 2 
 [rollback] 全部為新增檔案（無既有檔案破壞性修改，除 `ai_lego/modules/jurisdiction/__init__.py` 收斂重寫），`git revert` 對應 commit 即可完整回退，不影響 F01-F22 已建家族。
 
 [下一步] 依操作者指示不中途停頓，接續開 F24（呈現／認知偏好／協作，10 方法，Method Atlas 最後一個未開家族）。
+
+## 2026-09-12（續6）Method Atlas F24 呈現／協作家族 0/10 -> 10/10 開完並關閉 —— F15/F22/F23/F24 全部收工（41 方法）
+
+[任務] 承接同日 F15/F22/F23 條目；本條目開 F24（10 個方法：Representation Switching/Text-Outline View/Table-Matrix View/Mind Map View/Concept Graph View/Timeline View/Causal View/Audio-Conversational View/Guided Mode/Expert LEGO Mode），是操作者今天要求的 Method Atlas F15→F22→F23→F24 四家族任務的最後一個。過程中一度因 API 額度限流中斷（F23 尾聲），額度重置後確認全部資料完好才繼續；F24 building 階段中途操作者另外詢問部署網址，已另開澄清（見下一次對話開頭）不影響本條目收尾。
+
+[已修改]
+- 新增 `ai_lego/modules/representation/` 家族：10 個方法各自的 contract yaml、typed-object schema、builder+2-3 層獨立 gate 模組、CLI slice、mutation-style test，每個方法都含明確的 provenance-aliasing 回歸測試（並用 fault-injection 驗證測試非空殼——monkeypatch `copy.deepcopy`成 identity 確認測試真的會變紅）。
+- `methods/registry/contract-backlog.yaml`：序列附加 10 筆 tier_1 entry（twohundredtwentyseventh ~ twohundredthirtysixth_concrete_entry），最後一筆同時宣告整個 F15/F22/F23/F24 任務關閉。
+- `methods/registry/method-inventory.yaml`：F24 對應 10 列改 `complete/has_contract:true`，補 `machine_id`。
+- `ai_lego/modules/representation/__init__.py`：收斂重寫成完整 10 方法摘要。
+- **critic 覆審後修復**（詳見下方 [驗證結果]）：`ai_lego/modules/representation/table_matrix_view.py` 的 `scores[]` 驗證邏輯拆成三段式（shape/reference/computed-flag），修正一個真的重演的 F15 錯誤碼混淆 bug class；`causal_view.py` + 對應 contract/schema 文件修正 `causal.dag` 字首寫錯（`CDAG-`→`CDA-`，純文件）。
+
+[每個方法的真不變量]
+Representation Switching=同一次切換事件裡所有 view 必須共用同一個 knowledge_object_id+同一份 provenance（不可分岔出互相衝突的內容）；Text/Outline View=evidence_links 只能是參照字串+summary 有長度上限（Atlas 共享架構法則：View 只存呈現狀態，不得複製 Knowledge 本體，L1053）；Table/Matrix View=entities/criteria 只存參照 id+scores 必須標記 computed:true（不可被誤當正式資料）；Mind Map View=渲染任意 Knowledge Object 的既有節點（跟已建的 F04 `association.mind_map`——那是生成新內容——完整消歧，字首 MMVIEW- 不衝突 MINDMAP-，且有一個「把 MINDMAP- 格式塞進 MMVIEW- schema 應該失敗」的結構性測試）；Concept Graph View=每條渲染出的邊的 relation_type/provenance 必須跟來源關係完全一致，不可捏造；Timeline View=事件順序機械推導自各事件自己的 event_time，不可被外部指定；Causal View=每條邊必須有非空 assumption（Atlas 明文「避免一般圖誤當因果」的結構化體現，本批最強不變量）；Audio/Conversational View=CONFIRMED 狀態必須有 readback_transcript+confirmed_by_user 證據（跟 F23 `conflict_of_law_review` 同款人工確認慣例）；Guided Mode=method 選擇必須可追溯到真實問答軌跡+必須是 MethodCatalog 裡真實存在的 ACTIVE 方法（不是黑盒子）；Expert LEGO Mode=compile_status 機械推導（builder 根本不收此參數）——7 個編譯檢查全部存在且 PASS 才 COMPILED，Atlas 明文「自由組裝，不是自由破壞」的結構化體現。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit/test_{switching,text_outline_view,table_matrix_view,mind_map_view,concept_graph_view,timeline_view,causal_view,audio_conversational_view,guided_mode,expert_lego_mode}.py -q`（於 `Projects/internal/cognitive-engineering-os`） | exit=0 | result=critic 修復前 415 passed/80 subtests，修復後 416 passed/80 subtests（新增一個對稱的 criterion_id dangling-reference 測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit --collect-only -q` | exit=0 | result=13332 tests collected，零 collection error
+- REVIEW_DONE: critic=Standard | verdict=pass（修復後）| findings=0c/1m(已修)/1n(已修)——**Major**：`table_matrix_view.py` 的 `scores[]` 驗證把 shape/dangling-reference/computed-flag 三種問題全部混在一個 `_score_problem` 底下，錯誤碼一律回報 `TBLVIEW_SCORE_NOT_MARKED_COMPUTED`，正是這整批任務特別交代要防的 F15 錯誤碼混淆 bug class，**真的又重演了一次**——critic 用真實 repro 證實（送一個 dangling reference + 非數字 score 的輸入，回報訊息卻說「沒標 computed」）；已拆成三段獨立檢查（shape→`TBLVIEW_INVALID_SCORE_ENTRY`、reference→`TBLVIEW_DANGLING_REFERENCE`、computed→`TBLVIEW_SCORE_NOT_MARKED_COMPUTED`，比照同檔案 `_filter_problem`/`_sort_spec_problem` 早就採用的分離慣例），補上原本缺的對稱 criterion_id dangling 測試，獨立 gate 層本來就沒有這個問題（critic 確認未受影響）。**Minor**：`causal_view` 的消歧敘述誤寫已建的 `causal.dag` 字首為 `CDAG-`，實際是 `CDA-`（無真實撞名，純粹查證方法本身寫錯，已修三個檔案的文字）。其餘所有宣稱（Mind Map View 消歧、Expert LEGO Mode/Timeline View 的「推導非宣稱」欄位、Audio/Expert LEGO 的 fail-closed 樣式、Guided Mode 真的串接 live MethodCatalog、Switching 的跨視圖一致性、Causal View 的 edge-assumption 要求、跨 222+ 模組零字首/method-id 撞名）critic 都用真實執行驗證過為真，非僅重讀宣稱。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`representation\.(switching|text_outline_view|table_matrix_view|mind_map_view|concept_graph_view|timeline_view|causal_view|audio_conversational_view|guided_mode|expert_lego_mode)` | hits=0 殘留（命中皆本批自建檔案，另兩個命中是 ao-resume 狀態快照檔非真實引用）
+- 兩份 registry YAML 序列套用後皆用 `yaml.safe_load` 驗證解析成功；critic 修復後兩份被 sed 改過的 YAML 也重新驗證過解析成功。
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 沿用 F22 條目已列的 `stakeholders.raci.py:216` 既存 bug 追蹤票（task_c2dba1b8，尚未修復）；F24 本身修復後無新增已知風險。
+
+[rollback] 全部為新增檔案（無既有檔案破壞性修改，除 `ai_lego/modules/representation/__init__.py` 收斂重寫、`table_matrix_view.py`+其 test 檔的 critic 當場修復、`causal_view.py`+contract+schema 三個檔案的文字修正），`git revert` 對應 commit 即可完整回退，不影響 F01-F23 已建家族。
+
+[結論] **Method Atlas F15（實驗與驗證，11/11）／F22（PM/交付治理，10/10）／F23（全球管轄／合規，10/10）／F24（呈現／協作，10/10）今日全部開完並關閉，共 41 個方法、4 個 commit（`3d06b15c9`／`7698a0340`／`fd661d94d`／本條目對應 commit）。** 每個方法都有 contract yaml + typed-object schema + builder+獨立 gate 模組 + CLI slice + mutation-style test 四件套，全數經過至少一輪獨立 critic 覆審（F23 零發現、F24 修完後零發現、F15/F22 各修一個 Critical/Major 後零發現）。已知待辦：`stakeholders.raci.py:216` 既存 provenance aliasing bug 追蹤票（task_c2dba1b8，非今日新增，F22 覆審時發現的既存缺陷，尚待操作者排程修復）。
+
+[下一步] 操作者另外詢問 Cognitive Engineering OS 系統部署（目前僅為後端 Python library，無 HTTP/API/前端），屬於獨立的 High-risk 新範疇，需另外走 R0 規劃流程，不併入本次 Method Atlas 收尾。

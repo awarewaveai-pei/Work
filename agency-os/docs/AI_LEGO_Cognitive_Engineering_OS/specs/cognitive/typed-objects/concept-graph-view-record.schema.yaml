@@ -1,0 +1,173 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/concept-graph-view-record.schema.yaml"
+title: Concept Graph View Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ConceptGraphView` -- the declared
+  `outputs` of `representation.concept_graph_view`'s Method Contract
+  (methods/contracts/representation.concept_graph_view.contract.yaml,
+  `outputs: [ConceptGraphView]`). F24 representation family (Atlas L967:
+  "typed nodes/edges -> render relations/provenance").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) referential integrity -- every
+  `edges[].relation_id` resolves to a real source relation (checked against a
+  `source_relations[]` list passed to the builder/gate, deliberately NOT a
+  field on this record -- see compilation_decisions); (b) RENDERING FIDELITY,
+  THE real invariant this method exists to enforce -- every edge's
+  `relation_type` and `provenance_ref` must exactly equal its referenced
+  source relation's own values; an edge asserting a different relation_type
+  than the source data actually has is refused. `ai_lego/modules/
+  representation/concept_graph_view.py` enforces both at construction time
+  and independent gates.
+
+  Structural law (Atlas §9 L1053, "View 只保存 layout/filters/visible_fields/
+  presentation_preferences，不得複製 Knowledge 本體"): `edges[]` entries are a
+  CLOSED key set (`additionalProperties: false` at every level) of reference
+  ids plus narrow presentation state (`layout_position`, `visible`) -- no
+  field on this record can hold a copy of the relation's own substantive
+  content (description, evidence, etc.). `relation_type` is retained as the
+  one exception, disclosed below, precisely so the fidelity invariant above
+  is checkable at all.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 呈現／認知偏好／協作 table, Concept Graph View row (L967)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "methods/contracts/representation.concept_graph_view.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L967's own pipeline
+  plus low-risk, disclosed compilation choices (the CGRAPH- prefix, the
+  closed edge key set, keeping `relation_type` but not the relation's own
+  content).
+
+compilation_decisions:
+  - question: "Should this record embed the source relations[] it renders (so the record is self-contained), or only reference ids?"
+    decision: >
+      Only reference ids. Atlas L1053's no-duplication law is this method's
+      primary structural constraint -- embedding source_relations would
+      re-introduce exactly the Knowledge-content copy the law forbids. The
+      builder and its gates take `source_relations[]` as a SEPARATE parameter
+      (modeling what would, in production, be a live query against the
+      Knowledge Object store), never persisted onto the returned record.
+  - question: "Does keeping relation_type on the edge violate the no-duplication law?"
+    decision: >
+      No -- relation_type is a short, closed-vocabulary structural label (the
+      same class of field as `visible_fields` naming which fields a View
+      renders), not the relation's substantive content (its description,
+      evidence, or source text, none of which appear anywhere on this
+      record). It is retained specifically so a gate can independently
+      confirm no edge fabricates a relation_type inconsistent with the
+      referenced source relation -- removing it would make the rendering-
+      fidelity invariant unwriteable.
+  - question: "layout_position: a free-form object (like Atlas L1062's generic `layout`), or a narrow {x, y} shape?"
+    decision: >
+      Narrow {x, y} pair of numbers. A concept graph's per-edge layout state
+      is concretely 2D placement; a free-form object would be exactly the
+      "no field capable of holding arbitrary content" risk this schema
+      exists to close off, for no cited benefit.
+
+type: object
+additionalProperties: false
+required: [id, version, knowledge_ref, edges, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CGRAPH-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.concept_graph_view"
+
+  knowledge_ref:
+    type: string
+    minLength: 1
+    description: >
+      Reference to the underlying Knowledge Object this graph renders (Atlas
+      §9 L1052, §15.1 L3606-3619 -- the single Knowledge Object every View
+      hangs off of). Untyped bare-string reference, same convention specs/
+      cognitive/representation.schema.yaml's own `knowledge_ref` property
+      already uses.
+
+  edges:
+    type: array
+    description: >
+      RUNTIME invariant: referential integrity (every relation_id resolves to
+      a declared source relation) and RENDERING FIDELITY (relation_type and
+      provenance_ref exactly match the referenced source relation) -- see
+      module description. No entry may carry any key beyond the closed set
+      below (Atlas L1053 no-duplication law).
+    items:
+      type: object
+      additionalProperties: false
+      required: [edge_id, relation_id, relation_type, provenance_ref, layout_position, visible]
+      properties:
+        edge_id: {type: string, minLength: 1}
+        relation_id:
+          type: string
+          minLength: 1
+          description: "Reference to the underlying Knowledge Object relation by id -- never the relation's own content."
+        relation_type:
+          type: string
+          minLength: 1
+          description: "RUNTIME invariant: must exactly equal the referenced source relation's own relation_type (see module description)."
+        provenance_ref:
+          type: string
+          minLength: 1
+          description: "Bare reference id to the source relation's own provenance record -- not a copy of that record. RUNTIME invariant: must exactly equal the referenced source relation's own provenance_ref."
+        layout_position:
+          type: object
+          additionalProperties: false
+          required: [x, y]
+          properties:
+            x: {type: number}
+            y: {type: number}
+          description: "Atlas L1053 'layout' -- presentation state only."
+        visible:
+          type: boolean
+          description: "Atlas L1053 'visible_fields'-adjacent presentation state -- whether this edge currently renders."
+
+  provenance:
+    description: "Overall record provenance -- the View generation act itself, record-level only, same convention every sibling typed-object schema in this directory uses. Distinct from each edge's own provenance_ref, which points at the SOURCE relation's provenance."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "2-edge concept graph, both edges faithful to their source relations"
+    value:
+      id: "CGRAPH-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.concept_graph_view"
+      knowledge_ref: "KO-2026-09-12-001"
+      edges:
+        - {edge_id: "EDGE-1", relation_id: "REL-1", relation_type: "supports", provenance_ref: "PROV-REL-1", layout_position: {x: 0, y: 0}, visible: true}
+        - {edge_id: "EDGE-2", relation_id: "REL-2", relation_type: "contradicts", provenance_ref: "PROV-REL-2", layout_position: {x: 10, y: 20}, visible: true}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CGRAPHVIEWRECORD-1: no live Knowledge Object / relation store exists yet in this corpus -- source_relations[] is modeled as a caller-supplied parameter to the builder/gate rather than a queried store. Once a real store exists, should the fidelity gate be re-pointed at it directly?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table, Concept Graph View row (L967) directly, plus §9
+    Representation Contract (L1040-1053). Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "concept graph"/"concept-graph"/"CGRAPH-" and every schema title before
+    writing -- zero pre-existing implementation or schema title overlap found
+    (only the pre-existing generic specs/cognitive/representation.schema.yaml,
+    a different, broader dimension-H contract this file does not redefine).
+    Validated against jsonschema Draft202012Validator via
+    tests/unit/test_concept_graph_view.py.
+  note: >
+    No mother document was modified. The pipeline is transcribed directly
+    from Atlas L967. The CGRAPH- prefix, the closed edge key set, and
+    runtime-invariant placement of rendering fidelity are this file's own
+    compiled structure, disclosed above.

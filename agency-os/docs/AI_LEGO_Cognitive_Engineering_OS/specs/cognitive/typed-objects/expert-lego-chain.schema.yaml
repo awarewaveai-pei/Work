@@ -1,0 +1,182 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/expert-lego-chain.schema.yaml"
+title: Expert LEGO Chain
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ExpertLegoChain` -- the declared
+  `outputs` of `representation.expert_lego_mode`'s Method Contract
+  (methods/contracts/representation.expert_lego_mode.contract.yaml,
+  `outputs: [ExpertLegoChain]`). F24 representation family (Atlas L972,
+  §11.57 L2513-2538).
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `market-admission-record.schema.yaml`'s own
+  derived-decision precedent, which this file directly mirrors): (a) CHECK
+  COMPLETENESS -- `checks[]` must declare exactly the 7 named checks from
+  Atlas §11.57 (type_check, precondition_check, policy_check,
+  jurisdiction_check, cost_estimate, risk_estimate, required_gate_injection),
+  each exactly once; (b) DERIVED COMPILE STATUS, THE real invariant this
+  method exists to enforce -- `compile_status` must equal the mechanical
+  recomputation "COMPILED iff every check.status == PASS, else REJECTED",
+  never an asserted narrative. `ai_lego/modules/representation/
+  expert_lego_mode.py` enforces both at construction time (by never
+  accepting `compile_status` as a builder parameter at all -- there is no
+  such parameter) and an independent gate that re-derives it from raw
+  fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Expert LEGO Mode row (L972)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.57 (L2513-2538)"
+  - "methods/contracts/representation.expert_lego_mode.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/market-admission-record.schema.yaml -- the exact 'N required stages, mechanically-derived overall status' shape this file mirrors"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §11.57's 7-check
+  pipeline plus disclosed compilation choices (the ELEGO- prefix, the
+  2-valued PASS/FAIL check status vocabulary, the chain[] block shape).
+
+compilation_decisions:
+  - question: "Should per-check status be 2-valued (PASS/FAIL) like this file, or 3-valued (PASS/FAIL/UNKNOWN) like market-admission-record.schema.yaml's per-stage status?"
+    decision: "2-valued (PASS/FAIL). Atlas §11.57's own rule is 'Compiler 仍必須' run all 7 checks before compiling -- there is no textual analogue of market_admission_control's '任一 critical unknown：FAIL CLOSED' authored-UNKNOWN state here; a check that has not been run yet is simply not present, which the check-completeness invariant already refuses."
+  - question: "Should compile_status be a builder parameter with a runtime assertion, or structurally absent from the function signature?"
+    decision: "Structurally absent. Matching jurisdiction.market_admission_control's own admission_decision precedent: the builder function has NO parameter for compile_status at all, so a caller cannot even attempt to assert COMPILED -- stronger than a runtime check on an accepted parameter, which market_admission_control.py's own module docstring already establishes as this corpus's convention for a mechanically-derived field."
+
+type: object
+additionalProperties: false
+required: [id, version, chain, checks, compile_status, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ELEGO-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.expert_lego_mode"
+
+  chain:
+    type: array
+    minItems: 2
+    description: >
+      Atlas §11.57's own worked example (JTBD->Interview->Assumption
+      Mapping->Scenario->Monte Carlo->Red Team->MCDA) -- the "typed blocks"
+      an expert drags together, in execution order. RUNTIME invariant:
+      every step_id is unique.
+    items:
+      type: object
+      additionalProperties: false
+      required: [step_id, method_id]
+      properties:
+        step_id:
+          type: string
+          minLength: 1
+          description: "Unique per-chain identifier for this block instance. RUNTIME invariant: unique across chain[] (see module description)."
+        method_id:
+          type: string
+          pattern: "^[a-z_]+\\.[a-z_]+$"
+          description: "The typed block's own method.schema.yaml id grammar (ADR-005b), e.g. insight.interview. Not independently re-resolved against a live MethodCatalog by this method -- that is type_check's own asserted-check job (see open_questions)."
+
+  checks:
+    type: array
+    minItems: 7
+    maxItems: 7
+    description: >
+      RUNTIME invariant: must declare EXACTLY the 7 Atlas §11.57 check
+      names, each exactly once (no missing, no extra, no duplicate) -- not
+      expressible as a bare JSON Schema array constraint since the required
+      SET of names, not just the count, is the actual rule.
+    items:
+      type: object
+      additionalProperties: false
+      required: [check, status, note]
+      properties:
+        check:
+          type: string
+          enum: [type_check, precondition_check, policy_check, jurisdiction_check, cost_estimate, risk_estimate, required_gate_injection]
+          description: "Atlas §11.57's own 7-check pipeline (L2530-2536), verbatim, snake_case per this suite's status-on-object-field convention."
+        status:
+          type: string
+          enum: [PASS, FAIL]
+          description: "2-valued -- see compilation_decisions for why no UNKNOWN state is authored here."
+        note:
+          type: string
+          minLength: 1
+          description: "Human-readable justification for this check's status."
+
+  compile_status:
+    type: string
+    enum: [COMPILED, REJECTED]
+    description: >
+      DERIVED, never independently authored -- see `compilation_decisions`.
+      COMPILED iff every `checks[].status == PASS` (and exactly the 7
+      required checks are present); REJECTED otherwise. This is Atlas
+      §11.57's own "因此是「自由組裝」，不是「自由破壞」" rule made
+      structural.
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A fully-passed 3-step chain -- COMPILED."
+    value:
+      id: "ELEGO-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.expert_lego_mode"
+      chain:
+        - {step_id: "S1", method_id: "insight.interview"}
+        - {step_id: "S2", method_id: "foresight.scenario_planning"}
+        - {step_id: "S3", method_id: "decision.decision_tree"}
+      checks:
+        - {check: "type_check", status: "PASS", note: "every step's output type feeds the next step's required input"}
+        - {check: "precondition_check", status: "PASS", note: "all preconditions satisfied"}
+        - {check: "policy_check", status: "PASS", note: "no policy violation"}
+        - {check: "jurisdiction_check", status: "PASS", note: "no jurisdiction conflict"}
+        - {check: "cost_estimate", status: "PASS", note: "within budget"}
+        - {check: "risk_estimate", status: "PASS", note: "within risk tolerance"}
+        - {check: "required_gate_injection", status: "PASS", note: "mandatory gates injected per risk tier"}
+      compile_status: "COMPILED"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "One check FAIL -- must still be REJECTED even though the other 6 PASS."
+    value:
+      id: "ELEGO-2026-09-12-002"
+      version: "1.0.0"
+      generated_by_method: "representation.expert_lego_mode"
+      chain:
+        - {step_id: "S1", method_id: "insight.interview"}
+        - {step_id: "S2", method_id: "decision.decision_tree"}
+      checks:
+        - {check: "type_check", status: "PASS", note: "compatible"}
+        - {check: "precondition_check", status: "PASS", note: "satisfied"}
+        - {check: "policy_check", status: "PASS", note: "no violation"}
+        - {check: "jurisdiction_check", status: "FAIL", note: "cross-border data transfer not cleared"}
+        - {check: "cost_estimate", status: "PASS", note: "within budget"}
+        - {check: "risk_estimate", status: "PASS", note: "within tolerance"}
+        - {check: "required_gate_injection", status: "PASS", note: "gates injected"}
+      compile_status: "REJECTED"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-EXPERTLEGOCHAIN-1: each check's own PASS/FAIL status is caller-supplied evidence, not itself independently re-derived by this method (e.g. type_check is not re-verified against a live MethodCatalog the way guided_mode's selected_method_id is) -- only the final compile_status derivation from the 7 statuses is mechanical. A future revision could make individual checks genuinely self-verifying.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L972) and §11.57 (L2513-2538) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "expert lego"/"expert_lego"/"ExpertLegoChain" and every schema title
+    before writing -- zero pre-existing implementation or schema-title
+    overlap. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_expert_lego_mode.py.
+  note: >
+    No mother document was modified. The 7-check enum and the free-
+    assembly-not-destruction rule are transcribed directly from Atlas
+    §11.57. The ELEGO- prefix and the derived-compile_status field placement
+    directly mirror jurisdiction.market_admission_control.py's just-landed
+    admission_decision precedent, disclosed above.

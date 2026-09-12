@@ -1,0 +1,162 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/timeline-view-record.schema.yaml"
+title: Timeline View Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TimelineView` -- the declared
+  `outputs` of `representation.timeline_view`'s Method Contract (methods/
+  contracts/representation.timeline_view.contract.yaml, `outputs:
+  [TimelineView]`). F24 representation family (Atlas L968: "events->time->
+  decision/change markers").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `compliance-gap-analysis-record.schema.yaml`'s own
+  gap-derivation precedent): (a) referential integrity + completeness --
+  every `ordered_event_refs[].event_id` resolves to a real source event
+  (checked against an `events[]` list passed to the builder/gate,
+  deliberately NOT a field on this record -- see compilation_decisions), each
+  referenced exactly once; (b) CHRONOLOGICAL DERIVATION, THE real invariant
+  this method exists to enforce -- the `event_id` sequence of
+  `ordered_event_refs` must equal the source events sorted by their own
+  declared `event_time`, exactly; a caller-proposed order that disagrees with
+  the real chronology is refused. `ai_lego/modules/representation/
+  timeline_view.py` enforces both at construction time and independent
+  gates.
+
+  Structural law (Atlas §9 L1053, "View 只保存 layout/filters/visible_fields/
+  presentation_preferences，不得複製 Knowledge 本體"): `ordered_event_refs[]`
+  entries are a CLOSED key set (`additionalProperties: false` at every
+  level) of a bare event reference plus a closed marker classification --
+  no field on this record can hold the event's own substantive content
+  (description, event_time, or any other fact); `event_time` itself is
+  never persisted here, only used transiently by the builder/gate to verify
+  ordering.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 呈現／認知偏好／協作 table, Timeline View row (L968)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "methods/contracts/representation.timeline_view.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L968's own pipeline
+  plus low-risk, disclosed compilation choices (the TLVIEW- prefix, the
+  numeric event_time framing, the closed marker_type enum).
+
+compilation_decisions:
+  - question: "Should this record embed the source events[] it orders (so the record is self-contained), or only reference ids?"
+    decision: >
+      Only reference ids. Atlas L1053's no-duplication law is this method's
+      primary structural constraint -- embedding events[] (with their
+      event_time / description) would re-introduce exactly the Knowledge-
+      content copy the law forbids. The builder and its gates take
+      `events[]` as a SEPARATE parameter (modeling what would, in
+      production, be a live query against the Knowledge Object store),
+      never persisted onto the returned record.
+  - question: "event_time: an ISO 8601 date string, or a sortable numeric timestamp?"
+    decision: >
+      Sortable number (e.g. Unix epoch seconds, or any consistent ordinal
+      scale), same date-parsing-avoidance precedent typed-objects/
+      backcasting-plan.schema.yaml's own ordinal `horizon` field already
+      establishes -- avoids a date-parsing dependency and keeps chronological
+      comparison a plain numeric comparison. Not part of this record's own
+      schema (see above), but the shape the builder/gate's `events[]`
+      parameter must supply.
+  - question: "marker_type: free text, or a closed enum?"
+    decision: >
+      Closed 3-value enum [event, decision, change] -- Atlas L968's own
+      pipeline names exactly two marker kinds ('decision/change markers')
+      plus the plain unmarked case; a free-text field would let a caller
+      smuggle arbitrary content through a field intended only for a
+      presentation classification.
+
+type: object
+additionalProperties: false
+required: [id, version, knowledge_ref, ordered_event_refs, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^TLVIEW-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.timeline_view"
+
+  knowledge_ref:
+    type: string
+    minLength: 1
+    description: >
+      Reference to the underlying Knowledge Object this timeline renders
+      (Atlas §9 L1052, §15.1 L3606-3619). Untyped bare-string reference, same
+      convention specs/cognitive/representation.schema.yaml's own
+      `knowledge_ref` property already uses.
+
+  ordered_event_refs:
+    type: array
+    description: >
+      RUNTIME invariant: referential integrity + completeness (every entry
+      resolves to a declared source event, each event referenced exactly
+      once) and CHRONOLOGICAL DERIVATION (the event_id sequence, in array
+      order, equals the source events sorted by event_time) -- see module
+      description. No entry may carry any key beyond the closed set below
+      (Atlas L1053 no-duplication law); in particular, event_time itself is
+      never stored here.
+    items:
+      type: object
+      additionalProperties: false
+      required: [event_id, marker_type]
+      properties:
+        event_id:
+          type: string
+          minLength: 1
+          description: "Reference to the underlying Knowledge Object event by id -- never the event's own content or timestamp."
+        marker_type:
+          enum: [event, decision, change]
+          description: "Atlas L968 'decision/change markers' -- a closed presentation classification, not free text."
+
+  provenance:
+    description: "Overall record provenance -- the View generation act itself, record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "3-event timeline, in genuine chronological order (source event_time 100 < 200 < 300, not the order events happened to be declared in)"
+    value:
+      id: "TLVIEW-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.timeline_view"
+      knowledge_ref: "KO-2026-09-12-001"
+      ordered_event_refs:
+        - {event_id: "EVT-1", marker_type: event}
+        - {event_id: "EVT-3", marker_type: decision}
+        - {event_id: "EVT-2", marker_type: change}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-TLVIEWRECORD-1: no live Knowledge Object / event store exists yet in this corpus -- events[] is modeled as a caller-supplied parameter to the builder/gate rather than a queried store. Once a real store exists, should the chronological-derivation gate be re-pointed at it directly?（owner: operator）"
+  - "OQ-TLVIEWRECORD-2: ties (two events sharing the exact same event_time) are broken by event_id string ordering for determinism -- should a future revision expose an explicit tie-break field instead of an implicit id-sort?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table, Timeline View row (L968) directly, plus §9
+    Representation Contract (L1040-1053). Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "timeline view"/"timeline-view"/"TLVIEW-" and every schema title before
+    writing -- zero pre-existing implementation or schema title overlap found
+    (only the pre-existing generic specs/cognitive/representation.schema.yaml,
+    a different, broader dimension-H contract this file does not redefine).
+    Read `ai_lego/modules/jurisdiction/compliance_gap_analysis.py` in full
+    for the exact "derived, never accepted from the caller" convention this
+    method's ordered_event_refs field applies. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_timeline_view.py.
+  note: >
+    No mother document was modified. The pipeline is transcribed directly
+    from Atlas L968. The TLVIEW- prefix, the numeric event_time framing, and
+    runtime-invariant placement of chronological derivation are this file's
+    own compiled structure, disclosed above.

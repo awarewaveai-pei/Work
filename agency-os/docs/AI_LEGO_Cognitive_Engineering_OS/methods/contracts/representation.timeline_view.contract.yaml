@@ -1,0 +1,109 @@
+$id: "ai-lego://methods/contracts/representation.timeline_view.contract.yaml"
+title: "Timeline View Method Contract"
+status: ACTIVE
+
+description: >
+  F24 representation/cognitive-preference/collaboration family, table-row-only
+  citation (Atlas L968: "Timeline View | 按時間呈現事件 | events->time->
+  decision/change markers | 找時間關係"). Renders a Knowledge Object's events
+  in chronological order. Core invariant, same "derived, not asserted"
+  discipline this corpus's `experiment.mvp`/`jurisdiction.compliance_gap_
+  analysis` already establish: `ordered_event_refs` is MECHANICALLY DERIVED
+  by sorting the source events by their own declared event_time -- a
+  caller-supplied ordering that disagrees with the real chronological order
+  is refused. The view stores only the ordered reference sequence plus a
+  closed marker classification, never the events' own substantive content.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 呈現／認知偏好／協作 table, Timeline View row (L968)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L968 gives a real pipeline and effect
+  ("找時間關係") -- direct transcription plus low-risk, disclosed compilation
+  choices.
+
+id: representation.timeline_view
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [SEQUENCE, COMPARE, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F24
+# members). SEQUENCE orders the events by time, COMPARE checks a
+# caller-proposed order against the real chronology, VALIDATE refuses a
+# mismatch before any record is returned. All three CANONICAL_KERNEL
+# members.
+
+purpose:
+  - render_a_knowledge_objects_events_in_a_mechanically_verified_chronological_order
+# Atlas L968 verbatim sense: place events on a timeline and surface
+# decision/change markers, to find real temporal relationships -- a
+# timeline that is not genuinely sorted by time actively misleads rather
+# than informs.
+
+inputs:
+  required:
+    - KnowledgeObjectRef
+    - EventSet
+  # NEW DESIGN. Atlas gives no named input typed-object for this method; the
+  # starting point is a reference to the Knowledge Object being rendered plus
+  # its declared events (each carrying its own event_time, the ground truth
+  # a proposed ordering must stay faithful to), same honesty-gap class every
+  # sibling F-family contract already discloses.
+
+outputs:
+  - TimelineView
+# NEW output type (see typed-objects/timeline-view-record.schema.yaml).
+
+preconditions:
+  - "every ordered_event_refs entry references a real declared event by id, each event referenced exactly once (referential integrity + completeness)"
+  - "the event_id sequence of ordered_event_refs equals the source events sorted by event_time, exactly (chronological derivation)"
+  - "the view record carries no field capable of holding a copy of the events' own substantive content (Atlas L1053)"
+  # NEW, structurally necessary. Atlas's own pipeline is "events->time->
+  # decision/change markers" -- a caller narrating a different order than
+  # the real one is exactly the "AI 主觀打分" anti-pattern this corpus's own
+  # `experiment.mvp`/`jurisdiction.compliance_gap_analysis` were built to
+  # structurally prevent, applied here to temporal ordering.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- the View generation act itself, same
+  # placement convention every structurally similar single-record F-family
+  # sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F24's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- rendering a view has no external side effect.
+
+open_questions:
+  - "OQ-TLVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-TLVIEW-2: event_time is modeled as a sortable numeric timestamp (not a date string), same date-parsing-avoidance precedent typed-objects/backcasting-plan.schema.yaml's ordinal horizon field already establishes -- should a future revision add a real calendar-date framing?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973) directly; confirmed line 968 is the exact
+    Timeline View row. Read Atlas §9 Representation Contract (L1040-1053) and
+    §15.1 (L3606-3619). Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "timeline view"/"timeline-view"/"TLVIEW-"/"representation\." before
+    writing -- zero pre-existing implementation, contract, or schema title
+    overlap found (only the pre-existing generic specs/cognitive/
+    representation.schema.yaml, a different, broader dimension-H View
+    contract this method's record does not redefine). Read `ai_lego/modules/
+    jurisdiction/compliance_gap_analysis.py` in full for the exact
+    "derived, never accepted from the caller" convention this method's
+    ordered_event_refs field applies. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The pipeline is transcribed verbatim
+    from Atlas L968. The TLVIEW- id prefix, the numeric event_time framing,
+    and runtime-invariant placement of chronological derivation are this
+    file's own compiled structure, disclosed above, not textually cited.

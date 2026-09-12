@@ -1,0 +1,102 @@
+$id: "ai-lego://methods/contracts/representation.guided_mode.contract.yaml"
+title: "Guided Mode Method Contract"
+status: ACTIVE
+
+description: >
+  F24 Representation family (Atlas L971: "Guided Mode | 系統逐步提問 | one
+  question at a time→progressive disclosure | 降工具選擇焦慮"). Dedicated
+  §11.56 (L2493-2510) gives the worked example directly: instead of asking
+  "要不要使用 Fishbone？" the system asks "你目前是在找「可能原因」，還是已經有
+  數據想驗證原因？" and auto-selects the method from the answer, with the
+  explicit benefit "Method complexity 留在 engine，不丟給使用者". Core
+  invariant: every `selected_method_id` must be traceable to a real,
+  non-empty question->answer trail (>=1 question actually asked), AND must
+  resolve as a real ACTIVE contract in this corpus's own MethodCatalog -- a
+  session that "selects" a method with no real answer trail, or a method_id
+  that does not actually exist, is exactly the black box that defeats
+  "complexity stays in engine, not exposed as a fake choice".
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Guided Mode row (L971)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.56 (L2493-2510) -- the Fishbone worked example and the 'complexity stays in engine' benefit"
+  - "ai_lego/platform/ai_execution/method_resolver.py -- MethodCatalog, the real per-corpus method registry this method's own real invariant resolves selected_method_id against"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.56 gives a concrete worked example
+  and an explicit benefit statement -- direct transcription plus disclosed
+  compilation choices (the answer-trail-plus-catalog-resolution invariant).
+
+id: representation.guided_mode
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [QUESTION, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F24
+# members). QUESTION is literally "one question at a time"; DECIDE is
+# Atlas's own "依回答自動選 Method" (auto-select the method from the
+# answer). Both CANONICAL_KERNEL members.
+
+purpose:
+  - resolve_a_method_selection_through_a_progressive_question_answer_trail_without_exposing_method_names_to_the_user
+
+inputs:
+  required:
+    - MethodCatalog
+  # NEW DESIGN. Atlas §11.56 gives no named input typed-object; the real
+  # dependency is the live corpus method registry the selected_method_id
+  # must resolve against (see ai_lego/platform/ai_execution/method_resolver.
+  # py), same honesty-gap class every sibling F24 contract already
+  # discloses for its own missing named input type.
+
+outputs:
+  - GuidedModeSession
+# NEW output type (see typed-objects/guided-mode-session.schema.yaml).
+
+preconditions:
+  - "qa_trail has at least 1 question->answer pair, each non-empty"
+  - "selected_method_id resolves as an ACTIVE contract in the corpus's own MethodCatalog"
+  # NEW, structurally necessary. §11.56's own "Method complexity 留在
+  # engine，不丟給使用者" benefit is otherwise unenforceable at runtime --
+  # a session could silently claim a selection with no question ever asked,
+  # or name a method that does not exist in this corpus at all.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same placement convention every structurally
+  # similar single-record F-family sibling uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas F24's table row gives no explicit next-step method; the resolved
+# selected_method_id IS the next step, executed by that method's own
+# contract, not by this one.
+
+rollback:
+  side_effect_free: true
+  # Resolving a method selection through a question trail has no external
+  # side effect -- the selected method's own execution is a separate,
+  # later invocation.
+
+open_questions:
+  - "OQ-GUIDEDMODE-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-GUIDEDMODE-2: the real invariant re-resolves selected_method_id against a LIVE MethodCatalog at BOTH construction time and an independent gate, meaning a session's own gate verdict can change over time if the referenced contract is later deprecated -- is that dynamic re-validation the intended long-term semantics, or should a session freeze the resolution it saw at construction time?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973, confirmed line 971 for this row, no
+    citation drift) and §11.56 (L2493-2510) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "guided mode"/"guided_mode"/"GuidedModeSession" before writing -- zero
+    pre-existing implementation or schema-title overlap found (Atlas's own
+    prose mentions of "guided"/"引導" elsewhere are narrative descriptions
+    of other methods' UX, not a competing GuidedMode typed object).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The question->answer->auto-select
+    pipeline and the "complexity stays in engine" benefit are transcribed
+    from Atlas §11.56. The answer-trail-non-emptiness precondition and the
+    live-MethodCatalog-resolution precondition are this file's own compiled
+    structure, disclosed above, not textually cited.

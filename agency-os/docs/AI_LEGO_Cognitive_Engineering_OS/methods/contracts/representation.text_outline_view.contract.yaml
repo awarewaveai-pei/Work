@@ -1,0 +1,101 @@
+$id: "ai-lego://methods/contracts/representation.text_outline_view.contract.yaml"
+title: "Text / Outline View Method Contract"
+status: ACTIVE
+
+description: >
+  F24 Representation family (Atlas L964: "Text / Outline View | 線性文字與大綱
+  | summary->outline->details->evidence links | 適合深度閱讀"). Opens F24
+  (0/10 before this batch). Renders an arbitrary Knowledge Object as a nested
+  outline. Core invariant, shared by every F24 View (Atlas §9 Representation
+  Contract L1040-1053 + §15.1 mermaid L3606-3619): a View stores ONLY
+  layout/filters/visible_fields/presentation_preferences plus a reference to
+  its source -- never a copy of Knowledge content. This method's own
+  additional invariant: every evidence_links[] entry and every outline
+  node's details_ref is a bare id/URI-shaped reference (no whitespace), never
+  inline evidence/detail text, and every summary is length-bounded (a
+  structural proxy for "genuinely a summary", see schema
+  compilation_decisions for why a stored `details` blob was rejected).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Text / Outline View row (L964)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §15.1 mermaid diagram (L3606-3619)"
+  - "specs/cognitive/representation.schema.yaml -- pre-existing abstract View/state contract this method's concrete record specializes"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L964 + the shared Representation Contract
+  give the real pipeline and the no-duplication law; the reference-shape and
+  summary-length invariants are this file's own disclosed compilation
+  choices, same honesty-gap class every sibling F-family contract discloses.
+
+id: representation.text_outline_view
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [DECOMPOSE, GROUP]
+# INFERRED, not cited. DECOMPOSE breaks the Knowledge Object into an outline
+# hierarchy; GROUP places nodes under the correct parent. No TRANSFORM: a
+# View never reshapes the underlying Knowledge, only renders it.
+
+purpose:
+  - render_an_arbitrary_knowledge_object_as_a_summary_outline_hierarchy_with_reference_only_evidence_links
+
+inputs:
+  required:
+    - KnowledgeObjectRef
+  # NEW DESIGN. Atlas names "Knowledge Object" as the universal View parent
+  # (§9, §15.1) but gives no typed-object name for it; a bare reference is
+  # the input, same honesty-gap class every sibling F-family contract
+  # already discloses for its own missing named input type.
+
+outputs:
+  - TextOutlineViewRecord
+# NEW output type (see typed-objects/text-outline-view-record.schema.yaml).
+
+preconditions:
+  - "source_knowledge_object_id is present and reference-shaped (no whitespace)"
+  - "every outline[] node's summary is non-empty and does not exceed the schema's declared max length"
+  - "every evidence_links[] entry and every details_ref is reference-shaped (no whitespace) -- never inline text"
+  # NEW, structurally necessary -- the shared Representation Contract's own
+  # "不得複製 Knowledge 本體" (L1053) is otherwise unenforceable at runtime.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent view record.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas's F24 table names no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # A View re-render has no external side effect.
+
+open_questions:
+  - "OQ-TXTVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-TXTVIEW-2: no typed KnowledgeObjectRef schema exists yet corpus-wide -- this method treats it as a bare reference-shaped string, same gap every sibling F24 method in this batch shares.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973, confirmed line 964 for this row, no
+    citation drift), §9 Representation Contract (L1040-1053), §15.1 mermaid
+    (L3606-3619) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "text.?outline.?view", "outline.?view", "representation\." before
+    writing -- zero pre-existing implementation or contract-id overlap
+    found; `specs/cognitive/representation.schema.yaml` (abstract View
+    contract, pre-existing) and `method-inventory.yaml` L1523-1527 ("Text /
+    Outline View", has_contract: false) are the only related hits, both
+    read in full and cited above, neither a collision. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The pipeline (summary->outline->
+    details->evidence links) is transcribed verbatim from Atlas L964. The
+    reference-shape grammar, the summary max-length bound, and the decision
+    to store only a `details_ref` (never a `details` blob) are this file's
+    own compiled structure, disclosed above and in the schema's
+    compilation_decisions, not textually cited.

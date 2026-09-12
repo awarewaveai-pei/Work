@@ -1,0 +1,107 @@
+$id: "ai-lego://methods/contracts/representation.switching.contract.yaml"
+title: "Representation Switching Method Contract"
+status: ACTIVE
+
+description: >
+  F24 Representation family (Atlas L963: "Representation Switching | 同一
+  underlying model 切換 View | 共用 object IDs/provenance→render different
+  views | 零重工＋適配不同腦袋"). Dedicated §11.55 (L2468-2489) names the same
+  Knowledge Object rendered through 8 named views (Text/Table/Mind Map/
+  Concept Graph/Timeline/Causal Diagram/Canvas/Audio) with the explicit
+  benefit "Provenance 保持一致" and "不會因 UI 變化複製出多份互相衝突內容".
+  Core invariant: a RepresentationSwitchEvent's `views[]` must all reference
+  the SAME `knowledge_object_id` and carry the SAME `provenance` -- a switch
+  record naming two different knowledge objects, or whose per-view provenance
+  diverges, IS the "複製出多份互相衝突內容" failure this method exists to
+  prevent, made structural.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Representation Switching row (L963)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.55 (L2468-2489) -- the 8-view list and the Provenance/no-duplication benefits"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053) -- 'View 只保存 layout/filters/visible_fields/presentation_preferences，不得複製 Knowledge 本體'"
+  - "specs/cognitive/representation.schema.yaml -- pre-existing abstract View/state contract this method's switch-event record reuses the representation_category enum from"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.55 gives the real benefit statements
+  ("Provenance 保持一致", "不會...複製出多份互相衝突內容") -- direct
+  transcription plus disclosed compilation choices (the cross-view
+  consistency check, minimum-2-views bound).
+
+id: representation.switching
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [MAP, RELATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F24
+# members). MAP projects the one Knowledge Object onto each named view;
+# RELATE is what keeps every projection anchored to the same object/
+# provenance rather than drifting into independent copies. Both CANONICAL_
+# KERNEL members. No TRANSFORM: a view switch never reshapes the underlying
+# Knowledge, only re-renders it (same exclusion text_outline_view.contract.
+# yaml's own description already discloses for its sibling View method).
+
+purpose:
+  - switch_the_rendering_of_one_knowledge_object_across_views_without_forking_its_content_or_provenance
+
+inputs:
+  required:
+    - KnowledgeObjectRef
+  # NEW DESIGN. Same honesty-gap class every sibling F24 contract already
+  # discloses -- Atlas names "Knowledge Object" as the universal View parent
+  # but gives no typed-object name for it.
+
+outputs:
+  - RepresentationSwitchEvent
+# NEW output type (see typed-objects/representation-switch-event.schema.yaml).
+
+preconditions:
+  - "at least 2 views named in the switch"
+  - "every views[] entry references the SAME knowledge_object_id"
+  - "every views[] entry carries the SAME provenance"
+  # NEW, structurally necessary. §11.55's own stated benefits ("Provenance
+  # 保持一致", "不會...複製出多份互相衝突內容") are otherwise unenforceable
+  # at runtime -- a switch record could silently name two knowledge objects
+  # or diverging provenance and nothing would catch it.
+
+quality:
+  provenance_required: true
+  # Record-level provenance (who/what generated this switch-event record),
+  # distinct from the per-view provenance the preconditions above check for
+  # cross-view consistency -- same two-question split method.schema.yaml's
+  # own quality.provenance_required vs contract_provenance precedent draws.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas F24's table row gives no explicit next-step method.
+
+rollback:
+  side_effect_free: true
+  # A view switch has no external side effect -- it is a pure re-render.
+
+open_questions:
+  - "OQ-REPSWITCH-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-REPSWITCH-2: no typed KnowledgeObjectRef schema exists yet corpus-wide -- treated as a bare reference-shaped string, same gap every sibling F24 method in this batch shares.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973, confirmed line 963 for this row, no
+    citation drift), §11.55 (L2468-2489), and §9 Representation Contract
+    (L1040-1053) directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_
+    Engineering_OS` and `Projects/internal/cognitive-engineering-os`
+    case-insensitively for "representation switching"/"representation_
+    switching"/"RepresentationSwitchEvent" before writing -- zero
+    pre-existing implementation or schema-title overlap (pre-existing
+    `specs/cognitive/representation.schema.yaml` is the abstract View/state
+    contract this method's concrete switch-event record REUSES the
+    representation_category enum from, not a collision -- confirmed by
+    reading it in full; it explicitly excludes Guided Mode/Expert LEGO Mode
+    from its own scope but says nothing about a switch-EVENT record, which
+    is this method's own new design). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 8-view list and the Provenance/
+    no-duplication benefits are transcribed from Atlas §11.55. The
+    minimum-2-views bound and the cross-view knowledge-object/provenance
+    consistency check are this file's own compiled structure, disclosed
+    above, not textually cited.

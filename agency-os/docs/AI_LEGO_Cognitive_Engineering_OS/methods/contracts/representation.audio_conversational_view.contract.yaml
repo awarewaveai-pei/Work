@@ -1,0 +1,82 @@
+$id: "ai-lego://methods/contracts/representation.audio_conversational_view.contract.yaml"
+title: "Audio / Conversational View Method Contract"
+status: ACTIVE
+
+description: >
+  F24 representation family (Atlas L970: "Audio / Conversational View | 用
+  語音/對話操作 | speech->structured objects->readback/confirm | 降輸入門
+  檻"). A RENDERING/interaction layer over an existing Knowledge Object (per
+  the §9 Representation Contract, L1053, a View never copies Knowledge) that
+  lets a user operate it by voice. Core invariant, Atlas's own pipeline made
+  structural: a voice-derived structured object can never be CONFIRMED
+  without a non-empty readback_transcript AND confirmed_by_user=true --
+  skipping readback/confirm turns "降輸入門檻" into a silently-unreliable
+  interface (misheard speech treated as ground truth).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 呈現／認知偏好／協作 table, Audio / Conversational View row (L970)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053) + §15.1 (L3606-3619)"
+
+decided_by: >
+  No ADR governs the content. Atlas L970 gives the three-stage pipeline and
+  effect ("降輸入門檻") directly; mirrors the human-confirmation-before-
+  finalization convention `jurisdiction.conflict_of_law_review` (F23, same
+  corpus) already establishes for a different domain.
+
+id: representation.audio_conversational_view
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [EXPLAIN, DECIDE]
+# INFERRED (Atlas §4 gives no composition formula for F24). EXPLAIN is the
+# system's readback of what it heard; DECIDE is the user's confirm/reject.
+
+purpose:
+  - operate_a_knowledge_object_by_voice_with_mandatory_readback_confirmation
+
+inputs:
+  required:
+    - KnowledgeObject  # soft reference -- the underlying object this View is used to operate, same convention as representation.causal_view's inputs
+
+outputs:
+  - AudioConversationalViewRecord
+
+preconditions:
+  - "no structured_objects[] entry is status: CONFIRMED without a non-empty readback_transcript and confirmed_by_user: true"
+  # NEW, structurally necessary. Atlas's own pipeline ("speech->structured
+  # objects->readback/confirm") is not mere narrative order -- skipping
+  # straight to confirmed with no readback step is exactly the failure this
+  # method's benefit column ("降輸入門檻") exists to prevent from becoming
+  # unreliable.
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+recommended_next: []
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-ACVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-ACVIEW-2: DRAFT structured_objects[] carry no readback requirement, only CONFIRMED ones -- should a future revision require readback be attempted (even if rejected) before an object can be discarded, to log misrecognition rates?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table, Audio / Conversational View row (L970, confirmed
+    exact line number) and the Representation Contract (§9 L1040-1053, §15.1
+    L3606-3619) directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "audio view"/"conversational view"/"readback"/"ACVIEW-" before writing --
+    zero pre-existing implementation or schema-title overlap. Read
+    `ai_lego/modules/jurisdiction/conflict_of_law_review.py` for the exact
+    "cannot finalize without human confirmation evidence" convention this
+    method mirrors for voice confirmation instead of legal sign-off.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. The three-stage pipeline and benefit
+    are transcribed verbatim from Atlas L970. The structured_objects[] shape
+    and its readback/confirm-before-CONFIRMED requirement are this file's own
+    compiled structure, disclosed above.

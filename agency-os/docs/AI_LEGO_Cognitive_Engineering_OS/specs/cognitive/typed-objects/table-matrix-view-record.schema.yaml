@@ -1,0 +1,178 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/table-matrix-view-record.schema.yaml"
+title: Table / Matrix View Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TableMatrixViewRecord` -- the
+  declared `outputs` of `representation.table_matrix_view`'s Method Contract
+  (methods/contracts/representation.table_matrix_view.contract.yaml,
+  `outputs: [TableMatrixViewRecord]`). F24 Representation family (Atlas
+  L965: "entities×criteria->filter/sort/score").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own
+  precedent): (a) NO CONTENT DUPLICATION -- `entities[]`/`criteria[]` are
+  bare id REFERENCES, never the entities'/criteria's own values/content;
+  (b) every reference field (`entities[]`, `criteria[]`, `filters[].
+  criterion_id`, `sort_spec.criterion_id`, `scores[].entity_id`/
+  `criterion_id`) is id/URI-shaped (no whitespace); (c) referential
+  integrity -- every `filters[]`/`sort_spec`/`scores[]` reference resolves
+  to a declared `entities[]`/`criteria[]` entry; (d) COMPUTED-ARTIFACT
+  LABELING -- every `scores[]` entry MUST carry `computed: true` (a literal
+  boolean, never omitted or false) -- the structural declaration that a
+  score is a VIEW-LEVEL COMPUTED PRESENTATION artifact, not silently
+  promoted canonical data. `ai_lego/modules/representation/
+  table_matrix_view.py` enforces all of this at both construction time and
+  two independent gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Table / Matrix View row (L965)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "methods/contracts/representation.table_matrix_view.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L965's own
+  pipeline plus low-risk, disclosed compilation choices (the TBLVIEW-
+  prefix, the reference-shape grammar, the mandatory computed:true flag).
+
+compilation_decisions:
+  - question: "Should `scores[].score` be treated as new canonical fact data, or must it be explicitly labeled otherwise?"
+    decision: "Every score entry MUST carry `computed: true` (a required, const-true boolean field). A score is always a VIEW-LEVEL, re-derivable presentation artifact of the underlying entities/criteria -- never a new fact the View itself asserts. Silent omission (implying it could be treated as canonical) is refused, not defaulted."
+  - question: "Should `filters[]`'s own filter value be an open/unconstrained field?"
+    decision: "Yes, typed as a JSON scalar (string/number/boolean) with a 100-character bound on string values -- the FILTER CRITERION a user chose (e.g. 'only show status=active'), analogous to `specs/cognitive/representation.schema.yaml`'s own open `view_state.filters` object, not a copy of any entity's own field value. The length bound is a cheap structural guard against smuggling a large content blob through this field."
+  - question: "Reference-shape grammar for `entities[]`/`criteria[]`/every cross-field id reference?"
+    decision: "`^[A-Za-z0-9][A-Za-z0-9_.:/-]*$`, no whitespace permitted -- same grammar `text-outline-view-record.schema.yaml` uses, for the identical reason (a bare id/URI is whitespace-free; inline content is not)."
+
+type: object
+additionalProperties: false
+required: [id, version, source_knowledge_object_id, entities, criteria, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^TBLVIEW-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.table_matrix_view"
+
+  source_knowledge_object_id:
+    type: string
+    minLength: 1
+    description: "REFERENCE ONLY into the underlying Knowledge Object this View renders. RUNTIME invariant: reference-shaped."
+
+  entities:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1 }
+    description: "REFERENCE ONLY -- entity ids under comparison, never their own content/values. RUNTIME invariant: reference-shaped, unique."
+
+  criteria:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1 }
+    description: "REFERENCE ONLY -- criterion ids under comparison, never their own content/values. RUNTIME invariant: reference-shaped, unique."
+
+  filters:
+    type: array
+    description: "Presentation state (Atlas §9 L1053) -- the filter criteria a user chose, not a copy of any entity's actual field value."
+    items:
+      type: object
+      additionalProperties: false
+      required: [criterion_id, operator, value]
+      properties:
+        criterion_id: { type: string, minLength: 1, description: "RUNTIME invariant: must resolve to a declared criteria[] entry." }
+        operator: { type: string, minLength: 1, maxLength: 32 }
+        value:
+          description: "A JSON scalar (string/number/boolean) -- the chosen filter value. RUNTIME invariant: string values are length-bounded (see compilation_decisions)."
+          oneOf:
+            - { type: string, maxLength: 100 }
+            - { type: number }
+            - { type: boolean }
+
+  sort_spec:
+    type: object
+    additionalProperties: false
+    required: [criterion_id, direction]
+    description: "Presentation state (Atlas §9 L1053). RUNTIME invariant: criterion_id must resolve to a declared criteria[] entry."
+    properties:
+      criterion_id: { type: string, minLength: 1 }
+      direction: { type: string, enum: [asc, desc] }
+
+  score_config:
+    type: object
+    additionalProperties: false
+    description: "Presentation state (Atlas §9 L1053) -- declares HOW any scores[] below were computed, itself never a content copy."
+    properties:
+      method: { type: string, minLength: 1, maxLength: 64 }
+      weights:
+        type: object
+        description: "criterion_id -> weight (number). RUNTIME invariant: every key must resolve to a declared criteria[] entry."
+        additionalProperties: { type: number }
+
+  scores:
+    type: array
+    description: "VIEW-LEVEL COMPUTED PRESENTATION artifacts only -- see compilation_decisions. RUNTIME invariant: every entry resolves entity_id/criterion_id and carries computed:true."
+    items:
+      type: object
+      additionalProperties: false
+      required: [entity_id, criterion_id, score, computed]
+      properties:
+        entity_id: { type: string, minLength: 1 }
+        criterion_id: { type: string, minLength: 1 }
+        score: { type: number }
+        computed:
+          type: boolean
+          const: true
+          description: "MUST be literal true -- structurally forbids ever representing a score as anything other than a view-level computed artifact."
+
+  layout: { type: object, description: "Atlas §9 L1053 presentation-state field. Left as an open object." }
+  visible_fields:
+    type: array
+    items: { type: string }
+    description: "Atlas §9 L1053 presentation-state field -- which source fields this View renders."
+  presentation_preferences: { type: object, description: "Atlas §9 L1053 presentation-state field. Left as an open object." }
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "2 entities x 2 criteria, one filter, one sort spec, one view-level computed score"
+    value:
+      id: "TBLVIEW-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.table_matrix_view"
+      source_knowledge_object_id: "KO-2026-09-12-002"
+      entities: ["ENT-VENDOR-A", "ENT-VENDOR-B"]
+      criteria: ["CRIT-COST", "CRIT-SLA"]
+      filters: [{criterion_id: "CRIT-SLA", operator: "gte", value: 99.5}]
+      sort_spec: {criterion_id: "CRIT-COST", direction: asc}
+      score_config: {method: "weighted_sum", weights: {"CRIT-COST": 0.6, "CRIT-SLA": 0.4}}
+      scores:
+        - {entity_id: "ENT-VENDOR-A", criterion_id: "CRIT-COST", score: 0.8, computed: true}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-TABLEMATRIXVIEW-1: filters[].value string bound (100 chars) is this file's own compiled bound, not cited from Atlas.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table row (L965) and §9 Representation Contract
+    (L1040-1053) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "table.?matrix.?view", "TBLVIEW" before writing -- zero pre-existing
+    implementation or schema title overlap found. Validated against
+    jsonschema Draft202012Validator via tests/unit/test_table_matrix_view.py.
+  note: >
+    No mother document was modified. The pipeline is transcribed directly
+    from Atlas L965. The TBLVIEW- prefix, the reference-shape grammar, and
+    the mandatory computed:true score label are this file's own compiled
+    structure, disclosed above.

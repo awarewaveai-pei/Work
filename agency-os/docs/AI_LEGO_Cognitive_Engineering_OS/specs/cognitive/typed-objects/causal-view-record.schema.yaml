@@ -1,0 +1,121 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/causal-view-record.schema.yaml"
+title: Causal View Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CausalViewRecord` -- the declared
+  `outputs` of `representation.causal_view`'s Method Contract (methods/
+  contracts/representation.causal_view.contract.yaml, `outputs:
+  [CausalViewRecord]`). F24 representation family (Atlas L969: "DAG/CLD＋
+  assumptions"). A specialization of the generic View shape
+  `specs/cognitive/representation.schema.yaml#/representation`
+  (category=causal) -- reuses that file's `view_state` definition for
+  `state` rather than redefining it.
+
+  Real invariant (RUNTIME, same disclosed-gap class as every sibling
+  typed-object schema in this directory): every `rendered_edges[]` entry
+  must carry a non-empty `assumption`, and `edge_id` must be unique within
+  the record. `ai_lego/modules/representation/causal_view.py` enforces this
+  at both construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Causal View row (L969)"
+  - "methods/contracts/representation.causal_view.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/representation.schema.yaml (view_state definition, reused via $ref)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L969's own
+  pipeline plus low-risk, disclosed compilation choices (the CVIEW- prefix,
+  edge_id+assumption-only rendered_edges shape).
+
+compilation_decisions:
+  - question: "rendered_edges[] entries: edge_id+assumption only, or also duplicate source/target node ids from the underlying DAG?"
+    decision: "edge_id+assumption only -- duplicating node ids would copy the source DAG's own body into this View, violating the Representation Contract's 'View 不得複製 Knowledge 本體' (Atlas L1053)."
+  - question: "Reuse representation.schema.yaml#/definitions/view_state for `state`, or define a new shape here?"
+    decision: "Reuse via $ref -- it is the already-compiled canonical shape for what a View is permitted to persist; redefining it here would be a duplicate-definition drift risk."
+
+type: object
+additionalProperties: false
+required: [id, version, knowledge_ref, rendered_edges, state, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CVIEW-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.causal_view"
+
+  knowledge_ref:
+    type: string
+    minLength: 1
+    description: >
+      Points at the underlying causal.dag / systems.causal_loop_diagram
+      record this View renders -- untyped reference (bare string id), same
+      convention specs/cognitive/representation.schema.yaml's own
+      `knowledge_ref` field uses for the identical reason (no dependency on
+      which source module produced the record).
+
+  rendered_edges:
+    type: array
+    description: >
+      RUNTIME invariant: every entry's `assumption` must be a non-empty
+      string, and `edge_id` must be unique within this array (see module
+      description). Referencing edge_id only, not node ids, per
+      compilation_decisions.
+    items:
+      type: object
+      additionalProperties: false
+      required: [edge_id, assumption]
+      properties:
+        edge_id: {type: string, minLength: 1, description: "The source DAG/CLD's own edge identifier."}
+        assumption: {type: string, minLength: 1, description: "The causal assumption behind this edge -- Atlas L969's own 'DAG/CLD＋assumptions' pipeline stage, made mandatory."}
+
+  state:
+    $ref: "ai-lego://specs/cognitive/representation.schema.yaml#/definitions/view_state"
+
+  provenance:
+    description: "Record-level provenance -- one coherent View, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-edge Causal View over a pre-existing DAG, each edge carrying its own assumption"
+    value:
+      id: "CVIEW-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.causal_view"
+      knowledge_ref: "CDA-2026-09-01-001"
+      rendered_edges:
+        - {edge_id: "E-price-to-demand", assumption: "價格上升在需求彈性 > 0.3 的市場中降低需求（非僅相關）"}
+        - {edge_id: "E-demand-to-revenue", assumption: "需求變動在庫存充足時線性轉換為營收變動"}
+      state:
+        visible_fields: ["edge_id", "assumption"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CAUSALVIEWRECORD-1: rendered_edges[] carries no referential-integrity check against the live source DAG record's actual edge set (no cross-record fetch mechanism exists in this corpus for representation Views) -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table, Causal View row (L969) and the Representation
+    Contract (§9 L1040-1053) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "causal view"/"causal_view"/"CVIEW-" before writing -- zero pre-existing
+    overlap; confirmed distinct from the pre-existing `causal-dag-analysis.
+    schema.yaml` (CDA- prefix) and `causal-loop-diagram.schema.yaml` (CLD-
+    prefix), which this method references but does not duplicate. Validated
+    against jsonschema Draft202012Validator via
+    tests/unit/test_causal_view.py.
+  note: >
+    No mother document was modified. The rendered_edges[] shape and its
+    per-edge assumption requirement are this file's own compiled structure,
+    disclosed above; `state` is reused verbatim (via $ref) from
+    representation.schema.yaml's own already-compiled view_state.

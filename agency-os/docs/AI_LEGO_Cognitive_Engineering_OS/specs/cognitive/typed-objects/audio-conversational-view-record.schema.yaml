@@ -1,0 +1,131 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/audio-conversational-view-record.schema.yaml"
+title: Audio / Conversational View Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `AudioConversationalViewRecord` --
+  the declared `outputs` of `representation.audio_conversational_view`'s
+  Method Contract (methods/contracts/representation.audio_conversational_view.
+  contract.yaml, `outputs: [AudioConversationalViewRecord]`). F24
+  representation family (Atlas L970: "speech->structured objects->readback/
+  confirm"). A specialization of the generic View shape
+  `specs/cognitive/representation.schema.yaml#/representation`
+  (category=audio) -- reuses that file's `view_state` definition for `state`
+  rather than redefining it.
+
+  Real invariant (RUNTIME, same disclosed-gap class as every sibling
+  typed-object schema in this directory): a `structured_objects[]` entry
+  with `status: CONFIRMED` must carry a non-empty `readback_transcript` AND
+  `confirmed_by_user: true`. `ai_lego/modules/representation/
+  audio_conversational_view.py` enforces this at both construction time and
+  an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Audio / Conversational View row (L970)"
+  - "methods/contracts/representation.audio_conversational_view.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/representation.schema.yaml (view_state definition, reused via $ref)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L970's own
+  pipeline plus low-risk, disclosed compilation choices (the ACVIEW- prefix,
+  the DRAFT/CONFIRMED status enum, mirroring jurisdiction.conflict_of_law_
+  review's human-confirmation-before-finalization convention).
+
+compilation_decisions:
+  - question: "Should DRAFT structured_objects[] also require readback_transcript/confirmed_by_user?"
+    decision: "No -- only CONFIRMED status triggers the requirement. A DRAFT object is explicitly not-yet-finalized; requiring readback before a user has even reviewed it would contradict the pipeline's own order (speech -> structured object -> readback/confirm)."
+  - question: "Reuse representation.schema.yaml#/definitions/view_state for `state`, or define a new shape here?"
+    decision: "Reuse via $ref -- same reasoning as causal-view-record.schema.yaml's identical decision."
+
+type: object
+additionalProperties: false
+required: [id, version, knowledge_ref, structured_objects, state, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ACVIEW-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.audio_conversational_view"
+
+  knowledge_ref:
+    type: string
+    minLength: 1
+    description: "Points at the underlying Knowledge Object this voice interface operates -- same untyped-reference convention as causal-view-record.schema.yaml's knowledge_ref."
+
+  structured_objects:
+    type: array
+    description: >
+      RUNTIME invariant: any entry with status=CONFIRMED must carry a
+      non-empty readback_transcript AND confirmed_by_user=true (see module
+      description). DRAFT entries carry no such requirement.
+    items:
+      type: object
+      additionalProperties: false
+      required: [object_id, status, transcript, readback_transcript, confirmed_by_user]
+      properties:
+        object_id: {type: string, minLength: 1}
+        status: {type: string, enum: [DRAFT, CONFIRMED]}
+        transcript: {type: string, minLength: 1, description: "The raw speech-to-text recognition result -- Atlas L970's own 'speech' pipeline stage."}
+        readback_transcript:
+          type: [string, "null"]
+          description: "What the system read back to the user for confirmation -- Atlas L970's own 'readback' pipeline stage. Null only legal while status=DRAFT."
+        confirmed_by_user:
+          type: boolean
+          default: false
+          description: "Atlas L970's own 'confirm' pipeline stage, made an explicit boolean rather than inferred from status alone."
+
+  state:
+    $ref: "ai-lego://specs/cognitive/representation.schema.yaml#/definitions/view_state"
+
+  provenance:
+    description: "Record-level provenance -- one coherent View, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "One CONFIRMED object (with readback+confirm evidence) and one DRAFT object still awaiting confirmation"
+    value:
+      id: "ACVIEW-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.audio_conversational_view"
+      knowledge_ref: "KNOW-2026-09-12-001"
+      structured_objects:
+        - object_id: "SO-1"
+          status: CONFIRMED
+          transcript: "把截止日改成下週五"
+          readback_transcript: "你是說把截止日改成下週五，對嗎？"
+          confirmed_by_user: true
+        - object_id: "SO-2"
+          status: DRAFT
+          transcript: "新增一個負責人叫做小陳"
+          readback_transcript: null
+          confirmed_by_user: false
+      state:
+        visible_fields: ["object_id", "status", "transcript"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-AUDIOCONVERSATIONALVIEWRECORD-1: no field records WHY a DRAFT object was never confirmed (rejected vs abandoned) -- should a future revision add a rejection_reason?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table, Audio / Conversational View row (L970) and the
+    Representation Contract (§9 L1040-1053) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "audio view"/"conversational view"/"readback"/"ACVIEW-" before writing --
+    zero pre-existing overlap. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_audio_conversational_view.py.
+  note: >
+    No mother document was modified. The structured_objects[] shape and its
+    readback/confirm-before-CONFIRMED requirement are this file's own
+    compiled structure, disclosed above; `state` is reused verbatim (via
+    $ref) from representation.schema.yaml's own already-compiled view_state.

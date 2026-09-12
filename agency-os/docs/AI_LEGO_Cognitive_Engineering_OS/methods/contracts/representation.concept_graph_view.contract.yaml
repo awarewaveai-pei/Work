@@ -1,0 +1,105 @@
+$id: "ai-lego://methods/contracts/representation.concept_graph_view.contract.yaml"
+title: "Concept Graph View Method Contract"
+status: ACTIVE
+
+description: >
+  F24 representation/cognitive-preference/collaboration family, table-row-only
+  citation (Atlas L967: "Concept Graph View | typed nodes/edges | render
+  relations/provenance | 可視化知識與矛盾"). Renders a Knowledge Object's typed
+  relations as a graph. Core invariant, PLUS Atlas §9's Representation
+  Contract (L1053, "View 只保存 layout/filters/visible_fields/presentation_
+  preferences，不得複製 Knowledge 本體"): every rendered edge's relation_type
+  and provenance_ref must exactly match its referenced source relation --
+  fabricating or altering a relation type through the rendering layer is
+  refused. The view stores only edge presentation state + reference ids,
+  never the relation's own substantive content.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 呈現／認知偏好／協作 table, Concept Graph View row (L967)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L967 gives a real pipeline and effect
+  ("可視化知識與矛盾") -- direct transcription plus low-risk, disclosed
+  compilation choices.
+
+id: representation.concept_graph_view
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [ASSOCIATE, COMPARE, EXPLAIN]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F24
+# members). ASSOCIATE renders the typed node/edge relations, COMPARE checks
+# each rendered edge against its source relation, EXPLAIN surfaces
+# provenance alongside each relation for the "可視化...矛盾" (visualize
+# contradictions) effect. All three CANONICAL_KERNEL members.
+
+purpose:
+  - render_a_knowledge_objects_typed_relations_as_a_faithful_non_duplicating_graph
+# Atlas L967 verbatim sense: render typed nodes/edges with provenance, to
+# visualize knowledge and contradictions -- without inventing a relation the
+# source data does not actually have.
+
+inputs:
+  required:
+    - KnowledgeObjectRef
+    - RelationSet
+  # NEW DESIGN. Atlas gives no named input typed-object for this method; the
+  # starting point is a reference to the Knowledge Object being rendered plus
+  # its declared relations (the "source of truth" a rendered edge must stay
+  # faithful to), same honesty-gap class every sibling F-family contract
+  # already discloses.
+
+outputs:
+  - ConceptGraphView
+# NEW output type (see typed-objects/concept-graph-view-record.schema.yaml).
+
+preconditions:
+  - "every edge references a real declared relation by id (referential integrity)"
+  - "every edge's relation_type and provenance_ref exactly match the referenced relation's own values (rendering fidelity)"
+  - "the view record carries no field capable of holding a copy of the relation's own substantive content (Atlas L1053)"
+  # NEW, structurally necessary. Atlas's own §9 Representation Contract names
+  # the no-duplication law explicitly; the F24 table's own benefit column
+  # ("可視化知識與矛盾") only holds if the rendering layer cannot silently
+  # fabricate a relation type the source data does not have.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- the View generation act itself, same
+  # placement convention every structurally similar single-record F-family
+  # sibling uses. Distinct from the per-edge provenance_ref, which points at
+  # the SOURCE relation's own provenance, not the View's.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F24's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- rendering a view has no external side effect.
+
+open_questions:
+  - "OQ-CGRAPHVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-CGRAPHVIEW-2: this contract models 'source relations' as a caller-supplied ground-truth list (no live Knowledge Object store exists yet in this corpus) -- once one exists, should the fidelity check query it directly instead of trusting a caller-supplied RelationSet?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973) directly; confirmed line 967 is the exact
+    Concept Graph View row. Read Atlas §9 Representation Contract (L1040-1053)
+    and §15.1 (L3606-3619). Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "concept graph"/"concept-graph"/"CGRAPH-"/"representation\." before
+    writing -- zero pre-existing implementation, contract, or schema title
+    overlap found (only the pre-existing generic specs/cognitive/
+    representation.schema.yaml, a different, broader dimension-H View
+    contract this method's record does not redefine). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The pipeline is transcribed verbatim
+    from Atlas L967. The CGRAPH- id prefix, the closed edge-entry key set,
+    and the rendering-fidelity precondition are this file's own compiled
+    structure, disclosed above, not textually cited.

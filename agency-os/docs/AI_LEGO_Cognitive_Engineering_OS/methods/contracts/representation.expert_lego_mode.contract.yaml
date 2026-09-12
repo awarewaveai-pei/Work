@@ -1,0 +1,105 @@
+$id: "ai-lego://methods/contracts/representation.expert_lego_mode.contract.yaml"
+title: "Expert LEGO Mode Method Contract"
+status: ACTIVE
+
+description: >
+  F24 Representation family (Atlas L972: "Expert LEGO Mode | 專家自由拖拉方法
+  | typed blocks→compatibility→compile | 高控制、可重用"). Dedicated §11.57
+  (L2513-2538) gives a worked chain example (JTBD→Interview→Assumption
+  Mapping→Scenario→Monte Carlo→Red Team→MCDA) and names the compiler's own
+  mandatory checks: Type check, Precondition check, Policy check,
+  Jurisdiction check, Cost estimate, Risk estimate, Required gate injection --
+  closing with the explicit rule "因此是「自由組裝」，不是「自由破壞」" (this
+  is therefore "free assembly," not "free destruction"). Core invariant,
+  directly mirroring F23's jurisdiction.market_admission_control fail-closed
+  pattern: `compile_status` is NEVER a builder parameter -- it is always
+  mechanically derived as COMPILED iff all 7 named checks are present, each
+  exactly once, and PASS; any missing/unknown/duplicate/non-PASS check forces
+  REJECTED. A caller cannot assert COMPILED directly -- there is no such
+  parameter.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Expert LEGO Mode row (L972)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.57 (L2513-2538) -- the 7 mandatory compiler checks and the 'free assembly, not free destruction' rule"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §25.4 Mode D -- Expert LEGO Builder (L4428-4442) -- corroborating chain example with the identical 'Compiler 自動檢查 legality' framing"
+  - "ai_lego/modules/jurisdiction/market_admission_control.py -- the exact 'N required stages, mechanically-derived overall status, fail-closed on any missing/unknown stage' convention this method's compile_status reuses"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.57 gives a concrete named 7-check
+  list and an explicit assembly-not-destruction rule -- direct transcription
+  plus disclosed compilation choices (the mechanically-derived compile_status,
+  matching this corpus's own just-landed market_admission_control precedent).
+
+id: representation.expert_lego_mode
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F24
+# members). VALIDATE is Atlas's own "Compiler 自動檢查 legality" (all 7
+# named checks); DECIDE is the mechanical compile/reject verdict derived
+# from them. Both CANONICAL_KERNEL members.
+
+purpose:
+  - compile_an_expert_assembled_method_chain_into_a_verifiably_legal_or_rejected_execution_plan
+
+inputs:
+  required:
+    - MethodChainDraft
+  # NEW DESIGN. Atlas §11.57 names the worked chain (JTBD->Interview->...)
+  # but gives no typed-object name for the draft a user drags together;
+  # same honesty-gap class every sibling F24 contract already discloses for
+  # its own missing named input type. Modeled as the record's own `chain[]`
+  # field.
+
+outputs:
+  - ExpertLegoChain
+# NEW output type (see typed-objects/expert-lego-chain.schema.yaml).
+
+preconditions:
+  - "chain has at least 2 typed blocks (step_id + method_id), each step_id unique"
+  - "exactly the 7 named checks present, each exactly once (type_check, precondition_check, policy_check, jurisdiction_check, cost_estimate, risk_estimate, required_gate_injection)"
+  - "compile_status is derived, never accepted as a caller-supplied field"
+  - "compile_status == COMPILED iff every check status == PASS, else REJECTED"
+  # NEW, structurally necessary. §11.57's own explicit rule ("因此是「自由組裝」
+  # ，不是「自由破壞」") is defeated by construction if a caller could
+  # directly assert COMPILED while a check is missing, unknown, or FAIL.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same placement convention every structurally
+  # similar single-record F-family sibling uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas §11.57's own worked chain ends at MCDA with no further Method Atlas
+# method named as compile's own successor -- execution of a COMPILED chain
+# is a separate, later concern this contract does not govern.
+
+rollback:
+  side_effect_free: true
+  # Compiling a chain into a compile_status record has no external side
+  # effect -- executing a COMPILED chain is a separate, later invocation.
+
+open_questions:
+  - "OQ-ELEGO-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-ELEGO-2: each check's own PASS/FAIL status is caller-supplied evidence (mirroring market_admission_control's per-stage status), not itself independently re-derived by this method -- only the final compile_status derivation from those 7 statuses is mechanical. A future revision could make individual checks (e.g. type_check against a live MethodCatalog) genuinely self-verifying rather than asserted.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973, confirmed line 972 for this row, no
+    citation drift), §11.57 (L2513-2538), and §25.4 Mode D (L4428-4442)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "expert lego"/"expert_lego"/"ExpertLegoChain" before writing -- zero
+    pre-existing implementation or schema-title overlap found. Validated
+    against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 7-check list and the assembly-not-
+    destruction rule are transcribed from Atlas §11.57. The mechanically-
+    derived compile_status field (never a builder parameter) directly reuses
+    jurisdiction.market_admission_control's own just-landed
+    admission_decision convention, disclosed above, not independently
+    re-derived from Atlas text.

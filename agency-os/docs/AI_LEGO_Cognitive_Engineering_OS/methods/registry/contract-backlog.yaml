@@ -5876,6 +5876,269 @@ tier_1:
       across 207 corpus-wide prefixes. Verdict PASS. See WORKLOG
       2026-09-12 F23 entry.
 
+  twohundredtwentyseventh_concrete_entry:
+    # F24 Representation/Cognitive Preference/Collaboration family opening
+    # batch, 2026-09-12. 4 agents (3+3+2+2 methods); 0 of 10 existed before
+    # this batch. LAST family in the F15/F22/F23/F24 backfill push started
+    # today.
+    method_id: "representation.switching"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L963, effect "零重工＋適配不同腦袋") PLUS
+      dedicated section 11.55 (L2468-2489), which names 8 views and the
+      explicit benefits "Provenance 保持一致" / "不會因 UI 變化複製出多份
+      互相衝突內容". Real invariant: every views[] entry must share the
+      same knowledge_object_id AND the same provenance -- a mismatch on
+      either is refused at construction and an independent
+      cross_view_consistency gate.
+    source: "methods/contracts/representation.switching.contract.yaml + specs/cognitive/typed-objects/representation-switch-event.schema.yaml + ai_lego/modules/representation/switching.py"
+    note: >
+      40 tests pass, 8 subtests. F24 representation family opened this
+      batch by 4 concurrent sibling agents (10 members total). CLI PASS:
+      3-way switch (Text/Table/Mind Map) with consistent
+      knowledge_object_id + provenance + REPSWITCH_KNOWLEDGE_OBJECT_
+      MISMATCH construction-time refusal + independent
+      cross_view_consistency gate hand-tamper catch. Reuses specs/
+      cognitive/representation.schema.yaml's own representation_category
+      enum via hard $ref, not a duplicate.
+
+  twohundredtwentyeighth_concrete_entry:
+    method_id: "representation.text_outline_view"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L964: "summary->outline->details->evidence
+      links", effect "適合深度閱讀"). Shares F24's structural
+      Representation Contract law (Atlas section 9 L1040-1053): a View
+      stores ONLY presentation state plus a source reference, never a
+      copy of Knowledge content. Real invariant: every evidence_links[]/
+      details_ref entry is reference-shaped (no whitespace); every
+      summary (top-level + recursive outline nodes) is length-bounded
+      (<=240 chars) -- the structural proxy for "genuine summary, not a
+      copy" (a stored details blob was deliberately rejected, since
+      storing one would itself violate the shared law).
+    source: "methods/contracts/representation.text_outline_view.contract.yaml + specs/cognitive/typed-objects/text-outline-view-record.schema.yaml + ai_lego/modules/representation/text_outline_view.py"
+    note: >
+      41 tests pass. CLI PASS: 1 top-level node + 1 nested child +
+      TXTVIEW_INVALID_OUTLINE_NODE construction-time refusal of an
+      inline-evidence-text smuggling attempt + independent
+      summary_length gate hand-tamper catch.
+
+  twohundredtwentyninth_concrete_entry:
+    method_id: "representation.table_matrix_view"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L965: "entities x criteria->filter/sort/
+      score", effect "高效率比較"). Real invariant: entities[]/criteria[]
+      are reference-only id lists (never content); every scores[] entry
+      MUST carry computed: true (schema const:true + independent gate)
+      -- structurally forbids ever treating a view-level computed score
+      as canonical asserted data.
+    source: "methods/contracts/representation.table_matrix_view.contract.yaml + specs/cognitive/typed-objects/table-matrix-view-record.schema.yaml + ai_lego/modules/representation/table_matrix_view.py"
+    note: >
+      43 tests pass. CLI PASS: 2 entities x 2 criteria + 1 filter + 1
+      sort spec + 1 computed score + TBLVIEW_SCORE_NOT_MARKED_COMPUTED
+      construction-time refusal + independent reference_integrity gate
+      hand-tamper catch.
+
+  twohundredthirtieth_concrete_entry:
+    method_id: "representation.mind_map_view"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L966: "render idea/topic hierarchy", effect
+      "降工作記憶負荷"). Disambiguated from the pre-existing association.
+      mind_map (F04, MINDMAP- prefix) -- that method GENERATES new
+      central_topic/branches/keywords content; this method RENDERS an
+      arbitrary Knowledge Object's own existing nodes at radial (x,y)
+      positions, structurally incapable of holding label/keyword
+      content. Record prefix MMVIEW-. Real invariant: node_id/
+      center_node_id are reference-shaped and referentially sound; x/y/
+      distance_from_center are finite real numbers.
+    source: "methods/contracts/representation.mind_map_view.contract.yaml + specs/cognitive/typed-objects/mind-map-view-record.schema.yaml + ai_lego/modules/representation/mind_map_view.py"
+    note: >
+      50 tests pass, including a test that feeds a genuine MINDMAP-
+      shaped record into the MMVIEW- schema validator and confirms it
+      fails (structural type-incompatibility proof). CLI PASS: 3
+      rendered nodes + radial layout + MMVIEW_DANGLING_CENTER_REF
+      construction-time refusal + independent reference_integrity gate
+      hand-tamper catch.
+
+  twohundredthirtyfirst_concrete_entry:
+    method_id: "representation.concept_graph_view"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L967, sole citation: "typed nodes/edges ->
+      render relations/provenance", effect "可視化知識與矛盾"), PLUS
+      section 9 Representation Contract (L1040-1053, shared F24
+      no-duplication law). Real invariant: every edge's relation_type
+      AND provenance_ref must exactly match its referenced
+      source_relations[] entry -- a fabricated relation type is
+      refused, never silently rendered.
+    source: "methods/contracts/representation.concept_graph_view.contract.yaml + specs/cognitive/typed-objects/concept-graph-view-record.schema.yaml + ai_lego/modules/representation/concept_graph_view.py"
+    note: >
+      42 tests pass, 8 subtests. CLI PASS: 2-edge graph faithful to
+      source relations + CGRAPH_RELATION_TYPE_MISMATCH
+      construction-time refusal of a fabricated relation type +
+      independent rendering_fidelity gate hand-tamper catch.
+
+  twohundredthirtysecond_concrete_entry:
+    method_id: "representation.timeline_view"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L968, sole citation: "events->time->decision/
+      change markers", effect "找時間關係"), PLUS section 9
+      Representation Contract (L1040-1053). Real invariant:
+      ordered_event_refs[]'s event_id sequence must equal the source
+      events sorted by their own event_time, exactly -- a
+      caller-proposed order disagreeing with the real chronology is
+      refused, same "derived, not asserted" discipline jurisdiction.
+      compliance_gap_analysis establishes.
+    source: "methods/contracts/representation.timeline_view.contract.yaml + specs/cognitive/typed-objects/timeline-view-record.schema.yaml + ai_lego/modules/representation/timeline_view.py"
+    note: >
+      44 tests pass, 8 subtests. CLI PASS: 3-event timeline genuinely
+      sorted by event_time + TLVIEW_ORDER_MISMATCH construction-time
+      refusal of a mis-ordered sequence + independent
+      chronological_order gate hand-tamper catch.
+
+  twohundredthirtythird_concrete_entry:
+    method_id: "representation.causal_view"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L969, sole citation: "DAG/CLD＋assumptions",
+      effect "避免一般圖誤當因果"). Real invariant, the strongest in this
+      batch: every rendered_edges[] entry must carry a non-empty
+      assumption -- the builder REFUSES to render a causal edge with no
+      declared assumption. References the pre-existing causal.dag/
+      systems.causal_loop_diagram records by id (CVIEW- prefix, no
+      collision with their CDAG-/CLD- prefixes) but does not duplicate
+      their node/edge bodies.
+    source: "methods/contracts/representation.causal_view.contract.yaml + specs/cognitive/typed-objects/causal-view-record.schema.yaml + ai_lego/modules/representation/causal_view.py"
+    note: >
+      37 tests pass. CLI PASS: 2-edge Causal View built +
+      CVIEW_MISSING_ASSUMPTION construction-time refusal of an
+      unassumed-edge attempt + independent edge_assumption_required
+      gate hand-tamper catch.
+
+  twohundredthirtyfourth_concrete_entry:
+    method_id: "representation.audio_conversational_view"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L970, sole citation: "speech->structured
+      objects->readback/confirm", effect "降輸入門檻"). Real invariant,
+      mirroring F23's jurisdiction.conflict_of_law_review confirmation
+      convention: a structured_objects[] entry can never be status:
+      CONFIRMED without a non-empty readback_transcript AND
+      confirmed_by_user:true -- the builder REFUSES to auto-confirm
+      voice-derived content with no human verification evidence.
+    source: "methods/contracts/representation.audio_conversational_view.contract.yaml + specs/cognitive/typed-objects/audio-conversational-view-record.schema.yaml + ai_lego/modules/representation/audio_conversational_view.py"
+    note: >
+      36 tests pass. CLI PASS: 1 CONFIRMED (w/ readback+confirm) + 1
+      DRAFT object built + ACVIEW_MISSING_READBACK_CONFIRM
+      construction-time refusal + independent
+      readback_confirm_required gate hand-tamper catch.
+
+  twohundredthirtyfifth_concrete_entry:
+    method_id: "representation.guided_mode"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L971, effect "降工具選擇焦慮") PLUS dedicated
+      section 11.56 (L2493-2510), which gives the worked Fishbone
+      example and the rule "Method complexity 留在 engine，不丟給使用
+      者". Real invariant: selected_method_id must be traceable to >=1
+      real question->answer pair AND resolve as an ACTIVE contract in
+      the corpus's own live MethodCatalog -- a session naming a
+      nonexistent method or asserting a selection with no question
+      asked is refused at construction and an independent
+      method_registered gate (proven to fail closed against an emptied
+      catalog).
+    source: "methods/contracts/representation.guided_mode.contract.yaml + specs/cognitive/typed-objects/guided-mode-session.schema.yaml + ai_lego/modules/representation/guided_mode.py"
+    note: >
+      38 tests pass, 8 subtests. CLI PASS: Atlas section 11.56's own
+      worked Fishbone example (1 question -> root_cause.fishbone) +
+      GUIDED_EMPTY_QA_TRAIL refusal + GUIDED_METHOD_NOT_REGISTERED
+      refusal + independent method_registered gate hand-tamper catch.
+
+  twohundredthirtysixth_concrete_entry:
+    # Last of this 4-agent F24 opening batch -- F24 is 10/10 COMPLETE
+    # after this entry (independently confirmed via `ls
+    # ai_lego/modules/representation/*.py`: 10 method modules present,
+    # and a full-family pytest run: 415 passed, 80 subtests, 0
+    # failures). THIS ALSO CLOSES THE ENTIRE F15+F22+F23+F24 METHOD
+    # ATLAS TIER-1 BACKFILL PUSH started 2026-09-12: F15 (11/11), F22
+    # (10/10), F23 (10/10), F24 (10/10) -- 41 methods total in one day.
+    method_id: "representation.expert_lego_mode"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F24 table row (Atlas L972, effect "高控制、可重用") PLUS dedicated
+      section 11.57 (L2513-2538), which names the compiler's 7
+      mandatory checks and the rule "因此是「自由組裝」，不是「自由破
+      壞」". Real invariant, directly mirroring jurisdiction.
+      market_admission_control's own fail-closed pattern: compile_status
+      is MECHANICALLY DERIVED -- the builder accepts no such parameter
+      at all -- COMPILED iff all 7 named checks are present, each
+      exactly once, and PASS, else REJECTED.
+    source: "methods/contracts/representation.expert_lego_mode.contract.yaml + specs/cognitive/typed-objects/expert-lego-chain.schema.yaml + ai_lego/modules/representation/expert_lego_mode.py"
+    note: >
+      44 tests pass, 8 subtests. CLI PASS: 3-step chain, 7/7 checks
+      PASS -> COMPILED + ELEGO_MISSING_CHECK construction-time refusal
+      (6 checks) + 1-FAIL-among-7 correctly deriving REJECTED (never
+      COMPILED) + independent compile_status_consistency gate catching
+      a hand-asserted COMPILED-despite-FAIL record. **F24
+      Representation/Cognitive Preference/Collaboration family: 10 of
+      10 COMPLETE as of this entry** (switching/text_outline_view/
+      table_matrix_view/mind_map_view/concept_graph_view/timeline_view/
+      causal_view/audio_conversational_view/guided_mode/
+      expert_lego_mode landed via 4 concurrent sibling agents in this
+      same batch: 3+3+2+2 methods each). Batch totals: 415 tests, 80
+      subtests, 0 failures, full-family cross-check confirms zero
+      collisions across the 4 agents sharing one `ai_lego/modules/
+      representation/` package. Every method carries an explicit
+      provenance-aliasing regression test verified non-vacuous via
+      fault-injection (monkeypatched copy.deepcopy to identity,
+      confirmed the regression test goes red). Registry files (this
+      file + method-inventory.yaml) were deliberately NOT touched by
+      any of the 4 building agents, applied here serially by the
+      orchestrating session instead, per the F22/F23 precedent
+      (avoiding the concurrent-write git-index race that lost F10
+      registry data, commit `67780546a`). 1 independent critic pass
+      (Standard tier, hand-tamper-verified via 4 live fault-injection
+      probes -- monkeypatching copy.deepcopy to identity and confirming
+      the regression tests genuinely go red) found 0 Critical / 1 Major
+      / 1 Minor, both fixed. Major (F15 error-code-mislabeling class
+      recurring a 2nd time, in representation.table_matrix_view's
+      scores[] validation): a conflated _score_problem wrapped shape/
+      dangling-reference/computed-flag failures all under
+      TBLVIEW_SCORE_NOT_MARKED_COMPUTED -- confirmed live via the
+      critic's own repro. Fixed by splitting into 3 ordered checks
+      (shape -> TBLVIEW_INVALID_SCORE_ENTRY, reference ->
+      TBLVIEW_DANGLING_REFERENCE, computed flag ->
+      TBLVIEW_SCORE_NOT_MARKED_COMPUTED, matching this module's own
+      filter/sort_spec convention); added the missing symmetric
+      criterion_id-dangling test; suite now 416 tests (up from 415).
+      Minor: causal_view's disambiguation narrative claimed causal.dag
+      uses prefix CDAG-; real prefix is CDA- -- no actual collision,
+      but the claim was wrong; corrected in module/contract/schema
+      (text-only). All other claims (mind_map_view disambiguation,
+      expert_lego_mode/timeline_view derived-not-asserted fields,
+      audio/expert-lego fail-closed patterns, guided_mode's live
+      MethodCatalog integration, switching's cross-view consistency,
+      causal_view's edge-assumption requirement, zero prefix/method-id
+      collisions across 222+ modules) independently confirmed true via
+      live execution. Verdict PASS (post-fix). See WORKLOG 2026-09-12
+      F24 entry. **This entry closes the entire F15/F22/F23/F24 Method
+      Atlas Tier-1 backfill push started earlier today: 41 methods
+      (11+10+10+10), 4 families, 0 remaining unbuilt Tier-1 families in
+      the current backlog scope.**
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

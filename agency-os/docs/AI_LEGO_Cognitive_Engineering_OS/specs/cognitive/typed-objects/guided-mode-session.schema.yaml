@@ -1,0 +1,120 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/guided-mode-session.schema.yaml"
+title: Guided Mode Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `GuidedModeSession` -- the
+  declared `outputs` of `representation.guided_mode`'s Method Contract
+  (methods/contracts/representation.guided_mode.contract.yaml, `outputs:
+  [GuidedModeSession]`). F24 representation family (Atlas L971, §11.56
+  L2493-2510).
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) ANSWER-TRAIL TRACEABILITY -- `qa_trail[]`
+  must contain at least 1 non-empty question->answer pair; (b) LIVE CATALOG
+  RESOLUTION, THE real invariant this method exists to enforce --
+  `selected_method_id` must resolve as an ACTIVE contract in the corpus's
+  own `MethodCatalog` (ai_lego/platform/ai_execution/method_resolver.py),
+  not merely be a well-formed string. `ai_lego/modules/representation/
+  guided_mode.py` enforces both at construction time (the builder REQUIRES a
+  live `MethodCatalog` argument and refuses to build a session naming an
+  unregistered method) and an independent gate that re-resolves the same
+  field against the catalog again, never trusting the builder's own check
+  already ran.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Guided Mode row (L971)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.56 (L2493-2510)"
+  - "methods/contracts/representation.guided_mode.contract.yaml (outputs, preconditions, quality)"
+  - "ai_lego/platform/ai_execution/method_resolver.py -- MethodCatalog, the live registry selected_method_id resolves against"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §11.56's own
+  worked Fishbone example plus disclosed compilation choices (the GUIDED-
+  prefix, the qa_trail shape, the selected_method_id id-grammar reuse).
+
+compilation_decisions:
+  - question: "Should selected_method_id be a freeform string, or reuse method.schema.yaml's own id grammar?"
+    decision: "Reuse the ADR-005b bare <family>.<name> grammar (pattern \"^[a-z_]+\\\\.[a-z_]+$\") -- selected_method_id names a real method.schema.yaml contract id, so it must be shaped like one before it is even worth resolving against the catalog."
+  - question: "Should qa_trail entries carry a resolved-primitive/candidate-set field per question, or just the raw question/answer text?"
+    decision: "Raw question/answer text only. Atlas §11.56 gives one worked example of the QUESTION text itself (\"你目前是在找「可能原因」，還是已經有數據想驗證原因？\") and the fact that the ANSWER drives selection -- it names no intermediate structured representation of partial candidate sets, and inventing one here would be exactly the kind of unfounded richness this suite's own method.schema.yaml precondition discipline rejects."
+
+type: object
+additionalProperties: false
+required: [id, version, qa_trail, selected_method_id, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^GUIDED-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.guided_mode"
+
+  qa_trail:
+    type: array
+    minItems: 1
+    description: >
+      RUNTIME invariant: at least 1 well-shaped question->answer pair --
+      Atlas §11.56's own "one question at a time" pipeline stage, made
+      structural. A selected_method_id with an empty qa_trail is exactly
+      the black-box selection this method exists to prevent.
+    items:
+      type: object
+      additionalProperties: false
+      required: [question, answer]
+      properties:
+        question: {type: string, minLength: 1}
+        answer: {type: string, minLength: 1}
+
+  selected_method_id:
+    type: string
+    pattern: "^[a-z_]+\\.[a-z_]+$"
+    description: >
+      RUNTIME invariant: must resolve as an ACTIVE contract in the corpus's
+      own MethodCatalog (see module description) -- the grammar check here
+      is necessary but not sufficient; a well-shaped id that names no real
+      contract still fails at construction/gate time.
+    examples:
+      - root_cause.fishbone
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Atlas §11.56's own worked Fishbone example -- one question resolves to root_cause.fishbone."
+    value:
+      id: "GUIDED-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.guided_mode"
+      qa_trail:
+        - {question: "你目前是在找「可能原因」，還是已經有數據想驗證原因？", answer: "在找可能原因"}
+      selected_method_id: "root_cause.fishbone"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-GUIDEDMODESESSION-1: qa_trail carries no explicit mapping from a given answer to the candidate-narrowing logic that produced selected_method_id -- Atlas §11.56 gives one worked example, not a general decision-tree grammar, so this is left as an opaque trail rather than an invented expression AST (same discipline method.schema.yaml's own preconditions field applies).（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L971) and §11.56 (L2493-2510) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "guided mode"/"guided_mode"/"GuidedModeSession" and every schema title
+    before writing -- zero pre-existing implementation or schema-title
+    overlap. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_guided_mode.py.
+  note: >
+    No mother document was modified. The Fishbone worked example is
+    transcribed from Atlas §11.56. The GUIDED- prefix, the qa_trail shape,
+    and the id-grammar reuse for selected_method_id are this file's own
+    compiled structure, disclosed above.

@@ -1518,53 +1518,63 @@ by_document:
       - name: "Representation Switching"
         line: 963
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.switching"
       - name: "Text / Outline View"
         line: 964
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.text_outline_view"
       - name: "Table / Matrix View"
         line: 965
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.table_matrix_view"
       - name: "Mind Map View"
         line: 966
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.mind_map_view"
       - name: "Concept Graph View"
         line: 967
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.concept_graph_view"
       - name: "Timeline View"
         line: 968
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.timeline_view"
       - name: "Causal View"
         line: 969
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.causal_view"
       - name: "Audio / Conversational View"
         line: 970
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.audio_conversational_view"
       - name: "Guided Mode"
         line: 971
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.guided_mode"
       - name: "Expert LEGO Mode"
         line: 972
         category: "F24 representation"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "representation.expert_lego_mode"
       - name: "Monte Carlo Simulation"
         line: 1858
         category: "computation (uncataloged in F01–F24)"

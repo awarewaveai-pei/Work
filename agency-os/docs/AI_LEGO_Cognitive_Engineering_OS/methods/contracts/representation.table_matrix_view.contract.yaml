@@ -1,0 +1,100 @@
+$id: "ai-lego://methods/contracts/representation.table_matrix_view.contract.yaml"
+title: "Table / Matrix View Method Contract"
+status: ACTIVE
+
+description: >
+  F24 Representation family (Atlas L965: "Table / Matrix View | 列欄比較資訊
+  | entities×criteria->filter/sort/score | 高效率比較"). Renders an
+  entities-by-criteria comparison over an arbitrary Knowledge Object. Shares
+  F24's structural law (Atlas §9 Representation Contract L1040-1053): the
+  schema holds ONLY REFERENCES to `entities[]`/`criteria[]` plus presentation
+  state (`filters[]`/`sort_spec`/`score_config`) -- never the entities' or
+  criteria's own content/values. Core additional invariant: any `scores[]`
+  entry must be explicitly declared a VIEW-LEVEL COMPUTED PRESENTATION
+  artifact (`computed: true`), never silently treated as new canonical data.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Table / Matrix View row (L965)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §15.1 mermaid diagram (L3606-3619)"
+  - "specs/cognitive/representation.schema.yaml -- pre-existing abstract View/state contract this method's concrete record specializes"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L965 + the shared Representation Contract
+  give the real pipeline and the no-duplication law; the score-as-computed-
+  presentation-artifact framing is this file's own disclosed compilation
+  choice, same honesty-gap class every sibling F-family contract discloses.
+
+id: representation.table_matrix_view
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [DECOMPOSE, COMPARE]
+# INFERRED, not cited. DECOMPOSE breaks the Knowledge Object into an
+# entities x criteria grid; COMPARE is the table's own stated purpose
+# ("列欄比較資訊"). No TRANSFORM: a View never reshapes underlying Knowledge.
+
+purpose:
+  - render_an_entities_by_criteria_comparison_grid_with_reference_only_cells_and_view_level_computed_scores
+
+inputs:
+  required:
+    - KnowledgeObjectRef
+  # NEW DESIGN, same honesty-gap class every sibling F24 method in this
+  # batch discloses for its own missing named input type.
+
+outputs:
+  - TableMatrixViewRecord
+# NEW output type (see typed-objects/table-matrix-view-record.schema.yaml).
+
+preconditions:
+  - "source_knowledge_object_id is present and reference-shaped (no whitespace)"
+  - "entities[] and criteria[] are non-empty lists of unique, reference-shaped ids -- never entity/criterion content"
+  - "every filters[]/sort_spec/scores[] reference resolves to a declared entities[]/criteria[] id"
+  - "every scores[] entry carries computed: true -- a score is always a view-level computed presentation artifact, never asserted canonical data"
+  # NEW, structurally necessary -- the shared Representation Contract's own
+  # "不得複製 Knowledge 本體" (L1053) is otherwise unenforceable at runtime.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent view record.
+
+forbidden_transition:
+  - "TableMatrixViewRecord -> CanonicalScoreFact"
+# A view-level computed score must never be silently promoted into a
+# canonical fact object without an explicit, separate promotion step
+# (no such typed object exists yet; named as a forbidden hop per Atlas
+# §9's own forbidden_transition convention, L1019-1020).
+
+recommended_next: []
+# Atlas's F24 table names no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # A View re-render has no external side effect.
+
+open_questions:
+  - "OQ-TBLVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-TBLVIEW-2: no typed KnowledgeObjectRef schema exists yet corpus-wide -- this method treats it as a bare reference-shaped string, same gap every sibling F24 method in this batch shares.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973, confirmed line 965 for this row, no
+    citation drift), §9 Representation Contract (L1040-1053), §15.1 mermaid
+    (L3606-3619) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "table.?matrix.?view", "TBLVIEW" before writing -- zero pre-existing
+    implementation or contract-id overlap found;
+    `specs/cognitive/representation.schema.yaml` (abstract View contract,
+    pre-existing) and `method-inventory.yaml` L1528-1532 ("Table / Matrix
+    View", has_contract: false) are the only related hits, both read in
+    full and cited above, neither a collision. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The pipeline (entities x criteria ->
+    filter/sort/score) is transcribed verbatim from Atlas L965. The
+    reference-shape grammar and the computed:true score-labeling invariant
+    are this file's own compiled structure, disclosed above and in the
+    schema's compilation_decisions, not textually cited.

@@ -1,0 +1,146 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/mind-map-view-record.schema.yaml"
+title: Mind Map View Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MindMapViewRecord` -- the
+  declared `outputs` of `representation.mind_map_view`'s Method Contract
+  (methods/contracts/representation.mind_map_view.contract.yaml, `outputs:
+  [MindMapViewRecord]`). F24 Representation family (Atlas L966: "render
+  idea/topic hierarchy").
+
+  **STRUCTURAL DISAMBIGUATION from `mind-map-record.schema.yaml`**
+  (`association.mind_map`'s own `MINDMAP-` records): that schema requires
+  `central_topic`/`main_branches[].label`/`keywords[]` -- typed CONTENT a
+  method GENERATES. THIS schema has NONE of those fields; it requires only
+  `node_positions[].node_id` (a bare REFERENCE) plus numeric `x`/`y`
+  coordinates. The two schemas are TYPE-INCOMPATIBLE by construction: a
+  `MINDMAP-` record fails this schema's `id` pattern (`^MMVIEW-`) and is
+  missing every field this schema requires; an `MMVIEW-` record fails
+  `mind-map-record.schema.yaml`'s `id` pattern and is missing
+  `central_topic`/`main_branches`. No shared instance could ever validate
+  against both.
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own
+  precedent): (a) NO CONTENT DUPLICATION -- every `node_positions[].
+  node_id` and `layout.center_node_id` is a bare id REFERENCE, reference-
+  shaped (no whitespace), never the rendered node's own label/content;
+  (b) referential integrity -- `layout.center_node_id`, when present, must
+  resolve to a declared `node_positions[]` entry; (c) uniqueness -- no
+  `node_id` is rendered twice; (d) every `x`/`y` (and `distance_from_
+  center`, when present) is a finite real number. `ai_lego/modules/
+  representation/mind_map_view.py` enforces all of this at both
+  construction time and two independent gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Mind Map View row (L966)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "methods/contracts/representation.mind_map_view.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/mind-map-record.schema.yaml -- the pre-existing, structurally DIFFERENT F04 schema this file disambiguates against"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L966's own
+  rendering framing plus low-risk, disclosed compilation choices (the
+  MMVIEW- prefix -- deliberately distinct from association.mind_map's own
+  MINDMAP- -- the radial node_positions shape, the reference-shape grammar).
+
+compilation_decisions:
+  - question: "Reuse association.mind_map's central_topic/main_branches/keywords shape, since both render a 'mind map'?"
+    decision: "No -- structurally impossible by design. association.mind_map GENERATES new tree content (a brainstorm); this method RENDERS an arbitrary, already-existing Knowledge Object's own nodes. Reusing that shape would violate the shared F24 View law (L1053) by requiring this schema to carry label/keyword content it must never hold."
+  - question: "Record id prefix?"
+    decision: "MMVIEW- -- chosen specifically because MINDMAP- is already taken by association.mind_map's own records (grep-confirmed before writing); reusing it would make the two record families indistinguishable by id alone."
+  - question: "Reference-shape grammar for node_id / center_node_id?"
+    decision: "`^[A-Za-z0-9][A-Za-z0-9_.:/-]*$`, no whitespace -- same grammar `text-outline-view-record.schema.yaml`/`table-matrix-view-record.schema.yaml` use, for the identical reason."
+
+type: object
+additionalProperties: false
+required: [id, version, source_knowledge_object_id, node_positions, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^MMVIEW-"
+    description: "NEW DESIGN, deliberately distinct from association.mind_map's own MINDMAP- prefix (see compilation_decisions)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "representation.mind_map_view"
+
+  source_knowledge_object_id:
+    type: string
+    minLength: 1
+    description: "REFERENCE ONLY into the underlying Knowledge Object this View renders. RUNTIME invariant: reference-shaped."
+
+  node_positions:
+    type: array
+    minItems: 1
+    description: "Radial layout positions over the source Knowledge Object's OWN nodes. RUNTIME invariant: unique, reference-shaped node_id; finite numeric coordinates."
+    items:
+      type: object
+      additionalProperties: false
+      required: [node_id, x, y]
+      properties:
+        node_id: { type: string, minLength: 1, description: "REFERENCE ONLY into the source Knowledge Object's own node -- never that node's label/content." }
+        x: { type: number }
+        y: { type: number }
+        distance_from_center: { type: number, minimum: 0 }
+
+  layout:
+    type: object
+    additionalProperties: false
+    description: "Atlas §9 L1053 presentation-state field, specialized for a radial layout."
+    properties:
+      center_node_id: { type: string, minLength: 1, description: "RUNTIME invariant: must resolve to a declared node_positions[] entry when present." }
+      orientation: { type: string, minLength: 1, maxLength: 32 }
+
+  visible_fields:
+    type: array
+    items: { type: string }
+    description: "Atlas §9 L1053 presentation-state field -- which source fields this View renders."
+  presentation_preferences: { type: object, description: "Atlas §9 L1053 presentation-state field. Left as an open object." }
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "3 rendered nodes radially positioned around a declared center"
+    value:
+      id: "MMVIEW-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "representation.mind_map_view"
+      source_knowledge_object_id: "KO-2026-09-12-003"
+      node_positions:
+        - {node_id: "KNODE-CENTER", x: 0, y: 0, distance_from_center: 0}
+        - {node_id: "KNODE-A", x: 100, y: 0, distance_from_center: 100}
+        - {node_id: "KNODE-B", x: -70.7, y: 70.7, distance_from_center: 100}
+      layout: {center_node_id: "KNODE-CENTER", orientation: "radial"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-MINDMAPVIEW-1: no numeric bound is placed on x/y magnitude -- should a future revision cap layout extent for rendering-engine sanity?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table row (L966) and §9 Representation Contract
+    (L1040-1053) directly. Read `specs/cognitive/typed-objects/mind-map-
+    record.schema.yaml` (association.mind_map's own MINDMAP- schema) IN
+    FULL to confirm structural incompatibility (different required fields,
+    different id pattern, no shared instance possible). Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "mind.?map.?view", "MMVIEW", "node_positions" before writing -- zero
+    pre-existing implementation or schema title overlap found (beyond the
+    already-disambiguated MINDMAP- family). Validated against jsonschema
+    Draft202012Validator via tests/unit/test_mind_map_view.py.
+  note: >
+    No mother document was modified. The rendering framing is transcribed
+    from Atlas L966 plus the shared Representation Contract. The MMVIEW-
+    prefix, node_positions shape, and center_node_id referential-integrity
+    rule are this file's own compiled structure, disclosed above.

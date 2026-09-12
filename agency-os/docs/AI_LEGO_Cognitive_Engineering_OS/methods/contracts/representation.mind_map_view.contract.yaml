@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/representation.mind_map_view.contract.yaml"
+title: "Mind Map View Method Contract"
+status: ACTIVE
+
+description: >
+  F24 Representation family (Atlas L966: "Mind Map View | 樹狀自由聯想呈現 |
+  render idea/topic hierarchy | 降工作記憶負荷"). RENDERS an arbitrary
+  Knowledge Object's own already-existing nodes at radial `(x, y)`
+  positions -- shares F24's structural law (Atlas §9 Representation
+  Contract L1040-1053): the schema holds ONLY `layout`/`node_positions`
+  (a `node_positions` variant)/`visible_fields`/`presentation_preferences`
+  plus a source reference, never Knowledge content.
+  **CRITICAL DISAMBIGUATION**: the pre-existing `association.mind_map`
+  (F04, `MINDMAP-` prefix, Atlas §11.1 L1124-1172) GENERATES a NEW
+  central_topic/branches/keywords brainstorm tree -- typed CONTENT. This
+  method is structurally incapable of generating content: it has no
+  label/keyword/topic field anywhere, only `node_id` REFERENCES into a
+  Knowledge Object's own nodes plus numeric layout coordinates. Record
+  prefix `MMVIEW-`, distinct from `MINDMAP-`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F24 table, Mind Map View row (L966)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §9 Representation Contract (L1040-1053)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §15.1 mermaid diagram (L3606-3619)"
+  - "methods/contracts/association.mind_map.contract.yaml -- the pre-existing, structurally DIFFERENT F04 method this contract disambiguates against (already anticipated this exact ambiguity in its own verification.method field)"
+  - "specs/cognitive/representation.schema.yaml -- pre-existing abstract View/state contract this method's concrete record specializes"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L966 + the shared Representation
+  Contract give the real rendering law; the radial node_positions shape and
+  the MMVIEW- prefix (chosen specifically to avoid collision with
+  association.mind_map's own MINDMAP- prefix) are this file's own disclosed
+  compilation choices.
+
+id: representation.mind_map_view
+version: "1.0.0"
+family: representation
+
+cognitive_primitives: [GROUP]
+# INFERRED, not cited. A pure RENDERING of an already-structured Knowledge
+# Object at radial positions -- GROUP (spatial clustering around a center)
+# is the only primitive that applies; unlike association.mind_map, no
+# EXPAND/ASSOCIATE is present because this method generates no new content,
+# only a layout over existing nodes.
+
+purpose:
+  - render_an_arbitrary_knowledge_objects_own_nodes_at_radial_layout_positions_without_generating_new_content
+
+inputs:
+  required:
+    - KnowledgeObjectRef
+  # NEW DESIGN, same honesty-gap class every sibling F24 method in this
+  # batch discloses for its own missing named input type. Deliberately NOT
+  # association.mind_map's own MindMapRecord -- this method renders ANY
+  # Knowledge Object's nodes, not specifically a MindMapRecord's branches.
+
+outputs:
+  - MindMapViewRecord
+# NEW output type (see typed-objects/mind-map-view-record.schema.yaml).
+# Structurally type-incompatible with association.mind_map's own
+# MindMapRecord (different required fields, different id prefix) -- not
+# merely a different name for the same shape.
+
+preconditions:
+  - "source_knowledge_object_id is present and reference-shaped (no whitespace)"
+  - "node_positions is a non-empty list of unique, reference-shaped node_id entries, each with finite numeric x/y coordinates"
+  - "if layout.center_node_id is present, it MUST resolve to a declared node_positions[] entry"
+  - "no field anywhere expresses a label, keyword, topic, or any other content string belonging to a rendered node -- enforced structurally by the schema's own closed key set, not a runtime denylist"
+  # NEW, structurally necessary -- the shared Representation Contract's own
+  # "不得複製 Knowledge 本體" (L1053) is otherwise unenforceable at runtime.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent view record.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas's F24 table names no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # A View re-render has no external side effect.
+
+open_questions:
+  - "OQ-MMVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-MMVIEW-2: no typed KnowledgeObjectRef schema exists yet corpus-wide -- this method treats it as a bare reference-shaped string, same gap every sibling F24 method in this batch shares.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F24 table (L959-973, confirmed line 966 for this row, no
+    citation drift), §9 Representation Contract (L1040-1053), §15.1 mermaid
+    (L3606-3619) directly. Read
+    `methods/contracts/association.mind_map.contract.yaml` and
+    `ai_lego/modules/association/mind_map.py` IN FULL -- confirmed that file
+    already explicitly ruled OUT this exact F24 row as unrelated to its own
+    scope (quote from its own verification.method: "Ruled OUT as unrelated:
+    'Mind Map View' (F24 Representation table L966...) -- a RENDERING VIEW
+    of an arbitrary Knowledge Object..., not this method's own typed-object
+    shape"). Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "mind.?map.?view", "MMVIEW", "node_positions" before writing -- zero
+    pre-existing implementation or contract-id overlap found (the only
+    "mind_map"-adjacent hits are `association.mind_map`'s own `MINDMAP-`
+    files, already disambiguated above, and `method-inventory.yaml`
+    L1533-1537, "Mind Map View", has_contract: false). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The radial-layout rendering framing is
+    transcribed from Atlas L966's own "render idea/topic hierarchy" pipeline
+    plus the shared Representation Contract. The MMVIEW- prefix (chosen to
+    avoid MINDMAP- collision), the node_positions shape, and the
+    center_node_id referential-integrity rule are this file's own compiled
+    structure, disclosed above and in the schema's compilation_decisions.
