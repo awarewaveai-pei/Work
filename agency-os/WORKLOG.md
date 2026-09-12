@@ -151,7 +151,7 @@ REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`(第二次，補完 `
 REALTEST_EVIDENCE: tool=SSH | cmd=`curl -X POST http://127.0.0.1:3002/api/internal/collect/run-due-schedules`(無 auth／錯 token／對 token 三種)| exit=0 | result=401／401／`200 {"ok":true,"checked":0,"due":0,"results":[]}`
 REALTEST_EVIDENCE: tool=SSH | cmd=`curl` 對 `collection-schedule` 與既有 `collection-sources` 兩個端點用同樣假 header | exit=0 | result=兩者皆 401 `{"error":"unauthorized"}`，行為一致，證明是既有認證層而非新端點的錯
 
-**進行中**：Trigger.dev workflows 部署交給 `trigger-deploy-agent`（AGENTS.md 規定 `.trigger` 路徑要用專責 agent，PAT 用 `tr_pat_*` 不是 `tr_prod_*`）——這是本次唯一開的 subagent，符合「不准無效益派多個 agents」，因為這是它唯一被設計要做的事。完成後另開一筆 WORKLOG。
+**已完成**：Trigger.dev 部署完成，見 WORKLOG `2026-09-12`「collect-scheduled-crawl Trigger.dev EU 部署」條目（commit `376fcbf3a`）——過程中發現 `trigger.config.ts` 從沒同步過 `COLLECT_SCHEDULE_INGEST_TOKEN`（任務程式碼會讀，但沒人推送這個變數到 Trigger.dev），已一併修好；順帶修掉 ks-aw-01 2026-09-11 `/root` 權限強化造成的三個部署腳本 regression。三塊(SSRF/304/排程)全數 code-complete + 部署 + 真實驗證，此輪蒐集器改善結束。
 
 ## 2026-09-12 第十一批(蒐集器改善 3/3：排程自動化——scope 決策：架構做完整，UI 面板故意留白)
 
