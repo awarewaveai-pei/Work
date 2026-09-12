@@ -136,7 +136,7 @@ ssh -L 9001:127.0.0.1:9001 -L 9002:127.0.0.1:9002 <vps-host>
 
 ```bash
 # Prod 健康檢查
-curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/health  # 2026-08-29 訂正：路徑+Host，見 DEPLOY_ROLLBACK_RUNBOOK.md
+curl -sf http://127.0.0.1:3001/health  # 2026-09-12 再訂正：直打 container 埠，不走外層 nginx，見 DEPLOY_ROLLBACK_RUNBOOK.md
 docker ps --filter name=lobster-node-api --filter name=lobster-next-admin \
   --format "table {{.Names}}\t{{.Status}}" | grep -v staging
 ```
@@ -234,7 +234,7 @@ cd /root/lobster-phase1
 ./scripts/rollback-phase1.sh save node-api
 # ... 部署新版 ...
 ./scripts/rollback-phase1.sh restore node-api
-curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/health  # 2026-08-29 訂正：路徑+Host，見 DEPLOY_ROLLBACK_RUNBOOK.md
+curl -sf http://127.0.0.1:3001/health  # 2026-09-12 再訂正：直打 container 埠，不走外層 nginx，見 DEPLOY_ROLLBACK_RUNBOOK.md
 ```
 
 Rollback 僅影響 `:local` tag；`:staging` tag 不受影響。

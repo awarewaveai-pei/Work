@@ -1,5 +1,56 @@
 # Worklog
 
+## 2026-09-12（續13）部署續12的修復時被無關的 smoke check 假陽性自動 rollback 掉 —— sg-deploy.sh node-api 探針打錯 nginx 層，兩輪 critic 修正
+
+[任務] 承接續12。部署那個修復時，`sg-deploy.sh` 的 smoke check 自動把剛部署的正確版本 rollback 掉。
+
+[根因，跟續12的修復本身完全無關]：`sg-deploy.sh` 的 `node-api health` 探針原本是
+`curl -H "Host: api.aware-wave.com" http://127.0.0.1/health`，port 80 打到的是**外層
+host-nginx**（Certbot 管理，跟 docker 內的 lobster-nginx 是兩層不同東西）。今天稍早
+cognitive-os 部署觸發 Certbot 幫 `cognitive.aware-wave.com` 申請憑證，副作用是外層 nginx
+也開始強制 `api.aware-wave.com` 轉 https——這正是同一天稍早 `safe-infra-patch.sh` 那個
+nginx smoke check(commit `5a1ec19e1`)踩到的同一種「打錯層」bug，只是這次換一個腳本、
+換一個網域中招。SSH 直接查證：`curl -I http://127.0.0.1/health`(帶 Host)回 301，同時
+`docker port lobster-node-api 3001/tcp` → `127.0.0.1:3001`，直打這個埠回 200——證實
+next-admin 本身部署完全健康，是探針打錯地方，不是程式碼問題。
+
+[第一輪修復 + critic 抓到的問題，非我沒做 review 就是有真漏洞]：改成直打
+`http://127.0.0.1:3001/health`(繞開整層 nginx)。第二輪 critic(獨立一次覆審)抓到：
+①「node-api 的 port 固定」這個理由本身是錯的——`docker-compose.yml:212`
+`${NODE_API_HOST_PORT:-127.0.0.1:3001}:3001`，host 側其實可被 env var 覆寫(且
+`SAME_VPS_STAGING_RUNBOOK.md` 證實 staging 真的在用這個 override)，跟同日
+`safe-infra-patch.sh` 那次 critic 已經點名過的 `NGINX_HOST_PORT` 是同一種脆弱，只是今天
+prod `.env` 剛好沒設 override 所以沒觸發——這叫「目前沒事」不叫「修對了」。
+②繞開整層 nginx 等於把「`api.aware-wave.com` 對外 vhost/TLS 路徑本身有沒有通」這項舊探針
+(壞掉之前)原本有在測的覆蓋範圍整個砍掉，不是修復，是縮小了驗證範圍。
+
+[第二輪修復]
+- node-api 探針改成 `docker port lobster-node-api 3001/tcp` runtime 解析(跟
+  `safe-infra-patch.sh` 同一個模式)，不再硬編數字。
+- 額外加回一個探針 `nginx/api`：`https://api.aware-wave.com/health` 搭配
+  `--resolve api.aware-wave.com:443:127.0.0.1`(跟既有 wordpress 探針同款寫法)——直打
+  443 不會被 port 80 那條強制轉址規則影響(SSH 實測 `curl -k --resolve
+  api.aware-wave.com:443:127.0.0.1 https://api.aware-wave.com/health` → 200，這是修復前
+  就已經真的可行的路徑，不是猜的)。
+- next-admin 既有兩個探針(`:3002`)有同一種 host-port 硬編脆弱，**刻意不動**——不是這次
+  事故的觸發點，範圍外，另開 `agency-os/TASKS.md`(E 區)追蹤項。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n sg-deploy.sh`(兩輪修改後皆重跑)| exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl -I -H "Host: api.aware-wave.com" http://127.0.0.1/health` vs `curl http://127.0.0.1:3001/health` vs `curl -k --resolve api.aware-wave.com:443:127.0.0.1 https://api.aware-wave.com/health` | 結果=301／200／200，三個數字都是修復前對真實生產環境量到的，不是假設
+- REVIEW_DONE: critic=Quick ×2(獨立兩輪，第二輪找到第一輪自己漏掉的 2 個 Major，皆已修)| verdict=pass(第二輪)| findings 見上
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`Host: api\.aware-wave\.com.*127\.0\.0\.1/health` | hits=4 檔(`DEPLOY_ROLLBACK_RUNBOOK.md`／`README.md`／`SAME_VPS_STAGING_RUNBOOK.md`×2)全部同步訂正為新形式，`README.md`／`DEPLOY_ROLLBACK_RUNBOOK.md` 各留一行純敘述舊 bug 歷史的文字(非可執行指令，故意保留)
+- WORKLOG_DONE: 本條目
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh`(smoke check 兩個探針)
+- `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`／`lobster-factory/infra/hetzner-phase1-core/{README.md,SAME_VPS_STAGING_RUNBOOK.md}`(同步訂正舊探針指令)
+- `agency-os/TASKS.md`(新增 next-admin 探針同款脆弱的追蹤項)
+
+[剩餘風險] next-admin 兩個探針的 host-port 硬編脆弱維持原樣，見上方 TASKS.md 追蹤項——目前無症狀，prod `.env` 沒設 `NEXT_ADMIN_HOST_PORT`。
+
+[rollback] `git revert` 對應 commit；純改 smoke 探針寫法，不影響部署本身的建置/健康檢查/回滾核心邏輯。
+
 ## 2026-09-12（續12）/ops/collect【試跑】【正式抓取】按了沒反應 —— 根因 Cloudflare ~100s 邊緣逾時 kill 掉同步等待的長爬蟲請求，改成非同步+輪詢
 
 [任務] 操作者回報 app.aware-wave.com/ops/collect 按鈕沒反應。

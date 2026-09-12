@@ -582,6 +582,9 @@
   - `🟠 未開始` · `2026-09-12 開出` · `不卡誰，但會造成重工`
   - **一句話**：施工中途（`lib/kb`/`lib/cs` 的 0083 is_sensitive 修復，見 WORKLOG 2026-09-12 續8）該腳本跑了一次 stash-based 對齊，把 10 個檔案的未提交修改整批打回 HEAD，`git status` 顯示乾淨但內容其實是舊的。VBC 查證：改動沒有真的遺失，`git stash list` 找到同時間戳的 stash（雙親 merge commit，內容正確），逐檔 `git checkout stash@{N} -- <path>` 救回。**不變量**：一支背景自動化腳本不應該在另一個 session 正在編輯檔案時把它的未提交狀態動到看不出來的地方（`git status` 乾淨 ≠ 沒有正在進行的工作被吃掉）。修法方向待定：腳本改成偵測到近期修改（如 `git status` 有未提交檔案的 mtime 在 N 分鐘內）就跳過本輪對齊，或改成真正的 `stash pop`（不留鏡像在 stash 裡也不會安靜蓋掉）而非目前這種「建一個對齊結果 commit 塞進 stash，但工作目錄本身回到 HEAD」的手法。細節見 WORKLOG 2026-09-12（is_sensitive 條目內「事故」段落）。
 
+- [ ] **【2026-09-12 開出｜低優先】`sg-deploy.sh` next-admin 兩個 smoke 探針硬編 host port，同款漂移風險已知但未動**
+  - `🟡 未開始` · `2026-09-12 開出` · `不卡誰，目前 prod .env 未設 override 故未觸發`
+  - **一句話**：修 node-api 健康探針打錯 nginx 層那次（見 WORKLOG 2026-09-12），critic 覆審抓到 `sg-deploy.sh:311-312` 的 `next-admin /login`／`/api/ops/summary` 兩個探針一樣硬編 `127.0.0.1:3002`，而 `docker-compose.yml:437` 該埠其實是 `${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000`——跟當時 node-api 那個已修掉的 bug 同一種脆弱（host port 可被 env var 覆寫，硬編值只是「今天 prod .env 剛好沒設」才沒事）。node-api 已改成 `docker port lobster-node-api 3001/tcp` runtime 解析；next-admin 這兩行維持原樣未動，因為不是本次事故的觸發點，屬於刻意劃定的範圍外項目，非遺漏。修法方向：套同一個 `docker port lobster-next-admin 3000/tcp` 解析。細節見 WORKLOG 2026-09-12。
 - [ ] **【2026-09-11 開出｜HCI30｜低優先】mutation-check-wave1.ps1 的 `drop-all-subject-records-referencing-fks` 疑似 flaky**
   - `🟡 未開始` · `2026-09-11 開出` · `不卡誰`
   - **一句話**：該 mutation 用動態 OID 查找刪 FK（`SELECT conname INTO c ... WHERE ...`，多筆同型 FK 存在時任選一筆），單次真跑出現過兩個無關測試（`EPISTEMIC-PROMOTE-01`／`EPISTEMIC-INHERIT-01` 等）意外失敗，同一份程式碼立刻重跑就消失（127/127 全殺）。未深查根因，僅記錄以免未來誤判為新回歸。細節見 WORKLOG 2026-09-11（規則式評分引擎條目）。
@@ -1658,6 +1661,7 @@
 - [x] `lobster-factory` A9 雲端 artifacts 治理補齊 baseline（生命周期規則/IAM/稽核自動化：policy + validator + audit report）
 
 ## Backlog — 未完成
+- [ ] **Cloudflare MCP 連線失敗（`insufficient scope: account:read`）待操作者在 Cloudflare dashboard 修 token permission** — 根因已診斷完成（`CLOUDFLARE_AUTH_BEARER_TOKEN` 缺 `Account Settings: Read`），修復動作屬修改外部帳號安全設定，非 Claude 可代做。步驟見 WORKLOG 2026-09-12（續13）。同條目另揭露：診斷過程誤將 6 把憑證明文印進 session transcript，建議操作者輪替。
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 - [x] `lobster-factory` Enterprise 必備工具補強路線（已取消）
   - 範圍：Sentry / PostHog / Cloudflare / Secrets / Identity現況：Identity 採 JWT/OIDC（不綁特定供應商）；Secrets 暫採 env/mcp，後續升級 secrets manager
@@ -1702,5 +1706,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-11 14:30:03 UTC_
+_Last synced: 2026-09-12 14:30:03 UTC_
 

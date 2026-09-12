@@ -311,7 +311,30 @@ log "--- HTTP smoke check ---"
 _smoke_check "next-admin /login"           "http://127.0.0.1:3002/login"
 _smoke_check "next-admin /api/ops/summary" "http://127.0.0.1:3002/api/ops/summary"
 _smoke_check "nginx/wordpress"             "https://aware-wave.com/" "" "aware-wave.com"
-_smoke_check "node-api health"             "http://127.0.0.1/health" "api.aware-wave.com"
+# 2026-09-12 fix: this used to go through the outer host-nginx (port 80, Certbot-managed) with a
+# Host header, same wrong-layer bug as safe-infra-patch.sh's nginx smoke check (fixed same day,
+# commit 5a1ec19e1 — see that commit for the full root-cause account). A Certbot cert change for
+# an unrelated domain (cognitive.aware-wave.com) started forcing api.aware-wave.com onto HTTPS at
+# that outer layer too, turning this into a false-positive 301 that auto-rolled-back a healthy
+# next-admin deploy with nothing wrong with next-admin.
+#
+# First fix attempt hardcoded 127.0.0.1:3001 with the reasoning "node-api's PORT env var is fixed
+# in docker-compose.yml" -- critic review (second pass, same day) caught that this conflates the
+# CONTAINER-internal PORT with the HOST-published port, which is actually `${NODE_API_HOST_PORT:-
+# 127.0.0.1:3001}` (docker-compose.yml) -- the exact same override-fragility class the sibling
+# commit's own critic review already flagged for NGINX_HOST_PORT, and one SAME_VPS_STAGING_RUNBOOK.md
+# already documents as a LIVE override (staging maps it to 9001). Resolved at runtime instead, same
+# pattern as safe-infra-patch.sh's `docker port lobster-nginx 80/tcp`.
+node_api_port=$(docker port lobster-node-api 3001/tcp 2>/dev/null | head -1 | sed 's/.*://')
+node_api_port="${node_api_port:-3001}"
+_smoke_check "node-api health"             "http://127.0.0.1:${node_api_port}/health"
+# Second critic finding: the direct-port probe above only proves node-api itself is alive -- it
+# bypasses nginx entirely, silently dropping the coverage the old (broken) Host-header probe was
+# AT LEAST attempting before the Certbot regression (is api.aware-wave.com's own public vhost/TLS
+# routing intact?). Restored using the wordpress probe's already-reviewed --resolve pattern, which
+# sidesteps the port-80 redirect trap because a valid :443 request is never subject to an
+# http->https force-redirect rule (confirmed live 2026-09-12: returns 200 while port 80 still 301s).
+_smoke_check "nginx/api"                   "https://api.aware-wave.com/health" "" "api.aware-wave.com"
 
 if [[ "$_smoke_errors" -gt 0 ]]; then
   log "SMOKE_WARN: $_smoke_errors endpoint(s) returned non-2xx -- service may be partially degraded"

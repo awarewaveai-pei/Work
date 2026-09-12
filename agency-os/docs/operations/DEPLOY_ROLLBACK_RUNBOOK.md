@@ -17,11 +17,13 @@
 | 一鍵回滾 | `./scripts/rollback-phase1.sh restore <service> [snapshot-tag]` |
 | 清理舊快照 | `./scripts/rollback-phase1.sh clean <service> [days]`（預設 30 天） |
 | n8n 版本回滾 | `./scripts/rollback-phase1.sh n8n-pin <old-semver>` |
-| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1:3002/login && curl -sf http://127.0.0.1:3002/api/ops/summary && curl -sfk --resolve aware-wave.com:443:127.0.0.1 https://aware-wave.com/ && curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/health` |
+| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1:3002/login && curl -sf http://127.0.0.1:3002/api/ops/summary && curl -sfk --resolve aware-wave.com:443:127.0.0.1 https://aware-wave.com/ && curl -sf http://127.0.0.1:3001/health` |
 
 > **⚠️ Supabase-Auth cutover（2026-06-05）後**：next-admin 首頁 `/` 與所有 `/ops/*` 已被 middleware gate，未帶 session 的 `curl http://127.0.0.1:3002/` 會回 **302→/login**（健康但非 2xx）。故 `sg-deploy.sh` Step 7 smoke 與本驗收指令已改探測 **`/login`**（公開頁，回 200）+ `/api/ops/summary`（豁免端點）作為 liveness。完整登入流驗證需帶 Supabase session cookie（見 §auth-smoke）。
 >
 > **⚠️ `ks-aw-01` 整併後訂正（2026-08-29）**：wordpress／node-api 這兩探針原本寫「confirmed reachable 2026-05-21」，是舊單租戶 SG 機器的行為——2026-08-28 SG+EU 整併到 `ks-aw-01` 後該機同時掛 mainwp/n8n/postiz/oracle/soulfulexpression/sg-stack 等多個 vhost，裸 `curl http://127.0.0.1/`（無 Host header）不再落到 WordPress，會打中 nginx 預設 vhost 回 404；`api.aware-wave.com` 這邊 node-api 真正的健康路徑是 `/health`（不是 `/api/health`，該 vhost 不剝前綴）。**這個 stale 探針造成每一次 next-admin 部署都被這兩個無關端點的假陽性觸發自動 rollback**（2026-08-29 portal.aware-wave.com 部署時發現：next-admin 自己的兩個探針都過，是這兩個才炸）。`sg-deploy.sh` Step 7 與本表指令已同步訂正。**wordpress 探針走過兩輪修正**：第一輪改用裸 curl 帶 Host + `-L` 跟隨 WordPress 強制的 http→https 轉址，但 critic 覆審抓到 `-L` 會讓 curl 重新查公開 DNS、可能落到 Cloudflare edge——等於健康探針繞出機器之外，若本機 nginx→WordPress 這條路徑真的死了，Cloudflare 快取或別的節點仍可能回 200，讓這個「防自動 rollback 誤判」的閘門本身出現同一類假陽性。**第二輪改用 `--resolve <host>:443:127.0.0.1`**（`lobster-factory/infra/soulful/cutover-sync.sh:234` 既有慣例）強制在本機解析，探測真正的 vhost+TLS 路徑但不離開這台機器；改探 apex `aware-wave.com`（非 `www.`）避免多一層 www→apex 轉址。
+>
+> **⚠️ node-api 探針第三輪訂正（2026-09-12）**：前段訂正把 node-api 探針改成 `curl -H "Host: api.aware-wave.com" http://127.0.0.1/health`，這打的是**外層 host-nginx（Certbot 管理，監聽 80）**，不是實際跑 next-admin/node-api 的 docker 容器層——跟同日 `safe-infra-patch.sh` 那個 nginx smoke check 踩到的是同一種「打錯層」bug（commit `5a1ec19e1` 有完整根因記錄）。8/29 訂正當下這條探針還能過，是因為那時 Certbot 還沒對 `api.aware-wave.com` 加轉址規則；9/12 稍早一次 cognitive-os 部署觸發 Certbot 幫另一個網域(`cognitive.aware-wave.com`)申請憑證，副作用是外層也開始強制 `api.aware-wave.com` 轉 https，原本能過的探針變成 301 假陽性，誤觸發一次健康的 next-admin 部署自動 rollback（未造成資料遺失，rollback 機制本身正確運作，只是判斷依據錯了）。**訂正**：node-api 跟 next-admin 一樣有自己直接發布的容器埠（`docker-compose.yml` `PORT: "3001"`，本表 §容器對照也早就寫著 `node-api | 127.0.0.1:3001`），改探 `http://127.0.0.1:3001/health`——完全繞過任何一層 nginx，nginx 有沒有轉址跟 node-api 自己活著與否無關。
 
 ---
 
