@@ -16983,3 +16983,26 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 3. 尚未部署到 prod（migration 0082 需 `node scripts/apply-db-migration.mjs 0082`，next-admin 需重新 `sg-deploy.sh`）——本輪只決定授權範圍內的架構與實作，部署屬於下一個「去處理好」的動作，未經操作者當輪明確 go-ahead 前不主動部署（High-STOP：DB migration + prod deploy）。
 
 [rollback] 應用層改動（`rate-limit.ts`/`run.ts`/`index.ts`）為新增行為，未傳 store 時行為不變（`RateLimiter`/`createCollectFetch` 既有 default 全保留），`git revert` 即可。DB 側：`node scripts/apply-db-migration.mjs` 尚未對 prod 執行 0082；一旦執行，回滾走 `packages/db/scripts/0082_collection_rate_limit_buckets_down.sql`（已在真實 Postgres 驗證可逆、可重套用）。
+
+## 2026-09-12（續7）HCI-30 C4/C6/C8/C9 收斂——1 個查證後解消、3 個維持 DEFERRED 並取得操作者明確確認
+
+[任務] 承接「2、3、5 做完了 就去做C4、C6、C8、C9」。動工前先問操作者 4 個具體缺口（各自需要的業務判斷/High-risk go-ahead），依回答收斂，不猜測落地。
+
+[發現與決定]
+- **C4（跨構面總分）**：操作者問「怎樣才會是最精確的數字」，動工前查現有治理文件才發現 `ADR-0004`（`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0004-no-universal-human-trust-score.md`，狀態 ACCEPTED，早於本輪）已明文禁止 HCI 在任何層級（DB/API/報告/UI，含隱藏欄位）把 7 個信任構面收斂成一個純量總分。差點在沒查證的情況下依操作者字面問題落地一個「未加權平均」顯示——那正是 ADR-0004 自己列名的第一個被拒絕方案，理由是：未加權本身就是一個沒人審過的價值判斷；一旦分數被存下來因歷史真相不可竄改而永久留存，變成當事人未同意的名譽紀錄；標「僅供參考」也擋不住未來被悄悄浮出來。查證後回報操作者：沒有任何總分會比現有 7 構面分別顯示更精確（壓成一個數字是資訊損失，不是精確化）。**RESOLVED，不追蹤**，見 `HCI_C1_C10_DECISIONS.md` §C4 全文改寫。
+- **C6（真實登入）**：操作者選「先不動」。維持 DEFERRED，等 `portal.aware-wave.com`。
+- **C8（金鑰輪替）**：操作者問「你覺得怎樣比較好」，回報建議：High-risk 閘門的重點是需要一個具體觸發點（真實產鑰材料、真實事故、或專門排一輪驗證預算的 session），不該因為這輪「去做清單」的慣性就打開。維持 DEFERRED。
+- **C9（調查目的欄位裝飾）**：解釋「一般盡職調查」= 沒有特定紅旗、常規背景查核的統稱分類（跟另外 4 個各自命名具體疑慮的 purpose 對照）；順手查證程式碼跟文件，確認 5 個 purpose 目前確實零額外行為差異——操作者的原始觀察是對的，非誤解。操作者確認「先不動」。維持 DEFERRED。
+
+[已修改]
+- `docs/HCI_C1_C10_DECISIONS.md`：新增狀態 **RESOLVED**（第五種，跟既有 DONE/MITIGATED/PLANNED/DEFERRED 並列）；C4 全文從「DEFERRED，需業務判斷」改寫為 RESOLVED 並引 ADR-0004 全部三點理由；總覽表 C4/C6/C8/C9 四列更新，記錄操作者 2026-09-12 的明確確認。
+
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY -- 純文件更新，無程式碼/schema/行為改動（C4 從「未做總分」到「確認且記錄為何永遠不做總分」，執行期行為零改變）
+- REVIEW_WAIVED: DOC_ONLY -- 單一文件的狀態欄位改寫，每個引用皆可直接對照 ADR-0004 原文逐句核對，非需要獨立覆審的邏輯改動
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=`C4 —|§C4` | hits=1（僅 HCI_C1_C10_DECISIONS.md 自身，無其他文件持有需同步的舊狀態文字）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 無新增風險——C4 從「懸而未決」變成「已用既有治理文件解釋清楚」，C6/C8/C9 維持原判斷，皆有操作者本輪明確確認留存於本 WORKLOG 條目與決策文件。
+
+[rollback] `git revert` 對應 commit（純文件）。
