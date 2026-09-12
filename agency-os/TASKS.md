@@ -259,12 +259,12 @@
   - **真實 UI 端對端驗證**（非單元測試）：`soulful-expression` org + `series_1`（角色：小雨/畫家）→ 產生角度（角度內容正確反映「畫室」「自畫像」等 Bible 設定）→ 選角度產生完整腳本 → 面板顯示「✅ Story Bible 連續性檢查通過」。**範圍局限（我原本驗證漏掉）**：這只證明文字有反映 Bible，沒驗證畫面（生成的圖/影片）有沒有角色連續性。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「短劇 Story Bible 完整版接線」+「Story Bible 畫面層缺口 + 字幕查證」兩條目。
 
-- [ ] **【2026-09-11 開出→09-12 已實作待部署｜完整版】Story Bible 角色/場景設定接到畫面層（生圖）**
-  - `🟡 本機已完成，卡在你（deploy go-ahead，High-risk）` · 操作者選「完整：定裝照 + 自動比對」
-  - **做了什麼**：`buildSceneAsset` 接 `referenceImageUrl` → 有角色定裝照時強制 `flux-kontext-pro` 帶參考圖生圖；`doScript` 讓 Claude 幫每場景標 `character_id`；`autoGeneratePortraits` 幫沒有定裝照的角色自動生一張、存回 Bible 新草稿版本；新增 Claude vision 面板比對場景圖跟定裝照像不像。Critic 覆審抓到 4 個 Major（SSRF/confused-deputy、跨租戶 race condition 等）已全部修復。commit `400d96a8d`。
-  - **驗證止於本機**：`tsc`/`vitest` 全綠；真實瀏覽器測試時才發現這輪程式碼**還沒部署**（用 fetch spy 讀到伺服器送出的 prompt 仍是舊版，證實自動定裝照/vision 比對兩塊還沒在瀏覽器上真的跑過一次）。
-  - **下一步（需要你 go-ahead，deploy 是 High-risk，不因產品範疇已授權而跳過）**：`sg-deploy.sh` 部署 next-admin → 用同一套 Story Bible（soulful-expression/series_1/小雨）重跑一次真實瀏覽器 E2E，確認自動定裝照真的生成、畫面一致性面板真的顯示。
-  - **證據**：`agency-os/WORKLOG.md` 2026-09-11「Story Bible 畫面層缺口 + 字幕查證」+ 2026-09-12「Story Bible 畫面層角色一致性」兩條目。
+- [x] **【2026-09-11 開出→09-12 完成並真實驗證｜完整版】Story Bible 角色/場景設定接到畫面層（生圖）**
+  - `✅ 已完成、已部署、真實瀏覽器 E2E 驗證通過` · 操作者選「完整：定裝照 + 自動比對」，後追加「盡量用最便宜的模型」
+  - **做了什麼**：`buildSceneAsset` 接 `referenceImageUrl` → 有角色定裝照時強制 `flux-kontext-dev`（$0.045/張，非最初的 kontext-pro $0.10/張，改成最便宜的參考圖模型）帶參考圖生圖；`doScript` 讓 Claude 幫每場景標 `character_id`；`autoGeneratePortraits` 幫沒有定裝照的角色自動生一張（`flux-schnell` $0.003/張）、存回 Bible 新草稿版本；新增 Claude vision 面板比對場景圖跟定裝照像不像；`StoryBibleWorkbench.tsx`/`ScriptForge.tsx` 補上完整流程的網頁內說明。Critic 覆審抓到 4 個 Major（SSRF/confused-deputy、跨租戶 race condition 等）已全部修復。commit `400d96a8d`/`ee1fd9d91`，已 `sg-deploy.sh` 部署上線。
+  - **真實瀏覽器端對端驗證**（`soulful-expression`/`series_1`/小雨，部署後重跑）：產生角度→腳本（連續性檢查通過）→ 自動生成定裝照（`generate-portrait` 200，真實 R2 圖）→ 存回 Bible 新草稿→ 送去生產影片→生成草稿（6 場景圖真實生成）→「Story Bible 畫面一致性比對」面板顯示 3 個有角色場景皆 ✅ 一致，附具體理由（髮型/髮色/服裝比對）。肉眼比對定裝照與場景圖：同一張臉、同套穿著，確認非巧合。
+  - **過程中的真實插曲**：第一次部署後測試曾遇 Replicate 帳號 <$5 額度被限流導致 502（跟本次程式碼無關的既有帳務問題，操作者已處理）；程式碼曾在共用 worktree 中被並行 session 的 git 操作覆寫兩次，靠 `git diff --stat` 比對 HEAD 抓到並重做。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-11「Story Bible 畫面層缺口 + 字幕查證」+ 2026-09-12 兩條目（角色一致性實作、改最便宜模型+文件）。
 
 - [x] **【✅ 2026-09-10 全部收尾】CF API token 401 監控盲點 + aware-wave.com SPF/CAA 補齊** — 操作者於 Cloudflare dashboard 重新產生兩把 token（`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_AUTH_BEARER_TOKEN`）並貼進個人筆記 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md:147-148`，已同步進 `mcp/user-env.ps1`（不進 git）。完成定義四項全滿足：① `check-cloudflare-security.ps1` 新增 `BLIND` 第四態＋逐檔案 check 精準歸因（401/403/網路失敗分開講，不誇大成「全部」）② `Overall: PASS` 已實測確認（bot=ON, rules=1, xmlrpc=True）③ 順手發現並修復一個獨立根因：CF 舊版 `/firewall/rules` API 對此 zone 永久回 400（error 10021,自 9/4 之後這 zone 的自訂 ruleset 混進了新版 Rulesets API 建立的規則）,遷移到 `/rulesets/phases/http_request_firewall_custom/entrypoint`，並修一個 PowerShell array-unwrap 陷阱（單元素陣列經 if-expression 賦值會被拆包成純量，`@()` 需包住整個 if/else 而非各分支內部）④ SPF TXT 已補 `include:_spf.resend.com`、CAA 6 筆（`letsencrypt.org`/`pki.goog`/`sectigo.com` 各 issue+issuewild）已建立，皆用外部 `dns.google` DNS-over-HTTPS 查詢驗證生效（非只信 CF API 自己的回應）；CAA 驗證時額外發現 Cloudflare 自動補了 6 筆自己的簽發 CA（ssl.com/comodoca.com/digicert.com），符合官方文件行為，不是異常。
   - 完整根因、逐步證據、critic 兩輪覆審發現與修復細節見 `agency-os/WORKLOG.md` 2026-09-10「CF API token 401 監控盲點」＋「aware-wave.com SPF/CAA 補齊 + firewall/rules API 遷移」兩條目。

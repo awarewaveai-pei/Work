@@ -16343,3 +16343,21 @@ Commit 當下 real index 已有另一 session 正在準備的大量 staged 內�
 [剩餘風險] 無新增；純降級模型版本 + 文案，未改資料流或介面契約。
 
 [rollback] `git revert` 對應 commit，模型字串改回 kontext-pro/flux-dev。
+
+## 2026-09-12（續2）Story Bible 畫面層——部署後真實瀏覽器 E2E 全鏈通過
+
+[任務] 承接上兩條目；部署 `ee1fd9d91` 後重跑瀏覽器實測，確認整條鏈真的動。
+
+[驗證結果]（真實瀏覽器，soulful-expression/series_1/小雨，`app.aware-wave.com/tools/video?advanced=1`）
+- 產生角度→選角度→產生完整腳本：連續性檢查「✅ Story Bible 連續性檢查通過」。
+- 面板顯示「🎨 為新角色自動生成定裝照中...」→ 完成；`window.fetch` spy 確認 `POST /api/video/story-bibles/generate-portrait` 200，回傳真實 R2 圖片 URL；`POST /api/video/story-bibles` 201（新草稿版本）。
+- 送去生產影片→按「生成草稿」：`POST /api/video/draft` 200（第一次因 Replicate 帳號 <$5 額度限流回 502，操作者處理額度後這次成功）。
+- 草稿頁出現「📖 Story Bible 畫面一致性比對」面板，內容非空泛套語：「場景 2：髮型髮色、臉型、亮領毛衣與外套均一致，光線角度差異在允許範圍內。」「場景 4：...」「場景 6：...」三個有角色登場的場景皆 ✅。
+- 額外肉眼查核：把「定裝照」跟「場景 2 實際生成圖」兩張圖都下載下來直接看——同一張臉、同一件深色高領毛衣+外套、同髮型髮色，確認 `flux-kontext-dev` 的 reference-conditioning 真的在起作用，不是 vision 面板誤判。
+
+[REALTEST_EVIDENCE]: tool=Browser（真實瀏覽器，非 headless；`window.fetch` spy 逐一攔截確認每個環節的 request/response，非目測猜測） | cmd=完整跑一輪 角度→腳本→自動定裝照→送生產→生成草稿→畫面一致性比對 | exit=n/a | result=全鏈成功，見上
+[WORKLOG_DONE]: 本條目（含前兩條目共同構成本任務完整證據鏈）
+
+[結論] TASKS.md 對應項目改標 `[x]` 已完成。2026-09-11 操作者最初的抱怨「你做的影片完全看不出來有用這個工具」的根因（Story Bible 從未接到畫面層）已修復並真實驗證。
+
+[剩餘風險] 沿用前兩條目所列（成本預估面板未反映強制升級模型的加價；critic 修復未經第二輪獨立覆審）。
