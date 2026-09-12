@@ -1,0 +1,81 @@
+$id: "ai-lego://methods/contracts/jurisdiction.data_residency_assessment.contract.yaml"
+title: "Data Residency Assessment Method Contract"
+status: ACTIVE
+
+description: >
+  F23 jurisdiction/compliance/localization family (Atlas L943: "Data
+  Residency Assessment | 決定資料能放哪裡 | data classes->subjects->
+  laws/contracts->regions->routing | 支援主權與跨境資料"). Decides where
+  each declared data class is legally permitted to be stored/processed.
+  Core invariant: every declared data class must map to at least one
+  routing decision naming an allowed region -- Atlas's own benefit
+  ("支援主權與跨境資料", support sovereignty and cross-border data) is
+  exactly what a silently-unrouted data class would defeat.
+
+id: jurisdiction.data_residency_assessment
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [DECOMPOSE, MAP, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). DECOMPOSE breaks the scenario into data classes/subjects;
+# MAP resolves each class to applicable laws/contracts and candidate
+# regions; DECIDE commits to the final routing decision. All 3 are
+# CANONICAL_KERNEL members (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - determine_which_regions_each_declared_data_class_may_be_stored_or_processed_in
+
+inputs:
+  required:
+    - DataClassSet
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting
+  # point is the set of data classes under assessment, same honesty-gap
+  # class every sibling F-family contract already discloses.
+
+outputs:
+  - DataResidencyAssessment
+# NEW output type (see typed-objects/data-residency-assessment-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared data class"
+  - "every declared data class has at least one routing decision naming an allowed region (routing completeness)"
+  - "every routing decision resolves to a declared data class (no orphan routing)"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F23's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an assessment record has no
+  # external side effect.
+
+open_questions:
+  - "OQ-DRA-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-DRA-2: region is a free-text geographic label (e.g. 'EU', 'US-EAST'), deliberately NOT reusing specs/jurisdiction/pack.schema.yaml's data_residency storage-restriction-class enum (EU_ONLY/COUNTRY_ONLY/ON_PREM_ONLY/DEVICE_ONLY/UNRESTRICTED) -- that enum names a pack-level POLICY CLASS, this field names a literal routing TARGET, a different granularity. Should a future revision cross-reference the two?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Data Residency Assessment row (L943) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "data residency"/"data_residency"/"jurisdiction" before writing.
+    Found `specs/jurisdiction/pack.schema.yaml#/properties/data_residency`
+    (pack-level storage-restriction-class enum, MP §103) and
+    `docs/architecture/GLOBAL_JURISDICTION_PLAN.md` L62-68 -- a different
+    layer/granularity, disclosed in `open_questions` above, not reused
+    or duplicated. Zero pre-existing Method Atlas contract or typed-object
+    with this method's id/title. Validated against specs/cognitive/
+    method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-stage pipeline is transcribed
+    verbatim from Atlas L943. The routing-completeness precondition and
+    referential-integrity requirement are this file's own compiled
+    structure, disclosed above, not textually cited.

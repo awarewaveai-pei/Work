@@ -1,0 +1,181 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/conflict-of-law-review-record.schema.yaml"
+title: Conflict-of-Law Review Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ConflictOfLawReview` -- the
+  declared `outputs` of `jurisdiction.conflict_of_law_review`'s Method
+  Contract (methods/contracts/jurisdiction.conflict_of_law_review.
+  contract.yaml, `outputs: [ConflictOfLawReview]`). F23 jurisdiction
+  family (Atlas L944: "governing law->mandatory rules->conflicts->legal
+  review").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own
+  matrix-completeness precedent): (a) referential integrity --
+  `conflicts[].disputed_law_ids` (>=2 per conflict) resolve to a
+  declared `governing_laws[]` or `mandatory_rules[]` entry, and ids are
+  unique across both arrays combined; (b) THE CORE FAIL-CLOSED
+  INVARIANT -- a conflict's `applicable_law` is never non-null unless
+  that same conflict's `legal_review` is already a well-formed,
+  non-empty record (reviewer/date/outcome); a conflict with no
+  `legal_review` MUST have `applicable_law: null` (unresolved, pending
+  human review) -- the builder REFUSES to construct a record where an
+  automated resolution exists with no human sign-off attached; (c)
+  `applicable_law`, when non-null, must itself be one of that conflict's
+  own `disputed_law_ids`. `ai_lego/modules/jurisdiction/
+  conflict_of_law_review.py` enforces all three at construction time and
+  an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Conflict-of-Law Review row (L944)"
+  - "methods/contracts/jurisdiction.conflict_of_law_review.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L944's own
+  4-stage pipeline plus low-risk, disclosed compilation choices (the
+  COLR- prefix, record-level-only provenance, free-text legal_review
+  fields).
+
+compilation_decisions:
+  - question: "Record id prefix: reuse specs/jurisdiction/conflict-of-laws-output.schema.yaml's existing `^COL-` prefix, or a distinct one?"
+    decision: "Distinct prefix `^COLR-`. `conflict-of-laws-output.schema.yaml` already owns `^COL-` for a DIFFERENT object (the software-architecture Conflict-of-Laws Engine's output, GLOBAL_JURISDICTION_PLAN.md §5 / MP §98) -- reusing the same prefix for this method's own typed object would make ids from two structurally different schemas visually indistinguishable."
+  - question: "legal_review.outcome: closed enum, or free text?"
+    decision: "Free-text non-empty string. Atlas names no fixed outcome vocabulary for legal review; the structural requirement this method exists to enforce is only THAT a non-empty human review exists before finalization, not what shape its outcome narrative takes."
+  - question: "Fail-closed mandatory-legal-review-before-finalization: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12's allOf/if/then CAN express this specific cross-field rule declaratively (see the `allOf` block below, mirroring conflict-of-laws-output.schema.yaml's own status-consistency pattern), but referential integrity of disputed_law_ids against governing_laws/mandatory_rules cannot be, so both are additionally enforced at runtime by the builder/gate for a single consistent enforcement surface."
+
+type: object
+additionalProperties: false
+required: [id, version, governing_laws, mandatory_rules, conflicts, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^COLR-"
+    description: "NEW DESIGN, deliberately distinct from specs/jurisdiction/conflict-of-laws-output.schema.yaml's `^COL-` prefix -- see compilation_decisions."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.conflict_of_law_review"
+
+  governing_laws:
+    type: array
+    minItems: 1
+    description: "Candidate governing laws under review. RUNTIME invariant: law_id unique, and unique across mandatory_rules[]'s rule_id namespace too (see module description)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [law_id, jurisdiction, description]
+      properties:
+        law_id: {type: string, minLength: 1}
+        jurisdiction: {type: string, minLength: 1}
+        description: {type: string, minLength: 1}
+
+  mandatory_rules:
+    type: array
+    description: "Overriding mandatory/public-policy rules that cannot be contracted around. May be empty (not every review involves one)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [rule_id, jurisdiction, description]
+      properties:
+        rule_id: {type: string, minLength: 1}
+        jurisdiction: {type: string, minLength: 1}
+        description: {type: string, minLength: 1}
+
+  conflicts:
+    type: array
+    description: "RUNTIME invariant: referential integrity (disputed_law_ids resolve to governing_laws/mandatory_rules), and the fail-closed legal-review-before-finalization rule (see module description and the allOf block below)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [conflict_id, disputed_law_ids, description, legal_review, applicable_law]
+      properties:
+        conflict_id: {type: string, minLength: 1}
+        disputed_law_ids:
+          type: array
+          minItems: 2
+          items: {type: string, minLength: 1}
+          description: "RUNTIME invariant: every entry resolves to a declared governing_laws[].law_id or mandatory_rules[].rule_id (no dangling refs), no duplicates."
+        description: {type: string, minLength: 1}
+        legal_review:
+          description: "Non-null iff a human has reviewed this conflict. REQUIRED non-null (see allOf below) whenever applicable_law is non-null."
+          type: [object, "null"]
+          additionalProperties: false
+          required: [reviewer, date, outcome]
+          properties:
+            reviewer: {type: string, minLength: 1}
+            date: {type: string, format: date}
+            outcome: {type: string, minLength: 1}
+        applicable_law:
+          description: "The finalized governing law/rule id for this conflict, or null while unresolved. When non-null, MUST equal one of this conflict's own disputed_law_ids (RUNTIME invariant) and MUST be accompanied by a non-null legal_review (allOf below)."
+          type: [string, "null"]
+      allOf:
+        - if:
+            properties: { applicable_law: { not: { type: "null" } } }
+            required: [applicable_law]
+          then:
+            properties: { legal_review: { not: { type: "null" } } }
+            required: [legal_review]
+        # 2026-09-12: without this rule, a schema-valid conflict could carry a
+        # finalized applicable_law with legal_review: null -- an
+        # automation-only resolution with no human sign-off, exactly the
+        # "防自動化錯用法律" failure Atlas L944's benefit column exists to
+        # prevent. Mirrors conflict-of-laws-output.schema.yaml's own
+        # status/human_counsel_ref allOf pattern.
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent review."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-conflict review: one finalized with legal_review, one still pending human review (applicable_law null)"
+    value:
+      id: "COLR-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.conflict_of_law_review"
+      governing_laws:
+        - {law_id: "LAW-EU-GDPR", jurisdiction: "EU", description: "General Data Protection Regulation"}
+        - {law_id: "LAW-US-CCPA", jurisdiction: "US-CA", description: "California Consumer Privacy Act"}
+      mandatory_rules:
+        - {rule_id: "RULE-EU-PUBLIC-POLICY", jurisdiction: "EU", description: "EU public policy override on data subject rights"}
+      conflicts:
+        - conflict_id: "CONF-001"
+          disputed_law_ids: ["LAW-EU-GDPR", "LAW-US-CCPA"]
+          description: "Deletion request conflicts with a US retention obligation"
+          legal_review: {reviewer: "J. Alvarez, Esq.", date: "2026-09-01", outcome: "GDPR erasure right upheld; US retention obligation does not override an EU data subject's request"}
+          applicable_law: "LAW-EU-GDPR"
+        - conflict_id: "CONF-002"
+          disputed_law_ids: ["LAW-US-CCPA", "RULE-EU-PUBLIC-POLICY"]
+          description: "Cross-border transfer mechanism disputed between CCPA opt-out and EU public policy override"
+          legal_review: null
+          applicable_law: null
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CONFLICTOFLAWREVIEW-1: this method's finalized applicable_law is not structurally linked to specs/jurisdiction/conflict-of-laws-output.schema.yaml's resolution_rule_applied/status fields -- should a future revision cross-reference the two (this method feeding that engine, or vice versa)?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Conflict-of-Law Review row (L944) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "conflict of law"/"conflict-of-law"/"conflict_of_law" and every
+    schema title before writing -- found
+    specs/jurisdiction/conflict-of-laws-output.schema.yaml (a DIFFERENT
+    pre-existing object, $id COL-, software-architecture layer per
+    ADR-013), read in full, id prefix changed to COLR- to avoid
+    collision (see compilation_decisions). Zero pre-existing typed-object
+    title overlap. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_conflict_of_law_review.py.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    directly from Atlas L944. The COLR- prefix, the allOf fail-closed
+    legal-review rule, and free-text outcome field are this file's own
+    compiled structure, disclosed above.

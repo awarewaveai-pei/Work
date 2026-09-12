@@ -1,0 +1,146 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/jurisdiction-resolution-record.schema.yaml"
+title: Jurisdiction Resolution Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `JurisdictionResolution` -- the
+  declared `outputs` of `jurisdiction.resolver`'s Method Contract
+  (methods/contracts/jurisdiction.resolver.contract.yaml, `outputs:
+  [JurisdictionResolution]`). F23 jurisdiction family (Atlas L935,
+  §11.53 L2412-2437).
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) referential integrity --
+  `resolved_jurisdictions[].derived_from_dimensions` entries must each name
+  a dimension actually present in `declared_dimensions[]`; (b) DIMENSION
+  COVERAGE, THE real invariant this method exists to enforce -- when
+  `declared_dimensions[]` has >=2 entries, the union of
+  `derived_from_dimensions` across every `resolved_jurisdictions[]` entry
+  must cover >=2 distinct dimensions (a resolution derived from only 1
+  declared dimension, when 2+ were provided, is refused).
+  `ai_lego/modules/jurisdiction/resolver.py` enforces both at construction
+  time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Jurisdiction Resolver row (L935)"
+  - "methods/contracts/jurisdiction.resolver.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §11.53's 11-name
+  dimension vocabulary plus disclosed compilation choices (the JRES- prefix,
+  record-level-only provenance, the dimension enum casing).
+
+compilation_decisions:
+  - question: "Dimension vocabulary: Atlas §11.53's 11 names, or also merge in §18.1's 13-name corroborating list?"
+    decision: "Atlas §11.53's 11 names only, verbatim. §18.1's list is a partially-drifted duplicate of a DIFFERENT mother document (Master Plan §94), already flagged as dual-maintenance drift in verified-findings.yaml -- not silently merged here."
+  - question: "Should declared_dimensions be a free-form dict, or a typed array?"
+    decision: "Typed array of {dimension, value} objects, same event()-array shape cross-impact-analysis.schema.yaml already established for a declared-set-with-uniqueness-constraint field."
+
+type: object
+additionalProperties: false
+required: [id, version, declared_dimensions, resolved_jurisdictions, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^JRES-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.resolver"
+
+  declared_dimensions:
+    type: array
+    minItems: 1
+    description: >
+      The input dimensions actually provided for this resolution. RUNTIME
+      invariant: dimension values must be unique (no dimension declared
+      twice) -- enforced by the module, not expressible as a bare JSON
+      Schema array constraint since uniqueness is keyed on a sub-field, not
+      the whole item.
+    items:
+      type: object
+      additionalProperties: false
+      required: [dimension, value]
+      properties:
+        dimension:
+          type: string
+          enum: [LEGAL_ENTITY, USER_LOCATION, DATA_SUBJECT_LOCATION, PROCESSING_LOCATION, STORAGE_LOCATION, PROVIDER_LOCATION, MARKET, CONTRACT_GOVERNING_LAW, SECTOR, GOVERNMENT_LEVEL, SPECIAL_TERRITORY_INDIGENOUS_JURISDICTION]
+          description: "Atlas §11.53's 11 named input dimensions (L2419-2433), verbatim, cased UPPER_SNAKE per this suite's CODE/LABEL-vocabulary convention (see governance/epistemic-label.schema.yaml's epistemic_type)."
+        value:
+          type: string
+          minLength: 1
+          description: "Free-form concrete value for this dimension (e.g. a location code, a sector name). No mother document defines a closed value registry per dimension."
+
+  resolved_jurisdictions:
+    type: array
+    minItems: 1
+    description: >
+      RUNTIME invariant: referential integrity (every derived_from_dimensions
+      entry must name a dimension present in declared_dimensions[]) and
+      DIMENSION COVERAGE across the whole array (see module description).
+    items:
+      type: object
+      additionalProperties: false
+      required: [jurisdiction_id, derived_from_dimensions, basis]
+      properties:
+        jurisdiction_id:
+          type: string
+          minLength: 1
+          description: "Free-form concrete jurisdiction identifier (e.g. an ISO country/region code, or a sector-regulator id). No mother document defines a closed jurisdiction-node identifier grammar this could $ref into."
+        derived_from_dimensions:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [LEGAL_ENTITY, USER_LOCATION, DATA_SUBJECT_LOCATION, PROCESSING_LOCATION, STORAGE_LOCATION, PROVIDER_LOCATION, MARKET, CONTRACT_GOVERNING_LAW, SECTOR, GOVERNMENT_LEVEL, SPECIAL_TERRITORY_INDIGENOUS_JURISDICTION]
+          description: "Which declared dimension(s) this jurisdiction determination actually rests on. Referential integrity against declared_dimensions[] is a RUNTIME invariant, not expressible here."
+        basis:
+          type: string
+          minLength: 1
+          description: "Human-readable justification for why these dimensions place this jurisdiction as applicable."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A cross-border processing activity with 3 declared dimensions resolving to 2 jurisdictions, each traceable to >=2 dimensions -- satisfies dimension coverage."
+    value:
+      id: "JRES-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.resolver"
+      declared_dimensions:
+        - {dimension: "USER_LOCATION", value: "DE"}
+        - {dimension: "DATA_SUBJECT_LOCATION", value: "FR"}
+        - {dimension: "PROCESSING_LOCATION", value: "US"}
+      resolved_jurisdictions:
+        - {jurisdiction_id: "EU-GDPR", derived_from_dimensions: ["USER_LOCATION", "DATA_SUBJECT_LOCATION"], basis: "Users and data subjects both located in EU member states"}
+        - {jurisdiction_id: "US-Federal", derived_from_dimensions: ["PROCESSING_LOCATION"], basis: "Processing occurs on US soil"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-JURISDICTIONRESOLUTION-1: derived_from_dimensions carries no per-dimension weight or confidence -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L935) and §11.53 (L2412-2437) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "jurisdiction.resolver"/"JurisdictionResolution" and every schema title
+    before writing -- zero pre-existing implementation or schema title
+    overlap (pre-existing specs/jurisdiction/context.schema.yaml is a
+    different, Master-Plan-sourced object, disclosed in the contract's
+    open_questions). Validated against jsonschema Draft202012Validator via
+    tests/unit/test_resolver.py.
+  note: >
+    No mother document was modified. The 11-dimension enum is transcribed
+    directly from Atlas §11.53. The JRES- prefix and array-of-objects shapes
+    are this file's own compiled structure, disclosed above.

@@ -1,0 +1,100 @@
+$id: "ai-lego://methods/contracts/jurisdiction.obligation_to_control_mapping.contract.yaml"
+title: "Obligation-to-Control Mapping Method Contract"
+status: ACTIVE
+
+description: >
+  F23 global jurisdiction/compliance/localization family, table-row-only
+  citation (Atlas L937: "Obligation-to-Control Mapping | 法律義務轉工程控制
+  | obligation->control->owner->evidence->test | 法務與工程可對接"). Turns a
+  legal obligation into a traceable engineering control. Core invariant:
+  every declared obligation must be covered by at least one control carrying
+  a non-empty owner/evidence/test, and every control must reference a
+  declared obligation (no orphan control) -- an uncovered obligation or an
+  orphan control is exactly the "法務與工程無法對接" failure this method
+  exists to prevent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Obligation-to-Control Mapping row (L937)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L937 gives a real 5-stage pipeline and
+  effect ("法務與工程可對接") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: jurisdiction.obligation_to_control_mapping
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [DECOMPOSE, MAP, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). DECOMPOSE breaks a legal source into named obligations, MAP
+# builds the obligation->control->owner->evidence->test linkage itself,
+# VALIDATE checks every obligation is actually covered. All three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - map_every_legal_obligation_to_at_least_one_owned_evidenced_tested_control
+# Atlas L937 verbatim sense: turn a legal obligation into an engineering
+# control with an owner, evidence, and a test, so legal and engineering can
+# connect on the same object.
+
+inputs:
+  required:
+    - ObligationSet
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the set of legal obligations under analysis, same
+  # honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - ObligationToControlMapping
+# NEW output type (see typed-objects/obligation-to-control-mapping-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared obligation"
+  - "every declared obligation covered by at least 1 control (obligation coverage)"
+  - "every control references a declared obligation (no orphan control)"
+  # NEW, structurally necessary. Atlas's own pipeline is "obligation->
+  # control->owner->evidence->test" -- an obligation with zero controls, or
+  # a control that maps to nothing real, lets exactly the "法務與工程無法
+  # 對接" failure this method exists to prevent back in through the gap.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent mapping, same placement
+  # convention every structurally similar single-record F-family sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - jurisdiction.compliance_gap_analysis
+# This method's own output (required controls, by implication) is the
+# natural input the sibling Compliance Gap Analysis method (Atlas L938)
+# compares against actually-implemented controls.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a mapping has no external side effect.
+
+open_questions:
+  - "OQ-OCMAP-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-OCMAP-2: control test field is free text (a description of the test procedure), not a structured test-case reference -- should a future revision point at a dedicated test-registry typed object?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L931-956) directly; confirmed line 937 is the
+    exact Obligation-to-Control Mapping row. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "obligation-to-control"/"obligation to control"/"OCM-"/"jurisdiction\."
+    before writing -- zero pre-existing implementation, contract, or schema
+    title overlap found (the "jurisdiction" family/module namespace itself
+    did not exist before this batch). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-stage pipeline is transcribed
+    verbatim from Atlas L937. The coverage/no-orphan preconditions, the
+    OCM- id prefix, and the free-text test field are this file's own
+    compiled structure, disclosed above, not textually cited.

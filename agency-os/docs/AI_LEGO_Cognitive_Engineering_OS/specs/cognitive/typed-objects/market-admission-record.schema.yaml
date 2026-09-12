@@ -1,0 +1,173 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/market-admission-record.schema.yaml"
+title: Market Admission Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `MarketAdmissionRecord` -- the
+  declared `outputs` of `jurisdiction.market_admission_control`'s Method
+  Contract (methods/contracts/jurisdiction.market_admission_control.contract.yaml,
+  `outputs: [MarketAdmissionRecord]`). F23 jurisdiction family (Atlas L942,
+  §11.54 L2440-2465).
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `mvp-record.schema.yaml`'s own decision-consistency
+  precedent): (a) STAGE COMPLETENESS -- `stages[]` must declare exactly the
+  7 named stages from Atlas §11.54 (jurisdiction_pack, legal_freshness,
+  data_residency, ai_provider, security_privacy, localization_accessibility,
+  sector_controls), each exactly once, no missing, no extra, no duplicate;
+  (b) DERIVED DECISION, THE real invariant this method exists to enforce --
+  `admission_decision` must equal the mechanical recomputation "ENABLE iff
+  every stage.status == PASS AND human_signoff is a non-empty string, else
+  FAIL_CLOSED", never an asserted narrative.
+  `ai_lego/modules/jurisdiction/market_admission_control.py` enforces both
+  at construction time (by never accepting `admission_decision` as a builder
+  parameter at all) and an independent gate that re-derives it from raw
+  fields.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Market Admission Control row (L942)"
+  - "methods/contracts/jurisdiction.market_admission_control.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §11.54's 7-stage
+  pipeline plus disclosed compilation choices (the MADM- prefix, the
+  UNKNOWN-inclusive per-stage status vocabulary, record-level-only
+  provenance).
+
+compilation_decisions:
+  - question: "Should per-stage status be 2-valued (PASS/FAIL) or include UNKNOWN?"
+    decision: "3-valued (PASS/FAIL/UNKNOWN). Atlas §11.54's own rule is literally '任一 critical unknown：FAIL CLOSED' -- UNKNOWN must be an authorable status here (unlike specs/jurisdiction/availability.schema.yaml's computed-only unknown), since a caller genuinely may not yet have assessed a stage."
+  - question: "Should admission_decision be a builder parameter?"
+    decision: "No. The builder never accepts it -- it is always computed from stages[] + human_signoff, matching this corpus's experiment.mvp `outcome` precedent (derived, never asserted)."
+
+type: object
+additionalProperties: false
+required: [id, version, market_id, stages, human_signoff, admission_decision, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^MADM-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.market_admission_control"
+
+  market_id:
+    type: string
+    minLength: 1
+    description: "Free-form identifier of the market/region/sector being admitted (e.g. an ISO country code or a sector-scoped market id). No mother document defines a closed registry this could $ref into."
+
+  stages:
+    type: array
+    minItems: 7
+    maxItems: 7
+    description: >
+      RUNTIME invariant: must declare EXACTLY the 7 Atlas §11.54 stage
+      names, each exactly once (no missing, no extra, no duplicate) -- not
+      expressible as a bare JSON Schema array constraint since the required
+      SET of names, not just the count, is the actual rule.
+    items:
+      type: object
+      additionalProperties: false
+      required: [stage, status, note]
+      properties:
+        stage:
+          type: string
+          enum: [jurisdiction_pack, legal_freshness, data_residency, ai_provider, security_privacy, localization_accessibility, sector_controls]
+          description: "Atlas §11.54's own 7-stage pipeline (L2445-2454), verbatim, snake_case per this suite's status-on-object-field convention."
+        status:
+          type: string
+          enum: [PASS, FAIL, UNKNOWN]
+          description: "UNKNOWN is a legitimate authored value here (a stage not yet assessed) -- Atlas §11.54's own rule routes it to FAIL_CLOSED at the record level, it is not itself forbidden to author (contrast specs/jurisdiction/availability.schema.yaml's computed-only unknown)."
+        note:
+          type: string
+          minLength: 1
+          description: "Human-readable justification for this stage's status."
+
+  human_signoff:
+    oneOf:
+      - type: "null"
+      - type: string
+        minLength: 1
+    description: >
+      The named human reviewer/approval reference for Atlas §11.54's own
+      'Human Sign-off' pipeline stage (L2453). Null means no sign-off has
+      been recorded yet -- legal, and forces admission_decision to
+      FAIL_CLOSED regardless of stage statuses (see module description).
+
+  admission_decision:
+    type: string
+    enum: [ENABLE, FAIL_CLOSED]
+    description: >
+      DERIVED, never independently authored -- see `compilation_decisions`.
+      ENABLE iff every `stages[].status == PASS` AND `human_signoff` is a
+      non-empty string; FAIL_CLOSED otherwise. This is the field that makes
+      "全球支援" verifiable rather than a marketing claim (Atlas §11.54's
+      own stated benefit).
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A fully-passed admission with human sign-off -- ENABLE."
+    value:
+      id: "MADM-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.market_admission_control"
+      market_id: "DE"
+      stages:
+        - {stage: "jurisdiction_pack", status: "PASS", note: "DE jurisdiction pack ACTIVE"}
+        - {stage: "legal_freshness", status: "PASS", note: "Last reviewed within SLA"}
+        - {stage: "data_residency", status: "PASS", note: "EU-only storage confirmed"}
+        - {stage: "ai_provider", status: "PASS", note: "Model provider allowed in DE"}
+        - {stage: "security_privacy", status: "PASS", note: "DPIA complete"}
+        - {stage: "localization_accessibility", status: "PASS", note: "de-DE locale + WCAG AA verified"}
+        - {stage: "sector_controls", status: "PASS", note: "No sector-specific blockers"}
+      human_signoff: "legal-reviewer-042"
+      admission_decision: "ENABLE"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "One stage UNKNOWN, sign-off present -- must still be FAIL_CLOSED."
+    value:
+      id: "MADM-2026-09-12-002"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.market_admission_control"
+      market_id: "BR"
+      stages:
+        - {stage: "jurisdiction_pack", status: "PASS", note: "BR jurisdiction pack ACTIVE"}
+        - {stage: "legal_freshness", status: "PASS", note: "Within SLA"}
+        - {stage: "data_residency", status: "UNKNOWN", note: "Residency assessment not yet run"}
+        - {stage: "ai_provider", status: "PASS", note: "Allowed"}
+        - {stage: "security_privacy", status: "PASS", note: "Complete"}
+        - {stage: "localization_accessibility", status: "PASS", note: "pt-BR locale verified"}
+        - {stage: "sector_controls", status: "PASS", note: "No blockers"}
+      human_signoff: "legal-reviewer-042"
+      admission_decision: "FAIL_CLOSED"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-MARKETADMISSIONRECORD-1: stages[] carries no timestamp per stage -- should a future revision add one to support the Legal Freshness SLA machinery already sketched in docs/architecture/GLOBAL_JURISDICTION_PLAN.md §2 (a separate, PROPOSED document)?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L942) and §11.54 (L2440-2465) directly, plus §18.3
+    (L4034-4053). Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "market_admission_control"/"MarketAdmissionRecord" and every schema
+    title before writing -- zero pre-existing implementation or schema
+    title overlap (pre-existing specs/jurisdiction/pack.schema.yaml is a
+    different, Master-Plan-sourced registry object, disclosed in the
+    contract's open_questions). Validated against jsonschema
+    Draft202012Validator via tests/unit/test_market_admission_control.py.
+  note: >
+    No mother document was modified. The 7-stage enum and the fail-closed
+    rule are transcribed directly from Atlas §11.54. The MADM- prefix and
+    the derived-decision field placement are this file's own compiled
+    structure, disclosed above.

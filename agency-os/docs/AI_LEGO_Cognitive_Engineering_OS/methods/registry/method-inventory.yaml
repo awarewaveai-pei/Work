@@ -1458,53 +1458,63 @@ by_document:
       - name: "Jurisdiction Resolver"
         line: 935
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.resolver"
       - name: "Applicable Law Graph"
         line: 936
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.applicable_law_graph"
       - name: "Obligation-to-Control Mapping"
         line: 937
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.obligation_to_control_mapping"
       - name: "Compliance Gap Analysis"
         line: 938
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.compliance_gap_analysis"
       - name: "Regulatory Horizon Scan"
         line: 939
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.regulatory_horizon_scan"
       - name: "Localization Review"
         line: 940
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.localization_review"
       - name: "Cultural Context Review"
         line: 941
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.cultural_context_review"
       - name: "Market Admission Control"
         line: 942
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.market_admission_control"
       - name: "Data Residency Assessment"
         line: 943
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.data_residency_assessment"
       - name: "Conflict-of-Law Review"
         line: 944
         category: "F23 jurisdiction"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "jurisdiction.conflict_of_law_review"
       - name: "Representation Switching"
         line: 963
         category: "F24 representation"

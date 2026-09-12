@@ -1,0 +1,105 @@
+$id: "ai-lego://methods/contracts/jurisdiction.compliance_gap_analysis.contract.yaml"
+title: "Compliance Gap Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  F23 global jurisdiction/compliance/localization family, table-row-only
+  citation (Atlas L938: "Compliance Gap Analysis | 比較現況與要求 |
+  required controls vs implemented->gaps->severity->plan | 快速知道能否上
+  線"). Compares required controls against implemented controls. Core
+  invariant, same "derived, not asserted" discipline this corpus's
+  `experiment.mvp`/`delivery.risk_register` already establish: `gaps` is
+  MECHANICALLY DERIVED as the set difference required-controls minus
+  implemented-controls, never accepted as a caller-asserted list -- a
+  caller-supplied gap set that disagrees with the actual set difference is
+  refused. Every derived gap must carry a non-empty severity and plan.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Compliance Gap Analysis row (L938)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L938 gives a real 4-stage pipeline and
+  effect ("快速知道能否上線") -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: jurisdiction.compliance_gap_analysis
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [COMPARE, VALIDATE, PRIORITIZE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). COMPARE builds the required-vs-implemented set difference,
+# VALIDATE refuses a caller-asserted gap set that disagrees with that
+# difference, PRIORITIZE assigns severity to each gap. All three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - mechanically_derive_the_gap_between_required_and_implemented_controls_and_grade_severity
+# Atlas L938 verbatim sense: compare current state to requirements, derive
+# gaps, grade severity, and attach a remediation plan, so go-live readiness
+# can be answered quickly.
+
+inputs:
+  required:
+    - RequiredControlSet
+    - ImplementedControlSet
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is Atlas L938's own literal pair, "required controls
+  # vs implemented" -- the required side may in practice be sourced from a
+  # jurisdiction.obligation_to_control_mapping output, but this contract
+  # does not hard-couple to that record shape, same honesty-gap class every
+  # sibling F-family contract already discloses.
+
+outputs:
+  - ComplianceGapAnalysis
+# NEW output type (see typed-objects/compliance-gap-analysis-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared required control"
+  - "the asserted gaps[] control_id set equals required_controls minus implemented_controls, exactly (gap derivation)"
+  - "every gap carries a non-empty severity and plan"
+  # NEW, structurally necessary. Atlas's own pipeline is "required controls
+  # vs implemented->gaps" -- a caller narrating a smaller (or larger) gap
+  # set than the real set difference is exactly the "AI 主觀打分" anti-
+  # pattern this corpus's own `experiment.mvp`/`delivery.risk_register`
+  # were built to structurally prevent, applied here to compliance status.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent gap analysis, same placement
+  # convention every structurally similar single-record F-family sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F23's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing an analysis has no external side effect.
+
+open_questions:
+  - "OQ-CGAP-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-CGAP-2: severity is a closed 4-value enum (low/medium/high/critical), extending dpia_pia's own 3-value low/medium/high precedent with a critical tier for the go/no-go use case -- should a future revision reconcile the two into one shared severity typed object?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L931-956) directly; confirmed line 938 is the
+    exact Compliance Gap Analysis row. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "compliance gap"/"compliance-gap"/"CGAP-"/"jurisdiction\." before
+    writing -- zero pre-existing implementation, contract, or schema title
+    overlap found. Read `ai_lego/modules/experiment/mvp.py` and
+    `ai_lego/modules/delivery/risk_register.py` in full for the exact
+    "derived, never accepted from the caller" convention this method's
+    gaps[] field applies. Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    verbatim from Atlas L938. The gap-derivation precondition, the CGAP- id
+    prefix, and the 4-value severity enum are this file's own compiled
+    structure, disclosed above, not textually cited.

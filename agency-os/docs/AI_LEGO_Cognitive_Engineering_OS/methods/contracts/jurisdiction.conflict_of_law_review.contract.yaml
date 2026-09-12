@@ -1,0 +1,86 @@
+$id: "ai-lego://methods/contracts/jurisdiction.conflict_of_law_review.contract.yaml"
+title: "Conflict-of-Law Review Method Contract"
+status: ACTIVE
+
+description: >
+  F23 jurisdiction/compliance/localization family (Atlas L944:
+  "Conflict-of-Law Review | 多法律衝突時決定適用與人工升級 | governing
+  law->mandatory rules->conflicts->legal review | 防自動化錯用法律").
+  Core invariant, the strongest fail-closed pattern in this method:
+  ANY conflict that has been given a finalized `applicable_law` MUST
+  carry a non-empty `legal_review` record (reviewer/date/outcome) --
+  the builder REFUSES to auto-resolve a conflict with no human
+  sign-off attached. Atlas's own benefit column is literally
+  "防自動化錯用法律" (prevent automation from misapplying law); an
+  auto-resolved conflict with no human review is exactly that failure.
+
+id: jurisdiction.conflict_of_law_review
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [COMPARE, VALIDATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). COMPARE detects conflicts between governing laws and
+# mandatory rules; VALIDATE is the mandatory human legal_review gate;
+# DECIDE commits the final applicable_law determination, only after
+# VALIDATE has occurred. All 3 are CANONICAL_KERNEL members
+# (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - determine_applicable_law_for_a_declared_multi_law_conflict_with_mandatory_human_escalation
+
+inputs:
+  required:
+    - GoverningLawSet
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting
+  # point is the set of governing laws/mandatory rules under review,
+  # same honesty-gap class every sibling F-family contract discloses.
+
+outputs:
+  - ConflictOfLawReview
+# NEW output type (see typed-objects/conflict-of-law-review-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared governing law"
+  - "every conflict names >=2 disputed law/rule ids, all resolving to a declared governing law or mandatory rule"
+  - "a conflict's applicable_law is never finalized without a non-empty legal_review record (reviewer, date, outcome) already attached -- fail closed, no auto-resolution"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next: []
+# Atlas F23's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a review record has no external
+  # side effect (the mandatory human legal_review itself happens outside
+  # this method's own execution boundary).
+
+open_questions:
+  - "OQ-COLR-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-COLR-2: record id prefix is COLR- (Conflict-of-Law Review), deliberately NOT COL- -- specs/jurisdiction/conflict-of-laws-output.schema.yaml already owns the `^COL-` prefix for a DIFFERENT, software-architecture-layer object (the Conflict-of-Laws Engine's output, GLOBAL_JURISDICTION_PLAN.md §5 / MP §98). Should a future revision formally link the two records (this method's finalized applicable_law feeding that engine's `resolution_rule_applied`)?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Conflict-of-Law Review row (L944) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "conflict of law"/"conflict-of-law"/"conflict_of_law" before writing.
+    Found `specs/jurisdiction/conflict-of-laws-output.schema.yaml`
+    ($id COL-, a pre-existing DIFFERENT object: the Conflict-of-Laws
+    Engine's software-architecture output, decided_by ADR-013) -- read
+    in full, disclosed above and in the sibling typed-object schema, id
+    prefix changed to COLR- to avoid namespace collision. Zero
+    pre-existing Method Atlas contract with this method's id/title.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    verbatim from Atlas L944. The mandatory-legal-review-before-
+    finalization invariant and the COLR- prefix disambiguation are this
+    file's own compiled structure, disclosed above, not textually cited.

@@ -1,0 +1,120 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/compliance-gap-analysis-record.schema.yaml"
+title: Compliance Gap Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ComplianceGapAnalysis` -- the
+  declared `outputs` of `jurisdiction.compliance_gap_analysis`'s Method
+  Contract (methods/contracts/jurisdiction.compliance_gap_analysis.
+  contract.yaml, `outputs: [ComplianceGapAnalysis]`). F23 global
+  jurisdiction/compliance/localization family (Atlas L938: "required
+  controls vs implemented->gaps->severity->plan").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `risk-register-record.schema.yaml`'s own exposure-
+  derivation precedent): (a) GAP DERIVATION, THE real invariant this method
+  exists to enforce -- `gaps[].control_id` (as a set) equals
+  `required_controls` minus `implemented_controls`, exactly; a caller-
+  asserted `gaps[]` that disagrees with that set difference is refused,
+  never silently accepted; (b) every `gaps[]` entry carries a non-empty
+  `severity` and `plan`. `ai_lego/modules/jurisdiction/
+  compliance_gap_analysis.py` enforces both at construction time and
+  independent gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Compliance Gap Analysis row (L938)"
+  - "methods/contracts/jurisdiction.compliance_gap_analysis.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L938's own
+  4-stage pipeline plus low-risk, disclosed compilation choices (the CGAP-
+  prefix, record-level-only provenance, the 4-value severity enum).
+
+compilation_decisions:
+  - question: "Should severity be free text, or a closed enum?"
+    decision: >
+      Closed 4-value enum [low, medium, high, critical], extending
+      `dpia-pia-impact-assessment-record.schema.yaml`'s own existing
+      3-value severity enum [low, medium, high] with a `critical` tier --
+      Atlas L938's own benefit column ("快速知道能否上線") is a go/no-go
+      launch gate, and a launch-blocking gap needs a value distinguishable
+      from merely "high".
+  - question: "Gap derivation (gaps[] control_id set == required_controls - implemented_controls): JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot express a cross-array set-difference constraint declaratively, same gap class as risk-register-record.schema.yaml's own exposure-derivation precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, required_controls, implemented_controls, gaps, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CGAP-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.compliance_gap_analysis"
+
+  required_controls:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+    description: "The full set of control_id strings required for go-live. RUNTIME invariant: >=1 required, unique (method contract precondition) -- a compliance analysis over zero required controls answers nothing."
+
+  implemented_controls:
+    type: array
+    items: {type: string, minLength: 1}
+    description: "The subset of control_id strings actually implemented today. May be empty (nothing implemented yet) or reference control_ids outside required_controls (extra controls beyond scope, harmless)."
+
+  gaps:
+    type: array
+    description: "RUNTIME invariant: GAP DERIVATION -- the set of gaps[].control_id must equal required_controls minus implemented_controls, exactly (see module description)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [control_id, severity, plan]
+      properties:
+        control_id: {type: string, minLength: 1}
+        severity: {enum: [low, medium, high, critical]}
+        plan: {type: string, minLength: 1}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent analysis."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "3 required controls, 1 implemented -- 2 mechanically-derived gaps, each with severity+plan"
+    value:
+      id: "CGAP-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.compliance_gap_analysis"
+      required_controls: ["CTRL-1", "CTRL-2", "CTRL-3"]
+      implemented_controls: ["CTRL-1"]
+      gaps:
+        - {control_id: "CTRL-2", severity: high, plan: "assign Security Lead, target close 2026-10-31"}
+        - {control_id: "CTRL-3", severity: critical, plan: "blocks go-live -- escalate to Compliance Steward this week"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CGAP-1: gaps[] carries no target close date, only a free-text plan -- should a future revision add a structured due_date field, same convention delivery.raci already uses for deliverable due dates?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Compliance Gap Analysis row (L938) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "compliance gap"/"compliance-gap"/"CGAP-" and every schema title before
+    writing -- zero pre-existing implementation or schema title overlap
+    found. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_compliance_gap_analysis.py.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    directly from Atlas L938. The CGAP- prefix, the 4-value severity enum,
+    and runtime-invariant placement of gap derivation are this file's own
+    compiled structure, disclosed above.

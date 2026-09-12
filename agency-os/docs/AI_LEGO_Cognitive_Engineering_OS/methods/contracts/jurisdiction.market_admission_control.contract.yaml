@@ -1,0 +1,103 @@
+$id: "ai-lego://methods/contracts/jurisdiction.market_admission_control.contract.yaml"
+title: "Market Admission Control Method Contract"
+status: ACTIVE
+
+description: >
+  F23 global jurisdiction/compliance/localization family (Atlas L942:
+  "Market Admission Control | 新市場 go/no-go gate | pack→legal freshness
+  →data→provider→security→localization→sign-off | 市場級最小爆炸半徑").
+  Dedicated §11.54 (L2440-2465) gives the full pipeline: Jurisdiction Pack →
+  Legal Freshness → Data Residency → AI Provider/Model → Security/Privacy →
+  Localization/Accessibility → Sector Controls → Human Sign-off → ENABLE,
+  with the explicit rule "任一 critical unknown：FAIL CLOSED". Core
+  invariant: `admission_decision` is MECHANICALLY DERIVED, never caller-
+  asserted -- ENABLE iff all 7 named stages are PASS and a non-empty human
+  sign-off is present; any UNKNOWN or missing stage forces FAIL_CLOSED. This
+  is the method's own stated benefit ("把「全球支援」變成可驗證 admission
+  process，而不是行銷宣稱") made structural.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Market Admission Control row (L942)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.54 (L2440-2465) -- the 7-stage pipeline and the 'any critical unknown -> FAIL CLOSED' rule"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §18.3 Market Admission Gate (L4034-4053) -- corroborating mermaid flow with the same stage sequence"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas §11.54 gives a concrete named pipeline
+  and an explicit fail-closed rule -- direct transcription plus disclosed
+  compilation choices.
+
+id: jurisdiction.market_admission_control
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [DECOMPOSE, EVALUATE, DECIDE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). DECOMPOSE breaks admission into its 7 named stages; EVALUATE
+# assesses each stage's status; DECIDE derives the single admission_decision
+# from all 7 plus sign-off, never accepting it as an assertion. All three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - gate_new_market_or_sector_enablement_through_a_verifiable_multistage_admission_process
+
+inputs:
+  required:
+    - MarketAdmissionRequest
+  # NEW DESIGN. Atlas §11.54 names the 7 pipeline stages but gives no
+  # concrete input typed-object; same honesty-gap class every sibling
+  # F-family contract already discloses. Modeled as the record's own
+  # `stages[]` + `human_signoff` fields.
+
+outputs:
+  - MarketAdmissionRecord
+# NEW output type (see typed-objects/market-admission-record.schema.yaml).
+
+preconditions:
+  - "exactly the 7 named stages present, each exactly once (jurisdiction_pack, legal_freshness, data_residency, ai_provider, security_privacy, localization_accessibility, sector_controls)"
+  - "admission_decision is derived, never accepted as a caller-supplied field"
+  - "admission_decision == ENABLE iff every stage status == PASS AND human_signoff is a non-empty string"
+  # NEW, structurally necessary. §11.54's own explicit rule ("任一 critical
+  # unknown：FAIL CLOSED") is defeated by construction if a caller could
+  # directly assert ENABLE while a stage is UNKNOWN or missing.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same placement convention every structurally
+  # similar single-record F-family sibling uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas §13.6's own Global Market Entry Recipe places Market Admission
+# Control as the LAST gate before "Human Go/Hold/No-Go" (L3368-3369) --
+# no further Method Atlas method is named as its own successor.
+
+rollback:
+  side_effect_free: true
+  # Producing an admission record has no external side effect, same
+  # low-risk-by-analogy inference every sibling contract uses.
+
+open_questions:
+  - "OQ-MADM-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-MADM-2: verified-findings.yaml already records that Atlas §18.3's Market Admission Gate mermaid flow has drifted from Master Plan §142's own admission gate (different step split for Localization/Accessibility vs Sector/Sign-off) -- this contract follows Atlas §11.54's own 7-stage list verbatim, not MP §142's; a future revision may need to reconcile the two.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L942) and §11.54 (L2440-2465) directly, plus §18.3
+    (L4034-4053) for the corroborating mermaid flow. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "market_admission_control"/"MarketAdmissionRecord"/"market admission"
+    before writing -- zero pre-existing method contract or module overlap
+    (pre-existing `specs/jurisdiction/pack.schema.yaml` is a distinct,
+    Master-Plan-sourced Jurisdiction Pack REGISTRY object for a different
+    purpose -- an authored pack's own freshness/residency/override state --
+    not this method's per-admission-request PASS/FAIL stage record; no name
+    or output-schema-title collision). Validated against
+    specs/cognitive/method.schema.yaml with jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. The 7-stage pipeline and the fail-
+    closed-on-unknown rule are transcribed from Atlas §11.54. The stage-
+    completeness precondition and the derived-decision record shape are
+    this file's own compiled structure, disclosed above, not textually
+    cited.

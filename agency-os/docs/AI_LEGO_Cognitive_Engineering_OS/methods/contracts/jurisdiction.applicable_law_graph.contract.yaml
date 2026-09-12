@@ -1,0 +1,111 @@
+$id: "ai-lego://methods/contracts/jurisdiction.applicable_law_graph.contract.yaml"
+title: "Applicable Law Graph Method Contract"
+status: ACTIVE
+
+description: >
+  F23 global jurisdiction/compliance/localization family (Atlas L936:
+  "Applicable Law Graph | 法規來源與適用條件圖譜 | jurisdiction→source→
+  effective date→scope→conflict | 支援版本與衝突法"). Table-row-only
+  citation -- grep-confirmed no dedicated §11.x section exists for this
+  method (unlike its F23 siblings Jurisdiction Resolver §11.53 and Market
+  Admission Control §11.54); §13.6's Global Market Entry Recipe (L3356-3357)
+  places it immediately after Jurisdiction Resolver, corroborating no new
+  content. Core invariant: every law entry cites a real source and
+  effective_date and resolves to a declared jurisdiction node, and any two
+  entries sharing jurisdiction+scope with overlapping effective date ranges
+  MUST carry a non-null `conflict` flag -- the method's own stated benefit
+  ("支援版本與衝突法", support versioning AND conflict-of-law) is defeated
+  by construction if two silently-contradicting laws can coexist unflagged.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Applicable Law Graph row (L936)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §13.6 Global Market Entry Recipe (L3352-3370) -- ordering corroboration only, no additional fields"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L936 is the only citation (verified by
+  grep, no dedicated section exists) -- the pipeline
+  "jurisdiction→source→effective date→scope→conflict" is transcribed
+  verbatim as this method's own field ordering; the overlap-detection
+  mechanics are this file's own disclosed compilation choice.
+
+id: jurisdiction.applicable_law_graph
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [DECOMPOSE, COMPARE, SYNTHESIZE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). DECOMPOSE breaks the legal landscape into discrete law entries;
+# COMPARE checks every entry pair sharing jurisdiction+scope for date-range
+# overlap; SYNTHESIZE assembles the graph (jurisdiction nodes + law entries
+# + conflict flags) as one coherent structure. All three CANONICAL_KERNEL
+# members.
+
+purpose:
+  - build_a_referentially_complete_law_graph_with_flagged_temporal_conflicts
+
+inputs:
+  required:
+    - ApplicableLawGraphRequest
+  # NEW DESIGN. Atlas L936 names the pipeline stages but gives no concrete
+  # input typed-object; same honesty-gap class every sibling F-family
+  # contract already discloses. Modeled as the record's own
+  # `jurisdiction_nodes[]` + `law_entries[]` fields.
+
+outputs:
+  - ApplicableLawGraph
+# NEW output type (see typed-objects/applicable-law-graph-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared jurisdiction node"
+  - "at least 1 law entry"
+  - "every law_entries[].jurisdiction_id resolves to a declared jurisdiction_nodes[] entry"
+  - "every law entry has a non-empty source and a valid effective_date"
+  - "any two law entries sharing jurisdiction_id+scope with overlapping [effective_date, expiry_date) ranges must both carry a non-null conflict field"
+  # NEW, structurally necessary. Atlas's own benefit column
+  # ("支援版本與衝突法") is defeated by construction if two entries can
+  # silently both be in effect for the same jurisdiction+scope with no
+  # conflict flag naming the resolution.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same placement convention every structurally
+  # similar single-record F-family sibling uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas §13.6 places this method between Jurisdiction Resolver and Local
+# Language/Culture Pack (L3356-3358) -- neither is itself a Method Atlas
+# method id, so no `recommended_next` entry is asserted.
+
+rollback:
+  side_effect_free: true
+  # Producing a law graph record has no external side effect, same
+  # low-risk-by-analogy inference every sibling contract uses.
+
+open_questions:
+  - "OQ-ALG-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-ALG-2: pre-existing specs/jurisdiction/conflict-of-laws-output.schema.yaml models a DIFFERENT, heavier concept (a runtime Conflict-of-Laws Engine's escalation-to-human-counsel output, Master-Plan-§98-sourced); this method's own `conflict` field is a lighter graph-level flag naming the overlap, not an escalation record -- should a future revision cross-reference the two?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L936) directly, plus §13.6 (L3352-3370) for
+    ordering corroboration. Grepped the full Atlas file for "Applicable Law
+    Graph" (2026-09-12): exactly 2 hits, the table row (L936) and the
+    §13.6 recipe step name (L3357) -- confirmed no dedicated section exists
+    for this method (the task brief's own suspicion of a table-row-only
+    citation is correct). Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "applicable_law_graph"/"ApplicableLawGraph" before writing -- zero
+    pre-existing method contract or module overlap (pre-existing
+    specs/jurisdiction/conflict-of-laws-output.schema.yaml is a distinct,
+    heavier Master-Plan-§98-sourced object, disclosed in `open_questions`
+    above). Validated against specs/cognitive/method.schema.yaml with
+    jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. The pipeline order
+    "jurisdiction→source→effective date→scope→conflict" is transcribed
+    verbatim from Atlas L936. The referential-integrity and overlap-
+    conflict preconditions are this file's own compiled structure,
+    disclosed above, not textually cited.

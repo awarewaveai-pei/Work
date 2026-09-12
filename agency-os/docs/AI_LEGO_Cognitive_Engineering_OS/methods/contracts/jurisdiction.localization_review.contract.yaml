@@ -1,0 +1,92 @@
+$id: "ai-lego://methods/contracts/jurisdiction.localization_review.contract.yaml"
+title: "Localization Review Method Contract"
+status: ACTIVE
+
+description: >
+  F23 Global Jurisdiction/Compliance/Localization family (table row L940:
+  "檢查語言/貨幣/單位/時區/UX | locale→format→content→accessibility→QA | 不把
+  翻譯當在地化"). Dedicated §12.43 (L3138-3159) names 13 required dimensions
+  for a real localization review, not mere translation: Language, Date/Time,
+  Timezone, Currency, Number Format, Units, Address, Name, Phone, Tax, UI
+  Layout, Accessibility, Content Expectations. Core invariant: a record
+  cannot claim READY unless ALL 13 dimensions carry an explicit status +
+  non-empty note, and overall_status is mechanically derived from them,
+  never caller-asserted -- directly implementing L940's own "不把翻譯當在地化"
+  and §12.43's benefit "讓 Global Core 真正可被 local market 使用".
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Localization Review row (L940)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.43 在地化檢查／本地化審查 (L3138-3159)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. F23's table header (L931-933) gives no
+  family-wide shared principle line. §12.43's 13-dimension list is
+  transcribed verbatim; the status/derivation structure is this file's own
+  compilation, same shape as `delivery.definition_of_done`'s (F22) own
+  12-dimension precedent.
+
+id: jurisdiction.localization_review
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [DECOMPOSE, VERIFY, EVALUATE]
+# INFERRED, not cited (F23's table gives no composition formula). DECOMPOSE
+# breaks "localized" into 13 named dimensions; VERIFY checks each against
+# evidence; EVALUATE derives the overall readiness verdict. Same triad
+# `delivery.definition_of_done` already uses for the identical N-dimension-
+# gate shape.
+
+purpose:
+  - gate_market_readiness_across_all_13_atlas_localization_dimensions_not_just_translation
+
+inputs:
+  required: [LocalizationTarget]
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is whatever locale-scoped surface (a market, a
+  # storefront, a feature) is under review.
+
+outputs: [LocalizationReviewRecord]
+# NEW output type (see typed-objects/localization-review-record.schema.yaml).
+
+preconditions:
+  - "all 13 §12.43 dimensions declared (no missing, no extra)"
+  - "every dimension carries a non-empty note/evidence pointer"
+  - "overall_status equals the mechanical derivation from the 13 dimension statuses"
+  # NEW, structurally necessary -- L940's own benefit is "不把翻譯當在地化"; a
+  # record allowed to omit a dimension (e.g. declare only Language) or
+  # assert overall_status independent of the declared statuses lets exactly
+  # that anti-pattern back in.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention as every sibling F13/F15/F22 record.
+
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # Producing a localization review record has no external side effect,
+  # same low-risk-by-analogy inference every sibling contract in this
+  # directory uses.
+
+open_questions:
+  - "OQ-LOCREVIEW-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-LOCREVIEW-2: NOT_APPLICABLE is treated as satisfying a dimension for overall_status purposes (same as MET) -- should a future revision require a distinct justification field for NOT_APPLICABLE claims (same open question `delivery.definition_of_done` already carries)?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Localization Review row (L940), and §12.43
+    (L3138-3159) directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "localization"/"localization_review"/"LOCREVIEW" before writing -- zero
+    pre-existing implementation or schema title overlap found (only
+    method-inventory.yaml's own `pending` placeholder row at L1483-1487
+    existed).  Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 13-dimension list is transcribed
+    verbatim from §12.43 (L3144-3156). The MET/NOT_MET/NOT_APPLICABLE
+    status enum, the LOCREVIEW- prefix, and the READY/NOT_READY derivation
+    rule are this file's own compiled structure, disclosed above, not
+    textually cited.

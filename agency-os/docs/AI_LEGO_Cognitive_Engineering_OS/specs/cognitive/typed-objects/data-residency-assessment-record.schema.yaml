@@ -1,0 +1,130 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/data-residency-assessment-record.schema.yaml"
+title: Data Residency Assessment Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DataResidencyAssessment` --
+  the declared `outputs` of `jurisdiction.data_residency_assessment`'s
+  Method Contract (methods/contracts/
+  jurisdiction.data_residency_assessment.contract.yaml, `outputs:
+  [DataResidencyAssessment]`). F23 jurisdiction family (Atlas L943:
+  "data classes->subjects->laws/contracts->regions->routing").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own
+  matrix-completeness precedent): (a) referential integrity --
+  `routing_decisions[].data_class_id` resolves to a declared
+  `data_classes[]` entry (no orphan routing); (b) ROUTING COMPLETENESS
+  -- every declared data class has at least one routing decision (a
+  data class with zero routing decisions is silently unrouted, exactly
+  the "支援主權與跨境資料" failure this method exists to prevent).
+  `ai_lego/modules/jurisdiction/data_residency_assessment.py` enforces
+  both at construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Data Residency Assessment row (L943)"
+  - "methods/contracts/jurisdiction.data_residency_assessment.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L943's own
+  5-stage pipeline plus low-risk, disclosed compilation choices (the
+  DRA- prefix, record-level-only provenance, free-text region field).
+
+compilation_decisions:
+  - question: "region: free-text string, or a closed enum of geographic regions?"
+    decision: "Free-text non-empty string. Atlas names no fixed region vocabulary, and a real deployment's set of routable regions is an operational fact, not a corpus-cited enum -- inventing one here would be exactly the fabricate-a-rich-schema-with-no-textual-basis trap method.schema.yaml's own compilation_decisions warns against."
+  - question: "Routing completeness: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot cross-check that routing_decisions[] covers every data_classes[] entry declaratively, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, data_classes, routing_decisions, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DRA-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.data_residency_assessment"
+
+  data_classes:
+    type: array
+    minItems: 1
+    description: "The data classes under assessment. RUNTIME invariant: each must appear in >=1 routing_decisions entry (see module description)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [data_class_id, description, subjects, applicable_laws]
+      properties:
+        data_class_id: {type: string, minLength: 1}
+        description: {type: string, minLength: 1}
+        subjects:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1}
+          description: "The categories of data subject this class covers (e.g. 'EU residents', 'employees')."
+        applicable_laws:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1}
+          description: "The laws/contracts this class must be assessed against (free-text refs, e.g. 'LAW-GDPR', 'CONTRACT-DPA-2026')."
+
+  routing_decisions:
+    type: array
+    description: "RUNTIME invariant: referential integrity (data_class_id resolves to a declared data_classes[] entry) and routing completeness (every data class covered) -- see module description."
+    items:
+      type: object
+      additionalProperties: false
+      required: [data_class_id, region, rationale]
+      properties:
+        data_class_id: {type: string, minLength: 1}
+        region: {type: string, minLength: 1, description: "Free-text geographic routing target (e.g. 'EU', 'US-EAST') -- see compilation_decisions for why this is not a closed enum."}
+        rationale: {type: string, minLength: 1}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent assessment."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-data-class assessment (each class routed to >=1 region)"
+    value:
+      id: "DRA-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.data_residency_assessment"
+      data_classes:
+        - {data_class_id: "DC-EU-CUSTOMER-PII", description: "EU customer personally identifiable information", subjects: ["EU residents"], applicable_laws: ["LAW-GDPR"]}
+        - {data_class_id: "DC-FINANCIAL-RECORDS", description: "Transaction and billing records", subjects: ["EU residents", "US residents"], applicable_laws: ["LAW-GDPR", "LAW-CCPA", "CONTRACT-PSP-DPA"]}
+      routing_decisions:
+        - {data_class_id: "DC-EU-CUSTOMER-PII", region: "EU", rationale: "GDPR data-minimization/localization preference -- no adequacy transfer mechanism in place"}
+        - {data_class_id: "DC-FINANCIAL-RECORDS", region: "EU", rationale: "Primary processing region for the EU-resident subset"}
+        - {data_class_id: "DC-FINANCIAL-RECORDS", region: "US-EAST", rationale: "US-resident subset processed under the PSP's US data processing agreement"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-DATARESIDENCYASSESSMENT-1: routing_decisions[] carries no confidence/evidence sub-structure beyond rationale text -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Data Residency Assessment row (L943) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "data residency"/"data_residency" and every schema title before
+    writing -- found specs/jurisdiction/pack.schema.yaml's pack-level
+    data_residency storage-restriction-class enum (a different layer,
+    disclosed in the sibling contract yaml's open_questions), zero
+    pre-existing typed-object title overlap. Validated against
+    jsonschema Draft202012Validator via
+    tests/unit/test_data_residency_assessment.py.
+  note: >
+    No mother document was modified. The 5-stage pipeline is transcribed
+    directly from Atlas L943. The DRA- prefix, free-text region field,
+    and runtime-invariant placement of routing completeness are this
+    file's own compiled structure, disclosed above.

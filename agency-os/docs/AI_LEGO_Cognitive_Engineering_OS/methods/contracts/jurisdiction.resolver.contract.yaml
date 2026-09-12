@@ -1,0 +1,106 @@
+$id: "ai-lego://methods/contracts/jurisdiction.resolver.contract.yaml"
+title: "Jurisdiction Resolver Method Contract"
+status: ACTIVE
+
+description: >
+  F23 global jurisdiction/compliance/localization family (Atlas L935:
+  "Jurisdiction Resolver | 解析實際適用的多層管轄 | entity/market/user/data/
+  processing/storage/provider/sector→jurisdictions | 防止只用國家名粗判").
+  Dedicated §11.53 (L2412-2437): answers not "which country is the user
+  in" but which jurisdictions jointly govern a processing activity, across
+  >=11 named input dimensions (Legal Entity, User Location, Data Subject
+  Location, Processing Location, Storage Location, Provider Location,
+  Market, Contract Governing Law, Sector, Government Level, Special
+  Territory/Indigenous Jurisdiction). Core invariant: when 2+ dimensions
+  are declared, the output must be derived from >=2 of them -- a
+  resolution collapsing a multi-dimensional input to a single dimension
+  (e.g. user-location-only) is exactly the "country == XX" naivety this
+  method's own benefit column exists to prevent, made structural.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Jurisdiction Resolver row (L935)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.53 (L2412-2437) -- the 11 named input dimensions and the not-country-only framing"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L935 + §11.53 give a concrete dimension
+  list and a stated anti-pattern ("讓全球產品避免簡化成 country == XX") --
+  direct transcription plus disclosed compilation choices.
+
+id: jurisdiction.resolver
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY, SYNTHESIZE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). DECOMPOSE splits the request into its declared dimensions;
+# CLASSIFY places each into the Atlas §11.53 dimension vocabulary;
+# SYNTHESIZE combines >=2 dimensions into a joint jurisdiction
+# determination rather than any single one. All three CANONICAL_KERNEL
+# members.
+
+purpose:
+  - resolve_the_multilayer_jurisdiction_set_from_declared_input_dimensions
+
+inputs:
+  required:
+    - JurisdictionResolutionRequest
+  # NEW DESIGN. Atlas §11.53 names the dimension vocabulary but gives no
+  # concrete input typed-object; same honesty-gap class every sibling
+  # F-family contract already discloses. Modeled as the record's own
+  # `declared_dimensions[]` field rather than a separate typed object --
+  # see typed-objects/jurisdiction-resolution-record.schema.yaml.
+
+outputs:
+  - JurisdictionResolution
+# NEW output type (see typed-objects/jurisdiction-resolution-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared dimension"
+  - "at least 1 resolved jurisdiction"
+  - "every resolved jurisdiction's derived_from_dimensions is a non-empty subset of the declared dimensions"
+  - "when 2+ dimensions are declared, the union of derived_from_dimensions across all resolved jurisdictions covers >=2 of them"
+  # NEW, structurally necessary. §11.53's own stated purpose ("不是使用者在
+  # 哪個國家") is defeated by construction if the output can be traced back
+  # to only 1 declared dimension whenever 2+ were actually provided.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same placement convention every structurally
+  # similar single-record F-family sibling uses.
+
+forbidden_transition: []
+recommended_next: ["jurisdiction.applicable_law_graph", "jurisdiction.market_admission_control"]
+# Atlas §13.6 Global Market Entry Recipe (L3352-3370): Jurisdiction Resolver
+# -> Applicable Law Graph -> ... -> Market Admission Control.
+
+rollback:
+  side_effect_free: true
+  # Producing a resolution record has no external side effect, same
+  # low-risk-by-analogy inference every sibling contract uses.
+
+open_questions:
+  - "OQ-JRES-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-JRES-2: specs/jurisdiction/context.schema.yaml already exists as a separate, Master-Plan-§94-sourced 14-field JurisdictionContext with a partially different dimension list (disclosed in that file's own MRSP-context-1 open question) -- this method's own 11-dimension vocabulary is Atlas-sourced and deliberately NOT unified with it; should a future revision reconcile the two?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L935) and §11.53 (L2412-2437) directly, plus §18.1
+    (L3991-4012) for the corroborating (partially-drifted, per
+    verified-findings.yaml's own already-recorded MP-§94-vs-Atlas-§18
+    duplication finding) 13-dimension list. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "jurisdiction.resolver"/"jurisdiction_resolver"/"JurisdictionResolution"
+    before writing -- zero pre-existing method contract or module overlap
+    (pre-existing `specs/jurisdiction/context.schema.yaml` is a distinct,
+    Master-Plan-sourced typed object for a different purpose, disclosed in
+    `open_questions` above, not a name or shape collision with this
+    contract's `id` or this method's own output schema title). Validated
+    against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator.
+  note: >
+    No mother document was modified. The 11-dimension vocabulary and the
+    "not country == XX" framing are transcribed from Atlas §11.53. The
+    dimension-coverage precondition and the record shape are this file's
+    own compiled structure, disclosed above, not textually cited.

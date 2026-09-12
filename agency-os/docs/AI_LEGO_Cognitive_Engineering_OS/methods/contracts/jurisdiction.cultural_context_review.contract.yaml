@@ -1,0 +1,101 @@
+$id: "ai-lego://methods/contracts/jurisdiction.cultural_context_review.contract.yaml"
+title: "Cultural Context Review Method Contract"
+status: ACTIVE
+
+description: >
+  F23 Global Jurisdiction/Compliance/Localization family (table row L941:
+  "用 local evidence 評估文化因素 | trust/authority/risk/privacy/education
+  expectations 等 | 降文化誤判"). Dedicated §12.44 (L3163-3179) names 8
+  factors checked USING LOCAL EVIDENCE: Trust, Authority, Communication
+  style, Privacy perception, Risk preference, Technology acceptance,
+  Education expectation, Historical context. §12.44's own 關鍵規則
+  (key rule, L3177-3178, verbatim): "文化模型是 hypothesis/context，不是刻板
+  印象；高風險決策要有 Local Data / Interview / Survey / Expert Review"
+  (a cultural model is a hypothesis/context, NOT a stereotype; high-risk
+  decisions require Local Data/Interview/Survey/Expert Review as backing
+  evidence). Core invariant: any factor entry flagged `risk_level: HIGH`
+  must carry at least one non-empty evidence item from the closed set
+  {LOCAL_DATA, INTERVIEW, SURVEY, EXPERT_REVIEW} -- making §12.44's own
+  key rule structural rather than guidance text a caller can ignore.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Cultural Context Review row (L941)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.44 文化情境審查／文化脈絡分析 (L3163-3179)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. F23's table header (L931-933) gives no
+  family-wide shared principle line. §12.44's 8-factor list and its own
+  關鍵規則 are transcribed verbatim; the risk_level/evidence structure
+  making the key rule mechanical is this file's own compilation.
+
+id: jurisdiction.cultural_context_review
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [DECOMPOSE, VERIFY, EXPLAIN]
+# INFERRED, not cited (F23's table gives no composition formula). DECOMPOSE
+# breaks "cultural context" into 8 named factors; VERIFY checks each
+# HIGH-risk factor against a closed evidence set (§12.44's own 關鍵規則);
+# EXPLAIN articulates each factor's assessment as a real statement, not a
+# bare label -- guarding against exactly the "刻板印象" (stereotype)
+# framing §12.44 forbids.
+
+purpose:
+  - assess_8_atlas_cultural_factors_with_local_evidence_backing_every_high_risk_judgment
+
+inputs:
+  required: [CulturalReviewTarget]
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is whatever market/context/decision is under
+  # cultural review.
+
+outputs: [CulturalContextReviewRecord]
+# NEW output type (see typed-objects/cultural-context-review-record.schema.yaml).
+
+preconditions:
+  - "all 8 §12.44 factors declared (no missing, no extra)"
+  - "every factor carries a non-empty note and a well-shaped (possibly empty) evidence list"
+  - "every factor with risk_level HIGH carries at least 1 evidence item from {LOCAL_DATA, INTERVIEW, SURVEY, EXPERT_REVIEW}"
+  # NEW, structurally necessary -- §12.44's own 關鍵規則 says a HIGH-risk
+  # cultural judgment needs Local Data/Interview/Survey/Expert Review
+  # backing; a record allowed to assert HIGH risk with zero evidence lets
+  # exactly the "刻板印象" (stereotype) failure mode back in.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention as every sibling F13/F15/F22/
+  # jurisdiction.localization_review record.
+
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # Producing a cultural context review record has no external side
+  # effect, same low-risk-by-analogy inference every sibling contract in
+  # this directory uses.
+
+open_questions:
+  - "OQ-CULTCTX-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-CULTCTX-2: LOW/MEDIUM risk_level factors carry no evidence requirement at all (only HIGH does) -- should a future revision require at least 1 evidence item for MEDIUM too, tightening §12.44's own key rule beyond its literal 高風險 (high-risk) wording?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Cultural Context Review row (L941), and §12.44
+    (L3163-3179) directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "cultural.context"/"cultural_context"/"CULTCTX" before writing -- zero
+    pre-existing implementation or schema title overlap found (only
+    method-inventory.yaml's own `pending` placeholder row at L1488-1492
+    existed; unrelated coincidental hits on "cultural context" text inside
+    `insight.survey`'s own docstring were disambiguated as a different
+    method's citation of a different Atlas section, §12.18).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 8-factor list and the 關鍵規則's
+    evidence-source vocabulary (Local Data/Interview/Survey/Expert Review)
+    are transcribed verbatim from §12.44. The LOW/MEDIUM/HIGH risk_level
+    enum, the CULTCTX- prefix, and the runtime placement of the
+    evidence-for-HIGH-risk rule are this file's own compiled structure,
+    disclosed above, not textually cited.

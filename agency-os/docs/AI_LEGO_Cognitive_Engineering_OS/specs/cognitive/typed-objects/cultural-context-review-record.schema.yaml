@@ -1,0 +1,147 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/cultural-context-review-record.schema.yaml"
+title: Cultural Context Review Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CulturalContextReviewRecord` --
+  the declared `outputs` of `jurisdiction.cultural_context_review`'s Method
+  Contract (methods/contracts/jurisdiction.cultural_context_review.contract.
+  yaml, `outputs: [CulturalContextReviewRecord]`). F23 Global Jurisdiction/
+  Compliance/Localization family (Atlas L941 + §12.44 L3163-3179).
+
+  Real invariants (RUNTIME, same disclosed-gap class as
+  `definition-of-done-record.schema.yaml`'s own dimension-completeness
+  precedent): (a) FACTOR COMPLETENESS -- `factors` must declare exactly the
+  8 §12.44 factors, no missing, no extra, each with a valid `risk_level`, a
+  non-empty `note`, and a well-shaped `evidence` list; (b) EVIDENCE FOR
+  HIGH RISK, THE anti-stereotype invariant §12.44's own 關鍵規則 names --
+  any factor with `risk_level: HIGH` must carry at least 1 `evidence` item
+  drawn from the closed set {LOCAL_DATA, INTERVIEW, SURVEY, EXPERT_REVIEW}.
+  A HIGH-risk cultural judgment with zero evidence backing is exactly the
+  "刻板印象" (stereotype) §12.44's key rule forbids, made structural.
+  `ai_lego/modules/jurisdiction/cultural_context_review.py` enforces both
+  at construction time and two independent gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Cultural Context Review row (L941)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.44 文化情境審查／文化脈絡分析 (L3163-3179)"
+  - "methods/contracts/jurisdiction.cultural_context_review.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. The 8-factor list and the evidence-source
+  vocabulary are transcribed verbatim from §12.44. The risk_level enum,
+  CULTCTX- prefix, and evidence-array shape are this file's own
+  compilation choices.
+
+compilation_decisions:
+  - question: "Per-factor risk assessment: a free-text severity, or a closed enum?"
+    decision: "3-value enum LOW/MEDIUM/HIGH -- the evidence-for-HIGH-risk invariant needs a mechanically comparable value, not a free-text severity a caller could phrase to dodge the rule (e.g. 'quite risky' instead of 'HIGH')."
+  - question: "Evidence backing: a free-text citation, or a closed source-type enum?"
+    decision: "Closed enum {LOCAL_DATA, INTERVIEW, SURVEY, EXPERT_REVIEW}, transcribed verbatim from §12.44's own 關鍵規則 vocabulary (Local Data/Interview/Survey/Expert Review) -- a free-text field would let a caller write anything (including a restated stereotype) and call it 'evidence', defeating the rule's own purpose."
+  - question: "Evidence-for-HIGH-risk: JSON Schema conditional (if/then), or runtime invariant?"
+    decision: "Runtime invariant, same placement class as definition-of-done-record.schema.yaml's own status-derivation precedent -- kept alongside the sibling factor-completeness invariant in one Python module rather than split across a declarative if/then (per-key) and a Python fold (across-key), so both real invariants for this record are asserted, tested, and read in exactly one place."
+
+type: object
+additionalProperties: false
+required: [id, version, target, factors, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CULTCTX-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.cultural_context_review"
+
+  target:
+    type: string
+    minLength: 1
+    description: "What this review assesses -- e.g. a market/decision/context description. NEW DESIGN."
+
+  factors:
+    type: object
+    additionalProperties: false
+    description: >
+      RUNTIME invariant: must declare EXACTLY these 8 keys (§12.44
+      L3168-3175 verbatim order), no missing, no extra (see module
+      description).
+    required: [trust, authority, communication_style, privacy_perception, risk_preference, technology_acceptance, education_expectation, historical_context]
+    properties:
+      trust: {$ref: "#/factor_entry"}
+      authority: {$ref: "#/factor_entry"}
+      communication_style: {$ref: "#/factor_entry"}
+      privacy_perception: {$ref: "#/factor_entry"}
+      risk_preference: {$ref: "#/factor_entry"}
+      technology_acceptance: {$ref: "#/factor_entry"}
+      education_expectation: {$ref: "#/factor_entry"}
+      historical_context: {$ref: "#/factor_entry"}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+factor_entry:
+  type: object
+  additionalProperties: false
+  required: [risk_level, note, evidence]
+  properties:
+    risk_level:
+      type: string
+      enum: [LOW, MEDIUM, HIGH]
+    note:
+      type: string
+      minLength: 1
+      description: "Non-empty assessment -- §12.44's own 關鍵規則: this is a hypothesis/context statement, not a bare stereotype label."
+    evidence:
+      type: array
+      uniqueItems: true
+      items:
+        type: string
+        enum: [LOCAL_DATA, INTERVIEW, SURVEY, EXPERT_REVIEW]
+      description: >
+        RUNTIME invariant: MUST be non-empty when the sibling `risk_level`
+        is HIGH (see module description) -- §12.44's own 關鍵規則 made
+        structural. May be empty for LOW/MEDIUM.
+
+examples:
+  - description: "A review with one HIGH-risk factor (authority), backed by 2 evidence items -- NOT a bare stereotype"
+    value:
+      id: "CULTCTX-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.cultural_context_review"
+      target: "JP enterprise B2B sales motion -- direct-outreach cold-call campaign"
+      factors:
+        trust: {risk_level: MEDIUM, note: "brand trust builds slower than in the home market; third-party intro preferred", evidence: [LOCAL_DATA]}
+        authority: {risk_level: HIGH, note: "junior-staff direct outreach to senior decision-makers reads as a status violation, not merely 'formal' -- confirmed via 3 local interviews, not assumed", evidence: [INTERVIEW, EXPERT_REVIEW]}
+        communication_style: {risk_level: MEDIUM, note: "indirect refusal patterns mean a 'maybe' in email is often a soft no", evidence: [EXPERT_REVIEW]}
+        privacy_perception: {risk_level: LOW, note: "B2B contact data handling matches existing GDPR-equivalent posture", evidence: []}
+        risk_preference: {risk_level: MEDIUM, note: "conservative vendor-switching norms observed in the target sector", evidence: [SURVEY]}
+        technology_acceptance: {risk_level: LOW, note: "target sector already uses comparable SaaS tooling", evidence: []}
+        education_expectation: {risk_level: LOW, note: "no unusual credentialing expectation surfaced", evidence: []}
+        historical_context: {risk_level: LOW, note: "no adverse historical association with the product category found", evidence: []}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CULTURALCONTEXTREVIEWRECORD-1: no overall/aggregate risk_level is derived across the 8 factors (unlike definition-of-done-record.schema.yaml's overall_status fold) -- §12.44 gives no worst-of-8 or similar aggregation rule to transcribe; should a future revision add one the way delivery.change_risk_matrix's worst-of-5 does for a different Atlas row?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Cultural Context Review row (L941), and §12.44
+    (L3163-3179) directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "cultural-context"/"cultural_context"/"CULTCTX" before writing -- zero
+    pre-existing schema title overlap found. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_cultural_context_review.py.
+  note: >
+    No mother document was modified. The 8-factor list and evidence-source
+    vocabulary are transcribed verbatim from §12.44. The LOW/MEDIUM/HIGH
+    enum, CULTCTX- prefix, and runtime-invariant placement of factor
+    completeness + evidence-for-HIGH-risk are this file's own compiled
+    structure, disclosed above.

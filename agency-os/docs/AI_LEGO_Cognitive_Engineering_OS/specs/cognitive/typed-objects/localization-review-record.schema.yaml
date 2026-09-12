@@ -1,0 +1,153 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/localization-review-record.schema.yaml"
+title: Localization Review Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LocalizationReviewRecord` -- the
+  declared `outputs` of `jurisdiction.localization_review`'s Method Contract
+  (methods/contracts/jurisdiction.localization_review.contract.yaml,
+  `outputs: [LocalizationReviewRecord]`). F23 Global Jurisdiction/Compliance/
+  Localization family (Atlas L940 + §12.43 L3138-3159).
+
+  Real invariants (RUNTIME, same disclosed-gap class as
+  `definition-of-done-record.schema.yaml`'s own dimension-completeness/
+  status-derivation precedent): (a) DIMENSION COMPLETENESS -- `dimensions`
+  must declare exactly the 13 §12.43 dimensions, no missing, no extra, each
+  with a valid `status` and non-empty `note`; (b) STATUS DERIVATION --
+  `overall_status` must equal the mechanical recomputation from the 13
+  dimension statuses (READY only if every dimension is MET or
+  NOT_APPLICABLE), never an asserted override.
+  `ai_lego/modules/jurisdiction/localization_review.py` enforces both at
+  construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Localization Review row (L940)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.43 在地化檢查／本地化審查 (L3138-3159)"
+  - "methods/contracts/jurisdiction.localization_review.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. The 13-dimension list is transcribed verbatim
+  from §12.43. The status enum, LOCREVIEW- prefix, and derivation rule are
+  this file's own compilation choices.
+
+compilation_decisions:
+  - question: "Per-dimension status: boolean, or a 3-value enum?"
+    decision: "3-value enum MET/NOT_MET/NOT_APPLICABLE, same as delivery.definition_of_done's dimension_entry -- a bare boolean cannot distinguish 'not required for this locale' (e.g. no tax field surfaced in this UI) from 'required and unmet', which the DERIVATION rule must tell apart."
+  - question: "overall_status wording: reuse DONE/NOT_DONE, or a locale-specific pair?"
+    decision: "READY/NOT_READY -- §12.43's own benefit (L3159) is '讓 Global Core 真正可被 local market 使用' (make the Global Core genuinely usable by the local market), a market-readiness claim, not a completion-ticket claim; DONE/NOT_DONE would blur this record with delivery.definition_of_done's own DoD-prefixed record."
+  - question: "overall_status: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot recompute a fold over 13 sibling dimension statuses and check it against a 14th field declaratively, same gap class as definition-of-done-record.schema.yaml's own status-derivation precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, target, dimensions, overall_status, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^LOCREVIEW-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.localization_review"
+
+  target:
+    type: string
+    minLength: 1
+    description: "What this review gates -- e.g. a locale-scoped market/storefront/feature description. NEW DESIGN."
+
+  dimensions:
+    type: object
+    additionalProperties: false
+    description: >
+      RUNTIME invariant: must declare EXACTLY these 13 keys (§12.43
+      L3144-3156 verbatim order), no missing, no extra (see module
+      description).
+    required: [language, date_time, timezone, currency, number_format, units, address, name, phone, tax, ui_layout, accessibility, content_expectations]
+    properties:
+      language: {$ref: "#/dimension_entry"}
+      date_time: {$ref: "#/dimension_entry"}
+      timezone: {$ref: "#/dimension_entry"}
+      currency: {$ref: "#/dimension_entry"}
+      number_format: {$ref: "#/dimension_entry"}
+      units: {$ref: "#/dimension_entry"}
+      address: {$ref: "#/dimension_entry"}
+      name: {$ref: "#/dimension_entry"}
+      phone: {$ref: "#/dimension_entry"}
+      tax: {$ref: "#/dimension_entry"}
+      ui_layout: {$ref: "#/dimension_entry"}
+      accessibility: {$ref: "#/dimension_entry"}
+      content_expectations: {$ref: "#/dimension_entry"}
+
+  overall_status:
+    type: string
+    enum: [READY, NOT_READY]
+    description: >
+      RUNTIME invariant: DERIVED, never caller-asserted -- READY iff every
+      one of the 13 `dimensions[]` entries has `status` MET or
+      NOT_APPLICABLE (see module description and compilation_decisions).
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+dimension_entry:
+  type: object
+  additionalProperties: false
+  required: [status, note]
+  properties:
+    status:
+      type: string
+      enum: [MET, NOT_MET, NOT_APPLICABLE]
+    note:
+      type: string
+      minLength: 1
+      description: "Non-empty evidence pointer/justification -- a bare status with no note is not the real per-dimension check §12.43 asks for."
+
+examples:
+  - description: "A fully-READY record -- all 13 §12.43 dimensions MET or NOT_APPLICABLE"
+    value:
+      id: "LOCREVIEW-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.localization_review"
+      target: "zh-TW Taiwan storefront checkout flow"
+      dimensions:
+        language: {status: MET, note: "zh-Hant strings reviewed by native copywriter, not machine-translated"}
+        date_time: {status: MET, note: "yyyy/MM/dd + 24h clock rendered via locale-aware formatter"}
+        timezone: {status: MET, note: "Asia/Taipei used for all order timestamps"}
+        currency: {status: MET, note: "TWD, no decimal places, symbol placement verified"}
+        number_format: {status: MET, note: "thousands separator verified against zh-TW convention"}
+        units: {status: NOT_APPLICABLE, note: "no physical measurements shown in this checkout flow"}
+        address: {status: MET, note: "TW address field order (postal code first) implemented"}
+        name: {status: MET, note: "surname-first display order implemented for TW locale"}
+        phone: {status: MET, note: "+886 format validated"}
+        tax: {status: MET, note: "統一編號 (business tax ID) field added for B2B checkout"}
+        ui_layout: {status: MET, note: "zh-Hant string length checked against button/label overflow"}
+        accessibility: {status: MET, note: "screen-reader pass completed with zh-TW VoiceOver"}
+        content_expectations: {status: MET, note: "trust badges swapped to locally recognized payment providers"}
+      overall_status: READY
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-LOCALIZATIONREVIEWRECORD-1: NOT_APPLICABLE carries no separate justification field beyond the shared `note` -- should a future revision require a distinct why-not-applicable field (same open question definition-of-done-record.schema.yaml already carries)?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Localization Review row (L940), and §12.43
+    (L3138-3159) directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "localization-review"/"localization_review"/"LOCREVIEW" before writing --
+    zero pre-existing schema title overlap found. Validated against
+    jsonschema Draft202012Validator via tests/unit/test_localization_review.py.
+  note: >
+    No mother document was modified. The 13-dimension list is transcribed
+    verbatim from §12.43. The MET/NOT_MET/NOT_APPLICABLE enum, LOCREVIEW-
+    prefix, READY/NOT_READY wording, and runtime-invariant placement of
+    dimension completeness + status derivation are this file's own compiled
+    structure, disclosed above.

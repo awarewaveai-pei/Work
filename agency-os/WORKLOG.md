@@ -16763,3 +16763,30 @@ RAID Log=type 封閉於{RISK,ASSUMPTION,ISSUE,DEPENDENCY}+CLOSED 狀態必須有
 [下一步] 依操作者指示不中途停頓，接續開 F23（全球管轄／合規／在地化，10 方法）。
 
 [rollback] git revert 對應 commit；純新增能力（新檔+新選填欄位+新 UI chip 列），未改既有欄位語意；不選「AI 影片動態」時，整條路徑跟改動前逐位元相同（videoMotionModel 為 undefined 時 applyVideoMotionToPrimaryFormat 直接跳過）。
+
+## 2026-09-12（續5）Method Atlas F23 全球管轄／合規／在地化家族 0/10 -> 10/10 開完並關閉
+
+[任務] 承接同日 F15/F22 條目；操作者持續要求加快腳步。本條目開 F23（10 個方法：Jurisdiction Resolver/Applicable Law Graph/Obligation-to-Control Mapping/Compliance Gap Analysis/Regulatory Horizon Scan/Localization Review/Cultural Context Review/Market Admission Control/Data Residency Assessment/Conflict-of-Law Review），沿用 F15/F22 的並行/序列收斂模式。過程中一度因帳號額度限流中斷（4 個建置 agent + 1 個 critic 的背景收尾動作），額度重置後確認全部檔案與測試結果完好無損（395/395 綠燈不變），才繼續收斂。
+
+[已修改]
+- 新增 `ai_lego/modules/jurisdiction/` 家族：10 個方法各自的 contract yaml、typed-object schema、builder+2-3 層獨立 gate 模組、CLI slice、mutation-style test，每個方法都額外含明確的 provenance-aliasing 回歸測試（因應 F10/F13/F15/F22 已重演 4 次的同一類 aliasing bug，本批次事前特別交代要防）。
+- `methods/registry/contract-backlog.yaml`：序列附加 10 筆 tier_1 entry（twohundredseventeenth ~ twohundredtwentysixth_concrete_entry）。
+- `methods/registry/method-inventory.yaml`：F23 對應 10 列改 `complete/has_contract:true`，補 `machine_id`。
+- `ai_lego/modules/jurisdiction/__init__.py`：收斂重寫成完整 10 方法摘要。
+
+[每個方法的真不變量]
+Jurisdiction Resolver=宣告 2+ 維度時解析結果必須可追溯到至少 2 個維度，不可退化成 country==XX；Market Admission Control=admission_decision 機械推導（builder 簽名根本不收此參數）——7 個階段全 PASS+人工簽核才 ENABLE，任一 UNKNOWN 一律 FAIL_CLOSED（Atlas §11.54 明文規則）；Applicable Law Graph=同管轄+同 scope 且生效區間重疊的兩條法規必須都標 conflict（半開區間語意，邊界相接不算重疊，經 critic 實測驗證正確）；Obligation-to-Control Mapping=每個 obligation 至少一個 control 覆蓋+control 的 owner/evidence/test 皆非空；Compliance Gap Analysis=gaps 機械推導為 required_controls 減 implemented_controls（builder 根本不收 gaps 參數）；Regulatory Horizon Scan=source_type 封閉於官方管道集合（跟已建的 F13 `foresight.horizon_scanning` 完整釐清差異）；Localization Review=Atlas §12.43 明列 13 個維度全部宣告才算 READY（不只是翻譯）；Cultural Context Review=任何 HIGH risk_level 因子必須有 Local Data/Interview/Survey/Expert Review 其中一項證據（Atlas §12.44 明文反刻板印象規則）；Data Residency Assessment=每個宣告的 data class 至少一個 routing 決定；Conflict-of-Law Review=衝突項目要有 legal_review 才能定案 applicable_law，builder 拒絕自動判定（Atlas 本行效益「防自動化錯用法律」的直接體現，跟既有 `specs/jurisdiction/conflict-of-laws-output.schema.yaml` 用 COLR- vs COL- 字首避開衝突）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit/test_{resolver,applicable_law_graph,obligation_to_control_mapping,compliance_gap_analysis,regulatory_horizon_scan,localization_review,cultural_context_review,market_admission_control,data_residency_assessment,conflict_of_law_review}.py -q`（於 `Projects/internal/cognitive-engineering-os`） | exit=0 | result=395 passed, 87 subtests passed（額度中斷前後各驗證一次，結果一致）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit --collect-only -q` | exit=0 | result=12917 tests collected，零 collection error
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n——本批次目前為止最乾淨的一批：critic 用真實 mutation probe（含刻意移除一個 `copy.deepcopy` 呼叫驗證回歸測試真的會變紅，證明測試不是空殼）逐一驗證所有「derived not asserted」「fail-closed」「消歧」宣稱皆為真，並實測邊界情境（區間相接不算重疊、巢狀區間需標 conflict）正確無誤，跨 207 個既有模組零 RECORD_ID_PREFIX/METHOD_ID 撞名
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`jurisdiction\.(resolver|applicable_law_graph|obligation_to_control_mapping|compliance_gap_analysis|regulatory_horizon_scan|localization_review|cultural_context_review|market_admission_control|data_residency_assessment|conflict_of_law_review)` | hits=0 殘留（命中皆本批自建檔案，另兩個命中是 ao-resume 狀態快照檔非真實引用）
+- 兩份 registry YAML 序列套用後皆用 `yaml.safe_load` 驗證解析成功。
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] 沿用 F22 條目已列的 `stakeholders.raci.py:216` 既存 bug 追蹤票（task_c2dba1b8，尚未修復）；F23 本身無新增已知風險。
+
+[rollback] 全部為新增檔案（無既有檔案破壞性修改，除 `ai_lego/modules/jurisdiction/__init__.py` 收斂重寫），`git revert` 對應 commit 即可完整回退，不影響 F01-F22 已建家族。
+
+[下一步] 依操作者指示不中途停頓，接續開 F24（呈現／認知偏好／協作，10 方法，Method Atlas 最後一個未開家族）。

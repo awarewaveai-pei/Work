@@ -1,0 +1,116 @@
+$id: "ai-lego://methods/contracts/jurisdiction.regulatory_horizon_scan.contract.yaml"
+title: "Regulatory Horizon Scan Method Contract"
+status: ACTIVE
+
+description: >
+  F23 global jurisdiction/compliance/localization family, table-row-only
+  citation (Atlas L939: "Regulatory Horizon Scan | 追蹤 proposed/coming
+  regulation | official source->status/effective date->impact->owner | 降
+  法規突襲"). Tracks proposed or coming regulation. Core invariant: every
+  entry's source must be tagged with a `source_type` restricted to a closed
+  official-channel set (OFFICIAL_GOVERNMENT / OFFICIAL_REGULATOR /
+  OFFICIAL_LEGISLATIVE_RECORD) -- Atlas's own pipeline literally starts with
+  "official source", and an entry sourced from an unofficial/rumor channel
+  does not achieve "降法規突襲" reliably, it just adds noise. Every entry
+  also needs a non-empty status, effective_date_or_estimate, impact, and
+  owner.
+
+  Disambiguated from the pre-existing `foresight.horizon_scanning` (F13,
+  Atlas L672, dedicated §12.22) -- that method scans GENERIC emerging-trend
+  signals across any domain (6 mandatory fields: source/date/geography/
+  status/impact/confidence, sourced from free-text domains/sources, no
+  official-channel requirement). This method is REGULATION-SPECIFIC and
+  requires an official-channel source_type, an effective_date_or_estimate
+  (not a bare date), and an owner (not a confidence score or geography) --
+  deliberately NOT a copy of `foresight.horizon_scanning`, disambiguated by
+  record prefix RHS- vs HSCAN-.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Regulatory Horizon Scan row (L939)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L939 gives a real 4-stage pipeline and
+  effect ("降法規突襲") -- direct transcription plus low-risk, disclosed
+  compilation choices.
+
+id: jurisdiction.regulatory_horizon_scan
+version: "1.0.0"
+family: jurisdiction
+
+cognitive_primitives: [FORECAST, MAP, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F23
+# members). FORECAST tracks proposed/coming regulation ahead of its
+# effective date, MAP builds the source->status/effective date->impact->
+# owner linkage itself, VALIDATE checks every source is tagged as official.
+# All three CANONICAL_KERNEL members.
+
+purpose:
+  - track_proposed_or_coming_regulation_from_official_sources_only
+# Atlas L939 verbatim sense: track proposed/coming regulation via an
+# official source, with status/effective date, impact, and owner, to reduce
+# regulatory surprise.
+
+inputs:
+  required:
+    - RegulatoryHorizonSourceSet
+  # NEW DESIGN. Atlas gives no named input typed-object for this method;
+  # the starting point is the set of official sources being watched, same
+  # honesty-gap class every sibling F-family contract already discloses.
+
+outputs:
+  - RegulatoryHorizonScan
+# NEW output type (see typed-objects/regulatory-horizon-scan-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared entry"
+  - "every entry's source_type is one of the closed official-channel set (OFFICIAL_GOVERNMENT, OFFICIAL_REGULATOR, OFFICIAL_LEGISLATIVE_RECORD)"
+  - "every entry carries a non-empty status, effective_date_or_estimate, impact, and owner"
+  # NEW, structurally necessary. Atlas's own pipeline opens with "official
+  # source" -- an entry sourced from an unofficial channel, or missing any
+  # of the four remaining pipeline fields, is exactly the noise this
+  # method's own benefit column ("降法規突襲") exists to filter out.
+
+quality:
+  provenance_required: true
+  # Record-level provenance -- one coherent scan, same placement convention
+  # every structurally similar single-record F-family sibling uses.
+
+forbidden_transition: []
+# No sibling typed object exists yet to name a type-incompatible hop into.
+
+recommended_next:
+  - jurisdiction.obligation_to_control_mapping
+# An entry that becomes enacted regulation is the natural upstream trigger
+# for turning its new obligations into engineering controls (Atlas L937).
+
+rollback:
+  side_effect_free: true
+  # Same low-risk-by-analogy inference every sibling contract in this
+  # directory already uses -- producing a scan record has no external side effect.
+
+open_questions:
+  - "OQ-REGHORIZON-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-REGHORIZON-2: source_type's 3-value closed set (OFFICIAL_GOVERNMENT/OFFICIAL_REGULATOR/OFFICIAL_LEGISLATIVE_RECORD) is this file's own compiled structure, not cited from Atlas -- should a future revision add OFFICIAL_COURT_RECORD or OFFICIAL_STANDARDS_BODY?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L931-956) directly; confirmed line 939 is the
+    exact Regulatory Horizon Scan row. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "regulatory horizon"/"regulatory-horizon"/"RHS-"/"jurisdiction\." before
+    writing -- zero pre-existing implementation, contract, or schema title
+    overlap found. A DIFFERENT, pre-existing method `foresight.
+    horizon_scanning` (F13, Atlas L672, record prefix HSCAN-) was found
+    during this grep and is explicitly disambiguated above -- generic
+    trend-signal scanning, no official-channel requirement, distinct field
+    set. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    verbatim from Atlas L939. The closed source_type set, the RHS- id
+    prefix, and effective_date_or_estimate (a free-text field, since a
+    proposed regulation often has only an estimate, not a fixed date) are
+    this file's own compiled structure, disclosed above, not textually
+    cited.

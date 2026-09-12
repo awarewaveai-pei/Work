@@ -1,0 +1,143 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/regulatory-horizon-scan-record.schema.yaml"
+title: Regulatory Horizon Scan Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RegulatoryHorizonScan` -- the
+  declared `outputs` of `jurisdiction.regulatory_horizon_scan`'s Method
+  Contract (methods/contracts/jurisdiction.regulatory_horizon_scan.
+  contract.yaml, `outputs: [RegulatoryHorizonScan]`). F23 global
+  jurisdiction/compliance/localization family (Atlas L939: "official
+  source->status/effective date->impact->owner").
+
+  Real invariants (RUNTIME, not all declaratively expressible here as a
+  cross-field default): (a) OFFICIAL SOURCE, THE real invariant this
+  method exists to enforce -- every `entries[].source_type` is one of the
+  closed official-channel set (see `compilation_decisions`); a source
+  tagged outside that set is refused, never silently accepted as "probably
+  fine"; (b) every entry carries a non-empty `status`,
+  `effective_date_or_estimate`, `impact`, and `owner`.
+  `ai_lego/modules/jurisdiction/regulatory_horizon_scan.py` enforces both
+  at construction time and independent gates.
+
+  Disambiguated from the pre-existing `foresight.horizon_scanning`
+  (`horizon-scan-record.schema.yaml`, record prefix HSCAN-) -- that schema
+  covers GENERIC emerging-trend signals (source/date/geography/status/
+  impact/confidence, free-text source). This schema is REGULATION-SPECIFIC:
+  `source_type` is a closed official-channel enum (not free text),
+  `effective_date_or_estimate` replaces a bare date (a proposed regulation
+  often has only an estimate), and `owner` replaces `confidence`/
+  `geography` (this method tracks who is accountable for a coming
+  obligation, not how confident the scanner is in a trend). Record prefix
+  RHS- vs HSCAN-.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 全球管轄／合規／在地化 table, Regulatory Horizon Scan row (L939)"
+  - "methods/contracts/jurisdiction.regulatory_horizon_scan.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L939's own
+  4-stage pipeline plus low-risk, disclosed compilation choices (the RHS-
+  prefix, the closed source_type set, record-level-only provenance).
+
+compilation_decisions:
+  - question: "Should source_type be free text, or a closed enum?"
+    decision: >
+      Closed 3-value enum [OFFICIAL_GOVERNMENT, OFFICIAL_REGULATOR,
+      OFFICIAL_LEGISLATIVE_RECORD]. Atlas L939's own pipeline literally
+      opens with "official source" as a named, load-bearing stage (not
+      just "source") -- leaving it free text would let an entry sourced
+      from a news article or a rumor pass unchecked, defeating the
+      "降法規突襲" benefit this method exists to deliver. This file's own
+      compiled structure, not textually cited (Atlas gives no enumerated
+      value set for any F23 field).
+  - question: "Should status/impact be closed enums, matching source_type?"
+    decision: >
+      Free text, required non-empty -- same posture
+      `horizon-scan-record.schema.yaml`'s own status/impact/confidence
+      fields already take: Atlas names the fields but gives no value scale
+      for either, and inventing an ungrounded enum here would be exactly
+      the "fabricate a rich schema with no textual basis" this corpus's
+      own method.schema.yaml `preconditions` field description warns
+      against.
+  - question: "Should effective_date be a strict ISO date, given a proposed regulation usually only has an estimate?"
+    decision: >
+      Renamed to `effective_date_or_estimate`, free text (not a `date`
+      format). A proposed/coming regulation frequently has no fixed
+      effective date yet (e.g. "H2 2027" or "pending final vote") --
+      forcing a strict date format would make the schema unable to
+      represent the single most common real-world case this method exists
+      to track.
+
+type: object
+additionalProperties: false
+required: [id, version, entries, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^RHS-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema. Deliberately distinct from foresight.horizon_scanning's HSCAN- prefix -- see description for the full disambiguation."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.regulatory_horizon_scan"
+
+  entries:
+    type: array
+    minItems: 1
+    description: "The tracked proposed/coming regulations. RUNTIME invariant: >=1 required (method contract precondition), every entry's source_type in the closed official-channel set, and status/effective_date_or_estimate/impact/owner all non-empty (see module description)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [entry_id, regulation_title, source, source_type, status, effective_date_or_estimate, impact, owner]
+      properties:
+        entry_id: {type: string, minLength: 1}
+        regulation_title: {type: string, minLength: 1}
+        source: {type: string, minLength: 1, description: "Free-text citation of the specific official document/record (e.g. a bill number or gazette reference), not just the channel category."}
+        source_type: {enum: [OFFICIAL_GOVERNMENT, OFFICIAL_REGULATOR, OFFICIAL_LEGISLATIVE_RECORD]}
+        status: {type: string, minLength: 1}
+        effective_date_or_estimate: {type: string, minLength: 1}
+        impact: {type: string, minLength: 1}
+        owner: {type: string, minLength: 1}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent scan."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "2 tracked regulations, both official-channel-sourced"
+    value:
+      id: "RHS-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.regulatory_horizon_scan"
+      entries:
+        - {entry_id: "REG-1", regulation_title: "EU AI Act Art.6 high-risk classification amendment", source: "Official Journal of the European Union, C-series draft amendment 2026/0xxx", source_type: OFFICIAL_LEGISLATIVE_RECORD, status: "proposed, in trilogue negotiation", effective_date_or_estimate: "estimated H1 2028, pending final vote", impact: "may reclassify our HCI30 scoring feature as high-risk, triggering conformity assessment", owner: "Compliance Steward"}
+        - {entry_id: "REG-2", regulation_title: "California Delete Act enforcement regulations", source: "California Privacy Protection Agency rulemaking docket", source_type: OFFICIAL_REGULATOR, status: "final rule adopted, enforcement phase-in", effective_date_or_estimate: "2026-08-01", impact: "requires a single data-broker deletion mechanism integration", owner: "Data Protection Steward"}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-REGHORIZON-1: entries[] carries no confidence/likelihood-of-passage field, unlike foresight.horizon_scanning's confidence field -- should a future revision add one, or is 'status' (e.g. 'in trilogue negotiation') sufficient signal?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table, Regulatory Horizon Scan row (L939) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "regulatory horizon"/"regulatory-horizon"/"RHS-" and every schema title
+    before writing -- zero pre-existing implementation or schema title
+    overlap found for THIS method's own name. A DIFFERENT, pre-existing
+    schema `horizon-scan-record.schema.yaml` (foresight.horizon_scanning,
+    HSCAN-) was found and is explicitly disambiguated above. Validated
+    against jsonschema Draft202012Validator via
+    tests/unit/test_regulatory_horizon_scan.py.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    directly from Atlas L939. The RHS- prefix, the closed source_type set,
+    and effective_date_or_estimate's free-text shape are this file's own
+    compiled structure, disclosed above.

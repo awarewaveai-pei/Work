@@ -1,0 +1,156 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/applicable-law-graph-record.schema.yaml"
+title: Applicable Law Graph
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ApplicableLawGraph` -- the
+  declared `outputs` of `jurisdiction.applicable_law_graph`'s Method
+  Contract (methods/contracts/jurisdiction.applicable_law_graph.contract.yaml,
+  `outputs: [ApplicableLawGraph]`). F23 jurisdiction family (Atlas L936,
+  table-row-only citation).
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) referential integrity --
+  `law_entries[].jurisdiction_id` must resolve to a declared
+  `jurisdiction_nodes[]` entry; (b) every law entry's `source` is non-empty
+  and `effective_date` is a valid ISO-8601 date; (c) CONFLICT FLAGGING, THE
+  real invariant this method exists to enforce -- any two law entries
+  sharing the same `jurisdiction_id` + `scope` whose `[effective_date,
+  expiry_date)` ranges overlap must BOTH carry a non-null `conflict` field
+  naming the resolution/flag; an unflagged overlap is refused.
+  `ai_lego/modules/jurisdiction/applicable_law_graph.py` enforces all three
+  at construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F23 table, Applicable Law Graph row (L936)"
+  - "methods/contracts/jurisdiction.applicable_law_graph.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L936's own
+  pipeline order plus disclosed compilation choices (the ALG- prefix,
+  half-open interval semantics for date ranges, record-level-only
+  provenance).
+
+compilation_decisions:
+  - question: "Are effective_date/expiry_date ranges inclusive-inclusive or half-open?"
+    decision: "Half-open [effective_date, expiry_date) -- expiry_date null means open-ended (still effective). Two entries whose ranges merely touch at a boundary (one's expiry_date equals the other's effective_date) do NOT overlap -- this is a design choice disclosed here, not asserted from Atlas text, since Atlas L936 gives no interval semantics."
+  - question: "Should conflict be a boolean or a string?"
+    decision: "Nullable string naming the resolution/flag, not a bare boolean -- Atlas's own benefit column says 'support versioning AND conflict-of-law', implying the field must carry enough information to name which entries conflict and how, not merely that a conflict exists."
+
+type: object
+additionalProperties: false
+required: [id, version, jurisdiction_nodes, law_entries, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ALG-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "jurisdiction.applicable_law_graph"
+
+  jurisdiction_nodes:
+    type: array
+    minItems: 1
+    description: "The declared jurisdiction set law entries may reference. RUNTIME invariant: jurisdiction_id values must be unique."
+    items:
+      type: object
+      additionalProperties: false
+      required: [jurisdiction_id, description]
+      properties:
+        jurisdiction_id: {type: string, minLength: 1}
+        description: {type: string, minLength: 1}
+
+  law_entries:
+    type: array
+    minItems: 1
+    description: >
+      RUNTIME invariant: referential integrity against jurisdiction_nodes[],
+      law_id uniqueness, and CONFLICT FLAGGING (see module description).
+    items:
+      type: object
+      additionalProperties: false
+      required: [law_id, jurisdiction_id, scope, source, effective_date, expiry_date, conflict]
+      properties:
+        law_id:
+          type: string
+          minLength: 1
+          description: "Free-form unique identifier for this law entry. No mother document defines a closed Legal Source Registry grammar this could $ref into."
+        jurisdiction_id:
+          type: string
+          minLength: 1
+          description: "Must resolve to a declared jurisdiction_nodes[] entry -- RUNTIME referential integrity, not expressible here."
+        scope:
+          type: string
+          minLength: 1
+          description: "The regulatory scope/topic this law entry governs (e.g. 'data_privacy', 'ai_regulation'). Free-form -- no mother document defines a closed scope taxonomy."
+        source:
+          type: string
+          minLength: 1
+          description: "Atlas L936's own 'source' pipeline stage -- required non-empty per the method contract's own precondition."
+        effective_date:
+          type: string
+          format: date
+          description: "Atlas L936's own 'effective date' pipeline stage -- ISO-8601 date, required."
+        expiry_date:
+          type: ["string", "null"]
+          format: date
+          description: "Null means open-ended (still effective) -- see compilation_decisions for the half-open-interval semantics this enables."
+        conflict:
+          type: ["string", "null"]
+          description: >
+            Atlas L936's own 'conflict' pipeline stage. Non-null names the
+            resolution/flag for an overlap with another entry sharing
+            jurisdiction_id+scope. Null is legal ONLY when no such overlap
+            exists -- a RUNTIME invariant, not expressible here (see module
+            description).
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two non-overlapping law entries (no conflict) plus a superseding law with a flagged overlap in the same jurisdiction+scope."
+    value:
+      id: "ALG-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "jurisdiction.applicable_law_graph"
+      jurisdiction_nodes:
+        - {jurisdiction_id: "DE", description: "Germany"}
+        - {jurisdiction_id: "FR", description: "France"}
+      law_entries:
+        - {law_id: "LAW-DE-PRIVACY-2020", jurisdiction_id: "DE", scope: "data_privacy", source: "Bundesdatenschutzgesetz 2020 consolidated text", effective_date: "2020-01-01", expiry_date: "2024-06-01", conflict: null}
+        - {law_id: "LAW-DE-PRIVACY-2024", jurisdiction_id: "DE", scope: "data_privacy", source: "Bundesdatenschutzgesetz 2024 amendment", effective_date: "2024-06-01", expiry_date: null, conflict: null}
+        - {law_id: "LAW-FR-PRIVACY-2021", jurisdiction_id: "FR", scope: "data_privacy", source: "Loi Informatique et Libertes 2021", effective_date: "2021-03-01", expiry_date: null, conflict: null}
+
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-APPLICABLELAWGRAPH-1: conflict resolution beyond flagging (i.e. which entry actually governs during an overlap) is out of scope for this record -- should a future revision link an overlap to specs/jurisdiction/conflict-of-laws-output.schema.yaml's own escalation machinery?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F23 table (L936) directly; confirmed via full-file grep that
+    no dedicated §11.x section exists for this method (2 total hits: L936
+    table row, L3357 recipe step name). Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "applicable_law_graph"/"ApplicableLawGraph" and every schema title
+    before writing -- zero pre-existing implementation or schema title
+    overlap (pre-existing specs/jurisdiction/conflict-of-laws-output.schema.yaml
+    is a different, heavier Master-Plan-sourced object, disclosed in the
+    contract's open_questions). Validated against jsonschema
+    Draft202012Validator via tests/unit/test_applicable_law_graph.py.
+  note: >
+    No mother document was modified. The pipeline field order is
+    transcribed directly from Atlas L936. The ALG- prefix, half-open
+    interval semantics, and the conflict-string (not boolean) choice are
+    this file's own compiled structure, disclosed above.

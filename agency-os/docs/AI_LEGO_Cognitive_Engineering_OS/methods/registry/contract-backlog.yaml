@@ -5636,6 +5636,246 @@ tier_1:
       disambiguations) independently confirmed true, not just asserted.
       Verdict PASS. See WORKLOG 2026-09-12 F22 entry.
 
+  twohundredseventeenth_concrete_entry:
+    # F23 Global Jurisdiction/Compliance/Localization family opening batch,
+    # 2026-09-12. 4 agents (3+3+2+2 methods); 0 of 10 existed before this
+    # batch.
+    method_id: "jurisdiction.resolver"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L935, sole citation: "entity/market/user/data/
+      processing/storage/provider/sector->jurisdictions", effect "防止只用
+      國家名粗判"). Dedicated section 11.53 (L2412-2437) names 11 input
+      dimensions. Real invariant: when 2+ dimensions are declared, the
+      resolution must be traceable to >=2 of them -- a resolver collapsing
+      a multi-dimensional input to a single dimension (e.g.
+      user-location-only) is refused.
+    source: "methods/contracts/jurisdiction.resolver.contract.yaml + specs/cognitive/typed-objects/jurisdiction-resolution-record.schema.yaml + ai_lego/modules/jurisdiction/resolver.py"
+    note: >
+      37 tests pass. F23 Global Jurisdiction family opened this batch by
+      4 concurrent sibling agents (10 members total). CLI PASS:
+      3-dimension/2-jurisdiction resolution + JRES_INSUFFICIENT_DIMENSION_
+      COVERAGE construction-time refusal of a single-dimension collapse +
+      independent dimension_coverage gate hand-tamper catch.
+
+  twohundredeighteenth_concrete_entry:
+    method_id: "jurisdiction.applicable_law_graph"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L936, sole citation: "jurisdiction->source->
+      effective date->scope->conflict", effect "支援版本與衝突法").
+      Table-row-only. Real invariant: any two law entries sharing
+      jurisdiction_id+scope with overlapping [effective_date,
+      expiry_date) ranges must both carry a non-null conflict field.
+    source: "methods/contracts/jurisdiction.applicable_law_graph.contract.yaml + specs/cognitive/typed-objects/applicable-law-graph-record.schema.yaml + ai_lego/modules/jurisdiction/applicable_law_graph.py"
+    note: >
+      43 tests pass. CLI PASS: 2-jurisdiction/3-law-entry conflict-free
+      graph + ALG_UNFLAGGED_CONFLICT construction-time refusal of an
+      overlapping unflagged pair + independent conflict_flagging gate
+      hand-tamper catch.
+
+  twohundrednineteenth_concrete_entry:
+    method_id: "jurisdiction.obligation_to_control_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L937, sole citation: "obligation->control->
+      owner->evidence->test", effect "法務與工程可對接"). Real invariant:
+      every declared obligation must be covered by >=1 control carrying
+      non-empty owner/evidence/test; referential integrity (no orphan
+      control) re-derived independently at gate time.
+    source: "methods/contracts/jurisdiction.obligation_to_control_mapping.contract.yaml + specs/cognitive/typed-objects/obligation-to-control-mapping-record.schema.yaml + ai_lego/modules/jurisdiction/obligation_to_control_mapping.py"
+    note: >
+      38 tests pass, 8 subtests. CLI PASS: 2-obligation/3-control mapping
+      with full coverage + OCM_UNCOVERED_OBLIGATION construction-time
+      refusal of an uncovered obligation + independent
+      referential_integrity gate hand-tamper catch.
+
+  twohundredtwentieth_concrete_entry:
+    method_id: "jurisdiction.compliance_gap_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L938, sole citation: "required controls vs
+      implemented->gaps->severity->plan", effect "快速知道能否上線"). Real
+      invariant: gaps[] MECHANICALLY DERIVED as required_controls minus
+      implemented_controls -- the builder refuses a caller-asserted gap
+      set disagreeing with the real set difference, same "derived, not
+      asserted" discipline experiment.mvp/delivery.risk_register already
+      establish.
+    source: "methods/contracts/jurisdiction.compliance_gap_analysis.contract.yaml + specs/cognitive/typed-objects/compliance-gap-analysis-record.schema.yaml + ai_lego/modules/jurisdiction/compliance_gap_analysis.py"
+    note: >
+      38 tests pass, 8 subtests. CLI PASS: 3-required/1-implemented
+      analysis with 2 mechanically-derived gaps + COMPLIANCEGAP_GAP_
+      MISMATCH construction-time refusal + independent gap_derivation
+      gate hand-tamper catch.
+
+  twohundredtwentyfirst_concrete_entry:
+    method_id: "jurisdiction.regulatory_horizon_scan"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L939, sole citation: "official source->
+      status/effective date->impact->owner", effect "降法規突襲"). Real
+      invariant: source_type restricted to a closed official-channel set
+      (OFFICIAL_GOVERNMENT/OFFICIAL_REGULATOR/OFFICIAL_LEGISLATIVE_
+      RECORD). Disambiguated from the pre-existing foresight.
+      horizon_scanning (F13, HSCAN- prefix, generic trend scanning with
+      no official-channel requirement) -- deliberately not a copy,
+      record prefix RHS-.
+    source: "methods/contracts/jurisdiction.regulatory_horizon_scan.contract.yaml + specs/cognitive/typed-objects/regulatory-horizon-scan-record.schema.yaml + ai_lego/modules/jurisdiction/regulatory_horizon_scan.py"
+    note: >
+      37 tests pass, 11 subtests. CLI PASS: 2-entry scan, both
+      official-channel-sourced + REGHORIZON_UNOFFICIAL_SOURCE
+      construction-time refusal + independent official_source gate
+      hand-tamper catch.
+
+  twohundredtwentysecond_concrete_entry:
+    method_id: "jurisdiction.localization_review"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L940, effect "不把翻譯當在地化") PLUS dedicated
+      section 12.43 (L3138-3159), which names 13 required dimensions:
+      Language, Date/Time, Timezone, Currency, Number Format, Units,
+      Address, Name, Phone, Tax, UI Layout, Accessibility, Content
+      Expectations. Real invariant: a record cannot claim READY unless
+      all 13 carry status+non-empty note; overall_status mechanically
+      derived.
+    source: "methods/contracts/jurisdiction.localization_review.contract.yaml + specs/cognitive/typed-objects/localization-review-record.schema.yaml + ai_lego/modules/jurisdiction/localization_review.py"
+    note: >
+      38 tests pass, 8 subtests. CLI PASS: 13-dimension fully-READY
+      record + LOCREVIEW_INVALID_DIMENSIONS construction-time refusal of
+      a missing-dimension attempt + independent status_derivation gate
+      hand-tamper catch.
+
+  twohundredtwentythird_concrete_entry:
+    method_id: "jurisdiction.cultural_context_review"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L941, effect "降文化誤判") PLUS dedicated
+      section 12.44 (L3163-3179), which names 8 factors and its own
+      關鍵規則 (L3177-3178): a cultural model is a hypothesis/context, not
+      a stereotype; high-risk decisions require Local Data/Interview/
+      Survey/Expert Review. Real invariant: any factor flagged HIGH
+      risk_level must carry >=1 evidence item from that closed set.
+    source: "methods/contracts/jurisdiction.cultural_context_review.contract.yaml + specs/cognitive/typed-objects/cultural-context-review-record.schema.yaml + ai_lego/modules/jurisdiction/cultural_context_review.py"
+    note: >
+      43 tests pass, 12 subtests. CLI PASS: 8-factor review with 1
+      HIGH-risk factor backed by evidence + CULTCTX_MISSING_EVIDENCE_
+      FOR_HIGH_RISK construction-time refusal of a stereotype attempt +
+      independent evidence_required_for_high_risk gate hand-tamper
+      catch.
+
+  twohundredtwentyfourth_concrete_entry:
+    method_id: "jurisdiction.market_admission_control"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L942, effect "市場級最小爆炸半徑") PLUS
+      dedicated section 11.54 (L2440-2465), which names the 7-stage
+      pipeline plus human sign-off and the rule "任一 critical unknown：
+      FAIL CLOSED". Real invariant: admission_decision is MECHANICALLY
+      DERIVED -- the builder accepts no such parameter at all -- ENABLE
+      iff all 7 stages are PASS and human_signoff is non-empty, else
+      FAIL_CLOSED.
+    source: "methods/contracts/jurisdiction.market_admission_control.contract.yaml + specs/cognitive/typed-objects/market-admission-record.schema.yaml + ai_lego/modules/jurisdiction/market_admission_control.py"
+    note: >
+      40 tests pass, 8 subtests. CLI PASS: 7/7-PASS admission with
+      sign-off -> ENABLE + an UNKNOWN stage mechanically deriving
+      FAIL_CLOSED + independent admission_decision_consistency gate
+      hand-tamper catch.
+
+  twohundredtwentyfifth_concrete_entry:
+    method_id: "jurisdiction.data_residency_assessment"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L943, sole citation: "data classes->subjects->
+      laws/contracts->regions->routing", effect "支援主權與跨境資料"). No
+      dedicated section. Real invariant: every declared data class must
+      have >=1 routing decision naming an allowed region (routing
+      completeness) AND every routing decision resolves to a declared
+      data class (referential integrity). Disambiguated from
+      specs/jurisdiction/pack.schema.yaml's pack-level data_residency
+      storage-restriction-class enum (a different granularity, not
+      reused).
+    source: "methods/contracts/jurisdiction.data_residency_assessment.contract.yaml + specs/cognitive/typed-objects/data-residency-assessment-record.schema.yaml + ai_lego/modules/jurisdiction/data_residency_assessment.py"
+    note: >
+      81 tests pass (shared entry file with conflict_of_law_review; see
+      next entry for combined count). CLI PASS: well-formed 2-data-class
+      assessment (3 routing decisions, every class routed) +
+      DRA_UNROUTED_DATA_CLASS construction-time refusal + independent
+      routing_completeness gate hand-tamper catch.
+
+  twohundredtwentysixth_concrete_entry:
+    # Last of this 4-agent F23 opening batch -- F23 is 10/10 COMPLETE
+    # after this entry (independently confirmed via `ls
+    # ai_lego/modules/jurisdiction/*.py`: 10 method modules present, and
+    # a full-family pytest run: 395 passed, 87 subtests, 0 failures).
+    method_id: "jurisdiction.conflict_of_law_review"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F23 table row (Atlas L944, sole citation: "governing law->
+      mandatory rules->conflicts->legal review", effect "防自動化錯用
+      法律"). No dedicated section. Real invariant, the strongest
+      fail-closed pattern in this batch: a conflict's applicable_law is
+      never finalized (non-null) unless that conflict already carries a
+      non-empty, well-formed legal_review (reviewer/date/outcome) -- the
+      builder REFUSES to auto-resolve a conflict with no human sign-off.
+      Disambiguated from the pre-existing specs/jurisdiction/conflict-
+      of-laws-output.schema.yaml (a different, software-architecture-
+      layer object, $id prefix COL-); this method's records use prefix
+      COLR- to avoid collision.
+    source: "methods/contracts/jurisdiction.conflict_of_law_review.contract.yaml + specs/cognitive/typed-objects/conflict-of-law-review-record.schema.yaml + ai_lego/modules/jurisdiction/conflict_of_law_review.py"
+    note: >
+      81 tests pass across data_residency_assessment +
+      conflict_of_law_review (this agent's 2 methods), 16 subtests, 0
+      failures. CLI PASS: 2-conflict review (1 finalized with
+      legal_review, 1 pending) + COL_MISSING_LEGAL_REVIEW
+      construction-time refusal of an auto-resolved-without-review
+      attempt + independent legal_review_required gate hand-tamper
+      catch. **F23 Global Jurisdiction/Compliance/Localization family:
+      10 of 10 COMPLETE as of this entry** (resolver/
+      applicable_law_graph/obligation_to_control_mapping/
+      compliance_gap_analysis/regulatory_horizon_scan/
+      localization_review/cultural_context_review/
+      market_admission_control/data_residency_assessment/
+      conflict_of_law_review landed via 4 concurrent sibling agents in
+      this same batch: 3+3+2+2 methods each). Batch totals: 395 tests,
+      87 subtests, 0 failures, full-family cross-check confirms zero
+      collisions across the 4 agents sharing one `ai_lego/modules/
+      jurisdiction/` package. Every method carries an explicit
+      provenance-aliasing regression test (per this session's standing
+      instruction after the recurring F10/F13/F15/F22 aliasing bug
+      class). Registry files (this file + method-inventory.yaml) were
+      deliberately NOT touched by any of the 4 building agents, applied
+      here serially by the orchestrating session instead, to avoid
+      repeating the concurrent-write git-index race that lost F10
+      registry data (commit `67780546a`). 1 independent critic pass
+      (Standard tier, hand-tamper-verified via live mutation probes plus
+      a fault-injection sanity check that temporarily removed a
+      copy.deepcopy call and confirmed the regression test goes red)
+      found 0 Critical / 0 Major / 0 Minor -- the cleanest batch in this
+      corpus's Method Atlas backfill so far. Verified clean: aliasing
+      discipline across all 10 modules (the recurring F10/F13/F15/F22
+      bug class did not recur a 5th time), both "derived not asserted"
+      claims (admission_decision, gaps) structurally true via
+      inspect.signature, both fail-closed claims (conflict legal_review
+      requirement, market admission FAIL_CLOSED-on-UNKNOWN-stage)
+      genuinely enforced, all 3 disambiguation claims real (regulatory_
+      horizon_scan vs foresight.horizon_scanning, data_residency_
+      assessment vs pack.schema.yaml, conflict_of_law_review's COLR-
+      prefix vs the pre-existing COL- pattern -- confirmed no regex
+      collision), interval-overlap logic correct at both touching and
+      nested boundary cases, zero RECORD_ID_PREFIX/METHOD_ID collisions
+      across 207 corpus-wide prefixes. Verdict PASS. See WORKLOG
+      2026-09-12 F23 entry.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================
