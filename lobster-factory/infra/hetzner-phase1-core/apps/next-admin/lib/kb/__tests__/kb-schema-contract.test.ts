@@ -94,7 +94,8 @@ describe("lib/kb/db.ts writes only columns that exist", () => {
       return [...names].sort();
     };
 
-    // rpcArgs() supplies the five shared predicate arguments; each half adds its own.
+    // rpcArgs() supplies the six shared predicate arguments (migration 0083 added
+    // p_include_sensitive as the sixth); each half adds its own.
     const shared = [...dbSource.matchAll(/^\s{4}(p_[a-z_]+): s\./gm)].map((m) => m[1]);
     const ownArgs = (fnName: string): string[] => {
       const start = dbSource.indexOf(`export async function ${fnName}(`);
@@ -104,7 +105,7 @@ describe("lib/kb/db.ts writes only columns that exist", () => {
     };
     const passed = (fnName: string) => [...new Set([...shared, ...ownArgs(fnName)])].sort();
 
-    expect(shared.length).toBe(5);
+    expect(shared.length).toBe(6);
     expect(passed("matchChunksVector")).toEqual(declared("cs_match_chunks"));
     expect(passed("matchChunksKeyword")).toEqual(declared("cs_match_chunks_keyword"));
   });

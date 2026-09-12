@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmbeddingProvider } from "@/lib/kb/types";
 
-type Scope = { scope: string[]; spaces: string[] | null; viewer: string; asOf: string | null; model: string };
+type Scope = { scope: string[]; spaces: string[] | null; viewer: string; asOf: string | null; model: string; includeSensitive: boolean };
 
 const db = vi.hoisted(() => ({
   matchChunksVector: vi.fn(),
@@ -53,7 +53,24 @@ describe("retrieve", () => {
       viewer: ORG,
       asOf: "2026-01-01T00:00:00Z",
       model: "test-embedder",
+      includeSensitive: false,
     });
+  });
+
+  it("excludes sensitive content by default — a caller must opt IN, not remember to opt out (migration 0083)", async () => {
+    await retrieve({ scope: [ORG], viewer: ORG, embedder }, "退貨");
+    expect(vectorScope()).toMatchObject({ includeSensitive: false });
+    expect(keywordScope()).toMatchObject({ includeSensitive: false });
+  });
+
+  it("passes includeSensitive: true through only when a caller explicitly asks for it", async () => {
+    await retrieve({ scope: [ORG], viewer: ORG, embedder, includeSensitive: true }, "退貨");
+    expect(vectorScope()).toMatchObject({ includeSensitive: true });
+  });
+
+  it("treats includeSensitive: false the same as omitting it entirely", async () => {
+    await retrieve({ scope: [ORG], viewer: ORG, embedder, includeSensitive: false }, "退貨");
+    expect(vectorScope()).toMatchObject({ includeSensitive: false });
   });
 
   it("leaves the default space and now() to be resolved in SQL", async () => {

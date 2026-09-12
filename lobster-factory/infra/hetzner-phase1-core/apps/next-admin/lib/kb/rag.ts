@@ -80,6 +80,8 @@ function scopeOf(ctx: KbContext, model: string): RetrievalScope {
     viewer: ctx.viewer,
     asOf: ctx.asOf ?? null,
     model,
+    // Fail-closed: anything other than an explicit `true` excludes sensitive content (migration 0083).
+    includeSensitive: ctx.includeSensitive === true,
   };
 }
 

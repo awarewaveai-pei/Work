@@ -92,7 +92,12 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
     // 4. Retrieve knowledge.
     // Flat tenant today: scope = the org itself, viewer = the org (so its own sensitive docs are
     // visible to it). A tenant tree would pass the whole chain here and change nothing in the KB.
-    const chunks = await retrieve({ scope: [message.organizationId], viewer: message.organizationId }, message.text);
+    // includeSensitive: false (migration 0083) -- this IS the customer-service AI's own answer path;
+    // a document ticked "敏感" in the ops UI must never end up quoted back to an end user.
+    const chunks = await retrieve(
+      { scope: [message.organizationId], viewer: message.organizationId, includeSensitive: false },
+      message.text,
+    );
     const retrievalScore = topScore(chunks);
     const chunkIds = chunks.map((c) => c.id);
 

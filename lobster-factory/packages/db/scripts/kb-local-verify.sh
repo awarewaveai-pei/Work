@@ -68,6 +68,9 @@ psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
 echo "▶ applying 0076 (ranked keyword retrieval via pgroonga)"
 psql_file "$DB_DIR/migrations/0076_kb_ranked_keyword_retrieval.sql" >/dev/null
 
+echo "▶ applying 0083 (is_sensitive gets a real audience gate)"
+psql_file "$DB_DIR/migrations/0083_kb_sensitive_audience_gate.sql" >/dev/null
+
 echo "▶ proving the harness can fail (a green run of a dead harness proves nothing)"
 # Captured first, then matched: under `set -o pipefail` psql's non-zero exit (which is the point of
 # this check) would make the whole pipeline non-zero even when grep found the message.
@@ -82,9 +85,11 @@ VERIFY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1)" || { echo "$VERIFY_OU
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ retrieval assertions did not report KB_VERIFY_OK"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_CONSTRAINTS_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ constraint assertions did not report KB_VERIFY_CONSTRAINTS_OK"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_KEYWORD_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ behavioural assertions did not reach the last marker"; exit 1; }
-echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK + KB_VERIFY_KEYWORD_OK"
+echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_SENSITIVE_GATE_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ 0083 sensitive-audience-gate assertions did not report OK"; exit 1; }
+echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK + KB_VERIFY_KEYWORD_OK + KB_VERIFY_SENSITIVE_GATE_OK"
 
-echo "▶ applying the down migrations (newest first)"
+echo "▶ applying the down migrations (newest first — 0083 must go before 0076/0075, it replaced their function signatures)"
+psql_file "$DB_DIR/scripts/0083_kb_sensitive_audience_gate_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0076_kb_ranked_keyword_retrieval_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0075_kb_provenance_and_citation_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0072_kb_versioning_and_retrieval_predicates_down.sql" >/dev/null
@@ -105,12 +110,13 @@ DOWN_STATE="$(psql_run -tAc "
 [ "$DOWN_STATE" = "DOWN_OK" ] || { echo "✗ down migration did not restore the 0051 state: $DOWN_STATE"; exit 1; }
 echo "  DOWN_OK"
 
-echo "▶ re-applying 0072 + 0075 + 0076 (a migration you cannot re-apply is not a rollback path)"
+echo "▶ re-applying 0072 + 0075 + 0076 + 0083 (a migration you cannot re-apply is not a rollback path)"
 psql_file "$DB_DIR/migrations/0072_kb_versioning_and_retrieval_predicates.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0076_kb_ranked_keyword_retrieval.sql" >/dev/null
+psql_file "$DB_DIR/migrations/0083_kb_sensitive_audience_gate.sql" >/dev/null
 REAPPLY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1 || true)"
-echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_KEYWORD_OK' || {
+echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_SENSITIVE_GATE_OK' || {
   echo "$REAPPLY_OUT" | grep -E 'ERROR' | head -3; echo "✗ assertions failed after re-apply"; exit 1;
 }
 

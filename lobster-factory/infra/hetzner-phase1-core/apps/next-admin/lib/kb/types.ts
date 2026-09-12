@@ -99,6 +99,14 @@ export interface KbContext {
   asOf?: string | null;
   /** Embedding provider for THIS call. Omitted ⇒ the default OpenAI provider. */
   embedder?: EmbeddingProvider;
+  /**
+   * Migration 0083. Fail-closed: omitted ⇒ `false`, sensitive-flagged documents are excluded.
+   * A caller must actively opt IN to see them — the ops KB browser is the only place that should,
+   * and does not go through `retrieve()` today (it lists/edits sources directly). The
+   * customer-service reply path (lib/cs/orchestrator.ts, lib/cs/eval.ts) passes this explicitly as
+   * `false` anyway, so the intent is visible at the call site and not just inherited from a default.
+   */
+  includeSensitive?: boolean;
 }
 
 /**

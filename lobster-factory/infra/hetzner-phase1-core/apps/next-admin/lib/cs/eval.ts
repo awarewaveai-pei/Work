@@ -75,7 +75,9 @@ export async function runEvalCase(cis: CisProfile, intents: Intent[], c: EvalCas
     // 3. Retrieve + score.
     // One tenant node, viewing itself: the KB's scope chain is a list because tenants will become
     // a tree, but today customer service is flat (organizations has no parent_id).
-    const chunks = await retrieve({ scope: [orgId], viewer: orgId }, c.question);
+    // includeSensitive: false -- this eval harness simulates the real customer-service reply path
+    // (orchestrator.ts), so it must see exactly what that path sees, not more.
+    const chunks = await retrieve({ scope: [orgId], viewer: orgId, includeSensitive: false }, c.question);
     const retrievalScore = topScore(chunks);
 
     // 4. Generate + supervise (only when there's knowledge to ground on).

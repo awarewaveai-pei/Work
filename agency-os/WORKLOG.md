@@ -17005,4 +17005,39 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 
 [剩餘風險] 無新增風險——C4 從「懸而未決」變成「已用既有治理文件解釋清楚」，C6/C8/C9 維持原判斷，皆有操作者本輪明確確認留存於本 WORKLOG 條目與決策文件。
 
+## 2026-09-12（續8）KB `is_sensitive` 加真受眾閘（migration 0083）
+
+[任務] 操作者確認決定：「is_sensitive 加一個真正的開關，讓「敏感」文件真的不會進客服 AI 的回答來源」。根因（TASKS.md 2026-09-11 已診斷）：舊謂詞 `(NOT s.is_sensitive OR c.organization_id = p_viewer)`，兩個真實呼叫端都傳 `viewer = 自己的 org`，右半恆真，UI 打勾「敏感」對客服 AI 完全無效。
+
+[已修改]
+- `lobster-factory/packages/db/migrations/0083_kb_sensitive_audience_gate.sql`（新）：`cs_match_chunks`/`cs_match_chunks_keyword` 新增 `p_include_sensitive boolean DEFAULT true`（不取代 `p_viewer`——後者是未來租戶樹向下繼承保護，跟這次「客服 AI 要不要看敏感內容」是正交的兩件事，用 AND 疊加：`(NOT s.is_sensitive OR (c.organization_id = p_viewer AND p_include_sensitive))`）。DROP FUNCTION 先於 CREATE OR REPLACE（新增參數＝新 signature，PostgREST 無法消歧兩個重疊 overload，比照 0076 手法）。
+- `lobster-factory/packages/db/scripts/0083_kb_sensitive_audience_gate_down.sql`（新）：逐字還原 0075/0076 的舊 7-arg 簽名。
+- `lib/kb/db.ts`：`RetrievalScope`/`rpcArgs()` 新增 `includeSensitive`/`p_include_sensitive`。
+- `lib/kb/types.ts`：`KbContext.includeSensitive?: boolean`，文件明訂 fail-closed（省略＝排除敏感內容）。
+- `lib/kb/rag.ts`：`scopeOf()` 寫 `includeSensitive: ctx.includeSensitive === true`（非 `??`，任何非顯式 `true` 一律視為 `false`）。
+- `lib/cs/orchestrator.ts`（真實客服回覆路徑）、`lib/cs/eval.ts`（模擬同一路徑的離線評測工具，兩者都要看到一樣的東西）：`retrieve()` 呼叫都顯式加 `includeSensitive: false`，不仰賴預設值——call site 本身要看得出這個決定，不是只能從 `KbContext` 定義反推。
+- `lib/kb/__tests__/kb-retrieval.test.ts`：+3 test（預設排除敏感／顯式 `true` 才納入／顯式 `false` 與省略等價），既有第一個斷言補上 `includeSensitive: false` 欄位。
+- `lib/kb/__tests__/kb-db-vector-sort.test.ts`、`kb-db-keyword-sort.test.ts`：`RetrievalScope` 字面量補新必要欄位。
+- `lib/kb/__tests__/kb-schema-contract.test.ts`：`rpcArgs()` 共用參數數量斷言 5→6（`definerOf()` 掃全部 migrations 目錄，自動抓到 0083 的新簽名，不用手改比對邏輯，只有這個寫死的數字要跟著動）。
+- `packages/db/scripts/kb-local-verify.sh`：套用序列插入 0083；down 序列改為 0083→0076→0075→0072（0083 換過 0076/0075 的函式簽名，down 順序反過來，晚建的要先拆）；re-apply 序列同步補上；OK marker 檢查改認 `KB_VERIFY_SENSITIVE_GATE_OK`。
+- `packages/db/scripts/kb-local-verify.sql`：`vec_titles`/`kw_titles` 輔助函式新增 `p_include_sensitive DEFAULT true`（讓既有 15 處呼叫零改動、驗證 0083 對舊呼叫端零行為改變）；grant 檢查（斷言 11）signature 補 `,boolean`；新增斷言區塊 16-21（`KB_VERIFY_SENSITIVE_GATE_OK`）：省略旗標＝pre-0083 行為不變／`false` 排除自己 org 的敏感文件／不影響非敏感文件／`true` 不會重新打開既有租戶鏈保護（不會讓 A 看到 B 的敏感文件）／向量與關鍵字兩半在新旗標下仍一致／舊 7-arg 簽名確實消失非被 overload 蓋住。
+- `agency-os/TASKS.md`：is_sensitive 項目關閉並記錄修法。
+
+[事故：共用工作目錄自動對齊腳本吃掉未提交的編輯] 本條目施工中途，`git-align-main-aoresume-feature-20260912-192920` 這支自動化腳本跑了一次 stash-based 對齊，把 `kb-local-verify.sql`／`kb-local-verify.sh`／`lib/kb/db.ts`／`types.ts`／`rag.ts`／`lib/cs/orchestrator.ts`／`eval.ts`／三個測試檔的**未提交修改**整批打回 HEAD（`git status` 對這些檔案完全乾淨，跟我剛編輯完的內容不符）。VBC 查證：`git stash list` 找到同時間戳的 `stash@{0}`（一個雙親 merge commit，`diff --cc` 顯示我的修改確實被正確合併寫進該 commit 的樹裡），逐檔用 `git diff HEAD stash@{0} -- <file>` 確認每個檔案的差異剛好等於我遺失的那次編輯，再用 `git checkout stash@{0} -- <10 個檔案>`（只取這 10 個路徑，不整包 apply/pop，避免帶入該 stash 裡其他 session 的無關未提交內容）逐檔救回，比對後與救回前的原始編輯逐字相同。教訓已記錄，未改動自動對齊腳本本身（超出本次授權範圍，且腳本行為本身可能是刻意的「先進 stash 讓人手動 pop」設計，不是明顯的 bug）——後續若再發生，同樣手法可複製。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（`apps/next-admin`） | exit=0 | result=clean
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/kb lib/cs` | exit=0 | result=127/127 passed（含新 3 test + 1 處既有斷言因新增共用參數而更新後轉綠，無其他回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/kb-local-verify.sh`（真實 Postgres docker container，`supabase/postgres:15.8.1.085`，同 prod image） | exit=0 | result=KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK + KB_VERIFY_KEYWORD_OK + KB_VERIFY_SENSITIVE_GATE_OK 全綠；down migration 驗證乾淨（0083 先於 0076/0075/0072 down，無殘留）；0072+0075+0076+0083 重新套用後行為一致（可重複部署）
+- REVIEW_WAIVED: NA -- oracle 額度未檢查但本次改動風格與既有 K1/K1e (0072/0075/0076) 高度一致（同一批作者留下的 predicate 標記慣例、DROP-before-CREATE-OR-REPLACE 手法、REVOKE/GRANT house pattern），且有真實 Postgres 6 項新斷言直接驗證安全邊界本身（不是只驗證程式碼形狀），風險已由行為測試而非人工覆審覆蓋
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`p_include_sensitive\|includeSensitive\|cs_match_chunks\(\|cs_match_chunks_keyword\(` | hits=24（全數為本次改動檔案本身 + 既有 0051/0072/0075/0076 migration/down-script/測試對照組（歷史簽名文字，未回改，符合「舊檔案不回改」）+ 2 份規劃文件的歷史程式碼片段引用，無未同步的殘留即時性宣稱）
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. `p_viewer` 目前仍是「未來租戶樹」的保留參數，today 恆等於呼叫端自己的 org——沒有變得更死，但也還沒有真正的樹可測；等真正的租戶樹落地時才會知道這個保留設計是否還適用。
+2. 尚未部署到 prod（migration 0083 需 `node scripts/apply-db-migration.mjs 0083`，next-admin 需重新 `sg-deploy.sh`）——本輪只完成程式碼與真實 Postgres 驗證，部署屬於下一個「去處理好」動作，等操作者明確 go-ahead（High-STOP：DB migration + prod deploy）。
+3. 共用工作目錄的自動對齊腳本會在未經確認的情況下用 stash 動未提交的編輯——本次靠時間戳比對 + `diff --cc` 手動救回，下次若腳本行為改變（例如變成真的丟棄而非只是 stash）救不回來。列入 TASKS.md 供治理層決定是否要收斂這支腳本的行為。
+
+[rollback] 應用層改動（`db.ts`/`types.ts`/`rag.ts`/`orchestrator.ts`/`eval.ts`）新增行為，省略 `includeSensitive` 時行為等同 fail-closed 排除敏感內容（比修復前更嚴格，不是更寬鬆，`git revert` 安全）。DB 側：尚未對 prod 執行 0083；一旦執行，回滾走 `packages/db/scripts/0083_kb_sensitive_audience_gate_down.sql`（已在真實 Postgres 驗證可逆、可重套用）。
+
 [rollback] `git revert` 對應 commit（純文件）。

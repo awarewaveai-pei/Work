@@ -16,7 +16,7 @@ vi.mock("@/lib/supabase-server", () => ({
 
 const { matchChunksKeyword } = await import("@/lib/kb/db");
 
-const SCOPE = { scope: ["11111111-1111-4111-8111-111111111111"], spaces: null, viewer: "11111111-1111-4111-8111-111111111111", asOf: null, model: "m" };
+const SCOPE = { scope: ["11111111-1111-4111-8111-111111111111"], spaces: null, viewer: "11111111-1111-4111-8111-111111111111", asOf: null, model: "m", includeSensitive: false };
 
 beforeEach(() => vi.clearAllMocks());
 

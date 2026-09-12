@@ -276,6 +276,14 @@ export interface RetrievalScope {
   viewer: string;
   asOf: string | null;
   model: string;
+  /**
+   * Migration 0083. `viewer` alone cannot answer "should THIS caller see sensitive content" — every
+   * caller today passes viewer = its own org, which makes the tree-inheritance check that `viewer`
+   * exists for a no-op, and a customer-service AI's own org obviously matches its own org's docs.
+   * Default `true` (unchanged behaviour) is set here, not left to the RPC's own SQL default, so a
+   * caller that forgets this field is visible in a TypeScript diff, not just in a migration file.
+   */
+  includeSensitive: boolean;
 }
 
 function rpcArgs(s: RetrievalScope): Record<string, unknown> {
@@ -285,6 +293,7 @@ function rpcArgs(s: RetrievalScope): Record<string, unknown> {
     p_viewer: s.viewer,
     p_as_of: s.asOf,
     p_model: s.model,
+    p_include_sensitive: s.includeSensitive,
   };
 }
 

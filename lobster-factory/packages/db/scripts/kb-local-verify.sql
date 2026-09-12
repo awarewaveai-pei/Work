@@ -80,19 +80,24 @@ SELECT pg_temp.add_doc(pg_temp.uid('orgA'), gen_random_uuid(), 1, 'active', 'exp
                        false, NULL, now() - interval '10 days', now() - interval '1 day');
 
 -- ── Helpers that call the two halves exactly as lib/kb/db.ts does ─────────────
+-- p_include_sensitive DEFAULT true: every existing call site below predates migration 0083 and
+-- exercises the pre-0083 behaviour (a viewer sees its own org's sensitive docs) -- assertion block 16
+-- below is the only one that passes false explicitly.
 CREATE OR REPLACE FUNCTION pg_temp.vec_titles(
-  p_scope uuid[], p_spaces uuid[], p_viewer uuid, p_as_of timestamptz, p_model text
+  p_scope uuid[], p_spaces uuid[], p_viewer uuid, p_as_of timestamptz, p_model text,
+  p_include_sensitive boolean DEFAULT true
 ) RETURNS text[] LANGUAGE sql AS $$
   SELECT COALESCE(array_agg(s.title ORDER BY s.title), ARRAY[]::text[])
-  FROM public.cs_match_chunks(p_scope, p_spaces, p_viewer, p_as_of, p_model, pg_temp.vec(), 50) m
+  FROM public.cs_match_chunks(p_scope, p_spaces, p_viewer, p_as_of, p_model, pg_temp.vec(), 50, p_include_sensitive) m
   JOIN public.cs_knowledge_sources s ON s.id = m.source_id
 $$;
 
 CREATE OR REPLACE FUNCTION pg_temp.kw_titles(
-  p_scope uuid[], p_spaces uuid[], p_viewer uuid, p_as_of timestamptz, p_model text, p_term text DEFAULT 'kbmarker'
+  p_scope uuid[], p_spaces uuid[], p_viewer uuid, p_as_of timestamptz, p_model text, p_term text DEFAULT 'kbmarker',
+  p_include_sensitive boolean DEFAULT true
 ) RETURNS text[] LANGUAGE sql AS $$
   SELECT COALESCE(array_agg(s.title ORDER BY s.title), ARRAY[]::text[])
-  FROM public.cs_match_chunks_keyword(p_scope, p_spaces, p_viewer, p_as_of, p_model, p_term, 50) m
+  FROM public.cs_match_chunks_keyword(p_scope, p_spaces, p_viewer, p_as_of, p_model, p_term, 50, p_include_sensitive) m
   JOIN public.cs_knowledge_sources s ON s.id = m.source_id
 $$;
 
@@ -202,15 +207,69 @@ BEGIN
   -- 11. The 0064 lockdown: these RPCs take the tenant scope as a parameter and check no identity,
   --     so an anon-key holder must not be able to execute them. kb-local-verify.sh reproduces
   --     Supabase's ALTER DEFAULT PRIVILEGES before applying the migration, which is what makes
-  --     this assertion able to fail.
-  ASSERT NOT has_function_privilege('anon', 'public.cs_match_chunks(uuid[],uuid[],uuid,timestamptz,text,vector,int)', 'EXECUTE'),
+  --     this assertion able to fail. Signature includes 0083's trailing `boolean` -- the pre-0083
+  --     7-arg signature no longer exists once 0083 is applied, and has_function_privilege() on a
+  --     nonexistent signature raises an error rather than returning false.
+  ASSERT NOT has_function_privilege('anon', 'public.cs_match_chunks(uuid[],uuid[],uuid,timestamptz,text,vector,int,boolean)', 'EXECUTE'),
     'anon can execute cs_match_chunks';
-  ASSERT NOT has_function_privilege('anon', 'public.cs_match_chunks_keyword(uuid[],uuid[],uuid,timestamptz,text,text,int)', 'EXECUTE'),
+  ASSERT NOT has_function_privilege('anon', 'public.cs_match_chunks_keyword(uuid[],uuid[],uuid,timestamptz,text,text,int,boolean)', 'EXECUTE'),
     'anon can execute cs_match_chunks_keyword';
-  ASSERT NOT has_function_privilege('authenticated', 'public.cs_match_chunks(uuid[],uuid[],uuid,timestamptz,text,vector,int)', 'EXECUTE'),
+  ASSERT NOT has_function_privilege('authenticated', 'public.cs_match_chunks(uuid[],uuid[],uuid,timestamptz,text,vector,int,boolean)', 'EXECUTE'),
     'authenticated can execute cs_match_chunks';
 
   RAISE NOTICE 'KB_VERIFY_CONSTRAINTS_OK — versioning, tenancy and grant assertions passed';
+END $$;
+
+-- ── 0083: is_sensitive gets a real audience gate ──────────────────────────────
+DO $$
+DECLARE
+  a       uuid := pg_temp.uid('orgA');
+  b       uuid := pg_temp.uid('orgB');
+  m       text := 'text-embedding-3-small';
+  titles  text[];
+  kw      text[];
+BEGIN
+  -- 16. Every existing caller (p_include_sensitive omitted ⇒ SQL default true) sees EXACTLY what it
+  --     saw before 0083 -- this is the "additive parameter, zero behaviour change for callers who
+  --     don't ask" contract the migration's header promises.
+  ASSERT pg_temp.vec_titles(ARRAY[a, b], NULL, b, NULL, m) @> ARRAY['B secret'],
+    '0083 regression: omitting p_include_sensitive must keep pre-0083 behaviour (own sensitive doc visible)';
+
+  -- 17. THE fix: a caller viewing ITS OWN org's sensitive doc, but explicitly declining sensitive
+  --     content, must not receive it. Before 0083 there was no way to express this at all -- the
+  --     predicate's only gate was `c.organization_id = p_viewer`, true for every real caller.
+  titles := pg_temp.vec_titles(ARRAY[b], NULL, b, NULL, m, false);
+  ASSERT NOT (titles @> ARRAY['B secret']),
+    'includeSensitive=false did not exclude a sensitive doc from its own org''s viewer';
+
+  -- 18. Non-sensitive documents are never affected by the flag either direction.
+  ASSERT pg_temp.vec_titles(ARRAY[a], NULL, a, NULL, m, false) @> ARRAY['policy v2'],
+    'includeSensitive=false incorrectly hid a non-sensitive document';
+
+  -- 19. The existing tenant-chain protection (assertion 3) still composes correctly UNDER the new
+  --     flag: true does not resurrect a cross-tenant leak that p_viewer was already blocking.
+  ASSERT NOT (pg_temp.vec_titles(ARRAY[a, b], NULL, a, NULL, m, true) @> ARRAY['B secret']),
+    'includeSensitive=true reopened the cross-tenant leak that p_viewer=own-org was already blocking';
+
+  -- 20. Both retrieval halves agree under the new flag too -- same leak class as assertion 7.
+  titles := pg_temp.vec_titles(ARRAY[b], NULL, b, NULL, m, false);
+  kw := pg_temp.kw_titles(ARRAY[b], NULL, b, NULL, m, 'kbmarker', false);
+  ASSERT titles = kw, format('vector/keyword sensitivity-gate visibility diverged: vector=%s keyword=%s', titles, kw);
+
+  -- 21. The pre-0083 (7-arg) signatures must be gone, not shadowed by an overload -- same reasoning
+  --     as assertion 8: PostgREST cannot disambiguate two functions with the same name if both exist.
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'cs_match_chunks'
+      AND replace(oidvectortypes(p.proargtypes), ' ', '') = 'uuid,uuid,uuid,timestamptz,text,vector,int4'
+  ), 'the pre-0083 cs_match_chunks(uuid,uuid,uuid,timestamptz,text,vector,int) still exists';
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'cs_match_chunks_keyword'
+      AND replace(oidvectortypes(p.proargtypes), ' ', '') = 'uuid,uuid,uuid,timestamptz,text,text,int4'
+  ), 'the pre-0083 cs_match_chunks_keyword(uuid,uuid,uuid,timestamptz,text,text,int) still exists';
+
+  RAISE NOTICE 'KB_VERIFY_SENSITIVE_GATE_OK — is_sensitive audience gate (migration 0083) passed';
 END $$;
 
 -- ── Provenance, citation and the lock (0075) ─────────────────────────────────
