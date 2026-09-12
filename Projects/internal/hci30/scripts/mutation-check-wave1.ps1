@@ -44,6 +44,7 @@ $upMig14  = Join-Path $root 'database/migrations/0014_wave1_decision_recording_u
 $upMig15  = Join-Path $root 'database/migrations/0015_wave1_case_reopen_up.sql'
 $upMig16  = Join-Path $root 'database/migrations/0016_wave1_case_report_snapshots_up.sql'
 $upMig17  = Join-Path $root 'database/migrations/0017_wave1_rule_engine_auto_promote_up.sql'
+$upMig18  = Join-Path $root 'database/migrations/0018_wave1_evidence_hash_chain_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -903,7 +904,24 @@ $mutations = @(
      # CLOSED-SETUP/CLOSED-01 UPDATEs against that same nonexistent row match
      # zero rows and succeed trivially instead, same as CASE-LIFECYCLE-03's
      # own precedent above, so they do NOT join this list.
-     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01','CASE-REOPEN-SETUP-01','CASE-REOPEN-CLOSEDAT-CLEARED-01','CASE-REOPEN-SKIP-01','CASE-AUTO-PROMOTE-SETUP-01','CASE-AUTO-PROMOTE-DEFAULT-01') }
+     # 2026-09-12 (migration 0018): CHAIN-CASE-SETUP-01's own case-239 INSERT
+     # is rejected (app-role, same FORCE-RLS-denies-writes-too reasoning);
+     # CHAIN-GENESIS-01/CHAIN-LINK-SETUP-01 then fail their own FK against a
+     # case row that was never created; CHAIN-GENESIS-02/CHAIN-LINK-01 read
+     # rows that were never inserted (0 rows, predicate false);
+     # CHAIN-VERIFY-VALID-01 finds zero records for case 239 so bool_and()
+     # over no rows is NULL, not true; CHAIN-VERIFY-TAMPER-01 likewise finds
+     # no record 990 to match its EXISTS check. Real-Docker flagged all
+     # seven as unexpected, not assumed in advance. CHAIN-TAMPER-SETUP-01
+     # does NOT join: its UPDATE against the never-created record 990
+     # matches zero rows and succeeds trivially, same pattern as CASE-
+     # LIFECYCLE-03's own precedent. Nothing under case 238 (CHAIN-DELETE-*/
+     # CHAIN-VERIFY-DELETE-01) joins either: those setup statements run as
+     # hci_owner (after this test's block's own RESET ROLE), which bypasses
+     # RLS regardless of the dropped policy, and CHAIN-VERIFY-DELETE-01's
+     # verify call only reads subject_records/subject_record_chain_tips,
+     # neither of which this mutation touches.
+     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01','CASE-REOPEN-SETUP-01','CASE-REOPEN-CLOSEDAT-CLEARED-01','CASE-REOPEN-SKIP-01','CASE-AUTO-PROMOTE-SETUP-01','CASE-AUTO-PROMOTE-DEFAULT-01','CHAIN-CASE-SETUP-01','CHAIN-GENESIS-01','CHAIN-GENESIS-02','CHAIN-LINK-SETUP-01','CHAIN-LINK-01','CHAIN-VERIFY-VALID-01','CHAIN-VERIFY-TAMPER-01') }
   # RLS-OWN-02 (db-expert M2): hci.tenants is scoped by `id`, not `tenant_id`,
   # so it is invisible to every mutation above. Dropping its own policy fails
   # CLOSED - RLS-LEAK-02 (tenant B invisible) stays green - which is exactly
@@ -931,6 +949,13 @@ $mutations = @(
   @{ id = 'drop-record-decision-principal-check'
      sql = 'CREATE OR REPLACE FUNCTION hci.record_decision(p_case_id uuid, p_principal_id uuid, p_outcome text, p_rationale text) RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = hci, pg_temp AS $fn$ DECLARE v_tenant_id uuid; v_id uuid; BEGIN v_tenant_id := hci.current_tenant_id(); IF v_tenant_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1001'', MESSAGE = ''x''; END IF; IF NOT EXISTS (SELECT 1 FROM hci.cases WHERE tenant_id = v_tenant_id AND id = p_case_id) THEN RAISE EXCEPTION USING ERRCODE = ''H1020'', MESSAGE = ''x''; END IF; v_id := gen_random_uuid(); INSERT INTO hci.decisions (id, tenant_id, case_id, outcome, rationale, author_class, principal_id) VALUES (v_id, v_tenant_id, p_case_id, p_outcome, p_rationale, ''HUMAN_ONLY'', p_principal_id); RETURN v_id; END $fn$;'
      expect = @('RECORD-DECISION-CROSSTENANT-PRINCIPAL-01') }
+
+  # Evidence hash-chain (migrations/0018): without this trigger, content_hash/
+  # prev_hash stay NULL (no column DEFAULT computes them), so both the
+  # genesis/linkage checks and the whole-chain verify go red.
+  @{ id = 'drop-content-hash-trigger'
+     sql = 'DROP TRIGGER subject_records_content_hash ON hci.subject_records;'
+     expect = @('CHAIN-GENESIS-02','CHAIN-LINK-01','CHAIN-VERIFY-VALID-01') }
 )
 
 $project = "hcimut$PID"
@@ -1005,6 +1030,7 @@ function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig15)  -ne 0) { throw 'mutation harness: 0015 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig16)  -ne 0) { throw 'mutation harness: 0016 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig17)  -ne 0) { throw 'mutation harness: 0017 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig18)  -ne 0) { throw 'mutation harness: 0018 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

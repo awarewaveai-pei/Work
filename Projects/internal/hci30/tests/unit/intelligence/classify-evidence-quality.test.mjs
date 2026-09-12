@@ -8,8 +8,8 @@ test('worked example from the spec: a single-ref dimension is SINGLE_SOURCE, a m
     { dimension: 'PREDICTABILITY', value: 'HIGH', evidence_refs: ['ev-2', 'ev-3', 'ev-4'] },
   ]);
   assert.deepEqual(classified, [
-    { dimension: 'RELIABILITY_FULFILLMENT', domain: 'OPERATIONAL', value: 'HIGH', quality: 'SINGLE_SOURCE', evidence_refs: ['ev-1'] },
-    { dimension: 'PREDICTABILITY', domain: 'OPERATIONAL', value: 'HIGH', quality: 'MULTIPLE_SOURCES', evidence_refs: ['ev-2', 'ev-3', 'ev-4'] },
+    { dimension: 'RELIABILITY_FULFILLMENT', domain: 'OPERATIONAL', value: 'HIGH', quality: 'SINGLE_SOURCE', evidence_count: 1, evidence_refs: ['ev-1'] },
+    { dimension: 'PREDICTABILITY', domain: 'OPERATIONAL', value: 'HIGH', quality: 'MULTIPLE_SOURCES', evidence_count: 3, evidence_refs: ['ev-2', 'ev-3', 'ev-4'] },
   ]);
 });
 
@@ -35,6 +35,11 @@ test('duplicate refs count as one distinct source, not two -- classifies as SING
     { dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['https://acme.com/about', 'https://acme.com/about'] },
   ]);
   assert.equal(classified[0].quality, 'SINGLE_SOURCE');
+  // evidence_count must report the same distinct count the quality label
+  // itself is based on (1), not the raw array length (2) -- the exact
+  // "raw length vs distinct count" mismatch C2 above already guards for
+  // `quality`, now also guarded for the new count field.
+  assert.equal(classified[0].evidence_count, 1);
 });
 
 test('three refs with only two distinct values classifies as MULTIPLE_SOURCES (2 distinct, above the boundary)', () => {
@@ -42,6 +47,7 @@ test('three refs with only two distinct values classifies as MULTIPLE_SOURCES (2
     { dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1', 'ev-1', 'ev-2'] },
   ]);
   assert.equal(classified[0].quality, 'MULTIPLE_SOURCES');
+  assert.equal(classified[0].evidence_count, 2);
 });
 
 test('a dimension absent from the input does not appear in the output at all', () => {
@@ -67,8 +73,8 @@ test('output is ordered by ASSESSMENT_DIMENSIONS position, and domain/value fiel
   // though it was supplied second here -- and each row's own domain/value
   // must match its OWN dimension, not the first fixture's.
   assert.deepEqual(classified, [
-    { dimension: 'INTEGRITY_CONSISTENCY', domain: 'REPUTATIONAL', value: 'VERY_HIGH', quality: 'SINGLE_SOURCE', evidence_refs: ['ev-integrity'] },
-    { dimension: 'COMPETENCE', domain: 'COMPETENCE', value: 'LOW', quality: 'SINGLE_SOURCE', evidence_refs: ['ev-competence'] },
+    { dimension: 'INTEGRITY_CONSISTENCY', domain: 'REPUTATIONAL', value: 'VERY_HIGH', quality: 'SINGLE_SOURCE', evidence_count: 1, evidence_refs: ['ev-integrity'] },
+    { dimension: 'COMPETENCE', domain: 'COMPETENCE', value: 'LOW', quality: 'SINGLE_SOURCE', evidence_count: 1, evidence_refs: ['ev-competence'] },
   ]);
 });
 
@@ -78,8 +84,8 @@ test('multiple dimensions across different domains and qualities are all reporte
     { dimension: 'COMPETENCE', value: 'LOW', evidence_refs: ['ev-2', 'ev-3'] },
   ]);
   assert.deepEqual(classified, [
-    { dimension: 'COMPETENCE', domain: 'COMPETENCE', value: 'LOW', quality: 'MULTIPLE_SOURCES', evidence_refs: ['ev-2', 'ev-3'] },
-    { dimension: 'PREDICTABILITY', domain: 'OPERATIONAL', value: 'HIGH', quality: 'SINGLE_SOURCE', evidence_refs: ['ev-1'] },
+    { dimension: 'COMPETENCE', domain: 'COMPETENCE', value: 'LOW', quality: 'MULTIPLE_SOURCES', evidence_count: 2, evidence_refs: ['ev-2', 'ev-3'] },
+    { dimension: 'PREDICTABILITY', domain: 'OPERATIONAL', value: 'HIGH', quality: 'SINGLE_SOURCE', evidence_count: 1, evidence_refs: ['ev-1'] },
   ]);
 });
 

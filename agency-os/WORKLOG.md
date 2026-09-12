@@ -1,5 +1,81 @@
 # Worklog
 
+## 2026-09-12 HCI30 C10 落地（證據筆數揭露）+ C1-C10 完整決策清單建檔
+
+同一輪 C7（見上方條目）之外，一併把「HC 優缺點」清單的其餘 9 項逐一判斷
+並記錄成 `Projects/internal/hci30/docs/HCI_C1_C10_DECISIONS.md`（AI-readable
+極簡格式）。逐項結論：**DONE**（C7 證據雜湊鏈、C10 見下）、**PLANNED**
+（C2 否定詞窗口啟發式+規則版本號、C3 關鍵字堆疊偵測、C5 auto-promote
+稽核紀錄——設計已定，未落地，追蹤於 `agency-os/TASKS.md`）、**DEFERRED**
+（C1 資料蒐集器是操作者本人劃出的獨立工作流邊界；C4 跨構面總分/C9
+purpose 差異化行為都需要操作者本人的業務或法遵判斷，不是我能猜的工程細
+節，猜錯代價比維持現狀誠實留白更高；C6 真實登入、C8 金鑰輪替兩者皆屬
+AGENTS.md §3 High-risk，且都已有正確路徑或前人決定——C6 是等 HCI-30 對外
+開放時接現成的 `portal.aware-wave.com`，不是重新發明；C8 是 2026-09-07
+前一個 session 已經做過的「不趕」決定，本輪不推翻）。
+
+**C10（統計方法陽春，不看樣本數）落地**：`packages/intelligence/classify-
+evidence-quality.mjs` 的 `classifyEvidenceQuality()` 除了既有
+SINGLE_SOURCE/MULTIPLE_SOURCES 標籤，補上 `evidence_count`（沿用函式內本
+來就會算的 `distinctRefCount`，不是另開一套計數邏輯）。UI 兩處同步：
+`buildDomainGrid()` 的構面下鑽、`refreshDetail()`/`renderReportView()` 的
+證據卡片，「單一來源」→「單一來源（1 筆）」。刻意不做的是完整信賴區間/
+統計顯著性模型——沒有真實校準資料就編一個假的信賴區間，比維持現狀的誠實
+陽春更糟（會讓人誤以為有統計嚴謹性）。
+
+REALTEST_EVIDENCE: tool=Bash+Browser | cmd=node --test tests/unit/intelligence/*.mjs（146/146 全綠，含 classify-evidence-quality.test.mjs 16 個測試全數更新 deepEqual 斷言含新欄位）+ 瀏覽器建立真實案件（新當事人→證據→引用該證據的評估）確認構面下鑽與證據卡片皆顯示「單一來源（1 筆）」，活頁面與報告頁一致 | exit=0，console 零錯誤
+REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純欄位新增+對應測試更新，無新邏輯分支）
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=classifyEvidenceQuality\|evidenceQuality | hits=6 檔案，逐一核對：`app/server.mjs` 直接序列化整個陣列無解構丟欄位風險；無其他測試檔案 pin 過這個函式的輸出形狀
+WORKLOG_DONE: 本條目
+
+[已修改]
+- `Projects/internal/hci30/docs/HCI_C1_C10_DECISIONS.md`（新增，C1-C10 完整決策記錄）
+- `Projects/internal/hci30/packages/intelligence/classify-evidence-quality.mjs`（補 `evidence_count` 欄位）
+- `Projects/internal/hci30/tests/unit/intelligence/classify-evidence-quality.test.mjs`（全部 deepEqual 斷言補新欄位，2 個測試新增 evidence_count 專項斷言）
+- `Projects/internal/hci30/app/public/index.html`（構面下鑽 + 證據卡片顯示筆數，活頁面與報告頁同步）
+- `agency-os/TASKS.md`（新增 C2/C3/C5 三個 PLANNED 追蹤項）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——146/146 Node test + 瀏覽器真實案件驗證，console 零錯誤
+
+[剩餘風險] 無新增風險；純欄位新增與展示，未改動任何計分邏輯
+
+[rollback]
+`git revert` 本次 commit，回到只有 SINGLE_SOURCE/MULTIPLE_SOURCES 標籤、無筆數揭露的上一版。
+
+## 2026-09-12 HCI30 C1-C10 決策清單 + C7 完整落地：證據雜湊鏈（migrations/0018），關閉 P0-03 剩餘 2 項
+
+操作者要求把上次「HC 優缺點」列的 C1-C10 十項缺點「完美完善完整處理好」、全權授權決定。逐項判斷後（見下方觸發詞 HCI_C1_C10_DECISIONS.md，本輪同步建立），本輪先完整落地 **C7（證據完整性鏈沒建完，content hash/hash-chain）**——十項裡唯一同時滿足「真的是缺陷（非刻意設計）、已有前人規格、範圍單一、不需要業務判斷、不跟另一個獨立工作流衝突」的一項，其餘 9 項的決定與理由見 `HCI_C1_C10_DECISIONS.md`（極簡格式，不在這裡重複）。
+
+**根因重新核實**：`security/evidence-integrity/HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`（2026-09-07 寫）item 4/5 原本誠實記「OPEN——阻塞在 Evidence 沒有真實 payload 欄位」。查 `database/migrations/0012_wave1_subject_record_payload_up.sql`（ADR-0034），這個阻塞早在 2026-09-09 就被 `payload jsonb` 欄位解除，只是沒人回頭補完 item 4/5——**不是新缺口，是舊 spec 沒被重新檢查而卡住的既有工作**。
+
+**設計**：`subject_records` 新增 `content_hash`/`prev_hash`（server-only，trigger 算，未列入 app-role INSERT 欄位授權）；新表 `hci.subject_record_chain_tips`（每 case 一列，記當前鏈尾雜湊，交易級 advisory lock 防同 case 併發 race，含首筆 genesis race 的特別處理）；`hci.compute_subject_record_hash()` BEFORE INSERT trigger 算雜湊+串鏈；`hci.verify_subject_record_chain(tenant_id, case_id)` 重算全鏈驗證自洽性+鏈接性。範圍：EVIDENCE/CLAIM/ASSESSMENT/TRUST_DOMAIN 全部種類算在同一條鏈（同一張表、同一個 `system_recorded_at` 插入序，只鏈一部分會把「插入了被排除種類的紀錄」誤報成竄改）。
+
+**這條鏈實際防的是什麼**（不是重複現有機制）：`subject_records` 本來就 append-only（grant 層 REVOKE + trigger 層 `reject_update_delete()`），擋得住 app role、也擋得住一般 owner/superuser 連線——但擋不住先 `ALTER TABLE ... DISABLE TRIGGER` 再改資料再重新開回去的那一層（DDL ownership 門檻比 DML 高）。這條鏈是偵測用（不是預防用）：內容被改，`content_hash` 重算對不上；中間一筆被刪，下一筆存活紀錄的 `prev_hash` 會指向一個沒人產生的雜湊。兩種情境都用真實 Docker 環境重現過（見下方驗證），不是純推論。
+
+**真跑驗證**：`test-wave1-local.ps1` 269/269 assertion 全綠（新增 14 個 CHAIN-* 測試，含 owner-context 用既有 `DISABLE TRIGGER USER` 手法重現「內容被改」跟「中間一筆被刪」兩種情境並確認 `verify_subject_record_chain` 正確標記），down/up 回滾全流程重跑綠燈。`mutation-check-wave1.ps1` 128/128 全殺（新增 1 個 `drop-content-hash-trigger` mutation；順手修正既有 `drop-cases-rls-policy` 這個 mutation 的 expect list——real-Docker 跑出來發現漏了 7 個新測試的連鎖失敗，不是憑空估計）。過程中兩個既有的裸規則也抓到我自己新函式的違規（`FUNCTION-SEARCHPATH-01` 少 pin search_path；`BITEMP-SCOPE-01` 用了 `clock_timestamp()` 而非要求的 `now()`——0005 自己的檔頭註解早就警告過同一個坑，這次還是踩了一次，已修正）。
+
+**文件同步**：`HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md` item 4/5 改 CLOSED；`docs/domain/HCI_ENTITY_DICTIONARY.md` 補上 0012（`payload`）跟 0018（`content_hash`/`prev_hash`）兩列，順手修正一句「no real payload column exists yet」的過期主張（跟 tamper-evidence spec 原本那句是同一個根因、各自獨立殘留）；`HCI_INVARIANTS.md` 一句過期的「payload columns are Wave 4」括號註解同步修正；`agency-os/TASKS.md` P0-03 條目補一句 2026-09-12 全關的追記，不重寫整條歷史敘述。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/test-wave1-local.ps1（真 Docker，269 assertions）+ powershell -File scripts/mutation-check-wave1.ps1（真 Docker，128 mutations）| exit=0（兩次皆全綠，含中途兩輪失敗-修正-重跑）
+REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（自審：DDL/併發/授權/search_path 四個常見 Postgres 陷阱在真跑中各自被既有裸規則或自建測試抓到並修正，非憑空宣稱正確）
+BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=subject_record_chain_tips\|compute_subject_record_hash\|verify_subject_record_chain\|no real payload column | hits=在 `docs/domain/{HCI_ENTITY_DICTIONARY,HCI_INVARIANTS}.md` 抓到 2 處獨立殘留的「no real payload column」過期主張（跟 tamper-evidence spec 原本那句同根因，各自獨立寫過，這次一併修正）；README.md 一處僅為指向該 spec 的路徑指標，非過期主張本身，確認不需改
+WORKLOG_DONE: 本條目
+
+[已修改]
+- `Projects/internal/hci30/database/migrations/0018_wave1_evidence_hash_chain_{up,down}.sql`（新增：content_hash/prev_hash 欄位、chain_tips 表、trigger、verify 函式）
+- `Projects/internal/hci30/scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1`（migration 0018 接線；mutation-check 新增 1 個 mutation + 修正 `drop-cases-rls-policy` expect list）
+- `Projects/internal/hci30/database/tests/wave1-negative-tests.sql`（14 個新 CHAIN-* 測試，`finish(255)`→`finish(269)`）
+- `Projects/internal/hci30/security/evidence-integrity/HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md`（item 4/5 OPEN→CLOSED）
+- `Projects/internal/hci30/docs/domain/{HCI_ENTITY_DICTIONARY,HCI_INVARIANTS}.md`（補欄位列、修正過期 payload 主張）
+- `agency-os/TASKS.md`（P0-03 條目追記全關）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——本機真 Docker 環境驗證過，含正向（genesis/串鏈）與負向（竄改/刪除偵測）情境，269/269 + 128/128 全綠
+
+[剩餘風險] 這條鏈只防「有人拿到 table owner/DDL 權限並主動繞過 trigger」這一層，防不了憑證整個外洩（那是完全不同的紅線，見 C1-C10 決策清單裡 C8 金鑰輪替的獨立追蹤）；`subject_record_chain_tips` 本身雖有 RLS 隔離，仍是 app role INSERT/UPDATE 可寫的表（設計理由見 migration 檔頭），不是零信任邊界
+
+[rollback]
+`git revert` 本次 commit；或單獨對 migration 跑 `0018_wave1_evidence_hash_chain_down.sql`（已真跑驗證可逆）。
+
 ## 2026-09-12 第十一批(蒐集器改善 3/3：排程自動化——scope 決策：架構做完整，UI 面板故意留白)
 
 **架構決策**（操作者授權「4 需要決定的事都你決定」）：排程邏輯全部放 next-admin（跟爬蟲、跟它的測試套件同一個 codebase），Trigger.dev 只當一個空腦袋的每小時心跳，不查表、不算日期。理由：如果邏輯放 Trigger.dev task 裡直接查 `collection_schedules`，就要在兩個 package（next-admin + workflows）各寫一份「這個 schedule 現在該不該跑」的判斷，兩份遲早不同步。現在只有 `lib/collect/schedule.ts` 一份。

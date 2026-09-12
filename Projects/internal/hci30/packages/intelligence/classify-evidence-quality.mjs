@@ -53,6 +53,14 @@ export function classifyEvidenceQuality(dimensionScores) {
         domain: DIMENSION_TO_DOMAIN[entry.dimension],
         value: entry.value,
         quality,
+        // Operator, 2026-09-11 ("HC 缺點...統計方法很陽春"): SINGLE_SOURCE/
+        // MULTIPLE_SOURCES alone collapses "backed by 1 record" and "backed
+        // by 50 records" into the same label. The distinct count backing
+        // that same quality classification (already computed above, not a
+        // second independent count) -- an honest evidence-count signal, not
+        // a fabricated confidence interval/statistical model, which would
+        // need real calibration data this system does not have.
+        evidence_count: distinctRefCount,
         evidence_refs: entry.evidence_refs,
       };
     });
