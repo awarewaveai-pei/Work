@@ -588,6 +588,8 @@
 - [x] **【✅ 2026-09-12 完成】規則引擎否定詞窗口啟發式 + 規則集版本號（C2）** — `matchNegatedRules()`/`RULE_SET_VERSION`，`rule-engine.test.mjs` 24 test 全綠，真 Docker 282/282 assertion。細節見 WORKLOG 2026-09-12（C2/C3/C5 條目）。
 - [x] **【✅ 2026-09-12 完成】規則引擎關鍵字堆疊偵測（C3）** — `detectKeywordStacking()`，緩解非解法（可解釋性與抗操弄的必然張力見 `HCI_C1_C10_DECISIONS.md` §C3）。細節見 WORKLOG 2026-09-12（C2/C3/C5 條目）。
 - [x] **【✅ 2026-09-12 完成】auto-promote 開關稽核紀錄（C5）** — 新 migration `0019_wave1_case_auto_promote_audit`，append-only 骨架沿用 C7；critic 覆審抓到原子性缺口後改為 `hci.set_case_auto_promote_rule_findings()` 單一函式呼叫。細節見 WORKLOG 2026-09-12（C2/C3/C5 條目）。
+- [x] **【✅ 2026-09-12 確認維持擱置】金鑰輪替只有紙上設計（C8）** — High-risk（加密/憑證），前一輪 session 已決定「不趕、需要自己一輪完整 real-Docker 驗證」。操作者本輪被問「要不要推翻這個決定」，答「維持前人決定」。無程式碼異動，純確認留存。見 `Projects/internal/hci30/docs/HCI_C1_C10_DECISIONS.md` §C8。
+- [x] **【✅ 2026-09-12 確認維持擱置】「調查目的」欄位是裝飾（C9）** — 詐欺調查／人身安全／一般盡職調查等 5 個 purpose 目前零行為差異，要接不同法遵規則需要操作者給具體政策輸入，猜錯有法律風險。操作者本輪答「先不動」（原因：不清楚要怎麼設規則）。無程式碼異動，純確認留存。見 `HCI_C1_C10_DECISIONS.md` §C9。
 
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
   - `🟠 未開始` · `2026-08-28 開出` · `可直接做`
