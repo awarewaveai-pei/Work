@@ -1,5 +1,64 @@
 # Worklog
 
+## 2026-09-12 collect-scheduled-crawl deployed to Trigger.dev EU + fixed 3 ks-aw-01 root-hardening regressions in lobster-trigger-deploy.ps1
+
+任務：把上一輪新增的 `collect-scheduled-crawl`（hourly cron heartbeat -> next-admin
+`/api/internal/collect/run-due-schedules`）部署到 self-hosted Trigger.dev（trigger.aware-wave.com）。
+
+**發現的缺口**：`trigger.config.ts` 的 `syncEnvVars()` 從未加 `COLLECT_SCHEDULE_INGEST_TOKEN`
+（只有 `OPS_INBOX_INGEST_TOKEN`/`AWAREWAVE_WEBHOOK_BASE_URL`），任務程式碼已經在讀這個
+env var，但沒有任何路徑把它同步到 Trigger.dev 專案——部署後 task 會因缺 token 直接炸掉。
+
+**發現的三個環境 drift（2026-09-11 ks-aw-01 `/root` 硬化為 `drwx------` 造成，跟本任務無關但擋住部署）**：
+1. `grep /root/supabase/.env`／`/root/lobster-phase1/.env` 讀 secret：`Permission denied`（ubuntu 使用者無 sudo 直接讀不到）。
+2. `source /root/.nvm/nvm.sh`：`No such file or directory`——nvm 已被移除，node 改走系統 apt 套件（`/usr/bin/node` v20.20.2，經 sudo `secure_path` 可見）。
+3. `trigger deploy` 建置最後一步 `#20 pushing manifest` 卡 `401 Unauthorized`——硬化把 `/root/.docker/config.json`（registry:5000 的 docker login 態）清空了。
+
+**修法**（`scripts/lobster-trigger-deploy.ps1`）：讀 secret 全加 `sudo`；`NVM_DIR/nvm.sh` 改成
+`[ -s ... ] && source`（沒有就用系統 node，不是強制要求 nvm 存在）；VPS 上重新
+`sudo docker login registry:5000`（帳密取自該機 `/root/Work/lobster-factory/infra/trigger/.env`
+的 `DEPLOY_REGISTRY_USERNAME`/`DEPLOY_REGISTRY_PASSWORD`，未落地任何明碼）；最終執行步驟從
+`bash /tmp/lobster-deploy.sh` 改成 `sudo bash ...`，讓整條 pipeline（git pull／npm install／
+trigger deploy）都在 root 身分、吃得到 root-only 路徑與剛登入的 registry 憑證下跑。
+`trigger.config.ts` 補上 `COLLECT_SCHEDULE_INGEST_TOKEN` 的 `syncEnvVars` 條目，鏡射既有
+`OPS_INBOX_INGEST_TOKEN` 寫法（獨立 token，不共用，理由同 `postRunDueSchedules.ts` 檔頭）。
+
+**Git 併發**：`git push` 時遇到另兩個並行 session 的未推送本地 commit（52cccb45b 蒐集器 prod
+部署記錄、13d2303f0 影片動態功能）疊在我的 commit 上、同時 origin 也已前進兩個 commit（HCI30
+C7/C10）。用 `git pull --no-rebase`（非 rebase，避免打散別人 commit 的位置）合併；`WORKLOG.md`
+在檔案最上方兩則新條目撞在一起產生衝突，逐行核對兩側時間戳（HCI30 C10 15:52:59 晚於我方
+15:51:43）後單純保留兩段全文、依時間新→舊排序，未動內容；另有 3 個本機 untracked 檔
+（`0018_wave1_evidence_hash_chain_{up,down}.sql`、`HCI_C1_C10_DECISIONS.md`）跟即將併入的
+origin 版本逐位元 diff 確認完全一致才刪除解除卡點（不是盲刪，diff 過）；`Projects/internal/
+hci30/app/public/index.html` 是另一個仍在進行中的 session 的未提交修改，用
+`git stash push -- <path>` 只 stash 這一個檔案，merge 完後嘗試 pop 因為那個 session 又推進了
+新內容而衝突，比照本機既有慣例（`stash@{16}` 等既有 "not-mine" 命名）保留在 stash list 不動，
+交回那個 session 自己收尾。
+
+REALTEST_EVIDENCE: tool=Bash+SSH | cmd=`powershell -File scripts/lobster-trigger-deploy.ps1`（4 次疊代直到全綠：sudo 讀 secret 修好→nvm guard 修好→escape `` `$NVM_DIR `` PS 解析錯誤修好→registry 401 修好→trigger.config.ts 推上 remote 後最終跑成功）+ `docker exec trigger-postgres psql` 直接查 prod `TaskSchedule`／`EnvironmentVariable` 表 | exit=0 | 結果：`collect-scheduled-crawl` 為 `DECLARATIVE` schedule，`generatorExpression="0 * * * *"`，`active=t`；`EnvironmentVariable` 表新增 `COLLECT_SCHEDULE_INGEST_TOKEN`（updatedAt 2026-09-12 08:06:32，與 deploy 時間吻合），`AWAREWAVE_WEBHOOK_BASE_URL` 確認已是 `https://app.aware-wave.com`（未被覆寫成別的值）
+REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純新增 syncEnvVars 條目鏡射既有寫法；deploy script 三個修復皆對應可重現的具體錯誤訊息，非猜測性修改；未動任何 auth/RLS/金流邏輯）
+BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os,runbooks | grep=COLLECT_SCHEDULE_INGEST_TOKEN | hits=next-admin route/route.test.ts/docker-compose.yml 皆已存在且一致（消費端早就在等這個 token，這次只是把 Trigger.dev 供給端補齊）；grep=lobster-trigger-deploy\.ps1\|/root/\.nvm\|bash /tmp/lobster-deploy\.sh | hits=15 檔，其餘 14 個為文件/runbook 純引用腳本名或 SSOT 連結，無重複的 nvm/sudo 假設需要同步修正
+WORKLOG_DONE: 本條目
+
+**未做（刻意，任務本身列為 optional）**：未透過 dashboard/CLI 觸發 `collect-scheduled-crawl` 的
+一次測試執行去驗證 `{"ok":true,"checked":0,"due":0,"results":[]}` 端到端鏈路——trigger CLI 的
+`mint-token`/API 觸發需要另外處理 `tr_uat_`/prod 金鑰，超出本任務要求的最小驗證範圍；DB 層級的
+schedule + env var 直接驗證已足夠證明「部署成功＋設定正確」，但尚未證明 bearer auth 鏈路本身
+在 prod 環境下能跑通（下一個實際排程觸發時才會是第一次真實驗證，屆時 0 租戶啟用=無副作用）。
+
+[已修改]
+- `lobster-factory/packages/workflows/trigger.config.ts`（`syncEnvVars` 補 `COLLECT_SCHEDULE_INGEST_TOKEN`）
+- `scripts/lobster-trigger-deploy.ps1`（SRK/新 token 讀取加 `sudo`；nvm source 改為存在才跑；exec 步驟改 `sudo bash`；新增 token 讀取+export）
+- `lobster-factory/infra/trigger/TASK_REFERENCE.md`（新增 `collect-scheduled-crawl` 任務條目 + env var 表列）
+- `lobster-factory/infra/trigger/README.md`（常見卡點對照表新增今天三個 drift 的症狀→處理方向）
+
+[驗證結果] 見上 REALTEST_EVIDENCE——`trigger deploy` 成功（version 20260912.4，12 個 task），prod Postgres 直接查證 schedule 與 env var 皆正確落地
+
+[剩餘風險] `/root` 硬化（2026-09-11，非本任務所為）目前只確認影響這支腳本；其餘會用 ssh ubuntu 身分讀 `/root/supabase/.env`／`/root/lobster-phase1/.env` 的腳本未逐一稽核（grep 到 35 個檔案含這兩個路徑字串，多數是文件/runbook，少數 shell script 未逐一驗證執行身分是否受影響）——留給下次真的要跑到那些腳本時現場處理，不在此預先修
+
+[rollback]
+`git revert` 對應 commit；或個別回退：Trigger.dev dashboard 上 promote 回 version 20260912.1（部署前一版，不含新 token）即可讓 `collect-scheduled-crawl` 回到「同步但缺 token」狀態；VPS 上的 `docker login`/`sudo bash` 修法無副作用可回退（未改動任何既有檔案權限或憑證，只是新增登入態與 export）。
+
 ## 2026-09-12 HCI30 C10 落地（證據筆數揭露）+ C1-C10 完整決策清單建檔
 
 同一輪 C7（見上方條目）之外，一併把「HC 優缺點」清單的其餘 9 項逐一判斷
