@@ -1797,6 +1797,66 @@ SELECT hci_test.expect_success('CASE-AUTO-PROMOTE-CLOSED-SETUP-02',
 SELECT hci_test.expect_success('CASE-AUTO-PROMOTE-CLOSED-01',
   $q$UPDATE hci.cases SET auto_promote_rule_findings = false WHERE id = 'aaaaaaaa-0000-0000-0000-000000000231'$q$);
 
+-- Evidence tamper-evidence hash-chain (migrations/0018, closes
+-- HCI_EVIDENCE_TAMPER_EVIDENCE_SPEC.md items 4/5). App-role half: two
+-- ordinary EVIDENCE inserts into a fresh case prove genesis (no predecessor)
+-- and linkage (second row's prev_hash = first row's content_hash).
+SELECT hci_test.expect_success('CHAIN-CASE-SETUP-01',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000239','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture')$q$);
+SELECT hci_test.expect_success('CHAIN-GENESIS-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000990','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000239','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$);
+SELECT hci_test.expect_true('CHAIN-GENESIS-02',
+  $q$SELECT prev_hash IS NULL AND content_hash IS NOT NULL FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000990'$q$,
+  'a case''s first record must have no predecessor and a computed content_hash');
+SELECT hci_test.expect_success('CHAIN-LINK-SETUP-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000991','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000239','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$);
+SELECT hci_test.expect_true('CHAIN-LINK-01',
+  $q$SELECT prev_hash = (SELECT content_hash FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000990')
+       FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000991'$q$,
+  'second record''s prev_hash must equal the first record''s content_hash');
+SELECT hci_test.expect_true('CHAIN-VERIFY-VALID-01',
+  $q$SELECT bool_and(ok) FROM hci.verify_subject_record_chain('11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000239')$q$,
+  'an untampered two-record chain must verify fully valid');
+
+-- Owner-context half: proves detection survives the one bypass tier that
+-- matters (table-owner disables the append-only trigger, mutates/deletes,
+-- re-enables it) -- the exact tier APPEND-ONLY-TRIGGER-01..09 above prove
+-- the grant+trigger layers stop for everyone EXCEPT this one, and the whole
+-- reason 0018 added a chain instead of stopping at a bare content_hash
+-- column. `DISABLE TRIGGER USER` here is the same test-isolation tool
+-- CHECK-REAUDIT-SCOPED-01 above already uses, not a production escape hatch.
+RESET ROLE;
+ALTER TABLE hci.subject_records DISABLE TRIGGER USER;
+SELECT hci_test.expect_success('CHAIN-TAMPER-SETUP-01',
+  $q$UPDATE hci.subject_records SET payload = '{"content":"tampered-by-owner"}'::jsonb WHERE id = 'aaaaaaaa-0000-0000-0000-000000000990'$q$);
+SELECT hci_test.expect_success('CHAIN-DELETE-CASE-SETUP-01',
+  $q$INSERT INTO hci.cases (id,tenant_id,tenant_authorization_id,purpose,risk_tier,requester_context)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000238','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000001','general_due_diligence','R1','synthetic fixture')$q$);
+SELECT hci_test.expect_success('CHAIN-DELETE-SETUP-01',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000992','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000238','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$);
+SELECT hci_test.expect_success('CHAIN-DELETE-SETUP-02',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000993','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000238','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$);
+SELECT hci_test.expect_success('CHAIN-DELETE-SETUP-03',
+  $q$INSERT INTO hci.subject_records (id,tenant_id,person_id,kind,case_id,encryption_key_ref,author_class)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000994','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','EVIDENCE','aaaaaaaa-0000-0000-0000-000000000238','aaaaaaaa-0000-0000-0000-000000000800','DETERMINISTIC')$q$);
+SELECT hci_test.expect_success('CHAIN-DELETE-01',
+  $q$DELETE FROM hci.subject_records WHERE id = 'aaaaaaaa-0000-0000-0000-000000000993'$q$);
+ALTER TABLE hci.subject_records ENABLE TRIGGER USER;
+SET ROLE hci_app_test_a;
+SELECT hci_test.expect_true('CHAIN-VERIFY-TAMPER-01',
+  $q$SELECT EXISTS (SELECT 1 FROM hci.verify_subject_record_chain('11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000239')
+                     WHERE record_id = 'aaaaaaaa-0000-0000-0000-000000000990' AND ok = false)$q$,
+  'a record mutated after insert must fail its own content_hash recompute');
+SELECT hci_test.expect_true('CHAIN-VERIFY-DELETE-01',
+  $q$SELECT EXISTS (SELECT 1 FROM hci.verify_subject_record_chain('11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000238')
+                     WHERE record_id = 'aaaaaaaa-0000-0000-0000-000000000994' AND ok = false)$q$,
+  'deleting the middle record of a case must break the next surviving record''s prev_hash linkage');
+
 -- Restores the owner context hci_test.finish() requires below (that
 -- function's own EXECUTE grant list does not include hci_app_test_a/b --
 -- 00_test_harness.sql's final GRANT block only covers expect_sqlstate/
@@ -1808,4 +1868,4 @@ RESET ROLE;
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(255);
+SELECT hci_test.finish(269);

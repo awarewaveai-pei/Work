@@ -683,7 +683,7 @@ function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dim
       }).join('');
       const methodDisagreement = disagreementByDimension[q.dimension];
       const isAutoPromoted = autoPromotedSet.has(q.dimension);
-      return `<div class="domain-dim-row"><div><b>${DIMENSION_LABELS[q.dimension] || q.dimension}</b>：${bandBadge(q.value)} ${QUALITY_LABELS[q.quality] || q.quality}${isAutoPromoted ? '<span class="auto-promote-tag">系統自動判定，未經人工確認</span>' : ''}</div>
+      return `<div class="domain-dim-row"><div><b>${DIMENSION_LABELS[q.dimension] || q.dimension}</b>：${bandBadge(q.value)} ${QUALITY_LABELS[q.quality] || q.quality}（${q.evidence_count} 筆）${isAutoPromoted ? '<span class="auto-promote-tag">系統自動判定，未經人工確認</span>' : ''}</div>
         <ul class="domain-dim-refs">${refs}</ul>
         ${methodDisagreement ? `<div class="domain-disagreement-note">⚠ 人工判斷（${BAND_LABELS[methodDisagreement.human_value] || methodDisagreement.human_value}）與規則引擎判斷（${BAND_LABELS[methodDisagreement.rule_engine_value] || methodDisagreement.rule_engine_value}）不一致，已如實混合計算，未互相蓋過。</div>` : ''}</div>`;
     }).join('');
@@ -831,7 +831,7 @@ async function refreshDetail() {
     ? `<div class="cta-banner"><p>案件已建立，目前還沒有任何證據——請先新增第一筆，系統才能開始計算信任分數。</p><button type="button" onclick="goToAddRecord()">立即新增證據</button></div>`
     : '';
 
-  const qualityByDim = Object.fromEntries((body.evidenceQuality || []).map(q => [q.dimension, q.quality]));
+  const qualityByDim = Object.fromEntries((body.evidenceQuality || []).map(q => [q.dimension, q]));
   document.getElementById('d-domain-note').textContent = body.rollup.domains.length
     ? '根據上方評估紀錄即時運算 — 絕非人工填寫的分數。'
     : '';
@@ -870,7 +870,7 @@ async function refreshDetail() {
     return `<div class="record-card">
       <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span title="${r.id}" style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
       <div class="content">${esc(text)}</div>
-      ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality] || quality}</span>` : ''}
+      ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality.quality] || quality.quality}（${quality.evidence_count} 筆）</span>` : ''}
       ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
     </div>`;
   }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
@@ -934,7 +934,7 @@ function renderReportView(row) {
   const d = row.report;
   const c = d.case;
   const personById = Object.fromEntries(d.persons.map(p => [p.id, p.display_label]));
-  const qualityByDim = Object.fromEntries((d.evidenceQuality || []).map(q => [q.dimension, q.quality]));
+  const qualityByDim = Object.fromEntries((d.evidenceQuality || []).map(q => [q.dimension, q]));
   const recordById = Object.fromEntries(d.records.map(r => [r.id, r]));
 
   const decisionHtml = d.decisions.length
@@ -954,7 +954,7 @@ function renderReportView(row) {
     return `<div class="record-card">
       <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
       <div class="content">${esc(text)}</div>
-      ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality] || quality}</span>` : ''}
+      ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality.quality] || quality.quality}（${quality.evidence_count} 筆）</span>` : ''}
       ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
     </div>`;
   }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';

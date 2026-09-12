@@ -131,7 +131,9 @@ H1013):
 | `hci.decisions` | `HUMAN_ONLY` only |
 
 `kind` is the Wave-1 proxy for "field/transition" — no finer-grained
-field-level tracking exists yet (real payload columns are Wave 4).
+field-level tracking exists yet: `payload` (0012, ADR-0034) is one opaque
+jsonb blob per row, and a correction still supersedes the whole row
+(`supersedes_id`), not a per-field diff within it.
 
 ## Decision-Claim reaudit gate (ADR-0019 gate 4)
 

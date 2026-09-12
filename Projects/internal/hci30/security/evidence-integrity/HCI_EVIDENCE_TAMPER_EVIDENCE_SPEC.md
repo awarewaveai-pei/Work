@@ -4,8 +4,10 @@ P0-03 (`21_HCI_TOP_TIER_GAP_ANALYSIS.md`). Expected result: critical
 evidence cannot be silently rewritten without detection, and can still be
 lawfully erased when required. Five required elements named by the gap
 analysis; each mapped below to what the shipped schema
-(`database/migrations/0001`-`0011`, documented in full in `docs/domain/`)
-already provides, or honestly marked open with the specific blocker.
+(`database/migrations/0001`-`0018`, documented in full in `docs/domain/`)
+already provides. All five closed as of 0018 (2026-09-12) — see the summary
+table at the bottom for the two that were re-verified against actual current
+schema state and reclassified from a previous, stale "OPEN" reading.
 
 ## 1. Immutable audit refs — CLOSED, built
 
@@ -54,35 +56,47 @@ named Wave 4 gap (`07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md` §Immutability
 vs. Erasure) — erasure of *content* is not a meaningful mechanism to build
 against a row that has never held real content through a real write path.
 
-## 4. Content/source/attachment hashes — PARTIAL
+## 4. Content/source/attachment hashes — CLOSED (2026-09-12, migrations/0018)
 
 `hci.source_snapshots.content_hash` (required, non-blank) hashes a specific
-retrieval of a Source at a point in time — this half is closed. **Open**:
-`subject_records` (Evidence/Claim rows themselves) has no `content_hash`
-column, because it has no real content/payload column at all yet (Wave 1
-schema only — see `docs/domain/HCI_ENTITY_DICTIONARY.md`
-§Subject records; the `encryption_key_ref` column exists for a payload that
-does not exist yet either). Hashing a column that does not exist is not a
-schema decision this migration can make — it is the same Wave 4 payload-column
-gate item 3 above is blocked on, not a separate open question.
+retrieval of a Source at a point in time — closed since before this file was
+first written. **Was open, now closed**: this section previously said
+`subject_records` had no `content_hash` column "because it has no real
+content/payload column at all yet" — that blocker was actually resolved by
+`0012_wave1_subject_record_payload_up.sql` (ADR-0034's generic `payload
+jsonb` column, landed 2026-09-09) and this spec was never revisited until a
+2026-09-12 pass caught the drift. `subject_records.content_hash` (text,
+server-computed via `hci.compute_subject_record_hash()`, a `BEFORE INSERT`
+trigger) now hashes `payload` together with the row's own identity columns
+and its position in the chain (item 5) at insert time.
 
-## 5. Hash-chain / Merkle verification "where justified" — OPEN, correctly not built yet
+## 5. Hash-chain / Merkle verification "where justified" — CLOSED (2026-09-12, migrations/0018)
 
-The gap analysis's own wording ("where justified") makes this conditional,
-not unconditional. A hash chain or Merkle structure verifies that a
-*sequence* of records has not been reordered or had entries silently
-removed — meaningful once real Evidence content exists to chain (item 4).
-Chaining today would mean hashing rows that currently hold no real payload,
-which would prove nothing about content integrity and would need to be
-re-designed the moment a real payload column lands — inventing it now risks
-exactly the "shape that has to be torn out later" `0008`'s own header
-warns against for a different concept. **What would unblock this**: the
-Wave 4 payload-column decision (item 3/4's shared blocker). Once that
-lands, evaluate whether `source_relationships`' corroboration graph (which
-already has no correction mechanism at all — see
-`docs/domain/HCI_ENTITY_DICTIONARY.md` §Evidence / provenance graph) or the
-bitemporal supersession chain itself is the more natural place to add
-chaining, rather than a third, parallel mechanism.
+Was correctly deferred while item 4's blocker stood; that blocker cleared
+2026-09-09 (see above) and this item shipped alongside it 2026-09-12.
+`subject_records.prev_hash` chains every row to its immediate predecessor
+**within the same case**, ordered by the existing `system_recorded_at`
+column (0005) — ALL kinds (EVIDENCE/CLAIM/ASSESSMENT/TRUST_DOMAIN) chain
+together in one sequence, since they already share one physical append-only
+table and one insert-order timeline. `hci.subject_record_chain_tips` (one
+row per case, holding the current tip hash) makes the write path
+concurrency-safe without a full-table scan per insert. `hci.
+verify_subject_record_chain(tenant_id, case_id)` recomputes and checks the
+whole chain on demand.
+
+**What this catches that items 1-3 (grant + trigger layer append-only) do
+not**: those stop the *application role* from ever editing or deleting a
+row, and stop a table-owner/superuser connection too *as long as the
+append-only trigger stays enabled*. Neither stops a table owner who first
+runs `ALTER TABLE ... DISABLE TRIGGER`, edits or deletes a row, then
+re-enables it — DDL ownership is a strictly higher bar than the DML grants
+being bypassed, and no grant or trigger can defend against disabling itself.
+A hash chain is a *detective* control for exactly that gap: it cannot
+prevent the edit, but recomputing content_hash catches a changed row, and
+prev_hash linkage catches one deleted from the middle (the next surviving
+row's prev_hash then points at a hash no row produces). Real-Docker tested
+against both scenarios (CHAIN-VERIFY-TAMPER-01, CHAIN-VERIFY-DELETE-01 in
+`database/tests/wave1-negative-tests.sql`), not merely asserted.
 
 ## Summary
 
@@ -91,12 +105,10 @@ chaining, rather than a third, parallel mechanism.
 | Immutable audit refs | Closed |
 | Correction lineage | Closed |
 | Crypto-shredding | Closed (DSR-lifecycle wiring is Wave 4) |
-| Content/source/attachment hashes | Partial (Source-level closed; Evidence-content-level blocked on Wave 4 payload column) |
-| Hash-chain/Merkle | Open, correctly deferred (same Wave 4 blocker; "where justified" is conditional) |
+| Content/source/attachment hashes | Closed (2026-09-12, migrations/0018) |
+| Hash-chain/Merkle | Closed (2026-09-12, migrations/0018) |
 
-Two of five fully closed, one closed-with-a-tracked-Wave-4-gap, two blocked
-on the same single root cause: no real Evidence/Claim payload column exists
-in this schema yet. That is a genuine, undischarged product decision (what
-does a payload column even look like — free text, structured, external
-object reference?) — not something this spec should invent to look more
-complete.
+All five closed as of migrations/0001-0018 (DSR-lifecycle auto-wiring for
+crypto-shredding remains a separate, explicitly tracked Wave 4 item — not a
+gap in this spec's five named elements, which are about detecting/preventing
+silent rewrites, not about who/what triggers a lawful erasure).
