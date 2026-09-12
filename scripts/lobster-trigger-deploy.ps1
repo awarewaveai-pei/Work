@@ -47,11 +47,19 @@ if (-not $env:OPS_INBOX_INGEST_TOKEN) { throw "OPS_INBOX_INGEST_TOKEN not set in
 # ── 2. Read SERVICE_ROLE_KEY from VPS ──────────────────────────────────────
 Write-Host "[deploy] Reading SERVICE_ROLE_KEY from VPS..." -ForegroundColor Cyan
 $srk = (& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "grep '^SERVICE_ROLE_KEY=' /root/supabase/.env | cut -d= -f2-" 2>&1).Trim()
+    "sudo grep '^SERVICE_ROLE_KEY=' /root/supabase/.env | cut -d= -f2-" 2>&1).Trim()
 if (-not $srk -or $srk.StartsWith("ssh:") -or $srk.Length -lt 20) {
     throw "Could not read SERVICE_ROLE_KEY from VPS /root/supabase/.env"
 }
 Write-Host "[deploy] SERVICE_ROLE_KEY obtained (length=$($srk.Length))." -ForegroundColor Green
+
+Write-Host "[deploy] Reading COLLECT_SCHEDULE_INGEST_TOKEN from VPS..." -ForegroundColor Cyan
+$cst = (& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
+    "sudo grep '^COLLECT_SCHEDULE_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-" 2>&1).Trim()
+if (-not $cst -or $cst.StartsWith("ssh:") -or $cst.Length -lt 10) {
+    throw "Could not read COLLECT_SCHEDULE_INGEST_TOKEN from VPS /root/lobster-phase1/.env"
+}
+Write-Host "[deploy] COLLECT_SCHEDULE_INGEST_TOKEN obtained (length=$($cst.Length))." -ForegroundColor Green
 
 # ── 3. Build bash deploy script ────────────────────────────────────────────
 # PowerShell here-string: $pat/$srk/$phk/$oit/$AoOrgId are expanded by PS.
@@ -59,6 +67,7 @@ Write-Host "[deploy] SERVICE_ROLE_KEY obtained (length=$($srk.Length))." -Foregr
 $pat        = $env:TRIGGER_DEPLOY_PAT
 $phk        = $env:POSTHOG_API_KEY
 $oit        = $env:OPS_INBOX_INGEST_TOKEN
+$cstTok     = $cst
 # Optional — empty string is safe: syncEnvVars skips empty values
 $execSteps  = if ($env:LOBSTER_EXECUTE_MANIFEST_STEPS)  { $env:LOBSTER_EXECUTE_MANIFEST_STEPS }  else { "" }
 $wpSshKey   = if ($env:LOBSTER_WP_SSH_PRIVATE_KEY)      { $env:LOBSTER_WP_SSH_PRIVATE_KEY }      else { "" }
@@ -73,7 +82,10 @@ $deployBash = @"
 #!/bin/bash
 set -e
 export NVM_DIR=/root/.nvm
-source /root/.nvm/nvm.sh
+# 2026-09-12: /root/.nvm no longer present on ks-aw-01 (node now installed system-wide at
+# /usr/bin/node v20.20.2 via apt, reachable through sudo's secure_path). Guard instead of
+# hard-requiring nvm so this script keeps working after either provisioning style.
+if [ -s "`$NVM_DIR/nvm.sh" ]; then source "`$NVM_DIR/nvm.sh"; fi
 
 # Trigger.dev auth
 # TRIGGER_API_URL=localhost:8030 — bypass Cloudflare Bot Fight Mode for CLI deploy.
@@ -119,6 +131,7 @@ export POSTHOG_HOST=https://us.i.posthog.com
 # Webhooks
 export OPS_INBOX_INGEST_TOKEN='$oit'
 export AWAREWAVE_WEBHOOK_BASE_URL=https://app.aware-wave.com
+export COLLECT_SCHEDULE_INGEST_TOKEN='$cstTok'
 
 # wp-install-plugins: SSH execution gate + global SSH key
 export LOBSTER_EXECUTE_MANIFEST_STEPS='$execSteps'
@@ -173,7 +186,7 @@ Write-Host "[deploy] Script uploaded." -ForegroundColor Green
 # ── 5. Execute script on VPS (no TTY — trigger deploy works without it) ────
 Write-Host "[deploy] Running deploy on VPS..." -ForegroundColor Cyan
 & ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "bash /tmp/lobster-deploy.sh; EC=`$?; rm -f /tmp/lobster-deploy.sh; exit `$EC"
+    "sudo bash /tmp/lobster-deploy.sh; EC=`$?; rm -f /tmp/lobster-deploy.sh; exit `$EC"
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -ne 0) {

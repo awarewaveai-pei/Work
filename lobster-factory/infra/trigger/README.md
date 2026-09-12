@@ -214,6 +214,9 @@ powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
 | **502 / 連不上** | `docker compose ps` 看 **`trigger-webapp`** 是否 healthy；nginx 是否指到 **`:3000`**；`lobster-net` 是否同一台／名稱正確。 |
 | **OOM / 一直被殺** | 升級 RAM 或把 **supervisor** 拆到另一台（官方 worker compose 路徑）。 |
 | **Netdata `cgroup_trigger-webapp.mem_usage`** | 整機 RAM 從常態「五十多 %」飆高時，多半是 **webapp 容器 RSS** 逼近 **`mem_limit`**。請將 **`docker-compose.yml` 的 `webapp.mem_limit`／`NODE_MAX_OLD_SPACE_SIZE`** 與 repo 對齊後，於 EU：`cd /root/trigger && git pull && docker compose --env-file .env up -d webapp`。 |
+| `/root/supabase/.env: Permission denied` 或 `/root/lobster-phase1/.env: Permission denied` 讀 secret 失敗 | 2026-09-11 起 `/root` 硬化為 `drwx------`；讀取一律加 `sudo`（`lobster-trigger-deploy.ps1` 已於 2026-09-12 修）。 |
+| `/root/.nvm/nvm.sh: No such file or directory` | 同一波硬化後 nvm 已移除，node 改走系統 apt 套件（`/usr/bin/node`，經 sudo `secure_path` 可見）；腳本已改成 `[ -s "$NVM_DIR/nvm.sh" ]` 有才 source，沒有就用系統 node。 |
+| `trigger deploy` 建置卡在 `#20 pushing manifest` 最後 `401 Unauthorized`（`buildkit` push 到 `registry:5000`） | root 的 `/root/.docker/config.json` 遺失（同一波硬化清掉），登入態沒了。修：`sudo docker login registry:5000 -u <DEPLOY_REGISTRY_USERNAME> -p <DEPLOY_REGISTRY_PASSWORD>`（帳密見該機 `/root/Work/lobster-factory/infra/trigger/.env`）。整套 deploy 也要以 `sudo bash` 執行（不能只是 `ubuntu` 使用者），才能吃到這個登入態＋讀到 `/root/Work`、`/root/.nvm` 等 root-only 路徑。 |
 
 ---
 

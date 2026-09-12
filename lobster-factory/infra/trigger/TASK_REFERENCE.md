@@ -25,6 +25,7 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
 | `POSTHOG_HOST` | all tasks | `https://us.i.posthog.com` or self-hosted |
 | `OPS_INBOX_INGEST_TOKEN` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | Bearer token for AW webhook ingest |
 | `AWAREWAVE_WEBHOOK_BASE_URL` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | `https://app.aware-wave.com` |
+| `COLLECT_SCHEDULE_INGEST_TOKEN` | `collect-scheduled-crawl` | Dedicated bearer token (never `OPS_INBOX_INGEST_TOKEN`) for `/api/internal/collect/run-due-schedules` |
 | `SENTRY_AUTH_TOKEN` | `orchestrate-tenant-provisioning` | Sentry provisioning auth token |
 | `SENTRY_ORG_SLUG` | `orchestrate-tenant-provisioning` | e.g. `aware-wave` |
 | `TENANT_PROVISION_GITHUB_TOKEN` | `orchestrate-tenant-provisioning` | GitHub PAT with org:write scope |
@@ -216,6 +217,21 @@ every-minute poll spawned ~1,440 no-op runner containers/day; queue is usually e
 ```
 
 **Expected output**: `{ organizationId: "...", results: [{ provider: "sentry", ok: true }, ...] }`
+
+---
+
+### `collect-scheduled-crawl`
+
+**What it does**: Hourly cron (`0 * * * *`, declarative schedule) that pokes next-admin's
+`/api/internal/collect/run-due-schedules`. Owns no scheduling logic itself -- next-admin's
+`lib/collect/schedule.ts` (`isDueNow`) decides which tenants are actually due. Every tenant
+defaults to `collection_schedules.enabled = false`, so this firing hourly does nothing until an
+operator enables a tenant via `PATCH /api/ops/clients/[slug]/collection-schedule`.
+
+**Requires**: `COLLECT_SCHEDULE_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`
+
+**Test payload**: none (scheduled task, no input). Safe to test-run any time --
+0 schedules enabled returns `{"ok":true,"checked":0,"due":0,"results":[]}` with no side effects.
 
 ---
 

@@ -49,6 +49,12 @@ export default defineConfig({
         const awBase = process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "";
         if (awBase.trim()) out.AWAREWAVE_WEBHOOK_BASE_URL = awBase.trim().replace(/\/$/, "");
 
+        // collect-scheduled-crawl heartbeat -> next-admin /api/internal/collect/run-due-schedules.
+        // Dedicated token (never OPS_INBOX_INGEST_TOKEN) so a leak here cannot forge the other
+        // OPS_INBOX_INGEST_TOKEN-guarded endpoints, and vice versa.
+        const collectToken = process.env.COLLECT_SCHEDULE_INGEST_TOKEN ?? "";
+        if (collectToken.trim()) out.COLLECT_SCHEDULE_INGEST_TOKEN = collectToken.trim();
+
         // ── Supabase (Lobster DB writes) ─────────────────────────────────────
         const supabaseUrl = process.env.LOBSTER_SUPABASE_URL ?? "";
         const supabaseSrk = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY ?? "";
