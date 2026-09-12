@@ -1,0 +1,82 @@
+$id: "ai-lego://methods/contracts/delivery.definition_of_done.contract.yaml"
+title: "Definition of Done Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance Pack (table row L923: "把完成變成多面向 gate |
+  functional/security/privacy/observability/rollback/docs/tests | 防「能跑
+  就算完成」"). Dedicated §12.42 (L3113-3134) names 12 required dimensions
+  for a 30-year system: Functional, Tests, Security, Privacy, Data,
+  Observability, Capacity, Documentation, Migration, Rollback, Recovery,
+  Evidence. Core invariant: a record cannot claim DONE unless ALL 12
+  dimensions carry an explicit status + non-empty note, and overall_status
+  is mechanically derived from them, never caller-asserted -- directly
+  implementing §12.42's own "防止 patch-style 的「修到能跑就關單」".
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table, Definition of Done row (L923)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.42 完成定義 (L3113-3134)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. F22's own table header (L914-929) gives no
+  family-wide shared principle line the way F15's L750-752 does -- disclosed
+  here rather than invented. §12.42's 12-dimension list is transcribed
+  verbatim; the status/derivation structure is this file's own compilation.
+
+id: delivery.definition_of_done
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [DECOMPOSE, VERIFY, EVALUATE]
+# INFERRED, not cited (F22's table gives no composition formula). DECOMPOSE
+# breaks "done" into 12 named dimensions; VERIFY checks each against
+# evidence; EVALUATE derives the overall gate verdict.
+
+purpose:
+  - gate_completion_across_all_12_atlas_dimensions_not_just_functional
+inputs:
+  required: [ChangeUnderReview]
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting point
+  # is whatever unit of work (ticket/PR/feature) is being closed.
+outputs: [DefinitionOfDoneRecord]
+# NEW output type (see typed-objects/definition-of-done-record.schema.yaml).
+
+preconditions:
+  - "all 12 §12.42 dimensions declared (no missing, no extra)"
+  - "every dimension carries a non-empty note/evidence pointer"
+  - "overall_status equals the mechanical derivation from the 12 dimension statuses"
+  # NEW, structurally necessary -- §12.42's own benefit is "防止...修到能跑
+  #就關單"; a record allowed to omit a dimension or assert overall_status
+  # independent of the declared statuses lets exactly that anti-pattern back in.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention as every sibling F13/F15 record.
+
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # Producing a DoD record has no external side effect, same low-risk-by-
+  # analogy inference every sibling contract in this directory uses.
+
+open_questions:
+  - "OQ-DOD-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-DOD-2: NOT_APPLICABLE is treated as satisfying a dimension for overall_status purposes (same as MET) -- should a future revision require a distinct justification field for NOT_APPLICABLE claims?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table (L914-929) and §12.42 (L3113-3134) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "definition.of.done"/"definition_of_done" before writing -- zero
+    pre-existing implementation or schema title overlap found (only
+    method-inventory.yaml's own `pending` placeholder row existed).
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 12-dimension list is transcribed
+    verbatim from §12.42. The MET/NOT_MET/NOT_APPLICABLE status enum, the
+    DOD- prefix, and the DONE/NOT_DONE derivation rule are this file's own
+    compiled structure, disclosed above, not textually cited.

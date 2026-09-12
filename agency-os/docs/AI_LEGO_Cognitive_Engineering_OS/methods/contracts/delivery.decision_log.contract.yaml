@@ -1,0 +1,152 @@
+$id: "ai-lego://methods/contracts/delivery.decision_log.contract.yaml"
+title: "Decision Log Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance Pack (Atlas 專案管理／交付／治理套件), OPENING member
+  (F22 had zero built methods before this batch -- grep-confirmed no
+  `ai_lego/modules/delivery/` implementation existed; 1 of 4 concurrent agents
+  opening F22, building 2 of its 10 methods in this batch). Atlas cites this
+  method ONCE: F22 table row (L924, grep-verified: "Decision Log | 保存重要決策 |
+  context→decision→evidence→owner→revisit | 避免重複爭論"). NOT the same method
+  as `learning.decision_journal` (F17, L806 + §12.36 L3015-3025) despite the
+  identical Chinese label "決策日誌／決策紀錄" appearing informally for both --
+  see `decided_by` below for the full disambiguation. Real invariants: (1)
+  `decision` and `evidence` must both be non-empty -- a logged decision with
+  no stated evidence defeats L924's own "避免重複爭論" benefit, since nobody
+  can tell whether re-litigating it would surface new information; (2)
+  `revisit` must be an explicit `SCHEDULED` trigger or an explicit
+  `NO_REVISIT_PLANNED` marker -- silence on revisit is exactly the ambiguity
+  ("is this permanent or provisional?") this field exists to remove.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table row, Decision Log (L924)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: delivery.decision_log` mints a NEW
+  machine_id AND a NEW `family: delivery` (F22's first built member --
+  grep-confirmed zero pre-existing `delivery.*` contract in this corpus).
+  DISAMBIGUATION FROM `learning.decision_journal` (required due diligence,
+  same convention `stakeholders.raci.contract.yaml` uses to disambiguate
+  itself from this same F22 family's own then-unbuilt RACI entry): Atlas
+  names TWO genuinely different methods that both carry the Chinese gloss
+  "決策日誌／決策紀錄" in casual usage. `learning.decision_journal` (F17,
+  L806: "記錄當時資訊與信心 | context/options/evidence/forecast/confidence |
+  防 hindsight bias") captures a decision's context/options/evidence/forecast/
+  confidence BEFORE the outcome is known, specifically to compare Prediction
+  vs Reality and train calibration -- its own contract's `preconditions`
+  require >=2 options with exactly one `chosen`, and a two-stage
+  hash-verified tamper-evidence mechanism, neither of which has any
+  equivalent here. This method (`delivery.decision_log`, F22, L924) has a
+  DIFFERENT field shape (context/decision/evidence/owner/revisit, no
+  `options`, no `forecast`, no `confidence`) and a DIFFERENT purpose --
+  a governance/audit-trail record of a decision ALREADY MADE, whose job is
+  to stop the same settled question from being re-litigated from scratch
+  (L924's own "避免重複爭論"), not to measure decision-calibration. Grepped
+  the whole Atlas file case-insensitively for "Decision Log" -- L924's table
+  row is the only hit; no dedicated section exists for it (unlike
+  `learning.decision_journal`'s own §12.36). Grepped `method-inventory.yaml`
+  and `contract-backlog.yaml` case-insensitively for "decision log"/
+  "decision_log" -- confirmed only the still-pending F22 L924 entry
+  (`method-inventory.yaml` L1428-1432) and zero existing machine_id/contract
+  before this file. The `decision`+`evidence` non-empty and
+  `revisit` SCHEDULED/NO_REVISIT_PLANNED invariants are this file's own
+  compiled reading of L924's own "避免重複爭論" benefit column, not a
+  literal internal rule L924's bare table row itself states, disclosed as
+  such.
+
+id: delivery.decision_log
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [DECIDE, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method. DECIDE: the record's own `decision` field is a made choice, not an
+# open question. EXPLAIN: `evidence` and `context` articulate why, the actual
+# mechanism L924's own "避免重複爭論" benefit relies on.
+
+purpose:
+  - record_a_settled_decision_with_its_evidence_owner_and_revisit_disposition_to_prevent_re_litigation
+# Atlas L924 verbatim sense: 用途「保存重要決策」/ 使用方式「context→decision→
+# evidence→owner→revisit」/ 效益「避免重複爭論」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- L924's own bare table row names no
+  # companion input type, same "no hard upstream dependency" position every
+  # other opening-member Tier 1 contract in this batch takes.
+
+outputs:
+  - DecisionLogEntry
+# NEW output type (see typed-objects/decision-log-record.schema.yaml). Atlas
+# names no PascalCase output type for this method, same honesty gap every
+# other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "context, decision, and owner are each non-empty strings (DLOG_EMPTY_CONTEXT / DLOG_EMPTY_DECISION / DLOG_EMPTY_OWNER)"
+  - "evidence is a non-empty list of non-empty strings (DLOG_INVALID_EVIDENCE) -- a decision with a stated conclusion but no stated evidence defeats L924's own '避免重複爭論' benefit"
+  - "revisit.mode is exactly one of {SCHEDULED, NO_REVISIT_PLANNED}; SCHEDULED requires a non-empty trigger, NO_REVISIT_PLANNED requires trigger to be null (DLOG_INVALID_REVISIT) -- silence on revisit is the exact ambiguity this field exists to remove"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same thin-bare-table-row reasoning strategy.ansoff/insight.persona/stakeholders.raci already
+  # establish: L924 is a single bare table row, no dedicated section, no explicit unevidenced-claim caution to
+  # mechanize; `evidence` here is a flat list of stated reasons, not a per-item epistemic-typed claim structure.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L924 names no "最佳搭配" column for this method -- genuinely nothing to name, left empty rather than
+# inferring one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Flat evidence[] of plain strings, or a richer per-item {id, content, provenance} structure matching learning.decision_journal's own evidence_item shape?"
+    decision: "Flat list[str]. L924's own pipeline names a bare 'evidence' stage with no sub-structure, and this method's own quality.evidence_labeling_required is false (unlike decision_journal's true) -- a richer shape would import decision_journal's own design without a cited reason to."
+  - question: "revisit as a bare free-text string, or a closed {mode, trigger} discriminated shape?"
+    decision: "Closed {mode: SCHEDULED|NO_REVISIT_PLANNED, trigger}. A bare string cannot be mechanically checked for 'is this actually a date/trigger, or just silence dressed up as text' -- the closed enum is what makes the ambiguity-removal invariant structurally enforceable rather than a style convention."
+  - question: "Record id prefix DLOG- (bare) or something disambiguated from learning.decision_journal's own DJ- prefix?"
+    decision: "DLOG- -- already sufficiently distinct from DJ- (decision_journal's own prefix); no further disambiguation needed since the two record id namespaces cannot collide."
+
+open_questions:
+  - "OQ-DECISIONLOG-1: cognitive_primitives [DECIDE, EXPLAIN] is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-DECISIONLOG-2: owner is a bare string (no referential integrity against a stakeholders/RACI record) -- a future revision could require owner to resolve to a real stakeholders.raci assignment once that method is commonly available at decision-log-entry time.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table row (L924) directly. Grepped the whole Atlas file
+    case-insensitively for "Decision Log" -- L924 is the only hit, no
+    dedicated section, no §4 composition formula, no §14.1 legal-chain
+    mention. Grepped `methods/registry/method-inventory.yaml` and
+    `methods/registry/contract-backlog.yaml` case-insensitively for
+    "decision log"/"decision_log" before writing this file -- confirmed
+    method-inventory.yaml's own L1428-1432 pending F22 entry is unbuilt (no
+    machine_id, `has_contract: false`), and contract-backlog.yaml has no
+    `delivery.*` entry at all. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for
+    "delivery." and "decision log"/"decision_log" before writing any of this
+    method's own files -- confirmed zero pre-existing `delivery.*`
+    implementation, and the only "decision log" hits are L924 itself and
+    `learning.decision_journal.py`'s own docstring referring to ITSELF
+    (line 15: "Genuine decision, not a decision log"), not to this method.
+    Read `learning.decision_journal.contract.yaml` and its module in full to
+    confirm this method's field shape (context/decision/evidence/owner/
+    revisit) is genuinely distinct from decision_journal's own (context/
+    options/evidence/forecast/confidence) before minting this machine_id.
+    Read `stakeholders.raci.contract.yaml` for the exact disambiguation-
+    writing convention this corpus uses, applied above. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The evidence/revisit invariants are
+    this file's own compiled reading of L924's own "避免重複爭論" benefit
+    column, not a literal Atlas-cited rule beyond the bare table row wording
+    quoted above. The flat evidence[str] shape, the closed revisit
+    {mode, trigger} structure, and the DLOG- id prefix are this file's own
+    compilation decisions, disclosed above.

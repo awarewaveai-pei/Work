@@ -1,0 +1,123 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/raid-log-record.schema.yaml"
+title: RAID Log Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RaidLogRecord` -- the declared
+  `outputs` of `delivery.raid_log`'s Method Contract
+  (methods/contracts/delivery.raid_log.contract.yaml, `outputs:
+  [RaidLogRecord]`). F22 PM/Delivery/Governance family (Atlas L918;
+  dedicated §11.51 L2368-2392: "Risks, Assumptions, Issues, Dependencies
+  Log", 9 named minimum fields per item, benefit "把散落在 Slack、聊天、
+  會議中的 critical knowledge 正式化").
+
+  Real invariants (RUNTIME, not all declaratively expressible here): (a)
+  `type` is one of the closed set {RISK, ASSUMPTION, ISSUE, DEPENDENCY} --
+  literally what the R-A-I-D acronym names; (b) every item's
+  item_id/type/statement/owner/impact/status/next_action/due_review_date
+  is a non-empty string; (c) `evidence` may be empty ONLY while `status`
+  is not CLOSED or RESOLVED -- a RAID item silently closed with no
+  evidence defeats §11.51's own stated benefit.
+  `ai_lego/modules/delivery/raid_log.py` enforces all three at
+  construction time and two independent gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 PM/Delivery/Governance table, RAID Log row (L918)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.51 (L2368-2392)"
+  - "methods/contracts/delivery.raid_log.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L918/§11.51's
+  own 9-field minimum plus low-risk, disclosed compilation choices (the
+  RAID- prefix, closure-requires-evidence rule).
+
+compilation_decisions:
+  - question: "Atlas §11.51 lists Status as one of the 9 minimum fields but gives no enum vocabulary for it -- should this schema invent one?"
+    decision: "No. status stays a free non-empty string (Atlas gives Type a closed 4-value acronym but never does the same for Status). Only two literal values, CLOSED and RESOLVED, are singled out by name for the evidence-required rule -- a targeted rule, not a fabricated full status enum Atlas never specified."
+  - question: "Should evidence be required non-empty for EVERY item like the other 8 fields, or only conditionally?"
+    decision: "Conditionally -- non-empty is required only when status is CLOSED or RESOLVED. Requiring it unconditionally would make the closure rule vacuous (subsumed by a blanket rule) and would force fabricated evidence text onto items still legitimately open and awaiting it; the conditional form is the one that actually defeats the 'silently closed with no evidence' failure mode Atlas's own benefit column names."
+
+type: object
+additionalProperties: false
+required: [id, version, items, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^RAID-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.raid_log"
+
+  items:
+    type: array
+    minItems: 1
+    description: >
+      RUNTIME invariant: type closed-set, 8-of-9 fields non-empty, and
+      closure-requires-evidence -- see module description above.
+    items:
+      type: object
+      additionalProperties: false
+      required: [item_id, type, statement, owner, impact, status, next_action, due_review_date, evidence]
+      properties:
+        item_id: {type: string, minLength: 1, description: "Atlas §11.51's 'ID' field."}
+        type:
+          type: string
+          enum: [RISK, ASSUMPTION, ISSUE, DEPENDENCY]
+          description: "Closed set -- literally what R-A-I-D stands for."
+        statement: {type: string, minLength: 1}
+        owner: {type: string, minLength: 1}
+        impact: {type: string, minLength: 1}
+        status: {type: string, minLength: 1, description: "Free-form -- see compilation_decisions for why no full enum is imposed."}
+        next_action: {type: string, minLength: 1}
+        due_review_date: {type: string, minLength: 1, description: "Atlas §11.51's 'Due / Review Date' field. Free-form string, not a strict date format -- a review cadence like '2026-Q4' is legitimate and would fail a strict date format."}
+        evidence:
+          type: string
+          description: "May be empty UNLESS status is CLOSED or RESOLVED, in which case it must be non-empty -- declarative safety net for the RUNTIME invariant module description names."
+      if:
+        properties: {status: {enum: [CLOSED, RESOLVED]}}
+        required: [status]
+      then:
+        properties: {evidence: {minLength: 1}}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "3-item RAID log: one open RISK (evidence not yet required), one CLOSED ISSUE with evidence, one monitored ASSUMPTION"
+    value:
+      id: "RAID-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.raid_log"
+      items:
+        - {item_id: "R1", type: RISK, statement: "供應商可能延遲交貨", owner: "採購", impact: "上線延後 2 週", status: OPEN, next_action: "每週跟催", due_review_date: "2026-09-19", evidence: ""}
+        - {item_id: "I1", type: ISSUE, statement: "API 回應逾時", owner: "後端", impact: "結帳失敗率上升", status: CLOSED, next_action: "已修復並上線", due_review_date: "2026-09-05", evidence: "commit d00d3b99c + production error rate back to baseline"}
+        - {item_id: "A1", type: ASSUMPTION, statement: "假設第三方金流 SLA 99.9%", owner: "架構", impact: "若不成立需加重試機制", status: MONITORING, next_action: "季度覆核 SLA 報告", due_review_date: "2026-12-01", evidence: ""}
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-RAIDLOGRECORD-1: status has no closed vocabulary beyond the two literals this schema singles out (CLOSED/RESOLVED) -- should a future revision add a full enum?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table RAID Log row (L918) and dedicated §11.51
+    (L2368-2392) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "raid" before writing -- pre-existing hits are all Atlas/registry
+    cross-references, zero pre-existing `delivery.*` implementation or
+    schema-title overlap. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_raid_log.py.
+  note: >
+    No mother document was modified. The 9-field minimum is transcribed
+    directly from Atlas L918/§11.51. The RAID- prefix, the free-form
+    status field, and the closure-requires-evidence conditional rule are
+    this file's own compiled structure, disclosed above.

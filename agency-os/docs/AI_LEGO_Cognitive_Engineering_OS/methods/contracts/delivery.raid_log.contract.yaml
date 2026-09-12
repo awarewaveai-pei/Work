@@ -1,0 +1,90 @@
+$id: "ai-lego://methods/contracts/delivery.raid_log.contract.yaml"
+title: "RAID Log Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance family (Atlas L918: "RAID Log | 管 Risks/
+  Assumptions/Issues/Dependencies | ID→owner→status→impact→next action→
+  review date | 風險不散落聊天"; dedicated §11.51 L2368-2392 names 9 minimum
+  fields per item). Core invariant: `type` closed to {RISK, ASSUMPTION,
+  ISSUE, DEPENDENCY} (literally the acronym), and a CLOSED/RESOLVED item
+  must carry non-empty `evidence` -- a silently-closed item with no
+  evidence defeats §11.51's own stated benefit.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 專案管理／交付／治理套件 table, RAID Log row (L918)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.51 RAID 專案紀錄表 (L2368-2392)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L918 + §11.51 give the 9-field minimum
+  and the benefit statement -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: delivery.raid_log
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [DECOMPOSE, GROUP, VALIDATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F22
+# members). DECOMPOSE breaks scattered chat/meeting knowledge into
+# discrete items; GROUP classifies each item under its R/A/I/D type;
+# VALIDATE is the periodic review/evidence check that gates closure. All
+# three CANONICAL_KERNEL members.
+
+purpose:
+  - formalize_scattered_risk_assumption_issue_dependency_knowledge_with_evidence_backed_closure
+# Atlas L918 + §11.51 verbatim sense.
+
+inputs:
+  required:
+    - ScatteredKnowledgeSet
+# NEW DESIGN. Atlas gives no named input typed-object for this method;
+# the starting point is the raw risk/assumption/issue/dependency chatter
+# under review, same honesty-gap class every sibling F-family contract
+# already discloses.
+
+outputs:
+  - RaidLogRecord
+# NEW output type (see typed-objects/raid-log-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared item"
+  - "every item declares all 9 minimum fields (§11.51) with the 8 non-evidence fields non-empty"
+  - "a CLOSED or RESOLVED item declares non-empty evidence"
+  # STRUCTURAL. §11.51's own 9-field minimum plus the closure-evidence
+  # rule this method's core invariant makes real.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention every sibling single-record
+  # typed-object in this directory uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas F22's table gives no explicit next-step method for this row.
+
+rollback:
+  side_effect_free: true
+  # Recording a RAID log has no external side effect.
+
+open_questions:
+  - "OQ-RAID-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-RAID-2: status has no closed vocabulary beyond the two literals (CLOSED/RESOLVED) this contract singles out for the evidence rule -- should a future revision add a full enum?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table, RAID Log row (L918), and §11.51 (L2368-2392)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "raid" before writing -- pre-existing hits are all Atlas/registry
+    cross-references (mother doc, method-inventory.yaml,
+    architecture-inventory.yaml, section index), zero pre-existing
+    `delivery.*` implementation or schema-title overlap. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 9-field minimum and the benefit
+    statement are transcribed directly from Atlas L918/§11.51. The RAID-
+    id prefix, the free-form status field, and the closure-requires-
+    evidence conditional rule are this file's own compiled structure,
+    disclosed above, not textually cited.

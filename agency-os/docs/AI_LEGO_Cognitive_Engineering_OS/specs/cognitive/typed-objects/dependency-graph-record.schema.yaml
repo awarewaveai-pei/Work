@@ -1,0 +1,129 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/dependency-graph-record.schema.yaml"
+title: Dependency Graph Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DependencyGraph` -- the
+  declared `outputs` of `delivery.dependency_graph`'s Method Contract
+  (methods/contracts/delivery.dependency_graph.contract.yaml, `outputs:
+  [DependencyGraph]`). F22 PM/Delivery/Governance Pack (Atlas L920: "nodes
+  →edges→critical edges→owner→fallback"). Distinct from the pre-existing
+  `dependency-map.schema.yaml` (F18 `architecture.dependency_mapping`'s own
+  output, software/service/vendor/data dependencies) -- this schema models
+  TASK/DELIVERABLE/MILESTONE dependencies for project delivery.
+
+  Real invariants (RUNTIME, same disclosed-gap class as
+  `cross-impact-analysis.schema.yaml`'s own matrix-completeness
+  precedent): (a) referential integrity -- both `edges[].from_node_id`/
+  `to_node_id` resolve to declared `nodes[]` entries; (b) CRITICAL EDGE
+  COMPLETENESS -- every edge with `critical: true` must carry a non-empty
+  `owner` AND a non-empty `fallback`. `ai_lego/modules/delivery/
+  dependency_graph.py` enforces both at construction time and an
+  independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table, Dependency Graph row (L920)"
+  - "methods/contracts/delivery.dependency_graph.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L920's own
+  4-stage pipeline plus low-risk, disclosed compilation choices (the
+  DEPGRAPH- prefix, record-level-only provenance, closed node_type enum).
+
+compilation_decisions:
+  - question: "Should node_type be a closed enum, or free text?"
+    decision: "Closed 3-value enum (task, deliverable, milestone) -- by analogy to architecture.dependency_mapping's own closed 3-value enum (service/vendor/data) for its structurally parallel nodes->edges pipeline, adapted to this method's PM/delivery domain rather than a software-architecture one."
+  - question: "Critical edge completeness: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot conditionally require owner/fallback non-empty ONLY when a sibling field (critical) is true across an array item declaratively without a per-item if/then/else that this file deliberately keeps out of the schema body, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, nodes, edges, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DEPGRAPH-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.dependency_graph"
+
+  nodes:
+    type: array
+    minItems: 1
+    description: "The tasks/deliverables/milestones under analysis. RUNTIME invariant: >=1 required (method contract precondition), unique node_id."
+    items:
+      type: object
+      additionalProperties: false
+      required: [node_id, node_type, description]
+      properties:
+        node_id: {type: string, minLength: 1}
+        node_type: {type: string, enum: [task, deliverable, milestone]}
+        description: {type: string, minLength: 1}
+
+  edges:
+    type: array
+    description: >
+      RUNTIME invariant: referential integrity (both from_node_id/to_node_id
+      resolve to declared nodes[]) and CRITICAL EDGE COMPLETENESS (see
+      module description).
+    items:
+      type: object
+      additionalProperties: false
+      required: [from_node_id, to_node_id, critical, owner, fallback]
+      properties:
+        from_node_id: {type: string, minLength: 1}
+        to_node_id: {type: string, minLength: 1}
+        critical: {type: boolean}
+        owner:
+          type: string
+          description: "REQUIRED non-empty when critical is true (see module description); may be empty string when critical is false."
+        fallback:
+          type: string
+          description: "REQUIRED non-empty when critical is true (see module description); may be empty string when critical is false."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "3-node delivery chain with one critical edge (owner + fallback both declared)"
+    value:
+      id: "DEPGRAPH-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.dependency_graph"
+      nodes:
+        - {node_id: "T1", node_type: task, description: "資料庫 schema migration"}
+        - {node_id: "T2", node_type: task, description: "API 層改動"}
+        - {node_id: "M1", node_type: milestone, description: "v2 API 上線"}
+      edges:
+        - {from_node_id: "T1", to_node_id: "T2", critical: true, owner: "資料庫團隊", fallback: "改用 expand-contract 分兩階段上線，先不砍舊欄位"}
+        - {from_node_id: "T2", to_node_id: "M1", critical: false, owner: "", fallback: ""}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-DEPENDENCYGRAPHRECORD-1: edges[] carries no explicit dependency-type (finish-to-start vs start-to-start etc.) sub-field beyond critical/owner/fallback -- should a future revision add one?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table, Dependency Graph row (L920) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/
+    internal/cognitive-engineering-os` case-insensitively for
+    "dependency-graph"/"dependency_graph" and every schema title before
+    writing -- zero pre-existing implementation or schema title overlap
+    found; confirmed `dependency-map.schema.yaml` (F18) is a distinct,
+    differently-shaped software/service/vendor/data schema, not a
+    duplicate. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_dependency_graph.py.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    directly from Atlas L920. The DEPGRAPH- prefix, node_type enum, and
+    runtime-invariant placement of referential integrity + critical edge
+    completeness are this file's own compiled structure, disclosed above.

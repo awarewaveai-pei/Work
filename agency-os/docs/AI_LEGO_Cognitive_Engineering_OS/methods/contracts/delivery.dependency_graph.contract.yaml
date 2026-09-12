@@ -1,0 +1,88 @@
+$id: "ai-lego://methods/contracts/delivery.dependency_graph.contract.yaml"
+title: "Dependency Graph Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance Pack (table row L920: "顯式建模依賴 | nodes→
+  edges→critical edges→owner→fallback | 降隱性 blocker"). Table-row-only
+  citation, no dedicated §12.x section (grepped exhaustively). Distinct from
+  the pre-existing `architecture.dependency_mapping` (F18, node_type
+  service/vendor/data, software/service/vendor/data dependencies) -- this
+  method models TASK/DELIVERABLE dependencies for project delivery
+  (node_type task/deliverable/milestone). Core invariant: every edge must
+  reference declared nodes, and every edge marked `critical: true` must
+  carry a non-empty `owner` + `fallback` -- a critical dependency with
+  neither is exactly the "隱性 blocker" (hidden blocker) this method's own
+  benefit column names, wearing a label instead of being mitigated.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table, Dependency Graph row (L920)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. F22's own table header (L914-929) gives no
+  family-wide shared principle line the way F15's L750-752 does -- disclosed
+  here rather than invented. Direct transcription of L920's own 4-stage
+  pipeline plus low-risk, disclosed compilation choices.
+
+id: delivery.dependency_graph
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [MAP, RELATE, DECOMPOSE]
+# INFERRED, not cited (F22's table gives no composition formula). Same
+# triad `architecture.dependency_mapping`'s own contract already uses for
+# its structurally analogous nodes->edges pipeline.
+
+purpose:
+  - surface_hidden_blockers_in_task_and_deliverable_dependencies
+inputs:
+  required: [DeliveryPlan]
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting point
+  # is whatever plan of tasks/deliverables/milestones is under review.
+outputs: [DependencyGraph]
+# NEW output type (see typed-objects/dependency-graph-record.schema.yaml),
+# distinct from architecture.dependency_mapping's DependencyMap.
+
+preconditions:
+  - "at least 1 node supplied"
+  - "every edge resolves to declared node_id(s) in both directions (referential integrity)"
+  - "every edge marked critical: true carries a non-empty owner AND a non-empty fallback"
+  # NEW, structurally necessary. L920's own arrow sequence reads "critical
+  # edges->owner->fallback" -- a critical edge with either field empty is
+  # the exact hidden blocker this method's own benefit column names.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention as every sibling F13/F15 record.
+
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # Producing a dependency graph has no external side effect, same low-
+  # risk-by-analogy inference every sibling contract in this directory uses.
+
+open_questions:
+  - "OQ-DEPGRAPH-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-DEPGRAPH-2: node_type is a closed 3-value enum (task/deliverable/milestone) inferred by analogy to architecture.dependency_mapping's own closed enum, not cited from L920 itself -- should a future revision open it up?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table (L914-929) directly -- confirmed no dedicated
+    §12.x section exists for Dependency Graph (grepped exhaustively).
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "dependency.graph"/"dependency_graph" before writing -- zero
+    pre-existing implementation or schema title overlap found. Separately
+    confirmed `architecture.dependency_mapping` (F18) and `database_data.*`
+    (F21) are genuinely distinct, unrelated families (software/service/
+    vendor/data dependency mapping and ER/data modeling respectively, not
+    task/deliverable dependency graphs) -- disambiguated explicitly above.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    verbatim from L920. The DEPGRAPH- prefix, node_type enum, and the
+    critical-edge-requires-owner-and-fallback runtime invariant are this
+    file's own compiled structure, disclosed above, not textually cited.

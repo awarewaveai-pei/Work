@@ -1,0 +1,91 @@
+$id: "ai-lego://methods/contracts/delivery.change_risk_matrix.contract.yaml"
+title: "Change Risk Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance Pack (table row L922: "分級 production change |
+  scope/reversibility/data/traffic/security→risk tier | 高風險自動增加控
+  制"). Table-row-only citation, no dedicated §12.x section (grepped
+  exhaustively). NOT to be confused with `specs/execution/risk-tier.schema.
+  yaml`'s R0-R4 AI-execution-autonomy enum (a different domain: whether an
+  AI agent may act automatically) -- this is Atlas's own production CHANGE
+  risk classification into LOW/MEDIUM/HIGH via 5 named factors. Core
+  invariant: `risk_tier` is MECHANICALLY DERIVED (never caller-asserted)
+  from the 5 factors via an explicit worst-of-5 scoring rule, and
+  `required_controls` must be a superset of a per-tier minimum baseline
+  that is monotonically nested by construction (LOW⊆MEDIUM⊆HIGH) --
+  directly implementing this row's own benefit "高風險自動增加控制".
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table, Change Risk Matrix row (L922)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. F22's own table header (L914-929) gives no
+  family-wide shared principle line the way F15's L750-752 does -- disclosed
+  here rather than invented. The 5 factors and 5-stage pipeline are
+  transcribed verbatim from L922; the worst-of-5 derivation rule and nested
+  control baselines are this file's own compilation choices, same pattern
+  `experiment.mvp`'s own derive-never-accept `outcome` field establishes.
+
+id: delivery.change_risk_matrix
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [EVALUATE, CLASSIFY, DECOMPOSE]
+# INFERRED, not cited (F22's table gives no composition formula). DECOMPOSE
+# breaks the change into 5 factors; EVALUATE scores each; CLASSIFY derives
+# the tier and the resulting control set.
+
+purpose:
+  - mechanically_classify_production_change_risk_and_gate_the_matching_controls
+inputs:
+  required: [ChangeDescription]
+  # NEW DESIGN. Atlas gives no named input typed-object; the starting point
+  # is the production change under review.
+outputs: [ChangeRiskMatrixRecord]
+# NEW output type (see typed-objects/change-risk-matrix-record.schema.yaml).
+
+preconditions:
+  - "all 5 factors (scope, reversibility, data_sensitivity, traffic_impact, security_impact) declared as LOW/MEDIUM/HIGH"
+  - "risk_tier equals the worst-of-5 mechanical derivation from the 5 factors, never a caller-asserted value"
+  - "required_controls is a superset of the derived tier's minimum control baseline"
+  # NEW, structurally necessary. This row's own benefit is "高風險自動增加
+  # 控制"; a record allowed to assert its own tier, or to declare a HIGH
+  # tier with fewer controls than MEDIUM requires, inverts that benefit.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention as every sibling F13/F15 record.
+
+forbidden_transition: []
+recommended_next: []
+rollback:
+  side_effect_free: true
+  # Producing a risk classification has no external side effect, same low-
+  # risk-by-analogy inference every sibling contract in this directory uses.
+
+open_questions:
+  - "OQ-CRMATRIX-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-CRMATRIX-2: the worst-of-5 (max severity) derivation rule is this file's own compiled choice, not cited from L922 -- a future revision might instead need a weighted/summed rule for some domains.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table (L914-929) directly -- confirmed no dedicated
+    §12.x section exists for Change Risk Matrix (grepped exhaustively).
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "change.risk"/"change_risk"/"risk_tier"/"risk_matrix" before writing --
+    found `specs/execution/risk-tier.schema.yaml` (R0-R4 AI-execution-
+    autonomy enum, ADR-004) and `policies/ai-execution/risk-tiers.yaml`;
+    confirmed both are a genuinely different domain (AI autonomy gating,
+    not production change classification) and disambiguated explicitly
+    above -- zero pre-existing implementation or schema title overlap with
+    this method itself. Validated against specs/cognitive/method.schema.
+    yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5 factors and 5-stage pipeline are
+    transcribed verbatim from L922. The CRMATRIX- prefix, LOW/MEDIUM/HIGH
+    enum, worst-of-5 derivation rule, and nested minimum-control baselines
+    are this file's own compiled structure, disclosed above, not textually
+    cited.

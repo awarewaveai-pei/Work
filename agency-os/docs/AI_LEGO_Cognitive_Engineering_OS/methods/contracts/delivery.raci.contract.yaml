@@ -1,0 +1,114 @@
+$id: "ai-lego://methods/contracts/delivery.raci.contract.yaml"
+title: "Delivery RACI Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F22 PM/delivery/governance family (Atlas 專案管理／交付／治理套件), OPENING member (1 of 4 concurrent
+  agents opening F22 in this same parallel batch, this agent covering Risk Register + RACI (delivery)). Atlas
+  cites this method ONCE: F22 table row (L927: "RACI｜明確責任｜每 deliverable 定義 R/A/C/I｜防責任空洞"). NOT the
+  same method as `stakeholders.raci` (F07, Atlas L491) -- disambiguated below and via `id`/`family`/record
+  prefix. Two real invariants beyond F07's own generic-task RACI: (1) every `deliverable` requires a non-empty
+  `due_date` (a calendrically valid ISO date) -- L927's own word is "deliverable", not "task", and a deliverable
+  in a governance context is bound to a milestone; (2) if the Accountable assignment's `status` is
+  `UNAVAILABLE`, a non-empty `escalation_path` (a fallback Accountable) MUST be declared -- the genuinely new
+  governance angle F07's simpler stakeholder-engagement RACI does not need, and the real substance behind
+  L927's own "防責任空洞" (prevent a responsibility void) benefit: an unavailable Accountable with no declared
+  fallback IS a responsibility void.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 專案管理／交付／治理套件 table, RACI row (L927)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: delivery.raci` mints a NEW machine_id under `family: delivery` (F22's opening
+  member, shared with 3 sibling agents building the other 8 F22 methods in this same batch). Disambiguated from
+  the pre-existing `stakeholders.raci` (F07, L491, record prefix `SRACI-`) -- that contract's own `decided_by`
+  section already anticipated this exact F22 entry by name and reserved `SRACI-` specifically so the two would
+  never collide once F22 was built (grep-confirmed, read in full before writing this file). This file mints its
+  OWN distinct record prefix `DRACI-` (deliberately not bare `RACI-` and not `SRACI-`) for the same reason. The
+  exactly-1-Accountable / at-least-1-Responsible base rule is the same industry-standard RACI discipline F07's
+  own contract already discloses as a compiled reading of standard RACI practice, not Atlas-invented; the
+  due_date-required and escalation-path-on-unavailable-Accountable rules are this file's OWN compiled reading of
+  what makes a RACI matrix specifically a DELIVERABLE-level (not generic task-level) governance instrument.
+
+id: delivery.raci
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F22 members). Same pair stakeholders.raci's
+# own contract already infers for the structurally adjacent F07 RACI method: DECOMPOSE breaks delivery work
+# into individually-assignable deliverables; CLASSIFY assigns each stakeholder to exactly one of the 4 closed
+# RACI role categories per deliverable.
+
+purpose:
+  - assign_unambiguous_responsibility_per_deliverable_with_a_due_date_and_a_declared_escalation_path_when_the_accountable_is_unavailable
+# Atlas L927 verbatim sense: 用途「明確責任」/ 使用方式「每 deliverable 定義 R/A/C/I」/ 效益「防責任空洞」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position stakeholders.raci's own
+  # contract already takes; L927's own bare table row names no companion input type.
+
+outputs:
+  - DeliveryRaciMatrix
+# NEW output type (see typed-objects/delivery-raci-matrix.schema.yaml), deliberately NOT reusing `RaciMatrix`
+# (stakeholders.raci's own output type name) to avoid any type-identity confusion between the two methods.
+
+preconditions:
+  - "deliverables is a non-empty list -- a matrix naming zero deliverables has not actually '明確責任' for anything (L927's own defining purpose)"
+  - "every deliverable has a non-empty deliverable_name, a non-empty due_date that is a calendrically valid ISO date, and a non-empty assignments list, each assignment a non-empty stakeholder_name with role in the closed set {R, A, C, I} and status in {AVAILABLE, UNAVAILABLE} (DRACI_EMPTY_DELIVERABLE_NAME / DRACI_INVALID_DUE_DATE / DRACI_EMPTY_ASSIGNMENTS / DRACI_INVALID_ROLE / DRACI_INVALID_STATUS)"
+  - "every deliverable has EXACTLY ONE Accountable (A) assignment (DRACI_DELIVERABLE_NOT_EXACTLY_ONE_ACCOUNTABLE) and AT LEAST ONE Responsible (R) assignment (DRACI_DELIVERABLE_MISSING_RESPONSIBLE) -- same base industry-standard RACI discipline stakeholders.raci's own contract already establishes, at the deliverable level"
+  - "deliverable_name is unique across deliverables[] (DRACI_DUPLICATE_DELIVERABLE_NAME) -- two entries naming the same deliverable would each carry its own separately-counted Accountable, silently reintroducing the exact '責任空洞/責任模糊' this method exists to remove"
+  - "if the Accountable assignment's status is UNAVAILABLE, escalation_path MUST be a non-empty string (DRACI_MISSING_ESCALATION_PATH) -- the genuinely new governance invariant beyond stakeholders.raci: an unavailable Accountable with no declared fallback IS the responsibility void L927's own '防責任空洞' benefit exists to prevent"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same thin-bare-table-row reasoning strategy stakeholders.raci's own contract already establishes:
+  # L927 is a single bare table row, no dedicated section; this method's real discipline is a structural
+  # role-assignment + escalation-declaration invariant, not a claims-evidence-labeling concern.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L927 names no "最佳搭配" column for this method -- genuinely nothing to name, left empty rather than
+# inferring one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Reuse stakeholders.raci's exactly-1-Accountable / at-least-1-Responsible rule as-is with only a different id, or add a genuinely new deliverable-level invariant?"
+    decision: "Add two genuinely new invariants: a required due_date (deliverables are milestone-bound, generic tasks are not) and an escalation_path required specifically when the Accountable's status is UNAVAILABLE (a governance/continuity concern F07's stakeholder-engagement context does not raise). Reducing this to a copy of stakeholders.raci with a different id would not be a distinct method -- see task's own explicit disambiguation requirement."
+  - question: "Record id prefix bare RACI-, or reuse SRACI-?"
+    decision: "DRACI- -- a NEW, distinct prefix from both bare RACI- and stakeholders.raci's own SRACI-, grep-confirmed zero collision across the whole corpus before writing."
+  - question: "status/escalation_path: JSON Schema conditional (if/then keyed on a nested array field), or runtime-only?"
+    decision: "Runtime-only (ai_lego/modules/delivery/raci.py builder + independent gate) -- JSON Schema 2020-12 cannot cleanly express 'if any assignments[] entry with role==A has status==UNAVAILABLE, then this deliverable's escalation_path must be non-null' without a contains-based workaround; same restraint stakeholders.raci's own contract already applies to its cross-assignment count rule."
+
+open_questions:
+  - "OQ-DRACI-1: cognitive_primitives [DECOMPOSE, CLASSIFY] is this file's own inference, matching stakeholders.raci's own inference for the structurally adjacent F07 method (owner: operator)."
+  - "OQ-DRACI-2: escalation_path names only a fallback Accountable by string, not a resolvable reference into a future StakeholderMap -- same open question stakeholders.raci's own OQ-RACI-... series discloses for stakeholder_name (owner: operator)."
+  - "OQ-DRACI-3: a Responsible-role assignment going UNAVAILABLE carries no equivalent escalation requirement -- only the Accountable's unavailability triggers one, matching L927's own 'accountable, not merely responsible' framing of what a responsibility void actually is; a future revision could extend the rule (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F22 table, RACI row (L927) directly (line citation verified against the live file at time of
+    writing -- unchanged from the task's own citation). Read `methods/contracts/stakeholders.raci.contract.yaml`
+    and `ai_lego/modules/stakeholders/raci.py` IN FULL before writing this file -- confirmed the F07 method
+    operates at the generic-task/stakeholder-responsibility level with no due_date or availability concept at
+    all, and confirmed its own text already reserves the disambiguation this file completes. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os`
+    case-insensitively for "raci"/"DRACI-"/"delivery\\." before writing any of this method's own files -- the
+    only pre-existing hits are `stakeholders.raci` itself (a different method, read in full above) and
+    `method-inventory.yaml`'s own pending, unbuilt F22 "RACI (delivery)" row (L1443-1447) that this batch closes.
+    Zero `DRACI-` collision found. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The R/A/C/I role set and exactly-1-A/>=1-R base rule are transcribed from
+    the same standard RACI practice stakeholders.raci's own contract already discloses, applied here at the
+    deliverable level per L927's own literal "每 deliverable" wording. The due_date requirement, the
+    availability/escalation_path invariant, the DRACI- prefix, and the runtime-only enforcement of both are this
+    file's own compiled structure, disclosed above, not textually cited from Atlas.

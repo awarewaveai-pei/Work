@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/delivery-raci-matrix.schema.yaml"
+title: Delivery RACI Matrix
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DeliveryRaciMatrix` -- the declared `outputs` of `delivery.raci`'s
+  Method Contract (methods/contracts/delivery.raci.contract.yaml, `outputs: [DeliveryRaciMatrix]`). F22
+  PM/delivery/governance family (Atlas L927: "每 deliverable 定義 R/A/C/I -> 防責任空洞").
+
+  NOT the same typed object as `stakeholder-raci.schema.yaml`'s own `RaciMatrix` (F07, `stakeholders.raci`) --
+  deliberately distinct title, `$id`, and `id` pattern (`DRACI-`, not `SRACI-`) so the two never collide.
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same disclosed-gap class as
+  `stakeholder-raci.schema.yaml`'s own exactly-1-Accountable precedent): (a) every `deliverables[].due_date` is
+  a calendrically valid ISO date (e.g. rejects `2026-02-30`); (b) every `deliverables[]` entry has EXACTLY ONE
+  Accountable (role `A`) and AT LEAST ONE Responsible (role `R`) among its `assignments[]`; (c)
+  `deliverable_name` unique across `deliverables[]`; (d) if the Accountable assignment's `status` is
+  `UNAVAILABLE`, `escalation_path` MUST be a non-empty string, not null. `ai_lego/modules/delivery/raci.py`
+  enforces all four at both construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 專案管理／交付／治理套件 table, RACI row (L927)"
+  - "methods/contracts/delivery.raci.contract.yaml (outputs, preconditions, quality)"
+  - "specs/cognitive/typed-objects/stakeholder-raci.schema.yaml -- structural template (nested tasks[]/assignments[] shape) for the F07 sibling this file is deliberately disambiguated from"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L927's own "每 deliverable 定義 R/A/C/I" pipeline
+  plus low-risk, disclosed compilation choices (the DRACI- prefix, the due_date and status/escalation_path
+  fields absent from stakeholder-raci.schema.yaml, record-level-only provenance).
+
+compilation_decisions:
+  - question: "due_date: JSON Schema `format: date` alone, or additionally a runtime calendrical check?"
+    decision: "Both -- `format: date` as an annotation (this codebase's SchemaContracts loader builds Draft202012Validator with no format_checker, grep-confirmed, same disclosed gap smart-goal-record.schema.yaml's own target_date already documents), plus a real runtime `date.fromisoformat` check in ai_lego/modules/delivery/raci.py (rejects e.g. '2026-02-30', which format:date alone would not catch without a checker installed)."
+  - question: "escalation_path: a required-key-always-present nullable string (`type: [string, \"null\"]`), or an optional key omitted when not needed?"
+    decision: "Required-key-always-present nullable string -- same `type: [string, \"null\"]` REQUIRED-key convention decision-journal-entry.schema.yaml/hierarchical-task-analysis.schema.yaml already establish; the RUNTIME invariant (non-null required specifically when the Accountable's status is UNAVAILABLE) lives in ai_lego/modules/delivery/raci.py, not expressible as a schema-level if/then across a nested array without a contains-based workaround."
+  - question: "status: a field on every assignment (R/A/C/I holders all get a status), or only on the Accountable?"
+    decision: "On every assignment -- simpler uniform shape (one item schema for all 4 roles), and the RUNTIME invariant only inspects the Accountable's status; a Responsible/Consulted/Informed holder's status is stored but not itself gated (see method contract's own OQ-DRACI-3)."
+  - question: "Record id prefix DRACI- or bare RACI-/reused SRACI-?"
+    decision: "DRACI- -- a new, distinct prefix; stakeholders.raci's own contract already reserved SRACI- specifically anticipating this F22 entry, so reusing it here would defeat that disambiguation."
+
+type: object
+additionalProperties: false
+required: [id, version, deliverables, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DRACI-"
+    description: "NEW DESIGN. Deliberately distinct from stakeholders.raci's own SRACI- and from bare RACI- -- see compilation_decisions."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.raci"
+
+  deliverables:
+    type: array
+    minItems: 1
+    description: >
+      L927's own "每 deliverable 定義 R/A/C/I" framing: one entry per deliverable under responsibility
+      review. Non-empty -- a matrix naming zero deliverables has not actually assigned any responsibility.
+      RUNTIME invariant: deliverable_name unique across this array (see module description).
+    items:
+      type: object
+      additionalProperties: false
+      required: [deliverable_name, due_date, assignments, escalation_path]
+      properties:
+        deliverable_name:
+          type: string
+          minLength: 1
+          description: "REPORTED content -- names the specific deliverable under responsibility review. RUNTIME invariant: unique across deliverables[]."
+        due_date:
+          type: string
+          format: date
+          description: "REPORTED content -- the deliverable's milestone/due date. RUNTIME invariant: calendrically valid ISO date (see compilation_decisions). NEW invariant beyond stakeholder-raci.schema.yaml -- a deliverable is milestone-bound, a generic task is not."
+        assignments:
+          type: array
+          minItems: 1
+          description: >
+            One entry per stakeholder assigned a role on this deliverable. Non-empty -- a deliverable with
+            zero assignments has not actually had responsibility assigned. RUNTIME invariant: exactly 1
+            Accountable (A), at least 1 Responsible (R) across this array.
+          items:
+            type: object
+            additionalProperties: false
+            required: [stakeholder_name, role, status]
+            properties:
+              stakeholder_name:
+                type: string
+                minLength: 1
+                description: "REPORTED content -- names the specific stakeholder holding this role on this deliverable."
+              role:
+                type: string
+                enum: [R, A, C, I]
+                description: "Same closed R/A/C/I set stakeholder-raci.schema.yaml's own role field establishes -- Responsible/Accountable (exactly 1)/Consulted/Informed."
+              status:
+                type: string
+                enum: [AVAILABLE, UNAVAILABLE]
+                description: "NEW field beyond stakeholder-raci.schema.yaml -- whether this assignment-holder is currently able to fulfil the role. RUNTIME invariant: when the Accountable (role=A) assignment's status is UNAVAILABLE, this deliverable's escalation_path must be non-null (see below)."
+        escalation_path:
+          type: [string, "null"]
+          minLength: 1
+          description: >
+            REQUIRED key, always present. NEW field beyond stakeholder-raci.schema.yaml -- names a fallback
+            Accountable. RUNTIME invariant: MUST be a non-empty string (never null) when this deliverable's
+            Accountable assignment has status UNAVAILABLE -- an unavailable Accountable with no declared
+            fallback IS the responsibility void L927's own "防責任空洞" benefit exists to prevent. May be
+            null when the Accountable is AVAILABLE.
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent matrix."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-deliverable matrix: one with an AVAILABLE Accountable (escalation_path null), one with an UNAVAILABLE Accountable (escalation_path required and present)"
+    value:
+      id: "DRACI-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.raci"
+      deliverables:
+        - deliverable_name: "V2 API 規格文件"
+          due_date: "2026-10-15"
+          assignments:
+            - {stakeholder_name: "技術寫手", role: R, status: AVAILABLE}
+            - {stakeholder_name: "架構師", role: A, status: AVAILABLE}
+            - {stakeholder_name: "產品經理", role: C, status: AVAILABLE}
+            - {stakeholder_name: "QA 團隊", role: I, status: AVAILABLE}
+          escalation_path: null
+        - deliverable_name: "上線前資安審查報告"
+          due_date: "2026-11-01"
+          assignments:
+            - {stakeholder_name: "資安工程師", role: R, status: AVAILABLE}
+            - {stakeholder_name: "資安主管", role: A, status: UNAVAILABLE}
+            - {stakeholder_name: "法務", role: C, status: AVAILABLE}
+          escalation_path: "副資安主管"
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: null}
+
+open_questions:
+  - "OQ-DELIVERYRACIMATRIX-1: escalation_path names only a fallback Accountable by string, not a resolvable reference into a future StakeholderMap -- same open question stakeholder-raci.schema.yaml's own OQ-STAKEHOLDERRACI-2 discloses（owner: operator）."
+  - "OQ-DELIVERYRACIMATRIX-2: a Responsible/Consulted/Informed assignment going UNAVAILABLE carries no escalation requirement, only the Accountable's does（owner: operator）."
+
+verification:
+  method: >
+    Read Atlas F22 table, RACI row (L927) directly. Read stakeholder-raci.schema.yaml in full before writing
+    this file (structural template, deliberately disambiguated). Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/internal/cognitive-engineering-os`
+    case-insensitively for "raci"/"DRACI-"/"Delivery RACI" and every schema title before writing -- the only
+    pre-existing hits are `stakeholder-raci.schema.yaml` itself (read above) and method-inventory.yaml's own
+    pending, unbuilt F22 row this batch closes. Zero `DRACI-` collision. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_delivery_raci.py.
+  note: >
+    No mother document was modified. The R/A/C/I role enum is transcribed from the same standard RACI practice
+    stakeholder-raci.schema.yaml's own field already documents. The due_date field, the status/escalation_path
+    fields, the DRACI- prefix, and the runtime-only enforcement of calendrical validity, the exactly-1-A/>=1-R
+    rule, deliverable_name uniqueness, and the escalation-required-when-unavailable rule are this file's own
+    compiled structure, disclosed above.

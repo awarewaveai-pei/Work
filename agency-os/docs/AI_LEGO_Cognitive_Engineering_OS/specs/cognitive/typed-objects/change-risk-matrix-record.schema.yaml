@@ -1,0 +1,130 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/change-risk-matrix-record.schema.yaml"
+title: Change Risk Matrix Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `ChangeRiskMatrixRecord` -- the
+  declared `outputs` of `delivery.change_risk_matrix`'s Method Contract
+  (methods/contracts/delivery.change_risk_matrix.contract.yaml, `outputs:
+  [ChangeRiskMatrixRecord]`). F22 PM/Delivery/Governance Pack (Atlas L922:
+  "scope/reversibility/data/traffic/security→risk tier | 高風險自動增加控
+  制"). NOT the same enum/domain as `specs/execution/risk-tier.schema.
+  yaml`'s R0-R4 AI-execution-autonomy tiers -- this is a production CHANGE
+  risk classification (LOW/MEDIUM/HIGH).
+
+  Real invariants (RUNTIME, same disclosed-gap class as `mvp-record.schema.
+  yaml`'s own decision-consistency precedent): (a) RISK TIER DERIVATION --
+  `risk_tier` must equal the worst-of-5 mechanical recomputation from
+  `factors` (the single highest-severity factor dominates), never an
+  asserted narrative; (b) CONTROL SUFFICIENCY -- `required_controls` must
+  be a superset of the derived tier's minimum control baseline, and those
+  baselines are nested by construction (LOW⊆MEDIUM⊆HIGH) so a HIGH-tier
+  record can never declare fewer controls than a MEDIUM-tier one --
+  directly implementing this row's own benefit "高風險自動增加控制".
+  `ai_lego/modules/delivery/change_risk_matrix.py` enforces both at
+  construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table, Change Risk Matrix row (L922)"
+  - "methods/contracts/delivery.change_risk_matrix.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. The 5 factors are transcribed verbatim from
+  L922. The LOW/MEDIUM/HIGH enum, worst-of-5 derivation rule, and nested
+  control baselines are this file's own compilation choices.
+
+compilation_decisions:
+  - question: "How should the 5 factors combine into a single risk_tier?"
+    decision: "Worst-of-5 (max severity dominates) -- a single catastrophic factor (e.g. security_impact=HIGH on an otherwise low-scope change) must not be diluted by 4 low factors; this matches real change-management practice where one severe dimension forces the whole change into the higher tier."
+  - question: "Control monotonicity: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot compare a per-record required_controls list against a tier-keyed baseline table declaratively, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent. The baselines themselves are nested by construction in the module (a Python set union), not merely asserted here."
+
+type: object
+additionalProperties: false
+required: [id, version, change_description, factors, risk_tier, required_controls, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CRMATRIX-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.change_risk_matrix"
+
+  change_description:
+    type: string
+    minLength: 1
+    description: "The production change under review. NEW DESIGN."
+
+  factors:
+    type: object
+    additionalProperties: false
+    required: [scope, reversibility, data_sensitivity, traffic_impact, security_impact]
+    description: "Atlas L922's own 5 named factors, transcribed verbatim."
+    properties:
+      scope: {type: string, enum: [LOW, MEDIUM, HIGH]}
+      reversibility: {type: string, enum: [LOW, MEDIUM, HIGH]}
+      data_sensitivity: {type: string, enum: [LOW, MEDIUM, HIGH]}
+      traffic_impact: {type: string, enum: [LOW, MEDIUM, HIGH]}
+      security_impact: {type: string, enum: [LOW, MEDIUM, HIGH]}
+
+  risk_tier:
+    type: string
+    enum: [LOW, MEDIUM, HIGH]
+    description: >
+      RUNTIME invariant: DERIVED, never caller-asserted -- the worst-of-5
+      (highest severity) among `factors`' 5 values (see module
+      description). NOT `specs/execution/risk-tier.schema.yaml`'s R0-R4.
+
+  required_controls:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: {type: string, minLength: 1}
+    description: >
+      RUNTIME invariant: must be a superset of `risk_tier`'s minimum
+      control baseline (see module description) -- Atlas's own "高風險自動
+      增加控制" made structural.
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A HIGH-tier change (security_impact=HIGH dominates) with the full HIGH control baseline declared"
+    value:
+      id: "CRMATRIX-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.change_risk_matrix"
+      change_description: "移除舊版付款 API 的 legacy auth fallback"
+      factors: {scope: MEDIUM, reversibility: LOW, data_sensitivity: HIGH, traffic_impact: MEDIUM, security_impact: HIGH}
+      risk_tier: HIGH
+      required_controls: [peer_review, staging_validation, rollback_plan, change_advisory_board_signoff, canary_or_blue_green_deploy, post_deploy_verification]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-CHANGERISKMATRIXRECORD-1: factors carries no per-factor evidence/note field -- should a future revision require a justification for each factor's assigned level?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table, Change Risk Matrix row (L922) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and `Projects/
+    internal/cognitive-engineering-os` case-insensitively for "change-risk"/
+    "change_risk"/"risk_tier"/"risk_matrix" and every schema title before
+    writing -- found and disambiguated `specs/execution/risk-tier.schema.
+    yaml` (a different domain, R0-R4 AI-execution autonomy). Zero
+    pre-existing schema title overlap for this method's own record shape.
+    Validated against jsonschema Draft202012Validator via
+    tests/unit/test_change_risk_matrix.py.
+  note: >
+    No mother document was modified. The 5 factors are transcribed
+    verbatim from L922. The CRMATRIX- prefix, worst-of-5 derivation rule,
+    and runtime-invariant placement of tier derivation + control
+    sufficiency are this file's own compiled structure, disclosed above.

@@ -1,0 +1,99 @@
+$id: "ai-lego://methods/contracts/delivery.risk_register.contract.yaml"
+title: "Risk Register Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F22 PM/delivery/governance family (Atlas 專案管理／交付／治理套件), OPENING member (F22 had zero built
+  methods before this batch -- grep-confirmed no `ai_lego/modules/delivery/` implementation existed at batch
+  start; 1 of 4 concurrent agents opening F22 in this same parallel batch, this agent covering Risk Register +
+  RACI (delivery)). Atlas cites this method ONCE: F22 table row (L926: "Risk Register｜正式管理風險｜
+  probability/impact/exposure/owner/control/trigger｜讓風險可追蹤"). Core invariant: `exposure` is MECHANICALLY
+  DERIVED as probability x impact, never accepted as a caller-asserted value (same "derived, not asserted"
+  discipline `experiment.mvp`'s own `outcome` field already establishes) -- a caller-supplied `exposure` that
+  disagrees with its own probability/impact is exactly the "un-actionable risk theatre" L926's own "讓風險可追蹤"
+  (make risk traceable) benefit exists to prevent. Second invariant: every risk entry requires non-empty
+  `owner`/`control`/`trigger` -- a risk missing any of these three is a label, not a tracked risk.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 專案管理／交付／治理套件 table, Risk Register row (L926)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: delivery.risk_register` mints a NEW machine_id AND a NEW `family: delivery`
+  (F22's opening member, shared with 3 sibling agents building the other 8 F22 methods in this same batch into
+  the same `ai_lego/modules/delivery/` package -- grep-confirmed no prior `delivery.*` contract exists). The
+  probability/impact both in [0,1], exposure = probability * impact framing is this file's own compiled reading
+  of L926's own literal "probability/impact/exposure" pipeline order, disclosed as such below.
+
+id: delivery.risk_register
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [DECOMPOSE, CLASSIFY]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F22 members). DECOMPOSE breaks a scenario into
+# individually-tracked risks; CLASSIFY scores each risk's probability/impact against a closed [0,1] scale.
+
+purpose:
+  - formally_track_every_risk_with_a_mechanically_derived_exposure_and_a_non_empty_owner_control_trigger
+# Atlas L926 verbatim sense: 用途「正式管理風險」/ 使用方式「probability/impact/exposure/owner/control/trigger」/
+# 效益「讓風險可追蹤」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- same "no hard upstream dependency" position every other opening-member
+  # Tier 1 contract in this batch takes; L926's own bare table row names no companion input type.
+
+outputs:
+  - RiskRegister
+# NEW output type (see typed-objects/risk-register-record.schema.yaml). Atlas names no PascalCase output type
+# for this method, same honesty gap every other Tier 1 contract in this directory discloses.
+
+preconditions:
+  - "risks is a non-empty list -- a risk register naming zero risks has not actually '正式管理風險' for anything (L926's own defining purpose)"
+  - "every risk has a non-empty risk_id (unique across risks[]), description, owner, control, and trigger, plus probability and impact each a real finite number in [0,1] (RISKREG_EMPTY_RISKS / RISKREG_INVALID_RISK / RISKREG_DUPLICATE_RISK_ID)"
+  - "exposure is MECHANICALLY DERIVED as probability * impact, never accepted as a caller-supplied value -- the builder computes it internally and an independent gate re-derives it from a raw (possibly hand-tampered) record and refuses a mismatch (RISKREG_EXPOSURE_MISMATCH)"
+  - "every risk entry's owner/control/trigger is non-empty -- a risk register entry missing any of these three is a label, not a tracked risk (RISKREG_UNTRACKABLE_RISK)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same thin-bare-table-row reasoning strategy this batch's `stakeholders.raci` sibling already
+  # establishes: L926 is a single bare table row, no dedicated section, no explicit unevidenced-claim caution to
+  # mechanize; this method's real discipline (derived exposure, non-empty owner/control/trigger) is a structural
+  # computation/completeness invariant, not a claims-evidence-labeling concern.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L926 names no "最佳搭配" column for this method -- genuinely nothing to name, left empty rather than
+# inferring one.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "probability/impact as raw numbers on an arbitrary scale, or both normalized to [0,1] with exposure = probability * impact also in [0,1]?"
+    decision: "Both normalized to [0,1], exposure = probability * impact (also in [0,1]) -- the cleanest, most literal reading of L926's own 'probability/impact/exposure' pipeline order; a mixed-scale framing (e.g. probability [0,1] x impact 1-5) would need Atlas to name the impact scale, which it does not."
+  - question: "Record id prefix RISK- (bare, already used for a nested risk_id field inside security.dpia_pia's typed object) or a distinct prefix?"
+    decision: "RREG- -- grep-confirmed `RISK-` is already used as a nested `risk_id` FIELD prefix inside `dpia-pia-impact-assessment-record.schema.yaml` (a different typed object, field-level not record-level); RREG- avoids any visual confusion between the two while remaining this record's own distinct top-level id."
+
+open_questions:
+  - "OQ-RISKREG-1: cognitive_primitives [DECOMPOSE, CLASSIFY] is this file's own inference -- Atlas §4 gives no composition formula for this method (owner: operator)."
+  - "OQ-RISKREG-2: exposure = probability * impact is a linear product; a future revision could support a non-linear risk-scoring matrix (e.g. a 5x5 heat-map lookup) as an alternative, disclosed reading (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F22 table, Risk Register row (L926) directly (line citation verified against the live file at
+    time of writing -- unchanged from the task's own citation). Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for "risk register"/"delivery\\."/"RREG-"
+    before writing -- zero pre-existing `delivery.risk_register` implementation or schema title overlap found (a
+    field-level `RISK-` prefix exists inside `dpia-pia-impact-assessment-record.schema.yaml`, a different,
+    unrelated typed object -- disambiguated via RREG- above). Validated against specs/cognitive/method.schema.yaml
+    with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The probability/impact/exposure pipeline is transcribed directly from
+    Atlas L926. The [0,1] normalization, the RREG- prefix, and the runtime-only (not JSON-Schema-level)
+    enforcement of the exposure-derivation and owner/control/trigger-non-emptiness invariants are this file's
+    own compiled structure, disclosed above, not textually cited from Atlas.

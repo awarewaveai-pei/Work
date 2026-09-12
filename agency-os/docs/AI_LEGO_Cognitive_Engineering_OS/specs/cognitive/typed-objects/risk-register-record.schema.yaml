@@ -1,0 +1,144 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/risk-register-record.schema.yaml"
+title: Risk Register
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RiskRegister` -- the declared `outputs` of
+  `delivery.risk_register`'s Method Contract (methods/contracts/delivery.risk_register.contract.yaml,
+  `outputs: [RiskRegister]`). F22 PM/delivery/governance family (Atlas L926: "probability/impact/exposure/
+  owner/control/trigger -> 讓風險可追蹤").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same disclosed-gap class as
+  `stakeholder-raci.schema.yaml`'s own exactly-1-Accountable precedent): (a) EXPOSURE DERIVATION -- every
+  `risks[].exposure` must equal `risks[].probability * risks[].impact` exactly, never an independently
+  asserted value; (b) risk_id UNIQUENESS across `risks[]` (a duplicate risk_id breaks the very traceability
+  L926's own benefit column names); (c) `owner`/`control`/`trigger` non-empty on every entry.
+  `ai_lego/modules/delivery/risk_register.py` enforces all three at both construction time and an independent
+  gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 專案管理／交付／治理套件 table, Risk Register row (L926)"
+  - "methods/contracts/delivery.risk_register.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L926's own "probability/impact/exposure/owner/
+  control/trigger" pipeline plus low-risk, disclosed compilation choices (the RREG- prefix, [0,1]-normalized
+  probability/impact, record-level-only provenance).
+
+compilation_decisions:
+  - question: "exposure: a stored, independently-asserted field, or a value the schema documents as derived but cannot itself enforce?"
+    decision: "Stored field (needed so downstream consumers can read it without recomputing), but RUNTIME-ONLY enforced as probability * impact -- JSON Schema 2020-12 cannot express a cross-property arithmetic constraint declaratively, same gap class as game-theory.schema.yaml's own payoff-completeness precedent and experiment.mvp's own outcome-derivation precedent."
+  - question: "risk_id uniqueness: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 has no cross-item uniqueness-on-a-sub-property keyword (only whole-item uniqueItems); same class stakeholders.raci's own duplicate task_name check and foresight.cross_impact_analysis's own duplicate event_id check already establish."
+
+type: object
+additionalProperties: false
+required: [id, version, risks, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^RREG-"
+    description: "NEW DESIGN. Deliberately NOT bare RISK- (already used as a nested risk_id FIELD prefix inside dpia-pia-impact-assessment-record.schema.yaml, a different, unrelated typed object) -- see compilation_decisions in the method contract."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.risk_register"
+
+  risks:
+    type: array
+    minItems: 1
+    description: >
+      L926's own defining purpose ("正式管理風險"): one entry per formally tracked risk. Non-empty -- a
+      register naming zero risks has not actually tracked anything. RUNTIME invariant: risk_id unique across
+      this array (see module description).
+    items:
+      type: object
+      additionalProperties: false
+      required: [risk_id, description, probability, impact, exposure, owner, control, trigger]
+      properties:
+        risk_id:
+          type: string
+          minLength: 1
+          description: "REPORTED content -- must be unique across risks[] (RUNTIME invariant, see module description)."
+        description:
+          type: string
+          minLength: 1
+          description: "REPORTED content -- names the specific risk under management."
+        probability:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "L926's own 'probability' pipeline stage, normalized to [0,1]."
+        impact:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "L926's own 'impact' pipeline stage, normalized to [0,1] (same scale as probability -- see compilation_decisions)."
+        exposure:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "L926's own 'exposure' pipeline stage. RUNTIME invariant: MUST equal probability * impact exactly -- never an independently asserted value (see module description)."
+        owner:
+          type: string
+          minLength: 1
+          description: "L926's own 'owner' pipeline stage -- non-empty (RISKREG_UNTRACKABLE_RISK if missing)."
+        control:
+          type: string
+          minLength: 1
+          description: "L926's own 'control' pipeline stage -- the mitigation control, non-empty (RISKREG_UNTRACKABLE_RISK if missing)."
+        trigger:
+          type: string
+          minLength: 1
+          description: "L926's own 'trigger' pipeline stage -- the early-warning signal/threshold, non-empty (RISKREG_UNTRACKABLE_RISK if missing)."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent register."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A 2-risk register: one low-exposure risk with its early-warning trigger, one high-exposure risk"
+    value:
+      id: "RREG-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.risk_register"
+      risks:
+        - risk_id: "R1"
+          description: "關鍵供應商延遲交貨"
+          probability: 0.2
+          impact: 0.5
+          exposure: 0.1
+          owner: "採購經理"
+          control: "備援供應商已簽約，可 5 天內切換"
+          trigger: "供應商未於合約交期前 3 天回覆出貨確認"
+        - risk_id: "R2"
+          description: "核心工程師離職"
+          probability: 0.3
+          impact: 0.9
+          exposure: 0.27
+          owner: "工程總監"
+          control: "關鍵知識已文件化並有 2 名以上熟悉者"
+          trigger: "該工程師遞出辭呈或連續 2 週請假"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-RISKREGISTER-1: exposure = probability * impact is a linear product; a future revision could support a non-linear risk-scoring matrix (e.g. a 5x5 heat-map lookup) as an alternative, disclosed reading（owner: operator）."
+
+verification:
+  method: >
+    Read Atlas F22 table, Risk Register row (L926) directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`
+    and `Projects/internal/cognitive-engineering-os` case-insensitively for "risk register"/"RREG-"/"delivery\\."
+    and every schema title before writing -- zero pre-existing implementation or schema title overlap found (a
+    field-level `RISK-` prefix exists inside dpia-pia-impact-assessment-record.schema.yaml, a different,
+    unrelated typed object). Validated against jsonschema Draft202012Validator via tests/unit/test_risk_register.py.
+  note: >
+    No mother document was modified. The probability/impact/exposure/owner/control/trigger pipeline is
+    transcribed directly from Atlas L926. The RREG- prefix, [0,1]-normalized probability/impact, and the
+    runtime-only enforcement of exposure derivation, risk_id uniqueness, and owner/control/trigger non-emptiness
+    are this file's own compiled structure, disclosed above.

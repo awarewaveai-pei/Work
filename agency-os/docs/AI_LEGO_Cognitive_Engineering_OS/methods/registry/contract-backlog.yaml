@@ -5391,6 +5391,251 @@ tier_1:
       subtests after the fix. Verdict PASS. See WORKLOG 2026-09-12 F15
       entry.
 
+  twohundredseventh_concrete_entry:
+    # F22 PM/delivery/governance family opening batch, 2026-09-12. 4 agents
+    # (3+3+2+2 methods); 0 of 10 existed before this batch.
+    method_id: "delivery.raid_log"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L918, sole citation: "ID->owner->status->
+      impact->next action->review date", effect "風險不散落聊天") PLUS
+      dedicated section 11.51 (L2368-2392), which names 9 minimum fields
+      per item (ID/Type/Statement/Owner/Impact/Status/Next Action/
+      Due-Review Date/Evidence). Real invariant: type closed to {RISK,
+      ASSUMPTION, ISSUE, DEPENDENCY} (literally the acronym), 8-of-9
+      fields non-empty, and a CLOSED/RESOLVED item requires non-empty
+      evidence -- a silently-closed item with no evidence defeats
+      section 11.51's own stated benefit.
+    source: "methods/contracts/delivery.raid_log.contract.yaml + specs/cognitive/typed-objects/raid-log-record.schema.yaml + ai_lego/modules/delivery/raid_log.py"
+    note: >
+      42 tests pass. F22 PM/delivery/governance family opened this batch
+      by 4 concurrent sibling agents (10 members total). CLI PASS:
+      well-formed record + RAID_CLOSED_WITHOUT_EVIDENCE construction-time
+      refusal + independent closure_evidence gate hand-tamper catch.
+
+  twohundredeighth_concrete_entry:
+    method_id: "delivery.critical_path_method"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L919, sole citation: "tasks->duration->
+      dependency->forward/backward pass", effect "找真正不可延誤工作")
+      PLUS dedicated section 12.41 (L3103-3109), which restates the
+      pipeline and explicitly scopes OUT resource leveling/capacity
+      modeling. Real invariant, the strongest and most computationally
+      real in this batch: the declared critical_path must actually be
+      the longest chain through the task dependency DAG, verified via a
+      genuine Kahn's-algorithm forward/backward pass with every
+      critical-path task at zero slack -- a caller can never assert
+      which tasks are "critical", only the algorithm produces that
+      value.
+    source: "methods/contracts/delivery.critical_path_method.contract.yaml + specs/cognitive/typed-objects/critical-path-analysis-record.schema.yaml + ai_lego/modules/delivery/critical_path_method.py + ai_lego/compute/critical_path/forward_backward_pass.py"
+    note: >
+      51 tests pass. CLI PASS: 4-task diamond DAG (A->B->D, A->C->D)
+      hand-verified critical_path=[A,B,D], project_duration=10, C
+      genuinely non-critical (slack 3) + CPM_CYCLE_DETECTED
+      construction-time refusal of a cyclic graph + independent
+      cpm_integrity gate hand-tamper catch (non-critical task smuggled
+      into critical_path).
+
+  twohundredninth_concrete_entry:
+    method_id: "delivery.dependency_graph"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L920, sole citation: "nodes->edges->critical
+      edges->owner->fallback", effect "降隱性 blocker"). No dedicated
+      section. Real invariant: referential integrity (edges resolve to
+      declared nodes) AND every critical:true edge carries a non-empty
+      owner AND fallback. Disambiguated from the pre-existing
+      architecture.dependency_mapping (F18, software/service/vendor/
+      data, not task/deliverable/milestone).
+    source: "methods/contracts/delivery.dependency_graph.contract.yaml + specs/cognitive/typed-objects/dependency-graph-record.schema.yaml + ai_lego/modules/delivery/dependency_graph.py"
+    note: >
+      38 tests pass. CLI PASS: well-formed 3-node/2-edge graph +
+      DEPGRAPH_CRITICAL_EDGE_INCOMPLETE construction-time refusal of a
+      no-fallback critical edge + independent critical_edge_completeness
+      gate hand-tamper catch.
+
+  twohundredtenth_concrete_entry:
+    method_id: "delivery.stage_gate"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L921, sole citation: "stage evidence->gate
+      criteria->Go/Hold/Kill/Rework", effect "防 sunk-cost") PLUS
+      dedicated section 11.52 (L2394-2410), which explicitly pairs this
+      method with Pilot/Kill Criteria/Reversal Criteria (all three
+      already exist in this corpus, cited in recommended_next). Real
+      invariant: gate_decision closed to {GO, HOLD, REWORK, KILL}, and a
+      GO decision requires non-empty evidence. Disambiguated from the
+      unrelated generic execution/gate.schema.yaml#/gate_result type
+      (naming proximity only, different shape/purpose).
+    source: "methods/contracts/delivery.stage_gate.contract.yaml + specs/cognitive/typed-objects/stage-gate-record.schema.yaml + ai_lego/modules/delivery/stage_gate.py"
+    note: >
+      40 tests pass. CLI PASS: well-formed 2-stage record (GO/HOLD) +
+      STAGEGATE_GO_WITHOUT_EVIDENCE construction-time refusal +
+      independent go_decision_evidence gate hand-tamper catch.
+
+  twohundredeleventh_concrete_entry:
+    method_id: "delivery.change_risk_matrix"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L922, sole citation: "scope/reversibility/
+      data/traffic/security->risk tier", effect "高風險自動增加控制"). No
+      dedicated section. Real invariant: risk_tier is never a builder
+      parameter -- it is DERIVED (worst-of-5 severity across the 5
+      named factors), and required_controls must be a superset of the
+      derived tier's minimum baseline; the 3 baselines are nested by
+      construction (LOW subset MEDIUM subset HIGH). Disambiguated from
+      specs/execution/risk-tier.schema.yaml's R0-R4 (AI-execution-
+      autonomy, ADR-004, a different domain).
+    source: "methods/contracts/delivery.change_risk_matrix.contract.yaml + specs/cognitive/typed-objects/change-risk-matrix-record.schema.yaml + ai_lego/modules/delivery/change_risk_matrix.py"
+    note: >
+      44 tests pass, including a dedicated ControlBaselineMonotonicity
+      test class proving LOW<MEDIUM<HIGH by construction. CLI PASS:
+      well-formed HIGH-tier record (security_impact dominates) with
+      full control baseline + CHANGE_RISK_INSUFFICIENT_CONTROLS
+      construction-time refusal + independent risk_tier_derivation gate
+      hand-tamper catch.
+
+  twohundredtwelfth_concrete_entry:
+    method_id: "delivery.definition_of_done"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L923, sole citation: "functional/security/
+      privacy/observability/rollback/docs/tests", effect "防「能跑就算
+      完成」"). Dedicated section 12.42 (L3113-3134) names 12 required
+      dimensions. Real invariant: dimensions must declare EXACTLY the
+      12 section 12.42 dimensions (no missing, no extra), each with a
+      valid status + non-empty note, AND overall_status is mechanically
+      DERIVED (never caller-asserted) -- DONE iff every dimension is
+      MET or NOT_APPLICABLE.
+    source: "methods/contracts/delivery.definition_of_done.contract.yaml + specs/cognitive/typed-objects/definition-of-done-record.schema.yaml + ai_lego/modules/delivery/definition_of_done.py"
+    note: >
+      37 tests pass. CLI PASS: well-formed fully-DONE record +
+      DOD_INVALID_DIMENSIONS construction-time refusal of a missing
+      dimension + independent status_derivation gate hand-tamper catch.
+
+  twohundredthirteenth_concrete_entry:
+    method_id: "delivery.decision_log"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L924, sole citation: "context->decision->
+      evidence->owner->revisit", effect "避免重複爭論"). Real invariant:
+      decision and evidence both non-empty, and revisit is a closed
+      SCHEDULED(non-empty trigger)/NO_REVISIT_PLANNED(null trigger)
+      shape. Disambiguated from the pre-existing, differently-shaped
+      learning.decision_journal (F17, context/options/evidence/
+      forecast/confidence, exists to defeat hindsight bias) despite
+      both carrying the informal Chinese gloss "決策日誌／決策紀錄" --
+      this method exists to defeat re-litigation of a settled decision,
+      not to track forecast calibration.
+    source: "methods/contracts/delivery.decision_log.contract.yaml + specs/cognitive/typed-objects/decision-log-record.schema.yaml + ai_lego/modules/delivery/decision_log.py"
+    note: >
+      43 tests pass. CLI PASS: well-formed entry + DLOG_INVALID_EVIDENCE
+      construction-time refusal + independent revisit_disambiguation
+      gate hand-tamper catch.
+
+  twohundredfourteenth_concrete_entry:
+    method_id: "delivery.outcome_roadmap"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L925, sole citation: "themes->outcomes->
+      bets->evidence->review", effect "保持策略彈性"). Real invariant:
+      two-level referential integrity made structural -- every outcome
+      traces to a declared theme, every bet traces to a declared
+      outcome. A bet or outcome with no real parent IS exactly the
+      feature-driven roadmap entry this method's benefit exists to
+      prevent, mechanized by construction rather than a naming
+      convention.
+    source: "methods/contracts/delivery.outcome_roadmap.contract.yaml + specs/cognitive/typed-objects/outcome-roadmap-record.schema.yaml + ai_lego/modules/delivery/outcome_roadmap.py"
+    note: >
+      42 tests pass. CLI PASS: well-formed roadmap (1 theme, 2 outcomes,
+      2 bets) + OROAD_DANGLING_OUTCOME_REF construction-time refusal +
+      independent theme_coverage gate hand-tamper catch.
+
+  twohundredfifteenth_concrete_entry:
+    method_id: "delivery.risk_register"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L926, sole citation: "probability/impact/
+      exposure/owner/control/trigger", effect "讓風險可追蹤"). Real
+      invariant: exposure MECHANICALLY DERIVED as probability*impact --
+      the per-risk builder accepts no exposure parameter at all, and an
+      independent gate re-derives it from raw fields and refuses a
+      mismatch. Second invariant: owner/control/trigger non-empty on
+      every risk, plus risk_id uniqueness.
+    source: "methods/contracts/delivery.risk_register.contract.yaml + specs/cognitive/typed-objects/risk-register-record.schema.yaml + ai_lego/modules/delivery/risk_register.py"
+    note: >
+      34 tests pass. CLI PASS: 2-risk register with mechanically-derived
+      exposure + hand-tampered mismatched-exposure caught via
+      independent gate + RISKREG_INVALID_RISK construction-time refusal
+      of an empty-owner risk.
+
+  twohundredsixteenth_concrete_entry:
+    # Last of this 4-agent F22 opening batch -- F22 is 10/10 COMPLETE
+    # after this entry (independently confirmed via `ls
+    # ai_lego/modules/delivery/*.py`: 10 method modules present, and a
+    # full-family pytest run: 416 passed, 88 subtests, 0 failures).
+    method_id: "delivery.raci"
+    contract_status: complete
+    tier: 1
+    mandated_by: >
+      F22 table row (Atlas L927, sole citation: "每 deliverable 定義
+      R/A/C/I", effect "防責任空洞"). Disambiguated from stakeholders.
+      raci (F07, L491, record prefix SRACI-) -- deliberately NOT a copy:
+      operates at the deliverable level (due_date required and
+      calendrically valid via date.fromisoformat, rejecting e.g.
+      2026-02-30) and adds an escalation_path-required-when-Accountable-
+      unavailable governance invariant F07 does not have. Base
+      exactly-1-Accountable/at-least-1-Responsible rule carried over
+      from F07. Record prefix DRACI-.
+    source: "methods/contracts/delivery.raci.contract.yaml + specs/cognitive/typed-objects/delivery-raci-matrix.schema.yaml + ai_lego/modules/delivery/raci.py"
+    note: >
+      45 tests pass. CLI PASS: 2-deliverable matrix (1 UNAVAILABLE
+      Accountable with declared escalation_path) +
+      DRACI_MISSING_ESCALATION_PATH construction-time refusal of an
+      unescalated unavailable Accountable + independent
+      deliverable_governance gate hand-tamper catch. **F22 PM/delivery/
+      governance family: 10 of 10 COMPLETE as of this entry**
+      (raid_log/critical_path_method/dependency_graph/stage_gate/
+      change_risk_matrix/definition_of_done/decision_log/
+      outcome_roadmap/risk_register/raci landed via 4 concurrent sibling
+      agents in this same batch: 3+3+2+2 methods each). Batch totals:
+      416 tests, 88 subtests, 0 failures, full-family cross-check run
+      confirms zero collisions across the 4 agents sharing one
+      `ai_lego/modules/delivery/` package. Registry files (this file +
+      method-inventory.yaml) were deliberately NOT touched by any of
+      the 4 building agents, applied here serially by the orchestrating
+      session instead, to avoid repeating the concurrent-write
+      git-index race that lost F10 registry data (commit `67780546a`).
+      1 independent critic pass (Standard tier, hand-tamper-verified,
+      including an independently hand-computed 6-task CPM DAG matching
+      the builder's output on every field) found 1 Critical / 1 Major /
+      1 Minor. Critical (fixed inline, re-verified): delivery.raci's
+      generate_delivery_raci_matrix returned provenance BY REFERENCE
+      (no copy.deepcopy) -- the exact aliasing bug class F10/F13/F15
+      each found before, inherited from copying stakeholders.raci.py as
+      a template. Fixed with copy.deepcopy + a new regression test;
+      suite now 417 tests / 88 subtests (up from 416/88). Major
+      (out-of-scope, follow-up spawned): the same defect pre-exists at
+      stakeholders.raci.py:216 (F07, already shipped, not touched by
+      this F22 review's scope). Minor (no action needed): risk_register
+      exposure comparison uses exact float equality, latent fragility
+      only if this record ever crosses a non-float-stable serialization
+      boundary. All other claimed invariants (CPM algorithm, change-
+      risk-matrix control-baseline nesting, DoD status derivation,
+      risk-register exposure derivation, raci/decision_log
+      disambiguations) independently confirmed true, not just asserted.
+      Verdict PASS. See WORKLOG 2026-09-12 F22 entry.
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

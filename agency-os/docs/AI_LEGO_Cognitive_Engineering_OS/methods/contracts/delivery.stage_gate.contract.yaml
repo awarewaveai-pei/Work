@@ -1,0 +1,101 @@
+$id: "ai-lego://methods/contracts/delivery.stage_gate.contract.yaml"
+title: "Stage-Gate Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance family (Atlas L921: "Stage-Gate | 分階段用證據
+  決定是否繼續 | stage evidence→gate criteria→Go/Hold/Kill/Rework | 防
+  sunk-cost"; dedicated §11.52 L2394-2410 restates the pipeline and pairs it
+  explicitly with Pilot/Kill Criteria/Reversal Criteria). Core invariant:
+  `gate_decision` closed to {GO, HOLD, REWORK, KILL}, and a GO decision
+  requires non-empty `evidence` -- a Go with no evidence recreates exactly
+  the "一路做到底才發現方向錯" failure §11.52's own benefit exists to prevent.
+  NOT the same object as `execution/gate.schema.yaml#/gate_result` (the
+  generic per-method internal quality-gate outcome) -- see the typed-object
+  schema's own disambiguation note.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 專案管理／交付／治理套件 table, Stage-Gate row (L921)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.52 階段關卡／階段審查制 (L2394-2410)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L921 + §11.52 give the 4-stage pipeline
+  and the sunk-cost benefit -- direct transcription plus low-risk,
+  disclosed compilation choices.
+
+id: delivery.stage_gate
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [VALIDATE, DECIDE, REFLECT]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F22
+# members). VALIDATE checks declared evidence against gate criteria;
+# DECIDE is the Go/Hold/Rework/Kill verdict itself; REFLECT is the
+# periodic per-stage review §11.52's own pipeline implies. All three
+# CANONICAL_KERNEL members.
+
+purpose:
+  - gate_project_continuation_on_declared_evidence_at_each_stage_to_prevent_sunk_cost
+# Atlas L921 + §11.52 verbatim sense.
+
+inputs:
+  required:
+    - StageEvidenceSet
+# NEW DESIGN. Atlas gives no named input typed-object for this method;
+# the starting point is the evidence gathered for the stage under review,
+# same honesty-gap class every sibling F-family contract already
+# discloses.
+
+outputs:
+  - StageGateRecord
+# NEW output type (see typed-objects/stage-gate-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared stage review"
+  - "every stage review declares gate_criteria (non-empty)"
+  - "a GO gate_decision declares non-empty evidence"
+  # STRUCTURAL -- §11.52's own sunk-cost-prevention benefit made real: a
+  # Go verdict with nothing backing it is the exact failure this method
+  # exists to prevent.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention every sibling single-record
+  # typed-object in this directory uses.
+
+forbidden_transition: []
+recommended_next: [experiment.pilot, learning.kill_criteria, learning.reversal_criteria]
+# Atlas §11.52's own verbatim pairing: "與 Pilot、Kill Criteria、Reversal
+# Criteria 非常適合搭配" -- all three already exist in this corpus
+# (experiment.pilot, learning.kill_criteria, learning.reversal_criteria).
+
+rollback:
+  side_effect_free: true
+  # Recording a stage-gate review has no external side effect; distinct
+  # from the real-world KILL/HOLD/REWORK consequence the decision names,
+  # which this record only documents.
+
+open_questions:
+  - "OQ-STAGEGATE-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-STAGEGATE-2: this schema does not enforce 'no further stage review after a KILL' (a plausible additional sunk-cost invariant) -- Atlas's own pipeline names Go/Hold/Rework/Kill but not a sequencing rule across stages; left out to avoid inventing a rule not textually given.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table, Stage-Gate row (L921), and §11.52 (L2394-2410)
+    directly. Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "stage.gate"/"stage_gate"/"stagegate" and "gate_result" before writing
+    -- pre-existing hits are Atlas/registry cross-references plus the
+    UNRELATED generic `execution/gate.schema.yaml#/gate_result` type every
+    method's own internal quality gates already emit (explicitly
+    disambiguated in the typed-object schema, not confused with it); zero
+    pre-existing `delivery.*` implementation or schema-title overlap.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 4-stage pipeline and the
+    sunk-cost benefit are transcribed directly from Atlas L921/§11.52.
+    The STAGEGATE- id prefix, the stage_reviews[] list shape, and the
+    GO-requires-evidence conditional rule are this file's own compiled
+    structure, disclosed above, not textually cited.

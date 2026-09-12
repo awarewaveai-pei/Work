@@ -16676,4 +16676,31 @@ Prototype=保真度上限+iteration 可追溯；MVP=決策改變門檻+結果與
 2. 即使有 280s 內部逾時 + 3 併發上限，Veo（historically 較慢）仍可能在極端情況逼近或超過 nginx 300s——殘餘風險，未做客戶端 AbortSignal 級聯取消（critic 建議的更徹底修法，範圍更大，本輪未做）。
 3. Critic 修復本身沒有第二輪獨立驗證，只有原作者（我）自行核對每個 finding 對應的修復 + tsc/vitest 通過。
 
+## 2026-09-12（續4）Method Atlas F22 PM/交付治理家族 0/10 -> 10/10 開完並關閉
+
+[任務] 承接同日 F15 條目；操作者要求加快腳步開完 Method Atlas 剩餘四家族。本條目開 F22（10 個方法：RAID Log/Critical Path Method/Dependency Graph/Stage-Gate/Change Risk Matrix/Definition of Done/Decision Log/Outcome Roadmap/Risk Register/RACI(delivery)），沿用 F15 的並行/序列收斂模式（4 agent 各建檔案、不碰共享 registry、本 session 序列套用）。
+
+[已修改]
+- 新增 `ai_lego/modules/delivery/` 家族：10 個方法各自的 contract yaml、typed-object schema、builder+2 層獨立 gate 模組、CLI slice、mutation-style test；`critical_path_method` 額外新增 `ai_lego/compute/critical_path/forward_backward_pass.py`（真實 Kahn's algorithm 拓撲排序 + forward/backward pass，非裝飾性）。
+- `methods/registry/contract-backlog.yaml`：序列附加 10 筆 tier_1 entry（twohundredseventh ~ twohundredsixteenth_concrete_entry）。
+- `methods/registry/method-inventory.yaml`：F22 對應 10 列 `pending/has_contract:false` 改 `complete/has_contract:true`，補 `machine_id`。
+- `ai_lego/modules/delivery/__init__.py`：收斂重寫成完整 10 方法摘要。
+
+[每個方法的真不變量]
+RAID Log=type 封閉於{RISK,ASSUMPTION,ISSUE,DEPENDENCY}+CLOSED 狀態必須有 evidence；Critical Path Method=真實 Kahn 演算法算出的 critical path 才算數，非人工宣稱（本批唯一有真實圖演算法的方法，獨立 critic 另建 6-task DAG 手算比對逐欄位吻合）；Dependency Graph=referential integrity+critical edge 必須有 owner+fallback；Stage-Gate=decision 封閉於{GO,HOLD,REWORK,KILL}+GO 必須有 evidence；Change Risk Matrix=risk_tier 從 5 因子機械推導（非外部指定）+控制清單 LOW⊂MEDIUM⊂HIGH 用 frozenset union 結構保證；Definition of Done=Atlas §12.42 明列 12 維度全部宣告+overall_status 機械推導；Decision Log=decision+evidence 皆非空+revisit 封閉列舉（並與 F17 已建的 `learning.decision_journal` 完整釐清差異，兩者中文俗名相同但欄位/目的皆不同）；Outcome Roadmap=bet→outcome→theme 兩層 referential integrity；Risk Register=exposure=probability×impact 機械推導（builder 簽名根本不收 exposure 參數，結構上不可能被外部指定）；RACI(delivery)=deliverable 需 due_date（真實日曆合法性檢查）+ Accountable 若 UNAVAILABLE 必須有 escalation_path（刻意跟已建的 F07 `stakeholders.raci` 做出真正差異，非換皮重複，字首 DRACI- 跟 SRACI- 不衝突）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit/test_{raid_log,critical_path_method,dependency_graph,stage_gate,change_risk_matrix,definition_of_done,decision_log,outcome_roadmap,risk_register,delivery_raci}.py -q`（於 `Projects/internal/cognitive-engineering-os`） | exit=0 | result=417 passed, 88 subtests passed（critic 修復後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit --collect-only -q` | exit=0 | result=12521 tests collected，零 collection error
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=1c(已修)/1m(已標記後續)/1n(無需處理)——**Critical**：`delivery.raci` 的 `generate_delivery_raci_matrix` 把呼叫端的 `provenance` dict 直接以參照回傳（無 `copy.deepcopy`），正是 F10/F13/F15 已抓過兩次的同一類 aliasing bug，根因是照抄 `stakeholders.raci.py` 當範本時把該檔已有的同一個缺陷一併抄了進來；已當場修復（加 `copy.deepcopy` + 新回歸測試）並重測 417/88 綠燈。**Major**：`stakeholders.raci.py:216`（F07，已出貨）本身也有一模一樣的缺陷，屬本次 F22 覆審範圍外的既存 bug，已用 `spawn_task`（task_c2dba1b8）另開追蹤，不在本次 commit 修。**Minor**：`risk_register.py` 的 exposure 比對用浮點數 `!=` 精確相等，目前建構端與 gate 端算式完全一致故安全，只在未來若經過非浮點穩定的序列化邊界才有風險，暫不處理。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`delivery\.(raid_log|critical_path_method|dependency_graph|stage_gate|change_risk_matrix|definition_of_done|decision_log|outcome_roadmap|risk_register|raci)` | hits=0 殘留（命中皆為本批自建檔案，另兩個命中是 ao-resume 狀態快照檔，非真實程式碼引用）
+- 兩份 registry YAML 序列套用後皆用 `yaml.safe_load` 驗證解析成功。
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] `stakeholders.raci.py:216` 既存 provenance aliasing bug 已排入待辦（task_c2dba1b8），尚未修復；`risk_register.py` 浮點精確相等的序列化邊界風險（見上，低優先）；F22 尚未經第二輪獨立 critic 覆審（風險分級為文件系統，非 auth/crypto/個資/金流，適用單輪 critic 標準）。
+
+[rollback] 全部為新增檔案（無既有檔案破壞性修改，除 `ai_lego/modules/delivery/__init__.py` 收斂重寫、`ai_lego/modules/delivery/raci.py` 與其對應 test 檔的 critic 當場修復），`git revert` 對應 commit 即可完整回退，不影響 F01-F15 已建家族。
+
+[下一步] 依操作者指示不中途停頓，接續開 F23（全球管轄／合規／在地化，10 方法）。
+
 [rollback] git revert 對應 commit；純新增能力（新檔+新選填欄位+新 UI chip 列），未改既有欄位語意；不選「AI 影片動態」時，整條路徑跟改動前逐位元相同（videoMotionModel 為 undefined 時 applyVideoMotionToPrimaryFormat 直接跳過）。

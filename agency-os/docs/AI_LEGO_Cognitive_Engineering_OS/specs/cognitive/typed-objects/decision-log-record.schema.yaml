@@ -1,0 +1,134 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/decision-log-record.schema.yaml"
+title: Decision Log Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DecisionLogEntry` -- the declared
+  `outputs` of `delivery.decision_log`'s Method Contract
+  (methods/contracts/delivery.decision_log.contract.yaml,
+  `outputs: [DecisionLogEntry]`). F22 PM/Delivery/Governance Pack (Atlas
+  L924: "context->decision->evidence->owner->revisit").
+
+  Real invariants (RUNTIME, not all declaratively expressible here, same
+  disclosed-gap class as `cross-impact-analysis.schema.yaml`'s own matrix-
+  completeness precedent): (a) `decision` is a non-empty string; (b)
+  `evidence` is a non-empty list of non-empty strings; (c) `revisit.mode ==
+  SCHEDULED` requires a non-empty `trigger`, `revisit.mode ==
+  NO_REVISIT_PLANNED` requires `trigger == null`.
+  `ai_lego/modules/delivery/decision_log.py` enforces all of these at both
+  construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table row, Decision Log (L924)"
+  - "methods/contracts/delivery.decision_log.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L924's own 5-stage
+  pipeline plus low-risk, disclosed compilation choices (the DLOG- prefix,
+  record-level-only provenance, the closed revisit {mode, trigger} shape).
+
+compilation_decisions:
+  - question: "revisit: bare free-text string, or a closed {mode, trigger} shape?"
+    decision: "Closed {mode: enum[SCHEDULED, NO_REVISIT_PLANNED], trigger: string|null}. A bare string cannot be mechanically distinguished from silence dressed up as text -- the closed shape is what makes the ambiguity-removal invariant declaratively checkable."
+  - question: "evidence: flat list of strings, or a richer {id, content, provenance} structure matching learning.decision_journal's own evidence_item?"
+    decision: "Flat list[string]. This method's own contract sets quality.evidence_labeling_required: false -- no per-item epistemic label is required, so no per-item structure is needed either."
+
+type: object
+additionalProperties: false
+required: [id, version, context, decision, evidence, owner, revisit, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DLOG-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.decision_log"
+
+  context:
+    type: string
+    minLength: 1
+    description: "Atlas L924's own first pipeline element -- the situation the decision was made in."
+
+  decision:
+    type: string
+    minLength: 1
+    description: "Atlas L924's own second pipeline element. RUNTIME invariant: non-empty (method contract precondition)."
+
+  evidence:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1 }
+    description: "Atlas L924's own third pipeline element. RUNTIME invariant: non-empty list (method contract precondition) -- a decision with no stated evidence defeats L924's own '避免重複爭論' benefit."
+
+  owner:
+    type: string
+    minLength: 1
+    description: "Atlas L924's own fourth pipeline element -- who is accountable for this decision."
+
+  revisit:
+    type: object
+    additionalProperties: false
+    required: [mode, trigger]
+    description: "Atlas L924's own fifth pipeline element. RUNTIME invariant: mode==SCHEDULED requires a non-empty trigger; mode==NO_REVISIT_PLANNED requires trigger==null (see module description)."
+    properties:
+      mode:
+        type: string
+        enum: [SCHEDULED, NO_REVISIT_PLANNED]
+      trigger:
+        type: ["string", "null"]
+        description: "A future date or a described trigger condition when mode==SCHEDULED; must be null when mode==NO_REVISIT_PLANNED."
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses for a single coherent record."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A decision log entry with a scheduled revisit"
+    value:
+      id: "DLOG-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.decision_log"
+      context: "選擇下一季內容引擎的 SEO 策略方向"
+      decision: "採用 AI-first 內容引擎，不採購付費 SEO API"
+      evidence: ["付費 API 月費超過目前客戶預算上限", "AI-first 原型已驗證可產出可用內容"]
+      owner: "content-engine-lead"
+      revisit: {mode: SCHEDULED, trigger: "2027-Q1 或客戶數超過 20 時重新評估"}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: LOCKED_DECISION}
+  - description: "A decision log entry with no revisit planned"
+    value:
+      id: "DLOG-2026-09-12-002"
+      version: "1.0.0"
+      generated_by_method: "delivery.decision_log"
+      context: "命名慣例：method id 文法"
+      decision: "採用 bare <family>.<name> 文法，不用 method. 前綴"
+      evidence: ["ADR-005b 已裁決", "全部既有 real usage 已符合此文法"]
+      owner: "architecture-lead"
+      revisit: {mode: NO_REVISIT_PLANNED, trigger: null}
+      provenance: {epistemic_type: DECISION, authorship_state: HUMAN_APPROVED, locked: LOCKED_DECISION}
+
+open_questions:
+  - "OQ-DECISIONLOGRECORD-1: owner carries no referential-integrity check against a stakeholders/RACI record -- see the method contract's own open_questions.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table, Decision Log row (L924) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "decision log"/"decision_log" and every schema title before writing --
+    zero pre-existing implementation or schema title overlap found (the only
+    "decision log" hits are L924 itself and `learning/decision_journal.py`'s
+    own docstring referring to itself). Validated against jsonschema
+    Draft202012Validator via tests/unit/test_decision_log.py.
+  note: >
+    No mother document was modified. The 5-stage pipeline is transcribed
+    directly from Atlas L924. The DLOG- prefix, the closed revisit
+    {mode, trigger} shape, and the flat evidence[string] shape are this
+    file's own compiled structure, disclosed above.

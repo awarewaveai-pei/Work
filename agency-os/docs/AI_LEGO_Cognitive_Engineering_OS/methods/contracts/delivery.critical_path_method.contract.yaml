@@ -1,0 +1,97 @@
+$id: "ai-lego://methods/contracts/delivery.critical_path_method.contract.yaml"
+title: "Critical Path Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance family (Atlas L919: "Critical Path Method |
+  找決定最短工期的任務鏈 | tasks→duration→dependency→forward/backward pass |
+  找真正不可延誤工作"; dedicated §12.41 L3103-3109 restates the pipeline and
+  explicitly excludes resource leveling/capacity modeling). Core invariant,
+  the strongest in this batch: the declared `critical_path` must actually
+  BE the longest chain through the task dependency DAG -- verified by a
+  genuine forward/backward pass, with every critical-path task at zero
+  slack. A caller never supplies the computed fields; they are this
+  method's sole Trusted Compute output
+  (`ai_lego.compute.critical_path.forward_backward_pass`).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 專案管理／交付／治理套件 table, Critical Path Method row (L919)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.41 要徑法／關鍵路徑法 (L3103-3109)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. Atlas L919 + §12.41 give the pipeline, the
+  benefit, and the explicit resource-leveling exclusion -- direct
+  transcription plus low-risk, disclosed compilation choices.
+
+id: delivery.critical_path_method
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [DECOMPOSE, MAP, CALCULATE]
+# INFERRED, not cited (Atlas §4 gives no composition formula for F22
+# members). DECOMPOSE breaks the project into discrete tasks; MAP builds
+# the dependency graph between them; CALCULATE is the forward/backward
+# pass's own numeric derivation. All three CANONICAL_KERNEL members.
+
+purpose:
+  - compute_the_genuine_longest_task_chain_that_determines_the_project_makespan
+# Atlas L919 + §12.41 verbatim sense.
+
+inputs:
+  required:
+    - TaskDependencySet
+# NEW DESIGN. Atlas gives no named input typed-object for this method;
+# the starting point is the raw task/duration/dependency declarations,
+# same honesty-gap class every sibling F-family contract already
+# discloses.
+
+outputs:
+  - CriticalPathAnalysisRecord
+# NEW output type (see typed-objects/critical-path-analysis-record.schema.yaml).
+
+preconditions:
+  - "at least 1 declared task"
+  - "the task dependency graph is acyclic"
+  - "every declared critical_path task has zero slack and the path is a genuine longest chain"
+  # STRUCTURAL -- Atlas's own benefit column: "找真正不可延誤工作" (know
+  # which task TRULY cannot slip). A false critical path is worse than
+  # none per this method's own build rationale.
+
+quality:
+  provenance_required: true
+  # Record-level provenance, same convention every sibling single-record
+  # typed-object in this directory uses.
+
+forbidden_transition: []
+recommended_next: []
+# Atlas F22's table gives no explicit next-step method for this row.
+# §12.41's own stated limitation (resource leveling / capacity model) is
+# a scope exclusion, not a next-step method reference.
+
+rollback:
+  side_effect_free: true
+  # Computing/recording a critical path analysis has no external side effect.
+
+open_questions:
+  - "OQ-CPM-1: cognitive_primitives is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-CPM-2: resource constraints require a separate resource-leveling/capacity model per Atlas §12.41's own stated limitation -- explicitly out of scope here, not a gap in this contract.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table, Critical Path Method row (L919), and §12.41
+    (L3103-3109) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "critical.path"/"critical_path"/"cpm" before writing -- pre-existing
+    hits are all Atlas/registry cross-references or unrelated "critical
+    path" prose in `decomposition.wbs`/`devops_sre.capacity_model`, zero
+    pre-existing `delivery.*` implementation or schema-title overlap.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The forward/backward-pass pipeline
+    and the resource-leveling exclusion are transcribed directly from
+    Atlas L919/§12.41. The CPM- id prefix, integer-only duration, and the
+    deterministic critical-path tie-break rule are this file's own
+    compiled structure, disclosed above, not textually cited.

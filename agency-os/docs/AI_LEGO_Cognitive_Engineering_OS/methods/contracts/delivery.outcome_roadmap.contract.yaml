@@ -1,0 +1,133 @@
+$id: "ai-lego://methods/contracts/delivery.outcome_roadmap.contract.yaml"
+title: "Outcome Roadmap Method Contract"
+status: ACTIVE
+
+description: >
+  F22 PM/Delivery/Governance Pack, 2nd member of this batch's own opening pair
+  (same agent, same PR as `delivery.decision_log`; 1 of 4 concurrent agents
+  opening F22). Atlas cites this method ONCE: F22 table row (L925, grep-
+  verified: "Outcome Roadmap | 以 outcomes 而非 feature 排 roadmap |
+  themes→outcomes→bets→evidence→review | 保持策略彈性"). Real invariant:
+  referential integrity made structural, BY CONSTRUCTION enforcing "outcomes
+  not features" -- every `outcome` must trace to a declared `theme`, and
+  every `bet` must trace to a declared `outcome` (same dangling-reference
+  check class `foresight.cross_impact_analysis`'s own referential-integrity
+  gate already establishes). A `bet` with no `outcome` parent, or an
+  `outcome` with no `theme` parent, IS exactly a feature-driven roadmap entry
+  sneaking in under a different label -- precisely what L925's own "保持策略
+  彈性" benefit column exists to prevent.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table row, Outcome Roadmap (L925)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: delivery.outcome_roadmap` mints a NEW
+  machine_id, second member of the NEW `family: delivery` opened by this same
+  batch's `delivery.decision_log`. Grepped the whole Atlas file case-
+  insensitively for "Outcome Roadmap" -- L925 is the only hit, no dedicated
+  section. Grepped `method-inventory.yaml` and `contract-backlog.yaml`
+  case-insensitively for "outcome roadmap"/"outcome_roadmap" -- confirmed
+  only the still-pending F22 L925 entry (`method-inventory.yaml`
+  L1433-1437), no existing machine_id. Grepped the whole
+  `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+  `Projects/internal/cognitive-engineering-os` trees case-insensitively for
+  "outcome roadmap"/"outcome_roadmap" and "delivery." before writing --
+  confirmed zero pre-existing implementation or namespace collision. The
+  two-level referential-integrity chain (outcome->theme, bet->outcome) is
+  this file's own compiled structure that MAKES L925's own "以 outcomes 而非
+  feature 排 roadmap" pipeline order structural rather than a naming
+  convention -- disclosed as a compilation decision, not a literal Atlas-
+  cited rule beyond the 5-stage pipeline wording quoted above.
+
+id: delivery.outcome_roadmap
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [DECOMPOSE, EXPLAIN]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method. DECOMPOSE: themes broken into outcomes broken into bets, L925's
+# own 3-level pipeline. EXPLAIN: each bet's `evidence` articulates why the
+# bet is expected to move its parent outcome.
+
+purpose:
+  - structure_a_roadmap_around_declared_outcomes_and_their_supporting_themes_rather_than_a_flat_feature_list
+# Atlas L925 verbatim sense: 用途「以 outcomes 而非 feature 排 roadmap」/
+# 使用方式「themes→outcomes→bets→evidence→review」/ 效益「保持策略彈性」.
+
+inputs:
+  required: []
+  optional: []
+  # No upstream typed-object required -- L925's own bare table row names no
+  # companion input type, same position every other opening-member Tier 1
+  # contract in this batch takes.
+
+outputs:
+  - OutcomeRoadmap
+# NEW output type (see typed-objects/outcome-roadmap-record.schema.yaml).
+
+preconditions:
+  - "themes is a non-empty list with unique theme_id (OROAD_TOO_FEW_THEMES / OROAD_DUPLICATE_THEME_ID)"
+  - "outcomes is a non-empty list with unique outcome_id, and every outcome.theme_id resolves to a declared themes[] entry (OROAD_TOO_FEW_OUTCOMES / OROAD_DUPLICATE_OUTCOME_ID / OROAD_DANGLING_THEME_REF) -- THE real invariant this method's own '以 outcomes 而非 feature' pipeline stage exists to enforce at the outcome level"
+  - "bets may legally be an empty list (a roadmap may declare outcomes with no committed bets yet -- see compilation_decisions); every declared bet has a unique bet_id and its own bet.outcome_id resolves to a declared outcomes[] entry (OROAD_DUPLICATE_BET_ID / OROAD_DANGLING_OUTCOME_REF) -- a bet with no real outcome parent is exactly the 'feature sneaking in as a roadmap item' L925's own '保持策略彈性' benefit names"
+  - "next_review is a non-empty string (OROAD_EMPTY_NEXT_REVIEW) -- L925's own pipeline names 'review' as its last stage"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- same thin-bare-table-row reasoning every sibling opening-member contract in this batch already
+  # establishes: L925 is a single bare table row, no dedicated section; per-bet `evidence` here is a flat list
+  # of stated reasons, not a per-item epistemic-typed claim structure.
+
+forbidden_transition: []
+# No §14.1-style legal/illegal chain citation exists for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas L925 names no "最佳搭配" column for this method.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should bets[] require minItems: 1, matching outcomes[]/themes[]?"
+    decision: "No -- bets may legally be an empty list."
+    reasoning: >
+      L925's own benefit is '保持策略彈性' (keep strategic flexibility) -- a
+      roadmap that has declared outcomes but not yet committed to specific
+      bets is the MORE flexible state, not a malformed one; forcing a
+      minimum bet count would push toward premature feature-level
+      commitment, the opposite of this method's own stated purpose.
+  - question: "Per-bet evidence[] richness -- flat strings, or a typed {id, content, provenance} structure?"
+    decision: "Flat list[str], legally empty (an early-stage bet may have no gathered evidence yet) -- same reasoning delivery.decision_log's own sibling contract in this batch already applies to its own evidence field."
+  - question: "Enforce the two-level referential-integrity chain in the JSON Schema or only at the runtime builder+gate layer?"
+    decision: "Runtime builder+gate only -- same restraint foresight.cross_impact_analysis's own schema (matrix completeness) and stakeholders.raci's own schema (exactly-1-Accountable) already apply: JSON Schema 2020-12 cannot cross-check inter-array references declaratively."
+
+open_questions:
+  - "OQ-OUTCOMEROADMAP-1: cognitive_primitives [DECOMPOSE, EXPLAIN] is this file's own inference, not a cited Atlas §4 formula.（owner: operator）"
+  - "OQ-OUTCOMEROADMAP-2: next_review is a bare free-text string (no {mode, trigger} closed shape like delivery.decision_log's own revisit field) -- should a future revision unify the two review/revisit shapes across the delivery family?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table row (L925) directly. Grepped the whole Atlas file
+    case-insensitively for "Outcome Roadmap" -- L925 is the only hit, no
+    dedicated section, no §4 composition formula, no §14.1 legal-chain
+    mention. Grepped `methods/registry/method-inventory.yaml` and
+    `methods/registry/contract-backlog.yaml` case-insensitively for "outcome
+    roadmap"/"outcome_roadmap" before writing this file -- confirmed
+    method-inventory.yaml's own L1433-1437 pending F22 entry is unbuilt (no
+    machine_id, `has_contract: false`), and contract-backlog.yaml has no
+    `delivery.*` entry at all. Grepped the whole
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` trees case-insensitively for
+    "outcome roadmap"/"outcome_roadmap" and "delivery." before writing any of
+    this method's own files -- confirmed zero pre-existing implementation.
+    Read `foresight.cross_impact_analysis.contract.yaml` + its module in full
+    for the referential-integrity/dangling-reference precedent this
+    contract's own two-level chain reuses. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The two-level referential-integrity
+    chain (outcome->theme, bet->outcome), the legally-empty bets[]/evidence[]
+    fields, and the next_review free-text shape are this file's own compiled
+    structure, disclosed above, not textually cited beyond L925's own 5-stage
+    pipeline wording.

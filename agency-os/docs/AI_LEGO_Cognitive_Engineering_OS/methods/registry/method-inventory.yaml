@@ -1398,53 +1398,63 @@ by_document:
       - name: "RAID Log"
         line: 918
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.raid_log"
       - name: "Critical Path Method"
         line: 919
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.critical_path_method"
       - name: "Dependency Graph"
         line: 920
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.dependency_graph"
       - name: "Stage-Gate"
         line: 921
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.stage_gate"
       - name: "Change Risk Matrix"
         line: 922
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.change_risk_matrix"
       - name: "Definition of Done"
         line: 923
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.definition_of_done"
       - name: "Decision Log"
         line: 924
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.decision_log"
       - name: "Outcome Roadmap"
         line: 925
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.outcome_roadmap"
       - name: "Risk Register"
         line: 926
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.risk_register"
       - name: "RACI (delivery)"
         line: 927
         category: "F22 pm-governance"
-        has_contract: false
-        contract_status: pending
+        has_contract: true
+        contract_status: complete
+        machine_id: "delivery.raci"
       - name: "Jurisdiction Resolver"
         line: 935
         category: "F23 jurisdiction"

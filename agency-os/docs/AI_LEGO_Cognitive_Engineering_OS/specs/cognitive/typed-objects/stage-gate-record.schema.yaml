@@ -1,0 +1,145 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/stage-gate-record.schema.yaml"
+title: Stage Gate Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `StageGateRecord` -- the
+  declared `outputs` of `delivery.stage_gate`'s Method Contract
+  (methods/contracts/delivery.stage_gate.contract.yaml, `outputs:
+  [StageGateRecord]`). F22 PM/Delivery/Governance family (Atlas L921;
+  dedicated §11.52 L2394-2410: "Stage → Evidence → Gate → Go / Hold /
+  Rework / Kill", benefit "防止高成本專案一路做到底才發現方向錯").
+
+  **Disambiguation (explicitly required by this method's own build task):
+  this is NOT the same object as `execution/gate.schema.yaml#/gate_result`**
+  -- that file's `gate_result` is the GENERIC per-method internal
+  quality-gate outcome every method's own `evaluate_*_gate` functions in
+  this corpus emit (e.g. this very method's own
+  `evaluate_provenance_required_gate`), an execution-layer record.
+  `StageGateRecord` is a distinct, PROJECT-MANAGEMENT phase-gate review
+  artifact -- a sequence of per-stage reviews (evidence → criteria →
+  Go/Hold/Rework/Kill decisions about a real-world initiative), unrelated
+  in shape and purpose despite the naming proximity.
+
+  Real invariant (RUNTIME, not declaratively fully expressible for the
+  free-text `gate_criteria`/`evidence` content, though the closed-set/
+  GO-requires-evidence shape below IS schema-expressible): (a)
+  `gate_decision` is one of the closed set {GO, HOLD, REWORK, KILL}; (b) a
+  GO decision requires a non-empty `evidence` array -- Atlas §11.52's own
+  benefit is "prevent a costly project going all the way before
+  discovering it's on the wrong track"; a GO with no evidence recreates
+  exactly that failure inside the tool meant to prevent it.
+  `ai_lego/modules/delivery/stage_gate.py` enforces both at construction
+  time and two independent gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 PM/Delivery/Governance table, Stage-Gate row (L921)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §11.52 (L2394-2410)"
+  - "methods/contracts/delivery.stage_gate.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L921/§11.52's
+  own 4-stage pipeline plus low-risk, disclosed compilation choices (the
+  STAGEGATE- prefix, evidence-as-array shape, GO-requires-evidence rule).
+
+compilation_decisions:
+  - question: "evidence: a single free-text string, or an array of discrete evidence items?"
+    decision: "Array of non-empty strings. A stage review typically cites several distinct pieces of evidence (a metric, a user test result, a technical spike outcome); an array keeps each independently checkable rather than one run-on paragraph."
+  - question: "gate_criteria: required non-empty for every review, or only for a GO?"
+    decision: "Required non-empty for every review, regardless of decision -- a HOLD/REWORK/KILL verdict still needs to name what criteria were being evaluated against, otherwise the record cannot explain WHY the decision was made, only what it was."
+  - question: "Should this schema also enforce 'no stage review after a KILL' as a sequence-level sunk-cost invariant?"
+    decision: "No, left out. Atlas §11.52 names the per-decision Go/Hold/Rework/Kill vocabulary but gives no explicit cross-stage sequencing rule; inventing one would be a compilation choice not textually grounded. See the method contract's own open_questions."
+
+type: object
+additionalProperties: false
+required: [id, version, stage_reviews, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^STAGEGATE-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.stage_gate"
+
+  stage_reviews:
+    type: array
+    minItems: 1
+    description: >
+      RUNTIME invariant: gate_decision closed-set and GO-requires-evidence
+      -- see module description above. Each entry is ONE Stage ->
+      Evidence -> Gate -> Decision cycle per Atlas §11.52's own pipeline.
+    items:
+      type: object
+      additionalProperties: false
+      required: [stage_name, evidence, gate_criteria, gate_decision]
+      properties:
+        stage_name: {type: string, minLength: 1}
+        evidence:
+          type: array
+          items: {type: string, minLength: 1}
+          description: "May be empty UNLESS gate_decision is GO, in which case it must be non-empty -- declarative safety net for the RUNTIME invariant module description names."
+        gate_criteria:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1}
+          description: "The declared criteria this stage's evidence was evaluated against -- required non-empty regardless of decision, see compilation_decisions."
+        gate_decision:
+          type: string
+          enum: [GO, HOLD, REWORK, KILL]
+          description: "Closed set -- Atlas §11.52's own verbatim pipeline terminus."
+      if:
+        properties: {gate_decision: {const: GO}}
+        required: [gate_decision]
+      then:
+        properties: {evidence: {minItems: 1}}
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "2-stage review: Discovery stage GOes with evidence, Build stage HOLDs pending more data (no evidence required for HOLD)"
+    value:
+      id: "STAGEGATE-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.stage_gate"
+      stage_reviews:
+        - stage_name: "Discovery"
+          evidence: ["12 customer interviews confirm the pain point", "3 competitors lack this feature"]
+          gate_criteria: [">=10 confirmed customer interviews", ">=1 differentiated angle vs competitors"]
+          gate_decision: GO
+        - stage_name: "Build"
+          evidence: []
+          gate_criteria: ["prototype clickthrough rate >=20%"]
+          gate_decision: HOLD
+      provenance: {epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null}
+
+open_questions:
+  - "OQ-STAGEGATERECORD-1: no cross-stage sequencing rule (e.g. 'no review after a KILL') is enforced -- see the method contract's own open_questions for why.（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table Stage-Gate row (L921) and dedicated §11.52
+    (L2394-2410) directly. Grepped
+    `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "stage.gate"/"stage_gate"/"stagegate" and "gate_result" before writing
+    -- pre-existing hits are Atlas/registry cross-references plus the
+    unrelated generic `execution/gate.schema.yaml#/gate_result` type,
+    explicitly disambiguated above rather than confused with it; zero
+    pre-existing `delivery.*` implementation or schema-title overlap.
+    Validated against jsonschema Draft202012Validator via
+    tests/unit/test_stage_gate.py.
+  note: >
+    No mother document was modified. The 4-stage pipeline is transcribed
+    directly from Atlas L921/§11.52. The STAGEGATE- prefix, the
+    evidence-as-array shape, and the GO-requires-evidence conditional
+    rule are this file's own compiled structure, disclosed above.

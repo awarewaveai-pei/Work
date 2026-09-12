@@ -1,0 +1,146 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/definition-of-done-record.schema.yaml"
+title: Definition of Done Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `DefinitionOfDoneRecord` -- the
+  declared `outputs` of `delivery.definition_of_done`'s Method Contract
+  (methods/contracts/delivery.definition_of_done.contract.yaml, `outputs:
+  [DefinitionOfDoneRecord]`). F22 PM/Delivery/Governance Pack (Atlas L923 +
+  §12.42 L3113-3134).
+
+  Real invariants (RUNTIME, same disclosed-gap class as
+  `mvp-record.schema.yaml`'s own decision-consistency precedent): (a)
+  DIMENSION COMPLETENESS -- `dimensions` must declare exactly the 12
+  §12.42 dimensions, no missing, no extra, each with a valid `status` and
+  non-empty `note`; (b) STATUS DERIVATION -- `overall_status` must equal
+  the mechanical recomputation from the 12 dimension statuses (DONE only if
+  every dimension is MET or NOT_APPLICABLE), never an asserted override.
+  `ai_lego/modules/delivery/definition_of_done.py` enforces both at
+  construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F22 table, Definition of Done row (L923)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.42 完成定義 (L3113-3134)"
+  - "methods/contracts/delivery.definition_of_done.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. The 12-dimension list is transcribed verbatim
+  from §12.42. The status enum, DOD- prefix, and derivation rule are this
+  file's own compilation choices.
+
+compilation_decisions:
+  - question: "Per-dimension status: boolean, or a 3-value enum?"
+    decision: "3-value enum MET/NOT_MET/NOT_APPLICABLE -- a bare boolean cannot distinguish 'not required for this change' (e.g. no DB migration involved) from 'required and unmet', which the task's own DERIVATION rule must tell apart."
+  - question: "overall_status: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot recompute a fold over 12 sibling dimension statuses and check it against a 13th field declaratively, same gap class as cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, target, dimensions, overall_status, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^DOD-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "delivery.definition_of_done"
+
+  target:
+    type: string
+    minLength: 1
+    description: "What this DoD gates -- e.g. a ticket/PR/feature description. NEW DESIGN."
+
+  dimensions:
+    type: object
+    additionalProperties: false
+    description: >
+      RUNTIME invariant: must declare EXACTLY these 12 keys (§12.42
+      L3120-3131 verbatim), no missing, no extra (see module description).
+    required: [functional, tests, security, privacy, data, observability, capacity, documentation, migration, rollback, recovery, evidence]
+    properties:
+      functional: {$ref: "#/dimension_entry"}
+      tests: {$ref: "#/dimension_entry"}
+      security: {$ref: "#/dimension_entry"}
+      privacy: {$ref: "#/dimension_entry"}
+      data: {$ref: "#/dimension_entry"}
+      observability: {$ref: "#/dimension_entry"}
+      capacity: {$ref: "#/dimension_entry"}
+      documentation: {$ref: "#/dimension_entry"}
+      migration: {$ref: "#/dimension_entry"}
+      rollback: {$ref: "#/dimension_entry"}
+      recovery: {$ref: "#/dimension_entry"}
+      evidence: {$ref: "#/dimension_entry"}
+
+  overall_status:
+    type: string
+    enum: [DONE, NOT_DONE]
+    description: >
+      RUNTIME invariant: DERIVED, never caller-asserted -- DONE iff every
+      one of the 12 `dimensions[]` entries has `status` MET or
+      NOT_APPLICABLE (see module description).
+
+  provenance:
+    description: "Overall record provenance -- record-level only, same convention every sibling typed-object schema in this directory uses."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+dimension_entry:
+  type: object
+  additionalProperties: false
+  required: [status, note]
+  properties:
+    status:
+      type: string
+      enum: [MET, NOT_MET, NOT_APPLICABLE]
+    note:
+      type: string
+      minLength: 1
+      description: "Non-empty evidence pointer/justification -- a bare status with no note is not the '多面向 gate' §12.42 asks for."
+
+examples:
+  - description: "A fully-DONE record -- all 12 dimensions MET or NOT_APPLICABLE"
+    value:
+      id: "DOD-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.definition_of_done"
+      target: "PR #482: hybrid retrieval vector half no longer trusts implicit RPC row order"
+      dimensions:
+        functional: {status: MET, note: "manual repro + fix verified against production query"}
+        tests: {status: MET, note: "3 new unit tests, all pass"}
+        security: {status: NOT_APPLICABLE, note: "no auth/permission surface touched"}
+        privacy: {status: NOT_APPLICABLE, note: "no PII field touched"}
+        data: {status: MET, note: "no schema change; read-path only"}
+        observability: {status: MET, note: "existing query logs already capture the affected path"}
+        capacity: {status: NOT_APPLICABLE, note: "no new load introduced"}
+        documentation: {status: MET, note: "WORKLOG 2026-09-12 entry written"}
+        migration: {status: NOT_APPLICABLE, note: "no DB migration involved"}
+        rollback: {status: MET, note: "single-commit revert, no data migration to undo"}
+        recovery: {status: NOT_APPLICABLE, note: "no new failure mode introduced"}
+        evidence: {status: MET, note: "REALTEST_EVIDENCE line in WORKLOG"}
+      overall_status: DONE
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-DEFINITIONOFDONERECORD-1: NOT_APPLICABLE carries no separate justification field beyond the shared `note` -- should a future revision require a distinct why-not-applicable field?（owner: operator）"
+
+verification:
+  method: >
+    Read Atlas F22 table (L914-929) and §12.42 (L3113-3134) directly.
+    Grepped `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS` and
+    `Projects/internal/cognitive-engineering-os` case-insensitively for
+    "definition-of-done"/"definition_of_done" before writing -- zero
+    pre-existing schema title overlap found. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_definition_of_done.py.
+  note: >
+    No mother document was modified. The 12-dimension list is transcribed
+    verbatim from §12.42. The MET/NOT_MET/NOT_APPLICABLE enum, DOD- prefix,
+    and runtime-invariant placement of dimension completeness + status
+    derivation are this file's own compiled structure, disclosed above.
