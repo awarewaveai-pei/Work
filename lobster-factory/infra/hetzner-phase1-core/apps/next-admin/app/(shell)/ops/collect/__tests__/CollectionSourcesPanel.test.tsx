@@ -44,10 +44,19 @@ let root: Root;
 
 beforeEach(async () => {
   posted = [];
-  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") {
-      posted.push(JSON.parse(String(init.body)));
+      const body = JSON.parse(String(init.body));
+      posted.push(body);
+      // action:"run" no longer waits for the crawl (2026-09-12: see CollectionSourcesPanel.tsx's
+      // pollRun comment) — it hands back a runKey immediately, which the GET branch below answers.
+      if (body.action === "run") return { json: async () => ({ ok: true, queued: true, runKey: "manual-test" }) } as unknown as Response;
       return { json: async () => ({ ok: true, result: null }) } as unknown as Response;
+    }
+    // The one poll a test needs resolves "done" straight away, so tests don't wait out real
+    // setTimeout intervals or leave a poll loop running past the component's unmount.
+    if (typeof url === "string" && url.includes("runKey=")) {
+      return { json: async () => ({ ok: true, status: "done", result: null }) } as unknown as Response;
     }
     return { json: async () => ({ ok: true, catalogue: CATALOGUE, sources: SOURCES }) } as unknown as Response;
   });
@@ -158,6 +167,51 @@ describe("the run", () => {
     expect(posted[0].action).toBe("run");
     // undefined, not [] — an empty array would read as "run nothing" on the server.
     expect(posted[0].sourceIds).toBeUndefined();
+  });
+
+  it("polls through a running state and renders the report once the job is actually done", async () => {
+    // The whole point of this fix (WORKLOG 2026-09-12): a run's result is no longer in the POST
+    // response — it only shows up after one or more polls of GET ?runKey=. This exercises that
+    // real sequence rather than a mock that answers "done" on the very first call.
+    let pollCalls = 0;
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        posted.push(JSON.parse(String(init.body)));
+        return { json: async () => ({ ok: true, queued: true, runKey: "manual-poll-test" }) } as unknown as Response;
+      }
+      if (typeof url === "string" && url.includes("runKey=")) {
+        pollCalls++;
+        if (pollCalls === 1) return { json: async () => ({ ok: true, status: "running" }) } as unknown as Response;
+        return {
+          json: async () => ({
+            ok: true,
+            status: "done",
+            result: {
+              runKey: "manual-poll-test",
+              sources: 2,
+              dryRun: false,
+              report: { fetched: 3, dirty: [], quarantined: [], disallowed: [], gone: [], stoppedBy: "frontier_empty" },
+              sink: { written: 3, skipped: 0 },
+              incidentRaised: false,
+              errors: [],
+            },
+          }),
+        } as unknown as Response;
+      }
+      return { json: async () => ({ ok: true, catalogue: CATALOGUE, sources: SOURCES }) } as unknown as Response;
+    });
+
+    await click(buttonByText("正式抓取"));
+    // The first poll answers "running", which sleeps 2s before polling again — advance real time
+    // rather than fake timers, since fake timers and this file's manual microtask-driven `act()`
+    // calls don't compose cleanly here.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 2100));
+    });
+
+    expect(pollCalls).toBeGreaterThanOrEqual(2);
+    expect(container.textContent).toContain("manual-poll-test");
+    expect(container.textContent).toContain("2 個來源");
   });
 
   it("covers only the ticked sources", async () => {

@@ -48,9 +48,25 @@ export interface RunCollectionResult {
 /** Defaults sized for one operator-triggered run, not for a nightly crawl of everything. */
 const DEFAULT_BUDGET: BudgetLimits = { fetches: 200, bytes: 200_000_000, ms: 10 * 60_000 };
 
+/**
+ * The same format runCollection falls back to on its own, exported so a caller that needs the key
+ * BEFORE the run finishes (to hand back to the browser for polling — see lib/collect/run-jobs.ts)
+ * generates it identically rather than duplicating the format and risking the two drifting apart.
+ *
+ * A short random suffix, not just the second-precision timestamp: two runs for the same org
+ * starting in the same second (two ops tabs open on one client, both pressed at once) would
+ * otherwise collide both on collection_runs' (organization_id, run_key) upsert key AND on
+ * run-jobs.ts's in-memory tracker — the second run's job entry would silently overwrite the
+ * first's, so one tab's poller would end up reading the other run's result.
+ */
+export function defaultRunKey(): string {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `manual-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "")}-${suffix}`;
+}
+
 export async function runCollection(opts: RunCollectionOptions): Promise<RunCollectionResult> {
   const log = opts.log ?? (() => {});
-  const runKey = opts.runKey ?? `manual-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "")}`;
+  const runKey = opts.runKey ?? defaultRunKey();
 
   const all = await approvedSeeds(opts.organizationId);
   const chosen = opts.sourceIds?.length ? all.filter((p) => opts.sourceIds!.includes(p.source.id)) : all;

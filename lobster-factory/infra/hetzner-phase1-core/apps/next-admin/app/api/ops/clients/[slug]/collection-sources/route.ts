@@ -19,13 +19,15 @@ import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { sourceCatalogue } from "@/lib/collect/catalogue";
 import { addSource, approveSource, disableSource, listSources } from "@/lib/collect/sources-store";
-import { runCollection } from "@/lib/collect/run";
+import { runCollection, defaultRunKey } from "@/lib/collect/run";
+import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
 import "@/lib/collect/blocks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// A crawl of several sources takes longer than a normal request; the budget inside it is the real
-// limit, this is just the platform ceiling.
+// Kept generous even though the route itself now responds immediately (see action:"run" below) —
+// a request polling ?runKey= still goes through this same handler's file, and Next.js applies
+// maxDuration per route regardless of which export handles a given request.
 export const maxDuration = 300;
 
 async function orgIdOf(slug: string): Promise<string | null> {
@@ -48,10 +50,28 @@ function audit(orgId: string, role: string, source: string, event: string, paylo
 }
 
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
-  resolveOpsRole(request); // internal console — viewer+ may read
+  const resolved = resolveOpsRole(request); // internal console — viewer+ may read the catalogue/sources below
   const { slug } = await context.params;
   const orgId = await orgIdOf(slug);
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+
+  // Polling a run started by POST (action:"run") — see the header comment there for why this is a
+  // separate step rather than POST just waiting for the crawl itself. A run's result is the same
+  // detail level POST used to return directly (per-URL refusal reasons, which vendor key is
+  // misconfigured), which only owner/admin could see before this endpoint existed — so this branch
+  // needs the SAME gate as POST, not the viewer-level one the plain catalogue/sources body below
+  // still allows (critic finding, 2026-09-12: this was missing, a real authorization downgrade).
+  const runKey = new URL(request.url).searchParams.get("runKey");
+  if (runKey) {
+    if (!canWriteTenantConfig(resolved.role)) {
+      return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+    }
+    const job = getRunJob(`${orgId}:${runKey}`);
+    if (!job) return NextResponse.json({ ok: false, error: "run_not_found" }, { status: 404 });
+    if (job.status === "running") return NextResponse.json({ ok: true, status: "running" });
+    if (job.status === "error") return NextResponse.json({ ok: true, status: "error", error: job.error });
+    return NextResponse.json({ ok: true, status: "done", result: job.result });
+  }
 
   return NextResponse.json({
     ok: true,
@@ -79,22 +99,28 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (body.action === "run") {
     const dryRun = body.dryRun === true;
     const sourceIds = Array.isArray(body.sourceIds) ? (body.sourceIds as string[]) : undefined;
-    const logs: string[] = [];
-    const result = await runCollection({
-      organizationId: orgId,
-      sourceIds,
-      dryRun,
-      log: (m) => {
-        if (logs.length < 200) logs.push(m);
-      },
-    });
-    audit(orgId, resolved.role, resolved.source, dryRun ? "collection_dry_run" : "collection_run", {
-      runKey: result.runKey,
-      sources: result.sources,
-      written: result.sink.written,
-      dirty: result.report.dirty.length,
-    });
-    return NextResponse.json({ ok: true, result, logs });
+    const runKey = defaultRunKey();
+
+    // NOT awaited: a real run's own budget allows up to 10 minutes (run.ts DEFAULT_BUDGET), which
+    // this app's Cloudflare-fronted domain will never let a single request/response survive
+    // (~100s edge idle timeout — confirmed 2026-09-12 from production nginx access log showing
+    // repeated `POST .../collection-sources -> 499`, i.e. the edge closing the connection out from
+    // under a still-running upstream request). The browser now polls GET ?runKey= instead of
+    // waiting on this response body.
+    startRunJob(
+      `${orgId}:${runKey}`,
+      runCollection({ organizationId: orgId, sourceIds, dryRun, runKey }).then((result) => {
+        audit(orgId, resolved.role, resolved.source, dryRun ? "collection_dry_run" : "collection_run", {
+          runKey: result.runKey,
+          sources: result.sources,
+          written: result.sink.written,
+          dirty: result.report.dirty.length,
+        });
+        return result;
+      }),
+    );
+
+    return NextResponse.json({ ok: true, queued: true, runKey });
   }
 
   const blockId = typeof body.blockId === "string" ? body.blockId : "";

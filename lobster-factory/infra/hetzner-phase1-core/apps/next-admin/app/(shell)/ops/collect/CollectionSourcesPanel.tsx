@@ -8,7 +8,7 @@
 // this"), and a run's refusals are shown next to its successes (a crawl that stored nothing while
 // refusing forty pages must not look like a quiet day).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface CatalogueEntry {
   id: string;
@@ -101,6 +101,16 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [run, setRun] = useState<RunResult | null>(null);
+  // Guards pollRun's loop against a component that has already unmounted (navigated off this page
+  // mid-run) — critic finding, 2026-09-12: without this the loop kept polling and calling setState
+  // for up to ~10 minutes after the tab left /ops/collect. React itself no-ops a setState on an
+  // unmounted component rather than crashing, but the wasted network traffic has no reason to exist.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // No role header: the console's middleware injects the caller's real role from their session, and
   // a header set here would be a claim the browser makes about itself — ignored by design.
@@ -181,6 +191,56 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
     }
   }
 
+  // The run itself can take minutes (real crawling, politely rate-limited); this app's domain sits
+  // behind Cloudflare, whose edge drops an idle connection around 100s regardless of how much time
+  // the server itself is willing to give the request. So the POST below only starts the run and
+  // gets a key back — the actual wait happens here, as polling, which has no such ceiling because
+  // each individual poll is a fast, ordinary request. (Root cause + evidence: WORKLOG 2026-09-12.)
+  async function pollRun(runKey: string): Promise<void> {
+    // A flaky poll must not abandon an otherwise-healthy run — but a PERSISTENT failure (Wi-Fi
+    // dropped, VPN killed) must not spin forever either (critic finding, 2026-09-12): without a
+    // cap, busy stayed true and the run buttons stayed disabled indefinitely with no explanation,
+    // recoverable only by a full reload. 10 consecutive failures ≈ 20s of the network genuinely
+    // being down, not one dropped packet.
+    let consecutiveFailures = 0;
+    for (;;) {
+      if (!mountedRef.current) return; // navigated away mid-run; nothing left to update
+      let data: { ok?: boolean; status?: string; result?: RunResult; error?: string };
+      try {
+        const res = await fetch(`/api/ops/clients/${slug}/collection-sources?runKey=${encodeURIComponent(runKey)}`, { headers });
+        data = await res.json();
+        consecutiveFailures = 0;
+      } catch {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 10) {
+          if (mountedRef.current) setMessage("⚠ 追蹤執行狀態失敗（網路持續連不上）——正式抓取仍在伺服器上繼續跑，重新整理頁面看來源清單的 lastRunAt 確認結果");
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (!mountedRef.current) return;
+      if (!data.ok) {
+        // run_not_found: the tracked job is gone (e.g. the server restarted mid-run — the tracker is
+        // in-memory by design, see lib/collect/run-jobs.ts). The crawl itself was unaffected; only
+        // this tab's view of its progress was lost.
+        setMessage("⚠ 追蹤不到這次執行的狀態（可能伺服器重啟過）——如果是正式抓取，稍後重新整理來源清單看 lastRunAt 確認是否已完成");
+        return;
+      }
+      if (data.status === "running") {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (data.status === "error") {
+        setMessage(`⚠ ${data.error ?? "run_failed"}`);
+        return;
+      }
+      if (data.result) setRun(data.result);
+      await load();
+      return;
+    }
+  }
+
   async function collect(dryRun: boolean) {
     setBusy(true);
     setMessage(null);
@@ -191,10 +251,9 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
         headers,
         body: JSON.stringify({ action: "run", dryRun, sourceIds: runOnly.length ? runOnly : undefined }),
       });
-      const data = (await res.json()) as { ok?: boolean; result?: RunResult; errors?: string[] };
-      if (data.ok && data.result) {
-        setRun(data.result);
-        await load();
+      const data = (await res.json()) as { ok?: boolean; queued?: boolean; runKey?: string; errors?: string[] };
+      if (data.ok && data.runKey) {
+        await pollRun(data.runKey);
       } else {
         setMessage(`⚠ ${(data.errors ?? ["run_failed"]).join("、")}`);
       }

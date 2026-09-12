@@ -32,9 +32,15 @@ Next.js 自己的 300s 設定無關,兩層都給了足夠時間但擋不住更�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`(next-admin，改動後重跑兩次)| exit=0
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect "app/(shell)/ops/collect" app/api/ops/clients` | exit=0 | 212 passed / 7 skipped(既有需要真網路/金鑰的 live test)，含新增 `run-jobs.test.ts` 4 個測試(running→done、reject→error、跨 org 不互撞)
 - REALTEST_EVIDENCE: tool=SSH | cmd=`grep collection-sources /var/log/nginx/access.log*` + `grep proxy_read_timeout` + `curl -I` 確認 Cloudflare | exit=0 | 這是根因診斷的直接證據，不是修復後的驗證，但沒有這步就是在猜
-- REVIEW_DONE: critic=Quick(async subagent，尚未回報時本條目先落地；回報後若有 finding 另開條目修)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`collection-sources\|runCollection(\|defaultRunKey` | hits=10 檔，逐一核對：`run-due-schedules/route.ts`(Trigger.dev 排程呼叫端，未改動，範圍外)、`collect-run-rate-limit-wiring.test.ts`(直接測 runCollection，行為未變)、`RUNNABLE_DEMOS.md`(僅描述使用者可見結果「跑完列出抓到幾筆」，修復前後對使用者一致，不需改)，其餘皆為本次改動的檔案本身
-- 尚未部署到 prod——待 critic 回報 + 操作者 go-ahead
+- REVIEW_DONE: critic=Quick | verdict=pass(修復後)| findings=0 Critical / 2 Major(已修，見下)/ 2 Minor(已修，見下)/ 1 Suggestion(不動，已查證安全)
+  - Major①【真實授權降級，本次改動自己造成的】GET 新增的 `?runKey=` 分支原本只呼叫 `resolveOpsRole` 沒有 `canWriteTenantConfig`——這個分支回傳的內容(逐 URL 拒收原因、暴露哪個供應商金鑰設錯)跟修復前只有 POST(owner/admin 專屬)能拿到的資料一樣詳細，等於 viewer 角色現在也能讀到。修復：`route.ts` 該分支補上跟 POST/PATCH/DELETE 一致的 `canWriteTenantConfig` 檢查。
+  - Major②【prune 不看狀態】`run-jobs.ts` 的 30 分鐘清除邏輯原本不分青紅皂白砍最舊的 entry——`persistRunReport`+`recordRunOutcome` 跑在 crawl 自己的 10 分鐘 budget 之外不受它限制，Supabase 卡頓時一個仍在跑的 job 理論上可能被砍，砍掉後它真正跑完時 `if(job)` guard 直接吃掉結果、無任何紀錄。修復：`prune()` 只清 `status!=="running"` 的 entry。
+  - Minor①【輪詢遇到持續性網路失敗會卡死】`pollRun` 原本 catch 分支沒有重試上限，`busy` 永遠不會變 false、按鈕永遠是灰的、畫面什麼提示都沒有。修復：連續 10 次(~20 秒)失敗後停止並顯示終止訊息。
+  - Minor②【分頁離開後輪詢不會停】原本沒有 unmount 偵測，導覽離開 `/ops/collect` 後迴圈仍會跑到 10 分鐘。React 不會因此當掉(只是靜默 no-op)，純浪費網路。修復：新增 `mountedRef`，unmount 時停止。
+  - Minor③【測試沒測到真正的重點】原測試的 `runKey=` mock 永遠第一次就回 `done`，從沒真的走過 `running→done` 這個修復的核心路徑。修復：新增一個測試，第一次 poll 回 `running`，第二次才回 `done` 附真的 `result`，斷言畫面真的渲染出 `runKey`／來源數。
+  - Suggestion(不動)：POST 回應不再帶 `logs` 陣列——grep 過 `app/`、`lib/`、`scripts/` 範圍內沒有任何呼叫端讀取這個欄位(修復前前端本來就沒用過)，是死欄位移除不是行為改變，記錄存查不必補。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`collection-sources\|runCollection(\|defaultRunKey\|canWriteTenantConfig` | hits=14 檔，逐一核對：`run-due-schedules/route.ts`(Trigger.dev 排程呼叫端，未改動，範圍外)、`collect-run-rate-limit-wiring.test.ts`(直接測 runCollection，行為未變)、`RUNNABLE_DEMOS.md`(僅描述使用者可見結果「跑完列出抓到幾筆」，修復前後對使用者一致，不需改)，其餘皆為本次改動的檔案本身
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` + `npx vitest run lib/collect "app/(shell)/ops/collect" app/api/ops/clients`(critic 修復後重跑)| exit=0 | 215 passed / 7 skipped，含新增的 running→done 真實輪詢測試與兩個 pruning 測試
 
 [剩餘風險]
 1. Job tracker 記憶體型：next-admin 重啟/重新部署當下若剛好有人在等一個「正式抓取」，那個分頁的輪詢會收到 `run_not_found`，畫面會提示去看來源清單的 `lastRunAt` 確認——爬蟲本身不受影響，只是那個分頁看不到即時結果。
