@@ -6,7 +6,7 @@
  * 供呼叫端（ScriptForge）寫回 Bible 該角色的 referenceAssetIds、存新草稿版本。
  * 重用 buildSceneAsset（video-pipeline.ts 既有生圖+R2 邏輯，單一 SSOT，不重複實作）。
  *
- * Body: { organizationId, name, role? }
+ * Body: { organizationId, name, role?, description? }
  * Success: { ok: true, assetId, imageUrl }
  * Failure: { ok: false, error }
  */
@@ -23,6 +23,11 @@ interface GeneratePortraitBody {
   organizationId?: string;
   name?: string;
   role?: string;
+  /** 從 Story Bible continuity.prohibitions 篩出的、提到這個角色名字的外觀鎖定句（選填）——
+   * 2026-09-12 真實測試發現：name+role 兩者對圖片模型都是性別中性/無外觀線索的字串（"小雨"、
+   * "主角"），flux-schnell 沒有任何依據時會賭一個性別，賭錯了操作者的角色卡明明寫了「短髮、
+   * 米色針織外套」卻完全沒被用到。有這句就塞進 prompt，讓外觀鎖定規則真的影響生成結果。 */
+  description?: string;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -46,7 +51,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e) as NextResponse; throw e; }
 
   const role = body.role?.trim();
-  const prompt = `Character reference portrait, head and shoulders studio photo, neutral background, ${name}${role ? `, ${role}` : ""}, consistent identity for reuse across scenes`;
+  const description = body.description?.trim();
+  const prompt = `Character reference portrait, head and shoulders studio photo, neutral background, ${name}${role ? `, ${role}` : ""}${description ? `. ${description}` : ""}, consistent identity for reuse across scenes`;
 
   const { buildSceneAsset } = await import("@/lib/content/blocks/video-pipeline");
   const result = await buildSceneAsset(
@@ -74,7 +80,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     mime_type: result.mime,
     byte_size: result.bytes.byteLength,
     checksum_sha256: createHash("sha256").update(result.bytes).digest("hex"),
-    metadata: { source: "story_bible_auto_portrait", character_name: name, character_role: role ?? "" },
+    metadata: { source: "story_bible_auto_portrait", character_name: name, character_role: role ?? "", character_description: description ?? "" },
   }).select("id").single();
   if (asset.error || !asset.data) {
     if (result.r2Key) {

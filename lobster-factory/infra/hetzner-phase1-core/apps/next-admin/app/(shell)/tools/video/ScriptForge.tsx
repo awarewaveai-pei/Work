@@ -752,9 +752,15 @@ function ManualModule({brand}){
     if(missing.length===0)return;
     setPortraitStatus({loading:true});
     const generated: Record<string,string>={};const newRefIds: Record<string,string>={};
+    // 角色名字沒有內建性別/外觀線索（"小雨"、"主角"對生圖模型是中性字串）——2026-09-12 真實測試
+    // 證實：完全沒有描述時 flux-schnell 會賭一個性別，操作者明明在「不可違反的設定」寫了外觀鎖定
+    // 句（如「小雨的髮型與穿著...短髮、米色針織外套」）卻沒被用到。從 prohibitions 撈出提到這個
+    // 角色名字的句子塞進定裝照 prompt，讓這條規則真的生效，而不是只存在文件裡沒人讀。
+    const prohibitions=doc.continuity?.prohibitions||[];
     for(const c of missing){
+      const description=prohibitions.filter(p=>p&&c.name&&p.includes(c.name)).join("；")||undefined;
       try{
-        const r=await fetch("/api/video/story-bibles/generate-portrait",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({organizationId:org,name:c.name,role:c.role})});
+        const r=await fetch("/api/video/story-bibles/generate-portrait",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({organizationId:org,name:c.name,role:c.role,description})});
         const j=await r.json();
         if(j.ok){generated[c.id]=j.imageUrl;newRefIds[c.id]=j.assetId;}
       }catch{/* 單一角色失敗不擋其他角色 */}

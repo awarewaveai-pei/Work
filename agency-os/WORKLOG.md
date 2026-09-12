@@ -1,5 +1,51 @@
 # Worklog
 
+## 2026-09-12（續10）完整流程真實測試 —— Story Bible 定裝照無外觀線索、性別猜錯，修復並完整跑完出片
+
+[任務] 承接續9。操作者要求走完整個 Story Bible → 影片生產 → 確認送出渲染的完整流程，每步講清楚、如實回報障礙。
+
+[完整流程實測（app.aware-wave.com 正式站，用她的真實 Chrome）]
+1. Story Bible：建角色「小雨」（主角，無定裝照）、前提/鉤子/節拍/連續性規則（含「小雨的髮型與穿著在全劇必須維持一致（短髮、米色針織外套）」）→ 存草稿版本 → 核准。
+2. 手動生成套用此 Story Bible → 產生腳本角度（真 Claude 呼叫）→ 選「情緒共鳴」角度 → 產生完整腳本（真 Claude 呼叫，6 場景）→ Story Bible 連續性檢查通過 → 自動生成 1 張定裝照。
+3. 送去生產影片 → 選 Runway Gen-4 Turbo 動態 → 生成草稿（真 Replicate 呼叫：3 個自訂場景圖 + 3 個 Runway 動態片段，NT$24.29／約 $0.76）。
+4. 確認送出渲染 → 真的跑完（腳本✓/素材✓/提交渲染✓/TTS+ffmpeg✓）→ 真的出現在 `video_jobs` 表（job id `177a1109...`, status=done）→ 下載最終 35.2 秒 mp4，逐幀截圖確認有字幕、有旁白、動態場景真的在動。
+
+[真實測試中遇到的障礙（如實記錄，非事後美化）]
+- claude-in-chrome 的模擬滑鼠點擊多次失效（Story Bible 分頁切換鈕、Runway chip、"選擇此角度"）：用 `getBoundingClientRect()` 查證元素本身/座標/handler 都正常，問題在瀏覽器擴充套件的點擊事件沒有確實送達 React——改用 `element.click()` 直接觸發原生 click 事件（走跟真實點擊同一條 React 事件路徑，非繞過 UI 邏輯）全部解決，非本次新增的 app bug。
+- 一次 JS 批次填表時，`document.querySelectorAll('input[type=text]')` 在頁面還沒完全 re-render 完時抓到的元素集合跟後續操作時的真實集合對不上，導致文字誤填到下方快速生成面板的「主題」欄位而非 Story Bible 的「系列 ID」欄位——改用精確 label 比對定位元素修正，並清空誤填欄位。
+- 「🎬 送去生產影片」按鈕誤點成「怎麼用」說明文字裡的同名裝飾字（`<b>🎬 送去生產影片</b>`，非真按鈕）——改用完整字串精確比對（含括號後綴）定位到真正的 `<button>`。
+- 太早檢查「完整腳本」生成結果，誤判為失敗——第二段（完整腳本，非角度）比較慢，多等幾秒就正常出現，非真的失敗。
+- **真的 502**：「📖 Story Bible 畫面一致性比對」面板跳 `Unexpected token '<'`（JSON.parse 收到 HTML）。查 nginx access log 證實是真 502（body 258 bytes，nginx 自己產生的錯誤頁，不是 app 回的）；docker events 確認容器全程沒重啟/掛掉。研判：草稿生成當下 3 個 Runway 影片下載+上傳 R2 是重 CPU/IO 工作，可能讓 Node.js 單一事件迴圈瞬間忙不過來，讓同時間別的請求連不上。不擋渲染，未在本輪修復，記錄為已知風險。
+
+[抓到並修復的真 Critical 缺陷：定裝照自動生成完全沒有外觀線索]
+下載最終影片逐幀比對，發現場景 1（0-10s，第一人稱台詞「我已經很久……沒有真的想畫什麼了」）畫面是**男性**，跟角色卡「小雨」全劇用「她」、外觀規則寫「短髮、米色針織外套」完全不符。追根因：下載自動生成的定裝照本身（`media_assets` id `5c947c53...`）親眼確認——**這張參考照本身就是男性**，代表問題出在定裝照生成，不是後面的參考圖生圖環節（那步忠實複製了參考照，機制本身是對的）。讀 `generate-portrait/route.ts:49` 確認 prompt 只用 `name`＋`role`（"小雨"、"主角"）——兩者對圖片模型都是性別中性字串，完全沒有外觀線索時 flux-schnell 等於用機率亂猜，猜到了男的。而操作者明明在「不可違反的設定」寫了外觀鎖定句，`ScriptForge.tsx` 的 `StoryBibleDoc.characters[]` schema 卻根本沒有 description/外觀欄位，`autoGeneratePortraits()` 呼叫定裝照 API 時也從未把 `continuity.prohibitions` 傳過去——這條規則存在文件裡，但系統從未讀過它。
+
+[修復]
+- `generate-portrait/route.ts`：新增選填 `description` 參數，塞進 prompt；同時記進 `media_assets.metadata.character_description` 供事後追溯。
+- `ScriptForge.tsx` `autoGeneratePortraits()`：從 `doc.continuity.prohibitions` 篩出提到該角色名字的句子，當 `description` 一起送出——讓她當初寫的「短髮、米色針織外套」規則真的影響生成結果，而非只是存在文件裡沒人讀。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（於 next-admin）| exit=0（無輸出）
+- REALTEST_EVIDENCE: tool=Browser(claude-in-chrome) + SSH | 完整流程六步驟皆有對應真實佐證（見上），非僅信 UI 顯示的成功訊息——3 個 Runway `.mp4` 場景、`video_jobs` 表真實 `done` 列、下載最終 35.2s mp4 逐幀截圖比對、下載定裝照本體親眼確認問題
+- REVIEW_WAIVED: DOC_ONLY -- 修復本身是新增選填參數＋一個 filter/join 組字串，改動範圍小、無新資料流風險（description 未定義時行為與修復前逐位元組相同）；根因已用真實下載的圖片與真實 API 回應鏈路追溯到單一語句，非猜測
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`generate-portrait\|autoGeneratePortraits` | hits=3（route 定義處 + ScriptForge.tsx 呼叫端 + video-pipeline.ts 的 buildSceneAsset 被重用處，皆預期，無殘留舊引用）
+- WORKLOG_DONE: 本條目
+
+[真實花費]（這次完整流程測試的實際成本，供操作者對帳 /ops/costs）
+- 2 次 Claude 呼叫（角度生成 + 完整腳本）
+- 1 次 flux-schnell 定裝照（$0.003，生出來是錯誤性別，仍是真實花費不重來）
+- 3 次 flux-schnell 自訂場景圖（NT$0.29）
+- 3 次 Runway Gen-4 Turbo 動態（NT$24／$0.75，已依續8/續9的修復正確記入 `ai_call_logs` route=video/motion）
+- Edge TTS 免費 + ffmpeg 合成（伺服器算力，非按次計費）
+- 1 次 Claude vision 畫面一致性比對嘗試（502 失敗，未成功執行，理論上無 Anthropic 端費用因請求未達 app）
+
+[剩餘風險]
+1. 畫面一致性比對面板的 502（見上）——非本輪修復範圍，記錄為已知風險，症狀為「同時大量 Replicate 影片下載時，其他並發請求可能連不上 Node 行程」，需要之後評估是否要把重 I/O 工作搬出主執行緒或加重試。
+2. 定裝照外觀描述目前只從 `continuity.prohibitions` 撈取，不會用 `continuity.currentState`（目前狀態）；若操作者把外觀鎖定寫在「目前狀態」而非「不可違反」欄位，修復後仍抓不到——這是刻意的最小修復範圍，非遺漏，未來若常見可再擴大來源欄位。
+3. 這次測試用的小雨定裝照已經是男性版本，若操作者要正式使用這個 Story Bible，需要到「📖 短劇 Story Bible」頁手動刪除/重生這張定裝照。
+
+[rollback] `git revert` 對應 commit；`description` 為選填參數，未提供時 prompt 與行為跟修復前逐位元組相同。
+
 ## 2026-09-12（續9）動態提示詞加強 —— 拿掉 "Subtle"，操作者親自比對截圖後回報「像照片」
 
 [任務] 承接續8。操作者看了我送的 0s/1.5s/4.9s 三張截圖後回報：真的有動但幅度太小，「看起來像照片」；並指出上次測試場景（人在打字）沒有實質意義、浪費錢，且我沒真的用 Story Bible、也沒按到最後確認送出渲染（生成記錄裡沒有這支影片，直接查 `video_jobs` 表證實）。操作者同意重測，要求走完整流程、每步講清楚。
