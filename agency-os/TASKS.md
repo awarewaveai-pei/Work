@@ -581,15 +581,9 @@
 - [ ] **【2026-09-11 開出｜HCI30｜低優先】mutation-check-wave1.ps1 的 `drop-all-subject-records-referencing-fks` 疑似 flaky**
   - `🟡 未開始` · `2026-09-11 開出` · `不卡誰`
   - **一句話**：該 mutation 用動態 OID 查找刪 FK（`SELECT conname INTO c ... WHERE ...`，多筆同型 FK 存在時任選一筆），單次真跑出現過兩個無關測試（`EPISTEMIC-PROMOTE-01`／`EPISTEMIC-INHERIT-01` 等）意外失敗，同一份程式碼立刻重跑就消失（127/127 全殺）。未深查根因，僅記錄以免未來誤判為新回歸。細節見 WORKLOG 2026-09-11（規則式評分引擎條目）。
-- [ ] **【2026-09-12 開出｜HCI30｜中】規則引擎否定詞窗口啟發式 + 規則集版本號（C2）**
-  - `🟡 未開始` · `2026-09-12 開出` · `不卡誰`
-  - **一句話**：`packages/intelligence/rule-engine.mjs` 純字面比對，「排除了詐欺疑慮」會誤觸發跟「證實涉及詐欺」同一條規則。設計已定（見 `Projects/internal/hci30/docs/HCI_C1_C10_DECISIONS.md` §C2）：關鍵字前 N 字元窗口內出現否定詞則不計分但仍標記「已排除」供 UI 顯示；`RULES` 加版本號使凍結報告可追溯「用哪一版規則算的」。未落地原因：改動牽動 `matchRules()` 回傳形狀與 12+8 個既有測試斷言，跟同輪 C7/C10 一起做會擠壓驗證品質，刻意分開。
-- [ ] **【2026-09-12 開出｜HCI30｜低優先】規則引擎關鍵字堆疊偵測（C3）**
-  - `🟡 未開始` · `2026-09-12 開出` · `不卡誰`
-  - **一句話**：規則的關鍵字/理由在 UI 上直接可見，知道規則的人可刻意選字操弄分數——這是可解釋性（操作者明確要求）跟抗操弄的必然張力，此項只是緩解訊號不是解法。設計已定（見 `HCI_C1_C10_DECISIONS.md` §C3）：同一則證據文字短篇幅內命中異常多條規則時標記「疑似關鍵字堆疊」供人工複核，不改變分數。未落地原因同 C2。
-- [ ] **【2026-09-12 開出｜HCI30｜中】auto-promote 開關稽核紀錄（C5）**
-  - `🟡 未開始` · `2026-09-12 開出` · `不卡誰`
-  - **一句話**：`hci.cases.auto_promote_rule_findings`（migrations/0017）現在只知道當前值，不知道誰在何時切換過。設計已定（見 `HCI_C1_C10_DECISIONS.md` §C5）：新增不可竄改稽核紀錄，跟現有「系統自動判定，未經人工確認」UI 標籤互補。需要一個新 migration，跟 C7（migrations/0018）同等份量的真跑驗證（trigger+mutation-check），刻意不跟 C7/C10 塞進同一輪。
+- [x] **【✅ 2026-09-12 完成】規則引擎否定詞窗口啟發式 + 規則集版本號（C2）** — `matchNegatedRules()`/`RULE_SET_VERSION`，`rule-engine.test.mjs` 24 test 全綠，真 Docker 282/282 assertion。細節見 WORKLOG 2026-09-12（C2/C3/C5 條目）。
+- [x] **【✅ 2026-09-12 完成】規則引擎關鍵字堆疊偵測（C3）** — `detectKeywordStacking()`，緩解非解法（可解釋性與抗操弄的必然張力見 `HCI_C1_C10_DECISIONS.md` §C3）。細節見 WORKLOG 2026-09-12（C2/C3/C5 條目）。
+- [x] **【✅ 2026-09-12 完成】auto-promote 開關稽核紀錄（C5）** — 新 migration `0019_wave1_case_auto_promote_audit`，append-only 骨架沿用 C7；critic 覆審抓到原子性缺口後改為 `hci.set_case_auto_promote_rule_findings()` 單一函式呼叫。細節見 WORKLOG 2026-09-12（C2/C3/C5 條目）。
 
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
   - `🟠 未開始` · `2026-08-28 開出` · `可直接做`

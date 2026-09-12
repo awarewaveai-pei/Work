@@ -120,9 +120,11 @@
   .risk-tier-submit { padding: 0.4rem 1rem; border: none; border-radius: 999px; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
   .risk-tier-submit:hover { background: var(--teal-ink); }
   .reaudit-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: #f7ead0; color: var(--moderate); font-weight: 700; }
+  .stacking-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: var(--teal-tint); color: var(--teal-ink); font-weight: 700; }
   .auto-promote-toggle { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.8rem; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
   .auto-promote-toggle input { margin-top: 0.2rem; flex: none; }
   .auto-promote-tag { display: inline-block; margin-left: 0.4rem; font-size: 0.68rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #ece6d6; color: var(--muted); font-weight: 700; }
+  .auto-promote-audit-list { margin: 0.4rem 0 0; padding-left: 1.6rem; font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
 
   /* Report generation (operator-requested "產生信任評估報告", 2026-09-10) --
      a frozen, printable deliverable, distinct from the live editable case
@@ -183,6 +185,7 @@
   .domain-dim-row:first-of-type { margin-top: 0.3rem; }
   .domain-dim-refs { margin: 0.3rem 0 0; padding-left: 1.3rem; font-size: 0.8rem; color: var(--text); line-height: 1.6; }
   .domain-disagreement-note { margin-top: 0.5rem; font-size: 0.78rem; font-weight: 700; color: var(--moderate); }
+  .domain-negated-note { margin-top: 0.5rem; font-size: 0.78rem; color: var(--muted); }
 
   /* Rule engine (操作者要求 2026-09-11: "系統自己讀證據、自己判斷...用程式
      分析的方式...再統計分析...還是要有文字說明和分析緣由"). */
@@ -369,6 +372,7 @@
     <div>
       <div id="d-records"></div>
       <div id="d-suggestions"></div>
+      <div id="d-negated-hits"></div>
     </div>
     <div>
     <div class="add-panel" id="record-add-panel">
@@ -664,7 +668,7 @@ function toggleDomainDetail(id) {
 // frozen report view so both show the identical derivation trail; `prefix`
 // keeps element ids unique between the two (both can exist in the DOM at
 // once, only one visible).
-function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dimensionDisagreements, autoPromotedDimensions) {
+function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dimensionDisagreements, autoPromotedDimensions, negatedHitsByDimension) {
   const byDomain = Object.fromEntries(rollupDomains.map(d => [d.domain, d]));
   const dimsByDomain = {};
   (evidenceQuality || []).forEach(q => { (dimsByDomain[q.domain] = dimsByDomain[q.domain] || []).push(q); });
@@ -683,9 +687,11 @@ function buildDomainGrid(rollupDomains, evidenceQuality, recordById, prefix, dim
       }).join('');
       const methodDisagreement = disagreementByDimension[q.dimension];
       const isAutoPromoted = autoPromotedSet.has(q.dimension);
+      const negatedHits = (negatedHitsByDimension || {})[q.dimension] || [];
       return `<div class="domain-dim-row"><div><b>${DIMENSION_LABELS[q.dimension] || q.dimension}</b>：${bandBadge(q.value)} ${QUALITY_LABELS[q.quality] || q.quality}（${q.evidence_count} 筆）${isAutoPromoted ? '<span class="auto-promote-tag">系統自動判定，未經人工確認</span>' : ''}</div>
         <ul class="domain-dim-refs">${refs}</ul>
-        ${methodDisagreement ? `<div class="domain-disagreement-note">⚠ 人工判斷（${BAND_LABELS[methodDisagreement.human_value] || methodDisagreement.human_value}）與規則引擎判斷（${BAND_LABELS[methodDisagreement.rule_engine_value] || methodDisagreement.rule_engine_value}）不一致，已如實混合計算，未互相蓋過。</div>` : ''}</div>`;
+        ${methodDisagreement ? `<div class="domain-disagreement-note">⚠ 人工判斷（${BAND_LABELS[methodDisagreement.human_value] || methodDisagreement.human_value}）與規則引擎判斷（${BAND_LABELS[methodDisagreement.rule_engine_value] || methodDisagreement.rule_engine_value}）不一致，已如實混合計算，未互相蓋過。</div>` : ''}
+        ${negatedHits.length ? `<div class="domain-negated-note">系統偵測到 ${negatedHits.length} 個關鍵字命中因前後文出現否定語（如「排除」「並非」），判斷不計分：${negatedHits.map(h => esc(h.rationale)).join('；')}</div>` : ''}</div>`;
     }).join('');
 
     return `<div class="domain-card" onclick="toggleDomainDetail('${detailId}')" title="點擊查看依據">
@@ -730,6 +736,25 @@ function renderRuleEngineSuggestions(suggestions, hitsByDimension, recordById) {
         ${hitRows}
       </div>`;
     }).join('')}`;
+}
+
+// HCI_C1_C10_DECISIONS.md §C2 -- operator explicitly required a negation
+// match to stay visible, not be silently dropped from scoring. This is the
+// guaranteed-visible place: unlike the inline note inside buildDomainGrid
+// (which only renders when that dimension already has OTHER coverage), a
+// dimension whose ONLY signal was negated still shows up here.
+function renderNegatedHits(negatedHitsByDimension, recordById) {
+  const entries = Object.entries(negatedHitsByDimension || {});
+  if (!entries.length) return '';
+  return `<h3>系統偵測到但因否定語境不計分的關鍵字</h3>
+    <p class="field-hint">以下文字裡出現過規則關鍵字，但緊接在「排除」「並非」等否定詞之後，系統判斷為不成立，未列入任何分數計算。這是一個有限的字面比對規則，不是語意理解——距離較遠的否定或雙重否定仍可能漏判，請自行複核。</p>
+    ${entries.map(([dimension, hits]) => `<div class="suggestion-card">
+        <div class="suggestion-head"><b>${DIMENSION_LABELS[dimension] || dimension}</b></div>
+        ${hits.map(h => {
+          const r = recordById[h.record_id];
+          return `<div class="suggestion-hit">◌ ${esc(h.rationale)}（來源：${r ? esc(shortRecordText(r)) : '#' + h.record_id.slice(0,8)}，因否定語境未計分）</div>`;
+        }).join('')}
+      </div>`).join('')}`;
 }
 
 // Radar chart across all 7 Trust Domains -- a different VISUALIZATION of the
@@ -812,7 +837,8 @@ async function refreshDetail() {
     <label class="auto-promote-toggle">
       <input type="checkbox" id="d-auto-promote" ${body.case.auto_promote_rule_findings ? 'checked' : ''} onchange="toggleAutoPromote(this.checked)">
       允許規則引擎判斷在沒有人工評估時也直接計入信任構面分數（不需要另外建一筆評估才算數）
-    </label>`;
+    </label>
+    ${(body.autoPromoteAudit || []).length ? `<ul class="auto-promote-audit-list">${body.autoPromoteAudit.map(a => `<li>${new Date(a.changed_at).toLocaleString('zh-TW')}．改為${a.new_value ? '開啟' : '關閉'}</li>`).join('')}</ul>` : ''}`;
 
   const bannerEl = document.getElementById('d-decision-banner');
   if (body.decisions.length) {
@@ -837,9 +863,10 @@ async function refreshDetail() {
     : '';
   document.getElementById('d-radar').innerHTML = renderRadar(body.rollup.domains);
   const recordById = Object.fromEntries(body.records.map(r => [r.id, r]));
-  document.getElementById('d-domains').innerHTML = buildDomainGrid(body.rollup.domains, body.evidenceQuality, recordById, 'live', body.dimensionDisagreements, body.ruleEngineAutoPromoted);
+  document.getElementById('d-domains').innerHTML = buildDomainGrid(body.rollup.domains, body.evidenceQuality, recordById, 'live', body.dimensionDisagreements, body.ruleEngineAutoPromoted, body.ruleEngineNegatedHits);
   document.getElementById('d-severity').innerHTML = renderSeverityAlerts(body.severityAlerts);
   document.getElementById('d-suggestions').innerHTML = renderRuleEngineSuggestions(body.ruleEngineSuggestions, body.ruleEngineHits, recordById);
+  document.getElementById('d-negated-hits').innerHTML = renderNegatedHits(body.ruleEngineNegatedHits, recordById);
 
   document.getElementById('d-strengths').innerHTML = body.strengths.length
     ? body.strengths.map(s => `<li>${DOMAIN_LABELS[s.domain] || s.domain}（${BAND_LABELS[s.value] || s.value}）</li>`).join('')
@@ -863,15 +890,18 @@ async function refreshDetail() {
     </form>`;
 
   const personById = Object.fromEntries(body.persons.map(p => [p.id, p.display_label]));
+  const stackingFlagById = Object.fromEntries((body.keywordStackingFlags || []).map(f => [f.record_id, f]));
   const recordsEl = document.getElementById('d-records');
   recordsEl.innerHTML = body.records.length ? body.records.map(r => {
     const text = r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''}：${BAND_LABELS[r.payload.value] || r.payload.value || ''}`.trim();
     const quality = qualityByDim[r.payload.dimension];
+    const stackingFlag = stackingFlagById[r.id];
     return `<div class="record-card">
       <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span title="${r.id}" style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
       <div class="content">${esc(text)}</div>
       ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality.quality] || quality.quality}（${quality.evidence_count} 筆）</span>` : ''}
       ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
+      ${stackingFlag ? `<span class="stacking-tag" title="這則文字一次命中 ${stackingFlag.rule_count} 條不同規則，建議人工複核是否為刻意選字操弄分數">⚠ 疑似關鍵字堆疊（${stackingFlag.rule_count} 條規則）</span>` : ''}
     </div>`;
   }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
 
@@ -945,17 +975,30 @@ function renderReportView(row) {
       </div>`; })()
     : `<div class="decision-banner" style="background:#f0f1f3"><span class="subtitle">尚未記錄決策。</span></div>`;
 
-  const domainGridHtml = buildDomainGrid(d.rollup.domains, d.evidenceQuality, recordById, 'report', d.dimensionDisagreements, d.ruleEngineAutoPromoted);
+  const domainGridHtml = buildDomainGrid(d.rollup.domains, d.evidenceQuality, recordById, 'report', d.dimensionDisagreements, d.ruleEngineAutoPromoted, d.ruleEngineNegatedHits);
   const severityHtml = renderSeverityAlerts(d.severityAlerts);
+  // critic review (2026-09-12): renderNegatedHits() exists specifically so a
+  // dimension whose ONLY signal was a negated keyword is never silently
+  // dropped (HCI_C1_C10_DECISIONS.md §C2, "UI 上仍看得到，不是靜默丟棄") --
+  // that guarantee must hold in the frozen report too, not just the live
+  // page. Unlike renderRuleEngineSuggestions() (deliberately report-omitted:
+  // an unconfirmed AI signal, not yet promoted to fact), a negated hit is a
+  // disclosure that a keyword WAS investigated and excluded, which belongs
+  // in the same place the live page puts it -- inside 證據與主張, after the
+  // records themselves.
+  const negatedHitsHtml = renderNegatedHits(d.ruleEngineNegatedHits, recordById);
 
+  const stackingFlagById = Object.fromEntries((d.keywordStackingFlags || []).map(f => [f.record_id, f]));
   const recordsHtml = d.records.length ? d.records.map(r => {
     const text = r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''}：${BAND_LABELS[r.payload.value] || r.payload.value || ''}`.trim();
     const quality = qualityByDim[r.payload.dimension];
+    const stackingFlag = stackingFlagById[r.id];
     return `<div class="record-card">
       <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
       <div class="content">${esc(text)}</div>
       ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality.quality] || quality.quality}（${quality.evidence_count} 筆）</span>` : ''}
       ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
+      ${stackingFlag ? `<span class="stacking-tag" title="這則文字一次命中 ${stackingFlag.rule_count} 條不同規則，建議人工複核是否為刻意選字操弄分數">⚠ 疑似關鍵字堆疊（${stackingFlag.rule_count} 條規則）</span>` : ''}
     </div>`;
   }).join('') : '<p class="empty">尚未記錄任何證據、主張或評估。</p>';
 
@@ -970,6 +1013,7 @@ function renderReportView(row) {
     <section class="topic-block">
     <h2>證據與主張</h2>
     <div>${recordsHtml}</div>
+    ${negatedHitsHtml}
     </section>
 
     <section class="topic-block">
@@ -996,7 +1040,7 @@ function renderReportView(row) {
     <div class="report-legal">
       <p><b>免責聲明：</b>本報告可能包含尚未證實之指控、推論與主觀判讀，不構成事實認定。內容中標示為「主張」或「評估」者為判讀性質，唯有標示為「證據」者為直接查得之事實；使用本報告前應自行查證，不應逕自視為最終定論。</p>
       <p><b>用途限制：</b>本報告僅限用於案件開立時聲明之委託目的——${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}。不得轉作其他用途，亦不得作為對外公開評價或人身攻擊之依據。</p>
-      <p>報告 ID：${row.id} ．產生於 ${new Date(row.generated_at).toLocaleString('zh-TW')}</p>
+      <p>報告 ID：${row.id} ．產生於 ${new Date(row.generated_at).toLocaleString('zh-TW')} ．規則引擎版本：${d.ruleEngineVersion || '（本報告產生時尚未記錄版本號）'}</p>
     </div>`;
 }
 

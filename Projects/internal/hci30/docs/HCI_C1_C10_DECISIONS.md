@@ -18,30 +18,32 @@ TASKS.md，不得跟 DONE 混淆）、**DEFERRED**（判斷不該現在做，理
 
 ## C2 — 規則引擎零語境理解（無否定詞判斷）
 
-**PLANNED，未落地**。純字面比對（literal substring match）的語境理解無
-法在不違反操作者「用程式分析，不要 LLM」的明確要求下被「解決」——這是
-選擇確定性規則的必然代價，不是 bug。設計（未寫成程式碼）：
-- `RULES` 加否定詞窗口啟發式：關鍵字前 N 字元內出現「排除/沒有/並非/
-  未證實/否認/駁回/不成立」等否定詞則不計分，同時保留該筆命中但標記為
-  「已排除」，UI 上仍看得到，不是靜默丟棄。
-- 規則集版本號：目前只有 `RULE_ENGINE_METHOD_ID='rule_engine_v1'` 一個
-  固定字串，`RULES` 內容改了版本號不會跟著變——凍結報告已經把當時算出
-  的「值」存進快照，缺的是「用哪一版規則算出來的」本身也要可追溯。
-- 已知剩餘限制（即使落地也不會消失）：窗口啟發式仍會漏掉遠距離否定、
-  雙重否定等情況，不是完整解法。
-- 未落地原因：改動涉及 `matchRules()` 回傳形狀（要同時回報「命中且計
-  分」跟「命中但被否定詞排除」兩種結果），會牽動現有 12+8 個測試案例的
-  斷言，跟 C7/C10 同一輪硬塞第三個有真實測試面積的改動，會擠壓每一個的
-  驗證品質。追蹤於 `agency-os/TASKS.md`。
+**DONE**。純字面比對（literal substring match）的語境理解無法在不違反
+操作者「用程式分析，不要 LLM」的明確要求下被「解決」——這是選擇確定性
+規則的必然代價，不是 bug，本輪縮小影響面，未宣稱解決：
+- `packages/intelligence/rule-engine.mjs` 新增否定詞窗口啟發式：關鍵字
+  前 15 字元內出現「排除/沒有/並非/未證實/否認/駁回/不成立」等否定詞則
+  不計分；`matchRules()` 回傳形狀不變（仍是純陣列，過濾在內部發生，向下
+  相容），新增 `matchNegatedRules()` 回報被排除的命中，UI（`d-negated-
+  hits` 區塊）永遠顯示，不靜默丟棄。
+- 新增 `RULE_SET_VERSION`（`RULES` 內容的 sha256 前 12 碼），不是手動維
+  護的版本號——內容改了自動跟著變，不需要人記得手動升版。凍結報告的
+  `.report-legal` 新增一行「規則引擎版本：xxx」。
+- 已知剩餘限制（設計已知、無法用這個機制消除）：窗口啟發式仍會漏掉遠
+  距離否定、雙重否定、關鍵字後置的否定（如「詐欺，但已排除」）。
+- 真跑驗證：`rule-engine.test.mjs` 新增 10 個測試（含負負得正場景：同一
+  關鍵字一次被否定一次沒被否定，仍正確判定為命中），瀏覽器真實案件確認
+  「調查後排除了詐欺疑慮」不觸發 fraud_indicator 且正確顯示在排除清單。
 
 ## C3 — 規則透明 = 可被針對性操弄
 
-**PLANNED，未落地**。可解釋性（每條規則的關鍵字/理由 UI 上直接看得到）
-跟抗操弄本質互斥——操作者當初明確要「還是要有文字說明和分析緣由」，選
-了前者，這條張力不會被下面的設計「解決」，只會被稍微緩解。設計（未寫成
-程式碼）：同一則證據文字若在短篇幅內塞入異常多條規則的關鍵字，標記「疑
-似關鍵字堆疊」供人工複核留意，不改變分數本身。未落地原因同 C2。追蹤於
-`agency-os/TASKS.md`。
+**DONE**（緩解，非解決）。可解釋性（每條規則的關鍵字/理由 UI 上直接看
+得到）跟抗操弄本質互斥——操作者當初明確要「還是要有文字說明和分析緣
+由」，選了前者，這條張力沒有被下面的設計解決，只被緩解。`detect
+KeywordStacking()`：同一則證據文字命中 3 條以上不同規則時標記「疑似關
+鍵字堆疊」，證據卡片與報告頁皆顯示，供人工複核留意，不改變分數本身。
+真跑驗證：3 個新測試（含「同一規則的多個關鍵字不算堆疊，只算一條規
+則」的邊界情況），瀏覽器真實案件確認 3 條規則命中時正確標記。
 
 ## C4 — 沒有信任總分/最終裁決
 
@@ -55,13 +57,30 @@ AGENTS.md R0 禁止的「猜測補未知」。**正確路徑**：你決定加權
 
 ## C5 — auto-promote 開關風險
 
-**PLANNED，本輪未落地**。設計：新增 `hci.cases` 稽核——
+**DONE**（`database/migrations/0019_wave1_case_auto_promote_audit_
+{up,down}.sql`）。`hci.case_auto_promote_audit` append-only 稽核表，結構
+沿用 C7 的 append-only 骨架（GRANT SELECT/INSERT-only、REVOKE UPDATE/
+DELETE、`reject_update_delete()` trigger、RLS tenant_isolation）：
 `auto_promote_rule_findings` 每次被誰在何時切換都留一筆不可竄改紀錄，跟
 現有「系統自動判定，未經人工確認」UI 標籤互補（標籤說「這筆分數怎麼來
-的」，稽核紀錄說「誰決定要讓系統這樣算」）。需要一個新表/migration，跟
-C7 同等份量的真跑驗證（migration+trigger+mutation-check）——本輪已經對
-C7 跑完一輪完整的真 Docker 驗證循環，同一輪再塞一個一樣重的 migration
-會擠壓驗證時間，選擇不趕工。追蹤於 `agency-os/TASKS.md`。
+的」，稽核紀錄說「誰決定要讓系統這樣算」）。**吸取 C7 的教訓**：
+`changed_at` 用 `DEFAULT now()`，不是 `clock_timestamp()`（C7 當時誤用後
+者觸發 `BITEMP-SCOPE-01` 失敗，這次直接避開）。
+
+**Critic 覆審抓到 1 個 Major，已修**：初版把 UPDATE hci.cases 跟 INSERT
+稽核列寫成兩個獨立的 `queryAsTenant()` 呼叫，中間沒有交易包起來——兩者之
+間任何失敗（斷線、連線池耗盡）都會讓值已經改變但完全沒留下稽核紀錄，正
+是這張表存在的目的被最普通的暫時性失敗就打破。改法：仿照既有的
+`hci.record_decision()`（migrations/0014）模式，把 UPDATE+INSERT 收進一
+個新的 `hci.set_case_auto_promote_rule_findings()` SECURITY INVOKER 函式
+裡，一次呼叫=一個陳述式=結構上原子化，`server.mjs` 的 endpoint 改成
+`SELECT hci.set_case_auto_promote_rule_findings($1,$2,$3)`。同一輪順手修
+掉一個關聯問題：函式的 UPDATE 帶 `IS DISTINCT FROM` 條件，重複 POST 同一
+個值（no-op）不再產生第二筆稽核列。活頁面新增 `.auto-promote-audit-list`
+顯示歷史。真跑驗證：282/282 assertion（在前一輪 276 基礎上新增 6 個
+`FN-AUTOPROMOTE-*` 函式層測試）、131/131 mutation killed（含 2 個新
+mutation：整個 drop 掉函式、單獨弱化 no-op 判斷邏輯），瀏覽器真實案件確
+認切換開關後歷史列表正確顯示。
 
 ## C6 — 沒有真實登入驗證
 
@@ -114,10 +133,10 @@ purpose 該有的具體行為差異，我才落地。
 | 項目 | 狀態 | 需要操作者做的事 |
 |---|---|---|
 | C1 | DEFERRED（架構衝突） | 無，等 collector 完工後我方接線 |
-| C2 | PLANNED，未落地 | 無（追蹤於 TASKS.md） |
-| C3 | PLANNED，未落地 | 無（追蹤於 TASKS.md） |
+| C2 | **DONE** | 無 |
+| C3 | **DONE** | 無 |
 | C4 | DEFERRED（需業務判斷） | 決定跨構面加權政策，或決定永遠不做總分 |
-| C5 | PLANNED，未落地 | 無（追蹤於 TASKS.md） |
+| C5 | **DONE** | 無 |
 | C6 | DEFERRED（High-risk） | 明確 go-ahead 才會開始接 portal |
 | C7 | **DONE** | 無 |
 | C8 | DEFERRED（High-risk，前人已決定不趕） | 明確 go-ahead 才會重啟 |

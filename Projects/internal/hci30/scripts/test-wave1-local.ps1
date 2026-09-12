@@ -25,6 +25,7 @@ $upMig15   = Join-Path $root 'database/migrations/0015_wave1_case_reopen_up.sql'
 $upMig16   = Join-Path $root 'database/migrations/0016_wave1_case_report_snapshots_up.sql'
 $upMig17   = Join-Path $root 'database/migrations/0017_wave1_rule_engine_auto_promote_up.sql'
 $upMig18   = Join-Path $root 'database/migrations/0018_wave1_evidence_hash_chain_up.sql'
+$upMig19   = Join-Path $root 'database/migrations/0019_wave1_case_auto_promote_audit_up.sql'
 $fixtures  = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness   = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests  = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -174,6 +175,7 @@ try {
   Invoke-SqlFile -Path $upMig16  -Label 'migration 0016 up (case report snapshots)'
   Invoke-SqlFile -Path $upMig17  -Label 'migration 0017 up (rule engine auto-promote)'
   Invoke-SqlFile -Path $upMig18  -Label 'migration 0018 up (evidence hash chain)'
+  Invoke-SqlFile -Path $upMig19  -Label 'migration 0019 up (case auto-promote audit)'
   Invoke-SqlFile -Path $fixtures -Label 'synthetic fixtures'
   Invoke-SqlFile -Path $harness  -Label 'test harness'
   Invoke-SqlFile -Path $sqlTests -Label 'negative test suite'
@@ -203,10 +205,11 @@ try {
   # 0015_wave1_case_reopen_down.sql are the same narrower case for migrations
   # 0012, 0013, 0014, and 0015. 0016_wave1_case_report_snapshots_down.sql and
   # 0017_wave1_rule_engine_auto_promote_down.sql are the same narrower case
-  # for migrations 0016 and 0017. 0018_wave1_evidence_hash_chain_down.sql is
-  # the same narrower case for migration 0018.
+  # for migrations 0016 and 0017. 0018_wave1_evidence_hash_chain_down.sql and
+  # 0019_wave1_case_auto_promote_audit_down.sql are the same narrower case
+  # for migrations 0018 and 0019.
   Write-Host 'Verifying the migration is reversible...'
-  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001-0018 together)'
+  Invoke-SqlFile -Path $downMig -Label 'migration down (populated schema, drops 0001-0019 together)'
   Invoke-SqlFile -Path $upMig   -Label 'migration 0001 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig2  -Label 'migration 0002 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig3  -Label 'migration 0003 up (clean rebuild after down)'
@@ -225,6 +228,7 @@ try {
   Invoke-SqlFile -Path $upMig16 -Label 'migration 0016 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig17 -Label 'migration 0017 up (clean rebuild after down)'
   Invoke-SqlFile -Path $upMig18 -Label 'migration 0018 up (clean rebuild after down)'
+  Invoke-SqlFile -Path $upMig19 -Label 'migration 0019 up (clean rebuild after down)'
 
   Write-Host 'HCI Wave 1 local suite PASSED.'
 }

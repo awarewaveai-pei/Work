@@ -74,6 +74,37 @@ can match multiple rules, even multiple rules on the same dimension — e.g.
 one EVIDENCE citing both a data breach AND a regulatory fine matches two
 `INFORMATION_GOVERNANCE` rules). Pure function, no I/O, no model calls.
 
+**Negation window (2026-09-12, `HCI_C1_C10_DECISIONS.md` §C2)**: literal
+substring matching cannot tell "調查後排除了詐欺疑慮" from "證實涉及詐欺"
+— both contain "詐欺". If a negation cue (`排除`/`沒有`/`並非`/`未證實`/
+`否認`/`駁回`/`不成立`/`no evidence of`/`denied`/`ruled out`/etc., see
+`NEGATION_CUES`) appears within 15 characters immediately before a matched
+keyword, that occurrence does not count toward scoring. `matchRules()`'s
+own return shape is unchanged (still a plain array, filtering happens
+inside) — `matchNegatedRules(text)` is the separate function returning
+what got excluded, so a negated match is never silently dropped, only kept
+out of the score (surfaced to the operator via `negatedHitsByDimension`,
+§Aggregation below). **Disclosed limit, not a semantic parser**: a cue
+further than 15 characters away, a double negative, or a negation *after*
+the keyword ("詐欺，但已排除") all still slip through uncaught.
+
+**Rule-set version (`RULE_SET_VERSION`)**: a sha256 digest of `RULES`
+itself (first 12 hex chars), not a hand-maintained string — changes
+automatically the moment a keyword/delta/rationale is edited, with nothing
+for an editor to remember to bump. Exposed alongside `RULE_ENGINE_METHOD_ID`
+(which stays stable — it identifies the scoring *method* for
+`combineMethodFindings()`, not the keyword table's content) so a frozen
+report can record which revision of the table produced its numbers.
+
+**Keyword-stacking signal (`HCI_C1_C10_DECISIONS.md` §C3)**:
+`detectKeywordStacking(records)` flags any single EVIDENCE/CLAIM text
+matching 3 or more DISTINCT rules — a review signal for the operator, not
+a scoring change. The same transparency that makes every match explainable
+(keyword + rationale visible in the UI) also lets someone who knows the
+table word evidence to trigger or dodge specific rules; this does not
+resolve that tension (explainability was the operator's explicit choice
+over an opaque model), it only surfaces a pattern worth a second look.
+
 ## Aggregation ("再統計分析")
 
 Given every `EVIDENCE`/`CLAIM` record's matched hits, grouped by dimension:
@@ -101,23 +132,27 @@ itself.** Per dimension:
   2026-09-06, never had a real caller until this file) — the combined value
   rolls up; a genuine spread (≥2 ranks) is disclosed as `disagreement`, not
   averaged away.
-- Rule-engine finding exists, no human `ASSESSMENT` yet → held out of the
-  rollup entirely, surfaced to the operator as a suggestion
+- Rule-engine finding exists, no human `ASSESSMENT` yet → by default held
+  out of the rollup entirely, surfaced to the operator as a suggestion
   ("系統偵測到以下風險指標，尚未經人工確認") with every matched rule's
   rationale and source record. Promoting a suggestion into a real
-  `ASSESSMENT` is a manual action (create the `ASSESSMENT` record
-  yourself, citing the same evidence) — no auto-promotion path exists in
-  this change. This is the same "AI output does not automatically become
-  HCI fact" admission-gate principle
+  `ASSESSMENT` is normally a manual action (create the `ASSESSMENT` record
+  yourself, citing the same evidence). This is the same "AI output does not
+  automatically become HCI fact" admission-gate principle
   (`10_HCI_AI_LEGO_INTEGRATION_CONTRACT.md:45`) applied locally, so an
   unreviewed automated score can never silently become the formal number a
-  decision is made on.
+  decision is made on — **unless** the case has opted in, next paragraph.
 
-**Not built in this change, disclosed rather than silently deferred**: a
-per-case configurable auto-promotion threshold (operator's own "都要" —
-mandatory review by default, with an optional trust-threshold override) —
-that needs a new case-level policy setting this file does not add. Tracked
-as a follow-up, not implied to already work.
+**Built 2026-09-11 (migrations/0017), not a follow-up anymore**:
+`hci.cases.auto_promote_rule_findings` (default `false` — mandatory human
+review unless explicitly opted out of, operator's own "都要") is a
+per-case switch; when `true`, `combineDimensionSources()` admits a rule-
+engine-only finding directly into `dimensionScores` instead of holding it
+as a suggestion (tracked in `autoPromoted[]`, tagged "系統自動判定，未經
+人工確認" everywhere it's shown). Every toggle of this switch is itself
+append-only audited (`hci.case_auto_promote_audit`, migrations/0019,
+`HCI_C1_C10_DECISIONS.md` §C5) — the column only ever shows the CURRENT
+value, so a since-reverted toggle window would otherwise leave no trace.
 
 ## Severity floor — a second dormant mechanism given its first real caller
 
@@ -134,7 +169,8 @@ average — per that spec's own explicit design choice.
 ## Verification
 
 - `packages/intelligence/rule-engine.mjs` — `RULES`, `matchRules`,
-  `scoreRuleEngineFindings`.
+  `matchNegatedRules`, `scoreRuleEngineFindings`, `detectKeywordStacking`,
+  `RULE_SET_VERSION`.
 - `packages/intelligence/combine-dimension-sources.mjs` — per-dimension
   assembly of human + rule-engine findings via `combineMethodFindings`,
   producing the array `rollupTrustDomains`/`detectSeverityFloor` both

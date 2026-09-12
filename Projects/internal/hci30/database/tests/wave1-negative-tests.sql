@@ -1857,6 +1857,66 @@ SELECT hci_test.expect_true('CHAIN-VERIFY-DELETE-01',
                      WHERE record_id = 'aaaaaaaa-0000-0000-0000-000000000994' AND ok = false)$q$,
   'deleting the middle record of a case must break the next surviving record''s prev_hash linkage');
 
+-- Case auto-promote toggle audit (migrations/0019, closes
+-- HCI_C1_C10_DECISIONS.md §C5). App-role half: mirrors what POST
+-- /auto-promote-rule-findings actually does -- one INSERT per toggle,
+-- readable back, invisible cross-tenant, rejected on UPDATE/DELETE at the
+-- grant layer.
+SELECT hci_test.expect_success('AUTO-PROMOTE-AUDIT-SETUP-01',
+  $q$INSERT INTO hci.case_auto_promote_audit (id,tenant_id,case_id,changed_by_principal_id,new_value)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000720','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000200','aaaaaaaa-0000-0000-0000-000000000850',true)$q$);
+SELECT hci_test.expect_true('AUTO-PROMOTE-AUDIT-01',
+  $q$SELECT EXISTS (SELECT 1 FROM hci.case_auto_promote_audit WHERE id = 'aaaaaaaa-0000-0000-0000-000000000720' AND new_value = true)$q$,
+  'an inserted audit row must be readable back with the value it was given');
+SELECT hci_test.expect_true('RLS-LEAK-08',
+  $q$SELECT NOT EXISTS (SELECT 1 FROM hci.case_auto_promote_audit WHERE id = 'bbbbbbbb-0000-0000-0000-000000000710')$q$,
+  'tenant B auto-promote audit row must not be visible to tenant A');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-15',
+  $q$UPDATE hci.case_auto_promote_audit SET new_value = false WHERE id = 'aaaaaaaa-0000-0000-0000-000000000720'$q$,
+  '42501');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-GRANT-16',
+  $q$DELETE FROM hci.case_auto_promote_audit WHERE id = 'aaaaaaaa-0000-0000-0000-000000000720'$q$,
+  '42501');
+
+-- Trigger-layer half: owner connection bypasses the grant layer entirely,
+-- same reasoning as every other APPEND-ONLY-TRIGGER-0x pair in this file.
+RESET ROLE;
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-10',
+  $q$UPDATE hci.case_auto_promote_audit SET new_value = false WHERE id = 'aaaaaaaa-0000-0000-0000-000000000720'$q$,
+  'H1003');
+SELECT hci_test.expect_sqlstate('APPEND-ONLY-TRIGGER-11',
+  $q$DELETE FROM hci.case_auto_promote_audit WHERE id = 'aaaaaaaa-0000-0000-0000-000000000720'$q$,
+  'H1003');
+SET ROLE hci_app_test_a;
+
+-- Atomic toggle function (critic follow-up, 2026-09-12): the app-level
+-- endpoint draft did the hci.cases UPDATE and this audit table's INSERT as
+-- two separate round trips with no transaction spanning them -- a failure
+-- between them could change the value while writing no trace, exactly what
+-- this audit table exists to prevent. hci.set_case_auto_promote_rule_
+-- findings() (migrations/0019) folds both into one SECURITY INVOKER
+-- function call, same pattern hci.record_decision() (0014) already uses.
+-- It also verifies the no-op dedup this function adds: re-toggling to the
+-- value already held must write no new audit row.
+SELECT hci_test.expect_true('FN-AUTOPROMOTE-CHANGE-01',
+  $q$SELECT hci.set_case_auto_promote_rule_findings('aaaaaaaa-0000-0000-0000-000000000231', true, 'aaaaaaaa-0000-0000-0000-000000000850') IS TRUE$q$,
+  'toggling to a genuinely different value must return true');
+SELECT hci_test.expect_true('FN-AUTOPROMOTE-CHANGE-AUDIT-01',
+  $q$SELECT EXISTS (SELECT 1 FROM hci.case_auto_promote_audit WHERE case_id = 'aaaaaaaa-0000-0000-0000-000000000231' AND changed_by_principal_id = 'aaaaaaaa-0000-0000-0000-000000000850' AND new_value = true)$q$,
+  'the function must have written its own audit row atomically with the UPDATE, not just flipped the column');
+SELECT hci_test.expect_true('FN-AUTOPROMOTE-NOOP-01',
+  $q$SELECT hci.set_case_auto_promote_rule_findings('aaaaaaaa-0000-0000-0000-000000000231', true, 'aaaaaaaa-0000-0000-0000-000000000850') IS FALSE$q$,
+  're-POSTing the same value must be a no-op (returns false), not a second toggle');
+SELECT hci_test.expect_true('FN-AUTOPROMOTE-NOOP-NOAUDIT-01',
+  $q$SELECT (SELECT count(*) FROM hci.case_auto_promote_audit WHERE case_id = 'aaaaaaaa-0000-0000-0000-000000000231') = 1$q$,
+  'the no-op call above must not have written a second audit row');
+SELECT hci_test.expect_true('FN-AUTOPROMOTE-MISSING-CASE-01',
+  $q$SELECT hci.set_case_auto_promote_rule_findings('aaaaaaaa-0000-0000-0000-000000000999', true, 'aaaaaaaa-0000-0000-0000-000000000850') IS NULL$q$,
+  'a case_id invisible to the caller''s tenant must return NULL, not raise or silently no-op');
+SELECT hci_test.expect_sqlstate('FN-AUTOPROMOTE-CROSSTENANT-PRINCIPAL-01',
+  $q$SELECT hci.set_case_auto_promote_rule_findings('aaaaaaaa-0000-0000-0000-000000000231', false, 'bbbbbbbb-0000-0000-0000-000000000850')$q$,
+  'H1021');
+
 -- Restores the owner context hci_test.finish() requires below (that
 -- function's own EXECUTE grant list does not include hci_app_test_a/b --
 -- 00_test_harness.sql's final GRANT block only covers expect_sqlstate/
@@ -1868,4 +1928,4 @@ RESET ROLE;
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(269);
+SELECT hci_test.finish(282);

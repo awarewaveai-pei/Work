@@ -45,6 +45,7 @@ $upMig15  = Join-Path $root 'database/migrations/0015_wave1_case_reopen_up.sql'
 $upMig16  = Join-Path $root 'database/migrations/0016_wave1_case_report_snapshots_up.sql'
 $upMig17  = Join-Path $root 'database/migrations/0017_wave1_rule_engine_auto_promote_up.sql'
 $upMig18  = Join-Path $root 'database/migrations/0018_wave1_evidence_hash_chain_up.sql'
+$upMig19  = Join-Path $root 'database/migrations/0019_wave1_case_auto_promote_audit_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -594,9 +595,17 @@ $mutations = @(
   # hci.cases.auto_promote_rule_findings (migrations/0017) -- a plain
   # updatable column, no trigger/RLS control of its own beyond the grant
   # itself, so the grant is the only real thing to mutate.
+  # Real-Docker correction (2026-09-12, adding hci.set_case_auto_promote_
+  # rule_findings() for C5's atomicity fix): the function is SECURITY
+  # INVOKER, so its internal UPDATE runs under the CALLING role's own
+  # grants -- revoking this column's UPDATE grant breaks the function's
+  # UPDATE exactly like it breaks the two direct-UPDATE tests, cascading
+  # into every FN-AUTOPROMOTE-* test that depends on the function actually
+  # being able to change the value (NOOP-01/NOOP-NOAUDIT-01 assert on state
+  # CHANGE-01 was supposed to set up).
   @{ id = 'revoke-case-auto-promote-grant'
      sql = 'REVOKE UPDATE (auto_promote_rule_findings) ON hci.cases FROM hci_app_test_a, hci_app_test_b;'
-     expect = @('CASE-AUTO-PROMOTE-UPDATE-01','CASE-AUTO-PROMOTE-CLOSED-01') }
+     expect = @('CASE-AUTO-PROMOTE-UPDATE-01','CASE-AUTO-PROMOTE-CLOSED-01','FN-AUTOPROMOTE-CHANGE-01','FN-AUTOPROMOTE-CHANGE-AUDIT-01','FN-AUTOPROMOTE-NOOP-01','FN-AUTOPROMOTE-NOOP-NOAUDIT-01') }
 
   # db-expert review (2026-09-05) findings C1/C2/C3/M2 - each mutation below
   # is a surgical CREATE OR REPLACE reproducing the current real function
@@ -921,7 +930,19 @@ $mutations = @(
      # RLS regardless of the dropped policy, and CHAIN-VERIFY-DELETE-01's
      # verify call only reads subject_records/subject_record_chain_tips,
      # neither of which this mutation touches.
-     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01','CASE-REOPEN-SETUP-01','CASE-REOPEN-CLOSEDAT-CLEARED-01','CASE-REOPEN-SKIP-01','CASE-AUTO-PROMOTE-SETUP-01','CASE-AUTO-PROMOTE-DEFAULT-01','CHAIN-CASE-SETUP-01','CHAIN-GENESIS-01','CHAIN-GENESIS-02','CHAIN-LINK-SETUP-01','CHAIN-LINK-01','CHAIN-VERIFY-VALID-01','CHAIN-VERIFY-TAMPER-01') }
+     # 2026-09-12 (hci.set_case_auto_promote_rule_findings(), C5 atomicity
+     # fix): the function's own case-visibility check
+     # (`EXISTS (SELECT 1 FROM hci.cases WHERE tenant_id = ... AND id = ...)`)
+     # reads hci.cases under RLS just like hci.record_decision() does above,
+     # so losing the policy makes case -231 invisible to the function too --
+     # CHANGE-01 then returns NULL (not TRUE) since the function can't see
+     # the case, cascading into CHANGE-AUDIT-01 (no row to find) and
+     # NOOP-01/NOOP-NOAUDIT-01 (their preconditions never held). CROSSTENANT-
+     # PRINCIPAL-01 also flips: the case-visibility check now fails FIRST
+     # (returns NULL) instead of reaching the principal check that would
+     # raise H1021, so expect_sqlstate's exact match fails too. Real-Docker
+     # flagged all five as unexpected, not assumed in advance.
+     expect = @('CASE-LIFECYCLE-SETUP-01','CASE-LIFECYCLE-02b','CASE-CLOSED-IMMUTABLE-01','CASE-LIFECYCLE-SETUP-02','CASE-LIFECYCLE-04','CASE-OWNS-03-SETUP','CASE-CLOSED-GUARD-01','CASE-CLOSED-GUARD-02','CASE-PROJECTREF-02','REG-NEG-04','REG-NEG-05','REG-NEG-06','REG-NEG-07','REG-NEG-08','RLS-COMPLETENESS-02','RECORD-DECISION-HAPPY-01','RECORD-DECISION-CROSSTENANT-PRINCIPAL-01','CASE-REOPEN-SETUP-01','CASE-REOPEN-CLOSEDAT-CLEARED-01','CASE-REOPEN-SKIP-01','CASE-AUTO-PROMOTE-SETUP-01','CASE-AUTO-PROMOTE-DEFAULT-01','CHAIN-CASE-SETUP-01','CHAIN-GENESIS-01','CHAIN-GENESIS-02','CHAIN-LINK-SETUP-01','CHAIN-LINK-01','CHAIN-VERIFY-VALID-01','CHAIN-VERIFY-TAMPER-01','FN-AUTOPROMOTE-CHANGE-01','FN-AUTOPROMOTE-CHANGE-AUDIT-01','FN-AUTOPROMOTE-NOOP-01','FN-AUTOPROMOTE-NOOP-NOAUDIT-01','FN-AUTOPROMOTE-CROSSTENANT-PRINCIPAL-01') }
   # RLS-OWN-02 (db-expert M2): hci.tenants is scoped by `id`, not `tenant_id`,
   # so it is invisible to every mutation above. Dropping its own policy fails
   # CLOSED - RLS-LEAK-02 (tenant B invisible) stays green - which is exactly
@@ -956,6 +977,27 @@ $mutations = @(
   @{ id = 'drop-content-hash-trigger'
      sql = 'DROP TRIGGER subject_records_content_hash ON hci.subject_records;'
      expect = @('CHAIN-GENESIS-02','CHAIN-LINK-01','CHAIN-VERIFY-VALID-01') }
+
+  # Case auto-promote audit (migrations/0019): trigger-layer defense is the
+  # whole point of an audit trail (an editable audit row is not an audit
+  # trail) -- proves it independently of the grant-layer REVOKE.
+  @{ id = 'drop-case-auto-promote-audit-trigger'
+     sql = 'DROP TRIGGER case_auto_promote_audit_append_only ON hci.case_auto_promote_audit;'
+     expect = @('APPEND-ONLY-TRIGGER-10','APPEND-ONLY-TRIGGER-11') }
+
+  # hci.set_case_auto_promote_rule_findings() (migrations/0019, critic
+  # follow-up 2026-09-12): folds the hci.cases UPDATE + audit INSERT into
+  # one atomic call. First mutation proves the function itself is what the
+  # FN-AUTOPROMOTE-* assertions depend on; second proves the no-op dedup
+  # (skip the audit INSERT when the value didn't actually change) is real,
+  # not just an untested claim in a comment.
+  @{ id = 'drop-set-auto-promote-function'
+     sql = 'DROP FUNCTION hci.set_case_auto_promote_rule_findings(uuid, boolean, uuid);'
+     expect = @('FN-AUTOPROMOTE-CHANGE-01','FN-AUTOPROMOTE-CHANGE-AUDIT-01','FN-AUTOPROMOTE-NOOP-01','FN-AUTOPROMOTE-NOOP-NOAUDIT-01','FN-AUTOPROMOTE-MISSING-CASE-01','FN-AUTOPROMOTE-CROSSTENANT-PRINCIPAL-01') }
+  @{ id = 'weaken-set-auto-promote-noop-check'
+     sql = 'CREATE OR REPLACE FUNCTION hci.set_case_auto_promote_rule_findings(p_case_id uuid, p_new_value boolean, p_principal_id uuid) RETURNS boolean LANGUAGE plpgsql SECURITY INVOKER SET search_path = hci, pg_temp AS $fn$ DECLARE v_tenant_id uuid; v_changed boolean; BEGIN v_tenant_id := hci.current_tenant_id(); IF v_tenant_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1001'', MESSAGE = ''x''; END IF; IF NOT EXISTS (SELECT 1 FROM hci.cases WHERE tenant_id = v_tenant_id AND id = p_case_id) THEN RETURN NULL; END IF; IF NOT EXISTS (SELECT 1 FROM hci.principals WHERE tenant_id = v_tenant_id AND id = p_principal_id) THEN RAISE EXCEPTION USING ERRCODE = ''H1021'', MESSAGE = ''x''; END IF; UPDATE hci.cases SET auto_promote_rule_findings = p_new_value WHERE id = p_case_id AND tenant_id = v_tenant_id; v_changed := true; INSERT INTO hci.case_auto_promote_audit (id, tenant_id, case_id, changed_by_principal_id, new_value) VALUES (gen_random_uuid(), v_tenant_id, p_case_id, p_principal_id, p_new_value); RETURN v_changed; END $fn$;'
+     expect = @('FN-AUTOPROMOTE-NOOP-01','FN-AUTOPROMOTE-NOOP-NOAUDIT-01')
+     repin = @('hci.set_case_auto_promote_rule_findings(uuid,boolean,uuid)') }
 )
 
 $project = "hcimut$PID"
@@ -1031,6 +1073,7 @@ function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig16)  -ne 0) { throw 'mutation harness: 0016 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig17)  -ne 0) { throw 'mutation harness: 0017 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig18)  -ne 0) { throw 'mutation harness: 0018 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig19)  -ne 0) { throw 'mutation harness: 0019 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }

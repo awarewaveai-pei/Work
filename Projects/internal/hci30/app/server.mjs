@@ -8,7 +8,7 @@ import { validateSubjectRecordPayload } from '../packages/contracts/validate-sub
 import { rollupTrustDomains } from '../packages/intelligence/rollup-trust-domains.mjs';
 import { classifyEvidenceQuality } from '../packages/intelligence/classify-evidence-quality.mjs';
 import { detectSeverityFloor } from '../packages/intelligence/detect-severity-floor.mjs';
-import { scoreRuleEngineFindings } from '../packages/intelligence/rule-engine.mjs';
+import { scoreRuleEngineFindings, detectKeywordStacking, RULE_SET_VERSION } from '../packages/intelligence/rule-engine.mjs';
 import { combineDimensionSources } from '../packages/intelligence/combine-dimension-sources.mjs';
 import { TRUST_DOMAINS } from '../packages/contracts/trust-domains.mjs';
 
@@ -228,8 +228,24 @@ app.post('/api/hci/v1/cases/:caseId/auto-promote-rule-findings', async (req, res
   const { auto_promote_rule_findings } = req.body || {};
   if (typeof auto_promote_rule_findings !== 'boolean') return problem(res, 400, 'Bad Request', 'auto_promote_rule_findings must be a boolean');
   try {
-    const { rowCount } = await queryAsTenant(t.role, 'UPDATE hci.cases SET auto_promote_rule_findings = $1 WHERE id = $2', [auto_promote_rule_findings, req.params.caseId]);
-    if (rowCount === 0) return problem(res, 404, 'Not Found', 'no case with that id visible to this tenant');
+    // HCI_C1_C10_DECISIONS.md §C5: the hci.cases column above only ever
+    // shows the CURRENT value -- the audit row is the only place a since-
+    // reverted toggle window is still visible at all. Critic review
+    // (2026-09-12): the UPDATE and the audit INSERT used to be two separate
+    // round trips with no transaction spanning them, so a failure between
+    // them could change the value while writing no trace of who did it --
+    // exactly what this audit table exists to prevent. Moved into one
+    // SECURITY INVOKER function (migrations/0019) so it's atomic by
+    // construction, same pattern hci.record_decision() already uses below;
+    // it also skips the audit INSERT entirely when the POSTed value already
+    // matches the current one (no-op toggle -> no audit row).
+    const principalId = await findOrCreateReviewerPrincipal(t.role);
+    const { rows: toggleRows } = await queryAsTenant(
+      t.role,
+      'SELECT hci.set_case_auto_promote_rule_findings($1, $2, $3) AS changed',
+      [req.params.caseId, auto_promote_rule_findings, principalId]
+    );
+    if (toggleRows[0].changed === null) return problem(res, 404, 'Not Found', 'no case with that id visible to this tenant');
     const { rows } = await queryAsTenant(t.role, 'SELECT id, purpose, status, risk_tier, opened_at, closed_at, auto_promote_rule_findings FROM hci.cases WHERE id = $1', [req.params.caseId]);
     res.json(rows[0]);
   } catch (err) {
@@ -271,6 +287,13 @@ async function buildCaseReportPayload(role, caseId) {
     "SELECT id, kind, person_id, payload, reaudit_required FROM hci.subject_records WHERE case_id = $1 ORDER BY kind, id",
     [caseId]
   );
+  // HCI_C1_C10_DECISIONS.md §C5 -- the current column value alone cannot
+  // show a since-reverted toggle window ever existed; this is the trace.
+  const { rows: autoPromoteAudit } = await queryAsTenant(
+    role,
+    'SELECT new_value, changed_at FROM hci.case_auto_promote_audit WHERE case_id = $1 ORDER BY changed_at DESC',
+    [caseId]
+  );
   const { rows: decisions } = await queryAsTenant(
     role,
     'SELECT id, outcome, rationale, valid_from FROM hci.decisions WHERE case_id = $1 AND valid_to IS NULL ORDER BY valid_from DESC',
@@ -288,9 +311,14 @@ async function buildCaseReportPayload(role, caseId) {
   // and returned separately as `ruleEngineSuggestions`.
   const evidenceClaimRecords = records.filter(r => r.kind === 'EVIDENCE' || r.kind === 'CLAIM');
   const assessmentRecords = records.filter(r => r.kind === 'ASSESSMENT');
-  const { findings: ruleEngineFindings, hitsByDimension: ruleEngineHits } = scoreRuleEngineFindings(evidenceClaimRecords);
+  const { findings: ruleEngineFindings, hitsByDimension: ruleEngineHits, negatedHitsByDimension: ruleEngineNegatedHits } =
+    scoreRuleEngineFindings(evidenceClaimRecords);
   const { dimensionScores, disagreements: dimensionDisagreements, suggestions: ruleEngineSuggestions, autoPromoted: ruleEngineAutoPromoted } =
     combineDimensionSources(assessmentRecords, ruleEngineFindings, caseRows[0].auto_promote_rule_findings);
+  // HCI_C1_C10_DECISIONS.md §C3 -- a review signal only, never changes a
+  // score: unusually many distinct rules matching one EVIDENCE/CLAIM text
+  // is worth a second look.
+  const keywordStackingFlags = detectKeywordStacking(evidenceClaimRecords);
 
   let rollup = { domains: [] };
   let evidenceQuality = [];
@@ -323,6 +351,7 @@ async function buildCaseReportPayload(role, caseId) {
   return {
     case: caseRows[0], persons, records, decisions, rollup, evidenceQuality, strengths, risks, unknowns,
     ruleEngineSuggestions, ruleEngineHits, dimensionDisagreements, severityAlerts, ruleEngineAutoPromoted,
+    ruleEngineNegatedHits, ruleEngineVersion: RULE_SET_VERSION, keywordStackingFlags, autoPromoteAudit,
   };
 }
 

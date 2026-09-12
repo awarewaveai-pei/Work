@@ -16854,3 +16854,40 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 [結論] **Method Atlas F15（實驗與驗證，11/11）／F22（PM/交付治理，10/10）／F23（全球管轄／合規，10/10）／F24（呈現／協作，10/10）今日全部開完並關閉，共 41 個方法、4 個 commit（`3d06b15c9`／`7698a0340`／`fd661d94d`／本條目對應 commit）。** 每個方法都有 contract yaml + typed-object schema + builder+獨立 gate 模組 + CLI slice + mutation-style test 四件套，全數經過至少一輪獨立 critic 覆審（F23 零發現、F24 修完後零發現、F15/F22 各修一個 Critical/Major 後零發現）。已知待辦：`stakeholders.raci.py:216` 既存 provenance aliasing bug 追蹤票（task_c2dba1b8，非今日新增，F22 覆審時發現的既存缺陷，尚待操作者排程修復）。
 
 [下一步] 操作者另外詢問 Cognitive Engineering OS 系統部署（目前僅為後端 Python library，無 HTTP/API/前端），屬於獨立的 High-risk 新範疇，需另外走 R0 規劃流程，不併入本次 Method Atlas 收尾。
+
+## 2026-09-12（續6）HCI-30 C2/C3/C5 落地（規則引擎否定詞窗口+版本號、關鍵字堆疊偵測、auto-promote 稽核紀錄）+ critic 覆審 2 Major 全修
+
+[任務] 承接同日 C7/C10 條目與操作者「2、3、5」指示，把 `HCI_C1_C10_DECISIONS.md` 觸發的 C2/C3/C5 三項從 PLANNED 落地為 DONE。
+
+[已修改]
+- `packages/intelligence/rule-engine.mjs`：新增 `NEGATION_CUES`/`NEGATION_WINDOW_CHARS`（15 字元）、`keywordOccurrences()` 掃描單一關鍵字全部出現位置並各自判斷否定；`matchRules()` 回傳形狀不變（仍純陣列，過濾內部發生）；新增 `matchNegatedRules()` 回報被排除的命中；`scoreRuleEngineFindings()` 新增 `negatedHitsByDimension`（既有 `{findings,hitsByDimension}` 不動，純加法）；新增 `RULE_SET_VERSION`（`RULES` 內容 sha256 前 12 碼，內容變自動跟著變）；新增 `detectKeywordStacking()`（`STACKING_THRESHOLD=3`，同文字命中 ≥3 條不同規則即標記）。
+- `database/migrations/0019_wave1_case_auto_promote_audit_{up,down}.sql`（新）：`hci.case_auto_promote_audit` append-only 稽核表，結構沿用 C7（0018）骨架；`changed_at DEFAULT now()`（非 `clock_timestamp()`，吸取 C7 的 `BITEMP-SCOPE-01` 教訓）；新增 `hci.set_case_auto_promote_rule_findings(case_id,new_value,principal_id)` SECURITY INVOKER 函式（critic 覆審後加，見下）。
+- `app/server.mjs`：`buildCaseReportPayload()` 新增查詢/回傳 `autoPromoteAudit`/`ruleEngineNegatedHits`/`ruleEngineVersion`/`keywordStackingFlags`；`POST .../auto-promote-rule-findings` 改呼叫 `hci.set_case_auto_promote_rule_findings()`。
+- `app/public/index.html`：頁面流程重排（證據→信任構面→洞察→決策→報告）；移除 `<details>` accordion 改純 `<div>` 常駐展開；`.record-card`/`.topic-block` 卡片化四大區塊；`inline-form` textarea/input 寬度自動填滿；`h2` 改大字 serif、`h3` 為卡內子標籤；`buildDomainGrid()` 新增第 7 參數渲染 `.domain-negated-note`；新增 `renderNegatedHits()`（獨立保證可見區塊）+ `.stacking-tag` 徽章；`.auto-promote-audit-list` 顯示稽核歷史。
+- `docs/HCI_C1_C10_DECISIONS.md`、`docs/intelligence/HCI_RULE_ENGINE_SPEC.md`：C2/C3/C5 狀態更新為 DONE 並記錄實作細節；總覽表同步。
+- `agency-os/TASKS.md`：C2/C3/C5 三筆 PLANNED 追蹤項改標 `[x]` 完成並指向本條目，移除重複全文（AGENTS.md §8 細節只留一處）。
+- `database/tests/wave1-negative-tests.sql`：+13 assertion（AUTO-PROMOTE-AUDIT-*/RLS-LEAK-08/APPEND-ONLY-GRANT-15/16/APPEND-ONLY-TRIGGER-10/11 共 7 個 C5 表格層測試 + FN-AUTOPROMOTE-CHANGE-01/CHANGE-AUDIT-01/NOOP-01/NOOP-NOAUDIT-01/MISSING-CASE-01/CROSSTENANT-PRINCIPAL-01 共 6 個函式層測試），`hci_test.finish()` 269→282。
+- `database/fixtures/0001_synthetic.sql`：新增 tenant-B `case_auto_promote_audit` 列（RLS-LEAK-08 用）。
+- `scripts/{test-wave1-local,mutation-check-wave1,dev-db-init}.ps1`：wire migration 0019；`mutation-check-wave1.ps1` 新增 2 個 mutation（`drop-set-auto-promote-function`/`weaken-set-auto-promote-noop-check`）+ 修正 `revoke-case-auto-promote-grant`/`drop-cases-rls-policy` 兩個既有 mutation 的 expect 清單（真跑發現新函式測試也落在它們的爆炸半徑內，非事先假設）。
+- `tests/unit/intelligence/rule-engine.test.mjs`：+12 test（C2 否定窗口 4 個、matchNegatedRules 3 個、RULE_SET_VERSION 1 個、C3 堆疊 3 個、critic 抓到的 word-boundary 回歸 2 個）。
+
+[critic 覆審抓到並當場修復的 2 個 Major]（`critic` agent，`aa57feae75bb8497c`，全文見同一輪 agent 輸出，未整份複製於此）
+- **M1 原子性缺口**：`server.mjs` 初版把 `UPDATE hci.cases` 與稽核 `INSERT` 寫成兩個獨立 `queryAsTenant()` 呼叫，中間無交易——兩者之間任何失敗會讓值已改變但完全沒留下稽核紀錄，正是這張表存在的目的被最普通的暫時性失敗打破。修法：比照既有 `hci.record_decision()`（0014）模式，兩個寫入收進新函式 `hci.set_case_auto_promote_rule_findings()`，一次呼叫=一個陳述式=結構上原子化；順手修掉關聯的第二個問題（no-op 重複 POST 同一個值會產生多餘稽核列）——函式的 UPDATE 帶 `IS DISTINCT FROM` 條件。
+- **M2 凍結報告漏渲染**：`renderNegatedHits()` 原本只接到 `refreshDetail()`（活頁面），`renderReportView()`（凍結報告）從未呼叫它——若某構面唯一訊號是被否定的關鍵字，凍結報告會完全不顯示，跟 `HCI_C1_C10_DECISIONS.md`/`HCI_RULE_ENGINE_SPEC.md` 自己「UI 上仍看得到，不是靜默丟棄」的宣稱矛盾。修法：在 `renderReportView()` 的證據與主張區塊也接上 `renderNegatedHits()`，跟活頁面同一個位置（記錄之後）。
+- 另修 1 個 Minor（非 critic 要求但同輪一併處理）：`NEGATION_CUES` 的 `'did not'` 缺尾隨空白，會誤配對到 "did notify" 這類無關詞——改成 `'did not '`，比照 `'not '`/`'never '` 既有寫法；新增 2 個回歸測試。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/*.test.mjs`（於 `Projects/internal/hci30`） | exit=0 | result=158 passed, 0 failed
+- REALTEST_EVIDENCE: tool=Bash(PowerShell) | cmd=`scripts/test-wave1-local.ps1`（真 Docker，migrations 0001-0019 全套 up/down/reapply） | exit=0 | result=HCI Wave 1 local suite PASSED，282/282 SQL assertion
+- REALTEST_EVIDENCE: tool=Bash(PowerShell) | cmd=`scripts/mutation-check-wave1.ps1`（真 Docker） | exit=0 | result=All 131 mutations killed（含 2 個新 mutation + 2 個既有 mutation 因新函式測試落入其爆炸半徑而修正 expect 清單，皆真跑發現非事先假設）
+- REVIEW_DONE: critic=Standard | verdict=pass（覆審後） | findings=2m(已修)/1n(已修，非 critic 要求)/1s(已採納：`.stacking-tag` 改用 `--teal-tint`/`--teal-ink` 跟 `.reaudit-tag` 視覺區隔)——SQL injection/RLS/grant/XSS 全部確認乾淨，見 agent 輸出「Verified Clean」段
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts,.claude | grep=`matchNegatedRules\|detectKeywordStacking\|RULE_SET_VERSION\|case_auto_promote_audit\|autoPromoteAudit\|ruleEngineNegatedHits\|negatedHitsByDimension` | hits=0（僅 2 個 `.claude/sessions/*.md` 命中，為本次對話自身逐字稿存檔，非程式碼/文件引用）
+- 瀏覽器真實案件（真實 dev DB，非模擬）：建立「詐欺調查」案件（`7e8a5e37-a275-4e67-b78d-c6fa169ef191`），透過真實 API 新增「調查後排除了詐欺疑慮」EVIDENCE；先用 curl 直接查 `GET /cases/:id` 與產生的報告 JSON，確認 `ruleEngineNegatedHits`/`ruleEngineVersion` 兩處皆帶出同一筆資料且 `record_id` 在報告的 `records[]` 中可解析；再實際在瀏覽器開啟活頁面與該次凍結報告頁，逐字確認兩處都顯示「系統偵測到但因否定語境不計分的關鍵字」區塊與正確的來源文字——修復前只有活頁面會顯示，凍結報告是空的，此為 M2 修復的直接證據。驗證後 `dev-db-reset-empty.ps1` 清空測試資料。
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+1. 否定詞窗口是有限字面啟發式，非語意理解：距離較遠的否定、雙重否定、關鍵字後置的否定（如「詐欺，但已排除」）仍會漏判——已在 `HCI_RULE_ENGINE_SPEC.md`/`HCI_C1_C10_DECISIONS.md` 明確揭露，非本輪能解決的範圍。
+2. 關鍵字堆疊偵測只是複核訊號，不改變分數本身；可解釋性（每條規則的關鍵字/理由 UI 上可見）與抗操弄的張力仍未解決，只是被緩解。
+3. C4/C6/C8/C9 仍為 DEFERRED（業務判斷/High-risk STOP），本輪未動。
+
+[rollback] `git revert` 對應 commit。0019 為純新增 migration（新表+新函式），down script 已測（`test-wave1-local.ps1` 的 populated-schema down 流程涵蓋）；`server.mjs`/`index.html` 的改動皆為新增欄位/新增渲染分支，零案件命中規則引擎否定/堆疊時行為與改動前逐位元相同。

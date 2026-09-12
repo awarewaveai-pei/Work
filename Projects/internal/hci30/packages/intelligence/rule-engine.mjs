@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { RANK_BAND } from './band-scale.mjs';
 
 // HCI_RULE_ENGINE_SPEC.md's worked mechanism: a versioned, deterministic
@@ -81,13 +82,97 @@ export const RULES = Object.freeze([
     rationale: '證據內容提及臨時變更或朝令夕改，反映可預測性不足。' },
 ]);
 
+// Operator, 2026-09-12 ("HC 缺點...C2...規則集版本號"): a frozen report
+// snapshot already stores the VALUE a finding produced, but not which
+// revision of RULES produced it. A hand-maintained version string relies on
+// a human remembering to bump it every time RULES changes -- exactly the
+// kind of discipline-dependent mechanism this schema avoids elsewhere
+// (system_recorded_at is server-computed, not app-supplied, for the same
+// reason). Hashing RULES itself instead: it changes automatically and
+// unforgeably the moment a keyword/delta/rationale is edited, with nothing
+// for a human to remember.
+export const RULE_SET_VERSION = createHash('sha256').update(JSON.stringify(RULES)).digest('hex').slice(0, 12);
+
+// Operator, 2026-09-12 ("HC 缺點...C2...無否定詞判斷"): literal substring
+// matching cannot distinguish "調查後排除了詐欺疑慮" from "證實涉及詐欺" --
+// both contain "詐欺". This is a bounded heuristic, not a semantic parser:
+// if a negation cue appears within NEGATION_WINDOW_CHARS characters before
+// a matched keyword, that occurrence is excluded from scoring. It does NOT
+// solve negation in general -- a cue further away, a double negative, or a
+// negation *after* the keyword ("詐欺，但已排除") all still slip through.
+// Disclosed here and in HCI_RULE_ENGINE_SPEC.md, not oversold as a fix.
+const NEGATION_CUES = [
+  '排除', '沒有', '並非', '未證實', '否認', '駁回', '不成立', '無法證實', '未發現', '未涉及', '不存在',
+  'not ', 'no evidence of', 'denied', 'ruled out', 'unsubstantiated', 'did not ', 'never ',
+];
+const NEGATION_WINDOW_CHARS = 15;
+
+// Scans every occurrence of one keyword (not just the first) in already-
+// lowercased text, classifying each as matched or negated by what
+// immediately precedes it. A keyword appearing twice -- once negated, once
+// not -- is correctly `matched: true` overall (real signal exists
+// somewhere in the text), not silently dropped because one occurrence was
+// negated.
+function keywordOccurrences(lowerText, keywordLower) {
+  let matched = false;
+  let negated = false;
+  let idx = lowerText.indexOf(keywordLower);
+  while (idx !== -1) {
+    const windowStart = Math.max(0, idx - NEGATION_WINDOW_CHARS);
+    const window = lowerText.slice(windowStart, idx);
+    if (NEGATION_CUES.some((cue) => window.includes(cue))) negated = true;
+    else matched = true;
+    idx = lowerText.indexOf(keywordLower, idx + 1);
+  }
+  return { matched, negated };
+}
+
 // One text can match multiple rules (including multiple rules on the same
 // dimension -- e.g. a data breach AND a regulatory fine in one EVIDENCE).
-// Pure function: same input always produces the same output.
+// Pure function: same input always produces the same output. Return shape
+// unchanged from before negation-awareness landed (a plain array of RULES
+// entries) -- negation filtering happens inside, transparent to every
+// existing caller; matchNegatedRules() below is the new, separate way to
+// see what got excluded.
 export function matchRules(text) {
   if (typeof text !== 'string' || text === '') return [];
   const lower = text.toLowerCase();
-  return RULES.filter((rule) => rule.keywords.some((k) => lower.includes(k.toLowerCase())));
+  return RULES.filter((rule) => rule.keywords.some((k) => keywordOccurrences(lower, k.toLowerCase()).matched));
+}
+
+// The negation-window's other half: rules whose keyword is textually
+// present but EVERY occurrence was negated (so matchRules did not count
+// it). Never overlaps matchRules's result for the same text -- a rule with
+// at least one non-negated occurrence is `matched`, not `negated`, by
+// keywordOccurrences() above.
+export function matchNegatedRules(text) {
+  if (typeof text !== 'string' || text === '') return [];
+  const lower = text.toLowerCase();
+  return RULES.filter((rule) => {
+    const statuses = rule.keywords.map((k) => keywordOccurrences(lower, k.toLowerCase()));
+    return !statuses.some((s) => s.matched) && statuses.some((s) => s.negated);
+  });
+}
+
+// Operator, 2026-09-12 ("HC 缺點...C3...規則透明=可被針對性操弄"): the
+// same transparency that makes every score explainable also lets someone
+// who knows the keyword table word evidence to trigger or dodge specific
+// rules. This does not resolve that tension (operator explicitly chose
+// explainability over opacity) -- it only gives a human reviewer a signal:
+// one EVIDENCE/CLAIM text matching an unusually high number of DISTINCT
+// rules is worth a second look, not proof of manipulation on its own.
+const STACKING_THRESHOLD = 3;
+
+export function detectKeywordStacking(records) {
+  const flagged = [];
+  for (const record of records) {
+    const text = record.payload && typeof record.payload.content === 'string' ? record.payload.content : '';
+    const distinctRuleIds = [...new Set(matchRules(text).map((rule) => rule.id))];
+    if (distinctRuleIds.length >= STACKING_THRESHOLD) {
+      flagged.push({ record_id: record.id, rule_count: distinctRuleIds.length, rule_ids: distinctRuleIds });
+    }
+  }
+  return flagged;
 }
 
 // Given records ({id, kind, payload}) already filtered by the caller to
@@ -98,8 +183,14 @@ export function matchRules(text) {
 // requirement -- the finding's own {method_id, value, evidence_refs} shape
 // alone cannot carry rationale text, so hits travel alongside it, not
 // inside it.
+// negatedHitsByDimension is additive to the pre-existing return shape (a
+// new key, not a change to `findings`/`hitsByDimension`) -- a negation-only
+// match never creates a finding on its own, same as zero matches at all;
+// it only surfaces so a human reviewer can see "the keyword was there but
+// excluded", per operator instruction not to silently drop it.
 export function scoreRuleEngineFindings(records) {
   const byDimension = new Map();
+  const negatedByDimension = new Map();
   for (const record of records) {
     const text = record.payload && typeof record.payload.content === 'string' ? record.payload.content : '';
     const hits = matchRules(text);
@@ -110,6 +201,11 @@ export function scoreRuleEngineFindings(records) {
       entry.evidenceRefs.add(record.id);
       byDimension.set(rule.dimension, entry);
     }
+    for (const rule of matchNegatedRules(text)) {
+      const list = negatedByDimension.get(rule.dimension) || [];
+      list.push({ rule_id: rule.id, record_id: record.id, rationale: rule.rationale });
+      negatedByDimension.set(rule.dimension, list);
+    }
   }
 
   const findings = [];
@@ -119,5 +215,6 @@ export function scoreRuleEngineFindings(records) {
     findings.push({ method_id: RULE_ENGINE_METHOD_ID, dimension, value: RANK_BAND[rank - 1], evidence_refs: [...entry.evidenceRefs] });
     hitsByDimension[dimension] = entry.hits;
   }
-  return { findings, hitsByDimension };
+  const negatedHitsByDimension = Object.fromEntries(negatedByDimension);
+  return { findings, hitsByDimension, negatedHitsByDimension };
 }

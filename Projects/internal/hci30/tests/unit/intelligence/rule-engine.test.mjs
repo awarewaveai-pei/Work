@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { matchRules, scoreRuleEngineFindings, RULE_ENGINE_METHOD_ID } from '../../../packages/intelligence/rule-engine.mjs';
+import { createHash } from 'node:crypto';
+import {
+  matchRules, matchNegatedRules, scoreRuleEngineFindings, detectKeywordStacking,
+  RULE_ENGINE_METHOD_ID, RULE_SET_VERSION, RULES,
+} from '../../../packages/intelligence/rule-engine.mjs';
 
 test('matchRules finds a rule whose keyword appears in the text, case-insensitively', () => {
   const hits = matchRules('Vendor disclosed a DATA BREACH last quarter');
@@ -79,4 +83,97 @@ test('scoreRuleEngineFindings: hitsByDimension carries the rationale text for th
 test('scoreRuleEngineFindings: non-EVIDENCE/CLAIM shape (payload.content missing) is treated as empty text, not a crash', () => {
   const { findings } = scoreRuleEngineFindings([{ id: 'r1', kind: 'ASSESSMENT', payload: { dimension: 'COMPETENCE', value: 'HIGH' } }]);
   assert.deepEqual(findings, []);
+});
+
+// C2 (2026-09-12, "HC 缺點": 無否定詞判斷) -- a negation cue within the
+// window before a matched keyword excludes that occurrence from scoring.
+test('matchRules does not count a keyword whose only occurrence is inside a negation window', () => {
+  const hits = matchRules('調查後排除了詐欺疑慮');
+  assert.equal(hits.some((h) => h.id === 'fraud_indicator'), false);
+});
+
+test('matchRules still counts the same keyword when no negation cue precedes it', () => {
+  const hits = matchRules('證實涉及詐欺');
+  assert.equal(hits.some((h) => h.id === 'fraud_indicator'), true);
+});
+
+test('matchNegatedRules reports the rule matchRules excluded, never both at once for the same text', () => {
+  const text = '調查後排除了詐欺疑慮';
+  const matched = matchRules(text);
+  const negated = matchNegatedRules(text);
+  assert.equal(matched.some((r) => r.id === 'fraud_indicator'), false);
+  assert.equal(negated.some((r) => r.id === 'fraud_indicator'), true);
+});
+
+test('matchNegatedRules is empty when the keyword never appears at all', () => {
+  assert.deepEqual(matchNegatedRules('一切正常，沒有異常事件'), []);
+});
+
+// Critic-caught regression (2026-09-12): 'did not' without a trailing space
+// matched inside unrelated words like "did notify" via plain substring
+// search, silently excluding a genuine match. Every other multi-word cue
+// ('not ', 'never ') already carried this trailing space; 'did not' alone
+// didn't.
+test('a negation cue substring inside an unrelated word does not suppress a real match ("did notify" is not "did not")', () => {
+  const hits = matchRules('vendor did notify data breach');
+  assert.equal(hits.some((h) => h.id === 'data_breach'), true);
+});
+
+test('the "did not" cue still suppresses a genuine negation with the trailing space intact', () => {
+  const hits = matchRules('the vendor did not have a data breach');
+  assert.equal(hits.some((h) => h.id === 'data_breach'), false);
+});
+
+// A keyword appearing twice, once negated once not, is real signal
+// somewhere in the text -- must still count as matched overall.
+test('a keyword matched once and negated once elsewhere in the same text still counts as matched', () => {
+  const text = '雖然排除了詐欺疑慮，但另一份文件證實涉及詐欺';
+  const matched = matchRules(text);
+  const negated = matchNegatedRules(text);
+  assert.equal(matched.some((r) => r.id === 'fraud_indicator'), true);
+  assert.equal(negated.some((r) => r.id === 'fraud_indicator'), false);
+});
+
+test('scoreRuleEngineFindings exposes negatedHitsByDimension for a negation-only match, without creating a finding', () => {
+  const { findings, negatedHitsByDimension } = scoreRuleEngineFindings([
+    { id: 'r1', kind: 'EVIDENCE', payload: { content: '調查後排除了詐欺疑慮' } },
+  ]);
+  assert.deepEqual(findings, []); // negation-only match must never fabricate a finding, same as zero matches
+  assert.equal(negatedHitsByDimension.INTEGRITY_CONSISTENCY.length, 1);
+  assert.equal(negatedHitsByDimension.INTEGRITY_CONSISTENCY[0].rule_id, 'fraud_indicator');
+  assert.equal(negatedHitsByDimension.INTEGRITY_CONSISTENCY[0].record_id, 'r1');
+});
+
+// C2 -- rule-set version. Derived from RULES content, not hand-maintained,
+// so it changes automatically the moment a keyword/delta/rationale edits.
+test('RULE_SET_VERSION is a deterministic 12-hex-char digest of RULES, distinct from RULE_ENGINE_METHOD_ID', () => {
+  assert.match(RULE_SET_VERSION, /^[0-9a-f]{12}$/);
+  assert.notEqual(RULE_SET_VERSION, RULE_ENGINE_METHOD_ID);
+  const recomputed = createHash('sha256').update(JSON.stringify(RULES)).digest('hex').slice(0, 12);
+  assert.equal(RULE_SET_VERSION, recomputed);
+});
+
+// C3 (2026-09-12, "HC 缺點": 規則透明=可被針對性操弄) -- a review signal,
+// not a fix: unusually many distinct rules matching one text is worth a
+// second look.
+test('detectKeywordStacking flags a record whose text matches 3 or more distinct rules', () => {
+  const flagged = detectKeywordStacking([
+    { id: 'r1', kind: 'EVIDENCE', payload: { content: '資安事件，也遭主管機關裁罰，還有利益衝突' } },
+  ]);
+  assert.equal(flagged.length, 1);
+  assert.equal(flagged[0].record_id, 'r1');
+  assert.equal(flagged[0].rule_count, 3);
+  assert.deepEqual(new Set(flagged[0].rule_ids), new Set(['data_breach', 'regulatory_fine', 'conflict_of_interest']));
+});
+
+test('detectKeywordStacking does not flag a record matching only 2 distinct rules', () => {
+  const flagged = detectKeywordStacking([{ id: 'r1', kind: 'EVIDENCE', payload: { content: '資安事件，也遭主管機關裁罰' } }]);
+  assert.deepEqual(flagged, []);
+});
+
+test('detectKeywordStacking does not flag a record matching the same rule\'s multiple keywords repeatedly', () => {
+  // Same rule (data_breach) hit via two of its own keywords -- one distinct
+  // rule, not two -- must not count toward the stacking threshold.
+  const flagged = detectKeywordStacking([{ id: 'r1', kind: 'EVIDENCE', payload: { content: '資安事件與資料外洩同時發生' } }]);
+  assert.deepEqual(flagged, []);
 });

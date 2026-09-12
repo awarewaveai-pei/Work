@@ -128,3 +128,9 @@ INSERT INTO hci.decision_claims (id,tenant_id,decision_id,claim_id) VALUES
 -- reads this row's content, only its (in)visibility.
 INSERT INTO hci.case_report_snapshots (id,tenant_id,case_id,generated_by_principal_id,report) VALUES
   ('bbbbbbbb-0000-0000-0000-000000000700','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000850','{}'::jsonb);
+
+-- Case auto-promote audit fixture (migrations/0019, RLS-LEAK test): one
+-- real tenant-B row, same mirroring convention as the fixture directly
+-- above.
+INSERT INTO hci.case_auto_promote_audit (id,tenant_id,case_id,changed_by_principal_id,new_value) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000710','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000200','bbbbbbbb-0000-0000-0000-000000000850',true);
