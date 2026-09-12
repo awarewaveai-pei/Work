@@ -231,7 +231,7 @@ run(seeds, { sink, budget, tenantRef, maxDepth, flushEvery }):
 > ⓓ **`ctx.fetch` 預設查 robots**（要關必須顯式傳 `robots: null`）、**method 限 GET/HEAD**、**積木不得覆寫 UA／cookie／authorization**——UA 是 robots 判定的依據，能改就等於「用一個身分問許可、用另一個身分抓」。
 > ⓔ **tombstone 前加健康度閘**，且比對的是「本輪實際交付的 canonical URL」而非「走訪過的 target」：兩者是不同鍵空間，且「整站 5xx 但 frontier 清空」也會滿足原本的條件——差集就是整個租戶的知識庫。
 > ⓕ **偵測器誤殺修掉兩個**：soft-404 拆成強／弱樣式（弱樣式只在標題或開頭且要有第二訊號），否則「找不到頁面怎麼辦？」這種真 FAQ 會被擋在 KB 外；隱形字元清單移除 ZWJ/ZWNJ（emoji 與波斯／印度語系的必要字元）。
-> ⓖ **SSRF 檔頭改成誠實敘述**：literal + 解析後位址都擋，但 **DNS rebinding 沒有關**（檢查與連線各解析一次，中間沒有 pinning，需要 undici Agent）。原本的註解宣稱擋住了——宣稱比漏洞更危險。已進 TASKS。
+> ⓖ **SSRF 檔頭改成誠實敘述**：literal + 解析後位址都擋，但 **DNS rebinding 沒有關**（檢查與連線各解析一次，中間沒有 pinning，需要 undici Agent）。原本的註解宣稱擋住了——宣稱比漏洞更危險。已進 TASKS。**2026-09-12 已修復**：`net/fetcher.ts` 用 `undici.Agent({connect:{lookup}})` 把連線釘死在 `checkUrl()` 驗證過的那個位址，每個 hop 各自一個新 Agent；機制本身用真實 HTTP server 驗證過（不可解析的 hostname 仍連得到 pinned 位址），wiring 用 mock transport 驗證過（含跨 redirect 不共用 pin）。見 WORKLOG 2026-09-12、`lib/collect/__tests__/collect-dns-pin.test.ts`。
 > ⓗ 令牌桶介面改成單一原子 `take()`（get-then-set 中間有 await 就是競態，C3 的「兩個 run 併行不超限」用原介面做不到）；robots 取用失敗只快取 60 秒（永久 fail-closed = 一次瞬斷讓整站再也不抓）。
 >
 > **C0／C1 實作與本節的三處差異**（皆有程式內註解說明，理由見 WORKLOG 2026-09-11）：

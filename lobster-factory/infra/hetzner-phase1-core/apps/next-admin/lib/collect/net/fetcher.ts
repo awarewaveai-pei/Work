@@ -1,18 +1,39 @@
 // ctx.fetch — the single outward door for every collection block.
 //
 // Everything a block would otherwise have to remember lives here, once: the SSRF gate on every
-// redirect hop, a hard byte ceiling, a timeout, robots, the per-host token bucket, and budget
-// accounting. A block that called global fetch would skip all six at the same time, which is why
-// lib/collect/__tests__/collect-block-hygiene.test.ts fails the build if one does.
+// redirect hop, DNS-rebinding-proof connection pinning, a hard byte ceiling, a timeout, robots, the
+// per-host token bucket, and budget accounting. A block that called global fetch would skip all
+// seven at the same time, which is why lib/collect/__tests__/collect-block-hygiene.test.ts fails
+// the build if one does.
 //
 // Redirects are followed MANUALLY (redirect: "manual"). With the platform's automatic redirects the
 // gate only ever sees the first URL, so one 302 to 169.254.169.254 walks straight through it — this
 // is the exact hole the existing safeFetchText has (DATA_COLLECTION_PLAN.md §0).
 
+import { Agent, type Dispatcher } from "undici";
 import type { Budget } from "@/lib/collect/types";
 import { checkUrl, defaultResolver, type Resolver } from "@/lib/collect/net/ssrf";
 import { RateLimiter } from "@/lib/collect/net/rate-limit";
 import { RobotsCache } from "@/lib/collect/net/robots";
+
+/**
+ * A dispatcher whose TCP connect() always answers with `address`, no matter what hostname undici
+ * asks it to resolve. This is what turns checkUrl()'s "I resolved this hostname and it was safe"
+ * into a guarantee instead of advice: without it, the platform's fetch resolves the hostname AGAIN
+ * at connect time, and a DNS-rebinding host can answer differently the second time. One Agent per
+ * request (not shared/pooled) is deliberate — a pinned connection reused for a later request to a
+ * DIFFERENT resolved address for the same hostname would silently un-pin it.
+ */
+export function pinnedDispatcher(address: string): Dispatcher {
+  const family = address.includes(":") ? 6 : 4;
+  return new Agent({
+    connect: {
+      lookup(_hostname, _options, callback) {
+        callback(null, [{ address, family }]);
+      },
+    },
+  });
+}
 
 export const COLLECT_USER_AGENT = "AwareWaveCollector/1.0 (+https://aware-wave.com/bot)";
 
@@ -153,6 +174,9 @@ export function createCollectFetch(opts: CollectFetchOptions) {
 
       const gate = await checkUrl(current, resolver);
       if (!gate.ok) throw new CollectFetchError(`ssrf_blocked_${gate.reason}`, "blocked");
+      // gate.ok guarantees `address` is set (checkUrl's contract) — pin the connection to exactly
+      // the address just validated, so the platform's own re-resolution at connect time never runs.
+      const dispatcher = pinnedDispatcher(gate.address!);
 
       let crawlDelayMs: number | undefined;
       if (robots) {
@@ -172,22 +196,31 @@ export function createCollectFetch(opts: CollectFetchOptions) {
       const startedAt = Date.now();
       let res: Response;
       try {
-        res = await transport(current, {
-          method,
-          // Caller headers first, ours last: the user agent is what robots.txt was evaluated
-          // against, so a collector must not be able to send a different one. Credentials and Host
-          // are dropped outright — a crawler has no session to present to anybody.
-          headers: {
-            accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-            ...sanitizeHeaders(init.headers),
-            "user-agent": userAgent,
-          },
-          redirect: "manual", // load-bearing: see the file header
-          signal: AbortSignal.timeout(timeoutMs),
-        });
-      } catch (e) {
-        opts.budget.spend({ fetches: 1, ms: Date.now() - startedAt });
-        throw new CollectFetchError(`network_${String(e)}`, "network");
+        try {
+          res = await transport(current, {
+            method,
+            // Caller headers first, ours last: the user agent is what robots.txt was evaluated
+            // against, so a collector must not be able to send a different one. Credentials and Host
+            // are dropped outright — a crawler has no session to present to anybody.
+            headers: {
+              accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+              ...sanitizeHeaders(init.headers),
+              "user-agent": userAgent,
+            },
+            redirect: "manual", // load-bearing: see the file header
+            signal: AbortSignal.timeout(timeoutMs),
+            // Not part of the standard fetch types (a Node/undici extension) — real fetch reads it,
+            // a test's injected transport mock is free to ignore it.
+            dispatcher,
+          } as RequestInit & { dispatcher: Dispatcher });
+        } catch (e) {
+          opts.budget.spend({ fetches: 1, ms: Date.now() - startedAt });
+          throw new CollectFetchError(`network_${String(e)}`, "network");
+        }
+      } finally {
+        // One request per Agent (see pinnedDispatcher's own comment) — close it either way so a
+        // crawl of thousands of pages does not leak thousands of idle connection pools.
+        void dispatcher.close().catch(() => {});
       }
 
       // Only the statuses that actually mean "go here instead". 304 lives in the 3xx range but is

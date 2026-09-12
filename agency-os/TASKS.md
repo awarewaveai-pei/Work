@@ -112,7 +112,7 @@
 
 > 外部時鐘不等人。這一區由上往下就是先後順序。
 
-- [ ] **【2026-09-11 開出｜蒐集 C0｜安全】`ctx.fetch` 的 DNS rebinding 沒關，只是收窄** — `lib/collect/net/ssrf.ts` 解析主機名並檢查每個位址，但平台的 fetch 連線時會**再解析一次**，中間沒有 pinning：TTL=0 的網域可以對第一次查詢回公網 IP、對連線查詢回 `127.0.0.1`。爬蟲吃的是被爬頁面上的任意 URL，這是標準攻擊面。修法：加 `undici` 直接依賴，用 `new Agent({ connect: { lookup } })` 把連線釘在已驗證過的位址；或退而求其次驗 `socket.remoteAddress`。檔頭已改成誠實敘述（原本宣稱擋住了）。
+- [x] **【2026-09-11 開出，2026-09-12 修復｜蒐集 C0｜安全】`ctx.fetch` 的 DNS rebinding 沒關** — `net/fetcher.ts` 加 `undici.Agent({connect:{lookup}})`，把每個 hop 的連線釘死在 `checkUrl()` 剛驗證過的位址；`checkUrl` 回傳型別加 `address` 欄位傳遞驗證結果。機制（真實 HTTP server）與 wiring(mock transport，含跨 redirect 不共用 pin)都有測試，見 WORKLOG 2026-09-12、`lib/collect/__tests__/collect-dns-pin.test.ts`。
 - [ ] **【2026-09-11 開出｜蒐集 C1 × KB】`provenance` 與 `author` 到 sink 就斷** — 蒐集端每份文件都蓋 `EVIDENCE`/`SOURCE_QUOTATION`（`lib/collect/provenance.ts`）並抓 byline，但 `KnowledgeInput`（`lib/kb/types.ts`）沒有這兩個欄位，`sink/kb` 只能丟掉。後果：客服 AI 從 KB 撈到爬來的廠商行銷文案時，沒有任何標記可據以包裝成 untrusted quote——正是 `DATA_COLLECTION_PLAN.md` §1.3b「傳遞」列要防的整條路徑。KB 側屬 K2e（三軸 + locked），本項在那之前不得宣稱 §1.3b 完成。
 - [ ] **【2026-09-11 開出｜蒐集 C1 × KB】人工上傳與爬蟲抓回的同一份 FAQ 會變成兩份文件** — `lib/kb/family.ts` 對無 canonicalUrl 的手動文件用 `kb://manual/<kind>/<title>` 當身分，`sink/kb` 一律帶真 URL ⇒ 不同 family。C1 的價值主張是「今天靠人工貼的東西改由爬蟲維護」，開爬那天每份人工文件都會多出一份爬蟲版本，兩份同時可檢索且內容互相矛盾。修法：開爬前一次性 backfill（替既有手動文件補 `canonical_url`），或 sink 端先查同 org 同 title 的 manual family。
 - [ ] **【2026-09-11 開出｜蒐集 C3 前必修】304 短路會讓該頁的連結圖在該輪消失** — `collect/http-html` 收到 304 時回 `{docs: [], discovered: []}`。C3 開始送 `If-None-Match` 之後，一個未變更的目錄頁等於它底下所有子頁在該輪從 frontier 消失（子頁自己可能變了）。修法：把上輪的 discovered 存進 run state 一併回放，或對含連結的頁面不送條件式請求。

@@ -5,15 +5,20 @@
 // model. Here the URLs come from crawled pages — an attacker controls them — and every redirect hop
 // is another chance to point at 169.254.169.254.
 //
-// WHAT THIS STOPS: a private address written literally in the URL, and a hostname that resolves to
-// a private address at the moment we check it (the ordinary misconfigured-or-malicious host).
+// WHAT THIS STOPS: a private address written literally in the URL, a hostname that resolves to a
+// private address at the moment we check it, AND DNS REBINDING — a record with TTL 0 answering
+// "public" to this query and "127.0.0.1" to a second query made moments later at connect time. The
+// second query is exactly the hole: checkUrl() resolves once, and net/fetcher.ts pins the actual
+// TCP connection to THAT SAME address (an undici `Agent` with a custom `connect.lookup`, verified
+// live against a real HTTP server: an unresolvable hostname reached a 127.0.0.1 listener with no
+// real DNS query ever leaving the process). The platform's fetch never gets a second chance to
+// re-resolve, because it never resolves at all — the lookup override always answers with the one
+// address `checkUrl` already validated.
 //
-// WHAT THIS DOES NOT STOP — stated plainly, because a comfortable comment here is worse than the
-// gap itself: DNS REBINDING. This function resolves the name, and then the platform's fetch
-// resolves it AGAIN when it connects. A record with TTL 0 can answer "public" to the first query
-// and "127.0.0.1" to the second, and nothing here sees it. Closing it needs the connection pinned
-// to the address that was validated (an undici Agent with a custom `lookup`, which needs undici as
-// a direct dependency). Tracked in TASKS.md; until then this is a narrowing, not a seal.
+// WHAT THIS STILL DOES NOT STOP: a server behind a validated public IP that itself proxies the
+// request to a private address server-side (SSRF via an intentionally-cooperating public host).
+// That is a different threat — the address we connect to really is the public one we checked — and
+// out of scope for a network-layer gate.
 
 import { lookup } from "node:dns/promises";
 
@@ -61,6 +66,12 @@ export function isPrivateAddress(addr: string): boolean {
 export interface UrlGateResult {
   ok: boolean;
   reason: string | null;
+  /**
+   * The address the caller MUST pin its connection to when ok — the exact one this function
+   * validated. A literal-IP URL (host is already an address) pins to that literal; a hostname pins
+   * to the first of its validated resolved addresses. Absent when !ok.
+   */
+  address?: string;
 }
 
 /**
@@ -85,6 +96,11 @@ export async function checkUrl(rawUrl: string, resolver: Resolver = defaultResol
   if (!host) return { ok: false, reason: "empty_host" };
   if (isPrivateAddress(host)) return { ok: false, reason: "private_host_literal" };
 
+  // A literal IP has nothing to resolve — and nothing to rebind either, so it pins to itself.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) {
+    return { ok: true, reason: null, address: host };
+  }
+
   let addresses: string[];
   try {
     addresses = await resolver(host);
@@ -95,5 +111,8 @@ export async function checkUrl(rawUrl: string, resolver: Resolver = defaultResol
   for (const addr of addresses) {
     if (isPrivateAddress(addr)) return { ok: false, reason: `private_address_${addr}` };
   }
-  return { ok: true, reason: null };
+  // First of the validated set — deterministic given what the resolver returned, and the same
+  // address the pinned connection below will actually use, so "what we checked" and "what we
+  // connect to" can never diverge.
+  return { ok: true, reason: null, address: addresses[0] };
 }

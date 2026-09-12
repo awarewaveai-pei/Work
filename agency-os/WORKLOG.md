@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-09-12 第九批(蒐集器改善 1/3：SSRF DNS rebinding 補洞)
+
+操作者授權「1、2、4 需要決定的事都你決定」（304 修復／SSRF／排程自動化）。SSRF 這項不需新產品決策，只需新依賴（`undici`），先做完。
+
+**根因**：`checkUrl()`(net/ssrf.ts)解析主機名驗證每個位址安全，但平台 fetch 連線時**再解析一次**——中間沒有 pinning，TTL=0 的網域可以兩次查詢給不同答案。爬蟲吃的是被爬頁面上任意 URL，這是真實攻擊面（打內網服務、雲端 metadata endpoint）。
+
+**修法**：`net/fetcher.ts` 新增 `pinnedDispatcher(address)`，用 `undici.Agent({connect:{lookup}})` 讓連線的 DNS 查找永遠回答 `checkUrl()` 剛驗證過的那個位址，不管平台 fetch 想解析什麼主機名。每個 hop(含 redirect)各自建一個新 Agent、用完關閉——不共用池，避免「用第一跳驗證過的 pin 去接第二跳的連線」這種更隱蔽的錯法。`checkUrl` 回傳型別加 `address` 欄位把驗證結果傳出去。
+
+**驗證分兩層,因為機制跟 wiring 沒辦法用同一個測試證明**(SSRF gate 存在的目的就是擋掉任何我能拿來架測試伺服器的可路由位址,所以真實網路測試不可能同時測到 gate 通過 AND 真的連上東西):
+- 機制層(真實 HTTP server、真實 global fetch、零 mock)：對一個完全無法真實解析的 hostname 發 fetch,只給 `pinnedDispatcher("127.0.0.1")`,連線真的到本地 server——證明 undici 的 lookup override 真的讓 Node 全域 fetch 不做真實 DNS 查詢。
+- Wiring 層(mock transport)：斷言 `createCollectFetch` 真的把 dispatcher 傳給每次 transport 呼叫,而且跨 redirect 兩跳拿到的是兩個不同 Agent instance(不共用 pin)。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=手動腳本用真實 http server + 真實 global fetch + `undici.Agent({connect:{lookup}}})` 對不可解析 hostname 發請求 | exit=0 | result=連線成功抵達 127.0.0.1 本地 server,證明 pin 機制真實有效(驗證後腳本已刪除,無 repo 痕跡)
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect` | exit=0 | result=151 passed(新增 `collect-dns-pin.test.ts` 4 個)
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試：拔掉 fetcher.ts 傳給 transport 的 `dispatcher` 欄位重跑 `collect-dns-pin.test.ts` | exit=1 | result=2 個 wiring 斷言確實變紅(`expected undefined to be defined`),還原後轉綠
+REVIEW_DONE: critic=自審(未開 subagent——單一機制清楚、已用真實伺服器驗證過的修法,不是需要外部覆審的範疇) | verdict=pass | findings=0c/0m/0n
+BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=pinnedDispatcher,DNS rebinding | hits=符合預期(TASKS.md/WORKLOG/DATA_COLLECTION_PLAN.md 三處歷史紀錄同步標記已修復，程式碼側僅本次新增檔案命中)
+
+`agency-os/docs/data-collection/DATA_COLLECTION_PLAN.md` §ⓖ、`agency-os/TASKS.md` 該項同步標記已修復（不回改歷史敘述本身，只加關閉註記）。
+
+**剩餘風險**：只擋「攻擊者控制的網域/位址」這條攻擊面；擋不住「一個驗證過的公網位址背後,伺服器自己在內部把請求轉發到私網」——這是完全不同的威脅(合作式代理),網路層閘擋不到，超出這次修法範圍。
+
 ## 2026-09-12（併發 git index race：F10 收工 commit 遺失 method-inventory.yaml／contract-backlog.yaml／2 個 issue_tree 檔的變更，commit 本身乾淨無誤但內容是空的）
 
 **觸發**：F13（182–195 號切片）收尾前照慣例做 registry 跨檔一致性檢查（contracts/registry/backlog/modules 四方比對筆數），F09／F13 三方都對得上，唯獨 F10 對不上——`method-inventory.yaml`／`contract-backlog.yaml` 完全沒有 epistemic 家族的任何欄位。往回查才發現：F10 收工 commit `cb04e491f`（"open AND close F10 epistemic family"）本身乾淨落地（52 個檔案、10455 行新增，`git log` 顯示存在），但 `git show cb04e491f -- method-inventory.yaml` 回傳空 diff——這兩份 registry 檔案、`agency-os/WORKLOG.md`／`TASKS.md`、以及 F10 收尾時順手修正的 `decomposition.issue_tree.contract.yaml`／`issue-tree.schema.yaml` 兩處陳舊指稱，全部沒有真的進那個 commit。
