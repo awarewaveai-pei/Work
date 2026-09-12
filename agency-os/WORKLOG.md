@@ -17078,7 +17078,7 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - REALTEST_EVIDENCE: tool=Bash（真實網路，非 TestClient）| cmd=啟動真實 `uvicorn`，用 `curl` 跑完整登入→執行 `foresight.cross_impact_analysis`→demo→登出流程，另用 `bootstrap_phase1_tenant.py` 建立真實 tenant | exit=0 | result=全鏈成功，gate 全 PASS，未登入呼叫正確回 401
 - REVIEW_DONE: critic=Standard（auth/crypto 等級：逐項獨立重新推導，非抽查）| verdict=warn→pass（修復後）| findings=0c/1m(已修)/1n(已修)/1 suggestion(記錄待辦)——**Major**：critic 用真實計時量測（非抽象推理）證實 `authenticate()` 有 timing side-channel：不存在的 email 幾乎瞬間回應，密碼錯誤的真實帳號要跑完整 PBKDF2（約 182ms 差距，730 倍），可被用來列舉合法 email。已修：兩個失敗分支都改為對固定 dummy salt 跑一次同成本的真實雜湊才回傳 None，新增 `test_authenticate_timing.py` 用真實計時量測回歸（不是只斷言回傳值）驗證修復生效。**Minor**：`bootstrap_phase1_tenant.py` 的 `--password` CLI 參數會留在 shell history/`ps`，已預設走 `getpass` 提示，補上使用該旗標時的 stderr 警告。其餘（密碼雜湊鹽值/比對、session 安全性、cookie 旗標、SQL injection、dispatch/demo 端點的程式碼執行面、跨 tenant 隔離、entitlement tenant_id 來源、dependency injection 正確性）critic 逐項用真實攻擊 payload/hand-tamper SQLite row 驗證過為真，非僅閱讀程式碼假設。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`ai_lego\.platform\.identity\|ai_lego\.platform\.entitlement\|ai_lego\.apps\.api` | hits=0 殘留
-- 全庫回歸測試（`pytest tests/unit`，含既有 245+ 個 Method Atlas 測試）背景執行中，通過後另行補記。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`pytest tests/unit -q`（全庫，含既有 245+ 個 Method Atlas 方法的測試）| exit=0 | result=13405 passed, 1779 subtests passed，零迴歸
 - WORKLOG_DONE: 本條目
 
 [剩餘風險]

@@ -1,0 +1,82 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/identity.schema.yaml"
+title: Identity
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Domain object #25. A human actor who can authenticate and act inside a
+  Workspace. Built for the Cognitive OS Phase 1 deployment slice (see
+  `Projects/internal/cognitive-engineering-os/docs/
+  COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md`). This is the RECORD shape only --
+  password hashing/verification and session-token issuance are runtime
+  concerns owned by `ai_lego/platform/identity/store.py`, never fields on
+  this object (a password hash is a store-column, not a domain fact).
+
+source_of_truth_for:
+  - "specs/domain/workspace.schema.yaml -- the Workspace(s) an Identity may act inside, via the identity_workspace_membership relation (store-layer, not this schema)"
+
+decided_by: >
+  No dedicated ADR. Minimal Phase 1 compilation, disclosed as such.
+
+compilation_decisions:
+  - question: "Store password_hash as a field on this object?"
+    decision: "No. This schema is the Identity FACT record (who someone is); credential material lives in the store's own identity_credential table, never serialized alongside the Identity record returned by any API response."
+  - question: "tenant_id required on Identity, or derived via Workspace membership?"
+    decision: "tenant_id required directly on Identity (an Identity belongs to exactly one Tenant in Phase 1's single-tenant-per-identity model; multi-tenant membership for one human across tenants is a Phase 3 (enterprise/group) concern, not built here)."
+
+type: object
+required:
+  - identity_id
+  - tenant_id
+  - email
+  - display_name
+  - status
+  - created_at
+properties:
+  identity_id:
+    type: string
+    format: uuid
+    description: "Primary key. Immutable once set."
+  tenant_id:
+    type: string
+    format: uuid
+    description: "Soft reference to specs/domain/tenant.schema.yaml#/properties/tenant_id."
+  email:
+    type: string
+    format: email
+    description: "Unique within Tenant (enforced at the store layer)."
+  display_name:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum: [active, suspended, deleted]
+    description: "No default -- same fail-closed reasoning as tenant.schema.yaml#/properties/status."
+  created_at:
+    type: string
+    format: date-time
+
+examples:
+  - description: "A Phase 1 self-use Identity"
+    value:
+      identity_id: "5b6c7d8e-0000-4000-8000-000000000002"
+      tenant_id: "5b6c7d8e-0000-4000-8000-000000000000"
+      email: "operator@aware-wave.com"
+      display_name: "Operator"
+      status: active
+      created_at: "2026-09-12T00:00:00Z"
+
+open_questions:
+  - id: "OQ-IDENTITY-1"
+    question: "No role/permission model exists yet (RBAC) -- Phase 1 has exactly one Identity per Tenant with implicit full access. Add commercial/ENTERPRISE_STANDARD.md-aligned RBAC when Phase 3 (enterprise, multiple identities per tenant) starts."
+    owner: "operator, blocks Phase 3 start, not Phase 1"
+
+verification:
+  method: >
+    Grepped specs/domain/ for an existing identity schema -- none found,
+    confirming this is the first. Read specs/domain/tenant.schema.yaml
+    and specs/domain/workspace.schema.yaml in full before writing.
+  note: >
+    No mother document names Identity's own field list -- this file's
+    fields are a Phase-1-scoped compilation, disclosed as such.

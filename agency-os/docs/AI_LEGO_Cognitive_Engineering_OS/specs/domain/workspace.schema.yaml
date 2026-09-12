@@ -1,0 +1,85 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/workspace.schema.yaml"
+title: Workspace
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Domain object #24. ADR-003 ("Tenant 1:N Workspace", `specs/domain/
+  tenant.schema.yaml`) names the cardinality but explicitly does not build
+  Workspace itself ("a tenant_id foreign key on Workspace, not built yet").
+  This file builds it, minimally, for the Cognitive OS Phase 1 deployment
+  slice (see `Projects/internal/cognitive-engineering-os/docs/
+  COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md`) -- a Workspace is the unit an
+  Identity operates inside; every capability execution is scoped to
+  exactly one Workspace, which belongs to exactly one Tenant.
+
+source_of_truth_for:
+  - "docs/adr/ADR-003-tenant-model-and-cas-isolation.md -- the Tenant 1:N Workspace cardinality this schema's tenant_id foreign key implements"
+  - "specs/domain/tenant.schema.yaml -- the Tenant this Workspace's tenant_id references"
+
+decided_by: >
+  No dedicated ADR. Minimal compilation for Phase 1 (self-use) --
+  disclosed here rather than left undocumented, same honesty-gap
+  discipline every Method Atlas Tier-1 contract in this corpus already
+  applies. Field list kept to what Phase 1 actually needs (name, tenant
+  scoping, lifecycle status); NOT a transcription of any mother-document
+  passage since none exists for Workspace's own field shape.
+
+compilation_decisions:
+  - question: "tenant_id: hard $ref to tenant.schema.yaml, or a soft opaque string reference?"
+    decision: "Soft reference (format: uuid, no $ref) -- matches tenant.schema.yaml's own precedent of soft-referencing sibling concepts (home_jurisdiction, encryption_root_key_ref) to avoid load-order coupling."
+  - question: "One Workspace per Tenant for Phase 1 (self-use), or must the schema itself enforce exactly-1?"
+    decision: "Schema allows N Workspaces per Tenant (matches ADR-003's stated 1:N cardinality); Phase 1's store only happens to create one. Not artificially restricted to 1 here."
+
+type: object
+required:
+  - workspace_id
+  - tenant_id
+  - name
+  - status
+  - created_at
+properties:
+  workspace_id:
+    type: string
+    format: uuid
+    description: "Primary key. Immutable once set."
+  tenant_id:
+    type: string
+    format: uuid
+    description: "Soft reference to specs/domain/tenant.schema.yaml#/properties/tenant_id. Every Workspace belongs to exactly one Tenant (ADR-003)."
+  name:
+    type: string
+    minLength: 1
+    description: "Human-readable Workspace name, unique within its Tenant (enforced at the store layer, not by this schema)."
+  status:
+    type: string
+    enum: [active, suspended, deleted]
+    description: "No default -- same fail-closed-over-fail-open reasoning tenant.schema.yaml's own status field already applies (a Workspace is not active until explicitly provisioned active)."
+  created_at:
+    type: string
+    format: date-time
+
+examples:
+  - description: "A Phase 1 self-use Workspace"
+    value:
+      workspace_id: "5b6c7d8e-0000-4000-8000-000000000001"
+      tenant_id: "5b6c7d8e-0000-4000-8000-000000000000"
+      name: "AwareWave Internal"
+      status: active
+      created_at: "2026-09-12T00:00:00Z"
+
+open_questions:
+  - id: "OQ-WORKSPACE-1"
+    question: "No Row-Level-Security policy is defined here (specs/security/tenant-isolation-controls.schema.yaml covers Tenant-level RLS design conceptually, not this file's own relational table). Phase 1's single-tenant SQLite store has no cross-tenant query surface to leak across, so this is deferred, not solved, until Phase 2 introduces a 2nd tenant."
+    owner: "operator, blocks Phase 2 (subscription) start, not Phase 1"
+
+verification:
+  method: >
+    Read ADR-003 full text and specs/domain/tenant.schema.yaml in full
+    before writing. Grepped specs/domain/ for an existing workspace
+    schema -- none found, confirming this is the first.
+  note: >
+    No mother document or ADR names Workspace's own field list (only its
+    cardinality relative to Tenant) -- the fields above are this file's
+    own Phase-1-scoped compilation, disclosed as such.

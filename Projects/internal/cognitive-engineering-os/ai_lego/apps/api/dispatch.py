@@ -1,0 +1,84 @@
+"""Generic method dispatch: resolve a Method Atlas ``method_id`` to its module, find its sole
+builder (``generate_*``) and gate-runner (``evaluate_*_gates``) functions by introspection, and
+invoke them against a caller-supplied kwargs dict.
+
+Why introspection instead of a per-method adapter table: this corpus's own naming convention is
+NOT perfectly uniform (e.g. ``jurisdiction.market_admission_control``'s builder is named
+``generate_market_admission``, not ``generate_market_admission_control``) -- verified
+corpus-wide (2026-09-12) that every method module has EXACTLY 0 or 1 top-level function matching
+each of the two patterns below, so "the sole matching function" is a safe, mechanical way to find
+the right callable without hand-maintaining a 245-entry lookup table that would drift the moment a
+new method lands (violates zero-rework -- a new Method Atlas method should need ZERO changes here
+to become invokable through this API).
+"""
+
+from __future__ import annotations
+
+import importlib
+import inspect
+from typing import Any, Callable
+
+from ai_lego.errors import InvariantViolation
+
+
+class MethodDispatchError(Exception):
+    """Raised when a method_id resolves in the MethodCatalog but this module cannot find a
+    dispatchable builder/gate-runner for it (the ~8 non-method utility modules in
+    ai_lego/modules/{knowledge,research}/ that have no generate_*/evaluate_*_gates pair)."""
+
+
+def _module_for(method_id: str):
+    if "." not in method_id:
+        raise MethodDispatchError(f"method_id {method_id!r} is not in <family>.<name> form")
+    family, name = method_id.split(".", 1)
+    module_path = f"ai_lego.modules.{family}.{name}"
+    try:
+        return importlib.import_module(module_path)
+    except ModuleNotFoundError as error:
+        raise MethodDispatchError(f"no module {module_path} for method_id {method_id!r}") from error
+
+
+def _sole_matching_function(module: Any, predicate: Callable[[str], bool], kind: str, method_id: str) -> Callable[..., Any]:
+    matches = [name for name in dir(module) if predicate(name) and inspect.isfunction(getattr(module, name)) and inspect.getmodule(getattr(module, name)) is module]
+    if len(matches) != 1:
+        raise MethodDispatchError(f"expected exactly 1 {kind} function in {module.__name__} for method_id {method_id!r}, found {len(matches)}: {matches}")
+    return getattr(module, matches[0])
+
+
+def resolve_builder(method_id: str) -> Callable[..., dict[str, Any]]:
+    module = _module_for(method_id)
+    return _sole_matching_function(module, lambda n: n.startswith("generate_"), "builder (generate_*)", method_id)
+
+
+def resolve_gate_runner(method_id: str) -> Callable[..., list[dict[str, Any]]]:
+    module = _module_for(method_id)
+    return _sole_matching_function(module, lambda n: n.startswith("evaluate_") and n.endswith("_gates"), "gate-runner (evaluate_*_gates)", method_id)
+
+
+def record_id_prefix(method_id: str) -> str:
+    module = _module_for(method_id)
+    prefix = getattr(module, "RECORD_ID_PREFIX", None)
+    if not isinstance(prefix, str) or not prefix:
+        raise MethodDispatchError(f"{module.__name__} has no RECORD_ID_PREFIX constant for method_id {method_id!r}")
+    return prefix
+
+
+def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, provenance: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    """Binds ``body``'s keys to ``builder``'s own parameter names (every builder in this corpus
+    takes POSITIONAL_OR_KEYWORD params, so keyword-calling is always valid regardless of each
+    method's own positional/keyword split), auto-supplying ``record_id``/``provenance`` unless the
+    caller already provided them. Always raises ``InvariantViolation`` on any failure -- both a
+    real builder refusal (a business-rule violation) AND a bad-argument-shape ``TypeError`` from
+    ``inspect.Signature.bind`` (missing/unexpected argument) are normalized to this one exception
+    type, so the API layer (``ai_lego/apps/api/main.py``) needs only one ``except`` clause to turn
+    either failure into an HTTP 400."""
+    call_kwargs: dict[str, Any] = dict(body)
+    call_kwargs.setdefault("record_id", record_id)
+    call_kwargs.setdefault("provenance", provenance)
+    sig = inspect.signature(builder)
+    try:
+        bound = sig.bind(**call_kwargs)
+    except TypeError as error:
+        raise InvariantViolation(f"DISPATCH_BAD_ARGUMENTS: {error} (expected parameters: {list(sig.parameters)})") from error
+    bound.apply_defaults()
+    return builder(*bound.args, **bound.kwargs)
