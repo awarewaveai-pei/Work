@@ -19,6 +19,7 @@ from ai_lego.apps.api import main as api_main
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.support import b64
+from ai_lego.core.domain.provenance import make_provenance
 
 
 class ApiTestCase(unittest.TestCase):
@@ -51,6 +52,29 @@ class ApiTestCase(unittest.TestCase):
     def _login(self) -> None:
         response = self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "user@example.com", "password": "correct-horse-battery"})
         self.assertEqual(response.status_code, 200, response.text)
+
+
+def business_foundation_source() -> dict:
+    provenance = make_provenance("EVIDENCE", "HUMAN_APPROVED")
+    hypothesis_provenance = make_provenance("HYPOTHESIS", "AI_SUGGESTED")
+    factors = [
+        {"id": "SWOT-API-F1", "category": "STRENGTH", "statement": "existing educator network", "geography": "TW", "time": "2026-Q3", "source": "interview notes", "provenance": provenance, "supporting_evidence_refs": ["E-API-1"]},
+        {"id": "SWOT-API-F2", "category": "OPPORTUNITY", "statement": "growing demand for reflective learning", "geography": "TW", "time": "2026-Q3", "source": "field observation", "provenance": provenance, "supporting_evidence_refs": ["E-API-1"]},
+    ]
+    blocks = [
+        {"block": name, "content": f"disclosed hypothesis for {name.lower()}", "provenance": hypothesis_provenance}
+        for name in ["CUSTOMER_SEGMENTS", "VALUE_PROPOSITIONS", "CHANNELS", "CUSTOMER_RELATIONSHIPS", "REVENUE_STREAMS", "KEY_RESOURCES", "KEY_ACTIVITIES", "KEY_PARTNERS", "COST_STRUCTURE"]
+    ]
+    forces = [
+        {"force": name, "intensity": "MEDIUM", "assessment": f"assessment for {name.lower()}", "provenance": hypothesis_provenance}
+        for name in ["INDUSTRY_RIVALRY", "NEW_ENTRANTS", "SUBSTITUTES", "SUPPLIER_POWER", "BUYER_POWER"]
+    ]
+    return {
+        "swot": {"analysis_id": "SWOT-API-001", "knowledge_set_ref": "KS-API-001", "knowledge_set": [{"evidence_id": "E-API-1", "content": "educator interview observation", "source": "interview-1", "provenance": provenance}], "factors": factors},
+        "tows": {"record_id": "TOWS-API-001", "pairings": [{"id": "TOWS-API-P1", "internal_factor_id": "SWOT-API-F1", "external_factor_id": "SWOT-API-F2", "strategy_option": "use the educator network to test the reflective learning offer"}], "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")},
+        "porter": {"analysis_id": "PFF-API-001", "forces": forces, "overall_attractiveness": "moderately attractive pending validation", "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")},
+        "business_model": {"canvas_id": "BMC-API-001", "blocks": blocks, "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")},
+    }
 
 
 class HealthTests(ApiTestCase):
@@ -368,6 +392,25 @@ class RecipeRunTests(ApiTestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "PASS")
         self.assertEqual([step["ref"] for step in payload["workflow"]["steps"]], ["epistemic.assumption_mapping", "epistemic.evidence_matrix", "epistemic.toulmin_model"])
+
+    def test_business_foundation_recipe_consumes_swot_output_in_tows(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/business-foundation-v1/run",
+            json={"source": business_foundation_source(), "run_id": "api-business-foundation-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(
+            [step["ref"] for step in payload["workflow"]["steps"]],
+            ["strategy.swot", "strategy.tows", "strategy.porter_five_forces", "strategy.business_model_canvas"],
+        )
+        self.assertEqual(
+            payload["workflow"]["steps"][1]["input_paths"],
+            ["outputs.SWOT_analysis", "source.tows", "source.tows.record_id", "source.tows.pairings", "source.tows.provenance"],
+        )
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["TOWS_strategy_options"]["swot_analysis_ref"], "SWOT-API-001")
 
     def test_edd_offline_literature_capability_uses_registered_adapter(self):
         self._login()

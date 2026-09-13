@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import unittest
 
-from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner
+from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 
@@ -44,6 +44,23 @@ class ResolveGateRunnerTests(unittest.TestCase):
         gate_runner = resolve_gate_runner("jurisdiction.market_admission_control")
         self.assertTrue(gate_runner.__name__.startswith("evaluate_"))
         self.assertTrue(gate_runner.__name__.endswith("_gates"))
+
+    def test_gate_runner_receives_only_declared_arguments_and_context_dependency(self):
+        seen = []
+
+        def gate(analysis, upstream, validator, timestamp):
+            seen.append((analysis, upstream, validator, timestamp))
+            return [{"status": "PASS"}]
+
+        result = invoke_gate_runner(
+            gate,
+            {"id": "current"},
+            {"outputs": {"Upstream": {"id": "prior"}}},
+            "test",
+            "2026-09-14T00:00:00Z",
+        )
+        self.assertEqual(result, [{"status": "PASS"}])
+        self.assertEqual(seen, [({"id": "current"}, {"id": "prior"}, "test", "2026-09-14T00:00:00Z")])
 
 
 class RecordIdPrefixTests(unittest.TestCase):

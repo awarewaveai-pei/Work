@@ -93,3 +93,51 @@ def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, prove
         raise InvariantViolation(f"DISPATCH_BAD_ARGUMENTS: {error} (expected parameters: {list(sig.parameters)})") from error
     bound.apply_defaults()
     return builder(*bound.args, **bound.kwargs)
+
+
+def invoke_gate_runner(
+    gate_runner: Callable[..., list[dict[str, Any]]],
+    record: dict[str, Any],
+    context: dict[str, Any],
+    validator: str,
+    timestamp: str,
+) -> list[dict[str, Any]]:
+    """Invoke a method gate runner through explicit named context dependencies.
+
+    Gate runners are not uniform: most consume ``(record, validator,
+    timestamp)``, while cross-method gates such as TOWS also require the
+    upstream record they re-check.  Positional calling silently breaks the
+    latter class.  Resolve only the small set of named runtime values and
+    fail closed when a required dependency is not present in the workflow
+    context.
+    """
+    outputs = context.get("outputs")
+    if not isinstance(outputs, dict):
+        raise InvariantViolation("DISPATCH_GATE_CONTEXT_INVALID: outputs mapping required")
+    by_normalized_name = {str(key).lower(): value for key, value in outputs.items()}
+    values: dict[str, Any] = {
+        "record": record,
+        "output": record,
+        "result": record,
+        "validator": validator,
+        "timestamp": timestamp,
+    }
+    signature = inspect.signature(gate_runner)
+    parameters = list(signature.parameters.values())
+    # Gate modules use domain-specific names for their primary output
+    # (e.g. ``analysis``) rather than a shared ``record`` spelling.  The
+    # first positional parameter is the runner's current record by contract;
+    # resolve that shape mechanically, then require all later dependencies
+    # to be named runtime values or workflow outputs.
+    if parameters and parameters[0].kind in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD} and parameters[0].name not in values:
+        values[parameters[0].name] = record
+    for name in signature.parameters:
+        if name not in values and name.lower() in by_normalized_name:
+            values[name] = by_normalized_name[name.lower()]
+    call_kwargs = {name: values[name] for name in signature.parameters if name in values}
+    try:
+        bound = signature.bind(**call_kwargs)
+    except TypeError as error:
+        raise InvariantViolation(f"DISPATCH_GATE_ARGUMENTS: {error}") from error
+    bound.apply_defaults()
+    return gate_runner(*bound.args, **bound.kwargs)

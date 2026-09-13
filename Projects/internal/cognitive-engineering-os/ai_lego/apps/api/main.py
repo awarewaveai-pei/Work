@@ -53,7 +53,7 @@ from pydantic import BaseModel
 import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
-from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner
+from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search
@@ -519,7 +519,13 @@ def run_recipe(
             continue
         output = result.context["steps"][str(index)]
         try:
-            gates[str(index)] = resolve_gate_runner(node["method_id"])(output, "api.recipe", datetime.datetime.now(datetime.timezone.utc).isoformat())
+            gates[str(index)] = invoke_gate_runner(
+                resolve_gate_runner(node["method_id"]),
+                output,
+                result.context,
+                "api.recipe",
+                datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
         except (InvariantViolation, MethodDispatchError) as error:
             raise HTTPException(status_code=422, detail=f"WORKFLOW_GATE_EVALUATION_FAILED: {error}") from error
     passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates)

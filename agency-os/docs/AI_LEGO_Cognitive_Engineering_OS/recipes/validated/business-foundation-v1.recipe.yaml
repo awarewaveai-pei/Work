@@ -1,0 +1,96 @@
+$id: "ai-lego://recipes/validated/business-foundation-v1.recipe.yaml"
+title: "Business Foundation Recipe (SWOT -> TOWS -> Porter -> Business Model Canvas)"
+status: ACTIVE
+description: >
+  A reusable pre-finance business-planning chain. It turns caller-supplied,
+  evidence-labelled business facts into a SWOT analysis, consumes that actual
+  SWOT record to compute TOWS strategy options, records industry forces, and
+  assembles a Business Model Canvas. Financial assumptions, scenario
+  simulation, risk, KPI, execution planning, and proposal publication remain
+  separate future nodes until their contracts exist.
+id: business-foundation-v1
+version: "1.0.0"
+name: "Business Foundation (SWOT -> TOWS -> Porter -> Business Model Canvas)"
+
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+
+suited_for:
+  - "Early business planning where source facts and strategic assumptions are explicit"
+  - "A replayable foundation before finance, simulation, and execution planning"
+not_for:
+  - "A complete investment or financial decision"
+  - "Claims about market reality without current, independently verified evidence"
+
+mandatory_elements:
+  - "Every SWOT factor carries its evidence and provenance"
+  - "TOWS pairings reference real factor ids from the preceding SWOT output"
+  - "Porter forces and Business Model Canvas blocks remain caller-supplied and are not invented"
+  - "Financial assumptions and scenario simulation are explicitly out of scope until their contracts are active"
+forbidden_actions:
+  - "Treating a SWOT list or TOWS option as an approved strategy"
+  - "Presenting this foundation slice as the complete Business Planning Mode"
+  - "Inventing finance, market evidence, or customer research"
+
+steps:
+  - label: "SWOT_analysis"
+    type: method
+    method_id: strategy.swot
+    input: source.swot
+    bindings:
+      analysis_id: source.swot.analysis_id
+      knowledge_set_ref: source.swot.knowledge_set_ref
+      knowledge_set: source.swot.knowledge_set
+      factors: source.swot.factors
+    necessity: REQUIRED_BY_RISK
+  - label: "TOWS_strategy_options"
+    type: method
+    method_id: strategy.tows
+    input: [outputs.SWOT_analysis, source.tows]
+    bindings:
+      record_id: source.tows.record_id
+      swot_analysis: outputs.SWOT_analysis
+      pairings: source.tows.pairings
+      provenance: source.tows.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "Porter_five_forces"
+    type: method
+    method_id: strategy.porter_five_forces
+    input: source.porter
+    bindings:
+      analysis_id: source.porter.analysis_id
+      forces: source.porter.forces
+      overall_attractiveness: source.porter.overall_attractiveness
+      provenance: source.porter.provenance
+    necessity: RECOMMENDED
+  - label: "Business_model_canvas"
+    type: method
+    method_id: strategy.business_model_canvas
+    input: source.business_model
+    bindings:
+      canvas_id: source.business_model.canvas_id
+      blocks: source.business_model.blocks
+      provenance: source.business_model.provenance
+    necessity: RECOMMENDED
+
+outputs:
+  - "SWOTAnalysis"
+  - "TOWSMatrix"
+  - "PorterFiveForcesAnalysis"
+  - "BusinessModelCanvas"
+
+open_questions:
+  - id: "OQ-BUSINESS-FOUNDATION-1"
+    question: "When Financial Assumptions and Scenario Simulation contracts are active, should this recipe become a versioned downstream extension or remain a stable pre-finance foundation?"
+    owner: "operator, after finance/computation contracts are active"
+    blocks: "nothing in v1; this recipe deliberately stops before finance"
+
+verification:
+  required: true
+  checks:
+    - "All four method ids resolve to ACTIVE contracts before execution"
+    - "TOWS receives outputs.SWOT_analysis through an explicit binding"
+    - "Each method output is gate-evaluated by the API runtime"
+    - "No financial or market claim is synthesized by this recipe"

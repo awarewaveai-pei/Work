@@ -15,7 +15,7 @@ recipe instance):
      checks against every specs/ and policies/ai-execution/ (and, as of the
      Tier 0 method-contract backfill, policies/privacy/) file that declares
      a $schema (see tests/README.md for the fixture contract).
-  2. Recipe instance conformance -- the 8 recipes/validated/*.recipe.yaml
+  2. Recipe instance conformance -- the validated recipes/validated/*.recipe.yaml
      files (which are DATA instances, not schemas themselves) validate
      against specs/cognitive/recipe.schema.yaml. (Was 3 through Wave 7;
      research-qualitative-v1.recipe.yaml added 2026-08-30, Phase 5 Research
@@ -235,12 +235,23 @@ def run_recipe_instance_conformance():
     reg = registry.with_resource(recipe_schema_id, Resource.from_contents(schema_doc))
     validator = Draft202012Validator(schema_doc, registry=reg)
     recipe_files = sorted(glob.glob(os.path.join(ROOT, "recipes", "validated", "*.recipe.yaml")))
-    check(len(recipe_files) == 8, f"expected exactly 8 recipes/validated/*.recipe.yaml files (Wave 7's 3 + research-qualitative-v1 + life-decision-v1 + edd-research-evidence-v1 + art-therapy-creative-reflection-v1 + edd-literature-search-v1), found {len(recipe_files)}")
+    recipe_basenames = {os.path.basename(p)[: -len(".recipe.yaml")] for p in recipe_files}
+    expected_recipe_ids = {
+        "art-therapy-creative-reflection-v1",
+        "business-foundation-v1",
+        "champion-challenger",
+        "db-migration-expand-contract",
+        "edd-literature-search-v1",
+        "edd-research-evidence-v1",
+        "life-decision-v1",
+        "method-deprecation-retirement",
+        "research-qualitative-v1",
+    }
+    check(set(recipe_basenames) == expected_recipe_ids, f"recipe inventory mismatch: expected {sorted(expected_recipe_ids)}, found {sorted(recipe_basenames)}")
     # 2026-08-30 critic finding: a bare count check does not pin WHICH file is
     # present -- deleting research-qualitative-v1.recipe.yaml and adding any
     # other well-formed decoy recipe would still pass len()==4 silently.
-    recipe_basenames = {os.path.basename(p)[: -len(".recipe.yaml")] for p in recipe_files}
-    check("research-qualitative-v1" in recipe_basenames, f"expected recipes/validated/research-qualitative-v1.recipe.yaml specifically (Phase 5 Research Mode slice deliverable) among the 8, found {sorted(recipe_basenames)}")
+    check("research-qualitative-v1" in recipe_basenames, f"expected recipes/validated/research-qualitative-v1.recipe.yaml specifically (Phase 5 Research Mode slice deliverable), found {sorted(recipe_basenames)}")
     for p in recipe_files:
         rel_p = os.path.relpath(p, ROOT)
         inst = load(p)
