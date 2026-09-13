@@ -1,0 +1,76 @@
+$id: "ai-lego://recipes/validated/edd-research-evidence-v1.recipe.yaml"
+title: "EdD Research Evidence Recipe (Assumptions -> Evidence Matrix -> Toulmin Argument)"
+status: ACTIVE
+description: >
+  A method-only evidence construction chain for EdD research. It makes
+  assumptions visible, links claims to evidence, then renders one explicit
+  argument. It does not discover literature, assess causality, or replace
+  supervisor/methodologist review.
+id: edd-research-evidence-v1
+version: "1.0.0"
+name: "EdD Research Evidence (Assumptions -> Evidence Matrix -> Toulmin Argument)"
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+suited_for:
+  - "EdD claims requiring explicit assumption, evidence, and reasoning-bridge records"
+not_for:
+  - "A substitute for literature search, ethics review, statistical analysis, or supervisor approval"
+mandatory_elements:
+  - "Every method receives explicit bindings from source or prior output"
+  - "Claims and evidence retain provenance and are linked before argument construction"
+  - "Human research review remains required"
+forbidden_actions:
+  - "Presenting a Toulmin argument as a validated research conclusion without human review"
+  - "Inventing evidence or silently converting assumptions into facts"
+steps:
+  - label: "assumption_mapping"
+    type: method
+    method_id: epistemic.assumption_mapping
+    input: source.assumptions
+    bindings:
+      record_id: source.assumptions.record_id
+      mapped_assumptions: source.assumptions.mapped_assumptions
+      provenance: source.assumptions.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "evidence_matrix"
+    type: method
+    method_id: epistemic.evidence_matrix
+    input: [source.evidence_matrix, outputs.assumption_mapping]
+    bindings:
+      record_id: source.evidence_matrix.record_id
+      claims: source.evidence_matrix.claims
+      evidence_items: source.evidence_matrix.evidence_items
+      links: source.evidence_matrix.links
+      provenance: source.evidence_matrix.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "toulmin_argument"
+    type: method
+    method_id: epistemic.toulmin_model
+    input: [source.argument, outputs.evidence_matrix]
+    bindings:
+      record_id: source.argument.record_id
+      claim: source.argument.claim
+      grounds: source.argument.grounds
+      warrant: source.argument.warrant
+      backing: source.argument.backing
+      qualifier: source.argument.qualifier
+      rebuttal: source.argument.rebuttal
+      provenance: source.argument.provenance
+    necessity: REQUIRED_BY_RISK
+outputs:
+  - "AssumptionMapping"
+  - "EvidenceMatrix"
+  - "ToulminArgument"
+open_questions:
+  - id: "OQ-EDD-RESEARCH-1"
+    question: "Should a future Recipe add literature retrieval and citation verification before Toulmin construction?"
+    owner: "operator and research supervisor"
+    blocks: "nothing in v1; this Recipe is intentionally evidence-input driven"
+verification:
+  required: true
+  checks:
+    - "All method ids resolve to ACTIVE contracts"
+    - "Every output passes its method-specific gate"
+    - "Journal fingerprint prevents resuming with changed source data"

@@ -279,6 +279,38 @@ class RecipeRunTests(ApiTestCase):
         response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source()})
         self.assertEqual(response.status_code, 401)
 
+    def test_edd_evidence_recipe_runs_as_a_reusable_method_chain(self):
+        self._login()
+        source = {
+            "assumptions": {
+                "record_id": "AMAP-API-001",
+                "mapped_assumptions": [{"assumption_id": "ASM-1", "impact": "HIGH", "uncertainty": "HIGH"}],
+                "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None},
+            },
+            "evidence_matrix": {
+                "record_id": "EVIDMATRIX-API-001",
+                "claims": [{"claim_id": "C-1", "statement": "The intervention may improve reflective practice", "provenance": {"epistemic_type": "HUMAN_OPINION", "authorship_state": "HUMAN_ORIGINAL", "locked": None}}],
+                "evidence_items": [{"evidence_id": "E-1", "content": "Interview observation", "provenance": {"epistemic_type": "EVIDENCE", "authorship_state": "SOURCE_QUOTATION", "locked": None}}],
+                "links": [{"claim_id": "C-1", "evidence_id": "E-1", "relation": "SUPPORTS"}],
+                "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None},
+            },
+            "argument": {
+                "record_id": "TOULMIN-API-001",
+                "claim": "The intervention is worth further study",
+                "grounds": ["Interview observation suggests improved reflection"],
+                "warrant": "Observed improvement is a reason to conduct a structured follow-up",
+                "backing": ["The evidence matrix links the observation to the claim"],
+                "qualifier": "provisionally",
+                "rebuttal": "A larger sample may not reproduce the observation",
+                "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None},
+            },
+        }
+        response = self.client.post("/recipes/edd-research-evidence-v1/run", json={"source": source, "run_id": "api-edd-test"})
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual([step["ref"] for step in payload["workflow"]["steps"]], ["epistemic.assumption_mapping", "epistemic.evidence_matrix", "epistemic.toulmin_model"])
+
 
 class DemoTests(ApiTestCase):
     def test_demo_runs_the_real_cli_slice(self):
