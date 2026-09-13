@@ -41,7 +41,12 @@ def load_recipe(spec_root: Path, recipe_id: str) -> dict[str, Any]:
     return recipe
 
 
-def workflow_dataflow_issues(workflow_ir: Mapping[str, Any], *, allow_external_outputs: bool = False) -> tuple[str, ...]:
+def workflow_dataflow_issues(
+    workflow_ir: Mapping[str, Any],
+    *,
+    allow_external_outputs: bool = False,
+    allowed_external_output_labels: set[str] | None = None,
+) -> tuple[str, ...]:
     """Find output references whose producer is unknown or runs too late.
 
     ``outputs.<label>`` is created only after the node carrying ``label``
@@ -83,7 +88,12 @@ def workflow_dataflow_issues(workflow_ir: Mapping[str, Any], *, allow_external_o
                      if path == f"outputs.{label}" or path.startswith(f"outputs.{label}.")),
                     None,
                 )
-                if producer_label is None and not allow_external_outputs:
+                external_label = next(
+                    (label for label in sorted(allowed_external_output_labels or (), key=len, reverse=True)
+                     if path == f"outputs.{label}" or path.startswith(f"outputs.{label}.")),
+                    None,
+                )
+                if producer_label is None and external_label is None and not allow_external_outputs:
                     issues.append(f"node {consumer_index} references unknown output {path!r}")
                 elif producer_label is not None and producers[producer_label] >= consumer_index:
                     issues.append(
@@ -159,18 +169,64 @@ def project_workflow_ir(
     unknown_bindings = sorted(set(bindings) - set(node_indexes))
     if unknown_bindings:
         raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_BINDING_NOT_SELECTED: {unknown_bindings}")
+    for index in node_indexes:
+        if not isinstance(index, int) or index < 0 or index >= len(source_nodes):
+            raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_INDEX_OUT_OF_RANGE: {index!r}")
+    label_aliases: dict[str, str] = {}
+    for index in node_indexes:
+        source_node = source_nodes[index]
+        if not isinstance(source_node, Mapping):
+            continue
+        original = source_node.get("label")
+        if not isinstance(original, str) or not original.strip():
+            original = f"step-{index + 1}"
+        override = bindings.get(index, {}).get("label") if isinstance(bindings.get(index), Mapping) else None
+        effective = override if isinstance(override, str) and override.strip() else original
+        if original != effective:
+            label_aliases[original] = effective
+
+    def rewrite_output_path(path: str) -> str:
+        for original, effective in sorted(label_aliases.items(), key=lambda item: len(item[0]), reverse=True):
+            old_prefix = f"outputs.{original}"
+            if path == old_prefix or path.startswith(f"{old_prefix}."):
+                return f"outputs.{effective}{path[len(old_prefix):]}"
+        return path
+
+    def rewrite_node_paths(node: dict[str, Any]) -> None:
+        declared = node.get("input")
+        if isinstance(declared, str):
+            node["input"] = rewrite_output_path(declared)
+        elif isinstance(declared, list):
+            node["input"] = [rewrite_output_path(path) if isinstance(path, str) else path for path in declared]
+        declared_bindings = node.get("bindings")
+        if isinstance(declared_bindings, Mapping):
+            node["bindings"] = {
+                argument: rewrite_output_path(path) if isinstance(path, str) else path
+                for argument, path in declared_bindings.items()
+            }
+
     nodes: list[dict[str, Any]] = []
     for index in node_indexes:
         if not isinstance(index, int) or index < 0 or index >= len(source_nodes):
             raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_INDEX_OUT_OF_RANGE: {index!r}")
         node = dict(source_nodes[index])
         node.update(bindings.get(index, {}))
+        rewrite_node_paths(node)
         nodes.append(node)
     projected = dict(compiled_ir)
     projected["id"] = workflow_id or f"{compiled_ir['id']}:projection"
     projected["nodes"] = nodes
     projected["projection"] = {"source_node_indexes": list(node_indexes), "source_workflow_id": compiled_ir["id"]}
-    dataflow_issues = workflow_dataflow_issues(projected, allow_external_outputs=True)
+    selected_indexes = set(node_indexes)
+    external_labels = {
+        node.get("label") if isinstance(node.get("label"), str) and node.get("label").strip() else f"step-{index + 1}"
+        for index, node in enumerate(source_nodes)
+        if index not in selected_indexes and isinstance(node, Mapping)
+    }
+    dataflow_issues = workflow_dataflow_issues(
+        projected,
+        allowed_external_output_labels=external_labels,
+    )
     if dataflow_issues:
         raise InvariantViolation(f"WORKFLOW_PROJECTION_DATAFLOW_INVALID: {'; '.join(dataflow_issues)}")
     return projected

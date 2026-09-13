@@ -62,6 +62,7 @@ class WorkflowIrTests(unittest.TestCase):
 
         self.assertEqual([node["method_id"] if node["node_kind"] == "method" else node["ref"] for node in projected["nodes"]], ["research.qualitative_coding", "run_statistics", "literature_search", "evidence.triangulation"])
         self.assertEqual(projected["nodes"][0]["input"], "research.coding_request")
+        self.assertIn("outputs.coding.coder_1.code_set", projected["nodes"][1]["input"])
         self.assertEqual(projected["projection"], {"source_node_indexes": [1, 4, 3, 5], "source_workflow_id": "research-qualitative-v1"})
         with self.assertRaisesRegex(InvariantViolation, "PROJECTION_BINDING_NOT_SELECTED"):
             project_workflow_ir(ir, [1], {4: {"label": "wrong"}})
@@ -72,6 +73,11 @@ class WorkflowIrTests(unittest.TestCase):
         # producer selected after its consumer is never a valid projection.
         with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_PROJECTION_DATAFLOW_INVALID"):
             project_workflow_ir(ir, [1, 0])
+
+    def test_projection_refuses_an_output_typo_instead_of_treating_it_as_external(self):
+        ir = {"id": "projection-source", "nodes": [{"label": "producer"}, {"label": "consumer", "input": "outputs.typo.value"}]}
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_PROJECTION_DATAFLOW_INVALID"):
+            project_workflow_ir(ir, [1])
 
     def test_source_preflight_checks_only_initial_source_paths(self):
         ir = compile_recipe_to_workflow_ir(self.spec_root, "life-decision-v1", "R1")
