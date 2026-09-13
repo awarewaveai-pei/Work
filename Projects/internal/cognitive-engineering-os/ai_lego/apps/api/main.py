@@ -95,6 +95,11 @@ def configure_cors(target_app: FastAPI, raw_origins: str | None = None) -> tuple
 CONFIGURED_CORS_ORIGINS = configure_cors(app)
 
 
+def _api_journal_context(context: dict[str, Any]) -> dict[str, Any]:
+    """Persist checkpoint state without embedding the request's raw ``source`` object."""
+    return {"steps": context.get("steps", {}), "outputs": context.get("outputs", {})}
+
+
 def get_store() -> IdentityStore:
     db_path = Path(os.environ.get("COGNITIVE_OS_DB_PATH", DEFAULT_DB_PATH))
     return IdentityStore(db_path)
@@ -467,7 +472,15 @@ def run_recipe(
             return invoke_builder(_builder, "", make_provenance("AI_INFERENCE", "AI_GENERATED"), bindings)
 
         handlers[method_id] = handler
-    result = execute_workflow_ir(workflow_ir, {"source": source}, handlers, catalogs={"method": catalog, "capability": capability_catalog}, journal_path=journal, resume=resume)
+    result = execute_workflow_ir(
+        workflow_ir,
+        {"source": source},
+        handlers,
+        catalogs={"method": catalog, "capability": capability_catalog},
+        journal_path=journal,
+        resume=resume,
+        journal_context_projector=_api_journal_context,
+    )
     if result.status != "SUCCEEDED":
         return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal": str(journal), "method_resolution": method_resolution, "capability_resolution": capability_resolution}
     gates: dict[str, list[dict[str, Any]]] = {}

@@ -7,6 +7,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import uuid
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -289,6 +290,8 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(payload["status"], "PASS")
         self.assertEqual(len(payload["workflow"]["steps"]), 3)
         self.assertTrue(all(gate["status"] == "PASS" for gates in payload["gates"].values() for gate in gates))
+        journal = json.loads(Path(payload["journal"]).read_text(encoding="utf-8"))
+        self.assertNotIn("source", journal["context"])
 
     def test_life_recipe_resume_reuses_stable_journal_namespace(self):
         self._login()

@@ -41,8 +41,8 @@ Billing, credits, multiple tenants, SSO, enterprise contracts, regulated-system 
 - `life-decision-v1`: frame → SWOT → weighted decision matrix.
 - `edd-research-evidence-v1`: assumption mapping → evidence matrix → Toulmin argument.
 - `art-therapy-creative-reflection-v1`: random stimulus → mind map; non-diagnostic, no automated clinical inference.
-- Shared runtime now supports explicit context bindings, registered capability adapters, and durable journal/resume. The API has one deterministic offline `literature_search` capability slice; transcribe, external literature providers, media/consent storage, 31 new art-therapy methods, and Business Planning's finance/computation chain remain open.
+- Shared runtime now supports explicit context bindings, registered capability adapters, durable journal/resume, and caller-selected journal projection. API source-bearing runs omit raw `source` from the journal while retaining the input fingerprint for resume; checkpoint `outputs` still await encrypted CAS/KMS before external or clinical data is accepted. The API has one deterministic offline `literature_search` capability slice; transcribe, external literature providers, media/consent storage, 31 new art-therapy methods, and Business Planning's finance/computation chain remain open.
 
 ## Next action
 
-Phase 1 remains live. Next engineering slice: source-data protection plus a stateful Research adapter (transcription/storage) before external or clinical data is accepted. Phase 2 billing/credits/SSO remains deferred per the commercial-arc table.
+Phase 1 remains live. Next engineering slice: encrypted CAS/KMS-backed checkpoint outputs and source-data retention/deletion policy before a stateful Research adapter (transcription/storage) accepts external or clinical data. Phase 2 billing/credits/SSO remains deferred per the commercial-arc table.

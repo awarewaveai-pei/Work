@@ -158,6 +158,32 @@ class WorkflowExecutorTests(unittest.TestCase):
             with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_INPUT_MISMATCH"):
                 execute_workflow_ir(ir, {"source": "b"}, {"one.step": lambda *_: {"ok": True}}, journal_path=journal, resume=True)
 
+    def test_journal_projection_omits_raw_source_but_resume_rehydrates_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "projected.json"
+            ir = {"id": "projection-v1", "nodes": [{"node_kind": "method", "method_id": "one.step", "label": "one", "bindings": {"value": "source.secret"}}]}
+            source = {"secret": "do-not-persist-this"}
+            projector = lambda context: {"steps": context["steps"], "outputs": context["outputs"]}
+            result = execute_workflow_ir(
+                ir,
+                {"source": source},
+                {"one.step": lambda payload, _node: {"echo": payload["__bindings__"]["value"]}},
+                journal_path=journal,
+                journal_context_projector=projector,
+            )
+            self.assertEqual(result.status, "SUCCEEDED")
+            persisted = __import__("json").loads(journal.read_text(encoding="utf-8"))
+            self.assertNotIn("source", persisted["context"])
+            resumed = execute_workflow_ir(
+                ir,
+                {"source": source},
+                {"one.step": lambda payload, _node: {"echo": payload["__bindings__"]["value"]}},
+                journal_path=journal,
+                resume=True,
+                journal_context_projector=projector,
+            )
+            self.assertEqual(resumed.status, "SUCCEEDED")
+
 
 if __name__ == "__main__":
     unittest.main()

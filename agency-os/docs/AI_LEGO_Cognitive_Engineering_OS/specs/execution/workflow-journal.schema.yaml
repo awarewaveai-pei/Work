@@ -38,6 +38,11 @@ properties:
     minimum: 0
   context:
     type: object
+    description: >
+      Checkpoint context. A caller may project sensitive initial inputs out of
+      this object; resume still requires the caller to provide an identical
+      initial context fingerprint. The API's source-bearing runs persist only
+      steps and outputs here until encrypted CAS/KMS storage is available.
   steps:
     type: array
     items:
@@ -76,7 +81,7 @@ $defs:
 
 open_questions:
   - id: "OQ-WJ-1"
-    question: "Should a future durable runner move context/output payloads to encrypted CAS references instead of embedding them in the journal?"
+    question: "Should a future durable runner move checkpoint outputs to encrypted CAS references instead of embedding them in the journal?"
     owner: "runtime/security owner"
     blocks: "nothing in the local synthetic runtime; required before journals carry production personal data"
 
