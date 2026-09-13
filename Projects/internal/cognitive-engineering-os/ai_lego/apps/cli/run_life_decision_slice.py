@@ -17,7 +17,7 @@ from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.domain.evidence import evidence_record
 from ai_lego.core.domain.provenance import make_provenance
-from ai_lego.core.support import write_json
+from ai_lego.core.support import read_json, write_json
 from ai_lego.modules.decision.weighted_decision_matrix import (
     all_gates_pass as wdm_gates_pass,
     evaluate_weighted_decision_matrix_gates,
@@ -88,9 +88,10 @@ def fixture_source() -> dict[str, Any]:
     }
 
 
-def run_life_decision(spec_root: Path | None = None, runtime_dir: Path | None = None) -> dict[str, Any]:
+def run_life_decision(spec_root: Path | None = None, runtime_dir: Path | None = None, source: dict[str, Any] | None = None) -> dict[str, Any]:
     spec_root = resolve_spec_root(spec_root)
-    source = fixture_source()
+    if source is None:
+        source = fixture_source()
     catalog = MethodCatalog.from_spec_root(spec_root)
     resolution = catalog.resolve(["framing.problem_statement", "strategy.swot", "decision.weighted_decision_matrix"])
     if resolution.get("blocked"):
@@ -145,8 +146,12 @@ def run_life_decision(spec_root: Path | None = None, runtime_dir: Path | None = 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-dir", type=Path)
+    parser.add_argument("--input-json", type=Path, help="Caller-owned source object; must contain problem, swot, and decision")
     args = parser.parse_args()
-    report = run_life_decision(runtime_dir=args.runtime_dir)
+    source = read_json(args.input_json) if args.input_json else None
+    if source is not None and not isinstance(source, dict):
+        parser.error("--input-json must contain a JSON object")
+    report = run_life_decision(runtime_dir=args.runtime_dir, source=source)
     print(f"PASS: {report['workflow']['workflow_id']} ({len(report['workflow']['steps'])} steps); journal={report['journal']}")
     return 0
 
