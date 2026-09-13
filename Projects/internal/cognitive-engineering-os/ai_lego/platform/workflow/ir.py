@@ -11,13 +11,22 @@ from -- ``compiled_from`` names that Recipe and version.
 from __future__ import annotations
 
 from pathlib import Path
+from functools import lru_cache
 from typing import Any
 
 import yaml
 
 from ai_lego.errors import InvariantViolation
+from ai_lego.core.contracts.schema_contracts import SchemaContracts
 
 _PASSTHROUGH = ("label", "input", "bindings", "necessity", "gate_ref")
+_WORKFLOW_IR_SCHEMA = "ai-lego://specs/workflow/workflow-ir.schema.yaml"
+
+
+@lru_cache(maxsize=4)
+def _schema_contracts(spec_root_string: str) -> SchemaContracts:
+    """Cache the read-only schema registry while keeping compiler calls cheap."""
+    return SchemaContracts(Path(spec_root_string))
 
 
 def load_recipe(spec_root: Path, recipe_id: str) -> dict[str, Any]:
@@ -60,6 +69,7 @@ def compile_recipe_to_workflow_ir(spec_root: Path, recipe_id: str, risk_tier: st
     # contract instead of indexing an absent optional key.
     if "references" in recipe:
         compiled["references"] = recipe["references"]
+    _schema_contracts(str(spec_root.resolve())).validate(_WORKFLOW_IR_SCHEMA, compiled, f"compiled Workflow IR {recipe_id}")
     return compiled
 
 
