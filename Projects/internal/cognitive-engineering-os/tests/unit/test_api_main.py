@@ -141,9 +141,12 @@ class DashboardTests(ApiTestCase):
         self.assertNotRegex(html, r"innerHTML\s*=\s*`[^`]*\$\{m\.")
         self.assertIn("Open Input", html)
         self.assertIn("runLive", html)
-        self.assertIn("Run Recipe", html)
+        self.assertIn("Run Selected Recipe", html)
         self.assertIn("runRecipe", html)
         self.assertIn("recipe-json", html)
+        self.assertIn("prepareRecipe", html)
+        self.assertIn("recipe-run-btn", html)
+        self.assertIn("/recipes/${encodeURIComponent(recipeId)}/form", html)
 
 
 class UnauthenticatedAccessTests(ApiTestCase):

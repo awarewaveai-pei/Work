@@ -201,7 +201,9 @@ _DASHBOARD_HTML = """<!doctype html>
   <div id="method-list"></div>
   <h2>Recipes</h2>
   <div id="recipe-list"></div>
-  <textarea id="recipe-json" rows="10" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace" placeholder='{"problem": ..., "swot": ..., "decision": ...}'>{}</textarea>
+  <div id="recipe-help" class="method-meta">Choose a Recipe to load its Source fields.</div>
+  <textarea id="recipe-json" rows="10" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace" placeholder='Select a Recipe to generate its Source skeleton.'>{}</textarea>
+  <button id="recipe-run-btn" disabled>Run Selected Recipe</button>
   <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
     <div id="invoke-method" class="method-id"></div>
     <div id="invoke-help" class="method-meta"></div>
@@ -216,6 +218,7 @@ _DASHBOARD_HTML = """<!doctype html>
 <script>
 let methods = [];
 let loggedIn = false;
+let selectedRecipeId = null;
 
 async function checkStatus() {
   const r = await fetch('/methods', { credentials: 'same-origin' });
@@ -288,12 +291,42 @@ async function loadRecipes() {
     label.textContent = recipe.recipe_id + ' (' + recipe.step_count + ' steps)';
     row.appendChild(label);
     const button = document.createElement('button');
-    button.textContent = 'Run Recipe';
+    button.textContent = 'Prepare Source';
     button.disabled = !loggedIn;
-    button.onclick = () => runRecipe(recipe.recipe_id);
+    button.onclick = () => prepareRecipe(recipe.recipe_id);
     row.appendChild(button);
     list.appendChild(row);
   });
+}
+
+function assignPath(target, dottedPath, value) {
+  const parts = dottedPath.split('.');
+  let cursor = target;
+  parts.forEach((part, index) => {
+    if (index === parts.length - 1) { cursor[part] = value; return; }
+    if (!cursor[part] || typeof cursor[part] !== 'object' || Array.isArray(cursor[part])) cursor[part] = {};
+    cursor = cursor[part];
+  });
+}
+
+async function prepareRecipe(recipeId) {
+  const [formResponse, planResponse] = await Promise.all([
+    fetch(`/recipes/${encodeURIComponent(recipeId)}/form`, { credentials: 'same-origin' }),
+    fetch(`/recipes/${encodeURIComponent(recipeId)}/plan`, { credentials: 'same-origin' }),
+  ]);
+  const form = await formResponse.json();
+  const plan = await planResponse.json();
+  if (!formResponse.ok || !planResponse.ok) {
+    document.getElementById('result').textContent = JSON.stringify({ form, plan }, null, 2);
+    return;
+  }
+  selectedRecipeId = recipeId;
+  const skeleton = {};
+  form.source_fields.forEach(field => assignPath(skeleton, field.path, null));
+  document.getElementById('recipe-json').value = JSON.stringify(skeleton, null, 2);
+  document.getElementById('recipe-help').textContent = `${recipeId}: ${form.source_fields.length} Source fields. Plan status: ${plan.status}. Null values are placeholders; replace them with valid domain data before running.`;
+  document.getElementById('recipe-run-btn').disabled = !loggedIn || plan.status !== 'READY';
+  document.getElementById('result').textContent = JSON.stringify({ recipe_id: recipeId, plan_status: plan.status, source_fields: form.source_fields }, null, 2);
 }
 
 async function runDemo(methodId) {
@@ -335,6 +368,10 @@ async function runRecipe(recipeId) {
   const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/run`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source }) });
   document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
 }
+
+document.getElementById('recipe-run-btn').onclick = () => {
+  if (selectedRecipeId) runRecipe(selectedRecipeId);
+};
 
 document.getElementById('search').addEventListener('input', renderMethods);
 
