@@ -54,7 +54,7 @@ from pydantic import BaseModel
 import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
-from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, record_id_prefix, resolve_builder, resolve_gate_runner
+from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search
@@ -506,6 +506,7 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
     method_ids = [node["method_id"] for node in workflow_ir["nodes"] if node["node_kind"] == "method"]
     method_resolution = method_catalog.resolve(method_ids)
     method_dispatch_readiness: dict[str, list[str]] = {"registered": [], "missing": []}
+    method_binding_issues_by_node: list[dict[str, Any]] = []
     for method_id in sorted(set(method_ids)):
         try:
             resolve_builder(method_id)
@@ -514,6 +515,16 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
             method_dispatch_readiness["missing"].append(method_id)
         else:
             method_dispatch_readiness["registered"].append(method_id)
+    for index, node in enumerate(workflow_ir["nodes"]):
+        if node.get("node_kind") != "method" or not isinstance(node.get("bindings"), dict):
+            continue
+        try:
+            builder = resolve_builder(node["method_id"])
+        except MethodDispatchError:
+            continue
+        issues = method_binding_issues(builder, node["bindings"])
+        if issues:
+            method_binding_issues_by_node.append({"index": index, "ref": node["method_id"], "issues": issues})
     capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
     capability_resolution = capability_catalog.resolve(capability_refs(workflow_ir))
     executability = plan_executability(workflow_ir, capability_resolution)
@@ -533,7 +544,7 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         for index, node in enumerate(workflow_ir["nodes"])
         if not isinstance(node.get("bindings"), dict)
     ]
-    binding_ready = not missing_bindings
+    binding_ready = not missing_bindings and not method_binding_issues_by_node
     method_ready = method_resolution["blocked"] is None
     dispatch_ready = not method_dispatch_readiness["missing"]
     return {
@@ -544,12 +555,13 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "capability_resolution": capability_resolution,
         "plan_executability": executability,
         "adapter_readiness": {**adapter_readiness, "blocking": adapter_blocking, "ready": adapter_ready},
-        "binding_readiness": {"missing": missing_bindings, "ready": binding_ready},
+        "binding_readiness": {"missing": missing_bindings, "method_issues": method_binding_issues_by_node, "ready": binding_ready},
         "blockers": [
             *([{"code": "METHOD_RESOLUTION_BLOCKED", "detail": method_resolution["blocked"]}] if method_resolution["blocked"] else []),
             *([{"code": "METHOD_DISPATCH_BLOCKED", "detail": {"missing": method_dispatch_readiness["missing"]}}] if method_dispatch_readiness["missing"] else []),
             *([{"code": "CAPABILITY_RESOLUTION_BLOCKED", "detail": capability_resolution["blocked"]}] if capability_resolution["blocked"] else []),
             *([{"code": "CAPABILITY_ADAPTER_BLOCKED", "detail": adapter_blocking}] if adapter_blocking else []),
+            *([{"code": "METHOD_BINDING_BLOCKED", "detail": method_binding_issues_by_node}] if method_binding_issues_by_node else []),
             *([{"code": "WORKFLOW_BINDING_BLOCKED", "detail": missing_bindings}] if missing_bindings else []),
         ],
         "status": "READY" if method_ready and dispatch_ready and executability["executable"] and adapter_ready and binding_ready else "BLOCKED",
@@ -615,6 +627,19 @@ def run_recipe(
     capability_ids = capability_refs(workflow_ir)
     if any(not isinstance(node.get("bindings"), dict) for node in nodes):
         raise HTTPException(status_code=400, detail="WORKFLOW_BINDINGS_REQUIRED: every workflow node must declare explicit bindings")
+    invalid_method_bindings: list[dict[str, Any]] = []
+    for index, node in enumerate(nodes):
+        if node["node_kind"] != "method":
+            continue
+        try:
+            builder = resolve_builder(node["method_id"])
+        except MethodDispatchError:
+            continue
+        issues = method_binding_issues(builder, node["bindings"])
+        if issues:
+            invalid_method_bindings.append({"index": index, "ref": node["method_id"], "issues": issues})
+    if invalid_method_bindings:
+        raise HTTPException(status_code=400, detail={"code": "WORKFLOW_METHOD_BINDINGS_INVALID", "nodes": invalid_method_bindings})
     method_resolution = catalog.resolve(method_ids)
     if method_resolution["blocked"] is not None:
         raise HTTPException(status_code=409, detail=method_resolution["blocked"])

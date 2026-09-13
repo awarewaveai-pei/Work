@@ -124,11 +124,6 @@ def invoke_gate_runner(
     }
     signature = inspect.signature(gate_runner)
     parameters = list(signature.parameters.values())
-    # Gate modules use domain-specific names for their primary output
-    # (e.g. ``analysis``) rather than a shared ``record`` spelling.  The
-    # first positional parameter is the runner's current record by contract;
-    # resolve that shape mechanically, then require all later dependencies
-    # to be named runtime values or workflow outputs.
     if parameters and parameters[0].kind in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD} and parameters[0].name not in values:
         values[parameters[0].name] = record
     for name in signature.parameters:
@@ -141,3 +136,41 @@ def invoke_gate_runner(
         raise InvariantViolation(f"DISPATCH_GATE_ARGUMENTS: {error}") from error
     bound.apply_defaults()
     return gate_runner(*bound.args, **bound.kwargs)
+
+
+def method_binding_issues(builder: Callable[..., Any], bindings: Any) -> list[dict[str, Any]]:
+    """Check a Recipe method node's binding keys against the live builder signature.
+
+    ``record_id`` and ``provenance`` are runtime-supplied by ``invoke_builder``
+    when the builder declares them, so a Recipe need not bind either one.  All
+    other required parameters must be explicitly bound; unknown keys and
+    malformed paths fail at plan time instead of waiting for a runtime
+    ``TypeError``.
+    """
+    issues: list[dict[str, Any]] = []
+    if not isinstance(bindings, dict):
+        return [{"code": "BINDINGS_NOT_OBJECT", "detail": "method node bindings must be an object"}]
+    parameters = inspect.signature(builder).parameters
+    invalid_keys = sorted(
+        (str(key) for key in bindings if not isinstance(key, str) or not key or key not in parameters),
+        key=str,
+    )
+    if invalid_keys:
+        issues.append({"code": "UNKNOWN_BUILDER_ARGUMENT", "arguments": invalid_keys})
+    invalid_values = sorted(
+        (str(key) for key, value in bindings.items() if not isinstance(key, str) or not key or not isinstance(value, str) or not value),
+        key=str,
+    )
+    if invalid_values:
+        issues.append({"code": "BINDING_PATH_INVALID", "arguments": invalid_values})
+    missing = sorted(
+        name
+        for name, parameter in parameters.items()
+        if name not in {"record_id", "provenance"}
+        and parameter.default is inspect.Parameter.empty
+        and parameter.kind in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY}
+        and name not in bindings
+    )
+    if missing:
+        issues.append({"code": "REQUIRED_BUILDER_ARGUMENT_MISSING", "arguments": missing})
+    return issues

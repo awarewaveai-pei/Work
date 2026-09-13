@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import unittest
 
-from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, record_id_prefix, resolve_builder, resolve_gate_runner
+from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 
@@ -75,6 +75,21 @@ class RecordIdPrefixTests(unittest.TestCase):
 
 
 class InvokeBuilderTests(unittest.TestCase):
+    def test_method_binding_issues_reject_unknown_missing_and_malformed_bindings(self):
+        def builder(required_value, optional_value=1):
+            return {"required_value": required_value, "optional_value": optional_value}
+
+        issues = method_binding_issues(
+            builder,
+            {"required_value": "source.ok", "unknown": "source.nope", "optional_value": None},
+        )
+        codes = {issue["code"] for issue in issues}
+        self.assertIn("UNKNOWN_BUILDER_ARGUMENT", codes)
+        self.assertIn("BINDING_PATH_INVALID", codes)
+
+        missing = method_binding_issues(builder, {"optional_value": "source.optional"})
+        self.assertEqual(missing, [{"code": "REQUIRED_BUILDER_ARGUMENT_MISSING", "arguments": ["required_value"]}])
+
     def test_invoke_a_real_method_end_to_end(self):
         builder = resolve_builder("foresight.cross_impact_analysis")
         gate_runner = resolve_gate_runner("foresight.cross_impact_analysis")
