@@ -10,6 +10,7 @@ containment, not by convention.
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any
 
 from ai_lego.core.support import sha256_bytes
@@ -17,10 +18,18 @@ from ai_lego.errors import InvariantViolation
 
 
 class TenantScopedCas:
+    _TENANT_SEGMENT = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
     def __init__(self, root: Path) -> None:
         self.root = root
 
+    @classmethod
+    def _validate_tenant_id(cls, tenant_id: str) -> None:
+        if not isinstance(tenant_id, str) or cls._TENANT_SEGMENT.fullmatch(tenant_id) is None:
+            raise InvariantViolation("CAS_TENANT_ID_INVALID")
+
     def _tenant_root(self, tenant_id: str) -> Path:
+        self._validate_tenant_id(tenant_id)
         return (self.root / "objects" / tenant_id).resolve()
 
     def _resolve_owned(self, tenant_id: str, cas_path: dict[str, str]) -> Path:
@@ -32,6 +41,7 @@ class TenantScopedCas:
         return target
 
     def put(self, tenant_id: str, content: bytes) -> dict[str, str]:
+        self._validate_tenant_id(tenant_id)
         digest = sha256_bytes(content)
         relative = Path("objects") / tenant_id / "sha256" / digest[:2] / digest[2:4] / digest
         target = self.root / relative
