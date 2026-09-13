@@ -169,6 +169,14 @@ def project_workflow_ir(
     unknown_bindings = sorted(set(bindings) - set(node_indexes))
     if unknown_bindings:
         raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_BINDING_NOT_SELECTED: {unknown_bindings}")
+    for index, override in bindings.items():
+        if not isinstance(override, Mapping):
+            raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_BINDING_INVALID: node {index} override must be an object")
+        identity_overrides = sorted(set(override) - set(_PASSTHROUGH))
+        if identity_overrides:
+            raise InvariantViolation(
+                f"WORKFLOW_IR_PROJECTION_IDENTITY_OVERRIDE: node {index} cannot override {identity_overrides}"
+            )
     for index in node_indexes:
         if not isinstance(index, int) or index < 0 or index >= len(source_nodes):
             raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_INDEX_OUT_OF_RANGE: {index!r}")

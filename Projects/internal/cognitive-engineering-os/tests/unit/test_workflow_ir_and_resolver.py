@@ -66,6 +66,10 @@ class WorkflowIrTests(unittest.TestCase):
         self.assertEqual(projected["projection"], {"source_node_indexes": [1, 4, 3, 5], "source_workflow_id": "research-qualitative-v1"})
         with self.assertRaisesRegex(InvariantViolation, "PROJECTION_BINDING_NOT_SELECTED"):
             project_workflow_ir(ir, [1], {4: {"label": "wrong"}})
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_IR_PROJECTION_IDENTITY_OVERRIDE"):
+            project_workflow_ir(ir, [1], {1: {"method_id": "different.method"}})
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_IR_PROJECTION_BINDING_INVALID"):
+            project_workflow_ir(ir, [1], {1: "not-an-object"})
 
     def test_projection_refuses_a_subgraph_that_drops_an_output_producer(self):
         ir = {"id": "projection-source", "nodes": [{"label": "producer"}, {"label": "consumer", "input": "outputs.producer.value"}]}
