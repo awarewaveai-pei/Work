@@ -14,7 +14,8 @@ from typing import Any, Callable, Mapping, Protocol
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from ai_lego.core.support import b64, unb64
+from ai_lego.core.support import b64, canonical_json, sha256_bytes, unb64
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.errors import InvariantViolation
 
 
@@ -59,6 +60,55 @@ class AesGcmJournalContextProtector:
         try:
             plaintext = AESGCM(self._key).decrypt(unb64(stored["nonce"]), unb64(stored["ciphertext"]), self._aad)
             value = json.loads(plaintext.decode("utf-8"))
+        except Exception as error:
+            raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_DECRYPT_FAILED") from error
+        if not isinstance(value, dict):
+            raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_INVALID")
+        return value
+
+
+class CasJournalContextProtector:
+    """Store AES-GCM ciphertext in tenant-scoped CAS and keep only a reference in the journal."""
+
+    def __init__(self, cas: TenantScopedCas, tenant_id: str, journal_subject: str, key: bytes, aad: bytes = b"ai-lego-workflow-journal-v1"):
+        if len(key) != 32:
+            raise InvariantViolation("WORKFLOW_JOURNAL_KEY_INVALID: AES-256 requires exactly 32 bytes")
+        if not tenant_id or not journal_subject:
+            raise InvariantViolation("WORKFLOW_JOURNAL_SCOPE_INVALID")
+        self._cas = cas
+        self._tenant_id = tenant_id
+        self._journal_subject = journal_subject
+        self._key = bytes(key)
+        self._aad = bytes(aad) + b"|" + tenant_id.encode("utf-8") + b"|" + journal_subject.encode("utf-8")
+
+    def protect(self, context: Mapping[str, Any]) -> Mapping[str, Any]:
+        try:
+            plaintext = canonical_json(dict(context)).encode("utf-8")
+        except (TypeError, ValueError) as error:
+            raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_NOT_JSON") from error
+        nonce = secrets.token_bytes(12)
+        ciphertext = AESGCM(self._key).encrypt(nonce, plaintext, self._aad)
+        cas_path = self._cas.put(self._tenant_id, ciphertext)
+        return {
+            "protected": True,
+            "storage": "TENANT_SCOPED_CAS",
+            "cipher_alg": "AES-256-GCM",
+            "nonce": b64(nonce),
+            "cas_path": cas_path,
+        }
+
+    def restore(self, stored: Mapping[str, Any]) -> dict[str, Any]:
+        if stored.get("protected") is not True or stored.get("storage") != "TENANT_SCOPED_CAS" or stored.get("cipher_alg") != "AES-256-GCM":
+            raise InvariantViolation("WORKFLOW_JOURNAL_PROTECTION_REQUIRED")
+        try:
+            cas_path = stored["cas_path"]
+            ciphertext = self._cas.read(self._tenant_id, cas_path)
+            if sha256_bytes(ciphertext) != cas_path.get("hash"):
+                raise InvariantViolation("WORKFLOW_JOURNAL_CAS_HASH_MISMATCH")
+            plaintext = AESGCM(self._key).decrypt(unb64(stored["nonce"]), ciphertext, self._aad)
+            value = json.loads(plaintext.decode("utf-8"))
+        except InvariantViolation:
+            raise
         except Exception as error:
             raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_DECRYPT_FAILED") from error
         if not isinstance(value, dict):

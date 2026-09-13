@@ -5,7 +5,8 @@ from pathlib import Path
 
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.workflow.executor import execute_workflow_ir
-from ai_lego.platform.workflow.journal_protection import AesGcmJournalContextProtector
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
+from ai_lego.platform.workflow.journal_protection import AesGcmJournalContextProtector, CasJournalContextProtector
 
 
 class JournalProtectionTests(unittest.TestCase):
@@ -36,3 +37,15 @@ class JournalProtectionTests(unittest.TestCase):
             resumed = execute_workflow_ir(ir, {}, {"one.step": lambda *_: {}}, journal_path=journal, resume=True, journal_context_protector=protector)
             self.assertEqual(resumed.status, "SUCCEEDED")
 
+    def test_cas_protector_keeps_ciphertext_out_of_journal_and_enforces_tenant_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cas = TenantScopedCas(Path(directory) / "cas")
+            protector = CasJournalContextProtector(cas, "tenant-a", "run-1", b"k" * 32)
+            stored = protector.protect({"outputs": {"one": {"secret": "hidden"}}})
+            serialized = json.dumps(stored)
+            self.assertNotIn("hidden", serialized)
+            self.assertIn("TENANT_SCOPED_CAS", serialized)
+            self.assertEqual(protector.restore(stored), {"outputs": {"one": {"secret": "hidden"}}})
+            foreign = CasJournalContextProtector(cas, "tenant-b", "run-1", b"k" * 32)
+            with self.assertRaisesRegex(InvariantViolation, "CAS_TENANT_ACCESS_DENIED"):
+                foreign.restore(stored)
