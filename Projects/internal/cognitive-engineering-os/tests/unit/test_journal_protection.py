@@ -49,3 +49,6 @@ class JournalProtectionTests(unittest.TestCase):
             foreign = CasJournalContextProtector(cas, "tenant-b", "run-1", b"k" * 32)
             with self.assertRaisesRegex(InvariantViolation, "CAS_TENANT_ACCESS_DENIED"):
                 foreign.restore(stored)
+            protector.delete(stored)
+            with self.assertRaisesRegex(InvariantViolation, "CAS_TENANT_ACCESS_DENIED"):
+                protector.restore(stored)

@@ -114,3 +114,12 @@ class CasJournalContextProtector:
         if not isinstance(value, dict):
             raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_INVALID")
         return value
+
+    def delete(self, stored: Mapping[str, Any]) -> str:
+        """Remove the tenant-owned ciphertext object; KMS crypto-shred remains separate."""
+        if stored.get("protected") is not True or stored.get("storage") != "TENANT_SCOPED_CAS":
+            raise InvariantViolation("WORKFLOW_JOURNAL_PROTECTION_REQUIRED")
+        cas_path = stored.get("cas_path")
+        if not isinstance(cas_path, dict):
+            raise InvariantViolation("WORKFLOW_JOURNAL_CAS_REFERENCE_INVALID")
+        return self._cas.unlink(self._tenant_id, cas_path)
