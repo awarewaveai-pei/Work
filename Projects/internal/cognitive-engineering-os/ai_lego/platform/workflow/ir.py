@@ -63,19 +63,6 @@ def workflow_dataflow_issues(workflow_ir: Mapping[str, Any]) -> tuple[str, ...]:
             return (f"duplicate output label {label!r} at nodes {producers[label]} and {index}",)
         producers[label] = index
 
-    paths: list[str] = []
-    for raw_node in nodes:
-        if not isinstance(raw_node, Mapping):
-            continue
-        declared = raw_node.get("input")
-        if isinstance(declared, str):
-            paths.append(declared)
-        elif isinstance(declared, list):
-            paths.extend(item for item in declared if isinstance(item, str))
-        bindings = raw_node.get("bindings")
-        if isinstance(bindings, Mapping):
-            paths.extend(value for value in bindings.values() if isinstance(value, str))
-
     issues: list[str] = []
     for consumer_index, raw_node in enumerate(nodes):
         if not isinstance(raw_node, Mapping):
@@ -90,20 +77,27 @@ def workflow_dataflow_issues(workflow_ir: Mapping[str, Any]) -> tuple[str, ...]:
         if isinstance(bindings, Mapping):
             node_paths.extend(value for value in bindings.values() if isinstance(value, str))
         for path in dict.fromkeys(node_paths):
-            if not path.startswith("outputs."):
-                continue
-            producer_label = next(
-                (label for label in sorted(producers, key=len, reverse=True)
-                 if path == f"outputs.{label}" or path.startswith(f"outputs.{label}.")),
-                None,
-            )
-            if producer_label is None:
-                issues.append(f"node {consumer_index} references unknown output {path!r}")
-            elif producers[producer_label] >= consumer_index:
-                issues.append(
-                    f"node {consumer_index} references output {producer_label!r} from node {producers[producer_label]}"
-                    " that has not completed yet"
+            if path.startswith("outputs."):
+                producer_label = next(
+                    (label for label in sorted(producers, key=len, reverse=True)
+                     if path == f"outputs.{label}" or path.startswith(f"outputs.{label}.")),
+                    None,
                 )
+                if producer_label is None:
+                    issues.append(f"node {consumer_index} references unknown output {path!r}")
+                elif producers[producer_label] >= consumer_index:
+                    issues.append(
+                        f"node {consumer_index} references output {producer_label!r} from node {producers[producer_label]}"
+                        " that has not completed yet"
+                    )
+            elif path.startswith("steps."):
+                step_token = path.removeprefix("steps.").split(".", 1)[0]
+                if not step_token.isdigit() or int(step_token) >= len(nodes):
+                    issues.append(f"node {consumer_index} references unknown step path {path!r}")
+                elif int(step_token) >= consumer_index:
+                    issues.append(
+                        f"node {consumer_index} references step {int(step_token)} that has not completed yet"
+                    )
     return tuple(dict.fromkeys(issues))
 
 

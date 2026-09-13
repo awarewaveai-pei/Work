@@ -90,6 +90,19 @@ class WorkflowIrTests(unittest.TestCase):
             (),
         )
 
+    def test_dataflow_checker_applies_the_same_rule_to_step_outputs(self):
+        issues = workflow_dataflow_issues(
+            {
+                "nodes": [
+                    {"label": "first", "input": "source.value"},
+                    {"label": "second", "input": "steps.2.value"},
+                    {"label": "third", "input": "steps.9.value"},
+                ]
+            }
+        )
+        self.assertTrue(any("references step 2 that has not completed yet" in issue for issue in issues))
+        self.assertTrue(any("unknown step path 'steps.9.value'" in issue for issue in issues))
+
 
 class MethodResolverTests(unittest.TestCase):
     @classmethod
