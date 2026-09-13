@@ -1,0 +1,46 @@
+$id: "ai-lego://recipes/validated/edd-literature-search-v1.recipe.yaml"
+title: "EdD Offline Literature Fixture Recipe"
+status: ACTIVE
+description: >
+  A deliberately small EdD Research capability slice. It accepts a research
+  question and searches only the local synthetic corpus. The result is stale
+  and human-review gated; this Recipe is not a current scholarly search.
+id: edd-literature-search-v1
+version: "1.0.0"
+name: "EdD Offline Literature Fixture"
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+suited_for:
+  - "Testing capability-backed Recipe execution with synthetic EdD inputs"
+not_for:
+  - "Current literature review, citation verification, or publication evidence"
+mandatory_elements:
+  - "Research question is supplied explicitly by the source"
+  - "Offline and stale status remains visible in the capability output"
+  - "Human research review remains required"
+forbidden_actions:
+  - "Presenting synthetic fixture items as current scholarship"
+  - "Connecting an unregistered network provider through this Recipe"
+steps:
+  - label: "offline_literature_search"
+    type: capability
+    ref: literature_search
+    input: source.research_question
+    bindings:
+      research.question: source.research_question
+    necessity: REQUIRED_BY_RISK
+outputs:
+  - "LiteratureSet"
+open_questions:
+  - id: "OQ-EDD-LITERATURE-1"
+    question: "Which approved provider and freshness policy should replace the local synthetic adapter?"
+    owner: "operator and research supervisor"
+    blocks: "only the future network-backed Recipe"
+verification:
+  required: true
+  checks:
+    - "Capability contract resolves to ACTIVE"
+    - "Offline source status remains OFFLINE_SOURCE_STALE"
+    - "Raw source is not silently converted into a publication claim"

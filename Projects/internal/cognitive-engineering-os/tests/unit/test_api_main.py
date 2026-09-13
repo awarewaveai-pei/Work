@@ -336,6 +336,19 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(payload["status"], "PASS")
         self.assertEqual([step["ref"] for step in payload["workflow"]["steps"]], ["epistemic.assumption_mapping", "epistemic.evidence_matrix", "epistemic.toulmin_model"])
 
+    def test_edd_offline_literature_capability_uses_registered_adapter(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/edd-literature-search-v1/run",
+            json={"source": {"research_question": "How do educators describe reflective practice?"}, "run_id": "api-edd-literature-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["workflow"]["steps"][0]["node_kind"], "capability")
+        self.assertEqual(payload["workflow"]["steps"][0]["ref"], "literature_search")
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["offline_literature_search"]["literature"]["retrieval"]["status_code"], "OFFLINE_SOURCE_STALE")
+
     def test_art_reflection_recipe_preserves_non_diagnostic_boundary(self):
         self._login()
         source = {

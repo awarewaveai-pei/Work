@@ -8,6 +8,7 @@ Endpoints:
     GET  /methods/{method_id}        -- one method's contract descriptor
     GET  /recipes                    -- list ACTIVE validated Recipes
     GET  /recipes/{recipe_id}/plan   -- compile and resolve one Recipe
+    POST /recipes/{recipe_id}/run    -- auth + entitlement + registered adapters
     POST /auth/login                 -- {tenant_id, email, password} -> session cookie
     POST /auth/logout                -- revoke the caller's session
     POST /methods/{method_id}/invoke -- auth + entitlement required; body = builder kwargs
@@ -55,11 +56,13 @@ from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
+from ai_lego.modules.research.evidence_triangulation import offline_literature_search
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
+from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.executor import execute_workflow_ir
 
 SESSION_COOKIE = "cognitive_os_session"
@@ -401,7 +404,7 @@ def run_recipe(
     catalog: MethodCatalog = Depends(get_catalog),
     store: IdentityStore = Depends(get_store),
 ) -> dict[str, Any]:
-    """Execute a method-only Recipe through the shared durable Workflow runtime.
+    """Execute a Recipe through the shared durable Workflow runtime.
 
     ``body`` is ``{"source": {...}, "run_id": "optional", "resume": false}``.
     Bindings in the compiled IR are the only builder arguments; there is no
@@ -414,17 +417,29 @@ def run_recipe(
             raise HTTPException(status_code=404, detail=str(error)) from error
         raise HTTPException(status_code=400, detail=str(error)) from error
     nodes = workflow_ir["nodes"]
-    if any(node["node_kind"] != "method" for node in nodes):
-        raise HTTPException(status_code=501, detail="WORKFLOW_CAPABILITY_ADAPTER_UNAVAILABLE: this endpoint currently executes method-only Recipes")
-    method_ids = [node["method_id"] for node in nodes]
+    method_ids = [node["method_id"] for node in nodes if node["node_kind"] == "method"]
+    capability_ids = capability_refs(workflow_ir)
     if any(not isinstance(node.get("bindings"), dict) for node in nodes):
-        raise HTTPException(status_code=400, detail="WORKFLOW_BINDINGS_REQUIRED: every method node must declare explicit bindings")
-    resolution = catalog.resolve(method_ids)
-    if resolution["blocked"] is not None:
-        raise HTTPException(status_code=409, detail=resolution["blocked"])
-    for method_id in method_ids:
-        if not check_entitlement(store, session["tenant_id"], method_id):
-            raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {method_id!r}")
+        raise HTTPException(status_code=400, detail="WORKFLOW_BINDINGS_REQUIRED: every workflow node must declare explicit bindings")
+    method_resolution = catalog.resolve(method_ids)
+    if method_resolution["blocked"] is not None:
+        raise HTTPException(status_code=409, detail=method_resolution["blocked"])
+    capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
+    capability_resolution = capability_catalog.resolve(capability_ids)
+    if capability_resolution["blocked"] is not None:
+        raise HTTPException(status_code=409, detail=capability_resolution["blocked"])
+    capability_adapters = CapabilityAdapterRegistry(capability_catalog)
+    # Only the deterministic, local, read-only literature fixture is exposed here. External
+    # providers need their own egress, freshness and policy adapter before registration.
+    if "literature_search" in capability_ids:
+        capability_adapters.register("literature_search", offline_literature_search)
+    try:
+        capability_handlers = capability_adapters.handlers_for(capability_ids)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=501, detail=str(error)) from error
+    for ref in [*method_ids, *capability_ids]:
+        if not check_entitlement(store, session["tenant_id"], ref):
+            raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {ref!r}")
     source = body.get("source")
     if not isinstance(source, dict):
         raise HTTPException(status_code=400, detail="WORKFLOW_SOURCE_REQUIRED: body.source must be a JSON object")
@@ -437,7 +452,7 @@ def run_recipe(
     tenant_key = hashlib.sha256(session["tenant_id"].encode("utf-8")).hexdigest()[:32]  # stable opaque namespace; tenant identity never enters a path
     journal = PRODUCT_ROOT / ".runtime" / "workflows" / tenant_key / f"{run_id}.journal.json"
 
-    handlers: dict[str, Any] = {}
+    handlers: dict[str, Any] = dict(capability_handlers)
     for method_id in method_ids:
         try:
             builder = resolve_builder(method_id)
@@ -452,18 +467,20 @@ def run_recipe(
             return invoke_builder(_builder, "", make_provenance("AI_INFERENCE", "AI_GENERATED"), bindings)
 
         handlers[method_id] = handler
-    result = execute_workflow_ir(workflow_ir, {"source": source}, handlers, catalogs={"method": catalog}, journal_path=journal, resume=resume)
+    result = execute_workflow_ir(workflow_ir, {"source": source}, handlers, catalogs={"method": catalog, "capability": capability_catalog}, journal_path=journal, resume=resume)
     if result.status != "SUCCEEDED":
-        return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal": str(journal), "method_resolution": resolution}
+        return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal": str(journal), "method_resolution": method_resolution, "capability_resolution": capability_resolution}
     gates: dict[str, list[dict[str, Any]]] = {}
     for index, node in enumerate(nodes):
+        if node["node_kind"] != "method":
+            continue
         output = result.context["steps"][str(index)]
         try:
             gates[str(index)] = resolve_gate_runner(node["method_id"])(output, "api.recipe", datetime.datetime.now(datetime.timezone.utc).isoformat())
         except (InvariantViolation, MethodDispatchError) as error:
             raise HTTPException(status_code=422, detail=f"WORKFLOW_GATE_EVALUATION_FAILED: {error}") from error
     passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates)
-    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": result.as_dict(), "gates": gates, "journal": str(journal), "method_resolution": resolution}
+    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": result.as_dict(), "gates": gates, "journal": str(journal), "method_resolution": method_resolution, "capability_resolution": capability_resolution}
 
 
 @app.get("/methods/{method_id}")
