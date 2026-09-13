@@ -41,7 +41,7 @@ Billing, credits, multiple tenants, SSO, enterprise contracts, regulated-system 
 - `life-decision-v1`: frame → SWOT → weighted decision matrix.
 - `edd-research-evidence-v1`: assumption mapping → evidence matrix → Toulmin argument.
 - `art-therapy-creative-reflection-v1`: random stimulus → mind map; non-diagnostic, no automated clinical inference.
-- Shared runtime now supports explicit context bindings, registered capability adapters, durable journal/resume, and caller-selected journal projection. API source-bearing runs omit raw `source` from the journal while retaining the input fingerprint for resume; checkpoint `outputs` still await encrypted CAS/KMS before external or clinical data is accepted. The API has one deterministic offline `literature_search` capability slice; transcribe, external literature providers, media/consent storage, 31 new art-therapy methods, and Business Planning's finance/computation chain remain open.
+- Shared runtime now supports explicit context bindings, registered capability adapters, durable journal/resume, caller-selected journal projection, and an injected AES-256-GCM journal protector. Protected journals keep checkpoint outputs only inside encrypted context (step ledger stores status/contract metadata without a second plaintext output copy). API source-bearing runs currently use projection-only and retain the input fingerprint for resume; encrypted CAS/KMS key custody is still required before external or clinical data is accepted. The API has one deterministic offline `literature_search` capability slice; transcribe, external literature providers, media/consent storage, 31 new art-therapy methods, and Business Planning's finance/computation chain remain open.
 
 ## Next action
 

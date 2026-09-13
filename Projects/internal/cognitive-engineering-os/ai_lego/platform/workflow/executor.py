@@ -21,6 +21,7 @@ from typing import Any, Callable, Mapping
 
 from ai_lego.core.support import read_json, sha256_json, write_json
 from ai_lego.errors import InvariantViolation
+from ai_lego.platform.workflow.journal_protection import JournalContextProtector
 
 
 Handler = Callable[[dict[str, Any], dict[str, Any]], Mapping[str, Any]]
@@ -143,8 +144,19 @@ def _journal_record(
     steps: list[WorkflowStepResult],
     next_index: int,
     journal_context_projector: JournalContextProjector | None = None,
+    journal_context_protector: JournalContextProtector | None = None,
 ) -> dict[str, Any]:
     persisted_context = dict(journal_context_projector(context) if journal_context_projector is not None else context)
+    if journal_context_protector is not None:
+        persisted_context = dict(journal_context_protector.protect(persisted_context))
+    persisted_steps = []
+    for step in steps:
+        step_record = step.as_dict()
+        if journal_context_protector is not None:
+            # The protected context already carries checkpoint outputs. Keeping a second
+            # plaintext copy in the step ledger would defeat the protector.
+            step_record.pop("output", None)
+        persisted_steps.append(step_record)
     return {
         "journal_version": 1,
         "workflow_id": workflow_ir["id"],
@@ -153,11 +165,11 @@ def _journal_record(
         "status": status,
         "next_index": next_index,
         "context": persisted_context,
-        "steps": [step.as_dict() for step in steps],
+        "steps": persisted_steps,
     }
 
 
-def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context: Mapping[str, Any]) -> tuple[dict[str, Any], list[WorkflowStepResult], int, str]:
+def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context: Mapping[str, Any], journal_context_protector: JournalContextProtector | None = None) -> tuple[dict[str, Any], list[WorkflowStepResult], int, str]:
     try:
         journal = read_json(path)
     except Exception as error:
@@ -187,6 +199,10 @@ def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context
     context = journal.get("context")
     if not isinstance(context, dict):
         raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_INVALID")
+    if context.get("protected") is True:
+        if journal_context_protector is None:
+            raise InvariantViolation("WORKFLOW_JOURNAL_PROTECTION_REQUIRED")
+        context = journal_context_protector.restore(context)
     return context, restored, expected, str(journal["status"])
 
 
@@ -198,6 +214,7 @@ def execute_workflow_ir(
     journal_path: Path | None = None,
     resume: bool = False,
     journal_context_projector: JournalContextProjector | None = None,
+    journal_context_protector: JournalContextProtector | None = None,
 ) -> WorkflowRunResult:
     """Execute a flat compiled IR with explicit handler and input resolution.
 
@@ -228,7 +245,7 @@ def execute_workflow_ir(
     if journal_path is not None and journal_path.exists():
         if not resume:
             raise InvariantViolation(f"WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME: {journal_path}")
-        context, results, start_index, prior_status = _restore_journal(journal_path, workflow_ir, initial_context)
+        context, results, start_index, prior_status = _restore_journal(journal_path, workflow_ir, initial_context, journal_context_protector)
         # A protected journal may intentionally omit the original source. The caller supplies
         # it again (and the fingerprint above must still match); checkpointed execution state
         # overlays that fresh initial context for deterministic resume.
@@ -240,7 +257,7 @@ def execute_workflow_ir(
     elif resume:
         raise InvariantViolation(f"WORKFLOW_JOURNAL_NOT_FOUND: {journal_path}")
     if journal_path is not None:
-        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "RUNNING", context, results, start_index, journal_context_projector))
+        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "RUNNING", context, results, start_index, journal_context_projector, journal_context_protector))
 
     for index, raw_node in enumerate(nodes[start_index:], start=start_index):
         if not isinstance(raw_node, Mapping):
@@ -272,15 +289,15 @@ def execute_workflow_ir(
             step_result = WorkflowStepResult(index, label, node["node_kind"], ref, "SUCCEEDED", paths, output, contract=contract)
             results.append(step_result)
             if journal_path is not None:
-                _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "RUNNING", context, results, index + 1, journal_context_projector))
+                _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "RUNNING", context, results, index + 1, journal_context_projector, journal_context_protector))
         except Exception as error:
             message = str(error) or error.__class__.__name__
             failed_step = WorkflowStepResult(index, label, node.get("node_kind", "unknown"), ref, "FAILED", paths, error=message)
             results.append(failed_step)
             if journal_path is not None:
-                _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "FAILED", context, results, index, journal_context_projector))
+                _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "FAILED", context, results, index, journal_context_projector, journal_context_protector))
             return WorkflowRunResult(workflow_id, "FAILED", context, tuple(results))
 
     if journal_path is not None:
-        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "SUCCEEDED", context, results, len(nodes), journal_context_projector))
+        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "SUCCEEDED", context, results, len(nodes), journal_context_projector, journal_context_protector))
     return WorkflowRunResult(workflow_id, "SUCCEEDED", context, tuple(results))
