@@ -37,6 +37,7 @@ from ai_lego.errors import InvariantViolation
 
 PBKDF2_ITERATIONS = 600_000
 SESSION_TTL = timedelta(hours=12)
+PASSWORD_RESET_TTL = timedelta(hours=1)
 # Fixed (not secret, not per-identity) salt used ONLY to give the "no such identity"/"no such
 # credential row" authenticate() failure paths a real PBKDF2 hash of equal cost to the genuine
 # "wrong password" path -- closes the timing side-channel a critic pass found 2026-09-12 (see
@@ -82,6 +83,14 @@ CREATE TABLE IF NOT EXISTS session (
     tenant_id TEXT NOT NULL REFERENCES tenant(tenant_id),
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS password_reset_token (
+    reset_id TEXT PRIMARY KEY,
+    identity_id TEXT NOT NULL REFERENCES identity(identity_id),
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    consumed_at TEXT
 );
 CREATE TABLE IF NOT EXISTS entitlement_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -257,6 +266,76 @@ class IdentityStore:
     def revoke_session(self, session_token: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM session WHERE session_token = ?", (session_token,))
+
+    # -- Password reset -----------------------------------------------------------
+
+    def issue_password_reset_token(self, tenant_id: str, email: str) -> dict[str, str] | None:
+        """Create a single-use reset token for an active identity.
+
+        The returned raw token is an internal delivery payload. Only its SHA-256 digest is
+        persisted, and all earlier unconsumed tokens for the identity are invalidated. Callers
+        must hand the raw value to an explicitly configured delivery adapter; never log it or
+        place it in a journal/artifact.
+        """
+        identity = self._find_identity_by_email(tenant_id, email)
+        if identity is None or identity["status"] != "active":
+            return None
+        raw_token = secrets.token_urlsafe(32)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        expires = now + PASSWORD_RESET_TTL
+        record = {
+            "reset_id": str(secrets.token_hex(16)),
+            "identity_id": identity["identity_id"],
+            "token_hash": hashlib.sha256(raw_token.encode("utf-8")).hexdigest(),
+            "created_at": now.isoformat().replace("+00:00", "Z"),
+            "expires_at": expires.isoformat().replace("+00:00", "Z"),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE password_reset_token SET consumed_at = ? WHERE identity_id = ? AND consumed_at IS NULL",
+                (record["created_at"], record["identity_id"]),
+            )
+            conn.execute(
+                "INSERT INTO password_reset_token (reset_id, identity_id, token_hash, created_at, expires_at, consumed_at) VALUES (?,?,?,?,?,NULL)",
+                (record["reset_id"], record["identity_id"], record["token_hash"], record["created_at"], record["expires_at"]),
+            )
+        return {"reset_id": record["reset_id"], "token": raw_token, "expires_at": record["expires_at"]}
+
+    def consume_password_reset_token(self, raw_token: str, new_password: str) -> bool:
+        """Atomically consume a valid token, replace the password, and revoke all sessions."""
+        if len(new_password) < 12:
+            raise InvariantViolation(f"IDENTITY_WEAK_PASSWORD: password must be at least 12 characters, got {len(new_password)}")
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now_iso = now.isoformat().replace("+00:00", "Z")
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT reset_id, identity_id, expires_at FROM password_reset_token WHERE token_hash = ? AND consumed_at IS NULL",
+                (token_hash,),
+            ).fetchone()
+            if row is None:
+                return False
+            expires_at = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+            if now >= expires_at:
+                conn.execute("UPDATE password_reset_token SET consumed_at = ? WHERE reset_id = ? AND consumed_at IS NULL", (now_iso, row["reset_id"]))
+                return False
+            identity = conn.execute("SELECT status FROM identity WHERE identity_id = ?", (row["identity_id"],)).fetchone()
+            if identity is None or identity["status"] != "active":
+                return False
+            salt = secrets.token_bytes(16)
+            password_hash = _hash_password(new_password, salt)
+            updated = conn.execute(
+                "UPDATE password_reset_token SET consumed_at = ? WHERE reset_id = ? AND consumed_at IS NULL",
+                (now_iso, row["reset_id"]),
+            ).rowcount
+            if updated != 1:
+                return False
+            conn.execute(
+                "UPDATE identity_credential SET password_hash = ?, password_salt = ?, iterations = ? WHERE identity_id = ?",
+                (password_hash, salt, PBKDF2_ITERATIONS, row["identity_id"]),
+            )
+            conn.execute("DELETE FROM session WHERE identity_id = ?", (row["identity_id"],))
+        return True
 
     # -- Entitlement audit (see ai_lego/platform/entitlement/check.py) --------------
 

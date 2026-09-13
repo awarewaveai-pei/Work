@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
 import tempfile
 import unittest
 import uuid
@@ -165,6 +166,34 @@ class SessionTests(_TempStoreTestCase):
     def test_two_logins_issue_two_distinct_tokens(self):
         second_token = self.store.authenticate(self.tenant["tenant_id"], "user@example.com", "correct-horse-battery")
         self.assertNotEqual(self.token, second_token)
+
+
+class PasswordResetTests(_TempStoreTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tenant = self._make_tenant()
+        self.identity = self.store.create_identity(str(uuid.uuid4()), self.tenant["tenant_id"], "user@example.com", "User", "correct-horse-battery")
+
+    def test_issue_returns_raw_token_but_database_only_contains_digest(self):
+        issued = self.store.issue_password_reset_token(self.tenant["tenant_id"], "USER@EXAMPLE.COM")
+        self.assertIsNotNone(issued)
+        with self.store._connect() as conn:  # noqa: SLF001
+            row = conn.execute("SELECT token_hash FROM password_reset_token WHERE reset_id = ?", (issued["reset_id"],)).fetchone()
+        self.assertEqual(row["token_hash"], hashlib.sha256(issued["token"].encode()).hexdigest())
+        self.assertNotEqual(row["token_hash"], issued["token"])
+
+    def test_new_token_invalidates_previous_and_consumption_revokes_sessions(self):
+        session = self.store.authenticate(self.tenant["tenant_id"], "user@example.com", "correct-horse-battery")
+        first = self.store.issue_password_reset_token(self.tenant["tenant_id"], "user@example.com")
+        second = self.store.issue_password_reset_token(self.tenant["tenant_id"], "user@example.com")
+        self.assertFalse(self.store.consume_password_reset_token(first["token"], "new-correct-password"))
+        self.assertTrue(self.store.consume_password_reset_token(second["token"], "new-correct-password"))
+        self.assertIsNone(self.store.resolve_session(session))
+        self.assertIsNotNone(self.store.authenticate(self.tenant["tenant_id"], "user@example.com", "new-correct-password"))
+        self.assertFalse(self.store.consume_password_reset_token(second["token"], "another-password"))
+
+    def test_unknown_identity_does_not_issue_a_token(self):
+        self.assertIsNone(self.store.issue_password_reset_token(self.tenant["tenant_id"], "nobody@example.com"))
 
 
 class EntitlementAuditTests(_TempStoreTestCase):
