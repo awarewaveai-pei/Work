@@ -52,3 +52,15 @@ class JournalProtectionTests(unittest.TestCase):
             protector.delete(stored)
             with self.assertRaisesRegex(InvariantViolation, "CAS_TENANT_ACCESS_DENIED"):
                 protector.restore(stored)
+
+    def test_cas_delete_refuses_same_tenant_reference_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cas = TenantScopedCas(Path(directory) / "cas")
+            protector = CasJournalContextProtector(cas, "tenant-a", "run-1", b"k" * 32)
+            first = protector.protect({"outputs": {"id": "first"}})
+            second = protector.protect({"outputs": {"id": "second"}})
+            tampered = dict(first)
+            tampered["cas_path"] = second["cas_path"]
+            with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_CONTEXT_DECRYPT_FAILED"):
+                protector.delete(tampered)
+            self.assertEqual(protector.restore(second), {"outputs": {"id": "second"}})

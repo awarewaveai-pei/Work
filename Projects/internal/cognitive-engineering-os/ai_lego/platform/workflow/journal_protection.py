@@ -122,4 +122,7 @@ class CasJournalContextProtector:
         cas_path = stored.get("cas_path")
         if not isinstance(cas_path, dict):
             raise InvariantViolation("WORKFLOW_JOURNAL_CAS_REFERENCE_INVALID")
+        # Ownership alone is insufficient for a destructive operation: a tampered journal
+        # could otherwise point at another valid object in the same tenant namespace.
+        self.restore(stored)
         return self._cas.unlink(self._tenant_id, cas_path)
