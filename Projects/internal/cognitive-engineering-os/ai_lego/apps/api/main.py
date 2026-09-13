@@ -32,6 +32,7 @@ under test, which is exactly the bug this design avoids.
 from __future__ import annotations
 
 import datetime
+import inspect
 import os
 import secrets
 import subprocess
@@ -118,6 +119,12 @@ _DASHBOARD_HTML = """<!doctype html>
   <button id="logout-btn">Log out</button>
   <input id="search" placeholder="Filter methods by id (e.g. foresight, cross_impact_analysis)...">
   <div id="method-list"></div>
+  <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
+    <div id="invoke-method" class="method-id"></div>
+    <div id="invoke-help" class="method-meta"></div>
+    <textarea id="invoke-json" rows="12" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace">{}</textarea>
+    <button id="invoke-btn">Run with JSON</button>
+  </div>
 </div>
 
 <h3>Result</h3>
@@ -172,7 +179,14 @@ function renderMethods() {
       btn.textContent = 'Run Demo';
       btn.disabled = !loggedIn;
       btn.onclick = () => runDemo(m.method_id);
-      row.appendChild(btn);
+      const formBtn = document.createElement('button');
+      formBtn.textContent = 'Open Input';
+      formBtn.disabled = !loggedIn;
+      formBtn.onclick = () => openForm(m.method_id);
+      const actions = document.createElement('div');
+      actions.appendChild(btn);
+      actions.appendChild(formBtn);
+      row.appendChild(actions);
       list.appendChild(row);
     });
 }
@@ -182,6 +196,26 @@ async function runDemo(methodId) {
   const r = await fetch(`/methods/${encodeURIComponent(methodId)}/demo`, { credentials: 'same-origin' });
   const body = await r.json();
   document.getElementById('result').textContent = JSON.stringify(body, null, 2);
+}
+
+async function openForm(methodId) {
+  const r = await fetch(`/methods/${encodeURIComponent(methodId)}/form`, { credentials: 'same-origin' });
+  const body = await r.json();
+  if (!r.ok) { document.getElementById('result').textContent = JSON.stringify(body, null, 2); return; }
+  document.getElementById('invoke-box').style.display = 'block';
+  document.getElementById('invoke-method').textContent = methodId;
+  document.getElementById('invoke-help').textContent = 'Required/optional parameters: ' + body.parameters.map(p => p.name + (p.required ? ' (required)' : ' (optional)')).join(', ') + '. Values must be valid JSON.';
+  document.getElementById('invoke-json').value = '{}';
+  document.getElementById('invoke-btn').onclick = () => runLive(methodId);
+}
+
+async function runLive(methodId) {
+  let body;
+  try { body = JSON.parse(document.getElementById('invoke-json').value); }
+  catch (error) { document.getElementById('result').textContent = 'Invalid JSON: ' + error.message; return; }
+  document.getElementById('result').textContent = 'invoking ' + methodId + ' ...';
+  const r = await fetch(`/methods/${encodeURIComponent(methodId)}/invoke`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
 }
 
 document.getElementById('search').addEventListener('input', renderMethods);
@@ -252,6 +286,34 @@ def get_method(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) ->
     if not catalog.is_resolvable(method_id):
         raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
     return catalog.require(method_id)
+
+
+@app.get("/methods/{method_id}/form")
+def method_form(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) -> dict[str, Any]:
+    """Expose a safe, generic input descriptor for the dashboard.
+
+    The descriptor is derived from the live builder signature. It is not a
+    substitute for a domain JSON Schema; the invoke endpoint remains the
+    authority and validates the actual method contract/gates.
+    """
+    if not catalog.is_resolvable(method_id):
+        raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
+    try:
+        builder = resolve_builder(method_id)
+    except MethodDispatchError as error:
+        raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
+    parameters = []
+    for name, parameter in inspect.signature(builder).parameters.items():
+        has_default = parameter.default is not inspect.Parameter.empty
+        parameters.append(
+            {
+                "name": name,
+                "required": not has_default,
+                "default": None if not has_default else parameter.default,
+                "annotation": None if parameter.annotation is inspect.Parameter.empty else str(parameter.annotation),
+            }
+        )
+    return {"method_id": method_id, "contract": catalog.require(method_id), "parameters": parameters, "schema_source": "builder_signature_only"}
 
 
 @app.post("/auth/login")

@@ -84,6 +84,8 @@ class DashboardTests(ApiTestCase):
         innerHTML to a template literal that interpolates a `m.` field."""
         html = api_main._DASHBOARD_HTML
         self.assertNotRegex(html, r"innerHTML\s*=\s*`[^`]*\$\{m\.")
+        self.assertIn("Open Input", html)
+        self.assertIn("runLive", html)
 
 
 class UnauthenticatedAccessTests(ApiTestCase):
@@ -101,6 +103,21 @@ class UnauthenticatedAccessTests(ApiTestCase):
     def test_get_unknown_method_is_404(self):
         response = self.client.get("/methods/nonexistent.method")
         self.assertEqual(response.status_code, 404)
+
+    def test_get_method_form_is_derived_from_the_live_builder_signature(self):
+        response = self.client.get("/methods/foresight.cross_impact_analysis/form")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["method_id"], "foresight.cross_impact_analysis")
+        self.assertEqual(payload["schema_source"], "builder_signature_only")
+        parameter_names = [parameter["name"] for parameter in payload["parameters"]]
+        self.assertEqual(parameter_names[:4], ["record_id", "events", "impact_pairs", "provenance"])
+        self.assertIn("version", parameter_names)
+        self.assertIn("generated_by_method", parameter_names)
+
+    def test_method_form_for_unknown_method_is_404(self):
+        response = self.client.get("/methods/nonexistent.method/form")
+        self.assertEqual(response.status_code, 404, response.text)
 
     def test_invoke_without_session_is_401(self):
         response = self.client.post("/methods/foresight.cross_impact_analysis/invoke", json={})
