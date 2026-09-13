@@ -33,11 +33,14 @@ under test, which is exactly the bug this design avoids.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import inspect
 import os
+import re
 import secrets
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +58,7 @@ from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog,
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
+from ai_lego.platform.workflow.executor import execute_workflow_ir
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -123,6 +127,9 @@ _DASHBOARD_HTML = """<!doctype html>
   <button id="logout-btn">Log out</button>
   <input id="search" placeholder="Filter methods by id (e.g. foresight, cross_impact_analysis)...">
   <div id="method-list"></div>
+  <h2>Recipes</h2>
+  <div id="recipe-list"></div>
+  <textarea id="recipe-json" rows="10" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace" placeholder='{"problem": ..., "swot": ..., "decision": ...}'>{}</textarea>
   <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
     <div id="invoke-method" class="method-id"></div>
     <div id="invoke-help" class="method-meta"></div>
@@ -195,6 +202,28 @@ function renderMethods() {
     });
 }
 
+async function loadRecipes() {
+  const r = await fetch('/recipes', { credentials: 'same-origin' });
+  if (!r.ok) return;
+  const recipes = await r.json();
+  const list = document.getElementById('recipe-list');
+  while (list.firstChild) list.removeChild(list.firstChild);
+  recipes.forEach(recipe => {
+    const row = document.createElement('div');
+    row.className = 'method-row';
+    const label = document.createElement('span');
+    label.className = 'method-id';
+    label.textContent = recipe.recipe_id + ' (' + recipe.step_count + ' steps)';
+    row.appendChild(label);
+    const button = document.createElement('button');
+    button.textContent = 'Run Recipe';
+    button.disabled = !loggedIn;
+    button.onclick = () => runRecipe(recipe.recipe_id);
+    row.appendChild(button);
+    list.appendChild(row);
+  });
+}
+
 async function runDemo(methodId) {
   document.getElementById('result').textContent = 'running ' + methodId + ' ...';
   const r = await fetch(`/methods/${encodeURIComponent(methodId)}/demo`, { credentials: 'same-origin' });
@@ -222,6 +251,19 @@ async function runLive(methodId) {
   document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
 }
 
+async function runRecipe(recipeId) {
+  let source;
+  try { source = JSON.parse(document.getElementById('recipe-json').value); }
+  catch (error) { document.getElementById('result').textContent = 'Invalid JSON: ' + error.message; return; }
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    document.getElementById('result').textContent = 'Recipe source must be a JSON object';
+    return;
+  }
+  document.getElementById('result').textContent = 'running recipe ' + recipeId + ' ...';
+  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/run`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source }) });
+  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
 document.getElementById('search').addEventListener('input', renderMethods);
 
 document.getElementById('login-btn').onclick = async () => {
@@ -244,6 +286,7 @@ document.getElementById('login-btn').onclick = async () => {
   document.getElementById('login-box').style.display = 'none';
   document.getElementById('app-box').style.display = 'block';
   renderMethods();
+  loadRecipes();
 };
 
 document.getElementById('logout-btn').onclick = async () => {
@@ -255,6 +298,7 @@ document.getElementById('logout-btn').onclick = async () => {
 
 checkStatus();
 loadMethods();
+loadRecipes();
 </script>
 </body>
 </html>"""
@@ -321,6 +365,79 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "plan_executability": executability,
         "status": "READY" if method_ready and executability["executable"] else "BLOCKED",
     }
+
+
+@app.post("/recipes/{recipe_id}/run")
+def run_recipe(
+    recipe_id: str,
+    body: dict[str, Any],
+    session: dict[str, Any] = Depends(require_session),
+    catalog: MethodCatalog = Depends(get_catalog),
+    store: IdentityStore = Depends(get_store),
+) -> dict[str, Any]:
+    """Execute a method-only Recipe through the shared durable Workflow runtime.
+
+    ``body`` is ``{"source": {...}, "run_id": "optional", "resume": false}``.
+    Bindings in the compiled IR are the only builder arguments; there is no
+    positional guessing or fallback to the single-method API.
+    """
+    try:
+        workflow_ir = compile_recipe_to_workflow_ir(resolve_spec_root(), recipe_id, "R0")
+    except InvariantViolation as error:
+        if "RECIPE_NOT_FOUND" in str(error) or "RECIPE_ID_MISMATCH" in str(error):
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    nodes = workflow_ir["nodes"]
+    if any(node["node_kind"] != "method" for node in nodes):
+        raise HTTPException(status_code=501, detail="WORKFLOW_CAPABILITY_ADAPTER_UNAVAILABLE: this endpoint currently executes method-only Recipes")
+    method_ids = [node["method_id"] for node in nodes]
+    if any(not isinstance(node.get("bindings"), dict) for node in nodes):
+        raise HTTPException(status_code=400, detail="WORKFLOW_BINDINGS_REQUIRED: every method node must declare explicit bindings")
+    resolution = catalog.resolve(method_ids)
+    if resolution["blocked"] is not None:
+        raise HTTPException(status_code=409, detail=resolution["blocked"])
+    for method_id in method_ids:
+        if not check_entitlement(store, session["tenant_id"], method_id):
+            raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {method_id!r}")
+    source = body.get("source")
+    if not isinstance(source, dict):
+        raise HTTPException(status_code=400, detail="WORKFLOW_SOURCE_REQUIRED: body.source must be a JSON object")
+    run_id = body.get("run_id") or uuid.uuid4().hex
+    if not isinstance(run_id, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) is None:
+        raise HTTPException(status_code=400, detail="WORKFLOW_RUN_ID_INVALID: use 1-80 ASCII letters, numbers, '_' or '-'")
+    resume = body.get("resume", False)
+    if not isinstance(resume, bool):
+        raise HTTPException(status_code=400, detail="WORKFLOW_RESUME_INVALID: resume must be boolean")
+    tenant_key = hashlib.sha256(session["tenant_id"].encode("utf-8")).hexdigest()[:32]  # stable opaque namespace; tenant identity never enters a path
+    journal = PRODUCT_ROOT / ".runtime" / "workflows" / tenant_key / f"{run_id}.journal.json"
+
+    handlers: dict[str, Any] = {}
+    for method_id in method_ids:
+        try:
+            builder = resolve_builder(method_id)
+            gate_runner = resolve_gate_runner(method_id)
+        except MethodDispatchError as error:
+            raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
+
+        def handler(payload: dict[str, Any], _node: dict[str, Any], _builder=builder) -> dict[str, Any]:
+            bindings = payload.get("__bindings__")
+            if not isinstance(bindings, dict):
+                raise InvariantViolation("WORKFLOW_BINDINGS_REQUIRED: executor did not expose bindings")
+            return invoke_builder(_builder, "", make_provenance("AI_INFERENCE", "AI_GENERATED"), bindings)
+
+        handlers[method_id] = handler
+    result = execute_workflow_ir(workflow_ir, {"source": source}, handlers, catalogs={"method": catalog}, journal_path=journal, resume=resume)
+    if result.status != "SUCCEEDED":
+        return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal": str(journal), "method_resolution": resolution}
+    gates: dict[str, list[dict[str, Any]]] = {}
+    for index, node in enumerate(nodes):
+        output = result.context["steps"][str(index)]
+        try:
+            gates[str(index)] = resolve_gate_runner(node["method_id"])(output, "api.recipe", datetime.datetime.now(datetime.timezone.utc).isoformat())
+        except (InvariantViolation, MethodDispatchError) as error:
+            raise HTTPException(status_code=422, detail=f"WORKFLOW_GATE_EVALUATION_FAILED: {error}") from error
+    passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates)
+    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": result.as_dict(), "gates": gates, "journal": str(journal), "method_resolution": resolution}
 
 
 @app.get("/methods/{method_id}")

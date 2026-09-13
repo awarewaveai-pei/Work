@@ -36,16 +36,37 @@ steps:
     type: method
     method_id: framing.problem_statement
     input: source.problem
+    bindings:
+      problem_id: source.problem.problem_id
+      current_state: source.problem.current_state
+      expected_state: source.problem.expected_state
+      gap: source.problem.gap
+      provenance: source.problem.provenance
     necessity: REQUIRED_BY_RISK
   - label: "SWOT_analysis"
     type: method
     method_id: strategy.swot
     input: source.swot
+    bindings:
+      analysis_id: source.swot.analysis_id
+      knowledge_set_ref: source.swot.knowledge_set_ref
+      knowledge_set: source.swot.knowledge_set
+      factors: source.swot.factors
     necessity: REQUIRED_BY_RISK
   - label: "weighted_decision_matrix"
     type: method
     method_id: decision.weighted_decision_matrix
     input: [source.decision, outputs.SWOT_analysis]
+    bindings:
+      analysis_id: source.decision.analysis_id
+      options: source.decision.options
+      criteria: source.decision.criteria
+      scores: source.decision.scores
+      weights: source.decision.weights
+      scale_min: source.decision.scale_min
+      scale_max: source.decision.scale_max
+      sensitivity_notes: source.decision.sensitivity_notes
+      provenance: source.decision.provenance
     necessity: REQUIRED_BY_RISK
 
 outputs:

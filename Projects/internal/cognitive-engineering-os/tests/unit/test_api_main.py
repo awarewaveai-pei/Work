@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from ai_lego.apps.api import main as api_main
+from ai_lego.apps.cli.run_life_decision_slice import fixture_source
 from ai_lego.platform.identity.store import IdentityStore
 
 
@@ -86,6 +87,9 @@ class DashboardTests(ApiTestCase):
         self.assertNotRegex(html, r"innerHTML\s*=\s*`[^`]*\$\{m\.")
         self.assertIn("Open Input", html)
         self.assertIn("runLive", html)
+        self.assertIn("Run Recipe", html)
+        self.assertIn("runRecipe", html)
+        self.assertIn("recipe-json", html)
 
 
 class UnauthenticatedAccessTests(ApiTestCase):
@@ -249,6 +253,31 @@ class InvokeTests(ApiTestCase):
         response = self.client.post("/methods/jurisdiction.market_admission_control/invoke", json=body)
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["record"]["admission_decision"], "ENABLE")
+
+
+class RecipeRunTests(ApiTestCase):
+    def test_life_recipe_runs_through_shared_executor_and_gates(self):
+        self._login()
+        response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": "api-life-test"})
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(len(payload["workflow"]["steps"]), 3)
+        self.assertTrue(all(gate["status"] == "PASS" for gates in payload["gates"].values() for gate in gates))
+
+    def test_life_recipe_resume_reuses_stable_journal_namespace(self):
+        self._login()
+        source = fixture_source()
+        run_id = "api-life-resume-" + uuid.uuid4().hex[:12]
+        first = self.client.post("/recipes/life-decision-v1/run", json={"source": source, "run_id": run_id})
+        self.assertEqual(first.status_code, 200, first.text)
+        resumed = self.client.post("/recipes/life-decision-v1/run", json={"source": source, "run_id": run_id, "resume": True})
+        self.assertEqual(resumed.status_code, 200, resumed.text)
+        self.assertEqual(resumed.json()["status"], "PASS")
+
+    def test_recipe_run_requires_authentication(self):
+        response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source()})
+        self.assertEqual(response.status_code, 401)
 
 
 class DemoTests(ApiTestCase):
