@@ -1,0 +1,69 @@
+$id: "ai-lego://recipes/validated/life-decision-v1.recipe.yaml"
+title: "Life Decision Recipe (Frame -> SWOT -> Weighted Decision Matrix)"
+status: ACTIVE
+description: >
+  A reusable, human-in-the-loop decision chain for everyday choices. It
+  converts an explicit situation into a problem statement, records evidence-
+  labeled SWOT factors, and computes a transparent weighted comparison. The
+  result is a recommendation aid, never an automatic decision.
+id: life-decision-v1
+version: "1.0.0"
+name: "Life Decision (Frame -> SWOT -> Weighted Decision Matrix)"
+
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+
+suited_for:
+  - "Personal decisions with explicit alternatives, criteria, evidence, and a human decision owner"
+  - "Low-to-moderate risk choices where trade-offs should be visible and replayable"
+not_for:
+  - "Emergency, medical, legal, safeguarding, or other high-stakes decisions without qualified human review"
+  - "Decisions where options, criteria, or scores are missing or invented by the system"
+
+mandatory_elements:
+  - "Problem framing with distinct current state, expected state, and gap"
+  - "Evidence-labeled SWOT factors with provenance"
+  - "Explicit criteria, weights, scores, and sensitivity disclosure"
+  - "Human review before any action; computed ranking is advisory"
+forbidden_actions:
+  - "Treating a computed ranking as an automatic instruction or authority claim"
+  - "Silently inventing evidence, options, criteria, weights, or scores"
+
+steps:
+  - label: "problem_statement"
+    type: method
+    method_id: framing.problem_statement
+    input: source.problem
+    necessity: REQUIRED_BY_RISK
+  - label: "SWOT_analysis"
+    type: method
+    method_id: strategy.swot
+    input: source.swot
+    necessity: REQUIRED_BY_RISK
+  - label: "weighted_decision_matrix"
+    type: method
+    method_id: decision.weighted_decision_matrix
+    input: [source.decision, outputs.SWOT_analysis]
+    necessity: REQUIRED_BY_RISK
+
+outputs:
+  - "ProblemStatement"
+  - "SWOTAnalysis"
+  - "WeightedDecisionMatrixRecord"
+  - "HumanReviewDecision"
+
+open_questions:
+  - id: "OQ-LIFE-DECISION-1"
+    question: "Should a future version add an explicit counterfactual or risk review node for decisions above a configured risk tier?"
+    owner: "operator"
+    blocks: "nothing in v1; callers must apply human review and risk boundaries"
+
+verification:
+  required: true
+  checks:
+    - "All three method ids resolve to ACTIVE contracts before execution"
+    - "Each method output passes its own schema and method-specific gates"
+    - "Workflow journal is atomically persisted and resumable after a failed step"
+    - "No automatic-authority claim is present in the final decision record"
