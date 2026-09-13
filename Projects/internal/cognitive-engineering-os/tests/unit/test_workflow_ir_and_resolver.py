@@ -4,6 +4,7 @@ from ai_lego import resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation, SchemaValidationError
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog, state_transition
+from ai_lego.platform.workflow.executor import missing_workflow_input_paths
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir, project_workflow_ir
 
 TRANSITION = "ai-lego://specs/execution/execution-state-machine.schema.yaml#/state_transition_event"
@@ -54,6 +55,14 @@ class WorkflowIrTests(unittest.TestCase):
         self.assertEqual(projected["projection"], {"source_node_indexes": [1, 4, 3, 5], "source_workflow_id": "research-qualitative-v1"})
         with self.assertRaisesRegex(InvariantViolation, "PROJECTION_BINDING_NOT_SELECTED"):
             project_workflow_ir(ir, [1], {4: {"label": "wrong"}})
+
+    def test_source_preflight_checks_only_initial_source_paths(self):
+        ir = compile_recipe_to_workflow_ir(self.spec_root, "life-decision-v1", "R1")
+        missing = missing_workflow_input_paths(ir, {"source": {"problem": {}}})
+        self.assertIn("source.problem.problem_id", missing)
+        self.assertIn("source.swot.analysis_id", missing)
+        self.assertIn("source.decision.options", missing)
+        self.assertNotIn("outputs.SWOT_analysis", missing)
 
 
 class MethodResolverTests(unittest.TestCase):

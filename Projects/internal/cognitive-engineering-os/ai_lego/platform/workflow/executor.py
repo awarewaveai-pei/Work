@@ -115,6 +115,39 @@ def _resolve_bindings(context: Mapping[str, Any], node: Mapping[str, Any]) -> di
     return {argument: _lookup(context, path) for argument, path in bindings.items()}
 
 
+def missing_workflow_input_paths(
+    workflow_ir: Mapping[str, Any],
+    initial_context: Mapping[str, Any],
+    prefix: str = "source.",
+) -> tuple[str, ...]:
+    """Return declared initial-input paths that are absent from ``initial_context``.
+
+    Only paths under ``prefix`` are checked because paths such as
+    ``outputs.previous_step`` are intentionally created during execution.  The
+    function reuses the executor's exact dotted-path semantics, so a Recipe's
+    preflight cannot disagree with runtime binding resolution.  Malformed node
+    declarations still raise their normal invariant rather than being hidden as
+    missing data.
+    """
+    nodes = workflow_ir.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        raise InvariantViolation("WORKFLOW_NODES_MISSING")
+    paths: list[str] = []
+    for node in nodes:
+        if not isinstance(node, Mapping):
+            raise InvariantViolation("WORKFLOW_NODE_INVALID")
+        for path in _input_paths(node):
+            if path.startswith(prefix):
+                paths.append(path)
+    missing: list[str] = []
+    for path in dict.fromkeys(paths):
+        try:
+            _lookup(initial_context, path)
+        except InvariantViolation:
+            missing.append(path)
+    return tuple(missing)
+
+
 def _node_ref(node: Mapping[str, Any]) -> str:
     kind = node.get("node_kind")
     if kind == "method":

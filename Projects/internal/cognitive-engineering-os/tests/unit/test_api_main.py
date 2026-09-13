@@ -419,6 +419,18 @@ class RecipeRunTests(ApiTestCase):
         response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source()})
         self.assertEqual(response.status_code, 401)
 
+    def test_recipe_run_rejects_missing_source_fields_before_creating_a_journal(self):
+        self._login()
+        run_id = "api-missing-source-" + uuid.uuid4().hex[:12]
+        response = self.client.post(
+            "/recipes/life-decision-v1/run",
+            json={"source": {}, "run_id": run_id},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"]["code"], "WORKFLOW_SOURCE_FIELDS_MISSING")
+        self.assertIn("source.problem.problem_id", response.json()["detail"]["paths"])
+        self.assertFalse(any(Path(api_main.PRODUCT_ROOT).glob(f".runtime/workflows/*/{run_id}.journal.json")))
+
     def test_confidential_source_requires_encrypted_journal_provider(self):
         self._login()
         response = self.client.post(

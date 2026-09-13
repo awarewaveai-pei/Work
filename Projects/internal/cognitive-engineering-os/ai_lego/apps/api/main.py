@@ -67,7 +67,7 @@ from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider
-from ai_lego.platform.workflow.executor import execute_workflow_ir
+from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -597,6 +597,12 @@ def run_recipe(
     source = body.get("source")
     if not isinstance(source, dict):
         raise HTTPException(status_code=400, detail="WORKFLOW_SOURCE_REQUIRED: body.source must be a JSON object")
+    missing_source_paths = missing_workflow_input_paths(workflow_ir, {"source": source})
+    if missing_source_paths:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "WORKFLOW_SOURCE_FIELDS_MISSING", "paths": list(missing_source_paths)},
+        )
     run_id = body.get("run_id") or uuid.uuid4().hex
     if not isinstance(run_id, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) is None:
         raise HTTPException(status_code=400, detail="WORKFLOW_RUN_ID_INVALID: use 1-80 ASCII letters, numbers, '_' or '-'")
