@@ -23,10 +23,10 @@ description: >
   `RECOMMENDED`, so its absence never made the plan non-executable -- only
   not fully resolved.
 
-  **What this file does NOT claim**: no runtime implementation performs a
-  literature search today (the Phase 5 slice records `literature_search` as
-  `not_performed`); this contract types what such an implementation must
-  honour, in particular EC §83's offline rule.
+  **What this file does NOT claim**: the first runtime implementation is an
+  offline synthetic-corpus adapter, not a current scholarly search. It emits
+  `OFFLINE_SOURCE_STALE` and `NEEDS_HUMAN_REVIEW`; this contract still does not
+  claim that a fresh network-backed provider exists.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L783-785) -- `ref: literature_search`, `input: research.question`; the ONLY mother-document mention of this capability id (line numbers as of 2026-09-04)"
@@ -233,10 +233,9 @@ open_questions:
     blocks: "nothing in this file's own validity -- soft references are the corpus-wide convention today"
   - id: "OQ-LITSEARCH-3"
     question: >
-      No runtime implementation of this capability exists; the Phase 5
-      slice records it as `not_performed`. Which literature sources (and
-      which local corpus format for the offline path) should the first
-      implementation target?
+      The first runtime implementation is an offline synthetic-corpus adapter.
+      Which allow-listed scholarly sources and local corpus format should a
+      future network-backed implementation target?
     owner: "operator / next Phase 5 slice extension"
     blocks: "nothing in this file's own validity; it does block the Recipe's Literature Search step from ever being INVOKED (as opposed to resolved)"
 

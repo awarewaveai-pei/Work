@@ -30,8 +30,8 @@ through ``MethodCatalog.invoke`` the same way (ADR-023 section Consequences 5).
 ``OUTSIDE_CAPABILITY_PLANE`` -- the declared, self-expiring bypass mechanism
 (the run refuses to start, ``CAPABILITY_BYPASS_NO_LONGER_JUSTIFIED``, if a
 declared ref gains an ACTIVE contract) -- is kept but empty: nothing this slice
-does bypasses the plane any more; ``literature_search`` is compiled and
-resolved but not performed, and is recorded as such.
+does bypasses the plane any more.  The first offline literature adapter is
+executed through the same catalog gate and records its stale/review status.
 
 Run::
 
@@ -67,6 +67,7 @@ from ai_lego.modules.knowledge.ingest.transcription import FixtureTranscriber, M
 from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_from_transcript, reverse_trace
 from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_categories, suggest_open_codes, suggest_themes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
+from ai_lego.modules.research.evidence_triangulation import offline_literature_search, triangulate_themes_and_literature
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
 from ai_lego.modules.research.review import fixture_primary_review, fixture_review, locked_code_from_review, locked_definition_from_review, review_code_interactively, reviewed_codebook_definitions
 from ai_lego.modules.research.synthetic_fixtures import PROJECT_ID, SUGGESTED_LABEL, SYNTHETIC_CONSENT, SYNTHETIC_TRANSCRIPTS, expanded_synthetic_coder_judgments
@@ -434,9 +435,9 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             selective = suggest_themes(gateway, DEFAULT_LOCAL_MODEL_PROFILE, axial["categories"], pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:selective")
             emit(NORDBROOK.tenant_id, nord_aggregate, "SelectiveCodingSuggested", {"themes": [{"theme": t, "categories": c} for t, c in selective["themes"]], "rejected": selective["rejected"], "unassigned": selective["unassigned"], "suggestion_source": selective["suggestion_source"]}, 23.4)
             write_json(runtime / "modules" / "research" / "selective_model_response.json", selective)
-    # Execute the first real runtime sub-chain through the generic Workflow IR executor.  The full Recipe
-    # still contains intentionally unperformed ingest/literature/triangulation nodes; this sub-chain only
-    # claims the two nodes whose real adapters are available at this point: coding -> trusted statistics.
+    # Execute the Research evidence sub-chain through the generic Workflow IR executor.  The literature
+    # adapter is explicitly offline/synthetic and therefore returns OFFLINE_SOURCE_STALE; it is not a
+    # claim that current scholarship was searched.  Triangulation preserves that NEEDS_HUMAN_REVIEW state.
     coding_request = {
         "locked_code": locked_code,
         "ai_review": ai_review,
@@ -486,12 +487,19 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         "nodes": [
             {"node_kind": "method", "method_id": "research.qualitative_coding", "label": "coding", "input": "research.coding_request"},
             {"node_kind": "capability", "ref": "run_statistics", "label": "statistics", "input": "outputs.coding"},
+            {"node_kind": "capability", "ref": "literature_search", "label": "literature", "input": "research.question"},
+            {"node_kind": "method", "method_id": "evidence.triangulation", "label": "triangulation", "input": ["outputs.coding", "outputs.literature"]},
         ],
     }
     runtime_result = execute_workflow_ir(
         runtime_subchain,
-        {"research": {"coding_request": coding_request}},
-        {"research.qualitative_coding": execute_coding, "run_statistics": execute_statistics},
+        {"research": {"question": "after-hours boundary erosion among remote workers", "coding_request": coding_request}},
+        {
+            "research.qualitative_coding": execute_coding,
+            "run_statistics": execute_statistics,
+            "literature_search": offline_literature_search,
+            "evidence.triangulation": triangulate_themes_and_literature,
+        },
         catalogs={"method": live, "capability": capabilities},
     )
     if runtime_result.status != "SUCCEEDED":
@@ -500,6 +508,10 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     coding_contract = runtime_result.steps[0].contract
     coding_outputs = runtime_result.context["outputs"]["coding"]["coding_outputs"]
     runtime_statistics = runtime_result.context["outputs"]["statistics"]
+    literature = runtime_result.context["outputs"]["literature"]["literature"]
+    triangulation = runtime_result.context["outputs"]["triangulation"]["triangulation"]
+    if triangulation["status"] != "NEEDS_HUMAN_REVIEW" or triangulation["offline_status_code"] != "OFFLINE_SOURCE_STALE":
+        raise InvariantViolation("TRIANGULATION_FRESHNESS_GUARD_FAILED: offline literature must remain review-gated")
     if codebook_pass is None:
         coder_one, coder_two = expanded_synthetic_coder_judgments()
     else:
@@ -516,7 +528,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     transition("ROLLBACK_VALIDATED", "APPROVED", 24.2, authority_level="A4")
     transition("APPROVED", "EXECUTING", 24.3)
 
-    # The executor already routed run_statistics through CapabilityCatalog.invoke.  Preserve the existing
+    # The executor already routed statistics and literature through CapabilityCatalog.invoke.  Preserve the existing
     # semantic judgment source in the result while retaining the runtime's own observed shared-unit count.
     run_statistics_contract = next(step.contract for step in runtime_result.steps if step.ref == "run_statistics")
     statistics = {**runtime_statistics["statistics"], "judgment_source": runtime_statistics["judgment_source"], "runtime_execution": runtime_statistics["judgment_source"]}
@@ -530,6 +542,19 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             "block_id": "coding",
             "contract_path": coding_contract["path"],
             "contract_sha256": coding_contract["content_sha256"],
+            "prompt_version": "11",
+        }
+    )
+    triangulation_contract = next(step.contract for step in runtime_result.steps if step.ref == "evidence.triangulation")
+    method_execution_log.append(
+        {
+            "execution_id": "EX-METHOD-TRIANGULATION-001",
+            "method_id": triangulation_contract["ref"],
+            "method_version": triangulation_contract["version"],
+            "workflow_id": workflow_ir["id"],
+            "block_id": "triangulation",
+            "contract_path": triangulation_contract["path"],
+            "contract_sha256": triangulation_contract["content_sha256"],
             "prompt_version": "11",
         }
     )
@@ -590,7 +615,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             "",
             trace["sentence"],
             f"Evidence: {trace['source_id']} at {trace['audio_timestamp']} (synthetic fixture; locator {p1_precision}).",
-            "Triangulation: not performed in this slice (evidence.triangulation and literature_search are compiled and resolved, not executed).",
+            f"Triangulation: {len(triangulation['findings'])} finding(s) linked to the offline corpus; status={triangulation['status']} ({triangulation['offline_status_code']}).",
             f"Cohen's Kappa: {statistics['kappa']} (95% bootstrap CI {statistics['confidence_interval_95']}; {statistics['interpretation_landis_koch_1977']}).",
             "Gates: " + ", ".join(f"{gate_id}={status}" for gate_id, status in gates.items()),
         ]
@@ -748,9 +773,9 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         "knowledge_snapshot": sha256_json(evidence_graph),
     }
     contracts.validate("ai-lego://specs/execution/audit.schema.yaml", audit, "execution audit")
-    # CAPABILITY invocations homed on the manifest's method_execution_log, because the spec root has no capability
+    # Catalog invocations are homed on the manifest's method_execution_log, because the spec root has no capability
     # execution log yet (ADR-023 section Consequences 6). One entry per invocation the catalog actually observed
-    # (transcribe x4, run_statistics, artifact.generate_research_paper), in invocation order. `method_id` is
+    # (transcribe x4, run_statistics, literature_search, artifact.generate_research_paper), in invocation order. `method_id` is
     # schema-required and carries the capability ref; every version field here is the CONTRACT version that ran -- the
     # same semantics as the method entry above, never the package version -- and each entry has its own invocation id,
     # distinct from the top-level execution id.
@@ -810,6 +835,8 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         "state_machine_final_state": "VERIFYING (release states are outside the local synthetic slice)",
         "source_event_count": len(source_records) + 2,
         "statistics": statistics,
+        "literature": literature,
+        "triangulation": triangulation,
         "gates": gates,
         "gate_results": gate_results,
         "cas_isolation": {"tenant_a_path": nord_consent["path"], "tenant_b_path": cascadia_consent["path"], "same_hash": nord_consent["hash"] == cascadia_consent["hash"]},

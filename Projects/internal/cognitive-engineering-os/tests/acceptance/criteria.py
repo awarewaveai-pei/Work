@@ -149,7 +149,7 @@ class SliceCriteriaMixin:
         self.assertTrue(executability["executable"])
         # What went through the gate is the catalog's own observation log, not a literal the slice wrote.
         invoked_refs = [entry["ref"] for entry in record["invoked"]]
-        self.assertEqual(invoked_refs, ["transcribe"] * 4 + ["run_statistics", "artifact.generate_research_paper"])
+        self.assertEqual(invoked_refs, ["transcribe"] * 4 + ["run_statistics", "literature_search", "artifact.generate_research_paper"])
         for entry in record["invoked"]:
             self.assertEqual(entry["path"], f"capabilities/contracts/{entry['ref']}.capability.yaml")
             self.assertEqual(entry["version"], "1.0.0")
@@ -159,7 +159,7 @@ class SliceCriteriaMixin:
         self.assertEqual(outside, {})
         self.assertTrue(set(outside) <= set(expected_unresolved), "a declared bypass must not survive its ref gaining a contract")
         self.assertEqual(record["not_performed"], [ref for ref in record["refs"] if ref not in set(invoked_refs) and ref not in outside])
-        self.assertEqual(record["not_performed"], ["literature_search"])
+        self.assertEqual(record["not_performed"], [])
         # The verdict reaches the authoritative outputs (manifest results block, audit record), not only a nested field.
         manifest_results = self.result["manifest"]["results"]
         self.assertEqual(manifest_results["capability_plan_executable"], executability["executable"])
@@ -194,8 +194,9 @@ class SliceCriteriaMixin:
     def test_method_executions_went_through_the_method_atlas_gate(self):
         """ADR-023 Consequences 5: research.qualitative_coding runs (v11 coding, v12 re-analysis) are gated like capabilities."""
         invoked = self.result["method_resolution"]["invoked"]
-        self.assertEqual([entry["ref"] for entry in invoked], ["research.qualitative_coding", "research.qualitative_coding"])
-        self.assertTrue(all(entry["path"] == "methods/contracts/research.qualitative_coding.contract.yaml" for entry in invoked))
+        self.assertEqual([entry["ref"] for entry in invoked], ["research.qualitative_coding", "evidence.triangulation", "research.qualitative_coding"])
+        self.assertEqual(invoked[1]["path"], "methods/contracts/evidence.triangulation.contract.yaml")
+        self.assertEqual(invoked[2]["path"], "methods/contracts/research.qualitative_coding.contract.yaml")
         coding_log = next(entry for entry in self.result["manifest"]["method_execution_log"] if entry["block_id"] == "coding")
         self.assertEqual(coding_log["method_version"], invoked[0]["version"])
         self.assertEqual(coding_log["contract_sha256"], invoked[0]["content_sha256"])
@@ -372,7 +373,7 @@ class SliceCriteriaMixin:
         self.assertEqual(manifest["ai"]["prompt_version"], "11")
         method_ids = {entry["method_id"] for entry in manifest["method_execution_log"]}
         self.assertIn("research.qualitative_coding", method_ids)
-        for capability_ref in ("transcribe", "run_statistics", "artifact.generate_research_paper"):
+        for capability_ref in ("transcribe", "run_statistics", "literature_search", "artifact.generate_research_paper"):
             self.assertIn(capability_ref, method_ids)
 
     def test_timestamp_replays_before_first_and_after_last_are_sane(self):
