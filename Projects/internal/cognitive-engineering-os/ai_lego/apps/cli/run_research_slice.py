@@ -503,6 +503,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             "evidence.triangulation": triangulate_themes_and_literature,
         },
         catalogs={"method": live, "capability": capabilities},
+        journal_path=runtime / "platform" / "ai_execution" / "research_workflow.journal.json",
     )
     if runtime_result.status != "SUCCEEDED":
         failed_step = next(step for step in runtime_result.steps if step.status == "FAILED")
@@ -637,6 +638,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         {"research": {"artifact_path": str(runtime / "artifacts" / "research_memo.md"), "memo": memo}},
         {"artifact.generate_research_paper": execute_artifact},
         catalogs={"capability": capabilities},
+        journal_path=runtime / "platform" / "ai_execution" / "artifact_workflow.journal.json",
     )
     if artifact_result.status != "SUCCEEDED":
         failed_step = next(step for step in artifact_result.steps if step.status == "FAILED")

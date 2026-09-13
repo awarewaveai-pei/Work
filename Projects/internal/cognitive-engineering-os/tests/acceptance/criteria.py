@@ -193,6 +193,8 @@ class SliceCriteriaMixin:
         runtime_workflow = read_json(self.runtime / "platform" / "ai_execution" / "workflow_runtime.json")
         self.assertEqual(runtime_workflow["projections"][0]["source_node_indexes"], [1, 4, 3, 5])
         self.assertEqual(runtime_workflow["projections"][1]["source_node_indexes"], [6])
+        self.assertEqual(read_json(self.runtime / "platform" / "ai_execution" / "research_workflow.journal.json")["status"], "SUCCEEDED")
+        self.assertEqual(read_json(self.runtime / "platform" / "ai_execution" / "artifact_workflow.journal.json")["status"], "SUCCEEDED")
         artifact_phase = runtime_workflow["phases"][1]
         self.assertEqual(artifact_phase["status"], "SUCCEEDED")
         self.assertEqual(artifact_phase["steps"][0]["ref"], "artifact.generate_research_paper")

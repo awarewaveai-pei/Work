@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 from ai_lego import resolve_spec_root
 from ai_lego.errors import InvariantViolation
@@ -84,6 +86,51 @@ class WorkflowExecutorTests(unittest.TestCase):
         ir = {"id": "bad", "nodes": [{"node_kind": "method", "method_id": "x.y", "input": {"guess": "no"}}]}
         with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_INPUT_DECLARATION_INVALID"):
             execute_workflow_ir(ir, {}, {})
+
+    def test_durable_execution_persists_after_each_step_and_resume_skips_successes(self):
+        ir = {
+            "id": "durable-v1",
+            "nodes": [
+                {"node_kind": "method", "method_id": "one.step", "label": "one"},
+                {"node_kind": "method", "method_id": "two.step", "label": "two", "input": "outputs.one"},
+            ],
+        }
+        calls = []
+        failed_once = {"value": False}
+
+        def first(payload, _node):
+            calls.append("first")
+            return {"value": 1}
+
+        def second(payload, _node):
+            calls.append("second")
+            if not failed_once["value"]:
+                failed_once["value"] = True
+                raise InvariantViolation("temporary failure")
+            return {"value": payload["outputs.one"]["value"] + 1}
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "run.json"
+            first_result = execute_workflow_ir(ir, {}, {"one.step": first, "two.step": second}, journal_path=journal)
+            self.assertEqual(first_result.status, "FAILED")
+            self.assertEqual(calls, ["first", "second"])
+            self.assertEqual(first_result.steps[0].status, "SUCCEEDED")
+            resumed = execute_workflow_ir(ir, {}, {"one.step": first, "two.step": second}, journal_path=journal, resume=True)
+            self.assertEqual(resumed.status, "SUCCEEDED")
+            self.assertEqual(calls, ["first", "second", "second"])
+            self.assertEqual(resumed.context["outputs"]["two"], {"value": 2})
+            self.assertEqual(__import__("json").loads(journal.read_text(encoding="utf-8"))["status"], "SUCCEEDED")
+            completed_again = execute_workflow_ir(ir, {}, {"one.step": first, "two.step": second}, journal_path=journal, resume=True)
+            self.assertEqual(completed_again.status, "SUCCEEDED")
+            self.assertEqual(calls, ["first", "second", "second"])
+
+    def test_durable_resume_refuses_changed_inputs(self):
+        ir = {"id": "durable-v1", "nodes": [{"node_kind": "method", "method_id": "one.step"}]}
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "run.json"
+            execute_workflow_ir(ir, {"source": "a"}, {"one.step": lambda *_: {"ok": True}}, journal_path=journal)
+            with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_INPUT_MISMATCH"):
+                execute_workflow_ir(ir, {"source": "b"}, {"one.step": lambda *_: {"ok": True}}, journal_path=journal, resume=True)
 
 
 if __name__ == "__main__":
