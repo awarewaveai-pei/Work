@@ -49,13 +49,18 @@ def compile_recipe_to_workflow_ir(spec_root: Path, recipe_id: str, risk_tier: st
         nodes.append(node)
     if not nodes:
         raise InvariantViolation(f"RECIPE_HAS_NO_STEPS: {recipe_id}")
-    return {
+    compiled: dict[str, Any] = {
         "id": recipe_id,
-        "references": recipe["references"],
         "risk_tier": risk_tier,
         "compiled_from": {"source_kind": "recipe", "recipe_id": recipe_id, "recipe_version": str(recipe["version"])},
         "nodes": nodes,
     }
+    # references are optional for capability-only Recipes and required by the
+    # workflow IR only when a method node exists. Preserve that conditional
+    # contract instead of indexing an absent optional key.
+    if "references" in recipe:
+        compiled["references"] = recipe["references"]
+    return compiled
 
 
 def project_workflow_ir(

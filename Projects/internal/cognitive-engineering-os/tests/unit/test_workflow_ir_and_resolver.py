@@ -35,6 +35,11 @@ class WorkflowIrTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, "RECIPE_NOT_FOUND"):
             compile_recipe_to_workflow_ir(self.spec_root, "does-not-exist", "R1")
 
+    def test_capability_only_recipe_compiles_without_optional_atlas_references(self):
+        ir = compile_recipe_to_workflow_ir(self.spec_root, "champion-challenger", "R1")
+        self.assertNotIn("references", ir)
+        self.assertEqual([node["node_kind"] for node in ir["nodes"]], ["capability"] * 4)
+
     def test_projection_keeps_compiled_node_identity_and_allows_only_explicit_bindings(self):
         ir = compile_recipe_to_workflow_ir(self.spec_root, "research-qualitative-v1", "R4")
         projected = project_workflow_ir(

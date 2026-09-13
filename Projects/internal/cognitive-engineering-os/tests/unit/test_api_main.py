@@ -213,6 +213,13 @@ class UnauthenticatedAccessTests(ApiTestCase):
         self.assertTrue(payload["method_dispatch_readiness"]["ready"])
         self.assertEqual(payload["method_dispatch_readiness"]["missing"], [])
 
+    def test_all_capability_only_recipes_have_a_non_500_plan_response(self):
+        for recipe_id in ("champion-challenger", "db-migration-expand-contract", "method-deprecation-retirement"):
+            with self.subTest(recipe_id=recipe_id):
+                response = self.client.get(f"/recipes/{recipe_id}/plan")
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertIn(response.json()["status"], {"READY", "BLOCKED"})
+
     def test_recipe_form_describes_source_fields_from_bindings(self):
         response = self.client.get("/recipes/research-qualitative-v1/form")
         self.assertEqual(response.status_code, 200, response.text)
