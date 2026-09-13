@@ -78,6 +78,25 @@ def business_foundation_source() -> dict:
     }
 
 
+def business_feasibility_source() -> dict:
+    return {
+        "break_even": {
+            "record_id": "BEVEN-API-001",
+            "subject_ref": "project:reflective-learning",
+            "fixed_cost": 12000,
+            "contribution_margin_per_unit": 80,
+            "provenance": make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL"),
+        },
+        "npv": {
+            "record_id": "NPV-API-001",
+            "subject_ref": "project:reflective-learning",
+            "cash_flows": [{"period": 0, "amount": -12000}, {"period": 1, "amount": 9000}, {"period": 2, "amount": 11000}],
+            "discount_rate": 0.1,
+            "provenance": make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL"),
+        },
+    }
+
+
 class HealthTests(ApiTestCase):
     def test_health_requires_no_auth_and_touches_no_store(self):
         response = self.client.get("/health")
@@ -456,6 +475,22 @@ class RecipeRunTests(ApiTestCase):
             ["outputs.SWOT_analysis", "source.tows", "source.tows.record_id", "source.tows.pairings", "source.tows.provenance"],
         )
         self.assertEqual(payload["workflow"]["context"]["outputs"]["TOWS_strategy_options"]["swot_analysis_ref"], "SWOT-API-001")
+
+    def test_business_feasibility_recipe_runs_real_calculation_methods(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/business-feasibility-review-v1/run",
+            json={"source": business_feasibility_source(), "run_id": "api-business-feasibility-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(
+            [step["ref"] for step in payload["workflow"]["steps"]],
+            ["feasibility.break_even", "feasibility.npv"],
+        )
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["break_even_analysis"]["break_even_volume_units"], 150.0)
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["net_present_value_analysis"]["npv"], 5272.72727273)
 
     def test_edd_offline_literature_capability_uses_registered_adapter(self):
         self._login()

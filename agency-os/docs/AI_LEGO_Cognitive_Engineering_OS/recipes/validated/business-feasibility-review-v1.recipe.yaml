@@ -1,0 +1,74 @@
+$id: "ai-lego://recipes/validated/business-feasibility-review-v1.recipe.yaml"
+title: "Business Feasibility Review (Break-even -> NPV)"
+status: ACTIVE
+description: >
+  A bounded feasibility workflow for business projects. It computes break-even
+  volume and net present value from caller-supplied, provenance-bearing inputs.
+  This is not the missing Finance Domain Pack, does not infer assumptions, and
+  does not produce an investment decision or a complete business proposal.
+id: business-feasibility-review-v1
+version: "1.0.0"
+name: "Business Feasibility Review (Break-even -> NPV)"
+
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+
+suited_for:
+  - "Early feasibility checks with explicit cost, margin, cash-flow, and discount-rate inputs"
+  - "Replayable numeric analysis before human financial review"
+not_for:
+  - "Financial Assumptions Domain Pack semantics or automatic investment advice"
+  - "Forecasting, scenario simulation, risk approval, or proposal publication"
+
+mandatory_elements:
+  - "Break-even and NPV inputs are supplied explicitly and carry provenance"
+  - "Computed values are produced by the methods, never caller-supplied"
+  - "A qualified human reviews the assumptions before acting on either result"
+forbidden_actions:
+  - "Treating computed break-even or NPV as an approval or recommendation"
+  - "Inventing cash flows, costs, margins, discount rates, or evidence"
+  - "Describing this bounded workflow as the complete Business Planning Mode"
+
+steps:
+  - label: "break_even_analysis"
+    type: method
+    method_id: feasibility.break_even
+    input: source.break_even
+    bindings:
+      record_id: source.break_even.record_id
+      subject_ref: source.break_even.subject_ref
+      fixed_cost: source.break_even.fixed_cost
+      contribution_margin_per_unit: source.break_even.contribution_margin_per_unit
+      provenance: source.break_even.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "net_present_value_analysis"
+    type: method
+    method_id: feasibility.npv
+    input: [source.npv, outputs.break_even_analysis]
+    bindings:
+      record_id: source.npv.record_id
+      subject_ref: source.npv.subject_ref
+      cash_flows: source.npv.cash_flows
+      discount_rate: source.npv.discount_rate
+      provenance: source.npv.provenance
+    necessity: REQUIRED_BY_RISK
+
+outputs:
+  - "BreakEvenAnalysis"
+  - "NetPresentValueAnalysis"
+  - "HumanFinancialReview"
+
+open_questions:
+  - id: "OQ-BUSINESS-FEASIBILITY-1"
+    question: "When the Finance Domain Pack is formally built, should this remain a stable calculation slice or become a versioned sub-recipe?"
+    owner: "operator and qualified financial reviewer"
+    blocks: "nothing in v1; this recipe remains explicitly bounded"
+
+verification:
+  required: true
+  checks:
+    - "Both feasibility methods resolve to ACTIVE contracts"
+    - "Each computed value passes its independent integrity gate"
+    - "The workflow does not claim Financial Assumptions or automatic authority"

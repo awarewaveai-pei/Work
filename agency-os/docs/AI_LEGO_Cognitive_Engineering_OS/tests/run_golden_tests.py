@@ -238,6 +238,7 @@ def run_recipe_instance_conformance():
     recipe_basenames = {os.path.basename(p)[: -len(".recipe.yaml")] for p in recipe_files}
     expected_recipe_ids = {
         "art-therapy-creative-reflection-v1",
+        "business-feasibility-review-v1",
         "business-foundation-v1",
         "champion-challenger",
         "db-migration-expand-contract",
