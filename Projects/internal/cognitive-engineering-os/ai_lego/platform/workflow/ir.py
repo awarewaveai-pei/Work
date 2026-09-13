@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from functools import lru_cache
-from typing import Any
+from typing import Any, Mapping
 
 import yaml
 
@@ -39,6 +39,72 @@ def load_recipe(spec_root: Path, recipe_id: str) -> dict[str, Any]:
     if recipe.get("status") != "ACTIVE":
         raise InvariantViolation(f"RECIPE_NOT_ACTIVE: {recipe_id} has status {recipe.get('status')}")
     return recipe
+
+
+def workflow_dataflow_issues(workflow_ir: Mapping[str, Any]) -> tuple[str, ...]:
+    """Find output references whose producer is unknown or runs too late.
+
+    ``outputs.<label>`` is created only after the node carrying ``label``
+    succeeds.  Checking that dependency at compile time prevents a Recipe
+    from reaching runtime with a typo or a forward reference that can only
+    fail after journals and partial work have already been created.
+    """
+    nodes = workflow_ir.get("nodes")
+    if not isinstance(nodes, list):
+        return ("WORKFLOW_NODES_MISSING",)
+    producers: dict[str, int] = {}
+    for index, raw_node in enumerate(nodes):
+        if not isinstance(raw_node, Mapping):
+            continue
+        label = raw_node.get("label")
+        if not isinstance(label, str) or not label.strip():
+            label = f"step-{index + 1}"
+        if label in producers:
+            return (f"duplicate output label {label!r} at nodes {producers[label]} and {index}",)
+        producers[label] = index
+
+    paths: list[str] = []
+    for raw_node in nodes:
+        if not isinstance(raw_node, Mapping):
+            continue
+        declared = raw_node.get("input")
+        if isinstance(declared, str):
+            paths.append(declared)
+        elif isinstance(declared, list):
+            paths.extend(item for item in declared if isinstance(item, str))
+        bindings = raw_node.get("bindings")
+        if isinstance(bindings, Mapping):
+            paths.extend(value for value in bindings.values() if isinstance(value, str))
+
+    issues: list[str] = []
+    for consumer_index, raw_node in enumerate(nodes):
+        if not isinstance(raw_node, Mapping):
+            continue
+        declared = raw_node.get("input")
+        node_paths = []
+        if isinstance(declared, str):
+            node_paths.append(declared)
+        elif isinstance(declared, list):
+            node_paths.extend(item for item in declared if isinstance(item, str))
+        bindings = raw_node.get("bindings")
+        if isinstance(bindings, Mapping):
+            node_paths.extend(value for value in bindings.values() if isinstance(value, str))
+        for path in dict.fromkeys(node_paths):
+            if not path.startswith("outputs."):
+                continue
+            producer_label = next(
+                (label for label in sorted(producers, key=len, reverse=True)
+                 if path == f"outputs.{label}" or path.startswith(f"outputs.{label}.")),
+                None,
+            )
+            if producer_label is None:
+                issues.append(f"node {consumer_index} references unknown output {path!r}")
+            elif producers[producer_label] >= consumer_index:
+                issues.append(
+                    f"node {consumer_index} references output {producer_label!r} from node {producers[producer_label]}"
+                    " that has not completed yet"
+                )
+    return tuple(dict.fromkeys(issues))
 
 
 def compile_recipe_to_workflow_ir(spec_root: Path, recipe_id: str, risk_tier: str) -> dict[str, Any]:
@@ -69,6 +135,9 @@ def compile_recipe_to_workflow_ir(spec_root: Path, recipe_id: str, risk_tier: st
     # contract instead of indexing an absent optional key.
     if "references" in recipe:
         compiled["references"] = recipe["references"]
+    dataflow_issues = workflow_dataflow_issues(compiled)
+    if dataflow_issues:
+        raise InvariantViolation(f"WORKFLOW_DATAFLOW_INVALID: {'; '.join(dataflow_issues)}")
     _schema_contracts(str(spec_root.resolve())).validate(_WORKFLOW_IR_SCHEMA, compiled, f"compiled Workflow IR {recipe_id}")
     return compiled
 

@@ -5,7 +5,7 @@ from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation, SchemaValidationError
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog, state_transition
 from ai_lego.platform.workflow.executor import missing_workflow_input_paths
-from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir, project_workflow_ir
+from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir, project_workflow_ir, workflow_dataflow_issues
 
 TRANSITION = "ai-lego://specs/execution/execution-state-machine.schema.yaml#/state_transition_event"
 RESOLUTION = "ai-lego://specs/execution/method-resolution.schema.yaml#/method_resolution_result"
@@ -63,6 +63,32 @@ class WorkflowIrTests(unittest.TestCase):
         self.assertIn("source.swot.analysis_id", missing)
         self.assertIn("source.decision.options", missing)
         self.assertNotIn("outputs.SWOT_analysis", missing)
+
+    def test_dataflow_checker_rejects_unknown_and_forward_output_references(self):
+        issues = workflow_dataflow_issues(
+            {
+                "nodes": [
+                    {"label": "consumer", "input": ["outputs.missing", "outputs.producer"]},
+                    {"label": "producer", "input": "source.value"},
+                ]
+            }
+        )
+        self.assertEqual(len(issues), 2)
+        self.assertIn("unknown output 'outputs.missing'", issues[0])
+        self.assertIn("from node 1 that has not completed yet", issues[1])
+
+    def test_dataflow_checker_accepts_nested_fields_from_prior_output(self):
+        self.assertEqual(
+            workflow_dataflow_issues(
+                {
+                    "nodes": [
+                        {"label": "producer", "input": "source.value"},
+                        {"label": "consumer", "input": "outputs.producer.result.items"},
+                    ]
+                }
+            ),
+            (),
+        )
 
 
 class MethodResolverTests(unittest.TestCase):
