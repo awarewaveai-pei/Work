@@ -129,6 +129,63 @@ def art_project_ideation_source() -> dict:
     }
 
 
+def business_planning_feasibility_source() -> dict:
+    source = business_foundation_source()
+    source.update(business_feasibility_source())
+    provenance = make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL")
+    source.update(
+        {
+            "scenarios": {
+                "record_id": "SCEN-API-001",
+                "critical_uncertainties": ["demand", "delivery capacity"],
+                "scenarios": [
+                    {
+                        "id": f"SCEN-API-001-S{i}",
+                        "drivers": ["demand"],
+                        "assumptions": ["explicit workshop assumption"],
+                        "narrative": "A coherent scenario narrative.",
+                        "stakeholder_responses": ["partners respond"],
+                        "competitor_responses": ["competitors respond"],
+                        "second_third_order_effects": ["capacity changes"],
+                        "signposts": ["monthly demand signal"],
+                        "strategy_performance": "strategy remains testable",
+                        "reversal_condition": "demand falls below the reviewed threshold",
+                    }
+                    for i in range(1, 5)
+                ],
+                "provenance": provenance,
+            },
+            "risks": {
+                "record_id": "RREG-API-001",
+                "risks": [
+                    {"risk_id": "R-API-1", "description": "supplier delay", "probability": 0.2, "impact": 0.5, "owner": "operations", "control": "backup supplier", "trigger": "late confirmation"},
+                    {"risk_id": "R-API-2", "description": "capacity shortfall", "probability": 0.3, "impact": 0.8, "owner": "project lead", "control": "staged rollout", "trigger": "queue exceeds limit"},
+                ],
+                "provenance": provenance,
+            },
+            "tco": {
+                "record_id": "TCO-API-001",
+                "subject_ref": "project:reflective-learning",
+                "cost_categories": {key: 0 for key in ["purchase", "implementation", "migration", "people", "operation", "support", "security", "compliance", "downtime", "exit", "data_egress", "decommission"]},
+                "provenance": provenance,
+            },
+            "unit_economics": {
+                "record_id": "UECON-API-001",
+                "subject_ref": "project:reflective-learning",
+                "cac": 1200,
+                "ltv": 4200,
+                "gross_margin": 0.72,
+                "payback_period": 8,
+                "churn_rate": 0.03,
+                "arpu": 350,
+                "contribution_margin": 180,
+                "provenance": provenance,
+            },
+        }
+    )
+    return source
+
+
 class HealthTests(ApiTestCase):
     def test_health_requires_no_auth_and_touches_no_store(self):
         response = self.client.get("/health")
@@ -406,6 +463,20 @@ class InvokeTests(ApiTestCase):
 
 
 class RecipeRunTests(ApiTestCase):
+    def test_business_planning_feasibility_recipe_runs_the_bounded_ten_step_chain(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/business-planning-feasibility-v1/run",
+            json={"source": business_planning_feasibility_source(), "run_id": "api-business-planning-feasibility-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(len(payload["workflow"]["steps"]), 10)
+        self.assertEqual(payload["workflow"]["steps"][1]["input_paths"], ["source.tows", "outputs.SWOT_analysis", "source.tows.record_id", "source.tows.pairings", "source.tows.provenance"])
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["total_cost_of_ownership"]["total_tco"], 0.0)
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["unit_economics"]["scalable"], True)
+
     def test_art_project_ideation_recipe_runs_as_a_non_diagnostic_three_step_chain(self):
         self._login()
         response = self.client.post(

@@ -239,6 +239,7 @@ def run_recipe_instance_conformance():
     expected_recipe_ids = {
         "art-therapy-creative-reflection-v1",
         "art-therapy-project-ideation-v1",
+        "business-planning-feasibility-v1",
         "business-feasibility-review-v1",
         "business-foundation-v1",
         "champion-challenger",
