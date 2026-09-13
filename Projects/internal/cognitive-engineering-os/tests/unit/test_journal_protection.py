@@ -6,10 +6,22 @@ from pathlib import Path
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.workflow.executor import execute_workflow_ir
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
-from ai_lego.platform.workflow.journal_protection import AesGcmJournalContextProtector, CasJournalContextProtector, LocalDevJournalKeyProvider
+from ai_lego.platform.workflow.journal_protection import AesGcmJournalContextProtector, CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 
 
 class JournalProtectionTests(unittest.TestCase):
+    def test_external_provider_validates_and_preserves_kms_scope(self):
+        calls = []
+        provider = ResolverJournalKeyProvider(lambda tenant, purpose: (calls.append((tenant, purpose)) or b"k" * 32))
+        self.assertEqual(provider.key_for("tenant-a", "workflow-journal"), b"k" * 32)
+        self.assertEqual(calls, [("tenant-a", "workflow-journal")])
+
+    def test_external_provider_never_falls_back_on_failure_or_bad_key(self):
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_EXTERNAL_KEY_UNAVAILABLE"):
+            ResolverJournalKeyProvider(lambda *_: (_ for _ in ()).throw(RuntimeError("kms down"))).key_for("tenant-a", "journal")
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_EXTERNAL_KEY_INVALID"):
+            ResolverJournalKeyProvider(lambda *_: b"short").key_for("tenant-a", "journal")
+
     def test_local_dev_key_provider_requires_explicit_mode_and_valid_256_bit_key(self):
         settings = {"COGNITIVE_OS_JOURNAL_KEY_MODE": "local-dev", "COGNITIVE_OS_JOURNAL_KEY_B64": "a2" * 22}
         with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_KEY_INVALID"):

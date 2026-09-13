@@ -25,6 +25,31 @@ class JournalKeyProvider(Protocol):
     def key_for(self, tenant_id: str, purpose: str) -> bytes: ...
 
 
+class ResolverJournalKeyProvider:
+    """Production custody seam backed by an injected KMS/HSM resolver.
+
+    The resolver owns network calls, authentication, rotation and key
+    destruction.  This class deliberately performs no fallback to local
+    configuration: an unavailable or malformed external key blocks the run.
+    """
+
+    def __init__(self, resolver: Callable[[str, str], bytes]):
+        if not callable(resolver):
+            raise InvariantViolation("WORKFLOW_JOURNAL_KEY_RESOLVER_INVALID")
+        self._resolver = resolver
+
+    def key_for(self, tenant_id: str, purpose: str) -> bytes:
+        if not isinstance(tenant_id, str) or not tenant_id or not isinstance(purpose, str) or not purpose:
+            raise InvariantViolation("WORKFLOW_JOURNAL_KEY_SCOPE_INVALID")
+        try:
+            key = self._resolver(tenant_id, purpose)
+        except Exception as error:
+            raise InvariantViolation("WORKFLOW_JOURNAL_EXTERNAL_KEY_UNAVAILABLE") from error
+        if not isinstance(key, bytes) or len(key) != 32:
+            raise InvariantViolation("WORKFLOW_JOURNAL_EXTERNAL_KEY_INVALID: AES-256 requires exactly 32 bytes")
+        return bytes(key)
+
+
 class LocalDevJournalKeyProvider:
     """Explicit local-only provider backed by process configuration, never by persisted files."""
 
