@@ -38,6 +38,7 @@ Billing, credits, multiple tenants, SSO, enterprise contracts, regulated-system 
 
 ## 2026-09-14 runtime expansion
 
+- Dashboard Recipe input now includes a binding-derived field editor for ordinary and JSON-valued Source fields, while retaining the raw JSON editor as the canonical escape hatch; it does not invent domain types outside the Method contracts.
 - `life-decision-v1`: frame → SWOT → weighted decision matrix.
 - `edd-research-evidence-v1`: assumption mapping → evidence matrix → Toulmin argument.
 - `art-therapy-creative-reflection-v1`: random stimulus → mind map; non-diagnostic, no automated clinical inference.

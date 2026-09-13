@@ -166,6 +166,9 @@ class DashboardTests(ApiTestCase):
         self.assertIn("prepareRecipe", html)
         self.assertIn("recipe-run-btn", html)
         self.assertIn("/recipes/${encodeURIComponent(recipeId)}/form", html)
+        self.assertIn("recipe-fields", html)
+        self.assertIn("Build JSON from fields", html)
+        self.assertIn("applyRecipeFields", html)
 
 
 class UnauthenticatedAccessTests(ApiTestCase):

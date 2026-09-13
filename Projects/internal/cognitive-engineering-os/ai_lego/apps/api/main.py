@@ -179,6 +179,9 @@ _DASHBOARD_HTML = """<!doctype html>
   .method-meta { flex: 1; min-width: 0; }
   .method-id { font-family: monospace; font-size: 0.9rem; font-weight: 600; }
   .family-tag { display: inline-block; font-size: 0.7rem; background: #eef; color: #335; border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
+  .source-field { border: 1px solid #eee; border-radius: 4px; padding: 0.5rem; margin: 0.4rem 0; }
+  .source-field-label { display: block; font-family: monospace; font-size: 0.8rem; font-weight: 600; }
+  .source-field textarea { width: 100%; box-sizing: border-box; margin-top: 0.3rem; font-family: monospace; }
   #result { white-space: pre-wrap; font-family: monospace; font-size: 0.8rem; background: #111; color: #0f0; padding: 1rem; border-radius: 6px; max-height: 400px; overflow: auto; }
   .error { color: #c00; }
 </style>
@@ -202,6 +205,8 @@ _DASHBOARD_HTML = """<!doctype html>
   <h2>Recipes</h2>
   <div id="recipe-list"></div>
   <div id="recipe-help" class="method-meta">Choose a Recipe to load its Source fields.</div>
+  <div id="recipe-fields"></div>
+  <button id="recipe-fields-apply" disabled>Build JSON from fields</button>
   <textarea id="recipe-json" rows="10" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace" placeholder='Select a Recipe to generate its Source skeleton.'>{}</textarea>
   <button id="recipe-run-btn" disabled>Run Selected Recipe</button>
   <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
@@ -309,6 +314,40 @@ function assignPath(target, dottedPath, value) {
   });
 }
 
+function renderRecipeFields(fields) {
+  const container = document.getElementById('recipe-fields');
+  while (container.firstChild) container.removeChild(container.firstChild);
+  fields.forEach(field => {
+    const row = document.createElement('div');
+    row.className = 'source-field';
+    const label = document.createElement('label');
+    label.className = 'source-field-label';
+    label.textContent = field.path + (field.required ? ' (required)' : ' (optional)');
+    const input = document.createElement('textarea');
+    input.rows = field.path.includes('factors') || field.path.includes('criteria') || field.path.includes('claims') ? 4 : 2;
+    input.dataset.sourcePath = field.path;
+    input.placeholder = 'String or valid JSON value';
+    row.appendChild(label);
+    row.appendChild(input);
+    container.appendChild(row);
+  });
+  document.getElementById('recipe-fields-apply').disabled = fields.length === 0;
+}
+
+function applyRecipeFields() {
+  const source = {};
+  const inputs = document.querySelectorAll('#recipe-fields textarea[data-source-path]');
+  inputs.forEach(input => {
+    const raw = input.value.trim();
+    if (!raw) return;
+    let value;
+    try { value = JSON.parse(raw); }
+    catch (error) { value = raw; }
+    assignPath(source, input.dataset.sourcePath, value);
+  });
+  document.getElementById('recipe-json').value = JSON.stringify(source, null, 2);
+}
+
 async function prepareRecipe(recipeId) {
   const [formResponse, planResponse] = await Promise.all([
     fetch(`/recipes/${encodeURIComponent(recipeId)}/form`, { credentials: 'same-origin' }),
@@ -323,6 +362,7 @@ async function prepareRecipe(recipeId) {
   selectedRecipeId = recipeId;
   const skeleton = {};
   form.source_fields.forEach(field => assignPath(skeleton, field.path, null));
+  renderRecipeFields(form.source_fields);
   document.getElementById('recipe-json').value = JSON.stringify(skeleton, null, 2);
   const blockers = (plan.blockers || []).map(item => item.code + ': ' + JSON.stringify(item.detail)).join(' | ');
   document.getElementById('recipe-help').textContent = `${recipeId}: ${form.source_fields.length} Source fields. Plan status: ${plan.status}.${blockers ? ' Blockers: ' + blockers + '.' : ''} Null values are placeholders; replace them with valid domain data before running.`;
@@ -373,6 +413,8 @@ async function runRecipe(recipeId) {
 document.getElementById('recipe-run-btn').onclick = () => {
   if (selectedRecipeId) runRecipe(selectedRecipeId);
 };
+
+document.getElementById('recipe-fields-apply').onclick = applyRecipeFields;
 
 document.getElementById('search').addEventListener('input', renderMethods);
 
