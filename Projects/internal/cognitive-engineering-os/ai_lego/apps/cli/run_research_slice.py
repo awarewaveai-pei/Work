@@ -48,7 +48,6 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ai_lego import PRODUCT_ROOT, REPO_ROOT, __version__, resolve_spec_root
-from ai_lego.compute.statistics.reliability import interrater_reliability_result
 from ai_lego.core.contracts.ledger_guards import PiiLedgerGuard
 from ai_lego.core.contracts.runtime_dir import guard_runtime_dir, prepare_runtime_dir
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
@@ -68,6 +67,7 @@ from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_f
 from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_categories, suggest_open_codes, suggest_themes
 from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search, triangulate_themes_and_literature
+from ai_lego.modules.research.capability_adapters import run_statistics_adapter
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
 from ai_lego.modules.research.review import fixture_primary_review, fixture_review, locked_code_from_review, locked_definition_from_review, review_code_interactively, reviewed_codebook_definitions
 from ai_lego.modules.research.synthetic_fixtures import PROJECT_ID, SUGGESTED_LABEL, SYNTHETIC_CONSENT, SYNTHETIC_TRANSCRIPTS, expanded_synthetic_coder_judgments
@@ -480,7 +480,8 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             judgment_source = f"REAL_UNITS:{len(coder_one)}_SHARED_UNITS"
         if len(coder_one) < 2:
             raise InvariantViolation(f"KAPPA_INSUFFICIENT_UNITS: {len(coder_one)} unit(s) coded by both coders")
-        return {"statistics": interrater_reliability_result(coder_one, coder_two), "judgment_source": judgment_source}
+        computed = run_statistics_adapter({"coder_one": coder_one, "coder_two": coder_two}, {})
+        return {"statistics": computed["interrater_reliability_result"], "judgment_source": judgment_source}
 
     runtime_subchain = project_workflow_ir(
         workflow_ir,

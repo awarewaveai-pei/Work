@@ -57,6 +57,7 @@ from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invok
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search
+from ai_lego.modules.research.capability_adapters import research_paper_artifact_adapter, run_statistics_adapter
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
@@ -101,6 +102,10 @@ def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capabil
     # External providers need their own egress, freshness and policy adapter.
     if "literature_search" in capability_ids:
         adapters.register("literature_search", offline_literature_search)
+    if "run_statistics" in capability_ids:
+        adapters.register("run_statistics", run_statistics_adapter)
+    if "artifact.generate_research_paper" in capability_ids:
+        adapters.register("artifact.generate_research_paper", research_paper_artifact_adapter)
     return adapters
 
 
@@ -431,6 +436,12 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         and str(node.get("necessity", "RECOMMENDED")).startswith("REQUIRED_")
     ]
     adapter_ready = not adapter_blocking
+    missing_bindings = [
+        {"index": index, "label": node.get("label"), "ref": node.get("ref", node.get("method_id"))}
+        for index, node in enumerate(workflow_ir["nodes"])
+        if not isinstance(node.get("bindings"), dict)
+    ]
+    binding_ready = not missing_bindings
     method_ready = method_resolution["blocked"] is None
     return {
         "recipe_id": recipe_id,
@@ -439,7 +450,8 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "capability_resolution": capability_resolution,
         "plan_executability": executability,
         "adapter_readiness": {**adapter_readiness, "blocking": adapter_blocking, "ready": adapter_ready},
-        "status": "READY" if method_ready and executability["executable"] and adapter_ready else "BLOCKED",
+        "binding_readiness": {"missing": missing_bindings, "ready": binding_ready},
+        "status": "READY" if method_ready and executability["executable"] and adapter_ready and binding_ready else "BLOCKED",
     }
 
 
