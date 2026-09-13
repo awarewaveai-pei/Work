@@ -514,6 +514,11 @@ definitions:
           - type: string
           - type: array
             items: { type: string }
+      bindings:
+        type: object
+        additionalProperties:
+          type: string
+        description: "OPTIONAL explicit implementation-argument to context-path bindings compiled from the Recipe."
       necessity:
         $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/necessity"
         description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."
@@ -547,6 +552,11 @@ definitions:
           - type: string
           - type: array
             items: { type: string }
+      bindings:
+        type: object
+        additionalProperties:
+          type: string
+        description: "OPTIONAL explicit implementation-argument to context-path bindings compiled from the Recipe."
       necessity:
         $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/steps/items/properties/necessity"
         description: "OPTIONAL passthrough from the compiling Recipe step — see compilation_decisions above."

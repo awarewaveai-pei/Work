@@ -88,13 +88,29 @@ def _lookup(context: Mapping[str, Any], path: str) -> Any:
 
 def _input_paths(node: Mapping[str, Any]) -> tuple[str, ...]:
     declared = node.get("input")
-    if declared is None:
-        return ()
-    if isinstance(declared, str):
-        return (declared,)
-    if isinstance(declared, list) and all(isinstance(item, str) for item in declared):
-        return tuple(declared)
-    raise InvariantViolation(f"WORKFLOW_INPUT_DECLARATION_INVALID: {declared!r}")
+    paths: list[str] = []
+    if declared is not None:
+        if isinstance(declared, str):
+            paths.append(declared)
+        elif isinstance(declared, list) and all(isinstance(item, str) for item in declared):
+            paths.extend(declared)
+        else:
+            raise InvariantViolation(f"WORKFLOW_INPUT_DECLARATION_INVALID: {declared!r}")
+    bindings = node.get("bindings")
+    if bindings is not None:
+        if not isinstance(bindings, Mapping) or not all(isinstance(key, str) and key and isinstance(value, str) and value for key, value in bindings.items()):
+            raise InvariantViolation(f"WORKFLOW_BINDINGS_INVALID: {bindings!r}")
+        paths.extend(bindings.values())
+    return tuple(dict.fromkeys(paths))
+
+
+def _resolve_bindings(context: Mapping[str, Any], node: Mapping[str, Any]) -> dict[str, Any]:
+    bindings = node.get("bindings")
+    if bindings is None:
+        return {}
+    if not isinstance(bindings, Mapping):
+        raise InvariantViolation(f"WORKFLOW_BINDINGS_INVALID: {bindings!r}")
+    return {argument: _lookup(context, path) for argument, path in bindings.items()}
 
 
 def _node_ref(node: Mapping[str, Any]) -> str:
@@ -220,6 +236,8 @@ def execute_workflow_ir(
         paths = _input_paths(node)
         try:
             payload = {path: _lookup(context, path) for path in paths}
+            if node.get("bindings") is not None:
+                payload["__bindings__"] = _resolve_bindings(context, node)
             handler = handlers.get(ref)
             if handler is None:
                 raise InvariantViolation(f"WORKFLOW_HANDLER_NOT_REGISTERED: {ref}")

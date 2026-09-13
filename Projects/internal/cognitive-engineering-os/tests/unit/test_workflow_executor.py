@@ -88,6 +88,30 @@ class WorkflowExecutorTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_INPUT_DECLARATION_INVALID"):
             execute_workflow_ir(ir, {}, {})
 
+    def test_explicit_bindings_are_resolved_and_exposed_to_adapter(self):
+        ir = {
+            "id": "bindings-v1",
+            "nodes": [{"node_kind": "method", "method_id": "one.step", "bindings": {"question": "source.text"}}],
+        }
+        seen = []
+
+        def handler(payload, _node):
+            seen.append(payload)
+            return {"ok": True}
+
+        result = execute_workflow_ir(ir, {"source": {"text": "Should I study?"}}, {"one.step": handler})
+        self.assertEqual(result.status, "SUCCEEDED")
+        self.assertEqual(seen[0]["__bindings__"], {"question": "Should I study?"})
+        self.assertEqual(result.steps[0].input_paths, ("source.text",))
+
+    def test_missing_explicit_binding_fails_before_adapter(self):
+        ir = {"id": "bindings-v1", "nodes": [{"node_kind": "method", "method_id": "one.step", "bindings": {"question": "source.missing"}}]}
+        reached = []
+        result = execute_workflow_ir(ir, {"source": {}}, {"one.step": lambda *_: reached.append(True)})
+        self.assertEqual(result.status, "FAILED")
+        self.assertIn("WORKFLOW_INPUT_NOT_FOUND", result.steps[0].error)
+        self.assertEqual(reached, [])
+
     def test_durable_execution_persists_after_each_step_and_resume_skips_successes(self):
         ir = {
             "id": "durable-v1",

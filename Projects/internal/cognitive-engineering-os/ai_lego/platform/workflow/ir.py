@@ -17,7 +17,7 @@ import yaml
 
 from ai_lego.errors import InvariantViolation
 
-_PASSTHROUGH = ("label", "input", "necessity", "gate_ref")
+_PASSTHROUGH = ("label", "input", "bindings", "necessity", "gate_ref")
 
 
 def load_recipe(spec_root: Path, recipe_id: str) -> dict[str, Any]:

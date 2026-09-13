@@ -331,6 +331,14 @@ properties:
             - type: string
             - type: array
               items: { type: string }
+        bindings:
+          type: object
+          additionalProperties:
+            type: string
+          description: >
+            OPTIONAL explicit method/capability argument bindings. Each key is
+            an implementation argument and each value is a dotted context path;
+            no argument may be inferred from prose or a prior label.
         necessity:
           type: string
           enum: [RECOMMENDED, OPTIONAL, REQUIRED_BY_RISK, REQUIRED_BY_JURISDICTION, REQUIRED_BY_SECTOR, FORBIDDEN]
