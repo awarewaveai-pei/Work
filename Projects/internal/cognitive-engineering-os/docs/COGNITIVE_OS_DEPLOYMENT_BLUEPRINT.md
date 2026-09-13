@@ -61,4 +61,4 @@ Billing, credits, multiple tenants, SSO, enterprise contracts, regulated-system 
 
 ## Next action
 
-Phase 1 remains live. Next engineering slice: encrypted CAS/KMS-backed checkpoint outputs and source-data retention/deletion policy before a stateful Research adapter (transcription/storage) accepts external or clinical data. Phase 2 billing/credits/SSO remains deferred per the commercial-arc table.
+Phase 1 remains live. Encrypted CAS-backed checkpoints and the external KMS resolver seam are implemented; the next engineering slice is to configure and verify a real KMS/HSM provider, then complete source-data retention/deletion policy before a stateful Research adapter (transcription/storage) accepts external or clinical data. Phase 2 billing/credits/SSO remains deferred per the commercial-arc table.
