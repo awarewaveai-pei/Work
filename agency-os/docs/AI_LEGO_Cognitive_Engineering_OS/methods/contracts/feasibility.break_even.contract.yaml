@@ -1,0 +1,77 @@
+$id: "ai-lego://methods/contracts/feasibility.break_even.contract.yaml"
+title: "Break-even Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F14 feasibility & economics family (Atlas L727), first of two F14 members built this batch (with
+  feasibility.npv). New family opened this batch, zero prior siblings. Not an EC §32 security-change method. Core
+  invariant: `break_even_volume_units` is GENUINE_COMPUTE via `fixed_cost / contribution_margin_per_unit`, never
+  caller-supplied; `contribution_margin_per_unit <= 0` is refused with its own distinct
+  BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN code (a non-positive margin means no finite volume ever breaks even).
+  See ai_lego/modules/feasibility/break_even.py module docstring for the full formula and tolerance rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Break-even row (L727)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.break_even` mints a new machine_id in the NEW `family: feasibility`
+  opened this batch (feasibility.npv is its one sibling). Textbook break-even formula, not this file's own
+  invention.
+
+id: feasibility.break_even
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [ESTIMATE, CALCULATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ESTIMATE = fixed_cost/
+# contribution_margin_per_unit are themselves estimates; CALCULATE = break_even_volume_units is GENUINE_COMPUTE.
+# Verified against the real 24-value kernel (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - find_the_minimum_viable_volume_where_fixed_cost_is_covered
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content: subject_ref/fixed_cost/contribution_margin_per_unit), same class as
+  # epistemic.bayesian_updating.
+outputs: [BreakEvenAnalysis]
+preconditions:
+  - "record_id (BEVEN- prefix), subject_ref are non-empty strings; version is a string"
+  - "fixed_cost is a real finite number >= 0 (bool excluded); contribution_margin_per_unit is a real finite number (bool excluded)"
+  - "break_even_volume_units is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE via fixed_cost/contribution_margin_per_unit, independently re-derived by evaluate_break_even_content_integrity_gate on every call"
+  - "contribution_margin_per_unit must be > 0 -- a non-positive value raises BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN (fail-closed), never a silently-returned negative/zero/inf value"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+recommended_next: []
+# Atlas gives no explicit pipeline link from this row to any other F14 row beyond shared family membership.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should break_even_volume_units be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- the builder has no such parameter at all; a caller attempting break_even_volume_units= gets a plain TypeError."
+  - question: "How is the non-positive contribution margin case handled?"
+    decision: "Raised as a distinct BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN InvariantViolation before the division ever runs -- never a crash, never a silently-returned negative/zero/inf value."
+  - question: "Round break_even_volume_units, and what gate tolerance?"
+    decision: "round(x, 8), matching epistemic.bayesian_updating's own posterior convention. Gate re-derivation tolerance is 1e-9 -- one order of magnitude tighter than the 8th-decimal-place unit."
+
+open_questions:
+  - "OQ-BREAKEVEN-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L727) directly at the cited line, and confirmed no dedicated §12.x narrative section
+    exists for this row beyond the table itself (NPV has §12.28; Break-even does not). Grepped the full spec root
+    and the full ai_lego/ tree case-insensitively for "break-even"/"break_even"/"contribution margin" before
+    writing this contract: hits only the Atlas table row itself and the backlog listing in
+    methods/registry/method-inventory.yaml (planned-but-unbuilt, not an implementation). No duplicate found.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The break-even formula is a direct textbook transcription. cognitive_primitives
+    and the rounding/tolerance choices are disclosed compilation decisions above.

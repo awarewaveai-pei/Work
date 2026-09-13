@@ -1,0 +1,148 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/real-options-analysis.schema.yaml"
+title: Real Options Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `RealOptionsAnalysis` -- the
+  declared `outputs` of `feasibility.real_options`'s Method Contract
+  (methods/contracts/feasibility.real_options.contract.yaml, `outputs:
+  [RealOptionsAnalysis]`). F14 feasibility family (Atlas L730, sole
+  citation -- no dedicated §11/§12 section exists for this row).
+
+  Real invariant, mechanized as a RUNTIME invariant (JSON Schema 2020-12
+  cannot express cross-field distinctness-of-count declaratively): every
+  `options[]` entry carries a non-empty `trigger_condition` and >=2
+  `future_states[]` with distinct (normalized) descriptions -- Atlas L730's
+  own stated benefit ("避免一次性 yes/no", avoid a one-shot yes/no decision)
+  made real. Enforced by `ai_lego/modules/feasibility/real_options.py` at
+  construction time and independently re-derived by that module's own gates.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Real Options row (L730)"
+  - "methods/contracts/feasibility.real_options.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas L730's own
+  triggers/cost/future-states pipeline plus low-risk, disclosed compilation
+  choices (the ROPT- prefix, the option_type enum, the >=2-distinct rule).
+
+compilation_decisions:
+  - question: "Atlas L730 names only 延後 (defer)/擴張 (expand)/退出 (exit) as examples of option types -- is that the exhaustive enum?"
+    decision: "No -- closed enum {DEFER, EXPAND, CONTRACT, ABANDON, SWITCH}, the standard real-options-theory taxonomy those three examples are drawn from (ABANDON = 退出/exit). SWITCH and CONTRACT added from the same textbook taxonomy, disclosed as NEW_DESIGN rather than silently narrowed to only the 3 literally named."
+  - question: "Why require >=2 future_states with distinct descriptions, rather than just checking the field is present?"
+    decision: "Atlas L730's own stated purpose is avoiding a one-shot yes/no decision -- a single future state (or duplicate ones) IS the one-shot analysis this method exists to avoid, so it must be structurally refused, not merely discouraged."
+  - question: "additionalProperties: false at every object level (record, options[], future_states[])?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+additionalProperties: false
+required: [id, version, subject_ref, options, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^ROPT-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.real_options"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    description: "Free-text reference to the decision/investment this real-options analysis is about. Atlas L730 gives no structured shape for the subject."
+
+  options:
+    type: array
+    minItems: 1
+    description: "Atlas L730's own literal options being modeled (延後/擴張/退出/etc). Unique ids (cross-field invariant, checked by ai_lego/modules/feasibility/real_options.py, not this schema)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, option_type, trigger_condition, cost, future_states]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: "Local id, unique within this record's options[]."
+        option_type:
+          type: string
+          enum: [DEFER, EXPAND, CONTRACT, ABANDON, SWITCH]
+          description: "Standard real-options-theory taxonomy. See compilation_decisions for why this is wider than Atlas L730's own 3 literally-named examples."
+        trigger_condition:
+          type: string
+          minLength: 1
+          description: "Atlas L730's own 'triggers' pipeline element -- the condition under which this option would actually be exercised. An option with no trigger_condition is a hope, not a real option (cross-field non-emptiness re-checked at the runtime layer, not just JSON Schema's own minLength, so a hand-tampered whitespace-only string is also refused)."
+        cost:
+          type: number
+          description: "Atlas L730's own 'cost' pipeline element -- the cost of holding/exercising this option. Real finite number; bool excluded at the runtime layer."
+        future_states:
+          type: array
+          minItems: 2
+          description: "Atlas L730's own 'future states' pipeline element. >=2 required with distinct (normalized) descriptions -- see this schema's own top-level description for why."
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, description, estimated_value]
+            properties:
+              id:
+                type: string
+                minLength: 1
+                description: "Local id, unique within this option's own future_states[] (uniqueness not separately enforced beyond description-distinctness -- see open_questions)."
+              description:
+                type: string
+                minLength: 1
+                description: "The scenario being described. Must be distinct (casefolded + whitespace-collapsed) from every sibling future_states[] entry within the same option -- runtime invariant, not expressible via JSON Schema alone."
+              estimated_value:
+                type: number
+                description: "Estimated value of this future state (e.g. NPV under this scenario). Real finite number; bool excluded at the runtime layer."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "1 EXPAND option with 2 distinct future states -- the minimum shape that avoids Atlas L730's own one-shot yes/no trap."
+    value:
+      id: "ROPT-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.real_options"
+      subject_ref: "海外倉儲擴張決策"
+      options:
+        - id: "OPT-EXPAND-WAREHOUSE"
+          option_type: EXPAND
+          trigger_condition: "首年海外訂單量連續 3 個月超過現有產能 80%"
+          cost: 250000
+          future_states:
+            - {id: "FS-DEMAND-HIGH", description: "海外需求持續成長，擴張後產能被充分利用", estimated_value: 900000}
+            - {id: "FS-DEMAND-FLAT", description: "海外需求持平，擴張後產能閒置", estimated_value: -120000}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-ROPT-1: future_states[].id uniqueness within one option is not independently enforced beyond the description-distinctness rule -- two future states could in principle share an id while having distinct descriptions (owner: operator, if a future caller needs id-level referential integrity here)."
+
+verification:
+  method: >
+    Read Atlas F14 table Real Options row (L730) directly at the cited
+    line -- no dedicated §11/§12 section exists for this row, the table row
+    is the sole citation. Grepped the full spec root case-insensitively for
+    "real option"/"trigger_condition"/"future_states" before writing: hits
+    only in specs/execution/change-plan.schema.yaml/rollback.schema.yaml (a
+    differently-named, plural `trigger_conditions_met` field on
+    infrastructure change plans -- unrelated concept, no collision) and this
+    method's own F14 backlog listing rows (methods/registry/method-inventory.yaml,
+    contract-backlog.yaml). No duplicate found. Validated against jsonschema
+    Draft202012Validator via tests/unit/test_real_options.py, including
+    real mutation checks that a missing trigger_condition, a single future
+    state, and two duplicate-description future states are each refused.
+  note: >
+    No mother document was modified. Atlas L730's own triggers/cost/future-
+    states pipeline is transcribed directly; the id-prefix, option_type
+    enum, and >=2-distinct-future-states rule are disclosed compilation
+    decisions above.

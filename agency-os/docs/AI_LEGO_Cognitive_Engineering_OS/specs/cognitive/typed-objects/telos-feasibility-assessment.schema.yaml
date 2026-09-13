@@ -1,0 +1,135 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/telos-feasibility-assessment.schema.yaml"
+title: TELOS Feasibility Assessment
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TelosFeasibilityAssessment` --
+  the declared `outputs` of `feasibility.telos`'s Method Contract
+  (methods/contracts/feasibility.telos.contract.yaml, `outputs:
+  [TelosFeasibilityAssessment]`). F14 feasibility family (Atlas L722,
+  §12.24 L2831-2843: Technical/Economic/Legal/Operational/Schedule).
+
+  RUNTIME invariant (not declaratively expressible in JSON Schema alone,
+  same disclosed-gap class as `evidence-matrix.schema.yaml`'s own
+  no-orphan-claim precedent): each dimension must carry >=1 non-empty entry
+  across its own `assumptions`/`evidence`/`gaps`/`stop_conditions` COMBINED
+  -- an entirely empty dimension was never actually assessed. Enforced at
+  both construction time and an independent gate by
+  `ai_lego/modules/feasibility/telos.py`.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, TELOS row (L722)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.24 TELOS 可行性分析 (L2831-2843)"
+  - "methods/contracts/feasibility.telos.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. §12.24's 5-element checklist is a real, cited
+  textbook checklist (not this file's own invention); the id-prefix,
+  per-dimension field shape, and additionalProperties choices below are
+  low-risk disclosed compilation decisions, same class every sibling
+  typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should the 5 dimensions be a single 'dimensions' array, or 5 named top-level fields?"
+    decision: "5 named top-level fields (technical/economic/legal/operational/schedule), matching Atlas §12.24's own fixed, closed 5-item checklist -- an array would allow a caller to declare fewer than 5 or duplicate one, exactly the gap the required-parameter/required-key enforcement exists to close."
+  - question: "Combined-non-empty rule: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12 cannot express 'at least one of these 4 sibling array properties is non-empty' without a verbose per-dimension anyOf duplication; same gap class as game-theory.schema.yaml's own payoff-completeness precedent and cross-impact-analysis.schema.yaml's own matrix-completeness precedent."
+
+type: object
+additionalProperties: false
+required: [id, version, technical, economic, legal, operational, schedule, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^TELOS-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.telos"
+
+  technical: {$ref: "#/$defs/dimension"}
+  economic: {$ref: "#/$defs/dimension"}
+  legal: {$ref: "#/$defs/dimension"}
+  operational: {$ref: "#/$defs/dimension"}
+  schedule: {$ref: "#/$defs/dimension"}
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  dimension:
+    type: object
+    additionalProperties: false
+    required: [assumptions, evidence, gaps, stop_conditions]
+    description: >
+      One TELOS dimension. RUNTIME invariant: the 4 lists below must carry
+      >=1 non-empty string COMBINED (see module description) -- not
+      declaratively expressible here.
+    properties:
+      assumptions: {type: array, items: {type: string, minLength: 1}}
+      evidence: {type: array, items: {type: string, minLength: 1}}
+      gaps: {type: array, items: {type: string, minLength: 1}}
+      stop_conditions: {type: array, items: {type: string, minLength: 1}}
+
+examples:
+  - description: "A minimal but genuinely-assessed 5-dimension TELOS assessment (each dimension has exactly 1 combined entry)."
+    value:
+      id: "TELOS-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.telos"
+      technical:
+        assumptions: ["現有團隊具備所需的 Kubernetes 維運能力"]
+        evidence: []
+        gaps: []
+        stop_conditions: []
+      economic:
+        assumptions: []
+        evidence: []
+        gaps: ["尚未取得三年 TCO 估算"]
+        stop_conditions: []
+      legal:
+        assumptions: []
+        evidence: []
+        gaps: []
+        stop_conditions: ["若客戶資料需跨境傳輸且無 SCC，立即停止"]
+      operational:
+        assumptions: []
+        evidence: ["現有 on-call 輪值表可涵蓋新服務"]
+        gaps: []
+        stop_conditions: []
+      schedule:
+        assumptions: ["供應商可在 Q1 前完成 API 交付"]
+        evidence: []
+        gaps: []
+        stop_conditions: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-TELOSASSESSMENT-1: no per-dimension weighting or overall feasible/not-feasible verdict field exists -- Atlas §12.24 gives a checklist, not a scoring formula (owner: operator, or whoever builds a consuming MCDA/weighted-decision-matrix pipeline step)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L722) and §12.24 (L2831-2843) directly.
+    Grepped the full spec root (specs/**, methods/**) and the full ai_lego/
+    tree case-insensitively for "telos"/"feasibility" before writing this
+    file: only narrative mentions of "feasibility" as a general concept on
+    unrelated records and this same batch's sibling F14 backlog entries --
+    zero pre-existing TELOS implementation or schema title overlap.
+    Validated against jsonschema Draft202012Validator, including a real
+    mutation check that additionalProperties:false refuses a smuggled
+    top-level/dimension key and that a hand-tampered record with a
+    dimension's 4 lists all emptied is caught by the runtime gate (not
+    expressible in JSON Schema alone).
+  note: >
+    No mother document was modified. §12.24's 5-element checklist is a real
+    textbook citation, not this file's own invention. The id-prefix,
+    5-named-fields shape, and runtime-invariant placement of the
+    combined-non-empty rule are disclosed compilation decisions above.

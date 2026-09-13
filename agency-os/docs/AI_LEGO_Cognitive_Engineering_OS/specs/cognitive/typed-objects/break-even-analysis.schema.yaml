@@ -1,0 +1,106 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/break-even-analysis.schema.yaml"
+title: Break-even Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `BreakEvenAnalysis` -- the declared `outputs` of
+  `feasibility.break_even`'s Method Contract (methods/contracts/feasibility.break_even.contract.yaml, `outputs:
+  [BreakEvenAnalysis]`). F14 feasibility family, first of two members built this batch. Atlas F14 table row
+  (L727): "Break-even｜何時損益平衡｜fixed cost/contribution margin→volume｜找最低可行規模" -- textbook
+  fixed_cost/contribution_margin ratio, transcribed as a real structural invariant (full formula and the
+  non-positive-margin trap: see `ai_lego/modules/feasibility/break_even.py` module docstring).
+
+  Field provenance:
+    * `subject_ref` -- free text, Atlas gives no structured shape.
+    * `fixed_cost`/`contribution_margin_per_unit` -- Atlas's own 2-input formula elements, each a real finite
+      number (bool excluded -- see compilation_decisions).
+    * `break_even_volume_units` -- GENUINE_COMPUTE, fixed_cost/contribution_margin_per_unit, NEVER caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Break-even row (L727)"
+  - "methods/contracts/feasibility.break_even.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Break-even formula is a real, cited textbook formula (not this file's own invention);
+  the id-prefix, rounding, and additionalProperties choices below are low-risk disclosed compilation decisions,
+  same class every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should break_even_volume_units be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- never an accepted builder parameter. See ai_lego/modules/feasibility/break_even.py compute_break_even_volume."
+  - question: "How is the non-positive contribution margin case handled?"
+    decision: "Refused at construction with a distinct BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN error -- never a crash, never a silently-returned negative/zero/inf value. A record can therefore never exist with an undefined break-even volume; this schema has no such representation."
+  - question: "Round break_even_volume_units, or store raw float precision?"
+    decision: "Round to 8 decimal places (round(x, 8)), matching epistemic.bayesian_updating's own posterior rounding convention. Gate re-derivation tolerance is 1e-9 (module docstring)."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+required: [id, version, subject_ref, fixed_cost, contribution_margin_per_unit, break_even_volume_units, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^BEVEN-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.break_even"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    description: "The product/line/venture whose break-even point is being analyzed. Free text; Atlas gives no structured shape."
+
+  fixed_cost:
+    type: number
+    minimum: 0
+    description: "Atlas L727 pipeline element 1. Real finite number >= 0 -- bool excluded at the runtime layer (JSON Schema's `type: number` does not itself exclude JSON true/false; the builder/gate re-check independently, see method module docstring)."
+
+  contribution_margin_per_unit:
+    type: number
+    description: "Atlas L727 pipeline element 2 (per-unit contribution margin). Real finite number, no schema-level floor -- must be > 0 to compute a valid break-even volume; a non-positive value is refused at the runtime layer with a distinct error code (see compilation_decisions and method module docstring), not by a generic JSON Schema minimum, so the informative BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN code is reachable."
+
+  break_even_volume_units:
+    type: number
+    description: "Atlas L727 pipeline element 3 (volume). GENUINE_COMPUTE -- fixed_cost/contribution_margin_per_unit, NEVER a builder parameter. See compilation_decisions for the non-positive-margin refusal and rounding convention."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A hand-computed worked example: fixed_cost=120000, contribution_margin_per_unit=15 -> break_even_volume_units = 120000/15 = 8000."
+    value:
+      id: "BEVEN-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.break_even"
+      subject_ref: "新產品線 X 的第一年定價方案"
+      fixed_cost: 120000
+      contribution_margin_per_unit: 15
+      break_even_volume_units: 8000
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-BREAKEVEN-1: this schema models a single scenario (one fixed_cost/margin pair -> one volume). Sensitivity across a range of assumed margins is left to the calling workflow (repeated invocations), not a structural field on this record itself (owner: operator, or whoever builds a future BreakEvenSensitivitySet)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L727) directly at the cited line, and confirmed no dedicated §12.x narrative section
+    exists for this row beyond the table itself. Grepped the full spec root (specs/**, methods/**) and the full
+    ai_lego/ tree case-insensitively for "break-even"/"break_even"/"contribution margin" before writing this
+    file: hits only the Atlas table row itself and the backlog listing in methods/registry/method-inventory.yaml
+    (planned-but-unbuilt, not an implementation). No duplicate found. Validated against jsonschema
+    Draft202012Validator, including a real mutation check that additionalProperties:false refuses a smuggled top-
+    level key and that a hand-tampered break_even_volume_units disagreeing with the stored fixed_cost/
+    contribution_margin_per_unit is caught by the runtime gate (not expressible in JSON Schema alone).
+  note: >
+    No mother document was modified. The break-even formula itself is a real textbook citation, not this file's
+    own invention. The id-prefix and rounding/tolerance choices are disclosed compilation decisions above.

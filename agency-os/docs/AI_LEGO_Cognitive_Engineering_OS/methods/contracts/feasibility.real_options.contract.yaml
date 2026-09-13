@@ -1,0 +1,97 @@
+$id: "ai-lego://methods/contracts/feasibility.real_options.contract.yaml"
+title: "Real Options Method Contract"
+status: ACTIVE
+
+description: >
+  F14 feasibility family (Atlas L730, sole citation -- no dedicated §11/§12
+  section exists for this row): "Real Options｜把延後/擴張/退出視為 option｜
+  triggers/cost/future states→option value｜避免一次性 yes/no". Not an EC
+  §32 security-change method. Core invariant: every option requires a
+  non-empty trigger_condition AND >=2 future_states with distinct
+  descriptions -- Atlas's own stated purpose ("避免一次性 yes/no") made a
+  real structural refusal, not advisory prose. See
+  ai_lego/modules/feasibility/real_options.py module docstring.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Real Options row (L730)"
+  - "specs/cognitive/typed-objects/real-options-analysis.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.real_options` mints a
+  machine_id in the `family: feasibility` family opened this batch
+  (feasibility.irr is its sibling). option_type's closed enum is this
+  file's own compiled structure (disclosed below), not textually cited.
+
+id: feasibility.real_options
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [FRAME, ESTIMATE, EVALUATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method. FRAME = casting a decision as an option (defer/expand/etc) rather
+# than a one-shot commitment; ESTIMATE = cost/future-state values are
+# estimates; EVALUATE = comparing future states to judge option value. All
+# three verified against the real 24-value kernel (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - model_a_decision_as_a_real_option_with_a_trigger_and_multiple_future_states_instead_of_a_one_shot_choice
+
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content: subject_ref/options), same class as feasibility.irr/
+  # epistemic.bayesian_updating.
+
+outputs: [RealOptionsAnalysis]
+
+preconditions:
+  - "record_id (ROPT- prefix), subject_ref are non-empty strings; version is a string"
+  - "options has >=1 entry, each with a unique id, option_type in {DEFER, EXPAND, CONTRACT, ABANDON, SWITCH}, non-empty trigger_condition, finite cost (bool excluded)"
+  - "every option's future_states has >=2 entries with distinct (casefolded + whitespace-collapsed) descriptions -- Atlas L730's own '避免一次性 yes/no' made a real structural refusal, not advisory prose"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F14 table gives no explicit pipeline link from this row to any other beyond shared family
+# membership.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Atlas L730 names only 延後/擴張/退出 as examples -- is that the exhaustive option_type enum?"
+    decision: "No -- closed enum {DEFER, EXPAND, CONTRACT, ABANDON, SWITCH}, the standard real-options-theory taxonomy those 3 examples are drawn from. Disclosed as NEW_DESIGN, not silently narrowed to only the 3 literally named."
+  - question: "Why require >=2 distinct future_states rather than just checking presence?"
+    decision: "Atlas's own stated purpose is avoiding a one-shot yes/no decision -- a single (or duplicate) future state IS that one-shot analysis, so it must be structurally refused."
+  - question: "Should duplicate-id options be refused at both the builder and the gate?"
+    decision: "Yes -- unique option ids checked at construction AND independently re-derived by evaluate_referential_integrity_gate from raw fields, never trusting the builder's own check already ran."
+
+open_questions:
+  - "OQ-ROPT-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-ROPT-2: future_states[].id uniqueness within one option is not independently enforced beyond description-distinctness (owner: operator, if a future caller needs id-level referential integrity)."
+
+verification:
+  method: >
+    Read Atlas F14 table Real Options row (L730) directly at the cited
+    line -- no dedicated §11/§12 section exists for this row. Grepped the
+    full spec root case-insensitively for "real option"/"trigger_condition"/
+    "future_states" before writing this contract: hits only in
+    specs/execution/change-plan.schema.yaml/rollback.schema.yaml (a
+    differently-named, plural trigger_conditions_met field on
+    infrastructure change plans -- unrelated concept) and this method's
+    own F14 backlog listing rows (methods/registry/method-inventory.yaml,
+    contract-backlog.yaml). No duplicate found. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema Draft202012Validator.
+  note: >
+    No mother document was modified. Atlas L730's triggers/cost/future-
+    states pipeline is transcribed directly. cognitive_primitives, the
+    option_type enum, and the >=2-distinct-future-states rule are disclosed
+    compilation decisions above.

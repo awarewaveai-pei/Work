@@ -1,0 +1,100 @@
+$id: "ai-lego://methods/contracts/feasibility.irr.contract.yaml"
+title: "IRR Method Contract"
+status: ACTIVE
+
+description: >
+  F14 feasibility family (Atlas L730, sole citation -- no dedicated §11/§12
+  section exists for this row): "IRR｜投資內部報酬率｜cash flow→IRR→hurdle
+  rate｜直觀回報率". Not an EC §32 security-change method. Core invariant:
+  `irr` is GENUINE_COMPUTE -- the real root of
+  sum(cf.amount/(1+r)**cf.period)==0, solved by bisection, never a builder
+  parameter; an all-same-sign cash_flows series (no meaningful IRR) fails
+  closed with a distinct error. See ai_lego/modules/feasibility/irr.py
+  module docstring for the full solver/tolerance rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, IRR row (L730)"
+  - "specs/cognitive/typed-objects/irr-analysis.schema.yaml"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.irr` mints a machine_id in
+  the `family: feasibility` family opened this batch. Bisection-solved IRR
+  is a real textbook definition, not this file's own invention.
+
+id: feasibility.irr
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [CALCULATE, ESTIMATE, COMPARE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method. CALCULATE = irr is GENUINE_COMPUTE via bisection; ESTIMATE = the
+# cash_flows/hurdle_rate inputs are themselves estimates; COMPARE =
+# meets_hurdle is a direct comparison against hurdle_rate. All three
+# verified against the real 24-value kernel (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - solve_the_internal_rate_of_return_from_cash_flows_and_compare_to_a_hurdle_rate
+
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content: subject_ref/cash_flows/hurdle_rate), same class as
+  # epistemic.bayesian_updating/learning.decision_journal.
+
+outputs: [IrrAnalysis]
+
+preconditions:
+  - "record_id (IRR- prefix), subject_ref are non-empty strings; version is a string"
+  - "cash_flows has >=2 entries, each {period: unique non-negative int (bool excluded), amount: finite number (bool excluded)}"
+  - "cash_flows must contain at least one negative AND one positive amount -- an all-same-sign series has no meaningful IRR, refused as IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS"
+  - "hurdle_rate is a real finite number > -1"
+  - "irr and meets_hurdle are NEVER caller-supplied parameters -- both GENUINE_COMPUTE (irr via real bisection solve, meets_hurdle via irr>=hurdle_rate), independently RE-SOLVED (not merely re-checked) by evaluate_irr_content_integrity_gate on every call"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F14 table gives no explicit pipeline link from this row to any other beyond shared family
+# membership; feasibility.npv (built the same batch) is a sibling, not a stated successor.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should irr/meets_hurdle be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- the builder has no irr/meets_hurdle parameters at all; a caller attempting either as a keyword argument gets a plain TypeError."
+  - question: "How is the zero-meaningful-IRR case (all-same-sign cash flows) handled?"
+    decision: "Raised as a distinct IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS InvariantViolation before any solve attempt -- never a solver crash or hang, never a garbage extrapolated answer."
+  - question: "Solver method and convergence tolerance vs. gate re-derivation tolerance?"
+    decision: "Bisection, fixed lo=-0.999999 with exponentially-doubling hi bracket search, interval-width stopping tolerance 1e-10; stored irr is round(x,8). Gate re-solve tolerance is 1e-6 -- deliberately looser than both the solver's own 1e-10 precision and the 8dp storage unit, absorbing independent-re-solve + rounding noise without masking a real tamper (full rationale in the module docstring)."
+  - question: "What happens if no sign-changing bracket is found (non-convergence)?"
+    decision: "Raised as a distinct IRR_NO_SOLUTION_FOUND after a capped number of bracket expansions -- never an infinite loop, never a silently-wrong extrapolated answer."
+
+open_questions:
+  - "OQ-IRR-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-IRR-2: multiple sign changes in cash_flows[] can produce more than one mathematically valid IRR root -- this solver returns the first root its own fixed-bracket search finds, not an exhaustive enumeration (owner: operator, if a future caller needs all roots)."
+
+verification:
+  method: >
+    Read Atlas F14 table IRR row (L730) directly at the cited line -- no
+    dedicated §11/§12 section exists for this row. Grepped the full spec
+    root case-insensitively for "internal rate of return"/"IRR"/
+    "cash_flow"/"cash flow" before writing this contract: hits only in
+    methods/registry/method-inventory.yaml/contract-backlog.yaml's own F14
+    backlog listing rows (not implementations). No duplicate found.
+    Validated against specs/cognitive/method.schema.yaml with jsonschema
+    Draft202012Validator. The bisection solver's own output was
+    independently cross-checked against a hand-computed closed-form IRR
+    (2-cash-flow case: -1000 at period 0, +1200 at period 1 -> IRR=0.2
+    exactly) in tests/unit/test_irr.py, not merely trusted.
+  note: >
+    No mother document was modified. IRR's mathematical definition is a
+    real textbook citation. cognitive_primitives, the solver algorithm, and
+    the tolerance choices are disclosed compilation decisions above.

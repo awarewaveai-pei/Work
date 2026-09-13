@@ -1,0 +1,80 @@
+$id: "ai-lego://methods/contracts/feasibility.tco.contract.yaml"
+title: "Total Cost of Ownership Method Contract"
+status: ACTIVE
+
+description: >
+  F14 feasibility & economics family (Atlas L718-730), row L725: "TCO｜全生命週期成本｜acquisition+implementation+
+  operation+people+exit+migration｜看出隱性成本與 lock-in". Section 12.26 (L2857-2873) gives the binding 12-category
+  checklist. Not an EC §32 security-change method. Core invariant: all 12 named categories must be explicitly
+  present in `cost_categories` (a missing category is refused, 0 is a legal explicit value); `total_tco` is
+  GENUINE_COMPUTE (sum of the 12), never caller-supplied. See ai_lego/modules/feasibility/tco.py module
+  docstring for the full rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, TCO row (L725)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.26 (L2857-2873), the 12-category checklist"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.tco` mints a new machine_id in the `family: feasibility` NEW
+  family opened this batch (feasibility.unit_economics is its sibling built the same batch; 7 further F14
+  members are being built concurrently by disjoint sibling agents).
+
+id: feasibility.tco
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [ESTIMATE, CALCULATE, DECOMPOSE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ESTIMATE = each category cost
+# is itself an estimate; CALCULATE = total_tco is GENUINE_COMPUTE; DECOMPOSE = the whole-lifecycle cost is
+# broken into the 12 named categories.
+
+purpose:
+  - compute_total_lifecycle_cost_across_12_named_categories
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content: subject_ref/cost_categories), same class as
+  # epistemic.bayesian_updating/learning.decision_journal.
+outputs: [TotalCostOfOwnership]
+preconditions:
+  - "record_id (TCO- prefix), subject_ref are non-empty strings; version is a string"
+  - "cost_categories is an object carrying exactly the 12 named keys (purchase, implementation, migration, people, operation, support, security, compliance, downtime, exit, data_egress, decommission), each a real finite non-negative number (bool excluded); a missing key is refused, an unknown key is refused"
+  - "total_tco is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE = sum of the 12 category values, independently re-derived by evaluate_total_tco_integrity_gate on every call"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+recommended_next: []
+# Atlas's own §12.26 names no explicit downstream method; see open_questions.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should total_tco be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- the builder has no total_tco parameter at all."
+  - question: "What are the 12 category dict keys, given Atlas's own English category names have spaces?"
+    decision: "snake_case transliteration in section 12.26's own listed order (purchase..decommission); disclosed NEW_DESIGN mapping, not itself Atlas-named field text."
+  - question: "Is a missing category silently defaulted to 0, or refused?"
+    decision: "Refused -- an omitted category is exactly the hidden cost section 12.26's own benefit column exists to surface; 0 is only legal when explicitly stated."
+  - question: "Rounding and gate tolerance for total_tco?"
+    decision: "round(x, 2) (currency-style, distinct from this corpus's 8dp probability convention); gate tolerance 1e-6, far tighter than the 0.01 stored unit."
+
+open_questions:
+  - "OQ-TCO-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-TCO-2: Atlas's own F14 table lists no explicit recommended_next chain from TCO to any other row; a future workflow may want to feed total_tco into a Cost–Benefit Analysis or NPV method once those exist (owner: operator, or whoever builds one)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L725) and §12.26 (L2857-2873) directly at the cited lines. Grepped the full
+    spec root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for "TCO"/"total cost of
+    ownership"/"total-cost-of-ownership" before writing this contract: no prior TCO record shape or
+    RECORD_ID_PREFIX collision found. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 12-category checklist is a direct transcription of section 12.26's
+    own text fence. The snake_case key mapping, rounding, and tolerance choices are disclosed compilation
+    decisions above.

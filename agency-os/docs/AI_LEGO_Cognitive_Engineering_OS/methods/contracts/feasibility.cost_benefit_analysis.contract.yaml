@@ -1,0 +1,107 @@
+$id: "ai-lego://methods/contracts/feasibility.cost_benefit_analysis.contract.yaml"
+title: "Cost-Benefit Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  F14 feasibility/economics family (Atlas L723, §12.25 L2845-2853).
+  Monetizes and compares alternatives' costs/benefits over their lifecycle.
+  Not an EC §32 security-change method. Two core invariants, both from
+  §12.25's own verbatim text: (1) discounting, sensitivity, and
+  distributional effects are REQUIRED per alternative (L2850: 需
+  discounting、sensitivity、distributional effects); (2) a non-monetizable
+  item must carry value:null, never a fake precise price (L2852). See
+  ai_lego/modules/feasibility/cost_benefit_analysis.py module docstring for
+  the full two-layer enforcement.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Cost–Benefit Analysis row (L723)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.25 成本效益分析 (L2845-2853)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.cost_benefit_analysis` mints
+  a new machine_id in the `family: feasibility` NEW family opened this batch
+  (feasibility.telos, feasibility.cost_effectiveness are its 2 siblings
+  built the same batch; 6 more F14 members pending). §12.25's discounting/
+  sensitivity/distributional-effects rule and non-monetizable limitation are
+  direct textbook transcriptions, not this file's own invention.
+
+id: feasibility.cost_benefit_analysis
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [DECOMPOSE, CALCULATE, COMPARE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method. DECOMPOSE splits each alternative into costs/benefits; CALCULATE
+# is implicit in the discounted-value/sensitivity pipeline (disclosed as
+# caller-supplied disclosure, not a computed field -- see
+# compilation_decisions); COMPARE is the whole point of an alternatives[]
+# list. All three CANONICAL_KERNEL members.
+
+purpose:
+  - compare_alternatives_by_discounted_monetizable_costs_and_benefits
+
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied alternatives content), same class as
+  # decision.weighted_decision_matrix.
+
+outputs: [CostBenefitAnalysis]
+
+preconditions:
+  - "record_id (CBA- prefix), version are valid; provenance is schema-valid"
+  - "at least 1 alternative declared, each with a non-empty id, unique across alternatives[]"
+  - "each alternative's costs[]/benefits[] are non-empty lists, each item id unique within its own list"
+  - "each alternative's discount_rate is a real finite number > -1, and sensitivity_analysis/distributional_effects are non-empty disclosure strings -- Atlas §12.25 (L2850)"
+  - "every cost/benefit item's non_monetizable:true REQUIRES value:null, and non_monetizable:false REQUIRES a real finite numeric value -- Atlas §12.25 (L2852)"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F14 table gives no explicit next-step link from this row to any other; see OQ-CBA-1.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should discount_rate/sensitivity_analysis/distributional_effects be optional (disclosure-only convention) or structurally required?"
+    decision: "Structurally required per alternative, refused at construction if any is missing/empty -- Atlas §12.25's own 需 wording (must have) is stronger than most F-family sections' softer benefit-column language, warranting hard enforcement rather than disclosure-only."
+  - question: "How is the non_monetizable/value coupling enforced?"
+    decision: "Bidirectional: non_monetizable:true forces value:null (refuses a fake precise price, L2852), and non_monetizable:false forces a real finite numeric value (an item claimed monetizable cannot be left unpriced either) -- both directions checked by the same _item_problem predicate the builder and gate share."
+  - question: "Is a computed net-present-value / total-discounted-benefit field included?"
+    decision: "No -- NPV/discounting the actual cash flows over time is Atlas's own separate F14 row (NPV, L728, not yet built this batch). This method stores discount_rate as a required per-alternative DISCLOSURE (Atlas's own 需 discounting), not a computed aggregate; combining it with costs[]/benefits[] into an actual NPV is left to a future consuming method or workflow (see OQ-CBA-2)."
+  - question: "Distinct from challenge.pre_mortem / foresight.scenario_planning?"
+    decision: "Yes, grep-confirmed distinct scope -- pre_mortem reasons about a single plan's FUTURE failure causes, scenario_planning reasons about divergent FUTURE world-states; this method compares PRESENT known alternatives by monetizable/flagged-non-monetizable value. Neither sibling module's own docstring or schema mentions cost/benefit monetary comparison of alternatives."
+
+open_questions:
+  - "OQ-CBA-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-CBA-2: no computed NPV/total-discounted-value field exists on this record -- discount_rate is stored as a required disclosure only; a future method or workflow step would need to combine it with costs[]/benefits[] to produce an actual discounted valuation (owner: operator, or whoever builds feasibility.npv, F14 L728)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L723) and §12.25 (L2845-2853) directly.
+    Grepped the full spec root (specs/**, methods/**) and the full ai_lego/
+    tree case-insensitively for "cost-benefit"/"cost benefit"/
+    "discounting"/"distributional effects" before writing this contract:
+    only a single narrative mention ("MCDA / cost-benefit criteria
+    weighting") in specs/execution/method-resolution.schema.yaml describing
+    an unrelated weighting-adjustment mechanism, and this same batch's
+    sibling F14 backlog entries -- zero pre-existing implementation or
+    schema title overlap. Confirmed distinct scope from challenge.pre_mortem
+    and foresight.scenario_planning by reading both modules' own docstrings.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The discounting/sensitivity/
+    distributional-effects requirement and the non-monetizable limitation
+    are direct textbook transcriptions of Atlas §12.25. The id-prefix, the
+    per-list duplicate-id checks, and the NPV-deferral scope boundary are
+    disclosed compilation decisions above.

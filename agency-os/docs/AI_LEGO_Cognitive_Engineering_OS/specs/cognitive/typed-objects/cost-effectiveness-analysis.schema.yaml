@@ -1,0 +1,121 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/cost-effectiveness-analysis.schema.yaml"
+title: Cost-Effectiveness Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CostEffectivenessAnalysis` --
+  the declared `outputs` of `feasibility.cost_effectiveness`'s Method
+  Contract (methods/contracts/feasibility.cost_effectiveness.contract.yaml,
+  `outputs: [CostEffectivenessAnalysis]`). F14 feasibility family (Atlas
+  L724 -- the sole citation; no dedicated Atlas §12 section exists for this
+  method, disclosed here rather than smoothed over).
+
+  Field provenance:
+    * `id`/`cost`/`effectiveness_outcome_units` -- Atlas L724's own "cost
+      per unit outcome" pipeline elements, each caller-supplied.
+    * `cost_per_unit` -- GENUINE_COMPUTE, `cost / effectiveness_outcome_
+      units`, NEVER caller-supplied (full formula and the zero-
+      effectiveness trap: see `ai_lego/modules/feasibility/
+      cost_effectiveness.py` module docstring).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Cost–Effectiveness row (L724) -- sole citation, no dedicated section exists"
+  - "methods/contracts/feasibility.cost_effectiveness.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. cost_per_unit = cost / effectiveness_outcome_
+  units is a direct arithmetic transcription of the table row's own use-
+  column; the CE- prefix, rounding/tolerance, and additionalProperties
+  choices below are low-risk disclosed compilation decisions, same class
+  every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should cost_per_unit be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- never an accepted builder parameter. See ai_lego/modules/feasibility/cost_effectiveness.py compute_cost_per_unit."
+  - question: "How is the zero/negative effectiveness_outcome_units case handled?"
+    decision: "Refused at construction with a distinct CE_ZERO_EFFECTIVENESS error -- never a ZeroDivisionError crash, never a silently-returned inf/None. A record can therefore never exist with an effectiveness_outcome_units <= 0."
+  - question: "Round cost_per_unit, or store raw float precision?"
+    decision: "Round to 8 decimal places (round(x, 8)), matching epistemic.bayesian_updating's own posterior rounding convention -- avoids float-repr noise across serialize/deserialize round-trips. Gate re-derivation tolerance is 1e-9 (module docstring)."
+  - question: "additionalProperties: false at the top level and per-item?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+additionalProperties: false
+required: [id, version, alternatives, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CE-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.cost_effectiveness"
+
+  alternatives:
+    type: array
+    minItems: 1
+    description: "RUNTIME invariant: alternative id unique across this list (method contract precondition)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, cost, effectiveness_outcome_units, cost_per_unit]
+      properties:
+        id: {type: string, minLength: 1}
+        cost:
+          type: number
+          minimum: 0
+          description: "Atlas L724 pipeline element 1. A real finite number >= 0."
+        effectiveness_outcome_units:
+          type: number
+          exclusiveMinimum: 0
+          description: "Atlas L724 pipeline element 2 (e.g. lives saved, tickets resolved). A real finite number > 0 -- a value <= 0 is refused with CE_ZERO_EFFECTIVENESS at the runtime layer (JSON Schema's exclusiveMinimum enforces the same bound declaratively as a first layer)."
+        cost_per_unit:
+          type: number
+          minimum: 0
+          description: "Atlas L724 pipeline element 3 ('cost per unit outcome'). GENUINE_COMPUTE -- cost / effectiveness_outcome_units, NEVER a builder parameter. See compilation_decisions for the zero-effectiveness refusal and rounding convention."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two alternatives compared on the SAME outcome unit (cost per ticket resolved)."
+    value:
+      id: "CE-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.cost_effectiveness"
+      alternatives:
+        - {id: "ALT-OUTSOURCE-SUPPORT", cost: 480000, effectiveness_outcome_units: 12000, cost_per_unit: 40.0}
+        - {id: "ALT-INHOUSE-SUPPORT", cost: 900000, effectiveness_outcome_units: 15000, cost_per_unit: 60.0}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-COSTEFFECTIVENESSANALYSIS-1: no declared unit-of-measure field for effectiveness_outcome_units -- comparing cost_per_unit across alternatives is only meaningful when they share the SAME outcome unit (Atlas L724: 同一 outcome), and this schema does not structurally enforce that; left to the caller's own discipline (owner: operator, or a future revision adding an explicit outcome_unit field)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L724) directly; confirmed via full-text grep
+    of the §12 tool-detail chapter that no dedicated section exists for
+    this method. Grepped the full spec root (specs/**, methods/**) and the
+    full ai_lego/ tree case-insensitively for "cost-effectiveness"/"cost
+    effectiveness"/"cost per unit" before writing this file: only this same
+    batch's sibling F14 backlog entries -- zero pre-existing implementation
+    or schema title overlap. Validated against jsonschema
+    Draft202012Validator, including a real mutation check that
+    additionalProperties:false refuses a smuggled key and that a
+    hand-tampered wrong cost_per_unit is caught by the runtime gate (not
+    expressible in JSON Schema alone).
+  note: >
+    No mother document was modified. cost_per_unit = cost /
+    effectiveness_outcome_units is a direct arithmetic transcription of the
+    table row's own use-column. The CE- prefix and rounding/tolerance
+    choices are disclosed compilation decisions above. The absence of a
+    dedicated Atlas section for this method is disclosed, not smoothed
+    over.

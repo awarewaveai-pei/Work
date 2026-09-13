@@ -1,0 +1,131 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/total-cost-of-ownership.schema.yaml"
+title: Total Cost Of Ownership
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `TotalCostOfOwnership` -- the declared `outputs` of
+  `feasibility.tco`'s Method Contract (methods/contracts/feasibility.tco.contract.yaml, `outputs:
+  [TotalCostOfOwnership]`). F14 feasibility & economics family. Atlas F14 table row (L725): "TCO｜全生命週期成本｜
+  acquisition+implementation+operation+people+exit+migration｜看出隱性成本與 lock-in", and §12.26 (L2857-2873)'s
+  own binding 12-category checklist: Purchase, Implementation, Migration, People, Operation, Support, Security,
+  Compliance, Downtime, Exit, Data Egress, Decommission.
+
+  Field provenance:
+    * `subject_ref` -- free text, Atlas gives no structured shape for what is being TCO'd.
+    * `cost_categories` -- exactly section 12.26's own 12 named categories, snake_case-transliterated
+      (disclosed compilation decision, see contract), each a real finite non-negative number.
+    * `total_tco` -- GENUINE_COMPUTE, sum of the 12 category values, NEVER caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, TCO row (L725)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.26 (L2857-2873), the 12-category checklist"
+  - "methods/contracts/feasibility.tco.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. §12.26's 12-category checklist is a real, cited Atlas text-fence transcription (not
+  this file's own invention); the id-prefix, snake_case key mapping, rounding, and additionalProperties choices
+  below are low-risk disclosed compilation decisions, same class every sibling typed-object schema in this
+  directory documents.
+
+compilation_decisions:
+  - question: "Should total_tco be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- sum of the 12 cost_categories values. See ai_lego/modules/feasibility/tco.py compute_total_tco."
+  - question: "What are the 12 cost_categories dict keys, given Atlas's own category names have spaces (e.g. 'Data Egress')?"
+    decision: "snake_case transliteration in section 12.26's own listed order (purchase, implementation, migration, people, operation, support, security, compliance, downtime, exit, data_egress, decommission) -- disclosed NEW_DESIGN mapping."
+  - question: "Is a missing category legal (implicitly zero), or must all 12 be explicit?"
+    decision: "All 12 must be explicit -- a missing category is refused at the runtime layer (this schema's own `required` inside cost_categories cannot itself express 'exactly these 12 keys, no more no fewer' as cleanly as the runtime re-derivation does, so both layers assert it: additionalProperties:false + required lists all 12 here, and the runtime module independently re-checks the same set)."
+  - question: "Rounding and gate tolerance for total_tco?"
+    decision: "round(x, 2) (currency-style); gate re-derivation tolerance 1e-6 (module docstring)."
+  - question: "additionalProperties: false at the top level and inside cost_categories?"
+    decision: "Yes -- baseline hygiene this directory converges on, and the mechanism that structurally refuses a smuggled 13th category or a top-level key."
+
+type: object
+required: [id, version, subject_ref, cost_categories, total_tco, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^TCO-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.tco"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    description: "Free-text reference to what is being TCO'd (e.g. a system, vendor, or migration proposal). Atlas gives no structured shape."
+
+  cost_categories:
+    type: object
+    additionalProperties: false
+    required: [purchase, implementation, migration, people, operation, support, security, compliance, downtime, exit, data_egress, decommission]
+    description: "Exactly section 12.26's own 12 named cost categories (L2860-2872), snake_case-transliterated. Every key is required -- a missing category is refused (see compilation_decisions); 0 is a legal explicit value."
+    properties:
+      purchase: {type: number, minimum: 0}
+      implementation: {type: number, minimum: 0}
+      migration: {type: number, minimum: 0}
+      people: {type: number, minimum: 0}
+      operation: {type: number, minimum: 0}
+      support: {type: number, minimum: 0}
+      security: {type: number, minimum: 0}
+      compliance: {type: number, minimum: 0}
+      downtime: {type: number, minimum: 0}
+      exit: {type: number, minimum: 0}
+      data_egress: {type: number, minimum: 0}
+      decommission: {type: number, minimum: 0}
+
+  total_tco:
+    type: number
+    minimum: 0
+    description: "GENUINE_COMPUTE -- sum of all 12 cost_categories values, NEVER a builder parameter. See compilation_decisions for rounding/tolerance."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A hand-computed worked example: 12 categories summing to 187500.50."
+    value:
+      id: "TCO-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.tco"
+      subject_ref: "遷移現有自架 PostgreSQL 到 Managed Cloud DB 服務（3 年期）"
+      cost_categories:
+        purchase: 0
+        implementation: 45000
+        migration: 32000.5
+        people: 60000
+        operation: 28000
+        support: 9000
+        security: 6000
+        compliance: 4000
+        downtime: 2500
+        exit: 0
+        data_egress: 1000
+        decommission: 0
+      total_tco: 187500.5
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-TCO-1: Atlas's own F14 table lists no explicit recommended_next chain from TCO to any other row; a future workflow may want to feed total_tco into a Cost-Benefit Analysis or NPV method once those exist (owner: operator, or whoever builds one)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L725) and §12.26 (L2857-2873) directly at the cited lines. Grepped the full spec
+    root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for "TCO"/"total cost of
+    ownership"/"total-cost-of-ownership" before writing this file: no prior TCO record shape found. Validated
+    against jsonschema.Draft202012Validator, including a real mutation check that additionalProperties:false
+    refuses a smuggled top-level or cost_categories key and that a hand-tampered total_tco disagreeing with the
+    stored cost_categories is caught by the runtime gate (not expressible in JSON Schema alone).
+  note: >
+    No mother document was modified. Section 12.26's 12-category checklist is a real textbook-style Atlas
+    text-fence citation. The id-prefix, snake_case key mapping, and rounding/tolerance choices are disclosed
+    compilation decisions above.

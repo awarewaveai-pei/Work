@@ -1,0 +1,168 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/unit-economics-analysis.schema.yaml"
+title: Unit Economics Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `UnitEconomicsAnalysis` -- the declared `outputs` of
+  `feasibility.unit_economics`'s Method Contract (methods/contracts/feasibility.unit_economics.contract.yaml,
+  `outputs: [UnitEconomicsAnalysis]`). F14 feasibility & economics family. Atlas F14 table row (L726): "Unit
+  Economics｜每客戶/交易是否賺錢｜ARPU/gross margin/CAC/LTV/payback/churn｜判斷商模可擴張性", and §12.27
+  (L2882-2900)'s own binding 7-metric list: CAC, LTV, Gross Margin, Payback, Churn, ARPU, Contribution Margin.
+  Benefit: "避免「營收成長但越賣越虧」" (avoid "revenue growing but losing more per sale").
+
+  Field provenance:
+    * `subject_ref` -- free text, Atlas gives no structured shape for what is being analyzed.
+    * `cac`/`ltv`/`gross_margin`/`payback_period`/`churn_rate`/`arpu`/`contribution_margin` -- section 12.27's
+      own 7 named metrics, each a real finite number with a field-specific range (see compilation_decisions).
+    * `ltv_to_cac_ratio` -- GENUINE_COMPUTE = ltv/cac, NEVER caller-supplied.
+    * `scalable` -- GENUINE_COMPUTE = (contribution_margin >= 0), NEVER caller-supplied -- section 12.27's own
+      named failure mode made structural.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Unit Economics row (L726)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.27 (L2882-2900), the 7-metric list"
+  - "methods/contracts/feasibility.unit_economics.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Section 12.27's 7-metric list is a real, cited Atlas text-fence transcription (not
+  this file's own invention); the id-prefix, fraction representation, `scalable` formula, and
+  additionalProperties choices below are low-risk disclosed compilation decisions, same class every sibling
+  typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should ltv_to_cac_ratio/scalable be caller-supplied or mechanically derived?"
+    decision: "Both mechanically derived (GENUINE_COMPUTE) -- never accepted builder parameters. See ai_lego/modules/feasibility/unit_economics.py."
+  - question: "How is cac<=0 handled, given the ratio is undefined at cac=0?"
+    decision: "Refused at construction with a distinct UECON_INVALID_CAC error -- cac must be strictly positive (exclusiveMinimum: 0 here)."
+  - question: "What exact rule defines scalable?"
+    decision: "scalable = (contribution_margin >= 0) -- the minimal structural encoding of section 12.27's own named failure mode; a richer heuristic is deliberately NOT modeled (see contract open_questions)."
+  - question: "gross_margin/churn_rate representation -- fraction [0,1] or percentage?"
+    decision: "Fraction [0,1], disclosed -- matching this corpus's established rate/probability convention (e.g. bayesian-update.schema.yaml's own prior/likelihood fields)."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+required: [id, version, subject_ref, cac, ltv, gross_margin, payback_period, churn_rate, arpu, contribution_margin, ltv_to_cac_ratio, scalable, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^UECON-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.unit_economics"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    description: "Free-text reference to what is being analyzed (e.g. a product line, customer segment, or business model). Atlas gives no structured shape."
+
+  cac:
+    type: number
+    exclusiveMinimum: 0
+    description: "Customer Acquisition Cost. Section 12.27's own 'CAC'. Must be strictly positive -- the ratio to LTV is undefined at cac=0, and a non-positive acquisition cost is nonsensical."
+
+  ltv:
+    type: number
+    minimum: 0
+    description: "Lifetime Value. Section 12.27's own 'LTV'."
+
+  gross_margin:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Section 12.27's own 'Gross Margin', as a [0,1] fraction (disclosed representation; see compilation_decisions)."
+
+  payback_period:
+    type: number
+    minimum: 0
+    description: "Section 12.27's own 'Payback'. Unit (e.g. months) is left undefined by Atlas -- a free non-negative number (see contract open_questions)."
+
+  churn_rate:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Section 12.27's own 'Churn', as a [0,1] fraction (disclosed representation; see compilation_decisions)."
+
+  arpu:
+    type: number
+    minimum: 0
+    description: "Average Revenue Per User. Section 12.27's own 'ARPU'."
+
+  contribution_margin:
+    type: number
+    description: "Section 12.27's own 'Contribution Margin'. May be negative -- that is the whole point (a negative value is exactly the 'revenue growing but losing more per sale' failure mode this method exists to surface via `scalable`)."
+
+  ltv_to_cac_ratio:
+    type: number
+    minimum: 0
+    description: "GENUINE_COMPUTE = ltv/cac, NEVER a builder parameter. See compilation_decisions for rounding/tolerance (round(x, 8), tolerance 1e-9)."
+
+  scalable:
+    type: boolean
+    description: "GENUINE_COMPUTE = (contribution_margin >= 0), NEVER a builder parameter. MUST be false whenever contribution_margin < 0 -- see compilation_decisions."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A healthy, scalable unit economics profile: ltv_to_cac_ratio = 4200/1200 = 3.5."
+    value:
+      id: "UECON-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.unit_economics"
+      subject_ref: "SaaS 中小企業方案（月訂閱）"
+      cac: 1200
+      ltv: 4200
+      gross_margin: 0.72
+      payback_period: 8
+      churn_rate: 0.03
+      arpu: 350
+      contribution_margin: 180
+      ltv_to_cac_ratio: 3.5
+      scalable: true
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - description: "A losing-money-per-sale profile: contribution_margin is negative, so scalable MUST be false even though ltv_to_cac_ratio alone looks fine."
+    value:
+      id: "UECON-2026-09-12-002"
+      version: "1.0.0"
+      generated_by_method: "feasibility.unit_economics"
+      subject_ref: "促銷方案（折扣後單位虧損）"
+      cac: 800
+      ltv: 2400
+      gross_margin: 0.4
+      payback_period: 14
+      churn_rate: 0.08
+      arpu: 150
+      contribution_margin: -25
+      ltv_to_cac_ratio: 3
+      scalable: false
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-UNITECONOMICS-1: payback_period's own unit (months vs. another period) is left undefined by Atlas and by this record (owner: operator, or whoever builds a consuming workflow that needs one)."
+  - "OQ-UNITECONOMICS-2: a richer scalability heuristic (e.g. LTV:CAC >= 3) is out of scope -- not cited anywhere in the Atlas mother document, so not encoded (owner: operator)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L726) and §12.27 (L2882-2900) directly at the cited lines. Grepped the full spec
+    root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for "unit economics"/
+    "unit_economics" before writing this file: the only hit was strategy.business_model_canvas's own
+    forward-reference to a different, still-nonexistent strategy.unit_economics machine_id (Atlas L527) --
+    confirmed distinct scope, no collision. Validated against jsonschema.Draft202012Validator, including a real
+    mutation check that additionalProperties:false refuses a smuggled top-level key and that a hand-tampered
+    scalable=true alongside a negative contribution_margin is caught by the runtime gate (not expressible in
+    JSON Schema alone).
+  note: >
+    No mother document was modified. Section 12.27's 7-metric list is a real textbook-style Atlas text-fence
+    citation. The id-prefix, fraction representation, scalable formula, and rounding/tolerance choices are
+    disclosed compilation decisions above.

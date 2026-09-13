@@ -1,0 +1,167 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/cost-benefit-analysis.schema.yaml"
+title: Cost-Benefit Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `CostBenefitAnalysis` -- the
+  declared `outputs` of `feasibility.cost_benefit_analysis`'s Method
+  Contract (methods/contracts/feasibility.cost_benefit_analysis.contract.
+  yaml, `outputs: [CostBenefitAnalysis]`). F14 feasibility family (Atlas
+  L723, §12.25 L2845-2853).
+
+  RUNTIME invariants (not all declaratively expressible here, same
+  disclosed-gap class as `bayesian-update.schema.yaml`'s own posterior-
+  integrity precedent): (a) per-alternative `discount_rate` is a finite
+  number > -1, and `sensitivity_analysis`/`distributional_effects` are
+  non-empty strings -- Atlas §12.25's own "需 discounting、sensitivity、
+  distributional effects" (L2850); (b) every cost/benefit item's
+  `non_monetizable: true` REQUIRES `value: null`, and `non_monetizable:
+  false` REQUIRES a real finite numeric `value` -- Atlas §12.25's own "難
+  貨幣化...不可硬塞成假精準價格" (L2852); (c) item `id` unique within its
+  own `costs[]`/`benefits[]`, and alternative `id` unique across
+  `alternatives[]`. `ai_lego/modules/feasibility/cost_benefit_analysis.py`
+  enforces all three at both construction time and an independent gate.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Cost–Benefit Analysis row (L723)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.25 成本效益分析 (L2845-2853)"
+  - "methods/contracts/feasibility.cost_benefit_analysis.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Direct transcription of Atlas §12.25's own
+  discounting/sensitivity/distributional-effects requirement and
+  non-monetizable limitation, plus low-risk disclosed compilation choices
+  (the CBA- prefix, shared cost/benefit item shape, record-level-only
+  provenance).
+
+compilation_decisions:
+  - question: "Do costs[] and benefits[] share one item shape, or does each get its own?"
+    decision: "One shared shape ({id, description, value, non_monetizable}) reused for both -- Atlas §12.25 treats cost and benefit items symmetrically (both need the same monetization/non-monetizable disclosure), and a single $def avoids two independently-drifting copies of the same non_monetizable/value coupling rule."
+  - question: "non_monetizable/value coupling: JSON Schema keyword, or runtime invariant?"
+    decision: "Runtime invariant -- JSON Schema 2020-12's if/then/else COULD express this per-item, but the corpus convention for a value/flag coupling this shape (see bayesian-update.schema.yaml's own posterior-integrity precedent) is to enforce it at the construction+gate layer where the error message can name the specific violated Atlas citation, not a generic schema validation message."
+  - question: "Is a computed net-present-value / total-discounted-benefit field included?"
+    decision: "No -- see method contract's own OQ-CBA-2. discount_rate is a required per-alternative DISCLOSURE field (Atlas's own 需 discounting), not a computed NPV aggregate; that computation is Atlas's own separate F14 row (NPV, L728, not yet built this batch)."
+
+type: object
+additionalProperties: false
+required: [id, version, alternatives, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^CBA-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.cost_benefit_analysis"
+
+  alternatives:
+    type: array
+    minItems: 1
+    description: "RUNTIME invariant: alternative id unique across this list (method contract precondition)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, costs, benefits, discount_rate, sensitivity_analysis, distributional_effects]
+      properties:
+        id: {type: string, minLength: 1}
+        costs:
+          type: array
+          minItems: 1
+          description: "RUNTIME invariant: item id unique within this list."
+          items: {$ref: "#/$defs/cost_benefit_item"}
+        benefits:
+          type: array
+          minItems: 1
+          description: "RUNTIME invariant: item id unique within this list."
+          items: {$ref: "#/$defs/cost_benefit_item"}
+        discount_rate:
+          type: number
+          exclusiveMinimum: -1
+          description: "Atlas §12.25 (L2850): 需 discounting. A real finite number > -1 (e.g. 0.08 for 8%)."
+        sensitivity_analysis:
+          type: string
+          minLength: 1
+          description: "Atlas §12.25 (L2850): 需 sensitivity. Free-text disclosure of the sensitivity analysis performed."
+        distributional_effects:
+          type: string
+          minLength: 1
+          description: "Atlas §12.25 (L2850): 需 distributional effects. Free-text disclosure of who bears the costs/benefits."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  cost_benefit_item:
+    type: object
+    additionalProperties: false
+    required: [id, description, value, non_monetizable]
+    description: >
+      RUNTIME invariant (see module description): non_monetizable:true
+      REQUIRES value:null; non_monetizable:false REQUIRES a real finite
+      numeric value. Atlas §12.25 (L2852): 難貨幣化的人權、倫理、安全不可硬
+      塞成假精準價格.
+    properties:
+      id: {type: string, minLength: 1}
+      description: {type: string, minLength: 1}
+      value:
+        type: [number, "null"]
+        description: "Monetary value, or null when non_monetizable:true (see RUNTIME invariant above)."
+      non_monetizable: {type: boolean}
+
+examples:
+  - description: "Two alternatives; one benefit item flagged non-monetizable (value:null, Atlas L2852's own limitation honored)."
+    value:
+      id: "CBA-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.cost_benefit_analysis"
+      alternatives:
+        - id: "ALT-BUILD-INHOUSE"
+          costs:
+            - {id: "C1", description: "工程師薪資（12 個月）", value: 3600000, non_monetizable: false}
+          benefits:
+            - {id: "B1", description: "降低第三方授權費", value: 800000, non_monetizable: false}
+            - {id: "B2", description: "團隊留才與士氣提升", value: null, non_monetizable: true}
+          discount_rate: 0.08
+          sensitivity_analysis: "若人力成本上升 20%，淨效益仍為正；若延遲交付超過 3 個月則轉為負值"
+          distributional_effects: "成本由工程團隊承擔，效益主要歸屬產品團隊與客戶"
+        - id: "ALT-BUY-VENDOR"
+          costs:
+            - {id: "C2", description: "第三方授權費（年約）", value: 900000, non_monetizable: false}
+          benefits:
+            - {id: "B3", description: "上線時間縮短 6 個月", value: 1200000, non_monetizable: false}
+          discount_rate: 0.08
+          sensitivity_analysis: "若匯率波動超過 10%，授權費淨現值變動 +/- 90000"
+          distributional_effects: "成本由採購預算承擔，效益歸屬全公司交付速度"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-COSTBENEFITANALYSIS-1: no computed NPV/total-discounted-value field exists -- discount_rate is a required disclosure only (see method contract's own OQ-CBA-2) (owner: operator, or whoever builds feasibility.npv, F14 L728)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L723) and §12.25 (L2845-2853) directly.
+    Grepped the full spec root (specs/**, methods/**) and the full ai_lego/
+    tree case-insensitively for "cost-benefit"/"cost benefit"/
+    "discounting"/"distributional effects" before writing this file: only a
+    single narrative mention ("MCDA / cost-benefit criteria weighting") in
+    specs/execution/method-resolution.schema.yaml describing an unrelated
+    weighting-adjustment mechanism, and this same batch's sibling F14
+    backlog entries -- zero pre-existing implementation or schema title
+    overlap. Validated against jsonschema Draft202012Validator, including a
+    real mutation check that additionalProperties:false refuses a smuggled
+    key and that a hand-tampered non_monetizable/value mismatch is caught
+    by the runtime gate (not expressible in JSON Schema alone).
+  note: >
+    No mother document was modified. The discounting/sensitivity/
+    distributional-effects requirement and non-monetizable limitation are
+    direct textbook transcriptions of Atlas §12.25. The id-prefix, shared
+    item shape, and NPV-deferral scope boundary are disclosed compilation
+    decisions above.

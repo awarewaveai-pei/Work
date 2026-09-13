@@ -1,0 +1,133 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/irr-analysis.schema.yaml"
+title: IRR Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `IrrAnalysis` -- the declared
+  `outputs` of `feasibility.irr`'s Method Contract
+  (methods/contracts/feasibility.irr.contract.yaml, `outputs: [IrrAnalysis]`).
+  F14 feasibility family (Atlas L730, sole citation -- no dedicated §11/§12
+  section exists for this row).
+
+  Real invariant: `irr` is GENUINE_COMPUTE, the rate solving
+  `sum(cf.amount / (1+r)**cf.period) == 0` via a real bisection solve, never
+  a builder-supplied value; `meets_hurdle` is likewise GENUINE_COMPUTE
+  (`irr >= hurdle_rate`). Both independently re-derived by
+  `ai_lego/modules/feasibility/irr.py`'s own gate, never trusted from a
+  stored value. This schema alone cannot express either compute -- see that
+  module's docstring for the full solver/tolerance rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, IRR row (L730)"
+  - "methods/contracts/feasibility.irr.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. Bisection-solved IRR is a real textbook
+  definition, not this file's own invention; the id-prefix, cash_flows
+  shape, and rounding/tolerance choices are disclosed compilation
+  decisions below.
+
+compilation_decisions:
+  - question: "Should irr/meets_hurdle be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- the builder has no irr/meets_hurdle parameters at all; see ai_lego/modules/feasibility/irr.py."
+  - question: "How is an all-same-sign cash_flows series (no meaningful IRR) handled?"
+    decision: "Refused at construction with the distinct IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS error -- never a solver crash or hang, never a garbage answer."
+  - question: "Round irr, or store raw float precision, and what gate tolerance?"
+    decision: "round(irr, 8), matching this corpus's established float-storage convention (e.g. epistemic.bayesian_updating). Gate re-solve tolerance is 1e-6 -- deliberately looser than the 8dp storage unit and the solver's own 1e-10 interval precision, to absorb independent-re-solve + rounding noise without masking a real tamper. See module docstring for the full justification."
+  - question: "cash_flows shape: same as the sibling feasibility.npv method's own cash_flows?"
+    decision: "Kept structurally consistent ({period: int>=0, amount: number}, unique periods) where practical, built independently in the same batch -- not a shared $ref (no evidence a formal shared CashFlow typed-object exists yet)."
+  - question: "additionalProperties: false at the top level?"
+    decision: "Yes -- baseline hygiene this directory converges on."
+
+type: object
+additionalProperties: false
+required: [id, version, subject_ref, cash_flows, hurdle_rate, irr, meets_hurdle, provenance]
+properties:
+
+  id:
+    type: string
+    pattern: "^IRR-"
+    description: "NEW DESIGN. Same id-prefix convention as every sibling record schema."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.irr"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    description: "Free-text reference to the investment/project this IRR analysis is about. Atlas L730 gives no structured shape for the subject."
+
+  cash_flows:
+    type: array
+    minItems: 2
+    description: "Atlas L730 pipeline element 1 ('cash flow'). Each period unique (cross-field invariant, checked by ai_lego/modules/feasibility/irr.py, not this schema); at least one negative and one positive amount required for IRR to be defined."
+    items:
+      type: object
+      additionalProperties: false
+      required: [period, amount]
+      properties:
+        period:
+          type: integer
+          minimum: 0
+          description: "Discrete period index (e.g. year), unique within cash_flows[]. Non-negative int; bool excluded at the runtime layer."
+        amount:
+          type: number
+          description: "Signed cash flow amount at this period. Real finite number; bool excluded at the runtime layer."
+
+  hurdle_rate:
+    type: number
+    exclusiveMinimum: -1
+    description: "Atlas L730 pipeline element 3 ('hurdle rate'). Real finite number > -1 (a rate of -100% or lower makes (1+r) non-positive, outside this method's domain)."
+
+  irr:
+    type: number
+    exclusiveMinimum: -1
+    description: "Atlas L730 pipeline element 2. GENUINE_COMPUTE -- the real root of sum(cf.amount/(1+r)**cf.period)==0, solved by bisection, NEVER a builder parameter. See ai_lego/modules/feasibility/irr.py module docstring for the solver/tolerance rationale."
+
+  meets_hurdle:
+    type: boolean
+    description: "GENUINE_COMPUTE: irr >= hurdle_rate. Atlas L730's own pipeline endpoint ('cash flow→IRR→hurdle rate')."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Closed-form case: -1000 at period 0, +1200 at period 1 -> IRR = 1200/1000 - 1 = 0.2 exactly (hand-verifiable, no bisection needed to confirm)."
+    value:
+      id: "IRR-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.irr"
+      subject_ref: "設備採購案 A：一年期短期投資"
+      cash_flows:
+        - {period: 0, amount: -1000}
+        - {period: 1, amount: 1200}
+      hurdle_rate: 0.1
+      irr: 0.2
+      meets_hurdle: true
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-IRR-1: multiple sign changes in cash_flows[] can produce more than one mathematically valid IRR root (Descartes' rule) -- this method's bisection solver returns the first root found by its own fixed lo/expanding-hi bracket search, not an exhaustive enumeration of every root (owner: operator, if a future caller needs all roots)."
+
+verification:
+  method: >
+    Read Atlas F14 table IRR row (L730) directly at the cited line -- no
+    dedicated §11/§12 section exists for this row, the table row is the sole
+    citation. Grepped the full spec root case-insensitively for "internal
+    rate of return"/"IRR"/"cash_flow"/"cash flow" before writing: hits only
+    in methods/registry/method-inventory.yaml and contract-backlog.yaml's
+    own F14 backlog listing rows (not implementations). No duplicate found.
+    Validated against jsonschema Draft202012Validator via
+    tests/unit/test_irr.py, including a real bisection-vs-closed-form
+    cross-check (the example above) and independent-gate hand-tamper proofs.
+  note: >
+    No mother document was modified. IRR's mathematical definition is a
+    real textbook citation; the id-prefix, cash_flows shape, and
+    rounding/tolerance choices are disclosed compilation decisions above.

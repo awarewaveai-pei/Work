@@ -1,0 +1,126 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/net-present-value-analysis.schema.yaml"
+title: Net Present Value Analysis
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `NetPresentValueAnalysis` -- the declared `outputs` of
+  `feasibility.npv`'s Method Contract (methods/contracts/feasibility.npv.contract.yaml, `outputs:
+  [NetPresentValueAnalysis]`). F14 feasibility family, second of two members built this batch. Atlas F14 table row
+  (L728) + narrative §12.28 (L2902-2909): discount a series of cash flows at different times into one comparable
+  present value -- textbook `sum(amount/(1+discount_rate)**period)`, transcribed as a real structural invariant
+  (full formula and the discount_rate<=-1 trap: see `ai_lego/modules/feasibility/npv.py` module docstring).
+
+  Field provenance:
+    * `subject_ref` -- free text, Atlas gives no structured shape.
+    * `cash_flows[]` -- Atlas's own "cash flows" pipeline element, an ordered list of {period, amount} pairs
+      (period 0 is typically the initial outlay).
+    * `discount_rate` -- Atlas's own "discount rate" pipeline element, a real finite number > -1.
+    * `npv` -- GENUINE_COMPUTE, the formula above applied to cash_flows/discount_rate, NEVER caller-supplied.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, NPV row (L728) and §12.28 narrative (L2902-2909)"
+  - "methods/contracts/feasibility.npv.contract.yaml (outputs, preconditions, quality)"
+
+decided_by: >
+  No ADR governs this file. NPV formula is a real, cited textbook formula (not this file's own invention); the
+  id-prefix, cash_flows shape, rounding, and additionalProperties choices below are low-risk disclosed compilation
+  decisions, same class every sibling typed-object schema in this directory documents.
+
+compilation_decisions:
+  - question: "Should npv be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- never an accepted builder parameter. See ai_lego/modules/feasibility/npv.py compute_npv."
+  - question: "How is the discount_rate <= -1 case (undefined denominator) handled?"
+    decision: "Refused at construction with a distinct NPV_INVALID_DISCOUNT_RATE error -- never a crash, never a silently-returned inf/nan value. A record can therefore never exist with an undefined npv for its own stored inputs; this schema has no such representation."
+  - question: "Must cash_flows[].period values be unique, and why not express that in JSON Schema directly?"
+    decision: "Yes, unique -- enforced at the runtime layer (ai_lego/modules/feasibility/npv.py), not this schema. JSON Schema 2020-12 cannot natively express 'array items must have pairwise-distinct period values' without a verbose contains/not construct; the runtime builder/gate re-derivation is the enforcement point, same class of gap red-team's own dimensions_examined cross-field check documents."
+  - question: "Round npv, or store raw float precision?"
+    decision: "Round to 8 decimal places (round(x, 8)), matching epistemic.bayesian_updating's own posterior rounding convention -- a disclosed computed-field choice, distinct from the 2dp real-world currency display an NPV report would typically use. Gate re-derivation tolerance is 1e-9 (module docstring), proven both directions: tiny float noise passes, a real 1%-off tamper fails."
+  - question: "additionalProperties: false at the top level and on cash_flows[] items?"
+    decision: "Yes, both levels -- baseline hygiene this directory converges on, same as red-team-challenge.schema.yaml's own findings[] item-level enforcement."
+
+type: object
+required: [id, version, subject_ref, cash_flows, discount_rate, npv, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^NPV-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as every sibling schema's own record-id prefix."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "feasibility.npv"
+
+  subject_ref:
+    type: string
+    minLength: 1
+    description: "The investment/project being valued. Free text; Atlas gives no structured shape."
+
+  cash_flows:
+    type: array
+    minItems: 1
+    description: "Atlas L728 pipeline element 1 (cash flows). Ordered list of {period, amount} pairs -- period 0 is typically the initial outlay. Period uniqueness across entries is enforced at the runtime layer, not expressible here (see compilation_decisions)."
+    items:
+      type: object
+      additionalProperties: false
+      required: [period, amount]
+      properties:
+        period:
+          type: integer
+          minimum: 0
+          description: "Non-negative integer time index (0, 1, 2, ...). Bool excluded at the runtime layer (JSON Schema's `type: integer` does not itself exclude JSON true/false)."
+        amount:
+          type: number
+          description: "The cash flow at this period -- negative for an outlay, positive for an inflow. Real finite number, bool excluded at the runtime layer."
+
+  discount_rate:
+    type: number
+    exclusiveMinimum: -1
+    description: "Atlas L728 pipeline element 2. Real finite number > -1 -- at exactly -1 the formula's own denominator (1+discount_rate)**period is zero for every period > 0, an undefined NPV. Bool excluded at the runtime layer."
+
+  npv:
+    type: number
+    description: "Atlas L728 pipeline element 3. GENUINE_COMPUTE -- sum(amount/(1+discount_rate)**period) over cash_flows, NEVER a builder parameter. See compilation_decisions for the discount_rate<=-1 refusal and rounding convention."
+
+  provenance:
+    description: "Record-level only, matching this corpus's established batch precedent."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A hand-computed worked example: cash_flows=[{period:0,amount:-1000},{period:1,amount:600},{period:2,amount:600}], discount_rate=0.1 -> npv = -1000 + 600/1.1 + 600/1.21 = -1000 + 545.45454545 + 495.86776860 = 41.32231405 (rounded to 8dp)."
+    value:
+      id: "NPV-2026-09-12-001"
+      version: "1.0.0"
+      generated_by_method: "feasibility.npv"
+      subject_ref: "設備汰換投資案 -- 兩年回收期評估"
+      cash_flows:
+        - {period: 0, amount: -1000}
+        - {period: 1, amount: 600}
+        - {period: 2, amount: 600}
+      discount_rate: 0.1
+      npv: 41.32231405
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-NPV-1: Sensitivity/Scenario/Monte Carlo companions named in Atlas §13's recipe text do not yet exist as methods in this catalog -- a future NpvSensitivitySet wrapper, if built, would compose multiple records of this type rather than extending this schema's own shape (owner: operator, or whoever builds one)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L728) and §12.28 narrative section (L2902-2909) directly at the cited lines.
+    Grepped the full spec root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for "npv"/
+    "net present value"/"discount rate"/"cash flow" before writing this file: hits only the Atlas table row/
+    narrative section and the backlog listing in methods/registry/method-inventory.yaml (planned-but-unbuilt, not
+    an implementation). No duplicate found. Validated against jsonschema Draft202012Validator, including a real
+    mutation check that additionalProperties:false refuses a smuggled top-level key and that a hand-tampered npv
+    disagreeing with the stored cash_flows/discount_rate is caught by the runtime gate (not expressible in JSON
+    Schema alone).
+  note: >
+    No mother document was modified. The NPV formula itself is a real textbook citation, not this file's own
+    invention. The id-prefix, cash_flows shape, and rounding/tolerance choices are disclosed compilation decisions
+    above.

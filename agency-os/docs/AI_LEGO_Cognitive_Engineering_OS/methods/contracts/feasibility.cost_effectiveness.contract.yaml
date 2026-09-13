@@ -1,0 +1,107 @@
+$id: "ai-lego://methods/contracts/feasibility.cost_effectiveness.contract.yaml"
+title: "Cost-Effectiveness Method Contract"
+status: ACTIVE
+
+description: >
+  F14 feasibility/economics family (Atlas L724). Compares alternatives by
+  cost per unit of the SAME outcome, for use when benefit is hard to
+  monetize. Not an EC §32 security-change method. No dedicated Atlas
+  section exists for this method (grep-confirmed) -- the F14 table row
+  (L724) is the sole citation, disclosed here rather than silently treated
+  as if a worked example existed. Core invariant: cost_per_unit is
+  GENUINE_COMPUTE (cost / effectiveness_outcome_units), never
+  caller-supplied; effectiveness_outcome_units <= 0 is refused with its own
+  distinct CE_ZERO_EFFECTIVENESS code. See
+  ai_lego/modules/feasibility/cost_effectiveness.py module docstring for the
+  full two-layer enforcement.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Cost–Effectiveness row (L724) -- sole citation, no dedicated section exists"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.cost_effectiveness` mints a
+  new machine_id in the `family: feasibility` NEW family opened this batch
+  (feasibility.telos, feasibility.cost_benefit_analysis are its 2 siblings
+  built the same batch; 6 more F14 members pending). cost_per_unit =
+  cost / effectiveness_outcome_units is a direct arithmetic transcription of
+  the table row's own "cost per unit outcome" use-column, not this file's
+  own invention.
+
+id: feasibility.cost_effectiveness
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [CALCULATE, COMPARE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method (and no dedicated §12 section at all, see description). CALCULATE
+# is the cost_per_unit ratio itself (GENUINE_COMPUTE); COMPARE is the
+# alternatives[] list's own purpose (Atlas L724: 同一 outcome 比較成本). Both
+# CANONICAL_KERNEL members.
+
+purpose:
+  - compare_alternatives_by_cost_per_unit_of_the_same_outcome
+
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied cost/effectiveness content), same class
+  # as epistemic.bayesian_updating.
+
+outputs: [CostEffectivenessAnalysis]
+
+preconditions:
+  - "record_id (CE- prefix), version are valid; provenance is schema-valid"
+  - "at least 1 alternative declared, each with a non-empty id, unique across alternatives[]"
+  - "each alternative's cost is a real finite number >= 0"
+  - "each alternative's effectiveness_outcome_units is a real finite number > 0 -- a value <= 0 is refused with CE_ZERO_EFFECTIVENESS, never silently divided (never a ZeroDivisionError crash, never a silent inf/None)"
+  - "cost_per_unit is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE = cost / effectiveness_outcome_units, independently re-derived by evaluate_alternative_integrity_gate on every call"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F14 table gives no explicit next-step link from this row to any other; see OQ-CE-1.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should cost_per_unit be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- the builder has no cost_per_unit parameter at all; a caller attempting cost_per_unit= gets a plain TypeError, not a silently-accepted value. Same idiom epistemic.bayesian_updating's own posterior/foresight.delphi's own dispersion establish."
+  - question: "How is the zero/negative effectiveness_outcome_units case (undefined or nonsensical cost-per-unit) handled?"
+    decision: "Raised as a distinct CE_ZERO_EFFECTIVENESS InvariantViolation, checked before the division ever runs, at BOTH the alternative()-level construction guard AND independently inside compute_cost_per_unit itself -- never a crash, never a silent inf/None."
+  - question: "Round cost_per_unit, or store raw float precision, and what gate tolerance?"
+    decision: "round(x, 8), matching epistemic.bayesian_updating's own posterior rounding convention. Gate re-derivation tolerance is 1e-9 -- one order of magnitude tighter than the 8th-decimal-place unit, absorbing float round-trip noise without masking a real tamper."
+  - question: "No dedicated Atlas §12 section exists for this method -- how is that scope gap handled?"
+    decision: "Disclosed plainly here and in the schema's own verification section, not silently treated as if a worked-example section existed. The F14 table row (L724) alone is transcribed; nothing else is inferred beyond the 2-column use/effect it states."
+
+open_questions:
+  - "OQ-CE-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method, and no dedicated §12 section exists at all) (owner: operator)."
+  - "OQ-CE-2: effectiveness_outcome_units carries no declared unit-of-measure field (e.g. 'lives saved' vs 'tickets resolved') -- comparing cost_per_unit across alternatives is only meaningful when they share the SAME outcome unit, and this schema does not structurally enforce that (Atlas L724: 同一 outcome). Left to the caller's own discipline (owner: operator, or a future revision adding an explicit outcome_unit field)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L724) directly; confirmed via full-text grep
+    of the §12 tool-detail chapter that no dedicated section exists for
+    this method (only TELOS §12.24 and Cost–Benefit Analysis §12.25 are
+    adjacent dedicated sections). Grepped the full spec root (specs/**,
+    methods/**) and the full ai_lego/ tree case-insensitively for
+    "cost-effectiveness"/"cost effectiveness"/"cost per unit" before
+    writing this contract: only this same batch's sibling F14 backlog
+    entries -- zero pre-existing implementation or schema title overlap.
+    Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. cost_per_unit = cost /
+    effectiveness_outcome_units is a direct arithmetic transcription of the
+    table row's own use-column. The CE_ZERO_EFFECTIVENESS error code, the
+    rounding/tolerance choices, and the id-prefix are disclosed compilation
+    decisions above. The absence of a dedicated Atlas section for this
+    method is disclosed, not smoothed over.

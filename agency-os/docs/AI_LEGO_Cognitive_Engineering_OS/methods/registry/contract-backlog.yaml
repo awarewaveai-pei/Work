@@ -6140,6 +6140,74 @@ tier_1:
       the current backlog scope.**
 
 # =============================================================================
+# F14 feasibility & economics -- completed contracts registered after the
+# implementation batch landed in the shared worktree.
+# =============================================================================
+  twohundredthirtyseventh_concrete_entry:
+    method_id: "feasibility.break_even"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.break_even.contract.yaml + ai_lego/modules/feasibility/break_even.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredthirtyeighth_concrete_entry:
+    method_id: "feasibility.cost_benefit_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.cost_benefit_analysis.contract.yaml + ai_lego/modules/feasibility/cost_benefit_analysis.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredthirtyninth_concrete_entry:
+    method_id: "feasibility.cost_effectiveness"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.cost_effectiveness.contract.yaml + ai_lego/modules/feasibility/cost_effectiveness.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredfortieth_concrete_entry:
+    method_id: "feasibility.irr"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.irr.contract.yaml + ai_lego/modules/feasibility/irr.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredfortyfirst_concrete_entry:
+    method_id: "feasibility.npv"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.npv.contract.yaml + ai_lego/modules/feasibility/npv.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredfortysecond_concrete_entry:
+    method_id: "feasibility.real_options"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.real_options.contract.yaml + ai_lego/modules/feasibility/real_options.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredfortythird_concrete_entry:
+    method_id: "feasibility.tco"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.tco.contract.yaml + ai_lego/modules/feasibility/tco.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredfortyfourth_concrete_entry:
+    method_id: "feasibility.telos"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.telos.contract.yaml + ai_lego/modules/feasibility/telos.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredfortyfifth_concrete_entry:
+    method_id: "feasibility.unit_economics"
+    contract_status: complete
+    tier: 1
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
+    source: "methods/contracts/feasibility.unit_economics.contract.yaml + ai_lego/modules/feasibility/unit_economics.py"
+    note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+
+# =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================
 tier_2:

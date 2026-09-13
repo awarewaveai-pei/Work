@@ -1,0 +1,87 @@
+$id: "ai-lego://methods/contracts/feasibility.unit_economics.contract.yaml"
+title: "Unit Economics Method Contract"
+status: ACTIVE
+
+description: >
+  F14 feasibility & economics family (Atlas L718-730), row L726: "Unit Economics｜每客戶/交易是否賺錢｜ARPU/gross
+  margin/CAC/LTV/payback/churn｜判斷商模可擴張性". Section 12.27 (L2882-2900) gives the binding 7-metric list;
+  benefit "避免「營收成長但越賣越虧」". Not an EC §32 security-change method. Core invariants: `ltv_to_cac_ratio`
+  and `scalable` are both GENUINE_COMPUTE, never caller-supplied; `scalable` MUST be false whenever
+  `contribution_margin < 0`. See ai_lego/modules/feasibility/unit_economics.py module docstring for the full
+  rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, Unit Economics row (L726)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.27 (L2882-2900), the 7-metric list"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.unit_economics` mints a new machine_id in the `family:
+  feasibility` NEW family opened this batch (feasibility.tco is its sibling built the same batch; 7 further F14
+  members are being built concurrently by disjoint sibling agents). Distinct from
+  `strategy.business_model_canvas`'s own forward-reference to a still-nonexistent `strategy.unit_economics`
+  (Atlas L527) -- that would be a different machine_id in a different family; not built here (out of scope).
+
+id: feasibility.unit_economics
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [ESTIMATE, CALCULATE, EVALUATE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ESTIMATE = each of the 7 named
+# metrics is itself an estimate; CALCULATE = ltv_to_cac_ratio/scalable are GENUINE_COMPUTE; EVALUATE = the
+# method's own purpose (Atlas L726: "判斷商模可擴張性") is a scalability judgment.
+
+purpose:
+  - judge_unit_level_business_model_scalability_from_the_7_named_metrics
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content: subject_ref + the 7 metrics), same class as
+  # epistemic.bayesian_updating/feasibility.tco.
+outputs: [UnitEconomicsAnalysis]
+preconditions:
+  - "record_id (UECON- prefix), subject_ref are non-empty strings; version is a string"
+  - "cac, ltv, gross_margin, payback_period, churn_rate, arpu, contribution_margin are each a real finite number (bool excluded); cac is strictly > 0; ltv/payback_period/arpu are >= 0; gross_margin/churn_rate are in [0,1]; contribution_margin may be any finite sign"
+  - "ltv_to_cac_ratio is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE = ltv/cac, independently re-derived by evaluate_unit_economics_content_integrity_gate on every call"
+  - "scalable is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE = (contribution_margin >= 0); a caller or a hand-tampered record asserting scalable=true with contribution_margin < 0 is refused/caught (Atlas §12.27's own named failure mode, made structural)"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+recommended_next: []
+# Atlas's own §12.27 names no explicit downstream method; see open_questions.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should ltv_to_cac_ratio/scalable be caller-supplied or mechanically derived?"
+    decision: "Both mechanically derived (GENUINE_COMPUTE) -- the builder has neither parameter at all."
+  - question: "How is cac<=0 handled, given the ratio is undefined at cac=0?"
+    decision: "Refused with a distinct UECON_INVALID_CAC error before the division ever runs -- cac must be strictly positive."
+  - question: "What exact rule defines scalable, given Atlas cites no formula beyond the failure mode it names?"
+    decision: "scalable = (contribution_margin >= 0) -- the minimal structural encoding of section 12.27's own named failure mode and nothing more; a richer heuristic (e.g. an LTV:CAC ratio threshold) is deliberately NOT modeled since Atlas cites no such threshold."
+  - question: "gross_margin/churn_rate representation -- fraction [0,1] or percentage?"
+    decision: "Fraction [0,1], disclosed -- matching this corpus's established probability/rate convention (e.g. epistemic.bayesian_updating's own prior/likelihood fields)."
+  - question: "Rounding and gate tolerance for ltv_to_cac_ratio?"
+    decision: "round(x, 8), matching epistemic.bayesian_updating's own posterior convention; gate tolerance 1e-9."
+
+open_questions:
+  - "OQ-UNITECONOMICS-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-UNITECONOMICS-2: payback_period's own unit (months vs. another period) is left undefined by Atlas and by this record -- a free numeric field, not itself schema-typed to a unit (owner: operator, or whoever builds a consuming workflow that needs one)."
+  - "OQ-UNITECONOMICS-3: a richer scalability heuristic (e.g. LTV:CAC >= 3, a common SaaS rule of thumb) is out of scope -- not cited anywhere in the Atlas mother document, so not encoded (owner: operator, if a future method wants to add it as a separate, disclosed derived field)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L726) and §12.27 (L2882-2900) directly at the cited lines. Grepped the full
+    spec root (specs/**, methods/**) and the full ai_lego/ tree case-insensitively for "unit economics"/
+    "unit_economics" before writing this contract: the only hit was strategy.business_model_canvas's own
+    forward-reference to a different, still-nonexistent strategy.unit_economics machine_id (Atlas L527) --
+    confirmed distinct scope, no collision. Validated against specs/cognitive/method.schema.yaml with
+    jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 7-metric list is a direct transcription of section 12.27's own text
+    fence. The scalable formula, fraction representation, rounding, and tolerance choices are disclosed
+    compilation decisions above.

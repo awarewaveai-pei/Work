@@ -1,0 +1,97 @@
+$id: "ai-lego://methods/contracts/feasibility.telos.contract.yaml"
+title: "TELOS Feasibility Method Contract"
+status: ACTIVE
+
+description: >
+  F14 feasibility/economics family (Atlas L722, §12.24 L2831-2843). Verbatim
+  5-element checklist: Technical, Economic, Legal, Operational, Schedule.
+  Not an EC §32 security-change method. Core invariant: all 5 dimensions are
+  required builder parameters, and each must carry >=1 non-empty entry
+  across its own assumptions/evidence/gaps/stop_conditions -- an empty
+  dimension was never actually assessed (Atlas L2841: 避免工程師只證明「技
+  術做得到」就認為專案可行). See ai_lego/modules/feasibility/telos.py module
+  docstring for the full two-layer enforcement.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, TELOS row (L722)"
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md §12.24 TELOS 可行性分析 (L2831-2843)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.telos` mints a new machine_id
+  in the `family: feasibility` NEW family opened this batch
+  (feasibility.cost_benefit_analysis, feasibility.cost_effectiveness are its
+  2 siblings built the same batch; 6 more F14 members pending). §12.24's
+  5-element checklist is a direct textbook transcription, not this file's
+  own invention.
+
+id: feasibility.telos
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [DECOMPOSE, EVALUATE, CHECK]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this
+# method. DECOMPOSE splits feasibility into the 5 named dimensions; EVALUATE
+# assesses each via assumptions/evidence/gaps; CHECK is the stop_conditions
+# field's own defining act. All three verified against the real 24-value
+# kernel (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - assess_project_feasibility_across_all_five_telos_dimensions
+
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content per dimension), same class as
+  # epistemic.bayesian_updating/learning.decision_journal.
+
+outputs: [TelosFeasibilityAssessment]
+
+preconditions:
+  - "assessment_id (TELOS- prefix), version are valid; provenance is schema-valid"
+  - "all 5 dimensions (technical, economic, legal, operational, schedule) are present -- structurally required builder parameters, never optional"
+  - "each dimension carries >=1 non-empty entry across its own assumptions/evidence/gaps/stop_conditions combined -- an entirely empty dimension is refused (TELOS_INVALID_DIMENSION), independently re-checked by evaluate_five_dimensions_complete_gate on every call"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input (each dimension's own evidence[] field is free text, not a formal EvidenceSet claim).
+
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+
+recommended_next: []
+# Atlas's own F14 table gives no explicit next-step link from this row to any other; see OQ-TELOS-1.
+
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should the 5 dimensions be optional builder parameters (caller may omit one) or required?"
+    decision: "Required positional parameters, no default -- omitting one raises a plain Python TypeError, never a silently-accepted 4-of-5 assessment. This is the direct structural enforcement of Atlas L2841's own stated benefit."
+  - question: "What counts as a dimension actually being 'assessed', mechanically?"
+    decision: ">=1 non-empty string across the dimension's own assumptions/evidence/gaps/stop_conditions lists COMBINED (not one specific field) -- Atlas's own F14 table use-column names all four as the dimension's content, with no field singled out as mandatory over the others."
+  - question: "Per-list minimum: does each of the 4 fields (assumptions/evidence/gaps/stop_conditions) need >=1 entry individually?"
+    decision: "No -- only the COMBINED total across all 4 must be >=1. A dimension may legitimately have, e.g., only stop_conditions populated (a hard blocker identified with no assumptions yet recorded) and still count as assessed."
+
+open_questions:
+  - "OQ-TELOS-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-TELOS-2: no per-dimension weighting or an overall feasible/not-feasible verdict field exists on this record -- Atlas §12.24 gives a checklist, not a scoring formula; a future MCDA/weighted-decision-matrix record could consume this assessment's 5 dimensions as its own criteria (owner: operator, or whoever builds that pipeline link)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L722) and §12.24 (L2831-2843) directly.
+    Grepped the full spec root (specs/**, methods/**) and the full ai_lego/
+    tree case-insensitively for "telos"/"feasibility" before writing this
+    contract: only narrative mentions of "feasibility" as a general concept
+    on unrelated records (divergent-family feasibility_status enum,
+    association.morphological_analysis's own convergence step) and this
+    same batch's sibling F14 backlog entries -- zero pre-existing TELOS
+    implementation or schema title overlap. Validated against
+    specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The 5-element checklist is a direct
+    textbook transcription of Atlas §12.24. The required-parameter
+    enforcement, the combined-non-empty rule, and the id-prefix are
+    disclosed compilation decisions above.

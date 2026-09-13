@@ -1,0 +1,81 @@
+$id: "ai-lego://methods/contracts/feasibility.npv.contract.yaml"
+title: "Net Present Value Analysis Method Contract"
+status: ACTIVE
+
+description: >
+  Tier 1, F14 feasibility & economics family (Atlas L728, narrative §12.28 L2902-2909), second of two F14 members
+  built this batch (with feasibility.break_even, which opened the family). Not an EC §32 security-change method.
+  Core invariant: `npv` is GENUINE_COMPUTE via `sum(amount / (1+discount_rate)**period)`, never caller-supplied;
+  `discount_rate <= -1` is refused with its own distinct NPV_INVALID_DISCOUNT_RATE code (an undefined denominator,
+  not a computable answer). See ai_lego/modules/feasibility/npv.py module docstring for the full formula and
+  tolerance rationale.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md F14 table, NPV row (L728) and §12.28 narrative (L2902-2909)"
+  - "specs/cognitive/method.schema.yaml -- the schema this file's body is validated against"
+
+decided_by: >
+  No ADR governs the content. `id: feasibility.npv` mints a new machine_id in the `family: feasibility` (sibling
+  feasibility.break_even opened it this same batch). Textbook NPV formula, not this file's own invention. Atlas
+  §13's "NPV + Sensitivity + Scenario + Monte Carlo" recipe text is a pipeline-composition reference, not a
+  definition -- stated plainly, not treated as this method's own source.
+
+id: feasibility.npv
+version: "1.0.0"
+family: feasibility
+
+cognitive_primitives: [ESTIMATE, CALCULATE, COMPARE]
+# INFERRED, not cited -- Atlas §4 gives no composition formula for this method. ESTIMATE = cash_flows/discount_rate
+# are themselves estimates; CALCULATE = npv is GENUINE_COMPUTE; COMPARE = Atlas's own stated benefit ("比較不同時間
+# 投資"). Verified against the real 24-value kernel (specs/cognitive/primitive.schema.yaml).
+
+purpose:
+  - discount_a_cash_flow_series_to_a_single_comparable_present_value
+inputs:
+  required: []
+  optional: []
+  # Leaf method (raw caller-supplied content: subject_ref/cash_flows/discount_rate), same class as
+  # epistemic.bayesian_updating and sibling feasibility.break_even.
+outputs: [NetPresentValueAnalysis]
+preconditions:
+  - "record_id (NPV- prefix), subject_ref are non-empty strings; version is a string"
+  - "discount_rate is a real finite number > -1 (bool excluded)"
+  - "cash_flows is a non-empty list of {period: int >= 0 (bool excluded, unique per entry), amount: real finite number (bool excluded)}"
+  - "npv is NEVER a caller-supplied parameter -- always GENUINE_COMPUTE via sum(amount/(1+discount_rate)**period), independently re-derived by evaluate_npv_content_integrity_gate on every call"
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+  # false -- method.schema.yaml scopes this flag to claims originating from a supplied EvidenceSet input; this
+  # method takes no EvidenceSet input.
+forbidden_transition: []
+# Atlas gives no §14.1-style worked legal/illegal chain example for this method (grep-confirmed).
+recommended_next: []
+# Atlas §13's own recipe text names Sensitivity/Scenario/Monte Carlo analysis as companions, but none of those are
+# yet-built methods in this catalog -- left empty rather than pointing at a nonexistent method id.
+rollback:
+  side_effect_free: true
+
+compilation_decisions:
+  - question: "Should npv be caller-supplied or mechanically derived?"
+    decision: "Mechanically derived (GENUINE_COMPUTE) -- the builder has no such parameter at all; a caller attempting npv= gets a plain TypeError."
+  - question: "How is the discount_rate <= -1 case (undefined denominator) handled?"
+    decision: "Raised as a distinct NPV_INVALID_DISCOUNT_RATE InvariantViolation before any division ever runs -- never a crash, never a silently-returned inf/nan value."
+  - question: "Must cash_flows[].period values be unique?"
+    decision: "Yes -- two entries both claiming the same period is a malformed timeline that cannot be summed unambiguously; refused with NPV_INVALID_CASH_FLOWS at construction."
+  - question: "Round npv, and what gate tolerance?"
+    decision: "round(x, 8), matching epistemic.bayesian_updating's own posterior convention, disclosed as a computed-field choice distinct from real-world 2dp currency display. Gate re-derivation tolerance is 1e-9 -- one order of magnitude tighter than the 8th-decimal-place unit; proven both directions (tiny float noise passes, a real 1%-off tamper fails)."
+
+open_questions:
+  - "OQ-NPV-1: cognitive_primitives is this file's own inference (Atlas §4 gives no formula for this method) (owner: operator)."
+  - "OQ-NPV-2: Sensitivity/Scenario/Monte Carlo companions named in Atlas §13's recipe text do not yet exist as methods in this catalog -- recommended_next left empty until they are built (owner: operator, or whoever builds them)."
+
+verification:
+  method: >
+    Read Atlas F14 table row (L728) and §12.28 narrative section (L2902-2909) directly at the cited lines.
+    Grepped the full spec root and the full ai_lego/ tree case-insensitively for "npv"/"net present value"/
+    "discount rate"/"cash flow" before writing this contract: hits only the Atlas table row/narrative section and
+    the backlog listing in methods/registry/method-inventory.yaml (planned-but-unbuilt, not an implementation). No
+    duplicate found. Validated against specs/cognitive/method.schema.yaml with jsonschema.Draft202012Validator.
+  note: >
+    No mother document was modified. The NPV formula is a direct textbook transcription. cognitive_primitives, the
+    period-uniqueness invariant, and the rounding/tolerance choices are disclosed compilation decisions above.
