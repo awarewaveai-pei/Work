@@ -79,6 +79,7 @@ from ai_lego.platform.ai_execution.manifest import build_manifest, describe_git_
 from ai_lego.platform.ai_execution.method_resolver import DEPRECATED_ALIAS, METHOD_RESOLUTION_BLOCKED, MethodCatalog, state_transition
 from ai_lego.platform.ai_execution.replay import project
 from ai_lego.platform.ai_execution.rollback_plan import build_rollback_plan
+from ai_lego.platform.workflow.executor import execute_workflow_ir
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.security.key_vault.local_key_vault import DECRYPT_BLOCKED_PENDING_REPLAY, REDACTED, LocalKeyVault
 
@@ -433,20 +434,78 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             selective = suggest_themes(gateway, DEFAULT_LOCAL_MODEL_PROFILE, axial["categories"], pii_guard=pii_guard, classification_tag="Confidential", trace_id=f"{RUN_ID}:selective")
             emit(NORDBROOK.tenant_id, nord_aggregate, "SelectiveCodingSuggested", {"themes": [{"theme": t, "categories": c} for t, c in selective["themes"]], "rejected": selective["rejected"], "unassigned": selective["unassigned"], "suggestion_source": selective["suggestion_source"]}, 23.4)
             write_json(runtime / "modules" / "research" / "selective_model_response.json", selective)
-    coding_contract, coding_outputs = live.invoke(
-        "research.qualitative_coding",
-        assemble_coding_outputs,
-        locked_code,
-        ai_review,
-        clock.at(23.5),
-        pending_ai_labels=pending_ai_labels,
-        suggestion_source=None if open_coding is None else open_coding["suggestion_source"],
-        coder_two_labels=None if codebook_pass is None else codebook_pass["labels"],
-        coder_two_source=None if codebook_pass is None else codebook_pass["suggestion_source"],
-        category_of_label=None if axial is None else axial["category_of_label"],
-        themes_v11=None if axial is None else (selective["themes"] if selective is not None else []),
-        grouping_source=None if axial is None else {"axial": axial["suggestion_source"], "selective": None if selective is None else selective["suggestion_source"]},
+    # Execute the first real runtime sub-chain through the generic Workflow IR executor.  The full Recipe
+    # still contains intentionally unperformed ingest/literature/triangulation nodes; this sub-chain only
+    # claims the two nodes whose real adapters are available at this point: coding -> trusted statistics.
+    coding_request = {
+        "locked_code": locked_code,
+        "ai_review": ai_review,
+        "timestamp": clock.at(23.5),
+        "pending_ai_labels": pending_ai_labels,
+        "suggestion_source": None if open_coding is None else open_coding["suggestion_source"],
+        "coder_two_labels": None if codebook_pass is None else codebook_pass["labels"],
+        "coder_two_source": None if codebook_pass is None else codebook_pass["suggestion_source"],
+        "category_of_label": None if axial is None else axial["category_of_label"],
+        "themes_v11": None if axial is None else (selective["themes"] if selective is not None else []),
+        "grouping_source": None if axial is None else {"axial": axial["suggestion_source"], "selective": None if selective is None else selective["suggestion_source"]},
+    }
+
+    def execute_coding(payload: dict[str, Any], _node: dict[str, Any]) -> dict[str, Any]:
+        request = payload["research.coding_request"]
+        outputs = assemble_coding_outputs(
+            request["locked_code"],
+            request["ai_review"],
+            request["timestamp"],
+            pending_ai_labels=request["pending_ai_labels"],
+            suggestion_source=request["suggestion_source"],
+            coder_two_labels=request["coder_two_labels"],
+            coder_two_source=request["coder_two_source"],
+            category_of_label=request["category_of_label"],
+            themes_v11=request["themes_v11"],
+            grouping_source=request["grouping_source"],
+        )
+        by_source_c1 = {code["source_id"]: code["label"] for code in outputs["coder_1"]["code_set"]}
+        by_source_c2 = {code["source_id"]: code["label"] for code in outputs["coder_2"]["code_set"]}
+        shared_units = sorted(set(by_source_c1) & set(by_source_c2))
+        return {"coding_outputs": outputs, "coder_one": [by_source_c1[sid] for sid in shared_units], "coder_two": [by_source_c2[sid] for sid in shared_units]}
+
+    def execute_statistics(payload: dict[str, Any], _node: dict[str, Any]) -> dict[str, Any]:
+        coding = payload["outputs.coding"]
+        if codebook_pass is None:
+            coder_one, coder_two = expanded_synthetic_coder_judgments()
+            judgment_source = "SYNTHETIC_48_UNITS"
+        else:
+            coder_one, coder_two = coding["coder_one"], coding["coder_two"]
+            judgment_source = f"REAL_UNITS:{len(coder_one)}_SHARED_UNITS"
+        if len(coder_one) < 2:
+            raise InvariantViolation(f"KAPPA_INSUFFICIENT_UNITS: {len(coder_one)} unit(s) coded by both coders")
+        return {"statistics": interrater_reliability_result(coder_one, coder_two), "judgment_source": judgment_source}
+
+    runtime_subchain = {
+        "id": f"{workflow_ir['id']}:coding-statistics",
+        "nodes": [
+            {"node_kind": "method", "method_id": "research.qualitative_coding", "label": "coding", "input": "research.coding_request"},
+            {"node_kind": "capability", "ref": "run_statistics", "label": "statistics", "input": "outputs.coding"},
+        ],
+    }
+    runtime_result = execute_workflow_ir(
+        runtime_subchain,
+        {"research": {"coding_request": coding_request}},
+        {"research.qualitative_coding": execute_coding, "run_statistics": execute_statistics},
+        catalogs={"method": live, "capability": capabilities},
     )
+    if runtime_result.status != "SUCCEEDED":
+        failed_step = next(step for step in runtime_result.steps if step.status == "FAILED")
+        raise InvariantViolation(f"RESEARCH_WORKFLOW_EXECUTION_FAILED: {failed_step.error}")
+    coding_contract = runtime_result.steps[0].contract
+    coding_outputs = runtime_result.context["outputs"]["coding"]["coding_outputs"]
+    runtime_statistics = runtime_result.context["outputs"]["statistics"]
+    if codebook_pass is None:
+        coder_one, coder_two = expanded_synthetic_coder_judgments()
+    else:
+        coder_one = runtime_result.context["outputs"]["coding"]["coder_one"]
+        coder_two = runtime_result.context["outputs"]["coding"]["coder_two"]
+    write_json(runtime / "platform" / "ai_execution" / "workflow_runtime.json", runtime_result.as_dict())
 
     # Steps 16 (plan/rollback/approval) + real recovery-plan and current-state records before each transition.
     transition("METHODS_RESOLVED", "PLAN_COMPILED", 24)
@@ -457,26 +516,10 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     transition("ROLLBACK_VALIDATED", "APPROVED", 24.2, authority_level="A4")
     transition("APPROVED", "EXECUTING", 24.3)
 
-    # Steps 16-18 continued: Trusted Compute statistics (never LLM mental arithmetic); champion v11 theme set.
-    # Fixture mode: 48 balanced synthetic judgments. local-llm mode: the REAL per-unit judgments of coder 1 (after
-    # human review) vs the model second coder, aligned by source_id -- few units, honestly reported as such
-    # (`coding_unit_count`); the Kappa threshold stays OPERATOR_SET_PENDING either way.
-    if codebook_pass is None:
-        coder_one, coder_two = expanded_synthetic_coder_judgments()
-        kappa_input = "SYNTHETIC_48_UNITS"
-    else:
-        by_source_c1 = {code["source_id"]: code["label"] for code in coding_outputs["coder_1"]["code_set"]}
-        by_source_c2 = {code["source_id"]: code["label"] for code in coding_outputs["coder_2"]["code_set"]}
-        shared_units = sorted(set(by_source_c1) & set(by_source_c2))
-        if len(shared_units) < 2:
-            raise InvariantViolation(f"KAPPA_INSUFFICIENT_UNITS: {len(shared_units)} unit(s) coded by both coders")
-        coder_one = [by_source_c1[sid] for sid in shared_units]
-        coder_two = [by_source_c2[sid] for sid in shared_units]
-        kappa_input = f"REAL_UNITS:{','.join(shared_units)}"
-    # MP §7: the Capability Request passes the resolver BEFORE the implementation runs -- an unresolved ref raises here,
-    # so there is no path on which uncontracted compute produces a CALCULATED_RESULT.
-    run_statistics_contract, statistics = capabilities.invoke("run_statistics", interrater_reliability_result, coder_one, coder_two)
-    statistics = {**statistics, "judgment_source": kappa_input}
+    # The executor already routed run_statistics through CapabilityCatalog.invoke.  Preserve the existing
+    # semantic judgment source in the result while retaining the runtime's own observed shared-unit count.
+    run_statistics_contract = next(step.contract for step in runtime_result.steps if step.ref == "run_statistics")
+    statistics = {**runtime_statistics["statistics"], "judgment_source": runtime_statistics["judgment_source"], "runtime_execution": runtime_statistics["judgment_source"]}
     emit(NORDBROOK.tenant_id, nord_aggregate, "StatisticsCalculated", statistics, 24.5)
     method_execution_log.append(
         {
