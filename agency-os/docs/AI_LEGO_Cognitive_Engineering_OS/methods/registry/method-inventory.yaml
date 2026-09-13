@@ -1689,6 +1689,69 @@ phase_3_additions:
     machine_id: "research.qualitative_coding"
     source: "methods/contracts/research.qualitative_coding.contract.yaml"
     mandated_by: "docs/architecture/MVP_VERTICAL_SLICE_PLAN.md §4 (L105), §3 walkthrough step 12-13 (L72-73); slice selection ratified by docs/adr/ADR-014-phase-5-mode-selection-research.md (ACCEPTED 2026-08-30)"
+  - name: "feasibility.telos"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.telos"
+    source: "methods/contracts/feasibility.telos.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L722)"
+  - name: "feasibility.cost_benefit_analysis"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.cost_benefit_analysis"
+    source: "methods/contracts/feasibility.cost_benefit_analysis.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L723)"
+  - name: "feasibility.cost_effectiveness"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.cost_effectiveness"
+    source: "methods/contracts/feasibility.cost_effectiveness.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L724)"
+  - name: "feasibility.tco"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.tco"
+    source: "methods/contracts/feasibility.tco.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L725)"
+  - name: "feasibility.unit_economics"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.unit_economics"
+    source: "methods/contracts/feasibility.unit_economics.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L726)"
+  - name: "feasibility.break_even"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.break_even"
+    source: "methods/contracts/feasibility.break_even.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L727)"
+  - name: "feasibility.npv"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.npv"
+    source: "methods/contracts/feasibility.npv.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L728)"
+  - name: "feasibility.irr"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.irr"
+    source: "methods/contracts/feasibility.irr.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L729)"
+  - name: "feasibility.real_options"
+    category: "method (F14 feasibility & economics -- completed implementation)"
+    has_contract: true
+    contract_status: complete
+    machine_id: "feasibility.real_options"
+    source: "methods/contracts/feasibility.real_options.contract.yaml"
+    mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row (L730)"
 # ---------------------------------------------------------------------------
 verification:
   method: "Read (full file, 1182 lines) + Grep against the Phase 0 source before migrating; Read-back of this file after writing"
@@ -1700,8 +1763,8 @@ verification:
     2026-09-12 -- that file does not exist and never has. The count remains
     unverified by any test; only line-number correctness is now guarded, by
     `tests/unit/test_method_inventory_line_numbers.py`.) `phase_3_additions` above is a
-    SEPARATE, additive block of 1 entry (`research.qualitative_coding`),
-    bringing this file's true total to 290 -- deliberately not folded into
+    SEPARATE, additive block of 10 entries (`research.qualitative_coding` plus
+    the nine completed F14 methods), bringing this file's true total to 299 -- deliberately not folded into
     the 289 figure, per that block's own header comment.
   has_contract_true_count: 2
   has_contract_true_entries:
@@ -1714,10 +1777,10 @@ verification:
     AGENTS.md R4 Verify Before Conclude) -- matches
     MACHINE_READABLE_SPEC_PLAN.md §4's own stated figure. No mother document
     and no Phase 0 file was modified to produce this file. **2026-08-30
-    addition (separate task)**: `phase_3_additions.research.qualitative_coding`
-    is the one entry in this file with `has_contract: true` that is NOT one
-    of the 2 Phase-0-migrated entries above -- 3 has_contract:true entries
-    now exist in this file in total, across two structurally distinct blocks
-    (`by_document`: 2, `phase_3_additions`: 1), a distinction preserved
-    rather than collapsed into a single stale count.
+    additions (separate tasks)**: `phase_3_additions` contains the one
+    Research vertical-slice method plus nine completed F14 methods. The file
+    therefore has 12 `has_contract: true` entries in total, across two
+    structurally distinct blocks (`by_document`: 2,
+    `phase_3_additions`: 10), a distinction preserved rather than collapsed
+    into a stale Phase-0 count.
     (.ai/research/phase-0/method-inventory.yaml remains untouched, read-only source).

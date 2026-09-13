@@ -376,7 +376,20 @@ def run_registry_invariants():
     # singles out as the worst outcome.
     phase3 = mi.get("phase_3_additions", [])
     check(len(phase3) >= 1, f"method-inventory.yaml: expected phase_3_additions to be present and non-empty (research.qualitative_coding, added 2026-08-30), found {len(phase3)} entries")
-    check(any(e.get("name") == "research.qualitative_coding" for e in phase3), f"method-inventory.yaml phase_3_additions: expected an entry named research.qualitative_coding, found names {[e.get('name') for e in phase3]}")
+    required_phase3 = {
+        "research.qualitative_coding",
+        "feasibility.telos",
+        "feasibility.cost_benefit_analysis",
+        "feasibility.cost_effectiveness",
+        "feasibility.tco",
+        "feasibility.unit_economics",
+        "feasibility.break_even",
+        "feasibility.npv",
+        "feasibility.irr",
+        "feasibility.real_options",
+    }
+    found_phase3 = {e.get("name") for e in phase3}
+    check(required_phase3.issubset(found_phase3), f"method-inventory.yaml phase_3_additions: missing required live entries {sorted(required_phase3 - found_phase3)}")
     phase3_bad = [e.get("name") for e in phase3 if _has_contract_status_mismatch(e)]
     check(not phase3_bad, f"method-inventory.yaml phase_3_additions: has_contract/contract_status mismatch for {phase3_bad}")
 
