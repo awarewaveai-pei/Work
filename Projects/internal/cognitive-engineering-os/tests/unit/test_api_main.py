@@ -311,6 +311,27 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(payload["status"], "PASS")
         self.assertEqual([step["ref"] for step in payload["workflow"]["steps"]], ["epistemic.assumption_mapping", "epistemic.evidence_matrix", "epistemic.toulmin_model"])
 
+    def test_art_reflection_recipe_preserves_non_diagnostic_boundary(self):
+        self._login()
+        source = {
+            "stimulus": {
+                "session_id": "RANDOMSTIM-API-001",
+                "entries": [{"stimulus": "blue stone", "forced_connection": "A blue stone suggests steadiness.", "resulting_idea": "Draw a steady place."}],
+                "provenance": {"epistemic_type": "HUMAN_OPINION", "authorship_state": "HUMAN_ORIGINAL", "locked": None},
+            },
+            "mind_map": {
+                "record_id": "MINDMAP-API-001",
+                "central_topic": "A steady place",
+                "main_branches": [{"id": "MB-API-1", "label": "quiet water", "provenance": {"epistemic_type": "HUMAN_OPINION", "authorship_state": "HUMAN_ORIGINAL", "locked": None}}],
+                "provenance": {"epistemic_type": "HUMAN_OPINION", "authorship_state": "HUMAN_ORIGINAL", "locked": None},
+            },
+        }
+        response = self.client.post("/recipes/art-therapy-creative-reflection-v1/run", json={"source": source, "run_id": "api-art-test"})
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual([step["ref"] for step in payload["workflow"]["steps"]], ["divergent.random_stimulus", "association.mind_map"])
+
 
 class DemoTests(ApiTestCase):
     def test_demo_runs_the_real_cli_slice(self):

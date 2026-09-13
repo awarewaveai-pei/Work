@@ -235,12 +235,12 @@ def run_recipe_instance_conformance():
     reg = registry.with_resource(recipe_schema_id, Resource.from_contents(schema_doc))
     validator = Draft202012Validator(schema_doc, registry=reg)
     recipe_files = sorted(glob.glob(os.path.join(ROOT, "recipes", "validated", "*.recipe.yaml")))
-    check(len(recipe_files) == 6, f"expected exactly 6 recipes/validated/*.recipe.yaml files (Wave 7's 3 + research-qualitative-v1 + life-decision-v1 + edd-research-evidence-v1), found {len(recipe_files)}")
+    check(len(recipe_files) == 7, f"expected exactly 7 recipes/validated/*.recipe.yaml files (Wave 7's 3 + research-qualitative-v1 + life-decision-v1 + edd-research-evidence-v1 + art-therapy-creative-reflection-v1), found {len(recipe_files)}")
     # 2026-08-30 critic finding: a bare count check does not pin WHICH file is
     # present -- deleting research-qualitative-v1.recipe.yaml and adding any
     # other well-formed decoy recipe would still pass len()==4 silently.
     recipe_basenames = {os.path.basename(p)[: -len(".recipe.yaml")] for p in recipe_files}
-    check("research-qualitative-v1" in recipe_basenames, f"expected recipes/validated/research-qualitative-v1.recipe.yaml specifically (Phase 5 Research Mode slice deliverable) among the 6, found {sorted(recipe_basenames)}")
+    check("research-qualitative-v1" in recipe_basenames, f"expected recipes/validated/research-qualitative-v1.recipe.yaml specifically (Phase 5 Research Mode slice deliverable) among the 7, found {sorted(recipe_basenames)}")
     for p in recipe_files:
         rel_p = os.path.relpath(p, ROOT)
         inst = load(p)
