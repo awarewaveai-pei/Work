@@ -73,6 +73,8 @@ def scan_contract_files(spec_root: Path, relative_dir: str, glob_pattern: str) -
             "version": str(document.get("version", "")),
             "content_sha256": sha256_bytes(raw),
         }
+        if document.get("type") is not None:
+            contracts[contract_id]["type"] = document["type"]
     return contracts
 
 

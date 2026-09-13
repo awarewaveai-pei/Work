@@ -180,6 +180,11 @@ class UnauthenticatedAccessTests(ApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["ref"], "foresight.cross_impact_analysis")
 
+    def test_lens_contract_is_not_advertised_as_an_invokable_method(self):
+        response = self.client.get("/methods")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("stakeholder.regulator", {entry["method_id"] for entry in response.json()})
+
     def test_get_unknown_method_is_404(self):
         response = self.client.get("/methods/nonexistent.method")
         self.assertEqual(response.status_code, 404)

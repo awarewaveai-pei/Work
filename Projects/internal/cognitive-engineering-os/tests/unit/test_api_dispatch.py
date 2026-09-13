@@ -30,6 +30,12 @@ class ResolveBuilderTests(unittest.TestCase):
         builder = resolve_builder("representation.expert_lego_mode")
         self.assertEqual(builder.__name__, "generate_expert_lego_chain")
 
+    def test_contract_only_reuse_has_a_thin_dispatch_adapter(self):
+        builder = resolve_builder("architecture.trade_off_matrix")
+        gate_runner = resolve_gate_runner("architecture.trade_off_matrix")
+        self.assertEqual(builder.__name__, "generate_trade_off_matrix")
+        self.assertEqual(gate_runner.__name__, "evaluate_trade_off_matrix_gates")
+
     def test_unknown_method_id_raises_dispatch_error(self):
         with self.assertRaises(MethodDispatchError):
             resolve_builder("nonexistent_family.nonexistent_method")

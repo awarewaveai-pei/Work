@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from ai_lego.platform.ai_execution.contract_catalog import ContractCatalog, is_active
+from ai_lego.platform.ai_execution.contract_catalog import ContractCatalog, catalog_label, is_active, scan_contract_files
 
 METHOD_RESOLUTION_BLOCKED = "METHOD_RESOLUTION_BLOCKED"
 DEPRECATED_ALIAS = "PLANNING_BLOCKED_METHOD_ATLAS_REQUIRED"
@@ -40,6 +40,19 @@ class MethodCatalog(ContractCatalog):
     CONTRACTS_DIR: ClassVar[str] = CONTRACTS_DIR
     CONTRACT_GLOB: ClassVar[str] = CONTRACT_GLOB
     BLOCKED_SIGNAL: ClassVar[str] = METHOD_RESOLUTION_BLOCKED
+
+    @classmethod
+    def from_spec_root(cls, spec_root):
+        """Load Method contracts without promoting Atlas Lenses into Methods.
+
+        The shared directory contains the Tier-0 ``stakeholder.regulator`` lens
+        contract.  Its ``type: perspective`` is a different LEGO dimension and
+        has no builder/gate pair, so the Method catalog must not advertise it as
+        invokable.
+        """
+        contracts = scan_contract_files(spec_root, cls.CONTRACTS_DIR, cls.CONTRACT_GLOB)
+        contracts = {ref: entry for ref, entry in contracts.items() if entry.get("type") != "perspective"}
+        return cls(label=catalog_label(cls.CONTRACTS_DIR, contracts), contracts=contracts)
 
     def resolve(self, method_ids: list[str]) -> dict[str, Any]:
         """Instance of ``specs/execution/method-resolution.schema.yaml#/method_resolution_result``."""

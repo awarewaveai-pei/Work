@@ -6,5 +6,5 @@ substituted because it contains no digits, see that file's own docstring), ``arc
 (see ``dependency_mapping.py``), ``architecture.fitness_functions`` (see ``fitness_functions.py``),
 ``architecture.strangler_fig`` (see ``strangler_fig.py``), ``architecture.ddd`` (see ``ddd.py`` -- real-world
 name "Domain-Driven Design") -- nine built modules. The 10th row, Architecture Trade-off Matrix, is a confirmed
-duplicate of ``decision.mcda``'s own pipeline (contract-only entry, no module here -- see
+duplicate of ``decision.mcda``'s own pipeline and uses a thin dispatch adapter, not a second implementation (see
 methods/contracts/architecture.trade_off_matrix.contract.yaml)."""
