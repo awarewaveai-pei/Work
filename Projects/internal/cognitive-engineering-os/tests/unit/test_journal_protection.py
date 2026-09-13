@@ -6,10 +6,22 @@ from pathlib import Path
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.workflow.executor import execute_workflow_ir
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
-from ai_lego.platform.workflow.journal_protection import AesGcmJournalContextProtector, CasJournalContextProtector
+from ai_lego.platform.workflow.journal_protection import AesGcmJournalContextProtector, CasJournalContextProtector, LocalDevJournalKeyProvider
 
 
 class JournalProtectionTests(unittest.TestCase):
+    def test_local_dev_key_provider_requires_explicit_mode_and_valid_256_bit_key(self):
+        settings = {"COGNITIVE_OS_JOURNAL_KEY_MODE": "local-dev", "COGNITIVE_OS_JOURNAL_KEY_B64": "a2" * 22}
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_KEY_INVALID"):
+            LocalDevJournalKeyProvider(settings).key_for("tenant-a", "journal")
+        settings["COGNITIVE_OS_JOURNAL_KEY_B64"] = "az" * 22
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_KEY_INVALID"):
+            LocalDevJournalKeyProvider(settings).key_for("tenant-a", "journal")
+
+    def test_key_provider_does_not_return_a_key_when_mode_is_not_local_dev(self):
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_KEY_MODE_UNSUPPORTED"):
+            LocalDevJournalKeyProvider({"COGNITIVE_OS_JOURNAL_KEY_MODE": "disabled"}).key_for("tenant-a", "journal")
+
     def test_aes_gcm_protects_context_and_round_trips(self):
         protector = AesGcmJournalContextProtector(b"k" * 32)
         stored = protector.protect({"outputs": {"one": {"secret": "never plaintext"}}})

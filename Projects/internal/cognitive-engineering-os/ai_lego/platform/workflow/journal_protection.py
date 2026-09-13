@@ -19,6 +19,32 @@ from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.errors import InvariantViolation
 
 
+class JournalKeyProvider(Protocol):
+    """Key-custody boundary; production implementations resolve keys through KMS/HSM."""
+
+    def key_for(self, tenant_id: str, purpose: str) -> bytes: ...
+
+
+class LocalDevJournalKeyProvider:
+    """Explicit local-only provider backed by process configuration, never by persisted files."""
+
+    def __init__(self, settings: Mapping[str, str] | None = None):
+        self._settings = settings if settings is not None else __import__("os").environ
+
+    def key_for(self, tenant_id: str, purpose: str) -> bytes:
+        if not tenant_id or not purpose:
+            raise InvariantViolation("WORKFLOW_JOURNAL_KEY_SCOPE_INVALID")
+        if self._settings.get("COGNITIVE_OS_JOURNAL_KEY_MODE", "disabled") != "local-dev":
+            raise InvariantViolation("WORKFLOW_JOURNAL_KEY_MODE_UNSUPPORTED: production requires a KMS provider")
+        try:
+            key = unb64(self._settings.get("COGNITIVE_OS_JOURNAL_KEY_B64", ""))
+        except Exception as error:
+            raise InvariantViolation("WORKFLOW_JOURNAL_KEY_INVALID: local-dev key must be valid base64") from error
+        if len(key) != 32:
+            raise InvariantViolation("WORKFLOW_JOURNAL_KEY_INVALID: AES-256 requires exactly 32 bytes")
+        return key
+
+
 class JournalContextProtector(Protocol):
     def protect(self, context: Mapping[str, Any]) -> Mapping[str, Any]: ...
 

@@ -64,7 +64,7 @@ from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
-from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector
+from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir
 
 SESSION_COOKIE = "cognitive_os_session"
@@ -109,14 +109,8 @@ def build_api_journal_protector(tenant_id: str, run_id: str) -> CasJournalContex
         return None
     if mode != "local-dev":
         raise InvariantViolation("WORKFLOW_JOURNAL_KEY_MODE_UNSUPPORTED: production requires a KMS provider")
-    encoded_key = os.environ.get("COGNITIVE_OS_JOURNAL_KEY_B64", "")
-    try:
-        from ai_lego.core.support import unb64
-
-        key = unb64(encoded_key)
-    except Exception as error:
-        raise InvariantViolation("WORKFLOW_JOURNAL_KEY_INVALID: local-dev key must be valid base64") from error
     tenant_namespace = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
+    key = LocalDevJournalKeyProvider().key_for(tenant_namespace, "workflow-journal")
     return CasJournalContextProtector(
         TenantScopedCas(PRODUCT_ROOT / ".runtime" / "workflow-cas"),
         tenant_namespace,
