@@ -97,6 +97,38 @@ def business_feasibility_source() -> dict:
     }
 
 
+def art_project_ideation_source() -> dict:
+    human = make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL")
+    return {
+        "project_problem": {
+            "problem_id": "PROB-ART-API-001",
+            "current_state": "The workshop has a theme but no shared project direction.",
+            "expected_state": "The workshop has a participant-authored project direction to discuss.",
+            "gap": "A visible bridge is needed between the theme and possible making activities.",
+            "provenance": human,
+        },
+        "stimulus": {
+            "session_id": "RANDOMSTIM-ART-API-001",
+            "entries": [{
+                "stimulus": "blue stone",
+                "forced_connection": "A blue stone suggests steadiness.",
+                "resulting_idea": "Draw a steady place for the project.",
+            }],
+            "provenance": human,
+        },
+        "mind_map": {
+            "record_id": "MINDMAP-ART-API-001",
+            "central_topic": "A steady place for the project",
+            "main_branches": [{
+                "id": "MB-ART-API-1",
+                "label": "quiet water",
+                "provenance": human,
+            }],
+            "provenance": human,
+        },
+    }
+
+
 class HealthTests(ApiTestCase):
     def test_health_requires_no_auth_and_touches_no_store(self):
         response = self.client.get("/health")
@@ -374,6 +406,24 @@ class InvokeTests(ApiTestCase):
 
 
 class RecipeRunTests(ApiTestCase):
+    def test_art_project_ideation_recipe_runs_as_a_non_diagnostic_three_step_chain(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/art-therapy-project-ideation-v1/run",
+            json={"source": art_project_ideation_source(), "run_id": "api-art-project-ideation-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(
+            [step["ref"] for step in payload["workflow"]["steps"]],
+            ["framing.problem_statement", "divergent.random_stimulus", "association.mind_map"],
+        )
+        self.assertEqual(
+            payload["workflow"]["context"]["outputs"]["creative_stimulus"]["entries"][0]["feasibility_status"],
+            "NOT_YET_SCREENED",
+        )
+
     def test_research_qualitative_recipe_runs_as_a_fully_bound_mvp_chain(self):
         self._login()
         locked_code, ai_review = fixture_review()

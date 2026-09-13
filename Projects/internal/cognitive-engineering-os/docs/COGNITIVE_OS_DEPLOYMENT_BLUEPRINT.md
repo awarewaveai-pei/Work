@@ -42,6 +42,7 @@ Billing, credits, multiple tenants, SSO, enterprise contracts, regulated-system 
 - `life-decision-v1`: frame → SWOT → weighted decision matrix.
 - `edd-research-evidence-v1`: assumption mapping → evidence matrix → Toulmin argument.
 - `art-therapy-creative-reflection-v1`: random stimulus → mind map; non-diagnostic, no automated clinical inference.
+- `art-therapy-project-ideation-v1`: problem framing → random stimulus → mind map; a three-step non-diagnostic project-ideation chain that preserves the `NOT_YET_SCREENED` boundary.
 - `business-foundation-v1`: SWOT → TOWS (consumes the preceding SWOT output) → Porter Five Forces → Business Model Canvas; deliberately stops before finance/simulation/KPI/proposal publication.
 - `business-feasibility-review-v1`: caller-supplied break-even inputs → genuine-compute NPV; a bounded numeric feasibility review, not the missing Finance Domain Pack or an investment recommendation.
 - Gate dispatch now binds runner arguments by signature and workflow context, so cross-method gates such as TOWS are evaluated without positional assumptions.
