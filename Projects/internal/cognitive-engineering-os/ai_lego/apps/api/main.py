@@ -43,8 +43,10 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import yaml
@@ -64,6 +66,30 @@ SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
 
 app = FastAPI(title="Cognitive OS API", version="0.1.0-phase1")
+
+
+def configure_cors(target_app: FastAPI, raw_origins: str | None = None) -> tuple[str, ...]:
+    """Install explicit-origin CORS; empty configuration intentionally emits no CORS headers."""
+    raw = os.environ.get("COGNITIVE_OS_CORS_ORIGINS", "") if raw_origins is None else raw_origins
+    origins = tuple(origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip())
+    if "*" in origins:
+        raise ValueError("COGNITIVE_OS_CORS_ORIGINS must not contain '*' because session credentials are enabled")
+    for origin in origins:
+        parsed = urlparse(origin)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
+            raise ValueError(f"COGNITIVE_OS_CORS_ORIGIN_INVALID: expected an explicit http(s) origin, got {origin!r}")
+    if origins:
+        target_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(origins),
+            allow_credentials=True,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type"],
+        )
+    return origins
+
+
+CONFIGURED_CORS_ORIGINS = configure_cors(app)
 
 
 def get_store() -> IdentityStore:

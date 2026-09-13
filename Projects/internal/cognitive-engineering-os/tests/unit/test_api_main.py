@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
 from ai_lego.apps.api import main as api_main
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
@@ -53,6 +54,30 @@ class HealthTests(ApiTestCase):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
+
+class CorsConfigurationTests(unittest.TestCase):
+    def test_cors_is_disabled_by_default(self):
+        target = FastAPI()
+        self.assertEqual(api_main.configure_cors(target, ""), ())
+        client = TestClient(target, base_url="https://testserver")
+        response = client.get("/", headers={"Origin": "https://plugin.example"})
+        self.assertNotIn("access-control-allow-origin", response.headers)
+
+    def test_explicit_origin_allows_credentials_and_preflight(self):
+        target = FastAPI()
+        api_main.configure_cors(target, "https://plugin.example")
+        client = TestClient(target, base_url="https://testserver")
+        response = client.options("/", headers={"Origin": "https://plugin.example", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "Content-Type"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["access-control-allow-origin"], "https://plugin.example")
+        self.assertEqual(response.headers["access-control-allow-credentials"], "true")
+
+    def test_wildcard_and_non_http_origins_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "must not contain"):
+            api_main.configure_cors(FastAPI(), "*")
+        with self.assertRaisesRegex(ValueError, "ORIGIN_INVALID"):
+            api_main.configure_cors(FastAPI(), "chrome-extension://abc")
 
 
 class DashboardTests(ApiTestCase):
