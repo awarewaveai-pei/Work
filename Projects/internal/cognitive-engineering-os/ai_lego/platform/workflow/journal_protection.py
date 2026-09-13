@@ -70,7 +70,7 @@ class AesGcmJournalContextProtector:
 class CasJournalContextProtector:
     """Store AES-GCM ciphertext in tenant-scoped CAS and keep only a reference in the journal."""
 
-    def __init__(self, cas: TenantScopedCas, tenant_id: str, journal_subject: str, key: bytes, aad: bytes = b"ai-lego-workflow-journal-v1"):
+    def __init__(self, cas: TenantScopedCas, tenant_id: str, journal_subject: str, key: bytes, aad: bytes = b"ai-lego-workflow-journal-v1", projector: Callable[[dict[str, Any]], Mapping[str, Any]] | None = None):
         if len(key) != 32:
             raise InvariantViolation("WORKFLOW_JOURNAL_KEY_INVALID: AES-256 requires exactly 32 bytes")
         if not tenant_id or not journal_subject:
@@ -80,10 +80,12 @@ class CasJournalContextProtector:
         self._journal_subject = journal_subject
         self._key = bytes(key)
         self._aad = bytes(aad) + b"|" + tenant_id.encode("utf-8") + b"|" + journal_subject.encode("utf-8")
+        self._projector = projector
 
     def protect(self, context: Mapping[str, Any]) -> Mapping[str, Any]:
         try:
-            plaintext = canonical_json(dict(context)).encode("utf-8")
+            projected = dict(self._projector(dict(context)) if self._projector is not None else context)
+            plaintext = canonical_json(projected).encode("utf-8")
         except (TypeError, ValueError) as error:
             raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_NOT_JSON") from error
         nonce = secrets.token_bytes(12)

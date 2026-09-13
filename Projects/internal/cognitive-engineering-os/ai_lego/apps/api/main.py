@@ -61,8 +61,10 @@ from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
+from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector
 from ai_lego.platform.workflow.executor import execute_workflow_ir
 
 SESSION_COOKIE = "cognitive_os_session"
@@ -98,6 +100,30 @@ CONFIGURED_CORS_ORIGINS = configure_cors(app)
 def _api_journal_context(context: dict[str, Any]) -> dict[str, Any]:
     """Persist checkpoint state without embedding the request's raw ``source`` object."""
     return {"steps": context.get("steps", {}), "outputs": context.get("outputs", {})}
+
+
+def build_api_journal_protector(tenant_id: str, run_id: str) -> CasJournalContextProtector | None:
+    """Build only the explicitly opted-in local-dev protector; production KMS is a later adapter."""
+    mode = os.environ.get("COGNITIVE_OS_JOURNAL_KEY_MODE", "disabled")
+    if mode == "disabled":
+        return None
+    if mode != "local-dev":
+        raise InvariantViolation("WORKFLOW_JOURNAL_KEY_MODE_UNSUPPORTED: production requires a KMS provider")
+    encoded_key = os.environ.get("COGNITIVE_OS_JOURNAL_KEY_B64", "")
+    try:
+        from ai_lego.core.support import unb64
+
+        key = unb64(encoded_key)
+    except Exception as error:
+        raise InvariantViolation("WORKFLOW_JOURNAL_KEY_INVALID: local-dev key must be valid base64") from error
+    tenant_namespace = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
+    return CasJournalContextProtector(
+        TenantScopedCas(PRODUCT_ROOT / ".runtime" / "workflow-cas"),
+        tenant_namespace,
+        run_id,
+        key,
+        projector=_api_journal_context,
+    )
 
 
 def get_store() -> IdentityStore:
@@ -456,6 +482,15 @@ def run_recipe(
         raise HTTPException(status_code=400, detail="WORKFLOW_RESUME_INVALID: resume must be boolean")
     tenant_key = hashlib.sha256(session["tenant_id"].encode("utf-8")).hexdigest()[:32]  # stable opaque namespace; tenant identity never enters a path
     journal = PRODUCT_ROOT / ".runtime" / "workflows" / tenant_key / f"{run_id}.journal.json"
+    classification = body.get("data_classification", "INTERNAL")
+    if classification not in {"PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"}:
+        raise HTTPException(status_code=400, detail="WORKFLOW_DATA_CLASSIFICATION_INVALID")
+    try:
+        journal_protector = build_api_journal_protector(session["tenant_id"], run_id)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    if classification in {"CONFIDENTIAL", "RESTRICTED"} and journal_protector is None:
+        raise HTTPException(status_code=503, detail="WORKFLOW_JOURNAL_PROTECTION_REQUIRED: confidential/restricted source requires an encrypted journal provider")
 
     handlers: dict[str, Any] = dict(capability_handlers)
     for method_id in method_ids:
@@ -479,7 +514,8 @@ def run_recipe(
         catalogs={"method": catalog, "capability": capability_catalog},
         journal_path=journal,
         resume=resume,
-        journal_context_projector=_api_journal_context,
+        journal_context_projector=None if journal_protector is not None else _api_journal_context,
+        journal_context_protector=journal_protector,
     )
     if result.status != "SUCCEEDED":
         return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal": str(journal), "method_resolution": method_resolution, "capability_resolution": capability_resolution}

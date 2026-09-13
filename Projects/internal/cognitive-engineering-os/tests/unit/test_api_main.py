@@ -8,6 +8,8 @@ import tempfile
 import unittest
 import uuid
 import json
+import os
+from unittest.mock import patch
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -16,6 +18,7 @@ from fastapi import FastAPI
 from ai_lego.apps.api import main as api_main
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.core.support import b64
 
 
 class ApiTestCase(unittest.TestCase):
@@ -307,6 +310,33 @@ class RecipeRunTests(ApiTestCase):
         response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source()})
         self.assertEqual(response.status_code, 401)
 
+    def test_confidential_source_requires_encrypted_journal_provider(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/life-decision-v1/run",
+            json={"source": fixture_source(), "data_classification": "CONFIDENTIAL", "run_id": "api-confidential-test"},
+        )
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("WORKFLOW_JOURNAL_PROTECTION_REQUIRED", response.text)
+
+    def test_local_dev_provider_writes_encrypted_cas_checkpoint(self):
+        self._login()
+        with tempfile.TemporaryDirectory() as directory, patch.object(api_main, "PRODUCT_ROOT", Path(directory)), patch.dict(
+            os.environ,
+            {"COGNITIVE_OS_JOURNAL_KEY_MODE": "local-dev", "COGNITIVE_OS_JOURNAL_KEY_B64": b64(b"k" * 32)},
+            clear=False,
+        ):
+            response = self.client.post(
+                "/recipes/life-decision-v1/run",
+                json={"source": fixture_source(), "data_classification": "CONFIDENTIAL", "run_id": "api-encrypted-test"},
+            )
+            self.assertEqual(response.status_code, 200, response.text)
+            journal = json.loads(Path(response.json()["journal"]).read_text(encoding="utf-8"))
+            self.assertTrue(journal["context"]["protected"])
+            self.assertEqual(journal["context"]["storage"], "TENANT_SCOPED_CAS")
+            self.assertNotIn("source", journal["context"])
+            self.assertNotIn("Should I study?", json.dumps(journal))
+
     def test_edd_evidence_recipe_runs_as_a_reusable_method_chain(self):
         self._login()
         source = {
@@ -387,6 +417,17 @@ class DemoTests(ApiTestCase):
         self._login()
         response = self.client.get("/methods/nonexistent.method/demo")
         self.assertEqual(response.status_code, 404)
+
+
+class JournalConfigurationTests(unittest.TestCase):
+    def test_local_dev_configuration_builds_a_cas_protector_only_with_explicit_key(self):
+        with patch.dict(os.environ, {"COGNITIVE_OS_JOURNAL_KEY_MODE": "local-dev", "COGNITIVE_OS_JOURNAL_KEY_B64": b64(b"k" * 32)}, clear=False):
+            protector = api_main.build_api_journal_protector("tenant-a", "run-1")
+        self.assertIsNotNone(protector)
+
+    def test_default_configuration_does_not_create_a_protector(self):
+        with patch.dict(os.environ, {"COGNITIVE_OS_JOURNAL_KEY_MODE": "disabled"}, clear=False):
+            self.assertIsNone(api_main.build_api_journal_protector("tenant-a", "run-1"))
 
 
 if __name__ == "__main__":
