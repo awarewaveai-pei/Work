@@ -1,0 +1,84 @@
+$id: "ai-lego://specs/execution/workflow-journal.schema.yaml"
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "Durable Workflow Journal"
+description: >
+  Checkpoint record for a linear Workflow IR execution. A journal is an
+  operational recovery record, not an authorization record: the executor
+  still resolves every node through its Method/Capability catalog before
+  invoking a handler.
+
+type: object
+additionalProperties: false
+required:
+  - journal_version
+  - workflow_id
+  - workflow_sha256
+  - initial_context_sha256
+  - status
+  - next_index
+  - context
+  - steps
+properties:
+  journal_version:
+    const: 1
+  workflow_id:
+    type: string
+    minLength: 1
+  workflow_sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  initial_context_sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  status:
+    type: string
+    enum: [RUNNING, FAILED, SUCCEEDED]
+  next_index:
+    type: integer
+    minimum: 0
+  context:
+    type: object
+  steps:
+    type: array
+    items:
+      $ref: "#/$defs/step"
+
+$defs:
+  step:
+    type: object
+    additionalProperties: false
+    required: [index, label, node_kind, ref, status, input_paths]
+    properties:
+      index:
+        type: integer
+        minimum: 0
+      label:
+        type: string
+        minLength: 1
+      node_kind:
+        type: string
+        enum: [method, capability]
+      ref:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        enum: [SUCCEEDED, FAILED]
+      input_paths:
+        type: array
+        items: {type: string}
+      output:
+        type: object
+      error:
+        type: string
+      contract:
+        type: object
+
+open_questions:
+  - id: "OQ-WJ-1"
+    question: "Should a future durable runner move context/output payloads to encrypted CAS references instead of embedding them in the journal?"
+    owner: "runtime/security owner"
+    blocks: "nothing in the local synthetic runtime; required before journals carry production personal data"
+
+verification:
+  method: "Validated by SchemaContracts against the actual journal emitted by the Workflow executor and by failure/resume regression tests."

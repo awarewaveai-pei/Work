@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 from ai_lego import resolve_spec_root
+from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.workflow.executor import execute_workflow_ir
@@ -120,6 +121,7 @@ class WorkflowExecutorTests(unittest.TestCase):
             self.assertEqual(calls, ["first", "second", "second"])
             self.assertEqual(resumed.context["outputs"]["two"], {"value": 2})
             self.assertEqual(__import__("json").loads(journal.read_text(encoding="utf-8"))["status"], "SUCCEEDED")
+            SchemaContracts(resolve_spec_root()).validate("ai-lego://specs/execution/workflow-journal.schema.yaml", __import__("json").loads(journal.read_text(encoding="utf-8")), "durable workflow journal")
             completed_again = execute_workflow_ir(ir, {}, {"one.step": first, "two.step": second}, journal_path=journal, resume=True)
             self.assertEqual(completed_again.status, "SUCCEEDED")
             self.assertEqual(calls, ["first", "second", "second"])
