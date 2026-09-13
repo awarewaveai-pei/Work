@@ -190,6 +190,11 @@ class SliceCriteriaMixin:
         published = next(event for event in events if event["event_type"] == "ArtifactPublished")
         self.assertIs(published["payload"]["contract_backed"], True)
         self.assertEqual(published["payload"]["contract_path"], "capabilities/contracts/artifact.generate_research_paper.capability.yaml")
+        runtime_workflow = read_json(self.runtime / "platform" / "ai_execution" / "workflow_runtime.json")
+        artifact_phase = runtime_workflow["phases"][1]
+        self.assertEqual(artifact_phase["status"], "SUCCEEDED")
+        self.assertEqual(artifact_phase["steps"][0]["ref"], "artifact.generate_research_paper")
+        self.assertEqual(artifact_phase["steps"][0]["status"], "SUCCEEDED")
 
     def test_method_executions_went_through_the_method_atlas_gate(self):
         """ADR-023 Consequences 5: research.qualitative_coding runs (v11 coding, v12 re-analysis) are gated like capabilities."""

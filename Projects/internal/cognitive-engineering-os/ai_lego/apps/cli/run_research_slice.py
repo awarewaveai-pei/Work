@@ -517,7 +517,6 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     else:
         coder_one = runtime_result.context["outputs"]["coding"]["coder_one"]
         coder_two = runtime_result.context["outputs"]["coding"]["coder_two"]
-    write_json(runtime / "platform" / "ai_execution" / "workflow_runtime.json", runtime_result.as_dict())
 
     # Steps 16 (plan/rollback/approval) + real recovery-plan and current-state records before each transition.
     transition("METHODS_RESOLVED", "PLAN_COMPILED", 24)
@@ -620,7 +619,32 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             "Gates: " + ", ".join(f"{gate_id}={status}" for gate_id, status in gates.items()),
         ]
     )
-    artifact_contract, memo_path = capabilities.invoke("artifact.generate_research_paper", write_research_memo, runtime / "artifacts" / "research_memo.md", memo)
+    def execute_artifact(payload: dict[str, Any], _node: dict[str, Any]) -> dict[str, Any]:
+        path = Path(payload["research.artifact_path"])
+        memo_path = write_research_memo(path, payload["research.memo"])
+        return {"artifact_path": str(memo_path), "artifact_name": memo_path.name}
+
+    artifact_workflow = {
+        "id": f"{runtime_result.workflow_id}:artifact",
+        "nodes": [
+            {"node_kind": "capability", "ref": "artifact.generate_research_paper", "label": "artifact", "input": ["research.artifact_path", "research.memo"]},
+        ],
+    }
+    artifact_result = execute_workflow_ir(
+        artifact_workflow,
+        {"research": {"artifact_path": str(runtime / "artifacts" / "research_memo.md"), "memo": memo}},
+        {"artifact.generate_research_paper": execute_artifact},
+        catalogs={"capability": capabilities},
+    )
+    if artifact_result.status != "SUCCEEDED":
+        failed_step = next(step for step in artifact_result.steps if step.status == "FAILED")
+        raise InvariantViolation(f"RESEARCH_ARTIFACT_WORKFLOW_FAILED: {failed_step.error}")
+    artifact_contract = artifact_result.steps[0].contract
+    memo_path = Path(artifact_result.context["outputs"]["artifact"]["artifact_path"])
+    write_json(
+        runtime / "platform" / "ai_execution" / "workflow_runtime.json",
+        {"workflow_id": runtime_result.workflow_id, "status": "SUCCEEDED", "phases": [runtime_result.as_dict(), artifact_result.as_dict()]},
+    )
     emit(
         NORDBROOK.tenant_id,
         nord_aggregate,
