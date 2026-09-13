@@ -422,6 +422,15 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         raise HTTPException(status_code=400, detail=str(error)) from error
     method_ids = [node["method_id"] for node in workflow_ir["nodes"] if node["node_kind"] == "method"]
     method_resolution = method_catalog.resolve(method_ids)
+    method_dispatch_readiness: dict[str, list[str]] = {"registered": [], "missing": []}
+    for method_id in sorted(set(method_ids)):
+        try:
+            resolve_builder(method_id)
+            resolve_gate_runner(method_id)
+        except MethodDispatchError:
+            method_dispatch_readiness["missing"].append(method_id)
+        else:
+            method_dispatch_readiness["registered"].append(method_id)
     capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
     capability_resolution = capability_catalog.resolve(capability_refs(workflow_ir))
     executability = plan_executability(workflow_ir, capability_resolution)
@@ -443,15 +452,17 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
     ]
     binding_ready = not missing_bindings
     method_ready = method_resolution["blocked"] is None
+    dispatch_ready = not method_dispatch_readiness["missing"]
     return {
         "recipe_id": recipe_id,
         "workflow_ir": workflow_ir,
         "method_resolution": method_resolution,
+        "method_dispatch_readiness": {**method_dispatch_readiness, "ready": dispatch_ready},
         "capability_resolution": capability_resolution,
         "plan_executability": executability,
         "adapter_readiness": {**adapter_readiness, "blocking": adapter_blocking, "ready": adapter_ready},
         "binding_readiness": {"missing": missing_bindings, "ready": binding_ready},
-        "status": "READY" if method_ready and executability["executable"] and adapter_ready and binding_ready else "BLOCKED",
+        "status": "READY" if method_ready and dispatch_ready and executability["executable"] and adapter_ready and binding_ready else "BLOCKED",
     }
 
 
@@ -483,6 +494,12 @@ def run_recipe(
     method_resolution = catalog.resolve(method_ids)
     if method_resolution["blocked"] is not None:
         raise HTTPException(status_code=409, detail=method_resolution["blocked"])
+    for method_id in sorted(set(method_ids)):
+        try:
+            resolve_builder(method_id)
+            resolve_gate_runner(method_id)
+        except MethodDispatchError as error:
+            raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
     capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
     capability_resolution = capability_catalog.resolve(capability_ids)
     if capability_resolution["blocked"] is not None:

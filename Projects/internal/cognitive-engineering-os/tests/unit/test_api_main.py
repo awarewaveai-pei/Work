@@ -182,6 +182,11 @@ class UnauthenticatedAccessTests(ApiTestCase):
         )
         self.assertEqual(payload["adapter_readiness"]["blocking"], [])
         self.assertFalse(payload["binding_readiness"]["ready"])
+        self.assertFalse(payload["method_dispatch_readiness"]["ready"])
+        self.assertEqual(
+            payload["method_dispatch_readiness"]["missing"],
+            ["evidence.triangulation", "research.qualitative_coding"],
+        )
         self.assertEqual(payload["status"], "BLOCKED")
 
     def test_unknown_recipe_plan_is_404(self):
