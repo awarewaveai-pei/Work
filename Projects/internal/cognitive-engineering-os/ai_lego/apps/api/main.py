@@ -44,7 +44,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
@@ -66,7 +66,7 @@ from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
-from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider
+from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
 
 SESSION_COOKIE = "cognitive_os_session"
@@ -113,6 +113,7 @@ def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capabil
 
 
 CONFIGURED_CORS_ORIGINS = configure_cors(app)
+JOURNAL_KEY_RESOLVER: Callable[[str, str], bytes] | None = None
 
 
 def _api_journal_context(context: dict[str, Any]) -> dict[str, Any]:
@@ -121,14 +122,19 @@ def _api_journal_context(context: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_api_journal_protector(tenant_id: str, run_id: str) -> CasJournalContextProtector | None:
-    """Build only the explicitly opted-in local-dev protector; production KMS is a later adapter."""
+    """Build a protected journal using local-dev or an explicitly injected external KMS resolver."""
     mode = os.environ.get("COGNITIVE_OS_JOURNAL_KEY_MODE", "disabled")
     if mode == "disabled":
         return None
-    if mode != "local-dev":
+    if mode not in {"local-dev", "external"}:
         raise InvariantViolation("WORKFLOW_JOURNAL_KEY_MODE_UNSUPPORTED: production requires a KMS provider")
     tenant_namespace = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
-    key = LocalDevJournalKeyProvider().key_for(tenant_namespace, "workflow-journal")
+    if mode == "local-dev":
+        key = LocalDevJournalKeyProvider().key_for(tenant_namespace, "workflow-journal")
+    else:
+        if not callable(JOURNAL_KEY_RESOLVER):
+            raise InvariantViolation("WORKFLOW_JOURNAL_EXTERNAL_KEY_PROVIDER_NOT_CONFIGURED")
+        key = ResolverJournalKeyProvider(JOURNAL_KEY_RESOLVER).key_for(tenant_id, "workflow-journal")
     return CasJournalContextProtector(
         TenantScopedCas(PRODUCT_ROOT / ".runtime" / "workflow-cas"),
         tenant_namespace,

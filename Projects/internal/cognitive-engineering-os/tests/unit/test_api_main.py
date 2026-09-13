@@ -21,6 +21,7 @@ from ai_lego.modules.research.review import fixture_review
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.support import b64
 from ai_lego.core.domain.provenance import make_provenance
+from ai_lego.errors import InvariantViolation
 
 
 class ApiTestCase(unittest.TestCase):
@@ -713,6 +714,20 @@ class JournalConfigurationTests(unittest.TestCase):
     def test_default_configuration_does_not_create_a_protector(self):
         with patch.dict(os.environ, {"COGNITIVE_OS_JOURNAL_KEY_MODE": "disabled"}, clear=False):
             self.assertIsNone(api_main.build_api_journal_protector("tenant-a", "run-1"))
+
+    def test_external_configuration_uses_injected_resolver_without_local_fallback(self):
+        calls = []
+        with patch.dict(os.environ, {"COGNITIVE_OS_JOURNAL_KEY_MODE": "external"}, clear=False), patch.object(
+            api_main, "JOURNAL_KEY_RESOLVER", lambda tenant, purpose: (calls.append((tenant, purpose)) or b"k" * 32)
+        ):
+            protector = api_main.build_api_journal_protector("tenant-a", "run-1")
+        self.assertIsNotNone(protector)
+        self.assertEqual(calls, [("tenant-a", "workflow-journal")])
+
+    def test_external_configuration_fails_closed_when_provider_is_not_injected(self):
+        with patch.dict(os.environ, {"COGNITIVE_OS_JOURNAL_KEY_MODE": "external"}, clear=False), patch.object(api_main, "JOURNAL_KEY_RESOLVER", None):
+            with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_EXTERNAL_KEY_PROVIDER_NOT_CONFIGURED"):
+                api_main.build_api_journal_protector("tenant-a", "run-1")
 
 
 if __name__ == "__main__":
