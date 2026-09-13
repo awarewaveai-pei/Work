@@ -104,6 +104,25 @@ class UnauthenticatedAccessTests(ApiTestCase):
         response = self.client.get("/methods/nonexistent.method")
         self.assertEqual(response.status_code, 404)
 
+    def test_list_recipes_reads_active_recipe_files(self):
+        response = self.client.get("/recipes")
+        self.assertEqual(response.status_code, 200, response.text)
+        research = next(recipe for recipe in response.json() if recipe["recipe_id"] == "research-qualitative-v1")
+        self.assertEqual((research["status"], research["step_count"]), ("ACTIVE", 7))
+
+    def test_recipe_plan_compiles_and_resolves_against_live_catalogs(self):
+        response = self.client.get("/recipes/research-qualitative-v1/plan")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "READY")
+        self.assertEqual(len(payload["workflow_ir"]["nodes"]), 7)
+        self.assertTrue(payload["plan_executability"]["executable"])
+        self.assertTrue(payload["plan_executability"]["fully_resolved"])
+
+    def test_unknown_recipe_plan_is_404(self):
+        response = self.client.get("/recipes/does-not-exist/plan")
+        self.assertEqual(response.status_code, 404, response.text)
+
     def test_get_method_form_is_derived_from_the_live_builder_signature(self):
         response = self.client.get("/methods/foresight.cross_impact_analysis/form")
         self.assertEqual(response.status_code, 200, response.text)

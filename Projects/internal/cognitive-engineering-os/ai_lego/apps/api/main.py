@@ -6,6 +6,8 @@ Endpoints:
     GET  /                           -- minimal browser dashboard (login + browse + run demo)
     GET  /methods                    -- list every ACTIVE Method Atlas method
     GET  /methods/{method_id}        -- one method's contract descriptor
+    GET  /recipes                    -- list ACTIVE validated Recipes
+    GET  /recipes/{recipe_id}/plan   -- compile and resolve one Recipe
     POST /auth/login                 -- {tenant_id, email, password} -> session cookie
     POST /auth/logout                -- revoke the caller's session
     POST /methods/{method_id}/invoke -- auth + entitlement required; body = builder kwargs
@@ -13,9 +15,8 @@ Endpoints:
 
 ``/`` exists so a human has something to click, not just curl -- it only wraps the endpoints
 above (same-origin fetch, no separate auth path, no new capability). ``/methods/{id}/invoke``
-has no UI form because its request body shape is method-specific (240 different builder
-signatures) -- the dashboard's "Run Demo" button uses the argument-free ``/demo`` endpoint
-instead, which exists for exactly this reason.
+has a generic JSON input form generated from the live builder signature; the method contract
+and builder remain the authority for domain validation.
 
 Phase 1 scope only -- see ``Projects/internal/cognitive-engineering-os/docs/
 COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md``. No billing, no multi-tenant isolation testing yet
@@ -43,14 +44,17 @@ from typing import Any
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
+from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -279,6 +283,44 @@ def health() -> dict[str, str]:
 @app.get("/methods")
 def list_methods(catalog: MethodCatalog = Depends(get_catalog)) -> list[dict[str, Any]]:
     return [{"method_id": method_id, **{k: v for k, v in entry.items() if k != "content_sha256"}} for method_id, entry in sorted(catalog.contracts.items())]
+
+
+@app.get("/recipes")
+def list_recipes() -> list[dict[str, Any]]:
+    """List the real validated Recipe files; no hand-maintained registry."""
+    recipe_dir = resolve_spec_root() / "recipes" / "validated"
+    recipes = []
+    for path in sorted(recipe_dir.glob("*.recipe.yaml")):
+        recipe = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(recipe, dict) or recipe.get("status") != "ACTIVE":
+            continue
+        recipes.append({"recipe_id": recipe.get("id"), "version": str(recipe.get("version")), "status": recipe.get("status"), "step_count": len(recipe.get("steps", []))})
+    return recipes
+
+
+@app.get("/recipes/{recipe_id}/plan")
+def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_catalog)) -> dict[str, Any]:
+    """Compile one Recipe and return the authoritative fail-closed plan verdict."""
+    try:
+        workflow_ir = compile_recipe_to_workflow_ir(resolve_spec_root(), recipe_id, "R0")
+    except InvariantViolation as error:
+        if "RECIPE_NOT_FOUND" in str(error) or "RECIPE_ID_MISMATCH" in str(error):
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    method_ids = [node["method_id"] for node in workflow_ir["nodes"] if node["node_kind"] == "method"]
+    method_resolution = method_catalog.resolve(method_ids)
+    capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
+    capability_resolution = capability_catalog.resolve(capability_refs(workflow_ir))
+    executability = plan_executability(workflow_ir, capability_resolution)
+    method_ready = method_resolution["blocked"] is None
+    return {
+        "recipe_id": recipe_id,
+        "workflow_ir": workflow_ir,
+        "method_resolution": method_resolution,
+        "capability_resolution": capability_resolution,
+        "plan_executability": executability,
+        "status": "READY" if method_ready and executability["executable"] else "BLOCKED",
+    }
 
 
 @app.get("/methods/{method_id}")
