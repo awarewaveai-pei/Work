@@ -264,38 +264,61 @@ steps:
   - label: "Transcription"
     type: capability
     ref: transcribe
-    input: source.video
+    input: source.transcript
+    bindings:
+      transcript: source.transcript
     necessity: RECOMMENDED
   - label: "Qualitative Coding -- Coder 1 (Open / Axial / Selective)"
     type: method
     method_id: research.qualitative_coding
-    input: output.transcript
+    input: outputs.Transcription.transcript
+    bindings:
+      transcript: outputs.Transcription.transcript
+      locked_code: source.coder_one.locked_code
+      ai_review: source.coder_one.ai_review
+      at: source.coder_one.at
     necessity: RECOMMENDED
   - label: "Qualitative Coding -- Coder 2 (Open / Axial / Selective, independent)"
     type: method
     method_id: research.qualitative_coding
-    input: output.transcript
+    input: outputs.Transcription.transcript
+    bindings:
+      transcript: outputs.Transcription.transcript
+      locked_code: source.coder_two.locked_code
+      ai_review: source.coder_two.ai_review
+      at: source.coder_two.at
     necessity: RECOMMENDED
   - label: "Literature Search"
     type: capability
     ref: literature_search
-    input: research.question
+    input: source.question
+    bindings:
+      research.question: source.question
     necessity: RECOMMENDED
   - label: "Inter-rater Reliability (Cohen's Kappa)"
     type: capability
     ref: run_statistics
-    input: [coder_1.codes, coder_2.codes]
+    input: ["outputs.Qualitative Coding -- Coder 1 (Open / Axial / Selective).coder_1.code_set", "outputs.Qualitative Coding -- Coder 2 (Open / Axial / Selective, independent).coder_2.code_set"]
+    bindings:
+      coder_one: "outputs.Qualitative Coding -- Coder 1 (Open / Axial / Selective).coder_1.code_set"
+      coder_two: "outputs.Qualitative Coding -- Coder 2 (Open / Axial / Selective, independent).coder_2.code_set"
     necessity: REQUIRED_BY_RISK
     gate_ref: statistical
   - label: "Evidence Triangulation"
     type: method
     method_id: evidence.triangulation
-    input: [themes, literature]
+    input: ["outputs.Qualitative Coding -- Coder 1 (Open / Axial / Selective).theme_set", "outputs.Literature Search.literature"]
+    bindings:
+      themes: "outputs.Qualitative Coding -- Coder 1 (Open / Axial / Selective).theme_set"
+      literature: "outputs.Literature Search.literature"
     necessity: RECOMMENDED
   - label: "Research Memo Artifact Generation"
     type: capability
     ref: artifact.generate_research_paper
-    input: [triangulated_findings, interrater_reliability_result]
+    input: ["outputs.Evidence Triangulation.triangulation", "outputs.Inter-rater Reliability (Cohen's Kappa).interrater_reliability_result"]
+    bindings:
+      triangulated_findings: "outputs.Evidence Triangulation.triangulation"
+      interrater_reliability_result: "outputs.Inter-rater Reliability (Cohen's Kappa).interrater_reliability_result"
     necessity: REQUIRED_BY_RISK
     gate_ref: research_integrity
 

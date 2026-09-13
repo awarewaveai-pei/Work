@@ -1,11 +1,19 @@
 import unittest
 
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.capability_adapters import research_paper_artifact_adapter, run_statistics_adapter
+from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
 from ai_lego.modules.research.synthetic_fixtures import expanded_synthetic_coder_judgments
 
 
 class ResearchCapabilityAdapterTests(unittest.TestCase):
+    def test_pre_transcribed_adapter_requires_normalized_provenance_bearing_input(self):
+        transcript = {"status": "normalized", "provenance": {"epistemic_type": "SOURCE_FACT"}}
+        result = pre_transcribed_input_adapter({"transcript": transcript}, {})
+        self.assertEqual(result["mode"], "PRE_TRANSCRIBED_INPUT")
+        self.assertFalse(result["media_transcription_claimed"])
+        with self.assertRaisesRegex(InvariantViolation, "TRANSCRIPT_NORMALIZED_INPUT_REQUIRED"):
+            pre_transcribed_input_adapter({"transcript": {"status": "raw", "provenance": {}}}, {})
+
     def test_statistics_is_deterministic_trusted_compute(self):
         coder_one, coder_two = expanded_synthetic_coder_judgments()
         first = run_statistics_adapter({"rater_coding_set": {"coder_one": coder_one, "coder_two": coder_two}}, {})

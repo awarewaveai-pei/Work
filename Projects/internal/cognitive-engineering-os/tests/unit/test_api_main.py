@@ -17,6 +17,7 @@ from fastapi import FastAPI
 
 from ai_lego.apps.api import main as api_main
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
+from ai_lego.modules.research.review import fixture_review
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.support import b64
 from ai_lego.core.domain.provenance import make_provenance
@@ -171,23 +172,20 @@ class UnauthenticatedAccessTests(ApiTestCase):
         response = self.client.get("/recipes/research-qualitative-v1/plan")
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
-        self.assertEqual(payload["status"], "BLOCKED")
+        self.assertEqual(payload["status"], "READY")
         self.assertEqual(len(payload["workflow_ir"]["nodes"]), 7)
         self.assertTrue(payload["plan_executability"]["executable"])
         self.assertTrue(payload["plan_executability"]["fully_resolved"])
         self.assertTrue(payload["adapter_readiness"]["ready"])
         self.assertEqual(
             payload["adapter_readiness"]["registered"],
-            ["artifact.generate_research_paper", "literature_search", "run_statistics"],
+            ["artifact.generate_research_paper", "literature_search", "run_statistics", "transcribe"],
         )
         self.assertEqual(payload["adapter_readiness"]["blocking"], [])
-        self.assertFalse(payload["binding_readiness"]["ready"])
-        self.assertFalse(payload["method_dispatch_readiness"]["ready"])
-        self.assertEqual(
-            payload["method_dispatch_readiness"]["missing"],
-            ["evidence.triangulation", "research.qualitative_coding"],
-        )
-        self.assertEqual(payload["status"], "BLOCKED")
+        self.assertTrue(payload["binding_readiness"]["ready"])
+        self.assertTrue(payload["method_dispatch_readiness"]["ready"])
+        self.assertEqual(payload["method_dispatch_readiness"]["missing"], [])
+        self.assertEqual(payload["status"], "READY")
 
     def test_unknown_recipe_plan_is_404(self):
         response = self.client.get("/recipes/does-not-exist/plan")
@@ -322,6 +320,29 @@ class InvokeTests(ApiTestCase):
 
 
 class RecipeRunTests(ApiTestCase):
+    def test_research_qualitative_recipe_runs_as_a_fully_bound_mvp_chain(self):
+        self._login()
+        locked_code, ai_review = fixture_review()
+        source = {
+            "question": "How do remote workers describe after-hours boundaries?",
+            "transcript": {
+                "status": "normalized",
+                "text": "A reviewed transcript input.",
+                "provenance": make_provenance("SOURCE_FACT", "SOURCE_QUOTATION"),
+            },
+            "coder_one": {"locked_code": locked_code, "ai_review": ai_review, "at": "2026-09-14T00:00:00Z"},
+            "coder_two": {"locked_code": locked_code, "ai_review": ai_review, "at": "2026-09-14T00:00:00Z"},
+        }
+        response = self.client.post("/recipes/research-qualitative-v1/run", json={"source": source, "run_id": "api-research-qualitative-test"})
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(
+            [step["ref"] for step in payload["workflow"]["steps"]],
+            ["transcribe", "research.qualitative_coding", "research.qualitative_coding", "literature_search", "run_statistics", "evidence.triangulation", "artifact.generate_research_paper"],
+        )
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["Transcription"]["mode"], "PRE_TRANSCRIBED_INPUT")
+
     def test_life_recipe_runs_through_shared_executor_and_gates(self):
         self._login()
         response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": "api-life-test"})

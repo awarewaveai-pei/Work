@@ -57,7 +57,7 @@ from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invok
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search
-from ai_lego.modules.research.capability_adapters import research_paper_artifact_adapter, run_statistics_adapter
+from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
@@ -102,6 +102,8 @@ def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capabil
     # External providers need their own egress, freshness and policy adapter.
     if "literature_search" in capability_ids:
         adapters.register("literature_search", offline_literature_search)
+    if "transcribe" in capability_ids:
+        adapters.register("transcribe", pre_transcribed_input_adapter)
     if "run_statistics" in capability_ids:
         adapters.register("run_statistics", run_statistics_adapter)
     if "artifact.generate_research_paper" in capability_ids:

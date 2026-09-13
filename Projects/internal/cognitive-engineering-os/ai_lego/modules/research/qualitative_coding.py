@@ -223,3 +223,51 @@ def build_v12_over_merged_theme_set(coding_outputs: dict[str, Any]) -> list[dict
     category_ids = [category["category_id"] for category in coding_outputs["category_set"]]
     code_ids = [code_id for category in coding_outputs["category_set"] for code_id in category["code_ids"]]
     return [{"theme_id": "THEME-V12-1", "label": "over_merged_all_categories", "category_ids": category_ids, "code_ids": code_ids, "provenance": make_provenance("AI_INFERENCE", "AI_SUGGESTED")}]
+
+
+def generate_qualitative_coding(
+    transcript: dict[str, Any],
+    locked_code: dict[str, Any],
+    ai_review: dict[str, Any],
+    at: str,
+    *,
+    pending_ai_labels: dict[str, str] | None = None,
+    suggestion_source: dict[str, Any] | None = None,
+    coder_two_labels: dict[str, str] | None = None,
+    coder_two_source: dict[str, Any] | None = None,
+    category_of_label: dict[str, str] | None = None,
+    themes_v11: list[tuple[str, list[str]]] | None = None,
+    grouping_source: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Dispatchable reviewed-coding entrypoint for the generic Workflow API.
+
+    The current MVP deliberately receives reviewed coding material as input;
+    it does not infer codes from raw media or silently replace a human lock.
+    The transcript is still required and checked before the method runs.
+    """
+    if transcript.get("status") != "normalized" or not isinstance(transcript.get("provenance"), dict):
+        raise ValueError("QUALITATIVE_CODING_TRANSCRIPT_INVALID")
+    return assemble_coding_outputs(
+        locked_code,
+        ai_review,
+        at,
+        pending_ai_labels=pending_ai_labels,
+        suggestion_source=suggestion_source,
+        coder_two_labels=coder_two_labels,
+        coder_two_source=coder_two_source,
+        category_of_label=category_of_label,
+        themes_v11=themes_v11,
+        grouping_source=grouping_source,
+    )
+
+
+def evaluate_qualitative_coding_gates(record: dict[str, Any], validator: str, timestamp: str) -> list[dict[str, Any]]:
+    """Run the method-local structural gate; cross-step research gates stay upstream."""
+    passed = (
+        isinstance(record, dict)
+        and isinstance(record.get("coder_1", {}).get("code_set"), list)
+        and isinstance(record.get("coder_2", {}).get("code_set"), list)
+        and isinstance(record.get("category_set"), list)
+        and bool(record.get("theme_set", {}).get("themes"))
+    )
+    return [{"gate_id": "qualitative_coding_structure", "status": "PASS" if passed else "FAIL", "evidence": ["code/category/theme stages present"], "validator": validator, "timestamp": timestamp}]
