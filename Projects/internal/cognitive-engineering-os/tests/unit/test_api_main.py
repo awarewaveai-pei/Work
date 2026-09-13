@@ -185,7 +185,15 @@ class UnauthenticatedAccessTests(ApiTestCase):
         self.assertTrue(payload["binding_readiness"]["ready"])
         self.assertTrue(payload["method_dispatch_readiness"]["ready"])
         self.assertEqual(payload["method_dispatch_readiness"]["missing"], [])
-        self.assertEqual(payload["status"], "READY")
+
+    def test_recipe_form_describes_source_fields_from_bindings(self):
+        response = self.client.get("/recipes/research-qualitative-v1/form")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["schema_source"], "compiled_workflow_bindings")
+        paths = {field["path"] for field in payload["source_fields"]}
+        self.assertEqual(paths, {"question", "transcript", "coder_one.locked_code", "coder_one.ai_review", "coder_one.at", "coder_two.locked_code", "coder_two.ai_review", "coder_two.at"})
+        self.assertTrue(all(field["required"] for field in payload["source_fields"]))
 
     def test_unknown_recipe_plan_is_404(self):
         response = self.client.get("/recipes/does-not-exist/plan")

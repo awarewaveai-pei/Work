@@ -8,6 +8,7 @@ Endpoints:
     GET  /methods/{method_id}        -- one method's contract descriptor
     GET  /recipes                    -- list ACTIVE validated Recipes
     GET  /recipes/{recipe_id}/plan   -- compile and resolve one Recipe
+    GET  /recipes/{recipe_id}/form   -- describe the Source fields a Recipe needs
     POST /recipes/{recipe_id}/run    -- auth + entitlement + registered adapters
     POST /auth/login                 -- {tenant_id, email, password} -> session cookie
     POST /auth/logout                -- revoke the caller's session
@@ -466,6 +467,40 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "binding_readiness": {"missing": missing_bindings, "ready": binding_ready},
         "status": "READY" if method_ready and dispatch_ready and executability["executable"] and adapter_ready and binding_ready else "BLOCKED",
     }
+
+
+@app.get("/recipes/{recipe_id}/form")
+def recipe_form(recipe_id: str) -> dict[str, Any]:
+    """Expose a generic Source descriptor derived from compiled bindings.
+
+    This is intentionally a descriptor, not a guessed JSON Schema: domain
+    contracts remain authoritative and the run endpoint still performs the
+    actual path/type/gate checks.
+    """
+    try:
+        workflow_ir = compile_recipe_to_workflow_ir(resolve_spec_root(), recipe_id, "R0")
+    except InvariantViolation as error:
+        if "RECIPE_NOT_FOUND" in str(error) or "RECIPE_ID_MISMATCH" in str(error):
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    fields: dict[str, dict[str, Any]] = {}
+    for index, node in enumerate(workflow_ir["nodes"]):
+        bindings = node.get("bindings")
+        paths: list[str] = []
+        if isinstance(bindings, dict):
+            paths.extend(value for value in bindings.values() if isinstance(value, str))
+        declared = node.get("input")
+        if isinstance(declared, str):
+            paths.append(declared)
+        elif isinstance(declared, list):
+            paths.extend(value for value in declared if isinstance(value, str))
+        for path in dict.fromkeys(paths):
+            if not path.startswith("source."):
+                continue
+            source_path = path.removeprefix("source.")
+            field = fields.setdefault(source_path, {"path": source_path, "required": True, "consumers": []})
+            field["consumers"].append({"index": index, "label": node.get("label"), "ref": node.get("ref", node.get("method_id"))})
+    return {"recipe_id": recipe_id, "workflow_id": workflow_ir["id"], "source_fields": list(fields.values()), "schema_source": "compiled_workflow_bindings"}
 
 
 @app.post("/recipes/{recipe_id}/run")
