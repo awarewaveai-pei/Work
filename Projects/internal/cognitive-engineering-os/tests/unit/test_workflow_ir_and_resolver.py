@@ -4,7 +4,7 @@ from ai_lego import resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation, SchemaValidationError
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog, state_transition
-from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
+from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir, project_workflow_ir
 
 TRANSITION = "ai-lego://specs/execution/execution-state-machine.schema.yaml#/state_transition_event"
 RESOLUTION = "ai-lego://specs/execution/method-resolution.schema.yaml#/method_resolution_result"
@@ -34,6 +34,21 @@ class WorkflowIrTests(unittest.TestCase):
     def test_unknown_recipe_is_refused(self):
         with self.assertRaisesRegex(InvariantViolation, "RECIPE_NOT_FOUND"):
             compile_recipe_to_workflow_ir(self.spec_root, "does-not-exist", "R1")
+
+    def test_projection_keeps_compiled_node_identity_and_allows_only_explicit_bindings(self):
+        ir = compile_recipe_to_workflow_ir(self.spec_root, "research-qualitative-v1", "R4")
+        projected = project_workflow_ir(
+            ir,
+            [1, 4, 3, 5],
+            {1: {"label": "coding", "input": "research.coding_request"}},
+            workflow_id="research-qualitative-v1:runtime",
+        )
+
+        self.assertEqual([node["method_id"] if node["node_kind"] == "method" else node["ref"] for node in projected["nodes"]], ["research.qualitative_coding", "run_statistics", "literature_search", "evidence.triangulation"])
+        self.assertEqual(projected["nodes"][0]["input"], "research.coding_request")
+        self.assertEqual(projected["projection"], {"source_node_indexes": [1, 4, 3, 5], "source_workflow_id": "research-qualitative-v1"})
+        with self.assertRaisesRegex(InvariantViolation, "PROJECTION_BINDING_NOT_SELECTED"):
+            project_workflow_ir(ir, [1], {4: {"label": "wrong"}})
 
 
 class MethodResolverTests(unittest.TestCase):

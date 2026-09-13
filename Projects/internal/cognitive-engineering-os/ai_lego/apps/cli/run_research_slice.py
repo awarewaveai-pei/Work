@@ -81,7 +81,7 @@ from ai_lego.platform.ai_execution.method_resolver import DEPRECATED_ALIAS, METH
 from ai_lego.platform.ai_execution.replay import project
 from ai_lego.platform.ai_execution.rollback_plan import build_rollback_plan
 from ai_lego.platform.workflow.executor import execute_workflow_ir
-from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
+from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir, project_workflow_ir
 from ai_lego.security.key_vault.local_key_vault import DECRYPT_BLOCKED_PENDING_REPLAY, REDACTED, LocalKeyVault
 
 RUN_ID = "RUN-PHASE5-SYNTHETIC-001"
@@ -482,15 +482,17 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             raise InvariantViolation(f"KAPPA_INSUFFICIENT_UNITS: {len(coder_one)} unit(s) coded by both coders")
         return {"statistics": interrater_reliability_result(coder_one, coder_two), "judgment_source": judgment_source}
 
-    runtime_subchain = {
-        "id": f"{workflow_ir['id']}:coding-statistics",
-        "nodes": [
-            {"node_kind": "method", "method_id": "research.qualitative_coding", "label": "coding", "input": "research.coding_request"},
-            {"node_kind": "capability", "ref": "run_statistics", "label": "statistics", "input": "outputs.coding"},
-            {"node_kind": "capability", "ref": "literature_search", "label": "literature", "input": "research.question"},
-            {"node_kind": "method", "method_id": "evidence.triangulation", "label": "triangulation", "input": ["outputs.coding", "outputs.literature"]},
-        ],
-    }
+    runtime_subchain = project_workflow_ir(
+        workflow_ir,
+        [1, 4, 3, 5],
+        {
+            1: {"label": "coding", "input": "research.coding_request"},
+            4: {"label": "statistics", "input": "outputs.coding"},
+            3: {"label": "literature", "input": "research.question"},
+            5: {"label": "triangulation", "input": ["outputs.coding", "outputs.literature"]},
+        },
+        workflow_id=f"{workflow_ir['id']}:coding-statistics",
+    )
     runtime_result = execute_workflow_ir(
         runtime_subchain,
         {"research": {"question": "after-hours boundary erosion among remote workers", "coding_request": coding_request}},
@@ -624,12 +626,12 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         memo_path = write_research_memo(path, payload["research.memo"])
         return {"artifact_path": str(memo_path), "artifact_name": memo_path.name}
 
-    artifact_workflow = {
-        "id": f"{runtime_result.workflow_id}:artifact",
-        "nodes": [
-            {"node_kind": "capability", "ref": "artifact.generate_research_paper", "label": "artifact", "input": ["research.artifact_path", "research.memo"]},
-        ],
-    }
+    artifact_workflow = project_workflow_ir(
+        workflow_ir,
+        [6],
+        {6: {"label": "artifact", "input": ["research.artifact_path", "research.memo"]}},
+        workflow_id=f"{runtime_result.workflow_id}:artifact",
+    )
     artifact_result = execute_workflow_ir(
         artifact_workflow,
         {"research": {"artifact_path": str(runtime / "artifacts" / "research_memo.md"), "memo": memo}},
@@ -643,7 +645,12 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     memo_path = Path(artifact_result.context["outputs"]["artifact"]["artifact_path"])
     write_json(
         runtime / "platform" / "ai_execution" / "workflow_runtime.json",
-        {"workflow_id": runtime_result.workflow_id, "status": "SUCCEEDED", "phases": [runtime_result.as_dict(), artifact_result.as_dict()]},
+        {
+            "workflow_id": runtime_result.workflow_id,
+            "status": "SUCCEEDED",
+            "projections": [runtime_subchain["projection"], artifact_workflow["projection"]],
+            "phases": [runtime_result.as_dict(), artifact_result.as_dict()],
+        },
     )
     emit(
         NORDBROOK.tenant_id,

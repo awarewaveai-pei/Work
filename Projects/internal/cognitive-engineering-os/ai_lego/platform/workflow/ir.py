@@ -56,3 +56,40 @@ def compile_recipe_to_workflow_ir(spec_root: Path, recipe_id: str, risk_tier: st
         "compiled_from": {"source_kind": "recipe", "recipe_id": recipe_id, "recipe_version": str(recipe["version"])},
         "nodes": nodes,
     }
+
+
+def project_workflow_ir(
+    compiled_ir: dict[str, Any],
+    node_indexes: list[int],
+    bindings: dict[int, dict[str, Any]] | None = None,
+    workflow_id: str | None = None,
+) -> dict[str, Any]:
+    """Create an explicitly bound subgraph without re-declaring node identity.
+
+    A runtime vertical slice may execute only the currently implemented part of
+    a larger Recipe.  Its refs and node kinds must still come from the
+    compiler; only execution-specific aliases/inputs may be bound here.
+    Invalid indexes and bindings fail closed instead of silently selecting a
+    different Recipe node.
+    """
+    source_nodes = compiled_ir.get("nodes")
+    if not isinstance(source_nodes, list) or not source_nodes:
+        raise InvariantViolation("WORKFLOW_IR_SOURCE_NODES_MISSING")
+    if not node_indexes or len(set(node_indexes)) != len(node_indexes):
+        raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_INDEXES_INVALID: {node_indexes!r}")
+    bindings = bindings or {}
+    unknown_bindings = sorted(set(bindings) - set(node_indexes))
+    if unknown_bindings:
+        raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_BINDING_NOT_SELECTED: {unknown_bindings}")
+    nodes: list[dict[str, Any]] = []
+    for index in node_indexes:
+        if not isinstance(index, int) or index < 0 or index >= len(source_nodes):
+            raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_INDEX_OUT_OF_RANGE: {index!r}")
+        node = dict(source_nodes[index])
+        node.update(bindings.get(index, {}))
+        nodes.append(node)
+    projected = dict(compiled_ir)
+    projected["id"] = workflow_id or f"{compiled_ir['id']}:projection"
+    projected["nodes"] = nodes
+    projected["projection"] = {"source_node_indexes": list(node_indexes), "source_workflow_id": compiled_ir["id"]}
+    return projected

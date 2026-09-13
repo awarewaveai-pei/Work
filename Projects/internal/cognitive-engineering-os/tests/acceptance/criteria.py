@@ -191,6 +191,8 @@ class SliceCriteriaMixin:
         self.assertIs(published["payload"]["contract_backed"], True)
         self.assertEqual(published["payload"]["contract_path"], "capabilities/contracts/artifact.generate_research_paper.capability.yaml")
         runtime_workflow = read_json(self.runtime / "platform" / "ai_execution" / "workflow_runtime.json")
+        self.assertEqual(runtime_workflow["projections"][0]["source_node_indexes"], [1, 4, 3, 5])
+        self.assertEqual(runtime_workflow["projections"][1]["source_node_indexes"], [6])
         artifact_phase = runtime_workflow["phases"][1]
         self.assertEqual(artifact_phase["status"], "SUCCEEDED")
         self.assertEqual(artifact_phase["steps"][0]["ref"], "artifact.generate_research_paper")
