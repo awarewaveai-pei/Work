@@ -32,6 +32,16 @@ class WorkflowIrTests(unittest.TestCase):
         self.assertEqual(capability_refs, ["transcribe", "literature_search", "run_statistics", "artifact.generate_research_paper"])
         self.assertEqual(ir["references"]["cognitive_method_atlas"]["required"], True)
 
+    def test_every_active_recipe_compiles_and_passes_dataflow_validation(self):
+        recipe_dir = self.spec_root / "recipes" / "validated"
+        recipe_ids = sorted(path.name.removesuffix(".recipe.yaml") for path in recipe_dir.glob("*.recipe.yaml"))
+        self.assertGreaterEqual(len(recipe_ids), 12)
+        for recipe_id in recipe_ids:
+            with self.subTest(recipe_id=recipe_id):
+                ir = compile_recipe_to_workflow_ir(self.spec_root, recipe_id, "R1")
+                self.contracts.validate(WORKFLOW_IR, ir, f"compiled {recipe_id}")
+                self.assertEqual(workflow_dataflow_issues(ir), ())
+
     def test_unknown_recipe_is_refused(self):
         with self.assertRaisesRegex(InvariantViolation, "RECIPE_NOT_FOUND"):
             compile_recipe_to_workflow_ir(self.spec_root, "does-not-exist", "R1")
@@ -55,6 +65,13 @@ class WorkflowIrTests(unittest.TestCase):
         self.assertEqual(projected["projection"], {"source_node_indexes": [1, 4, 3, 5], "source_workflow_id": "research-qualitative-v1"})
         with self.assertRaisesRegex(InvariantViolation, "PROJECTION_BINDING_NOT_SELECTED"):
             project_workflow_ir(ir, [1], {4: {"label": "wrong"}})
+
+    def test_projection_refuses_a_subgraph_that_drops_an_output_producer(self):
+        ir = {"id": "projection-source", "nodes": [{"label": "producer"}, {"label": "consumer", "input": "outputs.producer.value"}]}
+        # An omitted producer may be an intentional external boundary; a
+        # producer selected after its consumer is never a valid projection.
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_PROJECTION_DATAFLOW_INVALID"):
+            project_workflow_ir(ir, [1, 0])
 
     def test_source_preflight_checks_only_initial_source_paths(self):
         ir = compile_recipe_to_workflow_ir(self.spec_root, "life-decision-v1", "R1")

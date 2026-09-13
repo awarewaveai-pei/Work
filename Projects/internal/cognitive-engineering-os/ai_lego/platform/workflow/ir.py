@@ -41,7 +41,7 @@ def load_recipe(spec_root: Path, recipe_id: str) -> dict[str, Any]:
     return recipe
 
 
-def workflow_dataflow_issues(workflow_ir: Mapping[str, Any]) -> tuple[str, ...]:
+def workflow_dataflow_issues(workflow_ir: Mapping[str, Any], *, allow_external_outputs: bool = False) -> tuple[str, ...]:
     """Find output references whose producer is unknown or runs too late.
 
     ``outputs.<label>`` is created only after the node carrying ``label``
@@ -83,9 +83,9 @@ def workflow_dataflow_issues(workflow_ir: Mapping[str, Any]) -> tuple[str, ...]:
                      if path == f"outputs.{label}" or path.startswith(f"outputs.{label}.")),
                     None,
                 )
-                if producer_label is None:
+                if producer_label is None and not allow_external_outputs:
                     issues.append(f"node {consumer_index} references unknown output {path!r}")
-                elif producers[producer_label] >= consumer_index:
+                elif producer_label is not None and producers[producer_label] >= consumer_index:
                     issues.append(
                         f"node {consumer_index} references output {producer_label!r} from node {producers[producer_label]}"
                         " that has not completed yet"
@@ -170,4 +170,7 @@ def project_workflow_ir(
     projected["id"] = workflow_id or f"{compiled_ir['id']}:projection"
     projected["nodes"] = nodes
     projected["projection"] = {"source_node_indexes": list(node_indexes), "source_workflow_id": compiled_ir["id"]}
+    dataflow_issues = workflow_dataflow_issues(projected, allow_external_outputs=True)
+    if dataflow_issues:
+        raise InvariantViolation(f"WORKFLOW_PROJECTION_DATAFLOW_INVALID: {'; '.join(dataflow_issues)}")
     return projected
