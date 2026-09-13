@@ -35,6 +35,7 @@ class WorkflowStepResult:
     input_paths: tuple[str, ...]
     output: dict[str, Any] | None = None
     error: str | None = None
+    contract: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -49,6 +50,8 @@ class WorkflowStepResult:
             result["output"] = self.output
         if self.error is not None:
             result["error"] = self.error
+        if self.contract is not None:
+            result["contract"] = self.contract
         return result
 
 
@@ -108,6 +111,7 @@ def execute_workflow_ir(
     workflow_ir: Mapping[str, Any],
     initial_context: Mapping[str, Any],
     handlers: Mapping[str, Handler],
+    catalogs: Mapping[str, Any] | None = None,
 ) -> WorkflowRunResult:
     """Execute a flat compiled IR with explicit handler and input resolution.
 
@@ -115,6 +119,11 @@ def execute_workflow_ir(
     Its output is stored under ``steps.<index>`` and, when a label exists,
     under ``outputs.<slug>``.  This preserves the raw execution record while
     giving later nodes stable, explicit paths to consume.
+
+    When ``catalogs`` is supplied, it must contain ``method`` and/or
+    ``capability`` catalogs.  Each node is then invoked through that catalog's
+    shared per-invocation gate; an implementation is never called for an
+    unresolved reference.
     """
     workflow_id = workflow_ir.get("id")
     nodes = workflow_ir.get("nodes")
@@ -142,10 +151,18 @@ def execute_workflow_ir(
             handler = handlers.get(ref)
             if handler is None:
                 raise InvariantViolation(f"WORKFLOW_HANDLER_NOT_REGISTERED: {ref}")
-            output = dict(handler(payload, node))
+            contract = None
+            if catalogs is not None:
+                catalog = catalogs.get(node["node_kind"])
+                if catalog is None:
+                    raise InvariantViolation(f"WORKFLOW_CATALOG_NOT_REGISTERED: {node['node_kind']}")
+                contract, raw_output = catalog.invoke(ref, handler, payload, node)
+                output = dict(raw_output)
+            else:
+                output = dict(handler(payload, node))
             context["steps"][str(index)] = output
             context["outputs"][label] = output
-            results.append(WorkflowStepResult(index, label, node["node_kind"], ref, "SUCCEEDED", paths, output))
+            results.append(WorkflowStepResult(index, label, node["node_kind"], ref, "SUCCEEDED", paths, output, contract=contract))
         except Exception as error:
             message = str(error) or error.__class__.__name__
             results.append(WorkflowStepResult(index, label, node.get("node_kind", "unknown"), ref, "FAILED", paths, error=message))

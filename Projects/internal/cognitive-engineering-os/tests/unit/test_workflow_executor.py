@@ -1,6 +1,8 @@
 import unittest
 
+from ai_lego import resolve_spec_root
 from ai_lego.errors import InvariantViolation
+from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.workflow.executor import execute_workflow_ir
 
 
@@ -49,6 +51,34 @@ class WorkflowExecutorTests(unittest.TestCase):
         result = execute_workflow_ir(ir, {}, {})
         self.assertEqual(result.status, "FAILED")
         self.assertIn("WORKFLOW_HANDLER_NOT_REGISTERED", result.steps[0].error)
+
+    def test_catalog_gate_blocks_unregistered_method_before_handler(self):
+        ir = {"id": "research-v1", "nodes": [{"node_kind": "method", "method_id": "research.unknown"}]}
+        reached = []
+        catalog = MethodCatalog.empty("test:no-contract")
+        result = execute_workflow_ir(
+            ir,
+            {},
+            {"research.unknown": lambda *_: reached.append("ran")},
+            catalogs={"method": catalog},
+        )
+        self.assertEqual(result.status, "FAILED")
+        self.assertIn("METHOD_RESOLUTION_BLOCKED", result.steps[0].error)
+        self.assertEqual(reached, [])
+        self.assertEqual(catalog.invocations, [])
+
+    def test_live_catalog_descriptor_is_recorded_for_successful_invocation(self):
+        ir = {"id": "research-v1", "nodes": [{"node_kind": "method", "method_id": "research.qualitative_coding"}]}
+        catalog = MethodCatalog.from_spec_root(resolve_spec_root())
+        result = execute_workflow_ir(
+            ir,
+            {},
+            {"research.qualitative_coding": lambda *_: {"validated": True}},
+            catalogs={"method": catalog},
+        )
+        self.assertEqual(result.status, "SUCCEEDED")
+        self.assertEqual(result.steps[0].contract["ref"], "research.qualitative_coding")
+        self.assertEqual(len(catalog.invocations), 1)
 
     def test_invalid_input_declaration_is_rejected(self):
         ir = {"id": "bad", "nodes": [{"node_kind": "method", "method_id": "x.y", "input": {"guess": "no"}}]}
