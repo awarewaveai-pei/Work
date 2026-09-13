@@ -526,7 +526,9 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(payload["status"], "PASS")
         self.assertEqual(len(payload["workflow"]["steps"]), 3)
         self.assertTrue(all(gate["status"] == "PASS" for gates in payload["gates"].values() for gate in gates))
-        journal = json.loads(Path(payload["journal"]).read_text(encoding="utf-8"))
+        self.assertTrue(payload["journal_ref"].startswith("workflow-journal://"))
+        self.assertNotIn(str(api_main.PRODUCT_ROOT), json.dumps(payload))
+        journal = json.loads(api_main.workflow_journal_path(self.tenant["tenant_id"], payload["run_id"]).read_text(encoding="utf-8"))
         self.assertNotIn("source", journal["context"])
 
     def test_life_recipe_resume_reuses_stable_journal_namespace(self):
@@ -576,7 +578,10 @@ class RecipeRunTests(ApiTestCase):
                 json={"source": fixture_source(), "data_classification": "CONFIDENTIAL", "run_id": "api-encrypted-test"},
             )
             self.assertEqual(response.status_code, 200, response.text)
-            journal = json.loads(Path(response.json()["journal"]).read_text(encoding="utf-8"))
+            result_payload = response.json()
+            self.assertTrue(result_payload["journal_ref"].startswith("workflow-journal://"))
+            self.assertNotIn(str(api_main.PRODUCT_ROOT), json.dumps(result_payload))
+            journal = json.loads(api_main.workflow_journal_path(self.tenant["tenant_id"], result_payload["run_id"]).read_text(encoding="utf-8"))
             self.assertTrue(journal["context"]["protected"])
             self.assertEqual(journal["context"]["storage"], "TENANT_SCOPED_CAS")
             self.assertNotIn("source", journal["context"])

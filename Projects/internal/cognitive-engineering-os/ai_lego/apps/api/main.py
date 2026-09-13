@@ -138,6 +138,20 @@ def build_api_journal_protector(tenant_id: str, run_id: str) -> CasJournalContex
     )
 
 
+def workflow_journal_path(tenant_id: str, run_id: str) -> Path:
+    """Resolve a journal path internally without exposing the host path to API clients."""
+    if not isinstance(tenant_id, str) or not tenant_id or not isinstance(run_id, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) is None:
+        raise InvariantViolation("WORKFLOW_JOURNAL_REFERENCE_INVALID")
+    tenant_key = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
+    return PRODUCT_ROOT / ".runtime" / "workflows" / tenant_key / f"{run_id}.journal.json"
+
+
+def workflow_journal_ref(tenant_id: str, run_id: str) -> str:
+    """Return a stable opaque reference; storage location remains an API-internal detail."""
+    tenant_key = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
+    return f"workflow-journal://{tenant_key}/{run_id}"
+
+
 def get_store() -> IdentityStore:
     db_path = Path(os.environ.get("COGNITIVE_OS_DB_PATH", DEFAULT_DB_PATH))
     return IdentityStore(db_path)
@@ -676,8 +690,8 @@ def run_recipe(
     resume = body.get("resume", False)
     if not isinstance(resume, bool):
         raise HTTPException(status_code=400, detail="WORKFLOW_RESUME_INVALID: resume must be boolean")
-    tenant_key = hashlib.sha256(session["tenant_id"].encode("utf-8")).hexdigest()[:32]  # stable opaque namespace; tenant identity never enters a path
-    journal = PRODUCT_ROOT / ".runtime" / "workflows" / tenant_key / f"{run_id}.journal.json"
+    journal = workflow_journal_path(session["tenant_id"], run_id)
+    journal_ref = workflow_journal_ref(session["tenant_id"], run_id)
     classification = body.get("data_classification", "INTERNAL")
     if classification not in {"PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"}:
         raise HTTPException(status_code=400, detail="WORKFLOW_DATA_CLASSIFICATION_INVALID")
@@ -714,7 +728,7 @@ def run_recipe(
         journal_context_protector=journal_protector,
     )
     if result.status != "SUCCEEDED":
-        return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal": str(journal), "method_resolution": method_resolution, "capability_resolution": capability_resolution}
+        return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
     gates: dict[str, list[dict[str, Any]]] = {}
     for index, node in enumerate(nodes):
         if node["node_kind"] != "method":
@@ -731,7 +745,7 @@ def run_recipe(
         except (InvariantViolation, MethodDispatchError) as error:
             raise HTTPException(status_code=422, detail=f"WORKFLOW_GATE_EVALUATION_FAILED: {error}") from error
     passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates)
-    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": result.as_dict(), "gates": gates, "journal": str(journal), "method_resolution": method_resolution, "capability_resolution": capability_resolution}
+    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": result.as_dict(), "gates": gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
 
 
 @app.get("/methods/{method_id}")
