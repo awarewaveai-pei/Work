@@ -94,6 +94,16 @@ def configure_cors(target_app: FastAPI, raw_origins: str | None = None) -> tuple
     return origins
 
 
+def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capability_ids: list[str]) -> CapabilityAdapterRegistry:
+    """Build the API's explicit adapter set once for both plan and run paths."""
+    adapters = CapabilityAdapterRegistry(capability_catalog)
+    # Only the deterministic, local, read-only literature fixture is exposed here.
+    # External providers need their own egress, freshness and policy adapter.
+    if "literature_search" in capability_ids:
+        adapters.register("literature_search", offline_literature_search)
+    return adapters
+
+
 CONFIGURED_CORS_ORIGINS = configure_cors(app)
 
 
@@ -410,6 +420,17 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
     capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
     capability_resolution = capability_catalog.resolve(capability_refs(workflow_ir))
     executability = plan_executability(workflow_ir, capability_resolution)
+    capability_ids = capability_refs(workflow_ir)
+    capability_adapters = build_api_capability_adapters(capability_catalog, capability_ids)
+    adapter_readiness = capability_adapters.availability(capability_ids)
+    adapter_blocking = [
+        {"ref": node["ref"], "label": node.get("label"), "necessity": node.get("necessity", "RECOMMENDED")}
+        for node in workflow_ir["nodes"]
+        if node.get("node_kind") == "capability"
+        and node["ref"] in adapter_readiness["missing"]
+        and str(node.get("necessity", "RECOMMENDED")).startswith("REQUIRED_")
+    ]
+    adapter_ready = not adapter_blocking
     method_ready = method_resolution["blocked"] is None
     return {
         "recipe_id": recipe_id,
@@ -417,7 +438,8 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "method_resolution": method_resolution,
         "capability_resolution": capability_resolution,
         "plan_executability": executability,
-        "status": "READY" if method_ready and executability["executable"] else "BLOCKED",
+        "adapter_readiness": {**adapter_readiness, "blocking": adapter_blocking, "ready": adapter_ready},
+        "status": "READY" if method_ready and executability["executable"] and adapter_ready else "BLOCKED",
     }
 
 
@@ -453,11 +475,7 @@ def run_recipe(
     capability_resolution = capability_catalog.resolve(capability_ids)
     if capability_resolution["blocked"] is not None:
         raise HTTPException(status_code=409, detail=capability_resolution["blocked"])
-    capability_adapters = CapabilityAdapterRegistry(capability_catalog)
-    # Only the deterministic, local, read-only literature fixture is exposed here. External
-    # providers need their own egress, freshness and policy adapter before registration.
-    if "literature_search" in capability_ids:
-        capability_adapters.register("literature_search", offline_literature_search)
+    capability_adapters = build_api_capability_adapters(capability_catalog, capability_ids)
     try:
         capability_handlers = capability_adapters.handlers_for(capability_ids)
     except InvariantViolation as error:

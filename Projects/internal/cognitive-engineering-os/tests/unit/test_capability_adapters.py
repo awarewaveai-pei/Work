@@ -36,3 +36,10 @@ class CapabilityAdapterRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, "CAPABILITY_ADAPTER_DUPLICATE"):
             registry.register("literature_search", lambda _payload, _node: {})
 
+    def test_availability_reports_registered_and_missing_without_invoking_anything(self):
+        registry = CapabilityAdapterRegistry(_Catalog({"literature_search", "run_statistics"}))
+        registry.register("literature_search", lambda _payload, _node: {})
+        self.assertEqual(
+            registry.availability(["literature_search", "run_statistics"]),
+            {"registered": ["literature_search"], "missing": ["run_statistics"]},
+        )

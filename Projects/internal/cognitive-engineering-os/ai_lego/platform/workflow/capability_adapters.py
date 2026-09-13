@@ -42,6 +42,14 @@ class CapabilityAdapterRegistry:
             raise InvariantViolation(f"CAPABILITY_ADAPTER_UNAVAILABLE: {', '.join(missing)}")
         return {ref: self._adapters[ref] for ref in refs}
 
+    def availability(self, refs: list[str]) -> dict[str, list[str]]:
+        """Report adapter readiness without confusing it with contract resolution."""
+        requested = set(refs)
+        return {
+            "registered": sorted(requested & set(self._adapters)),
+            "missing": sorted(requested - set(self._adapters)),
+        }
+
     def handlers_for(self, refs: list[str]) -> dict[str, CapabilityHandler]:
         """Return executor handlers with explicit bindings exposed as adapter args."""
         handlers = self.require_for(refs)

@@ -171,10 +171,16 @@ class UnauthenticatedAccessTests(ApiTestCase):
         response = self.client.get("/recipes/research-qualitative-v1/plan")
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
-        self.assertEqual(payload["status"], "READY")
+        self.assertEqual(payload["status"], "BLOCKED")
         self.assertEqual(len(payload["workflow_ir"]["nodes"]), 7)
         self.assertTrue(payload["plan_executability"]["executable"])
         self.assertTrue(payload["plan_executability"]["fully_resolved"])
+        self.assertFalse(payload["adapter_readiness"]["ready"])
+        self.assertEqual(payload["adapter_readiness"]["registered"], ["literature_search"])
+        self.assertEqual(
+            [item["ref"] for item in payload["adapter_readiness"]["blocking"]],
+            ["run_statistics", "artifact.generate_research_paper"],
+        )
 
     def test_unknown_recipe_plan_is_404(self):
         response = self.client.get("/recipes/does-not-exist/plan")
