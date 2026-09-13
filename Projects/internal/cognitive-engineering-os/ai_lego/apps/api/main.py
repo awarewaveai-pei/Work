@@ -324,7 +324,8 @@ async function prepareRecipe(recipeId) {
   const skeleton = {};
   form.source_fields.forEach(field => assignPath(skeleton, field.path, null));
   document.getElementById('recipe-json').value = JSON.stringify(skeleton, null, 2);
-  document.getElementById('recipe-help').textContent = `${recipeId}: ${form.source_fields.length} Source fields. Plan status: ${plan.status}. Null values are placeholders; replace them with valid domain data before running.`;
+  const blockers = (plan.blockers || []).map(item => item.code + ': ' + JSON.stringify(item.detail)).join(' | ');
+  document.getElementById('recipe-help').textContent = `${recipeId}: ${form.source_fields.length} Source fields. Plan status: ${plan.status}.${blockers ? ' Blockers: ' + blockers + '.' : ''} Null values are placeholders; replace them with valid domain data before running.`;
   document.getElementById('recipe-run-btn').disabled = !loggedIn || plan.status !== 'READY';
   document.getElementById('result').textContent = JSON.stringify({ recipe_id: recipeId, plan_status: plan.status, source_fields: form.source_fields }, null, 2);
 }
@@ -502,6 +503,13 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "plan_executability": executability,
         "adapter_readiness": {**adapter_readiness, "blocking": adapter_blocking, "ready": adapter_ready},
         "binding_readiness": {"missing": missing_bindings, "ready": binding_ready},
+        "blockers": [
+            *([{"code": "METHOD_RESOLUTION_BLOCKED", "detail": method_resolution["blocked"]}] if method_resolution["blocked"] else []),
+            *([{"code": "METHOD_DISPATCH_BLOCKED", "detail": {"missing": method_dispatch_readiness["missing"]}}] if method_dispatch_readiness["missing"] else []),
+            *([{"code": "CAPABILITY_RESOLUTION_BLOCKED", "detail": capability_resolution["blocked"]}] if capability_resolution["blocked"] else []),
+            *([{"code": "CAPABILITY_ADAPTER_BLOCKED", "detail": adapter_blocking}] if adapter_blocking else []),
+            *([{"code": "WORKFLOW_BINDING_BLOCKED", "detail": missing_bindings}] if missing_bindings else []),
+        ],
         "status": "READY" if method_ready and dispatch_ready and executability["executable"] and adapter_ready and binding_ready else "BLOCKED",
     }
 

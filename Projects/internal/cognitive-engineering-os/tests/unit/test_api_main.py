@@ -220,6 +220,15 @@ class UnauthenticatedAccessTests(ApiTestCase):
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertIn(response.json()["status"], {"READY", "BLOCKED"})
 
+    def test_blocked_recipe_plan_exposes_machine_readable_reasons(self):
+        response = self.client.get("/recipes/champion-challenger/plan")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "BLOCKED")
+        self.assertTrue(
+            any(item["code"] == "CAPABILITY_RESOLUTION_BLOCKED" for item in payload["blockers"])
+        )
+
     def test_recipe_form_describes_source_fields_from_bindings(self):
         response = self.client.get("/recipes/research-qualitative-v1/form")
         self.assertEqual(response.status_code, 200, response.text)
