@@ -27,6 +27,13 @@ class JsonArtifactStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, "JSON_ARTIFACT_HASH_MISMATCH"):
             self.store.read("tenant-a", reference)
 
+    def test_delete_requires_verified_reference_and_removes_owned_object(self):
+        reference = self.store.put("tenant-a", "Transcript", {"text": "erase me"})
+        deleted_path = Path(self.store.delete("tenant-a", reference))
+        self.assertFalse(deleted_path.exists())
+        with self.assertRaisesRegex(InvariantViolation, "CAS_TENANT_ACCESS_DENIED"):
+            self.store.delete("tenant-a", reference)
+
     def test_invalid_type_and_tenant_path_fail_closed(self):
         with self.assertRaisesRegex(InvariantViolation, "JSON_ARTIFACT_TYPE_INVALID"):
             self.store.put("tenant-a", "../transcript", {})

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import os
+import tempfile
 from typing import Any
 
 from ai_lego.core.support import sha256_bytes
@@ -46,7 +48,16 @@ class TenantScopedCas:
         relative = Path("objects") / tenant_id / "sha256" / digest[:2] / digest[2:4] / digest
         target = self.root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
+        fd, temporary_name = tempfile.mkstemp(prefix=f".{digest}.", dir=str(target.parent))
+        try:
+            with os.fdopen(fd, "wb") as temporary:
+                temporary.write(content)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+            os.replace(temporary_name, target)
+        finally:
+            if os.path.exists(temporary_name):
+                os.unlink(temporary_name)
         return {
             "path": "/" + relative.as_posix(),
             "tenant_segment": tenant_id,

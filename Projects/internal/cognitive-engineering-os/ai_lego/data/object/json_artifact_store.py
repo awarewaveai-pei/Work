@@ -61,3 +61,11 @@ class JsonArtifactStore:
         if not isinstance(value, dict):
             raise InvariantViolation("JSON_ARTIFACT_OBJECT_REQUIRED")
         return value
+
+    def delete(self, tenant_id: str, reference: Mapping[str, Any]) -> str:
+        """Delete only after verifying the reference and content hash."""
+        self.read(tenant_id, reference)
+        cas_path = reference.get("cas_path") if isinstance(reference, Mapping) else None
+        if not isinstance(cas_path, Mapping):
+            raise InvariantViolation("JSON_ARTIFACT_CAS_PATH_REQUIRED")
+        return self.cas.unlink(tenant_id, dict(cas_path))
