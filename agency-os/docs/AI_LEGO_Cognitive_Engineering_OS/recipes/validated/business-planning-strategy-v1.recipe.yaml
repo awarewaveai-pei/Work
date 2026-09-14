@@ -1,0 +1,128 @@
+$id: "ai-lego://recipes/validated/business-planning-strategy-v1.recipe.yaml"
+title: "Business Planning Strategy"
+status: ACTIVE
+description: >
+  A bounded, replayable strategy-planning workflow that turns explicitly
+  supplied problem, customer-observation, market-context, competitive, and
+  business-model records into a reviewable strategy hypothesis. It does not
+  perform market research, invent customer evidence, or publish a proposal.
+id: business-planning-strategy-v1
+version: "1.0.0"
+name: "Business Planning Strategy"
+
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+
+suited_for:
+  - "Early strategy framing from caller-supplied, provenance-labeled records"
+  - "A reusable strategy chain before feasibility review or human decision"
+not_for:
+  - "Automated market research, customer validation, investment advice, or proposal publication"
+  - "Clinical assessment or inference about a person's psychological state"
+
+mandatory_elements:
+  - "A distinct problem statement with current, expected, and gap fields"
+  - "Customer observations labeled FACT or INFERENCE across all empathy-map quadrants"
+  - "Explicit provenance on every method record and evidence references where the method requires them"
+  - "Human review before treating the outputs as a business decision"
+
+forbidden_actions:
+  - "Inventing customer, market, or competitor evidence"
+  - "Presenting the business model canvas as a validated business"
+  - "Publishing an investment recommendation or proposal artifact"
+
+steps:
+  - label: "problem_statement"
+    type: method
+    method_id: framing.problem_statement
+    input: source.problem
+    bindings:
+      problem_id: source.problem.problem_id
+      current_state: source.problem.current_state
+      expected_state: source.problem.expected_state
+      gap: source.problem.gap
+      provenance: source.problem.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "customer_empathy_map"
+    type: method
+    method_id: insight.empathy_map
+    input: source.customer_insight
+    bindings:
+      map_id: source.customer_insight.map_id
+      subject: source.customer_insight.subject
+      entries: source.customer_insight.entries
+      provenance: source.customer_insight.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "SWOT_analysis"
+    type: method
+    method_id: strategy.swot
+    input: source.swot
+    bindings:
+      analysis_id: source.swot.analysis_id
+      knowledge_set_ref: source.swot.knowledge_set_ref
+      knowledge_set: source.swot.knowledge_set
+      factors: source.swot.factors
+    necessity: REQUIRED_BY_RISK
+  - label: "PESTEL_analysis"
+    type: method
+    method_id: strategy.pestel
+    input: source.macro_environment
+    bindings:
+      analysis_id: source.macro_environment.analysis_id
+      factors: source.macro_environment.factors
+    necessity: REQUIRED_BY_RISK
+  - label: "Porter_five_forces"
+    type: method
+    method_id: strategy.porter_five_forces
+    input: source.porter
+    bindings:
+      analysis_id: source.porter.analysis_id
+      forces: source.porter.forces
+      overall_attractiveness: source.porter.overall_attractiveness
+      provenance: source.porter.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "STP_analysis"
+    type: method
+    method_id: strategy.stp
+    input: source.segmentation
+    bindings:
+      record_id: source.segmentation.record_id
+      segments: source.segmentation.segments
+      targeting_decision: source.segmentation.targeting_decision
+      positioning_statement: source.segmentation.positioning_statement
+      provenance: source.segmentation.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "business_model_canvas"
+    type: method
+    method_id: strategy.business_model_canvas
+    input: source.business_model
+    bindings:
+      canvas_id: source.business_model.canvas_id
+      blocks: source.business_model.blocks
+      provenance: source.business_model.provenance
+    necessity: REQUIRED_BY_RISK
+
+outputs:
+  - "ProblemStatement"
+  - "EmpathyMap"
+  - "SWOTAnalysis"
+  - "PESTELAnalysis"
+  - "PorterFiveForcesAnalysis"
+  - "StpAnalysis"
+  - "BusinessModelCanvas"
+
+open_questions:
+  - id: "OQ-BUSINESS-PLANNING-STRATEGY-1"
+    question: "Which separately contracted method should provide market sizing, competitor evidence, KPI design, execution planning, and proposal rendering in a future end-to-end mode?"
+    owner: "operator and qualified business reviewer"
+    blocks: "nothing in v1; this Recipe is explicitly a strategy hypothesis chain"
+
+verification:
+  required: true
+  checks:
+    - "All seven method ids resolve to ACTIVE contracts and dispatchable builders/gates"
+    - "All required source paths are explicit bindings and missing paths fail closed"
+    - "Outputs preserve provenance and method-level gate results"
+    - "The final canvas remains explicitly UNVALIDATED_HYPOTHESIS"

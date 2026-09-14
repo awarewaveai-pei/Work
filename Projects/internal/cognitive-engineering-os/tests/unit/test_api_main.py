@@ -187,6 +187,60 @@ def business_planning_feasibility_source() -> dict:
     return source
 
 
+def business_planning_strategy_source() -> dict:
+    source = business_foundation_source()
+    provenance = make_provenance("EVIDENCE", "HUMAN_APPROVED")
+    inference = make_provenance("AI_INFERENCE", "AI_SUGGESTED")
+    source.update(
+        {
+            "problem": {
+                "problem_id": "PROB-BUS-API-001",
+                "current_state": "The offer has scattered observations but no shared strategy frame.",
+                "expected_state": "The team has a traceable strategy hypothesis to review.",
+                "gap": "Observed customer and environment signals are not yet organized into a decision frame.",
+                "provenance": provenance,
+            },
+            "customer_insight": {
+                "map_id": "EMPATHY-BUS-API-001",
+                "subject": "adult educators exploring reflective learning",
+                "entries": [
+                    {"quadrant": quadrant, "content": f"reviewed {quadrant.lower()} observation", "basis": "FACT"}
+                    for quadrant in ["SAYS", "THINKS", "DOES", "FEELS"]
+                ],
+                "provenance": provenance,
+            },
+            "macro_environment": {
+                "analysis_id": "PESTEL-BUS-API-001",
+                "factors": [
+                    {
+                        "id": "PESTEL-BUS-API-F1",
+                        "dimension": "SOCIAL",
+                        "statement": "adult educators seek reflective learning formats",
+                        "geography": "TW",
+                        "source": "approved field notes",
+                        "source_type": "research",
+                        "effective_from": "2026-01-01",
+                        "effective_to": None,
+                        "trend": "increasing",
+                        "implication": "test a focused offer",
+                        "confidence": 0.7,
+                        "provenance": provenance,
+                        "supporting_evidence_refs": ["E-API-1"],
+                    }
+                ],
+            },
+            "segmentation": {
+                "record_id": "STP-BUS-API-001",
+                "segments": [{"id": "SEG-BUS-1", "description": "adult educators", "criteria": ["teaches adults"], "supporting_evidence_refs": ["E-API-1"]}],
+                "targeting_decision": {"targeted_segment_id": "SEG-BUS-1", "rationale": "This segment has the clearest reviewed need."},
+                "positioning_statement": "For adult educators, a traceable reflective-learning format turns observations into discussable practice.",
+                "provenance": inference,
+            },
+        }
+    )
+    return source
+
+
 class HealthTests(ApiTestCase):
     def test_health_requires_no_auth_and_touches_no_store(self):
         response = self.client.get("/health")
@@ -488,6 +542,31 @@ class InvokeTests(ApiTestCase):
 
 
 class RecipeRunTests(ApiTestCase):
+    def test_business_strategy_recipe_composes_problem_customer_and_strategy_methods(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/business-planning-strategy-v1/run",
+            json={"source": business_planning_strategy_source(), "run_id": "api-business-strategy-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(
+            [step["ref"] for step in payload["workflow"]["steps"]],
+            [
+                "framing.problem_statement",
+                "insight.empathy_map",
+                "strategy.swot",
+                "strategy.pestel",
+                "strategy.porter_five_forces",
+                "strategy.stp",
+                "strategy.business_model_canvas",
+            ],
+        )
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["problem_statement"]["id"], "PROB-BUS-API-001")
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["STP_analysis"]["targeting_decision"]["targeted_segment_id"], "SEG-BUS-1")
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["business_model_canvas"]["validation_status"], "UNVALIDATED_HYPOTHESIS")
+
     def test_business_planning_feasibility_recipe_runs_the_bounded_ten_step_chain(self):
         self._login()
         response = self.client.post(
