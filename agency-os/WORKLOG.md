@@ -17545,3 +17545,20 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`_api_workflow_result|result.as_dict\(\)|DO_NOT_ECHO_RAW_SOURCE` | hits=單一 API response projector、兩個 route response path、單一 regression test；無未投影的 recipe response path。
 - ROLLBACK: revert 本次 response projection commit；不改 journal、CAS、source storage 或 workflow execution semantics。
 - WORKLOG_DONE: API response source minimization
+[追記 2026-09-14 CAS deletion semantics correction]
+- 根因：`delete_journal_object` 實際 unlink tenant-scoped CAS ciphertext 並驗證不可 restore，但 `DeletionRequestBuilder` 固定輸出 `personal_data_crypto_shred`，造成 physical deletion 被誤標成 DEK/KMS crypto-shred。
+- 修正：Builder 支援兩種 deletion type；journal object deletion 先驗證 CAS hash target，再執行 policy checks，輸出 `production_row` + `cas-sha256:<hash>`；Research CLI 原有 subject-DEK destruction 保持 `personal_data_crypto_shred`。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.unit.test_journal_deletion tests.unit.test_retention_deletion_model` | exit=0 | result=75 tests OK；tool=Python | cmd=`python -m unittest tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests` | exit=0 | result=通過；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 builder、journal deletion、Research DEK path 與 schema assertions。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`DeletionRequestBuilder|delete_journal_object|personal_data_crypto_shred|production_row|cas-sha256` | hits=唯一 builder、唯一 journal object orchestration、唯一 Research DEK builder path、tests/docs；無 physical unlink 的 crypto-shred 偽裝旁路。
+- ROLLBACK: revert 本次 deletion semantics commit；既有 CAS objects、DEK vault 與 journal schema 不會被自動修改或刪除。
+- WORKLOG_DONE: CAS deletion semantics correction
+
+[追記 2026-09-14 optional capability fail-closed execution]
+- 根因：Workflow executor 對 capability node 一律呼叫 catalog.invoke；因此缺少 ACTIVE contract 的 `RECOMMENDED` 文獻能力會錯誤中止整條 Research workflow，違反既有 plan_executability 語義。
+- 修正：未解析且非 `REQUIRED_*` 的 capability 產生可稽核 `NOT_INVOKED` step/output，不執行 handler；Research triangulation 對此明確輸出 `NEEDS_HUMAN_REVIEW`/`CAPABILITY_NOT_RESOLVED`，required capability 仍 fail-closed 阻擋。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests` | exit=0 | result=34 tests OK；tool=Python | cmd=`python -m unittest -q tests.unit.test_journal_deletion tests.unit.test_retention_deletion_model tests.unit.test_workflow_executor tests.unit.test_research_evidence_chain` | exit=0 | result=88 tests OK；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 executor skip branch、REQUIRED gate、triangulation fallback 與 journal step serialization。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`NOT_INVOKED|CAPABILITY_NOT_RESOLVED|REQUIRED_.*catalog|catalog.invoke` | hits=optional skip 僅在 executor、Research fallback 僅在 triangulation、required path 保留 catalog gate；無 unresolved capability handler 旁路。
+- ROLLBACK: revert 本次 optional capability execution commit；不改 capability contracts、既有 journals 或已產生 artifacts。
+- WORKLOG_DONE: optional capability fail-closed execution

@@ -302,6 +302,24 @@ def execute_workflow_ir(
         ref = _node_ref(node)
         paths = _input_paths(node)
         try:
+            if node.get("node_kind") == "capability" and catalogs is not None:
+                catalog = catalogs.get("capability")
+                necessity = node.get("necessity", "RECOMMENDED")
+                if catalog is None:
+                    raise InvariantViolation("WORKFLOW_CATALOG_NOT_REGISTERED: capability")
+                if not catalog.is_resolvable(ref) and not str(necessity).startswith("REQUIRED_"):
+                    output = {
+                        "status": "NOT_INVOKED",
+                        "reason": "CAPABILITY_NOT_RESOLVED",
+                        "capability_ref": ref,
+                        "necessity": necessity,
+                    }
+                    context["steps"][str(index)] = output
+                    context["outputs"][label] = output
+                    results.append(WorkflowStepResult(index, label, node["node_kind"], ref, "NOT_INVOKED", paths, output=output))
+                    if journal_path is not None:
+                        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "RUNNING", context, results, index + 1, journal_context_projector, journal_context_protector))
+                    continue
             payload = {path: _lookup(context, path) for path in paths}
             if node.get("bindings") is not None:
                 payload["__bindings__"] = _resolve_bindings(context, node)

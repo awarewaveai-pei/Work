@@ -515,9 +515,14 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     coding_contract = runtime_result.steps[0].contract
     coding_outputs = runtime_result.context["outputs"]["coding"]["coding_outputs"]
     runtime_statistics = runtime_result.context["outputs"]["statistics"]
-    literature = runtime_result.context["outputs"]["literature"]["literature"]
+    literature_output = runtime_result.context["outputs"]["literature"]
+    literature = literature_output.get("literature")
     triangulation = runtime_result.context["outputs"]["triangulation"]["triangulation"]
-    if triangulation["status"] != "NEEDS_HUMAN_REVIEW" or triangulation["offline_status_code"] != "OFFLINE_SOURCE_STALE":
+    allowed_triangulation_status = {
+        "OFFLINE_SOURCE_STALE",
+        "CAPABILITY_NOT_RESOLVED",
+    }
+    if triangulation["status"] != "NEEDS_HUMAN_REVIEW" or triangulation["offline_status_code"] not in allowed_triangulation_status:
         raise InvariantViolation("TRIANGULATION_FRESHNESS_GUARD_FAILED: offline literature must remain review-gated")
     if codebook_pass is None:
         coder_one, coder_two = expanded_synthetic_coder_judgments()

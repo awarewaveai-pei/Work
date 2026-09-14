@@ -73,6 +73,17 @@ def triangulate_themes_and_literature(payload: dict[str, Any], _node: dict[str, 
     literature = payload.get("outputs.literature", {}).get("literature")
     if not isinstance(themes, list) or not themes:
         raise InvariantViolation("TRIANGULATION_THEMES_REQUIRED")
+    if payload.get("outputs.literature", {}).get("status") == "NOT_INVOKED":
+        return {
+            "triangulation": {
+                "findings": [],
+                "source_count": 1,
+                "status": NEEDS_HUMAN_REVIEW,
+                "offline_status_code": "CAPABILITY_NOT_RESOLVED",
+                "provenance_complete": False,
+                "reason": "literature capability was unavailable; no literature claim is made",
+            }
+        }
     if not isinstance(literature, dict) or not isinstance(literature.get("items"), list) or not literature["items"]:
         raise InvariantViolation("TRIANGULATION_LITERATURE_REQUIRED")
 

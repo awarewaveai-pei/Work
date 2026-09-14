@@ -44,8 +44,11 @@ def delete_journal_object(
     missing = [name for name, key in required_checks.items() if key not in checks or not callable(checks[key])]
     if missing:
         raise InvariantViolation(f"JOURNAL_DELETION_CHECKS_MISSING: {', '.join(missing)}")
-    builder = DeletionRequestBuilder(request_id, subject_id, requested_at)
+    cas_path = stored_reference.get("cas_path") if isinstance(stored_reference, Mapping) else None
+    if not isinstance(cas_path, Mapping) or not isinstance(cas_path.get("hash"), str) or not cas_path["hash"].strip():
+        raise InvariantViolation("JOURNAL_DELETION_TARGET_INVALID")
     evidence = lambda step: f"workflow-deletion://{request_id}/{step.lower().replace(' ', '-')}"
+    completed_policy_steps: list[tuple[str, str]] = []
     for step, key in required_checks.items():
         try:
             passed = bool(checks[key]())
@@ -53,7 +56,19 @@ def delete_journal_object(
             raise InvariantViolation(f"JOURNAL_DELETION_POLICY_ERROR: {step}") from error
         if not passed:
             raise InvariantViolation(f"JOURNAL_DELETION_POLICY_BLOCKED: {step}")
-        builder.record(step, now(), evidence(step))
+        completed_policy_steps.append((step, now()))
+
+    # This operation unlinks one CAS object and proves it is no longer restorable.
+    # It is production-row/object deletion, not DEK destruction or crypto-shred.
+    builder = DeletionRequestBuilder(
+        request_id,
+        None,
+        requested_at,
+        deletion_type="production_row",
+        target_refs=[f"cas-sha256:{cas_path['hash']}"],
+    )
+    for step, completed_at in completed_policy_steps:
+        builder.record(step, completed_at, evidence(step))
 
     try:
         protector.delete(stored_reference)

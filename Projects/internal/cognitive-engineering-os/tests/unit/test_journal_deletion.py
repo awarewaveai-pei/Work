@@ -25,6 +25,9 @@ class JournalDeletionTests(unittest.TestCase):
                 protector, stored, "DEL-RUN-1", "run-1", "2026-09-14T00:00:00Z", _checks(), now=lambda: "2026-09-14T00:00:01Z"
             )
             self.assertEqual(len(record["steps"]), 10)
+            self.assertEqual(record["deletion_type"], "production_row")
+            self.assertIsNone(record["subject_id"])
+            self.assertEqual(record["target_refs"], [f"cas-sha256:{stored['cas_path']['hash']}"])
             self.assertEqual(record["steps"][1]["step"], "Legal Hold Check")
             self.assertEqual(record["steps"][-1]["step"], "Deletion Evidence")
             SchemaContracts(resolve_spec_root()).validate("ai-lego://specs/execution/data-deletion.schema.yaml#/deletion_request", record, "journal deletion request")
@@ -39,11 +42,19 @@ class JournalDeletionTests(unittest.TestCase):
 
         protector = Protector()
         with self.assertRaisesRegex(InvariantViolation, "JOURNAL_DELETION_POLICY_BLOCKED: Legal Hold Check"):
-            delete_journal_object(protector, {}, "DEL-RUN-2", "run-2", "2026-09-14T00:00:00Z", _checks(legal_hold=False), now=lambda: "2026-09-14T00:00:01Z")
+            delete_journal_object(protector, {"cas_path": {"hash": "a" * 64}}, "DEL-RUN-2", "run-2", "2026-09-14T00:00:00Z", _checks(legal_hold=False), now=lambda: "2026-09-14T00:00:01Z")
         self.assertFalse(protector.deleted)
 
     def test_missing_policy_check_is_not_treated_as_approval(self):
         checks = _checks()
         del checks["retention"]
         with self.assertRaisesRegex(InvariantViolation, "JOURNAL_DELETION_CHECKS_MISSING: Retention Check"):
-            delete_journal_object(object(), {}, "DEL-RUN-3", "run-3", "2026-09-14T00:00:00Z", checks)
+            delete_journal_object(object(), {"cas_path": {"hash": "a" * 64}}, "DEL-RUN-3", "run-3", "2026-09-14T00:00:00Z", checks)
+
+    def test_invalid_cas_target_is_rejected_before_policy_or_delete(self):
+        called = []
+        checks = _checks()
+        checks["authorization"] = lambda: called.append("authorization") or True
+        with self.assertRaisesRegex(InvariantViolation, "JOURNAL_DELETION_TARGET_INVALID"):
+            delete_journal_object(object(), {}, "DEL-RUN-4", "run-4", "2026-09-14T00:00:00Z", checks)
+        self.assertEqual(called, [])
