@@ -210,6 +210,17 @@ properties:
       Strategy Recipe", §13.4 L3309).
     examples: ["Simple Brainstorm Recipe"]
 
+  workflow_gate_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[a-z][a-z0-9_.-]*$"
+    description: >
+      OPTIONAL stable refs for cross-node workflow gates. The runtime must
+      explicitly register every ref; an unavailable ref blocks plan/run.
+      This is a name-level extension point, not an import path.
+
   references:
     type: object
     description: >

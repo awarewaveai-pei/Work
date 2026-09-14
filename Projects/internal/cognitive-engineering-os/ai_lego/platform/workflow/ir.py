@@ -139,6 +139,8 @@ def compile_recipe_to_workflow_ir(spec_root: Path, recipe_id: str, risk_tier: st
     # contract instead of indexing an absent optional key.
     if "references" in recipe:
         compiled["references"] = recipe["references"]
+    if "workflow_gate_refs" in recipe:
+        compiled["workflow_gate_refs"] = recipe["workflow_gate_refs"]
     dataflow_issues = workflow_dataflow_issues(compiled)
     if dataflow_issues:
         raise InvariantViolation(f"WORKFLOW_DATAFLOW_INVALID: {'; '.join(dataflow_issues)}")

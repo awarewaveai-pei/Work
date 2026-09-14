@@ -429,6 +429,16 @@ properties:
       - db-migration-expand-contract
       - research.thematic_analysis_workflow
 
+  workflow_gate_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[a-z][a-z0-9_.-]*$"
+    description: >
+      Compiled Recipe-level workflow gate refs. Resolution is explicit at the
+      application composition root and missing refs fail closed.
+
   references:
     $ref: "ai-lego://specs/cognitive/recipe.schema.yaml#/properties/references"
     description: >

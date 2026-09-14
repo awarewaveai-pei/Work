@@ -69,6 +69,7 @@ from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegis
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
 from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
+from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -111,6 +112,24 @@ def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capabil
     if "artifact.generate_research_paper" in capability_ids:
         adapters.register("artifact.generate_research_paper", research_paper_artifact_adapter)
     return adapters
+
+
+def build_api_workflow_gate_registry() -> WorkflowGateRegistry:
+    """Build the explicit API gate set; domain runners are added by stable ref."""
+    registry = WorkflowGateRegistry()
+
+    def completion_gate(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            evaluate_workflow_completion_gate(
+                context,
+                workflow,
+                "ai_lego.apps.api.main",
+                datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+        ]
+
+    registry.register("workflow_execution_integrity", completion_gate)
+    return registry
 
 
 CONFIGURED_CORS_ORIGINS = configure_cors(app)
@@ -560,6 +579,12 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
     resolvable_capability_ids = [ref for ref in capability_ids if capability_catalog.is_resolvable(ref)]
     capability_adapters = build_api_capability_adapters(capability_catalog, resolvable_capability_ids)
     adapter_readiness = capability_adapters.availability(capability_ids)
+    workflow_gate_registry = build_api_workflow_gate_registry()
+    workflow_gate_refs = list(workflow_ir.get("workflow_gate_refs", []))
+    if "workflow_execution_integrity" not in workflow_gate_refs:
+        workflow_gate_refs.insert(0, "workflow_execution_integrity")
+    workflow_gate_readiness = workflow_gate_registry.availability(workflow_gate_refs)
+    workflow_gate_ready = not workflow_gate_readiness["missing"]
     adapter_blocking = [
         {"ref": node["ref"], "label": node.get("label"), "necessity": node.get("necessity", "RECOMMENDED")}
         for node in workflow_ir["nodes"]
@@ -584,6 +609,7 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "capability_resolution": capability_resolution,
         "plan_executability": executability,
         "adapter_readiness": {**adapter_readiness, "blocking": adapter_blocking, "ready": adapter_ready},
+        "workflow_gate_readiness": {**workflow_gate_readiness, "refs": workflow_gate_refs, "ready": workflow_gate_ready},
         "binding_readiness": {"missing": missing_bindings, "method_issues": method_binding_issues_by_node, "ready": binding_ready},
         "blockers": [
             *([{"code": "METHOD_RESOLUTION_BLOCKED", "detail": method_resolution["blocked"]}] if method_resolution["blocked"] else []),
@@ -592,8 +618,9 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
             *([{"code": "CAPABILITY_ADAPTER_BLOCKED", "detail": adapter_blocking}] if adapter_blocking else []),
             *([{"code": "METHOD_BINDING_BLOCKED", "detail": method_binding_issues_by_node}] if method_binding_issues_by_node else []),
             *([{"code": "WORKFLOW_BINDING_BLOCKED", "detail": missing_bindings}] if missing_bindings else []),
+            *([{"code": "WORKFLOW_GATE_BLOCKED", "detail": workflow_gate_readiness}] if not workflow_gate_ready else []),
         ],
-        "status": "READY" if method_ready and dispatch_ready and executability["executable"] and adapter_ready and binding_ready else "BLOCKED",
+        "status": "READY" if method_ready and dispatch_ready and executability["executable"] and adapter_ready and binding_ready and workflow_gate_ready else "BLOCKED",
     }
 
 
@@ -686,6 +713,14 @@ def run_recipe(
             raise HTTPException(status_code=409, detail={"code": "CAPABILITY_PLAN_NOT_EXECUTABLE", "plan_executability": executability, "resolution": capability_resolution["blocked"]})
     resolvable_capability_ids = [ref for ref in capability_ids if capability_catalog.is_resolvable(ref)]
     capability_adapters = build_api_capability_adapters(capability_catalog, resolvable_capability_ids)
+    workflow_gate_registry = build_api_workflow_gate_registry()
+    workflow_gate_refs = list(workflow_ir.get("workflow_gate_refs", []))
+    if "workflow_execution_integrity" not in workflow_gate_refs:
+        workflow_gate_refs.insert(0, "workflow_execution_integrity")
+    try:
+        workflow_gate_registry.require_for(workflow_gate_refs)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=501, detail=str(error)) from error
     try:
         capability_handlers = capability_adapters.handlers_for(resolvable_capability_ids)
     except InvariantViolation as error:
@@ -753,14 +788,7 @@ def run_recipe(
         gate_runners[index] = run_gate
 
     def evaluate_api_workflow_gate(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
-        return [
-            evaluate_workflow_completion_gate(
-                context,
-                workflow,
-                "ai_lego.apps.api.main",
-                datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            )
-        ]
+        return workflow_gate_registry.evaluate(workflow_gate_refs, context, workflow)
 
     result = execute_workflow_ir(
         workflow_ir,

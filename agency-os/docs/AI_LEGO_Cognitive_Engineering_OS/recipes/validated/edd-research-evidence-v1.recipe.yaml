@@ -9,6 +9,8 @@ description: >
 id: edd-research-evidence-v1
 version: "1.0.0"
 name: "EdD Research Evidence (Assumptions -> Evidence Matrix -> Toulmin Argument)"
+workflow_gate_refs:
+  - workflow_execution_integrity
 references:
   cognitive_method_atlas:
     file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"

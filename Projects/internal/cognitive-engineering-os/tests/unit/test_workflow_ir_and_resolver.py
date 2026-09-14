@@ -32,6 +32,10 @@ class WorkflowIrTests(unittest.TestCase):
         self.assertEqual(capability_refs, ["transcribe", "literature_search", "run_statistics", "artifact.generate_research_paper"])
         self.assertEqual(ir["references"]["cognitive_method_atlas"]["required"], True)
 
+    def test_recipe_workflow_gate_refs_are_compiled_into_ir(self):
+        ir = compile_recipe_to_workflow_ir(self.spec_root, "edd-research-evidence-v1", "R1")
+        self.assertEqual(ir["workflow_gate_refs"], ["workflow_execution_integrity"])
+
     def test_every_active_recipe_compiles_and_passes_dataflow_validation(self):
         recipe_dir = self.spec_root / "recipes" / "validated"
         recipe_ids = sorted(path.name.removesuffix(".recipe.yaml") for path in recipe_dir.glob("*.recipe.yaml"))
