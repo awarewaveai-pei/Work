@@ -6,11 +6,43 @@ from pathlib import Path
 
 from ai_lego.apps.cli.run_recipe import run_recipe
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
+from ai_lego.modules.research.review import fixture_review
 from tests.unit.test_api_main import business_planning_strategy_source
 from tests.unit.test_api_main import art_project_ideation_source
 
 
 class GenericRecipeCliTests(unittest.TestCase):
+    def test_runs_full_research_qualitative_recipe_through_generic_runtime(self):
+        locked_code, ai_review = fixture_review()
+        source = {
+            "question": "How do remote workers describe after-hours boundaries?",
+            "transcript": {
+                "status": "normalized",
+                "text": "A reviewed transcript input.",
+                "provenance": {"epistemic_type": "SOURCE_FACT", "authorship_state": "SOURCE_QUOTATION", "locked": None},
+            },
+            "coder_one": {"locked_code": locked_code, "ai_review": ai_review, "at": "2026-09-14T00:00:00Z"},
+            "coder_two": {"locked_code": locked_code, "ai_review": ai_review, "at": "2026-09-14T00:00:00Z"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            report = run_recipe("research-qualitative-v1", source, Path(directory))
+
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(
+            [step["ref"] for step in report["workflow"]["steps"]],
+            [
+                "transcribe",
+                "research.qualitative_coding",
+                "research.qualitative_coding",
+                "literature_search",
+                "run_statistics",
+                "evidence.triangulation",
+                "artifact.generate_research_paper",
+            ],
+        )
+        self.assertEqual(report["workflow"]["steps"][0]["output"]["mode"], "PRE_TRANSCRIBED_INPUT")
+        self.assertEqual(report["workflow"]["workflow_gates"][1]["gate_id"], "research_workflow_integrity")
+
     def test_runs_life_decision_recipe_through_generic_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
             report = run_recipe("life-decision-v1", fixture_source(), Path(directory))
