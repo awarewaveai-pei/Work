@@ -31,7 +31,7 @@
 | `specs/cognitive/primitive.schema.yaml` | ACTIVE | 1.0.0 | `#/primitive`: type=object required=[id, tier, dimension] properties[4]<br>`#/definitions/kernel_primitive_id`: type=string enum[24]<br>`#/definitions/extended_primitive_id`: type=string enum[5] |
 | `specs/cognitive/problem-type.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: $ref=#/problem_type<br>`#/problem_type`: type=string enum[13] |
 | `specs/cognitive/profile.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[rigor] properties[5] |
-| `specs/cognitive/recipe.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, name, steps] properties[11] |
+| `specs/cognitive/recipe.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, name, steps] properties[12] |
 | `specs/cognitive/representation.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: $ref=#/representation<br>`#/representation`: type=object required=[id, category, knowledge_ref, state] properties[5]<br>`#/definitions/representation_category`: type=string enum[11]<br>`#/definitions/view_state`: type=object properties[4] |
 | `specs/cognitive/rigor-level.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: $ref=#/rigor_mode<br>`#/rigor_mode`: type=string enum[5] |
 | `specs/cognitive/typed-method-result.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[execution_id, method_id, method_version, status, evaluated_at, provenance] properties[11]<br>`#/definitions/typed_output`: type=object required=[output_type, value] properties[4] |
@@ -329,4 +329,4 @@
 | `specs/security/personal-data-envelope.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[cipher_alg, kek_ref, dek_key_id, dek_wrapped, iv, ciphertext, classification_tag] properties[7] |
 | `specs/security/tenant-isolation-controls.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[default_isolation_model, shared_component_controls, object_storage_path_reuse, enforcement_from] properties[5] |
 | `specs/workflow/branch.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: $ref=#/branch allOf[5]<br>`#/branch`: allOf[2]<br>`#/definitions/branch_state`: type=string enum[6]<br>`#/definitions/merge_authority_level`: type=string enum[3] |
-| `specs/workflow/workflow-ir.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, nodes] properties[6]<br>`#/definitions/capability_node`: type=object required=[node_kind, ref] properties[7]<br>`#/definitions/method_node`: type=object required=[node_kind, method_id] properties[7]<br>`#/definitions/compiled_from`: type=object required=[source_kind] properties[4] allOf[2] |
+| `specs/workflow/workflow-ir.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, nodes] properties[7]<br>`#/definitions/capability_node`: type=object required=[node_kind, ref] properties[7]<br>`#/definitions/method_node`: type=object required=[node_kind, method_id] properties[7]<br>`#/definitions/compiled_from`: type=object required=[source_kind] properties[4] allOf[2] |

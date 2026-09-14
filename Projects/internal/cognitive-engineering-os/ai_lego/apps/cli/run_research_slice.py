@@ -65,7 +65,7 @@ from ai_lego.modules.knowledge.ingest.pii import detect_synthetic_pii, redact_tr
 from ai_lego.modules.knowledge.ingest.transcription import FixtureTranscriber, MeetingServiceTranscriber, OfflineFasterWhisperTranscriber, meeting_service_availability
 from ai_lego.modules.knowledge.provenance import build_evidence_graph, locator_from_transcript, reverse_trace
 from ai_lego.modules.research.ai_coding import DEFAULT_LOCAL_MODEL_PROFILE, apply_codebook, default_local_registry, suggest_categories, suggest_open_codes, suggest_themes
-from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates
+from ai_lego.modules.research.gates import all_gates_pass, evaluate_method_specific_gates, evaluate_research_workflow_integrity_gate
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search, triangulate_themes_and_literature
 from ai_lego.modules.research.capability_adapters import run_statistics_adapter
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs, build_v12_over_merged_theme_set
@@ -81,7 +81,9 @@ from ai_lego.platform.ai_execution.method_resolver import DEPRECATED_ALIAS, METH
 from ai_lego.platform.ai_execution.replay import project
 from ai_lego.platform.ai_execution.rollback_plan import build_rollback_plan
 from ai_lego.platform.workflow.executor import execute_workflow_ir
+from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir, project_workflow_ir
+from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.security.key_vault.local_key_vault import DECRYPT_BLOCKED_PENDING_REPLAY, REDACTED, LocalKeyVault
 
 RUN_ID = "RUN-PHASE5-SYNTHETIC-001"
@@ -518,7 +520,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         workflow_id=f"{workflow_ir['id']}:coding-statistics",
     )
 
-    def evaluate_research_workflow_gates(context: dict[str, Any], _workflow: dict[str, Any]) -> list[dict[str, Any]]:
+    def evaluate_research_method_gates(context: dict[str, Any], _workflow: dict[str, Any]) -> list[dict[str, Any]]:
         coding_outputs = context["outputs"]["coding"]["coding_outputs"]
         runtime_statistics = context["outputs"]["statistics"]
         statistics = {
@@ -541,6 +543,18 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             contracts.validate(S["gate_result"], gate, f"gate {gate['gate_id']}")
         return results
 
+    workflow_gate_registry = WorkflowGateRegistry()
+    workflow_gate_registry.register("workflow_execution_integrity", lambda context, workflow: [
+        evaluate_workflow_completion_gate(context, workflow, "ai_lego.platform.workflow.gates", clock.at(26))
+    ])
+    def evaluate_research_workflow_gates(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            *evaluate_research_method_gates(context, workflow),
+            *evaluate_research_workflow_integrity_gate(context, workflow, "ai_lego.modules.research.gates", clock.at(26)),
+        ]
+
+    workflow_gate_registry.register("research_workflow_integrity", evaluate_research_workflow_gates)
+
     runtime_result = execute_workflow_ir(
         runtime_subchain,
         {"research": {"question": "after-hours boundary erosion among remote workers", "coding_request": coding_request}},
@@ -551,7 +565,9 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             "evidence.triangulation": triangulate_themes_and_literature,
         },
         catalogs={"method": live, "capability": capabilities},
-        workflow_gate_runner=evaluate_research_workflow_gates,
+        workflow_gate_runner=lambda context, workflow: workflow_gate_registry.evaluate(
+            list(workflow.get("workflow_gate_refs", [])), context, workflow
+        ),
         journal_path=runtime / "platform" / "ai_execution" / "research_workflow.journal.json",
     )
     if runtime_result.status != "SUCCEEDED":

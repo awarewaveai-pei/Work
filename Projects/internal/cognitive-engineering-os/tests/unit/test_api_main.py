@@ -542,8 +542,11 @@ class RecipeRunTests(ApiTestCase):
             ["transcribe", "research.qualitative_coding", "research.qualitative_coding", "literature_search", "run_statistics", "evidence.triangulation", "artifact.generate_research_paper"],
         )
         self.assertEqual(payload["workflow"]["context"]["outputs"]["Transcription"]["mode"], "PRE_TRANSCRIBED_INPUT")
-        self.assertEqual([gate["gate_id"] for gate in payload["workflow_gates"]], ["workflow_execution_integrity"])
-        self.assertEqual(payload["workflow_gates"][0]["status"], "PASS")
+        self.assertEqual(
+            [gate["gate_id"] for gate in payload["workflow_gates"]],
+            ["workflow_execution_integrity", "research_workflow_integrity"],
+        )
+        self.assertTrue(all(gate["status"] == "PASS" for gate in payload["workflow_gates"]))
 
     def test_life_recipe_runs_through_shared_executor_and_gates(self):
         self._login()

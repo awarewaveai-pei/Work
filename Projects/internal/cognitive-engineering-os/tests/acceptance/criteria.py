@@ -307,8 +307,9 @@ class SliceCriteriaMixin:
         self.assertEqual(approved["authority_level"], "A4")
         verifying = next(t for t in self.result["state_transitions"] if t["to_state"] == "VERIFYING")
         gate_ids = [g["gate_id"] for g in verifying["gate_results"]]
-        self.assertEqual(gate_ids[:len(GATE_ORDER)], GATE_ORDER)
-        self.assertEqual(set(gate_ids[len(GATE_ORDER):]), set(HIGH_RISK_GATE_IDS))
+        method_gate_ids = [gate_id for gate_id in gate_ids if gate_id in GATE_ORDER]
+        self.assertEqual(method_gate_ids, GATE_ORDER)
+        self.assertEqual(set(gate_ids) - set(GATE_ORDER), set(HIGH_RISK_GATE_IDS))
 
     def test_terminal_state_guard_actually_refuses_a_downstream_emit(self):
         branch = self.result["blocked_then_cancelled"]
@@ -354,7 +355,10 @@ class SliceCriteriaMixin:
                     run_research_slice(SliceConfig(runtime_dir=runtime, transcription="fixture", review="fixture"))
             research_journal = read_json(runtime / "platform" / "ai_execution" / "research_workflow.journal.json")
             self.assertEqual(research_journal["status"], "FAILED")
-            self.assertEqual(research_journal["workflow_gates"][0]["status"], "FAIL")
+            research_gate = next(
+                gate for gate in research_journal["workflow_gates"] if gate["gate_id"] == "research_integrity"
+            )
+            self.assertEqual(research_gate["status"], "FAIL")
             transitions = read_json(runtime / "platform" / "ai_execution" / "state_transitions.json")
             self.assertEqual((transitions[-1]["from_state"], transitions[-1]["to_state"]), ("EXECUTING", "FAILED"))
             self.assertFalse((runtime / "results" / "slice_result.json").exists())

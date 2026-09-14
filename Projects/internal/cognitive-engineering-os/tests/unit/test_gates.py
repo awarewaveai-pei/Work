@@ -8,7 +8,7 @@ from ai_lego.core.domain.claim import claim_record
 from ai_lego.core.domain.evidence import build_sentence_provenance, evidence_record, source_node
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.modules.knowledge.provenance import build_evidence_graph
-from ai_lego.modules.research.gates import GATE_ORDER, evaluate_method_specific_gates
+from ai_lego.modules.research.gates import GATE_ORDER, evaluate_method_specific_gates, evaluate_research_workflow_integrity_gate
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs
 from ai_lego.modules.research.review import fixture_review
 from ai_lego.modules.research.synthetic_fixtures import expanded_synthetic_coder_judgments
@@ -33,6 +33,31 @@ def _statuses(inputs):
 
 
 class GateTests(unittest.TestCase):
+    def test_research_workflow_integrity_checks_cross_node_handoffs(self):
+        inputs = _complete_inputs()
+        workflow = {
+            "nodes": [
+                {"node_kind": "method", "method_id": "research.qualitative_coding"},
+                {"node_kind": "capability", "ref": "run_statistics"},
+                {"node_kind": "method", "method_id": "evidence.triangulation"},
+                {"node_kind": "capability", "ref": "artifact.generate_research_paper", "bindings": {"interrater_reliability_result": "outputs.statistics.interrater_reliability_result"}},
+            ]
+        }
+        context = {"steps": {
+            "0": inputs["coding_outputs"],
+            "1": {"statistics": inputs["statistics"]},
+            "2": {"triangulation": {"status": "NEEDS_HUMAN_REVIEW"}},
+            "3": {"artifact": {"artifact_type": "ResearchMemoArtifact"}},
+        }}
+        result = evaluate_research_workflow_integrity_gate(context, workflow, "test", "2026-09-14T00:00:00Z")
+        self.assertEqual(result[0]["status"], "PASS")
+
+    def test_research_workflow_integrity_rejects_publication_bound_triangulation(self):
+        workflow = {"nodes": [{"node_kind": "method", "method_id": "evidence.triangulation"}]}
+        context = {"steps": {"0": {"triangulation": {"status": "PASS"}}}}
+        result = evaluate_research_workflow_integrity_gate(context, workflow, "test", "2026-09-14T00:00:00Z")
+        self.assertEqual(result[0]["status"], "FAIL")
+
     def test_complete_inputs_pass_all_five_in_catalog_order(self):
         results = evaluate_method_specific_gates(**_complete_inputs(), validator="test", timestamp="2026-08-31T00:00:26Z")
         self.assertEqual([result["gate_id"] for result in results], GATE_ORDER)

@@ -225,6 +225,9 @@ compilation_decisions:
 id: research-qualitative-v1
 version: "1.0.0"
 name: "Qualitative Research Recipe (Coding + Triangulation + Inter-rater Reliability)"
+workflow_gate_refs:
+  - workflow_execution_integrity
+  - research_workflow_integrity
 
 references:
   cognitive_method_atlas:

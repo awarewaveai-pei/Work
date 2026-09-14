@@ -195,3 +195,80 @@ def evaluate_method_specific_gates(
 def all_gates_pass(gate_results: list[dict[str, Any]]) -> bool:
     """PASS or NOT_APPLICABLE (a gate legitimately not exercised in this scope) both clear; FAIL/BLOCKED do not."""
     return all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for gate in gate_results)
+
+
+def evaluate_research_workflow_integrity_gate(
+    context: dict[str, Any],
+    workflow_ir: dict[str, Any],
+    validator: str,
+    timestamp: str,
+) -> list[dict[str, Any]]:
+    """Check the cross-node contract of a qualitative research workflow.
+
+    Method-specific gates remain authoritative for coding, citation,
+    statistics, methodology, and authorship. This gate only verifies that a
+    workflow that claims to connect those stages actually carries the expected
+    typed hand-offs and keeps triangulation explicitly review-bound.
+    """
+    nodes = workflow_ir.get("nodes", [])
+    steps = context.get("steps", {})
+    checks: dict[str, Any] = {
+        "coding_nodes": 0,
+        "coding_outputs_present": False,
+        "statistics_output_present": False,
+        "triangulation_output_present": False,
+        "triangulation_remains_human_review_bound": False,
+        "artifact_has_reliability_input": True,
+    }
+    coding_outputs: list[dict[str, Any]] = []
+    statistics_outputs: list[dict[str, Any]] = []
+    triangulations: list[dict[str, Any]] = []
+    artifact_steps: list[dict[str, Any]] = []
+    for index, node in enumerate(nodes if isinstance(nodes, list) else []):
+        step = steps.get(str(index)) if isinstance(steps, dict) else None
+        if not isinstance(step, dict) or not isinstance(node, dict):
+            continue
+        if node.get("method_id") == "research.qualitative_coding":
+            checks["coding_nodes"] += 1
+            if isinstance(step.get("coding_outputs"), dict):
+                coding_outputs.append(step["coding_outputs"])
+            elif isinstance(step.get("stage_sequence"), list):
+                # API method handlers return the coding record directly;
+                # the CLI adapter wraps the same record under coding_outputs.
+                coding_outputs.append(step)
+        elif node.get("ref") == "run_statistics":
+            statistics_outputs.append(step)
+        elif node.get("method_id") == "evidence.triangulation":
+            if isinstance(step.get("triangulation"), dict):
+                triangulations.append(step["triangulation"])
+        elif node.get("ref") == "artifact.generate_research_paper":
+            artifact_steps.append(step)
+    # A full Recipe has two independent coders; the CLI's approved runtime
+    # projection intentionally executes one reviewed coding node and supplies
+    # the second rater through the deterministic statistics adapter. Both are
+    # valid workflow shapes, so the cross-node gate requires at least one
+    # coding output and leaves two-rater validity to the statistics gate.
+    checks["coding_outputs_present"] = bool(coding_outputs)
+    checks["statistics_output_present"] = bool(statistics_outputs) and all(
+        isinstance(row.get("interrater_reliability_result"), dict)
+        or isinstance(row.get("statistics"), dict)
+        for row in statistics_outputs
+    )
+    checks["triangulation_output_present"] = bool(triangulations)
+    checks["triangulation_remains_human_review_bound"] = bool(triangulations) and all(
+        row.get("status") == "NEEDS_HUMAN_REVIEW" for row in triangulations
+    )
+    if artifact_steps:
+        checks["artifact_has_reliability_input"] = all(
+            isinstance(row.get("interrater_reliability_result"), dict)
+            or any(
+                isinstance(node.get("bindings"), dict)
+                and isinstance(node["bindings"].get("interrater_reliability_result"), str)
+                and "outputs." in node["bindings"]["interrater_reliability_result"]
+                for node in nodes
+                if isinstance(node, dict) and node.get("ref") == "artifact.generate_research_paper"
+            )
+            for row in artifact_steps
+        )
+    passed = all(value is True for key, value in checks.items() if key != "coding_nodes") and checks["coding_nodes"] >= 1
+    return [_result("research_workflow_integrity", passed, [checks], validator, timestamp)]
