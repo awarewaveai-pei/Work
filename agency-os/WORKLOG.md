@@ -17616,3 +17616,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - ROLLBACK: revert 本次 Research aggregate gate integration commit；不修改既有 Recipe、CAS、artifact 或外部資料。
 - BOM_AUDIT: audit-cross-machine-bom exit=1；既有 3 個 memory feedback 檔缺 BOM，未由本輪修改。
 - WORKLOG_DONE: Research aggregate gate integration
+
+[追記 2026-09-14 API workflow completion integrity gate]
+- 根因：API Recipe runner 已有 per-step gates，但未使用 shared workflow-level seam；成功 response/journal 缺少跨節點完成性證據，required capability 的跳過風險沒有平台級重驗證。
+- 修正：新增 provider-neutral `evaluate_workflow_completion_gate`；API 每條 Recipe 在 final node 後、success journal 前執行，輸出 `workflow_execution_integrity` 至 response/journal，並維持原有 method gate 與 capability adapter 邊界。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m py_compile ai_lego/apps/api/main.py ai_lego/platform/workflow/gates.py tests/unit/test_workflow_gates.py tests/unit/test_api_main.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.unit.test_workflow_gates tests.unit.test_workflow_executor tests.unit.test_api_main tests.acceptance.test_research_slice_fixture_mode` | exit=0 | result=47 tests OK；tool=Python | cmd=`python -m unittest discover -s tests -t . -q` | exit=0；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 completion gate 的 required capability 判斷、API response/resume compatibility、journal serialization、既有 consumers。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evaluate_workflow_completion_gate|workflow_execution_integrity|workflow_gates` | hits=45；確認 API 唯一注入點、executor 唯一 serialization path、無舊 response consumer 被破壞。
+- ROLLBACK: revert 本次 API workflow completion integrity gate commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
+- WORKLOG_DONE: API workflow completion integrity gate

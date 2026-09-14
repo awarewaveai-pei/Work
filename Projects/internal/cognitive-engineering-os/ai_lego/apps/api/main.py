@@ -68,6 +68,7 @@ from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
+from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -751,22 +752,34 @@ def run_recipe(
 
         gate_runners[index] = run_gate
 
+    def evaluate_api_workflow_gate(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            evaluate_workflow_completion_gate(
+                context,
+                workflow,
+                "ai_lego.apps.api.main",
+                datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+        ]
+
     result = execute_workflow_ir(
         workflow_ir,
         {"source": source},
         handlers,
         catalogs={"method": catalog, "capability": capability_catalog},
         gate_runners=gate_runners,
+        workflow_gate_runner=evaluate_api_workflow_gate,
         journal_path=journal,
         resume=resume,
         journal_context_projector=None if journal_protector is not None else _api_journal_context,
         journal_context_protector=journal_protector,
     )
     gates = {str(step.index): list(step.gates) for step in result.steps if step.gates is not None}
+    workflow_gates = list(result.workflow_gates or [])
     if result.status != "SUCCEEDED":
-        return {"status": "FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
-    passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates)
-    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
+        return {"status": "FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "workflow_gates": workflow_gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
+    passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates) and all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for gate in workflow_gates)
+    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "workflow_gates": workflow_gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
 
 
 @app.get("/methods/{method_id}")
