@@ -193,7 +193,10 @@ class SliceCriteriaMixin:
         runtime_workflow = read_json(self.runtime / "platform" / "ai_execution" / "workflow_runtime.json")
         self.assertEqual(runtime_workflow["projections"][0]["source_node_indexes"], [1, 4, 3, 5])
         self.assertEqual(runtime_workflow["projections"][1]["source_node_indexes"], [6])
-        self.assertEqual(read_json(self.runtime / "platform" / "ai_execution" / "research_workflow.journal.json")["status"], "SUCCEEDED")
+        research_journal = read_json(self.runtime / "platform" / "ai_execution" / "research_workflow.journal.json")
+        self.assertEqual(research_journal["status"], "SUCCEEDED")
+        self.assertTrue(research_journal["workflow_gates"])
+        self.assertTrue(all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for gate in research_journal["workflow_gates"]))
         self.assertEqual(read_json(self.runtime / "platform" / "ai_execution" / "artifact_workflow.journal.json")["status"], "SUCCEEDED")
         artifact_phase = runtime_workflow["phases"][1]
         self.assertEqual(artifact_phase["status"], "SUCCEEDED")
@@ -349,6 +352,11 @@ class SliceCriteriaMixin:
             with mock.patch("ai_lego.apps.cli.run_research_slice.evaluate_method_specific_gates", forced_fail):
                 with self.assertRaisesRegex(InvariantViolation, "METHOD_GATE_FAILED"):
                     run_research_slice(SliceConfig(runtime_dir=runtime, transcription="fixture", review="fixture"))
+            research_journal = read_json(runtime / "platform" / "ai_execution" / "research_workflow.journal.json")
+            self.assertEqual(research_journal["status"], "FAILED")
+            self.assertEqual(research_journal["workflow_gates"][0]["status"], "FAIL")
+            transitions = read_json(runtime / "platform" / "ai_execution" / "state_transitions.json")
+            self.assertEqual((transitions[-1]["from_state"], transitions[-1]["to_state"]), ("EXECUTING", "FAILED"))
             self.assertFalse((runtime / "results" / "slice_result.json").exists())
             self.assertFalse((runtime / "artifacts" / "research_memo.md").exists())
             self.assertFalse((runtime / "platform" / "execution" / "manifest.json").exists())

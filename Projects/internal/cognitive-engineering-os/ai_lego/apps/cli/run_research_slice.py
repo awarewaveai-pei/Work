@@ -451,6 +451,26 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         "grouping_source": None if axial is None else {"axial": axial["suggestion_source"], "selective": None if selective is None else selective["suggestion_source"]},
     }
 
+    # Prepare cross-node evidence before execution.  The workflow gate consumes this
+    # immutable source-side evidence plus the final runtime outputs; it must run before
+    # any artifact workflow can be started.
+    sentence_provenance = build_sentence_provenance("SP-1", claim_1["statement"], claim_1, evidence_1, p1_locator, make_provenance("EVIDENCE", "AI_GENERATED"))
+    contracts.validate(S["sentence_provenance"], sentence_provenance, "sentence provenance")
+    trace = reverse_trace(sentence_provenance, evidence_graph)
+    trace["audio_timestamp"] = format_audio_timestamp(p1_locator["start_seconds"])
+    trace["locator_precision"] = p1_precision
+    write_json(runtime / "modules" / "knowledge" / "sentence_provenance.json", sentence_provenance)
+
+    # Steps 16 (plan/rollback/approval) happen before the runtime sub-chain.  This
+    # keeps the persisted state path truthful when a workflow-level gate fails.
+    transition("METHODS_RESOLVED", "PLAN_COMPILED", 24)
+    rollback_plan = build_rollback_plan("RB-PHASE5-SYNTHETIC-001", TASK_ID, EXECUTION_ID, {})
+    contracts.validate(S["rollback"], rollback_plan, "rollback plan")
+    write_json(runtime / "platform" / "ai_execution" / "rollback_plan.json", rollback_plan)
+    transition("PLAN_COMPILED", "ROLLBACK_VALIDATED", 24.1)
+    transition("ROLLBACK_VALIDATED", "APPROVED", 24.2, authority_level="A4")
+    transition("APPROVED", "EXECUTING", 24.3)
+
     def execute_coding(payload: dict[str, Any], _node: dict[str, Any]) -> dict[str, Any]:
         request = payload["research.coding_request"]
         outputs = assemble_coding_outputs(
@@ -497,6 +517,30 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         },
         workflow_id=f"{workflow_ir['id']}:coding-statistics",
     )
+
+    def evaluate_research_workflow_gates(context: dict[str, Any], _workflow: dict[str, Any]) -> list[dict[str, Any]]:
+        coding_outputs = context["outputs"]["coding"]["coding_outputs"]
+        runtime_statistics = context["outputs"]["statistics"]
+        statistics = {
+            **runtime_statistics["statistics"],
+            "judgment_source": runtime_statistics["judgment_source"],
+            "runtime_execution": runtime_statistics["judgment_source"],
+        }
+        results = evaluate_method_specific_gates(
+            coding_outputs=coding_outputs,
+            statistics=statistics,
+            sentence_provenances=[sentence_provenance],
+            evidence_graph=evidence_graph,
+            claims=[claim_1],
+            transcriptions=transcriptions,
+            validator="ai_lego.modules.research.gates",
+            timestamp=clock.at(26),
+        )
+        results += inject_mandatory_gates(workflow_ir.get("risk_tier", "R0"), "ai_lego.platform.ai_execution.mandatory_gates", clock.at(26))
+        for gate in results:
+            contracts.validate(S["gate_result"], gate, f"gate {gate['gate_id']}")
+        return results
+
     runtime_result = execute_workflow_ir(
         runtime_subchain,
         {"research": {"question": "after-hours boundary erosion among remote workers", "coding_request": coding_request}},
@@ -507,9 +551,16 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
             "evidence.triangulation": triangulate_themes_and_literature,
         },
         catalogs={"method": live, "capability": capabilities},
+        workflow_gate_runner=evaluate_research_workflow_gates,
         journal_path=runtime / "platform" / "ai_execution" / "research_workflow.journal.json",
     )
     if runtime_result.status != "SUCCEEDED":
+        if runtime_result.workflow_gates is not None:
+            gate_results = list(runtime_result.workflow_gates)
+            failing = [gate["gate_id"] for gate in gate_results if gate["status"] not in {"PASS", "NOT_APPLICABLE"}]
+            transition("EXECUTING", "FAILED", 26.4, gate_results=gate_results)
+            write_json(runtime / "platform" / "ai_execution" / "state_transitions.json", transitions)
+            raise InvariantViolation(f"METHOD_GATE_FAILED: {', '.join(failing)}")
         failed_step = next(step for step in runtime_result.steps if step.status == "FAILED")
         raise InvariantViolation(f"RESEARCH_WORKFLOW_EXECUTION_FAILED: {failed_step.error}")
     coding_contract = runtime_result.steps[0].contract
@@ -529,15 +580,6 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     else:
         coder_one = runtime_result.context["outputs"]["coding"]["coder_one"]
         coder_two = runtime_result.context["outputs"]["coding"]["coder_two"]
-
-    # Steps 16 (plan/rollback/approval) + real recovery-plan and current-state records before each transition.
-    transition("METHODS_RESOLVED", "PLAN_COMPILED", 24)
-    rollback_plan = build_rollback_plan("RB-PHASE5-SYNTHETIC-001", TASK_ID, EXECUTION_ID, {})
-    contracts.validate(S["rollback"], rollback_plan, "rollback plan")
-    write_json(runtime / "platform" / "ai_execution" / "rollback_plan.json", rollback_plan)
-    transition("PLAN_COMPILED", "ROLLBACK_VALIDATED", 24.1)
-    transition("ROLLBACK_VALIDATED", "APPROVED", 24.2, authority_level="A4")
-    transition("APPROVED", "EXECUTING", 24.3)
 
     # The executor already routed statistics and literature through CapabilityCatalog.invoke.  Preserve the existing
     # semantic judgment source in the result while retaining the runtime's own observed shared-unit count.
@@ -587,33 +629,12 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     if themes_v11 != coding_outputs["theme_set"]["themes"]:
         raise InvariantViolation("THEME_GROUPING_OVERWRITTEN: a rejected diff must never mutate the recorded theme set")
 
-    # Steps 19-22: sentence provenance (locator derived from the real transcript segments), the artifact, and the
-    # five method-specific gates PLUS the two R3/R4 mandatory gates -- evaluated for real; a FAIL raises here,
-    # before anything downstream (artifact publication, deletion) is even considered.
-    sentence_provenance = build_sentence_provenance("SP-1", claim_1["statement"], claim_1, evidence_1, p1_locator, make_provenance("EVIDENCE", "AI_GENERATED"))
-    contracts.validate(S["sentence_provenance"], sentence_provenance, "sentence provenance")
-    trace = reverse_trace(sentence_provenance, evidence_graph)
-    trace["audio_timestamp"] = format_audio_timestamp(p1_locator["start_seconds"])
-    trace["locator_precision"] = p1_precision
-    write_json(runtime / "modules" / "knowledge" / "sentence_provenance.json", sentence_provenance)
-    gate_results = evaluate_method_specific_gates(
-        coding_outputs=coding_outputs,
-        statistics=statistics,
-        sentence_provenances=[sentence_provenance],
-        evidence_graph=evidence_graph,
-        claims=[claim_1],
-        transcriptions=transcriptions,
-        validator="ai_lego.modules.research.gates",
-        timestamp=clock.at(26),
-    )
-    gate_results += inject_mandatory_gates(workflow_ir.get("risk_tier", "R0"), "ai_lego.platform.ai_execution.mandatory_gates", clock.at(26))
-    for gate in gate_results:
-        contracts.validate(S["gate_result"], gate, f"gate {gate['gate_id']}")
+    # Steps 19-22: the workflow-level gate has already validated sentence provenance,
+    # runtime coding/statistics, evidence graph, claims, transcripts, and mandatory gates.
+    gate_results = list(runtime_result.workflow_gates or [])
     gates = {gate["gate_id"]: gate["status"] for gate in gate_results}
     if not all_gates_pass(gate_results):
-        failing = [gate_id for gate_id, status in gates.items() if status not in {"PASS", "NOT_APPLICABLE"}]
-        transition("EXECUTING", "FAILED", 26.4, gate_results=gate_results)
-        raise InvariantViolation(f"METHOD_GATE_FAILED: {', '.join(failing)}")
+        raise InvariantViolation("WORKFLOW_GATE_RESULT_INCONSISTENT: successful runtime returned a failing workflow gate")
 
     # MVP section 3 step 20 memo content (theme summary + evidence quote + triangulation result + Kappa); the contracted
     # capability's output type is ResearchMemoArtifact (artifact.generate_research_paper.capability.yaml).

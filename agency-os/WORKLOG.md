@@ -17606,3 +17606,13 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`workflow_gate_runner|workflow_gates|WORKFLOW_GATE_RESULT_INVALID|_restore_journal` | hits=30；確認既有 consumer 相容、無第二套 workflow-gate serialization path。
 - ROLLBACK: revert 本次 workflow-level gate seam commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
 - WORKLOG_DONE: workflow-level gate seam
+
+[追記 2026-09-14 Research aggregate gate integration]
+- 根因：Research slice 仍在 runtime executor 外後置評估 aggregate gates；shared workflow-level seam 雖已存在但未形成第一條 EdD 垂直閉環，失敗時 state/journal/artifact 邊界不完整。
+- 修正：預先建立 sentence provenance 與 rollback/state path；Research runtime subchain 注入 workflow gate runner，於最後 node 後驗證 coding/statistics/evidence/claims/transcripts 與 mandatory gates；FAIL 寫 durable workflow journal + `EXECUTING -> FAILED` state transitions，artifact workflow 不啟動；成功結果直接取 journalized workflow gates。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m py_compile ai_lego/apps/cli/run_research_slice.py tests/acceptance/criteria.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.unit.test_workflow_executor tests.acceptance.test_research_slice_fixture_mode` | exit=0 | result=47 tests OK；tool=Python | cmd=`python -m unittest discover -s tests -t . -q` | exit=0；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED；tool=Python | cmd=`python -m ai_lego.apps.cli.run_research_slice --runtime-dir <unique temp dir>` | exit=0 | result=28/28 steps、all gates PASS、Kappa=0.75。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 Research runner gate callback、state transition ordering、failure journal、artifact boundary、acceptance assertions。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evaluate_research_workflow_gates|workflow_gate_runner|workflow_gates|EXECUTING.*FAILED|research_workflow\\.journal` | hits=34；確認 Research 唯一 aggregate gate path、無舊後置 evaluator，既有 consumers 相容。
+- ROLLBACK: revert 本次 Research aggregate gate integration commit；不修改既有 Recipe、CAS、artifact 或外部資料。
+- BOM_AUDIT: audit-cross-machine-bom exit=1；既有 3 個 memory feedback 檔缺 BOM，未由本輪修改。
+- WORKLOG_DONE: Research aggregate gate integration
