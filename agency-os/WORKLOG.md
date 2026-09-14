@@ -18130,3 +18130,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`完整 source snapshot|AI context|approved target|未使用資料`；確認未把完整 snapshot 設為 AI prompt 或 canonical write input。
 - ROLLBACK: `git revert <this-commit>`；僅回滾文件與 WORKLOG 修訂。
 - WORKLOG_DONE: Migration context minimization
+
+[追記 2026-09-14 AI-readable migration documents]
+- 根因：遷移規格與研究報告含有過多敘述與不會執行的候選內容，容易讓 AI 把研究資料誤當成執行指令。
+- 修正：將 master plan 第 64 節與 migration decision report 改成 Inputs／Use／Do not use／Contracts／Gates／Hard fail／Acceptance；只保留可執行規則與必要來源。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`Select-String rewritten documents for Inputs, allow-list, Do not use, Gates, Acceptance` | exit=0 | result=sections present。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回兩份文件，確認研究候選不再是執行依賴。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Wrapper|Whalesync|n8n|Airbyte|raw landing|AI context|allow-list`；確認 deny-list 與 write scope 明確。
+- ROLLBACK: `git revert <this-commit>`；僅回滾文件精簡，不觸碰 Airtable／Supabase。
+- WORKLOG_DONE: AI-readable migration documents
