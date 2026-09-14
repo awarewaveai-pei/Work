@@ -17527,3 +17527,7 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 3. 66 個「不符合標準慣例」的方法現在雖然不會再被強塞錯誤參數，但呼叫端仍需自己知道每個方法真正的參數名（無自動文件化這個差異）——`GET /methods/{id}` 目前只回 contract 描述檔，不含 builder 簽章本身；長期應該讓 dashboard 或文件揭露這個資訊，非本次範圍。
 
 [rollback] `git revert` 安全——`dispatch.py` 改動對 179 個既有相容方法零行為改變（mutation test 已證明）；`main.py` 一行搬移無副作用；`swot.py` 純新增常數。四檔皆為 additive/no-op-for-existing-callers 的修復，沒有破壞性風險。
+
+## 2026-09-14
+
+- 01:08 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-14.md
