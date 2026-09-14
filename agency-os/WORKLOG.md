@@ -1,5 +1,226 @@
 # Worklog
 
+## 2026-09-14｜Cognitive OS tenant-scoped Recipe run status lookup
+
+- 根因／缺口：durable journal 可被 resume，但 API/Dashboard 沒有 authenticated lookup；操作者無法查 run 狀態，也容易依賴手動記憶 run id。
+- 修改：新增 `GET /recipes/{recipe_id}/runs/{run_id}`；先以 journal schema 驗證，再回傳 status/next_index/hash/step-gate metadata，排除 context、outputs、raw Source、host path；journal path 仍由 tenant hash namespace 決定。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests.test_recipe_run_status_returns_authenticated_sanitized_journal_summary tests.unit.test_api_main.RecipeRunTests.test_recipe_run_status_requires_authentication tests.unit.test_api_main.RecipeRunTests.test_recipe_run_status_is_tenant_scoped tests.unit.test_api_main.RecipeRunTests.test_recipe_run_status_rejects_invalid_run_id -v` | exit=0 | ms=7023 | result=4 tests OK
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=95696 | result=61 tests OK
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests.test_recipe_run_status_rejects_invalid_run_id -v` | exit=0 | ms=1700 | result=1 test OK
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7281 | result=3954 PASS
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | ms=384 | result=PASS
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=513 | result=PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`recipe_run_status|_journal_run_summary|WORKFLOW_RUN_NOT_FOUND|WORKFLOW_RUN_ID_INVALID|recipe-status-btn` | hits=API/helper/tests/dashboard/runnable demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
+- rollback：回退本次 run status commit 即可；既有 POST run、journal、resume 與 tenant path helper 不受影響。
+
+## 2026-09-14｜Cognitive OS Dashboard 接通 Recipe run identity／resume
+
+- 根因／缺口：API 已支援 `run_id`／`resume`，但 Dashboard `runRecipe()` 只送 `source`，操作者無法從平台恢復既有 workflow。
+- 修改：新增 Run ID 與 Resume 控制；resume 無 run id 在 client 端 fail-closed；request 保持 JSON source、不新增後端或 capability 語意。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.DashboardTests.test_dashboard_recipe_runner_exposes_stable_run_identity_and_resume_payload -v` | exit=0 | ms=1011 | result=1 test OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=64208 | result=57 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7337 | result=3954 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | ms=226 | result=PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | result=PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`recipe-run-id|recipe-resume|run_id|resume` | hits=Dashboard/API/test/runnable demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
+- rollback：回退本次 Dashboard commit 即可；API run identity／resume 後端能力不受影響。
+
+## 2026-09-14｜Cognitive OS Recipe compiler schema boundary
+
+- 根因／缺口：`load_recipe` 只驗檔案、id、ACTIVE，未在 Recipe→Workflow IR 邊界驗證 `recipe.schema.yaml`；結構錯誤可能以 KeyError 或半成品 IR 進入 runtime。
+- 修改：compiler 在產生任何 node 前驗證 authoritative Recipe schema；新增 malformed Recipe negative test，所有現有 ACTIVE Recipes 維持可編譯。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_ir_and_resolver.WorkflowIrTests.test_recipe_compiler_rejects_schema_invalid_recipe_before_ir_compilation tests.unit.test_workflow_ir_and_resolver.WorkflowIrTests.test_every_active_recipe_compiles_and_passes_dataflow_validation -v` | exit=0 | ms=13838 | result=2 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_ir_and_resolver tests.unit.test_workflow_executor tests.unit.test_run_recipe_cli -q` | exit=0 | ms=163353 | result=40 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=31419 | result=3954 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests`; `bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=469 | result=compile 與 bughunt PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`_RECIPE_SCHEMA|compile_recipe_to_workflow_ir|recipe_compiler_rejects_schema_invalid` | hits=compiler/test/runnable demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
+- rollback：回退本次 compiler schema boundary commit 即可；不涉及 schema 檔、DB、auth 或 deploy。
+
+## 2026-09-14｜Cognitive OS generic Recipe CLI durable resume
+
+- 根因／缺口：durable journal 已存在，但 generic CLI 沒有明確的 run identity 與 resume 入口，操作者無法安全恢復中斷執行。
+- 修改：新增受驗證的 `--run-id`／`--resume`；journal/result 以同一 run id 隔離，沿用 executor 的 workflow/input fingerprint，輸入變更時 fail-closed。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=12519 | result=8 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_recipe edd-literature-search-v1 ... --run-id edd-resume-smoke` then `... --resume` | exit=0 | ms=3361+5045 | result=首次與 resume 均 PASS、同一 journal
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver -q` | exit=0 | ms=47488 | result=31 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=26068 | result=3954 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests`; `bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=505+ | result=compile 與 bughunt PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`run_id|resume|WORKFLOW_JOURNAL_INPUT_MISMATCH` | hits=runner/test/runnable demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
+- rollback：回退 `feat(cli): add durable recipe resume` 即可；不涉及 schema、DB、deploy 或既有 journal 格式。
+
+## 2026-09-14｜Cognitive OS 完整 EdD Research Recipe generic CLI proof
+
+- 根因／缺口：EdD `research-qualitative-v1` 先前只由 API fixture 證明，尚未驗證完整 7-step dataflow 可由 generic CLI 跑完。
+- 修改：新增 integration test，覆蓋 transcribe（pre-transcribed）→雙 coder→offline literature→Trusted Compute statistics→triangulation→research memo；不新增外部 provider 或 publication claim。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=8873 | result=7 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py tests/unit/test_run_recipe_cli.py` | exit=0 | ms=約2秒
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`research-qualitative-v1|research_workflow_integrity|build_registered_workflow_gate_registry` | hits=CLI test/Recipe/API/runnable demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本次 EdD generic CLI coverage commit；既有 generic runtime 與 API Research Recipe 不受影響。
+
+## 2026-09-14｜Cognitive OS shared domain workflow gates
+
+- 根因／缺口：generic CLI 只註冊 completion gate；Life／Art／Research Recipe 的 domain gate 因此無法走同一入口。
+- 修改：新增 `build_registered_workflow_gate_registry`，API/CLI 共用 workflow completion、Research integrity、Art Therapy project safety 三類已實作 gate；四場景 generic runtime coverage 補齊。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=40820 | result=6 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=182974 | result=56 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約45秒 | result=3954 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py tests/unit/test_run_recipe_cli.py` | exit=0 | ms=約2秒
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`build_registered_workflow_gate_registry|art_therapy_project_safety|research_workflow_integrity` | hits=shared factory/API/CLI/tests/runnable demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本輪 shared gate registry commit；API/CLI 回到各自 gate registry，Recipe contract 與 domain gate implementation 不變。
+
+## 2026-09-14｜Cognitive OS registered capability adapters 接入 generic CLI
+
+- 根因／缺口：generic CLI 只允許 method node，EdD offline literature capability 雖已有明確 adapter，仍無法走通用 Recipe runtime。
+- 修改：抽取 API/CLI 共用 `build_registered_capability_adapters`；CLI 以 CapabilityCatalog + necessity 判定執行，已註冊 local adapter 可跑，未解析 REQUIRED capability fail-closed；更新 `RUNNABLE_DEMOS.md` 避免過時宣稱。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=27293 | result=4 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_recipe edd-literature-search-v1 --input-json tests/fixtures/edd-literature-source.json --runtime-dir .runtime/edd-literature-cli-smoke` | exit=0 | ms=約6秒 | result=PASS、1 step、journal persisted
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=142878 | result=56 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約30秒 | result=3954 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ...; powershell -ExecutionPolicy Bypass -File D:\Work\scripts\bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=約2秒
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`build_registered_capability_adapters|edd-literature-search-v1|CLI_CAPABILITY_PLAN_NOT_EXECUTABLE` | hits=shared factory/API/CLI/tests/fixture/demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本次 capability CLI commit；generic CLI 回到 method-only，API existing adapter path 需同步回退同一 commit。
+
+## 2026-09-14｜Cognitive OS EdD Recipe 接入 generic CLI
+
+- 根因／缺口：EdD evidence chain 原先只在 API 測試中證明可跑，未證明 caller 能用通用 Recipe CLI 餵自己的研究 JSON。
+- 修改：新增 generic CLI 測試，實際覆蓋 `edd-research-evidence-v1` 的 assumption mapping → evidence matrix → Toulmin 三步鏈；同步登記可操作命令。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=3985 | result=3 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py` | exit=0 | ms=約1秒
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`edd-research-evidence-v1|run_recipe|epistemic.assumption_mapping` | hits=CLI test/runnable demo/API test/Recipe；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本次 EdD generic CLI test/demo commit；既有 EdD API Recipe 與 generic runtime 不受影響。
+
+## 2026-09-14｜Cognitive OS shared method runtime factory
+
+- 根因／缺口：API 與 generic Recipe CLI 各自建立 method handler/gate closure；新增 Recipe 會有兩套執行組裝邏輯，存在行為分叉風險。
+- 修改：新增 `ai_lego/apps/recipe_runtime.py` 作為 application-level shared factory；API/CLI 共用 method components，platform workflow 層不反向依賴 API，auth、capability、journal policy 仍留在各入口。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver -q` | exit=0 | ms=50035 | result=33 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=82687 | result=56 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約8秒 | result=3954 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py` | exit=0 | ms=約1秒
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`build_method_components|method_runtime|api.recipe|generic-recipe-cli` | hits=shared factory/API/CLI/tests/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本次 shared runtime factory commit；API/CLI 會回到各自內嵌組裝，既有 Recipe/Workflow contract 不變。
+
+## 2026-09-14｜Cognitive OS generic method Recipe CLI
+
+- 根因／缺口：Recipe runtime 已能由 API 組合，但操作者仍無法直接用自己的 JSON 在無 Dashboard／網路的方式執行通用 method-only Recipe。
+- 修改：新增 `ai_lego.apps.cli.run_recipe`，重用 compiler、MethodCatalog、dispatch、shared executor、method gates、workflow completion gate 與 durable journal；含 capability node 的 Recipe 明確拒絕，不靜默丟節點。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=約3秒 | result=2 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver tests.unit.test_run_recipe_cli -v` | exit=0 | ms=約16秒 | result=33 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -v` | exit=0 | ms=58669 | result=56 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約7秒 | result=3954 PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`run_recipe|CLI_RECIPE_CAPABILITY_UNSUPPORTED|generic-recipe-cli` | hits=runner/test/demo/worklog；bughunt-oracle exit=0
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本次 generic Recipe CLI commit；既有 API、Dashboard、executor 與 Recipes 不受影響。
+
+## 2026-09-14｜Cognitive OS business planning review Recipe
+
+- 根因／缺口：策略 Recipe 與 feasibility Recipe 各自可跑，但操作者仍沒有一條把問題、客戶觀察、策略、風險與計算串起來的 workflow。
+- 修改：新增 `business-planning-review-v1`；14 個既有 ACTIVE methods 以 compiled IR 與 explicit bindings 串成單一鏈，保留 TOWS→SWOT 上游依賴與 BMC `UNVALIDATED_HYPOTHESIS` 邊界；不建立 ADR-008 已標 pending 的 `finance.financial_assumptions` stub。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=57691 | result=56 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約8秒 | result=3954 PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`business-planning-review-v1|business_planning_review_source|test_business_review_recipe` | hits=Recipe/API test/golden/blueprint/worklog
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本次 review Recipe/test/golden/blueprint commit；既有 strategy、feasibility、EdD、life、Art Therapy Recipe 不受影響。
+
+## 2026-09-14｜Cognitive OS business strategy Recipe
+
+- 根因／缺口：既有 business foundation/feasibility 仍分段，缺少從問題與客戶觀察到策略假設的可重用跨方法鏈。
+- 修改：新增 `business-planning-strategy-v1`；以同一 compiled IR/executor 串 `framing.problem_statement` → `insight.empathy_map` → `strategy.swot` → `strategy.pestel` → `strategy.porter_five_forces` → `strategy.stp` → `strategy.business_model_canvas`；所有 source 與上游依賴均為 explicit bindings，BMC 保留 `UNVALIDATED_HYPOTHESIS`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=58161 | result=55 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約8秒 | result=3952 PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`business-planning-strategy-v1|business_planning_strategy_source|test_business_strategy_recipe` | hits=Recipe/API test/golden/blueprint/runnable demo/worklog
+- WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
+- rollback：回退本次 strategy Recipe/test/golden/blueprint commit；既有 business foundation/feasibility、EdD、life、Art Therapy Recipe 不受影響。
+
+## 2026-09-14｜Cognitive OS life-decision Recipe
+
+- 根因／缺口：三個已驗證方法仍是孤立積木，沒有可由操作者執行的跨方法鏈。
+- 修改：新增 `life-decision-v1`；runtime 以 compiled/projection IR、MethodCatalog、atomic journal 串接 framing → SWOT → WDM；CLI 支援 `--input-json` 真實資料。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit -p 'test_life_decision_slice.py'` | exit=0 | ms=4428
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | ms=約30秒 | 結果=3936 PASS / 0 FAIL
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`life-decision-v1|run_life_decision_slice|outputs.SWOT_analysis` | hits=跨檔命中 Recipe/CLI/test/demo/worklog
+- WORKLOG_DONE: 本條目
+- rollback：回退 commits `bb06ddb71`、`4c73722db`；不觸碰既有 dirty worktree。
+
+## 2026-09-14｜Cognitive OS explicit workflow bindings
+
+- 根因／缺口：Recipe 只有 input path，無法機械表達 builder argument → context path，API 無法安全泛化串接方法。
+- 修改：Recipe/Workflow IR 新增 `bindings`；compiler passthrough；executor 解析 binding、把缺失 path fail-closed，保留既有 handler payload 相容性。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver -v` | exit=0 | result=19 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3936 PASS / 0 FAIL
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`bindings|WORKFLOW_BINDINGS_INVALID|_resolve_bindings` | hits=IR schema/compiler/executor/tests/worklog；未發現第二套 binding resolver
+- WORKLOG_DONE: 本條目
+- rollback：回退本次 bindings commit；既有 Recipe 未使用 bindings，行為維持相容。
+
+## 2026-09-14｜Cognitive OS Recipe API + Dashboard
+
+- 根因／缺口：Recipe 只能由 CLI 呼叫，操作者仍無法在已登入 Dashboard 貼 source JSON 執行跨方法鏈。
+- 修改：新增受認證 `/recipes/{recipe_id}/run`；使用 compiled IR、explicit bindings、MethodCatalog、entitlement、atomic journal/resume、每步 gate；Dashboard 加 Recipe list/source JSON/Run Recipe。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.DashboardTests tests.unit.test_api_main.RecipeRunTests -v` | exit=0 | ms=18227 | result=7 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=171481 | result=30 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7275 | result=3936 PASS / 0 FAIL
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_life_decision_slice --runtime-dir .runtime/life-decision-api-ui-smoke` | exit=0 | result=3 steps PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`/recipes/{recipe_id}/run|Run Recipe|WORKFLOW_BINDINGS_REQUIRED|tenant_key` | hits=API/Dashboard/tests/demo/worklog；tenant path 使用穩定 opaque hash，未把 tenant id 寫入路徑
+- WORKLOG_DONE: 本條目
+- rollback：回退本次 API/Dashboard commit；既有 `/methods/*` 與 CLI runtime 不受影響。
+
+## 2026-09-14｜Cognitive OS EdD evidence Recipe
+
+- 根因／缺口：EdD 研究只能跑完整 CLI slice；缺少一條可由 API 重用的 evidence construction workflow。
+- 修改：新增 `edd-research-evidence-v1`：assumption mapping → evidence matrix → Toulmin argument；三步皆用 ACTIVE contract、explicit bindings、同一 executor、gate 與 journal。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests -v` | exit=0 | ms=16957 | result=4 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約17秒 | result=3938 PASS / 0 FAIL
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`edd-research-evidence-v1|epistemic\.assumption_mapping|epistemic\.evidence_matrix|epistemic\.toulmin_model` | hits=Recipe/API/test/demo/worklog/contract catalog；無第二套 runner
+- WORKLOG_DONE: 本條目
+- rollback：回退本次 EdD Recipe/test/golden commit；既有 research CLI 與 life decision API 不受影響。
+
+## 2026-09-14｜Cognitive OS art therapy creative reflection Recipe
+
+- 根因／缺口：藝術治療清單的 31 項新工具尚無 contract；不能用未驗證方法名冒充臨床功能，但既有 creative methods 可先形成安全 project flow。
+- 修改：新增 `art-therapy-creative-reflection-v1`：random stimulus → mind map；API 共用 Workflow runner，明確禁止 diagnosis/crisis/treatment inference。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests.test_art_reflection_recipe_preserves_non_diagnostic_boundary -v` | exit=0 | ms=1341 | result=1 test OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約17秒 | result=3940 PASS / 0 FAIL
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`art-therapy-creative-reflection-v1|divergent\.random_stimulus|association\.mind_map|diagnos` | hits=Recipe/API/test/demo/worklog/contract catalog；未發現 clinical inference runner
+- WORKLOG_DONE: 本條目
+- rollback：回退本次 Art Therapy Recipe/test/golden commit；不移除既有 creative method contracts。
+
+## 2026-09-14｜Cognitive OS CORS boundary
+
+- 根因／缺口：WordPress bridge 無法跨 origin 呼叫 API；未配置時又不應默認開放跨來源 credential request。
+- 修改：`configure_cors` 讀 `COGNITIVE_OS_CORS_ORIGINS`；空值 default-off，拒絕 `*`/非 HTTP(S)，只允許 GET/POST、Content-Type，credentials 只對明確 origin 開啟；部署 blueprint 同步更新。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.CorsConfigurationTests -v` | exit=0 | ms=14 | result=3 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile ai_lego/apps/api/main.py` | exit=0 | ms=約1秒
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`COGNITIVE_OS_CORS_ORIGINS|configure_cors|allow_credentials|allow_origins` | hits=API/tests/blueprint/worklog；未發現 wildcard fallback
+- WORKLOG_DONE: 本條目
+- rollback：回退本次 CORS/API test/blueprint commit；空值配置仍回到無 CORS headers。
+
 ## 2026-09-12（續14）續12+續13 兩個修復實際部署成功，prod 驗證
 
 [任務] 承接續13。清掉一個確認已死(root `kill -0` 驗證無此 PID)的殘留 deploy lock 後重跑
@@ -17527,6 +17748,195 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 3. 66 個「不符合標準慣例」的方法現在雖然不會再被強塞錯誤參數，但呼叫端仍需自己知道每個方法真正的參數名（無自動文件化這個差異）——`GET /methods/{id}` 目前只回 contract 描述檔，不含 builder 簽章本身；長期應該讓 dashboard 或文件揭露這個資訊，非本次範圍。
 
 [rollback] `git revert` 安全——`dispatch.py` 改動對 179 個既有相容方法零行為改變（mutation test 已證明）；`main.py` 一行搬移無副作用；`swot.py` 純新增常數。四檔皆為 additive/no-op-for-existing-callers 的修復，沒有破壞性風險。
+## 2026-09-14 Cognitive OS：建立可重用 Workflow IR executor 第一切片
+
+[任務]
+- 在不碰既有未提交變更、不做 DB/auth/deploy 的前提下，將 Recipe→Workflow IR 從「可編譯」推進到「可依序執行」的最小通用 runtime。
+
+[已修改]
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow/executor.py`：新增 handler injection、dotted input resolution、逐步結果 ledger、首錯即停；缺資料與缺 handler 一律 fail-closed。
+- `Projects/internal/cognitive-engineering-os/tests/unit/test_workflow_executor.py`：4 個 regression/negative tests。
+- `agency-os/docs/operations/RUNNABLE_DEMOS.md`：登記操作者可自行執行的 executor 測試指令。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver -v` | exit=0 | result=12 tests OK
+- REVIEW_WAIVED: NA -- 本輪由主 agent 逐檔讀回新增 runtime/test；下一個 code commit 前保留一個獨立 critic 覆審名額
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`execute_workflow_ir|WORKFLOW_INPUT_NOT_FOUND|WORKFLOW_HANDLER_NOT_REGISTERED` | hits=新增 executor、測試與本紀錄的預期命中，無既有同名實作
+- WORKLOG_DONE: 本條目
+
+[剩餘風險]
+- 尚未接 durable execution、Schema-backed execution event、真人 Research artifact、dashboard workflow UI；本切片不宣稱已完成端到端 Recipe 產品。
+- 現有 executor 的 `outputs.<label>` 是 runtime context seam；正式 Recipe schema 的輸出 alias、parallel/DAG、human gate 需下一個設計切片定義，避免從 label 推導出永久 API。
+
+[rollback]
+- `git revert` 本條目所屬 commit；只移除新增 executor/test/demo row/worklog，不涉及資料庫、部署或既有 runtime 狀態。
+[追記 2026-09-14]
+- `executor.py` 現已支援可選 `method`／`capability` ContractCatalog；每個節點先過 shared `invoke` gate 才能呼叫 handler，成功 step 保存 contract descriptor。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor -q` | exit=0 | result=6 tests OK
+- REVIEW_WAIVED: NA -- 主 agent 讀回 executor diff；新增空 catalog 阻擋與 live descriptor regression tests
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`catalogs=|METHOD_RESOLUTION_BLOCKED|contract` | hits=預期新增 runtime/test/worklog 命中，未發現第二套 workflow gate
+- WORKLOG_DONE: 追記
+
+[追記 2026-09-14 Research runtime 接線]
+- `run_research_slice.py` 的 coding→run_statistics 兩步改由 `execute_workflow_ir` 執行；兩步分別通過 live Method/Capability Catalog，結果落在 `platform/ai_execution/workflow_runtime.json`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_research_slice --transcription fixture --runtime-dir .runtime\\research-executor-20260914d` | exit=0 | result=28/28 steps、all gates PASS、Kappa=0.75
+- REVIEW_WAIVED: NA -- 本輪未派獨立 agent；主 agent 逐段讀回整合 diff + runtime JSON，保留下一個核心 runtime commit 的獨立 critic 名額
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`live\\.invoke\\(|capabilities\\.invoke\\(\"run_statistics\"|execute_workflow_ir|workflow_runtime\\.json` | hits=已確認 coding/statistics 接線只有 executor 路徑；後續 v12 re-analysis 的獨立 `live.invoke` 保留且非本次鏈
+- WORKLOG_DONE: Research runtime 接線
+
+[追記 2026-09-14 Research evidence chain]
+- `run_research_slice.py` 的 runtime chain 擴為 coding→run_statistics→literature_search→evidence.triangulation；新增離線 synthetic corpus adapter，明確輸出 `OFFLINE_SOURCE_STALE`／`NEEDS_HUMAN_REVIEW`，不宣稱最新文獻。
+- 新增 `ai_lego/modules/research/evidence_triangulation.py` 與兩項 unit tests；acceptance 更新 catalog invocation、method gate、manifest 期望。
+- REALTEST_EVIDENCE: CLI fixture exit=0；28/28 steps、all gates PASS、Kappa=0.75；unit evidence-chain 2 tests OK；workflow/resolver 14 tests OK；compileall exit=0。
+- REVIEW_WAIVED: NA -- 主 agent 逐段檢查契約、runtime JSON 與失敗閉鎖；未派獨立 agent，保留核心 runtime 後續 critic 名額。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`literature_search|evidence.triangulation|OFFLINE_SOURCE_STALE|NEEDS_HUMAN_REVIEW` | hits=契約、adapter、executor、測試與 runtime artifact 預期命中；未發現第二套執行路徑。
+- WORKLOG_DONE: Research evidence chain
+
+[追記 2026-09-14 Artifact workflow node]
+- artifact generation 改由第二段 Workflow IR 執行，只有在 research gates 全部 PASS 後才 dispatch；保留 artifact contract 的統計與政策前置條件。
+- `workflow_runtime.json` 現記錄 evidence phase 與 artifact phase；artifact capability 仍經 shared catalog gate，無鏈外直接呼叫。
+- REALTEST_EVIDENCE: CLI fixture exit=0；28/28 steps、all gates PASS、Kappa=0.75；artifact phase status=SUCCEEDED；targeted acceptance 2 tests OK；compileall exit=0。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 dispatch 順序、failure path、runtime JSON；未派獨立 agent，保留核心 runtime 後續 critic 名額。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`artifact.generate_research_paper|execute_workflow_ir|workflow_runtime.json` | hits=artifact 唯一由 executor/catalog gate 執行；未發現鏈外同一 artifact implementation path。
+- WORKLOG_DONE: Artifact workflow node
+
+[追記 2026-09-14 Compiled IR projection]
+- 新增 `project_workflow_ir`：runtime 子圖只能選取 compiled Recipe node index，再顯式綁定執行 input/label；禁止重宣告 ref 或選取未綁定 node。
+- Research runtime 與 artifact phase 改由 compiled IR 投影建立，runtime artifact 另記錄 source node indexes，降低 Recipe/runtime 漂移。
+- REALTEST_EVIDENCE: CLI fixture exit=0；28/28 steps、all gates PASS、Kappa=0.75；projection regression 1 test OK；combined workflow/evidence unit 18 tests OK；compileall exit=0。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 index validation、projection metadata、compiled Recipe source；未派獨立 agent，保留核心 runtime 後續 critic 名額。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`project_workflow_ir|source_node_indexes|runtime_subchain|artifact_workflow` | hits=唯一 projection implementation 與兩個使用點；未發現手寫 ref 的替代 runtime path。
+- WORKLOG_DONE: Compiled IR projection
+
+[追記 2026-09-14 Dashboard live input]
+- API 新增 `GET /methods/{method_id}/form`，從 live builder signature 產生 required/default/annotation descriptor；dashboard 新增 `Open Input` + JSON live invoke。
+- domain schema 尚未存在的 method 不被猜測補造；`schema_source=builder_signature_only`，實際 POST 仍由 catalog、entitlement、builder 與 gates 作最終驗證。
+- REALTEST_EVIDENCE: real FastAPI TestClient API tests 3 OK；包含 dashboard XSS guard、form descriptor、unknown method 404；compileall exit=0。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 route/auth/error path 與 textContent rendering；未派獨立 agent，保留 API/UI 後續 critic 名額。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`/form|Open Input|runLive|schema_source` | hits=唯一 form route/UI path 與 tests；未新增第二套 invoke authority。
+- WORKLOG_DONE: Dashboard live input
+
+[追記 2026-09-14 Recipe plan API]
+- 新增 read-only `GET /recipes` 與 `GET /recipes/{recipe_id}/plan`；直接掃描 ACTIVE Recipe、呼叫 compiler、MethodCatalog、CapabilityCatalog、plan_executability。
+- API 現在能回報完整 Recipe 的 IR、contract resolution、required blockage 與 READY/BLOCKED verdict；未新增第二套規則。
+- REALTEST_EVIDENCE: real FastAPI TestClient 3 tests OK（active recipe listing、research Recipe READY、unknown Recipe 404）；compileall exit=0。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 compiler/resolver authority、404/blocked path；未派獨立 agent，保留 Recipe API 後續 critic 名額。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`/recipes|recipe_plan|compile_recipe_to_workflow_ir|plan_executability` | hits=唯一 Recipe planning API path；未發現旁路 resolver。
+- WORKLOG_DONE: Recipe plan API
+
+[追記 2026-09-14 Durable Workflow journal]
+- `execute_workflow_ir` 新增可選 atomic journal/resume：每步落盤、workflow/input fingerprint、成功步驟不重跑、journal mismatch/in-progress/overwrite 一律 fail-closed。
+- EdD Research 與 artifact phase 實際寫入 `research_workflow.journal.json` / `artifact_workflow.journal.json`，不只停留在 unit utility。
+- REALTEST_EVIDENCE: CLI fixture exit=0；28/28、all gates PASS、Kappa=0.75；兩本 journal=SUCCEEDED（next_index=4/1）；workflow/evidence unit 19 tests OK；targeted acceptance 1 OK；compileall/diff check pass。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 atomic replace、resume fingerprint、failed-step retry 與 completed-run no-op；未派獨立 agent，保留 durable runtime 後續 critic 名額。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`journal_path|WORKFLOW_JOURNAL|_atomic_write_journal|resume` | hits=唯一 durable implementation 與兩個 Research 使用點；無第二套 journal semantics。
+- WORKLOG_DONE: Durable Workflow journal
+
+[追記 2026-09-14 Workflow journal schema]
+- 新增 `specs/execution/workflow-journal.schema.yaml`，並以實際 journal 做 SchemaContracts 驗證；runtime payload 不再只有未定義 JSON 慣例。
+- REALTEST_EVIDENCE: `python -m unittest tests.unit.test_workflow_executor -q` = 8 OK；正確 product root `compileall`/diff check pass；golden suite = 3915 PASS / 10 FAIL。
+- GOLDEN_FAILURE_DISCLOSURE: 10 failures 來自既有未提交 F14 feasibility contracts 缺 contract-backlog registry entries（9）與 generated spec index stale（1），非本輪 journal schema。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 schema dialect、step/context openness、實際 journal conformance；未派獨立 agent，保留 schema/registry critic 名額。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`workflow-journal.schema.yaml|journal_version|WORKFLOW_JOURNAL` | hits=single schema and executor semantics；無第二份 journal schema。
+- WORKLOG_DONE: Workflow journal schema
+
+[追記 2026-09-14 F14 feasibility batch registration]
+- 補齊並提交 F14 feasibility/economics 9 方法：break_even、cost_benefit_analysis、cost_effectiveness、irr、npv、real_options、tco、telos、unit_economics；包含 contracts、typed objects、modules、CLI slices、tests、registry entries。
+- 修復 registry/index drift；生成 SPEC_QUICKREF 與 MOTHER_DOC_SECTION_INDEX。
+- REALTEST_EVIDENCE: 9 個 F14 CLI smoke 全部 PASS；golden suite commit 後 `3934 PASS / 0 FAIL`。
+- REVIEW_WAIVED: NA -- 主 agent 逐方法檢查 live CLI refusal/tamper evidence；原整批 unittest 長跑重複啟動且未在 bounded window 結束，已安全停止，未宣稱整批 unittest PASS。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`feasibility\.|contract_status: complete|SPEC_QUICKREF` | hits=9 contracts、9 modules、9 CLI、9 registry entries 與 generated indexes 一致。
+- WORKLOG_DONE: F14 feasibility batch registration
+
+[追記 2026-09-14 Password reset core]
+- 新增 `password_reset_token` durable table 與 `IdentityStore.issue_password_reset_token` / `consume_password_reset_token`：只存 SHA-256 digest、前一 token 失效、expiration、single-use atomic consume、成功後撤銷該 identity 全部 sessions。
+- REALTEST_EVIDENCE: identity password-reset/session targeted suite = 8 OK；未知 identity 不發 token；重複 consume 與舊 token 均拒絕。
+- SECURITY_BOUNDARY: 外部 delivery adapter 尚未配置；raw token 只作內部 delivery payload，不進 DB/log/journal，API 不回傳假裝已寄出的 token。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 token entropy、digest-only persistence、atomic row-count guard、session revocation；未派獨立 agent，保留 delivery/security review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/identity,tests/unit | grep=`password_reset_token|consume_password_reset_token|token_hash` | hits=single store implementation + regression tests；未發現第二套 reset semantics。
+- ROLLBACK: revert this commit；既有 identity/session tables 不受影響，新表可由 schema bootstrap additive 建立。
+- WORKLOG_DONE: Password reset core
+
+[追記 2026-09-14 Capability adapter registry]
+- 新增明確 `CapabilityAdapterRegistry`：ACTIVE contract 才可 register、duplicate/缺 adapter fail-closed；Workflow executor 仍是唯一執行 authority。
+- API 接上第一個真實 capability adapter：離線 synthetic、read-only、明示 `OFFLINE_SOURCE_STALE` 的 `literature_search`；新增 `edd-literature-search-v1` Recipe。
+- REALTEST_EVIDENCE: registry 3/3 OK；API capability Recipe 1/1 OK；golden suite `3942 PASS / 0 FAIL`；完整 API suite 36/36 OK。
+- SECURITY_BOUNDARY: 未註冊 transcribe、外部 literature provider、artifact adapter 不會執行；network/clinical source 未被開放。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 contract-before-registration、coverage、binding propagation、capability catalog invocation；未派獨立 agent，保留 stateful adapter/data-protection review 名額。
+- ROLLBACK: revert this commit；既有 method-only Recipes 與 capability contracts 不受影響，新增 Recipe 可移除但不需 destructive migration。
+- WORKLOG_DONE: Capability adapter registry
+
+[追記 2026-09-14 Workflow journal source projection]
+- 通用 executor 新增可注入 `journal_context_projector`；API source-bearing Recipe 只落盤 `steps/outputs`，不落盤 raw `source`，resume 仍以完整 initial-context fingerprint 驗證並由新 request hydrate source。
+- REALTEST_EVIDENCE: workflow executor 11/11 OK；API life + EdD capability vertical tests 2/2 OK；golden `3942 PASS / 0 FAIL`；py_compile/diff check pass。
+- SECURITY_BOUNDARY: outputs 仍是 checkpoint payload，尚未 encrypted CAS/KMS；因此未宣稱 clinical/production data safe，外部/臨床 source 仍不在接受範圍。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 projection、resume hydration、input mismatch、atomic journal compatibility；未派獨立 agent，保留 encrypted-output/data-retention review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow,apps/api,tests | grep=`journal_context_projector|_api_journal_context|WORKFLOW_JOURNAL_INPUT_MISMATCH` | hits=single projection seam + regression coverage；無第二套 journal persistence policy。
+- ROLLBACK: revert this commit；未改動既有 journal schema version，舊 caller default semantics 保持相容。
+- WORKLOG_DONE: Workflow journal source projection
+
+[追記 2026-09-14 Journal context protector]
+- 新增可注入 `JournalContextProtector` 與 AES-256-GCM implementation；protected journal 的 checkpoint outputs 只在 encrypted context，`steps[].output` 不再保留明文副本。
+- REALTEST_EVIDENCE: journal protection + workflow executor 14/14 OK；tamper/wrong-protector fail-closed；py_compile/diff check pass。
+- SECURITY_BOUNDARY: API 尚未配置 KMS/production key custody，仍使用 source projection-only；不宣稱 external/clinical data at-rest protection 已完成。
+- REVIEW_WAIVED: NA -- 測試實際驗證 ciphertext、同 protector round-trip、無 protector resume 拒絕、tamper 拒絕；未派獨立 agent，保留 KMS/CAS review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow | grep=`JournalContextProtector|cipher_alg|step_record.pop` | hits=single protection seam；已修正 step output plaintext side-channel。
+- ROLLBACK: revert this commit；未改變 journal version，未使用 protector 的 callers 保持既有格式。
+- WORKLOG_DONE: Journal context protector
+
+[追記 2026-09-14 Tenant-scoped CAS journal protector]
+- 新增 `CasJournalContextProtector`：AES-256-GCM ciphertext 寫 tenant-scoped CAS，journal 僅留 CAS reference/nonce/algorithm；restore 驗證 tenant ownership、CAS hash 與 GCM authentication tag。
+- REALTEST_EVIDENCE: journal protection + executor suite 15/15 OK；same-tenant round-trip、foreign-tenant denial、tamper/wrong-key fail-closed 全通過。
+- SECURITY_BOUNDARY: key bytes 仍由外部注入；API 未啟用 local provider，production KMS custody/rotation/crypto-shred 與 retention/deletion 仍未完成。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 ciphertext-at-rest、CAS path ownership、hash integrity、AAD tenant/run binding；未派獨立 agent，保留 production KMS review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow,data/object | grep=`CasJournalContextProtector|TENANT_SCOPED_CAS|CAS_HASH` | hits=single CAS protector seam；無 journal plaintext ciphertext fallback。
+- ROLLBACK: revert this commit；既有 inline AES-GCM protector 與 projection-only API 不受影響。
+- WORKLOG_DONE: Tenant-scoped CAS journal protector
+
+[追記 2026-09-14 CAS journal object deletion]
+- 新增 `CasJournalContextProtector.delete`：只可刪除 tenant-owned ciphertext object，刪除後不可 restore；與 physical sanitization/KMS crypto-shred 明確分開。
+- REALTEST_EVIDENCE: journal protection unit suite 4/4 OK；same-tenant delete、deleted-object restore refusal、foreign tenant isolation 全通過。
+- SECURITY_BOUNDARY: deletion 是 storage unlink，不是合規 crypto-shred；KMS key destruction、retention/hold policy 與 immutable backup handling 仍未完成。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 deletion target validation、CAS ownership gate、post-delete behavior；未派獨立 agent，保留 deletion-pipeline review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow,data/object | grep=`def delete|CAS_TENANT_ACCESS_DENIED|crypto-shred` | hits=single deletion seam with explicit non-equivalence note。
+- ROLLBACK: revert this commit；既有 CAS objects 不會被自動刪除。
+- WORKLOG_DONE: CAS journal object deletion
+
+[追記 2026-09-14 Journal deletion policy orchestration]
+- 新增 `delete_journal_object`：要求 Authorization、Legal Hold、Retention、Dependency、Dry Run、Scope Preview、Approval 七個明示 policy checks 全部通過後才可刪除；刪除後 restore verification，回傳 canonical EC §31 10-step `deletion_request`。
+- REALTEST_EVIDENCE: deletion orchestration 3/3 OK；成功 record 經 `data-deletion.schema.yaml#/deletion_request` 驗證；active hold/缺 check 均在 delete 前拒絕。
+- SECURITY_BOUNDARY: policy checks 由 caller 注入，未發明預設 retention/法遵規則；CAS unlink 仍非 physical sanitization/KMS crypto-shred。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 step order/time monotonicity、hold-before-delete、post-delete restore proof、schema conformance；未派獨立 agent，保留 full deletion/KMS review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow | grep=`delete_journal_object|JOURNAL_DELETION_POLICY_BLOCKED|data-deletion.schema` | hits=single orchestration seam with no implicit allow path。
+- ROLLBACK: revert this commit；不會自動刪除既有 CAS objects。
+- WORKLOG_DONE: Journal deletion policy orchestration
+
+[追記 2026-09-14 CAS deletion reference verification]
+- 修正 `CasJournalContextProtector.delete`：destructive unlink 前先 restore 驗證 ciphertext hash、nonce、tenant/run AAD；防止 same-tenant tampered journal reference 刪除另一個 object。
+- REALTEST_EVIDENCE: journal protection + deletion suite 8/8 OK；same-tenant reference tamper 被拒絕且 target object 保持可 restore。
+- REVIEW_WAIVED: NA -- 主 agent 完成 destructive-path adversarial check；未派獨立 agent，保留 full KMS/deletion review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow | grep=`def delete|self.restore(stored)|JOURNAL_CONTEXT_DECRYPT_FAILED` | hits=pre-delete identity verification before unlink。
+- ROLLBACK: revert this commit；不會自動刪除既有 CAS objects。
+- WORKLOG_DONE: CAS deletion reference verification
+
+[追記 2026-09-14 API encrypted journal integration]
+- API 新增明示 local-dev protector config：`COGNITIVE_OS_JOURNAL_KEY_MODE=local-dev` + 32-byte base64 key 才啟用 tenant-scoped CAS；default disabled 保持 source projection，CONFIDENTIAL/RESTRICTED 無 protector 直接拒絕。
+- REALTEST_EVIDENCE: API encrypted CAS integration + configuration + confidential boundary 3/3 OK；journal 只含 protected CAS reference，raw source 不在 journal；journal protection/deletion 8/8 OK。
+- SECURITY_BOUNDARY: local-dev key path 不是 production KMS；API 未宣稱 clinical/production readiness，仍需 KMS custody、rotation、crypto-shred、retention/backup policy。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 config fail-closed、classification gate、temporary-root encrypted round-trip、no plaintext journal；未派獨立 agent，保留 production key-management review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/apps/api,platform/workflow | grep=`COGNITIVE_OS_JOURNAL_KEY_MODE|CONFIDENTIAL|CasJournalContextProtector` | hits=single API integration seam with disabled-safe default。
+- ROLLBACK: revert this commit；default projection-only behavior remains available。
+- WORKLOG_DONE: API encrypted journal integration
+
+[追記 2026-09-14 Journal key provider seam]
+- 將 API 內直接讀取/解析 key 的責任抽出為 `JournalKeyProvider` protocol；保留 `LocalDevJournalKeyProvider`，明示 mode、scope 與 256-bit key validation，production KMS/HSM 可替換而不改 executor/protector。
+- REALTEST_EVIDENCE: key/protection/configuration suite 9/9 OK；API encrypted integration、confidential boundary 與 default-disabled behavior 全通過；py_compile/diff check pass。
+- SECURITY_BOUNDARY: local-dev provider 不持久化 key，也不是 production KMS；rotation、custody、crypto-shred、retention/backup policy 仍未完成。
+- REVIEW_WAIVED: NA -- 主 agent 檢查 provider fail-closed、invalid key length/base64、API delegation；未派獨立 agent，保留 KMS provider security review 名額。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/ai_lego/platform/workflow,apps/api | grep=`JournalKeyProvider|LocalDevJournalKeyProvider|key_for` | hits=single key-acquisition seam。
+- ROLLBACK: revert this commit；API default disabled behavior remains unchanged。
+- WORKLOG_DONE: Journal key provider seam
+2026-09-14 | workflow | Added validated life-decision-v1 Recipe and 3-step runtime slice: framing -> SWOT -> weighted decision matrix; MethodCatalog, compiled/projection IR, atomic journal, schemas and method gates all exercised. Golden suite and smoke run pending/recorded in task output.
 
 [追記 2026-09-14 Projection runtime boundary regression]
 - 根因：`project_workflow_ir` 先套 runtime override 再改寫路徑，且 EdD projection 繼承了被省略 Transcription/下游節點的 bindings；合法 vertical slice 因解析舊 `outputs.*`/`source.*` 而 fail-closed。
@@ -17545,10 +17955,11 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`_api_workflow_result|result.as_dict\(\)|DO_NOT_ECHO_RAW_SOURCE` | hits=單一 API response projector、兩個 route response path、單一 regression test；無未投影的 recipe response path。
 - ROLLBACK: revert 本次 response projection commit；不改 journal、CAS、source storage 或 workflow execution semantics。
 - WORKLOG_DONE: API response source minimization
+
 [追記 2026-09-14 CAS deletion semantics correction]
 - 根因：`delete_journal_object` 實際 unlink tenant-scoped CAS ciphertext 並驗證不可 restore，但 `DeletionRequestBuilder` 固定輸出 `personal_data_crypto_shred`，造成 physical deletion 被誤標成 DEK/KMS crypto-shred。
 - 修正：Builder 支援兩種 deletion type；journal object deletion 先驗證 CAS hash target，再執行 policy checks，輸出 `production_row` + `cas-sha256:<hash>`；Research CLI 原有 subject-DEK destruction 保持 `personal_data_crypto_shred`。
-- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.unit.test_journal_deletion tests.unit.test_retention_deletion_model` | exit=0 | result=75 tests OK；tool=Python | cmd=`python -m unittest tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests` | exit=0 | result=通過；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.unit.test_journal_deletion tests.unit.test_retention_deletion_model` | exit=0 | ms=約19000 | result=75 tests OK；tool=Python | cmd=`python -m unittest tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests` | exit=0 | result=通過；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 builder、journal deletion、Research DEK path 與 schema assertions。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`DeletionRequestBuilder|delete_journal_object|personal_data_crypto_shred|production_row|cas-sha256` | hits=唯一 builder、唯一 journal object orchestration、唯一 Research DEK builder path、tests/docs；無 physical unlink 的 crypto-shred 偽裝旁路。
 - ROLLBACK: revert 本次 deletion semantics commit；既有 CAS objects、DEK vault 與 journal schema 不會被自動修改或刪除。
@@ -17562,6 +17973,7 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`NOT_INVOKED|CAPABILITY_NOT_RESOLVED|REQUIRED_.*catalog|catalog.invoke` | hits=optional skip 僅在 executor、Research fallback 僅在 triangulation、required path 保留 catalog gate；無 unresolved capability handler 旁路。
 - ROLLBACK: revert 本次 optional capability execution commit；不改 capability contracts、既有 journals 或已產生 artifacts。
 - WORKLOG_DONE: optional capability fail-closed execution
+
 [追記 2026-09-14 explicit deletion policy decision boundary]
 - 根因：`delete_journal_object` 的七個政策 gate 只能接任意 callbacks，沒有共同驗證 decision ref、evaluation timestamp 與 boolean 判定的入口，無法保證 retention/legal-hold/authorization 缺資料時 fail-closed 且可追溯。
 - 修正：新增 provider-neutral `deletion_policy.py`；要求七個明確 typed decisions、decision reference、ISO timestamp，將 policy decision 接入 journal deletion，前七步 evidence ref 回指 `policy-decision://<decision_ref>/...`；不自行推導法律期限、hold 或授權。
@@ -17612,7 +18024,7 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - 修正：預先建立 sentence provenance 與 rollback/state path；Research runtime subchain 注入 workflow gate runner，於最後 node 後驗證 coding/statistics/evidence/claims/transcripts 與 mandatory gates；FAIL 寫 durable workflow journal + `EXECUTING -> FAILED` state transitions，artifact workflow 不啟動；成功結果直接取 journalized workflow gates。
 - REALTEST_EVIDENCE: tool=Python | cmd=`python -m py_compile ai_lego/apps/cli/run_research_slice.py tests/acceptance/criteria.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.unit.test_workflow_executor tests.acceptance.test_research_slice_fixture_mode` | exit=0 | result=47 tests OK；tool=Python | cmd=`python -m unittest discover -s tests -t . -q` | exit=0；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED；tool=Python | cmd=`python -m ai_lego.apps.cli.run_research_slice --runtime-dir <unique temp dir>` | exit=0 | result=28/28 steps、all gates PASS、Kappa=0.75。
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 Research runner gate callback、state transition ordering、failure journal、artifact boundary、acceptance assertions。
-- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evaluate_research_workflow_gates|workflow_gate_runner|workflow_gates|EXECUTING.*FAILED|research_workflow\\.journal` | hits=34；確認 Research 唯一 aggregate gate path、無舊後置 evaluator，既有 consumers 相容。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evaluate_research_workflow_gates|workflow_gate_runner|workflow_gates|EXECUTING.*FAILED|research_workflow\.journal` | hits=34；確認 Research 唯一 aggregate gate path、無舊後置 evaluator，既有 consumers 相容。
 - ROLLBACK: revert 本次 Research aggregate gate integration commit；不修改既有 Recipe、CAS、artifact 或外部資料。
 - BOM_AUDIT: audit-cross-machine-bom exit=1；既有 3 個 memory feedback 檔缺 BOM，未由本輪修改。
 - WORKLOG_DONE: Research aggregate gate integration
@@ -17625,3 +18037,41 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evaluate_workflow_completion_gate|workflow_execution_integrity|workflow_gates` | hits=45；確認 API 唯一注入點、executor 唯一 serialization path、無舊 response consumer 被破壞。
 - ROLLBACK: revert 本次 API workflow completion integrity gate commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
 - WORKLOG_DONE: API workflow completion integrity gate
+
+[追記 2026-09-14 Recipe-level workflow gate registry]
+- 根因：executor 已有 workflow-level gate seam，但 Recipe 無跨節點 gate 宣告，API 只能硬編通用 callback，領域擴充會累積 recipe-id 特例。
+- 修正：新增 `workflow_gate_refs` schema/IR 欄位與顯式 `WorkflowGateRegistry`；API 以 stable ref 註冊 `workflow_execution_integrity`，plan 回報 readiness，run 對缺少註冊 fail closed；EdD evidence Recipe 實際宣告此 ref。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m py_compile ai_lego/platform/workflow/workflow_gates.py ai_lego/platform/workflow/ir.py ai_lego/apps/api/main.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.unit.test_workflow_gate_registry tests.unit.test_workflow_ir_and_resolver tests.unit.test_api_main` | exit=0；tool=Python | cmd=`python -m unittest discover -s tests -t . -q` | exit=0；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 schema、compiler、API plan/run、registry fail-closed 路徑與既有 Recipe consumer。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`workflow_gate_refs|WorkflowGateRegistry|WORKFLOW_GATE_UNAVAILABLE|workflow_execution_integrity`；確認 registry 是唯一 ref resolution path，未新增 recipe-id 分支；既有 3 個 BOM 缺口仍為 pre-existing。
+- BOM_AUDIT: audit-cross-machine-bom exit=1；既有 3 個 memory feedback 檔缺 BOM，未由本輪修改。
+- ROLLBACK: `git revert <this-commit>`；只回滾本輪 registry/schema/Recipe/API wiring，不修改既有 journal、CAS 或外部資料。
+- WORKLOG_DONE: Recipe-level workflow gate registry
+
+[追記 2026-09-14 Research workflow gate registry integration]
+- 根因：Research CLI 的 aggregate gate 仍在 runner 內直接 callback，沒有使用 Recipe ref registry；API 與 CLI 可能形成兩套研究跨節點規則。
+- 修正：新增 `research_workflow_integrity` cross-node gate；Recipe 宣告 `workflow_execution_integrity` + `research_workflow_integrity`；API/CLI 都經 `WorkflowGateRegistry` 解析，CLI 保留既有五個 method-specific gates，並允許核准的一個 coding-node runtime projection。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.unit.test_gates tests.unit.test_api_main` | exit=0 | result=64 tests OK；tool=Python | cmd=`python -m unittest -q tests.acceptance.test_research_slice_fixture_mode` | exit=0 | result=34 tests OK；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS；tool=Python | cmd=`python -m ai_lego.apps.cli.run_research_slice --transcription fixture --runtime-dir <unique temp dir>` | exit=0 | result=28/28 steps、all gates PASS。
+- REVIEW_DONE: critic=Quick | verdict=pass；按 gate_id 修正 acceptance assertion，避免新增 gate 改變索引造成假陰性。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`research_workflow_integrity|workflow_gate_refs|WorkflowGateRegistry`；確認 API/CLI 都走 ref resolution，未新增 recipe-id 分支。
+- ROLLBACK: `git revert <this-commit>`；不修改既有 journal、CAS 或外部 artifact。
+- WORKLOG_DONE: Research workflow gate registry integration
+
+[追記 2026-09-14 Art Therapy project safety workflow gate]
+- 根因：藝術治療 Recipe 已能串接三個方法，但跨節點安全邊界尚未由 workflow-level gate 重新驗證，不能只依賴 random-stimulus 單一方法 gate。
+- 修正：新增 `art_therapy_project_safety`；Recipe 宣告 `workflow_execution_integrity` + safety ref，API registry 顯式註冊；gate 重新驗證 Frame→Stimulus→Mind Map 順序、`NOT_YET_SCREENED`、及禁止診斷/治療/心理狀態宣稱。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.unit.test_art_therapy_workflow_gates tests.unit.test_api_main.RecipeRunTests.test_art_project_ideation_recipe_runs_as_a_non_diagnostic_three_step_chain` | exit=0 | result=3 tests OK；tool=Python | cmd=`python -m unittest -q tests.unit.test_api_main` | exit=0 | result=54 tests OK；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS。
+- REVIEW_DONE: critic=Quick | verdict=pass；讀回 art Recipe、random stimulus contract、API registry、response/journal gate path。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`art_therapy_project_safety|NOT_YET_SCREENED|diagnosis|treatment_effect`；確認安全規則在 builder 與 workflow-level gate 各有獨立檢查，無 recipe-id 分支。
+- BOM_AUDIT: audit-cross-machine-bom exit=1；既有 3 個 memory feedback 檔缺 BOM，未由本輪修改。
+- ROLLBACK: `git revert <this-commit>`；不修改既有 Recipe journal、CAS 或外部資料。
+- WORKLOG_DONE: Art Therapy project safety workflow gate
+
+[追記 2026-09-14 Airtable → Supabase migration method research]
+- 根因：先前遷移把 transport、raw source、semantic mapping 與 canonical model 混在一起，造成欄位覆蓋、中文內容缺失、linked/formula/lookup provenance 不完整。
+- 修正：研究 Airtable Web API、Supabase Airtable Wrapper、Supabase import/migrations 與 PostgreSQL JSON 官方文件；決策為 deterministic ETL + immutable raw JSON/source capture + approved mapping + relational canonical model。報告：`agency-os/reports/decisions/2026-09-14-airtable-supabase-migration-method.md`。
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=`web search/open official Airtable, Supabase, PostgreSQL documentation` | exit=0 | sources=5 primary docs reviewed。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回決策報告與 INDEX，確認首選、拒絕理由、pre-mortem、風險與驗收門檻一致。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Airtable|Supabase|Wrapper|raw JSON|deterministic ETL|canonical`；確認報告明確禁止 Wrapper-only、直匯、未批准 mapping 與未列入 ERD 的補丁表。
+- ROLLBACK: `git revert <this-commit>`；僅移除本次決策報告、INDEX entry 與 WORKLOG entry，不觸碰外部 Airtable 或 Supabase 資料。
+- WORKLOG_DONE: Airtable → Supabase migration method research
