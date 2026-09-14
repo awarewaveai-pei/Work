@@ -340,34 +340,48 @@ export async function buildAudit(snapshotDirectory, masterPlanPath, outputDirect
   const englishRows = recordsByTable.get(englishTable.id);
   const zhTitleIds = ["fldFrh2Fhj6OyGkSE", "flduaxljjFwshOzGp"];
   const enTitleIds = ["fldhMYlkfXI5NSuHL", "fld76eIafmTzChT3b"];
-  const titleIndex = new Map();
-  for (const record of chineseRows) for (const fieldId of zhTitleIds) {
-    const key = normalizeTitle(record.rawValueByFieldId[fieldId]);
-    if (key) {
-      if (!titleIndex.has(key)) titleIndex.set(key, new Set());
-      titleIndex.get(key).add(record.recordId);
+  const buildTitleIndex = (fieldId) => {
+    const index = new Map();
+    for (const record of chineseRows) {
+      const key = normalizeTitle(record.rawValueByFieldId[fieldId]);
+      if (key) {
+        if (!index.has(key)) index.set(key, new Set());
+        index.get(key).add(record.recordId);
+      }
     }
-  }
+    return index;
+  };
+  const chineseTitleIndex = buildTitleIndex(zhTitleIds[0]);
+  const englishTitleIndex = buildTitleIndex(zhTitleIds[1]);
   const chineseCandidates = chineseRows.map((record) => ({
     recordId: record.recordId,
     normalizedEnglishTitle: normalizeTitle(record.rawValueByFieldId[zhTitleIds[1]]),
   })).filter((candidate) => candidate.normalizedEnglishTitle);
   const translationRows = englishRows.map((record) => {
-    const keys = enTitleIds.map((fieldId) => normalizeTitle(record.rawValueByFieldId[fieldId])).filter(Boolean);
-    const matches = [...new Set(keys.flatMap((key) => [...(titleIndex.get(key) ?? [])]))];
-    const status = keys.length === 0 ? "EMPTY" : matches.length === 1 ? "MATCHED" : matches.length > 1 ? "AMBIGUOUS" : "UNMATCHED";
+    const chineseKey = normalizeTitle(record.rawValueByFieldId[enTitleIds[0]]);
+    const englishKey = normalizeTitle(record.rawValueByFieldId[enTitleIds[1]]);
+    const englishMatches = [...(englishTitleIndex.get(englishKey) ?? [])];
+    const chineseMatches = [...(chineseTitleIndex.get(chineseKey) ?? [])];
+    const matches = englishMatches.length > 0 ? englishMatches : chineseMatches;
+    const status = !chineseKey && !englishKey ? "EMPTY" : matches.length === 1 ? "MATCHED" : matches.length > 1 ? "AMBIGUOUS" : "UNMATCHED";
     const normalizedEnglishTitle = normalizeTitle(record.rawValueByFieldId[enTitleIds[1]]);
     const suggestions = status === "UNMATCHED" && normalizedEnglishTitle
       ? chineseCandidates.map((candidate) => ({ ...candidate, score: diceSimilarity(normalizedEnglishTitle, candidate.normalizedEnglishTitle) }))
         .sort((left, right) => right.score - left.score).slice(0, 3).filter((candidate) => candidate.score >= 0.35)
       : [];
+    const resolutionCandidate = status === "MATCHED" ? "merge_into_matched_canonical_tool"
+      : status === "UNMATCHED" ? "manual_decide_create_tool_or_archive"
+        : status === "AMBIGUOUS" ? "merge_duplicate_identity_content_conflict"
+          : "source_archive_only_no_meaningful_identity";
     return {
       english_record_id: record.recordId,
       source_title_zh: record.rawValueByFieldId[enTitleIds[0]] ?? "",
       source_title_en: record.rawValueByFieldId[enTitleIds[1]] ?? "",
       candidate_tool_record_ids: matches.join(";"), fuzzy_candidate_record_ids: suggestions.map((candidate) => candidate.recordId).join(";"),
       fuzzy_scores: suggestions.map((candidate) => candidate.score.toFixed(3)).join(";"), match_status: status,
-      match_rule: status === "MATCHED" ? "exact_normalized_zh_or_en_title" : "manual_review_required", approval_status: "pending",
+      match_rule: status === "MATCHED" ? (englishMatches.length ? "exact_normalized_en_title" : "exact_normalized_zh_title") : "manual_review_required",
+      resolution_candidate: resolutionCandidate,
+      approval_status: status === "EMPTY" ? "candidate_archive_only" : "pending",
     };
   });
   const translationCounts = Object.fromEntries(["MATCHED", "UNMATCHED", "AMBIGUOUS", "EMPTY"].map((status) => [status, translationRows.filter((row) => row.match_status === status).length]));
@@ -396,7 +410,7 @@ export async function buildAudit(snapshotDirectory, masterPlanPath, outputDirect
   const reviewRequiredMappings = activeNonemptyMappings.filter((row) => row.candidate_target.includes("REVIEW_REQUIRED"));
   const zeroTables = tableRows.filter((row) => row.record_count === 0);
   const excludedPopulated = tableRows.filter((row) => row.record_count > 0 && ARCHIVE_RECOMMENDATIONS.test(row.master_plan_disposition));
-  const hardBlocks = translationCounts.UNMATCHED + translationCounts.AMBIGUOUS + translationCounts.EMPTY + populationRows.length + pendingMappings.length;
+  const hardBlocks = translationCounts.UNMATCHED + translationCounts.AMBIGUOUS + populationRows.length + pendingMappings.length;
 
   const files = new Map();
   files.set("airtable_table_disposition.md", `# Airtable table disposition\n\nSnapshot: \`${validation.extractedAt}\`. All decisions remain pending until user approval.\n\n${mdTable(["#", "table_id", "table", "rows", "fields", "master plan", "scope", "approval"], tableRows.map((row) => [row.order, row.table_id, row.table_name, row.record_count, row.field_count, row.master_plan_disposition, row.current_migration_scope, row.approval_status]))}`);
@@ -406,7 +420,7 @@ export async function buildAudit(snapshotDirectory, masterPlanPath, outputDirect
   files.set("v2_entity_catalog.md", `# V2 entity catalog candidate\n\nOnly active populated knowledge tables are in this migration wave. Empty research/training schemas are deferred.\n\n${mdTable(["source", "rows", "master-plan disposition", "approval"], tableRows.filter((row) => row.current_migration_scope === "active").map((row) => [row.table_name, row.record_count, row.master_plan_disposition, row.approval_status]))}`);
   files.set("v2_erd.md", `# V2 ERD candidate — approval required\n\n\`tools\` is the single Tool identity. Chinese and English content use \`tool_localizations\`. Lookup values are derived from joins.\n\n\`\`\`mermaid\nerDiagram\n  tools ||--o{ tool_localizations : has\n  tools ||--o{ tool_healing_stages : uses\n  healing_stages ||--o{ tool_healing_stages : classifies\n  tools }o--o{ therapeutic_focuses : tool_focuses\n  tools }o--o{ theories : tool_theories\n  theories }o--o{ theory_categories : theory_category_links\n  tools }o--o{ settings : tool_settings\n  tools }o--o{ support_methods : tool_support_methods\n\`\`\`\n\nStatus: **PENDING APPROVAL**. No DDL may be generated as approved until every active nonempty field has an exact target.\n`);
   files.set("translation_mapping.csv", csv(translationRows));
-  files.set("migration_exceptions.md", `# Migration exceptions and blockers\n\n| blocker | count | required action |\n|---|---:|---|\n| Active nonempty field mappings pending approval | ${pendingMappings.length} | Approve exact target, transform and validation rule |\n| English Tool unmatched | ${translationCounts.UNMATCHED} | Select canonical Tool or approve archive-only |\n| English Tool ambiguous | ${translationCounts.AMBIGUOUS} | Select one canonical Tool |\n| English Tool empty identity | ${translationCounts.EMPTY} | Identify, archive-only, or approved exception |\n| Population semantic split | ${populationRows.length} | Classify each row as population, concern, or condition |\n| Populated excluded tables | ${excludedPopulated.length} | Confirm snapshot-only exclusion |\n| Zero-row tables | ${zeroTables.length} | Confirm deferred schema-only preservation |\n\nHard-block total (not deduplicated): **${hardBlocks}**.\n`);
+  files.set("migration_exceptions.md", `# Migration exceptions and blockers\n\n| blocker | count | required action |\n|---|---:|---|\n| Active nonempty field mappings pending approval | ${pendingMappings.length} | Approve exact target, transform and validation rule |\n| English Tool unmatched | ${translationCounts.UNMATCHED} | Select canonical Tool or approve archive-only |\n| English Tool ambiguous | ${translationCounts.AMBIGUOUS} | Resolve duplicate identity and content conflicts |\n| English Tool empty identity | ${translationCounts.EMPTY} | Candidate archive-only: whitespace plus migration metadata only |\n| Population semantic split | ${populationRows.length} | Approve source-category rule: 35 condition / 25 presenting concern |\n| Populated excluded tables | ${excludedPopulated.length} | Confirm snapshot-only exclusion |\n| Zero-row tables | ${zeroTables.length} | Confirm deferred schema-only preservation |\n\nHard-block total (not deduplicated): **${hardBlocks}**.\n`);
   files.set("population_semantic_review.csv", csv(populationRows));
   files.set("research_data_classification.md", `# Research and clinical data classification\n\n- Research/training source tables with 0 rows: preserved as schema metadata only; no empty Supabase tables in this wave.\n- \`Clients\`, \`Appointments\`, \`Treatment Plans\`, \`Assessment Results\`, \`Therapists\`, and \`Finance\`: populated but excluded from the knowledge schema by the master plan; values remain in the encrypted/local source snapshot pending explicit domain decision.\n- Research participant identity data must be pseudonymous before any future canonical write.\n- Approval status: **PENDING**.\n`);
   files.set("v2_acceptance_criteria.md", `# V2 migration gates\n\n| gate | status | evidence / blocker |\n|---|---|---|\n| G1 source extract | PASS | 60 tables; 1,484 fields; 1,114 records; 1,582 linked values; 6/6 attachments; checksum failures 0 |\n| G2 mapping and ERD | BLOCKED | ${pendingMappings.length} active nonempty fields pending; English ${translationCounts.MATCHED}/${englishRows.length} exact matches; ${populationRows.length} semantic classifications pending |\n| G3 dry-run | NOT STARTED | Requires approved G2 |\n| G4 production write / verify / restore | NOT STARTED | Requires approved G3 and backup |\n\nSupabase application writes during G1/G2: **0**.\n`);
