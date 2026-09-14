@@ -1,0 +1,23 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/project.schema.yaml"
+title: Project
+version: "1.0.0"
+status: ACTIVE
+description: "Shared-kernel Project. Runtime table: platform_projects (ADR-010)."
+source_of_truth_for:
+  - "Master Plan §3 Project domain object and §78 Create Project flow"
+  - "REPOSITORY_ARCHITECTURE.md Project -> /core/domain/project"
+type: object
+additionalProperties: false
+required: [project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at]
+properties:
+  project_id: {type: string, format: uuid}
+  tenant_id: {type: string, format: uuid}
+  workspace_id: {type: string, format: uuid}
+  name: {type: string, minLength: 1, maxLength: 200}
+  purpose: {type: string, minLength: 1, maxLength: 4000}
+  data_classification: {type: string, enum: [Public, Internal, Confidential, Restricted]}
+  status: {type: string, enum: [active, suspended, archived, deleted]}
+  version: {type: integer, minimum: 1}
+  created_by_identity_id: {type: string, format: uuid}
+  created_at: {type: string, format: date-time}
