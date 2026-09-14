@@ -9,6 +9,7 @@ limited to explicitly registered, deterministic local adapters.
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 from typing import Any
 
@@ -34,10 +35,23 @@ def _runtime_dir(path: Path | None, spec_root: Path) -> Path:
     return runtime
 
 
-def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spec_root: Path | None = None) -> dict[str, Any]:
+def run_recipe(
+    recipe_id: str,
+    source: dict[str, Any],
+    runtime_dir: Path,
+    *,
+    spec_root: Path | None = None,
+    run_id: str | None = None,
+    resume: bool = False,
+) -> dict[str, Any]:
     """Execute one ACTIVE Recipe and persist a JSON report."""
     if not isinstance(source, dict):
         raise TypeError("source must be a JSON object")
+    if not isinstance(resume, bool):
+        raise TypeError("resume must be a boolean")
+    run_id = run_id or recipe_id
+    if not isinstance(run_id, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) is None:
+        raise ValueError("run_id must be 1-80 ASCII letters, numbers, '_' or '-'")
     spec_root = resolve_spec_root(spec_root)
     runtime_dir = _runtime_dir(runtime_dir, spec_root)
     workflow_ir = compile_recipe_to_workflow_ir(spec_root, recipe_id, "R1")
@@ -83,7 +97,7 @@ def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spe
     except InvariantViolation as error:
         raise RuntimeError(f"CLI_WORKFLOW_GATE_UNSUPPORTED: {error}") from error
 
-    journal = runtime_dir / f"{recipe_id}.journal.json"
+    journal = runtime_dir / f"{run_id}.journal.json"
     result = execute_workflow_ir(
         workflow_ir,
         {"source": source},
@@ -92,16 +106,18 @@ def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spe
         gate_runners=gate_runners,
         workflow_gate_runner=lambda context, workflow: registry.evaluate(refs, context, workflow),
         journal_path=journal,
+        resume=resume,
     )
     report = {
         "status": "PASS" if result.status == "SUCCEEDED" else "FAILED",
         "recipe_id": recipe_id,
+        "run_id": run_id,
         "method_resolution": resolution,
         "capability_resolution": capability_resolution,
         "workflow": result.as_dict(),
         "journal": str(journal),
     }
-    write_json(runtime_dir / f"{recipe_id}.result.json", report)
+    write_json(runtime_dir / f"{run_id}.result.json", report)
     return report
 
 
@@ -110,9 +126,17 @@ def main() -> int:
     parser.add_argument("recipe_id")
     parser.add_argument("--input-json", required=True, type=Path)
     parser.add_argument("--runtime-dir", type=Path)
+    parser.add_argument("--run-id", type=str)
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
-    report = run_recipe(args.recipe_id, read_json(args.input_json), args.runtime_dir or PRODUCT_ROOT / ".runtime" / "recipe-cli")
-    print(f"{report['status']} {args.recipe_id}: {len(report['workflow']['steps'])} steps; journal={report['journal']}")
+    report = run_recipe(
+        args.recipe_id,
+        read_json(args.input_json),
+        args.runtime_dir or PRODUCT_ROOT / ".runtime" / "recipe-cli",
+        run_id=args.run_id,
+        resume=args.resume,
+    )
+    print(f"{report['status']} {args.recipe_id}: {len(report['workflow']['steps'])} steps; run_id={report['run_id']}; journal={report['journal']}")
     return 0 if report["status"] == "PASS" else 1
 
 

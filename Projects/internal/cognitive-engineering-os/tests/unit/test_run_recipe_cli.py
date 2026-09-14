@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ai_lego.apps.cli.run_recipe import run_recipe
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
+from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.review import fixture_review
 from tests.unit.test_api_main import business_planning_strategy_source
 from tests.unit.test_api_main import art_project_ideation_source
@@ -116,6 +117,22 @@ class GenericRecipeCliTests(unittest.TestCase):
         self.assertEqual(len(report["workflow"]["steps"]), 7)
         self.assertEqual(report["workflow"]["steps"][0]["ref"], "framing.problem_statement")
         self.assertEqual(report["workflow"]["workflow_gates"][0]["gate_id"], "workflow_execution_integrity")
+
+    def test_resume_uses_the_same_journal_and_refuses_changed_source(self):
+        source = business_planning_strategy_source()
+        with tempfile.TemporaryDirectory() as directory:
+            first = run_recipe("business-planning-strategy-v1", source, Path(directory), run_id="resume-check")
+            resumed = run_recipe("business-planning-strategy-v1", source, Path(directory), run_id="resume-check", resume=True)
+
+            changed = dict(source)
+            changed["problem"] = dict(source["problem"])
+            changed["problem"]["problem_statement"] = "changed after checkpoint"
+            with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_JOURNAL_INPUT_MISMATCH"):
+                run_recipe("business-planning-strategy-v1", changed, Path(directory), run_id="resume-check", resume=True)
+
+        self.assertEqual(first["status"], "PASS")
+        self.assertEqual(resumed["status"], "PASS")
+        self.assertEqual(first["journal"], resumed["journal"])
 
     def test_refuses_unresolved_required_capability_instead_of_silently_dropping_the_node(self):
         with tempfile.TemporaryDirectory() as directory:
