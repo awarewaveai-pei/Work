@@ -10,6 +10,7 @@ Endpoints:
     GET  /recipes/{recipe_id}/plan   -- compile and resolve one Recipe
     GET  /recipes/{recipe_id}/form   -- describe the Source fields a Recipe needs
     POST /recipes/{recipe_id}/run    -- auth + entitlement + registered adapters
+    GET  /recipes/{recipe_id}/runs/{run_id} -- auth + tenant-scoped run summary
     POST /auth/login                 -- {tenant_id, email, password} -> session cookie
     POST /auth/logout                -- revoke the caller's session
     POST /methods/{method_id}/invoke -- auth + entitlement required; body = builder kwargs
@@ -56,6 +57,8 @@ import yaml
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
+from ai_lego.core.contracts.schema_contracts import SchemaContracts
+from ai_lego.core.support import read_json
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
@@ -159,6 +162,41 @@ def workflow_journal_ref(tenant_id: str, run_id: str) -> str:
     return f"workflow-journal://{tenant_key}/{run_id}"
 
 
+def _journal_gate_summary(gate: Any) -> dict[str, Any]:
+    if not isinstance(gate, dict):
+        raise InvariantViolation("WORKFLOW_JOURNAL_GATE_INVALID")
+    return {key: gate[key] for key in ("gate_id", "id", "status") if key in gate}
+
+
+def _journal_run_summary(journal: dict[str, Any]) -> dict[str, Any]:
+    """Project a journal for status inspection without exposing context or outputs."""
+    steps: list[dict[str, Any]] = []
+    for raw_step in journal["steps"]:
+        if not isinstance(raw_step, dict):
+            raise InvariantViolation("WORKFLOW_JOURNAL_STEP_INVALID")
+        step = {
+            key: raw_step[key]
+            for key in ("index", "label", "node_kind", "ref", "status", "input_paths", "error")
+            if key in raw_step
+        }
+        if "gates" in raw_step:
+            if not isinstance(raw_step["gates"], list):
+                raise InvariantViolation("WORKFLOW_JOURNAL_GATES_INVALID")
+            step["gates"] = [_journal_gate_summary(gate) for gate in raw_step["gates"]]
+        steps.append(step)
+    workflow_gates = journal.get("workflow_gates", [])
+    if not isinstance(workflow_gates, list):
+        raise InvariantViolation("WORKFLOW_JOURNAL_WORKFLOW_GATES_INVALID")
+    return {
+        "status": journal["status"],
+        "next_index": journal["next_index"],
+        "workflow_sha256": journal["workflow_sha256"],
+        "initial_context_sha256": journal["initial_context_sha256"],
+        "steps": steps,
+        "workflow_gates": [_journal_gate_summary(gate) for gate in workflow_gates],
+    }
+
+
 def get_store() -> IdentityStore:
     db_path = Path(os.environ.get("COGNITIVE_OS_DB_PATH", DEFAULT_DB_PATH))
     return IdentityStore(db_path)
@@ -233,6 +271,7 @@ _DASHBOARD_HTML = """<!doctype html>
   <label><input id="recipe-resume" type="checkbox"> Resume existing run</label>
   <span id="recipe-run-error" class="error"></span>
   <button id="recipe-run-btn" disabled>Run Selected Recipe</button>
+  <button id="recipe-status-btn" disabled>Check Run</button>
   <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
     <div id="invoke-method" class="method-id"></div>
     <div id="invoke-help" class="method-meta"></div>
@@ -391,6 +430,7 @@ async function prepareRecipe(recipeId) {
   const blockers = (plan.blockers || []).map(item => item.code + ': ' + JSON.stringify(item.detail)).join(' | ');
   document.getElementById('recipe-help').textContent = `${recipeId}: ${form.source_fields.length} Source fields. Plan status: ${plan.status}.${blockers ? ' Blockers: ' + blockers + '.' : ''} Null values are placeholders; replace them with valid domain data before running.`;
   document.getElementById('recipe-run-btn').disabled = !loggedIn || plan.status !== 'READY';
+  document.getElementById('recipe-status-btn').disabled = !loggedIn;
   document.getElementById('result').textContent = JSON.stringify({ recipe_id: recipeId, plan_status: plan.status, source_fields: form.source_fields }, null, 2);
 }
 
@@ -442,8 +482,24 @@ async function runRecipe(recipeId) {
   document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
 }
 
+async function inspectRecipeRun(recipeId) {
+  const runId = document.getElementById('recipe-run-id').value.trim();
+  document.getElementById('recipe-run-error').textContent = '';
+  if (!runId) {
+    document.getElementById('recipe-run-error').textContent = 'A run ID is required to inspect a run';
+    return;
+  }
+  document.getElementById('result').textContent = 'checking recipe run ' + runId + ' ...';
+  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}`, { credentials: 'same-origin' });
+  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
 document.getElementById('recipe-run-btn').onclick = () => {
   if (selectedRecipeId) runRecipe(selectedRecipeId);
+};
+
+document.getElementById('recipe-status-btn').onclick = () => {
+  if (selectedRecipeId) inspectRecipeRun(selectedRecipeId);
 };
 
 document.getElementById('recipe-fields-apply').onclick = applyRecipeFields;
@@ -768,6 +824,40 @@ def run_recipe(
         return {"status": "FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "workflow_gates": workflow_gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
     passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates) and all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for gate in workflow_gates)
     return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "workflow_gates": workflow_gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
+
+
+@app.get("/recipes/{recipe_id}/runs/{run_id}")
+def recipe_run_status(
+    recipe_id: str,
+    run_id: str,
+    session: dict[str, Any] = Depends(require_session),
+) -> dict[str, Any]:
+    """Return a tenant-scoped, metadata-only view of one durable Recipe run."""
+    try:
+        journal = workflow_journal_path(session["tenant_id"], run_id)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail="WORKFLOW_RUN_ID_INVALID") from error
+    if not journal.is_file():
+        raise HTTPException(status_code=404, detail="WORKFLOW_RUN_NOT_FOUND")
+    try:
+        record = read_json(journal)
+        if not isinstance(record, dict):
+            raise InvariantViolation("WORKFLOW_JOURNAL_INVALID")
+        SchemaContracts(resolve_spec_root()).validate(
+            "ai-lego://specs/execution/workflow-journal.schema.yaml",
+            record,
+            "workflow run status journal",
+        )
+    except Exception as error:
+        raise HTTPException(status_code=500, detail="WORKFLOW_JOURNAL_UNREADABLE_OR_INVALID") from error
+    if record["workflow_id"] != recipe_id:
+        raise HTTPException(status_code=404, detail="WORKFLOW_RUN_NOT_FOUND")
+    return {
+        "recipe_id": recipe_id,
+        "run_id": run_id,
+        "journal_ref": workflow_journal_ref(session["tenant_id"], run_id),
+        **_journal_run_summary(record),
+    }
 
 
 @app.get("/methods/{method_id}")
