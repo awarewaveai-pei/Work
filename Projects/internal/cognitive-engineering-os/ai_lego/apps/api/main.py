@@ -72,6 +72,7 @@ from ai_lego.platform.workflow.journal_protection import CasJournalContextProtec
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
 from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
+from ai_lego.apps.recipe_runtime import build_method_components
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -775,37 +776,12 @@ def run_recipe(
     if classification in {"CONFIDENTIAL", "RESTRICTED"} and journal_protector is None:
         raise HTTPException(status_code=503, detail="WORKFLOW_JOURNAL_PROTECTION_REQUIRED: confidential/restricted source requires an encrypted journal provider")
 
+    try:
+        method_handlers, gate_runners = build_method_components(nodes, validator="api.recipe")
+    except MethodDispatchError as error:
+        raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
     handlers: dict[str, Any] = dict(capability_handlers)
-    for method_id in method_ids:
-        try:
-            builder = resolve_builder(method_id)
-            gate_runner = resolve_gate_runner(method_id)
-        except MethodDispatchError as error:
-            raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
-
-        def handler(payload: dict[str, Any], _node: dict[str, Any], _builder=builder) -> dict[str, Any]:
-            bindings = payload.get("__bindings__")
-            if not isinstance(bindings, dict):
-                raise InvariantViolation("WORKFLOW_BINDINGS_REQUIRED: executor did not expose bindings")
-            return invoke_builder(_builder, "", make_provenance("AI_INFERENCE", "AI_GENERATED"), bindings)
-
-        handlers[method_id] = handler
-    gate_runners: dict[int, Any] = {}
-    for index, node in enumerate(nodes):
-        if node["node_kind"] != "method":
-            continue
-        gate_runner = resolve_gate_runner(node["method_id"])
-
-        def run_gate(output: dict[str, Any], context: dict[str, Any], _node: dict[str, Any], _gate_runner=gate_runner) -> list[dict[str, Any]]:
-            return invoke_gate_runner(
-                _gate_runner,
-                output,
-                context,
-                "api.recipe",
-                datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            )
-
-        gate_runners[index] = run_gate
+    handlers.update(method_handlers)
 
     def evaluate_api_workflow_gate(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
         return workflow_gate_registry.evaluate(workflow_gate_refs, context, workflow)

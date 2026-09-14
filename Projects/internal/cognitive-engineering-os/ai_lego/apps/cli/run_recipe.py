@@ -14,15 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
-from ai_lego.apps.api.dispatch import (
-    MethodDispatchError,
-    invoke_builder,
-    invoke_gate_runner,
-    method_binding_issues,
-    resolve_builder,
-    resolve_gate_runner,
-)
-from ai_lego.core.domain.provenance import make_provenance
+from ai_lego.apps.api.dispatch import method_binding_issues, resolve_builder
+from ai_lego.apps.recipe_runtime import build_method_components
 from ai_lego.core.support import read_json, write_json
 from ai_lego.core.contracts.runtime_dir import guard_runtime_dir, prepare_runtime_dir
 from ai_lego.errors import InvariantViolation
@@ -69,30 +62,7 @@ def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spe
     if missing:
         raise InvariantViolation(f"WORKFLOW_SOURCE_FIELDS_MISSING: {', '.join(missing)}")
 
-    handlers: dict[str, Any] = {}
-    gate_runners: dict[int, Any] = {}
-    for index, node in enumerate(nodes):
-        method_id = node["method_id"]
-        builder = resolve_builder(method_id)
-        gate_runner = resolve_gate_runner(method_id)
-
-        def handler(payload: dict[str, Any], _node: dict[str, Any], _builder=builder) -> dict[str, Any]:
-            bindings = payload.get("__bindings__")
-            if not isinstance(bindings, dict):
-                raise InvariantViolation("WORKFLOW_BINDINGS_REQUIRED: executor did not expose bindings")
-            return invoke_builder(_builder, "", make_provenance("AI_INFERENCE", "AI_GENERATED"), bindings)
-
-        def run_gate(output: dict[str, Any], context: dict[str, Any], _node: dict[str, Any], _gate_runner=gate_runner) -> list[dict[str, Any]]:
-            return invoke_gate_runner(
-                _gate_runner,
-                output,
-                context,
-                VALIDATOR,
-                datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            )
-
-        handlers[method_id] = handler
-        gate_runners[index] = run_gate
+    handlers, gate_runners = build_method_components(nodes, validator=VALIDATOR)
 
     refs = list(workflow_ir.get("workflow_gate_refs", []))
     if "workflow_execution_integrity" not in refs:
