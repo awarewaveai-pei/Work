@@ -322,6 +322,9 @@ class DashboardTests(ApiTestCase):
         self.assertIn('id="recipe-status-btn"', html)
         self.assertIn("inspectRecipeRun", html)
         self.assertIn("/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}", html)
+        self.assertIn('id="recipe-result-btn"', html)
+        self.assertIn("loadRecipeRunResult", html)
+        self.assertIn("/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}/result", html)
 
     def test_dashboard_recipe_runner_exposes_stable_run_identity_and_resume_payload(self):
         html = api_main._DASHBOARD_HTML
@@ -773,6 +776,82 @@ class RecipeRunTests(ApiTestCase):
         response = self.client.get("/recipes/life-decision-v1/runs/bad%20run")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "WORKFLOW_RUN_ID_INVALID")
+
+    def test_recipe_run_result_returns_durable_outputs_without_source(self):
+        self._login()
+        source = fixture_source()
+        source["private_note"] = "DO_NOT_ECHO_RESULT_SOURCE"
+        run_id = "api-result-" + uuid.uuid4().hex[:12]
+        executed = self.client.post("/recipes/life-decision-v1/run", json={"source": source, "run_id": run_id})
+        self.assertEqual(executed.status_code, 200, executed.text)
+
+        response = self.client.get(f"/recipes/life-decision-v1/runs/{run_id}/result")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["recipe_id"], "life-decision-v1")
+        self.assertEqual(payload["run_id"], run_id)
+        self.assertEqual(payload["status"], "SUCCEEDED")
+        self.assertEqual(len(payload["workflow"]["steps"]), 3)
+        self.assertTrue(payload["workflow"]["context"]["outputs"])
+        self.assertIn("problem_statement", payload["workflow"]["context"]["outputs"])
+        self.assertIn("output", payload["workflow"]["steps"][0])
+        serialized = json.dumps(payload)
+        self.assertNotIn("DO_NOT_ECHO_RESULT_SOURCE", serialized)
+        self.assertNotIn("source", payload["workflow"]["context"])
+        self.assertNotIn(str(api_main.PRODUCT_ROOT), serialized)
+        self.assertNotIn("cas_path", serialized)
+
+    def test_recipe_run_result_requires_authentication(self):
+        run_id = "api-result-auth-" + uuid.uuid4().hex[:12]
+        response = self.client.get(f"/recipes/life-decision-v1/runs/{run_id}/result")
+        self.assertEqual(response.status_code, 401)
+
+    def test_recipe_run_result_is_tenant_scoped(self):
+        self._login()
+        run_id = "api-result-tenant-" + uuid.uuid4().hex[:12]
+        executed = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": run_id})
+        self.assertEqual(executed.status_code, 200, executed.text)
+
+        store = IdentityStore(self.db_path)
+        other_tenant_id = str(uuid.uuid4())
+        store.create_tenant(
+            tenant_id=other_tenant_id,
+            legal_name="Other Tenant",
+            home_jurisdiction="jurisdiction-pack.tw.v1",
+            data_residency_region="local-dev",
+            encryption_root_key_ref="other-test-kek-ref",
+        )
+        store.create_workspace(str(uuid.uuid4()), other_tenant_id, "Other Default")
+        store.create_identity(str(uuid.uuid4()), other_tenant_id, "other@example.com", "Other", "other-password")
+        login = self.client.post("/auth/login", json={"tenant_id": other_tenant_id, "email": "other@example.com", "password": "other-password"})
+        self.assertEqual(login.status_code, 200, login.text)
+
+        response = self.client.get(f"/recipes/life-decision-v1/runs/{run_id}/result")
+        self.assertEqual(response.status_code, 404)
+
+    def test_protected_recipe_run_result_restores_outputs_and_fails_closed_without_key(self):
+        self._login()
+        with tempfile.TemporaryDirectory() as directory, patch.object(api_main, "PRODUCT_ROOT", Path(directory)), patch.dict(
+            os.environ,
+            {"COGNITIVE_OS_JOURNAL_KEY_MODE": "local-dev", "COGNITIVE_OS_JOURNAL_KEY_B64": b64(b"k" * 32)},
+            clear=False,
+        ):
+            run_id = "api-protected-result-" + uuid.uuid4().hex[:12]
+            response = self.client.post(
+                "/recipes/life-decision-v1/run",
+                json={"source": fixture_source(), "data_classification": "CONFIDENTIAL", "run_id": run_id},
+            )
+            self.assertEqual(response.status_code, 200, response.text)
+
+            result = self.client.get(f"/recipes/life-decision-v1/runs/{run_id}/result")
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertTrue(result.json()["workflow"]["context"]["outputs"])
+            self.assertNotIn("cas_path", result.text)
+
+            with patch.dict(os.environ, {"COGNITIVE_OS_JOURNAL_KEY_MODE": "disabled"}, clear=False):
+                blocked = self.client.get(f"/recipes/life-decision-v1/runs/{run_id}/result")
+            self.assertEqual(blocked.status_code, 503, blocked.text)
+            self.assertEqual(blocked.json()["detail"], "WORKFLOW_JOURNAL_RESULT_PROTECTION_REQUIRED")
 
     def test_recipe_run_requires_authentication(self):
         response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source()})

@@ -11,6 +11,7 @@ Endpoints:
     GET  /recipes/{recipe_id}/form   -- describe the Source fields a Recipe needs
     POST /recipes/{recipe_id}/run    -- auth + entitlement + registered adapters
     GET  /recipes/{recipe_id}/runs/{run_id} -- auth + tenant-scoped run summary
+    GET  /recipes/{recipe_id}/runs/{run_id}/result -- auth + tenant-scoped projected outputs
     POST /auth/login                 -- {tenant_id, email, password} -> session cookie
     POST /auth/logout                -- revoke the caller's session
     POST /methods/{method_id}/invoke -- auth + entitlement required; body = builder kwargs
@@ -197,6 +198,82 @@ def _journal_run_summary(journal: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _api_result_context(context: Any) -> dict[str, Any]:
+    """Project restored journal context to the API's non-Source result surface."""
+    if not isinstance(context, dict):
+        raise InvariantViolation("WORKFLOW_JOURNAL_RESULT_CONTEXT_INVALID")
+    steps = context.get("steps")
+    outputs = context.get("outputs")
+    if not isinstance(steps, dict) or not isinstance(outputs, dict):
+        raise InvariantViolation("WORKFLOW_JOURNAL_RESULT_CONTEXT_INVALID")
+    return {"steps": steps, "outputs": outputs}
+
+
+def _journal_run_result(journal: dict[str, Any], context: Any) -> dict[str, Any]:
+    """Project durable execution outputs without returning raw journal fields."""
+    summary = _journal_run_summary(journal)
+    result_context = _api_result_context(context)
+    result_steps: list[dict[str, Any]] = []
+    for summary_step in summary["steps"]:
+        step = dict(summary_step)
+        index = step.get("index")
+        if isinstance(index, int) and str(index) in result_context["steps"]:
+            # Read outputs only from the protected/projected context. Never echo a raw
+            # step record, because an untrusted or future journal field could contain Source.
+            step["output"] = result_context["steps"][str(index)]
+        result_steps.append(step)
+    return {
+        **summary,
+        "workflow": {
+            "workflow_id": journal["workflow_id"],
+            "status": summary["status"],
+            "context": result_context,
+            "steps": result_steps,
+            "workflow_gates": summary["workflow_gates"],
+        },
+    }
+
+
+def _load_recipe_journal(session: dict[str, Any], recipe_id: str, run_id: str) -> dict[str, Any]:
+    """Load and validate one tenant-scoped journal without exposing its filesystem path."""
+    try:
+        journal = workflow_journal_path(session["tenant_id"], run_id)
+    except (KeyError, InvariantViolation) as error:
+        raise HTTPException(status_code=400, detail="WORKFLOW_RUN_ID_INVALID") from error
+    if not journal.is_file():
+        raise HTTPException(status_code=404, detail="WORKFLOW_RUN_NOT_FOUND")
+    try:
+        record = read_json(journal)
+        if not isinstance(record, dict):
+            raise InvariantViolation("WORKFLOW_JOURNAL_INVALID")
+        SchemaContracts(resolve_spec_root()).validate(
+            "ai-lego://specs/execution/workflow-journal.schema.yaml",
+            record,
+            "workflow run journal",
+        )
+    except Exception as error:
+        raise HTTPException(status_code=500, detail="WORKFLOW_JOURNAL_UNREADABLE_OR_INVALID") from error
+    if record["workflow_id"] != recipe_id:
+        raise HTTPException(status_code=404, detail="WORKFLOW_RUN_NOT_FOUND")
+    return record
+
+
+def _restore_api_result_context(record: dict[str, Any], tenant_id: str, run_id: str) -> dict[str, Any]:
+    """Restore protected result state or fail closed when its key boundary is unavailable."""
+    stored_context = record.get("context")
+    if not isinstance(stored_context, dict):
+        raise InvariantViolation("WORKFLOW_JOURNAL_RESULT_CONTEXT_INVALID")
+    if stored_context.get("protected") is True:
+        try:
+            protector = build_api_journal_protector(tenant_id, run_id)
+            if protector is None:
+                raise InvariantViolation("WORKFLOW_JOURNAL_RESULT_PROTECTION_REQUIRED")
+            stored_context = protector.restore(stored_context)
+        except InvariantViolation as error:
+            raise HTTPException(status_code=503, detail="WORKFLOW_JOURNAL_RESULT_PROTECTION_REQUIRED") from error
+    return _api_result_context(stored_context)
+
+
 def get_store() -> IdentityStore:
     db_path = Path(os.environ.get("COGNITIVE_OS_DB_PATH", DEFAULT_DB_PATH))
     return IdentityStore(db_path)
@@ -272,6 +349,7 @@ _DASHBOARD_HTML = """<!doctype html>
   <span id="recipe-run-error" class="error"></span>
   <button id="recipe-run-btn" disabled>Run Selected Recipe</button>
   <button id="recipe-status-btn" disabled>Check Run</button>
+  <button id="recipe-result-btn" disabled>Load Result</button>
   <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
     <div id="invoke-method" class="method-id"></div>
     <div id="invoke-help" class="method-meta"></div>
@@ -431,6 +509,7 @@ async function prepareRecipe(recipeId) {
   document.getElementById('recipe-help').textContent = `${recipeId}: ${form.source_fields.length} Source fields. Plan status: ${plan.status}.${blockers ? ' Blockers: ' + blockers + '.' : ''} Null values are placeholders; replace them with valid domain data before running.`;
   document.getElementById('recipe-run-btn').disabled = !loggedIn || plan.status !== 'READY';
   document.getElementById('recipe-status-btn').disabled = !loggedIn;
+  document.getElementById('recipe-result-btn').disabled = !loggedIn;
   document.getElementById('result').textContent = JSON.stringify({ recipe_id: recipeId, plan_status: plan.status, source_fields: form.source_fields }, null, 2);
 }
 
@@ -494,12 +573,28 @@ async function inspectRecipeRun(recipeId) {
   document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
 }
 
+async function loadRecipeRunResult(recipeId) {
+  const runId = document.getElementById('recipe-run-id').value.trim();
+  document.getElementById('recipe-run-error').textContent = '';
+  if (!runId) {
+    document.getElementById('recipe-run-error').textContent = 'A run ID is required to load a result';
+    return;
+  }
+  document.getElementById('result').textContent = 'loading recipe result ' + runId + ' ...';
+  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}/result`, { credentials: 'same-origin' });
+  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
 document.getElementById('recipe-run-btn').onclick = () => {
   if (selectedRecipeId) runRecipe(selectedRecipeId);
 };
 
 document.getElementById('recipe-status-btn').onclick = () => {
   if (selectedRecipeId) inspectRecipeRun(selectedRecipeId);
+};
+
+document.getElementById('recipe-result-btn').onclick = () => {
+  if (selectedRecipeId) loadRecipeRunResult(selectedRecipeId);
 };
 
 document.getElementById('recipe-fields-apply').onclick = applyRecipeFields;
@@ -841,30 +936,35 @@ def recipe_run_status(
     session: dict[str, Any] = Depends(require_session),
 ) -> dict[str, Any]:
     """Return a tenant-scoped, metadata-only view of one durable Recipe run."""
-    try:
-        journal = workflow_journal_path(session["tenant_id"], run_id)
-    except InvariantViolation as error:
-        raise HTTPException(status_code=400, detail="WORKFLOW_RUN_ID_INVALID") from error
-    if not journal.is_file():
-        raise HTTPException(status_code=404, detail="WORKFLOW_RUN_NOT_FOUND")
-    try:
-        record = read_json(journal)
-        if not isinstance(record, dict):
-            raise InvariantViolation("WORKFLOW_JOURNAL_INVALID")
-        SchemaContracts(resolve_spec_root()).validate(
-            "ai-lego://specs/execution/workflow-journal.schema.yaml",
-            record,
-            "workflow run status journal",
-        )
-    except Exception as error:
-        raise HTTPException(status_code=500, detail="WORKFLOW_JOURNAL_UNREADABLE_OR_INVALID") from error
-    if record["workflow_id"] != recipe_id:
-        raise HTTPException(status_code=404, detail="WORKFLOW_RUN_NOT_FOUND")
+    record = _load_recipe_journal(session, recipe_id, run_id)
     return {
         "recipe_id": recipe_id,
         "run_id": run_id,
         "journal_ref": workflow_journal_ref(session["tenant_id"], run_id),
         **_journal_run_summary(record),
+    }
+
+
+@app.get("/recipes/{recipe_id}/runs/{run_id}/result")
+def recipe_run_result(
+    recipe_id: str,
+    run_id: str,
+    session: dict[str, Any] = Depends(require_session),
+) -> dict[str, Any]:
+    """Return tenant-scoped durable outputs, restoring protected journal context when needed."""
+    record = _load_recipe_journal(session, recipe_id, run_id)
+    try:
+        context = _restore_api_result_context(record, session["tenant_id"], run_id)
+        result = _journal_run_result(record, context)
+    except HTTPException:
+        raise
+    except InvariantViolation as error:
+        raise HTTPException(status_code=500, detail="WORKFLOW_JOURNAL_RESULT_UNREADABLE_OR_INVALID") from error
+    return {
+        "recipe_id": recipe_id,
+        "run_id": run_id,
+        "journal_ref": workflow_journal_ref(session["tenant_id"], run_id),
+        **result,
     }
 
 
