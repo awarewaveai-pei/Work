@@ -521,7 +521,9 @@ class RecipeRunTests(ApiTestCase):
 
     def test_life_recipe_runs_through_shared_executor_and_gates(self):
         self._login()
-        response = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": "api-life-test"})
+        source = fixture_source()
+        source["private_note"] = "DO_NOT_ECHO_RAW_SOURCE"
+        response = self.client.post("/recipes/life-decision-v1/run", json={"source": source, "run_id": "api-life-test"})
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["status"], "PASS")
@@ -529,6 +531,8 @@ class RecipeRunTests(ApiTestCase):
         self.assertTrue(all(gate["status"] == "PASS" for gates in payload["gates"].values() for gate in gates))
         self.assertTrue(payload["journal_ref"].startswith("workflow-journal://"))
         self.assertNotIn(str(api_main.PRODUCT_ROOT), json.dumps(payload))
+        self.assertNotIn("DO_NOT_ECHO_RAW_SOURCE", json.dumps(payload))
+        self.assertNotIn("source", payload["workflow"]["context"])
         journal = json.loads(api_main.workflow_journal_path(self.tenant["tenant_id"], payload["run_id"]).read_text(encoding="utf-8"))
         self.assertNotIn("source", journal["context"])
 

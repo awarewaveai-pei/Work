@@ -121,6 +121,13 @@ def _api_journal_context(context: dict[str, Any]) -> dict[str, Any]:
     return {"steps": context.get("steps", {}), "outputs": context.get("outputs", {})}
 
 
+def _api_workflow_result(result: Any) -> dict[str, Any]:
+    """Return execution evidence without echoing the caller's raw Source payload."""
+    payload = result.as_dict()
+    payload["context"] = _api_journal_context(result.context)
+    return payload
+
+
 def build_api_journal_protector(tenant_id: str, run_id: str) -> CasJournalContextProtector | None:
     """Build a protected journal using local-dev or an explicitly injected external KMS resolver."""
     mode = os.environ.get("COGNITIVE_OS_JOURNAL_KEY_MODE", "disabled")
@@ -734,7 +741,7 @@ def run_recipe(
         journal_context_protector=journal_protector,
     )
     if result.status != "SUCCEEDED":
-        return {"status": "FAILED", "run_id": run_id, "workflow": result.as_dict(), "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
+        return {"status": "FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
     gates: dict[str, list[dict[str, Any]]] = {}
     for index, node in enumerate(nodes):
         if node["node_kind"] != "method":
@@ -751,7 +758,7 @@ def run_recipe(
         except (InvariantViolation, MethodDispatchError) as error:
             raise HTTPException(status_code=422, detail=f"WORKFLOW_GATE_EVALUATION_FAILED: {error}") from error
     passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates)
-    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": result.as_dict(), "gates": gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
+    return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
 
 
 @app.get("/methods/{method_id}")

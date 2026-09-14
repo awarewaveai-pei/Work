@@ -17536,3 +17536,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`project_workflow_ir|runtime_subchain|artifact_workflow|WORKFLOW_INPUT_NOT_FOUND` | hits=唯一 projection implementation、兩個 runtime 使用群組與既有 regression tests；無旁路 projection semantics。
 - ROLLBACK: revert `b644c9d46`；既有 Recipe/Journal schema 與 CAS 資料不受影響。
 - WORKLOG_DONE: Projection runtime boundary regression
+
+[追記 2026-09-14 API response source minimization]
+- 根因：API 直接序列化 `WorkflowRunResult.as_dict()`，把內部 executor context 的 raw `source` echo 回 response；journal 雖已 projection，response boundary 仍未最小化。
+- 修正：新增 `_api_workflow_result` response projector，保留 workflow id/status/steps/outputs，移除 raw source；成功與失敗回應共用同一 projection。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -v tests.unit.test_api_main.RecipeRunTests.test_life_recipe_runs_through_shared_executor_and_gates` | exit=0 | ms=約10000；assert=`DO_NOT_ECHO_RAW_SOURCE` absent、workflow.context.source absent。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 API helper、兩個 response path 與 regression test。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`_api_workflow_result|result.as_dict\(\)|DO_NOT_ECHO_RAW_SOURCE` | hits=單一 API response projector、兩個 route response path、單一 regression test；無未投影的 recipe response path。
+- ROLLBACK: revert 本次 response projection commit；不改 journal、CAS、source storage 或 workflow execution semantics。
+- WORKLOG_DONE: API response source minimization
