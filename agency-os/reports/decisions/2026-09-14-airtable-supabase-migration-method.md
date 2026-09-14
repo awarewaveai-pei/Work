@@ -19,6 +19,8 @@
 
 **本次實際執行 allow-list：** Airtable 官方 API、外部 raw JSON／JSONL archive、本機 staging／測試、核准的 Supabase migrations、核准的 `art_therapy` canonical／provenance／audit objects。其他候選工具與物件不會被安裝、建立或寫入 Supabase。
 
+**資料範圍規則：** 完整 source snapshot 只作保全與重跑證據；AI 不接收整個 snapshot，只接收當前 scope 的必要 metadata、dependency 與最小樣本；Supabase 只寫入 approved mapping 的欄位與必要關係。未使用資料不進 AI context，也不進 canonical tables。
+
 ## 背景與問題定義
 
 這不是單純的 CSV 搬運。來源同時包含中文 authoring、英文資料、linked records、lookup、rollup、formula、附件與不同語義層級的欄位。上次失敗的根因是過早建立目標表、以顯示名稱猜 mapping、把來源資料與 canonical model 混在一起，造成看似有資料但內容與欄位不完整。

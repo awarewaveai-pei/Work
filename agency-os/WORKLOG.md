@@ -1,4 +1,16 @@
 # Worklog
+## 2026-09-14｜Cognitive OS Recipe durable result read
+
+- 根因／缺口：Recipe 已能以 durable journal 執行、resume、查 metadata，但 Dashboard/API 尚不能在執行後讀回結果；protected journal 也沒有安全的 tenant/run 解密讀取邊界。
+- 修改：新增 authenticated tenant-scoped `GET /recipes/{recipe_id}/runs/{run_id}/result`；共用 journal schema loader；結果只投影 `steps`/`outputs`，不回傳 raw Source、host path、CAS metadata；protected context 透過同一 key provider restore，缺 key 或解密失敗統一 503 fail-closed；Dashboard 新增 `Load Result`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.DashboardTests.test_dashboard_never_interpolates_catalog_data_via_innerhtml tests.unit.test_api_main.RecipeRunTests.test_recipe_run_result_returns_durable_outputs_without_source tests.unit.test_api_main.RecipeRunTests.test_recipe_run_result_requires_authentication tests.unit.test_api_main.RecipeRunTests.test_recipe_run_result_is_tenant_scoped tests.unit.test_api_main.RecipeRunTests.test_protected_recipe_run_result_restores_outputs_and_fails_closed_without_key -q` | exit=0 | result=5 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests -q` | exit=0 | result=26 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | result=PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts\\bughunt-oracle.ps1 -WorkRoot D:\\Work` | success=True | result=PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`recipe_run_result|_load_recipe_journal|_restore_api_result_context|recipe-result-btn|WORKFLOW_JOURNAL_RESULT_PROTECTION_REQUIRED` | result=targeted implementation/tests/docs present; oracle PASS
+- WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
+- rollback：`git revert <result-read-commit>`；不涉及 schema、DB migration、密鑰或部署。
 
 ## 2026-09-14｜Cognitive OS atomic Recipe run claim
 
@@ -18109,3 +18121,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`Wrapper|Whalesync|n8n|Airbyte|raw landing|mirror`；確認候選僅為研究紀錄，沒有被列入實際 migration pipeline。
 - ROLLBACK: `git revert <this-commit>`；僅回滾文件與 WORKLOG 修訂。
 - WORKLOG_DONE: Migration execution allow-list
+
+[追記 2026-09-14 Migration context minimization]
+- 根因：完整 source preservation 與 AI／canonical write scope 未清楚分層，可能讓 AI 看到無關資料並把未使用欄位帶入正式表。
+- 修正：master plan／決策報告加入欄位級 allow-list；完整 snapshot 只作外部保全與重跑證據，AI 只接收當前 scope 的必要 metadata／dependency／最小樣本，Supabase 只寫 approved target。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`Select-String master plan/report for AI context, source archive, approved target scope` | exit=0 | result=scope separation present。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`完整 source snapshot|AI context|approved target|未使用資料`；確認未把完整 snapshot 設為 AI prompt 或 canonical write input。
+- ROLLBACK: `git revert <this-commit>`；僅回滾文件與 WORKLOG 修訂。
+- WORKLOG_DONE: Migration context minimization
