@@ -20,6 +20,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 
 _PASSTHROUGH = ("label", "input", "bindings", "necessity", "gate_ref")
+_RECIPE_SCHEMA = "ai-lego://specs/cognitive/recipe.schema.yaml"
 _WORKFLOW_IR_SCHEMA = "ai-lego://specs/workflow/workflow-ir.schema.yaml"
 
 
@@ -113,6 +114,7 @@ def workflow_dataflow_issues(
 
 def compile_recipe_to_workflow_ir(spec_root: Path, recipe_id: str, risk_tier: str) -> dict[str, Any]:
     recipe = load_recipe(spec_root, recipe_id)
+    _schema_contracts(str(spec_root.resolve())).validate(_RECIPE_SCHEMA, recipe, f"Recipe {recipe_id}")
     nodes: list[dict[str, Any]] = []
     for step in recipe.get("steps", []):
         kind = step.get("type")

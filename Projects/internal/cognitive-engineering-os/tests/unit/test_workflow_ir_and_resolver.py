@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from ai_lego import resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
@@ -31,6 +32,12 @@ class WorkflowIrTests(unittest.TestCase):
         self.assertEqual(method_ids, ["research.qualitative_coding", "research.qualitative_coding", "evidence.triangulation"])
         self.assertEqual(capability_refs, ["transcribe", "literature_search", "run_statistics", "artifact.generate_research_paper"])
         self.assertEqual(ir["references"]["cognitive_method_atlas"]["required"], True)
+
+    def test_recipe_compiler_rejects_schema_invalid_recipe_before_ir_compilation(self):
+        malformed = {"id": "malformed-recipe", "status": "ACTIVE", "version": "1.0.0", "name": "Malformed"}
+        with patch("ai_lego.platform.workflow.ir.load_recipe", return_value=malformed):
+            with self.assertRaisesRegex(SchemaValidationError, "SCHEMA_VALIDATION_FAILED"):
+                compile_recipe_to_workflow_ir(self.spec_root, "malformed-recipe", "R1")
 
     def test_recipe_workflow_gate_refs_are_compiled_into_ir(self):
         ir = compile_recipe_to_workflow_ir(self.spec_root, "edd-research-evidence-v1", "R1")
