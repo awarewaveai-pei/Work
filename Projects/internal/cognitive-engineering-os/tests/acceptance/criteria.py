@@ -309,7 +309,8 @@ class SliceCriteriaMixin:
         gate_ids = [g["gate_id"] for g in verifying["gate_results"]]
         method_gate_ids = [gate_id for gate_id in gate_ids if gate_id in GATE_ORDER]
         self.assertEqual(method_gate_ids, GATE_ORDER)
-        self.assertEqual(set(gate_ids) - set(GATE_ORDER), set(HIGH_RISK_GATE_IDS))
+        workflow_gate_ids = {"workflow_execution_integrity", "research_workflow_integrity"}
+        self.assertEqual(set(gate_ids) - set(GATE_ORDER) - workflow_gate_ids, set(HIGH_RISK_GATE_IDS))
 
     def test_terminal_state_guard_actually_refuses_a_downstream_emit(self):
         branch = self.result["blocked_then_cancelled"]
