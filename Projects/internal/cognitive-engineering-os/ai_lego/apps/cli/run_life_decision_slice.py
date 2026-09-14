@@ -19,17 +19,14 @@ from ai_lego.core.domain.evidence import evidence_record
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.core.support import read_json, write_json
 from ai_lego.modules.decision.weighted_decision_matrix import (
-    all_gates_pass as wdm_gates_pass,
     evaluate_weighted_decision_matrix_gates,
     generate_weighted_decision_matrix_analysis,
 )
 from ai_lego.modules.framing.problem_statement import (
-    all_gates_pass as problem_gates_pass,
     evaluate_problem_statement_gates,
     generate_problem_statement,
 )
 from ai_lego.modules.strategy.swot import (
-    all_gates_pass as swot_gates_pass,
     evaluate_swot_gates,
     generate_swot_analysis,
     swot_factor,
@@ -115,12 +112,22 @@ def run_life_decision(spec_root: Path | None = None, runtime_dir: Path | None = 
             raise RuntimeError("LIFE_DECISION_UPSTREAM_SWOT_MISSING")
         return generate_weighted_decision_matrix_analysis(**payload["source.decision"])
 
+    def problem_gate(output: dict[str, Any], _context: dict[str, Any], _node: dict[str, Any]) -> list[dict[str, Any]]:
+        return evaluate_problem_statement_gates(output, VALIDATOR, "2026-09-14T00:00:00Z")
+
+    def swot_gate(output: dict[str, Any], _context: dict[str, Any], _node: dict[str, Any]) -> list[dict[str, Any]]:
+        return evaluate_swot_gates(output, VALIDATOR, "2026-09-14T00:00:00Z")
+
+    def matrix_gate(output: dict[str, Any], _context: dict[str, Any], _node: dict[str, Any]) -> list[dict[str, Any]]:
+        return evaluate_weighted_decision_matrix_gates(output, VALIDATOR, "2026-09-14T00:00:00Z")
+
     journal = (runtime_dir or Path(tempfile.gettempdir()) / "ai-lego-life-decision") / "life_decision.journal.json"
     result = execute_workflow_ir(
         workflow,
         {"source": source},
         {"framing.problem_statement": problem, "strategy.swot": swot, "decision.weighted_decision_matrix": matrix},
         catalogs={"method": catalog},
+        gate_runners={0: problem_gate, 1: swot_gate, 2: matrix_gate},
         journal_path=journal,
     )
     if result.status != "SUCCEEDED":
@@ -129,13 +136,7 @@ def run_life_decision(spec_root: Path | None = None, runtime_dir: Path | None = 
     contracts.validate(SCHEMAS["problem"], outputs["problem_statement"], "problem statement")
     contracts.validate(SCHEMAS["swot"], outputs["SWOT_analysis"], "SWOT analysis")
     contracts.validate(SCHEMAS["wdm"], outputs["weighted_decision_matrix"], "weighted decision matrix")
-    gates = {
-        "problem_statement": evaluate_problem_statement_gates(outputs["problem_statement"], VALIDATOR, "2026-09-14T00:00:00Z"),
-        "SWOT_analysis": evaluate_swot_gates(outputs["SWOT_analysis"], VALIDATOR, "2026-09-14T00:00:00Z"),
-        "weighted_decision_matrix": evaluate_weighted_decision_matrix_gates(outputs["weighted_decision_matrix"], VALIDATOR, "2026-09-14T00:00:00Z"),
-    }
-    if not (problem_gates_pass(gates["problem_statement"]) and swot_gates_pass(gates["SWOT_analysis"]) and wdm_gates_pass(gates["weighted_decision_matrix"])):
-        raise RuntimeError(f"LIFE_DECISION_GATE_FAILED: {gates}")
+    gates = {step.label: list(step.gates or ()) for step in result.steps if step.gates is not None}
     report = {"status": "PASS", "workflow": result.as_dict(), "method_resolution": resolution, "gates": gates, "journal": str(journal)}
     output_path = (runtime_dir or journal.parent) / "life_decision.result.json"
     write_json(output_path, report)

@@ -17588,3 +17588,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`execute_workflow_ir|gate_runners|WORKFLOW_GATE_FAILED` | hits=24 executor references、8 new gate references；確認 API 唯一 production gate seam，既有 CLI/runtime consumers 未傳 gate_runners 且保持相容。
 - ROLLBACK: revert 本次 shared per-step gate boundary commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
 - WORKLOG_DONE: shared per-step gate boundary
+
+[追記 2026-09-14 life decision gate migration]
+- 根因：生活決策 CLI 是共用 executor 的另一個 consumer，但仍在整條鏈完成後才執行 problem/SWOT/WDM gates；因此沒有真正使用通用 gate boundary。
+- 修正：將三個 method gate runner 以 node index 注入 `execute_workflow_ir`；gate evidence 改由 step ledger 產生，移除 CLI 後置 gate 重跑與重複 pass 判斷。Recipe、方法 contract 與輸入形狀不變。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m py_compile ai_lego/apps/cli/run_life_decision_slice.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.unit.test_life_decision_slice` | exit=0 | result=1 test OK；tool=Python | cmd=`python -m ai_lego.apps.cli.run_life_decision_slice --runtime-dir <unique temp dir>` | exit=0 | result=PASS、3 steps、3 gate keys、journal exists。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 CLI gate closures、executor injection、report gate extraction 與產出 journal。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`execute_workflow_ir|gate_runners=|LIFE_DECISION_GATE_FAILED|evaluate_*_gates` | hits=2 executor invocation/gate injection；無生活決策後置 gate path 或重複 `all_gates_pass`。
+- ROLLBACK: revert 本次 life decision gate migration commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
+- WORKLOG_DONE: life decision gate migration
