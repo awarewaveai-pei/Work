@@ -27,7 +27,7 @@ Airtable Web API 每次最多回傳 100 筆，超過時必須使用 offset 逐�
 
 ### C1：自建 deterministic ETL（首選）
 
-建立一個有明確版本、checkpoint、重試、checksum、mapping registry 與驗證報告的遷移程式。它先完整讀取 Airtable metadata 與 records，再把原始 payload 保存到 raw archive／landing，最後依人工核准的 mapping 轉成 relational canonical model。
+建立一個有明確版本、checkpoint、重試、checksum、mapping registry 與驗證報告的遷移程式。它先讀取 master plan，再完整讀取 Airtable metadata 與 records，把原始 payload 保存到 raw archive，最後依人工核准的 mapping 轉成 relational canonical model。
 
 ### C2：Supabase Airtable Wrapper + SQL
 
@@ -47,7 +47,7 @@ Supabase Wrapper 可把 Airtable 查詢成 Postgres foreign table，但官方明
 
 ## 建議
 
-### 首選：C1 自建 deterministic ETL + raw landing + relational canonical
+### 首選：C1 自建 deterministic ETL + raw archive + relational canonical
 
 這是唯一同時滿足「資料先完整保存」與「正式資料模型不被 Airtable UI 結構綁死」的方案。
 
@@ -79,6 +79,36 @@ Supabase Wrapper 可把 Airtable 查詢成 Postgres foreign table，但官方明
 | 長期維運複雜度 | 7 | 8 | 7 | 5 | 8 | ★★ |
 | 鎖定風險 | 9 | 6 | 6 | 5 | 9 | ★★ |
 | **加權判定** | **首選** | 不足 | 次選 | 不足 | 不足 | |
+
+## 實際案例與外部方案核對
+
+### Whalesync：成功的是 table-level sync，不是 domain remodelling
+
+Whalesync 公開文章比較自建 API、Wrapper、Zapier、ETL/reverse ETL 與 Whalesync。其強項是 table-wide、一向／雙向同步與欄位方向控制；這適合兩邊長期都要編輯的資料橋接，不等於把一個複雜 Airtable base 重建成新的 canonical model。文章也列出 Wrapper 沒有 query pushdown、Zapier 需要多個 automation、雙向同步可能產生 loop 等限制。[^6]
+
+### Connex：成功的共同做法是 stable ID、unique、UPSERT、cursor 與 backfill 分離
+
+Connex 的公開方案把重點放在 Airtable record ID、資料庫 unique constraint、UPSERT、cursor、retry、per-record logging 與 backfill。這些是本案必須採用的 transport/integrity patterns；但該方案偏向持續同步，不代表可自動決定本案中文欄位與 canonical schema。[^7]
+
+### 專用 Airtable → PostgreSQL 工具：可做 sandbox pilot，不可盲信
+
+AT Migrator 等專用工具公開宣稱能處理 linked records、foreign keys、formula、rollup、lookup 與 attachments，並提供供應商自述的案例數字。這類工具值得在隔離環境測試，以降低 extraction 工作量；但其宣稱不是獨立驗證，正式結果仍必須與 Airtable snapshot 逐欄逐筆比對。[^8]
+
+### 開源 audit 工具：先回答「到底該搬什麼」
+
+`airtable-migration-audit` 這類工具先讀 schema 與 records，產出 null rate、cardinality、關係模式、候選字典與 import order，而不是直接搬資料。這正是本案所需的第一道防線。[^9]
+
+### n8n：可自動化流程，不代表語義已正確
+
+n8n 公開 workflow 宣稱可自動執行 Airtable → PostgreSQL 並處理 linked records，但公開 workflow 不能證明本案中文欄位、英文 reconciliation、formula 依賴、附件保存與 canonical remodelling 正確；只能作為 sandbox 候選。[^10]
+
+### YouTube 證據限制
+
+本次文字研究無法取得你提供的兩支影片內容或 transcript，因此不把它們冒充成已驗證證據：[影片 1](https://www.youtube.com/watch?v=ce7-Z7mNvMU)、[影片 2](https://www.youtube.com/watch?v=8M3cdMd5DHw)。可檢索到的 Whalesync 影片摘要只支持 table mapping、direction controls 與 multi-table verification，不足以證明複雜 domain migration 已完整成功。[^11]
+
+### 成功案例共同必要條件
+
+不同案例反覆出現的可靠做法是：source schema 與 records 先盤點、field ID／record ID 作 provenance、unique + UPSERT 防重複、分頁／rate limit／checkpoint 可重跑、linked records 先建立 source map、formula／lookup／rollup 延後重建、附件實體化保存，以及 source／target 逐欄逐筆驗證。
 
 ## 具體實作藍圖
 
@@ -182,7 +212,7 @@ dry-run 不寫正式 canonical tables，輸出逐表、逐欄、逐筆、逐關�
 
 ## 最終結論
 
-本案最好的方法不是找一個「自動把 Airtable 變成 Supabase」的按鈕，而是：**每次執行先同時讀取 master plan 與 Airtable；用 Airtable API 做完整、可驗證的 source capture；用外部 raw JSON 保護所有原始內容；用 deterministic、版本化 mapping 產生正式 relational Supabase model；用硬性差異驗證阻止任何不完整寫入。**
+本案最好的方法不是找一個「自動把 Airtable 變成 Supabase」的按鈕，而是：**每次執行先同時讀取 master plan 與 Airtable；用 Airtable API 或經 sandbox 驗證的 extractor 做完整 source capture；用外部 raw JSON 保護所有原始內容；用 deterministic、版本化 mapping 產生正式 relational Supabase model；用硬性差異驗證阻止任何不完整寫入。**
 
 這個方案的額外程式工作比直匯多，但它直接針對本案曾發生的錯誤：欄位覆蓋、中文內容遺失、關係失真、formula／lookup 混淆與無法追溯。這些風險不是換一個 AI model 或 connector 就會消失。
 
@@ -193,3 +223,9 @@ dry-run 不寫正式 canonical tables，輸出逐表、逐欄、逐筆、逐關�
 [^3]: Supabase, [Import data into Supabase](https://supabase.com/docs/guides/database/import-data). CSV、pgloader、COPY、API 等 load methods 與 production import 注意事項。
 [^4]: PostgreSQL, [JSON Types](https://www.postgresql.org/docs/17/datatype-json.html). JSON／relational 共存、結構可預期、整列 row lock 與 JSONB 使用取捨。
 [^5]: Supabase, [Database Migrations](https://supabase.com/docs/guides/deployment/database-migrations). Remote schema 應由 migration 管理，避免 migration history drift。
+[^6]: Whalesync, [How to Integrate Airtable and Supabase](https://www.whalesync.com/blog/how-to-connect-airtable-and-supabase). 公開比較五種整合方式與其限制。
+[^7]: Connex Digital, [Airtable to Supabase sync migration plan](https://connex.digital/blog/airtable-to-supabase-sync-new-rows-updates-backfill-a-practical-migration-plan/). Stable IDs、unique、UPSERT、cursor、retry 與 backfill。
+[^8]: AT Migrator, [Airtable to PostgreSQL Migration Tool](https://www.atmigrator.com/). Vendor-reported capabilities and case metrics; requires independent sandbox verification。
+[^9]: GitHub, [airtable-migration-audit](https://github.com/mperlak/airtable-migration-audit). Schema／record audit 與 migration readiness analysis。
+[^10]: n8n, [Automated Airtable to Postgres migration workflow](https://n8n.io/workflows/4772-automated-airtable-to-postgres-migration-with-n8n/). 公開 workflow；本案需自行驗證。
+[^11]: Whalesync, [How to integrate Airtable and Supabase (2025)](https://www.youtube.com/watch?v=7Nwz-0lMnEs). 可檢索摘要涉及 table mapping、direction controls 與 multi-table verification。
