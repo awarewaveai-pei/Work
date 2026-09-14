@@ -806,18 +806,26 @@ def run_recipe(
     def evaluate_api_workflow_gate(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
         return workflow_gate_registry.evaluate(workflow_gate_refs, context, workflow)
 
-    result = execute_workflow_ir(
-        workflow_ir,
-        {"source": source},
-        handlers,
-        catalogs={"method": catalog, "capability": capability_catalog},
-        gate_runners=gate_runners,
-        workflow_gate_runner=evaluate_api_workflow_gate,
-        journal_path=journal,
-        resume=resume,
-        journal_context_projector=None if journal_protector is not None else _api_journal_context,
-        journal_context_protector=journal_protector,
-    )
+    try:
+        result = execute_workflow_ir(
+            workflow_ir,
+            {"source": source},
+            handlers,
+            catalogs={"method": catalog, "capability": capability_catalog},
+            gate_runners=gate_runners,
+            workflow_gate_runner=evaluate_api_workflow_gate,
+            journal_path=journal,
+            resume=resume,
+            journal_context_projector=None if journal_protector is not None else _api_journal_context,
+            journal_context_protector=journal_protector,
+        )
+    except InvariantViolation as error:
+        if str(error).startswith("WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME"):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "WORKFLOW_RUN_EXISTS_REQUIRES_RESUME", "run_id": run_id},
+            ) from error
+        raise
     gates = {str(step.index): list(step.gates) for step in result.steps if step.gates is not None}
     workflow_gates = list(result.workflow_gates or [])
     if result.status != "SUCCEEDED":

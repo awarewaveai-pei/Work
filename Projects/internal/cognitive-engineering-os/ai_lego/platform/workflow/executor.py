@@ -4,17 +4,18 @@ This is the runtime seam between a compiled Recipe and domain adapters.  It
 does not know about a particular method or provider: callers register handlers
 for the IR node references and provide the initial context.  The executor
 resolves declared input paths, stops on the first failure, and returns a
-serialisable step ledger so a durable runner can be added later without
-changing Method contracts.
+serialisable step ledger for durable API/CLI entrypoints without changing
+Method contracts.
 
 The deliberately narrow contract is the first vertical slice of Master Plan
-§9: no implicit LLM fallback, no guessed input, and no partial success marked
-as a successful run.
+§9: no implicit LLM fallback, no guessed input, no partial success marked as
+a successful run, and one atomic journal claim shared by durable API/CLI entrypoints.
 """
 
 from __future__ import annotations
 
 import os
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -168,12 +169,26 @@ def _node_ref(node: Mapping[str, Any]) -> str:
     return ref
 
 
-def _atomic_write_journal(path: Path, payload: dict[str, Any]) -> None:
-    """Publish a journal record atomically so a crash cannot expose half JSON."""
+def _atomic_write_journal(path: Path, payload: dict[str, Any], *, create_only: bool = False) -> None:
+    """Publish a journal atomically, optionally claiming a never-before-used path.
+
+    The first record uses a fully-written temporary file plus an atomic hard-link
+    create.  ``os.replace`` is correct for checkpoints but would overwrite a
+    journal if two new runners passed an ``exists()`` check at the same time.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     write_json(temporary, payload)
-    os.replace(temporary, path)
+    try:
+        if create_only:
+            try:
+                os.link(temporary, path)
+            except FileExistsError as error:
+                raise InvariantViolation("WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME") from error
+        else:
+            os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _journal_record(
@@ -313,7 +328,11 @@ def execute_workflow_ir(
     elif resume:
         raise InvariantViolation(f"WORKFLOW_JOURNAL_NOT_FOUND: {journal_path}")
     if journal_path is not None:
-        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "RUNNING", context, results, start_index, journal_context_projector, journal_context_protector))
+        _atomic_write_journal(
+            journal_path,
+            _journal_record(workflow_ir, initial_context, "RUNNING", context, results, start_index, journal_context_projector, journal_context_protector),
+            create_only=not resume,
+        )
 
     for index, raw_node in enumerate(nodes[start_index:], start=start_index):
         if not isinstance(raw_node, Mapping):

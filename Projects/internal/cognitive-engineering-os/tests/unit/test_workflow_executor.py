@@ -1,6 +1,9 @@
 import unittest
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 
 from ai_lego import resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
@@ -221,6 +224,41 @@ class WorkflowExecutorTests(unittest.TestCase):
             completed_again = execute_workflow_ir(ir, {}, {"one.step": first, "two.step": second}, journal_path=journal, resume=True)
             self.assertEqual(completed_again.status, "SUCCEEDED")
             self.assertEqual(calls, ["first", "second", "second"])
+
+    def test_concurrent_new_runs_atomically_claim_one_journal(self):
+        ir = {"id": "atomic-claim-v1", "nodes": [{"node_kind": "method", "method_id": "one.step"}]}
+        journal_barrier = threading.Barrier(2)
+
+        def handler(_payload, _node):
+            return {"ok": True}
+
+        def synchronized_first_write(path, payload, *, create_only=False):
+            if create_only:
+                journal_barrier.wait(timeout=5)
+            return original_first_write(path, payload, create_only=create_only)
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "atomic.json"
+            from ai_lego.platform.workflow import executor as executor_module
+
+            original_first_write = executor_module._atomic_write_journal
+            with patch.object(executor_module, "_atomic_write_journal", side_effect=synchronized_first_write):
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    futures = [
+                        pool.submit(execute_workflow_ir, ir, {}, {"one.step": handler}, journal_path=journal)
+                        for _ in range(2)
+                    ]
+                    outcomes = []
+                    for future in futures:
+                        try:
+                            outcomes.append(("SUCCEEDED", future.result(timeout=5).status))
+                        except InvariantViolation as error:
+                            outcomes.append(("ERROR", str(error)))
+
+        self.assertEqual([kind for kind, _ in outcomes].count("SUCCEEDED"), 1)
+        errors = [value for kind, value in outcomes if kind == "ERROR"]
+        self.assertEqual(len(errors), 1)
+        self.assertIn("WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME", errors[0])
 
     def test_durable_resume_refuses_changed_inputs(self):
         ir = {"id": "durable-v1", "nodes": [{"node_kind": "method", "method_id": "one.step"}]}

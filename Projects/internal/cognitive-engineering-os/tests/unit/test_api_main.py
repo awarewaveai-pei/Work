@@ -708,6 +708,17 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(resumed.status_code, 200, resumed.text)
         self.assertEqual(resumed.json()["status"], "PASS")
 
+    def test_recipe_run_rejects_duplicate_run_without_resume(self):
+        self._login()
+        run_id = "api-duplicate-" + uuid.uuid4().hex[:12]
+        source = fixture_source()
+        first = self.client.post("/recipes/life-decision-v1/run", json={"source": source, "run_id": run_id})
+        self.assertEqual(first.status_code, 200, first.text)
+
+        duplicate = self.client.post("/recipes/life-decision-v1/run", json={"source": source, "run_id": run_id})
+        self.assertEqual(duplicate.status_code, 409, duplicate.text)
+        self.assertEqual(duplicate.json()["detail"]["code"], "WORKFLOW_RUN_EXISTS_REQUIRES_RESUME")
+
     def test_recipe_run_status_returns_authenticated_sanitized_journal_summary(self):
         self._login()
         source = fixture_source()
