@@ -487,10 +487,13 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         workflow_ir,
         [1, 4, 3, 5],
         {
-            1: {"label": "coding", "input": "research.coding_request"},
-            4: {"label": "statistics", "input": "outputs.coding"},
-            3: {"label": "literature", "input": "research.question"},
-            5: {"label": "triangulation", "input": ["outputs.coding", "outputs.literature"]},
+            # This runtime slice supplies the already-reviewed coding request;
+            # do not inherit the full Recipe's Transcription binding, whose
+            # producer is intentionally omitted from this projection.
+            1: {"label": "coding", "input": "research.coding_request", "bindings": {}},
+            4: {"label": "statistics", "input": "outputs.coding", "bindings": {}},
+            3: {"label": "literature", "input": "research.question", "bindings": {}},
+            5: {"label": "triangulation", "input": ["outputs.coding", "outputs.literature"], "bindings": {}},
         },
         workflow_id=f"{workflow_ir['id']}:coding-statistics",
     )
@@ -631,7 +634,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
     artifact_workflow = project_workflow_ir(
         workflow_ir,
         [6],
-        {6: {"label": "artifact", "input": ["research.artifact_path", "research.memo"]}},
+        {6: {"label": "artifact", "input": ["research.artifact_path", "research.memo"], "bindings": {}}},
         workflow_id=f"{runtime_result.workflow_id}:artifact",
     )
     artifact_result = execute_workflow_ir(

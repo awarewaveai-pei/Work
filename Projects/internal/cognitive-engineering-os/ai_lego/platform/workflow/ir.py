@@ -218,8 +218,10 @@ def project_workflow_ir(
         if not isinstance(index, int) or index < 0 or index >= len(source_nodes):
             raise InvariantViolation(f"WORKFLOW_IR_PROJECTION_INDEX_OUT_OF_RANGE: {index!r}")
         node = dict(source_nodes[index])
-        node.update(bindings.get(index, {}))
         rewrite_node_paths(node)
+        # Rewrite only inherited dataflow references. Explicit runtime bindings
+        # define the projected boundary and must remain authoritative.
+        node.update(bindings.get(index, {}))
         nodes.append(node)
     projected = dict(compiled_ir)
     projected["id"] = workflow_id or f"{compiled_ir['id']}:projection"
