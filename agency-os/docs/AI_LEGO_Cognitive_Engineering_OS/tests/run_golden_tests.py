@@ -243,6 +243,7 @@ def run_recipe_instance_conformance():
         "business-feasibility-review-v1",
         "business-foundation-v1",
         "business-planning-strategy-v1",
+        "business-planning-review-v1",
         "champion-challenger",
         "db-migration-expand-contract",
         "edd-literature-search-v1",

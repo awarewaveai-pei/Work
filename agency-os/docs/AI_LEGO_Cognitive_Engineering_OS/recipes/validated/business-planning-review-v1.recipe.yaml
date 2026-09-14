@@ -1,0 +1,211 @@
+$id: "ai-lego://recipes/validated/business-planning-review-v1.recipe.yaml"
+title: "Business Planning Review"
+status: ACTIVE
+description: >
+  The largest currently executable business-planning chain. It composes
+  problem framing, customer observations, strategic analysis, scenario/risk
+  review, and genuine financial calculations from explicitly supplied source
+  records. It stops before the unbuilt Finance Domain Pack, KPI/execution
+  planning, and proposal publication.
+id: business-planning-review-v1
+version: "1.0.0"
+name: "Business Planning Review"
+
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+
+suited_for:
+  - "A replayable pre-decision business planning review"
+  - "Connecting supplied strategy, risk, scenario, and financial records"
+not_for:
+  - "Market research, investment advice, financial forecasting from invented assumptions, or proposal publication"
+
+mandatory_elements:
+  - "All source records are supplied explicitly and retain provenance"
+  - "TOWS consumes the preceding SWOT output through an explicit binding"
+  - "Numeric results are genuine computations and remain subject to human review"
+
+forbidden_actions:
+  - "Inventing customer, market, competitor, risk, or financial evidence"
+  - "Treating the BMC, scenarios, or computed metrics as approval or recommendation"
+  - "Calling the bounded chain a complete Business Planning Mode proposal"
+
+steps:
+  - label: "problem_statement"
+    type: method
+    method_id: framing.problem_statement
+    input: source.problem
+    bindings:
+      problem_id: source.problem.problem_id
+      current_state: source.problem.current_state
+      expected_state: source.problem.expected_state
+      gap: source.problem.gap
+      provenance: source.problem.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "customer_empathy_map"
+    type: method
+    method_id: insight.empathy_map
+    input: source.customer_insight
+    bindings:
+      map_id: source.customer_insight.map_id
+      subject: source.customer_insight.subject
+      entries: source.customer_insight.entries
+      provenance: source.customer_insight.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "SWOT_analysis"
+    type: method
+    method_id: strategy.swot
+    input: source.swot
+    bindings:
+      analysis_id: source.swot.analysis_id
+      knowledge_set_ref: source.swot.knowledge_set_ref
+      knowledge_set: source.swot.knowledge_set
+      factors: source.swot.factors
+    necessity: REQUIRED_BY_RISK
+  - label: "PESTEL_analysis"
+    type: method
+    method_id: strategy.pestel
+    input: source.macro_environment
+    bindings:
+      analysis_id: source.macro_environment.analysis_id
+      factors: source.macro_environment.factors
+    necessity: REQUIRED_BY_RISK
+  - label: "Porter_five_forces"
+    type: method
+    method_id: strategy.porter_five_forces
+    input: source.porter
+    bindings:
+      analysis_id: source.porter.analysis_id
+      forces: source.porter.forces
+      overall_attractiveness: source.porter.overall_attractiveness
+      provenance: source.porter.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "STP_analysis"
+    type: method
+    method_id: strategy.stp
+    input: source.segmentation
+    bindings:
+      record_id: source.segmentation.record_id
+      segments: source.segmentation.segments
+      targeting_decision: source.segmentation.targeting_decision
+      positioning_statement: source.segmentation.positioning_statement
+      provenance: source.segmentation.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "business_model_canvas"
+    type: method
+    method_id: strategy.business_model_canvas
+    input: source.business_model
+    bindings:
+      canvas_id: source.business_model.canvas_id
+      blocks: source.business_model.blocks
+      provenance: source.business_model.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "TOWS_strategy_options"
+    type: method
+    method_id: strategy.tows
+    input: [source.tows, outputs.SWOT_analysis]
+    bindings:
+      record_id: source.tows.record_id
+      swot_analysis: outputs.SWOT_analysis
+      pairings: source.tows.pairings
+      provenance: source.tows.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "scenario_set"
+    type: method
+    method_id: foresight.scenario_planning
+    input: source.scenarios
+    bindings:
+      record_id: source.scenarios.record_id
+      critical_uncertainties: source.scenarios.critical_uncertainties
+      scenarios: source.scenarios.scenarios
+      provenance: source.scenarios.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "risk_register"
+    type: method
+    method_id: delivery.risk_register
+    input: source.risks
+    bindings:
+      record_id: source.risks.record_id
+      risks: source.risks.risks
+      provenance: source.risks.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "total_cost_of_ownership"
+    type: method
+    method_id: feasibility.tco
+    input: source.tco
+    bindings:
+      record_id: source.tco.record_id
+      subject_ref: source.tco.subject_ref
+      cost_categories: source.tco.cost_categories
+      provenance: source.tco.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "unit_economics"
+    type: method
+    method_id: feasibility.unit_economics
+    input: source.unit_economics
+    bindings:
+      record_id: source.unit_economics.record_id
+      subject_ref: source.unit_economics.subject_ref
+      cac: source.unit_economics.cac
+      ltv: source.unit_economics.ltv
+      gross_margin: source.unit_economics.gross_margin
+      payback_period: source.unit_economics.payback_period
+      churn_rate: source.unit_economics.churn_rate
+      arpu: source.unit_economics.arpu
+      contribution_margin: source.unit_economics.contribution_margin
+      provenance: source.unit_economics.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "break_even_analysis"
+    type: method
+    method_id: feasibility.break_even
+    input: source.break_even
+    bindings:
+      record_id: source.break_even.record_id
+      subject_ref: source.break_even.subject_ref
+      fixed_cost: source.break_even.fixed_cost
+      contribution_margin_per_unit: source.break_even.contribution_margin_per_unit
+      provenance: source.break_even.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "net_present_value_analysis"
+    type: method
+    method_id: feasibility.npv
+    input: [source.npv, outputs.break_even_analysis]
+    bindings:
+      record_id: source.npv.record_id
+      subject_ref: source.npv.subject_ref
+      cash_flows: source.npv.cash_flows
+      discount_rate: source.npv.discount_rate
+      provenance: source.npv.provenance
+    necessity: REQUIRED_BY_RISK
+
+outputs:
+  - "ProblemStatement"
+  - "EmpathyMap"
+  - "SWOTAnalysis"
+  - "PESTELAnalysis"
+  - "PorterFiveForcesAnalysis"
+  - "StpAnalysis"
+  - "BusinessModelCanvas"
+  - "TOWSMatrix"
+  - "ScenarioSet"
+  - "RiskRegister"
+  - "TotalCostOfOwnership"
+  - "UnitEconomicsAnalysis"
+  - "BreakEvenAnalysis"
+  - "NPVAnalysis"
+
+open_questions:
+  - id: "OQ-BUSINESS-PLANNING-REVIEW-1"
+    question: "When the Finance Domain Pack is formally contracted, which reviewed assumptions should feed the financial nodes and which KPI/execution/proposal methods should be added?"
+    owner: "operator and qualified business reviewer"
+    blocks: "the unbuilt full Business Planning Mode only"
+
+verification:
+  required: true
+  checks:
+    - "All fourteen method ids resolve to ACTIVE contracts and dispatchable builders/gates"
+    - "Cross-method output bindings are checked at compile time and runtime"
+    - "Financial values are genuine computations and not investment recommendations"
+    - "The missing Finance Domain Pack boundary remains explicit"

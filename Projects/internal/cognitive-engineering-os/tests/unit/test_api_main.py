@@ -241,6 +241,12 @@ def business_planning_strategy_source() -> dict:
     return source
 
 
+def business_planning_review_source() -> dict:
+    source = business_planning_strategy_source()
+    source.update(business_planning_feasibility_source())
+    return source
+
+
 class HealthTests(ApiTestCase):
     def test_health_requires_no_auth_and_touches_no_store(self):
         response = self.client.get("/health")
@@ -542,6 +548,38 @@ class InvokeTests(ApiTestCase):
 
 
 class RecipeRunTests(ApiTestCase):
+    def test_business_review_recipe_runs_strategy_then_feasibility_without_duplicate_nodes(self):
+        self._login()
+        response = self.client.post(
+            "/recipes/business-planning-review-v1/run",
+            json={"source": business_planning_review_source(), "run_id": "api-business-review-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(len(payload["workflow"]["steps"]), 14)
+        self.assertEqual(
+            [step["ref"] for step in payload["workflow"]["steps"]],
+            [
+                "framing.problem_statement",
+                "insight.empathy_map",
+                "strategy.swot",
+                "strategy.pestel",
+                "strategy.porter_five_forces",
+                "strategy.stp",
+                "strategy.business_model_canvas",
+                "strategy.tows",
+                "foresight.scenario_planning",
+                "delivery.risk_register",
+                "feasibility.tco",
+                "feasibility.unit_economics",
+                "feasibility.break_even",
+                "feasibility.npv",
+            ],
+        )
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["net_present_value_analysis"]["npv"], 5272.72727273)
+        self.assertEqual(payload["workflow"]["context"]["outputs"]["business_model_canvas"]["validation_status"], "UNVALIDATED_HYPOTHESIS")
+
     def test_business_strategy_recipe_composes_problem_customer_and_strategy_methods(self):
         self._login()
         response = self.client.post(
