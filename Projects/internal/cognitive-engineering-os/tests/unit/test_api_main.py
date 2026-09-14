@@ -320,6 +320,14 @@ class DashboardTests(ApiTestCase):
         self.assertIn("Build JSON from fields", html)
         self.assertIn("applyRecipeFields", html)
 
+    def test_dashboard_recipe_runner_exposes_stable_run_identity_and_resume_payload(self):
+        html = api_main._DASHBOARD_HTML
+        self.assertIn('id="recipe-run-id"', html)
+        self.assertIn('id="recipe-resume"', html)
+        self.assertIn("run_id: runId", html)
+        self.assertIn("resume: resume", html)
+        self.assertIn("A run ID is required to resume an existing run", html)
+
 
 class UnauthenticatedAccessTests(ApiTestCase):
     def test_list_methods_requires_no_auth(self):

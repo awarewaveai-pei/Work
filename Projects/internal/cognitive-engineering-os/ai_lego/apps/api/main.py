@@ -229,6 +229,9 @@ _DASHBOARD_HTML = """<!doctype html>
   <div id="recipe-fields"></div>
   <button id="recipe-fields-apply" disabled>Build JSON from fields</button>
   <textarea id="recipe-json" rows="10" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace" placeholder='Select a Recipe to generate its Source skeleton.'>{}</textarea>
+  <label>Run ID (optional; required to resume) <input id="recipe-run-id" maxlength="80" pattern="[A-Za-z0-9_-]{1,80}" placeholder="e.g. edd-study-001"></label>
+  <label><input id="recipe-resume" type="checkbox"> Resume existing run</label>
+  <span id="recipe-run-error" class="error"></span>
   <button id="recipe-run-btn" disabled>Run Selected Recipe</button>
   <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
     <div id="invoke-method" class="method-id"></div>
@@ -426,8 +429,16 @@ async function runRecipe(recipeId) {
     document.getElementById('result').textContent = 'Recipe source must be a JSON object';
     return;
   }
+  const runId = document.getElementById('recipe-run-id').value.trim();
+  const resume = document.getElementById('recipe-resume').checked;
+  document.getElementById('recipe-run-error').textContent = '';
+  if (resume && !runId) {
+    document.getElementById('recipe-run-error').textContent = 'A run ID is required to resume an existing run';
+    return;
+  }
   document.getElementById('result').textContent = 'running recipe ' + recipeId + ' ...';
-  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/run`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source }) });
+  const request = { source, run_id: runId || undefined, resume: resume };
+  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/run`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
   document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
 }
 
