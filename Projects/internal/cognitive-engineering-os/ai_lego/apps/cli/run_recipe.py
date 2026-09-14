@@ -9,22 +9,19 @@ limited to explicitly registered, deterministic local adapters.
 from __future__ import annotations
 
 import argparse
-import datetime
 from pathlib import Path
 from typing import Any
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import method_binding_issues, resolve_builder
-from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters
+from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry
 from ai_lego.core.support import read_json, write_json
 from ai_lego.core.contracts.runtime_dir import guard_runtime_dir, prepare_runtime_dir
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
-from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
-from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 
 
 VALIDATOR = "generic-recipe-cli"
@@ -80,13 +77,7 @@ def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spe
     refs = list(workflow_ir.get("workflow_gate_refs", []))
     if "workflow_execution_integrity" not in refs:
         refs.insert(0, "workflow_execution_integrity")
-    registry = WorkflowGateRegistry()
-    registry.register(
-        "workflow_execution_integrity",
-        lambda context, workflow: [
-            evaluate_workflow_completion_gate(context, workflow, VALIDATOR, datetime.datetime.now(datetime.timezone.utc).isoformat())
-        ],
-    )
+    registry = build_registered_workflow_gate_registry(VALIDATOR)
     try:
         registry.require_for(refs)
     except InvariantViolation as error:

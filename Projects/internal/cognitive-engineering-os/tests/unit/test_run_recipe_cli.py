@@ -5,10 +5,27 @@ import unittest
 from pathlib import Path
 
 from ai_lego.apps.cli.run_recipe import run_recipe
+from ai_lego.apps.cli.run_life_decision_slice import fixture_source
 from tests.unit.test_api_main import business_planning_strategy_source
+from tests.unit.test_api_main import art_project_ideation_source
 
 
 class GenericRecipeCliTests(unittest.TestCase):
+    def test_runs_life_decision_recipe_through_generic_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = run_recipe("life-decision-v1", fixture_source(), Path(directory))
+
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(len(report["workflow"]["steps"]), 3)
+
+    def test_runs_art_project_recipe_and_domain_safety_gate_through_generic_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = run_recipe("art-therapy-project-ideation-v1", art_project_ideation_source(), Path(directory))
+
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["workflow"]["workflow_gates"][1]["gate_id"], "art_therapy_project_safety")
+        self.assertEqual(report["workflow"]["workflow_gates"][1]["status"], "PASS")
+
     def test_runs_registered_offline_capability_recipe_from_caller_owned_json(self):
         with tempfile.TemporaryDirectory() as directory:
             report = run_recipe(

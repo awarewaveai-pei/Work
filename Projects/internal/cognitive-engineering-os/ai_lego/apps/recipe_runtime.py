@@ -10,8 +10,12 @@ from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search
+from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
+from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
+from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
+from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 
 
 def build_method_components(
@@ -84,3 +88,38 @@ def build_registered_capability_adapters(
         if handler is not None:
             adapters.register(capability_id, handler)
     return adapters
+
+
+def build_registered_workflow_gate_registry(validator: str) -> WorkflowGateRegistry:
+    """Build the shared registry of gates already implemented by the OS."""
+    registry = WorkflowGateRegistry()
+    registry.register(
+        "workflow_execution_integrity",
+        lambda context, workflow: [
+            evaluate_workflow_completion_gate(
+                context,
+                workflow,
+                validator,
+                datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+        ],
+    )
+    registry.register(
+        "research_workflow_integrity",
+        lambda context, workflow: evaluate_research_workflow_integrity_gate(
+            context,
+            workflow,
+            "ai_lego.modules.research.gates",
+            datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        ),
+    )
+    registry.register(
+        "art_therapy_project_safety",
+        lambda context, workflow: evaluate_art_therapy_project_workflow_gate(
+            context,
+            workflow,
+            "ai_lego.modules.art_therapy.workflow_gates",
+            datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        ),
+    )
+    return registry

@@ -57,8 +57,6 @@ from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
-from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
@@ -68,9 +66,8 @@ from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
-from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
-from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters
+from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -106,38 +103,7 @@ def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capabil
 
 def build_api_workflow_gate_registry() -> WorkflowGateRegistry:
     """Build the explicit API gate set; domain runners are added by stable ref."""
-    registry = WorkflowGateRegistry()
-
-    def completion_gate(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
-        return [
-            evaluate_workflow_completion_gate(
-                context,
-                workflow,
-                "ai_lego.apps.api.main",
-                datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            )
-        ]
-
-    registry.register("workflow_execution_integrity", completion_gate)
-    registry.register(
-        "research_workflow_integrity",
-        lambda context, workflow: evaluate_research_workflow_integrity_gate(
-            context,
-            workflow,
-            "ai_lego.modules.research.gates",
-            datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        ),
-    )
-    registry.register(
-        "art_therapy_project_safety",
-        lambda context, workflow: evaluate_art_therapy_project_workflow_gate(
-            context,
-            workflow,
-            "ai_lego.modules.art_therapy.workflow_gates",
-            datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        ),
-    )
-    return registry
+    return build_registered_workflow_gate_registry("ai_lego.apps.api.main")
 
 
 CONFIGURED_CORS_ORIGINS = configure_cors(app)
