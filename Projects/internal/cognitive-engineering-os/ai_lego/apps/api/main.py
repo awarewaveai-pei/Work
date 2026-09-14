@@ -60,6 +60,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search
 from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
 from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
+from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
@@ -136,6 +137,15 @@ def build_api_workflow_gate_registry() -> WorkflowGateRegistry:
             context,
             workflow,
             "ai_lego.modules.research.gates",
+            datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        ),
+    )
+    registry.register(
+        "art_therapy_project_safety",
+        lambda context, workflow: evaluate_art_therapy_project_workflow_gate(
+            context,
+            workflow,
+            "ai_lego.modules.art_therapy.workflow_gates",
             datetime.datetime.now(datetime.timezone.utc).isoformat(),
         ),
     )

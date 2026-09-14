@@ -519,6 +519,11 @@ class RecipeRunTests(ApiTestCase):
             payload["workflow"]["context"]["outputs"]["creative_stimulus"]["entries"][0]["feasibility_status"],
             "NOT_YET_SCREENED",
         )
+        self.assertEqual(
+            [gate["gate_id"] for gate in payload["workflow_gates"]],
+            ["workflow_execution_integrity", "art_therapy_project_safety"],
+        )
+        self.assertTrue(all(gate["status"] == "PASS" for gate in payload["workflow_gates"]))
 
     def test_research_qualitative_recipe_runs_as_a_fully_bound_mvp_chain(self):
         self._login()

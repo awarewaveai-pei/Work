@@ -10,6 +10,9 @@ description: >
 id: art-therapy-project-ideation-v1
 version: "1.0.0"
 name: "Art Therapy Project Ideation (Frame -> Random Stimulus -> Mind Map)"
+workflow_gate_refs:
+  - workflow_execution_integrity
+  - art_therapy_project_safety
 
 references:
   cognitive_method_atlas:
