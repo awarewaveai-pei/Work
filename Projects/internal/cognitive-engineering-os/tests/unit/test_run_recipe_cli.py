@@ -9,6 +9,21 @@ from tests.unit.test_api_main import business_planning_strategy_source
 
 
 class GenericRecipeCliTests(unittest.TestCase):
+    def test_runs_registered_offline_capability_recipe_from_caller_owned_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = run_recipe(
+                "edd-literature-search-v1",
+                {"research_question": "How do people describe work boundaries?"},
+                Path(directory),
+            )
+
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["capability_resolution"]["blocked"], None)
+        step = report["workflow"]["steps"][0]
+        self.assertEqual(step["node_kind"], "capability")
+        self.assertEqual(step["ref"], "literature_search")
+        self.assertEqual(step["output"]["literature"]["retrieval"]["status_code"], "OFFLINE_SOURCE_STALE")
+
     def test_runs_edd_evidence_recipe_through_the_same_generic_runtime(self):
         source = {
             "assumptions": {
@@ -53,7 +68,7 @@ class GenericRecipeCliTests(unittest.TestCase):
         self.assertEqual(report["workflow"]["steps"][0]["ref"], "framing.problem_statement")
         self.assertEqual(report["workflow"]["workflow_gates"][0]["gate_id"], "workflow_execution_integrity")
 
-    def test_refuses_capability_recipe_instead_of_silently_dropping_the_node(self):
+    def test_refuses_unresolved_required_capability_instead_of_silently_dropping_the_node(self):
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(RuntimeError, "CLI_RECIPE_CAPABILITY_UNSUPPORTED"):
-                run_recipe("edd-literature-search-v1", {"research_question": "q"}, Path(directory))
+            with self.assertRaisesRegex(RuntimeError, "CLI_CAPABILITY_PLAN_NOT_EXECUTABLE"):
+                run_recipe("db-migration-expand-contract", {}, Path(directory))

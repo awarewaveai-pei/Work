@@ -1,9 +1,9 @@
-"""Run a validated method-only Recipe from a caller-owned JSON source.
+"""Run a validated Recipe from a caller-owned JSON source.
 
 This is a thin command-line composition root: Recipe compilation, method
 resolution, binding validation, gate dispatch, journaling, and workflow
-completion all remain owned by the shared runtime. Capability-backed Recipes
-are refused until their provider-neutral CLI adapter is explicitly registered.
+completion all remain owned by the shared runtime. Capability execution is
+limited to explicitly registered, deterministic local adapters.
 """
 
 from __future__ import annotations
@@ -15,11 +15,12 @@ from typing import Any
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import method_binding_issues, resolve_builder
-from ai_lego.apps.recipe_runtime import build_method_components
+from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters
 from ai_lego.core.support import read_json, write_json
 from ai_lego.core.contracts.runtime_dir import guard_runtime_dir, prepare_runtime_dir
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
+from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
 from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
@@ -37,22 +38,22 @@ def _runtime_dir(path: Path | None, spec_root: Path) -> Path:
 
 
 def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spec_root: Path | None = None) -> dict[str, Any]:
-    """Execute one method-only ACTIVE Recipe and persist a JSON report."""
+    """Execute one ACTIVE Recipe and persist a JSON report."""
     if not isinstance(source, dict):
         raise TypeError("source must be a JSON object")
     spec_root = resolve_spec_root(spec_root)
     runtime_dir = _runtime_dir(runtime_dir, spec_root)
     workflow_ir = compile_recipe_to_workflow_ir(spec_root, recipe_id, "R1")
     nodes = workflow_ir["nodes"]
-    if any(node["node_kind"] != "method" for node in nodes):
-        raise RuntimeError("CLI_RECIPE_CAPABILITY_UNSUPPORTED: generic CLI currently accepts method-only Recipes")
-
-    method_ids = [node["method_id"] for node in nodes]
+    method_ids = [node["method_id"] for node in nodes if node["node_kind"] == "method"]
+    capability_ids = capability_refs(workflow_ir)
     catalog = MethodCatalog.from_spec_root(spec_root)
     resolution = catalog.resolve(method_ids)
     if resolution["blocked"] is not None:
         raise RuntimeError(f"METHOD_RESOLUTION_BLOCKED: {resolution['blocked']}")
     for node in nodes:
+        if node["node_kind"] != "method":
+            continue
         builder = resolve_builder(node["method_id"])
         issues = method_binding_issues(builder, node.get("bindings"))
         if issues:
@@ -63,6 +64,18 @@ def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spe
         raise InvariantViolation(f"WORKFLOW_SOURCE_FIELDS_MISSING: {', '.join(missing)}")
 
     handlers, gate_runners = build_method_components(nodes, validator=VALIDATOR)
+    capability_catalog = CapabilityCatalog.from_spec_root(spec_root)
+    capability_resolution = capability_catalog.resolve(capability_ids)
+    if capability_resolution["blocked"] is not None:
+        executability = plan_executability(workflow_ir, capability_resolution)
+        if not executability["executable"]:
+            raise RuntimeError(f"CLI_CAPABILITY_PLAN_NOT_EXECUTABLE: {executability}")
+    resolvable_capability_ids = [ref for ref in capability_ids if capability_catalog.is_resolvable(ref)]
+    capability_adapters = build_registered_capability_adapters(capability_catalog, resolvable_capability_ids)
+    try:
+        handlers.update(capability_adapters.handlers_for(resolvable_capability_ids))
+    except InvariantViolation as error:
+        raise RuntimeError(f"CLI_CAPABILITY_ADAPTER_UNAVAILABLE: {error}") from error
 
     refs = list(workflow_ir.get("workflow_gate_refs", []))
     if "workflow_execution_integrity" not in refs:
@@ -84,7 +97,7 @@ def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spe
         workflow_ir,
         {"source": source},
         handlers,
-        catalogs={"method": catalog},
+        catalogs={"method": catalog, "capability": capability_catalog},
         gate_runners=gate_runners,
         workflow_gate_runner=lambda context, workflow: registry.evaluate(refs, context, workflow),
         journal_path=journal,
@@ -93,6 +106,7 @@ def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spe
         "status": "PASS" if result.status == "SUCCEEDED" else "FAILED",
         "recipe_id": recipe_id,
         "method_resolution": resolution,
+        "capability_resolution": capability_resolution,
         "workflow": result.as_dict(),
         "journal": str(journal),
     }

@@ -57,8 +57,6 @@ from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.evidence_triangulation import offline_literature_search
-from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
 from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
 from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
@@ -72,7 +70,7 @@ from ai_lego.platform.workflow.journal_protection import CasJournalContextProtec
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
 from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
-from ai_lego.apps.recipe_runtime import build_method_components
+from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -103,18 +101,7 @@ def configure_cors(target_app: FastAPI, raw_origins: str | None = None) -> tuple
 
 def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capability_ids: list[str]) -> CapabilityAdapterRegistry:
     """Build the API's explicit adapter set once for both plan and run paths."""
-    adapters = CapabilityAdapterRegistry(capability_catalog)
-    # Only the deterministic, local, read-only literature fixture is exposed here.
-    # External providers need their own egress, freshness and policy adapter.
-    if "literature_search" in capability_ids:
-        adapters.register("literature_search", offline_literature_search)
-    if "transcribe" in capability_ids:
-        adapters.register("transcribe", pre_transcribed_input_adapter)
-    if "run_statistics" in capability_ids:
-        adapters.register("run_statistics", run_statistics_adapter)
-    if "artifact.generate_research_paper" in capability_ids:
-        adapters.register("artifact.generate_research_paper", research_paper_artifact_adapter)
-    return adapters
+    return build_registered_capability_adapters(capability_catalog, capability_ids)
 
 
 def build_api_workflow_gate_registry() -> WorkflowGateRegistry:

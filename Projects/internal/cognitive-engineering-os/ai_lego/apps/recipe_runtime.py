@@ -8,6 +8,10 @@ from typing import Any, Callable, Mapping
 from ai_lego.apps.api.dispatch import invoke_builder, invoke_gate_runner, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
+from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
+from ai_lego.modules.research.evidence_triangulation import offline_literature_search
+from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
+from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 
 
 def build_method_components(
@@ -57,3 +61,26 @@ def build_method_components(
         handlers[method_id] = handler
         gate_runners[index] = run_gate
     return handlers, gate_runners
+
+
+def build_registered_capability_adapters(
+    capability_catalog: CapabilityCatalog,
+    capability_ids: list[str],
+) -> CapabilityAdapterRegistry:
+    """Build the explicit, side-effect-free adapter set shared by API and CLI.
+
+    Network-backed providers and raw-media transcription are intentionally not
+    registered here. Adding one requires a separate provider/policy decision.
+    """
+    adapters = CapabilityAdapterRegistry(capability_catalog)
+    registered = {
+        "literature_search": offline_literature_search,
+        "transcribe": pre_transcribed_input_adapter,
+        "run_statistics": run_statistics_adapter,
+        "artifact.generate_research_paper": research_paper_artifact_adapter,
+    }
+    for capability_id in capability_ids:
+        handler = registered.get(capability_id)
+        if handler is not None:
+            adapters.register(capability_id, handler)
+    return adapters
