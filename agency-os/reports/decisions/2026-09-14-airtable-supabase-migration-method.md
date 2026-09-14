@@ -9,7 +9,7 @@
 
 **建議：** 採用「自建、可重跑、可驗證的 deterministic ETL」，而不是一鍵匯入、Wrapper-only、n8n 或 AI 自動 mapping。
 
-**正確架構：** Airtable API 完整讀取 → 原始快照與 raw landing layer → deterministic mapping → Supabase relational canonical tables → 差異驗證。
+**正確架構：** 先讀 master plan 與 Airtable API 完整資料 → 外部不可變 raw JSON snapshot → deterministic mapping → Supabase relational canonical tables → 差異驗證。
 
 **核心決定：** 原始 JSON 要立即完整保存；但 JSON 只作為 immutable source/landing，不作為網站與研究的正式資料模型。
 
@@ -51,7 +51,7 @@ Supabase Wrapper 可把 Airtable 查詢成 Postgres foreign table，但官方明
 
 這是唯一同時滿足「資料先完整保存」與「正式資料模型不被 Airtable UI 結構綁死」的方案。
 
-第一層是 immutable source archive：保存 Airtable metadata、raw record payload、display value、field ID、record ID、linked IDs、附件 metadata、snapshot manifest 與 checksum。第二層是受控 raw landing：若需要在 Supabase 內查詢與重跑，可使用一個明確定義、不可對外暴露的 raw schema；它只存來源 payload，不建立一堆按中文名稱命名的替代表，也不提供網站業務 API。
+第一層是 immutable source archive：保存 Airtable metadata、raw record payload、display value、field ID、record ID、linked IDs、附件 metadata、snapshot manifest 與 checksum。這份 raw archive 放在 Supabase 以外的受保護版本化位置，不在 audit 階段建立 Supabase raw landing、mirror table 或臨時 view；如此不會把尚未核准的來源結構誤變成 application schema。
 
 第三層才是 canonical relational model。只有經過 mapping review 的資料才進入正式 entities、localizations、junctions 與 publication/read models。PostgreSQL 文件也指出 JSON 與 relational 可以共存；JSON 適合結構仍在變動的文件，但文件結構應可預期，且整個 JSON row 更新會取得整列 row lock，因此不應把可獨立維護的核心關係永久塞進一個大 JSON 文件。[^4]
 
@@ -84,7 +84,7 @@ Supabase Wrapper 可把 Airtable 查詢成 Postgres foreign table，但官方明
 
 ### P1：只讀取來源並保存 raw
 
-使用 Airtable metadata API 取得全部 table／field definitions，再對每一張表用 table ID 分頁抓 records。每頁都寫入暫存檔並記錄 request、offset、page number、record count；遇到 429 依官方限制退避，不以部分成功當成功。空值欄位的判讀以 metadata 與實際統計為準，不能只看 record JSON。[^1]
+先讀取並解析 master plan，建立本次執行的規則、範圍、禁止事項與 acceptance criteria；再使用 Airtable metadata API 取得全部 table／field definitions，對每一張表用 table ID 分頁抓 records。每頁都寫入外部 snapshot 並記錄 request、offset、page number、record count；遇到 429 依官方限制退避，不以部分成功當成功。空值欄位的判讀以 metadata 與實際統計為準，不能只看 record JSON。[^1]
 
 raw record 的最小 envelope：
 
@@ -102,9 +102,9 @@ raw record 的最小 envelope：
 
 附件必須另行下載到版本化 archive 或保存可驗證的 attachment metadata；不能只保存會過期的 URL 而宣稱附件完成。
 
-### P2：raw 完整性驗證
+### P2：雙來源完整性驗證
 
-在任何 mapping 前產出 source report：每張表 fields 數、records 數、每欄非空數、record ID 唯一性、頁面數、API errors、附件數、checksum。報告必須能回答「Airtable 有什麼」而不是「程式成功跑完」。
+在任何 mapping 前，同時對照兩份輸入：master plan 定義「應如何建模與驗收」，Airtable snapshot 定義「實際存在什麼資料」。產出 source report：每張表 fields 數、records 數、每欄非空數、record ID 唯一性、頁面數、API errors、附件數、checksum，以及每個 plan-required entity／relationship 是否有來源證據。報告必須能回答「Airtable 有什麼、plan 要求什麼、兩者差在哪裡」，而不是只回答「程式成功跑完」。
 
 ### P3：mapping contract
 
@@ -182,7 +182,7 @@ dry-run 不寫正式 canonical tables，輸出逐表、逐欄、逐筆、逐關�
 
 ## 最終結論
 
-本案最好的方法不是找一個「自動把 Airtable 變成 Supabase」的按鈕，而是：**用 Airtable API 做完整、可驗證的 source capture；用 raw JSON 保護所有原始內容；用 deterministic、版本化 mapping 產生正式 relational Supabase model；用硬性差異驗證阻止任何不完整寫入。**
+本案最好的方法不是找一個「自動把 Airtable 變成 Supabase」的按鈕，而是：**每次執行先同時讀取 master plan 與 Airtable；用 Airtable API 做完整、可驗證的 source capture；用外部 raw JSON 保護所有原始內容；用 deterministic、版本化 mapping 產生正式 relational Supabase model；用硬性差異驗證阻止任何不完整寫入。**
 
 這個方案的額外程式工作比直匯多，但它直接針對本案曾發生的錯誤：欄位覆蓋、中文內容遺失、關係失真、formula／lookup 混淆與無法追溯。這些風險不是換一個 AI model 或 connector 就會消失。
 

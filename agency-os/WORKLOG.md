@@ -18075,3 +18075,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`Airtable|Supabase|Wrapper|raw JSON|deterministic ETL|canonical`；確認報告明確禁止 Wrapper-only、直匯、未批准 mapping 與未列入 ERD 的補丁表。
 - ROLLBACK: `git revert <this-commit>`；僅移除本次決策報告、INDEX entry 與 WORKLOG entry，不觸碰外部 Airtable 或 Supabase 資料。
 - WORKLOG_DONE: Airtable → Supabase migration method research
+
+[追記 2026-09-14 Migration decision alignment correction]
+- 根因：研究報告曾把 Supabase raw landing 寫成可選方案，與 master plan 的 Phase 0 零 application write 及禁止臨時 mirror/view 產生歧義。
+- 修正：移除 raw landing 選項；明確規定每次執行同時讀 master plan（規範來源）與 Airtable snapshot（資料來源），raw JSON 僅存於外部受保護 archive，approval 後才建立正式 canonical schema。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`Select-String master plan/report for Phase 0, raw landing, mirror, dual-source wording` | exit=0 | result=expected alignment terms present。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回兩份文件確認 raw landing option 已移除且雙來源 gate 一致。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`raw landing|master plan + snapshot|同時讀取|臨時 view`；確認未保留可將 raw landing 當 Phase 0 application object 的建議。
+- ROLLBACK: `git revert <this-commit>`；僅回滾決策文件修訂與 WORKLOG entry。
+- WORKLOG_DONE: Migration decision alignment correction
