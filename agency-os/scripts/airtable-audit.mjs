@@ -10,6 +10,183 @@ const ACTIVE_TABLES = new Set([
 ]);
 const COMPUTED_TYPES = new Set(["formula", "lookup", "multipleLookupValues", "rollup", "count"]);
 const ARCHIVE_RECOMMENDATIONS = /Exclude|Replace|Documentation\/config/i;
+const SOURCE_ARCHIVE_FIELD_IDS = new Set([
+  "fld0Wu0P49JOyKgSW", "fldqi8EanpcvSmEi7", "fldDREwCgkOC5C7PO", "fldCiMZbBPTRhwuFd",
+  "fldnmWFv5yAdBAgNU", "fldzl2rvkMhTmLK0J", "fldXVmSTTf6wgjcZj", "fldhMYlkfXI5NSuHL",
+  "fldJh6rE9gH39cmFV", "fld2gVqiIsxQ920zz", "fldRdMN8ZEIekski6", "fldKYiNy4peNIDIWD", "fld8yVQYXSyZ7HERa",
+]);
+const RELATION_TARGETS = new Map(Object.entries({
+  fldrAhoRhQDqSw4qd: "tool_healing_stages.(tool_id,healing_stage_id)",
+  fld3yyeurxaQsROYd: "tool_focuses.(tool_id,therapeutic_focus_id)",
+  fld0M3Vqp8frbx1Sx: "tool_theories.(tool_id,theory_id)",
+  fldhURlARgvRxQD70: "tool_support_methods.(tool_id,support_method_id)",
+  fldUiLrwTdUj479nu: "tool_settings.(tool_id,setting_id)",
+  fldkk1fobcNr2Us9c: "tool_support_methods.tool_id",
+  fldooKlAYvEhYjH8q: "tool_healing_stages.tool_id",
+  fld56Iklm0rnr0oIG: "tool_healing_stages.healing_stage_id",
+  fld7HZZFURCOln7Cu: "theory_category_links.theory_id",
+  fldgASfyFCQAWLm2S: "tool_theories.tool_id",
+  fldHecJpxMcimoH2I: "theory_category_links.theory_category_id",
+  fld5DnCGgHLubzNXf: "tool_focuses.tool_id",
+}));
+const TEXT_RELATION_FIELD_IDS = new Set(["fldhURlARgvRxQD70", "fldUiLrwTdUj479nu", "fldkk1fobcNr2Us9c"]);
+const COMPUTED_TARGETS = new Map(Object.entries({
+  fldttIzJSOurCCuI3: "tool_details.healing_stage_names",
+  fldWOin26XdDY3Ebr: "tool_details.therapeutic_focus_names",
+  fld31khhkhspFexkd: "tool_details.theory_category_names",
+  fldmbBt1lgTuU0bU4: "theory_details.theory_category_names",
+}));
+const BROKEN_FORMULA_FIELD_IDS = new Set(["fldQEDoNGSoC2nh7v", "fld1xoDFdVh9kjeHb"]);
+const COLUMN_BY_SOURCE_NAME = new Map(Object.entries({
+  "階段名稱": "title",
+  "對應五生": "five_life_correspondence",
+  "核心任務": "core_task",
+  "單次任務重點": "session_task_focus",
+  "主題與任務": "themes_and_tasks",
+  "階段任務簡述": "task_summary",
+  "是否需反覆探索": "repeat_exploration_guidance",
+  "建議次數（2.5hr/次）": "recommended_session_count_text",
+  "五氣": "five_qi",
+  "五元": "five_origin",
+  "氣入位置": "qi_entry_location",
+  "克服的五滅": "five_destructions_overcome",
+  "五行對應": "five_phase_correspondence",
+  "臟腑對應": "organ_correspondence",
+  "五階段癒療": "healing_process_description",
+  "常見個案語句": "common_client_statements",
+  "治療目標摘要": "therapeutic_goal_summary",
+  "藝術治療工具": "title",
+  "英文": "title",
+  "心理面向": "psychological_dimension",
+  "可解讀出": "interpretive_possibilities",
+  "可能會遇到的困難": "common_difficulties",
+  "提示用語": "facilitation_prompts",
+  "輔助工具": "title",
+  "如何幫助": "how_it_helps",
+  "為什麼可以幫助": "clinical_rationale",
+  "延伸進階工具": "advanced_extensions",
+  "為什麼適合（臨床說明）": "suitability_rationale",
+  "治療場所": "title",
+  "詳細流程步驟": "instructions",
+  "空間與設備要求": "space_and_equipment_requirements",
+  "材料與工具": "materials_summary",
+  "時間（總長度／分段）": "duration_guidance",
+  "反應紀錄建議方式": "response_recording_guidance",
+  "藝術治療資源": "resources_summary",
+  "免費線上工具": "free_online_resources",
+  "付費線上工具": "paid_online_resources",
+  "用途": "purpose",
+  "類別": "category_name",
+  "類別(英文)": "category_name",
+  "理論分類": "title",
+  "理論名稱": "title",
+  "分類定義": "definition",
+  "分類核心依據": "core_basis",
+  "一句話讓小白懂": "plain_language_summary",
+  "用途說明": "purpose",
+  "創始人物與背景": "founders_and_background",
+  "主要心理假設／人性觀": "psychological_assumptions_and_view_of_human_nature",
+  "改變歷程的觀點": "view_of_change_process",
+  "自我與意識系統的結構": "self_and_consciousness_structure",
+  "症狀產生機制與診斷邏輯": "symptom_mechanism_and_diagnostic_logic",
+  "對案主的理解": "understanding_of_client",
+  "治療目標與改變歷程": "treatment_goals_and_change_process",
+  "關係觀與治療者角色": "therapeutic_relationship_and_therapist_role",
+  "運作機制（投射／敘事／象徵等）": "mechanisms_of_action",
+  "常見技術與介入方式": "common_techniques_and_interventions",
+  "藝術治療運用方式": "art_therapy_applications",
+  "推薦媒材與活動": "recommended_media_and_activities",
+  "與藝術治療融合的困難": "art_therapy_integration_challenges",
+  "臨床適用族群與場域": "clinical_populations_and_settings",
+  "國際採用與研究支持": "international_adoption_and_research_support",
+  "與其他理論整合潛力": "integration_with_other_theories",
+  "與創作心理歷程的關聯": "creative_psychological_process_relationship",
+  "個體觀點與發展階段": "individual_perspective_and_developmental_stages",
+  "文化脈絡中的適用性": "cultural_applicability",
+  "適合哪類學生學習": "suitable_student_profiles",
+  "教學重點建議": "teaching_priorities",
+  "適合搭配哪些工具教學": "recommended_teaching_tools",
+  "常見誤解與澄清點": "common_misunderstandings_and_clarifications",
+  "適合搭配的閱讀文本／影片": "recommended_readings_and_videos",
+  "與現代神經科學的對應觀點": "modern_neuroscience_correspondence",
+  "跨文化應用建議": "cross_cultural_application_guidance",
+  "與藝術創作歷程的哲學關聯": "philosophical_relationship_to_artmaking",
+  "可作為教材模組的教學格式建議": "teaching_module_format_guidance",
+  "可設計的評量指標": "assessment_indicator_guidance",
+  "教學時常見學生反應與處理": "common_student_responses_and_handling",
+  "與其他課程整合建議": "course_integration_guidance",
+  "適合工作坊或模擬教學方式": "workshop_and_simulation_methods",
+  "對臨床轉譯能力的影響": "clinical_translation_competency_impact",
+  "可搭配的案例練習格式": "case_practice_formats",
+  "觀察學生學習困難的線索": "student_learning_difficulty_indicators",
+  "適合發展的學習成果任務": "learning_outcome_tasks",
+  "教師需留意的教學倫理點": "teaching_ethics_considerations",
+  "在職治療師進修的應用層次": "continuing_education_application_levels",
+  "國際教材發展潛力": "international_curriculum_potential",
+  "適合的個案狀態與療癒階段": "suitable_client_states_and_healing_stages",
+  "個案可能的內在感受變化": "possible_client_internal_changes",
+  "個案常見問題與回應建議": "common_client_questions_and_responses",
+  "為什麼這個方法會有幫助？": "why_this_method_helps",
+  "適合此理論的參與風格": "suitable_participation_styles",
+  "需要的心理準備或態度": "psychological_readiness_and_attitude",
+  "個案在療癒歷程中的角色轉變": "client_role_changes_during_healing",
+  "案主可攜帶的作品象徵意涵": "portable_artwork_symbolism",
+  "如果我感到混亂／不舒服怎麼辦？": "guidance_for_confusion_or_discomfort",
+  "案主在此療法中的權利與選擇": "client_rights_and_choices",
+  "可能的情緒風險與資源支持": "emotional_risks_and_support_resources",
+  "個案常見的情緒迴避與防衛": "common_emotional_avoidance_and_defenses",
+  "案主創作風格的個體差異": "individual_differences_in_artmaking_style",
+  "與過往創傷經驗的關聯": "relationship_to_past_trauma",
+  "個案可能對創作的誤解": "possible_client_misunderstandings_of_artmaking",
+  "適合個案書寫或創作的引導句": "client_writing_and_artmaking_prompts",
+  "個案在作品中投射的常見主題": "common_projected_themes_in_artwork",
+  "案主的文化與信仰考量": "client_cultural_and_belief_considerations",
+  "如何向個案說明理論來源與用途": "explaining_theory_origin_and_use_to_clients",
+  "個案療癒歷程的自我回顧方式": "client_self_review_methods",
+  "適合個案帶回家的日常練習": "take_home_practices",
+  "創作結束後可開展的自我行動": "post_artmaking_self_actions",
+  "療癒完成階段的象徵封存方式": "symbolic_closure_methods",
+  "對象/族群（Who）": "name",
+  "英文名稱 copy": "name",
+  "主要治療目標（心理／情緒／生理面向）": "primary_therapeutic_goals",
+  "問題分類": "concern_category",
+  "分類（心理、類病理、病理）": "clinical_classification",
+  "表現特徵": "presenting_features",
+  "核心概念/問題類型": "title",
+  "英文Core Concepts & Issue Categories": "title",
+  "分類原因": "classification_rationale",
+  "適用狀況": "applicable_situations",
+  "典型觸發因子": "typical_triggers",
+  "內在狀態": "internal_state",
+  "生理反應": "physiological_responses",
+  "表現行為": "observable_behaviors",
+  "臨床關鍵詞": "clinical_keywords",
+  "臨床風險等級": "clinical_risk_level",
+  "幫助效益": "benefits",
+  "效益說明": "benefit_rationale",
+  "場所分類": "setting_category",
+}));
+
+function snakeAscii(value) {
+  const result = value.normalize("NFKC").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  return result || null;
+}
+
+function localizationTarget(tableName, fieldName) {
+  const column = COLUMN_BY_SOURCE_NAME.get(fieldName) ?? snakeAscii(fieldName);
+  if (!column) return null;
+  const isEnglish = fieldName.includes("_EN") || fieldName.includes("英文") || (/[A-Za-z]/.test(fieldName) && !/[\u3400-\u9fff]/u.test(fieldName) && !fieldName.includes("_CH") && fieldName !== "Pinyin");
+  if (tableName === "五階段療程簡介") return `healing_stage_localizations(locale='${isEnglish ? "en" : "zh-TW"}').${column}`;
+  if (tableName === "藝術治療工具") return `tool_localizations(locale='${fieldName === "英文" ? "en" : "zh-TW"}').${column}`;
+  if (tableName === "Art-Therapy Tool（英文版）") return `tool_localizations(locale='en').${column}`;
+  if (tableName === "輔助工具") return `support_method_localizations(locale='${isEnglish ? "en" : "zh-TW"}').${column}`;
+  if (tableName === "理論分類") return `theory_category_localizations(locale='${isEnglish ? "en" : "zh-TW"}').${column}`;
+  if (tableName === "理論模式") return `theory_localizations(locale='${isEnglish ? "en" : "zh-TW"}').${column}`;
+  if (tableName === "適用對象/族群") return `conditions_or_presenting_concerns(locale='${fieldName.includes("英文") ? "en" : "zh-TW"}').${column}`;
+  if (tableName === "核心概念&問題類型") return `therapeutic_focus_localizations(locale='${fieldName.includes("英文") ? "en" : "zh-TW"}').${column}`;
+  if (tableName === "治療場所") return `settings.${column}`;
+  return null;
+}
 
 function parseArgs(argv) {
   const args = {};
@@ -67,19 +244,28 @@ function diceSimilarity(left, right) {
 function candidateTarget(table, field, disposition, rowCount, nonemptyCount) {
   if (rowCount === 0 || nonemptyCount === 0) return { status: "source_archive_only", target: "-", transform: "preserve_schema_only" };
   if (ARCHIVE_RECOMMENDATIONS.test(disposition.recommendation)) return { status: "source_archive_only", target: "-", transform: "preserve_in_external_snapshot" };
+  if (SOURCE_ARCHIVE_FIELD_IDS.has(field.id)) return { status: "source_archive_only", target: "-", transform: "comparison_or_migration_key_only" };
+  if (RELATION_TARGETS.has(field.id)) return {
+    status: "relationship",
+    target: RELATION_TARGETS.get(field.id),
+    transform: TEXT_RELATION_FIELD_IDS.has(field.id) ? "normalized_exact_name_match_else_exception" : "map_record_ids_to_canonical_ids",
+  };
+  if (BROKEN_FORMULA_FIELD_IDS.has(field.id)) return { status: "source_archive_only", target: "-", transform: "preserve_broken_formula_definition_and_error_results" };
+  if (COMPUTED_TARGETS.has(field.id)) return { status: "computed_definition", target: COMPUTED_TARGETS.get(field.id), transform: "rebuild_from_approved_relationship_join" };
   if (table.name === "Art-Therapy Tool（英文版）" || table.name === "Tool Translations") {
     if (COMPUTED_TYPES.has(field.type) || field.type === "createdTime") return { status: "source_archive_only", target: "-", transform: "preserve_migration_metadata" };
-    return { status: "localization", target: "tool_localizations(locale='en').REVIEW_REQUIRED", transform: "reconcile_to_canonical_tool_then_copy" };
+    const exactTarget = localizationTarget(table.name, field.name);
+    return exactTarget
+      ? { status: "localization", target: exactTarget, transform: "reconcile_to_canonical_tool_then_copy" }
+      : { status: "approved_exception", target: "REVIEW_REQUIRED", transform: "manual_semantic_mapping" };
   }
   if (COMPUTED_TYPES.has(field.type)) return { status: "computed_definition", target: "derived_read_model.REVIEW_REQUIRED", transform: "rebuild_from_dependency_not_copy" };
   if (field.type === "multipleRecordLinks") return { status: "relationship", target: "relationship.REVIEW_REQUIRED", transform: "map_record_ids_to_canonical_ids" };
   if (table.name === "五階段療程系統") return { status: "relationship", target: "tool_healing_stages.REVIEW_REQUIRED", transform: "relationship_metadata" };
   if (table.name === "藝術治療工具標題") return { status: "source_archive_only", target: "-", transform: "preserve_as_documentation" };
-  const codeTarget = disposition.explanation.match(/`([^`]+)`/)?.[1] ?? "canonical.REVIEW_REQUIRED";
-  const localized = ["richText", "multilineText"].includes(field.type) || table.name === "藝術治療工具";
-  return localized
-    ? { status: "localization", target: `${codeTarget}_localization.REVIEW_REQUIRED`, transform: "copy_preserving_unicode_and_linebreaks" }
-    : { status: "canonical_field", target: `${codeTarget}.REVIEW_REQUIRED`, transform: "typed_copy_after_approval" };
+  const exactTarget = localizationTarget(table.name, field.name);
+  if (exactTarget) return { status: exactTarget.includes("localizations") ? "localization" : "canonical_field", target: exactTarget, transform: "copy_preserving_unicode_and_linebreaks" };
+  return { status: "approved_exception", target: "REVIEW_REQUIRED", transform: "manual_semantic_mapping" };
 }
 
 function readRecords(snapshot, tableId) {
@@ -97,7 +283,7 @@ function mdTable(headers, rows) {
 export async function buildAudit(snapshotDirectory, masterPlanPath, outputDirectory) {
   const snapshot = resolve(snapshotDirectory);
   const output = resolve(outputDirectory);
-  await mkdir(output, { recursive: false });
+  await mkdir(output, { recursive: true });
   const [schema, validation, masterPlan] = await Promise.all([
     readFile(join(snapshot, "schema.json"), "utf8").then(JSON.parse),
     readFile(join(snapshot, "validation.json"), "utf8").then(JSON.parse),
@@ -207,6 +393,7 @@ export async function buildAudit(snapshotDirectory, masterPlanPath, outputDirect
 
   const activeNonemptyMappings = mappingRows.filter((row) => ACTIVE_TABLES.has(row.source_table_name) && row.nonempty_count > 0);
   const pendingMappings = activeNonemptyMappings.filter((row) => row.approval_status !== "approved");
+  const reviewRequiredMappings = activeNonemptyMappings.filter((row) => row.candidate_target.includes("REVIEW_REQUIRED"));
   const zeroTables = tableRows.filter((row) => row.record_count === 0);
   const excludedPopulated = tableRows.filter((row) => row.record_count > 0 && ARCHIVE_RECOMMENDATIONS.test(row.master_plan_disposition));
   const hardBlocks = translationCounts.UNMATCHED + translationCounts.AMBIGUOUS + translationCounts.EMPTY + populationRows.length + pendingMappings.length;
@@ -226,7 +413,7 @@ export async function buildAudit(snapshotDirectory, masterPlanPath, outputDirect
   files.set("audit-summary.json", `${JSON.stringify({
     sourceSnapshot: snapshot, sourceValidation: validation.status, tables: schema.tables.length,
     fields: mappingRows.length, records: validation.recordCount, activeTables: tableRows.filter((row) => row.current_migration_scope === "active").length,
-    activeNonemptyFields: activeNonemptyMappings.length, pendingMappings: pendingMappings.length,
+    activeNonemptyFields: activeNonemptyMappings.length, pendingMappings: pendingMappings.length, reviewRequiredTargets: reviewRequiredMappings.length,
     relationships: relationships.length, computedFields: computed.length, zeroRowTables: zeroTables.length,
     excludedPopulatedTables: excludedPopulated.length, englishReconciliation: translationCounts,
     populationSemanticReview: { total: populationRows.length, ...populationCandidateCounts }, g1: "PASS", g2: "BLOCKED", supabaseApplicationWrites: 0,
