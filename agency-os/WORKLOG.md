@@ -17562,3 +17562,11 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`NOT_INVOKED|CAPABILITY_NOT_RESOLVED|REQUIRED_.*catalog|catalog.invoke` | hits=optional skip 僅在 executor、Research fallback 僅在 triangulation、required path 保留 catalog gate；無 unresolved capability handler 旁路。
 - ROLLBACK: revert 本次 optional capability execution commit；不改 capability contracts、既有 journals 或已產生 artifacts。
 - WORKLOG_DONE: optional capability fail-closed execution
+[追記 2026-09-14 explicit deletion policy decision boundary]
+- 根因：`delete_journal_object` 的七個政策 gate 只能接任意 callbacks，沒有共同驗證 decision ref、evaluation timestamp 與 boolean 判定的入口，無法保證 retention/legal-hold/authorization 缺資料時 fail-closed 且可追溯。
+- 修正：新增 provider-neutral `deletion_policy.py`；要求七個明確 typed decisions、decision reference、ISO timestamp，將 policy decision 接入 journal deletion，前七步 evidence ref 回指 `policy-decision://<decision_ref>/...`；不自行推導法律期限、hold 或授權。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.unit.test_deletion_policy tests.unit.test_journal_deletion tests.unit.test_workflow_executor tests.unit.test_research_evidence_chain` | exit=0 | result=25 tests OK；tool=Python | cmd=`python -m py_compile ai_lego/platform/workflow/deletion_policy.py ai_lego/platform/workflow/journal_deletion.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests` | exit=0 | result=34 tests OK；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 policy validator、journal adapter、decision evidence linkage、false-retention integration test。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evaluate_deletion_policy|policy_checks|policy_decision|DELETION_POLICY_DECISION` | hits=單一 policy boundary、單一 journal consumer、6 個 regression tests 與 blueprint/WORKLOG；無第二套 deletion decision evaluator。
+- ROLLBACK: revert 本次 explicit policy boundary commit；不修改既有 CAS、DEK、journal 或 artifact 資料。
+- WORKLOG_DONE: explicit deletion policy decision boundary

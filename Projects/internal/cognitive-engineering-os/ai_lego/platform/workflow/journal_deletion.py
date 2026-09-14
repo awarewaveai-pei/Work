@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping
 
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.deletion import DeletionRequestBuilder, DELETION_STEPS
+from ai_lego.platform.workflow.deletion_policy import policy_checks
 
 
 PolicyCheck = Callable[[], bool]
@@ -23,8 +24,10 @@ def delete_journal_object(
     request_id: str,
     subject_id: str,
     requested_at: str,
-    checks: Mapping[str, PolicyCheck],
+    checks: Mapping[str, PolicyCheck] | None = None,
     now: Timestamp = utc_now_iso,
+    *,
+    policy_decision: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run the common deletion checks, delete one object, and verify it cannot restore.
 
@@ -32,6 +35,12 @@ def delete_journal_object(
     retention expiry, dependencies, or approval. A failed check raises before the protector's
     delete method is reached. The returned record uses the existing EC §31 builder shape.
     """
+    if checks is not None and policy_decision is not None:
+        raise InvariantViolation("JOURNAL_DELETION_POLICY_INPUTS_AMBIGUOUS")
+    if policy_decision is not None:
+        checks = policy_checks(policy_decision)
+    if checks is None:
+        raise InvariantViolation("JOURNAL_DELETION_POLICY_INPUTS_MISSING")
     required_checks = {
         "Authorization": "authorization",
         "Legal Hold Check": "legal_hold",
@@ -47,7 +56,12 @@ def delete_journal_object(
     cas_path = stored_reference.get("cas_path") if isinstance(stored_reference, Mapping) else None
     if not isinstance(cas_path, Mapping) or not isinstance(cas_path.get("hash"), str) or not cas_path["hash"].strip():
         raise InvariantViolation("JOURNAL_DELETION_TARGET_INVALID")
-    evidence = lambda step: f"workflow-deletion://{request_id}/{step.lower().replace(' ', '-')}"
+    policy_ref = policy_decision.get("decision_ref") if policy_decision is not None else None
+    evidence = lambda step: (
+        f"policy-decision://{policy_ref}/{step.lower().replace(' ', '-')}"
+        if policy_ref is not None
+        else f"workflow-deletion://{request_id}/{step.lower().replace(' ', '-')}"
+    )
     completed_policy_steps: list[tuple[str, str]] = []
     for step, key in required_checks.items():
         try:
