@@ -1,0 +1,145 @@
+"""Run a validated method-only Recipe from a caller-owned JSON source.
+
+This is a thin command-line composition root: Recipe compilation, method
+resolution, binding validation, gate dispatch, journaling, and workflow
+completion all remain owned by the shared runtime. Capability-backed Recipes
+are refused until their provider-neutral CLI adapter is explicitly registered.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime
+from pathlib import Path
+from typing import Any
+
+from ai_lego import PRODUCT_ROOT, resolve_spec_root
+from ai_lego.apps.api.dispatch import (
+    MethodDispatchError,
+    invoke_builder,
+    invoke_gate_runner,
+    method_binding_issues,
+    resolve_builder,
+    resolve_gate_runner,
+)
+from ai_lego.core.domain.provenance import make_provenance
+from ai_lego.core.support import read_json, write_json
+from ai_lego.core.contracts.runtime_dir import guard_runtime_dir, prepare_runtime_dir
+from ai_lego.errors import InvariantViolation
+from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
+from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
+from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
+from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
+from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
+
+
+VALIDATOR = "generic-recipe-cli"
+
+
+def _runtime_dir(path: Path | None, spec_root: Path) -> Path:
+    runtime = (path or PRODUCT_ROOT / ".runtime" / "recipe-cli").resolve()
+    guard_runtime_dir(runtime, spec_root, PRODUCT_ROOT, PRODUCT_ROOT / ".runtime")
+    prepare_runtime_dir(runtime, reset=False)
+    return runtime
+
+
+def run_recipe(recipe_id: str, source: dict[str, Any], runtime_dir: Path, *, spec_root: Path | None = None) -> dict[str, Any]:
+    """Execute one method-only ACTIVE Recipe and persist a JSON report."""
+    if not isinstance(source, dict):
+        raise TypeError("source must be a JSON object")
+    spec_root = resolve_spec_root(spec_root)
+    runtime_dir = _runtime_dir(runtime_dir, spec_root)
+    workflow_ir = compile_recipe_to_workflow_ir(spec_root, recipe_id, "R1")
+    nodes = workflow_ir["nodes"]
+    if any(node["node_kind"] != "method" for node in nodes):
+        raise RuntimeError("CLI_RECIPE_CAPABILITY_UNSUPPORTED: generic CLI currently accepts method-only Recipes")
+
+    method_ids = [node["method_id"] for node in nodes]
+    catalog = MethodCatalog.from_spec_root(spec_root)
+    resolution = catalog.resolve(method_ids)
+    if resolution["blocked"] is not None:
+        raise RuntimeError(f"METHOD_RESOLUTION_BLOCKED: {resolution['blocked']}")
+    for node in nodes:
+        builder = resolve_builder(node["method_id"])
+        issues = method_binding_issues(builder, node.get("bindings"))
+        if issues:
+            raise InvariantViolation(f"WORKFLOW_METHOD_BINDINGS_INVALID: node {node['method_id']}: {issues}")
+
+    missing = missing_workflow_input_paths(workflow_ir, {"source": source})
+    if missing:
+        raise InvariantViolation(f"WORKFLOW_SOURCE_FIELDS_MISSING: {', '.join(missing)}")
+
+    handlers: dict[str, Any] = {}
+    gate_runners: dict[int, Any] = {}
+    for index, node in enumerate(nodes):
+        method_id = node["method_id"]
+        builder = resolve_builder(method_id)
+        gate_runner = resolve_gate_runner(method_id)
+
+        def handler(payload: dict[str, Any], _node: dict[str, Any], _builder=builder) -> dict[str, Any]:
+            bindings = payload.get("__bindings__")
+            if not isinstance(bindings, dict):
+                raise InvariantViolation("WORKFLOW_BINDINGS_REQUIRED: executor did not expose bindings")
+            return invoke_builder(_builder, "", make_provenance("AI_INFERENCE", "AI_GENERATED"), bindings)
+
+        def run_gate(output: dict[str, Any], context: dict[str, Any], _node: dict[str, Any], _gate_runner=gate_runner) -> list[dict[str, Any]]:
+            return invoke_gate_runner(
+                _gate_runner,
+                output,
+                context,
+                VALIDATOR,
+                datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+
+        handlers[method_id] = handler
+        gate_runners[index] = run_gate
+
+    refs = list(workflow_ir.get("workflow_gate_refs", []))
+    if "workflow_execution_integrity" not in refs:
+        refs.insert(0, "workflow_execution_integrity")
+    registry = WorkflowGateRegistry()
+    registry.register(
+        "workflow_execution_integrity",
+        lambda context, workflow: [
+            evaluate_workflow_completion_gate(context, workflow, VALIDATOR, datetime.datetime.now(datetime.timezone.utc).isoformat())
+        ],
+    )
+    try:
+        registry.require_for(refs)
+    except InvariantViolation as error:
+        raise RuntimeError(f"CLI_WORKFLOW_GATE_UNSUPPORTED: {error}") from error
+
+    journal = runtime_dir / f"{recipe_id}.journal.json"
+    result = execute_workflow_ir(
+        workflow_ir,
+        {"source": source},
+        handlers,
+        catalogs={"method": catalog},
+        gate_runners=gate_runners,
+        workflow_gate_runner=lambda context, workflow: registry.evaluate(refs, context, workflow),
+        journal_path=journal,
+    )
+    report = {
+        "status": "PASS" if result.status == "SUCCEEDED" else "FAILED",
+        "recipe_id": recipe_id,
+        "method_resolution": resolution,
+        "workflow": result.as_dict(),
+        "journal": str(journal),
+    }
+    write_json(runtime_dir / f"{recipe_id}.result.json", report)
+    return report
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("recipe_id")
+    parser.add_argument("--input-json", required=True, type=Path)
+    parser.add_argument("--runtime-dir", type=Path)
+    args = parser.parse_args()
+    report = run_recipe(args.recipe_id, read_json(args.input_json), args.runtime_dir or PRODUCT_ROOT / ".runtime" / "recipe-cli")
+    print(f"{report['status']} {args.recipe_id}: {len(report['workflow']['steps'])} steps; journal={report['journal']}")
+    return 0 if report["status"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
