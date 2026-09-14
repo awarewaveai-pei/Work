@@ -313,14 +313,38 @@ class UnauthenticatedAccessTests(ApiTestCase):
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertIn(response.json()["status"], {"READY", "BLOCKED"})
 
-    def test_blocked_recipe_plan_exposes_machine_readable_reasons(self):
+    def test_blocked_recipe_plan_exposes_machine_readable_binding_reasons(self):
         response = self.client.get("/recipes/champion-challenger/plan")
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["status"], "BLOCKED")
         self.assertTrue(
-            any(item["code"] == "CAPABILITY_RESOLUTION_BLOCKED" for item in payload["blockers"])
+            any(item["code"] == "WORKFLOW_BINDING_BLOCKED" for item in payload["blockers"])
         )
+        self.assertFalse(any(item["code"] == "CAPABILITY_RESOLUTION_BLOCKED" for item in payload["blockers"]))
+
+    def test_optional_unresolved_capability_is_visible_but_not_a_plan_blocker(self):
+        from ai_lego import resolve_spec_root
+        from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
+
+        live = CapabilityCatalog.from_spec_root(resolve_spec_root())
+        catalog = CapabilityCatalog(label="test:without-literature", contracts={ref: entry for ref, entry in live.contracts.items() if ref != "literature_search"})
+        original_compile = api_main.compile_recipe_to_workflow_ir
+
+        def optional_fixture_compile(spec_root, recipe_id, risk_tier):
+            workflow_ir = original_compile(spec_root, recipe_id, risk_tier)
+            workflow_ir["nodes"][0]["necessity"] = "RECOMMENDED"
+            return workflow_ir
+
+        with patch.object(api_main, "compile_recipe_to_workflow_ir", side_effect=optional_fixture_compile), patch.object(
+            api_main.CapabilityCatalog, "from_spec_root", classmethod(lambda cls, spec_root: catalog)
+        ):
+            response = self.client.get("/recipes/edd-literature-search-v1/plan")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "READY")
+        self.assertEqual(payload["plan_executability"]["not_invocable"][0]["ref"], "literature_search")
+        self.assertFalse(any(item["code"] == "CAPABILITY_RESOLUTION_BLOCKED" for item in payload["blockers"]))
 
     def test_recipe_form_describes_source_fields_from_bindings(self):
         response = self.client.get("/recipes/research-qualitative-v1/form")
@@ -671,6 +695,33 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(payload["workflow"]["steps"][0]["node_kind"], "capability")
         self.assertEqual(payload["workflow"]["steps"][0]["ref"], "literature_search")
         self.assertEqual(payload["workflow"]["context"]["outputs"]["offline_literature_search"]["literature"]["retrieval"]["status_code"], "OFFLINE_SOURCE_STALE")
+
+    def test_api_skips_unresolved_recommended_capability_without_registering_an_uncontracted_adapter(self):
+        from ai_lego import resolve_spec_root
+        from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
+
+        self._login()
+        live = CapabilityCatalog.from_spec_root(resolve_spec_root())
+        catalog = CapabilityCatalog(label="test:without-literature", contracts={ref: entry for ref, entry in live.contracts.items() if ref != "literature_search"})
+        original_compile = api_main.compile_recipe_to_workflow_ir
+
+        def optional_fixture_compile(spec_root, recipe_id, risk_tier):
+            workflow_ir = original_compile(spec_root, recipe_id, risk_tier)
+            workflow_ir["nodes"][0]["necessity"] = "RECOMMENDED"
+            return workflow_ir
+
+        with patch.object(api_main, "compile_recipe_to_workflow_ir", side_effect=optional_fixture_compile), patch.object(
+            api_main.CapabilityCatalog, "from_spec_root", classmethod(lambda cls, spec_root: catalog)
+        ):
+            response = self.client.post(
+                "/recipes/edd-literature-search-v1/run",
+                json={"source": {"research_question": "How do educators describe reflective practice?"}, "run_id": "api-optional-capability-test"},
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["workflow"]["steps"][0]["status"], "NOT_INVOKED")
+        self.assertEqual(payload["workflow"]["steps"][0]["ref"], "literature_search")
 
     def test_art_reflection_recipe_preserves_non_diagnostic_boundary(self):
         self._login()

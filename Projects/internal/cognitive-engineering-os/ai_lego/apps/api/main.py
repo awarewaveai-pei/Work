@@ -556,7 +556,8 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
     capability_resolution = capability_catalog.resolve(capability_refs(workflow_ir))
     executability = plan_executability(workflow_ir, capability_resolution)
     capability_ids = capability_refs(workflow_ir)
-    capability_adapters = build_api_capability_adapters(capability_catalog, capability_ids)
+    resolvable_capability_ids = [ref for ref in capability_ids if capability_catalog.is_resolvable(ref)]
+    capability_adapters = build_api_capability_adapters(capability_catalog, resolvable_capability_ids)
     adapter_readiness = capability_adapters.availability(capability_ids)
     adapter_blocking = [
         {"ref": node["ref"], "label": node.get("label"), "necessity": node.get("necessity", "RECOMMENDED")}
@@ -586,7 +587,7 @@ def recipe_plan(recipe_id: str, method_catalog: MethodCatalog = Depends(get_cata
         "blockers": [
             *([{"code": "METHOD_RESOLUTION_BLOCKED", "detail": method_resolution["blocked"]}] if method_resolution["blocked"] else []),
             *([{"code": "METHOD_DISPATCH_BLOCKED", "detail": {"missing": method_dispatch_readiness["missing"]}}] if method_dispatch_readiness["missing"] else []),
-            *([{"code": "CAPABILITY_RESOLUTION_BLOCKED", "detail": capability_resolution["blocked"]}] if capability_resolution["blocked"] else []),
+            *([{"code": "CAPABILITY_RESOLUTION_BLOCKED", "detail": capability_resolution["blocked"]}] if capability_resolution["blocked"] and not executability["executable"] else []),
             *([{"code": "CAPABILITY_ADAPTER_BLOCKED", "detail": adapter_blocking}] if adapter_blocking else []),
             *([{"code": "METHOD_BINDING_BLOCKED", "detail": method_binding_issues_by_node}] if method_binding_issues_by_node else []),
             *([{"code": "WORKFLOW_BINDING_BLOCKED", "detail": missing_bindings}] if missing_bindings else []),
@@ -679,10 +680,13 @@ def run_recipe(
     capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
     capability_resolution = capability_catalog.resolve(capability_ids)
     if capability_resolution["blocked"] is not None:
-        raise HTTPException(status_code=409, detail=capability_resolution["blocked"])
-    capability_adapters = build_api_capability_adapters(capability_catalog, capability_ids)
+        executability = plan_executability(workflow_ir, capability_resolution)
+        if not executability["executable"]:
+            raise HTTPException(status_code=409, detail={"code": "CAPABILITY_PLAN_NOT_EXECUTABLE", "plan_executability": executability, "resolution": capability_resolution["blocked"]})
+    resolvable_capability_ids = [ref for ref in capability_ids if capability_catalog.is_resolvable(ref)]
+    capability_adapters = build_api_capability_adapters(capability_catalog, resolvable_capability_ids)
     try:
-        capability_handlers = capability_adapters.handlers_for(capability_ids)
+        capability_handlers = capability_adapters.handlers_for(resolvable_capability_ids)
     except InvariantViolation as error:
         raise HTTPException(status_code=501, detail=str(error)) from error
     for ref in [*method_ids, *capability_ids]:

@@ -17570,3 +17570,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evaluate_deletion_policy|policy_checks|policy_decision|DELETION_POLICY_DECISION` | hits=單一 policy boundary、單一 journal consumer、6 個 regression tests 與 blueprint/WORKLOG；無第二套 deletion decision evaluator。
 - ROLLBACK: revert 本次 explicit policy boundary commit；不修改既有 CAS、DEK、journal 或 artifact 資料。
 - WORKLOG_DONE: explicit deletion policy decision boundary
+
+[追記 2026-09-14 API optional capability plan/run parity]
+- 根因：CLI executor 已按 necessity 對 unresolved optional capability `NOT_INVOKED`，但 API plan/run 仍把任一 unresolved capability 當 409，且嘗試替未解析 ref 註冊 adapter，造成 CLI/API 語義分裂。
+- 修正：API plan/run 共用 `plan_executability`；只有 `REQUIRED_*` unresolved 阻擋；adapter registry 只建立 resolvable refs；optional unresolved 留在 `plan_executability.not_invocable`，executor 不呼叫 uncontracted handler。champion-challenger 測試期望改為真實 `WORKFLOW_BINDING_BLOCKED`；新增 API plan/run mutation regression，production recipe 原始 `REQUIRED_BY_RISK` 未改。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m unittest -q tests.unit.test_api_main` | exit=0 | result=54 tests OK；tool=Python | cmd=`python -m unittest -q tests.unit.test_capability_adapters tests.unit.test_capability_resolver tests.unit.test_workflow_executor tests.unit.test_research_evidence_chain tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests` | exit=0 | result=68 tests OK；tool=Python | cmd=`python D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\tests\run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 API plan/run branches、resolvable adapter selection、required 409 response、optional test mutation。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`plan_executability|resolvable_capability_ids|CAPABILITY_PLAN_NOT_EXECUTABLE|WORKFLOW_BINDING_BLOCKED` | hits=API plan/run 共用分類、兩個 API optional regression、既有 resolver/acceptance coverage；無 API path bypasses shared optional/required classification。
+- ROLLBACK: revert 本次 API optional capability parity commit；不改 Recipes、capability contracts、既有 journals 或 artifacts。
+- WORKLOG_DONE: API optional capability plan/run parity
