@@ -734,33 +734,37 @@ def run_recipe(
             return invoke_builder(_builder, "", make_provenance("AI_INFERENCE", "AI_GENERATED"), bindings)
 
         handlers[method_id] = handler
+    gate_runners: dict[int, Any] = {}
+    for index, node in enumerate(nodes):
+        if node["node_kind"] != "method":
+            continue
+        gate_runner = resolve_gate_runner(node["method_id"])
+
+        def run_gate(output: dict[str, Any], context: dict[str, Any], _node: dict[str, Any], _gate_runner=gate_runner) -> list[dict[str, Any]]:
+            return invoke_gate_runner(
+                _gate_runner,
+                output,
+                context,
+                "api.recipe",
+                datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+
+        gate_runners[index] = run_gate
+
     result = execute_workflow_ir(
         workflow_ir,
         {"source": source},
         handlers,
         catalogs={"method": catalog, "capability": capability_catalog},
+        gate_runners=gate_runners,
         journal_path=journal,
         resume=resume,
         journal_context_projector=None if journal_protector is not None else _api_journal_context,
         journal_context_protector=journal_protector,
     )
+    gates = {str(step.index): list(step.gates) for step in result.steps if step.gates is not None}
     if result.status != "SUCCEEDED":
-        return {"status": "FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
-    gates: dict[str, list[dict[str, Any]]] = {}
-    for index, node in enumerate(nodes):
-        if node["node_kind"] != "method":
-            continue
-        output = result.context["steps"][str(index)]
-        try:
-            gates[str(index)] = invoke_gate_runner(
-                resolve_gate_runner(node["method_id"]),
-                output,
-                result.context,
-                "api.recipe",
-                datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            )
-        except (InvariantViolation, MethodDispatchError) as error:
-            raise HTTPException(status_code=422, detail=f"WORKFLOW_GATE_EVALUATION_FAILED: {error}") from error
+        return {"status": "FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
     passed = all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for step_gates in gates.values() for gate in step_gates)
     return {"status": "PASS" if passed else "GATE_FAILED", "run_id": run_id, "workflow": _api_workflow_result(result), "gates": gates, "journal_ref": journal_ref, "method_resolution": method_resolution, "capability_resolution": capability_resolution}
 

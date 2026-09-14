@@ -26,6 +26,7 @@ from ai_lego.platform.workflow.journal_protection import JournalContextProtector
 
 Handler = Callable[[dict[str, Any], dict[str, Any]], Mapping[str, Any]]
 JournalContextProjector = Callable[[dict[str, Any]], Mapping[str, Any]]
+GateRunner = Callable[[dict[str, Any], dict[str, Any], dict[str, Any]], list[Mapping[str, Any]]]
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class WorkflowStepResult:
     output: dict[str, Any] | None = None
     error: str | None = None
     contract: dict[str, Any] | None = None
+    gates: tuple[dict[str, Any], ...] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -57,6 +59,8 @@ class WorkflowStepResult:
             result["error"] = self.error
         if self.contract is not None:
             result["contract"] = self.contract
+        if self.gates is not None:
+            result["gates"] = list(self.gates)
         return result
 
 
@@ -228,7 +232,7 @@ def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context
     for raw in raw_steps[:expected]:
         if not isinstance(raw, dict) or raw.get("status") != "SUCCEEDED":
             raise InvariantViolation("WORKFLOW_JOURNAL_COMPLETED_STEP_INVALID")
-        restored.append(WorkflowStepResult(int(raw["index"]), raw["label"], raw["node_kind"], raw["ref"], raw["status"], tuple(raw.get("input_paths", [])), raw.get("output"), raw.get("error"), raw.get("contract")))
+        restored.append(WorkflowStepResult(int(raw["index"]), raw["label"], raw["node_kind"], raw["ref"], raw["status"], tuple(raw.get("input_paths", [])), raw.get("output"), raw.get("error"), raw.get("contract"), tuple(raw.get("gates", [])) if raw.get("gates") is not None else None))
     context = journal.get("context")
     if not isinstance(context, dict):
         raise InvariantViolation("WORKFLOW_JOURNAL_CONTEXT_INVALID")
@@ -244,6 +248,7 @@ def execute_workflow_ir(
     initial_context: Mapping[str, Any],
     handlers: Mapping[str, Handler],
     catalogs: Mapping[str, Any] | None = None,
+    gate_runners: Mapping[int, GateRunner] | None = None,
     journal_path: Path | None = None,
     resume: bool = False,
     journal_context_projector: JournalContextProjector | None = None,
@@ -260,6 +265,11 @@ def execute_workflow_ir(
     ``capability`` catalogs.  Each node is then invoked through that catalog's
     shared per-invocation gate; an implementation is never called for an
     unresolved reference.
+    If ``gate_runners`` is supplied, a node's gate runner executes after its
+    handler but before the node is committed to workflow context or the next
+    node is started.  A non-PASS/NOT_APPLICABLE gate therefore durably stops
+    the workflow at that node; callers without gate runners retain the original
+    handler-only behavior.
     """
     workflow_id = workflow_ir.get("id")
     nodes = workflow_ir.get("nodes")
@@ -335,9 +345,28 @@ def execute_workflow_ir(
                 output = dict(raw_output)
             else:
                 output = dict(handler(payload, node))
+            gate_results: tuple[dict[str, Any], ...] | None = None
+            gate_runner = (gate_runners or {}).get(index)
+            if gate_runner is not None:
+                candidate_context = dict(context)
+                candidate_context["steps"] = dict(context["steps"])
+                candidate_context["outputs"] = dict(context["outputs"])
+                candidate_context["steps"][str(index)] = output
+                candidate_context["outputs"][label] = output
+                raw_gate_results = gate_runner(output, candidate_context, node)
+                if not isinstance(raw_gate_results, list) or any(not isinstance(gate, Mapping) for gate in raw_gate_results):
+                    raise InvariantViolation(f"WORKFLOW_GATE_RESULT_INVALID: node {index} must return a list of objects")
+                gate_results = tuple(dict(gate) for gate in raw_gate_results)
+                if any(gate.get("status") not in {"PASS", "NOT_APPLICABLE"} for gate in gate_results):
+                    failed_gate_statuses = [gate.get("status") for gate in gate_results if gate.get("status") not in {"PASS", "NOT_APPLICABLE"}]
+                    failed_step = WorkflowStepResult(index, label, node["node_kind"], ref, "FAILED", paths, output=output, error=f"WORKFLOW_GATE_FAILED: statuses={failed_gate_statuses!r}", contract=contract, gates=gate_results)
+                    results.append(failed_step)
+                    if journal_path is not None:
+                        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "FAILED", context, results, index, journal_context_projector, journal_context_protector))
+                    return WorkflowRunResult(workflow_id, "FAILED", context, tuple(results))
             context["steps"][str(index)] = output
             context["outputs"][label] = output
-            step_result = WorkflowStepResult(index, label, node["node_kind"], ref, "SUCCEEDED", paths, output, contract=contract)
+            step_result = WorkflowStepResult(index, label, node["node_kind"], ref, "SUCCEEDED", paths, output, contract=contract, gates=gate_results)
             results.append(step_result)
             if journal_path is not None:
                 _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "RUNNING", context, results, index + 1, journal_context_projector, journal_context_protector))

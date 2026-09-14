@@ -70,6 +70,49 @@ class WorkflowExecutorTests(unittest.TestCase):
         self.assertEqual(reached, [])
         self.assertEqual(catalog.invocations, [])
 
+    def test_gate_failure_stops_before_downstream_and_is_durable(self):
+        ir = {
+            "id": "gated-v1",
+            "nodes": [
+                {"node_kind": "method", "method_id": "one.step", "label": "one"},
+                {"node_kind": "method", "method_id": "two.step", "label": "two", "input": "outputs.one"},
+            ],
+        }
+        calls = []
+
+        def first(_payload, _node):
+            calls.append("first")
+            return {"value": 1}
+
+        def second(_payload, _node):
+            calls.append("second")
+            return {"value": 2}
+
+        def first_gate(output, context, node):
+            self.assertEqual(output, {"value": 1})
+            self.assertEqual(context["outputs"]["one"], {"value": 1})
+            self.assertEqual(node["method_id"], "one.step")
+            return [{"id": "quality", "status": "FAIL", "reason": "test mutation"}]
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "gated.json"
+            result = execute_workflow_ir(
+                ir,
+                {},
+                {"one.step": first, "two.step": second},
+                gate_runners={0: first_gate},
+                journal_path=journal,
+            )
+            self.assertEqual(result.status, "FAILED")
+            self.assertEqual(calls, ["first"])
+            self.assertEqual(result.steps[0].status, "FAILED")
+            self.assertEqual(result.steps[0].gates[0]["status"], "FAIL")
+            self.assertNotIn("one", result.context["outputs"])
+            persisted = __import__("json").loads(journal.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["status"], "FAILED")
+            self.assertEqual(persisted["steps"][0]["gates"][0]["id"], "quality")
+            SchemaContracts(resolve_spec_root()).validate("ai-lego://specs/execution/workflow-journal.schema.yaml", persisted, "gated workflow journal")
+
     def test_live_catalog_descriptor_is_recorded_for_successful_invocation(self):
         ir = {"id": "research-v1", "nodes": [{"node_kind": "method", "method_id": "research.qualitative_coding"}]}
         catalog = MethodCatalog.from_spec_root(resolve_spec_root())

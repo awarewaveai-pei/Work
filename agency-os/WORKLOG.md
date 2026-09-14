@@ -17579,3 +17579,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`plan_executability|resolvable_capability_ids|CAPABILITY_PLAN_NOT_EXECUTABLE|WORKFLOW_BINDING_BLOCKED` | hits=API plan/run 共用分類、兩個 API optional regression、既有 resolver/acceptance coverage；無 API path bypasses shared optional/required classification。
 - ROLLBACK: revert 本次 API optional capability parity commit；不改 Recipes、capability contracts、既有 journals 或 artifacts。
 - WORKLOG_DONE: API optional capability plan/run parity
+
+[追記 2026-09-14 shared per-step gate boundary]
+- 根因：API 在整條 Workflow executor 完成後才逐一執行 method gates；因此中途 gate FAIL 時，後續節點已可能執行，且失敗 gate 不在 durable step ledger 中。
+- 修正：`execute_workflow_ir` 新增 optional `gate_runners` seam；每個 gate 在當前 output commit 與下一節點前執行，非 `PASS`/`NOT_APPLICABLE` 立即以 `FAILED` step 停止，保存 gate evidence；API 改用同一 seam，移除後置 gate 重跑；workflow journal schema 支援 step `gates`。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m py_compile ai_lego/platform/workflow/executor.py ai_lego/apps/api/main.py tests/unit/test_workflow_executor.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.unit.test_workflow_executor` | exit=0 | result=12 tests OK；tool=Python | cmd=`python -m unittest -v tests.unit.test_api_main.RecipeRunTests.test_life_recipe_runs_through_shared_executor_and_gates` | exit=0 | result=1 test OK；tool=Python | cmd=`python -m unittest -q tests.unit.test_api_main` | exit=0 | result=54 tests OK；tool=Python | cmd=`python -m unittest -q tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests tests.unit.test_workflow_ir_and_resolver tests.unit.test_capability_resolver tests.unit.test_capability_adapters` | exit=0 | result=72 tests OK；tool=Python | cmd=`python D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\tests\run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 executor gate ordering、failed journal serialization、API gate response 與 existing consumers。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`execute_workflow_ir|gate_runners|WORKFLOW_GATE_FAILED` | hits=24 executor references、8 new gate references；確認 API 唯一 production gate seam，既有 CLI/runtime consumers 未傳 gate_runners 且保持相容。
+- ROLLBACK: revert 本次 shared per-step gate boundary commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
+- WORKLOG_DONE: shared per-step gate boundary

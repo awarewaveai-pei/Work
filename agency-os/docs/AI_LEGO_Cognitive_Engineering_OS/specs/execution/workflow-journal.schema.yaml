@@ -78,6 +78,11 @@ $defs:
         type: string
       contract:
         type: object
+      gates:
+        type: array
+        description: Gate evidence evaluated before this step was committed or the next step started.
+        items:
+          type: object
 
 open_questions:
   - id: "OQ-WJ-1"
