@@ -17,6 +17,8 @@
 
 **切換條件：** 若未來只需要單向、無語義轉換的定期複製，才考慮 Airbyte 等 replication 工具；本次一次性高完整性遷移不符合這個條件。
 
+**本次實際執行 allow-list：** Airtable 官方 API、外部 raw JSON／JSONL archive、本機 staging／測試、核准的 Supabase migrations、核准的 `art_therapy` canonical／provenance／audit objects。其他候選工具與物件不會被安裝、建立或寫入 Supabase。
+
 ## 背景與問題定義
 
 這不是單純的 CSV 搬運。來源同時包含中文 authoring、英文資料、linked records、lookup、rollup、formula、附件與不同語義層級的欄位。上次失敗的根因是過早建立目標表、以顯示名稱猜 mapping、把來源資料與 canonical model 混在一起，造成看似有資料但內容與欄位不完整。
@@ -50,6 +52,8 @@ Supabase Wrapper 可把 Airtable 查詢成 Postgres foreign table，但官方明
 ### 首選：C1 自建 deterministic ETL + raw archive + relational canonical
 
 這是唯一同時滿足「資料先完整保存」與「正式資料模型不被 Airtable UI 結構綁死」的方案。
+
+本次不採用 Airtable Wrapper、Whalesync、n8n、Zapier、Airbyte 或第三方 migration SaaS 作為執行依賴；它們只保留在本報告作為已研究、已排除的候選，不會出現在實際 Supabase schema 或 migration pipeline。
 
 第一層是 immutable source archive：保存 Airtable metadata、raw record payload、display value、field ID、record ID、linked IDs、附件 metadata、snapshot manifest 與 checksum。這份 raw archive 放在 Supabase 以外的受保護版本化位置，不在 audit 階段建立 Supabase raw landing、mirror table 或臨時 view；如此不會把尚未核准的來源結構誤變成 application schema。
 

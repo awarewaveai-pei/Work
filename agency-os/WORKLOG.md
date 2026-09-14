@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-09-14｜Cognitive OS atomic Recipe run claim
+
+- 根因／缺口：executor 先 `exists()` 再 `os.replace()`，兩個新 runner 可同時通過檢查並互相覆寫首份 journal；API duplicate run 會把已知 conflict 噴成未處理例外。
+- 修改：首次 journal 用完整暫存檔＋atomic hard-link create-only claim；checkpoint 保留 atomic replace 並改用唯一暫存檔；API 將 duplicate run 穩定映射為 409 `WORKFLOW_RUN_EXISTS_REQUIRES_RESUME`；新增受控併發與 API regression。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor.WorkflowExecutorTests.test_concurrent_new_runs_atomically_claim_one_journal tests.unit.test_api_main.RecipeRunTests.test_recipe_run_rejects_duplicate_run_without_resume -q` | exit=0 | ms=18942 | result=2 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor -q` | exit=0 | ms=7148 | result=14 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=229347 | result=62 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests -t . -q` | exit=0 | ms=1950570 | result=13613 tests OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7479 | result=3954 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | ms=409 | result=PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=499 | result=PASS
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`create_only|WORKFLOW_RUN_EXISTS_REQUIRES_RESUME|WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME|test_concurrent_new_runs_atomically_claim_one_journal` | hits=13
+- WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
+- rollback：`git revert <atomic-run-claim-commit>`；不涉及 schema、DB、密鑰或部署。
+
 ## 2026-09-14｜Cognitive OS tenant-scoped Recipe run status lookup
 
 - 根因／缺口：durable journal 可被 resume，但 API/Dashboard 沒有 authenticated lookup；操作者無法查 run 狀態，也容易依賴手動記憶 run id。
@@ -18084,3 +18100,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`raw landing|master plan + snapshot|同時讀取|臨時 view`；確認未保留可將 raw landing 當 Phase 0 application object 的建議。
 - ROLLBACK: `git revert <this-commit>`；僅回滾決策文件修訂與 WORKLOG entry。
 - WORKLOG_DONE: Migration decision alignment correction
+
+[追記 2026-09-14 Migration execution allow-list]
+- 根因：研究候選工具與 raw landing 的描述可能被誤讀成實際執行依賴或 Supabase 寫入物件。
+- 修正：master plan 與決策報告加入明確 allow-list／deny-list；正式執行只使用 Airtable API、外部 raw JSON archive、本機 staging、核准 migrations 與核准的 `art_therapy` objects。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`Select-String master plan/report for allow-list and prohibited objects` | exit=0 | result=explicit allow/deny text present。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Wrapper|Whalesync|n8n|Airbyte|raw landing|mirror`；確認候選僅為研究紀錄，沒有被列入實際 migration pipeline。
+- ROLLBACK: `git revert <this-commit>`；僅回滾文件與 WORKLOG 修訂。
+- WORKLOG_DONE: Migration execution allow-list
