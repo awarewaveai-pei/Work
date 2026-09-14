@@ -47,6 +47,11 @@ properties:
     type: array
     items:
       $ref: "#/$defs/step"
+  workflow_gates:
+    type: array
+    description: Cross-node gate evidence evaluated after the final step and before the run is successful.
+    items:
+      type: object
 
 $defs:
   step:

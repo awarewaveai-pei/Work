@@ -27,6 +27,7 @@ from ai_lego.platform.workflow.journal_protection import JournalContextProtector
 Handler = Callable[[dict[str, Any], dict[str, Any]], Mapping[str, Any]]
 JournalContextProjector = Callable[[dict[str, Any]], Mapping[str, Any]]
 GateRunner = Callable[[dict[str, Any], dict[str, Any], dict[str, Any]], list[Mapping[str, Any]]]
+WorkflowGateRunner = Callable[[dict[str, Any], dict[str, Any]], list[Mapping[str, Any]]]
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ class WorkflowRunResult:
     status: str
     context: dict[str, Any]
     steps: tuple[WorkflowStepResult, ...]
+    workflow_gates: tuple[dict[str, Any], ...] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +81,7 @@ class WorkflowRunResult:
             "status": self.status,
             "context": self.context,
             "steps": [step.as_dict() for step in self.steps],
+            **({"workflow_gates": list(self.workflow_gates)} if self.workflow_gates is not None else {}),
         }
 
 
@@ -182,6 +185,7 @@ def _journal_record(
     next_index: int,
     journal_context_projector: JournalContextProjector | None = None,
     journal_context_protector: JournalContextProtector | None = None,
+    workflow_gates: tuple[dict[str, Any], ...] | None = None,
 ) -> dict[str, Any]:
     persisted_context = dict(journal_context_projector(context) if journal_context_projector is not None else context)
     if journal_context_protector is not None:
@@ -194,7 +198,7 @@ def _journal_record(
             # plaintext copy in the step ledger would defeat the protector.
             step_record.pop("output", None)
         persisted_steps.append(step_record)
-    return {
+    record = {
         "journal_version": 1,
         "workflow_id": workflow_ir["id"],
         "workflow_sha256": sha256_json(dict(workflow_ir)),
@@ -204,9 +208,12 @@ def _journal_record(
         "context": persisted_context,
         "steps": persisted_steps,
     }
+    if workflow_gates is not None:
+        record["workflow_gates"] = list(workflow_gates)
+    return record
 
 
-def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context: Mapping[str, Any], journal_context_protector: JournalContextProtector | None = None) -> tuple[dict[str, Any], list[WorkflowStepResult], int, str]:
+def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context: Mapping[str, Any], journal_context_protector: JournalContextProtector | None = None) -> tuple[dict[str, Any], list[WorkflowStepResult], int, str, tuple[dict[str, Any], ...] | None]:
     try:
         journal = read_json(path)
     except Exception as error:
@@ -240,7 +247,9 @@ def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context
         if journal_context_protector is None:
             raise InvariantViolation("WORKFLOW_JOURNAL_PROTECTION_REQUIRED")
         context = journal_context_protector.restore(context)
-    return context, restored, expected, str(journal["status"])
+    raw_workflow_gates = journal.get("workflow_gates")
+    workflow_gates = tuple(dict(gate) for gate in raw_workflow_gates) if isinstance(raw_workflow_gates, list) else None
+    return context, restored, expected, str(journal["status"]), workflow_gates
 
 
 def execute_workflow_ir(
@@ -249,6 +258,7 @@ def execute_workflow_ir(
     handlers: Mapping[str, Handler],
     catalogs: Mapping[str, Any] | None = None,
     gate_runners: Mapping[int, GateRunner] | None = None,
+    workflow_gate_runner: WorkflowGateRunner | None = None,
     journal_path: Path | None = None,
     resume: bool = False,
     journal_context_projector: JournalContextProjector | None = None,
@@ -270,6 +280,9 @@ def execute_workflow_ir(
     node is started.  A non-PASS/NOT_APPLICABLE gate therefore durably stops
     the workflow at that node; callers without gate runners retain the original
     handler-only behavior.
+    A ``workflow_gate_runner`` executes after all nodes have succeeded and
+    before the run is marked successful.  A non-PASS/NOT_APPLICABLE result
+    fails the run while retaining all completed step checkpoints.
     """
     workflow_id = workflow_ir.get("id")
     nodes = workflow_ir.get("nodes")
@@ -288,7 +301,7 @@ def execute_workflow_ir(
     if journal_path is not None and journal_path.exists():
         if not resume:
             raise InvariantViolation(f"WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME: {journal_path}")
-        context, results, start_index, prior_status = _restore_journal(journal_path, workflow_ir, initial_context, journal_context_protector)
+        context, results, start_index, prior_status, restored_workflow_gates = _restore_journal(journal_path, workflow_ir, initial_context, journal_context_protector)
         # A protected journal may intentionally omit the original source. The caller supplies
         # it again (and the fingerprint above must still match); checkpointed execution state
         # overlays that fresh initial context for deterministic resume.
@@ -296,7 +309,7 @@ def execute_workflow_ir(
         restored_context.update(context)
         context = restored_context
         if prior_status == "SUCCEEDED":
-            return WorkflowRunResult(workflow_id, "SUCCEEDED", context, tuple(results))
+            return WorkflowRunResult(workflow_id, "SUCCEEDED", context, tuple(results), restored_workflow_gates)
     elif resume:
         raise InvariantViolation(f"WORKFLOW_JOURNAL_NOT_FOUND: {journal_path}")
     if journal_path is not None:
@@ -378,6 +391,16 @@ def execute_workflow_ir(
                 _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "FAILED", context, results, index, journal_context_projector, journal_context_protector))
             return WorkflowRunResult(workflow_id, "FAILED", context, tuple(results))
 
+    workflow_gates: tuple[dict[str, Any], ...] | None = None
+    if workflow_gate_runner is not None:
+        raw_workflow_gates = workflow_gate_runner(context, dict(workflow_ir))
+        if not isinstance(raw_workflow_gates, list) or any(not isinstance(gate, Mapping) for gate in raw_workflow_gates):
+            raise InvariantViolation("WORKFLOW_GATE_RESULT_INVALID: workflow gate must return a list of objects")
+        workflow_gates = tuple(dict(gate) for gate in raw_workflow_gates)
+        if any(gate.get("status") not in {"PASS", "NOT_APPLICABLE"} for gate in workflow_gates):
+            if journal_path is not None:
+                _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "FAILED", context, results, len(nodes), journal_context_projector, journal_context_protector, workflow_gates))
+            return WorkflowRunResult(workflow_id, "FAILED", context, tuple(results), workflow_gates)
     if journal_path is not None:
-        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "SUCCEEDED", context, results, len(nodes), journal_context_projector, journal_context_protector))
-    return WorkflowRunResult(workflow_id, "SUCCEEDED", context, tuple(results))
+        _atomic_write_journal(journal_path, _journal_record(workflow_ir, initial_context, "SUCCEEDED", context, results, len(nodes), journal_context_projector, journal_context_protector, workflow_gates))
+    return WorkflowRunResult(workflow_id, "SUCCEEDED", context, tuple(results), workflow_gates)

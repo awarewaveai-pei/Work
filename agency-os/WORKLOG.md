@@ -17597,3 +17597,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`execute_workflow_ir|gate_runners=|LIFE_DECISION_GATE_FAILED|evaluate_*_gates` | hits=2 executor invocation/gate injection；無生活決策後置 gate path 或重複 `all_gates_pass`。
 - ROLLBACK: revert 本次 life decision gate migration commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
 - WORKLOG_DONE: life decision gate migration
+
+[追記 2026-09-14 workflow-level gate seam]
+- 根因：共用 executor 只有逐節點 gate 邊界，無法在所有節點完成後、run 成功落 journal 前驗證跨節點證據；Research aggregate gate 因而沒有可重用的 durable seam。
+- 修正：新增 optional `workflow_gate_runner`；在最終節點 commit 後執行，非 `PASS`/`NOT_APPLICABLE` 以 `FAILED` journal 停止並保存 `workflow_gates`，resume 重用 step checkpoints 但重新驗證 workflow gate；同步更新 journal schema 與生成索引。
+- REALTEST_EVIDENCE: tool=Python | cmd=`python -m py_compile ai_lego/platform/workflow/executor.py tests/unit/test_workflow_executor.py` | exit=0；tool=Python | cmd=`python -m unittest -q tests.unit.test_workflow_executor` | exit=0 | result=13 tests OK；tool=Python | cmd=`python -m unittest -q tests.unit.test_api_main tests.acceptance.test_research_slice_fixture_mode.FixtureModeAcceptanceTests` | exit=0 | result=88 tests OK；tool=Python | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3950 PASS / ALL GOLDEN TESTS PASSED。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；讀回 executor workflow-gate ordering、resume path、journal schema、generated indexes、existing consumers。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`workflow_gate_runner|workflow_gates|WORKFLOW_GATE_RESULT_INVALID|_restore_journal` | hits=30；確認既有 consumer 相容、無第二套 workflow-gate serialization path。
+- ROLLBACK: revert 本次 workflow-level gate seam commit；不修改既有 Recipe、journal、CAS 或 artifact 資料。
+- WORKLOG_DONE: workflow-level gate seam

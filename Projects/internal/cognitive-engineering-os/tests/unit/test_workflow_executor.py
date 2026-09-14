@@ -113,6 +113,35 @@ class WorkflowExecutorTests(unittest.TestCase):
             self.assertEqual(persisted["steps"][0]["gates"][0]["id"], "quality")
             SchemaContracts(resolve_spec_root()).validate("ai-lego://specs/execution/workflow-journal.schema.yaml", persisted, "gated workflow journal")
 
+    def test_workflow_gate_failure_is_durable_after_all_steps_and_resume_rechecks_it(self):
+        ir = {"id": "workflow-gated-v1", "nodes": [{"node_kind": "method", "method_id": "one.step", "label": "one"}]}
+        calls = []
+        gate_calls = []
+
+        def handler(_payload, _node):
+            calls.append("handler")
+            return {"ok": True}
+
+        def workflow_gate(context, workflow):
+            gate_calls.append((context["outputs"]["one"], workflow["id"]))
+            return [{"gate_id": "workflow_quality", "status": "FAIL", "evidence": [{"reason": "test mutation"}], "validator": "test", "timestamp": "2026-09-14T00:00:00Z"}]
+
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "workflow-gated.json"
+            first = execute_workflow_ir(ir, {}, {"one.step": handler}, workflow_gate_runner=workflow_gate, journal_path=journal)
+            self.assertEqual(first.status, "FAILED")
+            self.assertEqual(calls, ["handler"])
+            self.assertEqual(len(gate_calls), 1)
+            self.assertEqual(first.workflow_gates[0]["status"], "FAIL")
+            persisted = __import__("json").loads(journal.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["status"], "FAILED")
+            self.assertEqual(persisted["workflow_gates"][0]["gate_id"], "workflow_quality")
+            SchemaContracts(resolve_spec_root()).validate("ai-lego://specs/execution/workflow-journal.schema.yaml", persisted, "workflow-gated journal")
+            resumed = execute_workflow_ir(ir, {}, {"one.step": handler}, workflow_gate_runner=workflow_gate, journal_path=journal, resume=True)
+            self.assertEqual(resumed.status, "FAILED")
+            self.assertEqual(calls, ["handler"])
+            self.assertEqual(len(gate_calls), 2)
+
     def test_live_catalog_descriptor_is_recorded_for_successful_invocation(self):
         ir = {"id": "research-v1", "nodes": [{"node_kind": "method", "method_id": "research.qualitative_coding"}]}
         catalog = MethodCatalog.from_spec_root(resolve_spec_root())
