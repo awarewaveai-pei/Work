@@ -1,7 +1,7 @@
 # 決策：Airtable 一次性完整移轉至 Supabase
 
 **日期：** 2026-09-14  
-**狀態：** 執行規格  
+**狀態：** 執行規格
 **首選：** Airtable API + deterministic ETL + 外部 raw snapshot + Supabase relational canonical model
 
 ## Context
