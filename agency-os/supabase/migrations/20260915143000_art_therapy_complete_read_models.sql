@@ -46,12 +46,12 @@ select 'therapeutic_focus', t.id, t.code, zh.title, en.title,
   to_jsonb(en) - 'id' - 'therapeutic_focus_id' - 'locale' - 'created_at' - 'updated_at'
 from art_therapy.therapeutic_focuses t left join art_therapy.therapeutic_focus_localizations zh on zh.therapeutic_focus_id=t.id and zh.locale='zh-TW' left join art_therapy.therapeutic_focus_localizations en on en.therapeutic_focus_id=t.id and en.locale='en'
 union all
-select 'condition', t.id, t.code, zh.title, en.title,
+select 'condition', t.id, t.code, coalesce(zh.title, zh.name), coalesce(en.title, en.name),
   to_jsonb(zh) - 'id' - 'condition_id' - 'locale' - 'created_at' - 'updated_at',
   to_jsonb(en) - 'id' - 'condition_id' - 'locale' - 'created_at' - 'updated_at'
 from art_therapy.conditions t left join art_therapy.condition_localizations zh on zh.condition_id=t.id and zh.locale='zh-TW' left join art_therapy.condition_localizations en on en.condition_id=t.id and en.locale='en'
 union all
-select 'presenting_concern', t.id, t.code, zh.title, en.title,
+select 'presenting_concern', t.id, t.code, coalesce(zh.title, zh.name), coalesce(en.title, en.name),
   to_jsonb(zh) - 'id' - 'presenting_concern_id' - 'locale' - 'created_at' - 'updated_at',
   to_jsonb(en) - 'id' - 'presenting_concern_id' - 'locale' - 'created_at' - 'updated_at'
 from art_therapy.presenting_concerns t left join art_therapy.presenting_concern_localizations zh on zh.presenting_concern_id=t.id and zh.locale='zh-TW' left join art_therapy.presenting_concern_localizations en on en.presenting_concern_id=t.id and en.locale='en'
