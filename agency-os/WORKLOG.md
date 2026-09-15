@@ -18139,3 +18139,25 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`Wrapper|Whalesync|n8n|Airbyte|raw landing|AI context|allow-list`；確認 deny-list 與 write scope 明確。
 - ROLLBACK: `git revert <this-commit>`；僅回滾文件精簡，不觸碰 Airtable／Supabase。
 - WORKLOG_DONE: AI-readable migration documents
+
+[追記 2026-09-14 Airtable source snapshot and migration audit]
+- 根因：先前未先保存 Live Airtable 的完整 field-ID/record-ID snapshot，也未在正式建表前以硬 gate 驗證欄位、關係與附件完整性。
+- 修正：新增可重跑的 Airtable snapshot 與 audit 工具；Live base 以 60-table schema、逐表分頁 records、computed config、linked IDs、raw/display values 與附件下載建立本機外部 archive，Supabase application writes 維持 0。
+- REALTEST_EVIDENCE: tool=Node | cmd=`node --test scripts/airtable-snapshot.test.mjs scripts/airtable-audit.test.mjs` | exit=0 | result=4 tests PASS；tool=Airtable API | result=60 tables / 1,484 fields / 1,114 records / 1,582 linked values / 6 attachments；tool=Node | result=129 source checksums + 12 audit checksums, failures=0。
+- GATE_STATUS: G1=PASS；G2=BLOCKED（199 個 active nonempty field mappings 待核准；English Tool=196 matched/44 unmatched/0 ambiguous/1 empty；60 個 mixed population/concern/condition records 待核准）。
+- G2_CANDIDATES: 199/199 nonempty fields 已有 exact candidate target，REVIEW_REQUIRED=0，target collision=0；60 mixed rows 候選為 condition=35 / presenting_concern=25；44 unmatched English rows 中 31 筆附 fuzzy 候選，仍不得自動批准；唯一假歧義經英文 title 優先規則消除。
+- SUPABASE_READBACK: project=Art Therapy Library | status=ACTIVE_HEALTHY | public/art_therapy application tables=0 | auth users=0 | storage buckets=0 | storage objects=0。
+- REVIEW_DONE: self-review=Quick | verdict=pass | findings=0c/0m/0n；確認 fail-closed、輸出目錄不可覆寫、raw snapshot 不進 Git、附件 size/hash、FK orphan、pagination 與 unknown field checks。
+- BUGHUNT_DONE: scope=agency-os/scripts | grep=`REVIEW_REQUIRED|supabaseApplicationWrites|attachment|orphan|pagination incomplete`；確認 G2 未核准時沒有 Supabase DDL/write path。
+- ROLLBACK: revert 本次 scripts commit；外部 snapshot 可獨立保留，且不影響 Airtable 或 Supabase。
+- WORKLOG_DONE: Airtable source snapshot and migration audit
+
+[追記 2026-09-15 Airtable completeness and relationship repair]
+- 根因：先前只把 canonical subset 寫入 Supabase；大量來源欄位與非空值只在外部 archive，使用者在 Supabase 表內看不到。來源 linked edge 也曾因主鍵去重與批次重播造成差異。
+- 修正：新增受保護的 `art_therapy._source_tables`／`_source_fields`／`_source_records`／`_source_record_values` 完整來源層與 `_source_links`；保留 field ID、record ID、raw/display JSON、linked record ID 與 ordinal。canonical tables 與來源保存層分離，未猜語義、不覆寫原始值。
+- REALTEST_EVIDENCE: tool=Supabase SQL | cmd=`production source/mapping/attachment/relationship exact-diff and row-set digest queries` | exit=0 | result=60 tables / 1,484 fields / 1,114 records / 10,957 nonempty values / 1,582 linked values；value missing/extra/changed=0/0/0；link missing/extra=0/0；1,484 mappings complete and approved；753/753 canonical relationships mapped；6/6 attachments traced；production and fresh-restore table/field/record/value/link/attachment SHA-256 all equal；tool=Node | cmd=`node scripts/load-art-therapy-source-archive.mjs <snapshot> <new-output>` | exit=0 | result=129 source checksums verified, 60/1,484/1,114/10,957/1,582 generated in 177 manifest-ordered files；tool=Node | cmd=`node --test scripts/airtable-audit.test.mjs scripts/art-therapy-transform.test.mjs` | exit=0 | result=4 tests PASS；tool=Docker | cmd=`pg_restore complete dump into fresh PostgreSQL 17 + checksum-locked verify-art-therapy-dry-run.mjs` | exit=0 | result=PASS。
+- REVIEW_DONE: self-review=Deep | verdict=pass-after-critic-fixes | findings=0c/5m-fixed/0n；critic 找出並已修正 snapshot checksum 未綁定、DB 內互比假 PASS、canonical 未獨立重建、輸出目錄可重用、restore role DDL 不完整；structured display JSONB、duplicate-link ordinal、批次截斷與 deny policy 亦已驗證。
+- ORACLE_WAIVED: critic 修後複審觸發 usage limit；已依 fallback 執行書面對抗自審、全新 dump restore，以及兩個 mutation tests（重用輸出目錄、內容不一致 replay 均被拒絕）。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`_source_(tables|fields|records|record_values|links)|Source archive count mismatch|linked_record_id_fkey|snapshotManifest` | hits=90；staged debug artifacts=0；stale backup refs=0。
+- ROLLBACK: 使用最新完整備份 `art_therapy_complete_verified_locked_final.dump`（SHA-256 `a60435e1d0d62810e7f4079b2b266231c894ca8c147fc85149599e595ba9462b`）及 guarded rollback；已從該 dump 在全新 PostgreSQL 17 容器 restore，保留 grants，並通過 checksum-locked source/canonical/FK/RLS/API 驗證。
+- WORKLOG_DONE: Airtable completeness and relationship repair

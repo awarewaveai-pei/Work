@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 
 const ACTIVE_TABLES = new Set([
   "五階段療程簡介", "五階段療程系統", "藝術治療工具", "輔助工具", "理論分類", "理論模式",
@@ -37,6 +37,12 @@ const COMPUTED_TARGETS = new Map(Object.entries({
   fldmbBt1lgTuU0bU4: "theory_details.theory_category_names",
 }));
 const BROKEN_FORMULA_FIELD_IDS = new Set(["fldQEDoNGSoC2nh7v", "fld1xoDFdVh9kjeHb"]);
+const LOCALIZATION_TARGET_OVERRIDES = new Map(Object.entries({
+  fld76eIafmTzChT3b: "tool_localizations(locale='en').title",
+  fldXVlb09Cqow2mSq: "support_method_localizations(locale='en').title",
+  fldF1NM1I7zbsYzEM: "theory_category_localizations(locale='en').title",
+  fld5oHQJ6BE16Jzc0: "theory_localizations(locale='en').title",
+}));
 const COLUMN_BY_SOURCE_NAME = new Map(Object.entries({
   "階段名稱": "title",
   "對應五生": "five_life_correspondence",
@@ -188,6 +194,10 @@ function localizationTarget(tableName, fieldName) {
   return null;
 }
 
+function exactLocalizationTarget(tableName, field) {
+  return LOCALIZATION_TARGET_OVERRIDES.get(field.id) ?? localizationTarget(tableName, field.name);
+}
+
 function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -248,13 +258,15 @@ function candidateTarget(table, field, disposition, rowCount, nonemptyCount) {
   if (RELATION_TARGETS.has(field.id)) return {
     status: "relationship",
     target: RELATION_TARGETS.get(field.id),
-    transform: TEXT_RELATION_FIELD_IDS.has(field.id) ? "normalized_exact_name_match_else_exception" : "map_record_ids_to_canonical_ids",
+    transform: field.id === "fldhURlARgvRxQD70"
+      ? "normalized_exact_name_match_else_create_support_method"
+      : TEXT_RELATION_FIELD_IDS.has(field.id) ? "normalized_exact_name_match_else_exception" : "map_record_ids_to_canonical_ids",
   };
   if (BROKEN_FORMULA_FIELD_IDS.has(field.id)) return { status: "source_archive_only", target: "-", transform: "preserve_broken_formula_definition_and_error_results" };
   if (COMPUTED_TARGETS.has(field.id)) return { status: "computed_definition", target: COMPUTED_TARGETS.get(field.id), transform: "rebuild_from_approved_relationship_join" };
   if (table.name === "Art-Therapy Tool（英文版）" || table.name === "Tool Translations") {
     if (COMPUTED_TYPES.has(field.type) || field.type === "createdTime") return { status: "source_archive_only", target: "-", transform: "preserve_migration_metadata" };
-    const exactTarget = localizationTarget(table.name, field.name);
+    const exactTarget = exactLocalizationTarget(table.name, field);
     return exactTarget
       ? { status: "localization", target: exactTarget, transform: "reconcile_to_canonical_tool_then_copy" }
       : { status: "approved_exception", target: "REVIEW_REQUIRED", transform: "manual_semantic_mapping" };
@@ -263,7 +275,7 @@ function candidateTarget(table, field, disposition, rowCount, nonemptyCount) {
   if (field.type === "multipleRecordLinks") return { status: "relationship", target: "relationship.REVIEW_REQUIRED", transform: "map_record_ids_to_canonical_ids" };
   if (table.name === "五階段療程系統") return { status: "relationship", target: "tool_healing_stages.REVIEW_REQUIRED", transform: "relationship_metadata" };
   if (table.name === "藝術治療工具標題") return { status: "source_archive_only", target: "-", transform: "preserve_as_documentation" };
-  const exactTarget = localizationTarget(table.name, field.name);
+  const exactTarget = exactLocalizationTarget(table.name, field);
   if (exactTarget) return { status: exactTarget.includes("localizations") ? "localization" : "canonical_field", target: exactTarget, transform: "copy_preserving_unicode_and_linebreaks" };
   return { status: "approved_exception", target: "REVIEW_REQUIRED", transform: "manual_semantic_mapping" };
 }
@@ -280,16 +292,37 @@ function mdTable(headers, rows) {
   return `| ${headers.join(" | ")} |\n|${headers.map(() => "---").join("|")}|\n${rows.map((row) => `| ${row.join(" | ")} |`).join("\n")}\n`;
 }
 
+export async function verifyChecksumManifest(rootDirectory, manifestName = "checksums.sha256") {
+  const root = resolve(rootDirectory);
+  const text = await readFile(join(root, manifestName), "utf8");
+  const entries = text.split(/\r?\n/u).filter(Boolean).map((line) => {
+    const match = line.match(/^([0-9a-f]{64})  (.+)$/u);
+    if (!match) throw new Error(`Invalid checksum line: ${line}`);
+    if (isAbsolute(match[2])) throw new Error(`Absolute checksum path is not allowed: ${match[2]}`);
+    const filePath = resolve(root, match[2]);
+    if (!filePath.startsWith(`${root}${sep}`)) throw new Error(`Checksum path escapes snapshot: ${match[2]}`);
+    return { expected: match[1], relativePath: match[2], filePath };
+  });
+  if (new Set(entries.map((entry) => entry.relativePath)).size !== entries.length) throw new Error("Duplicate checksum paths");
+  for (const entry of entries) {
+    const actual = createHash("sha256").update(await readFile(entry.filePath)).digest("hex");
+    if (actual !== entry.expected) throw new Error(`Checksum mismatch: ${entry.relativePath}`);
+  }
+  return { digest: createHash("sha256").update(text).digest("hex"), entries: entries.length };
+}
+
 export async function buildAudit(snapshotDirectory, masterPlanPath, outputDirectory) {
   const snapshot = resolve(snapshotDirectory);
   const output = resolve(outputDirectory);
   await mkdir(output, { recursive: true });
-  const [schema, validation, masterPlan] = await Promise.all([
+  const [sourceManifest, schema, validation, masterPlan] = await Promise.all([
+    verifyChecksumManifest(snapshot),
     readFile(join(snapshot, "schema.json"), "utf8").then(JSON.parse),
     readFile(join(snapshot, "validation.json"), "utf8").then(JSON.parse),
     readFile(resolve(masterPlanPath), "utf8"),
   ]);
   if (validation.status !== "PASS") throw new Error("Source snapshot validation is not PASS");
+  if (sourceManifest.entries < 1) throw new Error("Source snapshot checksum manifest is empty");
   const dispositions = parseDispositionMatrix(masterPlan);
   if (dispositions.size !== 60) throw new Error(`Expected 60 master-plan dispositions, got ${dispositions.size}`);
 

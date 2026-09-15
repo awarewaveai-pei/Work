@@ -1,0 +1,10 @@
+-- Bind every preserved source row to the verified immutable snapshot manifest.
+update art_therapy._source_tables set source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca';
+update art_therapy._source_records set source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca';
+update art_therapy._source_record_values set source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca';
+update art_therapy._source_links set source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca';
+
+alter table art_therapy._source_tables add constraint _source_tables_snapshot_checksum_check check (source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca');
+alter table art_therapy._source_records add constraint _source_records_snapshot_checksum_check check (source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca');
+alter table art_therapy._source_record_values add constraint _source_record_values_snapshot_checksum_check check (source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca');
+alter table art_therapy._source_links add constraint _source_links_snapshot_checksum_check check (source_snapshot = 'b2c0f0ff71856c1b9739465545487ec499d56f14ceaecffd23abbb59acbb36ca');
