@@ -19,6 +19,7 @@ const ENTITY_SPECS = new Map(Object.entries({
   "治療場所": { table: "settings", localization: null, prefix: "SETTING", titleField: "fld9lPoNO9TOsBHlD" },
 }));
 const TARGET_OVERRIDES = new Map(Object.entries({
+  fldhURlARgvRxQD70: "tool_localizations(locale='zh-TW').support_method_names_text",
   fld76eIafmTzChT3b: "tool_localizations(locale='en').title",
   fldXVlb09Cqow2mSq: "support_method_localizations(locale='en').title",
   fldF1NM1I7zbsYzEM: "theory_category_localizations(locale='en').title",
@@ -81,6 +82,12 @@ export function uuidV5(name, namespace = UUID_NAMESPACE) {
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = bytes.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export function assertAuthoritativeEntityCount(entityName, canonicalRows, authoritativeSourceRows) {
+  if (canonicalRows !== authoritativeSourceRows) {
+    throw new Error(`${entityName} identity count must equal its authoritative source table: expected ${authoritativeSourceRows}, got ${canonicalRows}`);
+  }
 }
 
 function present(value) {
@@ -412,6 +419,7 @@ export async function transformMigration(snapshotDirectory, auditDirectory, outp
       applyMappedFields(table, record, id);
     }
   }
+  assertAuthoritativeEntityCount("support_methods", data.get("support_methods").length, records.get("輔助工具").length);
 
   const populationTable = tables.get("適用對象/族群");
   let conditionSequence = 0, concernSequence = 0;
@@ -524,7 +532,6 @@ export async function transformMigration(snapshotDirectory, auditDirectory, outp
     }
     return result;
   };
-  const supportIndex = byLocalizedTitle("support_method_localizations");
   const toolIndex = byLocalizedTitle("tool_localizations");
   const settingIndex = new Map();
   for (const row of data.get("settings") ?? []) {
@@ -532,24 +539,8 @@ export async function transformMigration(snapshotDirectory, auditDirectory, outp
     if (!settingIndex.has(key)) settingIndex.set(key, []);
     settingIndex.get(key).push(row.id);
   }
-  let derivedSupportMethods = 0, nextSupportSequence = data.get("support_methods").length;
   for (const record of zhTools) {
     const toolId = canonicalId(zhToolTable.name, record.recordId);
-    for (const token of splitExactList(scalar(record, "fldhURlARgvRxQD70"))) {
-      const key = normalize(token);
-      const supportCandidates = supportIndex.get(key) ?? [];
-      let supportId;
-      if (supportCandidates.length === 0) {
-        derivedSupportMethods += 1; nextSupportSequence += 1;
-        supportId = uuidV5(`derived-support-method:${key}`);
-        addRow("support_methods", { id: supportId, code: `SUPPORT-${String(nextSupportSequence).padStart(6, "0")}` });
-        ensureLocalization("support_method_localizations", supportId, "zh-TW").title = token;
-        supportIndex.set(key, [supportId]);
-        addSourceMap(zhToolTable, record, "support_methods", supportId, "derived_from_relationship_token");
-      } else if (supportCandidates.length === 1) supportId = supportCandidates[0];
-      else { addException("AMBIGUOUS_SUPPORT_METHOD_TEXT", zhToolTable, record, "fldhURlARgvRxQD70", token, "No guessed relationship created"); continue; }
-      addRelation("tool_support_methods", `${toolId}:${supportId}`, { tool_id: toolId, support_method_id: supportId }, zhToolTable, record);
-    }
     for (const token of splitExactList(scalar(record, "fldUiLrwTdUj479nu"))) {
       const settingCandidates = settingIndex.get(normalize(token)) ?? [];
       if (settingCandidates.length === 1) {
@@ -665,7 +656,7 @@ export async function transformMigration(snapshotDirectory, auditDirectory, outp
     approval: { status: "approved", version: approval.version, authority: approval.authority },
     source: actualCounts,
     englishReconciliation: { matched: englishMatched, created: englishCreated, emptyArchiveOnly: englishEmpty },
-    population: { conditions: conditionSequence, presentingConcerns: concernSequence }, derivedSupportMethods,
+    population: { conditions: conditionSequence, presentingConcerns: concernSequence }, derivedSupportMethods: 0,
     computedComparisons, canonicalCounts: counts, approvedExceptions: exceptions.reduce((acc, row) => ({ ...acc, [row.exception_code]: (acc[row.exception_code] ?? 0) + 1 }), {}),
     checks,
     ddlFile: "001_art_therapy_v2_schema.sql", loadFiles,

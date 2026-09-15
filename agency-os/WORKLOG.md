@@ -18170,3 +18170,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`airtable_mirror|clinical|_source_tables|source_table_status` | hits=259；pre-existing migrations/docs 保留為 history，新增 migration 是唯一 forward cleanup，未改寫既有 migration。
 - ROLLBACK: restore `art_therapy_complete_verified_locked_final.dump`；SHA-256 `a60435e1d0d62810e7f4079b2b266231c894ca8c147fc85149599e595ba9462b` 已於刪除前重新驗證，既有 PostgreSQL 17 fresh-restore evidence=PASS。
 - WORKLOG_DONE: Art Therapy production allow-list cleanup
+
+[追記 2026-09-15 Support-method identity authority correction]
+- 根因：`藝術治療工具.輔助工具`（field `fldhURlARgvRxQD70`）是 `singleLineText`，舊轉換器卻把逗號文字 token 當成 FK identity；未命中正式 `輔助工具` 主表的 352 個名稱被誤建成 `support_methods`，並產生 401 條錯誤 junction。
+- 修正：唯一 identity authority 鎖定 Airtable `輔助工具` 的 54 筆；刪除 352 個衍生 identity 與 401 條衍生 junction。253 筆工具側原文字逐字保存在 `tool_localizations.support_method_names_text`，不再自動建立 entity/FK；transform 加入 54=54 hard assertion。
+- REALTEST_EVIDENCE: tool=Node | cmd=`node --test scripts/airtable-audit.test.mjs scripts/art-therapy-transform.test.mjs` | exit=0 | result=6 tests PASS；tool=Supabase | cmd=`apply_migration art_therapy_enforce_support_method_authority + production SQL readback` | exit=0 | result=support_methods=54, localizations=108, valid tool_support_methods=765, preserved text rows=253, non-authoritative identities=0, derived mappings=0, invalid FK=0, duplicate relationship=0；authoritative zh/en 54-row digests and 253 source-text digest match the immutable source snapshot.
+- REVIEW_DONE: self-review=Deep | verdict=pass；migration uses exact expected-count guards and executes atomically; production RLS/security and performance advisors checked after DDL.
+- BUGHUNT_DONE: scope=agency-os/scripts | grep=`derived_from_relationship_token|normalized_exact_name_match_else_create_support_method|fldhURlARgvRxQD70`；active transform/audit paths contain no identity-creation rule; old disposition remains only in the forward cleanup migration guards/history.
+- ROLLBACK: restore `C:\Users\user1115\Downloads\art_therapy_airtable_snapshot_20260914T061744821Z\migration_ready_v5\art_therapy_complete_verified_locked_final.dump` (SHA-256 `a60435e1d0d62810e7f4079b2b266231c894ca8c147fc85149599e595ba9462b`) and selectively replay approved forward migrations.
+- WORKLOG_DONE: Support-method identity authority correction

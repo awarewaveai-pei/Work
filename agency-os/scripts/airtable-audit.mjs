@@ -19,7 +19,6 @@ const RELATION_TARGETS = new Map(Object.entries({
   fldrAhoRhQDqSw4qd: "tool_healing_stages.(tool_id,healing_stage_id)",
   fld3yyeurxaQsROYd: "tool_focuses.(tool_id,therapeutic_focus_id)",
   fld0M3Vqp8frbx1Sx: "tool_theories.(tool_id,theory_id)",
-  fldhURlARgvRxQD70: "tool_support_methods.(tool_id,support_method_id)",
   fldUiLrwTdUj479nu: "tool_settings.(tool_id,setting_id)",
   fldkk1fobcNr2Us9c: "tool_support_methods.tool_id",
   fldooKlAYvEhYjH8q: "tool_healing_stages.tool_id",
@@ -29,7 +28,7 @@ const RELATION_TARGETS = new Map(Object.entries({
   fldHecJpxMcimoH2I: "theory_category_links.theory_category_id",
   fld5DnCGgHLubzNXf: "tool_focuses.tool_id",
 }));
-const TEXT_RELATION_FIELD_IDS = new Set(["fldhURlARgvRxQD70", "fldUiLrwTdUj479nu", "fldkk1fobcNr2Us9c"]);
+const TEXT_RELATION_FIELD_IDS = new Set(["fldUiLrwTdUj479nu", "fldkk1fobcNr2Us9c"]);
 const COMPUTED_TARGETS = new Map(Object.entries({
   fldttIzJSOurCCuI3: "tool_details.healing_stage_names",
   fldWOin26XdDY3Ebr: "tool_details.therapeutic_focus_names",
@@ -38,6 +37,7 @@ const COMPUTED_TARGETS = new Map(Object.entries({
 }));
 const BROKEN_FORMULA_FIELD_IDS = new Set(["fldQEDoNGSoC2nh7v", "fld1xoDFdVh9kjeHb"]);
 const LOCALIZATION_TARGET_OVERRIDES = new Map(Object.entries({
+  fldhURlARgvRxQD70: "tool_localizations(locale='zh-TW').support_method_names_text",
   fld76eIafmTzChT3b: "tool_localizations(locale='en').title",
   fldXVlb09Cqow2mSq: "support_method_localizations(locale='en').title",
   fldF1NM1I7zbsYzEM: "theory_category_localizations(locale='en').title",
@@ -251,16 +251,14 @@ function diceSimilarity(left, right) {
   return (2 * matches) / (Math.max(0, left.length - 1) + Math.max(0, right.length - 1) || 1);
 }
 
-function candidateTarget(table, field, disposition, rowCount, nonemptyCount) {
+export function candidateTarget(table, field, disposition, rowCount, nonemptyCount) {
   if (rowCount === 0 || nonemptyCount === 0) return { status: "source_archive_only", target: "-", transform: "preserve_schema_only" };
   if (ARCHIVE_RECOMMENDATIONS.test(disposition.recommendation)) return { status: "source_archive_only", target: "-", transform: "preserve_in_external_snapshot" };
   if (SOURCE_ARCHIVE_FIELD_IDS.has(field.id)) return { status: "source_archive_only", target: "-", transform: "comparison_or_migration_key_only" };
   if (RELATION_TARGETS.has(field.id)) return {
     status: "relationship",
     target: RELATION_TARGETS.get(field.id),
-    transform: field.id === "fldhURlARgvRxQD70"
-      ? "normalized_exact_name_match_else_create_support_method"
-      : TEXT_RELATION_FIELD_IDS.has(field.id) ? "normalized_exact_name_match_else_exception" : "map_record_ids_to_canonical_ids",
+    transform: TEXT_RELATION_FIELD_IDS.has(field.id) ? "normalized_exact_name_match_else_exception" : "map_record_ids_to_canonical_ids",
   };
   if (BROKEN_FORMULA_FIELD_IDS.has(field.id)) return { status: "source_archive_only", target: "-", transform: "preserve_broken_formula_definition_and_error_results" };
   if (COMPUTED_TARGETS.has(field.id)) return { status: "computed_definition", target: COMPUTED_TARGETS.get(field.id), transform: "rebuild_from_approved_relationship_join" };

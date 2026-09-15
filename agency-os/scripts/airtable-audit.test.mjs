@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { parseDispositionMatrix, verifyChecksumManifest } from "./airtable-audit.mjs";
+import { candidateTarget, parseDispositionMatrix, verifyChecksumManifest } from "./airtable-audit.mjs";
 
 test("parses only numbered disposition rows", () => {
   const markdown = `| # | Airtable table | V2 建議 | 說明 |\n|---:|---|---|---|\n| 1 | Tools | Canonical | \`tools\` |\n| 2 | Clients | Exclude | sensitive |`;
@@ -22,4 +22,19 @@ test("rejects a snapshot whose content no longer matches its checksum", async ()
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("plain-text support-method names remain tool content and never become identities", () => {
+  const mapping = candidateTarget(
+    { name: "藝術治療工具" },
+    { id: "fldhURlARgvRxQD70", name: "輔助工具", type: "singleLineText" },
+    { recommendation: "Canonical" },
+    254,
+    253,
+  );
+  assert.deepEqual(mapping, {
+    status: "localization",
+    target: "tool_localizations(locale='zh-TW').support_method_names_text",
+    transform: "copy_preserving_unicode_and_linebreaks",
+  });
 });
