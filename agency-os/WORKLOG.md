@@ -18161,3 +18161,12 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`_source_(tables|fields|records|record_values|links)|Source archive count mismatch|linked_record_id_fkey|snapshotManifest` | hits=90；staged debug artifacts=0；stale backup refs=0。
 - ROLLBACK: 使用最新完整備份 `art_therapy_complete_verified_locked_final.dump`（SHA-256 `a60435e1d0d62810e7f4079b2b266231c894ca8c147fc85149599e595ba9462b`）及 guarded rollback；已從該 dump 在全新 PostgreSQL 17 容器 restore，保留 grants，並通過 checksum-locked source/canonical/FK/RLS/API 驗證。
 - WORKLOG_DONE: Airtable completeness and relationship repair
+
+[追記 2026-09-15 Art Therapy production allow-list cleanup]
+- 根因：先前把來源完整性保存誤實作成 production `airtable_mirror`／`_source_*`，並把 master plan 明定屬於另一 domain 的六張 clinical source tables 建進同一專案；這違反外部 archive 與 production canonical allow-list 的邊界。
+- 修正：套用 `20260915153000_art_therapy_remove_noncanonical_landing_domains.sql`；先把 70 個 clinical field mappings 改為 approved exception 並新增 6 筆 table-level audit exceptions，再移除 `airtable_mirror`、`clinical`、5 張 `_source_*` tables 與 2 個 source-status views。保留 canonical/localization/junction、正式 API views、provenance/audit tables 與外部 immutable snapshot。
+- REALTEST_EVIDENCE: tool=Supabase | cmd=`apply_migration art_therapy_remove_noncanonical_landing_domains + production SQL readback` | exit=0 | result=removed schemas/raw objects all NULL；30 canonical/audit tables retained；24 FK validated；mapping targets missing=0；junction/localization invalid-or-duplicate=0；API views=298 tools/65 theories/901 entity content/1,920 relationship edges；RLS enabled+forced=30/30。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n；初始 orphan query 將 7 筆合法 `pre_assessment` NULL stage 誤判，依 validated CHECK constraint 修正後 invalid=0。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`airtable_mirror|clinical|_source_tables|source_table_status` | hits=259；pre-existing migrations/docs 保留為 history，新增 migration 是唯一 forward cleanup，未改寫既有 migration。
+- ROLLBACK: restore `art_therapy_complete_verified_locked_final.dump`；SHA-256 `a60435e1d0d62810e7f4079b2b266231c894ca8c147fc85149599e595ba9462b` 已於刪除前重新驗證，既有 PostgreSQL 17 fresh-restore evidence=PASS。
+- WORKLOG_DONE: Art Therapy production allow-list cleanup
