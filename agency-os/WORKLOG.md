@@ -18192,3 +18192,7 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - BUGHUNT_DONE: scope=agency-os/scripts | grep=`derived_from_relationship_token|normalized_exact_name_match_else_create_support_method|fldhURlARgvRxQD70`；active transform/audit paths contain no identity-creation rule; old disposition remains only in the forward cleanup migration guards/history.
 - ROLLBACK: restore `C:\Users\user1115\Downloads\art_therapy_airtable_snapshot_20260914T061744821Z\migration_ready_v5\art_therapy_complete_verified_locked_final.dump` (SHA-256 `a60435e1d0d62810e7f4079b2b266231c894ca8c147fc85149599e595ba9462b`) and selectively replay approved forward migrations.
 - WORKLOG_DONE: Support-method identity authority correction
+
+## 2026-09-14
+
+- 01:08 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-14.md
