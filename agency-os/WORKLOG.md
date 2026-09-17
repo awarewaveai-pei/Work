@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-17（續2）K2g 落地：知識庫內容檢視畫面（migration 0084 + 詳情 API + modal UI），critic 兩輪覆審
+
+[任務] 承接續1。實作 T1(後端:原文存取)+T2(前端:內容檢視畫面)，解決操作者回報的②③兩點(點了沒反應/看不到內容)。
+
+[已修改]
+- `packages/db/migrations/0084_kb_source_body.sql`(+ down)：`cs_knowledge_sources` 加 nullable `body text`，無 backfill。
+- `lib/kb/db.ts`：`SourceInput.body`；新增 `getSourceDetail()`(單筆詳情，含 provenance/citation 全欄位)、`listVersionsForFamily()`(同 family 全版本，含已封存)。
+- `lib/kb/rag.ts`：`ingestKnowledge()` 呼叫 `insertSource` 時多帶 `body: input.body`。
+- `lib/kb/index.ts`：匯出兩個新函式 + `SourceDetail`/`VersionSummary` 型別。
+- `app/api/ops/clients/[slug]/cs-knowledge/route.ts`：GET 加 `?sourceId=` 分支，回傳 `{detail, versions}`；沿用既有 viewer+ 讀取層級(跟 cs-config/collection-sources/collection-schedule 三個既有路由同款寫法，非本次新發明)；敏感文件的詳情瀏覽現在會寫 `ops_audit_events`。
+- 新檔 `app/(shell)/ops/clients/[slug]/KnowledgeDetailModal.tsx`：可點擊詳情 modal，顯示原文/出處/版本切換；`ClientHubTabs.tsx` 的 KB 列表標題從純文字 `<span>` 改成可點擊按鈕。
+
+[critic 覆審，兩輪，皆已處理]
+- 第一輪(T1 後端，Low risk)：1 Major(敏感文件詳情現在對 viewer 角色曝露完整原文，非僅列表原本的截斷程度——查證後確認這跟系統裡其他路由(`cs-config`/`collection-sources`/`collection-schedule`)一致的「viewer+ 讀/owner+ 寫」既有寫法一致，不是本次新發明的例外；`is_sensitive` 設計初衷是擋客服 AI 檢索(migration 0083)，全 repo 查無任何處用它做人類 RBAC 閘門)→ 決定：維持現行存取層級(不無端造一個只管一個欄位的新規則)，但補寫更精確的程式碼註解，並加審計紀錄(見下)。2 Minor：敏感文件詳情瀏覽無稽核紀錄(已修，敏感文件的 `?sourceId=` 讀取會寫 `cs_knowledge_detail_viewed` 稽核事件，非敏感文件不寫，避免雜訊)；`getSourceDetail`/`listVersionsForFamily` 兩次讀取間有 TOCTOU(併發 rebind 改變 family id 的窗口)——已加註解標明是刻意接受的已知限制，非之後要「修」的 bug(supabase-js 沒有交易，接受即可，畫面重整會自癒)。
+- 第二輪(T2 前端 modal)：無 finding，5 個測試皆為真實斷言(spot-check 版本切換測試時抓到自己寫的 mock URL 比對用 `.includes()` 導致 "s1" 誤配到 "s1v2"，修正為精確比對後驗證真的會切換版本，非測試造假通過)。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`(每輪修改後皆重跑) | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/kb "app/(shell)/ops/clients" app/api/ops/clients` | exit=0 | 127 passed，含新增 `kb-source-detail.test.ts` 6 個、`KnowledgeDetailModal.test.tsx` 5 個、route 新增 4 個(?sourceId= 成功/404/稽核開/稽核關)
+- REVIEW_DONE: critic=Quick ×2 | verdict=pass(兩輪皆為 Low overall risk)| findings=0 Critical / 1 Major(已處理，見上，非阻擋)/ 4 Minor(3 已修，1 為未來備註)/ 2 Suggestion(已知、接受)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`getSourceDetail\|listVersionsForFamily\|KnowledgeDetailModal\|insertSource\(` | hits=僅本次改動檔案本身，`011-collection-ingestion-boundary.md` 一處歷史 ADR 舊行號記錄(修 K1 前狀態，非現況主張，不需更新)
+
+[剩餘風險]
+1. 敏感文件全文現在 viewer 角色可讀——critic 判定跟既有系統一致、非本次收緊或放寬，但這是一個尚未被操作者正式拍板的既有慣例，如果之後要收緊成 owner/admin 才能看敏感文件全文，改動點在 `route.ts:86` 附近，已在程式碼註解標明。
+2. `getSourceDetail`/`listVersionsForFamily` 間的 TOCTOU 窗口，已接受不修。
+3. 前端 modal 未做 pagination/虛擬捲動——單一文件原文可能很長，目前用 `<pre>` 直接全塞，量大的文件(如整份法規)體感可能卡頓，暫不處理，等真的有客戶塞這種量的文件再看。
+
+[rollback] `git revert` 對應 commit；migration 有 down；`body` 為 nullable 加欄，未動既有資料。
+
 ## 2026-09-17（續1）知識庫 ops UI 重新規劃 —— 操作者回報 4 個真實 UX 缺口，planner 拆解 14 個 task，3 個產品決策已定案
 
 [任務] 操作者看 `/ops/clients/[slug]` 知識庫分頁截圖回報：①關鍵字寬容度沒得選(有時要長尾/模糊,有時要精確)②清單項目點了沒反應③要看得到內容並可選擇是否彙整④沒有資料夾,散落一地。問「還有什麼想得到的」+「這是全球企業用,要怎麼處理」。

@@ -12,6 +12,8 @@ const kb = vi.hoisted(() => ({
   rebindManualDocumentUrl: vi.fn(),
   deleteKnowledgeSource: vi.fn(),
   ingestKnowledge: vi.fn(),
+  getSourceDetail: vi.fn(),
+  listVersionsForFamily: vi.fn(),
 }));
 vi.mock("@/lib/kb", () => kb);
 
@@ -52,6 +54,42 @@ describe("GET /api/ops/clients/[slug]/cs-knowledge", () => {
     const res = await GET(req("GET", { qs: "?status=archived" }), ctx());
     expect(await res.json()).toEqual({ ok: true, sources: [{ id: "s2" }] });
     expect(kb.listKnowledgeSources).not.toHaveBeenCalled();
+  });
+
+  it("?sourceId= returns the detail + version history instead of the list (K2g)", async () => {
+    kb.getSourceDetail.mockResolvedValue({ id: "s1", docFamilyId: "f1", body: "全文" });
+    kb.listVersionsForFamily.mockResolvedValue([{ id: "s1", version: 1, status: "active", createdAt: "2026-09-17T00:00:00Z" }]);
+    const res = await GET(req("GET", { qs: "?sourceId=s1" }), ctx());
+    expect(await res.json()).toEqual({
+      ok: true,
+      detail: { id: "s1", docFamilyId: "f1", body: "全文" },
+      versions: [{ id: "s1", version: 1, status: "active", createdAt: "2026-09-17T00:00:00Z" }],
+    });
+    expect(kb.listVersionsForFamily).toHaveBeenCalledWith(ORG, "f1");
+    expect(kb.listKnowledgeSources).not.toHaveBeenCalled();
+  });
+
+  it("?sourceId= for an unknown/foreign id returns 404, not an empty detail", async () => {
+    kb.getSourceDetail.mockResolvedValue(null);
+    const res = await GET(req("GET", { qs: "?sourceId=nope" }), ctx());
+    expect(res.status).toBe(404);
+    expect(kb.listVersionsForFamily).not.toHaveBeenCalled();
+  });
+
+  it("audits a sensitive document's detail view (critic finding 2026-09-17)", async () => {
+    kb.getSourceDetail.mockResolvedValue({ id: "s1", docFamilyId: "f1", isSensitive: true });
+    kb.listVersionsForFamily.mockResolvedValue([]);
+    await GET(req("GET", { qs: "?sourceId=s1" }), ctx());
+    const auditCall = sb.from.mock.calls.find((c) => c[0] === "ops_audit_events");
+    expect(auditCall, "expected an insert into ops_audit_events").toBeTruthy();
+  });
+
+  it("does not audit an ordinary (non-sensitive) document view — noise, not signal", async () => {
+    kb.getSourceDetail.mockResolvedValue({ id: "s1", docFamilyId: "f1", isSensitive: false });
+    kb.listVersionsForFamily.mockResolvedValue([]);
+    await GET(req("GET", { qs: "?sourceId=s1" }), ctx());
+    const auditCall = sb.from.mock.calls.find((c) => c[0] === "ops_audit_events");
+    expect(auditCall).toBeUndefined();
   });
 });
 

@@ -31,7 +31,11 @@ export {
   restoreKnowledgeSource,
   rebindManualDocumentUrl,
   deleteKnowledgeSource,
+  getSourceDetail,
+  listVersionsForFamily,
   type RebindError,
+  type SourceDetail,
+  type VersionSummary,
 } from "@/lib/kb/db";
 
 export type { KnowledgeInput, EmbeddingProvider, RetrievedChunk, KbContext, IngestResult } from "@/lib/kb/types";

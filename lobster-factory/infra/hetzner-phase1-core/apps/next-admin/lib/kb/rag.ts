@@ -289,6 +289,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     docFamilyId: familyId,
     sourceVersion: version,
     contentHash: hash,
+    body: input.body,
     canonicalUrl: input.canonicalUrl ?? null,
     spaceId,
     validFrom: input.validFrom ?? null,

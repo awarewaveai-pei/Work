@@ -331,6 +331,8 @@ export interface SourceInput {
   docFamilyId: string;
   sourceVersion: number;
   contentHash: string;
+  /** Verbatim ingested text (migration 0084, K2g) — for the content-viewer, never reconstructed from chunks. */
+  body?: string | null;
   canonicalUrl?: string | null;
   spaceId?: string | null;
   validFrom?: string | null;
@@ -362,6 +364,7 @@ export async function insertSource(input: SourceInput): Promise<string | null> {
       source_version: input.sourceVersion,
       status: "active",
       content_hash: input.contentHash,
+      body: input.body ?? null,
       canonical_url: input.canonicalUrl ?? null,
       space_id: input.spaceId ?? KB_DEFAULT_SPACE_ID,
       valid_from: input.validFrom ?? null,
@@ -597,4 +600,93 @@ export async function matchChunksKeyword(
     // from ARRAY POSITION. Sorting explicitly makes that true by construction, not by an assumption
     // about what PostgREST does with a function's row order.
     .sort((a, b) => b.score - a.score);
+}
+
+export interface SourceDetail {
+  id: string;
+  title: string;
+  kind: string;
+  isSensitive: boolean;
+  status: string;
+  version: number;
+  docFamilyId: string;
+  canonicalUrl: string | null;
+  /** null distinguishes "ingested before migration 0084" from "ingested with an empty body" (the
+   *  latter cannot happen — POST .../cs-knowledge requires body.length >= 10). The UI must render
+   *  these two cases differently: an empty-looking viewer for a real document reads as data loss. */
+  body: string | null;
+  language: string | null;
+  epistemicType: string | null;
+  authorshipState: string | null;
+  locked: string | null;
+  author: string | null;
+  publishedAt: string | null;
+  venue: string | null;
+  doi: string | null;
+  createdAt: string;
+}
+
+/** One document's full detail for the ops content-viewer (K2g) — org-scoped, active or archived. */
+export async function getSourceDetail(organizationId: string, sourceId: string): Promise<SourceDetail | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .select(
+      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,body,language,epistemic_type,authorship_state,locked,author,published_at,venue,doi,created_at",
+    )
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    id: data.id as string,
+    title: data.title as string,
+    kind: data.kind as string,
+    isSensitive: data.is_sensitive === true,
+    status: data.status as string,
+    version: Number(data.source_version ?? 1),
+    docFamilyId: data.doc_family_id as string,
+    canonicalUrl: (data.canonical_url as string | null) ?? null,
+    body: (data.body as string | null) ?? null,
+    language: (data.language as string | null) ?? null,
+    epistemicType: (data.epistemic_type as string | null) ?? null,
+    authorshipState: (data.authorship_state as string | null) ?? null,
+    locked: (data.locked as string | null) ?? null,
+    author: (data.author as string | null) ?? null,
+    publishedAt: (data.published_at as string | null) ?? null,
+    venue: (data.venue as string | null) ?? null,
+    doi: (data.doi as string | null) ?? null,
+    createdAt: data.created_at as string,
+  };
+}
+
+export interface VersionSummary {
+  id: string;
+  version: number;
+  status: string;
+  createdAt: string;
+}
+
+/**
+ * Every version ever written for a document family, newest first — active and archived alike (K1
+ * versioning marks superseded versions `archived` rather than deleting them specifically so this
+ * history stays answerable; see archiveOtherVersions above).
+ */
+export async function listVersionsForFamily(organizationId: string, docFamilyId: string): Promise<VersionSummary[]> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .select("id,source_version,status,created_at")
+    .eq("organization_id", organizationId)
+    .eq("doc_family_id", docFamilyId)
+    .order("source_version", { ascending: false });
+  if (error || !data) return [];
+  return data.map((r) => ({
+    id: r.id as string,
+    version: Number(r.source_version ?? 1),
+    status: r.status as string,
+    createdAt: r.created_at as string,
+  }));
 }

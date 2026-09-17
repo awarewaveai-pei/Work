@@ -5,6 +5,7 @@ import Link from "next/link";
 import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
+import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
 import type { SiteContentDefaults } from "@/app/api/content/sites/route";
@@ -1285,6 +1286,8 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [rebindDraft, setRebindDraft] = useState<Record<string, string>>({});
   const [rebindMsg, setRebindMsg] = useState<Record<string, string>>({});
   const [rebindBusy, setRebindBusy] = useState<string | null>(null);
+  // K2g: which row's content viewer is open, if any.
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   async function reloadSources() {
     try {
@@ -1392,7 +1395,13 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
             {sources.map((s) => (
               <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ flex: 1, fontWeight: 500 }}>{s.title}</span>
+                  <button
+                    onClick={() => setViewingId(s.id)}
+                    title="檢視內容"
+                    style={{ flex: 1, textAlign: "left", fontWeight: 500, border: "none", background: "none", color: "var(--text-primary)", cursor: "pointer", padding: 0, font: "inherit", textDecoration: "underline", textDecorationColor: "var(--border-subtle)" }}
+                  >
+                    {s.title}
+                  </button>
                   {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
                   {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
                   <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
@@ -1437,7 +1446,13 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
             {archived.map((s) => (
               <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ flex: 1, fontWeight: 500, color: "var(--text-muted)" }}>{s.title}</span>
+                  <button
+                    onClick={() => setViewingId(s.id)}
+                    title="檢視內容"
+                    style={{ flex: 1, textAlign: "left", fontWeight: 500, color: "var(--text-muted)", border: "none", background: "none", cursor: "pointer", padding: 0, font: "inherit", textDecoration: "underline", textDecorationColor: "var(--border-subtle)" }}
+                  >
+                    {s.title}
+                  </button>
                   {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
                   {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
                   <button onClick={() => restoreKnowledge(s.id)} title="取消封存（恢復進 AI 檢索範圍）"
@@ -1470,6 +1485,9 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
         </div>
       </Card>
 
+      {viewingId && (
+        <KnowledgeDetailModal slug={org.slug} sourceId={viewingId} onClose={() => setViewingId(null)} />
+      )}
     </>
   );
 }

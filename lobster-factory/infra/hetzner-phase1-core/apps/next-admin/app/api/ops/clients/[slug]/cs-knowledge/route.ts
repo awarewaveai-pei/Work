@@ -1,5 +1,15 @@
 // GET/POST/PATCH/DELETE /api/ops/clients/[slug]/cs-knowledge — manage a client's RAG knowledge sources.
 // GET    — list sources (+ per-source chunk counts). ?status=archived lists the archived view instead.
+//          ?sourceId=<id> returns one document's full detail (K2g: body text, provenance, citation)
+//          plus every version in its document family — the content-viewer the ops console lacked.
+//          Same read level as the list (viewer+), matching every other route in this console
+//          (cs-config, collection-sources, collection-schedule all use the identical "viewer+ read,
+//          owner/admin write" split). Critic finding (2026-09-17): for an `isSensitive` document this
+//          IS a real increase over the list, which discloses zero body bytes regardless of the flag —
+//          `is_sensitive` was designed to gate the customer-facing AI's retrieval (migration 0083),
+//          never audited as a human-RBAC control. Kept at viewer+ for consistency with this file's
+//          own established pattern rather than inventing a new, narrower rule for one field; sensitive
+//          detail views are audited below so at least there is a record of who looked.
 // POST   — add one document: { title, kind?, body, isSensitive?, canonicalUrl? } → ingestKnowledge
 //          (chunk + embed + store) as a new VERSION of that document (K1): same title + new text
 //          supersedes the old version, same title + same text is a no-op. Needs OPENAI_API_KEY for
@@ -25,6 +35,8 @@ import {
   restoreKnowledgeSource,
   rebindManualDocumentUrl,
   deleteKnowledgeSource,
+  getSourceDetail,
+  listVersionsForFamily,
   type RebindError,
 } from "@/lib/kb";
 
@@ -69,11 +81,31 @@ function audit(orgId: string, role: string, source: string, event: string, paylo
 }
 
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
-  resolveOpsRole(request); // internal console — viewer+ may read
+  const resolved = resolveOpsRole(request); // internal console — viewer+ may read
   const { slug } = await context.params;
   const orgId = await orgIdOf(slug);
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
-  const wantsArchived = new URL(request.url).searchParams.get("status") === "archived";
+
+  const params = new URL(request.url).searchParams;
+  const sourceId = params.get("sourceId");
+  if (sourceId) {
+    const detail = await getSourceDetail(orgId, sourceId);
+    if (!detail) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+    // Critic finding (2026-09-17): no prior audit trail for who read a sensitive document's full
+    // text — cheap to close for the one case that matters (a locked-down flag with zero visibility
+    // into who looked), not worth it for every ordinary read.
+    if (detail.isSensitive) {
+      audit(orgId, resolved.role, resolved.source, "cs_knowledge_detail_viewed", { sourceId });
+    }
+    // docFamilyId is a point-in-time read; a concurrent PATCH rebind (below) changing it between
+    // these two calls would make the version list miss the very document just fetched. Accepted
+    // (display-only, self-heals on reload, no cross-tenant leak — both queries are independently
+    // organization_id-scoped) rather than "fixed" with a transaction supabase-js does not have.
+    const versions = await listVersionsForFamily(orgId, detail.docFamilyId);
+    return NextResponse.json({ ok: true, detail, versions });
+  }
+
+  const wantsArchived = params.get("status") === "archived";
   const sources = wantsArchived ? await listArchivedKnowledgeSources(orgId) : await listKnowledgeSources(orgId);
   return NextResponse.json({ ok: true, sources });
 }
