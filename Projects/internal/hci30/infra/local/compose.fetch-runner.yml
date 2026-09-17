@@ -1,0 +1,131 @@
+# HCI-30 isolated fetch runner (ADR-0029 gates 1-3;
+# HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 3). Deliberately its own
+# compose file: bringing this up with
+# `docker compose -f compose.fetch-runner.yml -p <project> up` creates
+# networks scoped only to that project, sharing nothing by name with
+# compose.dev.yml, compose.test.yml, or any lobster-factory/infra/*/
+# docker-compose.yml (trigger, n8n, supabase). Do not add an
+# `external: true` reference to any of those networks here -- that would
+# defeat the isolation this file exists to provide.
+#
+# Local/test only. Nothing here is deployed to ks-aw-01 by this file or any
+# script in this repo -- that is a separate High-risk STOP per the plan
+# doc's Task 3 boundaries (agency-os/AGENTS.md SS3).
+#
+# Bring up with a fresh, unique project name and generated secrets --
+# see tests/architecture/fetch-runner-network-isolation.test.ps1 for the
+# reference invocation (same pattern as scripts/test-wave1-local.ps1).
+services:
+  # No `restart:` key -- this is a security invariant, not an oversight
+  # (critic review, 2026-09-17). network-guard's iptables rules live in this
+  # container's netns and are wiped on any restart of it; network-guard is a
+  # one-shot sidecar that never re-runs. Adding a restart policy here without
+  # also making network-guard re-apply on every `runner` start would
+  # silently reopen full unrestricted egress on the next crash/OOM/host
+  # reboot, with the HEALTHCHECK below staying green throughout (it only
+  # probes the API, never the network policy). Do not add `restart:` to this
+  # service until that re-apply mechanism exists -- see
+  # tests/architecture/fetch-runner-network-isolation.test.ps1's
+  # "no restart policy" assertion, which is what makes this comment
+  # machine-checked instead of just documentation.
+  runner:
+    build: ./fetch-runner
+    environment:
+      HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?fetch runner requires a generated shared secret}
+      HCI_FETCH_RUNNER_PORT: "8090"
+    # DNS: the image's own CMD (fetch-runner/Dockerfile) overwrites
+    # /etc/resolv.conf to query 1.1.1.1/8.8.8.8 directly, bypassing Docker's
+    # embedded 127.0.0.11 proxy -- real testing on this machine found that
+    # proxy does not forward at all on a custom bridge network under this
+    # Docker Desktop version, independent of which upstream it is pointed
+    # at (compose's `dns:` key only changes the proxy's upstream, not
+    # whether the proxy itself forwards). 1.1.1.1/8.8.8.8 are public
+    # addresses already covered by network-guard's default-ACCEPT egress
+    # rule, no allowlist entry needed.
+    ports:
+      # 127.0.0.1-only, never 0.0.0.0 -- internal API, not a public-facing
+      # port (ADR-0029 gate 1).
+      - "127.0.0.1:8090:8090"
+    networks:
+      hci-fetch-runner-net:
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # One-shot sidecar: applies the OUTPUT egress policy inside `runner`'s own
+  # network namespace, then exits. `network_mode: service:runner` is what
+  # makes the rules land in the namespace the isolation tests actually
+  # probe. See infra/local/network-guard/entrypoint.sh for the rule set.
+  network-guard:
+    build: ./network-guard
+    network_mode: "service:runner"
+    depends_on:
+      runner:
+        condition: service_started
+    environment:
+      HCI_FETCH_RUNNER_MINIO_IP: ${HCI_FETCH_RUNNER_MINIO_IP:?network-guard requires the object-storage container's static IP to allowlist}
+      HCI_FETCH_RUNNER_PORT: "8090"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: "no"
+
+  # Independent object-storage instance for this runner (Task 3
+  # provisioning only; Task 5 wires the write-path client). NOT the same
+  # instance as Trigger.dev's own internal MinIO
+  # (lobster-factory/infra/trigger/docker-compose.yml's `minio` service) --
+  # separate compose project, separate network, separate volume. Same base
+  # image as that service purely for operational familiarity; this is not a
+  # shared container.
+  object-storage:
+    # Pinned by digest, not `:latest` (critic review, 2026-09-17): this
+    # instance will hold raw, attacker-influenced fetched content once
+    # Task 5 wires writes -- the same risk class this repo already pins
+    # ClickHouse against (agency-os/AGENTS.md SS0), enforced there by
+    # lobster-factory/infra/trigger/validate-config.ps1. Digest resolved
+    # from the tag actually pulled and tested in this session
+    # (`docker images --digests bitnamilegacy/minio`); re-pin deliberately,
+    # don't drift back to `:latest`, if this image is ever intentionally
+    # upgraded.
+    image: bitnamilegacy/minio@sha256:451fe6858cb770cc9d0e77ba811ce287420f781c7c1b806a386f6896471a349c
+    environment:
+      MINIO_ROOT_USER: ${HCI_FETCH_RUNNER_MINIO_ROOT_USER:?object storage requires a generated root user}
+      MINIO_ROOT_PASSWORD: ${HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD:?object storage requires a generated root password}
+      MINIO_DEFAULT_BUCKETS: hci-fetch-runner-raw
+    networks:
+      hci-fetch-runner-net:
+        ipv4_address: ${HCI_FETCH_RUNNER_MINIO_IP:?object storage requires a generated static IP}
+    volumes:
+      - hci-fetch-runner-objectstore:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+networks:
+  hci-fetch-runner-net:
+    driver: bridge
+    # Explicit, not relied-on-by-omission (critic review, 2026-09-17): the
+    # OUTPUT egress policy (network-guard/entrypoint.sh) is IPv4-only by
+    # design -- there is no legitimate IPv6 egress need here, and this repo
+    # has already been burned by an IPv4-only firewall on a host where IPv6
+    # defaults to ACCEPT (lobster-factory/.../hosting/providers/hetzner/
+    # cloudInit.ts:16-17). Compose not assigning a v6 address without this
+    # key set is today's *implicit* behavior; setting it explicitly makes
+    # "no v6 route exists" a stated property instead of an accident, backed
+    # by network-guard's own ip6tables default-deny and the isolation
+    # test's IPv6-address-absence assertion.
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
+
+volumes:
+  hci-fetch-runner-objectstore:

@@ -1,4 +1,38 @@
 # Worklog
+## 2026-09-17（續7）HCI-30 蒐集器 Task 3：隔離 fetch runner 網路層落地（ADR-0029 首次實作），critic 覆審 4 Major 全修 + 自抓 2 個測試腳本 bug
+
+[任務] 承接續6，繼續處理蒐集器計畫 Task 3（本機/測試環境的隔離 fetch runner，STOP 僅卡在 ks-aw-01 正式部署，本機建置不需另外確認）。第一次派 `devops-engineer` 誤判角色範圍（該角色僅限 ks-aw-01 SSH 維運，無 Write 權限），改派 `fullstack-engineer` 建置；該 agent 執行中撞到 session 額度上限被中斷，接續本 session 親自驗證、修正、完成收尾。
+
+[已修改]
+- 新增 `Projects/internal/hci30/infra/local/compose.fetch-runner.yml`：3-service compose（runner／network-guard／object-storage），獨立網路+獨立 MinIO，不與任何既有 Trigger.dev/next-admin/n8n 服務共用。
+- 新增 `infra/local/fetch-runner/{Dockerfile,server.mjs}`：內部 HTTP API 骨架（enqueue/status，bearer token 常數時間比對），無真實 fetch 邏輯。
+- 新增 `infra/local/network-guard/{Dockerfile,entrypoint.sh}`：one-shot sidecar，用 `network_mode: service:runner` 把 iptables OUTPUT 政策灌進 runner 的網路命名空間後退出。
+- 新增 `tests/architecture/fetch-runner-network-isolation.test.ps1`：real-Docker 驗證腳本，比照 `scripts/test-wave1-local.ps1` 的慣例（獨立 project 名、產生密鑰、finally 清理）。
+- `Projects/internal/hci30/docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md`：Task 3 標記本機/測試環境已完成，附完成狀態摘要。
+
+[critic 覆審，4 個 Major 全修]
+(1) iptables 政策原本只涵蓋 IPv4——這台機器所屬 host class（Hetzner-style 主機）在本 repo 已有真實栽過跟頭的先例（`lobster-factory` `cloudInit.ts:16-17`：「ip6tables 預設 ACCEPT，只擋 IPv4 的 INPUT DROP 等於沒擋」），且與操作者記憶中 4/20 挖礦入侵事件同一類「防火牆規則順序/涵蓋不全」錯誤。已修：`compose.fetch-runner.yml` 加 `enable_ipv6: false`，`entrypoint.sh` 加 ip6tables 預設全擋當備援。
+(2) `runner` 沒有 `restart:` 設定本身就是安全不變量，不是疏漏——network-guard 是 one-shot sidecar 永遠不會重跑，容器重啟會讓 iptables 規則隨命名空間一起消失且 HEALTHCHECK 完全偵測不到（它只探 API，不探網路政策）。已修：加註解標記為安全不變量 + 測試腳本機械化斷言 restart policy 必須是空/no。
+(3) `object-storage` 用 `bitnamilegacy/minio:latest` 浮動 tag，這顆未來會存放真實抓取回來的內容（Task 5）——本 repo 對這類風險已有機械化釘版本先例（`agency-os/AGENTS.md` §0 ClickHouse 版本鎖 + `lobster-factory/infra/trigger/validate-config.ps1` 硬擋浮動 tag）。已修：改用實際測試過的 image digest 釘死。
+(4) network-guard 完成前 runner 就已經在接受連線的競態窗口——今天無害（server.mjs 尚無任何對外 fetch 呼叫），但 ADR-0029 要求的性質必須「跨越未來每次設定變更都持續為真」。已在 server.mjs 註解標記為 Task 4/7 的硬性合併門檻（誰發第一個真實對外 fetch，就要先 gate 在 network-guard exit 0 上）。
+
+[真跑驗證過程中自己抓到並修正的 2 個測試腳本 bug（非 critic 抓到，是我自己跑真實 Docker 時發現斷言邏輯有問題）]
+- PowerShell 對字串陣列用 `-notmatch` 是「過濾」語意（回傳不匹配的元素），不是布林值——多行 log 輸出幾乎必然有不匹配的行，導致斷言即使真的通過也會誤判失敗。修法：先 `-join "`n"` 成單一字串再比對。
+- `docker inspect --format '{{.NetworkSettings.GlobalIPv6Address}}'` 這個頂層欄位只在預設 bridge 網路模式才存在；容器在自訂網路（本例的實際情況）下這個欄位根本不存在，會直接噴 Go template parse error 而非回傳空字串——斷言原本把這個錯誤誤判成「沒有 IPv6」而通過，完全沒驗證到真實答案。修法：改讀已經解析好的 per-network JSON（`.NetworkSettings.Networks.<實際網路名>.GlobalIPv6Address`）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cmd.exe //c run-fetch-test.bat`（呼叫 `tests/architecture/fetch-runner-network-isolation.test.ps1`，共跑 4 輪：初次通過→修 critic findings 後跑出 2 個自製斷言 bug→逐一修正→最終全綠）| 最終結果=`HCI-30 fetch-runner network isolation suite PASSED (ADR-0029 gates 1-3)`，含對本機真實在跑的 `trigger-webapp`(172.18.0.9:3000)/`trigger-postgres`(172.18.0.4:5432) 做真實連線嘗試並確認被擋（curl exit 28）、公開網路可通、DNS 可解析、白名單 MinIO peer 可連、內部 API 認證 401/202/200/401 全對
+- REVIEW_DONE: critic=Standard | verdict=pass（4 Major 全修）| findings=0 Critical / 4 Major / 3 Minor / 2 Suggestion
+- BUGHUNT_DONE: scope=Projects/internal/hci30 | grep=`hci-fetch-runner\|compose.fetch-runner\|network-guard` | hits=僅本次新增檔案本身，無孤兒引用
+
+[剩餘風險]
+1. Minor：Gate 2 只機會性探測了本機真的在跑的 trigger-webapp/trigger-postgres，Supabase admin endpoint／n8n webhook 管理 endpoint 這兩個 ADR-0029 gate 2 明訂的目標本機沒有服務可探，用 RFC1918 範圍擋等價替代——Task 13 獨立覆審時需明確告知這點，不能假設已經真的測過。
+2. Minor：iptables 允許清單只涵蓋 gate 3 字面最低要求（RFC1918+loopback+link-local+cloud metadata），未涵蓋 CGNAT/TEST-NET/multicast 等其他標準 SSRF 黑名單範圍——非本任務驗收範圍缺陷，已折入 Task 4 的 SSRF payload corpus 範圍。
+3. `runner` image 以 root 執行（無 USER 指令），`cap_drop: ALL` 大幅緩解但非等同 non-root——留給後續強化。
+4. 上 `ks-aw-01` 仍是 STOP，本輪只完成本機/測試環境部分。
+
+[rollback] 全新檔案（compose+2個Dockerfile+2個腳本+1個測試），`git revert` 該 commit 即可完全復原，未部署到任何共用/正式環境，不影響任何既有服務。
+
 ## 2026-09-17（續8）操作者下令清空兩客戶知識庫（測試期爬蟲資料）
 
 [任務] 操作者看 `/ops/knowledge`（全客戶知識庫總覽——獨立於本次 K2g-K2j 改的 per-client 頁面之外的另一頁，見下方「/ops/knowledge 研究」段落）反映「之前搜尋的東西全部刪除」。範圍不明，先查資料庫給出精確數字讓操作者選（AskUserQuestion），操作者選「兩個客戶知識庫全部清空」（含 1 筆手寫文件，非只清爬蟲抓的）。
