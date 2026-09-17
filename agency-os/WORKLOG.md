@@ -1,4 +1,103 @@
 # Worklog
+## 2026-09-18（續8）HCI-30 蒐集器 Task 12（判定 NOT APPLICABLE）+ Task 13（獨立 vuln-verifier 複核 ADR-0029 六道閘，6/6 CONFIRMED）——蒐集器管線非 STOP 範圍工作全部結束
+
+[任務] 承接續5（Task 10），依 Execution Order 走完最後兩項：Task 12（routing 三件套同步）、Task 13（獨立資安複核）。
+
+[Task 12：判定不適用，非略過]
+直接讀 `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md:1-19` 確認該檔＋`workflow-risk-matrix.json`＋`ROUTING_MATRIX.md` 記錄的是 Lobster Factory **client 自動化平台**的 `task_type`→執行工具（Trigger.dev／n8n／GitHub／WordPress）路由決策，跟「有沒有新開一條 REST API 路徑」是兩個不相關維度——這三檔從未、也不該收錄具體 URL path。Task 9 的 Trigger.dev 編排刻意未建立任何真實 `task_type`；Task 10 的 3 條新路由是 `app/server.mjs`（本機 demo app）上的一般 REST 端點，不對應任何 Lobster Factory task_type。另查證 HCI-30 自己的 `api/openapi/hci-v1.yaml:1-11`：檔頭明文「Skeleton only... not a complete surface」，`app/server.mjs` 既有 10+ 條路由從未同步進去，Task 10 這 3 條不應是唯一例外。兩個候選 Scope 皆判定不適用，記錄於計畫文件與 TASKS.md，不對錯誤目標動手。
+
+[Task 13：獨立 vuln-verifier 複核，1 agent，Docker 真跑]
+Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘（`fetch-runner-is-separate-service`／`wave6-no-bridge-route`／`-metadata-and-rfc1918-blocked`／`-dns-rebind-rejected`／`-ssrf-payload-corpus`／`wave6-trigger-no-direct-fetch`），要求自建獨立 Docker Compose 專案+自寫全新 PoC（非只重跑既有 fixture），read-only + 受控攻擊嘗試，不改動任何程式碼。
+
+**結果，6/6 CONFIRMED**：
+1-2. 自建獨立專案（`vulnverify6814`，獨立密鑰）起 runner，對 7 個真實在跑的 trigger-* 容器（webapp/postgres/minio/redis/clickhouse/supervisor，比計畫原文估計的規模更完整）逐一真連線嘗試，全部 `curl exit 28`（timeout，非 refused，確認封包在 iptables OUTPUT 層被丟棄）；另起第二個獨立專案交叉驗證官方既有 harness（`fetch-runner-network-isolation.test.ps1`）本身仍綠。
+3. metadata（169.254.169.254）／3 個 RFC1918 範圍／loopback 六個目標，網路層（iptables）+ 應用層（ssrf-guard）雙重擋下；正面控制組（`https://example.com/`、允許清單內的 MinIO peer）確認可正常連線，排除「規則太寬把什麼都擋掉」的假陽性；額外真跑一次含真實 MinIO 寫入的端對端 enqueue，metadata URL 走實際 runtime fetch path（非隔離單元測試）失敗並回傳 `ssrf_blocked_private_host_literal`。
+4-5. `node --test` 對 `pinned-http-client.test.mjs`（11 tests）／`ssrf-payload-corpus.test.mjs`（6 tests）／`ssrf-guard.test.mjs`（10 tests）全綠，DNS-rebind pin-to-first-answer 與編碼繞過語料庫（十進位/八進位/十六進位 IP、IPv4-mapped-IPv6、protocol/credential smuggling、open-redirect 串接）皆真實擋下。
+6. 對 `app/` 目錄以零容忍模式跑（非 critic 已知會誤報的 `public-intelligence/`），另手寫 5 個全新 PoC 檔案（與腳本內建 self-test fixture 內容不同）：別名繞過（`const x = fetch; x(...)`）＋ decoy 檔名繞過皆被抓到（2/2 flagged，0 false positive），動態字串屬性存取（`globalThis['fe'+'tch'](...)`）確認仍抓不到——跟腳本 header 與 `agency-os/TASKS.md` 已揭露的已知限制逐字對應，非新發現也非過期揭露。
+
+**邊界遵守確認**：3 個獨立 Docker project 驗證後全部清空（`docker network ls`／`docker ps -a` 確認零殘留，既有 `trigger-*` 容器未受影響）；`git status --porcelain` 前後比對確認零程式碼異動；gate 2 的探測方向全程是 runner→其他容器（確認隔離），未曾反向對生產鄰居容器發動任何寫入或資料擷取。
+
+**總結論：六道閘全部獨立復現為綠燈，零新繞過、零回歸，Gate C 收斂成立，不需退回任何任務。**
+
+[已修改]
+- `docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md`：Task 12 標記 NOT APPLICABLE（附查證依據）、Task 13 標記已完成（附複核結果摘要）。
+- `agency-os/TASKS.md`：HCI-30 管線追蹤條目更新為「Task 0/1 STOP 維持、2-11 完成、12 不適用、13 完成——非 STOP 範圍工作全部結束」。
+
+[驗證結果]
+- REVIEW_DONE: critic=NA（本輪為獨立驗證性質任務，非新程式碼——verifier 本身即扮演獨立複核角色，等同一次獨立 review）
+- REALTEST_EVIDENCE: tool=Bash（vuln-verifier agent 執行）| 六道閘逐項真跑，詳細指令與輸出見 agent 報告全文（本條目已摘要六項各自的複現方式與結果）；3 個獨立 Docker Compose 專案，全部驗證後 teardown 確認乾淨
+- BUGHUNT_WAIVED: DOC_ONLY -- Task 12/13 皆為文件判定與唯讀複核，未新增任何程式碼符號／schema 欄位
+
+[剩餘風險]
+1. `check-trigger-no-direct-fetch.ps1` 動態字串屬性存取繞過（`globalThis['fe'+'tch'](...)`）仍未修——本次獨立複核只確認揭露仍準確，非本次任務範圍；已有另一 session 認領 `spawn_task` 任務（task_04a0dd68）處理擴大掃描範圍到 `app/` 一事，動態字串繞過本身仍是誠實記錄的架構性限制，需要 AST/直譯器才能根治。
+2. HCI-30 蒐集器管線的部署層（Task 3 上 `ks-aw-01`、Task 9 實際 Trigger.dev 部署與登入驗證）仍是明確的獨立 STOP，非本次工作範圍——本機/測試環境的建置與驗證至此全部完成，上線部署留待未來明示 go-ahead。
+
+[rollback] Task 12/13 皆為唯讀判定與驗證，無程式碼異動；計畫文件與 TASKS.md 的文字更新可用 `git revert` 對應 commit 完全復原，不影響任何既有功能。
+
+## 2026-09-18（續7）修復 `collect/academic` 的 arXiv 來源在正式環境被 robots.txt 擋下、永遠零結果的 bug（回應續3揭露事項的後續修復）
+
+[任務] 操作者：續3做 PICO 任務時意外發現 `export.arxiv.org/robots.txt` 全站 `Disallow: /`，導致 `run.ts` 組裝的正式環境 `ctx.fetch` 呼叫 arXiv API 時 100% 被擋、回傳零結果（見續3 [剩餘風險] 第2項）；操作者今日明確指示正式修復，不含 PubMed（`eutils.ncbi.nlm.nih.gov` 同一根因但範圍外，今天沒有任何程式碼呼叫這個 host）。
+
+[現況分析] `git log --oneline -5` 確認起始點（`884fd23d1`）與 gitStatus 一致，無並行 session 搶先 commit。讀 `lib/collect/run.ts:114`（`createCollectFetch({ budget, log, rateLimiter })`，未傳 `robots`）→ `lib/collect/net/fetcher.ts` 預設建立真實 `RobotsCache`，對每個 URL 呼叫 `robots.allows()`，不通過就丟 `CollectFetchError robots_robots_disallow`（改動前的第 182-190 行）。`lib/collect/collectors/academic.ts:468` 的 `ctx.fetch(buildSearchUrl(...))` 對 arXiv 建構的 URL 是 `https://export.arxiv.org/api/query?...`，這個 host 正是被擋的那個。`curl https://export.arxiv.org/robots.txt` 實測確認 `User-agent: *` / `Disallow: /`；另外 `curl https://arxiv.org/robots.txt`（PDF 下載用的裸 host，`discovered` targets 指向這裡）確認 `*` 群組明確 `Allow: /pdf`、無衝突 `Disallow`——所以本次 bug 精確止於 `export.arxiv.org` 這個 API host，不含論文 PDF 下載路徑，不需擴大範圍。既有測試 `collect-live-smoke.test.ts` 的「live academic smoke」用 `robots: null` 整個關掉檢查，繞過了正式環境會踩到的路徑，因此測試綠但正式環境紅。
+
+[方案比較] A（採用，最小）：`net/fetcher.ts` 內加 `ROBOTS_EXEMPT_API_HOSTS`（host allowlist），`collectFetch` 內 `if (robots && !ROBOTS_EXEMPT_API_HOSTS.has(host))` 才查 robots——不改 `run.ts`（其預設組裝自動繼承這個例外）、不改 `academic.ts`、不影響其他 collector。B（不採用）：在 `run.ts` 組裝時手動傳一個自訂 `RobotsCache` wrapper——多一層物件，且 `run.ts` 是「所有 collector 共用的組裝點」，要讀懂 host 例外邏輯，下次加例外 host 得同步改兩處。C（不採用，操作者邊界已排除）：整個關掉 `ctx.fetch` 的 robots 檢查——會連帶讓真正在爬網頁的 collector 也不遵守 robots，過線。
+
+[已修改]
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/net/fetcher.ts`：新增 `ROBOTS_EXEMPT_API_HOSTS`（`Set(["export.arxiv.org"])`，含「只准在讀過真實 robots.txt 後才加」的警語註解）；`host` 計算搬到 robots 檢查之前（供例外判斷用，也去掉了原本 rate-limiter 段落重複算一次 host 的寫法）；`if (robots)` 改成 `if (robots && !ROBOTS_EXEMPT_API_HOSTS.has(host))`；`CollectFetchOptions.robots` 欄位的既有註解同步補一句「除 ROBOTS_EXEMPT_API_HOSTS 外」，避免讀者以為毫無例外。
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/__tests__/collect-fetch.test.ts`：新增 1 個單元測試——同一份 `Disallow: /` robots.txt 文字餵給兩個 host，`export.arxiv.org` 通過、`example.com` 仍被擋，且證明 `export.arxiv.org` 的 robots.txt 根本沒被抓（例外是「這不是頁面」而非「問了不理」）。
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/__tests__/collect-live-smoke.test.ts`：既有「live academic smoke」describe 區塊下新增 1 個 opt-in（`COLLECT_LIVE_SMOKE=1`）真實網路測試——刻意用 `run.ts` 的組裝形狀（不傳 `robots: null`）對 `export.arxiv.org` 發真實查詢，證明修法在正式環境的實際路徑上生效，不只是 mock transport 的單元測試。
+- `agency-os/docs/data-collection/DATA_COLLECTION_PLAN.md`：ⓓ 條目補一句 2026-09-18 加窄範圍例外的說明（比照同節ⓖ條目既有的「已修復」補述慣例），避免「ctx.fetch 預設查 robots」的既有敘述在有例外後顯得過時。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -sS https://export.arxiv.org/robots.txt` | exit=0 | result=`User-agent: *` / `Disallow: /`（確認任務描述屬實，未假設）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -sS https://arxiv.org/robots.txt` | exit=0 | result=`*` 群組 `Allow: /pdf`、無衝突 `Disallow`——確認 PDF 下載路徑本來就沒壞，本次範圍不需涵蓋裸 `arxiv.org`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin，全專案）| exit=0 | 乾淨無錯誤
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect/` | exit=0 | result=17 files/198 passed/9 skipped（含新單元測試，既有測試零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_LIVE_SMOKE=1 npx vitest run lib/collect/__tests__/collect-live-smoke.test.ts -t "live academic"` | exit=0 | result=真打 `export.arxiv.org`，5 篇論文（如「AR-RAG: Autoregressive Retrieval Augmentation for Image Generation」）+ 既有 OpenAlex smoke 測試同批同跑仍 5 篇正常（`robots: null` 那支不受影響）
+- REALTEST_EVIDENCE: tool=Bash | 突變測試——暫時把 `if (robots && !ROBOTS_EXEMPT_API_HOSTS.has(host))` 改回 `if (robots)`（例外關閉），重跑新增的單元測試與新增的 live 測試 | 兩個都精準變紅：單元測試丟 `CollectFetchError: robots_robots_disallow`；live 測試在 `academic.ts:468`→`fetcher.ts:203` 丟同一錯誤，正是任務描述的正式環境原始症狀——證明兩個新測試都不是空跑。還原後重跑 `npx tsc --noEmit` 與 `npx vitest run lib/collect/` 皆 exit=0 全綠。
+- REVIEW_WAIVED: NA -- 本次 subagent 執行環境未提供 Task/Agent 派工工具，無法呼叫 critic；依 AGENTS.md §4「oracle 全無額度」備援協議執行書面對抗自審（逐行重讀 `fetcher.ts` 改動後全文＋兩個新測試，核對計畫與實作一致）+ 上述突變測試（非省略 review，用可驗證方式證明新測試會抓真的迴歸）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`ROBOTS_EXEMPT_API_HOSTS\|export\.arxiv\.org` | hits=17（分布：`fetcher.ts` 定義+2處引用+註解共4、`academic.ts` 既有 `buildSearchUrl` 1、`collect-sources.test.ts` 既有純函式測試 1、`collect-live-smoke.test.ts` 新測試 3、`collect-fetch.test.ts` 新測試 4、`WORKLOG.md` 續3既有記錄 3、`DATA_COLLECTION_PLAN.md` 本次新增 1；`scripts` 0 命中）；全部為預期位置，無孤兒引用。另跑 `robots` 全文檢索確認 `DATA_COLLECTION_PLAN.md` ⓓ 條目是唯一需要同步的既有文件敘述（已修，見上），`literature_search.capability.yaml`（`ai_lego` 另一套 Python 實作，跟本次改動的 TypeScript `collect/academic` 無關）未提及 robots，非 stale。
+- WORKLOG_DONE: 修復 collect/academic 的 arXiv 來源正式環境 robots.txt 零結果 bug
+
+[剩餘風險]
+1. `eutils.ncbi.nlm.nih.gov`（PubMed 直連的假設性 host）同一根因，未修——任務邊界明確排除（PubMed 直連是另一個未建的 provider，今天沒有任何程式碼呼叫這個 host，不是「已知道會壞卻沒修」）。
+2. `ROBOTS_EXEMPT_API_HOSTS` 是全域、跨 collector 生效的 host allowlist（設計上刻意如此，見方案比較 A vs B）——未來若任何 collector 真的把一般網頁 URL 指到 `export.arxiv.org`（目前系統內沒有這種情況），該次 fetch 也會跳過 robots；風險極低但記錄於此，供未來加新 host 時的讀者注意（`fetcher.ts` 內的警語註解已寫這點）。
+
+[rollback] 三個程式碼相關檔案的純增量（新常數＋一個判斷式條件＋兩個新測試 `it` 區塊）+ 一份文件補述句。`git revert` 該 commit 即可完全復原到「`export.arxiv.org` 又被 robots.txt 擋下」的原狀，無資料庫遷移、無其他呼叫端需要同步修改（`run.ts` 未改動，因為它的預設組裝行為本身就是本次要修的目標）。
+
+## 2026-09-18（續6）Cognitive OS 儀表板雙語方法瀏覽 + 比較／自組工作流 + 自訂工作流後端，critic 覆審 1 Critical+2 Major 全修，途中意外觸發並修復 main 匯入中斷
+
+[任務] 操作者：儀表板方法清單只顯示 slug、無說明、單選（「現在的版面太陽春...我不是要看 slug 名稱...每個工具應該說明介紹功能和使用方式...可以自由複數選擇使用」）。AskUserQuestion 確認 3 模式全要：並排比較／自組工作流／存成工作流延伸既有「工作流」庫。動工中操作者兩次糾偏：「說明不要寫在選單裡」（把 blurb 從清單列移到 hover title + 詳情頁）、「內文版面要設計高質感...並說明應該要填寫提供什麼資料內容」（視覺設計改版 + ①描述步驟加每方法專屬欄位清單提示框）。
+
+[已修改]
+- `ai_lego/apps/api/main.py`：`_method_display_metadata()`（讀既有 `method-display-metadata.yaml`，比照 `list_recipes` 不快取慣例，檔案不存在或 YAML 壞掉都 fail-open 回 `{}`）掛到 `/methods`／`/methods/{id}/form` 的 `display` 欄位；新 `custom_workflow_record`／`CustomWorkflowRepository`（獨立 `custom_workflows.sqlite3`，比照 `ProjectSourceRepository` 連線／event-append 寫法，動工前先請 Explore agent 讀完該檔案確認慣例）+ 5 個 `/workflows/custom*` endpoint（無新 entitlement——存一份 method_id 清單本身不敏感，實際執行仍走 `/methods/{id}/invoke` 既有 entitlement 檢查）。
+- `ai_lego/apps/api/dashboard.html`：家族篩選 chips、雙語 name_zh/name_en 清單列（checkbox 多選，保留選取順序）、比較模式（並排卡片，各自呼叫 `/methods/{id}/form`）、自組工作流模式（加/移除/排序步驟、每步走既有 invoke 端點執行、存/更新/刪除走新 API、可在「工作流」分頁重新打開並標「自訂」）、視覺改版（spacing/type-scale CSS 變數、步驟數字徽章、guide-box 列出每方法必填/選填欄位）。
+- `ai_lego/core/domain/custom_workflow.py`（新）、`ai_lego/data/repositories/custom_workflow_repository.py`（新）、`tests/unit/test_custom_workflow_api.py`（新，13 案例）。
+- `ai_lego/core/domain/_intake_validation.py`：`require_timestamp` 加 `field=` 參數（預設 `"created_at"`，既有 2 個呼叫端不受影響）。
+
+[過程中的真實事故，非設計]
+1. 早期一次 Write 呼叫把 prose 裡打的「反斜線+u+四個零」跳脫序列文字，被工具鏈當成 JSON escape 解讀成真的 NUL 字元，寫進 dashboard.html 當搜尋用的分隔字元——binary diff 抓到，改成普通空白 join（分隔字元本來就非必要）。同一失誤在寫 commit message 檔時又發生一次（描述這個 bug 的 prose 本身又打了同樣的跳脫序列文字，又被解讀成 NUL），git commit 因而報「NUL byte in commit log message」失敗。撰寫本條 WORKLOG 條目時，描述前兩次事故的 prose 又踩了第三次同一個陷阱（已用二進位安全的方式修掉，記錄於此避免自己再犯：日後描述這個字元一律用文字敘述，不要在任何工具呼叫的內容參數裡打出那個跳脫序列文字本身）。
+2. 第一次 `git commit -F <訊息檔> -- main.py ...` 因上述 NUL byte 失散，但 `git-stage-hunks.py` 已把 main.py 我的 7 個 hunk `--cached` 進共用 index；此空窗期間另一並行 session 自己的 commit（`4646a7fd4`）把這個共用 index 狀態一併 commit 走，導致 main.py 在 HEAD 上已經 `import ai_lego.core.domain.custom_workflow`，但 `custom_workflow.py`／`custom_workflow_repository.py`／`test_custom_workflow_api.py` 三個檔案從未進 HEAD——main 一度無法 `import ai_lego.apps.api.main`（critic 抓到，🔴 Critical）。已補：把三個缺的檔案 commit 進去，closes 該缺口。
+
+[critic 覆審（1 agent，Standard tier），1 Critical + 2 Major 全修，0 Minor 濫竽充數]
+- 🔴 main 無法 import（見上，已修：補 commit 三個檔案）。
+- 🟠 `_method_display_metadata()` 原本只在檔案不存在時 fail-open，YAML 語法錯但檔案存在時會讓 `/methods`／`/methods/{id}/form` 直接 500——已加 `except yaml.YAMLError: return {}`。
+- 🟡 `require_timestamp` 沒有 `field` 參數時，`custom_workflow.py` 驗證 `updated_at` 失敗會誤報 `CREATED_AT_INVALID`——已加 `field=` 參數修正（見上）；`create_custom_workflow` 補 `except sqlite3.IntegrityError -> 409`，比照 `create_project`/`create_source` 慣例（`workflow_id` 是新生 uuid4，實務上不會撞，純粹一致性）。
+- 其餘（租戶隔離／SQL injection／repository 命中-未命中語意／DI pattern／無 entitlement 的設計判斷）逐項核實無問題，未列進上方是因為 critic 明確判定「沒問題」而非略過。
+
+[附帶發現，非本任務範圍，已 flag 給負責的並行 session]
+`tests/unit/test_project_source_api.py` 目前 4 個測試失敗（`test_oversized_doi_is_refused` 等），屬另一 session 的 doi/authors/venue citation metadata 功能；`source.py`／該測試檔跟 HEAD 完全無 diff（非本次改動），已用 SendMessage flag 給「02- 知識庫和資料蒐集架構」，未自行修改。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_custom_workflow_api.py -v` | exit=0 | ms=101760 | result=13 passed（session 必填 401、跨租戶隔離、不可解析 method_id 拒絕 400、create/list/get/update/delete 全流程，皆用真實 FastAPI TestClient + 真實 temp SQLite + 真實 MethodCatalog，未 mock）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py tests/unit/test_project_source_api.py -q`（critic 修復前）| exit=0 | ms=271290 | result=96 passed（確認 `/methods` 新增 `display` 欄位與新 import 對既有 API 無回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_custom_workflow_api.py tests/unit/test_source_domain.py tests/unit/test_intake_schemas.py -q`（critic 修復後，隔離驗證 `require_timestamp` 簽章變動未破壞既有呼叫端）| exit=0 | ms=23350 | result=20 passed
+- REALTEST_EVIDENCE: tool=Browser | cmd=真實 uvicorn + Claude Browser pane 對 `http://localhost:8420` 端到端操作 | result=curl 驗證 281 個方法 0 個缺 display（含即時發現並補齊 2 個並行 session 新增的 method：`art_therapy.wusheng_five_phase`／`research.reporting_guideline_checklist`）；清單列確認無 blurb（僅 hover title）；家族篩選正常；比較模式並排渲染 2 個真實方法表單；自組工作流勾選 2 方法 → 真實 `POST /workflows/custom`（200）→ 出現在「工作流」分頁標「自訂」→ 真實 `GET` 重新打開步驟還原正確 → 真實 `DELETE`（200）後從清單消失
+- REVIEW_DONE: critic=Standard | verdict=pass（修復後）| findings=1c/2m/0n（見上，全部已修）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`get_custom_workflow_repository\|CustomWorkflowRepository\|custom_workflow_record\|require_timestamp\(` | hits=17，全部為本次新增/修改檔案本身或既有 2 個未受影響呼叫端，無孤兒引用、無重複定義
+- [rollback] `main.py`／`_intake_validation.py`／`dashboard.html` 為既有檔案的純增量（可用該次 commit 的 revert 還原）；`custom_workflow.py`／`custom_workflow_repository.py`／`test_custom_workflow_api.py` 為新檔可直接刪除。無 prod 影響（純本機 dev server 測試，SQLite 檔案在 `.runtime/`，未部署）。
+- [下一步] Task 3c 圖表真渲染（matplotlib，操作者已同意新依賴）；`stakeholder.regulator`（Lens，非 Method）目前在雙語 metadata 檔裡有 entry 但 `/methods` 不會回傳它，屬預期行為，未來若做 Lens 瀏覽器可直接沿用。
+- WORKLOG_DONE: Cognitive OS dashboard bilingual browser + compare/chain + custom workflows
+
 ## 2026-09-18（續5）HCI-30 蒐集器 Task 10：操作介面（組織 seed 註冊 + DISCOVERED 審核佇列），critic 覆審 2 Major+3 Minor 全修，real-Postgres+瀏覽器全流程驗證，過程中另自行發現並修 2 個真實 bug
 
 [任務] 承接續2（Task 9），依 Execution Order 做 Task 10：讓人在 UI 上登記組織 seed、觸發 dry-run/正式跑、看到 DISCOVERED 清單、標記 REJECTED。動工前發現計畫原文 Scope（`lobster-factory/.../ops/collect/`）不適用——該頁面租戶模型是 Supabase `organizations`，跟 HCI-30 自己的 Postgres RLS + `hci_app_test_a/b` 角色租戶制是兩套不同底層資料模型，硬接會產生第二套平行租戶語意，違反「零重工/單一租戶 SSOT」——改落在 `Projects/internal/hci30/app/`（HCI-30 自己既有、已在跑的 Express app），沿用既有 `resolveTenant`/`queryAsTenant`/`problem`/`esc` 慣例。操作者全權授權「你決定，我要系統完整完美以頂級規格的方式建造完成」，中途對 Task 9 提出「為什麼需要建 Trigger.dev 專案」的關鍵糾偏（已在續2記錄，本任務延續同一結論：`app/server.mjs` 呼叫 `orchestrateDiscoveredFetch` 完全不需要任何 Trigger.dev 專案存在）。

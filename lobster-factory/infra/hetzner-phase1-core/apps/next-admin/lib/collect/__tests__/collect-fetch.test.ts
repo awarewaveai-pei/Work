@@ -185,6 +185,35 @@ describe("createCollectFetch", () => {
     expect(seen.some((u) => u.endsWith("/robots.txt"))).toBe(true);
   });
 
+  it("exempts export.arxiv.org from robots.txt (a documented keyless API, not a page), but leaves every other host's Disallow: / in force", async () => {
+    // export.arxiv.org's real robots.txt (curl'd 2026-09-18) is exactly this: Disallow: / for every
+    // agent. Serving that SAME text to both hosts isolates the variable to "which host asked" — this
+    // proves the allowlist is host-scoped, not a change to how Disallow: / is interpreted.
+    const robotsTxtCalls: string[] = [];
+    const transport = (async (url: string | URL) => {
+      const u = String(url);
+      if (u.endsWith("/robots.txt")) {
+        robotsTxtCalls.push(u);
+        return new Response("User-agent: *\nDisallow: /\n", { status: 200 });
+      }
+      return html("<p>ok</p>");
+    }) as unknown as typeof fetch;
+
+    const f = createCollectFetch({
+      budget: createBudget(),
+      transport,
+      resolver: publicResolver,
+      rateLimiter: instantLimiter(),
+      // robots deliberately not passed — this is run.ts's production shape, not a test-only opt-out.
+    });
+
+    await expect(f("https://export.arxiv.org/api/query?search_query=all:test")).resolves.toBeInstanceOf(Response);
+    await expect(f("https://example.com/anything")).rejects.toThrow(/robots_robots_disallow/);
+    // The exemption means export.arxiv.org's robots.txt is never even fetched — the point is "this
+    // isn't a page to ask permission for", not "ask, then ignore the answer".
+    expect(robotsTxtCalls).toEqual(["https://example.com/robots.txt"]);
+  });
+
   it("refuses a method a collector is not allowed to use", async () => {
     const f = createCollectFetch({
       budget: createBudget(),

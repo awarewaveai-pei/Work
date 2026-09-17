@@ -37,6 +37,20 @@ export function pinnedDispatcher(address: string): Dispatcher {
 
 export const COLLECT_USER_AGENT = "AwareWaveCollector/1.0 (+https://aware-wave.com/bot)";
 
+/**
+ * Hosts that are documented, keyless query APIs, not sites being crawled — robots.txt has nothing to
+ * say about an endpoint whose only purpose is machine querying. export.arxiv.org's robots.txt is
+ * `Disallow: /` for every agent (verified 2026-09-18), which otherwise silently zeroes out every
+ * result from collect/academic's arXiv registry option in production — the same conclusion
+ * collect-live-smoke.test.ts already reaches for its own test call via `robots: null` ("a documented
+ * public API, not a site being crawled"), narrowed here to exactly this host so run.ts's production
+ * wiring gets it too, instead of only a test that opts out of the robots gate entirely.
+ *
+ * Add a host ONLY after reading its actual robots.txt (curl it) — this set turns robots.txt off, per
+ * host, for every collector that ever fetches it, not just collect/academic.
+ */
+const ROBOTS_EXEMPT_API_HOSTS = new Set(["export.arxiv.org"]);
+
 export interface CollectFetchOptions {
   budget: Budget;
   /** Bytes accepted from ONE response before it is truncated. Stops a 500MB endpoint eating a run. */
@@ -47,10 +61,11 @@ export interface CollectFetchOptions {
   resolver?: Resolver;
   rateLimiter?: RateLimiter;
   /**
-   * Omitted ⇒ robots.txt IS consulted, through a cache this function builds itself. Passing `null`
-   * is the only way to switch it off, and it has to be deliberate: the previous shape (`robots?:`
-   * with no default) meant a caller who forgot the argument got a crawler that ignored robots
-   * everywhere, with every test still green.
+   * Omitted ⇒ robots.txt IS consulted, through a cache this function builds itself, for every host
+   * except ROBOTS_EXEMPT_API_HOSTS above. Passing `null` is the only way to switch it off for
+   * everything else, and it has to be deliberate: the previous shape (`robots?:` with no default)
+   * meant a caller who forgot the argument got a crawler that ignored robots everywhere, with every
+   * test still green.
    */
   robots?: RobotsCache | null;
   /** Injected so tests never touch the network. Defaults to the platform fetch. */
@@ -177,9 +192,10 @@ export function createCollectFetch(opts: CollectFetchOptions) {
       // gate.ok guarantees `address` is set (checkUrl's contract) — pin the connection to exactly
       // the address just validated, so the platform's own re-resolution at connect time never runs.
       const dispatcher = pinnedDispatcher(gate.address!);
+      const host = new URL(current).hostname.toLowerCase();
 
       let crawlDelayMs: number | undefined;
-      if (robots) {
+      if (robots && !ROBOTS_EXEMPT_API_HOSTS.has(host)) {
         const verdict = await robots.allows(current);
         if (!verdict.allowed) {
           // Two different situations: the site said no (settled), and we could not ask (transient).
@@ -189,7 +205,6 @@ export function createCollectFetch(opts: CollectFetchOptions) {
         if (verdict.crawlDelay) crawlDelayMs = verdict.crawlDelay * 1000;
       }
 
-      const host = new URL(current).hostname.toLowerCase();
       const waited = await limiter.take(host, { minIntervalMs: crawlDelayMs });
       if (waited) log(`rate-limited ${host} for ${waited}ms`);
 

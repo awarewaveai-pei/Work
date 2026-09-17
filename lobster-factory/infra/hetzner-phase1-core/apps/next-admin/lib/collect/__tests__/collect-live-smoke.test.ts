@@ -169,4 +169,48 @@ describe.skipIf(!LIVE)("live academic smoke", () => {
     },
     60_000,
   );
+
+  it(
+    "arXiv specifically, through run.ts's actual wiring (no robots: null override) — export.arxiv.org's robots.txt used to zero this out in production",
+    async () => {
+      // The test above disables robots entirely (`robots: null`), which is exactly why it never
+      // caught the production bug: export.arxiv.org/robots.txt is `Disallow: /` for every agent, and
+      // run.ts (createCollectFetch({ budget, log, rateLimiter }), no robots override) used to hit
+      // that on every real run, making the arXiv registry option return zero results, silently. This
+      // call is deliberately the SAME shape as run.ts — no robots override — so it only passes if the
+      // ROBOTS_EXEMPT_API_HOSTS carve-out in net/fetcher.ts is actually wired into production, not
+      // just proven in a mocked unit test.
+      const { academicCollector } = await import("@/lib/collect/collectors/academic");
+      const { createBudget } = await import("@/lib/collect/budget");
+      const { canonicalize } = await import("@/lib/collect/canonical");
+      const { createCollectFetch } = await import("@/lib/collect/net/fetcher");
+      const { RateLimiter } = await import("@/lib/collect/net/rate-limit");
+
+      const budget = createBudget({ fetches: 3, bytes: 5_000_000, ms: 60_000 });
+      const { docs } = await academicCollector.run(
+        {
+          uri: `academic://${encodeURIComponent("retrieval augmented generation")}`,
+          canonicalUri: "",
+          scope: { hosts: [] },
+          tier: 0,
+          depth: 0,
+          meta: { registry: "arxiv", limit: 5 },
+        },
+        {
+          fetch: createCollectFetch({ budget, rateLimiter: new RateLimiter({ ratePerSecond: 1, burst: 2 }) }),
+          canonicalize,
+          budget,
+          tenantRef: "live-smoke",
+          log: () => {},
+        },
+      );
+
+      // eslint-disable-next-line no-console -- the evidence is the point of this test
+      console.log(JSON.stringify({ papers: docs.length, first: docs[0]?.title ?? null }, null, 2));
+
+      expect(docs.length).toBeGreaterThan(0);
+      expect(docs.every((d) => d.title && d.text.length > 0)).toBe(true);
+    },
+    60_000,
+  );
 });
