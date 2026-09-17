@@ -593,6 +593,8 @@
 - [x] **【✅ 2026-09-12 完成】auto-promote 開關稽核紀錄（C5）** — 新 migration `0019_wave1_case_auto_promote_audit`，append-only 骨架沿用 C7；critic 覆審抓到原子性缺口後改為 `hci.set_case_auto_promote_rule_findings()` 單一函式呼叫。細節見 WORKLOG 2026-09-12（C2/C3/C5 條目）。
 - [x] **【✅ 2026-09-12 確認維持擱置】金鑰輪替只有紙上設計（C8）** — High-risk（加密/憑證），前一輪 session 已決定「不趕、需要自己一輪完整 real-Docker 驗證」。操作者本輪被問「要不要推翻這個決定」，答「維持前人決定」。無程式碼異動，純確認留存。見 `Projects/internal/hci30/docs/HCI_C1_C10_DECISIONS.md` §C8。
 - [x] **【✅ 2026-09-12 確認維持擱置】「調查目的」欄位是裝飾（C9）** — 詐欺調查／人身安全／一般盡職調查等 5 個 purpose 目前零行為差異，要接不同法遵規則需要操作者給具體政策輸入，猜錯有法律風險。操作者本輪答「先不動」（原因：不清楚要怎麼設規則）。無程式碼異動，純確認留存。見 `HCI_C1_C10_DECISIONS.md` §C9。
+- [ ] **HCI-30 C6 真實登入串接計畫（2026-09-17 `planner` 產出，審閱中，未授權執行）** — 12 個 Task Prompt，Task 3/5/6/7/9 為 High-risk STOP。計畫：`Projects/internal/hci30/docs/HCI_C6_REAL_LOGIN_PLAN.md`。C6 仍為 DEFERRED，本項只記錄計畫已產出，不代表開工授權。
+- [ ] **HCI-30 蒐集器→DISCOVERED 管線計畫（2026-09-17 `planner` 產出，審閱中，未授權執行）** — 13 個 Task Prompt，Task 0（真人資料紅線）/ Task 1（REJECTED 保存期限）為硬阻塞 STOP。計畫：`Projects/internal/hci30/docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md`。對應 `DATA_COLLECTION_PLAN.md` §3 C4。查證中發現原構想（直接接 `/ops/collect` 的 `ctx.fetch`）違反 ADR-011 §決策15c，計畫已改為隔離 runner 路線。
 
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
   - `🟠 未開始` · `2026-08-28 開出` · `可直接做`

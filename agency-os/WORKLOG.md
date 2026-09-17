@@ -15,6 +15,29 @@
 - rollback：`git revert <commit>`；prod 需重跑 deploy.sh（此 commit 尚未部署）。
 
 
+## 2026-09-17（續4）HCI-30 C6 真實登入 + 蒐集器管線：重跑 planner 落地成文件（純文件，無程式碼異動）
+
+[任務] 前一輪 session 已跑過兩個 `planner` agent（C6 真實登入串接、資料蒐集器→HCI-30 DISCOVERED 管線），但因 compaction 導致原始輸出遺失（task output 檔存在但內容為空），只剩對話裡的壓縮摘要。為避免用記憶重建任務清單造成幻覺（AGENTS.md 核心原則：不捏造未驗證的架構判斷），重新派兩個 `planner` agent，附上已驗證過的具體 file:line 線索重跑，落地成正式文件而非只留在對話裡。
+
+[已修改]
+- 新增 `Projects/internal/hci30/docs/HCI_C6_REAL_LOGIN_PLAN.md`：12 個 Task Prompt，Task 3/5/6/7/9 標記 STOP。
+- 新增 `Projects/internal/hci30/docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md`：13 個 Task Prompt，Task 0（真人資料紅線）/ Task 1（REJECTED 保存期限）為硬阻塞 STOP。
+- `Projects/internal/hci30/docs/HCI_C1_C10_DECISIONS.md` §C6：加一行指向新計畫文件。
+- `agency-os/docs/data-collection/DATA_COLLECTION_PLAN.md`：C4 列後加一則 blockquote 指向新計畫文件，並記錄查證發現（`hci.sources`/`hci.source_snapshots` 目前完全沒有 `admission_state` 欄位，「未產生 Evidence 狀態躍遷」現在只是散文承諾，無機械閘）。
+- `agency-os/TASKS.md`：兩則新條目指向上述兩份計畫文件，明記「審閱中，未授權執行」。
+
+[重跑 planner 時發現的重要修正]
+使用者原始構想「把 `/ops/collect` 的輸出直接接進 HCI-30」與 `ADR-011 §決策15c`/`DATA_COLLECTION_PLAN.md:117` 衝突——該系統的 `ctx.fetch` 跑在 next-admin process，與 Supabase/Trigger.dev/n8n 共用 docker bridge，正是 ADR-0029 要隔離掉的攻擊面。收斂計畫已改為「沿用契約形狀與 UI 殼，但執行必須落在全新隔離 runner」，未按字面接線。另外重跑發現兩個前次未見的阻塞性 schema 缺口：`hci.sources`/`source_snapshots` 無 `admission_state` 欄位、`source_snapshots` 無條件 append-only 且無 DELETE 授權（REJECTED 項目今天技術上刪不掉，保存期限問題升級為 schema 問題）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git log --oneline -10` 確認本機與 origin/main 同步（`6fba34d0d`）後再動筆，避免撞上並行 session
+- REVIEW_WAIVED: DOC_ONLY -- 純文件新增/連結，無程式碼改動，兩份計畫本身即為 planner 產出待操作者審閱的草稿，尚未進入實作
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`HCI_C6_REAL_LOGIN_PLAN\|HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN` | hits=僅本次新增的 4 處連結（TASKS.md ×2、HCI_C1_C10_DECISIONS.md ×1、DATA_COLLECTION_PLAN.md ×1），無孤兒引用
+
+[剩餘風險] 兩份計畫皆未取得操作者任何 go-ahead；C6 的 5 個 STOP 任務、蒐集器管線的 Task 0/1 硬阻塞，逐項需要操作者本人個別確認才能開工，不接受整批授權。
+
+[rollback] 純新增檔案 + 四處連結，`git revert` 該 commit 即可完全復原，不影響既有 schema 或程式碼。
+
 ## 2026-09-17（續3）續2 commit 掉檔事故 + HEAD typecheck 真的抓到一個 working-tree 沒抓到的錯誤
 
 [事故] `bbb4d7a76`(續2 的第一個 commit)本來要含 9 個檔案，`git add` 確認全部進 staged(`git status` 逐檔核對過)，但 `git commit` 完只進了 5 個新檔，8 個既有檔的修改(`db.ts`/`rag.ts`/`index.ts`/`route.ts`/`route.test.ts`/`kb-schema-contract.test.ts`/`ClientHubTabs.tsx`/`WORKLOG.md`/`KNOWLEDGE_BASE_PLAN.md`)沒進去——導致 `main` 有一段時間是壞的(新 modal 引用的函式在該 commit 看不到)。根因未深究(共用 worktree，疑似跟 TASKS.md 已追蹤的 `git-align-main-aoresume-feature-*` 同一類 stash 干擾，本次沒有時間逐一排查是哪個機制)，但確認**內容沒有遺失**——工作目錄上的檔案原封不動還在，`git diff --cached --stat` 核對過再補一個 commit(`a83659d2f`)補齊。

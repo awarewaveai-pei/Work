@@ -216,6 +216,8 @@ run(seeds, { sink, budget, tenantRef, maxDepth, flushEvery }):
 | **C5** | 個資 verticals | **BLOCKED**（ADR §決策 10） | — | — |
 | **C6** | 「幫我找出這個產業該追的來源」——但決定權留在人手上 | discovery 積木（查詢→候選來源）＋ `collection_source_candidates` 表＋ops 待核准清單＋撤銷路徑（[ADR 013](../architecture/decisions/013-open-web-discovery-into-corpus.md)） | 候選**永遠不會**直接變成 KB 文件（實測：discovery 產出後 KB 零新增）；核准後該來源走既有 seed 路徑入庫；取消核准後由它產生的文件可一次找出並 archive（實測）；未核准的 webhook／API 呼叫者不能塞任意 URL | 停用 discovery 積木；候選表可留 |
 
+> **C4 執行計畫**（2026-09-17，`planner` 產出）：見 [`HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md`](../../../Projects/internal/hci30/docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md)（13 個 Task Prompt，Task 0/1 為 STOP，尚未取得操作者 go-ahead，不得動工）。查證中發現本表「HCI 自有隔離 fetch runner」的設計意圖與 ADR-0029 一致，但 `hci.sources`/`hci.source_snapshots` 目前完全沒有 `admission_state` 欄位——DoD 講的「未產生任何 Evidence 狀態躍遷」現在只是散文承諾，無機械閘，需新 migration 才補得上。
+
 > **C6 的入口型別刻意與 `Target` 分開**（ADR 013 落地位置）：今天的 `match(t: Target)` 是 URL 形狀，把查詢塞進同一個型別會讓兩種語意共用一條路。C6 之前，`lib/collect/` 不得出現以查詢為入口的積木。
 
 > **C2 交付與計畫的差異**（2026-09-11）：

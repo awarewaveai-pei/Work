@@ -102,6 +102,8 @@ mutation：整個 drop 掉函式、單獨弱化 no-op 判斷邏輯），瀏覽�
 還沒動工到需要接線的階段。現在憑空造一個 ad-hoc 登入系統會跟已經決定的
 架構打架，正確路徑是等 HCI-30 要對外開放時接 portal，不是重新設計一套。
 
+**執行計畫**（2026-09-17，`planner` 產出）：見 [`HCI_C6_REAL_LOGIN_PLAN.md`](HCI_C6_REAL_LOGIN_PLAN.md)（12 個 Task Prompt，Task 3/5/6/7/9 為 STOP，尚未取得操作者 go-ahead，不得動工）。
+
 ## C7 — 證據完整性鏈沒建完
 
 **DONE**（`database/migrations/0018_wave1_evidence_hash_chain_{up,down}.sql`）。
