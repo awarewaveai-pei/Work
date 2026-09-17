@@ -1,4 +1,14 @@
 # Worklog
+## 2026-09-17（續10）修復 WORKLOG.md 隱藏 NUL byte，grep 被迫走 binary-match 路徑
+
+- [根因] 2026-09-12 commit `3bcfbf148` 寫一則描述 `url-state.ts` NUL-byte 事故的 WORKLOG 條目時，backtick 範例 `NUL byte(` `)` 裡直接嵌入了真實的 0x00 位元組，而不是寫成跳脫文字——git 當時就對那個 commit 顯示 `Binary files differ`。此後 `agency-os/WORKLOG.md` 被 grep 判定為 binary file（回報 "Binary file matches" 而非逐行結果），R0 §抓蟲強制的 grep 掃描對這個檔案從那天起悄悄失效，屬於跟先前 merge-conflict-marker 系列不同的另一種損毀類型。
+- [步驟] 用 `git cat-file blob`（非 `git show`，避免 autocrlf 過濾）取出 HEAD 版本；python 逐位元組定位 NUL；把該 0x00 換成字面 `\x00`（4 個 ASCII 字元），保留語意、不動其他任何位元組。因為這是共用 worktree、其他 session 同時在改同一份 WORKLOG.md，改用 `GIT_INDEX_FILE` 開一個 throwaway index（`read-tree HEAD` → `update-index --cacheinfo` 換單一 blob → `write-tree` → `commit-tree -p HEAD`）直接組 commit object，而不是 `git commit --only -- <path>`——後者在該路徑尚未 staged 時會隱性 `git add` 當下的 working-tree 內容，第一次嘗試因此把另一個 session 30 行未完成的 WORKLOG 條目一併掃進 commit，已用 `git reset --soft` 在本機復原（未 push）後才重做。過程中還踩到 `core.autocrlf=true` 在某次 git 操作時把整份 WORKLOG.md 從 CRLF 轉成 LF（多半是另一 session 自己的 `git add`/`commit` 觸發），已用逐行內容比對確認實際內容零損失後改採新 LF 基準對齊 working tree。
+- [驗證] python NUL 掃描：修復前 1 個、修復後 0 個；`grep -c .` 回傳正常行數（13662），不再是 "Binary file matches"；`git diff HEAD~1 HEAD -- agency-os/WORKLOG.md` 只有 1 行變動；fetch origin 確認 push 前無 divergence，fast-forward push 到 `origin/main`（commit `146a552d1`，之後另一 session 的 `82556b4c0` 疊在其上，兩者皆已在遠端）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 -c "open('agency-os/WORKLOG.md','rb').read().count(b'\x00')"` | exit=0 | result=0（修復前為 1）
+- REVIEW_DONE: critic=自審（單一位元組 plumbing 修法，非邏輯變更，跟前幾次 conflict-marker 修復同等級） | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`\\x00\|NUL byte` | hits=1（僅本條目本身描述性提及，非殘留問題）
+- [避免再發生] WORKLOG 條目若要在文字裡示範某個控制字元，一律寫跳脫表示（`\x00`／`\r`／`\n` 等字面文字），不得讓工具或複製貼上把真實位元組帶進 markdown；未來若 grep 又對 WORKLOG.md 回報 "Binary file matches"，直接比照本則的 python NUL 掃描 + throwaway-index 修法，不必重新設計流程。
+
 ## 2026-09-17（續9）Cognitive OS：Project + Source Import 第一個 HTTP 介面（Master Plan Phase 1 新 plane）
 
 - 操作者「繼續完成」→「全部都要」，確認範圍含「Master Plan Phase 1 其餘 plane」。查現況發現 Project／Source 網域物件 + SQLite repository（含內建 events 表＝Versioning 原語）早在 Phase 5 research 工作就建好且有測試，只缺 HTTP 介面——本輪補這塊，不是從零蓋。
