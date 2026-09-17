@@ -1,23 +1,58 @@
-// HCI-30 isolated fetch runner -- internal HTTP API skeleton (ADR-0029 gate 1,
-// HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 3). Enqueue/status only --
-// no outbound fetch/extract logic here (that is Task 4/7, dependent on the
-// DNS-rebind protection this task explicitly does not build). This file
-// exists so Task 9's Trigger.dev orchestrator has a real API shape to call
-// once wired, and so the network-isolation tests in
+// HCI-30 isolated fetch runner -- internal HTTP API (ADR-0029 gate 1;
+// HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 3 skeleton, Task 6 seed
+// governance, Task 7 fetch+extract+content-isolation). This file exists so
+// Task 9's Trigger.dev orchestrator has a real API shape to call once wired
+// (enqueue/status only -- Trigger.dev never fetches itself, ADR-0029 gate 6),
+// and so the network-isolation tests in
 // tests/architecture/fetch-runner-network-isolation.test.ps1 have a live
 // service running inside the container whose network namespace they probe.
 //
-// KNOWN GAP (left for Task 4/7, not this task): nothing here waits for the
-// network-guard sidecar's iptables rules to be confirmed applied before this
-// server starts accepting requests. That race is harmless today because this
-// server makes zero outbound calls of its own -- the day Task 7 adds a real
-// fetch() call, that call must not run until network-guard has finished
-// (compose.fetch-runner.yml's network-guard service exiting 0 is the signal;
-// wire a `depends_on: network-guard: condition: service_completed_successfully`
-// on whatever service issues the first real fetch, or block on a ready-file
-// network-guard writes).
+// Startup race, closed by Task 7 (previously documented here as a "KNOWN
+// GAP", harmless only while this server made zero outbound calls of its
+// own -- no longer true): network-guard's iptables rules land in this
+// container's OWN network namespace (`network_mode: service:runner`) but
+// network-guard cannot start until `runner` has already started, and
+// nothing in compose's dependency graph can express "runner refuses to
+// fetch until network-guard, which depends on runner, has finished" as an
+// ordering constraint alone. `waitForNetworkGuardReady()` below closes it
+// with a file-based signal instead: network-guard writes a ready-file
+// (entrypoint.sh's last line, only after every iptables rule has applied)
+// to a volume shared with `runner` (compose.fetch-runner.yml), and every
+// real outbound fetch waits for that file before dialling out. `/healthz`
+// and `/enqueue` still respond immediately either way -- only the actual
+// fetch execution blocks.
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import { fetchAndExtract } from './retrieval/http-html-fetch.mjs';
+import { scanForInstructionLikeContent } from './content-isolation/scan.mjs';
+
+const NETWORK_GUARD_READY_FILE = process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_FILE || '/var/run/network-guard/ready';
+const NETWORK_GUARD_READY_TIMEOUT_MS = Number(process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS || 30_000);
+const NETWORK_GUARD_READY_POLL_MS = 200;
+
+/**
+ * Poll for network-guard's ready-file. Fail-closed: a timeout throws rather
+ * than letting the caller silently proceed to fetch with an unknown egress
+ * policy state -- the one failure mode ADR-0029 cannot tolerate is "fetched
+ * something before we could prove the SSRF/isolation policy was actually
+ * applied".
+ */
+async function waitForNetworkGuardReady(timeoutMs = NETWORK_GUARD_READY_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      await fs.access(NETWORK_GUARD_READY_FILE);
+      return;
+    } catch {
+      // not ready yet
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(`network_guard_not_ready_after_${timeoutMs}ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, NETWORK_GUARD_READY_POLL_MS));
+  }
+}
 
 const PORT = Number(process.env.HCI_FETCH_RUNNER_PORT || 8090);
 const SHARED_SECRET = process.env.HCI_FETCH_RUNNER_SHARED_SECRET;
@@ -27,8 +62,16 @@ if (!SHARED_SECRET) {
 }
 
 // In-memory only -- Task 8 owns durable persistence into
-// hci.sources/hci.source_snapshots. A restart loses all queued/status state;
-// acceptable for a skeleton with no real fetch execution behind it yet.
+// hci.sources/hci.source_snapshots. A restart loses all queued/status state.
+//
+// KNOWN LIMITATION, tracked not fixed here (critic review 2026-09-17): this
+// Map has no TTL/eviction and now holds real per-job data (title, text
+// length, scanReasons with up to-200-char excerpts) instead of the empty
+// skeleton jobs it held before Task 7 -- under real sustained traffic
+// (Task 9 wiring Trigger.dev to actually call this in a loop) it grows
+// without bound. Acceptable for this task's own local/test verification
+// (single-digit jobs per test run); must be addressed (TTL sweep or LRU
+// cap) before Task 9 exposes this to anything resembling real volume.
 const jobs = new Map();
 
 function isAuthorized(req) {
@@ -72,6 +115,70 @@ function sendJson(res, status, body) {
   res.end(payload);
 }
 
+/**
+ * Task 7: fetch + extract + content-isolation scan for one job, mutating it
+ * in place so GET /status/:id reflects the outcome. Never stores `raw` bytes
+ * on the job object -- that would either bloat /status's JSON response with
+ * a full page body (Buffer.toJSON serializes as a {type,data} int array) or,
+ * for a flagged/failed job, leak attacker-controlled bytes into every future
+ * status poll. Object-storage upload of `raw` is Task 8's job (it also owns
+ * the DB write, and needs the bytes and the DB row in the same place).
+ *
+ * `deps` is a test seam (same pattern as pinned-http-client.mjs's `transport`
+ * and http-html-fetch.mjs's `safeFetch`): production code never passes it,
+ * tests inject `fetchAndExtractImpl`/`scanImpl`/`waitForReadyImpl` to drive
+ * this state machine without a real network fetch or a real network-guard
+ * sidecar.
+ */
+export async function processJob(job, deps = {}) {
+  const fetchAndExtractImpl = deps.fetchAndExtractImpl ?? fetchAndExtract;
+  const scanImpl = deps.scanImpl ?? scanForInstructionLikeContent;
+  const waitForReadyImpl = deps.waitForReadyImpl ?? waitForNetworkGuardReady;
+
+  job.status = 'fetching';
+  try {
+    await waitForReadyImpl();
+    const extracted = await fetchAndExtractImpl(job.targetUrl);
+    // Scans `scanSurface` (title + text + HTML comments/attribute values),
+    // not just `extracted.text` -- critic review 2026-09-17 found `title`
+    // reached status='completed' completely unscanned, and comment/
+    // attribute text (invisible to `text`'s extraction but still present in
+    // `raw`, which Task 5/8 durably persist) was equally invisible to the
+    // gate. See retrieval/http-html-fetch.mjs's `scanSurface` construction.
+    const scanResult = scanImpl(extracted.scanSurface);
+
+    if (scanResult.flagged) {
+      // ADR-011 SS決策15b: a hit routes to human review, never straight into
+      // the DISCOVERED write path (Task 8 must treat this status as terminal
+      // -- not something to retry-until-clean, since the content itself is
+      // what tripped the gate, not a transient fetch error).
+      job.status = 'flagged_for_review';
+      job.scanReasons = scanResult.reasons;
+      return;
+    }
+
+    job.status = 'completed';
+    job.contentHash = extracted.contentHash;
+    job.title = extracted.title;
+    job.textLength = extracted.text.length;
+    job.finalUrl = extracted.finalUrl;
+    job.fetchedAt = extracted.fetchedAt;
+    job.truncated = extracted.truncated;
+    job.contentProvenance = extracted.content_provenance;
+  } catch (err) {
+    job.status = 'failed';
+    // SsrfBlockedError's own .message is already the safe, non-sensitive,
+    // `ssrf_blocked_<reason>`-prefixed label (ssrf-guard.mjs's constructor
+    // does that prefixing itself) -- a future consumer can match on that
+    // prefix to distinguish "policy rejection, retrying changes nothing"
+    // from "transient fetch error, retry-worthy" without this function
+    // needing to know about SsrfBlockedError specifically. An earlier
+    // version re-wrapped it with a second `ssrf_blocked_` prefix, caught by
+    // this file's own unit test (tests/unit/fetch-runner/server.test.mjs).
+    job.error = (err && err.message) || 'unknown_error';
+  }
+}
+
 // Defense in depth (critic review 2026-09-17): `http.createServer` never
 // awaits this callback, so ANY future unguarded dereference inside it -- not
 // just the null-body case already fixed below -- would throw a synchronous
@@ -81,7 +188,13 @@ function sendJson(res, status, body) {
 // wipe network-guard's iptables rules), so any such crash is a full outage
 // until a human intervenes. One catch-all here turns "unknown future bug" +
 // "no auto-recovery" into a 500 response instead of a dead process.
-const server = http.createServer(async (req, res) => {
+// Exported so tests/unit/fetch-runner/server.test.mjs can close it in an
+// `after()` hook -- without an explicit close, `node --test` never observes
+// this process exit naturally (an open TCP listener keeps the event loop
+// alive indefinitely), which is not a concern for the real container
+// (it is SUPPOSED to keep running) but hangs any test file that imports
+// this module for its exported `processJob`.
+export const server = http.createServer(async (req, res) => {
   try {
     await handleRequest(req, res);
   } catch (err) {
@@ -151,6 +264,33 @@ async function handleRequest(req, res) {
       createdAt: new Date().toISOString(),
     };
     jobs.set(id, job);
+    // Fire-and-forget, deferred via setImmediate -- NOT called directly here.
+    // An async function's body runs SYNCHRONOUSLY up to its first `await`,
+    // so calling processJob(job) inline would already have mutated
+    // job.status to 'fetching' (processJob's first line) by the time
+    // sendJson below serializes `job` -- a real race found by this file's
+    // own architecture test (tests/architecture/fetch-runner-content-isolation.test.ps1),
+    // where a fast-completing fetch made /enqueue's response body show
+    // status='fetching' instead of the documented 'queued'. setImmediate
+    // pushes the entire call (including that synchronous prefix) to the
+    // next event-loop tick, guaranteeing this response always reflects the
+    // job's state at enqueue time. (Task 9's Trigger.dev orchestrator polls
+    // GET /status/:id for the eventual outcome -- ADR-0029 gate 6 requires
+    // Trigger.dev to never fetch itself, which is why this runs here at all
+    // rather than inside the request that enqueued it.)
+    setImmediate(() => {
+      processJob(job).catch((err) => {
+        // processJob itself catches everything into job.status='failed' --
+        // reaching here means a bug in processJob's OWN error handling, not
+        // a fetch failure. Logged, not rethrown: this runs detached from any
+        // request, so an uncaught rejection here would be a second
+        // unhandled-rejection crash vector on top of the one Task 6 already
+        // closed for the request-handling path.
+        console.error(`processJob threw outside its own try/catch for job ${job.id}:`, err);
+        job.status = 'failed';
+        job.error = 'internal_processing_error';
+      });
+    });
     return sendJson(res, 202, job);
   }
 

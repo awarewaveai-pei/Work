@@ -42,6 +42,19 @@ services:
       HCI_FETCH_RUNNER_MINIO_BUCKET: hci-fetch-runner-raw
       HCI_FETCH_RUNNER_MINIO_ACCESS_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_USER:?fetch runner requires the object-storage root user}
       HCI_FETCH_RUNNER_MINIO_SECRET_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD:?fetch runner requires the object-storage root password}
+      # Optional test-only tuning (server.mjs defaults to 30000ms when unset)
+      # -- lets fetch-runner-content-isolation.test.ps1's stale-ready-file
+      # regression check fail closed in single-digit seconds instead of
+      # waiting out the real production timeout.
+      HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS: ${HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS:-30000}
+    volumes:
+      # Task 7: shared with network-guard below. server.mjs's
+      # waitForNetworkGuardReady() polls for the ready-file network-guard
+      # writes here as the LAST step of entrypoint.sh, only after its
+      # iptables policy has fully applied -- closing the startup race this
+      # file used to only document as harmless (true only while `runner`
+      # made zero outbound calls of its own; Task 7 ends that).
+      - hci-fetch-runner-ready:/var/run/network-guard
     # DNS: the image's own CMD (fetch-runner/Dockerfile) overwrites
     # /etc/resolv.conf to query 1.1.1.1/8.8.8.8 directly, bypassing Docker's
     # embedded 127.0.0.11 proxy -- real testing on this machine found that
@@ -80,6 +93,8 @@ services:
     environment:
       HCI_FETCH_RUNNER_MINIO_IP: ${HCI_FETCH_RUNNER_MINIO_IP:?network-guard requires the object-storage container's static IP to allowlist}
       HCI_FETCH_RUNNER_PORT: "8090"
+    volumes:
+      - hci-fetch-runner-ready:/var/run/network-guard
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -138,3 +153,4 @@ networks:
 
 volumes:
   hci-fetch-runner-objectstore:
+  hci-fetch-runner-ready:

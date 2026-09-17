@@ -1,4 +1,66 @@
 # Worklog
+## 2026-09-17（續13）HCI-30 蒐集器 Task 7：runner 端 fetch+extract+不可信內容隔離，自抓 2 個真實 bug + critic 覆審 3 Major 全修
+
+[任務] 承接續11（Task 6），照 `HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` Execution Order 做 Task 7：在隔離 runner 內做最小可用抓取＋抽取，並把抓到的每一段文字標記為不可信、掃描指令樣態（ADR-011 §決策15b）。這是本輪第一個「從零全新」的任務——Task 4/5/6 都是救回/擴充前一個壞掉 session 的產物，Task 7 全部程式碼與測試都是本 session 現寫現跑。
+
+[已修改]
+- 新增 `infra/local/fetch-runner/content-isolation/scan.mjs`：`scanForInstructionLikeContent(text)`，機械偵測 ADR-011 §決策15b 點名的樣態（`ignore previous instructions`、`disregard prior`（原文 worked example）、`system:` 行首角色前綴、`<|im_start|>` chat template token、零寬字元隱藏文字、異常長 base64）。零寬字元先剝離再比對，防止插入零寬字元中斷關鍵字比對的規避手法。
+- 新增 `infra/local/fetch-runner/retrieval/http-html-fetch.mjs`：`fetchAndExtract(url, {safeFetch})`，走 Task 4 的 `createSafeFetch`（DNS 釘選＋SSRF 閘），重新實作極簡 HTML 文字/標題抽取（線性掃描去標籤，非回溯正則，避免同類演算法在未閉合標籤上二次方爆炸），算 sha256 `contentHash`，回傳 `{text, raw, contentHash, title, scanSurface, content_provenance, ...}`。`content_provenance.authorship_state` 明確標記為僅存在於記憶體/人工審核用途，絕不可寫進任何 `hci.*` 資料表欄位（migration 0010/0020 都已明文保留該欄位名、無 ADR 授權建欄）。
+- 修改 `infra/local/fetch-runner/server.mjs`：新增 `waitForNetworkGuardReady()`（輪詢 network-guard 寫的 ready-file，關掉 Task 3 遺留至今的「runner 可能在 network-guard 套完 iptables 前就先發真實 fetch」競態）；新增 `processJob(job, deps)` 狀態機（fetching→completed/flagged_for_review/failed），`deps` 注入比照既有 `transport`/`safeFetch` 慣例供測試使用；`/enqueue` 收到請求後用 `setImmediate` 延後呼叫 `processJob`（原因見下）。
+- 修改 `infra/local/network-guard/entrypoint.sh`：套完 iptables 政策後寫入 ready-file（放共用 volume）。
+- 修改 `infra/local/fetch-runner/Dockerfile`：`COPY net/ retrieval/ content-isolation/` 進 image；CMD 在 node 啟動前先 `rm -f` ready-file（原因見下）。
+- 修改 `infra/local/compose.fetch-runner.yml`：新增 `hci-fetch-runner-ready` 共用 volume（runner + network-guard）；新增可選 `HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS` 環境變數（供測試把 30s 生產預設值調短)。
+- 新增測試：`tests/unit/fetch-runner/content-isolation/scan.test.mjs`（13 個）、`tests/unit/fetch-runner/retrieval/http-html-fetch.test.mjs`（30 個）、`tests/unit/fetch-runner/server.test.mjs`（7 個，含 Task 7 驗收標準逐字重現：含 `ignore previous instructions`+零寬字元的 HTML 必須進 `flagged_for_review`、不得進 `completed`）、`tests/architecture/fetch-runner-content-isolation.test.ps1`（real-Docker：真實對 `https://example.com/` 跑完整鏈路到 `completed`、雲端 metadata 目標 fail-closed 到 `failed`、runner 重啟後 ready-file 過期驗證見下）。
+
+[真跑過程中自己抓到並修正的 2 個真實 bug（非 critic，是先跑測試時發現的）]
+1. `processJob(job).catch(...)` 原本直接內嵌呼叫——async function 的函式主體會同步執行到第一個 `await` 為止，所以呼叫當下 `job.status = 'fetching'`（`processJob` 第一行）就已經同步執行完畢，等 `/enqueue` 的 `sendJson(res, 202, job)` 序列化 `job` 時看到的已經是 `'fetching'` 而非文件宣稱的 `'queued'`。真實跑 real-Docker 測試對 `https://example.com/` 這種秒回的目標時直接現形（`/enqueue` 回應 body 裡 `status` 變成 `fetching`）。修法：改用 `setImmediate(() => { processJob(job)... })` 把整個呼叫（含同步前綴）延後到下一個 event loop tick，確保這次請求的回應永遠反映排入當下的狀態。
+2. `SsrfBlockedError` 的建構子（`ssrf-guard.mjs`）自己就已經把 reason 包成 `ssrf_blocked_<reason>` 格式的 `.message`——`processJob` 的 catch 分支誤以為 `.message`是裸 reason，又包了一次 `ssrf_blocked_${err.message}`，變成 `ssrf_blocked_ssrf_blocked_private_host_literal` 雙重前綴。被自己寫的單元測試抓到（斷言預期值跟實際值不符），修法：既然 class 自己已經做完標籤，直接用 `err.message`，不再二次包裝。
+
+[critic 覆審，3 個 Major 全修]
+1. **Major**——`processJob` 只掃 `extracted.text`，從未掃 `extracted.title`。`extractTitle()` 直接從 `<title>`/`<h1>` 取值無長度上限，一個 `<title>ignore previous instructions...</title>` 的頁面會頂著注入內容進 `status='completed'`，而 title 明明是 Task 7 文件宣告的輸出欄位之一。已修：`http-html-fetch.mjs` 新增 `extractScanSurface(html)`（另外抽出 HTML 註解＋常見可讀屬性值如 `alt`/`content`/`aria-label`）並組成 `scanSurface = title + text + scanSurface`；`processJob` 改成掃 `scanSurface` 而非單獨 `text`。連帶關掉第二個相關缺口：`extractText` 的通用 `<[^>]+>` 一次性去標籤會把 HTML 註解和屬性值整個吃掉（`<!--ignore previous instructions-->`、`<meta content="...">`），這些內容仍然完整存在 `raw`（將被 Task 5/8 持久化＋內容雜湊），卻對掃描完全隱形——同一個 `extractScanSurface` 修法一併解決。
+2. **Major**——network-guard 的 ready-file 放在**具名、持久化**的 Docker volume，只用空 `touch` 寫入且從不清除。若在不做 `--volumes` 完整拆除的情況下重啟 `runner`（例如崩潰重啟），舊 incarnation 遺留的 ready-file會被誤判為當下有效，即使 network-guard（one-shot，`restart: "no"`）根本不會重跑、舊 netns 的 iptables 規則早已消失——等於「全開放 egress + 假的 ready 訊號」，剛好是這個機制存在的目的要防的事。已修雙重防線：(a) network-guard 改寫入 `/proc/sys/kernel/random/uuid`（每次跑都是新值，不再是空 touch）；(b) `runner` 的 Dockerfile CMD 在 node 啟動前先 `rm -f` ready-file，確保無論如何舊檔案不可能被讀到。新增 real-Docker 回歸測試直接複現這個情境：`docker compose restart runner`（network-guard 不重跑）後確認 ready-file 已被刪除、且新 enqueue 的 job 正確地 fail-closed 到 `status=failed, error=network_guard_not_ready_after_*ms`，而非誤判為 ready。
+3. **Major**——`LONG_BASE64_RUN` 直接比對原始 `text`，一般 HTML 排版常見的換行/空白（例如 `<pre>` 區塊）插在長 base64 字串裡就能免費繞過整個「異常長 base64」訊號，不需要任何零寬字元規避手法。已修：比對前先去除所有空白字元。
+- 2 個 Minor 一併修：`HTML_CONTENT_TYPE` 從無錨點子字串比對改成錨定實際 media-type token；`raw.toString('utf8')` 一律假設 UTF-8 改成讀 `Content-Type` 的 `charset` 參數（未知/缺省退回 utf-8，不拋錯）。
+- `authorship_state` 絕不寫入 Postgres 這條不變量：critic 覆審全文 grep 確認本次 diff 沒有任何 DB client、該欄位只流進記憶體 `jobs` Map，成立；該不變量目前唯一的強制方式是註解＋人工紀律，真正的機械測試要等 Task 8（第一個會碰 Postgres 的模組）自己補負向測試。
+- 1 個 Minor 未修，記錄為已知限制：`jobs` Map 無 TTL/淘汰，Task 7 讓每個 job 攜帶的資料量比之前的空殼大很多，Task 9 真實流量接上前必須處理。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test`（`content-isolation/scan.test.mjs` + `retrieval/http-html-fetch.test.mjs` + `server.test.mjs`，共 50 個新測試）| exit=0 | 全綠，含驗收標準逐字重現測試與 3 個 critic finding 各自的回歸測試
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-content-isolation.test.ps1`（real-Docker：真實 fetch `https://example.com/`→抽取→完成；雲端 metadata 目標 fail-closed；runner 重啟＋ready-file 過期 fail-closed）| exit=0 | 全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-{network-isolation,object-storage-write-path}.test.ps1`（Task 3/5 既有測試，確認 compose/Dockerfile 改動無回歸）| exit=0 | 兩個都全綠（27 + 4 個 assertion）
+- REVIEW_DONE: critic=Standard | verdict=pass（3 Major 全修）| findings=0 Critical / 3 Major / 3 Minor / 3 Suggestion（Suggestion 未修，屬既有抽取簡化設計的既有取捨，非本次引入）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,lobster-factory | grep=`fetchAndExtract\|scanForInstructionLikeContent\|processJob\|waitForNetworkGuardReady\|extractScanSurface\|scanSurface\|decodeBody` | hits=僅本次新增/修改檔案本身，無孤兒引用
+
+[剩餘風險]
+1. `jobs` Map 無 TTL——已記錄為已知限制，Task 9 真實流量接上前必須處理（見上）。
+2. `extractScanSurface` 抽出的屬性值/註解清單是固定白名單（`alt`/`title`/`content`/`aria-label`/`placeholder`），非窮舉所有可能藏文字的屬性——足以涵蓋 ADR-011 點名的威脅形狀，但不是形式化證明的完備集合。
+3. Suggestion 未修：`stripElements` 巢狀同名 drop 標籤（如 `<nav><nav>x</nav>y</nav>`）非深度感知，`y` 會滲漏進正文——非安全繞過（掃描仍會跑在滲漏後的文字上），純抽取精確度瑕疵，且與參照實作（`http-html.ts`）同款設計取捨，非本次引入的新問題。
+4. Task 7 尚未真正接上 Task 5 的物件儲存上傳（`raw` bytes 目前只留在記憶體，未寫進 MinIO）——這是 Task 8 的範圍（Task 8 Input 明訂「Task 5 的物件儲存回傳值」與「Task 7 的抓取輸出」是分開的兩個輸入）。
+
+[rollback] 全新檔案（scan.mjs／http-html-fetch.mjs／4 個測試檔）+ 對既有 `server.mjs`/`Dockerfile`/`compose.fetch-runner.yml`/`entrypoint.sh` 純增量修改（新增函式/COPY/volume/env var，未刪改既有行為），`git revert` 該 commit 即可完全復原，未部署到任何共用/正式環境。
+
+## 2026-09-17（續12）Cognitive OS prod redeploy #4（續8+續9 內容上線並真實驗證）+ 發現 literature_search 與 `/ops/collect` 重複實作，待操作者裁決修法時機
+
+[任務] 操作者「繼續完成」，把續8（proposal CAS／AI 每日額度／Crossref＋citation_verification／fault_tree O(V+E)）與續9（Project+Source Import API）部署上線並真實驗證。
+
+[部署] `cd /opt/cognitive-os && git reset --hard cc066bf76 && deploy.sh`（typecheck→pytest test gate→build→up→healthcheck→local/public smoke）。`cc066bf76` 是併行 HCI-30 session 的 Task 6 commit，其祖先已含本次 cognitive-os 這批（`82556b4c0`），無衝突。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo git reset --hard cc066bf76 && bash deploy/deploy.sh` on ks-aw-01 | exit=0 | ms=~50000 | result=healthy after 6s；local smoke PASS；public smoke PASS
+- REALTEST_EVIDENCE: tool=Bash(SSH) | cmd=`bootstrap_phase1_tenant` 建立拋棄式驗證 tenant（`verify-cos-20260917@aware-wave.com`）| exit=0 | result=tenant/workspace/identity 三個真實 UUID
+- REALTEST_EVIDENCE: tool=Bash(python, 帶瀏覽器 UA 繞過 Cloudflare) | cmd=對 `https://cognitive.aware-wave.com` 依序 `POST /auth/login`→`GET /ai/status`→`POST /projects`→`GET /projects`→`POST /projects/{id}/sources`→`GET .../content`→`GET .../history`→`POST /methods/research.citation_verification/invoke`→`POST /auth/logout` | exit=0 | result=全部 200；`ai/status` 回 `configured=true model=claude-sonnet-5 budget.daily_limit=200000`；project/source 建立成功、content 讀回逐位元組相同、history 1 筆事件；citation_verification 兩個 gate（`provenance_required`／`citation_verification_integrity`）皆 PASS
+- REVIEW_WAIVED: NA -- 純部署執行動作，程式碼本身已於續8/續9完成 critic 覆審（0c/2m/3n 與 0c/3m/2n，皆已修）
+- BUGHUNT_WAIVED: NA -- 本條目未改程式碼，僅執行部署與驗證
+
+[發現，非本條目要處理的 bug，是架構重複] 操作者事後查看今日變更，發現續8新增的 `literature_search`（OpenAlex/Crossref，`ai_lego/modules/research/literature_providers.py`）跟 `lobster-factory` 既有的 `lib/collect/collectors/academic.ts` 是同一件事的兩份實作——同三個來源（OpenAlex/arXiv/Crossref）、同一批已解過的坑（inverted-index 摘要解碼、JATS 標籤剝除、DOI 正規化、無摘要記錄過濾）。操作者原則：資料蒐集一律走 `/ops/collect`（`https://app.aware-wave.com/ops/collect`），不重寫重複的東西。
+- 根因：續8的探索只在 `ai_lego` 自己的樹裡查「有沒有現成的」，沒跨查 `lobster-factory`。
+- 現況：`cognitive-os-api` 與 `lobster-next-admin` 兩個 container 已同在 `lobster-net` docker network（`docker-compose.yml:36-38` vs `lobster-factory/.../docker-compose.yml:452`）；但 `/ops/collect` 目前只有來源設定 CRUD、排程 CRUD、cron 觸發三支 API（`app/api/ops/clients/[slug]/collection-{sources,schedule}/route.ts`、`app/api/internal/collect/run-due-schedules/route.ts`），`runCollection()`（`lib/collect/run.ts:67`）合約是寫進某租戶知識庫，沒有「查詢後傳回結構化結果、不寫庫」的模式——今天還不能直接把 Cognitive OS 的呼叫換過去。
+- 治本修法（未執行，待操作者選時機）：`/ops/collect` 加一支 query-only 內部 API（重用既有 `academicCollector.run()`，走 `lobster-net` 內部呼叫、不經公開網路）；Cognitive OS 的 `literature_search_adapter` 改打這支；刪掉 `ai_lego` 自己的 OpenAlex/Crossref parsing。
+- 已存記憶 `feedback_route_data_fetch_through_ops_collect`：以後任何新的「要抓外部資料」需求，先查 `lib/collect/collectors/` 全庫範圍，不侷限在動手的那個 product 樹裡。
+- TASKS.md 已開放項【2026-09-17 開出｜架構決策】追蹤，未標記完成。
+
+[剩餘風險] 續8的 `literature_search` 現況仍在 prod 運作（真的打 OpenAlex/Crossref，非 fixture）——在治本修法完成前，這是已知重複但功能本身沒有錯誤或安全問題，未下架（下架會讓 EdD 線上文獻搜尋這個已交付功能退化，且未經操作者確認要現在做）。
+
+[rollback] 部署面：`docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d`。重複實作面：尚未動任何程式碼，無需 rollback。
+
 ## 2026-09-17（續11）HCI-30 蒐集器 Task 6：Seed 治理組織實體白名單守門，critic 覆審 1 Major（既存 null-body 崩潰）全修
 
 [任務] 操作者要求接續 Task 3/4/5，照 `HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` Execution Order 一路做 Task 6→7→8→9→10→12→13。Task 6（阻塞於 Task 0，已於決策記錄 `agency-os/reports/decisions/2026-09-17-hci30-c6-and-collector-task1-decisions.md` 裁決3 簽核解除）：機械化強制只有標記組織實體的 seed 能被 runner 接受，不做自然人推論分類。

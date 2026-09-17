@@ -104,3 +104,27 @@ iptables -A OUTPUT -j ACCEPT
 
 echo "network-guard: OUTPUT egress policy applied"
 iptables -L OUTPUT -n -v
+
+# HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 7: `runner` now issues real
+# outbound fetches, closing the race this file's own header comment (and
+# server.mjs's former "KNOWN GAP" comment) flagged as harmless only because
+# no such fetch existed yet. `/var/run/network-guard` is a volume shared with
+# `runner` (compose.fetch-runner.yml) -- this ready-file is the signal
+# server.mjs's waitForNetworkGuardReady() polls for before it will execute
+# ANY outbound fetch. Written last, only after every rule above has applied
+# successfully (`set -eu` means this line is never reached if any prior
+# command failed).
+#
+# Content is a fresh value every run (kernel-provided, no extra package
+# needed), not an empty touch -- critic review 2026-09-17: this volume is a
+# NAMED, PERSISTENT Docker volume, so a stale ready-file from a PREVIOUS
+# `runner` incarnation could otherwise survive a `docker compose restart
+# runner` / crash-and-restart-without-`--volumes`-teardown and be misread as
+# current, even though network-guard (one-shot, restart:"no") never re-runs
+# and the OUTPUT policy it applied is gone with the old netns. Making the
+# content itself provably fresh is only half the fix -- the Dockerfile's CMD
+# deletes any pre-existing ready-file at `runner` container startup, BEFORE
+# server.mjs ever runs, so a stale file can never be read as current even if
+# something raced this check.
+cat /proc/sys/kernel/random/uuid > /var/run/network-guard/ready
+echo "network-guard: ready file written -- runner may now perform outbound fetches"
