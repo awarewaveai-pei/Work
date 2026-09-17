@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-09-17（續3）續2 commit 掉檔事故 + HEAD typecheck 真的抓到一個 working-tree 沒抓到的錯誤
+
+[事故] `bbb4d7a76`(續2 的第一個 commit)本來要含 9 個檔案，`git add` 確認全部進 staged(`git status` 逐檔核對過)，但 `git commit` 完只進了 5 個新檔，8 個既有檔的修改(`db.ts`/`rag.ts`/`index.ts`/`route.ts`/`route.test.ts`/`kb-schema-contract.test.ts`/`ClientHubTabs.tsx`/`WORKLOG.md`/`KNOWLEDGE_BASE_PLAN.md`)沒進去——導致 `main` 有一段時間是壞的(新 modal 引用的函式在該 commit 看不到)。根因未深究(共用 worktree，疑似跟 TASKS.md 已追蹤的 `git-align-main-aoresume-feature-*` 同一類 stash 干擾，本次沒有時間逐一排查是哪個機制)，但確認**內容沒有遺失**——工作目錄上的檔案原封不動還在，`git diff --cached --stat` 核對過再補一個 commit(`a83659d2f`)補齊。
+
+[VBC 沒偷懶的地方]：沒有只信「commit 完成」就結案，而是照這個 session 稍早學到的教訓(見 `/verify-recent` skill 對 `scripts/verify-head-typecheck.ps1` 的說明：working tree 綠不代表 HEAD 綠)主動跑了一次 HEAD-only typecheck(全新 worktree，無 incremental cache)——**真的抓到一個 working tree 沒抓到的錯誤**：`route.test.ts` 的 `sb.from` mock 沒標參數型別，`vi.fn(() => {...})` 被推斷成零參數，導致 `mock.calls` 型別是 `[][]`，兩個新的稽核測試 `c[0]` 存取失敗編譯(`TS2493`)。本機多次 `npx tsc --noEmit` 都沒抓到(疑似 incremental cache 差異)，全新 worktree 才現形。修法：mock 參數明確標型別，補一個 commit(`0817142d9`)。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/verify-head-typecheck.ps1`(修復前後各跑一次)| 結果=修復前 `tsc FAILED on HEAD` 兩處 `TS2493`；修復後 `HEAD_TYPECHECK_OK sha=0817142d9`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/ops/clients lib/kb "app/(shell)/ops/clients"` | exit=0 | 127/127
+
+[剩餘風險] 掉檔根因未查——如果是 `git-align-main-aoresume-feature-*` 同一機制，那條治本項本來就已經在 TASKS.md 開著，本次算是再一次真實案例佐證，優先度可以往上調，但本輪不重複開新項。
+
+[rollback] 三個 commit(`bbb4d7a76`/`a83659d2f`/`0817142d9`)皆為疊加式補救，`git revert` 需按順序倒著revert。
+
 ## 2026-09-17（續2）K2g 落地：知識庫內容檢視畫面（migration 0084 + 詳情 API + modal UI），critic 兩輪覆審
 
 [任務] 承接續1。實作 T1(後端:原文存取)+T2(前端:內容檢視畫面)，解決操作者回報的②③兩點(點了沒反應/看不到內容)。
