@@ -1,4 +1,13 @@
 # Worklog
+## 2026-09-17｜Cognitive OS prod redeploy #2: gap closure live
+
+- 部署 commits 007d2aa15 + 5bc8f6fff（deploy.sh：129 tests passed→build→healthy 6s→local/public smoke PASS）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh` on ks-aw-01 | exit=0 | ms=~300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad prod verify`（login→GET /methods→POST /methods/art_therapy.life_wheel/invoke→POST /recipes/art-therapy-unstick-v1/run→POST /recipes/edd-literature-search-online-v1/run→logout）| exit=0 | result=methods 279, recipes 17, invoke 200 LWHEEL-…, unstick PASS 4 steps, edd online PASS mode ONLINE_PROVIDER 10 items（容器 egress 白名單生效）
+- REVIEW_WAIVED: DOC_ONLY -- 本條目僅部署紀錄
+- BUGHUNT_WAIVED: DOC_ONLY
+- rollback：ks-aw-01 `docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d`（:rollback = 今日上午 Recipe engine 版）。
+
 ## 2026-09-17｜Cognitive OS Gap A+C: 29 藝術治療清單方法 + Master Plan §43 商業全鏈
 
 - 缺口：54 項清單中 29 項無方法（清單原寫 31，實為 29＋2 個 SWOT 重複變體）；商業管線止於 NPV，Finance pack 空（ADR-008 延後）。
