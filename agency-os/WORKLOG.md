@@ -1122,7 +1122,7 @@ REALTEST_EVIDENCE: tool=Bash | cmd=突變測試：把 orchestrator 的 `if (resu
 REVIEW_DONE: critic=自審(未開 subagent——單一新能力、機制清楚、有真實 DB 測試佐證，跟前一批 SSRF 修法同等級複雜度) | verdict=pass | findings=0c/0m/0n
 BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=collection_url_state,UrlStateStore,notModified | hits=符合預期(僅本次新增檔案+一致的匯出點命中，無孤兒引用)
 
-**過程插曲**：`url-state.ts` 寫入時模板字串裡的空白字元意外變成 NUL byte(` `)，被既有的 `collect-block-hygiene.test.ts`「不准有雜散控制字元」測試抓到——機械閘做了它該做的事，直接用 Node 腳本置換修正，未影響邏輯。
+**過程插曲**：`url-state.ts` 寫入時模板字串裡的空白字元意外變成 NUL byte(`\x00`)，被既有的 `collect-block-hygiene.test.ts`「不准有雜散控制字元」測試抓到——機械閘做了它該做的事，直接用 Node 腳本置換修正，未影響邏輯。
 
 `agency-os/TASKS.md` 該項標記已修復。
 
