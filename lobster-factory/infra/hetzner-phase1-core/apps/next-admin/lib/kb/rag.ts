@@ -290,6 +290,12 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     sourceVersion: version,
     contentHash: hash,
     body: input.body,
+    // K2h (critic finding 2026-09-17): there is no ingest-time field for folder assignment — it is
+    // set afterwards via a separate ops-console action (PATCH .../cs-knowledge move_folder) — so a
+    // re-ingest must inherit it from the version being superseded, or every edit to a filed
+    // document would silently un-file it. A brand new document family has no `live`, so it starts
+    // unfiled exactly as it does today.
+    folderId: live?.folderId ?? null,
     canonicalUrl: input.canonicalUrl ?? null,
     spaceId,
     validFrom: input.validFrom ?? null,

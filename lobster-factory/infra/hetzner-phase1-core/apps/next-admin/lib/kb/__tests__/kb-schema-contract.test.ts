@@ -23,6 +23,8 @@ const MIGRATIONS = [
   "migrations/0072_kb_versioning_and_retrieval_predicates.sql",
   "migrations/0075_kb_provenance_and_citation.sql",
   "migrations/0084_kb_source_body.sql",
+  "migrations/0085_kb_folders.sql",
+  "migrations/0086_kb_keyword_mode.sql",
 ];
 const migrations = MIGRATIONS.map((f) => readFileSync(path.join(DB_PACKAGE, f), "utf8")).join("\n");
 // The RPC signatures live in whichever migration created them last.
@@ -122,5 +124,10 @@ describe("lib/kb/db.ts writes only columns that exist", () => {
       if (col === "id") continue;
       expect([col, all.has(col)]).toEqual([col, true]);
     }
+  });
+
+  it("KB_UNFILED_FOLDER_ID stays 'unfiled' — ClientHubTabs.tsx duplicates this literal locally (a client component can't import lib/kb, which pulls in the service-role Supabase client), so a rename here would silently desync the folder filter unless this fails first", async () => {
+    const { KB_UNFILED_FOLDER_ID } = await import("@/lib/kb/db");
+    expect(KB_UNFILED_FOLDER_ID).toBe("unfiled");
   });
 });

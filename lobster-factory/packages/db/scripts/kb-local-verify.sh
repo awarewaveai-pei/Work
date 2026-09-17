@@ -39,11 +39,17 @@ echo "▶ bootstrapping the dependencies 0051 assumes"
 psql_run <<'SQL' >/dev/null
 CREATE EXTENSION IF NOT EXISTS vector;
 -- Minimal stand-in for 0001_core.sql's organizations: 0051 only needs the primary key to reference,
--- and service_role only has to exist for the RLS policies to be creatable.
+-- and service_role only has to exist for the RLS policies to be creatable. `metadata` was added for
+-- 0086 (cs_match_chunks_keyword reads organizations.metadata.client_config.kbKeywordModeDefault) --
+-- real production 0001_core.sql already has it (`metadata jsonb not null default '{}'::jsonb`); a
+-- run against this stub without it errors with "column o.metadata does not exist" (caught live,
+-- 2026-09-17, running this harness for the first time after adding 0086 -- the migration itself was
+-- correct against the real schema; only this minimal stub was missing the column).
 CREATE TABLE IF NOT EXISTS public.organizations (
-  id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug text UNIQUE NOT NULL,
-  name text NOT NULL
+  id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug     text UNIQUE NOT NULL,
+  name     text NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role; END IF;
@@ -71,6 +77,15 @@ psql_file "$DB_DIR/migrations/0076_kb_ranked_keyword_retrieval.sql" >/dev/null
 echo "▶ applying 0083 (is_sensitive gets a real audience gate)"
 psql_file "$DB_DIR/migrations/0083_kb_sensitive_audience_gate.sql" >/dev/null
 
+echo "▶ applying 0084 (source body text, for the content-viewer)"
+psql_file "$DB_DIR/migrations/0084_kb_source_body.sql" >/dev/null
+
+echo "▶ applying 0085 (nested KB folders)"
+psql_file "$DB_DIR/migrations/0085_kb_folders.sql" >/dev/null
+
+echo "▶ applying 0086 (precise vs fuzzy keyword matching, per document)"
+psql_file "$DB_DIR/migrations/0086_kb_keyword_mode.sql" >/dev/null
+
 echo "▶ proving the harness can fail (a green run of a dead harness proves nothing)"
 # Captured first, then matched: under `set -o pipefail` psql's non-zero exit (which is the point of
 # this check) would make the whole pipeline non-zero even when grep found the message.
@@ -86,9 +101,15 @@ echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_OK' || { echo "$VERIFY_OUT" | tail -5; e
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_CONSTRAINTS_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ constraint assertions did not report KB_VERIFY_CONSTRAINTS_OK"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_KEYWORD_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ behavioural assertions did not reach the last marker"; exit 1; }
 echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_SENSITIVE_GATE_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ 0083 sensitive-audience-gate assertions did not report OK"; exit 1; }
-echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK + KB_VERIFY_KEYWORD_OK + KB_VERIFY_SENSITIVE_GATE_OK"
+echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_FOLDERS_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ 0085 folder assertions did not report OK"; exit 1; }
+echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_FOLDER_MOVE_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ 0085 cs_folder_move assertions did not report OK"; exit 1; }
+echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_KEYWORD_MODE_OK' || { echo "$VERIFY_OUT" | tail -5; echo "✗ 0086 keyword-mode assertions did not report OK"; exit 1; }
+echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK + KB_VERIFY_KEYWORD_OK + KB_VERIFY_SENSITIVE_GATE_OK + KB_VERIFY_FOLDERS_OK + KB_VERIFY_FOLDER_MOVE_OK + KB_VERIFY_KEYWORD_MODE_OK"
 
-echo "▶ applying the down migrations (newest first — 0083 must go before 0076/0075, it replaced their function signatures)"
+echo "▶ applying the down migrations (newest first — each replaced the previous one's function signature)"
+psql_file "$DB_DIR/scripts/0086_kb_keyword_mode_down.sql" >/dev/null
+psql_file "$DB_DIR/scripts/0085_kb_folders_down.sql" >/dev/null
+psql_file "$DB_DIR/scripts/0084_kb_source_body_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0083_kb_sensitive_audience_gate_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0076_kb_ranked_keyword_retrieval_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0075_kb_provenance_and_citation_down.sql" >/dev/null
@@ -98,6 +119,17 @@ DOWN_STATE="$(psql_run -tAc "
     WHEN EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name='cs_knowledge_sources' AND column_name='canonical_url')
       THEN 'down_left_columns_behind'
+    WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='cs_knowledge_sources' AND column_name IN ('body','folder_id','keyword_mode'))
+      THEN 'down_left_0084_0085_0086_columns_behind'
+    WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='cs_knowledge_folders')
+      THEN 'down_left_folders_table_behind'
+    WHEN EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                 WHERE n.nspname='public' AND p.proname='cs_folder_descendants')
+      THEN 'down_left_folder_descendants_rpc_behind'
+    WHEN EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                 WHERE n.nspname='public' AND p.proname='cs_folder_move')
+      THEN 'down_left_folder_move_rpc_behind'
     WHEN NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
                      WHERE n.nspname='public' AND p.proname='cs_match_chunks'
                        AND replace(oidvectortypes(p.proargtypes),' ','')='uuid,vector,integer')
@@ -110,13 +142,16 @@ DOWN_STATE="$(psql_run -tAc "
 [ "$DOWN_STATE" = "DOWN_OK" ] || { echo "✗ down migration did not restore the 0051 state: $DOWN_STATE"; exit 1; }
 echo "  DOWN_OK"
 
-echo "▶ re-applying 0072 + 0075 + 0076 + 0083 (a migration you cannot re-apply is not a rollback path)"
+echo "▶ re-applying 0072 + 0075 + 0076 + 0083 + 0084 + 0085 + 0086 (a migration you cannot re-apply is not a rollback path)"
 psql_file "$DB_DIR/migrations/0072_kb_versioning_and_retrieval_predicates.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0076_kb_ranked_keyword_retrieval.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0083_kb_sensitive_audience_gate.sql" >/dev/null
+psql_file "$DB_DIR/migrations/0084_kb_source_body.sql" >/dev/null
+psql_file "$DB_DIR/migrations/0085_kb_folders.sql" >/dev/null
+psql_file "$DB_DIR/migrations/0086_kb_keyword_mode.sql" >/dev/null
 REAPPLY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1 || true)"
-echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_SENSITIVE_GATE_OK' || {
+echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_KEYWORD_MODE_OK' || {
   echo "$REAPPLY_OUT" | grep -E 'ERROR' | head -3; echo "✗ assertions failed after re-apply"; exit 1;
 }
 

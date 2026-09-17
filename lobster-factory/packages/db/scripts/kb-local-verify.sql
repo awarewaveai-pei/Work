@@ -92,12 +92,16 @@ CREATE OR REPLACE FUNCTION pg_temp.vec_titles(
   JOIN public.cs_knowledge_sources s ON s.id = m.source_id
 $$;
 
+-- p_raw_query DEFAULT '' (0086): every call site before that migration's own assertion block passes
+-- only p_term, exercising documents whose keyword_mode stays at the column default ('inherit') with
+-- no tenant default set -- exact_mode evaluates to false for all of them, so the added p_raw_query
+-- gate is a no-op and every assertion above keeps testing exactly what it always has.
 CREATE OR REPLACE FUNCTION pg_temp.kw_titles(
   p_scope uuid[], p_spaces uuid[], p_viewer uuid, p_as_of timestamptz, p_model text, p_term text DEFAULT 'kbmarker',
-  p_include_sensitive boolean DEFAULT true
+  p_include_sensitive boolean DEFAULT true, p_raw_query text DEFAULT ''
 ) RETURNS text[] LANGUAGE sql AS $$
   SELECT COALESCE(array_agg(s.title ORDER BY s.title), ARRAY[]::text[])
-  FROM public.cs_match_chunks_keyword(p_scope, p_spaces, p_viewer, p_as_of, p_model, p_term, 50, p_include_sensitive) m
+  FROM public.cs_match_chunks_keyword(p_scope, p_spaces, p_viewer, p_as_of, p_model, p_term, 50, p_include_sensitive, p_raw_query) m
   JOIN public.cs_knowledge_sources s ON s.id = m.source_id
 $$;
 
@@ -210,9 +214,11 @@ BEGIN
   --     this assertion able to fail. Signature includes 0083's trailing `boolean` -- the pre-0083
   --     7-arg signature no longer exists once 0083 is applied, and has_function_privilege() on a
   --     nonexistent signature raises an error rather than returning false.
+  --     cs_match_chunks_keyword's signature below is the POST-0086 9-arg one (trailing `,text` for
+  --     p_raw_query) -- 0086 drops the 8-arg signature this assertion used to name, same reasoning.
   ASSERT NOT has_function_privilege('anon', 'public.cs_match_chunks(uuid[],uuid[],uuid,timestamptz,text,vector,int,boolean)', 'EXECUTE'),
     'anon can execute cs_match_chunks';
-  ASSERT NOT has_function_privilege('anon', 'public.cs_match_chunks_keyword(uuid[],uuid[],uuid,timestamptz,text,text,int,boolean)', 'EXECUTE'),
+  ASSERT NOT has_function_privilege('anon', 'public.cs_match_chunks_keyword(uuid[],uuid[],uuid,timestamptz,text,text,int,boolean,text)', 'EXECUTE'),
     'anon can execute cs_match_chunks_keyword';
   ASSERT NOT has_function_privilege('authenticated', 'public.cs_match_chunks(uuid[],uuid[],uuid,timestamptz,text,vector,int,boolean)', 'EXECUTE'),
     'authenticated can execute cs_match_chunks';
@@ -409,6 +415,155 @@ BEGIN
   ASSERT topscore > 0, 'ranking used a different normalizer than matching -- a full-width-only match scored 0';
 
   RAISE NOTICE 'KB_VERIFY_KEYWORD_OK';
+END $$;
+
+-- ── 0085: nested KB folders (K2h) ───────────────────────────────────────────────
+DO $$
+DECLARE
+  a        uuid := pg_temp.uid('orgA');
+  b        uuid := pg_temp.uid('orgB');
+  root_id  uuid;
+  child_id uuid;
+  gc_id    uuid;
+  doc_id   uuid;
+  desc_ids uuid[];
+  ok       boolean;
+BEGIN
+  INSERT INTO public.cs_knowledge_folders (organization_id, name) VALUES (a, 'root') RETURNING id INTO root_id;
+  INSERT INTO public.cs_knowledge_folders (organization_id, parent_id, name) VALUES (a, root_id, 'child') RETURNING id INTO child_id;
+  INSERT INTO public.cs_knowledge_folders (organization_id, parent_id, name) VALUES (a, child_id, 'grandchild') RETURNING id INTO gc_id;
+
+  -- 28. Cross-level filtering (K2h's own DoD, "資料夾巢狀可跨階層過濾"): root's descendants include
+  --     itself and every level below it.
+  SELECT array_agg(id) INTO desc_ids FROM public.cs_folder_descendants(a, root_id);
+  ASSERT desc_ids @> ARRAY[root_id, child_id, gc_id], 'cs_folder_descendants(root) missed a level';
+
+  -- 29. child's descendants do not leak its own ancestor.
+  SELECT array_agg(id) INTO desc_ids FROM public.cs_folder_descendants(a, child_id);
+  ASSERT desc_ids @> ARRAY[child_id, gc_id] AND NOT (desc_ids @> ARRAY[root_id]),
+    'cs_folder_descendants(child) leaked an ancestor or missed a descendant';
+
+  -- 30. Cross-tenant: a different org can never walk into this org's folder tree (base case of the
+  --     recursive CTE requires organization_id to match, so it matches nothing and array_agg is NULL).
+  SELECT array_agg(id) INTO desc_ids FROM public.cs_folder_descendants(b, root_id);
+  ASSERT desc_ids IS NULL, 'a different tenant could read into this org''s folder tree';
+
+  -- 31. UNIQUE NULLS NOT DISTINCT actually rejects a duplicate sibling name, not just documented to.
+  BEGIN
+    INSERT INTO public.cs_knowledge_folders (organization_id, parent_id, name) VALUES (a, root_id, 'child');
+    ok := false;
+  EXCEPTION WHEN unique_violation THEN ok := true;
+  END;
+  ASSERT ok, 'a duplicate sibling folder name was accepted';
+
+  -- 32. A document filed into 'child' survives that folder being deleted -- unfiled (ON DELETE SET
+  --     NULL), never removed; the folder's own empty subtree DOES cascade (ON DELETE CASCADE) -- two
+  --     different ON DELETE actions on the same migration, both real, not just written down.
+  doc_id := pg_temp.add_doc(a, gen_random_uuid(), 1, 'active', 'foldered doc', 'kbmarker 資料夾測試文件');
+  UPDATE public.cs_knowledge_sources SET folder_id = child_id WHERE id = doc_id;
+  DELETE FROM public.cs_knowledge_folders WHERE id = child_id;
+  ASSERT (SELECT folder_id FROM public.cs_knowledge_sources WHERE id = doc_id) IS NULL,
+    'deleting a folder left the document inside it dangling instead of unfiling it';
+  ASSERT NOT EXISTS (SELECT 1 FROM public.cs_knowledge_folders WHERE id = gc_id),
+    'deleting a folder did not cascade-delete its own empty subfolder';
+
+  RAISE NOTICE 'KB_VERIFY_FOLDERS_OK';
+END $$;
+
+-- ── 0085: cs_folder_move — atomic check-and-write, cycle guard (K2h; critic finding 2026-09-17: a
+--    prior JS-orchestrated read-then-write had a TOCTOU window where two concurrent moves could each
+--    pass a cycle check before either write landed) ─────────────────────────────
+DO $$
+DECLARE
+  a   uuid := pg_temp.uid('orgA');
+  f1  uuid;
+  f2  uuid;
+  f3  uuid;
+  res text;
+BEGIN
+  INSERT INTO public.cs_knowledge_folders (organization_id, name) VALUES (a, 'mv-1') RETURNING id INTO f1;
+  INSERT INTO public.cs_knowledge_folders (organization_id, name) VALUES (a, 'mv-2') RETURNING id INTO f2;
+  INSERT INTO public.cs_knowledge_folders (organization_id, parent_id, name) VALUES (a, f1, 'mv-3') RETURNING id INTO f3;
+
+  -- 33. A legitimate move succeeds AND is actually persisted (not just reported ok).
+  res := public.cs_folder_move(a, f2, f1);
+  ASSERT res = 'ok', 'a legitimate move was refused: ' || res;
+  ASSERT (SELECT parent_id FROM public.cs_knowledge_folders WHERE id = f2) = f1,
+    'cs_folder_move reported ok but did not persist the new parent';
+
+  -- 34. Self-move is refused.
+  res := public.cs_folder_move(a, f1, f1);
+  ASSERT res = 'would_create_cycle', 'a self-move was not refused: ' || res;
+
+  -- 35. Moving an ancestor under its own descendant is refused (f1 is f3's parent via f1 -> f3), and
+  --     the refused call did not mutate anything.
+  res := public.cs_folder_move(a, f1, f3);
+  ASSERT res = 'would_create_cycle', 'moving a folder under its own descendant was not refused: ' || res;
+  ASSERT (SELECT parent_id FROM public.cs_knowledge_folders WHERE id = f1) IS NULL,
+    'a refused move still mutated parent_id';
+
+  -- 36. A nonexistent target parent is reported distinctly from a cycle.
+  res := public.cs_folder_move(a, f1, gen_random_uuid());
+  ASSERT res = 'parent_not_found', 'a nonexistent parent was not reported: ' || res;
+
+  -- 37. A nonexistent folder-to-move is reported distinctly too.
+  res := public.cs_folder_move(a, gen_random_uuid(), f1);
+  ASSERT res = 'not_found', 'a nonexistent folder-to-move was not reported: ' || res;
+
+  RAISE NOTICE 'KB_VERIFY_FOLDER_MOVE_OK';
+END $$;
+
+-- ── 0086: precise ("exact") vs long-tail ("fuzzy") keyword matching, per document (K2i) ──
+DO $$
+DECLARE
+  a      uuid := pg_temp.uid('orgA');
+  m      text := 'text-embedding-3-small';
+  q      text := '請問 OR 問退 OR 退貨 OR 貨運 OR 運費 OR 費要 OR 要怎 OR 怎麼 OR 麼算';
+  titles text[];
+BEGIN
+  -- 'returns' (added in the 0076 block above) contains "退貨運費" but never the full literal
+  -- question "請問退貨運費要怎麼算" -- exactly the real-world "shares a bigram, not the whole phrase"
+  -- case the operator described (2026-09-17: "有時候我要精確關鍵字").
+  UPDATE public.cs_knowledge_sources SET keyword_mode = 'exact' WHERE organization_id = a AND title = 'returns';
+
+  -- 22. Bigram overlap alone (q matches "退貨"/"貨運"/"運費" as literal substrings) is NOT enough in
+  --     exact mode when the raw question itself never appears contiguously in the content.
+  titles := pg_temp.kw_titles(ARRAY[a], NULL, a, NULL, m, q, true, '請問退貨運費要怎麼算');
+  ASSERT NOT (titles @> ARRAY['returns']), 'exact mode matched on bigram overlap alone, without the literal phrase';
+
+  -- 23. The same document DOES match once the raw query is a phrase actually present in its content.
+  titles := pg_temp.kw_titles(ARRAY[a], NULL, a, NULL, m, q, true, '退貨運費');
+  ASSERT titles @> ARRAY['returns'], 'exact mode failed to match a phrase that is literally in the content';
+
+  -- 24. Empty raw query excludes an exact-mode document rather than matching everything -- guards the
+  --     strpos(x, '') = 1 trap this migration's own header calls out explicitly.
+  titles := pg_temp.kw_titles(ARRAY[a], NULL, a, NULL, m, q, true, '');
+  ASSERT NOT (titles @> ARRAY['returns']), 'an empty raw query matched an exact-mode document';
+
+  -- 25. Tenant default: reset 'returns' to 'inherit', opt orgA into an 'exact' tenant-wide default,
+  --     and confirm the SAME exact-vs-fuzzy distinction now applies with zero change to the document.
+  UPDATE public.cs_knowledge_sources SET keyword_mode = 'inherit' WHERE organization_id = a AND title = 'returns';
+  -- jsonb_set only ever creates the LAST path element when missing -- an org whose metadata has no
+  -- 'client_config' key at all (true here: this fixture's organizations rows were inserted with no
+  -- metadata argument) makes a two-level jsonb_set({client_config,kbKeywordModeDefault}) a silent
+  -- no-op, caught live running this exact assertion before this fix. One hop instead, merging
+  -- whatever client_config already exists rather than assuming it's empty.
+  UPDATE public.organizations
+     SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{client_config}',
+                               COALESCE(metadata -> 'client_config', '{}'::jsonb) || '{"kbKeywordModeDefault": "exact"}'::jsonb)
+   WHERE id = a;
+  titles := pg_temp.kw_titles(ARRAY[a], NULL, a, NULL, m, q, true, '請問退貨運費要怎麼算');
+  ASSERT NOT (titles @> ARRAY['returns']), 'tenant-wide exact default did not apply to an inherit-mode document';
+  titles := pg_temp.kw_titles(ARRAY[a], NULL, a, NULL, m, q, true, '退貨運費');
+  ASSERT titles @> ARRAY['returns'], 'tenant-wide exact default did not match a phrase actually in the content';
+
+  -- 26. A per-document override still wins over the tenant default: 'fuzzy' on 'returns' while the
+  --     tenant default is still 'exact' from assertion 25.
+  UPDATE public.cs_knowledge_sources SET keyword_mode = 'fuzzy' WHERE organization_id = a AND title = 'returns';
+  titles := pg_temp.kw_titles(ARRAY[a], NULL, a, NULL, m, q, true, '');
+  ASSERT titles @> ARRAY['returns'], 'a per-document fuzzy override did not win over the tenant exact default';
+
+  RAISE NOTICE 'KB_VERIFY_KEYWORD_MODE_OK';
 END $$;
 
 ROLLBACK;

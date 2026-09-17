@@ -1,9 +1,13 @@
 // GET/PATCH /api/ops/clients/[slug]/cs-config
 // GET  — per-client customer-service config: intents (autonomy levels), knowledge-source count,
-//        and the per-tenant kill-switch (client_config.csEnabled, default true). Read tier:
-//        internal ops console (any resolved role).
-// PATCH — toggle the per-tenant kill-switch only. Gated by canWriteTenantConfig (owner/admin),
-//        same tier as other client_config writes; audited via ops_audit_events.
+//        the per-tenant kill-switch (client_config.csEnabled, default true), and the KB's tenant-wide
+//        keyword-matching default (client_config.kbKeywordModeDefault, "fuzzy" | "exact", default
+//        "fuzzy" — K2i). Read tier: internal ops console (any resolved role).
+// PATCH — { csEnabled? , kbKeywordModeDefault? } → each field present is written; at least one must
+//        be given. Two independent settings sharing one endpoint/one JSON blob (client_config) rather
+//        than two routes: both are single-flag, whole-tenant toggles with the exact same read/write
+//        tier, and a third one would go here too rather than spawning another almost-identical route.
+//        Gated by canWriteTenantConfig (owner/admin); audited via ops_audit_events.
 // Reads cs_* tables via the service-role client (their RLS is service-role-only, 0051).
 
 import { NextResponse } from "next/server";
@@ -48,11 +52,14 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       .eq("organization_id", org.id),
   ]);
 
-  const csEnabled = clientConfigOf(org.metadata).csEnabled !== false; // default ON
+  const config = clientConfigOf(org.metadata);
+  const csEnabled = config.csEnabled !== false; // default ON
+  const kbKeywordModeDefault = config.kbKeywordModeDefault === "exact" ? "exact" : "fuzzy"; // default fuzzy (today's only behaviour, pre-K2i)
 
   return NextResponse.json({
     ok: true,
     csEnabled,
+    kbKeywordModeDefault,
     knowledgeCount: knowledgeRes.count ?? 0,
     intents: intentsRes.data ?? [],
   });
@@ -73,10 +80,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
-  if (typeof body.csEnabled !== "boolean") {
-    return NextResponse.json({ ok: false, error: "csEnabled_required" }, { status: 400 });
+  const hasCsEnabled = typeof body.csEnabled === "boolean";
+  const hasKeywordDefault = body.kbKeywordModeDefault === "fuzzy" || body.kbKeywordModeDefault === "exact";
+  if (!hasCsEnabled && !hasKeywordDefault) {
+    return NextResponse.json({ ok: false, error: "csEnabled_or_kbKeywordModeDefault_required" }, { status: 400 });
   }
-  const csEnabled = body.csEnabled;
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
@@ -85,7 +93,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   if (!org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const clientConfig = clientConfigOf(org.metadata);
-  clientConfig.csEnabled = csEnabled;
+  if (hasCsEnabled) clientConfig.csEnabled = body.csEnabled as boolean;
+  if (hasKeywordDefault) clientConfig.kbKeywordModeDefault = body.kbKeywordModeDefault as string;
 
   const { error: writeErr } = await supabase
     .from("organizations")
@@ -95,15 +104,28 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     return NextResponse.json({ ok: false, error: "update_failed", details: writeErr.message }, { status: 409 });
   }
 
-  await supabase.from("ops_audit_events").insert({
-    organization_id: org.id,
-    actor_role: resolved.role,
-    event_type: "cs_killswitch_toggled",
-    target_type: "organizations",
-    target_id: org.id,
-    trace_id: crypto.randomUUID(),
-    payload: { csEnabled, role_source: resolved.source },
-  });
+  if (hasCsEnabled) {
+    await supabase.from("ops_audit_events").insert({
+      organization_id: org.id,
+      actor_role: resolved.role,
+      event_type: "cs_killswitch_toggled",
+      target_type: "organizations",
+      target_id: org.id,
+      trace_id: crypto.randomUUID(),
+      payload: { csEnabled: body.csEnabled, role_source: resolved.source },
+    });
+  }
+  if (hasKeywordDefault) {
+    await supabase.from("ops_audit_events").insert({
+      organization_id: org.id,
+      actor_role: resolved.role,
+      event_type: "cs_kb_keyword_default_changed",
+      target_type: "organizations",
+      target_id: org.id,
+      trace_id: crypto.randomUUID(),
+      payload: { kbKeywordModeDefault: body.kbKeywordModeDefault, role_source: resolved.source },
+    });
+  }
 
-  return NextResponse.json({ ok: true, csEnabled });
+  return NextResponse.json({ ok: true, csEnabled: clientConfig.csEnabled !== false, kbKeywordModeDefault: clientConfig.kbKeywordModeDefault === "exact" ? "exact" : "fuzzy" });
 }

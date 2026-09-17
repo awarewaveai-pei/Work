@@ -36,6 +36,24 @@ export {
   type RebindError,
   type SourceDetail,
   type VersionSummary,
+  type SourceListRow,
+  type ArchivedSourceRow,
+  type ListSourcesOptions,
+  type ListSourcesResult,
+  KB_UNFILED_FOLDER_ID,
+  setKeywordMode,
+  type KeywordMode,
 } from "@/lib/kb/db";
+export {
+  listFolders,
+  createFolder,
+  renameFolder,
+  moveFolder,
+  deleteFolder,
+  moveSourceToFolder,
+  folderDescendantIds,
+  type FolderRow,
+  type FolderError,
+} from "@/lib/kb/folders";
 
 export type { KnowledgeInput, EmbeddingProvider, RetrievedChunk, KbContext, IngestResult } from "@/lib/kb/types";

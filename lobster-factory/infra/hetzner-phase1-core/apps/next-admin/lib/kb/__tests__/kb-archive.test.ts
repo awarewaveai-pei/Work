@@ -22,7 +22,7 @@ const state = vi.hoisted(() => ({
   calls: [] as Call[],
   selectResponses: [] as Array<{ data: unknown; error: unknown }>,
   updateResponses: [] as Array<{ data: unknown; error: unknown }>,
-  listResponse: { data: [{ id: "s1", title: "t", kind: "doc", is_sensitive: false, source_version: 1, doc_family_id: "f1" }], error: null } as { data: unknown; error: unknown },
+  listResponse: { data: [{ id: "s1", title: "t", kind: "doc", is_sensitive: false, source_version: 1, doc_family_id: "f1", folder_id: null }], error: null, count: 1 } as { data: unknown; error: unknown; count?: number },
 }));
 
 function fakeClient() {
@@ -37,7 +37,13 @@ function fakeClient() {
             return chain;
           },
           limit: () => chain,
-          order: () => Promise.resolve(state.listResponse),
+          ilike: () => chain,
+          in: () => chain,
+          is: () => chain,
+          // listArchivedKnowledgeSources chains .order(...).range(...) after the eq()s; the other
+          // two functions in this file only ever call .maybeSingle() straight off eq() and never
+          // reach this branch — same fake serves both shapes.
+          order: () => ({ range: () => Promise.resolve(state.listResponse) }),
           maybeSingle: () => Promise.resolve(state.selectResponses.shift() ?? { data: null, error: null }),
         };
         return chain;
@@ -154,13 +160,14 @@ describe("restoreKnowledgeSource", () => {
 });
 
 describe("listArchivedKnowledgeSources", () => {
-  it("returns the archived rows mapped to camelCase", async () => {
-    const rows = await listArchivedKnowledgeSources(ORG);
-    expect(rows).toEqual([{ id: "s1", title: "t", kind: "doc", isSensitive: false, version: 1, docFamilyId: "f1" }]);
+  it("returns the archived rows mapped to camelCase, paginated (K2h)", async () => {
+    const result = await listArchivedKnowledgeSources(ORG);
+    expect(result.items).toEqual([{ id: "s1", title: "t", kind: "doc", isSensitive: false, version: 1, docFamilyId: "f1", folderId: null }]);
+    expect(result).toMatchObject({ total: 1, page: 1, pageSize: 50 });
   });
 
-  it("degrades to an empty list with no Supabase client", async () => {
+  it("degrades to an empty page with no Supabase client", async () => {
     client = null;
-    expect(await listArchivedKnowledgeSources(ORG)).toEqual([]);
+    expect(await listArchivedKnowledgeSources(ORG)).toEqual({ items: [], total: 0, page: 1, pageSize: 50 });
   });
 });

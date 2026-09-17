@@ -1,5 +1,8 @@
 // GET/POST/PATCH/DELETE /api/ops/clients/[slug]/cs-knowledge — manage a client's RAG knowledge sources.
-// GET    — list sources (+ per-source chunk counts). ?status=archived lists the archived view instead.
+// GET    — list sources (+ per-source chunk counts), paginated (K2h: `?page=`/`?pageSize=`, default
+//          1/50, pageSize capped at 200) and filterable (`?search=` title substring; `?folderId=`
+//          scopes to a folder AND its subfolders). Response is `{ sources, total, page, pageSize }`.
+//          ?status=archived lists the archived view instead (same paging/filter params).
 //          ?sourceId=<id> returns one document's full detail (K2g: body text, provenance, citation)
 //          plus every version in its document family — the content-viewer the ops console lacked.
 //          Same read level as the list (viewer+), matching every other route in this console
@@ -20,6 +23,11 @@
 //          decision 2026-09-12, option A): point an existing MANUAL document at the real URL the
 //          crawler will later fetch, so ingest recognises it as the same document instead of
 //          creating a second, contradictory one. Only works on a source with no canonicalUrl yet.
+//        — { sourceId, action: "move_folder", folderId: string | null } → K2h: file a document into
+//          a folder, or null to unfile it. folderId is validated to exist in this org first (lib/kb).
+//        — { sourceId, action: "set_keyword_mode", mode: "inherit" | "exact" | "fuzzy" } → K2i:
+//          per-document keyword-matching override, read by cs_match_chunks_keyword (migration 0086).
+//          "inherit" (the default) follows the tenant-wide default (cs-config's kbKeywordModeDefault).
 // DELETE — { sourceId } → PERMANENTLY remove source (chunks cascade). Archive and delete are two
 //          separate, real actions (operator decision 2026-09-12) — this one does not come back.
 // Writes gated by canWriteTenantConfig (owner/admin). Reads open to the internal ops console.
@@ -37,7 +45,11 @@ import {
   deleteKnowledgeSource,
   getSourceDetail,
   listVersionsForFamily,
+  moveSourceToFolder,
+  setKeywordMode,
   type RebindError,
+  type FolderError,
+  type KeywordMode,
 } from "@/lib/kb";
 
 const REBIND_ERROR_HINT: Record<RebindError, string> = {
@@ -46,6 +58,15 @@ const REBIND_ERROR_HINT: Record<RebindError, string> = {
   url_already_claimed: "這個網址已經被另一份文件使用——可能爬蟲已經抓過了，請改用一般的重新上傳來合併版本",
   write_failed: "寫入失敗，請重試",
   lost_race: "同時間有另一個操作搶先改了這份文件，請重新整理後再試一次",
+};
+
+const FOLDER_ERROR_HINT: Record<FolderError, string> = {
+  name_required: "資料夾名稱不可為空",
+  duplicate_name: "同層已有相同名稱的資料夾",
+  parent_not_found: "找不到這個資料夾",
+  would_create_cycle: "不能把資料夾移進自己的子資料夾裡",
+  not_found: "找不到這份文件",
+  write_failed: "寫入失敗，請重試",
 };
 
 export const runtime = "nodejs";
@@ -105,9 +126,15 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     return NextResponse.json({ ok: true, detail, versions });
   }
 
+  const listOpts = {
+    search: params.get("search") ?? undefined,
+    folderId: params.get("folderId") ?? undefined,
+    page: params.get("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.get("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
   const wantsArchived = params.get("status") === "archived";
-  const sources = wantsArchived ? await listArchivedKnowledgeSources(orgId) : await listKnowledgeSources(orgId);
-  return NextResponse.json({ ok: true, sources });
+  const result = wantsArchived ? await listArchivedKnowledgeSources(orgId, listOpts) : await listKnowledgeSources(orgId, listOpts);
+  return NextResponse.json({ ok: true, sources: result.items, total: result.total, page: result.page, pageSize: result.pageSize });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ slug: string }> }) {
@@ -119,11 +146,33 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   let body: Record<string, unknown>;
   try { body = (await request.json()) as Record<string, unknown>; } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
   const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
-  const action = body.action === "archive" || body.action === "restore" || body.action === "rebind" ? body.action : null;
+  const action = body.action === "archive" || body.action === "restore" || body.action === "rebind" || body.action === "move_folder" || body.action === "set_keyword_mode" ? body.action : null;
   if (!sourceId || !action) return NextResponse.json({ ok: false, error: "sourceId_and_action_required" }, { status: 400 });
 
   const orgId = await orgIdOf(slug);
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+
+  if (action === "set_keyword_mode") {
+    const mode: KeywordMode | null = body.mode === "inherit" || body.mode === "exact" || body.mode === "fuzzy" ? body.mode : null;
+    if (!mode) return NextResponse.json({ ok: false, error: "valid_mode_required" }, { status: 400 });
+    const ok = await setKeywordMode(orgId, sourceId, mode);
+    if (!ok) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+    audit(orgId, resolved.role, resolved.source, "cs_knowledge_keyword_mode_set", { sourceId, mode });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "move_folder") {
+    // null explicitly unfiles the document; anything else must be a real, non-empty folder id.
+    const folderId = body.folderId === null ? null : typeof body.folderId === "string" && body.folderId ? body.folderId : undefined;
+    if (folderId === undefined) return NextResponse.json({ ok: false, error: "folderId_required" }, { status: 400 });
+    const result = await moveSourceToFolder(orgId, sourceId, folderId);
+    if (result.ok === true) {
+      audit(orgId, resolved.role, resolved.source, "cs_knowledge_moved_folder", { sourceId, folderId });
+      return NextResponse.json({ ok: true });
+    }
+    const err: FolderError = result.error;
+    return NextResponse.json({ ok: false, error: err, hint: FOLDER_ERROR_HINT[err] }, { status: err === "not_found" || err === "parent_not_found" ? 404 : 409 });
+  }
 
   if (action === "rebind") {
     const url = canonicalUrlOf(body.canonicalUrl);

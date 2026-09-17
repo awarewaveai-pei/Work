@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-17｜Cognitive OS Gap A+C: 29 藝術治療清單方法 + Master Plan §43 商業全鏈
+
+- 缺口：54 項清單中 29 項無方法（清單原寫 31，實為 29＋2 個 SWOT 重複變體）；商業管線止於 NPV，Finance pack 空（ADR-008 延後）。
+- Gap A 做法：不複製舊切片 ~200 行樣板，改共用 kit——`ai_lego/core/domain/record_kit.py`（invariant 助手單一擁有者）、`ai_lego/apps/cli/method_slice.py`（slice runner，每個 `run_<name>_slice.py` ~45 行）、`tests/unit/method_testkit.py`（MethodSliceMixin 7 個共用證明：schema／catalog+dispatch／gates／每個 refusal／每個 tamper／garbage fail-closed／slug）。29 個方法各有 contract + typed-object schema + module（builder + provenance/integrity 兩 gate，兩層獨立）+ slice + test + backlog tier_1；通用方法放自然家族（divergent×5、framing×4、systems×4、learning×2、delivery×1），治療專屬 13 個放 `art_therapy.*`。新 recipe `art-therapy-unstick-v1`（visual_metaphor→metaphor_dialogue→reframing→value_clarification）。
+- Gap C 做法（ADR-025）：`finance.financial_assumptions`（含 NPV 可直接綁定的 `cash_flow_projection`）、`strategy.market_analysis`（TAM≥SAM≥SOM）、capability `artifact.generate_proposal`（純組稿、fail-closed）、17 節點 recipe `business-plan-full-v1`（NPV 的 cash_flows/discount_rate 綁 `outputs.financial_assumptions`；proposal 列出所有來源 record id）。
+- Catalog：248→279 ACTIVE methods；recipes 14→17。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest <37 個新 test 檔> -q`（29 方法 + record_kit + literature + unstick + business_full + market + finassum + evidence_chain）| exit=0 | result=254 passed, 541 subtests
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec root）| exit=0 | result=PASSED 4119
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_<name>_slice` ×31 | exit=0 | result=全部 PASS（invariant_refused construction=True, gate=True）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`POST /recipes/business-plan-full-v1/run`（TestClient）| exit=0 | result=status PASS, 17 steps, npv.discount_rate == financial_assumptions.discount_rate, artifact.sources 完整
+- REVIEW_DONE: critic=Standard（kit + 29 方法）| verdict=warn→fixed | findings=0c/4m/4n（M1 `lambda v: v in SET` 遇 list 值 TypeError→500：kit 加 `is_one_of` + `entry_problem` predicate 例外轉 problem；M2 flowchart 自迴圈／重複邊／孤島繞過 degree 檢查→改 BFS 可達性 + 禁自迴圈/重複邊/非 DECISION 帶 condition/同 condition；M3 turning_point 用字串排序→改 date 比較；M4 `is_iso_date` 比 schema 寬鬆→嚴格 `^\d{4}-\d{2}-\d{2}$` 無 strip；m5 gantt 同日重疊→改嚴格 `start > dep.end`（inclusive days）；m6 cycle→嚴格日期規則已使 cycle 不可能，移除 dead code；m7 flowchart 允許項改為明示；m8 slice runner 固定 tmp 路徑併發 race→mkdtemp）；每項有回歸測試（`tests/unit/test_record_kit.py` 含 API 層 500→4xx 驗證）
+- REVIEW_DONE: critic=Quick（Gap C 4 檔 + recipe）| verdict=warn→fixed | findings=0c/1m/1n（M1 proposal 讀 problem_statement 頂層而非 content.*→印出 None，且 .get 違反 fail-closed：改嚴格 `_f()` 路徑存取缺欄位即 PROPOSAL_FIELD_MISSING；m1 測試只查標題→改斷言不含 None + 逐段實值）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`unbuilt Finance|Finance Domain Pack boundary|走到 NPV 就停|0/31` | hits=2（business-planning-review-v1 描述兩處已改指向 business-plan-full-v1）；`lambda v: v in` 殘留 hits=0
+- 剩餘風險：新方法尚未部署（本 commit 後跑 deploy.sh）；proposal artifact 只回傳 inline，未進 CAS（OQ-PROPOSAL-1）；scenario 未消費財務區間（OQ-BUSINESS-PLAN-FULL-1）。
+- rollback：`git revert <commit>`；prod `docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d`。
+
+<<<<<<< Updated upstream
 ## 2026-09-17（續5）HCI-30 全權授權後：C6/蒐集器 Task 1 決策 + 蒐集器 Task 2 落地（migration 0020）+ 兩輪覆審全修
 
 [任務] 操作者本輪明確全權授權（"需要決定的事都你決定"），且明確重申 High-STOP 不因整批授權跳過。據此：(1) 親自裁決 C6 Task 1(A)/(B) 與蒐集器 Task 0/1（非 STOP 的決策類任務，決定記錄見下）；(2) 蒐集器 Task 2（`hci.sources` admission_state 狀態機）非身分/RLS 邊界異動，實際建置；(3) C6 Task 3（provisioning endpoint，真身分/RLS 異動）維持 STOP，只做 Task 2 設計審查，不寫程式碼。
@@ -29,6 +46,51 @@
 3. C6 provisioning endpoint（Task 3）本身仍是 STOP，即使有了修正後的設計指引，實際程式碼與 migration 需操作者對這一項單獨明示 go-ahead 才能開工。
 
 [rollback] Migration 0020 有對應 down 檔並已 real-Docker 驗證可逆；`git revert` 本次 commit 即可完全復原程式碼與文件，資料庫尚未有任何真實環境套用此 migration。
+=======
+## 2026-09-17（續5）K2h 巢狀資料夾＋分頁搜尋、K2i 精確／模糊關鍵字模式：實作＋critic 修復＋真實 Postgres 驗證
+
+[任務] 續2/3 完成 K2g 後，依 KNOWLEDGE_BASE_PLAN.md 排序做 K2h（資料夾+分頁搜尋）、K2i（關鍵字模式）——操作者已在稍早的三題 AskUserQuestion 選定方案（巢狀資料夾／租戶預設+單篇覆蓋；K2j 畫面收合卡片留待下一輪）。
+
+[K2h 已寫入]
+- migration `0085_kb_folders.sql`：新表 `cs_knowledge_folders`（自參照 parent_id, UNIQUE NULLS NOT DISTINCT 防同層同名）；`cs_knowledge_sources.folder_id`（ON DELETE SET NULL，刪資料夾不刪文件；子資料夾 ON DELETE CASCADE）；`cs_folder_descendants` 遞迴 CTE（跨階層過濾、含自身、逐層驗 org_id 防跨租戶、CYCLE 子句防意外無窮迴圈）；`cs_folder_move` 原子 RPC（FOR UPDATE 鎖 + 單一陳述式內完成循環檢查+寫入，取代 JS 端 read-then-write 的 TOCTOU 缺口）。
+- `lib/kb/folders.ts`（新）：listFolders/createFolder/renameFolder/moveFolder/deleteFolder/moveSourceToFolder/folderDescendantIds。
+- `lib/kb/db.ts`：`listKnowledgeSources`/`listArchivedKnowledgeSources` 改回傳 `{items,total,page,pageSize}`（原本一次全撈陣列），加 search（title ILIKE）/folderId（含 `KB_UNFILED_FOLDER_ID` sentinel 代表未分類）/page/pageSize；`getFamilyState`/`insertSource`/`ingestKnowledge` 加 folder_id 透傳（critic Major finding：沒有這行，每次重新上傳同文件會靜默把它移出資料夾）。
+- 新路由 `cs-knowledge-folders/route.ts`（CRUD，viewer 讀/owner-admin 寫，含 audit）；`cs-knowledge/route.ts` PATCH 加 `move_folder` action。
+- `ClientHubTabs.tsx` KnowledgeTab：資料夾篩選 pill + 新增/改名/刪除、搜尋框（350ms debounce）、逐列資料夾下拉、分頁按鈕；request-id guard 防競速覆蓋畫面。
+
+[K2i 已寫入]
+- migration `0086_kb_keyword_mode.sql`：`cs_knowledge_sources.keyword_mode`（inherit/exact/fuzzy）；`cs_match_chunks_keyword` 加 `p_raw_query` 參數 + JOIN organizations 讀 `client_config.kbKeywordModeDefault`（租戶預設，沿用 cs-config 既有 csEnabled 同一個 JSON 欄位，不開新機制）；exact 模式在既有 bigram OR 閘門之上再要求原始問句逐字出現（`strpos`），空字串有 guard（否則 `strpos(x,'')=1` 會誤配全部文件）。
+- `lib/kb/db.ts` 加 `setKeywordMode`；`cs-knowledge/route.ts` PATCH 加 `set_keyword_mode`；`cs-config/route.ts` GET/PATCH 加 `kbKeywordModeDefault`（與 csEnabled 各自獨立，可單獨改其中一項）。
+- `ClientHubTabs.tsx`：租戶預設雙態鈕 + 逐列覆蓋下拉。
+
+[Critic 覆審 1 輪（Standard tier），findings 全數修復，直接整合進上方「已寫入」而非事後補丁]：2 Major（① folder_id 未跨版本延續，見上；② moveFolder 舊實作 read-then-write 有 TOCTOU，可被兩個並發搬移製造出真實循環）、4 Minor（folderDescendantIds 空陣列退化依賴 PostgREST 隱性行為→改用顯式長度檢查；pageBoundsOf 無 `Number.isFinite` 防呆→NaN 會傳進 `.range()`；封存/刪除後可能卡在已不存在的分頁→改成直接抓 page=1；資料夾 CRUD 四個動作原本零 audit→補齊）、1 Suggestion（KB_UNFILED_FOLDER_ID 前後端各存一份字串，加 drift test 防未來改名時後端未同步）。
+
+[REALTEST 兩層]：
+1. Vitest 全庫 `npx vitest run`（next-admin 全專案）：1225 passed／8 skipped（既有 skip，非本次新增）／0 failed；本次新增/改動 9 個測試檔。
+2. 真實 Postgres：`bash packages/db/scripts/kb-local-verify.sh`（`supabase/postgres:15.8.1.085` throwaway container）——順手把 harness 擴充到涵蓋 0084/0085/0086（原本只跑到 0083，是既有缺口，K2g 的 0084 也從未被這個 harness 實際跑過）。8 個行為 marker 全綠：KB_VERIFY_OK/CONSTRAINTS_OK/PROVENANCE_OK/KEYWORD_OK/SENSITIVE_GATE_OK/FOLDERS_OK/FOLDER_MOVE_OK/KEYWORD_MODE_OK；down migration 全還原（含新增的 folder_id/keyword_mode/body 欄位、cs_knowledge_folders 表、cs_folder_descendants/cs_folder_move 函式）；re-apply 成功。這一層測試本身抓到兩個問題：(a) harness 的 `organizations` stub 缺 `metadata` 欄位（0086 要讀，正式 schema `0001_core.sql` 本來就有這欄位，純測試替身缺陷）；(b) 我自己寫的驗證 SQL 一開始用兩層路徑 `jsonb_set` 對不存在的中繼 key 靜默 no-op（Postgres 官方行為：`create_missing` 只補「最後一層」，不會自動建中繼物件）——兩者都已修正；不影響正式程式碼路徑（正式 `cs-config/route.ts` PATCH 是 JS 端合併整個物件再寫回，沒有這個坑）。
+
+[已修改／新增檔案]
+- 新增：`lobster-factory/packages/db/migrations/{0085_kb_folders,0086_kb_keyword_mode}.sql`、`.../scripts/{0085_kb_folders,0086_kb_keyword_mode}_down.sql`
+- 新增：`.../apps/next-admin/lib/kb/folders.ts`、`.../cs-knowledge-folders/route.ts`(+`.test.ts`)、`lib/kb/__tests__/{kb-folders,kb-list-sources,kb-keyword-mode}.test.ts`、`.../cs-config/route.test.ts`
+- 修改：`lib/kb/{db,index,rag}.ts`、`app/api/.../cs-knowledge/route.ts`(+`.test.ts`)、`.../cs-config/route.ts`、`ClientHubTabs.tsx`、`lib/kb/__tests__/{kb-archive,kb-schema-contract,kb-db-keyword-sort}.test.ts`、`packages/db/scripts/kb-local-verify.{sh,sql}`
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全專案） | exit=0 | result=1225 passed/8 skipped/0 failed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/kb-local-verify.sh` | exit=0 | result=8/8 KB_VERIFY_*_OK markers, DOWN_OK, re-apply OK（真實 Postgres 15.8.1.085 + pgvector + pgroonga）
+- REVIEW_DONE: critic=Standard | verdict=pass（1 輪，findings 2M/4m/1s 全修復，見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`cs_folder_move\|cs_folder_descendants\|KB_UNFILED_FOLDER_ID\|kbKeywordModeDefault\|setKeywordMode\|moveSourceToFolder\|listKnowledgeSources\|listArchivedKnowledgeSources` | hits=158（逐一核對，無殘留舊呼叫/舊回傳形狀）
+
+[剩餘風險]
+- 兩個並發衝突的資料夾搬移請求（互相搬進對方底下）會被 Postgres deadlock detector 擋下一個並報錯，非靜默失敗；未額外做鎖排序，因這是低頻、僅 owner/admin 可觸發的操作。
+- 資料夾多層縮排 UI 目前無深度上限（純前端縮排，DoD 未要求上限）；資料夾名稱 200 字截斷理論上可能切到 emoji 一半（cosmetic-only，未修，未被回報過）。
+- 尚未部署到 production：migration 0085/0086 + 程式碼都只到 `main`，未跑 `sg-deploy.sh` / 對應的 DB migration apply 腳本，等待明確 go-ahead（High-risk）。
+
+[Rollback]：down migration 依序 `0086_kb_keyword_mode_down.sql` → `0085_kb_folders_down.sql`（新表/欄位/RPC 全清，文件本身不受影響）；程式碼 `git revert` 對應 commit。
+
+[WORKLOG_DONE]: K2h + K2i
+
+>>>>>>> Stashed changes
 
 ## 2026-09-17｜Cognitive OS Gap B: EdD 真文獻搜尋（OpenAlex）+ method kit pilot
 

@@ -49,4 +49,10 @@ describe("matchChunksKeyword sorts by score explicitly", () => {
     expect(await matchChunksKeyword(SCOPE, "!!! ???", 50)).toEqual([]);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it("passes the raw, un-bigrammed question through as p_raw_query (K2i exact-mode gate)", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    await matchChunksKeyword(SCOPE, "退貨政策是什麼", 50);
+    expect(rpc).toHaveBeenCalledWith("cs_match_chunks_keyword", expect.objectContaining({ p_raw_query: "退貨政策是什麼" }));
+  });
 });

@@ -14,6 +14,8 @@ const kb = vi.hoisted(() => ({
   ingestKnowledge: vi.fn(),
   getSourceDetail: vi.fn(),
   listVersionsForFamily: vi.fn(),
+  moveSourceToFolder: vi.fn(),
+  setKeywordMode: vi.fn(),
 }));
 vi.mock("@/lib/kb", () => kb);
 
@@ -45,18 +47,24 @@ function req(method: string, opts: { role?: string; body?: unknown; qs?: string 
 beforeEach(() => vi.clearAllMocks());
 
 describe("GET /api/ops/clients/[slug]/cs-knowledge", () => {
-  it("defaults to the active list", async () => {
-    kb.listKnowledgeSources.mockResolvedValue([{ id: "s1" }]);
+  it("defaults to the active list, page 1 (K2h pagination)", async () => {
+    kb.listKnowledgeSources.mockResolvedValue({ items: [{ id: "s1" }], total: 1, page: 1, pageSize: 50 });
     const res = await GET(req("GET"), ctx());
-    expect(await res.json()).toEqual({ ok: true, sources: [{ id: "s1" }] });
+    expect(await res.json()).toEqual({ ok: true, sources: [{ id: "s1" }], total: 1, page: 1, pageSize: 50 });
     expect(kb.listArchivedKnowledgeSources).not.toHaveBeenCalled();
   });
 
   it("?status=archived reads the archived view instead", async () => {
-    kb.listArchivedKnowledgeSources.mockResolvedValue([{ id: "s2" }]);
+    kb.listArchivedKnowledgeSources.mockResolvedValue({ items: [{ id: "s2" }], total: 1, page: 1, pageSize: 50 });
     const res = await GET(req("GET", { qs: "?status=archived" }), ctx());
-    expect(await res.json()).toEqual({ ok: true, sources: [{ id: "s2" }] });
+    expect(await res.json()).toEqual({ ok: true, sources: [{ id: "s2" }], total: 1, page: 1, pageSize: 50 });
     expect(kb.listKnowledgeSources).not.toHaveBeenCalled();
+  });
+
+  it("passes search/folderId/page/pageSize query params through to the list function (K2h)", async () => {
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 20 });
+    await GET(req("GET", { qs: "?search=退貨&folderId=f1&page=2&pageSize=20" }), ctx());
+    expect(kb.listKnowledgeSources).toHaveBeenCalledWith(ORG, { search: "退貨", folderId: "f1", page: 2, pageSize: 20 });
   });
 
   it("?sourceId= returns the detail + version history instead of the list (K2g)", async () => {
@@ -157,5 +165,65 @@ describe("PATCH /api/ops/clients/[slug]/cs-knowledge", () => {
     const res = await PATCH(req("PATCH", { role: "viewer", body: { sourceId: "s1", action: "rebind", canonicalUrl: "https://client.example.com/faq/returns" } }), ctx());
     expect(res.status).toBe(403);
     expect(kb.rebindManualDocumentUrl).not.toHaveBeenCalled();
+  });
+
+  it("files a document into a folder (K2h)", async () => {
+    kb.moveSourceToFolder.mockResolvedValue({ ok: true });
+    const res = await PATCH(req("PATCH", { role: "admin", body: { sourceId: "s1", action: "move_folder", folderId: "f1" } }), ctx());
+    expect(res.status).toBe(200);
+    expect(kb.moveSourceToFolder).toHaveBeenCalledWith(ORG, "s1", "f1");
+  });
+
+  it("passes an explicit null folderId through to unfile a document, not treating it as missing", async () => {
+    kb.moveSourceToFolder.mockResolvedValue({ ok: true });
+    const res = await PATCH(req("PATCH", { role: "admin", body: { sourceId: "s1", action: "move_folder", folderId: null } }), ctx());
+    expect(res.status).toBe(200);
+    expect(kb.moveSourceToFolder).toHaveBeenCalledWith(ORG, "s1", null);
+  });
+
+  it("rejects move_folder with folderId entirely missing from the body", async () => {
+    const res = await PATCH(req("PATCH", { role: "admin", body: { sourceId: "s1", action: "move_folder" } }), ctx());
+    expect(res.status).toBe(400);
+    expect(kb.moveSourceToFolder).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a move_folder failure with its hint, not a bare 200", async () => {
+    kb.moveSourceToFolder.mockResolvedValue({ ok: false, error: "parent_not_found" });
+    const res = await PATCH(req("PATCH", { role: "admin", body: { sourceId: "s1", action: "move_folder", folderId: "gone" } }), ctx());
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, error: "parent_not_found" });
+    expect(body.hint).toBeTruthy();
+  });
+
+  it("rejects move_folder from a viewer role — same write gate as every other action here", async () => {
+    const res = await PATCH(req("PATCH", { role: "viewer", body: { sourceId: "s1", action: "move_folder", folderId: "f1" } }), ctx());
+    expect(res.status).toBe(403);
+    expect(kb.moveSourceToFolder).not.toHaveBeenCalled();
+  });
+
+  it("sets a document's keyword-mode override (K2i)", async () => {
+    kb.setKeywordMode.mockResolvedValue(true);
+    const res = await PATCH(req("PATCH", { role: "admin", body: { sourceId: "s1", action: "set_keyword_mode", mode: "exact" } }), ctx());
+    expect(res.status).toBe(200);
+    expect(kb.setKeywordMode).toHaveBeenCalledWith(ORG, "s1", "exact");
+  });
+
+  it("rejects set_keyword_mode with an invalid mode value", async () => {
+    const res = await PATCH(req("PATCH", { role: "admin", body: { sourceId: "s1", action: "set_keyword_mode", mode: "bogus" } }), ctx());
+    expect(res.status).toBe(400);
+    expect(kb.setKeywordMode).not.toHaveBeenCalled();
+  });
+
+  it("reports a set_keyword_mode failure (stale/foreign sourceId) as 404, not a bare 200", async () => {
+    kb.setKeywordMode.mockResolvedValue(false);
+    const res = await PATCH(req("PATCH", { role: "admin", body: { sourceId: "gone", action: "set_keyword_mode", mode: "fuzzy" } }), ctx());
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects set_keyword_mode from a viewer role", async () => {
+    const res = await PATCH(req("PATCH", { role: "viewer", body: { sourceId: "s1", action: "set_keyword_mode", mode: "exact" } }), ctx());
+    expect(res.status).toBe(403);
+    expect(kb.setKeywordMode).not.toHaveBeenCalled();
   });
 });

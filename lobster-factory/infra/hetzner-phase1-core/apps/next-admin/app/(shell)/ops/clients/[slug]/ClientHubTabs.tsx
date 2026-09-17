@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
@@ -1274,9 +1274,65 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
 // customer service is its first consumer, with SEO writing / cold outreach / research to follow.
 // Buried inside another tab it read as missing — reported twice by the operator.
 
+// Sentinel for "documents with no folder" — must match lib/kb/db.ts's KB_UNFILED_FOLDER_ID exactly.
+// Duplicated here rather than imported: lib/kb's barrel pulls in the service-role Supabase client
+// (server-only secrets), which a "use client" component must never bundle — this file already
+// duplicates KINDS the same way, below.
+const KB_UNFILED_FOLDER_ID = "unfiled";
+const KB_PAGE_SIZE = 50;
+
+type FolderRow = { id: string; name: string; parentId: string | null };
+
+/** Depth-first, parent-before-child order for rendering an indented flat list from a flat API
+ *  response. `visited` guards a corrupt/cyclic parentId from ever infinite-looping the UI — the API
+ *  itself refuses to create a cycle (lib/kb/folders.ts moveFolder), so this is defence in depth. */
+function folderTreeOrder(folders: FolderRow[]): Array<FolderRow & { depth: number }> {
+  const byParent = new Map<string | null, FolderRow[]>();
+  for (const f of folders) {
+    const list = byParent.get(f.parentId) ?? [];
+    list.push(f);
+    byParent.set(f.parentId, list);
+  }
+  for (const list of byParent.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+  const out: Array<FolderRow & { depth: number }> = [];
+  const visited = new Set<string>();
+  function walk(parentId: string | null, depth: number) {
+    for (const f of byParent.get(parentId) ?? []) {
+      if (visited.has(f.id)) continue;
+      visited.add(f.id);
+      out.push({ ...f, depth });
+      walk(f.id, depth + 1);
+    }
+  }
+  walk(null, 0);
+  return out;
+}
+
+function folderPillStyle(active: boolean): CSSProperties {
+  return {
+    border: `1px solid ${active ? "var(--text-primary)" : "var(--card-border)"}`,
+    background: active ? "var(--text-primary)" : "var(--bg-canvas)",
+    color: active ? "var(--bg-canvas)" : "var(--text-secondary)",
+    cursor: "pointer", fontSize: 11, padding: "3px 9px", borderRadius: 12,
+  };
+}
+
 function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
-  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; canonicalUrl: string | null; chunks: number }>>([]);
+  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; canonicalUrl: string | null; folderId: string | null; keywordMode: string; chunks: number }>>([]);
+  const [kbDefault, setKbDefault] = useState<"fuzzy" | "exact">("fuzzy"); // K2i tenant-wide default
+  const [kbDefaultSaving, setKbDefaultSaving] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [folderFilter, setFolderFilter] = useState<string | null>(null); // null = 全部
+  const [folders, setFolders] = useState<FolderRow[]>([]);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderParentId, setNewFolderParentId] = useState(""); // "" = 頂層
+  const [folderBusy, setFolderBusy] = useState(false);
+  const [folderMsg, setFolderMsg] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const [archived, setArchived] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean }>>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [kTitle, setKTitle] = useState(""); const [kBody, setKBody] = useState(""); const [kKind, setKKind] = useState("doc");
@@ -1288,27 +1344,136 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [rebindBusy, setRebindBusy] = useState<string | null>(null);
   // K2g: which row's content viewer is open, if any.
   const [viewingId, setViewingId] = useState<string | null>(null);
+  // Guards against an in-flight request's response landing AFTER a newer one already rendered
+  // (rapid folder-click / typing) and silently overwriting the screen with stale results.
+  const reqIdRef = useRef(0);
 
-  async function reloadSources() {
+  async function reloadFolders() {
     try {
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { headers: { ...roleHeader("admin") } });
-      const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean; canonicalUrl: string | null; chunks: number }> };
-      if (data.ok && data.sources) setSources(data.sources);
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge-folders`, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; folders?: FolderRow[] };
+      if (data.ok && data.folders) setFolders(data.folders);
+    } catch { /* ignore */ }
+  }
+  async function reloadKbDefault() {
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; kbKeywordModeDefault?: string };
+      if (data.ok) setKbDefault(data.kbKeywordModeDefault === "exact" ? "exact" : "fuzzy");
+    } catch { /* ignore */ }
+  }
+  async function setKbDefaultNow(mode: "fuzzy" | "exact") {
+    setKbDefaultSaving(true);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, {
+        method: "PATCH", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ kbKeywordModeDefault: mode }),
+      });
+      const data = (await res.json()) as { ok?: boolean; kbKeywordModeDefault?: string };
+      if (res.ok && data.ok) setKbDefault(data.kbKeywordModeDefault === "exact" ? "exact" : "fuzzy");
+    } finally { setKbDefaultSaving(false); }
+  }
+  async function setRowKeywordMode(sourceId: string, mode: string) {
+    const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, {
+      method: "PATCH", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+      body: JSON.stringify({ sourceId, action: "set_keyword_mode", mode }),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) { setRebindMsg((m) => ({ ...m, [sourceId]: `⚠ 設定失敗：${data.error ?? res.status}` })); return; }
+    await reloadSources();
+  }
+  async function reloadSources(pageOverride?: number) {
+    const myReqId = ++reqIdRef.current;
+    try {
+      const qs = new URLSearchParams({ page: String(pageOverride ?? page), pageSize: String(KB_PAGE_SIZE) });
+      if (debouncedSearch) qs.set("search", debouncedSearch);
+      if (folderFilter) qs.set("folderId", folderFilter);
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge?${qs.toString()}`, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; sources?: typeof sources; total?: number };
+      if (reqIdRef.current !== myReqId) return; // superseded by a newer request
+      if (data.ok && data.sources) { setSources(data.sources); setTotal(data.total ?? data.sources.length); }
     } catch { /* ignore */ }
   }
   async function reloadArchived() {
     try {
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge?status=archived`, { headers: { ...roleHeader("admin") } });
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge?status=archived&pageSize=200`, { headers: { ...roleHeader("admin") } });
       const data = (await res.json()) as { ok?: boolean; sources?: Array<{ id: string; title: string; kind: string; isSensitive: boolean }> };
       if (data.ok && data.sources) setArchived(data.sources);
     } catch { /* ignore */ }
   }
   useEffect(() => {
     let alive = true;
-    (async () => { await reloadSources(); if (alive) setLoading(false); })();
+    (async () => { await Promise.all([reloadSources(), reloadFolders(), reloadKbDefault()]); if (alive) setLoading(false); })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org.slug]);
+  // Typing shouldn't fire one request per keystroke — settle for 350ms first.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+  // A filter changing invalidates whatever page the operator was on (page 3 of the old, unfiltered
+  // set may not exist in the new one) — reset before the fetch below runs with the new filter.
+  useEffect(() => {
+    if (!loading) setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, folderFilter]);
+  useEffect(() => {
+    if (!loading) reloadSources();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, folderFilter, debouncedSearch]);
+
+  async function moveToFolder(sourceId: string, folderId: string | null) {
+    const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, {
+      method: "PATCH", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+      body: JSON.stringify({ sourceId, action: "move_folder", folderId }),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) { setRebindMsg((m) => ({ ...m, [sourceId]: `⚠ 搬移失敗：${data.error ?? res.status}` })); return; }
+    await reloadSources();
+  }
+  async function addFolder() {
+    if (!newFolderName.trim()) return;
+    setFolderBusy(true); setFolderMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge-folders`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ name: newFolderName, parentId: newFolderParentId || null }),
+      });
+      const data = (await res.json()) as { ok?: boolean; hint?: string; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.hint ?? data.error ?? "失敗");
+      setNewFolderName("");
+      await reloadFolders();
+    } catch (e) { setFolderMsg(`⚠ ${String(e)}`); } finally { setFolderBusy(false); }
+  }
+  async function renameFolderNow(folderId: string) {
+    if (!renameDraft.trim()) return;
+    setFolderBusy(true); setFolderMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge-folders`, {
+        method: "PATCH", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ folderId, action: "rename", name: renameDraft }),
+      });
+      const data = (await res.json()) as { ok?: boolean; hint?: string; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.hint ?? data.error ?? "失敗");
+      setRenameDraft("");
+      await reloadFolders();
+    } catch (e) { setFolderMsg(`⚠ ${String(e)}`); } finally { setFolderBusy(false); }
+  }
+  async function deleteFolderNow(folderId: string) {
+    if (!confirm("刪除此資料夾？子資料夾會一併刪除；裡面的文件不會被刪除，只會變成「未分類」。")) return;
+    setFolderBusy(true); setFolderMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge-folders`, {
+        method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ folderId }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "失敗");
+      if (folderFilter === folderId) setFolderFilter(null);
+      await Promise.all([reloadFolders(), reloadSources()]);
+    } catch (e) { setFolderMsg(`⚠ ${String(e)}`); } finally { setFolderBusy(false); }
+  }
 
   async function addKnowledge() {
     setKSaving(true); setKMsg(null);
@@ -1335,7 +1500,12 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
     // Checked, not assumed: a 403 (wrong role) or 409 (e.g. the row already changed under us) must
     // not look like "the click did nothing" — the operator needs to see WHY it did not archive.
     if (!res.ok || !data.ok) { setRebindMsg((m) => ({ ...m, [id]: `⚠ 封存失敗：${data.error ?? res.status}` })); return; }
-    await reloadSources();
+    // Archiving removes a row from THIS page — on the last page with one row left, staying on the
+    // now-nonexistent page would strand the operator on a permanently-empty list (critic finding
+    // 2026-09-17). Fetch page 1 directly (not via setPage + the page-effect) so the correct page
+    // renders immediately rather than briefly showing a stale one.
+    await reloadSources(1);
+    setPage(1);
     if (showArchived) await reloadArchived();
   }
   async function restoreKnowledge(id: string) {
@@ -1375,7 +1545,9 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   async function delKnowledge(id: string) {
     if (!confirm("永久刪除此文件？此操作無法恢復，資料會直接消失（不是封存）。")) return;
     await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ sourceId: id }) });
-    await reloadSources();
+    // Same stranded-page risk as archiveKnowledge above — delete can remove the last row on a page.
+    await reloadSources(1);
+    setPage(1);
     await reloadArchived();
   }
   async function toggleArchived() {
@@ -1386,10 +1558,59 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
   return (
     <>
-      <Card title={`知識庫（${loading ? "…" : sources.length} 筆來源）`}>
+      <Card title={`知識庫（${loading ? "…" : total} 筆來源）`}>
         <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
           餵給 AI 的資料（FAQ / SOP / 產品說明…）。新增後自動切塊 + 向量化（pgvector），AI 只根據這些內容回答，答不出來轉真人。
         </p>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 11, flexWrap: "wrap" }}>
+          <span style={{ color: "var(--text-muted)" }}>關鍵字比對預設（全庫，單篇可覆蓋）：</span>
+          <button onClick={() => setKbDefaultNow("fuzzy")} disabled={kbDefaultSaving} style={folderPillStyle(kbDefault === "fuzzy")}>模糊（長尾關聯）</button>
+          <button onClick={() => setKbDefaultNow("exact")} disabled={kbDefaultSaving} style={folderPillStyle(kbDefault === "exact")}>精確（完全比對）</button>
+        </div>
+
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜尋標題…"
+          style={{ width: "100%", fontSize: 12, padding: "6px 8px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)", marginBottom: 8 }}
+        />
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+          <button onClick={() => setFolderFilter(null)} style={folderPillStyle(folderFilter === null)}>全部</button>
+          <button onClick={() => setFolderFilter(KB_UNFILED_FOLDER_ID)} style={folderPillStyle(folderFilter === KB_UNFILED_FOLDER_ID)}>未分類</button>
+          {folderTreeOrder(folders).map((f) => (
+            <button
+              key={f.id}
+              onClick={() => { setFolderFilter(f.id); setRenameDraft(f.name); }}
+              style={{ ...folderPillStyle(folderFilter === f.id), marginLeft: f.depth * 12 }}
+              title={f.depth > 0 ? `巢狀第 ${f.depth + 1} 層` : undefined}
+            >
+              📁 {f.name}
+            </button>
+          ))}
+        </div>
+
+        {folderFilter && folderFilter !== KB_UNFILED_FOLDER_ID && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, padding: "4px 6px", background: "var(--bg-canvas)", borderRadius: 6 }}>
+            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>這個資料夾：</span>
+            <input value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} style={{ flex: 1, fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
+            <button onClick={() => renameFolderNow(folderFilter)} disabled={folderBusy || !renameDraft.trim()} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>重新命名</button>
+            <button onClick={() => deleteFolderNow(folderFilter)} disabled={folderBusy} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--red)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>刪除資料夾</button>
+          </div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid var(--border-subtle)" }}>
+          <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>新增資料夾：</span>
+          <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="資料夾名稱" style={{ flex: 1, fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
+          <select value={newFolderParentId} onChange={(e) => setNewFolderParentId(e.target.value)} style={{ fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }}>
+            <option value="">（頂層）</option>
+            {folderTreeOrder(folders).map((f) => <option key={f.id} value={f.id}>{"　".repeat(f.depth)}{f.name}</option>)}
+          </select>
+          <button onClick={addFolder} disabled={folderBusy || !newFolderName.trim()} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>新增</button>
+        </div>
+        {folderMsg && <div style={{ fontSize: 11, color: "var(--red)", marginBottom: 8 }}>{folderMsg}</div>}
+
         {sources.length > 0 && (
           <div style={{ marginBottom: 10 }}>
             {sources.map((s) => (
@@ -1405,6 +1626,25 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
                   {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
                   {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
                   <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
+                  <select
+                    value={s.folderId ?? ""}
+                    onChange={(e) => moveToFolder(s.id, e.target.value || null)}
+                    title="搬移到資料夾"
+                    style={{ fontSize: 10, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", maxWidth: 110 }}
+                  >
+                    <option value="">未分類</option>
+                    {folderTreeOrder(folders).map((f) => <option key={f.id} value={f.id}>{"　".repeat(f.depth)}{f.name}</option>)}
+                  </select>
+                  <select
+                    value={s.keywordMode}
+                    onChange={(e) => setRowKeywordMode(s.id, e.target.value)}
+                    title="關鍵字比對模式（覆蓋租戶預設）"
+                    style={{ fontSize: 10, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)" }}
+                  >
+                    <option value="inherit">跟隨租戶</option>
+                    <option value="exact">精確</option>
+                    <option value="fuzzy">模糊</option>
+                  </select>
                   <button onClick={() => archiveKnowledge(s.id)} title="封存（從 AI 檢索範圍移除，資料保留，可復原）"
                     style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>
                     封存
@@ -1435,6 +1675,24 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
                 {rebindMsg[s.id] ? <div style={{ fontSize: 10, color: "var(--red)", marginTop: 2, paddingLeft: 4 }}>{rebindMsg[s.id]}</div> : null}
               </div>
             ))}
+          </div>
+        )}
+        {sources.length === 0 && !loading && (
+          <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 10px" }}>
+            {debouncedSearch || folderFilter ? "沒有符合篩選條件的文件。" : "尚無任何文件。"}
+          </p>
+        )}
+        {total > KB_PAGE_SIZE && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: 11 }}>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+              style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", padding: "3px 8px", borderRadius: 4, opacity: page <= 1 ? 0.5 : 1 }}>
+              上一頁
+            </button>
+            <span style={{ color: "var(--text-muted)" }}>第 {page} / {Math.max(1, Math.ceil(total / KB_PAGE_SIZE))} 頁，共 {total} 筆</span>
+            <button onClick={() => setPage((p) => (p * KB_PAGE_SIZE < total ? p + 1 : p))} disabled={page * KB_PAGE_SIZE >= total}
+              style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", padding: "3px 8px", borderRadius: 4, opacity: page * KB_PAGE_SIZE >= total ? 0.5 : 1 }}>
+              下一頁
+            </button>
           </div>
         )}
         <button onClick={toggleArchived} style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 11, padding: "0 0 8px", textDecoration: "underline" }}>

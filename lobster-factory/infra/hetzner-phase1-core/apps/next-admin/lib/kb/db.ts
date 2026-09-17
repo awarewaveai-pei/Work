@@ -15,35 +15,94 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { buildKeywordQuery } from "@/lib/kb/keyword-query";
 import { KB_DEFAULT_SPACE_ID } from "@/lib/kb/config";
 import { docFamilyId } from "@/lib/kb/family";
+import { folderDescendantIds } from "@/lib/kb/folders";
 
-/** List knowledge sources for the ops UI, with per-source chunk counts. */
-export async function listKnowledgeSources(
-  organizationId: string,
-): Promise<
-  Array<{
-    id: string;
-    title: string;
-    kind: string;
-    isSensitive: boolean;
-    status: string;
-    version: number;
-    docFamilyId: string;
-    canonicalUrl: string | null;
-    chunks: number;
-  }>
-> {
+export type SourceListRow = {
+  id: string;
+  title: string;
+  kind: string;
+  isSensitive: boolean;
+  status: string;
+  version: number;
+  docFamilyId: string;
+  canonicalUrl: string | null;
+  folderId: string | null;
+  /** K2i: this document's own override, or 'inherit' to follow the tenant default. */
+  keywordMode: string;
+  chunks: number;
+};
+
+/** The three keyword_mode values the column CHECK constraint (migration 0086) allows. */
+export type KeywordMode = "inherit" | "exact" | "fuzzy";
+const KEYWORD_MODES: readonly KeywordMode[] = ["inherit", "exact", "fuzzy"];
+
+/** Sentinel for "documents with no folder", passed as ListSourcesOptions.folderId — never a real
+ *  folder's id (folders are uuids), so it can share the one `folderId` string field instead of the
+ *  caller juggling a separate boolean alongside it. */
+export const KB_UNFILED_FOLDER_ID = "unfiled";
+
+export interface ListSourcesOptions {
+  /** Title substring match (case-insensitive). K2h scopes search to titles — the KB has no
+   *  full-text index over `body` yet, and a thousand-document tenant is already dominated by
+   *  "which document is this" rather than "which sentence", which title search answers. */
+  search?: string;
+  /** undefined = no folder filter. KB_UNFILED_FOLDER_ID = only unfiled documents. A real folder id =
+   *  that folder AND its subfolders (cross-level filtering, K2h's own DoD) — the descendant-id
+   *  expansion happens once here via lib/kb/folders.ts, not duplicated per caller. */
+  folderId?: string;
+  /** 1-based. Defaults to 1. */
+  page?: number;
+  /** Defaults to 50; capped at 200 so a crafted request can't force an effectively-unpaginated scan. */
+  pageSize?: number;
+}
+
+export interface ListSourcesResult {
+  items: SourceListRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+
+function pageBoundsOf(opts?: ListSourcesOptions): { page: number; pageSize: number; from: number; to: number } {
+  // Number.isFinite guards, not just Math.max/min: a malformed `?page=abc` from the directly-
+  // reachable, viewer-level GET route becomes Number("abc") = NaN, and Math.max/min PROPAGATE NaN
+  // rather than clamping it (critic finding 2026-09-17) — `.range(NaN, NaN)` would then depend on
+  // Supabase/PostgREST erroring on a malformed Range header to fail safe, an incidental behaviour of
+  // a different library rather than an invariant this function controls.
+  const page = Number.isFinite(opts?.page) ? Math.max(1, Math.floor(opts!.page!)) : 1;
+  const pageSize = Number.isFinite(opts?.pageSize) ? Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(opts!.pageSize!))) : DEFAULT_PAGE_SIZE;
+  const from = (page - 1) * pageSize;
+  return { page, pageSize, from, to: from + pageSize - 1 };
+}
+
+/** List knowledge sources for the ops UI, with per-source chunk counts, paginated + filterable
+ *  (K2h — thousand-document tenants can no longer be served by "fetch everything, filter in JS"). */
+export async function listKnowledgeSources(organizationId: string, opts?: ListSourcesOptions): Promise<ListSourcesResult> {
   const sb = getSupabaseWriteClient();
-  if (!sb) return [];
+  if (!sb) return { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE };
+  const { page, pageSize, from, to } = pageBoundsOf(opts);
+
   // Superseded versions are excluded: the ops list renders a delete button per row, and deleting a
   // row that only exists as version history destroys that history with no warning. K2 adds an
   // explicit "show versions" view.
-  const { data, error } = await sb
+  let query = sb
     .from("cs_knowledge_sources")
-    .select("id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url")
+    .select("id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode", { count: "exact" })
     .eq("organization_id", organizationId)
-    .neq("status", "archived")
-    .order("created_at", { ascending: false });
-  if (error || !data) return [];
+    .neq("status", "archived");
+  if (opts?.search?.trim()) query = query.ilike("title", `%${opts.search.trim()}%`);
+  if (opts?.folderId === KB_UNFILED_FOLDER_ID) {
+    query = query.is("folder_id", null);
+  } else if (opts?.folderId) {
+    const descendantIds = await folderDescendantIds(organizationId, opts.folderId);
+    query = query.in("folder_id", descendantIds);
+  }
+  const { data, error, count } = await query.order("created_at", { ascending: false }).range(from, to);
+  if (error || !data) return { items: [], total: 0, page, pageSize };
+
   const ids = data.map((s) => s.id as string);
   const counts = new Map<string, number>();
   if (ids.length) {
@@ -57,7 +116,7 @@ export async function listKnowledgeSources(
       counts.set(sid, (counts.get(sid) ?? 0) + 1);
     });
   }
-  return data.map((s) => ({
+  const items = data.map((s) => ({
     id: s.id as string,
     title: s.title as string,
     kind: s.kind as string,
@@ -66,8 +125,31 @@ export async function listKnowledgeSources(
     version: Number(s.source_version ?? 1),
     docFamilyId: s.doc_family_id as string,
     canonicalUrl: (s.canonical_url as string | null) ?? null,
+    folderId: (s.folder_id as string | null) ?? null,
+    keywordMode: (s.keyword_mode as string | null) ?? "inherit",
     chunks: counts.get(s.id as string) ?? 0,
   }));
+  return { items, total: count ?? items.length, page, pageSize };
+}
+
+/**
+ * K2i — set (or clear, via 'inherit') a single document's keyword-matching override. A separate
+ * write from ingestKnowledge()/insertSource() on purpose: an operator flipping precise/fuzzy for one
+ * document is a metadata change, not a new version of its content (no re-chunk, no re-embed, no
+ * doc_family_id bump) — the same reasoning archiveKnowledgeSource is its own function rather than a
+ * field on the ingest payload.
+ */
+export async function setKeywordMode(organizationId: string, sourceId: string, mode: KeywordMode): Promise<boolean> {
+  if (!KEYWORD_MODES.includes(mode)) return false;
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .update({ keyword_mode: mode, updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .select("id");
+  return !error && (data?.length ?? 0) > 0;
 }
 
 /**
@@ -77,26 +159,37 @@ export async function listKnowledgeSources(
  * restore/purge), and a boolean parameter callers must remember to pass is how the wrong list ends
  * up rendered with the wrong buttons.
  */
-export async function listArchivedKnowledgeSources(
-  organizationId: string,
-): Promise<Array<{ id: string; title: string; kind: string; isSensitive: boolean; version: number; docFamilyId: string }>> {
+export type ArchivedSourceRow = { id: string; title: string; kind: string; isSensitive: boolean; version: number; docFamilyId: string; folderId: string | null };
+
+export async function listArchivedKnowledgeSources(organizationId: string, opts?: ListSourcesOptions): Promise<{ items: ArchivedSourceRow[]; total: number; page: number; pageSize: number }> {
   const sb = getSupabaseWriteClient();
-  if (!sb) return [];
-  const { data, error } = await sb
+  if (!sb) return { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE };
+  const { page, pageSize, from, to } = pageBoundsOf(opts);
+
+  let query = sb
     .from("cs_knowledge_sources")
-    .select("id,title,kind,is_sensitive,source_version,doc_family_id")
+    .select("id,title,kind,is_sensitive,source_version,doc_family_id,folder_id", { count: "exact" })
     .eq("organization_id", organizationId)
-    .eq("status", "archived")
-    .order("updated_at", { ascending: false });
-  if (error || !data) return [];
-  return data.map((s) => ({
+    .eq("status", "archived");
+  if (opts?.search?.trim()) query = query.ilike("title", `%${opts.search.trim()}%`);
+  if (opts?.folderId === KB_UNFILED_FOLDER_ID) {
+    query = query.is("folder_id", null);
+  } else if (opts?.folderId) {
+    const descendantIds = await folderDescendantIds(organizationId, opts.folderId);
+    query = query.in("folder_id", descendantIds);
+  }
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).range(from, to);
+  if (error || !data) return { items: [], total: 0, page, pageSize };
+  const items = data.map((s) => ({
     id: s.id as string,
     title: s.title as string,
     kind: s.kind as string,
     isSensitive: s.is_sensitive === true,
     version: Number(s.source_version ?? 1),
     docFamilyId: s.doc_family_id as string,
+    folderId: (s.folder_id as string | null) ?? null,
   }));
+  return { items, total: count ?? items.length, page, pageSize };
 }
 
 /**
@@ -284,6 +377,11 @@ export interface LiveVersion {
   canonicalUrl: string | null;
   validFrom: string | null;
   validTo: string | null;
+  /** K2h: which folder the CURRENT version sits in — read by ingestKnowledge so a re-ingest (new
+   *  version, same document family) inherits it. There is no ingest-time field for this (folder
+   *  assignment is a separate ops-console action, PATCH .../cs-knowledge move_folder), so without
+   *  this carry-forward every edit would silently un-file the document (critic finding 2026-09-17). */
+  folderId: string | null;
 }
 
 /**
@@ -298,7 +396,7 @@ export async function getFamilyState(
   if (!sb) return { live: null, maxVersion: 0 };
   const { data, error } = await sb
     .from("cs_knowledge_sources")
-    .select("id,source_version,status,content_hash,is_sensitive,space_id,canonical_url,valid_from,valid_to,locked")
+    .select("id,source_version,status,content_hash,is_sensitive,space_id,canonical_url,valid_from,valid_to,locked,folder_id")
     .eq("organization_id", organizationId)
     .eq("doc_family_id", docFamilyId)
     .order("source_version", { ascending: false });
@@ -317,6 +415,7 @@ export async function getFamilyState(
           canonicalUrl: (active.canonical_url as string | null) ?? null,
           validFrom: (active.valid_from as string | null) ?? null,
           validTo: (active.valid_to as string | null) ?? null,
+          folderId: (active.folder_id as string | null) ?? null,
         }
       : null,
     maxVersion,
@@ -333,6 +432,8 @@ export interface SourceInput {
   contentHash: string;
   /** Verbatim ingested text (migration 0084, K2g) — for the content-viewer, never reconstructed from chunks. */
   body?: string | null;
+  /** K2h. Callers pass `live.folderId` from getFamilyState to carry it across a re-ingest — see LiveVersion.folderId. */
+  folderId?: string | null;
   canonicalUrl?: string | null;
   spaceId?: string | null;
   validFrom?: string | null;
@@ -365,6 +466,7 @@ export async function insertSource(input: SourceInput): Promise<string | null> {
       status: "active",
       content_hash: input.contentHash,
       body: input.body ?? null,
+      folder_id: input.folderId ?? null,
       canonical_url: input.canonicalUrl ?? null,
       space_id: input.spaceId ?? KB_DEFAULT_SPACE_ID,
       valid_from: input.validFrom ?? null,
@@ -581,6 +683,10 @@ export async function matchChunksKeyword(
     ...rpcArgs(s),
     p_term: term,
     p_limit: limit,
+    // K2i: the literal, un-bigrammed question — cs_match_chunks_keyword (migration 0086) uses it to
+    // require an exact substring match for documents in "precise" keyword mode, on top of (never
+    // instead of) the bigram-OR gate every document already goes through above.
+    p_raw_query: query,
   });
   if (error) {
     console.error("kb_match_keyword_failed", { code: error.code, message: error.message });
@@ -611,6 +717,9 @@ export interface SourceDetail {
   version: number;
   docFamilyId: string;
   canonicalUrl: string | null;
+  folderId: string | null;
+  /** K2i: this document's own override, or 'inherit' to follow the tenant default. */
+  keywordMode: string;
   /** null distinguishes "ingested before migration 0084" from "ingested with an empty body" (the
    *  latter cannot happen — POST .../cs-knowledge requires body.length >= 10). The UI must render
    *  these two cases differently: an empty-looking viewer for a real document reads as data loss. */
@@ -633,7 +742,7 @@ export async function getSourceDetail(organizationId: string, sourceId: string):
   const { data, error } = await sb
     .from("cs_knowledge_sources")
     .select(
-      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,body,language,epistemic_type,authorship_state,locked,author,published_at,venue,doi,created_at",
+      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,body,language,epistemic_type,authorship_state,locked,author,published_at,venue,doi,created_at",
     )
     .eq("organization_id", organizationId)
     .eq("id", sourceId)
@@ -648,6 +757,8 @@ export async function getSourceDetail(organizationId: string, sourceId: string):
     version: Number(data.source_version ?? 1),
     docFamilyId: data.doc_family_id as string,
     canonicalUrl: (data.canonical_url as string | null) ?? null,
+    folderId: (data.folder_id as string | null) ?? null,
+    keywordMode: (data.keyword_mode as string | null) ?? "inherit",
     body: (data.body as string | null) ?? null,
     language: (data.language as string | null) ?? null,
     epistemicType: (data.epistemic_type as string | null) ?? null,
