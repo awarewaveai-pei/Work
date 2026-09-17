@@ -995,6 +995,10 @@ class CreateSourceRequest(BaseModel):
 
 @app.post("/projects")
 def create_project(
+    doi: str | None = None
+    authors: list[str] | None = None
+    venue: str | None = None
+    published_at: str | None = None
     payload: CreateProjectRequest,
     session: dict[str, Any] = Depends(require_session),
     store: IdentityStore = Depends(get_store),
@@ -1084,7 +1088,10 @@ def create_source(
     if len(content_bytes) > MAX_SOURCE_CONTENT_BYTES:
         raise HTTPException(status_code=400, detail=f"SOURCE_CONTENT_TOO_LARGE: {len(content_bytes)} bytes exceeds {MAX_SOURCE_CONTENT_BYTES}")
     source_id = str(uuid.uuid4())
-    cas_path = source_cas.put(session["tenant_id"], content_bytes)
+    # cas_path_for predicts put()'s return value without any I/O (pure function of tenant_id+content) --
+    # validate first, physically write only after source_record() passes, so a rejected request never
+    # orphans a CAS blob nothing will ever reference.
+    cas_path = TenantScopedCas.cas_path_for(session["tenant_id"], content_bytes)
     artifact_uri = TenantScopedCas.artifact_uri(session["tenant_id"], project_id, source_id, cas_path)
     try:
         record = source_record(
@@ -1100,13 +1107,18 @@ def create_source(
             session["identity_id"],
             datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         )
-        return repo.add_source(record, cas_path)
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+            doi=payload.doi,
+            authors=payload.authors,
+            venue=payload.venue,
+            published_at=payload.published_at,
 
 
 @app.get("/projects/{project_id}/sources")
 def list_sources(
+    source_cas.put(session["tenant_id"], content_bytes)
+    return repo.add_source(record, cas_path)
     project_id: str,
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
