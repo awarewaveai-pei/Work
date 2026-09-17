@@ -64,6 +64,10 @@
 - REVIEW_DONE: critic=self（Standard，純刪除+回退既有已審過的程式碼+deploy.sh 單行文字移除，逐項自問：adapter 簽名是否相符/是否有殘留呼叫點/deploy.sh 是否精確字串替換）| verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`literature_providers\|PROVIDER_OPENALEX\|PROVIDER_CROSSREF\|research\.citation_verification\|ONLINE_SOURCE_UNVERIFIED` | hits=僅本條目自身/歷史記錄/gitignored runtime 快取/`egress.py` 既有歷史 docstring；均非殘留錯誤
 
+[部署] commit `48afd6b7a` 已 push 並部署 ks-aw-01（`git reset --hard 48afd6b7a && deploy.sh`，egress allowlist 改為只含 `api.anthropic.com`）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`deploy.sh` on ks-aw-01 | exit=0 | result=healthy after 6s；local/public smoke PASS
+- REALTEST_EVIDENCE: tool=Bash(python，帶瀏覽器 UA) | cmd=對 `https://cognitive.aware-wave.com` 依序 `POST /auth/login`→`GET /recipes`→`POST /methods/research.citation_verification/invoke`→`GET /health`→`POST /auth/logout` | exit=0 | result=`edd-literature-search-online-v1` 確認消失、`edd-literature-search-v1`（offline fixture 版）確認仍在、共 16 個 recipe（與 golden test 期望集合完全一致）、`research.citation_verification` 回 404 `METHOD_RESOLUTION_BLOCKED`（正確，非殘留）、`/health` 200
+
 [剩餘風險] `edd-literature-search-online-v1` recipe id 已從 prod 消失——若曾有文件直接連結該 recipe id 會變 404（預期行為）。AO-RESUME 的 `-FullMainlineParity` 硬重置風險是系統性問題（見 memory），本條目只是又一次真實案例，非新發現，不在本條目範圍內處理。
 
 [rollback] `git revert` 本次 commit 即完整恢復。
