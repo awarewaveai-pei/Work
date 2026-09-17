@@ -74,6 +74,28 @@ class EgressGateTests(unittest.TestCase):
         with patch.dict("os.environ", ALLOW), self.assertRaisesRegex(InvariantViolation, "NETWORK_EGRESS_DENIED"):
             handler.redirect_request(None, None, 301, "Moved", {}, "https://cdn.other-host.example/works")
 
+    def test_cross_host_redirect_is_refused_even_between_two_allowlisted_hosts(self):
+        """urllib forwards every request header (an API key included) onto the redirected request, so the
+        allowlist alone is not the invariant -- the redirect must stay on the origin host (critic 2026-09-17)."""
+        handler = lp._NoCrossHostRedirects()
+        req = urllib_request.Request("https://api.anthropic.com/v1/messages", headers={"x-api-key": "sk-test"})
+        both = {lp.EGRESS_ALLOWLIST_ENV: "api.openalex.org,api.anthropic.com"}
+        with patch.dict("os.environ", both), self.assertRaisesRegex(InvariantViolation, "cross-host redirect"):
+            handler.redirect_request(req, None, 302, "Found", {}, "https://api.openalex.org/works")
+        with patch.dict("os.environ", both), self.assertRaisesRegex(InvariantViolation, "non-https"):
+            handler.redirect_request(req, None, 302, "Found", {}, "http://api.anthropic.com/v1/messages")
+        with patch.dict("os.environ", both), patch.object(urllib_request.HTTPRedirectHandler, "redirect_request", return_value="ok"):
+            self.assertEqual(handler.redirect_request(req, None, 302, "Found", {}, "https://API.anthropic.com/v1/other"), "ok")
+
+    def test_fetch_json_refuses_non_https_and_maps_http_client_errors(self):
+        import http.client
+
+        with patch.dict("os.environ", ALLOW), self.assertRaisesRegex(InvariantViolation, "only https"):
+            lp.fetch_json("http://api.openalex.org/works")
+        with patch.dict("os.environ", ALLOW), patch.object(lp._OPENER, "open", side_effect=http.client.BadStatusLine("garbage")):
+            with self.assertRaisesRegex(InvariantViolation, r"LITERATURE_PROVIDER_UNAVAILABLE: BadStatusLine reaching api\.openalex\.org"):
+                lp.fetch_json("https://api.openalex.org/works")
+
     def test_same_host_redirect_still_goes_through_the_gate_and_is_allowed(self):
         handler = lp._NoCrossHostRedirects()
         with patch.dict("os.environ", ALLOW), patch.object(urllib_request.HTTPRedirectHandler, "redirect_request", return_value="ok") as parent:
@@ -94,7 +116,7 @@ class EgressGateTests(unittest.TestCase):
             def __exit__(self, *exc):
                 return False
 
-        with patch.object(lp._OPENER, "open", return_value=FakeResponse(lp.MAX_BODY_BYTES + 10)), self.assertRaisesRegex(InvariantViolation, "body exceeds"):
+        with patch.dict("os.environ", ALLOW), patch.object(lp._OPENER, "open", return_value=FakeResponse(lp.MAX_BODY_BYTES + 10)), self.assertRaisesRegex(InvariantViolation, "body exceeds"):
             lp.fetch_json("https://api.openalex.org/works?search=q")
 
     def test_per_page_bounds_and_bool_trap(self):

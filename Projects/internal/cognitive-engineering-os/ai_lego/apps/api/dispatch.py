@@ -55,12 +55,22 @@ def resolve_gate_runner(method_id: str) -> Callable[..., list[dict[str, Any]]]:
     return _sole_matching_function(module, lambda n: n.startswith("evaluate_") and n.endswith("_gates"), "gate-runner (evaluate_*_gates)", method_id)
 
 
-def record_id_prefix(method_id: str) -> str:
+def record_id_prefix(method_id: str, *, required: bool = True) -> str | None:
+    """``RECORD_ID_PREFIX`` is only load-bearing when the API auto-supplies ``record_id`` (builders that declare
+    that parameter). Builders with a domain identity param (``analysis_id``...) take the caller's id verbatim, so
+    ``required=False`` returns ``None`` for them instead of blocking dispatch (2026-09-17: 42 ACTIVE methods
+    answered 501 on /invoke for a constant they never used)."""
     module = _module_for(method_id)
     prefix = getattr(module, "RECORD_ID_PREFIX", None)
-    if not isinstance(prefix, str) or not prefix:
+    if isinstance(prefix, str) and prefix:
+        return prefix
+    if required:
         raise MethodDispatchError(f"{module.__name__} has no RECORD_ID_PREFIX constant for method_id {method_id!r}")
-    return prefix
+    return None
+
+
+def builder_takes_record_id(builder: Callable[..., Any]) -> bool:
+    return "record_id" in inspect.signature(builder).parameters
 
 
 def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, provenance: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:

@@ -99,6 +99,16 @@ CREATE TABLE IF NOT EXISTS entitlement_audit (
     granted INTEGER NOT NULL,
     checked_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ai_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT NOT NULL,
+    identity_id TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    used_at TEXT NOT NULL
+);
 """
 
 
@@ -345,3 +355,20 @@ class IdentityStore:
                 "INSERT INTO entitlement_audit (tenant_id, capability_id, granted, checked_at) VALUES (?,?,?,?)",
                 (tenant_id, capability_id, int(granted), _now_iso()),
             )
+
+    # -- AI gateway usage (Phase 2 credit metering reads this; Phase 1 only records) -----------
+
+    def record_ai_usage(self, tenant_id: str, identity_id: str, purpose: str, model: str, input_tokens: int, output_tokens: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO ai_usage (tenant_id, identity_id, purpose, model, input_tokens, output_tokens, used_at) VALUES (?,?,?,?,?,?,?)",
+                (tenant_id, identity_id, purpose, model, int(input_tokens), int(output_tokens), _now_iso()),
+            )
+
+    def ai_usage_totals(self, tenant_id: str) -> dict[str, int]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage WHERE tenant_id = ?",
+                (tenant_id,),
+            ).fetchone()
+        return {"calls": int(row["calls"]), "input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"])}

@@ -385,6 +385,8 @@ seed_content:
         # runtime 對應：docker-compose.yml COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST，
         # ai_lego/modules/research/literature_providers.py require_egress_allowed()。
         - "api.openalex.org"
+        # api.anthropic.com（已列於上方第三方整合）自 2026-09-17 起也是 AI gateway 的 runtime 目的地：
+        # ai_lego/platform/ai_gateway/provider.py，key 走 COGNITIVE_OS_ANTHROPIC_API_KEY（deploy/.env，不進 git）。
       classification_tag_ref: null
       mechanism_ref: >-
         2026-08-30 操作者提供第一方網域清單（DNS zone 全文 + 口頭補充 4 個），

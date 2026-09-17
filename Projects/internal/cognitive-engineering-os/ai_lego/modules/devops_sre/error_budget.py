@@ -38,6 +38,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 
 METHOD_ID = "devops_sre.error_budget"
+RECORD_ID_PREFIX = "EB-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.error_budget.budget.calculate_burn_rate"
 VALID_RELEASE_POLICIES = frozenset({"unrestricted", "frozen"})
 BUDGET_EXHAUSTED_THRESHOLD = 1.0

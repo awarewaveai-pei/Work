@@ -35,6 +35,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 
 METHOD_ID = "database_data.reconciliation"
+RECORD_ID_PREFIX = "RECON-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.reconciliation.compare.compute_check_result"
 
 

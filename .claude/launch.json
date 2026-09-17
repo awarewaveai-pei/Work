@@ -42,6 +42,18 @@
         "cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx next dev -p 3902"
       ],
       "port": 3902
+    },
+    {
+      "name": "cognitive-os-api",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "& './scripts/secrets-vault.ps1' -Action run -Names @('ANTHROPIC_API_KEY') -Command \"& 'C:/Users/user1115/AppData/Local/Temp/claude/D--Work/2f650e6f-96de-4c7b-b073-0113183803d1/scratchpad/launch_cos.ps1'\""
+      ],
+      "port": 8420
     }
   ]
 }

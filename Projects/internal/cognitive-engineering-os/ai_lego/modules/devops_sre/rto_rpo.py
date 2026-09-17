@@ -29,6 +29,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "devops_sre.rto_rpo"
+RECORD_ID_PREFIX = "RTORPO-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 DRILL_REF_PREFIX = "DRILL-"
 
 

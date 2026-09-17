@@ -40,6 +40,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "devops_sre.release_readiness_review"
+RECORD_ID_PREFIX = "RRR-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 CANONICAL_DOMAINS = frozenset({"change", "data", "security", "observability", "rollback", "capacity"})
 VALID_VERDICTS = frozenset({"ready", "not_ready"})
 _KNOWN_ASSESSMENT_KEYS = frozenset({"domain", "verdict", "note"})

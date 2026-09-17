@@ -42,6 +42,7 @@ from ai_lego.core.support import parse_timestamp
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "database_data.expand_contract_migration"
+RECORD_ID_PREFIX = "ECMIG-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 
 STAGE_SEQUENCE: tuple[str, ...] = (
     "schema_baseline",

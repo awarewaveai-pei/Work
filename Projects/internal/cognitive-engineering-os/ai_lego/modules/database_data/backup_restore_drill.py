@@ -44,6 +44,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "database_data.backup_restore_drill"
+RECORD_ID_PREFIX = "DRILL-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 VALID_STATUSES = frozenset({"passed", "failed"})
 
 

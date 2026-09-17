@@ -18,6 +18,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.adr"
+RECORD_ID_PREFIX = "ADR-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 VALID_STATUSES = frozenset({"proposed", "accepted", "superseded", "deprecated"})
 
 

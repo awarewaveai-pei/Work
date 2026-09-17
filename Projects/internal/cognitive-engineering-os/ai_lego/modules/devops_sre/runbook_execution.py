@@ -35,6 +35,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "devops_sre.runbook_execution"
+RECORD_ID_PREFIX = "RBEXEC-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 VALID_OUTCOMES = frozenset({"matched_expected", "deviated"})
 VALID_DECISIONS = frozenset({"go", "stop"})
 _KNOWN_STEP_KEYS = frozenset({"step_number", "description", "preconditions_met", "outcome", "decision"})

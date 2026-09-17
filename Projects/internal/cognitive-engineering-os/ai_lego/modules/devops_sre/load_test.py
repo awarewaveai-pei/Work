@@ -38,6 +38,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 
 METHOD_ID = "devops_sre.load_test"
+RECORD_ID_PREFIX = "LOADTEST-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.load_test.comparison.compare_load_measurements"
 _KNOWN_MEASUREMENT_KEYS = frozenset({"load_rps", "latency_p95_ms", "error_rate", "resource_utilization"})
 _KNOWN_ACCEPTANCE_KEYS = frozenset({"latency_p95_ms_max", "error_rate_max"})

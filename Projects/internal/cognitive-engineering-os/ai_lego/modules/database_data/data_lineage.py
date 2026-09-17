@@ -36,6 +36,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 
 METHOD_ID = "database_data.data_lineage"
+RECORD_ID_PREFIX = "DLR-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.lineage.traversal.traces_to_source"
 VALID_STAGES = frozenset({"SOURCE", "INGEST", "TRANSFORM", "DATASET", "ANALYSIS_RUN", "RESULT", "CLAIM", "PAPER_OR_DECISION"})
 

@@ -283,7 +283,7 @@ class DashboardTests(ApiTestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/html", response.headers["content-type"])
-        self.assertIn("Cognitive OS", response.text)
+        self.assertIn("\u8a8d\u77e5\u5de5\u7a0b OS", response.text)
 
     def test_dashboard_sets_frame_options_to_block_clickjacking(self):
         """This is the app's first page with a real login form -- an attacker iframing it to
@@ -308,31 +308,28 @@ class DashboardTests(ApiTestCase):
         innerHTML to a template literal that interpolates a `m.` field."""
         html = api_main._DASHBOARD_HTML
         self.assertNotRegex(html, r"innerHTML\s*=\s*`[^`]*\$\{m\.")
-        self.assertIn("Open Input", html)
-        self.assertIn("runLive", html)
-        self.assertIn("Run Selected Recipe", html)
-        self.assertIn("runRecipe", html)
-        self.assertIn("recipe-json", html)
-        self.assertIn("prepareRecipe", html)
-        self.assertIn("recipe-run-btn", html)
-        self.assertIn("/recipes/${encodeURIComponent(recipeId)}/form", html)
-        self.assertIn("recipe-fields", html)
-        self.assertIn("Build JSON from fields", html)
-        self.assertIn("applyRecipeFields", html)
-        self.assertIn('id="recipe-status-btn"', html)
-        self.assertIn("inspectRecipeRun", html)
-        self.assertIn("/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}", html)
-        self.assertIn('id="recipe-result-btn"', html)
-        self.assertIn("loadRecipeRunResult", html)
-        self.assertIn("/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}/result", html)
+        self.assertNotIn("innerHTML", html)
+        # 2026-09-17 guided UI: brief -> AI draft -> edit -> run; every server call goes through the same routes curl uses.
+        for needle in (
+            'id="brief"', 'id="draft-btn"', 'id="manual-btn"', 'id="fields"', 'id="raw-json"', 'id="run-btn"',
+            "/ai/draft/method/", "/ai/draft/recipe/", "/draft-plan", "/ai/status", "function failWorkspace",
+            "state.epoch += 1", "if (stale()) return;", "b.disabled = state.busy",
+            "/methods/' + encodeURIComponent(state.id) + '/invoke", "/recipes/' + encodeURIComponent(state.id) + '/run",
+        ):
+            self.assertIn(needle, html, needle)
 
     def test_dashboard_recipe_runner_exposes_stable_run_identity_and_resume_payload(self):
         html = api_main._DASHBOARD_HTML
         self.assertIn('id="recipe-run-id"', html)
         self.assertIn('id="recipe-resume"', html)
-        self.assertIn("run_id: runId", html)
         self.assertIn("resume: resume", html)
-        self.assertIn("A run ID is required to resume an existing run", html)
+        self.assertIn("payload.run_id = runId", html)
+        self.assertIn("if (resume && !runId)", html)
+
+    def test_dashboard_is_served_from_the_packaged_file(self):
+        """The page lives in ai_lego/apps/api/dashboard.html (pyproject package-data) so the container's pip install carries it."""
+        self.assertTrue(api_main._DASHBOARD_PATH.is_file())
+        self.assertEqual(api_main._DASHBOARD_PATH.name, "dashboard.html")
 
 
 class UnauthenticatedAccessTests(ApiTestCase):
@@ -494,19 +491,17 @@ class InvokeTests(ApiTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("XIMPACT_TOO_FEW_EVENTS", response.json()["detail"])
 
-    def test_invoke_a_method_missing_record_id_prefix_is_501_not_500(self):
-        """Regression test (2026-09-13): a real production invoke of strategy.swot crashed with a
-        raw 500 -- record_id_prefix() raised MethodDispatchError OUTSIDE the try/except that was
-        supposed to catch exactly that exception type, because it was called one line below the
-        block instead of inside it. architecture.adr is one of 45 modules (out of 254) that, like
-        swot.py was until this same fix, has no RECORD_ID_PREFIX constant -- this proves the API
-        itself no longer crashes for that whole class of gap, not just for the one module that
-        happened to get invoked first."""
+    def test_invoke_never_answers_501_for_a_missing_record_id_prefix(self):
+        """2026-09-13: a missing RECORD_ID_PREFIX crashed /invoke with a raw 500, then answered 501 for 42 ACTIVE
+        methods. 2026-09-17 class fix: the prefix is only required when the builder declares ``record_id``
+        (dispatch.record_id_prefix(required=builder_takes_record_id)); those modules now all carry the
+        constant, and domain-id builders (analysis_id, ...) need none. An empty body is therefore a 400
+        (builder refusal), never a 501, for both classes."""
         self._login()
-        response = self.client.post("/methods/architecture.adr/invoke", json={})
-        self.assertEqual(response.status_code, 501, response.text)
-        self.assertIn("DISPATCH_UNAVAILABLE", response.json()["detail"])
-        self.assertIn("RECORD_ID_PREFIX", response.json()["detail"])
+        for method_id in ("architecture.adr", "decision.mcda", "strategy.swot"):
+            response = self.client.post(f"/methods/{method_id}/invoke", json={})
+            self.assertEqual(response.status_code, 400, f"{method_id}: {response.text}")
+            self.assertNotIn("RECORD_ID_PREFIX", response.text)
 
     def test_invoke_strategy_swot_end_to_end(self):
         """Regression test (2026-09-13): strategy.swot itself was missing RECORD_ID_PREFIX, which

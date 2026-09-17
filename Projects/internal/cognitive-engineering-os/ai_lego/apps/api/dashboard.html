@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>認知工程 OS</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#e2e2e2; --bg:#f7f7f5; --accent:#2b4c7e; --ok:#1d7a3e; --bad:#b3261e; --warn:#8a6d00; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system, "Segoe UI", "Noto Sans TC", sans-serif; margin:0; color:var(--ink); background:var(--bg); }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:.7rem 1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+  header h1 { font-size:1.05rem; margin:0; }
+  #status { font-size:.8rem; color:var(--muted); flex:1; }
+  main { display:grid; grid-template-columns: 300px 1fr; gap:1rem; padding:1rem; max-width:1400px; margin:0 auto; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:1rem; }
+  .tabs { display:flex; gap:.4rem; margin-bottom:.6rem; }
+  .tabs button, .pill { padding:.35rem .7rem; border:1px solid var(--line); background:#fff; border-radius:999px; cursor:pointer; font-size:.85rem; }
+  .tabs button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  input, textarea { width:100%; padding:.45rem; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  textarea { font-family:ui-monospace, Consolas, monospace; font-size:.82rem; }
+  textarea.brief { font-family:inherit; font-size:.95rem; min-height:110px; }
+  label { display:block; font-size:.8rem; color:var(--muted); margin:.5rem 0 .2rem; }
+  button.primary { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.5rem 1rem; cursor:pointer; font:inherit; }
+  button.ghost { background:#fff; border:1px solid var(--line); border-radius:6px; padding:.45rem .9rem; cursor:pointer; font:inherit; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  #list { max-height:70vh; overflow:auto; }
+  .item { display:block; width:100%; text-align:left; padding:.45rem .5rem; border:0; border-bottom:1px solid var(--line); background:#fff; cursor:pointer; font:inherit; }
+  .item:hover { background:#f0f3f8; }
+  .item.on { background:#e6edf7; }
+  .item .id { font-family:ui-monospace, Consolas, monospace; font-size:.8rem; }
+  .item .fam { font-size:.7rem; color:var(--muted); margin-left:.4rem; }
+  .step { border-top:1px solid var(--line); padding-top:.8rem; margin-top:.8rem; }
+  .step h3 { margin:.2rem 0 .5rem; font-size:.95rem; }
+  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-top:.5rem; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  .note { font-size:.8rem; color:var(--muted); }
+  .field { margin:.4rem 0; }
+  .field label { margin:0 0 .15rem; font-family:ui-monospace, Consolas, monospace; color:var(--ink); }
+  .node { border:1px solid var(--line); border-radius:6px; padding:.5rem; margin:.4rem 0; }
+  .node .head { display:flex; justify-content:space-between; gap:.5rem; align-items:center; }
+  table { border-collapse:collapse; width:100%; font-size:.82rem; }
+  td, th { border-bottom:1px solid var(--line); padding:.3rem .4rem; text-align:left; vertical-align:top; }
+  pre { background:#111; color:#d6ffd6; padding:.8rem; border-radius:6px; font-size:.78rem; overflow:auto; max-height:420px; white-space:pre-wrap; }
+  pre.doc { background:#fff; color:var(--ink); border:1px solid var(--line); max-height:none; font-family:inherit; font-size:.92rem; }
+  details summary { cursor:pointer; font-size:.85rem; color:var(--muted); }
+  #login { max-width:420px; margin:3rem auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>認知工程 OS</h1>
+  <div id="status">連線中…</div>
+  <button id="logout-btn" class="ghost" style="display:none">登出</button>
+</header>
+
+<div id="login" class="panel">
+  <h2 style="margin-top:0;font-size:1rem">登入</h2>
+  <label>Tenant ID <input id="tenant_id" autocomplete="username"></label>
+  <label>Email <input id="email" type="email"></label>
+  <label>密碼 <input id="password" type="password" autocomplete="current-password"></label>
+  <div class="row"><button id="login-btn" class="primary">登入</button><span id="login-error" class="bad"></span></div>
+</div>
+
+<main id="app" style="display:none">
+  <section class="panel">
+    <div class="tabs">
+      <button id="tab-recipes" class="on">工作流</button>
+      <button id="tab-methods">單一方法</button>
+    </div>
+    <input id="search" placeholder="篩選…">
+    <div id="list"></div>
+  </section>
+
+  <section class="panel" id="work">
+    <div id="empty" class="note">左邊選一個工作流（多步驟，例如商業企劃、藝術治療卡關）或單一方法。<br>流程：① 用白話描述你的情況 → ② AI 起草結構化資料，你檢查修改 → ③ 執行，系統用每個方法自己的規則驗證。</div>
+
+    <div id="ws" style="display:none">
+      <div id="ws-title" style="font-family:ui-monospace,Consolas,monospace;font-weight:600"></div>
+      <div id="ws-desc" class="note"></div>
+
+      <div class="step">
+        <h3>① 描述</h3>
+        <textarea id="brief" class="brief" placeholder="用你自己的話寫：背景、現況、你想釐清什麼、已知的數字或事實。AI 只會根據你寫的內容起草，不足的地方會標 TBD 讓你補。"></textarea>
+        <div class="row">
+          <button id="draft-btn" class="primary">AI 起草</button>
+          <button id="manual-btn" class="ghost">略過起草，直接填</button>
+          <span id="draft-status" class="note"></span>
+        </div>
+      </div>
+
+      <div class="step" id="step2" style="display:none">
+        <h3>② 檢查與修改</h3>
+        <div id="draft-verdict" class="note"></div>
+        <div id="fields"></div>
+        <details><summary>原始 JSON（進階）</summary><textarea id="raw-json" rows="12"></textarea><div class="row"><button id="raw-apply" class="ghost">套用原始 JSON</button></div></details>
+      </div>
+
+      <div class="step" id="step3" style="display:none">
+        <h3>③ 執行</h3>
+        <div id="run-opts" class="row" style="display:none">
+          <label style="margin:0;flex:1">run_id（選填；續跑既有 run 時必填）<input id="recipe-run-id" maxlength="80" pattern="[A-Za-z0-9_-]{1,80}"></label>
+          <label style="margin:0"><input id="recipe-resume" type="checkbox" style="width:auto"> 續跑既有 run</label>
+        </div>
+        <div class="row">
+          <button id="run-btn" class="primary">執行並驗證</button>
+          <span id="run-status" class="note"></span>
+        </div>
+        <div id="result"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+// epoch: bumped on every workspace switch; an async draft that finishes for an older epoch is discarded
+// (2026-09-17: a recipe draft completing after the user switched to a method left recipe fields under a method run).
+const state = { methods: [], recipes: [], tab: 'recipes', kind: null, id: null, params: [], plan: [], data: {}, ai: { configured: false, model: null }, epoch: 0, busy: false };
+
+function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+function pretty(v) { return JSON.stringify(v, null, 2); }
+async function api(path, opts) {
+  const r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts || {}));
+  let body = null; try { body = await r.json(); } catch (e) { body = null; }
+  return { ok: r.ok, status: r.status, body };
+}
+function detailText(res) {
+  const d = res && res.body && res.body.detail;
+  if (d === undefined || d === null) return 'HTTP ' + res.status;
+  return typeof d === 'string' ? d : pretty(d);
+}
+
+// ---------- session ----------
+async function refreshStatus() {
+  const s = await api('/ai/status');
+  if (s.ok) {
+    state.ai = s.body;
+    $('status').textContent = s.body.configured ? ('AI 已連線：' + s.body.model + '　本租戶累計 ' + s.body.usage.calls + ' 次起草') : 'AI 未設定（伺服器缺 COGNITIVE_OS_ANTHROPIC_API_KEY）— 只能手動填';
+    return true;
+  }
+  $('status').textContent = s.status === 401 ? '請登入' : '狀態不可用 (' + s.status + ')';
+  return false;
+}
+function showApp(on) { $('login').style.display = on ? 'none' : ''; $('app').style.display = on ? '' : 'none'; $('logout-btn').style.display = on ? '' : 'none'; }
+$('login-btn').onclick = async () => {
+  $('login-error').textContent = '';
+  const r = await api('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenant_id: $('tenant_id').value.trim(), email: $('email').value.trim(), password: $('password').value }) });
+  if (!r.ok) { $('login-error').textContent = detailText(r); return; }
+  await boot();
+};
+$('logout-btn').onclick = async () => { await api('/auth/logout', { method: 'POST' }); showApp(false); $('status').textContent = '已登出'; };
+$('password').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+
+async function boot() {
+  const ok = await refreshStatus();
+  if (!ok) { showApp(false); return; }
+  showApp(true);
+  const [m, r] = await Promise.all([api('/methods'), api('/recipes')]);
+  state.methods = m.ok ? m.body : [];
+  state.recipes = r.ok ? r.body : [];
+  renderList();
+}
+
+// ---------- catalog ----------
+$('tab-recipes').onclick = () => { state.tab = 'recipes'; $('tab-recipes').classList.add('on'); $('tab-methods').classList.remove('on'); renderList(); };
+$('tab-methods').onclick = () => { state.tab = 'methods'; $('tab-methods').classList.add('on'); $('tab-recipes').classList.remove('on'); renderList(); };
+$('search').addEventListener('input', renderList);
+function renderList() {
+  const q = $('search').value.trim().toLowerCase();
+  const list = $('list'); clear(list);
+  if (state.tab === 'recipes') {
+    state.recipes.filter(r => !q || r.recipe_id.toLowerCase().includes(q)).forEach(r => {
+      const b = el('button', 'item' + (state.kind === 'recipe' && state.id === r.recipe_id ? ' on' : ''));
+      b.appendChild(el('span', 'id', r.recipe_id)); b.appendChild(el('span', 'fam', r.step_count + ' 步'));
+      b.disabled = state.busy; b.onclick = () => openRecipe(r.recipe_id); list.appendChild(b);
+    });
+  } else {
+    state.methods.filter(m => !q || m.method_id.toLowerCase().includes(q)).forEach(m => {
+      const b = el('button', 'item' + (state.kind === 'method' && state.id === m.method_id ? ' on' : ''));
+      b.appendChild(el('span', 'id', m.method_id)); b.appendChild(el('span', 'fam', m.method_id.split('.')[0]));
+      b.disabled = state.busy; b.onclick = () => openMethod(m.method_id); list.appendChild(b);
+    });
+  }
+}
+
+function resetWork() {
+  $('empty').style.display = 'none'; $('ws').style.display = '';
+  $('step2').style.display = 'none'; $('step3').style.display = 'none';
+  $('draft-status').textContent = ''; $('draft-verdict').textContent = ''; $('run-status').textContent = '';
+  clear($('fields')); clear($('result')); $('raw-json').value = '';
+  $('draft-btn').disabled = !state.ai.configured;
+  $('draft-btn').title = state.ai.configured ? '' : 'AI 未設定';
+  $('run-opts').style.display = state.kind === 'recipe' ? '' : 'none';
+  $('ws-desc').className = 'note';
+  $('ws').querySelectorAll('.step').forEach(s => { s.style.display = ''; });
+  $('step2').style.display = 'none'; $('step3').style.display = 'none';
+}
+
+function failWorkspace(id, res) {
+  if (res.status === 401) { showApp(false); $('status').textContent = '登入已過期，請重新登入'; return; }
+  resetWork();
+  $('ws-title').textContent = id;
+  $('ws-desc').textContent = '無法載入：' + detailText(res);
+  $('ws-desc').className = 'bad';
+  $('ws').querySelectorAll('.step').forEach(s => { s.style.display = 'none'; });
+  renderList();
+}
+
+async function openMethod(id) {
+  if (state.busy) return;
+  state.epoch += 1; state.kind = 'method'; state.id = id; state.data = {};
+  const f = await api('/methods/' + encodeURIComponent(id) + '/form');
+  if (!f.ok) { failWorkspace(id, f); return; }
+  state.params = f.body.parameters;
+  const c = f.body.contract || {};
+  resetWork();
+  $('ws-title').textContent = id;
+  $('ws-desc').textContent = (c.title ? c.title + '。' : '') + '欄位：' + state.params.map(p => p.name + (p.required ? '' : '?')).join(', ');
+  renderList();
+}
+
+async function openRecipe(id) {
+  if (state.busy) return;
+  state.epoch += 1; state.kind = 'recipe'; state.id = id; state.data = {};
+  const p = await api('/recipes/' + encodeURIComponent(id) + '/draft-plan');
+  if (!p.ok) { failWorkspace(id, p); return; }
+  state.plan = p.body.nodes;
+  resetWork();
+  $('ws-title').textContent = id;
+  $('ws-desc').textContent = '步驟：' + state.plan.map(n => n.label + ' (' + n.method_id + ')').join(' → ');
+  renderList();
+}
+
+// ---------- step 1: draft ----------
+$('manual-btn').onclick = () => {
+  if (state.kind === 'method') { state.data = {}; state.params.forEach(p => { if (p.required && p.name !== 'record_id' && p.name !== 'provenance') state.data[p.name] = ''; }); renderMethodFields(null); }
+  else { state.data = {}; state.plan.forEach(n => n.declared_source_paths.forEach(path => { state.data[path] = state.data[path] || {}; })); renderRecipeNodes([]); }
+  $('step2').style.display = ''; $('step3').style.display = '';
+};
+
+$('draft-btn').onclick = async () => {
+  const brief = $('brief').value.trim();
+  if (!brief) { $('draft-status').textContent = '先寫描述。'; return; }
+  const epoch = state.epoch;
+  const stale = () => epoch !== state.epoch;
+  state.busy = true; renderList();
+  $('draft-btn').disabled = true;
+  try {
+    if (state.kind === 'method') {
+      $('draft-status').textContent = 'AI 起草中…';
+      const r = await api('/ai/draft/method/' + encodeURIComponent(state.id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brief }) });
+      if (stale()) return;
+      if (!r.ok) { $('draft-status').textContent = '失敗：' + detailText(r); return; }
+      state.data = r.body.draft;
+      renderMethodFields(r.body);
+      $('draft-status').textContent = '完成（' + r.body.attempts + ' 輪，' + r.body.usage.input_tokens + '/' + r.body.usage.output_tokens + ' tokens）';
+    } else {
+      state.data = {};
+      const verdicts = [];
+      for (let i = 0; i < state.plan.length; i++) {
+        const n = state.plan[i];
+        $('draft-status').textContent = '起草 ' + (i + 1) + '/' + state.plan.length + '：' + n.label + '…';
+        const r = await api('/ai/draft/recipe/' + encodeURIComponent(state.id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brief, labels: [n.label], source: state.data }) });
+        if (stale()) return;
+        if (!r.ok) { verdicts.push({ label: n.label, method_id: n.method_id, ok: false, error: detailText(r) }); continue; }
+        state.data = r.body.source;
+        verdicts.push(...r.body.nodes);
+        renderRecipeNodes(verdicts);
+      }
+      renderRecipeNodes(verdicts);
+      $('draft-status').textContent = '完成：' + verdicts.filter(v => v.ok === true).length + ' 通過 / ' + verdicts.filter(v => v.ok === false).length + ' 需修正 / ' + verdicts.filter(v => v.ok === null).length + ' 由執行時驗證';
+    }
+    $('step2').style.display = ''; $('step3').style.display = '';
+  } finally { state.busy = false; renderList(); if (!stale()) $('draft-btn').disabled = !state.ai.configured; refreshStatus(); }
+};
+
+// ---------- step 2: edit ----------
+function valueToText(v) { return (typeof v === 'string') ? v : pretty(v); }
+function textToValue(t, wasString) {
+  const s = t.trim();
+  if (wasString) return t;
+  try { return JSON.parse(s); } catch (e) { return t; }
+}
+function verdictLine(v) {
+  if (!v) return '';
+  if (v.ok === true) return '✔ 方法規則驗證通過';
+  if (v.ok === null) return '○ ' + (v.error || '待執行時驗證');
+  return '✘ 被方法拒絕：' + (v.error || '');
+}
+function renderMethodFields(draft) {
+  const box = $('fields'); clear(box);
+  const vd = $('draft-verdict'); vd.textContent = draft ? verdictLine(draft.validation) : '手動填寫：字串直接打字；清單或物件用 JSON。';
+  vd.className = draft && draft.validation.ok === true ? 'ok' : (draft && draft.validation.ok === false ? 'bad' : 'note');
+  const names = new Set(state.params.map(p => p.name));
+  Object.keys(state.data).forEach(k => names.add(k));
+  names.forEach(name => {
+    if (name === 'provenance') return;
+    const p = state.params.find(x => x.name === name) || { required: false };
+    const v = state.data[name];
+    const f = el('div', 'field');
+    f.appendChild(el('label', null, name + (p.required ? '' : '（選填）')));
+    const ta = el('textarea'); ta.rows = (typeof v === 'string' || v === undefined) ? 2 : Math.min(14, valueToText(v).split('\n').length + 1);
+    ta.value = v === undefined ? '' : valueToText(v);
+    ta.dataset.name = name; ta.dataset.str = (typeof v === 'string' || v === undefined) ? '1' : '0';
+    ta.addEventListener('input', () => { const val = textToValue(ta.value, ta.dataset.str === '1'); if (ta.value.trim() === '' && !p.required) delete state.data[name]; else state.data[name] = val; $('raw-json').value = pretty(state.data); });
+    f.appendChild(ta); box.appendChild(f);
+  });
+  $('raw-json').value = pretty(state.data);
+}
+function renderRecipeNodes(verdicts) {
+  const box = $('fields'); clear(box);
+  $('draft-verdict').textContent = '每一步一個資料物件；執行時每個方法各自驗證。'; $('draft-verdict').className = 'note';
+  state.plan.forEach(n => {
+    const v = verdicts.find(x => x.label === n.label);
+    const node = el('div', 'node');
+    const head = el('div', 'head');
+    head.appendChild(el('span', 'id', n.label + '  ·  ' + n.method_id));
+    const s = el('span', v ? (v.ok === true ? 'ok' : (v.ok === false ? 'bad' : 'warn')) : 'note', v ? verdictLine(v) : (n.source_params && Object.keys(n.source_params).length ? '待起草' : '無需輸入'));
+    head.appendChild(s); node.appendChild(head);
+    n.declared_source_paths.forEach(path => {
+      const f = el('div', 'field'); f.appendChild(el('label', null, 'source.' + path));
+      const ta = el('textarea'); ta.rows = 6; ta.value = pretty(state.data[path] === undefined ? {} : state.data[path]);
+      ta.addEventListener('input', () => { try { state.data[path] = JSON.parse(ta.value); ta.style.borderColor = ''; } catch (e) { ta.style.borderColor = 'var(--bad)'; } $('raw-json').value = pretty(state.data); });
+      f.appendChild(ta); node.appendChild(f);
+    });
+    box.appendChild(node);
+  });
+  $('raw-json').value = pretty(state.data);
+}
+$('raw-apply').onclick = () => {
+  try { state.data = JSON.parse($('raw-json').value); } catch (e) { $('draft-verdict').textContent = '原始 JSON 無法解析：' + e.message; $('draft-verdict').className = 'bad'; return; }
+  if (state.kind === 'method') renderMethodFields(null); else renderRecipeNodes([]);
+};
+
+// ---------- step 3: run ----------
+function gateTable(gates) {
+  const t = el('table'); const h = el('tr'); ['閘門', '結果', '證據'].forEach(x => h.appendChild(el('th', null, x))); t.appendChild(h);
+  (gates || []).forEach(g => { const r = el('tr'); r.appendChild(el('td', null, g.gate_id || g.id || '')); r.appendChild(el('td', g.status === 'PASS' || g.status === 'NOT_APPLICABLE' ? 'ok' : 'bad', g.status)); r.appendChild(el('td', null, g.evidence === undefined ? '' : pretty(g.evidence))); t.appendChild(r); });
+  return t;
+}
+function findArtifacts(outputs) {
+  const found = [];
+  Object.keys(outputs || {}).forEach(k => { const v = outputs[k]; if (v && v.artifact && typeof v.artifact.content === 'string') found.push({ label: k, content: v.artifact.content }); });
+  return found;
+}
+$('run-btn').onclick = async () => {
+  const out = $('result'); clear(out); $('run-status').textContent = '執行中…'; $('run-btn').disabled = true;
+  try {
+    if (state.kind === 'method') {
+      const r = await api('/methods/' + encodeURIComponent(state.id) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data) });
+      if (!r.ok) { $('run-status').textContent = ''; out.appendChild(el('div', 'bad', '被拒絕：' + detailText(r))); return; }
+      const allPass = (r.body.gate_results || []).every(g => g.status === 'PASS' || g.status === 'NOT_APPLICABLE');
+      $('run-status').textContent = ''; out.appendChild(el('div', allPass ? 'ok' : 'bad', allPass ? '✔ 記錄成立，所有閘門通過' : '✘ 有閘門未通過'));
+      out.appendChild(gateTable(r.body.gate_results));
+      const d = el('details'); d.appendChild(el('summary', null, '記錄 JSON')); const pre = el('pre', null, pretty(r.body.record)); d.appendChild(pre); out.appendChild(d);
+    } else {
+      const runId = $('recipe-run-id').value.trim();
+      const resume = $('recipe-resume').checked;
+      if (resume && !runId) { $('run-status').textContent = ''; out.appendChild(el('div', 'bad', '續跑需要 run_id。')); return; }
+      const payload = { source: state.data, resume: resume };
+      if (runId) payload.run_id = runId;
+      const r = await api('/recipes/' + encodeURIComponent(state.id) + '/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!r.ok) { $('run-status').textContent = ''; out.appendChild(el('div', 'bad', '無法執行：' + detailText(r))); return; }
+      const b = r.body; $('run-status').textContent = 'run_id ' + b.run_id;
+      out.appendChild(el('div', b.status === 'PASS' ? 'ok' : 'bad', b.status === 'PASS' ? '✔ 全部步驟完成且閘門通過' : '✘ ' + b.status));
+      const t = el('table'); const h = el('tr'); ['步驟', '狀態', '錯誤／閘門'].forEach(x => h.appendChild(el('th', null, x))); t.appendChild(h);
+      const steps = (b.workflow && b.workflow.steps) || {};
+      Object.keys(steps).forEach(k => {
+        const s = steps[k]; const row = el('tr');
+        row.appendChild(el('td', null, (s.label || s.ref || k)));
+        row.appendChild(el('td', (s.status === 'SUCCEEDED' || s.status === 'PASS') ? 'ok' : 'bad', s.status || ''));
+        const gs = (b.gates && b.gates[k]) || [];
+        const bad = gs.filter(g => g.status !== 'PASS' && g.status !== 'NOT_APPLICABLE').map(g => g.gate_id + ': ' + pretty(g.evidence)).join('\n');
+        row.appendChild(el('td', null, (s.error ? String(s.error) + '\n' : '') + (bad || (gs.length ? gs.length + ' 閘門通過' : ''))));
+        t.appendChild(row);
+      });
+      out.appendChild(t);
+      findArtifacts(b.workflow && b.workflow.outputs).forEach(a => { out.appendChild(el('h4', null, '產出：' + a.label)); out.appendChild(el('pre', 'doc', a.content)); });
+      const d = el('details'); d.appendChild(el('summary', null, '完整輸出 JSON')); d.appendChild(el('pre', null, pretty(b.workflow && b.workflow.outputs))); out.appendChild(d);
+    }
+  } finally { $('run-btn').disabled = false; }
+};
+
+boot();
+</script>
+</body>
+</html>

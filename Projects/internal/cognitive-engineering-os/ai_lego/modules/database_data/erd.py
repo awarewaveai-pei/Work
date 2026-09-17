@@ -46,6 +46,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "database_data.erd"
+RECORD_ID_PREFIX = "ERD-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 _KNOWN_ATTRIBUTE_KEYS = frozenset({"name", "data_type", "is_primary_key"})
 _KNOWN_ENTITY_KEYS = frozenset({"name", "attributes"})
 _KNOWN_RELATIONSHIP_KEYS = frozenset({"from_entity", "to_entity", "cardinality", "foreign_key_attributes"})

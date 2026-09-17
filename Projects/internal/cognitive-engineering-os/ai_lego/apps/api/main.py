@@ -56,7 +56,7 @@ from pydantic import BaseModel
 import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
-from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
+from ai_lego.apps.api.dispatch import MethodDispatchError, builder_takes_record_id, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import read_json
@@ -64,6 +64,8 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
+from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
+from ai_lego.platform.ai_gateway.provider import AiProvider, provider_from_env
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
@@ -279,6 +281,11 @@ def get_store() -> IdentityStore:
     return IdentityStore(db_path)
 
 
+def get_ai_provider() -> AiProvider | None:
+    """``None`` = no key configured; /ai/* answers 503 AI_PROVIDER_UNCONFIGURED. Tests override this dependency."""
+    return provider_from_env()
+
+
 def get_catalog() -> MethodCatalog:
     return MethodCatalog.from_spec_root(resolve_spec_root())
 
@@ -298,345 +305,8 @@ class LoginRequest(BaseModel):
     password: str
 
 
-_DASHBOARD_HTML = """<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Cognitive OS -- Phase 1</title>
-<style>
-  body { font-family: -apple-system, Segoe UI, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
-  h1 { font-size: 1.3rem; }
-  #login-box, #app-box { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-  input { display: block; width: 100%; box-sizing: border-box; margin: 0.3rem 0 0.8rem; padding: 0.4rem; }
-  button { padding: 0.4rem 0.9rem; cursor: pointer; }
-  #status { font-size: 0.85rem; color: #666; margin-bottom: 0.8rem; }
-  #search { margin-bottom: 0.6rem; }
-  .method-row { border-bottom: 1px solid #eee; padding: 0.5rem 0; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-  .method-meta { flex: 1; min-width: 0; }
-  .method-id { font-family: monospace; font-size: 0.9rem; font-weight: 600; }
-  .family-tag { display: inline-block; font-size: 0.7rem; background: #eef; color: #335; border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
-  .source-field { border: 1px solid #eee; border-radius: 4px; padding: 0.5rem; margin: 0.4rem 0; }
-  .source-field-label { display: block; font-family: monospace; font-size: 0.8rem; font-weight: 600; }
-  .source-field textarea { width: 100%; box-sizing: border-box; margin-top: 0.3rem; font-family: monospace; }
-  #result { white-space: pre-wrap; font-family: monospace; font-size: 0.8rem; background: #111; color: #0f0; padding: 1rem; border-radius: 6px; max-height: 400px; overflow: auto; }
-  .error { color: #c00; }
-</style>
-</head>
-<body>
-<h1>Cognitive OS -- Phase 1</h1>
-<div id="status">checking session...</div>
-
-<div id="login-box">
-  <label>Tenant ID <input id="tenant_id"></label>
-  <label>Email <input id="email" type="email"></label>
-  <label>Password <input id="password" type="password"></label>
-  <button id="login-btn">Log in</button>
-  <span id="login-error" class="error"></span>
-</div>
-
-<div id="app-box" style="display:none">
-  <button id="logout-btn">Log out</button>
-  <input id="search" placeholder="Filter methods by id (e.g. foresight, cross_impact_analysis)...">
-  <div id="method-list"></div>
-  <h2>Recipes</h2>
-  <div id="recipe-list"></div>
-  <div id="recipe-help" class="method-meta">Choose a Recipe to load its Source fields.</div>
-  <div id="recipe-fields"></div>
-  <button id="recipe-fields-apply" disabled>Build JSON from fields</button>
-  <textarea id="recipe-json" rows="10" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace" placeholder='Select a Recipe to generate its Source skeleton.'>{}</textarea>
-  <label>Run ID (optional; required to resume) <input id="recipe-run-id" maxlength="80" pattern="[A-Za-z0-9_-]{1,80}" placeholder="e.g. edd-study-001"></label>
-  <label><input id="recipe-resume" type="checkbox"> Resume existing run</label>
-  <span id="recipe-run-error" class="error"></span>
-  <button id="recipe-run-btn" disabled>Run Selected Recipe</button>
-  <button id="recipe-status-btn" disabled>Check Run</button>
-  <button id="recipe-result-btn" disabled>Load Result</button>
-  <div id="invoke-box" style="display:none; border-top:1px solid #ddd; margin-top:1rem; padding-top:1rem">
-    <div id="invoke-method" class="method-id"></div>
-    <div id="invoke-help" class="method-meta"></div>
-    <textarea id="invoke-json" rows="12" style="width:100%; box-sizing:border-box; margin:0.6rem 0; font-family:monospace">{}</textarea>
-    <button id="invoke-btn">Run with JSON</button>
-  </div>
-</div>
-
-<h3>Result</h3>
-<div id="result">(nothing run yet)</div>
-
-<script>
-let methods = [];
-let loggedIn = false;
-let selectedRecipeId = null;
-
-async function checkStatus() {
-  const r = await fetch('/methods', { credentials: 'same-origin' });
-  document.getElementById('status').textContent = r.ok ? 'API reachable, ' + (await r.clone().json()).length + ' methods available' : 'API unreachable';
-}
-
-async function loadMethods() {
-  const r = await fetch('/methods', { credentials: 'same-origin' });
-  methods = await r.json();
-  renderMethods();
-}
-
-function renderMethods() {
-  // /methods only returns {method_id, path, status, version, content_sha256} -- there is no
-  // separate title/family field in the catalog, so nothing here reads one. All text nodes use
-  // textContent (never innerHTML) because method_id is free text from a YAML `id` field with no
-  // format enforcement (ai_lego/platform/ai_execution/contract_catalog.py scan_contract_files) --
-  // treat it as untrusted even though today's ~249 contract files are all team-authored.
-  const q = document.getElementById('search').value.toLowerCase();
-  const list = document.getElementById('method-list');
-  while (list.firstChild) list.removeChild(list.firstChild);
-  methods
-    .filter(m => !q || m.method_id.toLowerCase().includes(q))
-    .forEach(m => {
-      const row = document.createElement('div');
-      row.className = 'method-row';
-
-      const meta = document.createElement('div');
-      meta.className = 'method-meta';
-      const idLine = document.createElement('span');
-      idLine.className = 'method-id';
-      idLine.textContent = m.method_id;
-      meta.appendChild(idLine);
-      const family = m.method_id.includes('.') ? m.method_id.split('.')[0] : '';
-      if (family) {
-        const tag = document.createElement('span');
-        tag.className = 'family-tag';
-        tag.textContent = family;
-        meta.appendChild(tag);
-      }
-      row.appendChild(meta);
-
-      const btn = document.createElement('button');
-      btn.textContent = 'Run Demo';
-      btn.disabled = !loggedIn;
-      btn.onclick = () => runDemo(m.method_id);
-      const formBtn = document.createElement('button');
-      formBtn.textContent = 'Open Input';
-      formBtn.disabled = !loggedIn;
-      formBtn.onclick = () => openForm(m.method_id);
-      const actions = document.createElement('div');
-      actions.appendChild(btn);
-      actions.appendChild(formBtn);
-      row.appendChild(actions);
-      list.appendChild(row);
-    });
-}
-
-async function loadRecipes() {
-  const r = await fetch('/recipes', { credentials: 'same-origin' });
-  if (!r.ok) return;
-  const recipes = await r.json();
-  const list = document.getElementById('recipe-list');
-  while (list.firstChild) list.removeChild(list.firstChild);
-  recipes.forEach(recipe => {
-    const row = document.createElement('div');
-    row.className = 'method-row';
-    const label = document.createElement('span');
-    label.className = 'method-id';
-    label.textContent = recipe.recipe_id + ' (' + recipe.step_count + ' steps)';
-    row.appendChild(label);
-    const button = document.createElement('button');
-    button.textContent = 'Prepare Source';
-    button.disabled = !loggedIn;
-    button.onclick = () => prepareRecipe(recipe.recipe_id);
-    row.appendChild(button);
-    list.appendChild(row);
-  });
-}
-
-function assignPath(target, dottedPath, value) {
-  const parts = dottedPath.split('.');
-  let cursor = target;
-  parts.forEach((part, index) => {
-    if (index === parts.length - 1) { cursor[part] = value; return; }
-    if (!cursor[part] || typeof cursor[part] !== 'object' || Array.isArray(cursor[part])) cursor[part] = {};
-    cursor = cursor[part];
-  });
-}
-
-function renderRecipeFields(fields) {
-  const container = document.getElementById('recipe-fields');
-  while (container.firstChild) container.removeChild(container.firstChild);
-  fields.forEach(field => {
-    const row = document.createElement('div');
-    row.className = 'source-field';
-    const label = document.createElement('label');
-    label.className = 'source-field-label';
-    label.textContent = field.path + (field.required ? ' (required)' : ' (optional)');
-    const input = document.createElement('textarea');
-    input.rows = field.path.includes('factors') || field.path.includes('criteria') || field.path.includes('claims') ? 4 : 2;
-    input.dataset.sourcePath = field.path;
-    input.placeholder = 'String or valid JSON value';
-    row.appendChild(label);
-    row.appendChild(input);
-    container.appendChild(row);
-  });
-  document.getElementById('recipe-fields-apply').disabled = fields.length === 0;
-}
-
-function applyRecipeFields() {
-  const source = {};
-  const inputs = document.querySelectorAll('#recipe-fields textarea[data-source-path]');
-  inputs.forEach(input => {
-    const raw = input.value.trim();
-    if (!raw) return;
-    let value;
-    try { value = JSON.parse(raw); }
-    catch (error) { value = raw; }
-    assignPath(source, input.dataset.sourcePath, value);
-  });
-  document.getElementById('recipe-json').value = JSON.stringify(source, null, 2);
-}
-
-async function prepareRecipe(recipeId) {
-  const [formResponse, planResponse] = await Promise.all([
-    fetch(`/recipes/${encodeURIComponent(recipeId)}/form`, { credentials: 'same-origin' }),
-    fetch(`/recipes/${encodeURIComponent(recipeId)}/plan`, { credentials: 'same-origin' }),
-  ]);
-  const form = await formResponse.json();
-  const plan = await planResponse.json();
-  if (!formResponse.ok || !planResponse.ok) {
-    document.getElementById('result').textContent = JSON.stringify({ form, plan }, null, 2);
-    return;
-  }
-  selectedRecipeId = recipeId;
-  const skeleton = {};
-  form.source_fields.forEach(field => assignPath(skeleton, field.path, null));
-  renderRecipeFields(form.source_fields);
-  document.getElementById('recipe-json').value = JSON.stringify(skeleton, null, 2);
-  const blockers = (plan.blockers || []).map(item => item.code + ': ' + JSON.stringify(item.detail)).join(' | ');
-  document.getElementById('recipe-help').textContent = `${recipeId}: ${form.source_fields.length} Source fields. Plan status: ${plan.status}.${blockers ? ' Blockers: ' + blockers + '.' : ''} Null values are placeholders; replace them with valid domain data before running.`;
-  document.getElementById('recipe-run-btn').disabled = !loggedIn || plan.status !== 'READY';
-  document.getElementById('recipe-status-btn').disabled = !loggedIn;
-  document.getElementById('recipe-result-btn').disabled = !loggedIn;
-  document.getElementById('result').textContent = JSON.stringify({ recipe_id: recipeId, plan_status: plan.status, source_fields: form.source_fields }, null, 2);
-}
-
-async function runDemo(methodId) {
-  document.getElementById('result').textContent = 'running ' + methodId + ' ...';
-  const r = await fetch(`/methods/${encodeURIComponent(methodId)}/demo`, { credentials: 'same-origin' });
-  const body = await r.json();
-  document.getElementById('result').textContent = JSON.stringify(body, null, 2);
-}
-
-async function openForm(methodId) {
-  const r = await fetch(`/methods/${encodeURIComponent(methodId)}/form`, { credentials: 'same-origin' });
-  const body = await r.json();
-  if (!r.ok) { document.getElementById('result').textContent = JSON.stringify(body, null, 2); return; }
-  document.getElementById('invoke-box').style.display = 'block';
-  document.getElementById('invoke-method').textContent = methodId;
-  document.getElementById('invoke-help').textContent = 'Required/optional parameters: ' + body.parameters.map(p => p.name + (p.required ? ' (required)' : ' (optional)')).join(', ') + '. Values must be valid JSON.';
-  document.getElementById('invoke-json').value = '{}';
-  document.getElementById('invoke-btn').onclick = () => runLive(methodId);
-}
-
-async function runLive(methodId) {
-  let body;
-  try { body = JSON.parse(document.getElementById('invoke-json').value); }
-  catch (error) { document.getElementById('result').textContent = 'Invalid JSON: ' + error.message; return; }
-  document.getElementById('result').textContent = 'invoking ' + methodId + ' ...';
-  const r = await fetch(`/methods/${encodeURIComponent(methodId)}/invoke`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
-}
-
-async function runRecipe(recipeId) {
-  let source;
-  try { source = JSON.parse(document.getElementById('recipe-json').value); }
-  catch (error) { document.getElementById('result').textContent = 'Invalid JSON: ' + error.message; return; }
-  if (!source || typeof source !== 'object' || Array.isArray(source)) {
-    document.getElementById('result').textContent = 'Recipe source must be a JSON object';
-    return;
-  }
-  const runId = document.getElementById('recipe-run-id').value.trim();
-  const resume = document.getElementById('recipe-resume').checked;
-  document.getElementById('recipe-run-error').textContent = '';
-  if (resume && !runId) {
-    document.getElementById('recipe-run-error').textContent = 'A run ID is required to resume an existing run';
-    return;
-  }
-  document.getElementById('result').textContent = 'running recipe ' + recipeId + ' ...';
-  const request = { source, run_id: runId || undefined, resume: resume };
-  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/run`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
-  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
-}
-
-async function inspectRecipeRun(recipeId) {
-  const runId = document.getElementById('recipe-run-id').value.trim();
-  document.getElementById('recipe-run-error').textContent = '';
-  if (!runId) {
-    document.getElementById('recipe-run-error').textContent = 'A run ID is required to inspect a run';
-    return;
-  }
-  document.getElementById('result').textContent = 'checking recipe run ' + runId + ' ...';
-  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}`, { credentials: 'same-origin' });
-  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
-}
-
-async function loadRecipeRunResult(recipeId) {
-  const runId = document.getElementById('recipe-run-id').value.trim();
-  document.getElementById('recipe-run-error').textContent = '';
-  if (!runId) {
-    document.getElementById('recipe-run-error').textContent = 'A run ID is required to load a result';
-    return;
-  }
-  document.getElementById('result').textContent = 'loading recipe result ' + runId + ' ...';
-  const r = await fetch(`/recipes/${encodeURIComponent(recipeId)}/runs/${encodeURIComponent(runId)}/result`, { credentials: 'same-origin' });
-  document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
-}
-
-document.getElementById('recipe-run-btn').onclick = () => {
-  if (selectedRecipeId) runRecipe(selectedRecipeId);
-};
-
-document.getElementById('recipe-status-btn').onclick = () => {
-  if (selectedRecipeId) inspectRecipeRun(selectedRecipeId);
-};
-
-document.getElementById('recipe-result-btn').onclick = () => {
-  if (selectedRecipeId) loadRecipeRunResult(selectedRecipeId);
-};
-
-document.getElementById('recipe-fields-apply').onclick = applyRecipeFields;
-
-document.getElementById('search').addEventListener('input', renderMethods);
-
-document.getElementById('login-btn').onclick = async () => {
-  document.getElementById('login-error').textContent = '';
-  const r = await fetch('/auth/login', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tenant_id: document.getElementById('tenant_id').value,
-      email: document.getElementById('email').value,
-      password: document.getElementById('password').value,
-    }),
-  });
-  if (!r.ok) {
-    document.getElementById('login-error').textContent = (await r.json()).detail || 'login failed';
-    return;
-  }
-  loggedIn = true;
-  document.getElementById('login-box').style.display = 'none';
-  document.getElementById('app-box').style.display = 'block';
-  renderMethods();
-  loadRecipes();
-};
-
-document.getElementById('logout-btn').onclick = async () => {
-  await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
-  loggedIn = false;
-  document.getElementById('login-box').style.display = 'block';
-  document.getElementById('app-box').style.display = 'none';
-};
-
-checkStatus();
-loadMethods();
-loadRecipes();
-</script>
-</body>
-</html>"""
+_DASHBOARD_PATH = Path(__file__).with_name("dashboard.html")
+_DASHBOARD_HTML = _DASHBOARD_PATH.read_text(encoding="utf-8")
 
 
 @app.get("/")
@@ -1037,7 +707,7 @@ def invoke_method(
     try:
         builder = resolve_builder(method_id)
         gate_runner = resolve_gate_runner(method_id)
-        record_id = f"{record_id_prefix(method_id)}{secrets.token_hex(8).upper()}"
+        record_id = f"{record_id_prefix(method_id, required=builder_takes_record_id(builder)) or ''}{secrets.token_hex(8).upper()}"
     except MethodDispatchError as error:
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
 
@@ -1070,3 +740,84 @@ def demo_method(method_id: str, session: dict[str, Any] = Depends(require_sessio
         timeout=60,
     )
     return {"method_id": method_id, "exit_code": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+
+
+# -- AI gateway (Master Plan Phase 1 "AI Gateway" plane; first content 2026-09-17) ------------------------------
+
+
+class DraftRequest(BaseModel):
+    brief: str
+    labels: list[str] | None = None
+    source: dict[str, Any] | None = None
+
+
+def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> AiProvider:
+    if provider is None:
+        raise HTTPException(status_code=503, detail="AI_PROVIDER_UNCONFIGURED: set COGNITIVE_OS_ANTHROPIC_API_KEY (deploy/.env) to enable AI drafting")
+    if not check_entitlement(store, session["tenant_id"], AI_DRAFT_CAPABILITY):
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {AI_DRAFT_CAPABILITY!r}")
+    return provider
+
+
+@app.get("/ai/status")
+def ai_status(session: dict[str, Any] = Depends(require_session), provider: AiProvider | None = Depends(get_ai_provider), store: IdentityStore = Depends(get_store)) -> dict[str, Any]:
+    return {"configured": provider is not None, "model": provider.model if provider else None, "usage": store.ai_usage_totals(session["tenant_id"])}
+
+
+@app.get("/recipes/{recipe_id}/draft-plan")
+def recipe_draft_plan_endpoint(recipe_id: str, session: dict[str, Any] = Depends(require_session)) -> dict[str, Any]:
+    try:
+        return {"recipe_id": recipe_id, "nodes": recipe_draft_plan(resolve_spec_root(), recipe_id)}
+    except InvariantViolation as error:
+        if "RECIPE_NOT_FOUND" in str(error) or "RECIPE_ID_MISMATCH" in str(error):
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/ai/draft/method/{method_id}")
+def ai_draft_method(
+    method_id: str,
+    payload: DraftRequest,
+    session: dict[str, Any] = Depends(require_session),
+    catalog: MethodCatalog = Depends(get_catalog),
+    store: IdentityStore = Depends(get_store),
+    provider: AiProvider | None = Depends(get_ai_provider),
+) -> dict[str, Any]:
+    if not catalog.is_resolvable(method_id):
+        raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
+    active = _require_ai(provider, store, session)
+    try:
+        result = draft_method_kwargs(method_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog)
+    except AiDraftProviderError as error:
+        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", active.model, error.input_tokens, error.output_tokens)
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", result.model, result.input_tokens, result.output_tokens)
+    return result.as_dict()
+
+
+@app.post("/ai/draft/recipe/{recipe_id}")
+def ai_draft_recipe(
+    recipe_id: str,
+    payload: DraftRequest,
+    session: dict[str, Any] = Depends(require_session),
+    catalog: MethodCatalog = Depends(get_catalog),
+    store: IdentityStore = Depends(get_store),
+    provider: AiProvider | None = Depends(get_ai_provider),
+) -> dict[str, Any]:
+    active = _require_ai(provider, store, session)
+    if not payload.labels or len(payload.labels) > MAX_LABELS_PER_REQUEST:
+        raise HTTPException(status_code=400, detail=f"AI_DRAFT_LABELS_REQUIRED: draft 1..{MAX_LABELS_PER_REQUEST} nodes per request (one model call each); the dashboard drafts node by node")
+    try:
+        result = draft_recipe_source(recipe_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog, labels=payload.labels, source=payload.source)
+    except AiDraftProviderError as error:
+        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", active.model, error.input_tokens, error.output_tokens)
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    except InvariantViolation as error:
+        code = str(error)
+        if "RECIPE_NOT_FOUND" in code or "RECIPE_ID_MISMATCH" in code:
+            raise HTTPException(status_code=404, detail=code) from error
+        raise HTTPException(status_code=400, detail=code) from error
+    store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", result["model"], result["usage"]["input_tokens"], result["usage"]["output_tokens"])
+    return result

@@ -49,6 +49,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 
 METHOD_ID = "devops_sre.capacity_model"
+RECORD_ID_PREFIX = "CAPMODEL-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.capacity_model.projection.compute_headroom_ratio"
 
 

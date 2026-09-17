@@ -1,0 +1,67 @@
+$id: "ai-lego://capabilities/contracts/ai.draft_record.capability.yaml"
+title: "ai.draft_record -- Plain-language brief to method input draft (AI Gateway)"
+status: ACTIVE
+
+description: >
+  First content of Master Plan §7 AI Gateway. Turns a human brief into a
+  DRAFT of one method's builder kwargs, then runs that method's own builder
+  and gates on the draft (at most one repair round with the refusal fed
+  back). The model proposes; the method disposes: a refused draft is
+  returned together with the refusal, never accepted, never retried
+  silently. Top-level provenance is always AI_SUGGESTION/AI_SUGGESTED. For a
+  Recipe, one call per method node fills the Source object; params bound
+  from outputs.* are excluded and left to the Recipe run's own validation.
+  Runtime: ai_lego/platform/ai_gateway/{provider,draft}.py; API
+  POST /ai/draft/method/{id}, POST /ai/draft/recipe/{id}; egress to
+  api.anthropic.com only (policies/ai-execution/network-egress.yaml
+  EGRESS-EC99-2 + COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST); key
+  COGNITIVE_OS_ANTHROPIC_API_KEY never in git. Usage (tokens) recorded per
+  tenant in identity store table ai_usage for Phase 2 credit metering.
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §7 AI Gateway -- Capability Request -> Resolver -> Policy -> AI Gateway"
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §11.2 -- human content is never silently overwritten by AI (draft is a proposal the human edits)"
+  - "policies/ai-execution/network-egress.yaml EGRESS-EC99-2 -- api.anthropic.com"
+
+decided_by: "Operator directive 2026-09-17 (「全部去完成」+ 「這個垃圾東西我怎麼使用」: the dashboard required hand-written JSON because no AI was in the loop). No ADR; runtime-only, no mother document edited."
+
+id: ai.draft_record
+version: "1.0.0"
+
+input:
+  type:
+    - HumanBrief
+
+output:
+  type:
+    - MethodInputDraft
+
+preconditions:
+  - "brief is a non-empty string <= 8000 chars"
+  - "target method_id resolves to an ACTIVE contract with a dispatchable builder + gate runner"
+  - "provider configured (key present) -- otherwise 503, no fixture fallback"
+
+quality:
+  provenance_required: true
+  method_specific_gate_required: true
+  # The target method's own gates run on every draft; the draft is returned with their results.
+
+security:
+  external_ai: policy_controlled
+
+rollback:
+  side_effect_free_preferred: true
+
+open_questions:
+  - id: "OQ-AIDRAFT-1"
+    question: "Should the draft prompt include the method's demo fixture as a few-shot example (only 29/280 methods have a golden fixture today)?"
+    owner: "operator"
+    blocks: "nothing in v1"
+  - id: "OQ-AIDRAFT-2"
+    question: "Per-tenant token budget / rate limit before Phase 2 credits exist?"
+    owner: "operator"
+    blocks: "public subscribers (commercial arc stage 2)"
+
+verification:
+  method: "Validated against specs/domain/capability-contract.schema.yaml via tests/run_golden_tests.py check 2c; runtime covered by tests/unit/test_ai_gateway.py (fake provider: parse, repair round, refusal surfaced, egress denial, unconfigured 503, recipe source assembly)."
+  note: "No mother document was modified."

@@ -33,7 +33,7 @@ cd "$REPO_ROOT"
 log "typecheck | importing every ai_lego.apps.api / ai_lego.platform.identity / ai_lego.platform.entitlement module"
 ( cd "$PRODUCT_ROOT" && python3 -c "
 import importlib
-for mod in ['ai_lego.apps.api.main', 'ai_lego.apps.api.dispatch', 'ai_lego.platform.identity.store', 'ai_lego.platform.entitlement.check', 'ai_lego.core.domain.identity', 'ai_lego.core.domain.workspace']:
+for mod in ['ai_lego.apps.api.main', 'ai_lego.apps.api.dispatch', 'ai_lego.platform.ai_gateway.provider', 'ai_lego.platform.ai_gateway.draft', 'ai_lego.platform.net.egress', 'ai_lego.platform.identity.store', 'ai_lego.platform.entitlement.check', 'ai_lego.core.domain.identity', 'ai_lego.core.domain.workspace']:
     importlib.import_module(mod)
 print('OK: all modules import cleanly')
 " ) || { log "typecheck | FAIL"; notify "FAILED at typecheck (import sanity)"; exit 1; }
@@ -41,7 +41,7 @@ print('OK: all modules import cleanly')
 # -- 2. Test gate -- Phase 1 API-surface test files (the ~260 other tests/unit/* files are
 #    Method Atlas method-implementation tests, covered by their own CI path, not re-run here). --
 log "test-gate | running pytest for the Phase 1 test files"
-( cd "$PRODUCT_ROOT" && python3 -m pytest tests/unit/test_workspace_domain.py tests/unit/test_identity_domain.py tests/unit/test_identity_store.py tests/unit/test_entitlement_check.py tests/unit/test_api_dispatch.py tests/unit/test_api_main.py tests/unit/test_authenticate_timing.py -q ) \
+( cd "$PRODUCT_ROOT" && python3 -m pytest tests/unit/test_workspace_domain.py tests/unit/test_identity_domain.py tests/unit/test_identity_store.py tests/unit/test_entitlement_check.py tests/unit/test_api_dispatch.py tests/unit/test_api_main.py tests/unit/test_authenticate_timing.py tests/unit/test_ai_gateway.py tests/unit/test_literature_providers.py -q ) \
   || { log "test-gate | FAIL"; notify "FAILED at test gate"; exit 1; }
 
 # -- Tag the currently-running image as :rollback BEFORE building the new one, so a failed
@@ -50,6 +50,10 @@ if docker image inspect cognitive-os-api:latest >/dev/null 2>&1; then
   docker tag cognitive-os-api:latest cognitive-os-api:rollback
   log "rollback-tag | tagged current cognitive-os-api:latest as :rollback"
 fi
+
+# -- AI gateway env: docker-compose.yml env_file needs the file to exist even when no key is configured
+#    (short env_file syntax works on every Compose v2; the long `required: false` form needs >= 2.24). --
+touch "$PRODUCT_ROOT/deploy/.env"
 
 # -- 3. Build + up. --
 log "build | docker compose build"

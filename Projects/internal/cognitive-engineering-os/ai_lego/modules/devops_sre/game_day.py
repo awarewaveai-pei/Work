@@ -35,6 +35,7 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "devops_sre.game_day"
+RECORD_ID_PREFIX = "GAMEDAY-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
 VALID_OUTCOMES = frozenset({"recovered", "not_recovered"})
 RUNBOOK_EXECUTION_REF_PREFIX = "RBEXEC-"
 _KNOWN_ROLE_KEYS = frozenset({"role", "assignee"})

@@ -33,6 +33,27 @@
 
 [rollback] 全新檔案（compose+2個Dockerfile+2個腳本+1個測試），`git revert` 該 commit 即可完全復原，未部署到任何共用/正式環境，不影響任何既有服務。
 
+## 2026-09-17｜Cognitive OS AI Gateway：白話描述→AI 起草→方法閘門驗證；新引導式 UI；42 個方法 /invoke 501 治本
+
+- 操作者：「對! 全部去完成!」+「這個垃圾東西我怎麼使用」（dashboard 要手貼 JSON，因為迴圈裡沒有 AI）。本輪落地 Master Plan §7 AI Gateway 第一份內容 + 重做 UI。
+- 做法：
+  - `ai_lego/platform/net/egress.py`（新）：EC §99 egress gate + 唯一 HTTP seam，從 literature_providers 搬出共用；https-only；redirect 只准同主機（urllib 會把 x-api-key 轉發到 redirect 目標，「仍在 allowlist」不夠）；`http.client.HTTPException` 也映射成 `*_UNAVAILABLE`。
+  - `ai_lego/platform/ai_gateway/provider.py`（新）：Anthropic Messages API（urllib，無 SDK）；key 只讀 `COGNITIVE_OS_ANTHROPIC_API_KEY`，缺 key → `provider_from_env()` 回 None → API 503 `AI_PROVIDER_UNCONFIGURED`，不假裝。錯誤訊息只帶 HTTP code + host，不回 body。
+  - `ai_lego/platform/ai_gateway/draft.py`（新）：brief → prompt（contract purpose/preconditions + typed-object schema YAML + builder 參數）→ JSON → 真 builder + gates 驗證 → 拒絕時回饋一輪修正（上限 2 次）。頂層與**所有巢狀** provenance 強制 `AI_SUGGESTED`/unlocked（模型被指示但指示≠不變量）。Recipe：逐 method node 起草，`outputs.*` 綁定的參數排除、由 run 驗證；API 每次 1..3 個 node。
+  - API：`GET /ai/status`、`GET /recipes/{id}/draft-plan`、`POST /ai/draft/method/{id}`、`POST /ai/draft/recipe/{id}`；`ai_usage` 表逐次記 tokens（失敗也記）。
+  - UI `ai_lego/apps/api/dashboard.html`（新，從 main.py 抽出，pyproject package-data）：工作流／單一方法 → ① 白話描述 → ② AI 起草或手填、逐欄修改、原始 JSON → ③ 執行；結果顯示閘門表與產出。無 innerHTML。
+  - 既有缺口治本：42 個 ACTIVE 方法缺 `RECORD_ID_PREFIX` → `/invoke` 一直 501。不變量改為「只有 builder 宣告 `record_id` 才需要 prefix」（`dispatch.record_id_prefix(required=builder_takes_record_id(builder))`），15 個吃 record_id 的模組補上 schema 規定的 prefix；現在 280/280 可 dispatch（測試 `test_every_active_dispatchable_method_has_a_draftable_spec` 守 >275）。
+  - 部署：compose `env_file: ./deploy/.env`（gitignored，`deploy/.env.example`）、allowlist +`api.anthropic.com`；deploy.sh typecheck/test-gate 納入新模組；`.claude/launch.json` 本機 `cognitive-os-api`（金鑰由 `secrets-vault.ps1 -Action run` 注入，不落地）。
+  - Spec root：`capabilities/contracts/ai.draft_record.capability.yaml`（golden 4121 PASS）；`network-egress.yaml` 註明 api.anthropic.com 的 runtime 對應（原本就在第三方清單）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`secrets-vault.ps1 -Action run -Names @('ANTHROPIC_API_KEY') -Command "python scratchpad/real_draft.py"` | exit=0 | ms=114015 | result=claude-sonnet-5：systems.flowchart 起草 1 輪 PASS（2224/1427 tokens，20.4s）；art-therapy-unstick-v1 四 node 各 1 輪 PASS（7850/7559 tokens，93.6s）；起草結果餵回真 API：`POST /methods/systems.flowchart/invoke` 200 gates PASS/PASS；`POST /recipes/art-therapy-unstick-v1/run` 200 status PASS 四步 SUCCEEDED（scratchpad/run_drafted.py）。使用者環境變數那把 ANTHROPIC_API_KEY 已失效（401），vault 那把有效。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_ai_gateway.py tests/unit/test_api_main.py tests/unit/test_api_dispatch.py tests/unit/test_literature_providers.py` | exit=0 | ms=136000 | result=114 passed；全 unit suite 另跑（見下方部署條目）；golden 4121 PASS。
+- REALTEST_EVIDENCE: tool=Browser | cmd=preview `cognitive-os-api` → 登入 → 單一方法 systems.flowchart → 白話 brief → AI 起草 → ② 欄位表 → 執行 | exit=0 | ms=~25000 | result=見同日部署條目截圖說明。
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/3m/4n+1s（M1 allowlist 內跨主機 redirect 會轉發 API key→同主機限制；M2 巢狀 provenance 可宣稱 HUMAN_*→遞迴強制 AI_SUGGESTED；M3 單請求 17 node×2×90s 無上限→labels 1..3、timeout 60s；m4 http.client 例外 500→映射；m5 失敗時 tokens 未計→`AiDraftProviderError` 帶 usage、API 照記；m6 compose env_file 長語法需 ≥2.24→短語法 + deploy.sh touch；m7 UI plan/form 失敗靜默→`failWorkspace`；s8 https-only）；每項有回歸測試。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,.claude | grep=`record_id_prefix\(|_NoCrossHostRedirects|_DASHBOARD_HTML|Open Input|Run Demo|Prepare Source` | hits=22（全部為本輪程式/測試或歷史 WORKLOG；docs 無舊 UI 用語殘留；RUNNABLE_DEMOS 補一列）
+- 操作者本機預覽實測抓到 UI bug：起草進行中切換工作區，舊起草結果覆蓋新工作區，執行送錯方法（`missing 'title'`）。根因＝非同步結果套到已切換的工作區；修法＝`state.epoch` 守衛（切換後舊結果丟棄）+ 起草中鎖左側清單（`state.busy`），測試守三個字串。
+- 費用邊界（操作者問「這是要花錢的嗎」）：只有按「AI 起草」呼叫 Anthropic API 計費；其餘 279 方法／17 recipe／閘門皆本機確定性零費用；無 key 時按鈕反灰，手填照跑。
+- 剩餘：OQ-AIDRAFT-1（few-shot fixture）、OQ-AIDRAFT-2（每租戶 token 預算，Phase 2 前）；Master Plan Phase 1 其餘 plane（Project/Source Import/Canvas/Versioning）未動。
+
 ## 2026-09-17（續8）操作者下令清空兩客戶知識庫（測試期爬蟲資料）
 
 [任務] 操作者看 `/ops/knowledge`（全客戶知識庫總覽——獨立於本次 K2g-K2j 改的 per-client 頁面之外的另一頁，見下方「/ops/knowledge 研究」段落）反映「之前搜尋的東西全部刪除」。範圍不明，先查資料庫給出精確數字讓操作者選（AskUserQuestion），操作者選「兩個客戶知識庫全部清空」（含 1 筆手寫文件，非只清爬蟲抓的）。

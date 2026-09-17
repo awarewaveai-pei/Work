@@ -978,6 +978,9 @@
   - **新追蹤（2026-09-07 critic 發現，程式已誠實揭露、未倉促修）**：`root_cause.fault_tree`（`ai_lego/modules/root_cause/fault_tree.py` 的 `_cycle_violations`/`fires`）在高度共用節點的 DAG 上是指數複雜度，不是多項式——真實 Atlas 範例夠淺夠窄不受影響，但一個真的寬/深輸入會很慢（見 `OQ-FAULTTREE-3`）。治本修法：三色 DFS + visited-set memo，改成 O(V+E)。刻意不倉促動手（AGENTS.md R0 補丁判準：倉促的演算法重寫比原效能問題風險更大），註解裡的誇大安全宣稱已改寫成誠實敘述。
   - **完成定義（本條目，持續進行中）**：每個方法切片真跑通過、有測試證據、有真實花費時間記錄；操作者已明確表示「一直做直到完美完成」，本條目維持開啟直到範圍轉向或操作者喊停（現實邊界：`contract-backlog.yaml` 目前 56 個 tier_1 concrete entry（grep 驗證，2026-09-07），加計 57 個已建 module/slice 累計，屬多 session 長期工程，非單一 session 可收尾；Atlas 全文 F01-F24 個別工具總數遠大於此，尚未逐一清點）。
 
+- [x] **【2026-09-17】Cognitive OS AI Gateway + 引導式 UI（操作者：「全部去完成」／「這個垃圾東西我怎麼使用」）✅ 同日完成並部署**
+  - 白話描述 → AI 起草（Anthropic，只有這一步計費）→ 方法自己的 builder+gates 驗證 → 修改 → 執行；新 UI 取代「手貼 JSON」；順手治本 42 個方法 `/invoke` 501（RECORD_ID_PREFIX 類別缺口）。critic 0c/3m/4n 全修。細節、實測與費用邊界見 WORKLOG 2026-09-17「Cognitive OS AI Gateway」；部署見同日「prod redeploy #3」。
+  - 未完成（真實剩餘）：Master Plan Phase 1 其餘 plane（Project／Source Import／Canvas／Versioning／Local-first Storage）；提案書存 CAS（OQ-PROPOSAL-1）；MP §42 citation verification gate；每租戶 token 預算（OQ-AIDRAFT-2）；Phase 2 billing/SSO/KMS 依 9/12 商業弧延後；藝術治療 WordPress 外掛等操作者架好站。
 - [x] **Cognitive OS Phase 5 落地後續（ADR-022 OPEN gates；2026-09-03 開；✅ 2026-09-04 ①②③⑤ 全部完成）**
   - **一句話**：Phase 5 runtime 已落地 `Projects/internal/cognitive-engineering-os/`（`ai_lego` 套件 + 131 tests（2026-09-04 round 4 後；ADR-023 當日 122；round 2 時 99）+ `scripts/test-phase5-local.ps1`），exit gate 通過（本機合成範圍），同日已經一輪獨立對抗式覆審（47 finding 全修，含 2 個真實 crypto/timing bug）；以下是該 ADR 明列的 OPEN 項與移植時發現的 spec-root 文件缺陷。
   - ✅ ① **2026-09-04 完成**——先查 `git status`：該檔已無未 commit 修改（HCI session 已收工），L127-143 的 14 目錄子樹草圖改為指標段，指向 `REPOSITORY_ARCHITECTURE.md`（ACCEPTED 樹，列出真實頂層目錄）+ `ai_lego` 落點，不再維護第二份互相矛盾的樹。

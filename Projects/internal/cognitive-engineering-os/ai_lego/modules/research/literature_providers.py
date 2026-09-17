@@ -18,14 +18,20 @@ import hashlib
 import json
 import os
 import re
-import time
 import urllib.parse
-import urllib.request
 from typing import Any, Callable
 
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.evidence_triangulation import NEEDS_HUMAN_REVIEW, offline_literature_search
+from ai_lego.platform.net.egress import (  # noqa: F401 -- re-exported: tests and callers patch/import these names here
+    EGRESS_ALLOWLIST_ENV,
+    _NoCrossHostRedirects,
+    _OPENER,
+    egress_allowlist,
+    require_egress_allowed,
+)
+from ai_lego.platform.net.egress import fetch_json as _egress_fetch_json
 
 PROVIDER_OFFLINE = "offline"
 PROVIDER_OPENALEX = "openalex"
@@ -33,7 +39,6 @@ REGISTERED_PROVIDERS = frozenset({PROVIDER_OFFLINE, PROVIDER_OPENALEX})
 
 OPENALEX_HOST = "api.openalex.org"
 OPENALEX_WORKS_URL = f"https://{OPENALEX_HOST}/works"
-EGRESS_ALLOWLIST_ENV = "COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST"
 EGRESS_MAILTO_ENV = "COGNITIVE_OS_EGRESS_MAILTO"
 DEFAULT_PER_PAGE = 10
 MAX_PER_PAGE = 50
@@ -45,58 +50,9 @@ SOURCE_KIND_OPENALEX = "OPENALEX_WORK"
 _OPENALEX_WORK_TOKEN = re.compile(r"^W[0-9]+$")
 
 
-def egress_allowlist(environ: dict[str, str] | None = None) -> frozenset[str]:
-    """Comma-separated bare hostnames. A scheme/port/path in an entry is a configuration error, named loudly
-    (hostnames are not secret) instead of silently never matching."""
-    env = os.environ if environ is None else environ
-    raw = env.get(EGRESS_ALLOWLIST_ENV, "")
-    hosts: set[str] = set()
-    for entry in raw.split(","):
-        host = entry.strip().lower()
-        if not host:
-            continue
-        if any(ch in host for ch in "/:\\ \t") or host.startswith("."):
-            raise InvariantViolation(f"EGRESS_ALLOWLIST_ENTRY_INVALID: {host!r} must be a bare hostname (no scheme, port, or path)")
-        hosts.add(host)
-    return frozenset(hosts)
-
-
-class _NoCrossHostRedirects(urllib.request.HTTPRedirectHandler):
-    """Every redirect hop is re-gated by the same allowlist as the first hop -- the egress invariant holds for
-    the whole request, not only for the URL we composed."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401 -- urllib hook signature
-        host = urllib.parse.urlsplit(newurl).hostname or ""
-        require_egress_allowed(host)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-_OPENER = urllib.request.build_opener(_NoCrossHostRedirects)
-
-
-def require_egress_allowed(host: str, environ: dict[str, str] | None = None) -> None:
-    """EC §99 deny-by-default: an external host not on the runtime allowlist is refused before any I/O."""
-    if host.lower() not in egress_allowlist(environ):
-        raise InvariantViolation(
-            f"NETWORK_EGRESS_DENIED: host {host!r} is not in {EGRESS_ALLOWLIST_ENV} "
-            "(deny-by-default per policies/ai-execution/network-egress.yaml EGRESS-EC99-2)"
-        )
-
-
 def fetch_json(url: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
-    """The only network seam in this module. GET ``url`` and decode a JSON object."""
-    request = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "cognitive-os/1.0 (+https://cognitive.aware-wave.com)"})
-    started = time.monotonic()
-    with _OPENER.open(request, timeout=timeout) as response:  # noqa: S310 -- host allowlisted; redirects re-gated
-        body = response.read(MAX_BODY_BYTES + 1)
-    if len(body) > MAX_BODY_BYTES:
-        raise InvariantViolation(f"LITERATURE_PROVIDER_MALFORMED_RESPONSE: body exceeds {MAX_BODY_BYTES} bytes")
-    if time.monotonic() - started > timeout * 2:
-        raise InvariantViolation(f"LITERATURE_PROVIDER_UNAVAILABLE: provider exceeded the {timeout * 2:.0f}s wall-clock deadline")
-    parsed = json.loads(body.decode("utf-8"))
-    if not isinstance(parsed, dict):
-        raise InvariantViolation("LITERATURE_PROVIDER_MALFORMED_RESPONSE: top-level JSON is not an object")
-    return parsed
+    """The only network seam in this module (delegates to platform.net.egress; tests patch this name)."""
+    return _egress_fetch_json(url, timeout, max_bytes=MAX_BODY_BYTES, error_prefix="LITERATURE_PROVIDER")
 
 
 def _abstract_from_inverted(index: Any) -> str | None:
