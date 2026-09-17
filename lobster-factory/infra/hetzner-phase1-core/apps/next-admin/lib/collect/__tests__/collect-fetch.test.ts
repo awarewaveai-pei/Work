@@ -39,6 +39,34 @@ describe("SSRF gate", () => {
     expect((await checkUrl("file:///etc/passwd", publicResolver)).ok).toBe(false);
     expect((await checkUrl("https://user:pw@example.com/", publicResolver)).ok).toBe(false);
   });
+
+  it("does not blindly block a genuinely public IPv4-mapped-IPv6 address (regression: the mapped-address regex used to match on the bare `::ffff:` prefix alone, blocking every mapped address regardless of what it encoded)", async () => {
+    // WHATWG URL host serialization always normalizes a bracketed mapped host to this
+    // hex-tail canonical form -- verified via `new URL("http://[::ffff:8.8.8.8]/").hostname`
+    // -> `[::ffff:808:808]` -- never to a dotted-quad `::ffff:8.8.8.8` for a URL-derived host.
+    expect(isPrivateAddress("::ffff:808:808")).toBe(false); // 8.8.8.8
+    expect(isPrivateAddress("::ffff:8.8.8.8")).toBe(false); // literal dotted-quad spelling, already worked pre-fix
+    expect(isPrivateAddress("::ffff:7f00:1")).toBe(true); // 127.0.0.1, still blocked post-fix
+    expect(isPrivateAddress("::ffff:a9fe:a9fe")).toBe(true); // 169.254.169.254, cloud metadata endpoint
+    expect(isPrivateAddress("::ffff:0:808:808")).toBe(true); // malformed tail (not two hex groups) must fail closed
+
+    const verdict = await checkUrl("http://[::ffff:8.8.8.8]/", publicResolver);
+    expect(verdict.ok).toBe(true);
+  });
+
+  it("rejects a trailing-dot FQDN via the fast literal-string path, not just eventual DNS resolution (regression: the `.internal`/`.local`/`.localhost` suffix check did not strip a trailing dot the way an IPv4 literal is stripped by URL parsing)", async () => {
+    expect(isPrivateAddress("evil.internal.")).toBe(true);
+    expect(isPrivateAddress("evil.local.")).toBe(true);
+    expect(isPrivateAddress("evil.localhost.")).toBe(true);
+    expect(isPrivateAddress("localhost.")).toBe(true);
+    expect(isPrivateAddress("example.com.")).toBe(false); // sanity: public trailing-dot FQDN still passes
+
+    const resolverThatWouldBeWrong = vi.fn(async () => ["93.184.216.34"]);
+    const verdict = await checkUrl("http://evil.internal./x", resolverThatWouldBeWrong);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.reason).toBe("private_host_literal");
+    expect(resolverThatWouldBeWrong).not.toHaveBeenCalled(); // fast path rejects before any DNS lookup
+  });
 });
 
 describe("createCollectFetch", () => {

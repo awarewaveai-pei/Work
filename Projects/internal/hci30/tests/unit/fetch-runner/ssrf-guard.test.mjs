@@ -53,3 +53,40 @@ test('checkUrl: dns_failed and dns_empty are distinct, both fail closed', async 
   const empty = async () => [];
   assert.equal((await checkUrl('https://nowhere.example.com/', empty)).reason, 'dns_empty');
 });
+
+test('isPrivateAddress: a genuinely public IPv4-mapped-IPv6 address is not blindly blocked (regression: the mapped-address regex used to match on the bare `::ffff:` prefix alone, blocking every mapped address regardless of the address it encoded)', () => {
+  // WHATWG URL host serialization always normalizes a bracketed mapped host to this
+  // hex-tail canonical form -- verified via `new URL('http://[::ffff:8.8.8.8]/').hostname`
+  // -> `[::ffff:808:808]` -- never to a dotted-quad `::ffff:8.8.8.8` for a URL-derived host.
+  assert.equal(isPrivateAddress('::ffff:808:808'), false, '::ffff:808:808 (8.8.8.8) must decode to a dotted-quad and be classified public');
+  // The literal dotted-quad spelling of the same public address must also pass (already worked pre-fix; guards against a regression in the branch above the fix).
+  assert.equal(isPrivateAddress('::ffff:8.8.8.8'), false);
+  // A private address in the same hex-tail canonical form must still be blocked post-fix.
+  assert.equal(isPrivateAddress('::ffff:7f00:1'), true, '::ffff:7f00:1 (127.0.0.1) must still be classified private');
+  assert.equal(isPrivateAddress('::ffff:a9fe:a9fe'), true, '::ffff:a9fe:a9fe (169.254.169.254, the cloud metadata endpoint) must still be classified private');
+  // A mapped tail that isn't the canonical two-hex-group shape must fail closed (blocked), not fall through unblocked.
+  assert.equal(isPrivateAddress('::ffff:0:808:808'), true, 'a malformed ::ffff: tail must fail closed');
+});
+
+test('checkUrl: a bracketed public IPv4-mapped-IPv6 host resolves through and is not blocked', async () => {
+  const verdict = await checkUrl('http://[::ffff:8.8.8.8]/', publicResolver);
+  assert.equal(verdict.ok, true);
+});
+
+test('isPrivateAddress: a trailing-dot FQDN hits the fast literal-string path, not just DNS resolution (regression: the `.internal`/`.local`/`.localhost` suffix check did not strip a trailing dot the way an IPv4 literal is stripped by URL parsing, so "evil.internal." fell through the fast path)', () => {
+  assert.equal(isPrivateAddress('evil.internal.'), true);
+  assert.equal(isPrivateAddress('evil.local.'), true);
+  assert.equal(isPrivateAddress('evil.localhost.'), true);
+  assert.equal(isPrivateAddress('localhost.'), true);
+  // Sanity: a public trailing-dot FQDN must still pass.
+  assert.equal(isPrivateAddress('example.com.'), false);
+});
+
+test('checkUrl: a trailing-dot internal-TLD URL is rejected via the literal-host path, never reaching the resolver', async () => {
+  let resolverCalled = false;
+  const resolverThatWouldBeWrong = async () => { resolverCalled = true; return ['93.184.216.34']; };
+  const verdict = await checkUrl('http://evil.internal./x', resolverThatWouldBeWrong);
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.reason, 'private_host_literal');
+  assert.equal(resolverCalled, false, 'the fast literal-string path must reject before any DNS lookup happens');
+});

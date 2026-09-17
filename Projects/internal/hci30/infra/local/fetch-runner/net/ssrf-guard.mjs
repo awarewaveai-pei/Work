@@ -35,16 +35,31 @@ function stripBrackets(host) {
   return h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h;
 }
 
+/** Decodes the two-hex-group tail of a canonical `::ffff:HHHH:HHHH` mapped address (the
+ * form the WHATWG URL host serializer ALWAYS produces for a bracketed IPv4-mapped host --
+ * verified: `new URL('http://[::ffff:8.8.8.8]/').hostname` -> `[::ffff:808:808]`, never the
+ * dotted-quad form) into its dotted-quad string, or null if the tail isn't that shape. */
+function decodeMappedIPv4Tail(tail) {
+  const m = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(tail);
+  if (!m) return null;
+  const hi = parseInt(m[1], 16);
+  const lo = parseInt(m[2], 16);
+  return [(hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff].join('.');
+}
+
 /** True for an address that must never be reachable from the isolated runner. */
 export function isPrivateAddress(addr) {
-  const a = stripBrackets(addr);
+  // A trailing dot marks an absolute FQDN (RFC 1035) and is not part of the hostname the
+  // literal-suffix checks below compare against. Unlike an IPv4 literal -- which the WHATWG
+  // URL parser strips the trailing dot from -- a domain keeps it (verified: `new
+  // URL('http://evil.internal./').hostname` is still `evil.internal.`). Left unstripped,
+  // "evil.internal." skips this fast literal-string path and falls through to a real DNS
+  // lookup -- still blocked if it resolves to a private address, just slower.
+  const a = stripBrackets(addr).replace(/\.$/, '');
   if (a === 'localhost' || a.endsWith('.localhost') || a.endsWith('.internal') || a.endsWith('.local')) return true;
 
-  // IPv4 (and the IPv4 half of a mapped address, whichever textual form the caller
-  // handed us -- both the dotted-quad `::ffff:127.0.0.1` and the canonical hex-tail
-  // `::ffff:7f00:1` that Node's URL parser rewrites it to are handled: the dotted form
-  // by this slice+regex branch, the hex-tail form by the `::ffff:` prefix checks below
-  // when this branch's regex does not match).
+  // IPv4 (and the dotted-quad form of a mapped address, e.g. from inet_ntop-style DNS
+  // resolver output -- NOT from URL parsing, which always yields the hex-tail form below).
   const v4 = a.startsWith('::ffff:') ? a.slice(7) : a;
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v4)) {
     const [x, y] = v4.split('.').map(Number);
@@ -60,11 +75,17 @@ export function isPrivateAddress(addr) {
   // IPv6
   if (a === '::' || a === '::1') return true;
   if (/^::(0:)*1$/.test(a)) return true; // compressed loopback forms
-  if (/^::ffff:0*:?/.test(a)) return true; // mapped, any tail (dotted-quad already handled above, this also catches the hex-tail canonical form)
+  if (a.startsWith('::ffff:')) {
+    // Reached for the hex-tail canonical mapped form (see decodeMappedIPv4Tail doc) --
+    // decode it and re-run the same IPv4 range table, instead of blanket-blocking every
+    // `::ffff:` host. The old blanket block was fail-safe (over-blocks) but wrongly
+    // treated public mapped addresses -- e.g. `::ffff:808:808` (8.8.8.8) -- as private.
+    const decoded = decodeMappedIPv4Tail(a.slice(7));
+    return decoded === null ? true : isPrivateAddress(decoded);
+  }
   if (/^64:ff9b::/i.test(a)) return true; // NAT64 -- an IPv4 destination wearing an IPv6 address
   if (a.startsWith('fc') || a.startsWith('fd')) return true; // unique local
   if (/^fe[89ab]/.test(a)) return true; // link-local
-  if (a.startsWith('::ffff:')) return true; // mapped, but not a dotted-quad we could parse above
   return false;
 }
 
