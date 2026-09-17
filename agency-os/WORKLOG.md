@@ -1,4 +1,35 @@
 # Worklog
+## 2026-09-18 HCI-30 蒐集器 Task 8：sink/hci-discovered 寫入路徑，critic 覆審 2 Major（LIKE 萬用字元＋非授權步驟未 fail-soft）+ 1 測試涵蓋缺口全修
+
+[任務] 承接 2026-09-17 續13（Task 7），照 Execution Order 做 Task 8：把 runner 的抓取結果落地成 `hci.sources`/`hci.source_snapshots` 的 DISCOVERED 列。不同於 Task 4/5/7，這個寫入路徑**不能**跑在隔離 runner 內——runner 依 ADR-0029 gate 2 刻意切斷對 docker-internal bridge（Postgres 所在網路）的路由，把 DB 寫入邏輯放進 runner 會直接打穿隔離設計的目的。改落腳在 `Projects/internal/hci30/public-intelligence/source-registry/`（真正符合計畫原訂 Scope，這次不像 Task 4/5/7 需要因 Docker build context 而搬家）。
+
+[已修改]
+- 新增 `public-intelligence/source-registry/sink-hci-discovered.mjs`：`writeDiscoveredSource(query, {targetUrl, contentHash, snapshotRef, contentEpistemicType})`。`query` 依賴注入（無 `pg` import，零 npm 依賴）——呼叫端（`app/server.mjs` 的 `queryAsTenant`，未來 Task 9 的 Trigger.dev task）負責真正的 Postgres 連線與 `SET ROLE` 租戶範圍，本模組完全不碰 tenant_id 参數，RLS 靠呼叫端已 `SET ROLE` 的角色自動生效。邏輯：(1) 呼叫 `hci.upsert_discovered_source($1,$2)`，用回傳值（可能是既有列的 id，非剛生成的候選 id）當下一步的 FK；(2) `hci.source_snapshots` 一律 plain INSERT（append-only，非 upsert），`tenant_id` 直接用 SQL 內的 `hci.current_tenant_id()` 而非 JS 參數；(3) 候選提示計算——同來源網域（origin）的其他 `hci.sources` 列，非權威、只回傳給呼叫端，絕不寫入 `hci.source_relationships`（該表需要 Claim，DISCOVERED 階段沒有）。
+- 新增 `tests/unit/public-intelligence/source-registry/sink-hci-discovered.test.mjs`（11 個測試，`query` 全 mock，斷言送出的確切 SQL/參數，含「絕不觸碰 source_relationships/identity 表」的全域檢查）。
+- 新增 `app/scripts/verify-sink-hci-discovered.mjs`：真實 Postgres 驗證腳本（用 `app/node_modules` 既有的 `pg`；本地複寫一份 `queryAsTenant` 而非重構 `app/server.mjs` 抽出共用——那個檔案沒有自動化測試，這個 session 已經加了夠多新面，判斷不值得在無回歸防護網下動一個現在能動的檔案）。
+- 新增 `tests/architecture/sink-hci-discovered-write-path.test.ps1`：拉一個全新拋棄式 Postgres（沿用既有 `infra/local/compose.test.yml`，套一份另外產生、僅加 PID 衍生 host port 的 override compose 檔——`compose.test.yml` 本檔明文「刻意不開 host port，就是為了讓平行的拋棄式測試跑不會搶 port」的既定不變量，這次守住不變量本身：用疊加檔而非改動共用檔），套用 migrations 1-20 + fixtures，跑上面的 Node 驗證腳本。
+- 小 bug 順手修：`scripts/dev-db-init.ps1` 的 loop bound 卡在 `1..19`、「已套用」判斷條件還在查 migration 0019 的 marker（`hci.case_auto_promote_audit`）——migration 0020（今天稍早 Task 2 加的）永遠不會被套用到全新 volume 上，只是這台機器既有的 persistent dev DB 是手動套的所以症狀還沒現形。已修：loop bound `1..20`，marker 改查 0020 自己的 `hci.sources.admission_state`。
+
+[critic 覆審，2 個 Major + 1 個測試涵蓋缺口全修]
+1. **Major**——候選提示查詢用 `source_ref LIKE $1`（`$1 = origin + '/%'`）。Bound parameter 擋得住傳統 SQL injection，但擋不住參數值本身含字面 `_`/`%` 被 Postgres 當萬用字元解讀——WHATWG URL host parsing 合法允許 hostname 含底線（真實驗證：`new URL('https://my_test.example.com/x').origin` 原樣保留底線），`my_test.example.com/%` 會連帶命中 `myXtest.example.com/...`（X 任意字元），把不相關組織的來源誤判成候選「可能同story」——直接違反這功能自己宣告的「same origin, honestly non-authoritative」承諾。已修：改用 `starts_with(source_ref, $1)`，純字首比對零萬用字元語意，從根拔掉整類問題，不是逐字元跳脫。真跑 real Postgres 15.8 確認 `starts_with()` 可用且行為正確。
+2. **Major**——候選提示這一步不是 fail-soft：只有「URL 解析失敗」有 try/catch，實際下查詢那段完全沒包。這步驟明訂為非權威、僅供參考，但一旦它拋錯（連線斷線、逾時），會讓已經真實 COMMIT 的兩個權威寫入（upsert + snapshot INSERT，各自獨立 autocommit）被回報成整體失敗——重試的呼叫端會對同一 URL 再跑一次，`hci.sources` upsert 冪等沒事，但 `hci.source_snapshots` 是純 append，會產生對應同一次真實抓取的多餘重複列，破壞「一次抓取一列」的稽核軌跡保證。已修：整個候選提示查詢包 try/catch，任何失敗都降級成空陣列＋log，絕不讓非權威步驟拖垮已經成功的權威寫入。
+3. **測試涵蓋缺口**——8 個新單元測試 + Task 3-7 全部 `tests/unit/fetch-runner/**` 六個測試檔，都沒接進這個專案唯一的「跑全部」入口 `scripts/test-wave1-local.ps1`（該檔自己在 `evidence-refs.test.mjs` 那行的舊註解就承認過同一類疏漏發生過一次——這次又發生了一次）。已修：兩批全部接進去（sink-hci-discovered + 6 個 fetch-runner 檔），真跑整個 `test-wave1-local.ps1`（含 migrations 1-20 apply + down + 重新 apply 的可逆性檢查）確認新增的 11 個 + 52 個測試都真的執行且全綠、原有步驟無回歸。
+- 1 個 Minor 一併修：`targetUrl`/`contentHash`/`snapshotRef` 的必填檢查改用 `.trim()`，空白字串不再滑過 JS 層檢查、留給 DB 的 `CHECK (length(btrim(...)) > 0)` 丟一個較不清楚的錯誤。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/public-intelligence/source-registry/sink-hci-discovered.test.mjs` | exit=0 | 11/11 綠（含 3 個 critic finding 各自的回歸測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/sink-hci-discovered-write-path.test.ps1`（real-Docker/Postgres 15.8，拋棄式 DB，PID 衍生 port override）| exit=0 | 同 URL 兩次→同一 `hci.sources` 列／兩筆 `hci.source_snapshots`／`admission_state` 恆 DISCOVERED／`hci.source_relationships` 恆 0 列／同源第二頁正確浮現候選提示／不同源不誤判
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1`（全量 20 個 migration 套用+down+重新套用可逆性檢查，本 session 修過的 wiring 也在裡面真跑）| exit=0 | HCI Wave 1 local suite PASSED，新增的 63 個測試（11+52）與既有全部步驟一起執行確認無回歸
+- REVIEW_DONE: critic=Standard | verdict=pass（2 Major + 1 測試涵蓋缺口全修）| findings=0 Critical / 2 Major / 1 Minor / 1 test-coverage gap / 2 Suggestion（未修：併發寫入的真實並行測試——設計面已驗證正確，Postgres `ON CONFLICT` 本身的原子語意，非本模組程式碼問題；`dev-db-init.ps1` 的 hardcode-latest-marker 模式本身該用 migration 帳本表根治——記錄為已知模式債務，不在本次範圍擴大修）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,lobster-factory | grep=`writeDiscoveredSource\|findCandidateRelatedSources` | hits=僅本次新增/修改檔案本身，無孤兒引用
+
+[剩餘風險]
+1. 併發寫入的真實並行測試未補（Suggestion，未修）——目前只有循序測試（Task A 完成後 Task B 才開始），`hci.upsert_discovered_source` 的原子性是 Postgres `ON CONFLICT` 本身保證（非本模組程式碼邏輯），設計面已驗證正確，但沒有一個真正並行（`Promise.all`）的整合測試把它從「照文件語意推理正確」變成「執行證明過」。
+2. `dev-db-init.ps1` 的「hardcode 最新 migration 的 marker + loop bound」模式本身是這次 bug 的根因類型，這次只修了症狀（更新到 0020），下一個 migration（0021）若忘記同步更新，會重演同一類 staleness——critic 建議改用 migration 帳本表（記錄哪些 id 已套用，逐檔比對）根治，本次未做（範圍蔓延，且非 Task 8 直接要求）。
+3. Task 8 尚未有真正的生產呼叫端（Task 9 的 Trigger.dev task 還沒建）——目前只有自己的測試/驗證腳本會呼叫它，符合計畫依賴順序（Task 9 依賴 Task 8），本次改動對現有系統零 blast radius。
+
+[rollback] 全新檔案（`sink-hci-discovered.mjs` + 3 個測試/驗證檔）+ 對 `scripts/dev-db-init.ps1`/`scripts/test-wave1-local.ps1` 純增量修改（loop bound 數字＋新增測試呼叫行，未刪改既有步驟），`git revert` 該 commit 即可完全復原，未部署到任何共用/正式環境，也沒有生產呼叫端會受影響。
+
 ## 2026-09-17（續13）HCI-30 蒐集器 Task 7：runner 端 fetch+extract+不可信內容隔離，自抓 2 個真實 bug + critic 覆審 3 Major 全修
 
 [任務] 承接續11（Task 6），照 `HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` Execution Order 做 Task 7：在隔離 runner 內做最小可用抓取＋抽取，並把抓到的每一段文字標記為不可信、掃描指令樣態（ADR-011 §決策15b）。這是本輪第一個「從零全新」的任務——Task 4/5/6 都是救回/擴充前一個壞掉 session 的產物，Task 7 全部程式碼與測試都是本 session 現寫現跑。

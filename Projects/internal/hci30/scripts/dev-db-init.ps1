@@ -31,20 +31,25 @@ if ($LASTEXITCODE -ne 0) { throw 'Dev PostgreSQL did not become healthy.' }
 # Checks the LATEST migration's own marker, not an early one (critic review,
 # 2026-09-08: checking hci.cases -- migration 0002 -- would report "already
 # applied" and silently skip later migrations on any volume from before they
-# existed, since this check is all-or-nothing, not per-migration). 0019 adds
-# a wholly new table, so its marker is an information_schema existence
-# check. Update this alongside the loop bound below whenever a new
-# migration lands, same maintenance the project already accepts for the
-# equivalent $upMigN lists in test-wave1-local.ps1/mutation-check-wave1.ps1.
-$check = & docker @composeArgs exec -T db psql -tA -U hci_owner -d $db -c "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='hci' AND table_name='case_auto_promote_audit')"
+# existed, since this check is all-or-nothing, not per-migration). 0020 adds
+# a new column, so its marker is an information_schema existence check.
+# Update this alongside the loop bound below whenever a new migration lands,
+# same maintenance the project already accepts for the equivalent $upMigN
+# lists in test-wave1-local.ps1/mutation-check-wave1.ps1. Found stale (still
+# checking 0019's marker, loop bounded at 19) while wiring collector Task 8,
+# 2026-09-17 -- this container's volume already had 0020 applied by hand
+# during Task 2, so the staleness was latent (silent-skip on THIS volume) not
+# yet a real repro, but a from-scratch `docker compose down --volumes` +
+# rerun would have left 0020 permanently missing.
+$check = & docker @composeArgs exec -T db psql -tA -U hci_owner -d $db -c "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='hci' AND table_name='sources' AND column_name='admission_state')"
 if ($check -match 't') {
-  Write-Host 'Schema already applied (hci.case_auto_promote_audit exists, migration 0019) -- skipping migrations, DB left as-is.'
+  Write-Host 'Schema already applied (hci.sources.admission_state exists, migration 0020) -- skipping migrations, DB left as-is.'
   exit 0
 }
 
-Write-Host 'Applying Wave 1 schema (19 migrations + synthetic fixtures)...'
+Write-Host 'Applying Wave 1 schema (20 migrations + synthetic fixtures)...'
 $db2 = Join-Path $root 'database'
-1..19 | ForEach-Object {
+1..20 | ForEach-Object {
   $n = '{0:D4}' -f $_
   $f = Get-ChildItem -LiteralPath (Join-Path $db2 'migrations') -Filter "${n}_*_up.sql" | Select-Object -First 1
   Invoke-SqlFile -Path $f.FullName -Label "migration $n up"

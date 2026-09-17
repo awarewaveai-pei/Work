@@ -105,6 +105,36 @@ if ($LASTEXITCODE -ne 0) { throw 'Evidence-quality classification tests failed (
 node --test (Join-Path $root 'tests/unit/intelligence/bias-check-gate.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'Bias-check blocking-gate tests failed (04_HCI30_PRODUCT_SPEC.md:138).' }
 
+# HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 8: sink/hci-discovered
+# write path (mocked query -- the real-Postgres proof is the dedicated
+# tests/architecture/sink-hci-discovered-write-path.test.ps1). Node-level,
+# Docker-free.
+node --test (Join-Path $root 'tests/unit/public-intelligence/source-registry/sink-hci-discovered.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'sink/hci-discovered write-path tests failed (Task 8).' }
+
+# HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Tasks 4/5/6/7: isolated
+# fetch-runner (SSRF guard, DNS pinning, object storage, seed governance,
+# content-isolation scan, job-processing state machine). Found orphaned from
+# this runner entirely while wiring Task 8's own new test file in (critic
+# review, 2026-09-17) -- same failure class this file's own
+# evidence-refs.test.mjs comment above already flagged once, recurred here.
+# Node-level, Docker-free (the real-Docker proof for this subsystem is the
+# three tests/architecture/fetch-runner-*.test.ps1 files, not run from here
+# since this script's own scope is otherwise Docker-free until the Postgres
+# section below).
+node --test (Join-Path $root 'tests/unit/fetch-runner/ssrf-guard.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'fetch-runner SSRF guard tests failed (Task 4).' }
+node --test (Join-Path $root 'tests/unit/fetch-runner/pinned-http-client.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'fetch-runner pinned HTTP client tests failed (Task 4).' }
+node --test (Join-Path $root 'tests/unit/fetch-runner/ssrf-payload-corpus.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'fetch-runner SSRF payload corpus tests failed (Task 4).' }
+node --test (Join-Path $root 'tests/unit/fetch-runner/content-isolation/scan.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'fetch-runner content-isolation scan tests failed (Task 7).' }
+node --test (Join-Path $root 'tests/unit/fetch-runner/retrieval/http-html-fetch.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'fetch-runner fetch+extract tests failed (Task 7).' }
+node --test (Join-Path $root 'tests/unit/fetch-runner/server.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'fetch-runner job-processing state-machine tests failed (Task 6/7).' }
+
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
 # available, same as the request-policy validator above.
