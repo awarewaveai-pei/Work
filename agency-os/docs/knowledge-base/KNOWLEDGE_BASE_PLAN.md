@@ -282,6 +282,16 @@ CREATE INDEX IF NOT EXISTS idx_cs_chunks_hnsw_te3s  ON public.cs_knowledge_chunk
 | **K2f** | **答得出「當時為什麼那樣答」**——稽核／爭議客戶的入場券 | `retrieval_manifest`（§1.7）；replay API；`REPLAY_UNAVAILABLE` 終端狀態；chunker/ranker contract + version（§1.8） | 同一 query 用同一 manifest 重播**得到相同結果集**（實測）；刻意移除某個 chunker 版本後重播回 **`REPLAY_UNAVAILABLE`** 而**非**靜默用現行版本（這條是本階段的重點） | 停寫 manifest |
 | **K3** | 可計費 | 依 [ADR 012](../architecture/decisions/012-shared-platform-layer.md) 接共用計費 substrate：宣告 meters（查詢次數=flow／embedding token=flow／文件數=flow／**儲存量=stock**）、`limit_kind` 全為 `QUOTA`、驗證 `entitlement_ref`、回報簽章用量記錄。**不自建帳本** | 四個 meter 數字對得起來；**儲存量以 stock 形狀計提**（非事件流）；產品登記機械閘綠；**未直讀控制面資料表**（ADR-0002） | 停寫計量 |
 | **K4** | 可被非 TS 消費者使用（Python／外部客戶） | `lib/kb/` 抽成獨立服務 + HTTP 契約 + API key 鑑權 | **僅在出現第二個真實消費者時啟動**；既有 cs 改打網路版後行為不變（eval golden set 比對） | 退回同 process 呼叫 |
+| **K2g** 進行中 2026-09-17 | ops 主控台能看內容、不只寫入 | `cs_knowledge_sources` 加 `body text`（原文，非切片重組）；`getSourceDetail()`／版本列表 API；`ClientHubTabs.tsx` 加可點擊詳情視圖。完成 K2 遺留的「UI 版本檢視仍待」 | 上傳→點擊→原文逐字相符；同 family 兩版本皆可切換檢視；跨租戶讀不到別人的 | migration down 即可 |
+| **K2h** 待做，卡操作者已選方案 | 大量文件不失控 | 巢狀資料夾（操作者 2026-09-17 選定，非平面標籤）；清單分頁＋搜尋（企業規模：現況一次全撈） | 千筆文件下分頁查詢不全表掃描；資料夾巢狀可跨階層過濾 | 移除資料夾過濾，退回平面 |
+| **K2i** 待做，卡操作者已選方案 | 精確／模糊查詢可控 | 關鍵字比對模式：租戶預設值＋單篇可覆蓋（操作者 2026-09-17 選定）。`lib/kb/keyword-query.ts` 加精確比對路徑，不取代既有 bigram 模式 | 覆蓋單篇時精確模式生效；未覆蓋沿用租戶預設；既有 fuzzy 行為零回歸 | 移除覆蓋欄位 |
+| **K2j** 待做，卡操作者已選方案 | 相似內容不用逐篇看 | 「彙整」＝畫面收合卡片（操作者 2026-09-17 選定，非 AI 合併改寫，零額外算力成本）| 相似文件在清單／詳情收合成一張卡，展開見全部 | 移除收合，退回逐筆列出 |
+| **K2k** 待做 | 知道內容有沒有在用 | 依 `cs_ai_replies.retrieved_chunk_ids` 算每份文件被引用次數，UI 顯示 | 造合成引用資料，查得出正確次數；零引用顯示「0」非空白 | 移除顯示 |
+| **K2l** 待做 | 客戶自己拿得回全部內容 | 匯出單一租戶全部 active 文件（含原文＋出處＋版本）為 ndjson | 匯出後用既有 POST 重新匯入，內容逐位元組相同 | 移除匯出端點 |
+| **K2m** 待做，先做函式庫調研 | 不用手動轉純文字 | PDF／DOCX 直接上傳，抽字後走既有 `ingestKnowledge()`，不開第二條入庫路徑 | 上傳真實 PDF，抽出文字與存入內容相符 | 移除上傳 UI |
+| **K2n** 待評估，暫不動工 | 別讓近義重複的內容一直疊加 | 跨來源語意相似度偵測——**與 K2b 的結構性矛盾偵測是兩件事**：K2b 抓「同一 URL 兩個 active」「時間區間重疊」這類機械可判的身份重複；K2n 抓「不同來源、不同網址，講同一件事」的語意相似，需要 embedding 相似度門檻設計，成本與準確度要先評估 | （評估後填） | （評估後填） |
+
+> K2g-K2n 的完整任務拆解（六要素 task prompt、依賴順序、風險表）在 [WORKLOG 2026-09-17](../../WORKLOG.md)，此處只留摘要與 DoD——細節不兩處重複。操作者原始回報：關鍵字寬容度／點擊看不到內容／彙整選項／資料夾，見同篇 WORKLOG。
 
 **K4 的啟動條件（不是時間，是事件）**：出現對外產品客戶、或 cognitive-os 真的需要檢索。在那之前抽取只會把還沒驗證的契約凍進網路邊界。
 

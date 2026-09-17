@@ -1,4 +1,32 @@
 # Worklog
+
+## 2026-09-17（續1）知識庫 ops UI 重新規劃 —— 操作者回報 4 個真實 UX 缺口，planner 拆解 14 個 task，3 個產品決策已定案
+
+[任務] 操作者看 `/ops/clients/[slug]` 知識庫分頁截圖回報：①關鍵字寬容度沒得選(有時要長尾/模糊,有時要精確)②清單項目點了沒反應③要看得到內容並可選擇是否彙整④沒有資料夾,散落一地。問「還有什麼想得到的」+「這是全球企業用,要怎麼處理」。
+
+[現況查證,四點全部屬實，非感覺]
+- ①`lib/kb/keyword-query.ts:56-97` 只有一種 bigram OR-list 演算法，無精確模式、無切換點。
+- ②`ClientHubTabs.tsx:1395` `{s.title}` 是純 `<span>`，零 onClick，全 repo 沒有任何 KB 內容詳情檢視畫面。
+- ③同②的洞——看不到內容，遑論彙整選項。
+- ④`ClientHubTabs.tsx:1392` `sources.map()` 純平鋪，`cs_knowledge_sources` 表本身也沒有 folder/category 欄位，是資料模型缺口不只是 UI。
+
+[額外抓到，操作者沒提但同樣屬實]：K2/K2e 已做的出處/引用(epistemicType/authorshipState/locked/author/publishedAt)全部進了後端,這個畫面一個欄位都沒顯示；無版本歷史 UI(K2 自己文件早就記著「UI 版本檢視仍待」)；`cs_ai_replies.retrieved_chunk_ids` 存在但沒人用來算文件使用率；無跨來源語意重複偵測；只能貼文字不能上傳檔案；68/16 筆清單無搜尋/分頁，企業規模會炸。
+
+[Planner 拆解 14 個 task(六要素 contract)，關鍵發現]：`cs_knowledge_chunks` 從來沒存過完整原文，只存重疊切片——「內容檢視」如果直接拼 chunk 會因 80 字重疊+無排序欄位而拼出錯亂內容。**必須先在 `cs_knowledge_sources` 加 `body text` 存原文**，內容檢視才有東西可讀，這把 T2(內容檢視)的前置需求從「純讀取」變成「加欄位+改寫入路徑」。9 個決策無關的 task 可立即開工(T1/T3/T4/T5/T6a 工程 + T7/T9/T11/T13 設計選項比較)；3 個卡產品決策(T8/T10/T12)。
+
+[操作者當場決定，3 題全選建議選項，不需要再等 T7/T9/T11 的比較文件]
+- 資料夾形狀：**巢狀資料夾**(非平面標籤)
+- 關鍵字模式設在哪：**租戶預設值 + 單篇可覆蓋**
+- 「彙整」定義：**畫面收合卡片**(非 AI 合併改寫，零額外算力成本)
+
+[已寫入]：`agency-os/docs/knowledge-base/KNOWLEDGE_BASE_PLAN.md` 新增 K2g-K2n 九個階段列(K2g 內容檢視進行中；K2h 資料夾+分頁、K2i 關鍵字模式、K2j 彙整收合三項卡操作者已選方案待實作；K2k 使用率、K2l 匯出、K2m 檔案上傳、K2n 語意去重評估待做)。TASKS.md 為單一入口，此檔為 SSOT，不兩處各寫一份全文。
+
+[驗證結果] 本輪為規劃，非程式碼改動：REALTEST_WAIVED: DOC_ONLY -- 純規劃與文件更新；REVIEW_WAIVED: DOC_ONLY -- 無 code diff；BUGHUNT_DONE: scope=agency-os | grep=K2g\|K2h\|K2i\|K2j\|K2k\|K2l\|K2m\|K2n | hits=僅本次新增，無舊引用衝突
+
+[剩餘風險] T1(K2g)/T3(K2h 分頁部分)/T8(K2h 資料夾)三個 task 都會改到 `lib/kb/db.ts` 的 `listKnowledgeSources`，planner 已排出依序(T3 先落地，T8 在其簽名之上擴充)，避免兩個 task 平行改同一個函式簽名互相蓋掉。
+
+[rollback] 純文件規劃，`git revert` 即可；尚無程式碼異動。
+
 ## 2026-09-17｜Cognitive OS prod redeploy: Recipe engine live
 
 - 根因：GPT/Codex 09-14→09-16 的 114 commits 只在本機，未 push；origin/main 另有 7 commits（daily scaffold + `d3ec136f5` project/source foundation，內容與本機相同檔案 byte-identical）。prod 仍跑 09-12 image，`/recipes` 404。
