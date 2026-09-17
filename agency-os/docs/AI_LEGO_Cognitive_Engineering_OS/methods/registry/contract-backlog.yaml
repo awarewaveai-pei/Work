@@ -6429,6 +6429,20 @@ tier_1:
   # literature_search.capability.yaml OQ-LITSEARCH-3, WORKLOG 2026-09-17 續14/續15). Left with no
   # data path into it once the online search was removed -- MP §42 Research Integrity Engine's
   # Citation Verification sub-capability can be rebuilt when there's a real consumer.
+  twohundredseventyeighth_concrete_entry:
+    method_id: "research.reporting_guideline_checklist"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator directive 2026-09-18 (EdD reporting-guideline elicitation tool); GROUNDED ORIGINAL DESIGN, no ADR governs the content."
+    source: "methods/contracts/research.reporting_guideline_checklist.contract.yaml + ai_lego/modules/research/reporting_guideline_checklist.py"
+    note: "Registered after contract, typed-object schema, reference-data catalog (reference-data/reporting-guidelines.reference.yaml), implementation, tests, and CLI slice were verified (2026-09-18)."
+  twohundredseventyninth_concrete_entry:
+    method_id: "art_therapy.wusheng_five_phase"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator directive 2026-09-18 (build the WuSheng Five Phase method from her existing Airtable framework, base appbQ5ACPPxMybVvM); GROUNDED ORIGINAL DESIGN, no ADR governs the content."
+    source: "methods/contracts/art_therapy.wusheng_five_phase.contract.yaml + ai_lego/modules/art_therapy/wusheng_five_phase.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-18), same pattern as art_therapy.life_wheel (twohundredfortysixth_concrete_entry)."
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

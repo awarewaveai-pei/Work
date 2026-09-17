@@ -237,6 +237,7 @@
 | `specs/cognitive/typed-objects/regression-discontinuity-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, running_variable, cutoff_value, bandwidth, checks, provenance] properties[9] |
 | `specs/cognitive/typed-objects/regulatory-horizon-scan-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, entries, provenance] properties[5] |
 | `specs/cognitive/typed-objects/release-readiness-review-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, release_ref, domain_assessments, overall_status, provenance] properties[7] |
+| `specs/cognitive/typed-objects/reporting-guideline-checklist-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, guideline_id, guideline_citation, items, provenance] properties[7] |
 | `specs/cognitive/typed-objects/representation-switch-event.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, views, provenance] properties[5] |
 | `specs/cognitive/typed-objects/retention-deletion-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, data_class, purpose, retention_rule, deletion_trigger, holds, compliance_evidence, provenance] properties[13] |
 | `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, decision_ref, criteria, provenance] properties[6] |
@@ -310,6 +311,7 @@
 | `specs/cognitive/typed-objects/work-breakdown-structure.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, deliverable, provenance] properties[5] |
 | `specs/cognitive/typed-objects/workshop-certificate-drawing-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, journey_title, milestones, blessing_statement, sealed_on, created_by, provenance] properties[9] |
 | `specs/cognitive/typed-objects/wsjf-score-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, job, cost_of_delay, job_size, cost_of_delay_total, wsjf_score, engine, computation_provenance_ref, provenance] properties[11] |
+| `specs/cognitive/typed-objects/wusheng-five-phase-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, current_phase, progress_evidence, provenance] properties[8] |
 | `specs/cognitive/typed-objects/zero-trust-review-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, stages, provenance] properties[6] |
 | `specs/cognitive/typed-objects/zopa.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, provenance, seller_minimum, buyer_maximum, zopa_exists, zopa_range] properties[8] |
 | `specs/decision/decision.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, question, options, human_judgment_pending, provenance] properties[24] |
@@ -320,7 +322,7 @@
 | `specs/domain/personal-data-redacted-event.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[event_type, subject_id, redacted_fields, redacted_at, authorization_ref] properties[6] |
 | `specs/domain/project.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at] properties[10] |
 | `specs/domain/repository-contract.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[storage_tier, storage_engine_assignment, consistency_concurrency_strategy, backup_dr_matrix] properties[6] |
-| `specs/domain/source.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri, content_role, verification_status, status, version, created_by_identity_id, created_at] properties[15] |
+| `specs/domain/source.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri, content_role, verification_status, status, version, created_by_identity_id, created_at] properties[19] |
 | `specs/domain/tenant.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[tenant_id, legal_name, status, home_jurisdiction, data_residency_region, encryption_root_key_ref, created_at, deleted_at] properties[8] |
 | `specs/domain/workspace.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[workspace_id, tenant_id, name, status, created_at] properties[5] |
 | `specs/evidence/assumption.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, statement, status, provenance] properties[12] |
