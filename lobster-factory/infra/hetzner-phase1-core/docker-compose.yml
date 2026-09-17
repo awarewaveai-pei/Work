@@ -433,6 +433,19 @@ services:
       # constant in every deploy -- generate a real random value and set it once via the vault,
       # never reuse the fallback in production.
       PORTAL_SIGNUP_RATE_LIMIT_SALT: ${PORTAL_SIGNUP_RATE_LIMIT_SALT:-}
+      # Cognitive OS bridge (lib/cognitive-os/) -- next-admin's cs_knowledge_sources -> Cognitive OS
+      # Project Source Import, over the shared lobster-net docker network (never a public domain).
+      # Service-account tenant/identity created by ai_lego/apps/cli/bootstrap_service_identity.py
+      # against the cognitive-os-api container, NOT the human operator's own Phase 1 tenant.
+      # Empty = /api/internal/cognitive-os/import-project-sources answers 503 (fail closed).
+      COGNITIVE_OS_API_BASE_URL: ${COGNITIVE_OS_API_BASE_URL:-http://cognitive-os-api:8420}
+      COGNITIVE_OS_TENANT_ID: ${COGNITIVE_OS_TENANT_ID:-}
+      COGNITIVE_OS_SERVICE_EMAIL: ${COGNITIVE_OS_SERVICE_EMAIL:-}
+      COGNITIVE_OS_SERVICE_PASSWORD: ${COGNITIVE_OS_SERVICE_PASSWORD:-}
+      # Own dedicated token, never a token shared with an unrelated caller (see
+      # lib/ops-inbox/verifyIngestToken.ts's own M2 history for why that sharing is a blast-radius
+      # mistake this project already paid for once).
+      COGNITIVE_OS_IMPORT_INGEST_TOKEN: ${COGNITIVE_OS_IMPORT_INGEST_TOKEN:-}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:

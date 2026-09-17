@@ -116,6 +116,16 @@ $vars = @{
     TELEGRAM_ALLOWED_CHAT_IDS    = ""   # csv of numeric chat ids the bot listens on
     COMMAND_PLANE_DEFAULT_ORG_ID = ""   # uuid of organizations row representing the operator
     COMMAND_PLANE_DEFAULT_WORKSPACE_ID = ""  # optional uuid; null lets routes work org-wide
+    # Cognitive OS bridge (next-admin lib/cognitive-os/ -> cognitive-os-api). Service-account
+    # tenant/identity created by ai_lego/apps/cli/bootstrap_service_identity.py -- NOT the human
+    # operator's own Phase 1 login tenant. See docker-compose.yml (hetzner-phase1-core) for how
+    # these reach the deployed next-admin container.
+    COGNITIVE_OS_TENANT_ID       = ""
+    COGNITIVE_OS_SERVICE_EMAIL   = ""
+    COGNITIVE_OS_SERVICE_PASSWORD = ""
+    # Bearer token for POST /api/internal/cognitive-os/import-project-sources — own dedicated
+    # token, never shared with an unrelated internal-route caller.
+    COGNITIVE_OS_IMPORT_INGEST_TOKEN = ""
 }
 
 foreach ($entry in $vars.GetEnumerator()) {
