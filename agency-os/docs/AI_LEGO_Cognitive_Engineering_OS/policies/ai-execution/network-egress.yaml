@@ -381,11 +381,10 @@ seed_content:
         - "api.resend.com"
         - "amazonses.com"
         - "api.cloudflare.com"
-        # 學術文獻 provider（2026-09-17 操作者指示 EdD 文獻搜尋改為真實查詢；免金鑰、唯讀）。
-        # runtime 對應：docker-compose.yml COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST，
-        # ai_lego/modules/research/literature_providers.py require_egress_allowed()。
-        - "api.openalex.org"
-        - "api.crossref.org"  # 2026-09-17 second literature provider (OQ-LITSEARCH-3 second half, OQ-EDD-LITERATURE-ONLINE-1)
+        # 2026-09-17 曾短暫加入 api.openalex.org／api.crossref.org（EdD 線上文獻搜尋），
+        # 同日操作者裁定移除：Cognitive OS 不應有自己的資料蒐集功能，重複了
+        # lobster-factory lib/collect/collectors/academic.ts 既有實作；見 WORKLOG
+        # 2026-09-17（續14/續15）與 agency-os/memory/feedback_route_data_fetch_through_ops_collect.md。
         # api.anthropic.com（已列於上方第三方整合）自 2026-09-17 起也是 AI gateway 的 runtime 目的地：
         # ai_lego/platform/ai_gateway/provider.py，key 走 COGNITIVE_OS_ANTHROPIC_API_KEY（deploy/.env，不進 git）。
       classification_tag_ref: null

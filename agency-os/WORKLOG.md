@@ -30,6 +30,44 @@
 
 [rollback] 全新檔案（`sink-hci-discovered.mjs` + 3 個測試/驗證檔）+ 對 `scripts/dev-db-init.ps1`/`scripts/test-wave1-local.ps1` 純增量修改（loop bound 數字＋新增測試呼叫行，未刪改既有步驟），`git revert` 該 commit 即可完全復原，未部署到任何共用/正式環境，也沒有生產呼叫端會受影響。
 
+## 2026-09-17（續14）Cognitive OS `literature_search` 真實線上搜尋整批移除 —— 操作者裁定：不要有資料搜尋功能，重複 `/ops/collect` 既有實作（承接續12的發現）
+
+[任務] 續12發現 `literature_search`（OpenAlex/Crossref）跟 `/ops/collect` 的 `academic.ts` 重複後，操作者簡化裁決：「Cognitive OS 我是不要有搜尋資料功能」——不是換個方式接 `/ops/collect`，是整個移除。
+
+[執行過程的意外事故，本身也是本條目的一部分] 第一次完整做完刪除+編輯+驗證後，尚未 commit 就被一個並行 session 的 `git reset --hard origin/main`（`ao-resume.ps1 -FullMainlineParity`，任何 session 的招呼都可能觸發，見 memory `feedback_ao_resume_hard_reset_risk`）整批復原——8 個刪除的檔案全部復活、所有編輯全部回到刪除前內容、WORKLOG/TASKS 這則新增內容也一併消失（`git log -- agency-os/WORKLOG.md` 顯示 HEAD 已被並行 session 的 `03ad2374e`/`cc066bf76` 頂過，兩者都不含我的內容）。已用 `git status`/`git show HEAD:<path>`/逐檔 grep 逐一確認消失範圍後，原封不動重做一次，這次改用「改完立刻 commit」而非「全部做完再一次驗證再 commit」，縮小暴露窗。
+
+[核對重複，file:line 證據]
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/collectors/academic.ts` 早就實作 OpenAlex/arXiv/Crossref 三來源搜尋，含 inverted-index 摘要解碼、JATS 剝除、DOI 正規化、無摘要記錄過濾。
+- `ai_lego/modules/research/literature_providers.py`（今日新增）幾乎重做同一件事，且獨立重新踩了同一批坑（JATS、DOI 格式不一致、null 作者）。
+- 根因：探索範圍侷限在 `ai_lego` 自己的樹，沒跨查 `lobster-factory`。
+
+[已移除]
+- 檔案（整刪）：`ai_lego/modules/research/literature_providers.py`、`tests/unit/test_literature_providers.py`、`ai_lego/modules/research/citation_verification.py`、`tests/unit/test_citation_verification.py`、`ai_lego/apps/cli/run_citation_verification_slice.py`、`recipes/validated/edd-literature-search-online-v1.recipe.yaml`、`methods/contracts/research.citation_verification.contract.yaml`、`specs/cognitive/typed-objects/citation-verification-record.schema.yaml`。
+- `ai_lego/apps/recipe_runtime.py`：`literature_search` adapter 改回直接指向 `evidence_triangulation.offline_literature_search`。
+- `ai_lego/modules/research/evidence_triangulation.py`：`_CITABLE_SOURCE_KINDS` 移除 `OPENALEX_WORK`/`CROSSREF_WORK`，只留 `SYNTHETIC_FIXTURE`。
+- `policies/ai-execution/network-egress.yaml`：移除 `api.openalex.org`/`api.crossref.org`（`api.anthropic.com` 是 AI Gateway 用，保留）。
+- `docker-compose.yml`：`COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST` 只留 `api.anthropic.com`。
+- `deploy/deploy.sh`：test-gate 檔案清單移除已刪的兩個測試檔。
+- `specs/execution/status-codes.schema.yaml` + 其 fixture：移除 `ONLINE_SOURCE_UNVERIFIED`（無 producer 的註冊碼，不留死碼）。
+- `capabilities/contracts/literature_search.capability.yaml`：Runtime implementation 段落與 OQ-LITSEARCH-3 改回反映 offline-only 現況，附回溯記錄。
+- `methods/registry/contract-backlog.yaml`：citation_verification 條目改成註解說明移除原因。
+- `tests/run_golden_tests.py`：recipe inventory 硬編清單移除 `edd-literature-search-online-v1`。
+- `docs/COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md`、`agency-os/docs/operations/RUNNABLE_DEMOS.md`：對應段落更新為反映移除後現況（非重寫歷史，加註記）。
+- 已存記憶 `feedback_route_data_fetch_through_ops_collect`：以後任何「要抓外部資料」需求，先查全庫 `lib/collect/collectors/`，不侷限在動手的那個 product 樹。
+
+[保留，非本次範圍] `edd-literature-search-v1`（offline fixture 版，今日以前就存在，未曾真連網路）、Project/Source Import API、AI Gateway、art-therapy 29 methods、business chain §43——皆與「搜尋資料」無關，未動。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py && python tests/run_golden_tests.py`（spec root，第一次+重做後各跑一次）| exit=0 | result=ALL GOLDEN TESTS PASSED（4118）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py tests/unit/test_capability_adapters.py tests/unit/test_capability_resolver.py tests/unit/test_workflow_executor.py tests/unit/test_workflow_ir_and_resolver.py tests/unit/test_run_recipe_cli.py tests/unit/test_research_evidence_chain.py tests/unit/test_ai_gateway.py tests/unit/test_project_source_api.py -q`（第一次+重做後各跑一次）| exit=0 | result=185 passed, 19 subtests passed（兩次一致）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit -q`（全庫回歸，對第一次刪除後的版本跑，橫跨了意外重置事件但該次跑的 module import 快照不受事後檔案復原影響）| exit=0 | ms=~1996000 | result=13852 passed, 0 failed, 2333 subtests passed
+- REVIEW_DONE: critic=self（Standard，純刪除+回退既有已審過的程式碼+deploy.sh 單行文字移除，逐項自問：adapter 簽名是否相符/是否有殘留呼叫點/deploy.sh 是否精確字串替換）| verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`literature_providers\|PROVIDER_OPENALEX\|PROVIDER_CROSSREF\|research\.citation_verification\|ONLINE_SOURCE_UNVERIFIED` | hits=僅本條目自身/歷史記錄/gitignored runtime 快取/`egress.py` 既有歷史 docstring；均非殘留錯誤
+
+[剩餘風險] `edd-literature-search-online-v1` recipe id 已從 prod 消失——若曾有文件直接連結該 recipe id 會變 404（預期行為）。AO-RESUME 的 `-FullMainlineParity` 硬重置風險是系統性問題（見 memory），本條目只是又一次真實案例，非新發現，不在本條目範圍內處理。
+
+[rollback] `git revert` 本次 commit 即完整恢復。
+
 ## 2026-09-17（續13）HCI-30 蒐集器 Task 7：runner 端 fetch+extract+不可信內容隔離，自抓 2 個真實 bug + critic 覆審 3 Major 全修
 
 [任務] 承接續11（Task 6），照 `HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` Execution Order 做 Task 7：在隔離 runner 內做最小可用抓取＋抽取，並把抓到的每一段文字標記為不可信、掃描指令樣態（ADR-011 §決策15b）。這是本輪第一個「從零全新」的任務——Task 4/5/6 都是救回/擴充前一個壞掉 session 的產物，Task 7 全部程式碼與測試都是本 session 現寫現跑。

@@ -6423,13 +6423,12 @@ tier_1:
     mandated_by: "ADR-008 Migration step 4 mandate lifted by docs/adr/ADR-025-finance-domain-pack-first-content.md (operator directive 2026-09-17): first Finance domain-pack content"
     source: "methods/contracts/finance.financial_assumptions.contract.yaml + ai_lego/modules/finance/financial_assumptions.py"
     note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 business chain batch). The tier_2.explicit_entries row for the same id is ADR-008's historical mandate record."
-  twohundredseventyseventh_concrete_entry:
-    method_id: "research.citation_verification"
-    contract_status: complete
-    tier: 1
-    mandated_by: "Operator directive 2026-09-17 (「繼續完成」); Master Plan §42 Research Integrity Engine, Citation Verification sub-capability, structural scope only (GROUNDED, not a mother-document edit)"
-    source: "methods/contracts/research.citation_verification.contract.yaml + ai_lego/modules/research/citation_verification.py"
-    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 EdD gap batch). scope: STRUCTURAL_ONLY is declared explicitly -- Retraction Check and Contradiction Detection (MP §42's other sub-capabilities) remain unbuilt."
+  # twohundredseventyseventh_concrete_entry (research.citation_verification) registered 2026-09-17,
+  # REMOVED same day: built as a companion to the online literature_search providers, which were
+  # reverted as a duplicate of lobster-factory's /ops/collect academic collector (see
+  # literature_search.capability.yaml OQ-LITSEARCH-3, WORKLOG 2026-09-17 續14/續15). Left with no
+  # data path into it once the online search was removed -- MP §42 Research Integrity Engine's
+  # Citation Verification sub-capability can be rebuilt when there's a real consumer.
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

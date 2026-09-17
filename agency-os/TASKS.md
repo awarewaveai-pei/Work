@@ -255,7 +255,7 @@
 
 > 刷卡／登入第三方面板／瀏覽器點測／給截圖。多數每條只要幾分鐘，卻卡住下游。
 
-- [ ] **【2026-09-17 開出｜架構決策】Cognitive OS `literature_search`（OpenAlex/Crossref）與 `/ops/collect` 的 `lib/collect/collectors/academic.ts` 重複實作，待選修法時機** — 操作者發現 `ai_lego/modules/research/literature_providers.py`（今日新增）跟既有 `academic.ts` 做同一件事（OpenAlex/arXiv/Crossref 搜尋、摘要解碼、DOI 正規化、JATS 剝除），違反「用 LEGO 組裝、不重寫重複東西」原則。根因：探索範圍侷限在 `ai_lego` 樹，沒跨查 `lobster-factory`。治本修法：`/ops/collect` 加一個 query-only 內部 API（重用 `academicCollector.run()`，不寫 KB）；`cognitive-os-api` 與 `lobster-next-admin` 兩個 container 已同在 `lobster-net` docker network，可走內部呼叫不經公開網路；Cognitive OS 的 adapter 改打這支後，刪掉自己的 OpenAlex/Crossref parsing。等操作者選「現在做」或「排隊」。見 WORKLOG 2026-09-17（續12）、記憶 `feedback_route_data_fetch_through_ops_collect`。
+- [x] **【2026-09-17 開出並當日解決｜架構決策】Cognitive OS `literature_search`（OpenAlex/Crossref）與 `/ops/collect` 的 `lib/collect/collectors/academic.ts` 重複實作** — 操作者裁定：Cognitive OS 不要有自己的資料搜尋功能，不只是「換個修法方式」。已整批移除：`literature_providers.py`／`citation_verification.py` 及其測試/CLI/contract/schema、`edd-literature-search-online-v1` recipe、egress allowlist 的 openalex/crossref 條目、`ONLINE_SOURCE_UNVERIFIED` 狀態碼；`literature_search` capability 改回純 offline fixture adapter。golden tests + 目標單元測試全綠。已存記憶 `feedback_route_data_fetch_through_ops_collect`：以後任何資料蒐集需求先查 `/ops/collect`。見 WORKLOG 2026-09-17（續12/續14）。
 
 - [x] **【2026-09-11｜完整版・僅文字層】短劇模式的 Story Bible「套用」接線 + 自動連續性檢查**
   - `✅ 文字層已完成` · 操作者選「完整版：加自動連續性檢查」；**同日操作者實測「影片看不出來有用這個工具」，查出這條只做到文字層** → 畫面層缺口見下一條（待操作者選範圍）

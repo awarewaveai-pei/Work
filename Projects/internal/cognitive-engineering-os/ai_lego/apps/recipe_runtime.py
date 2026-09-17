@@ -9,7 +9,7 @@ from ai_lego.apps.api.dispatch import invoke_builder, invoke_gate_runner, resolv
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
-from ai_lego.modules.research.literature_providers import literature_search_adapter
+from ai_lego.modules.research.evidence_triangulation import offline_literature_search
 from ai_lego.modules.strategy.proposal_artifact import proposal_artifact_adapter
 from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
 from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
@@ -75,14 +75,16 @@ def build_registered_capability_adapters(
 ) -> CapabilityAdapterRegistry:
     """Build the explicit, side-effect-free adapter set shared by API and CLI.
 
-    Raw-media transcription is intentionally not registered here. The one
-    network-backed provider (OpenAlex behind ``literature_search``) is selected
-    by the bound ``research.provider`` and egress-gated at runtime; see
-    ``ai_lego.modules.research.literature_providers``.
+    Raw-media transcription is intentionally not registered here.
+    ``literature_search`` is the deterministic offline synthetic-corpus adapter
+    only -- Cognitive OS does not reach out to any external network provider
+    for data search (operator directive 2026-09-17: data collection is
+    `/ops/collect`'s job, not a capability duplicated here; see
+    `agency-os/memory/feedback_route_data_fetch_through_ops_collect.md`).
     """
     adapters = CapabilityAdapterRegistry(capability_catalog)
     registered = {
-        "literature_search": literature_search_adapter,
+        "literature_search": offline_literature_search,
         "transcribe": pre_transcribed_input_adapter,
         "run_statistics": run_statistics_adapter,
         "artifact.generate_research_paper": research_paper_artifact_adapter,

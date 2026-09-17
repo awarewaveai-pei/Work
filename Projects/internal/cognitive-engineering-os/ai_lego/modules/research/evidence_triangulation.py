@@ -16,9 +16,10 @@ from ai_lego.errors import InvariantViolation
 
 OFFLINE_SOURCE_STALE = "OFFLINE_SOURCE_STALE"
 NEEDS_HUMAN_REVIEW = "NEEDS_HUMAN_REVIEW"
-# source_kind values a triangulation may cross-reference. OPENALEX_WORK is emitted by
-# ai_lego.modules.research.literature_providers (kept as a literal here to avoid a circular import).
-_CITABLE_SOURCE_KINDS = frozenset({"SYNTHETIC_FIXTURE", "OPENALEX_WORK", "CROSSREF_WORK"})
+# source_kind values a triangulation may cross-reference. Offline synthetic corpus only --
+# Cognitive OS has no network-backed literature provider (see recipe_runtime.py's
+# build_registered_capability_adapters docstring).
+_CITABLE_SOURCE_KINDS = frozenset({"SYNTHETIC_FIXTURE"})
 
 _FIXTURE_LITERATURE = (
     {
@@ -95,8 +96,8 @@ def triangulate_themes_and_literature(payload: dict[str, Any], _node: dict[str, 
         label = str(theme.get("label", theme.get("theme_id", ""))).strip()
         if not label:
             raise InvariantViolation("TRIANGULATION_THEME_LABEL_REQUIRED")
-        # Any citable item (fixture or a registered online provider's work) is a candidate cross-reference;
-        # validation_status stays NEEDS_HUMAN_REVIEW regardless of source -- the human, not the adapter, decides.
+        # Any citable fixture item is a candidate cross-reference; validation_status stays
+        # NEEDS_HUMAN_REVIEW regardless -- the human, not the adapter, decides.
         related = [item["literature_id"] for item in literature["items"] if item.get("source_kind") in _CITABLE_SOURCE_KINDS]
         retrieval_mode = literature.get("retrieval", {}).get("mode")
         reason = (

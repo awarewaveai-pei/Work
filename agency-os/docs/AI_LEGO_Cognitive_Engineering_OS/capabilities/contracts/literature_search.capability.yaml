@@ -23,14 +23,14 @@ description: >
   `RECOMMENDED`, so its absence never made the plan non-executable -- only
   not fully resolved.
 
-  **Runtime implementations (2026-09-17)**: (1) offline synthetic-corpus
-  adapter -- emits `OFFLINE_SOURCE_STALE` + `NEEDS_HUMAN_REVIEW`, the default
-  when no `research.provider` is bound; (2)-(3) two registered online
-  providers, `openalex` and `crossref` (both `api.*`, read-only, no key) --
-  egress-gated at runtime by COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST, both
-  emit `retrieval.mode: ONLINE_PROVIDER`, `citation_verification:
-  NOT_PERFORMED`, `NEEDS_HUMAN_REVIEW`. Neither claims verified citations
-  (MP §42 gates are downstream). See OQ-LITSEARCH-3.
+  **Runtime implementation**: offline synthetic-corpus adapter only -- emits
+  `OFFLINE_SOURCE_STALE` + `NEEDS_HUMAN_REVIEW`. Cognitive OS does not call
+  out to any external network provider for this capability: a 2026-09-17
+  attempt to register `openalex`/`crossref` online providers was reverted
+  same day (operator directive -- data collection belongs to
+  `/ops/collect` (`lobster-factory/.../lib/collect/collectors/academic.ts`
+  already does this; duplicating it here was the mistake). See OQ-LITSEARCH-3
+  and WORKLOG 2026-09-17 (續14/續15).
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L783-785) -- `ref: literature_search`, `input: research.question`; the ONLY mother-document mention of this capability id (line numbers as of 2026-09-04)"
@@ -237,16 +237,18 @@ open_questions:
     blocks: "nothing in this file's own validity -- soft references are the corpus-wide convention today"
   - id: "OQ-LITSEARCH-3"
     question: >
-      RESOLVED 2026-09-17 (operator directive): a registered network provider
-      exists -- OpenAlex (`api.openalex.org`, no key, read-only), selected by
-      the bound `research.provider` and refused at runtime unless the host is
-      in COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST (EGRESS-EC99-2 mirror). See
-      `ai_lego/modules/research/literature_providers.py` and
-      `recipes/validated/edd-literature-search-online-v1.recipe.yaml`.
-      Second provider ANSWERED 2026-09-17: Crossref (api.crossref.org) registered alongside
-      OpenAlex, same dispatch-by-source.provider pattern. Still open: local corpus export format.
-    owner: "operator / research supervisor"
-    blocks: "nothing; offline fixture behaviour unchanged when no provider is bound"
+      Should this capability ever call an external network provider (OpenAlex,
+      Crossref, etc.) directly, or should any live literature data always
+      arrive via `/ops/collect` (which already has an `academic` collector
+      for OpenAlex/arXiv/Crossref) and enter Cognitive OS through Project/
+      Source Import instead? A 2026-09-17 attempt built OpenAlex+Crossref
+      providers directly into this capability; operator reverted it same day
+      as a duplicate of `/ops/collect`'s existing collector. Still open:
+      whether/how `/ops/collect` should expose a query-only (no KB-write)
+      API for a caller like Cognitive OS to use instead, and local corpus
+      export format for genuinely offline use.
+    owner: "operator"
+    blocks: "nothing; offline fixture behaviour unchanged"
 
 verification:
   method: >
