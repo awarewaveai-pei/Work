@@ -139,7 +139,7 @@
   - UI：seed 表單（URL、「確認為組織非個人」核取方塊預設不勾、「先試跑」核取方塊預設勾選）、DISCOVERED 清單卡片、拒絕按鈕（`confirm()` 二次確認）。
 - **完成狀態**：real-Postgres（`scripts/dev-db-init.ps1`）+ curl 逐分支驗證全部通過：GET 200 且 RLS 租戶隔離屬實（租戶 A 看得到、租戶 B 看不到同一列）；POST 400（缺 targetUrl／`subject_kind` 錯誤）／503（runner 未設定）；reject 200（真實 DISCOVERED→REJECTED）／200（REJECTED→REJECTED 冪等 no-op，trigger 自己的 `IS DISTINCT FROM` 設計，UI 本就不會對非 DISCOVERED 列顯示按鈕，非 bug）／409（真實驅動一列到 ACTIVE 後拒絕，H1022 真實觸發）／404（不存在的 id）。瀏覽器全流程（Claude 自己的 browser 工具）：分頁渲染、表單送出前端 gate（未勾組織確認擋下送出，不發網路請求）、真實 503 正確顯示、DISCOVERED 卡片正確渲染、console 零 JS 例外。
   - **過程中發現並修正 2 個真實 bug**：(1) `POST /seeds` 原本 503（runner 未設定）檢查跑在輸入驗證前，導致本機/多數 dev session 下任何格式錯誤的請求都被 503 訊息蓋住看不到真正錯誤——已修，輸入驗證移到 503 檢查前（app/server.mjs，訊息由 curl 實測確認排序正確）。(2) 這台長壽 `hci30dev` 容器的 `admission_state` 欄位 GRANT 從未真正套用（`has_column_privilege` 驗證回傳 false/false）——根因是先前某 session 為了解 Task 2 的鎖只手動 `ALTER TABLE` 加欄位，沒跑完整 migration 0020，而 `dev-db-init.ps1` 的「已套用」判斷只查欄位存不存在、不查 GRANT，因此沒被抓到（`dev-db-init.ps1` 自己的註解已預言過這個風險類別）；已用 0020 本來就宣告的兩行 `GRANT` 手動補上（幂等、無 schema 變更），並用 `scripts/test-wave1-local.ps1` 的從零重建流程確認 migration 檔本身正確、純屬這一個容器的既有 volume drift。
-  - **另定位一個範圍外缺口，已用 spawn_task 記錄追蹤而非就地擴大改動**：`app/server.mjs` 現在也呼叫 `orchestrateDiscoveredFetch`，成為 ADR-0029 gate 6 呼叫圖的第二個進入點，但 `scripts/check-trigger-no-direct-fetch.ps1` 只掃描 `public-intelligence/`。目前零風險（已 grep 確認 `app/server.mjs` 沒有裸 fetch/http 使用）；擴大掃描範圍需要三處腳本修改（`node_modules` 排除、字串常值先剝離再比對——已用真實 PowerShell regex 測試證實 `app/server.mjs:14` 自己的 import 路徑字面值與 `app/scripts/verify-sink-hci-discovered.mjs` 的 `s3://` bucket 名稱字面值都會誤報、以及零容忍模式的 allowlist 支援），不屬於本任務範圍，列為獨立後續任務。
+  - **另定位一個範圍外缺口，已用 spawn_task 記錄追蹤而非就地擴大改動**：`app/server.mjs` 現在也呼叫 `orchestrateDiscoveredFetch`，成為 ADR-0029 gate 6 呼叫圖的第二個進入點，但 `scripts/check-trigger-no-direct-fetch.ps1` 只掃描 `public-intelligence/`。目前零風險（已 grep 確認 `app/server.mjs` 沒有裸 fetch/http 使用）；擴大掃描範圍需要三處腳本修改（`node_modules` 排除、字串常值先剝離再比對——已用真實 PowerShell regex 測試證實 `app/server.mjs:14` 自己的 import 路徑字面值與 `app/scripts/verify-sink-hci-discovered.mjs` 的 `s3://` bucket 名稱字面值都會誤報、以及零容忍模式的 allowlist 支援），不屬於本任務範圍，列為獨立後續任務。**已於 2026-09-18 收斂**：三項腳本修改（node_modules 排除、字串/模板常值剝離、`-NoAllowlist` 零容忍模式）已完成並跑過真實 PowerShell 5.1 執行驗證，`scripts/test-wave1-local.ps1` 新增 `app/ -NoAllowlist` 呼叫，細節見當日 WORKLOG。
 - **Acceptance**：UI 端到端跑一次：登記 seed → dry-run 看到候選 → 正式跑 → 清單出現 DISCOVERED 列 → 標記 REJECTED → 狀態轉換成功且非法轉換被拒。**已完成**（fetch-runner 未部署，「正式跑」「dry-run 預覽」兩步驟走的是 503 分支的真實驗證，非端對端含真實抓取——這是 Task 9 自己已知的部署層 STOP，非本任務缺口；reject/list/RLS/狀態機四步驟已用真實資料完整跑過）。
 - **Boundaries**：此 UI 的伺服器端程式碼不得直接呼叫任何會執行對外 fetch 的函式（`app/server.mjs` 只能呼叫 Task 9 的 `orchestrateDiscoveredFetch`）；不在此頁面之外新增其他導覽入口。
 
@@ -152,14 +152,13 @@
 - **Acceptance**：既有呼叫端（非 web-collection 來源的 Assessment dimension）全部既有測試維持綠燈（零回歸）；新增 fixture 證明「50 個 URL、實為 3 個獨立來源」時聚類後計數為 3；`source_relationships` 為空時輸出與修改前逐位元組相同。
 - **Boundaries**：不修改 `evidence-refs.mjs`／`combine-dimension-sources.mjs` 等上游模組的既有介面；不在此任務裡構造假的 `source_relationships` 資料寫入真實 DB。
 
-## Task 12：Routing 三件套同步（若 Task 9/10 開出新 `/api/*`） — dispatch to `fullstack-engineer`（依賴 Task 9、10）
+## Task 12：Routing 三件套同步（若 Task 9/10 開出新 `/api/*`） — **判定：條件未觸發，NOT APPLICABLE**（2026-09-18，Task 10 完成後查證）
 
-- **Goal**：任何新對外/內部 API 路由三件套同 PR 更新。
-- **Scope**：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md`。
-- **Input**：Task 9（Trigger.dev enqueue）、Task 10（UI 背後 API）實際開出的路由清單。
-- **Output**：三檔同步更新的單一 PR。
-- **Acceptance**：既有 routing 一致性檢查腳本（若有）通過；三檔內容互相一致。
-- **Boundaries**：不新增與本計畫無關的路由項目。
+- **原 Goal**：任何新對外/內部 API 路由三件套同 PR 更新。
+- **原 Scope**：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md`。
+- **查證結果（判定不適用，非略過）**：直接讀 `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md:1-19` 確認這三檔的實際內容是 Lobster Factory **client 自動化平台**的 `task_type`→執行工具（Trigger.dev／n8n／GitHub／WordPress／Supabase）路由決策表，跟「有沒有新開一條 REST API 路徑」是兩個不相關的維度——這三檔從未、也不該收錄任何具體 URL path。觸發條件原文「若 Task 9/10 開出新 `/api/*`」把「新開 API 路徑」當「需要 routing 三件套同步」的代理訊號，是規劃階段的範疇誤判：Task 9 的 Trigger.dev 編排刻意只做邏輯層、未建立任何真實 `task_type`（見 Task 9 完成狀態）；Task 10 的三條新路由是 `app/server.mjs`（本機 demo app，非 client 自動化）上的一般 REST 端點，不對應任何 Lobster Factory task_type。
+- **另查證 HCI-30 自己的 API 文件**（`api/openapi/hci-v1.yaml:1-11`）：該檔頭部明文「Skeleton only... Endpoint inventory is undecided product scope... proves the shared conventions are machine-readable via **one worked example**... not a complete surface. No HCI API server exists yet」——這是刻意的部分文件，只示範慣例（分頁、並發、鑑權 scope 命名）不是逐路徑清單。`app/server.mjs` 目前已有的 10+ 條路由（cases CRUD／persons／decisions／records／reports／risk-tier／auto-promote／reopen）**沒有一條**曾被同步進這份 skeleton；本次新增的 3 條路由若同步進去，會是全專案唯一一次「demo app 路由回填進未來 API skeleton」，打破本檔案自己宣告的設計與過去每一個既有路由的一致做法，屬於不必要且不一致的新增動作，不做。
+- **結論**：兩個候選 Scope 皆判定不適用，非本任務的實作範圍缺口。若未來 HCI-30 真的要對外開 API（P0-06 acceptance 完整關閉時），逐路徑同步 `openapi/hci-v1.yaml` 才是有意義的動作，屆時應一次處理當時所有既有路由，而非現在只挑 Task 10 這 3 條。
 
 ## Task 13：ADR-0029 六道閘收斂驗證 — dispatch to `vuln-verifier`（依賴 Task 3、4、6、7、8、9）
 
