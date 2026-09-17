@@ -1,0 +1,56 @@
+$id: "ai-lego://recipes/validated/edd-literature-search-online-v1.recipe.yaml"
+title: "EdD Literature Search (registered online provider)"
+status: ACTIVE
+description: >
+  Real scholarly search for an EdD research question through the registered
+  `literature_search` provider named in the Source (`openalex`). Egress is
+  deny-by-default at runtime (COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST must list
+  api.openalex.org, mirrored in policies/ai-execution/network-egress.yaml
+  EGRESS-EC99-2). Results are unverified citations: citation/retraction
+  verification is NOT performed here, so every item stays NEEDS_HUMAN_REVIEW.
+  Sibling edd-literature-search-v1 keeps the offline fixture behaviour.
+id: edd-literature-search-online-v1
+version: "1.0.0"
+name: "EdD Literature Search (online)"
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+suited_for:
+  - "First-pass literature scan for an EdD research question (title/abstract/citation/DOI/open-access flag)"
+  - "Feeding a human-curated literature matrix"
+not_for:
+  - "Citation verification, retraction checking, or publication-ready evidence claims"
+  - "Any provider not registered in ai_lego/modules/research/literature_providers.py"
+mandatory_elements:
+  - "Research question and provider are supplied explicitly by the source"
+  - "Provider host is on the runtime egress allowlist or the step fails closed (NETWORK_EGRESS_DENIED)"
+  - "retrieval.citation_verification == NOT_PERFORMED remains visible in the output"
+forbidden_actions:
+  - "Silently falling back to the synthetic fixture when the provider is unavailable"
+  - "Presenting provider results as verified or as a completed literature review"
+steps:
+  - label: "online_literature_search"
+    type: capability
+    ref: literature_search
+    input: [source.research_question, source.provider]
+    bindings:
+      research.question: source.research_question
+      research.provider: source.provider
+    # per_page is deliberately NOT bound: a bound source path is mandatory at runtime, and the adapter's
+    # DEFAULT_PER_PAGE (10) is the intended default for a first-pass scan.
+    necessity: REQUIRED_BY_RISK
+outputs:
+  - "LiteratureSet"
+open_questions:
+  - id: "OQ-EDD-LITERATURE-ONLINE-1"
+    question: "Which second provider (Crossref, Semantic Scholar) and what freshness/dedup policy should join OpenAlex?"
+    owner: "operator and research supervisor"
+    blocks: "nothing in this Recipe's own validity"
+verification:
+  required: true
+  checks:
+    - "Capability contract resolves to ACTIVE"
+    - "provider outside REGISTERED_PROVIDERS is refused (LITERATURE_PROVIDER_UNREGISTERED)"
+    - "host missing from COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST is refused before any I/O (NETWORK_EGRESS_DENIED)"
+    - "retrieval.mode == ONLINE_PROVIDER and side_state == NEEDS_HUMAN_REVIEW on success"

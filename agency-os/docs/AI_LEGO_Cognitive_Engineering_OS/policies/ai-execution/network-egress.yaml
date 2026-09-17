@@ -381,6 +381,10 @@ seed_content:
         - "api.resend.com"
         - "amazonses.com"
         - "api.cloudflare.com"
+        # 學術文獻 provider（2026-09-17 操作者指示 EdD 文獻搜尋改為真實查詢；免金鑰、唯讀）。
+        # runtime 對應：docker-compose.yml COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST，
+        # ai_lego/modules/research/literature_providers.py require_egress_allowed()。
+        - "api.openalex.org"
       classification_tag_ref: null
       mechanism_ref: >-
         2026-08-30 操作者提供第一方網域清單（DNS zone 全文 + 口頭補充 4 個），

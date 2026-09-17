@@ -247,6 +247,7 @@ def run_recipe_instance_conformance():
         "champion-challenger",
         "db-migration-expand-contract",
         "edd-literature-search-v1",
+        "edd-literature-search-online-v1",
         "edd-research-evidence-v1",
         "life-decision-v1",
         "method-deprecation-retirement",

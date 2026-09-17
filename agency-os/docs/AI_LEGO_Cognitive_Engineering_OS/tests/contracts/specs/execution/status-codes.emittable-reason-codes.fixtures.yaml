@@ -17,6 +17,8 @@ valid:
     instance: "METHOD_RESOLUTION_BLOCKED"
   - name: offline_source_stale
     instance: "OFFLINE_SOURCE_STALE"
+  - name: online_source_unverified_registered_2026_09_17
+    instance: "ONLINE_SOURCE_UNVERIFIED"
 
 invalid:
   - name: new_proposed_code_is_not_emittable

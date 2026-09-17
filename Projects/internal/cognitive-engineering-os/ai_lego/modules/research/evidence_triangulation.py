@@ -16,6 +16,9 @@ from ai_lego.errors import InvariantViolation
 
 OFFLINE_SOURCE_STALE = "OFFLINE_SOURCE_STALE"
 NEEDS_HUMAN_REVIEW = "NEEDS_HUMAN_REVIEW"
+# source_kind values a triangulation may cross-reference. OPENALEX_WORK is emitted by
+# ai_lego.modules.research.literature_providers (kept as a literal here to avoid a circular import).
+_CITABLE_SOURCE_KINDS = frozenset({"SYNTHETIC_FIXTURE", "OPENALEX_WORK"})
 
 _FIXTURE_LITERATURE = (
     {
@@ -92,7 +95,15 @@ def triangulate_themes_and_literature(payload: dict[str, Any], _node: dict[str, 
         label = str(theme.get("label", theme.get("theme_id", ""))).strip()
         if not label:
             raise InvariantViolation("TRIANGULATION_THEME_LABEL_REQUIRED")
-        related = [item["literature_id"] for item in literature["items"] if item.get("source_kind") == "SYNTHETIC_FIXTURE"]
+        # Any citable item (fixture or a registered online provider's work) is a candidate cross-reference;
+        # validation_status stays NEEDS_HUMAN_REVIEW regardless of source -- the human, not the adapter, decides.
+        related = [item["literature_id"] for item in literature["items"] if item.get("source_kind") in _CITABLE_SOURCE_KINDS]
+        retrieval_mode = literature.get("retrieval", {}).get("mode")
+        reason = (
+            "local synthetic corpus is stale/unverified; no publication claim is made"
+            if retrieval_mode != "ONLINE_PROVIDER"
+            else "provider results are unverified citations (no retraction/citation check yet); no publication claim is made"
+        )
         findings.append(
             {
                 "finding_id": f"TRIANGULATED-{theme.get('theme_id', label)}",
@@ -101,7 +112,7 @@ def triangulate_themes_and_literature(payload: dict[str, Any], _node: dict[str, 
                 "literature_refs": related,
                 "validation_status": NEEDS_HUMAN_REVIEW,
                 "provenance": make_provenance("AI_INFERENCE", "AI_GENERATED"),
-                "reason": "local synthetic corpus is stale/unverified; no publication claim is made",
+                "reason": reason,
             }
         )
     return {

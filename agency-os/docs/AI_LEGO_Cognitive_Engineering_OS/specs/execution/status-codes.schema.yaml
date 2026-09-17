@@ -106,7 +106,7 @@ reference_vocabulary:
       enum: [PASS, PASS_WITH_APPROVED_RISK, BLOCKED, FAILED, NEEDS_HUMAN_REVIEW, ROLLED_BACK, PARTIAL_SUCCESS]
   emittable_reason_codes:
     source: "status_codes[] entries with status EXISTING_CONSOLIDATED or NEW_ACCEPTED_* (an ADR-accepted code that a real producer emits — CAPABILITY_RESOLUTION_BLOCKED, 2026-09-04), excluding NEEDS_HUMAN_REVIEW because it is a legal side state rather than a named signal, and excluding NEW_PROPOSED_* entries (proposed, no producer yet)"
-    values: [METHOD_RESOLUTION_BLOCKED, CAPABILITY_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
+    values: [METHOD_RESOLUTION_BLOCKED, CAPABILITY_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE, ONLINE_SOURCE_UNVERIFIED]
     # Referenceable vocabulary for execution/result.schema.yaml reason_code.
     # NEW_PROPOSED PLANNING_BLOCKED_METHOD_CONTRACT_REQUIRED is not emitted;
     # NEEDS_HUMAN_REVIEW is the side state, not a named cause.
@@ -114,7 +114,7 @@ reference_vocabulary:
     # pinned by tests/contracts/specs/execution/status-codes.emittable-reason-codes.fixtures.yaml.
     schema:
       type: string
-      enum: [METHOD_RESOLUTION_BLOCKED, CAPABILITY_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE]
+      enum: [METHOD_RESOLUTION_BLOCKED, CAPABILITY_RESOLUTION_BLOCKED, DOCUMENT_RESOLUTION_BLOCKED, CURRENT_STATE_DRIFT_DETECTED, SCOPE_CHANGE_REQUIRED, LEGAL_REVIEW_REQUIRED, BUDGET_REVIEW_REQUIRED, CONFLICT_REQUIRES_HUMAN_REVIEW, PREEXISTING_WORKTREE_CHANGES, OFFLINE_SOURCE_STALE, ONLINE_SOURCE_UNVERIFIED]
 
 # ---------------------------------------------------------------------------
 # Duplicate resolution: METHOD_RESOLUTION_BLOCKED vs
@@ -389,6 +389,21 @@ status_codes:
         Unlike the hard prerequisite-missing signals, this can plausibly be
         resolved either by waiting for connectivity or by a human accepting
         staleness with disclosure — a decision point, not an unconditional halt.
+
+  - name: ONLINE_SOURCE_UNVERIFIED
+    status: "NEW_ACCEPTED_2026-09-17"
+    canonical: true
+    accepted_by: "Operator directive 2026-09-17 (EdD literature search must query a real provider). Same status class as CAPABILITY_RESOLUTION_BLOCKED: a code a real producer emits, registered so online literature results are review-gated by the same reason-code mechanism as offline ones instead of by a null."
+    resolves_finding: ["OQ-LITSEARCH-3"]
+    appears_in:
+      - {file: "Projects/internal/cognitive-engineering-os/ai_lego/modules/research/literature_providers.py", section: "module constant; openalex_literature_search retrieval.status_code", line: 41, quote: "ONLINE_SOURCE_UNVERIFIED = \"ONLINE_SOURCE_UNVERIFIED\""}
+      - {file: "capabilities/contracts/literature_search.capability.yaml", section: "description -- Runtime implementations (2026-09-17)", line: 27, quote: "registered online provider `openalex`"}
+    trigger: "A registered network provider (EGRESS-EC99-2 allowlisted) returned literature items, but no citation verification / retraction check (MP §42) has been performed on them."
+    required_action: "MUST keep the result review-gated; MUST NOT present provider items as verified scholarship or as a completed literature review."
+    side_state_mapping:
+      value: NEEDS_HUMAN_REVIEW
+      mapping_basis: PROPOSED_BY_THIS_FILE
+      rationale: "Mirror of OFFLINE_SOURCE_STALE for the online case: the items are fresh but unverified; a human (or a future MP §42 gate) decides."
 
   - name: NEEDS_HUMAN_REVIEW
     status: EXISTING_CONSOLIDATED

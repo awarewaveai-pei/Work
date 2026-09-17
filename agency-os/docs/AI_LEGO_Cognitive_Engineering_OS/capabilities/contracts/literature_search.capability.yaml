@@ -23,10 +23,14 @@ description: >
   `RECOMMENDED`, so its absence never made the plan non-executable -- only
   not fully resolved.
 
-  **What this file does NOT claim**: the first runtime implementation is an
-  offline synthetic-corpus adapter, not a current scholarly search. It emits
-  `OFFLINE_SOURCE_STALE` and `NEEDS_HUMAN_REVIEW`; this contract still does not
-  claim that a fresh network-backed provider exists.
+  **Runtime implementations (2026-09-17)**: (1) offline synthetic-corpus
+  adapter -- emits `OFFLINE_SOURCE_STALE` + `NEEDS_HUMAN_REVIEW`, the default
+  when no `research.provider` is bound; (2) registered online provider
+  `openalex` (`api.openalex.org`, read-only, no key) -- egress-gated at
+  runtime by COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST, emits
+  `retrieval.mode: ONLINE_PROVIDER`, `citation_verification: NOT_PERFORMED`,
+  `NEEDS_HUMAN_REVIEW`. Neither claims verified citations (MP §42 gates are
+  downstream). See OQ-LITSEARCH-3.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L783-785) -- `ref: literature_search`, `input: research.question`; the ONLY mother-document mention of this capability id (line numbers as of 2026-09-04)"
@@ -233,11 +237,15 @@ open_questions:
     blocks: "nothing in this file's own validity -- soft references are the corpus-wide convention today"
   - id: "OQ-LITSEARCH-3"
     question: >
-      The first runtime implementation is an offline synthetic-corpus adapter.
-      Which allow-listed scholarly sources and local corpus format should a
-      future network-backed implementation target?
-    owner: "operator / next Phase 5 slice extension"
-    blocks: "nothing in this file's own validity; it does block the Recipe's Literature Search step from ever being INVOKED (as opposed to resolved)"
+      RESOLVED 2026-09-17 (operator directive): a registered network provider
+      exists -- OpenAlex (`api.openalex.org`, no key, read-only), selected by
+      the bound `research.provider` and refused at runtime unless the host is
+      in COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST (EGRESS-EC99-2 mirror). See
+      `ai_lego/modules/research/literature_providers.py` and
+      `recipes/validated/edd-literature-search-online-v1.recipe.yaml`.
+      Still open: second provider + local corpus export format.
+    owner: "operator / research supervisor"
+    blocks: "nothing; offline fixture behaviour unchanged when no provider is bound"
 
 verification:
   method: >

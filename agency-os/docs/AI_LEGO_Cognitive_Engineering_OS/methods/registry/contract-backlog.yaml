@@ -6206,6 +6206,13 @@ tier_1:
     mandated_by: "AI LEGO Method Atlas F14 feasibility & economics row"
     source: "methods/contracts/feasibility.unit_economics.contract.yaml + ai_lego/modules/feasibility/unit_economics.py"
     note: "Registered after contract, implementation, tests, and CLI slice were verified in the F14 batch."
+  twohundredfortysixth_concrete_entry:
+    method_id: "art_therapy.life_wheel"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md), Life Wheel row; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.life_wheel.contract.yaml + ai_lego/modules/art_therapy/life_wheel.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

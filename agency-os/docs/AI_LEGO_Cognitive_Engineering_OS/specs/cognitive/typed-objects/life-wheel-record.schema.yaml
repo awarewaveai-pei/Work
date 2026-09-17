@@ -1,0 +1,57 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/life-wheel-record.schema.yaml"
+title: Life Wheel Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `LifeWheelRecord` -- output of `art_therapy.life_wheel`. Client self-ratings (0-10) per life dimension.
+  Runtime invariants beyond this schema (ai_lego/modules/art_therapy/life_wheel.py): unique normalized names,
+  balance gap recomputed on read.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.life_wheel.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, subject, dimensions, provenance]
+properties:
+  id: { type: string, pattern: "^LWHEEL-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.life_wheel" }
+  subject:
+    type: string
+    minLength: 1
+    description: "Whose wheel this is, in the client's own words (a label, not an identity record)."
+  dimensions:
+    type: array
+    minItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, score]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        score: { type: number, minimum: 0, maximum: 10 }
+        note: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Six-dimension wheel with one clearly low area"
+    value:
+      id: "LWHEEL-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.life_wheel"
+      subject: "我這學期的生活"
+      dimensions:
+        - { id: "D1", name: "健康", score: 6 }
+        - { id: "D2", name: "學業／論文", score: 3, note: "四週零進度" }
+        - { id: "D3", name: "工作", score: 7 }
+        - { id: "D4", name: "人際", score: 6 }
+        - { id: "D5", name: "休息", score: 2 }
+        - { id: "D6", name: "創作", score: 8 }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

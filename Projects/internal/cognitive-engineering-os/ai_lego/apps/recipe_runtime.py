@@ -9,7 +9,7 @@ from ai_lego.apps.api.dispatch import invoke_builder, invoke_gate_runner, resolv
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
-from ai_lego.modules.research.evidence_triangulation import offline_literature_search
+from ai_lego.modules.research.literature_providers import literature_search_adapter
 from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
 from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
@@ -73,12 +73,14 @@ def build_registered_capability_adapters(
 ) -> CapabilityAdapterRegistry:
     """Build the explicit, side-effect-free adapter set shared by API and CLI.
 
-    Network-backed providers and raw-media transcription are intentionally not
-    registered here. Adding one requires a separate provider/policy decision.
+    Raw-media transcription is intentionally not registered here. The one
+    network-backed provider (OpenAlex behind ``literature_search``) is selected
+    by the bound ``research.provider`` and egress-gated at runtime; see
+    ``ai_lego.modules.research.literature_providers``.
     """
     adapters = CapabilityAdapterRegistry(capability_catalog)
     registered = {
-        "literature_search": offline_literature_search,
+        "literature_search": literature_search_adapter,
         "transcribe": pre_transcribed_input_adapter,
         "run_statistics": run_statistics_adapter,
         "artifact.generate_research_paper": research_paper_artifact_adapter,

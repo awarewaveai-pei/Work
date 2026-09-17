@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/art_therapy.life_wheel.contract.yaml"
+title: "Life Wheel Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.life_wheel (生命之輪). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source
+  is the operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), use
+  "評估生活各面向的平衡狀態". Not an EC §32 method. Core invariant: >= 4 uniquely named dimensions each scored
+  as a real number in [0, 10]; balance (max-min) is a derived view recomputed on read, never a stored claim.
+  Non-diagnostic: scores are the client's own self-rating, never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Life Wheel row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/life-wheel-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: art_therapy.life_wheel
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [MAP, EVALUATE]
+# INFERRED, not cited.
+
+purpose:
+  - rate_each_life_dimension_to_surface_imbalance_for_reflection
+
+inputs:
+  required: []
+  # Entry-point method: client self-ratings are supplied directly.
+
+outputs:
+  - LifeWheelRecord
+
+preconditions:
+  - "at least 4 dimensions, unique names, scores in [0, 10]"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - framing.smart
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-LIFEWHEEL-1: should a canonical 8-dimension set (career/finance/health/relationships/...) be offered as a default instead of free-form names?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'life wheel'/'life_wheel' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py."
+  note: "No mother document was modified. Field shape and the 4-dimension floor are this contract's own compilation decisions."

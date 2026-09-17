@@ -1,4 +1,19 @@
 # Worklog
+## 2026-09-17｜Cognitive OS Gap B: EdD 真文獻搜尋（OpenAlex）+ method kit pilot
+
+- 缺口：`literature_search` 只有合成 fixture adapter；EdD recipe 不是真查文獻。
+- 做法：`ai_lego/modules/research/literature_providers.py` 新增 registered provider `openalex`（免金鑰、唯讀），由 Source 綁定 `research.provider` 選擇，預設 offline 行為不變；EC §99 deny-by-default 在 runtime 強制（`COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST`，redirect 每一跳重驗；body ≤4MB；provider 失敗明示 `LITERATURE_PROVIDER_UNAVAILABLE`，不偷降級成 fixture）。新 recipe `edd-literature-search-online-v1`；新 status code `ONLINE_SOURCE_UNVERIFIED`（status-codes.schema.yaml + fixture）；policy `network-egress.yaml` EGRESS-EC99-2 加 `api.openalex.org`；compose env 同步。
+- Pilot（Gap A 前置）：shared kit `ai_lego/core/domain/record_kit.py`（invariant 助手單一擁有者）、`ai_lego/apps/cli/method_slice.py`（slice runner，每個 slice 檔從 ~190 行降到 ~45）、`tests/unit/method_testkit.py`（MethodSliceMixin 7 個共用證明）；第一個方法 `art_therapy.life_wheel`（contract/schema/module/slice/test/backlog #246）。
+- 訂正：`ART_THERAPY_METHOD_ATLAS_GAP_LIST.md` 總數 31→29（SWOT 兩個重複變體對應 strategy.swot）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST=api.openalex.org python -c "openalex_literature_search('arts-based inquiry doctoral education art therapy', per_page=5)"` | exit=0 | ms=2253 | result=count_reported 9076, 5 items with DOI（scratchpad/openalex_real.json）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_literature_providers.py tests/unit/test_research_evidence_chain.py tests/unit/test_life_wheel.py tests/unit/test_run_recipe_cli.py tests/unit/test_workflow_executor.py tests/unit/test_capability_resolver.py -q` + `test_api_main.py -k "capability_only or Recipe"` | exit=0 | result=31+40+33 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec root）| exit=0 | result=PASSED 3963
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_life_wheel_slice` | exit=0 | result=PASS, gates PASS, invariant_refused(construction=True, gate=True)
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/2m/6n（M1 body 無上限→`read(MAX_BODY_BYTES+1)`+deadline；M2 redirect 跨主機→`_NoCrossHostRedirects` 重驗；m3 per_page 綁定必填→移除綁定；m4 provider 非 str TypeError→isinstance；m5 composed citation 標 SOURCE_QUOTATION→加 `derived_provenance` CALCULATED_RESULT；m6 空 literature_id→`^W[0-9]+$`；m7 status_code None→註冊 ONLINE_SOURCE_UNVERIFIED；m8 allowlist 含 scheme/port 靜默不匹配→`EGRESS_ALLOWLIST_ENTRY_INVALID`）；每項有回歸測試
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`offline_literature_search` | hits=9（run_research_slice.py 仍直接註冊 offline adapter＝CLI demo 刻意離線，正確；capability contract 過期段落已改寫）
+- 剩餘風險：OpenAlex 無 SLA；無 citation/retraction 驗證（MP §42 gate 未建，輸出明示 NOT_PERFORMED）。
+- rollback：`git revert <commit>`；prod 需重跑 deploy.sh（此 commit 尚未部署）。
+
 
 ## 2026-09-17（續3）續2 commit 掉檔事故 + HEAD typecheck 真的抓到一個 working-tree 沒抓到的錯誤
 

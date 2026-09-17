@@ -19,6 +19,9 @@ services:
     restart: unless-stopped
     environment:
       - COGNITIVE_OS_DB_PATH=/app/Projects/internal/cognitive-engineering-os/.runtime/identity.sqlite3
+      # EC §99 runtime egress allowlist (deny-by-default). Hosts here must also be listed in
+      # agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/network-egress.yaml EGRESS-EC99-2.
+      - COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST=api.openalex.org
     volumes:
       - cognitive-os-identity-data:/app/Projects/internal/cognitive-engineering-os/.runtime
     ports:
