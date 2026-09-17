@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/framing.reframing.contract.yaml"
+title: "Reframing Method Contract"
+status: ACTIVE
+
+description: >
+  framing.reframing (框架轉換). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "換角度詮釋痛苦經驗，重新定義「失敗／羞恥／後悔」。". Not an EC §32 method. Core invariant: original frame has a statement and a closed-set label; >= 1 reframe (unique ids) whose statement differs from the original.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Reframing row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/reframing-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: framing.reframing
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [TRANSFORM, REFLECT]
+# INFERRED, not cited.
+
+purpose:
+  - reinterpret_a_painful_experience_from_named_alternative_perspectives
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - ReframingRecord
+
+preconditions:
+  - "original_frame.label in {FAILURE, SHAME, REGRET, LOSS, REJECTION, OTHER}"
+  - "each reframe differs from the original statement"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.synonym_substitution
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-REFRAME-1: should reframes be scored for believability by the client (0-10)?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'reframing'/'reframing' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_reframing.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

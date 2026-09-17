@@ -1,0 +1,249 @@
+$id: "ai-lego://recipes/validated/business-plan-full-v1.recipe.yaml"
+title: "Business Plan Full Chain (Master Plan §43)"
+status: ACTIVE
+description: >
+  The complete Master Plan §43 Business Planning chain, executable end to end:
+  Source → Problem Extraction → Customer Insight → Market Analysis → Competitor
+  Analysis → SWOT → PESTEL → Porter → STP → Business Model → Strategy (TOWS) →
+  Financial Assumptions → NPV → Scenario → Risk → KPI (OKR) → Execution Plan
+  (outcome roadmap) → Proposal. Closes the gap ADR-008 documented: Financial
+  Assumptions is now a real Finance-pack method (ADR-025) and NPV binds its
+  cash flows and discount rate FROM that record, not from a form field.
+  Market Analysis, KPI, Execution Plan and Proposal are real nodes.
+id: business-plan-full-v1
+version: "1.0.0"
+name: "Business Plan Full Chain"
+
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+
+suited_for:
+  - "Turning a reviewed Source pack into a complete, traceable business proposal draft"
+not_for:
+  - "Investment advice, forecasting from invented assumptions, or unreviewed publication"
+
+mandatory_elements:
+  - "All source records are supplied explicitly and retain provenance"
+  - "TOWS consumes outputs.SWOT_analysis; NPV consumes outputs.financial_assumptions"
+  - "The proposal artifact carries the ids of every record it was composed from"
+
+forbidden_actions:
+  - "Inventing customer, market, competitor, risk, or financial evidence"
+  - "Treating the proposal as approval or recommendation"
+
+steps:
+  - label: "problem_statement"
+    type: method
+    method_id: framing.problem_statement
+    input: source.problem
+    bindings:
+      problem_id: source.problem.problem_id
+      current_state: source.problem.current_state
+      expected_state: source.problem.expected_state
+      gap: source.problem.gap
+      provenance: source.problem.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "customer_empathy_map"
+    type: method
+    method_id: insight.empathy_map
+    input: source.customer_insight
+    bindings:
+      map_id: source.customer_insight.map_id
+      subject: source.customer_insight.subject
+      entries: source.customer_insight.entries
+      provenance: source.customer_insight.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "market_analysis"
+    type: method
+    method_id: strategy.market_analysis
+    input: source.market
+    bindings:
+      record_id: source.market.record_id
+      market_definition: source.market.market_definition
+      sizing: source.market.sizing
+      segments: source.market.segments
+      provenance: source.market.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "competitor_analysis"
+    type: method
+    method_id: strategy.three_c
+    input: source.competitors
+    bindings:
+      analysis_id: source.competitors.analysis_id
+      findings: source.competitors.findings
+      fit_summary: source.competitors.fit_summary
+    necessity: REQUIRED_BY_RISK
+  - label: "SWOT_analysis"
+    type: method
+    method_id: strategy.swot
+    input: source.swot
+    bindings:
+      analysis_id: source.swot.analysis_id
+      knowledge_set_ref: source.swot.knowledge_set_ref
+      knowledge_set: source.swot.knowledge_set
+      factors: source.swot.factors
+    necessity: REQUIRED_BY_RISK
+  - label: "PESTEL_analysis"
+    type: method
+    method_id: strategy.pestel
+    input: source.macro_environment
+    bindings:
+      analysis_id: source.macro_environment.analysis_id
+      factors: source.macro_environment.factors
+    necessity: REQUIRED_BY_RISK
+  - label: "Porter_five_forces"
+    type: method
+    method_id: strategy.porter_five_forces
+    input: source.porter
+    bindings:
+      analysis_id: source.porter.analysis_id
+      forces: source.porter.forces
+      overall_attractiveness: source.porter.overall_attractiveness
+      provenance: source.porter.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "STP_analysis"
+    type: method
+    method_id: strategy.stp
+    input: source.segmentation
+    bindings:
+      record_id: source.segmentation.record_id
+      segments: source.segmentation.segments
+      targeting_decision: source.segmentation.targeting_decision
+      positioning_statement: source.segmentation.positioning_statement
+      provenance: source.segmentation.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "business_model_canvas"
+    type: method
+    method_id: strategy.business_model_canvas
+    input: source.business_model
+    bindings:
+      canvas_id: source.business_model.canvas_id
+      blocks: source.business_model.blocks
+      provenance: source.business_model.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "TOWS_strategy_options"
+    type: method
+    method_id: strategy.tows
+    input: [source.tows, outputs.SWOT_analysis]
+    bindings:
+      record_id: source.tows.record_id
+      swot_analysis: outputs.SWOT_analysis
+      pairings: source.tows.pairings
+      provenance: source.tows.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "financial_assumptions"
+    type: method
+    method_id: finance.financial_assumptions
+    input: source.financial_assumptions
+    bindings:
+      record_id: source.financial_assumptions.record_id
+      subject_ref: source.financial_assumptions.subject_ref
+      currency: source.financial_assumptions.currency
+      discount_rate: source.financial_assumptions.discount_rate
+      horizon_years: source.financial_assumptions.horizon_years
+      assumptions: source.financial_assumptions.assumptions
+      cash_flow_projection: source.financial_assumptions.cash_flow_projection
+      provenance: source.financial_assumptions.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "net_present_value_analysis"
+    type: method
+    method_id: feasibility.npv
+    input: [source.npv, outputs.financial_assumptions]
+    bindings:
+      record_id: source.npv.record_id
+      subject_ref: outputs.financial_assumptions.subject_ref
+      cash_flows: outputs.financial_assumptions.cash_flow_projection
+      discount_rate: outputs.financial_assumptions.discount_rate
+      provenance: source.npv.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "scenario_set"
+    type: method
+    method_id: foresight.scenario_planning
+    input: source.scenarios
+    bindings:
+      record_id: source.scenarios.record_id
+      critical_uncertainties: source.scenarios.critical_uncertainties
+      scenarios: source.scenarios.scenarios
+      provenance: source.scenarios.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "risk_register"
+    type: method
+    method_id: delivery.risk_register
+    input: source.risks
+    bindings:
+      record_id: source.risks.record_id
+      risks: source.risks.risks
+      provenance: source.risks.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "kpi_okr"
+    type: method
+    method_id: framing.okr
+    input: source.kpi
+    bindings:
+      record_id: source.kpi.record_id
+      objective: source.kpi.objective
+      key_results: source.kpi.key_results
+      review_cadence: source.kpi.review_cadence
+      provenance: source.kpi.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "execution_plan"
+    type: method
+    method_id: delivery.outcome_roadmap
+    input: source.execution_plan
+    bindings:
+      record_id: source.execution_plan.record_id
+      themes: source.execution_plan.themes
+      outcomes: source.execution_plan.outcomes
+      bets: source.execution_plan.bets
+      next_review: source.execution_plan.next_review
+      provenance: source.execution_plan.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "proposal"
+    type: capability
+    ref: artifact.generate_proposal
+    input: [outputs.problem_statement, outputs.market_analysis, outputs.SWOT_analysis, outputs.TOWS_strategy_options, outputs.financial_assumptions, outputs.net_present_value_analysis, outputs.risk_register, outputs.kpi_okr, outputs.execution_plan]
+    bindings:
+      problem_statement: outputs.problem_statement
+      market_analysis: outputs.market_analysis
+      swot: outputs.SWOT_analysis
+      strategy_options: outputs.TOWS_strategy_options
+      financial_assumptions: outputs.financial_assumptions
+      npv: outputs.net_present_value_analysis
+      risk_register: outputs.risk_register
+      okr: outputs.kpi_okr
+      roadmap: outputs.execution_plan
+    necessity: REQUIRED_BY_RISK
+
+outputs:
+  - "ProblemStatement"
+  - "EmpathyMap"
+  - "MarketAnalysisRecord"
+  - "ThreeCAnalysis"
+  - "SWOTAnalysis"
+  - "PESTELAnalysis"
+  - "PorterFiveForcesAnalysis"
+  - "StpAnalysis"
+  - "BusinessModelCanvas"
+  - "TOWSMatrix"
+  - "FinancialAssumptionsRecord"
+  - "NPVAnalysis"
+  - "ScenarioSet"
+  - "RiskRegister"
+  - "OKRRecord"
+  - "OutcomeRoadmap"
+  - "BusinessProposalArtifact"
+
+open_questions:
+  - id: "OQ-BUSINESS-PLAN-FULL-1"
+    question: "Should scenario_set consume financial_assumptions (low/base/high) once a sensitivity range exists on that record?"
+    owner: "operator and qualified business reviewer"
+    blocks: "nothing in v1"
+
+verification:
+  required: true
+  checks:
+    - "All sixteen method ids and the proposal capability resolve to ACTIVE contracts"
+    - "NPV cash_flows/discount_rate are bound from outputs.financial_assumptions (compile-time dataflow check)"
+    - "The proposal artifact lists the source record ids it was composed from"

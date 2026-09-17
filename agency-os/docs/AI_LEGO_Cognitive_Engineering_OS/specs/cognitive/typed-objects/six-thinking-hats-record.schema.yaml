@@ -1,0 +1,53 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/six-thinking-hats-record.schema.yaml"
+title: Six Thinking Hats Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `SixThinkingHatsRecord` -- output of `divergent.six_thinking_hats` (六頂思考帽). One topic examined under WHITE/RED/BLACK/YELLOW/GREEN/BLUE with statements per hat. Runtime invariants beyond this
+  schema live in ai_lego/modules/divergent/six_thinking_hats.py.
+
+source_of_truth_for:
+  - "methods/contracts/divergent.six_thinking_hats.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, topic, hats, provenance]
+properties:
+  id: { type: string, pattern: "^SIXHATS-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "divergent.six_thinking_hats" }
+  topic: { type: string, minLength: 1 }
+  hats:
+    type: array
+    minItems: 6
+    maxItems: 6
+    items:
+      type: object
+      additionalProperties: false
+      required: [hat, statements]
+      properties:
+        hat: { type: string, enum: [WHITE, RED, BLACK, YELLOW, GREEN, BLUE] }
+        statements: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Whether to move the workshop to weekends"
+    value:
+      id: "SIXHATS-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.six_thinking_hats"
+      topic: "workshop 改到週末"
+      hats:
+        - { hat: "WHITE", statements: ["目前每週 3 晚，論文 4 週零進度"] }
+        - { hat: "RED", statements: ["想到週末也要工作就累"] }
+        - { hat: "BLACK", statements: ["週末學員出席率可能掉"] }
+        - { hat: "YELLOW", statements: ["平日晚上全部空出來給論文"] }
+        - { hat: "GREEN", statements: ["隔週制", "線上＋實體混合"] }
+        - { hat: "BLUE", statements: ["先試一個月再決定"] }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

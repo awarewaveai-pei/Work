@@ -1,0 +1,73 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/financial-assumptions-record.schema.yaml"
+title: Financial Assumptions Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `FinancialAssumptionsRecord` -- output of `finance.financial_assumptions` (財務假設). Reviewed assumptions with basis and provenance plus a period-indexed cash-flow projection that feasibility.npv can bind to directly. Runtime invariants beyond this
+  schema live in ai_lego/modules/finance/financial_assumptions.py.
+
+source_of_truth_for:
+  - "methods/contracts/finance.financial_assumptions.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, subject_ref, currency, discount_rate, horizon_years, assumptions, cash_flow_projection, provenance]
+properties:
+  id: { type: string, pattern: "^FINASSUM-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "finance.financial_assumptions" }
+  subject_ref: { type: string, minLength: 1 }
+  currency: { type: string, pattern: "^[A-Z]{3}$" }
+  discount_rate: { type: number, minimum: 0, maximum: 1 }
+  horizon_years: { type: integer, minimum: 1, maximum: 30 }
+  assumptions:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, value, unit, basis, provenance]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        value: { type: number }
+        unit: { type: string, minLength: 1 }
+        basis: { type: string, minLength: 1 }
+        provenance:
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+  cash_flow_projection:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [period, amount]
+      properties:
+        period: { type: integer, minimum: 0, maximum: 30 }
+        amount: { type: number }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Two-year workshop line with an initial outlay"
+    value:
+      id: "FINASSUM-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "finance.financial_assumptions"
+      subject_ref: "PLAN-WORKSHOP-2027"
+      currency: "TWD"
+      discount_rate: 0.08
+      horizon_years: 2
+      assumptions:
+        - { id: "A1", name: "每梯次學員數", value: 12, unit: "participants", basis: "過去 4 梯平均 11.5", provenance: { epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null } }
+        - { id: "A2", name: "每人學費", value: 6000, unit: "TWD", basis: "2026 定價表", provenance: { epistemic_type: SOURCE_FACT, authorship_state: HUMAN_ORIGINAL, locked: null } }
+      cash_flow_projection:
+        - { period: 0, amount: -150000 }
+        - { period: 1, amount: 180000 }
+        - { period: 2, amount: 210000 }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import datetime
+import re
 from typing import Any, Callable, Iterable
 
 from ai_lego.core.domain.provenance import provenance_is_valid
@@ -46,14 +47,29 @@ def is_int_in(value: Any, low: int, high: int) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
 
 
+_ISO_DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+
+
 def is_iso_date(value: Any) -> bool:
-    if not is_nonempty_str(value):
+    """Exactly ``YYYY-MM-DD`` (the typed-object schemas' pattern) AND a real calendar date. No whitespace tolerance:
+    the stored string must equal the validated string."""
+    if not isinstance(value, str) or not _ISO_DATE.fullmatch(value):
         return False
     try:
-        datetime.date.fromisoformat(value.strip())
+        datetime.date.fromisoformat(value)
     except ValueError:
         return False
     return True
+
+
+def parse_date(value: str) -> datetime.date:
+    """Precondition: ``is_iso_date(value)`` already held."""
+    return datetime.date.fromisoformat(value)
+
+
+def is_one_of(value: Any, allowed: Iterable[str]) -> bool:
+    """Closed-set membership that cannot raise: an unhashable JSON value (list/dict) is simply not a member."""
+    return isinstance(value, str) and value in allowed
 
 
 def normalize(value: str) -> str:
@@ -83,7 +99,13 @@ def entry_problem(entry: Any, required: frozenset[str], allowed: frozenset[str],
     if unknown:
         return f"unknown key(s) {sorted(unknown, key=repr)}"
     for key, check in checks.items():
-        if key in entry and not check(entry[key]):
+        if key not in entry:
+            continue
+        try:
+            ok = check(entry[key])
+        except Exception:  # a predicate must never turn caller JSON (e.g. an unhashable list) into a 500
+            ok = False
+        if not ok:
             return f"{key} invalid: {shallow_describe(entry[key])}"
     return None
 

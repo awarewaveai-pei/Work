@@ -1,0 +1,58 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/dmaic-record.schema.yaml"
+title: DMAIC Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `DmaicRecord` -- output of `learning.dmaic` (定義-測量-分析-改善-控制). Five DMAIC phases with a summary and items each; measurement and control must have content. Runtime invariants beyond this
+  schema live in ai_lego/modules/learning/dmaic.py.
+
+source_of_truth_for:
+  - "methods/contracts/learning.dmaic.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, problem_statement, phases, provenance]
+properties:
+  id: { type: string, pattern: "^DMAIC-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "learning.dmaic" }
+  problem_statement: { type: string, minLength: 1 }
+  phases:
+    type: object
+    additionalProperties: false
+    required: [define, measure, analyze, improve, control]
+    properties:
+      define: { $ref: "#/$defs/phase" }
+      measure: { $ref: "#/$defs/phase" }
+      analyze: { $ref: "#/$defs/phase" }
+      improve: { $ref: "#/$defs/phase" }
+      control: { $ref: "#/$defs/phase" }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  phase:
+    type: object
+    additionalProperties: false
+    required: [summary, items]
+    properties:
+      summary: { type: string, minLength: 1 }
+      items: { type: array, items: { type: string, minLength: 1 } }
+examples:
+  - description: "Late-night doom-scrolling as a process defect"
+    value:
+      id: "DMAIC-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "learning.dmaic"
+      problem_statement: "每晚滑手機超過一小時"
+      phases:
+        define: { summary: "晚上 10 點後的手機使用", items: [] }
+        measure: { summary: "用螢幕時間記一週", items: ["基線：平均 74 分鐘"] }
+        analyze: { summary: "都是回家後第一件事", items: ["觸發點：坐到沙發"] }
+        improve: { summary: "回家先換衣服再坐下", items: ["手機放玄關"] }
+        control: { summary: "每週日看螢幕時間", items: ["超過 30 分鐘就重看觸發點"] }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

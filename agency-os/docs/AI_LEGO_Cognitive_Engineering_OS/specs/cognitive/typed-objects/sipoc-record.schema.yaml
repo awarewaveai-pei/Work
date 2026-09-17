@@ -1,0 +1,57 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/sipoc-record.schema.yaml"
+title: SIPOC Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `SipocRecord` -- output of `systems.sipoc` (供應者-輸入-流程-輸出-顧客). A process scoped by its five SIPOC columns. Runtime invariants beyond this
+  schema live in ai_lego/modules/systems/sipoc.py.
+
+source_of_truth_for:
+  - "methods/contracts/systems.sipoc.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, process_name, suppliers, inputs, process_steps, outputs, customers, provenance]
+properties:
+  id: { type: string, pattern: "^SIPOC-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "systems.sipoc" }
+  process_name: { type: string, minLength: 1 }
+  suppliers: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+  inputs: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+  process_steps:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, step]
+      properties:
+        id: { type: string, minLength: 1 }
+        step: { type: string, minLength: 1 }
+  outputs: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+  customers: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Workshop enrolment process"
+    value:
+      id: "SIPOC-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "systems.sipoc"
+      process_name: "workshop 報名到第一堂"
+      suppliers: ["社群貼文", "舊學員介紹"]
+      inputs: ["報名表", "訂金"]
+      process_steps:
+        - { id: "P1", step: "收到報名" }
+        - { id: "P2", step: "寄行前信" }
+        - { id: "P3", step: "第一堂" }
+      outputs: ["出席的學員", "第一張作品"]
+      customers: ["學員", "轉介的諮商師"]
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

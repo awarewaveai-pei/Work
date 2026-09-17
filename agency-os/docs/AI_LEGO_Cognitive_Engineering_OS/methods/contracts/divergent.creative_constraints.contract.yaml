@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/divergent.creative_constraints.contract.yaml"
+title: "Creative Constraints Method Contract"
+status: ACTIVE
+
+description: >
+  divergent.creative_constraints (創意限制). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "以限制媒材方式（只能用紅色、只能用左手）促發非慣性表達與創作彈性。". Not an EC §32 method. Core invariant: >= 1 typed constraint with unique ids; >= 1 output, each referencing >= 1 declared constraint it was made under.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Creative Constraints row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/creative-constraints-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: divergent.creative_constraints
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [TRANSFORM, EXPAND]
+# INFERRED, not cited.
+
+purpose:
+  - impose_deliberate_material_or_rule_constraints_and_record_the_outputs_made_under_them
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - CreativeConstraintsRecord
+
+preconditions:
+  - "constraint_type in {MATERIAL, TOOL, TIME, COLOR, BODY, RULE}"
+  - "every output references declared constraints"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.visual_metaphor
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-CCONSTR-1: should outputs carry a portable artifact URI to the artwork?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'creative_constraints'/'creative constraints' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_creative_constraints.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

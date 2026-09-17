@@ -1,0 +1,59 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/grow-model-record.schema.yaml"
+title: GROW Model Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `GrowModelRecord` -- output of `framing.grow_model` (GROW 模型). Goal, Reality, Options and a dated Will that commits to one option. Runtime invariants beyond this
+  schema live in ai_lego/modules/framing/grow_model.py.
+
+source_of_truth_for:
+  - "methods/contracts/framing.grow_model.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, goal, reality, options, will, provenance]
+properties:
+  id: { type: string, pattern: "^GROW-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "framing.grow_model" }
+  goal: { type: string, minLength: 1 }
+  reality: { type: string, minLength: 1 }
+  options:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description]
+      properties:
+        id: { type: string, minLength: 1 }
+        description: { type: string, minLength: 1 }
+  will:
+    type: object
+    additionalProperties: false
+    required: [chosen_option_ref, first_step, by_when]
+    properties:
+      chosen_option_ref: { type: string, minLength: 1 }
+      first_step: { type: string, minLength: 1 }
+      by_when: { type: string, format: date, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Thesis chapter in six weeks"
+    value:
+      id: "GROW-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "framing.grow_model"
+      goal: "六週內交出第三章初稿"
+      reality: "每週能寫的時間約 6 小時，資料已收齊"
+      options:
+        - { id: "O1", description: "每天早上 1 小時" }
+        - { id: "O2", description: "週末各 3 小時" }
+      will: { chosen_option_ref: "O1", first_step: "明早先寫 300 字", by_when: "2026-09-18" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

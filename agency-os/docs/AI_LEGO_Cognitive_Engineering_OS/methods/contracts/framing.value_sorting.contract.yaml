@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/framing.value_sorting.contract.yaml"
+title: "Value Sorting Method Contract"
+status: ACTIVE
+
+description: >
+  framing.value_sorting (價值觀排序). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "釐清個人或團隊的核心價值。". Not an EC §32 method. Core invariant: >= 2 candidates with unique ids and normalized names; ranking is a permutation of the candidate ids.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Value Sorting row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/value-sorting-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: framing.value_sorting
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [EVALUATE]
+# INFERRED, not cited.
+
+purpose:
+  - rank_a_set_of_candidate_values_so_the_core_ones_surface
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - ValueSortingRecord
+
+preconditions:
+  - "at least 2 candidate values"
+  - "ranking lists every candidate id exactly once"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.value_clarification
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-VSORT-1: should a forced-choice pairwise variant be recorded instead of a full ordering?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'value_sorting'/'value sorting' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_value_sorting.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

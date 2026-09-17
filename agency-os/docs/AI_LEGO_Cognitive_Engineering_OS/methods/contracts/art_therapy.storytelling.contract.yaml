@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/art_therapy.storytelling.contract.yaml"
+title: "Storytelling Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.storytelling (故事敘說). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "用敘事建構意義與共享經驗。". Not an EC §32 method. Core invariant: the arc has exactly setting/conflict/resolution/meaning, all non-empty; >= 1 character with unique ids.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Storytelling row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/storytelling-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: art_therapy.storytelling
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [EXPAND, REFLECT]
+# INFERRED, not cited.
+
+purpose:
+  - tell_a_complete_narrative_arc_to_construct_meaning_from_experience
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - StorytellingRecord
+
+preconditions:
+  - "arc parts setting, conflict, resolution, meaning all present and non-empty"
+  - "at least 1 character"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.value_clarification
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-STORY-1: should a shared-experience variant record multiple tellers of the same story?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'storytelling'/'storytelling' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_storytelling.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

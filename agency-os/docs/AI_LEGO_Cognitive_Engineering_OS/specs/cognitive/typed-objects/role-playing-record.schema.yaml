@@ -1,0 +1,63 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/role-playing-record.schema.yaml"
+title: Role Playing Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `RolePlayingRecord` -- output of `art_therapy.role_playing` (角色扮演). A scenario, who played which role with what stance, and per-role observations and predictions. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/role_playing.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.role_playing.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, scenario, roles, reflections, provenance]
+properties:
+  id: { type: string, pattern: "^ROLEPLAY-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.role_playing" }
+  scenario: { type: string, minLength: 1 }
+  roles:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, played_by, stance]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        played_by: { type: string, enum: [CLIENT, FACILITATOR, PEER, EMPTY_CHAIR] }
+        stance: { type: string, minLength: 1 }
+  reflections:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, role_ref, observation, prediction]
+      properties:
+        id: { type: string, minLength: 1 }
+        role_ref: { type: string, minLength: 1 }
+        observation: { type: string, minLength: 1 }
+        prediction: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Rehearsing a boundary conversation"
+    value:
+      id: "ROLEPLAY-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.role_playing"
+      scenario: "跟指導教授說我需要延後兩週"
+      roles:
+        - { id: "R1", name: "我", played_by: "CLIENT", stance: "想被理解但怕被責備" }
+        - { id: "R2", name: "教授", played_by: "EMPTY_CHAIR", stance: "忙碌、就事論事" }
+      reflections:
+        - { id: "F1", role_ref: "R1", observation: "我一開口就道歉三次", prediction: "如果先講方案，對方比較不會不耐煩" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

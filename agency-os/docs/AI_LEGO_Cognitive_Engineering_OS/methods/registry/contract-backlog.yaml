@@ -6213,6 +6213,216 @@ tier_1:
     mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md), Life Wheel row; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
     source: "methods/contracts/art_therapy.life_wheel.contract.yaml + ai_lego/modules/art_therapy/life_wheel.py"
     note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfortyseventh_concrete_entry:
+    method_id: "art_therapy.turning_point_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.turning_point_analysis.contract.yaml + ai_lego/modules/art_therapy/turning_point_analysis.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfortyeighth_concrete_entry:
+    method_id: "art_therapy.story_completion"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.story_completion.contract.yaml + ai_lego/modules/art_therapy/story_completion.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfortyninth_concrete_entry:
+    method_id: "art_therapy.conflict_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.conflict_mapping.contract.yaml + ai_lego/modules/art_therapy/conflict_mapping.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftieth_concrete_entry:
+    method_id: "art_therapy.full_stop_method"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.full_stop_method.contract.yaml + ai_lego/modules/art_therapy/full_stop_method.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftyfirst_concrete_entry:
+    method_id: "art_therapy.synonym_substitution"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.synonym_substitution.contract.yaml + ai_lego/modules/art_therapy/synonym_substitution.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftysecond_concrete_entry:
+    method_id: "art_therapy.motivation_matrix"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.motivation_matrix.contract.yaml + ai_lego/modules/art_therapy/motivation_matrix.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftythird_concrete_entry:
+    method_id: "art_therapy.value_clarification"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.value_clarification.contract.yaml + ai_lego/modules/art_therapy/value_clarification.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftyfourth_concrete_entry:
+    method_id: "art_therapy.storytelling"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.storytelling.contract.yaml + ai_lego/modules/art_therapy/storytelling.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftyfifth_concrete_entry:
+    method_id: "art_therapy.role_playing"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.role_playing.contract.yaml + ai_lego/modules/art_therapy/role_playing.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftysixth_concrete_entry:
+    method_id: "art_therapy.visual_metaphor"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.visual_metaphor.contract.yaml + ai_lego/modules/art_therapy/visual_metaphor.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftyseventh_concrete_entry:
+    method_id: "art_therapy.metaphor_dialogue"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.metaphor_dialogue.contract.yaml + ai_lego/modules/art_therapy/metaphor_dialogue.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftyeighth_concrete_entry:
+    method_id: "art_therapy.workshop_certificate_drawing"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/art_therapy.workshop_certificate_drawing.contract.yaml + ai_lego/modules/art_therapy/workshop_certificate_drawing.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredfiftyninth_concrete_entry:
+    method_id: "divergent.six_thinking_hats"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/divergent.six_thinking_hats.contract.yaml + ai_lego/modules/divergent/six_thinking_hats.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtieth_concrete_entry:
+    method_id: "divergent.lateral_thinking"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/divergent.lateral_thinking.contract.yaml + ai_lego/modules/divergent/lateral_thinking.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtyfirst_concrete_entry:
+    method_id: "divergent.triz"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/divergent.triz.contract.yaml + ai_lego/modules/divergent/triz.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtysecond_concrete_entry:
+    method_id: "divergent.creative_constraints"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/divergent.creative_constraints.contract.yaml + ai_lego/modules/divergent/creative_constraints.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtythird_concrete_entry:
+    method_id: "divergent.design_thinking"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/divergent.design_thinking.contract.yaml + ai_lego/modules/divergent/design_thinking.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtyfourth_concrete_entry:
+    method_id: "framing.reframing"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/framing.reframing.contract.yaml + ai_lego/modules/framing/reframing.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtyfifth_concrete_entry:
+    method_id: "framing.grow_model"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/framing.grow_model.contract.yaml + ai_lego/modules/framing/grow_model.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtysixth_concrete_entry:
+    method_id: "framing.future_compass"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/framing.future_compass.contract.yaml + ai_lego/modules/framing/future_compass.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtyseventh_concrete_entry:
+    method_id: "framing.value_sorting"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/framing.value_sorting.contract.yaml + ai_lego/modules/framing/value_sorting.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtyeighth_concrete_entry:
+    method_id: "systems.life_system_mapping"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/systems.life_system_mapping.contract.yaml + ai_lego/modules/systems/life_system_mapping.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredsixtyninth_concrete_entry:
+    method_id: "systems.force_field_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/systems.force_field_analysis.contract.yaml + ai_lego/modules/systems/force_field_analysis.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredseventieth_concrete_entry:
+    method_id: "systems.sipoc"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/systems.sipoc.contract.yaml + ai_lego/modules/systems/sipoc.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredseventyfirst_concrete_entry:
+    method_id: "systems.flowchart"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/systems.flowchart.contract.yaml + ai_lego/modules/systems/flowchart.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredseventysecond_concrete_entry:
+    method_id: "learning.dmaic"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/learning.dmaic.contract.yaml + ai_lego/modules/learning/dmaic.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredseventythird_concrete_entry:
+    method_id: "learning.appreciative_inquiry"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/learning.appreciative_inquiry.contract.yaml + ai_lego/modules/learning/appreciative_inquiry.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredseventyfourth_concrete_entry:
+    method_id: "delivery.gantt_chart"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md); general method placed in its natural family; GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17"
+    source: "methods/contracts/delivery.gantt_chart.contract.yaml + ai_lego/modules/delivery/gantt_chart.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredseventyfifth_concrete_entry:
+    method_id: "strategy.market_analysis"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Master Plan §43 Business Planning Recipe 'Market Analysis' node (no Atlas method; ADR-008 Context table); GROUNDED ORIGINAL DESIGN, operator directive 2026-09-17, ADR-025"
+    source: "methods/contracts/strategy.market_analysis.contract.yaml + ai_lego/modules/strategy/market_analysis.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 art-therapy gap batch)."
+  twohundredseventysixth_concrete_entry:
+    method_id: "finance.financial_assumptions"
+    contract_status: complete
+    tier: 1
+    mandated_by: "ADR-008 Migration step 4 mandate lifted by docs/adr/ADR-025-finance-domain-pack-first-content.md (operator directive 2026-09-17): first Finance domain-pack content"
+    source: "methods/contracts/finance.financial_assumptions.contract.yaml + ai_lego/modules/finance/financial_assumptions.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-17 business chain batch). The tier_2.explicit_entries row for the same id is ADR-008's historical mandate record."
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
@@ -6308,9 +6518,9 @@ tier_2:
     # "contract-backlog" before writing this file. Omitting it would mean
     # building this file without honoring a decision already on the books.
     - method_id: "finance.financial_assumptions"
-      contract_status: pending
+      contract_status: pending  # tier_2 is pending-by-definition (golden registry invariant); the LIVE registration is the tier_1 concrete entry
       tier: 2
-      note: "見 ADR-008，P1-CONFLICT-4；Business Planning Mode 非目前選定 MVP 切片"
+      note: "見 ADR-008，P1-CONFLICT-4；2026-09-17 ADR-025 依操作者指示建成（tier_1 亦有 complete 條目；本條保留為 ADR-008 mandate 的歷史登記）"
       mandated_by: "docs/adr/ADR-008-business-planning-recipe-method-gap.md Migration step 4 (L107), Status: ACCEPTED (2026-08-29)"
       mandate_verbatim: >
         "待 Phase 3 建立 methods/registry/contract-backlog.yaml

@@ -1,0 +1,51 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/lateral-thinking-record.schema.yaml"
+title: Lateral Thinking Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `LateralThinkingRecord` -- output of `divergent.lateral_thinking` (水平思考). The assumption being escaped and the provocations used, each with the idea it moved to. Runtime invariants beyond this
+  schema live in ai_lego/modules/divergent/lateral_thinking.py.
+
+source_of_truth_for:
+  - "methods/contracts/divergent.lateral_thinking.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, problem_statement, dominant_assumption, provocations, provenance]
+properties:
+  id: { type: string, pattern: "^LATERAL-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "divergent.lateral_thinking" }
+  problem_statement: { type: string, minLength: 1 }
+  dominant_assumption: { type: string, minLength: 1 }
+  provocations:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, technique, statement, movement]
+      properties:
+        id: { type: string, minLength: 1 }
+        technique: { type: string, enum: [PROVOCATION_PO, REVERSAL, RANDOM_ENTRY, ESCAPE, DISTORTION, WISHFUL_THINKING] }
+        statement: { type: string, minLength: 1 }
+        movement: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Escaping 'workshops must be in the evening'"
+    value:
+      id: "LATERAL-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.lateral_thinking"
+      problem_statement: "找不到時間寫論文"
+      dominant_assumption: "workshop 一定要在晚上"
+      provocations:
+        - { id: "PO1", technique: "REVERSAL", statement: "Po: workshop 在早上六點", movement: "早鳥班：晨間創作＋早餐，晚上完全留給論文" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

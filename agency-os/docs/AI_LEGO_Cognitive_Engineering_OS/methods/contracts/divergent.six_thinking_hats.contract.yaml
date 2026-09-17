@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/divergent.six_thinking_hats.contract.yaml"
+title: "Six Thinking Hats Method Contract"
+status: ACTIVE
+
+description: >
+  divergent.six_thinking_hats (六頂思考帽). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "讓案主切換多元觀點：情緒、邏輯、批判、創意等，強化整合力。". Not an EC §32 method. Core invariant: exactly the six hats, each worn once with >= 1 statement -- a partial set is refused.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Six Thinking Hats row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/six-thinking-hats-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: divergent.six_thinking_hats
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [EXPAND, EVALUATE]
+# INFERRED, not cited.
+
+purpose:
+  - view_one_topic_through_all_six_thinking_hats_in_turn
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - SixThinkingHatsRecord
+
+preconditions:
+  - "all six hats present exactly once"
+  - "each hat has at least 1 statement"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - decision.weighted_decision_matrix
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-SIXHATS-1: should BLUE (process) statements be required to come last, per de Bono's sequencing?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'six_thinking_hats'/'six thinking hats' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_six_thinking_hats.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

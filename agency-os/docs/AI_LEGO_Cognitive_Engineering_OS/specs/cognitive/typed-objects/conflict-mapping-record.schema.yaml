@@ -1,0 +1,62 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/conflict-mapping-record.schema.yaml"
+title: Conflict Mapping Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ConflictMappingRecord` -- output of `art_therapy.conflict_mapping` (衝突地圖). A remembered conflict, its parties' needs, and the ordered path by which it transformed, each step recording a resource gained. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/conflict_mapping.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.conflict_mapping.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, conflict_label, parties, transformation_path, provenance]
+properties:
+  id: { type: string, pattern: "^CONFMAP-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.conflict_mapping" }
+  conflict_label: { type: string, minLength: 1 }
+  parties:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, need]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        need: { type: string, minLength: 1 }
+  transformation_path:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, step, resource_gained]
+      properties:
+        id: { type: string, minLength: 1 }
+        step: { type: string, minLength: 1 }
+        resource_gained: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "An inner conflict between two voices"
+    value:
+      id: "CONFMAP-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.conflict_mapping"
+      conflict_label: "要不要接新的 workshop"
+      parties:
+        - { id: "P1", name: "想休息的我", need: "恢復體力" }
+        - { id: "P2", name: "想被需要的我", need: "感到有價值" }
+      transformation_path:
+        - { id: "S1", step: "把兩個聲音各畫成一個角色", resource_gained: "看見兩者都是我" }
+        - { id: "S2", step: "讓它們協商出隔週制", resource_gained: "可以同時照顧兩個需求" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

@@ -1,0 +1,68 @@
+$id: "ai-lego://capabilities/contracts/artifact.generate_proposal.capability.yaml"
+title: "artifact.generate_proposal -- Business Proposal Artifact Capability Contract"
+status: ACTIVE
+
+description: >
+  Terminal node of Master Plan §43's Business Planning Recipe ("... → KPI →
+  Execution Plan → Proposal"). Composes a Markdown proposal from nine typed,
+  gate-checked upstream records (problem statement, market analysis, SWOT,
+  TOWS options, financial assumptions, NPV, risk register, OKR, outcome
+  roadmap). Nothing is generated: every number and sentence is carried from a
+  provenance-bearing record. Side-effect free (artifact value only; no
+  operator-path write). Fails closed when any bound input is not the upstream
+  record. Runtime: ai_lego/modules/strategy/proposal_artifact.py, registered in
+  ai_lego/apps/recipe_runtime.py. Built on operator directive 2026-09-17
+  (ADR-025 lifts ADR-008's deferral of the Finance pack).
+
+source_of_truth_for:
+  - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §43 Business Planning Mode -- 'Proposal' terminal node"
+  - "capabilities/contracts/artifact.generate_research_paper.capability.yaml -- sibling precedent for a side-effect-free artifact capability"
+  - "recipes/validated/business-plan-full-v1.recipe.yaml -- the consumer"
+
+decided_by: "docs/adr/ADR-025-finance-domain-pack-first-content.md (ACCEPTED 2026-09-17, operator directive)."
+
+id: artifact.generate_proposal
+version: "1.0.0"
+
+input:
+  type:
+    - ProblemStatement
+    - MarketAnalysisRecord
+    - SWOTAnalysis
+    - TOWSMatrix
+    - FinancialAssumptionsRecord
+    - NPVAnalysis
+    - RiskRegister
+    - OKRRecord
+    - OutcomeRoadmap
+
+output:
+  type:
+    - BusinessProposalArtifact
+
+preconditions:
+  - "every bound input is the upstream method's record (dict), not a scalar or missing"
+  - "workflow.static_validation == PASS"
+  - "policy.validation == PASS"
+
+quality:
+  provenance_required: true
+  method_specific_gate_required: false
+  # Each upstream record already passed its own provenance_required + integrity gates; the artifact
+  # carries their ids in `sources` so a reviewer can trace every line back.
+
+security:
+  external_ai: policy_controlled
+
+rollback:
+  side_effect_free_preferred: true
+
+open_questions:
+  - id: "OQ-PROPOSAL-1"
+    question: "Should the artifact be stored to the tenant CAS with a Portable Artifact URI in addition to being returned inline?"
+    owner: "operator"
+    blocks: "nothing in v1"
+
+verification:
+  method: "Validated against specs/domain/capability-contract.schema.yaml via tests/run_golden_tests.py check 2c; exercised end to end by tests/unit/test_business_plan_full_recipe.py."
+  note: "No mother document was modified."

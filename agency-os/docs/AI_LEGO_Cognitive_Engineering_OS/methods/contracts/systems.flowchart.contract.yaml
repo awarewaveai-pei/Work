@@ -1,0 +1,53 @@
+$id: "ai-lego://methods/contracts/systems.flowchart.contract.yaml"
+title: "Flowchart Method Contract"
+status: ACTIVE
+
+description: >
+  systems.flowchart (流程圖). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "視覺化工作流程，找出瓶頸與改善點。將反覆出現的困擾歷程以步驟視覺化，觀察卡關處。". Not an EC §32 method. Core invariant: one START, >= 1 END, edges resolve, START has no incoming and END no outgoing, every other node has incoming and outgoing edges, DECISION nodes have >= 2 conditioned exits.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Flowchart row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/flowchart-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: systems.flowchart
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [MAP, DECOMPOSE]
+# INFERRED, not cited.
+
+purpose:
+  - draw_a_recurring_process_as_a_well_formed_graph_to_locate_where_it_sticks
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - FlowchartRecord
+
+preconditions:
+  - "graph well-formed: one START, >= 1 END, no self-loops, no duplicate (from,to,condition) edges, every node reachable from START and able to reach an END (BFS), conditions only on DECISION exits, DECISION has >= 2 exits with distinct conditions; cycles between distinct nodes are allowed by design"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - root_cause.five_whys
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-FLOW-1: should a 'stuck_here' marker on a node be a first-class field?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'flowchart'/'flowchart' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_flowchart.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

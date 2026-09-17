@@ -1,0 +1,55 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/reframing-record.schema.yaml"
+title: Reframing Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ReframingRecord` -- output of `framing.reframing` (框架轉換). A painful original frame and the alternative perspectives it was re-read through. Runtime invariants beyond this
+  schema live in ai_lego/modules/framing/reframing.py.
+
+source_of_truth_for:
+  - "methods/contracts/framing.reframing.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, original_frame, reframes, provenance]
+properties:
+  id: { type: string, pattern: "^REFRAME-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "framing.reframing" }
+  original_frame:
+    type: object
+    additionalProperties: false
+    required: [statement, label]
+    properties:
+      statement: { type: string, minLength: 1 }
+      label: { type: string, enum: [FAILURE, SHAME, REGRET, LOSS, REJECTION, OTHER] }
+  reframes:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, perspective, statement]
+      properties:
+        id: { type: string, minLength: 1 }
+        perspective: { type: string, minLength: 1 }
+        statement: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "A missed deadline reframed"
+    value:
+      id: "REFRAME-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "framing.reframing"
+      original_frame: { statement: "我又沒趕上期限，我根本不適合念博士", label: "FAILURE" }
+      reframes:
+        - { id: "RF1", perspective: "十年後的我", statement: "那學期我同時在養活自己，晚兩週交不是失敗" }
+        - { id: "RF2", perspective: "指導教授", statement: "延期是常態，重點是有沒有進度" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

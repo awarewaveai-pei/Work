@@ -1,0 +1,53 @@
+$id: "ai-lego://methods/contracts/art_therapy.workshop_certificate_drawing.contract.yaml"
+title: "Workshop Certificate Drawing Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.workshop_certificate_drawing (工作坊證章畫). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "創作「療癒旅程完成證明」，象徵性封存與儀式性祝福。". Not an EC §32 method. Core invariant: >= 1 milestone with unique ids, a non-empty blessing, an ISO sealed_on date, and a created_by label.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Workshop Certificate Drawing row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/workshop-certificate-drawing-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: art_therapy.workshop_certificate_drawing
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [MAP, REFLECT]
+# INFERRED, not cited.
+
+purpose:
+  - seal_a_completed_healing_journey_with_a_drawn_certificate_naming_its_milestones_and_a_blessing
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - WorkshopCertificateDrawingRecord
+
+preconditions:
+  - "at least 1 milestone"
+  - "sealed_on is an ISO date"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next: []
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-WCERT-1: should the certificate artwork be stored via a portable artifact URI?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'workshop_certificate_drawing'/'workshop certificate drawing' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_workshop_certificate_drawing.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

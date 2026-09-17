@@ -1,0 +1,58 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/visual-metaphor-record.schema.yaml"
+title: Visual Metaphor Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `VisualMetaphorRecord` -- output of `art_therapy.visual_metaphor` (視覺隱喻創作). A felt experience made concrete as an image, the metaphor it states, and what each visual element stands for. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/visual_metaphor.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.visual_metaphor.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, felt_experience, image, metaphor_statement, elements, provenance]
+properties:
+  id: { type: string, pattern: "^VISMET-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.visual_metaphor" }
+  felt_experience: { type: string, minLength: 1 }
+  image:
+    type: object
+    additionalProperties: false
+    required: [medium, description]
+    properties:
+      medium: { type: string, minLength: 1 }
+      description: { type: string, minLength: 1 }
+  metaphor_statement: { type: string, minLength: 1 }
+  elements:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, element, stands_for]
+      properties:
+        id: { type: string, minLength: 1 }
+        element: { type: string, minLength: 1 }
+        stands_for: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Overwhelm drawn as weather"
+    value:
+      id: "VISMET-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.visual_metaphor"
+      felt_experience: "說不清楚的悶"
+      image: { medium: "粉彩", description: "灰藍色的雲壓在一座小房子上，屋頂有一扇亮著的窗" }
+      metaphor_statement: "我像那扇窗，雲再厚也還亮著"
+      elements:
+        - { id: "L1", element: "雲", stands_for: "論文和工作的壓力" }
+        - { id: "L2", element: "亮著的窗", stands_for: "還想創作的自己" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

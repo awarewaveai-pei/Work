@@ -73,7 +73,37 @@
 
 ## 建置進度（2026-09-17 起）
 
-| method_id | 狀態 |
-|---|---|
-| `art_therapy.life_wheel` | DONE（pilot，shared kit `ai_lego/core/domain/record_kit.py` + `apps/cli/method_slice.py` + `tests/unit/method_testkit.py`） |
+29/29 DONE 2026-09-17。通用方法放各自自然家族（不塞進 art_therapy），藝術治療專屬的放 `art_therapy.*`；共用 kit：`ai_lego/core/domain/record_kit.py`、`ai_lego/apps/cli/method_slice.py`、`tests/unit/method_testkit.py`。每個方法：contract + typed-object schema + module（builder + 2 gates）+ `run_<name>_slice.py` + `tests/unit/test_<name>.py` + contract-backlog tier_1 entry。
+
+| method_id | 中文 | 狀態 |
+|---|---|---|
+| `art_therapy.life_wheel` | 生命之輪 | DONE 2026-09-17 |
+| `art_therapy.turning_point_analysis` | 轉折點分析 | DONE 2026-09-17 |
+| `art_therapy.story_completion` | 故事延續 | DONE 2026-09-17 |
+| `art_therapy.conflict_mapping` | 衝突地圖 | DONE 2026-09-17 |
+| `art_therapy.full_stop_method` | 句點分析法 | DONE 2026-09-17 |
+| `art_therapy.synonym_substitution` | 同義詞替換 | DONE 2026-09-17 |
+| `art_therapy.motivation_matrix` | 動機矩陣 | DONE 2026-09-17 |
+| `art_therapy.value_clarification` | 價值澄清 | DONE 2026-09-17 |
+| `art_therapy.storytelling` | 故事敘說 | DONE 2026-09-17 |
+| `art_therapy.role_playing` | 角色扮演 | DONE 2026-09-17 |
+| `art_therapy.visual_metaphor` | 視覺隱喻創作 | DONE 2026-09-17 |
+| `art_therapy.metaphor_dialogue` | 隱喻對話 | DONE 2026-09-17 |
+| `art_therapy.workshop_certificate_drawing` | 工作坊證章畫 | DONE 2026-09-17 |
+| `divergent.six_thinking_hats` | 六頂思考帽 | DONE 2026-09-17 |
+| `divergent.lateral_thinking` | 水平思考 | DONE 2026-09-17 |
+| `divergent.triz` | TRIZ | DONE 2026-09-17 |
+| `divergent.creative_constraints` | 創意限制 | DONE 2026-09-17 |
+| `divergent.design_thinking` | 設計思考 | DONE 2026-09-17 |
+| `framing.reframing` | 框架轉換 | DONE 2026-09-17 |
+| `framing.grow_model` | GROW 模型 | DONE 2026-09-17 |
+| `framing.future_compass` | 未來羅盤 | DONE 2026-09-17 |
+| `framing.value_sorting` | 價值觀排序 | DONE 2026-09-17 |
+| `systems.life_system_mapping` | 生活系統圖 | DONE 2026-09-17 |
+| `systems.force_field_analysis` | 推力與阻力分析 | DONE 2026-09-17 |
+| `systems.sipoc` | SIPOC | DONE 2026-09-17 |
+| `systems.flowchart` | 流程圖 | DONE 2026-09-17 |
+| `learning.dmaic` | DMAIC | DONE 2026-09-17 |
+| `learning.appreciative_inquiry` | 欣賞式探詢 | DONE 2026-09-17 |
+| `delivery.gantt_chart` | 甘特圖 | DONE 2026-09-17 |
 

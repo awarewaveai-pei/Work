@@ -1,0 +1,55 @@
+$id: "ai-lego://methods/contracts/art_therapy.full_stop_method.contract.yaml"
+title: "Full Stop Method Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.full_stop_method (句點分析法). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "把思緒／情緒分段檢視，逐句拆解過度概括或情緒化句型。". Not an EC §32 method. Core invariant: >= 1 segment with unique ids and a pattern from the closed set; a distortion-tagged segment MUST carry a revision that differs from the sentence; a NONE segment carries none.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Full Stop Method row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/full-stop-method-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: art_therapy.full_stop_method
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [DECOMPOSE, TRANSFORM]
+# INFERRED, not cited.
+
+purpose:
+  - split_a_statement_into_sentences_tag_distorted_patterns_and_rewrite_each
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - FullStopMethodRecord
+
+preconditions:
+  - "at least 1 segment"
+  - "pattern in {NONE, OVERGENERALIZATION, CATASTROPHIZING, ALL_OR_NOTHING, LABELING, MIND_READING, SHOULD_STATEMENT, EMOTIONAL_REASONING}"
+  - "tagged segments carry a differing revision"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.synonym_substitution
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-FSTOP-1: should the pattern vocabulary be shared with a future CBT-style cognitive-distortion typed object?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'full_stop_method'/'full stop method' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_full_stop_method.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

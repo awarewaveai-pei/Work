@@ -1,0 +1,69 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/flowchart-record.schema.yaml"
+title: Flowchart Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `FlowchartRecord` -- output of `systems.flowchart` (流程圖). Nodes (START/END/PROCESS/DECISION) and directed edges; structural well-formedness is enforced at runtime. Runtime invariants beyond this
+  schema live in ai_lego/modules/systems/flowchart.py.
+
+source_of_truth_for:
+  - "methods/contracts/systems.flowchart.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, title, nodes, edges, provenance]
+properties:
+  id: { type: string, pattern: "^FLOW-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "systems.flowchart" }
+  title: { type: string, minLength: 1 }
+  nodes:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, kind, label]
+      properties:
+        id: { type: string, minLength: 1 }
+        kind: { type: string, enum: [START, END, PROCESS, DECISION] }
+        label: { type: string, minLength: 1 }
+  edges:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [from_ref, to_ref]
+      properties:
+        from_ref: { type: string, minLength: 1 }
+        to_ref: { type: string, minLength: 1 }
+        condition: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "The evening loop that eats the thesis"
+    value:
+      id: "FLOW-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "systems.flowchart"
+      title: "晚上時間怎麼不見的"
+      nodes:
+        - { id: "N0", kind: "START", label: "下課回家" }
+        - { id: "N1", kind: "DECISION", label: "累不累？" }
+        - { id: "N2", kind: "PROCESS", label: "滑手機" }
+        - { id: "N3", kind: "PROCESS", label: "寫論文" }
+        - { id: "N4", kind: "END", label: "睡覺" }
+      edges:
+        - { from_ref: "N0", to_ref: "N1" }
+        - { from_ref: "N1", to_ref: "N2", condition: "累" }
+        - { from_ref: "N1", to_ref: "N3", condition: "還好" }
+        - { from_ref: "N2", to_ref: "N4" }
+        - { from_ref: "N3", to_ref: "N4" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

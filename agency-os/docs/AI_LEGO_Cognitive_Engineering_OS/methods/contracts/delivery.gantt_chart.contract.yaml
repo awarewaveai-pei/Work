@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/delivery.gantt_chart.contract.yaml"
+title: "Gantt Chart Method Contract"
+status: ACTIVE
+
+description: >
+  delivery.gantt_chart (甘特圖). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "專案任務與時間進度管理工具。規劃具體行動時程表，適用目標分期計畫與行為追蹤。". Not an EC §32 method. Core invariant: >= 1 task with unique ids, ISO start <= end, dependencies resolve to other tasks, and finish-to-start ordering holds; project span derived on read.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Gantt Chart row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/gantt-chart-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: delivery.gantt_chart
+version: "1.0.0"
+family: delivery
+
+cognitive_primitives: [PLAN, MAP]
+# INFERRED, not cited.
+
+purpose:
+  - lay_out_dated_tasks_with_finish_to_start_dependencies_for_a_staged_goal
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - GanttChartRecord
+
+preconditions:
+  - "start <= end per task"
+  - "every depends_on resolves, no duplicates, no cycles; task.start > dependency.end (inclusive working days: a successor starts the day after its predecessor's last day)"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - delivery.critical_path_method
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-GANTT-1: should percent-complete be tracked here or in a separate progress record?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'gantt_chart'/'gantt chart' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_gantt_chart.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

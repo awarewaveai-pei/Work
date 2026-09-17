@@ -1,0 +1,53 @@
+$id: "ai-lego://methods/contracts/systems.sipoc.contract.yaml"
+title: "SIPOC Method Contract"
+status: ACTIVE
+
+description: >
+  systems.sipoc (供應者-輸入-流程-輸出-顧客). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "分析流程範圍與關鍵因素。". Not an EC §32 method. Core invariant: all five columns non-empty; process steps ordered with unique ids.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- SIPOC row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/sipoc-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: systems.sipoc
+version: "1.0.0"
+family: systems
+
+cognitive_primitives: [MAP, DECOMPOSE]
+# INFERRED, not cited.
+
+purpose:
+  - scope_one_process_by_its_suppliers_inputs_steps_outputs_and_customers
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - SipocRecord
+
+preconditions:
+  - "suppliers, inputs, process_steps, outputs, customers all non-empty"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - systems.flowchart
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-SIPOC-1: should inputs/outputs be linked to specific steps rather than the whole process?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'sipoc'/'sipoc' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_sipoc.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

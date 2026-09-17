@@ -60,7 +60,9 @@ class SliceConfig:
 
 def run_method_slice(spec: MethodSliceSpec, config: SliceConfig) -> dict[str, Any]:
     spec_root = resolve_spec_root(config.spec_root)
-    runtime = (config.runtime_dir or Path(tempfile.gettempdir()) / f"ai-lego-{spec.method_id.replace('.', '-')}-slice").resolve()
+    # A fresh mkdtemp per run: two concurrent `GET /methods/{id}/demo` calls must not race on one shared
+    # rmtree/recreate path (the legacy fixed-path slices had that race).
+    runtime = (config.runtime_dir or Path(tempfile.mkdtemp(prefix=f"ai-lego-{spec.method_id.replace('.', '-')}-slice-"))).resolve()
     guard_runtime_dir(runtime, spec_root, REPO_ROOT, PRODUCT_ROOT / ".runtime")
     prepare_runtime_dir(runtime, config.reset)
 

@@ -1,0 +1,59 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/future-compass-record.schema.yaml"
+title: Future Compass Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `FutureCompassRecord` -- output of `framing.future_compass` (未來羅盤). Where the client wants to be, where they are, the directions that matter, and the next concrete waypoint. Runtime invariants beyond this
+  schema live in ai_lego/modules/framing/future_compass.py.
+
+source_of_truth_for:
+  - "methods/contracts/framing.future_compass.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, destination, current_position, bearings, next_waypoint, provenance]
+properties:
+  id: { type: string, pattern: "^FCOMPASS-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "framing.future_compass" }
+  destination: { type: string, minLength: 1 }
+  current_position: { type: string, minLength: 1 }
+  bearings:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, direction_label, meaning]
+      properties:
+        id: { type: string, minLength: 1 }
+        direction_label: { type: string, minLength: 1 }
+        meaning: { type: string, minLength: 1 }
+  next_waypoint:
+    type: object
+    additionalProperties: false
+    required: [description, bearing_ref]
+    properties:
+      description: { type: string, minLength: 1 }
+      bearing_ref: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Three-year direction"
+    value:
+      id: "FCOMPASS-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "framing.future_compass"
+      destination: "三年後：EdD 畢業，帶自己的療癒課程品牌"
+      current_position: "論文第二章，課程還在借別人的場地"
+      bearings:
+        - { id: "B1", direction_label: "北：學術", meaning: "完成論文" }
+        - { id: "B2", direction_label: "東：品牌", meaning: "固定場地與名稱" }
+      next_waypoint: { description: "本月完成第三章大綱", bearing_ref: "B1" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

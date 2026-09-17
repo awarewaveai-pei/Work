@@ -1,0 +1,56 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/metaphor-dialogue-record.schema.yaml"
+title: Metaphor Dialogue Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `MetaphorDialogueRecord` -- output of `art_therapy.metaphor_dialogue` (隱喻對話). A named symbolic figure, the alternating lines exchanged with it, and the client's integration note. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/metaphor_dialogue.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.metaphor_dialogue.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, figure, exchanges, integration_note, provenance]
+properties:
+  id: { type: string, pattern: "^METDLG-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.metaphor_dialogue" }
+  figure:
+    type: object
+    additionalProperties: false
+    required: [name, origin]
+    properties:
+      name: { type: string, minLength: 1 }
+      origin: { type: string, minLength: 1 }
+  exchanges:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, speaker, line]
+      properties:
+        id: { type: string, minLength: 1 }
+        speaker: { type: string, enum: [SELF, FIGURE] }
+        line: { type: string, minLength: 1 }
+  integration_note: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Talking to the cloud from a visual metaphor"
+    value:
+      id: "METDLG-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.metaphor_dialogue"
+      figure: { name: "灰雲", origin: "視覺隱喻裡壓著房子的雲" }
+      exchanges:
+        - { id: "X1", speaker: "SELF", line: "你為什麼一直不走？" }
+        - { id: "X2", speaker: "FIGURE", line: "因為你一直看著我，沒有看窗。" }
+      integration_note: "壓力不是敵人，是我把注意力放錯地方"
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

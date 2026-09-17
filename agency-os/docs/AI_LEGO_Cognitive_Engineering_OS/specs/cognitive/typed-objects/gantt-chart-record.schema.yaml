@@ -1,0 +1,52 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/gantt-chart-record.schema.yaml"
+title: Gantt Chart Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `GanttChartRecord` -- output of `delivery.gantt_chart` (甘特圖). Dated tasks with dependency ids; ordering constraints enforced at runtime. Runtime invariants beyond this
+  schema live in ai_lego/modules/delivery/gantt_chart.py.
+
+source_of_truth_for:
+  - "methods/contracts/delivery.gantt_chart.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, project, tasks, provenance]
+properties:
+  id: { type: string, pattern: "^GANTT-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "delivery.gantt_chart" }
+  project: { type: string, minLength: 1 }
+  tasks:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, start, end, depends_on]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        start: { type: string, format: date, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        end: { type: string, format: date, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        depends_on: { type: array, items: { type: string, minLength: 1 } }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Thesis chapter in three tasks"
+    value:
+      id: "GANTT-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "delivery.gantt_chart"
+      project: "第三章初稿"
+      tasks:
+        - { id: "T1", name: "大綱", start: "2026-09-18", end: "2026-09-21", depends_on: [] }
+        - { id: "T2", name: "文獻段", start: "2026-09-22", end: "2026-10-05", depends_on: ["T1"] }
+        - { id: "T3", name: "方法段", start: "2026-10-06", end: "2026-10-20", depends_on: ["T1", "T2"] }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

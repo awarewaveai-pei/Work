@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/art_therapy.synonym_substitution.contract.yaml"
+title: "Synonym Substitution Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.synonym_substitution (同義詞替換). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "調整負面語言習慣，例如將「我很糟」換成「我正在學習中」。". Not an EC §32 method. Core invariant: >= 1 substitution with unique ids; replacement differs from the original (normalized); each carries the client's rationale.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Synonym Substitution row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/synonym-substitution-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: art_therapy.synonym_substitution
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [TRANSFORM]
+# INFERRED, not cited.
+
+purpose:
+  - replace_habitual_negative_phrases_with_workable_ones_and_record_why
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - SynonymSubstitutionRecord
+
+preconditions:
+  - "at least 1 substitution"
+  - "replacement_phrase differs from original_phrase (normalized)"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - learning.pdca
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-SYNSUB-1: should substitutions link back to full_stop_method segment ids they came from?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'synonym_substitution'/'synonym substitution' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_synonym_substitution.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

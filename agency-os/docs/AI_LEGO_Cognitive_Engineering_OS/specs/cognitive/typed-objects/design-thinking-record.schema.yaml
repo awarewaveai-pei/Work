@@ -1,0 +1,58 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/design-thinking-record.schema.yaml"
+title: Design Thinking Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `DesignThinkingRecord` -- output of `divergent.design_thinking` (設計思考). One integrated design-thinking pass with a summary and items per stage. Runtime invariants beyond this
+  schema live in ai_lego/modules/divergent/design_thinking.py.
+
+source_of_truth_for:
+  - "methods/contracts/divergent.design_thinking.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, challenge, stages, provenance]
+properties:
+  id: { type: string, pattern: "^DTHINK-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "divergent.design_thinking" }
+  challenge: { type: string, minLength: 1 }
+  stages:
+    type: object
+    additionalProperties: false
+    required: [empathize, define, ideate, prototype, test]
+    properties:
+      empathize: { $ref: "#/$defs/stage" }
+      define: { $ref: "#/$defs/stage" }
+      ideate: { $ref: "#/$defs/stage" }
+      prototype: { $ref: "#/$defs/stage" }
+      test: { $ref: "#/$defs/stage" }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  stage:
+    type: object
+    additionalProperties: false
+    required: [summary, items]
+    properties:
+      summary: { type: string, minLength: 1 }
+      items: { type: array, items: { type: string, minLength: 1 } }
+examples:
+  - description: "Redesigning the workshop intake form"
+    value:
+      id: "DTHINK-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.design_thinking"
+      challenge: "新學員報名後常常第一堂就沒來"
+      stages:
+        empathize: { summary: "訪談 5 位沒來的人", items: ["不知道要準備什麼", "怕自己不會畫"] }
+        define: { summary: "新學員需要在報名當下就知道『不用會畫』", items: [] }
+        ideate: { summary: "三個做法", items: ["報名頁放學員塗鴉", "報名後寄一張空白明信片", "第一堂改成戶外散步"] }
+        prototype: { summary: "先做明信片", items: ["手寫 10 張"] }
+        test: { summary: "下一梯試", items: ["出席率 60%→85%"] }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

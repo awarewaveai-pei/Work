@@ -1,0 +1,57 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/triz-record.schema.yaml"
+title: TRIZ Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `TrizRecord` -- output of `divergent.triz` (創新理論工具). A technical/inner contradiction and the numbered inventive principles applied to it. Runtime invariants beyond this
+  schema live in ai_lego/modules/divergent/triz.py.
+
+source_of_truth_for:
+  - "methods/contracts/divergent.triz.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, problem_statement, contradiction, principles, provenance]
+properties:
+  id: { type: string, pattern: "^TRIZ-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "divergent.triz" }
+  problem_statement: { type: string, minLength: 1 }
+  contradiction:
+    type: object
+    additionalProperties: false
+    required: [improving_parameter, worsening_parameter]
+    properties:
+      improving_parameter: { type: string, minLength: 1 }
+      worsening_parameter: { type: string, minLength: 1 }
+  principles:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [principle_number, name, application]
+      properties:
+        principle_number: { type: integer, minimum: 1, maximum: 40 }
+        name: { type: string, minLength: 1 }
+        application: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Wanting closeness and distance at once"
+    value:
+      id: "TRIZ-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.triz"
+      problem_statement: "想跟家人親近，又需要自己的空間"
+      contradiction: { improving_parameter: "親密感", worsening_parameter: "自主空間" }
+      principles:
+        - { principle_number: 1, name: "Segmentation", application: "把相處切成固定時段，時段外是自己的" }
+        - { principle_number: 15, name: "Dynamics", application: "距離隨狀態調整，不是固定值" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

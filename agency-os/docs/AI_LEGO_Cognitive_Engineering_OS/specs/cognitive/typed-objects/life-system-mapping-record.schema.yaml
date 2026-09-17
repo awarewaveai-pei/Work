@@ -1,0 +1,60 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/life-system-mapping-record.schema.yaml"
+title: Life System Mapping Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `LifeSystemMappingRecord` -- output of `systems.life_system_mapping` (生活系統圖). Life subsystems (family/work/...) with the client's role in each and directed influences between them. Runtime invariants beyond this
+  schema live in ai_lego/modules/systems/life_system_mapping.py.
+
+source_of_truth_for:
+  - "methods/contracts/systems.life_system_mapping.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, focal_person, subsystems, provenance]
+properties:
+  id: { type: string, pattern: "^LSYSMAP-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "systems.life_system_mapping" }
+  focal_person: { type: string, minLength: 1 }
+  subsystems:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, domain, role, influences]
+      properties:
+        id: { type: string, minLength: 1 }
+        domain: { type: string, enum: [FAMILY, WORK, RELATIONSHIPS, HEALTH, COMMUNITY, LEARNING, CREATIVE, OTHER] }
+        role: { type: string, minLength: 1 }
+        influences:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [target_ref, direction, note]
+            properties:
+              target_ref: { type: string, minLength: 1 }
+              direction: { type: string, enum: [SUPPORTS, STRAINS, MIXED] }
+              note: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Work straining learning, creative supporting health"
+    value:
+      id: "LSYSMAP-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "systems.life_system_mapping"
+      focal_person: "我"
+      subsystems:
+        - { id: "S1", domain: "WORK", role: "workshop 帶領者", influences: [{ target_ref: "S2", direction: "STRAINS", note: "晚上都被佔走" }] }
+        - { id: "S2", domain: "LEARNING", role: "EdD 學生", influences: [] }
+        - { id: "S3", domain: "CREATIVE", role: "創作者", influences: [{ target_ref: "S1", direction: "SUPPORTS", note: "創作是課程素材" }] }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

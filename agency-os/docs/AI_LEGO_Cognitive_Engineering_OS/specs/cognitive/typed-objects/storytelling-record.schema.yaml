@@ -1,0 +1,58 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/storytelling-record.schema.yaml"
+title: Storytelling Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `StorytellingRecord` -- output of `art_therapy.storytelling` (故事敘說). A complete narrative arc (setting, conflict, resolution, meaning) with its characters. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/storytelling.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.storytelling.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, title, arc, characters, provenance]
+properties:
+  id: { type: string, pattern: "^STORY-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.storytelling" }
+  title: { type: string, minLength: 1 }
+  arc:
+    type: object
+    additionalProperties: false
+    required: [setting, conflict, resolution, meaning]
+    properties:
+      setting: { type: string, minLength: 1 }
+      conflict: { type: string, minLength: 1 }
+      resolution: { type: string, minLength: 1 }
+      meaning: { type: string, minLength: 1 }
+  characters:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, role]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        role: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A short arc about the first workshop"
+    value:
+      id: "STORY-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.storytelling"
+      title: "第一次帶團體"
+      arc: { setting: "社區中心的小教室", conflict: "沒有人願意先開口", resolution: "我先畫了自己的害怕", meaning: "示範脆弱比講技巧更有用" }
+      characters:
+        - { id: "C1", name: "我", role: "帶領者" }
+        - { id: "C2", name: "沉默的學員", role: "鏡子" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

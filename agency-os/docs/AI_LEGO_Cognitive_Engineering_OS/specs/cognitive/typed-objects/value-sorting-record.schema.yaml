@@ -1,0 +1,56 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/value-sorting-record.schema.yaml"
+title: Value Sorting Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ValueSortingRecord` -- output of `framing.value_sorting` (價值觀排序). Candidate values and the client's full ordering of them. Runtime invariants beyond this
+  schema live in ai_lego/modules/framing/value_sorting.py.
+
+source_of_truth_for:
+  - "methods/contracts/framing.value_sorting.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, context, candidate_values, ranking, provenance]
+properties:
+  id: { type: string, pattern: "^VSORT-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "framing.value_sorting" }
+  context: { type: string, minLength: 1 }
+  candidate_values:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, value]
+      properties:
+        id: { type: string, minLength: 1 }
+        value: { type: string, minLength: 1 }
+  ranking:
+    type: array
+    minItems: 2
+    items: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Five values sorted"
+    value:
+      id: "VSORT-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "framing.value_sorting"
+      context: "選擇下一年的工作型態"
+      candidate_values:
+        - { id: "V1", value: "自主" }
+        - { id: "V2", value: "安全感" }
+        - { id: "V3", value: "學習" }
+        - { id: "V4", value: "陪伴" }
+        - { id: "V5", value: "收入" }
+      ranking: ["V1", "V3", "V4", "V5", "V2"]
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/art_therapy.story_completion.contract.yaml"
+title: "Story Completion Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.story_completion (故事延續). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "設計「未說完的故事」讓案主接續完成，表達內在角色與感受動力。". Not an EC §32 method. Core invariant: the continuation is non-empty and is not the stem echoed back (normalized); >= 1 character with unique ids, each naming its inner role.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Story Completion row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/story-completion-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: art_therapy.story_completion
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [EXPAND, REFLECT]
+# INFERRED, not cited.
+
+purpose:
+  - continue_an_unfinished_story_stem_to_voice_inner_roles_and_feelings
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - StoryCompletionRecord
+
+preconditions:
+  - "story_stem and continuation non-empty and different (normalized)"
+  - "at least 1 character with an inner_role"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.metaphor_dialogue
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-STORYC-1: should the stem library (pre-written unfinished stories) be a separate typed object?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'story_completion'/'story completion' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_story_completion.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

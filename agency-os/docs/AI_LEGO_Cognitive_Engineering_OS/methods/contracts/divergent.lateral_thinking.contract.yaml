@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/divergent.lateral_thinking.contract.yaml"
+title: "Lateral Thinking Method Contract"
+status: ACTIVE
+
+description: >
+  divergent.lateral_thinking (水平思考). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "跳脫邏輯慣性，以非線性方式解題。". Not an EC §32 method. Core invariant: the escaped dominant assumption is named; >= 1 provocation (unique ids, closed technique set) whose movement differs from its statement.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Lateral Thinking row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/lateral-thinking-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: divergent.lateral_thinking
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [EXPAND, TRANSFORM]
+# INFERRED, not cited.
+
+purpose:
+  - escape_a_dominant_assumption_with_provocations_and_move_each_to_an_idea
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - LateralThinkingRecord
+
+preconditions:
+  - "dominant_assumption named"
+  - "each provocation has a movement different from its statement"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - divergent.scamper
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-LATERAL-1: should movement be typed (extract principle / focus on difference / moment-to-moment)?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'lateral_thinking'/'lateral thinking' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_lateral_thinking.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

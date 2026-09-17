@@ -1,0 +1,53 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/force-field-analysis-record.schema.yaml"
+title: Force Field Analysis Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ForceFieldAnalysisRecord` -- output of `systems.force_field_analysis` (推力與阻力分析). Driving and restraining forces around one change goal, each with an integer strength. Runtime invariants beyond this
+  schema live in ai_lego/modules/systems/force_field_analysis.py.
+
+source_of_truth_for:
+  - "methods/contracts/systems.force_field_analysis.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, change_goal, driving_forces, restraining_forces, provenance]
+properties:
+  id: { type: string, pattern: "^FFA-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "systems.force_field_analysis" }
+  change_goal: { type: string, minLength: 1 }
+  driving_forces: { $ref: "#/$defs/forces" }
+  restraining_forces: { $ref: "#/$defs/forces" }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+$defs:
+  forces:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, description, strength]
+      properties:
+        id: { type: string, minLength: 1 }
+        description: { type: string, minLength: 1 }
+        strength: { type: integer, minimum: 1, maximum: 5 }
+examples:
+  - description: "Moving the workshop to alternate weeks"
+    value:
+      id: "FFA-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "systems.force_field_analysis"
+      change_goal: "workshop 改成隔週"
+      driving_forces:
+        - { id: "D1", description: "論文需要平日晚上", strength: 5 }
+        - { id: "D2", description: "學員也說太密集", strength: 3 }
+      restraining_forces:
+        - { id: "R1", description: "收入減半", strength: 4 }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

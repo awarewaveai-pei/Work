@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/framing.grow_model.contract.yaml"
+title: "GROW Model Method Contract"
+status: ACTIVE
+
+description: >
+  framing.grow_model (GROW 模型). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "設定目標與具體行動策略。". Not an EC §32 method. Core invariant: goal and reality stated; >= 2 options (unique ids); will commits to a declared option with a first step and an ISO by_when date.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- GROW Model row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/grow-model-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: framing.grow_model
+version: "1.0.0"
+family: framing
+
+cognitive_primitives: [EVALUATE, PLAN]
+# INFERRED, not cited.
+
+purpose:
+  - set_a_goal_face_reality_weigh_options_and_commit_to_a_dated_first_step
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - GrowModelRecord
+
+preconditions:
+  - "at least 2 options"
+  - "will.chosen_option_ref resolves; will.by_when is an ISO date"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - framing.smart
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-GROW-1: should reality be structured (obstacles/resources) rather than free text?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'grow_model'/'grow model' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_grow_model.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

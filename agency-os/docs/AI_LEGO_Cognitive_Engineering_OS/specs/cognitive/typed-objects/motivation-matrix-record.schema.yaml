@@ -1,0 +1,52 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/motivation-matrix-record.schema.yaml"
+title: Motivation Matrix Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `MotivationMatrixRecord` -- output of `art_therapy.motivation_matrix` (動機矩陣). Motives for one action placed in a source x polarity matrix with integer weights. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/motivation_matrix.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.motivation_matrix.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, action, entries, provenance]
+properties:
+  id: { type: string, pattern: "^MOTMX-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.motivation_matrix" }
+  action: { type: string, minLength: 1 }
+  entries:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, source, polarity, description, weight]
+      properties:
+        id: { type: string, minLength: 1 }
+        source: { type: string, enum: [INTRINSIC, EXTRINSIC] }
+        polarity: { type: string, enum: [DRIVES, BLOCKS] }
+        description: { type: string, minLength: 1 }
+        weight: { type: integer, minimum: 1, maximum: 5 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Motives around finishing a thesis chapter"
+    value:
+      id: "MOTMX-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.motivation_matrix"
+      action: "完成論文第三章"
+      entries:
+        - { id: "M1", source: "INTRINSIC", polarity: "DRIVES", description: "想把研究講清楚", weight: 4 }
+        - { id: "M2", source: "EXTRINSIC", polarity: "DRIVES", description: "指導教授期限", weight: 3 }
+        - { id: "M3", source: "INTRINSIC", polarity: "BLOCKS", description: "怕寫得不夠好", weight: 4 }
+        - { id: "M4", source: "EXTRINSIC", polarity: "BLOCKS", description: "晚上被 workshop 佔滿", weight: 5 }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

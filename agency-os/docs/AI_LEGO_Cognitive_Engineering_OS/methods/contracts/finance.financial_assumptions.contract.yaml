@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/finance.financial_assumptions.contract.yaml"
+title: "Financial Assumptions Method Contract"
+status: ACTIVE
+
+description: >
+  finance.financial_assumptions (財務假設). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "Master Plan §43 'Financial Assumptions' node; ADR-008 recorded the Finance pack as empty, ADR-025 (operator directive 2026-09-17) builds its first content.". Not an EC §32 method. Core invariant: 3-letter currency; discount_rate in [0,1]; horizon_years 1..30; >= 1 assumption with unique ids, finite value, unit, basis and provenance; cash_flow_projection has exactly periods 0..horizon_years in order.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Financial Assumptions row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/financial-assumptions-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: finance.financial_assumptions
+version: "1.0.0"
+family: finance
+
+cognitive_primitives: [EVALUATE, PLAN]
+# INFERRED, not cited.
+
+purpose:
+  - record_reviewed_numeric_assumptions_with_their_basis_so_financial_computations_trace_to_named_inputs
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - FinancialAssumptionsRecord
+
+preconditions:
+  - "every assumption states its basis and carries provenance"
+  - "cash_flow_projection periods are exactly 0..horizon_years"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - feasibility.npv
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-FINASSUM-1: should assumptions carry a sensitivity range (low/base/high) for scenario_planning to consume?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'financial_assumptions'/'financial assumptions' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_financial_assumptions.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

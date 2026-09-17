@@ -1,0 +1,62 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/creative-constraints-record.schema.yaml"
+title: Creative Constraints Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `CreativeConstraintsRecord` -- output of `divergent.creative_constraints` (創意限制). Deliberate constraints on a creative task and the outputs produced under each. Runtime invariants beyond this
+  schema live in ai_lego/modules/divergent/creative_constraints.py.
+
+source_of_truth_for:
+  - "methods/contracts/divergent.creative_constraints.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, objective, constraints, outputs, provenance]
+properties:
+  id: { type: string, pattern: "^CCONSTR-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "divergent.creative_constraints" }
+  objective: { type: string, minLength: 1 }
+  constraints:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, constraint_type, rule]
+      properties:
+        id: { type: string, minLength: 1 }
+        constraint_type: { type: string, enum: [MATERIAL, TOOL, TIME, COLOR, BODY, RULE] }
+        rule: { type: string, minLength: 1 }
+  outputs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, constraint_refs, description]
+      properties:
+        id: { type: string, minLength: 1 }
+        constraint_refs: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+        description: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+
+examples:
+  - description: "Red only, left hand only"
+    value:
+      id: "CCONSTR-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.creative_constraints"
+      objective: "鬆動慣性的線條"
+      constraints:
+        - { id: "K1", constraint_type: "COLOR", rule: "只能用紅色" }
+        - { id: "K2", constraint_type: "BODY", rule: "只能用左手" }
+      outputs:
+        - { id: "O1", constraint_refs: ["K1", "K2"], description: "抖動的紅色輪廓，比平常更放得開" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

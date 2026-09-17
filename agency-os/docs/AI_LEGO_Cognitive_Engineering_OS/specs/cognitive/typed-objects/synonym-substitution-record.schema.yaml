@@ -1,0 +1,49 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/synonym-substitution-record.schema.yaml"
+title: Synonym Substitution Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `SynonymSubstitutionRecord` -- output of `art_therapy.synonym_substitution` (同義詞替換). Phrase-level rewrites of a negative language habit with the rationale for each. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/synonym_substitution.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.synonym_substitution.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, context, substitutions, provenance]
+properties:
+  id: { type: string, pattern: "^SYNSUB-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.synonym_substitution" }
+  context: { type: string, minLength: 1 }
+  substitutions:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, original_phrase, replacement_phrase, rationale]
+      properties:
+        id: { type: string, minLength: 1 }
+        original_phrase: { type: string, minLength: 1 }
+        replacement_phrase: { type: string, minLength: 1 }
+        rationale: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two habitual phrases rewritten"
+    value:
+      id: "SYNSUB-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.synonym_substitution"
+      context: "自我批評的口頭禪"
+      substitutions:
+        - { id: "X1", original_phrase: "我很糟", replacement_phrase: "我正在學習中", rationale: "把狀態從固定改成進行式" }
+        - { id: "X2", original_phrase: "我一定會失敗", replacement_phrase: "我還不知道結果", rationale: "把預言改成事實" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

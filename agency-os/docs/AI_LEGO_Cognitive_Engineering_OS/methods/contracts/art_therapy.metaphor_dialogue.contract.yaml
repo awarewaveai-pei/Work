@@ -1,0 +1,55 @@
+$id: "ai-lego://methods/contracts/art_therapy.metaphor_dialogue.contract.yaml"
+title: "Metaphor Dialogue Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.metaphor_dialogue (隱喻對話). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "與自創象徵角色進行對話，調和衝突、支持轉化。". Not an EC §32 method. Core invariant: figure has name and origin; >= 2 exchanges with unique ids and both SELF and FIGURE speaking; an integration note closes the dialogue.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Metaphor Dialogue row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/metaphor-dialogue-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: art_therapy.metaphor_dialogue
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [SIMULATE, REFLECT]
+# INFERRED, not cited.
+
+purpose:
+  - dialogue_with_a_self_created_symbolic_figure_to_reconcile_a_conflict
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - MetaphorDialogueRecord
+
+preconditions:
+  - "figure has name and origin"
+  - "at least 2 exchanges; both speakers appear"
+  - "integration_note non-empty"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.value_clarification
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-METDLG-1: should the figure reference the visual_metaphor record it emerged from?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'metaphor_dialogue'/'metaphor dialogue' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_metaphor_dialogue.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

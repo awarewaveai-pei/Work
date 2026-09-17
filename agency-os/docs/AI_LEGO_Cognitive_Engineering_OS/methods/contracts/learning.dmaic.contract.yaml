@@ -1,0 +1,54 @@
+$id: "ai-lego://methods/contracts/learning.dmaic.contract.yaml"
+title: "DMAIC Method Contract"
+status: ACTIVE
+
+description: >
+  learning.dmaic (定義-測量-分析-改善-控制). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, 2026-09-13), therapeutic use
+  "用於六標準差中的品質改善流程。為重複性困擾建立流程診斷與精進計畫。". Not an EC §32 method. Core invariant: exactly the five phases each with a summary; measure and control each carry >= 1 item.
+  Non-diagnostic: the record holds the client's own words/ratings; it is never a clinical assessment.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- DMAIC row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/dmaic-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-17 (build the art-therapy gap methods); no ADR governs the content."
+
+id: learning.dmaic
+version: "1.0.0"
+family: learning
+
+cognitive_primitives: [EVALUATE, PLAN]
+# INFERRED, not cited.
+
+purpose:
+  - diagnose_and_improve_a_recurring_trouble_through_define_measure_analyze_improve_control
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - DmaicRecord
+
+preconditions:
+  - "phases define/measure/analyze/improve/control all present"
+  - "measure.items >= 1, control.items >= 1"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - learning.pdca
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-DMAIC-1: should measure items be typed {metric, baseline, target} instead of strings?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'dmaic'/'dmaic' before writing -- zero prior implementation. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_dmaic.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."

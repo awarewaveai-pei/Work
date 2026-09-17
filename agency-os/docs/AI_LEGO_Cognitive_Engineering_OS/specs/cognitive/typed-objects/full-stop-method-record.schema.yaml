@@ -1,0 +1,50 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/full-stop-method-record.schema.yaml"
+title: Full Stop Method Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `FullStopMethodRecord` -- output of `art_therapy.full_stop_method` (句點分析法). A raw statement split into tagged sentences; distortion-tagged segments carry the client's rewrite. Runtime invariants beyond this
+  schema live in ai_lego/modules/art_therapy/full_stop_method.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.full_stop_method.contract.yaml"
+
+decided_by: "Operator directive 2026-09-17; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, raw_statement, segments, provenance]
+properties:
+  id: { type: string, pattern: "^FSTOP-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.full_stop_method" }
+  raw_statement: { type: string, minLength: 1 }
+  segments:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, sentence, pattern]
+      properties:
+        id: { type: string, minLength: 1 }
+        sentence: { type: string, minLength: 1 }
+        pattern: { type: string, enum: [NONE, OVERGENERALIZATION, CATASTROPHIZING, ALL_OR_NOTHING, LABELING, MIND_READING, SHOULD_STATEMENT, EMOTIONAL_REASONING] }
+        revision: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Three sentences, two tagged and rewritten"
+    value:
+      id: "FSTOP-2026-09-17-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.full_stop_method"
+      raw_statement: "我又搞砸了。大家一定覺得我很沒用。反正我永遠做不好。"
+      segments:
+        - { id: "S1", sentence: "我又搞砸了。", pattern: "NONE" }
+        - { id: "S2", sentence: "大家一定覺得我很沒用。", pattern: "MIND_READING", revision: "我不知道大家怎麼想，我可以問。" }
+        - { id: "S3", sentence: "反正我永遠做不好。", pattern: "OVERGENERALIZATION", revision: "這次沒做好，不代表每次。" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

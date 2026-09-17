@@ -5,8 +5,9 @@ description: >
   The largest currently executable business-planning chain. It composes
   problem framing, customer observations, strategic analysis, scenario/risk
   review, and genuine financial calculations from explicitly supplied source
-  records. It stops before the unbuilt Finance Domain Pack, KPI/execution
-  planning, and proposal publication.
+  records. It stops before Financial Assumptions, KPI/execution planning and
+  the proposal artifact; the complete Master Plan §43 chain (ADR-025,
+  2026-09-17) is `business-plan-full-v1`. This bounded chain is kept as-is.
 id: business-planning-review-v1
 version: "1.0.0"
 name: "Business Planning Review"
@@ -208,4 +209,4 @@ verification:
     - "All fourteen method ids resolve to ACTIVE contracts and dispatchable builders/gates"
     - "Cross-method output bindings are checked at compile time and runtime"
     - "Financial values are genuine computations and not investment recommendations"
-    - "The missing Finance Domain Pack boundary remains explicit"
+    - "The boundary before Financial Assumptions/KPI/execution/proposal remains explicit (those nodes live in business-plan-full-v1)"
