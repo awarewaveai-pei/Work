@@ -1,4 +1,24 @@
 # Worklog
+## 2026-09-17（續8）操作者下令清空兩客戶知識庫（測試期爬蟲資料）
+
+[任務] 操作者看 `/ops/knowledge`（全客戶知識庫總覽——獨立於本次 K2g-K2j 改的 per-client 頁面之外的另一頁，見下方「/ops/knowledge 研究」段落）反映「之前搜尋的東西全部刪除」。範圍不明，先查資料庫給出精確數字讓操作者選（AskUserQuestion），操作者選「兩個客戶知識庫全部清空」（含 1 筆手寫文件，非只清爬蟲抓的）。
+
+[執行]：`DELETE FROM cs_knowledge_sources WHERE organization_id IN (awarewave-ops, soulful-expression)`，`cs_knowledge_chunks` 靠既有 `ON DELETE CASCADE`（migration 0051）自動清除，不必另下指令。刪前查證：awarewave-ops 69 筆文件/1227 塊、soulful-expression 17 筆文件/486 塊（含各 1 筆已封存版本）；兩者皆無資料夾（K2h 剛上線，尚無人建立）。刪除前一版查證 SQL 有 JOIN 扇出 bug（`count(s.id)` 算成 1227/486 而非真實文件數，用 `count(DISTINCT)`/子查詢重查後才是真數字 69/17）——只影響我自己核對數字時的中繼步驟，未影響實際刪除範圍（WHERE 子句本來就是精確用 organization_id 兩個 uuid，不受那個計數 bug 影響）。
+
+[範圍界定，刻意不動]：只刪知識庫本體（`cs_knowledge_sources`+級聯 `cs_knowledge_chunks`），沒有動 `collection-sources`/`collection-schedule`（資料蒐集排程/追蹤狀態，是不同系統，操作者說的是「知識庫」不是「蒐集排程」）——如果之後重新爬蟲，蒐集器若有自己的「已抓過」去重狀態，可能仍記得這些網址，需要另外處理，屆時再議。`cs_ai_replies.retrieved_chunk_ids` 是無 FK 的 uuid[]，本來就不會因為 chunk 被刪而跟著清，是既有設計（歷史回覆記錄留著死連結，不影響現在）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`SELECT count(*) FROM cs_knowledge_sources/cs_knowledge_chunks WHERE organization_id=...`（刪前）| exit=0 | result=awarewave-ops docs=69 chunks=1227；soulful-expression docs=17 chunks=486
+- REALTEST_EVIDENCE: tool=SSH | cmd=`DELETE FROM cs_knowledge_sources WHERE organization_id IN (...)` | exit=0 | result=DELETE 86
+- REALTEST_EVIDENCE: tool=SSH | cmd=同上 count 查詢（刪後）| exit=0 | result=兩者 docs=0 chunks=0
+
+[剩餘風險]：不可逆，無備份快照（操作者明確選「全部清空」，資料量小，未特別要求備份）。
+
+[Rollback]：無（硬刪除，非封存）。若操作者反悔，只能重新蒐集/手動重新輸入。
+
+[WORKLOG_DONE]: 清空 awarewave-ops + soulful-expression 知識庫
+
+
 ## 2026-09-17（續7）K2g-K2j 部署 production：DB migration 0084/0085/0086 + next-admin 部署 + smoke
 
 [任務] 操作者下令「部署」。K2g（migration 0084）/K2h（0085）/K2i（0086）/K2j 之前都只到 `main`，未上 production。
