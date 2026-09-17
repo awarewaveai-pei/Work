@@ -1,4 +1,25 @@
 # Worklog
+## 2026-09-17（續7）K2g-K2j 部署 production：DB migration 0084/0085/0086 + next-admin 部署 + smoke
+
+[任務] 操作者下令「部署」。K2g（migration 0084）/K2h（0085）/K2i（0086）/K2j 之前都只到 `main`，未上 production。
+
+[執行順序，先 DB 後程式碼]：先讀 prod 確認三個 migration 都還沒套（`information_schema.columns` 查 body/folder_id/keyword_mode 三欄皆不存在）→ `node scripts/apply-db-migration.mjs 0084 0085 0086` 依序套用（皆為 additive：新欄位有 default、新表、RPC 新參數皆有 default，舊程式碼不受影響）→ 套用後重新查證：三欄位存在、`cs_knowledge_folders` 表存在、`cs_folder_descendants`/`cs_folder_move` 函式存在、`cs_match_chunks_keyword` 簽名含 `p_raw_query`。全部確認後才跑 `/sg-deploy next-admin`（git pull 已是 `ec5a26a64`＝K2j commit、tsc/vitest 1234 全過、build、healthy、5 項 HTTP smoke 全 200）。
+
+[部署後額外驗證]：容器內確認新路由檔案真的在（`.next/server/app/api/ops/clients/[slug]/cs-knowledge-folders/route.js` 存在）；直接打內部 port 驗證新端點回應正確（`cs-knowledge-folders`/`cs-knowledge`/`cs-config` 皆回 401 unauthorized 而非 500——證明程式碼執行到 auth 檢查點沒有因為 DB schema 不符而先炸掉；沒有真實登入憑證無法再往下測認證後的實際資料，此限制已告知操作者）。跑完官方 post-deploy Playwright smoke suite：26 passed/6 skipped(既有，缺 OPS_BASIC_USER 環境變數)/0 failed。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0084 0085 0086` | exit=0 | result=APPLY_OK 3/3
+- REALTEST_EVIDENCE: tool=SSH | cmd=`psql -c "SELECT column_name FROM information_schema.columns WHERE table_name='cs_knowledge_sources' AND column_name IN ('body','folder_id','keyword_mode')"` | exit=0 | result=套用前 0 筆、套用後 3 筆全部存在；`cs_knowledge_folders`/`cs_folder_descendants`/`cs_folder_move`/`cs_match_chunks_keyword`(含p_raw_query) 全部確認存在
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | result=deployed commit ec5a26a643059f264d28c17b0f0812f70f4d5009；healthy after 1s；5/5 smoke 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` | exit=0 | result=26 passed/6 skipped/0 failed
+
+[剩餘風險]：認證後的實際資料流未在 production 用真人登入驗證過（無憑證，未索取）；資料庫已有真實 client 資料的情況下功能是否符合預期，等操作者自己在畫面上操作確認。
+
+[Rollback]：down migration 依序 0086→0085→0084；程式碼 `git revert` 對應 commit + 重跑 sg-deploy.sh。
+
+[WORKLOG_DONE]: K2g-K2j production 部署
+
+
 ## 2026-09-17（續6）K2j 依資料夾收合卡片：實作＋critic 修復（1 Major/2 Minor）＋render 測試
 
 [任務] 續5 完成 K2h（資料夾+分頁搜尋）／K2i（精確/模糊關鍵字）後，接著做 K2j——操作者原始四點抱怨的第三點「彙整」，稍早已用 AskUserQuestion 定案為「畫面收合卡片」（非 AI 合併改寫）。
