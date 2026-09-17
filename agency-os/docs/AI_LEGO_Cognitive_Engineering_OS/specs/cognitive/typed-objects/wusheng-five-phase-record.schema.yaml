@@ -1,0 +1,75 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/wusheng-five-phase-record.schema.yaml"
+title: WuSheng Five Phase Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `WuShengFivePhaseRecord` -- output of `art_therapy.wusheng_five_phase`. Tracks a client's placement within
+  the operator's five-phase (五階段) action-research framework, which maps Chinese Five-Element (五行) /
+  Zang-Fu (臟腑) theory onto a change-hypothesis-validation cycle. Non-diagnostic: `current_phase` is the
+  practitioner's own clinical placement and `progress_evidence` is her own free-text observation; this record
+  never computes or asserts that a phase's own quantitative progress indicator has been met (full boundary
+  statement and each phase's guiding question / working hypothesis / practice strategy / progress indicator:
+  `ai_lego/modules/art_therapy/wusheng_five_phase.py`, `PHASE_REFERENCE`).
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.wusheng_five_phase.contract.yaml"
+
+decided_by: >
+  Operator directive 2026-09-18 (Airtable base appbQ5ACPPxMybVvM, tables "WuSheng Five Phases" / "五階段療程系統");
+  no ADR.
+
+type: object
+additionalProperties: false
+required: [id, version, subject, current_phase, progress_evidence, provenance]
+properties:
+  id: { type: string, pattern: "^WUSHENG-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.wusheng_five_phase" }
+  subject:
+    type: string
+    minLength: 1
+    description: "Whose five-phase progression this is, in the practitioner's own words (a label, not an identity record)."
+  current_phase:
+    type: string
+    enum: [WS-01, WS-02, WS-03, WS-04, WS-05]
+    description: >
+      Closed set, one of the operator's own five phases -- never free text. WS-01 生存 Existence (金；肝、膽；
+      Exploration; 3-4 sessions; "Am I here?"). WS-02 生活 Life Stabilization (水；腎・膀胱含胰與心；
+      Exploration; 2-3 sessions; "Where am I stuck?"). WS-03 生態 Ecological Awareness (木；肝・膽；
+      Integration; 3-4 sessions; "How can these experiences nourish me?"). WS-04 生動 Activating Creative
+      Aliveness (火；心・小腸；Healing; 1-2 sessions; "How do I move now?"). WS-05 生機 Vital Emergence (土；
+      脾・胃三焦系統；Integration; 2-3 sessions; "How do I sustain this?"). Full working hypothesis / practice
+      strategy / progress indicator per phase: `ai_lego/modules/art_therapy/wusheng_five_phase.py`,
+      `PHASE_REFERENCE`.
+  progress_evidence:
+    type: string
+    minLength: 1
+    description: >
+      Practitioner's free-text observation/evidence for the client's current phase. NOT auto-graded against
+      the phase's own quantitative progress indicator (e.g. WS-04's "execution rate > 80% per week", WS-05's
+      "> 6 weeks steady growth") -- that judgment is human-only; see the module docstring's boundary
+      statement.
+  linked_tool_ids:
+    type: array
+    minItems: 1
+    items: { type: string, minLength: 1 }
+    description: >
+      Optional references into the operator's separate Art Reflection Tools table (50+ fields per tool --
+      materials/steps/venue/risk flags/theoretical grounding). Ids only; that table's own full structure is
+      out of scope for this record (a future method/schema).
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Client observed in WS-02 (生活 Life Stabilization), with two linked reflection tools"
+    value:
+      id: "WUSHENG-2026-09-18-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.wusheng_five_phase"
+      subject: "個案 A 的五階段歷程記錄"
+      current_phase: "WS-02"
+      progress_evidence: "個案本週回報連續三天完成晨間例行公事，提到「比較沒那麼卡住了」；但週五因工作截止日又出現失眠。"
+      linked_tool_ids: ["ART-TOOL-014", "ART-TOOL-027"]
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

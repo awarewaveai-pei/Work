@@ -1,0 +1,64 @@
+$id: "ai-lego://methods/contracts/art_therapy.wusheng_five_phase.contract.yaml"
+title: "WuSheng Five Phase Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.wusheng_five_phase (五階段療程系統／五行五階段). GROUNDED ORIGINAL DESIGN: not in the Method
+  Atlas mother document; source is the operator's own action-research framework mapping Chinese Five-Element
+  (五行) / Zang-Fu (臟腑) theory onto a change-hypothesis-validation cycle, extracted from her Airtable base
+  `appbQ5ACPPxMybVvM`, tables "WuSheng Five Phases" / "五階段療程系統" (2026-09-18). Not an EC §32 method.
+  Core invariant: `current_phase` is a closed set of exactly 5 codes (WS-01..WS-05), never free text;
+  `progress_evidence` is a required non-empty practitioner observation. Non-diagnostic, non-crisis-assessment,
+  non-treatment-outcome-determination: this method never infers a diagnosis or verifies from
+  `progress_evidence`'s text whether a phase's own quantitative progress indicator (e.g. WS-04's "execution
+  rate > 80% per week") has actually been met -- that judgment is human-only (same boundary class as
+  `recipes/validated/art-therapy-creative-reflection-v1.recipe.yaml`).
+
+source_of_truth_for:
+  - "Operator's Airtable base appbQ5ACPPxMybVvM, tables \"WuSheng Five Phases\" / \"五階段療程系統\" (phase definitions, guiding questions, working hypotheses, practice strategies, progress indicators)"
+  - "specs/cognitive/typed-objects/wusheng-five-phase-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-18 (build the WuSheng Five Phase method from her existing Airtable framework); no ADR governs the content."
+
+id: art_therapy.wusheng_five_phase
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [MAP, EVALUATE]
+# INFERRED, not cited.
+
+purpose:
+  - track_client_placement_and_evidence_within_the_five_phase_change_hypothesis_cycle
+
+inputs:
+  required: []
+  # Entry-point method: practitioner supplies phase placement + evidence directly.
+
+outputs:
+  - WuShengFivePhaseRecord
+
+preconditions:
+  - "current_phase in {WS-01, WS-02, WS-03, WS-04, WS-05}; progress_evidence non-empty"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - framing.smart
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-WUSHENG-1: should linked_tool_ids validate against a future art_therapy.reflection_tool catalog once that method/schema exists, instead of accepting any string id unchecked?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'wusheng'/'five_phase'/'五階段' before writing -- zero prior implementation. Validated directly against specs/cognitive/method.schema.yaml via SchemaContracts.validate (same mechanism tests/run_golden_tests.py check 2b uses)."
+  note: >
+    No mother document was modified. Field shape, the 5-code closed-set enum, and the structural-only
+    (non-semantic) gate scope are this contract's own compilation decisions, per explicit operator
+    instruction not to auto-grade progress_evidence against each phase's own quantitative threshold.
+    `recommended_next: framing.smart` is grounded in WS-04's own practice_strategy text ("Emotion pinboard +
+    SMART action checklist"), not copied from art_therapy.life_wheel without basis.
