@@ -1,4 +1,26 @@
 # Worklog
+## 2026-09-17（續11）HCI-30 蒐集器 Task 6：Seed 治理組織實體白名單守門，critic 覆審 1 Major（既存 null-body 崩潰）全修
+
+[任務] 操作者要求接續 Task 3/4/5，照 `HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` Execution Order 一路做 Task 6→7→8→9→10→12→13。Task 6（阻塞於 Task 0，已於決策記錄 `agency-os/reports/decisions/2026-09-17-hci30-c6-and-collector-task1-decisions.md` 裁決3 簽核解除）：機械化強制只有標記組織實體的 seed 能被 runner 接受，不做自然人推論分類。
+
+[已修改]
+- `infra/local/fetch-runner/server.mjs`：`/enqueue` 加 `subject_kind !== 'ORGANIZATION'` 嚴格相等檢查（未帶/誤填一律 400，不引入任何 NLP/LLM 判斷）；`job.subjectKind` 改硬編字面值而非回顯呼叫端輸入；加 `typeof body !== 'object' || body === null || Array.isArray(body)` 防護；整個 request handler 包一層 try/catch 當縱深防禦（見下）。
+- `tests/architecture/fetch-runner-network-isolation.test.ps1`：既有 `/enqueue` 正向測試加上必填 `subject_kind: 'ORGANIZATION'`；新增 6 個斷言（缺欄位 400／`PERSON` 400／小寫 `organization` 400／陣列型別混淆 400／JSON literal `null` body 400 且伺服器不崩潰／崩潰測試後 `/healthz` 仍 200 證明沒死掉）。
+
+[critic 覆審，1 個 Major 全修，非本次新增邏輯但與新程式碼共用同一段未防護路徑]
+`server.mjs:95`（修前行號）`body.targetUrl` 在 `body` 為 JSON literal `null` 時直接拋 `TypeError`——`JSON.parse("null")` 合法回傳 JS 值 `null`，這個例外發生在 `http.createServer` 從不 await 的 async handler 內，形成 unhandled promise rejection，Node 20 預設 `--unhandled-rejections=throw` 會讓整個 process 崩潰。這個 container 刻意不設 `restart:`（Task 3 已把「不自動重啟」寫成安全不變量，因為亂重啟會讓 network-guard 的 iptables 規則消失且無感知）——代表崩潰是完全不會自動復原的全面停機，直到有人手動介入。這個洞在新程式碼加進來之前就存在（`body.targetUrl` 本來就沒防護），但 Task 6 的 `subject_kind` 檢查緊接在同一段未防護路徑後面，等於在同一個坑上再疊一層假設。修法：(1) 在兩個欄位檢查之前加 `body` 型別守衛；(2) 整個 request handler 包 try/catch 當縱深防禦，任何未來類似的解引用錯誤降級成 500 回應而非 process 崩潰。真實跑 real-Docker 測試證明：送出 literal `null` body 得到乾淨的 400（不是 connection reset/timeout），緊接著 `/healthz` 仍回 200，證明伺服器真的沒死。另外一個 Minor（`job.subjectKind` 回顯輸入值而非硬編字面值——今天無害但未來若檢查邏輯放寬會悄悄脫鉤）也一併修。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-network-isolation.test.ps1`（real-Docker，fresh project name + 產生 secrets）| exit=0 | HCI-30 fetch-runner network isolation suite PASSED，含全部既有斷言 + 6 個新增 Task 6 斷言（含 null-body 崩潰回歸測試 + 崩潰後健康檢查）全綠
+- REVIEW_DONE: critic=Standard | verdict=pass（1 Major + 1 Minor 全修）| findings=0 Critical / 1 Major / 1 Minor / 3 test-coverage gap（皆已補測試）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,lobster-factory | grep=`subjectKind\|subject_kind\|handleRequest` | hits=僅本次新增檔案本身 + 2 個 `lobster-factory/.trigger/tmp/` build cache 誤判（`handleRequest` 是 Trigger.dev 自己 bundle 出的無關函式名，人工核對排除）
+
+[剩餘風險]
+1. `subject_kind` 只在 runner 的 `/enqueue` 這一層守門——Task 10 的 UI 表單本身若繞過 API 直接呼叫其他路徑，需在 Task 10 自己的伺服器端程式碼再驗一次，不能假設 UI 表單必填就等於機械強制（本任務範圍只到 runner API 層）。
+2. 500 縱深防禦只降低崩潰的影響半徑，不等於「找到並修完所有解引用風險」——之後每個新路由仍應在寫程式當下自己做欄位守衛，不能倚賴外層 catch 當唯一防線。
+
+[rollback] 純增量修改既有 `server.mjs`（新增檢查+防禦包裝，未刪改既有 targetUrl/auth/status 邏輯）+ 既有測試檔新增斷言，`git revert` 該 commit 即可完全復原。
+
 ## 2026-09-17（續10）修復 WORKLOG.md 隱藏 NUL byte，grep 被迫走 binary-match 路徑
 
 - [根因] 2026-09-12 commit `3bcfbf148` 寫一則描述 `url-state.ts` NUL-byte 事故的 WORKLOG 條目時，backtick 範例 `NUL byte(` `)` 裡直接嵌入了真實的 0x00 位元組，而不是寫成跳脫文字——git 當時就對那個 commit 顯示 `Binary files differ`。此後 `agency-os/WORKLOG.md` 被 grep 判定為 binary file（回報 "Binary file matches" 而非逐行結果），R0 §抓蟲強制的 grep 掃描對這個檔案從那天起悄悄失效，屬於跟先前 merge-conflict-marker 系列不同的另一種損毀類型。

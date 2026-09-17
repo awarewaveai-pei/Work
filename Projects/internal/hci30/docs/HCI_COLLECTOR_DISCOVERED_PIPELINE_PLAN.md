@@ -86,12 +86,13 @@
 - **Acceptance**：真實寫入一份合成內容、讀回位元組相同；超過位元組上限的輸入被拒絕而非截斷靜默通過。
 - **Boundaries**：不寫入 Postgres 任何 raw bytes 欄位；不建立跨租戶共用的 dedup（ADR-0026 僅允許 bytes 層可選 dedup 且不得掛 tenant_id/FK——本任務不做這個可選優化，避免範圍蔓延）。
 
-## Task 6：Seed 治理 — 組織實體白名單守門（阻塞於 Task 0） — dispatch to `fullstack-engineer`
+## Task 6：Seed 治理 — 組織實體白名單守門（阻塞於 Task 0） — **已完成**（2026-09-17，real-Docker 驗證通過）
 
 - **Goal**：機械化強制「只有標記為組織實體的 seed 才能被 runner 接受」，不做自然人推論分類。
-- **Scope**：seed 註冊資料結構與驗證邏輯（落在 Task 10 的 UI 背後的 API，或獨立於 `Projects/internal/hci30/public-intelligence/`）。
-- **Input**：Task 0 的簽核決策記錄；`ADR-011 §決策10` 原文。
-- **Output**：seed 註冊時要求人工顯式勾選/填寫 `subject_kind='ORGANIZATION'` 屬性且不可留白；缺此屬性的 seed 一律被 enqueue API 拒絕（fail-closed，非事後審核）；不引入任何 NLP/LLM 判斷「這段文字是不是在講一個人」。
+- **Scope**：實際落地在 `infra/local/fetch-runner/server.mjs` 的 `/enqueue` handler——這是今天 seed 進 runner 的唯一入口（Task 9/10 尚未建，UI/Trigger.dev 層目前都還不存在），不是獨立新目錄。
+- **Input**：Task 0 的簽核決策記錄（`agency-os/reports/decisions/2026-09-17-hci30-c6-and-collector-task1-decisions.md` 裁決3）；`ADR-011 §決策10` 原文。
+- **Output**：`subject_kind !== 'ORGANIZATION'` 嚴格相等檢查（無 NLP/LLM）；缺欄位/型別混淆/大小寫誤填皆同一律 400；`job.subjectKind` 硬編字面值不回顯輸入，避免未來檢查邏輯放寬時悄悄脫鉤。
+- **完成狀態**：critic 覆審抓到 1 個 Major——`body` 為 JSON literal `null` 時 `body.targetUrl` 直接拋 TypeError，在 `http.createServer` 不 await 的 async handler 內形成 unhandled rejection，Node 20 預設行為讓整個 process 崩潰（這個 container 依 Task 3 的安全不變量刻意不設 restart policy，代表崩潰是全面停機直到人工介入）。這個洞在 Task 6 加入前就存在（`targetUrl` 檢查本來就沒有 body 型別守衛），Task 6 的新檢查只是緊接在同一段未防護路徑後面。已修：body 型別守衛（拒絕 null/array/非物件）+ 整個 request handler 包 try/catch 當縱深防禦，任何未來類似解引用錯誤降級成 500 而非 process 崩潰。真跑 real-Docker 驗證：6 個新斷言全綠（缺欄位 400／`PERSON` 400／小寫誤填 400／陣列型別混淆 400／null body 400 且不崩潰／崩潰測試後 `/healthz` 仍 200 證明伺服器活著）+ 既有全部斷言無回歸。詳見 WORKLOG 2026-09-17（續11）。
 - **Acceptance**：缺 `subject_kind` 的 seed 呼叫 enqueue 回 4xx；帶 `subject_kind='PERSON'`（若誤填）同樣被拒且有明確錯誤訊息；真實跑一次組織 seed 成功排入。
 - **Boundaries**：不新增任何允許自然人 seed 通過的旁路參數；不在此任務嘗試「以後升級成自動判斷」的擴充點。
 

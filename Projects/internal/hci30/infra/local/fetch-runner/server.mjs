@@ -72,7 +72,25 @@ function sendJson(res, status, body) {
   res.end(payload);
 }
 
+// Defense in depth (critic review 2026-09-17): `http.createServer` never
+// awaits this callback, so ANY future unguarded dereference inside it -- not
+// just the null-body case already fixed below -- would throw a synchronous
+// TypeError, become an unhandled promise rejection, and crash the whole
+// process under Node's default `--unhandled-rejections=throw`. This
+// container has no restart policy (by design -- restarting would silently
+// wipe network-guard's iptables rules), so any such crash is a full outage
+// until a human intervenes. One catch-all here turns "unknown future bug" +
+// "no auto-recovery" into a 500 response instead of a dead process.
 const server = http.createServer(async (req, res) => {
+  try {
+    await handleRequest(req, res);
+  } catch (err) {
+    console.error('unhandled request error:', err);
+    if (!res.headersSent) sendJson(res, 500, { error: 'internal_error' });
+  }
+});
+
+async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   // Unauthenticated on purpose: the container HEALTHCHECK and compose's
@@ -92,14 +110,43 @@ const server = http.createServer(async (req, res) => {
     } catch {
       return sendJson(res, 400, { error: 'invalid_json' });
     }
+    // critic review 2026-09-17 (Task 6): `JSON.parse` accepts top-level
+    // `null`/arrays/scalars as legal JSON -- `body.targetUrl` on a `null`
+    // body throws a synchronous TypeError inside this unawaited async
+    // handler, which is an unhandled rejection that crashes the whole
+    // process under Node's default `--unhandled-rejections=throw` (no
+    // restart policy on this container by design, so that is a full outage
+    // until a human intervenes). Reject non-plain-object bodies before
+    // dereferencing anything on them.
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      return sendJson(res, 400, { error: 'invalid_body' });
+    }
     if (!body.targetUrl || typeof body.targetUrl !== 'string') {
       return sendJson(res, 400, { error: 'targetUrl is required' });
+    }
+    // HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 6 (ADR-011 SS決策10):
+    // this pipeline is org-entities-only, by machine-enforced whitelist, not
+    // NLP/LLM inference of "is this text about a person". Fail-closed on
+    // anything other than the exact literal -- a missing field and a
+    // misspelled/wrong-case value get the same rejection, because both mean
+    // "the caller did not affirmatively declare ORGANIZATION". No bypass
+    // parameter may ever be added here (plan's Boundaries line for Task 6).
+    if (body.subject_kind !== 'ORGANIZATION') {
+      return sendJson(res, 400, {
+        error: 'subject_kind_required',
+        message: "seed requires an explicit subject_kind: 'ORGANIZATION' -- this pipeline accepts organization-entity seeds only (see agency-os/reports/decisions/2026-09-17-hci30-c6-and-collector-task1-decisions.md, decision 3)",
+      });
     }
     const id = crypto.randomUUID();
     const job = {
       id,
       targetUrl: body.targetUrl,
       tenantId: body.tenantId ?? null,
+      // Hardcoded, not `body.subject_kind`: the check above has just proven
+      // strict equality to this literal, but echoing the caller's raw value
+      // would silently decouple "accepted" from "persisted" if that check is
+      // ever loosened later (critic review 2026-09-17).
+      subjectKind: 'ORGANIZATION',
       status: 'queued',
       createdAt: new Date().toISOString(),
     };
@@ -115,7 +162,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   sendJson(res, 404, { error: 'not_found' });
-});
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`hci-fetch-runner internal API listening on :${PORT}`);

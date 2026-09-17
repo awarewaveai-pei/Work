@@ -245,11 +245,58 @@ try {
   # argument to a native exe (the JSON body arrived at the server as
   # literal-broken text, `{error:"invalid_json"}`) -- stdin content is not
   # subject to that argument-quoting layer at all.
-  $enqueueBody = '{"targetUrl":"https://example.com","tenantId":"tenant-1"}'
+
+  # Task 6 (HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md, ADR-011 SS決策10):
+  # org-only whitelist gate. Missing/wrong subject_kind must be rejected
+  # fail-closed before the positive-path test proves the correct value works.
+  $missingKindBody = '{"targetUrl":"https://example.com","tenantId":"tenant-1"}'
+  $missingKindResponse = $missingKindBody | & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
+  if ($missingKindResponse -ne '400') { throw "ASSERTION FAILED: /enqueue with no subject_kind expected 400, got $missingKindResponse" }
+  Write-Host '  ok: /enqueue with missing subject_kind rejected (400)'
+
+  $personKindBody = '{"targetUrl":"https://example.com","tenantId":"tenant-1","subject_kind":"PERSON"}'
+  $personKindResponse = $personKindBody | & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
+  if ($personKindResponse -ne '400') { throw "ASSERTION FAILED: /enqueue with subject_kind=PERSON expected 400, got $personKindResponse" }
+  Write-Host '  ok: /enqueue with subject_kind=PERSON rejected (400) -- misfilled value is not a bypass'
+
+  # critic review 2026-09-17: the code comment claims "a missing field and a
+  # misspelled/wrong-case value get the same rejection" -- pin that down with
+  # an actual wrong-case value, not just a wrong-value test.
+  $lowercaseKindBody = '{"targetUrl":"https://example.com","tenantId":"tenant-1","subject_kind":"organization"}'
+  $lowercaseKindResponse = $lowercaseKindBody | & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
+  if ($lowercaseKindResponse -ne '400') { throw "ASSERTION FAILED: /enqueue with subject_kind=organization (wrong case) expected 400, got $lowercaseKindResponse" }
+  Write-Host '  ok: /enqueue with subject_kind=organization (wrong case) rejected (400)'
+
+  # critic review 2026-09-17: type confusion -- subject_kind as an array
+  # rather than a string. Strict `!==` never coerces, so this must reject.
+  $arrayKindBody = '{"targetUrl":"https://example.com","tenantId":"tenant-1","subject_kind":["ORGANIZATION"]}'
+  $arrayKindResponse = $arrayKindBody | & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
+  if ($arrayKindResponse -ne '400') { throw "ASSERTION FAILED: /enqueue with subject_kind as an array expected 400, got $arrayKindResponse" }
+  Write-Host '  ok: /enqueue with subject_kind as an array (type confusion) rejected (400)'
+
+  # critic review 2026-09-17 (Critical/Major finding): a literal JSON `null`
+  # body used to crash the whole process (`body.targetUrl` on `null` threw a
+  # synchronous TypeError inside an unawaited async handler -- an unhandled
+  # rejection that kills the process, with no restart policy to recover it).
+  # This is the regression test for that fix: prove it degrades to a clean
+  # 400, not a dropped connection / timeout from a dead server.
+  $nullBodyResponse = 'null' | & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
+  if ($nullBodyResponse -ne '400') { throw "ASSERTION FAILED: /enqueue with a literal JSON null body expected 400, got $nullBodyResponse" }
+  Write-Host '  ok: /enqueue with a literal JSON null body rejected (400), not a process crash'
+
+  # Prove the server is still alive and healthy after the null-body
+  # regression test above -- the whole point of that fix was that a crash
+  # would otherwise take the entire container down with no auto-restart.
+  $stillHealthy = & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/healthz
+  if ($stillHealthy -ne '200') { throw "ASSERTION FAILED: runner /healthz expected 200 after the null-body request, got $stillHealthy -- the server may have crashed" }
+  Write-Host '  ok: runner still healthy after the null-body request (no crash)'
+
+  $enqueueBody = '{"targetUrl":"https://example.com","tenantId":"tenant-1","subject_kind":"ORGANIZATION"}'
   $enqueueResponse = $enqueueBody | & docker @composeArgs exec -T runner curl -s -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
   $job = $enqueueResponse | ConvertFrom-Json
-  if (-not $job.id -or $job.status -ne 'queued') { throw "ASSERTION FAILED: /enqueue with valid secret did not return a queued job -- response: $enqueueResponse" }
-  Write-Host "  ok: authenticated /enqueue returned job $($job.id) (status=queued)"
+  if (-not $job.id -or $job.status -ne 'queued') { throw "ASSERTION FAILED: /enqueue with valid secret + subject_kind=ORGANIZATION did not return a queued job -- response: $enqueueResponse" }
+  if ($job.subjectKind -ne 'ORGANIZATION') { throw "ASSERTION FAILED: queued job did not echo back subjectKind=ORGANIZATION -- response: $enqueueResponse" }
+  Write-Host "  ok: authenticated /enqueue with subject_kind=ORGANIZATION returned job $($job.id) (status=queued)"
 
   $statusResponse = & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $sharedSecret" "http://127.0.0.1:8090/status/$($job.id)"
   if ($statusResponse -ne '200') { throw "ASSERTION FAILED: /status/$($job.id) with valid secret expected 200, got $statusResponse" }
