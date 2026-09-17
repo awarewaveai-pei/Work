@@ -1,4 +1,5 @@
 # Worklog
+<<<<<<< HEAD
 ## 2026-09-17（續6）HCI-30 蒐集器 Task 11：source-independence 計數改用聚類根，critic 覆審全修
 
 [任務] 承接續5的授權範圍，繼續處理蒐集器計畫中完全獨立、不需 STOP 確認的 Task 11（`classify-evidence-quality.mjs` 的重複來源計數修正）。
@@ -19,6 +20,16 @@
 [剩餘風險] `resolveClusterRoot` 本身尚無真實呼叫端建置（要接上 `hci.source_relationships` 才有實際聚類效果，屬未來 Claim-extraction wave 範圍，本任務原本就只驗證邏輯本身，不含真實接線）。
 
 [rollback] 純函式改動 + 新增測試，`git revert` 該 commit 即可完全復原，無 schema/資料異動。
+=======
+## 2026-09-17｜Cognitive OS prod redeploy #2: gap closure live
+
+- 部署 commits 007d2aa15 + 5bc8f6fff（deploy.sh：129 tests passed→build→healthy 6s→local/public smoke PASS）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh` on ks-aw-01 | exit=0 | ms=~300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad prod verify`（login→GET /methods→POST /methods/art_therapy.life_wheel/invoke→POST /recipes/art-therapy-unstick-v1/run→POST /recipes/edd-literature-search-online-v1/run→logout）| exit=0 | result=methods 279, recipes 17, invoke 200 LWHEEL-…, unstick PASS 4 steps, edd online PASS mode ONLINE_PROVIDER 10 items（容器 egress 白名單生效）
+- REVIEW_WAIVED: DOC_ONLY -- 本條目僅部署紀錄
+- BUGHUNT_WAIVED: DOC_ONLY
+- rollback：ks-aw-01 `docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d`（:rollback = 今日上午 Recipe engine 版）。
+>>>>>>> 3702aaf5b
 
 ## 2026-09-17｜Cognitive OS Gap A+C: 29 藝術治療清單方法 + Master Plan §43 商業全鏈
 
