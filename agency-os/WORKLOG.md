@@ -1,25 +1,4 @@
 # Worklog
-## 2026-09-17（續6）HCI-30 蒐集器 Task 11：source-independence 計數改用聚類根，critic 覆審全修
-
-[任務] 承接續5的授權範圍，繼續處理蒐集器計畫中完全獨立、不需 STOP 確認的 Task 11（`classify-evidence-quality.mjs` 的重複來源計數修正）。
-
-[已修改]
-- `Projects/internal/hci30/packages/intelligence/classify-evidence-quality.mjs`：`classifyEvidenceQuality(dimensionScores, options)` 新增可選 `resolveClusterRoot` resolver；有值時按聚類根去重計數，無值（今天唯一真實呼叫端 `app/server.mjs:331`）行為逐位元組不變。
-- `tests/unit/intelligence/classify-evidence-quality.test.mjs`：新增 9 個測試（fallback 行為、聚類收斂、resolver 回傳值驗證、resolver 拋錯處理）。
-
-[critic 覆審，已處理]
-0 Critical，2 Major：(1) resolver 回傳 undefined/null 時 `new Set()` 會把所有無法對應的 ref 全部塞進同一個 bucket，靜默把真正的 MULTIPLE_SOURCES 誤判成 SINGLE_SOURCE——已修，resolver 輸出強制驗證為非空字串，驗證失敗清楚拋錯並帶原始 ref。(2) resolver 回傳非 primitive（如物件）會因 `Set` 用參照相等而讓聚類完全失效且零錯誤訊號——同一個驗證修法一併涵蓋。2 個 Minor：`{resolveClusterRoot} = {}` 對顯式 `null` 引數會直接炸掉——已修為 `options ?? {}`；resolver 拋錯時原本會洩漏 resolver 自己的 stack trace——已修，重新包裝成本函式自己的錯誤訊息格式。1 個 Suggestion（`evidence_count` 是唯一權威獨立來源訊號，`evidence_refs.length` 不可當替代品）已寫進檔頭註解。
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/classify-evidence-quality.test.mjs` | exit=0 | 25/25
-- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/*.test.mjs`（整個套件回歸） | exit=0 | 167/167，零回歸
-- REVIEW_DONE: critic=Quick | verdict=pass（2 Major 全修）| findings=0 Critical / 2 Major / 2 Minor / 1 Suggestion
-- BUGHUNT_DONE: scope=Projects/internal/hci30 | grep=`resolveClusterRoot` | hits=僅本次改動的 2 個檔案本身，無孤兒引用
-
-[剩餘風險] `resolveClusterRoot` 本身尚無真實呼叫端建置（要接上 `hci.source_relationships` 才有實際聚類效果，屬未來 Claim-extraction wave 範圍，本任務原本就只驗證邏輯本身，不含真實接線）。
-
-[rollback] 純函式改動 + 新增測試，`git revert` 該 commit 即可完全復原，無 schema/資料異動。
-=======
 ## 2026-09-17｜Cognitive OS prod redeploy #2: gap closure live
 
 - 部署 commits 007d2aa15 + 5bc8f6fff（deploy.sh：129 tests passed→build→healthy 6s→local/public smoke PASS）。
@@ -45,6 +24,7 @@
 - 剩餘風險：新方法尚未部署（本 commit 後跑 deploy.sh）；proposal artifact 只回傳 inline，未進 CAS（OQ-PROPOSAL-1）；scenario 未消費財務區間（OQ-BUSINESS-PLAN-FULL-1）。
 - rollback：`git revert <commit>`；prod `docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d`。
 
+<<<<<<< Updated upstream
 ## 2026-09-17（續5）HCI-30 全權授權後：C6/蒐集器 Task 1 決策 + 蒐集器 Task 2 落地（migration 0020）+ 兩輪覆審全修
 
 [任務] 操作者本輪明確全權授權（"需要決定的事都你決定"），且明確重申 High-STOP 不因整批授權跳過。據此：(1) 親自裁決 C6 Task 1(A)/(B) 與蒐集器 Task 0/1（非 STOP 的決策類任務，決定記錄見下）；(2) 蒐集器 Task 2（`hci.sources` admission_state 狀態機）非身分/RLS 邊界異動，實際建置；(3) C6 Task 3（provisioning endpoint，真身分/RLS 異動）維持 STOP，只做 Task 2 設計審查，不寫程式碼。
@@ -75,7 +55,6 @@
 3. C6 provisioning endpoint（Task 3）本身仍是 STOP，即使有了修正後的設計指引，實際程式碼與 migration 需操作者對這一項單獨明示 go-ahead 才能開工。
 
 [rollback] Migration 0020 有對應 down 檔並已 real-Docker 驗證可逆；`git revert` 本次 commit 即可完全復原程式碼與文件，資料庫尚未有任何真實環境套用此 migration。
-=======
 ## 2026-09-17（續5）K2h 巢狀資料夾＋分頁搜尋、K2i 精確／模糊關鍵字模式：實作＋critic 修復＋真實 Postgres 驗證
 
 [任務] 續2/3 完成 K2g 後，依 KNOWLEDGE_BASE_PLAN.md 排序做 K2h（資料夾+分頁搜尋）、K2i（關鍵字模式）——操作者已在稍早的三題 AskUserQuestion 選定方案（巢狀資料夾／租戶預設+單篇覆蓋；K2j 畫面收合卡片留待下一輪）。
@@ -119,6 +98,7 @@
 
 [WORKLOG_DONE]: K2h + K2i
 
+>>>>>>> Stashed changes
 
 ## 2026-09-17｜Cognitive OS Gap B: EdD 真文獻搜尋（OpenAlex）+ method kit pilot
 
