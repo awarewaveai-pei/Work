@@ -33,6 +33,15 @@ services:
     environment:
       HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?fetch runner requires a generated shared secret}
       HCI_FETCH_RUNNER_PORT: "8090"
+      # Task 5 (object-storage-client.mjs): endpoint/credentials for this
+      # runner's own dedicated MinIO instance below. Bucket name is
+      # duplicated from object-storage's MINIO_DEFAULT_BUCKETS value further
+      # down this file -- same "must match" relationship as this file's
+      # HCI_FETCH_RUNNER_MINIO_IP already has with the test script.
+      HCI_FETCH_RUNNER_MINIO_ENDPOINT: http://${HCI_FETCH_RUNNER_MINIO_IP:?fetch runner requires the object-storage container's static IP}:9000
+      HCI_FETCH_RUNNER_MINIO_BUCKET: hci-fetch-runner-raw
+      HCI_FETCH_RUNNER_MINIO_ACCESS_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_USER:?fetch runner requires the object-storage root user}
+      HCI_FETCH_RUNNER_MINIO_SECRET_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD:?fetch runner requires the object-storage root password}
     # DNS: the image's own CMD (fetch-runner/Dockerfile) overwrites
     # /etc/resolv.conf to query 1.1.1.1/8.8.8.8 directly, bypassing Docker's
     # embedded 127.0.0.11 proxy -- real testing on this machine found that

@@ -66,21 +66,23 @@
 - **Acceptance**：從 runner 容器內連 Supabase admin endpoint／Trigger.dev 內部 endpoint／n8n webhook 管理 endpoint 三者皆連線失敗；連 `169.254.169.254`、RFC1918、loopback、link-local 皆連線失敗；連公開網際網路正常。
 - **Boundaries**：不修改 Trigger.dev 既有 service 定義本身的網路存取；不觸碰 `ks-aw-01` 上其他正在跑的服務；正式上機前需操作者對「prod 網路拓樸變更」明示批准。
 
-## Task 4：DNS-rebind 防護 + SSRF payload corpus（ADR-0029 gate 4-5） — dispatch to `fullstack-engineer`（依賴 Task 3）
+## Task 4：DNS-rebind 防護 + SSRF payload corpus（ADR-0029 gate 4-5） — **本機/測試環境已完成**（2026-09-17，`fullstack-engineer` + critic 覆審修 1 Critical/2 Major，真實驗證通過；未寫入 `server.mjs`，留給 Task 7）
 
 - **Goal**：runner 對外請求前解析並釘住目標 IP，連線時重驗，且能擋下已知 SSRF 手法。
-- **Scope**：`Projects/internal/hci30/public-intelligence/retrieval/`（新目錄）內的 HTTP client 層。
+- **Scope**：實際落地在 `infra/local/fetch-runner/net/`（非原計畫 `public-intelligence/retrieval/`——這批程式碼要被 Dockerfile `COPY` 進 runner image，必須落在 Docker build context 內，即 Dockerfile 所在目錄下；`public-intelligence/` 目前整個尚未建立）。
 - **Input**：`lobster-factory` `net/fetcher.ts` 用 `undici.Agent({connect:{lookup}})` 把連線釘死在驗證過位址的既有手法（同一手法可搬過來，但程式碼本身不可共用 import——兩側是隔離邊界）；ADR-0029 gate 4/5 原文。
-- **Output**：DNS pin 實作；具名 SSRF payload corpus（open redirect、十進位/八進位/十六進位 IP 編碼、IPv4-mapped IPv6、協定走私）作為測試套件；`wave6-dns-rebind-rejected`、`wave6-ssrf-payload-corpus` 測試 id。
+- **Output**：`net/ssrf-guard.mjs`（`checkUrl`/`isPrivateAddress`/`SsrfBlockedError`）+ `net/pinned-http-client.mjs`（`pinnedLookup`/`createPinnedAgent`/`defaultTransport`/`createSafeFetch`）+ 3 個測試檔（`ssrf-guard.test.mjs`/`pinned-http-client.test.mjs`/`ssrf-payload-corpus.test.mjs`，共 23 個測試）；`wave6-dns-rebind-rejected`、`wave6-ssrf-payload-corpus` 測試 id 皆有對應測試。
+- **完成狀態**：原始程式碼由前一個 session 的 `fullstack-engineer` agent 寫完，但該 agent 整個 session Bash 工具壞掉（同一 wrapper bug 導致零執行），程式碼從未跑過、未 commit。本 session 重新真實執行：(1) 修一個立即讓 `ssrf-payload-corpus.test.mjs` 炸掉的 bug——`pinned-http-client.mjs` 從 `ssrf-guard.mjs` import 了 `SsrfBlockedError` 卻沒有 re-export，消費者拿不到；(2) critic 覆審抓到 1 個 Critical + 2 個 Major：**Critical**——`defaultTransport` 的位元組上限截斷邏輯呼叫 `res.destroy()` 後還在等 `'end'` 事件才 resolve，但 `destroy()` 在讀取中的回應上只會觸發 `'close'`，永遠不會有 `'end'`，導致 Promise 永遠不 resolve（真實 repro：42KB body 對 3KB cap，掛住超過 10 秒不 settle，`finally` 裡的 `agent.destroy()` 也連帶跑不到，形成 socket 洩漏）——已修，改成在截斷當下立即 resolve，不等 `'end'`；**Major 1**——只有 idle timeout（每收到一個位元組就重置），沒有絕對 wall-clock 上限，慢速滴水攻擊可以無限期占用連線——已修，加 `deadlineMs`（預設 120s）用獨立 timer 強制斷線；**Major 2**——`object-storage-client.mjs` 的讀取路徑 `parseSnapshotRef` 對 `key` 沒有格式驗證，理論上能接受 `../` 之類的字串構成路徑穿越（寫入路徑本來就安全，因為 key 永遠是程式算出來的 sha256，這裡是讀取路徑的防禦缺口）——已修，讀取前驗證 `key` 必須符合 `^sha256\/[0-9a-f]{64}$`。修完加一個新測試直接證明截斷不再掛住（真實 socket，4096 bytes body vs 1024 byte cap，2.75ms 內 resolve）。2 個 Minor（`::ffff:` 正規表示式在 URL-derived hostname 上永遠命中前面分支使其變死碼；trailing-dot FQDN 略過字串快速路徑但仍被後續真實 DNS 解析擋下，安全結論不變）與 `lobster-factory` 對應檔案共用同一行為，非本次引入的回歸，留待兩側協調修，不在本次單邊改。詳見 WORKLOG 2026-09-17。
 - **Acceptance**：控制用測試網域在解析與連線間切換公開 IP／RFC1918 IP，連線被拒；corpus 內每個已知手法皆 fail-closed；測試對象僅限受控/合成目標。
 - **Boundaries**：不得對真實第三方網站執行 SSRF payload 測試；不得使用真人或真實客戶資料作為測試內容。
 
-## Task 5：物件儲存 client 端寫入路徑 — dispatch to `fullstack-engineer`（依賴 Task 3 的 bucket provisioning）
+## Task 5：物件儲存 client 端寫入路徑 — **本機/測試環境已完成**（2026-09-17，`fullstack-engineer` + critic 覆審，real-Docker/MinIO 驗證通過）
 
 - **Goal**：raw HTML/text 進物件儲存，Postgres 只存 hash+ref。
-- **Scope**：`Projects/internal/hci30/public-intelligence/source-registry/`（新目錄）內的儲存 client。
+- **Scope**：實際落地在 `infra/local/fetch-runner/object-storage-client.mjs`（非原計畫 `public-intelligence/source-registry/`——同 Task 4，理由是 Docker build context 邊界；`public-intelligence/` 尚未建立）。
 - **Input**：raw content 不得進 Postgres text/bytea（`06_HCI30_PUBLIC_INTELLIGENCE.md:300-302`）；Task 3 provisioning 的物件儲存端點/憑證；`hci.source_snapshots.content_hash`/`snapshot_ref` 欄位形狀（opaque 指標設計）。
-- **Output**：content-addressed 寫入函式（`sha256(bytes)` 為鍵）；單次位元組上限與逾時；回傳 `{content_hash, snapshot_ref}` 供 Task 8 寫入 DB。
+- **Output**：content-addressed 寫入函式（`sha256(bytes)` 為鍵，SigV4 簽章直連 MinIO，無需額外 npm 依賴）；單次位元組上限與逾時；回傳 `{content_hash, snapshot_ref}` 供 Task 8 寫入 DB；`tests/architecture/fetch-runner-object-storage-write-path.test.ps1`（沿用 Task 3 的 fresh-project-name + 產生 secrets 模式，對真實 MinIO 驗證）。
+- **完成狀態**：與 Task 4 同一個壞掉的 session 寫的，同樣零執行未 commit。本 session 真實跑 real-Docker 測試時抓到並修一個腳本本身的 bug——`[System.Security.Cryptography.RandomNumberGenerator]::Fill()` 是 .NET 5+ 才有的靜態方法，這台機器的 Windows PowerShell 5.1（.NET Framework）沒有這個多載，跑下去直接 `MethodNotFound`——改用 `RNGCryptoServiceProvider.GetBytes()`（兩邊都能跑）。critic 覆審抓到的讀取路徑 key 格式驗證缺口記在 Task 4 條目（`parseSnapshotRef` 在同一個 commit 一起修）。最終 real-Docker 全綠：合成內容真實寫入→讀回位元組相同；超過 1024 byte cap 的 2048 byte payload 被拒絕（exit 3）且該 content-addressed key 在 MinIO 裡確實不存在（無殘留半成品）。Task 3 的網路隔離測試在 compose/Dockerfile 改動後重跑仍全綠，無回歸。詳見 WORKLOG 2026-09-17。
 - **Acceptance**：真實寫入一份合成內容、讀回位元組相同；超過位元組上限的輸入被拒絕而非截斷靜默通過。
 - **Boundaries**：不寫入 Postgres 任何 raw bytes 欄位；不建立跨租戶共用的 dedup（ADR-0026 僅允許 bytes 層可選 dedup 且不得掛 tenant_id/FK——本任務不做這個可選優化，避免範圍蔓延）。
 

@@ -1,4 +1,42 @@
 # Worklog
+## 2026-09-17（續9）HCI-30 蒐集器 Task 4+5：DNS-rebind 防護＋SSRF corpus + 物件儲存 client 端寫入路徑，救回零執行的壞 session 產物，critic 覆審 1 Critical/2 Major 全修
+
+[任務] 承接續7（Task 3），Task 4（SSRF/DNS-rebind 防護）與 Task 5（物件儲存寫入路徑）已由前一個 session 派 `fullstack-engineer` agent 寫完程式碼，但那兩個 agent 整個 session 的 Bash 工具都壞掉（同一 wrapper bug：`/usr/bin/bash: -c: line NN: unexpected EOF`），完全零執行——程式碼從未跑過、未過 critic review、未 commit。操作者要求本 session 先驗證 Bash 正常（`echo hi` 成功），再依序真跑測試、修錯、critic 覆審、commit+push、更新文件。
+
+[已修改]
+- `infra/local/fetch-runner/net/ssrf-guard.mjs`：加一行 `export { SsrfBlockedError };`——`pinned-http-client.mjs` 從這裡 import 了這個 class 卻沒 re-export，`ssrf-payload-corpus.test.mjs` 一 import 就 `SyntaxError`（我跑第一輪測試時抓到的，非 critic finding）。
+- `infra/local/fetch-runner/net/pinned-http-client.mjs`：critic 覆審 Critical + Major 全修（見下）。
+- `infra/local/fetch-runner/object-storage-client.mjs`：critic 覆審 Major 全修（見下）。
+- `tests/unit/fetch-runner/pinned-http-client.test.mjs`：加一個新測試證明截斷不再掛住（真實 socket，4096 bytes body vs 1024 byte cap）。
+- `tests/architecture/fetch-runner-object-storage-write-path.test.ps1`：修一個 PS5.1 相容性 bug（見下）。
+- `Projects/internal/hci30/docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md`：Task 4/5 標記本機/測試環境已完成，附完成狀態摘要；同步修正 Scope 欄位（實際落地路徑與原計畫不同）。
+
+[真跑第一輪抓到的執行期 bug（非 critic，是先跑測試時發現的）]
+- `pinned-http-client.mjs` 忘記 re-export `SsrfBlockedError`（見上，已修）。
+- `tests/architecture/fetch-runner-object-storage-write-path.test.ps1` 呼叫 `[System.Security.Cryptography.RandomNumberGenerator]::Fill()`——這是 .NET 5+ 才有的靜態方法，這台機器的 Windows PowerShell 5.1（.NET Framework）沒有這個多載，直接 `MethodNotFound`。改用 `RNGCryptoServiceProvider.GetBytes()`（兩邊都支援）。
+
+[critic 覆審，1 Critical + 2 Major 全修]
+(1) **Critical**——`pinned-http-client.mjs:82-95`（修前行號）`defaultTransport` 的位元組上限截斷邏輯：`res.destroy()` 之後還在等 `res.on('end', ...)` 才 resolve，但 `destroy()` 在讀取中的 `IncomingMessage` 上只會觸發 `'close'`，永遠不會有 `'end'`——Promise 永遠不 settle。critic 真實 repro（不是猜的）：42KB body 對 3KB cap，掛住超過 10 秒不 settle；`finally` 裡的 `agent.destroy()` 也連帶跑不到，pinned Agent + 底層 socket 就這樣洩漏。這不是邊角案例——任何超過預設 5MB 上限的抓取內容都會讓呼叫的 coroutine 永遠卡住，把「位元組上限」這個資源邊界設計直接變成無界資源洩漏。已修：截斷當下立即 resolve（`truncated: true`），不再等 `'end'`；加 `settled` guard 防止重複 resolve/reject。新增真實 socket 測試驗證（2.75ms 內 resolve，見上）。
+(2) **Major**——同檔案：`timeout: timeoutMs` 傳給 `http.request` 是「閒置」計時器，每收到一個位元組就重置，不是總時長上限。一個維持在閒置上限之下慢慢滴水的伺服器可以無限期占用一條已釘住的連線，且永遠不會觸發位元組上限。對照 `lobster-factory` 的 proven reference `fetcher.ts` 本來就有明確 `deadlineMs`（120s）這一層，本檔案原本沒有對應機制。已修：`createSafeFetch` 加 `deadlineMs`（預設 120s），`defaultTransport` 用獨立 timer 在到期時強制 `req.destroy()`。
+(3) **Major**——`object-storage-client.mjs:194-198`：讀取路徑 `parseSnapshotRef` 對 `key` 沒有任何格式驗證，正規表示式 `(.+)` 貪婪吃下任何字串（含 `../` 之類的路徑穿越片段），該字串接著被直接拼進 HTTP request path。寫入路徑本來就安全（key 永遠是 `sha256Hex(bytes)` 程式算出來的），這是讀取路徑單邊的防禦缺口——MinIO 預設後端是 POSIX 檔案系統，object key 裡的 `..` 是已知對 S3 相容儲存的路徑穿越手法。今天不可利用（只有本模組自己的 round-trip 測試會呼叫這個函式），但這是一個沒有機械強制的不變量，掛在一個公開匯出的函式上。已修：`parseSnapshotRef` 在回傳前驗證 `key` 必須符合 `^sha256\/[0-9a-f]{64}$`，不符合直接拋錯。
+- 2 個 Minor（`::ffff:` 正規表示式在 URL-derived hostname 上永遠命中前面分支使其成為死碼；trailing-dot FQDN 略過字串快速路徑但仍被後續真實 DNS 解析擋下，安全結論不變）——這兩個都是與 `lobster-factory` 對應檔案逐位元組共用的既有行為，非本次引入的回歸，且該檔案自己的頭部註解明講「沒有共用真相來源可以一次修好」；critic 建議留待兩側協調修，不在本次單邊改，本 session 採納此建議。
+- 1 個 Suggestion（Task 7 要記得把 `net/` 目錄也 `COPY` 進 Dockerfile）——留在計畫文件 Task 7 提醒，非本次範圍。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/fetch-runner/ssrf-guard.test.mjs tests/unit/fetch-runner/pinned-http-client.test.mjs tests/unit/fetch-runner/ssrf-payload-corpus.test.mjs` | exit=0 | 23/23 全綠（含新增的截斷不掛住回歸測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-object-storage-write-path.test.ps1`（real-Docker/MinIO，fresh project name + 產生 secrets）| exit=0 | 合成內容真實寫入→讀回位元組相同；2048 byte payload 對 1024 byte cap 被拒（exit 3）且該 content-addressed key 在 MinIO 裡確實不存在（無殘留半成品）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-network-isolation.test.ps1`（Task 3 既有測試，確認 compose/Dockerfile 改動無回歸）| exit=0 | HCI-30 fetch-runner network isolation suite PASSED (ADR-0029 gates 1-3)
+- REVIEW_DONE: critic=Standard | verdict=pass（1 Critical + 2 Major 全修）| findings=1 Critical / 2 Major / 2 Minor / 1 Suggestion
+- BUGHUNT_DONE: scope=Projects/internal/hci30,agency-os,scripts | grep=`defaultTransport\|createSafeFetch\|parseSnapshotRef\|getContentAddressedObject\|putContentAddressedObject\|pinnedLookup\|createPinnedAgent` | hits=僅本次新增檔案本身，無其他消費者（預期中——Task 7 才會接上 `server.mjs`）
+
+[剩餘風險]
+1. 尚未寫入 `server.mjs` 的 `/enqueue` 路徑——這兩個模組目前只是驗證過的獨立原語，真正的攻擊面要等 Task 7 接上才存在，屆時 Task 7 必須把這次修好的 `deadlineMs`/截斷 resolve/key 驗證全部一起帶進去，不能只挑一部分。
+2. 2 個 Minor（`::ffff:` 死碼分支、trailing-dot FQDN）與 `lobster-factory` 共用，兩側協調修尚未排入任何 Task——目前安全結論不受影響（過度擋，不是繞過），但技術債留著。
+3. 實際檔案落地路徑（`infra/local/fetch-runner/`）與計畫原始 Scope（`public-intelligence/`）不同，原因是 Docker build context 邊界——已更新計畫文件 Scope 欄位，此項非風險，只是記錄决策已對齐。
+4. 上 `ks-aw-01` 仍是 STOP，本輪只完成本機/測試環境部分。
+
+[rollback] 全新檔案 + 對既有 `compose.fetch-runner.yml`/`Dockerfile` 純增量修改（新增 env var/COPY 指令，未刪改任何既有行），`git revert` 該 commit 即可完全復原，未部署到任何共用/正式環境。
+
 ## 2026-09-17（續7）HCI-30 蒐集器 Task 3：隔離 fetch runner 網路層落地（ADR-0029 首次實作），critic 覆審 4 Major 全修 + 自抓 2 個測試腳本 bug
 
 [任務] 承接續6，繼續處理蒐集器計畫 Task 3（本機/測試環境的隔離 fetch runner，STOP 僅卡在 ks-aw-01 正式部署，本機建置不需另外確認）。第一次派 `devops-engineer` 誤判角色範圍（該角色僅限 ks-aw-01 SSH 維運，無 Write 權限），改派 `fullstack-engineer` 建置；該 agent 執行中撞到 session 額度上限被中斷，接續本 session 親自驗證、修正、完成收尾。

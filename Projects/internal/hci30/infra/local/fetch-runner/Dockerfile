@@ -12,6 +12,7 @@ FROM node:20-alpine
 RUN apk add --no-cache curl bind-tools
 WORKDIR /app
 COPY server.mjs .
+COPY object-storage-client.mjs .
 EXPOSE 8090
 HEALTHCHECK --interval=5s --timeout=3s --retries=10 CMD curl -fsS http://127.0.0.1:8090/healthz || exit 1
 # Docker's embedded DNS proxy (127.0.0.11, compose's `dns:` key only changes
