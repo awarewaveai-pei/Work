@@ -19,6 +19,13 @@
 // All three ask for a contact email in the user agent and give you a faster, more reliable pool for
 // it (the "polite pool"). COLLECT_CONTACT_EMAIL supplies it; without one they still answer, more
 // slowly and with less patience.
+//
+// PICO (Population / Intervention / Comparison / Outcome, plus study type and a year range) is an
+// OPTIONAL, additional way to build the query, sitting next to the free-text one above rather than
+// replacing it: SciSpace's own published prompting guide structures a search exactly this way, and
+// buildPicoQuery turns that structure into a REAL boolean query instead of prose a registry's
+// relevance ranking has to guess at. An operator who fills in no PICO field is unaffected — the free
+// text keeps working exactly as it does today.
 
 import { createHash } from "node:crypto";
 import type { CollectBlock, CollectCtx, RawDoc, SourceOption, Target } from "@/lib/collect/types";
@@ -52,8 +59,29 @@ const REGISTRY_OPTION: SourceOption = {
     { value: "arxiv", label: "arXiv（預印本，最新）" },
     { value: "crossref", label: "Crossref（DOI 註冊處，引用資料最權威）" },
   ],
-  help: "三個都免金鑰。不確定就用 OpenAlex。",
+  help:
+    "三個都免金鑰。不確定就用 OpenAlex。PICO 欄位的 AND／OR 對 OpenAlex 與 arXiv 是真布林查詢；" +
+    "Crossref 不支援布林語法，PICO 欄位會被當一般關鍵字比對，精準度較低。",
 };
+
+/**
+ * PICO, as options rather than prose. Every field is OPTIONAL (validateSourceConfig only enforces
+ * `required: true` fields) — an operator who sets none of these gets exactly today's free-text
+ * behaviour; see buildPicoQuery for what filling them in actually does to the query.
+ *
+ * Each string field takes a comma-separated list of synonyms ("older adults, elderly") rather than
+ * pre-written boolean syntax, on purpose: an operator picking a research question apart into PICO
+ * should not also have to know this collector's query language.
+ */
+const PICO_OPTIONS: SourceOption[] = [
+  { key: "picoPopulation", label: "族群／對象（PICO：P）", type: "string", help: "同義詞用逗號分隔，會轉成 OR。留空則不限定。" },
+  { key: "picoIntervention", label: "介入或暴露（PICO：I）", type: "string", help: "同義詞用逗號分隔。" },
+  { key: "picoComparison", label: "比較對照（PICO：C）", type: "string", help: "沒有對照組（例如單組研究）就留空——填了會要求論文也提到這個對照。" },
+  { key: "picoOutcome", label: "結果指標（PICO：O）", type: "string", help: "同義詞用逗號分隔。" },
+  { key: "picoStudyType", label: "研究類型", type: "string", help: "例如「randomized controlled trial, systematic review」，逗號分隔多個（OR）。" },
+  { key: "picoYearFrom", label: "發表年份下限", type: "number", help: "留空不限。" },
+  { key: "picoYearTo", label: "發表年份上限", type: "number", help: "留空不限。" },
+];
 
 /** OpenAlex stores abstracts as an inverted index, for reasons of its own. */
 export function abstractFromInvertedIndex(index: Record<string, number[]> | null | undefined): string | null {
@@ -207,7 +235,95 @@ function queryOf(t: Target): string {
   return t.hint ?? "";
 }
 
+export interface PicoFields {
+  population?: string;
+  intervention?: string;
+  comparison?: string;
+  outcome?: string;
+  studyType?: string;
+}
+
+/**
+ * One field's value, read as a comma-separated list of synonyms and OR'd together —
+ * "diabetes, type 2 diabetes" becomes `("diabetes" OR "type 2 diabetes")`. A single term needs no
+ * parentheses. Multi-word terms are quoted so the shared boolean syntax (OpenAlex and arXiv both
+ * document double-quote phrase search) reads them as one phrase rather than N separately-ANDed words.
+ */
+function orTerms(value: string | undefined): string | null {
+  const terms = (value ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => (t.includes(" ") ? `"${t}"` : t));
+  if (!terms.length) return null;
+  return terms.length === 1 ? terms[0] : `(${terms.join(" OR ")})`;
+}
+
+/**
+ * PICO turned into one boolean query: non-empty fields are ANDed, each field's own synonyms are
+ * OR'd (orTerms). Pure and registry-agnostic on purpose — what OpenAlex/arXiv/Crossref each do with
+ * the resulting string is buildSearchUrl's concern, not this one's.
+ *
+ * Empty input (no PICO field set) returns "" — the caller falls back to the free-text query, so an
+ * operator who never touches these fields sees no change at all.
+ */
+export function buildPicoQuery(fields: PicoFields): string {
+  return [orTerms(fields.population), orTerms(fields.intervention), orTerms(fields.comparison), orTerms(fields.outcome), orTerms(fields.studyType)]
+    .filter((c): c is string => c !== null)
+    .join(" AND ");
+}
+
+/** Pulls PICO fields off a Target's meta, tolerating anything that is not a non-empty string. */
+function picoFieldsOf(meta: Record<string, unknown> | undefined): PicoFields {
+  const str = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
+  return {
+    population: str(meta?.picoPopulation),
+    intervention: str(meta?.picoIntervention),
+    comparison: str(meta?.picoComparison),
+    outcome: str(meta?.picoOutcome),
+    studyType: str(meta?.picoStudyType),
+  };
+}
+
+export interface YearRange {
+  from?: number;
+  to?: number;
+}
+
+/** picoYearFrom/picoYearTo off a Target's meta. Returns undefined when neither is a usable year. */
+function yearRangeOf(meta: Record<string, unknown> | undefined): YearRange | undefined {
+  const year = (v: unknown): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const from = year(meta?.picoYearFrom);
+  const to = year(meta?.picoYearTo);
+  return from || to ? { from, to } : undefined;
+}
+
 export type SortBy = "relevance" | "date";
+
+/**
+ * arXiv's own documented range syntax is a field, not a filter: `submittedDate:[FROM TO TO]` joins
+ * the rest of the query with a plain AND (see e.g. the manual's `au:X AND submittedDate:[...]`
+ * example) — there is no separate date-filter parameter the way OpenAlex/Crossref have one.
+ * Open-ended bounds use sentinels rather than a wildcard: arXiv's docs show only fully-bounded
+ * ranges, and guessing wildcard support here is exactly the kind of API behaviour AGENTS.md says to
+ * verify, not assume. 1991-01-01 predates arXiv itself; 2099-12-31 will outlive this file.
+ */
+function arxivDateClause(range: YearRange | undefined): string {
+  if (!range || (!range.from && !range.to)) return "";
+  const from = range.from ? `${range.from}0101` : "19910101";
+  const to = range.to ? `${range.to}1231` : "20991231";
+  return ` AND submittedDate:[${from}0000 TO ${to}2359]`;
+}
+
+/** OpenAlex's and Crossref's date filters, both `&filter=key:YYYY-MM-DD,key2:YYYY-MM-DD` in shape. */
+function dateFilterParam(fromKey: string, toKey: string, range: YearRange | undefined): string {
+  if (!range || (!range.from && !range.to)) return "";
+  const parts = [range.from ? `${fromKey}:${range.from}-01-01` : null, range.to ? `${toKey}:${range.to}-12-31` : null].filter(Boolean);
+  return `&filter=${parts.join(",")}`;
+}
 
 /**
  * Sorting by date on a broad query returns junk, and this was measured rather than assumed: a live
@@ -224,22 +340,25 @@ export function buildSearchUrl(
   limit: number,
   email: string | null,
   sortBy: SortBy = "relevance",
+  yearRange?: YearRange,
 ): string {
-  const q = encodeURIComponent(query);
   const mailto = email ? `&mailto=${encodeURIComponent(email)}` : "";
   switch (registry) {
     case "arxiv": {
       const sort = sortBy === "date" ? "submittedDate" : "relevance";
+      const q = encodeURIComponent(`${query}${arxivDateClause(yearRange)}`);
       return `https://export.arxiv.org/api/query?search_query=all:${q}&start=0&max_results=${limit}&sortBy=${sort}&sortOrder=descending`;
     }
     case "crossref": {
       const sort = sortBy === "date" ? "&sort=published&order=desc" : "&sort=relevance";
-      return `https://api.crossref.org/works?query=${q}&rows=${limit}${sort}${mailto}`;
+      const q = encodeURIComponent(query);
+      return `https://api.crossref.org/works?query=${q}&rows=${limit}${sort}${mailto}${dateFilterParam("from-pub-date", "until-pub-date", yearRange)}`;
     }
     case "openalex":
     default: {
       const sort = sortBy === "date" ? "publication_date:desc" : "relevance_score:desc";
-      return `https://api.openalex.org/works?search=${q}&per-page=${limit}&sort=${sort}${mailto}`;
+      const q = encodeURIComponent(query);
+      return `https://api.openalex.org/works?search=${q}&per-page=${limit}&sort=${sort}${mailto}${dateFilterParam("from_publication_date", "to_publication_date", yearRange)}`;
     }
   }
 }
@@ -295,7 +414,7 @@ export const academicCollector: CollectBlock = {
 
   describe: {
     kind: "academic",
-    summary: "用一句查詢追一個研究主題，取回論文的題名、作者、期刊、DOI 與摘要。三個來源都免金鑰。",
+    summary: "用一句查詢追一個研究主題，或用 PICO 欄位精準組查詢，取回論文的題名、作者、期刊、DOI 與摘要。三個來源都免金鑰。",
     entry: "query",
     queryScheme: "academic",
     options: [
@@ -325,6 +444,7 @@ export const academicCollector: CollectBlock = {
         default: false,
         help: "打開後，沒有免費全文的論文不會進知識庫（仍可看到它存在）。",
       },
+      ...PICO_OPTIONS,
     ],
   },
 
@@ -333,7 +453,10 @@ export const academicCollector: CollectBlock = {
   },
 
   async run(t: Target, ctx: CollectCtx): Promise<{ docs: RawDoc[]; discovered: Target[] }> {
-    const query = queryOf(t);
+    // PICO takes over the query the moment any field is filled in — see the file header for why
+    // this is a replacement rather than a combination. Falls through to the free-text query exactly
+    // as before when no PICO field is set (buildPicoQuery returns "" for an all-empty input).
+    const query = buildPicoQuery(picoFieldsOf(t.meta)) || queryOf(t);
     if (!query) throw Object.assign(new Error("academic_query_missing"), { status: 400 });
 
     const registry = (t.meta?.registry as Registry) ?? "openalex";
@@ -342,7 +465,7 @@ export const academicCollector: CollectBlock = {
     const requireAbstract = t.meta?.requireAbstract !== false;
 
     const sortBy: SortBy = t.meta?.sortBy === "date" ? "date" : "relevance";
-    const res = await ctx.fetch(buildSearchUrl(registry, query, limit, contactEmail(), sortBy));
+    const res = await ctx.fetch(buildSearchUrl(registry, query, limit, contactEmail(), sortBy, yearRangeOf(t.meta)));
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status} ${registry}`), { status: res.status });
 
     let papers: Paper[];

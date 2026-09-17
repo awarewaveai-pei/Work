@@ -19,6 +19,7 @@ import { sourceCatalogue, validateSourceConfig, catalogueEntry } from "@/lib/col
 import {
   academicCollector,
   abstractFromInvertedIndex,
+  buildPicoQuery,
   buildSearchUrl,
   parseArxivFeed,
 } from "@/lib/collect/collectors/academic";
@@ -227,6 +228,98 @@ describe("collect/academic", () => {
     const { discovered } = await academicCollector.run(target("academic://open%20access", { meta: {} }), ctx);
     expect(discovered).toHaveLength(1);
     expect(discovered[0].scope.hosts).toEqual(["arxiv.org"]);
+  });
+
+  describe("PICO structuring", () => {
+    it("builds a boolean query — AND across fields, OR (with quoting) within one", () => {
+      const q = buildPicoQuery({
+        population: "type 2 diabetes",
+        intervention: "metformin",
+        outcome: "HbA1c, glycemic control",
+      });
+      expect(q).toBe('"type 2 diabetes" AND metformin AND (HbA1c OR "glycemic control")');
+    });
+
+    it("skips a field that was left out, with no stray AND", () => {
+      expect(buildPicoQuery({ population: "adults", outcome: "mortality" })).toBe("adults AND mortality");
+    });
+
+    it("returns empty for no PICO fields, so the caller falls back to free text", () => {
+      expect(buildPicoQuery({})).toBe("");
+      expect(buildPicoQuery({ population: "", intervention: "   " })).toBe("");
+    });
+
+    it("adds a real per-registry date filter when a year range is given, and nothing when it isn't", () => {
+      expect(buildSearchUrl("openalex", "rag", 10, null, "relevance", { from: 2020, to: 2023 })).toContain(
+        "filter=from_publication_date:2020-01-01,to_publication_date:2023-12-31",
+      );
+      expect(buildSearchUrl("crossref", "rag", 10, null, "relevance", { from: 2020 })).toContain(
+        "filter=from-pub-date:2020-01-01",
+      );
+      expect(
+        decodeURIComponent(buildSearchUrl("arxiv", "rag", 10, null, "relevance", { from: 2020, to: 2023 })),
+      ).toContain("submittedDate:[202001010000 TO 202312312359]");
+      // No range given ⇒ byte-identical to the pre-PICO shape — regression safety for every existing caller.
+      expect(buildSearchUrl("openalex", "rag", 10, null)).not.toContain("filter=");
+      expect(buildSearchUrl("openalex", "rag", 10, "ops@aware-wave.com")).toContain("api.openalex.org/works?search=rag");
+    });
+
+    it("exposes PICO as optional catalogue options, so a source configured before this feature still validates", () => {
+      const entry = catalogueEntry("collect/academic", {})!;
+      for (const key of [
+        "picoPopulation",
+        "picoIntervention",
+        "picoComparison",
+        "picoOutcome",
+        "picoStudyType",
+        "picoYearFrom",
+        "picoYearTo",
+      ]) {
+        const opt = entry.options!.find((o) => o.key === key);
+        expect(opt, `${key} missing from the catalogue`).toBeTruthy();
+        expect(opt!.required, `${key} must stay optional — PICO is additive, not a forced replacement`).not.toBe(true);
+      }
+      expect(validateSourceConfig("collect/academic", { entry: "diabetes", options: {} }, {}).ok).toBe(true);
+    });
+
+    function fetchCapturingUrl(): { ctx: Parameters<typeof academicCollector.run>[1]; urlOf: () => string } {
+      let calledUrl = "";
+      const ctx = {
+        canonicalize: (u: string) => u,
+        fetch: (async (url: string) => {
+          calledUrl = url;
+          return new Response(JSON.stringify({ results: [] }), { headers: { "content-type": "application/json" } });
+        }) as never,
+        budget: createBudget(),
+        tenantRef: ORG,
+        log: () => {},
+      };
+      return { ctx, urlOf: () => calledUrl };
+    }
+
+    it("run() lets PICO fields take over the query the moment any is filled in", async () => {
+      const { ctx, urlOf } = fetchCapturingUrl();
+      const t = target(`academic://${encodeURIComponent("this free text must be ignored")}`, {
+        meta: { picoPopulation: "adults", picoOutcome: "mortality" },
+      });
+      await academicCollector.run(t, ctx);
+      expect(decodeURIComponent(urlOf())).toContain("search=adults AND mortality");
+      expect(urlOf()).not.toContain(encodeURIComponent("this free text must be ignored"));
+    });
+
+    it("run() still uses the free-text query when no PICO field is set — unchanged behaviour", async () => {
+      const { ctx, urlOf } = fetchCapturingUrl();
+      const t = target(`academic://${encodeURIComponent("retrieval augmented generation")}`, { meta: {} });
+      await academicCollector.run(t, ctx);
+      expect(decodeURIComponent(urlOf())).toContain("search=retrieval augmented generation");
+    });
+
+    it("run() ignores a non-string PICO value instead of throwing", async () => {
+      const { ctx, urlOf } = fetchCapturingUrl();
+      const t = target(`academic://${encodeURIComponent("fallback text")}`, { meta: { picoPopulation: 123 } });
+      await academicCollector.run(t, ctx);
+      expect(decodeURIComponent(urlOf())).toContain("search=fallback text");
+    });
   });
 });
 
