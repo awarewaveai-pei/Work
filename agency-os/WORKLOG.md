@@ -1,4 +1,34 @@
 # Worklog
+## 2026-09-17（續6）K2j 依資料夾收合卡片：實作＋critic 修復（1 Major/2 Minor）＋render 測試
+
+[任務] 續5 完成 K2h（資料夾+分頁搜尋）／K2i（精確/模糊關鍵字）後，接著做 K2j——操作者原始四點抱怨的第三點「彙整」，稍早已用 AskUserQuestion 定案為「畫面收合卡片」（非 AI 合併改寫）。
+
+[已寫入] `ClientHubTabs.tsx`：純函式 `groupByFolder`（依 `folderId` 分組，null 用 `UNFILED_GROUP_KEY` sentinel，保留每組首次出現順序）；`KnowledgeTab` 內文件列表從單層 `sources.map` 改成 `groupByFolder(sources).map(...)` 巢狀渲染，每組一個可收合標題（≤3 筆預設展開、>3 筆預設收合，`expandedGroups` state 記錄手動覆蓋）；只有一個分組時（未用資料夾，或篩選後全部同一資料夾）不顯示標題，維持原本逐筆列出，零視覺變化。純前端，對已抓回的當頁資料（K2h 分頁）重組，不加查詢。
+
+[Critic 覆審 1 輪，findings 全數修復]：
+- 🟠 Major：宣稱驗證只做了純函式單元測試 + tsc，沒有真的 mount 過 `KnowledgeTab` 組件本身驗證收合/展開的 DOM 行為——同目錄 `KnowledgeDetailModal.test.tsx` 已有免登入、免真伺服器的 jsdom mount 範式可直接複用。→ 補 `KnowledgeTab.render.test.tsx`（5 個測試，mount 真組件、stub fetch，驗證多分組渲染／小分組預設展開／大分組預設收合＋點擊展開再點收合／單分組時零標題／未分類分組）。撰寫過程中這個測試本身抓到一個測試設計陷阱：資料夾篩選 pill（頂部）跟分組標題（清單內）文字都含資料夾名稱，`.find()` 一開始抓到錯的按鈕——用分組標題獨有的「（N）」計數字尾修正選取條件。
+- 🟡 Minor：收合切換用了 closure 裡的 `isExpanded`（render-time 值）而非 updater 自己的 `g[key]`，同一 render cycle 內兩次點擊會有一次變 no-op——改成從 updater 的前值算。
+- 🟡 Minor：「資料夾已刪除」文案在 schema 上不可能觸發（`folder_id` 依 migration 0085 是 `ON DELETE SET NULL`，刪資料夾只會讓文件變未分類，不會留著已刪除的 id）——改成「資料夾清單尚未同步」，並加註解說明唯一可能觸發時機是 `reloadFolders()` 尚未完成或失敗。
+- 🔵 Suggestion（未修，記錄即可）：collapsible 標題按鈕缺 `aria-expanded`；跨頁分組各自獨立展開狀態（已有註解揭露為刻意取捨）；`expandedGroups` 跟其他 tab 內 state 一樣未在切換客戶時重置（既有模式，非本次引入）。
+- 順手修正：手動多步驟 Edit 造成的縮排飄移（`items.map` 整段比同層 JSX 少縮 8 格，manually brace-trace 確認邏輯無誤但視覺易誤判）——Python 腳本精準對指定行號區間統一 +8 空白，非跑全域 prettier（此檔案無 prettier 設定，跑了會產生大量無關格式異動）。
+
+[REALTEST]：`npx tsc --noEmit`（clean）；`npx vitest run`（next-admin 全專案）1234 passed／8 skipped（既有 skip）／0 failed（本次新增 9 個測試：groupByFolder 4 個 + KnowledgeTab.render 5 個）。未做真實瀏覽器登入點擊（ops console 需要登入憑證，未取得也不主動索取）——已於回覆中明確告知操作者此限制，改以 jsdom mount 測試覆蓋實際渲染/互動行為。
+
+[已修改／新增檔案]：`ClientHubTabs.tsx`（改）；`__tests__/groupByFolder.test.ts`、`__tests__/KnowledgeTab.render.test.tsx`（新增）；`agency-os/docs/knowledge-base/KNOWLEDGE_BASE_PLAN.md`（K2j 標記已完成）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全專案） | exit=0 | result=1234 passed/8 skipped/0 failed
+- REVIEW_DONE: critic=Standard | verdict=pass（1 輪，1 Major+2 Minor 全修復，3 Suggestion 記錄不修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`groupByFolder\|UNFILED_GROUP_KEY\|expandedGroups\|KnowledgeTab\b` | hits=23（逐一核對，無殘留）
+
+[剩餘風險]：ops console 需登入憑證，無法在此環境做真實瀏覽器點擊驗證（已告知操作者）；跨分頁分組展開狀態不延續（設計取捨，已註解揭露）。
+
+[Rollback]：純前端改動，revert commit 即可還原逐筆列出，無資料異動。
+
+[WORKLOG_DONE]: K2j
+
+
 ## 2026-09-17｜Cognitive OS prod redeploy #2: gap closure live
 
 - 部署 commits 007d2aa15 + 5bc8f6fff（deploy.sh：129 tests passed→build→healthy 6s→local/public smoke PASS）。

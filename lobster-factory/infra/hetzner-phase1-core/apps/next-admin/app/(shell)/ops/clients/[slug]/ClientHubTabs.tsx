@@ -1317,7 +1317,28 @@ function folderPillStyle(active: boolean): CSSProperties {
   };
 }
 
-function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
+// K2j (operator decision 2026-09-17: "彙整" = UI-collapse cards, NOT AI-merged/rewritten text — zero
+// extra inference cost). Groups the CURRENT PAGE's rows by folder — reusing K2h's folder_id rather
+// than inventing a similarity metric, which would tread on K2n's deliberately-deferred semantic-dedup
+// territory (KNOWLEDGE_BASE_PLAN.md §K2n). Client-side only: pagination already bounds the input to
+// one page, so this never needs its own query.
+export const UNFILED_GROUP_KEY = "__unfiled__";
+
+export function groupByFolder<T extends { folderId: string | null }>(items: T[]): Array<{ key: string; items: T[] }> {
+  const order: string[] = [];
+  const byKey = new Map<string, T[]>();
+  for (const item of items) {
+    const key = item.folderId ?? UNFILED_GROUP_KEY;
+    if (!byKey.has(key)) { byKey.set(key, []); order.push(key); }
+    byKey.get(key)!.push(item);
+  }
+  return order.map((key) => ({ key, items: byKey.get(key)! }));
+}
+
+// Exported for __tests__/groupByFolder.test.ts's sibling render test (KnowledgeTab.render.test.tsx) —
+// matches this directory's own convention of jsdom-rendering a "use client" component directly
+// (KnowledgeDetailModal.test.tsx), not a new testing approach.
+export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
   const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; canonicalUrl: string | null; folderId: string | null; keywordMode: string; chunks: number }>>([]);
   const [kbDefault, setKbDefault] = useState<"fuzzy" | "exact">("fuzzy"); // K2i tenant-wide default
@@ -1327,6 +1348,9 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [folderFilter, setFolderFilter] = useState<string | null>(null); // null = 全部
+  // K2j: explicit expand/collapse override per group key; absent = default heuristic (small groups
+  // start open, large ones start collapsed — see the render below).
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [newFolderName, setNewFolderName] = useState("");
   const [newFolderParentId, setNewFolderParentId] = useState(""); // "" = 頂層
@@ -1613,68 +1637,98 @@ function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
         {sources.length > 0 && (
           <div style={{ marginBottom: 10 }}>
-            {sources.map((s) => (
-              <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <button
-                    onClick={() => setViewingId(s.id)}
-                    title="檢視內容"
-                    style={{ flex: 1, textAlign: "left", fontWeight: 500, border: "none", background: "none", color: "var(--text-primary)", cursor: "pointer", padding: 0, font: "inherit", textDecoration: "underline", textDecorationColor: "var(--border-subtle)" }}
-                  >
-                    {s.title}
-                  </button>
-                  {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
-                  {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
-                  <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
-                  <select
-                    value={s.folderId ?? ""}
-                    onChange={(e) => moveToFolder(s.id, e.target.value || null)}
-                    title="搬移到資料夾"
-                    style={{ fontSize: 10, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", maxWidth: 110 }}
-                  >
-                    <option value="">未分類</option>
-                    {folderTreeOrder(folders).map((f) => <option key={f.id} value={f.id}>{"　".repeat(f.depth)}{f.name}</option>)}
-                  </select>
-                  <select
-                    value={s.keywordMode}
-                    onChange={(e) => setRowKeywordMode(s.id, e.target.value)}
-                    title="關鍵字比對模式（覆蓋租戶預設）"
-                    style={{ fontSize: 10, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)" }}
-                  >
-                    <option value="inherit">跟隨租戶</option>
-                    <option value="exact">精確</option>
-                    <option value="fuzzy">模糊</option>
-                  </select>
-                  <button onClick={() => archiveKnowledge(s.id)} title="封存（從 AI 檢索範圍移除，資料保留，可復原）"
-                    style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>
-                    封存
-                  </button>
-                  <button onClick={() => delKnowledge(s.id)} title="永久刪除（無法恢復）" aria-label="永久刪除"
-                    style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
-                </div>
-                {!s.canonicalUrl ? (
-                  //手動文件才會出現：開爬前先補上真實網址，爬蟲抓到同一網址時才會認成同一份文件的新版本，
-                  // 而不是多一份互相矛盾的內容（TASKS.md 2026-09-11「人工上傳 vs 爬蟲抓回」，操作者選項 A）。
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, paddingLeft: 4 }}>
-                    <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>手動文件，尚無網址</span>
-                    <input
-                      value={rebindDraft[s.id] ?? ""}
-                      onChange={(e) => setRebindDraft((d) => ({ ...d, [s.id]: e.target.value }))}
-                      placeholder="開爬前先補上這篇對應的真實網址（可留白）"
-                      style={{ flex: 1, fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }}
-                    />
-                    <button
-                      onClick={() => rebindKnowledge(s.id)}
-                      disabled={rebindBusy === s.id || !(rebindDraft[s.id] ?? "").trim()}
-                      style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4, flexShrink: 0, opacity: rebindBusy === s.id || !(rebindDraft[s.id] ?? "").trim() ? 0.5 : 1 }}
-                    >
-                      設定真實網址
-                    </button>
+            {(() => {
+              const groups = groupByFolder(sources);
+              const showHeaders = groups.length > 1; // one group only (e.g. no folders used yet) -> flat list, unchanged from pre-K2j
+              return groups.map(({ key, items }) => {
+                // A folder_id can never point at a deleted folder (ON DELETE SET NULL, migration
+                // 0085) — this fallback is reachable only while `folders` hasn't loaded/synced yet,
+                // never because the folder is actually gone (critic finding 2026-09-17).
+                const groupName = key === UNFILED_GROUP_KEY ? "未分類" : (folders.find((f) => f.id === key)?.name ?? "（資料夾清單尚未同步）");
+                const isExpanded = expandedGroups[key] ?? items.length <= 3; // small groups start open, large ones start collapsed
+                return (
+                  <div key={key}>
+                    {showHeaders && (
+                      <button
+                        // Derives the toggle target from the updater's own previous-state
+                        // parameter, not the closed-over `isExpanded` — two toggles landing in the
+                        // same render cycle would otherwise both compute `!isExpanded` from the same
+                        // stale value, making the second one a no-op instead of toggling back
+                        // (critic finding 2026-09-17).
+                        onClick={() => setExpandedGroups((g) => ({ ...g, [key]: !(g[key] ?? items.length <= 3) }))}
+                        style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", border: "none", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "5px 8px", borderRadius: 6, margin: "4px 0" }}
+                      >
+                        <span>{isExpanded ? "▾" : "▸"}</span>
+                        <span>📁 {groupName}</span>
+                        <span style={{ color: "var(--text-muted)" }}>（{items.length}）</span>
+                      </button>
+                    )}
+                    {(!showHeaders || isExpanded) && items.map((s) => (
+                      <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <button
+                            onClick={() => setViewingId(s.id)}
+                            title="檢視內容"
+                            style={{ flex: 1, textAlign: "left", fontWeight: 500, border: "none", background: "none", color: "var(--text-primary)", cursor: "pointer", padding: 0, font: "inherit", textDecoration: "underline", textDecorationColor: "var(--border-subtle)" }}
+                          >
+                            {s.title}
+                          </button>
+                          {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
+                          {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
+                          <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
+                          <select
+                            value={s.folderId ?? ""}
+                            onChange={(e) => moveToFolder(s.id, e.target.value || null)}
+                            title="搬移到資料夾"
+                            style={{ fontSize: 10, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", maxWidth: 110 }}
+                          >
+                            <option value="">未分類</option>
+                            {folderTreeOrder(folders).map((f) => <option key={f.id} value={f.id}>{"　".repeat(f.depth)}{f.name}</option>)}
+                          </select>
+                          <select
+                            value={s.keywordMode}
+                            onChange={(e) => setRowKeywordMode(s.id, e.target.value)}
+                            title="關鍵字比對模式（覆蓋租戶預設）"
+                            style={{ fontSize: 10, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)" }}
+                          >
+                            <option value="inherit">跟隨租戶</option>
+                            <option value="exact">精確</option>
+                            <option value="fuzzy">模糊</option>
+                          </select>
+                          <button onClick={() => archiveKnowledge(s.id)} title="封存（從 AI 檢索範圍移除，資料保留，可復原）"
+                            style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>
+                            封存
+                          </button>
+                          <button onClick={() => delKnowledge(s.id)} title="永久刪除（無法恢復）" aria-label="永久刪除"
+                            style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
+                        </div>
+                        {!s.canonicalUrl ? (
+                          //手動文件才會出現：開爬前先補上真實網址，爬蟲抓到同一網址時才會認成同一份文件的新版本，
+                          // 而不是多一份互相矛盾的內容（TASKS.md 2026-09-11「人工上傳 vs 爬蟲抓回」，操作者選項 A）。
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, paddingLeft: 4 }}>
+                            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>手動文件，尚無網址</span>
+                            <input
+                              value={rebindDraft[s.id] ?? ""}
+                              onChange={(e) => setRebindDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                              placeholder="開爬前先補上這篇對應的真實網址（可留白）"
+                              style={{ flex: 1, fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }}
+                            />
+                            <button
+                              onClick={() => rebindKnowledge(s.id)}
+                              disabled={rebindBusy === s.id || !(rebindDraft[s.id] ?? "").trim()}
+                              style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4, flexShrink: 0, opacity: rebindBusy === s.id || !(rebindDraft[s.id] ?? "").trim() ? 0.5 : 1 }}
+                            >
+                              設定真實網址
+                            </button>
+                          </div>
+                        ) : null}
+                        {rebindMsg[s.id] ? <div style={{ fontSize: 10, color: "var(--red)", marginTop: 2, paddingLeft: 4 }}>{rebindMsg[s.id]}</div> : null}
+                      </div>
+                    ))}
                   </div>
-                ) : null}
-                {rebindMsg[s.id] ? <div style={{ fontSize: 10, color: "var(--red)", marginTop: 2, paddingLeft: 4 }}>{rebindMsg[s.id]}</div> : null}
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         )}
         {sources.length === 0 && !loading && (
