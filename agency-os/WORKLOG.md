@@ -33,6 +33,16 @@
 
 [rollback] 全新檔案（compose+2個Dockerfile+2個腳本+1個測試），`git revert` 該 commit 即可完全復原，未部署到任何共用/正式環境，不影響任何既有服務。
 
+## 2026-09-17｜Cognitive OS prod redeploy #3: AI Gateway + 引導式 UI 上線
+
+- 部署 commit d41a7cfa1（deploy.sh：typecheck→test gate→build→up→healthy 6s→local/public smoke PASS；`:rollback` = 今日上午 gap-closure 版）。AI key 以 ssh stdin 寫入主機 `deploy/.env`（600，ubuntu），不進指令列、不進 git；容器 env 含 `COGNITIVE_OS_ANTHROPIC_API_KEY` 與 allowlist `api.openalex.org,api.anthropic.com`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo git reset --hard d41a7cfa1 && bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh` on ks-aw-01 | exit=0 | ms=~340000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad/prod_verify_ai.py`（login→GET /ai/status→GET draft-plan→POST /ai/draft/method/systems.flowchart（真 Anthropic）→POST /invoke→POST /methods/decision.mcda/invoke {}→GET /→logout）| exit=0 | ms=~25000 | result=configured=true model=claude-sonnet-5；起草 1 輪 PASS 19.8s 2224/1249 tokens；invoke gates PASS/PASS；mcda 空 body 400（原 501）；ai_usage calls=1；首頁 200 含「AI 起草」、X-Frame-Options DENY。注意：Cloudflare 對 python-urllib 預設 UA 回 403 error 1010，驗證腳本需帶瀏覽器 UA。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit -q`（排除已單跑的 4 檔）| exit=0 | ms=~2400000 | result=13711 passed, 0 failed, 2331 subtests passed in 1545.55s
+- REVIEW_WAIVED: DOC_ONLY -- 本條目僅部署紀錄（程式 critic 見上一條目）
+- BUGHUNT_WAIVED: DOC_ONLY
+- rollback：ks-aw-01 `cd /opt/cognitive-os/Projects/internal/cognitive-engineering-os && docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d`。
+
 ## 2026-09-17｜Cognitive OS AI Gateway：白話描述→AI 起草→方法閘門驗證；新引導式 UI；42 個方法 /invoke 501 治本
 
 - 操作者：「對! 全部去完成!」+「這個垃圾東西我怎麼使用」（dashboard 要手貼 JSON，因為迴圈裡沒有 AI）。本輪落地 Master Plan §7 AI Gateway 第一份內容 + 重做 UI。
