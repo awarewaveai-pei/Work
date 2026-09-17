@@ -40,6 +40,7 @@ column. Do not compute "next free" from any other file.**
 | `H1019` | Epistemic promotion `UNKNOWN`/`HYPOTHESIS` -> `SOURCE_FACT` on a superseding Claim without a human verifier (`epistemic_verifier_principal_id`) - the `epistemic-label.schema.yaml` `forbidden_transition`, ADR-0019 gate 5 / `NEG-HD08-04` | RAISED | `hci.enforce_claim_state_admission()` | `migrations/0010_wave1_epistemic_label_up.sql` |
 | `H1020` | `record_decision()`'s `case_id` argument does not belong to the caller's own tenant | RAISED — db-expert review (2026-09-08) found the first draft reused `H1001` here, a distinct referential/tenant-mismatch condition from `H1001`'s registered session/authorization-state meaning; split out to avoid the exact collision class this file's own header names as a repeat past incident | `hci.record_decision()` | `migrations/0014_wave1_decision_recording_up.sql` |
 | `H1021` | `record_decision()`'s `principal_id` argument does not belong to the caller's own tenant | RAISED — same review, same reasoning as `H1020`, split into its own code rather than reusing `H1020` since the two conditions test different columns and a caller may need to distinguish which argument was wrong | `hci.record_decision()` | `migrations/0014_wave1_decision_recording_up.sql` |
+| `H1022` | `hci.sources.admission_state` lifecycle transition rejected (must be admitted `DISCOVERED`; only forward transitions per `06_HCI30_PUBLIC_INTELLIGENCE.md:204-213` allowed; `ACTIVE`/`REJECTED` terminal) | RAISED | `hci.enforce_source_admission_transition()` | `migrations/0020_wave1_source_admission_state_up.sql` |
 
 `'H1TST'` is reserved separately for the test-harness sentinel
 (`database/tests/00_test_harness.sql`) and must never be raised by schema
@@ -48,7 +49,7 @@ succeeded" from every real domain code.
 
 ## Next free code
 
-**`H1022`.**
+**`H1023`.**
 
 ## Maintenance rule
 

@@ -1,4 +1,35 @@
 # Worklog
+## 2026-09-17（續5）HCI-30 全權授權後：C6/蒐集器 Task 1 決策 + 蒐集器 Task 2 落地（migration 0020）+ 兩輪覆審全修
+
+[任務] 操作者本輪明確全權授權（"需要決定的事都你決定"），且明確重申 High-STOP 不因整批授權跳過。據此：(1) 親自裁決 C6 Task 1(A)/(B) 與蒐集器 Task 0/1（非 STOP 的決策類任務，決定記錄見下）；(2) 蒐集器 Task 2（`hci.sources` admission_state 狀態機）非身分/RLS 邊界異動，實際建置；(3) C6 Task 3（provisioning endpoint，真身分/RLS 異動）維持 STOP，只做 Task 2 設計審查，不寫程式碼。
+
+[已修改]
+- 新增 `agency-os/reports/decisions/2026-09-17-hci30-c6-and-collector-task1-decisions.md`：4 項裁決（C6 身分傳遞=簽章 handoff token；C6 role 模型=延伸既有 per-tenant role；蒐集器 Task0=org-only 範圍重申；蒐集器 Task1=REJECTED retain-forever 列入既有系統性債務）。
+- 新增 `Projects/internal/hci30/database/migrations/0020_wave1_source_admission_state_{up,down}.sql`：`hci.sources.admission_state` 六態機械狀態機（trigger `hci.enforce_source_admission_transition()`，H1022）、`sources_tenant_ref_unique`、idempotent `hci.upsert_discovered_source(uuid,text)`、`hci.source_snapshots.content_epistemic_type`。
+- `database/fixtures/0001_synthetic.sql`：新增 2 筆 admission_state 專用 fixture（`-310`）。
+- `database/tests/wave1-negative-tests.sql`：新增 21 個斷言（`SRC-ADMIT-*`/`SRC-UPSERT-*`/`SRC-SNAP-EPISTEMIC-*`），`finish(282)`→`finish(302)`。
+- `database/ERROR_CODE_REGISTRY.md`：註冊 H1022，next-free 更新為 H1023。
+- `scripts/test-wave1-local.ps1`、`scripts/mutation-check-wave1.ps1`：補上 migration 0020（兩支腳本都用硬寫變數列舉每個 migration，容易漏掉新的一個）；新增 4 個 mutation（`drop-source-admission-trigger`／`revoke-source-admission-state-update-grant`／`drop-sources-tenant-ref-unique`／`weaken-upsert-resets-admission-state`），並修正既有 `disable-rls-on-sources` mutation 的 expect list。
+- `Projects/internal/hci30/docs/HCI_C6_REAL_LOGIN_PLAN.md`：Task 2 標記已完成，附 db-expert 審查結果全文（5 個 Critical + Major 建議）；Task 3 Input/Output/Boundaries 補上修正項，避免執行者照抄有漏洞的原始草案。
+
+[两輪覆審，皆已處理]
+- `critic`（migration 0020 本身）：0 Critical，3 Major——(1) error registry next-free-code 忘記遞增（已修 H1023）；(2) `upsert_discovered_source` 原始設計信任呼叫端傳入的 `p_tenant_id`，只靠 RLS 擋，跟本 schema `record_decision()`/`set_case_auto_promote_rule_findings()` 既有慣例（從 `hci.current_tenant_id()` 推導）不一致，零 defense-in-depth（已修：移除該參數，函式內部推導，比照既有慣例）；(3) `content_epistemic_type` 預設值原設 EVIDENCE，與 0010 自己訂的「最不可信狀態才是安全預設」規則及本 migration 自己引用的「原始網頁結果不得自動變成正式 Evidence」矛盾（已修：預設改 UNKNOWN）。1 個 Minor（缺 table-inventory drift check，已補）。修正後兩項連鎖影響：`SRC-UPSERT-CROSSTENANT-01` 測試因簽章改變而失去意義，改寫為 `SRC-UPSERT-TENANT-SCOPED-01/02`（驗證同 source_ref 撞另一租戶既有資料時仍正確落在呼叫者自己的租戶）；對應 mutation 的 expect list 一併修正。
+- `db-expert`（C6 Task 2，設計審查，不寫檔）：5 個 Critical——(1) `p_role_name` 由呼叫者指定＝跨租戶劫持漏洞（角色名撞既有角色時會綁錯 tenant）；(2) 缺 `SET row_security = off`，正式環境 `hci_owner` 非 superuser 時會 fail-open/fail-closed；(3) `hci_owner` 不該直接持有 `CREATEROLE`（PG15.8 語意比 PG16 鬆，risk 擴散），改用專職 `hci_provisioner`；(4) 簽章漏 `jurisdiction` 參數，讓 ADR-0012 法遵閘形同虛設；(5) 絕不能對 `wave1-negative-tests.sql` 用的資料庫跑（會炸 `ARCH-PEER-02b` 信任邊界測試）。全部寫入計畫文件供 Task 3（STOP）執行者參考，本輪不寫程式碼。額外發現一個與 C6 無關的既存缺口（`queryAsTenant()` 缺 transaction 包裹，PgBouncer transaction-mode 下有繞過 RLS 風險）——已列入 TASKS.md 追蹤，不在本輪修改（觸碰身分/RLS 邊界程式碼需操作者對此項單獨確認）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/test-wave1-local.ps1`（critic 修正前後各跑一次） | 修正前=13 個 SRC-* 斷言 FAIL（缺 GRANT + search_path，另見下方剩餘風險）；修正後=`HCI Wave 1 local suite PASSED`，302/302 通過，migration 可逆驗證通過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/mutation-check-wave1.ps1`（critic 修正前後各跑一次） | 修正前=4 個新 mutation expect-list 不精確（WEAK/SURVIVED，經修正 expect list 而非放寬判準解決）；修正後=`All 135 mutations killed`
+- REVIEW_DONE: critic=Standard | verdict=pass（3 Major 全修）| findings=0 Critical / 3 Major / 1 Minor / 1 Suggestion
+- REVIEW_DONE: critic=db-expert（設計審查） | verdict=需修正後才能排 Task 3 | findings=5 Critical（已寫入計畫文件） / 4 Major / 2 Minor / 1 Suggestion
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30 | grep=`admission_state\|upsert_discovered_source\|content_epistemic_type\|H1022` | hits=僅本次改動檔案本身 + 3 處既有治理文件（`ADR_INDEX.md`／`ADR-0013-...`／`HCI_WAVE1_NEGATIVE_TEST_SPEC.md`）原本就已預先寫入 `admission_state` 這個觸發詞（驗證了命名跟既有 ADR-0013 gate 5 的既定慣例一致，非巧合），無孤兒引用
+
+[剩餘風險]
+1. 過程中發現本 repo 兩支 real-Docker 驗證腳本（`test-wave1-local.ps1`／`mutation-check-wave1.ps1`）都用硬寫變數逐一列舉每個 migration 檔——新增 migration 時容易忘記同步兩處，本次剛好都補上了，但這是結構性脆弱點，非本次修復範圍。
+2. `queryAsTenant()` 缺 transaction 包裹的既存缺口（見上）已追蹤進 TASKS.md，未修。
+3. C6 provisioning endpoint（Task 3）本身仍是 STOP，即使有了修正後的設計指引，實際程式碼與 migration 需操作者對這一項單獨明示 go-ahead 才能開工。
+
+[rollback] Migration 0020 有對應 down 檔並已 real-Docker 驗證可逆；`git revert` 本次 commit 即可完全復原程式碼與文件，資料庫尚未有任何真實環境套用此 migration。
+
 ## 2026-09-17｜Cognitive OS Gap B: EdD 真文獻搜尋（OpenAlex）+ method kit pilot
 
 - 缺口：`literature_search` 只有合成 fixture adapter；EdD recipe 不是真查文獻。

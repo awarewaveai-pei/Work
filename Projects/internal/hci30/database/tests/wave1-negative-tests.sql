@@ -1923,9 +1923,105 @@ SELECT hci_test.expect_sqlstate('FN-AUTOPROMOTE-CROSSTENANT-PRINCIPAL-01',
 -- expect_success/expect_true), matching the role this file was already in
 -- at the point RLS-COMPLETENESS-01 temporarily left it.
 RESET ROLE;
+SET ROLE hci_app_test_a;
+
+-- ---------------------------------------------------------------------------
+-- hci.sources admission_state lifecycle (0020, HCI_COLLECTOR_DISCOVERED_
+-- PIPELINE_PLAN.md Task 2). Fixture rows -310 (tenant A/B) are dedicated to
+-- this sequence so mutating admission_state cannot couple to SOURCE-RLS-01/
+-- RLS-CLAIM-01, which assert on -300/-301.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_true('SRC-ADMIT-DEFAULT-01',
+  $q$SELECT admission_state = 'DISCOVERED' FROM hci.sources WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$,
+  'a source with admission_state omitted on INSERT must default to DISCOVERED');
+SELECT hci_test.expect_sqlstate('SRC-ADMIT-INSERT-REJECT-01',
+  $q$INSERT INTO hci.sources (id,tenant_id,source_ref,admission_state)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000311','11111111-1111-1111-1111-111111111111','https://example.com/tenant-a-bad-insert','ACTIVE')$q$,
+  'H1022');
+SELECT hci_test.expect_success('SRC-ADMIT-FORWARD-01',
+  $q$UPDATE hci.sources SET admission_state = 'MATCHED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$);
+SELECT hci_test.expect_success('SRC-ADMIT-FORWARD-02',
+  $q$UPDATE hci.sources SET admission_state = 'VERIFIED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$);
+SELECT hci_test.expect_sqlstate('SRC-ADMIT-SKIP-REJECT-01',
+  $q$UPDATE hci.sources SET admission_state = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$,
+  'H1022');
+SELECT hci_test.expect_success('SRC-ADMIT-FORWARD-03',
+  $q$UPDATE hci.sources SET admission_state = 'ACCEPTED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$);
+SELECT hci_test.expect_success('SRC-ADMIT-FORWARD-04',
+  $q$UPDATE hci.sources SET admission_state = 'ACTIVE' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$);
+SELECT hci_test.expect_sqlstate('SRC-ADMIT-TERMINAL-REJECT-01',
+  $q$UPDATE hci.sources SET admission_state = 'MATCHED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$,
+  'H1022');
+
+-- Trigger-layer half: owner connection bypasses the grant layer entirely but
+-- must still hit the state-machine trigger, same reasoning as every
+-- APPEND-ONLY-TRIGGER-0x pair in this file.
+RESET ROLE;
+SELECT hci_test.expect_sqlstate('SRC-ADMIT-TRIGGER-BYPASS-01',
+  $q$UPDATE hci.sources SET admission_state = 'MATCHED' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$,
+  'H1022');
+SET ROLE hci_app_test_a;
+
+-- REJECTED path + terminal, exercised on tenant B's dedicated row so the
+-- ACTIVE-terminal sequence above and this REJECTED-terminal sequence do not
+-- share mutable state.
+SET ROLE hci_app_test_b;
+SELECT hci_test.expect_success('SRC-ADMIT-REJECT-PATH-01',
+  $q$UPDATE hci.sources SET admission_state = 'REJECTED' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000310'$q$);
+SELECT hci_test.expect_sqlstate('SRC-ADMIT-REJECTED-TERMINAL-01',
+  $q$UPDATE hci.sources SET admission_state = 'MATCHED' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000310'$q$,
+  'H1022');
+SET ROLE hci_app_test_a;
+
+-- ---------------------------------------------------------------------------
+-- hci.upsert_discovered_source (0020): idempotent by (tenant_id, source_ref),
+-- must not regress an already-progressed source back to DISCOVERED, must
+-- stay tenant-scoped.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_true('SRC-UPSERT-IDEMPOTENT-01',
+  $q$SELECT hci.upsert_discovered_source('cccccccc-0000-0000-0000-000000000999','https://example.com/tenant-a-source') = 'aaaaaaaa-0000-0000-0000-000000000300'$q$,
+  're-discovering an existing source_ref must return the existing row''s id, not the candidate id');
+SELECT hci_test.expect_true('SRC-UPSERT-NEW-01',
+  $q$SELECT hci.upsert_discovered_source('aaaaaaaa-0000-0000-0000-000000000320','https://example.com/tenant-a-newly-discovered') = 'aaaaaaaa-0000-0000-0000-000000000320'$q$,
+  'a genuinely new source_ref must create a new row using the candidate id');
+SELECT hci_test.expect_true('SRC-UPSERT-NEW-DEFAULT-STATE-01',
+  $q$SELECT admission_state = 'DISCOVERED' FROM hci.sources WHERE id = 'aaaaaaaa-0000-0000-0000-000000000320'$q$,
+  'a source created via upsert must start DISCOVERED like any other insert');
+SELECT hci_test.expect_true('SRC-UPSERT-NO-REGRESS-01',
+  $q$SELECT hci.upsert_discovered_source('cccccccc-0000-0000-0000-000000000998','https://example.com/tenant-a-admission-lifecycle') = 'aaaaaaaa-0000-0000-0000-000000000310'$q$,
+  're-discovering the -310 source_ref (now ACTIVE) must resolve to the same row');
+SELECT hci_test.expect_true('SRC-UPSERT-NO-REGRESS-02',
+  $q$SELECT admission_state = 'ACTIVE' FROM hci.sources WHERE id = 'aaaaaaaa-0000-0000-0000-000000000310'$q$,
+  'the re-discovery upsert above must NOT have reset admission_state back to DISCOVERED');
+-- tenant_id is derived from hci.current_tenant_id(), not caller-supplied
+-- (critic follow-up, 2026-09-17) -- there is no longer a parameter to pass a
+-- wrong tenant through, so the meaningful tenant-isolation proof is that a
+-- source_ref colliding with ANOTHER tenant's existing source still resolves
+-- within the caller's own tenant, never touching or returning tenant B's row.
+SELECT hci_test.expect_true('SRC-UPSERT-TENANT-SCOPED-01',
+  $q$SELECT hci.upsert_discovered_source('cccccccc-0000-0000-0000-000000000997','https://example.com/tenant-b-source') = 'cccccccc-0000-0000-0000-000000000997'$q$,
+  'upserting a source_ref that collides with tenant B''s existing source_ref must create a new row scoped to the caller''s own tenant, not return tenant B''s id');
+SELECT hci_test.expect_true('SRC-UPSERT-TENANT-SCOPED-02',
+  $q$SELECT tenant_id = '11111111-1111-1111-1111-111111111111' FROM hci.sources WHERE id = 'cccccccc-0000-0000-0000-000000000997'$q$,
+  'the new row above must be scoped to the caller''s own tenant');
+
+-- ---------------------------------------------------------------------------
+-- hci.source_snapshots.content_epistemic_type (0020): reuses the kernel's
+-- 11-value epistemic_type domain verbatim (0010's own rule), scoped
+-- separately from the CLAIM-only hci.subject_records.epistemic_label column.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_true('SRC-SNAP-EPISTEMIC-DEFAULT-01',
+  $q$SELECT content_epistemic_type = 'UNKNOWN' FROM hci.source_snapshots WHERE id = 'aaaaaaaa-0000-0000-0000-000000000301'$q$,
+  'a pre-existing snapshot must default to UNKNOWN (least-trusted, 0010''s own rule), not EVIDENCE, after the column is added');
+SELECT hci_test.expect_sqlstate('SRC-SNAP-EPISTEMIC-REJECT-01',
+  $q$INSERT INTO hci.source_snapshots (id,tenant_id,source_id,content_hash,snapshot_ref,content_epistemic_type)
+     VALUES ('aaaaaaaa-0000-0000-0000-000000000330','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000300','sha256:bad-epistemic','s3://synthetic/tenant-a/bad','NOT_A_REAL_VALUE')$q$,
+  '23514');
+
+RESET ROLE;
 
 -- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(282);
+SELECT hci_test.finish(302);

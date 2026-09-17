@@ -1,6 +1,8 @@
 # HCI-30 C6 — 真實登入串接計畫（P9 Task Prompts）
 
 > 來源：`planner` agent 產出，2026-09-17。對應 [`HCI_C1_C10_DECISIONS.md`](HCI_C1_C10_DECISIONS.md) §C6（DEFERRED，2026-09-12 操作者確認「先不動」）。**本文件僅供審閱，非執行授權** — 見下方狀態聲明。
+>
+> **2026-09-17 `db-expert` 審查 Task 1(B)/Task 2 設計，發現 5 個 Critical 缺陷**（見 Task 2 區塊末尾「db-expert 審查結果」）——原始草案的 `provision_tenant_role(p_organization_ref, p_role_name)` 簽章讓呼叫者指定 Postgres role 名稱，是**跨租戶劫持漏洞**；缺 `SET row_security = off` 會在 `hci_owner` 非 superuser 的正式環境 fail-open/fail-closed 都可能發生；`hci_owner` 直接持有 `CREATEROLE` 在 PG15.8 上不安全；缺 `jurisdiction` 參數會讓 ADR-0012 的司法管辖法遵閘形同虛設；此函式絕不能對 `wave1-negative-tests.sql` 用的同一顆資料庫跑（會炸 `ARCH-PEER-02b` 信任邊界測試）。Task 3 執行前必須先套用修正設計，不得照字面實作原始草案。
 
 ## 狀態聲明(優先於以下所有內容)
 
@@ -54,7 +56,7 @@
 - **Acceptance**：兩個決策點都有選定方案 + 至少 2 個淘汰方案的理由；(B) 明確回答「是否相容 `API_CONTRACT_STANDARD.md:15-17`」；操作者確認。
 - **Boundaries**：不決定呼叫方向(已由 contract 定案：portal 呼叫 HCI)；不決定 gateway 路由實作方式(留給 Task 9)；不寫程式碼、不建 migration。
 
-## Task 2: DDL 設計審查(runtime CREATE ROLE) — dispatch to `db-expert`
+## Task 2: DDL 設計審查(runtime CREATE ROLE) — **已完成**（2026-09-17，`db-expert`）
 - **Goal**：審查 Task 1(B) 選定方案的具體 DDL/GRANT 序列是否安全、可回滾、不牴觸既有 RLS。
 - **Scope**：`Projects/internal/hci30/database/` 現有 migrations 唯讀審查；產出審查意見，不改 migration 檔。
 - **Input**：Task 1 決策記錄、`database/migrations/0001_wave1_synthetic_up.sql:278-380`(既有 role/RLS/grant 全貌)。
@@ -62,13 +64,31 @@
 - **Acceptance**：明確列出「若採用此設計，哪些 grant 語句必須在同一個 provisioning transaction 內」；R7 的具體失敗模式與偵測方式。
 - **Boundaries**：不涉及 Task 1(A) 的 session 傳輸設計；不執行任何 DDL。
 
+### db-expert 審查結果（2026-09-17，唯讀，無檔案異動）
+
+原始草案 `hci.provision_tenant_role(p_organization_ref text, p_role_name name) RETURNS uuid` 有 5 個 Critical 缺陷，Task 3 開工前必須先修正設計：
+
+1. **`p_role_name` 由呼叫者指定 = 跨租戶劫持漏洞**。若呼叫端傳入既有角色名（如 `hci_owner`），「idempotent find-or-create」邏輯會跳過 `CREATE ROLE`，直接把該既有角色綁定到新 tenant——任何以該角色連線的既有連線（含 `app/server.mjs` 預設的 `hci_owner` 連線）會被劫持成新租戶身分。**修正**：簽章移除 `p_role_name`，角色名由函式內部依 `tenant_id` 決定性生成（如 `'hci_tenant_' || replace(tenant_id::text,'-','')`），且新增 `H1023`（下一個可用碼，`database/ERROR_CODE_REGISTRY.md`）在命名撞號但綁定的 tenant_id 不同時拒絕。
+2. **缺 `SET row_security = off`**。`hci.tenants` 是 `FORCE ROW LEVEL SECURITY`（`0001:377-379`）；本 repo 既有慣例是每個碰 RLS-forced 表的 `SECURITY DEFINER` 函式都要帶這個設定（`docs/domain/HCI_INVARIANTS.md:226-241`、`DEFINER-RLS-FAILCLOSED-01` 測試、先例 `0013_wave1_key_issuance_up.sql:55`）。在本 schema 自己文件記載的正式環境形狀（`hci_owner` 非 superuser，見 `0014:40-44`）下漏掉這行，find-or-create 的 SELECT 會 fail-open（比對錯 tenant）或 INSERT 直接被 RLS 擋下——provisioning 第一次真實呼叫就不會照設計運作。
+3. **`hci_owner` 直接拿 `CREATEROLE` 在 PG15.8 不安全**。PG16 之前，持有 `CREATEROLE` 的角色可以把「任何」既有非 superuser 角色的成員資格授予「任何」其他角色（含自己），不需要對目標角色有 `ADMIN OPTION`——PG16 才收緊。`hci_owner` 已經是全 schema 的表/函式 owner，若同時擁有 `CREATEROLE`，一個 provisioning 函式裡的 bug 或注入就能拿到整個 schema 的控制權。**修正**：另建 `hci_provisioner` 角色，只給 `CREATEROLE`，不給任何表所有權/BYPASSRLS；provisioning 函式的 owner 設為 `hci_provisioner`，不是 `hci_owner`。
+4. **簽章漏了 `jurisdiction`，讓 ADR-0012 法遵閘形同虛設**。`hci.tenants.jurisdiction`（`0003_wave1_regulatory_market_scope_up.sql:102-110`，denylist CHECK 擋 EU/EEA/GB 等）晚於原始草案引用的 `0001:278-380` 兩個 migration 才加入；草案沒有這個參數，每個真實 provisioning 呼叫都會靜默套用 `DEFAULT 'US'`，CHECK 永遠沒有真實值可擋。Task 3 排程前必須先補這個參數，或明確決定由 Task 4(portal 端) 負責提供。
+5. **絕不能對 `wave1-negative-tests.sql` 用的同一顆資料庫跑**。`database/tests/wave1-negative-tests.sql:1293-1301`(`ARCH-PEER-02b`，ADR-0002 gate 3)會在偵測到 `hci_owner`/`hci_app_test_a`/`hci_app_test_b` 以外的任何角色時直接判定失敗——`infra/local/compose.dev.yml` 通常是開發者手邊唯一的本機 Postgres，Task 3 本機測試時很容易不小心對 `hci_wave1_synthetic` 跑一次真實 provisioning，永久污染這個信任邊界測試的假設。Task 3 必須對獨立的資料庫/實例跑，並考慮加一個 runtime guard（`current_database() = 'hci_wave1_synthetic'` 時直接拒絕 `CREATE ROLE`）。
+
+Major 建議（強烈建議採納，非阻塞）：
+- **不要在 runtime 內省 `information_schema` 重放 0001 的 grant 迴圈**——`hci_app_test_a/b` 的實際權限來自 0001 之後至少 14 個 migration 陸續補的 grant（0002/0004/0006/0008/0010/0012/0013/0014/0016/0017/0018/0019/0020），只重放 0001 會讓新角色權限嚴重不足，而且 runtime 內省沒有本 schema 既有的「hardcoded array + drift 斷言」safety net。**改用群組角色**：建一個 `hci_tenant_role NOLOGIN NOBYPASSRLS`，一次性手動授予完整標準權限集（比照 `hci_app_test_a` 現有權限，人工寫死、人工覆審，符合本 schema 既有慣例），新 per-tenant 角色一律 `GRANT hci_tenant_role TO <new_role>`（預設 `INHERIT`）取得權限——不動 `hci_app_test_a/b` 本身，`hci.current_tenant_id()` 的 `SET ROLE` 解析邏輯完全不受影響，未來新 migration 只需多授權一個群組角色，跟今天兩個角色的模式一致。
+- **`hci.app_tenant_bindings` 缺 `UNIQUE(tenant_id)`**——目前只有 `PRIMARY KEY(role_name)`，沒有東西擋兩個不同角色綁同一個 tenant_id；併發 provisioning 呼叫可能讓一個租戶產生兩個角色。修正：加 `UNIQUE(tenant_id)` 或在 provisioning transaction 開頭用 `pg_advisory_xact_lock` 鎖 `p_organization_ref`。
+- **既有 `queryAsTenant()`（`app/server.mjs:79-88`）的 `SET ROLE`/查詢/`RESET ROLE` 三個陳述式沒有明確 `BEGIN`/`COMMIT` 包裹**——今天安全只是因為 node-postgres 的 `pool.connect()` 把整個生命週期釘在同一條實體連線上；若 Task 9 之後在 HCI 自己的 Postgres 前面加 PgBouncer 且用 transaction pooling mode，三個陳述式可能落在不同 backend 連線，`SET ROLE` 完全無效但不報錯，等於繞過 RLS。這是**現有程式碼的既存缺口，與本次 C6 provisioning 設計無關**，但值得盡早修（包一層明確 transaction），或至少在 Task 9 排程時確認絕不用 transaction pooling mode。此項不阻塞 C6，未經操作者對「觸碰 tenant-resolution 程式碼」單獨確認前不會由本 session 逕自修改。
+- Offboarding 正確順序（單一 transaction）：`DELETE FROM hci.app_tenant_bindings WHERE role_name=...` → `DROP OWNED BY <role>` → `DROP ROLE <role>`。不能比照 `0001_..._down.sql` 的 `DROP SCHEMA CASCADE` 前提（正式環境資料要保留）。
+
+完整報告已存於本 session 紀錄，未落地成獨立檔案（純審查意見，Task 3 執行時直接依上述修正項設計即可，不需要另外去翻報告全文）。
+
 ## Task 3: HCI 端 provisioning adapter endpoint(建 Tenant + role) — dispatch to `fullstack-engineer` — **STOP(credentials/權限管理 + RLS 隔離邊界，需操作者對本項單獨 go-ahead)**
 - **Goal**：新增一個 service-to-service endpoint，收到 portal 的 provisioning 請求後 idempotent 建立/取回 HCI Tenant，runtime 建立對應 Postgres role 並寫入 `hci.app_tenant_bindings`，回傳 `tenant_id`。
 - **Scope**：`Projects/internal/hci30/app/`(新 route)、`Projects/internal/hci30/api/openapi/hci-v1.yaml`(新增此 endpoint 的 schema)、必要的新 migration(僅限「新增」不改既有表，若 Task 1(B) 判定需要改 `hci.current_tenant_id()` 則不在此任務範圍，見 Boundaries)。
-- **Input**：Task 1(B) 決策、Task 2 審查意見、`HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md:24-32`(provisioning/lifecycle 表：duplicate request 必須回同一 tenant_id 且僅限同一 claimant、fail-closed)、`HCI_WAVE1_NEGATIVE_TEST_SPEC.md:12-14`。
-- **Output**：新 endpoint(含 auth：沿用 `middleware.ts:58-67` shared-secret 模式，新建專屬密鑰，不重用 `OPS_PROXY_SHARED_SECRET`)、idempotency key 支援(`API_CONTRACT_STANDARD.md:27-29` 既有 convention)、新 migration(若需要)+ down migration。
-- **Acceptance**：真跑重複呼叫同一 organization_id → 回傳同一 tenant_id；不同 claimant 呼叫同一 tenant_id → 409 拒絕；`SET ROLE` 對新建角色真的成功(R7)；R4 精神延續——這支 API 本身可以有 HCI 業務詞彙(它就是 HCI 服務)，但不得洩漏到 gateway 層。
-- **Boundaries**：不得修改 `hci.current_tenant_id()` 定義或既有 migrations 0001-0019；不得直接查詢 portal/Supabase 的 DB(contract `:21`)；不觸碰 `lobster-factory/` 任何檔案。
+- **Input**：Task 1(B) 決策、**Task 2 db-expert 審查結果的 5 個 Critical 修正項（見上方，必讀，原始草案簽章有跨租戶劫持漏洞）**、`HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md:24-32`(provisioning/lifecycle 表：duplicate request 必須回同一 tenant_id 且僅限同一 claimant、fail-closed)、`HCI_WAVE1_NEGATIVE_TEST_SPEC.md:12-14`。
+- **Output**：新 endpoint(含 auth：沿用 `middleware.ts:58-67` shared-secret 模式，新建專屬密鑰，不重用 `OPS_PROXY_SHARED_SECRET`)、idempotency key 支援(`API_CONTRACT_STANDARD.md:27-29` 既有 convention)、新 migration(若需要)+ down migration。Provisioning 函式**不得**讓呼叫者指定 role 名稱（角色名內部依 tenant_id 決定性生成）、**必須**帶 `SET row_security = off`、owner 設為新建的 `hci_provisioner`(僅 `CREATEROLE`)而非 `hci_owner`、**必須**接受 `jurisdiction` 參數餵給 ADR-0012 的 denylist CHECK、**絕不**對 `hci_wave1_synthetic`(negative-test 用資料庫)執行。
+- **Acceptance**：真跑重複呼叫同一 organization_id → 回傳同一 tenant_id；不同 claimant 呼叫同一 tenant_id → 409 拒絕；`SET ROLE` 對新建角色真的成功(R7)；R4 精神延續——這支 API 本身可以有 HCI 業務詞彙(它就是 HCI 服務)，但不得洩漏到 gateway 層；額外驗收：`ARCH-PEER-02b`(`wave1-negative-tests.sql:1293-1301`)在 provisioning 測試前後都持續通過，證明兩顆資料庫確實隔離。
+- **Boundaries**：不得修改 `hci.current_tenant_id()` 定義或既有 migrations 0001-0019；不得直接查詢 portal/Supabase 的 DB(contract `:21`)；不觸碰 `lobster-factory/` 任何檔案；不得對 `hci_owner` 授予 `CREATEROLE`。
 
 ## Task 4: Portal 端 provisioning 整合 + launcher UI 狀態切換 — dispatch to `fullstack-engineer`
 - **Goal**：subscription 變成 `active` 且 `product_key='hci'` 時，portal 呼叫 Task 3 endpoint 取得 `tenant_id` 並寫回 `external_tenant_id`；launcher 卡片依真實狀態顯示 `available`/`coming_soon`。

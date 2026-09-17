@@ -71,6 +71,13 @@ INSERT INTO hci.source_snapshots (id,tenant_id,source_id,content_hash,snapshot_r
   ('aaaaaaaa-0000-0000-0000-000000000301','11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-0000-0000-000000000300','sha256:synthetic-a','s3://synthetic/tenant-a/snap1'),
   ('bbbbbbbb-0000-0000-0000-000000000301','22222222-2222-2222-2222-222222222222','bbbbbbbb-0000-0000-0000-000000000300','sha256:synthetic-b','s3://synthetic/tenant-b/snap1');
 
+-- Dedicated admission_state-lifecycle fixtures (0020, SRC-ADMIT-*). Separate
+-- from -300/-301 above so mutating admission_state across the SRC-ADMIT-*
+-- sequence cannot couple to SOURCE-RLS-01/RLS-CLAIM-01, which assert on -300.
+INSERT INTO hci.sources (id,tenant_id,source_ref) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000310','11111111-1111-1111-1111-111111111111','https://example.com/tenant-a-admission-lifecycle'),
+  ('bbbbbbbb-0000-0000-0000-000000000310','22222222-2222-2222-2222-222222222222','https://example.com/tenant-b-admission-lifecycle');
+
 -- Lawful-basis / source-terms fixtures (ADR-0010). Both tables have existed
 -- since 0001 with zero fixtures or tests until now - same situation
 -- hci.sources was in before the 2026-09-05 ADR-0026 pass gave it coverage.

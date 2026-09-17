@@ -46,6 +46,7 @@ $upMig16  = Join-Path $root 'database/migrations/0016_wave1_case_report_snapshot
 $upMig17  = Join-Path $root 'database/migrations/0017_wave1_rule_engine_auto_promote_up.sql'
 $upMig18  = Join-Path $root 'database/migrations/0018_wave1_evidence_hash_chain_up.sql'
 $upMig19  = Join-Path $root 'database/migrations/0019_wave1_case_auto_promote_audit_up.sql'
+$upMig20  = Join-Path $root 'database/migrations/0020_wave1_source_admission_state_up.sql'
 $fixtures = Join-Path $root 'database/fixtures/0001_synthetic.sql'
 $harness  = Join-Path $root 'database/tests/00_test_harness.sql'
 $sqlTests = Join-Path $root 'database/tests/wave1-negative-tests.sql'
@@ -307,6 +308,13 @@ $mutations = @(
   @{ id = 'disable-rls-on-sources'
      sql = 'ALTER TABLE hci.sources NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.sources DISABLE ROW LEVEL SECURITY;'
      # RLS-COMPLETENESS-01 joined 2026-09-06 (P0-09), see 'disable-rls-on-persons'.
+     # hci.upsert_discovered_source (migrations/0020) does NOT need adding
+     # here (critic follow-up, 2026-09-17 corrected the original draft, which
+     # took a caller-supplied p_tenant_id and relied on RLS alone): tenant
+     # scoping is now enforced by sources_tenant_ref_unique's (tenant_id,
+     # source_ref) columns plus hci.current_tenant_id()-derived tenant_id,
+     # independent of RLS visibility - disabling RLS here does not change
+     # that function's behavior, verified by real-Docker rerun after the fix.
      expect = @('SOURCE-RLS-01','RLS-COMPLETENESS-01') }
   @{ id = 'disable-rls-on-source-snapshots'
      sql = 'ALTER TABLE hci.source_snapshots NO FORCE ROW LEVEL SECURITY; ALTER TABLE hci.source_snapshots DISABLE ROW LEVEL SECURITY;'
@@ -998,6 +1006,51 @@ $mutations = @(
      sql = 'CREATE OR REPLACE FUNCTION hci.set_case_auto_promote_rule_findings(p_case_id uuid, p_new_value boolean, p_principal_id uuid) RETURNS boolean LANGUAGE plpgsql SECURITY INVOKER SET search_path = hci, pg_temp AS $fn$ DECLARE v_tenant_id uuid; v_changed boolean; BEGIN v_tenant_id := hci.current_tenant_id(); IF v_tenant_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1001'', MESSAGE = ''x''; END IF; IF NOT EXISTS (SELECT 1 FROM hci.cases WHERE tenant_id = v_tenant_id AND id = p_case_id) THEN RETURN NULL; END IF; IF NOT EXISTS (SELECT 1 FROM hci.principals WHERE tenant_id = v_tenant_id AND id = p_principal_id) THEN RAISE EXCEPTION USING ERRCODE = ''H1021'', MESSAGE = ''x''; END IF; UPDATE hci.cases SET auto_promote_rule_findings = p_new_value WHERE id = p_case_id AND tenant_id = v_tenant_id; v_changed := true; INSERT INTO hci.case_auto_promote_audit (id, tenant_id, case_id, changed_by_principal_id, new_value) VALUES (gen_random_uuid(), v_tenant_id, p_case_id, p_principal_id, p_new_value); RETURN v_changed; END $fn$;'
      expect = @('FN-AUTOPROMOTE-NOOP-01','FN-AUTOPROMOTE-NOOP-NOAUDIT-01')
      repin = @('hci.set_case_auto_promote_rule_findings(uuid,boolean,uuid)') }
+
+  # hci.sources admission_state lifecycle (migrations/0020): trigger-layer
+  # defense proves the state machine itself, independent of the grant-layer
+  # REVOKE the next mutation exercises -- same two-layer pattern as
+  # drop-case-auto-promote-audit-trigger above.
+  @{ id = 'drop-source-admission-trigger'
+     sql = 'DROP TRIGGER sources_admission_lifecycle ON hci.sources;'
+     expect = @('SRC-ADMIT-INSERT-REJECT-01','SRC-ADMIT-SKIP-REJECT-01','SRC-ADMIT-TERMINAL-REJECT-01','SRC-ADMIT-TRIGGER-BYPASS-01','SRC-ADMIT-REJECTED-TERMINAL-01') }
+  # Cascading expect list (real-Docker discovered, same recurring pattern as
+  # drop-cases-rls-policy below): SRC-ADMIT-FORWARD-01..04 and -REJECT-PATH-01
+  # fail directly (grant denied at INSERT/UPDATE time). Because those never
+  # actually advance the -310/bbbbbbbb-310 fixture rows past DISCOVERED, every
+  # later assertion in the same stateful sequence that expects those rows to
+  # already be MATCHED/VERIFIED/ACCEPTED/ACTIVE also goes red, just with a
+  # different failure shape (a legal-from-DISCOVERED transition unexpectedly
+  # succeeding, or a state-value check finding DISCOVERED instead of ACTIVE)
+  # rather than being independently "killed" by this mutation.
+  @{ id = 'revoke-source-admission-state-update-grant'
+     sql = 'REVOKE UPDATE (admission_state) ON hci.sources FROM hci_app_test_a, hci_app_test_b;'
+     expect = @('SRC-ADMIT-FORWARD-01','SRC-ADMIT-FORWARD-02','SRC-ADMIT-FORWARD-03','SRC-ADMIT-FORWARD-04','SRC-ADMIT-SKIP-REJECT-01','SRC-ADMIT-TERMINAL-REJECT-01','SRC-ADMIT-TRIGGER-BYPASS-01','SRC-ADMIT-REJECT-PATH-01','SRC-ADMIT-REJECTED-TERMINAL-01','SRC-UPSERT-NO-REGRESS-02') }
+  # sources_tenant_ref_unique backs hci.upsert_discovered_source's ON
+  # CONFLICT ON CONSTRAINT clause by name -- dropping it does not silently
+  # allow duplicates, it makes every call to the function raise
+  # undefined_object (42704). SRC-UPSERT-NO-REGRESS-02 is NOT in this list
+  # (real-Docker discovered): it only checks a state VALUE that NO-REGRESS-01's
+  # now-failing call never touched, so the value is untouched and the
+  # assertion keeps passing -- correctly, not vacuously, since nothing wrote
+  # to that row in this mutated run.
+  @{ id = 'drop-sources-tenant-ref-unique'
+     sql = 'ALTER TABLE hci.sources DROP CONSTRAINT sources_tenant_ref_unique;'
+     expect = @('SRC-UPSERT-IDEMPOTENT-01','SRC-UPSERT-NEW-01','SRC-UPSERT-NEW-DEFAULT-STATE-01','SRC-UPSERT-NO-REGRESS-01','SRC-UPSERT-TENANT-SCOPED-01','SRC-UPSERT-TENANT-SCOPED-02') }
+  # Intended to reintroduce the DISCOVERED-regression SRC-UPSERT-NO-REGRESS-02
+  # exists to catch, but real-Docker run showed a more interesting result:
+  # the -310 fixture row is ACTIVE (terminal) by the time this upsert call
+  # runs, so hci.enforce_source_admission_transition() (migrations/0020)
+  # independently rejects the ACTIVE->DISCOVERED write with H1022 before it
+  # can commit - true defense-in-depth, the trigger backstops the upsert
+  # function's own carefulness rather than only the reverse. The observable
+  # kill is SRC-UPSERT-NO-REGRESS-01 (its upsert call now raises H1022
+  # instead of returning cleanly), not -02 (which keeps passing because the
+  # rejected write never touched the row).
+  @{ id = 'weaken-upsert-resets-admission-state'
+     sql = 'CREATE OR REPLACE FUNCTION hci.upsert_discovered_source(p_id uuid, p_source_ref text) RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = hci, pg_temp AS $fn$ DECLARE v_tenant_id uuid; v_id uuid; BEGIN v_tenant_id := hci.current_tenant_id(); IF v_tenant_id IS NULL THEN RAISE EXCEPTION USING ERRCODE = ''H1001'', MESSAGE = ''x''; END IF; INSERT INTO hci.sources (id, tenant_id, source_ref) VALUES (p_id, v_tenant_id, p_source_ref) ON CONFLICT ON CONSTRAINT sources_tenant_ref_unique DO UPDATE SET source_ref = EXCLUDED.source_ref, admission_state = ''DISCOVERED'' RETURNING id INTO v_id; RETURN v_id; END $fn$;'
+     expect = @('SRC-UPSERT-NO-REGRESS-01')
+     repin = @('hci.upsert_discovered_source(uuid,text)') }
 )
 
 $project = "hcimut$PID"
@@ -1074,6 +1127,7 @@ function Initialize-Baseline {
   if ((Invoke-SqlFile -Path $upMig17)  -ne 0) { throw 'mutation harness: 0017 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig18)  -ne 0) { throw 'mutation harness: 0018 up migration failed' }
   if ((Invoke-SqlFile -Path $upMig19)  -ne 0) { throw 'mutation harness: 0019 up migration failed' }
+  if ((Invoke-SqlFile -Path $upMig20)  -ne 0) { throw 'mutation harness: 0020 up migration failed' }
   if ((Invoke-SqlFile -Path $fixtures) -ne 0) { throw 'mutation harness: fixtures failed' }
   if ((Invoke-SqlFile -Path $harness)  -ne 0) { throw 'mutation harness: harness failed' }
 }
