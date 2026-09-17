@@ -1,9 +1,9 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://specs/domain/source.schema.yaml"
 title: Source
-version: "1.0.0"
+version: "1.1.0"
 status: ACTIVE
-description: "Shared-kernel Source metadata. Raw content remains in tenant-scoped CAS; runtime table: prov_sources (ADR-010)."
+description: "Shared-kernel Source metadata. Raw content remains in tenant-scoped CAS; runtime table: prov_sources (ADR-010). v1.1.0 (2026-09-18) adds optional doi/authors/venue/published_at citation metadata for imported academic literature Sources, backward compatible (not required, default null)."
 source_of_truth_for:
   - "Master Plan §3 Source object, §35 instruction/data boundary, §59 Portable Artifact URI, §78 Upload Sources"
   - "REPOSITORY_ARCHITECTURE.md Source -> /core/domain/source"
@@ -26,3 +26,7 @@ properties:
   version: {type: integer, minimum: 1}
   created_by_identity_id: {type: string, format: uuid}
   created_at: {type: string, format: date-time}
+  doi: {type: ["string", "null"], minLength: 1, maxLength: 200, default: null, description: "Digital Object Identifier (e.g. 10.1000/xyz123). Optional citation metadata."}
+  authors: {type: ["array", "null"], default: null, items: {type: string, minLength: 1}, description: "Author names in citation order. Optional citation metadata."}
+  venue: {type: ["string", "null"], minLength: 1, maxLength: 300, default: null, description: "Publication venue (journal/conference/publisher). Optional citation metadata."}
+  published_at: {type: ["string", "null"], minLength: 1, maxLength: 40, default: null, description: "Free-text publication date (year, year-month, or full date) -- not a strict timestamp like created_at."}

@@ -42,6 +42,13 @@ class TenantScopedCasTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, "CAS_TENANT_ACCESS_DENIED"):
             self.cas.read(NORDBROOK.tenant_id, traversal)
 
+    def test_cas_path_for_predicts_put_without_writing(self):
+        content = b"validate before you commit"
+        predicted = self.cas.cas_path_for(NORDBROOK.tenant_id, content)
+        self.assertEqual(self.cas.list_objects(NORDBROOK.tenant_id), [])
+        actual = self.cas.put(NORDBROOK.tenant_id, content)
+        self.assertEqual(predicted, actual)
+
     def test_unlink_removes_the_object_and_is_not_repeatable(self):
         a = self.cas.put(NORDBROOK.tenant_id, b"to be removed")
         target = Path(self.cas.unlink(NORDBROOK.tenant_id, a))

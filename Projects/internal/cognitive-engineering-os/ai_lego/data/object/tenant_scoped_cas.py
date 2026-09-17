@@ -42,6 +42,27 @@ class TenantScopedCas:
             raise InvariantViolation("CAS_TENANT_ACCESS_DENIED")
         return target
 
+    @staticmethod
+    def cas_path_for(tenant_id: str, content: bytes) -> dict[str, str]:
+        """Compute the ``cas_path`` dict ``put`` would return, without writing anything.
+
+        Content-addressed storage: the destination is a pure function of ``(tenant_id, content)``
+        per ``specs/artifact/cas-path.schema.yaml``. Callers that must validate a record BEFORE
+        persisting bytes (``create_source`` in ``apps/api/main.py``, so a rejected write never
+        orphans a blob) call this first and only call ``put`` once validation passes. Mirrors
+        ``put``'s own digest/shard arithmetic -- ``test_tenant_scoped_cas.py`` asserts they agree,
+        so keep both in sync if this grammar ever changes.
+        """
+        TenantScopedCas._validate_tenant_id(tenant_id)
+        digest = sha256_bytes(content)
+        return {
+            "path": f"/objects/{tenant_id}/sha256/{digest[:2]}/{digest[2:4]}/{digest}",
+            "tenant_segment": tenant_id,
+            "hash": digest,
+            "shard_1": digest[:2],
+            "shard_2": digest[2:4],
+        }
+
     def put(self, tenant_id: str, content: bytes) -> dict[str, str]:
         self._validate_tenant_id(tenant_id)
         digest = sha256_bytes(content)

@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS prov_sources (
     created_by_identity_id TEXT NOT NULL,
     created_at TEXT NOT NULL,
     cas_path_json TEXT NOT NULL,
+    doi TEXT,
+    authors_json TEXT,
+    venue TEXT,
+    published_at TEXT,
     PRIMARY KEY (tenant_id, project_id, source_id),
     FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
 );
@@ -99,9 +103,24 @@ _SOURCE_COLUMNS = (
     "version",
     "created_by_identity_id",
     "created_at",
+    "doi",
+    "authors",
+    "venue",
+    "published_at",
 )
 
-_SOURCE_SELECT = "source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at"
+_SOURCE_SELECT = "source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at, doi, authors_json, venue, published_at"
+
+# 2026-09-18: doi/authors_json/venue/published_at added to an already-deployed table.
+# ``CREATE TABLE IF NOT EXISTS`` above is a no-op against an existing table, so a
+# pre-existing database file never gains these columns without this explicit migration
+# (see ProjectSourceRepository._migrate_source_columns).
+_SOURCE_MIGRATION_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("doi", "TEXT"),
+    ("authors_json", "TEXT"),
+    ("venue", "TEXT"),
+    ("published_at", "TEXT"),
+)
 
 
 class ProjectSourceRepository:
@@ -112,6 +131,7 @@ class ProjectSourceRepository:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connection() as connection:
             connection.executescript(_SCHEMA)
+            self._migrate_source_columns(connection)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
@@ -120,9 +140,18 @@ class ProjectSourceRepository:
         return connection
 
     @staticmethod
+    def _migrate_source_columns(connection: sqlite3.Connection) -> None:
+        existing_columns = {row["name"] for row in connection.execute("PRAGMA table_info(prov_sources)")}
+        for column, column_type in _SOURCE_MIGRATION_COLUMNS:
+            if column not in existing_columns:
+                connection.execute(f"ALTER TABLE prov_sources ADD COLUMN {column} {column_type}")
+
+    @staticmethod
     def _source_from_row(row: sqlite3.Row) -> dict[str, Any]:
         source = dict(row)
         source["artifact_uri"] = json.loads(source.pop("artifact_uri_json"))
+        authors_json = source.pop("authors_json")
+        source["authors"] = None if authors_json is None else json.loads(authors_json)
         return source
 
     @contextmanager
@@ -203,6 +232,8 @@ class ProjectSourceRepository:
         if cas_path.get("tenant_segment") != source["tenant_id"] or cas_path.get("hash") != source["content_sha256"]:
             raise InvariantViolation("SOURCE_STORAGE_REFERENCE_INVALID")
         artifact_uri_json = canonical_json(source.pop("artifact_uri"))
+        authors = source.pop("authors")
+        authors_json = None if authors is None else canonical_json(authors)
         cas_path_json = canonical_json(dict(cas_path))
         with self._connection() as connection:
             project = connection.execute(
@@ -214,7 +245,7 @@ class ProjectSourceRepository:
             if project["data_classification"] != source["data_classification"]:
                 raise InvariantViolation("SOURCE_PROJECT_CLASSIFICATION_MISMATCH")
             connection.execute(
-                "INSERT INTO prov_sources (source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at, cas_path_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO prov_sources (source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at, cas_path_json, doi, authors_json, venue, published_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     source["source_id"],
                     source["project_id"],
@@ -232,6 +263,10 @@ class ProjectSourceRepository:
                     source["created_by_identity_id"],
                     source["created_at"],
                     cas_path_json,
+                    source["doi"],
+                    authors_json,
+                    source["venue"],
+                    source["published_at"],
                 ),
             )
             self._append_event(

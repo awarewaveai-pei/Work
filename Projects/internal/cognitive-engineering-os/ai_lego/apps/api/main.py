@@ -16,6 +16,8 @@ Endpoints:
     POST /auth/logout                -- revoke the caller's session
     POST /methods/{method_id}/invoke -- auth + entitlement required; body = builder kwargs
     GET  /methods/{method_id}/demo   -- auth required; runs the method's existing CLI slice
+    GET/POST/PUT/DELETE /workflows/custom[/{workflow_id}] -- tenant's own self-assembled method
+        chains (dashboard "組成工作流"); each step still runs via /methods/{id}/invoke
 
 ``/`` exists so a human has something to click, not just curl -- it only wraps the endpoints
 above (same-origin fetch, no separate auth path, no new capability). ``/methods/{id}/invoke``
@@ -73,6 +75,8 @@ from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import TEXT_MEDIA_TYPES, source_record
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
+from ai_lego.core.domain.custom_workflow import custom_workflow_record
+from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowRepository
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
@@ -342,9 +346,27 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _method_display_metadata() -> dict[str, dict[str, str]]:
+    """``method_id -> {name_en, name_zh, blurb_en, blurb_zh}``, read fresh per call -- same
+    no-cache convention as ``list_recipes`` below, so dashboard copy edits don't need a restart.
+    Deliberately a separate file from each contract's own ``description`` (AI/engineer-facing
+    per AGENTS.md §9, not end-user copy) -- see the file's own header for why. Fails open to
+    ``{}`` if the file is missing so a browse-copy problem never 500s the method list."""
+    path = resolve_spec_root() / "methods" / "registry" / "method-display-metadata.yaml"
+    if not path.exists():
+        return {}
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    entries = document.get("entries") if isinstance(document, dict) else None
+    return entries if isinstance(entries, dict) else {}
+
+
 @app.get("/methods")
 def list_methods(catalog: MethodCatalog = Depends(get_catalog)) -> list[dict[str, Any]]:
-    return [{"method_id": method_id, **{k: v for k, v in entry.items() if k != "content_sha256"}} for method_id, entry in sorted(catalog.contracts.items())]
+    display = _method_display_metadata()
+    return [
+        {"method_id": method_id, **{k: v for k, v in entry.items() if k != "content_sha256"}, "display": display.get(method_id)}
+        for method_id, entry in sorted(catalog.contracts.items())
+    ]
 
 
 @app.get("/recipes")
@@ -685,7 +707,13 @@ def method_form(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) -
                 "annotation": None if parameter.annotation is inspect.Parameter.empty else str(parameter.annotation),
             }
         )
-    return {"method_id": method_id, "contract": catalog.require(method_id), "parameters": parameters, "schema_source": "builder_signature_only"}
+    return {
+        "method_id": method_id,
+        "contract": catalog.require(method_id),
+        "display": _method_display_metadata().get(method_id),
+        "parameters": parameters,
+        "schema_source": "builder_signature_only",
+    }
 
 
 @app.post("/auth/login")
@@ -920,6 +948,13 @@ def get_project_source_repository() -> ProjectSourceRepository:
     return ProjectSourceRepository(PRODUCT_ROOT / ".runtime" / "projects.sqlite3")
 
 
+def get_custom_workflow_repository() -> CustomWorkflowRepository:
+    """Own SQLite file, not ``projects.sqlite3`` -- a Custom Workflow is an ordered list of
+    method_ids the tenant picked, not a Project/Source aggregate; see
+    ``ai_lego/core/domain/custom_workflow.py`` for the full separation rationale."""
+    return CustomWorkflowRepository(PRODUCT_ROOT / ".runtime" / "custom_workflows.sqlite3")
+
+
 def get_source_cas() -> TenantScopedCas:
     """Separate CAS root from ``artifact-cas`` (capability-emitted artifacts) and ``workflow-cas`` (journal
     encryption): Source content has its own lifecycle (a Project's raw intake material, not a workflow
@@ -1124,3 +1159,96 @@ def source_history(
     if repo.get_source(session["tenant_id"], project_id, source_id) is None:
         raise HTTPException(status_code=404, detail=f"SOURCE_NOT_FOUND: {source_id!r}")
     return repo.list_events(session["tenant_id"], f"source:{source_id}")
+
+
+# ---------------------------------------------------------------------------
+# Custom Workflows -- a tenant's own self-assembled chain of existing methods
+# (dashboard "組成工作流"; operator 2026-09-18). No entitlement capability of its
+# own: saving/naming a list of method_ids is not sensitive, and each step is still
+# gated by that method's own entitlement check at invoke time (unchanged). See
+# ai_lego/core/domain/custom_workflow.py for why this is not a Recipe or a Project.
+# ---------------------------------------------------------------------------
+
+
+class CustomWorkflowRequest(BaseModel):
+    title: str
+    method_ids: list[str]
+
+
+def _unresolvable_method_ids(catalog: MethodCatalog, method_ids: list[str]) -> list[str]:
+    return [method_id for method_id in method_ids if not catalog.is_resolvable(method_id)]
+
+
+@app.post("/workflows/custom")
+def create_custom_workflow(
+    payload: CustomWorkflowRequest,
+    session: dict[str, Any] = Depends(require_session),
+    repo: CustomWorkflowRepository = Depends(get_custom_workflow_repository),
+    catalog: MethodCatalog = Depends(get_catalog),
+) -> dict[str, Any]:
+    unresolvable = _unresolvable_method_ids(catalog, payload.method_ids)
+    if unresolvable:
+        raise HTTPException(status_code=400, detail=f"CUSTOM_WORKFLOW_METHOD_ID_UNRESOLVABLE: {unresolvable!r}")
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    try:
+        record = custom_workflow_record(str(uuid.uuid4()), session["tenant_id"], payload.title, payload.method_ids, session["identity_id"], now, now)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+    return repo.create(record)
+
+
+@app.get("/workflows/custom")
+def list_custom_workflows(
+    session: dict[str, Any] = Depends(require_session),
+    repo: CustomWorkflowRepository = Depends(get_custom_workflow_repository),
+) -> list[dict[str, Any]]:
+    return repo.list(session["tenant_id"])
+
+
+@app.get("/workflows/custom/{workflow_id}")
+def get_custom_workflow(
+    workflow_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: CustomWorkflowRepository = Depends(get_custom_workflow_repository),
+) -> dict[str, Any]:
+    workflow = repo.get(session["tenant_id"], workflow_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail=f"CUSTOM_WORKFLOW_NOT_FOUND: {workflow_id!r}")
+    return workflow
+
+
+@app.put("/workflows/custom/{workflow_id}")
+def update_custom_workflow(
+    workflow_id: str,
+    payload: CustomWorkflowRequest,
+    session: dict[str, Any] = Depends(require_session),
+    repo: CustomWorkflowRepository = Depends(get_custom_workflow_repository),
+    catalog: MethodCatalog = Depends(get_catalog),
+) -> dict[str, Any]:
+    if repo.get(session["tenant_id"], workflow_id) is None:
+        raise HTTPException(status_code=404, detail=f"CUSTOM_WORKFLOW_NOT_FOUND: {workflow_id!r}")
+    unresolvable = _unresolvable_method_ids(catalog, payload.method_ids)
+    if unresolvable:
+        raise HTTPException(status_code=400, detail=f"CUSTOM_WORKFLOW_METHOD_ID_UNRESOLVABLE: {unresolvable!r}")
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    try:
+        # Reuses custom_workflow_record purely for its title/method_ids validation+normalization
+        # (e.g. title.strip()) -- created_at/updated_at here are throwaway, repo.update keeps the real one.
+        validated = custom_workflow_record(workflow_id, session["tenant_id"], payload.title, payload.method_ids, session["identity_id"], now, now)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+    updated = repo.update(session["tenant_id"], workflow_id, validated["title"], validated["method_ids"], now)
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"CUSTOM_WORKFLOW_NOT_FOUND: {workflow_id!r}")
+    return updated
+
+
+@app.delete("/workflows/custom/{workflow_id}")
+def delete_custom_workflow(
+    workflow_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: CustomWorkflowRepository = Depends(get_custom_workflow_repository),
+) -> dict[str, str]:
+    if not repo.delete(session["tenant_id"], workflow_id):
+        raise HTTPException(status_code=404, detail=f"CUSTOM_WORKFLOW_NOT_FOUND: {workflow_id!r}")
+    return {"status": "ok"}

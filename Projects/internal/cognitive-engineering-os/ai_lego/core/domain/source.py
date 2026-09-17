@@ -26,8 +26,18 @@ def source_record(
     artifact_uri: Mapping[str, Any],
     created_by_identity_id: str,
     created_at: str,
+    *,
+    doi: str | None = None,
+    authors: list[str] | None = None,
+    venue: str | None = None,
+    published_at: str | None = None,
 ) -> dict[str, Any]:
-    """Build metadata for one V1 UTF-8 Source without embedding its content."""
+    """Build metadata for one V1 UTF-8 Source without embedding its content.
+
+    ``doi``/``authors``/``venue``/``published_at`` are optional citation metadata for
+    imported academic literature Sources; ``None`` (the default) for every other Source,
+    kept out of ``required`` in source.schema.yaml.
+    """
     if media_type not in TEXT_MEDIA_TYPES:
         raise InvariantViolation("SOURCE_MEDIA_TYPE_UNSUPPORTED")
     if data_classification not in DATA_CLASSIFICATIONS:
@@ -52,6 +62,16 @@ def source_record(
     ]
     if segments != canonical_identity:
         raise InvariantViolation("SOURCE_ARTIFACT_URI_IDENTITY_MISMATCH")
+    if doi is not None:
+        doi = require_text("SOURCE", "doi", doi, maximum=200)
+    if venue is not None:
+        venue = require_text("SOURCE", "venue", venue, maximum=300)
+    if published_at is not None:
+        published_at = require_text("SOURCE", "published_at", published_at, maximum=40)
+    if authors is not None:
+        if not isinstance(authors, list) or not all(isinstance(author, str) and author.strip() for author in authors):
+            raise InvariantViolation("SOURCE_AUTHORS_INVALID")
+        authors = [author.strip() for author in authors]
     return {
         "source_id": require_uuid("SOURCE", "source_id", source_id),
         "project_id": require_uuid("SOURCE", "project_id", project_id),
@@ -68,4 +88,8 @@ def source_record(
         "version": 1,
         "created_by_identity_id": require_uuid("SOURCE", "created_by_identity_id", created_by_identity_id),
         "created_at": require_timestamp("SOURCE", created_at),
+        "doi": doi,
+        "authors": authors,
+        "venue": venue,
+        "published_at": published_at,
     }

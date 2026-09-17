@@ -167,6 +167,59 @@ class SourceApiTests(ProjectSourceApiTestCase):
         content = self.client.get(f"/projects/{project['project_id']}/sources/{source['source_id']}/content").json()
         self.assertEqual(content["content"], "participant said: I felt overwhelmed.")
 
+    def test_create_source_without_citation_metadata_defaults_to_null_backward_compatibly(self):
+        self._login()
+        project = self._create_project()
+        source = self._create_source(project["project_id"])
+        self.assertIsNone(source["doi"])
+        self.assertIsNone(source["authors"])
+        self.assertIsNone(source["venue"])
+        self.assertIsNone(source["published_at"])
+
+    def test_create_source_with_citation_metadata(self):
+        self._login()
+        project = self._create_project()
+        source = self._create_source(
+            project["project_id"],
+            doi="10.1000/xyz123",
+            authors=["Ada Lovelace", "Alan Turing"],
+            venue="Journal of Reflective Practice",
+            published_at="2020-05",
+        )
+        self.assertEqual(source["doi"], "10.1000/xyz123")
+        self.assertEqual(source["authors"], ["Ada Lovelace", "Alan Turing"])
+        self.assertEqual(source["venue"], "Journal of Reflective Practice")
+        self.assertEqual(source["published_at"], "2020-05")
+        fetched = self.client.get(f"/projects/{project['project_id']}/sources/{source['source_id']}").json()
+        self.assertEqual(fetched["doi"], "10.1000/xyz123")
+        self.assertEqual(fetched["authors"], ["Ada Lovelace", "Alan Turing"])
+
+    def test_oversized_doi_is_refused(self):
+        self._login()
+        project = self._create_project()
+        response = self.client.post(f"/projects/{project['project_id']}/sources", json={"title": "t", "media_type": "text/plain", "data_classification": "Confidential", "content": "x", "doi": "x" * 201})
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("SOURCE_DOI_INVALID", response.json()["detail"])
+
+    def test_invalid_doi_is_refused_before_any_cas_write(self):
+        """Follow-up to Task 2a's disclosed gap (WORKLOG 2026-09-18 'Cognitive OS Source 物件補齊引用中繼
+        資料欄位'): doi/authors/venue/published_at validation ran AFTER source_cas.put(), so a rejected doi
+        left a permanent orphaned blob nothing referenced. cas_path_for() now computes the destination
+        without writing, and source_record() validates against it before source_cas.put() is ever called."""
+        self._login()
+        project = self._create_project()
+        response = self.client.post(f"/projects/{project['project_id']}/sources", json={"title": "t", "media_type": "text/plain", "data_classification": "Confidential", "content": "orphan-would-be-this-content", "doi": "x" * 201})
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("SOURCE_DOI_INVALID", response.json()["detail"])
+        self.assertEqual(self._source_cas.list_objects(self.tenant["tenant_id"]), [])
+
+    def test_authors_containing_a_blank_string_is_refused(self):
+        self._login()
+        project = self._create_project()
+        response = self.client.post(f"/projects/{project['project_id']}/sources", json={"title": "t", "media_type": "text/plain", "data_classification": "Confidential", "content": "x", "authors": [""]})
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("SOURCE_AUTHORS_INVALID", response.json()["detail"])
+
     def test_source_under_a_nonexistent_project_is_404(self):
         self._login()
         response = self.client.post(f"/projects/{uuid.uuid4()}/sources", json={"title": "t", "media_type": "text/plain", "data_classification": "Confidential", "content": "x"})
