@@ -1,4 +1,17 @@
 # Worklog
+## 2026-09-14｜Cognitive OS Project／Source intake foundation
+
+- 缺口：系統雖可執行 Method／Recipe，尚無 Master Plan 起始流程需要的 Project／Source shared-kernel 與原始資料保存邊界。
+- 修改：新增 Project／Source ACTIVE schemas、domain invariants、portable URI identity check、四級資料分類、`RETRIEVED_SOURCE_DATA` 信任標記；新增 local-first repository，使用 `platform_projects`／`prov_sources`／append-only `events`，metadata 與 event 同交易，raw Source 不進 event，CAS reference 強制 tenant/hash 一致。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`python -m unittest tests.unit.test_project_domain tests.unit.test_source_domain tests.unit.test_intake_schemas tests.unit.test_project_source_repository tests.unit.test_tenant_scoped_cas tests.unit.test_json_artifact_store tests.unit.test_identity_store` | exit=0 | result=45 tests OK
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | result=3955 PASS；generated indexes fresh
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`python -m compileall -q ai_lego` | exit=0 | result=PASS
+- REVIEW_DONE: self-review=Quick | verdict=pass after fixes | findings=portable URI identity mismatch + Project/Source classification mismatch fixed with negative tests
+- ORACLE_WAIVED: 使用者明示禁止無效 agent fan-out；本次以 writer adversarial self-review 與 2 個 mutation-style negative tests 取代。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`platform_projects|prov_sources|RETRIEVED_SOURCE_DATA|SOURCE_ARTIFACT_URI_IDENTITY_MISMATCH|SOURCE_PROJECT_CLASSIFICATION_MISMATCH` | result=runtime/schema/tests aligned；scripts 無 stale caller
+- WORKLOG_DONE: 本條目保留於既有 dirty Worklog，避免把其他工作階段內容夾帶進本次 commit。
+- rollback：`git revert <project-source-foundation-commit>`；尚未接 API、未建立 production migration、未寫入 production data。
+
 ## 2026-09-14｜Cognitive OS Recipe durable result read
 
 - 根因／缺口：Recipe 已能以 durable journal 執行、resume、查 metadata，但 Dashboard/API 尚不能在執行後讀回結果；protected journal 也沒有安全的 tenant/run 解密讀取邊界。
@@ -7,7 +20,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests -q` | exit=0 | result=26 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | result=PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`scripts\\bughunt-oracle.ps1 -WorkRoot D:\\Work` | success=True | result=PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: self-review=Quick | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`recipe_run_result|_load_recipe_journal|_restore_api_result_context|recipe-result-btn|WORKFLOW_JOURNAL_RESULT_PROTECTION_REQUIRED` | result=targeted implementation/tests/docs present; oracle PASS
 - WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
 - rollback：`git revert <result-read-commit>`；不涉及 schema、DB migration、密鑰或部署。
