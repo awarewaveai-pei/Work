@@ -18812,3 +18812,22 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 ## 2026-09-14
 
 - 01:08 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-14.md
+
+## 2026-09-18
+
+### EdD research organization (edd-research) created in ops console
+
+- 任務：操作者建立個人 EdD 論文研究專用 organization，跟既有客戶（awarewave-ops／soulful-expression 等）資料分開，讓 `/ops/collect`、`/ops/clients/[slug]` 可用於她自己的文獻蒐集/知識庫瀏覽。CONFIRMED-INDEPENDENT-WORKSTREAM，只動 `organizations` 表一筆新 row。
+- 查證 `type` 欄位：`lobster-factory/packages/db/migrations/0001_core.sql:5` — `organizations.type` 有 CHECK 只允許 `agency`/`client`，`internal` 不是合法值（會被 DB 拒絕）。正式庫既有 5 筆 org（含 AwareWave Ops 自己）全部是 `type=client`。故採 `client`，與 `app/api/ops/organizations/route.ts:45` 預設值一致。另一欄位 `org_level`（migration 0077，值 group/company/individual）grep 全 next-admin 0 命中，沒有任何頁面讀取它，維持欄位 default `company` 未動（不在任務範圍內）。
+- 建立方式查證：`app/api/ops/organizations/route.ts` 目前唯一呼叫端是瀏覽器端 `app/(shell)/onboard/OnboardWizard.tsx:999` 的 `fetch`，靠 Supabase session cookie 經 `middleware.ts` 驗證後注入 `x-ops-claims-role`。`middleware.ts:230-235` 對所有路徑（含 `PUBLIC_API_PATHS`／sync-key 分支）一律先刪除 `x-ops-simulated-role` 與 claim headers 才放行，所以無法用 header 模擬 owner/admin，除非改 production 的 `OPS_ALLOW_SIMULATED_ROLE_FALLBACK`（範圍外、影響全站，未做）。改用與 route.ts 完全等價的 PostgREST 呼叫：同一 production Supabase（`supabase.aware-wave.com`）、同一 service-role key、同一 `upsert(onConflict=slug)` + `select` 欄位，未新增/修改任何程式碼。既有精確前例：`scripts/ops-console-bootstrap.ps1:130-139` 已用同一手法直接 POST `organizations`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -X POST https://supabase.aware-wave.com/rest/v1/organizations?on_conflict=slug&select=id,slug,name,type,status,created_at -H "Prefer: resolution=merge-duplicates,return=representation" --data-binary @edd-research-org.json` | exit=0 | ms=約1000 | result=HTTP 201, id=ecf4e311-4f38-4288-9396-e70fd7697aca, slug=edd-research, name="EdD 論文研究", type=client, status=active（寫入前已用同一 apikey GET `slug=eq.edd-research` 確認回傳 `[]`，證明是新增非覆蓋既有 row）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl .../rest/v1/organizations?select=slug,name&order=name.asc`（= `app/(shell)/ops/collect/page.tsx:20` loadClients() 原查詢複現）| exit=0 | result=edd-research/"EdD 論文研究" 出現在 6 筆排序清單內，`/ops/collect` 選單會列出
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl .../rest/v1/organizations?select=slug,name,metadata&order=created_at.asc`（= `app/(shell)/ops/clients/layout.tsx:16-19` 原查詢複現）| exit=0 | result=edd-research 出現在側欄清單最後一筆（依 created_at 最新）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl .../rest/v1/organizations?slug=eq.edd-research&select=id,slug,name,type,status,metadata,created_at`（= `app/(shell)/ops/clients/[slug]/page.tsx:49-53` 原查詢複現）| exit=0 | ms=1.02 | result=回傳該筆完整資料，頁面的 `notFound()` 分支不會觸發
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl https://supabase.aware-wave.com/auth/v1/admin/users`（GoTrue admin API，service-role）| exit=0 | result=唯一帳號 awarewaveai@gmail.com 的 `app_metadata.ops_role=owner`／`user_kind=null`(=staff)／`org_id=null`
+- RBAC 查證（不假設）：`grep -r "resolveOpsRole|ops_role|canWriteTenantConfig|organization_memberships" app/(shell)/` 在 next-admin 0 命中（僅 1 份 .md 文件提及，非程式碼）——確認 `/ops/clients/[slug]`、`/ops/collect`、`(shell)/ops/clients/layout.tsx` 都沒有 per-org membership 檢查，是全域 `ops_role`（owner/admin/operator/viewer）模型；`organization_memberships` 表只在 `app/portal/*`（客戶自助 portal 簽到）用到，與 ops 主控台無關。結論：操作者現有 owner 角色（全域）已涵蓋新 org，**不需要任何額外授權**。
+- REVIEW_WAIVED: NA -- 純資料操作，沒有程式碼 diff 可審；改以逐行比對 `route.ts` upsert 邏輯 + 重放三個頁面的原始 Supabase 查詢取代 code review。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`edd-research` | hits=10（寫入前預檢，全部落在 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/`：`recipes/validated/edd-research-evidence-v1.recipe.yaml`、對應的 golden test/demo 登記與 WORKLOG 條目——操作者另一套 Cognitive Engineering OS 研究方法工具，跟本次 `organizations` 表新增列完全是兩個系統，無程式或資料重疊，純屬命名巧合（都跟她的 EdD 研究有關））
+- 剩餘風險：新 org 的 `metadata` 留空 `{}`；其他既有 org 有非正式的 `client_kind`/`relationship` 慣例欄位（如 awarewave-ops 的 `internal`/`first_party`），本列未設，不影響任何既有功能（無程式讀取這兩個 key 做分流判斷），操作者之後可自行到 UI 補或忽略。
+- ROLLBACK: `DELETE FROM organizations WHERE slug='edd-research'`（單筆新增，未建立任何 workspace/membership/wp_site 等引用此列的資料，刪除無副作用）。
+- WORKLOG_DONE: EdD research organization (edd-research) created
