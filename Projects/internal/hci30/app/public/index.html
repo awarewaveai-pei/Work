@@ -123,6 +123,9 @@
   .stacking-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: var(--teal-tint); color: var(--teal-ink); font-weight: 700; }
   .auto-promote-toggle { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.8rem; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
   .auto-promote-toggle input { margin-top: 0.2rem; flex: none; }
+  .seed-result-card { margin-top: 1rem; padding: 1rem 1.2rem; border: 1px solid var(--border); border-radius: 8px; max-width: 640px; }
+  .seed-result-card p { margin: 0.4rem 0; font-size: 0.88rem; }
+  .seed-result-card.err { border-color: var(--very-low); }
   .auto-promote-tag { display: inline-block; margin-left: 0.4rem; font-size: 0.68rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #ece6d6; color: var(--muted); font-weight: 700; }
   .auto-promote-audit-list { margin: 0.4rem 0 0; padding-left: 1.6rem; font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
 
@@ -299,6 +302,7 @@
     <button type="button" class="tab" data-tab="new" onclick="switchTab('new')">＋ 新案件</button>
     <button type="button" class="tab active" data-tab="active" onclick="switchTab('active')">進行中案件</button>
     <button type="button" class="tab" data-tab="closed" onclick="switchTab('closed')">歷史案件</button>
+    <button type="button" class="tab" data-tab="seeds" onclick="switchTab('seeds')">🔎 探索來源</button>
   </div>
 
   <div class="tab-panel" id="tab-panel-new" style="display:none">
@@ -340,6 +344,28 @@
 
   <div class="tab-panel" id="tab-panel-closed" style="display:none">
     <div class="case-grid" id="cases-closed"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-panel-seeds" style="display:none">
+    <form class="inline-form" onsubmit="return submitSeed(event)">
+      <label for="s-url">目標網址</label>
+      <input id="s-url" type="url" placeholder="https://example.org" required>
+      <label class="auto-promote-toggle">
+        <input type="checkbox" id="s-is-org">
+        我確認這個網址屬於一個組織／公司，不是特定個人（本管線目前只接受組織實體，ADR-011 決策10）
+      </label>
+      <label class="auto-promote-toggle">
+        <input type="checkbox" id="s-dry-run" checked>
+        先試跑，不寫入資料庫（可先看到標題／字數／內容掃描結果，確認沒問題後取消勾選再送出一次才會正式寫入）
+      </label>
+      <button type="submit">送出</button>
+      <div id="s-err" class="err"></div>
+    </form>
+    <div id="s-result"></div>
+
+    <h3 style="margin-top:2.5rem">待審核來源（admission_state = DISCOVERED）</h3>
+    <p class="field-hint">由 isolated fetch-runner 擷取並通過內容隔離掃描後寫入的原始來源；尚未經人工比對／驗證，不會自動變成正式 Evidence。</p>
+    <div class="case-grid" id="seeds-discovered"></div>
   </div>
 
   <p class="subtitle" style="margin-top:2.5rem">合成開發資料，真實 API ＋真實 RLS 保護的 Postgres，非模擬系統；租戶身分暫用右上角按鈕手動切換（正式版會是真實登入）。</p>
@@ -596,6 +622,84 @@ async function loadList(tenant) {
   const closed = body.data.filter(c => c.status === 'CLOSED');
   activeEl.innerHTML = active.length ? active.map(caseCardHtml).join('') : '<p class="empty">目前沒有進行中的案件。</p>';
   closedEl.innerHTML = closed.length ? closed.map(caseCardHtml).join('') : '<p class="empty">尚無歷史案件。</p>';
+  await loadSeeds(tenant);
+}
+
+async function loadSeeds(tenant) {
+  const el = document.getElementById('seeds-discovered');
+  const res = await fetch('/api/hci/v1/seeds?tenant=' + tenant);
+  const body = await res.json();
+  if (!res.ok) { el.innerHTML = `<p class="err">錯誤：${esc(body.detail || body.title)}</p>`; return; }
+  el.innerHTML = body.data.length ? body.data.map(seedCardHtml).join('') : '<p class="empty">目前沒有待審核的來源。</p>';
+}
+
+function seedCardHtml(s) {
+  return `<div class="case-card">
+      <div>
+        <div class="title">${esc(s.source_ref)}</div>
+        <div class="meta">${esc(s.id)} ．狀態 ${esc(s.admission_state)}</div>
+      </div>
+      <button type="button" class="reopen-btn" onclick="event.stopPropagation(); rejectSeed('${s.id}')">✕ 拒絕</button>
+    </div>`;
+}
+
+async function rejectSeed(sourceId) {
+  if (!confirm('確定要拒絕這個來源嗎？此動作無法復原。')) return;
+  const res = await fetch(`/api/hci/v1/seeds/${sourceId}/reject?tenant=${currentTenant}`, { method: 'POST' });
+  const body = await res.json();
+  if (!res.ok) { alert('錯誤：' + (body.detail || body.title)); return; }
+  await loadSeeds(currentTenant);
+}
+
+async function submitSeed(evt) {
+  evt.preventDefault();
+  const targetUrl = document.getElementById('s-url').value;
+  const isOrg = document.getElementById('s-is-org').checked;
+  const dryRun = document.getElementById('s-dry-run').checked;
+  const errEl = document.getElementById('s-err');
+  const resultEl = document.getElementById('s-result');
+  if (!isOrg) { errEl.textContent = '請先勾選確認：這個網址屬於一個組織／公司'; return false; }
+  errEl.textContent = '';
+  resultEl.innerHTML = '<p class="empty">處理中…（isolated fetch-runner 擷取＋內容掃描，可能需要幾秒到幾十秒）</p>';
+  const res = await fetch(`/api/hci/v1/seeds?tenant=${currentTenant}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, targetUrl, subject_kind: 'ORGANIZATION', dryRun }),
+  });
+  const body = await res.json();
+  if (!res.ok) { resultEl.innerHTML = ''; errEl.textContent = body.detail || body.title; return false; }
+  resultEl.innerHTML = seedResultHtml(body);
+  if (body.outcome === 'written') await loadSeeds(currentTenant);
+  return false;
+}
+
+function seedResultHtml(r) {
+  if (r.outcome === 'dry_run_completed') {
+    return `<div class="seed-result-card">
+      <span class="badge status-OPEN">試跑完成，未寫入</span>
+      <p><b>標題：</b>${esc(r.title || '(無標題)')}</p>
+      <p><b>最終網址：</b>${esc(r.finalUrl)}</p>
+      <p><b>文字長度：</b>${esc(r.textLength ?? '—')}</p>
+      <p class="field-hint">確認沒問題後，取消勾選「先試跑」再送出一次即可正式寫入。</p>
+    </div>`;
+  }
+  if (r.outcome === 'written') {
+    const candidates = r.candidateRelatedSources || [];
+    return `<div class="seed-result-card"><span class="badge status-ACTIVE">已寫入</span><p>來源 ID：${esc(r.sourceId)}</p>${candidates.length ? `<p class="field-hint">可能相關的既有來源（非權威提示，需人工比對）：${candidates.map(c => esc(c.sourceRef)).join('、')}</p>` : ''}</div>`;
+  }
+  if (r.outcome === 'flagged_for_review') {
+    // scanReasons items are {id, ...} objects (content-isolation/scan.mjs) --
+    // esc() alone on an object array would render "[object Object]" via
+    // Array.prototype.join()'s default toString(), not the reason text.
+    const reasons = (r.scanReasons || []).map(x => x.id).join('、');
+    return `<div class="seed-result-card"><span class="badge status-CLOSED">已攔截，待人工審查</span><p>掃描原因：${esc(reasons || '(未提供)')}</p>${r.truncated ? '<p>內容過長已被截斷。</p>' : ''}</div>`;
+  }
+  if (r.outcome === 'failed') {
+    return `<div class="seed-result-card err">失敗：${esc(r.error || r.errorCode || '未知錯誤')}${r.retryable ? '（可重試）' : '（不建議重試）'}</div>`;
+  }
+  if (r.outcome === 'timed_out') {
+    return '<div class="seed-result-card err">逾時：runner 尚未在等待時間內完成，可稍後重新查詢或重送。</div>';
+  }
+  return `<pre>${esc(JSON.stringify(r, null, 2))}</pre>`;
 }
 
 function caseCardHtml(c) {

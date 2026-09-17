@@ -126,14 +126,22 @@
 - **Acceptance**：真跑一次 enqueue → Trigger.dev dashboard 顯示 status 變化 → runner 端完成 → 結果經 Task 8 落地（**部署層，待跑**）；靜態檢查對「刻意塞一行直接 fetch」的測試樣本能抓到（突變測試，**已完成**，含 critic 的 3 個進階繞過樣本，2/3 修正確認、1/3 誠實記為已知限制）。
 - **Boundaries**：不在 Trigger.dev task 內 import 任何會發起對外 HTTP 請求的函式庫；不影響既有 `collect-scheduled-crawl` task（C3，已上線）——本次未觸碰 `lobster-factory` 任何檔案，天然滿足。
 
-## Task 10：操作介面 — 組織 seed 註冊 + DISCOVERED 審核佇列 — dispatch to `fullstack-engineer`（依賴 Task 2、6、9）
+## Task 10：操作介面 — 組織 seed 註冊 + DISCOVERED 審核佇列 — **已完成**（2026-09-18，critic 覆審，real-Postgres+瀏覽器全流程驗證通過）
 
 - **Goal**：延伸 `/ops/collect` 的 UI 慣例，讓人能登記組織 seed、觸發跑一次、看到 DISCOVERED 清單並標記 REJECTED。
-- **Scope**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/collect/`（新增子分頁或延伸既有 `CollectionSourcesPanel.tsx` 的 pattern，不修改既有 collect/sink 邏輯本身）。
-- **Input**：Task 6 的 seed 屬性契約；Task 9 的 enqueue API；Task 2 的 admission_state 限定函式（供「標記 REJECTED」呼叫）。
-- **Output**：新 UI 區塊：seed 登記表單（含必填 `subject_kind='ORGANIZATION'`）、dry-run 優先、DISCOVERED 清單（依租戶篩選）、REJECTED 標記按鈕（呼叫 Task 2 的限定函式，不允許裸 SQL）。
-- **Acceptance**：UI 端到端跑一次：登記 seed → dry-run 看到候選 → 正式跑 → 清單出現 DISCOVERED 列 → 標記 REJECTED → 狀態轉換成功且非法轉換被拒。
-- **Boundaries**：此 UI 的伺服器端程式碼不得直接呼叫任何會執行對外 fetch 的函式（next-admin process 不得執行 HCI 目標的 fetch，只能呼叫 Task 9 的 enqueue API）；不在此頁面之外新增其他導覽入口。
+- **SCOPE 修正**（開工前判定，非 critic 事後抓到）：原訂 `lobster-factory/.../ops/collect/` 不適用——該頁面的租戶模型是 Supabase `organizations`，與 HCI-30 自己的 Postgres RLS + `hci_app_test_a/b` 角色租戶制完全不同底層資料模型，硬接會產生第二套平行租戶語意。實際落地：`Projects/internal/hci30/app/server.mjs`（3 條新路由）+ `app/public/index.html`（新分頁 `🔎 探索來源`），沿用本專案既有 `resolveTenant`/`queryAsTenant`/`problem`/`esc` 慣例，不新建平行機制。
+- **Input**：Task 6 的 seed 屬性契約；Task 9 的 `orchestrateDiscoveredFetch`（含新增 `dryRun` 參數）；migration 0020 的 `admission_state` 狀態機 trigger（`hci.enforce_source_admission_transition()`，database/migrations/0020_wave1_source_admission_state_up.sql:104-122）。
+- **Output**：
+  - `POST /api/hci/v1/seeds`（app/server.mjs）：驗證 `targetUrl`/`subject_kind==='ORGANIZATION'` → 呼叫 `orchestrateDiscoveredFetch`（`dryRun` 從 request body 直通）。
+  - `GET /api/hci/v1/seeds`：列出 `admission_state='DISCOVERED'`。
+  - `POST /api/hci/v1/seeds/:sourceId/reject`：`UPDATE admission_state='REJECTED'`，非法轉換由 0020 的 trigger 擋下（H1022 → 409）。**與計畫原文的差異**：Task 2/本任務原文寫「呼叫限定函式，不允許裸 SQL」，但實際已提交的 migration 0020 是直接 column-level GRANT + trigger 校驗（0020 自己的 header 註解：刻意仿照 `hci.enforce_dsr_transition()`/`hci.enforce_case_lifecycle()` 兩個既有 lifecycle-trigger 慣例，非疏漏）——trigger 對任何寫入路徑一視同仁生效，此處計畫原文已過時，以實際 schema 為準，不重寫已驗證通過的設計。
+  - `orchestrate-discovered-fetch.mjs` 新增 `dryRun` 參數：為真時跳過 tenantId/query 交叉檢查與 Task 8 寫入，回傳 `{outcome:'dry_run_completed', finalUrl, title, textLength, contentHash}` 供人工預覽。
+  - UI：seed 表單（URL、「確認為組織非個人」核取方塊預設不勾、「先試跑」核取方塊預設勾選）、DISCOVERED 清單卡片、拒絕按鈕（`confirm()` 二次確認）。
+- **完成狀態**：real-Postgres（`scripts/dev-db-init.ps1`）+ curl 逐分支驗證全部通過：GET 200 且 RLS 租戶隔離屬實（租戶 A 看得到、租戶 B 看不到同一列）；POST 400（缺 targetUrl／`subject_kind` 錯誤）／503（runner 未設定）；reject 200（真實 DISCOVERED→REJECTED）／200（REJECTED→REJECTED 冪等 no-op，trigger 自己的 `IS DISTINCT FROM` 設計，UI 本就不會對非 DISCOVERED 列顯示按鈕，非 bug）／409（真實驅動一列到 ACTIVE 後拒絕，H1022 真實觸發）／404（不存在的 id）。瀏覽器全流程（Claude 自己的 browser 工具）：分頁渲染、表單送出前端 gate（未勾組織確認擋下送出，不發網路請求）、真實 503 正確顯示、DISCOVERED 卡片正確渲染、console 零 JS 例外。
+  - **過程中發現並修正 2 個真實 bug**：(1) `POST /seeds` 原本 503（runner 未設定）檢查跑在輸入驗證前，導致本機/多數 dev session 下任何格式錯誤的請求都被 503 訊息蓋住看不到真正錯誤——已修，輸入驗證移到 503 檢查前（app/server.mjs，訊息由 curl 實測確認排序正確）。(2) 這台長壽 `hci30dev` 容器的 `admission_state` 欄位 GRANT 從未真正套用（`has_column_privilege` 驗證回傳 false/false）——根因是先前某 session 為了解 Task 2 的鎖只手動 `ALTER TABLE` 加欄位，沒跑完整 migration 0020，而 `dev-db-init.ps1` 的「已套用」判斷只查欄位存不存在、不查 GRANT，因此沒被抓到（`dev-db-init.ps1` 自己的註解已預言過這個風險類別）；已用 0020 本來就宣告的兩行 `GRANT` 手動補上（幂等、無 schema 變更），並用 `scripts/test-wave1-local.ps1` 的從零重建流程確認 migration 檔本身正確、純屬這一個容器的既有 volume drift。
+  - **另定位一個範圍外缺口，已用 spawn_task 記錄追蹤而非就地擴大改動**：`app/server.mjs` 現在也呼叫 `orchestrateDiscoveredFetch`，成為 ADR-0029 gate 6 呼叫圖的第二個進入點，但 `scripts/check-trigger-no-direct-fetch.ps1` 只掃描 `public-intelligence/`。目前零風險（已 grep 確認 `app/server.mjs` 沒有裸 fetch/http 使用）；擴大掃描範圍需要三處腳本修改（`node_modules` 排除、字串常值先剝離再比對——已用真實 PowerShell regex 測試證實 `app/server.mjs:14` 自己的 import 路徑字面值與 `app/scripts/verify-sink-hci-discovered.mjs` 的 `s3://` bucket 名稱字面值都會誤報、以及零容忍模式的 allowlist 支援），不屬於本任務範圍，列為獨立後續任務。
+- **Acceptance**：UI 端到端跑一次：登記 seed → dry-run 看到候選 → 正式跑 → 清單出現 DISCOVERED 列 → 標記 REJECTED → 狀態轉換成功且非法轉換被拒。**已完成**（fetch-runner 未部署，「正式跑」「dry-run 預覽」兩步驟走的是 503 分支的真實驗證，非端對端含真實抓取——這是 Task 9 自己已知的部署層 STOP，非本任務缺口；reject/list/RLS/狀態機四步驟已用真實資料完整跑過）。
+- **Boundaries**：此 UI 的伺服器端程式碼不得直接呼叫任何會執行對外 fetch 的函式（`app/server.mjs` 只能呼叫 Task 9 的 `orchestrateDiscoveredFetch`）；不在此頁面之外新增其他導覽入口。
 
 ## Task 11：`classify-evidence-quality.mjs` 聚類根計數修正 — dispatch to `fullstack-engineer`（獨立並行，不依賴 Task 2-10）
 

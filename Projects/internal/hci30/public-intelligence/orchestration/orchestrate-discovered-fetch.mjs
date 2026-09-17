@@ -65,31 +65,48 @@ export async function orchestrateDiscoveredFetch({
   subjectKind = 'ORGANIZATION',
   query,
   writeDiscoveredSourceImpl,
+  // Task 10 (operator UI): "dry-run first" is this pipeline's own version of
+  // /ops/collect's existing "試跑不會存任何東西" convention -- a human
+  // previewing an unfamiliar URL should be able to see what the runner would
+  // capture (title, text length, whether the content-isolation scan would
+  // flag it) without that preview ever landing in hci.sources/
+  // hci.source_snapshots. `dryRun: true` skips BOTH the tenantId/query
+  // consistency check and the Task 8 write call entirely -- `query` and
+  // `writeDiscoveredSourceImpl` are then not required at all, since nothing
+  // downstream of the runner's own answer is ever touched.
+  dryRun = false,
   enqueueImpl = enqueueDiscoveredFetch,
   getStatusImpl = getRunnerJobStatus,
   sleepImpl = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   pollIntervalMs = 2000,
   maxPollAttempts = 30,
 }) {
-  if (!writeDiscoveredSourceImpl) throw new TypeError('writeDiscoveredSourceImpl is required (e.g. Task 8\'s writeDiscoveredSource)');
+  if (!dryRun && !writeDiscoveredSourceImpl) throw new TypeError('writeDiscoveredSourceImpl is required (e.g. Task 8\'s writeDiscoveredSource) unless dryRun is true');
 
-  // critic review 2026-09-18 (Major, real cross-tenant-write risk): `tenantId`
-  // (told to the runner, cosmetic/audit-only on that side) and `query`
-  // (a caller-supplied, already-SET-ROLE'd connection whose RLS scope is the
-  // ONLY real tenant boundary Task 8's writeDiscoveredSource has -- it takes
-  // no tenant_id parameter at all, sink-hci-discovered.mjs's own header
-  // comment) are two independent inputs this function never used to cross-
-  // check. A caller bug (e.g. a loop over multiple tenants' seeds that pairs
-  // the wrong tenantId with the wrong query) could enqueue as "tenant B" on
-  // the runner while writing to hci.sources/hci.source_snapshots as
-  // whichever tenant `query` is actually SET ROLE'd to -- a real cross-
-  // tenant data-integrity bug, the highest-severity class in this stack, in
-  // the one shared entry point every future caller funnels through. No
-  // caller exists yet, making this the cheapest possible moment to close it.
-  const { rows: tenantCheckRows } = await query('SELECT hci.current_tenant_id() AS id');
-  const actualTenantId = tenantCheckRows[0]?.id;
-  if (actualTenantId !== tenantId) {
-    throw new Error(`tenantId mismatch: caller passed tenantId=${tenantId} but the supplied query's connection is SET ROLE'd to tenant=${actualTenantId ?? 'unknown'} -- refusing to enqueue a runner job under one tenant's identity while writing under another's`);
+  if (!dryRun) {
+    // critic review 2026-09-18 (Major, real cross-tenant-write risk): `tenantId`
+    // (told to the runner, cosmetic/audit-only on that side) and `query`
+    // (a caller-supplied, already-SET-ROLE'd connection whose RLS scope is the
+    // ONLY real tenant boundary Task 8's writeDiscoveredSource has -- it takes
+    // no tenant_id parameter at all, sink-hci-discovered.mjs's own header
+    // comment) are two independent inputs this function never used to cross-
+    // check. A caller bug (e.g. a loop over multiple tenants' seeds that pairs
+    // the wrong tenantId with the wrong query) could enqueue as "tenant B" on
+    // the runner while writing to hci.sources/hci.source_snapshots as
+    // whichever tenant `query` is actually SET ROLE'd to -- a real cross-
+    // tenant data-integrity bug, the highest-severity class in this stack, in
+    // the one shared entry point every future caller funnels through. No
+    // caller existed yet when this was written, making it the cheapest
+    // possible moment to close -- app/server.mjs (Task 10) is now the first
+    // real caller, and it happens to always pass a matching tenantId/query
+    // pair (both come from the same resolveTenant() result), so this check
+    // has never yet had a real bug to catch, only tests that simulate one.
+    // Skipped for a dry run -- there is no write for it to protect.
+    const { rows: tenantCheckRows } = await query('SELECT hci.current_tenant_id() AS id');
+    const actualTenantId = tenantCheckRows[0]?.id;
+    if (actualTenantId !== tenantId) {
+      throw new Error(`tenantId mismatch: caller passed tenantId=${tenantId} but the supplied query's connection is SET ROLE'd to tenant=${actualTenantId ?? 'unknown'} -- refusing to enqueue a runner job under one tenant's identity while writing under another's`);
+    }
   }
 
   const job = await enqueueImpl({ runnerBaseUrl, sharedSecret, targetUrl, tenantId, subjectKind });
@@ -137,6 +154,18 @@ export async function orchestrateDiscoveredFetch({
   // exception") instead of contradicting it.
   if (current.status !== 'completed') {
     throw new Error(`unrecognized terminal job status '${current.status}' -- expected one of ${[...TERMINAL_STATUSES].join(', ')}`);
+  }
+
+  if (dryRun) {
+    // Never calls writeDiscoveredSourceImpl -- a dry run's whole point is
+    // that nothing lands in hci.sources/hci.source_snapshots. finalUrl/
+    // title/textLength/truncated let a human preview exactly what a real
+    // run would have captured; snapshotRef is deliberately NOT surfaced --
+    // the object storage upload already happened for real inside the
+    // runner (Task 5/7's design, not something dry-run mode changes), but
+    // showing that pointer here would invite a caller to treat a "preview"
+    // as if it were an already-durable, DB-backed reference.
+    return { outcome: 'dry_run_completed', retryable: false, jobId: job.id, finalUrl: current.finalUrl || targetUrl, title: current.title ?? null, textLength: current.textLength ?? null, contentHash: current.contentHash };
   }
 
   const written = await writeDiscoveredSourceImpl(query, {

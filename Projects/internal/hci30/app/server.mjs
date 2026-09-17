@@ -11,6 +11,8 @@ import { detectSeverityFloor } from '../packages/intelligence/detect-severity-fl
 import { scoreRuleEngineFindings, detectKeywordStacking, RULE_SET_VERSION } from '../packages/intelligence/rule-engine.mjs';
 import { combineDimensionSources } from '../packages/intelligence/combine-dimension-sources.mjs';
 import { TRUST_DOMAINS } from '../packages/contracts/trust-domains.mjs';
+import { orchestrateDiscoveredFetch } from '../public-intelligence/orchestration/orchestrate-discovered-fetch.mjs';
+import { writeDiscoveredSource } from '../public-intelligence/source-registry/sink-hci-discovered.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,6 +77,16 @@ const pool = new pg.Pool({
   password: readDevDbPassword(),
   database: 'hci_wave1_synthetic',
 });
+
+// Task 10: the isolated fetch-runner's own address, NOT this process's own
+// network capability. ADR-0029 gate 6 applies to this app exactly as much as
+// to a Trigger.dev task -- this process must never fetch an HCI target
+// itself, only ever call the runner's own /enqueue via Task 9's
+// orchestrateDiscoveredFetch(). Absent by default (no fetch-runner running
+// yet in most dev sessions) -- the seed-registration endpoints below fail
+// with a clear 503 rather than silently doing nothing.
+const FETCH_RUNNER_BASE_URL = process.env.HCI_FETCH_RUNNER_BASE_URL;
+const FETCH_RUNNER_SHARED_SECRET = process.env.HCI_FETCH_RUNNER_SHARED_SECRET;
 
 async function queryAsTenant(role, sql, params = []) {
   const client = await pool.connect();
@@ -504,6 +516,96 @@ app.post('/api/hci/v1/cases/:caseId/decisions', async (req, res) => {
     );
     res.status(201).json({ id: rows[0].id, outcome, rationale });
   } catch (err) {
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
+// Task 10 (collector-pipeline operator UI). query/writeDiscoveredSourceImpl
+// are always injected, even for dryRun=true requests -- orchestrateDiscoveredFetch
+// itself skips the tenant-consistency check and the Task 8 write call whenever
+// dryRun is true (orchestrate-discovered-fetch.mjs:86,155-165), so passing them
+// unconditionally is simpler than duplicating that branch here and is provably
+// inert on the dry-run path.
+app.post('/api/hci/v1/seeds', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  // Client-input validation (400) runs BEFORE the fetch-runner-configured
+  // check (503) -- a real curl repro during Task 10 verification showed the
+  // opposite order masking every malformed request behind a 503 "fetch-runner
+  // is not configured" whenever the runner is absent (true for most dev
+  // sessions and until Task 9's deployment question is resolved), hiding the
+  // actual client mistake (missing targetUrl, wrong subject_kind) entirely.
+  const body = req.body || {};
+  const { targetUrl, subject_kind } = body;
+  if (typeof targetUrl !== 'string' || !targetUrl.trim()) return problem(res, 400, 'Bad Request', 'targetUrl is required');
+  if (subject_kind !== 'ORGANIZATION') {
+    return problem(res, 400, 'Bad Request', "subject_kind must be 'ORGANIZATION' -- this pipeline accepts organization-entity seeds only (ADR-011 決策10)");
+  }
+  // critic review 2026-09-18: `dryRun === true` silently treated any
+  // non-boolean (missing, "true" string, 1, null) as false -- a REAL write --
+  // the unsafe direction for a control whose whole purpose is to gate against
+  // one. Matches the stricter sibling pattern this file already uses for
+  // `auto_promote_rule_findings` (line ~241): reject an invalid type instead
+  // of coercing it, and default the ambiguous/omitted case to the safe
+  // (dry-run) interpretation rather than the consequential one.
+  const dryRun = 'dryRun' in body ? body.dryRun : true;
+  if (typeof dryRun !== 'boolean') return problem(res, 400, 'Bad Request', 'dryRun must be a boolean if provided');
+  if (!FETCH_RUNNER_BASE_URL || !FETCH_RUNNER_SHARED_SECRET) {
+    return problem(res, 503, 'Service Unavailable', 'fetch-runner is not configured (HCI_FETCH_RUNNER_BASE_URL / HCI_FETCH_RUNNER_SHARED_SECRET)');
+  }
+  try {
+    const result = await orchestrateDiscoveredFetch({
+      runnerBaseUrl: FETCH_RUNNER_BASE_URL,
+      sharedSecret: FETCH_RUNNER_SHARED_SECRET,
+      targetUrl: targetUrl.trim(),
+      tenantId: t.tenantId,
+      subjectKind: 'ORGANIZATION',
+      dryRun,
+      query: (sql, params) => queryAsTenant(t.role, sql, params),
+      writeDiscoveredSourceImpl: writeDiscoveredSource,
+      pollIntervalMs: 1000,
+      maxPollAttempts: 20,
+    });
+    // 200, not 202: critic review 2026-09-18 -- this handler already awaits
+    // orchestrateDiscoveredFetch to a terminal outcome before responding, so
+    // the body is final, not a "still processing" pointer a client should
+    // poll further. 202 would mislead any caller that follows HTTP
+    // conventions literally.
+    res.status(200).json(result);
+  } catch (err) {
+    problem(res, 502, 'Bad Gateway', err.message);
+  }
+});
+
+app.get('/api/hci/v1/seeds', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  try {
+    const { rows } = await queryAsTenant(
+      t.role,
+      "SELECT id, source_ref, admission_state FROM hci.sources WHERE admission_state = 'DISCOVERED' ORDER BY id"
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    problem(res, 500, 'Internal Server Error', err.message);
+  }
+});
+
+app.post('/api/hci/v1/seeds/:sourceId/reject', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  try {
+    const { rowCount } = await queryAsTenant(
+      t.role,
+      "UPDATE hci.sources SET admission_state = 'REJECTED' WHERE id = $1",
+      [req.params.sourceId]
+    );
+    if (rowCount === 0) return problem(res, 404, 'Not Found', 'no source with that id visible to this tenant');
+    res.status(200).json({ id: req.params.sourceId, admission_state: 'REJECTED' });
+  } catch (err) {
+    // hci.enforce_source_admission_transition() (migration 0020) rejects an
+    // invalid transition (e.g. a source already ACTIVE/REJECTED) with H1022 --
+    // a client-caused conflict, not a server fault.
     problem(res, 409, 'Conflict', err.message);
   }
 });

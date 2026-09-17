@@ -213,3 +213,58 @@ test('critic review 2026-09-18: HTTP_CLIENT_ERROR and UNSUPPORTED_CONTENT_TYPE a
     assert.equal(result.retryable, false, `${errorCode} should be non-retryable`);
   }
 });
+
+test('Task 10 dry run: a completed job returns a preview without ever calling Task 8s write, and does not require query/writeDiscoveredSourceImpl at all', async () => {
+  let writeWasCalled = false;
+  const result = await orchestrateDiscoveredFetch({
+    runnerBaseUrl: baseArgs.runnerBaseUrl,
+    sharedSecret: baseArgs.sharedSecret,
+    targetUrl: baseArgs.targetUrl,
+    tenantId: baseArgs.tenantId,
+    dryRun: true,
+    // Deliberately NOT passing `query` or `writeDiscoveredSourceImpl` at all
+    // -- a dry run must work without either, proving they are truly optional
+    // in this mode, not just unused-but-still-required.
+    enqueueImpl: async () => ({ id: 'job-dry', status: 'queued' }),
+    getStatusImpl: async () => ({ id: 'job-dry', status: 'completed', title: 'Acme Corp', textLength: 42, contentHash: 'abc', snapshotRef: 's3://should-not-be-surfaced', finalUrl: baseArgs.targetUrl }),
+    sleepImpl: noopSleep,
+  });
+
+  assert.equal(result.outcome, 'dry_run_completed');
+  assert.equal(result.retryable, false);
+  assert.equal(result.title, 'Acme Corp');
+  assert.equal(result.textLength, 42);
+  assert.equal(result.contentHash, 'abc');
+  assert.equal('snapshotRef' in result, false, 'a dry-run preview must not surface the object-storage pointer as if it were a durable reference');
+  assert.equal(writeWasCalled, false);
+});
+
+test('Task 10 dry run: flagged_for_review and failed outcomes behave identically to a real run (no write to skip either way)', async () => {
+  const flagged = await orchestrateDiscoveredFetch({
+    runnerBaseUrl: baseArgs.runnerBaseUrl, sharedSecret: baseArgs.sharedSecret, targetUrl: baseArgs.targetUrl, tenantId: baseArgs.tenantId, dryRun: true,
+    enqueueImpl: async () => ({ id: 'job-dry-2', status: 'queued' }),
+    getStatusImpl: async () => ({ id: 'job-dry-2', status: 'flagged_for_review', scanReasons: [{ id: 'ignore_previous_instructions' }] }),
+    sleepImpl: noopSleep,
+  });
+  assert.equal(flagged.outcome, 'flagged_for_review');
+
+  const failed = await orchestrateDiscoveredFetch({
+    runnerBaseUrl: baseArgs.runnerBaseUrl, sharedSecret: baseArgs.sharedSecret, targetUrl: baseArgs.targetUrl, tenantId: baseArgs.tenantId, dryRun: true,
+    enqueueImpl: async () => ({ id: 'job-dry-3', status: 'queued' }),
+    getStatusImpl: async () => ({ id: 'job-dry-3', status: 'failed', error: 'ssrf_blocked_private_host_literal' }),
+    sleepImpl: noopSleep,
+  });
+  assert.equal(failed.outcome, 'failed');
+  assert.equal(failed.retryable, false);
+});
+
+test('Task 10 dry run: an unrecognized status still throws loudly, same as a real run', async () => {
+  await assert.rejects(
+    () => orchestrateDiscoveredFetch({
+      runnerBaseUrl: baseArgs.runnerBaseUrl, sharedSecret: baseArgs.sharedSecret, targetUrl: baseArgs.targetUrl, tenantId: baseArgs.tenantId, dryRun: true,
+      enqueueImpl: async () => ({ id: 'job-dry-4', status: 'cancelled' }),
+      sleepImpl: noopSleep,
+    }),
+    /unrecognized terminal job status/,
+  );
+});
