@@ -13,6 +13,7 @@ from ai_lego.modules.research.literature_providers import literature_search_adap
 from ai_lego.modules.strategy.proposal_artifact import proposal_artifact_adapter
 from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
 from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
+from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.gates import evaluate_workflow_completion_gate
@@ -92,6 +93,44 @@ def build_registered_capability_adapters(
         if handler is not None:
             adapters.register(capability_id, handler)
     return adapters
+
+
+def persist_artifact_output(tenant_id: str, artifact_store: JsonArtifactStore, output: Any) -> Any:
+    """OQ-PROPOSAL-1 (answered 2026-09-17): any capability output shaped ``{"artifact": {"artifact_type": str,
+    "content": str, ...}}`` is CAS-persisted, in addition to being returned inline -- a class fix (every
+    artifact-emitting capability, not just ``artifact.generate_proposal``), matching this module's own
+    documented scope (shared runtime, not one capability's special case).
+
+    The reference is named ``cas_reference`` deliberately, NOT ``portable_artifact_uri``: the Portable Artifact
+    URI grammar (``specs/artifact/portable-uri.schema.yaml``) is scoped to a Project+Source pair a Recipe-run
+    artifact does not have; this stores a real, tenant-scoped, content-addressed reference readable via
+    ``JsonArtifactStore.read`` (``POST /artifacts/read``), not a claim of that other schema's URI shape."""
+    if not isinstance(output, Mapping):
+        return output
+    artifact = output.get("artifact")
+    if not isinstance(artifact, Mapping) or not isinstance(artifact.get("artifact_type"), str) or not isinstance(artifact.get("content"), str):
+        return dict(output)
+    reference = artifact_store.put(tenant_id, artifact["artifact_type"], dict(artifact))
+    enriched = dict(output)
+    enriched["artifact"] = {**artifact, "cas_reference": reference}
+    return enriched
+
+
+def wrap_capability_handlers_with_artifact_persistence(
+    handlers: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]],
+    tenant_id: str,
+    artifact_store: JsonArtifactStore,
+) -> dict[str, Callable[[dict[str, Any], dict[str, Any]], Any]]:
+    """Wrap every capability handler so its output passes through ``persist_artifact_output``. Handlers that do
+    not emit an artifact-shaped value are returned unchanged (dict-copied, never mutated in place)."""
+
+    def make_wrapper(inner: Callable[[dict[str, Any], dict[str, Any]], Any]) -> Callable[[dict[str, Any], dict[str, Any]], Any]:
+        def wrapped(payload: dict[str, Any], node: dict[str, Any]) -> Any:
+            return persist_artifact_output(tenant_id, artifact_store, inner(payload, node))
+
+        return wrapped
+
+    return {capability_id: make_wrapper(handler) for capability_id, handler in handlers.items()}
 
 
 def build_registered_workflow_gate_registry(validator: str) -> WorkflowGateRegistry:

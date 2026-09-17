@@ -186,6 +186,20 @@ class IdentityStore:
             )
         return record
 
+    def list_workspaces(self, tenant_id: str) -> list[dict[str, Any]]:
+        # `created_at` has second-granularity (`_now_iso` truncates microseconds); two workspaces created
+        # within the same second would tie there. `rowid` (SQLite's implicit column; `workspace` has no
+        # `WITHOUT ROWID` clause) is a true, gap-free insertion-order tiebreak -- unlike ordering by
+        # `workspace_id` (a random UUID), which would silently scramble same-second insertion order.
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM workspace WHERE tenant_id = ? ORDER BY created_at, rowid", (tenant_id,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_workspace(self, tenant_id: str, workspace_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM workspace WHERE tenant_id = ? AND workspace_id = ?", (tenant_id, workspace_id)).fetchone()
+        return dict(row) if row else None
+
     # -- Identity + credentials -----------------------------------------------------
 
     def create_identity(self, identity_id: str, tenant_id: str, email: str, display_name: str, password: str) -> dict[str, Any]:
@@ -365,10 +379,14 @@ class IdentityStore:
                 (tenant_id, identity_id, purpose, model, int(input_tokens), int(output_tokens), _now_iso()),
             )
 
-    def ai_usage_totals(self, tenant_id: str) -> dict[str, int]:
+    def ai_usage_totals(self, tenant_id: str, since: str | None = None) -> dict[str, int]:
+        """``since``: an ISO8601 ``YYYY-MM-DDTHH:MM:SSZ`` lower bound (inclusive), matching ``_now_iso``'s own
+        fixed-width format so a plain TEXT comparison in SQLite is correct -- no date parsing needed."""
+        query = "SELECT COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage WHERE tenant_id = ?"
+        params: list[str] = [tenant_id]
+        if since is not None:
+            query += " AND used_at >= ?"
+            params.append(since)
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage WHERE tenant_id = ?",
-                (tenant_id,),
-            ).fetchone()
+            row = conn.execute(query, params).fetchone()
         return {"calls": int(row["calls"]), "input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"])}

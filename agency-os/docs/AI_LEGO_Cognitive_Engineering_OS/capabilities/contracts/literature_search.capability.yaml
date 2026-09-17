@@ -25,12 +25,12 @@ description: >
 
   **Runtime implementations (2026-09-17)**: (1) offline synthetic-corpus
   adapter -- emits `OFFLINE_SOURCE_STALE` + `NEEDS_HUMAN_REVIEW`, the default
-  when no `research.provider` is bound; (2) registered online provider
-  `openalex` (`api.openalex.org`, read-only, no key) -- egress-gated at
-  runtime by COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST, emits
-  `retrieval.mode: ONLINE_PROVIDER`, `citation_verification: NOT_PERFORMED`,
-  `NEEDS_HUMAN_REVIEW`. Neither claims verified citations (MP §42 gates are
-  downstream). See OQ-LITSEARCH-3.
+  when no `research.provider` is bound; (2)-(3) two registered online
+  providers, `openalex` and `crossref` (both `api.*`, read-only, no key) --
+  egress-gated at runtime by COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST, both
+  emit `retrieval.mode: ONLINE_PROVIDER`, `citation_verification:
+  NOT_PERFORMED`, `NEEDS_HUMAN_REVIEW`. Neither claims verified citations
+  (MP §42 gates are downstream). See OQ-LITSEARCH-3.
 
 source_of_truth_for:
   - "AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md §9 (L783-785) -- `ref: literature_search`, `input: research.question`; the ONLY mother-document mention of this capability id (line numbers as of 2026-09-04)"
@@ -243,7 +243,8 @@ open_questions:
       in COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST (EGRESS-EC99-2 mirror). See
       `ai_lego/modules/research/literature_providers.py` and
       `recipes/validated/edd-literature-search-online-v1.recipe.yaml`.
-      Still open: second provider + local corpus export format.
+      Second provider ANSWERED 2026-09-17: Crossref (api.crossref.org) registered alongside
+      OpenAlex, same dispatch-by-source.provider pattern. Still open: local corpus export format.
     owner: "operator / research supervisor"
     blocks: "nothing; offline fixture behaviour unchanged when no provider is bound"
 

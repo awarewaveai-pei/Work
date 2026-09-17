@@ -18,7 +18,7 @@ OFFLINE_SOURCE_STALE = "OFFLINE_SOURCE_STALE"
 NEEDS_HUMAN_REVIEW = "NEEDS_HUMAN_REVIEW"
 # source_kind values a triangulation may cross-reference. OPENALEX_WORK is emitted by
 # ai_lego.modules.research.literature_providers (kept as a literal here to avoid a circular import).
-_CITABLE_SOURCE_KINDS = frozenset({"SYNTHETIC_FIXTURE", "OPENALEX_WORK"})
+_CITABLE_SOURCE_KINDS = frozenset({"SYNTHETIC_FIXTURE", "OPENALEX_WORK", "CROSSREF_WORK"})
 
 _FIXTURE_LITERATURE = (
     {

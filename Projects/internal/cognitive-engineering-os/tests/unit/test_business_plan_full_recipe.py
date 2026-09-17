@@ -7,12 +7,14 @@ and the proposal artifact lists the ids of every record it was composed from.
 from __future__ import annotations
 
 import unittest
+import uuid
 
 from ai_lego.apps.cli.run_financial_assumptions_slice import fixture_args as finassum_args
 from ai_lego.apps.cli.run_market_analysis_slice import fixture_args as market_args
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.modules.strategy.proposal_artifact import proposal_artifact_adapter
 from ai_lego.errors import InvariantViolation
+from ai_lego.platform.identity.store import IdentityStore
 from tests.unit.test_api_main import ApiTestCase, business_planning_review_source
 
 P = make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL")
@@ -82,6 +84,36 @@ class BusinessPlanFullRecipeTests(ApiTestCase):
         self.assertIn(f"NPV ({npv['id']}): {npv['npv']}", content)
         self.assertEqual(artifact["sources"]["npv"], npv["id"])
         self.assertEqual(artifact["sources"]["market_analysis"], outputs["market_analysis"]["id"])
+
+        # OQ-PROPOSAL-1 (answered 2026-09-17): the artifact is ALSO CAS-persisted, not only returned inline.
+        reference = artifact["cas_reference"]
+        self.assertEqual(reference["artifact_type"], "BusinessProposalArtifact")
+        self.assertEqual(reference["tenant_id"], self.tenant["tenant_id"])
+        read_back = self.client.post("/artifacts/read", json={"reference": reference})
+        self.assertEqual(read_back.status_code, 200, read_back.text)
+        self.assertEqual(read_back.json(), {k: v for k, v in artifact.items() if k != "cas_reference"})
+
+    def test_artifact_read_is_tenant_isolated_and_rejects_a_tampered_reference(self):
+        """A reference from another tenant, or one whose content_sha256 no longer matches, is refused (404) --
+        never silently substituted with a different tenant's or a stale artifact."""
+        self._login()
+        response = self.client.post("/recipes/business-plan-full-v1/run", json={"source": full_source(), "run_id": "api-business-full-cas-isolation"})
+        self.assertEqual(response.status_code, 200, response.text)
+        reference = response.json()["workflow"]["context"]["outputs"]["proposal"]["artifact"]["cas_reference"]
+
+        other_store = IdentityStore(self.db_path)
+        other_tenant = other_store.create_tenant(tenant_id=str(uuid.uuid4()), legal_name="Other", home_jurisdiction="jurisdiction-pack.tw.v1", data_residency_region="local-dev", encryption_root_key_ref="other-kek")
+        other_store.create_workspace(str(uuid.uuid4()), other_tenant["tenant_id"], "Default")
+        other_store.create_identity(str(uuid.uuid4()), other_tenant["tenant_id"], "other@example.com", "Other", "correct-horse-battery")
+        other_login = self.client.post("/auth/login", json={"tenant_id": other_tenant["tenant_id"], "email": "other@example.com", "password": "correct-horse-battery"})
+        self.assertEqual(other_login.status_code, 200, other_login.text)
+        cross_tenant_read = self.client.post("/artifacts/read", json={"reference": reference})
+        self.assertEqual(cross_tenant_read.status_code, 404, cross_tenant_read.text)
+
+        self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "user@example.com", "password": "correct-horse-battery"})
+        tampered = dict(reference, content_sha256="0" * 64)
+        tampered_read = self.client.post("/artifacts/read", json={"reference": tampered})
+        self.assertEqual(tampered_read.status_code, 404, tampered_read.text)
 
     def test_proposal_adapter_fails_closed_on_a_missing_upstream_record(self):
         with self.assertRaisesRegex(InvariantViolation, "PROPOSAL_FIELD_MISSING"):

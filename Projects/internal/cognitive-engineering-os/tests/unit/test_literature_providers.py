@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from ai_lego import resolve_spec_root
 from ai_lego.errors import InvariantViolation
+from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.modules.research import literature_providers as lp
 from ai_lego.modules.research.evidence_triangulation import OFFLINE_SOURCE_STALE, triangulate_themes_and_literature
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
@@ -41,6 +42,34 @@ OPENALEX_FIXTURE = {
 def _fake_fetch(url: str) -> dict:
     assert url.startswith(lp.OPENALEX_WORKS_URL + "?"), url
     return OPENALEX_FIXTURE
+
+
+ALLOW_CROSSREF = {lp.EGRESS_ALLOWLIST_ENV: "api.crossref.org"}
+
+CROSSREF_FIXTURE = {
+    "message": {
+        "total-results": 2,
+        "items": [
+            {
+                "DOI": "10.1000/example.crossref.1",
+                "title": ["Arts-based inquiry in doctoral education"],
+                "author": [{"given": "A.", "family": "Author"}, {"given": "B.", "family": "Writer"}],
+                "container-title": ["Journal of Education Research"],
+                "published": {"date-parts": [[2021, 3, 1]]},
+                "is-referenced-by-count": 12,
+                "URL": "https://doi.org/10.1000/example.crossref.1",
+                "abstract": "Arts-based inquiry works.",
+            },
+            {"DOI": "not-a-real-doi", "title": ["Malformed DOI: must be dropped"]},  # fails _DOI_PATTERN
+            {"title": ["No DOI at all: must be dropped"]},  # DOI missing entirely
+        ],
+    }
+}
+
+
+def _fake_crossref_fetch(url: str) -> dict:
+    assert url.startswith(lp.CROSSREF_WORKS_URL + "?"), url
+    return CROSSREF_FIXTURE
 
 
 class EgressGateTests(unittest.TestCase):
@@ -141,8 +170,60 @@ class NormalizationTests(unittest.TestCase):
         self.assertIn("A. Author, B. Writer", item["citation"])
         self.assertIn("(2021)", item["citation"])
         self.assertTrue(item["open_access"])
+        # DOI is normalized to bare form -- OpenAlex's own API returns "https://doi.org/10.xxxx/yyyy", but the
+        # field must be shape-identical to Crossref's bare form (research.citation_verification's DOI-format
+        # check assumes it; fixed 2026-09-17 after the two-provider inconsistency surfaced that check's own bug).
+        self.assertEqual(item["doi"], "10.1000/example.1")
+        self.assertIn("10.1000/example.1", item["citation"])
+        self.assertNotIn("doi.org", item["citation"])
         self.assertEqual(item["provenance"]["epistemic_type"], "SOURCE_FACT")
         self.assertEqual(item["derived_provenance"]["epistemic_type"], "CALCULATED_RESULT")
+
+    def test_crossref_null_name_parts_do_not_become_the_literal_string_none(self):
+        """Critic finding 2026-09-17: Crossref can report an explicit JSON null for `given`/`family`; `.get(key,
+        default)` only applies the default for a MISSING key, not an explicit null, so a naive implementation
+        produces the literal string "None Smith" -- a non-empty string that would silently defeat
+        research.citation_verification's MISSING_AUTHORS check."""
+        self.assertEqual(lp._crossref_authors({"author": [{"given": None, "family": "Smith"}]}), ["Smith"])
+        self.assertEqual(lp._crossref_authors({"author": [{"given": "A.", "family": None}]}), ["A."])
+        self.assertEqual(lp._crossref_authors({"author": [{"given": None, "family": None}]}), [])
+        for name in lp._crossref_authors({"author": [{"given": None, "family": "Smith"}]}):
+            self.assertNotIn("None", name)
+
+    def test_crossref_abstract_jats_markup_is_stripped_to_plain_text(self):
+        """Crossref's abstract is commonly JATS-XML-wrapped (confirmed against Crossref's own REST API docs);
+        storing it verbatim would surface raw markup to any downstream plain-text consumer."""
+        self.assertEqual(lp._strip_jats_markup("<jats:p>Hello <jats:italic>world</jats:italic>.</jats:p>"), "Hello world .")
+        self.assertIsNone(lp._strip_jats_markup(None))
+        self.assertIsNone(lp._strip_jats_markup("   "))
+        self.assertIsNone(lp._strip_jats_markup("<jats:p></jats:p>"))
+
+    def test_crossref_results_become_citable_literature_items(self):
+        result = lp.crossref_literature_search("arts-based inquiry", environ=ALLOW_CROSSREF, fetch=_fake_crossref_fetch)["literature"]
+        self.assertEqual(result["retrieval"]["mode"], "ONLINE_PROVIDER")
+        self.assertEqual(result["retrieval"]["provider"], lp.PROVIDER_CROSSREF)
+        self.assertEqual(result["retrieval"]["side_state"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["retrieval"]["citation_verification"], "NOT_PERFORMED")
+        self.assertEqual(result["retrieval"]["total_count_reported"], 2)
+        self.assertEqual(result["retrieval"]["returned_count"], 1)  # malformed-DOI + no-DOI items dropped
+        item = result["items"][0]
+        self.assertEqual(item["literature_id"], "10.1000/example.crossref.1")
+        self.assertEqual(item["source_kind"], lp.SOURCE_KIND_CROSSREF)
+        self.assertEqual(item["doi"], "10.1000/example.crossref.1")
+        self.assertEqual(item["publication_year"], 2021)
+        self.assertEqual(item["venue"], "Journal of Education Research")
+        self.assertIn("A. Author, B. Writer", item["citation"])
+        self.assertIn("(2021)", item["citation"])
+        self.assertFalse(item["open_access"])  # Crossref /works never reports OA -- must not be guessed True
+        self.assertEqual(item["provenance"]["epistemic_type"], "SOURCE_FACT")
+        self.assertEqual(item["derived_provenance"]["epistemic_type"], "CALCULATED_RESULT")
+
+    def test_crossref_set_id_is_deterministic_and_distinct_from_openalex(self):
+        a = lp.crossref_literature_search("Same Question", environ=ALLOW_CROSSREF, fetch=_fake_crossref_fetch)["literature"]["set_id"]
+        b = lp.crossref_literature_search("same question ", environ=ALLOW_CROSSREF, fetch=_fake_crossref_fetch)["literature"]["set_id"]
+        self.assertEqual(a, b)
+        openalex_id = lp.openalex_literature_search("Same Question", environ=ALLOW, fetch=_fake_fetch)["literature"]["set_id"]
+        self.assertNotEqual(a, openalex_id)
 
     def test_unhashable_provider_value_is_refused_not_a_type_error(self):
         with self.assertRaisesRegex(InvariantViolation, "LITERATURE_PROVIDER_UNREGISTERED"):
@@ -179,6 +260,13 @@ class AdapterRegistryTests(unittest.TestCase):
         with patch.dict("os.environ", {lp.EGRESS_ALLOWLIST_ENV: ""}), self.assertRaisesRegex(InvariantViolation, "NETWORK_EGRESS_DENIED"):
             lp.literature_search_adapter({"research.question": "q", "research.provider": "openalex"}, {})
 
+    def test_crossref_provider_dispatches_and_goes_through_the_egress_gate(self):
+        with patch.dict("os.environ", ALLOW_CROSSREF), patch.object(lp, "fetch_json", _fake_crossref_fetch):
+            out = lp.literature_search_adapter({"research.question": "q", "research.provider": "crossref"}, {})["literature"]
+        self.assertEqual(out["retrieval"]["provider"], lp.PROVIDER_CROSSREF)
+        with patch.dict("os.environ", {lp.EGRESS_ALLOWLIST_ENV: ""}), self.assertRaisesRegex(InvariantViolation, "NETWORK_EGRESS_DENIED"):
+            lp.literature_search_adapter({"research.question": "q", "research.provider": "crossref"}, {})
+
     def test_triangulation_cross_references_provider_items(self):
         literature = lp.openalex_literature_search("q", environ=ALLOW, fetch=_fake_fetch)
         payload = {
@@ -198,17 +286,37 @@ class OnlineRecipeTests(ApiTestCase):
 
     def test_recipe_runs_through_the_api_with_a_registered_provider(self):
         self._login()
-        source = {"research_question": "arts-based inquiry in doctoral education", "provider": "openalex", "per_page": 5}
+        source = {"research_question": "arts-based inquiry in doctoral education", "provider": "openalex", "per_page": 5, "citation_verification": {"record_id": "CITVER-API-001", "provenance": make_provenance("AI_INFERENCE", "AI_GENERATED")}}
         with patch.dict("os.environ", ALLOW), patch.object(lp, "fetch_json", _fake_fetch):
             response = self.client.post("/recipes/edd-literature-search-online-v1/run", json={"source": source, "run_id": "api-edd-online-test"})
         self.assertEqual(response.status_code, 200, response.text)
-        literature = response.json()["workflow"]["context"]["outputs"]["online_literature_search"]["literature"]
+        outputs = response.json()["workflow"]["context"]["outputs"]
+        literature = outputs["online_literature_search"]["literature"]
         self.assertEqual(literature["retrieval"]["mode"], "ONLINE_PROVIDER")
         self.assertEqual(literature["items"][0]["literature_id"], "W1234567890")
+        citation_verification = outputs["citation_verification"]
+        self.assertEqual(citation_verification["literature_set_id"], literature["set_id"])
+        self.assertEqual(citation_verification["scope"], "STRUCTURAL_ONLY")
+        self.assertTrue(citation_verification["checks"][0]["structurally_complete"])
+
+    def test_recipe_runs_through_the_api_with_the_second_provider(self):
+        """OQ-EDD-LITERATURE-ONLINE-1 (answered 2026-09-17): Crossref joins OpenAlex as a registered provider,
+        selected the same way -- by the Source, not by a separate Recipe."""
+        self._login()
+        source = {"research_question": "arts-based inquiry in doctoral education", "provider": "crossref", "per_page": 5, "citation_verification": {"record_id": "CITVER-API-002", "provenance": make_provenance("AI_INFERENCE", "AI_GENERATED")}}
+        with patch.dict("os.environ", ALLOW_CROSSREF), patch.object(lp, "fetch_json", _fake_crossref_fetch):
+            response = self.client.post("/recipes/edd-literature-search-online-v1/run", json={"source": source, "run_id": "api-edd-online-crossref-test"})
+        self.assertEqual(response.status_code, 200, response.text)
+        outputs = response.json()["workflow"]["context"]["outputs"]
+        literature = outputs["online_literature_search"]["literature"]
+        self.assertEqual(literature["retrieval"]["provider"], "crossref")
+        self.assertEqual(literature["items"][0]["literature_id"], "10.1000/example.crossref.1")
+        citation_verification = outputs["citation_verification"]
+        self.assertEqual(citation_verification["checks"][0]["doi_format_valid"], True)
 
     def test_recipe_fails_closed_when_egress_is_not_allowlisted(self):
         self._login()
-        source = {"research_question": "q", "provider": "openalex", "per_page": 5}
+        source = {"research_question": "q", "provider": "openalex", "per_page": 5, "citation_verification": {"record_id": "CITVER-API-003", "provenance": make_provenance("AI_INFERENCE", "AI_GENERATED")}}
         with patch.dict("os.environ", {lp.EGRESS_ALLOWLIST_ENV: ""}), patch.object(lp, "fetch_json", _fake_fetch):
             response = self.client.post("/recipes/edd-literature-search-online-v1/run", json={"source": source, "run_id": "api-edd-online-denied"})
         # Durable-run convention: HTTP 200 with the run journaled as FAILED and the step error recorded.

@@ -17,6 +17,8 @@ from fastapi import FastAPI
 
 from ai_lego.apps.api import main as api_main
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
+from ai_lego.data.object.json_artifact_store import JsonArtifactStore
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.modules.research.review import fixture_review
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.support import b64
@@ -29,6 +31,11 @@ class ApiTestCase(unittest.TestCase):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.db_path = Path(self._tmpdir.name) / "identity.sqlite3"
         api_main.app.dependency_overrides[api_main.get_store] = lambda: IdentityStore(self.db_path)
+        # Isolates artifact CAS writes from the real PRODUCT_ROOT/.runtime/artifact-cas (critic finding
+        # 2026-09-17: run_recipe originally called get_artifact_store() directly, bypassing overrides
+        # entirely -- fixed to use Depends(get_artifact_store), which is what makes this override effective).
+        self._artifact_cas_dir = Path(self._tmpdir.name) / "artifact-cas"
+        api_main.app.dependency_overrides[api_main.get_artifact_store] = lambda: JsonArtifactStore(TenantScopedCas(self._artifact_cas_dir))
         # base_url is https:// (not the TestClient default http://testserver) because the login
         # cookie is Secure -- deliberately, since Phase 1 deploys behind real TLS
         # (COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md) -- a Secure cookie is silently dropped by any

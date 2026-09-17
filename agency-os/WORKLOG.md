@@ -1,4 +1,34 @@
 # Worklog
+## 2026-09-17（續9）Cognitive OS：Project + Source Import 第一個 HTTP 介面（Master Plan Phase 1 新 plane）
+
+- 操作者「繼續完成」→「全部都要」，確認範圍含「Master Plan Phase 1 其餘 plane」。查現況發現 Project／Source 網域物件 + SQLite repository（含內建 events 表＝Versioning 原語）早在 Phase 5 research 工作就建好且有測試，只缺 HTTP 介面——本輪補這塊，不是從零蓋。
+- 做法：
+  - 新路由：`POST /projects`、`GET /projects`、`GET /projects/{id}`、`GET /projects/{id}/history`、`POST /projects/{id}/sources`、`GET /projects/{id}/sources`、`GET /projects/{id}/sources/{id}`、`GET /projects/{id}/sources/{id}/content`、`GET /projects/{id}/sources/{id}/history`。
+  - Source 內容 Phase 1 僅 UTF-8 文字（`TEXT_MEDIA_TYPES`），5 MiB 上限，存獨立租戶 CAS（`source-cas`，跟 `artifact-cas`／`workflow-cas`分開）。
+  - `IdentityStore` 新增 `list_workspaces`/`get_workspace`；建 Project 未指定 `workspace_id` 時自動用租戶唯一的預設 workspace。
+  - entitlement capability：`project.manage`／`source.manage`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_project_source_api.py tests/unit/test_identity_store.py -q` | exit=0 | ms=~18000 | result=24+31 tests PASS
+- REALTEST_EVIDENCE: tool=Browser | cmd=本機 uvicorn 真實 HTTP：登入→建 project→加 source→讀回 content 逐位元組相同→history 回真實 `ProjectCreated` 事件（`record_sha256` 相符）→list 回 1 筆 | exit=0 | ms=~2000 | result=全數符合預期，見對話截圖
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/3m/2n（M1 分類不符檢查在 CAS 寫入「之後」才做，任何不符請求都留下永久孤兒 CAS 物件→搬到寫入前；M2 source content 無大小上限，可被灌爆硬碟→加 `MAX_SOURCE_CONTENT_BYTES` 5 MiB；M3 專案重名撞 `UNIQUE(tenant_id, workspace_id, name)` 未接 `sqlite3.IntegrityError`→裸 500→改乾淨 409；m4 workspace 數量訊息 0 個和 >1 個共用誤導文字；m5 四條路由的跨租戶隔離測試只用假 UUID 沒用真實第二租戶）；每項有回歸測試
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`MAX_SOURCE_CONTENT_BYTES|SOURCE_PROJECT_CLASSIFICATION_MISMATCH|PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE|get_project_source_repository\(\)|get_source_cas\(\)` | hits=13（皆為本輪程式/測試自身或既有 repository 層的對應防禦層，無殘留錯誤；`get_project_source_repository()`/`get_source_cas()` 裸呼叫 0 處，全走 `Depends`）
+- 順手修：`agency-os/docs/operations/RUNNABLE_DEMOS.md` 發現 10 列真實 2026-09-14 demo 列卡在說明段前面、markdown table 外面（本 session 更早的手誤，非本輪造成，順手搬回表格內）——已併入上一則「續8」commit。
+- 剩餘：Canvas（Master Plan §11 Multimodal Knowledge Canvas，只有 schema、零 runtime code，真正待建的新模組）、Versioning 只做到 events 表讀取，未做 diff/rollback UI、Local-first Storage 是既有架構屬性（SQLite everywhere + egress deny-by-default）待正式寫文件確認滿足，非新程式。
+
+## 2026-09-17（續8）Cognitive OS 收尾：提案書 CAS 存檔、AI 每日用量上限、第二個文獻來源＋結構化引文查核、fault_tree 演算法治本
+
+- 操作者「繼續完成」→「全部都要」。本輪收掉四個已知缺口 + 一個技術債。
+- 做法：
+  - 提案書 CAS 存檔（OQ-PROPOSAL-1）：`ai_lego/apps/recipe_runtime.py` 新 `persist_artifact_output`/`wrap_capability_handlers_with_artifact_persistence`——任何 capability 輸出符合 `{"artifact": {artifact_type, content}}` 都存進租戶 CAS（類別修法，非只修 proposal），回傳掛 `cas_reference`；新 `POST /artifacts/read`（租戶＋內容雜湊雙重驗證）。刻意不用 `portable_artifact_uri`（那個 schema 綁 Project+Source，Recipe-run 產出的 artifact 沒有）。
+  - AI 每日用量上限（OQ-AIDRAFT-2）：`provider.py` 新 `daily_token_budget()`（env `COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET`，預設 200,000/天，設錯值直接 503 不會悄悄變無上限）；`store.ai_usage_totals` 加 `since` 篩選；`_require_ai` 超額回 429；`/ai/status` 多回 `budget` 欄位。
+  - 第二個文獻來源（OQ-EDD-LITERATURE-ONLINE-1 / OQ-LITSEARCH-3 後半）：`literature_providers.py` 新增 Crossref（`api.crossref.org`，免金鑰）；同批發現 OpenAlex 的 `doi` 欄位帶 `https://doi.org/` 前綴、Crossref 是裸 DOI，兩來源格式不一致——新 `_normalize_doi()` 統一成裸 DOI（治本，不是各自遷就）。
+  - 結構化引文查核（MP §42 Research Integrity Engine 第一項子能力，僅結構範圍）：新方法 `research.citation_verification`——檢查 DOI 格式、作者非空、年份合理、標題非空；`venue` 缺失只算軟警告不算失敗（preprint 本來就常沒有）。GENUINE_COMPUTE（builder 不收 checks/summary 參數，全從 literature 算），gate 從記錄自己存的 `literature_items` 重新推導比對。明確排除 Retraction Check／Contradiction Detection（MP §42 其餘子能力，未建，contract 裡的 `scope: STRUCTURAL_ONLY` 自報邊界）。接進 `edd-literature-search-online-v1` recipe 第二步。
+  - `root_cause.fault_tree` 演算法治本（`OQ-FAULTTREE-3`，2026-09-07 發現、當時刻意不倉促修）：`_cycle_violations` 改三色 DFS（WHITE/GRAY/BLACK）＋證明無環後用 post-order DP 算最長鏈（O(V+E)，取代舊版每條路徑重探索的指數複雜度）；`evaluate_top_event` 內 `fires` 加 memo dict。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_business_plan_full_recipe.py tests/unit/test_literature_providers.py tests/unit/test_citation_verification.py tests/unit/test_fault_tree.py tests/unit/test_ai_gateway.py -q` | exit=0 | ms=~90000 | result=全綠（含新增：CAS 往返讀回一致、跨租戶讀取 404、竄改內容雜湊 404、Crossref 真實網路查詢回 5 筆含真 DOI、OpenAlex/Crossref 混合跑過 citation_verification 皆得到誠實結果、每日額度超額 429／設錯值 503、fault_tree 20-layer diamond 圖從 ~6s 降到 0ms 且環偵測在共用子圖裡仍抓得到）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST=api.crossref.org python -c "..."` | exit=0 | ms=~2000 | result=真打 api.crossref.org，回 5 篇真論文含真 DOI（非 fixture）
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/2m/3n（M1 `run_recipe` 直接呼叫 `get_artifact_store()` 而非 `Depends(...)`，測試永遠寫真的 `.runtime/artifact-cas`、override 失效→改 `Depends`，測試也補 override；M2 AI 每日額度 check-then-record 之間有 TOCTOU race，同租戶並發請求可雙雙 溜過→per-tenant `threading.Lock` 包住整個檢查-呼叫-記錄臨界區，確定性測試證明（非碰運氣）；m3 `_verify_item` 宣稱不丟例外卻沒 guard 非 dict 輸入；m4 Crossref `given`/`family` 為顯式 null 時 `.get(k,'')` 不擋，變成字面 `"None Smith"` 騙過 `MISSING_AUTHORS`；m5 Crossref abstract 帶 JATS XML 標籤未剝除）；每項有回歸測試
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`get_artifact_store\(\)|portable_artifact_uri|citation_verification` | hits=3（`get_artifact_store()` 剩餘 1 處為函式自身定義；`portable_artifact_uri` 剩餘 1 處為 `persist_artifact_output` docstring 自己解釋為何不用；`citation_verification` 未出現於 `method-inventory.yaml` 是預期——GROUNDED ORIGINAL DESIGN 方法本就不進那份 Atlas 目錄，同 `art_therapy.*` 慣例；均非殘留錯誤）
+- 剩餘：MP §42 其餘七項子能力（Evidence Strength／Retraction Check／Contradiction Detection／Data Provenance／Methodology Check／Statistical Validation／Reproducibility Package）未建；跨 provider 去重/新鮮度政策未做（OQ-EDD-LITERATURE-ONLINE-1 部分回答，非全解）；DOI 線上解析（OQ-CITVER-1）與 retraction 資料源選擇（OQ-CITVER-2）留待操作者決定。
+
 ## 2026-09-17（續9）HCI-30 蒐集器 Task 4+5：DNS-rebind 防護＋SSRF corpus + 物件儲存 client 端寫入路徑，救回零執行的壞 session 產物，critic 覆審 1 Critical/2 Major 全修
 
 [任務] 承接續7（Task 3），Task 4（SSRF/DNS-rebind 防護）與 Task 5（物件儲存寫入路徑）已由前一個 session 派 `fullstack-engineer` agent 寫完程式碼，但那兩個 agent 整個 session 的 Bash 工具都壞掉（同一 wrapper bug：`/usr/bin/bash: -c: line NN: unexpected EOF`），完全零執行——程式碼從未跑過、未過 critic review、未 commit。操作者要求本 session 先驗證 Bash 正常（`echo hi` 成功），再依序真跑測試、修錯、critic 覆審、commit+push、更新文件。

@@ -73,6 +73,29 @@ class AnthropicProvider:
         )
 
 
+DAILY_TOKEN_BUDGET_ENV = "COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET"
+DEFAULT_DAILY_TOKEN_BUDGET = 200_000
+
+
+def daily_token_budget(environ: dict[str, str] | None = None) -> int:
+    """OQ-AIDRAFT-2 (answered 2026-09-17): a per-tenant daily ceiling on AI Gateway token usage (input+output
+    combined), checked against ``ai_usage`` before every draft call -- Phase 1 has no billing/credits system,
+    so this is the only thing standing between a runaway loop (or a malicious/confused caller hammering
+    ``/ai/draft/*``) and an unbounded Anthropic bill. A misconfigured value fails closed (raises) rather than
+    silently falling back to unlimited."""
+    env = os.environ if environ is None else environ
+    raw = env.get(DAILY_TOKEN_BUDGET_ENV, "").strip()
+    if not raw:
+        return DEFAULT_DAILY_TOKEN_BUDGET
+    try:
+        value = int(raw)
+    except ValueError:
+        raise InvariantViolation(f"AI_DAILY_TOKEN_BUDGET_INVALID: {raw!r} is not an integer") from None
+    if value <= 0:
+        raise InvariantViolation(f"AI_DAILY_TOKEN_BUDGET_INVALID: must be a positive integer, got {value}")
+    return value
+
+
 def provider_from_env(environ: dict[str, str] | None = None) -> AnthropicProvider | None:
     """``None`` when no key is configured -- the caller must answer "unconfigured", not fall back."""
     env = os.environ if environ is None else environ

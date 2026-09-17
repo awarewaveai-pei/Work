@@ -62,7 +62,13 @@ open_questions:
     question: "Should the artifact be stored to the tenant CAS with a Portable Artifact URI in addition to being returned inline?"
     owner: "operator"
     blocks: "nothing in v1"
+    status: "ANSWERED 2026-09-17 -- yes, in addition. ai_lego/apps/recipe_runtime.py persist_artifact_output()
+      CAS-stores every artifact-shaped capability output (not proposal-specific -- a class fix) via
+      JsonArtifactStore, reference exposed as artifact.cas_reference, readable via POST /artifacts/read
+      (tenant- and content-hash-verified). Deliberately NOT the Portable Artifact URI grammar
+      (specs/artifact/portable-uri.schema.yaml is scoped to a Project+Source pair a Recipe-run artifact does
+      not have) -- see that decision recorded in persist_artifact_output()'s own docstring."
 
 verification:
-  method: "Validated against specs/domain/capability-contract.schema.yaml via tests/run_golden_tests.py check 2c; exercised end to end by tests/unit/test_business_plan_full_recipe.py."
+  method: "Validated against specs/domain/capability-contract.schema.yaml via tests/run_golden_tests.py check 2c; exercised end to end by tests/unit/test_business_plan_full_recipe.py (incl. CAS round-trip + tenant isolation)."
   note: "No mother document was modified."

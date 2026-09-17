@@ -981,6 +981,12 @@
   - ✅ **【2026-09-17 完成】OQ-FAULTTREE-3 治本**：`_cycle_violations` 改三色 DFS（WHITE/GRAY/BLACK）+ acyclic 後 post-order DP 算最長鏈；`evaluate_top_event` 內 `fires` 加 memo dict。20-layer diamond-sharing 圖從 ~6s 降到 0ms（真實計時，`tests/unit/test_fault_tree.py::test_diamond_sharing_graph_is_linear_time_not_exponential`），另補一個「shared 子圖裡藏環」正確性回歸測試，106 tests 全綠（104 舊 + 2 新）。細節見 WORKLOG 2026-09-17「fault_tree O(V+E)」。
   - **完成定義（本條目，持續進行中）**：每個方法切片真跑通過、有測試證據、有真實花費時間記錄；操作者已明確表示「一直做直到完美完成」，本條目維持開啟直到範圍轉向或操作者喊停（現實邊界：`contract-backlog.yaml` 目前 56 個 tier_1 concrete entry（grep 驗證，2026-09-07），加計 57 個已建 module/slice 累計，屬多 session 長期工程，非單一 session 可收尾；Atlas 全文 F01-F24 個別工具總數遠大於此，尚未逐一清點）。
 
+- [x] **【2026-09-17】Cognitive OS：Project + Source Import HTTP 介面（Master Plan Phase 1 新 plane 第一片）**
+  - Project／Source 網域物件 + repository（含 events 表版本歷史）Phase 5 就建好，本輪補 9 條 HTTP 路由 + entitlement + 5 MiB 上限 CAS 存檔。critic 0c/3m/2n 全修（孤兒 CAS 物件、無大小上限、重名撞 UNIQUE 裸 500）。真實 uvicorn HTTP 全鏈驗證過。細節見 WORKLOG 2026-09-17「續9」。
+  - 未完成：Canvas（只有 schema 零 code，真正待建）；Versioning 只有 events 讀取無 diff/rollback；Local-first Storage 待補文件確認（架構屬性已滿足，非新程式）。
+- [x] **【2026-09-17】Cognitive OS 收尾（操作者：「繼續完成」→「全部都要」）：提案書 CAS、AI 每日用量上限、Crossref＋結構化引文查核、fault_tree 治本**
+  - 提案 artifact 存租戶 CAS（`POST /artifacts/read` 讀回，OQ-PROPOSAL-1）；`/ai/draft/*` 每租戶每日 token 上限（OQ-AIDRAFT-2，429/503 fail-closed）；`literature_search` 第二來源 Crossref + 兩來源 DOI 格式統一（`_normalize_doi`）；新方法 `research.citation_verification`（MP §42 結構範圍）接進 EdD 線上搜尋 recipe；`root_cause.fault_tree` 演算法治本（O(V+E)，OQ-FAULTTREE-3 收）。critic 0c/2m/3n 全修（含測試隔離 DI bug、AI 額度 TOCTOU race 用 per-tenant lock 關掉）。細節見 WORKLOG 2026-09-17「Cognitive OS 收尾」。
+  - 未完成：MP §42 其餘七項子能力；跨 provider 去重；DOI 線上解析／retraction 資料源（待操作者選）；Master Plan Phase 1 其餘 plane（Project／Source Import／Canvas／Versioning／Local-first Storage）尚未動工——這是下一輪主要範圍。
 - [x] **【2026-09-17】Cognitive OS AI Gateway + 引導式 UI（操作者：「全部去完成」／「這個垃圾東西我怎麼使用」）✅ 同日完成並部署**
   - 白話描述 → AI 起草（Anthropic，只有這一步計費）→ 方法自己的 builder+gates 驗證 → 修改 → 執行；新 UI 取代「手貼 JSON」；順手治本 42 個方法 `/invoke` 501（RECORD_ID_PREFIX 類別缺口）。critic 0c/3m/4n 全修。細節、實測與費用邊界見 WORKLOG 2026-09-17「Cognitive OS AI Gateway」；部署見同日「prod redeploy #3」。
   - 未完成（真實剩餘）：Master Plan Phase 1 其餘 plane（Project／Source Import／Canvas／Versioning／Local-first Storage）；提案書存 CAS（OQ-PROPOSAL-1）；MP §42 citation verification gate；每租戶 token 預算（OQ-AIDRAFT-2）；Phase 2 billing/SSO/KMS 依 9/12 商業弧延後；藝術治療 WordPress 外掛等操作者架好站。
@@ -1720,5 +1726,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-13 15:15:13 UTC_
+_Last synced: 2026-09-17 14:30:03 UTC_
 

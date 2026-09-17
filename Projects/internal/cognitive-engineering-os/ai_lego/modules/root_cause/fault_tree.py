@@ -85,12 +85,15 @@ MAX_GATE_DEPTH = 100
 # traversal instead: real fault trees are shallow (Atlas's own worked
 # examples across the whole spec root -- e.g. security.attack_tree's own
 # 3-level §12.38 case -- never approach three digits of depth). This bound
-# rejects only pathological/malicious input, not real usage, and BOUNDS
-# PER-PATH length only -- it does NOT bound total traversal work on a
-# maximally-shared DAG (measured: a 20-gate diamond-sharing graph with every
-# path <= 61 hops already takes ~6s; this is genuinely exponential in the
-# sharing factor, not polynomial -- see `_cycle_violations`'s own docstring
-# and OQ-FAULTTREE-3 for the honest scope and the deferred O(V+E) fix).
+# rejects only pathological/malicious input, not real usage. OQ-FAULTTREE-3
+# (the former exponential-on-a-shared-DAG behaviour of `_cycle_violations`
+# and `evaluate_top_event`'s own `fires`) is RESOLVED 2026-09-17: both are
+# now O(V+E) -- see `_cycle_violations`'s own docstring for the three-color
+# DFS + longest-path DP that replaced the old per-path re-exploration, and
+# `evaluate_top_event`'s own `fires` for the memoization that replaced its
+# unmemoized recursion. A 20-gate diamond-sharing graph that previously took
+# ~6s now completes in the same order of magnitude as a non-shared graph of
+# the same size.
 _KNOWN_BASIC_EVENT_KEYS_REQUIRED = frozenset({"id", "description"})
 _KNOWN_BASIC_EVENT_KEYS_ALL = frozenset({"id", "description", "probability"})
 _KNOWN_GATE_KEYS = frozenset({"id", "description", "gate_type", "required_count", "children"})
@@ -186,48 +189,71 @@ def _referential_integrity_violations(top_event: dict[str, Any], basic_events: l
 
 
 def _cycle_violations(gates: list[dict[str, Any]]) -> list[str]:
-    """Invariant #2, cyclic half: iterative DFS (an explicit stack, not Python call recursion, so this never
-    raises RecursionError regardless of graph size), tracking the CURRENT path -- a gate id appearing twice
-    on the same path is a real cycle. Run from EVERY gate as a potential start, not only the one reachable
-    from ``top_event`` -- an orphan cyclic sub-graph unreachable from the top event is still a malformed
-    record, not merely a wasted one. Only GATE-to-GATE edges extend the tracked path/depth: a basic_event
-    child is always a leaf (it has no ``children`` of its own), so it can never participate in a cycle and is
-    never pushed -- MAX_GATE_DEPTH therefore bounds the number of GATES chained together, not the trailing
-    basic_event leaf, matching the parameter's own name. A chain longer than that is refused the same way,
-    without waiting to discover whether it is cyclic or merely pathologically long.
+    """Invariant #2, cyclic half: iterative three-color DFS (WHITE=unvisited, GRAY=on the current DFS stack,
+    BLACK=fully explored and proven acyclic), an explicit stack rather than Python call recursion so this
+    never raises RecursionError regardless of graph size. A gate id colored GRAY when reached again is a real
+    cycle (it is an ancestor of itself on the active path). Run from every still-WHITE gate as a potential
+    start -- an orphan cyclic sub-graph unreachable from the top event is still a malformed record, not
+    merely a wasted one. Only GATE-to-GATE edges are pushed: a basic_event child is always a leaf (no
+    ``children`` of its own), so it can never participate in a cycle.
 
-    SCOPE (disclosed, not a silent gap -- and stronger than "not asymptotically optimal": this is
-    EXPONENTIAL, not polynomial, on a maximally-shared graph): this is a plain path-tracking DFS with no
-    cross-path memoization -- a gate reachable via many different parent paths (legitimate DAG sharing, e.g.
-    one basic event feeding two different subsystems) is re-explored down each path rather than cached as
-    "already known acyclic". MAX_GATE_DEPTH bounds per-path length and guarantees TERMINATION (no infinite
-    loop, no RecursionError) and CORRECTNESS (a real cycle or a too-long chain is always caught), but does
-    NOT bound total work: on a diamond-heavy DAG the number of re-explored paths grows with the sharing
-    factor, not just the gate count (measured: 20 gates / max path 61 -> ~6s). Real Method Atlas worked
-    examples are shallow AND narrow enough for this to be a non-issue today; a genuinely wide/deep supplied
-    fault tree could make this the slow path. Deferred fix (tracked, not silently dropped): three-color
-    DFS with a visited-set memo turns this into O(V+E) -- see OQ-FAULTTREE-3. Same class of
-    disclosed-not-yet-solved limitation `security.attack_tree`'s own OQ-ATTACKTREE-5 models for its own
-    algorithm, but that one is genuinely sub-optimal-not-optimal; this one is worse (exponential), which is
-    why it is now tracked as its own follow-up rather than filed under the same note.
+    O(V+E), fixing the FORMER exponential behaviour (OQ-FAULTTREE-3, now resolved 2026-09-17): each gate is
+    colored GRAY exactly once and BLACK exactly once across the ENTIRE call (a BLACK node reached again via a
+    different parent -- legitimate DAG sharing, e.g. one basic event feeding two subsystems -- is recognized
+    as already-proven-acyclic and never re-explored), and each edge is examined a constant number of times.
+    The old plain path-tracking DFS re-explored a shared gate down every path that reached it, which measured
+    ~6s on a 20-gate diamond-sharing graph; this version is linear in graph size.
+
+    MAX_GATE_DEPTH (the longest chain of GATES, matching the parameter's own name -- the trailing
+    basic_event leaf does not count) is enforced by computing, once the graph is proven acyclic, the longest
+    downward gate-chain starting at each gate via a post-order dynamic-programming pass
+    (``depth[node] = 1 + max(depth[child] for child in <its GATE children>, default=0)``) -- itself O(V+E)
+    and exact (this is the classic longest-path-in-a-DAG recurrence, safe here specifically because
+    acyclicity was just proven; it would be ill-defined on a cyclic graph). The overall worst-case reported
+    reason (cycle vs. too-deep) can differ from the old implementation's on a record that is BOTH cyclic AND
+    too deep in different branches simultaneously -- an edge case within an edge case; either reason means
+    the record is invalid, and both are still 100% caught.
 
     Precondition: every id in the graph already resolves (call only after
     ``_referential_integrity_violations`` returns empty) -- this function does not itself guard against a
     dangling id, it silently treats an unresolvable id as a leaf (already reported elsewhere)."""
     gates_by_id = {g["id"]: g for g in gates}
+    gate_children: dict[str, list[str]] = {gid: [c for c in g["children"] if c in gates_by_id] for gid, g in gates_by_id.items()}
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: dict[str, int] = {gid: WHITE for gid in gates_by_id}
+    depth: dict[str, int] = {}
+
     for start in gates_by_id:
-        stack: list[tuple[str, tuple[str, ...]]] = [(start, (start,))]
+        if color[start] != WHITE:
+            continue
+        color[start] = GRAY
+        path: list[str] = [start]
+        # Each stack frame is [node_id, its resolvable gate-children, next-child-index-to-examine] -- a list
+        # (not a tuple) so the index can be advanced in place without popping/re-pushing the frame.
+        stack: list[list[Any]] = [[start, gate_children[start], 0]]
         while stack:
-            node_id, path = stack.pop()
-            if len(path) > MAX_GATE_DEPTH:
-                return [f"gate chain exceeds MAX_GATE_DEPTH={MAX_GATE_DEPTH} (path starts {list(path[:3])}...)"]
-            g = gates_by_id[node_id]
-            for child_id in g["children"]:
-                if child_id not in gates_by_id:
-                    continue  # a basic_event id (or an unresolvable id already reported elsewhere) -- a leaf, cannot participate in a cycle
-                if child_id in path:
-                    return [f"cycle detected: {' -> '.join(path)} -> {child_id}"]
-                stack.append((child_id, path + (child_id,)))
+            frame = stack[-1]
+            node_id, children, idx = frame
+            if idx < len(children):
+                frame[2] += 1
+                child_id = children[idx]
+                if color[child_id] == GRAY:
+                    cycle_start = path.index(child_id)
+                    return [f"cycle detected: {' -> '.join(path[cycle_start:])} -> {child_id}"]
+                if color[child_id] == WHITE:
+                    color[child_id] = GRAY
+                    path.append(child_id)
+                    stack.append([child_id, gate_children[child_id], 0])
+                # BLACK: already fully explored and proven acyclic -- no cycle can run through it, skip.
+            else:
+                depth[node_id] = 1 + max((depth[c] for c in children), default=0)
+                color[node_id] = BLACK
+                stack.pop()
+                path.pop()
+
+    max_depth = max(depth.values(), default=0)
+    if max_depth > MAX_GATE_DEPTH:
+        return [f"gate chain exceeds MAX_GATE_DEPTH={MAX_GATE_DEPTH} (longest chain found: {max_depth} gates)"]
     return []
 
 
@@ -337,16 +363,30 @@ def evaluate_top_event(record: dict[str, Any], occurred_basic_event_ids: set[str
     family): this function performs ONLY the boolean evaluation over an ALREADY-VALID record -- referential
     integrity and acyclicity are the caller's own responsibility (``generate_fault_tree_record`` /
     ``evaluate_fault_tree_integrity_gate`` already proved both before this function is meant to run); it
-    does not re-validate shape and recurses with no depth guard on a record that skipped that validation."""
+    does not re-validate shape, and recurses with no depth guard on a record that skipped that validation
+    (safe in practice: an already-valid record's gate-chain depth is bounded by ``MAX_GATE_DEPTH`` = 100,
+    far under Python's default recursion limit).
+
+    MEMOIZED (fixed 2026-09-17, OQ-FAULTTREE-3's second half): a shared gate reachable via more than one
+    parent (legitimate DAG sharing) is evaluated exactly once and cached, not re-evaluated down every path
+    that reaches it -- the same O(V+E) fix ``_cycle_violations`` received, applied to boolean propagation
+    instead of cycle detection. Safe to cache unconditionally: this is a pure function of
+    ``occurred_basic_event_ids`` alone (no hidden state), so a gate's fired/not-fired verdict cannot change
+    between two occurrences within the same call."""
     gates_by_id = {g["id"]: g for g in record["gates"]}
     basic_event_ids = {e["id"] for e in record["basic_events"]}
+    memo: dict[str, bool] = {}
 
     def fires(node_id: str) -> bool:
         if node_id in basic_event_ids:
             return node_id in occurred_basic_event_ids
+        if node_id in memo:
+            return memo[node_id]
         g = gates_by_id[node_id]
         true_children = sum(1 for child_id in g["children"] if fires(child_id))
-        return true_children >= g["required_count"]
+        result = true_children >= g["required_count"]
+        memo[node_id] = result
+        return result
 
     return fires(record["top_event"]["gate_ref"])
 

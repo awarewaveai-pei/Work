@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import inspect
 import json
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -17,7 +19,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_gateway import draft as draft_mod
 from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs, draft_recipe_source, extract_json_object, method_input_spec, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, MODEL_ENV, AiCompletion, AnthropicProvider, provider_from_env
+from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MODEL_ENV, AiCompletion, AnthropicProvider, provider_from_env
 from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
 
@@ -271,9 +273,90 @@ class ApiRouteTests(ApiTestCase):
         self.assertEqual(body["usage"], {"input_tokens": 100, "output_tokens": 50})
         status = self.client.get("/ai/status").json()
         self.assertEqual(status["usage"], {"calls": 1, "input_tokens": 100, "output_tokens": 50})
+        self.assertEqual(status["budget"], {"daily_limit": DEFAULT_DAILY_TOKEN_BUDGET, "used_today": 150, "remaining_today": DEFAULT_DAILY_TOKEN_BUDGET - 150})
         invoked = self.client.post("/methods/systems.flowchart/invoke", json=body["draft"])
         self.assertEqual(invoked.status_code, 200, invoked.text)
         self.assertTrue(all(g["status"] == "PASS" for g in invoked.json()["gate_results"]))
+
+    def test_daily_token_budget_blocks_further_drafts_once_exceeded(self):
+        """OQ-AIDRAFT-2 (answered 2026-09-17): Phase 1 has no billing/credits, so a per-tenant daily token
+        ceiling is the only thing stopping a runaway loop from an unbounded Anthropic bill."""
+        self._login()
+        self._use(ScriptedProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False)))
+        with patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: "100"}):
+            response = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
+            self.assertEqual(response.status_code, 200, response.text)  # 0 used before this call -> allowed
+            status = self.client.get("/ai/status").json()
+            self.assertEqual(status["budget"], {"daily_limit": 100, "used_today": 150, "remaining_today": 0})
+            blocked = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
+            self.assertEqual(blocked.status_code, 429, blocked.text)
+            self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED", blocked.json()["detail"])
+
+    def test_daily_token_budget_only_counts_todays_usage(self):
+        self._login()
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        store.record_ai_usage(self.tenant["tenant_id"], self.identity["identity_id"], "draft:x", "m", 500, 500)  # unbounded timestamp -> "today"
+        with store._connect() as conn:
+            conn.execute("UPDATE ai_usage SET used_at = '2000-01-01T00:00:00Z'")
+        with patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: "100"}):
+            status = self.client.get("/ai/status").json()
+            self.assertEqual(status["usage"]["input_tokens"], 500, "all-time total still includes it")
+            self.assertEqual(status["budget"]["used_today"], 0, "a year-2000 row must not count against today's budget")
+
+    def test_misconfigured_budget_env_fails_closed_not_open(self):
+        self._login()
+        self._use(ScriptedProvider("{}"))
+        for bad in ("not-a-number", "0", "-5"):
+            with patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: bad}):
+                response = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
+                self.assertEqual(response.status_code, 503, (bad, response.text))
+                self.assertIn("AI_DAILY_TOKEN_BUDGET_INVALID", response.json()["detail"])
+
+    def test_ai_budget_lock_serializes_concurrent_requests_for_the_same_tenant(self):
+        """Deterministic proof (not timing-luck-dependent) of the critic-found TOCTOU fix (2026-09-17): a
+        second concurrent request for the SAME tenant must not reach the provider at all while the first is
+        still inside the check-budget/call-provider/record-usage critical section. Without
+        api_main._ai_budget_lock_for actually being held across that whole section, both requests would read
+        the same pre-call usage total and both proceed immediately."""
+        self._login()
+        entered_count: list[int] = []
+        count_lock = threading.Lock()
+        release = threading.Event()
+
+        class BlockingProvider(ScriptedProvider):
+            def complete(self, system, user, *, max_tokens):
+                with count_lock:
+                    entered_count.append(1)
+                release.wait(timeout=5)
+                return super().complete(system, user, max_tokens=max_tokens)
+
+        self._use(BlockingProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False), json.dumps(flowchart_kwargs(), ensure_ascii=False)))
+        results: dict[str, int] = {}
+
+        def call(key):
+            results[key] = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"}).status_code
+
+        first = threading.Thread(target=call, args=("first",))
+        first.start()
+        deadline = time.monotonic() + 5
+        while not entered_count and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(entered_count, [1], "first request never reached the provider")
+
+        second = threading.Thread(target=call, args=("second",))
+        second.start()
+        time.sleep(0.3)
+        self.assertEqual(entered_count, [1], "second request reached the provider while the first still held the tenant's budget lock -- the TOCTOU race is back")
+
+        release.set()
+        first.join(timeout=5)
+        second.join(timeout=5)
+        self.assertEqual(results.get("first"), 200)
+        self.assertEqual(results.get("second"), 200)
+
+    def test_ai_budget_lock_does_not_serialize_different_tenants(self):
+        self.assertIsNot(api_main._ai_budget_lock_for("tenant-a"), api_main._ai_budget_lock_for("tenant-b"))
+        self.assertIs(api_main._ai_budget_lock_for("tenant-a"), api_main._ai_budget_lock_for("tenant-a"))
 
     def test_unknown_method_is_404_and_provider_failures_are_502(self):
         self._login()

@@ -83,6 +83,7 @@
 | `specs/cognitive/typed-objects/change-analysis-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_analysis, fault_description, baseline, changes, provenance] properties[8] |
 | `specs/cognitive/typed-objects/change-risk-matrix-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, change_description, factors, risk_tier, required_controls, provenance] properties[8] |
 | `specs/cognitive/typed-objects/chaos-experiment.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, steady_state_hypothesis, blast_radius, injected_failure, recovered_as_hypothesized, status, provenance] properties[10] |
+| `specs/cognitive/typed-objects/citation-verification-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, literature_set_id, literature_items, checks, summary, scope, provenance] properties[9] |
 | `specs/cognitive/typed-objects/classic-brainstorming-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, ideas, evaluations, provenance] properties[6] |
 | `specs/cognitive/typed-objects/coalition-mapping.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, provenance, context, stakeholder_profiles, coalition_scenarios] properties[7] |
 | `specs/cognitive/typed-objects/compliance-gap-analysis-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, required_controls, implemented_controls, gaps, provenance] properties[7] |

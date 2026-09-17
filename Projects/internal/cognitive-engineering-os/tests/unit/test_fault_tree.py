@@ -103,6 +103,22 @@ def _deploy_record():
     return _build(record_id="FAULTTREE-T-DEPLOY", top_event=_deploy_top_event(), basic_events=_deploy_basic_events(), gates=_deploy_gates())
 
 
+def _diamond_gates(layers):
+    """``layers`` layers of two gates each, G{i}A/G{i}B, both taking BOTH of the PREVIOUS layer's two gates as
+    children (full diamond fan-in/out from layer 1 up) -- the exact shape that made the pre-2026-09-17
+    path-tracking DFS re-explore shared lower gates exponentially many times (measured ~6s at 20 layers).
+    Layer 0's two gates each take one distinct basic_event leaf. Returns (gates, top_gate_id, leaf_ids)."""
+    leaves = ["BE1", "BE2"]
+    gates = [gate("G0A", "layer 0 A", "OR", [leaves[0]]), gate("G0B", "layer 0 B", "OR", [leaves[1]])]
+    prev = ["G0A", "G0B"]
+    for layer in range(1, layers):
+        cur = [f"G{layer}A", f"G{layer}B"]
+        gates.append(gate(cur[0], f"layer {layer} A", "OR", list(prev)))
+        gates.append(gate(cur[1], f"layer {layer} B", "OR", list(prev)))
+        prev = cur
+    return gates, prev[0], leaves
+
+
 def _deep_chain_gates(depth):
     """``depth`` gates G0..G(depth-1), each single-child, alternating AND/OR (mathematically identical for a
     single child -- required_count is always 1 either way), G(depth-1) pointing at G(depth-2) down to G0,
@@ -500,6 +516,32 @@ class SpecConformanceTests(unittest.TestCase):
         gates, top_gate_id = _deep_chain_gates(MAX_GATE_DEPTH + 5000)
         with self.assertRaisesRegex(InvariantViolation, "FAULTTREE_CYCLE_DETECTED.*MAX_GATE_DEPTH"):
             _build(top_event=_top_event(gate_ref=top_gate_id), basic_events=[basic_event("BE-LEAF", "leaf")], gates=gates)
+
+    def test_diamond_sharing_graph_is_linear_time_not_exponential(self):
+        """OQ-FAULTTREE-3 regression guard (resolved 2026-09-17): a 20-layer diamond-sharing DAG (the exact
+        pathological shape the old docstring measured at ~6s) must now validate in well under a second --
+        proves `_cycle_violations` no longer re-explores a shared gate down every path that reaches it."""
+        import time
+
+        gates, top_gate_id, leaves = _diamond_gates(20)
+        started = time.monotonic()
+        record = _build(top_event=_top_event(gate_ref=top_gate_id), basic_events=[basic_event(leaf, "occurs") for leaf in leaves], gates=gates)
+        elapsed = time.monotonic() - started
+        self.assertLess(elapsed, 1.0, f"took {elapsed:.3f}s -- exponential blowup regression")
+        self.assertTrue(evaluate_top_event(record, {leaves[0]}))
+
+    def test_cycle_inside_a_diamond_shared_subgraph_is_still_caught(self):
+        """The memoized/colored traversal must not let a gate marked BLACK on one path hide a real cycle
+        reachable only through a different, still-unexplored path into the same shared region."""
+        gates = [
+            gate("G-TOP", "top", "OR", ["G-SHARED-A", "G-SHARED-B"]),
+            gate("G-SHARED-A", "shared, acyclic from here", "OR", ["BE-X"]),
+            gate("G-SHARED-B", "reaches the same shared gate via a cyclic detour", "OR", ["G-CYCLE-1"]),
+            gate("G-CYCLE-1", "cycle member 1", "OR", ["G-CYCLE-2"]),
+            gate("G-CYCLE-2", "cycle member 2", "OR", ["G-CYCLE-1"]),
+        ]
+        with self.assertRaisesRegex(InvariantViolation, "FAULTTREE_CYCLE_DETECTED"):
+            _build(basic_events=[basic_event("BE-X", "x")], top_event=_top_event(gate_ref="G-TOP"), gates=gates)
 
     # --- orphan basic_event (deliberately NOT an invariant violation -- see compilation_decisions) ---
     def test_orphan_basic_event_never_referenced_does_not_block_construction(self):

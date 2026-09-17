@@ -37,11 +37,13 @@ under test, which is exactly the bug this design avoids.
 from __future__ import annotations
 
 import datetime
+import threading
 import hashlib
 import inspect
 import os
 import re
 import secrets
+import sqlite3
 import subprocess
 import sys
 import uuid
@@ -65,15 +67,19 @@ from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import AiProvider, provider_from_env
+from ai_lego.platform.ai_gateway.provider import AiProvider, daily_token_budget, provider_from_env
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.core.domain.project import project_record
+from ai_lego.core.domain.source import TEXT_MEDIA_TYPES, source_record
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
-from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry
+from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
+from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -281,6 +287,13 @@ def get_store() -> IdentityStore:
     return IdentityStore(db_path)
 
 
+def get_artifact_store() -> JsonArtifactStore:
+    """Tenant-scoped CAS for capability-emitted artifacts (OQ-PROPOSAL-1). Separate CAS root from
+    ``workflow-cas`` (journal encryption): different lifecycle, different reader (any authenticated tenant
+    request vs. only the journal machinery)."""
+    return JsonArtifactStore(TenantScopedCas(PRODUCT_ROOT / ".runtime" / "artifact-cas"))
+
+
 def get_ai_provider() -> AiProvider | None:
     """``None`` = no key configured; /ai/* answers 503 AI_PROVIDER_UNCONFIGURED. Tests override this dependency."""
     return provider_from_env()
@@ -471,6 +484,7 @@ def run_recipe(
     session: dict[str, Any] = Depends(require_session),
     catalog: MethodCatalog = Depends(get_catalog),
     store: IdentityStore = Depends(get_store),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
     """Execute a Recipe through the shared durable Workflow runtime.
 
@@ -531,6 +545,7 @@ def run_recipe(
         capability_handlers = capability_adapters.handlers_for(resolvable_capability_ids)
     except InvariantViolation as error:
         raise HTTPException(status_code=501, detail=str(error)) from error
+    capability_handlers = wrap_capability_handlers_with_artifact_persistence(capability_handlers, session["tenant_id"], artifact_store)
     for ref in [*method_ids, *capability_ids]:
         if not check_entitlement(store, session["tenant_id"], ref):
             raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {ref!r}")
@@ -751,17 +766,80 @@ class DraftRequest(BaseModel):
     source: dict[str, Any] | None = None
 
 
+_AI_BUDGET_LOCKS: dict[str, threading.Lock] = {}
+_AI_BUDGET_LOCKS_GUARD = threading.Lock()
+
+
+def _ai_budget_lock_for(tenant_id: str) -> threading.Lock:
+    """One lock per tenant, created on first use. Serializing a tenant's OWN AI-draft requests end to end
+    (check budget -> call provider -> record usage) is what actually closes the TOCTOU race a plain
+    check-then-later-record sequence has: two concurrent requests for the SAME tenant would otherwise both
+    read the same pre-call usage total and both pass the check before either commits (critic finding,
+    2026-09-17). Different tenants never contend for the same lock. SCOPE: this closes the race for exactly
+    the deployment Phase 1 actually runs (``uvicorn`` with no ``--workers``, one process -- see Dockerfile
+    CMD) -- a future multi-process/multi-instance deployment would need a DB-level reservation instead of an
+    in-process lock; not attempted here (Phase 2 concern, tracked, not silently assumed away)."""
+    with _AI_BUDGET_LOCKS_GUARD:
+        lock = _AI_BUDGET_LOCKS.get(tenant_id)
+        if lock is None:
+            lock = threading.Lock()
+            _AI_BUDGET_LOCKS[tenant_id] = lock
+        return lock
+
+
+def _today_utc_start_iso() -> str:
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return now.strftime("%Y-%m-%dT00:00:00Z")
+
+
 def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> AiProvider:
     if provider is None:
         raise HTTPException(status_code=503, detail="AI_PROVIDER_UNCONFIGURED: set COGNITIVE_OS_ANTHROPIC_API_KEY (deploy/.env) to enable AI drafting")
     if not check_entitlement(store, session["tenant_id"], AI_DRAFT_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {AI_DRAFT_CAPABILITY!r}")
+    try:
+        budget = daily_token_budget()
+    except InvariantViolation as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    used = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
+    used_tokens = used["input_tokens"] + used["output_tokens"]
+    if used_tokens >= budget:
+        raise HTTPException(status_code=429, detail=f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: {used_tokens}/{budget} tokens used today (UTC); resets at midnight UTC")
     return provider
+
+
+class ArtifactReadRequest(BaseModel):
+    reference: dict[str, Any]
+
+
+@app.post("/artifacts/read")
+def read_artifact(payload: ArtifactReadRequest, session: dict[str, Any] = Depends(require_session), artifact_store: JsonArtifactStore = Depends(get_artifact_store)) -> dict[str, Any]:
+    """Read back a ``cas_reference`` a Recipe run emitted (``persist_artifact_output``). Tenant- and
+    content-hash-verified by ``JsonArtifactStore.read`` -- a reference from another tenant, or one whose
+    content_sha256 does not match the stored bytes, is refused, not silently substituted."""
+    try:
+        return artifact_store.read(session["tenant_id"], payload.reference)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.get("/ai/status")
 def ai_status(session: dict[str, Any] = Depends(require_session), provider: AiProvider | None = Depends(get_ai_provider), store: IdentityStore = Depends(get_store)) -> dict[str, Any]:
-    return {"configured": provider is not None, "model": provider.model if provider else None, "usage": store.ai_usage_totals(session["tenant_id"])}
+    try:
+        budget = daily_token_budget()
+    except InvariantViolation:
+        budget = None
+    used_today = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
+    return {
+        "configured": provider is not None,
+        "model": provider.model if provider else None,
+        "usage": store.ai_usage_totals(session["tenant_id"]),
+        "budget": {
+            "daily_limit": budget,
+            "used_today": used_today["input_tokens"] + used_today["output_tokens"],
+            "remaining_today": None if budget is None else max(0, budget - used_today["input_tokens"] - used_today["output_tokens"]),
+        },
+    }
 
 
 @app.get("/recipes/{recipe_id}/draft-plan")
@@ -785,15 +863,16 @@ def ai_draft_method(
 ) -> dict[str, Any]:
     if not catalog.is_resolvable(method_id):
         raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
-    active = _require_ai(provider, store, session)
-    try:
-        result = draft_method_kwargs(method_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog)
-    except AiDraftProviderError as error:
-        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", active.model, error.input_tokens, error.output_tokens)
-        raise HTTPException(status_code=502, detail=str(error)) from error
-    except InvariantViolation as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", result.model, result.input_tokens, result.output_tokens)
+    with _ai_budget_lock_for(session["tenant_id"]):
+        active = _require_ai(provider, store, session)
+        try:
+            result = draft_method_kwargs(method_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog)
+        except AiDraftProviderError as error:
+            store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", active.model, error.input_tokens, error.output_tokens)
+            raise HTTPException(status_code=502, detail=str(error)) from error
+        except InvariantViolation as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", result.model, result.input_tokens, result.output_tokens)
     return result.as_dict()
 
 
@@ -806,18 +885,242 @@ def ai_draft_recipe(
     store: IdentityStore = Depends(get_store),
     provider: AiProvider | None = Depends(get_ai_provider),
 ) -> dict[str, Any]:
-    active = _require_ai(provider, store, session)
     if not payload.labels or len(payload.labels) > MAX_LABELS_PER_REQUEST:
         raise HTTPException(status_code=400, detail=f"AI_DRAFT_LABELS_REQUIRED: draft 1..{MAX_LABELS_PER_REQUEST} nodes per request (one model call each); the dashboard drafts node by node")
-    try:
-        result = draft_recipe_source(recipe_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog, labels=payload.labels, source=payload.source)
-    except AiDraftProviderError as error:
-        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", active.model, error.input_tokens, error.output_tokens)
-        raise HTTPException(status_code=502, detail=str(error)) from error
-    except InvariantViolation as error:
-        code = str(error)
-        if "RECIPE_NOT_FOUND" in code or "RECIPE_ID_MISMATCH" in code:
-            raise HTTPException(status_code=404, detail=code) from error
-        raise HTTPException(status_code=400, detail=code) from error
-    store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", result["model"], result["usage"]["input_tokens"], result["usage"]["output_tokens"])
+    with _ai_budget_lock_for(session["tenant_id"]):
+        active = _require_ai(provider, store, session)
+        try:
+            result = draft_recipe_source(recipe_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog, labels=payload.labels, source=payload.source)
+        except AiDraftProviderError as error:
+            store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", active.model, error.input_tokens, error.output_tokens)
+            raise HTTPException(status_code=502, detail=str(error)) from error
+        except InvariantViolation as error:
+            code = str(error)
+            if "RECIPE_NOT_FOUND" in code or "RECIPE_ID_MISMATCH" in code:
+                raise HTTPException(status_code=404, detail=code) from error
+            raise HTTPException(status_code=400, detail=code) from error
+        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", result["model"], result["usage"]["input_tokens"], result["usage"]["output_tokens"])
     return result
+
+
+# -- Projects + Sources (Master Plan Phase 1 Core Platform: "Project", "Source Import") -------------------------
+#
+# Domain records (ai_lego/core/domain/{project,source}.py) and their SQLite repository
+# (ai_lego/data/repositories/project_source_repository.py, with a built-in append-only `events` table --
+# Phase 1's Versioning primitive) already existed, fully tested, from earlier Phase 5 research work; this is
+# the first HTTP surface + entitlement wiring for them (2026-09-17).
+
+
+PROJECT_MANAGE_CAPABILITY = "project.manage"
+SOURCE_MANAGE_CAPABILITY = "source.manage"
+MAX_SOURCE_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MiB; Phase 1 Source Import is UTF-8 text only, not bulk file upload
+
+
+def get_project_source_repository() -> ProjectSourceRepository:
+    return ProjectSourceRepository(PRODUCT_ROOT / ".runtime" / "projects.sqlite3")
+
+
+def get_source_cas() -> TenantScopedCas:
+    """Separate CAS root from ``artifact-cas`` (capability-emitted artifacts) and ``workflow-cas`` (journal
+    encryption): Source content has its own lifecycle (a Project's raw intake material, not a workflow
+    byproduct) and its own reader (any project member, not only the journal machinery)."""
+    return TenantScopedCas(PRODUCT_ROOT / ".runtime" / "source-cas")
+
+
+def _project_or_404(repo: ProjectSourceRepository, tenant_id: str, project_id: str) -> dict[str, Any]:
+    project = repo.get_project(tenant_id, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}")
+    return project
+
+
+def _domain_error_status(error: InvariantViolation) -> int:
+    return 404 if "NOT_FOUND" in str(error) else 400
+
+
+# NOTE: `data_classification` values here (Public/Internal/Confidential/Restricted, defined by
+# ai_lego.core.domain._intake_validation.DATA_CLASSIFICATIONS) are Title_Case and a DIFFERENT vocabulary from
+# the Recipe run classification check a few hundred lines above (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED) --
+# both internally consistent, not interchangeable (critic finding 2026-09-17, disclosed not unified).
+
+
+class CreateProjectRequest(BaseModel):
+    name: str
+    purpose: str
+    data_classification: str
+    workspace_id: str | None = None
+
+
+class CreateSourceRequest(BaseModel):
+    title: str
+    media_type: str
+    data_classification: str
+    content: str
+
+
+@app.post("/projects")
+def create_project(
+    payload: CreateProjectRequest,
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, Any]:
+    if not check_entitlement(store, session["tenant_id"], PROJECT_MANAGE_CAPABILITY):
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
+    workspace_id = payload.workspace_id
+    if workspace_id is None:
+        workspaces = store.list_workspaces(session["tenant_id"])
+        if len(workspaces) == 0:
+            raise HTTPException(status_code=400, detail="PROJECT_WORKSPACE_ID_REQUIRED: tenant has no workspaces yet -- provision one first")
+        if len(workspaces) > 1:
+            raise HTTPException(status_code=400, detail=f"PROJECT_WORKSPACE_ID_REQUIRED: tenant has {len(workspaces)} workspaces; specify workspace_id explicitly")
+        workspace_id = workspaces[0]["workspace_id"]
+    elif store.get_workspace(session["tenant_id"], workspace_id) is None:
+        raise HTTPException(status_code=404, detail=f"WORKSPACE_NOT_FOUND: {workspace_id!r}")
+    try:
+        record = project_record(
+            str(uuid.uuid4()),
+            session["tenant_id"],
+            workspace_id,
+            payload.name,
+            payload.purpose,
+            payload.data_classification,
+            session["identity_id"],
+            datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        )
+        return repo.create_project(record)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+    except sqlite3.IntegrityError as error:
+        # platform_projects has UNIQUE(tenant_id, workspace_id, name) -- a double-submit or client retry
+        # after a timeout hits this, not a programming error; answer a clean 409, not a raw 500.
+        raise HTTPException(status_code=409, detail=f"PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: {payload.name!r}") from error
+
+
+@app.get("/projects")
+def list_projects(
+    workspace_id: str | None = None,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> list[dict[str, Any]]:
+    return repo.list_projects(session["tenant_id"], workspace_id)
+
+
+@app.get("/projects/{project_id}")
+def get_project(
+    project_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, Any]:
+    return _project_or_404(repo, session["tenant_id"], project_id)
+
+
+@app.get("/projects/{project_id}/history")
+def project_history(
+    project_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> list[dict[str, Any]]:
+    """Phase 1's Versioning primitive: the append-only event log for this Project's own aggregate id."""
+    _project_or_404(repo, session["tenant_id"], project_id)
+    return repo.list_events(session["tenant_id"], f"project:{project_id}")
+
+
+@app.post("/projects/{project_id}/sources")
+def create_source(
+    project_id: str,
+    payload: CreateSourceRequest,
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    source_cas: TenantScopedCas = Depends(get_source_cas),
+) -> dict[str, Any]:
+    if not check_entitlement(store, session["tenant_id"], SOURCE_MANAGE_CAPABILITY):
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {SOURCE_MANAGE_CAPABILITY!r}")
+    project = _project_or_404(repo, session["tenant_id"], project_id)
+    if payload.media_type not in TEXT_MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail=f"SOURCE_MEDIA_TYPE_UNSUPPORTED: {payload.media_type!r} not in {sorted(TEXT_MEDIA_TYPES)} (Phase 1 Source Import is UTF-8 text only)")
+    if payload.data_classification != project["data_classification"]:
+        # Checked here too (repo.add_source enforces the same rule as defense-in-depth): failing BEFORE the
+        # CAS write means a guaranteed-to-fail request (trivially triggerable by any authenticated tenant)
+        # never leaves an orphaned, never-referenced, never-cleaned object under that tenant's CAS namespace.
+        raise HTTPException(status_code=400, detail=f"SOURCE_PROJECT_CLASSIFICATION_MISMATCH: source {payload.data_classification!r} != project {project['data_classification']!r}")
+    content_bytes = payload.content.encode("utf-8")
+    if len(content_bytes) > MAX_SOURCE_CONTENT_BYTES:
+        raise HTTPException(status_code=400, detail=f"SOURCE_CONTENT_TOO_LARGE: {len(content_bytes)} bytes exceeds {MAX_SOURCE_CONTENT_BYTES}")
+    source_id = str(uuid.uuid4())
+    cas_path = source_cas.put(session["tenant_id"], content_bytes)
+    artifact_uri = TenantScopedCas.artifact_uri(session["tenant_id"], project_id, source_id, cas_path)
+    try:
+        record = source_record(
+            source_id,
+            project_id,
+            session["tenant_id"],
+            payload.title,
+            payload.media_type,
+            payload.data_classification,
+            cas_path["hash"],
+            len(content_bytes),
+            artifact_uri,
+            session["identity_id"],
+            datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        )
+        return repo.add_source(record, cas_path)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+
+
+@app.get("/projects/{project_id}/sources")
+def list_sources(
+    project_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> list[dict[str, Any]]:
+    _project_or_404(repo, session["tenant_id"], project_id)
+    return repo.list_sources(session["tenant_id"], project_id)
+
+
+@app.get("/projects/{project_id}/sources/{source_id}")
+def get_source(
+    project_id: str,
+    source_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, Any]:
+    _project_or_404(repo, session["tenant_id"], project_id)
+    source = repo.get_source(session["tenant_id"], project_id, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail=f"SOURCE_NOT_FOUND: {source_id!r}")
+    return source
+
+
+@app.get("/projects/{project_id}/sources/{source_id}/content")
+def get_source_content(
+    project_id: str,
+    source_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    source_cas: TenantScopedCas = Depends(get_source_cas),
+) -> dict[str, str]:
+    _project_or_404(repo, session["tenant_id"], project_id)
+    cas_path = repo.get_source_content_reference(session["tenant_id"], project_id, source_id)
+    if cas_path is None:
+        raise HTTPException(status_code=404, detail=f"SOURCE_NOT_FOUND: {source_id!r}")
+    try:
+        content_bytes = source_cas.read(session["tenant_id"], cas_path)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return {"content": content_bytes.decode("utf-8")}
+
+
+@app.get("/projects/{project_id}/sources/{source_id}/history")
+def source_history(
+    project_id: str,
+    source_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> list[dict[str, Any]]:
+    _project_or_404(repo, session["tenant_id"], project_id)
+    if repo.get_source(session["tenant_id"], project_id, source_id) is None:
+        raise HTTPException(status_code=404, detail=f"SOURCE_NOT_FOUND: {source_id!r}")
+    return repo.list_events(session["tenant_id"], f"source:{source_id}")

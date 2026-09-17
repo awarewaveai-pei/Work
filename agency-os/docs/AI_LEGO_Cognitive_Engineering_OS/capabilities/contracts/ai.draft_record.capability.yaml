@@ -61,6 +61,12 @@ open_questions:
     question: "Per-tenant token budget / rate limit before Phase 2 credits exist?"
     owner: "operator"
     blocks: "public subscribers (commercial arc stage 2)"
+    status: "ANSWERED 2026-09-17 -- a per-tenant daily token ceiling (input+output combined),
+      ai_lego/platform/ai_gateway/provider.py daily_token_budget() (env COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET,
+      default 200,000/day), checked in main.py _require_ai before every /ai/draft/* call against
+      IdentityStore.ai_usage_totals(tenant_id, since=today_utc_start). Exceeded -> 429
+      AI_DAILY_TOKEN_BUDGET_EXCEEDED. A misconfigured value fails closed (503), never silently unlimited.
+      This is a Phase 1 hard ceiling, not the metered/prepaid-credit system Phase 2 billing still owns."
 
 verification:
   method: "Validated against specs/domain/capability-contract.schema.yaml via tests/run_golden_tests.py check 2c; runtime covered by tests/unit/test_ai_gateway.py (fake provider: parse, repair round, refusal surfaced, egress denial, unconfigured 503, recipe source assembly)."

@@ -62,6 +62,31 @@ class WorkspaceTests(_TempStoreTestCase):
         with self.assertRaises(Exception):  # sqlite3.IntegrityError -- UNIQUE(tenant_id, name)
             self.store.create_workspace(str(uuid.uuid4()), tenant["tenant_id"], "Default")
 
+    def test_list_workspaces_is_tenant_scoped_and_true_insertion_ordered(self):
+        # Ordered by `created_at, rowid` (not `workspace_id`): created_at has second-granularity (`_now_iso`
+        # truncates microseconds), so two workspaces created within the same second would tie there; rowid
+        # (SQLite's implicit, gap-free insertion-order column) breaks the tie correctly. Ordering by
+        # workspace_id (a random UUID) instead would silently scramble same-second insertion order -- caught
+        # by this test failing intermittently before the fix (both created within the same wall-clock second).
+        tenant_a = self._make_tenant()
+        tenant_b = self._make_tenant()
+        first = self.store.create_workspace(str(uuid.uuid4()), tenant_a["tenant_id"], "Default")
+        second = self.store.create_workspace(str(uuid.uuid4()), tenant_a["tenant_id"], "Second")
+        self.store.create_workspace(str(uuid.uuid4()), tenant_b["tenant_id"], "Other Tenant's Workspace")
+        listed = self.store.list_workspaces(tenant_a["tenant_id"])
+        self.assertEqual([w["workspace_id"] for w in listed], [first["workspace_id"], second["workspace_id"]])
+
+    def test_list_workspaces_for_unknown_tenant_is_empty_not_an_error(self):
+        self.assertEqual(self.store.list_workspaces(str(uuid.uuid4())), [])
+
+    def test_get_workspace_is_tenant_scoped(self):
+        tenant_a = self._make_tenant()
+        tenant_b = self._make_tenant()
+        workspace = self.store.create_workspace(str(uuid.uuid4()), tenant_a["tenant_id"], "Default")
+        self.assertEqual(self.store.get_workspace(tenant_a["tenant_id"], workspace["workspace_id"])["workspace_id"], workspace["workspace_id"])
+        self.assertIsNone(self.store.get_workspace(tenant_b["tenant_id"], workspace["workspace_id"]), "a workspace must not resolve under a different tenant")
+        self.assertIsNone(self.store.get_workspace(tenant_a["tenant_id"], str(uuid.uuid4())))
+
 
 class IdentityCreationTests(_TempStoreTestCase):
     def test_create_identity_under_real_tenant(self):
