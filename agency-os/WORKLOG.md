@@ -24,7 +24,6 @@
 - 剩餘風險：新方法尚未部署（本 commit 後跑 deploy.sh）；proposal artifact 只回傳 inline，未進 CAS（OQ-PROPOSAL-1）；scenario 未消費財務區間（OQ-BUSINESS-PLAN-FULL-1）。
 - rollback：`git revert <commit>`；prod `docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d`。
 
-<<<<<<< Updated upstream
 ## 2026-09-17（續5）HCI-30 全權授權後：C6/蒐集器 Task 1 決策 + 蒐集器 Task 2 落地（migration 0020）+ 兩輪覆審全修
 
 [任務] 操作者本輪明確全權授權（"需要決定的事都你決定"），且明確重申 High-STOP 不因整批授權跳過。據此：(1) 親自裁決 C6 Task 1(A)/(B) 與蒐集器 Task 0/1（非 STOP 的決策類任務，決定記錄見下）；(2) 蒐集器 Task 2（`hci.sources` admission_state 狀態機）非身分/RLS 邊界異動，實際建置；(3) C6 Task 3（provisioning endpoint，真身分/RLS 異動）維持 STOP，只做 Task 2 設計審查，不寫程式碼。
@@ -98,7 +97,6 @@
 
 [WORKLOG_DONE]: K2h + K2i
 
->>>>>>> Stashed changes
 
 ## 2026-09-17｜Cognitive OS Gap B: EdD 真文獻搜尋（OpenAlex）+ method kit pilot
 
