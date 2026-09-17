@@ -37,7 +37,43 @@ const SINGLE_SOURCE_COUNT = 1;
 // Pure function: same input always produces the same output, no model
 // calls, no hidden state. Ordered by ASSESSMENT_DIMENSIONS position (not
 // input order), same convention as the sibling detectors.
-export function classifyEvidenceQuality(dimensionScores) {
+//
+// resolveClusterRoot (2026-09-17, HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md
+// Task 11): optional `(ref) => rootRef` mapping an evidence_ref to its
+// hci.source_relationships ORIGINAL_SOURCE cluster root, so 100 URLs that
+// are really one syndicated story count as one independent source instead
+// of 100 (06_HCI30_PUBLIC_INTELLIGENCE.md:168-181, "URL count is not
+// independent-source count"). Defaults to identity (ref => ref), which
+// reproduces today's raw-distinct-ref-string behavior exactly -- this
+// module stays a pure function with zero DB access; a caller with
+// source_relationships data builds the resolver, a caller without any
+// (the common case until Claim-extraction wiring lands) passes nothing and
+// gets the unchanged legacy count. This is a mandatory fallback, not an
+// opt-in: every existing call site keeps working unmodified. `null` for the
+// options argument falls back the same as omitting it entirely (`?? {}`,
+// not destructuring straight off the parameter), matching every other
+// "nothing configured" shape a caller might reasonably pass.
+//
+// resolveRoot's return value is validated the same way evidence-refs.mjs
+// validates raw refs (critic review, 2026-09-17): an unvalidated resolver
+// that returns undefined/null for an unmapped ref would collapse every
+// such ref into one bucket regardless of how many genuinely distinct
+// sources they are -- silently downgrading a real MULTIPLE_SOURCES
+// dimension to SINGLE_SOURCE, the exact "false claim about evidence
+// strength, not a crash" failure class this file's other guards (sparse-
+// array holes, above) already exist to catch. A resolver exception is
+// re-thrown with this function's own name attached so the error surface
+// matches the rest of the file's labeled-validation style instead of
+// leaking the resolver's raw stack trace.
+//
+// evidence_count is the sole authoritative independence signal once a
+// resolver is supplied; evidence_refs.length must not be used as a proxy
+// for it (it already diverged for literal duplicate strings before this
+// change, and resolveClusterRoot widens that gap on purpose).
+export function classifyEvidenceQuality(dimensionScores, options) {
+  const { resolveClusterRoot } = options ?? {};
+  const identity = (ref) => ref;
+  const resolveRoot = typeof resolveClusterRoot === 'function' ? resolveClusterRoot : identity;
   const normalized = normalizeDimensionScores(dimensionScores);
 
   const byDimension = new Map(normalized.map((entry) => [entry.dimension, entry]));
@@ -46,7 +82,19 @@ export function classifyEvidenceQuality(dimensionScores) {
     .map((dimension) => byDimension.get(dimension))
     .filter(Boolean)
     .map((entry) => {
-      const distinctRefCount = new Set(entry.evidence_refs).size;
+      const roots = entry.evidence_refs.map((ref) => {
+        let root;
+        try {
+          root = resolveRoot(ref);
+        } catch (err) {
+          throw new Error(`classifyEvidenceQuality: resolveClusterRoot threw for ref "${ref}": ${err.message}`);
+        }
+        if (typeof root !== 'string' || root.trim() === '') {
+          throw new Error(`classifyEvidenceQuality: resolveClusterRoot must return a non-empty string for ref "${ref}", got ${JSON.stringify(root)}`);
+        }
+        return root;
+      });
+      const distinctRefCount = new Set(roots).size;
       const quality = distinctRefCount <= SINGLE_SOURCE_COUNT ? 'SINGLE_SOURCE' : 'MULTIPLE_SOURCES';
       return {
         dimension: entry.dimension,

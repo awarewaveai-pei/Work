@@ -1,4 +1,25 @@
 # Worklog
+## 2026-09-17（續6）HCI-30 蒐集器 Task 11：source-independence 計數改用聚類根，critic 覆審全修
+
+[任務] 承接續5的授權範圍，繼續處理蒐集器計畫中完全獨立、不需 STOP 確認的 Task 11（`classify-evidence-quality.mjs` 的重複來源計數修正）。
+
+[已修改]
+- `Projects/internal/hci30/packages/intelligence/classify-evidence-quality.mjs`：`classifyEvidenceQuality(dimensionScores, options)` 新增可選 `resolveClusterRoot` resolver；有值時按聚類根去重計數，無值（今天唯一真實呼叫端 `app/server.mjs:331`）行為逐位元組不變。
+- `tests/unit/intelligence/classify-evidence-quality.test.mjs`：新增 9 個測試（fallback 行為、聚類收斂、resolver 回傳值驗證、resolver 拋錯處理）。
+
+[critic 覆審，已處理]
+0 Critical，2 Major：(1) resolver 回傳 undefined/null 時 `new Set()` 會把所有無法對應的 ref 全部塞進同一個 bucket，靜默把真正的 MULTIPLE_SOURCES 誤判成 SINGLE_SOURCE——已修，resolver 輸出強制驗證為非空字串，驗證失敗清楚拋錯並帶原始 ref。(2) resolver 回傳非 primitive（如物件）會因 `Set` 用參照相等而讓聚類完全失效且零錯誤訊號——同一個驗證修法一併涵蓋。2 個 Minor：`{resolveClusterRoot} = {}` 對顯式 `null` 引數會直接炸掉——已修為 `options ?? {}`；resolver 拋錯時原本會洩漏 resolver 自己的 stack trace——已修，重新包裝成本函式自己的錯誤訊息格式。1 個 Suggestion（`evidence_count` 是唯一權威獨立來源訊號，`evidence_refs.length` 不可當替代品）已寫進檔頭註解。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/classify-evidence-quality.test.mjs` | exit=0 | 25/25
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/intelligence/*.test.mjs`（整個套件回歸） | exit=0 | 167/167，零回歸
+- REVIEW_DONE: critic=Quick | verdict=pass（2 Major 全修）| findings=0 Critical / 2 Major / 2 Minor / 1 Suggestion
+- BUGHUNT_DONE: scope=Projects/internal/hci30 | grep=`resolveClusterRoot` | hits=僅本次改動的 2 個檔案本身，無孤兒引用
+
+[剩餘風險] `resolveClusterRoot` 本身尚無真實呼叫端建置（要接上 `hci.source_relationships` 才有實際聚類效果，屬未來 Claim-extraction wave 範圍，本任務原本就只驗證邏輯本身，不含真實接線）。
+
+[rollback] 純函式改動 + 新增測試，`git revert` 該 commit 即可完全復原，無 schema/資料異動。
+
 ## 2026-09-17｜Cognitive OS Gap A+C: 29 藝術治療清單方法 + Master Plan §43 商業全鏈
 
 - 缺口：54 項清單中 29 項無方法（清單原寫 31，實為 29＋2 個 SWOT 重複變體）；商業管線止於 NPV，Finance pack 空（ADR-008 延後）。

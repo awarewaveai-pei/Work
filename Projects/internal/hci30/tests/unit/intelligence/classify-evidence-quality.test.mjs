@@ -132,3 +132,114 @@ test('a hole inside evidence_refs is rejected, not silently counted as an extra 
     /evidence_refs must contain only non-empty strings/,
   );
 });
+
+// resolveClusterRoot (2026-09-17, source-independence wiring, Task 11):
+// mandatory fallback when omitted must reproduce today's exact behavior --
+// every test above already proves this by never passing the second
+// argument at all; this test proves it explicitly for an empty options
+// object too, the other "nothing was configured" shape a real caller might
+// pass.
+test('an explicit empty options object behaves identically to omitting the second argument', () => {
+  const classified = classifyEvidenceQuality(
+    [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['https://a.example/x', 'https://b.example/x'] }],
+    {},
+  );
+  assert.equal(classified[0].quality, 'MULTIPLE_SOURCES');
+  assert.equal(classified[0].evidence_count, 2);
+});
+
+test('resolveClusterRoot collapses syndicated URLs to their original-source root -- 3 distinct refs, 1 distinct root, classifies SINGLE_SOURCE', () => {
+  // Simulates the 06_HCI30_PUBLIC_INTELLIGENCE.md:170 scenario directly:
+  // three different outlets' URLs all citing the same original wire story.
+  const resolveClusterRoot = (ref) => ({
+    'https://outlet-a.example/story': 'wire-story-42',
+    'https://outlet-b.example/story': 'wire-story-42',
+    'https://outlet-c.example/story': 'wire-story-42',
+  })[ref] ?? ref;
+  const classified = classifyEvidenceQuality(
+    [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['https://outlet-a.example/story', 'https://outlet-b.example/story', 'https://outlet-c.example/story'] }],
+    { resolveClusterRoot },
+  );
+  assert.equal(classified[0].quality, 'SINGLE_SOURCE');
+  assert.equal(classified[0].evidence_count, 1);
+  // evidence_refs itself must stay the raw, unresolved refs -- the cluster
+  // root is a counting mechanism, not a rewrite of the underlying evidence
+  // list callers still need for citation/audit purposes.
+  assert.deepEqual(classified[0].evidence_refs, ['https://outlet-a.example/story', 'https://outlet-b.example/story', 'https://outlet-c.example/story']);
+});
+
+test('resolveClusterRoot: refs that map to genuinely distinct roots still classify MULTIPLE_SOURCES', () => {
+  const resolveClusterRoot = (ref) => ({ 'https://a.example/x': 'root-a', 'https://b.example/y': 'root-b' })[ref] ?? ref;
+  const classified = classifyEvidenceQuality(
+    [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['https://a.example/x', 'https://b.example/y'] }],
+    { resolveClusterRoot },
+  );
+  assert.equal(classified[0].quality, 'MULTIPLE_SOURCES');
+  assert.equal(classified[0].evidence_count, 2);
+});
+
+test('a non-function resolveClusterRoot is ignored, not thrown on -- falls back to identity, same as omitting it', () => {
+  const classified = classifyEvidenceQuality(
+    [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1', 'ev-1'] }],
+    { resolveClusterRoot: 'not-a-function' },
+  );
+  assert.equal(classified[0].quality, 'SINGLE_SOURCE');
+  assert.equal(classified[0].evidence_count, 1);
+});
+
+test('passing null as the options argument falls back to identity, same as omitting it entirely', () => {
+  const classified = classifyEvidenceQuality(
+    [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1', 'ev-2'] }],
+    null,
+  );
+  assert.equal(classified[0].quality, 'MULTIPLE_SOURCES');
+  assert.equal(classified[0].evidence_count, 2);
+});
+
+// Critic review, 2026-09-17: a resolver that falls back to undefined/null
+// for an unmapped ref would otherwise collapse every such ref into one
+// Set bucket regardless of how many genuinely distinct sources they are --
+// silently downgrading a real MULTIPLE_SOURCES dimension to SINGLE_SOURCE.
+test('resolveClusterRoot returning undefined for a ref throws a clean error, not a silent under-count', () => {
+  const resolveClusterRoot = (ref) => (ref === 'ev-1' ? 'root-a' : undefined);
+  assert.throws(
+    () => classifyEvidenceQuality(
+      [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1', 'ev-2'] }],
+      { resolveClusterRoot },
+    ),
+    /resolveClusterRoot must return a non-empty string for ref "ev-2"/,
+  );
+});
+
+test('resolveClusterRoot returning a non-string (object identity would defeat Set dedup silently) throws a clean error', () => {
+  const resolveClusterRoot = (ref) => ({ root: ref });
+  assert.throws(
+    () => classifyEvidenceQuality(
+      [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1'] }],
+      { resolveClusterRoot },
+    ),
+    /resolveClusterRoot must return a non-empty string/,
+  );
+});
+
+test('resolveClusterRoot returning an empty/blank string is treated the same as no root and throws', () => {
+  const resolveClusterRoot = () => '   ';
+  assert.throws(
+    () => classifyEvidenceQuality(
+      [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1'] }],
+      { resolveClusterRoot },
+    ),
+    /resolveClusterRoot must return a non-empty string/,
+  );
+});
+
+test('a resolver that throws is re-thrown with this function\'s own name and the offending ref, not the resolver\'s raw stack', () => {
+  const resolveClusterRoot = () => { throw new Error('lookup table unavailable'); };
+  assert.throws(
+    () => classifyEvidenceQuality(
+      [{ dimension: 'COMPETENCE', value: 'HIGH', evidence_refs: ['ev-1'] }],
+      { resolveClusterRoot },
+    ),
+    /classifyEvidenceQuality: resolveClusterRoot threw for ref "ev-1": lookup table unavailable/,
+  );
+});
