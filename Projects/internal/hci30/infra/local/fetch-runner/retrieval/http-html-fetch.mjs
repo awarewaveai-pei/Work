@@ -194,13 +194,28 @@ export async function fetchAndExtract(url, opts = {}) {
   const res = await safeFetch(url, { method: 'GET' });
 
   if (res.status < 200 || res.status >= 300) {
-    throw Object.assign(new Error(`fetch_failed_http_${res.status}`), { status: res.status });
+    // critic review 2026-09-18: 4xx (except 429) gets a `.code` so Task 9's
+    // orchestrator can classify it non-retryable -- the same URL fetched
+    // again gets the identical 404/403/410/etc, so retrying is pure waste
+    // (both of Trigger.dev's retry budget and of real requests against a
+    // third-party site, a self-inflicted mild DoS-like pattern the critic
+    // review named directly). 429 (Too Many Requests) is deliberately
+    // excluded -- rate-limiting IS transient, unlike every other 4xx here.
+    // 5xx gets no code at all, staying in the existing default-retryable
+    // bucket, which is already correct for a transient server error.
+    const isNonRetryableClientError = res.status >= 400 && res.status < 500 && res.status !== 429;
+    throw Object.assign(new Error(`fetch_failed_http_${res.status}`), {
+      status: res.status,
+      ...(isNonRetryableClientError ? { code: 'HTTP_CLIENT_ERROR' } : {}),
+    });
   }
 
   const contentType = (res.headers && (res.headers['content-type'] || res.headers['Content-Type'])) || '';
   const contentTypeValue = (Array.isArray(contentType) ? contentType[0] : contentType).trim();
   if (!HTML_CONTENT_TYPE.test(contentTypeValue)) {
-    throw Object.assign(new Error(`unsupported_content_type_${contentTypeValue.split(';')[0] || 'unknown'}`), { status: 415 });
+    // Same critic review: the same URL will report the same content type
+    // again, so this is exactly as non-retryable as an HTTP_CLIENT_ERROR.
+    throw Object.assign(new Error(`unsupported_content_type_${contentTypeValue.split(';')[0] || 'unknown'}`), { status: 415, code: 'UNSUPPORTED_CONTENT_TYPE' });
   }
 
   const raw = res.body; // Buffer, from Task 4's defaultTransport

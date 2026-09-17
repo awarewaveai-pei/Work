@@ -1,4 +1,41 @@
 # Worklog
+## 2026-09-18（續2）HCI-30 蒐集器 Task 9：Trigger.dev 編排邏輯（enqueue/poll/retry 狀態機 + ADR-0029 gate 6 靜態閘），critic 覆審 7 Major 全修（含 PoC 證實的閘門繞過）
+
+[任務] 承接續1，做 Task 9：Trigger.dev 只負責排程/重試，實際 fetch 委派給隔離 runner。操作者在確認部署路線時提出關鍵問題「為什麼需要建 Trigger.dev 專案」——答案是不需要：`orchestrateDiscoveredFetch` 只是一個普通、可測試的 async function，跟 Trigger.dev 完全無關，要不要包成 Trigger.dev task／何時包／包進哪個專案，是之後才要決定的獨立問題。runner 至今沒有部署到任何網路可達的地方（Task 3 自己的獨立 STOP）、這個 session 的 trigger MCP 未登入驗證、AwareWave 唯一現有 Trigger.dev 專案已有真實上線任務——三個都是部署層的問題，不影響先把邏輯層寫好測好。操作者全權授權「怎麼做最好就怎麼做」。
+
+[已修改]
+- 新增 `public-intelligence/orchestration/runner-client.mjs`：ADR-0029 gate 6 唯一被允許直接呼叫 HTTP 的模組（`enqueueDiscoveredFetch`/`getRunnerJobStatus`，走全域 `fetch`，零 npm 依賴）。
+- 新增 `public-intelligence/orchestration/orchestrate-discovered-fetch.mjs`：`orchestrateDiscoveredFetch()` 狀態機（enqueue→輪詢→依終態分支→completed 才呼叫 Task 8 寫入），只 import `runner-client.mjs`，回傳結構化 `{outcome, retryable, ...}` 而非用 throw 表達終態。
+- 新增 `scripts/check-trigger-no-direct-fetch.ps1`：ADR-0029 gate 6 的靜態掃描閘（測試 id `wave6-trigger-no-direct-fetch`），沿用本 repo `check-no-universal-trust-column.ps1` 既有寫法慣例（內建 self-test 跑在真掃描前）。
+- 兩個新測試檔（20 個測試）+ 接入 `scripts/test-wave1-local.ps1`（見下）。
+
+[critic 覆審，7 個 Major 全修，其中 2 個是真實 PoC 證實的閘門繞過]
+1. **Major（PoC 證實）**——guard script 的 regex 只抓「直接呼叫」（`fetch(...)`），別名／重新匯出繞得過去：`const doFetch = fetch; doFetch(...)`、`export const unsafeFetch = fetch;` 都被 critic 用真實 fixture 跑出 `EXIT=0` 證實漏網。已修：pattern 從「`fetch` 後面必須馬上接 `(`」放寬成「裸露的 `fetch` 識別符，呼叫或引用都算」，用同一個 session 重跑 critic 的原始 3 個 PoC 檔案確認：別名繞過現在抓到、重新匯出繞過現在抓到。
+2. **Major（PoC 證實）**——allowlist 用檔名萬用字元比對（`*runner-client*`），critic 建一個 `runner-client-shim.mjs`（檔名含子字串但內容是 `export const unsafeFetch = fetch;`）光靠檔名就跳過全部規則。已修：改成相對 `$Dir` 的**精確路徑**比對，且新增「allowlist 必須剛好命中 1 個檔案」的機械斷言（0 個＝真正的 runner-client 不見了；>1 個＝有歧義）。
+3. **Major**——`tenantId`（告訴 runner 的，僅供稽核）跟 `query`（實際決定寫哪個租戶的 RLS 連線）從未交叉驗證，兩者是完全獨立的輸入。`writeDiscoveredSource` 不接受 tenant_id 參數（sink-hci-discovered.mjs 自己的設計），未來任何呼叫端把兩者配對配錯（例如多租戶迴圈傳錯 pair），就是跨租戶寫入 `hci.sources`——這個 stack 最高等級的資料完整性風險類別。已修：函式一開始就用 `query` 跑 `SELECT hci.current_tenant_id()`，跟傳入的 `tenantId` 不符就直接 throw，在真正接上任何呼叫端之前先把這道閘鎖上。
+4. **Major（真實重現）**——原本沒有顯式檢查 `current.status === 'completed'`，只是「不是前三種狀態就當作是」。critic 真實塞一個從未命名過的狀態值（`'cancelled'`），證實會流進 `writeDiscoveredSourceImpl` 呼叫——今天只是運氣好被 Task 8 自己的非空字串驗證攔下，不是這個檔案自己設計的防線。已修：顯式 `if (current.status !== 'completed') throw`，未知終態直接大聲失敗。
+5. **Major**——`isNonRetryable()` 漏掉 HTTP 4xx（除 429）跟不支援內容類型：這兩類錯誤（`retrieval/http-html-fetch.mjs`）從未帶 `.code`，落回預設的「當作暫時性、可重試」，導致對已下架/被擋的頁面重複發真實請求（輕度自我製造 DoS）。已修：`http-html-fetch.mjs` 補 `.code`（`HTTP_CLIENT_ERROR`／`UNSUPPORTED_CONTENT_TYPE`，429 明確排除在外，因為限流是真的暫時性），`NON_RETRYABLE_ERROR_CODES` 一併擴充。
+6. **Major**——`runner-client.mjs` 的兩個 fetch 呼叫沒有任何逾時，Node 18+ 全域 `fetch` 預設不逾時；`orchestrateDiscoveredFetch` 的 `maxPollAttempts` 上限形同虛設，因為卡住的是 `await` 本身，迴圈永遠沒機會遞增。已修：兩個函式都加可注入 `timeoutMs`（預設 30s），用 `AbortSignal.timeout()`。
+7. **Major**——新增的 20 個測試 + guard script 完全沒接進本專案唯一的「跑全部」入口 `scripts/test-wave1-local.ps1`——這正是 Task 8 才修過的同一類坑（TASKS.md 自己都寫了「已修全部接入」）又重演一次。已修：接入，真跑整個 20-migration 套用/可逆性檢查確認新增的 20 個測試 + guard script 都真的執行且全綠、原有步驟無回歸。
+- **guard script 的誠實揭露**：critic 也證實了規避手法 3「`globalThis['fe'+'tch'](...)` 動態字串組出屬性名稱」目前**抓不到**——這需要真正的 AST/直譯器才能堵住，不是文字掃描的能力範圍。已在腳本 header 明文記載這個已知盲點，不假裝這個閘是形式化證明過的完整方案；記入 TASKS.md 已知限制清單。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test`（runner-client.test.mjs + orchestrate-discovered-fetch.test.mjs，20 個測試；http-html-fetch.test.mjs 補測後 19 個）| exit=0 | 全綠，含 7 個 Major finding 各自的回歸測試
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/check-trigger-no-direct-fetch.ps1`（self-test + 對真實 `public-intelligence/orchestration` 目錄掃描）| exit=0 | 全綠
+- REALTEST_EVIDENCE: tool=Bash | 對真實檔案重跑 critic 原始 3 個 PoC 繞過樣本（別名／decoy 檔名／動態字串）| 別名+decoy 現在被抓到（exit 1，正確回報）；動態字串如預期仍未被抓到（誠實記載的已知限制，非本次目標修復範圍）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/test-wave1-local.ps1`（全量 20-migration apply+down+重新 apply 可逆性檢查）| exit=0 | HCI Wave 1 local suite PASSED，新增測試+guard script 確認真的在裡面跑
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-content-isolation.test.ps1`（http-html-fetch.mjs 屬已上線檔案，補 `.code` 後回歸驗證）| exit=0 | 全綠無回歸
+- REVIEW_DONE: critic=Standard | verdict=pass（7 Major 全修，含 2 個真實 PoC 證實的繞過）| findings=0 Critical / 7 Major / 2 Minor / 1 Suggestion
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,lobster-factory | grep=`HTTP_CLIENT_ERROR\|UNSUPPORTED_CONTENT_TYPE\|AllowlistRelativePath\|isNonRetryable` | hits=僅本次修改檔案本身，無孤兒引用
+
+[剩餘風險]
+1. guard script 的動態字串組出屬性名稱繞過（`globalThis['fe'+'tch'](...)`）未修——已誠實記載為已知限制，需要 AST/直譯器才能根治，記入 TASKS.md。
+2. `infra/local/fetch-runner/server.mjs` 的 `jobs` Map 無 TTL——Task 7 就已存在且已記錄的已知限制，Task 9 正是該註解點名的「真實流量接上」觸發條件，這次仍未處理（未接真實呼叫端，尚無 blast radius）。
+3. critic 額外指出的架構層級取捨（非本次程式碼錯誤）：若失敗發生在輪詢階段（例如 runner 重啟導致 job 狀態遺失），runner 端可能已經把內容寫進 MinIO，但因為呼叫端會重新 enqueue 而找不到對應的 DB 列可參照，形成孤兒物件——`object-storage-client.mjs` 沒有 TTL/GC 機制。記入 TASKS.md 已知債務。
+4. Task 9 的實際 Trigger.dev task wrapper（真正的 `task({...})` 包裝、trigger.config.ts、部署）本次刻意不做——邏輯層已完整测試，部署層留給 runner 真的有地方可部署、且有人能完成 Trigger.dev 登入驗證之後再說。
+
+[rollback] 全新檔案（2 個 orchestration 模組 + 1 個 guard script + 2 個測試檔）+ 對 `retrieval/http-html-fetch.mjs`／`test-wave1-local.ps1` 純增量修改（新增 `.code` 屬性 + 新增測試呼叫行，未刪改既有行為），`git revert` 該 commit 即可完全復原，無生產呼叫端會受影響。
+
 ## 2026-09-18（續1）回頭補 Task 7 的物件儲存缺口（設計 Task 9 時發現）+ critic 覆審 3 Major 全修
 
 [任務] 開始設計 Task 9（Trigger.dev 編排層）時發現：Task 7 的 `processJob` 從未真的呼叫 Task 5 的 `putContentAddressedObject` 上傳到 MinIO——只在本地算了 sha256，`job.status='completed'` 從來沒有 `snapshotRef` 欄位。Task 8 的 `writeDiscoveredSource()` 明訂需要 `snapshotRef` 當輸入，Task 9 沒有這個欄位完全無法運作。這不是 Task 9 自己的程式碼，是回頭補 Task 7 的真實缺口——物件儲存上傳只能在 runner 內做（只有 runner 對它自己專屬的 MinIO 有網路權限，network-guard 的 iptables 只允許這一個內部目標；Task 8/9 依設計跑在 runner 外，同一道政策把它們也擋在 MinIO 之外）。
@@ -18831,3 +18868,18 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - 剩餘風險：新 org 的 `metadata` 留空 `{}`；其他既有 org 有非正式的 `client_kind`/`relationship` 慣例欄位（如 awarewave-ops 的 `internal`/`first_party`），本列未設，不影響任何既有功能（無程式讀取這兩個 key 做分流判斷），操作者之後可自行到 UI 補或忽略。
 - ROLLBACK: `DELETE FROM organizations WHERE slug='edd-research'`（單筆新增，未建立任何 workspace/membership/wp_site 等引用此列的資料，刪除無副作用）。
 - WORKLOG_DONE: EdD research organization (edd-research) created
+
+### Cognitive OS Source 物件補齊引用中繼資料欄位（doi/authors/venue/published_at）
+
+- 任務：Cognitive OS 即將接收操作者從 next-admin 匯入的真實學術文獻（含 DOI／作者／期刊／出版年），但 `Source` 網域物件只有標題/媒體類型/資料分級/內容，接不住引用中繼資料。本輪只補欄位，實際橋接（next-admin → Cognitive OS）是另一個尚未執行的 task。CONFIRMED-INDEPENDENT-WORKSTREAM，只動 Source 相關檔案，與同批其他 4 個 task 無檔案重疊。
+- 修正：`ai_lego/core/domain/source.py` 的 `source_record()` 新增 4 個 keyword-only optional 參數 `doi/authors/venue/published_at`（預設 `None`，向後相容——既有 3 個測試檔案的 positional call site 不必修改）；`ai_lego/apps/api/main.py` 的 `CreateSourceRequest`/`create_source()` 同步透傳；`ai_lego/data/repositories/project_source_repository.py` 的 `prov_sources` 表加 4 個 nullable 欄位（`authors` 以 `authors_json` TEXT 存 JSON 陣列，其餘純 TEXT）。**已部署 production 的 SQLite 檔**（`cognitive-os-identity-data` docker volume）不會因為 `CREATE TABLE IF NOT EXISTS` 自動長出新欄位，故在 `ProjectSourceRepository.__init__` 加 `_migrate_source_columns()`：`PRAGMA table_info` 讀現有欄位，缺的才 `ALTER TABLE ADD COLUMN`（idempotent，可重複執行）。`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/domain/source.schema.yaml`（`additionalProperties: false`）同步加 4 個 nullable property，否則既有 `test_intake_schemas.py` 契約測試會失敗；version 1.0.0→1.1.0（比照 `reversal-criteria-set.schema.yaml` 的 additive-bump 前例），並重跑 `tests/gen_spec_index.py` 重新產生自動生成的 `SPEC_QUICKREF.md`（該檔頭自己聲明 generated，不可手改）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_project_source_api.py -q`（任務指定驗證指令）| exit=0 | ms=18260 | result=28 passed（24 既有 + 4 新增：citation metadata 建立/讀回、無 citation 時預設 null、doi 超長 400、authors 含空字串 400）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_source_domain.py tests/unit/test_project_source_repository.py tests/unit/test_intake_schemas.py -q` | exit=0 | ms=2760 | result=12 passed（含新增的 schema-contract populated-value 測試、repository round-trip 測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立腳本（非 pytest，`tempfile`+真實 sqlite3）：手刻舊版 `prov_sources`（無 doi/authors_json/venue/published_at 欄位）原始 SQLite 檔 → 塞一筆 project+source → 用真正的 `ProjectSourceRepository(path)` 重新開啟 | exit=0 | result=`PRAGMA table_info` 證實 migration 前無新欄位、之後有 4 欄；舊 row 讀回 `doi=None authors=None venue=None published_at=None`；同一張已升級的表接著能正常寫入含真實 citation 值的新 row 並讀回一致（`doi='10.1000/xyz123' authors=['Ada Lovelace']` 等）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/gen_spec_index.py --check`（改 schema 後）→ STALE → `python tests/gen_spec_index.py` → 再次 `--check` | exit=0 | result=regenerate 前回報 STALE，重新產生後 fresh；`git diff --stat` 只有 `SPEC_QUICKREF.md` 1 行變動（version 1.0.0→1.1.0、properties[15]→[19]），`MOTHER_DOC_SECTION_INDEX.md` byte-for-byte 不變
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（spec root 全量 golden tests；非任務指定，因改了 spec root 契約檔主動加驗）| exit=0 | ms=約2000 | result=PASSED: 4118，ALL GOLDEN TESTS PASSED
+- REVIEW_DONE: self-review=Standard | verdict=pass | findings=0c/0m/0n；逐行重讀 3 個 production 檔案 diff，確認 `_SOURCE_COLUMNS`/`_SOURCE_SELECT`/INSERT 語句/`_source_from_row` 四處欄位順序與數量一致（INSERT 20 個 `?` 對 20 欄），`source_record()` 用 keyword-only 參數確保既有 positional call site 不受影響。
+- BUGHUNT_DONE: scope=D:\Work（涵蓋 agency-os,scripts,lobster-factory）| grep=`source_record|prov_sources|CreateSourceRequest|ProjectSourceRepository|_SOURCE_COLUMNS|_SOURCE_SELECT` | hits=41 files；逐一排除誤命中（`art_therapy`/`airtable`/`security_control_mapping` 相關檔案皆為同名不同義的 `source_record(s)`/`source_record_type` 子字串巧合，與本次 Cognitive OS `Source` 物件無關；`ADR-010-database-platform-and-table-naming.md` 只是既有命名規則文件未變動）；真正呼叫端全部已同步（3 個 production 檔 + 4 個測試檔 + 1 個 schema 契約檔 + 其自動產生索引）。
+- ROLLBACK: `git revert <this-commit>`；純新增 nullable 欄位/optional kwargs，無既有欄位被修改或刪除，回滾不影響任何既有 Source/Project 資料列。
+- 剩餘風險（disclosed，非本次範圍）：`main.py` 的 `create_source()` 在呼叫 `source_cas.put()`（CAS 寫入）**之後**才呼叫 `source_record()` 驗證新的 4 個欄位；若驗證失敗（如 doi 超長）會留下一個未被任何 Source row 參照的 CAS blob，跟既有 `media_type`/`data_classification` mismatch 已修正的「CAS 寫入前先擋」設計不一致。因任務明確要求「不改 content/CAS 儲存邏輯」，且 Phase 1 本身尚無 rate limit/quota（`main.py` 檔頭既有註解已知缺口，非本次引入），本次刻意不重排驗證順序，留給後續橋接 task 或操作者決定是否處理。
+- WORKLOG_DONE: Cognitive OS Source citation metadata fields

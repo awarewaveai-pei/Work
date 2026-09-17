@@ -135,6 +135,29 @@ if ($LASTEXITCODE -ne 0) { throw 'fetch-runner fetch+extract tests failed (Task 
 node --test (Join-Path $root 'tests/unit/fetch-runner/server.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'fetch-runner job-processing state-machine tests failed (Task 6/7).' }
 
+# HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 9: Trigger.dev orchestration
+# logic (enqueue/poll/retry state machine + the ONE sanctioned runner-client
+# HTTP module). Found orphaned from this runner AGAIN while wiring Task 9's
+# own tests in (critic review, 2026-09-18) -- the exact same failure class
+# Task 8 fixed here one commit earlier ("Task 3-7 ... 都沒接進 ... 已修全部
+# 接入"). Node-level, Docker-free.
+node --test (Join-Path $root 'tests/unit/public-intelligence/orchestration/runner-client.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Trigger.dev orchestration runner-client tests failed (Task 9).' }
+node --test (Join-Path $root 'tests/unit/public-intelligence/orchestration/orchestrate-discovered-fetch.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Trigger.dev orchestration state-machine tests failed (Task 9).' }
+
+# ADR-0029 gate 6 (wave6-trigger-no-direct-fetch): no Trigger.dev task file
+# anywhere under public-intelligence/ may reference a direct HTTP client
+# outside the one allowlisted runner-client.mjs module. Scoped to the whole
+# public-intelligence/ tree, not just orchestration/, so a future task file
+# added elsewhere under it is not silently unscanned. Node-level (the script
+# itself is PowerShell, but touches no Docker/Postgres), runs its own
+# self-test first (see the script) -- this is ADR-0029 gate 6's ONLY
+# enforcement mechanism, see the script's own header for its documented
+# regex-vs-AST blind spot.
+& (Join-Path $PSScriptRoot 'check-trigger-no-direct-fetch.ps1') -Dir (Join-Path $root 'public-intelligence') -AllowlistRelativePath 'orchestration/runner-client.mjs'
+if ($LASTEXITCODE -ne 0) { throw 'ADR-0029 gate 6 direct-fetch guard failed (Task 9, wave6-trigger-no-direct-fetch).' }
+
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
 # available, same as the request-policy validator above.

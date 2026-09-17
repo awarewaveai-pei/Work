@@ -116,14 +116,15 @@
 - **Acceptance**：真實跑一次組織 seed，`hci.sources`/`hci.source_snapshots` 各出現預期列數；`admission_state` 恆為 DISCOVERED；同一 URL 重抓兩次，`hci.sources` 不增生第二筆，`hci.source_snapshots` 增生兩筆；候選提示不出現在 `hci.source_relationships` 任何列——`tests/architecture/sink-hci-discovered-write-path.test.ps1` 對真實拋棄式 Postgres 全部驗證通過。
 - **Boundaries**：不建立任何 Claim／Evidence／Assessment 列；不寫 `hci.identity_candidates`/`identity_verifications`（人工晉升時的事）；不做跨租戶去重。
 
-## Task 9：Trigger.dev 編排層（enqueue/status/retry-only，ADR-0029 gate 6） — dispatch to `fullstack-engineer`（依賴 Task 7、8）
+## Task 9：Trigger.dev 編排層（enqueue/status/retry-only，ADR-0029 gate 6） — **邏輯層已完成**（2026-09-18，critic 覆審 7 Major 全修）；**部署層刻意未做**，見完成狀態
 
 - **Goal**：Trigger.dev 只負責排程/重試/可觀測性，實際 fetch 全部委派給隔離 runner 的內部 API。
-- **Scope**：`Projects/internal/hci30/public-intelligence/`（Trigger.dev task 定義）。
+- **Scope**：`Projects/internal/hci30/public-intelligence/orchestration/`（邏輯層，真正落地）；Trigger.dev task 定義本身（`task({...})` 包裝、`trigger.config.ts`、實際部署）未建，見下。
 - **Input**：耐久編排歸屬 Trigger.dev（ADR 004）；Task 3 的 runner 內部 API；ADR-0029 gate 6（task 程式碼只能呼叫 runner 自己的 API，不能有任何對外 HTTP client 呼叫非白名單目標）。
-- **Output**：enqueue/status/retry task；靜態分析/架構檢查腳本，掃描本目錄下 Trigger.dev task 原始碼，若出現對非白名單目標的 HTTP client 呼叫即 build 失敗（測試 id `wave6-trigger-no-direct-fetch`）。
-- **Acceptance**：真跑一次 enqueue → Trigger.dev dashboard 顯示 status 變化 → runner 端完成 → 結果經 Task 8 落地；靜態檢查對「刻意塞一行直接 fetch」的測試樣本能抓到（突變測試）。
-- **Boundaries**：不在 Trigger.dev task 內 import 任何會發起對外 HTTP 請求的函式庫；不影響既有 `collect-scheduled-crawl` task（C3，已上線）。
+- **Output**：`orchestrate-discovered-fetch.mjs`（`orchestrateDiscoveredFetch()`：enqueue→輪詢→依終態分支→completed 才呼叫 Task 8 寫入，回傳結構化 `{outcome, retryable, ...}`）+ `runner-client.mjs`（唯一被允許直接呼叫 HTTP 的模組）+ `scripts/check-trigger-no-direct-fetch.ps1`（`wave6-trigger-no-direct-fetch`，掃描 `public-intelligence/` 整個樹）。
+- **完成狀態**：操作者在確認部署路線時提出關鍵問題「為什麼需要建 Trigger.dev 專案」——答案是不需要：`orchestrateDiscoveredFetch` 是普通、可測試的 async function，跟 Trigger.dev 完全無關；要不要包成 Trigger.dev task、何時包、包進哪個專案，是之後才要決定的獨立問題。今天卡住「真跑一次 enqueue → dashboard 顯示狀態」這條 Acceptance 的三個原因（runner 未部署到網路可達之處，Task 3 自己的獨立 STOP；本 session 的 trigger MCP 未登入驗證；AwareWave 唯一現有 Trigger.dev 專案已有真實上線任務，部署新程式碼進同一專案有波及風險）全部是**部署層**問題，不影響先把**邏輯層**寫好測好——於是本任務刻意只做邏輯層，實際 Trigger.dev task 包裝與部署留待 runner 有地方可部署、且有人完成 Trigger.dev 登入驗證之後再做。critic 覆審抓到 7 個 Major 全修，其中 2 個是**真實 PoC 證實**的閘門繞過：guard script 原本只抓「直接呼叫」形狀，別名（`const doFetch = fetch`）與重新匯出（`export const x = fetch`）繞得過去（critic 用真實 fixture 跑出 `EXIT=0` 證實）——已修，改抓裸露的 `fetch` 識別符本身；allowlist 原本用檔名萬用字元比對，一個叫 `runner-client-shim.mjs` 的 decoy 檔案光靠檔名就跳過全部規則——已修，改精確相對路徑比對 + 「剛好命中 1 個檔案」機械斷言。兩者都用 critic 原始 PoC 樣本重新驗證確實抓到；第三種繞過手法（`globalThis['fe'+'tch'](...)` 動態字串組出屬性名稱）證實抓不到，需要真正 AST/直譯器才能堵住，已誠實記入腳本 header 與 `agency-os/TASKS.md` 已知限制——**這是 ADR-0029 gate 6 目前唯一的執行機制，不是形式化證明過的完整方案**。其餘 5 個 Major：`tenantId`/`query` 從未交叉驗證（真實跨租戶寫入風險類別，今天沒觸發只因還沒有呼叫端）已修在函式開頭驗證 `hci.current_tenant_id()` 與傳入值一致；隱性「不是前三種狀態就當 completed」被 critic 真實塞一個未命名狀態證實會流進 Task 8 寫入呼叫——已修顯式檢查、未知終態直接大聲失敗；HTTP 4xx（除 429）/不支援內容類型漏標可重試性（會對已下架頁面重複發真實請求）已修——`retrieval/http-html-fetch.mjs` 補 `.code`；`runner-client.mjs` 兩個 fetch 呼叫無逾時（`maxPollAttempts` 上限因此形同虛設，卡住的是 `await` 本身）已修加 `AbortSignal.timeout()`；20 個新測試 + guard script 沒接進 `scripts/test-wave1-local.ps1`（Task 8 才修過的同一類坑又重演）已修全部接入並真跑確認執行。詳見 WORKLOG 2026-09-18（續2）。
+- **Acceptance**：真跑一次 enqueue → Trigger.dev dashboard 顯示 status 變化 → runner 端完成 → 結果經 Task 8 落地（**部署層，待跑**）；靜態檢查對「刻意塞一行直接 fetch」的測試樣本能抓到（突變測試，**已完成**，含 critic 的 3 個進階繞過樣本，2/3 修正確認、1/3 誠實記為已知限制）。
+- **Boundaries**：不在 Trigger.dev task 內 import 任何會發起對外 HTTP 請求的函式庫；不影響既有 `collect-scheduled-crawl` task（C3，已上線）——本次未觸碰 `lobster-factory` 任何檔案，天然滿足。
 
 ## Task 10：操作介面 — 組織 seed 註冊 + DISCOVERED 審核佇列 — dispatch to `fullstack-engineer`（依賴 Task 2、6、9）
 

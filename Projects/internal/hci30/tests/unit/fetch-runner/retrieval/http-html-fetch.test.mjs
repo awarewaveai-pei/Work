@@ -131,6 +131,32 @@ test('fetchAndExtract: non-2xx status throws with the status attached', async ()
   );
 });
 
+test('critic review 2026-09-18: a 4xx (except 429) carries code=HTTP_CLIENT_ERROR -- same URL will 404 again, retrying is pure waste', async () => {
+  for (const status of [400, 403, 404, 410]) {
+    const safeFetch = fakeSafeFetch({ status, headers: {}, body: Buffer.alloc(0), truncated: false, finalUrl: 'https://example.com/x' });
+    await assert.rejects(
+      () => fetchAndExtract('https://example.com/x', { safeFetch }),
+      (err) => { assert.equal(err.code, 'HTTP_CLIENT_ERROR', `status ${status} should carry HTTP_CLIENT_ERROR`); return true; },
+    );
+  }
+});
+
+test('critic review 2026-09-18: 429 (Too Many Requests) is NOT classified HTTP_CLIENT_ERROR -- rate-limiting is transient, unlike other 4xx', async () => {
+  const safeFetch = fakeSafeFetch({ status: 429, headers: {}, body: Buffer.alloc(0), truncated: false, finalUrl: 'https://example.com/x' });
+  await assert.rejects(
+    () => fetchAndExtract('https://example.com/x', { safeFetch }),
+    (err) => { assert.equal(err.code, undefined); return true; },
+  );
+});
+
+test('critic review 2026-09-18: a 5xx carries no .code -- stays in the default-retryable bucket, correctly (a transient server error)', async () => {
+  const safeFetch = fakeSafeFetch({ status: 503, headers: {}, body: Buffer.alloc(0), truncated: false, finalUrl: 'https://example.com/x' });
+  await assert.rejects(
+    () => fetchAndExtract('https://example.com/x', { safeFetch }),
+    (err) => { assert.equal(err.code, undefined); return true; },
+  );
+});
+
 test('fetchAndExtract: non-HTML content type is rejected, not silently extracted as text', async () => {
   const safeFetch = fakeSafeFetch({
     status: 200,
@@ -144,6 +170,7 @@ test('fetchAndExtract: non-HTML content type is rejected, not silently extracted
     (err) => {
       assert.match(err.message, /unsupported_content_type_application\/pdf/);
       assert.equal(err.status, 415);
+      assert.equal(err.code, 'UNSUPPORTED_CONTENT_TYPE'); // critic review 2026-09-18: same URL, same content type -- non-retryable
       return true;
     },
   );
