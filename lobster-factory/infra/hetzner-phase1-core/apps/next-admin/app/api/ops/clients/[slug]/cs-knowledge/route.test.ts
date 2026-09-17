@@ -19,7 +19,10 @@ vi.mock("@/lib/kb", () => kb);
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const sb = vi.hoisted(() => ({
-  from: vi.fn(() => ({
+  // Parameter typed explicitly: an inferred `() => {...}` gives vi.fn() a zero-arg signature, which
+  // makes `sb.from.mock.calls` a `[][]` (empty-tuple) type — `c[0]` on such a call then fails to
+  // typecheck even though the mock is actually invoked with one argument everywhere it's used.
+  from: vi.fn((_table: string) => ({
     select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { id: ORG }, error: null }) }) }),
     insert: () => Promise.resolve({ data: null, error: null }),
   })),
