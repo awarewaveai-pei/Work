@@ -1,4 +1,29 @@
 # Worklog
+## 2026-09-18（續1）回頭補 Task 7 的物件儲存缺口（設計 Task 9 時發現）+ critic 覆審 3 Major 全修
+
+[任務] 開始設計 Task 9（Trigger.dev 編排層）時發現：Task 7 的 `processJob` 從未真的呼叫 Task 5 的 `putContentAddressedObject` 上傳到 MinIO——只在本地算了 sha256，`job.status='completed'` 從來沒有 `snapshotRef` 欄位。Task 8 的 `writeDiscoveredSource()` 明訂需要 `snapshotRef` 當輸入，Task 9 沒有這個欄位完全無法運作。這不是 Task 9 自己的程式碼，是回頭補 Task 7 的真實缺口——物件儲存上傳只能在 runner 內做（只有 runner 對它自己專屬的 MinIO 有網路權限，network-guard 的 iptables 只允許這一個內部目標；Task 8/9 依設計跑在 runner 外，同一道政策把它們也擋在 MinIO 之外）。
+
+[已修改]
+- `infra/local/fetch-runner/server.mjs`：`processJob` 在乾淨（未被標記）內容通過掃描後、標記 completed 前，呼叫 `putContentAddressedObjectImpl(extracted.raw)`（依賴注入，預設走真實 `putContentAddressedObject(bytes, loadConfigFromEnv())`）；`job.contentHash`/`job.snapshotRef` 改用上傳回傳值（而非另外算的雜湊，兩者永遠一致，但用上傳來源保證 `contentHash` 與 `snapshotRef` 內嵌的雜湊機械對齊，不是巧合）。
+
+[critic 覆審，3 個 Major 全修]
+1. **Major**——截斷的抓取（Task 4 的 5MB 上限觸發）原本會被正常上傳、標記 `completed`，跟完整內容一模一樣，`truncated:true` 只留在記憶體裡的 job 物件、從未進 Task 8 的 `hci.source_snapshots` 任何欄位——一份從中間被截斷的頁面，被當成完整文件記錄下來，審核者毫無察覺依據。已修：截斷內容改走跟 content-isolation 命中同一條人工審核路線（`flagged_for_review`），不建新終態、不建新 DB 欄位，重用「這筆不可信，需要人看」的既有語意。改寫成 if/else 讓「flagged 或截斷絕不會碰到上傳呼叫」變成控制流程結構上不可能發生，不是單靠測試覆蓋的執行順序巧合。
+2. **Major**——物件儲存失敗（`ObjectTooLargeError`／`ObjectStorageTimeoutError`，兩者都已經帶 `.code`）跟一般 fetch 錯誤一樣被塞進同一個沒結構的 `job.error` 字串，Task 9（計畫明訂「enqueue/status/retry-only」）無法分辨「設定錯/超大，重試沒意義」跟「暫時性，值得重試」。已修：`job.errorCode = err.code ?? null`，直接把這兩個 class 本來就有的 `.code` 浮出來，不用另外發明字串前綴規則。
+3. **Major**——4 個 MinIO 環境變數只在 `processJob` 內懶惰驗證，要走到 network-guard-ready + 真實 fetch + 掃描通過才會踩到，跟 `SHARED_SECRET` 在 module load 就 fail-fast 的模式不對稱——容器可以正常啟動、通過 `/healthz`（從不碰 MinIO）、回報 healthy，直到第一個乾淨 job 才會失敗，且外觀跟任何其他失敗一樣。已修：MinIO 設定改在 module load 就檢查（跟 `SHARED_SECRET` 同一套 fail-fast），新增 `HCI_FETCH_RUNNER_SKIP_MINIO_STARTUP_CHECK` 讓單元測試（本來就全部注入 `putContentAddressedObjectImpl`、從不碰真實 MinIO）跳過，不用為了 import 這個檔案硬掰四個沒意義的假環境變數。
+- 1 個 Minor 一併修：「物件儲存上傳失敗」測試原本手刻一個字串 `Error('object_too_large_...')`，不是真的 `ObjectTooLargeError`——改用真實 error class，兩個 class 各自補一個測試。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/fetch-runner/server.test.mjs`（12 個測試，含 3 個 critic finding 各自的回歸測試）| exit=0 | 全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test`（fetch-runner 全部 6 個測試檔）| exit=0 | 69/69 全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-content-isolation.test.ps1`（real-Docker，強化：`snapshotRef` 形狀斷言 + 對真實 MinIO 執行 `object-storage-client.mjs get` 證明物件真的能取回，不只是 runner 自稱有 `snapshotRef`）| exit=0 | 全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/architecture/fetch-runner-{network-isolation,object-storage-write-path}.test.ps1`（確認 eager MinIO 啟動檢查沒有回歸）| exit=0 | 兩個都全綠
+- REVIEW_DONE: critic=Standard | verdict=pass（3 Major 全修）| findings=0 Critical / 3 Major / 1 Minor / 1 Suggestion（已採納：if/else 結構化，不算獨立項）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,lobster-factory | grep=`errorCode\|HCI_FETCH_RUNNER_SKIP_MINIO_STARTUP_CHECK` | hits=僅本次修改檔案本身 + 1 個 lobster-factory 巧合命中（`video/transcription/status/route.ts` 用同名欄位做完全無關的另一個功能，人工核對排除）
+
+[剩餘風險] 無新增——這是把 Task 7 已知的設計缺口補起來，不影響 Task 4/5/6/8 已完成的驗收範圍。
+
+[rollback] 對 `server.mjs`/`server.test.mjs`/1 個架構測試純增量修改（新增上傳呼叫+欄位+分支，未刪改既有 completed/failed 路徑本身的行為），`git revert` 該 commit 即可完全復原。
+
 ## 2026-09-18 HCI-30 蒐集器 Task 8：sink/hci-discovered 寫入路徑，critic 覆審 2 Major（LIKE 萬用字元＋非授權步驟未 fail-soft）+ 1 測試涵蓋缺口全修
 
 [任務] 承接 2026-09-17 續13（Task 7），照 Execution Order 做 Task 8：把 runner 的抓取結果落地成 `hci.sources`/`hci.source_snapshots` 的 DISCOVERED 列。不同於 Task 4/5/7，這個寫入路徑**不能**跑在隔離 runner 內——runner 依 ADR-0029 gate 2 刻意切斷對 docker-internal bridge（Postgres 所在網路）的路由，把 DB 寫入邏輯放進 runner 會直接打穿隔離設計的目的。改落腳在 `Projects/internal/hci30/public-intelligence/source-registry/`（真正符合計畫原訂 Scope，這次不像 Task 4/5/7 需要因 Docker build context 而搬家）。

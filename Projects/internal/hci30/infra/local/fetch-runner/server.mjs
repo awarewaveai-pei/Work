@@ -26,6 +26,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import { fetchAndExtract } from './retrieval/http-html-fetch.mjs';
 import { scanForInstructionLikeContent } from './content-isolation/scan.mjs';
+import { putContentAddressedObject, loadConfigFromEnv } from './object-storage-client.mjs';
 
 const NETWORK_GUARD_READY_FILE = process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_FILE || '/var/run/network-guard/ready';
 const NETWORK_GUARD_READY_TIMEOUT_MS = Number(process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS || 30_000);
@@ -59,6 +60,27 @@ const SHARED_SECRET = process.env.HCI_FETCH_RUNNER_SHARED_SECRET;
 if (!SHARED_SECRET) {
   console.error('HCI_FETCH_RUNNER_SHARED_SECRET is required -- refusing to start unauthenticated.');
   process.exit(1);
+}
+
+// critic review 2026-09-18: validated eagerly, at module load, same as
+// SHARED_SECRET above -- previously only checked lazily inside processJob,
+// reached only after network-guard-ready + a real fetch + a passing scan.
+// That let the container start, pass the unauthenticated /healthz probe
+// (never touches MinIO), and report healthy to compose's
+// `condition: service_healthy` with a config that would fail on the very
+// first clean job, indistinguishable in shape from any other per-job
+// failure. Skipped entirely when HCI_FETCH_RUNNER_SKIP_MINIO_STARTUP_CHECK
+// is set -- tests import this module for `processJob` and always inject
+// `putContentAddressedObjectImpl`, so they never need real MinIO env vars
+// (matching server.test.mjs's existing SHARED_SECRET/PORT dummy-value
+// pattern) and must not be forced to fabricate four more just to import it.
+if (!process.env.HCI_FETCH_RUNNER_SKIP_MINIO_STARTUP_CHECK) {
+  try {
+    loadConfigFromEnv();
+  } catch (err) {
+    console.error(`Object-storage configuration is invalid -- refusing to start: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 // In-memory only -- Task 8 owns durable persistence into
@@ -118,22 +140,39 @@ function sendJson(res, status, body) {
 /**
  * Task 7: fetch + extract + content-isolation scan for one job, mutating it
  * in place so GET /status/:id reflects the outcome. Never stores `raw` bytes
- * on the job object -- that would either bloat /status's JSON response with
- * a full page body (Buffer.toJSON serializes as a {type,data} int array) or,
- * for a flagged/failed job, leak attacker-controlled bytes into every future
- * status poll. Object-storage upload of `raw` is Task 8's job (it also owns
- * the DB write, and needs the bytes and the DB row in the same place).
+ * on the job object itself -- that would either bloat /status's JSON
+ * response with a full page body (Buffer.toJSON serializes as a
+ * {type,data} int array) or, for a flagged/failed job, leak
+ * attacker-controlled bytes into every future status poll. `raw` is instead
+ * uploaded to Task 5's object storage (clean/non-flagged content only) and
+ * only the resulting `snapshotRef` pointer is kept on the job.
+ *
+ * Object-storage upload lives HERE, not in Task 8/9 as an earlier version of
+ * this comment assumed: only this runner has network access to its own
+ * dedicated MinIO instance (network-guard's iptables policy allowlists
+ * exactly that one peer) -- Task 8's write-path module and Task 9's
+ * Trigger.dev orchestrator run OUTSIDE the isolated runner (deliberately --
+ * they need real Postgres/Trigger.dev access, which the runner is cut off
+ * from by the same isolation policy) and have no path to reach it. Found
+ * while wiring Task 9, which needs `snapshotRef` to call Task 8's
+ * writeDiscoveredSource() -- this runner is the only place that value can
+ * ever be produced.
  *
  * `deps` is a test seam (same pattern as pinned-http-client.mjs's `transport`
  * and http-html-fetch.mjs's `safeFetch`): production code never passes it,
- * tests inject `fetchAndExtractImpl`/`scanImpl`/`waitForReadyImpl` to drive
- * this state machine without a real network fetch or a real network-guard
- * sidecar.
+ * tests inject `fetchAndExtractImpl`/`scanImpl`/`waitForReadyImpl`/
+ * `putContentAddressedObjectImpl` to drive this state machine without a real
+ * network fetch, a real network-guard sidecar, or a real MinIO instance.
  */
 export async function processJob(job, deps = {}) {
   const fetchAndExtractImpl = deps.fetchAndExtractImpl ?? fetchAndExtract;
   const scanImpl = deps.scanImpl ?? scanForInstructionLikeContent;
   const waitForReadyImpl = deps.waitForReadyImpl ?? waitForNetworkGuardReady;
+  // Re-reads env vars already validated eagerly at module load above -- this
+  // call is expected to always succeed in production; it exists as its own
+  // function only so tests can inject `putContentAddressedObjectImpl` and
+  // never touch real MinIO config at all.
+  const putContentAddressedObjectImpl = deps.putContentAddressedObjectImpl ?? ((bytes) => putContentAddressedObject(bytes, loadConfigFromEnv()));
 
   job.status = 'fetching';
   try {
@@ -143,27 +182,59 @@ export async function processJob(job, deps = {}) {
     // not just `extracted.text` -- critic review 2026-09-17 found `title`
     // reached status='completed' completely unscanned, and comment/
     // attribute text (invisible to `text`'s extraction but still present in
-    // `raw`, which Task 5/8 durably persist) was equally invisible to the
-    // gate. See retrieval/http-html-fetch.mjs's `scanSurface` construction.
+    // `raw`, which is what actually gets uploaded/hashed below) was equally
+    // invisible to the gate. See retrieval/http-html-fetch.mjs's
+    // `scanSurface` construction.
     const scanResult = scanImpl(extracted.scanSurface);
 
-    if (scanResult.flagged) {
+    // critic review 2026-09-18: a truncated fetch (Task 4's 5MB response
+    // cap) used to be uploaded and marked 'completed' exactly like a
+    // complete one, with `truncated: true` sitting inert on the job and
+    // nowhere in Task 8's hci.source_snapshots row at all -- a page cut off
+    // mid-tag/mid-sentence recorded as if it were the whole document, with
+    // no signal for a human reviewer. Routing it through the SAME
+    // human-review lane as a content-isolation hit is the cheapest correct
+    // fix (no new terminal status, no new DB column): flagged_for_review
+    // already means "do not treat as a trustworthy DISCOVERED capture,
+    // needs a human to look."
+    if (scanResult.flagged || extracted.truncated) {
       // ADR-011 SS決策15b: a hit routes to human review, never straight into
       // the DISCOVERED write path (Task 8 must treat this status as terminal
       // -- not something to retry-until-clean, since the content itself is
-      // what tripped the gate, not a transient fetch error).
+      // what tripped the gate, not a transient fetch error). Raw bytes are
+      // never uploaded here -- a reviewer works from scanReasons' excerpts
+      // (or the truncation fact itself), not a durable copy of
+      // possibly-malicious or knowingly-incomplete content. Written as an
+      // if/else with the upload call physically inside the else branch
+      // (critic review 2026-09-18), not an early-return before it -- makes
+      // "flagged or truncated content never reaches upload" true by
+      // control-flow construction, not just by test coverage of today's
+      // ordering.
       job.status = 'flagged_for_review';
-      job.scanReasons = scanResult.reasons;
+      if (scanResult.flagged) job.scanReasons = scanResult.reasons;
+      if (extracted.truncated) job.truncated = true;
       return;
     }
 
+    // contentHash comes from the OBJECT STORAGE write's own return value,
+    // not extracted.contentHash (both hash the identical `raw` buffer with
+    // sha256 and will always agree) -- using the value object storage
+    // itself computed keeps contentHash mechanically consistent with
+    // snapshotRef, which embeds this exact hash as its MinIO key
+    // (s3://bucket/sha256/<hash>), rather than trusting two independent
+    // computations to stay in sync by coincidence.
+    const stored = await putContentAddressedObjectImpl(extracted.raw);
+
+    // No `job.truncated` field here: reaching this line means
+    // extracted.truncated was falsy (the branch above already returned for
+    // a truncated fetch) -- a 'completed' job is always a complete capture.
     job.status = 'completed';
-    job.contentHash = extracted.contentHash;
+    job.contentHash = stored.content_hash;
+    job.snapshotRef = stored.snapshot_ref;
     job.title = extracted.title;
     job.textLength = extracted.text.length;
     job.finalUrl = extracted.finalUrl;
     job.fetchedAt = extracted.fetchedAt;
-    job.truncated = extracted.truncated;
     job.contentProvenance = extracted.content_provenance;
   } catch (err) {
     job.status = 'failed';
@@ -176,6 +247,18 @@ export async function processJob(job, deps = {}) {
     // version re-wrapped it with a second `ssrf_blocked_` prefix, caught by
     // this file's own unit test (tests/unit/fetch-runner/server.test.mjs).
     job.error = (err && err.message) || 'unknown_error';
+    // critic review 2026-09-18: before this, every object-storage failure
+    // (ObjectTooLargeError, ObjectStorageTimeoutError -- both already carry
+    // a `.code`, object-storage-client.mjs) collapsed into this same
+    // unstructured message string alongside generic fetch errors, giving
+    // Task 9's retry logic (plan doc: "enqueue/status/retry-only") no way
+    // to tell "config/oversized, retrying is pointless" apart from
+    // "transient, retry is reasonable." Surfacing `.code` when the thrown
+    // error has one (both object-storage error classes do; SsrfBlockedError
+    // does not, which is fine -- its message prefix is already its own
+    // machine-matchable signal) gives Task 9 a real field to branch on
+    // without having to parse `job.error` prose.
+    job.errorCode = (err && err.code) || null;
   }
 }
 

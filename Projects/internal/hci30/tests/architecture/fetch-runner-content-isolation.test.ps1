@@ -134,6 +134,21 @@ try {
   }
   Write-Host "  ok: job $($job.id) completed -- contentHash=$($finalJob.contentHash.Substring(0,16))... textLength=$($finalJob.textLength) title='$($finalJob.title)'"
 
+  # Object-storage upload proof (Task 9 wiring found this belongs in
+  # processJob itself, not Task 8/9 -- see server.mjs's own comment).
+  # job.status='completed' already implies the upload succeeded (a real
+  # MinIO failure would route to 'failed' instead, per the unit test
+  # covering that path), but this proves the OBJECT ITSELF is retrievable
+  # from the real MinIO instance, not just that the runner claims a
+  # snapshotRef string -- same round-trip technique as Task 5's own
+  # fetch-runner-object-storage-write-path.test.ps1.
+  if (-not $finalJob.snapshotRef) { throw "ASSERTION FAILED: completed job has no snapshotRef -- response: $($finalJob | ConvertTo-Json -Compress)" }
+  $expectedSnapshotRefPrefix = "s3://hci-fetch-runner-raw/sha256/$($finalJob.contentHash)"
+  if ($finalJob.snapshotRef -ne $expectedSnapshotRefPrefix) { throw "ASSERTION FAILED: snapshotRef '$($finalJob.snapshotRef)' does not match expected '$expectedSnapshotRefPrefix'" }
+  $getResult = & docker @composeArgs exec -T runner node object-storage-client.mjs get $finalJob.snapshotRef --out=/tmp/verify-content-isolation.bin
+  if ($LASTEXITCODE -ne 0) { throw "ASSERTION FAILED: uploaded object is not retrievable from real MinIO at $($finalJob.snapshotRef) -- get exit $LASTEXITCODE, output: $getResult" }
+  Write-Host "  ok: snapshotRef object is real and retrievable from MinIO ($($finalJob.snapshotRef))"
+
   # --- fail-closed proof: an SSRF-gated target must reach status=failed, never completed/flagged ---
   Write-Host 'SSRF-gated target: must fail closed at the fetch layer, not silently complete'
   $ssrfBody = '{"targetUrl":"http://169.254.169.254/latest/meta-data/","tenantId":"tenant-1","subject_kind":"ORGANIZATION"}'
