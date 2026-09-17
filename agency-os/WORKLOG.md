@@ -1,4 +1,16 @@
 # Worklog
+## 2026-09-17｜Cognitive OS prod redeploy: Recipe engine live
+
+- 根因：GPT/Codex 09-14→09-16 的 114 commits 只在本機，未 push；origin/main 另有 7 commits（daily scaffold + `d3ec136f5` project/source foundation，內容與本機相同檔案 byte-identical）。prod 仍跑 09-12 image，`/recipes` 404。
+- 步驟：commit 遺留 WORKLOG 條目 `ca081bab8` → `git merge origin/main`（唯一衝突 WORKLOG，兩側保留）`322911a2e` → push → ks-aw-01 `/opt/cognitive-os` reset to 322911a2e → `deploy.sh`（typecheck→pytest 129 passed→rollback-tag→build→up→healthy 6s→local/public smoke PASS）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh` on ks-aw-01 | exit=0 | ms=~265000
+- REALTEST_EVIDENCE: tool=curl | cmd=`GET https://cognitive.aware-wave.com/recipes` | exit=0 | result=200, 14 recipes
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scratchpad/run_life_prod.py`（login→`POST /recipes/life-decision-v1/run` run_id=life-2026-09-17-real→`/result`→logout）| exit=0 | result=status PASS, 3 steps, gate workflow_execution_integrity PASS, ranking O3 4.2 / O2 3.8 / O1 2.1
+- REVIEW_WAIVED: NA -- 無 code 變更；合併之 code 檔兩側 byte-identical（`git diff --stat HEAD origin/main` 僅 SPEC_QUICKREF auto-merge）；merge 後 `pytest tests/unit/test_api_main.py tests/unit/test_project_source_repository.py` 69 passed
+- BUGHUNT_WAIVED: DOC_ONLY -- 本條目僅 WORKLOG + blueprint 部署行
+- 剩餘缺口（接續）：EdD `literature_search` adapter 為 deterministic offline fixture；藝術治療 31 個 gap methods 0 built；business 管線止於 NPV（缺市場分析／KPI／執行計畫／提案書，Finance pack 空）。
+- rollback：ks-aw-01 `docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose -f /opt/cognitive-os/Projects/internal/cognitive-engineering-os/docker-compose.yml up -d`（:rollback = 09-12 image）。
+
 ## 2026-09-14｜Cognitive OS Project／Source intake foundation
 
 - 缺口：系統雖可執行 Method／Recipe，尚無 Master Plan 起始流程需要的 Project／Source shared-kernel 與原始資料保存邊界。
