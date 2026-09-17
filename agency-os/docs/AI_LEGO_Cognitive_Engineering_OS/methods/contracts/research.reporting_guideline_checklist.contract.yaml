@@ -1,0 +1,79 @@
+$id: "ai-lego://methods/contracts/research.reporting_guideline_checklist.contract.yaml"
+title: "Reporting Guideline Checklist Method Contract"
+status: ACTIVE
+
+description: >
+  research.reporting_guideline_checklist. GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother
+  document; built for the operator's EdD methodology-chapter drafting workflow -- elicit a
+  manuscript's content item-by-item against an official academic reporting standard (the same
+  "official checklist text pasted into the prompt" workflow behind commercial "elicitation table"
+  demos; confirmed 2026-09-18 that pattern needs no special UI, only the standard's own wording in
+  the prompt). Uses the generic AI Gateway (ai_lego/platform/ai_gateway/draft.py, `/ai/draft/method/
+  {id}`) unchanged -- no platform code was added for this method. Only SRQR (Standards for Reporting
+  Qualitative Research; O'Brien BC, Harris IB, Beckman TJ, Reed DA, Cook DA. Academic Medicine.
+  2014;89(9):1245-1251. doi:10.1097/ACM.0000000000000388) is populated in
+  reference-data/reporting-guidelines.reference.yaml; additional guidelines (e.g. COREQ, CONSORT)
+  can be added to that catalog later with zero change to this method's code. That catalog lives
+  OUTSIDE specs/ deliberately (SchemaContracts treats every $id-bearing YAML under specs/ as a JSON
+  Schema resource; this file is a plain data catalog, not a schema). Core
+  invariant: `items` must cover EXACTLY the guideline's official `item_id` set, each item's
+  `requirement_text` must match the catalog's official wording verbatim, and `completion_percentage`
+  is a derived view recomputed on read from `drafted_content`'s own placeholder-or-not state, never a
+  stored claim (same discipline as `art_therapy.life_wheel`'s `balance_gap`).
+
+source_of_truth_for:
+  - "reference-data/reporting-guidelines.reference.yaml -- the guideline item catalog this method validates against"
+  - "specs/cognitive/typed-objects/reporting-guideline-checklist-record.schema.yaml"
+
+decided_by: "Operator directive 2026-09-18 (EdD reporting-guideline elicitation tool); no ADR governs the content."
+
+id: research.reporting_guideline_checklist
+version: "1.0.0"
+family: research
+
+cognitive_primitives: [DECOMPOSE, VALIDATE]
+# INFERRED, not cited: decompose a manuscript-writing task into a fixed set of official checklist
+# items, then validate each item's drafted content against that item's own official requirement.
+
+purpose:
+  - elicit_manuscript_content_against_an_official_reporting_standard_item_by_item
+
+inputs:
+  required: []
+  # Entry-point method: the guideline's official items come from this method's own reference
+  # catalog; drafted content comes directly from the caller (typically an AI Gateway draft built
+  # from research facts via this method's own build_checklist_brief()).
+
+outputs:
+  - ReportingGuidelineChecklistRecord
+
+preconditions:
+  - "guideline_id has an entry in reference-data/reporting-guidelines.reference.yaml#/guidelines"
+  - "items cover exactly that guideline's official item_id set, each requirement_text verbatim"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next: []
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-RPTCHK-1: should guideline_id become a closed enum once a second guideline (e.g. COREQ) is added to the reference catalog, or stay a free-text lookup key? (owner: operator)"
+
+verification:
+  method: >
+    Downloaded and read the primary source (O'Brien et al. 2014, Academic Medicine, Table 1, pp.
+    1247-1248) and the official EQUATOR Network SRQR checklist PDF; transcribed all 21 items from
+    both, cross-checked word-for-word identical (see reporting-guidelines.reference.yaml's own
+    `verification` block for full source detail). Grepped the spec root and ai_lego for
+    "reporting_guideline"/"SRQR" before writing -- zero prior implementation. Read
+    art_therapy.life_wheel.contract.yaml and life-wheel-record.schema.yaml as the shape template
+    (operator-assigned), and ai_lego/platform/ai_gateway/draft.py to confirm no platform code change
+    is needed for a new method with an ACTIVE contract + RECORD_ID_PREFIX.
+  note: >
+    No mother document was modified. All 21 SRQR items were successfully verified against the
+    primary literature; none required an "unable to verify" placeholder.

@@ -1,0 +1,75 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/reporting-guideline-checklist-record.schema.yaml"
+title: Reporting Guideline Checklist Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ReportingGuidelineChecklistRecord` -- output of `research.reporting_guideline_checklist`. One
+  item per official item of a cited academic reporting standard (e.g. SRQR), each carrying the
+  manuscript's own drafted content for that item. Runtime invariants beyond this schema
+  (ai_lego/modules/research/reporting_guideline_checklist.py): `items` must cover EXACTLY
+  `guideline_id`'s official `item_id` set from
+  reference-data/reporting-guidelines.reference.yaml (kept OUTSIDE specs/ deliberately -- see that
+  file's own header), `requirement_text` must match that catalog verbatim, and completion percentage
+  is recomputed on read (`completeness_summary()`), never stored on the record.
+
+source_of_truth_for:
+  - "methods/contracts/research.reporting_guideline_checklist.contract.yaml"
+
+decided_by: "Operator directive 2026-09-18; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, guideline_id, guideline_citation, items, provenance]
+properties:
+  id: { type: string, pattern: "^RPTCHK-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "research.reporting_guideline_checklist" }
+  guideline_id:
+    type: string
+    description: "Key into reference-data/reporting-guidelines.reference.yaml#/guidelines (e.g. 'SRQR')."
+  guideline_citation:
+    type: string
+    minLength: 1
+    description: "Full bibliographic citation; must match the reference catalog's own citation for guideline_id verbatim."
+  items:
+    type: array
+    minItems: 1
+    description: "Real invariant (beyond this schema): must cover exactly guideline_id's official item_id set."
+    items:
+      type: object
+      additionalProperties: false
+      required: [item_id, requirement_text, drafted_content, status]
+      properties:
+        item_id: { type: string, minLength: 1 }
+        requirement_text:
+          type: string
+          minLength: 1
+          description: "Must match the reference catalog's official wording for this item_id verbatim (normalized comparison)."
+        drafted_content:
+          type: string
+          minLength: 1
+          description: "A 'TBD: ...' prefix marks a placeholder (ai_lego/platform/ai_gateway/draft.py's own convention) -- excluded from the recomputed completion percentage."
+        status: { type: string, enum: [NOT_STARTED, DRAFTED, NOT_APPLICABLE] }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Two-item excerpt of an SRQR checklist (real records require all 21 SRQR items; shortened here for illustration), one drafted and one still pending"
+    value:
+      id: "RPTCHK-2026-09-18-001"
+      version: "1.0.0"
+      generated_by_method: "research.reporting_guideline_checklist"
+      guideline_id: "SRQR"
+      guideline_citation: "O'Brien BC, Harris IB, Beckman TJ, Reed DA, Cook DA. Standards for reporting qualitative research: a synthesis of recommendations. Academic Medicine. 2014;89(9):1245-1251. doi:10.1097/ACM.0000000000000388"
+      items:
+        - item_id: "S4"
+          requirement_text: "Purpose or research question — Purpose of the study and specific objectives or questions"
+          drafted_content: "This study explores how EdD art-therapy students experience reflexivity during their capstone research."
+          status: "DRAFTED"
+        - item_id: "S9"
+          requirement_text: "Ethical issues pertaining to human subjects — Documentation of approval by an appropriate ethics review board and participant consent, or explanation for lack thereof; other confidentiality and data security issues"
+          drafted_content: "TBD: IRB approval number and consent procedure not yet described in the research facts"
+          status: "NOT_STARTED"
+      provenance: { epistemic_type: AI_SUGGESTION, authorship_state: AI_SUGGESTED, locked: null }

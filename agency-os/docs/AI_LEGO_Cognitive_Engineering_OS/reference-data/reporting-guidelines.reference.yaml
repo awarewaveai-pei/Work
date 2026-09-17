@@ -1,0 +1,215 @@
+$id: "ai-lego://reference-data/reporting-guidelines.reference.yaml"
+title: Reporting Guideline Item Catalogs
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Static, citation-grounded item catalogs for academic reporting standards (e.g. SRQR, and future
+  additions such as COREQ/CONSORT). Consumed at runtime by `research.reporting_guideline_checklist`
+  (ai_lego/modules/research/reporting_guideline_checklist.py) via `resolve_spec_root()` -- the method
+  module never hardcodes checklist wording, so the official text of a standard lives in exactly one
+  place, independently auditable against its primary source. Adding a new guideline is a data-only
+  change: append a new key under `guidelines`, no code change to the method module.
+
+source_of_truth_for:
+  - "ai_lego/modules/research/reporting_guideline_checklist.py -- the only runtime reader of this file"
+  - "methods/contracts/research.reporting_guideline_checklist.contract.yaml"
+
+decided_by: "Operator directive 2026-09-18 (EdD reporting-guideline elicitation tool); no ADR governs the content."
+
+verification:
+  method: >
+    SRQR's 21 items were transcribed from two independent official reproductions of the primary
+    source, downloaded and read directly (not from training-data recall): (1) the EQUATOR Network's
+    own SRQR checklist PDF (http://www.equator-network.org/reporting-guidelines/srqr/, mirrored at
+    https://onlinelibrary.wiley.com/pb-assets/assets/15532712/SRQR_Checklist-1529502683197.pdf), and
+    (2) Table 1 (pp. 1247-1248) of the primary journal article itself (O'Brien BC, Harris IB, Beckman
+    TJ, Reed DA, Cook DA. "Standards for reporting qualitative research: a synthesis of
+    recommendations." Academic Medicine. 2014;89(9):1245-1251. doi:10.1097/ACM.0000000000000388;
+    PDF mirror https://med.stanford.edu/content/dam/sm/chri2/documents/O'Brien%20et%20al.%20-%202014%20-%20Standards%20for%20Reporting%20Qualitative%20Research%20A%20Sy.pdf).
+    Both sources were word-for-word identical for all 21 items; item numbering (S1-S21) and section
+    grouping reproduce Table 1's own "No./Topic/Item" columns exactly.
+  note: >
+    All 21 SRQR items were successfully verified against the primary literature -- none required an
+    "unable to verify, using paraphrase" fallback. `requirement_text` below is `"<Topic> — <Item>"`,
+    the Topic and Item column text concatenated verbatim (including the source's own missing period
+    between "study" and "Identifying" in S1 -- reproduced exactly as printed in both sources, not
+    corrected). `requires_rationale: true` marks the items Table 1 itself footnotes with a
+    superscript "rationale" marker (footnote b): the rationale should briefly discuss the
+    justification for choosing that theory/approach/method/technique over other options, the
+    assumptions/limitations implicit in that choice, and how the choice influences study conclusions
+    and transferability.
+
+guidelines:
+  SRQR:
+    name: "Standards for Reporting Qualitative Research (SRQR)"
+    citation: >
+      O'Brien BC, Harris IB, Beckman TJ, Reed DA, Cook DA. Standards for reporting qualitative
+      research: a synthesis of recommendations. Academic Medicine. 2014;89(9):1245-1251.
+      doi:10.1097/ACM.0000000000000388
+    source_urls:
+      - "https://journals.lww.com/academicmedicine/fulltext/2014/09000/standards_for_reporting_qualitative_research__a.21.aspx"
+      - "https://onlinelibrary.wiley.com/pb-assets/assets/15532712/SRQR_Checklist-1529502683197.pdf"
+      - "http://www.equator-network.org/reporting-guidelines/srqr/"
+    items:
+      - item_id: S1
+        section: "Title and abstract"
+        topic: Title
+        requires_rationale: false
+        requirement_text: >-
+          Title — Concise description of the nature and topic of the study Identifying the study as
+          qualitative or indicating the approach (e.g., ethnography, grounded theory) or data
+          collection methods (e.g., interview, focus group) is recommended
+      - item_id: S2
+        section: "Title and abstract"
+        topic: Abstract
+        requires_rationale: false
+        requirement_text: >-
+          Abstract — Summary of key elements of the study using the abstract format of the intended
+          publication; typically includes background, purpose, methods, results, and conclusions
+      - item_id: S3
+        section: Introduction
+        topic: "Problem formulation"
+        requires_rationale: false
+        requirement_text: >-
+          Problem formulation — Description and significance of the problem/phenomenon studied;
+          review of relevant theory and empirical work; problem statement
+      - item_id: S4
+        section: Introduction
+        topic: "Purpose or research question"
+        requires_rationale: false
+        requirement_text: >-
+          Purpose or research question — Purpose of the study and specific objectives or questions
+      - item_id: S5
+        section: Methods
+        topic: "Qualitative approach and research paradigm"
+        requires_rationale: true
+        requirement_text: >-
+          Qualitative approach and research paradigm — Qualitative approach (e.g., ethnography,
+          grounded theory, case study, phenomenology, narrative research) and guiding theory if
+          appropriate; identifying the research paradigm (e.g., postpositivist,
+          constructivist/interpretivist) is also recommended; rationale
+      - item_id: S6
+        section: Methods
+        topic: "Researcher characteristics and reflexivity"
+        requires_rationale: false
+        requirement_text: >-
+          Researcher characteristics and reflexivity — Researchers' characteristics that may
+          influence the research, including personal attributes, qualifications/experience,
+          relationship with participants, assumptions, and/or presuppositions; potential or actual
+          interaction between researchers' characteristics and the research questions, approach,
+          methods, results, and/or transferability
+      - item_id: S7
+        section: Methods
+        topic: Context
+        requires_rationale: true
+        requirement_text: >-
+          Context — Setting/site and salient contextual factors; rationale
+      - item_id: S8
+        section: Methods
+        topic: "Sampling strategy"
+        requires_rationale: true
+        requirement_text: >-
+          Sampling strategy — How and why research participants, documents, or events were selected;
+          criteria for deciding when no further sampling was necessary (e.g., sampling saturation);
+          rationale
+      - item_id: S9
+        section: Methods
+        topic: "Ethical issues pertaining to human subjects"
+        requires_rationale: false
+        requirement_text: >-
+          Ethical issues pertaining to human subjects — Documentation of approval by an appropriate
+          ethics review board and participant consent, or explanation for lack thereof; other
+          confidentiality and data security issues
+      - item_id: S10
+        section: Methods
+        topic: "Data collection methods"
+        requires_rationale: true
+        requirement_text: >-
+          Data collection methods — Types of data collected; details of data collection procedures
+          including (as appropriate) start and stop dates of data collection and analysis, iterative
+          process, triangulation of sources/methods, and modification of procedures in response to
+          evolving study findings; rationale
+      - item_id: S11
+        section: Methods
+        topic: "Data collection instruments and technologies"
+        requires_rationale: false
+        requirement_text: >-
+          Data collection instruments and technologies — Description of instruments (e.g., interview
+          guides, questionnaires) and devices (e.g., audio recorders) used for data collection;
+          if/how the instrument(s) changed over the course of the study
+      - item_id: S12
+        section: Methods
+        topic: "Units of study"
+        requires_rationale: false
+        requirement_text: >-
+          Units of study — Number and relevant characteristics of participants, documents, or events
+          included in the study; level of participation (could be reported in results)
+      - item_id: S13
+        section: Methods
+        topic: "Data processing"
+        requires_rationale: false
+        requirement_text: >-
+          Data processing — Methods for processing data prior to and during analysis, including
+          transcription, data entry, data management and security, verification of data integrity,
+          data coding, and anonymization/deidentification of excerpts
+      - item_id: S14
+        section: Methods
+        topic: "Data analysis"
+        requires_rationale: true
+        requirement_text: >-
+          Data analysis — Process by which inferences, themes, etc., were identified and developed,
+          including the researchers involved in data analysis; usually references a specific
+          paradigm or approach; rationale
+      - item_id: S15
+        section: Methods
+        topic: "Techniques to enhance trustworthiness"
+        requires_rationale: true
+        requirement_text: >-
+          Techniques to enhance trustworthiness — Techniques to enhance trustworthiness and
+          credibility of data analysis (e.g., member checking, audit trail, triangulation); rationale
+      - item_id: S16
+        section: "Results/findings"
+        topic: "Synthesis and interpretation"
+        requires_rationale: false
+        requirement_text: >-
+          Synthesis and interpretation — Main findings (e.g., interpretations, inferences, and
+          themes); might include development of a theory or model, or integration with prior
+          research or theory
+      - item_id: S17
+        section: "Results/findings"
+        topic: "Links to empirical data"
+        requires_rationale: false
+        requirement_text: >-
+          Links to empirical data — Evidence (e.g., quotes, field notes, text excerpts, photographs)
+          to substantiate analytic findings
+      - item_id: S18
+        section: Discussion
+        topic: "Integration with prior work, implications, transferability, and contribution(s) to the field"
+        requires_rationale: false
+        requirement_text: >-
+          Integration with prior work, implications, transferability, and contribution(s) to the
+          field — Short summary of main findings; explanation of how findings and conclusions
+          connect to, support, elaborate on, or challenge conclusions of earlier scholarship;
+          discussion of scope of application/generalizability; identification of unique
+          contribution(s) to scholarship in a discipline or field
+      - item_id: S19
+        section: Discussion
+        topic: Limitations
+        requires_rationale: false
+        requirement_text: >-
+          Limitations — Trustworthiness and limitations of findings
+      - item_id: S20
+        section: Other
+        topic: "Conflicts of interest"
+        requires_rationale: false
+        requirement_text: >-
+          Conflicts of interest — Potential sources of influence or perceived influence on study
+          conduct and conclusions; how these were managed
+      - item_id: S21
+        section: Other
+        topic: Funding
+        requires_rationale: false
+        requirement_text: >-
+          Funding — Sources of funding and other support; role of funders in data collection,
+          interpretation, and reporting
