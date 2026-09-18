@@ -1,4 +1,40 @@
 # Worklog
+## 2026-09-18（續23）HCI-30 部署 Phase A 全部完成（commit `82d3a7ff3`/`77e9a123c`/`b11b8e4d6`）——本機可測試、可回滾的部分到此結束，剩下全是動正式主機的 Phase B
+
+[任務] 承接續22，完成部署腳本擴充+資料庫搬遷工具，Phase A（不碰正式主機）到此收尾。
+
+[過程中揪出的第二個真實 bug，發現於嘗試真的用新路徑 build 時]：續22 commit 的 `hci-app`/`hci-fetch-runner`/`hci-network-guard` 三個服務用了 `../../../../Projects/internal/hci30` 這種相對於 git repo 自身結構的路徑，`docker compose config` 驗證得過（它只驗證 YAML/變數代換，不驗證路徑是否真的存在），但正式主機上這個 compose 檔案放在 `/root/lobster-phase1/`，沒有同樣的 git 祖先目錄結構——這條路徑在正式主機上會指到不存在的地方，部署當下才會爆炸。已修正為 `./apps/hci-app`（相對於 `$STAGING_DIR`，比照其他所有服務的既有寫法），並且**真的**在本機模擬 `sg-deploy.sh` 的 rsync 動作（手動 `cp -r` 出一份 `apps/hci-app/` 目錄）+ 真的對三個修正後的 build context 各跑一次 `docker build`，三個都成功，才確認這次是真的修好，不是又一次「驗證只驗證了語法」。
+
+[sg-deploy.sh／rollback-phase1.sh 擴充，1 個 critic agent 覆審通過]
+新增 `hci-app` 為第四個可部署 app，用兩個小函式（`app_git_source_root`／`app_container_name`）取代原本寫死的路徑/命名，兩者的 fallback 分支對既有三個 app（wordpress/node-api/next-admin）**逐字重現**舊行為——真的寫了一段獨立 bash 驗證新舊函式對既有三個 app 回傳值完全相同，不只是「看起來應該一樣」。加了 hci-app 專用的輕量 pre-build gate（`node --check` + `node --test` 跑 `tests/architecture/*.mjs`，刻意不跑需要 PowerShell 的完整 `test-wave1-local.ps1`，正式主機是純 Ubuntu 沒有 PowerShell）+ smoke check（比照 node-api 的 `docker port` 動態解析埠號寫法）。`rollback-phase1.sh` 的 `IMAGE_MAP` 加上 `hci-app`。critic 覆審抓到 2 個 Minor（`usage()` 文字沒同步更新、一段註解列舉測試檔名列少了一個會漏抓）已修；另外主動查證了 critic 點出的一個潛在大問題——正式主機的 `.env`／既有 compose 檔目前完全沒有我新加的 4 個密鑰需求，直接 SSH 確認：**正式主機現在還沒套用今天任何一支新 compose 服務**，`docker compose config` 對現有正式檔案仍然正常，代表目前所有既有 app 的部署都不受影響；但這也代表：**未來實際套用 hci-postgres/hci-app 這批 compose 異動時，必須跟灌真密鑰同一步做，不能分開**，不然下一次任何 app 的部署都會因為整份 compose 檔案的變數代換失敗而全部壞掉。
+
+[hci-postgres 專用 migration-apply 腳本，過程中真的抓到 2 個假設錯誤]
+新增 `scripts/apply-hci-postgres-migration.mjs`（比照既有 `apply-db-migration.mjs`，但改指向 `hci-postgres`/`hci_owner`，不是共用 Supabase）。**沒有照抄就收工，真的對全部 20 支既有 migration 跑過 `--check`**，結果馬上抓到兩個抄錯的地方：①原本要求每支 migration 檔要自帶 `BEGIN;`/`COMMIT;`（照抄 Supabase 那支的規則）——真的跑下去對 migration 0001 就失敗,查證 HCI-30 自己真正在用的套用方式（`dev-db-init.ps1` 的 `Invoke-SqlFile`）根本沒有這個包裝,直接刪掉這個錯誤假設,順便修正了成功判斷邏輯(原本會誤判「沒有 COMMIT 字樣」=失敗，但這個慣例本來就不會印出 COMMIT）。②文件裡寫「20 支 migration 零個用到 CONCURRENTLY」——這句話當初沒有真的查證，事後補查發現其實有 1 處提到,只是在解釋「為什麼這裡故意不用」的註解裡，程式邏輯本來就有跳過註解，功能沒有錯，但這個宣稱本身不查證就寫是不對的做法，已改寫成有實際查過的版本。修正後對全部 20 支真的重跑一次 `--check`，20/20 正確解析。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機模擬 rsync（`cp -r`）+ `docker build` 對 hci-app/hci-fetch-runner/hci-network-guard 三個修正後路徑 | exit=0（三次）
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立 bash 腳本比對新舊路徑/命名解析函式對 wordpress/node-api/next-admin 三個既有 app 的輸出 | result=三個皆逐字相同
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n` 兩支共用部署腳本 | exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo -n grep -c 'HCI_DB_PASSWORD\|...' /root/lobster-phase1/.env` + `docker compose config --quiet`（正式主機既有檔案）| result=0 個既有密鑰、既有 compose 檔案目前仍正常
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/apply-hci-postgres-migration.mjs --check 0001..0020` | result=20/20 正確解析，過程中抓到並修正 2 個未查證假設
+- REVIEW_DONE: critic=Standard（sg-deploy.sh/rollback-phase1.sh，AGENTS.md「Auto-Repair path」強制前置：讀 `auto-repair-2026-05-23.md` 相關段落 + 跑 `dogfood-auto-repair.ps1 -Mode HealthOnly`）| verdict=pass | findings=2 Minor（已修）
+- BUGHUNT_WAIVED: DOC_ONLY -- 本輪為部署工具新增/路徑修正，非既有呼叫端契約異動
+
+[Phase A 到此全部結束，累積 commit：`9cec87368`／`9a28ca285`／`6212323bd`／`82d3a7ff3`／`77e9a123c`／`b11b8e4d6`——全部本機驗證過，未套用到任何正式環境]
+
+[剩下，全部是 Phase B（動正式主機，AGENTS.md High-risk-STOP，等操作者對最終清單一次批准）]
+1. 灌真密鑰（`HCI_DB_PASSWORD`／`HCI_FETCH_RUNNER_SHARED_SECRET`／`HCI_FETCH_RUNNER_MINIO_ROOT_USER`／`HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD`）到正式主機 `.env`，須與下一項同步進行。
+2. 用 `safe-infra-patch.sh compose` 把 `hci-postgres`/`hci-app`/`hci-fetch-runner`/`hci-network-guard`/`hci-object-storage` 五個服務套進正式主機既有 compose 檔。
+3. `mkdir -p /root/lobster-phase1/apps/hci-app`（首次部署前置，避免 `sg-deploy.sh` 找不到目的地資料夾直接失敗）。
+4. `sg-deploy.sh hci-app` 首次部署（建議單獨跑，不要跟 next-admin 等其他 app 一起批次跑，等它證明穩定再合併）。
+5. `node scripts/apply-hci-postgres-migration.mjs 0001 ... 0020` 對正式 `hci-postgres` 套用全部 schema。
+6. `hci-postgres-backup` cron 排程安裝到 `/etc/cron.d/`。
+7. DNS 建立 `hci.aware-wave.com` A 記錄（Cloudflare）+ nginx vhost（照抄 `cognitive.aware-wave.com` 那個區塊）+ 憑證擴充（`certbot --expand`）。
+8. 全部就緒後：真的用瀏覽器/curl 打 `https://hci.aware-wave.com/health` 驗證整條路徑通。
+
+[已修改] 見 commit `82d3a7ff3`／`77e9a123c`／`b11b8e4d6` 訊息全文。
+
+[rollback] 三個 commit 皆可個別 `git revert`；正式主機目前完全未套用本輪任何異動（已直接 SSH 確認），無正式環境回滾需求。
 ## 2026-09-18（續34）280+ 方法內容深化第八批：database_data 家族全部 10 個方法（F21 資料庫／資料套件）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）的批次節奏，處理 database_data 家族全部 10 個方法：backup_restore_drill／data_contract／data_lineage／data_quality_dimensions／erd／expand_contract_migration／normalization／reconciliation／retention_deletion_model／schema_compatibility_analysis。
