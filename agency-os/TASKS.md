@@ -583,6 +583,13 @@
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
+- [ ] **【2026-09-19 開出｜Codex 主導前必修】Claude→Codex 同步實際失效：機械閘在 Codex 零觸發 + bridge 同步凍結**
+  - `🔴 現行` · `2026-09-19 開出，操作者計畫 2026-10 由 Codex 主導` · `閘的修法方向需操作者選`
+  - **一句話**：Codex 全走 `exec` 工具，hook matcher 只認 Claude 工具名 → 部署／commit／改檔閘全數旁路；同步腳本被 Git Bash 的 GNU tar 弄崩，09-01 後 685 次全失敗且被 AO-RESUME 吞掉。
+  - **下一步**：①tar 改絕對路徑（`sync-claude-to-codex.ps1:731`、`check-claude-codex-parity.ps1:50`）②AO-RESUME sync/parity 失敗進 smoke `blind_spots` ③runner 對 Codex `exec` 正規化或關 code_mode（需選）④清 `~/.codex/agents` 舊副本 + checker 補查 ⑤backup 保留上限 ⑥更正 5 處過度宣稱文件
+  - **完成定義**：Git Bash 環境下 parity PASSED；真實 Codex session 跑未標記 `sg-deploy.sh` 被 BLOCK、首次改檔被 git-log-injector 擋
+  - **證據**：WORKLOG 2026-09-19(續79)
+
 - [ ] **【2026-09-12 開出｜中優先】`git-align-main-aoresume-feature-*` 自動對齊腳本會吃掉未提交的編輯**
   - `🟠 未開始` · `2026-09-12 開出` · `不卡誰，但會造成重工`
   - **一句話**：施工中途（`lib/kb`/`lib/cs` 的 0083 is_sensitive 修復，見 WORKLOG 2026-09-12 續8）該腳本跑了一次 stash-based 對齊，把 10 個檔案的未提交修改整批打回 HEAD，`git status` 顯示乾淨但內容其實是舊的。VBC 查證：改動沒有真的遺失，`git stash list` 找到同時間戳的 stash（雙親 merge commit，內容正確），逐檔 `git checkout stash@{N} -- <path>` 救回。**不變量**：一支背景自動化腳本不應該在另一個 session 正在編輯檔案時把它的未提交狀態動到看不出來的地方（`git status` 乾淨 ≠ 沒有正在進行的工作被吃掉）。修法方向待定：腳本改成偵測到近期修改（如 `git status` 有未提交檔案的 mtime 在 N 分鐘內）就跳過本輪對齊，或改成真正的 `stash pop`（不留鏡像在 stash 裡也不會安靜蓋掉）而非目前這種「建一個對齊結果 commit 塞進 stash，但工作目錄本身回到 HEAD」的手法。細節見 WORKLOG 2026-09-12（is_sensitive 條目內「事故」段落）。

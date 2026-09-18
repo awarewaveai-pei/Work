@@ -20547,3 +20547,32 @@ BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp,.claude,.codex | grep=
 [剩餘風險] ① 正式主機 providers.ts guard 尚未部署(prod deploy = High，待操作者 go-ahead；現行 prod 程式本來就只打 /search)② 後台仍可能有未撤銷的舊 key(llm 那把 59 字元、Desktop 那把)——key 還活著就能被任何未來的工具拿去打 chat 模型，唯一治本是後台撤銷，需操作者登入 ③ deny 用精確工具名，若 @perplexity-ai/mcp-server 未來新增其他 chat 工具名不會被擋(目前該 server 未安裝於任何設定)
 [rollback] `git revert` 本 commit；本機：`llm install llm-perplexity`、還原 `~/.claude/settings.json.bak-*`
 WORKLOG_DONE: Perplexity Search-API-only 全面強制(app/CLI/Claude 權限/MCP 範本/llm 外掛)
+
+## 2026-09-19(續79)Claude→Codex 同步稽核：機械閘在 Codex 零觸發 + bridge 同步 18 天凍結(操作者：「徹底查清楚，我記得之前是要求所有 agents, skill, command, tool 是要可以同步的」；背景：計畫 2026-10 由 Codex 主導)
+
+原始要求：Codex session `~/.codex/sessions/2026/09/01/rollout-2026-09-01T08-59-07-*`「之後有打算把coding主力從claude 搬到codex…同步，好讓兩者用誰都沒差異」。bridge 架構由 Codex 當日自建。
+
+**結論**：靜態 bridge 有建(agents 25/25、skills 16/16、MCP 17/19)，但「用誰都沒差異」不成立——閘不生效、同步凍結、有未受控舊副本。本輪只調查，未改程式碼。
+
+- C1 機械閘在 Codex 從未觸發。①Codex 工具呼叫全走 code-mode `exec`(55 個 D:\Work rollout、7,062 次，0 次 Bash/Edit/Write)；`rules.manifest.json` PreToolUse matcher 全是 Claude 工具名(`Bash`/`Write|Edit`/`^Agent$`/`^Read$`/`^mcp__`)②runner 確定性測試：同一條 `ssh … sg-deploy.sh next-admin`，tool_name=Bash→exit 2 BLOCKED、Codex+Bash→BLOCKED、Codex 實際 tool_name=exec→exit 0 ALLOWED ③Codex 225 次 commit、1,112 次 patch 零 hook block；09-03 後 17 次 SSH 部署/重啟指令無一被擋(含 2026-09-09 未帶 CONFIRMED-HIGH-RISK 的 `sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin`)④09-01 23:05 Codex 自測 `git add --all`→「No hook output was produced」⑤`~/.codex/logs_2.sqlite`(09-09→09-19，29,377 筆)零 hook 執行紀錄。project 已 trusted(`~/.codex/config.toml` `[projects.'d:\\Work']`)、`codex features` hooks=stable/true → 不是沒開，是 matcher 接不到。`^Agent$` 的 subagent-budget 同樣管不到 Codex `spawn_agent`(單 session 見過 10 個)。
+  - 文件：`agency-os/AGENTS.md:64`「Codex 寫入時 hooks 不會跑」= 實況正確；過度宣稱 = `.codex/hooks.json:2`、`sync-claude-to-codex.ps1:344`、`mcp/codex-userlevel/README.md:17`、`dual-ide-coexistence-strategy.md:32,56`。
+- C2 bridge 同步 18 天凍結。根因：`sync-claude-to-codex.ps1:731`、`check-claude-codex-parity.ps1:50` 用裸 `tar`；AO-RESUME hook 經 Git Bash 啟動(`settings.template.json:56` 的 `~` 由 bash 展開)，子 powershell PATH 先解析到 `C:\Program Files\Git\usr\bin\tar.exe`(GNU tar)→ 把 `D:\…` 當 `host:path` → exit 128 → throw；`.skill` 封存檔之後的步驟(native agent bridge、7 個 index、`~/.codex/AGENTS.md`、migration-summary)全不執行。證據：`~/.codex/backups/claude-migration-*` 698 個，685 個只有 `repo-skill-bridges/`(死在 :731 前)，最後完整一次 2026-09-01 23:02:43(= `migration-summary.json` mtime)。
+- C3 失敗被吞：`ao-resume.ps1:486-494` 只 WARN + `$global:LASTEXITCODE = 0`，不進 smoke `blind_spots`；唯一硬閘 `ao-close.ps1:892-899`，但最後一份 AO-CLOSE 報告 2026-08-24(本輪 git-log-injector 錨點亦停在 2026-08-24)→ parity 閘自 bridge 建立起從未執行。backup 目錄無保留上限(41MB 累積中)。
+- M1 parity 實跑 FAILED 1/212：`/audit-repo-hygiene`(9205f2a0b，09-05 新增)不在 `~/.codex/skills/claude-compat/references/commands/index.md`(mtime 2026-09-02 10:49，為當日手動重產)。
+- M2 `~/.codex/agents/*.toml` 24 份完整複製舊版 agent(2026-08-19 Codex Desktop 內建 migrate 產生，3–12KB/份，缺 decision-intelligence)，與 repo `.codex/agents/` 薄 bridge 同名 = 架構禁止的第二份來源；parity checker 不查此目錄。同類：`~/.codex/scripts/sync-claude-to-codex.ps1`(2026-05-20 舊版)。
+- M3 MCP：registry 啟用 19 個，Codex 排除 `trigger`、`cloudflare`(`registry.template.json:215,261`，無理由欄)。Claude plugins(codex/adobe/postiz/cowork-plugin-management)只有 index，非 Codex 原生安裝。
+- m1 checker 盲點：只查 source→index 單向(不查已刪 command 殘留)、不查 `~/.codex/agents`、不驗 hook 真的觸發。
+- m2 Codex 主導後 `/codex-review` = Codex 審自己，跨模型 oracle 失效，需反轉成 Claude critic 當 oracle(設計取捨，歸操作者)。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-claude-codex-parity.ps1 -WorkRoot D:\Work`(Git Bash PATH) | exit=1 | ms=3313 | result=`/usr/bin/tar: Cannot connect to D: resolve failed` 崩潰
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上，PATH 前置 `C:\Windows\System32` | exit=1 | result=`Claude/Codex parity FAILED (1/212 checks)`：audit-repo-hygiene
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node runner_probe.mjs`(runner.js PreToolUse × 3 payload 形狀) | exit=0 | ms=288 | result=Bash BLOCKED / Codex+Bash BLOCKED / Codex exec ALLOWED
+- REALTEST_EVIDENCE: tool=Bash | cmd=python 串流掃 `~/.codex/sessions/2026/09` 的 D:\Work rollout(工具名、hook 輸出、commit/patch、高風險指令) | exit=0 | result=見 C1 ①③
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex exec -C D:\Work -s workspace-write --json`(hook 探測) | exit=1 | result=usage limit，未取得資料；已 `oracle-quota.ps1 -Action set -Tool codex -Until "2026-09-19 19:44"`
+- REVIEW_WAIVED: DOC_ONLY -- 純調查紀錄，未改程式碼；每個數字皆本輪指令輸出
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,.codex,runbooks | grep=`Codex (project )?hooks? (run|execute|invoke)|hooks run only after|executes? (the )?canonical|Codex.{0,30}hook.{0,30}(trusted|生效|會跑|不會跑)` | hits=8(2 正確、5 過度宣稱待更正、1 checker 自身)
+- ORACLE_WAIVED: 未 stage 任何 source 檔；Codex 額度用盡至 2026-09-19 19:44
+
+[剩餘風險] Codex 主導期間所有 R0/R3 機械閘(部署、commit 範圍、首次改檔 git log、subagent 上限)全數旁路，只剩 AGENTS.md 文字自律。
+[rollback] 本條目純紀錄，`git revert` 即可。
+WORKLOG_DONE: Claude→Codex 同步稽核
