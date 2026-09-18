@@ -66,6 +66,14 @@
   - m3：開跑取得 lock 後先清掉上一次的 `.rollback-triggered`。`auto-deploy-next-admin.sh:123` 依 `rollback_failures=` 決定通知內容：還原失敗時發 URGENT，不再宣稱「已還原」。
   - s1（混合 restorable／non-restorable 的部署回寫 `.deployed-commit`）：屬於既有行為，這類部署很少，不修。
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/3n
+- 真機驗證（commit 8e788ca81，部署 `sg-deploy.sh hci-app`）：
+  - 這次會觸發自我更新，log 出現 "re-execing new version"，之後沒有出現 "Another deploy is running"，證明 M1 已修好。
+  - save 的來源是正在跑的 image（`source=sha256:e382698c…`）。
+  - health 1s，smoke 全 OK。
+- restore 演練：`rollback-phase1.sh restore hci-app rollback-20260918-173850`（這次部署前的 image，程式碼相同）。
+  - restore_exit=0，container 的 image 等於快照 e382698c，health 為 healthy。
+  - 公開網址 /health 回 200，API 正常。
+- REALTEST_EVIDENCE: tool=SSH | cmd=rollback-phase1.sh restore hci-app rollback-20260918-173850 | exit=0 | ms=3000
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=`rollback-phase1.sh restore\|rollback-phase1.sh save\|rollback-triggered\|snapshot :local` | hits=4（runbook §2.1、LONG_TERM_OPS:45、rollback-phase1 檔頭、auto-deploy-next-admin:123；都已同步），其餘是手動操作說明，行為不變
 
 ## 2026-09-19（續80）訂正續78「≥250/285」為精確值：operator 質疑「自己亂掰」，逐一 introspect 真實 builder 簽名算出 266/285
