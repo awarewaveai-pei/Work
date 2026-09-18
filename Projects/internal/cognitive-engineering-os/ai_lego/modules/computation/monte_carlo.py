@@ -25,6 +25,14 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "computation.monte_carlo"
+RECORD_ID_PREFIX = "MC-"
+# Value MUST match typed-objects/monte-carlo-simulation.schema.yaml's own `id` pattern (`^MC-`) -- NOT a
+# mechanical transliteration of the method name (critic-caught 2026-09-18: an earlier draft of this line used
+# "MONTECARLO-", which is not what the canonical schema declares; see the same-day WORKLOG entry for the other
+# 6 architecture-module RECORD_ID_PREFIX values this exact mistake was found in). Dashboard-only (id-suggest
+# button) -- NOT load-bearing for API dispatch: this builder's identity param is the domain-specific
+# ``simulation_id``, not the literal ``record_id`` name ``invoke_builder`` auto-injects against, so nothing
+# here re-derives or checks this prefix at construction or gate time.
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.montecarlo.simulation.run_simulation"
 # Keys that would assert this method's own output is a certainty rather than a simulated distribution -- Atlas
 # §22.3 (L4153) forbids this method's output from ever carrying any of them. Same representative-blocklist-plus-

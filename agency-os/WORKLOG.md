@@ -1,4 +1,47 @@
 # Worklog
+## 2026-09-18（續30）280+ 方法內容深化第四批：association 家族收官 + 5 個零散方法 + 唯一的 stakeholder.regulator Lens，共 12 個補齊 why/url/example；critic 覆審意外揪出續22 那批 9 個 RECORD_ID_PREFIX 常數有 6 個值錯（含新加的 monte_carlo 共 7 個），全部改對並驗證
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對我先前列出的「270+ 方法還缺 why／權威網址／填表範例」清單，明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續28（decision.wsjf）的批次節奏。
+
+[已修改 -- 內容批次]
+1. `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：12 個條目補上 why_en/why_zh/url/example_zh/example_en。
+   - association 家族全部 6 個（affinity_diagram/analogy_mapping/attribute_listing/concept_map/mind_map/morphological_analysis）——family 0/6 → 6/6 收官。
+   - 零散方法 5 個：computation.monte_carlo、evidence.triangulation、finance.financial_assumptions、research.qualitative_coding、research.reporting_guideline_checklist。
+   - `stakeholder.regulator`（1 個）：VBC 發現這是全語料庫唯一一個 Lens（LEGO 維度 C「視角」，非維度 A「方法」）——`grep -r regulator ai_lego/modules/` 確認全庫沒有對應的 `generate_*` 建構函式，讀 `specs/cognitive/lens.schema.yaml` 確認這是刻意設計（Atlas §9 唯一一個完整範例，形狀是 id/version/family/type/requires/output/labels 的治理宣告，不是可送進系統驗證的資料紀錄）。因此 example 內容誠實寫成「這是套在既有分析結果上的治理規則，不是填表方法」，不虛構一個不存在的 generate_stakeholder_regulator() 呼叫。
+   - 一併 Glob/Grep 排除了 `research/` 底下 7 個非方法的基礎設施檔（`ai_coding.py`/`capability_adapters.py`/`coding_eval.py`/`eval_fixtures.py`/`gates.py`/`review.py`/`synthetic_fixtures.py`）——這些在 method-display-metadata.yaml 裡本來就沒有條目，確認過不需要處理，避免把 helper 檔誤當成方法硬寫內容。
+2. `Projects/internal/cognitive-engineering-os/ai_lego/modules/computation/monte_carlo.py`：補 `RECORD_ID_PREFIX`（最終值見下方 bug fix 段落）。
+
+[已修改 -- critic 覆審意外揪出的 bug fix，範圍擴大到續22 全部 9 個舊模組]
+派 critic 覆審 monte_carlo.py 新加的 `RECORD_ID_PREFIX = "MONTECARLO-"`，被抓到 🟠 Major：這個值是我自己亂猜的「方法名稱機械音譯」，跟該方法真正的 canonical schema（`typed-objects/monte-carlo-simulation.schema.yaml` 的 `id` pattern `^MC-`）對不上。續22 幫 9 個 architecture 模組補這個常數時，同樣只求「不要跟別人衝突」，從沒有逐一去對過各自 schema 真正宣告的 pattern——即 R0 的「補丁式修法」反面案例：只求按鈕會出現，沒去查真正的不變量是什麼。自己寫腳本把全部 10 個常數（9 個 architecture + monte_carlo）逐一比對各自 canonical schema 的 `id` pattern，發現 7 個錯、只有 3 個對：
+- `ddd.py`："DDD-" → 應為 "BCM-"（schema: bounded-context-map.schema.yaml）
+- `event_storming.py`："EVENTSTORM-" → 應為 "ES-"（event-storming-session.schema.yaml）
+- `fitness_functions.py`："FITNESSFN-" → 應為 "FFS-"（fitness-function-set.schema.yaml）
+- `strangler_fig.py`："STRANGLERFIG-" → 應為 "SFP-"（strangler-fig-plan.schema.yaml）
+- `system_context_model.py`："C4-" → 應為 "SCM-"（system-context-model.schema.yaml；原本的註解只解釋了「為什麼不用 SYSCONTEXTMODEL-」，從沒對過 schema 真正的 pattern，誤導性註解一併修正）
+- `trade_off_matrix.py`："TRADEOFFMATRIX-" → 應為 "MCDA-"（這個方法是直接包一層呼叫 `generate_mcda_analysis()`，本來就該用 MCDA 自己的 schema pattern，不是自創一個）
+- `monte_carlo.py`："MONTECARLO-" → 改為 "MC-"（本輪新加，commit 前就修正，未曾以錯誤值出過）
+`atam.py`／`dependency_mapping.py`／`quality_attribute_scenario.py` 三個原本就對，未動。全部 7 個檔案的註解都補上「值必須對應 canonical schema 的 id pattern，不是方法名稱音譯」的說明，並保留原本「dashboard-only、非 API dispatch 硬性要求」的既有正確論述。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_small_families_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 11 個真實 `generate_*`/`catalog_*` 函式（reporting_guideline_checklist 用真實 `catalog_items("SRQR")`／`catalog_citation("SRQR")` 取官方 21 項目錄，不手打）| exit=0 | 結果=11/11 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、53/285 done（本輪 +12，續28 收尾時是 41）
+- REVIEW_DONE: critic=Standard | verdict=fail（初版）→ pass（修正後）| findings=1 Major（本輪值錯）+ 1 Minor（指出另 2 個舊模組同款錯，已在本輪一併修正，見上）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=自寫腳本比對全部 10 個 RECORD_ID_PREFIX 常數 vs 各自 canonical schema 的 `id` pattern | 結果=修正前 7/10 錯、修正後 10/10 全對
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=`python -m py_compile` 對全部 7 個修改檔 | exit=0（7/7）
+- REALTEST_EVIDENCE: tool=Bash(pytest) | cmd=`python -m pytest tests/unit/test_monte_carlo.py tests/unit/test_ddd.py tests/unit/test_event_storming.py tests/unit/test_fitness_functions.py tests/unit/test_strangler_fig.py tests/unit/test_system_context_model.py tests/unit/test_mcda.py -q` | exit=0 | 結果=123 passed, 20 subtests passed（無任何測試依賴錯誤的舊值，換值未破壞既有行為）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=`generate_trade_off_matrix(...)` 真實呼叫（trade_off_matrix 沒有專屬測試檔，用真資料手動驗證）| 結果=`id="MCDA-T1"`，四個 gate 全 PASS
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=`record_id_prefix(method_id, required=False)` 對全部 7 個修改方法的 method_id 逐一呼叫真實 dispatch 路徑 | 結果=7/7 回傳值與 schema pattern 一致
+- REALTEST_EVIDENCE: tool=Bash(pytest) | cmd=`python -m pytest tests/unit/test_api_main.py tests/unit/test_ai_gateway.py -q` | exit=0 | 結果=127 passed（`self_id_prefix` 相關測試未受影響）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`RECORD_ID_PREFIX`（符號，全樹）+ 6 個錯誤舊值字串（`EVENTSTORM-`/`DDD-`/`STRANGLERFIG-`/`C4-`/`FITNESSFN-`/`TRADEOFFMATRIX-`，逐一查有無其他程式碼或測試引用這些字面值）| hits=0 額外——僅本檔常數宣告本身 + 少數同名字串的 false positive（如 "DDD-standard"／"C4-practice" 純英文用字，非常數引用）+ WORKLOG 舊 entry 描述文字，皆不需同步更新
+
+[VBC 過程記錄，非本輪缺陷] 一度誤判 `stakeholder.regulator` 的 `name_zh`/`blurb_zh` 是亂碼（`python -c "print(...)"` 經 Bash 工具輸出到 Windows 終端機時被主控台編碼搞亂），改用「寫成 UTF-8 檔案再用 Read 工具讀回」查證後確認檔案本身資料完全正確（「利害關係人／監管者視角」），是終端機顯示層問題不是資料層問題，未做任何不必要的修正——與既有 `reference_cjk_bash_cron_encoding` 記憶同一類陷阱的新實例（bash pipe 印 CJK 到 Windows 終端機不可信，需换一種真正 UTF-8-aware 的方式核對）。
+
+[根因與避免再發生] 續22 當時的驗證只做到「常數存在、dashboard 按鈕會出現、builder 不會因為這個值而拒絕」，沒有做到「這個值是不是真的對」——把「不會壞」跟「是對的」搞混，是本次的根本問題。往後任何 RECORD_ID_PREFIX 新增／修改，驗證必須包含「讀該方法自己 docstring 引用的 canonical schema 檔，grep 其 `id` 欄位的 `pattern`，逐字比對」這一步，不能只驗證「dispatch 有沒有回傳非 None」。
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 53/285 完成，232 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、causal 10、challenge 10、database_data 10、epistemic 10、jurisdiction 10、representation 10、security 10、stakeholders 10（複數家族，跟本輪已收官的單數 stakeholder 是兩個不同 family，尚未處理）、decomposition 9、feasibility 9、insight 9、root_cause 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增 + 1 個新增常數，無資料遷移、無外部相依變更、無既有欄位語意改變。
+
 ## 2026-09-18（續21）HCI-30 部署 ks-aw-01 規劃完成（1 個 devops agent 查證）+ 已完成的前置程式碼修正（commit `9cec87368`）——真正的部署還沒開始，範疇比預期大很多
 
 [任務] 操作者「你做最好的決定」全權延續，針對「要不要部署 HCI-30 到 ks-aw-01」明確要我規劃並開始執行可回滾的部分。派 1 個 devops-engineer agent（唯讀查證，不執行）徹底摸清 ks-aw-01 現況。

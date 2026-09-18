@@ -20,10 +20,14 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.event_storming"
-RECORD_ID_PREFIX = "EVENTSTORM-"
-# Not load-bearing for API auto-injection (identity param is the domain-specific session_id, not
-# `record_id`) -- exists only for the dashboard's opt-in id-suggest button. See atam.py's own
-# RECORD_ID_PREFIX comment for the full rationale (2026-09-18), not repeated in every sibling file.
+RECORD_ID_PREFIX = "ES-"
+# Value MUST match typed-objects/event-storming-session.schema.yaml's own `id` pattern (`^ES-`) -- NOT a
+# mechanical transliteration of the method name (critic-caught 2026-09-18: this line originally said
+# "EVENTSTORM-", which the canonical schema does not declare; see the same-day WORKLOG entry for the other
+# modules this exact mistake was found in). Not load-bearing for API auto-injection (identity param is the
+# domain-specific session_id, not `record_id`) -- exists only for the dashboard's opt-in id-suggest button.
+# See atam.py's own RECORD_ID_PREFIX comment for the full rationale (2026-09-18), not repeated in every
+# sibling file.
 VALID_ELEMENT_TYPES = frozenset({"domain_event", "command", "actor", "policy", "external_system", "aggregate", "read_model"})
 
 
