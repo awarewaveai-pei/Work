@@ -1,4 +1,27 @@
 # Worklog
+## 2026-09-18（續12）正式環境部署完成（操作者「建正式環境服務帳號+部署」指示，續10 中斷處接續）——test-gate 卡在同一根因的第三個實例，治本為 deploy.sh 自癒機制而非逐一補洞
+
+[延續續10] test-gate 首次重跑（`.runtime` 尚未修）：19 failed（`RecipeRunTests` 全滅 + `DemoTests`），第一個失敗的完整 traceback 是 `_atomic_write_journal` 寫入 `PRODUCT_ROOT/.runtime/workflows/<uuid>/` 時 `PermissionError`——跟續10發現的 `ai_lego/data/repositories/` 是同一顆疾病的第二個實例（`.runtime` 本身也是 root 持有，先前只修了 checkout 主體，刻意排除了 `.runtime` 因為誤以為它是 docker named volume 掛載點；重新查證 `docker-compose.yml` 確認該 volume 掛載在**容器內部**路徑，跟host端這個目錄完全是两回事，host端`.runtime`只是先前某次以root身份直接在host執行測試/CLI留下的殘留，非容器真正在用的資料）。`chown -R` 修 `.runtime` 後重跑：19→1 failed，剩 `DemoTests::test_demo_runs_the_real_cli_slice`（exit_code 1）。直接重現該 CLI slice 拿到完整 traceback：同一疾病第三個實例，`/tmp/ai-lego-cross-impact-analysis-slice/`（CLI slice 自己的 scratch 目錄，在 checkout 之外的 `/tmp`）一樣被 root 持有，`prepare_runtime_dir()` 的 `shutil.rmtree()` 炸掉。修完後 163/163 全綠。
+
+[操作者當場提問「same disease 有去找方法徹底解決嗎?」] 三個各自獨立發現、各自手動 chown 修復的實例，若只停在「修好眼前這個」= 補丁式修法（AGENTS.md R0 明禁）。治本：把「偵測+修復根owned檔案」寫進 `deploy.sh` 本身，每次執行都先跑（`-1. Ownership self-heal`），涵蓋整個 checkout（`$REPO_ROOT`，非只列出目前已知的三個路徑）+ 已知的 `/tmp/ai-lego-*` scratch 目錄慣例，用 `find ... -print -quit` 快速偵測（乾淨時完全不碰 sudo），髒了才 `sudo chown -R`（`ubuntu` 在此機本就有 passwordless sudo，非新授權）。不論未來哪個新指令又意外以 root 身份跑過這個 checkout，下一次 deploy 都會自動修正，不必再等某個測試剛好踩到才發現。用種假根owned decoy檔案的方式在正式主機上真實驗證偵測+修復+乾淨路徑不誤觸發 sudo 三種情境皆正確。一個獨立 critic 覆審中（範圍：新增區塊，含安全性/blast radius/race condition 六項具體提問），尚未落地 commit——不佔用本次部署的關�99鍵路徑，待覆審完成另立 commit。
+
+[正式部署執行] 用修復後的 host 狀態（`.deploy-venv` 正確啟用 + ownership 全乾淨）重跑完整 `deploy.sh`：typecheck PASS → test-gate 163 passed（323s）→ rollback-tag → docker build → up → healthcheck 6 秒 healthy → **local smoke PASS** → **public smoke PASS**（`https://cognitive.aware-wave.com/health`）→ notify 成功。獨立驗證（不只信 deploy.log 的宣稱）：直接 `docker inspect` 確認容器 `healthy` 且 `StartedAt` 時間戳對得上這次部署；直接對 local 和 public health endpoint 各自跑一次 curl，皆回 `{"status":"ok"}`。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`pytest`（`.runtime`修復前）| exit=1 | result=19 failed/144 passed，首個失敗完整 traceback 證實 `.runtime` PermissionError
+- REALTEST_EVIDENCE: tool=SSH | cmd=`chown -R` `.runtime` 後重跑同一 pytest 指令 | exit=1 | result=1 failed/66 passed（`RecipeRunTests` 全部轉綠，證實根因判斷正確）
+- REALTEST_EVIDENCE: tool=SSH | cmd=直接執行 `python3 -m ai_lego.apps.cli.run_cross_impact_analysis_slice` 重現剩餘失敗 | exit=1 | result=完整 traceback 指向 `/tmp/ai-lego-cross-impact-analysis-slice/` PermissionError
+- REALTEST_EVIDENCE: tool=SSH | cmd=`chown -R` 該 `/tmp` 目錄後重跑同一 CLI 指令 | exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=完整 test-gate 8 個測試檔最終重跑 | exit=0 | result=163 passed, 0 failed, 323.45s
+- REALTEST_EVIDENCE: tool=SSH | cmd=自製 decoy 測試腳本（種 root-owned 假檔於 `.runtime/` 和 `/tmp/ai-lego-*`，跑 self-heal 邏輯，驗證修復+驗證乾淨路徑不觸發 sudo）| exit=0 | result=三情境全符合預期
+- REALTEST_EVIDENCE: tool=SSH | cmd=完整 `deploy.sh` 正式執行 | exit=0 | result=typecheck+test-gate+build+up+healthcheck(6s)+local/public smoke 全 PASS
+- REALTEST_EVIDENCE: tool=SSH(curl) | cmd=`docker inspect` + 直接 curl local/public health（獨立於 deploy.log 宣稱之外）| exit=0 | result=`healthy`／`{"status":"ok"}` ×2
+- REALTEST_EVIDENCE: tool=SSH | cmd=critic 修復後：REPO_ROOT 自我驗證正常路徑 PASS + 模擬錯誤路徑（`BAD_REPO_ROOT=/`）正確 REFUSE（未觸碰 sudo chown）+ `sudo -n true` 確認免密 sudo 仍正常 + `/tmp` 分支新 filter 只動真正 dirty 的目錄不動已乾淨的 | exit=0 | result=四情境全符合預期
+- REVIEW_DONE: critic=Standard | verdict=pass(修復後) | findings=venv自癒區塊見續10；ownership self-heal 新區塊 0c(修復後)/2n/3s——**修復前 1 Critical**：`REPO_ROOT` 純靠 `BASH_SOURCE` 字串數學算出，若腳本未來被 symlink（如 `/usr/local/bin/xxx`）或搬移位置呼叫，`../../../..` 會靜默走錯，最壞情況 `REPO_ROOT` 落到 `/`，`sudo chown -R ubuntu:ubuntu /` 在無回退主機（AGENTS.md §0）上是需要 rescue-mode 救援等級的事故；修法=執行任何特權操作前先自我驗證「往上走再往下走能不能繞回這支腳本自己」，繞不回去就 FATAL exit 不做任何 chown。2 Minor 全修：`/tmp` 分支修復步驟少了跟自己的偵測條件一致的 `-not -user` filter（會對已乾淨的目錄做多餘但無害的 chown）；`sudo` 改 `sudo -n`（passwordless sudo 若因設定漂移失效，改成快速失敗而非整個部署卡住等密碼輸入）。3 Suggestion 未動（pre-existing 範圍外：無 flock 防併發呼叫；group ownership 假設單一操作者模型；comment 用詞"root-owned"可以更精準寫成"非本使用者持有"——均為低優先/跟這次修復無關的既有限制）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`ai-lego-cross-impact-analysis-slice\|_atomic_write_journal` | hits=僅本次涉及的檔案本身，無其他消費者需要同步修改
+- [rollback] `.runtime`／`/tmp/ai-lego-*` chown：純持有者變更無內容變動；deploy.sh 正式執行成功後 `deploy/deploy.sh`（腳本本身）rollback 已由腳本自身機制處理（`:rollback` image tag，這次未觸發因為 healthcheck 一次過）；container 本身可用 `docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose up -d` 手動回退（跟先前所有版本一致）。
+- WORKLOG_DONE: 操作者「建正式環境服務帳號+部署」指示的部署階段完成；下一步：next-admin `sg-deploy.sh` 讓 bridge route 上線 + 真實 E2E import 測試
+
 ## 2026-09-18（續11）Task 3c 真圖表渲染（森林圖+泡泡圖，matplotlib），critic 覆審 3 Major+1 Minor 全修，真實 docker build 驗證+順手修一個真的權限問題
 
 [任務] 另一並行 session（02- 知識庫和資料蒐集架構）交接 Task 3c：representation 模組目前零真實圖表渲染（既有方法/能力只產生結構化資料，從未產生點陣圖）；操作者明確要求真正的資料圖表，不是 AI 生圖。matplotlib 是新依賴，本 session 已用 AskUserQuestion 取得操作者明確同意（「同意 (推薦)」）才動工，符合 AGENTS.md Medium-risk 規則。範圍明確限定：森林圖（point estimate + CI）+ 泡泡圖（x/y/size）兩種，不含寫回知識庫（另一並行 task）。

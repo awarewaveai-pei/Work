@@ -27,6 +27,44 @@ notify() {
 
 cd "$REPO_ROOT"
 
+# -- -1. Ownership self-heal. Root-owned files anywhere under this checkout, or under this
+#    product's known /tmp scratch dirs, make later steps fail with errors that look nothing like
+#    an ownership problem: 19 unrelated-looking RecipeRunTests failures (PermissionError deep in
+#    _atomic_write_journal under PRODUCT_ROOT/.runtime/), or a demo CLI slice returning exit_code 1
+#    (PermissionError in shutil.rmtree under /tmp/ai-lego-<method>-slice/). Traced 2026-09-18 across
+#    three separate root-owned locations on ks-aw-01 (ai_lego/data/repositories/, PRODUCT_ROOT's
+#    own .runtime/, /tmp/ai-lego-cross-impact-analysis-slice/) back to one cause: some earlier
+#    command on this host ran as root -- plausibly a sudo-tainted shell that never dropped back
+#    after the one command that actually needed it (`sudo apt-get install python3.12-venv`,
+#    2026-09-12 WORKLOG, was the last confirmed legitimate use of sudo here). Rather than chase
+#    each new instance by hand as a fresh test happens to touch one, normalize ownership of
+#    everything this script depends on, every run, before anything else executes. ubuntu has
+#    passwordless sudo on this host (see runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md) so this never
+#    prompts; the check is cheap (`-quit` stops at the first hit) so sudo only actually runs when
+#    something is actually wrong.
+_me="$(id -un)"; _mygroup="$(id -gn)"
+# Self-consistency guard (critic finding, 2026-09-18): REPO_ROOT above is pure string math on
+# BASH_SOURCE -- correct only if this file is actually four directories below REPO_ROOT right now.
+# A convenience symlink (e.g. /usr/local/bin/cognitive-os-deploy), a future systemd ExecStart
+# pointing at a copy, or a refactor that moves this file would silently walk the `..` hops
+# somewhere else -- landing at "/" is possible once you run out of parents to ascend past.
+# ks-aw-01 has no fallback host (AGENTS.md SS0): `sudo chown -R ubuntu:ubuntu /` is exactly the
+# class of command that ends with a rescue-mode recovery. Verify the round-trip lands back on this
+# exact file before any privileged recursive operation is allowed to run at all.
+if [[ ! -f "$REPO_ROOT/Projects/internal/cognitive-engineering-os/deploy/deploy.sh" ]]; then
+  log "FATAL: REPO_ROOT ('$REPO_ROOT') does not resolve back to this script -- BASH_SOURCE path math is wrong here, refusing ownership self-heal"
+  notify "FAILED: REPO_ROOT self-check failed, refusing to run (see deploy.log)"
+  exit 1
+fi
+if find "$REPO_ROOT" -not -user "$_me" -print -quit 2>/dev/null | grep -q .; then
+  log "ownership | root-owned files found under $REPO_ROOT -- normalizing to $_me:$_mygroup"
+  sudo -n chown -R "$_me:$_mygroup" "$REPO_ROOT"
+fi
+if find /tmp -maxdepth 1 -iname "ai-lego-*" -not -user "$_me" -print -quit 2>/dev/null | grep -q .; then
+  log "ownership | root-owned /tmp/ai-lego-* scratch dir(s) found -- normalizing to $_me:$_mygroup"
+  find /tmp -maxdepth 1 -iname "ai-lego-*" -not -user "$_me" -print0 2>/dev/null | xargs -0 --no-run-if-empty sudo -n chown -R "$_me:$_mygroup"
+fi
+
 # -- 0. Typecheck/test-gate venv. Self-contained on purpose: this script must not depend on
 #    the invoking shell having already `source`d a venv (true for cron/systemd, and for any
 #    fresh SSH session that doesn't know this repo's local convention -- discovered 2026-09-18
