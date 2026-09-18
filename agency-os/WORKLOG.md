@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續66）280+ 方法內容深化第十六批：foresight 家族全部 14 個方法（F13 未知的未知與前瞻家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）的批次節奏，處理 foresight 家族全部 14 個方法：adjacent_discipline_search／backcasting／black_swan_exercise／cross_country_comparison／cross_impact_analysis／cross_industry_transfer／delphi／futures_wheel／historical_analogy／horizon_scanning／outlier_analysis／scenario_planning／weak_signal_detection／wild_cards。本批次是目前為止家族內方法數最多的單批（14 個），期間另有 2 個併行 session 各推進一次 HCI-30 收尾（commit `e74fc2a91`）與 feasibility 批（`8da2f1947`，本輪之前的批次），`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：14 個條目補上 why_en/why_zh/url/example_zh/example_en，foresight 家族 0/14 → 14/14 收官（F13 未知的未知與前瞻套件全數完成，174/285）。這個家族全是「參照完整性鏈」與「不能跳步驟」類不變量，每個都對應可獨立查證的真實方法論：adjacent_discipline_search 要求 adjacent_fields 與 current_disciplines 正規化後互斥（避免假裝跨領域）；backcasting 的 milestones horizon 必須從未來嚴格遞減到今天且至少 1 個 today_actions（John B. Robinson 1982 提出的倒推規劃）；black_swan_exercise 是 tail_events→exposures→survivability_assessments 三層參照完整性鏈，hedges 只查參照完整性不查覆蓋率（Taleb 黑天鵝理論）；cross_country_comparison 要求至少 2 個地區＋每筆比較都要有 normalization_basis；cross_impact_analysis 要求事件兩兩配對矩陣「剛好」完整無漏（Gordon & Hayward 1968）；cross_industry_transfer 要求來源/目標產業不同＋shared_job_or_constraint＋adaptation 三者皆非空；delphi 是這批最複雜的一個，同時有結構性匿名（禁止身分欄位）、少數意見保留（consensus_summary 不能沒有 minority_positions 或說明理由）、dispersion 是從最終輪重新計算的 GENUINE_COMPUTE 三條不變量（RAND Corporation 1950s Helmer/Dalkey/Rescher）；futures_wheel 的一階影響 parent 必須是中心事件哨兵值、二三階影響 parent 必須對應剛好淺一階（Jerome Glenn 1971）；historical_analogy 要求相似點與差異點都至少 1 筆＋機制抽取＋類比限制皆非空（Neustadt & May《Thinking in Time》三維度分析）；horizon_scanning 每個訊號六個必要欄位缺一不可（UK Government Office for Science 定義）；outlier_analysis 的 mechanism_hypothesis 只能在 data_error_ruled_out 為真布林值時才能填；scenario_planning 是這批對「不變量即結構」執行最嚴格的一個，要求剛好 2 個 critical_uncertainties＋剛好 4 個情境＋每個情境 9 個 Atlas 原文要素皆非空（Shell/Pierre Wack、Peter Schwartz 2x2 矩陣方法）；weak_signal_detection 要求至少 2 個「正規化後仍不同」的佐證來源，修正過去曾出現的空白正規化 bug（Ansoff 1975 微弱訊號概念）；wild_cards 要求 strategy_rerun 子結構且 still_holds 必須是真布林值非 int（John L. Petersen「Out of the Blue」）。撰寫過程中發現 cross_country_comparison.py 模組 docstring 自己寫的錯誤碼名稱（`XCOUNTRY_MISSING_NORMALIZATION_BASIS`）跟原始碼實際 raise 的字串（`XCOUNTRY_INVALID_COMPARISON`）不一致——docstring 描述的是概念，不是逐字錯誤碼；本次撰寫改用實際會出現的 `XCOUNTRY_TOO_FEW_JURISDICTIONS`（該檔案唯一一個 docstring 與程式碼完全一致的錯誤碼）做為 YAML 範例與驗證腳本的斷言依據，避免把一個不會真的出現的字串寫進使用者看得到的填表範例。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_foresight_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 14 個真實 `generate_*`/建構函式，每個額外驗證「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應 InvariantViolation，逐一核對過每個錯誤碼在原始碼裡逐字存在，不只信 docstring 摘要），delphi 額外斷言 dispersion 真實計算值＝2.5（母體標準差）| exit=0 | 結果=14/14 通過（一次通過，無需修正——歸功於撰寫前先逐檔比對 docstring 摘要與實際 raise 字串是否一致）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、174/285 done（本輪 +14，續64 收尾時是 160）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38/39/40/64 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=13（既有跨檔引用，本批次未新增/未移除任何 key 或檔案，無 stale 引用需要同步）
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 174/285 完成（過半後第 3 個里程碑，逼近 60%），111 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續65）HCI-30 bridge：next-admin 一直回報 hci_not_configured，根因是 Phase B 錨點插入漏補一處既有區塊
 
 [操作者回報] `/ops/collect` 畫面「送去 HCI 探索來源」按鈕顯示 `hci_not_configured` 警告，問怎麼處理（附截圖）。
