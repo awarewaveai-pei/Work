@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續35）280+ 方法內容深化第九批：jurisdiction 家族全部 10 個方法（F23 全球管轄／合規／在地化家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）的批次節奏，處理 jurisdiction 家族全部 10 個方法：applicable_law_graph／compliance_gap_analysis／conflict_of_law_review／cultural_context_review／data_residency_assessment／localization_review／market_admission_control／obligation_to_control_mapping／regulatory_horizon_scan／resolver。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：10 個條目補上 why_en/why_zh/url/example_zh/example_en，jurisdiction 家族 0/10 → 10/10 收官（F23 全球管轄／合規／在地化套件全數完成）。這個家族的不變量多半是「拒絕建構」而非「算出警示欄位」：conflict_of_law_review 的 applicable_law 一旦非空就強制要求同筆 legal_review 非空（COL_MISSING_LEGAL_REVIEW，直接拒絕建構，不是事後可補）；obligation_to_control_mapping／data_residency_assessment／applicable_law_graph 都是「宣告了就必須被覆蓋／必須被路由／衝突必須被標記」，覆蓋不足直接拒絕，不是留空。撰寫 example 過程中自己抓到一個不一致：obligation_to_control_mapping 原始草稿的範例只給 1 筆 control 對應 2 筆 obligation 的其中 1 筆，卻同時聲稱「這是範例」——這種寫法本身在真實呼叫時會直接被拒絕建構（OCM_UNCOVERED_OBLIGATION），跟 market_admission_control／localization_review 那種「範例本身仍會成功建構，只是算出來的欄位是負面結果（FAIL_CLOSED／NOT_READY）」不是同一類，寫的時候搞混了；已改為範例本身兩筆義務都有對應控制（成功建構），另外用一句話單獨說明「拿掉其中一筆控制會被拒絕」的假設情境，並同步修正驗證腳本。resolver 這個方法檔名雖然通用（`resolver.py`），但內容確認是獨立方法 `jurisdiction.resolver`（Atlas §11.53，record prefix `JRES-`），不是共用基礎設施，之前 pending 待查證的疑慮已解除。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_jurisdiction_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 10 個真實 `generate_*` 函式；額外針對 5 個「拒絕建構」不變量各自驗證正反兩面（applicable_law_graph 的 ALG_UNFLAGGED_CONFLICT、conflict_of_law_review 的 COL_MISSING_LEGAL_REVIEW、cultural_context_review 的 CULTCTX_MISSING_EVIDENCE_FOR_HIGH_RISK、obligation_to_control_mapping 的 OCM_UNCOVERED_OBLIGATION、resolver 的 JRES_INSUFFICIENT_DIMENSION_COVERAGE：正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應的 InvariantViolation） | exit=0 | 結果=10/10 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、102/285 done（本輪 +10，續34 收尾時是 92）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 102/285 完成，183 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、challenge 10、epistemic 10、representation 10、stakeholders 10（複數家族）、decomposition 9、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續23）HCI-30 部署 Phase A 全部完成（commit `82d3a7ff3`/`77e9a123c`/`b11b8e4d6`）——本機可測試、可回滾的部分到此結束，剩下全是動正式主機的 Phase B
 
 [任務] 承接續22，完成部署腳本擴充+資料庫搬遷工具，Phase A（不碰正式主機）到此收尾。
