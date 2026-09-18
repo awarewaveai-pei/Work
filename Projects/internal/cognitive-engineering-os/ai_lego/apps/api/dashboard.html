@@ -362,6 +362,9 @@ function freeParseBrief(brief, params) {
   // 「產生建議值」按鈕或使用者自己填，免費解析只負責填有意義的內容欄位。
   const selfId = params && params.length ? params[0].name : null;
   const required = (params || []).filter(p => p.required && p.name !== 'record_id' && p.name !== 'provenance' && p.name !== selfId);
+  // required.length === 0 (every required field was the id/provenance/self-id already excluded
+  // above) deliberately bails out to the AI path rather than "succeeding" with an empty {} --
+  // an empty match means there was nothing to compare against, not that the brief matched.
   // 'str' not "<class 'str'>": every builder module has `from __future__ import annotations`
   // (PEP 563), so main.py's `str(parameter.annotation)` is already stringified at signature-read
   // time -- the wire value really is the bare string 'str', confirmed via a live TestClient call.

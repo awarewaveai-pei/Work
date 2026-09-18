@@ -120,6 +120,23 @@ class DraftLoopTests(unittest.TestCase):
         self.assertIn("brief text", prompt)
         self.assertIn("DO NOT produce these keys", prompt)
 
+    def test_build_prompt_names_the_literal_record_id_param_for_a_record_id_style_method(self):
+        spec = method_input_spec(SPEC_ROOT, CATALOG, "systems.flowchart")
+        prompt = build_prompt(spec, "brief text")
+        self.assertIn("'record_id' if present must start with 'FLOW-'", prompt)
+
+    def test_build_prompt_names_the_real_identity_param_for_a_domain_specific_id_method(self):
+        """Regression guard (2026-09-18): this used to hardcode the literal string 'record_id' even
+        when the builder's actual identity param is named something else (analysis_id/canvas_id/...),
+        producing a vacuous prefix instruction the model could never act on. If a future signature
+        reorder ever moves the identity param off position 0, this test -- not just the "convention
+        holds for all 285 methods today" critic spot-check -- is what catches it."""
+        spec = method_input_spec(SPEC_ROOT, CATALOG, "architecture.atam")
+        self.assertEqual(spec["parameters"][0]["name"], "analysis_id")
+        prompt = build_prompt(spec, "brief text")
+        self.assertIn("'analysis_id' if present must start with 'ATAM-'", prompt)
+        self.assertNotIn("'record_id' if present must start with", prompt)
+
     def test_valid_draft_passes_builder_and_gates_in_one_attempt(self):
         provider = ScriptedProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False))
         result = draft_method_kwargs("systems.flowchart", "早上出門流程", provider=provider, spec_root=SPEC_ROOT, catalog=CATALOG)

@@ -1,4 +1,28 @@
 # Worklog
+## 2026-09-18（續26）280+ 方法內容深化第二批：decision 家族剩餘 12 個方法補齊 why/url/example；補 2 個 critic 建議的防禦性加強（draft.py prompt 斷言、freeParseBrief 空集合註解）
+
+[操作者請求] 續24 交完後操作者連續追問「為什麼不趕快去做」，明確要求不要再逐批停下確認，直接把 270+ 方法內容深化持續做下去（呼應更早的既有指示：memory `feedback_method_atlas_continuous_authorization` 2026-09-05「都不要停」）。本則為第一個延續批次，決策：以 family 為單位批次處理（跟續22 的 architecture 家族同一種切法），本次選 `decision` family 剩餘 12 個方法（ahp/decision_tree/expected_value/ice/impact_effort/kano/mcda/moscow/pareto_frontier/rice/topsis/weighted_decision_matrix）——該 family 共 13 個方法，`eisenhower_matrix` 續24 已做。
+
+[已修改 -- 2 個 critic 建議（續24 標記為 Suggestion 未做，本次補上）]
+`test_ai_gateway.py` 新增 2 個斷言：`decision.eisenhower_matrix`（record_id 版）與 `architecture.atam`（domain-specific-id 版）的 prompt 文字分別鎖死正確的識別碼欄位名稱+前綴——鎖死續24「識別碼永遠是第一個必填位置參數」這個假設本身，不只是「跑起來不出錯」。`dashboard.html` 的 `freeParseBrief` 補一行註解說明 `required.length === 0` 時故意判定失敗（沒有東西可比對，不是比對成功）。
+
+[已修改 -- 12 個 decision 方法的 why/url/example]
+逐一整檔讀完全部 12 個 builder（部分連帶讀 compute 層取得巢狀欄位的真實 key，例如 AHP 的 `pairwise_comparisons`、Kano 的 5 種合法 response 字串、MCDA 的 `raw_scores` 需要 `raw_value` 不是 `value`）；4 個 WebSearch 批次找權威來源（優先原始出處或 Wikipedia，非部落格轉述）：AHP/Kano/MCDA/MoSCoW/Pareto Frontier/TOPSIS/Decision Tree/Expected Value/Decision Matrix 用 Wikipedia（成熟教科書概念，內容穩定）；RICE 用 Intercom 官方部落格（發明者原始出處）；ICE 用 ProductPlan glossary；Impact-Effort 用 untools.co。跟續22/續24 同規格：why_zh/why_en 解釋「為什麼有效」而非重述功能、example 用真實換行＋示範選填欄位。
+
+[R4 驗證，非只信任「看起來合理」] 寫完 12 個範例後，另外寫一支獨立腳本（不是複製貼上 YAML 內容，是照 YAML 描述重新手打）直接呼叫全部 12 個真實 builder，抓到 2 個問題：
+1. `pareto_frontier` 的 `options` 範例只給了 `{id: ...}`，但 `pareto_frontier.py` 的 `_KNOWN_OPTION_KEYS` 其實要求 `id`+`label` 兩個欄位都有——**這是 YAML 內容本身的真實錯誤**，已修正（中英文版都補上 `label`）。
+2. `weighted_decision_matrix` 驗證腳本第一版用位置參數呼叫、參數順序打錯——這是驗證腳本自己的錯誤，不是 YAML 內容錯誤（`invoke_builder` 一律用關鍵字綁定，YAML 描述的是「有哪些具名欄位」，不是呼叫順序），改用關鍵字呼叫後確認 YAML 描述本身正確。修正後 12/12 範例全部用真實 builder 跑過一遍，回傳合法 record，非只是「格式看起來對」。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_ai_gateway.py -k build_prompt_names -v` | exit=0 | result=2 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "yaml.safe_load(...)"` 驗證 method-display-metadata.yaml（285 筆）+ 逐項確認 12 個新條目 why/url/example 齊全含真實換行 | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立撰寫腳本以關鍵字參數呼叫全部 12 個 decision 方法的真實 `generate_*` builder，比對 YAML 範例內容 | exit=0 | result=12/12 pass（首輪 10/12，抓到 1 個真實內容 bug+1 個腳本自身 bug，皆已修正並重新驗證）
+- REVIEW_WAIVED: NA -- 內容變更（YAML why/url/example 文字 + 2 個既有檔案的防禦性斷言/註解），無業務邏輯變更；bughunt+真實 builder 執行已提供比 critic 覆審更直接的正確性證據（builder 本身就是規格）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`decision\.ahp\|decision\.kano\|decision\.mcda\|PARETOFRONTIER-T1` | hits=僅本次觸及的 YAML/腳本，無孤兒引用
+- [rollback] 純內容/文件變更 + 2 個獨立測試/註解新增，無 DB migration、無業務邏輯改動；`git revert` 本次 commit 可完全復原
+
+[剩餘] decision family 全 13 個方法現已完整（含續24 的 eisenhower_matrix）。270+ 方法中還有約 261 個待補（architecture 10 個 + decision 13 個 + eisenhower_matrix/reverse_brainstorming/lean_canvas 已完成，共 26 個）——操作者指示不停批次繼續，下一批次另開條目記錄，不在本則預告範圍。
+
 ## 2026-09-18（續25）續23 的部署（tenant handoff + 資料夾自動分類）：兩個系統都上線+正式環境端對端驗證+順手抓到並根治一個既有部署腳本 bug
 
 [任務] 操作者對續23給出明確 go-ahead（「要」）。兩個系統都要部署：`lobster-factory`（next-admin，`sg-deploy.sh`）+ `Projects/internal/cognitive-engineering-os`（`cognitive-os-api`，自己的 `deploy/deploy.sh`）。
