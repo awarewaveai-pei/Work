@@ -134,7 +134,7 @@
 - **Output**：
   - `POST /api/hci/v1/seeds`（app/server.mjs）：驗證 `targetUrl`/`subject_kind==='ORGANIZATION'` → 呼叫 `orchestrateDiscoveredFetch`（`dryRun` 從 request body 直通）。
   - `GET /api/hci/v1/seeds`：列出 `admission_state='DISCOVERED'`。
-  - `POST /api/hci/v1/seeds/:sourceId/reject`：`UPDATE admission_state='REJECTED'`，非法轉換由 0020 的 trigger 擋下（H1022 → 409）。**與計畫原文的差異**：Task 2/本任務原文寫「呼叫限定函式，不允許裸 SQL」，但實際已提交的 migration 0020 是直接 column-level GRANT + trigger 校驗（0020 自己的 header 註解：刻意仿照 `hci.enforce_dsr_transition()`/`hci.enforce_case_lifecycle()` 兩個既有 lifecycle-trigger 慣例，非疏漏）——trigger 對任何寫入路徑一視同仁生效，此處計畫原文已過時，以實際 schema 為準，不重寫已驗證通過的設計。
+  - `POST /api/hci/v1/seeds/:sourceId/reject`：（2026-09-19 起僅限 DISCOVERED，見 Task 14）`UPDATE admission_state='REJECTED'`，非法轉換由 0020 的 trigger 擋下（H1022 → 409）。**與計畫原文的差異**：Task 2/本任務原文寫「呼叫限定函式，不允許裸 SQL」，但實際已提交的 migration 0020 是直接 column-level GRANT + trigger 校驗（0020 自己的 header 註解：刻意仿照 `hci.enforce_dsr_transition()`/`hci.enforce_case_lifecycle()` 兩個既有 lifecycle-trigger 慣例，非疏漏）——trigger 對任何寫入路徑一視同仁生效，此處計畫原文已過時，以實際 schema 為準，不重寫已驗證通過的設計。
   - `orchestrate-discovered-fetch.mjs` 新增 `dryRun` 參數：為真時跳過 tenantId/query 交叉檢查與 Task 8 寫入，回傳 `{outcome:'dry_run_completed', finalUrl, title, textLength, contentHash}` 供人工預覽。
   - UI：seed 表單（URL、「確認為組織非個人」核取方塊預設不勾、「先試跑」核取方塊預設勾選）、DISCOVERED 清單卡片、拒絕按鈕（`confirm()` 二次確認）。
 - **完成狀態**：real-Postgres（`scripts/dev-db-init.ps1`）+ curl 逐分支驗證全部通過：GET 200 且 RLS 租戶隔離屬實（租戶 A 看得到、租戶 B 看不到同一列）；POST 400（缺 targetUrl／`subject_kind` 錯誤）／503（runner 未設定）；reject 200（真實 DISCOVERED→REJECTED）／200（REJECTED→REJECTED 冪等 no-op，trigger 自己的 `IS DISTINCT FROM` 設計，UI 本就不會對非 DISCOVERED 列顯示按鈕，非 bug）／409（真實驅動一列到 ACTIVE 後拒絕，H1022 真實觸發）／404（不存在的 id）。瀏覽器全流程（Claude 自己的 browser 工具）：分頁渲染、表單送出前端 gate（未勾組織確認擋下送出，不發網路請求）、真實 503 正確顯示、DISCOVERED 卡片正確渲染、console 零 JS 例外。
@@ -168,6 +168,14 @@
 - **完成狀態**：獨立 agent（未參與 Task 3/4/6/7/8/9 建置）用自己另建的 Docker Compose 專案（獨立密鑰、獨立 project name，非重跑既有 fixture）+ 自寫全新 PoC，六項全部真跑復現：(1)(2) runner 對 7 個真實在跑的 trigger-* 容器（webapp/postgres/minio/redis/clickhouse/supervisor，非計畫原文估計的僅 1 個）逐一真連線嘗試皆逾時（curl exit 28，非 refused，確認封包在 iptables OUTPUT 層被丟棄而非埠關閉）；(3) metadata/RFC1918/loopback 六個目標網路層+應用層雙重擋下，含一次含真實 MinIO 寫入的端對端 enqueue 正面控制組；(4)(5) `node --test` 對 `pinned-http-client`/`ssrf-payload-corpus`/`ssrf-guard` 三個測試檔全綠（11+6+10 個測試）；(6) 對 zero-tolerance 模式跑 `app/` 目錄本身（非 critic 覆審已知會 false-positive 的 `public-intelligence/`），另手寫 5 個全新 PoC 檔案（不同於腳本內建 self-test 的 fixture 內容）逐一驗證：別名繞過／decoy 檔名繞過皆被抓到（2/2），動態字串屬性存取（`globalThis['fe'+'tch']`）確認仍抓不到——與腳本 header 及 `agency-os/TASKS.md` 已揭露的已知限制逐字對應，非新發現也非過期揭露。全部 Docker 資源（3 個獨立 project）驗證後清空，未觸碰任何既有容器；`git status --porcelain` 前後比對確認零程式碼異動。**總結論：六道閘全部獨立復現為綠燈，Gate C 收斂成立，不需退回任何任務。**
 - **Acceptance**：六項全部由 `vuln-verifier` 獨立復現為綠燈；任一項復現失敗則整個管線視為未完成，退回對應任務。**已達成**。
 - **Boundaries**：不對 `ks-aw-01` 上其他正在服務生產流量的容器發動任何攻擊嘗試；僅限本計畫新建的隔離 runner 與受控測試目標。
+
+## Task 14：DISCOVERED → 案件 EVIDENCE 人工晉升路徑 — **已完成**（2026-09-19，細節見 `agency-os/WORKLOG.md` 同日「HCI 採用為證據」條目）
+
+- 人工一次操作 = 讀快照文字（VERIFIED）+ 選案件×當事人（MATCHED）+ 確認（ACCEPTED）；逐步走 0020 trigger，不跳步；自動化仍止於 DISCOVERED（ADR-011 §15c 不變）。
+- 核心 `public-intelligence/source-registry/promote-discovered-source.mjs`；交易 `app/tenant-transaction.mjs`；路由 `GET /seeds/:id/content`、`POST /seeds/:id/promote`、`GET /persons`、`GET /cases?open=1`。
+- 證據文字只從已存快照 bytes 由 runner `POST /snapshot-text` 重新擷取（sha256 比對 + 以現行掃描器重掃），client 送來的文字一律不採用；EVIDENCE 無連結表（`source_relationships` 僅 CLAIM），出處存 `payload.source`，一般 records 端點禁用該 key。
+- 本任務一併收緊 Task 10 的 reject：僅限 DISCOVERED（0020 允許 ACCEPTED→REJECTED，會留下孤兒證據），非 DISCOVERED 回 409。
+- 已知缺口：抓取時的 HTTP header charset 未存，只靠 header 宣告非 UTF-8 的頁面，重新擷取會變亂碼（人工預覽看得到）→ TASKS 另列（需 `source_snapshots` 新欄位）。
 
 ## Execution Order
 

@@ -1,4 +1,33 @@
 # Worklog
+## 2026-09-19（續81）HCI 採用為證據：DISCOVERED 來源 → 案件 EVIDENCE 的人工晉升路徑
+
+- [操作者請求] 「這狗屎東西 怎麼做 HCI分析?」→「不修好 要怎麼用?!」。根因：自動化只做到 DISCOVERED（ADR-011 §15c），但**完全沒有**人工晉升路徑，抓到的網頁永遠進不了案件、不能評分。另外 runner 擷取了文字卻丟掉（`orchestrate-discovered-fetch.mjs:171-176` 只存 hash+ref），hci-app 也碰不到 MinIO。
+- 設計（不變量＝證據文字必須可證明來自 DB 指向的那份 bytes，且由人確認）：
+  - runner 新增 `POST /snapshot-text`（`infra/local/fetch-runner/server.mjs` readStoredSnapshotText）：讀 MinIO → 比對 sha256 與 content_hash → `extractFromBytes` → 用**現行**掃描器重掃 → 回傳 title/text。
+  - 核心 `public-intelligence/source-registry/promote-discovered-source.mjs`：先 FOR UPDATE，只接受 DISCOVERED，依 0020 trigger 逐步 MATCHED→VERIFIED→ACCEPTED，每個案件×當事人寫一筆 EVIDENCE（mint key、DETERMINISTIC），caseId 升冪插入（避開 0018 per-case advisory lock deadlock）。
+  - `app/tenant-transaction.mjs`（BEGIN + SET LOCAL ROLE；ROLLBACK 失敗 → release(true)）。
+  - 路由：`GET /seeds/:id/content`、`POST /seeds/:id/promote`（只收 snapshotId，文字由 server 重新擷取）、`GET /persons`、`GET /cases?open=1`。
+  - EVIDENCE 沒有連結表（`source_relationships` 只收 CLAIM，0004:147），出處放 `payload.source`。
+  - UI（`app/public/index.html`）：卡片「看內容／採用為證據」面板，案件與當事人都用按鈕複選，可直接建新當事人；案件頁的來源型證據只顯示標題連結＋摘要，全文收合。
+- critic Standard 0c/1m/7n，全部處理：
+  - M1：網頁自宣告 `<meta charset=utf-16>`／UTF-16 BOM／iso-2022-jp 會讓 ASCII 注入句解成亂碼、繞過掃描器（header charset=utf-16 為既有同類問題）→ 整類關閉：`extractFromBytes` 永遠加掃 utf-8 讀法，fail-closed；`detectHtmlEncoding` 依 WHATWG 順序（BOM>header>meta；meta 宣告 utf-16 視為 utf-8、不用 replacement），meta 只認真正的 charset／http-equiv 屬性。
+  - m1：lone surrogate 會讓 jsonb 永久寫入失敗 → `decodeEntities` 拒收 surrogate 範圍，截斷後 `toWellFormed()`。
+  - m3：一般 `POST /cases/:id/records` 禁用 `source`／`provenance` key（`RESERVED_EVIDENCE_KEYS`），手打紀錄不能冒充網頁證據。
+  - m4：reject 只接受 DISCOVERED，否則 409（0020 允許 ACCEPTED→REJECTED，會留下孤兒證據）。處理中停用同一張卡的拒絕鈕。
+  - m5：案件選單改用 `?open=1`，不再受 50 筆上限影響。
+  - m6：runner 409（bytes 被竄改）→ 500＋`INTEGRITY:` log，與一般 502 分開。
+  - m7：交易 helper 抽成模組並補 4 個測試。
+  - m2（header charset 沒存）需要 migration → 另列 TASKS。
+- 順帶修正 Dockerfile 的 `COPY app/server.mjs` 改成 `COPY app/*.mjs`，app/ 新增模組不會再漏打包。
+- 文件：`Projects/internal/hci30/docs/HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md` 新增 Task 14。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test "tests/unit/**/*.test.mjs" tests/architecture/*.mjs (Projects/internal/hci30) | exit=0 | ms=2100
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql hci_wave1_synthetic < hci_promote_probe.sql（BEGIN; SET LOCAL ROLE hci_app_test_a; FOR UPDATE→3 UPDATE→mint key→INSERT EVIDENCE；跳步 UPDATE 被拒 "invalid source admission-state transition"；ROLLBACK 後 state=DISCOVERED、probe_rows=0） | exit=0 | ms=900
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation（拔 caseId 排序／DISCOVERED guard／FOR UPDATE／utf-8 雙掃／surrogate guard／toWellFormed／release(destroy)，各自的測試檔 exit=1，還原後全套 exit=0） | exit=0 | ms=9000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/7n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,lobster-factory | grep=`decodeBody\|seeds/[^ ]*reject\|getContentAddressedObject\|Test-support only\|snapshot-text\|withTenantTransaction\|COPY app/server\.mjs` | hits=2（promote 模組註解指向舊位置、計畫文件 reject 描述；已修），其餘都是預期中的新呼叫端
+- ORACLE_WAIVED: critic Standard 已完整覆審（含 tenant 隔離與 XSS），另有 7 個突變證明與 prod BEGIN/ROLLBACK 真實 schema 驗證；不涉及 auth/crypto/金流新機制
+- 靜態閘：`scripts/check-trigger-no-direct-fetch.ps1` 對 public-intelligence（allowlist runner-client）和 app（-NoAllowlist）兩個範圍都 ok。
+
 ## 2026-09-19（續80）訂正續78「≥250/285」為精確值：operator 質疑「自己亂掰」，逐一 introspect 真實 builder 簽名算出 266/285
 
 - [操作者請求] 操作者對續78的「grep 確認 ≥250/285」提出質疑：「所以你說 所有工具都給錯表格 自己亂掰?」——質疑數字精確度，不是根因本身。

@@ -65,3 +65,22 @@ export async function getRunnerJobStatus({ runnerBaseUrl, sharedSecret, jobId, f
   if (!res.ok) throw Object.assign(new Error(`status_poll_failed_http_${res.status}`), { status: res.status });
   return res.json();
 }
+
+/**
+ * POST /snapshot-text on the isolated runner: readable text of an already-
+ * stored snapshot (fetch-runner server.mjs readStoredSnapshotText). A
+ * content-scan hit is a modelled outcome, returned as {flagged:true,
+ * scanReasons}; every other non-2xx throws with the runner's error label.
+ */
+export async function readSnapshotText({ runnerBaseUrl, sharedSecret, snapshotRef, contentHash, fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+  const res = await fetchImpl(`${runnerBaseUrl}/snapshot-text`, {
+    method: 'POST',
+    headers: authHeaders(sharedSecret),
+    body: JSON.stringify({ snapshotRef, contentHash }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const body = await res.json().catch(() => null);
+  if (res.status === 422 && body?.error === 'content_flagged') return { flagged: true, scanReasons: body.scanReasons ?? [] };
+  if (!res.ok) throw Object.assign(new Error(`snapshot_text_failed_http_${res.status}${body?.error ? `_${body.error}` : ''}`), { status: res.status });
+  return { flagged: false, ...body };
+}

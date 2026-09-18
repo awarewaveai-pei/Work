@@ -15,10 +15,9 @@
 // authorize building that layer; a lookup-before-write skip path would be
 // one, an unconditional PUT is not).
 //
-// Not wired into server.mjs's request handling -- that is Task 7/8's job
-// (fetch + extract, then the sink write path). `getContentAddressedObject`
-// exists only to let this module's own architecture test read back what it
-// wrote against the real MinIO instance; Task 8's write path never needs it.
+// `getContentAddressedObject` is a production read path since 2026-09-19:
+// server.mjs's readStoredSnapshotText() re-extracts a stored snapshot's text
+// for evidence promotion (the runner is the only process with MinIO access).
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -210,9 +209,9 @@ function parseSnapshotRef(ref) {
   return { bucket, key };
 }
 
-// Test-support only (not part of Task 5's write-path contract): lets the
-// architecture test prove round-trip byte equality against the real MinIO
-// instance without a separate S3 client.
+// Used by server.mjs's readStoredSnapshotText() and the architecture test's
+// round-trip check. parseSnapshotRef's key-shape + bucket checks are what keep
+// a DB-supplied ref from becoming an arbitrary MinIO path.
 export async function getContentAddressedObject(snapshotRef, config) {
   const { bucket, key } = parseSnapshotRef(snapshotRef);
   if (bucket !== config.bucket) throw new Error(`snapshot_ref bucket '${bucket}' does not match configured bucket '${config.bucket}'`);

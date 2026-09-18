@@ -8,7 +8,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { enqueueDiscoveredFetch, getRunnerJobStatus } from '../../../../public-intelligence/orchestration/runner-client.mjs';
+import { enqueueDiscoveredFetch, getRunnerJobStatus, readSnapshotText } from '../../../../public-intelligence/orchestration/runner-client.mjs';
 
 function fakeFetch(response) {
   const calls = [];
@@ -96,5 +96,37 @@ test('getRunnerJobStatus: a 404 (unknown job id) throws rather than returning a 
       assert.equal(err.status, 404);
       return true;
     },
+  );
+});
+
+test('readSnapshotText: POSTs snapshotRef+contentHash with auth, returns {flagged:false, ...body}', async () => {
+  const { fetchImpl, calls } = fakeFetch({ ok: true, status: 200, json: async () => ({ title: 'T', text: 'body', textLength: 4, textTruncated: false }) });
+  const r = await readSnapshotText({ runnerBaseUrl: 'http://runner:8090', sharedSecret: 'sekrit', snapshotRef: 's3://b/sha256/h', contentHash: 'h', fetchImpl });
+  assert.deepEqual(r, { flagged: false, title: 'T', text: 'body', textLength: 4, textTruncated: false });
+  assert.equal(calls[0].url, 'http://runner:8090/snapshot-text');
+  assert.equal(calls[0].opts.method, 'POST');
+  assert.equal(calls[0].opts.headers.Authorization, 'Bearer sekrit');
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { snapshotRef: 's3://b/sha256/h', contentHash: 'h' });
+});
+
+test('readSnapshotText: 422 content_flagged is a modelled outcome, not a throw', async () => {
+  const { fetchImpl } = fakeFetch({ ok: false, status: 422, json: async () => ({ error: 'content_flagged', scanReasons: [{ id: 'ignore_previous_instructions' }] }) });
+  const r = await readSnapshotText({ runnerBaseUrl: 'http://x', sharedSecret: 's', snapshotRef: 'r', contentHash: 'h', fetchImpl });
+  assert.deepEqual(r, { flagged: true, scanReasons: [{ id: 'ignore_previous_instructions' }] });
+});
+
+test('readSnapshotText: any other non-2xx throws with the runner error label and status', async () => {
+  const { fetchImpl } = fakeFetch({ ok: false, status: 409, json: async () => ({ error: 'stored_bytes_hash_mismatch' }) });
+  await assert.rejects(
+    () => readSnapshotText({ runnerBaseUrl: 'http://x', sharedSecret: 's', snapshotRef: 'r', contentHash: 'h', fetchImpl }),
+    (err) => { assert.match(err.message, /snapshot_text_failed_http_409_stored_bytes_hash_mismatch/); assert.equal(err.status, 409); return true; },
+  );
+});
+
+test('readSnapshotText: a non-JSON error body still throws cleanly (no secondary parse crash)', async () => {
+  const { fetchImpl } = fakeFetch({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } });
+  await assert.rejects(
+    () => readSnapshotText({ runnerBaseUrl: 'http://x', sharedSecret: 's', snapshotRef: 'r', contentHash: 'h', fetchImpl }),
+    /snapshot_text_failed_http_502$/,
   );
 });

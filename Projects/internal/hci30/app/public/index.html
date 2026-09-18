@@ -136,6 +136,21 @@
   .seed-result-card { margin-top: 1rem; padding: 1rem 1.2rem; border: 1px solid var(--border); border-radius: 8px; max-width: 640px; }
   .seed-result-card p { margin: 0.4rem 0; font-size: 0.88rem; }
   .seed-result-card.err { border-color: var(--very-low); }
+  /* 探索來源 -> 採用為證據 panel (2026-09-19) */
+  .seed-item { border-bottom: 1px solid var(--border); }
+  .seed-item > .case-card { border-bottom: none; cursor: default; }
+  .seed-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .reopen-btn.primary { background: var(--teal); color: #fff; }
+  .reopen-btn.primary:hover { background: var(--teal-ink); }
+  .seed-panel { padding: 0.2rem 1rem 1.5rem; }
+  .seed-panel > label { display: block; font-weight: 700; font-size: 0.9rem; margin: 1.2rem 0 0.5rem; }
+  .seed-text { max-height: 320px; overflow-y: auto; white-space: pre-wrap; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 0.8rem 1rem; font-size: 0.88rem; line-height: 1.65; }
+  .risk-tier-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+  /* Evidence promoted from a web source: title link + collapsed full text, never a whole page inline. */
+  .source-head { font-weight: 700; }
+  .source-head a { color: var(--teal-ink); }
+  .source-text summary { cursor: pointer; }
+  .source-full { white-space: pre-wrap; margin-top: 0.5rem; max-height: 480px; overflow-y: auto; font-size: 0.88rem; }
   .auto-promote-tag { display: inline-block; margin-left: 0.4rem; font-size: 0.68rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #ece6d6; color: var(--muted); font-weight: 700; }
   .auto-promote-audit-list { margin: 0.4rem 0 0; padding-left: 1.6rem; font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
 
@@ -374,7 +389,7 @@
     <div id="s-result"></div>
 
     <h3 style="margin-top:2.5rem">待審核來源（admission_state = DISCOVERED）</h3>
-    <p class="field-hint">由 isolated fetch-runner 擷取並通過內容隔離掃描後寫入的原始來源；尚未經人工比對／驗證，不會自動變成正式 Evidence。</p>
+    <p class="field-hint">由 isolated fetch-runner 擷取並通過內容隔離掃描後寫入的原始來源；不會自動變成正式證據——按「看內容／採用為證據」，讀過內容、選好案件與當事人後，由你確認才會存成證據。</p>
     <div class="case-grid" id="seeds-discovered"></div>
   </div>
 
@@ -605,6 +620,30 @@ function showAbout() {
     }).join('');
 }
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+// esc() leaves quotes intact -- anything placed inside an attribute value needs this.
+function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+// Only http(s) becomes a link: a source_ref is caller-typed text, and a
+// javascript: URL in an href would execute on click.
+function safeHttpUrl(u) { return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null; }
+
+// EVIDENCE promoted from 探索來源 carries payload.source (server.mjs promote
+// route). Short label = page title; the card shows the title link and keeps
+// the (up to 20k-char) page text collapsed.
+function sourceLabel(r) { return r.payload.source ? '📄 ' + (r.payload.source.title || r.payload.source.source_ref) : null; }
+function recordContentHtml(r, text) {
+  const s = r.payload.source;
+  if (!s) return `<div class="content">${esc(text)}</div>`;
+  const url = safeHttpUrl(s.source_ref);
+  const label = esc(s.title || s.source_ref);
+  const head = url ? `<a href="${escAttr(url)}" target="_blank" rel="noopener noreferrer">${label}</a>` : label;
+  const excerpt = text.length > 240 ? text.slice(0, 240) + '…' : text;
+  const truncNote = r.payload.content_truncated ? `．原文 ${esc(r.payload.full_text_length)} 字，證據存前 ${text.length} 字` : '';
+  return `<div class="content">
+      <div class="source-head">📄 ${head}</div>
+      <div class="field-hint">網頁擷取於 ${esc(new Date(s.retrieved_at).toLocaleString('zh-TW'))}${truncNote}</div>
+      <details class="source-text"><summary>${esc(excerpt)}</summary><div class="source-full">${esc(text)}</div></details>
+    </div>`;
+}
 
 // Shared handler for every button-based selector in the app (purpose, risk
 // tier, kind, dimension, band, outcome, person, evidence-ref citation) --
@@ -644,12 +683,133 @@ async function loadSeeds(tenant) {
 }
 
 function seedCardHtml(s) {
-  return `<div class="case-card">
-      <div>
-        <div class="title">${esc(s.source_ref)}</div>
-        <div class="meta">${esc(s.id)} ．狀態 ${esc(s.admission_state)}</div>
+  return `<div class="seed-item" id="seed-${s.id}">
+      <div class="case-card">
+        <div>
+          <div class="title">${esc(s.source_ref)}</div>
+          <div class="meta">#${esc(s.id.slice(0, 8))} ．待審核</div>
+        </div>
+        <div class="seed-actions">
+          <button type="button" class="reopen-btn primary" onclick="openSeedPanel('${s.id}')">📄 看內容／採用為證據</button>
+          <button type="button" class="reopen-btn" data-role="reject" onclick="rejectSeed('${s.id}')">✕ 拒絕</button>
+        </div>
       </div>
-      <button type="button" class="reopen-btn" onclick="event.stopPropagation(); rejectSeed('${s.id}')">✕ 拒絕</button>
+      <div class="seed-panel" id="seed-panel-${s.id}" style="display:none"></div>
+    </div>`;
+}
+
+// 探索來源 -> 採用為證據 (2026-09-19). Text comes from the stored snapshot
+// (server re-derives it from the same bytes on promote; the client only sends
+// back which snapshotId was shown). Cases and persons are multi-select buttons.
+const SEED_MAX_PAIRS = 20; // mirrors promote-discovered-source.mjs MAX_PAIRS; server enforces
+function seedPanel(sourceId) { return document.getElementById('seed-panel-' + sourceId); }
+function seedSelected(sourceId, role) {
+  return [...seedPanel(sourceId).querySelectorAll(`[data-role="${role}"] .chip.selected`)].map(b => b.dataset.value);
+}
+function personChipHtml(p, sourceId, selected) {
+  return `<button type="button" class="chip${selected ? ' selected' : ''}" data-value="${p.id}" onclick="toggleSeedChip(this,'${sourceId}')">${esc(p.display_label)}</button>`;
+}
+
+async function openSeedPanel(sourceId) {
+  const panel = seedPanel(sourceId);
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  panel.innerHTML = '<p class="empty">讀取已存的網頁內容中…</p>';
+  const [contentRes, casesRes, personsRes] = await Promise.all([
+    fetch(`/api/hci/v1/seeds/${sourceId}/content?tenant=${currentTenant}`),
+    fetch(`/api/hci/v1/cases?open=1&tenant=${currentTenant}`),
+    fetch(`/api/hci/v1/persons?tenant=${currentTenant}`),
+  ]);
+  const [content, cases, persons] = await Promise.all([contentRes.json(), casesRes.json(), personsRes.json()]);
+  if (!contentRes.ok) { panel.innerHTML = `<p class="err">讀不到內容：${esc(content.detail || content.title)}</p>`; return; }
+  if (content.flagged) {
+    const reasons = (content.scanReasons || []).map(x => x.id).join('、');
+    panel.innerHTML = `<p class="err">內容安全掃描攔下這個來源（${esc(reasons || '未提供原因')}），不能變成證據；建議按「拒絕」。</p>`;
+    return;
+  }
+  if (!casesRes.ok || !personsRes.ok) { panel.innerHTML = `<p class="err">讀不到案件或當事人清單：${esc((cases.detail || persons.detail) || '')}</p>`; return; }
+  const openCases = cases.data;
+  panel.dataset.snapshotId = content.snapshotId;
+  const caseChips = openCases.map(c => {
+    const ctx = (c.requester_context || '').trim();
+    return `<button type="button" class="chip block" data-value="${c.id}" onclick="toggleSeedChip(this,'${sourceId}')">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}${ctx ? ' · ' + esc(ctx.length > 40 ? ctx.slice(0, 40) + '…' : ctx) : ''} · #${c.id.slice(0, 8)}</button>`;
+  }).join('');
+  panel.innerHTML = `
+    <p><b>${esc(content.title || '(無標題)')}</b></p>
+    <p class="field-hint">網頁擷取於 ${esc(new Date(content.retrievedAt).toLocaleString('zh-TW'))}．全文 ${esc(content.textLength)} 字${content.textTruncated ? `，證據只會存前 ${esc(content.maxChars)} 字` : ''}</p>
+    <div class="seed-text">${content.text ? esc(content.text) : '<i>(這頁沒有可讀文字，無法當證據)</i>'}</div>
+    <label>1. 這份內容屬於哪個案件？（可複選）</label>
+    <div class="chip-group block" data-role="cases">${caseChips || '<p class="field-hint">目前沒有進行中的案件，請先到「＋ 新案件」建立一個。</p>'}</div>
+    <label>2. 內容是關於誰？（可複選）</label>
+    <div class="chip-group" data-role="persons">${persons.data.map(p => personChipHtml(p, sourceId, false)).join('')}</div>
+    <div class="person-new-row">
+      <input data-role="new-person" placeholder="清單裡沒有？輸入新當事人名稱">
+      <button type="button" class="person-create-btn" onclick="createPersonForSeed('${sourceId}')">＋ 建立</button>
+    </div>
+    <p class="field-hint" data-role="count">請至少選 1 個案件和 1 位當事人。</p>
+    <p class="field-hint">按下「採用為證據」代表：你已讀過上面的內容，並確認它和所選的案件、當事人有關。系統會在每個「案件 × 當事人」各存一筆證據（附原始網址和內容指紋），這個來源會從待審核清單移除；之後打開案件就能看到，並納入評分分析。</p>
+    <button type="button" class="risk-tier-submit" data-role="submit" disabled onclick="promoteSeed('${sourceId}')" ${content.text ? '' : 'data-empty="1"'}>✓ 採用為證據</button>
+    <div class="err" data-role="err"></div>`;
+}
+
+function toggleSeedChip(btn, sourceId) { btn.classList.toggle('selected'); updateSeedCount(sourceId); }
+
+function updateSeedCount(sourceId) {
+  const panel = seedPanel(sourceId);
+  const n = seedSelected(sourceId, 'cases').length * seedSelected(sourceId, 'persons').length;
+  const submit = panel.querySelector('[data-role="submit"]');
+  const countEl = panel.querySelector('[data-role="count"]');
+  if (n > SEED_MAX_PAIRS) countEl.textContent = `一次最多 ${SEED_MAX_PAIRS} 筆（目前選了 ${n} 筆），請減少案件或當事人。`;
+  else countEl.textContent = n ? `將建立 ${n} 筆證據。` : '請至少選 1 個案件和 1 位當事人。';
+  submit.disabled = n === 0 || n > SEED_MAX_PAIRS || submit.dataset.empty === '1';
+}
+
+async function createPersonForSeed(sourceId) {
+  const panel = seedPanel(sourceId);
+  const input = panel.querySelector('[data-role="new-person"]');
+  const errEl = panel.querySelector('[data-role="err"]');
+  const display_label = input.value.trim();
+  if (!display_label) { errEl.textContent = '請先輸入當事人名稱'; return; }
+  const res = await fetch(`/api/hci/v1/persons?tenant=${currentTenant}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: currentTenant, display_label }),
+  });
+  const body = await res.json();
+  if (!res.ok) { errEl.textContent = body.detail || body.title; return; }
+  errEl.textContent = '';
+  input.value = '';
+  panel.querySelector('[data-role="persons"]').insertAdjacentHTML('beforeend', personChipHtml(body, sourceId, true));
+  updateSeedCount(sourceId);
+}
+
+async function promoteSeed(sourceId) {
+  const panel = seedPanel(sourceId);
+  const submit = panel.querySelector('[data-role="submit"]');
+  const errEl = panel.querySelector('[data-role="err"]');
+  const rejectBtn = document.querySelector(`#seed-${sourceId} [data-role="reject"]`);
+  submit.disabled = true;
+  if (rejectBtn) rejectBtn.disabled = true;
+  submit.textContent = '處理中…';
+  const res = await fetch(`/api/hci/v1/seeds/${sourceId}/promote?tenant=${currentTenant}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tenant: currentTenant, snapshotId: panel.dataset.snapshotId,
+      caseIds: seedSelected(sourceId, 'cases'), personIds: seedSelected(sourceId, 'persons'),
+    }),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    errEl.textContent = body.detail || body.title;
+    submit.textContent = '✓ 採用為證據';
+    if (rejectBtn) rejectBtn.disabled = false;
+    updateSeedCount(sourceId);
+    return;
+  }
+  const caseIds = [...new Set(body.records.map(r => r.caseId))];
+  document.getElementById('seed-' + sourceId).innerHTML = `<div class="seed-result-card">
+      <span class="badge status-ACTIVE">已採用為證據</span>
+      <p>已建立 ${body.records.length} 筆證據${body.contentTruncated ? '（原文較長，只存前段）' : ''}。</p>
+      ${caseIds.map(id => `<button type="button" class="reopen-btn" onclick="openCase('${id}')">開啟案件 #${id.slice(0, 8)} →</button>`).join(' ')}
     </div>`;
 }
 
@@ -766,7 +926,7 @@ function bandBadge(value) {
 }
 
 function shortRecordText(r) {
-  const text = (r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''} ${BAND_LABELS[r.payload.value] || r.payload.value || ''}`).trim();
+  const text = sourceLabel(r) || (r.payload.content || `${DIMENSION_LABELS[r.payload.dimension] || r.payload.dimension || ''} ${BAND_LABELS[r.payload.value] || r.payload.value || ''}`).trim();
   return text.length > 70 ? text.slice(0, 70) + '…' : text;
 }
 
@@ -1012,7 +1172,7 @@ async function refreshDetail() {
     const stackingFlag = stackingFlagById[r.id];
     return `<div class="record-card">
       <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span title="${r.id}" style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
-      <div class="content">${esc(text)}</div>
+      ${recordContentHtml(r, text)}
       ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality.quality] || quality.quality}（${quality.evidence_count} 筆）</span>` : ''}
       ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
       ${stackingFlag ? `<span class="stacking-tag" title="這則文字一次命中 ${stackingFlag.rule_count} 條不同規則，建議人工複核是否為刻意選字操弄分數">⚠ 疑似關鍵字堆疊（${stackingFlag.rule_count} 條規則）</span>` : ''}
@@ -1109,7 +1269,7 @@ function renderReportView(row) {
     const stackingFlag = stackingFlagById[r.id];
     return `<div class="record-card">
       <span class="kind-tag">${KIND_LABELS[r.kind] || r.kind} · ${esc(personById[r.person_id] || r.person_id)} · <span style="font-family:monospace">#${r.id.slice(0,8)}</span></span>
-      <div class="content">${esc(text)}</div>
+      ${recordContentHtml(r, text)}
       ${quality ? `<span class="quality-tag">${QUALITY_LABELS[quality.quality] || quality.quality}（${quality.evidence_count} 筆）</span>` : ''}
       ${r.reaudit_required ? '<span class="reaudit-tag">⚠ 風險等級調升，需要重新審查</span>' : ''}
       ${stackingFlag ? `<span class="stacking-tag" title="這則文字一次命中 ${stackingFlag.rule_count} 條不同規則，建議人工複核是否為刻意選字操弄分數">⚠ 疑似關鍵字堆疊（${stackingFlag.rule_count} 條規則）</span>` : ''}
@@ -1198,7 +1358,7 @@ function citableChips() {
   const citable = currentRecords.filter(r => r.kind === 'EVIDENCE' || r.kind === 'CLAIM');
   if (!citable.length) return { html: '<p class="field-hint" style="color:var(--very-low)">－－請先新增證據－－</p>', first: '' };
   const html = citable.map((r, i) => {
-    const text = (r.payload.content || `${r.payload.dimension || ''} ${r.payload.value || ''}`).trim();
+    const text = sourceLabel(r) || (r.payload.content || `${r.payload.dimension || ''} ${r.payload.value || ''}`).trim();
     const short = text.length > 56 ? text.slice(0, 56) + '…' : text;
     return `<button type="button" class="chip block${i === 0 ? ' selected' : ''}" data-value="${r.id}" onclick="pickChip(this,'f-evref')">${esc(KIND_LABELS[r.kind] || r.kind)} · ${esc(short)}（#${r.id.slice(0,8)}）</button>`;
   }).join('');

@@ -20,7 +20,7 @@ RUN addgroup --system --gid 1001 nodejs \
 
 COPY --from=deps /build/app/node_modules ./app/node_modules
 COPY app/package.json ./app/package.json
-COPY app/server.mjs ./app/server.mjs
+COPY app/*.mjs ./app/
 COPY app/public ./app/public
 COPY packages ./packages
 COPY public-intelligence ./public-intelligence

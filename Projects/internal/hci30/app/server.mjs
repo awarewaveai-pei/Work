@@ -13,6 +13,12 @@ import { combineDimensionSources } from '../packages/intelligence/combine-dimens
 import { TRUST_DOMAINS } from '../packages/contracts/trust-domains.mjs';
 import { orchestrateDiscoveredFetch } from '../public-intelligence/orchestration/orchestrate-discovered-fetch.mjs';
 import { writeDiscoveredSource } from '../public-intelligence/source-registry/sink-hci-discovered.mjs';
+import { readSnapshotText } from '../public-intelligence/orchestration/runner-client.mjs';
+import {
+  PromoteError, isUuid, validatePromoteRequest, loadSnapshot, buildEvidencePayload, promoteDiscoveredSource,
+  EVIDENCE_CONTENT_MAX_CHARS, RESERVED_EVIDENCE_KEYS,
+} from '../public-intelligence/source-registry/promote-discovered-source.mjs';
+import { withTenantTransaction } from './tenant-transaction.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -142,9 +148,16 @@ app.get('/api/hci/v1/cases', async (req, res) => {
   const t = resolveTenant(req, res);
   if (!t) return;
   try {
+    // requester_context: the only human-written text on a case -- lets a picker
+    // (探索來源 -> 採用為證據) show WHICH case, not just a uuid. ?open=1 is that
+    // picker's list: every OPEN/ACTIVE case, not the newest-50 window of all
+    // statuses, so an older open case is never silently unselectable.
+    const openOnly = req.query.open === '1';
     const { rows } = await queryAsTenant(
       t.role,
-      'SELECT id, purpose, status, risk_tier, opened_at, closed_at FROM hci.cases ORDER BY opened_at DESC LIMIT 50'
+      openOnly
+        ? "SELECT id, purpose, status, risk_tier, opened_at, closed_at, requester_context FROM hci.cases WHERE status IN ('OPEN','ACTIVE') ORDER BY opened_at DESC LIMIT 1000"
+        : 'SELECT id, purpose, status, risk_tier, opened_at, closed_at, requester_context FROM hci.cases ORDER BY opened_at DESC LIMIT 50'
     );
     res.json({ data: rows, next_cursor: null });
   } catch (err) {
@@ -275,6 +288,17 @@ app.post('/api/hci/v1/cases/:caseId/auto-promote-rule-findings', async (req, res
     res.json(rows[0]);
   } catch (err) {
     problem(res, 409, 'Conflict', err.message);
+  }
+});
+
+app.get('/api/hci/v1/persons', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  try {
+    const { rows } = await queryAsTenant(t.role, 'SELECT id, display_label FROM hci.persons ORDER BY display_label');
+    res.json({ data: rows });
+  } catch (err) {
+    problem(res, 500, 'Internal Server Error', err.message);
   }
 });
 
@@ -461,6 +485,10 @@ app.post('/api/hci/v1/cases/:caseId/records', async (req, res) => {
   } catch (err) {
     return problem(res, 400, 'Bad Request', err.message);
   }
+  const reserved = RESERVED_EVIDENCE_KEYS.filter((k) => Object.hasOwn(payload, k));
+  if (reserved.length) {
+    return problem(res, 400, 'Bad Request', `payload keys ${reserved.join(', ')} are set only by source promotion (POST /seeds/:id/promote)`);
+  }
   try {
     const id = crypto.randomUUID();
     const extra = kind === 'CLAIM' ? { ...CLAIM_EXTRA_COLUMNS } : {};
@@ -608,17 +636,130 @@ app.post('/api/hci/v1/seeds/:sourceId/reject', async (req, res) => {
   const t = resolveTenant(req, res);
   if (!t) return;
   try {
+    // DISCOVERED-only (critic review 2026-09-19, m4): 0020 also allows
+    // ACCEPTED->REJECTED, so a stale tab's reject, or one queued behind a
+    // promotion's row lock, would otherwise reject an already-promoted source
+    // while its EVIDENCE rows stay in the case.
     const { rowCount } = await queryAsTenant(
       t.role,
-      "UPDATE hci.sources SET admission_state = 'REJECTED' WHERE id = $1",
+      "UPDATE hci.sources SET admission_state = 'REJECTED' WHERE id = $1 AND admission_state = 'DISCOVERED'",
       [req.params.sourceId]
     );
-    if (rowCount === 0) return problem(res, 404, 'Not Found', 'no source with that id visible to this tenant');
+    if (rowCount === 0) return problem(res, 409, 'Conflict', 'no DISCOVERED source with that id is visible to this tenant (already promoted, rejected, or unknown)');
     res.status(200).json({ id: req.params.sourceId, admission_state: 'REJECTED' });
   } catch (err) {
     // hci.enforce_source_admission_transition() (migration 0020) rejects an
     // invalid transition (e.g. a source already ACTIVE/REJECTED) with H1022 --
     // a client-caused conflict, not a server fault.
+    problem(res, 409, 'Conflict', err.message);
+  }
+});
+
+// ---- Evidence promotion (探索來源 -> 採用為證據, 2026-09-19) -------------------
+// Preview and promote both derive text from the STORED snapshot bytes via the
+// runner (the only process with object-storage access). Promote never accepts
+// text from the client, only the snapshotId the operator previewed, so the
+// evidence is exactly what they read.
+const PROBLEM_TITLES = { 400: 'Bad Request', 404: 'Not Found', 409: 'Conflict', 422: 'Unprocessable Entity' };
+
+function runnerConfigured(res) {
+  if (FETCH_RUNNER_BASE_URL && FETCH_RUNNER_SHARED_SECRET) return true;
+  problem(res, 503, 'Service Unavailable', 'fetch-runner is not configured (HCI_FETCH_RUNNER_BASE_URL / HCI_FETCH_RUNNER_SHARED_SECRET)');
+  return false;
+}
+
+function readStoredText(snapshot) {
+  return readSnapshotText({
+    runnerBaseUrl: FETCH_RUNNER_BASE_URL,
+    sharedSecret: FETCH_RUNNER_SHARED_SECRET,
+    snapshotRef: snapshot.snapshot_ref,
+    contentHash: snapshot.content_hash,
+  });
+}
+
+// Runner 409 = stored bytes no longer hash to the DB's content_hash (object
+// tampered/corrupted): an integrity alarm, not a transient gateway error.
+function runnerReadFailure(res, err, sourceId) {
+  if (err.status === 409) {
+    console.error(`INTEGRITY: stored snapshot bytes do not match content_hash (source ${sourceId}): ${err.message}`);
+    return problem(res, 500, 'Internal Server Error', 'stored snapshot failed its integrity check (bytes do not match the recorded content hash); it cannot be used');
+  }
+  return problem(res, 502, 'Bad Gateway', err.message);
+}
+
+function scanReasonIds(extracted) {
+  return (extracted.scanReasons || []).map((r) => r.id).join(', ') || 'unspecified';
+}
+
+app.get('/api/hci/v1/seeds/:sourceId/content', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  const { sourceId } = req.params;
+  if (!isUuid(sourceId)) return problem(res, 400, 'Bad Request', 'sourceId must be a uuid');
+  if (!runnerConfigured(res)) return;
+  let snapshot;
+  try {
+    snapshot = await loadSnapshot((sql, params) => queryAsTenant(t.role, sql, params), sourceId);
+  } catch (err) {
+    return problem(res, 500, 'Internal Server Error', err.message);
+  }
+  if (!snapshot) return problem(res, 404, 'Not Found', 'no stored snapshot for that source is visible to this tenant');
+  let extracted;
+  try {
+    extracted = await readStoredText(snapshot);
+  } catch (err) {
+    return runnerReadFailure(res, err, sourceId);
+  }
+  const meta = {
+    sourceId, sourceRef: snapshot.source_ref, admissionState: snapshot.admission_state,
+    snapshotId: snapshot.snapshot_id, retrievedAt: snapshot.retrieved_at,
+  };
+  if (extracted.flagged) return res.json({ ...meta, flagged: true, scanReasons: extracted.scanReasons });
+  const payload = buildEvidencePayload(snapshot, extracted);
+  res.json({
+    ...meta, flagged: false, title: extracted.title ?? null,
+    text: payload.content, textLength: payload.full_text_length, textTruncated: payload.content_truncated,
+    maxChars: EVIDENCE_CONTENT_MAX_CHARS,
+  });
+});
+
+app.post('/api/hci/v1/seeds/:sourceId/promote', async (req, res) => {
+  const t = resolveTenant(req, res);
+  if (!t) return;
+  const { sourceId } = req.params;
+  if (!isUuid(sourceId)) return problem(res, 400, 'Bad Request', 'sourceId must be a uuid');
+  let input;
+  try {
+    input = validatePromoteRequest(req.body);
+  } catch (err) {
+    return problem(res, err.status ?? 400, PROBLEM_TITLES[err.status] ?? 'Bad Request', err.message);
+  }
+  if (!runnerConfigured(res)) return;
+  let snapshot;
+  try {
+    snapshot = await loadSnapshot((sql, params) => queryAsTenant(t.role, sql, params), sourceId, input.snapshotId);
+  } catch (err) {
+    return problem(res, 500, 'Internal Server Error', err.message);
+  }
+  if (!snapshot) return problem(res, 404, 'Not Found', 'that snapshot of that source is not visible to this tenant');
+  let extracted;
+  try {
+    extracted = await readStoredText(snapshot);
+  } catch (err) {
+    return runnerReadFailure(res, err, sourceId);
+  }
+  if (extracted.flagged) {
+    return problem(res, 422, 'Unprocessable Entity', `content-isolation scan now flags this snapshot (${scanReasonIds(extracted)}); it cannot become evidence`);
+  }
+  const payload = buildEvidencePayload(snapshot, extracted);
+  try {
+    const result = await withTenantTransaction(pool, t.role, (query) => promoteDiscoveredSource(query, {
+      tenantId: t.tenantId, sourceId, snapshotId: input.snapshotId, caseIds: input.caseIds, personIds: input.personIds, payload,
+    }));
+    res.status(201).json({ ...result, contentTruncated: payload.content_truncated });
+  } catch (err) {
+    if (err instanceof PromoteError) return problem(res, err.status, PROBLEM_TITLES[err.status] ?? 'Conflict', err.message);
+    // H1xxx domain errors / FK violations from the DB -- whole transaction rolled back.
     problem(res, 409, 'Conflict', err.message);
   }
 });

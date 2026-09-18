@@ -24,9 +24,9 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
-import { fetchAndExtract } from './retrieval/http-html-fetch.mjs';
+import { fetchAndExtract, extractFromBytes } from './retrieval/http-html-fetch.mjs';
 import { scanForInstructionLikeContent } from './content-isolation/scan.mjs';
-import { putContentAddressedObject, loadConfigFromEnv } from './object-storage-client.mjs';
+import { putContentAddressedObject, getContentAddressedObject, sha256Hex, loadConfigFromEnv } from './object-storage-client.mjs';
 
 const NETWORK_GUARD_READY_FILE = process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_FILE || '/var/run/network-guard/ready';
 const NETWORK_GUARD_READY_TIMEOUT_MS = Number(process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS || 30_000);
@@ -262,6 +262,47 @@ export async function processJob(job, deps = {}) {
   }
 }
 
+const CONTENT_HASH_HEX = /^[0-9a-f]{64}$/;
+// Hard ceiling on text returned per call; callers cap lower for their own use.
+export const SNAPSHOT_TEXT_MAX_CHARS = 200_000;
+
+/**
+ * Readable text of an ALREADY-STORED snapshot (evidence promotion, 2026-09-19).
+ * The runner is the only process with MinIO access (network-guard allowlist),
+ * so re-extraction lives here; hci-app never sees raw bytes. No
+ * waitForNetworkGuardReady(): the only peer contacted is the configured MinIO
+ * endpoint, never a caller-supplied URL.
+ * - sha256(bytes) must equal contentHash: evidence text is provably derived
+ *   from the exact bytes the DB row points at.
+ * - Re-scanned with the CURRENT scanner on the identical scanSurface
+ *   (extractReadable): a scanner rule added after capture still blocks
+ *   promotion of content it would now flag.
+ * Returns {ok:false,status,error} for modelled rejections; throws only on
+ * object-storage/transport failure.
+ */
+export async function readStoredSnapshotText(input, deps = {}) {
+  const getObjectImpl = deps.getObjectImpl ?? ((ref) => getContentAddressedObject(ref, loadConfigFromEnv()));
+  const scanImpl = deps.scanImpl ?? scanForInstructionLikeContent;
+  const { snapshotRef, contentHash } = input;
+  if (typeof contentHash !== 'string' || !CONTENT_HASH_HEX.test(contentHash)) return { ok: false, status: 400, error: 'invalid_content_hash' };
+  if (typeof snapshotRef !== 'string' || !snapshotRef.endsWith(`/sha256/${contentHash}`)) return { ok: false, status: 400, error: 'snapshot_ref_does_not_match_content_hash' };
+
+  const raw = await getObjectImpl(snapshotRef);
+  if (sha256Hex(raw) !== contentHash) return { ok: false, status: 409, error: 'stored_bytes_hash_mismatch' };
+
+  const { title, text, scanSurface } = extractFromBytes(raw);
+  const scan = scanImpl(scanSurface);
+  if (scan.flagged) return { ok: false, status: 422, error: 'content_flagged', scanReasons: scan.reasons };
+  return {
+    ok: true,
+    title,
+    // toWellFormed: a cut can land inside a surrogate pair (CJK Ext-B names, emoji).
+    text: text.slice(0, SNAPSHOT_TEXT_MAX_CHARS).toWellFormed(),
+    textLength: text.length,
+    textTruncated: text.length > SNAPSHOT_TEXT_MAX_CHARS,
+  };
+}
+
 // Defense in depth (critic review 2026-09-17): `http.createServer` never
 // awaits this callback, so ANY future unguarded dereference inside it -- not
 // just the null-body case already fixed below -- would throw a synchronous
@@ -375,6 +416,31 @@ async function handleRequest(req, res) {
       });
     });
     return sendJson(res, 202, job);
+  }
+
+  if (req.method === 'POST' && url.pathname === '/snapshot-text') {
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return sendJson(res, 400, { error: 'invalid_json' });
+    }
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      return sendJson(res, 400, { error: 'invalid_body' });
+    }
+    let result;
+    try {
+      result = await readStoredSnapshotText(body);
+    } catch (err) {
+      console.error('snapshot-text: object storage read failed:', err && err.message);
+      return sendJson(res, 502, { error: 'object_storage_read_failed', errorCode: (err && err.code) || null });
+    }
+    if (!result.ok) {
+      const { ok, status, ...rest } = result;
+      return sendJson(res, status, rest);
+    }
+    const { ok, ...payload } = result;
+    return sendJson(res, 200, payload);
   }
 
   const statusMatch = req.method === 'GET' && url.pathname.match(/^\/status\/([^/]+)$/);

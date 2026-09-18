@@ -73,7 +73,9 @@ export function decodeEntities(s) {
       // String.fromCodePoint throws on an out-of-range code point, and the
       // page controls this number -- an unhandled RangeError here would
       // abort extraction for the whole document.
-      if (!Number.isInteger(code) || code < 0 || code > 0x10ffff) return whole;
+      // Surrogate range too: fromCodePoint(0xD800) does not throw, it yields a
+      // lone surrogate that Postgres jsonb rejects (evidence payload write).
+      if (!Number.isInteger(code) || code < 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return whole;
       try {
         return String.fromCodePoint(code);
       } catch {
@@ -139,27 +141,91 @@ export function extractScanSurface(html) {
 }
 
 /**
- * critic review 2026-09-17: unconditional `raw.toString('utf8')` ignored the
- * response's own declared charset -- non-UTF-8 pages (common for
- * older/regional sites) decoded to mojibake. Named ASCII instruction
- * phrases still matched regardless (ASCII bytes are stable across
- * UTF-8/Latin-1/Big5/etc.), so this never let anything past the scanner --
- * it only corrupted extracted text/title quality for a real fraction of
- * target sites. `<meta charset>` sniffing is intentionally NOT added here
- * (would need decoding once to even find that tag) -- header charset covers
- * the common case; a future task can add sniffing if it proves necessary.
+ * Title + readable text + the scan surface, from already-decoded HTML. Callers
+ * go through extractFromBytes below, so capture and promotion-time re-scan see
+ * the identical surface.
  */
-function decodeBody(raw, contentTypeValue) {
-  const charsetMatch = /charset\s*=\s*"?([\w-]+)"?/i.exec(contentTypeValue || '');
-  const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
+export function extractReadable(html) {
+  const text = extractText(html);
+  const title = extractTitle(html);
+  return { text, title, scanSurface: [title, text, extractScanSurface(html)].filter(Boolean).join('\n') };
+}
+
+/** WHATWG canonical encoding name for a label, or null if unknown/unsupported. */
+function resolveEncoding(label) {
   try {
-    return new TextDecoder(charset, { fatal: false }).decode(raw);
+    return new TextDecoder(label.trim()).encoding;
   } catch {
-    // Unknown/unsupported charset label (e.g. a typo'd or nonstandard
-    // value) -- fall back to utf-8 rather than throwing and losing the
-    // whole document over a malformed header.
-    return new TextDecoder('utf-8', { fatal: false }).decode(raw);
+    return null;
   }
+}
+
+/**
+ * Charset label from a real <meta charset> attribute or an
+ * http-equiv="content-type" content value -- never from some other meta's
+ * attribute text (critic review 2026-09-19: a bare regex matched
+ * `<meta name="description" content="... charset=utf-16 ...">`).
+ */
+function metaCharsetLabel(prefix) {
+  for (const tag of prefix.matchAll(/<meta\b([^>]*)>/gi)) {
+    const attrs = {};
+    for (const a of tag[1].matchAll(/([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
+      attrs[a[1].toLowerCase()] = a[2] ?? a[3] ?? a[4] ?? '';
+    }
+    if (attrs.charset) return attrs.charset;
+    if ((attrs['http-equiv'] || '').trim().toLowerCase() === 'content-type') {
+      const m = /charset\s*=\s*["']?\s*([\w-]+)/i.exec(attrs.content || '');
+      if (m) return m[1];
+    }
+  }
+  return null;
+}
+
+/**
+ * Encoding per WHATWG order: BOM > Content-Type header > <meta> prescan
+ * (first 1024 bytes, read as latin1 so the ASCII tag is findable before the
+ * real encoding is known) > utf-8. Meta-declared utf-16 means utf-8 and
+ * x-user-defined means windows-1252 (spec). 'replacement' (e.g. iso-2022-kr)
+ * would decode the whole page to U+FFFD, so it is never used. The meta
+ * prescan exists because stored snapshots are raw bytes with no headers.
+ */
+export function detectHtmlEncoding(raw, contentTypeValue = '') {
+  const bytes = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return 'utf-8';
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be';
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le';
+  const header = /charset\s*=\s*"?([\w-]+)"?/i.exec(contentTypeValue || '');
+  const fromHeader = header && resolveEncoding(header[1]);
+  if (fromHeader && fromHeader !== 'replacement') return fromHeader;
+  const metaLabel = metaCharsetLabel(bytes.subarray(0, 1024).toString('latin1'));
+  let fromMeta = metaLabel && resolveEncoding(metaLabel);
+  if (fromMeta === 'utf-16le' || fromMeta === 'utf-16be') fromMeta = 'utf-8';
+  if (fromMeta === 'x-user-defined') fromMeta = 'windows-1252';
+  if (fromMeta && fromMeta !== 'replacement') return fromMeta;
+  return 'utf-8';
+}
+
+export function decodeHtmlBytes(raw, contentTypeValue = '') {
+  return new TextDecoder(detectHtmlEncoding(raw, contentTypeValue)).decode(raw);
+}
+
+/**
+ * Bytes -> {text, title, scanSurface, encoding}. The ONE entry point for both
+ * live capture (fetchAndExtract) and stored-snapshot re-extraction.
+ *
+ * Fail-closed scan (critic review 2026-09-19, Major): the chosen encoding is
+ * page-controlled (BOM/header/meta). Under utf-16 or iso-2022-jp, ASCII
+ * instruction bytes decode to unrelated characters and slip past the scanner
+ * while staying in the stored raw bytes. The utf-8 reading of the same bytes
+ * is therefore always scanned too; a hit in either reading flags the page.
+ */
+export function extractFromBytes(raw, contentTypeValue = '') {
+  const encoding = detectHtmlEncoding(raw, contentTypeValue);
+  const readable = extractReadable(new TextDecoder(encoding).decode(raw));
+  const scanSurface = encoding === 'utf-8'
+    ? readable.scanSurface
+    : `${readable.scanSurface}\n${extractReadable(new TextDecoder('utf-8').decode(raw)).scanSurface}`;
+  return { ...readable, scanSurface, encoding };
 }
 
 /**
@@ -219,22 +285,18 @@ export async function fetchAndExtract(url, opts = {}) {
   }
 
   const raw = res.body; // Buffer, from Task 4's defaultTransport
-  const html = decodeBody(raw, contentTypeValue);
-  const text = extractText(html);
-  const title = extractTitle(html);
+  // scanSurface = title + visible text + comments/attribute values, NOT `text`
+  // alone (critic review 2026-09-17: title reached status='completed'
+  // unscanned otherwise; comment/attribute text is invisible to `text` but
+  // still present in `raw`, which gets durably persisted by Task 5/8).
+  const { text, title, scanSurface } = extractFromBytes(raw, contentTypeValue);
 
   return {
     text,
     raw,
     contentHash: crypto.createHash('sha256').update(raw).digest('hex'),
     title,
-    // Scan input for Task 7's content-isolation gate (server.mjs's
-    // processJob) -- title + visible text + comments/attribute values, NOT
-    // just `text` alone (critic review 2026-09-17: title reaches
-    // status='completed' unscanned otherwise, and comment/attribute text is
-    // invisible to `text` but still present in `raw`, which gets durably
-    // persisted by Task 5/8).
-    scanSurface: [title, text, extractScanSurface(html)].filter(Boolean).join('\n'),
+    scanSurface,
     finalUrl: res.finalUrl,
     fetchedAt: new Date().toISOString(),
     truncated: !!res.truncated,
