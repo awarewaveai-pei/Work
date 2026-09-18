@@ -1,4 +1,41 @@
 # Worklog
+## 2026-09-18（續19）資料蒐集器>>HCI-30 串接（commit `fefb56a71`）——真實 E2E 過程中揪出一個既存環境 drift bug，critic 抓到 2 個真實缺口已修
+
+[任務] 操作者確認「先自己用，之後要外用」定調後，問「資料蒐集器>>Cognitive OS>>HCI」「資料蒐集器>>HCI」現在能不能用。查證結果：collector→Cognitive OS 有接（今天稍早驗證過）；Cognitive OS→HCI 完全沒有；collector→HCI 直接也沒接，但這才是 HCI-30 自己規劃文件裡定案的路（`HCI_C1_C10_DECISIONS.md` C1：等 collector 端做出 `sink/hci-discovered` 再接線，非本輪重新設計）。操作者要求「要做，而且你要確定會進入正確的表格，可以真正完成HCI」——即優先做 collector→HCI 直接串接，且要真的驗證資料落地正確，不接受紙上談兵。
+
+[R0 現況分析] 讀 `lib/collect/types.ts`（RawDoc/SinkBlock 契約）、`lib/cognitive-os/import-sources.ts`+`client.ts`+其 API route+其 UI 按鈕（今天稍早才上線的姊妹功能，同一天 3 次 commit 持續擴充中）、HCI-30 `sink-hci-discovered.mjs`（Task 8 寫入邏輯，`upsert_discovered_source`/`source_snapshots` 契約）、`orchestrate-discovered-fetch.mjs`（4 種終態：written/flagged_for_review/failed/timed_out）。關鍵設計判斷：collector 端已有 SSRF-safe 的 `ctx.fetch`，但 HCI-30 的 ADR-0029 隔離 runner 是**另一層**防線（處理「未經篩選的候選 URL」這個不同的威脅模型）——結論：橋接只送 URL，不送已抓到的內文，讓 HCI-30 用它自己已測過的隔離 runner 重新抓，不建第二條繞過隔離邊界的寫入路徑（零重工，也避免兩條路徑分別要單獨資安審查）。
+
+[實作] 完全比照今天稍早上線的 collect→Cognitive OS 橋接模式（`f48bff8e6`/`bca42d8a5`）：
+- `lib/hci/client.ts`：薄 HTTP client 呼叫 HCI-30 既有的 `/api/hci/v1/seeds`。刻意不給 `HCI_API_BASE_URL` 預設值（不比照 Cognitive OS client 給 `localhost` 預設）——這個 app 跑在 ks-aw-01 容器內，容器自己的 localhost 不是操作者筆電，給預設值可能誤連到容器內其他服務。
+- `lib/hci/import-sources.ts`：gate 只檢查「有 URL」+「非敏感」，刻意不做內容種類過濾——cs_knowledge_sources 沒有「這是不是一個組織網站」的欄位，HCI-30 自己的 DISCOVERED 審核佇列本來就是設計來讓人篩選候選來源真偽（ADR-011），橋接不重複做這層判斷。
+- `hci_source_id`/`hci_imported_at`（migration `0088_kb_hci_link.sql`，db-expert agent 審過：純增欄位、nullable、無 lock 風險、0088 編號無衝突，仿 0087 一致）追蹤已送過的來源，避免重複觸發 HCI-30 的隔離 runner 重抓。
+- API route + `CollectionSourcesPanel.tsx` 新按鈕「送去 HCI 探索來源」、`ClientHubTabs.tsx` 每列狀態徽章——原樣照抄 Cognitive OS 那組的輪詢/錯誤處理模式（`mountedRef` 防呆、10 次連續失敗才放棄、write-back 失敗算軟警告不影響已送出的計數）。
+
+[真實 E2E，非只有 mock 測試] 本機起一個獨立 ephemeral fetch-runner Docker 專案（比照 `fetch-runner-object-storage-write-path.test.ps1` 的模式：獨立 project 名、產生的密鑰、`finally` teardown）+ 真的啟動 `app/server.mjs` 指向這個 runner，直接呼叫**真正的** `lib/hci/client.ts` 程式碼（非另外手刻等效邏輯）打向這組真實服務。
+
+**過程中揪出一個既存環境 drift bug（非本次橋接造成，但本次測試才發現）**：本機 dev DB 的 `hci.upsert_discovered_source` 是舊版 3 參數簽章（呼叫端自帶 `p_tenant_id`），但目前 migration 0020 檔案本身已改成 2 參數版（`tenant_id` 改由 `hci.current_tenant_id()` 內部推導，堵掉「呼叫端傳錯 tenant_id 造成跨租戶寫入」這個風險）——這個 DB 從未依照新版重建過。**這代表 Task 10 自己原本的「探索來源」UI 現在打下去也會壞**，不是這次橋接新增的問題。用既有的 `dev-db-reset-empty.ps1`（全清空重建，本機資料庫零真實資料，無風險）修復後，重新跑 E2E：`createHciSeed()` 真的成功，直接查 `hci.sources`／`hci.source_snapshots` 兩張表確認真的有資料落地（`admission_state=DISCOVERED`、真實 `snapshot_ref` 指向 MinIO 物件），修復後另外用 `dev-db-init.ps1` 的等價邏輯把先前的 fixture 資料（4 筆示範案件）補回去，不留一個被清空的環境。
+
+[critic 覆審，1 個 agent，抓到 2 個真實缺口，皆已修]
+1. Major：`docker-compose.yml` 的 next-admin service 從未加上 `HCI_API_BASE_URL`/`HCI_IMPORT_TENANT`（比對 Cognitive OS 那組同一天有補上 `COGNITIVE_OS_*` 四個變數卻漏了這組），代表這功能部署後會永遠讀不到設定、永遠 503——已補上（fail-closed 預設空字串，不比照 Cognitive OS 給 localhost 這種可能誤連的預設）。
+2. Major：橋接目前所有客戶共用同一個 HCI-30 測試租戶（HCI-30 尚無真正客戶對應租戶的機制），只寫在 code comment 裡操作者看不到——已補在按鈕說明文字上直接提醒「目前所有客戶共用同一個 HCI-30 帳號，還沒有客戶區隔」。
+3. Minor（未修，已加註解說明是刻意保留的取捨）：沒有像 Cognitive OS 那樣先做一次性可達性檢查，設定錯誤時會對每個來源各自失敗一次而非一次性擋下——非正確性問題（每筆失敗都正確記錄），效率取捨，留待真的需要時再處理。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(PowerShell) | cmd=獨立 ephemeral Docker fetch-runner + 真實 app/server.mjs + 真實 `lib/hci/client.ts` 呼叫 | exit=0 | result=`{"outcome":"written","sourceId":"9066da0b-...","snapshotId":"be00ed0a-..."}`，直接 SQL 查 `hci.sources`/`hci.source_snapshots` 確認兩張表皆有正確資料
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json`（next-admin 全專案）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/hci lib/cognitive-os lib/kb app/api/ops/clients "app/(shell)/ops/collect" "app/(shell)/ops/clients"` | exit=0 | result=27 files / 253 tests all passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose -f docker-compose.yml config --quiet`（驗證新增環境變數區塊語法）| exit=0
+- REVIEW_DONE: critic=Standard | verdict=pass（修復後）| findings=2 Major(已修)/1 Minor(記錄取捨未修)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/hci30 | grep=`hci_source_id\|hciSourceId\|hci_imported_at\|hciImportedAt\|importOrganizationSourcesToHci\|createHciSeed\|markSourceSentToHci\|HCI_API_BASE_URL\|HCI_IMPORT_TENANT` | hits=全部落在本次自己新增/修改的檔案內，無孤兒引用、無遺漏消費端
+
+[剩餘風險/尚未做的事]
+1. **migration `0088_kb_hci_link.sql` 尚未真的套用到正式 Supabase**——套用方式是 `node scripts/apply-db-migration.mjs 0088`，SSH 進 ks-aw-01 對 `supabase-db` 容器下 DDL，即使這個 migration 本身低風險（純增 nullable 欄位、db-expert 已審過），套用動作本身屬於 AGENTS.md 「prod deploy」High-risk-STOP 類別，不因 migration 本身安全就跳過——刻意停下等操作者明示 go-ahead，已於回覆中詢問。
+2. 部署順序提醒：這支 migration 必須在這批 code 實際部署到 ks-aw-01 之前（或同時）套用，否則 `lib/kb/db.ts` 新的 `.select()` 會因為欄位不存在直接讓現有的 Knowledge 分頁列表/詳情整個失敗（非只是新功能失效）——已寫進 commit message，部署時務必留意順序。
+3. 多客戶共用同一 HCI-30 租戶的限制維持（見 critic 發現 2），已在 UI 揭露但架構本身未變，等未來真正的客戶對應租戶機制（另一個更大、已知被 STOP 擋著的專案）。
+
+[已修改] 見 commit `fefb56a71` 訊息全文（13 檔，790 行新增），含 docker-compose.yml 環境變數區塊、migration 0088 + down script、`lib/hci/*` 全新模組、`lib/kb/db.ts`／`index.ts` 擴充、兩個既有 UI 檔案（`CollectionSourcesPanel.tsx`／`ClientHubTabs.tsx`）新增按鈕與徽章。
+
+[rollback] Code 部分 `git revert fefb56a71` 即可完全復原（未部署，僅本機驗證）。DB 部分：migration 0088 尚未套用到任何真實環境，無需回滾；本機 dev DB 的 drift 修復已用官方 reset 腳本完成，非本次橋接引入的問題，不屬於本次變更的回滾範圍。
 ## 2026-09-18（續18）圖表視覺化落地：新方法 decision.eisenhower_matrix + divergent.reverse_brainstorming、方法執行後自動出圖表+白話分析文章、順手修 2 個真實 bug + critic 覆審抓到的執行緒安全問題
 
 [操作者請求] 比較 MindManager 範本後要求補 2 個真的沒有的方法；接著問「為什麼他的版面都是圖形，我們執行完也是文字+圖形嗎」；最後要求「驗證分析完自動產生分析文章和圖表，還要教怎麼看，圖表中的什麼代表什麼意思」。
