@@ -19,7 +19,13 @@ from ai_lego.errors import InvariantViolation
 
 
 class JsonArtifactStore:
-    _TYPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$")
+    # Base pattern (PascalCase artifact type, e.g. "BusinessProposalArtifact") plus an optional
+    # "/subtype" suffix for a real MIME type (e.g. "image/png") -- added 2026-09-18 when
+    # artifact.generate_chart became this store's first binary-media producer and every call to
+    # persist_artifact_output() for it raised JSON_ARTIFACT_TYPE_INVALID (the store's own content
+    # encoding was already MIME-type-agnostic -- base64 image bytes are just a JSON string like
+    # any other artifact field -- only this label regex predated any "/"-bearing type existing).
+    _TYPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,127}(/[A-Za-z0-9][A-Za-z0-9_.+-]{0,127})?$")
 
     def __init__(self, cas: TenantScopedCas) -> None:
         self.cas = cas

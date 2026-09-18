@@ -190,6 +190,67 @@ class BubbleChartTests(unittest.TestCase):
             generate_chart_artifact(self._payload(points=too_many), {})
 
 
+class QuadrantChartTests(unittest.TestCase):
+    """Shared by any 2-axis-4-quadrant method (decision.impact_effort, decision.eisenhower_matrix,
+    ...) -- added 2026-09-18 rather than a bespoke renderer duplicated per method."""
+
+    def _payload(self, **overrides):
+        payload = {
+            "chart_type": "quadrant_chart",
+            "title": "Task Priority",
+            "x_threshold": 5,
+            "y_threshold": 5,
+            "quadrant_labels": {"top_right": "Do First", "top_left": "Schedule", "bottom_right": "Delegate", "bottom_left": "Eliminate"},
+            "points": [
+                {"label": "Task A", "x": 8, "y": 9},
+                {"label": "Task B", "x": 2, "y": 8},
+            ],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_renders_a_real_png(self):
+        result = generate_chart_artifact(self._payload(), {})
+        artifact = result["artifact"]
+        self.assertEqual(artifact["artifact_type"], "image/png")
+        image = _decode_and_verify_png(artifact["content"])
+        self.assertEqual(image.format, "PNG")
+
+    def test_renders_without_optional_quadrant_labels_or_point_labels(self):
+        points = [{"x": 1, "y": 2}, {"x": 3, "y": 4}]
+        result = generate_chart_artifact(self._payload(points=points, quadrant_labels={}), {})
+        _decode_and_verify_png(result["artifact"]["content"])
+
+    def test_rejects_empty_points(self):
+        with self.assertRaises(InvariantViolation):
+            generate_chart_artifact(self._payload(points=[]), {})
+
+    def test_rejects_missing_x_threshold(self):
+        payload = self._payload()
+        del payload["x_threshold"]
+        with self.assertRaises(InvariantViolation):
+            generate_chart_artifact(payload, {})
+
+    def test_rejects_nan_threshold(self):
+        with self.assertRaises(InvariantViolation):
+            generate_chart_artifact(self._payload(x_threshold=float("nan")), {})
+
+    def test_rejects_unknown_quadrant_label_key(self):
+        with self.assertRaises(InvariantViolation):
+            generate_chart_artifact(self._payload(quadrant_labels={"middle": "?"}), {})
+
+    def test_rejects_empty_quadrant_label_text(self):
+        with self.assertRaises(InvariantViolation):
+            generate_chart_artifact(self._payload(quadrant_labels={"top_right": ""}), {})
+
+    def test_rejects_more_points_than_the_cap(self):
+        from ai_lego.modules.representation.chart_render import MAX_POINTS
+
+        too_many = [{"x": i, "y": i} for i in range(MAX_POINTS + 1)]
+        with self.assertRaises(InvariantViolation):
+            generate_chart_artifact(self._payload(points=too_many), {})
+
+
 class ChartTypeTests(unittest.TestCase):
     def test_rejects_unknown_chart_type(self):
         with self.assertRaises(InvariantViolation):

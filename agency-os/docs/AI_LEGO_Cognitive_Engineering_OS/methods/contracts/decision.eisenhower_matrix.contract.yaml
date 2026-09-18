@@ -1,0 +1,60 @@
+$id: "ai-lego://methods/contracts/decision.eisenhower_matrix.contract.yaml"
+title: "Eisenhower Matrix Method Contract"
+status: ACTIVE
+
+description: >
+  Classifies tasks into 4 quadrants (do_first/schedule/delegate/eliminate) by urgency x
+  importance, each scored against a caller-declared scale and threshold. NOT Atlas-cited (grep-
+  confirmed zero "Eisenhower" hits in the Atlas) -- added 2026-09-18 per direct operator request;
+  external grounding (Covey's "7 Habits", attributed to Eisenhower) is in the compute module's own
+  docstring, not repeated here. Same shape as decision.impact_effort (2 axes, 2 thresholds, 4-way
+  split, read in full before writing this) but a distinct method: different axes, different
+  quadrant semantics, different citation. Quadrant is recomputed fresh from urgency/importance/
+  declared thresholds at the gate, never trusts a stored label.
+
+id: decision.eisenhower_matrix
+version: "1.0.0"
+family: decision
+
+cognitive_primitives: [COMPARE, CLASSIFY, PRIORITIZE, CALCULATE]
+# Same inferred set decision.impact_effort's own contract uses for the identical 2-axis-quadrant
+# shape (see that contract for the per-primitive reasoning) -- DECIDE deliberately excluded, same
+# reason: forbidden_transition below denies automatic authority.
+
+purpose:
+  - triage_a_batch_of_tasks_into_4_fixed_quadrants_by_urgency_and_importance_for_fast_first_pass_prioritization
+
+inputs:
+  required: [Tasks, UrgencyScale, ImportanceScale, UrgencyThreshold, ImportanceThreshold]
+  optional: []
+
+outputs: [EisenhowerMatrixClassification]
+
+preconditions:
+  - "record_id (EISENHOWER- prefix), subject non-empty strings; version is a string"
+  - "urgency_scale and importance_scale each {min, max}, both finite numbers, min < max -- validated independently per axis"
+  - "urgency_threshold within urgency_scale's own [min, max]; importance_threshold within importance_scale's own [min, max] -- both caller-supplied, no invented default"
+  - "tasks has >=1 entry; every entry has a unique id, non-empty label, and urgency/importance each a finite number within their own declared scale"
+  - "quadrant is COMPUTED only -- never a caller-supplied constructor input"
+  - "provenance.epistemic_type is NORMALIZED to CALCULATED_RESULT by the builder regardless of the caller-supplied value (authorship_state passes through unchanged) -- this record's classification is always genuine deterministic compute, never a caller choice; critic-reviewed 2026-09-18 as low-risk today (no Recipe binding wires provenance from elsewhere yet) but disclosed here so a future integrator isn't silently surprised by the override"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+forbidden_transition:
+  - "Automatic Authority"
+# Same inferred (not table-cited -- there is no table, this method isn't in the Atlas) caution
+# decision.impact_effort's own contract applies: a first-pass triage tool must not itself carry a
+# top-level claim of final/automatic authority over which tasks get done.
+
+recommended_next: [decision.impact_effort]
+# Both are fast first-pass 2-axis triage tools; impact_effort is the closest sibling for a second
+# cut using a different axis pair once urgency/importance triage is done.
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-EISENHOWER-1: quadrant boundary uses >= (inclusive-high) for both thresholds, same convention decision.impact_effort's own OQ-IMPACTEFFORT-1 discloses. Not independently re-derived from any external source -- a consistency choice with the sibling method, not a citation.（owner: operator）"
+  - "OQ-EISENHOWER-2: classify_quadrant here and in decision.impact_effort are structurally identical (2 axes, 2 thresholds, 4-way split) with only naming/semantics differing. Not extracted into a shared module -- would require refactoring impact_effort's own working, tested implementation, out of scope for this addition (smallest-blast-radius preference). Revisit if a third quadrant method is added.（owner: operator, or whoever next builds a two-axis quadrant method）"

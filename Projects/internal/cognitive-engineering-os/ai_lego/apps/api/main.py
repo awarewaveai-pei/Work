@@ -792,6 +792,49 @@ def invoke_method(
     return {"record": record, "gate_results": gate_results}
 
 
+@app.post("/capabilities/{capability_id}/invoke")
+def invoke_capability(
+    capability_id: str,
+    body: dict[str, Any],
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """Direct one-shot capability invocation outside a Recipe/workflow graph -- e.g. the dashboard's
+    chart-generation panel. Mirrors /methods/{id}/invoke's shape (resolve -> entitlement -> dispatch
+    -> InvariantViolation-as-400), and reuses the exact same adapter-build + artifact-persistence
+    wrapping the recipe runtime uses (build_api_capability_adapters,
+    wrap_capability_handlers_with_artifact_persistence) so a chart generated here is validated and
+    stored the same way one generated inside a recipe run would be -- not a parallel, divergent path.
+
+    Generic over EVERY registered capability (see recipe_runtime.build_registered_capability_adapters),
+    not chart-only -- deliberately not narrowed to artifact.generate_chart, matching this
+    dispatch layer's existing "new capability needs zero new endpoint code" convention. Not a new
+    privilege boundary: check_entitlement is a Phase-1 stub granting any active tenant everything
+    regardless of ref (ai_lego/platform/entitlement/check.py), and any tenant could already reach
+    every one of these same handlers today by composing a trivial 1-node custom workflow via
+    POST /workflows/custom + /recipes/{id}/run (critic review, 2026-09-18)."""
+    capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
+    if not capability_catalog.is_resolvable(capability_id):
+        raise HTTPException(status_code=404, detail=f"CAPABILITY_RESOLUTION_BLOCKED: no ACTIVE contract for {capability_id!r}")
+
+    if not check_entitlement(store, session["tenant_id"], capability_id):
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {capability_id!r}")
+
+    try:
+        adapters = build_api_capability_adapters(capability_catalog, [capability_id])
+        handler = adapters.require_for([capability_id])[capability_id]
+    except InvariantViolation as error:
+        raise HTTPException(status_code=501, detail=f"CAPABILITY_ADAPTER_UNAVAILABLE: {error}") from error
+
+    persisted_handler = wrap_capability_handlers_with_artifact_persistence({capability_id: handler}, session["tenant_id"], artifact_store)[capability_id]
+    try:
+        result = persisted_handler(body, {})
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return dict(result)
+
+
 @app.get("/methods/{method_id}/demo")
 def demo_method(method_id: str, session: dict[str, Any] = Depends(require_session), catalog: MethodCatalog = Depends(get_catalog)) -> dict[str, Any]:
     if not catalog.is_resolvable(method_id):

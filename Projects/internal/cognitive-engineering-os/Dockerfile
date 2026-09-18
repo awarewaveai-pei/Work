@@ -4,10 +4,17 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# System deps: none beyond what python:3.12-slim already has -- ai_lego's own dependencies
-# (PyYAML/jsonschema/referencing/cryptography/fastapi/uvicorn/matplotlib) are all pure-Python
-# or ship manylinux wheels, so no build-essential/gcc layer is needed (verified 2026-09-18 with
-# matplotlib added: `docker build` installs matplotlib-*-manylinux2014_x86_64.whl, no compile step).
+# System deps: ai_lego's own Python dependencies (PyYAML/jsonschema/referencing/cryptography/
+# fastapi/uvicorn/matplotlib) are all pure-Python or ship manylinux wheels, so no build-essential/
+# gcc layer is needed (verified 2026-09-18 with matplotlib added: `docker build` installs
+# matplotlib-*-manylinux2014_x86_64.whl, no compile step). fonts-noto-cjk IS a real system dep,
+# added same day: matplotlib's default font (DejaVu Sans) has no CJK glyphs, so any chart with a
+# Chinese title/label (this product is bilingual EN/ZH throughout) rendered as tofu boxes on a
+# base image with no CJK font installed at all -- confirmed by opening a real rendered PNG, not
+# just checking it decodes.
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY Projects/internal/cognitive-engineering-os/pyproject.toml Projects/internal/cognitive-engineering-os/pyproject.toml
 COPY Projects/internal/cognitive-engineering-os/ai_lego Projects/internal/cognitive-engineering-os/ai_lego
 COPY agency-os/docs/AI_LEGO_Cognitive_Engineering_OS agency-os/docs/AI_LEGO_Cognitive_Engineering_OS

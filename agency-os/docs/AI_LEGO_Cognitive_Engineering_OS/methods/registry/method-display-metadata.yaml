@@ -417,6 +417,12 @@ entries:
     name_zh: "決策樹"
     blurb_en: "Branches through decision nodes and chance nodes (with probabilities and payoffs) to surface uncertainty explicitly. Use it for a multi-stage decision where later choices depend on earlier random outcomes."
     blurb_zh: "用決策節點與機率節點（含機率與報酬）分支呈現不確定性。多階段決策、後面選擇取決於前面隨機結果時用。"
+  decision.eisenhower_matrix:
+    name_en: "Eisenhower Matrix"
+    abbr: ""
+    name_zh: "艾森豪矩陣"
+    blurb_en: "Scores each task by urgency x importance against your own declared thresholds, sorting it into Do First / Schedule / Delegate / Eliminate. Use it for a fast first-pass triage of a task list before deeper prioritization."
+    blurb_zh: "用「緊急程度 x 重要程度」對照你自訂的門檻，把每項任務分到「立即做／排程／委派／刪除」四象限。想快速對一份任務清單做第一輪篩選時用。"
   decision.expected_value:
     name_en: "Expected Value"
     abbr: ""
@@ -743,6 +749,12 @@ entries:
     name_zh: "隨機刺激法"
     blurb_en: "Forces a connection between your problem and a random word or image to break habitual thinking. Ideas need a feasibility screen afterward -- it's for breaking ruts, not for final selection."
     blurb_zh: "用隨機詞或圖強制找出跟問題的關聯，打破慣性思考。之後需要可行性篩選——它是用來打破思路卡住，不是拿來做最終決定。"
+  divergent.reverse_brainstorming:
+    name_en: "Reverse Brainstorming"
+    abbr: ""
+    name_zh: "反向腦力激盪法"
+    blurb_en: "Instead of 'how do we solve X', brainstorm 'how could we cause or worsen X', then invert each answer into a real candidate solution. Use it when direct problem-solving keeps circling the same ideas."
+    blurb_zh: "不直接想「怎麼解決 X」，而是先想「怎麼樣會讓 X 更糟」，再把每個答案反過來變成真正的解法。想解決問題卻一直卡在同樣幾個想法時用。"
   divergent.scamper:
     name_en: "SCAMPER"
     abbr: "SCAMPER"

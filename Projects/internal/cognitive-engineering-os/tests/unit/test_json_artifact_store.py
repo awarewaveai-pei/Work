@@ -39,3 +39,21 @@ class JsonArtifactStoreTests(unittest.TestCase):
             self.store.put("tenant-a", "../transcript", {})
         with self.assertRaisesRegex(InvariantViolation, "CAS_TENANT_ID_INVALID"):
             self.store.cas.put("../tenant-a", b"secret")
+
+    def test_mime_shaped_artifact_type_is_accepted(self):
+        # regression: artifact.generate_chart's "image/png" raised JSON_ARTIFACT_TYPE_INVALID
+        # against the pre-2026-09-18 regex, which never allowed a "/" -- the first binary-media
+        # capability this store had to hold. The stored bytes are unaffected either way (a base64
+        # image string is just JSON text like any other artifact field); only the type label
+        # needed the "/subtype" grammar added.
+        reference = self.store.put("tenant-a", "image/png", {"artifact_type": "image/png", "content": "aGVsbG8="})
+        self.assertEqual(reference["artifact_type"], "image/png")
+        self.assertEqual(self.store.read("tenant-a", reference), {"artifact_type": "image/png", "content": "aGVsbG8="})
+
+    def test_type_with_more_than_one_slash_is_rejected(self):
+        with self.assertRaisesRegex(InvariantViolation, "JSON_ARTIFACT_TYPE_INVALID"):
+            self.store.put("tenant-a", "image/png/extra", {})
+
+    def test_type_with_trailing_slash_and_no_subtype_is_rejected(self):
+        with self.assertRaisesRegex(InvariantViolation, "JSON_ARTIFACT_TYPE_INVALID"):
+            self.store.put("tenant-a", "image/", {})

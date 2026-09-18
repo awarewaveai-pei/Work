@@ -4,6 +4,8 @@ temp-file SQLite identity store."""
 
 from __future__ import annotations
 
+import base64
+import io
 import tempfile
 import unittest
 import uuid
@@ -11,6 +13,8 @@ import json
 import os
 from unittest.mock import patch
 from pathlib import Path
+
+from PIL import Image
 
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
@@ -582,6 +586,361 @@ class InvokeTests(ApiTestCase):
         response = self.client.post("/methods/jurisdiction.market_admission_control/invoke", json=body)
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["record"]["admission_decision"], "ENABLE")
+
+
+class GenuineComputeProvenanceDefaultRegressionTests(ApiTestCase):
+    """Regression coverage for a real, pre-existing bug (2026-09-18): every genuine-compute method that
+    reuses ``modules.research.gates.evaluate_statistical_gate`` requires ``provenance.epistemic_type ==
+    "CALCULATED_RESULT"``, but this endpoint defaults an un-supplied ``provenance`` to
+    ``epistemic_type=AI_INFERENCE`` (main.py:784) -- and the dashboard never exposes a provenance field to
+    the user (dashboard.html's ``renderMethodFields`` excludes it, same treatment as ``record_id``), so
+    every real dashboard invocation of these 19 methods failed ``genuine_compute`` every single time. Fixed
+    by ``ai_lego.modules.research.gates.genuine_compute_provenance``, called at each of these builders' own
+    record-construction site. Each test below omits ``provenance`` from the body entirely -- the exact real
+    dashboard shape -- and asserts every gate PASSes, not just a 200 status (a 200 with a FAILed
+    genuine_compute gate is exactly the silent failure mode this bug produced)."""
+
+    def _assert_all_gates_pass(self, response) -> None:
+        self.assertEqual(response.status_code, 200, response.text)
+        gate_results = response.json()["gate_results"]
+        self.assertTrue(gate_results, "expected at least one gate result")
+        self.assertTrue(
+            all(g["status"] in {"PASS", "NOT_APPLICABLE"} for g in gate_results),
+            f"not all gates passed: {gate_results}",
+        )
+
+    def test_root_cause_pareto_without_provenance_passes_genuine_compute(self):
+        from ai_lego.modules.root_cause.fishbone import build_problem_statement, cause_hypothesis, generate_cause_hypothesis_set
+
+        self._login()
+        problem_statement = build_problem_statement(
+            "PROB-API-PA-001", {"current_state": "x", "expected_state": "y", "gap": "z"}, make_provenance("EVIDENCE", "HUMAN_APPROVED")
+        )
+        hypotheses = [
+            cause_hypothesis("CHS-API-PA-001-H1", "cause one", "Technology", make_provenance("EVIDENCE", "HUMAN_APPROVED")),
+            cause_hypothesis("CHS-API-PA-001-H2", "cause two", "Process", make_provenance("HYPOTHESIS", "AI_SUGGESTED")),
+        ]
+        cause_hypothesis_set = generate_cause_hypothesis_set("CHS-API-PA-001", problem_statement, hypotheses)
+        body = {
+            "analysis_id": "PA-API-001",
+            "cause_hypothesis_set": cause_hypothesis_set,
+            "metric_name": "incident_count",
+            "dataset": [
+                {"hypothesis_id": "CHS-API-PA-001-H1", "metric_value": 80},
+                {"hypothesis_id": "CHS-API-PA-001-H2", "metric_value": 20},
+            ],
+        }
+        response = self.client.post("/methods/root_cause.pareto/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_ahp_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "analysis_id": "AHP-API-001",
+            "goal": "pick a vendor",
+            "criteria": [{"id": "C1", "label": "cost"}, {"id": "C2", "label": "quality"}, {"id": "C3", "label": "speed"}],
+            "pairwise_comparisons": [
+                {"criterion_a_id": "C1", "criterion_b_id": "C2", "value": 2.0},
+                {"criterion_a_id": "C1", "criterion_b_id": "C3", "value": 4.0},
+                {"criterion_a_id": "C2", "criterion_b_id": "C3", "value": 2.0},
+            ],
+        }
+        response = self.client.post("/methods/decision.ahp/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_mcda_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "analysis_id": "MCDA-API-001",
+            "options": [{"id": "O1", "label": "build"}, {"id": "O2", "label": "outsource"}],
+            "criteria": [{"id": "C1", "label": "cost", "direction": "minimize"}, {"id": "C2", "label": "speed", "direction": "maximize"}],
+            "raw_scores": [
+                {"option_id": "O1", "criterion_id": "C1", "raw_value": 80000},
+                {"option_id": "O1", "criterion_id": "C2", "raw_value": 4},
+                {"option_id": "O2", "criterion_id": "C1", "raw_value": 50000},
+                {"option_id": "O2", "criterion_id": "C2", "raw_value": 6},
+            ],
+            "weights": [{"criterion_id": "C1", "weight": 0.5}, {"criterion_id": "C2", "weight": 0.5}],
+            "sensitivity_notes": "manually reviewed, stable outside a narrow band",
+        }
+        response = self.client.post("/methods/decision.mcda/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_ice_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "context": "test backlog",
+            "items": [
+                {"id": "I1", "label": "trust badge", "impact": 6, "confidence": 8, "ease": 9},
+                {"id": "I2", "label": "onboarding rewrite", "impact": 8, "confidence": 6, "ease": 4},
+            ],
+        }
+        response = self.client.post("/methods/decision.ice/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_impact_effort_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "subject": "Q4 triage",
+            "ideas": [
+                {"id": "IDEA-1", "label": "self-serve password reset", "impact": 5, "effort": 2},
+                {"id": "IDEA-2", "label": "SSO integration", "impact": 5, "effort": 5},
+            ],
+            "impact_scale": {"min": 1, "max": 5},
+            "effort_scale": {"min": 1, "max": 5},
+            "impact_threshold": 3,
+            "effort_threshold": 3,
+        }
+        response = self.client.post("/methods/decision.impact_effort/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_kano_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "subject": "Q4 triage",
+            "features": [
+                {"id": "FEAT-1", "label": "biometric login", "functional_response": "LIKE", "dysfunctional_response": "NEUTRAL"},
+                {"id": "FEAT-2", "label": "HTTPS", "functional_response": "MUST_BE", "dysfunctional_response": "DISLIKE"},
+            ],
+        }
+        response = self.client.post("/methods/decision.kano/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_decision_tree_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "decision_context": "test decision",
+            "root": {
+                "node_type": "decision",
+                "label": "Choose",
+                "branches": [
+                    {"label": "Option A", "child": {"node_type": "terminal", "label": "A outcome", "payoff": 100}},
+                    {"label": "Option B", "child": {"node_type": "terminal", "label": "B outcome", "payoff": 200}},
+                ],
+            },
+        }
+        response = self.client.post("/methods/decision.decision_tree/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_pareto_frontier_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "subject": "test shortlist",
+            "objectives": [{"id": "OBJ-COST", "label": "cost", "direction": "minimize"}, {"id": "OBJ-QUALITY", "label": "quality", "direction": "maximize"}],
+            "options": [{"id": "OPT-A", "label": "vendor A"}, {"id": "OPT-B", "label": "vendor B"}],
+            "option_values": [
+                {"option_id": "OPT-A", "objective_id": "OBJ-COST", "value": 10},
+                {"option_id": "OPT-A", "objective_id": "OBJ-QUALITY", "value": 8},
+                {"option_id": "OPT-B", "objective_id": "OBJ-COST", "value": 8},
+                {"option_id": "OPT-B", "objective_id": "OBJ-QUALITY", "value": 9},
+            ],
+        }
+        response = self.client.post("/methods/decision.pareto_frontier/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decision_weighted_decision_matrix_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "analysis_id": "WDM-API-001",
+            "options": [{"id": "O1", "label": "vendor A"}, {"id": "O2", "label": "vendor B"}],
+            "criteria": [{"id": "C1", "label": "price"}, {"id": "C2", "label": "quality"}, {"id": "C3", "label": "speed"}],
+            "scores": [
+                {"option_id": "O1", "criterion_id": "C1", "value": 4},
+                {"option_id": "O1", "criterion_id": "C2", "value": 3},
+                {"option_id": "O1", "criterion_id": "C3", "value": 5},
+                {"option_id": "O2", "criterion_id": "C1", "value": 2},
+                {"option_id": "O2", "criterion_id": "C2", "value": 5},
+                {"option_id": "O2", "criterion_id": "C3", "value": 4},
+            ],
+            "weights": [{"criterion_id": "C1", "weight": 0.3}, {"criterion_id": "C2", "weight": 0.4}, {"criterion_id": "C3", "weight": 0.3}],
+            "scale_min": 1,
+            "scale_max": 5,
+            "sensitivity_notes": "manually reviewed",
+        }
+        response = self.client.post("/methods/decision.weighted_decision_matrix/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_decomposition_mece_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "check_id": "MECE-API-001",
+            "universe_item_ids": ["A", "B", "C", "D"],
+            "categories": [
+                {"category_name": "evens", "member_item_ids": ["B", "D"]},
+                {"category_name": "odds", "member_item_ids": ["A", "C"]},
+            ],
+        }
+        response = self.client.post("/methods/decomposition.mece/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_database_data_data_lineage_without_provenance_passes_genuine_compute(self):
+        self._login()
+        node_provenance = {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}
+        body = {
+            "dataset_ref": "PROP-API-001",
+            "nodes": [
+                {"id": "N1", "stage": "SOURCE", "description": "source system", "upstream_refs": [], "provenance": node_provenance},
+                {"id": "N2", "stage": "DATASET", "description": "final dataset", "upstream_refs": ["N1"], "provenance": node_provenance},
+            ],
+        }
+        response = self.client.post("/methods/database_data.data_lineage/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_database_data_normalization_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "entity_name": "order_items",
+            "primary_key_attributes": ["order_id", "product_id"],
+            "non_key_attributes": ["quantity", "product_name", "product_price"],
+            "functional_dependencies": [
+                {"determinant": ["product_id"], "dependent": "product_name"},
+                {"determinant": ["product_id"], "dependent": "product_price"},
+            ],
+        }
+        response = self.client.post("/methods/database_data.normalization/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_database_data_data_quality_dimensions_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "dataset_or_topic": "checkout-api.order-events",
+            "dimensions": [
+                {"dimension": "completeness", "rule": "rule text", "profiled_score": 0.98, "threshold": 0.95, "owner": "team-a"},
+                {"dimension": "accuracy", "rule": "rule text", "profiled_score": 0.80, "threshold": 0.70, "owner": "team-a"},
+            ],
+        }
+        response = self.client.post("/methods/database_data.data_quality_dimensions/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_database_data_reconciliation_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "source_ref": "source-db",
+            "target_ref": "target-db",
+            "checks": [
+                {"id": "C1", "name": "row count", "check_type": "COUNT", "source_value": "100", "target_value": "100"},
+                {"id": "C2", "name": "checksum", "check_type": "CHECKSUM", "source_value": "abc123", "target_value": "abc123"},
+            ],
+            "overall_status": "reconciled",
+        }
+        response = self.client.post("/methods/database_data.reconciliation/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_devops_sre_capacity_model_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "resource_name": "test resource",
+            "current_workload": 1000.0,
+            "growth_rate_per_period": 0.10,
+            "periods_ahead": 6,
+            "resource_coefficient": 0.002,
+            "current_capacity": 5.0,
+            "low_threshold_ratio": 0.15,
+            "high_threshold_ratio": 0.60,
+        }
+        response = self.client.post("/methods/devops_sre.capacity_model/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_devops_sre_error_budget_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "service_under_measurement": "checkout-api",
+            "slo_target_ratio": 0.999,
+            "observed_failure_rate": 0.0001,
+            "release_policy": "unrestricted",
+        }
+        response = self.client.post("/methods/devops_sre.error_budget/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_devops_sre_load_test_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "system_under_test": "checkout-api",
+            "baseline": {"load_rps": 100, "latency_p95_ms": 120, "error_rate": 0.001, "resource_utilization": {"cpu": 0.35}},
+            "target": {"load_rps": 500, "latency_p95_ms": 240, "error_rate": 0.004, "resource_utilization": {"cpu": 0.72}},
+            "acceptance": {"latency_p95_ms_max": 300, "error_rate_max": 0.01},
+        }
+        response = self.client.post("/methods/devops_sre.load_test/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_devops_sre_stress_test_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "system_under_test": "checkout-api",
+            "expected_load_rps": 400,
+            "load_steps": [
+                {"load_rps": 500, "latency_p95_ms": 150, "error_rate": 0.002, "resource_utilization": {"cpu": 0.30}},
+                {"load_rps": 600, "latency_p95_ms": 160, "error_rate": 0.003, "resource_utilization": {"cpu": 0.35}},
+            ],
+            "breaking_thresholds": {"latency_p95_ms_max": 1000, "error_rate_max": 0.5},
+            "recovery": None,
+        }
+        response = self.client.post("/methods/devops_sre.stress_test/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+    def test_devops_sre_soak_test_without_provenance_passes_genuine_compute(self):
+        self._login()
+        body = {
+            "system_under_test": "checkout-api",
+            "sustained_load_rps": 200,
+            "samples": [
+                {"elapsed_minutes": 0, "measurement": {"load_rps": 200, "latency_p95_ms": 140, "error_rate": 0.002, "resource_utilization": {"cpu": 0.40}}},
+                {"elapsed_minutes": 60, "measurement": {"load_rps": 200, "latency_p95_ms": 142, "error_rate": 0.002, "resource_utilization": {"cpu": 0.41}}},
+                {"elapsed_minutes": 120, "measurement": {"load_rps": 200, "latency_p95_ms": 141, "error_rate": 0.003, "resource_utilization": {"cpu": 0.40}}},
+            ],
+            "degradation_thresholds": {"latency_p95_increase_ms_max": 20, "error_rate_increase_max": 0.01, "resource_increase_max": 0.10},
+        }
+        response = self.client.post("/methods/devops_sre.soak_test/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
+
+class CapabilityInvokeTests(ApiTestCase):
+    """POST /capabilities/{id}/invoke -- direct one-shot capability invocation outside a Recipe
+    graph (dashboard's chart-generation panel). Added alongside a real bug this endpoint's first
+    real call surfaced: JsonArtifactStore's type-validation regex never allowed a "/", so
+    persist_artifact_output raised JSON_ARTIFACT_TYPE_INVALID for every real MIME artifact_type
+    ("image/png") -- see test_json_artifact_store.py for the regex-level regression test."""
+
+    def test_invoke_generate_chart_end_to_end_with_real_png_validation(self):
+        self._login()
+        body = {
+            "chart_type": "forest_plot",
+            "rows": [
+                {"label": "Study A", "estimate": 0.5, "ci_low": 0.2, "ci_high": 0.8},
+                {"label": "Pooled", "estimate": 0.25, "ci_low": 0.05, "ci_high": 0.45},
+            ],
+        }
+        response = self.client.post("/capabilities/artifact.generate_chart/invoke", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        artifact = response.json()["artifact"]
+        self.assertEqual(artifact["artifact_type"], "image/png")
+        self.assertIn("cas_reference", artifact, "capability output should be persisted like a recipe-produced artifact, not a divergent path")
+        raw = base64.b64decode(artifact["content"])
+        self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n")
+        Image.open(io.BytesIO(raw)).verify()
+
+    def test_invoke_a_real_refusal_is_400_not_500(self):
+        self._login()
+        response = self.client.post("/capabilities/artifact.generate_chart/invoke", json={"chart_type": "forest_plot", "rows": []})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("CHART_FIELD_INVALID", response.json()["detail"])
+
+    def test_invoke_unknown_capability_is_404(self):
+        self._login()
+        response = self.client.post("/capabilities/not.a.real.capability/invoke", json={})
+        self.assertEqual(response.status_code, 404)
+
+    def test_invoke_requires_auth(self):
+        response = self.client.post("/capabilities/artifact.generate_chart/invoke", json={"chart_type": "forest_plot", "rows": []})
+        self.assertEqual(response.status_code, 401)
+
+    def test_invoke_denied_for_suspended_tenant(self):
+        self._login()
+        store = IdentityStore(self.db_path)
+        with store._connect() as conn:  # noqa: SLF001
+            conn.execute("UPDATE tenant SET status = 'suspended' WHERE tenant_id = ?", (self.tenant["tenant_id"],))
+        response = self.client.post("/capabilities/artifact.generate_chart/invoke", json={"chart_type": "forest_plot", "rows": []})
+        self.assertEqual(response.status_code, 403)
 
 
 class RecipeRunTests(ApiTestCase):

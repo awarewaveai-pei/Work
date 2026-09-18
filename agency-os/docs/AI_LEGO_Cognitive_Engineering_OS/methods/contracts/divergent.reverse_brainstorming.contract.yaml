@@ -1,0 +1,48 @@
+$id: "ai-lego://methods/contracts/divergent.reverse_brainstorming.contract.yaml"
+title: "Reverse Brainstorming Method Contract"
+status: ACTIVE
+
+description: >
+  Instead of "how do we solve X", generates ideas for "how could we CAUSE or WORSEN X"
+  (worsening_ideas), then inverts each into a genuine candidate solution (inversions). NOT
+  Atlas-cited (grep-confirmed zero "reverse brainstorm"/"反向腦力" hits) -- added 2026-09-18 per
+  direct operator request. Same flat-list-plus-referential-integrity shape as
+  divergent.classic_brainstorming (read in full first) but a distinct operation: worsening_ideas
+  are never solutions, inversions is the only mechanism that turns one into a solution candidate.
+  No genuine-compute gate -- qualitative ideation, not deterministic compute.
+
+id: divergent.reverse_brainstorming
+version: "1.0.0"
+family: divergent
+
+cognitive_primitives: [DIVERGE, INVERT, GENERATE]
+# INFERRED, not cited (no Atlas entry to cite a formula from). DIVERGE=classic_brainstorming's
+# own primitive for open-ended idea generation, reused here for worsening_ideas; INVERT=the one
+# operation genuinely new to this method (turning a worsening idea into its solution mirror);
+# GENERATE=producing the inverted_solution text itself.
+
+purpose:
+  - surface_a_problems_failure_mechanisms_by_brainstorming_how_to_worsen_it_then_invert_each_into_a_candidate_solution
+
+inputs:
+  required: [ProblemStatement, WorseningIdeas]
+  optional: [Inversions]
+
+outputs: [ReverseBrainstormingSession]
+
+preconditions:
+  - "record_id (REVERSEBRAINSTORM- prefix), problem_statement non-empty strings; version is a string; record-level provenance schema-valid"
+  - "worsening_ideas has >=1 entry; every entry has a unique id, non-empty text, and schema-valid provenance -- no score/verdict field is ever accepted (judging comes via inversion, not a verdict)"
+  - "inversions may be empty (inversion deferred to a later pass is a legal, incomplete-but-valid state); every entry's worsening_idea_ref must resolve to a real worsening_ideas[].id"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: false
+
+rollback:
+  side_effect_free: true
+
+recommended_next: [divergent.classic_brainstorming]
+
+open_questions:
+  - "OQ-REVERSEBRAINSTORM-1: an inversion is free-text (inverted_solution), not itself re-scored or re-classified by any downstream gate -- same 'judgment happens once, not re-litigated structurally' choice classic_brainstorming's own evaluations make.（owner: operator）"

@@ -1,10 +1,13 @@
 """``artifact.generate_chart`` capability adapter -- real matplotlib chart rendering.
 
-Two chart types only: forest plot (point estimate + confidence interval per row) and bubble
-chart (x/y/size per point). Every pixel comes from the caller's own numbers -- this is NOT an
-AI-generated image and makes no AI/network call. Fail-closed: malformed input raises
-InvariantViolation before matplotlib is ever touched, same discipline as the other artifact
-adapters in this package (see ai_lego/modules/strategy/proposal_artifact.py).
+Three chart types: forest plot (point estimate + confidence interval per row), bubble chart
+(x/y/size per point), and quadrant chart (x/y per point, split into 4 labeled regions by an
+x/y threshold pair -- shared by any 2-axis-4-quadrant method, e.g. decision.impact_effort and
+decision.eisenhower_matrix, added 2026-09-18 rather than duplicated per method). Every pixel
+comes from the caller's own numbers -- this is NOT an AI-generated image and makes no AI/network
+call. Fail-closed: malformed input raises InvariantViolation before matplotlib is ever touched,
+same discipline as the other artifact adapters in this package (see
+ai_lego/modules/strategy/proposal_artifact.py).
 
 Agg is a non-interactive, headless rendering backend -- required because this runs inside a
 server process with no display, and must be selected via matplotlib.use() before pyplot is
@@ -16,6 +19,7 @@ from __future__ import annotations
 import base64
 import io
 import math
+import threading
 from typing import Any
 
 import matplotlib
@@ -26,7 +30,42 @@ import matplotlib.pyplot as plt  # noqa: E402 -- must follow matplotlib.use("Agg
 
 from ai_lego.errors import InvariantViolation
 
-CHART_TYPES = frozenset({"forest_plot", "bubble_chart"})
+# matplotlib's pyplot module keeps a single process-global figure registry (Gcf) that is NOT
+# thread-safe (matplotlib's own FAQ documents known race conditions and explicitly calls out a
+# threaded web-server dispatch as the risk scenario). FastAPI/Starlette runs a plain `def` path
+# operation (this one, via artifact.generate_chart) in a worker thread pool, not the event loop,
+# and this repo's own Dockerfile starts uvicorn with no --workers (one process, many threads) --
+# so two concurrent chart requests really can interleave plt.subplots()/plt.close() calls against
+# the same global registry. Serializing the whole render+encode+close lifecycle behind one lock
+# is the smallest fix that doesn't require rewriting all 3 renderers off the pyplot global API
+# (critic finding 2026-09-18 -- pre-existing since forest_plot/bubble_chart, newly load-bearing
+# now that a chart renders on every decision.impact_effort/decision.eisenhower_matrix run, not
+# just inside a recipe).
+_RENDER_LOCK = threading.Lock()
+
+# matplotlib's own default font (DejaVu Sans) has zero CJK glyphs -- any Chinese title/label
+# (this product is bilingual EN/ZH throughout) renders as a "missing glyph" tofu box, silently,
+# with only a UserWarning on stderr (2026-09-18, caught by actually opening a rendered chart with
+# a Chinese label, not just checking the PNG magic bytes). Listing several candidate family names
+# lets matplotlib pick whichever is actually installed -- Noto Sans CJK on the Linux container
+# (see Dockerfile), a Microsoft/Apple system font on local dev -- falling back to DejaVu Sans (no
+# CJK, but still renders EN-only charts fine) if literally none of them are present.
+matplotlib.rcParams["font.sans-serif"] = [
+    "Noto Sans CJK TC", "Noto Sans CJK SC", "Microsoft JhengHei", "Microsoft YaHei",
+    "PingFang TC", "PingFang SC", "SimHei", "Arial Unicode MS", "DejaVu Sans",
+]
+# A CJK fallback font commonly lacks the typographic Unicode minus (U+2212) matplotlib defaults
+# to for negative axis ticks -- same "tofu" failure mode, just on numbers instead of labels.
+# Plain ASCII hyphen-minus renders in every font, CJK or not.
+matplotlib.rcParams["axes.unicode_minus"] = False
+
+CHART_TYPES = frozenset({"forest_plot", "bubble_chart", "quadrant_chart"})
+_QUADRANT_CORNERS = {
+    "top_right": {"pos": (0.97, 0.95), "ha": "right", "va": "top"},
+    "top_left": {"pos": (0.03, 0.95), "ha": "left", "va": "top"},
+    "bottom_right": {"pos": (0.97, 0.05), "ha": "right", "va": "bottom"},
+    "bottom_left": {"pos": (0.03, 0.05), "ha": "left", "va": "bottom"},
+}
 _ACCENT = "#2b4c7e"
 _ACCENT_DARK = "#1d3a63"
 _MIN_BUBBLE_AREA = 80.0  # points^2 -- floor so the smallest bubble in a wide-range set is still visible
@@ -147,7 +186,52 @@ def _render_bubble_chart(payload: dict[str, Any]) -> "plt.Figure":
     return fig
 
 
-_RENDERERS = {"forest_plot": _render_forest_plot, "bubble_chart": _render_bubble_chart}
+def _render_quadrant_chart(payload: dict[str, Any]) -> "plt.Figure":
+    points = _require_nonempty_list(payload.get("points"), "points", maximum=MAX_POINTS)
+    x_threshold = _require_number(payload.get("x_threshold"), "x_threshold")
+    y_threshold = _require_number(payload.get("y_threshold"), "y_threshold")
+    quadrant_labels = payload.get("quadrant_labels", {})
+    if not isinstance(quadrant_labels, dict):
+        raise InvariantViolation("CHART_FIELD_INVALID: quadrant_labels must be an object")
+    for corner, text in quadrant_labels.items():
+        if corner not in _QUADRANT_CORNERS:
+            raise InvariantViolation(f"CHART_FIELD_INVALID: quadrant_labels key must be one of {sorted(_QUADRANT_CORNERS)}, got {corner!r}")
+        if not isinstance(text, str) or not text.strip():
+            raise InvariantViolation(f"CHART_FIELD_INVALID: quadrant_labels[{corner!r}] must be a non-empty string")
+
+    xs: list[float] = []
+    ys: list[float] = []
+    labels: list[str | None] = []
+    for index, point in enumerate(points):
+        if not isinstance(point, dict):
+            raise InvariantViolation(f"CHART_FIELD_INVALID: points[{index}] must be an object")
+        xs.append(_require_number(point.get("x"), f"points[{index}].x"))
+        ys.append(_require_number(point.get("y"), f"points[{index}].y"))
+        label = point.get("label")
+        labels.append(label if isinstance(label, str) and label.strip() else None)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    try:
+        ax.scatter(xs, ys, s=90, alpha=0.75, color=_ACCENT, edgecolors=_ACCENT_DARK, linewidths=1, zorder=3)
+        for x, y, label in zip(xs, ys, labels):
+            if label:
+                ax.annotate(label, (x, y), fontsize=8, xytext=(5, 5), textcoords="offset points")
+        ax.axvline(x_threshold, color="#999999", linewidth=1, linestyle="--", zorder=1)
+        ax.axhline(y_threshold, color="#999999", linewidth=1, linestyle="--", zorder=1)
+        for corner, text in quadrant_labels.items():
+            spec = _QUADRANT_CORNERS[corner]
+            ax.text(*spec["pos"], text, transform=ax.transAxes, ha=spec["ha"], va=spec["va"], fontsize=10, fontweight="bold", color=_ACCENT_DARK, alpha=0.8, zorder=2)
+        ax.set_title(_optional_str(payload, "title", "Quadrant Chart"))
+        ax.set_xlabel(_optional_str(payload, "x_label", "X"))
+        ax.set_ylabel(_optional_str(payload, "y_label", "Y"))
+        fig.tight_layout()
+    except Exception:
+        plt.close(fig)  # same leak-on-exception guard as _render_forest_plot -- see its comment
+        raise
+    return fig
+
+
+_RENDERERS = {"forest_plot": _render_forest_plot, "bubble_chart": _render_bubble_chart, "quadrant_chart": _render_quadrant_chart}
 
 
 def generate_chart_artifact(payload: dict[str, Any], _node: dict[str, Any]) -> dict[str, Any]:
@@ -158,10 +242,11 @@ def generate_chart_artifact(payload: dict[str, Any], _node: dict[str, Any]) -> d
         # 2026-09-18) -- every other check in this module isinstance-guards before a type-specific
         # operation; this is the one that didn't.
         raise InvariantViolation(f"CHART_TYPE_INVALID: chart_type must be one of {sorted(CHART_TYPES)}, got {chart_type!r}")
-    fig = _RENDERERS[chart_type](payload)
-    try:
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format="png", dpi=150)
-    finally:
-        plt.close(fig)
+    with _RENDER_LOCK:
+        fig = _RENDERERS[chart_type](payload)
+        try:
+            buffer = io.BytesIO()
+            fig.savefig(buffer, format="png", dpi=150)
+        finally:
+            plt.close(fig)
     return {"artifact": {"artifact_type": "image/png", "content": base64.b64encode(buffer.getvalue()).decode("ascii")}}

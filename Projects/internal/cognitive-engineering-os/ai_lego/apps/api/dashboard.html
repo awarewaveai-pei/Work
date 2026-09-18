@@ -131,6 +131,7 @@
     <div class="tabs">
       <button id="tab-recipes" class="on">工作流</button>
       <button id="tab-methods">單一方法</button>
+      <button id="tab-charts">圖表</button>
     </div>
     <input id="search" placeholder="搜尋中英文名稱、說明、代號…">
     <div id="fam-filters" style="display:none"></div>
@@ -140,6 +141,20 @@
       <button id="sel-compare" class="ghost">並排比較</button>
       <button id="sel-chain" class="ghost">組成工作流</button>
       <button id="sel-clear" class="ghost">清除選取</button>
+    </div>
+    <div id="chart-form" style="display:none">
+      <div class="note" style="margin-bottom:var(--sp-3)">真實資料畫出來的圖表（不是 AI 生成的示意圖）——森林圖用逐列的估計值+信賴區間，泡泡圖用逐點的 x/y/大小。</div>
+      <label>圖表類型
+        <select id="chart-type"><option value="forest_plot">森林圖 Forest Plot</option><option value="bubble_chart">泡泡圖 Bubble Chart</option></select>
+      </label>
+      <label>標題（選填）<input id="chart-title" placeholder="例如：介入措施效果"></label>
+      <label id="chart-data-label">資料（JSON 陣列）</label>
+      <textarea id="chart-data" rows="10"></textarea>
+      <div class="row">
+        <button id="chart-generate" class="primary">產生圖表</button>
+        <button id="chart-fill-example" class="ghost">填入範例</button>
+        <span id="chart-status" class="note"></span>
+      </div>
     </div>
   </section>
 
@@ -223,6 +238,14 @@
         </div>
       </div>
     </div>
+
+    <div id="chart-view" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <div style="font-weight:600">圖表結果</div>
+        <button id="chart-view-back" class="ghost">關閉</button>
+      </div>
+      <div id="chart-result"></div>
+    </div>
   </section>
 </main>
 
@@ -296,8 +319,18 @@ async function boot() {
 }
 
 // ---------- catalog: tabs, search, family filter ----------
-$('tab-recipes').onclick = () => { state.tab = 'recipes'; $('tab-recipes').classList.add('on'); $('tab-methods').classList.remove('on'); $('fam-filters').style.display = 'none'; renderList(); };
-$('tab-methods').onclick = () => { state.tab = 'methods'; $('tab-methods').classList.add('on'); $('tab-recipes').classList.remove('on'); $('fam-filters').style.display = ''; renderList(); };
+function showBrowseTab(tab) {
+  state.tab = tab;
+  ['tab-recipes', 'tab-methods', 'tab-charts'].forEach(t => $(t).classList.toggle('on', t === 'tab-' + tab));
+  $('search').style.display = tab === 'charts' ? 'none' : '';
+  $('fam-filters').style.display = tab === 'methods' ? '' : 'none';
+  $('list').style.display = tab === 'charts' ? 'none' : '';
+  $('chart-form').style.display = tab === 'charts' ? '' : 'none';
+  if (tab === 'charts') { state.epoch += 1; $('selbar').style.display = 'none'; showMode('empty'); } else { renderList(); }
+}
+$('tab-recipes').onclick = () => showBrowseTab('recipes');
+$('tab-methods').onclick = () => showBrowseTab('methods');
+$('tab-charts').onclick = () => showBrowseTab('charts');
 $('search').addEventListener('input', renderList);
 
 function readableFieldLabel(name) {
@@ -409,6 +442,7 @@ function showMode(mode) {
   $('ws').style.display = mode === 'workspace' ? '' : 'none';
   $('compare').style.display = mode === 'compare' ? '' : 'none';
   $('chain').style.display = mode === 'chain' ? '' : 'none';
+  $('chart-view').style.display = mode === 'chart' ? '' : 'none';
 }
 
 function updateBriefImportAvailability() {
@@ -551,6 +585,53 @@ function openCustomWorkflow(workflow) {
   renderChain();
 }
 $('chain-back').onclick = () => { state.epoch += 1; showMode('empty'); renderList(); };
+
+// ---------- chart panel (artifact.generate_chart capability, invoked directly -- not part of a recipe) ----------
+const CHART_EXAMPLES = {
+  forest_plot: [
+    { label: '研究 A', estimate: 0.5, ci_low: 0.2, ci_high: 0.8 },
+    { label: '研究 B', estimate: -0.1, ci_low: -0.4, ci_high: 0.2 },
+    { label: '整體', estimate: 0.25, ci_low: 0.05, ci_high: 0.45 },
+  ],
+  bubble_chart: [
+    { label: '區塊 A', x: 0.1, y: 0.3, size: 50 },
+    { label: '區塊 B', x: 0.4, y: 0.6, size: 200 },
+    { label: '區塊 C', x: 0.7, y: 0.2, size: 10 },
+  ],
+};
+function chartDataLabelText() { return $('chart-type').value === 'forest_plot' ? '資料（JSON 陣列，每列一個 label/estimate/ci_low/ci_high）' : '資料（JSON 陣列，每點一個 label/x/y/size）'; }
+$('chart-type').addEventListener('change', () => { $('chart-data-label').textContent = chartDataLabelText(); });
+$('chart-data-label').textContent = chartDataLabelText();
+$('chart-fill-example').onclick = () => { $('chart-data').value = pretty(CHART_EXAMPLES[$('chart-type').value]); };
+$('chart-generate').onclick = async () => {
+  const chartType = $('chart-type').value;
+  const title = $('chart-title').value.trim();
+  const dataRaw = $('chart-data').value.trim();
+  let dataArr;
+  try { dataArr = dataRaw ? JSON.parse(dataRaw) : []; } catch (e) { $('chart-status').textContent = 'JSON 格式錯誤：' + e.message; return; }
+  const payload = { chart_type: chartType };
+  if (title) payload.title = title;
+  payload[chartType === 'forest_plot' ? 'rows' : 'points'] = dataArr;
+  $('chart-status').textContent = '產生中…'; $('chart-generate').disabled = true;
+  const r = await api('/capabilities/artifact.generate_chart/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  $('chart-generate').disabled = false;
+  if (!r.ok) { $('chart-status').textContent = '失敗：' + detailText(r); return; }
+  $('chart-status').textContent = '完成';
+  state.epoch += 1;
+  showMode('chart');
+  const box = $('chart-result'); clear(box);
+  const artifact = r.body.artifact;
+  if (artifact && typeof artifact.artifact_type === 'string' && artifact.artifact_type.startsWith('image/') && typeof artifact.content === 'string') {
+    const img = document.createElement('img');
+    img.src = 'data:' + artifact.artifact_type + ';base64,' + artifact.content;
+    img.style.maxWidth = '100%'; img.style.border = '1px solid var(--line)'; img.style.borderRadius = 'var(--radius-sm)';
+    box.appendChild(img);
+  } else {
+    box.appendChild(el('div', 'bad', '回應沒有可顯示的圖片產出。'));
+    box.appendChild(el('pre', null, pretty(r.body)));
+  }
+};
+$('chart-view-back').onclick = () => { showMode('empty'); };
 
 function chainStepFields(id, box) {
   clear(box);
@@ -793,19 +874,114 @@ function gateTable(gates) {
 }
 function findArtifacts(outputs) {
   const found = [];
-  Object.keys(outputs || {}).forEach(k => { const v = outputs[k]; if (v && v.artifact && typeof v.artifact.content === 'string') found.push({ label: k, content: v.artifact.content }); });
+  Object.keys(outputs || {}).forEach(k => { const v = outputs[k]; if (v && v.artifact && typeof v.artifact.content === 'string') found.push({ label: k, content: v.artifact.content, artifactType: v.artifact.artifact_type }); });
   return found;
 }
+function appendArtifact(container, a) {
+  if (typeof a.artifactType === 'string' && a.artifactType.startsWith('image/')) {
+    const img = document.createElement('img');
+    img.src = 'data:' + a.artifactType + ';base64,' + a.content;
+    img.style.maxWidth = '100%'; img.style.border = '1px solid var(--line)'; img.style.borderRadius = 'var(--radius-sm)';
+    container.appendChild(img);
+  } else {
+    container.appendChild(el('pre', 'doc', a.content));
+  }
+}
+
+// ---------- auto chart + plain-language explanation for 2-axis-4-quadrant methods ----------
+// Method-specific: the chart capability itself is generic, but knowing WHICH record fields are
+// the x/y/thresholds, and what each quadrant code means in plain language, is inherently
+// per-method (operator 2026-09-18: "驗證分析完自動產生分析文章和圖表，還要教怎麼看，圖表中的
+// 什麼代表什麼意思"). Add a new entry here when a future method has the same 2-axis-quadrant shape.
+const QUADRANT_CHART_METHODS = {
+  'decision.eisenhower_matrix': {
+    itemsKey: 'tasks', xKey: 'urgency', yKey: 'importance',
+    xThresholdKey: 'urgency_threshold', yThresholdKey: 'importance_threshold',
+    xLabel: '緊急程度', yLabel: '重要程度', title: '任務優先序（艾森豪矩陣）',
+    quadrants: {
+      do_first: { name: '① 立即做', corner: 'top_right', explain: '緊急且重要——立刻處理，不要拖。' },
+      schedule: { name: '② 排程', corner: 'top_left', explain: '重要但不緊急——排進行事曆預留時間做，不要被緊急的事擠掉。' },
+      delegate: { name: '③ 委派', corner: 'bottom_right', explain: '緊急但不重要——盡量交給別人做，或用最少時間打發。' },
+      eliminate: { name: '④ 刪除', corner: 'bottom_left', explain: '不緊急也不重要——考慮直接刪除或忽略。' },
+    },
+  },
+  'decision.impact_effort': {
+    itemsKey: 'ideas', xKey: 'effort', yKey: 'impact',
+    xThresholdKey: 'effort_threshold', yThresholdKey: 'impact_threshold',
+    xLabel: '投入程度', yLabel: '影響程度', title: '構想優先序（影響-投入矩陣）',
+    quadrants: {
+      quick_wins: { name: '① 快速見效', corner: 'top_left', explain: '影響大、投入少——優先做，報酬率最高。' },
+      major_projects: { name: '② 重大專案', corner: 'top_right', explain: '影響大、投入也大——值得做，但需要規劃資源。' },
+      fill_ins: { name: '③ 順手做', corner: 'bottom_left', explain: '影響小、投入也小——有餘力再做。' },
+      avoid_reconsider: { name: '④ 避免或重新考慮', corner: 'bottom_right', explain: '影響小、投入卻大——重新考慮是否值得做。' },
+    },
+  },
+};
+
+function renderQuadrantAnalysisArticle(container, spec, record) {
+  const items = record[spec.itemsKey] || [];
+  const byQuadrant = {};
+  items.forEach(item => { (byQuadrant[item.quadrant] = byQuadrant[item.quadrant] || []).push(item); });
+  container.appendChild(el('div', 'guide-title', '📖 怎麼看這張圖'));
+  const howTo = el('div', null);
+  howTo.appendChild(document.createTextNode('橫軸是「' + spec.xLabel + '」，縱軸是「' + spec.yLabel + '」；虛線是你設定的門檻，把圖分成 4 個象限。每個點是一個項目，位置由它自己的數值決定。'));
+  container.appendChild(howTo);
+  const ul = el('ul');
+  Object.keys(spec.quadrants).forEach(code => {
+    const q = spec.quadrants[code];
+    const entries = byQuadrant[code] || [];
+    const li = el('li');
+    li.appendChild(el('b', null, q.name + '（' + entries.length + ' 項）'));
+    li.appendChild(document.createTextNode('：' + q.explain + (entries.length ? '　→ ' + entries.map(e => e.label).join('、') : '')));
+    ul.appendChild(li);
+  });
+  container.appendChild(ul);
+}
+
+async function renderQuadrantChartForMethod(methodId, record, container) {
+  const spec = QUADRANT_CHART_METHODS[methodId];
+  if (!spec) return;
+  const items = record[spec.itemsKey];
+  if (!Array.isArray(items) || !items.length) return;
+  const xThreshold = record[spec.xThresholdKey];
+  const yThreshold = record[spec.yThresholdKey];
+  const quadrantLabels = {};
+  Object.keys(spec.quadrants).forEach(code => { quadrantLabels[spec.quadrants[code].corner] = spec.quadrants[code].name; });
+  const payload = {
+    chart_type: 'quadrant_chart', title: spec.title, x_label: spec.xLabel, y_label: spec.yLabel,
+    x_threshold: xThreshold, y_threshold: yThreshold, quadrant_labels: quadrantLabels,
+    points: items.map(item => ({ label: item.label, x: item[spec.xKey], y: item[spec.yKey] })),
+  };
+  const box = el('div', 'draft-box');
+  box.appendChild(el('div', 'draft-box-title', '⚡ 自動產生的圖表與說明'));
+  container.appendChild(box);
+  const r = await api('/capabilities/artifact.generate_chart/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!r.ok) { box.appendChild(el('div', 'bad', '圖表產生失敗：' + detailText(r))); return; }
+  const artifact = r.body.artifact;
+  if (artifact && typeof artifact.artifact_type === 'string' && artifact.artifact_type.startsWith('image/')) {
+    const img = document.createElement('img');
+    img.src = 'data:' + artifact.artifact_type + ';base64,' + artifact.content;
+    img.style.maxWidth = '100%'; img.style.border = '1px solid var(--line)'; img.style.borderRadius = 'var(--radius-sm)'; img.style.marginBottom = 'var(--sp-3)';
+    box.appendChild(img);
+  }
+  renderQuadrantAnalysisArticle(box, spec, record);
+}
+
 $('run-btn').onclick = async () => {
+  const epoch = state.epoch;
+  const stale = () => epoch !== state.epoch;
   const out = $('result'); clear(out); $('run-status').textContent = '執行中…'; $('run-btn').disabled = true;
   try {
     if (state.kind === 'method') {
       const r = await api('/methods/' + encodeURIComponent(state.id) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data) });
+      if (stale()) return;
       if (!r.ok) { $('run-status').textContent = ''; out.appendChild(el('div', 'bad', '被拒絕：' + detailText(r))); return; }
       const allPass = (r.body.gate_results || []).every(g => g.status === 'PASS' || g.status === 'NOT_APPLICABLE');
       $('run-status').textContent = ''; out.appendChild(el('div', allPass ? 'ok' : 'bad', allPass ? '✔ 記錄成立，所有閘門通過' : '✘ 有閘門未通過'));
       out.appendChild(gateTable(r.body.gate_results));
       const d = el('details'); d.appendChild(el('summary', null, '記錄 JSON')); const pre = el('pre', null, pretty(r.body.record)); d.appendChild(pre); out.appendChild(d);
+      await renderQuadrantChartForMethod(state.id, r.body.record, out);
+      if (stale()) { clear(out); }
     } else {
       const runId = $('recipe-run-id').value.trim();
       const resume = $('recipe-resume').checked;
@@ -828,7 +1004,7 @@ $('run-btn').onclick = async () => {
         t.appendChild(row);
       });
       out.appendChild(t);
-      findArtifacts(b.workflow && b.workflow.outputs).forEach(a => { out.appendChild(el('h4', null, '產出：' + a.label)); out.appendChild(el('pre', 'doc', a.content)); });
+      findArtifacts(b.workflow && b.workflow.outputs).forEach(a => { out.appendChild(el('h4', null, '產出：' + a.label)); appendArtifact(out, a); });
       const d = el('details'); d.appendChild(el('summary', null, '完整輸出 JSON')); d.appendChild(el('pre', null, pretty(b.workflow && b.workflow.outputs))); out.appendChild(d);
     }
   } finally { $('run-btn').disabled = false; }
