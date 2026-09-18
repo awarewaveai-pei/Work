@@ -146,10 +146,12 @@ describe("KnowledgeTab — K2j collapse-cards grouping", () => {
       [],
     );
     expect(container.textContent).toContain("已送 Cognitive OS");
-    const link = container.querySelector("a[href*='cognitive.aware-wave.com']") as HTMLAnchorElement | null;
+    // Goes through the cross-tenant handoff route (app/api/cognitive-os/open/route.ts), not a
+    // direct dashboard link, since 2026-09-18 — see that route's own header comment for why.
+    const link = container.querySelector("a[href*='/api/cognitive-os/open']") as HTMLAnchorElement | null;
     expect(link, "deep link must exist for the sent source").not.toBeNull();
     expect(link!.href).toContain("project=proj-abc");
     // Only one badge — the second source (never sent) must not also render one.
-    expect(container.querySelectorAll("a[href*='cognitive.aware-wave.com']").length).toBe(1);
+    expect(container.querySelectorAll("a[href*='/api/cognitive-os/open']").length).toBe(1);
   });
 });
