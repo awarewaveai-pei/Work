@@ -42,6 +42,10 @@
   - hci-app：`sg-deploy.sh` 的 `.deployed-commit` 回到 af27647e1 後重新部署。
   - runner：`docker tag lobster-phase1-hci-fetch-runner:rollback-20260919 lobster-phase1-hci-fetch-runner:latest && docker compose up -d --no-build hci-fetch-runner hci-network-guard`。
   - 已寫入的 EVIDENCE 是 append-only，不回滾，只有合成測試資料那一筆。
+- 瀏覽器實測（公開網址）：
+  - Cambridge 來源的預覽面板顯示真實標題與全文 2135 字；案件、當事人都是按鈕，沒選之前採用鈕停用。
+  - 案件頁的來源型證據顯示為標題連結＋收合全文。
+  - 發現兩個 fixture 案件的標籤同為 `#aaaaaaaa`（id 前 8 碼相同），補上「開立於」日期（index.html seed 面板 caseChips）。
 
 ## 2026-09-19（續80）訂正續78「≥250/285」為精確值：operator 質疑「自己亂掰」，逐一 introspect 真實 builder 簽名算出 266/285
 

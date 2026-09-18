@@ -732,7 +732,7 @@ async function openSeedPanel(sourceId) {
   panel.dataset.snapshotId = content.snapshotId;
   const caseChips = openCases.map(c => {
     const ctx = (c.requester_context || '').trim();
-    return `<button type="button" class="chip block" data-value="${c.id}" onclick="toggleSeedChip(this,'${sourceId}')">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}${ctx ? ' · ' + esc(ctx.length > 40 ? ctx.slice(0, 40) + '…' : ctx) : ''} · #${c.id.slice(0, 8)}</button>`;
+    return `<button type="button" class="chip block" data-value="${c.id}" onclick="toggleSeedChip(this,'${sourceId}')">${esc(PURPOSE_LABELS[c.purpose] || c.purpose)}${ctx ? ' · ' + esc(ctx.length > 40 ? ctx.slice(0, 40) + '…' : ctx) : ''} · 開立於 ${esc(new Date(c.opened_at).toLocaleDateString('zh-TW'))} · #${c.id.slice(0, 8)}</button>`;
   }).join('');
   panel.innerHTML = `
     <p><b>${esc(content.title || '(無標題)')}</b></p>
