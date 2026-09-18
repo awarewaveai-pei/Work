@@ -74,14 +74,6 @@ enabled = true
 ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY}"
 ANTHROPIC_MODEL = "claude-sonnet-4-6"
 
-[mcp_servers.perplexity]
-command = "cmd"
-args = ["/c", "npx", "-y", "@perplexity-ai/mcp-server"]
-enabled = true
-
-[mcp_servers.perplexity.env]
-PERPLEXITY_API_KEY = "${PERPLEXITY_API_KEY}"
-
 [mcp_servers.gemini-fast]
 command = "powershell"
 args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/run-llm-mcp.ps1", "-Provider", "gemini"]

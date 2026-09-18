@@ -121,18 +121,6 @@
         "ANTHROPIC_MODEL": "claude-sonnet-4-6"
       }
     },
-    "perplexity": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@perplexity-ai/mcp-server"
-      ],
-      "env": {
-        "PERPLEXITY_API_KEY": "<PASTE_PERPLEXITY_KEY>"
-      }
-    },
     "gemini-fast": {
       "command": "powershell",
       "args": [

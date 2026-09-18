@@ -118,6 +118,26 @@ describe("createProviderCall", () => {
     await expect(call("firecrawl", { path: "/v1/scrape" })).rejects.toMatchObject({ kind: "http", status: 402 });
     await expect(call("firecrawl", { path: "/v1/scrape" })).rejects.toBeInstanceOf(ProviderCallError);
   });
+
+  it("allows Perplexity only on /search — chat/agent endpoints never leave the process", async () => {
+    const hit: string[] = [];
+    const call = createProviderCall({
+      budget: createBudget(),
+      env: { PERPLEXITY_API_KEY: "pplx-test" },
+      transport: (async (u: string | URL) => {
+        hit.push(String(u));
+        return new Response(JSON.stringify({ results: [] }), { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+
+    for (const path of ["/chat/completions", "/v1/sonar", "/v1/agent", "/v1/embeddings", "/search/../chat/completions", "/SEARCH"]) {
+      await expect(call("perplexity", { path })).rejects.toThrow(/path_not_allowed_perplexity/);
+    }
+    expect(hit).toEqual([]);
+
+    await call("perplexity", { path: "/search", body: { query: "q" } });
+    expect(hit).toEqual(["https://api.perplexity.ai/search"]);
+  });
 });
 
 describe("markdownToText", () => {

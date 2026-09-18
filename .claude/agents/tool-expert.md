@@ -111,7 +111,7 @@ MCP tools appear as **deferred tools** — you must fetch their schemas before c
 | `mcp__github__` | GitHub operations | `create_repository`, `push_files`, `create_pull_request`, `get_file_contents`, `search_code` |
 | `mcp__airtable__` | Airtable data | `list_records`, `create_record`, `update_record`, `search_records` |
 | `mcp__canva__` | Canva design | `generate-design`, `export-design`, `search-designs`, `create-design-from-brand-template` |
-| `mcp__perplexity__` | Web-grounded AI search | `perplexity_search`, `perplexity_ask`, `perplexity_research`, `perplexity_reason` |
+| `mcp__perplexity__` | Web search (Search API only) | `perplexity_search` only — `perplexity_ask`/`perplexity_research`/`perplexity_reason` are denied in settings (per-token chat models drained the budget 2026-06-21 and 2026-09-12) |
 | `mcp__posthog__` | PostHog analytics | `authenticate`, `complete_authentication` |
 | `mcp__replicate__` | Replicate AI models | `create_predictions`, `get_predictions`, `search_models` |
 | `mcp__resend__` | Transactional email | `send-email`, `create-contact`, `list-emails`, `get-email` |

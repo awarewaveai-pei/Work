@@ -20515,3 +20515,35 @@ BUGHUNT_DONE: scope=agency-os,scripts | grep=`bughunt-oracle` | hits=僅 AGENTS.
 [rollback] 純文件新增，`git diff agency-os/TASKS.md agency-os/WORKLOG.md` 可完整審視
 [commit] 尚未 commit，待操作者確認(與 續75 同批，非本 session 自行 commit)
 WORKLOG_DONE: 定位 2026-06-21 修復未涵蓋 perplexity-cli.ps1 的確切根因(BUGHUNT_DONE 驗證步驟本身遺漏，非決策排除)+ 開 TASKS 追蹤驗證工具缺口
+
+## 2026-09-19(續78)Perplexity 全面強制 Search-API-only(操作者：「查所有會用到 perplexity 的地方是不是有強制規定只能用 search」)
+
+續75/續77 只修了 CLI 預設值、且把它誤當 9/12 主因(9/12 是 sonar 69%，CLI 舊預設是 sonar-pro，對不上)。本輪改成盤點所有能打 Perplexity 的出口，逐一加硬性限制。
+
+**盤點結果(能發出請求的出口)**
+- next-admin `lib/collect/net/providers.ts` + `collectors/web-search.ts`：只打 `/search`，但 provider 層任何 path 都放行 → 加 `allowedPaths`，perplexity 限 `["/search"]`，其他 path 在發請求前丟 `path_not_allowed_perplexity`
+- `scripts/perplexity-cli.ps1`(+ `bin/pplx.cmd`/`bin/perplexity.cmd`)：有 chat(/v1/sonar)/agent/embeddings/raw → 全刪，只留 search，唯一出口 `Invoke-PerplexitySearch` 拒絕非 `/search`
+- `~/.claude/settings.json`：`defaultMode=bypassPermissions`，且 allow 清單預放行 `perplexity_ask`/`perplexity_research`(模板沒有，是漂移) → 模板 `permissions.deny` 加 `mcp__perplexity__perplexity_{ask,reason,research}`，`wire-remote-hooks.sh` 鏡像，`settings-deny-parity.test.mjs` 守兩邊；`sync-claude-userlevel.ps1 -Mode merge` 套到本機，並清掉殘留 allow(備份 `settings.json.bak-*`)
+- `mcp.json.template`、`.codex/config.toml.example`、本機 `D:\Work\mcp.json`(git-excluded)：含 `@perplexity-ai/mcp-server`(裝了就帶 ask/reason/research，Codex 不吃 Claude deny) → 條目移除
+- `llm` CLI 的 `llm-perplexity` 外掛(critic 抓到)：可直接打 sonar/sonar-pro/sonar-reasoning-pro/sonar-deep-research，且存一把 59 字元舊 key → `llm uninstall llm-perplexity`，刪 `keys.json` 的 perplexity 條目；`ensure-agent-bootstrap-prompts.ps1` 原本叫 agent 用它，改指向 `perplexity-cli.ps1 search`
+- `.claude/agents/tool-expert.md`：改成只列 `perplexity_search`
+
+**排除(非出口)**：n8n 5 個 workflow 全停用、無 Perplexity 節點；claude.ai connectors 無 Perplexity；`llm` logs.db 0 筆(logging ON，從未被使用 → 非 9/12 來源)；ks-aw-01 只有 `lobster-next-admin` 容器持 key(`pplx-g3aV`,53)，無 cron；其餘命中皆文件/價目表。
+
+**Key 現況**：本機 `mcp/user-env.ps1` = `pplx-Ztpe`(9/11 實測 401)；正式主機 = `pplx-g3aV`(狀態未測，唯一呼叫端是 `/search`)；`llm` 舊 key(59)已從本機刪除但未在後台撤銷；Desktop 舊設定那把(53)值不可考。
+
+**9/12 來源仍未定**：本機、repo、正式主機、n8n、claude.ai connectors 皆無能打 sonar 模型的活路徑。唯一剩下的判定來源是 Perplexity API 後台按 key 拆的用量——需操作者登入(console.perplexity.ai 已登出)。
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect/__tests__/collect-provider-tier.test.ts lib/collect/__tests__/collect-web-search.test.ts` | exit=0 | result=29/29 綠；新測試斷言 /chat/completions、/v1/sonar、/v1/agent、/v1/embeddings、/search/../chat/completions、/SEARCH 全被拒且 transport 零呼叫，/search 放行
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試(providers.ts guard 換成 `if (false)`)| exit=1→0 | result=新測試紅 1/13 → 還原 13/13 綠
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`(next-admin)| exit=0
+REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/hooks/settings-deny-parity.test.mjs` | exit=0 | result=3/3(含 wire-remote-hooks.sh 實際產生的 settings 含 deny)
+REALTEST_EVIDENCE: tool=Bash | cmd=`perplexity-cli.ps1 {chat,agent,embeddings,raw} hello` + AST 抽出 `Invoke-PerplexitySearch` 餵非 /search path | exit=0 | result=四個指令皆 `Unknown or disabled command`；guard 對 /chat/completions、/v1/sonar、/v1/agent、/search/../chat 皆在網路呼叫前 Refused
+REALTEST_EVIDENCE: tool=Bash | cmd=`llm models \| grep -ci sonar` 移除後 | exit=0 | result=0；`llm keys list` 空
+REALTEST_EVIDENCE: tool=SSH | cmd=ks-aw-01 逐容器 `printenv \| grep PERPLEXITY` + .env + crontab | exit=0 | result=僅 lobster-next-admin 持 key
+REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/1M/1m(M1 llm-perplexity 外掛繞過全部閘門 → 已移除；m1 本機 mcp.json 殘留條目 → 已移除)
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp,.claude,.codex | grep=`perplexity|pplx|api.perplexity.ai|@perplexity-ai` | hits=可發請求者僅 providers.ts、perplexity-cli.ps1(皆已鎖)；其餘為文件/價目/env 模板/docker-compose 傳 key 給 next-admin
+
+[剩餘風險] ① 正式主機 providers.ts guard 尚未部署(prod deploy = High，待操作者 go-ahead；現行 prod 程式本來就只打 /search)② 後台仍可能有未撤銷的舊 key(llm 那把 59 字元、Desktop 那把)——key 還活著就能被任何未來的工具拿去打 chat 模型，唯一治本是後台撤銷，需操作者登入 ③ deny 用精確工具名，若 @perplexity-ai/mcp-server 未來新增其他 chat 工具名不會被擋(目前該 server 未安裝於任何設定)
+[rollback] `git revert` 本 commit；本機：`llm install llm-perplexity`、還原 `~/.claude/settings.json.bak-*`
+WORKLOG_DONE: Perplexity Search-API-only 全面強制(app/CLI/Claude 權限/MCP 範本/llm 外掛)

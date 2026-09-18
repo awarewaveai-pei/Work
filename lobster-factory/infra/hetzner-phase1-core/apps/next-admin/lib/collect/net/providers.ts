@@ -25,6 +25,8 @@ export interface ProviderSpec {
   apiKeyEnv: string;
   /** How this vendor wants the key. Defaults to `Authorization: Bearer <key>`. */
   authHeader?: (key: string) => Record<string, string>;
+  /** If set, the only URL paths this provider may be called on; anything else is refused before the request. */
+  allowedPaths?: readonly string[];
 }
 
 export const PROVIDERS: Record<string, ProviderSpec> = {
@@ -43,10 +45,13 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
   // asked to match; nothing of its answer text is used, only the URLs (see collectors/web-search.ts
   // for why the snippet is never stored). Swapping vendors is one entry here plus a response parser
   // — COLLECT_SEARCH_PROVIDER already selects between them.
+  // Search API only. Chat/agent endpoints bill per token by model (sonar-pro, reasoning, deep
+  // research) and drained the account twice (2026-06-21, 2026-09-12) — they must stay unreachable.
   perplexity: {
     id: "perplexity",
     origin: "https://api.perplexity.ai",
     apiKeyEnv: "PERPLEXITY_API_KEY",
+    allowedPaths: ["/search"],
   },
 
   // The same job, a different vendor, so the search source is not one account away from useless.
@@ -123,6 +128,9 @@ export function createProviderCall(opts: ProviderCallOptions): ProviderCall {
     }
     const url = new URL(init.path, spec.origin);
     if (url.origin !== spec.origin) throw new ProviderCallError("origin_escape", "unconfigured");
+    if (spec.allowedPaths && !spec.allowedPaths.includes(url.pathname)) {
+      throw new ProviderCallError(`path_not_allowed_${providerId}`, "unconfigured");
+    }
 
     const auth = spec.authHeader ? spec.authHeader(key) : { authorization: `Bearer ${key}` };
     const startedAt = Date.now();

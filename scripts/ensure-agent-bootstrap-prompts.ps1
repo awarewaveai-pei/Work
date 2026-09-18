@@ -69,10 +69,10 @@ $promptPack = @(
     'If there is any conflict, follow the canonical files above and do not invent a second process.',
     '```',
     '',
-    '## Perplexity / llm plugin note',
+    '## Perplexity note',
     '',
-    'Perplexity CLI (`llm + plugin`) does not read Cursor rules.',
-    'It follows repo policy only when you paste the startup prompt and ensure `PERPLEXITY_API_KEY` is loaded.',
+    'Perplexity is Search API only: use `scripts/perplexity-cli.ps1 search <query>`.',
+    'Never call Sonar chat / agent / deep-research models (per-token billing drained the account 2026-06-21 and 2026-09-12); the `llm-perplexity` plugin is intentionally not installed.',
     ''
 ) -join [Environment]::NewLine
 
