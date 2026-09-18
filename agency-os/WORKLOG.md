@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續71）280+ 方法內容深化第二十批：delivery 家族全部 11 個方法（F22 PM/交付/治理家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）／續67（insight 9）／續69（learning 11）／續70（experiment 11）的批次節奏，處理 delivery 家族全部 11 個方法：change_risk_matrix／critical_path_method／decision_log／definition_of_done／dependency_graph／gantt_chart／outcome_roadmap／raci／raid_log／risk_register／stage_gate。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：11 個條目補上 why_en/why_zh/url/example_zh/example_en，delivery 家族 0/11 → 11/11 收官（F22 PM／交付／治理套件全數完成，216/285，超過 75%）。這個家族的不變量分兩類：GENUINE_COMPUTE 衍生型（change_risk_matrix 的 risk_tier 是 5 因子取最壞值、definition_of_done 的 overall_status 是 12 面向全 MET/NOT_APPLICABLE 才 DONE、risk_register 的 exposure 是 probability×impact、critical_path_method 的整條 critical_path／project_duration 都來自真實的正推反推排程演算法，這批唯一用到 Trusted Compute 而非純結構檢查的方法）；參照完整性＋「標籤不算緩解」型（dependency_graph 的 critical edge 必須有 owner+fallback、outcome_roadmap 的 bet 必須連到真實 outcome、delivery.raci 的 Accountable 若 UNAVAILABLE 必須有 escalation_path、raid_log／stage_gate 都是「關閉／GO 決策必須有證據」的變體）。特別記錄 delivery.raci 跟既有的 stakeholders.raci（續39 已完成）刻意不是同一個方法——F07 版本管的是 generic tasks 的責任分配（剛好 1 個 Accountable／至少 1 個 Responsible），這個 F22 版本管的是 deliverables 的交付治理，多了 due_date 跟 UNAVAILABLE→escalation_path 兩個 F07 沒有的不變量，兩者 RECORD_ID_PREFIX 也刻意不同（SRACI- vs DRACI-）。全部方法均可獨立查證於真實方法論：CPM 要徑法、Gantt 圖（Henry Gantt）、Definition of Done（Scrum/Agile）、RAID Log、Stage-Gate（Robert G. Cooper）、RACI／responsibility assignment matrix、risk register（PMBOK）、ITIL change control。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_delivery_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 11 個真實 `generate_*` 函式，每個額外驗證「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應 InvariantViolation：CHANGE_RISK_INSUFFICIENT_CONTROLS／CPM_DANGLING_DEPENDENCY／DLOG_INVALID_REVISIT／DOD_INVALID_DIMENSIONS／DEPGRAPH_CRITICAL_EDGE_INCOMPLETE／GANTT_INVALID_SCHEDULE／OROAD_DANGLING_OUTCOME_REF／DRACI_MISSING_ESCALATION_PATH／RAID_CLOSED_WITHOUT_EVIDENCE／RISKREG_INVALID_RISK／STAGEGATE_GO_WITHOUT_EVIDENCE），critical_path_method 額外手算驗證真實正推反推排程結果（4 任務、project_duration=15、critical_path=[T1,T3,T4]，T2 有 5 天浮時不在關鍵路徑上，跟系統真實呼叫 `compute_critical_path` 算出的結果完全吻合）| exit=0 | 結果=11/11 通過（一次通過，無需修正）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、216/285 done（本輪 +11，續70 收尾時是 205）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38/39/40/64/66/67/69/70 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=14（既有跨檔引用，本批次未新增/未移除任何 key 或檔案，無 stale 引用需要同步）
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 216/285 完成（超過 75%），69 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、devops_sre 13、systems 12）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續70）280+ 方法內容深化第十九批：experiment 家族全部 11 個方法（F15 實驗與驗證家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）／續67（insight 9）／續69（learning 11）的批次節奏，處理 experiment 家族全部 11 個方法：ab_test／benchmark／concierge_test／fake_door／mvp／pilot／proof_of_concept／prototype／smoke_test／technical_spike／wizard_of_oz。
