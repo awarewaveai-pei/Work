@@ -604,6 +604,11 @@ entries:
     name_zh: "加權最短工作優先法"
     blurb_en: "Divides Cost of Delay by Job Size to prioritize a portfolio by what's most expensive to postpone relative to how long it takes. Use it in a SAFe/Agile portfolio to sequence work by delay cost, not just effort."
     blurb_zh: "用「延遲成本÷工作量」排序一個投資組合，凸顯「拖越久越貴」的項目。在敏捷投資組合裡想依延遲成本（不只是工作量）排序時用。"
+    why_en: "Cost of Delay is broken into 3 inspectable sub-factors (business value, time criticality, risk reduction/opportunity enablement) instead of one opaque number -- that breakdown is what actually lets someone see WHY a job is urgent, not just trust a single unexplained score. Dividing by job size (not multiplying) means a big-but-not-urgent job doesn't jump the queue just because it's large."
+    why_zh: "延遲成本被拆成 3 個看得見的子因子（商業價值、時間急迫性、風險降低/機會促成），不是一個看不懂的黑箱數字——這個拆解才能真正讓人看出「為什麼這件事急」，而不是只信任一個沒有解釋的分數。用除的（不是乘的）代表一件大但不急的工作不會只因為規模大就插隊。"
+    url: "https://framework.scaledagile.com/wsjf/"
+    example_zh: "情境：在敏捷投資組合裡幫一項工作算 WSJF 分數。\njob：{id: \"J1\", label: \"重構付款流程\"}\ncost_of_delay：{business_value: 8, time_criticality: 5, risk_reduction_opportunity_enablement: 3}（三個子因子都是 ≥0 的數字，總和會自動算出 cost_of_delay_total）\njob_size：4（必須大於 0，代表相對工作量）\n（wsjf_score 由系統自動計算為 cost_of_delay_total ÷ job_size，不用也不能自己填）\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
+    example_en: "Scenario: scoring a piece of work with WSJF in an Agile portfolio. job: {id: 'J1', label: 'Refactor the payment flow'}; cost_of_delay: {business_value: 8, time_criticality: 5, risk_reduction_opportunity_enablement: 3} (all 3 sub-factors are numbers >=0; their sum is computed automatically as cost_of_delay_total); job_size: 4 (must be > 0, the relative size of the job). wsjf_score is computed by the system as cost_of_delay_total / job_size, never supplied. version/generated_by_method can be left blank, the system supplies defaults."
 
   # ---- decomposition (F02) ----
   decomposition.fast:

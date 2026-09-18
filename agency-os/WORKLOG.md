@@ -1,4 +1,16 @@
 # Worklog
+## 2026-09-18（續28）VBC 自查續26 補上 decision.wsjf——扇形統計腳本抓出 decision family 其實是 14 個不是 12+1 個
+
+[發現] 為了規劃下一個 family 批次，寫了一支腳本統計全部 285 個方法的 family/done/todo 分布，赫然發現 `decision` family 顯示 14 筆、續26+eisenhower_matrix 只做了 13 筆——`decision.wsjf`（加權最短工作優先法）當初 `awk` 手動列檔名清單時漏掉，不是它不存在。已補上，跟其餘 decision 方法同規格：why/url 用 SAFe 官方框架頁（`scaledagileframework.com/wsjf/` 301 轉址到 `framework.scaledagile.com/wsjf/`，WebFetch 讀過確認公式與三個子因子用詞跟真實 builder 一致，用最終網址不留轉址）、example 真實換行、獨立驗證腳本直接呼叫 `generate_wsjf_record` 通過。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=直接呼叫 `generate_wsjf_record` 帶入範例資料 | exit=0 | result=wsjf_score=4.0, cost_of_delay_total=16（跟範例文字描述的算法一致）
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=`https://framework.scaledagile.com/wsjf/` | 確認公式「相對延遲成本÷相對工作時長」與 business value/time criticality/risk reduction 用詞跟 wsjf.py 原始碼一致
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`decision\.wsjf\|WSJF-T1` | hits=僅本次觸及檔案
+- [rollback] 純內容新增，`git revert` 可完全復原
+
+[更新後總計] architecture(10)+decision(14，本則補齊)+strategy(16)+reverse_brainstorming(1) = 41 個方法完整；285 個總數中還有 244 個待補。
+
 ## 2026-09-18（續27）280+ 方法內容深化第三批：strategy 家族全部 15 個標準方法（含 business_model_canvas）補齊 why/url/example
 
 [操作者請求] 續26 之後操作者持續要求「不要停」，繼續下一個 family 批次，不逐批確認。本次選 `strategy` family——該 family 共 17 個 method-id，其中 `lean_canvas`（續24 已做）跟 `proposal_artifact`（VBC 查證：這是 Recipe 專用的 capability adapter，簽名是 `(payload, _node)` 不是 `generate_*`，不會出現在 dashboard 單一方法列表，method-display-metadata.yaml 本來就沒有它的條目——正確排除，不是遺漏）不計入，剩下 15 個標準方法全部補齊。
