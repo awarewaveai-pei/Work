@@ -1,4 +1,32 @@
 # Worklog
+## 2026-09-18（續25）續23 的部署（tenant handoff + 資料夾自動分類）：兩個系統都上線+正式環境端對端驗證+順手抓到並根治一個既有部署腳本 bug
+
+[任務] 操作者對續23給出明確 go-ahead（「要」）。兩個系統都要部署：`lobster-factory`（next-admin，`sg-deploy.sh`）+ `Projects/internal/cognitive-engineering-os`（`cognitive-os-api`，自己的 `deploy/deploy.sh`）。
+
+[next-admin 部署]：`sg-deploy.sh next-admin` 第一次跑，pre-build test gate **正確擋下**——`CollectionSourcesPanel.test.tsx`／`KnowledgeTab.render.test.tsx` 兩個既有測試斷言舊版直連連結（`querySelector("a[href*='cognitive.aware-wave.com']")`），續23 改點新路由後這兩個斷言理所當然過期。**根因是自己續23的 BUGHUNT_DONE grep pattern 開太窄**——當時搜的是完整字串 `cognitive.aware-wave.com/?project=`，這兩個測試只斷言網域子字串（不含 `/?project=` 尾巴），搜不到。改用不帶尾碼的寬 pattern `cognitive.aware-wave.com` 重新掃一次，只剩 3 個合法命中（`COGNITIVE_OS_PUBLIC_URL` 常數本身、route.ts 自己的說明註解、`lib/portal/products.ts` 一個無關的 portal 產品清單項目，非連結）。修正兩個測試斷言後（改斷言 `a[href*='/api/cognitive-os/open']`），本機 `npx vitest run`（完整 next-admin 專案，非本次選讀子目錄）1297 passed/0 failed，commit `4dccfe83b`，重跑 `sg-deploy.sh next-admin` 成功：test gate 過、build 過、healthy after 9s、5 個 smoke 端點全 OK。
+
+[cognitive-os-api 部署]：**發現 `deploy/deploy.sh` 讀local `/root/Work`docstring 寫的執行位置是誤導**——目前真正的 prod 執行位置是**獨立的 sparse clone `/opt/cognitive-os`**（`git sparse-checkout list` 確認只含 `Projects/internal/cognitive-engineering-os` + `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`），跟 next-admin 用的 `/root/Work` 是兩個不同 checkout，靠 `docker inspect cognitive-os-api --format '{{.Config.Labels}}'` 的 `com.docker.compose.project.config_files` 標籤實測確認，沒有用猜的。`/opt/cognitive-os` `git pull --ff-only` 拉到 `4dccfe83b` 後跑 `deploy/deploy.sh`，第一次在 typecheck 步驟就失敗：`ModuleNotFoundError: matplotlib`——**跟本次任務本身無關**，是更早一個並行 session 的 `fc4bf5e89`（chart rendering feature）已經把 `matplotlib` 加進 `pyproject.toml` 正式依賴，但 `.deploy-venv` 從沒重新安裝過，而腳本自己的 `venv_functional()` 只驗 `import fastapi, pytest` 兩個名字，驗不到這個缺口。
+
+[deploy.sh 根因修復（發現即治本，非本次任務範圍但擋住部署，順手修）]：止血——先直接 `pip install -e "...[test]"` 到 `/opt/cognitive-os/.deploy-venv` 解除封鎖，重跑成功（見下方 REALTEST_EVIDENCE）。治本——`venv_functional()` 這種「查兩個寫死的名字來代表整個依賴清單」的做法，本質上跟寫死 allowlist 會跟真實清單漂移是同一種病；改成**拿掉這個捷徑，每次部署都跑一次 `pip install -e ...[test]`**（pip 本身冪等，沒變動時幾秒內結束），只有「venv 目錄整個不存在」才保留跳過建立目錄這一步的快路徑。critic 覆審：0 Critical/Major，1 Minor（log 訊息措辭在「目錄存在但 python3 損毀」這個分支下失真，已修）、2 Suggestion（都評估後判定不用改：「每次部署都依賴 pip 成功」是本次事故的正確取捨方向且失敗會清楚在 log/Slack 通知，不是靜默；效能上 critic 自己本機真的量過 pip install 熱快取約 5-7 秒，比後面的 docker build／120 秒 healthcheck 等待小很多，不值得為此加 `--no-build-isolation` 複雜度）。
+
+[正式環境端對端驗證]（不是只看部署腳本自己回報成功，實際重跑一次操作者原本回報壞掉的那個流程）：用服務帳號登入 `cognitive.aware-wave.com` → `POST /auth/handoff/mint`（真實 project_id）拿到真代碼 → 用**全新、完全沒有 cookie 的** curl 對 `GET /auth/handoff?code=` 兌換 → 收到 302 到 `/?project=8e323c1c-...` + 正確的 `Set-Cookie`（HttpOnly/Secure/SameSite=strict/12小時）→ 用這個全新 cookie 呼叫 `GET /projects` 真的列出該 Project → 同一個代碼原樣重放 → 400（單次使用在正式環境確認生效，非只在測試環境）。這條鏈完整證明操作者最初回報的「找不到資料」在正式環境已經解決。
+
+[已修改]
+- `Projects/internal/cognitive-engineering-os/deploy/deploy.sh`：`venv_functional()` 捷徑拿掉，改成每次都跑 `pip install -e ...[test]`；log 措辭修正
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` + `npx vitest run`（next-admin 全專案，非子目錄）| exit=0 | result=140 files/1297 passed, 0 failed（前一輪 2 failed 已修正並確認）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` on ks-aw-01（第二次，含 test gate/build/healthcheck/smoke）| exit=0 | result=healthy after 9s；5 個 smoke 端點（/login、/api/ops/summary、nginx/wordpress、node-api health、nginx/api）全部 200
+- REALTEST_EVIDENCE: tool=SSH | cmd=`deploy/deploy.sh` on `/opt/cognitive-os`（cognitive-os-api，含 venv fix 後重跑）| exit=0 | result=typecheck OK；pytest 194 passed/6 subtests；healthy after 6s；local+public smoke 皆 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=正式環境端對端 mint→(全新 cookie-less client)兌換→列出 Project→原代碼重放 | exit=0 | result=302+正確 Set-Cookie、`GET /projects` 真的回傳該 Project、重放回 400——操作者原始回報的症狀已在 prod 確認修復
+- REVIEW_DONE: critic=Standard（deploy.sh venv 修復專案）| verdict=pass，1 Minor 已修，2 Suggestion 評估後不用改 | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os | grep=`venv_functional\|cognitive\.aware-wave\.com`（拿掉 `/?project=` 尾碼的寬版，修正續23漏抓 test 檔的教訓）| hits=`venv_functional` 0 殘留（confirmed 全移除無孤兒呼叫）；`cognitive.aware-wave.com` 3 處全合法（常數/註解/無關 portal 清單），2 個測試檔已修正指向新路由
+
+[剩餘風險] 無新增；同續23。deploy.sh 的 sparse-clone 路徑（`/opt/cognitive-os` vs `/root/Work`）值得記一筆到部署文件，避免下次又靠猜的——本次靠 `docker inspect` 標籤才查對，沒有現成文件講這件事，暫記於此，未另開文件（後續若同類混淆重複發生再獨立成文件）。
+
+[rollback] deploy.sh 該次修改是既有邏輯的簡化，`git revert` 可完整復原；兩個服務都已透過腳本自己內建的 rollback tag（`:rollback` image / `rollback-phase1.sh` snapshot）機制留有回滾點，非本次額外操作。
+
+- WORKLOG_DONE: 續23 部署完成，正式環境端對端驗證通過，順手發現+根治 deploy.sh 既有 venv 檢查缺口
+
 ## 2026-09-18（續24）Dashboard 10 項操作者回饋收尾（延續續14/續18/續6 同一份清單）：guide box 拿掉重複欄位清單、12 個方法補齊填表範例斷句+選填示範、AI 起草免費規則比對前置（critic 抓到初版整段死碼，已修）、id 建議值機制擴大到 9 個既有方法+修正一個連帶喚醒的 prompt 錯字、工作流建議順序、比較→工作流一鍵橋接、新增 Lean Canvas 方法、AI 起草成本查證
 
 [操作者請求] 貼上 10 項截圖+文字回饋（圖一：ADR 填寫畫面）；訊息尾端附一段先前的舊狀態摘要（「270+ 方法還沒做」）。VBC 先查 WORKLOG：續14（9 項回饋批次）、續18（圖表視覺化+2 新方法）、續6（並排比較/組成工作流）當天稍早已處理掉其中多數項目；沒有只信任 WORKLOG 文字宣稱，逐項比對現有 dashboard.html/main.py/method-display-metadata.yaml 程式碼後確認：④⑨已完成、⑤(record_id 版方法) 已完成；①③⑥(先前只做了 UI 強調、未含免費解析/成本查證)⑦⑧(先前只做了 discoverability、未含建議順序/直接橋接)⑤(非 record_id 版方法) 仍是真缺口；⑩艾森豪矩陣/反向腦力激盪已建，Lean Canvas 完全不存在（跟既有 Business Model Canvas 逐欄比對證實真的欄位不同，非重複）。

@@ -73,25 +73,27 @@ fi
 #    already been activated by hand). Assumes a dedicated per-product checkout (prod uses a
 #    sparse clone at /opt/cognitive-os) -- a shared monorepo checkout running this same pattern
 #    for a second product would collide on this directory name.
-#    Functional (not just existence) check: (re)installs whenever fastapi/pytest aren't actually
-#    importable, so a dependency added to pyproject.toml later, or a venv left half-built by an
-#    interrupted prior bootstrap (OOM-kill, host reboot), self-heals instead of silently blocking
-#    every future deploy or trusting a broken venv forever.
+#    No longer a "looks functional, skip reinstall" shortcut (root-cause fix, 2026-09-18): a prior
+#    version only checked `import fastapi, pytest` before deciding to skip `pip install` entirely,
+#    which passed even though a REAL, already-declared-in-pyproject.toml dependency
+#    (matplotlib, added by the chart-rendering feature) was missing from this already-bootstrapped
+#    venv -- first deploy attempt after that feature merged failed at the typecheck step below with
+#    `ModuleNotFoundError: matplotlib`. The check was approximating "is the venv correct" with two
+#    hardcoded names that can never track pyproject.toml's actual dependency list as it grows --
+#    the same failure shape as a hand-maintained allowlist drifting from its source of truth.
+#    Fix: always run `pip install -e ...[test]` (idempotent -- pip resolves against what's already
+#    satisfied and typically finishes in a couple seconds when nothing changed); only the expensive
+#    `python3 -m venv` creation step is skipped when the directory already exists.
 DEPLOY_VENV="$REPO_ROOT/.deploy-venv"
-venv_functional() {
-  [[ -x "$DEPLOY_VENV/bin/python3" ]] && "$DEPLOY_VENV/bin/python3" -c "import fastapi, pytest" >/dev/null 2>&1
-}
-if ! venv_functional; then
-  log "venv | $DEPLOY_VENV missing or incomplete -- (re)bootstrapping from pyproject.toml"
+if [[ ! -x "$DEPLOY_VENV/bin/python3" ]]; then
+  log "venv | $DEPLOY_VENV missing or incomplete (no executable bin/python3) -- creating"
   timeout 300 python3 -m venv "$DEPLOY_VENV" >>"$LOG" 2>&1 || { log "venv | FAIL: python3 -m venv (see $LOG for detail)"; notify "FAILED to bootstrap .deploy-venv"; exit 1; }
-  # shellcheck disable=SC1091
-  source "$DEPLOY_VENV/bin/activate"
-  timeout 300 pip install --quiet --upgrade pip >>"$LOG" 2>&1 || log "venv | WARN: pip self-upgrade failed, continuing with bundled pip"
-  timeout 300 pip install --quiet -e "$PRODUCT_ROOT[test]" >>"$LOG" 2>&1 || { log "venv | FAIL: pip install (see $LOG for detail)"; notify "FAILED to install deploy-venv deps"; exit 1; }
-else
-  # shellcheck disable=SC1091
-  source "$DEPLOY_VENV/bin/activate"
 fi
+# shellcheck disable=SC1091
+source "$DEPLOY_VENV/bin/activate"
+timeout 300 pip install --quiet --upgrade pip >>"$LOG" 2>&1 || log "venv | WARN: pip self-upgrade failed, continuing with bundled pip"
+log "venv | ensuring deps match pyproject.toml (pip install -e ...[test])"
+timeout 300 pip install --quiet -e "$PRODUCT_ROOT[test]" >>"$LOG" 2>&1 || { log "venv | FAIL: pip install (see $LOG for detail)"; notify "FAILED to install deploy-venv deps"; exit 1; }
 log "venv | using $(command -v python3) ($(python3 --version))"
 
 # -- 1. Typecheck substitute (Python has no tsc; the closest real equivalent is "does every
