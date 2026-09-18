@@ -1,4 +1,23 @@
 # Worklog
+## 2026-09-18（續31）280+ 方法內容深化第五批：causal 家族全部 10 個方法（F11 因果推理家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）的批次節奏，處理 causal 家族全部 10 個方法：counterfactual_reasoning／dag／difference_in_differences／instrumental_variables／logic_model／process_tracing／rct／regression_discontinuity／synthetic_control／theory_of_change。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：10 個條目補上 why_en/why_zh/url/example_zh/example_en，causal 家族 0/10 → 10/10 收官。多數方法屬「只記錄研究設計、不跑真實統計」類型（DiD／IV／RCT／RDD／synthetic_control），example 內容照各自模組docstring 揭露的 DISCLOSURE-ONLY 範疇如實描述，不虛構任何統計運算。causal.dag 的 example 額外示範 cause_hypothesis_set 引用欄位；causal.process_tracing 的 example 示範 HOOP／SMOKING_GUN 兩種證據類型與其計算出的 implication；causal.theory_of_change 示範完整 6 階段+5 個位置固定的 transitions（每個都要 assumption/evidence/indicator/risk 四個必填欄位）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_causal_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 10 個真實 `generate_*` 函式 | exit=0 | 結果=10/10 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、63/285 done（本輪 +10，續30 收尾時是 53）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30 同類批次先例；寫入過程自查抓到並修正 3 處我自己寫入時產生的 YAML 語法錯誤（見下「過程記錄」），修正後才跑驗證腳本，最終版本已通過完整 `yaml.safe_load()` 解析
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，沒有改動任何 `.py` 程式碼，無需查 symbol 級別引用
+
+[過程記錄，寫入時自己造成、寫完就自查修正，非既有缺陷] 本輪寫 YAML 時連續 3 次手誤造成語法錯誤：(1) `causal.instrumental_variables` 的 `why_zh` 打成 `why_zh":`（多一個引號）；(2) `causal.logic_model` 的 example_en 裡一個英文所有格用了不必要的反斜線跳脫 `seniors\'`；(3) `causal.synthetic_control` 的 example_en 裡兩處英文所有格 `State A's` 因為多輪修正疊加，一度變成 `State A\\u2019s`（雙反斜線+unicode跳脫字面文字，不是真的 unicode 字元）再變成 `State A\'s`（反斜線+引號），兩者在 YAML 雙引號字串裡都是不合法跳脫。每次都是先跑 `python -c "yaml.safe_load(...)"` 全檔解析才抓到，最終用最簡單的辦法根治：直接拿掉英文所有格的撇號（改成 \"States\"／\"State As\" 這種不需要撇號的講法），不再嘗試在 YAML 雙引號字串裡跳脫單引號——這是本次的教訓，記錄在案避免下一批重蹈覆轍。
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 63/285 完成，222 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、challenge 10、database_data 10、epistemic 10、jurisdiction 10、representation 10、security 10、stakeholders 10（複數家族）、decomposition 9、feasibility 9、insight 9、root_cause 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續22）HCI-30 部署：ADR-0021 六道 gate 中四道關閉（commit `9a28ca285`/`6212323bd`）——過程中發現並修正一個差點出貨的架構誤判
 
 [任務] 承接續21 的規劃，操作者明示「去做好剩下的...不會再分批問」，開始執行 Phase A（本機可測試、不碰正式主機的部分）。
