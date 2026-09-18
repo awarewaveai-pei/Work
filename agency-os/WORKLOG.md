@@ -1,4 +1,23 @@
 # Worklog
+## 2026-09-18（續9）緊急修復 main.py 語法損壞（HEAD 一度無法 import）+ Cognitive OS 儀表板操作者中途 3 項糾偏（縮寫獨立欄位、欄位表單免點擊即顯示、可讀欄位標籤）
+
+[緊急事故] 準備 commit 續6 的 critic 修復時，`git diff` 發現 main.py 出現我沒動過的新 hunk；`git show HEAD:...main.py | python -m py_compile` 直接 SyntaxError（line 998）。根因：`CreateSourceRequest`/`create_source`/`list_sources`（另一 session 的 doi/authors/venue 功能區塊）被錯位拼接——4 個欄位跑進 `create_project()` 函式簽名裡（無逗號，語法錯誤）、`source_record()` 的 `doi=`/`authors=`/`venue=`/`published_at=` kwargs 跑到呼叫括號外面、`source_cas.put()`/`return repo.add_source()` 被夾進 `list_sources` 的 decorator 和自己的 def 之間。形狀符合 hunk-based patch（`git apply`／`git-stage-hunks.py` 類工具）套用時行號跟並行編輯沒對齊，非手誤。未深究確切成因（API 已整個 import 不起來，擋到任何 fresh clone/pull/CI/deploy，優先恢復正確性）；working tree 那三段本來就是對的（未曾動過該邏輯），直接照現有正確版本 commit 覆蓋修復（`953d98665`）。已用 SendMessage flag 給負責 doi/authors/venue 功能的並行 session，請他們對照這個 commit 確認沒有本地未 commit 異動被意外覆蓋。
+
+[操作者中途糾偏，續6之後追加]
+1. **「只要這三個資訊：中文/英文/縮寫，各自跳下一行」**：`method-display-metadata.yaml` 282 個方法加 `abbr` 欄位（58 個有真實縮寫如 ADR/SWOT/RACI/DAG 等，其餘留空）；有縮寫的 24 個原本嵌在 `name_en` 括號裡的縮寫已拆出（如 "Architecture Decision Record (ADR)" → `name_en`="Architecture Decision Record"／`abbr`="ADR"）。Dashboard 新 `appendNameBlock()` 共用元件，清單列／工作區標題／比較卡片／自組工作流步驟頭統一顯示三行。
+2. **「方法也可以選擇一個就好」**：查證後確認既有邏輯本來就無最低選取數限制（`openCompare`/`openChain` 對 1 個方法一樣可觸發），瀏覽器實測勾選 1 個方法 → 並排比較／組成工作流皆正常開啟；無需改動，純驗證。
+3. **「點擊方法後右側視窗要解釋工具和告知應該要填寫提供什麼資料內容才能幫助分析」+「為什麼沒有填資料的地方」**：發現真實 UX 缺口——原本欄位輸入表單（step②）要點「AI 起草」或「略過起草，直接填」才會出現，導致使用者打開方法後找不到可以填資料的地方。改為打開方法立即顯示全部欄位輸入框（不必任何額外點擊），「AI 起草」降級為 `<details>` 收合的選填加速器（起草完仍會自動填進同一組欄位）；移除因此變得矛盾且有清空資料風險的「略過起草，直接填」按鈕。步驟改編號為 2 步（①填寫資料含 AI 選填起草＋欄位表單、②執行），guide-box 文案改「為了做出最完整、最有效的分析，請提供以下內容」；所有欄位標籤（含比較模式、自組工作流）從 raw snake_case（如 `alternatives_considered`）改可讀格式（"Alternatives Considered"，原始欄位名縮小字體保留在旁供進階/JSON 參照）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git show HEAD:.../main.py \| python -m py_compile -`（修復前）| exit=1 | result=`SyntaxError: invalid syntax. Perhaps you forgot a comma?` line 998，證實損壞
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上（修復並 commit 953d98665 後重跑）| exit=0 | result=乾淨通過，HEAD 現在可正常 import
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_custom_workflow_api.py tests/unit/test_source_domain.py tests/unit/test_intake_schemas.py tests/unit/test_project_source_api.py -q`（修復後）| exit=0 | ms=35520 | result=49 passed（含先前 4 個 doi 相關失敗測試，修復損壞後同步轉綠，證實根因判斷正確）
+- REALTEST_EVIDENCE: tool=Browser | cmd=真實 uvicorn + Claude Browser pane，新建本機測試租戶登入 | result=清單列/工作區標題確認三行格式（中文/英文/ADR 徽章）；打開 architecture.adr 立即看到 17 個欄位輸入框（無需點擊起草），實際在 Context 欄位打字驗證雙向綁定正常；勾選 1 個方法測試並排比較成功開啟單卡片
+- REVIEW_DONE: self-review=Standard | verdict=pass | findings=0c/0m/0n；純 UI/文案調整 + 一個獨立損壞區塊的逐行比對修復，非 auth/crypto/個資/金流範疇
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`appendNameBlock\|readableFieldLabel\|manual-btn` | hits=3（`appendNameBlock`/`readableFieldLabel` 僅出現在新增的共用函式定義與呼叫端，正常；但 `manual-btn` 抓到 1 個真殘留：`tests/unit/test_api_main.py:321` 的 dashboard 結構回歸測試還斷言該按鈕存在——移除按鈕時漏改，已修正該測試並移除斷言，`test_api_main.py` 67/67 全綠重跑確認）
+- [rollback] main.py：`git revert 953d98665`（會恢復損壞狀態，不建議；正確做法是與並行 session 核對後再決定）。dashboard.html／method-display-metadata.yaml／_intake_validation.py：純既有檔案增量，可用該次 commit revert 還原。
+- WORKLOG_DONE: main.py 語法損壞緊急修復 + Cognitive OS 儀表板操作者中途 3 項糾偏
+
 ## 2026-09-18（續8）HCI-30 蒐集器 Task 12（判定 NOT APPLICABLE）+ Task 13（獨立 vuln-verifier 複核 ADR-0029 六道閘，6/6 CONFIRMED）——蒐集器管線非 STOP 範圍工作全部結束
 
 [任務] 承接續5（Task 10），依 Execution Order 走完最後兩項：Task 12（routing 三件套同步）、Task 13（獨立資安複核）。
