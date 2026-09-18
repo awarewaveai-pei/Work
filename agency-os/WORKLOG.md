@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續40）280+ 方法內容深化第十四批：decomposition 家族全部 9 個方法（F02 拆解與結構化家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）的批次節奏，處理 decomposition 家族全部 9 個方法：fast／functional_decomposition／hierarchical_task_analysis／issue_tree／logic_tree／mece／objective_tree／problem_tree／wbs。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：9 個條目補上 why_en/why_zh/url/example_zh/example_en，decomposition 家族 0/9 → 9/9 收官（F02 拆解與結構化套件全數完成，151/285）。這個家族全部是遞迴樹狀結構，每個方法各自的不變量都對應到一個真實、可獨立查證的既有方法論規則，不是憑空發明：fast 的「唯一根＋無環」對應 FAST 圖的 Why/How 邏輯（重用 `ai_lego.compute.graph.dag.find_cycle` 三色 DFS，非啟發式）；issue_tree 是全樹 id 全域唯一（不只是兄弟不重複）；logic_tree 反過來只檢查同層兄弟不能共用同一個分類值（不同分支可以合法重複，這是跟 issue_tree 刻意不同的不變量類別）；hierarchical_task_analysis 的 plan 欄位是雙向檢查（多子節點一定要有、葉節點/單子節點一定不能有）；wbs 的 total_estimate_hours 是真正的遞迴加總（外部 WBS「100% 原則」的機械化），且葉節點/非葉節點對 owner／estimate_hours 的要求也是雙向的；problem_tree 要求 causes／effects 兩個 id 集合互斥；objective_tree 要求雙射覆蓋（每個負面項目剛好被 1 個目標轉換）加上「positive_statement 不能逐字複製負面陳述」的反矇混檢查；mece 是唯一一個「檢查失敗（is_mece: false）不會被拒絕建立」的方法——Atlas 自己明講不是所有系統都能完美 MECE，這個方法存在的目的就是誠實回報，不是要求完美。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_decomposition_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 9 個真實 `generate_*` 函式，其中 8 個額外驗證各自「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應的 InvariantViolation：FAST_CYCLE_DETECTED／FUNCDECOMP_DANGLING_INTERFACE_REF／HTA_UNEXPECTED_PLAN_FOR_LEAF_OR_SINGLE_CHILD／ISSUETREE_DUPLICATE_NODE_ID／LOGICTREE_DUPLICATE_SIBLING_CATEGORY_VALUE／OBJTREE_PASSTHROUGH_STATEMENT／PROBTREE_CAUSE_EFFECT_ID_COLLISION／WBS_NONLEAF_HAS_OWNER_OR_ESTIMATE），mece 額外斷言真實計算出來的 overlaps／gaps／is_mece 數值正確、wbs 額外斷言遞迴加總算對（13=8+5）| exit=0 | 結果=9/9 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、151/285 done（本輪 +9，續39 收尾時是 142）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38/39 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 151/285 完成，134 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續39）280+ 方法內容深化第十三批：stakeholders 家族全部 10 個方法（F07 利害關係人／權力／協商家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）的批次節奏，處理 stakeholders 家族全部 10 個方法：batna／coalition_mapping／game_theory／incentive_mapping／interest_based_negotiation／power_interest／raci／salience_model／stakeholder_map／zopa。
