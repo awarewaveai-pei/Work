@@ -34,6 +34,10 @@ export type SourceListRow = {
    *  importOrganizationSources() successfully POSTs this row to Cognitive OS -- never guessed. */
   cognitiveOsProjectId: string | null;
   cognitiveOsImportedAt: string | null;
+  /** HCI-30 bridge (migration 0088). Both null until lib/hci/import-sources.ts's
+   *  importOrganizationSourcesToHci() successfully sends this row's URL to HCI-30 -- never guessed. */
+  hciSourceId: string | null;
+  hciImportedAt: string | null;
 };
 
 /** The three keyword_mode values the column CHECK constraint (migration 0086) allows. */
@@ -95,7 +99,7 @@ export async function listKnowledgeSources(organizationId: string, opts?: ListSo
   let query = sb
     .from("cs_knowledge_sources")
     .select(
-      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,cognitive_os_project_id,cognitive_os_imported_at",
+      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,cognitive_os_project_id,cognitive_os_imported_at,hci_source_id,hci_imported_at",
       { count: "exact" },
     )
     .eq("organization_id", organizationId)
@@ -137,6 +141,8 @@ export async function listKnowledgeSources(organizationId: string, opts?: ListSo
     chunks: counts.get(s.id as string) ?? 0,
     cognitiveOsProjectId: (s.cognitive_os_project_id as string | null) ?? null,
     cognitiveOsImportedAt: (s.cognitive_os_imported_at as string | null) ?? null,
+    hciSourceId: (s.hci_source_id as string | null) ?? null,
+    hciImportedAt: (s.hci_imported_at as string | null) ?? null,
   }));
   return { items, total: count ?? items.length, page, pageSize };
 }
@@ -745,6 +751,9 @@ export interface SourceDetail {
   /** Cognitive OS bridge (migration 0087) — see SourceListRow's matching fields for how these get set. */
   cognitiveOsProjectId: string | null;
   cognitiveOsImportedAt: string | null;
+  /** HCI-30 bridge (migration 0088) — see SourceListRow's matching fields for how these get set. */
+  hciSourceId: string | null;
+  hciImportedAt: string | null;
 }
 
 /** One document's full detail for the ops content-viewer (K2g) — org-scoped, active or archived. */
@@ -754,7 +763,7 @@ export async function getSourceDetail(organizationId: string, sourceId: string):
   const { data, error } = await sb
     .from("cs_knowledge_sources")
     .select(
-      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,body,language,epistemic_type,authorship_state,locked,author,published_at,venue,doi,created_at,cognitive_os_project_id,cognitive_os_imported_at",
+      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,body,language,epistemic_type,authorship_state,locked,author,published_at,venue,doi,created_at,cognitive_os_project_id,cognitive_os_imported_at,hci_source_id,hci_imported_at",
     )
     .eq("organization_id", organizationId)
     .eq("id", sourceId)
@@ -783,6 +792,8 @@ export async function getSourceDetail(organizationId: string, sourceId: string):
     createdAt: data.created_at as string,
     cognitiveOsProjectId: (data.cognitive_os_project_id as string | null) ?? null,
     cognitiveOsImportedAt: (data.cognitive_os_imported_at as string | null) ?? null,
+    hciSourceId: (data.hci_source_id as string | null) ?? null,
+    hciImportedAt: (data.hci_imported_at as string | null) ?? null,
   };
 }
 
@@ -805,6 +816,28 @@ export async function markSourceSentToCognitiveOs(organizationId: string, source
   const { data, error } = await sb
     .from("cs_knowledge_sources")
     .update({ cognitive_os_project_id: projectId, cognitive_os_imported_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .select("id");
+  return !error && (data?.length ?? 0) > 0;
+}
+
+/**
+ * HCI-30 bridge write-back (migration 0088). Called by lib/hci/import-sources.ts's
+ * importOrganizationSourcesToHci() immediately after a source's URL is successfully written as a
+ * DISCOVERED row in HCI-30's hci.sources — never called speculatively, so a non-null hciSourceId is
+ * always backed by a real, already-succeeded POST .../api/hci/v1/seeds call whose outcome was
+ * 'written'.
+ *
+ * Same `.select("id")` row-count check as markSourceSentToCognitiveOs above, for the identical
+ * reason: Supabase/PostgREST returns `error: null` even when the WHERE clause matches zero rows.
+ */
+export async function markSourceSentToHci(organizationId: string, sourceId: string, hciSourceId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .update({ hci_source_id: hciSourceId, hci_imported_at: new Date().toISOString() })
     .eq("organization_id", organizationId)
     .eq("id", sourceId)
     .select("id");

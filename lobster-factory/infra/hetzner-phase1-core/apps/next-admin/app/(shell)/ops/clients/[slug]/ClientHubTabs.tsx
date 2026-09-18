@@ -1352,6 +1352,8 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
       chunks: number;
       cognitiveOsProjectId: string | null;
       cognitiveOsImportedAt: string | null;
+      hciSourceId: string | null;
+      hciImportedAt: string | null;
     }>
   >([]);
   const [kbDefault, setKbDefault] = useState<"fuzzy" | "exact">("fuzzy"); // K2i tenant-wide default
@@ -1698,6 +1700,17 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
                             >
                               已送 Cognitive OS →
                             </a>
+                          ) : null}
+                          {s.hciSourceId ? (
+                            // Plain span, not the badge() helper (no title param) and not an <a> like
+                            // Cognitive OS above: HCI-30 has no deployed, publicly reachable URL yet,
+                            // so a link would claim one exists.
+                            <span
+                              title={s.hciImportedAt ? `已於 ${s.hciImportedAt.slice(0, 16).replace("T", " ")} 送去 HCI-30 探索來源佇列` : "已送去 HCI-30 探索來源佇列"}
+                              style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, background: "var(--badge-green-bg)", color: "var(--badge-green-text)", whiteSpace: "nowrap" }}
+                            >
+                              已送 HCI
+                            </span>
                           ) : null}
                           <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
                           <select

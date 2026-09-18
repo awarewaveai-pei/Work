@@ -53,6 +53,8 @@ function detail(overrides: Partial<SourceDetail> = {}): SourceDetail {
     createdAt: "2020-01-01T00:00:00+00:00",
     cognitiveOsProjectId: null,
     cognitiveOsImportedAt: null,
+    hciSourceId: null,
+    hciImportedAt: null,
     ...overrides,
   };
 }

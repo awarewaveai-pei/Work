@@ -88,6 +88,18 @@ interface CognitiveOsImportResult {
   errors: string[];
 }
 
+/** Mirrors lib/hci/import-sources.ts's HciImportSummary 1:1 (returned by
+ *  POST /api/ops/clients/[slug]/hci-import) -- see that file for field meaning. No projectId: HCI-30
+ *  has no project concept, every accepted URL becomes one hci.sources row under a fixed tenant. */
+interface HciImportResult {
+  organizationId: string;
+  totalCandidates: number;
+  imported: number;
+  alreadyImported: number;
+  rejected: Array<{ sourceId: string; title: string; issues: string[] }>;
+  errors: string[];
+}
+
 // Public dashboard for the Cognitive Engineering OS Phase 1 API (deploy/deploy.sh's own SMOKE_URL
 // host) — no project-scoped route existed before 2026-09-18; ?project=<id> now deep-links the
 // operator straight to this Project's sources inside that dashboard.
@@ -122,6 +134,9 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
   const [cognitiveOsBusy, setCognitiveOsBusy] = useState(false);
   const [cognitiveOsMessage, setCognitiveOsMessage] = useState<string | null>(null);
   const [cognitiveOsRun, setCognitiveOsRun] = useState<CognitiveOsImportResult | null>(null);
+  const [hciBusy, setHciBusy] = useState(false);
+  const [hciMessage, setHciMessage] = useState<string | null>(null);
+  const [hciRun, setHciRun] = useState<HciImportResult | null>(null);
   // Guards pollRun's loop against a component that has already unmounted (navigated off this page
   // mid-run) — critic finding, 2026-09-12: without this the loop kept polling and calling setState
   // for up to ~10 minutes after the tab left /ops/collect. React itself no-ops a setState on an
@@ -338,6 +353,61 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
     }
   }
 
+  // Same edge-timeout reasoning as pollCognitiveOsImport above: a real send calls HCI-30 once per
+  // eligible source (each one a real fetch through HCI-30's isolated runner).
+  async function pollHciImport(runKey: string): Promise<void> {
+    let consecutiveFailures = 0;
+    for (;;) {
+      if (!mountedRef.current) return;
+      let data: { ok?: boolean; status?: string; result?: HciImportResult; error?: string };
+      try {
+        const res = await fetch(`/api/ops/clients/${slug}/hci-import?runKey=${encodeURIComponent(runKey)}`, { headers });
+        data = await res.json();
+        consecutiveFailures = 0;
+      } catch {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 10) {
+          if (mountedRef.current) setHciMessage("⚠ 追蹤送出狀態失敗（網路持續連不上）——送出仍在伺服器上繼續跑，稍後重新整理頁面確認結果");
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (!mountedRef.current) return;
+      if (!data.ok) {
+        setHciMessage("⚠ 追蹤不到這次送出的狀態（可能伺服器重啟過）——稍後重新整理頁面確認是否已完成");
+        return;
+      }
+      if (data.status === "running") {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (data.status === "error") {
+        setHciMessage(`⚠ ${data.error ?? "hci_import_failed"}`);
+        return;
+      }
+      if (data.result) setHciRun(data.result);
+      return;
+    }
+  }
+
+  async function sendToHci() {
+    setHciBusy(true);
+    setHciMessage(null);
+    setHciRun(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${slug}/hci-import`, { method: "POST", headers, body: JSON.stringify({}) });
+      const data = (await res.json()) as { ok?: boolean; queued?: boolean; runKey?: string; error?: string };
+      if (data.ok && data.runKey) {
+        await pollHciImport(data.runKey);
+      } else {
+        setHciMessage(`⚠ ${data.error ?? "hci_import_failed"}`);
+      }
+    } finally {
+      setHciBusy(false);
+    }
+  }
+
   const approved = sources.filter((s) => s.status === "approved");
   const candidates = sources.filter((s) => s.status === "candidate");
   const disabled = sources.filter((s) => s.status === "disabled");
@@ -477,6 +547,22 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
           </div>
           {cognitiveOsMessage ? <p style={{ fontSize: 12, color: "#b45309", whiteSpace: "pre-wrap" }}>{cognitiveOsMessage}</p> : null}
           {cognitiveOsRun ? <CognitiveOsImportReport run={cognitiveOsRun} /> : null}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap", borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+            <button onClick={sendToHci} disabled={hciBusy} style={buttonStyle(false)}>
+              送去 HCI 探索來源
+            </button>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>
+              把已入庫來源的網址送給 HCI-30 重新查核，進它自己的候選來源審核佇列。
+              {/* Critic finding, 2026-09-18: HCI-30 has no per-organization tenant mapping yet -- every
+                  client that uses this button shares the SAME HCI-30 review queue. Surfaced here, not
+                  only in a code comment, since this matters most exactly when it's about to be used on
+                  a second real client. */}
+              <strong>注意：目前所有客戶共用同一個 HCI-30 帳號，還沒有客戶區隔。</strong>
+            </span>
+          </div>
+          {hciMessage ? <p style={{ fontSize: 12, color: "#b45309", whiteSpace: "pre-wrap" }}>{hciMessage}</p> : null}
+          {hciRun ? <HciImportReport run={hciRun} /> : null}
         </section>
 
         <section data-panel="form">
@@ -801,6 +887,34 @@ function CognitiveOsImportReport({ run }: { run: CognitiveOsImportResult }) {
       </a>
       {/* Same "explain the refusal, don't hide it" convention as RunReport above — a rejected
           citation-metadata record must not look like a quiet, everything-went-fine send. */}
+      {run.rejected.length ? (
+        <div style={{ marginTop: 8 }}>
+          {run.rejected.slice(0, 12).map((r) => (
+            <div key={r.sourceId} style={{ fontSize: 11, marginBottom: 4, color: "#b45309", overflowWrap: "anywhere" }}>
+              {r.title}：{r.issues.join("、")}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {run.errors.length ? <div style={{ color: "#b91c1c", marginTop: 6 }}>{run.errors.join("、")}</div> : null}
+    </div>
+  );
+}
+
+function HciImportReport({ run }: { run: HciImportResult }) {
+  return (
+    <div style={{ marginTop: 12, border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, fontSize: 13 }}>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>已送去 HCI-30 探索來源佇列</div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
+        <span>候選 {run.totalCandidates}</span>
+        <span>新送出 {run.imported}</span>
+        <span>已送過 {run.alreadyImported}</span>
+        <span style={{ color: run.rejected.length ? "#b45309" : undefined }}>不合格 {run.rejected.length}</span>
+      </div>
+      {/* No dashboard link here (unlike CognitiveOsImportReport): HCI-30 has no deployed, publicly
+          reachable URL yet -- linking to one would claim it exists. */}
+      <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px" }}>去 HCI-30 自己的「🔎 探索來源」分頁審核（核准／拒絕）。</p>
+      {/* Same "explain the refusal, don't hide it" convention as CognitiveOsImportReport above. */}
       {run.rejected.length ? (
         <div style={{ marginTop: 8 }}>
           {run.rejected.slice(0, 12).map((r) => (

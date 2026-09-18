@@ -446,6 +446,21 @@ services:
       # lib/ops-inbox/verifyIngestToken.ts's own M2 history for why that sharing is a blast-radius
       # mistake this project already paid for once).
       COGNITIVE_OS_IMPORT_INGEST_TOKEN: ${COGNITIVE_OS_IMPORT_INGEST_TOKEN:-}
+      # HCI-30 bridge (lib/hci/) -- next-admin's cs_knowledge_sources -> HCI-30's DISCOVERED-source
+      # admission pipeline (POST /api/hci/v1/seeds). No usable default for the base URL, unlike
+      # Cognitive OS above: HCI-30 has never been deployed onto this stack's own docker network, and
+      # this container's own "localhost" is not the operator's laptop -- critic review 2026-09-18
+      # caught that omitting this var here would leave lib/hci/client.ts permanently unable to read
+      # it after any deploy (process.env.HCI_API_BASE_URL undefined with no env_file passthrough in
+      # this file), silently stranding the whole feature in its fail-closed (503) state forever.
+      # Empty = POST /api/ops/clients/[slug]/hci-import answers 503 (fail closed).
+      HCI_API_BASE_URL: ${HCI_API_BASE_URL:-}
+      # 'a' is one of HCI-30's two hardcoded synthetic dev tenants (app/server.mjs TENANT_ROLES) --
+      # there is no real per-organization HCI-30 tenant mapping yet (a separate, much larger,
+      # explicitly deferred project), so every organization that uses this bridge lands in the SAME
+      # shared HCI-30 review queue. CollectionSourcesPanel.tsx's button surfaces this to the operator
+      # directly rather than leaving it as a comment only she'd have to already know to go read.
+      HCI_IMPORT_TENANT: ${HCI_IMPORT_TENANT:-a}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:

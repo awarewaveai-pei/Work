@@ -34,6 +34,7 @@ export {
   getSourceDetail,
   listVersionsForFamily,
   markSourceSentToCognitiveOs,
+  markSourceSentToHci,
   type RebindError,
   type SourceDetail,
   type VersionSummary,
