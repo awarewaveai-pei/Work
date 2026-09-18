@@ -1,4 +1,26 @@
 # Worklog
+## 2026-09-18（續13）next-admin bridge route 修復 401（machine-local docker-compose.yml 漏了整段 COGNITIVE_OS_* 環境變數）+ 真實 E2E import 測試——操作者「建正式環境服務帳號+部署」指示全部完成
+
+[發現] `/check-drift` 顯示 next-admin 已在 `253d74fe8`（推測是並行 session 或自動流程稍早已跑過 `sg-deploy.sh`，非本次動作），容器內確認 bridge route 檔案（`import-project-sources`）已建置進 `.next/server`。直接打真實 API 驗證：`POST /api/internal/cognitive-os/import-project-sources` 回 `{"ok":false,"error":"unauthorized"}`——token 對得上 `.env` 裡的值，但 `docker exec ... printenv COGNITIVE_OS_IMPORT_INGEST_TOKEN` 回空，代表容器根本沒收到這個環境變數。根因：`/root/lobster-phase1/docker-compose.yml`（CLAUDE.md 明訂的「machine-local」檔案，`sg-deploy.sh` 的 rsync 只同步 `apps/<APP>/` 底下的原始碼，不動這個上層 compose 檔）從未被更新成跟 repo 裡 `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 一致——repo 版本 441-448 行早就寫好 `COGNITIVE_OS_*` 五個環境變數映射，機器上的實際檔案完全沒有這段（連同一併發現 `PORTAL_SIGNUP_*` 也漏，範圍更廣但不在本次修復範圍內，已揭露不隱藏）。
+
+[修復] 依 AGENTS.md 規定的 compose 改動路徑 `/root/lobster-phase1/scripts/safe-infra-patch.sh`（備份→套用→health→失敗自動 rollback）。避免手動謄寫全檔（434 行）出錯風險：改用 SSH 上直接 `cp` 原檔 + `sed` 在唯一匹配的錨點行（`TURNSTILE_SECRET_KEY:`，第 396 行）後插入新區塊，`diff` 原檔/新檔機械證明改動範圍剛好等於插入的 16 行、其餘 byte-for-byte 相同（非目視核對），`docker compose config --quiet` 驗證語法正確後才餵給 `safe-infra-patch.sh`。套用後 next-admin 容器 9 秒轉 healthy，backup 留存於 `docker-compose.yml.bak.safe-patch-20260918-041426`。
+
+[真實 E2E 測試] 修復後重打同一支 API：`{"ok":true,"summary":{"organizationId":"ecf4e311-...","projectId":"8e323c1c-f02f-4837-96cd-f87b933142c2","totalCandidates":0,"imported":0,...}}`——auth 過、Cognitive OS Project 正確解析/建立，管線基礎設施端到端可用。`totalCandidates:0` 是誠實結果非 bug：`edd-research` 這個 org 目前 `cs_knowledge_sources` 是空的，還沒有人透過 `/ops/collect`（含今天新增的 PICO 結構化查詢）對這個 org 真的跑過一次文獻蒐集。**不假裝這是「完整資料流已驗證」**——管線接通了，還缺操作者自己用真實研究題目跑一次蒐集才會有東西可匯入。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv COGNITIVE_OS_IMPORT_INGEST_TOKEN`（修復前）| exit=1 | result=空值，證實環境變數未傳入容器
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep COGNITIVE_OS /root/lobster-phase1/docker-compose.yml`（修復前）| exit=1 | result=0 命中，證實機器本地檔案缺整段
+- REALTEST_EVIDENCE: tool=SSH | cmd=`diff` 原檔與 sed 插入後新檔 | result=僅 16 行插入，其餘完全相同（機械證明非目視）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker compose -f <new> --project-directory /root/lobster-phase1 config --quiet`（套用前驗證）| exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=`safe-infra-patch.sh compose ... next-admin` | exit=0 | result=backup 建立+套用+9秒 healthy
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv`（修復後）| exit=0 | result=三個關鍵變數皆正確載入
+- REALTEST_EVIDENCE: tool=SSH(curl) | cmd=真實 `POST /api/internal/cognitive-os/import-project-sources` 打 `edd-research` org（`ecf4e311-4f38-4288-9396-e70fd7697aca`）| result=`ok:true`，projectId 正確解析，totalCandidates=0（誠實反映org尚無資料，非管線問題）
+- REVIEW_DONE: self-review=Standard | verdict=pass | findings=0c/0m/0n；純設定檔補齊既有 repo 已定義的區塊，非新邏輯；改動前後 diff 已機械驗證非目視
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core | grep=`COGNITIVE_OS_IMPORT_INGEST_TOKEN` | hits=僅 repo 版 compose.yml（來源）+ next-admin route.ts（消費端）+ user-env.ps1/.env（機密值），無其他消費者遺漏未接線
+- [rollback] `sudo cp /root/lobster-phase1/docker-compose.yml.bak.safe-patch-20260918-041426 /root/lobster-phase1/docker-compose.yml && cd /root/lobster-phase1 && sudo docker compose --env-file .env up -d next-admin`
+- **[已知限制，非本次修復範圍，供後續參考]** 同一份 machine-local compose 檔也缺 `PORTAL_SIGNUP_ENABLED`/`PORTAL_SIGNUP_RATE_LIMIT_SALT`（repo 429-435 行），代表這份檔案的漂移不只 Cognitive OS 一項；建議下次動這個檔案時做一次完整逐行 diff against repo 版本，而非等下一個功能又踩到才發現。
+- WORKLOG_DONE: 操作者「建正式環境服務帳號+部署」四項指示全部完成——服務帳號✅、Cognitive OS 部署✅（含根因治本的 ownership 自癒機制）、next-admin bridge 部署✅（含這次修復的環境變數缺口）、E2E 驗證✅（誠實回報：管線通了，等真實資料）
+
 ## 2026-09-18（續12）正式環境部署完成（操作者「建正式環境服務帳號+部署」指示，續10 中斷處接續）——test-gate 卡在同一根因的第三個實例，治本為 deploy.sh 自癒機制而非逐一補洞
 
 [延續續10] test-gate 首次重跑（`.runtime` 尚未修）：19 failed（`RecipeRunTests` 全滅 + `DemoTests`），第一個失敗的完整 traceback 是 `_atomic_write_journal` 寫入 `PRODUCT_ROOT/.runtime/workflows/<uuid>/` 時 `PermissionError`——跟續10發現的 `ai_lego/data/repositories/` 是同一顆疾病的第二個實例（`.runtime` 本身也是 root 持有，先前只修了 checkout 主體，刻意排除了 `.runtime` 因為誤以為它是 docker named volume 掛載點；重新查證 `docker-compose.yml` 確認該 volume 掛載在**容器內部**路徑，跟host端這個目錄完全是两回事，host端`.runtime`只是先前某次以root身份直接在host執行測試/CLI留下的殘留，非容器真正在用的資料）。`chown -R` 修 `.runtime` 後重跑：19→1 failed，剩 `DemoTests::test_demo_runs_the_real_cli_slice`（exit_code 1）。直接重現該 CLI slice 拿到完整 traceback：同一疾病第三個實例，`/tmp/ai-lego-cross-impact-analysis-slice/`（CLI slice 自己的 scratch 目錄，在 checkout 之外的 `/tmp`）一樣被 root 持有，`prepare_runtime_dir()` 的 `shutil.rmtree()` 炸掉。修完後 163/163 全綠。
