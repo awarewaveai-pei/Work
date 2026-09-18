@@ -12,7 +12,7 @@ import { crawl } from "@/lib/collect/orchestrator";
 import { createBudget } from "@/lib/collect/budget";
 import { createNullSink } from "@/lib/collect/sinks/null";
 import { canonicalize } from "@/lib/collect/canonical";
-import { createProviderCall, ProviderCallError, providerConfigured } from "@/lib/collect/net/providers";
+import { createProviderCall, ProviderCallError, providerConfigured, PROVIDERS } from "@/lib/collect/net/providers";
 import { extractProviderCollector, extractProviderId, markdownToText } from "@/lib/collect/collectors/extract-provider";
 import { httpHtmlCollector } from "@/lib/collect/collectors/http-html";
 import { createCollectFetch } from "@/lib/collect/net/fetcher";
@@ -137,6 +137,12 @@ describe("createProviderCall", () => {
 
     await call("perplexity", { path: "/search", body: { query: "q" } });
     expect(hit).toEqual(["https://api.perplexity.ai/search"]);
+  });
+
+  it("every provider pointing at perplexity.ai is locked to /search, under any id", () => {
+    const pplx = Object.values(PROVIDERS).filter((p) => new URL(p.origin).hostname.endsWith("perplexity.ai"));
+    expect(pplx.length).toBeGreaterThan(0);
+    for (const p of pplx) expect(p.allowedPaths, p.id).toEqual(["/search"]);
   });
 });
 

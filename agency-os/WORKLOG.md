@@ -20605,3 +20605,25 @@ WORKLOG_DONE: Claude→Codex 同步稽核
 - REALTEST_EVIDENCE: tool=Bash | cmd=`git log --all -S<key 尾段>` | exit=0 | result=0 commits
 - REVIEW_WAIVED: DOC_ONLY -- 調查紀錄，無程式變更
 - BUGHUNT_WAIVED: DOC_ONLY -- 調查紀錄，無程式變更
+
+## 2026-09-19(續80)Perplexity Search-only 加 CI 守門 + 定期任務全面排查(操作者：「我要杜絕這件事」)
+
+**定期任務排查(9/13 後用量歸零 = 餘額見底打不動，不等於呼叫端停了；再儲值可能重演)**：Windows 工作排程器(非 Microsoft 任務逐一看 action)、Claude Desktop 排程任務(0 個)、claude.ai 雲端 routine 8 個(0 個提到 perplexity/pplx)、ks-aw-01 所有使用者 crontab + `/etc/cron*` + systemd timers → 皆無 Perplexity。
+
+**操作者追問「是做 video 用完的嗎」→ 否**：Agent API 需要 `provider/model` 格式的模型 id(`anthropic/claude-haiku-4-5` 等)，全 repo(不看 gitignore，含 video-service)0 處；影片管線直接打 Anthropic + Replicate(`lib/ai/cost-model.ts` TEXT_FEATURES video-script、VIDEO_MOTION_RATES)。
+
+**新增 CI 守門** `scripts/check-perplexity-search-only.mjs` + `.github/workflows/perplexity-search-only-guard.yml`(push/PR to main 每次跑)：
+- 掃所有 tracked 檔(含 `.claude/.agents/.codex` 下的 markdown 與 SKILL.md、UTF-16 檔去 NUL 後照掃)：api 主機名只准出現在 providers.ts / perplexity-cli.ps1 / 其測試，且各**只准一次**(擋同檔第二個出口)；Perplexity SDK/gateway/MCP 套件名(`@ai-sdk/perplexity`、`@perplexity-ai/`、`perplexityai`、`ChatPerplexity`、`"perplexity/…"`、`PERPLEXITY_BASE_URL`、各 perplexity MCP 套件)一律擋；讀 `PERPLEXITY_API_KEY` 的程式只准 4 個已知檔(任何繞法——SDK、env base URL、拆字串——最終都得讀 key)；`llm-perplexity` 除 bootstrap prompt 說明文字外一律擋
+- 不變量：providers.ts 的 perplexity `allowedPaths: ["/search"]` 與強制邏輯仍在；CLI `$AllowedPath="/search"` 與拒絕邏輯仍在；settings 模板三條 deny 仍在
+- workflow 另跑 `tests/hooks/settings-deny-parity.test.mjs`(原本沒有任何 workflow 跑它)
+- vitest 新增：`PROVIDERS` 內任何 origin 為 perplexity.ai 的 provider(不論 id)都必須 `allowedPaths=["/search"]`
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/check-perplexity-search-only.mjs --self-test` + 實掃 | exit=0 | result=13 案例 + UTF-16 + 不變量；6772 tracked 檔 0 違規
+REALTEST_EVIDENCE: tool=Bash | cmd=突變測試(mcp.json.template 加回 `@perplexity-ai/mcp-server` + providers.ts 拿掉 allowedPaths)| exit=1→0 | result=兩條違規皆被點名；還原後綠
+REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run collect-provider-tier.test.ts` + `npx tsc --noEmit` + `node --test settings-deny-parity.test.mjs` | exit=0 | result=14/14、tsc 0、3/3
+REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/5M/4m(M1 程式內寫入真 NUL byte 使 git 視為二進位 → 改 `buf.indexOf(0)`，檔內 0 個 NUL；M2 允許檔可藏第二出口 → 主機名限一次 + vitest 全 PROVIDERS；M3 SDK/env base URL 繞過 → 加套件名與讀 key 規則；M4 UTF-16 檔被略過 → 去 NUL 照掃；M5 agent 讀的 markdown 未掃 → 納入；m 套件名/llm-perplexity 裸字/parity 未進 CI 皆已補；m「只在 push 後報警、不擋部署」未做，見剩餘風險)
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,.github | grep=`api\.perplexity\.ai|@perplexity-ai/|llm-perplexity|PERPLEXITY_API_KEY` | hits=守門實掃 6772 檔 0 違規(僅允許清單內檔案命中)
+
+[剩餘風險] ① 守門是事後偵測(push 後紅燈)，未接進 `sg-deploy.sh` 部署閘(動正式部署腳本 = High，待操作者)② 真正的根治仍是後台撤銷 fWoh——repo 內全部封死也管不到已外洩的 key ③ Perplexity 官方文件未見「硬性消費上限」功能(僅用量分級)，是否有需登入後台確認
+[rollback] `git revert` 本 commit
+WORKLOG_DONE: Perplexity Search-only CI 守門 + 定期任務排查

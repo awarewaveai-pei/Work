@@ -1,0 +1,32 @@
+name: Perplexity Search-only guard
+
+# Perplexity may only be called on POST /search. Chat/agent endpoints drained the
+# account twice (2026-06-21, 2026-09-12). Runs on every change so no path, template,
+# or plugin install can reintroduce them. Local: node scripts/check-perplexity-search-only.mjs
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  perplexity-search-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Self-test
+        run: node scripts/check-perplexity-search-only.mjs --self-test
+
+      - name: Scan tracked files
+        run: node scripts/check-perplexity-search-only.mjs
+
+      - name: Deny-list parity (workstation template + remote-session mirror)
+        run: node --test tests/hooks/settings-deny-parity.test.mjs
