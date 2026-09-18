@@ -42,7 +42,7 @@
    - **B. digest 釘選**（最硬）：`image: repo/name@sha256:...` — 在 **WORKLOG** 記「為何在這天升級／回滾方式」。  
 3. **龍蝦自有 image**（`lobster-phase1-*:local`）：以 **Git commit SHA** 或 **日曆版本** 在 `WORKLOG` 標記「當前 production 對應哪個 repo 版本」。  
 4. **PHP / MariaDB / WordPress**：大版本跳躍（例如 PHP 8.2 → 8.4）前，必做 **staging 外掛相容矩陣**（WP 生態最易卡這裡）。
-5. **回滾快照（deploy 前必做）**：部署本地映像（`wordpress`、`node-api`、`next-admin`）前，先執行 `scripts/rollback-phase1.sh save <service>`，將 `:local` 快照存為 `:rollback-YYYYMMDD-HHMMSS`；出問題時 `restore` 一鍵還原。操作正本：`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`。
+5. **回滾快照（deploy 前必做）**：部署本地映像（`wordpress`、`node-api`、`next-admin`）前，先執行 `scripts/rollback-phase1.sh save <service>`，將**正在跑的 container 的 image**（沒有才用 `:local`；都沒有＝首次部署，印 `Saved: NONE`）存為 `:rollback-YYYYMMDD-HHMMSS`（`sg-deploy.sh` Step 2.5 自動執行）；出問題時 `restore` 一鍵還原。操作正本：`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`。
 
 ---
 

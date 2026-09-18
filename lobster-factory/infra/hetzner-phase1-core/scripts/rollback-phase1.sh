@@ -4,8 +4,10 @@
 # Run from lobster-factory/infra/hetzner-phase1-core/ on the VPS.
 #
 # COMMANDS
-#   save    <service>              snapshot :local image before a deploy
-#   restore <service> [snapshot]   re-tag snapshot → :local and restart (default: latest)
+#   save    <service>              snapshot the RUNNING container's image before a deploy
+#                                  (:local only if none runs; neither -> "Saved: NONE", first deploy)
+#   restore <service> [snapshot]   re-tag snapshot → :local and restart (default: latest;
+#                                  sg-deploy always passes the tag its own save printed)
 #   list    [service]              list available snapshots (all or one service)
 #   clean   <service> [days]       remove snapshots older than N days (default: 30)
 #   n8n-pin <semver-tag>           update N8N_IMAGE_TAG in .env and restart n8n
@@ -78,7 +80,7 @@ wait_healthy() {
 usage() {
   cat <<'EOF'
 Usage:
-  rollback-phase1.sh save    <service>              snapshot :local before deploy
+  rollback-phase1.sh save    <service>              snapshot the running image before deploy
   rollback-phase1.sh restore <service> [snapshot]   roll back (default: latest snapshot)
   rollback-phase1.sh list    [service]              list available snapshots
   rollback-phase1.sh clean   <service> [days]       prune snapshots older than N days (default: 30)
@@ -101,10 +103,24 @@ case "$cmd" in
     svc="${2:-}"; [[ -z "$svc" ]] && { echo "ERROR: service name required"; usage; }
     img="${IMAGE_MAP[$svc]:-}"
     [[ -z "$img" ]] && die "unknown local-build service '$svc'. Valid: ${!IMAGE_MAP[*]}"
-    image_exists "$img:local" || die "$img:local not found — build first: docker compose --env-file .env build $svc"
+    # Snapshot the image the RUNNING container uses, not :local (critic review 2026-09-19):
+    # after a deploy that failed post-build, :local IS that failed build, so saving it would
+    # make the next rollback re-deploy the broken image. :local is only the fallback when no
+    # container runs. Neither one = first deploy: nothing to roll back to, reported as
+    # "Saved: NONE" (exit 0) so sg-deploy can tell it apart from a failed save.
+    cd "$ROOT"
+    cid=$(docker compose --env-file "$ENV_FILE" ps -q "$svc" 2>/dev/null | head -1 || true)
+    src=""
+    [[ -n "$cid" ]] && src=$(docker inspect -f '{{.Image}}' "$cid" 2>/dev/null || true)
+    [[ -z "$src" ]] && image_exists "$img:local" && src="$img:local"
+    if [[ -z "$src" ]]; then
+      log "save | service=$svc | snapshot=NONE (no running container, no $img:local -- first deploy) | user=${USER:-unknown}"
+      echo "Saved: NONE"
+      exit 0
+    fi
     snapshot_tag="rollback-$STAMP"
-    docker tag "$img:local" "$img:$snapshot_tag"
-    log "save | service=$svc | snapshot=$img:$snapshot_tag | user=${USER:-unknown}"
+    docker tag "$src" "$img:$snapshot_tag"
+    log "save | service=$svc | snapshot=$img:$snapshot_tag | source=$src | user=${USER:-unknown}"
     echo "Saved: $img:$snapshot_tag"
     ;;
 
@@ -132,7 +148,9 @@ case "$cmd" in
       log "health | service=$svc | status=PASS"
     else
       log "health | service=$svc | status=FAIL"
-      echo "WARNING: health check did not pass — inspect logs: docker compose logs $svc"
+      echo "ERROR: restored $svc did not pass its health check — inspect logs: docker compose logs $svc"
+      # Non-zero so sg-deploy counts it as ROLLBACK_FAILED instead of reporting a clean revert.
+      exit 1
     fi
     echo "Rollback done. Verify: docker compose ps"
     ;;

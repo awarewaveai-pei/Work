@@ -48,8 +48,25 @@
   - 發現兩個 fixture 案件的標籤同為 `#aaaaaaaa`（id 前 8 碼相同），補上「開立於」日期（index.html seed 面板 caseChips）。
 - **順帶抓到部署安全缺口**：sg-deploy 的 log 出現 `WARN: scripts/rollback-phase1.sh not executable; auto-rollback disabled this run`，但檔案本身是 755。
   - 根因：`sg-deploy.sh:99` 用 `$(dirname "$0")` 組相對路徑；依文件叫法 `bash scripts/sg-deploy.sh` 執行時，step 1 會 `cd /root/Work`，`-x` 檢查就指到不存在的路徑。
-  - 影響：伺服器 log 顯示至少從 2026-07-04 起，每次部署的自動回滾都被靜默停用，AGENTS §0 宣稱的「失敗自動 rollback」其實不成立。
+  - 影響（依 critic m2 訂正範圍，已查證）：只有手動用相對路徑呼叫的部署受影響。749 份 sg-deploy log 中有 93 份停用了回滾，最早一份是 2026-07-04。自動化路徑（`auto-deploy-next-admin.sh`、GHA）用絕對路徑呼叫，`rollback.log` 裡有 484 筆 `save |`，回滾正常。
   - 修正：改由 `SELF_PATH` 推導（`:52`，在任何 cd 之前就算好的絕對路徑）。同檔已無其他以 `$0` 組出的路徑。`rollback-phase1.sh` 自己用 `BASH_SOURCE` 算 ROOT，不受工作目錄影響。
+- Quick critic 覆審這一行修正：0c/4m/2n。判定修正本身正確，但啟用回滾路徑後會暴露既有問題，一併修掉。不變量：只要有可回滾的 app，回滾就必須可用，而且還原的是本次部署前實際在跑的 image。
+  - M1：step 1.8 自更新時用 `exec`，PID 不變、EXIT trap 不會跑，於是撞上自己留下的 lock。影響：任何改到 sg-deploy.sh 的 commit，下一次部署都會中止（本 commit 也會觸發）。修正：lock 檢查遇到 `LOCK_PID == $$` 視為自己的 lock，直接繼續。
+  - M2：`save` 原本快照 `:local`，但上一次失敗部署後 `:local` 就是壞 build。修正：改快照正在跑的 container 的 image；沒有 container 才用 `:local`；兩者都沒有就是首次部署，印 `Saved: NONE`。
+  - M3：Step 6 unhealthy／逾時原本只 fail，壞 container 會留在 prod。修正：抽出 `do_rollback`，Step 6、7 共用。
+  - M4：腳本不可執行或 save 失敗時原本只 WARN、繼續部署。修正：改成在 build 前就 fail。
+  - m1：restore 原本抓「最新的 rollback-*」。修正：改還原本次 save 出來的 tag。
+  - 另外，restore 之後 health 失敗改為 exit 1，才會被算成 ROLLBACK_FAILED。
+  - runbook `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1 Step 2.5/6/7 同步。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scratchpad/rollback_harness.sh（stub docker：真實執行 rollback-phase1 save/restore 共 5 案；從 sg-deploy.sh 原文抽出 do_rollback 跑 4 案；tag 解析 2 案；lock 2 案） | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation（拔掉 own-PID lock 分支、restore 不帶本次 tag → 各自的指定測試 FAIL，還原後 13/13） | exit=0 | ms=8000
+- Quick critic 複審 rework：pass 0c/0m/3n，3 個 Minor 已修：
+  - m1：tag 解析不到時，只有明確的 `Saved: NONE` 才放行；其他情況在 build 前 fail。已在 `set -euo pipefail` 下實測 3 種輸出。
+  - m2：過時說法已更新，位置是 `rollback-phase1.sh` 檔頭、`LONG_TERM_OPS.md:45`。
+  - m3：開跑取得 lock 後先清掉上一次的 `.rollback-triggered`。`auto-deploy-next-admin.sh:123` 依 `rollback_failures=` 決定通知內容：還原失敗時發 URGENT，不再宣稱「已還原」。
+  - s1（混合 restorable／non-restorable 的部署回寫 `.deployed-commit`）：屬於既有行為，這類部署很少，不修。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=`rollback-phase1.sh restore\|rollback-phase1.sh save\|rollback-triggered\|snapshot :local` | hits=4（runbook §2.1、LONG_TERM_OPS:45、rollback-phase1 檔頭、auto-deploy-next-admin:123；都已同步），其餘是手動操作說明，行為不變
 
 ## 2026-09-19（續80）訂正續78「≥250/285」為精確值：operator 質疑「自己亂掰」，逐一 introspect 真實 builder 簽名算出 266/285
 

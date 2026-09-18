@@ -77,7 +77,12 @@ LOCK_FILE="/tmp/sg-deploy.lock"
 LOCK_HELD=0
 if [ -f "$LOCK_FILE" ] && [ "$FORCE" -eq 0 ]; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-  if [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
+  if [ "$LOCK_PID" = "$$" ]; then
+    # Our own lock, inherited across step 1.8's self-update `exec` (exec keeps the PID and
+    # never runs the EXIT trap). Without this, every deploy that pulled a changed
+    # sg-deploy.sh aborted here as "Another deploy is running (PID <self>)".
+    :
+  elif [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
     echo "[sg-deploy] Another deploy is running (PID $LOCK_PID). Use --force to override."
     exit 1
   else
@@ -88,6 +93,9 @@ fi
 echo $$ > "$LOCK_FILE"
 LOCK_HELD=1
 trap 'if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi' EXIT INT TERM
+# A previous run's rollback marker must not be reported as THIS run's rollback when this run
+# fails before reaching do_rollback (auto-deploy-next-admin.sh reads it on any failure).
+rm -f "$STAGING_DIR/.rollback-triggered"
 
 if [[ ${#APPS[@]} -eq 0 ]]; then
   APPS=(next-admin)
@@ -96,7 +104,11 @@ fi
 # C1 fix (Errata EMaj-2): partition APPS into restorable (have image snapshot semantics
 # in rollback-phase1.sh IMAGE_MAP) vs not. Only restorable apps participate in
 # save-before-build + restore-on-smoke-fail.
-ROLLBACK_SCRIPT="$(dirname "$0")/rollback-phase1.sh"
+# From SELF_PATH (absolute, resolved before any cd), never "$(dirname "$0")": the documented
+# invocation is `bash scripts/sg-deploy.sh` (relative $0) and step 1 cd's to $REPO_DIR, so a
+# $0-relative path pointed at /root/Work/scripts/ -- the -x check failed and auto-rollback was
+# silently disabled on every such run (WORKLOG 2026-09-19 續81; logs show it since 2026-07-04).
+ROLLBACK_SCRIPT="$(dirname "$SELF_PATH")/rollback-phase1.sh"
 RESTORABLE_APPS=()
 NON_RESTORABLE_APPS=()
 for _app in "${APPS[@]}"; do
@@ -233,16 +245,30 @@ fi
 #     Without this, the first auto-rollback fires on a build that has no snapshot →
 #     rollback-phase1.sh restore would error. We snapshot every restorable app pre-build
 #     so the smoke-fail rollback path always has a tag to restore.
+#     Invariant (critic review 2026-09-19): a restorable app is never built without a working
+#     rollback point from THIS run. A missing script or a failed save stops the deploy before
+#     build; a WARN-and-continue here is what hid the $0-relative path bug for months.
+#     SNAPSHOT_TAG[app] = this run's tag, so rollback restores exactly it, never "latest
+#     rollback-*" (which a failed save would silently turn into an older deploy's image).
+#     Empty = first deploy of that app (save printed "Saved: NONE"): nothing to roll back to.
+declare -A SNAPSHOT_TAG=()
 if [[ ${#RESTORABLE_APPS[@]} -gt 0 ]]; then
-  if [[ -x "$ROLLBACK_SCRIPT" ]]; then
-    log "--- snapshot before build (rollback prep) ---"
-    for APP in "${RESTORABLE_APPS[@]}"; do
-      "$ROLLBACK_SCRIPT" save "$APP" 2>&1 | tee -a "$LOG_FILE" \
-        || log "WARN: snapshot save for $APP failed; auto-rollback will not be available for this app"
-    done
-  else
-    log "WARN: $ROLLBACK_SCRIPT not executable; auto-rollback disabled this run"
-  fi
+  [[ -x "$ROLLBACK_SCRIPT" ]] \
+    || fail "$ROLLBACK_SCRIPT not executable -- refusing to deploy ${RESTORABLE_APPS[*]} without auto-rollback"
+  log "--- snapshot before build (rollback prep) ---"
+  for APP in "${RESTORABLE_APPS[@]}"; do
+    if ! _save_out=$("$ROLLBACK_SCRIPT" save "$APP" 2>&1); then
+      printf '%s\n' "$_save_out" | tee -a "$LOG_FILE"
+      fail "snapshot save for $APP failed -- refusing to deploy without a rollback point"
+    fi
+    printf '%s\n' "$_save_out" | tee -a "$LOG_FILE"
+    SNAPSHOT_TAG[$APP]=$(printf '%s\n' "$_save_out" | sed -n 's/^Saved: [^:]*:\(rollback-[0-9-]*\)$/\1/p' | tail -1)
+    # Empty tag is accepted ONLY for an explicit first deploy; anything else (e.g. save's
+    # tag format changed) must not quietly become "nothing to restore" at rollback time.
+    if [[ -z "${SNAPSHOT_TAG[$APP]}" ]] && ! grep -qx 'Saved: NONE' <<< "$_save_out"; then
+      fail "cannot parse snapshot tag for $APP from save output -- refusing to deploy without a rollback point"
+    fi
+  done
 fi
 if [[ ${#NON_RESTORABLE_APPS[@]} -gt 0 ]]; then
   log "WARN: apps outside rollback-phase1.sh IMAGE_MAP, no auto-rollback for: ${NON_RESTORABLE_APPS[*]}"
@@ -282,7 +308,46 @@ echo "$NEW_COMMIT" > "$STAGING_DIR/.deployed-commit"
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.deployed-at"
 log "wrote .deployed-commit = $NEW_COMMIT (previous: ${PREVIOUS_COMMIT:-none})"
 
-# 6. wait for healthy (informational; does not invalidate the .deployed-commit record)
+# Auto-rollback: ONE path for every post-`up` failure (health in step 6, smoke in step 7).
+# Before 2026-09-19 only smoke failure rolled back; an unhealthy/crash-looping new container
+# (the most common failed-deploy shape) was left running with .deployed-commit advanced.
+# Restores each restorable app to SNAPSHOT_TAG from this run, reverts .deployed-commit,
+# always exits non-zero. AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false (drill mode) skips it.
+rollback_enabled() { [[ "${AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL:-true}" == "true" ]]; }
+do_rollback() {
+  local reason="$1" smoke_errors="${2:-0}" failures=0 app tag
+  log "--- AUTO-ROLLBACK triggered: $reason ---"
+  [[ ${#RESTORABLE_APPS[@]} -gt 0 ]] || fail "$reason; no restorable apps in this deploy, cannot auto-rollback"
+  for app in "${RESTORABLE_APPS[@]}"; do
+    tag="${SNAPSHOT_TAG[$app]:-}"
+    if [[ -z "$tag" ]]; then
+      log "ROLLBACK_FAILED for $app -- no snapshot from this run (first deploy of $app, nothing to restore)"
+      failures=$((failures + 1)); continue
+    fi
+    log "rolling back $app to $tag..."
+    if ! "$ROLLBACK_SCRIPT" restore "$app" "$tag" 2>&1 | tee -a "$LOG_FILE"; then
+      log "ROLLBACK_FAILED for $app -- manual intervention required"
+      failures=$((failures + 1))
+    fi
+  done
+  if [[ -n "$PREVIOUS_COMMIT" ]]; then
+    echo "$PREVIOUS_COMMIT" > "$STAGING_DIR/.deployed-commit"
+    log ".deployed-commit reverted to $PREVIOUS_COMMIT (pre-rollback state)"
+  fi
+  printf 'ROLLBACK|smoke_errors=%d|rollback_failures=%d|%s|reason=%s\n' \
+    "$smoke_errors" "$failures" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$reason" \
+    > "$STAGING_DIR/.rollback-triggered"
+  if [[ "$failures" -gt 0 ]]; then
+    fail "auto-rollback fired ($reason) but $failures app(s) failed to restore; URGENT manual check required"
+  fi
+  fail "auto-rollback fired ($reason); new code reverted to this run's pre-deploy snapshot"
+}
+health_fail() {
+  rollback_enabled && do_rollback "$1"
+  fail "$1"
+}
+
+# 6. wait for healthy. Failure -> auto-rollback (see do_rollback).
 for APP in "${APPS[@]}"; do
   CONTAINER="$(app_container_name "$APP")"
   log "--- waiting for $CONTAINER healthy ---"
@@ -295,10 +360,10 @@ for APP in "${APPS[@]}"; do
       log "$CONTAINER no healthcheck defined; assuming OK"; break
     fi
     if [[ "$STATUS" == "unhealthy" ]]; then
-      fail "$CONTAINER unhealthy"
+      health_fail "$CONTAINER unhealthy"
     fi
     sleep 1
-    [[ $i -eq 60 ]] && fail "$CONTAINER did not become healthy in 60s (status=$STATUS)"
+    [[ $i -eq 60 ]] && health_fail "$CONTAINER did not become healthy in 60s (status=$STATUS)"
   done
 done
 
@@ -400,37 +465,8 @@ if [[ "$_smoke_errors" -gt 0 ]]; then
   printf '%s|%s\n' "$_smoke_errors" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.smoke-warn"
 
   # C1: Plan §五 third-layer auto-rollback (default ON).
-  if [[ "${AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL:-true}" == "true" ]]; then
-    log "--- AUTO-ROLLBACK triggered by smoke failure ---"
-    if [[ ${#RESTORABLE_APPS[@]} -eq 0 ]]; then
-      log "ERROR: no restorable apps in this deploy; cannot auto-rollback"
-      fail "smoke check failed and no restorable apps to roll back"
-    fi
-    if [[ ! -x "$ROLLBACK_SCRIPT" ]]; then
-      log "ERROR: $ROLLBACK_SCRIPT not executable; auto-rollback unavailable"
-      fail "smoke check failed and rollback script unavailable"
-    fi
-    _rollback_failures=0
-    for APP in "${RESTORABLE_APPS[@]}"; do
-      log "rolling back $APP to previous snapshot..."
-      if ! "$ROLLBACK_SCRIPT" restore "$APP" 2>&1 | tee -a "$LOG_FILE"; then
-        log "ROLLBACK_FAILED for $APP -- manual intervention required"
-        _rollback_failures=$((_rollback_failures + 1))
-      fi
-    done
-    # Revert .deployed-commit to pre-deploy state so drift detector reflects rollback.
-    if [[ -n "$PREVIOUS_COMMIT" ]]; then
-      echo "$PREVIOUS_COMMIT" > "$STAGING_DIR/.deployed-commit"
-      log ".deployed-commit reverted to $PREVIOUS_COMMIT (pre-rollback state)"
-    fi
-    printf 'ROLLBACK|smoke_errors=%d|rollback_failures=%d|%s\n' \
-      "$_smoke_errors" "$_rollback_failures" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-      > "$STAGING_DIR/.rollback-triggered"
-    if [[ "$_rollback_failures" -gt 0 ]]; then
-      fail "auto-rollback fired but $_rollback_failures app(s) failed to restore; URGENT manual check required"
-    else
-      fail "auto-rollback fired after smoke check; new code reverted to previous snapshot"
-    fi
+  if rollback_enabled; then
+    do_rollback "smoke check: $_smoke_errors endpoint(s) non-2xx" "$_smoke_errors"
   else
     log "AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false -- DRILL MODE; leaving degraded state for inspection"
   fi

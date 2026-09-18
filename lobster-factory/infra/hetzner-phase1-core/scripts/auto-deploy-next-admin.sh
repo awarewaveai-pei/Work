@@ -122,7 +122,11 @@ else
     # sg-deploy now exits non-zero AFTER firing rollback-phase1.sh restore on smoke fail.
     if [[ -f "$DEPLOY_DIR/.rollback-triggered" ]]; then
         _rb=$(cat "$DEPLOY_DIR/.rollback-triggered" 2>/dev/null || echo "?")
-        ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED: ${_rb}\n(previous snapshot restored; new code reverted)"
+        if [[ "$_rb" == *"rollback_failures=0|"* ]]; then
+            ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED: ${_rb}\n(previous snapshot restored; new code reverted)"
+        else
+            ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED BUT RESTORE FAILED: ${_rb}\n(URGENT: prod may be running the failed build -- manual check)"
+        fi
         log "ROLLBACK flag detected: $_rb"
     fi
     post_to_ops_inbox "deploy_failed"
