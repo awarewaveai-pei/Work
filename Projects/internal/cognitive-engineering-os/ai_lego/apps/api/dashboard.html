@@ -34,6 +34,12 @@
   .tabs button.on { background:var(--surface); color:var(--accent); box-shadow:var(--shadow-1); }
   .pill { padding:var(--sp-1) var(--sp-3); border:1px solid var(--line); background:var(--surface); border-radius:var(--radius-pill); cursor:pointer; font-size:var(--fs-xs); color:var(--ink-soft); }
   .pill.on { background:var(--accent-bg); border-color:var(--accent-line); color:var(--accent); font-weight:700; }
+  .pill.tiny { padding:.05rem .5rem; }
+  .fivew1h-grid { display:flex; flex-direction:column; gap:var(--sp-3); }
+  .fivew1h-row { border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--sp-3); }
+  .fivew1h-dim { font-weight:700; font-family:ui-monospace, Consolas, monospace; margin-bottom:var(--sp-2); color:var(--accent-dark); }
+  .fivew1h-row .row { margin-top:0; }
+  .fivew1h-row label { margin-top:var(--sp-2); }
   input, textarea, select { width:100%; padding:var(--sp-2) var(--sp-3); border:1px solid var(--line); border-radius:var(--radius-sm); font:inherit; color:var(--ink); background:var(--surface); }
   input:focus, textarea:focus { outline:2px solid var(--accent-line); outline-offset:1px; border-color:var(--accent); }
   textarea { font-family:ui-monospace, Consolas, monospace; font-size:.82rem; }
@@ -933,6 +939,121 @@ function verdictLine(v) {
   if (v.ok === null) return '○ ' + (v.error || '待執行時驗證');
   return '✘ 被方法拒絕：' + (v.error || '');
 }
+// ---------- structured array field widgets ----------
+// The loop below renders one generic textarea per Python builder parameter, expecting the
+// operator to hand-type JSON for anything that isn't a plain string -- correct for flat str
+// params, but for a FIXED positional array of typed sub-objects (e.g. 5W1H's own 6
+// WHO/WHAT/WHEN/WHERE/WHY/HOW dimensions -- the entire point of that method, methods/contracts/
+// framing.five_w_one_h.contract.yaml preconditions) it collapses the method's real structure
+// into one opaque "Dimensions" box. Operator flagged this 2026-09-19 ("跟 5W1H 有什麼關係") --
+// this registry is the extension point: register "<method_id>.<field_name>" -> {label, render}
+// for any other method whose builder takes the same kind of Atlas-cited fixed dimension/criterion
+// set (root_cause.kepner_tregoe, framing.smart, ... -- same positionally-ordered class, not yet
+// registered here) instead of copy-pasting a new branch into the render loop below.
+const FIVEW1H_DIMENSION_ORDER = ['WHO', 'WHAT', 'WHEN', 'WHERE', 'WHY', 'HOW'];
+const FIVEW1H_DIMENSION_LABELS = { WHO: 'WHO・誰', WHAT: 'WHAT・什麼事', WHEN: 'WHEN・何時', WHERE: 'WHERE・何地', WHY: 'WHY・為什麼', HOW: 'HOW・如何' };
+
+// dimension_entry.provenance is required per dimension (5w1h-record.schema.yaml $defs.dimension_entry)
+// but nothing auto-supplies it the way /invoke defaults the RECORD-level provenance (main.py
+// `body.pop("provenance", None) or make_provenance(...)`) -- so this widget must assemble a valid
+// one itself. Two-way toggle per row (not the full 11/6-value enum picker -- that's 17 buttons per
+// row for a case this project's own canonical example already answers) maps onto the exact pairing
+// specs/cognitive/typed-objects/5w1h-record.schema.yaml's own worked example uses: KNOWN+human ->
+// EVIDENCE/HUMAN_APPROVED, UNKNOWN+AI -> HYPOTHESIS/AI_SUGGESTED (epistemic-label.schema.yaml enums).
+// Defaults to "human" for both statuses: the operator is directly typing into this exact box, so
+// silently labeling their own words AI_GENERATED would itself be a false provenance claim.
+function fiveW1HProvenance(status, humanConfirmed) {
+  if (status === 'KNOWN') {
+    return humanConfirmed
+      ? { epistemic_type: 'EVIDENCE', authorship_state: 'HUMAN_APPROVED' }
+      : { epistemic_type: 'AI_INFERENCE', authorship_state: 'AI_GENERATED' };
+  }
+  return humanConfirmed
+    ? { epistemic_type: 'ASSUMPTION', authorship_state: 'HUMAN_ORIGINAL' }
+    : { epistemic_type: 'HYPOTHESIS', authorship_state: 'AI_SUGGESTED' };
+}
+
+function renderFiveW1HDimensions(container, name, onAssembled) {
+  // rows[dim] is UI-only working state; assemble() below turns it into the real
+  // dimension_entry shape (ai_lego/modules/framing/five_w_one_h.py dimension_entry) on every
+  // change, same as the generic textarea path writes state.data[name] on every keystroke.
+  const existing = Array.isArray(state.data[name]) ? state.data[name] : null;
+  const rows = {};
+  FIVEW1H_DIMENSION_ORDER.forEach((dim, i) => {
+    const e = existing && existing[i] && existing[i].dimension === dim ? existing[i] : null;
+    rows[dim] = {
+      status: e ? e.status : 'UNKNOWN',
+      answer: e && e.answer ? e.answer : '',
+      gapNote: e && e.gap_note ? e.gap_note : '',
+      // Round-trips only the 2 canonical pairs above -- an existing entry with some other
+      // authorship_state (e.g. HUMAN_EDITED, SOURCE_QUOTATION) collapses to the nearest bucket
+      // here; the operator can flip the toggle if that guess is wrong. Disclosed simplification,
+      // not silent data loss: assemble() below always re-derives a schema-valid pair either way.
+      humanConfirmed: !e || !e.provenance || e.provenance.authorship_state === 'HUMAN_APPROVED' || e.provenance.authorship_state === 'HUMAN_ORIGINAL' || e.provenance.authorship_state === 'HUMAN_EDITED',
+    };
+  });
+
+  function assemble() {
+    return FIVEW1H_DIMENSION_ORDER.map(dim => {
+      const r = rows[dim];
+      const entry = { dimension: dim, status: r.status, provenance: fiveW1HProvenance(r.status, r.humanConfirmed) };
+      if (r.status === 'KNOWN') { if (r.answer.trim()) entry.answer = r.answer; }
+      else if (r.gapNote.trim()) entry.gap_note = r.gapNote;
+      return entry;
+    });
+  }
+  function commit() { state.data[name] = assemble(); onAssembled(); }
+
+  const wrap = el('div', 'fivew1h-grid');
+  FIVEW1H_DIMENSION_ORDER.forEach(dim => {
+    const r = rows[dim];
+    const row = el('div', 'fivew1h-row');
+    row.appendChild(el('div', 'fivew1h-dim', FIVEW1H_DIMENSION_LABELS[dim]));
+
+    const knownBtn = el('button', 'pill', '已知'); knownBtn.type = 'button';
+    const unknownBtn = el('button', 'pill', '未知（缺口）'); unknownBtn.type = 'button';
+    const toggle = el('div', 'row'); toggle.appendChild(knownBtn); toggle.appendChild(unknownBtn);
+    const body = el('div');
+
+    function renderStatusBtns() {
+      knownBtn.classList.toggle('on', r.status === 'KNOWN');
+      unknownBtn.classList.toggle('on', r.status === 'UNKNOWN');
+    }
+    function renderBody() {
+      clear(body);
+      const ta = el('textarea'); ta.rows = 2;
+      if (r.status === 'KNOWN') { ta.placeholder = '這個面向的答案…'; ta.value = r.answer; ta.addEventListener('input', () => { r.answer = ta.value; commit(); }); }
+      else { ta.placeholder = '（選填）還缺什麼資訊才能回答…'; ta.value = r.gapNote; ta.addEventListener('input', () => { r.gapNote = ta.value; commit(); }); }
+      body.appendChild(ta);
+
+      const srcLbl = el('label', null, '來源');
+      const meBtn = el('button', 'pill tiny' + (r.humanConfirmed ? ' on' : ''), r.status === 'KNOWN' ? '我自己確認的' : '我自己判斷的');
+      const aiBtn = el('button', 'pill tiny' + (!r.humanConfirmed ? ' on' : ''), r.status === 'KNOWN' ? 'AI 推論，未確認' : 'AI 推測的缺口');
+      meBtn.type = 'button'; aiBtn.type = 'button';
+      meBtn.onclick = () => { r.humanConfirmed = true; commit(); renderBody(); };
+      aiBtn.onclick = () => { r.humanConfirmed = false; commit(); renderBody(); };
+      const srcToggle = el('div', 'row'); srcToggle.appendChild(meBtn); srcToggle.appendChild(aiBtn);
+      body.appendChild(srcLbl); body.appendChild(srcToggle);
+    }
+    knownBtn.onclick = () => { r.status = 'KNOWN'; commit(); renderStatusBtns(); renderBody(); };
+    unknownBtn.onclick = () => { r.status = 'UNKNOWN'; commit(); renderStatusBtns(); renderBody(); };
+    renderStatusBtns(); renderBody();
+    row.appendChild(toggle); row.appendChild(body);
+    wrap.appendChild(row);
+  });
+  container.appendChild(wrap);
+  commit(); // seed state.data[name] with a schema-shaped value immediately, same as the generic
+  // path's openMethod pre-seed (line ~584) -- an untouched required field must never submit as
+  // the pre-seeded '' string; here it submits as 6 well-formed UNKNOWN entries instead.
+}
+
+const STRUCTURED_ARRAY_FIELDS = {
+  'framing.five_w_one_h.dimensions': {
+    label: 'WHO／WHAT／WHEN／WHERE／WHY／HOW（六個面向，這個方法的核心欄位）',
+    render: renderFiveW1HDimensions,
+  },
+};
+
 function renderMethodFields(draft) {
   const box = $('fields'); clear(box);
   const vd = $('draft-verdict'); vd.textContent = draft ? verdictLine(draft.validation) : '手動填寫：字串直接打字；清單或物件用 JSON。';
@@ -942,19 +1063,26 @@ function renderMethodFields(draft) {
   names.forEach(name => {
     if (name === 'provenance' || name === 'record_id') return;
     const p = state.params.find(x => x.name === name) || { required: false };
-    const v = state.data[name];
+    const structured = STRUCTURED_ARRAY_FIELDS[state.id + '.' + name];
     const f = el('div', 'field');
+    const lbl = el('label'); lbl.title = name;
+    lbl.appendChild(document.createTextNode(structured ? structured.label : readableFieldLabel(name)));
+    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
+    f.appendChild(lbl);
+    if (structured) {
+      structured.render(f, name, () => { $('raw-json').value = pretty(state.data); });
+      box.appendChild(f);
+      return;
+    }
+    const v = state.data[name];
     const ta = el('textarea'); ta.rows = (typeof v === 'string' || v === undefined) ? 2 : Math.min(14, valueToText(v).split('\n').length + 1);
     ta.value = v === undefined ? '' : valueToText(v);
     ta.dataset.name = name; ta.dataset.str = (typeof v === 'string' || v === undefined) ? '1' : '0';
     ta.addEventListener('input', () => { const val = textToValue(ta.value, ta.dataset.str === '1'); if (ta.value.trim() === '' && !p.required) delete state.data[name]; else state.data[name] = val; $('raw-json').value = pretty(state.data); });
-    const lbl = el('label'); lbl.title = name;
-    lbl.appendChild(document.createTextNode(readableFieldLabel(name)));
-    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
     if (selfIdCandidate(name, state.params, state.selfIdPrefix)) {
       appendIdSuggestButton(lbl, state.selfIdPrefix, (val) => { ta.value = val; ta.dataset.str = '1'; state.data[name] = val; $('raw-json').value = pretty(state.data); });
     }
-    f.appendChild(lbl); f.appendChild(ta); box.appendChild(f);
+    f.appendChild(ta); box.appendChild(f);
   });
   $('raw-json').value = pretty(state.data);
 }
