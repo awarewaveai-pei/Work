@@ -1,4 +1,36 @@
 # Worklog
+## 2026-09-18（續11）Task 3c 真圖表渲染（森林圖+泡泡圖，matplotlib），critic 覆審 3 Major+1 Minor 全修，真實 docker build 驗證+順手修一個真的權限問題
+
+[任務] 另一並行 session（02- 知識庫和資料蒐集架構）交接 Task 3c：representation 模組目前零真實圖表渲染（既有方法/能力只產生結構化資料，從未產生點陣圖）；操作者明確要求真正的資料圖表，不是 AI 生圖。matplotlib 是新依賴，本 session 已用 AskUserQuestion 取得操作者明確同意（「同意 (推薦)」）才動工，符合 AGENTS.md Medium-risk 規則。範圍明確限定：森林圖（point estimate + CI）+ 泡泡圖（x/y/size）兩種，不含寫回知識庫（另一並行 task）。
+
+[已修改]
+- 新 capability `artifact.generate_chart`：contract `capabilities/contracts/artifact.generate_chart.capability.yaml`（刻意寫精簡版——同系統舊有姐妹 capability contract 動輒 400+ 行 compilation_decisions 散文，AGENTS.md §9 現在要求新治理文件走密度優先，不比照舊檔案風格）；runtime `ai_lego/modules/representation/chart_render.py`，掛進 `ai_lego/apps/recipe_runtime.py build_registered_capability_adapters()`。輸出比照既有 `persist_artifact_output()` 契約：`{"artifact": {"artifact_type": "image/png", "content": "<base64 str>"}}`，Agg backend（無顯示、無網路）。
+- `pyproject.toml` 加 `matplotlib>=3.9`（此檔異動落在並行 session 自己的 commit `6230c5b8a`，共用 index 被掃進去的同一種現象，內容正確已驗證，未重做）。
+- `Dockerfile`：確認並更新註解（matplotlib 確實走 manylinux wheel，不需 build-essential）+ 新增 `ENV MPLCONFIGDIR`（見下方真實發現）。
+
+[獨立驗證交接時揭露的兩個風險，未假設，真的去測]
+1. **Dockerfile「不需 build-essential」的宣稱**：真的跑 `docker build`（非本機 `pip install` 就假設過關）——確認 matplotlib 從 `manylinux2014_x86_64` wheel 安裝，零編譯。過程中意外抓到一個真實問題：容器內非 root 使用者（`cognitive`）沒有可寫入的 home 目錄，matplotlib 預設 cache 路徑因此權限被拒，靜默 fallback 到 `/tmp` 並在每次啟動印警告——已修：`ENV MPLCONFIGDIR` 指向 Dockerfile 裡已經 `chown` 給 `cognitive` 的 `.runtime` 目錄。修後重建+重跑容器，警告消失，`docker run` + `curl /health` + `curl /methods`（281 個方法）全部正常。
+2. **base64 PNG 輸出真的是圖片，不是只驗字串長度**：真的 base64 decode 後檢查 PNG magic bytes（`\x89PNG\r\n\x1a\n`）+ 真的用 Pillow `Image.open().verify()` 解碼，本機 pytest 跟容器內都各測一次。
+
+[critic 覆審（1 agent，Standard tier），3 Major + 1 Minor，全部有真實可重現證據（非臆測），全修]
+1. **Major**：`rows`/`points` 清單長度沒有上限，直接餵進 matplotlib 的 figsize/畫布配置——~10 萬筆 rows 會讓單一請求配置到數十 GB（Agg framebuffer = 寬×高×4 bytes），且整個 API 是單一 process，OOM 會拖垮所有租戶。已修：加 `MAX_ROWS=200`／`MAX_POINTS=500`，比照本系統既有慣例（`decision_tree.py MAX_TREE_DEPTH`／`focus_group.py MAX_PARTICIPANTS`／`morphological_analysis.py MAX_RAW_COMBINATION_SPACE`）。
+2. **Major**：`title`/`label` 若包含裸 `$$`（matplotlib mathtext 解析器會丟例外），會在 `plt.subplots()` 之後、`return fig` 之前中斷——critic 實測用 `plt.get_fignums()` 證實此時 Figure 永久洩漏在 process 全域註冊表（因為外層的 `try/finally` 只包住 `savefig`，例外發生時 `fig` 根本沒被賦值到外層變數）。已修：兩個 render 函式各自把 `plt.subplots()` 之後的內容包進 `try/except: plt.close(fig); raise`。
+3. **Major**：`chart_type not in CHART_TYPES` 對 list/dict 這種不可雜湊值會丟原始 `TypeError`，而不是本模組自己文件宣稱的 `InvariantViolation`——已修：先 `isinstance(chart_type, str)` 才做成員檢查，跟檔案裡其他每個檢查的寫法一致。
+4. **Minor**：NaN 對任何比較運算子都回傳 False，導致「必須 > 0」「必須落在 [ci_low, ci_high]」的檢查對 NaN/Infinity 靜默放行——已修：共用的 `_require_number` 加 `math.isfinite()` 檢查，一次擋住所有呼叫點。
+全部 4 項都補了對應的 regression test（含一個明確斷言 `plt.get_fignums()` 修復前後不變的洩漏測試）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_chart_render.py -v` | exit=0 | ms=1210 | result=25 passed（真實 matplotlib 渲染兩種圖表 + 真實 PNG 驗證 + 全部 fail-closed 路徑 + 真實 CapabilityCatalog 註冊/派工測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_chart_render.py tests/unit/test_ai_gateway.py tests/unit/test_api_main.py -q`（修復後回歸）| exit=0 | ms=115580 | result=122 passed，無回歸
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker build -f Projects/internal/cognitive-engineering-os/Dockerfile -t <test-image> .`（真實建置，非假設）| exit=0 | result=matplotlib 從 manylinux wheel 安裝成功，零編譯步驟
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker run --rm <test-image> python -c "...generate_chart_artifact..."`（MPLCONFIGDIR 修復前後各跑一次）| exit=0 | result=修復前有權限警告但仍渲染成功；修復後零警告，PNG bytes 正確
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker run -d ... && curl /health && curl /methods`（完整容器啟動煙霧測試）| exit=0 | result=health OK；`/methods` 回傳 281 個方法
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py`（agency-os/docs/AI_LEGO_Cognitive_Engineering_OS）| exit=0 | result=PASSED 4130（新 capability contract 通過 schema 驗證）
+- REVIEW_DONE: critic=Standard | verdict=pass（修復後）| findings=3m/1n（見上，全部已修，非臆測全部有可重現證據）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`generate_chart_artifact\|artifact\.generate_chart\|chart_render` | hits=6，全部為本次新增檔案本身，無孤兒引用、無重複定義
+- [rollback] 全部新增檔案（`chart_render.py`／`test_chart_render.py`／contract yaml）可直接刪除；`recipe_runtime.py`／`Dockerfile` 為既有檔案純增量可用該次 commit revert 還原；`pyproject.toml` 的 matplotlib 依賴需連同並行 session 的 `6230c5b8a` 一併考慮（該行內容正確，非本次要復原的異動）。無 prod 影響（本次驗證全在本機 docker + pytest，未部署到 ks-aw-01）。
+- [下一步] Task 4（寫回知識庫）為另一並行 session 的範圍；儀表板前端目前尚未接上一個「產生圖表」的 UI 入口（capability 已可用，尚無 recipe/dashboard 呼叫端）。
+- WORKLOG_DONE: Task 3c chart rendering（forest plot + bubble chart，matplotlib）
+
 ## 2026-09-18（續10）獨立驗證續9的main.py修復＋恢復正式環境部署（操作者「建正式環境服務帳號+部署」指示的部署步驟），途中另揭露並修復2個真實bug
 
 [獨立驗證 續9 的修復] 未直接信任並行 session 的宣稱：`git fetch`+`git merge-base --is-ancestor` 確認 `953d98665` 是 `bc87536c6`（我先前那個損壞 commit）的直系後代；讀回 `main.py` 兩段損壞區域的實際內容（`CreateSourceRequest`/`create_source`/`list_sources`）逐行核對正確；`ast.parse`+`py_compile` 乾淨；`pytest tests/unit/test_project_source_api.py tests/unit/test_api_main.py tests/unit/test_ai_gateway.py` 125 passed/1 failed（失敗的 `test_dashboard_never_interpolates_catalog_data_via_innerhtml` 純屬時序——測試當下我尚未 pull 到並行 session 同時在推的 `094284e90`/`5be8cc048`，事後對方用我推的版本重跑已確認 PASS，非迴歸）。用 SendMessage 雙向對齊，對方確認無被覆蓋的本地改動。
