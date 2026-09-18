@@ -20589,3 +20589,19 @@ WORKLOG_DONE: Perplexity Search-API-only 全面強制(app/CLI/Claude 權限/MCP 
 [剩餘風險] Codex 主導期間所有 R0/R3 機械閘(部署、commit 範圍、首次改檔 git log、subagent 上限)全數旁路，只剩 AGENTS.md 文字自律。
 [rollback] 本條目純紀錄，`git revert` 即可。
 WORKLOG_DONE: Claude→Codex 同步稽核
+
+## 2026-09-19(續79)9/12 Perplexity 帳單歸因(操作者貼出後台明細)+ 訂正 續78
+
+**帳單(key 尾碼 fWoh)**：Agent API $9.86(第三方模型：Claude Haiku/Opus/Sonnet、Gemini 3 Pro/Flash、Grok 4.20；Haiku cache 建立 1.2M、Opus 60 萬、Gemini 3 Pro 未快取輸入 1.1M)；Sonar $0.19(35 次、token 極少)；Search $0.02(4 次)；Embeddings ≈$0。
+**fWoh = 正式主機 next-admin 那把 key**，也是 9/12 以前 `mcp/user-env.ps1`、Windows 使用者環境變數、Claude Desktop perplexity MCP 用的同一把(`.claude/file-history/51e7f93b-*` 與 `claude_desktop_config.json.bak-*` 可證)。9/11 對它測得 401 是帳號沒額度；9/12 21:41(台北)操作者儲值 $10 並給新 key(`pplx-Ztpe`)，額度是帳號共用 → fWoh 立刻復活。
+**訂正 續78**：`pplx-Ztpe` 不是「9/11 測過 401 的死 key」，是 9/12 新建的 key(目前只在 `mcp/user-env.ps1` 與 Windows 使用者環境變數，無已知使用者)。
+
+**逐一查過、9/12 皆無 Agent API／Perplexity 聊天呼叫**：Claude Code 全部 transcript(含 subagent；`mcp__perplexity__*` 歷來只有 8/17 的 6 次 search)、Claude Desktop `Logs/mcp-server-perplexity.log`(9/12 只有 initialize/tools/list，0 次 tools/call)、Codex sessions(9/12 無)、`llm` logs.db(0 筆)、PowerShell 歷史、Cowork local-agent 稽核檔、ks-aw-01(shell 歷史無；next-admin 程式只有 /search，對得上帳單 4 次 Search)。repo 全樹(不看 gitignore)除已鎖的 providers.ts / perplexity-cli.ps1 外無任何程式呼叫 api.perplexity.ai。key 從未進 git 歷史，repo 為 PRIVATE。
+
+**結論**：$9.86 Agent API 的呼叫端不在本機、repo、正式主機任何有紀錄的地方。fWoh 散落在約 40 個本機檔(VS Code/Cursor 歷史、Gemini Code Assist log、Codex log、Desktop 設定備份、Cowork ai-saas `.env`)與 ks-aw-01 上 15 個 `.env` 備份，曾長期在 Windows 使用者環境變數(所有程式繼承)。使用模式(多家前沿模型、大量 cache 建立、儲值當天燒到見底)符合 key 外洩被當模型閘道盜用；未能證實。
+
+**處置(待操作者)**：① 後台撤銷 fWoh(需登入，最優先)② 決定是否一併撤銷 Ztpe ③ 建新 key 只放正式主機 `/root/lobster-phase1/.env`，清掉主機上 15 個含舊 key 的 `.env` 備份與本機散落副本(prod 變更 = High，需 go-ahead)。
+- REALTEST_EVIDENCE: tool=Bash | cmd=掃 `mcp-server-perplexity.log` 9/12 全部行 | exit=0 | result=0 次 tools/call
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git log --all -S<key 尾段>` | exit=0 | result=0 commits
+- REVIEW_WAIVED: DOC_ONLY -- 調查紀錄，無程式變更
+- BUGHUNT_WAIVED: DOC_ONLY -- 調查紀錄，無程式變更
