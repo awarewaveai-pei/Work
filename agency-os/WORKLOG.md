@@ -1,4 +1,31 @@
 # Worklog
+## 2026-09-18（續20）migration 0088 套用正式環境時意外揪出 0087 從未套用——27 筆真實 Knowledge 來源在正式環境靜默不可見，已修復
+
+[任務] 操作者對續19 的橋接功能明示批准套用 migration 0088（`node scripts/apply-db-migration.mjs 0088`，SSH 進 ks-aw-01 對 `supabase-db` 容器下 DDL——依 AGENTS.md 屬 prod deploy High-risk-STOP，即使 migration 本身低風險也需操作者個別批准，已取得）。
+
+[意外發現，非本次橋接引入] 套用 0088 後直接查證正式環境（不只信任 exit code）：
+```
+SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='cs_knowledge_sources';
+```
+只看到 `hci_source_id`/`hci_imported_at`（剛套用的 0088），**沒有** `cognitive_os_project_id`/`cognitive_os_imported_at`（今天稍早由另一 session 建立的 migration 0087，`f48bff8e6`/`bca42d8a5` 等多個 commit 已經在其上持續擴充）。直接對正式環境下真實查詢驗證：`cs_knowledge_sources` 有 27 筆真實資料（`SELECT count(*)`），對其中任一筆 `SELECT ... cognitive_os_project_id` 直接拋出 `ERROR: column "cognitive_os_project_id" does not exist`——確認 0087 從未真的套用到正式 Supabase，只有程式碼合併、從未執行過部署端的 migration 步驟。
+
+**實際影響**：`lib/kb/db.ts` 檔頭自述設計「Every function degrades safely: no client / error ⇒ empty result... never a throw」——`listKnowledgeSources`／`getSourceDetail` 兩個函式的 `.select()` 都無條件包含這兩個不存在的欄位，代表對正式環境的每一次呼叫都會真的拋出上述錯誤，而這個錯誤被現有的「安全降級」設計吞掉、回傳空清單。換句話說：Knowledge 分頁在正式環境對操作者靜默顯示「沒有來源」，而不是真實存在的 27 筆——不是當機，是安靜地錯，不容易被發現。全表掃描確認除了 0087 這組欄位外，0084/0085/0086 的欄位（`body`/`folder_id`/`keyword_mode`）都正確存在，範圍精準鎖定在 0087 這一支被跳過，非更大範圍的部署流程系統性遺漏。
+
+[修復] 操作者明示批准後（同一套 High-risk-STOP 流程）套用 `node scripts/apply-db-migration.mjs 0087`。套用後重跑同一條先前會報錯的查詢，直接對正式環境驗證：三筆真實標題成功回傳（如「Using the framework method for the analysis of qualitative data...」），確認欄位存在且可正常查詢，Knowledge 分頁對這 27 筆來源的可見性已恢復。
+
+[根因] 這是**另一個 session**（今天稍早建置 collect→Cognitive OS 橋接的那一個）的部署順序疏漏：程式碼已合併並持續在其上擴充（`f48bff8e6`→`bca42d8a5`→`9414ac0cc`→`e745221a5` 一路建置），但 migration 本身從未走過 `apply-db-migration.mjs` 這一步——跟本次（續19）刻意「code 完成但明確停下等待 migration 套用批准」的做法形成對照，此案例是疏漏未做，非刻意延後。不在本次變更範圍內做任何程式碼修正（程式碼本身正確，缺的只是資料庫那一步），僅記錄+已修復資料庫狀態。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs --check 0088` 而後 `... 0088`（無 --check）| exit=0 | result=`APPLY_OK 1/1: 0088`
+- REALTEST_EVIDENCE: tool=SSH | cmd=直接對正式 `supabase-db` 容器 `information_schema.columns` 查詢 | result=修復前只見 33 欄中缺 `cognitive_os_project_id`/`cognitive_os_imported_at`；`SELECT ... cognitive_os_project_id` 直接 `ERROR: column ... does not exist`（真實錯誤，非推測）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs --check 0087` 而後 `... 0087` | exit=0 | result=`APPLY_OK 1/1: 0087`
+- REALTEST_EVIDENCE: tool=SSH | cmd=套用後重跑同一條查詢 | result=成功回傳 3 筆真實標題，確認修復生效
+- REVIEW_WAIVED: NA -- 純資料庫欄位套用（先前已由 db-expert agent 審過安全性），非本次新增程式碼
+- BUGHUNT_WAIVED: NA -- 無程式碼異動，純部署步驟補做
+
+[剩餘風險] 無新增。兩支 migration（0087/0088）現皆已套用於正式環境，跟本機/程式碼狀態一致。發現的根因（另一 session 漏掉部署步驟）屬於一次性疏漏，已透過本次直接查證修復，非系統性流程缺口——但提醒：任何新增資料庫欄位的 PR，「code 已合併」不等於「migration 已套用」，兩者需分別確認，尤其在多個並行 session 同時推進的環境下。
+
+[rollback] `packages/db/scripts/0087_kb_cognitive_os_link_down.sql`／`0088_kb_hci_link_down.sql` 皆可回滾，但兩者現在都已被正式程式碼實際消費（`lib/kb/db.ts`），回滾前需先確認對應程式碼已下線，兩支 down script 自己的檔頭註解都已載明這個前提。
 ## 2026-09-18（續20）修復 19 個 genuine-compute 方法透過真實 dashboard 執行必掛的 provenance 預設值 bug（承接續18 spawn_task 轉交）
 
 [任務] 續18 發現 `decision.impact_effort`/`mcda`/`ahp`/`ice`/`pareto_frontier`（等）透過 dashboard 真實執行 `genuine_compute` 閘門必掛，用 `spawn_task` 轉交獨立 session（本次）處理，範圍刻意排除續18 自己已修好的 `decision.eisenhower_matrix`。
