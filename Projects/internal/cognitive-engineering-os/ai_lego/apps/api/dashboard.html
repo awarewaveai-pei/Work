@@ -98,6 +98,11 @@
   .guide-box .guide-intro { margin-bottom:var(--sp-1); }
   .guide-box ul { margin:var(--sp-1) 0 0; padding-left:1.2rem; }
   .guide-box li.optional { color:var(--faint); }
+  .guide-box .guide-section { margin:var(--sp-2) 0; }
+  .guide-box .guide-section a { color:var(--accent); font-weight:600; }
+  .guide-box details.guide-example { margin-top:var(--sp-2); }
+  .guide-box details.guide-example summary { cursor:pointer; font-weight:600; color:var(--accent-dark); }
+  .guide-box details.guide-example > div { margin-top:var(--sp-1); }
   .compare-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:var(--sp-4); align-items:start; }
   .compare-card { border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4); box-shadow:var(--shadow-1); }
   .compare-card h4 { margin:.1rem 0; font-size:var(--fs-md); font-weight:700; }
@@ -478,15 +483,36 @@ function renderBriefGuide(display, params) {
   const box = $('brief-guide');
   const d = display || {};
   const fields = params.filter(p => p.name !== 'record_id' && p.name !== 'provenance');
-  if (!d.blurb_zh && !d.blurb_en && !fields.length) { box.style.display = 'none'; return; }
+  const hasDeepContent = !!(d.why_zh || d.why_en || d.url || d.example_zh || d.example_en);
+  if (!d.blurb_zh && !d.blurb_en && !fields.length && !hasDeepContent) { box.style.display = 'none'; return; }
   clear(box);
   box.style.display = '';
   if (d.blurb_zh || d.blurb_en) box.appendChild(el('div', 'guide-title', d.blurb_zh || d.blurb_en));
+  if (d.why_zh || d.why_en) {
+    const why = el('div', 'guide-section');
+    why.appendChild(el('b', null, '為什麼有效：'));
+    why.appendChild(document.createTextNode(d.why_zh || d.why_en));
+    box.appendChild(why);
+  }
+  if (typeof d.url === 'string' && /^https?:\/\//.test(d.url)) {
+    const link = el('div', 'guide-section');
+    const a = document.createElement('a');
+    a.href = d.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = '延伸資源／工具 →';
+    link.appendChild(a);
+    box.appendChild(link);
+  }
   if (fields.length) {
     box.appendChild(el('div', 'guide-intro', '為了做出最完整、最有效的分析，請在下面欄位提供以下內容（也可以直接寫進上面的懶人填寫描述裡，由 AI 自動拆進欄位）：'));
     const ul = el('ul');
     fields.forEach(p => { ul.appendChild(el('li', p.required ? '' : 'optional', readableFieldLabel(p.name) + (p.required ? '' : '（選填）'))); });
     box.appendChild(ul);
+  }
+  if (d.example_zh || d.example_en) {
+    const details = document.createElement('details');
+    details.className = 'guide-example';
+    details.appendChild(el('summary', null, '📝 填表範例'));
+    details.appendChild(el('div', null, d.example_zh || d.example_en));
+    box.appendChild(details);
   }
 }
 

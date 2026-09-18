@@ -1,4 +1,42 @@
 # Worklog
+## 2026-09-18（續22）280+ 方法內容深化第一批：architecture 家族全部 10 個方法補「為什麼有效／權威網址／填表範例」，dashboard 導引框新增對應渲染
+
+[任務] 操作者要求（item 4，本 session 較早前就已提出、答應「兩者都要，能找到哪個就放哪個」+「分批慢慢做，像之前雙語資料一樣」）：每個方法的說明內容除了既有的 blurb 外，還要加（1）為什麼這個方法有效、（2）真實權威網址（方法論參考或免費線上工具，兩者皆可）、（3）真實填表範例。280+ 方法規模太大，本次做第一批：`architecture` 家族全部 10 個方法（adr/atam/ddd/dependency_mapping/event_storming/fitness_functions/quality_attribute_scenario/strangler_fig/system_context_model/trade_off_matrix），依檔案既有順序（非操作者正在測試的方法優先，操作者明確選了「系統化分批」而非「先做常用的」）。
+
+[執行方式] 每個方法：(a) 真實 WebSearch 查證權威網址（不編網址）——ADR 用 adr.github.io（社群維護的免費完整資源，優於原始 2011 部落格文章）、ATAM 用 Wikipedia（SEI 官方無單一乾淨頁面，多份技術 PDF）、DDD 用 Domain Language 官方免費 PDF 參考文件、Event Storming 用官方 eventstorming.com、Fitness Functions 用 Thoughtworks 官方文章、Quality Attribute Scenario 用 SEI 官方 PDF、Strangler Fig 用 Martin Fowler 官方 bliki 原文、C4 Model（system_context_model 顯示名稱本來就是 C4 Model）用官方 c4model.com、Trade-off Matrix 用真實驗證過的免費線上工具 nanoglobals.com/tools/decision-matrix（WebFetch 確認非詐騙/停放頁，真的能用）、Dependency Mapping 用 AWS 官方免費說明頁（付費工具查證後發現這類工具幾乎都收費，改用說明性質權威來源）。(b) 每個填表範例都對照真實 builder 函式簽名+驗證邏輯寫（讀了全部 10 個方法的 `.py` 檔案，不是憑印象編）——過程中抓到自己 3 處初稿猜錯真實欄位/enum 值（dependency_mapping 的 node_type 不是 type、from_id/to_id 不是 from/to；event_storming 的 domain_event 元素需要至少一筆 incoming relationship 不能孤兒；strangler_fig 的 slices status 必須是 planned/verified/expanded/retired 之一不是隨便字串；trade_off_matrix 直接是 decision.mcda 的 dispatch wrapper，raw_scores 用 raw_value 不是 score、weights 必須總和剛好 1.0），全部改成讀真實驗證碼後的正確版本。
+
+[Dashboard 渲染] `renderBriefGuide` 新增：「為什麼有效」段落、真實可點擊連結（`http(s)://` 開頭才渲染，防禦性擋 `javascript:`/`data:` scheme，`rel="noopener noreferrer"`）、「📝 填表範例」摺疊區塊（`<details>`，避免內容一次全展開太長）。全程 `textContent`/`createElement`，無 innerHTML，符合既有 `test_dashboard_never_interpolates_catalog_data_via_innerhtml` 迴歸測試。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "yaml.safe_load(...); 確認 10 個 architecture.* 條目都有 why_zh/why_en/url/example_zh/example_en"` | exit=0 | result=10/10 complete
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py -q` | exit=0 | result=93 passed
+- REALTEST_EVIDENCE: tool=Browser | cmd=登入+開 architecture.adr | result=「為什麼有效」正確顯示、連結 `href` 真的是 `https://adr.github.io/`、「📝 填表範例」摺疊區塊存在
+- REVIEW_DONE: self-review=Standard | verdict=pass | findings=0c/0m/3n（自己初稿抓到並修正，見上）——單一小改動、風險低，比照 AGENTS.md §4「中低風險抽查」，未另開 critic agent
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`why_zh\|why_en\|guide-example\|guide-section` | hits=僅 dashboard.html（本次改動的消費端），無遺漏
+- [rollback] `git revert`；純新增欄位+新增渲染邏輯，無既有欄位被改名或移除，舊記錄/舊方法不受影響
+
+[剩餘] 270+ 方法尚未做（下一批待定家族）；本次也確認另一 session 已 commit `e745221a5`（19 個 genuine-compute 方法 provenance bug 修復），共用函式 `genuine_compute_provenance()` 已落地——`decision.eisenhower_matrix` 目前仍是自己內聯正規化，可另開小工改成呼叫共用函式（非本次範圍，僅記錄）。
+
+## 2026-09-18（續21）修復 computation.monte_carlo 同根因 genuine_compute provenance bug（承接續20 spawn_task task_57b3158a 轉交，SIMULATED_RESULT 版本）
+
+[任務] 續20 修復 19 個 CALCULATED_RESULT 家族 genuine-compute 方法的 provenance 預設值 bug 時，`computation.monte_carlo` 因自己的 `evaluate_genuine_compute_gate` 要求 `SIMULATED_RESULT`（非 CALCULATED_RESULT，明文不重用 `evaluate_statistical_gate`）當時排除在外，以 spawn_task（task_57b3158a）轉交獨立 session。本次執行該任務。
+
+[根因] 同續20 同一根因、不同目標值：`ai_lego/apps/api/main.py:784`（`invoke_method`）對未提供 `provenance` 的 body 預設 `make_provenance("AI_INFERENCE","AI_GENERATED")`；`computation.monte_carlo` 自己的 `evaluate_genuine_compute_gate`（`ai_lego/modules/computation/monte_carlo.py:107-131`）要求 `provenance.epistemic_type=="SIMULATED_RESULT"`。直接重現驗證：`generate_monte_carlo_simulation(...,make_provenance("AI_INFERENCE","AI_GENERATED"))` → gate FAIL，`epistemic_type_is_simulated_result=False`（其餘 3 項 checks 皆 True，確認根因單一、非其他因素混淆）。
+
+[修法] `monte_carlo.py` 新增**本地**（非 import）`genuine_compute_provenance()`，正規化模式與 `gates.py` 版本相同但目標 `SIMULATED_RESULT`。刻意不 import `gates.py` 版本——該模組自己的 `evaluate_genuine_compute_gate` 已明文不重用 `gates.py` 共用閘（docstring 原文寫明原因），正規化函式的獨立性延伸同一設計決策，避免建立與既有架構決策矛盾的新跨模組依賴。`locked:None` 同續20 理由：`core/domain/provenance.py::LOCK_REQUIRES` 對 `SIMULATED_RESULT` 同樣無項目，不清會讓正規化後的紀錄變 schema-invalid。建構點 `generate_monte_carlo_simulation` 一行 `"provenance":provenance,` → `"provenance":genuine_compute_provenance(provenance),`。
+
+[相容性] 既有 CLI（`run_monte_carlo_slice.py:109`）與既有測試 fixture 皆已明文傳 `SIMULATED_RESULT` → 正規化函式 identity 分支、零行為變動（新增 `assertIs` 測試證實，含 builder 層級與函式層級各一）。
+
+[critic 2 個 Minor 處理] Minor①（新函式原無直接單元測試，`gates.py` 版本有 `test_gates.py::GenuineComputeProvenanceTests` 6 條鏡射覆蓋、monte_carlo 版本沒有）→已修，`test_monte_carlo.py` 新增同名鏡射測試類別 7 條（6 條對應+1 條 builder 層級 identity 檢查）。Minor②（`task_57b3158a` 於 TASKS.md 無對應開放項）→ 本條目即關閉紀錄，TASKS.md 本無需關閉的開放項（僅 spawn_task chip），另行 dismiss_task 收尾。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=直接呼叫 builder+gate，provenance=make_provenance("AI_INFERENCE","AI_GENERATED")（main.py:784 確切預設值）| exit=0 | result=修復前 FAIL(epistemic_type_is_simulated_result=False)→修復後 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_monte_carlo.py tests/unit/test_api_main.py tests/unit/test_gates.py -q`（含新增 1 條 API regression test `test_computation_monte_carlo_without_provenance_passes_genuine_compute` + 7 條 `GenuineComputeProvenanceTests` 鏡射覆蓋）| exit=0 | result=139 passed，0 failed，0 regression
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_monte_carlo_slice --runtime-dir <session-scratch>`（預設 tmp 目錄有他次執行殘留、無 marker 檔，改用隔離路徑，未動原目錄）| exit=0 | result=`PASS computation.monte_carlo: ... gates [provenance_required=PASS, genuine_compute=PASS, sensitivity_disclosed=PASS, no_certainty_claim=PASS]`
+- REVIEW_DONE: critic=Standard | verdict=pass（0 Critical/0 Major）| findings=0c/0m/2n（皆已修，見上[critic 2 個 Minor 處理]）。critic 另做 mutation 驗證：暫還原成 `"provenance":provenance,` 重跑新測試證實真變紅（`epistemic_type_is_simulated_result:False`），還原後再全線轉綠，證明測試非空測試。
+- BUGHUNT_DONE: scope=D:\Work 全 repo（含 agency-os,scripts,lobster-factory,.claude,Projects/internal/cognitive-engineering-os）| grep=`generate_monte_carlo_simulation\|computation\.monte_carlo` | hits=30 檔，僅 `monte_carlo.py`/2 個測試檔/CLI runner（已驗證 identity no-op）為真消費者，其餘為 docs/contract/schema/sibling-docstring 引用非程式碼依賴
+- [rollback] `git revert` 本次 commit；純新增本地函式+單一建構點一行替換+2 個測試檔新增，無 schema/migration 變更，無對外部既有行為的破壞性變更（既有 test_monte_carlo.py 23 條測試零修改全過即證明）
+- 收尾：呼叫 dismiss_task(task_57b3158a) 嘗試收回過期 chip——回應「no pending task」（該 chip 屬另一 session 建立，本 session 查無可撤回紀錄，非本次操作失敗；若操作者 UI 仍看得到該 chip，屬顯示層殘留，本條目 WORKLOG 為實際完成狀態的正本）
+
 ## 2026-09-18（續20）migration 0088 套用正式環境時意外揪出 0087 從未套用——27 筆真實 Knowledge 來源在正式環境靜默不可見，已修復
 
 [任務] 操作者對續19 的橋接功能明示批准套用 migration 0088（`node scripts/apply-db-migration.mjs 0088`，SSH 進 ks-aw-01 對 `supabase-db` 容器下 DDL——依 AGENTS.md 屬 prod deploy High-risk-STOP，即使 migration 本身低風險也需操作者個別批准，已取得）。
