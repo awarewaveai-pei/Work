@@ -486,6 +486,176 @@ services:
           cpus: '1.00'
     logging: *lobster-logging
 
+  # HCI-30 (ADR-0021: dedicated Postgres, physically isolated from the shared Supabase instance
+  # so an RLS bypass on this schema cannot reach n8n's workflow secrets on that same cluster;
+  # ADR-0007 gate 1 requires this service definition to live HERE, in the single existing
+  # deployment orchestration surface, not a second docker-compose*.yml under Projects/internal/hci30/).
+  hci-postgres:
+    image: postgres:15.8
+    container_name: hci-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hci_wave1_synthetic
+      POSTGRES_USER: hci_owner
+      # ADR-0021 gate 3: own dedicated secret, never the shared ${POSTGRES_PASSWORD} that every
+      # Supabase-instance service already reuses (lobster-factory/infra/supabase/docker-compose.yml).
+      POSTGRES_PASSWORD: ${HCI_DB_PASSWORD:?hci-postgres requires its own dedicated password, distinct from the shared Supabase POSTGRES_PASSWORD}
+    volumes:
+      # ADR-0021 gate 1: own hci_-prefixed named volume, never a path under infra/supabase/volumes/
+      # (tests/architecture/hci-db-isolation.test.mjs enforces this).
+      - hci_pgdata:/var/lib/postgresql/data
+    networks:
+      # Private link to hci-app only -- no lobster-net membership, no published host port. Nothing
+      # else in this file may reach this service (tests/architecture/hci-db-isolation.test.mjs's
+      # "no unexpected consumer" check enforces this at review time).
+      - hci-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hci_owner -d hci_wave1_synthetic"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          # ADR-0021 gate 5: pattern copied from supabase-db's own 768m/1.0
+          # (lobster-factory/infra/supabase/docker-compose.yml) -- same-scale workload, same limit.
+          memory: 768M
+          cpus: '1.00'
+    logging: *lobster-logging
+
+  # HCI-30's app/server.mjs (Express REST API). Joins BOTH networks: hci-net to reach its own
+  # database, lobster-net (external) so nginx can reach it by name -- same dual-membership pattern
+  # cognitive-os-api already uses for the identical reason.
+  hci-app:
+    build:
+      context: ../../../../Projects/internal/hci30
+      dockerfile: Dockerfile
+    image: hci30-app:local
+    container_name: hci-app
+    restart: unless-stopped
+    extra_hosts:
+      # Reaches the isolated fetch-runner stack below by its published host port, across the
+      # network-isolation boundary those services exist to enforce -- hci-app is deliberately NOT a
+      # member of hci-fetch-runner-net (see that network's own comment for why joining it would
+      # defeat the isolation). Same host.docker.internal pattern next-admin already uses.
+      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: "4030"
+      HCI_DB_HOST: hci-postgres
+      HCI_DB_PORT: "5432"
+      HCI_DB_USER: hci_owner
+      HCI_DB_PASSWORD: ${HCI_DB_PASSWORD:?hci-app needs the same value as hci-postgres's own POSTGRES_PASSWORD above}
+      HCI_DB_NAME: hci_wave1_synthetic
+      HCI_FETCH_RUNNER_BASE_URL: http://host.docker.internal:${HCI_FETCH_RUNNER_HOST_PORT:-8190}
+      HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?hci-app needs the same value as hci-fetch-runner's own shared secret below}
+    depends_on:
+      hci-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4030/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - hci-net
+      - lobster-net
+    deploy:
+      resources:
+        limits:
+          # Same scale as node-api (Express + pg, no build/SSR overhead) -- not next-admin's Next.js
+          # footprint, which this service has nothing in common with.
+          memory: 512M
+          cpus: '0.50'
+    logging: *lobster-logging
+
+  # ADR-0029 gate 1: "its own container/service definition inside the existing docker-compose
+  # stack" -- moved here from Projects/internal/hci30/infra/local/compose.fetch-runner.yml's local
+  # dev-only file for prod (that file stays local/test-only; ks-aw-01 runs from this block instead,
+  # so there is exactly one deployment orchestration surface per ADR-0007 gate 1, not two).
+  # No `restart:` key -- security invariant (network-guard's iptables rules live in this
+  # container's netns and are wiped on any restart; network-guard is a one-shot sidecar that never
+  # re-runs -- see that service's own comment below). Do not add one without also making
+  # network-guard re-apply on every runner start.
+  hci-fetch-runner:
+    build:
+      context: ../../../../Projects/internal/hci30/infra/local/fetch-runner
+    container_name: hci-fetch-runner
+    environment:
+      HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?fetch runner requires a generated shared secret}
+      HCI_FETCH_RUNNER_PORT: "8090"
+      HCI_FETCH_RUNNER_MINIO_ENDPOINT: http://${HCI_FETCH_RUNNER_MINIO_IP:?fetch runner requires the object-storage container's static IP}:9000
+      HCI_FETCH_RUNNER_MINIO_BUCKET: hci-fetch-runner-raw
+      HCI_FETCH_RUNNER_MINIO_ACCESS_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_USER:?fetch runner requires the object-storage root user}
+      HCI_FETCH_RUNNER_MINIO_SECRET_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD:?fetch runner requires the object-storage root password}
+    volumes:
+      - hci_fetch_runner_ready:/var/run/network-guard
+    ports:
+      # 127.0.0.1-only, never 0.0.0.0 (ADR-0029 gate 1) -- internal API, reached from hci-app above
+      # only via host.docker.internal, never joined to this service's own isolated network.
+      - "127.0.0.1:${HCI_FETCH_RUNNER_HOST_PORT:-8190}:8090"
+    networks:
+      - hci-fetch-runner-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *lobster-logging
+
+  # One-shot sidecar: applies the OUTPUT egress policy inside hci-fetch-runner's own network
+  # namespace, then exits. `network_mode: service:hci-fetch-runner` is what makes the rules land in
+  # the namespace the isolation tests actually probe -- this is NOT a second, independent network
+  # membership, it shares the runner's own netns by construction.
+  hci-network-guard:
+    build:
+      context: ../../../../Projects/internal/hci30/infra/local/network-guard
+    container_name: hci-network-guard
+    network_mode: "service:hci-fetch-runner"
+    depends_on:
+      hci-fetch-runner:
+        condition: service_started
+    environment:
+      HCI_FETCH_RUNNER_MINIO_IP: ${HCI_FETCH_RUNNER_MINIO_IP:?network-guard requires the object-storage container's static IP to allowlist}
+      HCI_FETCH_RUNNER_PORT: "8090"
+    volumes:
+      - hci_fetch_runner_ready:/var/run/network-guard
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: "no"
+    logging: *lobster-logging
+
+  # Dedicated object storage for hci-fetch-runner's raw fetched content -- NOT the same instance as
+  # Trigger.dev's own internal MinIO (lobster-factory/infra/trigger/docker-compose.yml's `minio`
+  # service): separate image pull, separate network, separate volume, separate credentials.
+  hci-object-storage:
+    # Pinned by digest, not `:latest` -- this instance holds raw, attacker-influenced fetched
+    # content, the same risk class this repo already pins ClickHouse against (agency-os/AGENTS.md).
+    # Same digest already validated locally (infra/local/compose.fetch-runner.yml) -- not re-chosen
+    # here, re-used, so the prod image is byte-identical to what the local isolation tests exercised.
+    image: bitnamilegacy/minio@sha256:451fe6858cb770cc9d0e77ba811ce287420f781c7c1b806a386f6896471a349c
+    container_name: hci-object-storage
+    environment:
+      MINIO_ROOT_USER: ${HCI_FETCH_RUNNER_MINIO_ROOT_USER:?object storage requires a generated root user}
+      MINIO_ROOT_PASSWORD: ${HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD:?object storage requires a generated root password}
+      MINIO_DEFAULT_BUCKETS: hci-fetch-runner-raw
+    networks:
+      hci-fetch-runner-net:
+        ipv4_address: ${HCI_FETCH_RUNNER_MINIO_IP:?object storage requires a generated static IP}
+    volumes:
+      - hci_fetch_runner_objectstore:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *lobster-logging
+
 networks:
   lobster-net:
     name: lobster-net
@@ -493,9 +663,33 @@ networks:
   observability:
     name: lobster-phase1_observability
     external: true
+  # Private hci-postgres <-> hci-app link only. Explicit subnet outside 172.16.0.0/12 (ks-aw-01's
+  # entire default Docker address pool -- all 15 /16s -- is already occupied by other networks;
+  # verified via `ip route show`, no 10.x route exists on that host today). Local dev is
+  # unaffected: this network only exists in this file, never in infra/local/compose.dev.yml.
+  hci-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${HCI_NET_SUBNET:-10.240.0.0/24}
+  # ADR-0029's isolated network -- deliberately NOT external, shares nothing by name with
+  # lobster-net/observability/trigger/n8n. Do not add hci-app (or anything else) to this network's
+  # membership list; that would defeat the isolation this network exists to provide. Same
+  # enable_ipv6:false + explicit-subnet reasoning as the local dev version
+  # (Projects/internal/hci30/infra/local/compose.fetch-runner.yml), subnet moved to a free /24
+  # outside 172.16.0.0/12 for the same reason as hci-net above.
+  hci-fetch-runner-net:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${HCI_FETCH_RUNNER_SUBNET:-10.240.1.0/24}
 
 volumes:
   redis_data:
   n8n_data:
   wordpress_db_data:
+  hci_pgdata:
+  hci_fetch_runner_objectstore:
+  hci_fetch_runner_ready:
   wordpress_data:

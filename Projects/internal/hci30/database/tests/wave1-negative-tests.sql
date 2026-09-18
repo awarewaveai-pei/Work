@@ -2021,7 +2021,20 @@ SELECT hci_test.expect_sqlstate('SRC-SNAP-EPISTEMIC-REJECT-01',
 RESET ROLE;
 
 -- ---------------------------------------------------------------------------
+-- ADR-0021 gate 2: hci-postgres must never grow a live cross-instance link.
+-- postgres_fdw/dblink are the two extensions that would let a query on this
+-- instance reach into another Postgres server at all -- their mere presence
+-- (installed, not necessarily used) is the thing this gate forbids, since an
+-- installed-but-unused extension is one `CREATE SERVER`/`dblink_connect` call
+-- away from silently defeating physical isolation. Runs unprivileged (no
+-- SET ROLE) -- pg_extension is a catalog, readable by any role by default.
+-- ---------------------------------------------------------------------------
+SELECT hci_test.expect_true('ARCH-DB-03',
+  $q$SELECT count(*) = 0 FROM pg_extension WHERE extname IN ('postgres_fdw','dblink')$q$,
+  'hci-postgres must never have postgres_fdw or dblink installed (ADR-0021 gate 2: no live cross-instance link)');
+
+-- ---------------------------------------------------------------------------
 \echo '--- assertion results ---'
 SELECT test_id, outcome, actor, detail FROM hci_test.results ORDER BY id;
 
-SELECT hci_test.finish(302);
+SELECT hci_test.finish(303);
