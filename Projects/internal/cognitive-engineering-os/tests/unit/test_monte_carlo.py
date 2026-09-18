@@ -21,6 +21,7 @@ from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation, SchemaValidationError
 from ai_lego.modules.computation.monte_carlo import (
+    COMPUTATION_PROVENANCE_REF,
     METHOD_ID,
     all_gates_pass,
     assert_no_certainty_claim,
@@ -29,6 +30,7 @@ from ai_lego.modules.computation.monte_carlo import (
     evaluate_no_certainty_claim_gate,
     evaluate_sensitivity_disclosed_gate,
     generate_monte_carlo_simulation,
+    genuine_compute_provenance,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
 
@@ -182,6 +184,98 @@ class GateMutationTests(unittest.TestCase):
         simulation["sensitivity_notes"] = "   "
         gate = evaluate_sensitivity_disclosed_gate(simulation, "test", "2026-09-04T00:00:00Z")
         self.assertEqual(gate["status"], "FAIL")
+
+
+class GenuineComputeProvenanceTests(unittest.TestCase):
+    """``genuine_compute_provenance`` fixes a real bug (2026-09-18, WORKLOG same date): ``POST
+    /methods/{id}/invoke`` defaults an un-supplied ``provenance`` to ``epistemic_type=AI_INFERENCE``
+    (main.py:784), which this method's own ``genuine_compute`` gate then failed on every real dashboard
+    invocation (the dashboard never sends a ``provenance`` field) -- same bug as the 19 CALCULATED_RESULT
+    methods fixed earlier the same day (see ``ai_lego.modules.research.gates.GenuineComputeProvenanceTests``
+    in ``test_gates.py`` for the sibling coverage this class mirrors), different target epistemic_type."""
+
+    def test_normalizes_the_exact_main_py_default_to_a_passing_record(self):
+        buggy_default = make_provenance("AI_INFERENCE", "AI_GENERATED")
+        record = {
+            "engine": "local_python_deterministic_compute",
+            "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
+            "provenance": genuine_compute_provenance(buggy_default),
+        }
+        gate = evaluate_genuine_compute_gate(record, "test", "2026-09-18T00:00:00Z")
+        self.assertEqual(gate["status"], "PASS", gate["evidence"])
+
+    def test_the_unfixed_default_actually_fails_first(self):
+        """Proves the test above is not a tautology -- the exact same default, unnormalized, must fail."""
+        buggy_default = make_provenance("AI_INFERENCE", "AI_GENERATED")
+        record = {
+            "engine": "local_python_deterministic_compute",
+            "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
+            "provenance": buggy_default,
+        }
+        gate = evaluate_genuine_compute_gate(record, "test", "2026-09-18T00:00:00Z")
+        self.assertEqual(gate["status"], "FAIL")
+
+    def test_authorship_state_passes_through_unchanged(self):
+        provenance = make_provenance("AI_INFERENCE", "HUMAN_APPROVED")
+        normalized = genuine_compute_provenance(provenance)
+        self.assertEqual(normalized["epistemic_type"], "SIMULATED_RESULT")
+        self.assertEqual(normalized["authorship_state"], "HUMAN_APPROVED")
+
+    def test_already_correct_provenance_is_returned_by_identity_not_rebuilt(self):
+        """Every real fixture in this module already supplies SIMULATED_RESULT (e.g. this file's own
+        ``_valid_simulation()``) -- this must keep holding, same aliasing discipline
+        ``ai_lego.modules.research.gates.genuine_compute_provenance`` established for its 19 callers."""
+        provenance = make_provenance("SIMULATED_RESULT", "AI_GENERATED")
+        self.assertIs(genuine_compute_provenance(provenance), provenance)
+
+    def test_non_dict_input_passes_through_unchanged_not_a_new_crash(self):
+        """Before this fix, a non-dict provenance was stored as-is (crashing later, if at all, inside the
+        gate's own .get() call) -- this must not become a NEW construction-time crash."""
+        self.assertIsNone(genuine_compute_provenance(None))
+        self.assertEqual(genuine_compute_provenance("not-a-dict"), "not-a-dict")
+
+    def test_a_locked_value_valid_for_the_original_epistemic_type_is_cleared_not_left_dangling(self):
+        """LOCK_REQUIRES has no entry for SIMULATED_RESULT, so a caller-supplied `locked` that was valid for
+        their ORIGINAL epistemic_type (LOCKED_FACT needs SOURCE_FACT) becomes schema-invalid the instant
+        epistemic_type is forced to SIMULATED_RESULT -- this must not leave the result in that invalid,
+        misleadingly-gate-passing state."""
+        provenance = make_provenance("SOURCE_FACT", "HUMAN_APPROVED", locked="LOCKED_FACT")
+        normalized = genuine_compute_provenance(provenance)
+        self.assertEqual(normalized["epistemic_type"], "SIMULATED_RESULT")
+        self.assertIsNone(normalized["locked"])
+        record = {
+            "engine": "local_python_deterministic_compute",
+            "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
+            "provenance": normalized,
+        }
+        from ai_lego.core.domain.provenance import provenance_is_valid
+
+        self.assertTrue(provenance_is_valid(record["provenance"]))
+        gate = evaluate_genuine_compute_gate(record, "test", "2026-09-18T00:00:00Z")
+        self.assertEqual(gate["status"], "PASS", gate["evidence"])
+
+    def test_builder_aliases_already_correct_provenance_not_rebuilt(self):
+        """Wiring check, not just the bare function: generate_monte_carlo_simulation's own record must carry
+        the SAME object back to the caller when the caller already supplied SIMULATED_RESULT -- the family
+        convention gates.py's docstring documents (e.g. test_impact_effort.py::
+        test_provenance_is_deliberately_aliased_not_rebuilt), extended here to this method's own local
+        normalizer."""
+        provenance = make_provenance("SIMULATED_RESULT", "AI_GENERATED")
+        simulation = generate_monte_carlo_simulation("MC-T-PROV-001", _distributions(), 1, 100, "identity check", provenance)
+        self.assertIs(simulation["provenance"], provenance)
+
+    def test_builder_normalizes_a_buggy_default_provenance(self):
+        """Wiring check for the actual regression this fix closes: if generate_monte_carlo_simulation ever
+        stopped calling genuine_compute_provenance at its construction site, this must catch it -- unlike the
+        identity test above, which only exercises the already-correct path and stays green even if the builder
+        never calls the normalizer at all (critic-caught by mutation, 2026-09-18: reverting the construction-site
+        wiring left all 30 tests in this file passing without this test)."""
+        buggy_default = make_provenance("AI_INFERENCE", "AI_GENERATED")
+        simulation = generate_monte_carlo_simulation("MC-T-PROV-002", _distributions(), 1, 100, "wiring check", buggy_default)
+        self.assertEqual(simulation["provenance"]["epistemic_type"], "SIMULATED_RESULT")
+        self.assertEqual(simulation["provenance"]["authorship_state"], "AI_GENERATED")
+        gate = evaluate_genuine_compute_gate(simulation, "test", "2026-09-18T00:00:00Z")
+        self.assertEqual(gate["status"], "PASS", gate["evidence"])
 
 
 if __name__ == "__main__":

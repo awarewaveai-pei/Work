@@ -43,6 +43,38 @@ def assert_no_certainty_claim(record: dict[str, Any]) -> None:
         raise InvariantViolation(f"MONTECARLO_CERTAINTY_CLAIM_FORBIDDEN: top-level key(s) {sorted(violations)} assert a guaranteed/certain outcome (Atlas §22.3 L4153: Monte Carlo may not directly output Guaranteed Outcome)")
 
 
+def genuine_compute_provenance(provenance: Any) -> Any:
+    """Normalize a caller-supplied top-level ``provenance`` at construction: this method's computation is always
+    real seeded sampling, never an LLM inference, so ``epistemic_type`` must always be ``SIMULATED_RESULT``
+    regardless of what the caller passed -- ``authorship_state`` (was a human involved) IS a real caller choice
+    and passes through unchanged. Same normalization ``ai_lego.modules.research.gates.genuine_compute_provenance``
+    applies for ``CALCULATED_RESULT``-reusing methods, independently re-derived here (not imported) because this
+    module's own ``evaluate_genuine_compute_gate`` already deliberately does not reuse that shared gate either
+    (see its docstring) -- SIMULATED_RESULT, not CALCULATED_RESULT, is this method's correct label.
+
+    Root cause this fixes: ``ai_lego/apps/api/main.py``'s ``POST /methods/{id}/invoke`` defaults an un-supplied
+    ``provenance`` to ``epistemic_type=AI_INFERENCE`` (main.py:784) -- correct for the ~150 AI-inference methods
+    in this corpus, but wrong for this method, which then failed ``genuine_compute`` on every real dashboard
+    invocation (the dashboard never exposes a provenance field; same bug as the 19 CALCULATED_RESULT methods,
+    2026-09-18 WORKLOG, different target epistemic_type).
+
+    Returns the SAME object when no change is needed (every real fixture in this module, e.g. this file's own
+    ``_valid_simulation()`` test helper, already supplies SIMULATED_RESULT) -- only the previously-broken
+    default-provenance path changes. Passes non-dict input through unchanged (existing callers already handle
+    an invalid ``provenance`` no earlier than ``evaluate_provenance_required_gate``; this must not introduce a
+    new construction-time crash for a shape that previously reached the gate safely).
+
+    Also forces ``locked: None`` on the rebuild branch: ``core/domain/provenance.py``'s own ``LOCK_REQUIRES`` has
+    no entry for ``SIMULATED_RESULT``, so a caller-supplied ``locked`` value valid for their ORIGINAL
+    epistemic_type (e.g. ``LOCKED_FACT`` paired with ``SOURCE_FACT``) would become schema-invalid the instant
+    epistemic_type is forced to ``SIMULATED_RESULT`` -- which would make this gate misleadingly PASS on a record
+    ``evaluate_provenance_required_gate`` then correctly fails, for a confusing reason (same fix gates.py's
+    sibling function applies for CALCULATED_RESULT)."""
+    if not isinstance(provenance, dict) or provenance.get("epistemic_type") == "SIMULATED_RESULT":
+        return provenance
+    return {**provenance, "epistemic_type": "SIMULATED_RESULT", "locked": None}
+
+
 def generate_monte_carlo_simulation(
     simulation_id: str,
     input_distributions: list[dict[str, Any]],
@@ -85,7 +117,7 @@ def generate_monte_carlo_simulation(
         "sensitivity_notes": sensitivity_notes,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
     if success_threshold is not None:
         record["success_threshold"] = success_threshold

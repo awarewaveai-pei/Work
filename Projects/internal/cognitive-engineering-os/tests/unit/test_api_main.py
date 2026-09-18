@@ -893,6 +893,26 @@ class GenuineComputeProvenanceDefaultRegressionTests(ApiTestCase):
         response = self.client.post("/methods/devops_sre.soak_test/invoke", json=body)
         self._assert_all_gates_pass(response)
 
+    def test_computation_monte_carlo_without_provenance_passes_genuine_compute(self):
+        """computation.monte_carlo is the 20th genuine-compute method with this bug, but the only one whose gate
+        requires SIMULATED_RESULT instead of CALCULATED_RESULT -- it deliberately does not reuse
+        modules.research.gates.evaluate_statistical_gate (see monte_carlo.py's own evaluate_genuine_compute_gate
+        docstring), so it needed its own genuine_compute_provenance normalizer rather than the shared one every
+        other test in this class exercises."""
+        self._login()
+        body = {
+            "simulation_id": "MC-API-001",
+            "input_distributions": [
+                {"id": "D1", "label": "material cost", "distribution_type": "normal", "params": {"mean": 50000, "std_dev": 8000}},
+                {"id": "D2", "label": "labor cost", "distribution_type": "triangular", "params": {"min": 20000, "mode": 30000, "max": 45000}},
+            ],
+            "random_seed": 42,
+            "num_runs": 5000,
+            "sensitivity_notes": "manually reviewed -- D1 std_dev dominates the tail",
+        }
+        response = self.client.post("/methods/computation.monte_carlo/invoke", json=body)
+        self._assert_all_gates_pass(response)
+
 
 class CapabilityInvokeTests(ApiTestCase):
     """POST /capabilities/{id}/invoke -- direct one-shot capability invocation outside a Recipe
