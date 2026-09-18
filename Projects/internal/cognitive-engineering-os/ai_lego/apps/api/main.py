@@ -351,11 +351,15 @@ def _method_display_metadata() -> dict[str, dict[str, str]]:
     no-cache convention as ``list_recipes`` below, so dashboard copy edits don't need a restart.
     Deliberately a separate file from each contract's own ``description`` (AI/engineer-facing
     per AGENTS.md §9, not end-user copy) -- see the file's own header for why. Fails open to
-    ``{}`` if the file is missing so a browse-copy problem never 500s the method list."""
+    ``{}`` if the file is missing OR fails to parse (critic finding 2026-09-18: a malformed-but-
+    present file must not 500 /methods and /methods/{id}/form, the two basic discovery routes)."""
     path = resolve_spec_root() / "methods" / "registry" / "method-display-metadata.yaml"
     if not path.exists():
         return {}
-    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return {}
     entries = document.get("entries") if isinstance(document, dict) else None
     return entries if isinstance(entries, dict) else {}
 
@@ -991,14 +995,14 @@ class CreateSourceRequest(BaseModel):
     media_type: str
     data_classification: str
     content: str
-
-
-@app.post("/projects")
-def create_project(
     doi: str | None = None
     authors: list[str] | None = None
     venue: str | None = None
     published_at: str | None = None
+
+
+@app.post("/projects")
+def create_project(
     payload: CreateProjectRequest,
     session: dict[str, Any] = Depends(require_session),
     store: IdentityStore = Depends(get_store),
@@ -1106,19 +1110,19 @@ def create_source(
             artifact_uri,
             session["identity_id"],
             datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        )
-    except InvariantViolation as error:
-        raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
             doi=payload.doi,
             authors=payload.authors,
             venue=payload.venue,
             published_at=payload.published_at,
+        )
+    except InvariantViolation as error:
+        raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+    source_cas.put(session["tenant_id"], content_bytes)
+    return repo.add_source(record, cas_path)
 
 
 @app.get("/projects/{project_id}/sources")
 def list_sources(
-    source_cas.put(session["tenant_id"], content_bytes)
-    return repo.add_source(record, cas_path)
     project_id: str,
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
@@ -1204,9 +1208,15 @@ def create_custom_workflow(
     now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     try:
         record = custom_workflow_record(str(uuid.uuid4()), session["tenant_id"], payload.title, payload.method_ids, session["identity_id"], now, now)
+        return repo.create(record)
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
-    return repo.create(record)
+    except sqlite3.IntegrityError as error:
+        # workflow_id is a fresh uuid4() (line above), so this is only reachable via an
+        # astronomically unlikely UUID collision -- caught anyway to match the sibling
+        # create_project/create_source convention (critic finding 2026-09-18: a raw 500 here
+        # would be surprising to an engineer used to that convention).
+        raise HTTPException(status_code=409, detail="CUSTOM_WORKFLOW_ID_COLLISION") from error
 
 
 @app.get("/workflows/custom")
