@@ -335,6 +335,25 @@ class DashboardTests(ApiTestCase):
         self.assertIn("payload.run_id = runId", html)
         self.assertIn("if (resume && !runId)", html)
 
+    def test_dashboard_exposes_project_sources_brief_import_ui(self):
+        """2026-09-18 literature-review pipeline gap closure: a Project picker + "帶入 Project 來源當背景
+        資料" button that calls GET /projects/{id}/sources/brief and replaces the brief textarea's content.
+        Structural-only regression (no browser test infra for dashboard.html beyond this file's own
+        established pattern, see test_dashboard_recipe_runner_exposes_stable_run_identity_and_resume_payload
+        above)."""
+        html = api_main._DASHBOARD_HTML
+        for needle in (
+            'id="project-picker"', 'id="brief-import-btn"', 'id="brief-import-status"',
+            "function renderProjectPicker", "function updateBriefImportAvailability",
+            "/projects/' + encodeURIComponent(state.project) + '/sources/brief",
+            "new URLSearchParams(location.search).get('project')",
+        ):
+            self.assertIn(needle, html, needle)
+        # Project names (state.projects[].name, tenant-controlled free text) and the imported brief text
+        # (Source content, also tenant-controlled) must render via textContent/el()/.value, never innerHTML
+        # -- same stored-XSS class the 2026-09-12 regression guard above covers for method_id/family.
+        self.assertNotIn("innerHTML", html)
+
     def test_dashboard_is_served_from_the_packaged_file(self):
         """The page lives in ai_lego/apps/api/dashboard.html (pyproject package-data) so the container's pip install carries it."""
         self.assertTrue(api_main._DASHBOARD_PATH.is_file())

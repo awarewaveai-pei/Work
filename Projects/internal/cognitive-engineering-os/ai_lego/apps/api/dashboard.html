@@ -114,6 +114,7 @@
 <header>
   <h1>認知工程 OS</h1>
   <div id="status">連線中…</div>
+  <div id="project-picker" class="row" style="display:none"></div>
   <button id="logout-btn" class="ghost" style="display:none">登出</button>
 </header>
 
@@ -162,6 +163,10 @@
         <div class="draft-box">
           <div class="draft-box-title">⚡ 懶人填寫：貼上資料，AI 自動拆進欄位</div>
           <div class="note" style="margin-bottom:var(--sp-2)">不用照格式，背景、現況、已知數字，想到什麼寫什麼即可；AI 讀完會自動填進下面對應的欄位，你再確認或修改。</div>
+          <div class="row">
+            <button id="brief-import-btn" class="ghost">帶入 Project 來源當背景資料</button>
+            <span id="brief-import-status" class="note"></span>
+          </div>
           <textarea id="brief" class="brief" placeholder="貼上或寫下你手邊已有的資料…"></textarea>
           <div class="row">
             <button id="draft-btn" class="primary">AI 自動拆解並填入</button>
@@ -233,6 +238,7 @@ const state = {
   params: [], plan: [], data: {}, ai: { configured: false, model: null }, epoch: 0, busy: false,
   familyFilter: null, selectedOrder: [],
   chain: { order: [], data: {}, results: {}, savedId: null, title: '' },
+  projects: [], project: null,
 };
 const COMPARE_MAX = 4, CHAIN_MAX = 12;
 
@@ -277,10 +283,14 @@ async function boot() {
   const ok = await refreshStatus();
   if (!ok) { showApp(false); return; }
   showApp(true);
-  const [m, r, w] = await Promise.all([api('/methods'), api('/recipes'), api('/workflows/custom')]);
+  const [m, r, w, p] = await Promise.all([api('/methods'), api('/recipes'), api('/workflows/custom'), api('/projects')]);
   state.methods = m.ok ? m.body : [];
   state.recipes = r.ok ? r.body : [];
   state.customWorkflows = w.ok ? w.body : [];
+  state.projects = p.ok ? p.body : [];
+  const preselectProject = new URLSearchParams(location.search).get('project');
+  if (preselectProject && state.projects.some(x => x.project_id === preselectProject)) state.project = preselectProject;
+  renderProjectPicker();
   renderFamilyFilters();
   renderList();
 }
@@ -315,6 +325,22 @@ function renderFamilyFilters() {
   Object.keys(counts).sort().forEach(fam => {
     const b = el('button', 'pill' + (state.familyFilter === fam ? ' on' : ''), familyLabel(fam) + ' (' + counts[fam] + ')');
     b.onclick = () => { state.familyFilter = state.familyFilter === fam ? null : fam; renderFamilyFilters(); renderList(); };
+    box.appendChild(b);
+  });
+}
+
+// Project picker: pill buttons (same idiom as the family filter above, not a <select>) so the
+// "帶入 Project 來源當背景資料" button knows which Project's Sources to compose. Single-select,
+// same toggle-off-on-repeat-click behavior as the family filter. Deep-link via ?project=<id> is
+// applied once in boot() before the first render.
+function renderProjectPicker() {
+  const box = $('project-picker'); clear(box);
+  if (!state.projects.length) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  box.appendChild(el('span', 'note', 'Project：'));
+  state.projects.forEach(p => {
+    const b = el('button', 'pill' + (state.project === p.project_id ? ' on' : ''), p.name);
+    b.onclick = () => { state.project = state.project === p.project_id ? null : p.project_id; renderProjectPicker(); updateBriefImportAvailability(); };
     box.appendChild(b);
   });
 }
@@ -385,6 +411,11 @@ function showMode(mode) {
   $('chain').style.display = mode === 'chain' ? '' : 'none';
 }
 
+function updateBriefImportAvailability() {
+  $('brief-import-btn').disabled = !state.project;
+  $('brief-import-btn').title = state.project ? '' : '先在上方選擇一個 Project';
+}
+
 function resetWork() {
   showMode('workspace');
   $('draft-status').textContent = ''; $('draft-verdict').textContent = ''; $('run-status').textContent = '';
@@ -392,6 +423,8 @@ function resetWork() {
   $('brief-guide').style.display = 'none'; clear($('brief-guide'));
   $('draft-btn').disabled = !state.ai.configured;
   $('draft-btn').title = state.ai.configured ? '' : 'AI 未設定';
+  updateBriefImportAvailability();
+  $('brief-import-status').textContent = '';
   $('run-opts').style.display = state.kind === 'recipe' ? '' : 'none';
   $('ws-desc').className = 'note';
 }
@@ -641,6 +674,21 @@ $('chain-delete').onclick = async () => {
 };
 
 // ---------- step 1: draft (single-method / recipe workspace) ----------
+$('brief-import-btn').onclick = async () => {
+  if (!state.project) return;
+  $('brief-import-status').textContent = '載入中…'; $('brief-import-status').className = 'note';
+  const r = await api('/projects/' + encodeURIComponent(state.project) + '/sources/brief');
+  if (!r.ok) { $('brief-import-status').textContent = '失敗：' + detailText(r); $('brief-import-status').className = 'bad'; return; }
+  $('brief').value = r.body.brief;
+  const countText = r.body.sources_included + '/' + r.body.sources_total + ' 筆來源';
+  if (r.body.truncated) {
+    $('brief-import-status').textContent = '⚠ 來源內容過長，僅帶入 ' + countText + '（超過長度上限，其餘未帶入）';
+    $('brief-import-status').className = 'warn';
+  } else {
+    $('brief-import-status').textContent = '已帶入 ' + countText;
+    $('brief-import-status').className = 'note';
+  }
+};
 $('draft-btn').onclick = async () => {
   const brief = $('brief').value.trim();
   if (!brief) { $('draft-status').textContent = '先寫描述。'; return; }

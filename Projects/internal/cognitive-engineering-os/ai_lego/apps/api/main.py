@@ -69,7 +69,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
-from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
+from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.provider import AiProvider, daily_token_budget, provider_from_env
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.domain.project import project_record
@@ -969,6 +969,10 @@ def ai_draft_recipe(
 PROJECT_MANAGE_CAPABILITY = "project.manage"
 SOURCE_MANAGE_CAPABILITY = "source.manage"
 MAX_SOURCE_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MiB; Phase 1 Source Import is UTF-8 text only, not bulk file upload
+# Not an independent number: /projects/{id}/sources/brief's composed text is pasted straight into the
+# dashboard's AI-draft "brief" field, and require_brief() (draft.py) rejects anything past MAX_BRIEF_CHARS --
+# reusing that exact cap means a non-truncated response is always immediately usable by /ai/draft/*.
+MAX_SOURCE_BRIEF_CHARS = MAX_BRIEF_CHARS
 
 
 def get_project_source_repository() -> ProjectSourceRepository:
@@ -1152,6 +1156,78 @@ def list_sources(
 ) -> list[dict[str, Any]]:
     _project_or_404(repo, session["tenant_id"], project_id)
     return repo.list_sources(session["tenant_id"], project_id)
+
+
+def _source_brief_block(source: dict[str, Any], content: str) -> str:
+    """One Source's contribution to a composed literature brief: a ``## title`` heading, a byline line
+    (authors/venue/published_at -- only the parts actually present), the doi if present, then the full
+    content, terminated by a ``---`` separator."""
+    byline_parts = []
+    if source.get("authors"):
+        byline_parts.append(", ".join(source["authors"]))
+    if source.get("venue"):
+        byline_parts.append(source["venue"])
+    if source.get("published_at"):
+        byline_parts.append(source["published_at"])
+    lines = [f"## {source['title']}"]
+    if byline_parts:
+        lines.append(", ".join(byline_parts))
+    if source.get("doi"):
+        lines.append(source["doi"])
+    lines.extend(["", content, "", "---", ""])
+    return "\n".join(lines)
+
+
+# IMPORTANT: this route must stay registered BEFORE /projects/{project_id}/sources/{source_id} below --
+# FastAPI/Starlette matches routes in registration order, so a literal "brief" segment would otherwise be
+# swallowed by {source_id} and this route would never be reached (would 404 as SOURCE_NOT_FOUND: 'brief').
+@app.get("/projects/{project_id}/sources/brief")
+def project_sources_brief(
+    project_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    source_cas: TenantScopedCas = Depends(get_source_cas),
+) -> dict[str, Any]:
+    """Compose this Project's Sources into one text blob for the dashboard's "帶入 Project 來源當背景資料"
+    button, which pastes the result straight into the AI-draft brief field. No entitlement check --
+    matches ``list_sources`` above (read-only, same permissiveness; Phase 1 has no read-scoped capability
+    for this resource, and gating a read with a manage-capability would be stricter than its sibling
+    route for no stated reason).
+
+    Whole-source granularity: a Source is included only if its FULL block fits under
+    ``MAX_SOURCE_BRIEF_CHARS``, never cut mid-source (a severed sentence would misrepresent the source
+    and hide exactly which part is missing) -- so ``sources_included`` can be 0 when even the first
+    Source alone exceeds the cap. ``truncated``/``sources_included``/``sources_total`` always disclose
+    when the picture is incomplete, including that edge case.
+    """
+    _project_or_404(repo, session["tenant_id"], project_id)
+    sources = repo.list_sources(session["tenant_id"], project_id)
+    blocks: list[str] = []
+    included = 0
+    total_chars = 0
+    truncated = False
+    for source in sources:
+        cas_path = repo.get_source_content_reference(session["tenant_id"], project_id, source["source_id"])
+        if cas_path is None:
+            raise HTTPException(status_code=500, detail=f"SOURCE_CONTENT_REFERENCE_MISSING: {source['source_id']!r}")
+        try:
+            content = source_cas.read(session["tenant_id"], cas_path).decode("utf-8")
+        except InvariantViolation as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
+        block = _source_brief_block(source, content)
+        if total_chars + len(block) > MAX_SOURCE_BRIEF_CHARS:
+            truncated = True
+            break
+        blocks.append(block)
+        total_chars += len(block)
+        included += 1
+    return {
+        "project_id": project_id,
+        "brief": "".join(blocks),
+        "sources_total": len(sources),
+        "sources_included": included,
+        "truncated": truncated,
+    }
 
 
 @app.get("/projects/{project_id}/sources/{source_id}")

@@ -303,6 +303,103 @@ class SourceApiTests(ProjectSourceApiTestCase):
             self._source_cas.read("some-other-tenant-id", cas_path)
 
 
+class SourcesBriefApiTests(ProjectSourceApiTestCase):
+    """``GET /projects/{id}/sources/brief`` -- composes a Project's Sources into one text blob for the
+    dashboard's "帶入 Project 來源當背景資料" button (2026-09-18)."""
+
+    def _create_source(self, project_id: str, **overrides) -> dict:
+        body = {"title": "Interview notes", "media_type": "text/plain", "data_classification": "Confidential", "content": "participant said: I felt overwhelmed."}
+        body.update(overrides)
+        response = self.client.post(f"/projects/{project_id}/sources", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def test_brief_requires_a_session(self):
+        self.assertEqual(self.client.get("/projects/x/sources/brief").status_code, 401)
+
+    def test_brief_for_unknown_project_is_404(self):
+        self._login()
+        response = self.client.get(f"/projects/{uuid.uuid4()}/sources/brief")
+        self.assertEqual(response.status_code, 404, response.text)
+        self.assertIn("PROJECT_NOT_FOUND", response.json()["detail"])
+
+    def test_brief_with_no_sources_is_empty_not_an_error(self):
+        self._login()
+        project = self._create_project()
+        response = self.client.get(f"/projects/{project['project_id']}/sources/brief")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(
+            response.json(),
+            {"project_id": project["project_id"], "brief": "", "sources_total": 0, "sources_included": 0, "truncated": False},
+        )
+
+    def test_brief_composes_multiple_sources_titles_and_content(self):
+        """No ordering assertion: create_source's created_at is second-resolution (source_record.py via
+        the handler's ``.replace(microsecond=0)``), so two sources created back-to-back in a fast test can
+        tie on created_at -- list_sources then tie-breaks on source_id (a random UUID), not insertion order.
+        That is a pre-existing repo.list_sources characteristic this endpoint deliberately reuses as-is
+        (task scope: reuse the query, don't duplicate it), not something this test should assume away."""
+        self._login()
+        project = self._create_project()
+        self._create_source(project["project_id"], title="First Paper", content="alpha content")
+        self._create_source(project["project_id"], title="Second Paper", content="beta content")
+        body = self.client.get(f"/projects/{project['project_id']}/sources/brief").json()
+        self.assertEqual(body["sources_total"], 2)
+        self.assertEqual(body["sources_included"], 2)
+        self.assertFalse(body["truncated"])
+        self.assertIn("First Paper", body["brief"])
+        self.assertIn("Second Paper", body["brief"])
+        self.assertIn("alpha content", body["brief"])
+        self.assertIn("beta content", body["brief"])
+
+    def test_brief_includes_citation_metadata(self):
+        self._login()
+        project = self._create_project()
+        self._create_source(
+            project["project_id"],
+            title="Cited Paper",
+            content="body text",
+            doi="10.1000/xyz",
+            authors=["Ada Lovelace"],
+            venue="Journal X",
+            published_at="2020-05",
+        )
+        body = self.client.get(f"/projects/{project['project_id']}/sources/brief").json()
+        self.assertIn("Cited Paper", body["brief"])
+        self.assertIn("Ada Lovelace", body["brief"])
+        self.assertIn("Journal X", body["brief"])
+        self.assertIn("2020-05", body["brief"])
+        self.assertIn("10.1000/xyz", body["brief"])
+
+    def test_brief_truncates_when_sources_exceed_the_cap_without_cutting_a_source_mid_way(self):
+        """Whole-source granularity (main.py's own disclosed design choice): a source that would push the
+        composed brief past MAX_SOURCE_BRIEF_CHARS is excluded whole, never included as a severed partial.
+        Assertions are order-agnostic (see test_brief_composes_multiple_sources_titles_and_content for why
+        list_sources's tie-break order isn't creation order in a fast test) -- they check that exactly
+        ``sources_included`` COMPLETE blocks made it in, not which named sources those were."""
+        self._login()
+        project = self._create_project()
+        chunk = "A" * (api_main.MAX_SOURCE_BRIEF_CHARS // 2)
+        for label in ("Large One", "Large Two", "Large Three"):
+            self._create_source(project["project_id"], title=label, content=chunk)
+        response = self.client.get(f"/projects/{project['project_id']}/sources/brief")
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["sources_total"], 3)
+        self.assertTrue(body["truncated"])
+        self.assertLess(body["sources_included"], 3)
+        self.assertLessEqual(len(body["brief"]), api_main.MAX_SOURCE_BRIEF_CHARS)
+        self.assertEqual(body["brief"].count("## Large "), body["sources_included"])
+        self.assertEqual(body["brief"].count(chunk), body["sources_included"])
+
+    def test_brief_is_invisible_to_a_real_second_tenant(self):
+        self._login()
+        project = self._create_project()
+        self._create_source(project["project_id"])
+        self._login_as_a_different_tenant()
+        self.assertEqual(self.client.get(f"/projects/{project['project_id']}/sources/brief").status_code, 404)
+
+
 if __name__ == "__main__":
     import unittest
 

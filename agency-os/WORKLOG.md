@@ -1,4 +1,34 @@
 # Worklog
+## 2026-09-18（續16）Cognitive OS 文獻回顧管線缺口修復：新增 `GET /projects/{id}/sources/brief` + dashboard Project 帶入 UI
+
+[任務] 操作者交辦前先查證的真實架構缺口：`POST /projects/{id}/sources`（main.py:1134 `create_source`，存 Source）與 `POST /ai/draft/method/{id}`（AI 起草）完全不相通——`wusheng_five_phase.py:139-149`/`reporting_guideline_checklist.py:147-156` 兩個既有 method 都只吃手填/AI 草稿的欄位值，從不讀 Project 的 Source；`draft.py` 的 `DraftRequest.source` 是另一個不相關概念（recipe-chain 節點間傳遞的草稿物件，非文獻來源）。`dashboard.html` 對 `Project`/`/projects` 零 grep 命中，純方法目錄瀏覽器。範圍明訂：只加一個唯讀組裝端點 + dashboard UI，不碰任何既有 method 簽名、不碰 `draft.py` 核心邏輯、不部署上線。
+
+[已修改]
+- `ai_lego/apps/api/main.py`：新增 `GET /projects/{project_id}/sources/brief`（main.py:1220 `project_sources_brief`，插在 `list_sources` 與 `get_source` 之間）+ 私有 helper `_source_brief_block()`（main.py:1196）；新常數 `MAX_SOURCE_BRIEF_CHARS = MAX_BRIEF_CHARS`（main.py:1010，re-export 自 `draft.py:35`，非獨立數字，理由見下）；import 增列 `MAX_BRIEF_CHARS`。
+- `ai_lego/apps/api/dashboard.html`：header 新增 `#project-picker`（pill 按鈕，非 `<select>`）；`boot()` 併發抓 `GET /projects` + 讀 `?project=` query param 深連結預選（`new URLSearchParams(location.search)`，全檔案先前零 query-param 處理，新寫）；`.draft-box` 內 `#brief` textarea 上方新增「帶入 Project 來源當背景資料」按鈕（`#brief-import-btn`）+ 狀態列（`#brief-import-status`，`truncated=true` 時顯示可見警告文字，非只 console.log）；`resetWork()` 併入 `updateBriefImportAvailability()`（無選定 Project 時禁用按鈕，比照既有 `draft-btn`/`state.ai.configured` 慣例）。
+- `tests/unit/test_project_source_api.py`：新測試類 `SourcesBriefApiTests`（7 個：401、404、組裝含 citation 中繼資料、whole-source 截斷、租戶隔離、空來源）。
+- `tests/unit/test_api_main.py`：擴充既有 dashboard 結構回歸慣例，新增 `test_dashboard_exposes_project_sources_brief_import_ui`（斷言新 UI 元素存在 + 重申零 `innerHTML`）。
+
+[關鍵設計決策，均有查證依據非猜測]
+1. **路由宣告順序是這次變更最容易踩雷的一點**：WebSearch 查證 FastAPI/Starlette 依「宣告順序」比對路由、非依特異度——靜態路徑宣告在動態路徑之後會被吃掉、永遠打不到。`/projects/{id}/sources/brief` 若排在既有 `/projects/{id}/sources/{source_id}`（main.py:1268）之後，"brief" 會被解析成 `source_id="brief"`，回 404 `SOURCE_NOT_FOUND`。已排在其之前，並用突變測試證實非裝飾性註解（見[驗證]）。
+2. **`MAX_SOURCE_BRIEF_CHARS` 直接 re-export `draft.py:35` 的 `MAX_BRIEF_CHARS`（8000），非另訂獨立數字**：組裝出的 brief 會被原樣貼進同一個 dashboard `#brief` textarea，該欄位送 `/ai/draft/*` 時受 `require_brief()`（`draft.py:70-71`）同一個上限擋下。若這裡選更寬鬆的獨立上限，會製造一個立即可重現的斷點——按「帶入」成功但緊接著按「AI 草稿」卻 400 `AI_DRAFT_BRIEF_TOO_LONG`。
+3. **Whole-source granularity（整篇 Source 要嘛整篇收錄要嘛整篇不收，不切一半）**：被腰斬的來源會誤導內容且無法從回應得知具體缺了哪段；代價是最極端情況下第一篇 Source 內容單獨就超過上限時 `sources_included` 會是 0——已在 docstring/回應欄位揭露，`truncated`/`sources_included`/`sources_total` 三個欄位任何情況都誠實反映，不靜默給不完整的東西。
+4. **無 entitlement 檢查**：直接查證 `list_sources`（main.py:1186，同檔姐妹讀取端點）本身也完全沒呼叫 `check_entitlement`——比照其寬鬆度，沒有另立門檻的理由。
+5. Project picker 用 pill 按鈕非 `<select>`：全檔案本來就 0 個真實 `<select>` 元素（僅 CSS selector combinator），既有 family-filter 已是同款 pill 慣例；操作者對 ops UI 也明確表態過不要下拉選單（memory record，`feedback_no_dropdowns_multiselect`）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_project_source_api.py tests/unit/test_api_main.py -q`（連續驗證 3 次非偶然）| exit=0 | result=109 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check`（抽出 dashboard.html `<script>` 區塊）+ `python -m py_compile main.py` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | 突變測試 1（路由順序）：暫時把 `/sources/brief` 搬到 `/sources/{source_id}` 之後 | 4/7 brief 測試精準變紅，錯誤訊息正是預期的 `404 SOURCE_NOT_FOUND: 'brief'`——證實路由順序修法非裝飾性註解。過程中誤用 `git checkout --` 一度把整檔回退到 HEAD（連同並行 session 尚未 commit 的 `/capabilities/{capability_id}/invoke` 端點一起清空）——立即用還原前存的 `git diff` 快照以 `git apply` 補回，`grep`+`py_compile`+完整測試重跑確認雙方改動皆完整無損；後續改用直接字串替換復原突變，不再用 `git checkout --`
+- REALTEST_EVIDENCE: tool=Bash | 突變測試 2（截斷邏輯）：暫時把截斷判斷式改成 `if False:` | 恰好 1 個測試（截斷測試本身）精準變紅，其餘 6 個不受影響；還原後用 `diff` 對前後 `git diff` 快照確認 byte-identical，7/7 轉綠
+- REALTEST_EVIDENCE: tool=Bash | 過程中發現並修正測試自身的錯誤假設：`create_source` 的 `created_at` 是秒級精度（`.replace(microsecond=0)`），同一秒內連續建立的來源會在既有 `list_sources`（沿用、非本次新寫）的 `ORDER BY created_at, source_id` 靠隨機 UUID tie-break，非建立順序——已將 2 個原本假設嚴格建立順序的測試改為順序無關斷言（測試內附註解說明），非隱藏此發現
+- REVIEW_WAIVED: NA -- 本次 subagent 執行環境未提供 Task/Agent 或 codex-review 派工工具，無法呼叫外部 critic；依 AGENTS.md §4「oracle 全無額度」備援協議執行書面對抗自審（租戶隔離/entitlement 對照/XSS/路由順序/截斷邊界/空來源/citation 欄位逐項核對）+ 上述兩個突變測試證明關鍵邏輯非空跑
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`MAX_SOURCE_BRIEF_CHARS\|project_sources_brief\|_source_brief_block\|sources/brief\|brief-import-btn\|project-picker\|renderProjectPicker\|updateBriefImportAvailability` | hits=4 檔（皆本次新增/預期位置：main.py／dashboard.html／test_api_main.py／test_project_source_api.py），`agency-os` 0 命中，無孤兒引用、無既有機制重複
+- [rollback] 三個檔案皆既有檔案的純增量（新 route/新 UI 元素/新測試類），無 DB migration、無既有函式簽名變更；`git revert` 本次 commit 即可完全復原
+- **[已知限制，非本次範圍，誠實揭露]** (a) `project_sources_brief` 沿用 `list_sources` 的無上限迭代特性（Project 內 Source 數量無論多少都全掃），跟既有姐妹端點同一種特性、非本次新增風險，真要修需要動 `list_sources` 本身（範圍外）；(b) 上述 `created_at` 秒級精度 tie-break 特性同樣是 pre-existing、非本次引入，留給下次真的需要嚴格排序保證時處理
+- **[流程事故揭露]** 本條目原本要落在「續15」，寫入後另一並行 session 的 WORKLOG splice 機制搶先 commit 了它自己的「續15」（`8b5d057af`），沒有我的內容——`git status`/`git log` 事後才發現我的版本被靜默蓋掉，非本 session 資料遺失，是重寫成「續16」補回。
+- WORKLOG_DONE: `GET /projects/{id}/sources/brief` + dashboard Project 帶入 UI，文獻回顧管線「收集→分析/起草」斷點已接通
+
 ## 2026-09-18（續15）Portal + Cognitive OS 對外客戶就緒度查證（唯讀，回應「HCI-30 上線該接哪裡」範疇釐清）——結論：兩邊都還沒有能接的介面
 
 [任務] 操作者對「HCI-30 完美完整」的下一步提出疑問（該接 cognitive.aware-wave.com 還是 app.aware-wave.com？其他系統要不要一起部署？），顯示這已超出原 13-task 蒐集器管線範疇，變成「HCI-30（可能+Cognitive OS）對外客戶正式上線」的更大決策。指示先查清 portal 與 Cognitive OS 現況再談，派 2 個唯讀 agent 平行查證，不做任何程式碼異動。
