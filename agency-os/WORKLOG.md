@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續27）280+ 方法內容深化第三批：strategy 家族全部 15 個標準方法（含 business_model_canvas）補齊 why/url/example
+
+[操作者請求] 續26 之後操作者持續要求「不要停」，繼續下一個 family 批次，不逐批確認。本次選 `strategy` family——該 family 共 17 個 method-id，其中 `lean_canvas`（續24 已做）跟 `proposal_artifact`（VBC 查證：這是 Recipe 專用的 capability adapter，簽名是 `(payload, _node)` 不是 `generate_*`，不會出現在 dashboard 單一方法列表，method-display-metadata.yaml 本來就沒有它的條目——正確排除，不是遺漏）不計入，剩下 15 個標準方法全部補齊。
+
+[已修改] 整檔讀完全部 15 個 builder（部分連帶讀取 record_kit 共用工具或交叉引用的 SWOT 模組，例如 TOWS 的 pairings 需要真實 SwotAnalysis 記錄、VPC 的 fit_hypotheses 需要跨 6 個陣列的參照完整性）；WebSearch 找權威來源，成熟教科書概念（SWOT/PESTEL/Porter 五力/VRIO/STP/價值鏈/Ansoff/藍海策略/BCG 矩陣）用 Wikipedia，較冷門的 STEEPV 用專門的 foresight 方法論網站，TOWS 用 MindTools 具體文章（非導覽頁），Value Proposition Canvas/Business Model Canvas 用 Strategyzer（Osterwalder 本人的公司，跟續24 lean_canvas 選 leanstack.com 同一個「找創始人自己的網站」邏輯），Market Analysis（TAM/SAM/SOM）用一個附計算機的行銷顧問公司頁面。跟前兩批同規格：why_zh/why_en 解釋「為什麼有效」而非重述功能、example 用真實換行＋示範選填欄位。
+
+[R4 驗證] 寫完 15 個範例後，照續26 建立的方法另外寫一支獨立腳本（不是複製貼上 YAML，是照 YAML 描述重新手打）直接呼叫全部 15 個真實 builder，包含跨方法依賴的 TOWS（先真的呼叫一次 `generate_swot_analysis` 產出真實 SwotAnalysis，再把它餵給 `generate_tows_matrix`，不是憑空編一個 dict）。15/15 一次全過，沒有抓到新的內容錯誤（吸取續26 pareto_frontier 漏 label 的教訓，這次寫範例時逐一比對 builder 的 `_KNOWN_*_KEYS` frozenset 再落筆，而不是照現有其他方法的欄位慣例用猜的）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "yaml.safe_load(...)"` 驗證 method-display-metadata.yaml（285 筆）+ 逐項確認 15 個新條目 why/url/example 齊全含真實換行 | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=獨立撰寫腳本以關鍵字參數呼叫全部 15 個 strategy 方法的真實 `generate_*` builder（含 TOWS 的真實跨方法 SwotAnalysis 依賴鏈）| exit=0 | result=15/15 pass，一次到位
+- REVIEW_WAIVED: NA -- 純內容變更（YAML why/url/example 文字），無業務邏輯變更；15/15 真實 builder 執行已提供比 critic 覆審更直接的正確性證據
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`strategy\.vrio\|strategy\.tows\|strategy\.value_proposition_canvas\|BMC-T1` | hits=僅本次觸及的 YAML/腳本，無孤兒引用
+- [rollback] 純內容變更，無 DB migration、無業務邏輯改動；`git revert` 本次 commit 可完全復原
+
+[剩餘] architecture(10)/decision(13)/strategy(15，本則) + eisenhower_matrix/reverse_brainstorming/lean_canvas 共 3 個獨立方法 = 41 個方法已完整。270+ 方法中還有約 244 個待補（association/systems/causal/computation/root_cause/stakeholders/representation/research/foresight/challenge/learning/security/art_therapy 等其餘 family），操作者指示不停批次繼續，下一批次另開條目記錄。
+
 ## 2026-09-18（續26）280+ 方法內容深化第二批：decision 家族剩餘 12 個方法補齊 why/url/example；補 2 個 critic 建議的防禦性加強（draft.py prompt 斷言、freeParseBrief 空集合註解）
 
 [操作者請求] 續24 交完後操作者連續追問「為什麼不趕快去做」，明確要求不要再逐批停下確認，直接把 270+ 方法內容深化持續做下去（呼應更早的既有指示：memory `feedback_method_atlas_continuous_authorization` 2026-09-05「都不要停」）。本則為第一個延續批次，決策：以 family 為單位批次處理（跟續22 的 architecture 家族同一種切法），本次選 `decision` family 剩餘 12 個方法（ahp/decision_tree/expected_value/ice/impact_effort/kano/mcda/moscow/pareto_frontier/rice/topsis/weighted_decision_matrix）——該 family 共 13 個方法，`eisenhower_matrix` 續24 已做。
