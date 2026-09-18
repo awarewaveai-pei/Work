@@ -1,4 +1,38 @@
 # Worklog
+## 2026-09-18（續68）HCI-30 bridge 第二個真實 bug：hci-app 連不到 hci-fetch-runner，根因是網路拓樸規劃錯誤（非設定值問題）
+
+[操作者回報] 續65 修完 `hci_not_configured` 後，操作者真的按了「送去 HCI 探索來源」，4 個候選全部 `hci_error_502`。
+
+[診斷過程，逐層排除] 先懷疑是 hairpin NAT（同主機打自己的公開網域），但用同一組 POST payload 從外部機器重現，證實 Cloudflare 本身就回 502（`Server: cloudflare`），代表 Cloudflare 連不到 origin 的正常回應——不是 next-admin 這端的問題。往回一層，直接對 `127.0.0.1:4030`（bypass 所有 nginx/CF）打同一個 POST，拿到 hci-app 自己吐出的真實 RFC7807 錯誤：`"tenantId mismatch: caller passed tenantId=11111111-... but the supplied query's connection is SET ROLE'd to tenant=unknown"`。
+
+[根因 1（已修）] `hci.current_tenant_id()`（`0001_wave1_synthetic_up.sql:283`）靠查 `hci.app_tenant_bindings` 表反查目前 `SET ROLE` 的角色對應哪個 tenant_id；這張表的種子資料**不在任何一支編號 migration 裡，只在 `database/fixtures/0001_synthetic.sql`**，而本機 `dev-db-init.ps1:57` 明講「20 migrations + synthetic fixtures」兩步都要跑。續22 Phase A 寫的 `apply-hci-postgres-migration.mjs` 從設計上就只掃 `database/migrations/`（腳本自己的 docstring 也只提 migrations），續24 Phase B 執行時延用同一支腳本，兩層都沒人注意到 fixtures 是分開的必要步驟。修法：直接對正式 `hci-postgres` 套用這支 fixture（跟本機開發用的是同一份檔案，逐字不改），套用前確認 `hci.tenants`／`hci.app_tenant_bindings` 兩張表皆為 0 筆（純新增、無資料流失風險）。
+
+[根因 2（已修，這次是真正的架構規劃錯誤）] tenant 問題修完後，同一個請求換一個新錯誤：`"fetch failed"`（Node 底層網路錯誤，非 HTTP 層錯誤）。查到 `hci-app` 的 `HCI_FETCH_RUNNER_BASE_URL` 設計成 `http://host.docker.internal:8190`，而 `hci-fetch-runner` 的對外埠特意寫死 `127.0.0.1:8190:8090`（續22 自己的註解寫「ADR-0029 gate 1，绝不能 0.0.0.0」）。**這個組合在 Linux Docker 上原理上就不會通**：`127.0.0.1`-only 的 port publish 只接受真的從 loopback 進來的連線，`host.docker.internal` 解析到的是 docker bridge gateway，從那個介面進來的封包不算 loopback 來源，會被直接拒絕——這不是哪裡漏設定，是續22規劃這條路徑時就想錯了，`docker exec hci-app node -e "fetch('http://host.docker.internal:8190/healthz')"` 直接重現一樣的 `fetch failed`。修法前重讀 ADR-0029 全部 6 個 gate 原文＋`network-guard/entrypoint.sh` 全部 iptables 規則：gate 1 講的是「獨立 compose service」不是 port binding 範圍；gate 2 講的是「runner 自己不能有路徑連到其他 bridge network」，不是「誰能連進 runner」；entrypoint.sh 全部規則只碰 `OUTPUT` chain，從來沒動過 `INPUT`。三者都確認跟「讓 hci-app 加入 `hci-fetch-runner-net`、改用內部服務名連線」這個修法無關，不違反任何一個 gate。改用 `0.0.0.0` 讓 host 防火牆擋——這條路徑**明確排除**，這台主機 2026-08-18 KS-6 規劃階段就抓到過同一種 bug class（Docker 自己的 iptables 規則會繞過 UFW 的 INPUT chain，跟 4/20 挖礦入侵是同一個漏洞類別），不能重蹈覆轍。
+
+[已修改]
+- `Projects/internal/hci30/database/fixtures/0001_synthetic.sql` 套用到正式 `hci-postgres`（無程式碼變更，純資料）。
+- `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（commit `32ca2e590`）：`hci-app` 加入 `hci-fetch-runner-net`、移除已無用途的 `extra_hosts`、`HCI_FETCH_RUNNER_BASE_URL` 改為 `http://hci-fetch-runner:8090`；`hci-fetch-runner` 的 port 註解更正為「host-side debug only，不是 runtime 路徑」。正式主機透過 `safe-infra-patch.sh compose` 套用（備份+套用+`docker compose config`驗證+health check+失敗自動 rollback），`hci-app` 確實 Recreated（非沿用舊容器），6 秒轉 healthy。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(curl，外部機器) | cmd=對 `https://hci.aware-wave.com/api/hci/v1/seeds` 直接 POST 重現 | result=Cloudflare 自己的 502 錯誤頁（`Server: cloudflare`），證明不是 next-admin 端問題
+- REALTEST_EVIDENCE: tool=SSH | cmd=對 `127.0.0.1:4030` 直打同一個 POST（bypass 所有 nginx/CF）| result=hci-app 自己吐出的真實 tenant-mismatch 錯誤內容，非通用 502
+- REALTEST_EVIDENCE: tool=SSH | cmd=套用 fixture 後重查 `hci.app_tenant_bindings` | result=2 筆正確存在（`hci_app_test_a`→`11111111...`／`hci_app_test_b`→`22222222...`）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec hci-app node -e "fetch('http://host.docker.internal:8190/healthz')"` | result=修前 `FETCH_ERROR fetch failed`；修後對 `http://hci-fetch-runner:8090/healthz` | result=`STATUS 200 {"status":"ok"}`
+- REALTEST_EVIDENCE: tool=Bash(curl，外部機器對公網) | cmd=完整重打原本失敗的 POST（`targetUrl` 換一個不存在的路徑）| result=`{"outcome":"failed","error":"fetch_failed_http_404",...}`——這是正確的應用行為（假路徑本來就該回 404），不是 bug
+- REALTEST_EVIDENCE: tool=Bash(curl，外部機器對公網) | cmd=同一條路徑，`targetUrl` 換成真實存在的 `https://example.com/` | result=`{"outcome":"written","sourceId":"4b058395-...","snapshotId":"680b482d-..."}`——真正端到端成功
+- REALTEST_EVIDENCE: tool=SSH | cmd=`SELECT * FROM hci.sources WHERE id='4b058395-...'` 獨立查證（不只信任 API 回應）| result=真實存在，`admission_state='DISCOVERED'`，tenant_id 正確——完成操作者最初「確定會進入正確的表格」的要求
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=套用兩次修復後皆對 `app.aware-wave.com`／`cognitive.aware-wave.com` 做回歸檢查 | result=307/200，無回歸
+- REVIEW_DONE: critic=self（無額外 agent；ADR-0029 全 6 個 gate 原文 + `network-guard/entrypoint.sh` 全部規則逐條核對，非猜測）| verdict=pass | findings=0
+- BUGHUNT_WAIVED: NA -- 純 infra 配置 + 一次性資料種子，非既有呼叫端契約異動
+
+[已知殘留，非 bug] 驗證過程中寫入的測試 source（`https://example.com/`，id `4b058395-...`）想清掉時發現 `hci.source_snapshots` 是 append-only 表（DELETE 被觸發器拒絕，`reject_update_delete()`），這是設計上的證據鏈完整性保護，不是問題，順其自然不強行繞過。**操作者的候選佇列裡會看到這一筆測試來源**，跟 `database/fixtures/0001_synthetic.sql` 本來就有的兩筆 `tenant-a-source`/`tenant-a-admission-lifecycle` 一樣，直接在 HCI-30 自己的審核介面按「拒絕」即可，這是系統本來就有的正常路徑，不需要額外處理。
+
+[里程碑] 「送去 HCI 探索來源」→「真的寫進 `hci.sources`／`hci.source_snapshots`」全鏈路第一次真實跑通，操作者續?（本session更早）「你要確定會進入正確的表格 可以真正完成HCI」的要求在此獨立驗證完成。
+
+[剩餘風險] 無新增。`hci-fetch-runner`／`hci-network-guard` 的既有 SSRF 隔離驗證（續24）未受此次改動影響——只改了「誰能連進 runner 的控制 API」，沒有改「runner 自己能連到哪裡」的既有規則。
+
+[rollback] compose 檔有 `safe-infra-patch.sh` 時間戳備份可還原；fixture 資料是新增-only、無法整批撤銷（append-only by design），但每一筆都是無害的合成資料，不影響任何真實客戶資料的可見性或正確性。
+
 ## 2026-09-18（續67）280+ 方法內容深化第十七批：insight 家族全部 9 個方法（F06 人類／顧客洞察家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）的批次節奏，處理 insight 家族全部 9 個方法：contextual_inquiry／empathy_map／focus_group／interview／journey_map／jtbd／persona／service_blueprint／survey。期間另有 1 個併行 session 推進 HCI-30 網路修復（commit `32ca2e590`），`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
