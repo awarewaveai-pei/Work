@@ -1,4 +1,32 @@
 # Worklog
+## 2026-09-18（續63）HCI-30 Phase B 收尾：DNS+憑證+公開網址驗證完成，8/8 全部真實上線
+
+[任務] 承接續24（commit `eaf47f28c`）留下的最後一項——操作者手動在 Cloudflare 建立 `hci` A 記錄後，接手完成憑證擴充＋最終公開網址驗證。
+
+[已完成]
+1. Host 層 nginx（`/etc/nginx/sites-available/sg-stack.aware-wave.com`，非 lobster-nginx container）補 `hci.aware-wave.com` 進兩處 `server_name`（:80/:443）+ 對應 http→https redirect if-block——續24 只做了 container 內 vhost，沒做這層；比照 `cognitive`/`portal` 上線先例，這層沒補，certbot 找不到掛載點、公網也連不到 container。
+2. `certbot certonly --cert-name aware-wave.com --nginx --expand` 補齊既有 9 個網域 + `hci.aware-wave.com`，成功簽發（10 SAN，新到期 2026-12-17），`openssl x509 -text` 核對真的含 `DNS:hci.aware-wave.com`。
+3. 檢查已知的 certbot `--expand` 自動污染 `00-default-placeholder` 的 bug（chatwoot 先例，2026-09-11）——這次沒發生，0 命中。
+
+[過程中抓到並修正的真實 bug] 手動幫 hci 補 http→https redirect if-block 時，第一次用 SSH→bash→`python -c` 三層嵌套 escaping 插入含 `$host$request_uri` 的內容，反斜線層數算錯，`$host` 整個被吃掉——寫進 host 上的檔案變成語法上能通過 `nginx -t`（沒有語法錯誤）但語意錯誤的裸 `\` 字面值，redirect 目標會變成 `https://`（沒有主機名）而非 `https://hci.aware-wave.com/...`。這是一個「測試會過但行為是錯的」的靜默 bug 樣態，插入後立刻 `grep -A2` 核對內容才抓到，沒有等到後續真實流量才發現。改用本機檔案（Edit tool 精確字串替換，不經任何 shell）→ `ssh ... tee` 以 stdin pipe 寫回（不經命令列參數，不需跳脫任何字元）重做，`grep`/`sed -n` 核對每個 `$` 字元都在正確位置後才 `nginx -t`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(DNS) | cmd=`nslookup hci.aware-wave.com` | result=解析到跟 `cognitive.aware-wave.com` 相同的 4 個 Cloudflare edge IP
+- REALTEST_EVIDENCE: tool=SSH | cmd=`nginx -t` + `systemctl reload nginx`（host 層，兩輪：server_name 補丁 + certbot 擴充後各一次）| exit=0 both rounds
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=擴充後對 4 個既有網域（app/cognitive/api/portal）各打一次 `https://` | result=307/200/200/308，皆正常，無回歸
+- REALTEST_EVIDENCE: tool=SSH | cmd=`openssl x509 -in fullchain.pem -noout -text \| grep SAN` | result=10 網域，含 `DNS:hci.aware-wave.com`
+- REALTEST_EVIDENCE: tool=Bash(curl，本機對公網) | cmd=`curl https://hci.aware-wave.com/health` | result=`{"ok":true,"service":"hci30-app"}` HTTP 200——這是唯一一個真正走完整公網路徑（DNS→Cloudflare proxy→host nginx→certbot 簽發的憑證→lobster-nginx container→hci-app）的測試，續24 做的是 Host-header bypass，不含這一段
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=`curl http://hci.aware-wave.com/health`（純 HTTP）| result=301 → https，跟其他 9 個網域行為一致
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=`curl https://hci.aware-wave.com/api/hci/v1/cases?tenant=a` | result=200，`{"data":[],"next_cursor":null}`，證明公網路徑最終真的打到 hci-app 且連得上 hci-postgres，不是只有 health check 端點通
+- REVIEW_WAIVED: NA -- 純 infra 執行（host nginx 設定 + certbot），非程式碼變更
+- BUGHUNT_WAIVED: NA -- 同上
+
+[里程碑] **HCI-30 Phase B 原 8 項清單全部完成（8/8），`https://hci.aware-wave.com/` 從公網可正常存取**。HCI-30 從「本機可測試」到「正式對外網址可用」全部落地，本輪部署任務結束。
+
+[剩餘風險] 無新增，維持續24 WORKLOG 所述（新增服務均可用既有 rollback 機制單獨停用，不影響其他既有服務）。
+
+[rollback] Host nginx：`sg-stack.aware-wave.com.bak-hci-20260918-220002`（原始、無 hci）可還原。憑證：certbot `--expand` 只增不減既有 SAN；若要撤銷 hci 網域，另跑一次 `--expand` 但 `-d` 清單不含 hci 即可移除，不影響其他 9 個既有網域。
+
 ## 2026-09-18（續40）280+ 方法內容深化第十四批：decomposition 家族全部 9 個方法（F02 拆解與結構化家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）的批次節奏，處理 decomposition 家族全部 9 個方法：fast／functional_decomposition／hierarchical_task_analysis／issue_tree／logic_tree／mece／objective_tree／problem_tree／wbs。
