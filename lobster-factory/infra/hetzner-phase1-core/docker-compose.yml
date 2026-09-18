@@ -551,6 +551,12 @@ services:
       # member of hci-fetch-runner-net (see that network's own comment for why joining it would
       # defeat the isolation). Same host.docker.internal pattern next-admin already uses.
       - "host.docker.internal:host-gateway"
+    ports:
+      # sg-deploy.sh's own smoke-check needs a host-reachable port to curl directly (same
+      # `${..._HOST_PORT:-...}` + runtime `docker port` resolution pattern node-api already uses,
+      # not a hardcoded assumption) -- independent of whether nginx/DNS for hci.aware-wave.com are
+      # wired up yet, so a code deploy's own health can be verified before that separate step exists.
+      - "${HCI_APP_HOST_PORT:-127.0.0.1:4030}:4030"
     environment:
       PORT: "4030"
       HCI_DB_HOST: hci-postgres

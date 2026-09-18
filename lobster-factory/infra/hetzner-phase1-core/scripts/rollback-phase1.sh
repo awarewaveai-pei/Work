@@ -10,7 +10,7 @@
 #   clean   <service> [days]       remove snapshots older than N days (default: 30)
 #   n8n-pin <semver-tag>           update N8N_IMAGE_TAG in .env and restart n8n
 #
-# LOCAL-BUILD services: wordpress | node-api | next-admin
+# LOCAL-BUILD services: wordpress | node-api | next-admin | hci-app
 # EXTERNAL services (n8n): use n8n-pin.
 # Other external (nginx, redis, mariadb): manual .env image tag edit + docker compose pull.
 #
@@ -35,6 +35,7 @@ declare -A IMAGE_MAP=(
   [wordpress]="lobster-phase1-wordpress"
   [node-api]="lobster-phase1-node-api"
   [next-admin]="lobster-phase1-next-admin"
+  [hci-app]="hci30-app"
 )
 
 # ---------- helpers ----------
@@ -83,7 +84,7 @@ Usage:
   rollback-phase1.sh clean   <service> [days]       prune snapshots older than N days (default: 30)
   rollback-phase1.sh n8n-pin <semver>               update N8N_IMAGE_TAG in .env and restart n8n
 
-Local-build services: wordpress | node-api | next-admin
+Local-build services: wordpress | node-api | next-admin | hci-app
 Env: ROLLBACK_HEALTH_TIMEOUT=<sec> (default: 90)
 EOF
   exit 1

@@ -1,6 +1,6 @@
 # 部署與回滾 Runbook（Phase 1 Compose）
 
-**Owner**：本地映像（WordPress／Node API／Next Admin）與外部映像（n8n）的**部署前快照、標準部署、一鍵回滾**操作正本。  
+**Owner**：本地映像（WordPress／Node API／Next Admin／HCI-30 App，2026-09-18 起）與外部映像（n8n）的**部署前快照、標準部署、一鍵回滾**操作正本。  
 **相關腳本**：`lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`  
 **映像釘選策略**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md` §3  
 **資料備份策略**（資料層分開）：`LONG_TERM_OPS.md` §4、`scripts/backup-phase1.sh`  
@@ -34,6 +34,7 @@
 | `node-api` | 本地建置（`lobster-phase1-node-api:local`） | `save` / `restore` |
 | `next-admin` | 本地建置（`lobster-phase1-next-admin:local`） | `save` / `restore` |
 | `wordpress` | 本地建置（`lobster-phase1-wordpress:local`） | `save` / `restore` |
+| `hci-app`（2026-09-18 起）| 本地建置（`hci30-app:local`，source root `Projects/internal/hci30/` 整棵，非 `apps/` 底下） | `save` / `restore`。同一 commit 也加了 `hci-postgres`/`hci-fetch-runner`/`hci-network-guard`/`hci-object-storage`（見 `docker-compose.yml`）——這四個是基礎設施服務，透過 `safe-infra-patch.sh compose` 套用，不隨 `hci-app` 的程式碼部署重建，此表的 `save`/`restore` 只涵蓋 `hci-app` 本身 |
 | `n8n` | 外部映像，版本由 `.env` `N8N_IMAGE_TAG` 控制 | `n8n-pin <old-semver>` |
 | `nginx` | `nginx:stable`（upstream tag） | 改 compose image tag → `docker compose pull nginx && up -d nginx` |
 | `redis` | `redis:7-alpine`（upstream tag） | 同上 |

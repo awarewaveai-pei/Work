@@ -22,6 +22,29 @@ set -euo pipefail
 REPO_DIR="/root/Work"
 STAGING_DIR="/root/lobster-phase1"
 GIT_APPS_ROOT="$REPO_DIR/lobster-factory/infra/hetzner-phase1-core/apps"
+# Per-app git source root (2026-09-18, hci-app prod-deploy prep): every app before hci-app lives
+# under GIT_APPS_ROOT, one directory per app name. hci-app does not -- it is
+# Projects/internal/hci30/'s own product root (needed whole, not just its app/ subdirectory, since
+# app/server.mjs imports sibling packages/ and public-intelligence/ by relative path -- see that
+# product's own Dockerfile header). This function is the one place that difference lives; every
+# other reference to "where does $APP's source come from" below calls it, so a future app with the
+# same shape needs one new case here, not a scattered set of if-APP-is-hci-app checks.
+app_git_source_root() {
+  case "$1" in
+    hci-app) echo "$REPO_DIR/Projects/internal/hci30" ;;
+    *) echo "$GIT_APPS_ROOT/$1" ;;
+  esac
+}
+# Per-app deployed container name (2026-09-18): every app before hci-app is deployed as
+# "lobster-$APP" (docker-compose.yml container_name:). hci-app's own compose block deliberately
+# uses the bare product name "hci-app" instead (HCI-30 is not "lobster"-branded), matching
+# hci-postgres/hci-fetch-runner's own container_name: choices in the same file.
+app_container_name() {
+  case "$1" in
+    hci-app) echo "hci-app" ;;
+    *) echo "lobster-$1" ;;
+  esac
+}
 LOG_DIR="$STAGING_DIR/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/sg-deploy-$(date +%Y%m%d-%H%M%S).log}"
@@ -78,7 +101,7 @@ RESTORABLE_APPS=()
 NON_RESTORABLE_APPS=()
 for _app in "${APPS[@]}"; do
   case "$_app" in
-    wordpress|node-api|next-admin) RESTORABLE_APPS+=("$_app") ;;
+    wordpress|node-api|next-admin|hci-app) RESTORABLE_APPS+=("$_app") ;;
     *) NON_RESTORABLE_APPS+=("$_app") ;;
   esac
 done
@@ -150,8 +173,35 @@ if [[ " ${APPS[*]} " =~ " next-admin " && $DRY_RUN -eq 0 ]]; then
   log "npm test passed"
 fi
 
+# 1.6. pre-build gate for hci-app -- Node-native only (node --check + node --test), deliberately
+# NOT the full tests/architecture/*.ps1 / test-wave1-local.ps1 suite: those need PowerShell + an
+# ephemeral Docker Postgres, and ks-aw-01 is a bare Ubuntu host with no PowerShell -- installing it
+# just for this one gate would be disproportionate (per this session's own earlier deploy-plan
+# investigation). This fast subset still catches the two failure classes that actually matter for
+# a deploy gate: a syntax-broken server.mjs, and a real regression in any pure-Node architecture
+# test under tests/architecture/*.mjs (critic review, 2026-09-18: deliberately not enumerated by
+# name here -- a hardcoded list drifts the moment a new one is added, exactly what this comment
+# itself did on its first draft, which named 4 of the 5 already present and missed
+# peer-boundary.test.mjs). Deliberately EXCLUDED: the .ps1 architecture tests (fetch-runner
+# network/content/object-storage isolation) -- these need PowerShell + a real Docker Postgres,
+# unavailable on ks-aw-01. Known, named residual risk: a regression in the isolated fetch-runner's
+# actual network isolation (ADR-0029) would NOT be caught by this deploy gate -- it can only be
+# caught by manually re-running those .ps1 tests, which this gate does not automate.
+if [[ " ${APPS[*]} " =~ " hci-app " && $DRY_RUN -eq 0 ]]; then
+  HCI_SRC_ROOT="$(app_git_source_root hci-app)"
+  log "--- node --check gate (hci-app) ---"
+  node --check "$HCI_SRC_ROOT/app/server.mjs" 2>&1 | tee -a "$LOG_FILE" \
+    || fail "node --check FAILED on hci-app/app/server.mjs — deploy aborted"
+  log "node --check passed"
+
+  log "--- node --test gate (hci-app architecture tests) ---"
+  node --test "$HCI_SRC_ROOT/tests/architecture/"*.mjs 2>&1 | tee -a "$LOG_FILE" \
+    || fail "hci-app architecture tests FAILED — deploy aborted; fix before re-deploying hci-app"
+  log "hci-app architecture tests passed"
+fi
+
 for APP in "${APPS[@]}"; do
-  SRC="$GIT_APPS_ROOT/$APP/"
+  SRC="$(app_git_source_root "$APP")/"
   DST="$STAGING_DIR/apps/$APP/"
   [[ -d "$SRC" ]] || fail "source not found: $SRC"
   [[ -d "$DST" ]] || fail "staging dest not found: $DST"
@@ -234,7 +284,7 @@ log "wrote .deployed-commit = $NEW_COMMIT (previous: ${PREVIOUS_COMMIT:-none})"
 
 # 6. wait for healthy (informational; does not invalidate the .deployed-commit record)
 for APP in "${APPS[@]}"; do
-  CONTAINER="lobster-$APP"
+  CONTAINER="$(app_container_name "$APP")"
   log "--- waiting for $CONTAINER healthy ---"
   for i in $(seq 1 60); do
     STATUS=$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "no-healthcheck")
@@ -335,6 +385,15 @@ _smoke_check "node-api health"             "http://127.0.0.1:${node_api_port}/he
 # sidesteps the port-80 redirect trap because a valid :443 request is never subject to an
 # http->https force-redirect rule (confirmed live 2026-09-12: returns 200 while port 80 still 301s).
 _smoke_check "nginx/api"                   "https://api.aware-wave.com/health" "" "api.aware-wave.com"
+# hci-app (2026-09-18): direct-port probe only, matching node-api's own reasoning above (the
+# nginx/DNS vhost for hci.aware-wave.com is a separate, not-yet-done step -- see this app's own
+# WORKLOG entry -- so there is deliberately no "nginx/hci" probe here yet; add one the same day
+# that vhost lands, same pattern as the api.aware-wave.com probe two lines up).
+if [[ " ${APPS[*]} " =~ " hci-app " ]]; then
+  hci_app_port=$(docker port hci-app 4030/tcp 2>/dev/null | head -1 | sed 's/.*://')
+  hci_app_port="${hci_app_port:-4030}"
+  _smoke_check "hci-app health"              "http://127.0.0.1:${hci_app_port}/health"
+fi
 
 if [[ "$_smoke_errors" -gt 0 ]]; then
   log "SMOKE_WARN: $_smoke_errors endpoint(s) returned non-2xx -- service may be partially degraded"
