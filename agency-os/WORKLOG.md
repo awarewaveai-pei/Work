@@ -33,6 +33,24 @@
 
 [rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
 
+## 2026-09-18(續75)scripts/perplexity-cli.ps1 chat 預設模型 sonar-pro → sonar(操作者質疑 9/12 Perplexity 一天 $10 用量觸發)
+
+操作者出示 9/12 Perplexity API 用量截圖(sonar 69%／sonar-reasoning-pro／sonar-pro，共 35 次)，質疑「不是設定成只用 search 嗎」。查證：app 自己的蒐集器(`lib/collect/collectors/web-search.ts`)只打 `/search`，且 Perplexity 官方定價(cloudzero.com/blog/perplexity-api-pricing、docs.perplexity.ai/docs/getting-started/pricing)證實 `/search` 按整批 request 計費、不分 model，結構上不可能產生畫面上那種按 model 拆的用量。`claude_desktop_config.json` 的 perplexity MCP entry 已不存在(現況剩 5 個 server，較 TASKS.md 2026-08-28 記錄的 10 個少 5 個)，但該檔不在 git、無備份腳本涵蓋(`sanitize-user-mcp-config.ps1:14-20` 現在的註解仍寫「不在清單上，且它應該要在」)，無法回溯移除時間。
+
+**真正找到的現行問題**：`scripts/perplexity-cli.ps1`(git-tracked，2026-04-23 起未再改動)`chat` 子指令預設 `$model = "sonar-pro"`(原 line 194，呼叫 `/v1/sonar`)，未帶 `--model` 就會用貴的模型。這正是 2026-06-21 已發生過一次的同款事故(`agency-os/WORKLOG-archive/2026-06.md:2758-2782`「MCP server 靜默用 premium 模型燒費」)，當時的修復拔掉了 `mcp/registry.template.json`／`.mcp.json` 的 perplexity entry，但沒動這支 CLI script，缺口留到今天。
+
+[已修改]
+- `scripts/perplexity-cli.ps1`：`chat` 預設模型 `sonar-pro` → `sonar`(help text + 實際預設賦值兩處)；`agent`/`search`/`embeddings` 三個子指令未動(本來就無預設 premium model 問題)
+- `agency-os/TASKS.md:628-632`：補 2026-09-18 複查段落(perplexity/chatgpt-fast/chatgpt-latest/gemini-fast/gemini-latest 五個已從 `claude_desktop_config.json` 消失，時間不可考)
+
+REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/perplexity-cli.ps1 help` | exit=0 | result=help text 正確顯示「Default: sonar」
+REVIEW_DONE: critic=Quick(self-review；單一預設值改動、無新邏輯分支，非 auth/crypto/個資/金流，依 AGENTS.md §4 單一自審足夠)| verdict=pass | findings=0c/0m
+BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`perplexity-cli|sonar-pro` | hits=`bin/pplx.cmd`／`bin/perplexity.cmd`(純轉呼叫，無寫死 model，不受影響)、`scripts/README.md`(無 sonar 相關文字)、WORKLOG-archive 兩處歷史記錄(append-only，不回改)——無遺漏呼叫端
+
+[剩餘風險] 無法證明 9/12 那 35 次確實是這支 CLI 打的——腳本呼叫不會自動留 WORKLOG 記錄，這是相關性最強的現行機制，不是已證實的因果。`agent` 子指令(`/v1/agent`，Perplexity Agent API)未帶預設 model，行為交由 Perplexity 後端決定，未鎖定；未觀察到它被呼叫過的證據，本次不做臆測性加固。
+[rollback] `git diff scripts/perplexity-cli.ps1`；純預設值改動兩處，`git checkout -- scripts/perplexity-cli.ps1` 即可完整復原
+[commit] 尚未 commit，待操作者確認
+WORKLOG_DONE: perplexity-cli.ps1 sonar-pro 預設值修正 + claude_desktop_config.json 現況複查 + TASKS.md:628 更新
 ## 2026-09-18（續74）280+ 方法內容深化第二十三批：divergent 家族剩餘 15 個方法（F03 發散式創意家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）／續67（insight 9）／續69（learning 11）／續70（experiment 11）／續71（delivery 11）／續72（systems 12）／續73（devops_sre 13）的批次節奏，處理 divergent 家族剩餘 15 個方法（divergent.reverse_brainstorming 先前已完成，不在本批）：brainwriting／classic_brainstorming／crazy_eights／creative_constraints／design_thinking／forced_connections／lateral_thinking／lotus_blossom／random_stimulus／scamper／six_thinking_hats／six_three_five／starbursting／synectics／triz。開工前先跑過 `grep`／`ls` 核對現況（因為前一批 devops_sre 收工時發現一個併行 art_therapy session 留下的 `record_kit.py` 共用模組，擔心 divergent 家族也有類似併行風險），確認 divergent 家族 YAML 內容本身完全沒人動過（僅 reverse_brainstorming 1/16 已完成），才開始本批。
@@ -20425,3 +20443,23 @@ Representation Switching=同一次切換事件裡所有 view 必須共用同一�
 - [剩餘風險] 與上一條目相同（`$forbiddenImportPattern`/`$xhrPattern` 裸別名/backtick/串接繞過，已追蹤 TASKS.md 未修；dynamic-property-construction 既有 blind spot 未變）——**唯一更正**：`/regex/` 前面緊接關鍵字這個 class 已徹底關閉，不再是殘留 blind spot（上一條目該行敘述已由本條目訂正）
 - [rollback] 純增量修改同一個已在 tracker 中、尚未 commit 的檔案；`git diff` 可完整審視；若要復原到上一條目的狀態，`git restore` 對本次 commit 前的工作目錄無意義（本次改動與上一條目改動一起等待同一次 commit），完整 rollback 需 `git revert` 即將產生的那個 commit
 - WORKLOG_DONE: /verify-recent 第 2 輪 critic 抓到 2 個更嚴重的 Critical（關鍵字誤判＋interpolation 狀態洩漏），皆已修＋補永久回歸測試；tracker 清除、準備 commit
+## 2026-09-19(續77)根因：為什麼 2026-06-21 已經修過一次 Perplexity 燒費，2026-09-18 又發生一次(操作者追問；接續上一則 續75。附加在檔尾而非檔頭插入，因檔頭區域當下有其他 session 高頻併發寫入，多次 Edit 因外部改動而失敗)
+
+操作者對 續75 的修復追問「之前已經修過一次，為什麼又發生」。查證 2026-06-21 那次修復(`agency-os/WORKLOG-archive/2026-06.md:2758-2782`)自己的 BUGHUNT_DONE 行：`grep=PERPLEXITY_API_KEY | hits=3 (generate-core:194 + trending-sources:28,317 — 均為 gated usage，非 bug)`，scope=agency-os,scripts,lobster-factory。
+
+**今天原樣重跑同一個 scope/pattern**：立刻多出 `scripts/perplexity-cli.ps1:10,12,15` 三處命中。`git log` 確認該檔案 2026-04-23 建立(`398722cfb feat(cli): add grok and perplexity local wrappers`)，早於 6/21 那次修復兩個月，理當被同一次 grep 掃到。那行記錄只列 3 個 app-route 命中，沒提到這支 CLI 腳本，也沒有像同一條目裡 `trending-sources.ts`／`generate-core.ts` 那樣寫「不動理由」——後兩者是確認過、刻意留著(`enabled: !!process.env.PERPLEXITY_API_KEY` 保護)，perplexity-cli.ps1 則完全沒被提及，不是被評估後放行，是漏掃。
+
+**根因不是「沒人想到」，是「驗證步驟本身沒做完整」**：BUGHUNT_DONE 是 AGENTS.md R4 規定的抓蟲動作，存在的目的就是防止這種遺漏；6/21 那次確實執行了、也確實寫了證據行，但宣告的 3 筆命中不是真實 grep 結果的全集。`bughunt-oracle.ps1`(AGENTS.md §4 提到的跨模型驗真機制)目前只驗證 `hits=0` 的零命中宣告是否造假("宣告 0 實際命中 = HARD FAIL")，不驗證 `hits=N`(N>0)的清單本身是否完整——這個案例剛好落在它不驗的那一半，所以 6/21 的漏洞沒被任何機械閘攔下，一路留到今天。已開 TASKS.md 對應項，附修法方向(非零 hits 也該獨立重跑比對完整性)，尚未實作(改驗證機制屬 Medium risk，待操作者同意)。
+
+[已修改]
+- `agency-os/TASKS.md`：新增「bughunt-oracle 驗證缺口」項，含完整根因鏈與修法方向
+
+REALTEST_EVIDENCE: tool=Grep | cmd=`PERPLEXITY_API_KEY` scope=agency-os,scripts,lobster-factory(與 6/21 記錄同一 scope/pattern)| result=`scripts/perplexity-cli.ps1:10,12,15` 三處命中，6/21 記錄未列
+REALTEST_EVIDENCE: tool=Bash | cmd=`git log --date=iso --pretty=format:"%h %ad %s" -- scripts/perplexity-cli.ps1` | exit=0 | result=`398722cfb 2026-04-23 17:43:53 +0800 feat(cli): add grok and perplexity local wrappers`——確認建立時間早於 6/21 修復
+REVIEW_DONE: self-review=Quick(純文件記錄+根因比對，無程式碼異動)| verdict=pass | findings=0c/0m
+BUGHUNT_DONE: scope=agency-os,scripts | grep=`bughunt-oracle` | hits=僅 AGENTS.md 說明文字與 script 本體提及，未修改；本次只記錄缺口方向
+
+[剩餘風險] `bughunt-oracle.ps1` 的驗證缺口本身尚未修——本條目只記錄根因、開 TASKS 追蹤，未動治理腳本邏輯。同類「宣告非零 hits 但清單不全」的漏洞理論上可能存在於其他歷史 BUGHUNT_DONE 記錄，未逐一回溯稽核。
+[rollback] 純文件新增，`git diff agency-os/TASKS.md agency-os/WORKLOG.md` 可完整審視
+[commit] 尚未 commit，待操作者確認(與 續75 同批，非本 session 自行 commit)
+WORKLOG_DONE: 定位 2026-06-21 修復未涵蓋 perplexity-cli.ps1 的確切根因(BUGHUNT_DONE 驗證步驟本身遺漏，非決策排除)+ 開 TASKS 追蹤驗證工具缺口

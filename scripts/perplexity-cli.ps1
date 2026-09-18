@@ -84,7 +84,7 @@ Common options:
   --body-file <file>
 
 Chat options:
-  --model <model>                Default: sonar-pro
+  --model <model>                Default: sonar (cheapest; pass --model sonar-pro / sonar-reasoning-pro for premium)
   --system <text>
   --max-tokens <n>
   --temperature <n>
@@ -191,7 +191,7 @@ $json = $false
 
 switch ($command) {
     "chat" {
-        $model = "sonar-pro"
+        $model = "sonar"
         $system = ""
         $maxTokens = $null
         $temperature = $null

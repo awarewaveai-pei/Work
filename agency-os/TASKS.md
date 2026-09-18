@@ -630,6 +630,9 @@
   - **一句話**：`%APPDATA%\Claude\claude_desktop_config.json` 被 Claude 與 repo `.mcp.json` 合併載入，但它不在 `mcp/claude-userlevel/manifest.json` 裡、不被 `sanitize-user-mcp-config.ps1` 備份、沒有任何 gate 讀它。
   - **實測（2026-08-28）**：10 個 server，其中 **8 個與 repo `.mcp.json` 同名**（`airtable` `chatgpt-fast` `chatgpt-latest` `gemini-fast` `gemini-latest` `github` `replicate` `work-global`），**2 個只存在於此**（`perplexity` `wordpress`）。全檔 `${env:}` 與 `${}` 佔位符 **0 個** —— 值全是明文，正規表達式掃出 6 種前綴：`sk-proj-`(164)、`patVgCIuooi8`(82)、`pplx-`(53)、`ghp_`(40)、`r8_`(40)、`AIza`(39)，另有 `REPLICATE_WEBHOOK_SIGNING_KEY` 與 soulful 站的 `JWT_TOKEN`。
   - **它繼承了角色卻沒繼承治理**：這正是 `~/.cursor/mcp.json` 原本的處境（同樣被合併、同樣持明文），差別只在後者有 `cursor-mcp` 條目管。Cursor 2026-08-26 退場、`~/.cursor` 2026-08-28 刪除後，那條退場了，這個檔卻從來沒被納入。
+  - **複查（2026-09-18，操作者質疑 Perplexity 一天 $10 用量觸發）**：現況剩 **5 個 server**（`airtable` `wordpress` `replicate` `github` `work-global`）。原 10 個裡 `chatgpt-fast` `chatgpt-latest` `gemini-fast` `gemini-latest` `perplexity` 五個已不在，含那把 `pplx-`(53) key。此檔不在 git、從未被任何腳本備份過（`sanitize-user-mcp-config.ps1:14-20` 現在的註解仍寫「不在備份清單上，且它應該要在」），**移除的確切時間與操作者不可考**——mtime 對這檔案無意義（Claude Desktop 每次啟動都會為其他 UI 狀態重寫它），故無法判斷這次移除發生在 9/12 那次 Perplexity 用量高峰之前或之後。治理缺口本身沒關：這項仍該開著。
+
+- [ ] **【2026-09-19 開出｜bughunt-oracle 驗證缺口｜根因：為什麼 6/21 的修復沒擋住 9/19 的 sonar-pro 預設值】**`bughunt-oracle.ps1` 只驗 `hits=0` 的零命中宣告是否造假，不驗 `hits=N`（N>0）的清單是否完整。2026-06-21 那次 Perplexity 修復（WORKLOG-archive/2026-06.md:2777）宣告 `BUGHUNT_DONE: grep=PERPLEXITY_API_KEY | hits=3`，但同一個 scope（agency-os,scripts,lobster-factory）、同一個 pattern，2026-09-19 重跑立刻多出 `scripts/perplexity-cli.ps1:10,12,15` 三處命中——該檔案 2026-04-23 就存在，早於那次修復兩個月，理當被同一次 grep 掃到。這行記錄沒提到它，也沒有像 `trending-sources.ts`/`generate-core.ts` 那樣寫「不動理由」，代表不是刻意排除，是漏掉。這正是 `scripts/perplexity-cli.ps1` 的 sonar-pro 預設值沒被那次修復一併抓到、缺口留到今天的直接原因。詳見 WORKLOG 2026-09-19（續76）。**修法方向**：bughunt-oracle 對非零 hits 也該獨立重跑 grep 比對清單是否完整，不能只驗證「宣告的每一條是否真實存在」。
   - **機制已經寫好且刻意留著**：`scripts/prune-duplicate-mcp-servers.mjs` 是 `--target/--compare/--collection` 的通用工具，處理的正是「刪掉碰撞的鍵、保留只存在於此的逃生門鍵」這個形狀 —— `replace-json` 會把 `perplexity`/`wordpress` 一起殺掉，所以不能用。**不需要改 code，只需要一條 manifest 條目。**
   - **下一步**：① 操作者確認 `perplexity` / `wordpress` 是否該進 `mcp/registry.template.json`（進了就連逃生門都不需要）② 決定 8 個碰撞鍵是否 prune ③ 明文 key 併入既有輪換批次一起處理（見同區 2026-08-15 / 2026-08-27 兩條）④ 加 manifest 條目 `claude-desktop-mcp`（`prune-duplicate-json`），並在 `sanitize-user-mcp-config.ps1` 備份清單補上此路徑
   - **為何沒有直接做**：改寫的是 Claude 正在載入、且持有活憑證的檔案 —— 依 AGENTS.md §操作風險分級屬 Medium 以上，需明示 go-ahead。
@@ -1747,5 +1750,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-17 14:30:03 UTC_
+_Last synced: 2026-09-18 14:30:03 UTC_
 
