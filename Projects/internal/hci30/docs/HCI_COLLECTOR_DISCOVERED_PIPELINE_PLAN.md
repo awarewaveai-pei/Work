@@ -160,13 +160,13 @@
 - **另查證 HCI-30 自己的 API 文件**（`api/openapi/hci-v1.yaml:1-11`）：該檔頭部明文「Skeleton only... Endpoint inventory is undecided product scope... proves the shared conventions are machine-readable via **one worked example**... not a complete surface. No HCI API server exists yet」——這是刻意的部分文件，只示範慣例（分頁、並發、鑑權 scope 命名）不是逐路徑清單。`app/server.mjs` 目前已有的 10+ 條路由（cases CRUD／persons／decisions／records／reports／risk-tier／auto-promote／reopen）**沒有一條**曾被同步進這份 skeleton；本次新增的 3 條路由若同步進去，會是全專案唯一一次「demo app 路由回填進未來 API skeleton」，打破本檔案自己宣告的設計與過去每一個既有路由的一致做法，屬於不必要且不一致的新增動作，不做。
 - **結論**：兩個候選 Scope 皆判定不適用，非本任務的實作範圍缺口。若未來 HCI-30 真的要對外開 API（P0-06 acceptance 完整關閉時），逐路徑同步 `openapi/hci-v1.yaml` 才是有意義的動作，屆時應一次處理當時所有既有路由，而非現在只挑 Task 10 這 3 條。
 
-## Task 13：ADR-0029 六道閘收斂驗證 — dispatch to `vuln-verifier`（依賴 Task 3、4、6、7、8、9）
+## Task 13：ADR-0029 六道閘收斂驗證 — **已完成**（2026-09-18，`vuln-verifier` 獨立複核，6/6 CONFIRMED，零回歸、零新繞過）
 
 - **Goal**：以攻擊者視角對隔離 runner 實際發動 PoC 等級的嘗試，確認四道網路閘與 SSRF/DNS-rebind 防護真的擋得住，作為 Gate C 收斂前的獨立確認。
 - **Scope**：只讀操作 + 對隔離 runner 的受控攻擊嘗試，不改動任何程式碼。
 - **Input**：Task 3/4 的六個測試 id（`fetch-runner-is-separate-service`、`wave6-no-bridge-route`、`-metadata-and-rfc1918-blocked`、`-dns-rebind-rejected`、`-ssrf-payload-corpus`、`-trigger-no-direct-fetch`）與其通過紀錄。
-- **Output**：一份獨立驗證報告，逐項複現或補測 Task 3/4 聲稱的通過結果，附實際指令與輸出。
-- **Acceptance**：六項全部由 `vuln-verifier` 獨立復現為綠燈；任一項復現失敗則整個管線視為未完成，退回對應任務。
+- **完成狀態**：獨立 agent（未參與 Task 3/4/6/7/8/9 建置）用自己另建的 Docker Compose 專案（獨立密鑰、獨立 project name，非重跑既有 fixture）+ 自寫全新 PoC，六項全部真跑復現：(1)(2) runner 對 7 個真實在跑的 trigger-* 容器（webapp/postgres/minio/redis/clickhouse/supervisor，非計畫原文估計的僅 1 個）逐一真連線嘗試皆逾時（curl exit 28，非 refused，確認封包在 iptables OUTPUT 層被丟棄而非埠關閉）；(3) metadata/RFC1918/loopback 六個目標網路層+應用層雙重擋下，含一次含真實 MinIO 寫入的端對端 enqueue 正面控制組；(4)(5) `node --test` 對 `pinned-http-client`/`ssrf-payload-corpus`/`ssrf-guard` 三個測試檔全綠（11+6+10 個測試）；(6) 對 zero-tolerance 模式跑 `app/` 目錄本身（非 critic 覆審已知會 false-positive 的 `public-intelligence/`），另手寫 5 個全新 PoC 檔案（不同於腳本內建 self-test 的 fixture 內容）逐一驗證：別名繞過／decoy 檔名繞過皆被抓到（2/2），動態字串屬性存取（`globalThis['fe'+'tch']`）確認仍抓不到——與腳本 header 及 `agency-os/TASKS.md` 已揭露的已知限制逐字對應，非新發現也非過期揭露。全部 Docker 資源（3 個獨立 project）驗證後清空，未觸碰任何既有容器；`git status --porcelain` 前後比對確認零程式碼異動。**總結論：六道閘全部獨立復現為綠燈，Gate C 收斂成立，不需退回任何任務。**
+- **Acceptance**：六項全部由 `vuln-verifier` 獨立復現為綠燈；任一項復現失敗則整個管線視為未完成，退回對應任務。**已達成**。
 - **Boundaries**：不對 `ks-aw-01` 上其他正在服務生產流量的容器發動任何攻擊嘗試；僅限本計畫新建的隔離 runner 與受控測試目標。
 
 ## Execution Order
