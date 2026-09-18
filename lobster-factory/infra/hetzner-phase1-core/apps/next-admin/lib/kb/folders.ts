@@ -150,6 +150,54 @@ export async function deleteFolder(organizationId: string, folderId: string): Pr
   return !error && (data?.length ?? 0) > 0;
 }
 
+/** A single folder by id, scoped to `organizationId` (never trusts a bare folderId alone — the same
+ *  organization-scoping every other function in this module applies). */
+export async function getFolder(organizationId: string, folderId: string): Promise<FolderRow | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return null;
+  const { data } = await sb.from("cs_knowledge_folders").select("id,name,parent_id").eq("organization_id", organizationId).eq("id", folderId).maybeSingle();
+  return data ? { id: data.id as string, name: data.name as string, parentId: (data.parent_id as string | null) ?? null } : null;
+}
+
+/**
+ * migration 0089 — the Cognitive OS Project this folder's contents get sent into. Kept id-anchored
+ * (never re-derived from the folder's `name`) for the identical reason
+ * lib/cognitive-os/import-sources.ts's ensureProjectForOrganization was rewritten on 2026-09-18: a
+ * folder's name changes routinely (重新命名 sits right next to it in the UI), which would make
+ * name-based Project matching fail silently the moment someone renames a folder after its first
+ * send.
+ */
+export async function getFolderCognitiveOsProjectId(organizationId: string, folderId: string): Promise<string | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return null;
+  const { data } = await sb.from("cs_knowledge_folders").select("cognitive_os_project_id").eq("organization_id", organizationId).eq("id", folderId).maybeSingle();
+  const id = data?.cognitive_os_project_id;
+  return typeof id === "string" && id ? id : null;
+}
+
+/**
+ * Returns whether the write actually matched a row -- db-expert review, 2026-09-18: this is the
+ * third occurrence in this codebase of a documented bug class (lib/kb/db.ts:806-811's own comment,
+ * itself re-flagging a 2026-09-12 finding): Supabase/PostgREST returns `error: null` even when the
+ * WHERE clause matches zero rows, so a void-returning update makes a stale/foreign folderId fail
+ * silently. Mirrors markSourceSentToCognitiveOs's exact shape (lib/kb/db.ts:813-823) -- `.select("id")`
+ * plus a length check, not just `!error`. A caller that ignores a `false` here and treats the
+ * project id as stored anyway reproduces the exact duplicate-Project bug
+ * ensureProjectForOrganization already had to fix once for organizations (matching organizationId,
+ * not name) -- see importFolderSources's own call site for how the return value is used.
+ */
+export async function setFolderCognitiveOsProjectId(organizationId: string, folderId: string, projectId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { data, error } = await sb
+    .from("cs_knowledge_folders")
+    .update({ cognitive_os_project_id: projectId })
+    .eq("organization_id", organizationId)
+    .eq("id", folderId)
+    .select("id");
+  return !error && (data?.length ?? 0) > 0;
+}
+
 /** Assign (or clear, folderId = null) which folder a document lives in. */
 export async function moveSourceToFolder(organizationId: string, sourceId: string, folderId: string | null): Promise<{ ok: true } | { ok: false; error: FolderError }> {
   const sb = getSupabaseWriteClient();

@@ -19,7 +19,7 @@
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { importOrganizationSources, type ImportSummary } from "@/lib/cognitive-os/import-sources";
+import { importFolderSources, importOrganizationSources, type ImportSummary } from "@/lib/cognitive-os/import-sources";
 import { isCognitiveOsConfigured } from "@/lib/cognitive-os/client";
 import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
 
@@ -27,11 +27,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-async function orgIdOf(slug: string): Promise<string | null> {
+async function orgOf(slug: string): Promise<{ id: string; name: string } | null> {
   const sb = getSupabaseWriteClient();
   if (!sb) return null;
-  const { data, error } = await sb.from("organizations").select("id").eq("slug", slug).single();
-  return error || !data ? null : (data.id as string);
+  const { data, error } = await sb.from("organizations").select("id, name").eq("slug", slug).single();
+  return error || !data ? null : { id: data.id as string, name: data.name as string };
 }
 
 function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
@@ -65,8 +65,9 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
   const { slug } = await context.params;
-  const orgId = await orgIdOf(slug);
-  if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+  const org = await orgOf(slug);
+  if (!org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+  const orgId = org.id;
 
   const runKey = new URL(request.url).searchParams.get("runKey");
   if (!runKey) return NextResponse.json({ ok: false, error: "runKey_required" }, { status: 400 });
@@ -87,15 +88,33 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     return NextResponse.json({ ok: false, error: "cognitive_os_not_configured" }, { status: 503 });
   }
   const { slug } = await context.params;
-  const orgId = await orgIdOf(slug);
-  if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+  const org = await orgOf(slug);
+  if (!org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+  const orgId = org.id;
+
+  // Optional: scope the import to one KB folder instead of the whole organization (operator,
+  // 2026-09-18 — see importFolderSources's own header for why a folder gets its own Project rather
+  // than piling into the organization-wide one). A missing/empty body (existing callers, existing
+  // tests) keeps today's whole-organization behavior unchanged.
+  let folderId: string | undefined;
+  try {
+    const body = (await request.json()) as { folderId?: unknown };
+    folderId = typeof body.folderId === "string" && body.folderId.trim() ? body.folderId.trim() : undefined;
+  } catch {
+    // No/empty JSON body — same as no folderId, not an error (this route's own existing callers
+    // send `{}` today).
+  }
 
   const runKey = newRunKey();
+  const importResult = folderId
+    ? importFolderSources(orgId, folderId)
+    : importOrganizationSources(orgId, { organizationName: org.name });
   startRunJob<ImportSummary>(
     JOB_KIND,
     jobKey(orgId, runKey),
-    importOrganizationSources(orgId).then((summary) => {
+    importResult.then((summary) => {
       audit(orgId, resolved.role, resolved.source, "cognitive_os_import", {
+        folderId: folderId ?? null,
         projectId: summary.projectId,
         imported: summary.imported,
         alreadyImported: summary.alreadyImported,

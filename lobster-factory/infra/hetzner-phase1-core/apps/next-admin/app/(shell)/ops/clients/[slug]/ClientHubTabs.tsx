@@ -9,6 +9,7 @@ import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
 import type { SiteContentDefaults } from "@/app/api/content/sites/route";
+import type { ImportSummary } from "@/lib/cognitive-os/import-sources";
 
 // ── Content-defaults dropdown options (mirror ContentStudio constants) ─────────
 
@@ -1372,6 +1373,11 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [folderBusy, setFolderBusy] = useState(false);
   const [folderMsg, setFolderMsg] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
+  // Separate from folderBusy/folderMsg on purpose: a Cognitive OS send can run for a while (one API
+  // call per eligible source, see cognitive-os-import route's own header) and must not read as "the
+  // rename/delete button is doing something" or block them from being used concurrently.
+  const [cognitiveOsFolderBusy, setCognitiveOsFolderBusy] = useState(false);
+  const [cognitiveOsFolderMsg, setCognitiveOsFolderMsg] = useState<string | null>(null);
   const [archived, setArchived] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean }>>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [kTitle, setKTitle] = useState(""); const [kBody, setKBody] = useState(""); const [kKind, setKKind] = useState("doc");
@@ -1514,6 +1520,69 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
     } catch (e) { setFolderMsg(`⚠ ${String(e)}`); } finally { setFolderBusy(false); }
   }
 
+  /**
+   * One Project per folder (migration 0089), not one per whole organization — see
+   * lib/cognitive-os/import-sources.ts's importFolderSources header for why. POST returns a runKey
+   * immediately (a real import can call Cognitive OS once per eligible source, past this app's
+   * Cloudflare-fronted edge's ~100s idle ceiling — same reasoning as CollectionSourcesPanel's own
+   * pollCognitiveOsImport), polled here with the same 2s-interval / 10-consecutive-failure bailout.
+   */
+  async function sendFolderToCognitiveOs(folderId: string) {
+    setCognitiveOsFolderBusy(true);
+    setCognitiveOsFolderMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cognitive-os-import`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ folderId }),
+      });
+      const posted = (await res.json()) as { ok?: boolean; runKey?: string; error?: string };
+      if (!posted.ok || !posted.runKey) {
+        setCognitiveOsFolderMsg(`⚠ ${posted.error ?? "cognitive_os_import_failed"}`);
+        return;
+      }
+      let consecutiveFailures = 0;
+      for (;;) {
+        let data: { ok?: boolean; status?: string; result?: ImportSummary; error?: string };
+        try {
+          const pollRes = await fetch(`/api/ops/clients/${org.slug}/cognitive-os-import?runKey=${encodeURIComponent(posted.runKey)}`, { headers: { ...roleHeader("admin") } });
+          data = await pollRes.json();
+          consecutiveFailures = 0;
+        } catch {
+          consecutiveFailures++;
+          if (consecutiveFailures >= 10) {
+            setCognitiveOsFolderMsg("⚠ 追蹤送出狀態失敗（網路持續連不上）——匯入仍在伺服器上繼續跑，稍後重新整理頁面確認結果");
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        if (!data.ok) {
+          setCognitiveOsFolderMsg("⚠ 追蹤不到這次送出的狀態（可能伺服器重啟過）——稍後重新整理頁面確認是否已完成");
+          return;
+        }
+        if (data.status === "running") {
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        if (data.status === "error") {
+          setCognitiveOsFolderMsg(`⚠ ${data.error ?? "cognitive_os_import_failed"}`);
+          return;
+        }
+        if (data.result) {
+          const r = data.result;
+          setCognitiveOsFolderMsg(
+            r.errors.length
+              ? `已送出：新送出 ${r.imported}、已送過 ${r.alreadyImported}、不合格 ${r.rejected.length}、錯誤 ${r.errors.length}`
+              : `✓ 已送出：新送出 ${r.imported}、已送過 ${r.alreadyImported}、不合格 ${r.rejected.length}`,
+          );
+        }
+        return;
+      }
+    } finally {
+      setCognitiveOsFolderBusy(false);
+    }
+  }
+
   async function addKnowledge() {
     setKSaving(true); setKMsg(null);
     try {
@@ -1631,11 +1700,22 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
         </div>
 
         {folderFilter && folderFilter !== KB_UNFILED_FOLDER_ID && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, padding: "4px 6px", background: "var(--bg-canvas)", borderRadius: 6 }}>
-            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>這個資料夾：</span>
-            <input value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} style={{ flex: 1, fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
-            <button onClick={() => renameFolderNow(folderFilter)} disabled={folderBusy || !renameDraft.trim()} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>重新命名</button>
-            <button onClick={() => deleteFolderNow(folderFilter)} disabled={folderBusy} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--red)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>刪除資料夾</button>
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", background: "var(--bg-canvas)", borderRadius: 6 }}>
+              <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>這個資料夾：</span>
+              <input value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} style={{ flex: 1, fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
+              <button onClick={() => renameFolderNow(folderFilter)} disabled={folderBusy || !renameDraft.trim()} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>重新命名</button>
+              <button onClick={() => deleteFolderNow(folderFilter)} disabled={folderBusy} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--red)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>刪除資料夾</button>
+              <button
+                onClick={() => sendFolderToCognitiveOs(folderFilter)}
+                disabled={cognitiveOsFolderBusy}
+                title="這個資料夾自己的 Cognitive OS Project，不會跟其他資料夾混在一起"
+                style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}
+              >
+                {cognitiveOsFolderBusy ? "送出中…" : "送去 Cognitive OS 分析"}
+              </button>
+            </div>
+            {cognitiveOsFolderMsg && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>{cognitiveOsFolderMsg}</div>}
           </div>
         )}
 

@@ -38,7 +38,19 @@ function makeChain(): Record<string, unknown> {
 let client: { from: () => Record<string, unknown>; rpc: (fn: string, args: Record<string, unknown>) => Promise<Resp> } | null;
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => client }));
 
-const { listFolders, createFolder, renameFolder, moveFolder, deleteFolder, moveSourceToFolder, folderDescendantIds, findOrCreateFolderByName } = await import("@/lib/kb/folders");
+const {
+  listFolders,
+  createFolder,
+  renameFolder,
+  moveFolder,
+  deleteFolder,
+  moveSourceToFolder,
+  folderDescendantIds,
+  findOrCreateFolderByName,
+  getFolder,
+  getFolderCognitiveOsProjectId,
+  setFolderCognitiveOsProjectId,
+} = await import("@/lib/kb/folders");
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 
@@ -191,5 +203,48 @@ describe("folderDescendantIds", () => {
   it("degrades to just the folder itself on a successful-but-empty RPC result too (stale/foreign id) — not relying on a caller's downstream .in([]) behaviour to fail safe", async () => {
     state.rpcQueue.push({ data: [], error: null });
     expect(await folderDescendantIds(ORG, "gone")).toEqual(["gone"]);
+  });
+});
+
+describe("getFolder", () => {
+  it("returns the folder scoped to organizationId", async () => {
+    state.queue.push({ data: { id: "f1", name: "Research", parent_id: null }, error: null });
+    expect(await getFolder(ORG, "f1")).toEqual({ id: "f1", name: "Research", parentId: null });
+  });
+  it("returns null for a folder that does not exist (or belongs to another organization)", async () => {
+    state.queue.push({ data: null, error: null });
+    expect(await getFolder(ORG, "gone")).toBeNull();
+  });
+});
+
+describe("getFolderCognitiveOsProjectId / setFolderCognitiveOsProjectId (migration 0089)", () => {
+  it("getFolderCognitiveOsProjectId returns the stored id when present", async () => {
+    state.queue.push({ data: { cognitive_os_project_id: "proj-1" }, error: null });
+    expect(await getFolderCognitiveOsProjectId(ORG, "f1")).toBe("proj-1");
+  });
+  it("getFolderCognitiveOsProjectId returns null when never sent (column is genuinely null)", async () => {
+    state.queue.push({ data: { cognitive_os_project_id: null }, error: null });
+    expect(await getFolderCognitiveOsProjectId(ORG, "f1")).toBeNull();
+  });
+  it("getFolderCognitiveOsProjectId returns null for a folder that does not exist", async () => {
+    state.queue.push({ data: null, error: null });
+    expect(await getFolderCognitiveOsProjectId(ORG, "gone")).toBeNull();
+  });
+
+  // db-expert review, 2026-09-18: this is the third occurrence in this codebase of a documented bug
+  // class (lib/kb/db.ts's markSourceSentToCognitiveOs/markSourceSentToHci comments) — Supabase/
+  // PostgREST returns error:null even when an UPDATE's WHERE clause matches zero rows, so a
+  // void-returning write would make a stale/foreign folderId fail silently.
+  it("setFolderCognitiveOsProjectId returns true when the update actually matched a row", async () => {
+    state.queue.push({ data: [{ id: "f1" }], error: null });
+    expect(await setFolderCognitiveOsProjectId(ORG, "f1", "proj-1")).toBe(true);
+  });
+  it("setFolderCognitiveOsProjectId returns false when the update matches zero rows (stale/foreign folderId) — error is still null, only the row-count check catches this", async () => {
+    state.queue.push({ data: [], error: null });
+    expect(await setFolderCognitiveOsProjectId(ORG, "gone", "proj-1")).toBe(false);
+  });
+  it("setFolderCognitiveOsProjectId returns false on a real Postgres error", async () => {
+    state.queue.push({ data: null, error: { message: "boom" } });
+    expect(await setFolderCognitiveOsProjectId(ORG, "f1", "proj-1")).toBe(false);
   });
 });

@@ -25,7 +25,43 @@ const client = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/cognitive-os/client", () => client);
 
-const { evaluateSourceForImport, importOrganizationSources, parseAuthors } = await import("@/lib/cognitive-os/import-sources");
+const folders = vi.hoisted(() => ({
+  getFolder: vi.fn(),
+  getFolderCognitiveOsProjectId: vi.fn(),
+  setFolderCognitiveOsProjectId: vi.fn(),
+}));
+vi.mock("@/lib/kb/folders", () => folders);
+
+// organizations.metadata.cognitive_os_import_project_id storage (2026-09-18 critical fix) -- keyed per
+// organization id so the cross-organization non-collision test below can prove two different orgs
+// never share state. Same read-select/write-update shape as every other organizations.metadata
+// writer in this app (e.g. app/api/ops/clients/[slug]/cs-config/route.test.ts's own sb mock).
+const orgMeta = vi.hoisted(() => ({
+  byOrgId: new Map<string, Record<string, unknown>>(),
+  updateCalls: [] as Array<{ id: string; metadata: Record<string, unknown> }>,
+}));
+const sb = vi.hoisted(() => ({
+  from: vi.fn((table: string) => {
+    if (table !== "organizations") throw new Error(`unexpected table: ${table}`);
+    return {
+      select: () => ({
+        eq: (_col: string, id: string) => ({
+          maybeSingle: () => Promise.resolve({ data: { id, metadata: orgMeta.byOrgId.get(id) ?? {} }, error: null }),
+        }),
+      }),
+      update: (patch: { metadata: Record<string, unknown> }) => ({
+        eq: (_col: string, id: string) => {
+          orgMeta.byOrgId.set(id, patch.metadata);
+          orgMeta.updateCalls.push({ id, metadata: patch.metadata });
+          return Promise.resolve({ error: null });
+        },
+      }),
+    };
+  }),
+}));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => sb }));
+
+const { evaluateSourceForImport, importFolderSources, importOrganizationSources, parseAuthors } = await import("@/lib/cognitive-os/import-sources");
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -118,6 +154,8 @@ describe("evaluateSourceForImport", () => {
 describe("importOrganizationSources", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    orgMeta.byOrgId.clear();
+    orgMeta.updateCalls.length = 0;
     // Default: write-back succeeds, matching the overwhelming common case — tests that care about
     // the failure path override this explicitly, per markSourceSentToCognitiveOs's real signature
     // (Promise<boolean>, critic finding 2026-09-18: it used to be untyped/unchecked Promise<void>).
@@ -165,6 +203,107 @@ describe("importOrganizationSources", () => {
 
     expect(client.createCognitiveOsProject).not.toHaveBeenCalled();
     expect(summary.projectId).toBe("proj-existing");
+  });
+
+  // Operator, 2026-09-18: two real projects both named "Knowledge Import: <uuid>" were
+  // indistinguishable at a glance. organizationName fixes naming for new Projects without
+  // orphaning organizations that already imported under the old id-based name.
+  it("names a brand-new Project after the organization, not its opaque id, when organizationName is given", async () => {
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-named" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importOrganizationSources(ORG_ID, { organizationName: "EdD 論文研究" });
+
+    // 8-char id suffix (see importOrganizationSources's own header comment) -- guarantees this
+    // string can never collide with another organization's Project name at Cognitive OS's
+    // UNIQUE(tenant_id, workspace_id, name) constraint, not just decoration.
+    expect(client.createCognitiveOsProject).toHaveBeenCalledWith(
+      expect.objectContaining({ name: `Knowledge Import: EdD 論文研究 (${ORG_ID.slice(0, 8)})` }),
+    );
+    expect(summary.projectId).toBe("proj-named");
+    // Backfilled into metadata immediately, not just resolved in-memory for this one call.
+    expect(orgMeta.byOrgId.get(ORG_ID)).toEqual({ cognitive_os_import_project_id: "proj-named" });
+  });
+
+  it("reuses an organization's existing legacy id-named Project instead of forking a second, newly-named one", async () => {
+    // Cognitive OS has no project-rename endpoint (checked directly against
+    // ai_lego/apps/api/main.py's route list before writing this) -- an org that already has
+    // `Knowledge Import: <uuid>` MUST keep landing there, or its prior imports get orphaned in a
+    // Project the operator no longer sees results in.
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [{ project_id: "proj-legacy", name: `Knowledge Import: ${ORG_ID}` }] });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importOrganizationSources(ORG_ID, { organizationName: "EdD 論文研究" });
+
+    expect(client.createCognitiveOsProject).not.toHaveBeenCalled();
+    expect(summary.projectId).toBe("proj-legacy");
+    // The whole point of the backfill: next run resolves from metadata alone (see the fast-path
+    // test below), never re-scanning listCognitiveOsProjects for this organization again.
+    expect(orgMeta.byOrgId.get(ORG_ID)).toEqual({ cognitive_os_import_project_id: "proj-legacy" });
+  });
+
+  it("resolves from stored metadata alone once set, without calling listCognitiveOsProjects again", async () => {
+    orgMeta.byOrgId.set(ORG_ID, { cognitive_os_import_project_id: "proj-cached", some_other_key: "preserved" });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importOrganizationSources(ORG_ID, { organizationName: "EdD 論文研究" });
+
+    expect(client.listCognitiveOsProjects).not.toHaveBeenCalled();
+    expect(client.createCognitiveOsProject).not.toHaveBeenCalled();
+    expect(summary.projectId).toBe("proj-cached");
+  });
+
+  // The actual vulnerability the critic caught: an earlier version of this fix matched Projects by
+  // organizationName alone. organizations.name has no uniqueness constraint and is settable via the
+  // public signup form — two different, unrelated organizations picking the same display name must
+  // never land in the same Cognitive OS Project (a real cross-tenant knowledge-base leak).
+  it("does NOT merge two different organizations that happen to share the same organizationName", async () => {
+    const ORG_A = "aaaaaaaa-1111-4111-8111-000000000001";
+    const ORG_B = "bbbbbbbb-2222-4111-8111-000000000002";
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsProject
+      .mockResolvedValueOnce({ ok: true, value: { project_id: "proj-A" } })
+      .mockResolvedValueOnce({ ok: true, value: { project_id: "proj-B" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summaryA = await importOrganizationSources(ORG_A, { organizationName: "Acme Studio" });
+    const summaryB = await importOrganizationSources(ORG_B, { organizationName: "Acme Studio" });
+
+    expect(summaryA.projectId).toBe("proj-A");
+    expect(summaryB.projectId).toBe("proj-B");
+    expect(summaryA.projectId).not.toBe(summaryB.projectId);
+    expect(client.createCognitiveOsProject).toHaveBeenCalledTimes(2);
+    // Each organization's own metadata points at its own Project — never each other's.
+    expect(orgMeta.byOrgId.get(ORG_A)).toEqual({ cognitive_os_import_project_id: "proj-A" });
+    expect(orgMeta.byOrgId.get(ORG_B)).toEqual({ cognitive_os_import_project_id: "proj-B" });
+  });
+
+  // Narrower than the test above, and deliberately so: the id-suffix in preferredName (see
+  // importOrganizationSources's header comment) already makes a REAL accidental name collision
+  // astronomically unlikely on its own, which would make a same-organizationName test alone too
+  // weak to prove the underlying matching MECHANISM is actually id-anchored rather than
+  // name-anchored (verified directly: reverting ensureProjectForOrganization's match target from
+  // legacyName back to preferredName still left the test above passing, because two different real
+  // org ids can never produce the same suffixed preferredName either way -- this test closes that
+  // gap by handing the flawed match target a name it WOULD wrongly match on if matching ever fell
+  // back to preferredName instead of the id-derived legacyName).
+  it("never reuses a Project found by matching its human-readable display name, even if one coincidentally exists", async () => {
+    const coincidentalName = `Knowledge Import: Acme Studio (${ORG_ID.slice(0, 8)})`;
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [{ project_id: "proj-unrelated", name: coincidentalName }] });
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-real" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importOrganizationSources(ORG_ID, { organizationName: "Acme Studio" });
+
+    expect(client.createCognitiveOsProject).toHaveBeenCalled();
+    expect(summary.projectId).toBe("proj-real");
+    expect(summary.projectId).not.toBe("proj-unrelated");
   });
 
   it("skips a source whose title already exists in the target Project", async () => {
@@ -262,5 +401,99 @@ describe("importOrganizationSources", () => {
     expect(summary.errors).toEqual(["src-1:cognitive_os_unreachable"]);
     expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledTimes(1);
     expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledWith(ORG_ID, "src-2", "proj-1");
+  });
+});
+
+// migration 0089 — one Project per KB folder instead of one per whole organization (operator,
+// 2026-09-18: "為什麼不延續需搜尋時新增的資料夾"). Identity is anchored to folderId, stored directly
+// on cs_knowledge_folders — no legacy-name fallback to test here (unlike importOrganizationSources),
+// since no folder was ever sent to Cognitive OS before this column existed.
+describe("importFolderSources", () => {
+  const FOLDER_ID = "cccccccc-3333-4111-8111-000000000003";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    folders.setFolderCognitiveOsProjectId.mockResolvedValue(true);
+    kb.markSourceSentToCognitiveOs.mockResolvedValue(true);
+  });
+
+  it("reports a typed error instead of throwing when the folder does not exist (or belongs to another organization)", async () => {
+    folders.getFolder.mockResolvedValue(null);
+
+    const summary = await importFolderSources(ORG_ID, FOLDER_ID);
+
+    expect(summary.errors).toEqual(["folder_not_found"]);
+    expect(client.createCognitiveOsProject).not.toHaveBeenCalled();
+  });
+
+  it("names a brand-new Project after the folder (with an id suffix) on first send, and stores its id back on the folder row", async () => {
+    folders.getFolder.mockResolvedValue({ id: FOLDER_ID, name: "Theo Gerard Farrell", parentId: null });
+    folders.getFolderCognitiveOsProjectId.mockResolvedValue(null);
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-folder-1" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importFolderSources(ORG_ID, FOLDER_ID);
+
+    expect(client.createCognitiveOsProject).toHaveBeenCalledWith(
+      expect.objectContaining({ name: `Knowledge Import: Theo Gerard Farrell (${FOLDER_ID.slice(0, 8)})` }),
+    );
+    expect(folders.setFolderCognitiveOsProjectId).toHaveBeenCalledWith(ORG_ID, FOLDER_ID, "proj-folder-1");
+    expect(summary.projectId).toBe("proj-folder-1");
+    // Fetches THIS folder's sources, not the whole organization's.
+    expect(kb.listKnowledgeSources).toHaveBeenCalledWith(ORG_ID, expect.objectContaining({ folderId: FOLDER_ID }));
+  });
+
+  it("resolves from the folder's stored project id on later runs, without creating a second Project", async () => {
+    folders.getFolder.mockResolvedValue({ id: FOLDER_ID, name: "Theo Gerard Farrell", parentId: null });
+    folders.getFolderCognitiveOsProjectId.mockResolvedValue("proj-folder-cached");
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importFolderSources(ORG_ID, FOLDER_ID);
+
+    expect(client.createCognitiveOsProject).not.toHaveBeenCalled();
+    expect(folders.setFolderCognitiveOsProjectId).not.toHaveBeenCalled();
+    expect(summary.projectId).toBe("proj-folder-cached");
+  });
+
+  it("does NOT merge two different folders that happen to share the same name", async () => {
+    const FOLDER_A = "cccccccc-aaaa-4111-8111-00000000000a";
+    const FOLDER_B = "cccccccc-bbbb-4111-8111-00000000000b";
+    folders.getFolderCognitiveOsProjectId.mockResolvedValue(null);
+    folders.getFolder.mockImplementation((_org: string, id: string) => Promise.resolve({ id, name: "Research", parentId: null }));
+    client.createCognitiveOsProject
+      .mockResolvedValueOnce({ ok: true, value: { project_id: "proj-A" } })
+      .mockResolvedValueOnce({ ok: true, value: { project_id: "proj-B" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summaryA = await importFolderSources(ORG_ID, FOLDER_A);
+    const summaryB = await importFolderSources(ORG_ID, FOLDER_B);
+
+    expect(summaryA.projectId).toBe("proj-A");
+    expect(summaryB.projectId).toBe("proj-B");
+    expect(folders.setFolderCognitiveOsProjectId).toHaveBeenCalledWith(ORG_ID, FOLDER_A, "proj-A");
+    expect(folders.setFolderCognitiveOsProjectId).toHaveBeenCalledWith(ORG_ID, FOLDER_B, "proj-B");
+  });
+
+  // db-expert review, 2026-09-18: setFolderCognitiveOsProjectId now reports whether the UPDATE
+  // actually matched a row (Supabase/PostgREST returns error:null even on a zero-row match) — this
+  // proves the caller actually reads and surfaces that signal, not just that the function itself
+  // returns the right boolean in isolation.
+  it("surfaces a warning (without aborting the import) when the folder-project backfill write matches zero rows", async () => {
+    folders.getFolder.mockResolvedValue({ id: FOLDER_ID, name: "Theo Gerard Farrell", parentId: null });
+    folders.getFolderCognitiveOsProjectId.mockResolvedValue(null);
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-folder-1" } });
+    folders.setFolderCognitiveOsProjectId.mockResolvedValue(false); // stale/foreign folderId, zero rows matched
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importFolderSources(ORG_ID, FOLDER_ID);
+
+    // The Project really was created and really is usable -- a failed local bookkeeping write must
+    // not throw the whole import away.
+    expect(summary.projectId).toBe("proj-folder-1");
+    expect(summary.errors).toContain(`folder_project_link_write_failed:${FOLDER_ID}`);
   });
 });

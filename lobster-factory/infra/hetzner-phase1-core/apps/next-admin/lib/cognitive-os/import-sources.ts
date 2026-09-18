@@ -12,12 +12,14 @@
 // items[] list) -- it does NOT restore that Python method, which stays retired.
 
 import { getSourceDetail, listKnowledgeSources, markSourceSentToCognitiveOs, type SourceDetail } from "@/lib/kb";
+import { getFolder, getFolderCognitiveOsProjectId, setFolderCognitiveOsProjectId } from "@/lib/kb/folders";
 import {
   createCognitiveOsProject,
   createCognitiveOsSource,
   listCognitiveOsProjects,
   listCognitiveOsSources,
 } from "@/lib/cognitive-os/client";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 const DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
 const MIN_YEAR = 1400;
@@ -120,35 +122,95 @@ export interface ImportSummary {
   errors: string[];
 }
 
-async function ensureProject(projectName: string): Promise<{ projectId: string } | { error: string }> {
+/** Exact-name create-or-reuse, for a caller that names an EXACT target Project itself (the internal
+ *  bearer-token route's own `projectName` option) -- a deliberate, trusted, server-supplied string,
+ *  not a value that needs cross-organization collision protection (see ensureProjectForOrganization,
+ *  which every OTHER caller goes through, for why that distinction matters). */
+async function ensureProjectByExactName(name: string): Promise<{ projectId: string } | { error: string }> {
   const existing = await listCognitiveOsProjects();
   // `=== false`, never `!x.ok`: see the matching comment in lib/cognitive-os/client.ts
   // (this repo's strict:false tsconfig does not narrow a discriminated union on negated truthiness).
   if (existing.ok === false) return { error: existing.error };
-  const found = existing.value.find((p) => p.name === projectName);
+  const found = existing.value.find((p) => p.name === name);
   if (found) return { projectId: found.project_id };
-  const created = await createCognitiveOsProject({
-    name: projectName,
-    purpose: PROJECT_PURPOSE,
-    data_classification: DATA_CLASSIFICATION,
-  });
+  const created = await createCognitiveOsProject({ name, purpose: PROJECT_PURPOSE, data_classification: DATA_CLASSIFICATION });
   if (created.ok === false) return { error: created.error };
   return { projectId: created.value.project_id };
 }
 
+async function getStoredProjectId(organizationId: string): Promise<string | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return null;
+  const { data } = await sb.from("organizations").select("metadata").eq("id", organizationId).maybeSingle();
+  const id = (data?.metadata as Record<string, unknown> | null | undefined)?.cognitive_os_import_project_id;
+  return typeof id === "string" && id ? id : null;
+}
+
+/** Read-merge-write, same convention as every other organizations.metadata writer in this app (e.g.
+ *  app/api/ops/clients/[slug]/cis/route.ts) -- metadata is a shared JSONB bag, so a blind
+ *  `update({metadata: {cognitive_os_import_project_id: ...}})` would silently drop every other key already
+ *  in it (client_config, etc.). Best-effort: a failed write here just means the next run repeats the
+ *  legacy-name lookup in ensureProjectForOrganization instead of hitting the fast path -- not a
+ *  reason to fail the whole import. */
+async function storeProjectId(organizationId: string, projectId: string): Promise<void> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return;
+  const { data } = await sb.from("organizations").select("metadata").eq("id", organizationId).maybeSingle();
+  const metadata = (data?.metadata as Record<string, unknown> | null | undefined) ?? {};
+  await sb.from("organizations").update({ metadata: { ...metadata, cognitive_os_import_project_id: projectId } }).eq("id", organizationId);
+}
+
 /**
- * List every non-archived source for `organizationId` with its full body/citation fields.
- * `listKnowledgeSources` only returns list-view columns (lib/kb/db.ts) -- `getSourceDetail` fills
- * in body/author/doi/venue/publishedAt per id. Pages through in 200-row batches; a personal
- * research corpus is not expected to need more than a handful of pages, so this stays a plain
- * sequential loop rather than a concurrent fan-out.
+ * Identity for "this organization's Cognitive OS Project" is ALWAYS `organizationId` -- never
+ * `preferredName` alone. Critic finding, 2026-09-18: an earlier version of this fix matched on the
+ * human-readable organization name to solve "Knowledge Import: <uuid> tells me nothing" -- but
+ * `organizations.name` has no uniqueness constraint and is settable by the public product-signup
+ * form (app/portal/api/signup/route.ts) with only a length check, so two organizations that happen
+ * to share a display name would have silently merged into the same Project (every subsequent import
+ * for either one landing in the other's knowledge base, permanently, with no error). Resolution
+ * order, every step keyed on organizationId, never on what a human named anything:
+ *   1. organizations.metadata.cognitive_os_import_project_id -- the fast path once set, no Cognitive OS
+ *      API call needed at all to resolve identity.
+ *   2. The legacy `Knowledge Import: <organizationId>` name (itself id-derived, so still collision-
+ *      safe) -- for an organization whose Project predates this metadata tracking. Found once, then
+ *      backfilled into metadata so this branch is never taken again for that organization.
+ *   3. Create fresh, named `preferredName` purely for a human to read -- tracked in metadata
+ *      immediately, so name collisions with some OTHER organization's Project can never cause a
+ *      match on a later run.
  */
-async function fetchAllSourceDetails(organizationId: string): Promise<SourceDetail[]> {
+async function ensureProjectForOrganization(organizationId: string, preferredName: string): Promise<{ projectId: string } | { error: string }> {
+  const stored = await getStoredProjectId(organizationId);
+  if (stored) return { projectId: stored };
+
+  const existing = await listCognitiveOsProjects();
+  if (existing.ok === false) return { error: existing.error };
+  const legacyName = `Knowledge Import: ${organizationId}`;
+  const legacyMatch = existing.value.find((p) => p.name === legacyName);
+  if (legacyMatch) {
+    await storeProjectId(organizationId, legacyMatch.project_id);
+    return { projectId: legacyMatch.project_id };
+  }
+
+  const created = await createCognitiveOsProject({ name: preferredName, purpose: PROJECT_PURPOSE, data_classification: DATA_CLASSIFICATION });
+  if (created.ok === false) return { error: created.error };
+  await storeProjectId(organizationId, created.value.project_id);
+  return { projectId: created.value.project_id };
+}
+
+/**
+ * List every non-archived source for `organizationId` (optionally scoped to one folder and its
+ * subfolders -- `folderId`'s own descendant-expansion happens inside listKnowledgeSources, not
+ * duplicated here) with its full body/citation fields. `listKnowledgeSources` only returns
+ * list-view columns (lib/kb/db.ts) -- `getSourceDetail` fills in body/author/doi/venue/publishedAt
+ * per id. Pages through in 200-row batches; a personal research corpus is not expected to need more
+ * than a handful of pages, so this stays a plain sequential loop rather than a concurrent fan-out.
+ */
+async function fetchAllSourceDetails(organizationId: string, folderId?: string): Promise<SourceDetail[]> {
   const pageSize = 200;
   const details: SourceDetail[] = [];
   let page = 1;
   for (;;) {
-    const { items, total } = await listKnowledgeSources(organizationId, { page, pageSize });
+    const { items, total } = await listKnowledgeSources(organizationId, { page, pageSize, folderId });
     for (const item of items) {
       const detail = await getSourceDetail(organizationId, item.id);
       if (detail) details.push(detail);
@@ -160,29 +222,23 @@ async function fetchAllSourceDetails(organizationId: string): Promise<SourceDeta
 }
 
 /**
- * Import one organization's eligible cs_knowledge_sources into its Cognitive OS Project, creating
- * the Project on first run and reusing it (by exact name match) on every later run. Sources already
- * present in the target Project (matched by title) are counted as `alreadyImported` and skipped --
- * Cognitive OS's Source table has no uniqueness constraint on title, so re-running this without a
- * dedup check would create a duplicate row per re-run.
+ * Shared core of importOrganizationSources/importFolderSources: given an already-resolved
+ * `projectId` and the source list to consider, do the actual dedup-by-title-check / eligibility-gate
+ * / create-or-self-heal-write-back loop. Neither caller's own "how do I resolve a projectId" logic
+ * belongs in here -- an organization-wide import and a single-folder import resolve their Project
+ * completely differently (see ensureProjectForOrganization vs ensureProjectForFolder).
  */
-export async function importOrganizationSources(
+async function importSourcesIntoProject(
   organizationId: string,
-  opts?: { projectName?: string },
-): Promise<ImportSummary> {
-  const projectName = opts?.projectName?.trim() || `Knowledge Import: ${organizationId}`;
-  const project = await ensureProject(projectName);
-  if ("error" in project) {
-    return { organizationId, projectId: "", totalCandidates: 0, imported: 0, alreadyImported: 0, rejected: [], errors: [`ensure_project_failed:${project.error}`] };
-  }
-
-  const existingSources = await listCognitiveOsSources(project.projectId);
+  projectId: string,
+  sources: SourceDetail[],
+): Promise<Omit<ImportSummary, "organizationId">> {
+  const existingSources = await listCognitiveOsSources(projectId);
   if (existingSources.ok === false) {
-    return { organizationId, projectId: project.projectId, totalCandidates: 0, imported: 0, alreadyImported: 0, rejected: [], errors: [`list_existing_sources_failed:${existingSources.error}`] };
+    return { projectId, totalCandidates: 0, imported: 0, alreadyImported: 0, rejected: [], errors: [`list_existing_sources_failed:${existingSources.error}`] };
   }
   const existingTitles = new Set(existingSources.value.map((s) => s.title));
 
-  const sources = await fetchAllSourceDetails(organizationId);
   const rejected: RejectedSource[] = [];
   const errors: string[] = [];
   let imported = 0;
@@ -195,8 +251,8 @@ export async function importOrganizationSources(
       // stale (critic finding, 2026-09-18): without this comparison every already-imported source
       // got an unconditional UPDATE on every single click, forever, scaling with total KB size for
       // zero benefit in the overwhelming common case where the write-back already landed correctly.
-      if (source.cognitiveOsProjectId !== project.projectId) {
-        const wrote = await markSourceSentToCognitiveOs(organizationId, source.id, project.projectId);
+      if (source.cognitiveOsProjectId !== projectId) {
+        const wrote = await markSourceSentToCognitiveOs(organizationId, source.id, projectId);
         if (!wrote) errors.push(`write_back_failed:${source.id}`);
       }
       alreadyImported += 1;
@@ -207,7 +263,7 @@ export async function importOrganizationSources(
       rejected.push({ sourceId: source.id, title: source.title, issues: gate.issues });
       continue;
     }
-    const result = await createCognitiveOsSource(project.projectId, {
+    const result = await createCognitiveOsSource(projectId, {
       title: source.title,
       media_type: TEXT_MEDIA_TYPE,
       data_classification: DATA_CLASSIFICATION,
@@ -224,10 +280,93 @@ export async function importOrganizationSources(
     // The Cognitive OS create already succeeded at this point -- a failed write-back is this app's
     // own bookkeeping falling behind reality, not an import failure, so it's a soft warning
     // (surfaced in the UI's error list) rather than un-counting an import that genuinely happened.
-    const wrote = await markSourceSentToCognitiveOs(organizationId, source.id, project.projectId);
+    const wrote = await markSourceSentToCognitiveOs(organizationId, source.id, projectId);
     if (!wrote) errors.push(`write_back_failed:${source.id}`);
     imported += 1;
   }
 
-  return { organizationId, projectId: project.projectId, totalCandidates: sources.length, imported, alreadyImported, rejected, errors };
+  return { projectId, totalCandidates: sources.length, imported, alreadyImported, rejected, errors };
+}
+
+const FAILED_SUMMARY: Omit<ImportSummary, "organizationId" | "errors"> = { projectId: "", totalCandidates: 0, imported: 0, alreadyImported: 0, rejected: [] };
+
+/**
+ * Import one organization's eligible cs_knowledge_sources into its Cognitive OS Project, creating
+ * the Project on first run and reusing it on every later run (see ensureProjectForOrganization for
+ * how that reuse is anchored to organizationId, never to a name). Sources already present in the
+ * target Project (matched by title) are counted as `alreadyImported` and skipped -- Cognitive OS's
+ * Source table has no uniqueness constraint on title, so re-running this without a dedup check
+ * would create a duplicate row per re-run.
+ *
+ * `organizationName` (when the caller has it -- the route does, next-admin's own `organizations`
+ * row) names a brand-new Project after the ORGANIZATION, not its opaque id: "Knowledge Import:
+ * ecf4e311-4f38-4288-9396-e70fd7697aca" and "Knowledge Import: 9e6e0993-..." are indistinguishable
+ * at a glance and only get worse as more organizations import (operator, 2026-09-18). It is a
+ * display label only -- identity/reuse never depends on it (ensureProjectForOrganization), so two
+ * organizations sharing a display name cannot merge into the same Project. The 8-char id suffix
+ * below is a separate, narrower concern: Cognitive OS enforces UNIQUE(tenant_id, workspace_id, name)
+ * server-side (ai_lego/apps/api/main.py), and every organization shares one tenant+workspace (one
+ * service account for this whole bridge) -- without the suffix, two organizations that happen to
+ * pick the same display name would still fail at CREATE time with a name collision (loud, not a
+ * silent merge, but still an avoidable failure for something an operator does not control).
+ */
+export async function importOrganizationSources(
+  organizationId: string,
+  opts?: { projectName?: string; organizationName?: string },
+): Promise<ImportSummary> {
+  const explicitName = opts?.projectName?.trim();
+  const displayName = opts?.organizationName?.trim();
+  const preferredName = displayName ? `Knowledge Import: ${displayName} (${organizationId.slice(0, 8)})` : `Knowledge Import: ${organizationId}`;
+  const project = explicitName ? await ensureProjectByExactName(explicitName) : await ensureProjectForOrganization(organizationId, preferredName);
+  if ("error" in project) {
+    return { organizationId, ...FAILED_SUMMARY, errors: [`ensure_project_failed:${project.error}`] };
+  }
+  const sources = await fetchAllSourceDetails(organizationId);
+  const result = await importSourcesIntoProject(organizationId, project.projectId, sources);
+  return { organizationId, ...result };
+}
+
+/**
+ * Import one FOLDER's eligible cs_knowledge_sources (its own documents plus every subfolder's, same
+ * descendant expansion the KB browser itself uses) into a Project of its own, instead of
+ * importOrganizationSources's one-Project-per-whole-organization design (operator, 2026-09-18:
+ * "為什麼不延續需搜尋時新增的資料夾" -- Cognitive OS has no folder/tag/collection concept below a
+ * Project at all, checked directly against ai_lego/apps/api/main.py's CreateSourceRequest fields, so
+ * "one Project per KB folder" is the closest this bridge can get to mirroring the KB's own
+ * organisation instead of flattening every organization's imports into one undifferentiated pile).
+ *
+ * Project identity is anchored to `folderId` (migration 0089's
+ * cs_knowledge_folders.cognitive_os_project_id), never to the folder's `name` -- a folder gets
+ * renamed far more routinely than an organization does (重新命名 sits right next to the folder
+ * picker in ClientHubTabs.tsx), which would make name-based matching break the moment someone
+ * renames a folder after its first send. Unlike importOrganizationSources there is no legacy-name
+ * fallback to worry about: no folder has ever been sent to Cognitive OS before this column existed,
+ * so the stored column is the only identity source from day one.
+ */
+export async function importFolderSources(organizationId: string, folderId: string): Promise<ImportSummary> {
+  const folder = await getFolder(organizationId, folderId);
+  if (!folder) return { organizationId, ...FAILED_SUMMARY, errors: ["folder_not_found"] };
+
+  const stored = await getFolderCognitiveOsProjectId(organizationId, folderId);
+  let projectId: string;
+  // Only non-empty when the backfill write below fails -- the Cognitive OS Project itself still got
+  // created successfully at that point, so this is a soft warning threaded into the final result,
+  // not a reason to abort the import (db-expert review, 2026-09-18: a stale/foreign folderId making
+  // this UPDATE match zero rows must be surfaced, not swallowed -- see setFolderCognitiveOsProjectId's
+  // own header for the bug class this closes).
+  const backfillErrors: string[] = [];
+  if (stored) {
+    projectId = stored;
+  } else {
+    const preferredName = `Knowledge Import: ${folder.name} (${folderId.slice(0, 8)})`;
+    const created = await createCognitiveOsProject({ name: preferredName, purpose: PROJECT_PURPOSE, data_classification: DATA_CLASSIFICATION });
+    if (created.ok === false) return { organizationId, ...FAILED_SUMMARY, errors: [`ensure_project_failed:${created.error}`] };
+    projectId = created.value.project_id;
+    const wrote = await setFolderCognitiveOsProjectId(organizationId, folderId, projectId);
+    if (!wrote) backfillErrors.push(`folder_project_link_write_failed:${folderId}`);
+  }
+
+  const sources = await fetchAllSourceDetails(organizationId, folderId);
+  const result = await importSourcesIntoProject(organizationId, projectId, sources);
+  return { organizationId, ...result, errors: [...backfillErrors, ...result.errors] };
 }
