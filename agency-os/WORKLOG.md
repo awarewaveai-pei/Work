@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續38）280+ 方法內容深化第十二批：representation 家族全部 10 個方法（F24 呈現／認知偏好／協作家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）的批次節奏，處理 representation 家族全部 10 個方法：audio_conversational_view／causal_view／concept_graph_view／expert_lego_mode／guided_mode／mind_map_view／switching／table_matrix_view／text_outline_view／timeline_view。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：10 個條目補上 why_en/why_zh/url/example_zh/example_en，representation 家族 0/10 → 10/10 收官（F24 呈現／認知偏好／協作套件全數完成）。這個家族所有方法共用同一條結構性法則（Atlas §9：View 只保存 layout／filters／visible_fields／presentation_preferences，不得複製 Knowledge 本體），所以不變量幾乎都是「參照忠實性」類：causal_view／concept_graph_view 檢查渲染出來的邊沒有竄改底層關係、timeline_view 檢查排序是機械算出來的而非呼叫端主張、text_outline_view／mind_map_view／table_matrix_view 靠 schema 完全沒有內容欄位（只有純參照 id）結構性防止複製內容、switching 檢查多個 View 共用同一份 knowledge_object_id 跟 provenance、guided_mode 檢查選中的方法真的在方法目錄裡註冊、expert_lego_mode 的 compile_status 是 7 項強制檢查全過才算數。目錄裡另有一個 `chart_render.py`（11 個檔案裡的第 11 個）——查證後確認是 `artifact.generate_chart` 共用渲染 adapter，不是 285 個方法之一，不計入本批次。撰寫 text_outline_view 範例時自己抓到一個真實 bug：details_ref 範例填了 `REPORT-market-2026#section-2.1`，但 `#` 不在該方法自己的參照格式正則（`^[A-Za-z0-9][A-Za-z0-9_.:/-]*$`）允許字元內，跑驗證腳本才發現，已改用冒號分隔並同步修正 YAML 跟驗證腳本。guided_mode 驗證額外沿用該方法自己測試檔案（`tests/unit/test_guided_mode.py`）已驗證過的真實 `MethodCatalog.from_spec_root()` + `root_cause.fishbone`（Atlas §11.56 自己的範例）組合，不是自製 mock。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_representation_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 10 個真實 `generate_*` 函式，其中 9 個額外驗證各自「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應的 InvariantViolation：ACVIEW_MISSING_READBACK_CONFIRM／CVIEW_MISSING_ASSUMPTION／CGRAPH_RELATION_TYPE_MISMATCH／GUIDED_METHOD_NOT_REGISTERED（對真實 MethodCatalog）／MMVIEW_DANGLING_CENTER_REF／REPSWITCH_KNOWLEDGE_OBJECT_MISMATCH／TBLVIEW_SCORE_NOT_MARKED_COMPUTED／TXTVIEW_SUMMARY_TOO_LONG／TLVIEW_ORDER_MISMATCH），expert_lego_mode 額外斷言 1 項檢查 FAIL 時 compile_status 必為 REJECTED | 第一次跑 exit=1（text_outline_view 的 details_ref 格式錯誤，見上）| 修正後 exit=0 | 結果=10/10 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、132/285 done（本輪 +10，續37 收尾時是 122）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 132/285 完成，153 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、stakeholders 10（複數家族）、decomposition 9、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續37）280+ 方法內容深化第十一批：epistemic 家族全部 10 個方法（F10 認知品質家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）的批次節奏，處理 epistemic 家族全部 10 個方法：argument_mapping／assumption_mapping／assumption_registry／bayesian_updating／confidence_calibration／contradiction_detection／evidence_hierarchy／evidence_matrix／ladder_of_inference／toulmin_model。
