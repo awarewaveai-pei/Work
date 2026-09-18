@@ -49,6 +49,7 @@ import sqlite3
 import subprocess
 import sys
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
@@ -303,8 +304,30 @@ def get_ai_provider() -> AiProvider | None:
     return provider_from_env()
 
 
+@lru_cache(maxsize=4)
+def _cached_method_catalog(spec_root_string: str) -> MethodCatalog:
+    """Cache the read-only method contract scan -- ``from_spec_root`` reads, parses and
+    sha256-hashes every ACTIVE method contract (281 files) on each call; uncached, that ran on
+    every single dashboard click (2026-09-18: measured ~1s flat per request, list_methods and
+    method_form alike). Same fix as ir.py's ``_schema_contracts`` for the same reason -- no test
+    ever overrides ``get_catalog`` with a different spec root (see test_custom_workflow_api.py),
+    so caching by that root's string is safe for the process lifetime."""
+    return MethodCatalog.from_spec_root(Path(spec_root_string))
+
+
 def get_catalog() -> MethodCatalog:
-    return MethodCatalog.from_spec_root(resolve_spec_root())
+    return _cached_method_catalog(str(resolve_spec_root()))
+
+
+# CapabilityCatalog deliberately NOT cached like MethodCatalog above: two tests
+# (test_optional_unresolved_capability_is_visible_but_not_a_plan_blocker and
+# test_api_skips_unresolved_recommended_capability_without_registering_an_uncontracted_adapter)
+# monkeypatch `CapabilityCatalog.from_spec_root` itself via patch.object to inject a modified
+# test catalog; an lru_cache wrapper around it returns the first (real) result on every later
+# call with the same spec-root string, silently ignoring the patch (proven 2026-09-18: both
+# tests failed with cache in place -- IndexError / SUCCEEDED-not-NOT_INVOKED). Its call sites
+# were never part of the measured dashboard slowness anyway (that was list_methods/method_form,
+# both MethodCatalog-only), so there is no performance reason to cache it too.
 
 
 def require_session(cognitive_os_session: str | None = Cookie(default=None), store: IdentityStore = Depends(get_store)) -> dict[str, Any]:

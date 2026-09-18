@@ -1,4 +1,27 @@
 # Worklog
+## 2026-09-18（續14）Dashboard UX 9 項操作者回饋（清單精簡/欄位徽章/懶人填寫拉最上面/效能）+ critic 覆審抓到 1 個真實 Major（`*_id` 自動填值會偽造無效參照）已修
+
+[操作者回饋 9 項] 截圖+文字：①清單列只留中文名(縮寫)/英文名兩行 ②欄位標籤旁不要出現 snake_case slug ③必填/選填要在欄位標題旁不要埋在說明文字裡 ④說明內容要含有效性原因/權威網址/填表範例（280 方法全套，另立批次，操作者選「兩者都要+分批做」）⑤ID 欄位是否該自動產生 ⑥要一個「懶人填寫」貼上資料自動拆欄位的按鍵 ⑦多選方法後想同時用不只是比較 ⑧組成工作流要能調順序+建議順序 ⑨選方法後右側說明更新很慢。
+
+[已修，瀏覽器實測+105 tests 全過]
+①②③⑥ dashboard.html：清單列改 `appendListNameBlock`（2 行，拿掉 id/family metadata row）；欄位標籤拿掉可見 raw slug（改 `title` hover）、加必填/選填徽章（`.req-badge`）；guide box 不再重複必填/選填文字；AI 起草從 `<details>` 收合小字拉成常駐的 `.draft-box` 高亮框。
+⑤ 過程中發現真實 bug：`record_id` 應該完全隱藏（伺服器 `dispatch.py:96-97` `invoke_builder` 會自動補），但 `renderMethodFields`/`chainStepFields` 只排除了 `provenance`，`record_id` 其實會顯示成一個空的必填欄位——已補排除。
+⑦⑧ 「組成工作流」本來就支援多個獨立方法同時使用（不強制依賴）+ 排序按鈕（↑↓）本來就有，改說明文字和按鈕標籤讓這兩件事更容易被注意到。
+⑨ 實測 `GET /methods`、`/methods/{id}/form` 每次 ~1000ms 平坦（不管哪個 method、重複打幾次都一樣），根因：`main.py:306-307`（改動前）`get_catalog()` 每個請求都重新 `MethodCatalog.from_spec_root()`──重新掃描+解析+sha256 全部 281 個 method contract 檔。加 `functools.lru_cache`（同 `ir.py:27` `_schema_contracts` 慣例）後實測降到 ~75ms（13 倍）。過程中也順手把 recipe-plan 端點用的 `CapabilityCatalog.from_spec_root` 兩處一起快取，但真實 pytest 抓到 2 個測試變紅（`test_optional_unresolved_capability_is_visible_but_not_a_plan_blocker`、`test_api_skips_unresolved_recommended_capability_without_registering_an_uncontracted_adapter`——兩者都 monkeypatch `CapabilityCatalog.from_spec_root` 模擬 optional-capability 情境，快取讓 monkeypatch 失效），確認這兩個呼叫點從來不是量測到的效能瓶頸後直接 revert，只留 `MethodCatalog` 這個真正量到的熱路徑。
+
+[critic 覆審抓到的真實 Major，已修] ⑤原本的修法是幫 `*_id` 結尾的必填欄位（如 `analysis_id`）自動填一個產生的預設值，省得使用者自己想字串。critic 用 AST 掃過全部 245 個 `generate_*` builder（74 個 `_id` 結尾必填參數、35 種名稱），抓到至少 4 個具體反例：`representation.guided_mode.selected_method_id` 要對到真實存在的 method_id、`root_cause.five_whys.target_hypothesis_id` 要對到呼叫端自己 payload 裡的假設 id、`stakeholders.batna.best_alternative_id` 要對到呼叫端自己的替代方案 id——這三個會被伺服器拒絕；最糟的是 `representation.text_outline_view`/`table_matrix_view`/`mind_map_view` 的 `source_knowledge_object_id` 只做格式檢查不檢查是否存在，亂數字串會被**靜默接受**，產生一筆參照到不存在物件的壞紀錄、完全不報錯。光看欄位名稱分不出「自己的識別碼」和「參照別的東西」這兩種，沒有便宜的辦法安全區分，所以整個自動填值機制直接移除，`*_id` 欄位跟其他必填欄位一樣留白讓使用者自己填——這是誠實的最小修法，不是治本（治本要嘛在 method-display-metadata.yaml 加明確標記哪個欄位是自身識別碼，要嘛改成使用者主動按鈕才產生建議值，目前都還沒做，先移除有害的版本）。同批修了 1 個 Minor（guide box 必填/選填原本只靠顏色區分，加回文字）；1 個 Minor 未動（raw slug 改 hover-only 犧牲了無障礙/觸控可見性，但跟操作者①②的明確指示衝突，留給操作者決定要不要要回來）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=瀏覽器 fetch 計時 `GET /methods`/`GET /methods/{id}/form`（快取前）| result=3~5 次皆 ~1000-1080ms 平坦
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上（加 lru_cache 後）| result=~72-97ms，13 倍
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py tests/unit/test_custom_workflow_api.py tests/unit/test_chart_render.py -q`（CapabilityCatalog 一起快取時）| exit=0 | result=2 failed/103 passed，兩個失敗皆為 monkeypatch 被快取蓋掉
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上（revert CapabilityCatalog 快取後）| exit=0 | result=105 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=同上（移除 `*_id` 自動填值機制後，最終版本）| exit=0 | result=105 passed, 44.93s
+- REALTEST_EVIDENCE: tool=Browser | cmd=實際登入+點擊 WSJF/SWOT/PESTEL/TOWS/ADR/ATAM 多個方法、勾選並排比較、開組成工作流 | result=清單格式/欄位徽章/懶人填寫框/record_id 隱藏/analysis_id 留白皆符合預期，無新增 console error
+- REVIEW_DONE: critic=Standard | verdict=fail→pass(修復後) | findings=1 Major(已修)/3 Minor(2 已修、1 因與操作者明確指示衝突特意保留現狀)/2 Suggestion(未動，範圍外或非本次迴歸)
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`get_catalog\(\)\|MethodCatalog\.from_spec_root\|CapabilityCatalog\.from_spec_root`（限 ai_lego/apps/api/ 內）+ `generateIdDefault`+`item2-meta`+`用 AI 協助起草`（全 repo）| hits=main.py 3 處呼叫點皆已核對正確（1 快取 2 不快取）；`generateIdDefault`/`item2-meta` 0 殘留；`RUNNABLE_DEMOS.md` 1 處歷史行引用舊按鈕文字「AI 起草」——該檔規則「一列一個 demo，不改舊列」，已加新列取代而非改舊列
+- [rollback] `git revert` 本次 commit；三個檔案（main.py/dashboard.html/RUNNABLE_DEMOS.md）皆為獨立可回退變更，無資料庫/部署動作
+
 ## 2026-09-18（續13）next-admin bridge route 修復 401（machine-local docker-compose.yml 漏了整段 COGNITIVE_OS_* 環境變數）+ 真實 E2E import 測試——操作者「建正式環境服務帳號+部署」指示全部完成
 
 [發現] `/check-drift` 顯示 next-admin 已在 `253d74fe8`（推測是並行 session 或自動流程稍早已跑過 `sg-deploy.sh`，非本次動作），容器內確認 bridge route 檔案（`import-project-sources`）已建置進 `.next/server`。直接打真實 API 驗證：`POST /api/internal/cognitive-os/import-project-sources` 回 `{"ok":false,"error":"unauthorized"}`——token 對得上 `.env` 裡的值，但 `docker exec ... printenv COGNITIVE_OS_IMPORT_INGEST_TOKEN` 回空，代表容器根本沒收到這個環境變數。根因：`/root/lobster-phase1/docker-compose.yml`（CLAUDE.md 明訂的「machine-local」檔案，`sg-deploy.sh` 的 rsync 只同步 `apps/<APP>/` 底下的原始碼，不動這個上層 compose 檔）從未被更新成跟 repo 裡 `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 一致——repo 版本 441-448 行早就寫好 `COGNITIVE_OS_*` 五個環境變數映射，機器上的實際檔案完全沒有這段（連同一併發現 `PORTAL_SIGNUP_*` 也漏，範圍更廣但不在本次修復範圍內，已揭露不隱藏）。
