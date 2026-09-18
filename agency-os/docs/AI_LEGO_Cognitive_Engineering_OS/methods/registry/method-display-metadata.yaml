@@ -35,7 +35,7 @@ entries:
     why_zh: "強制把決策當下的脈絡、選項、後果寫下來，讓「為什麼當初這樣選」不會隨人員流動而消失——決策變成可追溯的紀錄，不是只存在某人記憶裡。"
     url: "https://adr.github.io/"
     example_en: "Scenario: the team decides to switch from MySQL to PostgreSQL. title: 'Switch to PostgreSQL from MySQL'; status: 'proposed'; context: 'MySQL table-locks under high write concurrency'; decision: 'Migrate to PostgreSQL for its MVCC engine'; alternatives_considered: ['Keep MySQL with read replicas', 'Switch to MongoDB']; each impact field (security_privacy_impact/data_impact/operational_impact/compatibility/migration/rollback/validation) gets 1-2 real sentences, e.g. migration: 'Dual-write for 3 months before cutting over traffic.'"
-    example_zh: "情境：團隊要把 MySQL 換成 PostgreSQL。title：「改用 PostgreSQL 取代 MySQL」；status：「proposed」；context：「MySQL 高並發寫入時鎖表」；decision：「遷移到 PostgreSQL，用其 MVCC 機制」；alternatives_considered：[\"維持 MySQL 加讀寫分離\", \"改用 MongoDB\"]；其餘影響類欄位（security_privacy_impact/data_impact/operational_impact/compatibility/migration/rollback/validation）各寫 1-2 句實際內容，例如 migration：「先雙寫 3 個月再切流量」。"
+    example_zh: "情境：團隊要把 MySQL 換成 PostgreSQL。\ntitle：「改用 PostgreSQL 取代 MySQL」\nstatus：「proposed」\ncontext：「MySQL 高並發寫入時鎖表」\ndecision：「遷移到 PostgreSQL，用其 MVCC 機制」\nalternatives_considered：[\"維持 MySQL 加讀寫分離\", \"改用 MongoDB\"]\n其餘影響類欄位（security_privacy_impact/data_impact/operational_impact/compatibility/migration/rollback/validation）各寫 1-2 句實際內容，例如 migration：「先雙寫 3 個月再切流量」。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.atam:
     name_en: "Architecture Tradeoff Analysis Method"
     abbr: "ATAM"
@@ -46,7 +46,7 @@ entries:
     why_zh: "讓利害關係人一起針對架構腦力激盪情境，系統性逼出敏感點和取捨點，而不是憑感覺說架構「應該還可以」。"
     url: "https://en.wikipedia.org/wiki/Architecture_tradeoff_analysis_method"
     example_en: "Scenario: evaluating whether a new order system can survive Black Friday traffic. architecture_description: 'Order service + message queue + MySQL primary-replica'; findings has >=1 entry, e.g. {category: 'sensitivity_point', description: 'Queue shard count directly caps peak throughput', quality_attribute: 'performance'} (category must be one of sensitivity_point/tradeoff_point/risk/non_risk)."
-    example_zh: "情境：評估新訂單系統扛不扛得住尖峰流量。architecture_description：「訂單服務+訊息佇列+MySQL 主從」；findings 至少 1 筆，例如 {category: \"sensitivity_point\", description: \"佇列分片數直接決定尖峰吞吐上限\", quality_attribute: \"performance\"}（category 必須是 sensitivity_point/tradeoff_point/risk/non_risk 其中之一）。"
+    example_zh: "情境：評估新訂單系統扛不扛得住尖峰流量。\narchitecture_description：「訂單服務+訊息佇列+MySQL 主從」\nfindings 至少 1 筆，例如 {category: \"sensitivity_point\", description: \"佇列分片數直接決定尖峰吞吐上限\", quality_attribute: \"performance\"}（category 必須是 sensitivity_point/tradeoff_point/risk/non_risk 其中之一）。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.ddd:
     name_en: "Domain-Driven Design"
     abbr: "DDD"
@@ -57,7 +57,7 @@ entries:
     why_zh: "強迫先把大而模糊的業務領域拆成邊界清楚的子領域，再畫出彼此怎麼互動——邊界不清楚最常見的後果（同一個詞在兩團隊代表不同意思）會被迫浮現。"
     url: "https://www.domainlanguage.com/wp-content/uploads/2016/05/DDD_Reference_2015-03.pdf"
     example_en: "Scenario: an e-commerce platform clarifies what 'order' means to logistics vs. customer service. domain_description: 'Order processing for an e-commerce platform'; subdomains has >=1 entry, e.g. {name: 'Logistics', type: 'core'} (type must be core/supporting/generic); optional bounded_contexts/context_map describe the integration pattern between subdomains (e.g. 'customer_supplier')."
-    example_zh: "情境：電商平台釐清「訂單」在物流跟客服眼中的不同定義。domain_description：「電商平台的訂單處理」；subdomains 至少 1 筆，例如 {name: \"物流\", type: \"core\"}（type 必須是 core/supporting/generic 其中之一）；選填的 bounded_contexts/context_map 描述子領域之間的整合模式（例如 \"customer_supplier\"）。"
+    example_zh: "情境：電商平台釐清「訂單」在物流跟客服眼中的不同定義。\ndomain_description：「電商平台的訂單處理」\nsubdomains 至少 1 筆，每筆需要唯一 id，例如 {id: \"logistics\", name: \"物流\", type: \"core\"}（type 選填，填的話必須是 core/supporting/generic 其中之一）。\n（選填）bounded_contexts：每筆需要唯一 id 跟至少 1 個 subdomain_ids（對應到真實存在的 subdomain id），例如 {id: \"logistics-bc\", subdomain_ids: [\"logistics\"]}。\n（選填）context_map：描述兩個 bounded_context 之間的整合模式，from_context_id/to_context_id 都要對到真實存在的 bounded_context id，pattern 必須是 9 種標準 DDD 模式之一（例如 customer_supplier），例如 {from_context_id: \"logistics-bc\", to_context_id: \"support-bc\", pattern: \"customer_supplier\"}。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.dependency_mapping:
     name_en: "Dependency Mapping"
     abbr: ""
@@ -68,7 +68,7 @@ entries:
     why_zh: "把「誰依賴誰」明講成節點跟邊，這樣「改這個會影響誰」是圖上直接查得到的答案，不用靠開發者記憶或臨時問人。"
     url: "https://aws.amazon.com/what-is/dependency-mapping/"
     example_en: "Scenario: figuring out what breaks if the 'user authentication service' changes. system_under_mapping: 'User Authentication Service'; nodes has >=1 entry, e.g. {id: 'auth-svc', node_type: 'service'} (node_type must be service/vendor/data); edges has >=1 entry, e.g. {from_id: 'order-svc', to_id: 'auth-svc', is_critical: true, fallback: 'Degrade to read-only mode'} (fallback is required whenever is_critical is true)."
-    example_zh: "情境：搞清楚改動「使用者驗證服務」會波及誰。system_under_mapping：「使用者驗證服務」；nodes 至少 1 筆，例如 {id: \"auth-svc\", node_type: \"service\"}（node_type 必須是 service/vendor/data 其中之一）；edges 至少 1 筆，例如 {from_id: \"order-svc\", to_id: \"auth-svc\", is_critical: true, fallback: \"降級為唯讀模式\"}（is_critical 為 true 時 fallback 必填）。"
+    example_zh: "情境：搞清楚改動「使用者驗證服務」會波及誰。\nsystem_under_mapping：「使用者驗證服務」\nnodes 至少 1 筆，例如 {id: \"auth-svc\", node_type: \"service\"}（node_type 必須是 service/vendor/data 其中之一）\nedges 至少 1 筆，例如 {from_id: \"order-svc\", to_id: \"auth-svc\", is_critical: true, fallback: \"降級為唯讀模式\"}（is_critical 為 true 時 fallback 必填）。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.event_storming:
     name_en: "Event Storming"
     abbr: ""
@@ -79,7 +79,7 @@ entries:
     why_zh: "用「先列出所有業務事件」的限制，逼參與者用時間順序思考，而不是一開始就掉進技術細節——事件之間的因果關係看清楚後，系統邊界會自然浮現。"
     url: "https://www.eventstorming.com/"
     example_en: "Scenario: mapping 'customer places order to shipment'. domain_process_description: 'E-commerce order-to-shipment flow'; elements has >=1 entry, each needing a unique id and a type from {domain_event, command, actor, policy, external_system, aggregate, read_model}, e.g. {id: 'cmd1', type: 'command', label: 'Customer submits order'} and {id: 'evt1', type: 'domain_event', label: 'Order Placed'}; relationships has >=1 entry linking them, e.g. {from_id: 'cmd1', to_id: 'evt1'} -- every domain_event element needs at least one incoming relationship (no orphan events)."
-    example_zh: "情境：梳理「客戶下單到出貨」流程。domain_process_description：「電商下單到出貨流程」；elements 至少 1 筆，每筆需要唯一 id 跟一個 type（從 domain_event/command/actor/policy/external_system/aggregate/read_model 選），例如 {id: \"cmd1\", type: \"command\", label: \"客戶送出訂單\"} 和 {id: \"evt1\", type: \"domain_event\", label: \"訂單已建立\"}；relationships 至少 1 筆連接它們，例如 {from_id: \"cmd1\", to_id: \"evt1\"}——每個 domain_event 元素都要至少有一筆指向它的關係（不能是孤兒事件）。"
+    example_zh: "情境：梳理「客戶下單到出貨」流程。\ndomain_process_description：「電商下單到出貨流程」\nelements 至少 1 筆，每筆需要唯一 id 跟一個 type（從 domain_event/command/actor/policy/external_system/aggregate/read_model 選），例如 {id: \"cmd1\", type: \"command\", label: \"客戶送出訂單\"} 和 {id: \"evt1\", type: \"domain_event\", label: \"訂單已建立\"}\nrelationships 至少 1 筆連接它們，例如 {from_id: \"cmd1\", to_id: \"evt1\"}——每個 domain_event 元素都要至少有一筆指向它的關係（不能是孤兒事件）。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.fitness_functions:
     name_en: "Architecture Fitness Functions"
     abbr: ""
@@ -90,7 +90,7 @@ entries:
     why_zh: "把「架構有沒有變壞」從開會時的主觀爭論，變成每次 CI/CD 都自動跑的客觀檢查——不再依賴有人記得要盯著看。"
     url: "https://www.thoughtworks.com/en-us/insights/articles/fitness-function-driven-development"
     example_en: "Scenario: ensuring a microservices architecture doesn't quietly grow circular dependencies. architecture_under_governance: 'Order microservices cluster'; functions has >=1 entry, e.g. {name: 'no_circular_dependencies', type: 'static_analysis', threshold: '0 circular dependencies', frequency: 'every CI build'}."
-    example_zh: "情境：確保微服務架構不會悄悄長出循環依賴。architecture_under_governance：「訂單微服務群」；functions 至少 1 筆，例如 {name: \"no_circular_dependencies\", type: \"static_analysis\", threshold: \"0 個循環依賴\", frequency: \"每次 CI build\"}。"
+    example_zh: "情境：確保微服務架構不會悄悄長出循環依賴。\narchitecture_under_governance：「訂單微服務群」\nfunctions 至少 1 筆，例如 {name: \"no_circular_dependencies\", type: \"static_analysis\", threshold: \"0 個循環依賴\", frequency: \"每次 CI build\"}。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.quality_attribute_scenario:
     name_en: "Quality Attribute Scenario"
     abbr: ""
@@ -101,7 +101,7 @@ entries:
     why_zh: "把「系統要夠快」這種說不清楚的期待，拆成六個具體欄位（來源/刺激/產物/環境/回應/量測），逼出真的能拿去測試的數字，不是永遠吵不完的形容詞。"
     url: "https://www.sei.cmu.edu/documents/5465/2013_018_101_60984.pdf"
     example_en: "Scenario: pinning down 'the system needs to survive peak traffic'. quality_goal: 'Performance'; source: 'Traffic spike from a marketing campaign'; stimulus: '5000 order requests per second'; artifact: 'Order service'; environment: 'Normal operating hours'; response: 'System queues requests without dropping any'; measure: '99% of requests respond within 2 seconds, 0 orders lost'. All 7 text fields must be non-empty."
-    example_zh: "情境：把「系統要撐住尖峰流量」講清楚。quality_goal：「效能」；source：「行銷活動導入的突發流量」；stimulus：「每秒 5000 個下單請求」；artifact：「訂單服務」；environment：「正常營運時段」；response：「系統排隊處理，不掉單」；measure：「99% 請求 2 秒內回應，0 筆訂單遺失」。以上 7 個文字欄位都必須非空。"
+    example_zh: "情境：把「系統要撐住尖峰流量」講清楚。\nquality_goal：「效能」\nsource：「行銷活動導入的突發流量」\nstimulus：「每秒 5000 個下單請求」\nartifact：「訂單服務」\nenvironment：「正常營運時段」\nresponse：「系統排隊處理，不掉單」\nmeasure：「99% 請求 2 秒內回應，0 筆訂單遺失」\n以上 7 個文字欄位都必須非空。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.strangler_fig:
     name_en: "Strangler Fig Pattern"
     abbr: ""
@@ -112,7 +112,7 @@ entries:
     why_zh: "不是一次性重寫（風險最高），而是在舊系統前架一層攔截層，一小片一小片搬到新系統，每片都能立刻驗證——舊系統慢慢被取代，不是被推倒重蓋。"
     url: "https://martinfowler.com/bliki/StranglerFigApplication.html"
     example_en: "Scenario: gradually replacing a ten-year-old monolith with microservices. legacy_system_under_migration: 'Ten-year-old order-processing monolith'; seams has >=1 entry, e.g. {name: 'Order lookup API', interception_point: 'API Gateway'}; slices has >=1 entry with a status from {planned, verified, expanded, retired}, e.g. {name: 'Migrate order lookup to new service', order: 1, status: 'planned'}."
-    example_zh: "情境：把十年歷史的單體系統慢慢換成微服務。legacy_system_under_migration：「十年歷史的訂單單體系統」；seams 至少 1 筆，例如 {name: \"訂單查詢 API\", interception_point: \"API Gateway\"}；slices 至少 1 筆，status 必須是 planned/verified/expanded/retired 其中之一，例如 {name: \"訂單查詢遷移到新服務\", order: 1, status: \"planned\"}。"
+    example_zh: "情境：把十年歷史的單體系統慢慢換成微服務。\nlegacy_system_under_migration：「十年歷史的訂單單體系統」\nseams 至少 1 筆，例如 {name: \"訂單查詢 API\", interception_point: \"API Gateway\"}\nslices 至少 1 筆，status 必須是 planned/verified/expanded/retired 其中之一，例如 {name: \"訂單查詢遷移到新服務\", order: 1, status: \"planned\"}。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.system_context_model:
     name_en: "C4 Model"
     abbr: "C4"
@@ -123,7 +123,7 @@ entries:
     why_zh: "先畫最粗略的圖（系統跟外部世界的邊界在哪），再逐層放大到容器、元件——避免一開始就塞滿技術細節、沒人看得懂全貌的常見失敗模式。"
     url: "https://c4model.com/"
     example_en: "Scenario: letting a new hire understand an e-commerce system in 5 minutes. system_context: 'E-commerce platform; users place orders via web, integrated with a payment gateway and logistics providers'; containers has >=1 entry, each needing a unique id, e.g. {id: 'web-frontend', name: 'Web frontend', technology: 'React', description: 'Order-placing UI'}. Optional components must each reference a real container_id; optional code must each reference a real component_id."
-    example_zh: "情境：讓新人 5 分鐘看懂電商系統的整體樣貌。system_context：「電商平台，使用者透過網頁下單，串接金流與物流廠商」；containers 至少 1 筆，每筆需要唯一 id，例如 {id: \"web-frontend\", name: \"Web 前端\", technology: \"React\", description: \"使用者下單介面\"}。選填的 components 每筆都要對到一個真實存在的 container_id；選填的 code 每筆都要對到一個真實存在的 component_id。"
+    example_zh: "情境：讓新人 5 分鐘看懂電商系統的整體樣貌。\nsystem_context：「電商平台，使用者透過網頁下單，串接金流與物流廠商」\ncontainers 至少 1 筆，每筆需要唯一 id，例如 {id: \"web-frontend\", name: \"Web 前端\", technology: \"React\", description: \"使用者下單介面\"}。\n（選填）components：每筆需要唯一 id 且 container_id 對到真實存在的 container，例如 {id: \"order-ui\", container_id: \"web-frontend\", name: \"訂單頁面元件\"}。\n（選填）code：每筆的 component_id 要對到真實存在的 component。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
   architecture.trade_off_matrix:
     name_en: "Architecture Trade-off Matrix"
     abbr: ""
@@ -134,7 +134,7 @@ entries:
     why_zh: "把「憑感覺選方案」變成「每個方案在每個標準上都有分數，乘上權重加總」——決策可以被檢視、複製。事後有人問為什麼，答案是表格裡的數字，不是模糊印象。"
     url: "https://nanoglobals.com/tools/decision-matrix/"
     example_en: "Scenario: choosing between two cloud providers on cost and performance. options has >=2 entries with a unique id, e.g. [{id: 'aws'}, {id: 'gcp'}]; criteria each need id/label/direction (maximize or minimize), e.g. [{id: 'cost', label: 'Cost', direction: 'minimize'}, {id: 'performance', label: 'Performance', direction: 'maximize'}]; raw_scores has one entry per option x criteria pair, e.g. {option_id: 'aws', criterion_id: 'cost', raw_value: 7}; weights must sum to exactly 1.0, e.g. [{criterion_id: 'cost', weight: 0.4}, {criterion_id: 'performance', weight: 0.6}]; sensitivity_notes is a required non-empty string disclosing how sensitive the ranking is to the weights chosen."
-    example_zh: "情境：在兩個雲端供應商之間依成本與效能做選擇。options 至少 2 筆且各有唯一 id，例如 [{id: \"aws\"}, {id: \"gcp\"}]；criteria 每筆需要 id/label/direction（maximize 或 minimize），例如 [{id: \"cost\", label: \"成本\", direction: \"minimize\"}, {id: \"performance\", label: \"效能\", direction: \"maximize\"}]；raw_scores 對每個「方案×標準」組合給一筆，例如 {option_id: \"aws\", criterion_id: \"cost\", raw_value: 7}；weights 總和必須剛好是 1.0，例如 [{criterion_id: \"cost\", weight: 0.4}, {criterion_id: \"performance\", weight: 0.6}]；sensitivity_notes 是必填非空字串，說明排名對權重選擇有多敏感。"
+    example_zh: "情境：在兩個雲端供應商之間依成本與效能做選擇。\noptions 至少 2 筆且各有唯一 id，例如 [{id: \"aws\"}, {id: \"gcp\"}]\ncriteria 每筆需要 id/label/direction（maximize 或 minimize），例如 [{id: \"cost\", label: \"成本\", direction: \"minimize\"}, {id: \"performance\", label: \"效能\", direction: \"maximize\"}]\nraw_scores 對每個「方案×標準」組合給一筆，例如 {option_id: \"aws\", criterion_id: \"cost\", raw_value: 7}\nweights 總和必須剛好是 1.0，例如 [{criterion_id: \"cost\", weight: 0.4}, {criterion_id: \"performance\", weight: 0.6}]\nsensitivity_notes 是必填非空字串，說明排名對權重選擇有多敏感。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
 
   # ---- art_therapy (operator's 54-item art-therapy tool list; Chinese names/use are source-original) ----
   art_therapy.conflict_mapping:
@@ -473,6 +473,11 @@ entries:
     name_zh: "艾森豪矩陣"
     blurb_en: "Scores each task by urgency x importance against your own declared thresholds, sorting it into Do First / Schedule / Delegate / Eliminate. Use it for a fast first-pass triage of a task list before deeper prioritization."
     blurb_zh: "用「緊急程度 x 重要程度」對照你自訂的門檻，把每項任務分到「立即做／排程／委派／刪除」四象限。想快速對一份任務清單做第一輪篩選時用。"
+    why_en: "Urgency and importance are two dimensions people habitually collapse into one gut feeling; scoring them separately and crossing them is what reveals that a loud, urgent task can still be low-importance and belong on someone else's plate, not an instinctive top priority."
+    why_zh: "緊急程度跟重要程度是兩個常被憑直覺混在一起判斷的維度——分開評分再交叉比對，才會發現「很吵很急」的事其實不重要，該委派出去，而不是本能地優先處理最大聲的事。"
+    url: "https://www.eisenhower.me/eisenhower-matrix/"
+    example_zh: "情境：整理本週待辦事項。\nsubject：「本週工作清單」\nurgency_scale：{min: 0, max: 10}\nimportance_scale：{min: 0, max: 10}\nurgency_threshold：5\nimportance_threshold：5\ntasks 至少 1 筆，每筆需要唯一 id/label/urgency/importance，例如 {id: \"T1\", label: \"修復上線中的錯誤\", urgency: 9, importance: 9}（urgency、importance 都要落在上面宣告的 scale 範圍內；quadrant 由系統自動計算，不用也不能自己填）。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
+    example_en: "Scenario: triaging this week's to-do list. subject: 'This week's work list'; urgency_scale: {min: 0, max: 10}; importance_scale: {min: 0, max: 10}; urgency_threshold: 5; importance_threshold: 5; tasks has >=1 entry, each needing a unique id/label/urgency/importance, e.g. {id: 'T1', label: 'Fix the production bug', urgency: 9, importance: 9} (urgency/importance must fall within the declared scale; quadrant is computed by the system, never supplied). Optional: version/generated_by_method can be left blank, the system supplies defaults."
   decision.expected_value:
     name_en: "Expected Value"
     abbr: ""
@@ -805,6 +810,11 @@ entries:
     name_zh: "反向腦力激盪法"
     blurb_en: "Instead of 'how do we solve X', brainstorm 'how could we cause or worsen X', then invert each answer into a real candidate solution. Use it when direct problem-solving keeps circling the same ideas."
     blurb_zh: "不直接想「怎麼解決 X」，而是先想「怎麼樣會讓 X 更糟」，再把每個答案反過來變成真正的解法。想解決問題卻一直卡在同樣幾個想法時用。"
+    why_en: "Directly asking 'how do we fix this' often stalls on the same few ideas; asking 'how could we sabotage this' is usually easier to answer freely, and inverting each sabotage into its opposite produces a concrete fix while surfacing failure mechanisms a direct framing tends to route around."
+    why_zh: "直接問「怎麼解決」常常卡住、繞著同幾個想法打轉；反過來問「怎麼樣會搞砸它」通常更容易放開想，再把每個「搞砸的方法」倒過來，就變成一個具體的解法，還能順便揭露原本沒注意到的失敗風險。"
+    url: "https://miro.com/brainstorming/what-is-reverse-brainstorming/"
+    example_zh: "情境：新用戶完成註冊的比例偏低，一直想不出怎麼提升，反過來想「怎麼樣會讓註冊完成率更低」。\nproblem_statement：「新用戶完成註冊的比例偏低」\nworsening_ideas 至少 1 筆，每筆需要唯一 id/text/provenance，例如 {id: \"W1\", text: \"註冊表單要填 20 個欄位\", provenance: {epistemic_type: \"ASSUMPTION\", authorship_state: \"HUMAN_ORIGINAL\", locked: null}}。\n（選填）inversions：把每個「讓事情更糟」的點子倒過來變成解法，worsening_idea_ref 要對到真實存在的 worsening_ideas id，例如 {worsening_idea_ref: \"W1\", inverted_solution: \"把表單砍到只剩 3 個必填欄位，其餘留到之後補\", provenance: {epistemic_type: \"HYPOTHESIS\", authorship_state: \"HUMAN_ORIGINAL\", locked: null}}。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
+    example_en: "Scenario: new-user signup completion is low and direct brainstorming keeps stalling, so the team asks 'how could we make completion even worse' instead. problem_statement: 'New-user signup completion rate is low'; worsening_ideas has >=1 entry, each needing a unique id/text/provenance, e.g. {id: 'W1', text: 'Make the signup form require 20 fields', provenance: {epistemic_type: 'ASSUMPTION', authorship_state: 'HUMAN_ORIGINAL', locked: null}}. Optional: inversions flips each 'way to make it worse' into a solution, worsening_idea_ref must point at a real worsening_ideas id, e.g. {worsening_idea_ref: 'W1', inverted_solution: 'Cut the form down to 3 required fields, defer the rest', provenance: {epistemic_type: 'HYPOTHESIS', authorship_state: 'HUMAN_ORIGINAL', locked: null}}. version/generated_by_method can be left blank, the system supplies defaults."
   divergent.scamper:
     name_en: "SCAMPER"
     abbr: "SCAMPER"
@@ -1739,6 +1749,17 @@ entries:
     name_zh: "商業模式圖"
     blurb_en: "Lays out all nine standard business-model blocks (key partners, activities, resources, value propositions, customer relationships, channels, segments, cost structure, revenue streams) on one canvas, explicitly marked as a hypothesis until validated against a real business. Use it to describe an entire business model on a single page before committing to a full business plan."
     blurb_zh: "把九個標準商業模式區塊（關鍵夥伴、關鍵活動、關鍵資源、價值主張、顧客關係、通路、客群、成本結構、收益流）畫在同一張畫布上，並明確標記為假設，直到對照真實商業運作驗證過為止。想在投入完整商業計畫前，先用一頁描述整個商業模式時用。"
+  strategy.lean_canvas:
+    name_en: "Lean Canvas"
+    abbr: ""
+    name_zh: "精實畫布"
+    blurb_en: "Ash Maurya's startup-focused adaptation of the Business Model Canvas: swaps out the 4 'running an existing business' blocks (Key Partners/Activities/Resources/Customer Relationships) for 4 'starting a new business' blocks (Problem, Solution, Key Metrics, Unfair Advantage). Use it for an early-stage or pre-validation startup idea, where BMC's operations-focused blocks don't fit yet."
+    blurb_zh: "Ash Maurya 把 Business Model Canvas 改成新創專用版：拿掉「怎麼經營一家已存在的公司」的 4 個區塊（關鍵夥伴、關鍵活動、關鍵資源、顧客關係），換成「怎麼開始一家新公司」的 4 個區塊（問題、解決方案、關鍵指標、難以模仿的優勢）。剛起步、還沒驗證過的新創點子，BMC 那套營運導向的區塊還用不上時用這個。"
+    why_en: "Business Model Canvas assumes a business that already exists and needs describing; a pre-validation startup doesn't have Key Partners or a Customer Relationships process yet -- it has a guess about a Problem and a Solution that hasn't been tested. Swapping in Problem/Solution/Key Metrics/Unfair Advantage forces the canvas to ask the questions that actually matter before you've built anything: is this problem real, and what stops someone from copying you the moment it works?"
+    why_zh: "商業模式圖假設一家公司已經存在、只是需要被描述清楚；但一個還沒驗證的新創點子根本還沒有關鍵夥伴、也沒有顧客關係流程——它有的只是一個尚未被測試過的「問題」猜想和「解決方案」猜想。換成問題／解決方案／關鍵指標／難以模仿的優勢，逼你在還沒做出東西之前，先回答真正關鍵的問題：這個問題是真的嗎？一旦做成了，別人要怎麼樣才抄不走？"
+    url: "https://leanstack.com/lean-canvas"
+    example_zh: "情境：想做一個幫小型會計師事務所整合多客戶對帳的工具。\nblocks 必須剛好是這 9 個區塊各一筆（順序不限）：PROBLEM、CUSTOMER_SEGMENTS、UNIQUE_VALUE_PROPOSITION、SOLUTION、CHANNELS、REVENUE_STREAMS、COST_STRUCTURE、KEY_METRICS、UNFAIR_ADVANTAGE。\n每一筆需要 block／content／provenance 三個欄位，例如 PROBLEM 這筆：{block: \"PROBLEM\", content: \"小型會計師事務所每週花 5 小時手動對帳多個客戶的帳本\", provenance: {epistemic_type: \"EVIDENCE\", authorship_state: \"HUMAN_APPROVED\"}}。\n（選填）supporting_evidence_refs：某一筆的 provenance.epistemic_type 若填 \"EVIDENCE\"，這筆就必須附至少 1 個引用來源字串，例如 [\"訪談紀錄-003\"]；填 \"HYPOTHESIS\" 或其他類型則不用附。\nvalidation_status 由系統自動填入 \"UNVALIDATED_HYPOTHESIS\"，不是欄位、不用也不能自己填。\n（選填）version、generated_by_method：留空由系統帶入預設值即可，通常不用填。"
+    example_en: "Scenario: building a tool that helps small accounting practices reconcile multiple clients' books in one place. blocks must be exactly these 9, one entry each, any order: PROBLEM, CUSTOMER_SEGMENTS, UNIQUE_VALUE_PROPOSITION, SOLUTION, CHANNELS, REVENUE_STREAMS, COST_STRUCTURE, KEY_METRICS, UNFAIR_ADVANTAGE. Each entry needs block/content/provenance, e.g. the PROBLEM entry: {block: 'PROBLEM', content: \"Small accounting practices lose 5h/week reconciling multiple clients' books by hand\", provenance: {epistemic_type: 'EVIDENCE', authorship_state: 'HUMAN_APPROVED'}}. Optional: supporting_evidence_refs is required (>=1 string) whenever that entry's provenance.epistemic_type is 'EVIDENCE', e.g. ['interview-notes-003']; not needed for 'HYPOTHESIS' or other types. validation_status is filled in by the system as 'UNVALIDATED_HYPOTHESIS' automatically -- not a field you supply. version/generated_by_method can be left blank, the system supplies defaults."
   strategy.value_proposition_canvas:
     name_en: "Value Proposition Canvas"
     abbr: ""

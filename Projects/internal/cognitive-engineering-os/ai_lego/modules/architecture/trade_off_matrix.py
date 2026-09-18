@@ -13,6 +13,10 @@ from typing import Any
 from ai_lego.modules.decision.mcda import evaluate_mcda_gates, generate_mcda_analysis
 
 METHOD_ID = "architecture.trade_off_matrix"
+RECORD_ID_PREFIX = "TRADEOFFMATRIX-"
+# Not load-bearing for API auto-injection (identity param is the domain-specific analysis_id, not
+# `record_id`) -- exists only for the dashboard's opt-in id-suggest button. See atam.py's own
+# RECORD_ID_PREFIX comment for the full rationale (2026-09-18), not repeated in every sibling file.
 
 
 def generate_trade_off_matrix(

@@ -102,7 +102,9 @@
   .guide-box .guide-section a { color:var(--accent); font-weight:600; }
   .guide-box details.guide-example { margin-top:var(--sp-2); }
   .guide-box details.guide-example summary { cursor:pointer; font-weight:600; color:var(--accent-dark); }
-  .guide-box details.guide-example > div { margin-top:var(--sp-1); }
+  .guide-box details.guide-example > div { margin-top:var(--sp-1); white-space:pre-line; }
+  .id-suggest-btn { font-size:var(--fs-xs); padding:.05rem .55rem; }
+  .order-hint { font-size:var(--fs-xs); color:var(--muted); margin-left:var(--sp-2); }
   .compare-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:var(--sp-4); align-items:start; }
   .compare-card { border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4); box-shadow:var(--shadow-1); }
   .compare-card h4 { margin:.1rem 0; font-size:var(--fs-md); font-weight:700; }
@@ -182,7 +184,7 @@
         <div id="brief-guide" class="guide-box" style="display:none"></div>
         <div class="draft-box">
           <div class="draft-box-title">⚡ 懶人填寫：貼上資料，AI 自動拆進欄位</div>
-          <div class="note" style="margin-bottom:var(--sp-2)">不用照格式，背景、現況、已知數字，想到什麼寫什麼即可；AI 讀完會自動填進下面對應的欄位，你再確認或修改。</div>
+          <div class="note" style="margin-bottom:var(--sp-2)">不用照格式，背景、現況、已知數字，想到什麼寫什麼即可；系統讀完會自動填進下面對應的欄位，你再確認或修改。（如果貼的內容剛好是「欄位: 值」逐行格式，例如照填表範例改寫，會先免費比對、不花費 AI 額度；比對不完整才會呼叫 AI。）</div>
           <div class="row">
             <button id="brief-import-btn" class="ghost">帶入 Project 來源當背景資料</button>
             <span id="brief-import-status" class="note"></span>
@@ -217,8 +219,12 @@
     <div id="compare" style="display:none">
       <div class="row" style="justify-content:space-between">
         <div style="font-weight:600">並排比較（<span id="compare-count"></span>）</div>
-        <button id="compare-back" class="ghost">關閉比較</button>
+        <div class="row" style="margin:0">
+          <button id="compare-to-chain" class="primary">把這些方法一起組成工作流</button>
+          <button id="compare-back" class="ghost">關閉比較</button>
+        </div>
       </div>
+      <div class="note">看完比較後，想同時用這幾個方法（不只是看）就按左邊的按鈕——會直接帶著這批方法開一個新工作流，可再調整順序。</div>
       <div id="compare-grid" class="compare-grid"></div>
     </div>
 
@@ -228,6 +234,10 @@
         <button id="chain-back" class="ghost">關閉</button>
       </div>
       <div class="note">每一步都是獨立的單一方法，各自填自己的欄位、各自驗證——不一定要有先後依賴，也可以只是想同時用好幾個工具。用下面的 ↑↓ 調整順序、「移除」拿掉步驟；完成後存成工作流，之後在「工作流」分頁可再打開繼續編輯或執行。</div>
+      <div class="row">
+        <button id="chain-suggest-order" class="ghost">建議順序</button>
+        <span class="order-hint">依「發散→找根因→分析／計算→利害關係人→架構或策略設計→呈現→決策」概略排序，只是建議，同一階段內原順序不變，仍可用 ↑↓ 手動調整</span>
+      </div>
       <div id="chain-steps"></div>
       <div class="row">
         <button id="chain-run-all" class="primary">全部依序執行</button>
@@ -340,6 +350,37 @@ $('search').addEventListener('input', renderList);
 
 function readableFieldLabel(name) {
   return name.split('_').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+}
+// 免費快速解析（0 tokens，不呼叫 AI）：如果貼上的文字已經是「欄位名: 值」逐行/逐句格式（填表範例就是這樣
+// 示範的），直接用規則比對抽出來，不需要 AI。只在「每一個必填欄位都比對到非空值」時才採用，否則整包放棄、
+// 照舊呼叫 AI——不做半套（避免自信滿滿填錯又不明顯）。只處理字串型別欄位：list/dict 欄位（例如 ADR 的
+// alternatives_considered 是陣列）無法從一行文字安全還原，只要有一個必填欄位是這類型就直接放棄、交給 AI。
+function freeParseBrief(brief, params) {
+  // 排除識別碼欄位（record_id 或第一個參數的 domain-specific id，跟 selfIdCandidate 認定同一個
+  // 欄位）：使用者的自然語言描述通常不會提到「scenario_id: xxx」這種內部識別碼，若把它也列入必須比對
+  // 到的必填欄位，會讓每一個非 record_id 方法的免費解析永遠失敗、整條路徑形同虛設。識別碼留給
+  // 「產生建議值」按鈕或使用者自己填，免費解析只負責填有意義的內容欄位。
+  const selfId = params && params.length ? params[0].name : null;
+  const required = (params || []).filter(p => p.required && p.name !== 'record_id' && p.name !== 'provenance' && p.name !== selfId);
+  // 'str' not "<class 'str'>": every builder module has `from __future__ import annotations`
+  // (PEP 563), so main.py's `str(parameter.annotation)` is already stringified at signature-read
+  // time -- the wire value really is the bare string 'str', confirmed via a live TestClient call.
+  // A wrong comparison here would make this whole free-parse path permanently unreachable dead
+  // code (critic-caught 2026-09-18: it was exactly that until this line was fixed).
+  if (!required.length || !required.every(p => p.annotation === 'str')) return null;
+  const segments = brief.split(/[;；\n]+/).map(s => s.trim()).filter(Boolean);
+  const strip = s => s.trim().replace(/^[「『"']+|[」』"']+$/g, '').trim();
+  const result = {};
+  for (const p of required) {
+    const variants = new Set([p.name.toLowerCase(), p.name.replace(/_/g, ' ').toLowerCase(), readableFieldLabel(p.name).toLowerCase()]);
+    for (const seg of segments) {
+      const m = seg.match(/^([^:：]{1,40})[:：]\s*(.+)$/);
+      if (!m || !variants.has(strip(m[1]).toLowerCase())) continue;
+      const value = strip(m[2]);
+      if (value) { result[p.name] = value; break; }
+    }
+  }
+  return required.every(p => result[p.name]) ? result : null;
 }
 function appendNameBlock(container, d) {
   d = d || {};
@@ -502,10 +543,9 @@ function renderBriefGuide(display, params) {
     box.appendChild(link);
   }
   if (fields.length) {
-    box.appendChild(el('div', 'guide-intro', '為了做出最完整、最有效的分析，請在下面欄位提供以下內容（也可以直接寫進上面的懶人填寫描述裡，由 AI 自動拆進欄位）：'));
-    const ul = el('ul');
-    fields.forEach(p => { ul.appendChild(el('li', p.required ? '' : 'optional', readableFieldLabel(p.name) + (p.required ? '' : '（選填）'))); });
-    box.appendChild(ul);
+    // 不重複列出下面表單已經標示的欄位名稱（操作者 2026-09-18 回饋：「表格已經有註明」）；
+    // 只提示「懶人填寫」這個表單本身看不出來的替代路徑。
+    box.appendChild(el('div', 'guide-intro', '💡 也可以不管欄位格式，直接把手邊資料寫進下面的「懶人填寫」欄位，AI 會自動拆進對應欄位。'));
   }
   if (d.example_zh || d.example_en) {
     const details = document.createElement('details');
@@ -522,6 +562,7 @@ async function openMethod(id) {
   const f = await api('/methods/' + encodeURIComponent(id) + '/form');
   if (!f.ok) { failWorkspace(id, f); return; }
   state.params = f.body.parameters;
+  state.selfIdPrefix = f.body.self_id_prefix || null;
   const c = f.body.contract || {};
   const d = f.body.display || {};
   resetWork();
@@ -587,6 +628,13 @@ async function openCompare(ids) {
   });
 }
 $('compare-back').onclick = () => { state.epoch += 1; showMode('empty'); };
+$('compare-to-chain').onclick = () => {
+  // 用完整勾選清單（跟側欄「組成工作流」按鈕同一個資料來源），不是只用比較畫面因 COMPARE_MAX=4 截斷過的
+  // state.compareIds——否則使用者勾了 8 個、比較只看得到前 4 個，這顆按鈕卻只帶 4 個進工作流，
+  // 會比側欄按鈕功能更弱，跟按鈕文字「把這些方法一起組成工作流」的預期不符。
+  const ids = state.selectedOrder.slice(0, CHAIN_MAX);
+  if (ids.length) openChain(ids);
+};
 
 // ---------- chain mode (self-assembled custom workflow) ----------
 function openChain(ids) {
@@ -663,13 +711,10 @@ function chainStepFields(id, box) {
   clear(box);
   const m = methodById(id);
   const params = (m && m._formParams) || [];
+  const selfIdPrefix = m && m._selfIdPrefix;
   params.forEach(p => {
     if (p.name === 'provenance' || p.name === 'record_id') return;
     const f = el('div', 'field');
-    const lbl = el('label'); lbl.title = p.name;
-    lbl.appendChild(document.createTextNode(readableFieldLabel(p.name)));
-    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
-    f.appendChild(lbl);
     const v = state.chain.data[id][p.name];
     const ta = el('textarea'); ta.rows = 2; ta.value = v === undefined ? '' : (typeof v === 'string' ? v : pretty(v));
     ta.addEventListener('input', () => {
@@ -677,6 +722,11 @@ function chainStepFields(id, box) {
       if (t.trim() === '') { delete state.chain.data[id][p.name]; return; }
       try { state.chain.data[id][p.name] = JSON.parse(t); } catch (e) { state.chain.data[id][p.name] = t; }
     });
+    const lbl = el('label'); lbl.title = p.name;
+    lbl.appendChild(document.createTextNode(readableFieldLabel(p.name)));
+    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
+    if (selfIdCandidate(p.name, params, selfIdPrefix)) appendIdSuggestButton(lbl, selfIdPrefix, (val) => { ta.value = val; state.chain.data[id][p.name] = val; });
+    f.appendChild(lbl);
     f.appendChild(ta); box.appendChild(f);
   });
 }
@@ -685,8 +735,23 @@ async function ensureFormParams(id) {
   if (m && m._formParams) return m._formParams;
   const f = await api('/methods/' + encodeURIComponent(id) + '/form');
   const params = f.ok ? f.body.parameters : [];
-  if (m) m._formParams = params;
+  if (m) { m._formParams = params; m._selfIdPrefix = f.ok ? f.body.self_id_prefix : null; }
   return params;
+}
+// 自身識別碼欄位判定：只認「表單第一個參數、必填、非 record_id/provenance」且伺服器有回傳前綴
+// （只有伺服器知道真正的 RECORD_ID_PREFIX，例如 behavior_over_time -> "BOT-"，無法從方法名機械推導，
+// 見 main.py /methods/{id}/form 的 self_id_prefix 註解）。刻意不比對欄位名稱結尾 *_id 以外的位置，
+// 避免重蹈續14 critic 抓到的錯誤（後面的 *_id 欄位常是參照別的東西，不是自己的識別碼）。
+function selfIdCandidate(name, params, prefix) {
+  return !!(prefix && params.length && params[0].name === name && params[0].required && name !== 'record_id' && name !== 'provenance');
+}
+function randomIdSuffix() { return Math.random().toString(36).slice(2, 10).toUpperCase(); }
+function appendIdSuggestButton(lbl, prefix, onFill) {
+  const btn = el('button', 'ghost id-suggest-btn', '產生建議值');
+  btn.type = 'button';
+  btn.title = '產生一個以 ' + prefix + ' 開頭的建議識別碼，可再自行修改；不會自動送出。';
+  btn.onclick = (e) => { e.preventDefault(); onFill(prefix + randomIdSuffix()); };
+  lbl.appendChild(btn);
 }
 async function renderChain() {
   const box = $('chain-steps'); clear(box);
@@ -725,6 +790,18 @@ function chainMove(i, delta) {
   const arr = state.chain.order; [arr[i], arr[j]] = [arr[j], arr[i]];
   renderChain();
 }
+// 通用問題解決階段的粗略排序，非讀懂個別方法語意——同一階段內的方法保持原相對順序（穩定排序），
+// 沒列到的 family 一律歸中間（4.5），不會被推到最前或最後。純建議，使用者仍可用 ↑↓ 覆蓋。
+// 數字必須跟 HTML 裡 #chain .order-hint 文字描述的順序一致（critic 2026-09-18 抓到兩者曾經對不上）。
+const FAMILY_PHASE_ORDER = { divergent: 1, root_cause: 2, research: 3, computation: 3, stakeholders: 4, architecture: 5, strategy: 5, representation: 6, decision: 7 };
+function familyPhase(methodId) { const fam = methodId.split('.')[0]; return FAMILY_PHASE_ORDER[fam] ?? 4.5; }
+function suggestChainOrder() {
+  const withIndex = state.chain.order.map((id, i) => ({ id, i, phase: familyPhase(id) }));
+  withIndex.sort((a, b) => (a.phase - b.phase) || (a.i - b.i));
+  state.chain.order = withIndex.map(x => x.id);
+  renderChain();
+}
+$('chain-suggest-order').onclick = suggestChainOrder;
 function chainRemove(id) {
   state.chain.order = state.chain.order.filter(x => x !== id);
   delete state.chain.data[id]; delete state.chain.results[id];
@@ -805,13 +882,22 @@ $('draft-btn').onclick = async () => {
   $('draft-btn').disabled = true;
   try {
     if (state.kind === 'method') {
-      $('draft-status').textContent = 'AI 起草中…';
-      const r = await api('/ai/draft/method/' + encodeURIComponent(state.id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brief }) });
-      if (stale()) return;
-      if (!r.ok) { $('draft-status').textContent = '失敗：' + detailText(r); return; }
-      state.data = r.body.draft;
-      renderMethodFields(r.body);
-      $('draft-status').textContent = '完成（' + r.body.attempts + ' 輪，' + r.body.usage.input_tokens + '/' + r.body.usage.output_tokens + ' tokens）';
+      const free = freeParseBrief(brief, state.params);
+      if (free) {
+        state.data = Object.assign({}, state.data, free);
+        renderMethodFields(null);
+        $('draft-verdict').textContent = '✓ 文字已符合「欄位: 值」格式，已用免費規則比對完成，未呼叫 AI。可再檢查或修改下面欄位。';
+        $('draft-verdict').className = 'ok';
+        $('draft-status').textContent = '完成（免費解析，0 tokens）';
+      } else {
+        $('draft-status').textContent = 'AI 起草中…';
+        const r = await api('/ai/draft/method/' + encodeURIComponent(state.id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brief }) });
+        if (stale()) return;
+        if (!r.ok) { $('draft-status').textContent = '失敗：' + detailText(r); return; }
+        state.data = r.body.draft;
+        renderMethodFields(r.body);
+        $('draft-status').textContent = '完成（' + r.body.attempts + ' 輪，' + r.body.usage.input_tokens + '/' + r.body.usage.output_tokens + ' tokens）';
+      }
     } else {
       state.data = {};
       const verdicts = [];
@@ -855,15 +941,17 @@ function renderMethodFields(draft) {
     const p = state.params.find(x => x.name === name) || { required: false };
     const v = state.data[name];
     const f = el('div', 'field');
-    const lbl = el('label'); lbl.title = name;
-    lbl.appendChild(document.createTextNode(readableFieldLabel(name)));
-    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
-    f.appendChild(lbl);
     const ta = el('textarea'); ta.rows = (typeof v === 'string' || v === undefined) ? 2 : Math.min(14, valueToText(v).split('\n').length + 1);
     ta.value = v === undefined ? '' : valueToText(v);
     ta.dataset.name = name; ta.dataset.str = (typeof v === 'string' || v === undefined) ? '1' : '0';
     ta.addEventListener('input', () => { const val = textToValue(ta.value, ta.dataset.str === '1'); if (ta.value.trim() === '' && !p.required) delete state.data[name]; else state.data[name] = val; $('raw-json').value = pretty(state.data); });
-    f.appendChild(ta); box.appendChild(f);
+    const lbl = el('label'); lbl.title = name;
+    lbl.appendChild(document.createTextNode(readableFieldLabel(name)));
+    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
+    if (selfIdCandidate(name, state.params, state.selfIdPrefix)) {
+      appendIdSuggestButton(lbl, state.selfIdPrefix, (val) => { ta.value = val; ta.dataset.str = '1'; state.data[name] = val; $('raw-json').value = pretty(state.data); });
+    }
+    f.appendChild(lbl); f.appendChild(ta); box.appendChild(f);
   });
   $('raw-json').value = pretty(state.data);
 }

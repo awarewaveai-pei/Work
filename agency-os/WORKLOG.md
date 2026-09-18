@@ -1,4 +1,56 @@
 # Worklog
+## 2026-09-18（續24）Dashboard 10 項操作者回饋收尾（延續續14/續18/續6 同一份清單）：guide box 拿掉重複欄位清單、12 個方法補齊填表範例斷句+選填示範、AI 起草免費規則比對前置（critic 抓到初版整段死碼，已修）、id 建議值機制擴大到 9 個既有方法+修正一個連帶喚醒的 prompt 錯字、工作流建議順序、比較→工作流一鍵橋接、新增 Lean Canvas 方法、AI 起草成本查證
+
+[操作者請求] 貼上 10 項截圖+文字回饋（圖一：ADR 填寫畫面）；訊息尾端附一段先前的舊狀態摘要（「270+ 方法還沒做」）。VBC 先查 WORKLOG：續14（9 項回饋批次）、續18（圖表視覺化+2 新方法）、續6（並排比較/組成工作流）當天稍早已處理掉其中多數項目；沒有只信任 WORKLOG 文字宣稱，逐項比對現有 dashboard.html/main.py/method-display-metadata.yaml 程式碼後確認：④⑨已完成、⑤(record_id 版方法) 已完成；①③⑥(先前只做了 UI 強調、未含免費解析/成本查證)⑦⑧(先前只做了 discoverability、未含建議順序/直接橋接)⑤(非 record_id 版方法) 仍是真缺口；⑩艾森豪矩陣/反向腦力激盪已建，Lean Canvas 完全不存在（跟既有 Business Model Canvas 逐欄比對證實真的欄位不同，非重複）。
+
+[已修改 -- dashboard.html]
+①guide box 拿掉逐欄列出欄位名稱的清單（`renderBriefGuide`），改一句不重複的提示；操作者原話「表格已經有註明」。
+③CSS 加 `white-space:pre-line`；10 個既有 architecture 方法 + 新補的 2 個方法的填表範例改用真實換行（YAML `\n`）取代全形分號連寫的一段話。
+⑥`freeParseBrief()`：貼上文字若已是「欄位: 值」逐行格式（填表範例本身就是這樣示範），純規則比對直接填入欄位，完全不呼叫 AI；只在方法的必填欄位（識別碼欄位除外）全部是字串型別、且每個都比對到非空值時才採用，否則整包放棄、照舊呼叫 AI（不做半套）。
+⑤(非 record_id 版)：新增「產生建議值」按鈕（`selfIdCandidate`/`appendIdSuggestButton`），只認表單第一個參數、必填、非 record_id/provenance，且伺服器有回傳真實前綴才顯示。
+⑦比較畫面加「把這些方法一起組成工作流」按鈕，直接帶同一批已勾選方法開工作流。
+⑧工作流畫面加「建議順序」按鈕：依「發散→找根因→分析/計算→利害關係人→架構或策略設計→呈現→決策」通用問題解決階段粗略排序，同階段內維持原順序（穩定排序），沒列到的 family 一律歸中間，純建議、仍可用既有 ↑↓ 覆蓋。
+
+[已修改 -- main.py]（此檔改動已因下方「過程事故」被另一並行 session 一併 commit，本次 commit 不再包含它）
+新增 `/methods/{id}/form` 回應欄位 `self_id_prefix`：只有 builder 不吃字面 `record_id`（domain-specific identity 參數）時才回傳真正的 `RECORD_ID_PREFIX`，重用既有 `builder_takes_record_id`/`record_id_prefix`，零新 import、不觸及 invoke 邏輯本身。
+
+[已修改 -- 9 個既有架構方法模組 + 1 個連帶發現並修正的既有 bug]
+初版只加了 dashboard 端機制，**REALTEST 立刻抓到**：`architecture.atam` 等 9 個方法（除 adr 外全部）從未宣告 `RECORD_ID_PREFIX`——先前只抽樣看了 association/systems family 就以為全部方法皆有此常數，這是本次自己的以偏概全——導致新按鈕對這 9 個方法完全不會出現。逐一補上（ATAM-/DDD-/DEPMAP-/EVENTSTORM-/FITNESSFN-/QAS-/STRANGLERFIG-/C4-/TRADEOFFMATRIX-，逐一 grep 確認無既有前綴衝突）；純新增常數，這 9 個 builder 從不驗證這個值（`analysis_id` 等只是原樣存入 `id`），不影響任何既有行為。
+
+過程中連帶發現一個**這次改動會喚醒的既有休眠 bug**：`draft.py:build_prompt()` 把識別碼欄位名稱寫死成 `'record_id'`，但這 9 個方法（以及既有的 `strategy.business_model_canvas` 等 66 個方法）的識別碼參數其實叫 `analysis_id`/`canvas_id`/...——之前這句 prefix 提示因為 `record_id_prefix()` 回傳 `None` 而整段不出現，是無害死碼；一旦補上這 9 個常數，AI 起草的 prompt 就會開始提及一個不存在的 `record_id` 鍵名，變成誤導 AI 的雜訊。改用 `spec["parameters"][0]["name"]`（本系統一致的慣例：識別碼永遠是第一個必填位置參數，critic 已對全部 285 個方法程式化驗證過這個假設零例外）取代硬編字串，順手也修正了 BMC 等既有方法一直存在但從未真正觸發過的同一個問題。
+
+[已修改 -- 新方法 strategy.lean_canvas]
+新增 `ai_lego/modules/strategy/lean_canvas.py`：Ash Maurya 的精實畫布（9 區塊：PROBLEM/CUSTOMER_SEGMENTS/UNIQUE_VALUE_PROPOSITION/SOLUTION/CHANNELS/REVENUE_STREAMS/COST_STRUCTURE/KEY_METRICS/UNFAIR_ADVANTAGE）。跟 `strategy.business_model_canvas` 讀完全文比對後確認：同一種「封閉集合、順序不限、缺一不可」形狀，但只共用 4 個區塊名稱（客群/通路/收益流/成本結構），其餘完全不同——不是改名也不是子集，是操作者原話「欄位不同」的真實驗證（測試裡加了一條斷言鎖死這個交集）。刻意選 `record_id` 當識別碼參數名（不是 BMC 的 `canvas_id`），讓這個新方法從一開始就享有伺服器自動補值+完全隱藏的待遇。權威來源 https://leanstack.com/lean-canvas（WebFetch 追蹤兩層轉址到 leanspark.ai 確認為 Ash Maurya 本人現行工具、免費層、AI 輔助）；`validation_status` 比照 BMC 的「UNVALIDATED_HYPOTHESIS」結構性保證。52 個新測試（鏡射 `test_business_model_canvas.py` 的 mutation-style 測試形狀；不建 typed-object schema.yaml，跟同一天新建的 eisenhower_matrix/reverse_brainstorming 同一慣例——這系統的真正強制層是 builder+gate，schema.yaml 是選配）。
+
+[280+ 方法內容深化 -- 補齊 2 個既有方法的缺口]
+`decision.eisenhower_matrix`/`divergent.reverse_brainstorming`（續18 新建，只有 blurb）補上與 10 個 architecture 方法同規格的 why/url/example。10 個既有 architecture 方法的 example_zh 全部重寫成真實換行，並補上 version/generated_by_method 選填示範；DDD 額外修正一個**內容錯誤**：原範例 subdomains 只給 `{name, type}`，但 `ddd.py` 的 `subdomain_ids = {s["id"] for s in subdomains}` 是必要的字面存取，缺 `id` 會讓使用者照抄範例後直接吃到未處理的 `KeyError` 而非乾淨的 `InvariantViolation`（續22 那批範例自己的既有錯誤，非本次新引入，順手一併修正，critic 已核對此修正正確）。
+
+[AI 起草成本查證，回答操作者「用 AI 是否很貴」]
+`ai_gateway/provider.py` 確認：預設模型 `claude-sonnet-5`（`.env.example` 的 `COGNITIVE_OS_AI_MODEL` 留空，代表正式環境現在就是走這個預設）；WebFetch 直接讀 claude.com/pricing（非部落格轉述）：Sonnet 5 = 2/10 美元每百萬 token（input/output），Haiku 4.5 = 1/5。單次「懶人填寫」worst case（`MAX_ATTEMPTS=2`×`DRAFT_MAX_TOKENS=6000`）約 15 美分，真實案例通常 1-2 美分。系統已有 `COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET`（預設每租戶每日 20 萬 token）當額度斷路器。回答不是只有查證，兩個方向都真的落地：(1) 本次新增的 `freeParseBrief` 對「已照填表範例格式貼」的情況做到真正 0 token（見下方 critic 修復記錄）；(2) 想更省可設 `COGNITIVE_OS_AI_MODEL=claude-haiku-4-5-20251001`，零程式碼改動——正確性由 builder+gate 保證、不靠模型本身，換便宜模型不會降低最終資料正確性。
+
+[critic 覆審抓到，已修復並用真實執行驗證]
+- 🟠 Major：`freeParseBrief` 的型別判斷寫成 `p.annotation === "<class 'str'>"`，但每個方法模組都有 `from __future__ import annotations`（PEP 563），main.py 送出的 wire 值其實是裸字串 `'str'`——這個比對**永遠不會相等，整段「免費解析」功能對全部 285 個方法都是死碼**，dashboard 上「會先免費比對、不花費 AI 額度」的說明文字從未兌現過。改成比對 `'str'`；用 Node 抽出函式直接餵真實格式的 brief 驗證：修復前的字串比對真的回傳 null，修復後正確抽出全部欄位、0 AI 呼叫。修復過程中**又抓到自己引入的第二個問題**：`required` 清單沒排除識別碼欄位（如 `scenario_id`），導致非 record_id 方法即使其餘欄位都填對，仍會因為 brief 裡沒提到內部識別碼而整包判定失敗——比照 `selfIdCandidate` 的同一個判準（表單第一個參數）一併排除，修完用同一支 Node 腳本重新驗證通過。
+- 🟠 Major：工作流「建議順序」的說明文字（發散→…→架構或策略設計→利害關係人→決策→呈現）跟實際 `FAMILY_PHASE_ORDER` 常數的真實順序（…→利害關係人→架構或策略設計→呈現→決策）兩處對調、對不上。改說明文字配合程式碼（呈現在決策之前更合理：通常是先用圖表/呈現支援決策，不是先決定再回頭呈現），並在常數旁加註解防止下次又對不上。
+- 🟡 Minor：新增的 `strategy.lean_canvas.example_en` 有一個多餘的反斜線（`clients\' books`），YAML 雖能正確解析但畫面會顯示出這個雜字元。改用雙引號包字串，拿掉不必要的跳脫。
+
+[過程事故揭露] main.py 的 `self_id_prefix` 修改完成、其他檔案 commit 前，被另一並行 session（16:37 commit `1e7d259f1`「tenant-scoped Project invisible via bridge link」，WORKLOG 續23）的自動 checkpoint 機制一併掃進去提交——`git status` 顯示該檔已無待 commit 差異，逐行核對內容正確、無遺漏無損毀，純粹掛在不相關的 commit message 底下（跟續16 記錄過的同一類共用 worktree 現象）。不重寫該 commit 歷史，僅此記錄；本次 commit 不再包含 main.py。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_lean_canvas.py -v` | exit=0 | result=52 passed, 4 subtests passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_business_model_canvas.py tests/unit/test_eisenhower_matrix.py tests/unit/test_reverse_brainstorming.py -q` | exit=0 | result=88 passed, 4 subtests passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_ai_gateway.py -q` | exit=1 | result=29 passed/1 failed；`git stash` 還原到修改前版本重跑同一測試同樣失敗——確認跟本次改動無關的既有缺陷（並行請求 budget lock 序列化，timing-sensitive），非本次引入，未修（範圍外）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py -q`（含新增的 2 個 self_id_prefix 測試）| exit=0 | result=95 passed, 3 subtests passed, 257.84s
+- REALTEST_EVIDENCE: tool=Bash | cmd=自訂腳本直接呼叫 `resolve_builder`/`builder_takes_record_id`/`record_id_prefix` 核對 13 個方法（10 個 architecture+2 個既有+1 個新 lean_canvas）| exit=0 | result=13/13 全對
+- REALTEST_EVIDENCE: tool=Bash(Node) | cmd=抽出 dashboard.html 的 `freeParseBrief`/`readableFieldLabel` 函式直接餵真實格式 brief | exit=0 | result=修復前字串比對回傳 null（證實 bug 為真）、修復後正確抽出全部欄位且 0 AI 呼叫；ADR 類非字串必填欄位正確 fallback 到 AI
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check` 抽出 dashboard.html script 區塊 + 逐一確認所有 `$('id')` 引用在 HTML 內都存在 | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "yaml.safe_load(...)"` 驗證 method-display-metadata.yaml（285 筆）+ 逐項確認 12 個新/改條目 why/url/example 齊全含真實換行、無殘留跳脫字元 | exit=0
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=claude.com/pricing、leanstack.com/lean-canvas（追蹤 2 層轉址到 leanspark.ai 確認為 Ash Maurya 本人現行工具、免費層）| exit=0
+- REVIEW_DONE: critic=Standard | verdict=fail→pass（修復後）| findings=2 Major（全修，含 1 修復過程中自己又抓到的連帶問題）/1 Minor（全修）/2 Suggestion（未動：draft.py 缺針對修復後 prompt 文字的專屬斷言、freeParseBrief 對零必填欄位方法的短路未加註解說明——皆非本次範圍內的迴歸風險）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`self_id_prefix`,`lean_canvas`,`freeParseBrief`,`selfIdCandidate`,`appendIdSuggestButton`,`suggestChainOrder`,`FAMILY_PHASE_ORDER`,`compare-to-chain`,`chain-suggest-order` | hits=全數為本次觸及檔案，無孤兒引用、無既有機制重複；method-inventory.yaml 確認新方法比照 eisenhower_matrix/reverse_brainstorming 慣例不需登記
+- [rollback] 全部為新增路徑或獨立常數（9 個 RECORD_ID_PREFIX、dashboard.html 新函式、lean_canvas 新模組、draft.py prompt 文字修正），無 DB migration、無對外部署；`git revert` 本次 commit 可完全復原（main.py 除外，見上方過程事故揭露，該檔已在續23 commit 中）
+
+[剩餘/仍未做] 270+ 方法中，除本次 12 個（10 個 architecture + eisenhower_matrix + reverse_brainstorming）+ lean_canvas，其餘仍缺 why/url/example 完整內容——續22 已確認操作者選「兩者都要+分批做」，維持批次進行中狀態，非本次範圍。
+
 ## 2026-09-18（續23）/ops/collect -> Cognitive OS 連結 tenant 不對根治（OAuth-code 式跨源 handoff）+ 搜尋結果自動歸資料夾 + 內容檢視淺灰色對比度 bug
 
 [任務] 操作者 QA 今天稍早才上線的 collect->Cognitive OS bridge（EdD 論文文獻蒐集用），回報「送去 Cognitive OS 分析」的連結點進去說找不到資料、內容檢視顏色淺灰字很少、詢問「取回篇數」用意與精確/模糊搜尋差異、要求搜尋結果自動歸資料夾（命名規則：關鍵字+YYYYMMDDHHmm）。tenant 修法操作者明確授權「你決定」並引用 AGENTS.md R0 全套標準（30 年紀律／零重工／完整閉環／最小爆炸半徑）；部署延後到與此修法一起「一次部署」。

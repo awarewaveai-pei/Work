@@ -140,13 +140,22 @@ _SYSTEM = (
 
 def build_prompt(spec: dict[str, Any], brief: str, *, exclude_params: tuple[str, ...] = (), previous: dict[str, Any] | None = None, error: str | None = None) -> str:
     params = [p for p in spec["parameters"] if p["name"] not in exclude_params]
+    # The identity parameter is not always literally named `record_id` -- ~66 builders use a
+    # domain-specific name instead (e.g. analysis_id/canvas_id/map_id; see dispatch.py's
+    # invoke_builder docstring). It is, by this codebase's own consistent convention (every builder
+    # signature checked 2026-09-18), always the FIRST declared parameter. Hardcoding the literal
+    # string 'record_id' here (pre-existing bug, found while adding RECORD_ID_PREFIX to several
+    # architecture-family modules for the dashboard's id-suggest button) told the model to prefix a
+    # key that, for those builders, does not exist -- a vacuous instruction that silently gave the
+    # model zero guidance on the real key's expected prefix.
+    identity_param = spec["parameters"][0]["name"] if spec.get("parameters") else None
     lines = [
         f"METHOD: {spec['method_id']} -- {spec.get('title') or ''}",
         f"PURPOSE: {json.dumps(spec.get('purpose'), ensure_ascii=False)}",
         f"PRECONDITIONS (the builder refuses records that violate these): {json.dumps(spec.get('preconditions'), ensure_ascii=False)}",
         f"DESCRIPTION: {spec.get('description')}",
         "BUILDER PARAMETERS (produce exactly these keys"
-        + (f"; 'record_id' if present must start with '{spec['record_id_prefix']}'" if spec.get("record_id_prefix") else "")
+        + (f"; '{identity_param}' if present must start with '{spec['record_id_prefix']}'" if spec.get("record_id_prefix") and identity_param else "")
         + f"): {json.dumps(params, ensure_ascii=False)}",
     ]
     if exclude_params:

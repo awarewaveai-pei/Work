@@ -1,0 +1,65 @@
+$id: "ai-lego://methods/contracts/strategy.lean_canvas.contract.yaml"
+title: "Lean Canvas Method Contract"
+status: ACTIVE
+
+description: >
+  Sketches a business model as 9 fixed blocks (Problem, Customer Segments, Unique Value
+  Proposition, Solution, Channels, Revenue Streams, Cost Structure, Key Metrics, Unfair
+  Advantage), each an explicit, labeled hypothesis rather than a settled fact. NOT Atlas-cited
+  (grep-confirmed zero "lean canvas" hits, case-insensitive, in the Atlas and the whole
+  agency-os/docs/AI_LEGO_Cognitive_Engineering_OS tree) -- added 2026-09-18 per direct operator
+  request; external grounding is Ash Maurya's own Lean Canvas (Maurya, "Running Lean", 2012;
+  https://leanstack.com/lean-canvas), disclosed in the compute module's own docstring, not
+  repeated here. Same closed-block-set shape as strategy.business_model_canvas (read in full
+  before writing this) but a distinct block vocabulary -- see that module's own due-diligence
+  comparison for exactly which blocks differ and why.
+
+id: strategy.lean_canvas
+version: "1.0.0"
+family: strategy
+
+cognitive_primitives: [CLASSIFY, DECOMPOSE, HYPOTHESIZE]
+# Same inferred set strategy.business_model_canvas's own contract would use for the identical
+# closed-block-set shape (decompose a business into named parts, classify content into the right
+# block), plus HYPOTHESIZE specifically because every block here is explicitly an unvalidated
+# guess (module docstring "Validation-status handling"), unlike BMC's block content which Atlas
+# does not frame the same way.
+
+purpose:
+  - sketch_a_startup_business_model_as_9_explicit_assumptions_to_validate
+
+inputs:
+  required: [BusinessModelDescription]
+  optional: []
+
+outputs: [LeanCanvas]
+
+preconditions:
+  - "record_id (LEANCANVAS- prefix) is a non-empty string; version is a string"
+  - "blocks is a list of EXACTLY the 9 named blocks (PROBLEM, CUSTOMER_SEGMENTS, UNIQUE_VALUE_PROPOSITION, SOLUTION, CHANNELS, REVENUE_STREAMS, COST_STRUCTURE, KEY_METRICS, UNFAIR_ADVANTAGE), each appearing exactly once, in any order"
+  - "every block entry carries non-empty content and a schema-valid provenance; supporting_evidence_refs, if present, is a non-empty list of strings"
+  - "a block entry whose provenance.epistemic_type is EVIDENCE must cite at least one supporting_evidence_refs entry"
+  - "validation_status is COMPUTED only -- always UNVALIDATED_HYPOTHESIS, never a caller-supplied constructor input"
+
+quality:
+  provenance_required: true
+  evidence_labeling_required: true
+
+forbidden_transition:
+  - "LeanCanvas -> AutomaticProductionDeployment"
+# Same inferred (not table-cited -- there is no table, this method isn't in the Atlas) caution
+# every non-Atlas method in this family discloses: a canvas of unvalidated assumptions must not
+# itself carry a top-level claim of automatic authority to ship or deploy anything.
+
+recommended_next:
+  - strategy.business_model_canvas
+# Once the riskiest Lean Canvas assumptions are validated, the fuller operations-oriented BMC
+# (Key Partners/Activities/Resources/Customer Relationships) becomes relevant for describing how
+# the now-validated business actually runs day to day -- the two methods are sequential, not
+# competing descriptions of the same thing.
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-LEANCANVAS-1: block completeness is enforced the same way strategy.business_model_canvas enforces its own 9-block completeness (exact set, no more, no fewer). A canvas genuinely too early to fill even one block (e.g. Revenue Streams for a pre-monetization idea) has no way to express 'not yet known' other than writing that as the block's own content -- consistency with BMC's own established convention preferred over inventing a different completeness rule for a sibling method.（owner: operator, or whoever next revisits BMC's own convention)"

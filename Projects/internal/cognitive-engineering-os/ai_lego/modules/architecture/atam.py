@@ -12,6 +12,12 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.atam"
+RECORD_ID_PREFIX = "ATAM-"
+# Added 2026-09-18: this method's identity param is analysis_id (domain-specific, not the literal
+# `record_id` the API auto-supplies -- see dispatch.py's invoke_builder docstring), so this constant
+# is NOT load-bearing for auto-injection. It exists only so /methods/{id}/form can expose a real
+# prefix for the dashboard's opt-in "generate a suggested value" button (main.py's self_id_prefix
+# field) -- without it that button silently has nothing to offer, same as before this change.
 VALID_CATEGORIES = frozenset({"sensitivity_point", "tradeoff_point", "risk", "non_risk"})
 
 

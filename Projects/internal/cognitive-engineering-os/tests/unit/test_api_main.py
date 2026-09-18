@@ -477,6 +477,24 @@ class UnauthenticatedAccessTests(ApiTestCase):
         response = self.client.get("/methods/nonexistent.method/form")
         self.assertEqual(response.status_code, 404, response.text)
 
+    def test_self_id_prefix_is_null_for_a_record_id_style_builder(self):
+        """foresight.cross_impact_analysis takes the literal `record_id` param (asserted above) --
+        the API already auto-supplies that on invoke, so the dashboard's id-suggest button (which
+        reads this field) must stay dormant for it, not offer a redundant suggestion."""
+        response = self.client.get("/methods/foresight.cross_impact_analysis/form")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIsNone(response.json()["self_id_prefix"])
+
+    def test_self_id_prefix_exposes_the_real_prefix_for_a_domain_specific_id_builder(self):
+        """architecture.atam takes `analysis_id`, not `record_id` -- the API does NOT auto-supply
+        it (dispatch.py's invoke_builder docstring), so the dashboard's id-suggest button needs the
+        real ATAM- prefix from the module's own RECORD_ID_PREFIX constant, not a guess."""
+        response = self.client.get("/methods/architecture.atam/form")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertNotIn("record_id", [p["name"] for p in payload["parameters"]])
+        self.assertEqual(payload["self_id_prefix"], "ATAM-")
+
     def test_invoke_without_session_is_401(self):
         response = self.client.post("/methods/foresight.cross_impact_analysis/invoke", json={})
         self.assertEqual(response.status_code, 401)

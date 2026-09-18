@@ -16,6 +16,12 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.system_context_model"
+RECORD_ID_PREFIX = "C4-"
+# "C4-" not "SYSCONTEXTMODEL-": this constant is a record_id PREFIX, a free-text field with no
+# grammar restriction -- unlike METHOD_ID/family, which this module's own docstring already
+# explains cannot contain a digit. Not load-bearing for API auto-injection (identity param is the
+# domain-specific model_id, not `record_id`) -- exists only for the dashboard's opt-in id-suggest
+# button. See atam.py's own RECORD_ID_PREFIX comment for the full rationale (2026-09-18).
 
 
 def generate_system_context_model(

@@ -14,6 +14,10 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.dependency_mapping"
+RECORD_ID_PREFIX = "DEPMAP-"
+# Not load-bearing for API auto-injection (identity param is the domain-specific map_id, not
+# `record_id`) -- exists only for the dashboard's opt-in id-suggest button. See atam.py's own
+# RECORD_ID_PREFIX comment for the full rationale (2026-09-18), not repeated in every sibling file.
 VALID_NODE_TYPES = frozenset({"service", "vendor", "data"})
 
 

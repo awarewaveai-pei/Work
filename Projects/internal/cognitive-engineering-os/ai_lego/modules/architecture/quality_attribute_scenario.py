@@ -12,6 +12,10 @@ from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.quality_attribute_scenario"
+RECORD_ID_PREFIX = "QAS-"
+# Not load-bearing for API auto-injection (identity param is the domain-specific scenario_id, not
+# `record_id`) -- exists only for the dashboard's opt-in id-suggest button. See atam.py's own
+# RECORD_ID_PREFIX comment for the full rationale (2026-09-18), not repeated in every sibling file.
 REQUIRED_FIELDS = ("source", "stimulus", "artifact", "environment", "response", "measure")
 
 
