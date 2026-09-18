@@ -5,46 +5,106 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>認知工程 OS</title>
 <style>
-  :root { --ink:#1a1a1a; --muted:#666; --line:#e2e2e2; --bg:#f7f7f5; --accent:#2b4c7e; --ok:#1d7a3e; --bad:#b3261e; --warn:#8a6d00; }
+  :root {
+    /* color */
+    --ink:#161a1f; --ink-soft:#3a4048; --muted:#6b7280; --faint:#9aa1ab;
+    --line:#e5e7eb; --line-soft:#eef0f3; --bg:#f5f6f8; --surface:#fff;
+    --accent:#2b4c7e; --accent-dark:#1d3a63; --accent-bg:#eef2f8; --accent-line:#c9d7ea;
+    --ok:#1d7a3e; --ok-bg:#eaf6ee; --bad:#b3261e; --bad-bg:#fbeceb; --warn:#8a6d00; --warn-bg:#fdf6e3;
+    /* spacing scale (4px base) */
+    --sp-1:.25rem; --sp-2:.5rem; --sp-3:.75rem; --sp-4:1rem; --sp-5:1.5rem; --sp-6:2rem;
+    /* type scale */
+    --fs-xs:.72rem; --fs-sm:.8rem; --fs-base:.92rem; --fs-md:1rem; --fs-lg:1.15rem; --fs-xl:1.4rem;
+    --radius:10px; --radius-sm:6px; --radius-pill:999px;
+    --shadow-1:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+    --shadow-2:0 4px 12px rgba(16,24,40,.08);
+  }
   * { box-sizing:border-box; }
-  body { font-family:-apple-system, "Segoe UI", "Noto Sans TC", sans-serif; margin:0; color:var(--ink); background:var(--bg); }
-  header { background:#fff; border-bottom:1px solid var(--line); padding:.7rem 1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
-  header h1 { font-size:1.05rem; margin:0; }
-  #status { font-size:.8rem; color:var(--muted); flex:1; }
-  main { display:grid; grid-template-columns: 300px 1fr; gap:1rem; padding:1rem; max-width:1400px; margin:0 auto; }
+  body { font-family:-apple-system, "Segoe UI", "Noto Sans TC", sans-serif; margin:0; color:var(--ink); background:var(--bg); font-size:var(--fs-base); line-height:1.5; }
+  h1, h2, h3, h4 { font-family:inherit; line-height:1.3; }
+  header { background:var(--surface); border-bottom:1px solid var(--line); padding:var(--sp-3) var(--sp-5); display:flex; align-items:center; gap:var(--sp-4); flex-wrap:wrap; box-shadow:var(--shadow-1); position:sticky; top:0; z-index:10; }
+  header h1 { font-size:var(--fs-lg); font-weight:700; margin:0; letter-spacing:.01em; }
+  #status { font-size:var(--fs-sm); color:var(--muted); flex:1; }
+  main { display:grid; grid-template-columns: 350px 1fr; gap:var(--sp-5); padding:var(--sp-5); max-width:1500px; margin:0 auto; align-items:start; }
   @media (max-width:900px) { main { grid-template-columns:1fr; } }
-  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:1rem; }
-  .tabs { display:flex; gap:.4rem; margin-bottom:.6rem; }
-  .tabs button, .pill { padding:.35rem .7rem; border:1px solid var(--line); background:#fff; border-radius:999px; cursor:pointer; font-size:.85rem; }
-  .tabs button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
-  input, textarea { width:100%; padding:.45rem; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  .panel { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4); box-shadow:var(--shadow-1); }
+  .panel-title { font-size:var(--fs-sm); font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 var(--sp-3); }
+  .tabs { display:flex; gap:var(--sp-2); margin-bottom:var(--sp-3); background:var(--line-soft); padding:3px; border-radius:var(--radius-pill); }
+  .tabs button { flex:1; padding:var(--sp-2) var(--sp-3); border:0; background:transparent; border-radius:var(--radius-pill); cursor:pointer; font-size:var(--fs-sm); font-weight:600; color:var(--muted); transition:background .12s,color .12s; }
+  .tabs button.on { background:var(--surface); color:var(--accent); box-shadow:var(--shadow-1); }
+  .pill { padding:var(--sp-1) var(--sp-3); border:1px solid var(--line); background:var(--surface); border-radius:var(--radius-pill); cursor:pointer; font-size:var(--fs-xs); color:var(--ink-soft); }
+  .pill.on { background:var(--accent-bg); border-color:var(--accent-line); color:var(--accent); font-weight:700; }
+  input, textarea, select { width:100%; padding:var(--sp-2) var(--sp-3); border:1px solid var(--line); border-radius:var(--radius-sm); font:inherit; color:var(--ink); background:var(--surface); }
+  input:focus, textarea:focus { outline:2px solid var(--accent-line); outline-offset:1px; border-color:var(--accent); }
   textarea { font-family:ui-monospace, Consolas, monospace; font-size:.82rem; }
-  textarea.brief { font-family:inherit; font-size:.95rem; min-height:110px; }
-  label { display:block; font-size:.8rem; color:var(--muted); margin:.5rem 0 .2rem; }
-  button.primary { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.5rem 1rem; cursor:pointer; font:inherit; }
-  button.ghost { background:#fff; border:1px solid var(--line); border-radius:6px; padding:.45rem .9rem; cursor:pointer; font:inherit; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  #list { max-height:70vh; overflow:auto; }
-  .item { display:block; width:100%; text-align:left; padding:.45rem .5rem; border:0; border-bottom:1px solid var(--line); background:#fff; cursor:pointer; font:inherit; }
-  .item:hover { background:#f0f3f8; }
-  .item.on { background:#e6edf7; }
-  .item .id { font-family:ui-monospace, Consolas, monospace; font-size:.8rem; }
-  .item .fam { font-size:.7rem; color:var(--muted); margin-left:.4rem; }
-  .step { border-top:1px solid var(--line); padding-top:.8rem; margin-top:.8rem; }
-  .step h3 { margin:.2rem 0 .5rem; font-size:.95rem; }
-  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-top:.5rem; }
+  textarea.brief { font-family:inherit; font-size:var(--fs-md); min-height:120px; }
+  label { display:block; font-size:var(--fs-sm); color:var(--muted); font-weight:600; margin:var(--sp-3) 0 var(--sp-1); }
+  button { font:inherit; }
+  button.primary { background:var(--accent); color:#fff; border:1px solid var(--accent); border-radius:var(--radius-sm); padding:var(--sp-2) var(--sp-4); cursor:pointer; font-weight:600; box-shadow:var(--shadow-1); }
+  button.primary:hover:not(:disabled) { background:var(--accent-dark); }
+  button.ghost { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--sp-2) var(--sp-4); cursor:pointer; font-weight:600; color:var(--ink-soft); }
+  button.ghost:hover:not(:disabled) { border-color:var(--accent-line); color:var(--accent); }
+  button.tiny { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:.15rem .5rem; cursor:pointer; font-size:var(--fs-xs); color:var(--ink-soft); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  #fam-filters { display:flex; flex-wrap:wrap; gap:var(--sp-1); margin:var(--sp-3) 0; max-height:5.6rem; overflow:auto; }
+  #list { max-height:54vh; overflow:auto; margin-top:var(--sp-2); border-top:1px solid var(--line-soft); }
+  .item2 { display:flex; gap:var(--sp-2); align-items:flex-start; border-bottom:1px solid var(--line-soft); padding:var(--sp-3) var(--sp-1); }
+  .item2:hover { background:var(--accent-bg); }
+  .item2 input[type=checkbox] { margin-top:.3rem; width:16px; height:16px; flex:none; accent-color:var(--accent); }
+  .item2-main { flex:1; text-align:left; background:none; border:0; padding:0; cursor:pointer; font:inherit; color:inherit; min-width:0; }
+  /* name-zh/name-en/name-abbr: shared 3-line identity block (list rows, workspace header,
+     compare cards, chain steps) -- operator: "只要這三個資訊：中文/英文/縮寫，各自跳下一行". */
+  .name-zh { font-weight:700; font-size:var(--fs-base); color:var(--ink); line-height:1.3; }
+  .name-en { font-weight:400; color:var(--muted); font-size:var(--fs-sm); line-height:1.3; }
+  .name-abbr { display:inline-block; font-family:ui-monospace, Consolas, monospace; font-size:var(--fs-xs); font-weight:700; color:var(--accent); background:var(--accent-bg); border-radius:var(--radius-sm); padding:0 .4rem; margin-top:.2rem; letter-spacing:.03em; }
+  .item2-meta { font-size:var(--fs-xs); color:var(--faint); margin-top:var(--sp-1); }
+  .item2-meta .id { font-family:ui-monospace, Consolas, monospace; }
+  .item2-meta .fam { margin-left:var(--sp-2); padding:.05rem .45rem; background:var(--line-soft); border-radius:var(--radius-pill); }
+  .item2.on { background:var(--accent-bg); }
+  .item { display:block; width:100%; text-align:left; padding:var(--sp-3) var(--sp-2); border:0; border-bottom:1px solid var(--line-soft); background:var(--surface); cursor:pointer; font:inherit; }
+  .item:hover { background:var(--accent-bg); }
+  .item.on { background:var(--accent-bg); }
+  .item .id { font-family:ui-monospace, Consolas, monospace; font-size:var(--fs-sm); font-weight:600; }
+  .item .fam { font-size:var(--fs-xs); color:var(--muted); margin-left:var(--sp-2); }
+  .item .badge { font-size:var(--fs-xs); padding:.05rem .45rem; border-radius:var(--radius-pill); margin-left:var(--sp-2); background:var(--accent-bg); color:var(--accent); font-weight:700; }
+  #selbar { display:none; position:sticky; bottom:-1rem; background:var(--surface); border-top:1px solid var(--line); padding:var(--sp-3) var(--sp-1); margin-top:var(--sp-2); gap:var(--sp-2); align-items:center; flex-wrap:wrap; }
+  .step { border-top:1px solid var(--line); padding-top:var(--sp-4); margin-top:var(--sp-4); }
+  .step h3 { display:flex; align-items:center; gap:var(--sp-2); margin:0 0 var(--sp-3); font-size:var(--fs-md); font-weight:700; }
+  .step h3 .num { display:inline-flex; align-items:center; justify-content:center; width:1.6em; height:1.6em; border-radius:50%; background:var(--accent); color:#fff; font-size:.8em; flex:none; }
+  .row { display:flex; gap:var(--sp-2); align-items:center; flex-wrap:wrap; margin-top:var(--sp-3); }
   .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
-  .note { font-size:.8rem; color:var(--muted); }
-  .field { margin:.4rem 0; }
-  .field label { margin:0 0 .15rem; font-family:ui-monospace, Consolas, monospace; color:var(--ink); }
-  .node { border:1px solid var(--line); border-radius:6px; padding:.5rem; margin:.4rem 0; }
-  .node .head { display:flex; justify-content:space-between; gap:.5rem; align-items:center; }
-  table { border-collapse:collapse; width:100%; font-size:.82rem; }
-  td, th { border-bottom:1px solid var(--line); padding:.3rem .4rem; text-align:left; vertical-align:top; }
-  pre { background:#111; color:#d6ffd6; padding:.8rem; border-radius:6px; font-size:.78rem; overflow:auto; max-height:420px; white-space:pre-wrap; }
-  pre.doc { background:#fff; color:var(--ink); border:1px solid var(--line); max-height:none; font-family:inherit; font-size:.92rem; }
-  details summary { cursor:pointer; font-size:.85rem; color:var(--muted); }
+  .note { font-size:var(--fs-sm); color:var(--muted); }
+  .field { margin:var(--sp-3) 0; }
+  .field label { margin:0 0 .2rem; color:var(--ink-soft); font-weight:600; font-size:var(--fs-base); }
+  .field label .raw { font-family:ui-monospace, Consolas, monospace; font-weight:400; color:var(--faint); font-size:var(--fs-xs); margin-left:var(--sp-2); }
+  .node { border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--sp-3); margin:var(--sp-2) 0; }
+  .node .head { display:flex; justify-content:space-between; gap:var(--sp-2); align-items:center; }
+  table { border-collapse:collapse; width:100%; font-size:var(--fs-sm); }
+  td, th { border-bottom:1px solid var(--line-soft); padding:var(--sp-2) var(--sp-3); text-align:left; vertical-align:top; }
+  th { font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; }
+  pre { background:#12161c; color:#d6ffd6; padding:var(--sp-4); border-radius:var(--radius-sm); font-size:.78rem; overflow:auto; max-height:420px; white-space:pre-wrap; }
+  pre.doc { background:var(--surface); color:var(--ink); border:1px solid var(--line); max-height:none; font-family:inherit; font-size:var(--fs-md); }
+  details summary { cursor:pointer; font-size:var(--fs-sm); color:var(--muted); font-weight:600; }
   #login { max-width:420px; margin:3rem auto; }
+  #login h2 { font-size:var(--fs-xl); }
+  .ws-header { padding-bottom:var(--sp-4); border-bottom:1px solid var(--line); margin-bottom:var(--sp-1); }
+  #ws-title { font-size:var(--fs-xl); font-weight:700; }
+  #ws-subtitle { font-family:ui-monospace, Consolas, monospace; font-size:var(--fs-xs); color:var(--faint); margin-top:.1rem; }
+  #ws-desc { margin-top:var(--sp-2); }
+  .guide-box { background:var(--accent-bg); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:var(--sp-3) var(--sp-4); margin-bottom:var(--sp-3); font-size:var(--fs-sm); color:var(--ink-soft); line-height:1.55; }
+  .guide-box .guide-title { font-weight:700; color:var(--accent-dark); margin-bottom:var(--sp-1); }
+  .guide-box ul { margin:var(--sp-1) 0 0; padding-left:1.2rem; }
+  .guide-box li b { color:var(--ink); }
+  .compare-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:var(--sp-4); align-items:start; }
+  .compare-card { border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4); box-shadow:var(--shadow-1); }
+  .compare-card h4 { margin:.1rem 0; font-size:var(--fs-md); font-weight:700; }
+  .compare-card .en { color:var(--muted); font-size:var(--fs-xs); font-weight:400; }
+  .compare-card .blurb { font-size:var(--fs-sm); margin:var(--sp-2) 0; line-height:1.5; color:var(--ink-soft); }
+  .compare-card ul { margin:var(--sp-2) 0; padding-left:1.1rem; font-size:var(--fs-xs); color:var(--muted); }
+  .chain-step { border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4); margin:var(--sp-3) 0; box-shadow:var(--shadow-1); }
+  .chain-step .head { display:flex; justify-content:space-between; align-items:flex-start; gap:var(--sp-2); }
+  .chain-step .head .name-wrap { min-width:0; }
+  .chain-step .ctrl { display:flex; gap:var(--sp-1); }
 </style>
 </head>
 <body>
@@ -68,36 +128,51 @@
       <button id="tab-recipes" class="on">工作流</button>
       <button id="tab-methods">單一方法</button>
     </div>
-    <input id="search" placeholder="篩選…">
+    <input id="search" placeholder="搜尋中英文名稱、說明、代號…">
+    <div id="fam-filters" style="display:none"></div>
     <div id="list"></div>
+    <div id="selbar" class="row">
+      <span id="sel-count" class="note"></span>
+      <button id="sel-compare" class="ghost">並排比較</button>
+      <button id="sel-chain" class="ghost">組成工作流</button>
+      <button id="sel-clear" class="ghost">清除選取</button>
+    </div>
   </section>
 
   <section class="panel" id="work">
-    <div id="empty" class="note">左邊選一個工作流（多步驟，例如商業企劃、藝術治療卡關）或單一方法。<br>流程：① 用白話描述你的情況 → ② AI 起草結構化資料，你檢查修改 → ③ 執行，系統用每個方法自己的規則驗證。</div>
+    <div id="empty" class="note">
+      左邊選一個工作流（多步驟，例如商業企劃、藝術治療卡關）或單一方法，右邊會直接顯示說明和欄位可以填。<br>
+      每個方法都可以選 AI 協助起草，或直接手動填欄位；填完按「執行並驗證」，系統用該方法自己的規則驗證。<br><br>
+      在「單一方法」也可以勾選多個方法（單選一個也可以）：<b>並排比較</b>它們的說明與欄位，或<b>組成工作流</b>自己串接多個方法依序執行，並存成你自己的工作流。
+    </div>
 
     <div id="ws" style="display:none">
-      <div id="ws-title" style="font-family:ui-monospace,Consolas,monospace;font-weight:600"></div>
-      <div id="ws-desc" class="note"></div>
+      <div class="ws-header">
+        <div id="ws-title"></div>
+        <div id="ws-subtitle"></div>
+        <div id="ws-desc" class="note"></div>
+      </div>
 
       <div class="step">
-        <h3>① 描述</h3>
-        <textarea id="brief" class="brief" placeholder="用你自己的話寫：背景、現況、你想釐清什麼、已知的數字或事實。AI 只會根據你寫的內容起草，不足的地方會標 TBD 讓你補。"></textarea>
-        <div class="row">
-          <button id="draft-btn" class="primary">AI 起草</button>
-          <button id="manual-btn" class="ghost">略過起草，直接填</button>
-          <span id="draft-status" class="note"></span>
+        <h3><span class="num">1</span> 填寫資料</h3>
+        <div id="brief-guide" class="guide-box" style="display:none"></div>
+        <details>
+          <summary>用 AI 協助起草（選填，非必要）</summary>
+          <textarea id="brief" class="brief" placeholder="用你自己的話寫：背景、現況、你想釐清什麼、已知的數字或事實。AI 只會根據你寫的內容起草，不足的地方會標 TBD 讓你補；起草完會自動填進下面的欄位，你仍可修改。" style="margin-top:.5rem"></textarea>
+          <div class="row">
+            <button id="draft-btn" class="primary">AI 起草</button>
+            <span id="draft-status" class="note"></span>
+          </div>
+        </details>
+        <div id="step2">
+          <div id="draft-verdict" class="note"></div>
+          <div id="fields"></div>
+          <details><summary>原始 JSON（進階）</summary><textarea id="raw-json" rows="12"></textarea><div class="row"><button id="raw-apply" class="ghost">套用原始 JSON</button></div></details>
         </div>
       </div>
 
-      <div class="step" id="step2" style="display:none">
-        <h3>② 檢查與修改</h3>
-        <div id="draft-verdict" class="note"></div>
-        <div id="fields"></div>
-        <details><summary>原始 JSON（進階）</summary><textarea id="raw-json" rows="12"></textarea><div class="row"><button id="raw-apply" class="ghost">套用原始 JSON</button></div></details>
-      </div>
-
-      <div class="step" id="step3" style="display:none">
-        <h3>③ 執行</h3>
+      <div class="step" id="step3">
+        <h3><span class="num">2</span> 執行</h3>
         <div id="run-opts" class="row" style="display:none">
           <label style="margin:0;flex:1">run_id（選填；續跑既有 run 時必填）<input id="recipe-run-id" maxlength="80" pattern="[A-Za-z0-9_-]{1,80}"></label>
           <label style="margin:0"><input id="recipe-resume" type="checkbox" style="width:auto"> 續跑既有 run</label>
@@ -109,19 +184,58 @@
         <div id="result"></div>
       </div>
     </div>
+
+    <div id="compare" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <div style="font-weight:600">並排比較（<span id="compare-count"></span>）</div>
+        <button id="compare-back" class="ghost">關閉比較</button>
+      </div>
+      <div id="compare-grid" class="compare-grid"></div>
+    </div>
+
+    <div id="chain" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <div style="font-weight:600">自組工作流</div>
+        <button id="chain-back" class="ghost">關閉</button>
+      </div>
+      <div class="note">依序執行每一步；每一步都是既有的單一方法，各自套用自己的規則驗證。可調整順序、移除步驟，完成後存成工作流，之後在「工作流」分頁可再打開繼續編輯或執行。</div>
+      <div id="chain-steps"></div>
+      <div class="row">
+        <button id="chain-run-all" class="primary">全部依序執行</button>
+        <span id="chain-run-status" class="note"></span>
+      </div>
+      <div class="step">
+        <h3>儲存</h3>
+        <label>工作流名稱 <input id="chain-title" placeholder="例如：新客戶盡職調查"></label>
+        <div class="row">
+          <button id="chain-save" class="primary">儲存為工作流</button>
+          <button id="chain-delete" class="ghost" style="display:none">刪除這個工作流</button>
+          <span id="chain-save-status" class="note"></span>
+        </div>
+      </div>
+    </div>
   </section>
 </main>
 
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
-// epoch: bumped on every workspace switch; an async draft that finishes for an older epoch is discarded
-// (2026-09-17: a recipe draft completing after the user switched to a method left recipe fields under a method run).
-const state = { methods: [], recipes: [], tab: 'recipes', kind: null, id: null, params: [], plan: [], data: {}, ai: { configured: false, model: null }, epoch: 0, busy: false };
+// epoch: bumped on every workspace/mode switch; an async draft/run that finishes for an older
+// epoch is discarded (2026-09-17: a recipe draft completing after the user switched to a method
+// left recipe fields under a method run; the same hazard applies to compare/chain now).
+const state = {
+  methods: [], recipes: [], customWorkflows: [],
+  tab: 'recipes', mode: 'empty', kind: null, id: null,
+  params: [], plan: [], data: {}, ai: { configured: false, model: null }, epoch: 0, busy: false,
+  familyFilter: null, selectedOrder: [],
+  chain: { order: [], data: {}, results: {}, savedId: null, title: '' },
+};
+const COMPARE_MAX = 4, CHAIN_MAX = 12;
 
 function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
 function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
 function pretty(v) { return JSON.stringify(v, null, 2); }
+function familyLabel(fam) { return (fam || '').split('_').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' '); }
 async function api(path, opts) {
   const r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts || {}));
   let body = null; try { body = await r.json(); } catch (e) { body = null; }
@@ -132,6 +246,7 @@ function detailText(res) {
   if (d === undefined || d === null) return 'HTTP ' + res.status;
   return typeof d === 'string' ? d : pretty(d);
 }
+function methodById(id) { return state.methods.find(m => m.method_id === id); }
 
 // ---------- session ----------
 async function refreshStatus() {
@@ -158,16 +273,48 @@ async function boot() {
   const ok = await refreshStatus();
   if (!ok) { showApp(false); return; }
   showApp(true);
-  const [m, r] = await Promise.all([api('/methods'), api('/recipes')]);
+  const [m, r, w] = await Promise.all([api('/methods'), api('/recipes'), api('/workflows/custom')]);
   state.methods = m.ok ? m.body : [];
   state.recipes = r.ok ? r.body : [];
+  state.customWorkflows = w.ok ? w.body : [];
+  renderFamilyFilters();
   renderList();
 }
 
-// ---------- catalog ----------
-$('tab-recipes').onclick = () => { state.tab = 'recipes'; $('tab-recipes').classList.add('on'); $('tab-methods').classList.remove('on'); renderList(); };
-$('tab-methods').onclick = () => { state.tab = 'methods'; $('tab-methods').classList.add('on'); $('tab-recipes').classList.remove('on'); renderList(); };
+// ---------- catalog: tabs, search, family filter ----------
+$('tab-recipes').onclick = () => { state.tab = 'recipes'; $('tab-recipes').classList.add('on'); $('tab-methods').classList.remove('on'); $('fam-filters').style.display = 'none'; renderList(); };
+$('tab-methods').onclick = () => { state.tab = 'methods'; $('tab-methods').classList.add('on'); $('tab-recipes').classList.remove('on'); $('fam-filters').style.display = ''; renderList(); };
 $('search').addEventListener('input', renderList);
+
+function readableFieldLabel(name) {
+  return name.split('_').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+}
+function appendNameBlock(container, d) {
+  d = d || {};
+  if (d.name_zh) container.appendChild(el('div', 'name-zh', d.name_zh));
+  if (d.name_en) container.appendChild(el('div', 'name-en', d.name_en));
+  if (d.abbr) container.appendChild(el('div', 'name-abbr', d.abbr));
+}
+
+function renderFamilyFilters() {
+  const box = $('fam-filters'); clear(box);
+  const counts = {};
+  state.methods.forEach(m => { const f = m.family || m.method_id.split('.')[0]; counts[f] = (counts[f] || 0) + 1; });
+  Object.keys(counts).sort().forEach(fam => {
+    const b = el('button', 'pill' + (state.familyFilter === fam ? ' on' : ''), familyLabel(fam) + ' (' + counts[fam] + ')');
+    b.onclick = () => { state.familyFilter = state.familyFilter === fam ? null : fam; renderFamilyFilters(); renderList(); };
+    box.appendChild(b);
+  });
+}
+
+function matchMethod(m, q) {
+  if (state.familyFilter && (m.family || m.method_id.split('.')[0]) !== state.familyFilter) return false;
+  if (!q) return true;
+  const d = m.display || {};
+  const hay = [m.method_id, m.family, d.name_en, d.name_zh, d.abbr, d.blurb_en, d.blurb_zh].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(q);
+}
+
 function renderList() {
   const q = $('search').value.trim().toLowerCase();
   const list = $('list'); clear(list);
@@ -177,36 +324,96 @@ function renderList() {
       b.appendChild(el('span', 'id', r.recipe_id)); b.appendChild(el('span', 'fam', r.step_count + ' 步'));
       b.disabled = state.busy; b.onclick = () => openRecipe(r.recipe_id); list.appendChild(b);
     });
-  } else {
-    state.methods.filter(m => !q || m.method_id.toLowerCase().includes(q)).forEach(m => {
-      const b = el('button', 'item' + (state.kind === 'method' && state.id === m.method_id ? ' on' : ''));
-      b.appendChild(el('span', 'id', m.method_id)); b.appendChild(el('span', 'fam', m.method_id.split('.')[0]));
-      b.disabled = state.busy; b.onclick = () => openMethod(m.method_id); list.appendChild(b);
+    state.customWorkflows.filter(w => !q || (w.title || '').toLowerCase().includes(q)).forEach(w => {
+      const b = el('button', 'item' + (state.kind === 'custom' && state.id === w.workflow_id ? ' on' : ''));
+      b.appendChild(el('span', 'id', w.title || w.workflow_id)); b.appendChild(el('span', 'badge', '自訂')); b.appendChild(el('span', 'fam', w.method_ids.length + ' 步'));
+      b.disabled = state.busy; b.onclick = () => openCustomWorkflow(w); list.appendChild(b);
     });
+    $('selbar').style.display = 'none';
+  } else {
+    const shown = state.methods.filter(m => matchMethod(m, q));
+    shown.forEach(m => {
+      const d = m.display || {};
+      const row = el('div', 'item2');
+      row.title = d.blurb_zh || d.blurb_en || '';
+      const box = el('input'); box.type = 'checkbox'; box.checked = state.selectedOrder.includes(m.method_id); box.disabled = state.busy;
+      box.onchange = () => { toggleSelect(m.method_id, box.checked); };
+      row.appendChild(box);
+      const main = el('button', 'item2-main');
+      if (d.name_zh || d.name_en) appendNameBlock(main, d); else main.appendChild(el('div', 'name-zh', m.method_id));
+      const meta = el('div', 'item2-meta');
+      meta.appendChild(el('span', 'id', m.method_id));
+      meta.appendChild(el('span', 'fam', familyLabel(m.family || m.method_id.split('.')[0])));
+      main.appendChild(meta);
+      main.disabled = state.busy; main.onclick = () => openMethod(m.method_id);
+      row.appendChild(main);
+      if (state.kind === 'method' && state.id === m.method_id) row.classList.add('on');
+      list.appendChild(row);
+    });
+    renderSelbar();
   }
 }
 
+function toggleSelect(id, on) {
+  const i = state.selectedOrder.indexOf(id);
+  if (on && i === -1) state.selectedOrder.push(id);
+  if (!on && i !== -1) state.selectedOrder.splice(i, 1);
+  renderSelbar();
+}
+function renderSelbar() {
+  const n = state.selectedOrder.length;
+  $('selbar').style.display = n ? 'flex' : 'none';
+  $('sel-count').textContent = n ? ('已選 ' + n + ' 個方法') : '';
+}
+$('sel-clear').onclick = () => { state.selectedOrder = []; renderList(); };
+$('sel-compare').onclick = () => openCompare(state.selectedOrder.slice(0, COMPARE_MAX));
+$('sel-chain').onclick = () => openChain(state.selectedOrder.slice(0, CHAIN_MAX));
+
+function showMode(mode) {
+  state.mode = mode;
+  $('empty').style.display = mode === 'empty' ? '' : 'none';
+  $('ws').style.display = mode === 'workspace' ? '' : 'none';
+  $('compare').style.display = mode === 'compare' ? '' : 'none';
+  $('chain').style.display = mode === 'chain' ? '' : 'none';
+}
+
 function resetWork() {
-  $('empty').style.display = 'none'; $('ws').style.display = '';
-  $('step2').style.display = 'none'; $('step3').style.display = 'none';
+  showMode('workspace');
   $('draft-status').textContent = ''; $('draft-verdict').textContent = ''; $('run-status').textContent = '';
   clear($('fields')); clear($('result')); $('raw-json').value = '';
+  $('brief-guide').style.display = 'none'; clear($('brief-guide'));
   $('draft-btn').disabled = !state.ai.configured;
   $('draft-btn').title = state.ai.configured ? '' : 'AI 未設定';
   $('run-opts').style.display = state.kind === 'recipe' ? '' : 'none';
   $('ws-desc').className = 'note';
-  $('ws').querySelectorAll('.step').forEach(s => { s.style.display = ''; });
-  $('step2').style.display = 'none'; $('step3').style.display = 'none';
 }
 
 function failWorkspace(id, res) {
   if (res.status === 401) { showApp(false); $('status').textContent = '登入已過期，請重新登入'; return; }
   resetWork();
-  $('ws-title').textContent = id;
+  clear($('ws-title')); $('ws-title').appendChild(el('div', 'name-zh', id));
+  $('ws-subtitle').textContent = '';
   $('ws-desc').textContent = '無法載入：' + detailText(res);
   $('ws-desc').className = 'bad';
   $('ws').querySelectorAll('.step').forEach(s => { s.style.display = 'none'; });
   renderList();
+}
+
+function renderBriefGuide(display, params) {
+  const box = $('brief-guide');
+  const d = display || {};
+  const required = params.filter(p => p.required && p.name !== 'record_id' && p.name !== 'provenance');
+  const optional = params.filter(p => !p.required && p.name !== 'record_id' && p.name !== 'provenance');
+  if (!d.blurb_zh && !required.length && !optional.length) { box.style.display = 'none'; return; }
+  clear(box);
+  box.style.display = '';
+  if (d.blurb_zh || d.blurb_en) box.appendChild(el('div', 'guide-title', d.blurb_zh || d.blurb_en));
+  const intro = el('div', null, '為了做出最完整、最有效的分析，請提供以下內容（可以直接填下面的欄位，或寫進 AI 起草的描述裡）：');
+  box.appendChild(intro);
+  const ul = el('ul');
+  required.forEach(p => { const li = el('li'); li.appendChild(el('b', null, readableFieldLabel(p.name))); li.appendChild(document.createTextNode('（必填 ' + p.name + '）')); ul.appendChild(li); });
+  optional.forEach(p => { const li = el('li'); li.appendChild(el('span', null, readableFieldLabel(p.name))); li.appendChild(document.createTextNode('（選填 ' + p.name + '，沒有就留給 AI 判斷或標 TBD）')); ul.appendChild(li); });
+  box.appendChild(ul);
 }
 
 async function openMethod(id) {
@@ -216,9 +423,16 @@ async function openMethod(id) {
   if (!f.ok) { failWorkspace(id, f); return; }
   state.params = f.body.parameters;
   const c = f.body.contract || {};
+  const d = f.body.display || {};
   resetWork();
-  $('ws-title').textContent = id;
-  $('ws-desc').textContent = (c.title ? c.title + '。' : '') + '欄位：' + state.params.map(p => p.name + (p.required ? '' : '?')).join(', ');
+  clear($('ws-title'));
+  if (d.name_zh || d.name_en) appendNameBlock($('ws-title'), d); else $('ws-title').appendChild(el('div', 'name-zh', c.title || id));
+  $('ws-subtitle').textContent = id;
+  $('ws-desc').textContent = familyLabel(c.family || id.split('.')[0]) + '　·　' + state.params.length + ' 個欄位';
+  renderBriefGuide(d, state.params);
+  // 欄位表單立刻可見可填，不必先觸發 AI 起草或額外點擊——操作者：「為什麼沒有填資料的地方」。
+  state.params.forEach(p => { if (p.required && p.name !== 'record_id' && p.name !== 'provenance') state.data[p.name] = ''; });
+  renderMethodFields(null);
   renderList();
 }
 
@@ -229,18 +443,190 @@ async function openRecipe(id) {
   if (!p.ok) { failWorkspace(id, p); return; }
   state.plan = p.body.nodes;
   resetWork();
-  $('ws-title').textContent = id;
+  clear($('ws-title')); $('ws-title').appendChild(el('div', 'name-zh', id));
+  $('ws-subtitle').textContent = '';
   $('ws-desc').textContent = '步驟：' + state.plan.map(n => n.label + ' (' + n.method_id + ')').join(' → ');
+  // 每一步的欄位表單立刻可見可填，理由同 openMethod。
+  state.plan.forEach(n => n.declared_source_paths.forEach(path => { state.data[path] = state.data[path] || {}; }));
+  renderRecipeNodes([]);
   renderList();
 }
 
-// ---------- step 1: draft ----------
-$('manual-btn').onclick = () => {
-  if (state.kind === 'method') { state.data = {}; state.params.forEach(p => { if (p.required && p.name !== 'record_id' && p.name !== 'provenance') state.data[p.name] = ''; }); renderMethodFields(null); }
-  else { state.data = {}; state.plan.forEach(n => n.declared_source_paths.forEach(path => { state.data[path] = state.data[path] || {}; })); renderRecipeNodes([]); }
-  $('step2').style.display = ''; $('step3').style.display = '';
+// ---------- compare mode ----------
+async function openCompare(ids) {
+  if (!ids.length) return;
+  state.epoch += 1; state.kind = 'compare'; state.id = null;
+  showMode('compare');
+  $('compare-count').textContent = ids.length + (ids.length < state.selectedOrder.length ? '，超過上限只取前 ' + COMPARE_MAX + ' 個' : '');
+  const grid = $('compare-grid'); clear(grid);
+  const forms = await Promise.all(ids.map(id => api('/methods/' + encodeURIComponent(id) + '/form')));
+  clear(grid);
+  ids.forEach((id, i) => {
+    const f = forms[i];
+    const card = el('div', 'compare-card');
+    if (!f.ok) { card.appendChild(el('div', 'bad', id + '：無法載入 (' + detailText(f) + ')')); grid.appendChild(card); return; }
+    const d = f.body.display || {}; const c = f.body.contract || {};
+    if (d.name_zh || d.name_en) appendNameBlock(card, d); else card.appendChild(el('div', 'name-zh', id));
+    card.appendChild(el('div', 'note', id + '　·　' + familyLabel(c.family || id.split('.')[0])));
+    card.appendChild(el('div', 'blurb', d.blurb_zh || d.blurb_en || c.title || '（尚無說明）'));
+    const ul = el('ul');
+    const params = f.body.parameters.filter(p => p.name !== 'record_id' && p.name !== 'provenance');
+    params.filter(p => p.required).forEach(p => ul.appendChild(el('li', null, readableFieldLabel(p.name) + '（必填）')));
+    params.filter(p => !p.required).forEach(p => ul.appendChild(el('li', null, readableFieldLabel(p.name) + '（選填）')));
+    card.appendChild(ul);
+    const open = el('button', 'ghost', '開啟完整工作區');
+    open.onclick = () => openMethod(id);
+    card.appendChild(open);
+    grid.appendChild(card);
+  });
+}
+$('compare-back').onclick = () => { state.epoch += 1; showMode('empty'); };
+
+// ---------- chain mode (self-assembled custom workflow) ----------
+function openChain(ids) {
+  state.epoch += 1; state.kind = 'chain'; state.id = null;
+  state.chain = { order: ids.slice(), data: {}, results: {}, savedId: null, title: '' };
+  ids.forEach(id => { state.chain.data[id] = {}; });
+  showMode('chain');
+  $('chain-title').value = '';
+  $('chain-run-status').textContent = ''; $('chain-save-status').textContent = '';
+  $('chain-delete').style.display = 'none';
+  renderChain();
+}
+function openCustomWorkflow(workflow) {
+  state.epoch += 1; state.kind = 'chain'; state.id = workflow.workflow_id;
+  state.chain = { order: workflow.method_ids.slice(), data: {}, results: {}, savedId: workflow.workflow_id, title: workflow.title || '' };
+  workflow.method_ids.forEach(id => { state.chain.data[id] = {}; });
+  showMode('chain');
+  $('chain-title').value = state.chain.title;
+  $('chain-run-status').textContent = ''; $('chain-save-status').textContent = '';
+  $('chain-delete').style.display = '';
+  renderList();
+  renderChain();
+}
+$('chain-back').onclick = () => { state.epoch += 1; showMode('empty'); renderList(); };
+
+function chainStepFields(id, box) {
+  clear(box);
+  const m = methodById(id);
+  const params = (m && m._formParams) || [];
+  params.forEach(p => {
+    if (p.name === 'provenance') return;
+    const f = el('div', 'field');
+    const lbl = el('label', null, readableFieldLabel(p.name) + (p.required ? '' : '（選填）'));
+    lbl.appendChild(el('span', 'raw', p.name));
+    f.appendChild(lbl);
+    const v = state.chain.data[id][p.name];
+    const ta = el('textarea'); ta.rows = 2; ta.value = v === undefined ? '' : (typeof v === 'string' ? v : pretty(v));
+    ta.addEventListener('input', () => {
+      const t = ta.value;
+      if (t.trim() === '') { delete state.chain.data[id][p.name]; return; }
+      try { state.chain.data[id][p.name] = JSON.parse(t); } catch (e) { state.chain.data[id][p.name] = t; }
+    });
+    f.appendChild(ta); box.appendChild(f);
+  });
+}
+async function ensureFormParams(id) {
+  const m = methodById(id);
+  if (m && m._formParams) return m._formParams;
+  const f = await api('/methods/' + encodeURIComponent(id) + '/form');
+  const params = f.ok ? f.body.parameters : [];
+  if (m) m._formParams = params;
+  return params;
+}
+async function renderChain() {
+  const box = $('chain-steps'); clear(box);
+  for (let i = 0; i < state.chain.order.length; i++) {
+    const id = state.chain.order[i];
+    await ensureFormParams(id);
+    const m = methodById(id); const d = (m && m.display) || {};
+    const stepEl = el('div', 'chain-step');
+    const head = el('div', 'head');
+    const nameWrap = el('div', 'name-wrap');
+    nameWrap.appendChild(el('div', 'note', '步驟 ' + (i + 1)));
+    if (d.name_zh || d.name_en) appendNameBlock(nameWrap, d); else nameWrap.appendChild(el('div', 'name-zh', id));
+    head.appendChild(nameWrap);
+    const ctrl = el('div', 'ctrl');
+    const up = el('button', 'tiny', '↑'); up.disabled = i === 0; up.onclick = () => { chainMove(i, -1); };
+    const down = el('button', 'tiny', '↓'); down.disabled = i === state.chain.order.length - 1; down.onclick = () => { chainMove(i, 1); };
+    const rm = el('button', 'tiny', '移除'); rm.onclick = () => { chainRemove(id); };
+    ctrl.appendChild(up); ctrl.appendChild(down); ctrl.appendChild(rm);
+    head.appendChild(ctrl);
+    stepEl.appendChild(head);
+    stepEl.appendChild(el('div', 'note', id + (d.blurb_zh ? '　·　' + d.blurb_zh : '')));
+    const fieldsBox = el('div'); chainStepFields(id, fieldsBox); stepEl.appendChild(fieldsBox);
+    const runRow = el('div', 'row');
+    const runBtn = el('button', 'ghost', '執行這一步'); runBtn.onclick = () => chainRunStep(id, i);
+    runRow.appendChild(runBtn);
+    const verdict = state.chain.results[id];
+    const vSpan = el('span', verdict ? (verdict.ok ? 'ok' : 'bad') : 'note', verdict ? (verdict.ok ? '✔ 通過' : '✘ ' + verdict.error) : '尚未執行');
+    runRow.appendChild(vSpan);
+    stepEl.appendChild(runRow);
+    box.appendChild(stepEl);
+  }
+  if (!state.chain.order.length) box.appendChild(el('div', 'note', '尚無步驟；回到「單一方法」勾選要加入的方法。'));
+}
+function chainMove(i, delta) {
+  const j = i + delta; if (j < 0 || j >= state.chain.order.length) return;
+  const arr = state.chain.order; [arr[i], arr[j]] = [arr[j], arr[i]];
+  renderChain();
+}
+function chainRemove(id) {
+  state.chain.order = state.chain.order.filter(x => x !== id);
+  delete state.chain.data[id]; delete state.chain.results[id];
+  renderChain();
+}
+async function chainRunStep(id, index) {
+  const epoch = state.epoch;
+  $('chain-run-status').textContent = '執行步驟 ' + (index + 1) + '…';
+  const r = await api('/methods/' + encodeURIComponent(id) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.chain.data[id] || {}) });
+  if (epoch !== state.epoch) return;
+  if (!r.ok) { state.chain.results[id] = { ok: false, error: detailText(r) }; }
+  else {
+    const allPass = (r.body.gate_results || []).every(g => g.status === 'PASS' || g.status === 'NOT_APPLICABLE');
+    state.chain.results[id] = { ok: allPass, error: allPass ? '' : '有閘門未通過', record: r.body.record, gates: r.body.gate_results };
+  }
+  $('chain-run-status').textContent = '';
+  renderChain();
+}
+$('chain-run-all').onclick = async () => {
+  const epoch = state.epoch;
+  for (let i = 0; i < state.chain.order.length; i++) {
+    await chainRunStep(state.chain.order[i], i);
+    if (epoch !== state.epoch) return;
+    if (!state.chain.results[state.chain.order[i]].ok) { $('chain-run-status').textContent = '步驟 ' + (i + 1) + ' 未通過，已停止。'; return; }
+  }
+  $('chain-run-status').textContent = '全部步驟完成。';
+};
+$('chain-save').onclick = async () => {
+  const title = $('chain-title').value.trim();
+  if (!title) { $('chain-save-status').textContent = '先取個名稱。'; return; }
+  if (!state.chain.order.length) { $('chain-save-status').textContent = '至少要有一個步驟。'; return; }
+  $('chain-save-status').textContent = '儲存中…';
+  const payload = { title, method_ids: state.chain.order };
+  const r = state.chain.savedId
+    ? await api('/workflows/custom/' + encodeURIComponent(state.chain.savedId), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    : await api('/workflows/custom', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!r.ok) { $('chain-save-status').textContent = '失敗：' + detailText(r); return; }
+  state.chain.savedId = r.body.workflow_id; state.chain.title = title;
+  $('chain-delete').style.display = '';
+  const wl = await api('/workflows/custom');
+  if (wl.ok) state.customWorkflows = wl.body;
+  $('chain-save-status').textContent = '已儲存，可在「工作流」分頁找到。';
+};
+$('chain-delete').onclick = async () => {
+  if (!state.chain.savedId) return;
+  $('chain-save-status').textContent = '刪除中…';
+  const r = await api('/workflows/custom/' + encodeURIComponent(state.chain.savedId), { method: 'DELETE' });
+  if (!r.ok) { $('chain-save-status').textContent = '刪除失敗：' + detailText(r); return; }
+  const wl = await api('/workflows/custom');
+  if (wl.ok) state.customWorkflows = wl.body;
+  state.epoch += 1;
+  showMode('empty');
+  renderList();
 };
 
+// ---------- step 1: draft (single-method / recipe workspace) ----------
 $('draft-btn').onclick = async () => {
   const brief = $('brief').value.trim();
   if (!brief) { $('draft-status').textContent = '先寫描述。'; return; }
@@ -273,7 +659,6 @@ $('draft-btn').onclick = async () => {
       renderRecipeNodes(verdicts);
       $('draft-status').textContent = '完成：' + verdicts.filter(v => v.ok === true).length + ' 通過 / ' + verdicts.filter(v => v.ok === false).length + ' 需修正 / ' + verdicts.filter(v => v.ok === null).length + ' 由執行時驗證';
     }
-    $('step2').style.display = ''; $('step3').style.display = '';
   } finally { state.busy = false; renderList(); if (!stale()) $('draft-btn').disabled = !state.ai.configured; refreshStatus(); }
 };
 
@@ -301,7 +686,9 @@ function renderMethodFields(draft) {
     const p = state.params.find(x => x.name === name) || { required: false };
     const v = state.data[name];
     const f = el('div', 'field');
-    f.appendChild(el('label', null, name + (p.required ? '' : '（選填）')));
+    const lbl = el('label', null, readableFieldLabel(name) + (p.required ? '' : '（選填）'));
+    lbl.appendChild(el('span', 'raw', name));
+    f.appendChild(lbl);
     const ta = el('textarea'); ta.rows = (typeof v === 'string' || v === undefined) ? 2 : Math.min(14, valueToText(v).split('\n').length + 1);
     ta.value = v === undefined ? '' : valueToText(v);
     ta.dataset.name = name; ta.dataset.str = (typeof v === 'string' || v === undefined) ? '1' : '0';
@@ -335,7 +722,7 @@ $('raw-apply').onclick = () => {
   if (state.kind === 'method') renderMethodFields(null); else renderRecipeNodes([]);
 };
 
-// ---------- step 3: run ----------
+// ---------- step 3: run (single method / recipe) ----------
 function gateTable(gates) {
   const t = el('table'); const h = el('tr'); ['閘門', '結果', '證據'].forEach(x => h.appendChild(el('th', null, x))); t.appendChild(h);
   (gates || []).forEach(g => { const r = el('tr'); r.appendChild(el('td', null, g.gate_id || g.id || '')); r.appendChild(el('td', g.status === 'PASS' || g.status === 'NOT_APPLICABLE' ? 'ok' : 'bad', g.status)); r.appendChild(el('td', null, g.evidence === undefined ? '' : pretty(g.evidence))); t.appendChild(r); });

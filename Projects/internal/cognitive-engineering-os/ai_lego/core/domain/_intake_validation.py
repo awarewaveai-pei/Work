@@ -25,11 +25,11 @@ def require_text(prefix: str, field: str, value: str, *, maximum: int) -> str:
     return value.strip()
 
 
-def require_timestamp(prefix: str, value: str) -> str:
+def require_timestamp(prefix: str, value: str, field: str = "created_at") -> str:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except (AttributeError, TypeError, ValueError) as error:
-        raise InvariantViolation(f"{prefix}_CREATED_AT_INVALID") from error
+        raise InvariantViolation(f"{prefix}_{field.upper()}_INVALID") from error
     if parsed.tzinfo is None:
-        raise InvariantViolation(f"{prefix}_CREATED_AT_INVALID")
+        raise InvariantViolation(f"{prefix}_{field.upper()}_INVALID")
     return value

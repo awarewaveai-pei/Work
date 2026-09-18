@@ -317,8 +317,10 @@ class DashboardTests(ApiTestCase):
         self.assertNotRegex(html, r"innerHTML\s*=\s*`[^`]*\$\{m\.")
         self.assertNotIn("innerHTML", html)
         # 2026-09-17 guided UI: brief -> AI draft -> edit -> run; every server call goes through the same routes curl uses.
+        # 2026-09-18: manual-btn removed -- fields render immediately on open (no longer gated behind a
+        # "skip drafting" click, operator: "為什麼沒有填資料的地方"), so that button no longer exists.
         for needle in (
-            'id="brief"', 'id="draft-btn"', 'id="manual-btn"', 'id="fields"', 'id="raw-json"', 'id="run-btn"',
+            'id="brief"', 'id="draft-btn"', 'id="fields"', 'id="raw-json"', 'id="run-btn"',
             "/ai/draft/method/", "/ai/draft/recipe/", "/draft-plan", "/ai/status", "function failWorkspace",
             "state.epoch += 1", "if (stale()) return;", "b.disabled = state.busy",
             "/methods/' + encodeURIComponent(state.id) + '/invoke", "/recipes/' + encodeURIComponent(state.id) + '/run",
