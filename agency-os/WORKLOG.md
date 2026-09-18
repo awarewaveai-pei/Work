@@ -1,4 +1,31 @@
 # Worklog
+## 2026-09-18（續22）HCI-30 部署：ADR-0021 六道 gate 中四道關閉（commit `9a28ca285`/`6212323bd`）——過程中發現並修正一個差點出貨的架構誤判
+
+[任務] 承接續21 的規劃，操作者明示「去做好剩下的...不會再分批問」，開始執行 Phase A（本機可測試、不碰正式主機的部分）。
+
+[完成，皆真實測試過，非文件宣稱]
+- Gate 1（獨立 compose 服務+volume）：`hci-postgres` 進 `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`，新測試 `tests/architecture/hci-db-isolation.test.mjs` 從紅（MISSING_SERVICE）變綠——過程中這個新測試自己也抓到一個真的 bug：檢查邏輯誤判一段解釋性錯誤訊息文字裡出現的「Supabase」字樣，已收斂成只查 volumes: 清單本身。
+- Gate 2（禁跨實例外鍵）：新測試 `tests/architecture/no-cross-instance-fk.test.mjs`（確認現有 20 支 migration 的 REFERENCES 都在同一棵樹內建立，本來就是，現在機械強制）+ `wave1-negative-tests.sql` 加 `ARCH-DB-03`（`pg_extension` 檢查 dblink/postgres_fdw），真對本機 dev DB 跑過：303 個斷言、0 失敗。
+- Gate 5（資源上限）：`hci-postgres` 設 `memory: 768M / cpus: 1.00`，比照 `supabase-db` 同檔既有寫法。
+- Gate 6（ADR-0007 對帳）：`ADR-0007` gate 2 文字已標注「被 ADR-0021 在這一點上取代」。
+- **意外一併修正**：`ADR-0007` gate 1 的豁免清單本來只列了 `compose.test.yml` 一個檔案，但 `compose.dev.yml`／`compose.fetch-runner.yml` 早就滿足同一條 gate 的理由（自己檔頭都寫「local/test only, never deployed」），文字從沒更新過——新測試 `tests/architecture/no-parallel-deploy-stack.test.mjs` 用修正後的三檔清單機械強制。
+- Gate 4（獨立備份線）產物：新腳本 `scripts/backup-hci-postgres-prod.sh`，刻意不跟共用的 `backup-eu-stack.sh` 共用一支（讓兩邊互不拖累），照抄同一份腳本的 dump-完整性檢查+清理安全模式（含那個「清理只能刪自己建立的東西」的教訓性註解，2026-08-24 EU 曾因清理邏輯太寬刪掉 769MB 客戶備份）。真對本機 dev DB 跑過 `pg_dump | gzip`，產出的壓縮檔驗證完整、內含 25 個真實 `CREATE TABLE`。cron 排程本身（host 動作）留待 Phase B。
+
+[過程中差點出貨的誤判，已攔下]：續21 的部署計畫（devops agent 查證）原本規劃隔離抓取服務(fetch-runner)另開一支獨立 prod compose 檔+獨立部署腳本。重新逐字讀 `ADR-0029` gate 1 原文才發現：條文明講「inside the existing docker-compose stack」，不是另開檔案——跟原計畫直接衝突。已改正：`hci-fetch-runner`/`hci-network-guard`/`hci-object-storage` 三個服務改進同一個共用 `docker-compose.yml`，只是仍然各自獨立掛在**新開的**、非 external 的 `hci-fetch-runner-net`（`hci-app` 不加入這個網路，靠 `host.docker.internal` 打它發布出來的 host port，維持真正網路隔離，不因為同一個檔案就共用網路）。整個檔案已用 `docker compose config` 驗證語法正確（預設值+prod 覆蓋值兩種情境）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/architecture/*.mjs`（含既有 peer-boundary 測試）| exit=0 | result=10 tests, 10 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cat wave1-negative-tests.sql | docker exec -i hci30dev-db-1 psql ...`| result=303 assertions, 0 failed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose -f docker-compose.yml config --quiet`（全新 5 服務+2 網路+3 volume，兩種環境變數組合）| exit=0（兩次）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker exec hci30dev-db-1 pg_dump ... \| gzip` + `gzip -t` + `zcat \| grep CREATE TABLE` | result=完整性通過，25 個真實資料表
+- REVIEW_DONE: critic=Standard（`mcp/user-env.template.ps1` 高風險檔強制）| verdict=pass | findings=1 Suggestion（對齊，已修）
+- BUGHUNT_WAIVED: DOC_ONLY -- 本輪為 gate 產物新增/文件對帳，非既有呼叫端契約異動
+
+[剩餘] Gate 3 只完成密鑰**名稱**登記(`mcp/user-env.template.ps1`)，真值產生+ADR 自己要求的「不可跟 Supabase 共用同一個 vault entry」pre-deploy check 腳本仍未寫。`sg-deploy.sh` 擴充（讓 hci-app 走既有回滾管道）、hci-postgres 專用 migration-apply 腳本，皆未開始。灌真密鑰、真的套用到 ks-aw-01、DNS/nginx/憑證——這些全部是 AGENTS.md High-risk-STOP，等最終清單一次批准，非本輪範圍。
+
+[已修改] 見 commit `9a28ca285`（8 檔）與 `6212323bd`（1 檔）訊息全文。
+
+[rollback] 三個 commit 皆可個別 `git revert`；本機/正式主機皆未實際套用任何本輪 compose/腳本異動，僅程式碼與治理文件層級的變更。
 ## 2026-09-18（續30）280+ 方法內容深化第四批：association 家族收官 + 5 個零散方法 + 唯一的 stakeholder.regulator Lens，共 12 個補齊 why/url/example；critic 覆審意外揪出續22 那批 9 個 RECORD_ID_PREFIX 常數有 6 個值錯（含新加的 monte_carlo 共 7 個），全部改對並驗證
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對我先前列出的「270+ 方法還缺 why／權威網址／填表範例」清單，明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續28（decision.wsjf）的批次節奏。
