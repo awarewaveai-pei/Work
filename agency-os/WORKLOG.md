@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續64）280+ 方法內容深化第十五批：feasibility 家族全部 9 個方法（F14 可行性與經濟性家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）的批次節奏，處理 feasibility 家族全部 9 個方法：break_even／cost_benefit_analysis／cost_effectiveness／irr／npv／real_options／tco／telos／unit_economics。本批次介於續40（decomposition，commit `22b2fa560`）與續63（HCI-30 Phase B 收尾，`7438882cd`）之間有另一 session 併行推進 HCI-30 部署，`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：9 個條目補上 why_en/why_zh/url/example_zh/example_en，feasibility 家族 0/9 → 9/9 收官（F14 可行性與經濟性套件全數完成，160/285，過半後第二個里程碑）。這個家族全部是財務／經濟計算類方法，每個方法的核心數值欄位都是 GENUINE_COMPUTE（builder 完全沒有對應參數，呼叫端塞值會直接 TypeError）且各自對應一個可獨立查證的真實公式/框架：break_even 是 fixed_cost÷contribution_margin_per_unit（CFI）；cost_benefit_analysis 把 Atlas 自己的「需 discounting/sensitivity/distributional effects」跟「無法定價不可硬塞假價格」兩條規則都變成雙向結構限制（OMB Circular A-94）；cost_effectiveness 是 cost÷effectiveness_outcome_units，拒絕零/負成果單位（CDC POLARIS）；irr 用真正的二分逼近法解 NPV(rate)==0（非公式近似），拒絕同號現金流（CFI）；npv 是 sum(amount/(1+rate)**period)，拒絕 discount_rate<=-1（分母歸零的數學邊界，Wikipedia）；real_options 要求每個選擇權至少 2 個描述互異的 future_states，避免退回一次性 yes/no（Wikipedia real options valuation，taxonomy 含 DEFER/EXPAND/CONTRACT/ABANDON/SWITCH）；tco 要求 Atlas §12.26 自己列的全部 12 個成本類別明確存在（Gartner，0 合法但缺項目被拒絕）；telos 要求 5 個面向都是必填位置參數且各自至少 1 筆非空證據（Wikipedia feasibility study 確認 TELOS 詞條）；unit_economics 的 ltv_to_cac_ratio／scalable 皆為 GENUINE_COMPUTE，cac 必須嚴格 >0（Mercury blog，涵蓋全部 7 個 Atlas 指定指標 CAC/LTV/gross margin/payback/churn/ARPU/contribution margin）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_feasibility_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 9 個真實 `generate_*`/建構函式，每個額外驗證「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應 InvariantViolation：BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN／CBA_INVALID_ITEM（雙向：non_monetizable=true 給非 null 值、non_monetizable=false 給 null 值）／CE_ZERO_EFFECTIVENESS／IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS／NPV_INVALID_DISCOUNT_RATE／ROPT_INSUFFICIENT_FUTURE_STATES＋ROPT_INVALID_OPTION／TCO_INVALID_COST_CATEGORIES／TELOS_INVALID_DIMENSION／UECON_INVALID_CAC），並額外斷言計算值正確：break_even 2000＝50000÷25、cost_effectiveness 2500/3000、irr 0.2 exactly（收斂到 1200/1000 的閉式解）、npv ≈-525.92（獨立用同一公式重算比對，非硬編 8 位小數，記取續37 Brier score 手算誤差的教訓）、tco 595000＝12 類別加總、unit_economics ltv_to_cac_ratio=4.0 | exit=0 | 結果=9/9 通過（一次通過，無需修正）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、160/285 done（本輪 +9，續40 收尾時是 151）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38/39/40 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=13（既有跨檔引用，本批次未新增/未移除任何 key 或檔案，無 stale 引用需要同步）
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 160/285 完成，125 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續63）HCI-30 Phase B 收尾：DNS+憑證+公開網址驗證完成，8/8 全部真實上線
 
 [任務] 承接續24（commit `eaf47f28c`）留下的最後一項——操作者手動在 Cloudflare 建立 `hci` A 記錄後，接手完成憑證擴充＋最終公開網址驗證。
