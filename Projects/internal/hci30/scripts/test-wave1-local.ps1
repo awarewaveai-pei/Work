@@ -158,6 +158,20 @@ if ($LASTEXITCODE -ne 0) { throw 'Trigger.dev orchestration state-machine tests 
 & (Join-Path $PSScriptRoot 'check-trigger-no-direct-fetch.ps1') -Dir (Join-Path $root 'public-intelligence') -AllowlistRelativePath 'orchestration/runner-client.mjs'
 if ($LASTEXITCODE -ne 0) { throw 'ADR-0029 gate 6 direct-fetch guard failed (Task 9, wave6-trigger-no-direct-fetch).' }
 
+# ADR-0029 gate 6, extended (Task 10 follow-up): app/server.mjs became this
+# call graph's SECOND real caller (imports orchestrateDiscoveredFetch
+# directly, per Task 10's own Boundaries -- app/server.mjs may reach an HCI
+# target only through that function, never a fetch of its own). -NoAllowlist
+# (zero-tolerance) rather than -AllowlistRelativePath: app/ has no
+# legitimate direct-fetch module at all, so there is nothing to name as one.
+# check-trigger-no-direct-fetch.ps1's own header documents the node_modules
+# exclusion and string/template-literal stripping this invocation needed
+# (app/node_modules alone would otherwise false-positive on hundreds of
+# vendored files, and app/server.mjs's own import-path string literal would
+# false-positive without the string-literal fix).
+& (Join-Path $PSScriptRoot 'check-trigger-no-direct-fetch.ps1') -Dir (Join-Path $root 'app') -NoAllowlist
+if ($LASTEXITCODE -ne 0) { throw 'ADR-0029 gate 6 direct-fetch guard failed for app/ (Task 10, wave6-trigger-no-direct-fetch).' }
+
 # ARCH-PEER-01 (ADR-0001 gate 1): source-tree boundary against AI LEGO
 # Cognitive OS. Node-level, not SQL - runs regardless of whether Docker is
 # available, same as the request-policy validator above.
