@@ -1,4 +1,26 @@
 # Worklog
+## 2026-09-18（續15）Portal + Cognitive OS 對外客戶就緒度查證（唯讀，回應「HCI-30 上線該接哪裡」範疇釐清）——結論：兩邊都還沒有能接的介面
+
+[任務] 操作者對「HCI-30 完美完整」的下一步提出疑問（該接 cognitive.aware-wave.com 還是 app.aware-wave.com？其他系統要不要一起部署？），顯示這已超出原 13-task 蒐集器管線範疇，變成「HCI-30（可能+Cognitive OS）對外客戶正式上線」的更大決策。指示先查清 portal 與 Cognitive OS 現況再談，派 2 個唯讀 agent 平行查證，不做任何程式碼異動。
+
+[Portal 現況] `portal.aware-wave.com` 自 2026-08-29 唯一一次 commit(`83277d804`)後零 code 異動；live 驗證(WebFetch GET)仍是 Supabase-auth 登入頁，與設計文件一致。`lib/portal/products.ts:6-32` = 純靜態 2 項陣列(status:"coming_soon")，未呼叫任何產品 API。9-11(`943b5eb28`，tenant-guard 通用 hardening，22 個 consumer 共用非 portal 專屬)、9-12(`5a1ec19e1`，nginx drift 修正)兩筆與 portal 相關但非功能異動。紙上進展：ADR-0009(9-01 accepted，tenant/org model)+ 9-17 新增 12-task 執行計畫(`HCI_C6_REAL_LOGIN_PLAN.md`)定義 handoff token 契約(portal 簽發短效 token → HCI 兌換建自己 session，資料庫不共用，`external_tenant_id` 存 `organization_product_subscriptions` 為 nullable 非 FK)——契約有文件、0% 落地(無 HCI 端 endpoint／無 portal 呼叫／無共用密鑰)。
+
+[Cognitive OS 現況] Phase 1(自用)code complete；Phase 2(真訂閱者帳務/entitlement)、Phase 3(企業多租戶)均未建置。entitlement check(`ai_lego/platform/entitlement/check.py:5-10,23-32`)是永遠 grant 的 stub，非真權限判斷；設計上單租戶(single-tenant by design，`ai_lego/platform/identity/store.py:1-20,124-125,236-262`)。portal 重新開放 Cognitive OS 卡片的觸發條件之一同樣是「真的 provisioning API」——跟 HCI-30 卡在同一個洞。`README.md:31` 已過期(聲稱無 auth/deployment，現況已不符)。
+
+[HCI-30 缺口] 現在完全無真帳號概念：兩組寫死 Postgres role/UUID 由 `?tenant=a|b` 切換(`app/server.mjs:36,42`)，計畫文件自陳「Not an auth system」。12-task 計畫 5 項 STOP-gated，各需操作者個別批准(承接操作者 2026-09-12「先不動」決策，`HCI_C1_C10_DECISIONS.md`)；Task 2 db-expert review 第一版 DDL 就抓到 5 個 Critical(如 caller 指定 role 名可跨租戶劫持)。要接 portal 契約需從零做：HCI 端 provisioning endpoint、portal 呼叫+write-back、token 簽發/兌換、`resolveTenant()` 全面重寫、新簽章密鑰、3 個 adapter 負向測試、auth/PII 級 critic review，外加 HCI-30 首次真部署上 prod(現在只有 dev-only Postgres，未曾部署任何環境)。
+
+[結論] 兩邊都還沒有能接 portal 的介面；「HCI-30 該接哪個網域」「要不要跟 Cognitive OS 一起上線」兩題目前的事實答案是：都還沒有能掛上去的東西，不是選哪邊的問題。已原話回報操作者，不夾帶建議，待操作者定調下一步範疇。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=GET https://portal.aware-wave.com/ | 結果=Supabase-auth 登入頁，符合 2026-08-29 部署紀錄
+- 來源：`agency-os/docs/operations/PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md:401-421`、`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0009-tenant-organization-model-reconciliation.md:38-102`、`agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT.md:17-33`、`lobster-factory/packages/db/migrations/0062_organization_product_subscriptions.sql:76-88`、`lib/tenant-guard.ts:146-154`、`Projects/internal/hci30/app/server.mjs:36,42`、`Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py:5-10,23-32`
+- REVIEW_WAIVED: NA -- 純唯讀查證任務，非程式碼改動
+- BUGHUNT_WAIVED: NA -- 無程式碼異動
+
+[剩餘風險] 無新增；HCI-30 部署層 STOP 維持(續8 已記錄)。Portal／Cognitive OS 對外上線範疇尚未定案，需操作者下一步指示。
+
+[rollback] 純唯讀查證，本條目僅記錄文字，無程式碼異動可回滾。
+
 ## 2026-09-18（續14）Dashboard UX 9 項操作者回饋（清單精簡/欄位徽章/懶人填寫拉最上面/效能）+ critic 覆審抓到 1 個真實 Major（`*_id` 自動填值會偽造無效參照）已修
 
 [操作者回饋 9 項] 截圖+文字：①清單列只留中文名(縮寫)/英文名兩行 ②欄位標籤旁不要出現 snake_case slug ③必填/選填要在欄位標題旁不要埋在說明文字裡 ④說明內容要含有效性原因/權威網址/填表範例（280 方法全套，另立批次，操作者選「兩者都要+分批做」）⑤ID 欄位是否該自動產生 ⑥要一個「懶人填寫」貼上資料自動拆欄位的按鍵 ⑦多選方法後想同時用不只是比較 ⑧組成工作流要能調順序+建議順序 ⑨選方法後右側說明更新很慢。
