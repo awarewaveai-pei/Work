@@ -8,6 +8,8 @@ import tempfile
 import uuid
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
 from ai_lego.apps.api import main as api_main
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
@@ -398,6 +400,85 @@ class SourcesBriefApiTests(ProjectSourceApiTestCase):
         self._create_source(project["project_id"])
         self._login_as_a_different_tenant()
         self.assertEqual(self.client.get(f"/projects/{project['project_id']}/sources/brief").status_code, 404)
+
+
+class HandoffApiTests(ProjectSourceApiTestCase):
+    """/auth/handoff/mint + /auth/handoff (operator report 2026-09-18): next-admin's service tenant
+    creates a Project the operator's own dashboard login can never see (different tenant, and
+    GET /projects / _project_or_404 are both tenant-scoped) -- these two routes are the fix. Real
+    end-to-end proof lives in test_redeeming_the_code_actually_grants_a_working_session below: a
+    SECOND, cookie-less TestClient (standing in for the operator's browser, which has never talked to
+    this tenant) ends up able to list the minting session's own projects after nothing but following
+    the redirect -- the exact capability the direct ?project=<id> link never had."""
+
+    def test_mint_requires_a_session(self):
+        self.assertEqual(self.client.post("/auth/handoff/mint", json={"project_id": "x"}).status_code, 401)
+
+    def test_mint_requires_a_real_project_for_the_callers_tenant(self):
+        self._login()
+        response = self.client.post("/auth/handoff/mint", json={"project_id": str(uuid.uuid4())})
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("PROJECT_NOT_FOUND", response.json()["detail"])
+
+    def test_mint_rejects_a_non_uuid_project_id_before_ever_querying_the_repository(self):
+        """Defense in depth (critic suggestion, 2026-09-18): redeem_handoff's redirect target is built
+        from this value -- reject anything that could not possibly be a real project_id (every stored
+        one is server-generated via project_record()'s own require_uuid) at the earliest point."""
+        self._login()
+        response = self.client.post("/auth/handoff/mint", json={"project_id": "../../evil"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("HANDOFF_PROJECT_ID_INVALID", response.json()["detail"])
+
+    def test_mint_for_another_tenants_project_is_refused(self):
+        """Real second tenant owns the project; the FIRST tenant's own session tries to mint a
+        handoff for it -- must 404 exactly like a direct GET of that project would (_project_or_404
+        gates both the same way), not silently mint a code for someone else's data."""
+        self._login()
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        other_tenant = store.create_tenant(tenant_id=str(uuid.uuid4()), legal_name="Other", home_jurisdiction="jurisdiction-pack.tw.v1", data_residency_region="local-dev", encryption_root_key_ref="k")
+        store.create_workspace(str(uuid.uuid4()), other_tenant["tenant_id"], "Default")
+        store.create_identity(str(uuid.uuid4()), other_tenant["tenant_id"], "other@example.com", "Other", "correct-horse-battery")
+
+        other_client = TestClient(api_main.app, base_url="https://testserver")
+        login = other_client.post("/auth/login", json={"tenant_id": other_tenant["tenant_id"], "email": "other@example.com", "password": "correct-horse-battery"})
+        self.assertEqual(login.status_code, 200, login.text)
+        other_project = other_client.post("/projects", json={"name": "n", "purpose": "p", "data_classification": "Confidential"}).json()
+
+        response = self.client.post("/auth/handoff/mint", json={"project_id": other_project["project_id"]})
+        self.assertEqual(response.status_code, 404)
+
+    def test_redeem_invalid_code_is_400(self):
+        response = self.client.get("/auth/handoff", params={"code": "not-a-real-code"}, follow_redirects=False)
+        self.assertEqual(response.status_code, 400)
+
+    def test_redeem_is_single_use_at_the_api_level(self):
+        self._login()
+        project = self._create_project()
+        code = self.client.post("/auth/handoff/mint", json={"project_id": project["project_id"]}).json()["code"]
+        anon = TestClient(api_main.app, base_url="https://testserver")
+        first = anon.get("/auth/handoff", params={"code": code}, follow_redirects=False)
+        self.assertEqual(first.status_code, 302)
+        second = anon.get("/auth/handoff", params={"code": code}, follow_redirects=False)
+        self.assertEqual(second.status_code, 400)
+
+    def test_redeeming_the_code_actually_grants_a_working_session(self):
+        """End-to-end: mint as the logged-in session, redeem from a brand-new client that has never
+        authenticated, then use THAT client's resulting cookie to list /projects and find the exact
+        project the handoff was minted for -- the real-world proof that the operator's browser, which
+        never held service-tenant credentials, ends up able to see what the service tenant created."""
+        self._login()
+        project = self._create_project()
+        code = self.client.post("/auth/handoff/mint", json={"project_id": project["project_id"]}).json()["code"]
+
+        anon = TestClient(api_main.app, base_url="https://testserver")
+        redirect = anon.get("/auth/handoff", params={"code": code}, follow_redirects=False)
+        self.assertEqual(redirect.status_code, 302)
+        self.assertEqual(redirect.headers["location"], f"/?project={project['project_id']}")
+        self.assertIn("cognitive_os_session", redirect.cookies)
+
+        listed = anon.get("/projects")
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertIn(project["project_id"], [p["project_id"] for p in listed.json()])
 
 
 if __name__ == "__main__":

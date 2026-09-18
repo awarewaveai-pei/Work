@@ -179,7 +179,7 @@ export function KnowledgeDetailModal({
               {detail.body !== null ? (
                 <pre style={{
                   whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit", fontSize: 12,
-                  background: "var(--card-bg, transparent)", border: "1px solid var(--border-subtle)",
+                  background: "var(--card-bg, transparent)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)",
                   borderRadius: 6, padding: "10px 12px", margin: 0, lineHeight: 1.7,
                 }}>
                   {detail.body}

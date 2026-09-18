@@ -12,6 +12,76 @@
 import type { RawDoc, SinkBlock, SinkCtx, SinkReport } from "@/lib/collect/types";
 import { registerSink } from "@/lib/collect/registry";
 import { ingestKnowledge } from "@/lib/kb";
+import { findOrCreateFolderByName, moveSourceToFolder } from "@/lib/kb/folders";
+
+// Auto-foldering for search-driven runs (operator, 2026-09-18: "搜尋到的資料應該直接進入一個資料夾, 不是散落
+// 一地" — folder name = search keyword + YYYYMMDDHHmm). Scoped to documents whose Target carried a
+// `searchQuery` (collect/web-search.ts and collect/academic.ts both stamp it, http-html.ts carries it
+// through) — a plain "add this one URL" source has no query to name a folder after, so it stays
+// unfoldered exactly as before this feature existed.
+//
+// Cache shape mirrors lib/collect/run-jobs.ts's own reasoning: this sink is one long-lived module
+// instance for the life of the server process (registerSink(createKbSink()) below runs once at
+// import time), so a plain Map safely de-dupes repeated (runId, query) lookups across a run's
+// multiple flush() calls without a new table — and, keying the cache by the PROMISE rather than the
+// resolved id, two docs from the very same flush racing to resolve the same brand-new folder name
+// share one in-flight createFolder call instead of both hitting the duplicate_name fallback path.
+const folderCache = new Map<string, { promise: Promise<string | null>; createdAt: number }>();
+const FOLDER_CACHE_MAX_AGE_MS = 60 * 60_000; // a run does not legitimately span longer than this
+
+function pruneFolderCache(now: number) {
+  for (const [key, entry] of folderCache) {
+    if (now - entry.createdAt > FOLDER_CACHE_MAX_AGE_MS) folderCache.delete(key);
+  }
+}
+
+/** Test-only escape hatch, same rationale as lib/cognitive-os/client.ts's own
+ *  resetCognitiveOsSessionCacheForTests: this module-level cache is the whole point in production
+ *  (one long-lived sink instance for the server process's life) but leaks between otherwise-isolated
+ *  test cases that reuse the same (runId, query) pair otherwise. */
+export function resetFolderCacheForTests(): void {
+  folderCache.clear();
+}
+
+function folderName(query: string, now: Date): string {
+  const stamp =
+    String(now.getUTCFullYear()) +
+    String(now.getUTCMonth() + 1).padStart(2, "0") +
+    String(now.getUTCDate()).padStart(2, "0") +
+    String(now.getUTCHours()).padStart(2, "0") +
+    String(now.getUTCMinutes()).padStart(2, "0");
+  // Capped well under createFolder's own 200-char slice so the timestamp suffix -- the part that
+  // actually distinguishes one run's folder from the next -- can never itself be the part silently
+  // truncated off a long PICO boolean query.
+  return `${query.trim().slice(0, 150)}_${stamp}`;
+}
+
+/**
+ * Resolves to null (never rejects) on any failure — a folder-assignment problem must not be
+ * mistaken for the ingest itself having failed; see this file's write-loop for how the caller
+ * reports that distinction.
+ *
+ * Only a CONFIRMED SUCCESS is cached (critic finding, 2026-09-18) — today's orchestrator (run.ts /
+ * orchestrator.ts) awaits each sink flush sequentially and this file's own write-loop is a plain
+ * `for...of` with `await` inside, so there is no concurrent race for the promise-level cache to
+ * de-dupe in the first place; caching a transient failure would only cost every later doc in the
+ * same run its own retry, for up to FOLDER_CACHE_MAX_AGE_MS, over one blip. Matches
+ * lib/cognitive-os/client.ts's own cachedCookie precedent, which populates its cache strictly
+ * after a confirmed-good login, never before.
+ */
+async function resolveSearchFolderId(organizationId: string, runId: string, query: string): Promise<string | null> {
+  const now = Date.now();
+  pruneFolderCache(now);
+  const key = `${organizationId}:${runId}:${query}`;
+  const cached = folderCache.get(key);
+  if (cached) return cached.promise;
+  const id = await findOrCreateFolderByName(organizationId, folderName(query, new Date(now)), null).then(
+    (r) => (r.ok ? r.id : null),
+    () => null,
+  );
+  if (id) folderCache.set(key, { promise: Promise.resolve(id), createdAt: now });
+  return id;
+}
 
 export interface KbSinkOptions {
   /**
@@ -100,6 +170,33 @@ export function createKbSink(opts: KbSinkOptions = {}): SinkBlock {
             report.errors!.push(`supersede_failed:${doc.canonicalUrl}`);
           }
           report.written++;
+
+          // Only a document's FIRST-EVER version gets foldered (critic finding, 2026-09-18): a
+          // content-changed re-ingest (version > 1) is not new — result.unchanged already `continue`d
+          // above only catches a BYTE-IDENTICAL re-ingest, and lib/kb/rag.ts's own versioning
+          // (getFamilyState -> live.folderId, restated in lib/kb/db.ts) deliberately carries the prior
+          // version's folderId forward specifically so an edit never un-files a document the operator
+          // has since organized elsewhere. Re-foldering here on every version would silently fight
+          // that inherited assignment on the very next edit to a search-driven page.
+          const searchQuery = result.version === 1 && typeof doc.meta.searchQuery === "string" ? doc.meta.searchQuery.trim() : "";
+          if (searchQuery) {
+            try {
+              const folderId = await resolveSearchFolderId(organizationId, ctx.runId, searchQuery);
+              if (folderId) {
+                const moved = await moveSourceToFolder(organizationId, result.sourceId, folderId);
+                // `=== false`, never `!moved.ok` — see lib/cognitive-os/client.ts's comment on why
+                // (this repo's strict:false tsconfig does not narrow on negated truthiness here).
+                if (moved.ok === false) report.errors!.push(`folder_assign_failed:${doc.canonicalUrl}:${moved.error}`);
+              } else {
+                report.errors!.push(`folder_assign_failed:${doc.canonicalUrl}:folder_resolve_failed`);
+              }
+            } catch (e) {
+              // Never lets a foldering problem read as the ingest itself having failed — the
+              // document above is already correctly written and retrievable regardless.
+              report.errors!.push(`folder_assign_failed:${doc.canonicalUrl}:${String(e).slice(0, 160)}`);
+            }
+          }
+
           ctx.log(`sink/kb: ${doc.canonicalUrl} -> v${result.version} (${result.chunks} chunks)`);
         } catch (e) {
           // One bad document must not abort a crawl's whole flush; the rest of the batch still lands.

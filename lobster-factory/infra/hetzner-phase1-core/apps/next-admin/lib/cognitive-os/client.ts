@@ -20,6 +20,11 @@ type CognitiveOsErr = { ok: false; error: string; status?: number };
 export type CognitiveOsResult<T> = CognitiveOsOk<T> | CognitiveOsErr;
 
 const DEFAULT_BASE_URL = "http://cognitive-os-api:8420";
+// The browser-facing origin -- deliberately a different constant from DEFAULT_BASE_URL above (that
+// one is the internal docker hostname this module's own server-to-server calls use, never reachable
+// from a browser). Consumed by app/api/cognitive-os/open/route.ts to build the redirect Location a
+// human's browser actually follows.
+export const COGNITIVE_OS_PUBLIC_URL = "https://cognitive.aware-wave.com";
 // Server-side session TTL is 12h (main.py SESSION_TTL / login() max_age=12*3600). Re-login an hour
 // early rather than racing a request against the exact expiry instant.
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -189,5 +194,21 @@ export function createCognitiveOsSource(
   return cognitiveOsFetch<CognitiveOsSource>(`/projects/${encodeURIComponent(projectId)}/sources`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Step 1 of the cross-origin handoff (full rationale: ai_lego's store.py, handoff_code section).
+ * Mints a single-use, 60s-lived code for the SERVICE tenant's own session -- never for whichever
+ * next-admin operator clicked the link, since this module only ever authenticates as the service
+ * identity in the first place (see this file's header). Consumed by app/api/cognitive-os/open/
+ * route.ts, which redirects the operator's browser to redeem it directly against Cognitive OS's own
+ * origin -- so the resulting session cookie is set by that origin, host-only, exactly like a normal
+ * login, with no cross-domain Set-Cookie involved.
+ */
+export function mintCognitiveOsHandoff(projectId: string): Promise<CognitiveOsResult<{ code: string }>> {
+  return cognitiveOsFetch<{ code: string }>("/auth/handoff/mint", {
+    method: "POST",
+    body: JSON.stringify({ project_id: projectId }),
   });
 }

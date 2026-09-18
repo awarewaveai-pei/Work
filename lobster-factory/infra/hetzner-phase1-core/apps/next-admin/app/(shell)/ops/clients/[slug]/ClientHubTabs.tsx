@@ -1692,7 +1692,10 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
                           {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
                           {s.cognitiveOsProjectId ? (
                             <a
-                              href={`https://cognitive.aware-wave.com/?project=${encodeURIComponent(s.cognitiveOsProjectId)}`}
+                              // Goes through the handoff route, not a direct dashboard link — see
+                              // app/api/cognitive-os/open/route.ts's header for why (service-tenant
+                              // vs operator-tenant mismatch, operator report 2026-09-18).
+                              href={`/api/cognitive-os/open?project=${encodeURIComponent(s.cognitiveOsProjectId)}`}
                               target="_blank"
                               rel="noreferrer"
                               title={s.cognitiveOsImportedAt ? `已於 ${s.cognitiveOsImportedAt.slice(0, 16).replace("T", " ")} 送去 Cognitive OS` : "已送去 Cognitive OS"}

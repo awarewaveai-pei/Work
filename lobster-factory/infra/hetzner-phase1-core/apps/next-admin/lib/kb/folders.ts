@@ -30,6 +30,31 @@ export async function listFolders(organizationId: string): Promise<FolderRow[]> 
 
 export type FolderError = "name_required" | "duplicate_name" | "parent_not_found" | "would_create_cycle" | "not_found" | "write_failed";
 
+/**
+ * Create-or-reuse by exact name, for callers that want "the folder called X" rather than "a new
+ * folder" (lib/collect/sinks/kb.ts's auto-foldering of search-driven runs — operator: "搜尋到的資料應該
+ *直接進入一個資料夾", 2026-09-18). Optimistic create, not check-then-create: two concurrent callers
+ * racing to create the same name is exactly what createFolder's own unique-constraint 23505 handling
+ * already resolves correctly (see isDuplicateKeyError above) — a separate existence check first would
+ * just reopen that same TOCTOU window one line earlier.
+ */
+export async function findOrCreateFolderByName(organizationId: string, name: string, parentId: string | null): Promise<{ ok: true; id: string } | { ok: false; error: FolderError }> {
+  const created = await createFolder(organizationId, name, parentId);
+  // `=== false`, never `!created.ok`: this repo's tsconfig has strict:false (strictNullChecks off),
+  // under which TS does not narrow a discriminated union via negated-truthiness on a literal boolean
+  // property — see lib/cognitive-os/client.ts's own comment on the same gotcha.
+  if (created.ok === false) {
+    if (created.error !== "duplicate_name") return created;
+  } else {
+    return created;
+  }
+  const trimmed = name.trim().slice(0, 200);
+  const existing = (await listFolders(organizationId)).find((f) => f.name === trimmed && f.parentId === parentId);
+  // The 23505 that got here proves a row with this (organization_id, parent_id, name) exists — a
+  // miss here means only that it is INVISIBLE to this read (RLS, replica lag), not that it is gone.
+  return existing ? { ok: true, id: existing.id } : { ok: false, error: "write_failed" };
+}
+
 function isDuplicateKeyError(error: { code?: string } | null): boolean {
   return error?.code === "23505";
 }

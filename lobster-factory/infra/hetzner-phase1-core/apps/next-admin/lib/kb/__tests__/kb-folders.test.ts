@@ -38,7 +38,7 @@ function makeChain(): Record<string, unknown> {
 let client: { from: () => Record<string, unknown>; rpc: (fn: string, args: Record<string, unknown>) => Promise<Resp> } | null;
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => client }));
 
-const { listFolders, createFolder, renameFolder, moveFolder, deleteFolder, moveSourceToFolder, folderDescendantIds } = await import("@/lib/kb/folders");
+const { listFolders, createFolder, renameFolder, moveFolder, deleteFolder, moveSourceToFolder, folderDescendantIds, findOrCreateFolderByName } = await import("@/lib/kb/folders");
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 
@@ -79,6 +79,34 @@ describe("createFolder", () => {
   it("maps a unique-violation (23505) to duplicate_name, not a bare write_failed", async () => {
     state.queue.push({ data: null, error: { code: "23505" } });
     expect(await createFolder(ORG, "Dup", null)).toEqual({ ok: false, error: "duplicate_name" });
+  });
+});
+
+describe("findOrCreateFolderByName", () => {
+  // lib/collect/sinks/kb.ts's auto-foldering (operator, 2026-09-18) calls this on every doc from a
+  // search-driven run — it must reuse the SAME folder across a whole run, not fight the unique
+  // constraint every time, hence the create-then-fallback shape under test here.
+  it("creates and returns the new folder when the name is free", async () => {
+    state.queue.push({ data: { id: "new1" }, error: null }); // createFolder's own insert
+    expect(await findOrCreateFolderByName(ORG, "art therapy_202609180304", null)).toEqual({ ok: true, id: "new1" });
+  });
+
+  it("on a name collision, resolves to the EXISTING folder's id instead of failing", async () => {
+    state.queue.push({ data: null, error: { code: "23505" } }); // createFolder's insert -> duplicate_name
+    state.queue.push({ data: [{ id: "existing1", name: "art therapy_202609180304", parent_id: null }], error: null }); // listFolders fallback
+    expect(await findOrCreateFolderByName(ORG, "art therapy_202609180304", null)).toEqual({ ok: true, id: "existing1" });
+  });
+
+  it("a collision whose row is not visible on the fallback read reports write_failed, not a silent miss", async () => {
+    state.queue.push({ data: null, error: { code: "23505" } });
+    state.queue.push({ data: [], error: null }); // fallback listFolders finds nothing (RLS/replica lag)
+    expect(await findOrCreateFolderByName(ORG, "art therapy_202609180304", null)).toEqual({ ok: false, error: "write_failed" });
+  });
+
+  it("a non-duplicate failure (e.g. bad parentId) is returned as-is, no fallback lookup attempted", async () => {
+    state.queue.push({ data: null, error: null }); // createFolder's own parent-existence check -> not found
+    expect(await findOrCreateFolderByName(ORG, "x", "missing-parent")).toEqual({ ok: false, error: "parent_not_found" });
+    expect(state.queue).toHaveLength(0); // no listFolders call was made
   });
 });
 

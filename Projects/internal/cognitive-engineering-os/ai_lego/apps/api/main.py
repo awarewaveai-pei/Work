@@ -56,7 +56,7 @@ from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 import yaml
 
@@ -72,6 +72,7 @@ from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.provider import AiProvider, daily_token_budget, provider_from_env
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.core.domain._intake_validation import require_uuid
 from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import TEXT_MEDIA_TYPES, source_record
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
@@ -343,6 +344,10 @@ class LoginRequest(BaseModel):
     tenant_id: str
     email: str
     password: str
+
+
+class HandoffMintRequest(BaseModel):
+    project_id: str
 
 
 _DASHBOARD_PATH = Path(__file__).with_name("dashboard.html")
@@ -734,12 +739,23 @@ def method_form(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) -
                 "annotation": None if parameter.annotation is inspect.Parameter.empty else str(parameter.annotation),
             }
         )
+    # self_id_prefix: only meaningful for the ~66 builders with a domain-specific identity param
+    # (analysis_id/map_id/...) instead of the literal `record_id` -- those already get one
+    # auto-supplied server-side (see /methods/{id}/invoke). Exposed so the dashboard can offer a
+    # user-initiated "generate a suggested value" button for the domain-specific case WITHOUT
+    # guessing the prefix client-side (module abbreviations are not mechanically derivable from
+    # method_id, e.g. "behavior_over_time" -> "BOT-", "morphological_analysis" -> "MORPHANALYSIS-").
+    # Never auto-filled and never applied to any OTHER *_id-suffixed parameter -- 續14 critic finding
+    # (2026-09-18 WORKLOG) is that a second *_id field is frequently a REFERENCE to another record,
+    # not this record's own identity, and cannot be told apart from the name alone.
+    self_id_prefix = None if builder_takes_record_id(builder) else record_id_prefix(method_id, required=False)
     return {
         "method_id": method_id,
         "contract": catalog.require(method_id),
         "display": _method_display_metadata().get(method_id),
         "parameters": parameters,
         "schema_source": "builder_signature_only",
+        "self_id_prefix": self_id_prefix,
     }
 
 
@@ -1041,6 +1057,55 @@ def _project_or_404(repo: ProjectSourceRepository, tenant_id: str, project_id: s
     if project is None:
         raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}")
     return project
+
+
+@app.post("/auth/handoff/mint")
+def mint_handoff(
+    payload: HandoffMintRequest,
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, str]:
+    """Cross-origin session handoff, step 1 of 2 (see store.py's handoff_code section header for the
+    full design rationale). ALWAYS mints for session's OWN identity_id/tenant_id -- payload carries
+    only which Project the resulting browser tab should land on, never who to mint for, so this
+    cannot be used to obtain a session for anyone other than whoever already holds the calling
+    session (next-admin's own service-tenant login today; nothing more privileged than a caller
+    already logged in as the target identity, same as every other require_session route).
+
+    Placed here (after _project_or_404/get_project_source_repository, not up by /auth/login) because
+    FastAPI's Depends(...) defaults are evaluated at `def` time, not call time -- defining this any
+    earlier in the file raises NameError before either name exists (caught by test collection: moving
+    it fixed a real collection-time crash the first placement introduced)."""
+    try:
+        # Defense in depth (critic suggestion, 2026-09-18): redeem_handoff's redirect_path is built
+        # from payload.project_id below. It is safe today on THREE independent, already-true
+        # invariants (a query-string value can't hijack a relative redirect's host; _project_or_404
+        # just below only accepts an id that already matches a stored row; every stored project_id is
+        # server-generated via project_record()'s own require_uuid) -- but all three are transitive,
+        # not enforced at this call site itself. require_uuid is the same validator project_record()
+        # uses, so this rejects exactly the same shapes that could never have been a real project_id.
+        require_uuid("HANDOFF", "project_id", payload.project_id)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    _project_or_404(repo, session["tenant_id"], payload.project_id)
+    code = store.issue_handoff_code(session["identity_id"], session["tenant_id"], f"/?project={payload.project_id}")
+    return {"code": code}
+
+
+@app.get("/auth/handoff")
+def redeem_handoff(code: str, store: IdentityStore = Depends(get_store)) -> RedirectResponse:
+    """Step 2 of 2: the browser's own request, no session cookie yet -- code is the only credential.
+    Single-use and 60s-lived (HANDOFF_CODE_TTL); either exhausted resolves to the same 400 as a
+    fabricated code, not a distinguishing error, since a real one and a replayed one both mean this
+    request should not be trusted."""
+    redeemed = store.redeem_handoff_code(code)
+    if redeemed is None:
+        raise HTTPException(status_code=400, detail="HANDOFF_CODE_INVALID_OR_EXPIRED")
+    token = store.issue_session_for_identity(redeemed["identity_id"], redeemed["tenant_id"])
+    response = RedirectResponse(url=redeemed["redirect_path"], status_code=302)
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="strict", secure=True, max_age=12 * 3600)
+    return response
 
 
 def _domain_error_status(error: InvariantViolation) -> int:

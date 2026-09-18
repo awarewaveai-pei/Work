@@ -100,10 +100,12 @@ interface HciImportResult {
   errors: string[];
 }
 
-// Public dashboard for the Cognitive Engineering OS Phase 1 API (deploy/deploy.sh's own SMOKE_URL
-// host) — no project-scoped route existed before 2026-09-18; ?project=<id> now deep-links the
-// operator straight to this Project's sources inside that dashboard.
-const COGNITIVE_OS_DASHBOARD_URL = "https://cognitive.aware-wave.com/";
+// The link below goes through /api/cognitive-os/open (next-admin's own route), never straight at the
+// Cognitive OS dashboard: that Project was created under next-admin's SERVICE tenant, a different
+// tenant from whatever the operator is logged into on the dashboard directly, so a direct
+// ?project=<id> link 404s (PROJECT_NOT_FOUND) for anyone but that service identity. The route mints a
+// one-time cross-origin handoff and redirects through it instead (operator report, 2026-09-18 —
+// route's own header has the full rationale).
 
 const ENTRY_PLACEHOLDER: Record<string, string> = {
   url: "https://example.com/faq",
@@ -878,7 +880,7 @@ function CognitiveOsImportReport({ run }: { run: CognitiveOsImportResult }) {
         <span style={{ color: run.rejected.length ? "#b45309" : undefined }}>不合格 {run.rejected.length}</span>
       </div>
       <a
-        href={`${COGNITIVE_OS_DASHBOARD_URL}?project=${encodeURIComponent(run.projectId)}`}
+        href={`/api/cognitive-os/open?project=${encodeURIComponent(run.projectId)}`}
         target="_blank"
         rel="noreferrer"
         style={{ fontSize: 12 }}

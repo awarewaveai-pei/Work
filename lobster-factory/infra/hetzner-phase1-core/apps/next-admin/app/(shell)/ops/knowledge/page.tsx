@@ -190,7 +190,10 @@ export default async function KnowledgeOverview() {
                       {r.isSensitive ? <Tag color="#b91c1c">敏感</Tag> : null}
                       {r.cognitiveOsProjectId ? (
                         <a
-                          href={`https://cognitive.aware-wave.com/?project=${encodeURIComponent(r.cognitiveOsProjectId)}`}
+                          // Handoff route, not a direct dashboard link — see
+                          // app/api/cognitive-os/open/route.ts's header (service-tenant vs
+                          // operator-tenant mismatch, operator report 2026-09-18).
+                          href={`/api/cognitive-os/open?project=${encodeURIComponent(r.cognitiveOsProjectId)}`}
                           target="_blank"
                           rel="noreferrer"
                           style={{ textDecoration: "none" }}

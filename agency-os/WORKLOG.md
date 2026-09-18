@@ -1,4 +1,58 @@
 # Worklog
+## 2026-09-18（續23）/ops/collect -> Cognitive OS 連結 tenant 不對根治（OAuth-code 式跨源 handoff）+ 搜尋結果自動歸資料夾 + 內容檢視淺灰色對比度 bug
+
+[任務] 操作者 QA 今天稍早才上線的 collect->Cognitive OS bridge（EdD 論文文獻蒐集用），回報「送去 Cognitive OS 分析」的連結點進去說找不到資料、內容檢視顏色淺灰字很少、詢問「取回篇數」用意與精確/模糊搜尋差異、要求搜尋結果自動歸資料夾（命名規則：關鍵字+YYYYMMDDHHmm）。tenant 修法操作者明確授權「你決定」並引用 AGENTS.md R0 全套標準（30 年紀律／零重工／完整閉環／最小爆炸半徑）；部署延後到與此修法一起「一次部署」。
+
+[根因 1 — 找不到資料] `lib/cognitive-os/client.ts` 的 bridge 用next-admin 的**服務帳號**（`COGNITIVE_OS_TENANT_ID`）寫入 Cognitive OS；操作者自己開 `cognitive.aware-wave.com` 網頁版登入的是**另一個 tenant**（`dashboard.html` 自己的登入表單）。`GET /projects`／`_project_or_404`（`main.py`）皆用 session 自己的 tenant_id 過濾，服務帳號建的 Project 對操作者自己的登入永遠是空氣，直連 `?project=` 只會 404 `PROJECT_NOT_FOUND`。**用服務帳號直接 curl 登入+`GET /projects`/`GET .../sources` 實測驗證**：Project 真的存在（`8e323c1c-...`，2026-09-18T04:14:54Z 建立）但 0 筆 sources——證實資料沒送丟，純粹是可見性問題。
+
+[根因 2 — 內容淺灰色] `KnowledgeDetailModal.tsx` 的內容 `<pre>` 沒設 `color`，繼承全站 `pre{color:var(--pre-text)}`（`#e2e8f0`，設計給深色 code block 用），在這個白底彈窗裡變成近白字疊白底——低對比讓內容看起來「很少字」，不完全是真的字少。已加 `color:var(--text-primary)` 修正。
+
+[Tenant 修法 — OAuth authorization-code 式跨源 handoff]（操作者「你決定」後的架構取捨，見下方 3 個被拒絕的替代方案）：next-admin（已用服務帳號登入）呼叫新端點 `POST /auth/handoff/mint`（`require_session` 保護，永遠只能為呼叫者自己的 identity/tenant mint，payload 只帶 project_id 決定導向哪裡，不能指定幫誰 mint）→ 產生一次性 60 秒代碼（`IdentityStore.issue_handoff_code`，SQLite 新表 `handoff_code`，仿 `password_reset_token` 的 hash-at-rest 設計）→ 導向瀏覽器到 Cognitive OS **自己的** `GET /auth/handoff?code=`→ 該端點兌換代碼（`redeem_handoff_code`，`UPDATE...WHERE consumed_at IS NULL` 保證單次使用+防 TOCTOU）→ `issue_session_for_identity` 生真實 session → 用它自己的 origin 設一般 host-only cookie（跟手動登入完全一樣）→ 302 到 `/?project=`（`dashboard.html` 既有的 deep-link 邏輯完全不用改）。next-admin 側：`lib/cognitive-os/client.ts` 新增 `mintCognitiveOsHandoff`/`COGNITIVE_OS_PUBLIC_URL`；新路由 `app/api/cognitive-os/open/route.ts`（`canWriteTenantConfig` 角色閘，`target="_blank"` 開啟失敗時回可讀 HTML 而非原始 JSON）；3 個舊直連連結（`CollectionSourcesPanel.tsx`／`ClientHubTabs.tsx`／`/ops/knowledge/page.tsx`）全部改指向新路由。
+被拒絕的替代方案：(A) 兩個 tenant 合併——取消服務帳號與人分開的原始安全設計，且要把操作者個人密碼放進 next-admin 環境變數；(B) next-admin 的 redirect 直接 `Set-Cookie` 給 `cognitive.aware-wave.com`——跨網域 cookie 需要 `Domain=` 放寬到共同上層網域，會跟目標網站自己的同名 host-only cookie衝突順序不確定，非乾淨設計。
+
+[資料夾自動分類]（操作者確認「一起做，跟 tenant 修法同一次部署」）：`lib/collect/sinks/kb.ts`（collect 與 KB 之間唯一知道兩邊都存在的檔案）在**新寫入且是文件第一個版本**（`result.version===1`，非僅 `!result.unchanged`）時，用 `lib/kb/folders.ts` 新增的 `findOrCreateFolderByName` 建立/沿用 `<搜尋關鍵字>_<UTC YYYYMMDDHHmm>` 資料夾並歸檔。只對帶 `searchQuery` 的文件生效（`collect/web-search.ts` 原本就有標記；`collect/academic.ts` 補標記，`paperToDoc` 多穿一個 `query` 參數；`collect/http-html.ts` 補「把 Target.meta 帶進 RawDoc.meta」——原本這個共用頁面抓取器完全不繼承 Target 的自訂 meta，是這次才發現的既有缺口）。module-level cache 依 `(organizationId, runId, query)` 去重，跨同一次 run 的多次 flush 共用同一個資料夾解析結果。
+
+[critic 覆審抓到 2 Major，皆已修＋補永久測試]：
+1. **資料夾指派條件跟 `lib/kb/rag.ts`/`lib/kb/db.ts` 既有的版本繼承不變量衝突**——內容有改的重新擷取（version>1）本來就該繼承前一版的 `folderId`（`rag.ts` 明文寫「否則每次編輯都會把文件退檔」），我原本只用 `!result.unchanged` 判斷會讓每次內容真的改變的重新擷取都被強制拉回新的日期資料夾，蓋掉操作者手動整理過的分類。已加 `result.version===1` 才歸檔的條件。
+2. **`resolveSearchFolderId` 快取失敗的解析結果最長 1 小時，比完全不快取還糟**——今天的 orchestrator 是循序 await（`orchestrator.ts`/`kb.ts` 自己的 `for...of`），critic 指出原本用來正當化「快取 promise」的並行去重情境目前根本不存在，快取一次暫時性 Supabase 失敗會讓同一個 run 剩下所有文件整整一小時都拿不到資料夾且不重試；也跟被引用作 precedent 的 `lib/cognitive-os/client.ts` 的 `cachedCookie`（只在確認成功後才寫入快取）不一致。已改成只在成功時才寫入快取。
+Minor（已記錄，本次不修）：`GET /auth/handoff` 兌換端無 CSRF 防護——攻擊者可幫自己的帳號 mint 一個代碼，誘騙受害者瀏覽器載入該連結，讓受害者的瀏覽器悄悄變成攻擊者身分登入。Phase 1 只有操作者本人+next-admin 服務帳號兩個身分，沒有真正的第三方受害者族群可被鎖定，列為 Phase 2（多租戶）前必須關閉的已知限制，寫進 code comment，未在本次修。
+另採納 2 個建議項：`mint_handoff` 加 `require_uuid` 明確驗證 `project_id`（沿用 `_intake_validation.py` 既有驗證器，非新造）防禦性擋格式錯誤值；`/api/cognitive-os/open` 失敗時回可讀 HTML（含 `escapeHtml`）而非原始 JSON，因為所有呼叫端都是 `target="_blank"` 整頁導航非 fetch。
+
+[已修改]
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/identity/store.py`：新 SQLite 表 `handoff_code`、`HANDOFF_CODE_TTL`、`issue_session_for_identity`／`issue_handoff_code`／`redeem_handoff_code`
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py`：`HandoffMintRequest`、`POST /auth/handoff/mint`、`GET /auth/handoff`（置於 `_project_or_404`/`get_project_source_repository` 定義之後——FastAPI `Depends(...)` 預設值在 `def`當下就求值，放太前面會在 collection 階段就 `NameError`，本次過程中真的踩到又修正）、`require_uuid` 引用
+- `Projects/internal/cognitive-engineering-os/tests/unit/test_identity_store.py`：新增 `HandoffCodeTests`（5 個測試）
+- `Projects/internal/cognitive-engineering-os/tests/unit/test_project_source_api.py`：新增 `HandoffApiTests`（7 個測試，含真實端對端 mint→redeem→用全新無 cookie 的 `TestClient` 列出 Project 驗證）
+- `lobster-factory/.../lib/cognitive-os/client.ts`：`COGNITIVE_OS_PUBLIC_URL`、`mintCognitiveOsHandoff`
+- `lobster-factory/.../app/api/cognitive-os/open/route.ts`：新檔
+- `lobster-factory/.../app/(shell)/ops/{collect/CollectionSourcesPanel.tsx,clients/[slug]/ClientHubTabs.tsx,knowledge/page.tsx}`：改連結指向新路由
+- `lobster-factory/.../app/(shell)/ops/clients/[slug]/KnowledgeDetailModal.tsx`：`<pre>` 補 `color`
+- `lobster-factory/.../lib/collect/sinks/kb.ts`：資料夾自動歸檔邏輯+快取（含 2 個 critic 修正）、`resetFolderCacheForTests`
+- `lobster-factory/.../lib/kb/folders.ts`：`findOrCreateFolderByName`
+- `lobster-factory/.../lib/collect/collectors/{academic.ts,http-html.ts}`：`searchQuery` 標記與傳遞
+- `lobster-factory/.../lib/kb/__tests__/kb-folders.test.ts`＋新檔 `lib/collect/sinks/__tests__/kb.test.ts`（8 個測試）
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -X POST https://cognitive.aware-wave.com/auth/login`（服務帳號）+ `GET /projects` + `GET .../sources` | exit=0 | result=根因 1 現場驗證：Project 存在、0 sources，證實純可見性問題非資料遺失
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案，本次改動後共跑 4 次，每輪修正後重跑）| exit=0 | result=clean
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect lib/kb`（排除 *-live）| exit=0 | result=351 passed, 1 skipped（需真實網路）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/collect/sinks/__tests__/kb.test.ts lib/kb/__tests__/kb-folders.test.ts`（critic 修正後最終回歸）| exit=0 | result=34 passed（8+26）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile`（store.py／main.py）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_identity_store.py tests/unit/test_project_source_api.py tests/unit/test_api_main.py`（critic 修正+`require_uuid`後最終回歸）| exit=0 | ms=401390 | result=172 passed, 3 subtests passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit`（全 repo，背景執行）| exit=0 | ms=1852420（30分52秒）| result=14024 passed, 2379 subtests passed, 0 failed——確認新 SQLite 表+auth 端點對全 corpus 零破壞
+- REVIEW_DONE: critic=Standard | verdict=2 Critical/Major 級發現全修＋補永久回歸測試（見上）；1 Minor（CSRF）已記錄追蹤未修，屬 Phase 2 範疇 | findings=0c/2m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os | grep=`auth/handoff\|issue_handoff_code\|redeem_handoff_code\|issue_session_for_identity\|mintCognitiveOsHandoff\|findOrCreateFolderByName\|resolveSearchFolderId\|resetFolderCacheForTests\|COGNITIVE_OS_PUBLIC_URL\|cognitive-os/open\|cognitive.aware-wave.com/?project=` | hits=13 檔，全部為本次新增/修改的檔案本身；舊版直連連結字串（`cognitive.aware-wave.com/?project=`）僅剩 `route.ts` 自己說明用途的註解，3 個呼叫端已全部改點新路由，無殘留
+
+[剩餘風險]
+- `/auth/handoff` 兌換端無 CSRF 防護（見上，已記錄未修，Phase 1 單操作者場景風險低）
+- 資料夾自動分類只對 `entry:"query"` 型收集器（academic／web-search）生效，直接加 URL／本機路徑的來源不會被歸檔——符合操作者原始需求措辭（「搜尋到的資料」），非遺漏
+- PICO 布林查詢對 Crossref 不支援（既有限制，非本次引入，已在對話中向操作者說明）
+
+[下一步] 兩個系統都要部署，操作者尚未給 go-ahead（High-STOP，等明示）：① `lobster-factory` 側 `sg-deploy.sh`（next-admin）；② `Projects/internal/cognitive-engineering-os/deploy/deploy.sh`（`cognitive-os-api` 容器，獨立於①之外，這次新增的 SQLite 表結構會在容器重啟時自動 `CREATE TABLE IF NOT EXISTS` 建立，無需額外 migration 步驟）。部署後應請操作者實際重跑一次「送去 Cognitive OS 分析」+ 點資料夾連結驗證端對端。
+
+[rollback] 全部為新增檔案或既有檔案的純增量修改（無刪除任何既有邏輯分支）；`git revert` 本次 commit 即可完整復原；未觸碰任何 prod 環境、未執行任何部署腳本。
+
+- WORKLOG_DONE: /ops/collect -> Cognitive OS tenant 不對根治（OAuth-code handoff）+ 搜尋結果自動歸資料夾 + 內容檢視對比度修正；程式碼與測試層面完成，部署待操作者 go-ahead
+
 ## 2026-09-18（續22）280+ 方法內容深化第一批：architecture 家族全部 10 個方法補「為什麼有效／權威網址／填表範例」，dashboard 導引框新增對應渲染
 
 [任務] 操作者要求（item 4，本 session 較早前就已提出、答應「兩者都要，能找到哪個就放哪個」+「分批慢慢做，像之前雙語資料一樣」）：每個方法的說明內容除了既有的 blurb 外，還要加（1）為什麼這個方法有效、（2）真實權威網址（方法論參考或免費線上工具，兩者皆可）、（3）真實填表範例。280+ 方法規模太大，本次做第一批：`architecture` 家族全部 10 個方法（adr/atam/ddd/dependency_mapping/event_storming/fitness_functions/quality_attribute_scenario/strangler_fig/system_context_model/trade_off_matrix），依檔案既有順序（非操作者正在測試的方法優先，操作者明確選了「系統化分批」而非「先做常用的」）。

@@ -38,6 +38,12 @@ from ai_lego.errors import InvariantViolation
 PBKDF2_ITERATIONS = 600_000
 SESSION_TTL = timedelta(hours=12)
 PASSWORD_RESET_TTL = timedelta(hours=1)
+# Deliberately short (agency-os AGENTS.md R0 "minimum blast radius"): a handoff code exists only to
+# survive one server-to-server mint call immediately followed by one browser redirect (sub-second in
+# practice). 60s leaves headroom for a slow network hop without giving a leaked code (referrer header,
+# proxy log, browser history) a meaningfully usable window -- unlike PASSWORD_RESET_TTL, which must
+# survive a human reading an email.
+HANDOFF_CODE_TTL = timedelta(seconds=60)
 # Fixed (not secret, not per-identity) salt used ONLY to give the "no such identity"/"no such
 # credential row" authenticate() failure paths a real PBKDF2 hash of equal cost to the genuine
 # "wrong password" path -- closes the timing side-channel a critic pass found 2026-09-12 (see
@@ -88,6 +94,15 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
     reset_id TEXT PRIMARY KEY,
     identity_id TEXT NOT NULL REFERENCES identity(identity_id),
     token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    consumed_at TEXT
+);
+CREATE TABLE IF NOT EXISTS handoff_code (
+    code_hash TEXT PRIMARY KEY,
+    identity_id TEXT NOT NULL REFERENCES identity(identity_id),
+    tenant_id TEXT NOT NULL REFERENCES tenant(tenant_id),
+    redirect_path TEXT NOT NULL,
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     consumed_at TEXT
@@ -290,6 +305,81 @@ class IdentityStore:
     def revoke_session(self, session_token: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM session WHERE session_token = ?", (session_token,))
+
+    def issue_session_for_identity(self, identity_id: str, tenant_id: str) -> str:
+        """Mint a session for an identity the CALLER has already authenticated by some other means
+        (today: redeem_handoff_code below). Skips password verification entirely -- callers must
+        never expose this to anything that has not independently established the caller really is
+        identity_id first, since unlike authenticate() there is no credential check here at all."""
+        return self._issue_session(identity_id, tenant_id)
+
+    # -- Cross-origin handoff codes (single-use, short-TTL) ------------------------
+    #
+    # Problem this solves: next-admin's /ops/collect bridge writes into Cognitive OS as a SEPARATE
+    # service identity (bootstrap_service_identity.py), on purpose -- so an automated write is never
+    # attributable to, or credentialed as, the human operator. But that means the operator's own
+    # browser session against THIS dashboard (a different identity/tenant) can never see what the
+    # service identity just created: GET /projects is tenant-scoped (see list_projects/_project_or_404
+    # above), so the operator's ?project=<id> deep link 404s even though the Project genuinely exists
+    # (operator report 2026-09-18, confirmed via direct API call: project existed, 0 sources, and
+    # separately invisible to the operator's own tenant regardless of source count).
+    #
+    # Fix shape, deliberately NOT "merge the two identities" (that would undo the original
+    # least-privilege separation) and NOT "give next-admin's redirect a Set-Cookie for this domain"
+    # (a response FROM app.aware-wave.com cannot set a cookie scoped to cognitive.aware-wave.com
+    # without broadening Domain= to the shared parent, which then collides with this dashboard's own
+    # host-only login cookie of the same name -- fragile, order-dependent behaviour, not a 30-year
+    # design). Instead: the standard OAuth-authorization-code shape. next-admin (already holding a
+    # valid service-tenant session server-side) calls issue_handoff_code FOR ITS OWN identity_id/
+    # tenant_id (see main.py's require_session-gated mint endpoint -- a caller can only ever mint a
+    # code for the session it already holds, never an arbitrary target, so this cannot become a
+    # privilege-escalation primitive). The code then travels to the browser via an ordinary 302
+    # Location header (no secret in a Set-Cookie, no password in a URL) and is redeemed exactly once,
+    # from cognitive.aware-wave.com's own origin, which sets its OWN normal host-only session cookie --
+    # identical in shape to a real login, because redeem_handoff_code's caller mints one via
+    # issue_session_for_identity above.
+
+    def issue_handoff_code(self, identity_id: str, tenant_id: str, redirect_path: str) -> str:
+        """Raw code exists only in the return value and the caller's redirect Location header --
+        only its hash is persisted, matching issue_password_reset_token's own rationale above."""
+        raw_code = secrets.token_urlsafe(32)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        expires = now + HANDOFF_CODE_TTL
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO handoff_code (code_hash, identity_id, tenant_id, redirect_path, created_at, expires_at, consumed_at) VALUES (?,?,?,?,?,?,NULL)",
+                (
+                    hashlib.sha256(raw_code.encode("utf-8")).hexdigest(),
+                    identity_id,
+                    tenant_id,
+                    redirect_path,
+                    now.isoformat().replace("+00:00", "Z"),
+                    expires.isoformat().replace("+00:00", "Z"),
+                ),
+            )
+        return raw_code
+
+    def redeem_handoff_code(self, raw_code: str) -> dict[str, Any] | None:
+        """One-shot: a code already consumed (double redemption -- e.g. a browser prefetch, or a
+        reload of the redirect response) or expired resolves to None exactly like a code that never
+        existed, same as consume_password_reset_token's own failure shape above."""
+        code_hash = hashlib.sha256(raw_code.encode("utf-8")).hexdigest()
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT identity_id, tenant_id, redirect_path, expires_at FROM handoff_code WHERE code_hash = ? AND consumed_at IS NULL",
+                (code_hash,),
+            ).fetchone()
+            if row is None:
+                return None
+            expires_at = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+            marked = conn.execute(
+                "UPDATE handoff_code SET consumed_at = ? WHERE code_hash = ? AND consumed_at IS NULL",
+                (now.isoformat().replace("+00:00", "Z"), code_hash),
+            ).rowcount
+            if marked != 1 or now >= expires_at:
+                return None
+        return {"identity_id": row["identity_id"], "tenant_id": row["tenant_id"], "redirect_path": row["redirect_path"]}
 
     # -- Password reset -----------------------------------------------------------
 

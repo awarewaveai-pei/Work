@@ -363,7 +363,7 @@ export function buildSearchUrl(
   }
 }
 
-export function paperToDoc(paper: Paper, ctx: CollectCtx): RawDoc {
+export function paperToDoc(paper: Paper, ctx: CollectCtx, query: string): RawDoc {
   // Title, authors, venue and abstract in one text body: the abstract alone loses the very fields a
   // citation needs, and the knowledge base has nowhere else to put them yet.
   const header = [
@@ -403,6 +403,10 @@ export function paperToDoc(paper: Paper, ctx: CollectCtx): RawDoc {
       // An abstract is not the paper. Recorded so a consumer can say so rather than implying it
       // read the whole thing.
       isAbstractOnly: true,
+      // Same key collect/web-search.ts stamps on its own discovered targets — sink/kb.ts reads this
+      // one name to auto-file a search run's results into a folder (operator, 2026-09-18), so both
+      // query-entry collectors feed it the same way rather than the sink knowing two field names.
+      searchQuery: query,
     },
   };
 }
@@ -490,7 +494,7 @@ export const academicCollector: CollectBlock = {
 
     return {
       // Abstract-level documents, which is what these registries can give for everything.
-      docs: kept.map((p) => paperToDoc(p, ctx)),
+      docs: kept.map((p) => paperToDoc(p, ctx, query)),
       // The open-access full text is offered as a normal target, so the ordinary tiers fetch it and
       // the ordinary quality gate judges it. Nothing here goes hunting for a copy on another site.
       discovered: kept

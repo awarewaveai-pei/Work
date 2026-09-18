@@ -193,6 +193,55 @@ class SessionTests(_TempStoreTestCase):
         self.assertNotEqual(self.token, second_token)
 
 
+class HandoffCodeTests(_TempStoreTestCase):
+    """Cross-origin handoff codes (ai_lego/apps/api/main.py's /auth/handoff/mint + /auth/handoff --
+    operator report 2026-09-18: a next-admin-created Cognitive OS Project was invisible to the
+    operator's own dashboard login because they are different tenants)."""
+
+    def setUp(self):
+        super().setUp()
+        self.tenant = self._make_tenant()
+        self.identity = self.store.create_identity(str(uuid.uuid4()), self.tenant["tenant_id"], "service@example.com", "Service", "correct-horse-battery")
+
+    def test_mint_then_redeem_returns_identity_tenant_and_path(self):
+        code = self.store.issue_handoff_code(self.identity["identity_id"], self.tenant["tenant_id"], "/?project=abc-123")
+        redeemed = self.store.redeem_handoff_code(code)
+        self.assertIsNotNone(redeemed)
+        self.assertEqual(redeemed["identity_id"], self.identity["identity_id"])
+        self.assertEqual(redeemed["tenant_id"], self.tenant["tenant_id"])
+        self.assertEqual(redeemed["redirect_path"], "/?project=abc-123")
+
+    def test_redeem_unknown_code_returns_none(self):
+        self.assertIsNone(self.store.redeem_handoff_code("not-a-real-code"))
+
+    def test_redeem_is_single_use(self):
+        code = self.store.issue_handoff_code(self.identity["identity_id"], self.tenant["tenant_id"], "/?project=abc-123")
+        first = self.store.redeem_handoff_code(code)
+        self.assertIsNotNone(first)
+        second = self.store.redeem_handoff_code(code)
+        self.assertIsNone(second, "a redeemed code must not be usable a second time (e.g. browser prefetch, reload of the redirect)")
+
+    def test_expired_code_is_rejected(self):
+        """Hand-tamper expires_at into the past, same technique as SessionTests.
+        test_expired_session_is_rejected_and_deleted above -- proves redeem_handoff_code actually
+        checks expiry rather than trusting row existence + consumed_at alone."""
+        code = self.store.issue_handoff_code(self.identity["identity_id"], self.tenant["tenant_id"], "/?project=abc-123")
+        past = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        with self.store._connect() as conn:  # noqa: SLF001
+            conn.execute("UPDATE handoff_code SET expires_at = ? WHERE code_hash = ?", (past, code_hash))
+        self.assertIsNone(self.store.redeem_handoff_code(code))
+
+    def test_issue_session_for_identity_produces_a_resolvable_session(self):
+        """No password check here (unlike authenticate()) -- this is the primitive redeem_handoff_code
+        uses to turn an already-proven identity into a real, revocable session row."""
+        token = self.store.issue_session_for_identity(self.identity["identity_id"], self.tenant["tenant_id"])
+        resolved = self.store.resolve_session(token)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved["identity_id"], self.identity["identity_id"])
+        self.assertEqual(resolved["tenant_id"], self.tenant["tenant_id"])
+
+
 class PasswordResetTests(_TempStoreTestCase):
     def setUp(self):
         super().setUp()
