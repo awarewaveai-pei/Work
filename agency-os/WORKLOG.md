@@ -1,4 +1,25 @@
 # Worklog
+## 2026-09-18（續69）280+ 方法內容深化第十八批：learning 家族全部 11 個方法（F17 學習與逆轉家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）／續67（insight 9）的批次節奏，處理 learning 家族全部 11 個方法：after_action_review／appreciative_inquiry／build_measure_learn／decision_journal／dmaic／kill_criteria／ooda／pdca／post_mortem／prediction_tracking／reversal_criteria。期間另有 2 個併行 session 各推進一次 HCI-30 bridge 除錯（commit `32ca2e590`、`eb5a3b41b`），`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：11 個條目補上 why_en/why_zh/url/example_zh/example_en，learning 家族 0/11 → 11/11 收官（F17 學習與逆轉套件全數完成，194/285，超過三分之二）。這個家族是目前為止不變量密度最高的家族，多個方法用真正的雜湊防竄改機制（tamper-evidence hash）而不只是結構檢查：decision_journal 跟 prediction_tracking 都是「先承諾再看結果」兩階段設計——建構時對關鍵欄位算 stage1_integrity_hash 鎖住，之後每次 gate 檢查都獨立重算比對，抓出事後諸葛偏誤（hindsight bias）的手動竄改；PDCA 的跨週期學習延續性、OODA 的 orient 階段必須連結到同一筆記錄自己觀察到的內容、post_mortem 的原因必須連結到同一份記錄的時間軸事件，都是同一種「參照完整性」不變量的不同應用；kill_criteria／reversal_criteria 是姊妹方法但方向不同（kill_criteria 是單向停損，reversal_criteria 是可能翻案的重審），both 都要求非空 owner／action 才算真正可執行的控制措施。全部方法均可獨立查證於真實方法論：AAR（美國陸軍）、欣賞式探詢 4-D 循環（David Cooperrider）、Build-Measure-Learn（Eric Ries 精實創業）、決策日誌對抗事後諸葛（Annie Duke）、DMAIC（六標準差／ASQ）、OODA 循環（John Boyd）、PDCA（Deming/Shewhart）、無究責事後檢討（Google SRE）、預測校準與 Brier score（Philip Tetlock）、if-then 預先承諾（Gollwitzer 執行意圖研究）。撰寫過程中自己抓到並修正 2 個真實 bug（詳見驗證段）。
+
+[過程中抓到並修正的真實 bug]
+1. after_action_review 的 why_factors 不變量是「每筆 description 至少 3 個以空白分隔的字詞」（`_word_count` 用 Python `.split()` 純粹以空白切）——原始範例寫純中文句子「新流程多了一個確認步驟」，中文本身沒有空白，`.split()` 只會切出 1 個詞，實際跑驗證腳本時真的被 AAR_INSUFFICIENT_WHY_ANALYSIS 拒絕。修法：改成刻意用空白分隔語意片段（「新流程 比舊版 多了一個確認步驟」），驗證腳本與 YAML example_zh 同步修正。
+2. prediction_tracking 的驗證腳本原本猜測 provenance 用 `("HUMAN_INPUT", "VERIFIED")`，兩個值都不在 `EPISTEMIC_TYPES`/`AUTHORSHIP_STATES` 這兩個 frozenset 裡（讀 `ai_lego/core/domain/provenance.py` 才確認合法值），實際跑會被 PREDICTIONTRACKING_INVALID_OUTCOME_PROVENANCE 拒絕。修法：改用已確認合法的 `("SOURCE_FACT", "HUMAN_ORIGINAL")`。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_learning_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 11 個真實 `generate_*` 函式，每個額外驗證「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應 InvariantViolation），第一次執行揪出上述 2 個真實 bug（AAR 中文詞數計算、prediction_tracking provenance 列舉值），修正後重跑 | exit=0 | 結果=11/11 通過（第二次執行）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、194/285 done（本輪 +11，續67 收尾時是 183）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38/39/40/64/66/67 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=14（既有跨檔引用，本批次未新增/未移除任何 key 或檔案，無 stale 引用需要同步）
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 194/285 完成（超過三分之二），91 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、devops_sre 13、systems 12、delivery 11、experiment 11）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續68）HCI-30 bridge 第二個真實 bug：hci-app 連不到 hci-fetch-runner，根因是網路拓樸規劃錯誤（非設定值問題）
 
 [操作者回報] 續65 修完 `hci_not_configured` 後，操作者真的按了「送去 HCI 探索來源」，4 個候選全部 `hci_error_502`。
