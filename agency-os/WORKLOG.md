@@ -27,6 +27,21 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,lobster-factory | grep=`decodeBody\|seeds/[^ ]*reject\|getContentAddressedObject\|Test-support only\|snapshot-text\|withTenantTransaction\|COPY app/server\.mjs` | hits=2（promote 模組註解指向舊位置、計畫文件 reject 描述；已修），其餘都是預期中的新呼叫端
 - ORACLE_WAIVED: critic Standard 已完整覆審（含 tenant 隔離與 XSS），另有 7 個突變證明與 prod BEGIN/ROLLBACK 真實 schema 驗證；不涉及 auth/crypto/金流新機制
 - 靜態閘：`scripts/check-trigger-no-direct-fetch.ps1` 對 public-intelligence（allowlist runner-client）和 app（-NoAllowlist）兩個範圍都 ok。
+- 部署（commit af7b5fa01）：
+  - `sg-deploy.sh hci-app`：healthy 6s，smoke 全 OK。
+  - runner 重建前已打回滾點 `lobster-phase1-hci-fetch-runner:rollback-20260919`（原 image ce9390b1）。`compose build hci-fetch-runner` + `up -d hci-fetch-runner hci-network-guard` 後，runner healthy，guard exit=0，ready-file 為新寫入。
+  - 隔離重測：runner 內連 169.254.169.254 → 000（被擋），example.com → 200。
+- 端到端（公開網址 https://hci.aware-wave.com，合成租戶 a，測試頁 example.org → 新來源 21bf5d4e）：
+  - 預覽回傳真實擷取文字。
+  - 錯誤輸入：缺 snapshotId → 400；CLOSED 案件 → 409；手動 record 帶 `source` → 400。
+  - 正式採用 → 201，建立 EVIDENCE 0d25bba5，來源變 ACCEPTED。
+  - 重複送出 → 409；採用後按拒絕 → 409；租戶 b 讀取 → 404。
+  - DB：kind=EVIDENCE、DETERMINISTIC、有 key、`payload.source.content_hash` 等於快照 hash、`verify_subject_record_chain` ok=t。
+- REALTEST_EVIDENCE: tool=curl | cmd=POST https://hci.aware-wave.com/api/hci/v1/seeds/21bf5d4e-1b2c-4685-b74b-f4cce4f0d428/promote?tenant=a | exit=0 | ms=700
+- rollback：
+  - hci-app：`sg-deploy.sh` 的 `.deployed-commit` 回到 af27647e1 後重新部署。
+  - runner：`docker tag lobster-phase1-hci-fetch-runner:rollback-20260919 lobster-phase1-hci-fetch-runner:latest && docker compose up -d --no-build hci-fetch-runner hci-network-guard`。
+  - 已寫入的 EVIDENCE 是 append-only，不回滾，只有合成測試資料那一筆。
 
 ## 2026-09-19（續80）訂正續78「≥250/285」為精確值：operator 質疑「自己亂掰」，逐一 introspect 真實 builder 簽名算出 266/285
 
