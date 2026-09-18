@@ -70,12 +70,18 @@ const AUTHOR_CLASS_BY_KIND = { EVIDENCE: 'DETERMINISTIC', CLAIM: 'HUMAN_ONLY', A
 // not attempt to add that review workflow, only to stop conflicting with it.
 const CLAIM_EXTRA_COLUMNS = { claim_state: 'DRAFT', human_spotcheck_status: 'PENDING' };
 
+// Env-driven with the exact prior hardcoded values as defaults (2026-09-18, prod-deploy prep):
+// an unset HCI_DB_* set behaves identically to before this change, including the
+// readDevDbPassword() local-secret-file fallback -- existing dev workflows are unaffected.
+// Prod (ks-aw-01) sets all five explicitly, pointing at its own dedicated hci-postgres
+// container (ADR-0021), never the shared self-hosted Supabase (ADR-0002: no cross-product
+// database access).
 const pool = new pg.Pool({
-  host: '127.0.0.1',
-  port: 5433,
-  user: 'hci_owner',
-  password: readDevDbPassword(),
-  database: 'hci_wave1_synthetic',
+  host: process.env.HCI_DB_HOST || '127.0.0.1',
+  port: Number(process.env.HCI_DB_PORT) || 5433,
+  user: process.env.HCI_DB_USER || 'hci_owner',
+  password: process.env.HCI_DB_PASSWORD || readDevDbPassword(),
+  database: process.env.HCI_DB_NAME || 'hci_wave1_synthetic',
 });
 
 // Task 10: the isolated fetch-runner's own address, NOT this process's own
@@ -117,6 +123,13 @@ app.use((err, req, res, next) => {
   next(err);
 });
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Liveness only (2026-09-18, prod-deploy prep) -- matches apps/node-api/src/index.js's own
+// /health shape exactly (plain ok:true + service name, no DB round-trip). A DB-touching health
+// check would make this endpoint's own failure mode depend on pool/tenant state that has
+// nothing to do with "is the process up," which is the one thing a deploy healthcheck/smoke
+// probe actually needs to know.
+app.get('/health', (_req, res) => res.json({ ok: true, service: 'hci30-app' }));
 
 function resolveTenant(req, res) {
   const tenant = req.query.tenant || req.body?.tenant;

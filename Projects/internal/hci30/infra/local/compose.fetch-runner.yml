@@ -66,8 +66,14 @@ services:
     # rule, no allowlist entry needed.
     ports:
       # 127.0.0.1-only, never 0.0.0.0 -- internal API, not a public-facing
-      # port (ADR-0029 gate 1).
-      - "127.0.0.1:8090:8090"
+      # port (ADR-0029 gate 1). Host side parameterized (2026-09-18,
+      # prod-deploy prep): ks-aw-01 already has an unrelated container bound
+      # to 127.0.0.1:8090 (mainwp-web) -- default here stays 8090 so every
+      # existing local dev setup is unaffected; the prod env file sets
+      # HCI_FETCH_RUNNER_HOST_PORT to a free port instead. Container-internal
+      # port is unaffected either way -- app/server.mjs's HCI_FETCH_RUNNER_BASE_URL
+      # points at whatever host:port this resolves to, from the app's side.
+      - "127.0.0.1:${HCI_FETCH_RUNNER_HOST_PORT:-8090}:8090"
     networks:
       hci-fetch-runner-net:
     healthcheck:
@@ -149,7 +155,13 @@ networks:
     enable_ipv6: false
     ipam:
       config:
-        - subnet: 172.30.42.0/24
+        # Parameterized (2026-09-18, prod-deploy prep): ks-aw-01 already has all 15 of Docker's
+        # default-pool /16s (172.16.0.0/12) in use by other unrelated networks (verified via
+        # `ip route show` -- lobster-video-net alone already owns 172.30.0.0/16, overlapping this
+        # literal subnet). Default here stays 172.30.42.0/24 so every existing local dev setup is
+        # unaffected; the prod env file sets HCI_FETCH_RUNNER_SUBNET to an address outside
+        # 172.16.0.0/12 instead (no 10.x route exists on that host today).
+        - subnet: ${HCI_FETCH_RUNNER_SUBNET:-172.30.42.0/24}
 
 volumes:
   hci-fetch-runner-objectstore:
