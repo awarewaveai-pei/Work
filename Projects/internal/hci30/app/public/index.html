@@ -121,7 +121,17 @@
   .risk-tier-submit:hover { background: var(--teal-ink); }
   .reaudit-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: #f7ead0; color: var(--moderate); font-weight: 700; }
   .stacking-tag { display: inline-block; margin-top: 0.5rem; margin-left: 0.5rem; font-size: 0.7rem; padding: 0.14rem 0.6rem; border-radius: 999px; background: var(--teal-tint); color: var(--teal-ink); font-weight: 700; }
-  .auto-promote-toggle { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.8rem; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+  /* flex-wrap: wrap (2026-09-18 live bug) -- the checkbox (flex: none, below) cannot shrink, so
+     with the default nowrap every bit of squeeze fell on the label text next to it. For CJK text
+     that is catastrophic: UAX #14 treats the gap between most ideographs as a valid break, so a
+     flex item's auto min-width (its min-content size) collapses toward a SINGLE character wide,
+     and the browser then wraps the whole 40+ character sentence one character per line to fit that
+     sliver -- reproduced live on the 探索來源 tab's two checkboxes and the case-detail auto-promote
+     toggle (all three share this class, all three have long sentences, not just the ones an
+     operator happened to see first). Letting the text wrap onto its own full-width line instead
+     (checkbox stays flex:none on line 1; text becomes its own item once it doesn't fit next to the
+     checkbox) gives it its real width back and it wraps normally, at word-ish boundaries. */
+  .auto-promote-toggle { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; margin-top: 0.8rem; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
   .auto-promote-toggle input { margin-top: 0.2rem; flex: none; }
   .seed-result-card { margin-top: 1rem; padding: 1rem 1.2rem; border: 1px solid var(--border); border-radius: 8px; max-width: 640px; }
   .seed-result-card p { margin: 0.4rem 0; font-size: 0.88rem; }
