@@ -226,6 +226,87 @@ describe("the run", () => {
   });
 });
 
+describe("send to Cognitive OS", () => {
+  it("polls through to a done result and shows the project + a deep link to pick a method", async () => {
+    let pollCalls = 0;
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (typeof url === "string" && url.includes("cognitive-os-import")) {
+        if (init?.method === "POST") {
+          return { json: async () => ({ ok: true, queued: true, runKey: "cogos-poll-test" }) } as unknown as Response;
+        }
+        pollCalls++;
+        if (pollCalls === 1) return { json: async () => ({ ok: true, status: "running" }) } as unknown as Response;
+        return {
+          json: async () => ({
+            ok: true,
+            status: "done",
+            result: {
+              organizationId: "org-1",
+              projectId: "proj-abc",
+              totalCandidates: 3,
+              imported: 2,
+              alreadyImported: 1,
+              rejected: [],
+              errors: [],
+            },
+          }),
+        } as unknown as Response;
+      }
+      if (init?.method === "POST") {
+        posted.push(JSON.parse(String(init.body)));
+        return { json: async () => ({ ok: true, queued: true, runKey: "manual-test" }) } as unknown as Response;
+      }
+      return { json: async () => ({ ok: true, catalogue: CATALOGUE, sources: SOURCES }) } as unknown as Response;
+    });
+
+    await click(buttonByText("送去 Cognitive OS 分析"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 2100));
+    });
+
+    expect(pollCalls).toBeGreaterThanOrEqual(2);
+    expect(container.textContent).toContain("proj-abc");
+    expect(container.textContent).toContain("新匯入 2");
+    expect(container.textContent).toContain("已匯入過 1");
+    const link = container.querySelector("a[href*='cognitive.aware-wave.com']") as HTMLAnchorElement | null;
+    expect(link, "deep link to the Cognitive OS project must exist").not.toBeNull();
+    expect(link!.href).toContain("project=proj-abc");
+  });
+
+  it("shows rejected sources with their reason, never a silent quiet-send", async () => {
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (typeof url === "string" && url.includes("cognitive-os-import")) {
+        if (init?.method === "POST") return { json: async () => ({ ok: true, queued: true, runKey: "cogos-reject-test" }) } as unknown as Response;
+        return {
+          json: async () => ({
+            ok: true,
+            status: "done",
+            result: {
+              organizationId: "org-1",
+              projectId: "proj-abc",
+              totalCandidates: 1,
+              imported: 0,
+              alreadyImported: 0,
+              rejected: [{ sourceId: "s9", title: "Untitled Draft", issues: ["MISSING_AUTHORS"] }],
+              errors: [],
+            },
+          }),
+        } as unknown as Response;
+      }
+      if (init?.method === "POST") return { json: async () => ({ ok: true, queued: true, runKey: "manual-test" }) } as unknown as Response;
+      return { json: async () => ({ ok: true, catalogue: CATALOGUE, sources: SOURCES }) } as unknown as Response;
+    });
+
+    await click(buttonByText("送去 Cognitive OS 分析"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    expect(container.textContent).toContain("Untitled Draft");
+    expect(container.textContent).toContain("MISSING_AUTHORS");
+  });
+});
+
 describe("a refusal is explained, not printed", () => {
   it("turns the exact string the operator hit into an instruction", () => {
     // This is the real reason from a live run on 2026-09-11.

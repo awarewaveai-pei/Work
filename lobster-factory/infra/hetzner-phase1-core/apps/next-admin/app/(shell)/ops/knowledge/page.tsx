@@ -30,6 +30,7 @@ interface Row {
   orgName: string;
   orgSlug: string | null;
   chunks: number;
+  cognitiveOsProjectId: string | null;
 }
 
 async function loadRows(): Promise<{ rows: Row[]; archived: number } | null> {
@@ -41,7 +42,7 @@ async function loadRows(): Promise<{ rows: Row[]; archived: number } | null> {
   const { data, error } = await sb
     .from("cs_knowledge_sources")
     .select(
-      "id,title,kind,status,source_version,canonical_url,author,epistemic_type,authorship_state,locked,is_sensitive,updated_at,organization_id",
+      "id,title,kind,status,source_version,canonical_url,author,epistemic_type,authorship_state,locked,is_sensitive,updated_at,organization_id,cognitive_os_project_id",
     )
     .neq("status", "archived")
     .order("updated_at", { ascending: false })
@@ -86,6 +87,7 @@ async function loadRows(): Promise<{ rows: Row[]; archived: number } | null> {
       orgName: orgs.get(r.organization_id as string)?.name ?? "—",
       orgSlug: orgs.get(r.organization_id as string)?.slug ?? null,
       chunks: counts.get(r.id as string) ?? 0,
+      cognitiveOsProjectId: (r.cognitive_os_project_id as string) ?? null,
     })),
   };
 }
@@ -186,6 +188,16 @@ export default async function KnowledgeOverview() {
                       <Origin row={r} />
                       {r.locked ? <Tag color="#111827">已鎖定</Tag> : null}
                       {r.isSensitive ? <Tag color="#b91c1c">敏感</Tag> : null}
+                      {r.cognitiveOsProjectId ? (
+                        <a
+                          href={`https://cognitive.aware-wave.com/?project=${encodeURIComponent(r.cognitiveOsProjectId)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ textDecoration: "none" }}
+                        >
+                          <Tag color="#047857">已送 Cognitive OS</Tag>
+                        </a>
+                      ) : null}
                     </div>
                   </td>
                   <td style={td}>v{r.version}</td>

@@ -30,6 +30,10 @@ export type SourceListRow = {
   /** K2i: this document's own override, or 'inherit' to follow the tenant default. */
   keywordMode: string;
   chunks: number;
+  /** Cognitive OS bridge (migration 0087). Both null until lib/cognitive-os/import-sources.ts's
+   *  importOrganizationSources() successfully POSTs this row to Cognitive OS -- never guessed. */
+  cognitiveOsProjectId: string | null;
+  cognitiveOsImportedAt: string | null;
 };
 
 /** The three keyword_mode values the column CHECK constraint (migration 0086) allows. */
@@ -90,7 +94,10 @@ export async function listKnowledgeSources(organizationId: string, opts?: ListSo
   // explicit "show versions" view.
   let query = sb
     .from("cs_knowledge_sources")
-    .select("id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode", { count: "exact" })
+    .select(
+      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,cognitive_os_project_id,cognitive_os_imported_at",
+      { count: "exact" },
+    )
     .eq("organization_id", organizationId)
     .neq("status", "archived");
   if (opts?.search?.trim()) query = query.ilike("title", `%${opts.search.trim()}%`);
@@ -128,6 +135,8 @@ export async function listKnowledgeSources(organizationId: string, opts?: ListSo
     folderId: (s.folder_id as string | null) ?? null,
     keywordMode: (s.keyword_mode as string | null) ?? "inherit",
     chunks: counts.get(s.id as string) ?? 0,
+    cognitiveOsProjectId: (s.cognitive_os_project_id as string | null) ?? null,
+    cognitiveOsImportedAt: (s.cognitive_os_imported_at as string | null) ?? null,
   }));
   return { items, total: count ?? items.length, page, pageSize };
 }
@@ -733,6 +742,9 @@ export interface SourceDetail {
   venue: string | null;
   doi: string | null;
   createdAt: string;
+  /** Cognitive OS bridge (migration 0087) — see SourceListRow's matching fields for how these get set. */
+  cognitiveOsProjectId: string | null;
+  cognitiveOsImportedAt: string | null;
 }
 
 /** One document's full detail for the ops content-viewer (K2g) — org-scoped, active or archived. */
@@ -742,7 +754,7 @@ export async function getSourceDetail(organizationId: string, sourceId: string):
   const { data, error } = await sb
     .from("cs_knowledge_sources")
     .select(
-      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,body,language,epistemic_type,authorship_state,locked,author,published_at,venue,doi,created_at",
+      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,body,language,epistemic_type,authorship_state,locked,author,published_at,venue,doi,created_at,cognitive_os_project_id,cognitive_os_imported_at",
     )
     .eq("organization_id", organizationId)
     .eq("id", sourceId)
@@ -769,7 +781,34 @@ export async function getSourceDetail(organizationId: string, sourceId: string):
     venue: (data.venue as string | null) ?? null,
     doi: (data.doi as string | null) ?? null,
     createdAt: data.created_at as string,
+    cognitiveOsProjectId: (data.cognitive_os_project_id as string | null) ?? null,
+    cognitiveOsImportedAt: (data.cognitive_os_imported_at as string | null) ?? null,
   };
+}
+
+/**
+ * Cognitive OS bridge write-back (migration 0087). Called by
+ * lib/cognitive-os/import-sources.ts's importOrganizationSources() immediately after a source is
+ * successfully created in Cognitive OS — never called speculatively, so a non-null
+ * cognitiveOsProjectId is always backed by a real, already-succeeded POST .../sources call.
+ *
+ * Returns `Promise<boolean>` and checks `.select("id")` row count, not just `error` (critic finding,
+ * 2026-09-18, re-flagging the exact class of bug archiveKnowledgeSource's own comment above already
+ * documents from 2026-09-12): Supabase/PostgREST returns `error: null` even when the WHERE clause
+ * matches zero rows, so an unchecked write here would report success on a stale/foreign sourceId. A
+ * write-back failure does NOT mean the Cognitive OS import itself failed — that already succeeded —
+ * so the caller surfaces this as a soft warning (ImportSummary.errors), not a re-thrown exception.
+ */
+export async function markSourceSentToCognitiveOs(organizationId: string, sourceId: string, projectId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { data, error } = await sb
+    .from("cs_knowledge_sources")
+    .update({ cognitive_os_project_id: projectId, cognitive_os_imported_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", sourceId)
+    .select("id");
+  return !error && (data?.length ?? 0) > 0;
 }
 
 export interface VersionSummary {

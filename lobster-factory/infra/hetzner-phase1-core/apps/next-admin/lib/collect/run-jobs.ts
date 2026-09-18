@@ -22,14 +22,25 @@
 
 import type { RunCollectionResult } from "@/lib/collect/run";
 
-export interface RunJob {
+// Generic over the result type (2026-09-18, closing the collect -> Cognitive OS loop): the send-to-
+// Cognitive-OS action needs this exact same "start async, poll by key" infrastructure for a
+// completely different result shape (ImportSummary, not RunCollectionResult) -- everything below this
+// line was already result-shape-agnostic in practice (Map<string, {status,startedAt,result,error}>),
+// only the type annotations were needlessly narrow. `<T = RunCollectionResult>` keeps every existing
+// caller's inferred type identical with zero call-site changes.
+export interface RunJob<T = RunCollectionResult> {
+  /** Which feature registered this job (critic finding, 2026-09-18): the map is shared across job
+   *  kinds keyed only by caller-chosen `runKey` strings — this discriminant is checked by getRunJob
+   *  so a future job kind that forgets its own key-namespacing convention gets a clean `null`
+   *  ("not found") instead of silently reading another kind's differently-shaped result object. */
+  kind: string;
   status: "running" | "done" | "error";
   startedAt: number;
-  result?: RunCollectionResult;
+  result?: T;
   error?: string;
 }
 
-const jobs = new Map<string, RunJob>();
+const jobs = new Map<string, RunJob<unknown>>();
 
 /**
  * Terminal jobs older than this are pruned on the next write. NOT applied to "running" jobs
@@ -51,12 +62,13 @@ function prune(now: number) {
 /**
  * Register a run under `runKey` and let it proceed in the background. Never rejects — a thrown
  * error becomes a "error" status instead of an unhandled rejection, since nothing downstream awaits
- * this call.
+ * this call. `kind` must be the same literal every caller in one feature uses (e.g. "collection-run",
+ * "cognitive-os-import") — getRunJob checks it before returning a result.
  */
-export function startRunJob(runKey: string, work: Promise<RunCollectionResult>): void {
+export function startRunJob<T = RunCollectionResult>(kind: string, runKey: string, work: Promise<T>): void {
   const now = Date.now();
   prune(now);
-  jobs.set(runKey, { status: "running", startedAt: now });
+  jobs.set(runKey, { kind, status: "running", startedAt: now });
   work.then(
     (result) => {
       const job = jobs.get(runKey);
@@ -75,6 +87,10 @@ export function startRunJob(runKey: string, work: Promise<RunCollectionResult>):
   );
 }
 
-export function getRunJob(runKey: string): RunJob | null {
-  return jobs.get(runKey) ?? null;
+export function getRunJob<T = RunCollectionResult>(kind: string, runKey: string): RunJob<T> | null {
+  const job = jobs.get(runKey);
+  if (!job || job.kind !== kind) return null;
+  // Cast is now backed by the kind check above, not just caller discipline: a mismatched kind
+  // returns null before this line, rather than a wrongly-shaped object with no error.
+  return job as RunJob<T>;
 }

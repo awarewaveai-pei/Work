@@ -9,10 +9,12 @@ import type { SourceDetail } from "@/lib/kb";
 const kb = vi.hoisted(() => ({
   listKnowledgeSources: vi.fn(),
   getSourceDetail: vi.fn(),
+  markSourceSentToCognitiveOs: vi.fn(),
 }));
 vi.mock("@/lib/kb", () => ({
   listKnowledgeSources: kb.listKnowledgeSources,
   getSourceDetail: kb.getSourceDetail,
+  markSourceSentToCognitiveOs: kb.markSourceSentToCognitiveOs,
 }));
 
 const client = vi.hoisted(() => ({
@@ -49,6 +51,8 @@ function detail(overrides: Partial<SourceDetail> = {}): SourceDetail {
     venue: "Journal of Testing",
     doi: "10.1234/abcd.5678",
     createdAt: "2020-01-01T00:00:00+00:00",
+    cognitiveOsProjectId: null,
+    cognitiveOsImportedAt: null,
     ...overrides,
   };
 }
@@ -99,11 +103,23 @@ describe("evaluateSourceForImport", () => {
     expect(result.eligible).toBe(false);
     expect(result.issues).toContain("MISSING_BODY");
   });
+
+  it("rejects a source flagged sensitive, even when everything else is fully eligible", () => {
+    // Same failure class migration 0083 hardened for a different consumer (the customer-service AI):
+    // an operator's 敏感 checkbox must not silently do nothing for this consumer either.
+    const result = evaluateSourceForImport(detail({ isSensitive: true }));
+    expect(result.eligible).toBe(false);
+    expect(result.issues).toContain("SENSITIVE_EXCLUDED");
+  });
 });
 
 describe("importOrganizationSources", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: write-back succeeds, matching the overwhelming common case — tests that care about
+    // the failure path override this explicitly, per markSourceSentToCognitiveOs's real signature
+    // (Promise<boolean>, critic finding 2026-09-18: it used to be untyped/unchecked Promise<void>).
+    kb.markSourceSentToCognitiveOs.mockResolvedValue(true);
   });
 
   it("creates a Project on first run, imports every eligible source, and reports rejects", async () => {
@@ -132,6 +148,10 @@ describe("importOrganizationSources", () => {
       "proj-1",
       expect.objectContaining({ title: "A Real Paper", authors: ["Jane Smith", "John Doe"], media_type: "text/plain" }),
     );
+    // Write-back happens for the imported source, never for the rejected one — a rejected source
+    // was never actually sent, so recording it as sent would be a false claim.
+    expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledTimes(1);
+    expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledWith(ORG_ID, "src-1", "proj-1");
   });
 
   it("reuses an existing Project by exact name match instead of creating a duplicate", async () => {
@@ -156,6 +176,39 @@ describe("importOrganizationSources", () => {
     expect(summary.alreadyImported).toBe(1);
     expect(summary.imported).toBe(0);
     expect(client.createCognitiveOsSource).not.toHaveBeenCalled();
+    // Self-heal: an already-imported source still gets its next-admin-side write-back re-asserted,
+    // in case an earlier run's write-back never landed (or predates migration 0087 entirely).
+    expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledWith(ORG_ID, "src-1", "proj-1");
+  });
+
+  it("does NOT re-write an already-imported source whose write-back is already correct (no unbounded per-click UPDATE sweep)", async () => {
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [{ project_id: "proj-1", name: `Knowledge Import: ${ORG_ID}` }] });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [{ title: "A Real Paper" }] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [{ id: "src-1" }], total: 1, page: 1, pageSize: 200 });
+    // cognitiveOsProjectId already matches the target project -- the write-back already landed.
+    kb.getSourceDetail.mockResolvedValue(detail({ cognitiveOsProjectId: "proj-1" }));
+
+    const summary = await importOrganizationSources(ORG_ID);
+
+    expect(summary.alreadyImported).toBe(1);
+    expect(kb.markSourceSentToCognitiveOs).not.toHaveBeenCalled();
+    expect(summary.errors).toEqual([]);
+  });
+
+  it("surfaces a write-back failure as a soft warning without un-counting a real import", async () => {
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-1" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsSource.mockResolvedValue({ ok: true, value: { source_id: "cos-1" } });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [{ id: "src-1" }], total: 1, page: 1, pageSize: 200 });
+    kb.getSourceDetail.mockResolvedValue(detail());
+    // The Cognitive OS create already succeeded; only this app's own bookkeeping write fails.
+    kb.markSourceSentToCognitiveOs.mockResolvedValue(false);
+
+    const summary = await importOrganizationSources(ORG_ID);
+
+    expect(summary.imported).toBe(1); // the import itself genuinely happened -- not un-counted
+    expect(summary.errors).toEqual(["write_back_failed:src-1"]);
   });
 
   it("paginates through more than one page of candidates", async () => {
@@ -184,5 +237,28 @@ describe("importOrganizationSources", () => {
 
     expect(summary.errors).toEqual(["ensure_project_failed:cognitive_os_not_configured"]);
     expect(kb.listKnowledgeSources).not.toHaveBeenCalled();
+  });
+
+  it("isolates one source's createCognitiveOsSource failure — the rest of the batch still imports", async () => {
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-1" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsSource.mockImplementation((_projectId: string, payload: { title: string }) =>
+      Promise.resolve(
+        payload.title === "Flaky Paper" ? { ok: false, error: "cognitive_os_unreachable" } : { ok: true, value: { source_id: "cos-ok" } },
+      ),
+    );
+    kb.listKnowledgeSources.mockResolvedValue({ items: [{ id: "src-1" }, { id: "src-2" }], total: 2, page: 1, pageSize: 200 });
+    kb.getSourceDetail.mockImplementation((_org: string, id: string) =>
+      Promise.resolve(id === "src-1" ? detail({ id: "src-1", title: "Flaky Paper" }) : detail({ id: "src-2", title: "Good Paper" })),
+    );
+
+    const summary = await importOrganizationSources(ORG_ID);
+
+    // One failed, one succeeded — the loop did not abort on the first error.
+    expect(summary.imported).toBe(1);
+    expect(summary.errors).toEqual(["src-1:cognitive_os_unreachable"]);
+    expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledTimes(1);
+    expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledWith(ORG_ID, "src-2", "proj-1");
   });
 });

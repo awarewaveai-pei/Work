@@ -17,8 +17,19 @@ import { KnowledgeTab } from "../ClientHubTabs";
 
 const ORG = { id: "o1", slug: "acme", name: "Acme", type: "client", status: "active" };
 
-function sourceRow(id: string, title: string, folderId: string | null) {
-  return { id, title, kind: "doc", isSensitive: false, canonicalUrl: "https://example.com", folderId, keywordMode: "inherit", chunks: 1 };
+function sourceRow(id: string, title: string, folderId: string | null, cognitiveOsProjectId: string | null = null) {
+  return {
+    id,
+    title,
+    kind: "doc",
+    isSensitive: false,
+    canonicalUrl: "https://example.com",
+    folderId,
+    keywordMode: "inherit",
+    chunks: 1,
+    cognitiveOsProjectId,
+    cognitiveOsImportedAt: cognitiveOsProjectId ? "2026-09-18T04:00:00+00:00" : null,
+  };
 }
 
 let container: HTMLDivElement;
@@ -127,5 +138,18 @@ describe("KnowledgeTab — K2j collapse-cards grouping", () => {
     );
     expect(container.textContent).toContain("未分類");
     expect(container.textContent).toContain("客服文件");
+  });
+
+  it("shows a Cognitive OS badge with a deep link only for sources actually sent there", async () => {
+    await mount(
+      [sourceRow("s1", "已送出的文件", null, "proj-abc"), sourceRow("s2", "尚未送出的文件", null)],
+      [],
+    );
+    expect(container.textContent).toContain("已送 Cognitive OS");
+    const link = container.querySelector("a[href*='cognitive.aware-wave.com']") as HTMLAnchorElement | null;
+    expect(link, "deep link must exist for the sent source").not.toBeNull();
+    expect(link!.href).toContain("project=proj-abc");
+    // Only one badge — the second source (never sent) must not also render one.
+    expect(container.querySelectorAll("a[href*='cognitive.aware-wave.com']").length).toBe(1);
   });
 });

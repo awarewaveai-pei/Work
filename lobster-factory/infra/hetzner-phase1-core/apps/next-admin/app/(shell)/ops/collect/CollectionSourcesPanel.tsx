@@ -75,6 +75,24 @@ interface RunResult {
   errors: string[];
 }
 
+/** Mirrors ai_lego/apps/api/main.py's ImportSummary shape returned by
+ *  POST /api/ops/clients/[slug]/cognitive-os-import (which wraps lib/cognitive-os/import-sources.ts's
+ *  own ImportSummary 1:1 — see that file for field meaning). */
+interface CognitiveOsImportResult {
+  organizationId: string;
+  projectId: string;
+  totalCandidates: number;
+  imported: number;
+  alreadyImported: number;
+  rejected: Array<{ sourceId: string; title: string; issues: string[] }>;
+  errors: string[];
+}
+
+// Public dashboard for the Cognitive Engineering OS Phase 1 API (deploy/deploy.sh's own SMOKE_URL
+// host) — no project-scoped route existed before 2026-09-18; ?project=<id> now deep-links the
+// operator straight to this Project's sources inside that dashboard.
+const COGNITIVE_OS_DASHBOARD_URL = "https://cognitive.aware-wave.com/";
+
 const ENTRY_PLACEHOLDER: Record<string, string> = {
   url: "https://example.com/faq",
   query: "退貨政策 OR 消費者保護法",
@@ -101,6 +119,9 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [run, setRun] = useState<RunResult | null>(null);
+  const [cognitiveOsBusy, setCognitiveOsBusy] = useState(false);
+  const [cognitiveOsMessage, setCognitiveOsMessage] = useState<string | null>(null);
+  const [cognitiveOsRun, setCognitiveOsRun] = useState<CognitiveOsImportResult | null>(null);
   // Guards pollRun's loop against a component that has already unmounted (navigated off this page
   // mid-run) — critic finding, 2026-09-12: without this the loop kept polling and calling setState
   // for up to ~10 minutes after the tab left /ops/collect. React itself no-ops a setState on an
@@ -262,6 +283,61 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
     }
   }
 
+  // Same edge-timeout reasoning as pollRun above (WORKLOG 2026-09-12): a real import calls
+  // Cognitive OS once per eligible source, easily past the ~100s Cloudflare idle ceiling.
+  async function pollCognitiveOsImport(runKey: string): Promise<void> {
+    let consecutiveFailures = 0;
+    for (;;) {
+      if (!mountedRef.current) return;
+      let data: { ok?: boolean; status?: string; result?: CognitiveOsImportResult; error?: string };
+      try {
+        const res = await fetch(`/api/ops/clients/${slug}/cognitive-os-import?runKey=${encodeURIComponent(runKey)}`, { headers });
+        data = await res.json();
+        consecutiveFailures = 0;
+      } catch {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 10) {
+          if (mountedRef.current) setCognitiveOsMessage("⚠ 追蹤送出狀態失敗（網路持續連不上）——匯入仍在伺服器上繼續跑，稍後重新整理頁面看 Knowledge 分頁確認結果");
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (!mountedRef.current) return;
+      if (!data.ok) {
+        setCognitiveOsMessage("⚠ 追蹤不到這次送出的狀態（可能伺服器重啟過）——稍後重新整理 Knowledge 分頁確認是否已完成");
+        return;
+      }
+      if (data.status === "running") {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (data.status === "error") {
+        setCognitiveOsMessage(`⚠ ${data.error ?? "cognitive_os_import_failed"}`);
+        return;
+      }
+      if (data.result) setCognitiveOsRun(data.result);
+      return;
+    }
+  }
+
+  async function sendToCognitiveOs() {
+    setCognitiveOsBusy(true);
+    setCognitiveOsMessage(null);
+    setCognitiveOsRun(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${slug}/cognitive-os-import`, { method: "POST", headers, body: JSON.stringify({}) });
+      const data = (await res.json()) as { ok?: boolean; queued?: boolean; runKey?: string; error?: string };
+      if (data.ok && data.runKey) {
+        await pollCognitiveOsImport(data.runKey);
+      } else {
+        setCognitiveOsMessage(`⚠ ${data.error ?? "cognitive_os_import_failed"}`);
+      }
+    } finally {
+      setCognitiveOsBusy(false);
+    }
+  }
+
   const approved = sources.filter((s) => s.status === "approved");
   const candidates = sources.filter((s) => s.status === "candidate");
   const disabled = sources.filter((s) => s.status === "disabled");
@@ -392,6 +468,15 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
           </div>
 
           {run ? <RunReport run={run} /> : null}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap", borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+            <button onClick={sendToCognitiveOs} disabled={cognitiveOsBusy} style={buttonStyle(false)}>
+              送去 Cognitive OS 分析
+            </button>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>把已入庫的來源送進 Cognitive OS，之後去那邊挑方法分析</span>
+          </div>
+          {cognitiveOsMessage ? <p style={{ fontSize: 12, color: "#b45309", whiteSpace: "pre-wrap" }}>{cognitiveOsMessage}</p> : null}
+          {cognitiveOsRun ? <CognitiveOsImportReport run={cognitiveOsRun} /> : null}
         </section>
 
         <section data-panel="form">
@@ -691,6 +776,40 @@ function RunReport({ run }: { run: RunResult }) {
           </div>
         );
       })}
+      {run.errors.length ? <div style={{ color: "#b91c1c", marginTop: 6 }}>{run.errors.join("、")}</div> : null}
+    </div>
+  );
+}
+
+function CognitiveOsImportReport({ run }: { run: CognitiveOsImportResult }) {
+  return (
+    <div style={{ marginTop: 12, border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, fontSize: 13 }}>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>已送去 Cognitive OS · Project {run.projectId}</div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
+        <span>候選 {run.totalCandidates}</span>
+        <span>新匯入 {run.imported}</span>
+        <span>已匯入過 {run.alreadyImported}</span>
+        <span style={{ color: run.rejected.length ? "#b45309" : undefined }}>不合格 {run.rejected.length}</span>
+      </div>
+      <a
+        href={`${COGNITIVE_OS_DASHBOARD_URL}?project=${encodeURIComponent(run.projectId)}`}
+        target="_blank"
+        rel="noreferrer"
+        style={{ fontSize: 12 }}
+      >
+        前往 Cognitive OS 挑選方法 →
+      </a>
+      {/* Same "explain the refusal, don't hide it" convention as RunReport above — a rejected
+          citation-metadata record must not look like a quiet, everything-went-fine send. */}
+      {run.rejected.length ? (
+        <div style={{ marginTop: 8 }}>
+          {run.rejected.slice(0, 12).map((r) => (
+            <div key={r.sourceId} style={{ fontSize: 11, marginBottom: 4, color: "#b45309", overflowWrap: "anywhere" }}>
+              {r.title}：{r.issues.join("、")}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {run.errors.length ? <div style={{ color: "#b91c1c", marginTop: 6 }}>{run.errors.join("、")}</div> : null}
     </div>
   );

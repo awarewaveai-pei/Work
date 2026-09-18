@@ -11,7 +11,7 @@
 // different input shape (cs_knowledge_sources' single `author` string, not a literature_search
 // items[] list) -- it does NOT restore that Python method, which stays retired.
 
-import { getSourceDetail, listKnowledgeSources, type SourceDetail } from "@/lib/kb";
+import { getSourceDetail, listKnowledgeSources, markSourceSentToCognitiveOs, type SourceDetail } from "@/lib/kb";
 import {
   createCognitiveOsProject,
   createCognitiveOsSource,
@@ -24,8 +24,10 @@ const MIN_YEAR = 1400;
 const MAX_YEAR = 2100;
 // Title_Case vocabulary: ai_lego.core.domain._intake_validation.DATA_CLASSIFICATIONS
 // ({"Public","Internal","Confidential","Restricted"}) -- a DIFFERENT vocabulary from the KB's own
-// PUBLIC/INTERNAL/... used elsewhere in this app. "Internal" is the safe default for a personal
-// research corpus: not literally Public, and there is no signal here to justify Confidential/Restricted.
+// PUBLIC/INTERNAL/... used elsewhere in this app. "Internal" is the safe default for what actually
+// reaches this constant: evaluateSourceForImport excludes every is_sensitive=true row before this
+// point (SENSITIVE_EXCLUDED, below), so nothing needing Confidential/Restricted is ever classified
+// here in the first place -- this is not a claim that no such content exists in cs_knowledge_sources.
 const DATA_CLASSIFICATION = "Internal";
 // ai_lego.core.domain.source.TEXT_MEDIA_TYPES Phase 1 accepts UTF-8 text only. cs_knowledge_sources
 // bodies are always extraction output (lib/collect sinks store raw extracted text), never markdown
@@ -67,9 +69,19 @@ export function parseAuthors(author: string | null): string[] {
  * 0051/0072/0084_kb_source_body.sql and lib/kb/db.ts's own SourceDetail projection, both of which
  * expose `body` as the only content field. An empty body is reported as a gate failure
  * (MISSING_BODY) instead of being silently sent to an endpoint that would just reject it.
+ *
+ * `isSensitive` is also a hard gate (critic finding, 2026-09-18): migration 0083's own header
+ * documents that this exact flag was found to silently do nothing for a DIFFERENT consumer of this
+ * same table (the customer-service AI) -- a document an operator marked 敏感 stayed fully retrievable
+ * regardless of the checkbox. Reproducing that same failure here (bulk-exporting a flagged-sensitive
+ * document into a separate system with a blanket "Internal" classification, on one click, with no
+ * warning) would be the identical bug in a new consumer. Cognitive OS's own DATA_CLASSIFICATION
+ * vocabulary has "Confidential"/"Restricted" tiers for exactly this case, but this bridge has no
+ * operator-facing UI yet to choose between them per document -- excluding sensitive rows entirely
+ * (SENSITIVE_EXCLUDED) is the correct default until that UI exists, not a permanent policy.
  */
 export function evaluateSourceForImport(
-  source: Pick<SourceDetail, "title" | "author" | "doi" | "publishedAt" | "body">,
+  source: Pick<SourceDetail, "title" | "author" | "doi" | "publishedAt" | "body" | "isSensitive">,
 ): SourceGateResult {
   const issues: string[] = [];
   if (!source.title?.trim()) issues.push("MISSING_TITLE");
@@ -87,6 +99,7 @@ export function evaluateSourceForImport(
   }
 
   if (!source.body?.trim()) issues.push("MISSING_BODY");
+  if (source.isSensitive) issues.push("SENSITIVE_EXCLUDED");
 
   return { eligible: issues.length === 0, authors, issues };
 }
@@ -177,6 +190,15 @@ export async function importOrganizationSources(
 
   for (const source of sources) {
     if (existingTitles.has(source.title)) {
+      // Self-heals a next-admin-side write-back this row missed (source imported before migration
+      // 0087 existed, or a prior run's write-back failed) -- but only when it's actually missing or
+      // stale (critic finding, 2026-09-18): without this comparison every already-imported source
+      // got an unconditional UPDATE on every single click, forever, scaling with total KB size for
+      // zero benefit in the overwhelming common case where the write-back already landed correctly.
+      if (source.cognitiveOsProjectId !== project.projectId) {
+        const wrote = await markSourceSentToCognitiveOs(organizationId, source.id, project.projectId);
+        if (!wrote) errors.push(`write_back_failed:${source.id}`);
+      }
       alreadyImported += 1;
       continue;
     }
@@ -199,6 +221,11 @@ export async function importOrganizationSources(
       errors.push(`${source.id}:${result.error}`);
       continue;
     }
+    // The Cognitive OS create already succeeded at this point -- a failed write-back is this app's
+    // own bookkeeping falling behind reality, not an import failure, so it's a soft warning
+    // (surfaced in the UI's error list) rather than un-counting an import that genuinely happened.
+    const wrote = await markSourceSentToCognitiveOs(organizationId, source.id, project.projectId);
+    if (!wrote) errors.push(`write_back_failed:${source.id}`);
     imported += 1;
   }
 

@@ -1340,7 +1340,20 @@ export function groupByFolder<T extends { folderId: string | null }>(items: T[])
 // (KnowledgeDetailModal.test.tsx), not a new testing approach.
 export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
-  const [sources, setSources] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean; canonicalUrl: string | null; folderId: string | null; keywordMode: string; chunks: number }>>([]);
+  const [sources, setSources] = useState<
+    Array<{
+      id: string;
+      title: string;
+      kind: string;
+      isSensitive: boolean;
+      canonicalUrl: string | null;
+      folderId: string | null;
+      keywordMode: string;
+      chunks: number;
+      cognitiveOsProjectId: string | null;
+      cognitiveOsImportedAt: string | null;
+    }>
+  >([]);
   const [kbDefault, setKbDefault] = useState<"fuzzy" | "exact">("fuzzy"); // K2i tenant-wide default
   const [kbDefaultSaving, setKbDefaultSaving] = useState(false);
   const [total, setTotal] = useState(0);
@@ -1675,6 +1688,17 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
                           </button>
                           {badge("var(--bg-canvas)", "var(--text-muted)", s.kind)}
                           {s.isSensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感")}
+                          {s.cognitiveOsProjectId ? (
+                            <a
+                              href={`https://cognitive.aware-wave.com/?project=${encodeURIComponent(s.cognitiveOsProjectId)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={s.cognitiveOsImportedAt ? `已於 ${s.cognitiveOsImportedAt.slice(0, 16).replace("T", " ")} 送去 Cognitive OS` : "已送去 Cognitive OS"}
+                              style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--badge-green-bg)", color: "var(--badge-green-text)", textDecoration: "none" }}
+                            >
+                              已送 Cognitive OS →
+                            </a>
+                          ) : null}
                           <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
                           <select
                             value={s.folderId ?? ""}

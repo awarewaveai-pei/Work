@@ -86,6 +86,9 @@ psql_file "$DB_DIR/migrations/0085_kb_folders.sql" >/dev/null
 echo "▶ applying 0086 (precise vs fuzzy keyword matching, per document)"
 psql_file "$DB_DIR/migrations/0086_kb_keyword_mode.sql" >/dev/null
 
+echo "▶ applying 0087 (Cognitive OS bridge link columns -- no new predicate/RPC, syntax-only check)"
+psql_file "$DB_DIR/migrations/0087_kb_cognitive_os_link.sql" >/dev/null
+
 echo "▶ proving the harness can fail (a green run of a dead harness proves nothing)"
 # Captured first, then matched: under `set -o pipefail` psql's non-zero exit (which is the point of
 # this check) would make the whole pipeline non-zero even when grep found the message.
@@ -107,6 +110,7 @@ echo "$VERIFY_OUT" | grep -q 'KB_VERIFY_KEYWORD_MODE_OK' || { echo "$VERIFY_OUT"
 echo "  KB_VERIFY_OK + KB_VERIFY_CONSTRAINTS_OK + KB_VERIFY_PROVENANCE_OK + KB_VERIFY_KEYWORD_OK + KB_VERIFY_SENSITIVE_GATE_OK + KB_VERIFY_FOLDERS_OK + KB_VERIFY_FOLDER_MOVE_OK + KB_VERIFY_KEYWORD_MODE_OK"
 
 echo "▶ applying the down migrations (newest first — each replaced the previous one's function signature)"
+psql_file "$DB_DIR/scripts/0087_kb_cognitive_os_link_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0086_kb_keyword_mode_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0085_kb_folders_down.sql" >/dev/null
 psql_file "$DB_DIR/scripts/0084_kb_source_body_down.sql" >/dev/null
@@ -122,6 +126,9 @@ DOWN_STATE="$(psql_run -tAc "
     WHEN EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name='cs_knowledge_sources' AND column_name IN ('body','folder_id','keyword_mode'))
       THEN 'down_left_0084_0085_0086_columns_behind'
+    WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='cs_knowledge_sources' AND column_name IN ('cognitive_os_project_id','cognitive_os_imported_at'))
+      THEN 'down_left_0087_columns_behind'
     WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='cs_knowledge_folders')
       THEN 'down_left_folders_table_behind'
     WHEN EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
@@ -142,7 +149,7 @@ DOWN_STATE="$(psql_run -tAc "
 [ "$DOWN_STATE" = "DOWN_OK" ] || { echo "✗ down migration did not restore the 0051 state: $DOWN_STATE"; exit 1; }
 echo "  DOWN_OK"
 
-echo "▶ re-applying 0072 + 0075 + 0076 + 0083 + 0084 + 0085 + 0086 (a migration you cannot re-apply is not a rollback path)"
+echo "▶ re-applying 0072 + 0075 + 0076 + 0083 + 0084 + 0085 + 0086 + 0087 (a migration you cannot re-apply is not a rollback path)"
 psql_file "$DB_DIR/migrations/0072_kb_versioning_and_retrieval_predicates.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0075_kb_provenance_and_citation.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0076_kb_ranked_keyword_retrieval.sql" >/dev/null
@@ -150,6 +157,7 @@ psql_file "$DB_DIR/migrations/0083_kb_sensitive_audience_gate.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0084_kb_source_body.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0085_kb_folders.sql" >/dev/null
 psql_file "$DB_DIR/migrations/0086_kb_keyword_mode.sql" >/dev/null
+psql_file "$DB_DIR/migrations/0087_kb_cognitive_os_link.sql" >/dev/null
 REAPPLY_OUT="$(psql_file "$HERE/kb-local-verify.sql" 2>&1 || true)"
 echo "$REAPPLY_OUT" | grep -q 'KB_VERIFY_KEYWORD_MODE_OK' || {
   echo "$REAPPLY_OUT" | grep -E 'ERROR' | head -3; echo "✗ assertions failed after re-apply"; exit 1;

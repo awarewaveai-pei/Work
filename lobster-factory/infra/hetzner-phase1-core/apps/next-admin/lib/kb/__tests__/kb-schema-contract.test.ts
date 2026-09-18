@@ -25,6 +25,7 @@ const MIGRATIONS = [
   "migrations/0084_kb_source_body.sql",
   "migrations/0085_kb_folders.sql",
   "migrations/0086_kb_keyword_mode.sql",
+  "migrations/0087_kb_cognitive_os_link.sql",
 ];
 const migrations = MIGRATIONS.map((f) => readFileSync(path.join(DB_PACKAGE, f), "utf8")).join("\n");
 // The RPC signatures live in whichever migration created them last.

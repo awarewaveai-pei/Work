@@ -33,6 +33,7 @@ export {
   deleteKnowledgeSource,
   getSourceDetail,
   listVersionsForFamily,
+  markSourceSentToCognitiveOs,
   type RebindError,
   type SourceDetail,
   type VersionSummary,

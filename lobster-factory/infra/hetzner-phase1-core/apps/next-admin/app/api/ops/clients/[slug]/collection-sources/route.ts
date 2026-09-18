@@ -66,7 +66,7 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     if (!canWriteTenantConfig(resolved.role)) {
       return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
     }
-    const job = getRunJob(`${orgId}:${runKey}`);
+    const job = getRunJob("collection-run", `${orgId}:${runKey}`);
     if (!job) return NextResponse.json({ ok: false, error: "run_not_found" }, { status: 404 });
     if (job.status === "running") return NextResponse.json({ ok: true, status: "running" });
     if (job.status === "error") return NextResponse.json({ ok: true, status: "error", error: job.error });
@@ -108,6 +108,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     // under a still-running upstream request). The browser now polls GET ?runKey= instead of
     // waiting on this response body.
     startRunJob(
+      "collection-run",
       `${orgId}:${runKey}`,
       runCollection({ organizationId: orgId, sourceIds, dryRun, runKey }).then((result) => {
         audit(orgId, resolved.role, resolved.source, dryRun ? "collection_dry_run" : "collection_run", {
