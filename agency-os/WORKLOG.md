@@ -1,4 +1,24 @@
 # Worklog
+## 2026-09-18（續10）獨立驗證續9的main.py修復＋恢復正式環境部署（操作者「建正式環境服務帳號+部署」指示的部署步驟），途中另揭露並修復2個真實bug
+
+[獨立驗證 續9 的修復] 未直接信任並行 session 的宣稱：`git fetch`+`git merge-base --is-ancestor` 確認 `953d98665` 是 `bc87536c6`（我先前那個損壞 commit）的直系後代；讀回 `main.py` 兩段損壞區域的實際內容（`CreateSourceRequest`/`create_source`/`list_sources`）逐行核對正確；`ast.parse`+`py_compile` 乾淨；`pytest tests/unit/test_project_source_api.py tests/unit/test_api_main.py tests/unit/test_ai_gateway.py` 125 passed/1 failed（失敗的 `test_dashboard_never_interpolates_catalog_data_via_innerhtml` 純屬時序——測試當下我尚未 pull 到並行 session 同時在推的 `094284e90`/`5be8cc048`，事後對方用我推的版本重跑已確認 PASS，非迴歸）。用 SendMessage 雙向對齊，對方確認無被覆蓋的本地改動。
+
+[正式環境部署，恢復操作者稍早批准的部署動作] SSH `ks-aw-01` 準備 `git pull` 時發現兩個與本次修復無關的既有問題，當場處理（非補丁，見下）：
+1. **`/opt/cognitive-os` checkout 844 個檔案（不含 `.runtime/` 執行期資料）被 root 持有**（`ai_lego/data/repositories/` 目錄 `root:root 755`，`ubuntu` 使用者連新建檔案都不行，`git merge --ff-only` 直接 `Permission denied`）。根因未完全追溯（非本次阻塞重點），修法：`find`排除 `.runtime/` 後 `chown -R ubuntu:ubuntu`，範圍精準排除執行期資料卷掛載點；`git merge --ff-only` 中途因此中斷留下 7 個檔案「已寫入磁碟但 HEAD 指標未前進」的中間態，逐一 `git diff --quiet origin/main` 確認全部已與目標一致後才 `git reset --hard origin/main`（有徹底驗證磁碟內容不會遺失才用這個指令，非盲用）。
+2. **`deploy.sh` 的 typecheck/test-gate 步驟隱性依賴一個從未寫進任何文件、需要人手動 `source .deploy-venv/bin/activate` 才能跑的慣例**——`deploy.log` 顯示 9/12、9/17 多次乾淨成功，但那些都是「已知情的人手動先啟用 venv」的 shell 跑的；一個全新 SSH session 直接 `ModuleNotFoundError: fastapi`，跟 SyntaxError 表面上都是「typecheck FAIL」，容易誤判成同一種問題。治本（非在我這次 session 手動 activate 就算了）：`deploy.sh` 自行 `source $REPO_ROOT/.deploy-venv/bin/activate`；用**功能性檢查**（`import fastapi, pytest` 真的能跑）取代「檔案存在就信任」，缺件或損壞會自動重新 bootstrap，而非永久卡住或裝作沒事；bootstrap 失敗時的 stdout/stderr 現在真的寫進 `deploy.log`（原本只有一句固定字串，今天稍早那次真實故障就是因為這樣才需要人工 SSH 找根因）；網路呼叫加 `timeout 300`。過程中另發現 `pyproject.toml` 的 `test` extra 沒列 `pytest` 本身——沿用舊 venv 才没發現，全新 bootstrap 會在 test-gate 卡死，SSOT（`pyproject.toml`）補上。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git merge-base --is-ancestor bc87536c6 953d98665`（獨立驗證續9是真的往前修，不是碰巧同內容）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_project_source_api.py tests/unit/test_api_main.py tests/unit/test_ai_gateway.py -q`（against 953d98665 HEAD，非僅 pre-commit working tree）| exit=1(1 failed, 見上時序說明)| result=125 passed
+- REALTEST_EVIDENCE: tool=SSH | cmd=`chown` 後 `find . -not -path "*/.runtime/*" -not -user ubuntu` | exit=0 | result=0 遺留（僅刻意保留的 `.runtime` 掛載點本身）
+- REALTEST_EVIDENCE: tool=SSH | cmd=對 7 個「merge 中斷」檔案逐一 `git diff --quiet origin/main --` | exit=0（全部無差異，才執行 `git reset --hard`）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/tmp/test-venv-block2.sh`（TEST A 全新 bootstrap／TEST B 功能性檢查快速跳過／TEST C 刻意拔掉 fastapi 驗證能偵測損壞觸發自癒）| exit=0 | result=三情境全符合預期（TEST A 首次因 pyproject.toml 修復尚未同步到host 而失敗，push+pull 後重跑通過，見續文字）
+- REVIEW_DONE: critic=Standard | verdict=pass(修復後) | findings=0c/3m/2n（3 Major 全修：fresh-bootstrap 缺 pytest／`else`分支不會自癒／失敗訊息丟棄真實錯誤；2 Minor 全修：pip 自我升級失敗静默吞噬／網路呼叫無逾時上限）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`deploy-venv\|DEPLOY_VENV` | hits=4（全部為 WORKLOG 歷史敘事，非需同步的程式碼；`deploy.sh` 是此慣例唯一消費者，`pyproject.toml` 全 repo 唯一一份）
+- [rollback] deploy.sh／pyproject.toml：revert 本次 commit 即回到需手動 activate 的舊行為（功能不變，純自動化程度倒退，不影響正確性）；chown：純檔案持有者變更，無內容變動，不需要 rollback；main.py 驗證：純讀取，無變更。
+- **[已知限制，非本次修復範圍，供後續參考]** critic 額外揭露兩個 pre-existing、跟這次 diff 無關的問題，記錄不修：(a) `log()`（`deploy.sh:19`）用 `echo | tee`，`pipefail` 下若 `tee` 本身失敗（磁碟滿）會讓 `set -e` 在 `notify()` 執行前就中止腳本，整份檔案的錯誤處理都有這個洞，不只本次新增區塊；(b) repo 無 `.dockerignore`，`.deploy-venv` 現在會永久留在 docker build context 內（`docker-compose.yml` 的 `.gitignore` 已排除進版控，但沒排除進 build context）。兩者都不影響本次部署的正確性，留給下次真的動 `deploy.sh`/`docker-compose.yml` 時一併處理。
+- WORKLOG_DONE: main.py 修復獨立驗證 + deploy.sh venv 自舉修復（含 critic 3 Major/2 Minor 全修）——**部署本身尚未執行完成**，下一則 WORKLOG entry 會記錄實際 deploy.sh 執行結果與 E2E import 測試
+
 ## 2026-09-18（續9）緊急修復 main.py 語法損壞（HEAD 一度無法 import）+ Cognitive OS 儀表板操作者中途 3 項糾偏（縮寫獨立欄位、欄位表單免點擊即顯示、可讀欄位標籤）
 
 [緊急事故] 準備 commit 續6 的 critic 修復時，`git diff` 發現 main.py 出現我沒動過的新 hunk；`git show HEAD:...main.py | python -m py_compile` 直接 SyntaxError（line 998）。根因：`CreateSourceRequest`/`create_source`/`list_sources`（另一 session 的 doi/authors/venue 功能區塊）被錯位拼接——4 個欄位跑進 `create_project()` 函式簽名裡（無逗號，語法錯誤）、`source_record()` 的 `doi=`/`authors=`/`venue=`/`published_at=` kwargs 跑到呼叫括號外面、`source_cas.put()`/`return repo.add_source()` 被夾進 `list_sources` 的 decorator 和自己的 def 之間。形狀符合 hunk-based patch（`git apply`／`git-stage-hunks.py` 類工具）套用時行號跟並行編輯沒對齊，非手誤。未深究確切成因（API 已整個 import 不起來，擋到任何 fresh clone/pull/CI/deploy，優先恢復正確性）；working tree 那三段本來就是對的（未曾動過該邏輯），直接照現有正確版本 commit 覆蓋修復（`953d98665`）。已用 SendMessage flag 給負責 doi/authors/venue 功能的並行 session，請他們對照這個 commit 確認沒有本地未 commit 異動被意外覆蓋。

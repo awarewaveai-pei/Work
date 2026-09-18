@@ -27,6 +27,35 @@ notify() {
 
 cd "$REPO_ROOT"
 
+# -- 0. Typecheck/test-gate venv. Self-contained on purpose: this script must not depend on
+#    the invoking shell having already `source`d a venv (true for cron/systemd, and for any
+#    fresh SSH session that doesn't know this repo's local convention -- discovered 2026-09-18
+#    when a plain `bash deploy.sh` failed with ModuleNotFoundError: fastapi despite deploy.log
+#    showing many prior clean runs, because those ran from a shell where .deploy-venv had
+#    already been activated by hand). Assumes a dedicated per-product checkout (prod uses a
+#    sparse clone at /opt/cognitive-os) -- a shared monorepo checkout running this same pattern
+#    for a second product would collide on this directory name.
+#    Functional (not just existence) check: (re)installs whenever fastapi/pytest aren't actually
+#    importable, so a dependency added to pyproject.toml later, or a venv left half-built by an
+#    interrupted prior bootstrap (OOM-kill, host reboot), self-heals instead of silently blocking
+#    every future deploy or trusting a broken venv forever.
+DEPLOY_VENV="$REPO_ROOT/.deploy-venv"
+venv_functional() {
+  [[ -x "$DEPLOY_VENV/bin/python3" ]] && "$DEPLOY_VENV/bin/python3" -c "import fastapi, pytest" >/dev/null 2>&1
+}
+if ! venv_functional; then
+  log "venv | $DEPLOY_VENV missing or incomplete -- (re)bootstrapping from pyproject.toml"
+  timeout 300 python3 -m venv "$DEPLOY_VENV" >>"$LOG" 2>&1 || { log "venv | FAIL: python3 -m venv (see $LOG for detail)"; notify "FAILED to bootstrap .deploy-venv"; exit 1; }
+  # shellcheck disable=SC1091
+  source "$DEPLOY_VENV/bin/activate"
+  timeout 300 pip install --quiet --upgrade pip >>"$LOG" 2>&1 || log "venv | WARN: pip self-upgrade failed, continuing with bundled pip"
+  timeout 300 pip install --quiet -e "$PRODUCT_ROOT[test]" >>"$LOG" 2>&1 || { log "venv | FAIL: pip install (see $LOG for detail)"; notify "FAILED to install deploy-venv deps"; exit 1; }
+else
+  # shellcheck disable=SC1091
+  source "$DEPLOY_VENV/bin/activate"
+fi
+log "venv | using $(command -v python3) ($(python3 --version))"
+
 # -- 1. Typecheck substitute (Python has no tsc; the closest real equivalent is "does every
 #    module even import cleanly" -- catches syntax errors and import-time exceptions before
 #    they'd otherwise only surface at request time inside the container). --
