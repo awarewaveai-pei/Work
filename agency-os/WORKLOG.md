@@ -1,4 +1,17 @@
 # Worklog
+## 2026-09-19（續80）訂正續78「≥250/285」為精確值：operator 質疑「自己亂掰」，逐一 introspect 真實 builder 簽名算出 266/285
+
+- [操作者請求] 操作者對續78的「grep 確認 ≥250/285」提出質疑：「所以你說 所有工具都給錯表格 自己亂掰?」——質疑數字精確度，不是根因本身。
+- 續78 那句「≥250」是 `Grep -l "^def generate_\w+\("` 命中檔案數（觸及工具 250 上限，純文字比對）跟另一個「任一 `: list[` 出現在檔案任何角落」計數混著講——兩者都只是粗略 proxy，不是逐一驗證每個方法的 builder 簽名。操作者這個質疑成立：續78 那句話確實不夠精確（懶，不是造假）。
+- **訂正**：寫腳本用 `ai_lego/apps/api/dispatch.py` 的 `resolve_builder()`——跟 `/methods/{id}/form`（`main.py:717-759`）內部呼叫的**同一個函式**——對 285 個 ACTIVE 方法逐一 `inspect.signature()`，排除 `record_id`/`provenance`，把每個參數的 annotation 分類成「扁平」（`str`/`int`/`float`/`bool`，含 `| None` 變體）或「結構化」（`list[...]`/`dict[...]`/其他）。精確結果：**266/285（93%）至少 1 個結構化參數**（同 5W1H 的病）、**18/285（6%）全扁平**（現有通用文字框其實沒問題，不是全部都錯）、**1 個（`stakeholder.regulator`）dispatch 直接找不到 builder**（獨立 bug，未追蹤）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`PYTHONPATH=. python3` 對 285 個 `methods/contracts/*.yaml` 的 ACTIVE id 逐一呼叫 `resolve_builder(mid)` + `inspect.signature(builder)` 分類 | exit=0 | result=266 structured／18 flat-only／1 dispatch-error，總和 285 對齊 contracts 總數，無遺漏無重複
+- REVIEW_DONE: self-review=Quick（單一唯讀分析腳本，未落地新程式碼，僅更正既有記錄的數字） | verdict=pass | findings=0c/0m
+- BUGHUNT_DONE: scope=agency-os | grep=`≥250/285\|266/285` | hits=`TASKS.md` 舊估計已同步更正為精確值；`WORKLOG.md` 續78 原文依 append-only 慣例不回改，本條目訂正取代
+- [已修改] `agency-os/TASKS.md`：結構化欄位項的粗估「≥250」更正為精確「266/285（93%）」，附驗證方法一句話
+- [剩餘風險] 無新增——這只是把續78一個不夠精確的數字換成精確值，根因與修復範圍不變
+- [rollback] 純文件訂正，`git diff agency-os/TASKS.md agency-os/WORKLOG.md` 可完整審視
+- WORKLOG_DONE: 續78「≥250」粗估訂正為逐一 introspect 得出的精確值 266/285（93%）＋ 18/285 全扁平（現有 UI 沒問題）＋ 1 個獨立 dispatch bug
+
 ## 2026-09-19（續79）Cognitive OS import：一個組織一個 Project 改成一個資料夾一個 Project，過程中兩輪跨模型審查各抓到一個真實 bug
 
 [任務] 承接續65（cognitive-os project 命名用 org UUID 看不出是誰）+ 操作者「檔案一多時要怎麼辦?...為什麼不延續需搜尋時新增的資料夾」。查證 Cognitive OS 自己的原始碼（`ai_lego/apps/api/main.py` 的 `CreateSourceRequest`／`/projects/{id}/sources`）確認它完全沒有資料夾/標籤/collection 概念，Project 底下就是一包扁平清單——「一個客戶一個 Project」的舊設計沒有做錯排序，是選錯了單位。改成「一個 KB 資料夾一個 Project」，直接對應操作者自己在知識庫那邊已經建好的分類。
