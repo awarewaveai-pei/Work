@@ -545,12 +545,6 @@ services:
     image: hci30-app:local
     container_name: hci-app
     restart: unless-stopped
-    extra_hosts:
-      # Reaches the isolated fetch-runner stack below by its published host port, across the
-      # network-isolation boundary those services exist to enforce -- hci-app is deliberately NOT a
-      # member of hci-fetch-runner-net (see that network's own comment for why joining it would
-      # defeat the isolation). Same host.docker.internal pattern next-admin already uses.
-      - "host.docker.internal:host-gateway"
     ports:
       # sg-deploy.sh's own smoke-check needs a host-reachable port to curl directly (same
       # `${..._HOST_PORT:-...}` + runtime `docker port` resolution pattern node-api already uses,
@@ -564,7 +558,17 @@ services:
       HCI_DB_USER: hci_owner
       HCI_DB_PASSWORD: ${HCI_DB_PASSWORD:?hci-app needs the same value as hci-postgres's own POSTGRES_PASSWORD above}
       HCI_DB_NAME: hci_wave1_synthetic
-      HCI_FETCH_RUNNER_BASE_URL: http://host.docker.internal:${HCI_FETCH_RUNNER_HOST_PORT:-8190}
+      # Internal service DNS on hci-fetch-runner-net (this service's own networks: list below), not
+      # host.docker.internal + the published host port -- 2026-09-18 prod incident: a 127.0.0.1-only
+      # host-port publish does not accept a connection arriving via the docker bridge gateway on this
+      # (Linux) host, so hci-app got "fetch failed" for every real request. The published host port
+      # (hci-fetch-runner's own ports: block) stays for host-side/SSH debugging only, never the
+      # runtime call path. Joining hci-fetch-runner-net does not weaken ADR-0029 gate 2 ("no route
+      # to the docker-internal bridge network" for the RUNNER's own egress): network membership does
+      # not grant the runner any new outbound route to hci-net/lobster-net just because hci-app is
+      # dual-homed, and network-guard's iptables rules (entrypoint.sh) only ever touch the OUTPUT
+      # chain -- inbound reachability to the runner was never the thing gate 2 restricts.
+      HCI_FETCH_RUNNER_BASE_URL: http://hci-fetch-runner:8090
       HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?hci-app needs the same value as hci-fetch-runner's own shared secret below}
     depends_on:
       hci-postgres:
@@ -578,6 +582,7 @@ services:
     networks:
       - hci-net
       - lobster-net
+      - hci-fetch-runner-net
     deploy:
       resources:
         limits:
@@ -611,8 +616,11 @@ services:
     volumes:
       - hci_fetch_runner_ready:/var/run/network-guard
     ports:
-      # 127.0.0.1-only, never 0.0.0.0 (ADR-0029 gate 1) -- internal API, reached from hci-app above
-      # only via host.docker.internal, never joined to this service's own isolated network.
+      # 127.0.0.1-only, never 0.0.0.0 -- host-side/SSH debugging only (curl from the host shell).
+      # hci-app (the one real caller) reaches this service over hci-fetch-runner-net's internal DNS
+      # (http://hci-fetch-runner:8090, that service's own environment block) instead, since a
+      # 127.0.0.1-bound publish never accepts a connection arriving via the docker bridge gateway --
+      # see hci-app's own HCI_FETCH_RUNNER_BASE_URL comment for the 2026-09-18 incident this replaced.
       - "127.0.0.1:${HCI_FETCH_RUNNER_HOST_PORT:-8190}:8090"
     networks:
       - hci-fetch-runner-net
