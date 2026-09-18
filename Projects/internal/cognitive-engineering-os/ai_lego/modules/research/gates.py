@@ -99,6 +99,41 @@ def evaluate_statistical_gate(statistics: dict[str, Any]) -> tuple[bool, list[An
     return all(checks.values()), [checks]
 
 
+def genuine_compute_provenance(provenance: Any) -> Any:
+    """Normalize a caller-supplied top-level ``provenance`` for a method whose gate reuses
+    ``evaluate_statistical_gate``: the computation itself is always real deterministic Python compute, never
+    an LLM inference, so ``epistemic_type`` must always be ``CALCULATED_RESULT`` regardless of what the caller
+    passed -- ``authorship_state`` (was a human involved) IS a real caller choice and passes through unchanged.
+
+    Root cause this fixes: ``ai_lego/apps/api/main.py``'s ``POST /methods/{id}/invoke`` defaults an un-supplied
+    ``provenance`` to ``epistemic_type=AI_INFERENCE`` (main.py:784) -- correct for the ~150 AI-inference methods
+    in this corpus, but wrong for the ~20 genuine-compute methods reusing this gate, which then failed
+    ``genuine_compute`` on every real dashboard invocation (the dashboard never exposes a provenance field).
+    Fixing the default itself was rejected: ``AI_INFERENCE`` is the deliberately correct default for the
+    majority of methods (see e.g. ``research.qualitative_coding``'s own hard-coded ``AI_INFERENCE`` sub-records),
+    so this normalizes only at the genuine-compute call sites that actually require it.
+
+    Returns the SAME object when no change is needed -- every sibling builder in this family has its own test
+    asserting ``provenance`` is aliased, not rebuilt (e.g. ``test_impact_effort.py::
+    test_provenance_is_deliberately_aliased_not_rebuilt``), and every real fixture in this corpus already
+    supplies ``CALCULATED_RESULT`` -- so this never changes existing behavior, only the previously-broken
+    default-provenance path. Passes non-dict input through unchanged (existing callers already handle an
+    invalid ``provenance`` no earlier than ``evaluate_provenance_required_gate``; this must not introduce a new
+    construction-time crash for a shape that previously reached the gate safely).
+
+    On the rebuild branch, also forces ``locked: None`` (critic-caught, 2026-09-18): ``core/domain/provenance
+    .py``'s own ``LOCK_REQUIRES`` has no entry for ``CALCULATED_RESULT``, so a caller-supplied ``locked``
+    value that was valid for their ORIGINAL epistemic_type (e.g. ``LOCKED_FACT`` paired with ``SOURCE_FACT``)
+    becomes schema-invalid the instant epistemic_type is forced to ``CALCULATED_RESULT`` -- which would make
+    this gate misleadingly PASS on a record ``evaluate_provenance_required_gate`` then correctly fails, for a
+    confusing reason. None of these 19 real callers has a legitimate use for a locked genuine-compute record
+    (every real fixture already passes ``locked=None``), so clearing it is a safe simplification, not a
+    behavior loss."""
+    if not isinstance(provenance, dict) or provenance.get("epistemic_type") == "CALCULATED_RESULT":
+        return provenance
+    return {**provenance, "epistemic_type": "CALCULATED_RESULT", "locked": None}
+
+
 def evaluate_methodology_gate(coding_outputs: dict[str, Any]) -> tuple[bool, list[Any]]:
     """Structural check: themes reachable from categories reachable from real coder code sets; no forbidden CodeSet->ThemeSet jump."""
     stage_ok = coding_outputs.get("stage_sequence") == STAGE_SEQUENCE

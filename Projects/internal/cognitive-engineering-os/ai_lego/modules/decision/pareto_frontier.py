@@ -63,7 +63,7 @@ from typing import Any
 from ai_lego.compute.pareto_frontier.dominance import VALID_STATUSES, compute_frontier
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.pareto_frontier"
 RECORD_ID_PREFIX = "PARETOFRONTIER-"
@@ -204,7 +204,7 @@ def generate_pareto_frontier_record(
         "frontier_classification": frontier_classification,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
     assert_no_automatic_authority_claim(record)
     return record

@@ -46,7 +46,7 @@ from typing import Any
 from ai_lego.compute.capacity_model.projection import compute_headroom_ratio, project_workload
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "devops_sre.capacity_model"
 RECORD_ID_PREFIX = "CAPMODEL-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
@@ -140,7 +140,7 @@ def generate_capacity_model_record(
         "status": status,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

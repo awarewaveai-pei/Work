@@ -61,7 +61,7 @@ from ai_lego.compute.kano.classification import (
 )
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.kano"
 RECORD_ID_PREFIX = "KANO-"
@@ -139,7 +139,7 @@ def generate_kano_classification_record(
         "features": classified_features,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

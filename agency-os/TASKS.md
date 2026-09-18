@@ -1190,6 +1190,12 @@
   - **完成定義（已達成）**：15 gate + 46 unittest 全綠、`manifest.json` 已 `regenerate_integrity.py --write` 重算。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-08「System Foundry v1.6 — 多產業 industry-pack 選層」條目。
 
+- [ ] **`decision.eisenhower_matrix` 內聯 provenance 正規化改呼叫共用函式**
+  - `🟢 D 可直接做` · `2026-09-18 開出` · `無人卡`
+  - **一句話**：`ai_lego/modules/decision/eisenhower_matrix.py:131-135` 為避免跨 session commit 順序耦合，自己內聯實作了 `{**provenance, "epistemic_type": "CALCULATED_RESULT"}` 正規化；`ai_lego/modules/research/gates.py::genuine_compute_provenance` 共用函式現已 commit，可改成呼叫它（含 critic 2026-09-18 加的 `locked: None` 修正）。
+  - **完成定義**：該檔 import 加 `genuine_compute_provenance`，`generate_eisenhower_matrix_classification` 內聯正規化行換成呼叫共用函式，`tests/unit/test_eisenhower_matrix.py` 零修改全過。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-18（續18）與（續19）。
+
 > `/tomo` 自動寫入此分類
 > **原名 `#### 待釐清 / 明日提醒`**（2026-08-26 更名並清空）。它原本裝了 86 條 —— 31 條開放項已歸入 A–H、55 條已完成項已移入歷程。
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。

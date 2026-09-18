@@ -28,7 +28,7 @@ from typing import Any
 
 from ai_lego.compute.pareto.ranking import pareto_ranking, vital_few
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "root_cause.pareto"
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.pareto.ranking.pareto_ranking"
@@ -86,7 +86,7 @@ def generate_pareto_analysis(
         "vital_few_hypothesis_ids": vital_few_ids,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

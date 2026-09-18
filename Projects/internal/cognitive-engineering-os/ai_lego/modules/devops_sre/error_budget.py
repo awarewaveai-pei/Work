@@ -35,7 +35,7 @@ from typing import Any
 
 from ai_lego.compute.error_budget.budget import calculate_burn_rate, calculate_error_budget_ratio
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "devops_sre.error_budget"
 RECORD_ID_PREFIX = "EB-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
@@ -89,7 +89,7 @@ def generate_error_budget_record(
         "release_policy": release_policy,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
     if related_slo_id is not None:
         record["related_slo_id"] = related_slo_id

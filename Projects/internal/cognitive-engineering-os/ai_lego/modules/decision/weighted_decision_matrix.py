@@ -68,7 +68,7 @@ from ai_lego.compute.mcda.scoring import validate_weights_sum_to_one
 from ai_lego.compute.weighted_decision_matrix.scoring import validate_scores_within_common_scale
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.weighted_decision_matrix"
 RECORD_ID_PREFIX = "WDM-"
@@ -253,7 +253,7 @@ def generate_weighted_decision_matrix_analysis(
         "sensitivity_notes": sensitivity_notes,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
     assert_no_automatic_authority_claim(record)
     return record

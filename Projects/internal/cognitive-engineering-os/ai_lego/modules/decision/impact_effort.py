@@ -64,7 +64,7 @@ from ai_lego.compute.impact_effort.classification import (
 )
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.impact_effort"
 RECORD_ID_PREFIX = "IMPACTEFFORT-"
@@ -174,7 +174,7 @@ def generate_impact_effort_classification(
         "ideas": classified_ideas,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
     assert_no_automatic_authority_claim(record)
     return record

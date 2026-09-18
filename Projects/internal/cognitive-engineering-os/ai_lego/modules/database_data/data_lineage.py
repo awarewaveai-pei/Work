@@ -33,7 +33,7 @@ from typing import Any
 from ai_lego.compute.lineage.traversal import traces_to_source
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "database_data.data_lineage"
 RECORD_ID_PREFIX = "DLR-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
@@ -143,7 +143,7 @@ def generate_data_lineage_record(
         "nodes": record_nodes,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

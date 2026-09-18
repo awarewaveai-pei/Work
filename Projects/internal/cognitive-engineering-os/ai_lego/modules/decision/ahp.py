@@ -31,7 +31,7 @@ from typing import Any
 
 from ai_lego.compute.ahp.weights import build_pairwise_matrix, consistency_ratio as compute_consistency_ratio, geometric_mean_weights, rank_options
 from ai_lego.core.domain.provenance import provenance_is_valid
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.ahp"
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.ahp.weights.geometric_mean_weights"
@@ -87,7 +87,7 @@ def generate_ahp_analysis(
         "ranking": ranking,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

@@ -71,7 +71,7 @@ from typing import Any
 from ai_lego.compute.ice.scoring import SCORE_TOLERANCE, compute_ice_score, is_valid_dimension_score, score_matches
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.ice"
 RECORD_ID_PREFIX = "ICE-"
@@ -170,7 +170,7 @@ def generate_ice_score_record(
         "ranking": ranking,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

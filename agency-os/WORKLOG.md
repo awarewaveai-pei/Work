@@ -1,4 +1,29 @@
 # Worklog
+## 2026-09-18（續20）修復 19 個 genuine-compute 方法透過真實 dashboard 執行必掛的 provenance 預設值 bug（承接續18 spawn_task 轉交）
+
+[任務] 續18 發現 `decision.impact_effort`/`mcda`/`ahp`/`ice`/`pareto_frontier`（等）透過 dashboard 真實執行 `genuine_compute` 閘門必掛，用 `spawn_task` 轉交獨立 session（本次）處理，範圍刻意排除續18 自己已修好的 `decision.eisenhower_matrix`。
+
+[根因] `ai_lego/apps/api/main.py:784`（`invoke_method`）對未提供 `provenance` 的 body 預設 `make_provenance("AI_INFERENCE","AI_GENERATED")`；`ai_lego/modules/research/gates.py::evaluate_statistical_gate` 的 `genuine_compute` 閘門要求 `provenance.epistemic_type=="CALCULATED_RESULT"`。`dashboard.html` 5 處（480/514/553/641/828 行）明確把 `provenance` 排除在自動產生的表單之外（grep 驗證，非採信操作者原話）——任何 reuse 這個共用閘門的方法透過真實 dashboard 執行，閘門必然 FAIL：200 回應但閘門紅燈的沉默失敗，非本次引入。
+
+[範圍修正] 原始回報只列 5 個方法；`grep -rn "from ai_lego.modules.research.gates import.*evaluate_statistical_gate"` 找到實際 **19 個**（不含已修的 `decision.eisenhower_matrix`）：`root_cause.pareto`、`decision.{ahp,mcda,ice,impact_effort,kano,decision_tree,pareto_frontier,weighted_decision_matrix}`、`decomposition.mece`、`database_data.{data_lineage,normalization,data_quality_dimensions,reconciliation}`、`devops_sre.{capacity_model,error_budget,load_test,stress_test,soak_test}`。另讀 `computation.monte_carlo`（同根因但要求 `SIMULATED_RESULT` 非 `CALCULATED_RESULT`，走自己一套獨立閘門非 reuse 共用函式）+ `decision.expected_value`（docstring 提及 CALCULATED_RESULT 但實際閘門從未檢查 epistemic_type，未受影響，讀原始碼確認非只信 docstring）——前者已 `spawn_task` 轉交（task_57b3158a），後者確認不受影響。
+
+[修法層級決策] 三選項比較：(a) 19 檔各自複製正規化邏輯；(b) 改 `main.py` 全域預設值；(c) 閘門本身。(b) 排除：grep `make_provenance("AI_INFERENCE"` 確認全 corpus ~150 個 CLI/module 呼叫點視 AI_INFERENCE 為正確語意（如 `qualitative_coding.py` 硬編 AI_SUGGESTED 子紀錄），改全域預設會讓這些方法的輸出被錯誤標成「真實運算」。採 (a)(c) 之間：`gates.py` 新增 `genuine_compute_provenance()` 共用函式（與 `evaluate_statistical_gate` 同檔，未來第 20 個 genuine-compute 方法會在同一處同時找到閘門與配套正規化函式），19 個 builder 各自一行 `"provenance": provenance,` → `"provenance": genuine_compute_provenance(provenance),` + import 加一個名字。
+
+[相容性關鍵發現] 5/19 模組（impact_effort/ice/kano/pareto_frontier/data_quality_dimensions）既有測試斷言 `provenance` 是「別名不重建」（`assertIs(record["provenance"], prov)`；`ice`/`data_quality_dimensions` 另有「建構後修改呼叫端物件，record 反映該修改」的活體參照測試，逐一讀完全部 19 個模組的測試檔確認沒有第 6 個）。`genuine_compute_provenance` 因此只在 `epistemic_type != "CALCULATED_RESULT"` 才配置新 dict，已是 CALCULATED_RESULT（全 corpus 每個既有 fixture 皆是）時原樣回傳同一物件。非 dict 輸入原樣放行（不新增建構期例外，維持原本「稍後在閘門的 `.get()` crash」的既有行為，不引入新崩潰面；逐模組追蹤 19 個真實呼叫點的既有建構期驗證順序，證實此路徑行為對全部 19 個逐一不變，非假設）。
+
+[過程事故一] `data_quality_dimensions.py` 的 import 行 Edit 在兩次連續 Edit 之間被同一檔案的並行寫入蓋回原狀（`git diff` 證實只留下第二個 Edit，import 行消失）——非 AO-RESUME 全域 hard reset（其餘 14 檔核對後完好，研判是另一 session/程序同時碰同一檔）；當場重新套用，逐檔 grep count 驗證全數 19+1 正確。
+
+[過程事故二] critic 覆審期間 `git log` 顯示本地 `main` 一度領先 `origin/main` 一個 commit（`9414ac0cc`，續18 自己的 commit），該 commit 已含本次新增的 `test_api_main.py` 19 個測試（`git diff HEAD` против working tree 為 0 行——研判某跨 session 自動 checkpoint 機制已把當時髒的 `test_api_main.py` 一併提交），但 `gates.py`／19 個 module 檔仍未 commit——代表當下 `origin/main`（後來已推）實際上是「測試檔已進但實作未進」的紅燈狀態。已於本次一併 commit 補齊，回到全綠。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py::GenuineComputeProvenanceDefaultRegressionTests -v`（19 個新 HTTP-level 迴歸測試，body 完全不含 provenance，模擬真實 dashboard 行為）| exit=0 | result=19 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_gates.py -v`（`genuine_compute_provenance` 6 個直接單元測試，含「不修的話真的會 FAIL」對照組 + critic 抓到的 locked 欄位邊界案例）| exit=0 | result=16 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_{pareto,ahp,mcda,ice,impact_effort,kano,decision_tree,pareto_frontier,weighted_decision_matrix,mece,data_lineage,normalization,data_quality_dimensions,reconciliation,capacity_model,error_budget,load_test,stress_test,soak_test,gates,eisenhower_matrix}.py tests/unit/test_api_main.py::GenuineComputeProvenanceDefaultRegressionTests -q`（19 個受影響模組既有測試套件 + 新測試，locked 欄位修正後最終版）| exit=0 | result=1362 passed, 186 subtests passed, 156.53s
+- REVIEW_DONE: critic=Standard | verdict=pass（1 Major + 2 Minor 全修後）| findings=0c/1m→已修/2n→已修（Major：本次修復當下未 commit，`origin/main` 已推的測試套件依賴尚未提交的實作，紅燈風險；Minor①：`locked` 欄位在正規化後可能與新 epistemic_type 不相容，critic 直接執行重現；Minor②：`decision.eisenhower_matrix` 自己的內聯正規化整併只存在 WORKLOG 散文，TASKS.md 未追蹤）。critic 另外自己重新獨立驗證：逐一讀完 19 個模組全檔（非只讀我的摘要）、對 26 個 `evaluate_statistical_gate` 消費者逐一分類確認無漏網、monkeypatch `genuine_compute_provenance` 回退成 identity 後重跑 19 個新測試證實全數正確變紅（非空測試）。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`genuine_compute_provenance\|evaluate_statistical_gate` | hits=72 檔，全數為既有 19+1 消費者/測試/文件，無遺漏 code 消費者
+- [rollback] `git revert` 本次 commit；純新增 helper + 19 個 builder 的 provenance 建構行替換，無 schema/migration、無對外部行為的破壞性變更（既有測試零修改全過即證明）
+- 另開：`computation.monte_carlo` 同根因不同修法（需 `SIMULATED_RESULT`），已 `spawn_task` 轉交獨立 session（task_57b3158a）；`decision.eisenhower_matrix` 內聯正規化整併成呼叫共用函式，已記 `TASKS.md`（D 類可直接做，無人卡）
+
 ## 2026-09-18（續19）資料蒐集器>>HCI-30 串接（commit `fefb56a71`）——真實 E2E 過程中揪出一個既存環境 drift bug，critic 抓到 2 個真實缺口已修
 
 [任務] 操作者確認「先自己用，之後要外用」定調後，問「資料蒐集器>>Cognitive OS>>HCI」「資料蒐集器>>HCI」現在能不能用。查證結果：collector→Cognitive OS 有接（今天稍早驗證過）；Cognitive OS→HCI 完全沒有；collector→HCI 直接也沒接，但這才是 HCI-30 自己規劃文件裡定案的路（`HCI_C1_C10_DECISIONS.md` C1：等 collector 端做出 `sink/hci-discovered` 再接線，非本輪重新設計）。操作者要求「要做，而且你要確定會進入正確的表格，可以真正完成HCI」——即優先做 collector→HCI 直接串接，且要真的驗證資料落地正確，不接受紙上談兵。

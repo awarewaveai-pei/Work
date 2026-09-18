@@ -41,7 +41,7 @@ from typing import Any
 from ai_lego.compute.mece.check import mece_check
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decomposition.mece"
 RECORD_ID_PREFIX = "MECE-"
@@ -149,7 +149,7 @@ def generate_mece_check(
         "is_mece": computed["is_mece"],
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

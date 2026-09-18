@@ -32,7 +32,7 @@ from typing import Any
 from ai_lego.compute.reconciliation.compare import VALID_CHECK_TYPES, compute_check_result
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "database_data.reconciliation"
 RECORD_ID_PREFIX = "RECON-"  # = typed-object schema id pattern; used only when the API auto-supplies record_id
@@ -202,7 +202,7 @@ def generate_reconciliation_record(
         "overall_status": overall_status,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

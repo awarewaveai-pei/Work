@@ -8,7 +8,7 @@ from ai_lego.core.domain.claim import claim_record
 from ai_lego.core.domain.evidence import build_sentence_provenance, evidence_record, source_node
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.modules.knowledge.provenance import build_evidence_graph
-from ai_lego.modules.research.gates import GATE_ORDER, evaluate_method_specific_gates, evaluate_research_workflow_integrity_gate
+from ai_lego.modules.research.gates import GATE_ORDER, evaluate_method_specific_gates, evaluate_research_workflow_integrity_gate, evaluate_statistical_gate, genuine_compute_provenance
 from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs
 from ai_lego.modules.research.review import fixture_review
 from ai_lego.modules.research.synthetic_fixtures import expanded_synthetic_coder_judgments
@@ -112,6 +112,75 @@ class GateTests(unittest.TestCase):
         inputs = _complete_inputs()
         inputs["coding_outputs"] = coding
         self.assertEqual(_statuses(inputs)["authorship"], "PASS")
+
+
+class GenuineComputeProvenanceTests(unittest.TestCase):
+    """``genuine_compute_provenance`` fixes a real bug (2026-09-18, WORKLOG same date): ``POST
+    /methods/{id}/invoke`` defaults an un-supplied ``provenance`` to ``epistemic_type=AI_INFERENCE``
+    (main.py:784), which every one of the ~20 genuine-compute methods reusing ``evaluate_statistical_gate``
+    then failed on every real dashboard invocation (the dashboard never sends a ``provenance`` field)."""
+
+    def test_normalizes_the_exact_main_py_default_to_a_passing_record(self):
+        buggy_default = make_provenance("AI_INFERENCE", "AI_GENERATED")
+        record = {
+            "engine": "local_python_deterministic_compute",
+            "computation_provenance_ref": "ai_lego.compute.ahp.weights.geometric_mean_weights",
+            "provenance": genuine_compute_provenance(buggy_default),
+        }
+        passed, evidence = evaluate_statistical_gate(record)
+        self.assertTrue(passed, evidence)
+
+    def test_the_unfixed_default_actually_fails_first(self):
+        """Proves the test above is not a tautology -- the exact same default, unnormalized, must fail."""
+        buggy_default = make_provenance("AI_INFERENCE", "AI_GENERATED")
+        record = {
+            "engine": "local_python_deterministic_compute",
+            "computation_provenance_ref": "ai_lego.compute.ahp.weights.geometric_mean_weights",
+            "provenance": buggy_default,
+        }
+        passed, _ = evaluate_statistical_gate(record)
+        self.assertFalse(passed)
+
+    def test_authorship_state_passes_through_unchanged(self):
+        provenance = make_provenance("AI_INFERENCE", "HUMAN_APPROVED")
+        normalized = genuine_compute_provenance(provenance)
+        self.assertEqual(normalized["epistemic_type"], "CALCULATED_RESULT")
+        self.assertEqual(normalized["authorship_state"], "HUMAN_APPROVED")
+
+    def test_already_correct_provenance_is_returned_by_identity_not_rebuilt(self):
+        """Every real fixture in this corpus already supplies CALCULATED_RESULT (e.g. every _prov() helper
+        across tests/unit/test_{impact_effort,ice,kano,pareto_frontier,data_quality_dimensions,...}.py), and
+        5 of the 19 fixed modules have their own test asserting the record's stored provenance IS
+        (identity) the caller's object, not a copy (e.g. test_impact_effort.py::
+        test_provenance_is_deliberately_aliased_not_rebuilt). This must keep holding."""
+        provenance = make_provenance("CALCULATED_RESULT", "AI_GENERATED")
+        self.assertIs(genuine_compute_provenance(provenance), provenance)
+
+    def test_non_dict_input_passes_through_unchanged_not_a_new_crash(self):
+        """Before this fix, a non-dict provenance was stored as-is (crashing later, if at all, inside the
+        gate's own .get() call) -- this must not become a NEW construction-time crash."""
+        self.assertIsNone(genuine_compute_provenance(None))
+        self.assertEqual(genuine_compute_provenance("not-a-dict"), "not-a-dict")
+
+    def test_a_locked_value_valid_for_the_original_epistemic_type_is_cleared_not_left_dangling(self):
+        """Critic-caught (2026-09-18): LOCK_REQUIRES has no entry for CALCULATED_RESULT, so a caller-supplied
+        `locked` that was valid for their ORIGINAL epistemic_type (LOCKED_FACT needs SOURCE_FACT) becomes
+        schema-invalid the instant epistemic_type is forced to CALCULATED_RESULT -- this must not leave the
+        result in that invalid, misleadingly-gate-passing state."""
+        provenance = make_provenance("SOURCE_FACT", "HUMAN_APPROVED", locked="LOCKED_FACT")
+        normalized = genuine_compute_provenance(provenance)
+        self.assertEqual(normalized["epistemic_type"], "CALCULATED_RESULT")
+        self.assertIsNone(normalized["locked"])
+        record = {
+            "engine": "local_python_deterministic_compute",
+            "computation_provenance_ref": "ai_lego.compute.ahp.weights.geometric_mean_weights",
+            "provenance": normalized,
+        }
+        from ai_lego.core.domain.provenance import provenance_is_valid
+
+        self.assertTrue(provenance_is_valid(record["provenance"]))
+        passed, evidence = evaluate_statistical_gate(record)
+        self.assertTrue(passed, evidence)
 
 
 if __name__ == "__main__":

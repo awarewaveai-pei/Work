@@ -62,7 +62,7 @@ from typing import Any
 from ai_lego.compute.data_quality.gate import evaluate_dimensions
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "database_data.data_quality_dimensions"
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.data_quality.gate.evaluate_dimensions"
@@ -190,7 +190,7 @@ def generate_data_quality_assessment_record(
         "quarantined_dimensions": computed["quarantined_dimensions"],
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
     if schema_ref is not None:
         record["schema_ref"] = schema_ref

@@ -101,7 +101,7 @@ from typing import Any
 from ai_lego.compute.decision_tree.rollup import probability_sum_violations, resolved_value, roll_up_node
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.decision_tree"
 RECORD_ID_PREFIX = "DECISIONTREE-"
@@ -322,7 +322,7 @@ def generate_decision_tree_record(
         "root_expected_value": resolved_value(rolled_root),
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
 
 

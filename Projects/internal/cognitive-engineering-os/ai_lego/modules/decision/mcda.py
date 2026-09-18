@@ -32,7 +32,7 @@ from ai_lego.compute.ahp.weights import rank_options
 from ai_lego.compute.mcda.scoring import normalize_scores, validate_weights_sum_to_one
 from ai_lego.core.domain.provenance import provenance_is_valid
 from ai_lego.errors import InvariantViolation
-from ai_lego.modules.research.gates import evaluate_statistical_gate
+from ai_lego.modules.research.gates import evaluate_statistical_gate, genuine_compute_provenance
 
 METHOD_ID = "decision.mcda"
 COMPUTATION_PROVENANCE_REF = "ai_lego.compute.mcda.scoring.normalize_scores"
@@ -104,7 +104,7 @@ def generate_mcda_analysis(
         "sensitivity_notes": sensitivity_notes,
         "engine": "local_python_deterministic_compute",
         "computation_provenance_ref": COMPUTATION_PROVENANCE_REF,
-        "provenance": provenance,
+        "provenance": genuine_compute_provenance(provenance),
     }
     assert_no_automatic_authority_claim(record)
     return record
