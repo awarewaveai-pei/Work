@@ -20675,3 +20675,15 @@ BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,.github | grep=`ap
 [剩餘風險] ① 守門是事後偵測(push 後紅燈)，未接進 `sg-deploy.sh` 部署閘(動正式部署腳本 = High，待操作者)② 真正的根治仍是後台撤銷 fWoh——repo 內全部封死也管不到已外洩的 key ③ Perplexity 官方文件未見「硬性消費上限」功能(僅用量分級)，是否有需登入後台確認
 [rollback] `git revert` 本 commit
 WORKLOG_DONE: Perplexity Search-only CI 守門 + 定期任務排查
+
+## 2026-09-19(續81)確認 Perplexity Search API 存在與規格(操作者：「之後只用 search API，你去確認有這個東西」)
+
+- 官方 `docs.perplexity.ai/api-reference/search-post`：`POST https://api.perplexity.ai/search`，欄位 query/max_results(≤50)/max_tokens_per_page/search_domain_filter(≤20)/search_recency_filter/country/search_language_filter…，回傳 `results[]`(title/url/snippet/date/last_updated)，不是 LLM 回答。
+- 官方 pricing：Search API「$5.00 per 1,000 requests」、無 token 費；操作者 9/12 帳單 `Search API 4 × 0.005 = $0.02` 吻合。
+- 我方兩個出口(`web-search.ts` 經 providers.ts、`perplexity-cli.ps1 search`)送出欄位皆在官方清單內。
+- 官方 projects 文件：**無** key 限定 API/模型的功能、**無**消費上限、**無**用量提醒；**有** auto top-up 且官方標「Recommended」→ 必須由操作者確認關閉。「只用 Search」只能靠我方程式閘(續78/續80)＋ key 衛生。
+- 實打一次(`Ztpe` key)：HTTP 401 `{"type":"insufficient_quota"}` → key 有效，帳號額度為 0。**訂正**：9/11 對 fWoh 的 401 同樣是額度為 0，不是 key 失效；額度歸零時所有 key 一律 401，這也是 9/13 後用量歸零的原因——呼叫端未被證明已停止。
+- 端到端成功呼叫尚未驗證(需先有額度)。順序：先撤銷 fWoh、確認 auto top-up 關閉 → 再小額儲值 → 重跑同一指令驗證。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Invoke-WebRequest POST https://api.perplexity.ai/search`(User env key)| exit=0 | result=401 insufficient_quota
+- REVIEW_WAIVED: DOC_ONLY -- 查證紀錄，無程式變更
+- BUGHUNT_WAIVED: DOC_ONLY -- 查證紀錄，無程式變更
