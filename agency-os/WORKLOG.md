@@ -1,4 +1,29 @@
 # Worklog
+## 2026-09-18（續65）HCI-30 bridge：next-admin 一直回報 hci_not_configured，根因是 Phase B 錨點插入漏補一處既有區塊
+
+[操作者回報] `/ops/collect` 畫面「送去 HCI 探索來源」按鈕顯示 `hci_not_configured` 警告，問怎麼處理（附截圖）。
+
+[根因] `HCI_API_BASE_URL`／`HCI_IMPORT_TENANT` 這兩行其實續22就已經寫進本機 git 版 `docker-compose.yml`（`next-admin` service 的 `environment:` 區塊，當時 critic 還特別提醒漏了會讓功能永久卡在 fail-closed），但續24 Phase B 把正式主機 compose 檔套用新服務時，做法是「錨點插入 3 段全新內容」（5 個服務區塊／2 個新網路／3 個新 volume），這兩行是**修改既有 next-admin 區塊**，不屬於任何一段新內容，插入時被漏掉——正式主機的 compose 檔裡 `next-admin` 的 environment 區塊從頭到尾沒有這兩個變數，`.env` 就算設定也讀不到。續24 WORKLOG 的驗證只查了新服務本身，没有回頭 grep 既有服務區塊是否同步，這是這次沒抓到的缺口。
+
+[已修改／已完成]
+1. 正式主機 `/root/lobster-phase1/.env` 加入 `HCI_API_BASE_URL=https://hci.aware-wave.com`（新增行，備份於 `.env.bak-hci-api-url-20260918-*`）。
+2. 正式主機 `docker-compose.yml` 的 `next-admin` service `environment:` 區塊補上 `HCI_API_BASE_URL`／`HCI_IMPORT_TENANT` 兩行（跟本機 git 版逐字一致），用 `safe-infra-patch.sh compose` 套用（自動備份+套用+`docker compose config`驗證+health check+失敗自動 rollback）。
+3. `docker compose up -d next-admin` 由 `safe-infra-patch.sh` 內部觸發，容器真的重建（非沿用舊容器），9 秒內轉 healthy。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`diff` 正式主機套用前後的 compose 檔 | result=只有這 10 行新增（含 3 行註解），其餘逐位元組相同
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv \| grep HCI_` | result=`HCI_API_BASE_URL=https://hci.aware-wave.com`／`HCI_IMPORT_TENANT=a` 兩者皆真的進到容器環境變數
+- REALTEST_EVIDENCE: tool=Bash | cmd=讀 `lib/hci/client.ts` 的 `config()`／`isHciConfigured()` 原始邏輯核對 | result=純檢查 `process.env.HCI_API_BASE_URL` 非空字串，現在會回傳 `true`（非空字串已確認在容器內存在）
+- REALTEST_EVIDENCE: tool=Bash(curl) | cmd=套用後對 `app.aware-wave.com`／`cognitive.aware-wave.com` 各打一次 | result=307/200，無回歸
+- REVIEW_WAIVED: NA -- 純設定值補齊，程式碼本身續22已審過
+- BUGHUNT_WAIVED: NA -- 同上；已額外 grep 正式主機 compose 檔確認這兩個變數只出現在 next-admin 一處，沒有其他服務誤用同名變數
+
+[教訓] 往後任何一次「錨點插入新內容到共用漂移檔案」的操作，收工驗證清單要多一項：**grep 這次改動涉及的所有既有 service 區塊**（不只是新增的區塊），確認有沒有同一個 commit 裡「修改既有區塊」跟「新增區塊」被分開處理、其中一半漏掉的狀況。
+
+[剩餘風險] 無新增。此路徑目前仍是走公網（`https://hci.aware-wave.com`）而非 docker 內部網路——next-admin 沒有加入 `hci-net`，這是合理的（HTTP API 本來就是對外的整合介面，且不需要跟資料庫隔離綁在一起），但如果之後在意這段內部到內部的流量要繞出去再繞回來，可以考慮讓 next-admin 額外掛 `hci-net` 改用 `http://hci-app:4030` 內部位址；非本次範圍，未經操作者要求不做。
+
+[rollback] `.env`／`docker-compose.yml` 皆有 `safe-infra-patch.sh`／手動時間戳備份可還原；純加變數操作，移除即回到 fail-closed 原狀，不影響其他服務。
+
 ## 2026-09-18（續64）280+ 方法內容深化第十五批：feasibility 家族全部 9 個方法（F14 可行性與經濟性家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）的批次節奏，處理 feasibility 家族全部 9 個方法：break_even／cost_benefit_analysis／cost_effectiveness／irr／npv／real_options／tco／telos／unit_economics。本批次介於續40（decomposition，commit `22b2fa560`）與續63（HCI-30 Phase B 收尾，`7438882cd`）之間有另一 session 併行推進 HCI-30 部署，`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
