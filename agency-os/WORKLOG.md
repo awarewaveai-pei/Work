@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續32）280+ 方法內容深化第六批：root_cause 家族全部 9 個方法（F05 根因分析家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）的批次節奏，處理 root_cause 家族全部 9 個方法：barrier_analysis／bow_tie／change_analysis／event_tree／fault_tree／fishbone／five_whys／kepner_tregoe／pareto。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：9 個條目補上 why_en/why_zh/url/example_zh/example_en，root_cause 家族 0/9 → 9/9 收官。4 個方法（fishbone／five_whys／kepner_tregoe／pareto）彼此有真實資料鏈式依賴（fishbone 產出 CauseHypothesisSet，five_whys／kepner_tregoe／pareto 都要吃這個物件才能跑），example 內容明確標示「延續 root_cause.fishbone 的範例」而非各自獨立虛構資料，避免使用者以為這 4 個方法互不相干。barrier_analysis／change_analysis／bow_tie 三個方法各自都有「刻意不留因果／究責欄位」的治理設計（分別是不留具名個人欄位、不留 caused_by 類欄位、要求 owner+test），why 內容照實解釋這個設計為什麼重要，不是通用套話。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_rootcause_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫真實 `generate_*`／`build_*` 函式，其中 fishbone/five_whys/kepner_tregoe/pareto 四個方法串成一條真實依賴鏈驗證（跟 example 文字描述的用法一致）| exit=0 | 結果=6/6 check groups 通過，涵蓋全部 9 個方法
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、72/285 done（本輪 +9，續31 收尾時是 63）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 72/285 完成，213 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、challenge 10、database_data 10、epistemic 10、jurisdiction 10、representation 10、security 10、stakeholders 10（複數家族）、decomposition 9、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續31）280+ 方法內容深化第五批：causal 家族全部 10 個方法（F11 因果推理家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）的批次節奏，處理 causal 家族全部 10 個方法：counterfactual_reasoning／dag／difference_in_differences／instrumental_variables／logic_model／process_tracing／rct／regression_discontinuity／synthetic_control／theory_of_change。
