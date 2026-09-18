@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續67）280+ 方法內容深化第十七批：insight 家族全部 9 個方法（F06 人類／顧客洞察家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）的批次節奏，處理 insight 家族全部 9 個方法：contextual_inquiry／empathy_map／focus_group／interview／journey_map／jtbd／persona／service_blueprint／survey。期間另有 1 個併行 session 推進 HCI-30 網路修復（commit `32ca2e590`），`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：9 個條目補上 why_en/why_zh/url/example_zh/example_en，insight 家族 0/9 → 9/9 收官（F06 人類／顧客洞察套件全數完成，183/285，逼近 65%）。這個家族全是「完整度」與「涵蓋率」類不變量，每個都對應可獨立查證的真實 UX／質性研究方法論：contextual_inquiry 要求每筆觀察三欄位（做了什麼／研究者筆記／追問）全部非空，缺一不算完成「做→看→問」循環（Beyer & Holtzblatt 情境訪查法）；empathy_map 要求 SAYS/THINKS/DOES/FEELS 四象限至少各出現一次（可超過 4 筆），每筆都要標 FACT 或 INFERENCE（Dave Gray/XPLANE 同理心地圖）；focus_group 的 participant_count 是整數且落在 [6,10] 閉區間，generalizability_scope 是 GENUINE 寫死值（不接受呼叫端自訂）；interview 有 §12.17 自己的 9 階段管線 + documented_biases 是額外必填欄位（機械化 F06 表格列自己的「樣本與偏誤要記錄」警告）；journey_map 的 stage_number 集合必須剛好等於 {1..N} 無空缺無重複（NN/G 旅程地圖）；jtbd 的 local_evidence 是強制欄位，非推論出來的軟性提醒，而是 §11.12 明講的硬性規則（Christensen 待完成任務理論）；persona 的 research_basis 不能是空清單，機械化 Atlas 自己的誤用警告「Persona ≠ 真實民意」（Alan Cooper persona 方法論）；service_blueprint 要求 5 層（顧客行動／前台／後台／支援流程／系統資料）至少各出現一次，重複允許（Lynn Shostack 服務藍圖）；survey 是這批最複雜的一個，有雙重不變量：quality_dimensions 4 類別至少各出現一次（可重複）+ is_translated 為 true/false 時 semantic_equivalence_check／local_pilot_ref 兩個翻譯欄位是「全有或全無」的不對稱條件式必填（Atlas §12.18 全球化要求）。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_insight_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 9 個真實 `generate_*` 函式，每個額外驗證「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應 InvariantViolation：CTXINQUIRY_INCOMPLETE_OBSERVATION_CYCLE／EMPATHY_MISSING_QUADRANTS／FOCUSGROUP_INVALID_PARTICIPANT_COUNT／INTERVIEW_EMPTY_DOCUMENTED_BIASES／JOURNEY_STAGE_NUMBER_GAP／JTBD_EMPTY_LOCAL_EVIDENCE／PERSONA_EMPTY_RESEARCH_BASIS／SVCBLUEPRINT_INCOMPLETE_LAYER_COVERAGE／SURVEY_MISSING_SEMANTIC_EQUIVALENCE_CHECK），focus_group 額外斷言 generalizability_scope 真的被系統寫死成固定值 | exit=0 | 結果=9/9 通過（一次通過，無需修正）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、183/285 done（本輪 +9，續66 收尾時是 174）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38/39/40/64/66 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=14（既有跨檔引用，本批次未新增/未移除任何 key 或檔案，無 stale 引用需要同步）
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 183/285 完成（逼近 65%），102 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續66）280+ 方法內容深化第十六批：foresight 家族全部 14 個方法（F13 未知的未知與前瞻家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）的批次節奏，處理 foresight 家族全部 14 個方法：adjacent_discipline_search／backcasting／black_swan_exercise／cross_country_comparison／cross_impact_analysis／cross_industry_transfer／delphi／futures_wheel／historical_analogy／horizon_scanning／outlier_analysis／scenario_planning／weak_signal_detection／wild_cards。本批次是目前為止家族內方法數最多的單批（14 個），期間另有 2 個併行 session 各推進一次 HCI-30 收尾（commit `e74fc2a91`）與 feasibility 批（`8da2f1947`，本輪之前的批次），`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
