@@ -1,4 +1,39 @@
 # Worklog
+## 2026-09-18（續29）續25部署後操作者實測回報「根本沒奏效」：PostgREST schema cache 過期根治+4筆正式環境資料修復、資料夾不變量從 version===1 改為 inheritedFolderId、正式抓取結果補實際筆數
+
+[任務] 操作者對續23/25 實際測試後回報三個問題（附截圖）：①「送去 Cognitive OS 分析」結果卡片顯示 4 筆 `write_back_failed`；②知識庫裡新收的 4 篇論文完全沒有進資料夾；③按「正式抓取」後不知道到底抓到沒，只能自己去知識庫肉眼核對。用詞「根本沒奏效」。
+
+[根因 1 — write_back_failed]：直接對 `https://supabase.aware-wave.com` 用 service role key 重現操作者截圖裡的確切 UPDATE，拿到真錯誤（不是憑截圖猜）：`PGRST204: Could not find the 'cognitive_os_imported_at' column ... in the schema cache`。用 `docker exec supabase-db psql` 直查 `information_schema.columns` 排除「欄位真的不存在」——5 個欄位（`cognitive_os_project_id`／`cognitive_os_imported_at`／`folder_id`／`hci_source_id`／`hci_imported_at`）在 Postgres 端全部存在，證實純粹是 **PostgREST 的 schema cache 沒跟著今天稍早的並行 session 套用 migration 0087/0088 一起重載**（該 session 用原生 SQL/psql 執行 ALTER TABLE，沒有觸發 PostgREST 重新讀 schema）。修法：`docker exec supabase-db psql -c "NOTIFY pgrst, 'reload schema';"`（零停機，不重啟任何容器）。修完後原樣重放同一個 UPDATE，200 成功，證實 root cause 抓對。接著用同一組 REST API 呼叫，把操作者截圖裡那 4 筆真的卡住的 `cs_knowledge_sources` 資料列手動補回 `cognitive_os_project_id`/`cognitive_os_imported_at`（值與 app 本來要寫的完全一致，不是編造）——這是修復正式環境既有壞資料，不是新測試資料。
+
+[根因 2 — 資料夾沒被建立]：查其中一筆的版本歷史，發現這批 4 篇其實是 `source_version:2`——`version:1` 建立於 `07:00:58 UTC`（今天稍早、續23部署前，是操作者更早的測試），`folder_id` 當時是 null（功能還沒上線，正常）；`version:2` 建立於 `10:31:02 UTC`（續23部署後，操作者這次重新整理測試的結果），`folder_id` 仍是 null——**續23的 critic 修復（`result.version===1` 才歸檔）正確地保護了「不要蓋掉手動整理過的分類」這個不變量，但副作用是：任何在這個功能上線「之前」就已經存在、後來又被重新收集過一次的文件，永遠不會有機會被自動歸檔，即使它從頭到尾根本沒被歸檔過**。不變量從版本號改成真正要保護的東西：`lib/kb/rag.ts` 本來就會在每次寫入新版本時算出 `live?.folderId ?? null`（既有註解：「re-ingest 必須繼承前一版的 folderId，否則每次編輯都會把文件退檔」）——把這個值透過新欄位 `IngestResult.inheritedFolderId` 讓外部看得到，`sink/kb.ts` 的判斷條件從 `result.version===1` 改成 `result.inheritedFolderId===null`（null＝這一版真的沒繼承到任何real assignment，可以安全歸檔；非 null＝有真的要保護的東西，不動）。這樣操作者的實際情境（v2、兩版 folder_id 都是 null）現在會正確被歸檔，原本 critic 抓到的情境（v2、真的有手動分類）依然正確被保護。
+
+[根因 3 — 正式抓取後不知道抓到沒]：`收集來源` 列本來就有持久化的「上次 {時間} ({狀態})」（`collection_sources.last_status`，100 字上限欄位），但狀態字串本來就只有 `"ok"`／`"stopped_by_budget"`，真的抓到 5 篇跟真的抓到 0 篇看起來一模一樣。新增 `lib/collect/run.ts` 的 `runStatusSummary()`，把這次執行的實際統計（抓幾筆／入庫幾筆／未變幾筆／被擋幾筆）打包進同一個既有欄位——`CollectionSourcesPanel.tsx` 的 `SourceRow` 本來就是原樣顯示 `source.lastStatus`，不用改任何前端程式碼，欄位變豐富了畫面自動跟著豐富。誠實揭露限制：一次執行如果同時勾選多個來源，這個統計是**整批總和**不是「這個來源自己」的貢獻（orchestrator 本來就是全部來源共用一個 frontier／budget，沒有逐來源歸因）——單一來源執行時這個總和就是該來源自己的數字，多來源批次會顯示同一組總和在每一列，已在 code comment 誠實寫明是總和不是精確歸因。
+
+[critic 覆審（inheritedFolderId + runStatusSummary，第2輪）]：0 Critical/Major。1 Minor 已修——`collect-c1.test.ts` 5 個既有 `ingestKnowledge` mock literal 沒加新欄位（這個檔案真的跑 `createKbSink()`+`crawl()`，不像 `kb.test.ts` 有 mock `lib/kb/folders`，未來如果誰重用這些 fixture 又剛好加了 `searchQuery` 的 doc，會意外打到真正的 `findOrCreateFolderByName`）已全部補 `inheritedFolderId: null`。2 個 Suggestion 已採納一個（`rag.ts` 兩個目前死路徑的失敗 return 也補上 `live?.folderId ?? null`，為將來新 consumer 預先關閉），另一個（100 字上限測試不夠貼近真實上限、summary 沒含 unhandled/gone 等次要欄位）評估後判定低優先，未修，已記錄。
+
+[已修改]
+- `lib/kb/types.ts`：`IngestResult` 新增必填欄位 `inheritedFolderId: string | null`
+- `lib/kb/rag.ts`：6 個實際 return 點全部正確算出該值（含 critic 建議修的 2 個目前死路徑）
+- `lib/collect/sinks/kb.ts`：資料夾歸檔判斷條件 `version===1` → `inheritedFolderId===null`
+- `lib/collect/run.ts`：新增 `runStatusSummary()`，`recordRunOutcome` 呼叫改用它
+- `lib/collect/__tests__/collect-c1.test.ts`：5 處 mock 補新欄位（critic 找到）
+- 新增測試：`lib/collect/__tests__/run-status-summary.test.ts`（5 個）；`lib/collect/sinks/__tests__/kb.test.ts` 新增 1 個（inheritedFolderId===null 時 version>1 也要歸檔）
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=對 `supabase.aware-wave.com` REST API 原樣重放操作者截圖裡失敗的 UPDATE | exit=0（修復前 400 PGRST204）| result=`NOTIFY pgrst, 'reload schema'` 後 200，證實 root cause 抓對
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -c "SELECT column_name... information_schema.columns..."` | exit=0 | result=5 個欄位全部存在於 Postgres，排除「欄位不存在」的錯誤假設
+- REALTEST_EVIDENCE: tool=Bash | cmd=對 4 筆真實受影響的 `cs_knowledge_sources` 資料列逐一 PATCH 修復 | exit=0（4/4 皆 200）| result=正式環境資料已修復，非新造測試資料
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` + `npx vitest run`（next-admin 全專案）| exit=0 | result=141 files/1303 passed, 0 failed（含本次新增 6 個測試）
+- REVIEW_DONE: critic=Standard（inheritedFolderId+runStatusSummary 專案）| verdict=pass，1 Minor 已修，1 Suggestion 已採納，1 Suggestion 評估後不修 | findings=0c/0m/1n（+2 建議）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os | grep=`inheritedFolderId\|runStatusSummary\|last_status` | hits=`inheritedFolderId` 5 檔（定義/來源/consumer/2個測試，皆預期）；`runStatusSummary` 3 檔（定義/測試/未來 import 點皆無孤兒）；`last_status` 全 repo 16 處，唯一讀取端 `CollectionSourcesPanel.tsx` 原樣字串顯示，無 exact-match 比對或長度假設需要同步修正
+
+[剩餘風險] 多來源同批次執行時 `runStatusSummary` 顯示的是整批總和非單一來源貢獻（已誠實揭露於 code comment，非本次範圍的精確歸因需要 orchestrator 層面改動）；`unhandled`/`gone` 等次要統計未納入摘要字串（critic Suggestion，低優先未修）。
+
+[rollback] `git revert` 可完整復原本次 commit；正式環境的 4 筆資料修復是獨立、冪等的資料修復動作（重新執行「送去 Cognitive OS 分析」也會自我修復，見 `import-sources.ts` 既有的 self-heal 邏輯），不隨程式碼 revert 而復原，但也沒有 revert 的必要——修復的是正確資料。
+
+[下一步] 這輪只動 TypeScript（next-admin），需要重新 `sg-deploy.sh next-admin` 才會讓操作者實際用到；`cognitive-os-api` 這輪未變動不需重新部署。需要操作者 go-ahead。
+
+- WORKLOG_DONE: 續23/25 上線後的真實回饋全部根因+修復（PostgREST cache 過期＋4筆資料修復、資料夾不變量精準化、執行結果補實際筆數），待部署
+
 ## 2026-09-18（續28）VBC 自查續26 補上 decision.wsjf——扇形統計腳本抓出 decision family 其實是 14 個不是 12+1 個
 
 [發現] 為了規劃下一個 family 批次，寫了一支腳本統計全部 285 個方法的 family/done/todo 分布，赫然發現 `decision` family 顯示 14 筆、續26+eisenhower_matrix 只做了 13 筆——`decision.wsjf`（加權最短工作優先法）當初 `awk` 手動列檔名清單時漏掉，不是它不存在。已補上，跟其餘 decision 方法同規格：why/url 用 SAFe 官方框架頁（`scaledagileframework.com/wsjf/` 301 轉址到 `framework.scaledagile.com/wsjf/`，WebFetch 讀過確認公式與三個子因子用詞跟真實 builder 一致，用最終網址不留轉址）、example 真實換行、獨立驗證腳本直接呼叫 `generate_wsjf_record` 通過。

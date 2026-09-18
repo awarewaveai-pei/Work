@@ -148,4 +148,12 @@ export interface IngestResult {
   supersedeFailed?: boolean;
   /** Set when the write was refused on purpose; `sourceId` is null and nothing changed. */
   refused?: IngestRefusal;
+  /**
+   * The folder_id this version was actually stored with (rag.ts: `live?.folderId ?? null`) —
+   * null means either a brand-new document family, or a re-ingest of one that was never manually
+   * filed. A caller deciding whether to auto-assign a folder (lib/collect/sinks/kb.ts) should act
+   * only when this is null; anything else is a real, already-inherited assignment from the version
+   * being superseded and must not be overwritten (K2h invariant, lib/kb/db.ts's own comment).
+   */
+  inheritedFolderId: string | null;
 }

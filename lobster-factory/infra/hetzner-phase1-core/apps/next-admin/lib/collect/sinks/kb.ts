@@ -171,14 +171,16 @@ export function createKbSink(opts: KbSinkOptions = {}): SinkBlock {
           }
           report.written++;
 
-          // Only a document's FIRST-EVER version gets foldered (critic finding, 2026-09-18): a
-          // content-changed re-ingest (version > 1) is not new — result.unchanged already `continue`d
-          // above only catches a BYTE-IDENTICAL re-ingest, and lib/kb/rag.ts's own versioning
-          // (getFamilyState -> live.folderId, restated in lib/kb/db.ts) deliberately carries the prior
-          // version's folderId forward specifically so an edit never un-files a document the operator
-          // has since organized elsewhere. Re-foldering here on every version would silently fight
-          // that inherited assignment on the very next edit to a search-driven page.
-          const searchQuery = result.version === 1 && typeof doc.meta.searchQuery === "string" ? doc.meta.searchQuery.trim() : "";
+          // Only files when nothing is already inherited (critic finding 2026-09-18, refined
+          // 2026-09-18 operator report: gating on version===1 alone made a document collected once
+          // before this feature shipped, then re-collected with changed text, permanently
+          // unfolderable — result.version was 2 forever after, even though it had never actually
+          // been filed anywhere). result.inheritedFolderId is lib/kb/rag.ts's own
+          // `live?.folderId ?? null`: null means either a brand-new document family OR a re-ingest
+          // of one that was never manually organized — both are safe to auto-file. Anything else is
+          // a REAL prior assignment (manual or a previous auto-file) carried forward on purpose
+          // (K2h invariant, lib/kb/db.ts's own comment) and must not be overwritten.
+          const searchQuery = result.inheritedFolderId === null && typeof doc.meta.searchQuery === "string" ? doc.meta.searchQuery.trim() : "";
           if (searchQuery) {
             try {
               const folderId = await resolveSearchFolderId(organizationId, ctx.runId, searchQuery);

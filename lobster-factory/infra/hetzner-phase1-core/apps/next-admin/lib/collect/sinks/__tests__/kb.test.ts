@@ -41,7 +41,7 @@ function ctx(runId = "run-1"): SinkCtx {
 }
 
 function ingested(overrides: Partial<IngestResult> = {}): IngestResult {
-  return { sourceId: "src-1", docFamilyId: "fam-1", version: 1, chunks: 2, unchanged: false, ...overrides };
+  return { sourceId: "src-1", docFamilyId: "fam-1", version: 1, chunks: 2, unchanged: false, inheritedFolderId: null, ...overrides };
 }
 
 beforeEach(() => {
@@ -93,12 +93,20 @@ describe("sink/kb auto-foldering", () => {
     expect(folders.findOrCreateFolderByName).not.toHaveBeenCalled();
   });
 
-  it("does not re-file a content-changed re-ingest (version > 1) even with a searchQuery (critic finding, 2026-09-18: lib/kb/rag.ts already carries the PRIOR version's folderId forward on purpose — re-foldering here would fight that on every edit to a search-driven page)", async () => {
-    kb.ingestKnowledge.mockResolvedValue(ingested({ version: 2, unchanged: false }));
+  it("does not re-file a content-changed re-ingest that already has a real inherited folder (critic finding, 2026-09-18: lib/kb/rag.ts already carries the PRIOR version's folderId forward on purpose — re-foldering here would fight that on every edit to a search-driven page)", async () => {
+    kb.ingestKnowledge.mockResolvedValue(ingested({ version: 2, unchanged: false, inheritedFolderId: "folder-manual" }));
     const report = await createKbSink().run([doc({ meta: { searchQuery: "art therapy" } })], ctx());
     expect(report.written).toBe(1); // the content-changed write itself still lands
     expect(folders.findOrCreateFolderByName).not.toHaveBeenCalled();
     expect(folders.moveSourceToFolder).not.toHaveBeenCalled();
+  });
+
+  it("DOES re-file a content-changed re-ingest that was never actually filed (operator report, 2026-09-18: gating on version===1 alone made a document collected once before this feature existed, then re-collected with changed text, permanently unfolderable even though inheritedFolderId was null both times)", async () => {
+    kb.ingestKnowledge.mockResolvedValue(ingested({ version: 2, unchanged: false, inheritedFolderId: null }));
+    const report = await createKbSink().run([doc({ meta: { searchQuery: "art therapy" } })], ctx());
+    expect(report.written).toBe(1);
+    expect(folders.findOrCreateFolderByName).toHaveBeenCalledTimes(1);
+    expect(folders.moveSourceToFolder).toHaveBeenCalledWith("org-1", "src-1", "folder-1");
   });
 
   it("does not cache a failed resolution — the next doc in a later run gets a fresh attempt (critic finding, 2026-09-18)", async () => {

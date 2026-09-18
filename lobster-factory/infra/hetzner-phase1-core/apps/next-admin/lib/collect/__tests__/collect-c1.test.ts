@@ -77,6 +77,7 @@ beforeEach(() => {
     version: 1,
     chunks: 3,
     unchanged: false,
+    inheritedFolderId: null,
   });
 });
 
@@ -171,6 +172,7 @@ describe("C1: crawl -> knowledge base", () => {
       version: 1,
       chunks: 0,
       unchanged: true,
+      inheritedFolderId: null,
     });
     const transport = (async () =>
       new Response(faqPage(FAQ_TEXT), { status: 200, headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
@@ -190,7 +192,7 @@ describe("C1: crawl -> knowledge base", () => {
       new Response(faqPage(FAQ_TEXT.replace("七日", "十四日")), { status: 200, headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
 
     await crawl([{ uri: "https://shop.example.com/faq/returns" }], crawlOptions(first));
-    kb.ingestKnowledge.mockResolvedValue({ sourceId: "src-2", docFamilyId: "fam-1", version: 2, chunks: 3, unchanged: false });
+    kb.ingestKnowledge.mockResolvedValue({ sourceId: "src-2", docFamilyId: "fam-1", version: 2, chunks: 3, unchanged: false, inheritedFolderId: null });
     await crawl([{ uri: "https://shop.example.com/faq/returns" }], crawlOptions(second));
 
     const [a, b] = kb.ingestKnowledge.mock.calls.map((c) => c[0]);
@@ -260,7 +262,7 @@ describe("C1: crawl -> knowledge base", () => {
   });
 
   it("reports a failed ingest instead of counting it as stored", async () => {
-    kb.ingestKnowledge.mockResolvedValue({ sourceId: null, docFamilyId: "fam-1", version: 0, chunks: 0, unchanged: false });
+    kb.ingestKnowledge.mockResolvedValue({ sourceId: null, docFamilyId: "fam-1", version: 0, chunks: 0, unchanged: false, inheritedFolderId: null });
     const transport = (async () =>
       new Response(faqPage(FAQ_TEXT), { status: 200, headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
 
@@ -271,7 +273,7 @@ describe("C1: crawl -> knowledge base", () => {
 
   it("surfaces a stored-but-not-superseded document rather than swallowing it", async () => {
     kb.ingestKnowledge.mockResolvedValue({
-      sourceId: "src-9", docFamilyId: "fam-1", version: 4, chunks: 2, unchanged: false, supersedeFailed: true,
+      sourceId: "src-9", docFamilyId: "fam-1", version: 4, chunks: 2, unchanged: false, supersedeFailed: true, inheritedFolderId: null,
     });
     const transport = (async () =>
       new Response(faqPage(FAQ_TEXT), { status: 200, headers: { "content-type": "text/html" } })) as unknown as typeof fetch;

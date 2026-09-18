@@ -217,7 +217,7 @@ export function chunkText(body: string, target = 500, overlap = 80): string[] {
   return out;
 }
 
-const EMPTY_INGEST: IngestResult = { sourceId: null, docFamilyId: null, version: 0, chunks: 0, unchanged: false };
+const EMPTY_INGEST: IngestResult = { sourceId: null, docFamilyId: null, version: 0, chunks: 0, unchanged: false, inheritedFolderId: null };
 
 /**
  * Ingest one knowledge document as a new VERSION of its document family.
@@ -257,7 +257,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     input.provenance?.authorshipState === "AI_GENERATED" ||
     input.provenance?.authorshipState === "AI_SUGGESTED";
   if (live?.locked && fromAutomation) {
-    return { ...EMPTY_INGEST, docFamilyId: familyId, sourceId: live.id, version: live.version, refused: "locked" };
+    return { ...EMPTY_INGEST, docFamilyId: familyId, sourceId: live.id, version: live.version, refused: "locked", inheritedFolderId: live.folderId ?? null };
   }
   // "Unchanged" has to mean the whole document, not just its text. Re-uploading the same body with
   // the sensitive flag newly ticked is a real change; treating it as a no-op would silently discard
@@ -270,7 +270,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     (live.validFrom ?? null) === (input.validFrom ?? null) &&
     (live.validTo ?? null) === (input.validTo ?? null);
   if (live && live.contentHash === hash && sameMetadata) {
-    return { sourceId: live.id, docFamilyId: familyId, version: live.version, chunks: 0, unchanged: true };
+    return { sourceId: live.id, docFamilyId: familyId, version: live.version, chunks: 0, unchanged: true, inheritedFolderId: live.folderId ?? null };
   }
 
   const version = maxVersion + 1;
@@ -312,7 +312,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     venue: input.venue ?? null,
     doi: input.doi ?? null,
   });
-  if (!sourceId) return { ...EMPTY_INGEST, docFamilyId: familyId };
+  if (!sourceId) return { ...EMPTY_INGEST, docFamilyId: familyId, inheritedFolderId: live?.folderId ?? null };
 
   const provider = embedder ?? defaultEmbedder();
   try {
@@ -336,7 +336,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     if (chunks !== pieces.length) {
       // Partially stored is not a version. Remove it and leave the previous one active.
       await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});
-      return { ...EMPTY_INGEST, docFamilyId: familyId };
+      return { ...EMPTY_INGEST, docFamilyId: familyId, inheritedFolderId: live?.folderId ?? null };
     }
     const archive = await archiveOtherVersions(input.organizationId, familyId, sourceId);
     return {
@@ -346,6 +346,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
       chunks,
       unchanged: false,
       supersedeFailed: archive.failed,
+      inheritedFolderId: live?.folderId ?? null,
     };
   } catch (e) {
     await deleteKnowledgeSource(input.organizationId, sourceId).catch(() => {});

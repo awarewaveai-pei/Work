@@ -22,6 +22,25 @@ import { createSupabaseUrlStateStore } from "@/lib/collect/url-state";
 import type { SinkBlock } from "@/lib/collect/types";
 import "@/lib/collect/blocks"; // registering the built-in sources is the point of calling this
 
+/**
+ * A source row's own `(lastStatus)` display used to be a bare "ok" — indistinguishable from a run
+ * that genuinely fetched and stored nothing (operator report, 2026-09-18: "按正式抓取後不知道抓到沒,
+ * 只能去知識庫看"). Packed into the existing `last_status` column (100-char cap, sources-store.ts)
+ * rather than a schema change: CollectionSourcesPanel.tsx's SourceRow already interpolates
+ * `source.lastStatus` verbatim, so a richer string here reaches the UI with no frontend change.
+ *
+ * These are the WHOLE RUN's totals, not this one source's own contribution — the orchestrator
+ * crawls every chosen source through one shared frontier/budget and never tracks per-source
+ * attribution (see the Promise.all below: every chosen source gets the same summary). Labelled
+ * plainly as a total rather than implying per-source precision it cannot honestly claim; for the
+ * common single-source run this total IS the per-source count anyway.
+ */
+export function runStatusSummary(result: Pick<CrawlResult, "report" | "sink">): string {
+  const base = result.report.stoppedBy === "budget" ? "stopped_by_budget" : "ok";
+  const refused = result.report.dirty.length + result.report.quarantined.length + result.report.disallowed.length;
+  return `${base} · 抓${result.report.fetched} 入庫${result.sink.written} 未變${result.sink.skipped} 擋${refused}`;
+}
+
 export interface RunCollectionOptions {
   organizationId: string;
   /** Restrict the run to specific configured sources. Omitted ⇒ everything approved. */
@@ -135,10 +154,11 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
     incidentRaised = persisted.incidentRaised;
     errors.push(...persisted.errors);
 
+    const status = runStatusSummary(result);
     await Promise.all(
       chosen.map(({ source }: { source: CollectionSource }) =>
         recordRunOutcome(source.id, {
-          status: result.report.stoppedBy === "budget" ? "stopped_by_budget" : "ok",
+          status,
           error: result.sink.errors?.[0] ?? null,
         }),
       ),
