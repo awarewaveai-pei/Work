@@ -10,6 +10,7 @@ from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
 from ai_lego.modules.research.evidence_triangulation import offline_literature_search
+from ai_lego.modules.representation.chart_render import generate_chart_artifact
 from ai_lego.modules.strategy.proposal_artifact import proposal_artifact_adapter
 from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
 from ai_lego.modules.art_therapy.workflow_gates import evaluate_art_therapy_project_workflow_gate
@@ -89,6 +90,7 @@ def build_registered_capability_adapters(
         "run_statistics": run_statistics_adapter,
         "artifact.generate_research_paper": research_paper_artifact_adapter,
         "artifact.generate_proposal": proposal_artifact_adapter,
+        "artifact.generate_chart": generate_chart_artifact,
     }
     for capability_id in capability_ids:
         handler = registered.get(capability_id)

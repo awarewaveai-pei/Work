@@ -1,0 +1,76 @@
+$id: "ai-lego://capabilities/contracts/artifact.generate_chart.capability.yaml"
+title: "artifact.generate_chart -- Chart Rendering Capability Contract"
+status: ACTIVE
+
+description: >
+  Renders a forest plot (point estimates + confidence intervals) or a bubble chart (x/y/size)
+  from caller-supplied numeric data into a real PNG via matplotlib (Agg backend, headless --
+  no display, no network). Not an AI-generated image: every pixel is plotted directly from the
+  input numbers, nothing is invented. Side-effect free -- returns the artifact value only; CAS
+  persistence is `ai_lego/apps/recipe_runtime.py persist_artifact_output()`'s job, same as every
+  other artifact-emitting capability (`artifact.generate_proposal`, `artifact.generate_research_paper`).
+  Runtime: `ai_lego/modules/representation/chart_render.py`, registered in
+  `ai_lego/apps/recipe_runtime.py build_registered_capability_adapters()`. Built per operator
+  directive 2026-09-18 (dashboard "外加以下也要去處理...我不是要 AI 生成圖片，而是要真正的圖表")
+  and a peer session's Task 3c handoff (matplotlib as new dependency, operator consent obtained
+  via AskUserQuestion same session). Knowledge-base write-back of the rendered chart is explicitly
+  out of scope here (separate peer-session task).
+
+source_of_truth_for:
+  - "ai_lego/modules/representation/chart_render.py -- the runtime"
+
+decided_by: "Operator directive 2026-09-18; no ADR governs the content (a rendering utility, not a domain decision)."
+
+id: artifact.generate_chart
+version: "1.0.0"
+
+input:
+  type:
+    - ChartRenderRequest
+  # NEW_DESIGN, soft reference only (no cognitive/typed-objects/*.schema.yaml -- same treatment
+  # as run_statistics.capability.yaml's RaterCodingSet). Discriminated by `chart_type`:
+  #   forest_plot: {chart_type, title?, rows: [{label, estimate, ci_low, ci_high}, ...]}
+  #   bubble_chart: {chart_type, title?, x_label?, y_label?, points: [{label?, x, y, size}, ...]}
+  # See chart_render.py's own module docstring for the exact validated shape.
+
+output:
+  type:
+    - ChartArtifact
+  # NEW_DESIGN. {"artifact": {"artifact_type": "image/png", "content": "<base64-encoded PNG str>"}}
+  # -- content is a base64 str (not raw bytes), matching persist_artifact_output()'s own
+  # isinstance(artifact.get("content"), str) requirement.
+
+preconditions:
+  - "chart_type is exactly one of forest_plot | bubble_chart"
+  - "forest_plot: rows is non-empty; every row's ci_low <= estimate <= ci_high"
+  - "bubble_chart: points is non-empty; every point's size > 0"
+
+quality:
+  provenance_required: false
+  method_specific_gate_required: false
+  # Pure rendering of caller-supplied numbers -- makes no new epistemic claim of its own to
+  # gate; the upstream data's own provenance (if any) is unaffected and unclaimed here.
+
+security:
+  external_ai: none
+  # Free string per capability-contract.schema.yaml (not an enum) -- "none" is accurate: this
+  # capability makes zero AI/network calls, unlike literature_search's policy_controlled peers.
+
+rollback:
+  side_effect_free_preferred: true
+
+open_questions:
+  - id: "OQ-CHARTRENDER-1"
+    question: "Should ChartRenderRequest/ChartArtifact get real cognitive/typed-objects/*.schema.yaml files in a future Wave, the way run_statistics.capability.yaml's OQ-RSTAT-4 flags the same open question for its own soft-referenced types?"
+    owner: "operator, or a future typed-objects compilation pass"
+    blocks: "nothing in this file's own validity -- input/output.type are soft-reference bare string arrays per capability-contract.schema.yaml's own design"
+
+verification:
+  method: >
+    Validated against specs/domain/capability-contract.schema.yaml (required: [id, version,
+    input, output], all present). Exercised by tests/unit/test_chart_render.py: real matplotlib
+    render for both chart types, output validated as a genuine PNG via magic-byte check
+    (b"\x89PNG\r\n\x1a\n") and a real Pillow open()+verify(), not merely a base64-length check.
+    Docker build tested for real (`docker build` against the project Dockerfile with matplotlib
+    added) to confirm python:3.12-slim's manylinux wheel coverage still holds without adding
+    build-essential.
