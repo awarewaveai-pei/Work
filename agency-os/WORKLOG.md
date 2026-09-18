@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續34）280+ 方法內容深化第八批：database_data 家族全部 10 個方法（F21 資料庫／資料套件）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）的批次節奏，處理 database_data 家族全部 10 個方法：backup_restore_drill／data_contract／data_lineage／data_quality_dimensions／erd／expand_contract_migration／normalization／reconciliation／retention_deletion_model／schema_compatibility_analysis。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：10 個條目補上 why_en/why_zh/url/example_zh/example_en，database_data 家族 0/10 → 10/10 收官（F21 資料庫套件全數完成）。這個家族多數方法是 GENUINE_COMPUTE（真實計算結果，非 AI 猜測）：normalization 的正規化形式、schema_compatibility_analysis 的相容性分類、data_lineage 的可追溯性、reconciliation 的比對結果、data_quality_dimensions 的門檻通過與否，全部由真實程式計算並在 gate 端重新推導比對，example 內容特別強調這些欄位「不用也不能自己填」。VBC 過程記錄：`retention_deletion_model.py` 舊 docstring 曾誤判 schema_compatibility_analysis 已被 expand_contract_migration 涵蓋、不需另建，但 `schema_compatibility_analysis.py` 自己的 docstring 已誠實記載後續盡職調查推翻此結論、確認是真正的缺口——確認這是正常的迭代開發紀錄自我更正，非矛盾，未做任何修正動作。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_databasedata_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 10 個真實 `generate_*` 函式，其中 schema_compatibility_analysis 額外斷言 drop_column 改動必然導致 overall_verdict=requires_coordinated_deploy（驗證 GENUINE_COMPUTE 而非空跑） | exit=0 | 結果=10/10 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、92/285 done（本輪 +10，續33 收尾時是 82）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 92/285 完成，193 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、challenge 10、epistemic 10、jurisdiction 10、representation 10、stakeholders 10（複數家族）、decomposition 9、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續33）280+ 方法內容深化第七批：security 家族全部 10 個方法（F20 資安／隱私套件）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）的批次節奏，處理 security 家族全部 10 個方法：stride／attack_tree／pasta／linddun／dpia_pia／zero_trust_review／secrets_threat_review／supply_chain_threat_model／abuse_case／security_control_mapping。
