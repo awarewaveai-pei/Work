@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續70）280+ 方法內容深化第十九批：experiment 家族全部 11 個方法（F15 實驗與驗證家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）／續67（insight 9）／續69（learning 11）的批次節奏，處理 experiment 家族全部 11 個方法：ab_test／benchmark／concierge_test／fake_door／mvp／pilot／proof_of_concept／prototype／smoke_test／technical_spike／wizard_of_oz。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：11 個條目補上 why_en/why_zh/url/example_zh/example_en，experiment 家族 0/11 → 11/11 收官（F15 實驗與驗證套件全數完成，205/285，超過 72%）。這個家族共享同一個核心原則（Atlas L750-752：「找到最便宜且足以證偽 Critical Assumption 的測試，而不是讓 AI 主觀打 8.7/10」），每個方法都把這個原則操作化成一個具體的結構不變量：ab_test／smoke_test 都要求 registered_at／threshold_declared_at 嚴格早於分析／測量時間點（防偷看），且 decision 是套用預先註冊規則到真實數字後的機械結果；mvp／proof_of_concept 都是 outcome/feasibility_verdict 為 GENUINE_COMPUTE（從真實量測對照門檻機械算出，非呼叫端能填），且 mvp 額外要求決策門檻兩邊的行動必須不同（否則無法真的改變決策）；concierge_test 要求零自動化（automation_components 必須是空清單）+ 至少 1 筆量測訊號；fake_door 要求揭露揭露文字（disclosure_shown 必須是 true）+ click_count≤impression_count；wizard_of_oz 要求前台/後台對比兩個旗標都剛好是 true（跟 concierge_test 互為對照組，一個公開人工、一個偽裝自動化）+ 至少揭露 1 項偽裝元件；pilot 的 success/stop/rollback 三個 criteria 都是 Atlas 自己標記「強制」的非空清單；prototype 要求 fidelity 上限為 LOW/MEDIUM（不可 HIGH）+ 每個 iteration 必須連結到真實觀察；technical_spike 要求 decision_note.decided_at 落在 timebox 自己實際的 [started_at, closed_at] 時間窗內；benchmark 要求每個候選方案的 results 剛好涵蓋固定的 metrics 集合。全部方法均可獨立查證於真實方法論：A/B 測試統計學、Eric Ries 精實創業（MVP／Concierge MVP／Build-Measure-Learn 家族）、Amplitude 假門測試、NN/G 低保真原型、Jeff Kelley 1983 綠野仙蹤方法、Kent Beck／Extreme Programming 技術試探（spike）、標準效能測試方法論。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_experiment_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 11 個真實 `generate_*` 函式，每個額外驗證「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應 InvariantViolation：ABTEST_NOT_PREREGISTERED／BENCH_METRIC_MISMATCH／CONCIERGE_NOT_MANUAL／FAKEDOOR_NOT_DISCLOSED／MVP_THRESHOLD_NOT_DECISION_CHANGING／PILOT_CRITERIA_MANDATE_VIOLATION／POC_NOT_ISOLATED／PROTO_DANGLING_OBSERVATION_REF／SMOKETEST_DECISION_INCONSISTENT／SPIKE_DECISION_OUTSIDE_WINDOW／WOZ_BACK_NOT_HUMAN），mvp／proof_of_concept 額外斷言 GENUINE_COMPUTE 的 outcome/feasibility_verdict 真實算對 | exit=0 | 結果=11/11 通過（一次通過，無需修正）
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、205/285 done（本輪 +11，續69 收尾時是 194）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38/39/40/64/66/67/69 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=14（既有跨檔引用，本批次未新增/未移除任何 key 或檔案，無 stale 引用需要同步）
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 205/285 完成（超過 72%），80 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、devops_sre 13、systems 12、delivery 11）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續69）280+ 方法內容深化第十八批：learning 家族全部 11 個方法（F17 學習與逆轉家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）／續39（stakeholders 10）／續40（decomposition 9）／續64（feasibility 9）／續66（foresight 14）／續67（insight 9）的批次節奏，處理 learning 家族全部 11 個方法：after_action_review／appreciative_inquiry／build_measure_learn／decision_journal／dmaic／kill_criteria／ooda／pdca／post_mortem／prediction_tracking／reversal_criteria。期間另有 2 個併行 session 各推進一次 HCI-30 bridge 除錯（commit `32ca2e590`、`eb5a3b41b`），`git log`/`git pull` 核對後確認無檔案衝突，僅本檔（`method-display-metadata.yaml`）為本輪變更範圍。
