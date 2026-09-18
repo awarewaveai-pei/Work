@@ -1,4 +1,34 @@
 # Worklog
+## 2026-09-19（續79）Cognitive OS import：一個組織一個 Project 改成一個資料夾一個 Project，過程中兩輪跨模型審查各抓到一個真實 bug
+
+[任務] 承接續65（cognitive-os project 命名用 org UUID 看不出是誰）+ 操作者「檔案一多時要怎麼辦?...為什麼不延續需搜尋時新增的資料夾」。查證 Cognitive OS 自己的原始碼（`ai_lego/apps/api/main.py` 的 `CreateSourceRequest`／`/projects/{id}/sources`）確認它完全沒有資料夾/標籤/collection 概念，Project 底下就是一包扁平清單——「一個客戶一個 Project」的舊設計沒有做錯排序，是選錯了單位。改成「一個 KB 資料夾一個 Project」，直接對應操作者自己在知識庫那邊已經建好的分類。
+
+[真實 bug 1，critic 抓到，Critical] 幫命名加人類可讀名稱時，第一版把比對邏輯改成用 `organizationName`（人類填的顯示字串）去比對既有 Project——但 `organizations.name`沒有唯一性限制，且公開自助註冊表單就能設定。兩個不同客戶只要顯示名稱剛好一樣，就會被判定成「同一個」Project，知識庫被永久混在一起，不會報錯也不會有任何警示。修法：比對永遠只用 `organizationId`（先查 `organizations.metadata.cognitive_os_import_project_id` 快取，沒有再退回舊版 `Knowledge Import: <uuid>` 這個 id-derived 名稱），人類名稱只用來當「新建時的顯示字串」，且額外加 8 碼 id 後綴避免撞到 Cognitive OS 自己的 `UNIQUE(tenant_id, workspace_id, name)`。critic 覆審兩輪（第一輪抓到問題、第二輪獨立驗證修復），期間自己做 mutation-proof 時發現原本設計的「跨組織不合併」測試其實測不出真正的比對機制被改壞（id 後綴本身就讓兩個真實 UUID 不可能撞名），另外補一個更貼近機制本身的測試（塞一個剛好符合「如果比對邏輯退回用顯示名稱」才會命中的假 Project），才是真的會抓到重新引入這個 bug 的測試。
+
+[真實 bug 2，db-expert 抓到，Major] 幫資料夾寫回 Cognitive OS Project id 時（`setFolderCognitiveOsProjectId`），原本回傳 `void`，沒有檢查 UPDATE 真的改到幾筆。這是同一個檔案（`lib/kb/db.ts`）自己文件裡記載過兩次的同一類 bug（Supabase/PostgREST 對「WHERE 條件比對到 0 筆」跟「真的成功」回傳一樣的 `error: null`）。修法：比照已經修過的 `markSourceSentToCognitiveOs` 加 `.select("id")` + 筆數檢查，回傳 `boolean`；呼叫端（`importFolderSources`）檢查失敗時把警告塞進 `errors`，但不擋下整個匯入（Cognitive OS 那邊的 Project 本來就真的建成功了，只是本地記錄失敗，屬於軟性警告而非硬失敗）。
+
+[已修改]
+- `lib/cognitive-os/import-sources.ts`：`ensureProject` 拆成 `ensureProjectByExactName`（維持給內部 bearer-token 呼叫端用的舊行為）跟 `ensureProjectForOrganization`（id-anchored，見 bug 1）；抽出共用核心 `importSourcesIntoProject`；新增 `importFolderSources`（資料夾層級匯入，無需 legacy-name 回退，因為這個功能本來就是全新的）。
+- `lib/kb/folders.ts`：新增 `getFolder`／`getFolderCognitiveOsProjectId`／`setFolderCognitiveOsProjectId`（見 bug 2）。
+- `app/api/ops/clients/[slug]/cognitive-os-import/route.ts`：`orgIdOf`→`orgOf` 一併撈 `name`；POST body 可選 `folderId`，有就走資料夾匯入。
+- `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`：資料夾選取列新增「送去 Cognitive OS 分析」按鈕，獨立 busy/message 狀態（不跟既有重新命名/刪除共用，避免互相卡住）。
+- `packages/db/migrations/0089_kb_folder_cognitive_os_link.sql` + down script：`cs_knowledge_folders` 加 `cognitive_os_project_id uuid`（db-expert 審查 GO，正式環境已套用並獨立核對）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（整個 next-admin）| exit=0，多輪重跑皆過
+- REALTEST_EVIDENCE: tool=Bash(vitest) | cmd=`lib/cognitive-os` + `lib/kb` + ClientHubTabs 測試目錄 + internal cognitive-os route 測試一次跑 | result=22 個測試檔、202 個測試全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=對 bug 1 的修復做 mutation-proof——手動把比對邏輯改回用 `preferredName`，重跑測試 | result=剛好 1 個測試失敗（就是新加的那個「不能靠顯示名稱比對」測試），其餘 27 個都過；改回正確版本後 28 個全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/apply-db-migration.mjs --check 0089` 再 `0089`（正式環境）| result=`APPLY_OK 1/1`；獨立 `\d cs_knowledge_folders` 核對欄位真的存在
+- REVIEW_DONE: critic=Standard（`import-sources.ts` 命名安全性，兩輪：第一輪抓到 Critical 跨組織合併風險，第二輪獨立重跑 mutation test 確認修復）| verdict=pass | findings=1 Critical（已修，二次覆審確認）
+- REVIEW_DONE: critic=db-expert（migration 0089 + `folders.ts`）| verdict=GO | findings=1 Major（已修）+ 1 Minor（既有模式，未修，見下）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`importFolderSources`／`ensureProjectForOrganization`／`getFolderCognitiveOsProjectId` | hits=0（無 stale 文件引用）
+
+[已知、非本次範圍的殘留風險] db-expert 額外指出 `ensureProjectForOrganization`（含新的資料夾版本）是「先讀後建」，沒有鎖，兩次幾乎同時的重複點擊理論上可能各自建一個 Project（結果是多一個孤兒 Project，不是資料遺失或跨租戶洩漏）。這是既有模式（組織層級原本就有），資料夾層級是複製既有模式，非本次新增的風險等級。db-expert 建議可選加 `UNIQUE` 限制讓輸家直接報錯而非靜默覆蓋，未在本輪動手，留待真的需要時再做。
+
+[里程碑] Cognitive OS 匯入從「一個客戶一坨」變成「一個資料夾一包」，跟知識庫畫面本來就有的分類方式一致；順帶在過程中透過兩個獨立跨模型審查抓到並修掉一個真實的跨租戶資料混合風險（從未上線過，純粹在這次修復過程中被引入又被抓到）跟一個既有 bug class 的第三次重複出現。
+
+[rollback] migration 0089 有 down script（僅在功能上線前可安全回退，已於腳本註解註明）；app 程式碼皆未部署到正式環境（下一步）。
+
 ## 2026-09-19（續78）Cognitive OS dashboard「5W1H 表單欄位跟 5W1H 沒有任何關係」根因 + 修復：`dimensions` 結構化陣列被通用表單產生器攤平成一個裸 JSON textarea
 
 - [操作者請求] 操作者傳 `https://cognitive.aware-wave.com/` 5W1H 工具截圖，怒：「所有的每個工具都亂做表格？！那些表格跟 5W1H 有什麼關係？」中途再催「簡單的事情你要查多久」——要求根因 + 立即修復，非解釋。
