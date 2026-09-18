@@ -1,4 +1,38 @@
 # Worklog
+## 2026-09-18（續24）HCI-30 正式上線 ks-aw-01（Phase B 執行，操作者明示「全部一次做」批准）——7/8 項真實完成並逐項獨立驗證，DNS 卡在工具連線問題
+
+[任務] 操作者對 8 項清單明示「全部一次做」，逐項執行，每項都有真實指令+獨立查證，非只信任腳本自己回報成功。
+
+[已完成，全部真實驗證，非文件宣稱]
+1. **密鑰**：4 個真值（`HCI_DB_PASSWORD`／`HCI_FETCH_RUNNER_SHARED_SECRET`／`HCI_FETCH_RUNNER_MINIO_ROOT_USER`／`HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD`）在正式主機上直接產生+寫入 `.env`，數值從未離開主機、從未出現在本次對話任何輸出裡；套用前備份 `.env` 成功。
+2. **五個服務套進正式 compose**：發現正式主機的 `docker-compose.yml` 早就跟 git 版本產生大量*未提交*的漂移（影片管線／POD／OPS_INBOX 等既有功能，都是合法但從未回寫 git 的內容）——沒有直接覆蓋整份檔案，改成精準抽取我這次新增的 3 段內容（5 個服務區塊／2 個新網路／3 個新 volume）用位置錨點插入正式檔案，**逐位元組驗證**「插入後的檔案扣掉我新增的 3 段＝原本正式檔案一模一樣」，確認零遺漏、零覆蓋既有內容後才套用。透過 `safe-infra-patch.sh compose`（自動備份+套用+健康檢查）帶起 `hci-postgres`，6 秒內轉 healthy。
+3. **首次部署資料夾**：`mkdir -p apps/hci-app` 完成。
+4. **hci-app 部署**：`sg-deploy.sh hci-app` 第一次執行時踩到一個真實的操作性陷阱——這支腳本自己的第一步是 `git pull`，而這次 pull 的內容恰好包含它自己被改過的版本，導致 bash 那次執行到一半用的是記憶體裡「pull 前」讀進來的舊版腳本邏輯（可重現的 bash「腳本執行中被自己覆寫」陷阱，不是我程式邏輯錯），造成第一次嘗試用了舊的寫死路徑失敗。重跑一次（這次 git 已經是最新，不會再自我覆寫）就正常跑完：real build、6 秒轉 healthy、**全部既有 app（next-admin/node-api/wordpress）+ 新增的 hci-app 六項 smoke check 全數 200**，證明沒有連帶弄壞既有部署。獨立驗證：真的打 `/health` 跟一個真實業務 API（`/api/hci/v1/cases`），皆正確回應。
+5. **hci-postgres 套 schema**：`apply-hci-postgres-migration.mjs` 對正式資料庫跑全部 20 支，`APPLY_OK 20/20`。獨立查證：正式資料庫裡真的有 28 張表，`pg_extension` 裡 dblink/postgres_fdw 真的是 0（ADR-0021 gate 2 在正式環境上也成立，不只本機）。
+6. **隔離抓取服務三件組上線**：`hci-fetch-runner`／`hci-network-guard`／`hci-object-storage` build+up，皆 healthy。**真的對正式環境做了資安驗證，不是只看容器狀態**：從 runner 容器內部嘗試連 cloud metadata IP（`169.254.169.254`）→ 連線逾時（真的被擋，`network-guard` 真實 iptables 規則表直接印出來核對：預設 DROP、metadata/內網範圍明確擋、既有允許清單明確放行）；正面對照組確認 runner 仍能連到真正的外部網站（`example.com` → 200），排除「規則太寬把什麼都擋掉」的假陽性。
+7. **備份**：cron 排程裝進 `/etc/cron.d/hci-postgres-backup`，**當場真的手動觸發跑一次**（不等明天 02:45），產出真實 18.6KB 備份檔，`gzip -t` 完整性驗證通過。
+8.（部分）**nginx vhost**：`hci.aware-wave.com` 的 server 區塊已加進正式 nginx（比照 `cognitive.aware-wave.com` 既有寫法，backend 指到 `hci-app:4030`）。透過 `safe-infra-patch.sh nginx` 套用（自動備份+`nginx -t`+reload+健康探測）。獨立驗證：用 Host header 直接打正式 nginx（繞過 DNS，因為 DNS 還沒建），`hci.aware-wave.com` → `hci-app` → `/health` 整條路徑真的通。
+
+[卡住，未完成，非我能力範圍內卡住的]
+**DNS 記錄**（Cloudflare A record，`hci` → `145.239.195.47`）**沒有建立**——這次 session 的 Cloudflare MCP 連線失敗（429 rate limited），沒有其他已驗證有 DNS 寫入權限的管道；正式主機 `.env` 裡雖然有 `CLOUDFLARE_API_TOKEN`，但那是給「Repair OS 健康探測」用的既有用途，範圍未知是否含 DNS 寫入，沒有把它拿來賭一次寫入操作。**憑證（certbot --expand）跟最終公開網址驗證都連帶卡住**——兩者都需要 DNS 先真的指過去才能做（certbot 要驗證網域所有權，公開網址要有 DNS 才打得到）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker ps`/`docker exec ... psql` 對 hci-postgres | result=真實容器、真實查詢成功
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/apply-hci-postgres-migration.mjs 0001..0020` | result=`APPLY_OK 20/20`；獨立 SQL 查證 28 張表、0 個禁用擴充
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh hci-app`（含一次因腳本自我覆寫而失敗、重跑後成功的完整過程）| result=全部 6 項 smoke check（含既有 3 個 app）皆 200
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl http://127.0.0.1:4030/health` + `curl .../api/hci/v1/cases?tenant=a` | result=真實 200，真實業務資料回應
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec hci-fetch-runner curl 169.254.169.254`（應擋）+ `curl https://example.com/`（應通）| result=擋下（timeout）／通過（200），雙向驗證非假陽性
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker inspect hci-network-guard` + `docker logs` | result=exit=0，真實 iptables 規則表核對
+- REALTEST_EVIDENCE: tool=SSH | cmd=手動觸發 `backup-hci-postgres-prod.sh` | result=真實 18.6KB 備份檔，完整性驗證通過
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl -H "Host: hci.aware-wave.com" http://127.0.0.1:<nginx-port>/health` | result=`{"ok":true,"service":"hci30-app"}`，整條路徑通
+- REVIEW_WAIVED: NA -- 純執行既有已審過的計畫，非新程式碼
+- BUGHUNT_WAIVED: NA -- 純部署執行
+
+[里程碑] **HCI-30 從今天起第一次有任何元件真的跑在正式主機上**，全部本輪新建的服務皆已備份/健康檢查覆蓋。
+
+[剩餘，非本次範圍卡住] DNS 記錄建立——需要 Cloudflare 存取權（MCP 連線恢復，或操作者自己在 Cloudflare 後台加一筆 A 記錄：`hci` → `145.239.195.47`，走既有 proxy 設定）。做完這一筆之後，`certbot --cert-name aware-wave.com --expand -d hci.aware-wave.com` 一個指令就能把憑證擴到新網域，最終公開網址驗證也才做得了。
+
+[rollback] 每一步都用了既有的安全機制（`safe-infra-patch.sh` 自動備份、`sg-deploy.sh`/`rollback-phase1.sh` 的 snapshot/restore），所有備份檔都留在原地（`.bak.safe-patch-*`／`.bak.hci-secrets-*`）。要整個收回：`docker compose stop hci-app hci-postgres hci-fetch-runner hci-network-guard hci-object-storage` + 還原兩個 `.bak` 檔案即可，不影響任何既有服務（皆為新增，未修改既有服務的定義本身）。
 ## 2026-09-18（續38）280+ 方法內容深化第十二批：representation 家族全部 10 個方法（F24 呈現／認知偏好／協作家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）的批次節奏，處理 representation 家族全部 10 個方法：audio_conversational_view／causal_view／concept_graph_view／expert_lego_mode／guided_mode／mind_map_view／switching／table_matrix_view／text_outline_view／timeline_view。
