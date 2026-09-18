@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續36）280+ 方法內容深化第十批：challenge 家族全部 10 個方法（F12 挑戰／紅隊／風險家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）的批次節奏，處理 challenge 家族全部 10 個方法：blue_team／counterexample_search／devils_advocate／disconfirming_evidence／fmea／hazop／independent_judge／pre_mortem／red_team／stress_testing。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：10 個條目補上 why_en/why_zh/url/example_zh/example_en，challenge 家族 0/10 → 10/10 收官（F12 挑戰／紅隊／風險套件全數完成）。這個家族多數方法是「拒絕建構」類不變量，且彼此故意刻意不同：blue_team（至少 1 筆 improvement）比姊妹方法 red_team（findings 可為空）更嚴格；fmea 的 action_priority 是 severity≥9 時無視 RPN 強制覆寫成 MANDATORY_CONTROL_REQUIRED；disconfirming_evidence 強制 falsifier_criteria 必須先於 search_results 宣告（防事後合理化）；red_team 的 assert_no_authority_claim 連 builder 跟 schema additionalProperties:false 兩層都擋"最終判定"欄位。特別注意 stress_testing（F12，認知面極端情境推演）跟 devops_sre.stress_test（F19，真實流量工程壓測）是刻意設計成同名易混淆但完全不同的兩個方法——example 內容明確加註說明兩者的差異，避免使用者誤用。撰寫過程中額外驗證了 4 個方法各自的「拒絕建構」反面案例（不是只驗證成功路徑）：blue_team 的空 improvements、counterexample_search／disconfirming_evidence 的懸空引用、devils_advocate 的正規化後相同、independent_judge 的空 criteria_used、pre_mortem 的未覆蓋 cause、red_team 的權威宣稱欄位、stress_testing 的 extreme_value 落在正常範圍內。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_challenge_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 10 個真實 `generate_*` 函式，其中 7 個額外驗證各自「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應的 InvariantViolation：BLUETEAM_NO_IMPROVEMENTS_RECORDED／CES_COUNTEREXAMPLE_UNKNOWN_BOUNDARY_CASE／DEVADV_POSITIONS_NOT_DISTINCT／DISCONF_SEARCH_RESULT_UNKNOWN_FALSIFIER／INDEPENDENTJUDGE_NO_CRITERIA_CITED／PREMORTEM_UNCOVERED_CAUSE／REDTEAM_AUTHORITY_CLAIM_FORBIDDEN／STRESSTESTING_EXTREME_VALUE_NOT_EXTREME），fmea 額外斷言 severity=9 時 action_priority 必為 MANDATORY_CONTROL_REQUIRED（RPN=54 僅 MEDIUM 等級也不會降級）、pre_mortem 額外斷言 priority 自動算成 CRITICAL | exit=0 | 結果=10/10 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、112/285 done（本輪 +10，續35 收尾時是 102）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 112/285 完成，173 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、epistemic 10、representation 10、stakeholders 10（複數家族）、decomposition 9、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續35）280+ 方法內容深化第九批：jurisdiction 家族全部 10 個方法（F23 全球管轄／合規／在地化家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）的批次節奏，處理 jurisdiction 家族全部 10 個方法：applicable_law_graph／compliance_gap_analysis／conflict_of_law_review／cultural_context_review／data_residency_assessment／localization_review／market_admission_control／obligation_to_control_mapping／regulatory_horizon_scan／resolver。
