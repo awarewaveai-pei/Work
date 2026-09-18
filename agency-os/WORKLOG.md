@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續37）280+ 方法內容深化第十一批：epistemic 家族全部 10 個方法（F10 認知品質家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）的批次節奏，處理 epistemic 家族全部 10 個方法：argument_mapping／assumption_mapping／assumption_registry／bayesian_updating／confidence_calibration／contradiction_detection／evidence_hierarchy／evidence_matrix／ladder_of_inference／toulmin_model。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：10 個條目補上 why_en/why_zh/url/example_zh/example_en，epistemic 家族 0/10 → 10/10 收官（F10 認知品質套件全數完成）。這個家族有 2 個真正的量化方法（bayesian_updating 的 posterior 用貝氏定理算、confidence_calibration 的 brier_score 用均方誤差算），其餘 8 個都是「拒絕建構」類結構不變量：argument_mapping／evidence_matrix 的懸空引用、assumption_mapping／assumption_registry 的 GENUINE_COMPUTE 衍生欄位（quadrant／is_critical_assumption）、contradiction_detection 的無序配對去重、evidence_hierarchy 的 rank 嚴格全序、ladder_of_inference／toulmin_model 的「下層沒填不能填上層」推理橋梁規則。撰寫 confidence_calibration 範例時自己算錯 Brier score（手算成約 0.207，寫進 YAML 跟驗證腳本斷言都用了這個錯值），跑驗證腳本時 assertion 失敗才抓到——正確答案是 (0.9-1)²+(0.6-0)²+(0.7-1)² 除以 3 = 0.46/3 ≈ 0.153，已同步修正 YAML 的 example_zh／example_en 跟驗證腳本斷言，這正是「不能只憑印象斷定」這個家族本身在講的道理，用在自己身上再次驗證有效。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_epistemic_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 10 個真實 `generate_*` 函式，其中 8 個額外驗證各自「拒絕建構」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應的 InvariantViolation：ARGMAP_DANGLING_REBUTTAL／ASSUMPTIONREGISTRY_INVALID_ENTRY／BAYES_UNDEFINED_POSTERIOR／CALIB_TOO_FEW_PREDICTIONS／CONTRADICTIONDETECTION_DUPLICATE_PAIR／EVIDENCEHIERARCHY_DUPLICATE_RANK／EVIDMATRIX_ORPHAN_CLAIM／LADDER_CONCLUSION_WITHOUT_ASSUMPTION／TOULMIN_MISSING_WARRANT／TOULMIN_BACKING_WITHOUT_WARRANT），bayesian_updating／confidence_calibration 額外斷言算出來的 posterior／brier_score 數值正確 | 第一次跑 exit=1（confidence_calibration 斷言用錯值失敗，見上）| 修正後 exit=0 | 結果=10/10 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、122/285 done（本輪 +10，續36 收尾時是 112）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 122/285 完成，163 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、representation 10、stakeholders 10（複數家族）、decomposition 9、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續36）280+ 方法內容深化第十批：challenge 家族全部 10 個方法（F12 挑戰／紅隊／風險家族）補齊 why/url/example
 
 [操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）的批次節奏，處理 challenge 家族全部 10 個方法：blue_team／counterexample_search／devils_advocate／disconfirming_evidence／fmea／hazop／independent_judge／pre_mortem／red_team／stress_testing。
