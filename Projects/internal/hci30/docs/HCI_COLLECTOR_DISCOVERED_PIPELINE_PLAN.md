@@ -29,7 +29,7 @@
 | `classify-evidence-quality.mjs` 是通用模組，改壞回歸到 web-collection 以外的呼叫端 | M | M | Task 11 要求全量既有測試 + 新增 fallback 測試，`hits=0` 需 bughunt-oracle 驗證 |
 | 兩題政策問題被默默視為已解決而動工 | H（已發生過一次） | H | Task 0/1 設為硬阻塞，不接受任何實作任務繞過 |
 
-## Task 0：真人資料紅線覆核（STOP — 不指派給任何實作角色）
+## Task 0：真人資料紅線覆核 — **已簽核**（2026-09-17，`agency-os/reports/decisions/2026-09-17-hci30-c6-and-collector-task1-decisions.md` 裁決3：重申 ADR-011 決策10 既定範圍，非新判斷）
 
 - **Goal**：操作者明確簽核「本計畫全程僅限組織實體，任何自然人研究對象一律排除」，並鎖死未來擴大範圍的觸發條件。
 - **Scope**：本計畫全體任務（Task 2, 6-10）的執行授權邊界；不改任何檔案。
@@ -38,7 +38,7 @@
 - **Acceptance**：操作者書面簽核存在；Task 6 的驗收條件引用本決策記錄路徑。
 - **Boundaries**：不產出任何程式碼或 schema；不預先為「以後做真人版」預留欄位/型別。
 
-## Task 1：REJECTED 保存期限與抹除機制決策 — dispatch to `decision-intelligence`（STOP，阻塞 Task 2）
+## Task 1：REJECTED 保存期限與抹除機制決策 — **已裁決**（2026-09-17，同上決策記錄裁決4：選 A，retain-forever，列入既有 ADR-0026 gate3／ADR-0018 gate5 同類系統性債務）
 
 - **Goal**：對「DISCOVERED/REJECTED 的 `hci.sources`/`hci.source_snapshots` 要保留多久、能不能刪」做出可執行決策。
 - **Scope**：純決策文件，不動 schema。
