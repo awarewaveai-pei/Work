@@ -528,7 +528,19 @@ services:
   # cognitive-os-api already uses for the identical reason.
   hci-app:
     build:
-      context: ../../../../Projects/internal/hci30
+      # `./apps/hci-app`, matching every other service's convention (relative to THIS compose
+      # file's own directory on the deploy host, $STAGING_DIR -- sg-deploy.sh rsyncs source there,
+      # it does not run from inside a live git checkout at a fixed relative depth). A
+      # git-repo-relative `../../../../Projects/internal/hci30` path (this block's own first draft)
+      # validates fine with `docker compose config` run from inside the git repo, but silently
+      # resolves to nothing useful on the real host, where this compose file lives at
+      # /root/lobster-phase1/docker-compose.yml with no such git ancestry above it -- caught before
+      # any deploy attempt, not after. The staged copy here holds the WHOLE hci30 product tree
+      # (app/, packages/, public-intelligence/, infra/local/fetch-runner, infra/local/network-guard),
+      # not just app/ -- see this Dockerfile's own header for why the build context must be the
+      # whole tree. hci-fetch-runner/hci-network-guard below build from sub-paths of this SAME
+      # staged copy, for the identical reason.
+      context: ./apps/hci-app
       dockerfile: Dockerfile
     image: hci30-app:local
     container_name: hci-app
@@ -579,7 +591,9 @@ services:
   # network-guard re-apply on every runner start.
   hci-fetch-runner:
     build:
-      context: ../../../../Projects/internal/hci30/infra/local/fetch-runner
+      # Sub-path of hci-app's own staged copy (./apps/hci-app/...) -- see that service's build
+      # context comment for why a git-repo-relative path here would not resolve on the real host.
+      context: ./apps/hci-app/infra/local/fetch-runner
     container_name: hci-fetch-runner
     environment:
       HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?fetch runner requires a generated shared secret}
@@ -613,7 +627,8 @@ services:
   # membership, it shares the runner's own netns by construction.
   hci-network-guard:
     build:
-      context: ../../../../Projects/internal/hci30/infra/local/network-guard
+      # Same sub-path pattern as hci-fetch-runner above.
+      context: ./apps/hci-app/infra/local/network-guard
     container_name: hci-network-guard
     network_mode: "service:hci-fetch-runner"
     depends_on:
