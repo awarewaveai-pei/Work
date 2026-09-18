@@ -1,4 +1,21 @@
 # Worklog
+## 2026-09-18（續39）280+ 方法內容深化第十三批：stakeholders 家族全部 10 個方法（F07 利害關係人／權力／協商家族）補齊 why/url/example
+
+[操作者請求] 「為什麼不趕快去做?」——操作者對「270+ 方法還缺 why／權威網址／填表範例」清單明確指示停止解釋、立刻執行，不逐批確認。本輪延續續22（architecture 10）／續26（decision 12）／續27（strategy 15）／續30（association 6+小家族 5+Lens 1）／續31（causal 10）／續32（root_cause 9）／續33（security 10）／續34（database_data 10）／續35（jurisdiction 10）／續36（challenge 10）／續37（epistemic 10）／續38（representation 10）的批次節奏，處理 stakeholders 家族全部 10 個方法：batna／coalition_mapping／game_theory／incentive_mapping／interest_based_negotiation／power_interest／raci／salience_model／stakeholder_map／zopa。
+
+[已修改]
+`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-display-metadata.yaml`：10 個條目補上 why_en/why_zh/url/example_zh/example_en，stakeholders 家族 0/10 → 10/10 收官（F07 利害關係人／權力／協商套件全數完成，285 方法語料庫過半：142/285）。這個家族多是真實、可獨立查證的既有理論（BATNA／ZOPA 出自 Fisher & Ury「Getting to Yes」、Power-Interest 出自 Mendelow 1991、Salience Model 出自 Mitchell-Agle-Wood 1997、RACI 是業界標準），不是 Atlas 自創詞彙；程式碼本身在多處明確揭露「哪些是真的學術引用、哪些是本語料庫自己的補充命名」（例如 salience_model 的 8 分類是自創、不是 Mitchell-Agle-Wood 原始 7 分類）。不變量以「衍生欄位不可竄改」跟「不能只有表面完整」兩類為主：batna 的 reservation_point 是算出來的且必須真的是最佳選項；zopa 的 zopa_exists／zopa_range 是純算術推導；power_interest／salience_model 的象限／分類是固定對照表算出來的；raci 的「剛好 1 個 Accountable」跟 stakeholder_map 的「整份地圖 relationship_types 聯集至少涵蓋 2 類」都是防止「表面做了、實際上退化成單一視角」的結構性檢查；incentive_mapping 是逐卡完整性檢查（少一欄就整卡不算數）；interest_based_negotiation 的「interests 不能是 position 的換句話說」直接把 Fisher & Ury 的核心動作變成硬規則。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=獨立驗證腳本（`verify_stakeholders_examples.py`，內容從 YAML 的 example 文字重新手 key，非複製貼上）依序呼叫 10 個真實 `generate_*` 函式，其中 9 個額外驗證各自「拒絕建構／衍生錯誤」不變量的反面案例（正常輸入成功建構，刻意破壞不變量的輸入必須真的拋出對應的 InvariantViolation：BATNA_BEST_ALTERNATIVE_NOT_OPTIMAL／COALMAP_SCENARIO_TOO_FEW_MEMBERS／GAMETH_PAYOFF_INCOMPLETE／INCMAP_INCOMPLETE_CARD／IBN_INTEREST_ECHOES_POSITION／RACI_TASK_NOT_EXACTLY_ONE_ACCOUNTABLE／SALIENCE_INVALID_POWER／STKMAP_RELATIONSHIP_COVERAGE_TOO_NARROW），power_interest 額外斷言兩種分數組合各自算出正確象限，zopa 額外斷言存在／不存在兩種情境都算對 | exit=0 | 結果=10/10 通過
+- REALTEST_EVIDENCE: tool=Bash(python) | cmd=全檔 `yaml.safe_load()` + 逐條 key 存在性檢查 | 結果=285 筆條目總數不變、142/285 done（本輪 +10，續38 收尾時是 132；過半）
+- REVIEW_WAIVED: DOC_ONLY -- 內容深化為 YAML 文字欄位新增，比照續22/26/27/30/31/32/33/34/35/36/37/38 同類批次先例；本輪未改動任何 `.py` 檔案
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-display-metadata`（檔名）| hits=0 額外——本批次純內容新增，無 symbol 級別變更需要同步
+
+[剩餘風險] 270+ 方法待補清單：本輪後累計 142/285 完成（過半），143 個方法待處理（下一批候選家族：divergent 15、framing 15、art_therapy 14、foresight 14、devops_sre 13、systems 12、delivery 11、experiment 11、learning 11、decomposition 9、feasibility 9、insight 9）。持續依操作者指示執行，不逐批確認。
+
+[rollback] `git revert` 本 commit；純內容新增，無程式碼變更、無資料遷移。
+
 ## 2026-09-18（續24）HCI-30 正式上線 ks-aw-01（Phase B 執行，操作者明示「全部一次做」批准）——7/8 項真實完成並逐項獨立驗證，DNS 卡在工具連線問題
 
 [任務] 操作者對 8 項清單明示「全部一次做」，逐項執行，每項都有真實指令+獨立查證，非只信任腳本自己回報成功。
