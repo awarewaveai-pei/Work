@@ -46,6 +46,10 @@
   - Cambridge 來源的預覽面板顯示真實標題與全文 2135 字；案件、當事人都是按鈕，沒選之前採用鈕停用。
   - 案件頁的來源型證據顯示為標題連結＋收合全文。
   - 發現兩個 fixture 案件的標籤同為 `#aaaaaaaa`（id 前 8 碼相同），補上「開立於」日期（index.html seed 面板 caseChips）。
+- **順帶抓到部署安全缺口**：sg-deploy 的 log 出現 `WARN: scripts/rollback-phase1.sh not executable; auto-rollback disabled this run`，但檔案本身是 755。
+  - 根因：`sg-deploy.sh:99` 用 `$(dirname "$0")` 組相對路徑；依文件叫法 `bash scripts/sg-deploy.sh` 執行時，step 1 會 `cd /root/Work`，`-x` 檢查就指到不存在的路徑。
+  - 影響：伺服器 log 顯示至少從 2026-07-04 起，每次部署的自動回滾都被靜默停用，AGENTS §0 宣稱的「失敗自動 rollback」其實不成立。
+  - 修正：改由 `SELF_PATH` 推導（`:52`，在任何 cd 之前就算好的絕對路徑）。同檔已無其他以 `$0` 組出的路徑。`rollback-phase1.sh` 自己用 `BASH_SOURCE` 算 ROOT，不受工作目錄影響。
 
 ## 2026-09-19（續80）訂正續78「≥250/285」為精確值：operator 質疑「自己亂掰」，逐一 introspect 真實 builder 簽名算出 266/285
 
@@ -20687,3 +20691,16 @@ WORKLOG_DONE: Perplexity Search-only CI 守門 + 定期任務排查
 - REALTEST_EVIDENCE: tool=Bash | cmd=`Invoke-WebRequest POST https://api.perplexity.ai/search`(User env key)| exit=0 | result=401 insufficient_quota
 - REVIEW_WAIVED: DOC_ONLY -- 查證紀錄，無程式變更
 - BUGHUNT_WAIVED: DOC_ONLY -- 查證紀錄，無程式變更
+
+## 2026-09-19(續82)正式主機換 Perplexity key(fWoh→Ztpe)+ 部署 Search-only 限制(操作者：「先改」)
+
+- 本機 → origin/main：Search-only 相關 commit(bda64bb1c、260f6646f 等)已在遠端；本次 push a77193a8f。GitHub `perplexity-search-only-guard` workflow 已實跑：853ca7bc8／514433a49／af7b5fa01 皆 success。
+- ks-aw-01 `/root/lobster-phase1/.env` 與 `/root/Work/lobster-factory/infra/hetzner-phase1-core/.env`：`PERPLEXITY_API_KEY` 由 fWoh 換成 Ztpe(key 經 stdin 傳入，未進指令列/log)；原檔備份 `.bak-pplx-rotate-20260918-172402`。前者原本還附有「# quota exhausted 2026-06-22」註解，一併移除。本機 `lobster-factory/infra/hetzner-phase1-core/.env` 同步更換。
+- `sg-deploy.sh next-admin`：853ca7bc8 → a77193a8f，healthy 9s，smoke 5/5 = 200。
+- 驗證(線上容器)：`printenv PERPLEXITY_API_KEY` 尾碼 tSbW；`.next/server` 內含 `allowedPaths:["/search"]` 與 `path_not_allowed_`(2 個 bundle)。
+- 現況：fWoh 已不在任何我方運作中的系統(正式主機、本機開發 .env、Windows 使用者環境變數皆為 Ztpe)；殘留只在歷史備份/編輯器歷史檔，撤銷後即無效。**操作者可安全撤銷 fWoh**，撤銷不影響正式主機。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | result=deployed a77193a8f，healthy 9s，smoke all OK
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv PERPLEXITY_API_KEY \| tail -c 5` + grep `.next/server` | exit=0 | result=tSbW；allowedPaths:["/search"] 已編入
+- REVIEW_WAIVED: NA -- 部署與設定值更換，程式碼已於 續78/續80 經 critic 覆審
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`zfWoh`(key 尾段，本機 + 主機，不看 gitignore)| hits=運作中設定檔 0；僅剩歷史備份與編輯器歷史
+[rollback] 主機 `cp /root/lobster-phase1/.env.bak-pplx-rotate-20260918-172402 /root/lobster-phase1/.env` 後以 `.deployed-commit` 前值 853ca7bc8 重跑 sg-deploy
