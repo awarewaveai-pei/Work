@@ -1,4 +1,45 @@
 # Worklog
+## 2026-09-18（續21）HCI-30 部署 ks-aw-01 規劃完成（1 個 devops agent 查證）+ 已完成的前置程式碼修正（commit `9cec87368`）——真正的部署還沒開始，範疇比預期大很多
+
+[任務] 操作者「你做最好的決定」全權延續，針對「要不要部署 HCI-30 到 ks-aw-01」明確要我規劃並開始執行可回滾的部分。派 1 個 devops-engineer agent（唯讀查證，不執行）徹底摸清 ks-aw-01 現況。
+
+[查證結論，全部有真實指令輸出佐證，非猜測]
+1. **ADR-0029 隔離模型不需為了上共用主機而妥協**：`network-guard/entrypoint.sh` 用 `network_mode: service:runner`（同一個 network namespace 內的 iptables），跟 host 本身的防火牆/DOCKER-USER chain 完全無關；直接查證 host 的 `ufw status`/`iptables -L DOCKER-USER` 確認 host 完全不管容器對容器或容器對外流量。結論：安全設計原封不動搬得上去，只是撞到兩個具體號碼。
+2. **號碼撞了**：fetch-runner 預設埠 `127.0.0.1:8090` 已被現有 `mainwp-web` 佔用；預設網段 `172.30.42.0/24` 落在既有 `lobster-video-net`（`172.30.0.0/16`）範圍內——ks-aw-01 上 Docker 預設位址池（`172.16.0.0/12` 全部 15 個 /16）**已經全部用滿**，任何新網路都必須手動指定跳出這個範圍的網段（查證 host 上完全沒有 10.x 路由，可用）。
+3. **HCI-30 自己的程式碼還沒準備好上線**：沒有 Dockerfile、沒有健康檢查端點、資料庫連線寫死本機路徑——這三項本次已修好且真實測過（見下）。
+4. **部署管道現況**：`sg-deploy.sh` 目前寫死只認得 `lobster-factory/infra/hetzner-phase1-core/apps/` 底下的服務、白名單只有 `wordpress|node-api|next-admin` 可自動回滾、test gate 只認 next-admin——HCI-30 不能直接套用，需擴充或另立部署腳本。
+5. **正式資料庫落腳點**：`ADR-0021`（已裁決，2026-09-02，操作者授權）決定用獨立 `hci-postgres` 容器（非共用 Supabase），本次重新讀了完整六道 gate 條文（非只信任先前查證摘要），逐一列在下方——**六道 gate 現在全部 OPEN，一個都沒做**：
+   - Gate 1：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 加 `hci-postgres` 服務區塊（獨立 named volume，Postgres 15.8）+ 新測試 `tests/architecture/hci-db-isolation.test.*`（不存在，待寫）。
+   - Gate 2：`wave1-negative-tests.sql` 加 `ARCH-DB-03`（禁 `dblink`/`postgres_fdw` 擴充）+ 新測試 `no-cross-instance-fk.test.*`（不存在，待寫）。
+   - Gate 3：獨立密鑰，登記進 `mcp/user-env.template.ps1`（目前查無 `HCI_`/`hci_` 任何項目）。
+   - Gate 4：`/etc/cron.d/ks-stack-backup` 加一條獨立備份線（mtime 需獨立於 Supabase 備份）。
+   - Gate 5：`mem_limit`/`cpus` 資源限制（比照 `supabase-db` 的 768m/1.0 寫法）。
+   - Gate 6：同一個 commit 要**改 `ADR-0007` 本身**＋它的 `no-second-db-dsn.test.*`，讓兩份 ADR 的測試不再互相矛盾。
+
+[已完成，本次修正，真實測試過]（commit `9cec87368`）
+- `app/server.mjs` 加 `/health`（純存活檢查，比照 `node-api` 慣例）；資料庫連線改吃 `HCI_DB_HOST/PORT/USER/PASSWORD/NAME` 環境變數，全部留空時行為跟修改前完全一致（本機既有開發流程零影響）。
+- 新增 `Dockerfile`（放在 hci30 repo 根目錄，非 `app/` 底下——因為 `server.mjs` 用相對路徑 import 手足目錄 `packages/`/`public-intelligence/`，build context 必須是整個產品根目錄）。**真實跑過**：`docker build` 成功、`docker run` 起容器、故意不給密碼時真的 crash-loop（正確的 fail-fast，非靜默錯誤）、給了密碼後 `curl /health` 真的回 200。
+- `compose.fetch-runner.yml` 埠號/網段參數化（`HCI_FETCH_RUNNER_HOST_PORT`/`HCI_FETCH_RUNNER_SUBNET`），預設值完全等於現有寫死值，`docker compose config` 分別用預設值與 prod 覆蓋值都驗證語法正確。
+
+[尚未做，範疇比原本預期大很多，誠實列出]
+1. ADR-0021 六道 gate（見上）——大部分要新寫測試檔，非只是接個環境變數。
+2. `sg-deploy.sh` 擴充（讓 HCI-30 走既有回滾/健檢管道）——這是共用部署基礎設施，牽動所有其他 app 的部署，需要獨立謹慎處理，不能倉促。
+3. 隔離抓取服務（fetch-runner）本身的正式部署腳本——結構上就不適合塞進 `sg-deploy.sh` 的單 app 迴圈，需要一支新腳本，用固定 project 名稱（非本機測試用的 `$PID` 動態命名）。
+4. hci-postgres 專用的 migration-apply 腳本（現有 `apply-db-migration.mjs` 寫死指向 `supabase-db`，不能直接沿用）。
+5. 實際套用到正式主機的動作（灌密鑰、真的 `docker compose up`、DNS/nginx/憑證）——每一項都屬於 AGENTS.md High-risk-STOP，需操作者對最終方案明示批准，非本次delegation 涵蓋範圍（衝突裁決：AO 生命週期預授權/一般全權委託 > 風險分級 > R0 逐項批准，prod deploy 兩種情境都停）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker build -f Dockerfile -t hci30-app-test .`| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker run`（無 HCI_DB_PASSWORD）| result=正確 crash-loop，錯誤訊息清楚指出缺少哪個變數
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker run`（有 HCI_DB_PASSWORD）+ `curl http://localhost:14030/health` | result=`{"ok":true,"service":"hci30-app"}`，真實 HTTP 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check app/server.mjs` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose ... config --quiet`（compose.fetch-runner.yml，預設值+prod覆蓋值兩種情境）| exit=0（兩次）
+- REVIEW_WAIVED: DOC_ONLY -- 本次為小範圍、每項都真實功能測試過的獨立修正（health route/env 化/Dockerfile），非本次新增複雜業務邏輯；下一階段（compose 服務區塊、sg-deploy.sh 擴充）會在動手前另跑 critic
+- BUGHUNT_WAIVED: NA -- 純新增/env 化，未改變既有呼叫端契約
+
+[剩餘風險] 見上「尚未做」清單，皆已誠實揭露、有清楚下一步。測試環境的臨時容器/映像檔（`hci30-app-test`）已於驗證後清除，未留殘餘。
+
+[rollback] `git revert 9cec87368` 即可完全復原，三個檔案皆為獨立可回退變更（新增 Dockerfile、server.mjs 兩處小改、compose 檔參數化且預設值不變），未部署到任何環境，本機/正式主機均未受影響。
 ## 2026-09-18（續29）續25部署後操作者實測回報「根本沒奏效」：PostgREST schema cache 過期根治+4筆正式環境資料修復、資料夾不變量從 version===1 改為 inheritedFolderId、正式抓取結果補實際筆數
 
 [任務] 操作者對續23/25 實際測試後回報三個問題（附截圖）：①「送去 Cognitive OS 分析」結果卡片顯示 4 筆 `write_back_failed`；②知識庫裡新收的 4 篇論文完全沒有進資料夾；③按「正式抓取」後不知道到底抓到沒，只能自己去知識庫肉眼核對。用詞「根本沒奏效」。
