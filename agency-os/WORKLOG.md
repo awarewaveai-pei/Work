@@ -1,4 +1,30 @@
 ﻿# Worklog
+## 2026-09-20（續93）套用 0090 + 部署 + prod 實跑：閘做對了，但讀不到頁面；而我的 passing-mention 規則被真實資料打臉
+
+- [操作者授權] 「全部去做好」——套 migration、部署、跑通。
+- [已執行]
+  1. `git pull` → `/root/Work` f311be5d0；migration 檔 sha256 與本機逐位元相同（`71bf4de2…`）。
+  2. 套用 0090：`docker exec -i supabase-db psql -v ON_ERROR_STOP=1 < 0090…sql` → BEGIN/SET/SET/ALTER/DO/DO/ALTER/DO/COMMENT/NOTIFY/COMMIT，EXIT=0。
+  3. `sg-deploy.sh next-admin` → 10 秒轉 healthy，5 個 smoke 端點全 200，`.deployed-commit = f311be5d0`。
+  4. 用真實 prod 路徑（`runCollection`，同一份 code、同一個 DB）跑 entity-dossier 來源一次，再跑一次 `buildFolderDossier`。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`psql -c "SELECT column_name,data_type,column_default,is_nullable …"` + `pg_constraint` 查詢 | exit=0 | result=`off_entity integer NOT NULL DEFAULT 0`；CHECK 恰好一條、五個值、convalidated=t；`collection_issues` 196 列完好
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | result=healthy after 10s；smoke 5/5 OK
+  - REALTEST_EVIDENCE: tool=Bash | cmd=prod `runCollection`（6 角度、英文、anchors=La Trobe/Vice-Chancellor/war studies） | exit=0 | ms=81324 | result=**`runId=79c0eb80-…` 有寫進 `collection_runs`——靜默丟報告的問題確認修好**；`fetched=12 written=0 offEntity=2 dirty=16 stoppedBy=frontier_empty`；**零筆書店／Amazon／中文噪音**（前兩個修法在 prod 生效）
+  - REALTEST_EVIDENCE: tool=Bash | cmd=prod `buildFolderDossier`（資料夾 `Theo Farrell_202609200716`，8 份來源） | exit=0 | ms=41362 | result=報告已寫入知識庫；抓到兩起真實爭議（2018 Ramsay Centre 西方文明學位、2025 親以色列團體就 Bendigo Writers Festival 致函校長）；列出三條來源矛盾，其中一條**指出某來源宣稱「1864 年第一次英阿戰爭」可能有誤**；10 條具體缺口
+  - REVIEW_WAIVED: NA -- 本輪主體是前一輪已 review 過的 code 的部署與行為修正；新增的 `peripheral` 標籤改動有 1432 tests 全綠 + tsc 乾淨，下一輪改動一併送 oracle
+  - BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=`entity_passing_mention` | hits=0（refusal 路徑已全數移除；型別、測試、UI badge 同批更新）
+- [根因：written=0]
+  16 筆被擋下的組成——**8 筆 HTTP 403（機器人封鎖）**：latrobe.edu.au ×3、iru.edu.au、researchgate、thepienews、smallwarsjournal、rocketreach；**6 筆讀不到（JS 渲染／低密度）**：scholars.latrobe、scholar.google、royalsoc、jstor、ptinews、sbs；1 筆 rate limit。
+  **搜尋品質其實很好**——校長官方頁、任命新聞稿、ABC News、The PIE News、JSTOR 都找到了，**一頁都讀不進來**。瓶頸從「JS 渲染」擴大為「JS 渲染 + UA 封鎖」，兩者一個渲染階都能解（真瀏覽器有真 UA）。**未把 User-Agent 偽裝成 Chrome**：那是規避偵測不是修問題；robots.txt 仍然先行且不降級（robots 拒絕的 URL 永遠到不了付費階）。
+- [我自己的規則被推翻]
+  `entity_passing_mention` 原本**丟棄**只被順帶提到的頁面。實跑後發現被丟的兩頁正是整批資料裡唯一記載爭議的來源：`sbs.com.au 今日大事` 帶出 Ramsay Centre 爭議、`sdu.dk` 的 Sten Rynning 個人頁帶出一本合著書。**盡職調查裡「被連帶提到」常常就是發現本身**。已改為不丟、標記 `peripheral`，UI 顯示「順帶提到：<名字>」。真正的垃圾（書店／社群／標籤頁）由 `source-class.ts` 從 URL 就擋掉，那才是該做這個判斷的位置。
+- [剩餘風險]
+  1. **渲染／反封鎖階仍未開通，背景調查目前入庫率接近 0。** 這是現在唯一的瓶頸，需操作者決定供應商（Cloudflare Browser Run 與 Firecrawl 的條款比較見本日對話與 TASKS 項）。
+  2. prod 的 dossier 報告是用本機 `gpt-5.4` 產的（本機 ANTHROPIC key 回 401）；prod 容器兩把 key 都在，按 `defaultDossierModel()` 會走 claude-sonnet-4-6，該模型的輸出品質未實測。
+  3. 連按兩次會產生兩個資料夾（`…0716`／`…0718`），是預期行為（一次 run 一個資料夾），但看起來雜亂。
+- [rollback] code：`git revert`；DB：`packages/db/scripts/0090_collection_off_entity_down.sql`（含 LOCK TABLE 前置與 append 式備份表）；部署：`sg-deploy.sh` 對前一個 commit 重跑。
+
 ## 2026-09-20（續92）背景調查第二輪：相關 ≠ 有用；並補上我上一輪漏掉的「最終彙整」
 
 - [操作者回報] 「沒有真正搜出以下角度，而且居然給我書店和 amazon 的東西？？也沒有最終的資料彙整」。

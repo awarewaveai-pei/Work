@@ -1361,7 +1361,14 @@ function EntityEvidence({ metadata }: { metadata?: Record<string, unknown> | nul
   // different person with the same name. Amber, because it is a real finding that needs a human eye,
   // not an error.
   const weak = confidence === "weak";
-  const label = weak ? `可能不是本人：${name}` : `✓ ${name}${anchors.length ? `・${anchors.join("/")}` : ""}${hits ? `（${hits} 處）` : ""}`;
+  // peripheral = the page mentions them without being about them. Not a warning (it is often where
+  // a controversy is recorded) but not a profile either, so it reads differently from a ✓.
+  const peripheral = confidence === "peripheral";
+  const label = weak
+    ? `可能不是本人：${name}`
+    : peripheral
+      ? `順帶提到：${name}${hits ? `（${hits} 處）` : ""}`
+      : `✓ ${name}${anchors.length ? `・${anchors.join("/")}` : ""}${hits ? `（${hits} 處）` : ""}`;
 
   return (
     <span
@@ -1371,8 +1378,8 @@ function EntityEvidence({ metadata }: { metadata?: Record<string, unknown> | nul
         padding: "2px 7px",
         borderRadius: 5,
         whiteSpace: "nowrap",
-        background: weak ? "var(--badge-amber-bg, var(--bg-canvas))" : "var(--badge-green-bg)",
-        color: weak ? "var(--amber, var(--text-secondary))" : "var(--badge-green-text)",
+        background: weak || peripheral ? "var(--badge-amber-bg, var(--bg-canvas))" : "var(--badge-green-bg)",
+        color: weak ? "var(--amber, var(--text-secondary))" : peripheral ? "var(--text-muted)" : "var(--badge-green-text)",
       }}
     >
       {label}
