@@ -1,4 +1,35 @@
 # Worklog
+## 2026-09-20（續88）docker-compose.yml repo/prod drift 治本：查明兩軌部署架構、補齊 repo、`/check-drift` 新增機械偵測
+
+操作者對續85（Perplexity→Serper）留下的追蹤項下達「處理好!」+ 完整 R0 架構師身份宣告。
+
+- [根因，非猜測] 讀 `sg-deploy.sh`／`safe-infra-patch.sh`／`DEPLOY_ROLLBACK_RUNBOOK.md §2.6` 全文確認：這是既有、已用 4+ 個月的兩軌架構——app 程式碼走 git→`sg-deploy.sh`；nginx／Dockerfile／**compose** 走 Auto-Repair 紅線規定的 `safe-infra-patch.sh compose <file> <service>`（backup→apply(stdin)→`docker compose config`驗證→`up -d --no-build`→等 healthy→失敗自動還原），直接在伺服器操作，不經 git（`/root/lobster-phase1/` 下 70+ 個 `.bak-*`/`.bak.safe-patch-*` 檔可查，最早 4 月）。repo 那份 docker-compose.yml 從未被回寫更新，兩邊各自累積對方沒有的宣告。**我自己續85部署時就繞過了這個規定**（手動 SSH+python3+`--force-recreate`），事後才讀到 `safe-infra-patch.sh`，記取教訓。
+- [已修改]
+  1. repo `docker-compose.yml`：補齊 9 個「prod 有、repo 沒有」但程式碼真的會讀的變數——`GOOGLE_OAUTH_CLIENT_ID/SECRET`（Gmail OAuth outreach）、`WPBRIDGE_BASE_URL/KEY_ID/PRIVATE_KEY`（wp-bridge 一鍵發佈）、`MEDIA_PRODUCTION_PERSISTENCE_ENABLED`、`MEDIA_OUTCOME_WEBHOOK_ENABLED/TOKEN`、`MEDIA_PROVIDER_ALLOWLIST`（影片管線）——每個都先 Grep 確認過真的有 `process.env.X` 讀取，不是猜測；插入位置緊鄰 prod 版本的相同鄰居（如 MEDIA_* 接在 `NETDATA_BASE_URL` 後）。
+  2. `scripts/check-deploy-drift.ps1`：新增獨立的 `composeVarDrift` 欄位——SSH `grep` 伺服器端 compose 宣告的變數名稱集合，本機讀 repo 版本用等價 regex 抽取，回報 onlyOnServer/onlyInRepo，**不依賴 commit-behind 數**（這正是這次踩到的坑：commit 對齊≠compose 對齊）。過程中三次自我抓蟲：① `Get-Content` 未指定 `-Encoding utf8`，CJK 註解旁 4 個變數被誤判成「只在伺服器」——已修，兩輪真實 SSH 重跑驗證（修前 4 個 false positive，修後 0）；② 第一版用 `bash -o pipefail -c "grep '...' | sort -u"` 巢狀單/雙引號在 PowerShell→Windows argv→ssh.exe→remote bash 這條鏈上實測直接壞掉（grep 收到亂掉的 pattern，報 usage error）——改成不用 remote pipe，grep 自己的 exit code 直接可信，`sort -u` 改本機做；③ human-readable（非 `-Json`）輸出對 hashtable 值只會印 `System.Collections.Hashtable`（`-f` 對 Hashtable 呼叫的是它沒覆寫的 `ToString()`，WebSearch 查證非臆測）——`Emit-Result` 補了攤平邏輯。
+  3. 修正自己續85寫進 `AGENTS.md` §0 的舊條目（那時還沒讀到 `safe-infra-patch.sh`，寫成「SSH 手動同步」不夠精確）——改為明確指向 `safe-infra-patch.sh compose`，並提及新的 `composeVarDrift` 偵測。
+  4. `.claude/commands/check-drift.md`：補上「compose 只改的 commit，`/sg-deploy` 不會套用，看 `composeVarDrift`」的提醒。
+  5. **critic 覆審抓到 2 個 Major：這個新訊號的兩個實際消費端沒被同步更新，等於白做**——`scripts/ao-close.ps1:1435` 原本只在 `behind -gt 0` 才印部署提示，`composeVarDrift`（behind 可能=0）會被整個吃掉；`scripts/system-health-check.ps1:530-531` 的 WARN 訊息不分青紅皂白都叫人跑 `sg-deploy.sh`——對 compose-only drift 這是錯的建議。兩處都已修：前者新增獨立的 composeVarDrift 提示分支，後者依 `behind` 是否為 0 分流訊息與正確補救指令（`safe-infra-patch.sh compose`）。
+  6. `.claude/agents/client-onboarding.md:120-135`：既有新客戶上線流程一直教人對 staging compose 用 raw `sed -i` + 手動 `docker compose up -d`（同一類繞過安全工具的錯，早於本次事件就存在）——改成 `sed`（不加 `-i`，串流）接 `safe-infra-patch.sh compose`。
+  7. `scripts/README.md:37`：一行說明補上新欄位與新呼叫端（`ao-close.ps1`）。
+  8. 意外發現並記錄一個工具盲點：`Grep`/`Glob` 若 `path` 設在 `D:\Work`（或更上層），會**靜默跳過**`.claude/`（junction 到 `C:\Users\user1115\.claude\`）內容——實測驗證（在 `check-drift.md` 加一個字串，`D:\Work` 根找不到、直接指 `.claude` 才找得到）。存成 memory `feedback_claude_dir_grep_blind_spot.md`；`bughunt-oracle.ps1`／PowerShell 側是否共享這個盲點未查證，列 TASKS 追蹤。
+- [已知、接受的殘留限制] `composeVarDrift` 是純變數名稱的扁平集合比對，非 YAML/service-aware——例如 `PORT` 在 next-admin/node-api/hci-app 三個服務各自宣告不同值，若其中一邊漏寫，只要另一邊三個服務都還在，扁平集合比對會互相抵消看起來一致。已在程式碼註解記錄為刻意的權衡（要做到 service-scoped 需要真正解析 YAML，是更大的獨立改動），不是本次沒發現。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "import yaml; yaml.safe_load(open('docker-compose.yml'))"` （Desktop Commander，本 session Bash 工具仍故障）| exit=0 | result=YAML_SYNTAX_OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose config --quiet`（本機，缺 `.env`）| exit=1 | result=僅 HCI-30 既有 `:?`-required 變數缺值報錯（與本次改動無關，本次新增變數皆用安全的 `:-` 預設）；純 YAML 語法另以 python yaml 確認過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`[Parser]::ParseFile` 對 `check-deploy-drift.ps1`／`ao-close.ps1`／`system-health-check.ps1` 三支 | exit=0 | result=3/3 語法乾淨
+- REALTEST_EVIDENCE: tool=SSH+Bash | cmd=`powershell -File check-deploy-drift.ps1`（真實對 ks-aw-01 跑，`-Json` 與純文字各一次，前後共 4 輪含修 bug 前後對照）| exit=0/1 | result=最終：`onlyOnServer=[]`（9 個 repo 新補的變數確認雙邊一致）、`onlyInRepo=[9 個 OPS_INBOX_*/PORTAL_SIGNUP_* 變數]`（尚待 safe-infra-patch 推上 prod，見下）、`composeVarDriftCheckError=null`（probe 本身健康）、human-readable 模式正確顯示攤平後的字串
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/4m(+3 minor+2 suggestion)：Major 4 個（ao-close/system-health-check 未接、SSH pipefail 可被 sort 掩蓋、hashtable 渲染成亂碼字串、.claude junction grep 盲點）全部已修或已記錄；Minor（`-AppCodeOnly` compose 計入 behind 的既有不精確、README 一行說明、WORKLOG 可追溯性）已處理或屬本條目自身補上；`createProviderCall` header 大小寫合併（續85 遺留 Minor）與 service-scoped drift 這兩項留待未來，已記錄不變量而非沉默略過
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands,.claude/agents | grep=`check-deploy-drift\|docker-compose.*sync\|safe-infra-patch` | hits=`DEPLOY_ROLLBACK_RUNBOOK.md:87-88`／`AUDIT_REGISTRY.md:69,112` 為既有歷史稽核紀錄（不同主題，未過期，未動）；`.claude/commands/check-drift.md`／`.claude/agents/client-onboarding.md` 命中已修；`agency-os/reports/health/*.json`（200+ 檔）為歷史快照，比照 WORKLOG 慣例不回改
+
+[剩餘風險]
+- 仍有一個 High-STOP 動作待操作者授權：SSH 執行 `safe-infra-patch.sh compose docker-compose.yml next-admin` 把 repo 現有內容（含 9 個 OPS_INBOX_*/PORTAL_SIGNUP_* 新宣告）推上 prod。值本身仍空（`.env` 無真值），這步只讓宣告存在，但畢竟是一次 prod 變更動作。
+- `composeVarDrift` 的 service-scoped 盲點（見上）暫不修。
+- `-AppCodeOnly` 把 docker-compose.yml 計入 commit-behind 的既有不精確（非本次引入）未動，留意見已記錄在程式碼註解。
+
+[rollback] `git revert` 本 commit；`check-deploy-drift.ps1`／`ao-close.ps1`／`system-health-check.ps1` 三支純新增邏輯分支，回退不影響既有行為。
+
+WORKLOG_DONE: docker-compose.yml repo/prod drift 根因查明＋repo 補齊＋機械化偵測上線＋兩個消費端接上；剩 safe-infra-patch.sh 執行本身待操作者 go-ahead
+
 ## 2026-09-20（續87）auth timing 測試改成交錯取樣：修的是量測方法，不是門檻
 
 - [操作者請求] 「所有的事處理好!」。承續86 開出的治本項。

@@ -1435,6 +1435,14 @@ Repair it first, then re-run:
             if ($driftObj -and $driftObj.behind -gt 0) {
                 Write-Host ("DEPLOY HINT: SG production is {0} app-code commit(s) behind. Run sg-deploy.sh when ready." -f $driftObj.behind) -ForegroundColor Yellow
             }
+            # composeVarDrift (2026-09-20) is independent of $behind by design -- a compose-only
+            # change can sit at behind=0 (the commit shipped) while docker-compose.yml itself was
+            # never applied (sg-deploy.sh does not sync that file). Checked separately so this hint
+            # is not silently swallowed by the -gt 0 guard above, which is exactly the incident this
+            # check exists to catch.
+            if ($driftObj -and $driftObj.composeVarDrift) {
+                Write-Host ("DEPLOY HINT: docker-compose.yml differs from production (server-only: {0}; repo-only: {1}). Fix via safe-infra-patch.sh compose, NOT sg-deploy.sh." -f @($driftObj.composeVarDrift.onlyOnServer).Count, @($driftObj.composeVarDrift.onlyInRepo).Count) -ForegroundColor Yellow
+            }
         }
     } catch { }
 

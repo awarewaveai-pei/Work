@@ -528,7 +528,15 @@ if (Test-Path $driftScript) {
         if ($driftObj -and $driftObj.status -eq "PASS") {
             Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("PASS at " + $driftObj.deployedCommit.Substring(0, [Math]::Min(7, $driftObj.deployedCommit.Length)))
         } elseif ($driftObj -and $driftObj.status -eq "WARN") {
-            Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: " + $driftObj.behind + " app-code commit(s) behind origin/main; run /root/lobster-phase1/scripts/sg-deploy.sh on SG when ready")
+            # composeVarDrift (2026-09-20) can be the ONLY reason for WARN (behind=0, commit fully
+            # deployed, but docker-compose.yml itself was never applied -- sg-deploy.sh does not sync
+            # that file). Branching so this check never tells an operator to run the one command that
+            # cannot fix a compose-only drift.
+            if ($driftObj.composeVarDrift -and $driftObj.behind -eq 0) {
+                Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: docker-compose.yml differs from production (server-only: " + @($driftObj.composeVarDrift.onlyOnServer).Count + "; repo-only: " + @($driftObj.composeVarDrift.onlyInRepo).Count + "); fix via safe-infra-patch.sh compose, NOT sg-deploy.sh")
+            } else {
+                Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: " + $driftObj.behind + " app-code commit(s) behind origin/main; run /root/lobster-phase1/scripts/sg-deploy.sh on SG when ready")
+            }
         } elseif ($driftObj -and $driftObj.status -eq "FAIL") {
             Add-Check -Name "Deploy drift (SG next-admin)" -Pass $false -Detail ("FAIL: " + $driftObj.behind + " app-code commit(s) behind origin/main (>= " + $driftObj.failAt + "); run sg-deploy.sh now")
         } else {

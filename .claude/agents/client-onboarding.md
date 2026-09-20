@@ -119,18 +119,22 @@ $envLine = "SSH_KEY_<KEY_LABEL_UPPERCASE>=$b64"
 # Append to ks-aw-01 .env（原 SG，2026-08-31 整併；路徑 /root/lobster-phase1 不變，ubuntu 需 sudo）
 ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 "echo '$envLine' >> /root/lobster-phase1/.env"
 
-# Add to staging docker-compose.yml
+# Add to staging docker-compose.yml via the MANDATED safe-infra-patch.sh (Auto-Repair 紅線 --
+# backup -> apply(stdin) -> `docker compose config` validate -> `up -d --no-build` -> wait-healthy
+# -> auto-restore-from-backup on failure. A raw `sed -i` + manual `docker compose up -d`, as an
+# earlier version of this doc had, skips ALL of that and is not the approved way to touch this file
+# (2026-09-20 finding: docker-compose.yml is machine-local, sg-deploy.sh never syncs it -- this is
+# the one script allowed to change it on the server).
 ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 `
-  "sed -i 's|TRIGGER_ACCESS_TOKEN: \${TRIGGER_ACCESS_TOKEN:-}|TRIGGER_ACCESS_TOKEN: \${TRIGGER_ACCESS_TOKEN:-}\n      SSH_KEY_<KEY_LABEL_UPPERCASE>: \${SSH_KEY_<KEY_LABEL_UPPERCASE>:-}|' /root/lobster-phase1/docker-compose.yml"
+  "sed 's|TRIGGER_ACCESS_TOKEN: \${TRIGGER_ACCESS_TOKEN:-}|TRIGGER_ACCESS_TOKEN: \${TRIGGER_ACCESS_TOKEN:-}\n      SSH_KEY_<KEY_LABEL_UPPERCASE>: \${SSH_KEY_<KEY_LABEL_UPPERCASE>:-}|' /root/lobster-phase1/docker-compose.yml | sudo /root/lobster-phase1/scripts/safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin"
 
-# Also add to repo docker-compose.yml (commit later)
+# Also add to repo docker-compose.yml (commit later) -- keeps the two in sync for future reference;
+# a repo-only edit has ZERO effect on production by itself (see note above). `/check-drift`'s
+# composeVarDrift field (2026-09-20) will WARN if this step gets forgotten.
 # lobster-factory/infra/hetzner-phase1-core/docker-compose.yml
 
-# Restart container to pick up env
-ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 \
-  "cd /root/lobster-phase1 && docker compose up -d next-admin"
-
-# Verify
+# Verify (safe-infra-patch.sh already waited for healthy before returning; this confirms the
+# actual env value landed, which is the only thing docker compose config --quiet does NOT prove)
 ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 \
   "docker exec lobster-next-admin printenv | grep SSH_KEY"
 ```

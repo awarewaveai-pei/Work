@@ -127,7 +127,17 @@ function Emit-Result {
     } else {
         Write-Output ("[{0}] {1}" -f $Status, $Message)
         foreach ($k in $Data.Keys) {
-            Write-Output ("  - {0}: {1}" -f $k, $Data[$k])
+            $v = $Data[$k]
+            # A bare hashtable/array renders via .ToString() as "System.Collections.Hashtable" (no
+            # override on that type) -- caught in review, 2026-09-20, for the new composeVarDrift
+            # field. Flatten to something a human reading plain-text output can actually use; -Json
+            # still gets the full structured value untouched (Depth 6 above).
+            if ($v -is [hashtable]) {
+                $v = (($v.Keys | ForEach-Object { "{0}=[{1}]" -f $_, (($v[$_] -join ", ")) }) -join "; ")
+            } elseif ($v -is [array]) {
+                $v = ($v -join ", ")
+            }
+            Write-Output ("  - {0}: {1}" -f $k, $v)
         }
     }
     exit $ExitCode
@@ -207,6 +217,12 @@ try {
     }
     if ($AppCodeOnly) {
         # Count only commits that touch SG next-admin app paths (ignores governance/tooling noise).
+        # NOTE (2026-09-20): docker-compose.yml counting toward $behind here is a known imprecision,
+        # not fixed today -- sg-deploy.sh stamps .deployed-commit on ANY app deploy regardless of
+        # which files changed, so a compose-only commit can show $behind=0 (looks "deployed") while
+        # never having been applied to the live file at all. That gap is exactly what the separate,
+        # unconditional composeVarDrift check below exists to catch -- $behind was never a reliable
+        # signal for this one path and should not be treated as one.
         $appPaths = @(
             "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/",
             "lobster-factory/infra/hetzner-phase1-core/nginx/",
@@ -226,6 +242,63 @@ try {
     Pop-Location
 }
 
+# 4.5 Compose variable drift (2026-09-20): docker-compose.yml is machine-local on the server
+# (sg-deploy.sh's own header comment -- only apps/<APP> source is rsynced; safe-infra-patch.sh, not
+# git, is the required way to change the live file per Auto-Repair 紅線). A repo edit to this file's
+# environment: blocks has ZERO effect on production regardless of commit drift above -- a real
+# incident: a vendor-swap env-var change sat inert in prod through a full sg-deploy.sh run, because
+# `behind` was 0 (the commit shipped) but the compose file itself was never touched. This check does
+# not gate on `behind` -- it is a genuinely separate axis of drift.
+#
+# KNOWN, ACCEPTED LIMITATION: this is a flat variable-NAME set diff, not a YAML/service-aware one --
+# it cannot tell "present under the wrong service" from "present, correctly". docker-compose.yml
+# genuinely declares the same name (`PORT`) three times under three different services with three
+# different values (next-admin/node-api/hci-app) -- a real per-service drift there would cancel out
+# in this set-difference and report clean. Accepted for now: this check's job is to catch the "never
+# even declared" class (which is what actually bit this app -- a wholesale-missing var, not a
+# cross-service value mixup), and a real per-service-scoped rewrite is a larger, separate change.
+#
+# Independent SSH call (not folded into the step-3 probe above) to avoid touching that probe's
+# already-hardened parsing -- see its own comments for the CP950/exit-code history. Deliberately NO
+# remote pipe (no `| sort -u` on the SSH side): a first attempt used `bash -o pipefail -c "grep ...
+# | sort -u"` to stop a failing grep from being masked by sort succeeding on empty stdin, but nested
+# single/double quoting across PowerShell -> Windows argv -> ssh.exe -> remote bash proved fragile
+# in practice (grep received a mangled pattern live-tested, 2026-09-20). Simpler and more robust:
+# grep alone (its own exit code is directly `$composeProbe.ExitCode`, nothing to mask), dedupe
+# locally instead. No `2>/dev/null` either -- a real error is wanted in $composeVarDriftCheckError,
+# not silently thrown away (the previous version hid exactly the diagnostic this field exists for).
+$composeVarDrift = $null
+$composeVarDriftCheckError = $null
+$composeProbe = Invoke-Ssh -Cmd "sudo grep -ohP '^\s+\K[A-Z][A-Z0-9_]+(?=:)' /root/lobster-phase1/docker-compose.yml"
+$serverVars = @($composeProbe.Output -split "`n" | Where-Object { $_ -match '^[A-Z][A-Z0-9_]+$' } | Sort-Object -Unique)
+if ($composeProbe.ExitCode -ne 0 -or $serverVars.Count -eq 0) {
+    # Distinguishable from "checked, no drift found" -- surfaced in $data so a WARN-suppressing PASS
+    # can never come from a probe that silently found nothing to compare.
+    $composeVarDriftCheckError = "compose var probe failed or found 0 vars (exit $($composeProbe.ExitCode)): $($composeProbe.Output)"
+} else {
+    $repoComposePath = Join-Path $repoRoot "lobster-factory\infra\hetzner-phase1-core\docker-compose.yml"
+    if (Test-Path $repoComposePath) {
+        # Explicit UTF-8 (repo .yml has no BOM): PS 5.1's Get-Content without -Encoding falls back to
+        # the system codepage, which can misalign byte boundaries around the file's many CJK
+        # comments and corrupt regex matches on nearby lines -- caught live, 2026-09-20: this exact
+        # bug made REPLICATE_API_TOKEN/REMOTION_*/R2_VIDEO_BUCKET (each sitting right after a CJK
+        # comment) falsely report as "only on server" when they were plainly present in repo too.
+        $repoText = Get-Content -LiteralPath $repoComposePath -Raw -Encoding utf8
+        $repoVars = @([regex]::Matches($repoText, '(?m)^[ \t]+([A-Z][A-Z0-9_]+):') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+        $onlyServer = @($serverVars | Where-Object { $repoVars -notcontains $_ })
+        $onlyRepo   = @($repoVars   | Where-Object { $serverVars -notcontains $_ })
+        if ($onlyServer.Count -gt 0 -or $onlyRepo.Count -gt 0) {
+            $composeVarDrift = @{
+                onlyOnServer = $onlyServer
+                onlyInRepo   = $onlyRepo
+                hint         = "repo docker-compose.yml env changes need scripts/safe-infra-patch.sh compose <file> <service> on the server -- sg-deploy.sh does not sync this file"
+            }
+        }
+    } else {
+        $composeVarDriftCheckError = "repo compose file not found at $repoComposePath"
+    }
+}
+
 # 5. Verdict
 $data = @{
     server          = $ServerHost
@@ -236,6 +309,8 @@ $data = @{
     warnAt          = $WarnAt
     failAt          = $FailAt
     appCodeOnly     = [bool]$AppCodeOnly
+    composeVarDrift = $composeVarDrift
+    composeVarDriftCheckError = $composeVarDriftCheckError
 }
 
 if ($behind -ge $FailAt) {
@@ -245,5 +320,16 @@ if ($behind -ge $WarnAt) {
     $code = if ($Strict) { 2 } else { 1 }
     $status = if ($Strict) { "FAIL" } else { "WARN" }
     Emit-Result -Status $status -ExitCode $code -Message ("Production is {0} commit(s) behind origin/main." -f $behind) -Data $data
+}
+if ($composeVarDrift) {
+    $code = if ($Strict) { 2 } else { 1 }
+    $status = if ($Strict) { "FAIL" } else { "WARN" }
+    Emit-Result -Status $status -ExitCode $code -Message ("Production is at origin/main (commit {0}), but docker-compose.yml declares different variables than repo (server-only: {1}; repo-only: {2}). Fix via safe-infra-patch.sh, NOT sg-deploy.sh -- see composeVarDrift." -f $deployedCommit.Substring(0,7), $composeVarDrift.onlyOnServer.Count, $composeVarDrift.onlyInRepo.Count) -Data $data
+}
+if ($composeVarDriftCheckError) {
+    # Non-Strict WARN only -- this is "the supplementary check didn't run", not "everything is
+    # broken" (the primary commit-drift verdict above already reported correctly). Never silently
+    # dropped, unlike the pre-fix behavior this replaced.
+    Emit-Result -Status "WARN" -ExitCode 1 -Message ("Production is at origin/main (commit {0}), but the compose-variable-drift check itself failed: {1}" -f $deployedCommit.Substring(0,7), $composeVarDriftCheckError) -Data $data
 }
 Emit-Result -Status "PASS" -ExitCode 0 -Message ("Production is at origin/main (commit {0})." -f $deployedCommit.Substring(0,7)) -Data $data

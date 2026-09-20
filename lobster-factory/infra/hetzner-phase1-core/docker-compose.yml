@@ -289,6 +289,11 @@ services:
       OPS_INBOX_GEMINI_ENABLED: ${OPS_INBOX_GEMINI_ENABLED:-}
       OPS_INBOX_GEMINI_DAILY_LIMIT: ${OPS_INBOX_GEMINI_DAILY_LIMIT:-1400}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Outreach: Gmail OAuth connector (app/api/outreach/{messages/gmail-draft,connectors/gmail/*}).
+      # Was live on the server since before this file tracked it (2026-09-20 compose-drift audit) --
+      # added here so a fresh deploy of this file no longer silently omits it.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       OPS_PROXY_SHARED_SECRET: ${OPS_PROXY_SHARED_SECRET:-}
       OPS_ALLOW_SIMULATED_ROLE_FALLBACK: ${OPS_ALLOW_SIMULATED_ROLE_FALLBACK:-}
       OPS_ROLE_RESOLUTION_MODE: ${OPS_ROLE_RESOLUTION_MODE:-}
@@ -356,6 +361,12 @@ services:
       # when on. WC_WEBHOOK_SECRET = the WooCommerce webhook secret used to HMAC-verify the payload.
       POD_AUTO_FULFILL_ENABLED: ${POD_AUTO_FULFILL_ENABLED:-false}
       WC_WEBHOOK_SECRET: ${WC_WEBHOOK_SECRET:-}
+      # wp-bridge signing client (one-click publish; lib/studio/wp-bridge-client.ts). Was live on the
+      # server since before this file tracked it (2026-09-20 compose-drift audit) -- added here so a
+      # fresh deploy of this file no longer silently omits it.
+      WPBRIDGE_BASE_URL: ${WPBRIDGE_BASE_URL:-}
+      WPBRIDGE_KEY_ID: ${WPBRIDGE_KEY_ID:-}
+      WPBRIDGE_PRIVATE_KEY: ${WPBRIDGE_PRIVATE_KEY:-}
       # Repair OS Integrations: provider health adapters use reference-only secrets from env.
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLOUDFLARE_AUTH_BEARER_TOKEN: ${CLOUDFLARE_AUTH_BEARER_TOKEN:-}
@@ -370,6 +381,15 @@ services:
       GRAFANA_INTERNAL_BASE_URL: ${GRAFANA_INTERNAL_BASE_URL:-}
       GRAFANA_SERVICE_ACCOUNT_TOKEN: ${GRAFANA_SERVICE_ACCOUNT_TOKEN:-}
       NETDATA_BASE_URL: ${NETDATA_BASE_URL:-}
+      # Video pipeline production gates (lib/content/video/{caption-qa-persistence,delivery-receipts,
+      # qa-persistence,provider-policy}.ts, app/api/video/{release,qa/editorial-rights}/route.ts,
+      # app/api/webhooks/video-outcome/route.ts). Was live on the server since before this file
+      # tracked it (2026-09-20 compose-drift audit) -- added here so a fresh deploy of this file no
+      # longer silently omits it.
+      MEDIA_PRODUCTION_PERSISTENCE_ENABLED: ${MEDIA_PRODUCTION_PERSISTENCE_ENABLED:-false}
+      MEDIA_OUTCOME_WEBHOOK_ENABLED: ${MEDIA_OUTCOME_WEBHOOK_ENABLED:-false}
+      MEDIA_OUTCOME_WEBHOOK_TOKEN: ${MEDIA_OUTCOME_WEBHOOK_TOKEN:-}
+      MEDIA_PROVIDER_ALLOWLIST: ${MEDIA_PROVIDER_ALLOWLIST:-}
       NETDATA_API_TOKEN: ${NETDATA_API_TOKEN:-}
       SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY: ${SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY:-}
       SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY: ${SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY:-}
