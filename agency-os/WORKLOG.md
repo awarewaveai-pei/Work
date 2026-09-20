@@ -20812,6 +20812,11 @@ WORKLOG_DONE: Perplexity Search-only CI 守門 + 定期任務排查
 [rollback] `git revert` 本 commit；`~/.codex` 全部變動皆先備份於 `~/.codex/backups/claude-migration-<timestamp>/`(含 24 份舊 agent 副本)；`~/.claude/hooks` 由 `scripts/sync-claude-userlevel.ps1 -Mode merge` 從 repo 重建。
 WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈修復
 
+[追記 2026-09-20] 操作者決定把 `trigger`／`cloudflare` 兩個 MCP 納入 Codex（推翻 2026-06-16 commit `c2fc3df2f` 的排除；當時未記原因）。`mcp/registry.template.json` 移除兩處 `clients.codex.exclude` → `scripts/sync-mcp-config.ps1`。Codex 端現與 Claude 同為 19 個 server；`canva` 仍排除（OAuth 彈窗，理由寫在 registry `note`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/sync-mcp-config.ps1` + `codex mcp list` + parity | exit=0 | result=Codex managed block 19 個（含 trigger stdio、cloudflare bearer）；`.mcp.json` 無變動（排除本來就只影響 Codex）；`codex mcp list` 全部 enabled、憑證顯示為遮罩；parity 仍只剩 trust 一項未過
+- REVIEW_WAIVED: NA -- 單一設定值移除（兩行），無邏輯變更
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp | grep=`clients.*codex.*exclude` | hits=1（僅剩 `canva`，其 `note` 已載明理由）
+
 ## 2026-09-20(續83)Perplexity console 帳號層盤點與加固(操作者：「你去處理這些」，經其 Chrome 已登入 session)
 
 現場查核(console.perplexity.ai，專案 `Soulful Expression` / 95e2cf43-fd96-4f92-8fbb-93f3f42bb65b)：

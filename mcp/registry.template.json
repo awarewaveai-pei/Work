@@ -212,7 +212,6 @@
                                           }
                             },
                     "trigger":  {
-                                    "clients":  { "codex":  { "exclude":  true } },
                                     "enabled":  true,
                                     "transport":  "stdio",
                                     "command":  "powershell",
@@ -258,7 +257,6 @@
                                      "note":  "DISABLED: self-hosted Supabase Kong has no /mcp endpoint (returns 403). Use awarewave-ops for REST API and supabase-awarewave-postgres (requires SSH tunnel) for SQL. Re-enable only if Supabase officially adds self-hosted /mcp support."
                                  },
                     "cloudflare":  {
-                                       "clients":  { "codex":  { "exclude":  true } },
                                        "enabled":  true,
                                        "transport":  "http",
                                        "url":  "https://mcp.cloudflare.com/mcp",
