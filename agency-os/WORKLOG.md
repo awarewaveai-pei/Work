@@ -11,6 +11,11 @@
   - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`SAMPLES\|_time_calls\|MAX_ACCEPTABLE_RATIO` | hits=0（舊的 `SAMPLES`／`_time_calls` 只此檔使用，無其他 call site；門檻常數同檔）
 - [剩餘風險] 交錯取樣消除漂移，但若整機在測試全程持續重載，兩邊會一起變慢（比值仍正確，這是設計上想要的）。真正無法量測的極端情況（單核 100% 被別的程序佔滿）會讓 12 對取樣的中位數也失真，屆時是機器問題不是程式問題。
 - [rollback] `git revert` 本 commit 即回到批次取樣版本（門檻從未變動，回退不會放寬任何安全條件）。
+- [部署 prod（操作者 go-ahead：「所有的事處理好!」）] ks-aw-01 `/opt/cognitive-os` 由 `dd204ff6` fast-forward 到 `3b7dae03`（含續86 的文案／範例與續87 的測試），跑 `Projects/internal/cognitive-engineering-os/deploy/deploy.sh`：typecheck → test gate → 保留 `:rollback` 映像 → build → healthcheck **6 秒健康** → 本機 smoke PASS → 對外 smoke PASS → notify。保留 `cognitive-os-api:rollback` 可一鍵回退。
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh`（ks-aw-01）| exit=0 | result=healthy after 6s；local+public smoke PASS（`deploy/deploy.log` 2026-09-20T05:20:36Z–05:20:45Z）
+  - REALTEST_EVIDENCE: tool=curl | cmd=`GET https://cognitive.aware-wave.com/methods/framing.five_w_one_h/form` | exit=0 | result=`schema_source=record_schema`、`form.example` 有 scenario＋input（dimensions/topic）、`display.example_zh`／`example_en` 已不存在、`why_zh` 為新白話版且掃不到識別碼；另抽 5 個方法（pdca／causal_loop_diagram／zopa／security.attack_tree／vrio）全部 200 且都帶 example
+  - REALTEST_EVIDENCE: tool=curl | cmd=`POST https://cognitive.aware-wave.com/methods/framing.five_w_one_h/invoke`（登入後，body＝線上那筆範例＋頁面預設 provenance）| exit=0 | result=**200，prod 真的產生記錄 `5W1H-4666C1747A9DF5A5`**，gate `provenance_required`／`evidence_labeling_required` 等全 PASS，`information_gaps=[WHEN, WHY]` 由兩筆「未知」面向當場算出——正是新版 why_zh 描述的行為。驗完已 `POST /auth/logout` 撤銷該 session。
+  - 過程中的真發現：直接把範例原封不動 POST 給 `/invoke` 會 400（`FIVEWONEH_INVALID_DIMENSION_SET`），因為範例刻意不含列層 provenance、由表單在送出時補上。這是**測試路徑**的差異不是產品缺陷（頁面實際走的序列化器會補，本機無頭瀏覽器實測與 282 筆範例測試走的都是那條路徑）；補上頁面預設 provenance 後 200。記在這裡是為了下次不要用「裸 POST 範例」當成使用者路徑的等價驗證。
 
 ## 2026-09-20（續86）方法頁上的「為什麼有效」與「填表範例」：把我自己寫壞的工程語改成白話，範例改成會直接填進表單的真實資料
 
