@@ -14,15 +14,9 @@ from ai_lego.modules.decision.mcda import evaluate_mcda_gates, generate_mcda_ana
 
 METHOD_ID = "architecture.trade_off_matrix"
 RECORD_ID_PREFIX = "MCDA-"
-# Value MUST match typed-objects/mcda-analysis.schema.yaml's own `id` pattern (`^MCDA-`) -- this module wraps
-# generate_mcda_analysis() directly (see module docstring: "field-for-field the same method as
-# decision.mcda"), so a record built here really is an MCDA record under the hood, not a distinct
-# architecture-trade-off-matrix-* shape. An earlier draft of this line used "TRADEOFFMATRIX-" (a mechanical
-# transliteration of the method name that ignored the reused schema; critic-caught 2026-09-18, see the
-# same-day WORKLOG entry for the other modules this exact mistake was found in). Not load-bearing for API
-# auto-injection (identity param is the domain-specific analysis_id, not `record_id`) -- exists only for the
-# dashboard's opt-in id-suggest button. See atam.py's own RECORD_ID_PREFIX comment for the full rationale
-# (2026-09-18).
+# Value MUST match typed-objects/mcda-analysis.schema.yaml's own `id` pattern (`^MCDA-`): this module wraps
+# generate_mcda_analysis(), so the record really is an MCDA record -- not a transliteration of the method name
+# (critic-caught 2026-09-18). Prefixes the analysis_id /methods/{id}/invoke generates when the caller omits it (dispatch.self_id_param).
 
 
 def generate_trade_off_matrix(

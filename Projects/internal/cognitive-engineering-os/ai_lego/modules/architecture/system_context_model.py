@@ -17,14 +17,9 @@ from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.system_context_model"
 RECORD_ID_PREFIX = "SCM-"
-# Value MUST match typed-objects/system-context-model.schema.yaml's own `id` pattern (`^SCM-`) -- an earlier
-# draft of this line used "C4-" (the real-world method name, chosen because record_id is a free-text field
-# with no grammar restriction against digits, unlike METHOD_ID/family) but never actually cross-checked the
-# canonical schema's own declared pattern, which is "SCM-", not "C4-" (critic-caught 2026-09-18; see the
-# same-day WORKLOG entry for the other modules this exact mistake was found in). Not load-bearing for API
-# auto-injection (identity param is the domain-specific model_id, not `record_id`) -- exists only for the
-# dashboard's opt-in id-suggest button. See atam.py's own RECORD_ID_PREFIX comment for the full rationale
-# (2026-09-18).
+# Value MUST match typed-objects/system-context-model.schema.yaml's own `id` pattern (`^SCM-`), not the
+# real-world method name "C4-" (critic-caught 2026-09-18).
+# Prefixes the model_id /methods/{id}/invoke generates when the caller omits it (dispatch.self_id_param).
 
 
 def generate_system_context_model(

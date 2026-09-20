@@ -1,0 +1,2199 @@
+# Method input forms: labels and the few structural overrides for the dashboard form.
+#
+# The form's STRUCTURE comes from each method's own record schema (specs/cognitive/typed-objects/),
+# read by ai_lego/apps/api/method_form.py. This file only adds what a schema cannot say:
+#   glossary      field key -> Chinese label (or {label, hint}); applies to every method
+#   enum_labels   enum / fixed-row value -> Chinese label; applies to every method
+#   methods.<id>  per-method entries, looked up before the glossary:
+#     <path> or <key>      label / {label, hint} for that field (path = dotted from the parameter)
+#     "<path>=" / "<key>="  {value: label} for that field's options
+#     _computed            record fields the builder computes (never inputs) the schema does not mark
+#     _inputs              fields the schema calls computed but the builder still requires as input
+#     _params.<param>      schema: JSON-Schema snippet for a parameter the record schema does not hold
+#                          upstream: method id (or {select_by, methods}) when the parameter IS another
+#                          method's whole record
+#     _workflow_only       recipe id -- the method's inputs are other steps' outputs; no hand form
+# tests/unit/test_method_form.py fails when a visible field or option has no Chinese label, or when a
+# form cannot produce input the real builder accepts.
+
+_provenance: &provenance
+  $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+_evidence_refs: &evidence_refs
+  type: array
+  items: {type: string, pattern: "^E-[0-9]+$"}
+
+methods:
+  framing.five_w_one_h:
+    topic: {label: 要釐清的主題, hint: 這六個面向共同在問的那一件事。}
+    dimensions: {label: 六何（5W1H）, hint: 每一列：知道答案就選「已知」並寫下來；還不知道就選「未知」，可以寫缺什麼資訊。系統會自動列出資訊缺口。}
+    "dimensions.dimension=":
+      WHO: Who（何人）：主角、參與者或對象是誰
+      WHAT: What（何事）：發生了什麼事、要做什麼或討論什麼
+      WHEN: When（何時）：發生的時間、期限或進度
+      WHERE: Where（何地）：發生的地點、場所或範圍
+      WHY: Why（為何）：背後的原因、目的或動機
+      HOW: How（如何）：執行的步驟、方法、過程或解法
+    dimensions.status: 這一面向目前
+    dimensions.gap_note: 還缺什麼資訊（選填）
+
+  challenge.fmea:
+    _computed: [failure_modes.rpn, failure_modes.action_priority]
+
+  decision.decision_tree:
+    _computed: [expected_value, optimal_branch_label]
+    "node_type=": {decision: 決策節點, chance: 機率節點, terminal: 終點節點}
+
+  epistemic.assumption_registry:
+    _computed: [entries.is_critical_assumption]
+
+  strategy.tows:
+    _computed: [pairings.pairing_type]
+
+  devops_sre.stress_test:
+    # the builder requires the caller's own recovered verdict and refuses it when it disagrees with the computed one
+    _inputs: [recovery.recovered]
+
+  jurisdiction.compliance_gap_analysis:
+    _params:
+      gap_annotations:
+        schema:
+          type: array
+          items:
+            type: object
+            required: [control_id, severity, plan]
+            properties:
+              control_id: {type: string}
+              severity: {type: string, enum: [low, medium, high, critical]}
+              plan: {type: string}
+
+  representation.concept_graph_view:
+    _params:
+      source_relations:
+        schema:
+          type: array
+          items:
+            type: object
+            required: [relation_id, relation_type, provenance_ref]
+            properties:
+              relation_id: {type: string}
+              relation_type: {type: string}
+              provenance_ref: {type: string}
+
+  representation.timeline_view:
+    _params:
+      events:
+        schema:
+          type: array
+          items:
+            type: object
+            required: [event_id, event_time]
+            properties:
+              event_id: {type: string}
+              event_time: {type: number}  # the builder sorts on a real number (ordinal or timestamp), not a date string
+
+  security.security_control_mapping:
+    _params:
+      source_record:
+        upstream:
+          select_by: source_record_type
+          methods: {stride: security.stride, linddun: security.linddun}
+
+  strategy.swot:
+    _params:
+      knowledge_set:
+        schema:
+          type: array
+          minItems: 1
+          items: {$ref: "ai-lego://specs/evidence/evidence.schema.yaml"}
+
+  decision.eisenhower_matrix:
+    _params:
+      subject: {schema: {type: string}}
+      tasks:
+        schema:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, label, urgency, importance]
+            properties:
+              id: {type: string}
+              label: {type: string}
+              urgency: {type: number}
+              importance: {type: number}
+      urgency_scale:
+        schema: &eisenhower_scale
+          type: object
+          required: [min, max]
+          properties:
+            min: {type: number}
+            max: {type: number}
+      importance_scale: {schema: *eisenhower_scale}
+      urgency_threshold: {schema: {type: number}}
+      importance_threshold: {schema: {type: number}}
+
+  divergent.reverse_brainstorming:
+    _params:
+      problem_statement: {schema: {type: string}}
+      worsening_ideas:
+        schema:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, text, provenance]
+            properties:
+              id: {type: string}
+              text: {type: string}
+              provenance: *provenance
+      inversions:
+        schema:
+          type: array
+          items:
+            type: object
+            required: [worsening_idea_ref, inverted_solution, provenance]
+            properties:
+              worsening_idea_ref: {type: string}
+              inverted_solution: {type: string}
+              provenance: *provenance
+
+  strategy.lean_canvas:
+    _params:
+      blocks:
+        schema:
+          type: array
+          prefixItems:
+            - &lean_block {type: object, required: [block, content, provenance], properties: {block: {const: PROBLEM}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: CUSTOMER_SEGMENTS}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: UNIQUE_VALUE_PROPOSITION}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: SOLUTION}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: CHANNELS}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: REVENUE_STREAMS}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: COST_STRUCTURE}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: KEY_METRICS}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+            - {<<: *lean_block, properties: {block: {const: UNFAIR_ADVANTAGE}, content: {type: string}, provenance: *provenance, supporting_evidence_refs: *evidence_refs}}
+
+  research.reporting_guideline_checklist:
+    # official item wording is compared verbatim by the builder: rows come from the catalog, the user only drafts
+    _reference_variant:
+      file: reference-data/reporting-guidelines.reference.yaml
+      collection: guidelines
+      discriminator: guideline_id
+      option_label: name
+      constants: {guideline_citation: citation}
+      rows:
+        param: items
+        source: items
+        row_key: item_id
+        row_label: requirement_text
+        constants: {requirement_text: requirement_text}
+        fields:
+          # the builder's own not-yet-drafted placeholder convention (_PLACEHOLDER_PREFIX)
+          drafted_content: {type: string, default: "TBD:"}
+          status: {type: string, enum: [NOT_STARTED, DRAFTED, NOT_APPLICABLE], default: NOT_STARTED}
+
+  evidence.triangulation:
+    _workflow_only: research-qualitative-v1
+
+  research.qualitative_coding:
+    _workflow_only: research-qualitative-v1
+
+# field key -> Chinese label (applies to every method unless a methods.<id> entry overrides it)
+glossary:
+  id: 編號
+  description: 說明
+  label: 名稱
+  status: 狀態
+  name: 名稱
+  note: 備註
+  supporting_evidence_refs: 佐證資料編號（E-…）
+  statement: 陳述
+  evidence: 證據
+  summary: 摘要
+  value: 數值
+  owner: 負責人
+  source: 來源
+  stages: 階段
+  items: 項目
+  subject: 主題
+  system_or_component: 系統或元件
+  content: 內容
+  criterion_id: 準則編號
+  context: 背景脈絡
+  category: 類別
+  options: 選項
+  impact: 影響程度
+  dimension: 面向
+  geography: 地區
+  criteria: 評估準則
+  subject_ref: 分析對象
+  evidence_id: 證據編號（E-…）
+  risk_level: 風險等級
+  decision: 決策
+  rationale: 理由
+  assumptions: 前提假設
+  confidence: 信心程度
+  children: 子項目
+  edges: 連線
+  nodes: 節點
+  direction: 方向（越高越好／越低越好）
+  dimensions: 面向
+  entries: 條目
+  hierarchy_tier: 證據層級
+  quality_assessment: 品質評估
+  consistency: 一致性
+  directness: 直接性
+  independence: 獨立性
+  method_quality: 方法品質
+  recency: 時效性
+  sample: 樣本
+  source_authority: 來源權威性
+  control_id: 控制措施編號
+  findings: 發現
+  option_id: 選項編號
+  weights: 權重
+  weight: 權重
+  role: 角色
+  text: 內容
+  constraints: 限制條件
+  controls: 控制措施
+  max: 最大值
+  min: 最小值
+  target: 目標對象
+  unit: 單位
+  control: 控制措施
+  problem_statement: 問題陳述
+  outcome: 結果
+  probability: 機率
+  factors: 因素
+  stakeholder_name: 利害關係人
+  error_rate: 錯誤率（0–1）
+  latency_p95_ms: P95 延遲（毫秒）
+  gaps: 缺口
+  stop_conditions: 停止條件
+  layout: 版面配置
+  presentation_preferences: 呈現偏好
+  visible_fields: 顯示欄位
+  type: 類型
+  sensitivity_notes: 敏感度說明
+  events: 事件
+  topic: 主題
+  analysis_summary: 分析摘要
+  proposal_ref: 受審方案
+  severity: 嚴重度
+  schema_ref: 資料結構參照
+  threshold: 門檻
+  goal: 目標
+  root: 根節點
+  tasks: 任務
+  ideas: 點子
+  question: 問題
+  load_rps: 負載（每秒請求數）
+  resource_utilization: 資源使用率（0–1）
+  domain: 領域
+  claim_id: 主張編號
+  event_id: 事件編號
+  answer: 答案
+  justification: 理由說明
+  decision_ref: 對應決策
+  knowledge_ref: 知識物件參照
+  filters: 篩選條件
+  assets: 資產
+  entry_points: 入口點
+  residual_risk: 殘餘風險
+  test_evidence: 測試證據
+  trust_boundaries: 信任邊界
+  migration: 遷移計畫
+  title: 標題
+  notes: 備註
+  node_type: 節點類型
+  environment: 環境條件
+  measure: 衡量標準
+  raw_scores: 原始分數
+  raw_value: 原始數值
+  step: 步驟序號
+  segments: 區段
+  score: 分數
+  polarity: 屬性（原因／結果）
+  from_node_id: 起點節點
+  to_node_id: 終點節點
+  cause_hypothesis_set: 原因假設集（魚骨圖結果）
+  checks: 檢查項目
+  node_id: 節點編號
+  migration_ref: 遷移紀錄參照
+  evidence_ref: 佐證參照
+  reasoning: 推理說明
+  reason: 原因
+  changes: 變更項目
+  scope: 範圍
+  recovery: 恢復情況
+  outcome_id: 成果編號
+  risks: 風險
+  risk_id: 風險編號
+  system_under_test: 受測系統
+  verdict: 判定
+  test: 驗證方式
+  metric: 指標
+  observations: 觀察紀錄
+  source_type: 來源類型
+  alternatives: 替代方案
+  discount_rate: 折現率
+  cost: 成本
+  amount: 金額
+  period: 期數
+  basis: 依據（事實／推論）
+  jurisdiction: 法域
+  jurisdiction_id: 法域編號
+  source_knowledge_object_id: 來源知識物件編號
+  barrier_id: 屏障編號
+  threats: 威脅
+  system_under_analysis: 分析的系統
+  secret_id: 機密編號
+  present: 是否具備
+  rollback: 回滾方式
+  validation: 驗證方式
+  pattern: 模式
+  fallback: 備援方案
+  from_id: 起點
+  to_id: 終點
+  elements: 元素
+  relationships: 關係
+  functions: 適應度函數
+  stimulus: 刺激事件
+  action: 行動
+  roles: 角色
+  scenario: 情境
+  characters: 角色
+  conflict: 衝突
+  meaning: 意義
+  resolution: 解決方式
+  milestones: 里程碑
+  attributes: 屬性
+  attribute_name: 屬性名稱
+  variant_id: 變體編號
+  central_topic: 中心主題
+  actual_outcome: 實際結果
+  intervention: 介入措施
+  control_group: 對照組
+  indicators: 指標
+  result: 結果
+  assumption: 假設
+  indicator: 指標
+  claim: 主張
+  failure_modes: 失效模式
+  cause: 原因
+  source_ref: 來源參照
+  cluster: 群組
+  likelihood: 可能性
+  scenarios: 情境
+  mode: 模式
+  rpo_target_seconds: RPO 目標（秒）
+  rto_target_seconds: RTO 目標（秒）
+  dataset_or_topic: 資料集或主題
+  data_type: 資料型別
+  stage: 階段
+  rule: 規則
+  entities: 實體
+  target_value: 目標端數值
+  overall_status: 整體狀態
+  target_ref: 目標端
+  decision_context: 決策情境
+  branches: 分支
+  urgency: 緊急程度
+  effort: 投入程度
+  objectives: 目標
+  scores: 分數
+  plan: 計畫
+  task_name: 任務名稱
+  categories: 類別
+  causes: 原因
+  required_controls: 必要控制措施
+  depends_on: 前置依賴
+  trigger: 觸發條件
+  security: 資安
+  outcomes: 成果
+  theme_id: 主題編號
+  themes: 主題
+  assignments: 分派
+  stage_name: 階段名稱
+  injected_failure: 注入的故障
+  service_under_measurement: 量測的服務
+  actual: 實際發生
+  expected: 預期
+  error_rate_max: 錯誤率上限（0–1）
+  latency_p95_ms_max: P95 延遲上限（毫秒）
+  baseline: 基準量測
+  tier: 等級
+  steps: 步驟
+  metric_type: 指標類型
+  contributor_id: 貢獻者
+  objective: 目標
+  outputs: 產出
+  define: 定義問題（Define）
+  resulting_idea: 產生的點子
+  rounds: 輪次
+  round_number: 第幾輪
+  questions: 問題
+  analogies: 類比
+  contradicting_evidence: 反面證據
+  coverage: 涵蓋範圍
+  quality: 品質
+  supporting_evidence: 支持證據
+  hypothesis: 假設
+  claims: 主張
+  relation: 關係
+  level_id: 層級編號
+  parameters: 參數
+  metrics: 指標
+  workload: 工作負載
+  measured_at: 量測時間
+  falsifiable_if: 何種觀察可以推翻
+  comparison: 比較方式
+  method: 方法
+  participant_count: 參與人數
+  non_monetizable: 無法貨幣化的效益
+  cash_flows: 現金流
+  currency: 幣別
+  horizon: 時間跨度
+  exposure_id: 暴露點編號
+  date: 日期
+  quadrant: 象限
+  actions: 行動
+  situation: 情境
+  goals: 目標
+  law_id: 法規編號
+  data_class_id: 資料類別編號
+  obligation_id: 義務編號
+  timestamp: 時間戳記
+  condition: 條件
+  operator: 運算子
+  state: 狀態
+  edge_id: 連線編號
+  x: X 座標
+  "y": Y 座標
+  provenance_ref: 來源紀錄參照
+  relation_id: 關係編號
+  relation_type: 關係類型
+  step_id: 步驟編號
+  barriers: 屏障
+  after_state: 變更後狀態
+  before_state: 變更前狀態
+  distinction_id: 差異編號
+  addresses_step_ids: 對應的步驟編號
+  data_flow_elements: 資料流元素
+  element_type: 元素類型
+  element_name: 元素名稱
+  interests: 利益關注
+  power: 影響力
+  player_id: 參與者編號
+  strategy_id: 策略編號
+  stakeholders: 利害關係人
+  growth_rate: 市場成長率
+  blocks: 區塊
+  time: 時間
+  strength: 力道
+  alternatives_considered: 考慮過的替代方案
+  compatibility: 相容性
+  data_impact: 資料影響
+  operational_impact: 維運影響
+  revisit_reversal_conditions: 重新檢討／撤回條件
+  security_privacy_impact: 資安／隱私影響
+  architecture_description: 架構說明
+  bounded_contexts: 限界上下文（Bounded Context）
+  subdomain_ids: 所屬子領域
+  context_map: 上下文地圖（Context Map）
+  from_context_id: 來源上下文
+  to_context_id: 目標上下文
+  domain_description: 領域說明
+  subdomains: 子領域
+  is_critical: 是否關鍵
+  system_under_mapping: 盤點的系統
+  domain_process_description: 業務流程說明
+  architecture_under_governance: 受治理的架構
+  ci_gate: CI 關卡位置
+  invariant: 要守住的不變量
+  test_or_metric: 檢查方式或指標
+  artifact: 受影響元件
+  quality_goal: 品質目標
+  response: 系統回應
+  legacy_system_under_migration: 要汰換的舊系統
+  seams: 切入點（Seam）
+  slices: 切片
+  seam_id: 切入點編號
+  code: 程式碼層（Code）
+  component_id: 元件編號
+  components: 元件
+  container_id: 容器編號
+  containers: 容器（Container）
+  system_context: 系統脈絡（System Context）
+  conflict_label: 衝突名稱
+  parties: 衝突各方
+  need: 需求
+  transformation_path: 轉化路徑
+  resource_gained: 獲得的資源
+  raw_statement: 原始陳述
+  revision: 修改後
+  sentence: 句子
+  exchanges: 對話往返
+  line: 台詞
+  speaker: 說話者
+  figure: 隱喻形象
+  origin: 來源
+  integration_note: 整合心得
+  reflections: 反思
+  observation: 觀察
+  prediction: 預測
+  role_ref: 對應角色
+  played_by: 扮演者
+  stance: 立場
+  inner_role: 內在角色
+  continuation: 故事接續
+  felt_dynamics: 感受到的動力
+  story_stem: 故事開頭
+  arc: 故事弧線
+  setting: 場景設定
+  substitutions: 替換詞組
+  original_phrase: 原本的說法
+  replacement_phrase: 替換後的說法
+  belief_shift: 信念轉變
+  emotion_after: 事件後的情緒
+  emotion_before: 事件前的情緒
+  event: 事件
+  when: 發生時間
+  core_values: 核心價值
+  life_direction: 人生方向
+  why_it_matters: 為什麼重要
+  transformation_context: 轉化脈絡
+  element: 畫面元素
+  stands_for: 代表的意義
+  felt_experience: 感受經驗
+  image: 畫面
+  medium: 創作媒材
+  metaphor_statement: 隱喻陳述
+  blessing_statement: 祝福語
+  created_by: 創作者
+  journey_title: 旅程標題
+  sealed_on: 完成日期
+  current_phase: 目前所在階段
+  linked_tool_ids: 搭配使用的工具編號
+  progress_evidence: 進展的觀察證據
+  cards: 卡片
+  groups: 分組
+  item_refs: 包含的卡片編號
+  higher_level_themes: 更高層次的主題
+  group_refs: 涵蓋的分組編號
+  theme: 主題
+  abstracted_mechanism: 抽象出的機制
+  informs_historical_analogy_ref: 對應的歷史類比紀錄
+  source_domain_description: 來源領域說明
+  target_mapping: 套用到目標問題的方式
+  target_problem: 目標問題
+  original_value: 原本的值
+  transformed_variants: 變換後的版本
+  variant_text: 變換內容
+  informs_scamper_ref: 對應的 SCAMPER 紀錄
+  recombination: 重新組合
+  combined_from: 組合來源
+  proposal_description: 新方案說明
+  relationship_type: 關係類型
+  main_branches: 主要分支
+  sub_branches: 次要分支
+  keywords: 關鍵詞
+  dimension_a: 面向 A
+  dimension_b: 面向 B
+  option_a: 選項 A
+  option_b: 選項 B
+  informs_mcda_ref: 對應的多準則決策紀錄
+  counterfactual_outcome: 反事實結果（若沒介入會怎樣）
+  parallel_trends_justification: 平行趨勢的理由
+  post_period: 介入後期間
+  pre_period: 介入前期間
+  treated_group: 實驗組
+  endogenous_variable: 內生變數
+  exclusion_justification: 排除限制的理由
+  instrument: 工具變數
+  relevance_justification: 相關性的理由
+  program_name: 計畫名稱
+  causal_mechanism: 因果機制
+  cause_hypothesis_set_ref: 對應的原因假設集
+  test_type: 檢驗類型
+  power_analysis: 檢定力分析
+  randomization: 隨機分派方式
+  treatment_group: 介入組
+  bandwidth: 頻寬（Bandwidth）
+  cutoff_value: 斷點值
+  running_variable: 跑動變數（Running Variable）
+  donor_pool: 對照單位池（Donor Pool）
+  fit_quality: 擬合品質
+  placebo_tests: 安慰劑檢驗
+  post_treatment_gap: 介入後差距
+  treated_unit: 受介入單位
+  donor: 對照單位
+  transitions: 階段轉換
+  risk: 風險
+  to_stage: 轉換到的階段
+  improvements: 改進建議
+  boundary_cases: 邊界案例
+  true_counterexamples: 真正的反例
+  boundary_case_id: 邊界案例編號
+  contradiction_explanation: 為什麼推翻了主張
+  alternative_position: 替代立場
+  mainstream_position: 主流立場
+  supporting_arguments: 支持論點
+  current_belief: 目前的信念
+  falsifier_criteria: 推翻標準
+  search_results: 搜尋結果
+  evidence_description: 證據說明
+  falsifier_criteria_id: 推翻標準編號
+  found: 是否找到
+  detection: 可偵測度（1–10）
+  effect: 影響後果
+  existing_control: 現有控制措施
+  failure_mode: 失效模式
+  function: 功能
+  occurrence: 發生頻率（1–10）
+  deviations: 偏差
+  consequence: 後果
+  guide_word: 引導詞（Guide Word）
+  risk_rating: 風險評等
+  safeguard: 防護措施
+  criteria_used: 採用的判準
+  judgment: 判決
+  minority_opinion: 少數意見
+  positions_considered: 考量過的立場
+  reversal_conditions: 撤回條件
+  unknowns: 未知事項
+  addresses_cause_id: 對應的失敗原因編號
+  control_type: 控制類型
+  failure_causes: 失敗原因
+  failure_scenario: 失敗情境
+  dimensions_examined: 檢視的面向
+  extreme_value: 極端值
+  normal_range: 正常範圍
+  combine_mode: 合併方式
+  input_distributions: 輸入分布
+  params: 分布參數
+  mean: 平均數
+  std_dev: 標準差
+  num_runs: 模擬次數
+  random_seed: 隨機種子
+  success_direction: 成功方向
+  success_threshold: 成功門檻
+  actual_recovery_duration_seconds: 實際復原耗時（秒）
+  backup_id: 備份編號
+  integrity_checks_passed: 完整性檢查是否通過
+  issues_recorded: 記錄到的問題
+  observed_data_age_seconds: 還原資料的新舊程度（秒）
+  restore_environment: 還原環境
+  compatibility_policy: 相容性政策
+  compatibility_ref: 相容性紀錄參照
+  consumers: 使用方
+  deprecation_ref: 淘汰計畫參照
+  fields: 欄位
+  nullable: 可否為空
+  freshness_ref: 資料新鮮度參照
+  producer: 產出方
+  quality_notes: 品質說明
+  semantics: 語意說明
+  dataset_ref: 資料集
+  upstream_refs: 上游節點
+  data_contract_ref: 資料契約參照
+  profiled_score: 量測分數（0–1）
+  lineage_ref: 資料血緣參照
+  restore_drill_ref: 還原演練參照
+  is_primary_key: 是否為主鍵
+  cardinality: 對應關係（基數）
+  foreign_key_attributes: 外鍵欄位
+  from_entity: 參照方實體
+  to_entity: 被參照實體
+  system_or_database: 系統或資料庫
+  completed_at: 完成時間
+  stage_id: 階段
+  denormalization_decision: 反正規化決策
+  entity_name: 實體名稱
+  functional_dependencies: 函數相依
+  dependent: 相依欄位
+  determinant: 決定欄位
+  non_key_attributes: 非鍵欄位
+  primary_key_attributes: 主鍵欄位
+  check_type: 核對類型
+  resolved_as_expected: 差異是否符合預期
+  source_value: 來源端數值
+  compliance_evidence: 合規證明
+  conflict_resolution: 衝突處理方式
+  data_class: 資料類別
+  deletion_evidence_ref: 刪除證明參照
+  deletion_trigger: 刪除觸發條件
+  holds: 保留例外（Hold）
+  active: 是否生效中
+  hold_type: 保留類型
+  purpose: 目的
+  retention_rule: 保留規則
+  change_type: 變更類型
+  option_scores: 各選項分數
+  pairwise_comparisons: 兩兩比較
+  criterion_a_id: 準則 A
+  criterion_b_id: 準則 B
+  child: 下一個節點
+  payoff: 報酬
+  importance_scale: 重要程度量尺
+  importance_threshold: 重要程度門檻
+  importance: 重要程度
+  urgency_scale: 緊急程度量尺
+  urgency_threshold: 緊急程度門檻
+  decision_subject: 決策主題
+  states: 可能狀態
+  outcome_value: 結果價值
+  ease: 容易程度（1–10）
+  effort_scale: 投入程度量尺
+  effort_threshold: 投入程度門檻
+  impact_scale: 影響程度量尺
+  impact_threshold: 影響程度門檻
+  features: 功能
+  dysfunctional_response: 沒有這個功能時的感受
+  functional_response: 有這個功能時的感受
+  bucket: 分類
+  release_scope: 發布範圍
+  option_values: 各選項數值
+  objective_id: 目標編號
+  idea: 點子
+  reach: 觸及人數
+  scale_max: 量尺上限
+  scale_min: 量尺下限
+  cost_of_delay: 延遲成本
+  business_value: 商業價值
+  risk_reduction_opportunity_enablement: 降低風險／創造機會
+  time_criticality: 時間急迫性
+  job: 工作項目
+  job_size: 工作規模
+  why_ref: 上一層（為什麼）
+  interfaces: 介面
+  from_function_ref: 來源功能
+  to_function_ref: 目標功能
+  top_function: 最上層功能
+  function_name: 功能名稱
+  classification_rule: 分類規則
+  category_value: 分類值
+  category_name: 類別名稱
+  member_item_ids: 包含的項目
+  universe_item_ids: 全部項目
+  positive_statement: 正向陳述
+  source_item_ref: 對應的問題項目
+  source_problem_items: 問題樹項目
+  core_problem: 核心問題
+  effects: 影響結果
+  deliverable: 交付成果
+  estimate_hours: 估計工時（小時）
+  change_description: 變更說明
+  data_sensitivity: 資料敏感度
+  reversibility: 可回復性
+  security_impact: 資安影響
+  traffic_impact: 流量影響
+  duration: 工期
+  earliest_finish: 最早完成
+  earliest_start: 最早開始
+  latest_finish: 最晚完成
+  latest_start: 最晚開始
+  slack: 浮時（Slack）
+  task_id: 任務編號
+  revisit: 重新檢視
+  capacity: 容量
+  data: 資料
+  documentation: 文件
+  functional: 功能
+  observability: 可觀測性
+  privacy: 隱私
+  tests: 測試
+  critical: 是否關鍵
+  project: 專案
+  end: 結束
+  start: 開始
+  bets: 押注項目（Bets）
+  bet_id: 押注編號
+  next_review: 下次檢視
+  deliverables: 交付成果
+  deliverable_name: 交付成果名稱
+  due_date: 到期日
+  escalation_path: 升級路徑
+  due_review_date: 到期／檢視日期
+  item_id: 項目編號
+  next_action: 下一步行動
+  exposure: 曝險值
+  stage_reviews: 各階段審查
+  gate_criteria: 關卡標準
+  gate_decision: 關卡決策
+  blue_environment: 藍環境（現行正式）
+  blue_retained: 是否保留藍環境
+  cutover_status: 切換狀態
+  green_environment: 綠環境（新版本）
+  green_verified: 綠環境是否已驗證
+  release_under_rollout: 發布中的版本
+  healthy: 是否健康
+  metrics_summary: 指標摘要
+  traffic_percent: 流量比例（%）
+  current_capacity: 目前容量
+  current_workload: 目前負載
+  growth_rate_per_period: 每期成長率
+  high_threshold_ratio: 過度配置門檻
+  low_threshold_ratio: 容量不足門檻
+  periods_ahead: 預測期數
+  resource_coefficient: 每單位負載需要的資源
+  resource_name: 資源名稱
+  blast_radius: 影響範圍（Blast Radius）
+  recovered_as_hypothesized: 是否如預期自動恢復
+  steady_state_hypothesis: 穩態假設
+  observed_failure_rate: 實際失敗率
+  related_slo_id: 對應的 SLO
+  release_policy: 發布政策
+  slo_target_ratio: SLO 目標比例
+  aar: 事後檢討（AAR）
+  next: 下一步
+  why: 為什麼
+  runbook_execution_ref: 對應的 Runbook 執行紀錄
+  time_to_recover_minutes: 恢復耗時（分鐘）
+  assignee: 負責人
+  acceptance: 驗收門檻
+  domain_assessments: 各領域評估
+  release_ref: 發布版本
+  business_impact_statement: 業務影響說明
+  drill_ref: 演練紀錄參照
+  rollback_performed: 是否已回滾
+  runbook_ref: Runbook
+  preconditions_met: 前置條件是否符合
+  step_number: 步驟序號
+  sla_required: 是否需要 SLA
+  sla_terms: SLA 條款
+  sli_description: SLI 說明（量什麼）
+  slo_target: SLO 目標
+  degradation_thresholds: 劣化門檻
+  error_rate_increase_max: 錯誤率增幅上限
+  latency_p95_increase_ms_max: P95 延遲增幅上限（毫秒）
+  resource_increase_max: 資源使用率增幅上限
+  samples: 取樣
+  elapsed_minutes: 經過時間（分鐘）
+  measurement: 量測值
+  sustained_load_rps: 持續負載（每秒請求數）
+  breaking_thresholds: 崩潰門檻
+  expected_load_rps: 預期負載（每秒請求數）
+  load_steps: 加壓階梯
+  recovered: 是否已恢復
+  reduced_load_rps: 降載後負載（每秒請求數）
+  individual_contributions: 個人各自寫下的點子
+  idea_text: 點子內容
+  merged_ideas: 合併後的點子
+  source_contribution_refs: 來源點子
+  evaluations: 評估
+  idea_ref: 對應的點子
+  concepts: 概念
+  box_number: 格子編號
+  sketch_description: 草圖說明
+  constraint_type: 限制類型
+  constraint_refs: 套用的限制
+  challenge: 挑戰
+  empathize: 同理（Empathize）
+  ideate: 發想（Ideate）
+  prototype: 原型（Prototype）
+  combinations: 交叉組合
+  feature_a_ref: A 的特徵
+  feature_b_ref: B 的特徵
+  concept_a_features: 概念 A 的特徵
+  concept_a_name: 概念 A
+  concept_b_features: 概念 B 的特徵
+  concept_b_name: 概念 B
+  dominant_assumption: 主流假設
+  provocations: 刺激命題（Provocation）
+  movement: 從刺激推進到點子的過程
+  technique: 技巧
+  branch_number: 分支編號
+  branch_theme: 分支主題
+  center_theme: 中心主題
+  forced_connection: 強制連結
+  inversions: 反轉成解法
+  inverted_solution: 反轉後的解法
+  worsening_idea_ref: 對應的「變更糟」點子
+  worsening_ideas: 讓問題變更糟的點子
+  lens: SCAMPER 角度
+  transformed_idea: 變化後的點子
+  hats: 六頂帽子
+  hat: 帽子
+  statements: 陳述
+  participant_ids: 參與者
+  sheets: 點子單
+  sheet_id: 點子單編號
+  question_text: 問題內容
+  analogy_content: 類比內容
+  analogy_type: 類比類型
+  reframed_insight: 重構後的洞見
+  original_problem: 原本的問題
+  contradiction: 矛盾
+  improving_parameter: 想改善的參數
+  worsening_parameter: 會變差的參數
+  principles: 發明原則
+  application: 應用方式
+  principle_number: 原則編號
+  main_claim: 主要主張
+  objections: 反對意見
+  rebuttals: 反駁
+  objection_id: 對應的反對意見
+  supports: 支持理由
+  mapped_assumptions: 對應的假設
+  assumption_id: 假設編號
+  uncertainty: 不確定性
+  evidence_strength: 證據強度
+  impact_if_wrong: 若錯誤的影響
+  likelihood_given_false: 假設不成立時看到此證據的機率
+  likelihood_given_true: 假設成立時看到此證據的機率
+  prior: 先驗機率
+  predictions: 預測
+  stated_confidence: 當時表示的信心
+  relations: 關係
+  claim_id_a: 主張 A
+  claim_id_b: 主張 B
+  evidence_assignments: 證據分級
+  hierarchy_levels: 證據層級
+  rank: 排序
+  evidence_items: 證據項目
+  links: 對應關係
+  assumptions_made: 做出的假設
+  conclusions_drawn: 得出的結論
+  meanings_assigned: 賦予的意義
+  observed_data: 觀察到的資料
+  backing: 支撐（Backing）
+  grounds: 根據（Grounds）
+  qualifier: 限定詞（Qualifier）
+  rebuttal: 反駁條件（Rebuttal）
+  warrant: 推論依據（Warrant）
+  analyzed_at: 分析時間
+  guardrail_metrics: 護欄指標
+  primary_metric: 主要指標
+  randomization_unit: 隨機分派單位
+  registered_at: 預先登錄時間
+  sample_size_per_arm: 每組樣本數
+  candidates: 候選方案
+  candidate_id: 候選方案編號
+  results: 結果
+  manual_delivery: 人工交付
+  automation_components: 自動化元件
+  delivered_by: 交付者
+  measurements: 量測紀錄
+  sample_size: 樣本數
+  service_description: 服務說明
+  click_count: 點擊數
+  cta_copy: 行動呼籲文案（CTA）
+  disclosure_shown: 是否已揭露
+  disclosure_text: 揭露文字
+  feature_under_test: 測試的功能
+  impression_count: 曝光數
+  critical_assumption_: 關鍵假設
+  decision_threshold_: 決策門檻
+  decision_if_met: 達標時的決定
+  decision_if_not_met: 未達標時的決定
+  real_usage_result_: 真實使用結果
+  actual_value: 實際數值
+  real_users_count: 真實使用者人數
+  usage_context: 使用情境
+  monitoring_metrics: 監控指標
+  review: 檢討
+  conducted: 是否已執行
+  rollback_criteria: 回滾標準
+  boundaries: 邊界
+  stop_criteria: 停止標準
+  success_criteria: 成功標準
+  benchmark_result_: 基準測試結果
+  measured_value: 量測值
+  methodology: 方法
+  implementation_: 實作方式
+  isolated: 是否隔離
+  production_integration: 是否已接入正式環境
+  success_criteria_: 成功標準
+  technical_unknown_: 技術未知數
+  fidelity_: 擬真度
+  level: 等級
+  iterations: 迭代
+  change: 變更
+  triggered_by_observation_index: 觸發這次修改的觀察序號
+  learning_goal_: 學習目標
+  user_test_: 使用者測試
+  measured_signups: 實際報名／預購數
+  offer_description: 提案內容
+  signup_or_preorder_threshold: 報名／預購門檻
+  threshold_declared_at: 門檻設定時間
+  decision_note: 決策紀錄
+  decided_at: 決策時間
+  timebox: 時間盒
+  closed_at: 結束時間
+  deadline: 截止時間
+  started_at: 開始時間
+  back_end: 後台（實際由人操作）
+  actually_human_operated: 實際由人操作
+  operator_role: 操作者角色
+  disclosure: 揭露
+  disclosed_to: 揭露對象
+  faked_components: 模擬的元件
+  real_components: 真實的元件
+  front_end: 前台
+  presented_as_automated: 對外呈現為自動化
+  interaction_description: 互動說明
+  contribution_margin_per_unit: 單位邊際貢獻
+  fixed_cost: 固定成本
+  benefits: 效益
+  costs: 成本
+  distributional_effects: 分配效果
+  sensitivity_analysis: 敏感度分析
+  effectiveness_outcome_units: 成效單位
+  hurdle_rate: 門檻報酬率
+  future_states: 未來狀態
+  estimated_value: 估計價值
+  option_type: 選擇權類型
+  trigger_condition: 觸發條件
+  cost_categories: 成本類別
+  compliance: 合規
+  data_egress: 資料傳出費用
+  decommission: 汰除
+  downtime: 停機
+  exit: 退場
+  implementation: 導入
+  operation: 營運
+  people: 人力
+  purchase: 購置
+  support: 支援
+  economic: 經濟可行性
+  legal: 法律可行性
+  operational: 營運可行性
+  schedule: 時程可行性
+  technical: 技術可行性
+  arpu: 每用戶平均收入（ARPU）
+  cac: 顧客取得成本（CAC）
+  churn_rate: 流失率（0–1）
+  contribution_margin: 邊際貢獻
+  gross_margin: 毛利率（0–1）
+  ltv: 顧客終身價值（LTV）
+  payback_period: 回本期
+  cash_flow_projection: 現金流預估
+  horizon_years: 預估年數
+  adjacent_fields: 相鄰領域
+  current_disciplines: 目前的專業領域
+  imported_models: 引進的模型
+  field_ref: 來源領域
+  model_description: 模型說明
+  future_state: 理想的未來狀態
+  today_actions: 今天就能做的行動
+  exposures: 暴露點
+  tail_event_id: 對應的尾端事件
+  hedges: 避險措施
+  survivability_assessments: 存活能力評估
+  tail_events: 尾端事件
+  comparisons: 比較項目
+  normalization_basis: 標準化基準
+  values: 各法域數值
+  jurisdictions: 法域
+  impact_pairs: 事件交互影響
+  conditional_probability_shift: 條件機率變化
+  event_a_id: 事件 A
+  event_b_id: 事件 B
+  transfers: 跨產業移植
+  adaptation: 調整方式
+  shared_job_or_constraint: 共同的任務或限制
+  source_industry: 來源產業
+  source_mechanism: 來源機制
+  target_industry: 目標產業
+  consensus_summary: 共識摘要
+  minority_positions: 少數立場
+  minority_positions_none_recorded_reason: 沒有少數立場的原因
+  responses: 回應
+  estimate: 估計值
+  participant_id: 參與者代號
+  center_event: 中心事件
+  impacts: 影響
+  order: 階層（第幾階影響）
+  parent_id: 上一層
+  analogy_limits: 類比的限制
+  differences: 差異
+  extracted_mechanism: 抽出的機制
+  historical_case: 歷史案例
+  similarities: 相似處
+  domains: 掃描領域
+  domain_id: 領域編號
+  signals: 訊號
+  sources: 來源
+  source_id: 來源編號
+  outliers: 異常案例
+  data_error_assessment: 資料錯誤評估
+  data_error_ruled_out: 是否已排除資料錯誤
+  mechanism_hypothesis: 機制假設
+  critical_uncertainties: 關鍵不確定因素
+  competitor_responses: 競爭者反應
+  drivers: 驅動力
+  narrative: 情境敘事
+  reversal_condition: 反轉條件
+  second_third_order_effects: 二階／三階效應
+  signposts: 早期指標
+  stakeholder_responses: 利害關係人反應
+  strategy_performance: 策略表現
+  weak_signals: 微弱訊號
+  corroborating_source_refs: 佐證來源
+  monitor_status: 監測狀態
+  wild_cards: 萬用卡事件（Wild Card）
+  strategy_rerun: 重跑策略的結果
+  outcome_under_card: 這張卡發生時的結果
+  still_holds: 策略是否仍成立
+  strategy_ref: 對應的策略
+  empty_justification: 留空的理由
+  problem_statement_ref: 對應的問題陳述
+  gap_note: 缺什麼資訊
+  informs_problem_statement_ref: 延伸的問題陳述紀錄
+  candidate_framings: 候選問法
+  frame_text: 問法
+  informs_boundary_critique_ref: 延伸的邊界批判紀錄
+  phenomenon: 現象
+  selected_frame_ref: 選定的問法
+  bearings: 方位
+  direction_label: 方向名稱
+  current_position: 目前位置
+  destination: 目的地
+  next_waypoint: 下一個中繼點
+  bearing_ref: 對應方位
+  beneficiaries: 受益者
+  success_condition: 成功條件
+  success_criteria_ref: 對應的成功標準紀錄
+  timeframe: 時間範圍
+  reality: 現況（Reality）
+  will: 行動意願（Will）
+  by_when: 期限
+  chosen_option_ref: 選定的選項
+  first_step: 第一步
+  hmw_question: 我們可以如何…？（HMW 問題）
+  pain_point: 痛點
+  excluded_scope: 排除的範圍
+  re_review_trigger: 重新檢視的條件
+  related_moscow_wont_ref: 對應的 MoSCoW 不做項目
+  scope_item: 排除項目
+  project_scope: 專案範圍
+  anti_gaming_validation: 防作弊驗證
+  core_value_proposition: 核心價值主張
+  proxy_metric: 代理指標
+  key_results: 關鍵成果（KR）
+  review_cadence: 檢視頻率
+  affected_stakeholders: 受影響的利害關係人
+  current_state: 現況
+  expected_state: 期望狀態
+  gap: 差距
+  origin_method: 產出這份陳述的方法
+  scope_non_goals: 範圍／不做的事
+  original_frame: 原本的框架
+  reframes: 重新框架
+  perspective: 角度
+  target_date: 目標日期
+  goal_statement: 目標陳述
+  refines_goal_statement_ref: 對應的目標陳述紀錄
+  guardrail: 護欄（不能越過的界線）
+  must: 必須達成（Must）
+  reversal_criteria_ref: 對應的反轉標準紀錄
+  should: 希望達成（Should）
+  stop: 停止條件（Stop）
+  candidate_values: 候選價值
+  ranking: 排序
+  environment_context: 環境脈絡
+  action_observed: 觀察到的行動
+  followup_question: 追問
+  researcher_note: 研究者筆記
+  analysis: 分析
+  discussion_summary: 討論摘要
+  moderation_approach: 主持方式
+  codes: 編碼
+  consent_process: 知情同意程序
+  documented_biases: 記錄到的偏誤
+  guide: 訪談大綱
+  interview_notes: 訪談筆記
+  negative_cases: 反例
+  research_question: 研究問題
+  sampling_approach: 抽樣方式
+  transcript_ref: 逐字稿參照
+  journey_subject: 旅程主角
+  emotion: 情緒
+  opportunity: 機會
+  pain: 痛點
+  stage_number: 階段序號
+  desired_outcome: 想要的結果
+  local_evidence: 在地證據
+  motivation: 動機
+  workaround: 目前的替代做法
+  behaviors: 行為
+  persona_name: 人物誌名稱
+  research_basis: 研究依據
+  layers: 層次
+  layer_type: 層次類型
+  service_name: 服務名稱
+  analysis_plan: 分析計畫
+  construct_definition: 構念定義
+  is_translated: 是否為翻譯問卷
+  local_pilot_ref: 在地前測紀錄
+  pilot_summary: 前測摘要
+  quality_dimensions: 品質面向
+  mitigation_note: 因應措施
+  question_design: 題目設計
+  sampling_plan: 抽樣計畫
+  semantic_equivalence_check: 語意等同檢查
+  jurisdiction_nodes: 法域節點
+  law_entries: 法規條目
+  effective_date: 生效日期
+  expiry_date: 失效日期
+  gap_annotations: 缺口處理計畫
+  implemented_controls: 已實施的控制措施
+  conflicts: 衝突
+  applicable_law: 最終適用的法規
+  conflict_id: 衝突編號
+  disputed_law_ids: 有爭議的法規
+  legal_review: 法務審查
+  reviewer: 審查人
+  governing_laws: 候選準據法
+  mandatory_rules: 強制規定
+  rule_id: 規定編號
+  authority: 權威觀念
+  communication_style: 溝通風格
+  education_expectation: 教育期待
+  historical_context: 歷史脈絡
+  privacy_perception: 隱私觀念
+  risk_preference: 風險偏好
+  technology_acceptance: 科技接受度
+  trust: 信任
+  data_classes: 資料類別
+  applicable_laws: 適用法規
+  subjects: 資料主體
+  routing_decisions: 資料存放決策
+  region: 地區
+  accessibility: 無障礙
+  address: 地址格式
+  content_expectations: 內容期待
+  date_time: 日期時間格式
+  language: 語言
+  number_format: 數字格式
+  phone: 電話格式
+  tax: 稅務
+  timezone: 時區
+  ui_layout: 介面版面
+  units: 度量單位
+  human_signoff: 人工簽核
+  market_id: 市場
+  obligations: 法律義務
+  effective_date_or_estimate: 生效日期或預估
+  entry_id: 條目編號
+  regulation_title: 法規名稱
+  declared_dimensions: 提供的判斷維度
+  resolved_jurisdictions: 判定的法域
+  derived_from_dimensions: 依據的維度
+  activity_ref: 對應的活動
+  next_actions: 下一步行動
+  why_factors: 原因因素
+  affirmative_topic: 正向主題
+  design: 設計（Design）
+  destiny: 實踐（Destiny）
+  discover: 探索（Discover）
+  dream: 夢想（Dream）
+  build: 建造（Build）
+  artifact_id: 產出物編號
+  cut_scope: 刻意省略的範圍
+  learn: 學習（Learn）
+  conclusion: 結論
+  metric_refs: 對應指標
+  build_ref: 對應的產出物
+  product_under_exploration: 探索中的產品
+  forecast: 預測
+  chosen: 是否選定
+  phases: 階段
+  analyze: 分析（Analyze）
+  improve: 改善（Improve）
+  thresholds: 門檻
+  stop_action: 觸發時的動作
+  mental_model_update: 心智模型的更新
+  observation_refs: 引用的觀察
+  cycles: 循環
+  cycle_number: 第幾輪循環
+  action_items: 行動項目
+  carried_forward_action_item_ids: 延續上一輪的行動項目
+  process_under_improvement: 改善中的流程
+  action_id: 行動編號
+  cause_id: 原因編號
+  source_analysis_ref: 對應的根因分析
+  timeline_ref: 對應的時間軸事件
+  impact_description: 影響說明
+  incident_name: 事件名稱
+  timeline: 時間軸
+  predicted_probability: 預測機率（0–1）
+  predicted_value: 預測數值
+  prediction_type: 預測類型
+  structured_rule: 結構化規則
+  consecutive_periods: 連續期數
+  structured_objects: 結構化物件
+  confirmed_by_user: 使用者是否確認
+  object_id: 物件編號
+  readback_transcript: 回讀內容
+  transcript: 逐字稿
+  rendered_edges: 呈現的連線
+  layout_position: 版面位置
+  visible: 是否顯示
+  source_relations: 來源關係
+  chain: 串接鏈
+  method_id: 方法編號
+  check: 檢查項目
+  qa_trail: 問答紀錄
+  selected_method_id: 選定的方法
+  center_node_id: 中心節點
+  orientation: 方向
+  node_positions: 節點位置
+  distance_from_center: 與中心的距離
+  views: 檢視
+  knowledge_object_id: 知識物件編號
+  score_config: 分數設定
+  computed: 是否為計算值
+  entity_id: 實體編號
+  sort_spec: 排序方式
+  outline: 大綱
+  details_ref: 細節參照
+  evidence_links: 證據連結
+  event_time: 事件時間（數字，例如年份或序號）
+  ordered_event_refs: 排序後的事件
+  marker_type: 標記類型
+  guideline_id: 報告指引
+  drafted_content: 撰寫內容
+  barrier_ref: 對應的屏障
+  failure_mode_id: 失效模式編號
+  hazard_description: 危害說明
+  system_or_incident: 系統或事件
+  target_description: 保護對象說明
+  consequences: 後果
+  consequence_id: 後果編號
+  side: 左右側（預防／緩解）
+  target_id: 對應目標
+  threat_id: 威脅編號
+  top_event_description: 頂端事件說明
+  correlation_strength: 關聯強度
+  temporal_proximity: 時間接近程度
+  fault_description: 故障說明
+  initiating_event: 起始事件
+  path: 路徑
+  basic_events: 基本事件
+  gates: 邏輯閘
+  gate_type: 閘類型（AND／OR）
+  required_count: 需要觸發的數量
+  top_event: 頂端事件
+  gate_ref: 對應的邏輯閘
+  hypotheses: 原因假設
+  suggested_categories: 建議分類
+  human_carelessness_treated_as_final_cause: 是否把「人為疏失」當成最終根因
+  single_path_oversimplifies_multi_causal_problem: 單一路徑是否過度簡化多因問題
+  stop_conditions_met: 已符合的停止條件
+  target_hypothesis_id: 要追問的原因假設
+  why_chain: 為什麼鏈
+  change_id: 變化編號
+  is: 是（IS）
+  is_not: 不是（IS NOT）
+  distinctions: 差異
+  dataset: 資料集
+  hypothesis_id: 原因假設
+  metric_value: 指標數值
+  metric_name: 指標名稱
+  vital_few_threshold_percent: 關鍵少數門檻（%）
+  detections: 偵測措施
+  detection_id: 偵測編號
+  detectability: 可偵測性
+  skill: 所需技能
+  approver_name: 核准人
+  approver_role: 核准人職稱
+  assessments: 評估
+  accepted_by: 接受者
+  residual_likelihood: 殘餘可能性
+  residual_risk_level: 殘餘風險等級
+  residual_severity: 殘餘嚴重度
+  conditions: 條件
+  mitigates_risk_ids: 降低的風險
+  decision_date: 決策日期
+  jurisdiction_pack_ref: 法域規則包參照
+  affected_rights: 受影響的權利
+  authorized_identities: 有權存取的身分
+  exception_justification: 例外理由
+  key_vault_ref: 金鑰保管庫參照
+  last_access_review_at: 上次存取審查時間
+  last_rotated_at: 上次輪替時間
+  response_flow: 應變流程
+  flow_stage_reached: 已進行到的流程階段
+  triggered: 是否已觸發
+  rotation_interval: 輪替週期
+  rotation_overdue: 是否逾期未輪替
+  storage_mechanism: 存放方式
+  detected_at: 偵測時間
+  detected_by: 偵測者
+  location: 位置
+  secrets: 機密
+  secret_type: 機密類型
+  control_mappings: 控制措施對應
+  source_threat_category: 來源威脅類別
+  source_threat_element_name: 來源威脅元素
+  source_threat_index: 來源威脅序號
+  verified_by: 驗證人
+  verified_date: 驗證日期
+  source_record: 來源威脅模型紀錄
+  source_record_type: 來源紀錄類型
+  artifact_verified: 產出物是否已驗證
+  dependency_entries: 相依套件
+  considerations: 評估考量
+  license: 授權
+  long_term_support: 長期支援
+  maintenance: 維護狀況
+  replaceability: 可替換性
+  size_performance: 體積／效能
+  transitive_dependencies: 間接相依
+  vulnerability_history: 漏洞紀錄
+  production_deployment_occurred: 是否已部署到正式環境
+  verification_method: 驗證方式
+  audit_log_ref: 稽核日誌參照
+  authn_method: 身分驗證方式
+  authn_verified: 身分驗證是否通過
+  authz_decision: 授權決策
+  continuous_monitoring_confirmed: 是否持續監控
+  credential_type: 憑證類型
+  issued_at: 發放時間
+  least_privilege_confirmed: 是否符合最小權限
+  mutual_authentication_confirmed: 是否雙向驗證
+  pdp_engine_ref: 政策決策引擎參照
+  resource: 資源
+  resource_id: 資源編號
+  sensitivity_classification: 敏感度分級
+  resource_access_granted: 是否授予存取
+  idp_ref: 身分提供者參照
+  subject_id: 主體編號
+  ttl_seconds: 有效期限（秒）
+  workload_id: 工作負載編號
+  workload_identity_strategy_ref: 工作負載身分策略參照
+  cost_estimate: 成本估計
+  value_estimate: 價值估計
+  best_alternative_id: 最佳替代方案（BATNA）
+  coalition_scenarios: 結盟情境
+  member_ids: 成員
+  stakeholder_profiles: 利害關係人概況
+  resources: 資源
+  equilibrium: 均衡
+  payoffs: 報酬
+  players: 參與者
+  strategies: 策略
+  incentive_cards: 誘因卡
+  incentives: 誘因
+  objective_criteria: 客觀標準
+  position: 立場
+  separate_people_from_problem: 把人和問題分開
+  interest_reasoning: 關注程度的理由
+  interest_score: 關注程度
+  power_reasoning: 影響力的理由
+  power_score: 影響力
+  legitimacy: 正當性
+  relationship_types: 關係類型
+  buyer_maximum: 買方最高價
+  seller_minimum: 賣方最低價
+  quadrants: 象限
+  strategy_description: 策略說明
+  portfolio_items: 產品組合項目
+  growth_rate_reasoning: 成長率的理由
+  item_name: 項目名稱
+  relative_share: 相對市占率
+  relative_share_reasoning: 相對市占率的理由
+  competing_factors: 競爭因素
+  errc_action: ERRC 行動（消除／減少／提升／創造）
+  factor_name: 因素名稱
+  industry_standard_level: 產業目前水準
+  new_value_curve_summary: 新價值曲線摘要
+  block: 區塊
+  market_definition: 市場定義
+  size_estimate: 規模估計
+  sizing: 市場規模
+  sam: 可服務市場（SAM）
+  som: 可取得市場（SOM）
+  tam: 總體市場（TAM）
+  effective_from: 生效起日
+  effective_to: 生效迄日
+  implication: 意涵
+  trend: 趨勢
+  forces: 五力
+  assessment: 評估
+  force: 力量
+  intensity: 強度
+  overall_attractiveness: 整體吸引力
+  positioning_statement: 定位陳述
+  targeting_decision: 目標市場決策
+  targeted_segment_id: 選定的區隔
+  knowledge_set: 知識集（證據清單）
+  knowledge_set_ref: 知識集編號
+  fit_summary: 契合度摘要
+  pairings: 配對
+  external_factor_id: 外部因素（機會／威脅）
+  internal_factor_id: 內部因素（優勢／劣勢）
+  strategy_option: 策略選項
+  swot_analysis: SWOT 分析結果
+  activities: 活動
+  activity_name: 活動名稱
+  cost_driver: 成本驅動因素
+  value_driver: 價值驅動因素
+  leverage_points: 槓桿點
+  fit_hypotheses: 契合假設
+  fit_rationale: 契合理由
+  pain_or_gain_id: 對應的痛點或收穫
+  reliever_or_creator_id: 對應的解方或創益
+  gain_creators: 創益方式（Gain Creators）
+  gains: 收穫（Gains）
+  jobs: 任務（Jobs）
+  pain_relievers: 痛點解方（Pain Relievers）
+  pains: 痛點（Pains）
+  products_and_services: 產品與服務
+  resource_description: 資源說明
+  agents: 代理人（Agent）
+  rules: 規則
+  environment_description: 環境說明
+  runs: 模擬執行
+  agent_ids_involved: 涉及的代理人
+  points: 資料點
+  variable_name: 變數名稱
+  from_variable_id: 起點變數
+  to_variable_id: 終點變數
+  loops: 迴圈
+  edge_ids: 組成迴圈的連線
+  loop_type: 迴圈類型
+  variables: 變數
+  from_ref: 起點
+  to_ref: 終點
+  kind: 種類
+  change_goal: 改變目標
+  driving_forces: 推動力
+  restraining_forces: 阻礙力
+  mental_models: 心智模型
+  patterns: 模式
+  structures: 結構
+  intervention_points: 介入點
+  focal_person: 核心人物
+  subsystems: 子系統
+  influences: 影響
+  actors: 行動者
+  issues: 議題
+  involves_actor_ids: 涉及的行動者
+  customers: 顧客（Customers）
+  inputs: 投入（Inputs）
+  process_name: 流程名稱
+  process_steps: 流程步驟（Process）
+  suppliers: 供應者（Suppliers）
+  flows: 流量
+  rate_description: 速率說明
+  target_stock_id: 影響的存量
+  stocks: 存量
+  initial_value: 初始值
+  archetype_matches: 符合的系統基模
+  archetype_name: 系統基模名稱
+  observed_symptoms: 觀察到的症狀
+
+# enum / fixed-row value -> Chinese label (numbers need none: they are shown as-is)
+enum_labels:
+  NOT_APPLICABLE: 不適用
+  MET: 已達成
+  NOT_MET: 未達成
+  LOW: 低
+  HIGH: 高
+  MEDIUM: 中
+  high: 高
+  low: 低
+  medium: 中
+  EXPERT_REVIEW: 專家審查
+  INTERVIEW: 訪談
+  LOCAL_DATA: 在地資料
+  SURVEY: 問卷
+  maximize: 越高越好
+  minimize: 越低越好
+  WHAT: What（何事）
+  WHEN: When（何時）
+  WHERE: Where（何地）
+  WHO: Who（何人）
+  WHY: Why（為何）
+  HOW: How（如何）
+  ACTIVITIES: 活動
+  INPUTS: 投入
+  LONG_TERM_OUTCOMES: 長期成果
+  OUTPUTS: 產出
+  SHORT_TERM_OUTCOMES: 短期成果
+  LEGAL: 法律
+  NEUTRAL: 無所謂
+  SUPPORTS: 支持
+  OTHER: 其他
+  superseded: 已被取代
+  risk: 風險
+  data: 資料
+  actor: 行動者
+  NONE: 無
+  MONITORING: 監測
+  RECOVERY: 復原
+  REVERSE: 反向
+  ASSUMPTIONS: 假設
+  COUNTEREXAMPLES: 反例
+  CULTURE: 文化
+  LOGIC: 邏輯
+  MISSING_VARIABLES: 遺漏變數
+  OPERATIONS: 營運
+  OVERCONFIDENCE: 過度自信
+  PRIVACY: 隱私
+  SECURITY: 資安
+  STATISTICAL_VALIDITY: 統計效度
+  decision: 決策
+  DISLIKE: 不喜歡
+  LIKE: 喜歡
+  LIVE_WITH: 可以忍受
+  MUST_BE: 理所當然
+  A: A 最終負責（Accountable）
+  C: C 諮詢（Consulted）
+  I: I 告知（Informed）
+  R: R 負責執行（Responsible）
+  GO: 通過（Go）
+  completed: 已完成
+  change: 變更
+  not_ready: 未就緒
+  ready: 已就緒
+  ELIMINATE: 消除
+  DIRECT: 直接
+  CONTRADICTS: 矛盾
+  EQ: 等於
+  GT: 大於
+  GTE: 大於等於
+  LT: 小於
+  LTE: 小於等於
+  EXPAND: 擴大
+  CONFIRMED: 已確認
+  VALUES: 價值觀
+  UNKNOWN: 未知（資訊缺口）
+  KNOWN: 已知
+  rejected: 已否決
+  FAIL: 不通過
+  PASS: 通過
+  CONTRACT_GOVERNING_LAW: 契約準據法
+  DATA_SUBJECT_LOCATION: 資料主體所在地
+  GOVERNMENT_LEVEL: 政府層級
+  LEGAL_ENTITY: 法律主體
+  MARKET: 市場
+  PROCESSING_LOCATION: 資料處理地
+  PROVIDER_LOCATION: 服務提供者所在地
+  SECTOR: 產業別
+  SPECIAL_TERRITORY_INDIGENOUS_JURISDICTION: 特殊地區／原住民族管轄
+  STORAGE_LOCATION: 資料存放地
+  USER_LOCATION: 使用者所在地
+  ACT: 行動（Act）
+  AND: 全部都要（AND）
+  OR: 任一即可（OR）
+  EXTENT: 程度
+  controls: 控制措施
+  data_flow: 資料流
+  data_store: 資料儲存
+  external_entity: 外部實體
+  process: 處理程序
+  other: 其他
+  CHANNELS: 通路
+  COST_STRUCTURE: 成本結構
+  CUSTOMER_SEGMENTS: 目標客群
+  REVENUE_STREAMS: 收益來源
+  ECONOMIC: 經濟（E）
+  ENVIRONMENTAL: 環境（E）
+  POLITICAL: 政治（P）
+  SOCIAL: 社會（S）
+  TECHNOLOGICAL: 科技（T）
+  accepted: 已採納
+  deprecated: 已淘汰
+  proposed: 提案中
+  non_risk: 非風險
+  sensitivity_point: 敏感點
+  tradeoff_point: 權衡點
+  anticorruption_layer: 防腐層（Anticorruption Layer）
+  big_ball_of_mud: 大泥球（Big Ball of Mud）
+  conformist: 遵奉者（Conformist）
+  customer_supplier: 客戶／供應者（Customer-Supplier）
+  open_host_service: 開放主機服務（Open Host Service）
+  partnership: 夥伴關係（Partnership）
+  published_language: 公開語言（Published Language）
+  separate_ways: 各行其道（Separate Ways）
+  shared_kernel: 共享核心（Shared Kernel）
+  core: 核心
+  generic: 通用
+  supporting: 支援
+  service: 服務
+  vendor: 供應商
+  aggregate: 聚合（Aggregate）
+  command: 命令（Command）
+  domain_event: 領域事件（Domain Event）
+  external_system: 外部系統
+  policy: 政策（Policy）
+  read_model: 讀取模型（Read Model）
+  expanded: 已擴大
+  planned: 已規劃
+  retired: 已退役
+  verified: 已驗證
+  ALL_OR_NOTHING: 全有全無
+  CATASTROPHIZING: 災難化思考
+  EMOTIONAL_REASONING: 情緒化推理
+  LABELING: 貼標籤
+  MIND_READING: 讀心術
+  OVERGENERALIZATION: 以偏概全
+  SHOULD_STATEMENT: 應該句
+  FIGURE: 隱喻形象
+  SELF: 自己
+  BLOCKS: 阻礙
+  DRIVES: 推動
+  EXTRINSIC: 外在
+  INTRINSIC: 內在
+  CLIENT: 案主
+  EMPTY_CHAIR: 空椅
+  FACILITATOR: 帶領者
+  PEER: 同儕
+  WS-01: 第一階段
+  WS-02: 第二階段
+  WS-03: 第三階段
+  WS-04: 第四階段
+  WS-05: 第五階段
+  COLLIDER: 碰撞變數（Collider）
+  CONFOUNDER: 干擾變數（Confounder）
+  MEDIATOR: 中介變數（Mediator）
+  OUTCOME: 結果變數
+  TREATMENT: 介入變數
+  ABSENT: 沒找到
+  PRESENT: 有找到
+  HOOP: 圈套檢驗（Hoop）
+  SMOKING_GUN: 確鑿證據檢驗（Smoking Gun）
+  IMPACT: 影響
+  CONTROLS: 控制措施
+  EVIDENCE: 證據
+  FALLBACK: 備援
+  AFTER: 之後
+  AS_WELL_AS: 同時
+  BEFORE: 之前
+  EARLY: 太早
+  LATE: 太晚
+  LESS: 較少
+  MORE: 較多
+  NO_NOT: 沒有
+  OTHER_THAN: 以外的
+  PART_OF: 部分
+  DETECTION: 偵測
+  PREVENTION: 預防
+  BROKEN: 崩潰
+  DEGRADED: 劣化
+  WITHIN_TOLERANCE: 在容許範圍內
+  normal: 常態分布
+  triangular: 三角分布
+  uniform: 均勻分布
+  at_least: 至少（大於等於）
+  at_most: 至多（小於等於）
+  failed: 失敗
+  passed: 通過
+  ANALYSIS_RUN: 分析執行
+  CLAIM: 主張
+  DATASET: 資料集
+  INGEST: 匯入
+  PAPER_OR_DECISION: 論文或決策
+  RESULT: 結果
+  SOURCE: 來源
+  TRANSFORM: 轉換
+  accuracy: 正確性
+  completeness: 完整性
+  consistency: 一致性
+  timeliness: 即時性
+  uniqueness: 唯一性
+  validity: 有效性
+  many_to_one: 多對一
+  one_to_one: 一對一
+  backfill: 回填資料
+  backup_restore_validation: 備份還原驗證
+  canary: 金絲雀發布
+  close_rollback_window: 關閉回滾窗口
+  compatibility_analysis: 相容性分析
+  contract_old_schema: 收斂舊結構
+  data_contract: 資料契約
+  deploy_compatible_code: 部署相容程式碼
+  dual_read_verification: 雙讀驗證
+  enable_dual_write: 開啟雙寫
+  expand: 擴充結構
+  observe: 觀察
+  reconciliation: 對帳
+  schema_baseline: 結構基準
+  traffic_migration_switch: 切換流量
+  denormalize: 反正規化
+  keep_normalized: 維持正規化
+  BUSINESS_INVARIANT: 業務不變量
+  CHECKSUM: 校驗和
+  COUNT: 筆數
+  open: 未結清
+  reconciled: 已對平
+  contractual_hold: 合約保留
+  legal_hold: 法律保留
+  regulatory_hold: 法規保留
+  research_hold: 研究保留
+  user_deletion_request: 使用者刪除請求
+  add_column_with_default: 新增有預設值的欄位
+  add_index: 新增索引
+  add_not_null_column_without_default: 新增不可為空且無預設值的欄位
+  add_nullable_column: 新增可為空的欄位
+  add_unique_constraint: 新增唯一限制
+  drop_column: 刪除欄位
+  drop_index: 刪除索引
+  drop_unique_constraint: 移除唯一限制
+  narrow_type: 縮小型別
+  relax_not_null_to_nullable: 放寬為可為空
+  rename_column: 重新命名欄位
+  tighten_nullable_to_not_null: 收緊為不可為空
+  widen_type: 放寬型別
+  chance: 機率節點
+  terminal: 終點節點
+  COULD: 可以做（Could）
+  MUST: 必須做（Must）
+  SHOULD: 應該做（Should）
+  WONT: 這次不做（Won't）
+  CAUSE: 原因
+  EFFECT: 結果
+  NO_REVISIT_PLANNED: 不預計重新檢視
+  SCHEDULED: 已排定檢視
+  deliverable: 交付成果
+  milestone: 里程碑
+  task: 任務
+  AVAILABLE: 可用
+  UNAVAILABLE: 不可用
+  ASSUMPTION: 假設
+  DEPENDENCY: 依賴
+  ISSUE: 議題
+  RISK: 風險
+  HOLD: 暫緩（Hold）
+  KILL: 終止（Kill）
+  REWORK: 重做（Rework）
+  cut_over: 已切換
+  not_cut_over: 尚未切換
+  in_progress: 進行中
+  rolled_back: 已回滾
+  stopped: 已停止
+  frozen: 凍結發布
+  unrestricted: 不限制
+  not_recovered: 未恢復
+  recovered: 已恢復
+  capacity: 容量
+  observability: 可觀測性
+  rollback: 回滾
+  security: 資安
+  go: 繼續
+  stop: 停止
+  deviated: 偏離預期
+  matched_expected: 符合預期
+  availability: 可用性
+  correctness: 正確性
+  durability: 耐久性
+  freshness: 新鮮度
+  latency: 延遲
+  BODY: 身體
+  COLOR: 顏色
+  MATERIAL: 材料
+  RULE: 規則
+  TIME: 時間
+  TOOL: 工具
+  DISTORTION: 扭曲
+  ESCAPE: 逃脫
+  PROVOCATION_PO: 刺激命題（Po）
+  RANDOM_ENTRY: 隨機切入
+  REVERSAL: 反轉
+  WISHFUL_THINKING: 一廂情願
+  ADAPT: 調整（Adapt）
+  COMBINE: 合併（Combine）
+  MODIFY: 修改（Modify）
+  PUT: 挪用（Put to other uses）
+  SUBSTITUTE: 替代（Substitute）
+  BLACK: 黑帽（風險）
+  BLUE: 藍帽（流程）
+  GREEN: 綠帽（創意）
+  RED: 紅帽（感受）
+  WHITE: 白帽（事實）
+  YELLOW: 黃帽（價值）
+  PERSONAL: 擬人
+  SYMBOLIC: 象徵
+  CONTEXT_DEPENDENT: 視情境而定
+  DO_NOT_SHIP: 不上線
+  INCONCLUSIVE: 無定論
+  SHIP: 上線
+  USAGE_COUNT: 使用次數
+  WILLINGNESS_TO_PAY_AMOUNT: 願付金額
+  CONTINUE: 繼續
+  ROLLBACK: 回滾
+  STOP: 停止
+  NO_GO: 不通過（No-Go）
+  DOCS: 文件
+  EXPERIMENT: 實驗
+  INTERNAL_TEAM_ONLY: 只有內部團隊知道
+  NEVER_DISCLOSED_TO_USER: 不向使用者揭露
+  WILL_DISCLOSE_TO_USER_AT_STUDY_END: 研究結束時向使用者揭露
+  ABANDON: 放棄
+  CONTRACT: 縮減
+  DEFER: 延後
+  SWITCH: 轉換
+  ARCHIVED: 已封存
+  DISCONFIRMED: 已否證
+  ESCALATING: 升溫中
+  AFFECTED: 受影響者
+  DECISION_MAKER: 決策者
+  EXCLUDED: 被排除者
+  RESOURCES: 資源
+  DECLARED_EMPTY: 刻意留空
+  POPULATED: 已填寫
+  draft: 草稿
+  under_review: 審查中
+  validated: 已驗證
+  FAILURE: 失敗
+  LOSS: 失去
+  REGRET: 後悔
+  REJECTION: 被拒絕
+  SHAME: 羞愧
+  ACHIEVABLE: 可達成（Achievable）
+  MEASURABLE: 可衡量（Measurable）
+  RELEVANT: 相關（Relevant）
+  SPECIFIC: 具體（Specific）
+  TIME_BOUND: 有時限（Time-bound）
+  FACT: 事實
+  INFERENCE: 推論
+  DOES: 做了什麼（Does）
+  FEELS: 感受（Feels）
+  SAYS: 說了什麼（Says）
+  THINKS: 想法（Thinks）
+  BACKSTAGE: 後台行動
+  CUSTOMER_ACTIONS: 顧客行動
+  FRONTSTAGE: 前台行動
+  SUPPORT_PROCESSES: 支援流程
+  SYSTEMS_DATA: 系統與資料
+  CONSTRUCT_VALIDITY: 構念效度
+  NON_RESPONSE_BIAS: 未回應偏誤
+  QUESTION_WORDING: 題目措辭
+  SAMPLING: 抽樣
+  critical: 嚴重
+  ai_provider: AI 供應商
+  data_residency: 資料落地
+  jurisdiction_pack: 法域規則包
+  legal_freshness: 法規時效
+  localization_accessibility: 在地化與無障礙
+  sector_controls: 產業控制措施
+  security_privacy: 資安與隱私
+  OFFICIAL_GOVERNMENT: 政府官方
+  OFFICIAL_LEGISLATIVE_RECORD: 立法紀錄
+  OFFICIAL_REGULATOR: 主管機關
+  max_loss: 最大可承受損失
+  max_time: 最長時間
+  min_quality: 最低品質
+  DECIDE: 決策（Decide）
+  OBSERVE: 觀察（Observe）
+  ORIENT: 判斷（Orient）
+  CHECK: 檢核（Check）
+  DO: 執行（Do）
+  PLAN: 計畫（Plan）
+  POINT_ESTIMATE: 數值預測
+  PROBABILITY: 機率預測
+  "<": 小於
+  "<=": 小於等於
+  "==": 等於
+  ">": 大於
+  ">=": 大於等於
+  DRAFT: 草稿
+  cost_estimate: 成本估計
+  jurisdiction_check: 法域檢查
+  policy_check: 政策檢查
+  precondition_check: 前置條件檢查
+  required_gate_injection: 必要閘門注入
+  risk_estimate: 風險估計
+  type_check: 型別檢查
+  audio: 語音
+  canvas: 畫布
+  causal: 因果圖
+  conceptmap: 概念圖
+  graph: 關係圖
+  matrix: 矩陣
+  mindmap: 心智圖
+  outline: 大綱
+  table: 表格
+  text: 文字
+  timeline: 時間軸
+  asc: 由小到大
+  desc: 由大到小
+  event: 事件
+  DRAFTED: 已撰寫
+  NOT_STARTED: 尚未開始
+  mitigation: 緩解（右側）
+  prevention: 預防（左側）
+  MODERATE: 中等
+  STRONG: 強
+  WEAK: 弱
+  AFTER_FAULT: 故障之後
+  CONCURRENT: 同時
+  DISTANT_BEFORE: 很久之前
+  IMMEDIATELY_BEFORE: 緊接在前
+  SHORTLY_BEFORE: 不久之前
+  failure: 失敗
+  success: 成功
+  CLEAR_EVIDENCE_TO_VERIFY: 有明確證據可驗證
+  CONTROLLABLE_BY_ORGANIZATION: 組織可以控制
+  FOUND_SYSTEM_PROCESS_MECHANISM: 找到系統／流程機制
+  FURTHER_QUESTIONING_BECOMES_ABSTRACT: 再問下去會變得空泛
+  abuse_flow: 濫用流程
+  detection: 偵測
+  goal: 攻擊目標
+  internal_node: 內部節點（拆成子目標）
+  leaf_node: 葉節點（具體攻擊手法）
+  approved: 核准
+  approved_with_conditions: 附條件核准
+  escalated: 已升級處理
+  approval: 核准
+  data_subjects: 資料主體
+  necessity_proportionality: 必要性與比例性
+  processing: 處理活動
+  purpose: 目的
+  residual_risk: 殘餘風險
+  risks: 風險
+  detectability: 可偵測性（Detectability）
+  disclosure: 資訊揭露（Disclosure）
+  identifiability: 可識別性（Identifiability）
+  linkability: 可連結性（Linkability）
+  non_compliance: 不合規（Non-compliance）
+  non_repudiation: 不可否認性（Non-repudiation）
+  unawareness: 不知情（Unawareness）
+  attack: 攻擊模擬
+  business: 業務目標
+  decompose: 應用拆解
+  scope: 技術範圍
+  threat: 威脅分析
+  vulnerability: 弱點分析
+  INVESTIGATED: 已調查
+  NOT_TRIGGERED: 未觸發
+  RESUMED: 已恢復
+  REVOKED_OR_ROTATED: 已撤銷或輪替
+  STOPPED: 已停止
+  OS_KEYCHAIN: 作業系統金鑰圈
+  SECRET_MANAGER: 機密管理服務
+  SHORT_LIVED_CREDENTIAL: 短期憑證
+  WORKLOAD_IDENTITY: 工作負載身分
+  ARTIFACT: 建置產出物
+  CHAT_TRANSCRIPT: 聊天紀錄
+  CLI_ARGV: 命令列參數
+  CRASH_DUMP: 當機傾印
+  GIT: Git 版本庫
+  LOGS: 日誌
+  MARKDOWN: Markdown 文件
+  PROMPT: 提示詞
+  SCREENSHOT: 截圖
+  TEST_FIXTURE: 測試資料
+  api_key: API 金鑰
+  crypto_key: 加密金鑰
+  db_credential: 資料庫帳密
+  oauth_token: OAuth 權杖
+  ssh_key: SSH 金鑰
+  tls_certificate: TLS 憑證
+  webhook_secret: Webhook 密鑰
+  access: 存取控管
+  exposure: 外洩應變
+  inventory: 盤點
+  revocation: 撤銷
+  rotation: 輪替
+  storage: 存放
+  detective: 偵測型
+  preventive: 預防型
+  recovery: 復原型
+  linddun: LINDDUN 隱私威脅模型
+  stride: STRIDE 資安威脅模型
+  denial_of_service: 阻斷服務（Denial of Service）
+  elevation_of_privilege: 權限提升（Elevation of Privilege）
+  information_disclosure: 資訊洩露（Information Disclosure）
+  repudiation: 否認（Repudiation）
+  spoofing: 偽冒（Spoofing）
+  tampering: 竄改（Tampering）
+  artifact: 產出物
+  ci: 持續整合（CI）
+  dependency: 相依套件
+  deploy: 部署
+  registry: 套件庫
+  sign_verify: 簽章驗證
+  source: 原始碼
+  deny: 拒絕
+  permit: 允許
+  Confidential: 機密
+  Internal: 內部
+  Public: 公開
+  Restricted: 限制
+  access_decision: 存取決策
+  audit_trail: 稽核軌跡
+  credential_issuance: 憑證發放
+  identity_context: 身分脈絡
+  BENEFICIARY: 受益者
+  INDIRECT: 間接
+  RISK_BEARER: 承擔風險者
+  DIVERSIFICATION: 多角化
+  MARKET_DEVELOPMENT: 市場開發
+  MARKET_PENETRATION: 市場滲透
+  PRODUCT_DEVELOPMENT: 產品開發
+  CREATE: 創造
+  RAISE: 提升
+  REDUCE: 減少
+  CUSTOMER_RELATIONSHIPS: 顧客關係
+  KEY_ACTIVITIES: 關鍵活動
+  KEY_PARTNERS: 關鍵夥伴
+  KEY_RESOURCES: 關鍵資源
+  VALUE_PROPOSITIONS: 價值主張
+  KEY_METRICS: 關鍵指標
+  PROBLEM: 問題
+  SOLUTION: 解決方案
+  UNFAIR_ADVANTAGE: 門檻優勢
+  UNIQUE_VALUE_PROPOSITION: 獨特價值主張
+  market: 市場資料
+  official: 官方資料
+  research: 研究資料
+  BUYER_POWER: 買方議價力
+  INDUSTRY_RIVALRY: 產業內競爭
+  NEW_ENTRANTS: 新進者威脅
+  SUBSTITUTES: 替代品威脅
+  SUPPLIER_POWER: 供應商議價力
+  OPPORTUNITY: 機會（O）
+  STRENGTH: 優勢（S）
+  THREAT: 威脅（T）
+  WEAKNESS: 劣勢（W）
+  COMPANY: 自家公司
+  COMPETITOR: 競爭者
+  CUSTOMER: 顧客
+  PRIMARY: 主要活動
+  SUPPORT: 支援活動
+  "NO": 否
+  "YES": 是
+  IMITABILITY: 難以模仿（I）
+  ORGANIZATION: 組織能力（O）
+  RARITY: 稀少性（R）
+  VALUE: 價值（V）
+  "+": 正向（+）
+  "-": 反向（−）
+  BALANCING: 調節迴圈（B）
+  REINFORCING: 增強迴圈（R）
+  DECISION: 判斷
+  END: 結束
+  PROCESS: 處理步驟
+  START: 開始
+  FEEDBACK: 回饋
+  GOALS: 目標
+  PARADIGM: 典範
+  PARAMETERS: 參數
+  RULES: 規則
+  COMMUNITY: 社群
+  CREATIVE: 創作
+  FAMILY: 家庭
+  HEALTH: 健康
+  LEARNING: 學習
+  RELATIONSHIPS: 人際關係
+  WORK: 工作
+  MIXED: 混合
+  STRAINS: 緊張
+  IN: 流入
+  OUT: 流出
+  ACCIDENTAL_ADVERSARIES: 意外的敵人
+  DRIFTING_GOALS: 目標漂移
+  ERODING_GOALS: 目標侵蝕
+  ESCALATION: 惡性競爭
+  FIXES_THAT_FAIL: 飲鴆止渴
+  GROWTH_AND_UNDERINVESTMENT: 成長與投資不足
+  LIMITS_TO_GROWTH: 成長上限
+  SHIFTING_THE_BURDEN: 捨本逐末
+  SUCCESS_TO_THE_SUCCESSFUL: 富者愈富
+  TRAGEDY_OF_THE_COMMONS: 共有財的悲劇

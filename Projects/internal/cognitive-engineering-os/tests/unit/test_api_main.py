@@ -462,38 +462,33 @@ class UnauthenticatedAccessTests(ApiTestCase):
         response = self.client.get("/recipes/does-not-exist/plan")
         self.assertEqual(response.status_code, 404, response.text)
 
-    def test_get_method_form_is_derived_from_the_live_builder_signature(self):
+    def test_get_method_form_is_derived_from_the_record_schema(self):
+        """Not the Python signature: 2026-09-19 that turned 5W1H's six WHO..HOW rows into one raw-JSON
+        box. Per-method coverage of every form lives in test_method_form.py."""
         response = self.client.get("/methods/foresight.cross_impact_analysis/form")
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["method_id"], "foresight.cross_impact_analysis")
-        self.assertEqual(payload["schema_source"], "builder_signature_only")
-        parameter_names = [parameter["name"] for parameter in payload["parameters"]]
-        self.assertEqual(parameter_names[:4], ["record_id", "events", "impact_pairs", "provenance"])
-        self.assertIn("version", parameter_names)
-        self.assertIn("generated_by_method", parameter_names)
+        self.assertEqual(payload["schema_source"], "record_schema")
+        fields = payload["form"]["fields"]
+        keys = [field["key"] for field in fields]
+        self.assertEqual(keys[:2], ["events", "impact_pairs"])
+        self.assertFalse({"record_id", "provenance", "version", "generated_by_method"} & set(keys))
+        self.assertEqual(fields[0]["kind"], "rows")
+        self.assertIn("event_id", [f["key"] for f in fields[0]["item"]["fields"]])
 
     def test_method_form_for_unknown_method_is_404(self):
         response = self.client.get("/methods/nonexistent.method/form")
         self.assertEqual(response.status_code, 404, response.text)
 
-    def test_self_id_prefix_is_null_for_a_record_id_style_builder(self):
-        """foresight.cross_impact_analysis takes the literal `record_id` param (asserted above) --
-        the API already auto-supplies that on invoke, so the dashboard's id-suggest button (which
-        reads this field) must stay dormant for it, not offer a redundant suggestion."""
-        response = self.client.get("/methods/foresight.cross_impact_analysis/form")
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertIsNone(response.json()["self_id_prefix"])
-
-    def test_self_id_prefix_exposes_the_real_prefix_for_a_domain_specific_id_builder(self):
-        """architecture.atam takes `analysis_id`, not `record_id` -- the API does NOT auto-supply
-        it (dispatch.py's invoke_builder docstring), so the dashboard's id-suggest button needs the
-        real ATAM- prefix from the module's own RECORD_ID_PREFIX constant, not a guess."""
+    def test_domain_identity_param_is_not_a_form_field(self):
+        """architecture.atam takes `analysis_id`, not `record_id`: /invoke supplies it now (dispatch.
+        self_id_param), so the form no longer asks a person to invent an internal id."""
         response = self.client.get("/methods/architecture.atam/form")
         self.assertEqual(response.status_code, 200, response.text)
-        payload = response.json()
-        self.assertNotIn("record_id", [p["name"] for p in payload["parameters"]])
-        self.assertEqual(payload["self_id_prefix"], "ATAM-")
+        keys = [field["key"] for field in response.json()["form"]["fields"]]
+        self.assertNotIn("analysis_id", keys)
+        self.assertNotIn("record_id", keys)
 
     def test_invoke_without_session_is_401(self):
         response = self.client.post("/methods/foresight.cross_impact_analysis/invoke", json={})
@@ -570,6 +565,31 @@ class InvokeTests(ApiTestCase):
         response = self.client.post("/methods/strategy.swot/invoke", json=body)
         self.assertEqual(response.status_code, 200, response.text)
         self.assertTrue(response.json()["record"]["id"].startswith("SWOT-"))
+
+    def test_invoke_supplies_the_domain_identity_param_when_the_body_omits_it(self):
+        """strategy.swot's identity param is `analysis_id`; the dashboard form never sends it."""
+        self._login()
+        body = {
+            "knowledge_set_ref": "KS-TEST-001",
+            "knowledge_set": [{"evidence_id": "E-1", "content": "c", "source": "s", "provenance": {"epistemic_type": "EVIDENCE", "authorship_state": "HUMAN_APPROVED", "locked": None}}],
+            "factors": [
+                {"id": "F1", "category": "STRENGTH", "statement": "s1", "geography": "TW", "time": "2026-Q3", "source": "src", "provenance": {"epistemic_type": "HUMAN_OPINION", "authorship_state": "HUMAN_ORIGINAL", "locked": None}},
+            ],
+        }
+        response = self.client.post("/methods/strategy.swot/invoke", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["record"]["id"].startswith("SWOT-"))
+
+    def test_invoke_passes_the_live_catalog_to_guided_mode(self):
+        """guided_mode's builder AND gate take ``method_catalog`` (a live object no JSON body can carry);
+        the positional gate call used to hand it the validator string."""
+        from tests.unit.test_method_form import sample_input
+
+        self._login()
+        response = self.client.post("/methods/representation.guided_mode/invoke", json=sample_input("representation.guided_mode"))
+        self.assertEqual(response.status_code, 200, response.text)
+        gates = response.json()["gate_results"]
+        self.assertTrue(gates and all(g["status"] in {"PASS", "NOT_APPLICABLE"} for g in gates), gates)
 
     def test_invoke_unknown_method_is_404(self):
         self._login()

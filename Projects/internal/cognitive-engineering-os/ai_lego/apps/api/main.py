@@ -20,9 +20,9 @@ Endpoints:
         chains (dashboard "組成工作流"); each step still runs via /methods/{id}/invoke
 
 ``/`` exists so a human has something to click, not just curl -- it only wraps the endpoints
-above (same-origin fetch, no separate auth path, no new capability). ``/methods/{id}/invoke``
-has a generic JSON input form generated from the live builder signature; the method contract
-and builder remain the authority for domain validation.
+above (same-origin fetch, no separate auth path, no new capability). ``/methods/{id}/form`` is a
+field tree derived from each method's own typed-object record schema (``method_form.py``); the
+method contract and builder remain the authority for domain validation.
 
 Phase 1 scope only -- see ``Projects/internal/cognitive-engineering-os/docs/
 COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md``. No billing, no multi-tenant isolation testing yet
@@ -41,7 +41,6 @@ from __future__ import annotations
 import datetime
 import threading
 import hashlib
-import inspect
 import os
 import re
 import secrets
@@ -61,7 +60,8 @@ from pydantic import BaseModel
 import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
-from ai_lego.apps.api.dispatch import MethodDispatchError, builder_takes_record_id, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner
+from ai_lego.apps.api.dispatch import MethodDispatchError, builder_takes_record_id, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner, run_gate_runner
+from ai_lego.apps.api.method_form import describe_method_form, load_forms
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import read_json
@@ -716,11 +716,10 @@ def get_method(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) ->
 
 @app.get("/methods/{method_id}/form")
 def method_form(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) -> dict[str, Any]:
-    """Expose a safe, generic input descriptor for the dashboard.
-
-    The descriptor is derived from the live builder signature. It is not a
-    substitute for a domain JSON Schema; the invoke endpoint remains the
-    authority and validates the actual method contract/gates.
+    """The dashboard's input form: a field tree derived from the method's own typed-object record
+    schema, labelled from ``methods/registry/method-input-forms.yaml`` (``method_form.py``). System
+    parameters (record_id/provenance/version/generated_by_method) and the domain identity param
+    (analysis_id...) are never fields -- /invoke supplies them. The invoke endpoint stays the authority.
     """
     if not catalog.is_resolvable(method_id):
         raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
@@ -728,34 +727,14 @@ def method_form(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) -
         builder = resolve_builder(method_id)
     except MethodDispatchError as error:
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
-    parameters = []
-    for name, parameter in inspect.signature(builder).parameters.items():
-        has_default = parameter.default is not inspect.Parameter.empty
-        parameters.append(
-            {
-                "name": name,
-                "required": not has_default,
-                "default": None if not has_default else parameter.default,
-                "annotation": None if parameter.annotation is inspect.Parameter.empty else str(parameter.annotation),
-            }
-        )
-    # self_id_prefix: only meaningful for the ~66 builders with a domain-specific identity param
-    # (analysis_id/map_id/...) instead of the literal `record_id` -- those already get one
-    # auto-supplied server-side (see /methods/{id}/invoke). Exposed so the dashboard can offer a
-    # user-initiated "generate a suggested value" button for the domain-specific case WITHOUT
-    # guessing the prefix client-side (module abbreviations are not mechanically derivable from
-    # method_id, e.g. "behavior_over_time" -> "BOT-", "morphological_analysis" -> "MORPHANALYSIS-").
-    # Never auto-filled and never applied to any OTHER *_id-suffixed parameter -- 續14 critic finding
-    # (2026-09-18 WORKLOG) is that a second *_id field is frequently a REFERENCE to another record,
-    # not this record's own identity, and cannot be told apart from the name alone.
-    self_id_prefix = None if builder_takes_record_id(builder) else record_id_prefix(method_id, required=False)
+    spec_root = resolve_spec_root()
+    form = describe_method_form(spec_root, {mid: entry["path"] for mid, entry in catalog.contracts.items()}, method_id, builder, load_forms(spec_root))
     return {
         "method_id": method_id,
         "contract": catalog.require(method_id),
         "display": _method_display_metadata().get(method_id),
-        "parameters": parameters,
-        "schema_source": "builder_signature_only",
-        "self_id_prefix": self_id_prefix,
+        "form": {key: form[key] for key in ("fields", "workflow_only", "record_schema") if key in form},
+        "schema_source": "record_schema",
     }
 
 
@@ -798,13 +777,14 @@ def invoke_method(
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
 
     provenance = body.pop("provenance", None) or make_provenance("AI_INFERENCE", "AI_GENERATED")
+    injected = {"method_catalog": catalog}  # live server objects a builder/gate declares by name (guided_mode)
 
     try:
-        record = invoke_builder(builder, record_id, provenance, body)
+        record = invoke_builder(builder, record_id, provenance, body, injected)
     except InvariantViolation as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    gate_results = gate_runner(record, "api.invoke", datetime.datetime.now(datetime.timezone.utc).isoformat())
+    gate_results = run_gate_runner(gate_runner, record, "api.invoke", datetime.datetime.now(datetime.timezone.utc).isoformat(), injected, body)
     return {"record": record, "gate_results": gate_results}
 
 

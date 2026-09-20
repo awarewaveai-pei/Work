@@ -17,13 +17,13 @@ import inspect
 import json
 import re
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner
+from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner, run_gate_runner
+from ai_lego.apps.api.method_form import SERVER_INJECTED_PARAMS, TYPED_OBJECTS, record_schema_name
 from ai_lego.core.domain.provenance import AUTHORSHIP_STATES, EPISTEMIC_TYPES, make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
@@ -37,8 +37,6 @@ MAX_SCHEMA_CHARS = 7000
 MAX_CONTRACT_CHARS = 1500
 MAX_ATTEMPTS = 2
 DRAFT_MAX_TOKENS = 6000
-_TYPED_OBJECTS = "specs/cognitive/typed-objects"
-_SCHEMA_REF = re.compile(r"specs/cognitive/typed-objects/([A-Za-z0-9_.-]+\.schema\.yaml)")
 
 
 @dataclass
@@ -72,32 +70,12 @@ def require_brief(brief: Any) -> str:
     return brief.strip()
 
 
-@lru_cache(maxsize=4)
-def _schema_index(spec_root: str) -> dict[str, str]:
-    """title-without-punctuation (lowercase) -> schema filename; fallback when a contract cites no schema path."""
-    index: dict[str, str] = {}
-    for path in sorted(Path(spec_root, _TYPED_OBJECTS).glob("*.schema.yaml")):
-        try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        except yaml.YAMLError:
-            continue
-        if isinstance(data, dict) and isinstance(data.get("title"), str):
-            index[re.sub(r"[^a-z0-9]", "", data["title"].lower())] = path.name
-    return index
-
-
-def _schema_text(spec_root: Path, contract_path: Path, outputs: list[Any]) -> str | None:
-    """Output type name -> typed-object schema. Exact title match first (``ErdRecord`` == ``ERD Record``); a
-    schema path cited by the contract only as fallback (contracts cite sibling schemas for comparison, so a
-    cited path is NOT necessarily this method's own)."""
-    index = _schema_index(str(spec_root))
-    names = [index[key] for key in (re.sub(r"[^a-z0-9]", "", str(output).lower()) for output in outputs) if key in index]
-    if not names:
-        names = _SCHEMA_REF.findall(contract_path.read_text(encoding="utf-8"))
-    if not names:
-        return None
-    schema_path = spec_root / _TYPED_OBJECTS / names[0]
-    if not schema_path.is_file():
+def _schema_text(spec_root: Path, method_id: str, contract: dict[str, Any], contract_text: str) -> str | None:
+    """The method's output-record schema -- the same resolver the dashboard form uses
+    (``method_form.record_schema_name``), so the model and the form never describe different shapes."""
+    name = record_schema_name(spec_root, method_id, contract, contract_text)
+    schema_path = spec_root / TYPED_OBJECTS / name if name else None
+    if schema_path is None or not schema_path.is_file():
         return None
     text = schema_path.read_text(encoding="utf-8")
     return text if len(text) <= MAX_SCHEMA_CHARS else text[:MAX_SCHEMA_CHARS] + "\n# ...(truncated)"
@@ -107,11 +85,14 @@ def method_input_spec(spec_root: Path, catalog: MethodCatalog, method_id: str) -
     """Everything the model needs to draft one method's builder kwargs. Raises when the method is not dispatchable."""
     entry = catalog.require(method_id)
     contract_path = spec_root / entry["path"] if not Path(entry["path"]).is_absolute() else Path(entry["path"])
-    contract = yaml.safe_load(contract_path.read_text(encoding="utf-8")) if contract_path.is_file() else {}
+    contract_text = contract_path.read_text(encoding="utf-8") if contract_path.is_file() else ""
+    contract = yaml.safe_load(contract_text) if contract_text else {}
     contract = contract if isinstance(contract, dict) else {}
     builder = resolve_builder(method_id)
     parameters = []
     for name, parameter in inspect.signature(builder).parameters.items():
+        if name in SERVER_INJECTED_PARAMS:  # live server object (method_catalog), never drafted
+            continue
         parameters.append({"name": name, "required": parameter.default is inspect.Parameter.empty})
     description = str(contract.get("description") or "")
     return {
@@ -123,7 +104,7 @@ def method_input_spec(spec_root: Path, catalog: MethodCatalog, method_id: str) -
         "forbidden": contract.get("forbidden_transition"),
         "parameters": parameters,
         "record_id_prefix": record_id_prefix(method_id, required=False),
-        "schema_yaml": _schema_text(spec_root, contract_path, list(contract.get("outputs") or [])) if contract_path.is_file() else None,
+        "schema_yaml": _schema_text(spec_root, method_id, contract, contract_text) if contract_text else None,
     }
 
 
@@ -185,18 +166,19 @@ def extract_json_object(text: str) -> dict[str, Any]:
     return parsed
 
 
-def _validate(method_id: str, kwargs: dict[str, Any]) -> dict[str, Any]:
+def _validate(method_id: str, kwargs: dict[str, Any], catalog: MethodCatalog) -> dict[str, Any]:
     """Run the real builder + gates on the draft. Never raises for a bad draft; raises only when dispatch itself is broken."""
     builder = resolve_builder(method_id)
     gate_runner = resolve_gate_runner(method_id)
     body = dict(kwargs)
     provenance = body.pop("provenance", None) or make_provenance("AI_SUGGESTION", "AI_SUGGESTED")
     record_id = body.get("record_id") or f"{record_id_prefix(method_id, required=False) or ''}DRAFT"
+    injected = {"method_catalog": catalog}  # same server objects /methods/{id}/invoke passes
     try:
-        record = invoke_builder(builder, record_id, provenance, body)
+        record = invoke_builder(builder, record_id, provenance, body, injected)
     except InvariantViolation as error:
         return {"ok": False, "stage": "builder", "error": str(error), "gate_results": []}
-    gate_results = gate_runner(record, "ai.draft", datetime.datetime.now(datetime.timezone.utc).isoformat())
+    gate_results = run_gate_runner(gate_runner, record, "ai.draft", datetime.datetime.now(datetime.timezone.utc).isoformat(), injected, body)
     failed = [g for g in gate_results if not isinstance(g, dict) or g.get("status") != "PASS"]
     if failed:
         return {
@@ -280,7 +262,7 @@ def draft_method_kwargs(
         if exclude_params:
             result.validation = {"ok": None, "stage": "skipped", "error": "params bound from upstream outputs; the Recipe run validates", "gate_results": []}
             return result
-        result.validation = _validate(method_id, kwargs)
+        result.validation = _validate(method_id, kwargs, catalog)
         if result.validation["ok"]:
             return result
         previous, error = kwargs, result.validation["error"]

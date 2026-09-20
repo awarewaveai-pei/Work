@@ -35,11 +35,19 @@
   .pill { padding:var(--sp-1) var(--sp-3); border:1px solid var(--line); background:var(--surface); border-radius:var(--radius-pill); cursor:pointer; font-size:var(--fs-xs); color:var(--ink-soft); }
   .pill.on { background:var(--accent-bg); border-color:var(--accent-line); color:var(--accent); font-weight:700; }
   .pill.tiny { padding:.05rem .5rem; }
-  .fivew1h-grid { display:flex; flex-direction:column; gap:var(--sp-3); }
-  .fivew1h-row { border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--sp-3); }
-  .fivew1h-dim { font-weight:700; font-family:ui-monospace, Consolas, monospace; margin-bottom:var(--sp-2); color:var(--accent-dark); }
-  .fivew1h-row .row { margin-top:0; }
-  .fivew1h-row label { margin-top:var(--sp-2); }
+  /* method form (renderFieldList): rows/fixed rows/groups/variants rendered from the record schema */
+  .fx-group { border-left:3px solid var(--accent-line); padding-left:var(--sp-3); margin-top:var(--sp-1); }
+  .fx-rows { display:flex; flex-direction:column; gap:var(--sp-3); margin-top:var(--sp-1); }
+  .fx-row-card { border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--sp-3); background:var(--surface); }
+  .fx-row-card .field { margin:var(--sp-2) 0; }
+  .fx-row-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
+  .fx-row-title { font-weight:700; color:var(--accent-dark); margin-bottom:var(--sp-1); }
+  .fx-pills { margin-top:0; }
+  .fx-hint { margin:0 0 var(--sp-1); }
+  .fx-add { margin-top:var(--sp-2); }
+  .fx-adv { margin-top:var(--sp-2); }
+  .fx-upstream { background:var(--line-soft); border-radius:var(--radius-sm); padding:var(--sp-3); }
+  textarea.fx-text { font-family:inherit; font-size:var(--fs-base); }
   input, textarea, select { width:100%; padding:var(--sp-2) var(--sp-3); border:1px solid var(--line); border-radius:var(--radius-sm); font:inherit; color:var(--ink); background:var(--surface); }
   input:focus, textarea:focus { outline:2px solid var(--accent-line); outline-offset:1px; border-color:var(--accent); }
   textarea { font-family:ui-monospace, Consolas, monospace; font-size:.82rem; }
@@ -109,7 +117,6 @@
   .guide-box details.guide-example { margin-top:var(--sp-2); }
   .guide-box details.guide-example summary { cursor:pointer; font-weight:600; color:var(--accent-dark); }
   .guide-box details.guide-example > div { margin-top:var(--sp-1); white-space:pre-line; }
-  .id-suggest-btn { font-size:var(--fs-xs); padding:.05rem .55rem; }
   .order-hint { font-size:var(--fs-xs); color:var(--muted); margin-left:var(--sp-2); }
   .compare-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:var(--sp-4); align-items:start; }
   .compare-card { border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4); box-shadow:var(--shadow-1); }
@@ -279,7 +286,7 @@ const $ = id => document.getElementById(id);
 const state = {
   methods: [], recipes: [], customWorkflows: [],
   tab: 'recipes', mode: 'empty', kind: null, id: null,
-  params: [], plan: [], data: {}, ai: { configured: false, model: null }, epoch: 0, busy: false,
+  form: null, plan: [], data: {}, ai: { configured: false, model: null }, epoch: 0, busy: false,
   familyFilter: null, selectedOrder: [],
   chain: { order: [], data: {}, results: {}, savedId: null, title: '' },
   projects: [], project: null,
@@ -359,37 +366,25 @@ function readableFieldLabel(name) {
 }
 // 免費快速解析（0 tokens，不呼叫 AI）：如果貼上的文字已經是「欄位名: 值」逐行/逐句格式（填表範例就是這樣
 // 示範的），直接用規則比對抽出來，不需要 AI。只在「每一個必填欄位都比對到非空值」時才採用，否則整包放棄、
-// 照舊呼叫 AI——不做半套（避免自信滿滿填錯又不明顯）。只處理字串型別欄位：list/dict 欄位（例如 ADR 的
-// alternatives_considered 是陣列）無法從一行文字安全還原，只要有一個必填欄位是這類型就直接放棄、交給 AI。
-function freeParseBrief(brief, params) {
-  // 排除識別碼欄位（record_id 或第一個參數的 domain-specific id，跟 selfIdCandidate 認定同一個
-  // 欄位）：使用者的自然語言描述通常不會提到「scenario_id: xxx」這種內部識別碼，若把它也列入必須比對
-  // 到的必填欄位，會讓每一個非 record_id 方法的免費解析永遠失敗、整條路徑形同虛設。識別碼留給
-  // 「產生建議值」按鈕或使用者自己填，免費解析只負責填有意義的內容欄位。
-  const selfId = params && params.length ? params[0].name : null;
-  const required = (params || []).filter(p => p.required && p.name !== 'record_id' && p.name !== 'provenance' && p.name !== selfId);
-  // required.length === 0 (every required field was the id/provenance/self-id already excluded
-  // above) deliberately bails out to the AI path rather than "succeeding" with an empty {} --
-  // an empty match means there was nothing to compare against, not that the brief matched.
-  // 'str' not "<class 'str'>": every builder module has `from __future__ import annotations`
-  // (PEP 563), so main.py's `str(parameter.annotation)` is already stringified at signature-read
-  // time -- the wire value really is the bare string 'str', confirmed via a live TestClient call.
-  // A wrong comparison here would make this whole free-parse path permanently unreachable dead
-  // code (critic-caught 2026-09-18: it was exactly that until this line was fixed).
-  if (!required.length || !required.every(p => p.annotation === 'str')) return null;
+// 照舊呼叫 AI——不做半套（避免自信滿滿填錯又不明顯）。只處理文字欄位：清單／多列欄位無法從一行文字安全
+// 還原，只要有一個必填欄位不是文字就直接放棄、交給 AI。識別碼與來源標記不是表單欄位（伺服器自動補）。
+function freeParseBrief(brief, form) {
+  const required = ((form && form.fields) || []).filter(f => f.required && !AUTO_KINDS.has(f.kind));
+  // an empty match means there was nothing to compare against, not that the brief matched -> AI path
+  if (!required.length || !required.every(f => f.kind === 'text')) return null;
   const segments = brief.split(/[;；\n]+/).map(s => s.trim()).filter(Boolean);
   const strip = s => s.trim().replace(/^[「『"']+|[」』"']+$/g, '').trim();
   const result = {};
-  for (const p of required) {
-    const variants = new Set([p.name.toLowerCase(), p.name.replace(/_/g, ' ').toLowerCase(), readableFieldLabel(p.name).toLowerCase()]);
+  for (const f of required) {
+    const variants = new Set([f.key.toLowerCase(), f.key.replace(/_/g, ' ').toLowerCase(), readableFieldLabel(f.key).toLowerCase(), (f.label || '').toLowerCase()].filter(Boolean));
     for (const seg of segments) {
       const m = seg.match(/^([^:：]{1,40})[:：]\s*(.+)$/);
       if (!m || !variants.has(strip(m[1]).toLowerCase())) continue;
       const value = strip(m[2]);
-      if (value) { result[p.name] = value; break; }
+      if (value) { result[f.key] = value; break; }
     }
   }
-  return required.every(p => result[p.name]) ? result : null;
+  return required.every(f => result[f.key]) ? result : null;
 }
 function appendNameBlock(container, d) {
   d = d || {};
@@ -529,10 +524,10 @@ function failWorkspace(id, res) {
   renderList();
 }
 
-function renderBriefGuide(display, params) {
+function renderBriefGuide(display, form) {
   const box = $('brief-guide');
   const d = display || {};
-  const fields = params.filter(p => p.name !== 'record_id' && p.name !== 'provenance');
+  const fields = visibleFields(form);
   const hasDeepContent = !!(d.why_zh || d.why_en || d.url || d.example_zh || d.example_en);
   if (!d.blurb_zh && !d.blurb_en && !fields.length && !hasDeepContent) { box.style.display = 'none'; return; }
   clear(box);
@@ -570,24 +565,17 @@ async function openMethod(id) {
   state.epoch += 1; state.kind = 'method'; state.id = id; state.data = {};
   const f = await api('/methods/' + encodeURIComponent(id) + '/form');
   if (!f.ok) { failWorkspace(id, f); return; }
-  state.params = f.body.parameters;
-  state.selfIdPrefix = f.body.self_id_prefix || null;
+  state.form = f.body.form;
   const c = f.body.contract || {};
   const d = f.body.display || {};
   resetWork();
   clear($('ws-title'));
   if (d.name_zh || d.name_en) appendNameBlock($('ws-title'), d); else $('ws-title').appendChild(el('div', 'name-zh', c.title || id));
   $('ws-subtitle').textContent = id;
-  $('ws-desc').textContent = familyLabel(c.family || id.split('.')[0]) + '　·　' + state.params.length + ' 個欄位';
-  renderBriefGuide(d, state.params);
-  // 欄位表單立刻可見可填，不必先觸發 AI 起草或額外點擊——操作者：「為什麼沒有填資料的地方」。
-  // *_id 欄位曾經試過自動預填一個產生的字串（省得使用者自己想），但 critic 覆審用 AST 掃過全部
-  // 245 個 builder 抓到反例：不少 *_id 參數其實是「參照別的東西」而非自己的識別碼（例如
-  // guided_mode.selected_method_id 要對到真實存在的 method_id、five_whys.target_hypothesis_id
-  // 要對到呼叫端自己 payload 裡的假設 id、representation.*_view 的 source_knowledge_object_id
-  // 只做格式檢查、不檢查是否真的存在——亂數字串會被靜默接受，產生一筆參照到不存在物件的壞紀錄，
-  // 完全不會報錯）。光看欄位名稱分不出這兩種，所以不再自動填值，跟其他必填欄位一樣留白讓使用者填。
-  state.params.forEach(p => { if (p.required && p.name !== 'record_id' && p.name !== 'provenance') state.data[p.name] = ''; });
+  $('ws-desc').textContent = familyLabel(c.family || id.split('.')[0]) + '　·　' + visibleFields(state.form).length + ' 個欄位';
+  renderBriefGuide(d, state.form);
+  // 欄位表單立刻可見可填（操作者：「為什麼沒有填資料的地方」）。自己的識別碼（record_id／analysis_id…）
+  // 不是欄位，/invoke 自動產生；後面的 *_id 欄位多半是「參照別的紀錄」，照樣留給使用者填。
   renderMethodFields(null);
   renderList();
 }
@@ -626,9 +614,9 @@ async function openCompare(ids) {
     card.appendChild(el('div', 'note', id + '　·　' + familyLabel(c.family || id.split('.')[0])));
     card.appendChild(el('div', 'blurb', d.blurb_zh || d.blurb_en || c.title || '（尚無說明）'));
     const ul = el('ul');
-    const params = f.body.parameters.filter(p => p.name !== 'record_id' && p.name !== 'provenance');
-    params.filter(p => p.required).forEach(p => ul.appendChild(el('li', null, readableFieldLabel(p.name) + '（必填）')));
-    params.filter(p => !p.required).forEach(p => ul.appendChild(el('li', null, readableFieldLabel(p.name) + '（選填）')));
+    const fields = visibleFields(f.body.form);
+    fields.filter(x => x.required).forEach(x => ul.appendChild(el('li', null, fieldLabel(x) + '（必填）')));
+    fields.filter(x => !x.required).forEach(x => ul.appendChild(el('li', null, fieldLabel(x) + '（選填）')));
     card.appendChild(ul);
     const open = el('button', 'ghost', '開啟完整工作區');
     open.onclick = () => openMethod(id);
@@ -719,54 +707,14 @@ $('chart-view-back').onclick = () => { showMode('empty'); };
 function chainStepFields(id, box) {
   clear(box);
   const m = methodById(id);
-  const params = (m && m._formParams) || [];
-  const selfIdPrefix = m && m._selfIdPrefix;
-  params.forEach(p => {
-    if (p.name === 'provenance' || p.name === 'record_id') return;
-    const f = el('div', 'field');
-    const v = state.chain.data[id][p.name];
-    const ta = el('textarea'); ta.rows = 2; ta.value = v === undefined ? '' : (typeof v === 'string' ? v : pretty(v));
-    ta.addEventListener('input', () => {
-      const t = ta.value;
-      if (t.trim() === '') { delete state.chain.data[id][p.name]; return; }
-      try { state.chain.data[id][p.name] = JSON.parse(t); } catch (e) { state.chain.data[id][p.name] = t; }
-    });
-    const lbl = el('label'); lbl.title = p.name;
-    lbl.appendChild(document.createTextNode(readableFieldLabel(p.name)));
-    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
-    if (selfIdCandidate(p.name, params, selfIdPrefix)) appendIdSuggestButton(lbl, selfIdPrefix, (val) => { ta.value = val; state.chain.data[id][p.name] = val; });
-    f.appendChild(lbl);
-    f.appendChild(ta); box.appendChild(f);
-  });
-}
-async function ensureFormParams(id) {
-  const m = methodById(id);
-  if (m && m._formParams) return m._formParams;
-  const f = await api('/methods/' + encodeURIComponent(id) + '/form');
-  const params = f.ok ? f.body.parameters : [];
-  if (m) { m._formParams = params; m._selfIdPrefix = f.ok ? f.body.self_id_prefix : null; }
-  return params;
-}
-// 自身識別碼欄位判定：只認「表單第一個參數、必填、非 record_id/provenance」且伺服器有回傳前綴
-// （只有伺服器知道真正的 RECORD_ID_PREFIX，例如 behavior_over_time -> "BOT-"，無法從方法名機械推導，
-// 見 main.py /methods/{id}/form 的 self_id_prefix 註解）。刻意不比對欄位名稱結尾 *_id 以外的位置，
-// 避免重蹈續14 critic 抓到的錯誤（後面的 *_id 欄位常是參照別的東西，不是自己的識別碼）。
-function selfIdCandidate(name, params, prefix) {
-  return !!(prefix && params.length && params[0].name === name && params[0].required && name !== 'record_id' && name !== 'provenance');
-}
-function randomIdSuffix() { return Math.random().toString(36).slice(2, 10).toUpperCase(); }
-function appendIdSuggestButton(lbl, prefix, onFill) {
-  const btn = el('button', 'ghost id-suggest-btn', '產生建議值');
-  btn.type = 'button';
-  btn.title = '產生一個以 ' + prefix + ' 開頭的建議識別碼，可再自行修改；不會自動送出。';
-  btn.onclick = (e) => { e.preventDefault(); onFill(prefix + randomIdSuffix()); };
-  lbl.appendChild(btn);
+  if (!m || !m._form) { box.appendChild(el('div', 'bad', '無法載入這個方法的欄位。')); return; }
+  renderMethodForm(box, m._form, state.chain.data[id], null);
 }
 async function renderChain() {
   const box = $('chain-steps'); clear(box);
   for (let i = 0; i < state.chain.order.length; i++) {
     const id = state.chain.order[i];
-    await ensureFormParams(id);
+    await ensureForm(id);
     const m = methodById(id); const d = (m && m.display) || {};
     const stepEl = el('div', 'chain-step');
     const head = el('div', 'head');
@@ -819,7 +767,12 @@ function chainRemove(id) {
 async function chainRunStep(id, index) {
   const epoch = state.epoch;
   $('chain-run-status').textContent = '執行步驟 ' + (index + 1) + '…';
-  const r = await api('/methods/' + encodeURIComponent(id) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.chain.data[id] || {}) });
+  let body;
+  try { body = await collectPayload(await ensureForm(id), state.chain.data[id] || {}); } catch (e) {
+    if (epoch !== state.epoch) return;
+    state.chain.results[id] = { ok: false, error: e.message }; $('chain-run-status').textContent = ''; renderChain(); return;
+  }
+  const r = await api('/methods/' + encodeURIComponent(id) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (epoch !== state.epoch) return;
   if (!r.ok) { state.chain.results[id] = { ok: false, error: detailText(r) }; }
   else {
@@ -891,7 +844,7 @@ $('draft-btn').onclick = async () => {
   $('draft-btn').disabled = true;
   try {
     if (state.kind === 'method') {
-      const free = freeParseBrief(brief, state.params);
+      const free = freeParseBrief(brief, state.form);
       if (free) {
         state.data = Object.assign({}, state.data, free);
         renderMethodFields(null);
@@ -926,12 +879,370 @@ $('draft-btn').onclick = async () => {
   } finally { state.busy = false; renderList(); if (!stale()) $('draft-btn').disabled = !state.ai.configured; refreshStatus(); }
 };
 
-// ---------- step 2: edit ----------
-function valueToText(v) { return (typeof v === 'string') ? v : pretty(v); }
-function textToValue(t, wasString) {
-  const s = t.trim();
-  if (wasString) return t;
-  try { return JSON.parse(s); } catch (e) { return t; }
+// ---------- step 2: edit -- the method form rendered from GET /methods/{id}/form ----------
+// The field tree comes from each method's own record schema (ai_lego/apps/api/method_form.py); labels
+// from methods/registry/method-input-forms.yaml. Widgets edit a plain value tree keyed by builder
+// parameter name (state.data; state.chain.data[id] per chain step). collectFields() turns it into the
+// /invoke body and mirrors tests/unit/test_method_form.py serialize_fields -- change both together:
+// empty optional keys are OMITTED (several builders refuse a present-but-empty key, e.g. a 5W1H UNKNOWN
+// row carrying "answer"), provenance/const are filled in, a field the schema forbids under its
+// sibling's current value is dropped. One deliberate difference: a row that already carries a
+// provenance (an AI draft's) keeps it; the test covers the typed-by-hand default.
+const ROW_PROVENANCE = { epistemic_type: 'HUMAN_OPINION', authorship_state: 'HUMAN_ORIGINAL', locked: null };
+const AUTO_KINDS = new Set(['provenance', 'const']);
+function fieldLabel(f) { return f.label || readableFieldLabel(f.key); }
+function visibleFields(form) { return ((form && form.fields) || []).filter(f => !AUTO_KINDS.has(f.kind)); }
+function isEmptyValue(v) {
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string') return v.trim() === '';
+  if (Array.isArray(v)) return v.length === 0;
+  return typeof v === 'object' && Object.keys(v).length === 0;
+}
+function isObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function collectDefs(fields, defs) {
+  (fields || []).forEach(f => {
+    if (f.def_id && !defs[f.def_id]) defs[f.def_id] = f;
+    collectDefs(f.fields, defs);
+    (f.options || []).forEach(o => { if (isObject(o)) collectDefs(o.fields, defs); });
+    (f.rows || []).forEach(r => { if (isObject(r)) collectDefs(r.fields, defs); });
+    if (isObject(f.item)) collectDefs([f.item], defs);
+  });
+  return defs;
+}
+function ruleHits(rules, obj, mode) { return (rules || []).some(r => r.mode === mode && obj[r.key] === r.equals); }
+
+// ---- serialize (mirror of tests/unit/test_method_form.py) ----
+function collectValue(f, v, defs) {
+  switch (f.kind) {
+    case 'recursive': return defs[f.target] ? collectValue(defs[f.target], v, defs) : v;
+    case 'provenance': return (isObject(v) && v.epistemic_type && v.authorship_state) ? v : Object.assign({}, ROW_PROVENANCE, f.epistemic_type ? { epistemic_type: f.epistemic_type } : {});
+    case 'const': return f.value;
+    case 'variant': {
+      const src = isObject(v) ? v : {};
+      if (f.synthetic) {
+        const opt = f.options.find(o => o.value === src.__variant) || f.options.find(o => o.required_keys.every(k => k in src)) || f.options[0];
+        return collectFields(opt.fields, src, opt.conditions, defs);
+      }
+      const chosen = src[f.discriminator] !== undefined ? src[f.discriminator] : f.options[0].value;
+      const opt = f.options.find(o => o.value === chosen) || f.options[0];
+      return Object.assign({ [f.discriminator]: opt.value }, collectFields(opt.fields, src, opt.conditions, defs));
+    }
+    case 'fixed_rows': {
+      const items = Array.isArray(v) ? v : [];
+      const sources = f.rows.map((r, i) => {
+        const found = f.row_key ? items.find(x => isObject(x) && x[f.row_key] === r.value) : items[i];
+        return isObject(found) ? found : {};
+      });
+      // rows past min_rows are optional (PDCA's in-progress cycle stops after DO): send up to the last touched one
+      let last = -1;
+      f.rows.forEach((r, i) => { if (r.fields.some(x => !AUTO_KINDS.has(x.kind) && !isEmptyValue(sources[i][x.key]))) last = i; });
+      const count = Math.max(typeof f.min_rows === 'number' ? f.min_rows : f.rows.length, last + 1);
+      return f.rows.slice(0, count).map((r, i) => {
+        const row = collectFields(r.fields, sources[i], r.conditions, defs);
+        return f.row_key ? Object.assign({ [f.row_key]: r.value }, row) : row;
+      });
+    }
+    case 'rows': return (Array.isArray(v) ? v : []).map(item => collectValue(f.item, item, defs));
+    case 'group': return collectFields(f.fields, isObject(v) ? v : {}, f.conditions, defs);
+    default: return v;
+  }
+}
+function collectFields(fields, obj, conditions, defs) {
+  const out = {};
+  obj = obj || {};
+  (fields || []).forEach(f => {
+    if (f.kind === 'upstream') return; // collectPayload runs the upstream method and fills this in
+    if (f.kind === 'variant' && f.flatten) { Object.assign(out, collectValue(f, obj, defs)); return; }
+    let raw = obj[f.key];
+    if (raw === undefined && f.default !== undefined) raw = f.default;
+    if (raw === undefined && !['provenance', 'const', 'fixed_rows', 'variant'].includes(f.kind)) return;
+    if (raw === null && f.nullable) { if (f.required) out[f.key] = null; return; }
+    const value = collectValue(f, raw, defs);
+    if (isEmptyValue(value) && !f.required) return;
+    out[f.key] = value;
+  });
+  Object.keys(conditions || {}).forEach(key => { if (ruleHits(conditions[key], out, 'forbidden')) delete out[key]; });
+  return out;
+}
+async function ensureForm(id) {
+  const m = methodById(id);
+  if (m && m._form) return m._form;
+  const f = await api('/methods/' + encodeURIComponent(id) + '/form');
+  const form = f.ok ? f.body.form : null;
+  if (m && form) m._form = form;
+  return form;
+}
+function upstreamMethodId(f, data) { return f.method_id || ((f.methods || {})[data[f.select_by]]) || null; }
+function methodName(id) { const m = methodById(id); return (m && m.display && m.display.name_zh) || id; }
+// The /invoke body: a field that IS another method's whole record (fishbone's problem_statement) runs
+// that method first -- validated by its own builder + gates -- and carries the resulting record in.
+async function collectPayload(form, data) {
+  const payload = collectFields(form.fields, data, null, collectDefs(form.fields, {}));
+  for (const f of form.fields) {
+    if (f.kind !== 'upstream') continue;
+    const up = (data.__upstream || {})[f.key];
+    const methodId = upstreamMethodId(f, data);
+    if (!up || !methodId || up.methodId !== methodId) {
+      if (isObject(data[f.key])) { payload[f.key] = data[f.key]; continue; } // a record pasted via raw JSON
+      if (f.required) throw new Error('「' + fieldLabel(f) + '」需要先填上游方法的欄位。');
+      continue;
+    }
+    const upForm = await ensureForm(methodId);
+    if (!upForm) throw new Error('無法載入上游方法 ' + methodId + ' 的欄位。');
+    const r = await api('/methods/' + encodeURIComponent(methodId) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(await collectPayload(upForm, up.data)) });
+    if (!r.ok) throw new Error('上游方法「' + methodName(methodId) + '」被拒絕：' + detailText(r));
+    payload[f.key] = r.body.record;
+  }
+  return payload;
+}
+
+// ---- render ----
+function renderMethodForm(container, form, data, onChange) {
+  const ctx = { form, data, defs: collectDefs(form.fields, {}), onChange: () => { if (onChange) onChange(ctx); } };
+  if (form.workflow_only) {
+    container.appendChild(el('div', 'note', '這個方法是工作流「' + form.workflow_only + '」裡的一個步驟，它的輸入是前面步驟的產出（例如逐字稿、兩位編碼者的標註），沒辦法單獨手動填寫。請從「工作流」分頁執行整個流程。'));
+    const b = el('button', 'ghost', '開啟這個工作流'); b.type = 'button';
+    b.onclick = () => { showBrowseTab('recipes'); openRecipe(form.workflow_only); };
+    container.appendChild(b);
+    return ctx;
+  }
+  renderFieldList(container, form.fields, data, null, ctx);
+  return ctx;
+}
+function renderFieldList(container, fields, obj, conditions, ctx) {
+  const entries = [];
+  let advanced = null;
+  (fields || []).forEach(f => {
+    if (AUTO_KINDS.has(f.kind)) return;
+    if (f.kind === 'variant' && f.flatten) { renderVariant(container, f, obj, ctx, true); return; }
+    const wrap = el('div', 'field');
+    const lbl = el('label'); lbl.title = f.key;
+    lbl.appendChild(document.createTextNode(fieldLabel(f)));
+    const badge = el('span', 'req-badge');
+    lbl.appendChild(badge);
+    wrap.appendChild(lbl);
+    if (f.hint) wrap.appendChild(el('div', 'note fx-hint', f.hint));
+    const entry = { f, wrap, badge, sync: null };
+    entry.sync = renderWidget(wrap, f, obj, ctx, () => refresh());
+    if (f.advanced) {
+      if (!advanced) { advanced = document.createElement('details'); advanced.className = 'fx-adv'; advanced.appendChild(el('summary', null, '進階：關聯其他紀錄（選填）')); }
+      advanced.appendChild(wrap);
+    } else {
+      container.appendChild(wrap);
+    }
+    entries.push(entry);
+  });
+  if (advanced) container.appendChild(advanced);
+  function refresh() {
+    entries.forEach(({ f, wrap, badge, sync }) => {
+      const rules = (conditions || {})[f.key];
+      wrap.style.display = ruleHits(rules, obj, 'forbidden') ? 'none' : '';
+      const required = f.required || ruleHits(rules, obj, 'required');
+      badge.className = 'req-badge ' + (required ? 'req' : 'opt');
+      badge.textContent = required ? '必填' : '選填';
+      if (typeof sync === 'function') sync();
+    });
+    ctx.onChange();
+  }
+  refresh();
+  return refresh;
+}
+// returns an optional sync() the level calls after any sibling change (upstream select_by)
+function renderWidget(wrap, f, obj, ctx, changed) {
+  const set = v => { if (v === undefined) delete obj[f.key]; else obj[f.key] = v; changed(); };
+  if (obj[f.key] === undefined && f.default !== undefined && ['text', 'number', 'choice', 'bool'].includes(f.kind)) obj[f.key] = f.default;
+  switch (f.kind) {
+    case 'text': {
+      const input = f.format === 'date' ? el('input') : el('textarea', 'fx-text');
+      if (f.format === 'date') input.type = 'date'; else input.rows = 2;
+      input.value = obj[f.key] === undefined || obj[f.key] === null ? '' : String(obj[f.key]);
+      input.addEventListener('input', () => set(input.value.trim() === '' ? undefined : input.value));
+      wrap.appendChild(input);
+      return null;
+    }
+    case 'number': {
+      const input = el('input'); input.type = 'number'; input.step = f.integer ? '1' : 'any';
+      if (typeof f.min === 'number') input.min = String(f.min);
+      if (typeof f.max === 'number') input.max = String(f.max);
+      input.value = obj[f.key] === undefined || obj[f.key] === null ? '' : String(obj[f.key]);
+      input.addEventListener('input', () => { const t = input.value.trim(); set(t === '' ? undefined : Number(t)); });
+      wrap.appendChild(input);
+      return null;
+    }
+    case 'bool': renderPills(wrap, [{ value: true, label: '是' }, { value: false, label: '否' }], obj, f.key, false, changed); return null;
+    case 'choice': renderPills(wrap, f.options, obj, f.key, false, changed); return null;
+    case 'multi_choice': renderPills(wrap, f.options, obj, f.key, true, changed); return null;
+    case 'list': {
+      const ta = el('textarea', 'fx-text'); ta.rows = 3; ta.placeholder = '一行一項';
+      ta.value = Array.isArray(obj[f.key]) ? obj[f.key].join('\n') : '';
+      ta.addEventListener('input', () => {
+        const items = ta.value.split('\n').map(s => s.trim()).filter(Boolean).map(s => f.item_kind === 'number' ? Number(s) : s);
+        set(items.length ? items : undefined);
+      });
+      wrap.appendChild(ta);
+      return null;
+    }
+    case 'map': {
+      const ta = el('textarea', 'fx-text'); ta.rows = 3; ta.placeholder = '一行一組，格式：名稱: 值';
+      ta.value = isObject(obj[f.key]) ? Object.keys(obj[f.key]).map(k => k + ': ' + obj[f.key][k]).join('\n') : '';
+      ta.addEventListener('input', () => {
+        const out = {};
+        ta.value.split('\n').forEach(line => { const m = line.match(/^([^:：]+)[:：]\s*(.*)$/); if (m && m[1].trim()) out[m[1].trim()] = f.value_kind === 'number' ? Number(m[2]) : m[2].trim(); });
+        set(Object.keys(out).length ? out : undefined);
+      });
+      wrap.appendChild(ta);
+      return null;
+    }
+    case 'group': case 'recursive': case 'variant': {
+      const box = el('div', 'fx-group'); wrap.appendChild(box);
+      renderObjectSpec(box, f, obj, f.key, ctx);
+      return null;
+    }
+    case 'rows': renderRows(wrap, f, obj, ctx); return null;
+    case 'fixed_rows': renderFixedRows(wrap, f, obj, ctx); return null;
+    case 'upstream': return renderUpstream(wrap, f, obj, ctx);
+    default: renderJson(wrap, f, obj, changed); return null;
+  }
+}
+// an object-valued spec (group / variant / recursive tree node) stored at holder[key]. A tree child
+// (kind 'recursive') starts as the variant's LEAF option: defaulting it to "decision node" again made
+// every new node demand two more decision nodes and the render recursed until the stack overflowed.
+const MAX_TREE_DEPTH = 12;
+function renderObjectSpec(container, spec, holder, key, ctx) {
+  const nested = spec.kind === 'recursive';
+  const target = nested ? ctx.defs[spec.target] : spec;
+  if (!target) { renderJson(container, spec, holder, ctx.onChange); return; }
+  if (!isObject(holder[key])) holder[key] = {};
+  const depth = (ctx.depth || 0) + (nested ? 1 : 0);
+  if (depth > MAX_TREE_DEPTH) { container.appendChild(el('div', 'note', '層數太深，這一層請改用下方「原始 JSON（進階）」編輯。')); return; }
+  const inner = Object.assign({}, ctx, { depth, preferLeaf: nested });
+  if (target.kind === 'variant') renderVariant(container, target, holder[key], inner, false);
+  else renderFieldList(container, target.fields || [], holder[key], target.conditions, inner);
+}
+function isLeafOption(o) { return !(o.fields || []).some(x => x.required && ['rows', 'fixed_rows', 'recursive', 'variant'].includes(x.kind)); }
+function defaultOption(f, preferLeaf) { return (preferLeaf && f.options.find(isLeafOption)) || f.options[0]; }
+function renderPills(wrap, options, obj, key, multi, changed) {
+  const row = el('div', 'row fx-pills'); wrap.appendChild(row);
+  function draw() {
+    clear(row);
+    (options || []).forEach(o => {
+      const on = multi ? (Array.isArray(obj[key]) && obj[key].includes(o.value)) : obj[key] === o.value;
+      const b = el('button', 'pill' + (on ? ' on' : ''), o.label || String(o.value)); b.type = 'button'; b.title = String(o.value);
+      b.onclick = () => {
+        if (multi) {
+          const cur = Array.isArray(obj[key]) ? obj[key].slice() : [];
+          const i = cur.indexOf(o.value); if (i === -1) cur.push(o.value); else cur.splice(i, 1);
+          if (cur.length) obj[key] = cur; else delete obj[key];
+        } else if (obj[key] === o.value) { delete obj[key]; } else { obj[key] = o.value; }
+        draw(); changed();
+      };
+      row.appendChild(b);
+    });
+  }
+  draw();
+}
+function renderVariant(container, f, obj, ctx, flatten) {
+  const box = el('div', flatten ? 'field' : '');
+  if (flatten) {
+    const lbl = el('label'); lbl.appendChild(document.createTextNode(fieldLabel(f))); lbl.appendChild(el('span', 'req-badge req', '必填'));
+    box.appendChild(lbl);
+    if (f.hint) box.appendChild(el('div', 'note fx-hint', f.hint));
+  }
+  const pills = el('div', 'row fx-pills'); const body = el('div');
+  box.appendChild(pills); box.appendChild(body); container.appendChild(box);
+  function current() {
+    if (f.synthetic) return obj.__variant !== undefined ? obj.__variant : (f.options.find(o => o.required_keys.length && o.required_keys.every(k => k in obj)) || defaultOption(f, ctx.preferLeaf)).value;
+    return obj[f.discriminator] !== undefined ? obj[f.discriminator] : defaultOption(f, ctx.preferLeaf).value;
+  }
+  function draw() {
+    clear(pills); clear(body);
+    const cur = current();
+    if (f.synthetic) obj.__variant = cur; else obj[f.discriminator] = cur;
+    f.options.forEach(o => {
+      const b = el('button', 'pill' + (o.value === cur ? ' on' : ''), o.label || String(o.value)); b.type = 'button';
+      b.onclick = () => { if (f.synthetic) obj.__variant = o.value; else obj[f.discriminator] = o.value; draw(); ctx.onChange(); };
+      pills.appendChild(b);
+    });
+    const opt = f.options.find(o => o.value === cur) || f.options[0];
+    renderFieldList(body, opt.fields, obj, opt.conditions, ctx);
+  }
+  draw();
+}
+function renderRows(wrap, f, obj, ctx) {
+  if (!Array.isArray(obj[f.key])) obj[f.key] = [];
+  const arr = obj[f.key];
+  const min = typeof f.minItems === 'number' ? f.minItems : 0;
+  // one starter row for a required list -- but never for a tree's own children list (endless nesting)
+  const recursiveItem = f.item && (f.item.kind === 'recursive' || f.item.def_id);
+  while (arr.length < Math.max(min, f.required && !recursiveItem ? 1 : 0)) arr.push({});
+  const list = el('div', 'fx-rows'); wrap.appendChild(list);
+  const add = el('button', 'ghost fx-add', '＋ 新增一列'); add.type = 'button';
+  function draw() {
+    clear(list);
+    arr.forEach((item, i) => {
+      const card = el('div', 'fx-row-card');
+      const head = el('div', 'fx-row-head');
+      head.appendChild(el('span', 'note', '第 ' + (i + 1) + ' 列'));
+      const rm = el('button', 'tiny', '刪除'); rm.type = 'button';
+      rm.disabled = arr.length <= min;
+      rm.onclick = () => { arr.splice(i, 1); draw(); ctx.onChange(); };
+      head.appendChild(rm); card.appendChild(head);
+      renderObjectSpec(card, f.item, arr, i, ctx);
+      list.appendChild(card);
+    });
+    add.disabled = typeof f.maxItems === 'number' && arr.length >= f.maxItems;
+  }
+  add.onclick = () => { arr.push({}); draw(); ctx.onChange(); };
+  draw();
+  wrap.appendChild(add);
+}
+function renderFixedRows(wrap, f, obj, ctx) {
+  const existing = Array.isArray(obj[f.key]) ? obj[f.key] : [];
+  const arr = f.rows.map((r, i) => {
+    const found = f.row_key ? existing.find(x => isObject(x) && x[f.row_key] === r.value) : existing[i];
+    const item = isObject(found) ? found : {};
+    if (f.row_key) item[f.row_key] = r.value;
+    return item;
+  });
+  obj[f.key] = arr;
+  const minRows = typeof f.min_rows === 'number' ? f.min_rows : f.rows.length;
+  const list = el('div', 'fx-rows'); wrap.appendChild(list);
+  f.rows.forEach((r, i) => {
+    const card = el('div', 'fx-row-card');
+    card.appendChild(el('div', 'fx-row-title', r.label || String(r.value)));
+    if (i >= minRows) card.appendChild(el('div', 'note', '（選填，還沒做到可以留空）'));
+    renderFieldList(card, r.fields, arr[i], r.conditions, ctx);
+    list.appendChild(card);
+  });
+}
+function renderUpstream(wrap, f, obj, ctx) {
+  const box = el('div', 'fx-upstream'); wrap.appendChild(box);
+  let drawnFor;
+  async function draw() {
+    const methodId = upstreamMethodId(f, obj);
+    drawnFor = methodId;
+    clear(box);
+    if (!methodId) { box.appendChild(el('div', 'note', '先在上面選好來源類型，這裡會出現對應方法的欄位。')); return; }
+    box.appendChild(el('div', 'note', '這一欄是「' + methodName(methodId) + '」這個方法的完整結果。直接在下面填它的欄位；按「執行並驗證」時，系統會先執行它、通過驗證後再把結果帶進來。'));
+    const form = await ensureForm(methodId);
+    if (drawnFor !== methodId) return;
+    if (!form) { box.appendChild(el('div', 'bad', '無法載入 ' + methodId + ' 的欄位。')); return; }
+    obj.__upstream = obj.__upstream || {};
+    if (!obj.__upstream[f.key] || obj.__upstream[f.key].methodId !== methodId) obj.__upstream[f.key] = { methodId, data: {} };
+    const sub = el('div', 'fx-group'); box.appendChild(sub);
+    renderMethodForm(sub, form, obj.__upstream[f.key].data, ctx.onChange);
+  }
+  draw();
+  return () => { if (upstreamMethodId(f, obj) !== drawnFor) draw(); };
+}
+function renderJson(wrap, f, obj, changed) {
+  const ta = el('textarea'); ta.rows = 4; ta.placeholder = 'JSON';
+  ta.value = obj[f.key] === undefined ? '' : pretty(obj[f.key]);
+  ta.addEventListener('input', () => {
+    if (ta.value.trim() === '') { ta.style.borderColor = ''; delete obj[f.key]; changed(); return; }
+    try { obj[f.key] = JSON.parse(ta.value); ta.style.borderColor = ''; changed(); } catch (e) { ta.style.borderColor = 'var(--bad)'; }
+  });
+  wrap.appendChild(ta);
 }
 function verdictLine(v) {
   if (!v) return '';
@@ -939,152 +1250,12 @@ function verdictLine(v) {
   if (v.ok === null) return '○ ' + (v.error || '待執行時驗證');
   return '✘ 被方法拒絕：' + (v.error || '');
 }
-// ---------- structured array field widgets ----------
-// The loop below renders one generic textarea per Python builder parameter, expecting the
-// operator to hand-type JSON for anything that isn't a plain string -- correct for flat str
-// params, but for a FIXED positional array of typed sub-objects (e.g. 5W1H's own 6
-// WHO/WHAT/WHEN/WHERE/WHY/HOW dimensions -- the entire point of that method, methods/contracts/
-// framing.five_w_one_h.contract.yaml preconditions) it collapses the method's real structure
-// into one opaque "Dimensions" box. Operator flagged this 2026-09-19 ("跟 5W1H 有什麼關係") --
-// this registry is the extension point: register "<method_id>.<field_name>" -> {label, render}
-// for any other method whose builder takes the same kind of Atlas-cited fixed dimension/criterion
-// set (root_cause.kepner_tregoe, framing.smart, ... -- same positionally-ordered class, not yet
-// registered here) instead of copy-pasting a new branch into the render loop below.
-const FIVEW1H_DIMENSION_ORDER = ['WHO', 'WHAT', 'WHEN', 'WHERE', 'WHY', 'HOW'];
-const FIVEW1H_DIMENSION_LABELS = { WHO: 'WHO・誰', WHAT: 'WHAT・什麼事', WHEN: 'WHEN・何時', WHERE: 'WHERE・何地', WHY: 'WHY・為什麼', HOW: 'HOW・如何' };
-
-// dimension_entry.provenance is required per dimension (5w1h-record.schema.yaml $defs.dimension_entry)
-// but nothing auto-supplies it the way /invoke defaults the RECORD-level provenance (main.py
-// `body.pop("provenance", None) or make_provenance(...)`) -- so this widget must assemble a valid
-// one itself. Two-way toggle per row (not the full 11/6-value enum picker -- that's 17 buttons per
-// row for a case this project's own canonical example already answers) maps onto the exact pairing
-// specs/cognitive/typed-objects/5w1h-record.schema.yaml's own worked example uses: KNOWN+human ->
-// EVIDENCE/HUMAN_APPROVED, UNKNOWN+AI -> HYPOTHESIS/AI_SUGGESTED (epistemic-label.schema.yaml enums).
-// Defaults to "human" for both statuses: the operator is directly typing into this exact box, so
-// silently labeling their own words AI_GENERATED would itself be a false provenance claim.
-function fiveW1HProvenance(status, humanConfirmed) {
-  if (status === 'KNOWN') {
-    return humanConfirmed
-      ? { epistemic_type: 'EVIDENCE', authorship_state: 'HUMAN_APPROVED' }
-      : { epistemic_type: 'AI_INFERENCE', authorship_state: 'AI_GENERATED' };
-  }
-  return humanConfirmed
-    ? { epistemic_type: 'ASSUMPTION', authorship_state: 'HUMAN_ORIGINAL' }
-    : { epistemic_type: 'HYPOTHESIS', authorship_state: 'AI_SUGGESTED' };
-}
-
-function renderFiveW1HDimensions(container, name, onAssembled) {
-  // rows[dim] is UI-only working state; assemble() below turns it into the real
-  // dimension_entry shape (ai_lego/modules/framing/five_w_one_h.py dimension_entry) on every
-  // change, same as the generic textarea path writes state.data[name] on every keystroke.
-  const existing = Array.isArray(state.data[name]) ? state.data[name] : null;
-  const rows = {};
-  FIVEW1H_DIMENSION_ORDER.forEach((dim, i) => {
-    const e = existing && existing[i] && existing[i].dimension === dim ? existing[i] : null;
-    rows[dim] = {
-      status: e ? e.status : 'UNKNOWN',
-      answer: e && e.answer ? e.answer : '',
-      gapNote: e && e.gap_note ? e.gap_note : '',
-      // Round-trips only the 2 canonical pairs above -- an existing entry with some other
-      // authorship_state (e.g. HUMAN_EDITED, SOURCE_QUOTATION) collapses to the nearest bucket
-      // here; the operator can flip the toggle if that guess is wrong. Disclosed simplification,
-      // not silent data loss: assemble() below always re-derives a schema-valid pair either way.
-      humanConfirmed: !e || !e.provenance || e.provenance.authorship_state === 'HUMAN_APPROVED' || e.provenance.authorship_state === 'HUMAN_ORIGINAL' || e.provenance.authorship_state === 'HUMAN_EDITED',
-    };
-  });
-
-  function assemble() {
-    return FIVEW1H_DIMENSION_ORDER.map(dim => {
-      const r = rows[dim];
-      const entry = { dimension: dim, status: r.status, provenance: fiveW1HProvenance(r.status, r.humanConfirmed) };
-      if (r.status === 'KNOWN') { if (r.answer.trim()) entry.answer = r.answer; }
-      else if (r.gapNote.trim()) entry.gap_note = r.gapNote;
-      return entry;
-    });
-  }
-  function commit() { state.data[name] = assemble(); onAssembled(); }
-
-  const wrap = el('div', 'fivew1h-grid');
-  FIVEW1H_DIMENSION_ORDER.forEach(dim => {
-    const r = rows[dim];
-    const row = el('div', 'fivew1h-row');
-    row.appendChild(el('div', 'fivew1h-dim', FIVEW1H_DIMENSION_LABELS[dim]));
-
-    const knownBtn = el('button', 'pill', '已知'); knownBtn.type = 'button';
-    const unknownBtn = el('button', 'pill', '未知（缺口）'); unknownBtn.type = 'button';
-    const toggle = el('div', 'row'); toggle.appendChild(knownBtn); toggle.appendChild(unknownBtn);
-    const body = el('div');
-
-    function renderStatusBtns() {
-      knownBtn.classList.toggle('on', r.status === 'KNOWN');
-      unknownBtn.classList.toggle('on', r.status === 'UNKNOWN');
-    }
-    function renderBody() {
-      clear(body);
-      const ta = el('textarea'); ta.rows = 2;
-      if (r.status === 'KNOWN') { ta.placeholder = '這個面向的答案…'; ta.value = r.answer; ta.addEventListener('input', () => { r.answer = ta.value; commit(); }); }
-      else { ta.placeholder = '（選填）還缺什麼資訊才能回答…'; ta.value = r.gapNote; ta.addEventListener('input', () => { r.gapNote = ta.value; commit(); }); }
-      body.appendChild(ta);
-
-      const srcLbl = el('label', null, '來源');
-      const meBtn = el('button', 'pill tiny' + (r.humanConfirmed ? ' on' : ''), r.status === 'KNOWN' ? '我自己確認的' : '我自己判斷的');
-      const aiBtn = el('button', 'pill tiny' + (!r.humanConfirmed ? ' on' : ''), r.status === 'KNOWN' ? 'AI 推論，未確認' : 'AI 推測的缺口');
-      meBtn.type = 'button'; aiBtn.type = 'button';
-      meBtn.onclick = () => { r.humanConfirmed = true; commit(); renderBody(); };
-      aiBtn.onclick = () => { r.humanConfirmed = false; commit(); renderBody(); };
-      const srcToggle = el('div', 'row'); srcToggle.appendChild(meBtn); srcToggle.appendChild(aiBtn);
-      body.appendChild(srcLbl); body.appendChild(srcToggle);
-    }
-    knownBtn.onclick = () => { r.status = 'KNOWN'; commit(); renderStatusBtns(); renderBody(); };
-    unknownBtn.onclick = () => { r.status = 'UNKNOWN'; commit(); renderStatusBtns(); renderBody(); };
-    renderStatusBtns(); renderBody();
-    row.appendChild(toggle); row.appendChild(body);
-    wrap.appendChild(row);
-  });
-  container.appendChild(wrap);
-  commit(); // seed state.data[name] with a schema-shaped value immediately, same as the generic
-  // path's openMethod pre-seed (line ~584) -- an untouched required field must never submit as
-  // the pre-seeded '' string; here it submits as 6 well-formed UNKNOWN entries instead.
-}
-
-const STRUCTURED_ARRAY_FIELDS = {
-  'framing.five_w_one_h.dimensions': {
-    label: 'WHO／WHAT／WHEN／WHERE／WHY／HOW（六個面向，這個方法的核心欄位）',
-    render: renderFiveW1HDimensions,
-  },
-};
-
 function renderMethodFields(draft) {
   const box = $('fields'); clear(box);
-  const vd = $('draft-verdict'); vd.textContent = draft ? verdictLine(draft.validation) : '手動填寫：字串直接打字；清單或物件用 JSON。';
+  const vd = $('draft-verdict'); vd.textContent = draft ? verdictLine(draft.validation) : '直接在下面各欄位填寫；有「＋ 新增一列」的欄位可以填好幾列。';
   vd.className = draft && draft.validation.ok === true ? 'ok' : (draft && draft.validation.ok === false ? 'bad' : 'note');
-  const names = new Set(state.params.map(p => p.name));
-  Object.keys(state.data).forEach(k => names.add(k));
-  names.forEach(name => {
-    if (name === 'provenance' || name === 'record_id') return;
-    const p = state.params.find(x => x.name === name) || { required: false };
-    const structured = STRUCTURED_ARRAY_FIELDS[state.id + '.' + name];
-    const f = el('div', 'field');
-    const lbl = el('label'); lbl.title = name;
-    lbl.appendChild(document.createTextNode(structured ? structured.label : readableFieldLabel(name)));
-    lbl.appendChild(el('span', 'req-badge ' + (p.required ? 'req' : 'opt'), p.required ? '必填' : '選填'));
-    f.appendChild(lbl);
-    if (structured) {
-      structured.render(f, name, () => { $('raw-json').value = pretty(state.data); });
-      box.appendChild(f);
-      return;
-    }
-    const v = state.data[name];
-    const ta = el('textarea'); ta.rows = (typeof v === 'string' || v === undefined) ? 2 : Math.min(14, valueToText(v).split('\n').length + 1);
-    ta.value = v === undefined ? '' : valueToText(v);
-    ta.dataset.name = name; ta.dataset.str = (typeof v === 'string' || v === undefined) ? '1' : '0';
-    ta.addEventListener('input', () => { const val = textToValue(ta.value, ta.dataset.str === '1'); if (ta.value.trim() === '' && !p.required) delete state.data[name]; else state.data[name] = val; $('raw-json').value = pretty(state.data); });
-    if (selfIdCandidate(name, state.params, state.selfIdPrefix)) {
-      appendIdSuggestButton(lbl, state.selfIdPrefix, (val) => { ta.value = val; ta.dataset.str = '1'; state.data[name] = val; $('raw-json').value = pretty(state.data); });
-    }
-    f.appendChild(ta); box.appendChild(f);
-  });
-  $('raw-json').value = pretty(state.data);
+  if (!isObject(state.data)) state.data = {};
+  renderMethodForm(box, state.form, state.data, ctx => { $('raw-json').value = pretty(collectFields(ctx.form.fields, ctx.data, null, ctx.defs)); });
 }
 function renderRecipeNodes(verdicts) {
   const box = $('fields'); clear(box);
@@ -1218,7 +1389,10 @@ $('run-btn').onclick = async () => {
   const out = $('result'); clear(out); $('run-status').textContent = '執行中…'; $('run-btn').disabled = true;
   try {
     if (state.kind === 'method') {
-      const r = await api('/methods/' + encodeURIComponent(state.id) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state.data) });
+      let body;
+      try { body = await collectPayload(state.form, state.data); } catch (e) { if (stale()) return; $('run-status').textContent = ''; out.appendChild(el('div', 'bad', e.message)); return; }
+      if (stale()) return;
+      const r = await api('/methods/' + encodeURIComponent(state.id) + '/invoke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (stale()) return;
       if (!r.ok) { $('run-status').textContent = ''; out.appendChild(el('div', 'bad', '被拒絕：' + detailText(r))); return; }
       const allPass = (r.body.gate_results || []).every(g => g.status === 'PASS' || g.status === 'NOT_APPLICABLE');

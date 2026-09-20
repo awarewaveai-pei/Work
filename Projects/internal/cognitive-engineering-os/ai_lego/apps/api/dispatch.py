@@ -73,7 +73,46 @@ def builder_takes_record_id(builder: Callable[..., Any]) -> bool:
     return "record_id" in inspect.signature(builder).parameters
 
 
-def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, provenance: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+def self_id_param(builder: Callable[..., Any]) -> str | None:
+    """The domain-specific identity parameter (``analysis_id``, ``session_id``...) of a builder that
+    does not take ``record_id``: by this corpus's convention it is always the FIRST parameter. A later
+    ``*_id`` parameter is usually a REFERENCE to another record and is never auto-filled."""
+    parameters = list(inspect.signature(builder).parameters)
+    if not parameters or "record_id" in parameters:
+        return None
+    return parameters[0] if parameters[0].endswith("_id") else None
+
+
+def server_kwargs(builder_or_gate: Callable[..., Any], injected: dict[str, Any] | None) -> dict[str, Any]:
+    """The subset of live server objects (``method_catalog``...) this callable declares by name."""
+    parameters = inspect.signature(builder_or_gate).parameters
+    return {name: value for name, value in (injected or {}).items() if name in parameters}
+
+
+def run_gate_runner(
+    gate_runner: Callable[..., list[dict[str, Any]]],
+    record: dict[str, Any],
+    validator: str,
+    timestamp: str,
+    injected: dict[str, Any] | None = None,
+    inputs: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Call a single-method gate runner by parameter NAME: most are ``(record, validator, timestamp)``,
+    but guided_mode's takes ``method_catalog`` and concept_graph_view's re-checks the record against the
+    ``source_relations`` the builder was given (not stored in the record) -- a positional call handed
+    the first one the validator string and crashed the second."""
+    parameters = list(inspect.signature(gate_runner).parameters)
+    kwargs: dict[str, Any] = {parameters[0]: record, **server_kwargs(gate_runner, injected)}
+    for name, value in (("validator", validator), ("timestamp", timestamp)):
+        if name in parameters:
+            kwargs[name] = value
+    for name in parameters:
+        if name not in kwargs and inputs is not None and name in inputs:
+            kwargs[name] = inputs[name]
+    return gate_runner(**kwargs)
+
+
+def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, provenance: dict[str, Any], body: dict[str, Any], injected: dict[str, Any] | None = None) -> dict[str, Any]:
     """Binds ``body``'s keys to ``builder``'s own parameter names (every builder in this corpus
     takes POSITIONAL_OR_KEYWORD params, so keyword-calling is always valid regardless of each
     method's own positional/keyword split), auto-supplying ``record_id``/``provenance`` unless the
@@ -83,8 +122,10 @@ def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, prove
     instead of as a top-level param -- unconditionally injecting ``record_id``/``provenance`` into
     ``call_kwargs`` for those made every one of their real production invokes fail with
     DISPATCH_BAD_ARGUMENTS regardless of what the caller sent (found 2026-09-13 testing
-    strategy.swot for real against the live API -- see WORKLOG). For those builders, the caller
-    must supply whatever identity field the method's own contract actually names.
+    strategy.swot for real against the live API -- see WORKLOG). Their identity param is the FIRST
+    parameter (``self_id_param``) and gets the same generated id by default (2026-09-19); a caller
+    may still pass its own. ``injected`` carries live server objects (``method_catalog``) to the
+    builders that declare them by name.
 
     Always raises ``InvariantViolation`` on any failure -- both a real builder refusal (a
     business-rule violation) AND a bad-argument-shape ``TypeError`` from ``inspect.Signature.bind``
@@ -95,8 +136,14 @@ def invoke_builder(builder: Callable[..., dict[str, Any]], record_id: str, prove
     sig = inspect.signature(builder)
     if "record_id" in sig.parameters:
         call_kwargs.setdefault("record_id", record_id)
+    identity = self_id_param(builder)
+    if identity is not None:
+        # same auto-supply as record_id: the dashboard no longer asks a person to invent an internal id
+        call_kwargs.setdefault(identity, record_id)
     if "provenance" in sig.parameters:
         call_kwargs.setdefault("provenance", provenance)
+    for name, value in server_kwargs(builder, injected).items():
+        call_kwargs[name] = value  # never caller-overridable: a JSON body cannot carry a live catalog anyway
     try:
         bound = sig.bind(**call_kwargs)
     except TypeError as error:

@@ -1,0 +1,76 @@
+# Filled-in form samples (record-shaped: field key -> value) for methods whose record schema has no
+# usable example -- consumed by tests/unit/test_method_form.py, which serializes them exactly as the
+# dashboard would and runs the real builder + gates. Every other method uses its schema's own example.
+
+decision.eisenhower_matrix:
+  subject: 本週待辦分流
+  tasks:
+    - {id: T1, label: 回覆客戶報價, urgency: 9, importance: 8}
+    - {id: T2, label: 寫季度規劃, urgency: 3, importance: 9}
+    - {id: T3, label: 整理信箱, urgency: 6, importance: 2}
+    - {id: T4, label: 看產業新聞, urgency: 2, importance: 3}
+  urgency_scale: {min: 0, max: 10}
+  importance_scale: {min: 0, max: 10}
+  urgency_threshold: 5
+  importance_threshold: 5
+
+divergent.reverse_brainstorming:
+  problem_statement: 新進員工到職第一週就想離職
+  worsening_ideas:
+    - {id: W1, text: 第一天不給電腦，也不介紹任何同事}
+    - {id: W2, text: 把所有規章文件一次丟給他自己讀}
+  inversions:
+    - {worsening_idea_ref: W1, inverted_solution: 到職前備妥設備，並指定一位夥伴帶他認識團隊}
+
+strategy.lean_canvas:
+  blocks:
+    - {block: PROBLEM, content: 小型工作室找不到能一次管好排程與收款的工具}
+    - {block: CUSTOMER_SEGMENTS, content: 1 到 5 人的設計與攝影工作室}
+    - {block: UNIQUE_VALUE_PROPOSITION, content: 接案、排程、收款同一個畫面完成}
+    - {block: SOLUTION, content: 預約頁自動產生報價單與付款連結}
+    - {block: CHANNELS, content: 設計社群與既有客戶轉介}
+    - {block: REVENUE_STREAMS, content: 每月訂閱費}
+    - {block: COST_STRUCTURE, content: 雲端主機與金流手續費}
+    - {block: KEY_METRICS, content: 每月完成付款的預約數}
+    - {block: UNFAIR_ADVANTAGE, content: 創辦人本身是工作室經營者，熟悉實際流程}
+
+# Overlays: merged onto the schema example for parameters the record stores under another shape.
+jurisdiction.compliance_gap_analysis:
+  gap_annotations:
+    - {control_id: CTRL-2, severity: high, plan: 指派資安負責人，目標 2026-10-31 前補上}
+    - {control_id: CTRL-3, severity: critical, plan: 擋住上線，本週升級給法遵負責人}
+
+representation.concept_graph_view:
+  source_relations:
+    - {relation_id: REL-1, relation_type: supports, provenance_ref: PROV-REL-1}
+    - {relation_id: REL-2, relation_type: contradicts, provenance_ref: PROV-REL-2}
+
+representation.timeline_view:
+  events:
+    - {event_id: EVT-1, event_time: 1}
+    - {event_id: EVT-2, event_time: 3}
+    - {event_id: EVT-3, event_time: 2}
+
+strategy.swot:
+  knowledge_set:
+    - {evidence_id: E-101, content: 既有客戶續約率連續三季高於 92%}
+    - {evidence_id: E-102, content: 同區域出現兩家提供相同服務的新進業者}
+
+# The upstream cause-hypothesis set is built from root_cause.fishbone's own example (CHS-2026-08-29-001);
+# these two examples cite a different set, so point them at the hypotheses that record really has.
+root_cause.five_whys:
+  target_hypothesis_id: CHS-2026-08-29-001-H1
+
+root_cause.pareto:
+  dataset:
+    - {hypothesis_id: CHS-2026-08-29-001-H1, metric_value: 42}
+    - {hypothesis_id: CHS-2026-08-29-001-H2, metric_value: 8}
+
+# The upstream SwotAnalysis is strategy.swot's own example (factors F1 STRENGTH, F2 THREAT); the TOWS
+# example pairs F1 with an F3 that record does not have.
+strategy.tows:
+  pairings:
+    - id: TOWS-2026-09-11-001-P1
+      internal_factor_id: SWOT-2026-09-04-001-F1
+      external_factor_id: SWOT-2026-09-04-001-F2
+      strategy_option: 用 92% 續約率證明的客戶黏著度，搶先綁定長約，擋住新進業者的低價挖角

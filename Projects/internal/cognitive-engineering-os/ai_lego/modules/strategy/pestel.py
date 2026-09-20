@@ -64,6 +64,7 @@ from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "strategy.pestel"
 ANALYSIS_ID_PREFIX = "PESTEL-"
+RECORD_ID_PREFIX = ANALYSIS_ID_PREFIX  # corpus-wide name dispatch.record_id_prefix reads (auto-generated analysis_id)
 DIMENSIONS = frozenset({"POLITICAL", "ECONOMIC", "SOCIAL", "TECHNOLOGICAL", "ENVIRONMENTAL", "LEGAL"})
 SOURCE_TYPES = frozenset({"official", "research", "market", "other"})
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")

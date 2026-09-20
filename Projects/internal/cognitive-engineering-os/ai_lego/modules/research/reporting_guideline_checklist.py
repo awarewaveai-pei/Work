@@ -9,7 +9,7 @@ the Method Atlas mother document; disclosed in the contract.
 The guideline's official items live in exactly one place -- ``reference-data/reporting-guidelines.
 reference.yaml`` under the read-only spec root (kept OUTSIDE ``specs/`` deliberately: ``SchemaContracts``
 treats every ``$id``-bearing YAML under ``specs/`` as a JSON Schema resource, and this file is a plain
-data catalog, not a schema) -- loaded lazily and cached (``draft.py``'s own ``_schema_index`` idiom),
+data catalog, not a schema) -- loaded lazily and cached (``method_form.py``'s own ``_schema_indexes`` idiom),
 never hardcoded here, so the wording stays independently auditable against its academic citation. Only
 ``SRQR`` is populated; a future guideline is a data-only addition to that catalog.
 

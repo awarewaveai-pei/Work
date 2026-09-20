@@ -1,4 +1,37 @@
 # Worklog
+## 2026-09-20（續83）Cognitive OS 表單整類修好：284 個方法的輸入表單改由各自的 record schema 產生，不再反射 Python 簽名
+
+- [操作者請求] 操作者把另一個 session 的對話整段貼進來：「你他媽的是不是 所有的每個工具都亂做表格?!」「所以你說 所有工具都給錯表格 自己亂掰?」「你這個蠢豬 到底要做多少蠢事?!」。續78 只替 5W1H 做了一個特例 widget（＝補丁），另外 265 個結構化方法照舊是裸 JSON textarea，那個 session 還回頭問操作者「其他 ~250 個要不要比照修」。本次不再註冊特例，整類修掉。
+- [根因（承續78／續80，補完）] `/methods/{id}/form` 只有 `inspect.signature(builder)`，從未讀每個方法自己的 typed-object record schema（`specs/cognitive/typed-objects/*.schema.yaml`，279 份，內含 enum、`prefixItems` 固定列、items 子欄位結構、`allOf if/then` 條件式必填）。同一份 schema，AI 起草路徑（`ai_lego/platform/ai_gateway/draft.py` 的 `_schema_text`）早就在讀並餵給模型——表單是唯一沒讀它的消費者。這是「同一個事實兩個來源」的典型後果，不是 5W1H 特例。
+- [已修改]
+  - 新增 `ai_lego/apps/api/method_form.py`：record schema → 欄位樹。支援 `$ref`／`allOf` 展開、`oneOf` 變體（含沒有共同 const 的「合成變體」，如攻擊樹的 internal／leaf 節點）、遞迴樹（決策樹／攻擊樹／大綱）、`prefixItems` 固定列（5W1H 六列、PDCA 四階段、Lean Canvas 九宮格）、computed 欄位排除（builder 自己算的不給填）、`allOf if/then` 轉成條件式顯示與必填（5W1H：選「已知」才出現答案欄；選「未知」時答案欄連 key 都不送，因為 builder 會拒絕）。
+  - `ai_lego/apps/api/dispatch.py`：新增 `self_id_param()`（builder 沒有 `record_id` 時，第一個 `*_id` 參數＝自身識別碼）→ `/invoke` 自動產生，表單不再要人自己編內部 id（65 個方法受惠）；新增 `server_kwargs()`／`run_gate_runner()` 依**參數名**綁定 gate 參數——順帶修掉 `representation.guided_mode`（gate 收到 validator 字串當 method_catalog）與 `representation.concept_graph_view`（gate 缺 `source_relations` 直接 TypeError → 500）兩個「一叫就爆」的既有 bug。
+  - `ai_lego/apps/api/main.py`：`/methods/{id}/form` 回傳欄位樹（`schema_source: "record_schema"`）；`/invoke` 注入 `method_catalog` 並改走 `run_gate_runner`。
+  - `ai_lego/platform/ai_gateway/draft.py`：schema 解析改用同一支 `record_schema_name()`（原本只用 title 比對，21 個方法對不到，會退回猜 contract 文字裡第一個 typed-object 路徑）。
+  - `ai_lego/apps/api/dashboard.html`：刪除 5W1H 特例 widget 與 `STRUCTURED_ARRAY_FIELDS` registry（-160 行），改為單一通用渲染器（text／number／bool／choice／multi_choice／list／map／group／rows／fixed_rows／variant／recursive／upstream／json）＋單一序列化器；選項一律用看得見的按鈕，不用 `<select>`。
+  - 新增 `methods/registry/method-input-forms.yaml`：1386 個欄位中文標籤 + 608 個選項中文標籤 + 9 個方法的結構覆寫（record schema 沒描述到的輸入，例如 Eisenhower 的量尺、SRQR 由 reference-data 展開逐條官方項目）。
+  - 新增 `tests/unit/test_method_form.py` + `tests/fixtures/method_form_samples.yaml`：284 個方法逐一「表單 → 真實 builder → 所有 gate」。
+  - `ai_lego/modules/strategy/pestel.py`：補 `RECORD_ID_PREFIX`（原本只有 `ANALYSIS_ID_PREFIX`，自動產生的 id 會被它自己的 builder 拒絕）。
+  - 9 個 architecture 模組 + `computation/monte_carlo.py` + `research/reporting_guideline_checklist.py` 的註解：原本寫「這個常數只給 dashboard 的 id-suggest 按鈕用、不是 API 派發的依據」，現在它就是自動產生 id 的前綴，屬於**已經不成立的宣稱**，一併更正（保留仍成立的那半句：前綴必須對上 schema 自己的 `id` pattern，不是方法名的機械轉寫）。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_method_form.py tests/unit/test_api_main.py tests/unit/test_ai_gateway.py -q` | exit=0 | result=133 passed／287 subtests（含 284 個方法逐一 round-trip）
+  - REALTEST_EVIDENCE: tool=Browser(headless chromium via playwright-core) | cmd=登入本機 8431 → 開 5W1H → 點「已知／未知」按鈕 → 填欄位 → 按「執行並驗證」 | exit=0 | result=「✔ 記錄成立，所有閘門通過」，3 個 gate 全 PASS，`information_gaps` 正確算出 `[WHEN, WHERE, WHY, HOW]`；同一輪另外檢查 decision_tree（遞迴節點）／attack_tree（合成變體）／fishbone（上游紀錄內嵌）／SRQR（21 條官方項目）／lean_canvas（九宮格）／qualitative_coding（工作流限定，誠實擋下）六種結構皆正確渲染
+  - REALTEST_EVIDENCE: tool=Bash(node) | cmd=從 `dashboard.html` 原文抽出真正的 JS 序列化器（4060 bytes，不是重寫），對 282 個方法的範例輸入跑一遍，與 Python 測試鏡像逐一比對 | exit=0 | result=**282／282 payload 完全相同**——證明 CI 測的就是 UI 真正會送出的東西
+  - REVIEW_WAIVED: NA -- critic subagent 跑到一半被帳號 session rate limit 中斷（429，4:20am 重置）；codex oracle 也 BLOCKED（`oracle-quota.ps1 -Action check -Tool codex` exit=3，到 19:44）。改以下方三項機械證據替代。
+  - ORACLE_WAIVED: codex 額度 BLOCKED 至 2026-09-19 19:44（exit=3，未連線）；critic 被中斷於「抽出 JS 序列化器做 parity」那一步——該步改由本 session 自己機械完成（見上一條 REALTEST）。
+  - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`builder_signature_only\|self_id_prefix\|STRUCTURED_ARRAY_FIELDS\|id-suggest\|renderFiveW1HDimensions` | hits=17 檔 → 其中 11 處是**已不成立的宣稱**，已同步更正（9 個 architecture 模組、monte_carlo、reporting_guideline_checklist 的註解）；lobster-factory 零命中（無外部消費者）；其餘是歷史 WORKLOG／TASKS 紀錄與語意不同的 "builder signature"（recipe binding 檢查，仍然正確），不動。
+- [對抗自審（oracle 不可用時的替代，三項都是機械證據不是意見）]
+  - 自身識別碼自動產生，會不會塞進「參照別的紀錄」的欄位？逐一驗證 65 個會被自動補 id 的 builder：用範例跑完後比對 `record["id"]` 是否等於系統產生的那個 id → **65／65 相符、0 例外**，證明這 65 個第一參數都是自己的 id，不是參照。
+  - gate 參數改成依名字綁定後，呼叫端能不能餵 gate 一個跟 builder 不同的值來放水？逐一掃 284 個 gate runner 簽名：只有 4 個（`concept_graph_view.source_relations`／`timeline_view.events`／`security_control_mapping.source_record`／`tows.swot_analysis`）會從 body 綁值，而這 4 個同時也是該方法 builder 的參數、讀的是同一個 dict；body 帶入 builder 不認得的 key 會被 `sig.bind` 直接拒絕（`DISPATCH_BAD_ARGUMENTS`），所以不存在「gate 看到的跟 builder 看到的不一樣」的路徑。
+  - 測試會不會是空跑？突變測試：`_conditions` 改成永遠回傳 `{}` → 指名測試變紅；`_is_computed` 改成永遠 False → round-trip 變紅；`self_id_param` 改成永遠 None → round-trip 變紅；三者還原後全綠。
+- [剩餘風險]
+  - JS↔Python 逐方法比對涵蓋的是「範例輸入」這一種狀態；互動中途的狀態（切換變體後再改、刪列後重排）只有 5W1H 在瀏覽器實測過，其餘靠共用的資料形狀推論。
+  - 刻意保留的行為差異：AI 起草產生的列會保留它自己的 provenance（JS），Python 鏡像一律套用手填預設值——兩邊在測試輸入（已剝除 provenance）下結果相同，差異只在「已有 provenance」的情境，已在 `dashboard.html` 與測試 docstring 兩處寫明。
+  - `research.qualitative_coding` 與 `evidence.triangulation` 不提供單獨表單（輸入是前面步驟的產出），改為明講並附「開啟這個工作流」按鈕，不是假裝可以手填。
+  - 方法頁上方的「為什麼有效」與「填表範例」兩段文字仍是本 session 稍早自己寫壞的工程語（181／285 含欄位名或錯誤碼；280／285 的範例用舊英文 key），下一批修，不在本 commit。
+  - prod（cognitive.aware-wave.com）仍落後：本次改動要生效需在 ks-aw-01 重新部署，屬 High-risk，未執行，等操作者 go-ahead。
+- [rollback] `git revert` 本 commit 即可；`method_form.py`／`method-input-forms.yaml`／`test_method_form.py` 為新增檔，revert 後 `/methods/{id}/form` 回到反射簽名的舊行為，無資料遷移、無 schema 變更。
+
 ## 2026-09-19（續81）HCI 採用為證據：DISCOVERED 來源 → 案件 EVIDENCE 的人工晉升路徑
 
 - [操作者請求] 「這狗屎東西 怎麼做 HCI分析?」→「不修好 要怎麼用?!」。根因：自動化只做到 DISCOVERED（ADR-011 §15c），但**完全沒有**人工晉升路徑，抓到的網頁永遠進不了案件、不能評分。另外 runner 擷取了文字卻丟掉（`orchestrate-discovered-fetch.mjs:171-176` 只存 hash+ref），hci-app 也碰不到 MinIO。

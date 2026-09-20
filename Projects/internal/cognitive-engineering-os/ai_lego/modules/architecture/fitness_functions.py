@@ -13,13 +13,9 @@ from ai_lego.errors import InvariantViolation
 
 METHOD_ID = "architecture.fitness_functions"
 RECORD_ID_PREFIX = "FFS-"
-# Value MUST match typed-objects/fitness-function-set.schema.yaml's own `id` pattern (`^FFS-`) -- NOT a
-# mechanical transliteration of the method name (critic-caught 2026-09-18: this line originally said
-# "FITNESSFN-", which the canonical schema does not declare; see the same-day WORKLOG entry for the other
-# modules this exact mistake was found in). Not load-bearing for API auto-injection (identity param is the
-# domain-specific set_id, not `record_id`) -- exists only for the dashboard's opt-in id-suggest button. See
-# atam.py's own RECORD_ID_PREFIX comment for the full rationale (2026-09-18), not repeated in every sibling
-# file.
+# Value MUST match typed-objects/fitness-function-set.schema.yaml's own `id` pattern (`^FFS-`), not a
+# transliteration of the method name (critic-caught 2026-09-18).
+# Prefixes the set_id /methods/{id}/invoke generates when the caller omits it (dispatch.self_id_param).
 
 
 def generate_fitness_function_set(
