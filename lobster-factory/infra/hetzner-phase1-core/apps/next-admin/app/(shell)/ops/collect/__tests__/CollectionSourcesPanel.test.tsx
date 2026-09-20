@@ -21,6 +21,30 @@ const CATALOGUE = [
   { id: "collect/http-html", title: "網頁", kind: "web", summary: "單頁", entry: "url", available: true, missing: [] },
   { id: "collect/sitemap", title: "Sitemap", kind: "sitemap", summary: "整站", entry: "url", available: true, missing: [] },
   {
+    // The entity dossier is the one source with multiselect options, and multiselect is rendered as
+    // visible checkboxes rather than a native <select> (house convention). Present in the fixture so
+    // that rendering is exercised at all — a dropdown-shaped regression would otherwise ship unseen.
+    id: "collect/entity-dossier",
+    title: "背景調查",
+    kind: "web",
+    summary: "人／公司／事件",
+    entry: "query",
+    available: true,
+    missing: [],
+    metered: true,
+    options: [
+      { key: "kind", label: "對象類型", type: "select", default: "person", choices: [
+        { value: "person", label: "人" },
+        { value: "company", label: "公司" },
+      ] },
+      { key: "angles", label: "要查哪些角度", type: "multiselect", choices: [
+        { value: "identity", label: "身分" },
+        { value: "news", label: "新聞" },
+        { value: "legal", label: "訴訟" },
+      ] },
+    ],
+  },
+  {
     id: "collect/extract-provider",
     title: "JS 渲染網頁",
     kind: "rendered",
@@ -333,5 +357,52 @@ describe("a refusal is explained, not printed", () => {
   it("says nothing rather than inventing an explanation it does not have", () => {
     // A vague "something went wrong" would hide the one string that could be searched for.
     expect(explainReason("some_reason_nobody_mapped")).toBeNull();
+  });
+});
+
+describe("choice options render as visible buttons, never a dropdown", () => {
+  function pickDossier() {
+    const box = [...container.querySelectorAll("[data-panel=catalogue] input[type=checkbox]")].find(
+      (b) => (b as HTMLInputElement).closest("label")?.textContent?.includes("背景調查"),
+    ) as HTMLInputElement;
+    return box;
+  }
+
+  it("renders every choice as a button and no <select> in the option form", async () => {
+    await act(async () => pickDossier().click());
+
+    const fieldset = [...container.querySelectorAll("fieldset")].find((f) => f.textContent?.includes("要查哪些角度"));
+    expect(fieldset, "the dossier option fieldset never rendered").toBeTruthy();
+    expect(fieldset!.querySelector("select"), "a dropdown came back").toBeNull();
+    const labels = [...fieldset!.querySelectorAll("button")].map((b) => b.textContent ?? "");
+    expect(labels.some((l) => l.includes("身分"))).toBe(true);
+    expect(labels.some((l) => l.includes("訴訟"))).toBe(true);
+    // Unticked multiselect choices show an empty box, so "how many are on" is readable at a glance.
+    expect(labels.filter((l) => l.startsWith("☐")).length).toBe(3);
+  });
+
+  it("ticks several angles at once and stores them in the declared order", async () => {
+    await act(async () => pickDossier().click());
+    const fieldset = [...container.querySelectorAll("fieldset")].find((f) => f.textContent?.includes("要查哪些角度"))!;
+    const byLabel = (t: string) =>
+      [...fieldset.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes(t)) as HTMLButtonElement;
+
+    // Clicked out of order on purpose: the stored string must follow the DECLARED order, so two
+    // operators who tick the same boxes produce the same row.
+    await act(async () => byLabel("訴訟").click());
+    await act(async () => byLabel("身分").click());
+
+    // Same selector the other tests use: `input[type=text]` alone also matches inputs React has
+    // not finished owning, and jsdom then refuses the native value setter.
+    const entryBox = container.querySelector("input[type=text], input:not([type])") as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+      setter.call(entryBox, "Theo Farrell");
+      entryBox.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(buttonByText("加入"));
+
+    const body = posted.find((p) => p.blockId === "collect/entity-dossier");
+    expect((body?.options as Record<string, unknown>)?.angles).toBe("identity,legal");
   });
 });
