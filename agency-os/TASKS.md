@@ -584,11 +584,11 @@
 #### E. ▶️ 可直接做 — 治理與機械閘
 
 - [ ] **【2026-09-19 開出｜Codex 主導前必修】Claude→Codex 同步實際失效：機械閘在 Codex 零觸發 + bridge 同步凍結**
-  - `🔴 現行` · `2026-09-19 開出，操作者計畫 2026-10 由 Codex 主導` · `閘的修法方向需操作者選`
-  - **一句話**：Codex 全走 `exec` 工具，hook matcher 只認 Claude 工具名 → 部署／commit／改檔閘全數旁路；同步腳本被 Git Bash 的 GNU tar 弄崩，09-01 後 685 次全失敗且被 AO-RESUME 吞掉。
-  - **下一步**：①tar 改絕對路徑（`sync-claude-to-codex.ps1:731`、`check-claude-codex-parity.ps1:50`）②AO-RESUME sync/parity 失敗進 smoke `blind_spots` ③runner 對 Codex `exec` 正規化或關 code_mode（需選）④清 `~/.codex/agents` 舊副本 + checker 補查 ⑤backup 保留上限 ⑥更正 5 處過度宣稱文件
-  - **完成定義**：Git Bash 環境下 parity PASSED；真實 Codex session 跑未標記 `sg-deploy.sh` 被 BLOCK、首次改檔被 git-log-injector 擋
-  - **證據**：WORKLOG 2026-09-19(續79)
+  - `🟠 程式側已完成，卡在操作者一步` · `2026-09-19 開出，2026-09-20 修完` · `卡在你：Codex /hooks trust`
+  - **已完成**：runner 加 Codex 轉接層與心跳、使用者層 `~/.codex/hooks.json` 產生器、deny 清單鏡像、同步腧 tar 地雷、parity 新增 trust/心跳/雙向檢查、smoke `codex_parity`、反向 oracle `/claude-review`、部署 hook 治本（詳 WORKLOG 2026-09-20(續84)）
+  - **下一步**（操作者）：① Codex 開在 `D:\Work` → `/hooks` → trust 8 個 handler ② trust 後跑一次活體探測（`dual-ide-coexistence-strategy.md` 接手清單第 4 項：未標記危險指令與首次改檔應被 BLOCK，順便驗證 openai/codex#27833 在 0.149.1 是否仍在）③ 決定 `trigger`/`cloudflare` MCP 是否納入 Codex
+  - **完成定義**：smoke `codex_parity=ok`（trust + 實際心跳），且活體探測確認 BLOCK 真的發生
+  - **證據**：WORKLOG 2026-09-19(續79) 稽核、2026-09-20(續84) 修復
 
 - [ ] **【2026-09-12 開出｜中優先】`git-align-main-aoresume-feature-*` 自動對齊腳本會吃掉未提交的編輯**
   - `🟠 未開始` · `2026-09-12 開出` · `不卡誰，但會造成重工`
@@ -1761,5 +1761,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-18 14:30:03 UTC_
+_Last synced: 2026-09-20 03:31:11 UTC_
 

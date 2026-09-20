@@ -12,9 +12,11 @@ The bootstrap script calls `mcp\codex-userlevel\scripts\sync-claude-to-codex.ps1
 
 - repo `.agents\skills\<name>\SKILL.md` wrappers that read the Claude source when triggered;
 - repo `.codex\agents\<name>.toml` profiles that read the matching Claude prompt and the shared subagent charter;
-- `%USERPROFILE%\.codex\skills\claude-compat` indexes for commands, agents, hooks, MCP, plugins, and runbooks.
+- `%USERPROFILE%\.codex\skills\claude-compat` indexes for commands, agents, hooks, MCP, plugins, and runbooks, plus the Claude-tool-to-Codex mapping;
+- `%USERPROFILE%\.codex\hooks.json` wiring the canonical `mcp\claude-userlevel\hooks\runner.js` (`--host=codex`), AO-RESUME and post-push hooks;
+- `%USERPROFILE%\.codex\AGENTS.md` user-level rules (hook trust, `/claude-review`, operator memory pointer).
 
-It backs up and removes same-named legacy user-level skill copies and the obsolete global/project Codex hook runtimes only after verifying they map to the canonical `mcp\claude-userlevel\hooks` source. Codex project hooks now invoke that source directly from the repository git root.
+It backs up and removes same-named legacy copies (user-level skills, `~/.codex/agents` full-copy agents, the obsolete `~/.codex/hooks\` runtime) and refuses to overwrite a `~/.codex/hooks.json` that contains foreign handlers. After `hooks.json` is (re)written, trust it once in Codex with `/hooks`; untrusted hooks are skipped silently. Details: `agency-os/docs/operations/dual-ide-coexistence-strategy.md`. Shared helpers live in `scripts/codex-bridge-lib.ps1`.
 
 Do not sync whole `%USERPROFILE%\.codex` folders between machines. They contain runtime state, logs, auth data, caches, and machine-local config.
 

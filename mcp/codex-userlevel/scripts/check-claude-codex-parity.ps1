@@ -16,6 +16,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'codex-bridge-lib.ps1')
 
 if ([string]::IsNullOrWhiteSpace($WorkRoot)) {
   $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
@@ -46,11 +47,7 @@ function Get-SourceSkillNames {
     Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') } |
     ForEach-Object { $names.Add($_.Name) }
   Get-ChildItem -File -LiteralPath $Path -Filter '*.skill' |
-    ForEach-Object {
-      $top = (& tar -tf $_.FullName | Select-Object -First 1) -replace '/.*$', ''
-      if ([string]::IsNullOrWhiteSpace($top)) { throw "Cannot read source archive: $($_.FullName)" }
-      $names.Add($top)
-    }
+    ForEach-Object { $names.Add((Get-SkillArchiveTopFolder -Path $_.FullName)) }
   @('source-command-caveman', 'source-command-wp-bridge-release', 'source-command-zoom-out') |
     ForEach-Object { $names.Add($_) }
   return @($names | Sort-Object -Unique)
@@ -67,6 +64,31 @@ function Get-TomlMcpServerNames {
       ForEach-Object { $_.Groups[1].Value } |
       Sort-Object -Unique
   )
+}
+
+# Keys of [hooks.state."<key>"] tables (or inline `"<key>" = { trusted_hash = ... }`
+# under [hooks.state]) that carry a trusted_hash.
+function Get-TrustedHookKeys {
+  param([string]$ConfigPath)
+  if (-not (Test-Path -LiteralPath $ConfigPath)) { return @() }
+  $keys = New-Object System.Collections.Generic.List[string]
+  $current = $null
+  $inStateTable = $false
+  foreach ($line in (Get-Content -Encoding UTF8 -LiteralPath $ConfigPath)) {
+    if ($line -match '^\s*\[hooks\.state\.(?:"([^"]+)"|''([^'']+)''|([^\]\s]+))\]\s*$') {
+      $current = @($Matches[1], $Matches[2], $Matches[3]) | Where-Object { $_ } | Select-Object -First 1
+      $inStateTable = $false
+      continue
+    }
+    if ($line -match '^\s*\[') {
+      $current = $null
+      $inStateTable = ($line -match '^\s*\[hooks\.state\]\s*$')
+      continue
+    }
+    if ($current -and $line -match '^\s*trusted_hash\s*=') { $keys.Add($current); $current = $null; continue }
+    if ($inStateTable -and $line -match '^\s*"([^"]+)"\s*=\s*\{[^}]*trusted_hash') { $keys.Add($Matches[1]) }
+  }
+  return @($keys | Sort-Object -Unique)
 }
 
 function Get-RegistryClientServerNames {
@@ -143,22 +165,110 @@ if (Test-Path -LiteralPath $commandIndex) {
   foreach ($command in $commands) {
     Assert-Parity ($index -match [regex]::Escape($command.FullName)) "Command index lacks direct source link for /$($command.BaseName)."
   }
+  foreach ($m in [regex]::Matches($index, '\]\(([^)]+\.md)\)')) {
+    $target = $m.Groups[1].Value
+    if ([IO.Path]::IsPathRooted($target)) {
+      Assert-Parity (Test-Path -LiteralPath $target) "Command index points at a deleted source: $target"
+    }
+  }
 }
 
-Assert-Parity (Test-Path -LiteralPath $projectHooks) "Missing project hook bridge: $projectHooks"
-if (Test-Path -LiteralPath $projectHooks) {
-  $hooks = Get-Content -Raw -Encoding UTF8 -LiteralPath $projectHooks | ConvertFrom-Json
-  $expectedEvents = @('PreToolUse', 'PostToolUse', 'SessionStart', 'UserPromptSubmit', 'Stop', 'SubagentStart')
-  foreach ($event in $expectedEvents) {
-    Assert-Parity ($hooks.hooks.PSObject.Properties.Name -contains $event) "Project hook event missing: $event"
-    $commandsForEvent = @($hooks.hooks.$event | ForEach-Object { $_.hooks } | ForEach-Object { $_.commandWindows }) -join "`n"
-    Assert-Parity ($commandsForEvent -match 'mcp\\claude-userlevel\\hooks') "Project hook event does not invoke canonical hook source: $event"
+# Legacy full-copy agents under ~/.codex/agents shadow the thin bridges.
+$userAgentDir = Join-Path $CodexHome 'agents'
+if (Test-Path -LiteralPath $userAgentDir) {
+  foreach ($source in $sourceAgents) {
+    Assert-Parity (-not (Test-Path -LiteralPath (Join-Path $userAgentDir "$($source.BaseName).toml"))) "Legacy user-level agent copy shadows the bridge: $(Join-Path $userAgentDir "$($source.BaseName).toml")"
   }
+}
+
+# Hooks: user-level, generated, byte-identical to what the generator produces now.
+# A repo-level .codex/hooks.json would ALSO run once trusted (double execution).
+Assert-Parity (-not (Test-Path -LiteralPath $projectHooks)) "Repo-level Codex hook file must not exist (hooks are user-level; both would run): $projectHooks"
+$userHooks = Join-Path $CodexHome 'hooks.json'
+$expectedHooksJson = Get-CodexUserHooksJson -WorkRoot $WorkRoot
+Assert-Parity (Test-Path -LiteralPath $userHooks) "Missing generated Codex user hooks: $userHooks (run sync-claude-to-codex.ps1)"
+if (Test-Path -LiteralPath $userHooks) {
+  # Byte comparison: -eq is case-insensitive and Get-Content strips a BOM, so a
+  # file that differs only in case or encoding would read as identical.
+  $actualBytes = [IO.File]::ReadAllBytes($userHooks)
+  $expectedBytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($expectedHooksJson)
+  $sameBytes = ($actualBytes.Length -eq $expectedBytes.Length)
+  if ($sameBytes) {
+    for ($i = 0; $i -lt $actualBytes.Length; $i++) {
+      if ($actualBytes[$i] -ne $expectedBytes[$i]) { $sameBytes = $false; break }
+    }
+  }
+  Assert-Parity $sameBytes "Codex user hooks drift from the generator output: $userHooks (run sync-claude-to-codex.ps1)"
 }
 $legacyProjectHookFiles = @(if (Test-Path -LiteralPath $legacyProjectHooks) { Get-ChildItem -LiteralPath $legacyProjectHooks -File -Recurse } else { @() })
 Assert-Parity ($legacyProjectHookFiles.Count -eq 0) "Obsolete project hook runtime still contains $($legacyProjectHookFiles.Count) file(s): $legacyProjectHooks"
-Assert-Parity (-not (Test-Path -LiteralPath (Join-Path $CodexHome 'hooks.json'))) "Obsolete global Codex hook configuration still exists: $(Join-Path $CodexHome 'hooks.json')"
 Assert-Parity (-not (Test-Path -LiteralPath (Join-Path $CodexHome 'hooks'))) "Obsolete global Codex hook runtime still exists: $(Join-Path $CodexHome 'hooks')"
+
+# Trust: Codex records [hooks.state."<source>:<event>:<group>:<handler>"] trusted_hash
+# only through the interactive /hooks review; untrusted hooks are skipped silently.
+$expectedHandlers = 0
+foreach ($ev in (Get-CodexUserHooksDocument -WorkRoot $WorkRoot).hooks.Values) { foreach ($g in $ev) { $expectedHandlers += @($g.hooks).Count } }
+$trusted = @(Get-TrustedHookKeys -ConfigPath (Join-Path $CodexHome 'config.toml'))
+# A trusted key from some other hook source must not make these look trusted.
+$homeNeedles = @($CodexHome.ToLowerInvariant(), $CodexHome.ToLowerInvariant().Replace('\', '/'))
+$attributed = @($trusted | Where-Object {
+    $k = $_.ToLowerInvariant()
+    ($k -like '*hooks.json*') -or ($homeNeedles | Where-Object { $k -like ('*' + $_ + '*') })
+  })
+if ($attributed.Count -gt 0) { $trusted = $attributed }
+elseif ($trusted.Count -gt 0) {
+  Write-Host "Note: no trusted hook key names the user hooks file; counting all $($trusted.Count) trusted keys (attribution unknown). The heartbeat check below is what proves execution." -ForegroundColor DarkYellow
+}
+Assert-Parity ($trusted.Count -ge $expectedHandlers) "Codex has $($trusted.Count)/$expectedHandlers hook handlers trusted; untrusted hooks are skipped silently. Open Codex in $WorkRoot, run /hooks, trust the AwareWave hooks (trusted keys seen: $($trusted -join '; ')). This count is a pre-check only -- the heartbeat check below is the proof that hooks actually ran."
+
+# Proof of execution: a Codex session that started after the current hook file
+# but left no heartbeat means the hooks were skipped (stale trust hash).
+$heartbeatPath = Join-Path $CodexHome 'awarewave-hook-heartbeat.json'
+if (Test-Path -LiteralPath $userHooks) {
+  $hooksWritten = (Get-Item -LiteralPath $userHooks).LastWriteTimeUtc
+  $sessionsDir = Join-Path $CodexHome 'sessions'
+  $newestRollout = if (Test-Path -LiteralPath $sessionsDir) {
+    Get-ChildItem -LiteralPath $sessionsDir -Recurse -File -Filter 'rollout-*.jsonl' |
+      Where-Object { $_.CreationTimeUtc -gt $hooksWritten } | Sort-Object CreationTimeUtc -Descending | Select-Object -First 1
+  }
+  if ($newestRollout) {
+    $state = $null
+    if (Test-Path -LiteralPath $heartbeatPath) { try { $state = Get-Content -Raw -Encoding UTF8 -LiteralPath $heartbeatPath | ConvertFrom-Json } catch { $state = $null } }
+    $floor = $newestRollout.CreationTimeUtc.AddMinutes(-1)
+    function Get-BeatUtc {
+        param([object]$State, [string]$Event)
+        try {
+            $value = if ($Event) { $State.events.$Event.last_utc } else { $State.updated_utc }
+            if ($value) { return ([DateTime]::Parse($value)).ToUniversalTime() }
+        } catch { }
+        return $null
+    }
+    $anyBeat = Get-BeatUtc -State $state -Event ''
+    Assert-Parity ($null -ne $anyBeat -and $anyBeat -ge $floor) "Codex session $($newestRollout.Name) ran after the hook file was written but no hook heartbeat followed: hooks were skipped (untrusted or stale trust). Run /hooks in Codex."
+    # Per-event proof: SessionStart alone can stay trusted while the only BLOCKING
+    # event (PreToolUse) has a stale hash, so a tool-using session must show a
+    # PreToolUse beat of its own.
+    $usedTools = $false
+    try { $usedTools = [bool](Select-String -LiteralPath $newestRollout.FullName -Pattern '"(custom_tool_call|function_call|local_shell_call)"' -List -Quiet) } catch { $usedTools = $false }
+    if ($usedTools) {
+        $preBeat = Get-BeatUtc -State $state -Event 'PreToolUse'
+        Assert-Parity ($null -ne $preBeat -and $preBeat -ge $floor) "Codex session $($newestRollout.Name) made tool calls but left no PreToolUse heartbeat: the blocking gate did not run (stale hook trust). Run /hooks in Codex and re-check."
+    }
+  } else {
+    Write-Host "Note: no Codex session since the hook file was written; hook execution not yet proven by heartbeat." -ForegroundColor DarkYellow
+  }
+}
+
+$globalAgentsPath = Join-Path $CodexHome 'AGENTS.md'
+Assert-Parity (Test-Path -LiteralPath $globalAgentsPath) "Missing generated user-level Codex instructions: $globalAgentsPath"
+if (Test-Path -LiteralPath $globalAgentsPath) {
+  $globalText = Get-Content -Raw -Encoding UTF8 -LiteralPath $globalAgentsPath
+  Assert-Parity ($globalText -match '/claude-review') 'User-level Codex instructions lack the reversed cross-model review rule (/claude-review).'
+  $memoryIndex = Get-ClaudeMemoryIndexPath -WorkRoot $WorkRoot
+  if (Test-Path -LiteralPath $memoryIndex) {
+    Assert-Parity ($globalText -match [regex]::Escape($memoryIndex)) "User-level Codex instructions do not point at the operator memory index: $memoryIndex"
+  }
+}
 
 $manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $canonicalHooks 'rules.manifest.json') | ConvertFrom-Json
 Assert-Parity ($null -ne $manifest.events.SubagentStart) 'Canonical hook manifest lacks SubagentStart.'

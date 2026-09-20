@@ -1,5 +1,7 @@
 Run a code review on all files changed since the last commit, with depth scaled to change size and sensitivity.
 
+**Writer = Codex** (2026-09-19): wherever this file says `/codex-review` or `codex-oracle.ps1`, use `/claude-review` instead — the cross-model oracle must be the model that did not write the change (AGENTS.md §4). In a Codex session the critic role is a Codex `spawn_agent` with `agent_type: critic`, which spends Codex quota, so Step 0 checks `-Tool codex` there.
+
 ## Step 0 — Quota circuit breaker (2026-09-04, operator: 撞到額度就停)
 
 ```bash

@@ -69,7 +69,12 @@ param(
     [string]$DiffRef = '',
     [string[]]$Path = @(),
 
-    [string]$RepoRoot = ''
+    [string]$RepoRoot = '',
+
+    # Which model produced -Answer. The oracle must be the model that did NOT
+    # write the change: codex reviews Claude's work, claude reviews Codex's.
+    [ValidateSet('codex', 'claude')]
+    [string]$Reviewer = 'codex'
 )
 
 Set-StrictMode -Version Latest
@@ -266,6 +271,18 @@ if ($Mode -eq 'review') {
     }
 }
 
+
+# The oracle must be the model that did NOT write the change (AGENTS.md section 4).
+# The ORACLE gate only checks that SOME artifact exists today, so the refusal has
+# to happen where every artifact is produced: here.
+. (Join-Path $PSScriptRoot '_agent-host.ps1')
+if ($Mode -eq 'review') {
+    $agentHost = Get-AgentHost
+    if ($agentHost -eq $Reviewer) {
+        Fail "Refusing to write a $Reviewer-reviewed artifact from inside a $agentHost session: that is the same model reviewing its own change. Run the other model's oracle (/codex-review or /claude-review)."
+    }
+}
+
 # ---- findings count: JSON-first, then two known text-render fallbacks, never
 # guess -----------------------------------------------------------------------
 # Critic M3: a bare regex count of the substring `"severity":` returns 0 for
@@ -305,11 +322,13 @@ $stamp        = [guid]::NewGuid().ToString('N').Substring(0, 8)
 $artifactKind = if ($Mode -eq 'review' -and ($DiffRef -or $Path.Count -gt 0)) { 'partialreview' } else { $Mode }
 $artifact     = Join-Path $oracleDir (('{0}-{1}-{2}.md' -f (Get-Date -Format 'yyyy-MM-dd'), $artifactKind, $stamp))
 
+$reviewerSource = if ($Reviewer -eq 'claude') { '`claude -p` via scripts/claude-oracle.ps1 (/claude-review)' } else { '`/codex:adversarial-review` (via write-oracle-artifact.ps1, not codex-oracle.ps1)' }
 $meta = @(
-    ('# codex-oracle {0} -- {1}' -f $Mode, (Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')),
+    ('# {0}-oracle {1} -- {2}' -f $Reviewer, $Mode, (Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')),
     '',
     ('- mode: `{0}`' -f $Mode),
-    ('- source: `/codex:adversarial-review` (via write-oracle-artifact.ps1, not codex-oracle.ps1)'),
+    ('- reviewer: `{0}`' -f $Reviewer),
+    ('- source: {0}' -f $reviewerSource),
     ('- binding: {0}' -f $bindingNote),
     ('- scope: {0}' -f $(if ($Path.Count -gt 0) { '-Path ' + ($Path -join ', ') + '  <-- PARTIAL: does not satisfy the ORACLE gate' } else { 'whole repo' })),
     ('- target: `{0}`' -f $(if ($DiffRef) { $DiffRef } else { 'working tree (staged + unstaged + untracked)' })),
@@ -318,7 +337,7 @@ $meta = @(
     ('- deletions-reviewed: {0}' -f $(if ($deletedPathsList) { $deletedPathsList } else { '(none)' })),
     ('- findings-count: {0}' -f $findingsCountStr),
     '',
-    '> Codex output via /codex:adversarial-review, NOT verified truth. R0 requires the',
+    ('> {0} output, NOT verified truth. R0 requires the' -f $(if ($Reviewer -eq 'claude') { 'Claude' } else { 'Codex' })),
     '> caller to confirm every `file:line` before acting on it. Archived so that SKIPPING',
     '> the oracle is visible -- not so that its findings are trusted.',
     '',
@@ -333,7 +352,7 @@ if ($Mode -eq 'review') {
     Write-Host ""
     Write-Host "Verify each finding yourself, then record in WORKLOG [verification]:" -ForegroundColor DarkGray
     Write-Host ("- REVIEW_DONE: critic=Deep | verdict=<pass/warn/fail> | findings={0}" -f $findingsCountStr) -ForegroundColor DarkGray
-    Write-Host "  - external oracle = /codex:adversarial-review, artifact recorded via write-oracle-artifact.ps1" -ForegroundColor DarkGray
+    Write-Host ("  - external oracle = {0}, artifact recorded via write-oracle-artifact.ps1" -f $reviewerSource) -ForegroundColor DarkGray
     if ($findingsCountStr -eq '<unknown>') {
         Write-Host "  - WARNING: could not determine findings count from answer shape -- fill in manually after reading the artifact, do not guess 0." -ForegroundColor Yellow
     }

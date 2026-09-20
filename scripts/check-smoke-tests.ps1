@@ -423,18 +423,41 @@ try {
     $noEvidence["docker_watchdog"] = $true
 }
 
+# --- Check 7: Claude -> Codex parity ---
+# The only detector for "Codex runs with every governance hook silently off"
+# (untrusted/stale hook trust, frozen bridge sync). ao-resume.ps1 used to print a
+# WARN for this and reset the exit code; 18 days of a crashed sync went unseen.
+try {
+    $parityScript = Join-Path $root "mcp\codex-userlevel\scripts\check-claude-codex-parity.ps1"
+    if (-not (Test-Path -LiteralPath (Join-Path $env:USERPROFILE ".codex")) -or -not (Test-Path -LiteralPath $parityScript)) {
+        $results["codex_parity"] = "skip:no_codex"
+    } else {
+        $parityOut = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $parityScript -WorkRoot $root 2>&1 | ForEach-Object { "$_" })
+        if ($LASTEXITCODE -eq 0) {
+            $results["codex_parity"] = "ok:parity"
+        } else {
+            $firstFail = @($parityOut | Where-Object { $_ -match '^\s*-\s' } | Select-Object -First 1)
+            $reason = if ($firstFail.Count) { ($firstFail[0] -replace '^\s*-\s*', '' -replace '\s+', '_') } else { 'see_check-claude-codex-parity.ps1' }
+            $results["codex_parity"] = "warn:" + $reason.Substring(0, [Math]::Min(140, $reason.Length))
+        }
+    }
+} catch {
+    $results["codex_parity"]    = "warn:exception"
+    $noEvidence["codex_parity"] = $true
+}
+
 # --- Verdict ---
 # Computed BEFORE the JSON write so the report carries the conclusion. Without it every
 # reader (Claude in AO-RESUME §1, a human skimming the file) has to re-derive the verdict
 # by hand, and each re-derivation is a chance to repeat the swallow-the-skip bug below.
-$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog")
+$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity")
 
 # Checks that are the ONLY detector of a silent-failure class. For these, "skip" means
 # monitoring has stopped, so reporting PASS would repeat the mistake that caused the
 # 2026-08-03 mail outage: FluentSMTP's own failure notice travelled through wp_mail, so
 # the alarm died with the channel it was watching. A detector that goes quiet must be
 # louder than one that reports nothing wrong.
-$criticalChecks = @("client_mail","docker_watchdog")
+$criticalChecks = @("client_mail","docker_watchdog","codex_parity")
 
 $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" })
 # Keyed on "produced no measurement", not on the verdict prefix: warn:ssh_exit255 and
@@ -463,6 +486,6 @@ if ($blindSpots.Count -gt 0) {
     $blindNote = " | BLIND: " + (($blindSpots | ForEach-Object { "$_=$($results[$_])" }) -join ",")
 }
 
-Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5} | docker_wd={6}{7} ==" -f `
-    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"], $results["docker_watchdog"], $blindNote) -ForegroundColor $colour
+Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5} | docker_wd={6} | codex={7}{8} ==" -f `
+    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"], $results["docker_watchdog"], $results["codex_parity"], $blindNote) -ForegroundColor $colour
 exit 0

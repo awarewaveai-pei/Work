@@ -27,13 +27,23 @@ function isRmRf(segment) {
   }
   return recursive && force;
 }
+// PowerShell spelling of the same thing (Codex on Windows runs PowerShell):
+// Remove-Item or its aliases with -Recurse and -Force in any accepted abbreviation.
+const PS_REMOVE = /^(?:Remove-Item|ri|del|erase|rd|rmdir)(?:\s|$)/i;
+function isRemoveItemRecurseForce(segment) {
+  if (!PS_REMOVE.test(segment)) return false;
+  const tokens = segment.split(/\s+/).slice(1);
+  const recursive = tokens.some((t) => /^-r(?:e(?:c(?:u(?:r(?:s(?:e)?)?)?)?)?)?(?::\$?true)?$/i.test(t));
+  const force = tokens.some((t) => /^-fo(?:r(?:c(?:e)?)?)?(?::\$?true)?$/i.test(t));
+  return recursive && force;
+}
 const GIT_NO_VERIFY = /^(?:sudo\s+)?git\b[^\n]*--no-verify\b/;
 
 module.exports = {
   check(ctx) {
     const segs = ctx.commandSegments || [];
-    if (segs.some(isRmRf)) {
-      return { block: ['[Hook] BLOCKED: rm -rf is dangerous. Delete explicitly-listed paths instead.'] };
+    if (segs.some(isRmRf) || segs.some(isRemoveItemRecurseForce)) {
+      return { block: ['[Hook] BLOCKED: rm -rf is dangerous (so is Remove-Item -Recurse -Force). Delete explicitly-listed paths instead.'] };
     }
     if (segs.some((s) => GIT_NO_VERIFY.test(s))) {
       return { block: ['[Hook] BLOCKED: --no-verify is not allowed. Let git hooks run.'] };

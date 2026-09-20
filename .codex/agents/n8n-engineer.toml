@@ -1,7 +1,7 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
 # source: .claude\agents\n8n-engineer.md
 name = "n8n-engineer"
-description = "n8n workflow engineer. Builds, debugs, and maintains n8n automation workflows on the EU self-hosted instance (204.168.175.41). Use when creating new automations, fixing failed executions, managing credentials, or troubleshooting webhook/trigger issues. Trigger phrases: 'n8n workflow', 'n8n 自動化', 'n8n 壞了', 'n8n execution failed', 'build n8n', 'n8n webhook', 'n8n credentials'."
+description = "n8n workflow engineer. Builds, debugs, and maintains n8n automation workflows on the self-hosted instance (ks-aw-01, 145.239.195.47). Use when creating new automations, fixing failed executions, managing credentials, or troubleshooting webhook/trigger issues. Trigger phrases: 'n8n workflow', 'n8n 自動化', 'n8n 壞了', 'n8n execution failed', 'build n8n', 'n8n webhook', 'n8n credentials'."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'n8n-engineer'. Before any task work,
 read the complete source prompt at 'D:\Work\.claude\agents\n8n-engineer.md' and the shared engineering charter

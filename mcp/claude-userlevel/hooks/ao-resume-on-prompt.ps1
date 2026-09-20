@@ -5,6 +5,16 @@
 # Ported from .cursor/hooks/run-ao-resume-on-prompt.ps1 (Cursor beforeSubmitPrompt).
 # Both hooks call the same scripts/ao-resume.ps1 and write to the same state dir,
 # so the 300-second de-dup guard in ao-resume-hook-last.json works across both IDEs.
+#
+# -HookHost codex is passed by the generated ~/.codex/hooks.json. Codex sessions
+# include machine-driven ones (Claude's /codex-review and codex-oracle `codex exec`,
+# subagent threads) and AO-RESUME rewrites the working tree (stash / reset --hard /
+# push), so for Codex it runs only for an operator: an explicit AO-RESUME, or a bare
+# greeting from a session that no Claude process launched.
+param(
+    [ValidateSet('claude', 'codex')]
+    [string]$HookHost = 'claude'
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -54,6 +64,36 @@ function Test-IsAoResumePrompt {
     return ($Prompt.Trim() -match '(?i)^AO-RESUME\b')
 }
 
+function Test-IsGreetingPrompt {
+    param([string]$Prompt)
+    if ([string]::IsNullOrWhiteSpace($Prompt)) { return $false }
+    $p = $Prompt.Trim()
+    # Keep this file ASCII-only (PS 5.1 reads BOM-less .ps1 as CP950): CJK greetings
+    # are matched by code point. U+65E9 U+5B89 (morning), U+5348 U+5B89 (noon),
+    # U+55E8 (hi), U+4F60 U+597D (hello), U+54C8 U+56C9 (hello), U+958B U+5DE5 (start work).
+    $cjk = @(
+        ([string][char]0x65E9), ([string][char]0x65E9 + [char]0x5B89), ([string][char]0x5348 + [char]0x5B89),
+        ([string][char]0x55E8), ([string][char]0x4F60 + [char]0x597D), ([string][char]0x54C8 + [char]0x56C9),
+        ([string][char]0x958B + [char]0x5DE5)
+    )
+    $core = $p -replace '[\s!.~?,]+$', '' -replace ('[' + [char]0xFF01 + [char]0x3002 + [char]0xFF5E + [char]0xFF1F + ']+$'), ''
+    if ($core -match '^(?i)(hi|hello|hey|morning|good morning|yo)$') { return $true }
+    return ($cjk -contains $core)
+}
+
+function Test-LaunchedByClaude {
+    # True when a Claude process is an ancestor of this hook (e.g. a `codex exec`
+    # review started by a Claude session). Fail closed: unknown => treat as launched.
+    try {
+        $proc = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $PID) -ErrorAction Stop
+        for ($i = 0; $i -lt 25 -and $proc; $i++) {
+            if ($proc.Name -match '^(?i)claude') { return $true }
+            $proc = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $proc.ParentProcessId) -ErrorAction SilentlyContinue
+        }
+        return $false
+    } catch { return $true }
+}
+
 function Get-GitDirtyEntries {
     param([string]$RepoRoot)
     Push-Location -LiteralPath $RepoRoot
@@ -84,6 +124,13 @@ try {
     $sessionId = ""
     if ($obj.PSObject.Properties.Name -contains "session_id") { $sessionId = [string]$obj.session_id }
     $isAoResume = Test-IsAoResumePrompt -Prompt $prompt
+
+    if ($HookHost -eq 'codex' -and -not $isAoResume) {
+        if (-not (Test-IsGreetingPrompt -Prompt $prompt) -or (Test-LaunchedByClaude)) {
+            Write-HookResponse '{"continue":true}'
+            exit 0
+        }
+    }
 
     $roots = @()
     if ($obj.PSObject.Properties.Name -contains "workspace_roots" -and $obj.workspace_roots) {

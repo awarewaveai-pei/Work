@@ -56,12 +56,12 @@
 ## 4. 信任邊界與跨模型 oracle
 
 - 機械閘只驗證據行**格式存在**，不驗內容真實；唯一內容驗真是 `bughunt-oracle`。閘全部 **fail-open**（閘壞 = 放行 + 寫 `~/.claude/verify-gate-failures.log`），改 hooks 後必跑 `bash scripts/test-hooks.sh`。§已知信任邊界
-- 閘擋「忘記做」不擋「做錯」→ 補這個缺口靠外部模型。**唯一入口 `/codex-review`**（`.claude/commands/codex-review.md`，內含 ORACLE gate artifact 落地）；`scripts/codex-oracle.ps1` 為官方指令連續失敗 ≥2 次的備援。ORACLE gate：staged 含 source 檔時要求當日且晚於最後改檔的 `agency-os/reports/oracle/` artifact；豁免寫 `- ORACLE_WAIVED: <理由>`。§ORACLE gate
+- 閘擋「忘記做」不擋「做錯」→ 補這個缺口靠外部模型。**審查者永遠是沒寫這段改動的那個模型**：Claude 寫 → `/codex-review`（`.claude/commands/codex-review.md`；`scripts/codex-oracle.ps1` 為連續失敗 ≥2 次的備援）；Codex 寫 → `/claude-review`（`.claude/commands/claude-review.md` → `scripts/claude-oracle.ps1`，額度鍵 `critic`）。兩者都落地同一種 ORACLE gate artifact。ORACLE gate：staged 含 source 檔時要求當日且晚於最後改檔的 `agency-os/reports/oracle/` artifact；豁免寫 `- ORACLE_WAIVED: <理由>`。§ORACLE gate
 - **額度斷路器**：任何 oracle 呼叫前 `scripts/oracle-quota.ps1 -Action check -Tool <codex|critic>`，exit 3 = 直接 fallback 不連線；回覆含 `429`／`rate limit`／`usage limit`／`try again at` → 立刻 `-Action set`（無時間 `-Hours 5`），本 session 不再碰同一工具；成功後 `-Action clear`。
 - **oracle 全無額度時不跳過 review**：書面對抗自審 + 突變測試證據（拔 guard → 指名測試變紅 → 還原變綠）+ WORKLOG `ORACLE_WAIVED`。
 - **critic 用量與深度依風險分級**：每 commit 一個 critic，深淺依 `.claude/commands/review.md` tier；多代理（2 個以上）只用在 auth／crypto／個資／金流。真碰 auth／crypto／個資／金流才要求對每個 claim 全面重新獨立推導；其餘中低風險項目抽查 2–3 個關鍵 claim，不整份重跑。§跨模型 oracle
 - **同一 reviewer 對同一段 code 連續回報 2 次 → 第 3 次修正前先寫不變量分析**，不得以「範圍小」跳過。
-- 分工：寫入 `D:\Work` 者負責完整 R0/R4 證據鏈（Codex 寫入時 hooks 不會跑，須手動等價執行 git log／風險分級／驗證／WORKLOG／commit）；大量讀檔／跨檔掃描優先 Codex；設計取捨歸操作者。**禁止**：裸 `codex exec`（漏 `-o` 噴 ~120KB）；用 `chatgpt-*`／`gemini-*`／`grok-*` MCP 當 oracle（按 token 計費）；未 Grep 驗證 `file:line` 就採用 finding；Claude 與 Codex 同時改同一檔。給 Codex 的 prompt 只放 Decision／Constraints／Files／Acceptance。§跨模型 oracle
+- 分工：寫入 `D:\Work` 者負責完整 R0/R4 證據鏈。Codex 的閘走同步產生的 `~/.codex/hooks.json`（同一支 runner，`--host=codex`），**只有在 Codex `/hooks` trust 過、smoke `codex_parity=ok`、且本 session 第一次工具呼叫後 `~/.codex/awarewave-hook-heartbeat.json` 的 `events.PreToolUse.last_utc` 是剛剛，才算有閘**；不是 ok 時等同 hooks 不會跑，須手動等價執行 git log／風險分級／驗證／WORKLOG／commit；大量讀檔／跨檔掃描優先 Codex；設計取捨歸操作者。**禁止**：裸 `codex exec`（漏 `-o` 噴 ~120KB）；用 `chatgpt-*`／`gemini-*`／`grok-*` MCP 當 oracle（按 token 計費）；未 Grep 驗證 `file:line` 就採用 finding；Claude 與 Codex 同時改同一檔。給 Codex 的 prompt 只放 Decision／Constraints／Files／Acceptance。§跨模型 oracle
 
 ## 5. Context 與 agent 用量
 
@@ -124,5 +124,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-07 05:35:40 UTC_
+_Last synced: 2026-09-20 03:31:11 UTC_
 

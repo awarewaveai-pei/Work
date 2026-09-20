@@ -128,7 +128,7 @@ if (Test-Path -LiteralPath $syncCodexUserlevel) {
         Write-Host "Verifying Claude/Codex bridge parity (names and structure only)..." -ForegroundColor Green
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkCodexParity -WorkRoot $WorkspaceRoot
         if ($LASTEXITCODE -ne 0) {
-            throw "check-claude-codex-parity.ps1 failed (exit $LASTEXITCODE)"
+            throw "check-claude-codex-parity.ps1 failed (exit $LASTEXITCODE). On a fresh machine the hook-trust check fails until you open Codex in $WorkspaceRoot, run /hooks and trust the AwareWave hooks; then rerun the parity check."
         }
     }
 }

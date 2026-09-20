@@ -218,9 +218,11 @@
 | repo 外拋棄式工作（`D:\tmp` 原型、一次性腳本、demo） | Codex 全包，Claude 不插手 |
 | prod deploy / DB migration / 憑證 | 操作者明示 go-ahead + 具備對應能力的授權 agent。**不可委派給未授權者** |
 
-**跨工具寫入的控制**：`git-log-injector`、`file-path-router`、`high-risk-bash-warn`、`verify-gate-commit`、`audit-cp950-traps` 是 Claude Code hooks，對 Codex 不會自動執行。使用 Codex 寫入時，寫入者必須手動執行等價的 git log、風險分級、驗證、review、bughunt、WORKLOG、commit 與 push；不可把缺少 hook 當作降低門檻的理由。此規則取代 Claude-only writer 限制（操作者明示，2026-09-01）。
+**跨工具寫入的控制**：`git-log-injector`、`file-path-router`、`high-risk-bash-warn`、`verify-gate-commit` 等規則由同一支 `mcp/claude-userlevel/hooks/runner.js` 執行：Claude 走 `~/.claude/settings.json`，Codex 走同步產生的 `~/.codex/hooks.json`（`--host=codex`，`hooks/lib/codex-adapter.js` 把 `apply_patch`／`spawn_agent` 轉成 Edit／Agent；Claude 的 `permissions.deny` 清單在 Codex 由 `permission-deny-mirror` 規則執行）。Codex 對 hook 定義採雜湊 trust，未 trust 或雜湊過期就**靜默略過**——所以 Codex 只有在 `/hooks` trust 過且 smoke `codex_parity=ok`（trust 數 + 執行心跳）時才算有閘；否則寫入者必須手動執行等價的 git log、風險分級、驗證、review、bughunt、WORKLOG、commit 與 push，不可把缺少 hook 當作降低門檻的理由。此規則取代 Claude-only writer 限制（操作者明示，2026-09-01）；Codex 接線 2026-09-19 修正（WORKLOG 續79／續80）。
 
 **唯一入口（2026-08-30 起）**：跑 **`/codex-review`**（本 repo 自建 command，`.claude/commands/codex-review.md`）——不要手動拼 `/codex:adversarial-review` 的呼叫。原因：這個工作需要固定附帶 2 段 focus text（隱藏依賴檢查 + NO FINDINGS 許可，官方 adversarial-review 的 attack-surface/calibration/grounding 規則不含這 2 條）+ 跑完手動落地 ORACLE gate artifact（`scripts/write-oracle-artifact.ps1`）——細節寫死在 command 檔裡，不是散文規則靠記憶執行；散文版本容易在 AGENTS.md 這種大檔案裡被漏讀，command 檔案每次呼叫保證完整。
+
+**反向（2026-09-19 起，Codex 主導準備）**：oracle 的意義是「另一個模型」，所以寫入者是 Codex 時改跑 **`/claude-review`**（`.claude/commands/claude-review.md` → `scripts/claude-oracle.ps1`）：同樣先 capture 再審、`claude -p` 唯讀（Read/Grep/Glob，子行程 `disableAllHooks` 以免觸發 AO-RESUME，MCP 全關）、落地同一種 ORACLE artifact（`write-oracle-artifact.ps1 -Reviewer claude`）。額度鍵沿用 `critic`（= Claude 帳號額度）。
 
 **推理強度刻意不降**：抓蟲抓漏洞的用途本來就是要花推理成本換深度，`~/.codex/config.toml` 的 `model_reasoning_effort=xhigh` 保留不動；要省的是餵給它的輸入量（untracked 檔案排除 lock 檔/vendor/生成檔、設總量上限），不是砍它想的深度。
 
@@ -664,5 +666,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-09-07 05:35:40 UTC_
+_Last synced: 2026-09-20 03:31:11 UTC_
 

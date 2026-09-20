@@ -257,7 +257,7 @@ try {
         $hasOracleWaiver = ($section -match '(?m)^\s*-\s*ORACLE_WAIVED:\s+\S')
         if ($todayOracle.Count -eq 0 -and -not $hasOracleWaiver) {
             $orMsg = ("verify-closeout-completeness: source files staged ({0}) but no cross-model review artifact dated {1} in agency-os/reports/oracle/." -f ($oracleStaged -join ', '), $today) +
-                     " Run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what this change solves>'" +
+                     " Run the OTHER model's oracle: /codex-review if Claude wrote it, /claude-review (scripts\claude-oracle.ps1 -Context '<what this change solves>') if Codex wrote it" +
                      (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
             if ($Gate -eq "strict") { Write-Host $orMsg -ForegroundColor Red; exit 1 }
             Write-Warning $orMsg
@@ -399,7 +399,7 @@ try {
             }
             if ($staleAgainst.Count -gt 0 -and -not $hasOracleWaiver) {
                 $stMsg = ("verify-closeout-completeness: newest oracle artifact ({0}, {1}) predates staged change(s) made after it: {2}." -f $newestArtifact.Name, $newestArtifact.LastWriteTime.ToString('HH:mm:ss'), ($staleAgainst -join ', ')) +
-                         " The review did not see the final staged state. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
+                         " The review did not see the final staged state. Re-run the other model's oracle (/codex-review or /claude-review)" +
                          (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
                 if ($Gate -eq "strict") { Write-Host $stMsg -ForegroundColor Red; exit 1 }
                 Write-Warning $stMsg
@@ -410,7 +410,7 @@ try {
                 # modification (files-reviewed) but never as the deletion itself.
                 # Resolvable: re-run oracle now that the deletion is staged.
                 $ucMsg = ("verify-closeout-completeness: staged deletion(s) not confirmed in any today's oracle deletions-reviewed record: {0}." -f ($unconfirmed -join ', ')) +
-                         " The review that ran may not have actually included this file's deletion. Re-run: .\scripts\codex-oracle.ps1 -Mode review -Context '<what changed>'" +
+                         " The review that ran may not have actually included this file's deletion. Re-run the other model's oracle (/codex-review or /claude-review)" +
                          (" OR add: - ORACLE_WAIVED: <one-line reason> to {0}. Gate={1}" -f $hdr, $Gate)
                 if ($Gate -eq "strict") { Write-Host $ucMsg -ForegroundColor Red; exit 1 }
                 Write-Warning $ucMsg

@@ -20762,3 +20762,46 @@ WORKLOG_DONE: Perplexity Search-only CI 守門 + 定期任務排查
 - REVIEW_WAIVED: NA -- 部署與設定值更換，程式碼已於 續78/續80 經 critic 覆審
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`zfWoh`(key 尾段，本機 + 主機，不看 gitignore)| hits=運作中設定檔 0；僅剩歷史備份與編輯器歷史
 [rollback] 主機 `cp /root/lobster-phase1/.env.bak-pplx-rotate-20260918-172402 /root/lobster-phase1/.env` 後以 `.deployed-commit` 前值 853ca7bc8 重跑 sg-deploy
+
+## 2026-09-20(續84)Codex 100% 接手：hook 真正接上 Codex、同步解凍、反向 oracle、部署 hook 治本(操作者：「全部處理好, 我要 codex 100% 可以接手」；接續 2026-09-19(續79) 稽核)
+
+**續79 之後補齊的兩層根因**：①`.codex/hooks.json` 從未被 trust——Codex 把 trust 存在 `~/.codex/config.toml` `[hooks.state."<source>:<event>:<group>:<handler>"] trusted_hash`，只能由互動 `/hooks` 寫入，未 trust 就**靜默略過**(連 SessionStart 都沒觸發過)②Windows 上 Codex 以 cmd／PowerShell／Git Bash 執行 hook 的回報都存在，舊 `commandWindows` 內含 `$root` 會被外層 shell 破壞。
+
+**[已修改]**
+- `hooks/runner.js`：`--host=codex` 確定性宿主辨識；Codex payload 經 `lib/codex-adapter.js`(新) 轉成 Claude 形狀；`lib/codex-heartbeat.js`(新) 記錄執行證據(事件／工具名／欄位名／`tool_response` 型別，不記值，暫存檔 rename 原子寫入)；Codex 不輸出未文件化的 PreToolUse additionalContext；`collectFiles` 去重
+- `hooks/rules/permission-deny-mirror.js`(新)：Claude `permissions.deny` 是權限層不是 rule，Codex 完全沒有 → 本規則只在 `ctx.host='codex'` 時，執行期讀 `settings.template.json` 同一份清單(不複製)強制：禁自建 branch／`reset --hard origin/*`／`git clean -fd`／`sudo`／force push 等
+- `hooks/rules/dangerous-bash.js`：補 PowerShell 版遞迴強制刪除(`Remove-Item -Recurse -Force` 及別名/縮寫)，與 `rm -rf` 同政策
+- `hooks/ao-resume-on-prompt.ps1`：新增 `-HookHost`。Codex 端只有「明確 AO-RESUME」或「單純問候語」才自動觸發，且祖先鏈出現 Claude 行程(= Claude 叫起的 `codex exec` 審查)一律不觸發——否則每個審查 session 都會 stash/`reset --hard`/自動 push 它正在審的工作樹(critic Critical)
+- `hooks/post-push-trigger-deploy.ps1`：**既有 bug 治本**。原本掛在所有 Bash 上、只看 `HEAD~1..HEAD`，commit 過 workflows 後每次 Bash 都重新部署(log 3,825 次觸發/18 次部署，09-12 23 分鐘內 5 次)。改為：UTF-8 讀 payload(CP950 會讓含中文的 commit 訊息解析失敗)→只認 `git push`(支援 `git -C`)→只追蹤 `refs/remotes/origin/main`(部署腳本本來就只部署它，推其他分支自然不觸發)→`.git`(common dir)標記檔讓每段推送範圍**恰好評估一次**→獨佔鎖 `FileOptions.DeleteOnClose`(鎖存在 ⇔ 持有把手，無 unlink-by-path 競態)→持鎖者部署後重新檢查 origin/main(部署期間落地的推送不漏)→部署失敗不前進標記→迴圈上限到達會明確告警不靜默→log 輪替且只記 push
+- `mcp/codex-userlevel/scripts/codex-bridge-lib.ps1`(新)：`.skill` 改用 .NET 讀 zip(移除 `tar`)、產生 `~/.codex/hooks.json`(無引號絕對路徑、shell 中立；WorkRoot 含空白直接 throw)、記憶索引路徑(slug 比照 Claude 全非英數換 `-`)
+- `sync-claude-to-codex.ps1`：產生使用者層 hooks(內容不變不重寫以免 trust 失效；有外來 handler 拒絕覆寫；空檔視同不存在；擁有權檢查含 `commandWindows`)且**在破壞性步驟之前**執行；備份移除 `~/.codex/agents` 24 份同名全文舊副本與 `~/.codex/scripts` 舊腳本；備份分類(只有帶 GENERATED 標記/wrapper 文字的才算可再生、可被保留上限清理，手動改過的進 `legacy-*` 永不清)；plugin 索引改讀 `installed_plugins.json`；`claude-compat` 加「Claude 工具→Codex」對照表與反向審查規則；`~/.codex/AGENTS.md` 加 hook trust／每 session 心跳自我確認／deny 鏡像／`/claude-review`／AO 生命週期／操作者記憶索引指標
+- `check-claude-codex-parity.ps1`：repo 層 `.codex/hooks.json` 必須不存在(trust 後會雙重執行，該檔已 `git rm`)；`~/.codex/hooks.json` 與產生器**逐位元組**比對(`-eq` 不分大小寫且會吃 BOM)；trust key 盡量歸屬到本檔(無法歸屬時明講)；**逐事件心跳**：有工具呼叫的 session 必須留下 `PreToolUse` 心跳(只有 SessionStart 仍 trust、PreToolUse 雜湊過期的情況會被抓到)；command 索引雙向；`~/.codex/agents` 同名副本；使用者層規則內容
+- `check-smoke-tests.ps1`：新增 critical check `codex_parity`(失敗=WARN、檢查器自身壞掉=blind spot)，取代 AO-RESUME 只印 WARN 就把 exit code 吞掉的舊行為
+- 反向 oracle：`scripts/_agent-host.ps1`(新，行程祖先鏈判宿主；`CLAUDECODE=1` 會經 Claude→Codex 繼承所以不可用)、`scripts/claude-oracle.ps1`(新)、`.claude/commands/claude-review.md`(新)、`write-oracle-artifact.ps1 -Reviewer`。三支腳本各自拒絕同模型審查(claude-oracle 在 Claude session exit 4；write-oracle-artifact 在 reviewer==宿主時 Fail；codex-oracle 在 Codex session exit 4)——ORACLE 閘只檢查「今天有沒有 artifact」，所以防呆必須放在 artifact 的產生處
+- 其他：`review.md` 加「寫入者是 Codex 時全部換成 /claude-review」；`verify-closeout-completeness.ps1` 三處提示改為「跑另一個模型的 oracle」；`bootstrap-mcp-machine.ps1` parity 失敗訊息加 trust 指引；文件 `AGENTS.md §4`／`AGENTS_APPENDIX.md`／`dual-ide-coexistence-strategy.md`(改寫，含接手檢查清單與上游缺口)／`codex-userlevel/README.md`／`TOOL_TRIGGER_MAP.md`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh`(含新增 `tests/hooks/codex-adapter.test.mjs`) | exit=0 | ms=28383 | result=187/187(原 171 + 16)
+- REALTEST_EVIDENCE: tool=Bash | cmd=部署 hook 真實情境套件(臨時 repo+bare remote+假部署腳本，15 情境：非 push/其他分支/no-op/連續推送/部署中落地的推送/失敗重試/鎖被佔/中文 commit 訊息/空標記) | exit=0 | result=15/15
+- REALTEST_EVIDENCE: tool=Bash | cmd=鎖存活測試(活著的持有者+2 小時舊時間戳) | exit=0 | result=無法被竊取、無併發部署；持有者消失後才回收 → oracle 第一輪 FINDING 1 判定誤報
+- REALTEST_EVIDENCE: tool=Bash | cmd=parity 分支測試(臨時 CODEX_HOME，6 情境：未 trust/已 trust/有 session 無心跳/有心跳/有工具呼叫無 PreToolUse 心跳/有 PreToolUse 心跳) | exit=0 | result=6/6 符合預期
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sync-claude-to-codex.ps1`(Git Bash PATH，即原本必崩的環境) + `check-claude-codex-parity.ps1` | exit=0 / exit=1 | result=同步成功(16 skills、25 agents、24 份舊副本備份移除、676 個可再生備份清理)；parity 275/276，唯一失敗=hook 尚未 trust(只能由操作者按)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex debug prompt-input`(不呼叫模型) | exit=0 | result=Codex 實際模型輸入含新使用者規則 4 條(心跳自我確認/deny 鏡像/`claude-review`/記憶索引)+repo 橋接+`claude-compat`+16 個 skill
+- REALTEST_EVIDENCE: tool=Bash | cmd=同模型審查防呆實跑 | exit=4/2 | result=`claude-oracle` 在 Claude session exit 4；`write-oracle-artifact -Reviewer claude` Fail exit 2
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變測試 ×3 | exit=0 | result=關掉轉接層→4 紅；關掉心跳→1 紅；關掉 deny 鏡像→7 紅；舊 CP950 stdin 讀法→中文 commit 情境紅；全部還原後 187/187 綠
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=1c/9m/8n(+5 建議)。Critical=Codex 每個新 session(含審查用 `codex exec`)都會觸發破壞性 AO-RESUME → 已用 HookHost+問候語+祖先鏈三條件修掉。Major 全處理：oracle stderr 在 EAP=Stop 下變終止錯誤、額度誤判(被審 diff 自己含 "rate limit"/429)、`--allowedTools` 不是白名單改 `--tools`+`dontAsk`、ORACLE 閘接受同模型 artifact、Codex 無 exit code(#34289)、parity 兩個假 ok、部署鎖併發、CP950 stdin、Claude deny 清單未鏡像。Minor/建議：log-error 別名移除、心跳原子寫入、備份分類、hooks 產生順序、`--git-common-dir`、標記驗證、只看 origin/main、參數引號、log 輪替、`ctx.files` 去重、slug 規則、位元組比對
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/0n(Codex oracle 第1輪，artifact `2026-09-20-partialreview-17147008.md`)：F1 部署鎖可被竊取=**誤報**(實測證明活著的持有者擋得住，已加註解避免未來被「修掉」)；F2 `^Bash$` matcher 可能漏掉 Codex shell 別名=已改成 `^(Bash|exec_command|shell|local_shell|unified_exec)$`
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/3m/0n(第2輪 `2026-09-20-partialreview-0262cb3a.md`)：F1 `%gd` 被誤當時間戳=**誤報**(`--date=unix` 實跑輸出 `origin/main@{1789875977}`)；F2 鎖的釋放與刪除是兩步有競態=真，依「鎖存在⇔持有把手」不變量改用 `DeleteOnClose`(第2次針對同段 code 的回報，已先寫不變量分析再改)；F3 trust 計數可被無關 hook 湊滿=真，已改為歸屬本檔
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2m/0n(第3輪 `2026-09-20-partialreview-721adb6e.md`)：迴圈上限後靜默遺留待部署範圍→改明確告警；SHA-256 repo 的 64 字元 hash 不被接受→放寬驗證。修完未再跑第4輪(邊際效益遞減，改以 15/15 情境套件驗證)
+- 另註：第2輪第一次呼叫 Codex 自述「read-only sandbox 拒絕所有讀取，無法查證」(artifact `2026-09-20-partialreview-a02d8bb8.md`)，非程式問題，重試後正常
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude,.codex,.agents,tests,runbooks | grep=`permission-deny-mirror|Get-AgentHost|_agent-host|HookHost|awarewave-trigger-deploy|legacy-manual-|Get-SkillBridgeBackupFolder|Get-AgentBridgeBackupFolder|AllowSameHost|tool_response_type` | hits=75(全部在預期檔案；其餘命中在 gitignore 的 `agency-os/Backups/`)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File <每支改動的 .ps1> -ParseBreakOnly/-RawReadOnly` + AST parse | exit=0 | result=12 支全過(過程中抓到我自己引入的 2 個未指定編碼的 `Get-Content -Raw` 並修掉)
+
+**[剩餘風險]**
+- **操作者必做一次**：Codex 開在 `D:\Work` → `/hooks` → trust 8 個 handler。在那之前 Codex 仍是零閘(smoke `codex_parity` 會持續 WARN)。
+- 上游缺口(非本專案可修)：openai/codex#34289 shell 結果不帶 exit code → `repeat-failure-guard` 在 Codex 無法計數(轉接層已寫好，Codex 一旦補上結構化回應即生效)；#27833 Windows 上 `apply_patch` 的 deny 可能不被執行 → trust 後要用 `dual-ide-coexistence-strategy.md` 的活體探測確認；#23411 code-mode 外層 `exec` 不觸發 hook(內層呼叫會)。
+- MCP：`trigger`／`cloudflare` 仍依 2026-06-16 操作者決定排除於 Codex(commit `c2fc3df2f` 未記原因)，待操作者確認是否納入。
+- 心跳與 parity 只能證明「有跑」，不能證明「規則正確」——內容正確性仍靠測試與跨模型審查。
+
+[rollback] `git revert` 本 commit；`~/.codex` 全部變動皆先備份於 `~/.codex/backups/claude-migration-<timestamp>/`(含 24 份舊 agent 副本)；`~/.claude/hooks` 由 `scripts/sync-claude-userlevel.ps1 -Mode merge` 從 repo 重建。
+WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈修復

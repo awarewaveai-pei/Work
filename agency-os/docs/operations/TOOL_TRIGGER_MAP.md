@@ -228,7 +228,8 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 | 工具/環節 | 功能 | 觸發 |
 |-----|------|------|
-| `/codex-review`（2026-08-30 起主力，本 repo 自建 command）| 包住 `/codex:adversarial-review` + 固定附帶隱藏依賴/NO FINDINGS focus text + 自動落地 ORACLE gate artifact | 🟢 R0 [驗證計畫] Review 動作；`/review` 的 critic 連續失敗 ≥2 次時的第一層 fallback |
+| `/codex-review`（2026-08-30 起主力，本 repo 自建 command）| 包住 `/codex:adversarial-review` + 固定附帶隱藏依賴/NO FINDINGS focus text + 自動落地 ORACLE gate artifact | 🟢 R0 [驗證計畫] Review 動作（寫入者 = Claude）；`/review` 的 critic 連續失敗 ≥2 次時的第一層 fallback |
+| `/claude-review`（2026-09-19 起，本 repo 自建 command）| `scripts/claude-oracle.ps1`：capture → `claude -p` 唯讀審查 → ORACLE artifact（`-Reviewer claude`）| 🟢 R0 [驗證計畫] Review 動作（寫入者 = Codex）；額度鍵 `critic` |
 | `scripts/codex-oracle.ps1 -Mode inspect` | Codex 唯讀讀 repo，回摘要問答 | 🟢 規劃前想省 Claude context 時；`-Prompt "<具體問題>"`（inspect 用途不變，仍為主力）|
 | `scripts/codex-oracle.ps1 -Mode review` | Codex 對抗式覆審 working tree（含 untracked 新檔）| 🟡 **降級為備援**：`/codex-review` 連續失敗 ≥2 次時的第二層 fallback（2026-08-30 起）|
 | ORACLE gate（`verify-closeout-completeness.ps1` §ORACLE gate）| staged 含 source 檔時強制要求當日 review artifact 存在 | 🔴 Hook（AO-CLOSE 自動強制）；刪除的檔案改用 `path@blob-hash` 內容綁定（2026-08-24），修改的檔案仍用時間戳排序 |
@@ -433,5 +434,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-09-07 05:35:40 UTC_
+_Last synced: 2026-09-20 03:31:11 UTC_
 

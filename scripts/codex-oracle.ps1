@@ -164,6 +164,13 @@ $sb       = New-Object System.Text.StringBuilder
 $diffFile = $null
 $inlined  = @()   # untracked files inlined into the diff; populated below only when reviewing the working tree
 
+# Codex must not review a change Codex wrote (AGENTS.md section 4).
+. (Join-Path $PSScriptRoot '_agent-host.ps1')
+if ((Get-AgentHost) -eq 'codex') {
+    Write-Host "codex-oracle: refusing - this is a Codex session, so Codex is the writer. Run /claude-review instead." -ForegroundColor Red
+    exit 4
+}
+
 if ($Mode -eq 'review') {
     $diffFile = Join-Path $env:TEMP ("codex-oracle-diff-{0}.patch" -f ([guid]::NewGuid().ToString('N').Substring(0,8)))
     try {

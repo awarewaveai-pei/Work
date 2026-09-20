@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+. (Join-Path $PSScriptRoot 'codex-bridge-lib.ps1')
 
 function Write-Utf8NoBom {
   param(
@@ -173,7 +174,7 @@ function Sync-NativeAgentBridges {
       $destinationName = "$($_.BaseName).toml"
       $sourceNames.Add($destinationName) | Out-Null
       $destination = Join-Path $DestinationDir $destinationName
-      Backup-And-ReplaceFile -Path $destination -BackupRoot $bridgeBackupRoot -AllowedRoot $DestinationDir
+      Backup-And-ReplaceFile -Path $destination -BackupRoot (Join-Path $BackupRoot (Get-AgentBridgeBackupFolder -Destination $destination)) -AllowedRoot $DestinationDir
       Write-NativeAgentBridge -SourcePath $_.FullName -DestinationPath $destination -WorkRoot $WorkRoot
     }
 
@@ -187,6 +188,28 @@ function Sync-NativeAgentBridges {
     }
 
   return @($sourceNames | Sort-Object)
+}
+
+# Retention may prune backups of generated output, so a destination that is NOT
+# generated (someone edited the wrapper by hand) must land in a kept legacy-* folder.
+function Get-SkillBridgeBackupFolder {
+  param([string]$Destination)
+  $skillMd = Join-Path $Destination 'SKILL.md'
+  if (Test-Path -LiteralPath $skillMd) {
+    $text = Get-Content -Raw -Encoding UTF8 -LiteralPath $skillMd
+    if ($text -match 'generated Codex wrapper|Codex wrapper for a Claude skill') { return 'repo-skill-bridges' }
+    return 'legacy-manual-skill-edits'
+  }
+  return 'repo-skill-bridges'
+}
+
+function Get-AgentBridgeBackupFolder {
+  param([string]$Destination)
+  if (Test-Path -LiteralPath $Destination) {
+    $first = Get-Content -LiteralPath $Destination -Encoding UTF8 -TotalCount 1
+    if ($first -ne '# GENERATED: Claude-first native agent bridge. Do not edit by hand.') { return 'legacy-manual-agent-edits' }
+  }
+  return 'native-agent-bridges'
 }
 
 function Write-ClaudeCommandSkillWrapper {
@@ -214,35 +237,57 @@ The Claude command file remains the only human-maintained source.
   Write-Utf8NoBom -Path (Join-Path $SkillPath 'SKILL.md') -Value $content
 }
 
+function Get-HookCommands {
+  param([object]$Config)
+  $commands = @()
+  if ($Config -and $Config.hooks) {
+    foreach ($event in $Config.hooks.PSObject.Properties) {
+      foreach ($group in @($event.Value)) {
+        foreach ($hook in @($group.hooks)) {
+          if ($hook.type -eq 'command') {
+            $commands += [string]$hook.command
+            if ($hook.PSObject.Properties.Name -contains 'commandWindows') { $commands += [string]$hook.commandWindows }
+          }
+        }
+      }
+    }
+  }
+  return $commands
+}
+
+# ~/.codex/hooks.json is GENERATED from the canonical source (user-level, like
+# Claude's ~/.claude/settings.json hooks). Rewritten only when content differs,
+# because any change invalidates Codex's per-hook trust and needs /hooks review.
+function Write-CodexUserHooks {
+  param(
+    [string]$CodexHome,
+    [string]$WorkRoot,
+    [string]$BackupRoot
+  )
+
+  $path = Join-Path $CodexHome 'hooks.json'
+  $json = Get-CodexUserHooksJson -WorkRoot $WorkRoot
+  $existing = if (Test-Path -LiteralPath $path) { Get-Content -Raw -Encoding UTF8 -LiteralPath $path } else { '' }
+  if ($existing -and $existing.Trim()) {
+    if ($existing -eq $json) { return 'unchanged' }
+    $commands = @()
+    try { $commands = Get-HookCommands (ConvertFrom-Json $existing) } catch { $commands = @('<unparseable>') }
+    $foreign = @($commands | Where-Object { $_ -notmatch 'claude-userlevel[\\/]+hooks[\\/]' -and $_ -notmatch [regex]::Escape($CodexHome.TrimEnd('\') + '\hooks\') })
+    if ($foreign.Count -gt 0) {
+      throw "Refusing to overwrite ${path}: it contains $($foreign.Count) non-AwareWave or unparseable hook handler(s). Move them into the canonical hook source or out of this file, then re-run."
+    }
+    Backup-And-ReplaceFile -Path $path -BackupRoot (Join-Path $BackupRoot 'legacy-user-hooks') -AllowedRoot $CodexHome
+  }
+  Write-Utf8NoBom -Path $path -Value $json
+  return 'written'
+}
+
 function Remove-LegacyCodexHookRuntime {
   param(
     [string]$CodexHome,
     [string]$CanonicalHookRoot,
     [string]$BackupRoot
   )
-
-  $legacyConfig = Join-Path $CodexHome 'hooks.json'
-  if (Test-Path -LiteralPath $legacyConfig) {
-    $config = Get-Content -Raw -Encoding UTF8 -LiteralPath $legacyConfig | ConvertFrom-Json
-    $commands = @()
-    if ($config.hooks) {
-      foreach ($event in $config.hooks.PSObject.Properties) {
-        foreach ($group in @($event.Value)) {
-          foreach ($hook in @($group.hooks)) {
-            if ($hook.type -eq 'command') { $commands += [string]$hook.command }
-          }
-        }
-      }
-    }
-    $allManaged = $commands.Count -gt 0 -and @($commands | Where-Object { $_ -notmatch [regex]::Escape($CodexHome.TrimEnd('\') + '\hooks\') }).Count -eq 0
-    if (-not $allManaged) {
-      throw "Refusing to remove $legacyConfig because it contains a non-AwareWave or unparseable hook handler. Preserve it manually, then re-run this sync."
-    }
-    $configBackup = Join-Path $BackupRoot 'legacy-global-hooks'
-    Ensure-Directory $configBackup
-    Copy-Item -LiteralPath $legacyConfig -Destination (Join-Path $configBackup 'hooks.json') -Force
-    Remove-Item -LiteralPath $legacyConfig -Force
-  }
 
   $legacyHookRoot = Join-Path $CodexHome 'hooks'
   if (Test-Path -LiteralPath $legacyHookRoot) {
@@ -341,7 +386,7 @@ function Write-HookIndex {
   $rows = @(
     "# Claude Hook Index"
     ""
-    'The canonical hook implementation lives under `mcp/claude-userlevel/hooks`. Claude uses its synced user-level runtime copy; Codex project hooks execute this source directly from the git root after hook trust is granted.'
+    'The canonical hook implementation lives under `mcp/claude-userlevel/hooks`. Claude runs its synced ~/.claude/hooks copy; Codex runs the source directly through the generated ~/.codex/hooks.json (`--host=codex`, translated by hooks/lib/codex-adapter.js). Codex skips any hook whose trust hash is stale, so a hook only protects the workspace after /hooks trust and a fresh ~/.codex/awarewave-hook-heartbeat.json entry.'
     ""
     "| Event | Matcher | Type | Command |"
     "|---|---|---|---|"
@@ -490,45 +535,33 @@ function Write-ProjectIndex {
   Write-Utf8NoBom -Path (Join-Path $DestDir "index.md") -Value ($rows -join "`n")
 }
 
+# Lists only plugins actually INSTALLED for Claude (installed_plugins.json), not
+# the marketplace catalog: listing uninstalled catalog entries told Codex that
+# dozens of unavailable plugins existed.
 function Write-PluginIndex {
   param(
-    [string]$PluginMarketplacesDir,
+    [string]$InstalledPluginsPath,
     [string]$DestDir
   )
 
+  $notApplicable = @{ 'codex@openai-codex' = 'Claude-side bridge that calls Codex; inside Codex use Codex itself.' }
   $rows = @(
     "# Claude Plugin Index"
     ""
-    "Claude plugins are not installed as native Codex plugins by this migration. Use this index to find plugin source prompts, commands, and skills if a user asks for a migrated Claude plugin workflow."
+    "Installed Claude Code plugins on this machine. They are not native Codex plugins; claude.ai account connectors (Gmail, Drive, Notion, Adobe, ...) are account-level and never appear here."
     ""
-    "| Plugin | Agents | Commands | Skills | Source |"
-    "|---|---:|---:|---:|---|"
+    "| Plugin | Version | Codex use | Install path |"
+    "|---|---|---|---|"
   )
 
-  if (Test-Path -LiteralPath $PluginMarketplacesDir) {
-    Get-ChildItem -Directory -Recurse -LiteralPath $PluginMarketplacesDir |
-      Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "README.md") } |
-      Sort-Object FullName |
-      ForEach-Object {
-        $agentCount = 0
-        $commandCount = 0
-        $skillCount = 0
-        $agentsDir = Join-Path $_.FullName "agents"
-        $commandsDir = Join-Path $_.FullName "commands"
-        $skillsDir = Join-Path $_.FullName "skills"
-        if (Test-Path -LiteralPath $agentsDir) {
-          $agentCount = @(Get-ChildItem -File -LiteralPath $agentsDir -Filter "*.md").Count
-        }
-        if (Test-Path -LiteralPath $commandsDir) {
-          $commandCount = @(Get-ChildItem -File -LiteralPath $commandsDir -Filter "*.md").Count
-        }
-        if (Test-Path -LiteralPath $skillsDir) {
-          $skillCount = @(Get-ChildItem -Recurse -File -LiteralPath $skillsDir -Filter "SKILL.md").Count
-        }
-        if (($agentCount + $commandCount + $skillCount) -gt 0) {
-          $rows += "| $(Escape-TableCell $_.Name) | $agentCount | $commandCount | $skillCount | `"$($_.FullName)`" |"
-        }
-      }
+  if (Test-Path -LiteralPath $InstalledPluginsPath) {
+    $installed = Get-Content -Raw -Encoding UTF8 -LiteralPath $InstalledPluginsPath | ConvertFrom-Json
+    $plugins = if ($installed.PSObject.Properties.Name -contains 'plugins') { $installed.plugins } else { $installed }
+    foreach ($p in ($plugins.PSObject.Properties | Sort-Object Name)) {
+      $entry = @($p.Value) | Select-Object -First 1
+      $use = if ($notApplicable.ContainsKey($p.Name)) { $notApplicable[$p.Name] } else { 'Read its skills/commands under the install path when the user asks for this plugin.' }
+      $rows += "| $(Escape-TableCell $p.Name) | $(Escape-TableCell ([string]$entry.version)) | $(Escape-TableCell $use) | $(Escape-TableCell ([string]$entry.installPath)) |"
+    }
   }
 
   Write-Utf8NoBom -Path (Join-Path $DestDir "index.md") -Value ($rows -join "`n")
@@ -580,7 +613,28 @@ For a slash command such as `/review`, read its direct source path in `reference
 
 ## Hooks
 
-The canonical hook implementation is `D:\Work\mcp\claude-userlevel\hooks`. Codex project hooks execute it directly from the git root when the project is trusted and the current hook hash has been trusted. Matching global and project hooks both run, so this migration intentionally removes its obsolete global Codex hook copy. Do not assume a hook has protected the workspace unless the current project hook configuration is trusted and an applicable event actually ran.
+The canonical hook implementation is `D:\Work\mcp\claude-userlevel\hooks`. Codex runs it through the generated user-level `~/.codex/hooks.json` (`--host=codex`; `hooks/lib/codex-adapter.js` maps `apply_patch` to Edit and `spawn_agent` to Agent; Codex sends shell results with the exit code stripped (openai/codex#34289), so repeat-failure-guard cannot count failures here). Codex silently skips hooks whose trust hash is stale: if `/hooks` shows AwareWave hooks as new or changed, stop and ask the operator to trust them. A hook BLOCK (exit 2) is a real governance stop — read the message and follow it (e.g. add `# CONFIRMED-HIGH-RISK: <reason>` only after the operator approved). Do not assume a hook protected the workspace unless `~/.codex/awarewave-hook-heartbeat.json` shows the event ran this session.
+
+## Claude tool to Codex equivalent
+
+Claude command/agent/skill sources name Claude tools. Translate, do not skip the step:
+
+| Claude source says | Do this in Codex |
+|---|---|
+| `Agent` / `subagent_type: X` | `spawn_agent` with `agent_type: X` (native bridge in `D:\Work\.codex\agents`) |
+| `Skill` / `/skill-name` | read the matching `SKILL.md` (repo `.agents/skills` wrapper points at the Claude source) |
+| `Bash` | shell command (hooks see it as Bash) |
+| `Read` / `Grep` / `Glob` | `Get-Content` / `rg` / `Get-ChildItem` via shell |
+| `Edit` / `Write` | `apply_patch` (hooks see it as Edit) |
+| `WebFetch` / `WebSearch` | Codex web search |
+| `TodoWrite` / task tools | `update_plan` |
+| `AskUserQuestion` | ask one question in chat |
+| `mcp__<server>__<tool>` | the same registry-managed MCP server in Codex (`references/mcp/index.md`) |
+| `Artifact`, claude.ai connectors | not available in Codex; write a file in the repo instead |
+
+## Cross-model review
+
+The oracle must be the OTHER model. When Codex wrote the change, run `/claude-review` (`D:\Work\.claude\commands\claude-review.md`); never `/codex-review`, which asks Codex to review itself.
 
 ## MCP
 
@@ -606,7 +660,7 @@ function Write-WrapperSkill {
 
   Ensure-Directory $SkillPath
   $sourceInstruction = if ($IsArchive) {
-    "The source is a Claude ``.skill`` archive at ``$SourcePath``. When this wrapper triggers, inspect it with ``tar -tf`` and read files with ``tar -xOf``, starting with the packaged ``SKILL.md``; then follow the source workflow."
+    "The source is a Claude ``.skill`` archive (zip) at ``$SourcePath``. When this wrapper triggers, list it with ``& `"`$env:SystemRoot\System32\tar.exe`" -tf <archive>`` and read files with ``-xOf <archive> <path>``, starting with the packaged ``SKILL.md``; then follow the source workflow. Use the System32 tar explicitly: a bare ``tar`` may resolve to Git Bash's GNU tar, which cannot open ``D:\`` paths."
   } else {
     "The source skill lives at ``$SourcePath``. When this wrapper triggers, read that ``SKILL.md`` and follow the source workflow directly."
   }
@@ -700,7 +754,11 @@ $skillRoot = Join-Path $CodexHome "skills"
 $compatSkill = Join-Path $skillRoot "claude-compat"
 
 Ensure-Directory $skillRoot
-Ensure-Directory $backupRoot
+# Generated BEFORE any destructive step: this call can throw (foreign handlers,
+# WorkRoot with whitespace) and must not leave a half-rebuilt claude-compat skill.
+$userHooksState = Write-CodexUserHooks -CodexHome $CodexHome -WorkRoot $WorkRoot -BackupRoot $backupRoot
+# $backupRoot is created lazily by the Backup-And-Replace* helpers: an eager
+# mkdir left an empty dir per run (698 accumulated by 2026-09-19).
 
 $claudeSkills = Join-Path $ClaudeHome "skills"
 $repoSkillRoot = Join-Path $WorkRoot ".agents\skills"
@@ -718,7 +776,7 @@ Get-ChildItem -Directory -LiteralPath $claudeSkills |
   Sort-Object Name |
   ForEach-Object {
     $destination = Join-Path $repoSkillRoot $_.Name
-    Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot "repo-skill-bridges") -CodexRoot $WorkRoot
+    Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot (Get-SkillBridgeBackupFolder -Destination $destination)) -CodexRoot $WorkRoot
     $sourceSkillMd = Join-Path $_.FullName "SKILL.md"
     $description = Get-CodexSkillDescription -Name $_.Name -SourceSkillMd $sourceSkillMd
     Write-WrapperSkill -SkillPath $destination -Name $_.Name -Description $description -SourcePath $sourceSkillMd
@@ -728,12 +786,9 @@ Get-ChildItem -Directory -LiteralPath $claudeSkills |
 Get-ChildItem -File -LiteralPath $claudeSkills -Filter "*.skill" |
   Sort-Object Name |
   ForEach-Object {
-    $topLevel = (& tar -tf $_.FullName | Select-Object -First 1) -replace "/.*$", ""
-    if ([string]::IsNullOrWhiteSpace($topLevel)) {
-      throw "Unable to determine top-level folder for archive: $($_.FullName)"
-    }
+    $topLevel = Get-SkillArchiveTopFolder -Path $_.FullName
     $destination = Join-Path $repoSkillRoot $topLevel
-    Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot "repo-skill-bridges") -CodexRoot $WorkRoot
+    Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot (Get-SkillBridgeBackupFolder -Destination $destination)) -CodexRoot $WorkRoot
     $description = Get-CodexSkillDescription -Name $topLevel -SourceSkillMd ""
     Write-WrapperSkill -SkillPath $destination -Name $topLevel -Description $description -SourcePath $_.FullName -IsArchive
     $installedSkills.Add($topLevel)
@@ -750,7 +805,7 @@ foreach ($entry in $commandSkillMap.GetEnumerator() | Sort-Object Key) {
     throw "Expected Claude command source is missing: $commandPath"
   }
   $destination = Join-Path $repoSkillRoot $entry.Key
-  Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot "repo-skill-bridges") -CodexRoot $WorkRoot
+  Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot (Get-SkillBridgeBackupFolder -Destination $destination)) -CodexRoot $WorkRoot
   Write-ClaudeCommandSkillWrapper -SkillPath $destination -Name $entry.Key -CommandPath $commandPath -CommandName ([IO.Path]::GetFileNameWithoutExtension($entry.Value))
   $installedSkills.Add($entry.Key)
 }
@@ -799,6 +854,26 @@ $nativeAgentRoot = Join-Path $WorkRoot ".codex\agents"
 $nativeAgentNames = Sync-NativeAgentBridges -SourceDir (Join-Path $ClaudeHome "agents") -DestinationDir $nativeAgentRoot -WorkRoot $WorkRoot -BackupRoot $backupRoot
 Remove-LegacyCodexHookRuntime -CodexHome $CodexHome -CanonicalHookRoot (Join-Path $WorkRoot "mcp\claude-userlevel\hooks") -BackupRoot $backupRoot
 
+# Codex Desktop's built-in "migrate subagents" (2026-08-19) left FULL copies of
+# the Claude agent prompts in ~/.codex/agents under the same names as the thin
+# bridges: a second, frozen source. Same-named ones are backed up and removed.
+$legacyUserAgents = @()
+$userAgentDir = Join-Path $CodexHome "agents"
+if (Test-Path -LiteralPath $userAgentDir) {
+  foreach ($f in @(Get-ChildItem -File -LiteralPath $userAgentDir -Filter "*.toml")) {
+    if ($nativeAgentNames -contains $f.Name) {
+      Backup-And-ReplaceFile -Path $f.FullName -BackupRoot (Join-Path $backupRoot "legacy-user-agents") -AllowedRoot $CodexHome
+      $legacyUserAgents += $f.Name
+    }
+  }
+}
+# A May-2026 copy of this generator, never referenced by anything.
+$legacyUserSync = Join-Path $CodexHome "scripts\sync-claude-to-codex.ps1"
+if (Test-Path -LiteralPath $legacyUserSync) {
+  Backup-And-ReplaceFile -Path $legacyUserSync -BackupRoot (Join-Path $backupRoot "legacy-user-scripts") -AllowedRoot $CodexHome
+}
+
+
 Write-ClaudeCompatSkill -SkillPath $compatSkill -SourceClaudeHome $ClaudeHome
 Write-AgentIndex -SourceDir (Join-Path $ClaudeHome "agents") -DestDir $agentDest -UseSourceLinks ($Mode -eq "linked")
 Write-CommandIndex -SourceDir (Join-Path $ClaudeHome "commands") -DestDir $commandDest -UseSourceLinks ($Mode -eq "linked")
@@ -806,7 +881,7 @@ Write-HookIndex -ClaudeSettingsPath (Join-Path $ClaudeHome "settings.json") -Des
 Write-McpIndex -ClaudeMcpPath (Join-Path $WorkRoot ".mcp.json") -CodexConfigPath (Join-Path $CodexHome "config.toml") -DestDir $mcpDest
 Write-ProjectIndex -WorkRoot $WorkRoot -DestDir $projectDest -ClaudeHome $ClaudeHome
 Write-RunbookIndex -WorkRoot $WorkRoot -DestDir $runbookDest
-Write-PluginIndex -PluginMarketplacesDir (Join-Path $ClaudeHome "plugins\marketplaces") -DestDir $pluginDest
+Write-PluginIndex -InstalledPluginsPath (Join-Path $ClaudeHome "plugins\installed_plugins.json") -DestDir $pluginDest
 
 $globalAgents = Join-Path $CodexHome "AGENTS.md"
 $globalAgentsContent = @'
@@ -820,7 +895,16 @@ $globalAgentsContent = @'
 - Project-specific instructions may live in nested repo `AGENTS.md` files when a project intentionally owns them.
 - The user-level MCP config may contain live secrets. Never print raw `config.toml`, `.mcp.json`, `mcp.json`, `.credentials.json`, or token-bearing env values.
 - Shared MCP configuration is managed from `D:\Work\mcp\registry.template.json` and `D:\Work\scripts\sync-mcp-config.ps1`.
+- Governance hooks run from the generated `~/.codex/hooks.json`. If `/hooks` lists AwareWave hooks as new, changed, or untrusted, tell the operator before task work: until they are trusted every mechanical gate is silently off. A hook BLOCK is a real stop; follow its message.
+- Prove the gates per session, do not assume: after your first tool call, `~/.codex/awarewave-hook-heartbeat.json` must show a `events.PreToolUse.last_utc` from this session. If it does not, hooks are being skipped -- say so and do the R0/R4 steps manually.
+- Claude's `permissions.deny` list (no new branches, `reset --hard origin/*`, `git clean -fd`, `sudo`, force push, recursive forced delete, ...) is enforced for Codex by the `permission-deny-mirror` hook rule. A block there is policy, not a bug.
+- Cross-model review: when Codex authored the change, the oracle is Claude: run `/claude-review` (`D:\Work\.claude\commands\claude-review.md`), never `/codex-review`.
+- Greetings and close-out phrases follow CLAUDE.md's AO-RESUME / AO-CLOSE lifecycle; the UserPromptSubmit hook already runs `scripts\ao-resume.ps1` on a new session.
 '@
+$memoryIndex = Get-ClaudeMemoryIndexPath -WorkRoot $WorkRoot
+if (Test-Path -LiteralPath $memoryIndex) {
+  $globalAgentsContent += "`n- Operator memory (shared with Claude, single source): before task work in ``$WorkRoot``, read ``$memoryIndex`` and every linked memory file relevant to the task; feedback memories bind Codex exactly as they bind Claude. When the operator states a new durable preference, add a file in that directory with the same frontmatter (``name``, ``description``, ``metadata.type``) plus one index line.`n"
+}
 Write-Utf8NoBom -Path $globalAgents -Value $globalAgentsContent
 
 $validationScript = Join-Path $CodexHome "skills\.system\skill-creator\scripts\quick_validate.py"
@@ -849,6 +933,8 @@ $summary = [ordered]@{
   backupRoot = $backupRoot
   installedSkills = @($installedSkills | Sort-Object -Unique)
   nativeAgentBridges = @($nativeAgentNames)
+  removedLegacyUserAgents = @($legacyUserAgents)
+  userHooks = $userHooksState
   repoSkillRoot = $repoSkillRoot
   compatibilitySkill = $compatSkill
   validation = @($validationResults)
@@ -857,9 +943,30 @@ $summary = [ordered]@{
 $summaryPath = Join-Path $compatSkill "migration-summary.json"
 Write-Utf8NoBom -Path $summaryPath -Value ($summary | ConvertTo-Json -Depth 5)
 
+# Retention: prune backup dirs holding ONLY regenerable output of this script;
+# anything with a legacy-* folder holds pre-migration user content and is kept.
+$generatedOnly = @('repo-skill-bridges', 'native-agent-bridges', 'claude-compat')
+$backupsDir = Join-Path $CodexHome "backups"
+$pruned = 0
+if (Test-Path -LiteralPath $backupsDir) {
+  $candidates = @(Get-ChildItem -Directory -LiteralPath $backupsDir -Filter "claude-migration-*" |
+    Where-Object { @(Get-ChildItem -LiteralPath $_.FullName -Name | Where-Object { $_ -notin $generatedOnly }).Count -eq 0 } |
+    Sort-Object Name -Descending)
+  foreach ($old in @($candidates | Select-Object -Skip 15)) {
+    Assert-ChildPath -Path $old.FullName -Root $backupsDir
+    Remove-Item -LiteralPath $old.FullName -Recurse -Force
+    $pruned++
+  }
+}
+
 Write-Host "Generated repo skill bridges:" (($installedSkills | Sort-Object -Unique) -join ", ")
 Write-Host "Generated native agent bridges:" (($nativeAgentNames) -join ", ")
 Write-Host "Installed compatibility skill: claude-compat"
-Write-Host "Backup root: $backupRoot"
+Write-Host "Backup root: $backupRoot (pruned $pruned regenerable backup dir(s))"
+if ($legacyUserAgents.Count) { Write-Host "Removed legacy full-copy user agents (backed up): $($legacyUserAgents -join ', ')" }
+Write-Host "Codex user hooks (~/.codex/hooks.json): $userHooksState"
+if ($userHooksState -eq 'written') {
+  Write-Host "ACTION: Codex hook definitions changed -> open Codex in $WorkRoot, run /hooks, trust the AwareWave hooks. Until then Codex skips them silently." -ForegroundColor Yellow
+}
 Write-Host "Validation:"
 $validationResults | ForEach-Object { Write-Host " - $_" }

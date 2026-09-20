@@ -3,6 +3,11 @@
   "events": {
     "PreToolUse": [
       {
+        "rules": [
+          "permission-deny-mirror"
+        ]
+      },
+      {
         "matcher": "Bash",
         "rules": [
           "dangerous-bash",
