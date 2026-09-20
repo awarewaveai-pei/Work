@@ -108,8 +108,8 @@
 
 ### 未完成
 
-- [ ] **【oracle 工具層】兩支 cross-model oracle 的 packet 會被無關 untracked 檔灌爆，導致 review 靜默失敗** — 2026-09-20 實測：`/codex-review`（companion `adversarial-review`）與第二層 fallback `scripts/codex-oracle.ps1 -Mode review` 對同一份 130 檔改動**雙雙回不出 final message**。根因不是額度（log 0 bytes、無任何 `429`／`rate limit` 字樣），是 packet 4.97MB：兩支的 builder 都只按「可審檔案型別 + 512KB 單檔上限 + 名稱像 secret」過濾，沒有「與本次改動無關的 untracked 檔要排除」，於是 100+ 個 `.claude/sessions/*.md` session transcript、`agency-os/reports/{governance,monthly}/**`、`.next/trace` 全被 inline 進去，把真正要審的 130 檔淹掉。**失效模式最糟的地方是靜默**：companion 開跑 8 秒吐一個 `findings: []` 的空殼就卡住，看起來像「審過且沒問題」。治本方向：packet builder 加一層「untracked 檔須與 tracked 改動同目錄樹或明確 allowlist」的過濾，並讓「no final message」變成明確的 FAIL 而非空 findings；同時 companion 那個 8 秒空殼要能被識別為未完成而非 pass。
-  - 影響：每次大批改動的 R0 Review 動作都會退化成書面自審（2026-09-20 就是這樣結案的，見 WORKLOG 2026-09-20 續86 的 `ORACLE_WAIVED`）。
+- [x] **【oracle 工具層｜已修 2026-09-20】兩支 cross-model oracle 的 packet 會被無關 untracked 檔灌爆，導致 review 靜默失敗** — 2026-09-20 實測：`/codex-review`（companion `adversarial-review`）與第二層 fallback `scripts/codex-oracle.ps1 -Mode review` 對同一份 130 檔改動**雙雙回不出 final message**。根因不是額度（log 0 bytes、無任何 `429`／`rate limit` 字樣），是 packet 4.97MB：兩支的 builder 都只按「可審檔案型別 + 512KB 單檔上限 + 名稱像 secret」過濾，沒有「與本次改動無關的 untracked 檔要排除」，於是 100+ 個 `.claude/sessions/*.md` session transcript、`agency-os/reports/{governance,monthly}/**`、`.next/trace` 全被 inline 進去，把真正要審的 130 檔淹掉。**失效模式最糟的地方是靜默**：companion 開跑 8 秒吐一個 `findings: []` 的空殼就卡住，看起來像「審過且沒問題」。已修：兩支 capture path 共用 runtime 排除與 2MB hard cap；空/截斷/無 verdict schema 的回覆 fail-closed，不產生 review artifact；real capture 由 4.97MB 收斂至 109KB。
+  - 驗證：87 個 `.claude/sessions` transcript 被明確 skipped；`{"findings":[]}` exit 2 且不落 artifact；Claude CLI 本次仍回 invalid/incomplete，無 429/rate-limit，未設斷路器。
 - [ ] **Codex `/hooks` trust 未執行，Codex 側等同零機械閘** — `check-claude-codex-parity.ps1` 444/446，唯二失敗就是這條（`0/8 hook handlers trusted` + 無 heartbeat）。2026-09-20 的共用資產成果（41 個 command wrapper、25 個 agent bridge、相對路徑、model 分層）在 Codex session 內全都沒有機械強制。**需操作者在 Codex 開 `D:\Work` 跑 `/hooks` 並 trust AwareWave hooks**，之後 `check-claude-codex-parity.ps1` 應轉 446/446。
 
 #### A. ⏰ 有外部時鐘（死線／到期日）
@@ -259,7 +259,7 @@
 - [x] **【2026-09-19 開出、2026-09-20 部署完成｜Cognitive OS 部署】cognitive.aware-wave.com prod 落後 repo** — 操作者 go-ahead 後在 ks-aw-01 fast-forward 到 `dd204ff65` 並跑 `deploy/deploy.sh`：test-gate PASS、healthcheck 6 秒健康、本機與對外 smoke 皆 PASS。線上實測 `/methods/framing.five_w_one_h/form` 已回 `schema_source=record_schema` 與中文欄位，`why_zh`/`example_zh` 也一併上線。保留 `cognitive-os-api:rollback` 映像可一鍵回退。詳見 WORKLOG 2026-09-20（續83）。
 - [x] **【2026-09-20 開出並當日解決｜Cognitive OS dashboard】方法頁上方兩段說明是工程語、範例對不上新表單** — 「為什麼有效」181／285 夾著欄位名與錯誤碼，全部重寫成白話；「填表範例」280／285 是描述舊裸 JSON 表單的散文，改成 `methods/registry/method-form-examples.yaml`（282 筆結構化範例）＋頁面上的「用這個範例填入」按鈕，每一筆都被測試推過真實 builder 與 gate。散文換成資料的理由：散文沒辦法被測試，表單一改就會默默對不上。詳見 WORKLOG 2026-09-20（續86）。
 - [x] **【2026-09-20 開出並當日解決｜Cognitive OS 測試穩定性】`tests/unit/test_authenticate_timing.py` 的量測方法在筆電上不穩** — 改成 A/B 交錯取樣＋左右輪流先後＋中位數＋暖身丟棄＋12 對樣本；**三個門檻一字未動**。突變測試雙向驗證：拿掉 `store.py` 查無帳號分支的 dummy hash → 375.1x/371.2x 變紅，還原 → 綠。詳見 WORKLOG 2026-09-20（續87）。
-- [ ] **【2026-09-20 開出｜Cognitive OS dashboard】`why_en`／`blurb_en` 仍是工程語，英文介面開張前要比照中文重寫** — 285 筆都有 `why_zh`，前端一律優先顯示中文，所以今天使用者看不到英文那份；但它還留在 `methods/registry/method-display-metadata.yaml` 裡，一旦做英文 UI（或有人拿 `_en` 當資料源）就會把欄位名與錯誤碼直接端給使用者。修法同續86：照使用者語言重寫，不是翻譯現有工程語。詳見 WORKLOG 2026-09-20（續86）[剩餘風險]。
+- [x] **【2026-09-20 開出並當日解決｜Cognitive OS dashboard】`why_en`／`blurb_en` 仍是工程語** — 186／285 筆 `why_en` 照已修好的中文重新用英文寫（非翻譯舊英文），掃描後 0 筆殘留識別碼；`blurb_en` 查證後確認 10 筆命中全為誤報、不需改動。中英數字逐筆交叉比對，真實漂移 0 筆。詳見 WORKLOG 2026-09-20（續90）。
 
 #### B. 🔒 卡在你（你動手才會動，我做不了）
 
@@ -1787,4 +1787,3 @@
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
 _Last synced: 2026-09-20 03:31:11 UTC_
-

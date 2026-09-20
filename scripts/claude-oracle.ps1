@@ -116,7 +116,14 @@ $stderrText = if (Test-Path -LiteralPath $stderrFile) { (Get-Content -Raw -Encod
 $fence = [regex]::Match($answer, '(?s)```(?:json)?\s*(\{.*\})\s*```')
 if ($fence.Success) { $answer = $fence.Groups[1].Value }
 $answerIsJson = $false
-try { $null = $answer | ConvertFrom-Json -ErrorAction Stop; $answerIsJson = $true } catch { $answerIsJson = $false }
+$parsedAnswer = $null
+try {
+    $parsedAnswer = $answer | ConvertFrom-Json -ErrorAction Stop
+    $hasVerdict = $parsedAnswer.PSObject.Properties.Name -contains 'verdict'
+    $hasFindings = $parsedAnswer.PSObject.Properties.Name -contains 'findings'
+    $validVerdict = $hasVerdict -and ([string]$parsedAnswer.verdict -in @('approve', 'needs-attention'))
+    $answerIsJson = $hasVerdict -and $hasFindings -and $validVerdict
+} catch { $answerIsJson = $false }
 
 # Quota detection runs ONLY on a failed call: the reviewed diff itself can
 # contain "rate limit" or "429" (this repo has such code), and matching that in
@@ -131,9 +138,9 @@ if (-not $answerIsJson -or $claudeExit -ne 0) {
         exit 3
     }
 }
-if ($claudeExit -ne 0 -or -not $answer.Trim()) {
-    Write-Host "claude-oracle: claude -p failed (exit $claudeExit)." -ForegroundColor Red
-    if ($stderrText.Trim()) { Write-Host $stderrText.Trim() }
+if ($claudeExit -ne 0 -or -not $answer.Trim() -or -not $answerIsJson) {
+    Write-Host "claude-oracle: claude -p failed or returned an invalid/incomplete review schema (exit $claudeExit)." -ForegroundColor Red
+    if ([string]$stderrText -and $stderrText.Trim()) { Write-Host $stderrText.Trim() }
     exit 1
 }
 

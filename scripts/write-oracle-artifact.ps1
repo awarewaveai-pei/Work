@@ -89,6 +89,8 @@ if (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue) {
     [Console]::Error.WriteLine("write-oracle-artifact: missing dependency _console-encoding-helpers.ps1 next to this script -- refusing to run without UTF-8-safe git output capture (CP950 mangling risk).")
     exit 2
 }
+. (Join-Path $PSScriptRoot 'oracle-capture-policy.ps1')
+$capturePolicy = Get-OracleCapturePolicy
 
 function Fail {
     # M4 fix: Write-Error under $ErrorActionPreference='Stop' throws a
@@ -162,37 +164,12 @@ if ($Mode -eq 'capture') {
     $inlined = @()
     $skipped = @()
     if (-not $DiffRef) {
-        $reviewableExt = @('.ps1', '.psm1', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.sh',
-                           '.py', '.sql', '.json', '.yml', '.yaml', '.toml', '.md', '.php', '.css', '.html')
-        $secretish     = '(^|[\\/._-])(env|secret|secrets|credential|credentials|token|tokens|password|passwd|vault|id_rsa|id_ed25519)([\\/._-]|$)|\.(pem|key|pfx|p12|crt|keystore)$'
-        $selfArtifacts = '^agency-os/reports/oracle/'
-
         $ru        = Invoke-Git -GitArgs @('ls-files', '--others', '--exclude-standard') -Root $root
-        $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch $selfArtifacts })
-        if ($Path.Count -gt 0) {
-            # @() wrapping required -- Set-StrictMode suppresses the synthetic
-            # .Count on a non-array Where-Object result (0 or exactly 1 match),
-            # the exact bug class fixed in codex-oracle.ps1 by commit eb0530ea1.
-            $untracked = @($untracked | Where-Object {
-                $f = $_
-                @($Path | Where-Object { $f -like (($_ -replace '\\', '/').TrimEnd('/') + '*') }).Count -gt 0
-            })
-        }
-
-        foreach ($u in $untracked) {
-            $full = Join-Path $root ($u -replace '/', '\')
-            if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
-            if ($u -match $secretish) { $skipped += "$u (name suggests a secret)"; continue }
-            if ($reviewableExt -notcontains ([IO.Path]::GetExtension($u).ToLower())) {
-                $skipped += "$u (not a reviewable source type)"; continue
-            }
-            if ((Get-Item -LiteralPath $full).Length -gt 512KB) {
-                $skipped += "$u (larger than 512KB)"; continue
-            }
-            $body = Get-Content -LiteralPath $full -Raw -Encoding UTF8
-            $diffText += "`n`n--- NEW UNTRACKED FILE: $u ---`n" + $body
-            $inlined  += $u
-        }
+        $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+        $capture = Invoke-OracleUntrackedCapture -Root $root -Candidates $untracked -Policy $capturePolicy -Path $Path
+        $diffText += $capture.Additions
+        $inlined = @($capture.Inlined)
+        $skipped = @($capture.Skipped)
         if ($inlined.Count -gt 0) {
             Write-Host ("write-oracle-artifact: inlining {0} untracked file(s): {1}" -f $inlined.Count, ($inlined -join ', ')) -ForegroundColor DarkGray
         }
@@ -218,6 +195,8 @@ if ($Mode -eq 'capture') {
         Write-Host "write-oracle-artifact: WARNING -- recent commit(s) at HEAD look like session auto-checkpoints. This snapshot may not include everything you expect." -ForegroundColor DarkYellow
     }
 
+    try { [void](Assert-OraclePacketSize -Packet $diffText -Policy $capturePolicy) }
+    catch { Fail $_.Exception.Message }
     Set-Content -LiteralPath $Out -Value $diffText -Encoding UTF8
     Write-Host ("write-oracle-artifact: captured -> {0} ({1} bytes)" -f $Out, (Get-Item -LiteralPath $Out).Length) -ForegroundColor DarkGray
     exit 0
@@ -303,7 +282,11 @@ $findingsCountStr = '<unknown>'
 try {
     $parsed = $Answer | ConvertFrom-Json -ErrorAction Stop
     if ($parsed.PSObject.Properties.Name -contains 'findings') {
-        $findingsCountStr = [string](@($parsed.findings)).Count
+        $hasVerdict = $parsed.PSObject.Properties.Name -contains 'verdict'
+        $validVerdict = $hasVerdict -and ([string]$parsed.verdict -in @('approve', 'needs-attention'))
+        if ($validVerdict) {
+            $findingsCountStr = [string](@($parsed.findings)).Count
+        }
     }
 } catch {
     $textMatches = [regex]::Matches($Answer, '(?m)^\s*FINDING\s+\d+')
@@ -313,6 +296,10 @@ try {
     } elseif ($bulletMatches.Count -gt 0 -or $Answer -match '(?im)^verdict:\s*approve\b') {
         $findingsCountStr = [string]$bulletMatches.Count
     }
+}
+
+if ($Mode -eq 'review' -and $findingsCountStr -eq '<unknown>') {
+    Fail "Cannot validate oracle answer shape: refusing to write a review artifact. The reviewer may have returned an empty, truncated, or unsupported response."
 }
 
 $oracleDir = Join-Path $root 'agency-os\reports\oracle'

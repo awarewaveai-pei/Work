@@ -1,4 +1,43 @@
-# Worklog
+﻿# Worklog
+## 2026-09-20（續90）英文版「為什麼有效」186 筆重寫：英文介面開張前先把工程語清乾淨
+
+- [操作者請求] 「處理好」——把續86 標為剩餘風險、續87 開成 TASKS 的 `why_en`／`blurb_en` 一併處理掉。
+- [根因] 同續86：這批文案當初是照 builder 原始碼寫的，把實作細節當成使用者說明。中文那邊已修，英文沒修；今天前端一律優先顯示中文所以看不到，但檔案裡還在，做英文 UI 或有人拿 `_en` 當資料源時就會端給使用者。
+- [已修改] `methods/registry/method-display-metadata.yaml`：186 筆 `why_en` 重寫（186／285 有工程語，其餘 99 筆本來就乾淨、未動）。**不是翻譯舊英文，是照已修好的中文重新用英文寫**——舊英文本身就是要丟掉的那份東西。`blurb_en` **經查全部不用改**：10 筆命中都是誤報（資料庫方法的 `schema`、安全方法的 `API keys` 是使用者自己的詞；`gate` 命中的是 Dele**gate** 這個字和「a go/no-go gate」；`mind_map` 是 `association.mind_map` 的交叉引用，中文版同樣保留）。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_api_main.py tests/unit/test_method_form.py -q` | exit=0 | ms=58160 | result=102 passed／287 subtests
+  - REALTEST_EVIDENCE: tool=Bash | cmd=套用腳本自帶斷言（`apply_why_en.py`）| exit=0 | result=186 筆全部命中、285 entry 數不變、**每個 entry 的其他欄位逐一比對 byte-identical**、重寫後掃描識別碼／錯誤碼 **0 筆殘留**
+  - REVIEW_WAIVED: DOC_ONLY -- 純文案資料，無程式邏輯改動；改以機械交叉檢查替代：把中英兩版的數字逐筆比對（中文數字與阿拉伯數字都抽），40 筆有差異，逐筆查完**真實漂移 0 筆**——全是抽取器假陽性（`四` 夾在 `四十` 裡、`三` 夾在 `十三` 裡）或英文直接把三項逐一列出而沒寫 three
+  - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`why_en` | hits=1（唯一消費端是 `main.py` 的 display metadata 直傳，前端 `dashboard.html` 以 `d.why_zh || d.why_en` fallback；285 筆都有 zh，故英文目前仍不顯示，改動零風險）
+- [剩餘風險] 英文文案沒有母語者覆審。內容正確性靠「照已驗證的中文重寫 + 數字逐筆比對」保證，文體風格未經第二人檢查。
+- [rollback] `git revert` 本 commit；186 筆舊英文完整留在 git 歷史。
+
+## 2026-09-20（續89）Oracle packet 汙染與空殼 review 治本修復
+
+操作者要求處理兩支 cross-model oracle 的 4.97MB transcript 汙染與靜默空殼成功問題。根因已由實際程式碼確認：`scripts/codex-oracle.ps1:228-278` 與 `scripts/write-oracle-artifact.ps1:164-196` 都從 `git ls-files --others --exclude-standard` 取得全 repo untracked，再以副檔名／512KB／secret 名稱過濾；`.claude/sessions/*.md` 因此全部被 inline。另 `write-oracle-artifact.ps1:303-315` 原本只要 JSON 含 `findings` 就可把 `{"findings":[]}` 記為 0 finding，沒有要求 verdict；`claude-oracle.ps1:116-143` 也只驗 JSON 可解析，且 null stderr error path 會二次拋例外。
+
+[已修改]
+1. `scripts/oracle-capture-policy.ps1`：新增兩支 wrapper 共用的 capture policy；明確排除 `.claude/sessions/`、`.claude/uploads/`、`.claude/worktrees/`、`.next/`、`node_modules/`、build/runtime transcript 路徑；保留 source extension/secret/512KB 檢查；最多 64 個 untracked source，packet 超過 2MB 直接拒絕。
+2. `scripts/codex-oracle.ps1`、`scripts/write-oracle-artifact.ps1`：移除各自重複的 untracked builder，改用共享 policy；Codex 空 output/非零 exit 明確失敗；capture 超限不寫出 packet。
+3. `scripts/claude-oracle.ps1`、`scripts/write-oracle-artifact.ps1`：review answer 必須有合法 `verdict`（`approve|needs-attention`）與 `findings`；`{"findings":[]}`、空、截斷或 unsupported shape 不產生 artifact；stderr `$null` 不再造成二次例外。
+4. `tests/oracle-capture-policy.test.ps1`：新增 runtime exclusion、2MB cap、mutation proof 回歸測試。
+5. `agency-os/TASKS.md`：本事故項目改為已修並補實測證據。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File scripts/write-oracle-artifact.ps1 -Mode capture -Out <TEMP> -RepoRoot D:/Work` | exit=0 | result=109,322 bytes；12 個 intended source inline；87 個 `.claude/sessions` transcript 明確 skipped；原 incident packet 4.97MB 不再進入模型。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell.exe -File tests/oracle-capture-policy.test.ps1` | exit=0 | result=runtime exclusion + packet cap + mutation proof PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`write-oracle-artifact.ps1 -Mode review -Answer '{"findings":[]}'` | exit=2 | result=拒絕寫 artifact；確認空殼不再被記成 clean review。
+- REALTEST_EVIDENCE: tool=Bash | cmd=PowerShell 5.1 Parser::ParseFile 對 5 個改動腳本/測試 | exit=0 | result=全部語法 PASS。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/0m/0n（外部 Claude oracle 已實際啟動並完成 96,033-byte capture，但 `claude -p` 回 invalid/incomplete、exit=1；無 `429`/`rate limit`，未設 quota breaker；因此沒有把外部 review 失敗冒充 pass）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,tests | grep=`Invoke-OracleUntrackedCapture\|MaxPacketBytes\|findingsCountStr\|NEW UNTRACKED FILE` | hits=改動的 5 個 producer/consumer/test 路徑，未發現第二套未修 capture builder；歷史 `.agency-state`/WORKLOG 命中為紀錄，不是 runtime call site。
+- ORACLE_WAIVED: Claude reviewer 本次 invalid/incomplete（exit=1，無 quota evidence）；以 real capture、negative schema test、mutation proof、跨檔 grep 取代，不宣告外部 review 通過。
+
+[剩餘風險]
+- 共享 policy 目前是明確 runtime denylist + source filter；若未來新增 runtime 目錄，必須把它加入 `RuntimePathPatterns`，否則 2MB hard cap 會 fail closed 而不會外送超大 packet。
+- `/codex-review` companion 本身尚未取得可驗證 final answer；本修法已讓其 invalid/empty output 不會落 artifact，但 companion 的上游 timeout/輸出問題仍需另案處理。
+
+[rollback] 回退本次 scoped commit 即可移除 shared policy、兩支 wrapper 接線與測試；不涉及 secrets、DB、prod、外部服務或資料刪除。
+
 ## 2026-09-20（續88）docker-compose.yml repo/prod drift 治本：查明兩軌部署架構、補齊 repo、`/check-drift` 新增機械偵測
 
 操作者對續85（Perplexity→Serper）留下的追蹤項下達「處理好!」+ 完整 R0 架構師身份宣告。

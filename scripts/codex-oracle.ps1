@@ -65,6 +65,8 @@ $ErrorActionPreference = 'Stop'
 # Big5 console is the CP950 trap that audit-cp950-traps.ps1 exists to catch.
 $encHelpers = Join-Path $PSScriptRoot '_console-encoding-helpers.ps1'
 if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
+. (Join-Path $PSScriptRoot 'oracle-capture-policy.ps1')
+$capturePolicy = Get-OracleCapturePolicy
 
 function Invoke-Git {
     <#
@@ -225,16 +227,8 @@ if ($Mode -eq 'review') {
         # narrow: reviewable source extensions only, never anything whose name suggests a
         # secret, and every inlined path is printed so the caller sees what left the machine.
         if (-not $DiffRef) {
-            $reviewableExt = @('.ps1','.psm1','.ts','.tsx','.js','.jsx','.mjs','.cjs','.sh',
-                               '.py','.sql','.json','.yml','.yaml','.toml','.md','.php','.css','.html')
-            $secretish     = '(^|[\\/._-])(env|secret|secrets|credential|credentials|token|tokens|password|passwd|vault|id_rsa|id_ed25519)([\\/._-]|$)|\.(pem|key|pfx|p12|crt|keystore)$'
-            # FINDING 3 (codex, 2026-08-20): oracle artifacts are untracked .md under a
-            # non-ignored path, so a SECOND review would inline the FIRST review's prose
-            # as "new source" -- self-inflicted by persisting artifacts. Excluded here.
-            $selfArtifacts = '^agency-os/reports/oracle/'
-
             $ru        = Invoke-Git -GitArgs @('ls-files','--others','--exclude-standard') -Root $root
-            $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch $selfArtifacts })
+            $untracked = @($ru.Text -split "`n" | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
             if ($Path.Count -gt 0) {
                 # @() is required around the inner Where-Object. Under Set-StrictMode
                 # -Version Latest (line 61), the synthetic Count/Length ETS member is
@@ -252,24 +246,10 @@ if ($Mode -eq 'review') {
                 })
             }
 
-            $inlined = @()
-            $skipped = @()
-            foreach ($u in $untracked) {
-                $full = Join-Path $root ($u -replace '/', '\')
-                if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
-                if ($u -match $secretish) { $skipped += "$u (name suggests a secret)"; continue }
-                if ($reviewableExt -notcontains ([IO.Path]::GetExtension($u).ToLower())) {
-                    $skipped += "$u (not a reviewable source type)"; continue
-                }
-                if ((Get-Item -LiteralPath $full).Length -gt 512KB) {
-                    $skipped += "$u (larger than 512KB)"; continue
-                }
-                # -Encoding UTF8 is required: Windows PowerShell 5.1 decodes BOM-less files
-                # with the ANSI codepage (CP950 here), which mangles CJK before it is sent.
-                $body = Get-Content -LiteralPath $full -Raw -Encoding UTF8
-                $diffText += "`n`n--- NEW UNTRACKED FILE: $u ---`n" + $body
-                $inlined  += $u
-            }
+            $capture = Invoke-OracleUntrackedCapture -Root $root -Candidates $untracked -Policy $capturePolicy -Path $Path
+            $diffText += $capture.Additions
+            $inlined = @($capture.Inlined)
+            $skipped = @($capture.Skipped)
 
             if ($inlined.Count -gt 0) {
                 Write-Host ("codex-oracle: inlining {0} untracked file(s): {1}" -f $inlined.Count, ($inlined -join ', ')) -ForegroundColor DarkGray
@@ -442,6 +422,7 @@ else {
 }
 
 $packet  = $sb.ToString()
+$packetBytes = Assert-OraclePacketSize -Packet $packet -Policy $capturePolicy
 $stamp   = [guid]::NewGuid().ToString('N').Substring(0,8)
 $pktFile = Join-Path $env:TEMP "codex-oracle-packet-$stamp.md"
 $outFile = Join-Path $env:TEMP "codex-oracle-out-$stamp.txt"
@@ -450,7 +431,7 @@ $errFile = $logFile + '.err'
 Set-Content -LiteralPath $pktFile -Value $packet -Encoding UTF8
 
 Write-Host ("codex-oracle: mode={0} root={1} packet={2}KB" -f `
-    $Mode, $root, [math]::Round((Get-Item -LiteralPath $pktFile).Length / 1KB, 1)) -ForegroundColor DarkGray
+    $Mode, $root, [math]::Round($packetBytes / 1KB, 1)) -ForegroundColor DarkGray
 
 # -s read-only is deliberate and must never become a parameter: it is the mechanical
 # half of "Codex does not write". --ephemeral keeps one-shot reviews out of the store.
@@ -510,6 +491,10 @@ if (-not (Test-Path -LiteralPath $outFile)) {
 }
 
 $answer = (Get-Content -LiteralPath $outFile -Raw -Encoding UTF8)
+if ($exit -ne 0 -or -not $answer.Trim()) {
+    Write-Error "codex produced an empty or failed final message (exit=$exit). Raw log: $logFile"
+    exit 3
+}
 Write-Host ""
 Write-Host $answer
 Write-Host ""
