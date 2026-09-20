@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-20（續92）sg-deploy.sh next-admin：補上落後的 8 個 commit（其他並行 session 的 collect entity/relevance 功能 + UI 測試）
+
+操作者對「prod 落後 origin/main 8 commit」的附帶提醒回「要」。跑之前先 `git log a19507b6f..origin/main` 看過內容，非盲跑：實際會動 next-admin 的是 `d630705ce`（背景調查蒐集器新增 entity/relevance 品質軸）+ `d369bfce2`（收集面板選項改按鈕不用下拉，符合操作者一貫要求）；其餘是 Cognitive OS／Claude-Codex 共用資產的變更，不在 next-admin 部署範圍內。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | result=typecheck 過、`npm test` 1393 passed/11 skipped/0 failed、build（多數 layer cache 命中）、`next-admin` healthy after 1s、smoke 5/5 200，`.deployed-commit`=d369bfce2
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-deploy-drift.ps1` | exit=0 | result=PASS，behind=0，composeVarDrift 為空
+- REVIEW_WAIVED: NA -- 部署本身即為既有 gate 鏈（typecheck/test/healthcheck/smoke/auto-rollback），內容為其他 session 已各自完成的工作
+- BUGHUNT_WAIVED: NA -- 純部署動作，無新程式碼
+[rollback] `rollback-phase1.sh restore next-admin lobster-phase1-next-admin:rollback-20260920-070843`（sg-deploy.sh 部署前自動存的快照）
+
 ## 2026-09-20（續91）背景調查蒐集器：相關性成為第二條品質軸，搜尋結果不再變成整站抓取
 
 - [操作者請求] 「用 Theo Farrell 搜尋只找到 2 筆無關緊要的資料，我何不用 Google 就好」→ 追問後確認真實需求是「給個人／公司／事件的背景資料搜尋」。決定範圍：「最完善完整，1-3 項都要處理妥當，不准用補丁」。
