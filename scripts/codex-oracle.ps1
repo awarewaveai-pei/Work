@@ -189,9 +189,14 @@ if ($Mode -eq 'review') {
         # gate, so a rerun after any later gate failure would see the PREVIOUS artifact
         # as STAGED content. Excluding it from the untracked collector alone was not
         # enough -- the artifact directory is excluded from every diff, staged or not.
-        $excludeArtifacts = ':(exclude)agency-os/reports/oracle'
-        if ($Path.Count -gt 0) { $diffArgs += @('--') + $Path + @($excludeArtifacts) }
-        else                   { $diffArgs += @('--', '.', $excludeArtifacts) }
+        # Widened 2026-09-20 from the oracle artifact dir alone to every runtime/generated
+        # path in the shared policy. The untracked collector already skipped them; the
+        # TRACKED diff did not, and 8 deleted `.claude/sessions/*.md` files were still
+        # arriving as 9656 lines of deletion hunks -- 81% of a measured 640KB packet.
+        # Derived from Get-OracleCapturePolicy so this list cannot drift from the regex one.
+        $excludeArtifacts = @(Get-OracleGitExcludePathspecs -Policy $capturePolicy)
+        if ($Path.Count -gt 0) { $diffArgs += @('--') + $Path + $excludeArtifacts }
+        else                   { $diffArgs += @('--', '.') + $excludeArtifacts }
 
         $r        = Invoke-Git -GitArgs $diffArgs -Root $root
         $diffText = $r.Text
@@ -207,8 +212,8 @@ if ($Mode -eq 'review') {
             # Working tree: the unstaged diff alone misses anything already staged, which
             # is the normal pre-commit state and exactly what needs reviewing.
             $stagedArgs = @('diff', '--cached')
-            if ($Path.Count -gt 0) { $stagedArgs += @('--') + $Path + @($excludeArtifacts) }
-            else                   { $stagedArgs += @('--', '.', $excludeArtifacts) }
+            if ($Path.Count -gt 0) { $stagedArgs += @('--') + $Path + $excludeArtifacts }
+            else                   { $stagedArgs += @('--', '.') + $excludeArtifacts }
             $rs = Invoke-Git -GitArgs $stagedArgs -Root $root
             if ($rs.Exit -ne 0) {
                 Write-Error "git diff --cached failed (exit=$($rs.Exit)): $($rs.Text.Trim())"

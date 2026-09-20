@@ -144,9 +144,12 @@ if ($Mode -eq 'capture') {
     } else {
         $diffArgs = @('diff')
     }
-    $excludeArtifacts = ':(exclude)agency-os/reports/oracle'
-    if ($Path.Count -gt 0) { $diffArgs += @('--') + $Path + @($excludeArtifacts) }
-    else                   { $diffArgs += @('--', '.', $excludeArtifacts) }
+    # The tracked door. Same runtime paths the untracked filter uses, derived from the one
+    # policy list -- closing only the untracked door left 81% of a measured 640KB packet as
+    # deleted session transcripts (2026-09-20).
+    $excludeArtifacts = @(Get-OracleGitExcludePathspecs -Policy $capturePolicy)
+    if ($Path.Count -gt 0) { $diffArgs += @('--') + $Path + $excludeArtifacts }
+    else                   { $diffArgs += @('--', '.') + $excludeArtifacts }
 
     $r = Invoke-Git -GitArgs $diffArgs -Root $root
     if ($r.Exit -ne 0) { Fail "git $($diffArgs -join ' ') failed (exit=$($r.Exit)): $($r.Text.Trim())" }
@@ -154,8 +157,8 @@ if ($Mode -eq 'capture') {
 
     if (-not $DiffRef) {
         $stagedArgs = @('diff', '--cached')
-        if ($Path.Count -gt 0) { $stagedArgs += @('--') + $Path + @($excludeArtifacts) }
-        else                   { $stagedArgs += @('--', '.', $excludeArtifacts) }
+        if ($Path.Count -gt 0) { $stagedArgs += @('--') + $Path + $excludeArtifacts }
+        else                   { $stagedArgs += @('--', '.') + $excludeArtifacts }
         $rs = Invoke-Git -GitArgs $stagedArgs -Root $root
         if ($rs.Exit -ne 0) { Fail "git diff --cached failed (exit=$($rs.Exit)): $($rs.Text.Trim())" }
         $diffText = ($rs.Text + "`n" + $diffText).Trim()
@@ -286,6 +289,25 @@ try {
         $validVerdict = $hasVerdict -and ([string]$parsed.verdict -in @('approve', 'needs-attention'))
         if ($validVerdict) {
             $findingsCountStr = [string](@($parsed.findings)).Count
+            # `needs-attention` with nothing to attend to is self-contradictory, and it is the
+            # exact shape of a review that never happened: on 2026-09-20 the companion emitted
+            # {"verdict":"needs-attention","findings":[],"summary":"Reviewing the working-tree
+            # diff and tracing changed behavior..."} EIGHT SECONDS into a 130-file diff, then
+            # hung for ten minutes. The verdict was valid and findings parsed as 0, so this
+            # script wrote the artifact and printed `REVIEW_DONE ... findings=0` -- a
+            # gate-satisfying token for a review that produced nothing.
+            #
+            # An EMPTY findings list is NOT itself the problem: `approve` with zero findings is
+            # the correct outcome when there is genuinely nothing wrong, and the review prompt
+            # explicitly asks the reviewer to say so rather than invent a weak finding. The
+            # contradiction between the two fields is what is mechanically decidable, so that
+            # is what is refused.
+            if (([string]$parsed.verdict) -eq 'needs-attention' -and (@($parsed.findings)).Count -eq 0) {
+                Fail ("Oracle answer is self-contradictory: verdict='needs-attention' with zero findings. " +
+                      "This is the signature of a review that started and never finished (the reviewer " +
+                      "emitted its opening intent and stopped). Re-run the review, or narrow it with -Path; " +
+                      "if the reviewer genuinely found nothing, it must say verdict='approve'.")
+            }
         }
     }
 } catch {

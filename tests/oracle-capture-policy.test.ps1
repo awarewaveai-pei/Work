@@ -25,15 +25,35 @@ try {
     # Mutation proof: removing the runtime guard must make the transcript visible
     # again; otherwise the regression test would be decorative.
     $mutatedPolicy = Get-OracleCapturePolicy
-    $mutatedPolicy.RuntimePathPatterns = @()
+    $mutatedPolicy.RuntimePaths = @()
     $mutated = Invoke-OracleUntrackedCapture -Root $root -Candidates @('.claude/sessions/transcript.md') -Policy $mutatedPolicy
     Assert-True ($mutated.Inlined -contains '.claude/sessions/transcript.md') 'mutation did not disable the runtime guard'
 
+
+    # Both doors, one list. The untracked filter (regex) and the tracked `git diff` pathspecs
+    # are both derived from $policy.RuntimePaths, so they cannot drift apart; excluding a path
+    # from only one door is not an exclusion. Measured 2026-09-20: untracked closed + tracked
+    # open left 81% of a 640KB packet as deleted .claude/sessions transcripts.
+    $patterns  = @(Get-OracleRuntimePathPatterns -Policy $policy)
+    $pathspecs = @(Get-OracleGitExcludePathspecs -Policy $policy)
+    Assert-True ($patterns.Count -eq @($policy.RuntimePaths).Count) 'regex form lost an entry'
+    Assert-True ($pathspecs.Count -eq @($policy.RuntimePaths).Count) 'pathspec form lost an entry'
+    Assert-True ($pathspecs -contains ':(exclude).claude/sessions') 'tracked diff does not exclude session transcripts'
+    Assert-True ($pathspecs -contains ':(exclude)agency-os/reports/oracle') 'tracked diff does not exclude the oracle artifact dir'
+    Assert-True ($pathspecs -contains ':(exclude)**/node_modules') 'an Anywhere-scoped path lost its **/ prefix, so git would only match it at the repo root'
+    Assert-True ('.claude/sessions/x.md' -match ($patterns -join '|')) 'regex form stopped matching a rooted runtime path'
+    Assert-True ('a/b/node_modules/x.js' -match ($patterns -join '|')) 'regex form stopped matching a nested runtime path'
+    Assert-True (-not ('scripts/.claude/sessions/x.md' -match ($patterns -join '|'))) 'a Rooted path must not match at depth'
+
+    # Mutation proof for the tracked door too: emptying the one list must empty BOTH forms.
+    $mutatedBoth = Get-OracleCapturePolicy
+    $mutatedBoth.RuntimePaths = @()
+    Assert-True (@(Get-OracleGitExcludePathspecs -Policy $mutatedBoth).Count -eq 0) 'mutation did not disable the tracked-diff exclusions'
     $tooLarge = ('x' * ($policy.MaxPacketBytes + 1))
     $rejected = $false
     try { [void](Assert-OraclePacketSize -Packet $tooLarge -Policy $policy) } catch { $rejected = $true }
     Assert-True $rejected 'oversized packet was not rejected'
-    Write-Output 'oracle-capture-policy: PASS (runtime exclusion + packet cap)'
+    Write-Output 'oracle-capture-policy: PASS (runtime exclusion on BOTH doors + packet cap)'
 } finally {
     if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
 }

@@ -13,12 +13,48 @@ function Get-OracleCapturePolicy {
         ReviewableExtensions = @('.ps1','.psm1','.ts','.tsx','.js','.jsx','.mjs','.cjs','.sh',
                                  '.py','.sql','.json','.yml','.yaml','.toml','.md','.php','.css','.html')
         SecretishPattern     = '(^|[\/._-])(env|secret|secrets|credential|credentials|token|tokens|password|passwd|vault|id_rsa|id_ed25519)([\/._-]|$)|\.(pem|key|pfx|p12|crt|keystore)$'
-        RuntimePathPatterns  = @(
-            '^agency-os/reports/oracle/',
-            '^\.claude/(sessions|uploads|worktrees)/',
-            '(^|/)(node_modules|\.next|dist|build|coverage|tmp|temp|transcripts)/'
+        # ONE list of runtime/generated locations. Both the untracked-file filter (a regex)
+        # and the `git diff` pathspecs (`:(exclude)...`) are derived from it below, because a
+        # review packet has two doors and excluding a path from only one of them is not an
+        # exclusion. Measured 2026-09-20: with the untracked door closed but the tracked door
+        # open, 81% of a 640KB packet was still session transcripts -- 8 DELETED tracked
+        # `.claude/sessions/*.md` files whose full 9656 lines arrived as deletion hunks.
+        # Rooted = only at the repo root; Anywhere = at any depth.
+        RuntimePaths         = @(
+            @{ Scope = 'Rooted';   Path = 'agency-os/reports/oracle' },
+            @{ Scope = 'Rooted';   Path = '.claude/sessions' },
+            @{ Scope = 'Rooted';   Path = '.claude/uploads' },
+            @{ Scope = 'Rooted';   Path = '.claude/worktrees' },
+            @{ Scope = 'Anywhere'; Path = 'node_modules' },
+            @{ Scope = 'Anywhere'; Path = '.next' },
+            @{ Scope = 'Anywhere'; Path = 'dist' },
+            @{ Scope = 'Anywhere'; Path = 'build' },
+            @{ Scope = 'Anywhere'; Path = 'coverage' },
+            @{ Scope = 'Anywhere'; Path = 'tmp' },
+            @{ Scope = 'Anywhere'; Path = 'temp' },
+            @{ Scope = 'Anywhere'; Path = 'transcripts' }
         )
     }
+}
+
+# Regex form, for filtering a path string (the untracked door).
+function Get-OracleRuntimePathPatterns {
+    param([Parameter(Mandatory)][System.Collections.IDictionary]$Policy)
+
+    return @(@($Policy.RuntimePaths) | ForEach-Object {
+        $escaped = [regex]::Escape($_.Path)
+        if ($_.Scope -eq 'Rooted') { '^' + $escaped + '/' } else { '(^|/)' + $escaped + '/' }
+    })
+}
+
+# Pathspec form, for `git diff -- . <excludes>` (the tracked door). Rooted entries get the
+# `:(exclude)` magic prefix; Anywhere entries need `**/` so git matches at any depth.
+function Get-OracleGitExcludePathspecs {
+    param([Parameter(Mandatory)][System.Collections.IDictionary]$Policy)
+
+    return @(@($Policy.RuntimePaths) | ForEach-Object {
+        if ($_.Scope -eq 'Rooted') { ':(exclude)' + $_.Path } else { ':(exclude)**/' + $_.Path }
+    })
 }
 
 function Get-OracleSkipReason {
@@ -28,7 +64,7 @@ function Get-OracleSkipReason {
     )
 
     $path = ($RelativePath -replace '\\', '/')
-    $runtimePatterns = @($Policy.RuntimePathPatterns)
+    $runtimePatterns = @(Get-OracleRuntimePathPatterns -Policy $Policy)
     if ($runtimePatterns.Count -gt 0 -and $path -match ($runtimePatterns -join '|')) { return 'runtime/generated path' }
     if ($path -match $Policy.SecretishPattern) { return 'name suggests a secret' }
     if ($Policy.ReviewableExtensions -notcontains ([IO.Path]::GetExtension($path).ToLowerInvariant())) {

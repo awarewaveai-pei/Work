@@ -1,4 +1,32 @@
 ﻿# Worklog
+## 2026-09-20（續92）背景調查第二輪：相關 ≠ 有用；並補上我上一輪漏掉的「最終彙整」
+
+- [操作者回報] 「沒有真正搜出以下角度，而且居然給我書店和 amazon 的東西？？也沒有最終的資料彙整」。
+- [根因] 五個，全部實測確認：
+  1. **migration 0090 沒套就部署了新 code**（prod BUILD_ID 時間 07:04，`information_schema` 查 `collection_runs.off_entity` = 0 rows）。後果正是 db-expert 預測的那條：`collection_runs` upsert 撞未知欄位 → `report-store.ts` 提早 return → **整份 run report 靜默丟失**。查 `collection_runs` 自 05:40 起零筆，但 `collection_sources.last_status` 有 07:18 的結果——證據對得上。她「看不到角度有沒有跑」不是錯覺，是報告真的沒被寫下來。
+  2. **角度其實跑了**：入庫文件的 `metadata->>searchAngle` 涵蓋 identity／affiliation／works／interview／controversy／network 六個角度。看不見而已。
+  3. **相關 ≠ 有用**：12 筆全是 `entityConfidence=name_only`（她沒填定位詞）。其中 `sdu.dk` 是另一位教授 Sten Rynning 的個人頁（只提到他一次）、`sbs.com.au 今日大事(12月18日)` 是新聞流水帳、`amazon.com/.../dp/1555879756` 是書籍商品頁。三者都通過「頁面有這個名字」，但沒有一條可引用的事實。
+  4. **中文查詢對拉丁名外國人是純噪音**：`languages` 未設時我寫死 `"zh,en"`，於是 `"Theo Farrell" 著作 出版 論文` 撈回武漢大學動態、淡江電子學位論文、輔仁校友總會、萬友教育——四筆，零事實，還付兩倍查詢費。
+  5. **我自己的兩個 UI bug**：`KIND_CHOICES.label.slice(0,2)` 把「人（個人背景）」切成「人（」，所以選項顯示「人（·身分／職稱」；且 person 與 company 共用 `identity`／`news` 兩個 angle id，扁平的 choice 清單讓同一個 value 出現兩次——勾一個會連動另一個。
+- [已修改]
+  1. `lib/collect/source-class.ts`（新）：**第三條軸**。retail／social／aggregator／reference 分類，購物與社群與標籤頁在**發出 fetch 之前**就擋掉。**fail-open**——沒被分類的 host 一律放行，只會移除有人明確列出的，永遠不會用白名單把沒人想到的地方來源擋死。
+  2. `lib/collect/relevance.ts`：新增 `entity_passing_mention`。被提到 ≠ 這頁在講他：標題命中、或出現 ≥2 處、或全文 < 2500 字（短通知一次就是全部）三者之一才算。
+  3. `query-plan.ts` `defaultLanguagesFor()`：查詢語言跟著**名字的字集**走。拉丁名只查英文；CJK 名查中英（中文對象的英文報導常常才是找不到的那半）。
+  4. angle 選項改為 `<kind>:<id>` 命名空間 + `short` 標籤欄位，兩個 UI bug 一起修。
+  5. `lib/dossier/`（新層）：`report.ts` 產生帶 [n] 引註的背景檔案（結論／各段落／**來源互相矛盾**／**這批資料沒回答的問題**／來源清單），`folder.ts` 讀資料夾→產生→以 `AI_INFERENCE／AI_GENERATED` 寫回同一個資料夾。API `POST cs-knowledge {action:"build_dossier"}`，UI 資料夾工具列「產生背景檔案」按鈕。**放 `lib/dossier/` 不放 `lib/collect/`**：collection 必須能在沒有知識庫的情況下運作（ADR 011，只有 sink 可以 import `lib/kb`），我一開始放錯位置，`collect-block-hygiene.test.ts` 當場擋下來——閘做了它該做的事。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_DOSSIER_LIVE=1 DOSSIER_FOLDER="Theo Farrell_202609200517" npx vitest run lib/dossier/__tests__/dossier-live.test.ts`（真 prod Supabase 讀 + 真 OpenAI 模型） | exit=0 | ms=21425 | result=2 份來源產出完整報告；**每一段主張都帶 [n]**；自動抓到真實矛盾（Penguin 稱 Executive Dean vs UOW 2019 稱 Deputy Vice-Chancellor）；gaps 列出 9 條具體缺口含「缺少確認是否存在同名的其他 Theo Farrell」；爭議段落誠實寫「來源未記載任何指控」而非硬掰
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` + `npx tsc --noEmit` | exit=0 | result=1424 passed / 11 skipped / 146 files；typecheck 乾淨
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -c "SELECT column_name FROM information_schema.columns WHERE table_name='collection_runs' AND column_name='off_entity'"` | exit=0 | result=**0 rows** — migration 未套用，確認 run report 遺失的根因
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin sh -c 'cat /app/.next/BUILD_ID'` + `docker inspect --format {{.State.StartedAt}}` | exit=0 | result=2026-09-20T07:04:50Z — 新 code 已在 prod，schema 沒有跟上
+  - REVIEW_DONE: 見本日 ORACLE artifact（`/codex-review` 第二層 `codex-oracle.ps1`，Claude 寫 → Codex 審）
+  - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`dossier|sourceClass|passing_mention|defaultLanguagesFor|ANGLE_CHOICES` | hits=1 真實命中（`collect-block-hygiene.test.ts` 的 lib/kb 邊界，已改為移出 `lib/collect/`）
+- [剩餘風險]
+  1. **prod 現在是 code 新、schema 舊的狀態，run report 持續在丟。** 套 0090 是 High-risk，等操作者明示。
+  2. `source-class.ts` 的 host 清單必然不完整。設計上 fail-open，所以漏列只會多收一筆雜訊，不會少收真資料——但別期待它擋得住沒見過的電商。
+  3. 本機 `ANTHROPIC_API_KEY` 401（prod 那把是好的），所以 live 報告是用 `gpt-5.4` 產的。`defaultDossierModel()` 依實際存在的 key 選模型，prod 會走 claude-sonnet-4-6，**輸出品質未在 prod 模型上實測**。
+- [rollback] `git revert`；`lib/dossier/` 整層刪除不影響蒐集；source-class 與 passing-mention 兩個閘只在 target 帶 `meta.entity` 時作用，其他來源零影響。
+
 ## 2026-09-20（續92）sg-deploy.sh next-admin：補上落後的 8 個 commit（其他並行 session 的 collect entity/relevance 功能 + UI 測試）
 
 操作者對「prod 落後 origin/main 8 commit」的附帶提醒回「要」。跑之前先 `git log a19507b6f..origin/main` 看過內容，非盲跑：實際會動 next-admin 的是 `d630705ce`（背景調查蒐集器新增 entity/relevance 品質軸）+ `d369bfce2`（收集面板選項改按鈕不用下拉，符合操作者一貫要求）；其餘是 Cognitive OS／Claude-Codex 共用資產的變更，不在 next-admin 部署範圍內。
@@ -21107,3 +21135,30 @@ WORKLOG_DONE: /ops/collect 搜尋全網 Perplexity→Serper 切換完成並已�
 [rollback] `git revert` 本 commit，然後重跑 `powershell -File mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1` 讓 wrapper/toml 回到舊形式（generator 是產生者，revert 原始碼後必須再跑一次才會真的回退產出）。刪掉的 4 支 command 由 revert 一併復原。
 
 WORKLOG_DONE: Claude+Codex 共用資產 13 項全處理；新增 2 支 `.mjs` 機械閘（+30 tests）+ CI workflow；C1 初判經實查訂正為錯誤並已在檔案裡說清楚
+
+## 2026-09-20（續88）驗證 Codex 回報的兩項，一項未做、一項只做一半（操作者：「看處理好了沒? codex 說他做了」）
+
+不採信「agent 說了」，兩項各自機械驗真。
+
+**① Codex `/hooks` trust：未做。** `check-claude-codex-parity.ps1` 仍 2/445 失敗。直接查憑據而非只看檢查器輸出：`~/.codex/config.toml` 裡 `trusted_hash` 條目 **0 個**、`[hooks` 區段 **0 個**；`~/.codex/awarewave-hook-heartbeat.json` 最新事件 `PreToolUse.last_utc=2026-09-20T04:50:32Z`（count 28），而我在 05:21Z 重跑過 generator 改寫 hook 檔 → hash 變更 → 12:50 local 那次的 trust 已失效，之後沒有任何 Codex session 觸發過 hook。**現況 = Codex 側零機械閘**，仍需操作者在 Codex 開 `D:\Work` 跑 `/hooks`。另冒出一項新 drift：`~/.codex/hooks.json` 與 generator 產出不一致（未處理，記入 TASKS）。
+
+**② oracle packet：Codex 修了一半，量化後仍有 81% 噪音。** commit `2b48454aa` 新增 `scripts/oracle-capture-policy.ps1`（runtime 路徑排除 + 2MB 上限 + 自帶測試），實測 packet 4.97MB → 640KB，`.claude/sessions/*` 被標 `runtime/generated path` 排除 —— 這部分是真的。**但一個 review packet 有兩道門**，排除只套在 untracked inlining，沒套到 tracked `git diff`：量測 640KB 中 **513,736 字元（81%）仍是 session transcript** —— 8 個被刪除的 tracked `.claude/sessions/*.md`，整份 9656 行以刪除 hunk 進入 diff。只關一道門不叫排除。
+- 治本（不寫第二份清單）：政策改為單一來源 `RuntimePaths`（`Scope=Rooted|Anywhere` + `Path`），regex 形式與 git pathspec 形式**都從它導出**（`Get-OracleRuntimePathPatterns` / `Get-OracleGitExcludePathspecs`），兩者不可能各自漂移。`write-oracle-artifact.ps1` 與 `codex-oracle.ps1` 的 tracked/staged diff 皆改用導出的 `:(exclude)` pathspecs（`Anywhere` 加 `**/` 前綴，否則 git 只在 repo 根匹配）。
+- **另一半宣稱「fail closed on empty answers」不成立**：實測把當初卡死的那個 payload 原樣餵進去 —— `{"verdict":"needs-attention","findings":[],"summary":"Reviewing the working-tree diff..."}` —— 仍 exit 0、仍寫出 artifact、仍印 `REVIEW_DONE ... findings=0`。驗證只擋「verdict 缺失或非法」，而該 payload verdict 合法。**判別點不是「findings 空」**（`approve` + 零發現是合法且是 review prompt 明文要求的誠實回答），而是 `needs-attention` 卻零發現 —— 自相矛盾、機械可判。已加該檢查並雙向實測：矛盾 payload exit 2 被拒；`approve` + 零發現仍 exit 0 通過。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`write-oracle-artifact.ps1 -Mode capture` 實跑量測 packet | exit=0 | result=4.97MB→640KB（Codex）→**149,049 bytes**（兩道門都關），`grep -cE '^diff --git a/\.claude/sessions'` = **0**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex-oracle.ps1 -Mode review` —— 即今天失敗兩次的同一支 | exit=0 | ms=71908 | result=**4 個帶 file:line 的具體發現**，packet 148.1KB。這是 packet 膨脹即根因的定論證明。
+- REALTEST_EVIDENCE: tool=Bash | cmd=空殼 payload 雙向實測 | exit=2／0 | result=`needs-attention`+0 findings 被拒；`approve`+0 findings 通過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep` 直查 `~/.codex/config.toml` 與 heartbeat JSON | exit=0 | result=trusted_hash 0 個、`[hooks` 0 個、PreToolUse last=04:50:32Z（早於 05:21Z 的 hook 檔改寫）
+- REVIEW_DONE: critic=書面自審 + 外部 oracle 實跑 | verdict=warn→fixed | findings=1C（tracked 門未關，81% 量化）/1M（空殼未 fail closed）/0m，兩項皆已修並實測
+- BUGHUNT_DONE: scope=`scripts,tests` | grep=`RuntimePathPatterns\|excludeArtifacts` | hits=**2 處實際命中**：`codex-oracle.ps1:192-194` 與 `:210-211` 有和 `write-oracle-artifact.ps1` 一樣的舊 `:(exclude)` 單項寫法（第二支 oracle，同樣失敗過），一併改掉；另 `tests/oracle-capture-policy.test.ps1` 的突變證明改握把到新單一來源，並補「兩道門同源」與 `Rooted` 不得在深層匹配等 9 條斷言
+- 突變測試：清空 `RuntimePaths` → untracked 與 tracked **兩種形式同時歸零**（原測試只證得了 untracked 一邊）
+
+**[轉交，非我的檔]** 上面那次真 review 的 4 個發現全部落在**另一個 session 未提交的 untracked** `lib/dossier/{report,folder}.ts`。已 grep 驗真：符號都存在、問題方向為真，但**行號偏移**——`folder.ts:152` 才是無回傳檢查的 `await moveSourceToFolder(...)`（回報 :147）；`report.ts:100` 的 `renderSourceBlock` 把 body 原樣插在 `<<<SOURCE n BEGIN/END>>>` 之間，body 內若含 END 標記即可逃出圍欄（回報 :116，那行是 prompt 規則不是漏洞點）。**我沒有動這 4 個檔**（另一 session 進行中，AGENTS.md 禁同時改同一檔），交給寫 dossier 的人。
+
+**[剩餘風險]** ① Codex `/hooks` trust 仍未跑，且每次重跑 generator 都會讓既有 trust 失效（hash 變更）—— 這個「修完閘就要再 trust 一次」的耦合本身是個坑，尚無提示機制 ② `~/.codex/hooks.json` 對 generator 產出的新 drift 未查因 ③ 2MB 上限對「只改幾個大檔」的情境仍可能誤擋，目前只能靠 `-Path` 收斂
+
+[rollback] `git revert` 本 commit；oracle 回到只關 untracked 門的狀態（仍優於 2b48454aa 之前）。
+
+WORKLOG_DONE: Codex 兩項回報驗真 —— hooks trust 未做（憑據層確認），oracle packet 只修了 untracked 一半，tracked 門與空殼 fail-closed 兩處補完並以真 review 跑通（4 findings/72s/148KB）
