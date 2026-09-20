@@ -15,7 +15,31 @@
 import { assessEntity, entityRefOf, type EntityMatch, type EntityRef } from "@/lib/collect/entity";
 import type { RawDoc } from "@/lib/collect/types";
 
-export type RelevanceReason = "entity_absent" | "entity_anchor_missing";
+export type RelevanceReason = "entity_absent" | "entity_anchor_missing" | "entity_passing_mention";
+
+/**
+ * Being NAMED on a page and being what the page is ABOUT are different things, and the gap between
+ * them is where a dossier fills up with noise. Real examples from one prod run (2026-09-20): a daily
+ * news round-up ("今日大事 12月18日"), and another professor's staff profile that lists him as a
+ * co-author. Both name him exactly once, both passed a name match, neither tells you anything.
+ *
+ * A page counts as being ABOUT the entity when any one of these holds:
+ *   - the name is in the TITLE — the page itself says that is its subject;
+ *   - the name appears in two or more separate places — sustained, not incidental;
+ *   - the name appears near the TOP of the text — how a document about somebody opens;
+ *   - the text is SHORT (a notice, an abstract, a short bio), where one mention is the whole point.
+ *
+ * The opening test is what removes the length CLIFF that a bare "short enough" rule creates: a
+ * 2,501-character official notice naming the entity in its first line is exactly as much about them
+ * as a 2,499-character one (cross-model oracle finding, 2026-09-20). It also still refuses the two
+ * documents this rule was written for, because a news round-up and another professor's staff page
+ * both reach the name halfway down.
+ *
+ * Deliberately not a ratio of mentions to length: that reads as precision it does not have, and it
+ * punishes a long, careful profile that states the name once in the opening and then says "he".
+ */
+const SHORT_ENOUGH_FOR_ONE_MENTION = 2500;
+const NAMED_IN_THE_OPENING = 0.15;
 
 export interface RelevanceVerdict {
   /** False ⇒ this target made no entity claim; the caller must treat the document as admissible. */
@@ -58,6 +82,14 @@ export function assessRelevance(doc: Pick<RawDoc, "text" | "title">, targetMeta:
 
   if (!match.nameHit) {
     return { applicable: true, ok: false, reason: "entity_absent", confidence: null, match, entity };
+  }
+  const aboutTheEntity =
+    match.titleHit ||
+    match.nameHits >= 2 ||
+    (match.firstMentionAt >= 0 && match.firstMentionAt <= NAMED_IN_THE_OPENING) ||
+    match.textLength <= SHORT_ENOUGH_FOR_ONE_MENTION;
+  if (!aboutTheEntity) {
+    return { applicable: true, ok: false, reason: "entity_passing_mention", confidence: null, match, entity };
   }
   if (match.anchorsAsked > 0 && match.anchorsHit.length === 0) {
     // Strict is the default (see EntityRef.strictAnchors): the operator supplied anchors precisely

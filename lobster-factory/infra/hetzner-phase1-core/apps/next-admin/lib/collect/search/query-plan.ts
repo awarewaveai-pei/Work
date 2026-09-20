@@ -151,3 +151,18 @@ export function parseLanguages(value: unknown): QueryLang[] {
     .map((l) => l.trim().toLowerCase())
     .filter((l): l is QueryLang => l === "zh" || l === "en");
 }
+
+/**
+ * The languages to search when the operator picked none — taken from the NAME's own script.
+ *
+ * Searching both languages for everybody sounds thorough and is not. A Chinese-language query for a
+ * Latin-named foreigner returns pages that merely contain the Latin letters of the name, which in
+ * one prod run (2026-09-20) meant a Wuhan university notice, a Taiwanese thesis index, a Fu Jen
+ * alumni bulletin and an SBS daily round-up — four documents, no facts, paid for twice over.
+ *
+ * A CJK name still gets both: a Chinese or Japanese subject is routinely written about in English
+ * too, and the English coverage is often the part the operator cannot find by hand.
+ */
+export function defaultLanguagesFor(name: string): QueryLang[] {
+  return /[㐀-鿿豈-﫿぀-ヿ가-힯]/.test(name) ? ["zh", "en"] : ["en"];
+}

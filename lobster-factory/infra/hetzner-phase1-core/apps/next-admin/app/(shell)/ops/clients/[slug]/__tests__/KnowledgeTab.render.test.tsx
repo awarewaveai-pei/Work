@@ -155,3 +155,54 @@ describe("KnowledgeTab — K2j collapse-cards grouping", () => {
     expect(container.querySelectorAll("a[href*='/api/cognitive-os/open']").length).toBe(1);
   });
 });
+
+describe("KnowledgeTab — 背景檔案", () => {
+  /** Pick a folder so the per-folder toolbar (rename / delete / dossier / Cognitive OS) renders. */
+  async function openFolder() {
+    await mount([sourceRow("s1", "任命新聞", "f1")], [{ id: "f1", name: "Theo Farrell_202609200517", parentId: null }]);
+    const pill = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Theo Farrell_2026"))!;
+    await act(async () => pill.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  }
+
+  it("offers the button on a folder, because the folder IS the dossier", async () => {
+    await openFolder();
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "產生背景檔案")).toBe(true);
+  });
+
+  it("asks the server to build the dossier for THIS folder, and says what came back", async () => {
+    await openFolder();
+    const posted: Array<Record<string, unknown>> = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        posted.push(JSON.parse(String(init.body)));
+        return { ok: true, json: async () => ({ ok: true, sourcesUsed: 7 }) } as unknown as Response;
+      }
+      return { ok: true, json: async () => ({ ok: true, sources: [], total: 0, page: 1, pageSize: 50, folders: [] }) } as unknown as Response;
+    });
+
+    const btn = [...container.querySelectorAll("button")].find((b) => b.textContent === "產生背景檔案")!;
+    await act(async () => btn.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(posted[0]).toMatchObject({ action: "build_dossier", folderId: "f1" });
+    expect(container.textContent).toContain("已用 7 份來源產出背景檔案");
+  });
+
+  it("shows the server's plain-language hint AND the raw error, not one or the other", async () => {
+    await openFolder();
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return { ok: false, json: async () => ({ ok: false, error: "no_sources", hint: "這個資料夾裡沒有可用的文件內容" }) } as unknown as Response;
+      }
+      return { ok: true, json: async () => ({ ok: true, sources: [], total: 0, page: 1, pageSize: 50, folders: [] }) } as unknown as Response;
+    });
+
+    const btn = [...container.querySelectorAll("button")].find((b) => b.textContent === "產生背景檔案")!;
+    await act(async () => btn.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => { await Promise.resolve(); });
+
+    // The hint is for the human; the raw code is what you search for when the hint runs out.
+    expect(container.textContent).toContain("這個資料夾裡沒有可用的文件內容");
+    expect(container.textContent).toContain("no_sources");
+  });
+});

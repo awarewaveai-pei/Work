@@ -199,6 +199,16 @@ export interface EntityMatch {
   /** The name (or one of its aliases) is present. */
   nameHit: boolean;
   nameHits: number;
+  /** The name is in the TITLE — the strongest single signal that the page is about the entity. */
+  titleHit: boolean;
+  /** Extracted text length, so one mention in a short notice is told apart from one in a long report. */
+  textLength: number;
+  /**
+   * Where the first mention sits, as a fraction of the whole text (0 = the very top, 1 = the end).
+   * -1 when there is no mention. A document that is ABOUT somebody names them near the top; one
+   * that merely mentions them gets to them halfway down.
+   */
+  firstMentionAt: number;
   /** Which anchors appeared. Empty when none were configured OR none appeared — `anchorsAsked` tells them apart. */
   anchorsHit: string[];
   anchorsAsked: number;
@@ -217,13 +227,19 @@ export function assessEntity(text: string, title: string | null, ref: EntityRef)
   const haystack = normalizeForMatch(`${title ?? ""}\n${text}`);
   const names = [ref.name, ...ref.aliases].map((n) => n.trim()).filter(Boolean);
 
+  const titleHay = normalizeForMatch(title ?? "");
   let nameHits = 0;
   let firstIndex = -1;
+  let titleHit = false;
   for (const name of names) {
     const tokens = significantTokens(name, ref.kind);
-    const hit = findTokenWindows(haystack, tokens, requiredTokenCount(tokens, ref.kind));
+    const required = requiredTokenCount(tokens, ref.kind);
+    const hit = findTokenWindows(haystack, tokens, required);
     nameHits += hit.count;
     if (hit.firstIndex >= 0 && (firstIndex < 0 || hit.firstIndex < firstIndex)) firstIndex = hit.firstIndex;
+    // Scanned separately from the body: the title is the page declaring what it is about, which is
+    // a different claim from the name appearing somewhere in 50KB of prose.
+    if (findTokenWindows(titleHay, tokens, required).count > 0) titleHit = true;
   }
 
   const anchorsHit = ref.anchors
@@ -237,8 +253,11 @@ export function assessEntity(text: string, title: string | null, ref: EntityRef)
   return {
     nameHit: nameHits > 0,
     nameHits,
+    titleHit,
+    textLength: text.length,
     anchorsHit,
     anchorsAsked: ref.anchors.filter((a) => a.trim()).length,
+    firstMentionAt: firstIndex >= 0 && haystack.length > 0 ? firstIndex / haystack.length : -1,
     snippet: firstIndex >= 0 ? snippetAt(haystack, firstIndex) : null,
   };
 }

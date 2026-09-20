@@ -35,6 +35,8 @@
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { buildFolderDossier } from "@/lib/dossier/folder";
+import { isAiTextModel } from "@/lib/ai/text-model-options";
 import {
   ingestKnowledge,
   listKnowledgeSources,
@@ -51,6 +53,14 @@ import {
   type FolderError,
   type KeywordMode,
 } from "@/lib/kb";
+
+const DOSSIER_ERROR_HINT: Record<string, string> = {
+  folder_not_found: "找不到這個資料夾",
+  no_sources: "這個資料夾裡沒有可用的文件內容——先跑一次蒐集，或確認文件不是全部被封存了",
+  model_failed: "模型沒有回傳可用的結果，請重試；若持續失敗請換一個模型",
+  ingest_failed: "報告產生成功但寫入知識庫失敗，請重試",
+  no_supabase_client: "資料庫未設定",
+};
 
 const REBIND_ERROR_HINT: Record<RebindError, string> = {
   not_found: "找不到這份文件",
@@ -201,6 +211,43 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   const { slug } = await context.params;
   let body: Record<string, unknown>;
   try { body = (await request.json()) as Record<string, unknown>; } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
+
+  // The one POST that is not an upload: build a background file OUT OF a folder's documents. Kept
+  // on this route rather than a new one because it is a knowledge-base write gated by exactly the
+  // same role check, and a second route would be a second place to get that check wrong.
+  if (body.action === "build_dossier") {
+    const folderId = typeof body.folderId === "string" ? body.folderId : "";
+    if (!folderId) return NextResponse.json({ ok: false, error: "folderId_required" }, { status: 400 });
+    const orgIdForDossier = await orgIdOf(slug);
+    if (!orgIdForDossier) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
+
+    const result = await buildFolderDossier({
+      organizationId: orgIdForDossier,
+      folderId,
+      model: isAiTextModel(body.model) ? body.model : undefined,
+      preview: body.preview === true,
+    });
+    if (!result.ok) {
+      const status = result.error === "folder_not_found" ? 404 : result.error === "no_sources" ? 400 : 502;
+      return NextResponse.json(
+        { ok: false, error: result.error, hint: DOSSIER_ERROR_HINT[result.error!] ?? null, detail: result.detail ?? null },
+        { status },
+      );
+    }
+    audit(orgIdForDossier, resolved.role, resolved.source, "cs_knowledge_dossier_built", {
+      folderId,
+      sourceId: result.sourceId ?? null,
+      sourcesUsed: result.sourcesUsed,
+      preview: body.preview === true,
+    });
+    return NextResponse.json({
+      ok: true,
+      sourceId: result.sourceId ?? null,
+      sourcesUsed: result.sourcesUsed,
+      markdown: result.markdown,
+      report: result.report,
+    });
+  }
 
   const title = (typeof body.title === "string" ? body.title.trim() : "").slice(0, 300);
   const docBody = typeof body.body === "string" ? body.body.trim() : "";

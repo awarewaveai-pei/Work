@@ -13,7 +13,7 @@ import {
   entityRefFromMeta,
   ENTITY_SCHEME,
 } from "@/lib/collect/collectors/entity-dossier";
-import { ANGLES, DEFAULT_ANGLES, MAX_QUERIES, buildQueryPlan, parseLanguages } from "@/lib/collect/search/query-plan";
+import { ANGLES, DEFAULT_ANGLES, MAX_QUERIES, buildQueryPlan, defaultLanguagesFor, parseLanguages } from "@/lib/collect/search/query-plan";
 import { CollectFetchError } from "@/lib/collect/net/fetcher";
 import { createBudget } from "@/lib/collect/budget";
 import { canonicalize } from "@/lib/collect/canonical";
@@ -121,6 +121,19 @@ describe("parseLanguages", () => {
   });
 });
 
+describe("language default follows the NAME, not the operator's locale", () => {
+  it("searches English only for a Latin-script name", () => {
+    // Chinese queries for a Latin-named foreigner returned a Wuhan university notice, a Taiwanese
+    // thesis index and an alumni bulletin — four documents, no facts, billed twice (2026-09-20).
+    expect(defaultLanguagesFor("Theo Farrell")).toEqual(["en"]);
+  });
+
+  it("searches both for a CJK name — the English coverage is the part you cannot find by hand", () => {
+    expect(defaultLanguagesFor("王大明")).toEqual(["zh", "en"]);
+    expect(defaultLanguagesFor("覺浪股份有限公司")).toEqual(["zh", "en"]);
+  });
+});
+
 describe("entityRefFromMeta / anglesFromMeta", () => {
   it("reads the name out of the entity:// uri", () => {
     expect(entityNameOf(target("Theo Farrell"))).toBe("Theo Farrell");
@@ -139,6 +152,16 @@ describe("entityRefFromMeta / anglesFromMeta", () => {
   it("drops an angle id that does not belong to the chosen kind", () => {
     // "registration" is a company angle; asking for it on a person must not produce a dead query.
     expect(anglesFromMeta("person", "identity,registration")).toEqual(["identity"]);
+  });
+
+  it("reads namespaced ids, so person·新聞 and 公司·新聞 are two separate checkboxes", () => {
+    // Both kinds declare `identity` and `news`. Unnamespaced, one tick toggled two boxes.
+    expect(anglesFromMeta("person", "person:identity,person:news")).toEqual(["identity", "news"]);
+    expect(anglesFromMeta("person", "company:identity")).toEqual(DEFAULT_ANGLES.person);
+  });
+
+  it("still accepts bare ids written before namespacing, rather than silently defaulting", () => {
+    expect(anglesFromMeta("company", "registration,legal")).toEqual(["registration", "legal"]);
   });
 });
 
@@ -225,6 +248,29 @@ describe("entityDossierCollector.run", () => {
     );
 
     expect(discovered).toHaveLength(2);
+  });
+
+  it("drops a bookshop listing before paying to fetch it", async () => {
+    const ctx = ctxWith({
+      "*": [
+        { title: "Theo Farrell: Books", link: "https://www.amazon.com/-/zh_TW/Theo-Farrell/dp/1555879756" },
+        { title: "Theo Farrell", link: "https://www.penguin.com.au/authors/theo-farrell" },
+        { title: "Vice-Chancellor", link: "https://www.latrobe.edu.au/vc" },
+      ],
+    });
+    const { discovered } = await entityDossierCollector.run(target("Theo Farrell", meta), ctx);
+
+    expect(discovered.map((d) => d.uri)).toEqual(["https://www.latrobe.edu.au/vc"]);
+    expect(discovered[0].meta?.sourceClass).toBe("unknown");
+  });
+
+  it("collects the shops when the operator explicitly asks for them", async () => {
+    const ctx = ctxWith({ "*": [{ title: "Books", link: "https://www.amazon.com/dp/1555879756" }] });
+    const { discovered } = await entityDossierCollector.run(
+      target("Theo Farrell", { ...meta, includeShops: true }),
+      ctx,
+    );
+    expect(discovered).toHaveLength(1);
   });
 
   it("refuses to run without a name rather than searching for the anchors", async () => {

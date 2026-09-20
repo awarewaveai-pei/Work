@@ -1420,6 +1420,8 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   // rename/delete button is doing something" or block them from being used concurrently.
   const [cognitiveOsFolderBusy, setCognitiveOsFolderBusy] = useState(false);
   const [cognitiveOsFolderMsg, setCognitiveOsFolderMsg] = useState<string | null>(null);
+  const [dossierBusy, setDossierBusy] = useState(false);
+  const [dossierMsg, setDossierMsg] = useState<string | null>(null);
   const [archived, setArchived] = useState<Array<{ id: string; title: string; kind: string; isSensitive: boolean }>>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [kTitle, setKTitle] = useState(""); const [kBody, setKBody] = useState(""); const [kKind, setKKind] = useState("doc");
@@ -1569,6 +1571,39 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
    * Cloudflare-fronted edge's ~100s idle ceiling — same reasoning as CollectionSourcesPanel's own
    * pollCognitiveOsImport), polled here with the same 2s-interval / 10-consecutive-failure bailout.
    */
+  /**
+   * Read this folder's documents and write a background file back into it.
+   *
+   * Reloads the list afterwards rather than optimistically inserting a row: the report goes through
+   * the ordinary ingest path, which may supersede a previous version, and guessing what that did
+   * would put a wrong row on screen.
+   */
+  async function buildDossier(folderId: string) {
+    setDossierBusy(true);
+    setDossierMsg(null);
+    try {
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-knowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ action: "build_dossier", folderId }),
+      });
+      const data = (await res.json()) as { ok?: boolean; sourcesUsed?: number; hint?: string; error?: string; detail?: string };
+      if (data.ok) {
+        setDossierMsg(`已用 ${data.sourcesUsed} 份來源產出背景檔案，已存回這個資料夾。`);
+        await reloadSources();
+      } else {
+        // The hint is written for a human; the raw error stays visible underneath because that is
+        // the string worth searching for when the hint runs out.
+        setDossierMsg(`${data.hint ?? "產生失敗"}
+（${data.error}${data.detail ? `: ${data.detail}` : ""}）`);
+      }
+    } catch (e) {
+      setDossierMsg(`產生失敗：${String(e).slice(0, 160)}`);
+    } finally {
+      setDossierBusy(false);
+    }
+  }
+
   async function sendFolderToCognitiveOs(folderId: string) {
     setCognitiveOsFolderBusy(true);
     setCognitiveOsFolderMsg(null);
@@ -1749,6 +1784,14 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
               <button onClick={() => renameFolderNow(folderFilter)} disabled={folderBusy || !renameDraft.trim()} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>重新命名</button>
               <button onClick={() => deleteFolderNow(folderFilter)} disabled={folderBusy} style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--red)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}>刪除資料夾</button>
               <button
+                onClick={() => buildDossier(folderFilter)}
+                disabled={dossierBusy}
+                title="讀這個資料夾裡所有文件，產出一份帶出處的背景檔案，存回同一個資料夾"
+                style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}
+              >
+                {dossierBusy ? "彙整中…" : "產生背景檔案"}
+              </button>
+              <button
                 onClick={() => sendFolderToCognitiveOs(folderFilter)}
                 disabled={cognitiveOsFolderBusy}
                 title="這個資料夾自己的 Cognitive OS Project，不會跟其他資料夾混在一起"
@@ -1758,6 +1801,7 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
               </button>
             </div>
             {cognitiveOsFolderMsg && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>{cognitiveOsFolderMsg}</div>}
+            {dossierMsg && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4, whiteSpace: "pre-line" }}>{dossierMsg}</div>}
           </div>
         )}
 

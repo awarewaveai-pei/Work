@@ -19,7 +19,10 @@
   - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` + `npx tsc --noEmit` | exit=0 | result=1424 passed / 11 skipped / 146 files；typecheck 乾淨
   - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -c "SELECT column_name FROM information_schema.columns WHERE table_name='collection_runs' AND column_name='off_entity'"` | exit=0 | result=**0 rows** — migration 未套用，確認 run report 遺失的根因
   - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin sh -c 'cat /app/.next/BUILD_ID'` + `docker inspect --format {{.State.StartedAt}}` | exit=0 | result=2026-09-20T07:04:50Z — 新 code 已在 prod，schema 沒有跟上
-  - REVIEW_DONE: 見本日 ORACLE artifact（`/codex-review` 第二層 `codex-oracle.ps1`，Claude 寫 → Codex 審）
+  - REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/1m/0n | artifact=`agency-os/reports/oracle/2026-09-20-review-21450fff.md`（external oracle = Codex CLI）。兩個 finding 自行驗證後都成立、都已修：
+    - **C1 引註規則只是「要求」不是「強制」**：system prompt 命令每句話帶 [n]，但沒有任何程式檢查它有沒有照做。更難堪的是**我自己的測試裡就出現模型寫 [7] 而只有 2 份來源**，我當時只斷言「citations 清單是我們的」就放過了——那正是 AGENTS 說的「偵測器沒在偵測」。已加 `enforceCitations()`：超出範圍的編號改寫成 `[?]` 並記錄（捏造的引註比沒有引註危險，它看起來是真的）；整份報告一個有效引註都沒有 → 直接拒絕 `model_returned_no_citations`；沒引註的段落不拒絕但列出（「來源未記載任何爭議」是正確且有用的句子）。報告開頭會印出這兩類問題。
+    - **M1 2500 字硬門檻會誤殺**：2,501 字的官方公告只提一次名字、標題又沒帶名字 → 被判 passing_mention。已改成多一條「名字出現在全文前 15%」——關於某人的文件通常開頭就點名，順帶提到的則在中段。懸崖消失，而原本要擋的兩份（新聞流水帳、別人的個人頁）仍然被擋。
+  - 突變測試（新閘非空跑）：`relevance.ts` 的 `if (!aboutTheEntity)` 短路 → `collect-source-class.test.ts` 的兩個 passing-mention 斷言變紅；`entity-dossier.ts` 的 class 過濾短路 → 「drops a bookshop listing before paying to fetch it」變紅；還原皆轉綠
   - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`dossier|sourceClass|passing_mention|defaultLanguagesFor|ANGLE_CHOICES` | hits=1 真實命中（`collect-block-hygiene.test.ts` 的 lib/kb 邊界，已改為移出 `lib/collect/`）
 - [剩餘風險]
   1. **prod 現在是 code 新、schema 舊的狀態，run report 持續在丟。** 套 0090 是 High-risk，等操作者明示。

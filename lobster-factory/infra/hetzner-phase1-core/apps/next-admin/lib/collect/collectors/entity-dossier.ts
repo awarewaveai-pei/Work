@@ -40,9 +40,11 @@ import {
   DEFAULT_ANGLES,
   MAX_QUERIES,
   buildQueryPlan,
+  defaultLanguagesFor,
   parseLanguages,
   type PlannedQuery,
 } from "@/lib/collect/search/query-plan";
+import { DOSSIER_EXCLUDED_BY_DEFAULT, classifySource, sourceClassLabel } from "@/lib/collect/source-class";
 import { isEntityKind, parseTermList, type EntityKind, type EntityRef } from "@/lib/collect/entity";
 
 export const ENTITY_SCHEME = "entity";
@@ -75,16 +77,27 @@ export function entityRefFromMeta(t: Target): EntityRef {
   };
 }
 
-/** Angle ids the operator ticked, falling back to the defaults for this entity kind. */
+/**
+ * Angle ids the operator ticked, falling back to the defaults for this entity kind.
+ *
+ * Choices are stored as `<kind>:<angleId>` because `identity` and `news` exist under BOTH person and
+ * company: a flat list gave two checkboxes the same value, so ticking one visibly ticked the other
+ * and React saw duplicate keys. Bare ids are still accepted — rows written before this change have
+ * them, and silently dropping those would turn a configured source into a default one with nothing
+ * saying so.
+ */
 export function anglesFromMeta(kind: EntityKind, value: unknown): string[] {
-  const chosen = parseTermList(value, MAX_QUERIES).filter((id) => ANGLES[kind].some((a) => a.id === id));
+  const chosen = parseTermList(value, MAX_QUERIES)
+    .map((v) => (v.includes(":") ? v.split(":") : [kind, v]))
+    .filter(([k, id]) => k === kind && ANGLES[kind].some((a) => a.id === id))
+    .map(([, id]) => id);
   return chosen.length ? chosen : DEFAULT_ANGLES[kind];
 }
 
-const KIND_CHOICES = [
-  { value: "person", label: "人（個人背景）" },
-  { value: "company", label: "公司／組織" },
-  { value: "event", label: "事件" },
+const KIND_CHOICES: Array<{ value: EntityKind; label: string; short: string }> = [
+  { value: "person", label: "人（個人背景）", short: "人" },
+  { value: "company", label: "公司／組織", short: "公司" },
+  { value: "event", label: "事件", short: "事件" },
 ];
 
 /**
@@ -92,9 +105,12 @@ const KIND_CHOICES = [
  * schema is static while the chosen kind is not — and a box that silently changes its contents
  * after the operator ticked things is worse than a longer list.
  */
-const ANGLE_CHOICES = (Object.keys(ANGLES) as EntityKind[]).flatMap((kind) =>
-  ANGLES[kind].map((a) => ({ value: a.id, label: `${KIND_CHOICES.find((k) => k.value === kind)!.label.slice(0, 2)}·${a.label}` })),
-);
+const ANGLE_CHOICES = (Object.keys(ANGLES) as EntityKind[]).flatMap((kind) => {
+  const k = KIND_CHOICES.find((c) => c.value === kind)!;
+  // `short`, not label.slice(0, 2): slicing "人（個人背景）" produced the label "人（·身分／職稱",
+  // which shipped to the operator exactly like that (2026-09-20).
+  return ANGLES[kind].map((a) => ({ value: `${kind}:${a.id}`, label: `${k.short}·${a.label}` }));
+});
 
 export const entityDossierCollector: CollectBlock = {
   id: "collect/entity-dossier",
@@ -156,6 +172,13 @@ export const entityDossierCollector: CollectBlock = {
         help: "兩種都勾 = 查詢次數加倍，但中英文的來源本來就不同一批。",
       },
       {
+        key: "includeShops",
+        label: "連購物／社群／列表頁也收",
+        type: "boolean",
+        default: false,
+        help: "預設不收。Amazon、書店、Facebook、標籤頁這類頁面會出現你的對象的名字，但沒有任何可引用的事實——2026-09-20 實測它們佔掉一半的結果。",
+      },
+      {
         key: "maxResultsPerQuery",
         label: "每個角度取幾筆結果",
         type: "number",
@@ -207,7 +230,10 @@ export const entityDossierCollector: CollectBlock = {
       anchors: entity.anchors,
       aliases: entity.aliases,
       angleIds,
-      languages: parseLanguages(meta.languages ?? "zh,en"),
+      // Empty means "decide from the name", not "search everything": see defaultLanguagesFor.
+      languages: parseLanguages(meta.languages).length
+        ? parseLanguages(meta.languages)
+        : defaultLanguagesFor(entity.name),
     });
     const maxResults = Math.min(Math.max(Number(meta.maxResultsPerQuery ?? 8) || 8, 1), 20);
     const domains = domainFilter(meta.domains);
@@ -217,6 +243,8 @@ export const entityDossierCollector: CollectBlock = {
 
     const discovered: Target[] = [];
     const seen = new Set<string>();
+    const skippedByClass: string[] = [];
+    const excluded = meta.includeShops === true ? [] : DOSSIER_EXCLUDED_BY_DEFAULT;
     let executed = 0;
 
     for (const planned of plan) {
@@ -249,6 +277,15 @@ export const entityDossierCollector: CollectBlock = {
         const key = `${url.hostname}${url.pathname}`.toLowerCase();
         if (seen.has(key)) continue;
         seen.add(key);
+
+        // Refused BEFORE it is fetched: a bookshop listing costs a fetch, a quality grade, an
+        // injection screen and a row in the knowledge base to learn what its URL already said.
+        // Fails open — an unclassified host is admitted (lib/collect/source-class.ts).
+        const cls = classifySource(url.toString());
+        if (excluded.includes(cls)) {
+          skippedByClass.push(`${sourceClassLabel(cls)} ${url.hostname}`);
+          continue;
+        }
         discovered.push({
           uri: url.toString(),
           canonicalUri: ctx.canonicalize(url.toString()),
@@ -260,6 +297,7 @@ export const entityDossierCollector: CollectBlock = {
           meta: {
             // The assertion the relevance gate tests each fetched page against.
             entity,
+            sourceClass: cls,
             // Belt and braces with the scope above: even if a later change made scope wider, this
             // says "read this page, follow nothing". A dossier is a set of pages, not a crawl.
             maxDepth: 0,
@@ -276,7 +314,10 @@ export const entityDossierCollector: CollectBlock = {
       }
     }
 
-    ctx.log(`dossier "${entity.name}": ${executed} queries -> ${discovered.length} unique pages to read`);
+    ctx.log(
+      `dossier "${entity.name}": ${executed} queries -> ${discovered.length} unique pages to read` +
+        (skippedByClass.length ? ` (skipped ${skippedByClass.length}: ${[...new Set(skippedByClass)].slice(0, 6).join(", ")})` : ""),
+    );
     return { docs: [], discovered };
   },
 };
