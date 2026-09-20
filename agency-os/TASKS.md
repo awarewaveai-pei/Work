@@ -1092,8 +1092,8 @@
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
-- [ ] **【2026-09-20 開出，同日大部分解決｜部署】docker-compose.yml repo/prod drift——已查明機制、已補齊 repo、機械偵測已上線；剩一個 High-STOP 動作待操作者授權**
-  - **【進行中，剩最後一步卡在你】**
+- [x] **【✅ 2026-09-20 開出並同日完成｜部署】docker-compose.yml repo/prod drift——查明機制、repo 補齊、機械偵測上線、prod 同步完成**
+  - **【已完成】操作者「要」授權後，透過 `safe-infra-patch.sh compose` 把 9 個變數宣告推上 prod。REALTEST：`safe-infra-patch.sh` 輸出 exit=0（backup→apply→`next-admin` healthy after 9s→success）；`docker exec lobster-next-admin printenv OPS_INBOX_GRAFANA_TOKEN`/`PORTAL_SIGNUP_ENABLED` 兩者 exit=0（宣告存在，值仍空，符合預期）；`/login`+`/api/ops/summary` 皆 200；`check-deploy-drift.ps1` 重跑確認 `composeVarDrift` 為空（雙向皆已一致）。用的是先前上傳整份合併後內容做逐項比對驗證（YAML 語法+9 個目標變數各恰 1 次宣告+12 個服務名各恰 1 次+多個既有變數抽查未受影響），而非未經驗證就推送。見 WORKLOG 續88 續篇。
   - **根因查明**（非猜測，讀 `sg-deploy.sh`+`safe-infra-patch.sh`+`DEPLOY_ROLLBACK_RUNBOOK.md §2.6` 全文確認）：這不是意外遺漏，是既有兩軌架構——app 程式碼走 git→`sg-deploy.sh`；nginx／Dockerfile／**compose** 走 Auto-Repair 紅線規定的 `safe-infra-patch.sh compose <file> <service>`，直接在伺服器 backup→apply→health→（失敗）rollback，不經 git。這條路徑本身正確且已用超過 4 個月（`/root/lobster-phase1/` 下 70+ 個 `.bak-*`/`.bak.safe-patch-*` 檔可查），只是 repo 那份 docker-compose.yml 從未被回寫更新，導致兩邊各自累積了對方沒有的宣告。
   - **已修**：
     1. repo `docker-compose.yml` 補齊 9 個「prod 有、repo 沒有」但程式碼真的會讀的變數（`GOOGLE_OAUTH_CLIENT_ID/SECRET`、`WPBRIDGE_BASE_URL/KEY_ID/PRIVATE_KEY`、`MEDIA_PRODUCTION_PERSISTENCE_ENABLED`、`MEDIA_OUTCOME_WEBHOOK_ENABLED/TOKEN`、`MEDIA_PROVIDER_ALLOWLIST`）——每個都先用 Grep 確認過真的有 `process.env.X` 讀取，不是猜測。

@@ -69,6 +69,15 @@
 
 WORKLOG_DONE: docker-compose.yml repo/prod drift 根因查明＋repo 補齊＋機械化偵測上線＋兩個消費端接上；剩 safe-infra-patch.sh 執行本身待操作者 go-ahead
 
+[追記] 操作者「要」授權後執行最後一步。做法：SSH `sudo cat` 取回伺服器現有完整 compose 內容 → 本機把 9 個缺的變數（含其原有註解）逐一插入正確位置（不是整檔覆蓋，避免動到任何我沒逐行核對過的既存差異）→ 驗證合併結果（python yaml 語法檢查 + 9 個目標變數與 12 個服務名各自恰好出現預期次數 + 逐行讀回全文核對）→ SFTP 上傳到 `/tmp` → `sudo /root/lobster-phase1/scripts/safe-infra-patch.sh compose docker-compose.yml next-admin`（真正規定的工具，不是我續85那次繞過的手動編輯）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`safe-infra-patch.sh compose docker-compose.yml next-admin` | exit=0 | result=backup 建立→apply→`docker compose config` 驗證通過→`next-admin` healthy after 9s→success
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv OPS_INBOX_GRAFANA_TOKEN`/`PORTAL_SIGNUP_ENABLED` | exit=0/0 | result=兩者宣告皆存在（值空，符合預期——`.env` 尚無真值，這步只補宣告）；`/login`+`/api/ops/summary` 200/200
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-deploy-drift.ps1` 部署後重跑 | exit=1(FAIL) | result=`composeVarDrift` 為空（雙向已一致，本次目標達成）；FAIL 狀態是另一件事——8 個 commit 落後 origin/main，來自其他並行 session 的無關工作，非本次改動造成，未處理（不在本次授權範圍內，需另外決定是否觸發 `sg-deploy.sh`）
+- REVIEW_WAIVED: NA -- 伺服器端套用為既有工具（safe-infra-patch.sh）的規定用法，非新邏輯；內容本身已用上面的驗證步驟確認
+- BUGHUNT_WAIVED: NA -- 純資料同步，無程式碼變更
+[rollback] `safe-infra-patch.sh` 自留備份 `/root/lobster-phase1/docker-compose.yml.bak.safe-patch-20260920-062133`；如需退回：`sudo cp` 該備份回原路徑 + `docker compose up -d --no-build next-admin`。
+WORKLOG_DONE（續）: docker-compose.yml repo/prod drift 全部完成，雙向皆已同步，`/check-drift` 常駐機械偵測上線；剩下的 commit-behind FAIL 是另一件無關的事，留給操作者決定
+
 ## 2026-09-20（續87）auth timing 測試改成交錯取樣：修的是量測方法，不是門檻
 
 - [操作者請求] 「所有的事處理好!」。承續86 開出的治本項。
