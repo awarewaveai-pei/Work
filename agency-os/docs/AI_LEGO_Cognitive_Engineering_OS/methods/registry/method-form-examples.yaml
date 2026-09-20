@@ -1,0 +1,5104 @@
+# One worked example per method, shown in the dashboard as 「用這個範例填入」: it fills the real form.
+#
+# `input` is keyed by BUILDER PARAMETER, exactly like the dashboard's own form state, so filling the form
+# with it and pressing 執行 sends what is written here. Row provenance is deliberately absent -- the form
+# fills its own honest default, the same as for a person typing.
+#
+# These are the same scenarios method-display-metadata.yaml's `example_zh` describes in prose, but as data:
+# tests/unit/test_method_form.py pushes every entry through the form serializer into the real builder and
+# its gates, so an example can never drift from what the method actually accepts. Prose cannot be tested.
+#
+# Two methods have no entry (research.qualitative_coding, evidence.triangulation): their inputs are other
+# steps' outputs, so they run only inside their recipe.
+examples:
+  architecture.adr:
+    input:
+      alternatives_considered:
+      - 維持 WooCommerce 外掛方案，接受單平台限制
+      - 自建 adapter 層同時支援外掛與 native，複雜度換取相容性
+      compatibility: 既有外掛客戶不受影響，向前相容。
+      context: 多客戶／多平台需求成長，app 本身定位是操作台而非商店本體，既有外掛方案耦合單一平台且難以擴充。
+      data_impact: 訂單 schema 需要一次性遷移腳本，既有客戶資料不動。
+      decision: 新客戶一律走 native fulfillment pipeline；既有客戶不強制遷移。
+      migration: 新客戶直接走 native；既有客戶維持現狀，無強制遷移時程。
+      operational_impact: 新增一條獨立 pipeline 需要維運，短期維運成本上升。
+      revisit_reversal_conditions: 若 native pipeline 維運成本超過外掛方案 2 倍，重新評估。
+      rollback: native pipeline 若出問題，個別客戶可退回外掛方案（一次性、非自動）。
+      security_privacy_impact: 訂單資料不再經過第三方外掛儲存層，降低資料外洩面。
+      status: accepted
+      title: POD 訂單履約走 native 架構，不走 WooCommerce 外掛
+      validation: 上線後追蹤前 3 個 native 客戶的訂單成功率與人工介入率。
+    scenario: 團隊要把 MySQL 換成 PostgreSQL。
+  architecture.atam:
+    input:
+      architecture_description: API 層加密強度與快取策略決策
+      findings:
+      - category: tradeoff_point
+        description: 加密強度提升安全，但提高 latency
+        id: F1
+      - category: risk
+        description: Cache 提高 performance，但增加一致性複雜度
+        id: F2
+    scenario: 評估新訂單系統扛不扛得住尖峰流量。
+  architecture.ddd:
+    input:
+      bounded_contexts:
+      - id: BC1
+        label: Order Context
+        subdomain_ids:
+        - SD1
+      - id: BC2
+        label: Payment Context
+        subdomain_ids:
+        - SD2
+      context_map:
+      - from_context_id: BC1
+        notes: Order Context 是上游，決定退款/付款請求的介面
+        pattern: customer_supplier
+        to_context_id: BC2
+      domain_description: 電商平台：訂單管理與金流服務
+      subdomains:
+      - id: SD1
+        label: Order Management
+        type: core
+      - id: SD2
+        label: Payments
+        type: supporting
+    scenario: 電商平台釐清「訂單」在物流跟客服眼中的不同定義。
+  architecture.dependency_mapping:
+    input:
+      edges:
+      - fallback: 切換備援金流供應商，SLA 內完成
+        from_id: N1
+        is_critical: true
+        to_id: N2
+      - from_id: N1
+        is_critical: false
+        to_id: N3
+      nodes:
+      - id: N1
+        label: Checkout API
+        node_type: service
+      - id: N2
+        label: 第三方金流
+        node_type: vendor
+      - id: N3
+        label: 商品庫存快照
+        node_type: data
+      system_under_mapping: 訂單結帳流程
+    scenario: 搞清楚改動「使用者驗證服務」會波及誰。
+  architecture.event_storming:
+    input:
+      domain_process_description: 客戶取消訂單的完整流程，含退款觸發
+      elements:
+      - id: A1
+        label: 客戶
+        type: actor
+      - id: C1
+        label: 取消訂單
+        type: command
+      - id: AG1
+        label: Order
+        type: aggregate
+      - id: E1
+        label: 訂單已取消
+        type: domain_event
+      - id: P1
+        label: 訂單取消後自動觸發退款
+        type: policy
+      - id: C2
+        label: 發起退款
+        type: command
+      - id: RM1
+        label: 客戶訂單歷史
+        type: read_model
+      relationships:
+      - from_id: A1
+        label: issues
+        to_id: C1
+      - from_id: C1
+        label: handled by
+        to_id: AG1
+      - from_id: AG1
+        label: emits
+        to_id: E1
+      - from_id: E1
+        label: triggers
+        to_id: P1
+      - from_id: P1
+        label: issues
+        to_id: C2
+      - from_id: E1
+        label: updates
+        to_id: RM1
+    scenario: 梳理「客戶下單到出貨」流程。
+  architecture.fitness_functions:
+    input:
+      architecture_under_governance: ai_lego 套件
+      functions:
+      - ci_gate: pre-merge lint job
+        id: FF1
+        invariant: domain 層不得直接 import 第三方 provider SDK
+        test_or_metric: AST 掃描 core/domain/**，禁止 import 白名單外的套件
+      - ci_gate: pre-merge architecture-check job
+        id: FF2
+        invariant: compute 層不得反向依賴 modules 層
+        test_or_metric: 靜態依賴圖檢查 compute/** 對 modules/** 的 import
+    scenario: 確保微服務架構不會悄悄長出循環依賴。
+  architecture.quality_attribute_scenario:
+    input:
+      artifact: 訂單查詢 API
+      environment: 尖峰時段，QPS 500
+      measure: p99 延遲 < 300ms
+      quality_goal: fast
+      response: 回傳查詢結果
+      source: 已登入使用者
+      stimulus: 發出訂單查詢請求
+    scenario: 把「系統要撐住尖峰流量」講清楚。
+  architecture.strangler_fig:
+    input:
+      legacy_system_under_migration: 舊版訂單系統（monolith）
+      seams:
+      - id: S1
+        label: 訂單查詢 API
+      slices:
+      - id: SL1
+        label: 訂單查詢改走新服務
+        seam_id: S1
+        status: expanded
+      - id: SL2
+        label: 訂單建立改走新服務
+        seam_id: S1
+        status: planned
+    scenario: 把十年歷史的單體系統慢慢換成微服務。
+  architecture.system_context_model:
+    input:
+      components:
+      - container_id: CT1
+        id: CP1
+        label: OrderController
+      containers:
+      - id: CT1
+        label: Order API
+      system_context: 訂單服務，外部使用者透過網頁下單，串接第三方金流
+    scenario: 讓新人 5 分鐘看懂電商系統的整體樣貌。
+  architecture.trade_off_matrix:
+    input:
+      criteria:
+      - direction: minimize
+        id: C1
+        label: 成本（美元）
+      - direction: maximize
+        id: C2
+        label: 上線速度（1-10）
+      - direction: maximize
+        id: C3
+        label: 長期可維護性（1-10）
+      options:
+      - id: O1
+        label: 方案 A：自建
+      - id: O2
+        label: 方案 B：外包
+      raw_scores:
+      - criterion_id: C1
+        option_id: O1
+        raw_value: 80000
+      - criterion_id: C2
+        option_id: O1
+        raw_value: 4
+      - criterion_id: C3
+        option_id: O1
+        raw_value: 9
+      - criterion_id: C1
+        option_id: O2
+        raw_value: 50000
+      - criterion_id: C2
+        option_id: O2
+        raw_value: 8
+      - criterion_id: C3
+        option_id: O2
+        raw_value: 5
+      sensitivity_notes: C1（成本）權重從 0.4 降到 0.25 以下時排名反轉；其餘區間排名穩定。人工檢查，非機械計算。
+      weights:
+      - criterion_id: C1
+        weight: 0.4
+      - criterion_id: C2
+        weight: 0.3
+      - criterion_id: C3
+        weight: 0.3
+    scenario: 在兩個雲端供應商之間依成本與效能做選擇。
+  art_therapy.conflict_mapping:
+    input:
+      conflict_label: 與已故父親之間未解的期待衝突
+      parties:
+      - id: P1
+        name: 案主（女兒）
+        need: 被父親認可自己的人生選擇
+      - id: P2
+        name: 父親（內在意象）
+        need: 女兒延續家族事業，證明他的教養方式是對的
+      transformation_path:
+      - id: T1
+        resource_gained: 第一次看清楚，這個衝突不是誰對誰錯，是兩種愛的方式衝撞
+        step: 畫出兩人各自站立的位置與之間的距離
+      - id: T2
+        resource_gained: 理解父親的沉默不是不認可，是他自己的表達侷限
+        step: 想像父親說出『我只是不知道怎麼表達驕傲』
+    scenario: 回顧與已故父親之間未解的期待衝突，標示出後來的轉化路徑。
+  art_therapy.full_stop_method:
+    input:
+      raw_statement: 我每次報告都會搞砸，大家一定都覺得我很沒用
+      segments:
+      - id: S1
+        pattern: OVERGENERALIZATION
+        revision: 上次報告有一段忘詞，但整體內容同事說有幫助到他們
+        sentence: 我每次報告都會搞砸
+      - id: S2
+        pattern: MIND_READING
+        revision: 我沒有真的問過同事的想法，這是我自己的猜測，不是事實
+        sentence: 大家一定都覺得我很沒用
+      - id: S3
+        pattern: NONE
+        sentence: 今天下午三點要交這份報告
+    scenario: 把「我每次報告都會搞砸，大家一定都覺得我很沒用」逐句拆解檢視。
+  art_therapy.life_wheel:
+    input:
+      dimensions:
+      - id: D1
+        name: 工作與事業
+        score: 7
+      - id: D2
+        name: 健康與活力
+        score: 3
+      - id: D3
+        name: 人際關係
+        score: 6
+      - id: D4
+        name: 自我成長
+        score: 8
+      - id: D5
+        name: 財務安全感
+        score: 5
+      subject: 小美目前的生活平衡狀態
+    scenario: 評估小美目前的生活平衡狀態。
+  art_therapy.metaphor_dialogue:
+    input:
+      exchanges:
+      - id: X1
+        line: 你為什麼一直擋在這裡，不讓我過去？
+        speaker: SELF
+      - id: X2
+        line: 我不是要擋你，我是在確認你準備好了才讓你過去，上次你太快走進去，受傷了
+        speaker: FIGURE
+      - id: X3
+        line: 原來你是在保護我，不是在阻止我
+        speaker: SELF
+      figure:
+        name: 石頭守門人
+        origin: 案主在沙盤裡放的一顆大石頭，擋在通往內心花園的路口
+      integration_note: 這顆石頭原來不是敵人，是我自己謹慎的那一部分，現在可以練習跟它商量，而不是硬闖
+    scenario: 與案主在沙盤裡放置的一顆大石頭進行對話。
+  art_therapy.motivation_matrix:
+    input:
+      action: 決定要不要離開現在的工作、去創業
+      entries:
+      - description: 想證明自己有能力獨立打造一個東西
+        id: E1
+        polarity: DRIVES
+        source: INTRINSIC
+        weight: 5
+      - description: 身邊朋友創業成功帶來的激勵
+        id: E2
+        polarity: DRIVES
+        source: EXTRINSIC
+        weight: 2
+      - description: 害怕失敗後證明自己真的不夠好
+        id: E3
+        polarity: BLOCKS
+        source: INTRINSIC
+        weight: 4
+      - description: 家人反對，擔心經濟不穩定
+        id: E4
+        polarity: BLOCKS
+        source: EXTRINSIC
+        weight: 3
+    scenario: 分析「決定要不要離開現在的工作、去創業」這個行動背後的動機。
+  art_therapy.role_playing:
+    input:
+      reflections:
+      - id: F1
+        observation: 演練時發現自己講到一半聲音就變小，身體往後縮
+        prediction: 真實對話中可能會因為緊張又妥協加班
+        role_ref: R1
+      roles:
+      - id: R1
+        name: 案主本人
+        played_by: CLIENT
+        stance: 想拒絕但又擔心被貼上不配合的標籤
+      - id: R2
+        name: 主管
+        played_by: EMPTY_CHAIR
+        stance: 習慣用施壓的方式要求下屬配合
+      scenario: 演練即將到來、與強勢主管要求加班的對話
+    scenario: 演練即將到來、與強勢主管要求加班的對話。
+  art_therapy.story_completion:
+    input:
+      characters:
+      - id: C1
+        inner_role: 案主害怕改變、卻又渴望探索的那一部分
+        name: 小狐狸
+      continuation: 小狐狸站在邊界猶豫了很久，後來牠發現自己其實不是怕黑森林本身，是怕走進去之後，再也回不到熟悉的這一邊。牠最後帶著一小片從家附近摘的葉子，一起走了進去
+      felt_dynamics:
+      - 猶豫與渴望同時存在
+      - 需要一個熟悉的錨點才敢冒險
+      story_stem: 有一天，一隻小狐狸走到森林的邊界，前面是一片從沒去過的黑森林……
+    scenario: 用一個未完成的故事開頭，讓案主接續下去。
+  art_therapy.storytelling:
+    input:
+      arc:
+        conflict: 我當時因為自己也在期末考壓力最大的時候，接了電話卻只講了五分鐘就說我明天再回她電話
+        meaning: 我學到『我很忙』不能是拒絕別人求助的理由，現在我會先問清楚是不是緊急，而不是自己先判斷
+        resolution: 隔天我後悔打去道歉，還好她那晚找了另一個朋友陪她撐過去
+        setting: 大學時期，最好的朋友半夜打給我說她撐不下去了
+      characters:
+      - id: C1
+        name: 我
+        role: 敘事者，也是那個沒接住的人
+      - id: C2
+        name: 最好的朋友
+        role: 當時陷入低潮、伸手求助的人
+      title: 那次我沒有接住她
+    scenario: 敘說「那次我沒有接住她」這個完整的故事。
+  art_therapy.synonym_substitution:
+    input:
+      context: 案主習慣性用『我很糟』來回應任何一個小失誤
+      substitutions:
+      - id: S1
+        original_phrase: 我很糟
+        rationale: 『很糟』是一個固定不變的結論，『正在學習』承認了現在不完美，但留了成長的空間
+        replacement_phrase: 我正在學習中
+      - id: S2
+        original_phrase: 我又搞砸了
+        rationale: 把『搞砸』這個對自己的全面否定，換成對這一次具體結果的描述
+        replacement_phrase: 這次的結果不是我要的，下次可以試試別的方法
+    scenario: 案主習慣性用「我很糟」來回應任何一個小失誤。
+  art_therapy.turning_point_analysis:
+    input:
+      events:
+      - belief_shift: 以為只要努力就不會被淘汰，原來公司的決定跟我努不努力沒有直接關係
+        emotion_after: 羞愧、恐慌
+        emotion_before: 安全感、自信
+        event: 第一份工作被資遣
+        id: E1
+        when: '2018-06-15'
+      - belief_shift: 我撐過了一次以為撐不過的谷底，代表我比自己以為的更有韌性
+        emotion_after: 謹慎的踏實感
+        emotion_before: 羞愧、恐慌
+        event: 疫情期間自己接案撐過半年收入歸零
+        id: E2
+        when: '2020-03-01'
+      subject: 案主的職涯信念轉折歷程
+    scenario: 梳理案主職涯信念的轉折歷程。
+  art_therapy.value_clarification:
+    input:
+      core_values:
+      - id: V1
+        life_direction: 以後在關係裡，感受到不舒服的當下就說出來，不等到累積到爆炸
+        value: 誠實面對自己的感受
+        why_it_matters: 過去為了維持關係常常壓抑真實感受，現在發現壓抑帶來的代價比誠實更大
+      - id: V2
+        life_direction: 重新練習，任何決定先問自己想要什麼，再考慮對方
+        value: 獨立完整的自我
+        why_it_matters: 分手後才發現自己好多決定都是以對方為中心做的
+      transformation_context: 結束一段五年感情、重新認識自己之後
+    scenario: 結束一段五年感情、重新認識自己之後，澄清最核心的價值。
+  art_therapy.visual_metaphor:
+    input:
+      elements:
+      - element: 深灰色石頭
+        id: EL1
+        stands_for: 長期累積、說不出口的責任與期待
+      - element: 石頭裂縫透出的金色光
+        id: EL2
+        stands_for: 即使被壓著，自己內在還沒熄滅的那一點生命力
+      felt_experience: 一種說不出來、但一直壓在胸口的沉重感，好像隨時要被什麼東西壓垮
+      image:
+        description: 畫面中央是一塊巨大的深灰色石頭，壓在一個小小的、蜷縮的人形上面，石頭裂了一道細縫，透出一點點金色的光
+        medium: 壓克力顏料+拼貼
+      metaphor_statement: 這塊石頭是我一直不敢說出口的責任感，但它裂開的那道縫，是我還沒放棄的那部分自己
+    scenario: 把一種說不出來、但一直壓在胸口的沉重感畫出來。
+  art_therapy.workshop_certificate_drawing:
+    input:
+      blessing_statement: 願妳帶著這八週練出來的勇氣，繼續在團體之外，好好為自己說話
+      created_by: 第三期成長團體全體成員與帶領者
+      journey_title: 八週藝術治療團體：重新找回自己的聲音
+      milestones:
+      - id: M1
+        label: 第一次願意在團體面前分享自己畫的圖
+      - id: M2
+        label: 第一次用言語說出『我值得被好好對待』
+      - id: M3
+        label: 結業當天主動擁抱了另一位成員
+      sealed_on: '2026-09-18'
+    scenario: 為八週藝術治療團體畫出結業證章。
+  art_therapy.wusheng_five_phase:
+    input:
+      current_phase: WS-03
+      linked_tool_ids:
+      - ART-STORY-004
+      - ART-SYSTEM-012
+      progress_evidence: 案主這次會談主動把上次衝突的事件重新講了一遍，但這次用的角度是『這件事教會我什麼』，而不是像前幾次一樣停在『對方又做錯了什麼』
+      subject: 案主在八次療程後的階段評估
+    scenario: 案主在八次療程後的階段評估。
+  association.affinity_diagram:
+    input:
+      cards:
+      - id: C1
+        text: 重組後怕漏掉重要訊息
+      - id: C2
+        text: 主管習慣晚上傳訊息
+      - id: C3
+        text: 睡前習慣性看一次信箱
+      groups:
+      - id: G1
+        item_refs:
+        - C1
+        - C2
+        name: 組織壓力
+      - id: G2
+        item_refs:
+        - C3
+        name: 個人習慣
+      higher_level_themes:
+      - group_refs:
+        - G1
+        - G2
+        theme: 下班界線消失
+      topic: 遠端團隊晚上仍在回訊息的原因
+    scenario: 訪談後有一堆零散的觀察，想找出隱藏主題。
+  association.analogy_mapping:
+    input:
+      abstracted_mechanism: 用一個獨立於抵達順序的『急迫度』指標重新排定處理隊伍
+      source_domain_description: 急診檢傷分類：不是先到先看，是先依症狀嚴重度分級再排順序
+      target_mapping: 客服工單先跑自動急迫度評分（帳務停用／資安／一般諮詢），改成依評分排隊而非先到先服務
+      target_problem: 降低客服等待時間
+    scenario: 想降低客服等待時間。
+  association.attribute_listing:
+    input:
+      attributes:
+      - attribute_name: 瓶蓋開啟方式
+        original_value: 旋轉式瓶蓋
+        transformed_variants:
+        - variant_id: V1
+          variant_text: 按壓式瓶蓋
+        - variant_id: V2
+          variant_text: 感應式瓶蓋
+      - attribute_name: 外殼材質
+        original_value: 不鏽鋼
+        transformed_variants:
+        - variant_id: V3
+          variant_text: 可食用矽膠外層
+      recombination:
+        combined_from:
+        - attribute_name: 瓶蓋開啟方式
+          variant_id: V1
+        - attribute_name: 外殼材質
+          variant_id: V3
+        proposal_description: 按壓式瓶蓋＋矽膠外殼的兒童友善保溫瓶
+      subject: 保溫瓶
+    scenario: 想改良一款保溫瓶。
+  association.concept_map:
+    input:
+      context: 遠端工作倦怠成因
+      edges:
+      - from_node_id: N1
+        relationship_type: 導致
+        to_node_id: N2
+      - from_node_id: N2
+        relationship_type: 加劇
+        supporting_evidence_refs:
+        - SRC-1
+        to_node_id: N3
+      nodes:
+      - id: N1
+        label: 組織重組
+      - id: N2
+        label: 下班後查看訊息
+      - id: N3
+        label: 情緒耗竭
+    scenario: 分析遠端工作倦怠的成因。
+  association.mind_map:
+    input:
+      central_topic: 新產品發表會籌備
+      main_branches:
+      - id: B1
+        label: 場地
+        sub_branches:
+        - id: B1-1
+          keywords:
+          - 150人
+          - 舞台區
+          label: 容納人數
+      - id: B2
+        label: 行銷
+    scenario: 籌備新產品發表會，先把想法都倒出來。
+  association.morphological_analysis:
+    input:
+      constraints:
+      - dimension_a: 地點
+        dimension_b: 座位制度
+        option_a: 純遠端
+        option_b: 固定座位
+      dimensions:
+      - name: 地點
+        options:
+        - 市中心
+        - 郊區
+        - 純遠端
+      - name: 座位制度
+        options:
+        - 固定座位
+        - 彈性座位
+        - 無實體座位
+      subject: 新辦公室選址與制度
+    scenario: 規劃新辦公室的座位與合約制度。
+  causal.counterfactual_reasoning:
+    input:
+      actual_outcome: 上線後流失率降到 4%
+      assumptions:
+      - 同期沒有其他行銷活動介入
+      - 客群組成跟上線前相近
+      counterfactual_outcome: 若未上線，估計流失率仍會維持在 6%
+      intervention: 上線客服自動回覆功能
+    scenario: 檢查上線一個新的客服自動回覆功能是否真的降低了流失率。
+  causal.dag:
+    input:
+      cause_hypothesis_set:
+        id: FISHBONE-T1
+      edges:
+      - from_node_id: N3
+        to_node_id: N1
+      - from_node_id: N3
+        to_node_id: N2
+      - from_node_id: N1
+        supporting_evidence_refs:
+        - SRC-1
+        to_node_id: N2
+      nodes:
+      - id: N1
+        label: 咖啡因攝取
+        role: TREATMENT
+      - id: N2
+        label: 心臟病
+        role: OUTCOME
+      - id: N3
+        label: 吸菸
+        role: CONFOUNDER
+    scenario: 分析「咖啡因攝取」跟「心臟病」之間的關係，懷疑「吸菸」是干擾變數。
+  causal.difference_in_differences:
+    input:
+      analysis_summary: 處理組就業率變化 -1.2%，對照組 -0.3%，估計政策效果約 -0.9 個百分點
+      control_group: 未調漲最低工資的鄰近城市
+      parallel_trends_justification: 兩城市過去 3 年就業率趨勢高度平行，且產業結構相近
+      post_period: 調漲後 12 個月
+      pre_period: 調漲前 12 個月
+      treated_group: 調漲最低工資的城市
+    scenario: 評估某城市最低工資調漲對就業率的影響，用鄰近未調漲城市當對照組。
+  causal.instrumental_variables:
+    input:
+      analysis_summary: 2SLS 估計教育年數每增加一年，收入提升約 8%
+      endogenous_variable: 教育年數
+      exclusion_justification: 出生季節本身不太可能透過教育以外的路徑直接影響成年後收入
+      instrument: 出生季節（影響入學年齡進而影響教育年數，但不直接影響收入）
+      relevance_justification: 出生季節透過入學規則影響實際受教育年數，第一階段迴歸的 F 統計量需 >10
+    scenario: 研究「教育年數」對「收入」的因果效果，懷疑能力等未觀察因素同時影響兩者，用「出生季節」當工具變數。
+  causal.logic_model:
+    input:
+      program_name: 社區長者健康促進計畫
+      stages:
+      - description: 3 名社工、活動場地、10 萬元經費
+        stage: INPUTS
+      - description: 每週 2 次運動課程、每月健康講座
+        stage: ACTIVITIES
+      - description: 全年開課 100 場、參與人次 2000
+        stage: OUTPUTS
+      - description: 參與者運動習慣提升
+        indicators:
+        - 每週運動 >=3 次的比例提升 20%
+        stage: SHORT_TERM_OUTCOMES
+      - description: 社區長者整體健康狀況改善
+        indicators:
+        - 年度健檢異常率下降
+        stage: LONG_TERM_OUTCOMES
+    scenario: 規劃一個社區長者健康促進專案。
+  causal.process_tracing:
+    input:
+      causal_mechanism: 政策宣導 -> 民眾認知提升 -> 行為改變
+      evidence:
+      - description: 檢查民眾是否真的接觸過宣導內容
+        id: EV1
+        result: PRESENT
+        test_type: HOOP
+      - description: 檢查行為改變者是否明確提及受宣導內容影響
+        id: EV2
+        result: PRESENT
+        test_type: SMOKING_GUN
+    scenario: 追蹤「某政策宣導」是否真的是「民眾行為改變」的因果機制。
+  causal.rct:
+    input:
+      analysis_summary: 處理組轉換率 6.1% vs 對照組 5.0%，差異在統計上顯著
+      control_group: 看到舊版引導流程
+      power_analysis: 預期基準轉換率 5%、想偵測到 1 個百分點差異，80% 檢定力、雙尾 alpha=0.05，估計每組需要 3140 人
+      randomization: 用戶 ID 末位數字隨機分派，各 50%
+      treatment_group: 看到新版引導流程
+    scenario: 驗證新版 App 引導流程是否提升付費轉換率。
+  causal.regression_discontinuity:
+    input:
+      analysis_summary: 切點處學業表現跳動約 0.3 個標準差
+      bandwidth: 切點上下各 5 分
+      checks:
+      - 密度檢定：確認分數在切點附近沒有異常堆積（無人為操縱）
+      - 安慰劑檢定：在假切點（如 55 分）重跑一次，確認沒有假跳動
+      cutoff_value: 60
+      running_variable: 入學測驗分數
+    scenario: 評估「入學測驗 60 分」門檻對後續學業表現的因果效果。
+  causal.synthetic_control:
+    input:
+      donor_pool:
+      - B 州
+      - C 州
+      - D 州
+      fit_quality: 合成對照在介入前 10 年跟 A 州的香菸消費軌跡幾乎重合，RMSPE 很低
+      placebo_tests:
+      - 對 B 州做安慰劑檢定：假裝 B 州也調了菸稅，觀察到的落差遠小於 A 州的真實落差
+      post_treatment_gap: 介入後 A 州跟合成對照的消費量差距逐年擴大，5 年後約低 15%
+      treated_unit: 調高菸稅的 A 州
+      weights:
+      - donor: B 州
+        weight: 0.6
+      - donor: C 州
+        weight: 0.4
+    scenario: 評估某州調高菸稅對香菸消費量的因果效果，用其他州加權組合出虛擬對照州。
+  causal.theory_of_change:
+    input:
+      intervention: 提供偏鄉學校每週雙語閱讀課程
+      stages:
+      - description: 師資、教材、經費
+        stage: INPUTS
+      - description: 每週雙語閱讀課
+        stage: ACTIVITIES
+      - description: 開課校數、上課時數
+        stage: OUTPUTS
+      - description: 學童識字率提升
+        stage: SHORT_TERM_OUTCOMES
+      - description: 學童升學率提升
+        stage: LONG_TERM_OUTCOMES
+      - description: 偏鄉教育落差縮小
+        stage: IMPACT
+      transitions:
+      - assumption: 師資到位後課程能如期開課
+        evidence: 過去類似專案的開課達成率
+        from_stage: INPUTS
+        indicator: 實際開課校數 / 預計開課校數
+        risk: 師資招募不足導致延後開課
+        to_stage: ACTIVITIES
+      - assumption: 開課後學童會持續參與
+        evidence: 過去專案的出席率
+        from_stage: ACTIVITIES
+        indicator: 平均出席率
+        risk: 學童因交通問題中途退出
+        to_stage: OUTPUTS
+      - assumption: 課程時數足以影響識字能力
+        evidence: 同類課程的前後測比較
+        from_stage: OUTPUTS
+        indicator: 識字測驗分數變化
+        risk: 課程時數不足以產生效果
+        to_stage: SHORT_TERM_OUTCOMES
+      - assumption: 識字率提升會帶動升學意願
+        evidence: 過去追蹤研究的相關性
+        from_stage: SHORT_TERM_OUTCOMES
+        indicator: 升學率
+        risk: 家庭經濟因素抵銷識字率提升的效果
+        to_stage: LONG_TERM_OUTCOMES
+      - assumption: 個別學童升學率提升會擴散成社區層級的教育落差縮小
+        evidence: 類似區域型專案的長期追蹤數據
+        from_stage: LONG_TERM_OUTCOMES
+        indicator: 偏鄉與都會區升學率差距
+        risk: 樣本規模不足以觀察到社區層級變化
+        to_stage: IMPACT
+    scenario: 規劃一個「提升偏鄉學童識字率」的長期社會影響專案。
+  challenge.blue_team:
+    input:
+      improvements:
+      - category: MONITORING
+        description: 加入供應商回應時間異常告警
+        id: IMP-1
+      - category: FALLBACK
+        description: 保留舊供應商合約 3 個月作為備援
+        id: IMP-2
+      proposal_ref: 提案-AI供應商導入-v2
+    scenario: 對「導入第三方 AI 供應商」提案做 Blue Team 審查，把它強化到最強版本。
+  challenge.counterexample_search:
+    input:
+      boundary_cases:
+      - description: 企業方案、需要走 SSO 設定的使用者
+        id: BC-1
+      - description: 免費試用轉付費的使用者
+        id: BC-2
+      claim: 所有付費使用者都會在 7 天內完成 onboarding
+      true_counterexamples:
+      - boundary_case_id: BC-1
+        contradiction_explanation: 實際追蹤發現企業方案使用者平均要 14 天才完成 SSO 設定，超出 7 天規則
+    scenario: 測試「所有付費使用者都會在 7 天內完成 onboarding」這條規則的邊界。
+  challenge.devils_advocate:
+    input:
+      alternative_position: 這次改版應該維持模組化的單體架構，只在真正需要獨立擴展的部分拆出服務
+      mainstream_position: 這次改版應該全面採用微服務架構
+      supporting_arguments:
+      - 團隊目前只有 4 名後端工程師，微服務的維運負擔可能壓垮團隊
+      - 目前流量還沒有明顯的單一瓶頸模組，過早拆分缺乏真實依據
+    scenario: 對「這次改版應該全面採用微服務架構」這個主流觀點做 Devil's Advocate 挑戰。
+  challenge.disconfirming_evidence:
+    input:
+      current_belief: 新功能上線後留存率一定會提升
+      falsifier_criteria:
+      - description: 上線後 4 週留存率沒有顯著提升甚至下降
+        id: F-1
+      - description: 重度使用者的留存率反而下降
+        id: F-2
+      search_results:
+      - evidence_description: 上線後 4 週數據顯示重度使用者留存率從 78% 降到 71%
+        falsifier_criteria_id: F-2
+        found: true
+    scenario: 檢驗「我們的新功能上線後留存率一定會提升」這個信念是否禁得起考驗。
+  challenge.fmea:
+    input:
+      failure_modes:
+      - cause: 重試邏輯沒有冪等性保護
+        detection: 3
+        effect: 客戶被扣兩次錢，客訴與退款成本
+        existing_control: ''
+        failure_mode: 重複扣款
+        function: 扣款
+        id: FM-1
+        occurrence: 2
+        severity: 9
+      subject_ref: 客戶付款流程
+    scenario: 對「客戶付款流程」做 FMEA 分析。
+  challenge.hazop:
+    input:
+      deviations:
+      - cause: 控制閥卡在全開位置
+        consequence: 儲槽過量進料，可能溢流
+        guide_word: MORE
+        node_id: N-1
+        risk_rating: 7
+        safeguard: 高液位警報
+      nodes:
+      - description: 進料泵浦到儲槽的管線段
+        id: N-1
+    scenario: 對「化學品儲槽進料流程」做 HAZOP 研究。
+  challenge.independent_judge:
+    input:
+      criteria_used:
+      - 是否有書面 SLA
+      - 過去 12 個月的服務中斷次數
+      judgment: 依 SLA 與過去中斷紀錄兩項判準，採用供應商 B
+      positions_considered:
+      - description: 採用供應商 A：價格較低但支援回應較慢
+        id: POS-1
+      - description: 採用供應商 B：價格較高但有 SLA 保障
+        id: POS-2
+      proposal_ref: 供應商選型提案-2026Q3
+    scenario: 對「是否採用供應商 A 還是供應商 B」這個提案做獨立裁決。
+  challenge.pre_mortem:
+    input:
+      controls:
+      - addresses_cause_id: FC-1
+        control_type: PREVENTION
+        description: 上線前找 10 位真實使用者做 onboarding 可用性測試
+        id: CTRL-1
+      failure_causes:
+      - cluster: 使用者體驗
+        description: onboarding 流程太複雜，新用戶第一週就流失
+        id: FC-1
+        impact: HIGH
+        likelihood: HIGH
+      failure_scenario: 新產品上市 3 個月後被市場放棄
+    scenario: 假設「新產品上市 3 個月後失敗」，做 pre-mortem 分析。
+  challenge.red_team:
+    input:
+      dimensions_examined:
+      - SECURITY
+      - LEGAL
+      findings:
+      - description: 停用 2FA 會讓帳號在密碼外洩情境下完全暴露
+        dimension: SECURITY
+        id: F-1
+      proposal_ref: 提案-停用2FA-2026
+    scenario: 對「全面停用內部工具的雙因子驗證以加快登入速度」這個提案做 Red Team 挑戰。
+  challenge.stress_testing:
+    input:
+      proposal_ref: 結帳流程 2026 年終大促備戰計畫
+      scenarios:
+      - description: 單日訂單量突然暴增
+        extreme_value: 50000
+        id: SC-1
+        normal_range:
+          max: 5000
+          min: 1000
+        outcome: DEGRADED
+    scenario: 對「訂單結帳流程能不能撐過極端但合理的情境」做壓力測試（注意：這是認知面的情境推演，跟 devops_sre.stress_test 那種真的對系統打流量的工程壓測是兩回事）。
+  computation.monte_carlo:
+    input:
+      input_distributions:
+      - distribution_type: normal
+        id: D1
+        label: 新增訂單收益
+        params:
+          mean: 500
+          std_dev: 120
+      - distribution_type: triangular
+        id: D2
+        label: 額外維運成本
+        params:
+          max: -50
+          min: -200
+          mode: -100
+      num_runs: 2000
+      random_seed: 42
+      sensitivity_notes: 維運成本假設若惡化 50%，達標機率會明顯下降
+      success_direction: at_least
+      success_threshold: 300
+    scenario: 估計新方案上線後的淨效益分布，有 2 個不確定因素。
+  database_data.backup_restore_drill:
+    input:
+      actual_recovery_duration_seconds: 2100
+      backup_id: prod-db-2026-09-17-nightly
+      integrity_checks_passed: true
+      issues_recorded:
+      - 還原過程中有一次連線逾時，重試後成功
+      observed_data_age_seconds: 600
+      restore_environment: 隔離的還原測試環境（非正式環境）
+      rpo_target_seconds: 900
+      rto_target_seconds: 3600
+      status: passed
+    scenario: 對正式環境資料庫做一次還原演練。
+  database_data.data_contract:
+    input:
+      compatibility_policy: 新增欄位必須是可為空或有預設值；不得直接砍欄位，需先走棄用流程
+      consumers:
+      - 分析團隊的營收儀表板
+      - 財務對帳批次任務
+      dataset_or_topic: orders.order_created 事件
+      fields:
+      - data_type: string
+        name: order_id
+        nullable: false
+      - data_type: string
+        name: discount_code
+        nullable: true
+      producer: 訂單服務
+      quality_notes:
+      - discount_code 只有走過優惠碼流程的訂單才會有值
+      semantics: order_id 是訂單建立時產生的唯一識別碼，不會重複使用
+    scenario: 訂閱系統的「訂單建立事件」跟下游分析團隊訂出資料契約。
+  database_data.data_lineage:
+    input:
+      dataset_ref: 月報 -- 活躍用戶數
+      nodes:
+      - description: 應用程式登入事件原始 log
+        id: N1
+        stage: SOURCE
+        upstream_refs: []
+      - description: 依使用者 ID 去重、依月份聚合
+        id: N2
+        stage: TRANSFORM
+        upstream_refs:
+        - N1
+      - description: 董事會月報
+        id: N3
+        stage: PAPER_OR_DECISION
+        upstream_refs:
+        - N2
+    scenario: 追蹤一份月報裡「活躍用戶數」這個數字的完整血緣。
+  database_data.data_quality_dimensions:
+    input:
+      dataset_or_topic: 客戶主檔資料表
+      dimensions:
+      - dimension: completeness
+        owner: 資料團隊
+        profiled_score: 0.97
+        rule: email 欄位不可為空
+        threshold: 0.95
+      - dimension: uniqueness
+        owner: 資料團隊
+        profiled_score: 0.88
+        rule: 手機號碼不可重複
+        threshold: 0.99
+    scenario: 評估一份客戶資料表的品質。
+  database_data.erd:
+    input:
+      constraints:
+      - email 必須唯一
+      entities:
+      - attributes:
+        - data_type: UUID
+          is_primary_key: true
+          name: customer_id
+        - data_type: VARCHAR(255)
+          is_primary_key: false
+          name: email
+        name: customers
+      - attributes:
+        - data_type: UUID
+          is_primary_key: true
+          name: order_id
+        - data_type: UUID
+          is_primary_key: false
+          name: customer_id
+        name: orders
+      relationships:
+      - cardinality: many_to_one
+        foreign_key_attributes:
+        - customer_id
+        from_entity: orders
+        to_entity: customers
+      system_or_database: 電商訂單系統
+    scenario: 設計「訂單」與「客戶」的資料庫結構。
+  database_data.expand_contract_migration:
+    input:
+      migration_ref: JIRA-1234
+      stages:
+      - completed_at: '2026-09-01T09:00:00Z'
+        stage_id: schema_baseline
+      - completed_at: '2026-09-01T10:00:00Z'
+        stage_id: data_contract
+      - completed_at: '2026-09-02T09:00:00Z'
+        stage_id: compatibility_analysis
+    scenario: 記錄一個正在進行中的資料庫欄位型別遷移。
+  database_data.normalization:
+    input:
+      denormalization_decision:
+        decision: keep_normalized
+        reasoning: 目前查詢量不大，先維持正規化
+      entity_name: 訂單明細
+      functional_dependencies:
+      - dependent: quantity
+        determinant:
+        - order_id
+        - line_number
+      - dependent: product_price
+        determinant:
+        - product_name
+      non_key_attributes:
+      - product_name
+      - product_price
+      - quantity
+      primary_key_attributes:
+      - order_id
+      - line_number
+    scenario: 檢查一張「訂單明細」表的正規化程度。
+  database_data.reconciliation:
+    input:
+      checks:
+      - check_type: COUNT
+        id: CHK-1
+        name: 訂單總筆數
+        source_value: '15000'
+        target_value: '15000'
+      - check_type: CHECKSUM
+        id: CHK-2
+        name: 訂單總金額 checksum
+        source_value: a1b2c3
+        target_value: a1b2c3
+      - check_type: COUNT
+        id: CHK-3
+        name: 取消訂單數
+        resolution:
+          note: 2 筆是遷移期間新取消的訂單，屬於預期差異
+          resolved_as_expected: true
+        source_value: '50'
+        target_value: '48'
+      overall_status: reconciled
+      source_ref: 舊資料庫 orders 表
+      target_ref: 新資料庫 orders 表
+    scenario: 資料庫遷移後，對帳來源與目標系統的訂單資料。
+  database_data.retention_deletion_model:
+    input:
+      compliance_evidence: 依當地稅法第 X 條規定
+      data_class: 客戶交易紀錄
+      deletion_trigger: 保留期滿且無生效中的保留要求
+      holds:
+      - active: true
+        hold_type: regulatory_hold
+        reason: 稅務機關要求延長保留 2 年
+      purpose: 稅務申報與客訴處理
+      retention_rule: 交易完成後保留 7 年
+    scenario: 制定客戶交易紀錄的保留與刪除政策。
+  database_data.schema_compatibility_analysis:
+    input:
+      changes:
+      - change_type: add_nullable_column
+        target: orders.shipping_note
+      - change_type: drop_column
+        notes: 確認無任何服務仍在讀取此欄位
+        target: orders.legacy_status
+      subject: 訂單表 schema 變更
+    scenario: 檢查一組即將上線的 schema 改動是否能零停機部署。
+  decision.ahp:
+    input:
+      criteria:
+      - id: cost
+      - id: performance
+      - id: stability
+      goal: 選出最適合的雲端供應商
+      option_scores:
+      - criterion_id: cost
+        option_id: aws
+        score: 0.6
+      options:
+      - id: aws
+      - id: gcp
+      pairwise_comparisons:
+      - criterion_a_id: cost
+        criterion_b_id: performance
+        value: 3
+      - criterion_a_id: cost
+        criterion_b_id: stability
+        value: 2
+      - criterion_a_id: performance
+        criterion_b_id: stability
+        value: 0.5
+    scenario: 在 3 個雲端方案間選擇，準則是成本／效能／穩定度。
+  decision.decision_tree:
+    input:
+      decision_context: 新產品線是否要先做市場調查
+      root:
+        branches:
+        - child:
+            branches:
+            - child:
+                label: 樂觀後上市
+                node_type: terminal
+                payoff: 80
+              label: 樂觀
+              probability: 0.6
+            - child:
+                label: 悲觀後上市
+                node_type: terminal
+                payoff: 20
+              label: 悲觀
+              probability: 0.4
+            label: 調查結果
+            node_type: chance
+          label: 調查
+        - child:
+            label: 直接上市
+            node_type: terminal
+            payoff: 50
+          label: 不調查直接上市
+        label: 是否調查
+        node_type: decision
+    scenario: 要不要為新產品線投資做市場調查。
+  decision.eisenhower_matrix:
+    input:
+      importance_scale:
+        max: 10
+        min: 0
+      importance_threshold: 5
+      subject: 本週待辦分流
+      tasks:
+      - id: T1
+        importance: 8
+        label: 回覆客戶報價
+        urgency: 9
+      - id: T2
+        importance: 9
+        label: 寫季度規劃
+        urgency: 3
+      - id: T3
+        importance: 2
+        label: 整理信箱
+        urgency: 6
+      - id: T4
+        importance: 3
+        label: 看產業新聞
+        urgency: 2
+      urgency_scale:
+        max: 10
+        min: 0
+      urgency_threshold: 5
+    scenario: 整理本週待辦事項。
+  decision.expected_value:
+    input:
+      decision_subject: 新功能上線的預期收益
+      states:
+      - id: S1
+        label: 大幅成長
+        outcome_value: 100
+        probability: 0.3
+      - id: S2
+        label: 持平
+        outcome_value: 10
+        probability: 0.5
+      - id: S3
+        label: 下滑
+        outcome_value: -20
+        probability: 0.2
+    scenario: 估算一個新功能上線的期望收益。
+  decision.ice:
+    input:
+      context: Q3 新功能點子初篩
+      items:
+      - confidence: 6
+        ease: 4
+        id: F1
+        impact: 8
+        label: 加入單一登入
+      - confidence: 9
+        ease: 9
+        id: F2
+        impact: 2
+        label: 換按鈕顏色
+    scenario: 從一堆新功能點子中快速篩出優先項目。
+  decision.impact_effort:
+    input:
+      effort_scale:
+        max: 10
+        min: 0
+      effort_threshold: 5
+      ideas:
+      - effort: 3
+        id: I1
+        impact: 8
+        label: 加自動化測試
+      impact_scale:
+        max: 10
+        min: 0
+      impact_threshold: 5
+      subject: 本季改善點子初篩
+    scenario: 篩選這一季一堆改善點子該先做哪個。
+  decision.kano:
+    input:
+      features:
+      - dysfunctional_response: NEUTRAL
+        functional_response: LIKE
+        id: F1
+        label: 深色模式
+      subject: 深色模式功能評估
+    scenario: 評估「深色模式」這個功能對使用者的重要性。
+  decision.mcda:
+    input:
+      criteria:
+      - direction: minimize
+        id: cost
+        label: 成本
+      - direction: minimize
+        id: leadtime
+        label: 交期
+      options:
+      - id: vendor_a
+      - id: vendor_b
+      raw_scores:
+      - criterion_id: cost
+        option_id: vendor_a
+        raw_value: 12000
+      - criterion_id: cost
+        option_id: vendor_b
+        raw_value: 9000
+      - criterion_id: leadtime
+        option_id: vendor_a
+        raw_value: 10
+      - criterion_id: leadtime
+        option_id: vendor_b
+        raw_value: 20
+      sensitivity_notes: 若成本權重降到 0.4，vendor_b 會反超
+      weights:
+      - criterion_id: cost
+        weight: 0.6
+      - criterion_id: leadtime
+        weight: 0.4
+    scenario: 在兩個供應商之間依成本與交期做選擇。
+  decision.moscow:
+    input:
+      items:
+      - bucket: MUST
+        description: 支援單一登入
+        id: IT1
+      - bucket: WONT
+        description: 支援離線模式
+        id: IT2
+        reason: 這版時程不夠，下一版再評估
+      release_scope: v2.0 版範圍鎖定
+    scenario: 鎖定下一版的功能範圍。
+  decision.pareto_frontier:
+    input:
+      objectives:
+      - direction: minimize
+        id: cost
+        label: 成本
+      - direction: maximize
+        id: performance
+        label: 效能
+      option_values:
+      - objective_id: cost
+        option_id: spec_a
+        value: 500
+      - objective_id: cost
+        option_id: spec_b
+        value: 800
+      - objective_id: cost
+        option_id: spec_c
+        value: 300
+      - objective_id: performance
+        option_id: spec_a
+        value: 70
+      - objective_id: performance
+        option_id: spec_b
+        value: 90
+      - objective_id: performance
+        option_id: spec_c
+        value: 60
+      options:
+      - id: spec_a
+        label: 規格 A
+      - id: spec_b
+        label: 規格 B
+      - id: spec_c
+        label: 規格 C
+      subject: 伺服器規格選型
+    scenario: 在成本與效能之間找出真正值得考慮的方案，不要太早壓成單一總分。
+  decision.rice:
+    input:
+      confidence: 0.8
+      effort: 3
+      idea:
+        id: IDEA1
+        label: 加入批次匯出
+      impact: 2
+      reach:
+        unit: users/quarter
+        value: 500
+    scenario: 幫一個新功能點子打 RICE 分數。
+  decision.topsis:
+    input:
+      criteria:
+      - direction: minimize
+        id: cost
+        label: 成本
+      - direction: maximize
+        id: quality
+        label: 品質
+      options:
+      - id: v1
+        label: V1
+      - id: v2
+        label: V2
+      - id: v3
+        label: V3
+      raw_scores:
+      - criterion_id: cost
+        option_id: v1
+        raw_value: 8000
+      - criterion_id: cost
+        option_id: v2
+        raw_value: 6000
+      - criterion_id: cost
+        option_id: v3
+        raw_value: 9000
+      - criterion_id: quality
+        option_id: v1
+        raw_value: 70
+      - criterion_id: quality
+        option_id: v2
+        raw_value: 90
+      - criterion_id: quality
+        option_id: v3
+        raw_value: 60
+      weights:
+      - criterion_id: cost
+        weight: 0.5
+      - criterion_id: quality
+        weight: 0.5
+    scenario: 在 3 個廠商之間依成本與品質排序。
+  decision.weighted_decision_matrix:
+    input:
+      criteria:
+      - id: rent
+        label: 租金
+      - id: transit
+        label: 交通
+      options:
+      - id: site_a
+        label: A
+      - id: site_b
+        label: B
+      - id: site_c
+        label: C
+      scale_max: 5
+      scale_min: 1
+      scores:
+      - criterion_id: rent
+        option_id: site_a
+        value: 4
+      - criterion_id: transit
+        option_id: site_a
+        value: 3
+      - criterion_id: rent
+        option_id: site_b
+        value: 2
+      - criterion_id: transit
+        option_id: site_b
+        value: 5
+      - criterion_id: rent
+        option_id: site_c
+        value: 5
+      - criterion_id: transit
+        option_id: site_c
+        value: 2
+      sensitivity_notes: 租金權重若降到 0.4，site_b 會勝出
+      weights:
+      - criterion_id: rent
+        weight: 0.6
+      - criterion_id: transit
+        weight: 0.4
+    scenario: 在 3 個辦公室地點之間依租金、交通、空間打分。
+  decision.wsjf:
+    input:
+      cost_of_delay:
+        business_value: 8
+        risk_reduction_opportunity_enablement: 5
+        time_criticality: 13
+      job:
+        id: JOB-1
+        label: API 速率限制修復
+      job_size: 5
+    scenario: 在敏捷投資組合裡幫一項工作算 WSJF 分數。
+  decomposition.fast:
+    input:
+      functions:
+      - id: F1
+        name: 保障居家安全
+        why_ref: null
+      - id: F2
+        name: 防止未授權進入
+        why_ref: F1
+      - id: F3
+        name: 辨識授權使用者
+        why_ref: F2
+    scenario: 分析「自動門鎖」這個產品的功能鏈。
+  decomposition.functional_decomposition:
+    input:
+      interfaces:
+      - description: 庫存確認後才觸發付款
+        from_function_ref: F1
+        id: I1
+        to_function_ref: F2
+      top_function:
+        children:
+        - children: []
+          function_name: 驗證庫存
+          id: F1
+        - children: []
+          function_name: 處理付款
+          id: F2
+        function_name: 處理訂單
+        id: F0
+    scenario: 把「訂單處理系統」按功能拆解，並標出模組間的介面。
+  decomposition.hierarchical_task_analysis:
+    input:
+      goal:
+        children:
+        - children: []
+          id: T1
+          plan: null
+          task_name: 確認購物車內容
+        - children: []
+          id: T2
+          plan: null
+          task_name: 改用替代商品
+        id: G
+        plan: 先 1，若庫存不足則改做 2
+        task_name: 完成線上結帳
+    scenario: 拆解「線上結帳」這個使用者任務。
+  decomposition.issue_tree:
+    input:
+      root:
+        children:
+        - children: []
+          id: Q1
+          question: 市場吸引力如何？
+        - children: []
+          id: Q2
+          question: 公司能力是否足夠？
+        id: Q0
+        question: 是否進入新市場？
+    scenario: 拆解「是否進入新市場？」這個主問題。
+  decomposition.logic_tree:
+    input:
+      classification_rule: 依銷售通路分類
+      root:
+        category_value: 全部產品
+        children:
+        - category_value: 線上通路
+          children: []
+          id: N1
+        - category_value: 實體通路
+          children: []
+          id: N2
+        id: N0
+    scenario: 先定好「依銷售通路分類」這條規則，再展開產品線的邏輯樹。
+  decomposition.mece:
+    input:
+      categories:
+      - category_name: 新客戶
+        member_item_ids:
+        - customer-1
+      - category_name: 回頭客
+        member_item_ids:
+        - customer-1
+        - customer-2
+      universe_item_ids:
+      - customer-1
+      - customer-2
+      - customer-3
+    scenario: 檢查「客戶分群」這個分類是否互斥且完整。
+  decomposition.objective_tree:
+    input:
+      objectives:
+      - id: O1
+        positive_statement: 客服回應時間縮短到 30 分鐘內
+        source_item_ref: P1
+      - id: O2
+        positive_statement: 顧客滿意度提升
+        source_item_ref: P2
+      source_problem_items:
+      - id: P1
+        polarity: CAUSE
+        statement: 客服回應時間過長
+      - id: P2
+        polarity: EFFECT
+        statement: 顧客滿意度下降
+    scenario: 把「顧客流失率高」這個問題樹的項目轉成目標樹。
+  decomposition.problem_tree:
+    input:
+      causes:
+      - id: C1
+        statement: 工業排放缺乏有效監管
+      core_problem: 都市空氣品質惡化
+      effects:
+      - id: E1
+        statement: 呼吸道疾病就診率上升
+    scenario: 分析「都市空氣品質惡化」這個核心問題的原因與後果。
+  decomposition.wbs:
+    input:
+      deliverable:
+        children:
+        - children: []
+          estimate_hours: 8
+          id: WP1
+          name: 場地布置
+          owner: 小美
+        - children: []
+          estimate_hours: 5
+          id: WP2
+          name: 邀請媒體
+          owner: 小華
+        estimate_hours: null
+        id: D0
+        name: 辦一場產品發表會
+        owner: null
+    scenario: 把「辦一場產品發表會」拆成工作分解結構。
+  delivery.change_risk_matrix:
+    input:
+      change_description: 資料庫主鍵型別從 int 改成 bigint
+      factors:
+        data_sensitivity: HIGH
+        reversibility: MEDIUM
+        scope: HIGH
+        security_impact: LOW
+        traffic_impact: MEDIUM
+      required_controls:
+      - peer_review
+      - staging_validation
+      - rollback_plan
+      - change_advisory_board_signoff
+      - canary_or_blue_green_deploy
+      - post_deploy_verification
+    scenario: 評估「資料庫主鍵型別從 int 改成 bigint」這個正式環境變更的風險。
+  delivery.critical_path_method:
+    input:
+      tasks:
+      - depends_on: []
+        duration: 5
+        task_id: T1
+      - depends_on:
+        - T1
+        duration: 3
+        task_id: T2
+      - depends_on:
+        - T1
+        duration: 8
+        task_id: T3
+      - depends_on:
+        - T2
+        - T3
+        duration: 2
+        task_id: T4
+    scenario: 找出四個任務中真正決定工期的關鍵路徑。
+  delivery.decision_log:
+    input:
+      context: 是否繼續投資自建搜尋引擎還是改用第三方服務
+      decision: 改用第三方搜尋服務(Algolia)
+      evidence:
+      - 自建團隊過去 6 個月只完成 40% 預定功能
+      - 第三方服務報價比自建人力成本低 60%
+      owner: 技術長
+      revisit:
+        mode: SCHEDULED
+        trigger: 若 Algolia 年費調漲超過 50% 則重新評估
+    scenario: 記錄「改用第三方搜尋服務」這個已經做出的決策。
+  delivery.definition_of_done:
+    input:
+      dimensions:
+        capacity:
+          note: capacity 已確認
+          status: MET
+        data:
+          note: data 已確認
+          status: MET
+        documentation:
+          note: documentation 已確認
+          status: MET
+        evidence:
+          note: evidence 已確認
+          status: MET
+        functional:
+          note: functional 已確認
+          status: MET
+        migration:
+          note: 無需資料庫遷移
+          status: NOT_APPLICABLE
+        observability:
+          note: observability 已確認
+          status: MET
+        privacy:
+          note: 此功能不涉及個資
+          status: NOT_APPLICABLE
+        recovery:
+          note: recovery 已確認
+          status: MET
+        rollback:
+          note: rollback 已確認
+          status: MET
+        security:
+          note: security 已確認
+          status: MET
+        tests:
+          note: tests 已確認
+          status: MET
+      target: 使用者匯出報表功能 v2
+    scenario: 判斷「使用者匯出報表功能 v2」是否真正完成。
+  delivery.dependency_graph:
+    input:
+      edges:
+      - critical: true
+        fallback: 若核准延遲，先用備援支付商上線
+        from_node_id: N2
+        owner: 技術長
+        to_node_id: N1
+      nodes:
+      - description: 完成付款 API 串接
+        node_id: N1
+        node_type: task
+      - description: 第三方支付商核准上線
+        node_id: N2
+        node_type: milestone
+    scenario: 明確標出「付款 API 串接」對「第三方支付商核准」的依賴關係。
+  delivery.gantt_chart:
+    input:
+      project: 辦公室搬遷計畫
+      tasks:
+      - depends_on: []
+        end: '2026-10-05'
+        id: T1
+        name: 簽新辦公室租約
+        start: '2026-10-01'
+      - depends_on:
+        - T1
+        end: '2026-10-20'
+        id: T2
+        name: 裝修新辦公室
+        start: '2026-10-06'
+    scenario: 規劃辦公室搬遷計畫的時程。
+  delivery.outcome_roadmap:
+    input:
+      bets:
+      - bet_id: B1
+        description: 加入新手引導教學
+        evidence:
+        - A/B測試顯示有引導的用戶留存率高 12%
+        outcome_id: O1
+      next_review: 2026-Q1
+      outcomes:
+      - description: 新用戶 7 天留存率從 20% 提升到 35%
+        outcome_id: O1
+        theme_id: TH1
+      themes:
+      - name: 提升新用戶留存
+        theme_id: TH1
+    scenario: 用 outcome 導向排出新用戶留存的 roadmap。
+  delivery.raci:
+    input:
+      deliverables:
+      - assignments:
+        - role: A
+          stakeholder_name: 小華
+          status: AVAILABLE
+        - role: R
+          stakeholder_name: 小美
+          status: AVAILABLE
+        deliverable_name: 第三方支付串接上線
+        due_date: '2026-11-15'
+        escalation_path: null
+    scenario: 為「第三方支付串接上線」這個交付項目指派 RACI。
+  delivery.raid_log:
+    input:
+      items:
+      - due_review_date: '2026-10-01'
+        evidence: ''
+        impact: 可能增加 20% 年度雲端支出
+        item_id: R1
+        next_action: 詢問其他供應商報價作為談判籌碼
+        owner: 採購經理
+        statement: 主要雲端供應商可能調漲價格
+        status: OPEN
+        type: RISK
+    scenario: 記錄「主要雲端供應商可能調漲價格」這個風險。
+  delivery.risk_register:
+    input:
+      risks:
+      - control: 建立知識文件並安排 pair programming
+        description: 關鍵工程師離職導致專案延誤
+        exposure: 0.21
+        impact: 0.7
+        owner: 專案經理
+        probability: 0.3
+        risk_id: RISK-1
+        trigger: 該工程師遞交辭呈或連續 2 週請假
+    scenario: 登記「關鍵工程師離職導致專案延誤」這個風險。
+  delivery.stage_gate:
+    input:
+      stage_reviews:
+      - evidence:
+        - PoC 顯示核心演算法在 100ms 內完成運算，符合效能門檻
+        gate_criteria:
+        - 效能達標
+        - 初步成本估算在預算內
+        gate_decision: GO
+        stage_name: 概念驗證階段
+    scenario: 對一個新產品概念驗證階段做關卡審查。
+  devops_sre.blue_green_deployment:
+    input:
+      blue_environment: v2.3.0（藍，目前正式環境）
+      cutover_status: cut_over
+      green_environment: v2.4.0（綠，待切換，已在隔離環境跑完全部驗證測試）
+      green_verified: true
+    scenario: 把結帳服務從 v2.3.0 切換到 v2.4.0。
+  devops_sre.canary_deployment:
+    input:
+      outcome: completed
+      release_under_rollout: recommendation-service v5.1.0
+      stages:
+      - healthy: true
+        traffic_percent: 5
+      - healthy: true
+        traffic_percent: 25
+      - healthy: true
+        traffic_percent: 100
+    scenario: 把新版推薦演算法分階段放量給流量。
+  devops_sre.capacity_model:
+    input:
+      current_capacity: 4000
+      current_workload: 1000
+      growth_rate_per_period: 0.2
+      high_threshold_ratio: 0.3
+      low_threshold_ratio: 0.1
+      periods_ahead: 3
+      resource_coefficient: 2
+      resource_name: 訂單服務資料庫
+    scenario: 評估訂單服務資料庫在未來 3 期（每期成長 20%）後的容量餘裕。
+  devops_sre.chaos_engineering:
+    input:
+      blast_radius: 僅限 checkout-service 的 1 個 canary pod
+      injected_failure: 用 tc netem 對該 pod 注入 300ms 網路延遲，持續 5 分鐘
+      recovered_as_hypothesized: true
+      status: completed
+      steady_state_hypothesis: 平均延遲在 200ms 以下，且錯誤率低於 0.1%
+    scenario: 對結帳服務注入網路延遲，驗證系統是否如預期自動恢復。
+  devops_sre.error_budget:
+    input:
+      observed_failure_rate: 0.0005
+      release_policy: unrestricted
+      service_under_measurement: checkout-api
+      slo_target_ratio: 0.999
+    scenario: 檢視結帳服務本季 SLO 的錯誤預算燃燒狀況。
+  devops_sre.game_day:
+    input:
+      aar:
+        actual: failover 實際花了 18 分鐘
+        expected: 應在 15 分鐘內自動 failover 到備援節點
+        next: 把健康檢查間隔縮短到 10 秒、連續 2 次觸發，DNS TTL 降到 30 秒
+        why: 健康檢查間隔 30 秒需連續 3 次才觸發，加上 DNS TTL 快取延遲
+      injected_failure: 手動關閉支付服務資料庫的主節點 VM
+      recovery:
+        outcome: recovered
+        time_to_recover_minutes: 18
+      roles:
+      - assignee: 小美
+        role: 事件指揮官
+      - assignee: 小華
+        role: 溝通窗口
+      scenario: 模擬支付服務資料庫主節點在尖峰時段故障
+    scenario: 演練支付服務資料庫主節點在尖峰時段故障的應變流程。
+  devops_sre.load_test:
+    input:
+      acceptance:
+        error_rate_max: 0.01
+        latency_p95_ms_max: 200
+      baseline:
+        error_rate: 0.001
+        latency_p95_ms: 80
+        load_rps: 100
+        resource_utilization:
+          cpu: 0.3
+          memory: 0.4
+      system_under_test: checkout-api
+      target:
+        error_rate: 0.004
+        latency_p95_ms: 180
+        load_rps: 500
+        resource_utilization:
+          cpu: 0.75
+          memory: 0.55
+    scenario: 比較結帳服務在基準流量跟 5 倍流量下的效能表現。
+  devops_sre.release_readiness_review:
+    input:
+      domain_assessments:
+      - domain: change
+        verdict: ready
+      - domain: data
+        verdict: ready
+      - domain: security
+        verdict: ready
+      - domain: observability
+        verdict: ready
+      - domain: rollback
+        verdict: ready
+      - domain: capacity
+        verdict: ready
+      overall_status: ready
+      release_ref: v2.8.0-checkout-redesign
+    scenario: v2.8.0 結帳頁改版上線前的最終就緒審查。
+  devops_sre.rto_rpo:
+    input:
+      business_impact_statement: 訂單資料庫離線期間，所有新訂單與付款都無法處理，每小時預估損失營收約 50 萬元
+      drill_ref: DRILL-2026Q3-ORDERDB-01
+      rpo_target_seconds: 300
+      rto_target_seconds: 1800
+      system_or_component: 訂單資料庫主叢集
+      tier: Tier-1
+    scenario: 為訂單資料庫主叢集訂出災難復原目標。
+  devops_sre.runbook_execution:
+    input:
+      rollback_performed: false
+      runbook_ref: RB-restart-payment-worker-v3
+      steps:
+      - decision: go
+        description: 確認 payment-worker pod 的健康檢查端點回傳非 200
+        outcome: matched_expected
+        preconditions_met: true
+        step_number: 1
+      - decision: go
+        description: 執行 kubectl rollout restart deployment/payment-worker
+        outcome: matched_expected
+        preconditions_met: true
+        step_number: 2
+      - decision: go
+        description: 確認重啟後 5 分鐘內佇列深度回到正常範圍
+        outcome: matched_expected
+        preconditions_met: true
+        step_number: 3
+    scenario: 執行「重啟卡住的付款背景工作程序」作業手冊。
+  devops_sre.sli_slo:
+    input:
+      indicators:
+      - id: SLI-AVAIL
+        metric_type: availability
+        sla_required: false
+      - id: SLI-LATENCY
+        metric_type: latency
+        sla_required: true
+        sla_terms: 若月可用性低於 99.5%，依合約退還當月服務費 10%
+      service_under_measurement: checkout-api
+    scenario: 為結帳 API 定義可靠性指標，其中延遲有對外合約承諾。
+  devops_sre.soak_test:
+    input:
+      degradation_thresholds:
+        error_rate_increase_max: 0.005
+        latency_p95_increase_ms_max: 20
+        resource_increase_max: 0.2
+      samples:
+      - elapsed_minutes: 0
+        measurement:
+          error_rate: 0.001
+          latency_p95_ms: 90
+          load_rps: 200
+          resource_utilization:
+            cpu: 0.35
+            memory: 0.4
+      - elapsed_minutes: 60
+        measurement:
+          error_rate: 0.001
+          latency_p95_ms: 95
+          load_rps: 200
+          resource_utilization:
+            cpu: 0.36
+            memory: 0.55
+      - elapsed_minutes: 120
+        measurement:
+          error_rate: 0.0012
+          latency_p95_ms: 98
+          load_rps: 200
+          resource_utilization:
+            cpu: 0.37
+            memory: 0.72
+      sustained_load_rps: 200
+      system_under_test: order-service
+    scenario: 對訂單服務跑 2 小時穩定負載，檢查是否有緩慢的記憶體洩漏。
+  devops_sre.stress_test:
+    input:
+      breaking_thresholds:
+        error_rate_max: 0.05
+        latency_p95_ms_max: 250
+      expected_load_rps: 300
+      load_steps:
+      - error_rate: 0.001
+        latency_p95_ms: 100
+        load_rps: 200
+        resource_utilization:
+          cpu: 0.4
+      - error_rate: 0.003
+        latency_p95_ms: 140
+        load_rps: 350
+        resource_utilization:
+          cpu: 0.65
+      - error_rate: 0.08
+        latency_p95_ms: 320
+        load_rps: 500
+        resource_utilization:
+          cpu: 0.95
+      recovery:
+        error_rate: 0.002
+        latency_p95_ms: 130
+        recovered: true
+        reduced_load_rps: 350
+      system_under_test: checkout-api
+    scenario: 把結帳服務的負載一路推到超過預期流量，找出真正的崩潰點。
+  divergent.brainwriting:
+    input:
+      individual_contributions:
+      - contributor_id: 小美
+        id: C1
+        idea_text: 用訂閱制取代一次性付費
+      - contributor_id: 小華
+        id: C2
+        idea_text: 加入免費試用期降低訂閱門檻
+      - contributor_id: 小美
+        id: C3
+        idea_text: 訂閱制搭配忠誠度積分
+      merged_ideas:
+      - id: M1
+        source_contribution_refs:
+        - C1
+        - C2
+    scenario: 兩位成員各自先寫下訂閱制相關想法，再合併討論。
+  divergent.classic_brainstorming:
+    input:
+      evaluations:
+      - idea_ref: I1
+        rationale: 成本低，兩週內可上線
+        verdict: 優先實作
+      ideas:
+      - id: I1
+        text: 客服開場白模板化，省去每次重打招呼語的時間
+      - id: I2
+        text: 常見問題自動帶出建議回覆草稿
+    scenario: 針對「如何降低客服平均處理時間」快速產生大量想法，之後再獨立評估。
+  divergent.crazy_eights:
+    input:
+      concepts:
+      - box_number: 1
+        sketch_description: 大型單色按鈕置中
+      - box_number: 2
+        sketch_description: 按鈕加倒數計時動畫
+      - box_number: 3
+        sketch_description: 按鈕旁加信任徽章
+      - box_number: 4
+        sketch_description: 按鈕改成浮動吸底
+      - box_number: 5
+        sketch_description: 按鈕搭配進度條
+      - box_number: 6
+        sketch_description: 按鈕文字改成動詞開頭
+      - box_number: 7
+        sketch_description: 按鈕加庫存倒數提示
+      - box_number: 8
+        sketch_description: 按鈕分成兩段式確認
+    scenario: 為結帳流程的付款按鈕畫出 8 個不同的視覺概念。
+  divergent.creative_constraints:
+    input:
+      constraints:
+      - constraint_type: TIME
+        id: C1
+        rule: 每個素材發想時間不得超過 3 分鐘
+      - constraint_type: COLOR
+        id: C2
+        rule: 只能用黑白兩色
+      objective: 為新產品發想 10 個行銷素材點子
+      outputs:
+      - constraint_refs:
+        - C1
+        - C2
+        description: 3分鐘內畫出的黑白版產品海報草稿，強調對比而非色彩
+        id: O1
+    scenario: 用限制媒材的方式，為新產品發想行銷素材。
+  divergent.design_thinking:
+    input:
+      challenge: 改善年長用戶對我們 App 掛號流程的挫折感
+      stages:
+        define:
+          items: []
+          summary: 核心問題:互動元件對比不足、返回路徑不直覺，導致掛號中途放棄
+        empathize:
+          items:
+          - 王阿姨反覆點錯上一步按鈕
+          - 李伯伯看不清楚灰色的次要按鈕文字
+          summary: 訪談 8 位 65 歲以上用戶，觀察他們實際操作掛號流程
+        ideate:
+          items:
+          - 加大按鈕尺寸並提高文字對比度
+          - 加入語音導覽輔助操作
+          summary: 腦力激盪至少兩種改善方向
+        prototype:
+          items:
+          - 方案A:大按鈕高對比線框圖
+          - 方案B:語音導覽線框圖
+          summary: 做出兩個低保真度線框圖
+        test:
+          items:
+          - 方案A完成率從40%提升到85%
+          summary: 找5位年長用戶實測兩個原型
+    scenario: 改善年長用戶對 App 掛號流程的挫折感。
+  divergent.forced_connections:
+    input:
+      combinations:
+      - feature_a_ref: A1
+        feature_b_ref: B1
+        id: CMB1
+        resulting_idea: 用心率感測器的邏輯做一個『植物澆水提醒手環』，偵測土壤濕度並像量測心跳一樣提醒澆水
+      concept_a_features:
+      - description: 心率感測器
+        id: A1
+      concept_a_name: 智慧手錶
+      concept_b_features:
+      - description: 需要規律澆水
+        id: B1
+      concept_b_name: 植物盆栽
+    scenario: 把「智慧手錶」跟「植物盆栽」兩個不相關概念強制連結。
+  divergent.lateral_thinking:
+    input:
+      dominant_assumption: 客服人員必須即時回覆才能讓客戶滿意
+      problem_statement: 如何提升線上客服的滿意度
+      provocations:
+      - id: P1
+        movement: 改成明確預告等待時間並主動更新進度，客戶對『已知的等待』的滿意度其實高於『不確定的即時』
+        statement: Po:客服故意不要即時回覆
+        technique: REVERSAL
+    scenario: 用「反轉」技巧挑戰「客服必須即時回覆才能讓客戶滿意」這個預設假設。
+  divergent.lotus_blossom:
+    input:
+      branches:
+      - branch_number: 1
+        branch_theme: 溝通
+        ideas:
+        - 每日站立會議
+        - 非同步文字更新
+        - 回覆時限共識
+        - 視訊開鏡頭
+        - 每週語音閒聊
+        - 文件留言規範
+        - 緊急聯絡SOP
+        - 跨時區重疊時段
+      - branch_number: 2
+        branch_theme: 儀式感
+        ideas:
+        - 週五慶功時刻
+        - 團隊主題曲
+        - 線上擊掌動畫
+        - 月度回顧儀式
+        - 新人歡迎儀式
+        - 專案結案儀式
+        - 生日祝福機器人
+        - 季度心得分享會
+      - branch_number: 3
+        branch_theme: 認可與獎勵
+        ideas:
+        - 公開感謝頻道
+        - 同儕互評積分
+        - 月度之星投票
+        - 小額禮品卡
+        - 彈性假期獎勵
+        - 週報曝光
+        - 客戶好評分享
+        - 技能認證獎章
+      - branch_number: 4
+        branch_theme: 彈性
+        ideas:
+        - 彈性上下班
+        - 四天工作制試辦
+        - 異地辦公補助
+        - 彈性休假
+        - 會議可錄影補看
+        - 核心協作時段
+        - 生產力節奏尊重
+        - 混合辦公選項
+      - branch_number: 5
+        branch_theme: 共同目標
+        ideas:
+        - 季度OKR共識會
+        - 願景共創工作坊
+        - 個人目標對齊
+        - 進度儀表板透明化
+        - 里程碑慶祝
+        - 跨部門目標串聯
+        - 北極星指標共識
+        - 目標回顧與調整
+      - branch_number: 6
+        branch_theme: 信任建立
+        ideas:
+        - 一對一定期會談
+        - 開放式回饋文化
+        - 失敗經驗分享會
+        - 心理安全感調查
+        - 跨職能結對合作
+        - 透明決策紀錄
+        - 匿名意見箱
+        - 新人導師制
+      - branch_number: 7
+        branch_theme: 娛樂
+        ideas:
+        - 線上桌遊時間
+        - 團隊播放清單
+        - 迷因分享頻道
+        - 線上咖啡閒聊
+        - 週五電影夜
+        - 團隊運動挑戰賽
+        - 線上密室逃脫
+        - 隨機配對午餐
+      - branch_number: 8
+        branch_theme: 學習成長
+        ideas:
+        - 內部讀書會
+        - 技能交換工作坊
+        - 外部課程補助
+        - 內部講師計畫
+        - 失敗案例學習會
+        - 跨團隊輪調機會
+        - 導師制度
+        - 季度學習分享
+      center_theme: 如何提升遠距工作團隊的向心力
+    scenario: 從「如何提升遠距工作團隊的向心力」這個中心主題展開。
+  divergent.random_stimulus:
+    input:
+      entries:
+      - forced_connection: 降落傘的核心邏輯是『在墜落開始前先展開保護』
+        resulting_idea: 做一個在信用卡盜刷警訊出現『之前』就先凍結可疑金額的『預防性凍結』功能，而不是盜刷後才通知
+        stimulus: 降落傘
+    scenario: 用「降落傘」這個隨機刺激詞，強制找出跟信用卡防盜刷功能的關聯。
+  divergent.reverse_brainstorming:
+    input:
+      inversions:
+      - inverted_solution: 到職前備妥設備，並指定一位夥伴帶他認識團隊
+        worsening_idea_ref: W1
+      problem_statement: 新進員工到職第一週就想離職
+      worsening_ideas:
+      - id: W1
+        text: 第一天不給電腦，也不介紹任何同事
+      - id: W2
+        text: 把所有規章文件一次丟給他自己讀
+    scenario: 新用戶完成註冊的比例偏低，一直想不出怎麼提升，反過來想「怎麼樣會讓註冊完成率更低」。
+  divergent.scamper:
+    input:
+      entries:
+      - lens: SUBSTITUTE
+        reasoning: 離峰時間運力過剩、尖峰時間運力不足，時段定價比純距離定價更貼近真實成本結構
+        transformed_idea: 把外送平台的『依距離計費』換成『依時段動態計費』
+      - lens: ELIMINATE
+        reasoning: 降低下單門檻，改用趨近即時的動態運費補回單均利潤，而不是用門檻硬性排除小單
+        transformed_idea: 拿掉『最低訂單金額』限制
+    scenario: 用 SCAMPER 改造外送平台的運費計算方式。
+  divergent.six_thinking_hats:
+    input:
+      hats:
+      - hat: WHITE
+        statements:
+        - 目前 AI 客服解決率是62%
+        - 人工客服平均等待時間4分鐘
+      - hat: RED
+        statements:
+        - 團隊對『AI優先』這個詞感到不安，擔心被取代
+      - hat: BLACK
+        statements:
+        - AI誤判複雜案件可能引發客訴升級
+      - hat: YELLOW
+        statements:
+        - 常見問題交給AI可以把人力集中在高價值案件
+      - hat: GREEN
+        statements:
+        - 可以讓AI在對話中主動提議轉人工，而不是等客戶自己要求
+      - hat: BLUE
+        statements:
+        - 先做兩週AB測試，再決定是否全面轉換
+      topic: 是否要把客服全面轉為 AI 優先、人工升級
+    scenario: 討論是否要把客服全面轉為 AI 優先、人工升級。
+  divergent.six_three_five:
+    input:
+      participant_ids:
+      - 小美
+      - 小華
+      - 阿明
+      sheets:
+      - rounds:
+        - contributor_id: 小美
+          ideas:
+          - 加開凌晨時段客服
+          - AI優先分流
+          - 延長保固期
+          round_number: 1
+        - contributor_id: 小華
+          ideas:
+          - 針對凌晨時段加開緊急聯絡管道
+          - AI分流後保留人工申訴選項
+          - 保固延長搭配訂閱制
+          round_number: 2
+        - contributor_id: 阿明
+          ideas:
+          - 凌晨時段外包海外客服
+          - AI分流準確率門檻90%才生效
+          - 保固延長限定高單價商品
+          round_number: 3
+        sheet_id: S1
+    scenario: 3 人（人數可調整，不必是原始的 6 人）針對客服改善提案跑一輪 6-3-5。
+  divergent.starbursting:
+    input:
+      central_topic: 推出企業版訂閱方案
+      questions:
+      - category: WHO
+        question_text: 企業版的核心決策者是誰？
+      - category: WHAT
+        question_text: 企業版跟個人版的功能差異是什麼？
+      - category: WHEN
+        question_text: 企業版應該什麼時候上線比較好？
+      - category: WHERE
+        question_text: 企業版的銷售管道要從哪裡開始？
+      - category: WHY
+        question_text: 為什麼企業客戶現在還沒有訂閱我們的個人版？
+      - category: HOW
+        question_text: 企業版的定價要如何跟個人版做區隔？
+    scenario: 推出企業版訂閱方案前，先用星爆法發散出還不知道的問題。
+  divergent.synectics:
+    input:
+      analogies:
+      - analogy_content: 如果我是那份問卷本身，我會覺得自己像一份沒有盡頭的考卷，每翻一頁都讓人更想放棄
+        analogy_type: PERSONAL
+        reframed_insight: 改成進度條加分段儲存，讓使用者隨時可以離開再回來，而不是給一次做完的壓力
+      - analogy_content: 像餐廳的『套餐點餐』，先問幾個大方向問題，再依回答動態展開細節問題
+        analogy_type: DIRECT
+        reframed_insight: 用條件式問卷，依照使用者角色動態跳過不相關的題目，而不是所有人都看到同一份完整問卷
+      original_problem: 如何讓使用者更願意完整填寫落落長的入職問卷
+    scenario: 用類比重構「如何讓使用者更願意完整填寫落落長的入職問卷」這個問題。
+  divergent.triz:
+    input:
+      contradiction:
+        improving_parameter: 續航力（電池容量）
+        worsening_parameter: 車身重量與操控性
+      principles:
+      - application: 把單一大電池拆成多個模組化小電池分散配置在車架不同位置，降低單點重量集中，同時維持總電量
+        name: 分割原則（Segmentation）
+        principle_number: 1
+      - application: 車架改用碳纖維複合材料取代部分金屬結構，減輕的重量用來換取更大電池容量的空間
+        name: 複合材料原則（Composite Materials）
+        principle_number: 40
+      problem_statement: 想讓電動機車電池續航力更長，但電池越大車身越重、操控變差
+    scenario: 電動機車想讓電池續航力更長，但電池越大車身越重、操控越差，這是一個真實的矛盾。
+  epistemic.argument_mapping:
+    input:
+      main_claim:
+        claim_id: C-1
+        statement: 公司應該全面轉為遠端工作
+      objections:
+      - id: O-1
+        text: 新人 onboarding 跟團隊文化建立會變困難
+      rebuttals:
+      - id: R-1
+        objection_id: O-1
+        text: 改用結構化 buddy 制度加每週實體聚會可以緩解
+      supports:
+      - id: S-1
+        text: 可以招募到不受地理限制的人才
+    scenario: 對「公司應該全面轉為遠端工作」這個主張建立論證地圖。
+  epistemic.assumption_mapping:
+    input:
+      mapped_assumptions:
+      - assumption_id: ASM-1
+        impact: HIGH
+        uncertainty: HIGH
+      - assumption_id: ASM-2
+        impact: HIGH
+        uncertainty: LOW
+    scenario: 對「新訂閱制方案」的幾個關鍵假設排優先順序。
+  epistemic.assumption_registry:
+    input:
+      entries:
+      - id: ASM-1
+        impact_if_wrong: Critical
+        statement: 主要供應商能在 48 小時內完成 API 整合
+        status: Unverified
+    scenario: 正式登記「主要供應商能在 48 小時內完成 API 整合」這個假設。
+  epistemic.bayesian_updating:
+    input:
+      evidence_ref: AB測試報告-2026-09
+      hypothesis: 新版結帳流程能提高轉換率
+      likelihood_given_false: 0.3
+      likelihood_given_true: 0.8
+      prior: 0.5
+    scenario: 根據新的 A/B 測試數據，更新「新版結帳流程能提高轉換率」這個假設的信心。
+  epistemic.confidence_calibration:
+    input:
+      predictions:
+      - actual_outcome: true
+        id: P-1
+        stated_confidence: 0.9
+      - actual_outcome: false
+        id: P-2
+        stated_confidence: 0.6
+      - actual_outcome: true
+        id: P-3
+        stated_confidence: 0.7
+    scenario: 檢驗一位分析師過去幾次「這個功能會提升留存率」的信心程度校準得準不準。
+  epistemic.contradiction_detection:
+    input:
+      claims:
+      - claim_id: C-1
+      - claim_id: C-2
+      - claim_id: C-3
+      relations:
+      - claim_id_a: C-1
+        claim_id_b: C-2
+        relation: CONTRADICTS
+    scenario: 比對三份不同來源對「遠端工作是否降低生產力」的主張是否互相衝突。
+  epistemic.evidence_hierarchy:
+    input:
+      domain: 使用者研究
+      evidence_assignments:
+      - evidence_id: E-1
+        level_id: L1
+      hierarchy_levels:
+      - label: 大規模對照可用性測試
+        level_id: L1
+        rank: 1
+      - label: 單次深度訪談
+        level_id: L2
+        rank: 2
+      - label: 團隊內部猜測
+        level_id: L3
+        rank: 3
+    scenario: 為「使用者研究」這個領域建立自己的證據強度階層。
+  epistemic.evidence_matrix:
+    input:
+      claims:
+      - claim_id: C-1
+        statement: 導入新定價方案會提升營收
+      - claim_id: C-2
+        statement: 客戶會因為漲價而流失
+      evidence_items:
+      - evidence_id: E-1
+      - evidence_id: E-2
+      links:
+      - claim_id: C-1
+        evidence_id: E-1
+        relation: SUPPORTS
+      - claim_id: C-2
+        evidence_id: E-2
+        relation: CONTRADICTS
+    scenario: 對照「導入新定價方案會提升營收」跟「客戶會因為漲價而流失」這兩個主張各自的證據強度。
+  epistemic.ladder_of_inference:
+    input:
+      assumptions_made:
+      - 準時是這個團隊評斷責任感的標準
+      conclusions_drawn:
+      - 這位新同事不適合這份工作
+      meanings_assigned:
+      - 他對這份工作不夠重視
+      observed_data:
+      - 他這週有兩次會議遲到 10 分鐘
+    scenario: 拆解「這位新同事一定不適合這份工作」這個結論是怎麼一步步爬上來的。
+  epistemic.toulmin_model:
+    input:
+      backing:
+      - 世界衛生組織的空污研究報告
+      claim: 這個城市應該禁止市中心私家車通行
+      grounds:
+      - 市中心的空氣品質指數長期超標
+      - 其他實施同樣政策的城市空污下降了 30%
+      qualifier: 在配套大眾運輸到位的前提下
+      rebuttal: 除非商業區有特殊物流需求
+      warrant: 減少私家車流量能直接降低空氣污染，進而改善市中心空氣品質
+    scenario: 用 Toulmin 模型分析「這個城市應該禁止市中心私家車通行」這個論證。
+  experiment.ab_test:
+    input:
+      analyzed_at: '2026-08-15T00:00:00Z'
+      decision: SHIP
+      guardrail_metrics:
+      - 頁面停留時間
+      - 跳出率
+      hypothesis: 將 CTA 按鈕改成綠色會提升點擊率
+      primary_metric: CTA 點擊率
+      randomization_unit: 使用者 ID
+      registered_at: '2026-08-01T00:00:00Z'
+      sample_size_per_arm: 5000
+    scenario: 測試把 CTA 按鈕改成綠色是否提升點擊率。
+  experiment.benchmark:
+    input:
+      candidates:
+      - candidate_id: C1
+        label: 方案A：批次寫入
+        results:
+          處理總耗時(秒): 42
+          記憶體峰值(MB): 850
+      - candidate_id: C2
+        label: 方案B：逐筆寫入
+        results:
+          處理總耗時(秒): 118
+          記憶體峰值(MB): 320
+      environment:
+        description: 單台 8 核 32GB 測試機
+      metrics:
+      - 處理總耗時(秒)
+      - 記憶體峰值(MB)
+      workload:
+        description: 處理 10 萬筆訂單匯入
+        parameters:
+          batch_size: 1000
+    scenario: 比較兩種訂單匯入方案的效能。
+  experiment.concierge_test:
+    input:
+      manual_delivery:
+        automation_components: []
+        delivered_by: 創辦人本人
+      measurements:
+      - measured_at: '2026-08-30T00:00:00Z'
+        metric_type: USAGE_COUNT
+        sample_size: 30
+        unit: 人
+        value: 23
+      service_description: 幫顧客手動規劃每週健身菜單
+    scenario: 先用人工方式幫顧客規劃每週健身菜單，驗證是否有真實需求。
+  experiment.fake_door:
+    input:
+      click_count: 210
+      cta_copy: 匯出成 Notion（點我試試）
+      disclosure_shown: true
+      disclosure_text: 此功能尚未開放，感謝登記，上線會通知您
+      feature_under_test: 匯出成 Notion 格式
+      impression_count: 3200
+    scenario: 測試「匯出成 Notion 格式」這個功能的真實需求。
+  experiment.mvp:
+    input:
+      critical_assumption_:
+        falsifiable_if: 4 週內活躍使用率低於 20%
+        statement: 用戶會願意每週至少使用一次自動記帳功能
+      decision_threshold_:
+        comparison: GTE
+        decision_if_met: 投入資源打磨並正式上線
+        decision_if_not_met: 停止開發，訪談使用者了解原因
+        metric: 週活躍使用率
+        target_value: 0.2
+      real_usage_result_:
+        actual_value: 0.35
+        real_users_count: 150
+        usage_context: 4 週封測
+    scenario: 驗證用戶是否真的願意持續使用自動記帳功能。
+  experiment.pilot:
+    input:
+      monitoring_metrics:
+      - 每週排班衝突次數
+      - 系統可用率
+      rollback_criteria:
+      - 系統當機超過 4 小時
+      scope:
+        boundaries:
+        - 僅限台北兩間分店
+        - 為期 6 週
+        description: 在 2 個分店試行新排班系統
+      stop_criteria:
+      - 任何一週出現無人排班的班次
+      success_criteria:
+      - 員工排班衝突投訴減少 50%
+    scenario: 在 2 個分店試行新排班系統。
+  experiment.proof_of_concept:
+    input:
+      benchmark_result_:
+        environment: 獨立測試環境，16GB RAM
+        measured_value: 78
+        methodology: 連續執行 1000 次查詢取平均值
+      implementation_:
+        description: 在獨立測試環境載入 100 萬筆向量做查詢測試
+        isolated: true
+        production_integration: false
+      success_criteria_:
+        comparison: LTE
+        metric: 查詢延遲(ms)
+        threshold: 100
+      technical_unknown_:
+        statement: 不確定現有向量資料庫能否在 100ms 內處理百萬級向量的相似度搜尋
+    scenario: 驗證現有向量資料庫能否在 100ms 內完成百萬級向量相似度搜尋。
+  experiment.prototype:
+    input:
+      fidelity_:
+        level: LOW
+        rationale: 用紙本線框稿測試，不做可互動介面
+      iterations:
+      - change: 把第二步的按鈕文字改成更明確的『確認付款』
+        triggered_by_observation_index: 0
+      learning_goal_:
+        falsifiable_if: 超過一半的測試者在第二步卡住超過 30 秒
+        statement: 使用者能否理解新的三步驟結帳流程
+      user_test_:
+        method: 5 人可用性測試
+        observations:
+        - 3 位使用者在第二步不確定該按哪個按鈕
+        - 1 位使用者誤以為已經完成付款
+        participant_count: 5
+    scenario: 測試使用者能否理解新的三步驟結帳流程。
+  experiment.smoke_test:
+    input:
+      decision: GO
+      measured_at: '2026-07-31T00:00:00Z'
+      measured_signups: 340
+      offer_description: 智慧澆花器預購頁面
+      signup_or_preorder_threshold: 200
+      threshold_declared_at: '2026-07-01T00:00:00Z'
+    scenario: 用預購頁面測試智慧澆花器的市場需求。
+  experiment.technical_spike:
+    input:
+      decision_note:
+        decided_at: '2026-09-03T16:00:00Z'
+        decision: 採用向量搜尋，但排程延後 1 天
+        rationale: 轉換層工作量可控，技術風險已釐清
+      findings:
+      - source_type: EXPERIMENT
+        summary: 實測向量搜尋回傳格式需要額外轉換層，多花 1 天
+      question: 能不能在 3 天內把現有推薦引擎換成向量搜尋而不影響現有 API 介面？
+      timebox:
+        closed_at: '2026-09-03T17:00:00Z'
+        deadline: '2026-09-04T09:00:00Z'
+        started_at: '2026-09-01T09:00:00Z'
+    scenario: 用限時研究釐清能否在 3 天內把推薦引擎換成向量搜尋。
+  experiment.wizard_of_oz:
+    input:
+      back_end:
+        actually_human_operated: true
+        description: 專員在後台即時手動輸入回覆，偽裝成 AI 回應
+        operator_role: 客服專員
+      disclosure:
+        disclosed_to: WILL_DISCLOSE_TO_USER_AT_STUDY_END
+        faked_components:
+        - AI 自動回覆
+        real_components:
+        - 聊天視窗 UI
+        - 訊息即時傳遞
+      front_end:
+        description: 使用者看到的是即時聊天視窗，介面標示『AI 助理』
+        presented_as_automated: true
+      interaction_description: AI 客服聊天機器人回答退換貨問題
+    scenario: 測試 AI 客服聊天機器人是否能有效回答退換貨問題（實際由真人假扮）。
+  feasibility.break_even:
+    input:
+      contribution_margin_per_unit: 25
+      fixed_cost: 50000
+      subject_ref: 新產品 X 損益兩平評估
+    scenario: 評估一項新產品要賣多少件才不虧錢。
+  feasibility.cost_benefit_analysis:
+    input:
+      alternatives:
+      - benefits:
+        - description: 系統客製化彈性
+          id: B1
+          non_monetizable: true
+          value: null
+        - description: 3 年累計節省授權費
+          id: B2
+          non_monetizable: false
+          value: 600000
+        costs:
+        - description: 自建開發人力 12 個月
+          id: C1
+          non_monetizable: false
+          value: 800000
+        discount_rate: 0.08
+        distributional_effects: 開發團隊工時增加，客服團隊短期無影響
+        id: ALT-BUILD
+        sensitivity_analysis: 若開發延遲 3 個月，成本增加約 15%
+    scenario: 比較「自建 CRM」vs「採購 SaaS CRM」兩個方案。
+  feasibility.cost_effectiveness:
+    input:
+      alternatives:
+      - cost: 500000
+        cost_per_unit: 2500.0
+        effectiveness_outcome_units: 200
+        id: ALT-A
+      - cost: 300000
+        cost_per_unit: 3000.0
+        effectiveness_outcome_units: 100
+        id: ALT-B
+    scenario: 比較兩個公衛介入方案，用「預防病例數」當共同成果單位（效益本身很難換算成金額）。
+  feasibility.irr:
+    input:
+      cash_flows:
+      - amount: -1000
+        period: 0
+      - amount: 1200
+        period: 1
+      hurdle_rate: 0.1
+      subject_ref: 設備採購案 IRR 評估
+    scenario: 評估一筆設備採購案的內部報酬率。
+  feasibility.npv:
+    input:
+      cash_flows:
+      - amount: -100000
+        period: 0
+      - amount: 40000
+        period: 1
+      - amount: 40000
+        period: 2
+      - amount: 40000
+        period: 3
+      discount_rate: 0.1
+      subject_ref: 3 年期投資案 NPV 評估
+    scenario: 評估一筆為期 3 年、初期投入 10 萬的投資案。
+  feasibility.real_options:
+    input:
+      options:
+      - cost: 200000
+        future_states:
+        - description: 試點成功，需求強勁
+          estimated_value: 1500000
+          id: FS1
+        - description: 試點表現平平，維持現狀
+          estimated_value: 0
+          id: FS2
+        id: OPT-1
+        option_type: EXPAND
+        trigger_condition: 若第一年海外試點月活躍用戶超過 5 萬，啟動擴張
+      subject_ref: 海外市場擴張選擇權評估
+    scenario: 評估「先小規模試點，若成功再擴張海外市場」的選擇權。
+  feasibility.tco:
+    input:
+      cost_categories:
+        compliance: 15000
+        data_egress: 8000
+        decommission: 12000
+        downtime: 10000
+        exit: 5000
+        implementation: 50000
+        migration: 30000
+        operation: 120000
+        people: 80000
+        purchase: 200000
+        security: 25000
+        support: 40000
+      subject_ref: 新系統導入 TCO 評估
+    scenario: 評估導入一套新系統的總持有成本。
+  feasibility.telos:
+    input:
+      economic:
+        assumptions:
+        - 雲端費用年增不超過 10%
+        evidence: []
+        gaps:
+        - 尚未取得 3 年 TCO 估算
+        stop_conditions: []
+      legal:
+        assumptions: []
+        evidence:
+        - 法務已確認符合當地資料落地要求
+        gaps: []
+        stop_conditions: []
+      operational:
+        assumptions:
+        - 現有客服團隊可吸收新流程
+        evidence: []
+        gaps: []
+        stop_conditions:
+        - 若客服團隊反對比例超過 50% 則暫停
+      schedule:
+        assumptions:
+        - 6 個月內可完成遷移
+        evidence: []
+        gaps:
+        - 尚未排定人力甘特圖
+        stop_conditions: []
+      technical:
+        assumptions:
+        - 現有團隊具備 Kubernetes 維運經驗
+        evidence:
+        - POC 已驗證核心 API 延遲 <200ms
+        gaps: []
+        stop_conditions: []
+    scenario: 評估一項系統遷移專案的五面向可行性。
+  feasibility.unit_economics:
+    input:
+      arpu: 50
+      cac: 300
+      churn_rate: 0.05
+      contribution_margin: 37.5
+      gross_margin: 0.75
+      ltv: 1200
+      payback_period: 6
+      subject_ref: SaaS 訂閱方案 A 單位經濟效益
+    scenario: 檢查一個 SaaS 訂閱方案每位客戶到底賺不賺錢。
+  finance.financial_assumptions:
+    input:
+      assumptions:
+      - basis: 過去 6 個月同類產品平均客單價
+        id: A1
+        name: 客單價
+        unit: USD/order
+        value: 45
+      - basis: 產業報告估計的保守成長率
+        id: A2
+        name: 月成長率
+        unit: ratio
+        value: 0.05
+      cash_flow_projection:
+      - amount: -50000
+        period: 0
+      - amount: 15000
+        period: 1
+      - amount: 22000
+        period: 2
+      - amount: 30000
+        period: 3
+      currency: USD
+      discount_rate: 0.08
+      horizon_years: 3
+      subject_ref: 新產品線財務假設
+    scenario: 新產品線的財務假設，期間抓 3 年。
+  foresight.adjacent_discipline_search:
+    input:
+      adjacent_fields:
+      - 流行病學
+      - 生態學
+      current_disciplines:
+      - 軟體工程
+      - 資料科學
+      imported_models:
+      - field_ref: 流行病學
+        id: IM1
+        model_description: 借用傳染病 SIR 模型的傳播率概念類比顧客流失擴散速度
+    scenario: 團隊做顧客流失預測，想借用非本行的模型。
+  foresight.backcasting:
+    input:
+      future_state: 2030 年公司達成碳中和
+      milestones:
+      - description: 2028 年完成全面再生能源採購
+        horizon: 2
+        id: M1
+      - description: 2026 年完成排放盤查基準線
+        horizon: 1
+        id: M2
+      today_actions:
+      - 啟動排放盤查專案招標
+    scenario: 從「2030 年公司達成碳中和」倒推今天該做什麼。
+  foresight.black_swan_exercise:
+    input:
+      exposures:
+      - description: 核心服務完全依賴單一雲端區域，無跨雲備援
+        id: EX1
+        tail_event_id: TE1
+      hedges:
+      - description: 建立跨雲備援環境，目標 RTO 縮短到 30 分鐘
+        exposure_id: EX1
+        id: H1
+      survivability_assessments:
+      - description: 目前只能撐 4 小時，超過就開始流失客戶
+        exposure_id: EX1
+        id: SA1
+      tail_events:
+      - description: 主要雲端供應商全球性長時間停機
+        id: TE1
+    scenario: 演練「主要雲端供應商長時間停機」這個尾端風險。
+  foresight.cross_country_comparison:
+    input:
+      comparisons:
+      - metric: 最低工資
+        normalization_basis: 以每小時計，換算為美元購買力平價(PPP)
+        values:
+        - jurisdiction: 台灣
+          value: 5.2
+        - jurisdiction: 新加坡
+          value: 6.8
+        - jurisdiction: 日本
+          value: 7.1
+      jurisdictions:
+      - 台灣
+      - 新加坡
+      - 日本
+    scenario: 比較台灣、新加坡、日本三地的最低工資水準。
+  foresight.cross_impact_analysis:
+    input:
+      events:
+      - description: 主要供應商無預警破產
+        event_id: E1
+      - description: 關稅大幅調漲
+        event_id: E2
+      impact_pairs:
+      - conditional_probability_shift: 0.3
+        event_a_id: E1
+        event_b_id: E2
+    scenario: 分析「主要供應商破產」與「關稅大幅調漲」這兩個事件是否互相影響。
+  foresight.cross_industry_transfer:
+    input:
+      transfers:
+      - adaptation: 改造成手術室安全檢查清單，加入器械清點與交班確認步驟
+        id: T1
+        shared_job_or_constraint: 都需要在高風險環境下標準化檢查以降低人為疏失
+        source_industry: 航空業
+        source_mechanism: 飛行前檢查清單(pre-flight checklist)
+        target_industry: 醫療業
+    scenario: 把航空業的檢查清單機制移植到醫療業。
+  foresight.delphi:
+    input:
+      consensus_summary: 多數專家收斂在 50-55% 區間
+      minority_positions:
+      - 仍有 1 位專家堅持不應低於 65%，因其引用不同的成長曲線資料
+      rounds:
+      - responses:
+        - estimate: 60
+          participant_id: P1
+        - estimate: 45
+          participant_id: P2
+        round_number: 1
+      - responses:
+        - estimate: 55
+          participant_id: P1
+        - estimate: 50
+          participant_id: P2
+        round_number: 2
+    scenario: 用德爾菲法估計某新技術三年後的市場滲透率。
+  foresight.futures_wheel:
+    input:
+      center_event: 政府宣布全面電動車補貼政策
+      impacts:
+      - description: 電動車銷量短期大增
+        id: I1
+        order: 1
+        parent_id: CENTER
+      - description: 充電站需求暴增，出現排隊現象
+        id: I2
+        order: 2
+        parent_id: I1
+    scenario: 展開「政府宣布全面電動車補貼政策」這個中心事件的漣漪效應。
+  foresight.historical_analogy:
+    input:
+      analogies:
+      - analogy_limits: 電信業的資本密集特性讓這個類比能解釋整併動態，但無法直接套用在數位平台網路效應主導的競爭結構上
+        differences:
+        - 電信業解除管制花了將近 10 年，本次數位平台監管改革預期 3 年內完成
+        - 電信業有龐大固定資產，數位平台的進入門檻結構完全不同
+        extracted_mechanism: 解除管制初期會出現價格戰與整併潮，存活下來的少數業者最後靠規模經濟建立護城河
+        historical_case: 1990 年代電信業解除管制
+        id: A1
+        similarities:
+        - 都是政府從管制走向開放市場
+        - 都出現既有大型業者與新進者的競爭重組
+      subject_ref: 數位平台監管改革分析
+    scenario: 用歷史先例分析當前的數位平台監管改革。
+  foresight.horizon_scanning:
+    input:
+      domains:
+      - domain_id: D1
+        name: 人工智慧監理
+      signals:
+      - confidence: 中
+        date: 2026-03
+        description: 歐盟研擬新的 AI 責任指令
+        domain: D1
+        geography: 歐盟
+        id: SIG1
+        impact: 高
+        source: S1
+        status: 立法草案階段
+      sources:
+      - name: 歐盟執委會公告
+        source_id: S1
+    scenario: 掃描 AI 監理領域的新興變化訊號。
+  foresight.outlier_analysis:
+    input:
+      outliers:
+      - data_error_assessment: 已核對 POS 紀錄與銀行對帳單，排除輸入錯誤與重複入帳
+        data_error_ruled_out: true
+        description: 某分店單月營收暴增 300%
+        id: O1
+        mechanism_hypothesis: 該分店同期舉辦快閃店活動，吸引大量非常客一次性消費
+    scenario: 分析某分店單月營收暴增 300% 的異常個案。
+  foresight.scenario_planning:
+    input:
+      critical_uncertainties:
+      - 法規鬆緊
+      - AI 訓練成本高低
+      scenarios:
+      - assumptions:
+        - assumption-寬鬆低成本
+        competitor_responses:
+        - competitor-寬鬆低成本
+        drivers:
+        - driver-寬鬆低成本
+        id: S1
+        narrative: narrative-寬鬆低成本
+        reversal_condition: reversal-寬鬆低成本
+        second_third_order_effects:
+        - effect-寬鬆低成本
+        signposts:
+        - signpost-寬鬆低成本
+        stakeholder_responses:
+        - stakeholder-寬鬆低成本
+        strategy_performance: performance-寬鬆低成本
+      - assumptions:
+        - assumption-寬鬆高成本
+        competitor_responses:
+        - competitor-寬鬆高成本
+        drivers:
+        - driver-寬鬆高成本
+        id: S2
+        narrative: narrative-寬鬆高成本
+        reversal_condition: reversal-寬鬆高成本
+        second_third_order_effects:
+        - effect-寬鬆高成本
+        signposts:
+        - signpost-寬鬆高成本
+        stakeholder_responses:
+        - stakeholder-寬鬆高成本
+        strategy_performance: performance-寬鬆高成本
+      - assumptions:
+        - assumption-嚴格低成本
+        competitor_responses:
+        - competitor-嚴格低成本
+        drivers:
+        - driver-嚴格低成本
+        id: S3
+        narrative: narrative-嚴格低成本
+        reversal_condition: reversal-嚴格低成本
+        second_third_order_effects:
+        - effect-嚴格低成本
+        signposts:
+        - signpost-嚴格低成本
+        stakeholder_responses:
+        - stakeholder-嚴格低成本
+        strategy_performance: performance-嚴格低成本
+      - assumptions:
+        - assumption-嚴格高成本
+        competitor_responses:
+        - competitor-嚴格高成本
+        drivers:
+        - driver-嚴格高成本
+        id: S4
+        narrative: narrative-嚴格高成本
+        reversal_condition: reversal-嚴格高成本
+        second_third_order_effects:
+        - effect-嚴格高成本
+        signposts:
+        - signpost-嚴格高成本
+        stakeholder_responses:
+        - stakeholder-嚴格高成本
+        strategy_performance: performance-嚴格高成本
+    scenario: 用「法規鬆緊」「AI 訓練成本高低」兩個關鍵不確定因素建 4 個情境。
+  foresight.weak_signal_detection:
+    input:
+      weak_signals:
+      - corroborating_source_refs:
+        - 歐盟研究報告
+        - 日本新創募資新聞
+        description: 多個獨立團隊開始用合成生物材料取代塑膠包裝
+        id: WS1
+        monitor_status: MONITORING
+    scenario: 偵測一個關於「合成生物材料」的微弱訊號。
+  foresight.wild_cards:
+    input:
+      wild_cards:
+      - description: 中央銀行系統性失能導致惡性通膨
+        id: WC1
+        strategy_rerun:
+          outcome_under_card: 重新模擬後，固定年度訂價策略會在 6 個月內侵蝕全部毛利
+          still_holds: false
+          strategy_ref: STRAT-PRICING-2026
+    scenario: 測試「央行系統性失能導致惡性通膨」這張外卡對現行訂價策略的衝擊。
+  framing.boundary_critique:
+    input:
+      categories:
+      - category: DECISION_MAKER
+        items:
+        - name: 市政府捷運工程處
+        status: POPULATED
+      - category: AFFECTED
+        items:
+        - name: 周邊200戶被徵收居民
+        - name: 每日通勤族
+        status: POPULATED
+      - category: EXCLUDED
+        items:
+        - name: 土地開發商
+        status: POPULATED
+      - category: RESOURCES
+        items:
+        - name: 市政府年度預算15億元
+        status: POPULATED
+      - category: VALUES
+        empty_justification: 尚未召開公聽會蒐集在地居民的價值觀優先順序，此欄位暫時留白待補
+        items: []
+        status: DECLARED_EMPTY
+      decision_context: 是否要在市中心徵收私有土地興建捷運站
+    scenario: 檢視是否要在市中心徵收私有土地興建捷運站，這個決策涉及誰。
+  framing.five_w_one_h:
+    input:
+      dimensions:
+      - answer: 客服團隊跟IT部門共同負責
+        dimension: WHO
+        status: KNOWN
+      - answer: 新客戶帳號開通平均要等5個工作天
+        dimension: WHAT
+        status: KNOWN
+      - dimension: WHEN
+        gap_note: 不確定延誤是從哪個環節開始的
+        status: UNKNOWN
+      - answer: 全部發生在內部帳務系統
+        dimension: WHERE
+        status: KNOWN
+      - dimension: WHY
+        gap_note: 還沒訪談過IT部門確認技術限制
+        status: UNKNOWN
+      - answer: 手動審核搭配Excel追蹤
+        dimension: HOW
+        status: KNOWN
+      topic: 新客戶入職流程延誤
+    scenario: 釐清「新客戶入職流程延誤」這個還很模糊的問題。
+  framing.frame_storming:
+    input:
+      candidate_framings:
+      - frame_text: 這是一個表單填寫體驗太差的問題
+        id: F1
+      - frame_text: 這其實是一個用戶還沒準備好就被要求註冊的時機問題
+        id: F2
+      - frame_text: 這可能是一個信任問題——用戶不確定我們會怎麼用他們的資料
+        id: F3
+      phenomenon: 新用戶註冊完成率只有35%
+      selected_frame_ref: F3
+    scenario: 新用戶註冊完成率只有35%，先產生多種問題框架再選定一個。
+  framing.future_compass:
+    input:
+      bearings:
+      - direction_label: 授權
+        id: B1
+        meaning: 逐步把決策權限下放給資深客服，從低風險案件開始
+      - direction_label: 知識沉澱
+        id: B2
+        meaning: 把主管處理過的案例整理成可查詢的知識庫
+      current_position: 目前80%的升級案件都要主管親自處理
+      destination: 團隊每個人都能獨立處理客戶升級案件，不需要主管介入
+      next_waypoint:
+        bearing_ref: B2
+        description: 這兩週先把10個常見升級情境整理成SOP
+    scenario: 釐清團隊從現狀走向理想目標的方向感。
+  framing.goal_statement:
+    input:
+      beneficiaries:
+      - 行動購物用戶
+      - 客服團隊（減少流程卡住的客訴）
+      constraints:
+      - 不能改動金流商的API合約
+      - 工程資源只有2名全職開發者
+      goal: 讓行動App的結帳流程從5步驟縮短到2步驟
+      success_condition: 結帳轉換率從目前的62%提升到80%以上，且用戶平均完成結帳時間低於90秒
+      timeframe: 本季度結束前（Q4）
+    scenario: 把「讓結帳流程變好」這個模糊願望轉成明確目標。
+  framing.grow_model:
+    input:
+      goal: 想在半年內轉職成資料分析師
+      options:
+      - description: 報名線上資料分析證照課程，系統化從頭學
+        id: O1
+      - description: 先在現職工作中主動要求接觸數據分析相關任務，邊做邊學
+        id: O2
+      reality: 目前是行銷專員，有Excel基礎但沒有SQL/Python經驗
+      will:
+        by_when: '2026-10-01'
+        chosen_option_ref: O2
+        first_step: 這週跟主管提案，申請加入下一次的行銷成效分析專案
+    scenario: 想在半年內轉職成資料分析師。
+  framing.how_might_we:
+    input:
+      hmw_question: 我們可以如何讓第一次使用者在3分鐘內就完成註冊並感受到產品價值？
+      pain_point: 第一次使用者常常在3分鐘內就放棄註冊，因為表單要填的欄位太多
+    scenario: 把「表單太多欄位導致用戶放棄註冊」這個痛點轉成開放問題。
+  framing.non_goals:
+    input:
+      excluded_scope:
+      - id: N1
+        re_review_trigger: 當海外訂單佔比超過營收10%時重新評估
+        reason: 目前只服務台灣市場，國際化不是這次的優先目標
+        scope_item: 多語系支援
+      - id: N2
+        re_review_trigger: 當行動端流量佔比超過20%時重新評估
+        reason: 行動端流量佔比不到5%，先集中資源在網頁版
+        scope_item: 行動端App原生重構
+      project_scope: v2.0 電商後台重構
+    scenario: 明確界定 v2.0 電商後台重構這次不做什麼。
+  framing.north_star_metric:
+    input:
+      anti_gaming_validation: 排除只是打開App但沒有實際觸發排程動作的登入行為，避免優化成單純衝高登入次數
+      core_value_proposition: 使用者透過我們的平台真正解決了工作排程衝突的問題
+      proxy_metric: 每週完成至少3次行事曆同步且無衝突警示的活躍使用者數
+    scenario: 為一個行事曆排程產品找出北極星指標。
+  framing.okr:
+    input:
+      key_results:
+      - description: 平均首次回覆時間
+        id: KR1
+        owner: 客服主管小美
+        target: 從4小時降到1小時內
+      - description: 客戶滿意度調查(CSAT)分數
+        id: KR2
+        owner: 客服品保專員小華
+        target: 從72%提升到90%以上
+      objective: 讓客服團隊的回覆品質變成客戶主動推薦我們的原因
+      review_cadence: 每兩週一次團隊回顧會議
+    scenario: 為客服團隊設定本季 OKR。
+  framing.problem_statement:
+    input:
+      current_state: 客服平均要在3個不同系統間切換才能處理一張客訴單
+      expected_state: 客服可以在單一介面看到客戶完整歷程並直接處理客訴
+      gap: 缺少一個整合訂單、金流、歷史客服紀錄的統一工作台
+      impact: 平均每張客訴單處理時間多花12分鐘，一年估計多耗費800人時
+    scenario: 建立跨部門對「客服處理效率低落」問題的共同定義。
+  framing.reframing:
+    input:
+      original_frame:
+        label: FAILURE
+        statement: 我把這次晉升機會搞砸了，面試的時候腦袋一片空白
+      reframes:
+      - id: R1
+        perspective: 學習者視角
+        statement: 這次面試讓我第一次真實體驗到高壓情境下的反應模式，現在我知道具體要練習什麼
+      - id: R2
+        perspective: 長期視角
+        statement: 半年後回頭看，這次經驗可能只是眾多晉升機會中的第一次嘗試，不是唯一一次
+    scenario: 重新詮釋「把晉升機會搞砸了」這個痛苦經驗。
+  framing.smart:
+    input:
+      criteria:
+      - criterion: SPECIFIC
+        justification: 明確鎖定'首次回覆時間'這一項指標，不是籠統的'服務品質'
+      - criterion: MEASURABLE
+        justification: 可以直接從客服系統後台匯出首次回覆時間的統計數字
+      - criterion: ACHIEVABLE
+        justification: 對照過去三個月的歷史數據，目前的人力配置足以支撐這個改善幅度
+      - criterion: RELEVANT
+        justification: 首次回覆時間是客戶滿意度調查裡相關性最高的單一指標
+      - criterion: TIME_BOUND
+        justification: 設定明確的季度截止日，避免無限期拖延
+        target_date: '2026-12-31'
+      goal_statement: 提升客服團隊的首次回覆時間
+    scenario: 用 SMART 五項標準精煉「提升客服團隊的首次回覆時間」這個目標。
+  framing.success_criteria:
+    input:
+      decision_ref: 是否要簽下三年期的海外倉儲合約
+      guardrail:
+      - id: G1
+        statement: 合約必須包含每季可調整倉儲容量的彈性條款
+      must:
+      - id: M1
+        statement: 海外訂單的平均到貨時間必須從14天縮短到7天以內
+      should:
+      - id: S1
+        statement: 倉儲月租成本盡量控制在現有物流預算的120%以內
+      stop:
+      - id: T1
+        statement: 若簽約後3個月到貨時間沒有改善，啟動合約終止評估
+    scenario: 簽下三年期海外倉儲合約之前，先定義成功標準。
+  framing.value_sorting:
+    input:
+      candidate_values:
+      - id: V1
+        value: 穩定的收入
+      - id: V2
+        value: 工作與生活平衡
+      - id: V3
+        value: 持續學習成長的機會
+      context: 排序這次轉職決策時最重要的價值觀
+      ranking:
+      - V3
+      - V2
+      - V1
+    scenario: 排序這次轉職決策時最重要的價值觀。
+  insight.contextual_inquiry:
+    input:
+      environment_context: 顧客家中廚房，實際操作智慧型烤箱
+      observations:
+      - action_observed: 使用者按了三次同一個按鈕才找到預熱功能
+        followup_question: 為什麼會先按這個按鈕而不是別的？
+        researcher_note: 操作路徑不直覺，圖示不夠清楚
+    scenario: 在顧客家中廚房觀察她實際操作智慧型烤箱。
+  insight.empathy_map:
+    input:
+      entries:
+      - basis: FACT
+        content: 這個介面看起來很複雜
+        quadrant: SAYS
+      - basis: INFERENCE
+        content: 我可能會漏記一筆帳，錯過該還的錢
+        quadrant: THINKS
+      - basis: FACT
+        content: 反覆點開又關閉分類選單
+        quadrant: DOES
+      - basis: INFERENCE
+        content: 有點焦慮，怕自己用錯
+        quadrant: FEELS
+      subject: 新手用戶對記帳 App 的使用經驗
+    scenario: 了解新手用戶對記帳 App 的真實感受。
+  insight.focus_group:
+    input:
+      analysis: 開瓶便利性是共識優點，防滑材質是下一步可以改善的方向
+      discussion_summary: 多數參與者認為單手開瓶很方便，但有 3 位提到瓶蓋容易滑手
+      moderation_approach: 半結構式訪談，先個別體驗產品再開放討論
+      participant_count: 8
+      topic: 新款保溫瓶的開瓶設計
+    scenario: 針對新款保溫瓶的開瓶設計做焦點團體訪談。
+  insight.interview:
+    input:
+      codes:
+      - 價格敏感
+      - 功能未被使用
+      - 忘記取消
+      consent_process: 口頭同意錄音，告知可隨時中止
+      documented_biases: 樣本全部來自同一個城市，可能無法代表其他地區的使用習慣
+      guide: 半結構式訪談大綱，聚焦取消前的最後一次使用經驗
+      interview_notes: 多數受訪者提到續訂價格上升是主因
+      negative_cases: 1 位受訪者續訂價格沒變也取消，原因是搬家後健身房會員更划算
+      research_question: 使用者為什麼放棄訂閱制健身 App？
+      sampling_approach: 立意抽樣，找 3 個月內取消訂閱的用戶
+      themes:
+      - 續訂價格是主要流失原因
+      transcript_ref: TRANSCRIPT-2026-INT-014
+    scenario: 研究使用者為什麼取消訂閱制健身 App。
+  insight.journey_map:
+    input:
+      journey_subject: 線上訂餐從搜尋到收到餐點
+      stages:
+      - actions: 在 App 上搜尋附近評價高的餐廳
+        emotion: 期待
+        evidence: null
+        opportunity: 可以加入依口味/預算篩選功能
+        pain: 選項太多不知道怎麼選
+        stage_name: 搜尋餐廳
+        stage_number: 1
+      - actions: 選好餐點後結帳
+        emotion: 有點緊張怕選錯
+        evidence: null
+        opportunity: 簡化付款流程到 2 步內
+        pain: 付款頁面跳轉太多步驟
+        stage_name: 下單付款
+        stage_number: 2
+    scenario: 畫出「線上訂餐從搜尋到收到餐點」的旅程地圖。
+  insight.jtbd:
+    input:
+      desired_outcome: 這樣我到公司前就能學完一個單元，不浪費通勤時間
+      local_evidence: 台灣用戶訪談中 6/10 人提到通勤是主要學習時段，且抱怨行動網路不穩定
+      motivation: 想要離線也能繼續看課程影片
+      situation: 當我在通勤路上想追進度但網速不穩
+      workaround: 目前會提前在有 wifi 時手動下載影片存到手機相簿
+    scenario: 了解用戶為什麼想要離線學習功能。
+  insight.persona:
+    input:
+      behaviors:
+      - 下班路上用手機看食譜
+      - 傾向選擇 30 分鐘內能完成的料理
+      context: 全職工作＋照顧 2 個小孩，晚上時間非常有限
+      goals:
+      - 快速做出健康的晚餐
+      - 不想每天想菜單
+      persona_name: 小美，34 歲，雙薪家庭的忙碌媽媽
+      research_basis:
+      - 2026 年 3 月對 15 位雙薪家長的深度訪談
+      - App 使用數據顯示晚間 6-8 點是尖峰使用時段
+    scenario: 為一個食譜 App 建立代表性使用者。
+  insight.service_blueprint:
+    input:
+      layers:
+      - description: 顧客在 App 選好飲品並預付款
+        layer_type: CUSTOMER_ACTIONS
+      - description: 店員在螢幕看到新訂單並確認
+        layer_type: FRONTSTAGE
+      - description: 吧檯人員依序製作飲品
+        layer_type: BACKSTAGE
+      - description: 庫存系統自動扣除對應原料
+        layer_type: SUPPORT_PROCESSES
+      - description: POS 系統同步訂單狀態給顧客 App
+        layer_type: SYSTEMS_DATA
+      service_name: 連鎖咖啡店線上預點服務
+    scenario: 畫出連鎖咖啡店線上預點服務的服務藍圖。
+  insight.survey:
+    input:
+      analysis_plan: 用描述統計呈現各面向平均分，並用迴歸分析找出對整體滿意度影響最大的面向
+      construct_definition: 定義「顧客滿意度」為對產品易用性、客服回應速度、價格合理性三面向的綜合評分
+      is_translated: false
+      pilot_summary: 對 20 人做前測，修正 2 題語意不清的題目
+      quality_dimensions:
+      - dimension: CONSTRUCT_VALIDITY
+        mitigation_note: 題目已請 2 位外部專家審查是否真的測到滿意度而非單純情緒
+      - dimension: SAMPLING
+        mitigation_note: 確認樣本涵蓋不同購買頻率的客群，避免只問常客
+      - dimension: QUESTION_WORDING
+        mitigation_note: 前測後修正了容易誤解的雙重否定題目
+      - dimension: NON_RESPONSE_BIAS
+        mitigation_note: 比對填答者與未填答者的基本輪廓，確認無明顯系統性差異
+      question_design: 每面向各 3 題 5 點量表，避免雙重否定與誘導性用詞
+      sampling_plan: 從近 6 個月購買紀錄中分層抽樣，涵蓋新舊客戶比例
+    scenario: 設計一份測量顧客滿意度的問卷（未翻譯，單一語言市場）。
+  jurisdiction.applicable_law_graph:
+    input:
+      jurisdiction_nodes:
+      - description: 台灣子公司資料蒐集
+        jurisdiction_id: TW
+      - description: EU 客群，適用 GDPR
+        jurisdiction_id: EU
+      law_entries:
+      - conflict: null
+        effective_date: '2010-01-01'
+        expiry_date: '2015-12-31'
+        jurisdiction_id: TW
+        law_id: LAW-TW-PDPA-2015
+        scope: 個人資料蒐集與利用
+        source: 個人資料保護法(舊版)
+      - conflict: null
+        effective_date: '2016-01-01'
+        expiry_date: null
+        jurisdiction_id: TW
+        law_id: LAW-TW-PDPA-2016
+        scope: 個人資料蒐集與利用
+        source: 個人資料保護法(修正版)
+      - conflict: 與會員國國內法在特定產業的跨境傳輸規則重疊，需個案認定何者優先
+        effective_date: '2018-05-25'
+        expiry_date: null
+        jurisdiction_id: EU
+        law_id: LAW-EU-GDPR
+        scope: 跨境資料傳輸
+        source: GDPR
+      - conflict: 與 GDPR 一般規則重疊，電信業須先適用本條款
+        effective_date: '2018-05-25'
+        expiry_date: null
+        jurisdiction_id: EU
+        law_id: LAW-DE-BDSG-TELECOM
+        scope: 跨境資料傳輸
+        source: 德國電信資料保護特別規定
+    scenario: 比對台灣與 EU 客群適用的個資法規，並抓出衝突。
+  jurisdiction.compliance_gap_analysis:
+    input:
+      gap_annotations:
+      - control_id: 存取紀錄留存 1 年
+        plan: Q4 導入集中式 log 保留服務
+        severity: high
+      - control_id: 資料可攜出
+        plan: 開發使用者資料匯出 API
+        severity: medium
+      implemented_controls:
+      - 加密靜態資料
+      required_controls:
+      - 加密靜態資料
+      - 存取紀錄留存 1 年
+      - 資料可攜出
+    scenario: 某 SaaS 產品要在歐盟上線前做合規缺口分析。
+  jurisdiction.conflict_of_law_review:
+    input:
+      conflicts:
+      - applicable_law: null
+        conflict_id: CONF-1
+        description: 消費爭議應適用新加坡合約法還是台灣消保法
+        disputed_law_ids:
+        - LAW-SG
+        - LAW-TW
+        legal_review: null
+      governing_laws:
+      - description: 合約準據法條款指定新加坡法
+        jurisdiction: 新加坡
+        law_id: LAW-SG
+      - description: 消費者保護法屬地強制適用
+        jurisdiction: 台灣
+        law_id: LAW-TW
+      mandatory_rules: []
+    scenario: 一份跨境合約同時被兩套法律主張管轄，需要人工升級判定。
+  jurisdiction.cultural_context_review:
+    input:
+      factors:
+        authority:
+          evidence:
+          - SURVEY
+          note: 決策傾向徵詢家中長輩意見
+          risk_level: MEDIUM
+        communication_style:
+          evidence:
+          - SURVEY
+          note: 偏好直接明確的訊息，不需迂迴鋪陳
+          risk_level: LOW
+        education_expectation:
+          evidence:
+          - EXPERT_REVIEW
+          note: App 需提供簡易圖示引導
+          risk_level: LOW
+        historical_context:
+          evidence: []
+          note: 與台灣市場歷史脈絡差異不大
+          risk_level: LOW
+        privacy_perception:
+          evidence:
+          - INTERVIEW
+          note: 對行動支付綁定個資有疑慮
+          risk_level: MEDIUM
+        risk_preference:
+          evidence: []
+          note: 對小額行動支付接受度高
+          risk_level: LOW
+        technology_acceptance:
+          evidence:
+          - LOCAL_DATA
+          note: 智慧型手機普及率高，接受度佳
+          risk_level: LOW
+        trust:
+          evidence:
+          - LOCAL_DATA
+          - INTERVIEW
+          note: 當地消費者對純線上品牌信任度低，偏好熟人介紹
+          risk_level: HIGH
+      target: 越南消費者市場的行動支付 App
+    scenario: 評估某東南亞市場的文化脈絡，決定產品的權限設計與溝通風格。
+  jurisdiction.data_residency_assessment:
+    input:
+      data_classes:
+      - applicable_laws:
+        - GDPR
+        - 個人資料保護法
+        data_class_id: DC-PII
+        description: 客戶個人識別資訊
+        subjects:
+        - EU 居民
+        - 台灣居民
+      - applicable_laws:
+        - PCI-DSS
+        data_class_id: DC-TXN
+        description: 交易紀錄
+        subjects:
+        - 全球使用者
+      routing_decisions:
+      - data_class_id: DC-PII
+        rationale: EU 居民個資須落地在歐盟境內
+        region: eu-west-1
+      - data_class_id: DC-TXN
+        rationale: 交易量集中在亞太，就近處理降低延遲
+        region: ap-southeast-1
+    scenario: 決定客戶個資與交易紀錄兩類資料各自能存放在哪個地區。
+  jurisdiction.localization_review:
+    input:
+      dimensions:
+        accessibility:
+          note: 已通過螢幕閱讀器測試
+          status: MET
+        address:
+          note: 此 App 不收集地址
+          status: NOT_APPLICABLE
+        content_expectations:
+          note: 已調整符合當地法規揭露用語
+          status: MET
+        currency:
+          note: 已支援日圓且無小數點顯示
+          status: MET
+        date_time:
+          note: 日期格式改為年/月/日
+          status: MET
+        language:
+          note: 已完成日文翻譯與在地語氣調整
+          status: MET
+        name:
+          note: 姓名欄位改為姓／名分開輸入
+          status: MET
+        number_format:
+          note: 千分位改為日式慣例
+          status: MET
+        phone:
+          note: 已支援日本電話格式驗證
+          status: MET
+        tax:
+          note: 消費稅發票格式尚未串接國稅系統
+          status: NOT_MET
+        timezone:
+          note: 已支援 Asia/Tokyo
+          status: MET
+        ui_layout:
+          note: 已確認日文字元不會截斷
+          status: MET
+        units:
+          note: 此 App 不涉及度量衡
+          status: NOT_APPLICABLE
+      target: 記帳 App 日本上線
+    scenario: 某記帳 App 要在日本上線前做在地化審查。
+  jurisdiction.market_admission_control:
+    input:
+      human_signoff: null
+      market_id: 印尼
+      stages:
+      - note: 已建立印尼管轄包
+        stage: jurisdiction_pack
+        status: PASS
+      - note: 法規時效性審查通過
+        stage: legal_freshness
+        status: PASS
+      - note: 資料落地評估通過
+        stage: data_residency
+        status: PASS
+      - note: AI 供應商合規審查通過
+        stage: ai_provider
+        status: PASS
+      - note: 資安隱私審查通過
+        stage: security_privacy
+        status: PASS
+      - note: 在地化審查尚未完成
+        stage: localization_accessibility
+        status: UNKNOWN
+      - note: 產業別控管審查通過
+        stage: sector_controls
+        status: PASS
+    scenario: 評估是否開放印尼作為新市場。
+  jurisdiction.obligation_to_control_mapping:
+    input:
+      controls:
+      - control_id: CTRL-1
+        evidence: 帳號刪除 API 的設計文件
+        obligation_id: OBL-1
+        owner: 後端團隊
+        test: 每季執行一次刪除請求的端對端測試
+      - control_id: CTRL-2
+        evidence: 資料匯出 API 的設計文件
+        obligation_id: OBL-2
+        owner: 後端團隊
+        test: 每季執行一次匯出請求的端對端測試
+      obligations:
+      - description: 依 GDPR 第 17 條，使用者可申請刪除個資
+        obligation_id: OBL-1
+      - description: 依 GDPR 第 20 條，使用者可申請資料可攜出
+        obligation_id: OBL-2
+    scenario: 把兩條法律義務（申請刪除個資、申請資料可攜出）都轉成可追蹤的工程控制。
+  jurisdiction.regulatory_horizon_scan:
+    input:
+      entries:
+      - effective_date_or_estimate: 預估 2027 Q2 生效
+        entry_id: RHS-1
+        impact: 公司的 AI 風險評估功能需重新分類為高風險系統
+        owner: 法遵長
+        regulation_title: EU AI 法案分級要求修訂案
+        source: 歐盟執委會官方公告
+        source_type: OFFICIAL_REGULATOR
+        status: 草案徵詢意見中
+    scenario: 追蹤即將上路、可能影響產品的新資料法規。
+  jurisdiction.resolver:
+    input:
+      declared_dimensions:
+      - dimension: LEGAL_ENTITY
+        value: 台灣公司登記地
+      - dimension: USER_LOCATION
+        value: 歐盟
+      - dimension: PROCESSING_LOCATION
+        value: 新加坡
+      resolved_jurisdictions:
+      - basis: 公司設立登記地
+        derived_from_dimensions:
+        - LEGAL_ENTITY
+        jurisdiction_id: TW
+      - basis: GDPR 第 3 條的鎖定原則
+        derived_from_dimensions:
+        - USER_LOCATION
+        jurisdiction_id: EU
+    scenario: 判斷一家台灣公司經營、伺服器在新加坡、卻鎖定歐盟使用者的服務適用哪些管轄權。
+  learning.after_action_review:
+    input:
+      actual: 轉換率反而下降 3%
+      expected: 新版結帳流程上線後轉換率應提升 10%
+      next_actions:
+      - description: 移除多餘確認步驟並重新測試
+        id: A1
+        owner: 小美
+      why_factors:
+      - description: 新流程 比舊版 多了一個確認步驟
+        id: W1
+      - description: 按鈕位置 在行動版 變得不明顯
+        id: W2
+    scenario: 檢討新版結帳流程上線後轉換率不升反降。
+  learning.appreciative_inquiry:
+    input:
+      affirmative_topic: 打造讓新人第一週就有歸屬感的入職體驗
+      design:
+      - 入職第一天指派一位『歡迎夥伴』一起吃午餐
+      destiny:
+      - 下週開始為新進的 2 位工程師試辦歡迎夥伴制度
+      discover:
+      - 上次有一位新人主動說『第一天就被安排跟資深同事一起吃午餐讓我很放心』
+      dream: 每個新人第一週結束時都主動想跟人分享今天學到的事
+    scenario: 用欣賞式探詢改善新人入職體驗。
+  learning.build_measure_learn:
+    input:
+      build:
+        artifact_id: ARTIFACT-EXPORT-V1
+        cut_scope:
+        - 不做排程匯出
+        - 不做多語系欄位名稱
+        description: 只做 CSV 匯出，不做 PDF/Excel
+      learn:
+        conclusion: 需求確實存在，但完成率偏低，可能是欄位選擇介面太複雜
+        metric_refs:
+        - METRIC-1
+      measure:
+        build_ref: ARTIFACT-EXPORT-V1
+        description: 追蹤一週內的匯出按鈕點擊與完成率
+        metrics:
+        - id: METRIC-1
+          name: 點擊匯出按鈕次數
+          unit: 次/週
+          value: 47
+      product_under_exploration: 一鍵匯出報表功能
+    scenario: 驗證「一鍵匯出報表」功能是否真的有需求。
+  learning.decision_journal:
+    input:
+      confidence: 65
+      context: 決定是否簽下年度雲端服務合約
+      evidence: []
+      forecast: 預期續約後年度成本持平，服務中斷次數不變
+      options:
+      - chosen: true
+        description: 續約現有供應商
+        id: O1
+      - chosen: false
+        description: 改用新供應商
+        id: O2
+    scenario: 記錄是否續簽年度雲端服務合約的決策。
+  learning.dmaic:
+    input:
+      phases:
+        analyze:
+          items:
+          - 工單分派規則造成同一人塞單
+          summary: 分析延遲原因
+        control:
+          items:
+          - 每週自動報表監控平均回應時間，超過 5 小時觸發告警
+          summary: 建立監控機制避免故態復萌
+        define:
+          items:
+          - 確認 SLA 目標為 4 小時
+          summary: 定義問題範圍：僅限電子郵件客服通道
+        improve:
+          items:
+          - 改為依當前工單量自動平均分派
+          summary: 改善分派邏輯
+        measure:
+          items:
+          - 過去 3 個月平均回應時間為 7.2 小時
+          summary: 量測目前平均回應時間
+      problem_statement: 客服平均回應時間超過 SLA 4 小時目標
+    scenario: 改善客服電子郵件回應時間超過 SLA 的問題。
+  learning.kill_criteria:
+    input:
+      decision_ref: 新市場擴張試點案
+      thresholds:
+      - dimension: max_loss
+        id: T1
+        owner: 財務長
+        stop_action: 立即停止試點，資源轉回既有市場
+        unit: USD
+        value: 500000
+    scenario: 為一項新市場擴張試點案設定停損條件。
+  learning.ooda:
+    input:
+      situation: 競爭對手突然大幅降價
+      stages:
+      - content: 觀察競爭對手降價動作
+        observations:
+        - content: 監測到競爭對手網站價格昨晚下調 20%
+          id: OBS1
+        stage_type: OBSERVE
+        timestamp: '2026-09-18T09:00:00Z'
+      - content: 重新評估我方定價策略是否還站得住腳
+        mental_model_update: 原本假設『價格不是主要競爭因素』需要修正
+        observation_refs:
+        - OBS1
+        stage_type: ORIENT
+        timestamp: '2026-09-18T09:15:00Z'
+      - content: 決定推出限時對應方案而非直接跟跌
+        stage_type: DECIDE
+        timestamp: '2026-09-18T09:30:00Z'
+      - content: 上線限時方案並通知業務團隊
+        stage_type: ACT
+        timestamp: '2026-09-18T10:00:00Z'
+    scenario: 面對競爭對手突然大幅降價的快速決策循環。
+  learning.pdca:
+    input:
+      cycles:
+      - cycle_number: 1
+        stages:
+        - carried_forward_action_item_ids: null
+          description: 規劃新功能上線檢查清單
+          stage_name: PLAN
+        - description: 執行上線並照清單檢查
+          stage_name: DO
+        - description: 檢視上線結果
+          stage_name: CHECK
+        - action_items:
+          - description: 下次多測試手機版排版
+            id: ACTION-1
+          description: 記錄下次改善方向
+          stage_name: ACT
+      - cycle_number: 2
+        stages:
+        - carried_forward_action_item_ids:
+          - ACTION-1
+          description: 納入上次教訓規劃第二輪
+          stage_name: PLAN
+        - description: 執行第二輪
+          stage_name: DO
+        - description: 檢視第二輪結果
+          stage_name: CHECK
+        - action_items:
+          - description: 持續觀察
+            id: ACTION-2
+          description: 記錄第二輪改善方向
+          stage_name: ACT
+      process_under_improvement: 新功能上線檢查流程
+    scenario: 兩輪 PDCA 持續改善一個上線流程。
+  learning.post_mortem:
+    input:
+      actions:
+      - action_id: A-1
+        description: 調高連線池上限並加入自動擴充機制
+        owner: 小華
+      causes:
+      - cause_id: C-1
+        description: 資料庫連線池設定值過低，尖峰時段耗盡連線
+        timeline_ref: T-1
+      impact_description: 約 1,200 筆訂單付款失敗，估計損失營收 15 萬元
+      incident_name: 付款服務半夜中斷 40 分鐘
+      timeline:
+      - description: 監控系統偵測到付款成功率驟降至 0%
+        event_id: T-1
+        timestamp: '2026-09-15T02:10:00Z'
+    scenario: 檢討一次付款服務半夜中斷 40 分鐘的事故。
+  learning.prediction_tracking:
+    input:
+      horizon: 發表會後 30 天
+      predicted_probability: 0.7
+      prediction_type: PROBABILITY
+      statement: 這次產品發表會後，付費轉換率會提升
+    scenario: 追蹤「這次產品發表會後付費轉換率會提升」這個預測。
+  learning.reversal_criteria:
+    input:
+      criteria:
+      - action: 重新加入真人客服選項並暫停機器人優先分流
+        condition: 連續 3 個月低於 80%
+        id: R1
+        indicator: 客戶滿意度(CSAT)
+        owner: 客服主管
+      decision_ref: 採用新的客服自動化機器人
+    scenario: 為「採用新的客服自動化機器人」這個決策設定重審條件。
+  representation.audio_conversational_view:
+    input:
+      knowledge_ref: TASK-2026-W38
+      state: {}
+      structured_objects:
+      - confirmed_by_user: false
+        object_id: SO-1
+        readback_transcript: null
+        status: DRAFT
+        transcript: 新增一項：週五前完成月報
+      - confirmed_by_user: true
+        object_id: SO-2
+        readback_transcript: 確認要刪除「舊版簡報」這項待辦，對嗎？
+        status: CONFIRMED
+        transcript: 刪除待辦：舊版簡報
+    scenario: 用語音操作記錄「本週待辦事項」這個 Knowledge Object。
+  representation.causal_view:
+    input:
+      knowledge_ref: CDA-marketing-revenue-2026
+      rendered_edges:
+      - assumption: 假設沒有其他同期活動（如季節性促銷）同時影響營收
+        edge_id: E-1
+      - assumption: 假設預算增加確實轉化為曝光量增加，而非被內部效率損耗吃掉
+        edge_id: E-2
+      state: {}
+    scenario: 渲染一份「行銷預算增加會提升營收」的因果視圖。
+  representation.concept_graph_view:
+    input:
+      edges:
+      - edge_id: E-1
+        layout_position:
+          x: 100
+          y: 50
+        provenance_ref: REPORT-A-vs-REPORT-B
+        relation_id: REL-1
+        relation_type: CONTRADICTS
+        visible: true
+      knowledge_ref: KB-climate-reports-2026
+      source_relations:
+      - provenance_ref: REPORT-A-vs-REPORT-B
+        relation_id: REL-1
+        relation_type: CONTRADICTS
+    scenario: 把一份知識庫裡「兩份研究報告互相矛盾」的關係渲染成概念圖。
+  representation.expert_lego_mode:
+    input:
+      chain:
+      - method_id: insight.jtbd
+        step_id: S1
+      - method_id: epistemic.assumption_mapping
+        step_id: S2
+      - method_id: computation.monte_carlo
+        step_id: S3
+      checks:
+      - check: type_check
+        note: 每步輸出型別跟下一步輸入型別相容
+        status: PASS
+      - check: precondition_check
+        note: 前置條件皆滿足
+        status: PASS
+      - check: policy_check
+        note: 無政策違規
+        status: PASS
+      - check: jurisdiction_check
+        note: S3 需要的運算資源不在允許的管轄區
+        status: FAIL
+      - check: cost_estimate
+        note: 預估成本在預算內
+        status: PASS
+      - check: risk_estimate
+        note: 風險評估通過
+        status: PASS
+      - check: required_gate_injection
+        note: 已注入必要 gate
+        status: PASS
+    scenario: 專家自由組裝一條「JTBD → 假設地圖 → 蒙地卡羅模擬」的方法鏈。
+  representation.guided_mode:
+    input:
+      qa_trail:
+      - answer: 還在找可能原因，還沒有數據
+        question: 你目前是在找「可能原因」，還是已經有數據想驗證原因？
+      selected_method_id: root_cause.fishbone
+    scenario: 使用者不確定該用哪個方法找問題根因，系統逐步提問後自動選定方法。
+  representation.mind_map_view:
+    input:
+      layout:
+        center_node_id: central_topic
+        orientation: clockwise
+      node_positions:
+      - node_id: central_topic
+        x: 0
+        y: 0
+      - distance_from_center: 111.8
+        node_id: branch-1
+        x: 100
+        y: 50
+      source_knowledge_object_id: MINDMAP-brainstorm-2026-09
+    scenario: 把一份既有的腦力激盪知識物件，用放射狀佈局渲染成心智圖畫面。
+  representation.switching:
+    input:
+      views:
+      - category: outline
+        knowledge_object_id: MEETING-2026-09-18
+      - category: mindmap
+        knowledge_object_id: MEETING-2026-09-18
+    scenario: 讓使用者在「文字大綱」跟「心智圖」兩種呈現方式之間切換，看同一份會議記錄。
+  representation.table_matrix_view:
+    input:
+      criteria:
+      - price
+      - sla
+      entities:
+      - vendor-a
+      - vendor-b
+      - vendor-c
+      scores:
+      - computed: true
+        criterion_id: price
+        entity_id: vendor-a
+        score: 8.5
+      source_knowledge_object_id: VENDOR-comparison-2026
+    scenario: 比較三個雲端供應商在「價格」跟「SLA」兩個準則上的表現。
+  representation.text_outline_view:
+    input:
+      outline:
+      - children:
+        - details_ref: REPORT-market-2026:section-2.1
+          id: N1-1
+          summary: 北美市場成長率降至 3%
+        evidence_links:
+        - EVID-report-p12
+        id: N1
+        summary: 趨勢一：訂閱制成長放緩
+      source_knowledge_object_id: REPORT-market-2026
+      summary: 2026 年市場報告：三大趨勢與對應建議
+    scenario: 把一份長篇研究報告渲染成摘要優先的大綱檢視。
+  representation.timeline_view:
+    input:
+      events:
+      - event_id: EV-1
+        event_time: 3
+      - event_id: EV-2
+        event_time: 1
+      - event_id: EV-3
+        event_time: 2
+      knowledge_ref: PROJECT-launch-2026
+      ordered_event_refs:
+      - event_id: EV-2
+        marker_type: event
+      - event_id: EV-3
+        marker_type: decision
+      - event_id: EV-1
+        marker_type: change
+    scenario: 把三個既有事件渲染成一條時間軸。
+  research.reporting_guideline_checklist:
+    input:
+      guideline_id: SRQR
+    scenario: EdD 論文方法論章節，對照 SRQR（質性研究報告規範，共 21 項官方項目）逐項檢查。
+  root_cause.barrier_analysis:
+    input:
+      barriers:
+      - barrier_id: B-1
+        description: 人車分道警示線
+      - barrier_id: B-2
+        description: 堆高機倒車警報聲
+      failure_modes:
+      - barrier_ref: B-1
+        description: 警示線因貨物堆放而遮蔽
+        failure_mode_id: FM-1
+      hazard_description: 行進中的堆高機
+      system_or_incident: 倉庫堆高機作業區事故
+      target_description: 行走中的作業人員
+    scenario: 倉庫堆高機撞傷人員的事故分析。
+  root_cause.bow_tie:
+    input:
+      consequences:
+      - consequence_id: C-1
+        description: 客戶提告求償
+      controls:
+      - control_id: CTRL-1
+        description: 強制雙因子驗證
+        owner: 資安團隊
+        side: prevention
+        target_id: T-1
+        test: 每季稽核登入紀錄
+      - control_id: CTRL-2
+        description: 法務通報與和解流程
+        owner: 法務部
+        side: mitigation
+        target_id: C-1
+        test: 每年演練一次
+      system_or_component: 客戶資料庫
+      threats:
+      - description: 員工帳號密碼外流
+        threat_id: T-1
+      top_event_description: 客戶個資外洩
+    scenario: 資料外洩風險的蝴蝶結分析。
+  root_cause.change_analysis:
+    input:
+      baseline:
+        after_state: 回應緩慢，平均 3000ms
+        before_state: 正常運作，平均 200ms
+      changes:
+      - after_state: 新複合索引
+        before_state: 舊索引
+        correlation_strength: STRONG
+        description: 資料庫索引調整
+        id: CH1
+        temporal_proximity: IMMEDIATELY_BEFORE
+      fault_description: 回應時間從平均 200ms 惡化到 3000ms
+      system_under_analysis: 訂單查詢 API
+    scenario: API 回應時間在某天突然變慢，列出可疑變更。
+  root_cause.event_tree:
+    input:
+      barriers:
+      - barrier_id: BAR-1
+        description: 煙霧偵測器觸發
+      - barrier_id: BAR-2
+        description: 自動滅火系統啟動
+      initiating_event:
+        description: 機房內電氣設備起火
+      outcomes:
+      - description: 偵測與滅火都成功，損害輕微
+        outcome_id: OUT-1
+        path:
+        - barrier_id: BAR-1
+          probability: 0.95
+          result: success
+        - barrier_id: BAR-2
+          probability: 0.9
+          result: success
+      - description: 偵測到但滅火失敗，損害擴大
+        outcome_id: OUT-2
+        path:
+        - barrier_id: BAR-1
+          probability: 0.95
+          result: success
+        - barrier_id: BAR-2
+          probability: 0.1
+          result: failure
+      system_under_analysis: 伺服器機房
+    scenario: 伺服器機房失火後，評估各層防護是否成功阻止損害擴大。
+  root_cause.fault_tree:
+    input:
+      basic_events:
+      - description: 電源供應器故障
+        id: BE1
+        probability: 0.02
+      - description: 主機板故障
+        id: BE2
+        probability: 0.01
+      - description: 記憶體故障
+        id: BE3
+        probability: 0.03
+      gates:
+      - children:
+        - BE1
+        - BE2
+        - BE3
+        description: 硬體層失效
+        gate_type: OR
+        id: G1
+        required_count: 1
+      system_under_analysis: 伺服器主機
+      top_event:
+        description: 伺服器無法開機
+        gate_ref: G1
+    scenario: 分析伺服器無法開機的所有可能根因組合。
+  root_cause.fishbone:
+    input:
+      hypotheses:
+      - category: 技術／設備
+        id: H1
+        statement: 結帳頁面載入過慢
+      - category: 流程
+        id: H2
+        statement: 必填欄位過多讓使用者放棄
+      problem_statement:
+        content:
+          current_state: 結帳放棄率過高
+          expected_state: 結帳放棄率降低
+        id: PROB-T1
+        provenance:
+          authorship_state: AI_SUGGESTED
+          epistemic_type: AI_INFERENCE
+          locked: null
+        status: validated
+        version: 1.0.0
+    scenario: 分析「網站結帳流程放棄率過高」的候選原因。
+  root_cause.five_whys:
+    input:
+      cause_hypothesis_set:
+        generated_by_method: root_cause.fishbone
+        hypotheses:
+        - category: 技術／設備
+          id: H1
+          provenance:
+            authorship_state: AI_SUGGESTED
+            epistemic_type: AI_INFERENCE
+            locked: null
+          statement: 結帳頁面載入過慢
+        - category: 流程
+          id: H2
+          provenance:
+            authorship_state: AI_SUGGESTED
+            epistemic_type: AI_INFERENCE
+            locked: null
+          statement: 必填欄位過多讓使用者放棄
+        id: CHS-T1
+        problem_statement_ref: PROB-T1
+        promotion:
+          ready_for_promotion: false
+          validation_methods_applied: []
+        version: 1.0.0
+      stop_conditions_met:
+      - FOUND_SYSTEM_PROCESS_MECHANISM
+      target_hypothesis_id: H1
+      why_chain:
+      - answer: 因為載入了未優化的高解析度圖片
+        question: 為什麼結帳頁面載入過慢?
+        step: 1
+        supporting_evidence_refs:
+        - perf-report-2026-09
+      - answer: 部署流程沒有自動壓縮圖片的步驟
+        question: 為什麼圖片沒有優化?
+        step: 2
+    scenario: 延續上面 root_cause.fishbone 的例子，驗證「結帳頁面載入過慢」這個假設（hypothesis H1）。
+  root_cause.kepner_tregoe:
+    input:
+      changes:
+      - change_id: CHG-1
+        description: 上週改版換了行動版圖片元件
+        distinction_id: DIST-1
+      dimensions:
+      - dimension: WHAT
+        is: 結帳頁面載入超過 5 秒
+        is_not: 其他頁面載入正常
+      - dimension: WHERE
+        is: 僅行動裝置版本
+        is_not: 桌機版本正常
+      - dimension: WHEN
+        is: 上週改版後開始
+      - dimension: EXTENT
+        is: 約 30% 的行動裝置訂單
+      distinctions:
+      - description: 只有行動版用了新的圖片元件
+        dimension: WHERE
+        distinction_id: DIST-1
+      problem_statement:
+        content:
+          current_state: 結帳放棄率過高
+          expected_state: 結帳放棄率降低
+        id: PROB-T1
+        provenance:
+          authorship_state: AI_SUGGESTED
+          epistemic_type: AI_INFERENCE
+          locked: null
+        status: validated
+        version: 1.0.0
+    scenario: 延續 root_cause.fishbone 的問題陳述，用結構化方式界定「結帳頁面載入過慢」發生的確切範圍。
+  root_cause.pareto:
+    input:
+      cause_hypothesis_set:
+        generated_by_method: root_cause.fishbone
+        hypotheses:
+        - category: 技術／設備
+          id: H1
+          provenance:
+            authorship_state: AI_SUGGESTED
+            epistemic_type: AI_INFERENCE
+            locked: null
+          statement: 結帳頁面載入過慢
+        - category: 流程
+          id: H2
+          provenance:
+            authorship_state: AI_SUGGESTED
+            epistemic_type: AI_INFERENCE
+            locked: null
+          statement: 必填欄位過多讓使用者放棄
+        id: CHS-T1
+        problem_statement_ref: PROB-T1
+        promotion:
+          ready_for_promotion: false
+          validation_methods_applied: []
+        version: 1.0.0
+      dataset:
+      - hypothesis_id: H1
+        metric_value: 45
+      - hypothesis_id: H2
+        metric_value: 12
+      - hypothesis_id: H1
+        metric_value: 8
+      metric_name: 客訴次數
+      vital_few_threshold_percent: 80
+    scenario: 延續 root_cause.fishbone 的假設集合，統計哪些假設對應的客訴次數最多。
+  security.abuse_case:
+    input:
+      stages:
+      - stage_id: actor
+        summary: 擁有多個帳號的一般使用者
+      - stage_id: goal
+        summary: 用同一張優惠券重複兌換超過限額
+      - stage_id: abuse_flow
+        steps:
+        - description: 用多個帳號各自兌換同一張優惠券
+          step_id: STEP-1
+        - description: 用腳本高速重複呼叫兌換 API
+          step_id: STEP-2
+      - controls:
+        - addresses_step_ids:
+          - STEP-1
+          control_id: CTRL-1
+          description: 優惠券綁定單一已驗證帳號
+        - addresses_step_ids:
+          - STEP-2
+          control_id: CTRL-2
+          description: API 加上頻率限制
+        stage_id: controls
+      - detections:
+        - addresses_step_ids:
+          - STEP-1
+          description: 監控同一張優惠券被多帳號兌換的異常模式
+          detection_id: DET-1
+        - addresses_step_ids:
+          - STEP-2
+          description: 監控單一 IP 對兌換 API 的異常呼叫頻率
+          detection_id: DET-2
+        stage_id: detection
+      system_or_component: 優惠券兌換功能
+    scenario: 分析「優惠券兌換功能」可能被怎麼濫用。
+  security.attack_tree:
+    input:
+      assets:
+      - 管理員帳號憑證
+      entry_points: []
+      root:
+        children:
+        - control: 強制雙因子驗證
+          cost: 500
+          detectability: medium
+          name: 竊取憑證
+          residual_risk: 中
+          skill: low
+          test_evidence: 2026 Q3 red team 報告
+        - control: 每月弱點掃描
+          cost: 5000
+          detectability: high
+          name: 利用未修補漏洞
+          residual_risk: 低
+          skill: high
+          test_evidence: 掃描紀錄
+        name: 取得管理員權限
+        node_type: OR
+      system_or_component: 後台管理系統
+      trust_boundaries: []
+    scenario: 分析攻擊者取得管理員帳號的攻擊樹。
+  security.dpia_pia:
+    input:
+      stages:
+      - stage_id: processing
+        summary: 蒐集員工臉部特徵值用於打卡驗證
+      - stage_id: purpose
+        summary: 防止代打卡
+      - stage_id: necessity_proportionality
+        summary: 評估是否有較不侵入的替代方案（如指紋、卡片）
+      - stage_id: data_subjects
+        summary: 全體在職員工，約 300 人
+      - risks:
+        - affected_rights:
+          - 個人資料保護權
+          description: 臉部特徵值外洩可能造成永久性生物特徵風險
+          likelihood: low
+          risk_id: RISK-1
+          severity: high
+        stage_id: risks
+      - controls:
+        - control_id: CTRL-1
+          description: 特徵值加密儲存且不可還原成原始影像
+          mitigates_risk_ids:
+          - RISK-1
+        stage_id: controls
+      - assessments:
+        - accepted_by: 資安主管
+          residual_likelihood: low
+          residual_risk_level: medium
+          residual_severity: medium
+          risk_id: RISK-1
+        stage_id: residual_risk
+      - approver_name: 王小明
+        approver_role: 資料保護長
+        conditions:
+        - 半年後重新評估
+        decision: approved_with_conditions
+        decision_date: '2026-09-18'
+        jurisdiction_pack_ref: null
+        stage_id: approval
+      system_or_component: 臉部辨識打卡功能
+    scenario: 對「新增臉部辨識打卡功能」做 DPIA。
+  security.linddun:
+    input:
+      assets:
+      - 行為紀錄
+      data_flow_elements:
+      - element_type: data_store
+        name: 行為紀錄資料庫
+      entry_points: []
+      system_or_component: 使用者行為分析功能
+      threats:
+      - category: linkability
+        control: 跨裝置紀錄改用不可逆雜湊 ID
+        description: 跨裝置的匿名行為紀錄可能被組合識別出同一人
+        element_name: 行為紀錄資料庫
+        residual_risk: 中
+        test_evidence: 隱私影響評估報告
+      trust_boundaries: []
+    scenario: 對一個會蒐集使用者行為紀錄的分析功能做 LINDDUN 隱私威脅建模。
+  security.pasta:
+    input:
+      assets:
+      - 交易金流
+      entry_points: []
+      stages:
+      - stage_id: business
+        summary: 確保支付流程不影響營收與商譽
+      - stage_id: scope
+        summary: 涵蓋結帳頁到金流商回呼
+      - stage_id: decompose
+        summary: 拆解成前端表單、API、金流商串接三個部分
+      - stage_id: threat
+        summary: 識別出中間人竄改金額、重放攻擊等威脅
+      - stage_id: vulnerability
+        summary: API 缺少金額簽章驗證
+      - stage_id: attack
+        summary: 模擬竄改請求金額後重送
+      - control: 每筆交易加上伺服器端簽章驗證
+        residual_risk: 低
+        stage_id: risk
+        summary: 竄改金額若成功，單筆最高損失估計 5 萬元
+        test_evidence: 2026 Q3 支付安全測試報告
+      system_or_component: 線上支付功能
+      trust_boundaries: []
+    scenario: 對一個線上支付功能做 PASTA 分析。
+  security.secrets_threat_review:
+    input:
+      stages:
+      - secrets:
+        - owner: 金流團隊
+          secret_id: SECRET-1
+          secret_type: api_key
+          system_or_component: 金流串接服務
+        stage_id: inventory
+      - entries:
+        - exception_justification: null
+          key_vault_ref: null
+          secret_id: SECRET-1
+          storage_mechanism: SECRET_MANAGER
+        stage_id: storage
+      - entries:
+        - authorized_identities:
+          - svc-payments
+          last_access_review_at: '2026-09-01'
+          secret_id: SECRET-1
+        stage_id: access
+      - entries:
+        - last_rotated_at: '2026-08-01'
+          rotation_interval: 90 days
+          rotation_overdue: false
+          secret_id: SECRET-1
+        stage_id: rotation
+      - findings: []
+        stage_id: exposure
+      - entries:
+        - response_flow:
+            flow_stage_reached: NOT_TRIGGERED
+            triggered: false
+          secret_id: SECRET-1
+        stage_id: revocation
+      system_or_component: 金流串接服務
+    scenario: 檢視第三方金流 API 金鑰的機密資訊治理狀況。
+  security.security_control_mapping:
+    input:
+      control_mappings:
+      - control_id: CTRL-1
+        source_threat_category: spoofing
+        source_threat_element_name: 驗證服務
+        source_threat_index: 0
+      controls:
+      - category: preventive
+        control_id: CTRL-1
+        description: 強制雙因子驗證
+        evidence:
+          description: 抽查 20 個帳號皆已啟用
+          verified_by: 資安工程師 A
+          verified_date: '2026-09-18'
+      source_record:
+        assets:
+        - 使用者密碼雜湊
+        - session token
+        data_flow_elements:
+        - element_type: external_entity
+          name: 登入表單
+        - element_type: process
+          name: 驗證服務
+        - element_type: data_store
+          name: 使用者資料庫
+        elements_with_no_recorded_threats:
+        - 登入表單
+        - 使用者資料庫
+        entry_points:
+        - POST /login
+        generated_by_method: security.stride
+        id: STRIDE-T1
+        provenance:
+          authorship_state: AI_SUGGESTED
+          epistemic_type: AI_INFERENCE
+          locked: null
+        system_or_component: 使用者登入流程
+        threats:
+        - category: spoofing
+          control: session token 綁定 IP 與 User-Agent
+          description: 攻擊者偽造已登入使用者的 session
+          element_name: 驗證服務
+          residual_risk: 低
+          test_evidence: 2026 Q3 滲透測試報告
+        trust_boundaries:
+        - description: 使用者瀏覽器到 API Gateway
+          name: 公網／內網邊界
+        version: 1.0.0
+      source_record_type: stride
+      system_or_component: 使用者登入流程
+    scenario: 對一份既有的 STRIDE 威脅模型做控制對照收尾。
+  security.stride:
+    input:
+      assets:
+      - 使用者密碼雜湊
+      - session token
+      data_flow_elements:
+      - element_type: external_entity
+        name: 登入表單
+      - element_type: process
+        name: 驗證服務
+      - element_type: data_store
+        name: 使用者資料庫
+      entry_points:
+      - POST /login
+      system_or_component: 使用者登入流程
+      threats:
+      - category: spoofing
+        control: session token 綁定 IP 與 User-Agent
+        description: 攻擊者偽造已登入使用者的 session
+        element_name: 驗證服務
+        residual_risk: 低
+        test_evidence: 2026 Q3 滲透測試報告
+      trust_boundaries:
+      - description: 使用者瀏覽器到 API Gateway
+        name: 公網／內網邊界
+    scenario: 對一個使用者登入流程做 STRIDE 威脅建模。
+  security.supply_chain_threat_model:
+    input:
+      stages:
+      - stage_id: source
+        summary: 程式碼存放於私有 GitHub repo，強制簽署 commit
+      - dependency_entries:
+        - considerations:
+            license: MIT
+            long_term_support: 維護者為知名基金會，長期支援可信
+            maintenance: 近 6 個月有持續維護
+            replaceability: 功能簡單，容易自行實作替代
+            size_performance: 打包後小於 5KB
+            transitive_dependencies: 零遞移依賴
+            vulnerability_history: 近 2 年無重大 CVE
+          name: left-pad-successor
+        stage_id: dependency
+      - stage_id: ci
+        summary: CI 使用短效期憑證，無長期存活的部署金鑰
+      - stage_id: artifact
+        summary: 建置產物附帶 SBOM
+      - stage_id: registry
+        summary: 私有 registry，存取需驗證
+      - stage_id: deploy
+        summary: 部署管道僅接受簽章過的產物
+      - artifact_verified: true
+        production_deployment_occurred: true
+        stage_id: sign_verify
+        summary: 使用 Sigstore/cosign 做無金鑰簽章
+        verification_method: cosign verify + Rekor 透明日誌查核
+      system_or_component: 後端 API 服務
+    scenario: 新增一個第三方 npm 套件並走一次完整供應鏈審查。
+  security.zero_trust_review:
+    input:
+      stages:
+      - resource:
+          description: 訂單資料庫
+          resource_id: orders-db
+          sensitivity_classification: Confidential
+        stage_id: identity_context
+        subject:
+          description: 訂單服務身分
+          idp_ref: null
+          subject_id: svc-order
+        workload:
+          description: 生產環境訂單服務 pod
+          workload_id: order-service-prod
+          workload_identity_strategy_ref: mTLS
+      - authn_method: mTLS 憑證
+        authn_verified: true
+        authz_decision: permit
+        least_privilege_confirmed: true
+        pdp_engine_ref: Cedar
+        stage_id: access_decision
+      - credential_type: short_lived_token
+        issued_at: '2026-09-18T10:00:00Z'
+        mutual_authentication_confirmed: true
+        stage_id: credential_issuance
+        ttl_seconds: 900
+      - audit_log_ref: cloudtrail-2026-09-18
+        continuous_monitoring_confirmed: true
+        resource_access_granted: true
+        stage_id: audit_trail
+      system_or_component: 訂單服務存取訂單資料庫
+    scenario: 檢視一個微服務對資料庫的存取路徑是否符合零信任原則。
+  stakeholders.batna:
+    input:
+      alternatives:
+      - cost_estimate: 80000
+        id: ALT-1
+        label: 改用供應商 B
+        value_estimate: 500000
+      - cost_estimate: 300000
+        id: ALT-2
+        label: 自建內部團隊
+        value_estimate: 600000
+      best_alternative_id: ALT-1
+      subject: 與供應商 A 的年約續約談判
+    scenario: 評估一份供應商合約談不成時的最佳替代方案。
+  stakeholders.coalition_mapping:
+    input:
+      coalition_scenarios:
+      - id: SC-1
+        label: 單車團體＋環保團體聯盟
+        member_ids:
+        - S1
+        - S2
+      context: 都市自行車道擴建政策
+      stakeholder_profiles:
+      - id: S1
+        interests: 擴大自行車道網絡
+        name: 單車團體
+        power: 中（媒體聲量大）
+        resources: 志工人力、社群動員
+      - id: S2
+        interests: 保留路邊停車格
+        name: 商圈協會
+        power: 高（地方政治關係）
+        resources: 資金、地方議員關係
+    scenario: 評估「都市自行車道政策」可能形成的聯盟。
+  stakeholders.game_theory:
+    input:
+      equilibrium: 雙方同時降價（囚徒困境）
+      payoffs:
+      - player_id: P1
+        strategy_id: 降價
+        value: -5
+      - player_id: P1
+        strategy_id: 維持
+        value: 10
+      - player_id: P2
+        strategy_id: 降價
+        value: -5
+      - player_id: P2
+        strategy_id: 維持
+        value: 10
+      players:
+      - id: P1
+        name: 公司 A
+      - id: P2
+        name: 公司 B
+      strategies:
+      - name: 公司 A 降價
+        player_id: P1
+        strategy_id: 降價
+      - name: 公司 A 維持原價
+        player_id: P1
+        strategy_id: 維持
+      - name: 公司 B 降價
+        player_id: P2
+        strategy_id: 降價
+      - name: 公司 B 維持原價
+        player_id: P2
+        strategy_id: 維持
+    scenario: 對「兩家公司要不要同時降價」建立賽局模型。
+  stakeholders.incentive_mapping:
+    input:
+      incentive_cards:
+      - constraints: 沒有額外時間做一對一輔導
+        goals: 團隊績效數字好看
+        incentives: 考核結果影響主管自己的年終獎金
+        risks: 新制度上線初期團隊產出可能下滑，影響自己考核
+        stakeholder_name: 部門主管
+    scenario: 分析「導入新的績效考核制度」時，各關鍵利害關係人的真實行為動機。
+  stakeholders.interest_based_negotiation:
+    input:
+      interests:
+      - 房東需要租金跟得上維修成本上漲
+      - 房客需要可預期、不會突然大漲的居住成本
+      objective_criteria:
+      - 參考當地同類型房屋近一年租金行情
+      options:
+      - 分兩年逐步調漲，而非一次到位
+      position: 房東最初開的口頭要求：租金一次調漲 20%
+      separate_people_from_problem: 先跟房客表達理解他的財務壓力，再回到租約條件本身討論，不把對方當對手
+    scenario: 分析一場「租金調漲」的房東房客協商。
+  stakeholders.power_interest:
+    input:
+      stakeholders:
+      - interest_reasoning: 新系統直接影響他的部門日常運作
+        interest_score: 9
+        power_reasoning: 掌握系統換新的預算核准權
+        power_score: 8
+        stakeholder_name: IT 部門主管
+      - interest_reasoning: 每天都要用這套系統工作
+        interest_score: 8
+        power_reasoning: 沒有決策權，只能提意見
+        power_score: 3
+        stakeholder_name: 一般員工
+    scenario: 對「公司內部系統換新」這個專案的關鍵利害關係人分類，決定溝通策略。
+  stakeholders.raci:
+    input:
+      tasks:
+      - assignments:
+        - role: R
+          stakeholder_name: 行銷專員
+        - role: A
+          stakeholder_name: 行銷經理
+        - role: C
+          stakeholder_name: 產品經理
+        - role: I
+          stakeholder_name: 客服團隊
+        task_name: 撰寫上線公告
+    scenario: 為「產品上線」這個專案指派責任歸屬。
+  stakeholders.salience_model:
+    input:
+      legitimacy:
+        justification: 訴求與當地既有環境法規保障範圍一致
+        present: true
+      power:
+        justification: 有能力發動媒體輿論施壓，過去曾成功延宕類似開發案
+        present: true
+      stakeholder_name: 當地環保團體
+      urgency:
+        justification: null
+        present: false
+    scenario: 評估「環保團體」對某開發案的顯著性（salience）。
+  stakeholders.stakeholder_map:
+    input:
+      stakeholders:
+      - category: 決策層
+        name: 定價委員會
+        relationship_types:
+        - DIRECT
+      - category: null
+        name: 現有訂閱用戶
+        relationship_types:
+        - RISK_BEARER
+      - category: 執行層
+        name: 業務團隊
+        relationship_types:
+        - BENEFICIARY
+    scenario: 為「新產品定價策略」列出完整的利害關係人地圖。
+  stakeholders.zopa:
+    input:
+      buyer_maximum: 320000
+      seller_minimum: 280000
+    scenario: 分析一場二手車買賣的可成交區間。
+  strategy.ansoff:
+    input:
+      quadrants:
+      - quadrant: MARKET_PENETRATION
+        risk_level: LOW
+        strategy_description: 加碼行銷現有產品在現有市場
+      - quadrant: MARKET_DEVELOPMENT
+        risk_level: MEDIUM
+        strategy_description: 把現有產品賣進新地區
+      - quadrant: PRODUCT_DEVELOPMENT
+        risk_level: MEDIUM
+        strategy_description: 為現有市場開發新產品
+      - quadrant: DIVERSIFICATION
+        risk_level: HIGH
+        strategy_description: 全新產品進全新市場
+    scenario: 為公司評估四種成長方向的風險。
+  strategy.bcg_matrix:
+    input:
+      portfolio_items:
+      - growth_rate: LOW
+        growth_rate_reasoning: 市場已成熟成長趨緩
+        item_name: 主力 App
+        relative_share: HIGH
+        relative_share_reasoning: 市占率遠高於競爭對手
+    scenario: 檢視公司三條產品線該加碼還是撤資。
+  strategy.blue_ocean:
+    input:
+      competing_factors:
+      - errc_action: REDUCE
+        factor_name: 教練一對一時數
+        id: F1
+        industry_standard_level: HIGH
+        rationale: 多數會員其實不需要那麼多一對一
+      - errc_action: CREATE
+        factor_name: 社群共同運動配對
+        id: F2
+        rationale: 業界沒有人做這個，可以創造全新差異化
+      new_value_curve_summary: 降低一對一教練時數換取更低價格，加上獨創的社群配對功能
+    scenario: 為一家健身房品牌設計差異化策略。
+  strategy.business_model_canvas:
+    input:
+      blocks:
+      - block: CUSTOMER_SEGMENTS
+        content: 50-500 人規模的中型企業人資部門
+      - block: VALUE_PROPOSITIONS
+        content: 自動化排班節省 70% 人資時間
+      - block: CHANNELS
+        content: 直接業務+線上自助試用
+      - block: CUSTOMER_RELATIONSHIPS
+        content: 專屬客戶成功經理
+      - block: REVENUE_STREAMS
+        content: 按帳號數月費訂閱
+      - block: KEY_RESOURCES
+        content: 排班演算法+雲端架構
+      - block: KEY_ACTIVITIES
+        content: 產品開發、客戶導入
+      - block: KEY_PARTNERS
+        content: 雲端供應商、HR 系統整合商
+      - block: COST_STRUCTURE
+        content: 研發人力、雲端運算成本
+    scenario: 描述一家 B2B SaaS 公司的商業模式。
+  strategy.lean_canvas:
+    input:
+      blocks:
+      - block: PROBLEM
+        content: 小型工作室找不到能一次管好排程與收款的工具
+      - block: CUSTOMER_SEGMENTS
+        content: 1 到 5 人的設計與攝影工作室
+      - block: UNIQUE_VALUE_PROPOSITION
+        content: 接案、排程、收款同一個畫面完成
+      - block: SOLUTION
+        content: 預約頁自動產生報價單與付款連結
+      - block: CHANNELS
+        content: 設計社群與既有客戶轉介
+      - block: REVENUE_STREAMS
+        content: 每月訂閱費
+      - block: COST_STRUCTURE
+        content: 雲端主機與金流手續費
+      - block: KEY_METRICS
+        content: 每月完成付款的預約數
+      - block: UNFAIR_ADVANTAGE
+        content: 創辦人本身是工作室經營者，熟悉實際流程
+    scenario: 想做一個幫小型會計師事務所整合多客戶對帳的工具。
+  strategy.market_analysis:
+    input:
+      market_definition: 中小企業排班管理 SaaS
+      segments:
+      - evidence_ref: 產業報告 2026-Q2
+        growth_rate: 0.08
+        id: SEG1
+        name: 零售業中小企業
+        size_estimate: 15000000
+      sizing:
+        sam: 800000000
+        som: 40000000
+        tam: 5000000000
+        unit: USD
+    scenario: 為一款新的 SaaS 產品估算市場規模。
+  strategy.pestel:
+    input:
+      factors:
+      - confidence: 高
+        dimension: ECONOMIC
+        effective_from: '2026-01-01'
+        effective_to: null
+        geography: 越南
+        id: F1
+        implication: 消費性產品市場擴大
+        source: 世界銀行報告
+        source_type: research
+        statement: 中產階級消費力持續成長
+        trend: 上升
+    scenario: 評估東南亞市場的總體環境。
+  strategy.porter_five_forces:
+    input:
+      forces:
+      - assessment: 同業眾多
+        force: INDUSTRY_RIVALRY
+        intensity: HIGH
+      - assessment: 雲端基礎建設資本支出門檻極高
+        force: NEW_ENTRANTS
+        intensity: LOW
+      - assessment: 本地儲存仍是替代選項
+        force: SUBSTITUTES
+        intensity: MEDIUM
+      - assessment: 晶片供應商集中度高
+        force: SUPPLIER_POWER
+        intensity: HIGH
+      - assessment: 企業客戶議價力中等
+        force: BUYER_POWER
+        intensity: MEDIUM
+      overall_attractiveness: 中等吸引力：進入門檻高但供應商集中度也高
+    scenario: 評估雲端儲存產業的競爭強度。
+  strategy.steepv:
+    input:
+      factors:
+      - dimension: VALUES
+        id: F1
+        statement: 年輕消費者越來越重視品牌的永續承諾是否言行一致
+      - dimension: TECHNOLOGICAL
+        id: F2
+        statement: AI 生成內容大量普及
+    scenario: 評估一個長期社會變遷趨勢對品牌的影響。
+  strategy.stp:
+    input:
+      positioning_statement: 給沒時間上健身房的忙碌上班族，一天 15 分鐘的居家高效訓練
+      segments:
+      - criteria:
+        - 25-40 歲
+        - 每週運動 <2 次
+        - 願意付費省時間
+        description: 忙碌上班族
+        id: S1
+      targeting_decision:
+        rationale: 這群人付費意願高且市場缺乏針對性產品
+        targeted_segment_id: S1
+    scenario: 為一款新的健身 App 決定市場定位。
+  strategy.swot:
+    input:
+      factors:
+      - category: OPPORTUNITY
+        geography: 台灣
+        id: F1
+        source: 經濟部公告
+        statement: 當地法規剛放寬外資限制
+        time: 2026 Q3
+      knowledge_set:
+      - id: E1
+        type: evidence
+      knowledge_set_ref: 新市場進入評估-知識庫
+    scenario: 評估一家新創公司要不要進入某個新市場。
+  strategy.three_c:
+    input:
+      findings:
+      - dimension: CUSTOMER
+        id: F1
+        statement: 目標客群願意為省時付費，但對長期綁約敏感
+      - dimension: COMPETITOR
+        id: F2
+        statement: 主要對手主打低價但功能陽春
+      - dimension: COMPANY
+        id: F3
+        statement: 我們有現成的自動化技術但品牌知名度低
+      fit_summary: 客群重視省時、對手功能陽春、我方技術對得上——但品牌需要先建立信任才能轉換
+    scenario: 判斷新推出的訂閱服務是否真的站得住腳。
+  strategy.tows:
+    input:
+      pairings:
+      - external_factor_id: F2
+        id: P1
+        internal_factor_id: F1
+        strategy_option: 用現有技術優勢搶進剛開放的市場
+      swot_analysis:
+        factors:
+        - category: STRENGTH
+          geography: 全球
+          id: F1
+          provenance:
+            authorship_state: AI_SUGGESTED
+            epistemic_type: HYPOTHESIS
+            locked: null
+          source: 內部
+          statement: 現有技術優勢
+          time: '2026'
+        - category: OPPORTUNITY
+          geography: 全球
+          id: F2
+          provenance:
+            authorship_state: AI_SUGGESTED
+            epistemic_type: HYPOTHESIS
+            locked: null
+          source: 內部
+          statement: 剛開放的市場
+          time: '2026'
+        generated_by_method: strategy.swot
+        id: SWOT-T2
+        knowledge_set_ref: kb
+        version: 1.0.0
+    scenario: 把先前做好的 SWOT 分析轉成具體策略選項（**先決條件：已有一份真實的 SwotAnalysis 記錄**）。
+  strategy.value_chain:
+    input:
+      activities:
+      - activity_name: 物流配送
+        category: PRIMARY
+        cost_driver: 最後一哩配送成本佔比高
+        id: A1
+      - activity_name: 供應商管理
+        category: SUPPORT
+        id: A2
+        value_driver: 長期合作換取優先供貨權
+      leverage_points: 物流最後一哩是最大改善槓桿點，優化後可同時降成本又提升顧客體驗
+    scenario: 分析一家電商公司的價值鏈找出高槓桿改善點。
+  strategy.value_proposition_canvas:
+    input:
+      fit_hypotheses:
+      - fit_rationale: 自動讀取直接解決忘記記帳的痛點
+        id: FH1
+        pain_or_gain_id: P1
+        reliever_or_creator_id: PR1
+      gain_creators:
+      - id: GC1
+        statement: 每月自動產生視覺化報表
+      gains:
+      - id: G1
+        statement: 想一眼看懂錢花去哪
+      jobs:
+      - id: J1
+        statement: 追蹤每月支出
+      pain_relievers:
+      - id: PR1
+        statement: 自動讀取銀行簡訊記帳
+      pains:
+      - id: P1
+        statement: 手動記帳很麻煩常常忘記
+      products_and_services:
+      - id: PS1
+        statement: 自動分類記帳 App
+    scenario: 檢查一款記帳 App 的功能是否真的契合使用者需求。
+  strategy.vrio:
+    input:
+      questions:
+      - answer: 'YES'
+        dimension: VALUE
+        reasoning: 確實提升了轉換率
+      - answer: 'YES'
+        dimension: RARITY
+        reasoning: 同業還沒有類似演算法
+      - answer: 'NO'
+        dimension: IMITABILITY
+        reasoning: 競爭對手用 6 個月就能複製出類似效果
+      - answer: 'YES'
+        dimension: ORGANIZATION
+        reasoning: 已有專責團隊持續優化
+      resource_description: 公司自研的客製化推薦演算法
+    scenario: 檢驗公司的客製化演算法是否構成真正的競爭優勢。
+  systems.agent_based_modeling:
+    input:
+      agents:
+      - id: AG1
+        name: 通勤顧客
+        rules:
+        - 若店前排隊人數少於3人就進店
+        - 若排隊人數 >= 3人就改去隔壁店
+      - id: AG2
+        name: 店家A的每日備貨決策
+        rules:
+        - 每天早上依照前一天銷量調整咖啡機開機數量
+      environment_description: 兩間相鄰咖啡店，顧客每天早上通勤時經過，依排隊人數決定要不要進店
+      runs:
+      - agent_ids_involved:
+        - AG1
+        - AG2
+        id: R1
+        summary: 模擬第一週，兩間店都維持原價
+    scenario: 模擬顧客在兩間相鄰咖啡店之間的選擇行為，跑兩週。
+  systems.behavior_over_time:
+    input:
+      points:
+      - time: 2026-W01
+        value: 1200
+      - time: 2026-W02
+        value: 1350
+      - time: 2026-W03
+        value: 1100
+      - time: 2026-W04
+        value: 900
+      variable_name: 每週活躍使用者數
+    scenario: 追蹤某產品每週活躍使用者數，呈現先成長後反轉下滑的行為模式。
+  systems.causal_loop_diagram:
+    input:
+      edges:
+      - from_variable_id: V1
+        id: E1
+        polarity: '-'
+        to_variable_id: V2
+      - from_variable_id: V2
+        id: E2
+        polarity: +
+        to_variable_id: V1
+      loops:
+      - edge_ids:
+        - E1
+        - E2
+        id: L1
+        loop_type: BALANCING
+      variables:
+      - id: V1
+        name: 室內溫度
+      - id: V2
+        name: 暖氣啟動程度
+    scenario: 畫出「室內溫度」與「暖氣啟動程度」之間的自我調節迴路。
+  systems.flowchart:
+    input:
+      edges:
+      - from_ref: N1
+        to_ref: N2
+      - from_ref: N2
+        to_ref: N3
+      - condition: 需要退款
+        from_ref: N3
+        to_ref: N4
+      - condition: 不需要退款
+        from_ref: N3
+        to_ref: N5
+      - from_ref: N4
+        to_ref: N5
+      nodes:
+      - id: N1
+        kind: START
+        label: 收到客訴
+      - id: N2
+        kind: PROCESS
+        label: 客服人員初步分類
+      - id: N3
+        kind: DECISION
+        label: 是否需要退款
+      - id: N4
+        kind: PROCESS
+        label: 核准退款並執行
+      - id: N5
+        kind: END
+        label: 結案
+      title: 客訴處理流程
+    scenario: 畫出客訴處理流程，找出流程實際卡在哪一步。
+  systems.force_field_analysis:
+    input:
+      change_goal: 是否搬遷到新辦公室
+      driving_forces:
+      - description: 新辦公室通勤時間縮短約30分鐘
+        id: F1
+        strength: 4
+      - description: 新辦公室租金比現在便宜15%
+        id: F2
+        strength: 3
+      restraining_forces:
+      - description: 搬遷期間可能中斷約一週的正常營運
+        id: F3
+        strength: 3
+      - description: 部分資深員工已經習慣現在的通勤路線
+        id: F4
+        strength: 2
+    scenario: 評估是否要搬遷到新辦公室。
+  systems.iceberg_model:
+    input:
+      events:
+      - 本季客服滿意度分數從85分掉到62分
+      mental_models:
+      - 管理層把『客服是成本中心』當成預設假設，訓練預算永遠是最先被砍的項目
+      patterns:
+      - 過去六個月，滿意度分數每季穩定下滑，新進客服人員的流動率也同步上升
+      structures:
+      - 新人上線訓練只有兩天，資深人員因為忙著處理緊急案件沒空帶新人，導致新人準備不足就要獨立接案
+    scenario: 從客服滿意度分數下滑這個事件，一路往下挖到深層心智模式。
+  systems.leverage_point_analysis:
+    input:
+      intervention_points:
+      - description: 調高客服人力配置的每日上限
+        id: P1
+        tier: PARAMETERS
+      - description: 取消退款需要主管簽核的規則，改為系統自動核准
+        id: P2
+        tier: RULES
+      - description: 把公司內部『客服是成本中心』的預設信念，改成『客服是留存與口碑引擎』
+        id: P3
+        tier: PARADIGM
+    scenario: 評估三個能提升客服留任率的介入方案，依 Meadows 五層槓桿鏈分類。
+  systems.life_system_mapping:
+    input:
+      focal_person: 小美
+      subsystems:
+      - domain: WORK
+        id: WORK
+        influences:
+        - direction: STRAINS
+          note: 最近常常加班到很晚，睡眠時間被壓縮
+          target_ref: HEALTH
+        role: 新創公司產品經理
+      - domain: HEALTH
+        id: HEALTH
+        influences:
+        - direction: SUPPORTS
+          note: 跑步後專注力比較好，工作效率提升
+          target_ref: WORK
+        role: 每週固定跑步兩次
+    scenario: 畫出小美的工作與健康兩個生活子系統如何互相影響。
+  systems.rich_picture:
+    input:
+      actors:
+      - id: A1
+        name: 行銷總監
+      - id: A2
+        name: 工程主管
+      - id: A3
+        name: 客服主管
+      context: 檢視新產品上線後，行銷與工程兩部門為何反覆衝突
+      issues:
+      - description: 行銷對外承諾的上線日期，工程從未被告知或同意過
+        id: I1
+        involves_actor_ids:
+        - A1
+        - A2
+      - description: 客服收到大量客訴，卻沒有正式管道回饋給行銷或工程
+        id: I2
+        involves_actor_ids:
+        - A3
+    scenario: 梳理新產品上線後，行銷與工程兩部門屢次衝突的混亂情境。
+  systems.sipoc:
+    input:
+      customers:
+      - 新客戶
+      - 客戶成功團隊
+      inputs:
+      - 客戶基本資料
+      - 已簽署的服務合約
+      outputs:
+      - 已開通的客戶帳戶
+      - 登入憑證信件
+      process_name: 新客戶內部帳戶開通流程
+      process_steps:
+      - id: S1
+        step: 業務提交開通申請
+      - id: S2
+        step: IT建立帳戶並設定權限
+      - id: S3
+        step: 寄送登入資訊給客戶
+      suppliers:
+      - 業務部
+      - IT部
+    scenario: 界定新客戶內部帳戶開通流程的範圍。
+  systems.stock_and_flow:
+    input:
+      flows:
+      - direction: IN
+        id: FL1
+        name: 每月固定存款
+        rate_description: 每月月初自動存入 5000 元
+        target_stock_id: ST1
+      stocks:
+      - id: ST1
+        initial_value: 100000
+        name: 銀行帳戶餘額
+    scenario: 為一個儲蓄帳戶建模累積餘額與每月存入的關係。
+  systems.systems_archetypes:
+    input:
+      archetype_matches:
+      - archetype_name: ESCALATION
+        description: 兩隊互相把對方的加碼視為威脅，持續加碼升級，沒有人真正贏，只是提成成本越墊越高
+        id: M1
+        observed_symptoms:
+        - A team 上個月率先加碼提成方案搶客戶
+        - B team 這個月立刻跟進加碼，且加碼幅度比 A team 更大
+      context: 分析 A、B 兩個業務團隊近三個月的提成方案為何持續加碼
+    scenario: 檢視兩個業務團隊為何互搶客戶、越搶越兇。

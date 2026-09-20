@@ -1,4 +1,28 @@
 # Worklog
+## 2026-09-20（續86）方法頁上的「為什麼有效」與「填表範例」：把我自己寫壞的工程語改成白話，範例改成會直接填進表單的真實資料
+
+- [操作者請求] 承續83。修完表單後我自己回讀頁面，發現上方兩段說明是本 session 稍早（280+ 方法內容深化那批）寫壞的：「為什麼有效」181／285 夾著欄位名與錯誤碼（5W1H 那段直接出現 `FIVEWONEH_UNKNOWN_HAS_ANSWER`、`GENUINE_COMPUTE`），「填表範例」280／285 用舊英文 key 與 JSON 片段寫成——那是在描述舊的裸 JSON 表單，跟新表單對不起來。操作者：「繼續修」。
+- [根因] 這兩段是給使用者看的文案，但當時是照 builder 原始碼寫的，等於把實作細節當成使用者說明；而且範例是散文，散文沒辦法被測試，所以表單一改就默默對不上，沒有任何機制會發現。
+- [已修改]
+  - 新增 `methods/registry/method-form-examples.yaml`（282 個方法，134 KB）：每個方法一筆**參數鍵值結構化範例**，來源是本 session 稍早替每個方法手寫並跑過真實 builder 的驗證腳本（用包裝 builder 的方式把成功呼叫的參數原封不動擷取出來），逐筆剝除列層 provenance（改由表單填誠實預設值）。**散文換成資料**：資料可以被測試，散文不行。
+  - `ai_lego/apps/api/method_form.py`：新增 `load_examples()`，並把標籤／範例兩個註冊檔改成**以 mtime 為鍵的快取**（文案改了仍然免重啟，但 134 KB 的 YAML 不再每次點擊都重新解析）；`describe_method_form()` 回傳裡附上該方法的範例。
+  - `ai_lego/apps/api/dashboard.html`：guide box 的散文範例區塊換成「範例情境一句話 ＋『用這個範例填入』按鈕」——按下去直接把真正的表單填滿，使用者可以直接改、直接執行。
+  - `methods/registry/method-display-metadata.yaml`：181 筆 `why_zh` 全部重寫成白話（保留原本真正的洞見，拿掉欄位名／錯誤碼／builder・gate・schema 這類字眼）；刪除已無任何消費者的 `example_zh`／`example_en`（570 行）——範例的唯一正本改為上面那份會被測試的資料檔，避免同一件事留兩個版本（這正是表單當初出錯的同一種病）。
+  - 新增 `tests/unit/test_method_form_examples.py` + `tests/js/method_form_parity.cjs`：每個範例都要能填進表單並通過真實 builder 與 gate；範例不能用表單畫不出來的欄位；**並把 JS↔Python 序列化器比對變成常駐測試**（從 `dashboard.html` 原文抽出真正的序列化器跑一遍，逐方法比對）。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_method_form.py tests/unit/test_method_form_examples.py tests/unit/test_api_main.py tests/unit/test_ai_gateway.py -q` | exit=0 | result=138 passed／287 subtests（含 282 個範例逐一 builder+gate、282/282 JS↔Python payload 相同）
+  - REALTEST_EVIDENCE: tool=Browser(headless chromium) | cmd=登入本機 8431 → 對 5W1H／SWOT／魚骨圖／艾森豪矩陣 各按「用這個範例填入」→「執行並驗證」 | exit=0 | result=四個全部「✔ 記錄成立，所有閘門通過」，零 JS 例外；魚骨圖那筆同時證明上游紀錄（問題陳述）會被正確帶入
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit -q`（完整語料庫回歸，43 分鐘）| result=**14087 passed / 1 failed**；唯一失敗是 `test_authenticate_timing.py`，與本次改動無關，見下方[既有問題]
+  - REVIEW_WAIVED: NA -- critic subagent 仍在帳號 session rate limit（4:20am 重置）、codex 額度到 19:44；改以機械證據替代（逐方法 builder+gate、JS↔Python 逐方法比對、瀏覽器實測、重寫後全檔掃描零殘留識別碼）
+  - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`example_zh\|example_en\|why_en` | hits=刪除前先確認 `example_zh`／`example_en` 在整個 repo 零程式消費者（只剩 dashboard 舊區塊，已一併移除）；`why_en` 仍是前端的 fallback（285 筆都有 zh，實際永遠不會顯示），保留未動並已開 TASKS 追蹤
+- [既有問題，非本次造成，已開 TASKS] `tests/unit/test_authenticate_timing.py` 在這台筆電穩定失敗（比值 3.9x > 3.0x 門檻），但：(1) 這段 auth 程式碼與其測試，從我動工前的 commit 到現在 `git diff` 為 0 行；(2) 今天 04:02 ks-aw-01 部署時，同一支測試在 deploy.sh 的 test-gate 裡是通過的；(3) 我用計數而非計時驗證真正的性質：三條路徑（查無此帳號／密碼錯／密碼對）各自剛好呼叫 1 次 PBKDF2、迭代次數相同，也就是**工作量確實是等長的**，時間差來自這台機器的排程／降頻。結論：不是 side-channel 回歸，是這支測試的量測方法（分兩批連續取樣、8 個樣本、3 倍比值）在異質核心筆電上不穩。**刻意不動門檻**（調門檻去消音偵測器是 AGENTS 明令的最惡樣態），改開治本項：把取樣方式改成兩條路徑交錯取樣＋取中位數。
+- [中途事故：未 commit 的改動被另一個 session 的 AO-RESUME 硬重設清掉] 寫完上述三個檔（尚未 commit）時，另一個 session 的 AO-RESUME `-FullMainlineParity` 跑了 `reset --hard origin/main`（`git reflog` HEAD@{0} 可見），把三個**已追蹤**檔案的修改全部丟掉；新增的未追蹤檔（範例 YAML、兩支新測試）因不受 reset 影響而倖存。重做成本低是因為改動本身是腳本化的（`apply_why.py`／`drop_prose_examples.py` 都在暫存區，重跑得到同樣的 181 改寫／570 刪除），程式那兩處則以帶斷言的 patch 腳本重打並重跑測試確認。**避免再發生**：這正是記憶檔 `feedback_ao_resume_hard_reset_risk` 記的那條——已追蹤檔案的修改要盡快 commit，不要在長時間驗證（跑完整測試套件、開瀏覽器）期間累積；本次違反了自己的規則，代價是 15 分鐘重做。
+- [剩餘風險]
+  - 範例的情境文字沿用原本 `example_zh` 的第一句，其餘散文已刪除（git 可回溯）。
+  - `why_en`／`blurb_en` 仍是工程語，目前不顯示；若之後要做英文介面，需比照這次重寫。
+  - prod 仍是續83 那版：這批（範例按鈕＋文案）要再部署一次才會生效。
+- [rollback] `git revert` 本 commit；`method-form-examples.yaml`／兩支測試為新增檔，display metadata 的 181 筆 why_zh 與 570 行範例散文都在 git 歷史裡可完整還原。
+
 ## 2026-09-20（續83）Cognitive OS 表單整類修好：284 個方法的輸入表單改由各自的 record schema 產生，不再反射 Python 簽名
 
 - [操作者請求] 操作者把另一個 session 的對話整段貼進來：「你他媽的是不是 所有的每個工具都亂做表格?!」「所以你說 所有工具都給錯表格 自己亂掰?」「你這個蠢豬 到底要做多少蠢事?!」。續78 只替 5W1H 做了一個特例 widget（＝補丁），另外 265 個結構化方法照舊是裸 JSON textarea，那個 session 還回頭問操作者「其他 ~250 個要不要比照修」。本次不再註冊特例，整類修掉。

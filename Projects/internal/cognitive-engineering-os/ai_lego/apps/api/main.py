@@ -733,7 +733,7 @@ def method_form(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) -
         "method_id": method_id,
         "contract": catalog.require(method_id),
         "display": _method_display_metadata().get(method_id),
-        "form": {key: form[key] for key in ("fields", "workflow_only", "record_schema") if key in form},
+        "form": {key: form[key] for key in ("fields", "workflow_only", "record_schema", "example") if key in form},
         "schema_source": "record_schema",
     }
 

@@ -114,9 +114,8 @@
   .guide-box li.optional { color:var(--faint); }
   .guide-box .guide-section { margin:var(--sp-2) 0; }
   .guide-box .guide-section a { color:var(--accent); font-weight:600; }
-  .guide-box details.guide-example { margin-top:var(--sp-2); }
-  .guide-box details.guide-example summary { cursor:pointer; font-weight:600; color:var(--accent-dark); }
-  .guide-box details.guide-example > div { margin-top:var(--sp-1); white-space:pre-line; }
+  .guide-box .guide-example { margin-top:var(--sp-2); }
+  .guide-box .guide-example button { margin-top:var(--sp-1); }
   .order-hint { font-size:var(--fs-xs); color:var(--muted); margin-left:var(--sp-2); }
   .compare-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:var(--sp-4); align-items:start; }
   .compare-card { border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4); box-shadow:var(--shadow-1); }
@@ -528,7 +527,7 @@ function renderBriefGuide(display, form) {
   const box = $('brief-guide');
   const d = display || {};
   const fields = visibleFields(form);
-  const hasDeepContent = !!(d.why_zh || d.why_en || d.url || d.example_zh || d.example_en);
+  const hasDeepContent = !!(d.why_zh || d.why_en || d.url || (form && form.example));
   if (!d.blurb_zh && !d.blurb_en && !fields.length && !hasDeepContent) { box.style.display = 'none'; return; }
   clear(box);
   box.style.display = '';
@@ -551,12 +550,21 @@ function renderBriefGuide(display, form) {
     // 只提示「懶人填寫」這個表單本身看不出來的替代路徑。
     box.appendChild(el('div', 'guide-intro', '💡 也可以不管欄位格式，直接把手邊資料寫進下面的「懶人填寫」欄位，AI 會自動拆進對應欄位。'));
   }
-  if (d.example_zh || d.example_en) {
-    const details = document.createElement('details');
-    details.className = 'guide-example';
-    details.appendChild(el('summary', null, '📝 填表範例'));
-    details.appendChild(el('div', null, d.example_zh || d.example_en));
-    box.appendChild(details);
+  const example = form && form.example;
+  if (example && isObject(example.input)) {
+    const wrap = el('div', 'guide-example');
+    wrap.appendChild(el('b', null, '📝 範例情境：'));
+    wrap.appendChild(document.createTextNode(example.scenario || ''));
+    const fill = el('button', 'ghost', '用這個範例填入');
+    fill.type = 'button';
+    fill.onclick = function () {
+      // 深拷貝：使用者接著改欄位不該改到範例本身，否則再按一次拿到的是被改過的版本。
+      state.data = JSON.parse(JSON.stringify(example.input));
+      renderMethodFields(null);
+    };
+    wrap.appendChild(document.createElement('br'));
+    wrap.appendChild(fill);
+    box.appendChild(wrap);
   }
 }
 

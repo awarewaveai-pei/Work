@@ -581,19 +581,40 @@ def build_method_form(
 
 
 FORMS_RELATIVE_PATH = Path("methods") / "registry" / "method-input-forms.yaml"
+EXAMPLES_RELATIVE_PATH = Path("methods") / "registry" / "method-form-examples.yaml"
 
 
-def load_forms(spec_root: Path) -> dict[str, Any]:
-    """Read fresh per call (dashboard copy edits need no restart); a missing or malformed file
-    degrades to structure-only forms with no labels, never a 500 on the discovery routes."""
-    path = spec_root / FORMS_RELATIVE_PATH
-    if not path.is_file():
-        return {}
+@lru_cache(maxsize=8)
+def _cached_registry(path_string: str, mtime_ns: int) -> dict[str, Any]:
+    """Keyed on mtime rather than read-once: a copy edit still takes effect with no restart, but the
+    134 KB examples file is not re-parsed on every dashboard click."""
     try:
-        document = _load_yaml(path)
+        document = _load_yaml(Path(path_string))
     except yaml.YAMLError:
         return {}
     return document if isinstance(document, dict) else {}
+
+
+def _registry(spec_root: Path, relative: Path) -> dict[str, Any]:
+    """A missing or malformed registry degrades to an empty one, never a 500 on the discovery routes."""
+    path = spec_root / relative
+    try:
+        stamp = path.stat().st_mtime_ns
+    except OSError:
+        return {}
+    return _cached_registry(str(path), stamp)
+
+
+def load_forms(spec_root: Path) -> dict[str, Any]:
+    """Labels and the few structural overrides for the form tree."""
+    return _registry(spec_root, FORMS_RELATIVE_PATH)
+
+
+def load_examples(spec_root: Path) -> dict[str, Any]:
+    """method_id -> {scenario, input}: the filled-in example behind the dashboard's one-click button.
+    Parameter-keyed like /invoke's body, so it can be dropped straight into the form state."""
+    examples = _registry(spec_root, EXAMPLES_RELATIVE_PATH).get("examples")
+    return examples if isinstance(examples, dict) else {}
 
 
 @lru_cache(maxsize=4)
@@ -614,4 +635,8 @@ def describe_method_form(spec_root: Path, contract_paths: dict[str, str], method
     contracts = _contracts(str(spec_root), tuple(sorted(contract_paths.items())))
     contract, contract_text = contracts[method_id]
     producers = output_producers({mid: parsed for mid, (parsed, _) in contracts.items()})
-    return build_method_form(spec_root, method_id, builder, contract, contract_text, forms, producers)
+    form = build_method_form(spec_root, method_id, builder, contract, contract_text, forms, producers)
+    example = load_examples(spec_root).get(method_id)
+    if isinstance(example, dict) and isinstance(example.get("input"), dict):
+        form["example"] = example
+    return form
