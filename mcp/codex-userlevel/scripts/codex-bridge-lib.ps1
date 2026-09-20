@@ -76,7 +76,15 @@ function Get-CodexUserHooksDocument {
 
 function Get-CodexUserHooksJson {
   param([Parameter(Mandatory)][string]$WorkRoot)
-  return ((Get-CodexUserHooksDocument -WorkRoot $WorkRoot) | ConvertTo-Json -Depth 10)
+  # LF-normalized, because Write-Utf8NoBom normalizes on write and the parity checker
+  # byte-compares this string against the file on disk. Regression introduced by a13b05112:
+  # that commit made Write-Utf8NoBom strip CR (the fix for 40+ phantom-dirty generated .md
+  # files), so ~/.codex/hooks.json landed with 88 LF while ConvertTo-Json still produced 88
+  # CRLF -- an 88-byte difference that read as "Codex user hooks drift from the generator
+  # output" even immediately after running the generator. Normalizing HERE makes producer and
+  # expectation identical by construction, so the byte comparison stays strict and keeps
+  # meaning what it says (it exists to catch case and encoding differences that -eq misses).
+  return (((Get-CodexUserHooksDocument -WorkRoot $WorkRoot) | ConvertTo-Json -Depth 10) -replace "`r`n", "`n")
 }
 
 # Claude memory index for a repo: ~/.claude/projects/<root with : \ / replaced by -> /memory/MEMORY.md

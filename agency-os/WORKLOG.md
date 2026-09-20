@@ -21164,4 +21164,10 @@ WORKLOG_DONE: Claude+Codex 共用資產 13 項全處理；新增 2 支 `.mjs` �
 
 [rollback] `git revert` 本 commit；oracle 回到只關 untracked 門的狀態（仍優於 2b48454aa 之前）。
 
+
+**[追加，同日]** 上面 ① 的「新 drift」查出根因：**是我 a13b05112 造成的回歸**。該 commit 讓 `Write-Utf8NoBom` 正規化成 LF（治 40+ 檔 phantom-dirty），但它也寫 `~/.codex/hooks.json`，而 `Get-CodexUserHooksJson` 仍用 `ConvertTo-Json` 的 CRLF → 檢查器 byte 比對差正好 88 bytes（88 個被剝掉的 CR），於是「剛跑完 generator 卻報 drift」。修在共用點：`Get-CodexUserHooksJson` 一併正規化，生產者與期望值由構造相同，byte 比對維持嚴格（它存在的目的是抓 `-eq` 抓不到的大小寫與編碼差異）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-claude-codex-parity.ps1` | exit=1 | result=2/445 → **1/445**，唯一剩下的就是 Codex `/hooks` trust
+- 突變測試：拿掉該正規化 → drift 立刻回來（2 failures），還原 → 1 failure
+- 這支檢查器是 `ao-close.ps1:899` 的 closeout gate，所以該回歸今晚收工時會擋下 AO-CLOSE；提早修掉。
+
 WORKLOG_DONE: Codex 兩項回報驗真 —— hooks trust 未做（憑據層確認），oracle packet 只修了 untracked 一半，tracked 門與空殼 fail-closed 兩處補完並以真 review 跑通（4 findings/72s/148KB）
