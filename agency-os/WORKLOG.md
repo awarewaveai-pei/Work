@@ -20817,6 +20817,18 @@ WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈�
 - REVIEW_WAIVED: NA -- 單一設定值移除（兩行），無邏輯變更
 - BUGHUNT_DONE: scope=agency-os,scripts,mcp | grep=`clients.*codex.*exclude` | hits=1（僅剩 `canva`，其 `note` 已載明理由）
 
+[追記 2026-09-20 活體驗證：只有真的跑 Codex 才會抓到的兩個洞]
+操作者升到 Codex 0.155.1 並完成 `/hooks` trust（`~/.codex/config.toml` 8 筆 `trusted_hash`，key 形如 `<hooks.json 路徑>:<event>:<group>:<handler>`）。parity 隨即 **PASSED 278 項**。接著實際跑 `codex exec` 探測，抓到兩個純靠單元測試看不出來的問題：
+- **B1 Windows 指令包裝**：Codex 把每個 shell 呼叫送成 `"C:\WINDOWS\...\powershell.exe" -Command '<真指令>'`，而所有以「指令開頭」錨定的規則（`--no-verify`、deny 鏡像、high-risk ssh…）只看到外層包裝 → 全部比不到。`runner.js` 的 `expandCommand` 原本只拆 `bash -c`，補上 `powershell`/`pwsh -Command` 與 `cmd /c`。
+- **B2 擋下方式**：Codex 0.155.1 **不理會 exit 2**（第一次探測：被判定要擋的 `git commit --no-verify` 照樣執行）。改為對 Codex 輸出官方 JSON 決定（PreToolUse 用 `permissionDecision: deny`，其餘用 `decision: block`）並 exit 0——非零退出會讓 Codex 視為 hook 自己失敗而丟棄決定。Claude 端維持 exit 2 不變。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex exec -C D:\Work "git commit --no-verify --dry-run -m probe"` | exit=0 | result=修正前：指令成功執行、無任何 hook 訊息；修正後：`Command blocked by PreToolUse hook: [Hook] BLOCKED: --no-verify is not allowed.`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`codex exec -C D:\Work "git clean -fd --dry-run"` | exit=0 | result=`Command blocked by PreToolUse hook: [Hook] BLOCKED: matches Claude permissions.deny "Bash(git clean -fd*)" ... permission-deny-mirror`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh`(新增 11 條：Windows 包裝展開 ×8、deny 決定形狀 ×3) | exit=0 | result=198/198；突變測試：拿掉 Windows 展開 → 7 條紅
+- REALTEST_EVIDENCE: tool=Bash | cmd=心跳統計 | exit=0 | result=PreToolUse 28 次(Bash 25 / apply_patch 3)、PostToolUse 7 次且 `tool_response_type=string` → 再次確認 openai/codex#34289 在 0.155.1 仍在；apply_patch 會觸發 PreToolUse(#23411 的內層呼叫部分成立)
+- REVIEW_WAIVED: NA -- 兩處修正皆由活體實測直接驗證，並有突變測試
+- BUGHUNT_DONE: scope=mcp,tests,agency-os | grep=`WIN_C_RE|permissionDecision|expandCommand` | hits=8(runner 3、測試 4、dual-ide 文件 1)
+[剩餘風險追記] `apply_patch` 的 deny 是否被執行(openai/codex#27833)仍未驗證：`codex exec` 在寫入前就被唯讀沙箱擋掉，需從互動式 Codex session 測（步驟寫在 `dual-ide-coexistence-strategy.md` 接手清單第 5 項）。
+
 ## 2026-09-20(續83)Perplexity console 帳號層盤點與加固(操作者：「你去處理這些」，經其 Chrome 已登入 session)
 
 現場查核(console.perplexity.ai，專案 `Soulful Expression` / 95e2cf43-fd96-4f92-8fbb-93f3f42bb65b)：

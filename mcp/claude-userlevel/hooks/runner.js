@@ -63,15 +63,23 @@ function failOpenLog(name, err) {
 // command-scanning rules can match verbs hidden inside a shell wrapper.
 // Appended as extra lines, so ^-anchored multiline patterns keep working.
 const SHELL_C_RE = /\b(?:bash|sh|zsh|dash)\s+(?:-[A-Za-z-]+\s+)*-[A-Za-z]*c\s+(?:"([^"]+)"|'([^']+)')/g;
+// Same for the Windows wrappers. Codex on Windows dispatches every shell call as
+// `"C:\...\powershell.exe" -Command '<real command>'`, so without this every
+// command-position rule (--no-verify, deny mirror, high-risk ssh, ...) sees only
+// the wrapper and matches nothing -- found by a live Codex probe on 2026-09-20.
+const WIN_C_RE = /(?:powershell(?:\.exe)?|pwsh(?:\.exe)?)["']?\s+(?:-[A-Za-z]+(?:\s+\S+)?\s+)*-(?:c|Command)\s+(?:"((?:[^"\\]|\\.)+)"|'((?:[^'])+)')|(?:\bcmd(?:\.exe)?["']?\s+(?:\/[a-zA-Z]\s+)*\/[cCkK]\s+(?:"([^"]+)"|'([^']+)'|(\S.*)))/g;
 function expandCommand(cmd) {
   const seen = [String(cmd || '')];
   let frontier = seen.slice();
   for (let depth = 0; depth < 3 && frontier.length; depth++) {
     const next = [];
     for (const text of frontier) {
-      for (const m of text.matchAll(SHELL_C_RE)) {
-        const payload = m[1] || m[2];
-        if (payload) next.push(payload);
+      for (const re of [SHELL_C_RE, WIN_C_RE]) {
+        re.lastIndex = 0;
+        for (const m of text.matchAll(re)) {
+          const payload = m.slice(1).find((g) => g);
+          if (payload) next.push(payload.replace(/\\"/g, '"'));
+        }
       }
     }
     seen.push(...next);
@@ -269,6 +277,18 @@ function main() {
 
     if (blocks.length) {
       for (const ln of blocks) process.stderr.write(ln + '\n');
+      if (isCodexPayload) {
+        // Codex ignores exit 2 here (live probe, CLI 0.155.1: a blocked
+        // `git commit --no-verify` still ran). Its documented channel is a JSON
+        // decision on stdout, so emit that and exit 0 -- a non-zero exit would
+        // make Codex treat the hook itself as failed and drop the decision.
+        const reason = blocks.join('\n');
+        const decision = event === 'PreToolUse'
+          ? { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }
+          : { decision: 'block', reason };
+        process.stdout.write(JSON.stringify(decision), () => process.exit(0));
+        return;
+      }
       // flush-guarded exit(2) — required on Windows pipes
       process.stderr.write('', () => process.exit(2));
       return;

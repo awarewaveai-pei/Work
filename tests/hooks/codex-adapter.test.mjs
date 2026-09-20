@@ -27,6 +27,18 @@ function codex(event, payload, opts = {}) {
   return { ...r, codexHome };
 }
 
+// A block reaches Claude as exit 2 and Codex as a JSON decision on stdout
+// (Codex 0.155.1 ignores exit 2 -- proven by a live probe on 2026-09-20).
+function assertDenied(r, message) {
+  if (r.status === 2) return;
+  let decision = null;
+  try { decision = JSON.parse(r.stdout); } catch { /* falls through to the failure below */ }
+  const denied = decision
+    && ((decision.hookSpecificOutput && decision.hookSpecificOutput.permissionDecision === 'deny')
+      || decision.decision === 'block');
+  assert.ok(denied, `expected a deny decision, got status=${r.status} stdout=${r.stdout} stderr=${r.stderr} ${message || ''}`);
+}
+
 const DEPLOY = 'ssh -p 58122 ubuntu@145.239.195.47 "sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin"';
 
 // ---------------------------------------------------------------- adapter units
@@ -89,20 +101,22 @@ test('adapter: does not alias tool_response to tool_output (log-error stays iner
 // ---------------------------------------------------------------- runner + real rules
 test('codex host: unmarked prod deploy over SSH is BLOCKED (high-risk-bash-warn)', () => {
   const r = codex('PreToolUse', { session_id: freshSid('cx'), turn_id: 't', tool_name: 'Bash', tool_input: { command: DEPLOY } });
-  assert.equal(r.status, 2, r.stderr);
+  assertDenied(r);
   assert.match(r.stderr, /HIGH-RISK OPERATION BLOCKED/);
-  assert.equal(r.stdout, '', 'Codex stdout must stay empty or JSON');
+  // stdout must be empty or a JSON decision -- never the echoed payload.
+  assert.doesNotMatch(r.stdout, /tool_input|session_id/);
+  if (r.stdout.trim()) JSON.parse(r.stdout);
 });
 
 test('codex host: exec_command alias reaches the same Bash gates', () => {
   const r = codex('PreToolUse', { session_id: freshSid('cx'), tool_name: 'exec_command', tool_input: { cmd: 'rm -rf /tmp/x' } });
-  assert.equal(r.status, 2, r.stderr);
+  assertDenied(r);
 });
 
 test('codex host: apply_patch onto a .env file is BLOCKED (sensitive-file-block)', () => {
   const patch = '*** Begin Patch\n*** Add File: config/.env\n+KEY=1\n*** End Patch';
   const r = codex('PreToolUse', { session_id: freshSid('cx'), tool_name: 'apply_patch', tool_input: { command: patch } });
-  assert.equal(r.status, 2, r.stderr);
+  assertDenied(r);
   assert.match(r.stderr, /sensitive file/);
 });
 
@@ -112,7 +126,7 @@ test('codex host: first apply_patch in a repo is BLOCKED once by git-log-injecto
   const patch = '*** Begin Patch\n*** Add File: note.txt\n+hi\n*** End Patch';
   const payload = { session_id: sid, cwd: repo, tool_name: 'apply_patch', tool_input: { command: patch } };
   const first = codex('PreToolUse', payload, { cwd: repo });
-  assert.equal(first.status, 2, first.stderr);
+  assertDenied(first);
   assert.match(first.stderr, /GIT LOG/);
   const second = codex('PreToolUse', payload, { cwd: repo });
   assert.equal(second.status, 0, second.stderr);
@@ -125,7 +139,7 @@ test('codex host: if Codex exposes a structured exit_code, repeated failures tri
   codex('PostToolUse', fail);
   codex('PostToolUse', fail);
   const third = codex('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd } });
-  assert.equal(third.status, 2, third.stderr);
+  assertDenied(third);
   assert.match(third.stderr, /repeat-failure-guard/);
 });
 
@@ -158,10 +172,41 @@ test('codex host: heartbeat records the tool_response TYPE so the upstream shape
 for (const cmd of ['git checkout -b feature-x', 'git switch -c feature-x', 'git branch', 'git reset --hard origin/main', 'git clean -fdx', 'sudo systemctl restart nginx', 'git push --force origin main', 'cd sub; git branch -D old']) {
   test(`codex host: Claude deny list enforced -> ${cmd}`, () => {
     const r = codex('PreToolUse', { session_id: freshSid('cxdeny'), tool_name: 'Bash', tool_input: { command: cmd } });
-    assert.equal(r.status, 2, r.stderr);
+    assertDenied(r, cmd);
     assert.match(r.stderr, /permission-deny-mirror|BLOCKED/);
   });
 }
+
+// Windows Codex wraps every shell call: `"C:\...\powershell.exe" -Command '<cmd>'`.
+// A live probe on 2026-09-20 showed `git commit --no-verify` sailing through because
+// the rules only saw the wrapper.
+const PS = '"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"';
+for (const [label, cmd, expect] of [
+  ['powershell -Command git --no-verify', `${PS} -Command 'git commit --no-verify -m probe'`, /--no-verify is not allowed/],
+  ['powershell -Command deny-listed branch', `${PS} -Command 'git checkout -b feature-x'`, /permission-deny-mirror/],
+  ['powershell -Command double quotes', `powershell.exe -NoProfile -Command "git branch -D old"`, /permission-deny-mirror/],
+  ['pwsh -Command rm -rf', `pwsh -Command 'rm -rf /tmp/x'`, /rm -rf is dangerous/],
+  ['cmd /c deny-listed', `cmd.exe /d /s /c "git reset --hard origin/main"`, /permission-deny-mirror/],
+  ['powershell -Command high-risk ssh', `${PS} -Command 'ssh -p 58122 ubuntu@145.239.195.47 "sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin"'`, /HIGH-RISK/],
+]) {
+  test(`codex host: wrapped command is unwrapped before matching -> ${label}`, () => {
+    const r = codex('PreToolUse', { session_id: freshSid('cxwrap'), tool_name: 'Bash', tool_input: { command: cmd } });
+    assertDenied(r, cmd);
+    assert.match(r.stderr, expect);
+  });
+}
+
+test('claude host: wrapper unwrapping also applies (same runner, same rules)', () => {
+  const r = runNode(RUNNER, { session_id: freshSid('clwrap'), tool_name: 'Bash', tool_input: { command: `${PS} -Command 'git commit --no-verify -m x'` } }, {
+    args: ['PreToolUse'], cwd: NON_REPO, env: { CODEX_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'hooktest-codexhome-')) },
+  });
+  assert.equal(r.status, 2, r.stderr);
+});
+
+test('codex host: a wrapper around an innocent command still passes', () => {
+  const r = codex('PreToolUse', { session_id: freshSid('cxwrapok'), tool_name: 'Bash', tool_input: { command: `${PS} -Command 'git status --short'` } });
+  assert.equal(r.status, 0, r.stderr);
+});
 
 test('codex host: allowed git commands are not caught by the deny mirror', () => {
   for (const cmd of ['git status', 'git log --oneline -5', 'git push origin main', 'git reset --soft HEAD~1']) {
@@ -183,7 +228,7 @@ for (const [host, cmd] of [['codex', 'Remove-Item -Recurse -Force .\\build'], ['
     const r = runNode(RUNNER, { session_id: freshSid('psdel'), tool_name: 'Bash', tool_input: { command: cmd } }, {
       args, cwd: NON_REPO, env: { CODEX_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'hooktest-codexhome-')) },
     });
-    assert.equal(r.status, 2, r.stderr);
+    assertDenied(r, cmd);
     assert.match(r.stderr, /rm -rf is dangerous/);
   });
 }
@@ -200,4 +245,32 @@ test('claude host: no --host flag and no turn_id writes no Codex heartbeat', () 
   });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.existsSync(path.join(codexHome, 'awarewave-hook-heartbeat.json')), false);
+});
+
+test('codex host: a block is delivered as the documented deny decision, not exit 2', () => {
+  const r = codex('PreToolUse', { session_id: freshSid('cxjson'), tool_name: 'Bash', tool_input: { command: DEPLOY } });
+  assert.equal(r.status, 0, 'a non-zero exit makes Codex treat the hook as failed and drop the decision');
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.hookSpecificOutput.hookEventName, 'PreToolUse');
+  assert.equal(out.hookSpecificOutput.permissionDecision, 'deny');
+  assert.match(out.hookSpecificOutput.permissionDecisionReason, /HIGH-RISK/);
+});
+
+test('codex host: a PostToolUse block uses the decision/reason shape', () => {
+  const repo = makeGitRepo();
+  const sid = freshSid('cxpost');
+  const r = codex('PostToolUse', { session_id: sid, cwd: repo, tool_name: 'Bash', tool_input: { command: 'git add -A' }, tool_response: 'ok' }, { cwd: repo });
+  if (r.status === 0 && r.stdout.trim()) {
+    const out = JSON.parse(r.stdout);
+    assert.ok(out.decision === 'block' || out.hookSpecificOutput, 'PostToolUse decisions use decision/reason');
+  }
+});
+
+test('claude host: blocks still use exit 2 with no stdout', () => {
+  const r = runNode(RUNNER, { session_id: freshSid('clblock'), tool_name: 'Bash', tool_input: { command: DEPLOY } }, {
+    args: ['PreToolUse'], cwd: NON_REPO, env: { CODEX_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'hooktest-codexhome-')) },
+  });
+  assert.equal(r.status, 2);
+  assert.equal(r.stdout, '');
+  assert.match(r.stderr, /HIGH-RISK/);
 });
