@@ -1,3 +1,8 @@
+---
+name: phase4-check
+description: Manually trigger the Repair Center Phase 4 weekly check. Fallback path -- the scheduled routine is primary.
+---
+
 Manually trigger the Repair Center Phase 4 weekly check. This is the **fallback** path — the primary path is the Claude routine `AgencyOS-RepairCenterPhase4Weekly` which runs every Friday 14:00 TPE in Anthropic cloud.
 
 ## When to use this command

@@ -1,3 +1,8 @@
+---
+name: verify
+description: Run the build-gate verification to confirm every quality and governance gate passes before committing.
+---
+
 Run the build gates verification to confirm all quality and governance gates pass before committing or deploying.
 
 ```powershell

@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\devops-engineer.md
+# source: .claude/agents/devops-engineer.md
 name = "devops-engineer"
-description = "DevOps / infrastructure engineer for AwareWave's SG and EU VPS. SSH into servers, manage Docker Compose services, fix nginx config, restart services, read logs, and resolve infra incidents. Use when a service is down, Docker container is unhealthy, nginx is misconfigured, or any VPS-level operation is needed. Trigger phrases: 'SG 服務掛了', 'EU server', 'docker restart', 'nginx 設定', 'service is down', 'container crashed', 'VPS ops'."
+description = "DevOps / infrastructure engineer for AwareWave's only live host, ks-aw-01 (OVH dedicated; the former SG and EU VPS were folded into it on 2026-08-31). SSH into servers, manage Docker Compose services, fix nginx config, restart services, read logs, and resolve infra incidents. Use when a service is down, Docker container is unhealthy, nginx is misconfigured, or any VPS-level operation is needed. Trigger phrases: 'SG 服務掛了', 'EU server', 'docker restart', 'nginx 設定', 'service is down', 'container crashed', 'VPS ops'."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'devops-engineer'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\devops-engineer.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/devops-engineer.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

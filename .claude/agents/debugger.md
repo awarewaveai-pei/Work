@@ -1,6 +1,7 @@
 ---
 name: debugger
 description: "Debug engineer and log analyst. Systematically finds the root cause of bugs: reads logs, narrows scope, builds hypotheses, verifies, fixes. Also analyzes PM2 / Docker / systemd / Nginx logs for error patterns. Use for any bug, service outage, test failure, or unexpected behavior. Never guesses — always traces."
+model: opus
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

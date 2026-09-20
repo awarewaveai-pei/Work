@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\onboarder.md
+# source: .claude/agents/onboarder.md
 name = "onboarder"
 description = "Codebase explorer for first-time exploration. Builds a mental model of an unfamiliar codebase: architecture, entry points, key modules, external dependencies, suspicious areas. Read-only. Use when joining a new project, evaluating an open-source repo before contributing, or auditing a repo you haven't touched in months."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'onboarder'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\onboarder.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/onboarder.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

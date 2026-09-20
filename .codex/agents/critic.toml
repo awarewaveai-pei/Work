@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\critic.md
+# source: .claude/agents/critic.md
 name = "critic"
 description = "Code reviewer and security auditor. Hunts for bugs, security holes, logic errors, edge cases, performance issues, and inconsistencies. Every finding with file path + line number. Use before every commit, deploy, or merge. Also handles deep security review (hardcoded secrets, injection, XSS, path traversal)."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'critic'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\critic.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/critic.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

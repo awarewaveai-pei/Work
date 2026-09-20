@@ -206,7 +206,6 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | `/vault-sync` | Vault → Windows env 同步 | 🟢 `/vault-status` 顯示缺口後自動接著跑 |
 | `/decide` | Decision-intelligence 19 階段決策 | 🟢 A vs B / 架構決策 / 技術選型 / 工具比較 |
 | `/strategy-review` | 多角度策略審查（紅藍隊 / pre-mortem）| 🟢 「要不要做 X」「值不值得」「策略審查」|
-| `/fix-sidebars` | 修 VSCode Claude Code / Codex sidebar | ⚪ 你說 sidebar 壞了 |
 
 ### 2026-06 後新增（2026-07-02 稽核補登）
 
@@ -215,8 +214,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | `/zoom-out` | 陌生模組地圖（caller/系統層定位）| 🟢 讀 code 碰到陌生區段時 Claude 自動跑，不問 |
 | `/browser-test` | Chrome MCP 真瀏覽器 e2e 測試 | 🟢 「幫我測」「瀏覽器測試」「live test」|
 | `/caveman` | token 壓縮 ~75%（本 project 永久預設）| 🟢 「caveman」「be brief」「less tokens」|
-| `/origin-lockdown` | SG VPS Cloudflare origin 鎖定（80/443 限 CF IP）| ⚪ 明確要求 |
-| `/provision-client` | 一鍵租 Hetzner + day-1 硬化 + DNS | 🟢 「一鍵架站」「租主機」「provision」（High 步驟等 go-ahead）|
+| `/provision-client` | 一鍵租主機（供應商依客戶而定）+ day-1 硬化 + DNS | 🟢 「一鍵架站」「租主機」「provision」（High 步驟等 go-ahead）|
 | `/wp-bridge-release` | wp-bridge 外掛發版（release repo tag → zip）| 🟢 改 wp-bridge code 且 bump 版號後自動 |
 | `/wp-redirect` | WordPress 301/302 轉址（Rank Math）| 🟢 「轉址」「redirect」|
 

@@ -110,12 +110,12 @@ MCP tools appear as **deferred tools** — you must fetch their schemas before c
 | `mcp__hetzner-ssh__` | SSH to SG/EU VPS | `ssh_connect`, `ssh_exec`, `ssh_disconnect`, `sftp_read`, `sftp_write` |
 | `mcp__github__` | GitHub operations | `create_repository`, `push_files`, `create_pull_request`, `get_file_contents`, `search_code` |
 | `mcp__airtable__` | Airtable data | `list_records`, `create_record`, `update_record`, `search_records` |
-| `mcp__canva__` | Canva design | `generate-design`, `export-design`, `search-designs`, `create-design-from-brand-template` |
-| `mcp__perplexity__` | Web search (Search API only) | `perplexity_search` only — `perplexity_ask`/`perplexity_research`/`perplexity_reason` are denied in settings (per-token chat models drained the budget 2026-06-21 and 2026-09-12) |
-| `mcp__posthog__` | PostHog analytics | `authenticate`, `complete_authentication` |
+| ~~`mcp__canva__`~~ | Canva design | **Not available** — `enabled: false` in `mcp/registry.template.json`, so `sync-mcp-config.ps1` never emits it into `.mcp.json`. Same for `supabase` and `wordpress`. |
+| ~~`mcp__perplexity__`~~ | — | **Retired 2026-09-19.** The MCP server is gone from `registry.template.json` and `.mcp.json`, and `scripts/check-perplexity-search-only.mjs` now fails CI on any Perplexity MCP package. The only sanctioned path is the Search API through `/ops/collect` (`lib/collect/collectors/`, `providers.ts` pins `allowedPaths: ["/search"]`). The three `deny` entries in the settings templates stay as defence in depth — do not remove them. |
+| `mcp__posthog__` | PostHog analytics | `exec` — one command tool; its `command` parameter description carries the syntax. There is no `authenticate` tool. |
 | `mcp__replicate__` | Replicate AI models | `create_predictions`, `get_predictions`, `search_models` |
 | `mcp__resend__` | Transactional email | `send-email`, `create-contact`, `list-emails`, `get-email` |
-| `mcp__claude_ai_Gmail__` | Gmail | `authenticate`, `complete_authentication` |
+| Gmail (desktop connector) | Gmail | Exposed under a per-install UUID server id (`mcp__<uuid>__search_threads`, `get_message`, `create_draft`, …), not a fixed `mcp__claude_ai_Gmail__` name. Resolve the id from the live tool list; never hardcode it. |
 | `mcp__claude_ai_Google_Calendar__` | Google Calendar | `list_events`, `create_event`, `update_event` |
 | `mcp__claude_ai_Google_Drive__` | Google Drive | `authenticate`, `complete_authentication` |
 | `mcp__claude_ai_Notion__` | Notion | `notion-search`, `notion-fetch`, `notion-create-pages`, `notion-update-page` |

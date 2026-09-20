@@ -1,3 +1,8 @@
+---
+name: vault-status
+description: Show the vault key inventory and the alignment gap against the MCP configuration.
+---
+
 Show vault key inventory and alignment gap with MCP configuration.
 
 Run both commands:

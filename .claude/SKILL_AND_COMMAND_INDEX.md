@@ -31,6 +31,9 @@
 | `/verify` | 跑 build gates，確認所有品質與治理 gate 在 commit/deploy 前通過。 | [commands/verify.md](commands/verify.md) |
 | `/verify-recent` | 驗證本 session 改過的 code 檔（syntax + critic + 實測）。 | [commands/verify-recent.md](commands/verify-recent.md) |
 | `/review` | 對上次 commit 以來變更的檔做 code review，深度依改動大小與敏感度調整。 | [commands/review.md](commands/review.md) |
+| `/codex-review` | 跨模型 oracle——**Claude 寫的**改動的 R0 Review 動作，落地 ORACLE gate artifact。 | [commands/codex-review.md](commands/codex-review.md) |
+| `/claude-review` | 跨模型 oracle——**Codex 寫的**改動的 R0 Review 動作（反向 oracle）。 | [commands/claude-review.md](commands/claude-review.md) |
+| `/audit-repo-hygiene` | repo hygiene 稽核：case-collision（AO-CLOSE 硬闥）+ oversized-file（資訊性）。 | [commands/audit-repo-hygiene.md](commands/audit-repo-hygiene.md) |
 | `/apply-audit` | 以完整紀律套用 audit 報告的 ready-to-apply patches。 | [commands/apply-audit.md](commands/apply-audit.md) |
 | `/audit-encoding` | 跑 PowerShell 腳本的 CP950 / encoding-trap 稽核。 | [commands/audit-encoding.md](commands/audit-encoding.md) |
 | `/audit-cross-machine-bom` | 稽核跨 Google Drive 同步的 `.md` 的 UTF-8 BOM 合規；可 backfill。 | [commands/audit-cross-machine-bom.md](commands/audit-cross-machine-bom.md) |
@@ -43,12 +46,11 @@
 
 | 指令 | 描述 | 路徑 |
 |---|---|---|
-| `/sg-deploy` | SSH 進 SG VPS 跑 `sg-deploy.sh` 部署 lobster-phase1 服務。 | [commands/sg-deploy.md](commands/sg-deploy.md) |
-| `/check-drift` | 對 SG production 跑 deploy drift checker 並回報。 | [commands/check-drift.md](commands/check-drift.md) |
-| `/sg-reboot` | **已被 `/ks-aw-01-reboot` 取代**（SG 5.223.93.113 已退租；指令僅重導）。 | [commands/sg-reboot.md](commands/sg-reboot.md) |
-| `/eu-reboot` | **已被 `/ks-aw-01-reboot` 取代**（EU 204.168.175.41 已退租；指令僅重導）。 | [commands/eu-reboot.md](commands/eu-reboot.md) |
+| `/sg-deploy` | SSH 進 ks-aw-01 跑 `sg-deploy.sh` 部署 lobster-phase1 服務（指令名稱為歷史，SG 已整併）。 | [commands/sg-deploy.md](commands/sg-deploy.md) |
+| `/check-drift` | 對 ks-aw-01 production 跑 deploy drift checker 並回報。 | [commands/check-drift.md](commands/check-drift.md) |
+| `/ks-aw-01-reboot` | 唯一現役主機 ks-aw-01 的安全重啟（完整 pre/post-flight）。取代已删除的 `/sg-reboot`／`/eu-reboot`。 | [commands/ks-aw-01-reboot.md](commands/ks-aw-01-reboot.md) |
 | `/auto-reboot-status` | 檢查 VPS auto-reboot 系統健康（B-Minimal，唯讀診斷）。 | [commands/auto-reboot-status.md](commands/auto-reboot-status.md) |
-| `/command-plane-verify` | 診斷 Telegram bot 為何沉默；跑 -Verify 並查 SG docker env。 | [commands/command-plane-verify.md](commands/command-plane-verify.md) |
+| `/command-plane-verify` | 診斷 Telegram bot 為何沉默；跑 -Verify 並查主機 docker env。 | [commands/command-plane-verify.md](commands/command-plane-verify.md) |
 | `/phase4-check` | 手動觸發 Repair Center Phase 4 週檢（fallback 路徑）。 | [commands/phase4-check.md](commands/phase4-check.md) |
 
 ### 客戶 / 租戶 / WordPress
@@ -67,7 +69,6 @@
 |---|---|---|
 | `/vault-status` | 顯示 vault 金鑰盤點與對 MCP 設定的對齊缺口。 | [commands/vault-status.md](commands/vault-status.md) |
 | `/vault-sync` | 把所有 vault secret 同步到 Windows user env 並回報對齊。 | [commands/vault-sync.md](commands/vault-sync.md) |
-| `/fix-sidebars` | 修 Cursor 缺失的 Claude Code / Codex sidebar（patch extension package.json）。 | [commands/fix-sidebars.md](commands/fix-sidebars.md) |
 | `/decide` | 觸發 decision-intelligence agent 做結構化多 agent 決策審查。 | [commands/decide.md](commands/decide.md) |
 | `/strategy-review` | 觸發 strategy-review 技能做多角度策略審查。 | [commands/strategy-review.md](commands/strategy-review.md) |
 
@@ -85,14 +86,24 @@
 | 指令 | 描述 | 路徑 |
 |---|---|---|
 | `/browser-test` | Chrome MCP 真瀏覽器 e2e 測試入口。 | [commands/browser-test.md](commands/browser-test.md) |
-| `/origin-lockdown` | SG VPS Cloudflare origin 鎖定（80/443 限 CF IP）。 | [commands/origin-lockdown.md](commands/origin-lockdown.md) |
-| `/provision-client` | 一鍵租 Hetzner 主機 + day-1 硬化 + DNS。 | [commands/provision-client.md](commands/provision-client.md) |
+| `/provision-client` | 一鍵租主機（供應商依客戶而定，勿預設 Hetzner）+ day-1 硬化 + DNS。 | [commands/provision-client.md](commands/provision-client.md) |
 | `/wp-bridge-release` | wp-bridge 外掛發版（release repo tag → GitHub Release zip）。 | [commands/wp-bridge-release.md](commands/wp-bridge-release.md) |
 | `/wp-redirect` | WordPress 301/302 轉址（Rank Math）。 | [commands/wp-redirect.md](commands/wp-redirect.md) |
 
+### 已退役（2026-09-20 删除）
+
+保留一行是為了讓舊文件裡的指令名還查得到去路；檔案本身不再存在，也不再進每轮的指令清單。
+
+| 已删除指令 | 原因 | 現行去路 |
+|---|---|---|
+| `/sg-reboot` | SG `5.223.93.113` 2026-08-30 已删機 | `/ks-aw-01-reboot` |
+| `/eu-reboot` | EU `204.168.175.41` 2026-08-30 已删機 | `/ks-aw-01-reboot` |
+| `/origin-lockdown` | 指向已删除的 SG 主機 | `runbooks/CLOUDFLARE-WAF-SETUP.md` §Origin Lockdown SOP + OVH Edge Firewall |
+| `/fix-sidebars` | Cursor 2026-08-26 退場，`scripts/fix-cursor-ai-sidebars.mjs` 已不存在 | 無（不再適用）|
+
 ---
 
-## B. Skills（12）
+## B. Skills（13）
 
 ### 現有系統 Skills
 

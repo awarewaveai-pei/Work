@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\wordpress-plugin-expert.md
+# source: .claude/agents/wordpress-plugin-expert.md
 name = "wordpress-plugin-expert"
 description = "WordPress plugin specialist covering Kadence (theme + blocks), WooCommerce, and the full Fluent suite (FluentCRM, FluentForms, FluentBooking, FluentSupport). Diagnoses plugin conflicts, configures settings, writes custom snippets, and fixes issues via WP-CLI or SSH. Use for any WordPress plugin problem, configuration, customization, or conflict. Trigger phrases: 'WordPress plugin', 'Kadence', 'WooCommerce', 'FluentCRM', 'FluentForms', 'FluentBooking', 'FluentSupport', 'WP 外掛', '外掛衝突', 'WooCommerce 訂單', 'Fluent 自動化', 'Kadence block 壞了'."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'wordpress-plugin-expert'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\wordpress-plugin-expert.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/wordpress-plugin-expert.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

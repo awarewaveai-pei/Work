@@ -1,3 +1,9 @@
+---
+name: signals
+description: Fetch Slack and Telegram messages for a time range.
+argument-hint: [from-datetime] [to-datetime]
+---
+
 # /signals — Fetch Slack + Telegram messages for a time range
 
 ## 自動觸發條件（Claude 主動使用，不等使用者開口）

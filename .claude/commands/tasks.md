@@ -1,3 +1,8 @@
+---
+name: tasks
+description: Show every currently open task.
+---
+
 Show all currently open tasks.
 
 1. Read `agency-os/.agency-state/open-tasks-snapshot.md` if it exists (prefer this — it reflects the last ao-resume run).

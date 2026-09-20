@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\vuln-verifier.md
+# source: .claude/agents/vuln-verifier.md
 name = "vuln-verifier"
 description = "Vulnerability verifier. Takes the critic's findings and writes actual PoC code to prove each vulnerability is real (or a false positive). Produces verification reports suitable for security advisories, issues, and PRs. Use AFTER critic flags a suspected security issue."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'vuln-verifier'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\vuln-verifier.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/vuln-verifier.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

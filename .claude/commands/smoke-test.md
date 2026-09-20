@@ -1,3 +1,8 @@
+---
+name: smoke-test
+description: Run the daily mechanical smoke tests and report overall plus blind_spots verbatim from the JSON, without arithmetic.
+---
+
 Run the daily mechanical smoke tests. This is the first check after AO-RESUME — runs automatically on session start per Blueprint §3.
 
 ## 1. Ops-console DoD (primary daily check)

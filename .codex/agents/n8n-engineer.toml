@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\n8n-engineer.md
+# source: .claude/agents/n8n-engineer.md
 name = "n8n-engineer"
 description = "n8n workflow engineer. Builds, debugs, and maintains n8n automation workflows on the self-hosted instance (ks-aw-01, 145.239.195.47). Use when creating new automations, fixing failed executions, managing credentials, or troubleshooting webhook/trigger issues. Trigger phrases: 'n8n workflow', 'n8n 自動化', 'n8n 壞了', 'n8n execution failed', 'build n8n', 'n8n webhook', 'n8n credentials'."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'n8n-engineer'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\n8n-engineer.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/n8n-engineer.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

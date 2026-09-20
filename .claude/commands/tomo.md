@@ -1,4 +1,10 @@
-﻿Follow the `/tomo` carry-over protocol.
+---
+name: tomo
+description: Write a cross-session carry-over handoff packet. Writes immediately with no preview and no confirmation step.
+argument-hint: [hint]
+---
+
+Follow the `/tomo` carry-over protocol.
 
 ## Overview
 

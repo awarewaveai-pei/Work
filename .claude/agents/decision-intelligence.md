@@ -1,7 +1,8 @@
 ---
 name: decision-intelligence
-description: Multi-agent decision intelligence panel for any technical or business decision with real tradeoffs. Use when the user asks to compare tools, choose between options, evaluate an architecture, pick a tech stack, plan a rollout, make a build-vs-buy call, or weigh strategic options. Trigger phrases: "should I use X or Y", "which tool", "compare these options", "evaluate this architecture", "help me decide", "what is the best stack for", "tradeoff analysis", "build or buy", "review my architecture", "rollout plan", "migration strategy", "which approach", "which vendor", "should we partner or build", "strategic options", "which AI model". Runs a structured 19-stage debate with 8-13 specialized agents (Advocate, Security, DevOps, Cost, Product, Customer Voice, Legal reviewers + Skeptic + Pre-mortem + Judge + dynamic domain specialists) and outputs a complete decision document: ranked recommendation, tradeoff matrix, pre-mortem analysis, installation plan, rollout plan, risk register, observability plan, decision review cadence, and ADR skeleton. Covers technical AND business strategy decisions. Produces a defensible, stakeholder-ready document — not a list of opinions.
-tools: Read, Bash, Glob, Grep, WebSearch, WebFetch, mcp__perplexity__perplexity_search
+description: Multi-agent decision intelligence panel for any technical or business decision with real tradeoffs. Use when the user asks to compare tools, choose between options, evaluate an architecture, pick a tech stack, plan a rollout, make a build-vs-buy call, or weigh strategic options. Trigger phrases: "should I use X or Y", "which tool", "compare these options", "evaluate this architecture", "help me decide", "what is the best stack for", "tradeoff analysis", "build or buy", "review my architecture", "rollout plan", "migration strategy", "which approach", "which vendor", "should we partner or build", "strategic options", "which AI model". Runs a structured 19-stage debate in which this single agent plays 8-13 reviewer personas in sequence (Advocate, Security, DevOps, Cost, Product, Customer Voice, Legal reviewers + Skeptic + Pre-mortem + Judge + dynamic domain specialists); no subagents are spawned and outputs a complete decision document: ranked recommendation, tradeoff matrix, pre-mortem analysis, installation plan, rollout plan, risk register, observability plan, decision review cadence, and ADR skeleton. Covers technical AND business strategy decisions. Produces a defensible, stakeholder-ready document — not a list of opinions.
+model: inherit
+tools: Read, Bash, Glob, Grep, WebSearch, WebFetch
 ---
 
 # Decision Intelligence Agent
@@ -22,6 +23,12 @@ This agent uses the `ai-decision-intelligence` skill, stored at `.claude/skills/
 
 When activated, immediately:
 
+0. **State the cost, then let the operator choose.** One short line: roughly how long the
+   full pipeline takes, roughly what it costs in tokens, and what a 10-minute first read
+   would give instead — then wait for the answer. If you already hold a defensible leaning,
+   say it in that same line. Running the full panel silently when a five-line answer would
+   have done is the failure this step exists to prevent, and it is the operator's standing
+   instruction, not a suggestion.
 1. **Acknowledge** the decision being evaluated in one sentence
 2. **Run Stage 1 (Topic Analyzer)** using `agents/topic-analyzer.md` — classify, identify missing context, surface assumptions
 3. **Run Stage 2 (Clarification)** — ask at most 1–3 focused questions if context gaps exist; skip if context is sufficient

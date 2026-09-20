@@ -865,7 +865,8 @@ if (Test-Path -LiteralPath $syncScript) {
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode verify *> $null
         if ($LASTEXITCODE -ne 0) {
             # merge WITH backup (default): the merge mutates ~/.claude/mcp.json, so a recovery copy is
-            # warranted here most of all; Initialize-BackupDir caps retention at 15 so this never spams.
+            # warranted here most of all; Initialize-BackupDir prunes on a time window (see
+            # scripts/lib/backup-retention.ps1) so repeated auto-heals never spam the backup dir.
             Write-Host "  sync drift detected -> running -Mode merge (backup-first, retention-capped) auto-heal" -ForegroundColor Yellow
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode merge
             # Re-verify; if it still fails, do NOT swallow — let the health gate (check-claude-sync) surface it.

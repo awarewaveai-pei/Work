@@ -1,3 +1,8 @@
+---
+name: audit-encoding
+description: Run the CP950 / encoding-trap audit over the PowerShell scripts. Trigger on encoding, 亂碼, mojibake, CP950.
+---
+
 Run the CP950 / encoding-trap audit on PowerShell scripts.
 
 Detects THREE independent CP950-trap shapes:

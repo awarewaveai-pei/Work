@@ -1,0 +1,49 @@
+name: Shared asset gates (Claude + Codex)
+
+# The slash commands, agents and skills under .claude/, .agents/ and .codex/ are ONE
+# shared surface consumed by both Claude Code and Codex. Two things used to rot silently
+# in it, so both are checked on every change:
+#
+#   1. MCP tool references that name a server which cannot exist. browser-test told the
+#      agent to call `mcp__Claude_in_Chrome__*` (real id: `claude-in-chrome`) for months,
+#      so its first tool call always failed; decision-intelligence kept declaring the
+#      retired `mcp__perplexity__perplexity_search`.
+#   2. Parity and index drift. The Codex command bridge was a hardcoded 3-entry table, so
+#      42 of 45 commands never reached Codex -- including /claude-review, the review a
+#      Codex session is required to run. SKILL_AND_COMMAND_INDEX.md had been stale since
+#      2026-09-04.
+#
+# Node-only on purpose: Codex containers ship without pwsh, so these gates have to run
+# without it. Local equivalents:
+#   node scripts/verify-asset-mcp-refs.mjs
+#   node scripts/verify-asset-parity.mjs
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-asset-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: MCP reference gate -- self-test
+        run: node scripts/verify-asset-mcp-refs.mjs --self-test
+
+      - name: MCP reference gate -- scan assets
+        run: node scripts/verify-asset-mcp-refs.mjs
+
+      - name: Asset parity gate -- Claude/Codex bridges and index coverage
+        run: node scripts/verify-asset-parity.mjs
+
+      - name: Rule-level tests for both gates
+        run: node --test tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs

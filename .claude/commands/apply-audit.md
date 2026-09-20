@@ -1,3 +1,10 @@
+---
+name: apply-audit
+description: Apply an audit report's ready-to-apply patches under full Auto-Repair discipline: backup, patch, health gate, rollback on failure, WORKLOG.
+argument-hint: <report-path>
+disable-model-invocation: true
+---
+
 Apply an audit report's ready-to-apply patches with the full discipline that 2026-05-23 Auto-Repair audit had to learn the hard way: Patch Errata fold-in + cross-file 抓蟲 catch-up + 4-action verification per patch + AUDIT_REGISTRY status upgrade + WORKLOG entry.
 
 This command exists because on 2026-05-23 the audit work hit three operator push-backs in a row — "ready-to-apply" turned out to mean "5 Major design defects waiting in the Errata that I deferred reviewing". Future audit apply rounds must not repeat that pattern.

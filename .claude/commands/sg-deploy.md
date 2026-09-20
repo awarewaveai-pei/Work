@@ -1,4 +1,11 @@
-Deploy lobster-phase1 services on the SG VPS by SSHing in and running `sg-deploy.sh`.
+---
+name: sg-deploy
+description: Deploy the lobster-phase1 services on the host by running sg-deploy.sh there (test gate, healthcheck, HTTP smoke, automatic rollback). HIGH-RISK: the ssh deploy step is additionally gated by high-risk-bash-warn.js.
+argument-hint: [service ...] [--dry-run]
+---
+
+Deploy lobster-phase1 services on ks-aw-01 by SSHing in and running `sg-deploy.sh`.
+The command name is historical: SG was folded into ks-aw-01 on 2026-08-31 and there is no separate SG host.
 
 Default app is `next-admin`. Pass extra args after `/sg-deploy` to override:
 - `/sg-deploy next-admin` — deploy just next-admin

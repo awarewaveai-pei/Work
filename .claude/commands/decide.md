@@ -1,6 +1,41 @@
+---
+name: decide
+description: Structured multi-agent decision review for a choice with real tradeoffs: ranked recommendation, tradeoff matrix, pre-mortem, rollout plan, risk register, ADR skeleton. Costly -- state the cost before running. Trigger on 要不要, 該選哪個, compare X vs Y, help me decide, build or buy.
+argument-hint: <the decision to make>
+---
+
 Trigger the **decision-intelligence** agent for a structured multi-agent decision review.
 
 This is the slash-command entry point for the `decision-intelligence` agent (`.claude/agents/decision-intelligence.md`) which runs the `ai-decision-intelligence` skill.
+
+---
+
+## Step 0 — say the cost, then let the operator choose (do NOT skip)
+
+Before any agent is spawned, state in one short line: roughly how long this takes, roughly
+what it costs in tokens, and what the cheap alternative would give instead. Then wait.
+
+> 這題跑全套約 30–40 分鐘、~200–280K tokens。要全套，還是我先給 10 分鐘的初判 + 取捨表？
+
+If you already have a defensible leaning, say it in that same line. Running the full panel
+behind the operator's back when a five-line answer would have done is the failure this step
+exists to prevent (operator feedback, `feedback_decision_panel_cost_awareness`).
+
+Skip the panel entirely and answer directly when the decision is reversible, cheap to undo,
+and you already know the answer. `/decide` is for choices that are expensive to reverse.
+
+## Step 0.5 — the roster is personas, not spawns
+
+`/decide` is **one** Agent spawn. The 12–19 "agents" named below are roles a single agent plays
+in sequence: `decision-intelligence` does not have the Agent tool, and the skill archive
+contains no spawn instruction anywhere. Token cost is real and is why Step 0 exists; agent
+fan-out is not, and `subagent-budget.js` never enters the picture.
+
+Stated here because the phrasing "19-stage debate with 8-13 specialized agents" reads like
+fan-out and has been mistaken for it. If anyone ever converts these personas into real Agent
+spawns, note that the budget gate hard-blocks the eleventh spawn in a 20-minute window and
+AGENTS.md section 5 caps a role-based fan-out at 4–5 — so the honest conversion is waves of
+≤5 with roles merged, never one agent per candidate or per specialist.
 
 ## Usage
 
@@ -65,7 +100,12 @@ The final document includes:
 
 ## Agent roster
 
-**Fixed (always run):** Topic Analyzer, Research Agent, Advocates (1 per candidate), Security Reviewer, DevOps Reviewer, Cost Reviewer, Product Reviewer, Skeptic, Judge, **Pre-mortem**, Installation Planner, Rollout Planner
+Each entry is a **persona one agent plays in sequence** (see Step 0.5), read from its own file
+in the skill archive before the role is played.
+
+**Fixed (always run):** Topic Analyzer, Research Agent, Advocate per candidate, Security
+Reviewer, DevOps Reviewer, Cost Reviewer, Product Reviewer, Skeptic, Judge, **Pre-mortem**,
+Installation Planner, Rollout Planner
 
 **Dynamic (added by topic):**
 - Customer Voice — when decision affects end users or has migration impact
@@ -76,6 +116,9 @@ The final document includes:
 - Scalability Specialist — when 10k+ user scale is relevant
 - WordPress Specialist — for WP/WooCommerce decisions
 - (+ more in specialists/)
+
+Each added persona lengthens the run and the token bill, which is what Step 0 has to be
+honest about before starting.
 
 ## Auto-save (always runs after Stage 19)
 

@@ -1,3 +1,8 @@
+---
+name: audit-cross-machine-bom
+description: Audit UTF-8 BOM compliance on every .md file that crosses Google Drive sync, and optionally repair the drift in bulk.
+---
+
 Audit UTF-8 BOM compliance on all `.md` files that cross Google Drive sync. Reports drift; can backfill with `-Fix`.
 
 Why this matters: PowerShell on Windows (Big5 locale) misreads UTF-8 `.md` files without BOM as Big5, garbling CJK on cross-machine sync. The export/import scripts now enforce BOM at the boundary, but drift can still appear (manual edits via VSCode that strip BOM, files imported before the BOM rule existed, etc.).

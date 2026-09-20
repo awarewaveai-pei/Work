@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\posthog-analyst.md
+# source: .claude/agents/posthog-analyst.md
 name = "posthog-analyst"
 description = "PostHog product analytics analyst. Queries events, funnels, retention, and feature flag data from the PostHog instance. Read-only — analyzes and reports, never modifies production data. Use when checking feature adoption, conversion rates, user behavior, error event trends, or whether a specific event is being tracked. Trigger phrases: 'PostHog 數據', 'conversion rate', 'funnel analysis', 'feature flag usage', 'event tracking', 'user behavior', 'analytics report', '有人用嗎', '轉換率'."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'posthog-analyst'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\posthog-analyst.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/posthog-analyst.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

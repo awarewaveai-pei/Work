@@ -1,4 +1,9 @@
-Reboot ks-aw-01 (`145.239.195.47`, OVH KS-6, SSH port `58122`, user `ubuntu`) safely with full pre-flight + post-flight checklists. **Replaces `/sg-reboot` and `/eu-reboot`** — those two commands targeted retired hosts; running either is invalid. Both old commands now redirect here.
+---
+name: ks-aw-01-reboot
+description: Reboot ks-aw-01 (the only live host) with the full pre-flight and post-flight checklist. HIGH-RISK: the actual reboot is additionally gated by high-risk-bash-warn.js.
+---
+
+Reboot ks-aw-01 (`145.239.195.47`, OVH KS-6, SSH port `58122`, user `ubuntu`) safely with full pre-flight + post-flight checklists. **Replaces `/sg-reboot` and `/eu-reboot`** — those two commands targeted retired hosts, so they were deleted on 2026-09-20 rather than left as gravestones that still showed up in the command list.
 
 > **Why this file exists (2026-08-30)**: `/codex-review` flagged that after the 2026-08-28 SG+EU consolidation, `scripts/ao-resume.ps1`'s reboot-required escalation still computed `/sg-reboot` or `/eu-reboot` as the suggested action, and both of those pointed their SSH `Connection:` at IPs that were deleted 2026-08-30 — a real risk that Claude itself would be instructed to run a command that fails outright. `ao-resume.ps1` now always points here instead.
 

@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\debugger.md
+# source: .claude/agents/debugger.md
 name = "debugger"
 description = "Debug engineer and log analyst. Systematically finds the root cause of bugs: reads logs, narrows scope, builds hypotheses, verifies, fixes. Also analyzes PM2 / Docker / systemd / Nginx logs for error patterns. Use for any bug, service outage, test failure, or unexpected behavior. Never guesses — always traces."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'debugger'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\debugger.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/debugger.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

@@ -71,15 +71,13 @@
 | `command-plane-verify.md` | Command plane 驗證 |
 | `decide.md` | 決策輔助 |
 | `doc-sync.md` | 文件同步 |
-| `eu-reboot.md` | EU VPS 重啟 |
-| `fix-sidebars.md` | Sidebar 修復 |
+| `ks-aw-01-reboot.md` | 唯一現役主機重啟（取代已删除的 sg-reboot / eu-reboot）|
 | `health.md` | 系統健康檢查 |
 | `phase4-check.md` | Phase 4 進度查詢 |
 | `playwright.md` | Playwright 測試 |
 | `recap.md` | 對話摘要 |
 | `review.md` | Critic subagent 審查 |
-| `sg-deploy.md` | SG VPS 部署 |
-| `sg-reboot.md` | SG VPS 重啟 |
+| `sg-deploy.md` | ks-aw-01 部署（指令名稱為歷史）|
 | `signals.md` | 外部信號抓取 |
 | `smoke-test.md` | Smoke test |
 | `strategy-review.md` | 策略審查 |

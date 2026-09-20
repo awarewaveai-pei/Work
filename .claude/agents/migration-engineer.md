@@ -134,7 +134,7 @@ After all changes are applied:
 - **Package manager**: npm (`package-lock.json`)
 - **Supabase client**: `@supabase/supabase-js` — check version before upgrading (auth behavior changes between majors)
 - **Trigger.dev SDK**: must stay in sync with server version `v4.4.4` on EU — upgrading SDK without server upgrade breaks deploys
-- **ClickHouse**: NEVER migrate via this agent — version is hardware-pinned to `25.7.5`, any bump requires manual EU server procedure
+- **ClickHouse**: NEVER migrate via this agent — version is hardware-pinned to `25.7.5`, any bump requires a manual procedure on ks-aw-01
 
 **Before any npm upgrade on next-admin or node-api:**
 1. Check `lobster-factory/infra/hetzner-phase1-core/apps/<app>/package.json` for current versions

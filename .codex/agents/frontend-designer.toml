@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\frontend-designer.md
+# source: .claude/agents/frontend-designer.md
 name = "frontend-designer"
 description = "Frontend designer who builds memorable UIs: landing pages, dashboards, components. Rejects generic AI slop, commits to a bold aesthetic direction, ships production-quality code. Use for new pages, UI redesigns, and visual upgrades."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'frontend-designer'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\frontend-designer.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/frontend-designer.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

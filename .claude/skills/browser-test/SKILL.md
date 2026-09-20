@@ -5,15 +5,25 @@ description: Live browser testing via Chrome MCP (Claude-in-Chrome extension). D
 
 # Browser Test (Chrome MCP)
 
-Uses **Claude-in-Chrome** (`mcp__Claude_in_Chrome__*`) to drive the user's real Chrome browser.
+Uses **Claude-in-Chrome** (`mcp__claude-in-chrome__*`) to drive the user's real Chrome browser.
 Not headless — uses the already-logged-in session. Complementary to `/playwright` (which is headless + scripted).
+
+The server id is `claude-in-chrome` — lowercase, hyphens. `mcp__Claude_in_Chrome__*` is not a tool name; every call under it fails.
+
+**Load the tools before the first call.** They are deferred: only their names are in context, not their schemas, so calling one unloaded fails with `InputValidationError`. Load the whole set in ONE `ToolSearch` call — one round-trip, not one per tool:
+
+```
+ToolSearch  query="select:mcp__claude-in-chrome__list_connected_browsers,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__find,mcp__claude-in-chrome__form_input,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__read_network_requests,mcp__claude-in-chrome__read_console_messages"
+```
+
+In a Codex session the same source applies — use Codex's own browser tooling for the equivalent steps. The flow and the evidence format below do not change.
 
 ---
 
 ## Pre-flight
 
 ```
-mcp__Claude_in_Chrome__list_connected_browsers
+mcp__claude-in-chrome__list_connected_browsers
 ```
 
 - If result is empty → ask user to open Chrome and enable the Claude-in-Chrome extension
@@ -26,7 +36,7 @@ mcp__Claude_in_Chrome__list_connected_browsers
 ### 1. Navigate
 
 ```
-mcp__Claude_in_Chrome__navigate  url=<target>
+mcp__claude-in-chrome__navigate  url=<target>
 ```
 
 Wait for `read_page` to show the page content before proceeding.
@@ -34,26 +44,27 @@ Wait for `read_page` to show the page content before proceeding.
 ### 2. Read page structure
 
 ```
-mcp__Claude_in_Chrome__read_page
+mcp__claude-in-chrome__read_page
 ```
 
 Use this to find elements by role, text, or aria-label before clicking.
 Prefer `find` over pixel-clicking — it returns `ref_id` for precise interaction.
 
 ```
-mcp__Claude_in_Chrome__find  query="<button text or label>"
+mcp__claude-in-chrome__find  query="<button text or label>"
 ```
 
 ### 3. Interact
 
 ```
-mcp__Claude_in_Chrome__form_input  ref=<ref_id>  value=<text>   # fill text field
-mcp__Claude_in_Chrome__javascript_tool  script="..."             # run JS in page context
+mcp__claude-in-chrome__form_input  ref=<ref_id>  value=<text>
+mcp__claude-in-chrome__javascript_tool  action=javascript_exec  text="<js>"
+mcp__claude-in-chrome__computer  action=left_click  ref=<ref_id>
 ```
 
 Click order of preference:
 1. `form_input` for inputs
-2. `find` → get ref → `computer left_click` with ref (most reliable for React apps)
+2. `find` → get ref → `computer` with `action=left_click` and that `ref` (most reliable for React apps)
 3. `javascript_tool` to trigger via JS if click doesn't fire React handlers
 
 ### 4. Verify via JS (preferred over screenshots for logic checks)
@@ -88,15 +99,17 @@ fc?.getObjects()
 ### 5. Check network requests
 
 ```
-mcp__Claude_in_Chrome__read_network_requests
+mcp__claude-in-chrome__read_network_requests
 ```
 
 Verify: correct API endpoints called, correct HTTP method, status 200/201.
 
 ### 6. Screenshot for evidence
 
+There is no `screenshot` tool. A screenshot is an action on `computer`:
+
 ```
-mcp__Claude_in_Chrome__screenshot
+mcp__claude-in-chrome__computer  action=screenshot
 ```
 
 Take after key state changes (after form submit, after generation, after upload).
@@ -134,7 +147,7 @@ After testing, output:
 **Bugs found**:
 - [bug description] — file:line if known
 
-**REALTEST_EVIDENCE**: tool=mcp__Claude_in_Chrome | cmd=navigate+JS+screenshot | exit=0 | ms=<N>
+**REALTEST_EVIDENCE**: tool=mcp__claude-in-chrome | cmd=navigate+JS+screenshot | exit=0 | ms=<N>
 ```
 
 ---

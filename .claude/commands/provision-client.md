@@ -1,4 +1,12 @@
-# /provision-client — 一鍵租 Hetzner 主機 + day-1 硬化 + DNS（Decision 0 Phase-1 觸發）
+---
+name: provision-client
+description: Rent and harden a new VPS for a client (day-1 hardening plus DNS). HIGH-RISK: spends money and creates an external host.
+disable-model-invocation: true
+---
+
+# /provision-client — 一鍵租主機 + day-1 硬化 + DNS（Decision 0 Phase-1 觸發）
+
+> 主機商依客戶而定（Hostinger / SiteGround / Cloudways / OVH 皆可能）。不要假設 Hetzner：我方自用主機 ks-aw-01 已不在 Hetzner。供應商在 adapter seam 選，不硬綁。
 
 呼叫 `provisionClient` 編排器（SSOT），替新客戶租主機。觸發層之一（之後 app 按鈕 Phase 5 呼叫同一支）。
 

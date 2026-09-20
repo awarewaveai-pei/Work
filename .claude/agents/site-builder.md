@@ -1,6 +1,7 @@
 ---
 name: site-builder
 description: "Tenant provisioning agent for new client onboarding via the Lobster Factory. Use when provisioning a new client site — creates GitHub repo, Sentry project, PostHog project, Supabase schema, and n8n workflows. Requires explicit user authorization before any external API call. Reports each step result and rolls back on failure. Trigger phrases: 'build-tenant', 'provision new client', 'onboard new site', 'create tenant', '新客戶佈建', '建立租戶'."
+model: inherit
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, mcp__github__create_repository, mcp__github__create_branch, mcp__github__push_files
 ---
 

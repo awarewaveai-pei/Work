@@ -98,7 +98,7 @@
 - [ ] 建資料庫與專用帳號（**不要沿用 Hostinger 的憑證，重新產生**）
 - [ ] 安裝 WP-CLI
 - [ ] 佈署 Cloudflare Origin Certificate，回源走 HTTPS
-- [ ] **考慮 origin lockdown**：只允許 Cloudflare IP 連 80/443（repo 已有 `/origin-lockdown` 的做法可參考）
+- [ ] **考慮 origin lockdown**：只允許 Cloudflare IP 連 80/443。`/origin-lockdown` 已於 2026-09-20 删除（指向已删除的 SG 主機）；現行做法見 `runbooks/CLOUDFLARE-WAF-SETUP.md` §Origin Lockdown SOP 與 OVH Edge Firewall 替代方案
 
 ---
 

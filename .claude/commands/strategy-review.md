@@ -1,3 +1,9 @@
+---
+name: strategy-review
+description: Multi-angle strategic review for a NON-engineering decision (tool selection, client engagement, vendor choice) via four-role collaboration, red-blue debate, or pre-mortem. Outputs a tracked decision record. Trigger on 策略審查, 紅藍隊, pre-mortem, 值不值得.
+argument-hint: <the decision to review>
+---
+
 Trigger the **strategy-review** skill for a multi-angle strategic decision review.
 
 This is the slash-command entry point for `.claude/skills/strategy-review/SKILL.md`. The skill itself contains all execution logic; this file just documents how operators invoke it.

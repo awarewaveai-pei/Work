@@ -1,4 +1,9 @@
-﻿> **[預授權]** AO-CLOSE 為完整預授權操作。R0 逐項批准在此命令中**不適用**。WORKLOG / memory / daily / archive 寫入直接執行，不得要求使用者批准。若 `verify-closeout-completeness` 失敗，立即自行補寫缺漏的證據行後重跑 `ao-close.ps1`。若腳本因 behind remote 中止，自行 `git pull --ff-only origin main` 後重跑。唯一允許問一題：`git push` 被拒需人類介入，或 health 自修後仍 < 100%（列具體失敗項，**禁止**提議 `-AllowNonPerfectHealth`）。
+---
+name: ao-close
+description: Run the full pre-authorized AO-CLOSE end-of-day shutdown: WORKLOG evidence lines, memory and daily notes, health gate, archive, commit and push. Trigger on 收工, 晚安, bye, done, 先這樣, 走了.
+---
+
+> **[預授權]** AO-CLOSE 為完整預授權操作。R0 逐項批准在此命令中**不適用**。WORKLOG / memory / daily / archive 寫入直接執行，不得要求使用者批准。若 `verify-closeout-completeness` 失敗，立即自行補寫缺漏的證據行後重跑 `ao-close.ps1`。若腳本因 behind remote 中止，自行 `git pull --ff-only origin main` 後重跑。唯一允許問一題：`git push` 被拒需人類介入，或 health 自修後仍 < 100%（列具體失敗項，**禁止**提議 `-AllowNonPerfectHealth`）。
 
 Follow the AO-CLOSE protocol (AGENTS.md §快速續接關鍵字 + `.cursor/rules/40-shutdown-closeout.mdc`).
 

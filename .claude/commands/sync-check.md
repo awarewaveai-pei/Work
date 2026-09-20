@@ -1,3 +1,8 @@
+---
+name: sync-check
+description: Run the Claude Code cross-machine sync verifier and report each gate's result.
+---
+
 Run the Claude Code cross-machine sync verifier and report results.
 
 ```powershell

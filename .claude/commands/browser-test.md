@@ -1,3 +1,9 @@
+---
+name: browser-test
+description: Live browser testing through the Claude-in-Chrome extension against the real logged-in Chrome session. Use for e2e verification of authenticated pages, Canvas/Fabric.js tools, React state and API calls. Trigger on 幫我測, 瀏覽器測試, browser test, live test.
+argument-hint: [path|url]
+---
+
 Live browser testing via Chrome MCP (Claude-in-Chrome extension).
 
 ## Usage
@@ -15,8 +21,9 @@ Read the full methodology in `.claude/skills/browser-test/SKILL.md`.
 
 ## Steps
 
-1. Call `mcp__Claude_in_Chrome__list_connected_browsers`
+1. Load the Chrome tools in one `ToolSearch` call (they are deferred — an unloaded call fails), then call `mcp__claude-in-chrome__list_connected_browsers`
    → If empty: ask user to open Chrome and enable the Claude-in-Chrome extension
+   → Server id is `claude-in-chrome`, lowercase with hyphens
 
 2. Navigate to target URL
 
@@ -26,7 +33,7 @@ Read the full methodology in `.claude/skills/browser-test/SKILL.md`.
 
 5. Check `read_network_requests` for correct API calls
 
-6. Screenshot for evidence
+6. Screenshot for evidence via `computer` with `action=screenshot` (there is no `screenshot` tool)
 
 7. Report: flow results table + any bugs found + REALTEST_EVIDENCE line
 

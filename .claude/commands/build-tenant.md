@@ -1,3 +1,10 @@
+---
+name: build-tenant
+description: Provision a new client tenant through the Lobster Factory: GitHub repo, Sentry project, PostHog project, Supabase schema, n8n workflows. Creates irreversible external resources.
+argument-hint: <client-slug>
+disable-model-invocation: true
+---
+
 Provision a new client tenant using the Lobster Factory workflow.
 
 Before starting, ask for:

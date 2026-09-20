@@ -1,3 +1,9 @@
+---
+name: verify-recent
+description: Verify every code file modified this session: syntax, critic review, and a real execution test.
+argument-hint: [--ack]
+---
+
 Verify all code files modified this session (syntax + critic + real exec test).
 
 Companion to the harness-enforced rule (`mcp/claude-userlevel/hooks/rules/code-change-tracker.js` +

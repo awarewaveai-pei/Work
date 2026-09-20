@@ -134,5 +134,5 @@ curl -s -X POST \
 ## Related
 - `runbooks/CLOUDFLARE-WAF-SETUP.md` — CF WAF API mechanics (SSOT for rule IDs + PATCH commands)
 - `lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh` — lockdown script
-- `.claude/commands/origin-lockdown.md` — `/origin-lockdown` slash command
+- `/origin-lockdown` was deleted 2026-09-20 (it targeted the retired SG host). Use `runbooks/CLOUDFLARE-WAF-SETUP.md` §Origin Lockdown SOP plus the OVH Edge Firewall alternative.
 - `scripts/check-cloudflare-security.ps1` — automated CF posture check

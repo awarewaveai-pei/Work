@@ -41,15 +41,36 @@ function Get-SourceAgentFiles {
 }
 
 function Get-SourceSkillNames {
-  param([string]$Path)
+  param(
+    [string]$Path,
+    [string]$CommandsPath
+  )
   $names = New-Object System.Collections.Generic.List[string]
   Get-ChildItem -Directory -LiteralPath $Path |
     Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') } |
     ForEach-Object { $names.Add($_.Name) }
   Get-ChildItem -File -LiteralPath $Path -Filter '*.skill' |
     ForEach-Object { $names.Add((Get-SkillArchiveTopFolder -Path $_.FullName)) }
-  @('source-command-caveman', 'source-command-wp-bridge-release', 'source-command-zoom-out') |
-    ForEach-Object { $names.Add($_) }
+
+  # Command wrappers, enumerated from disk. This list was the same hardcoded three entries
+  # as the generator's (caveman / wp-bridge-release / zoom-out), so the CHECKER agreed with
+  # the generator about a set that excluded 42 of 45 commands -- two copies of one wrong
+  # assumption, which is why nothing flagged it. Both sides now read the directory, and the
+  # `codex-skip: true` opt-out has to be honoured identically here or parity reports a
+  # phantom gap. SSOT for the generation rule:
+  # mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1
+  if ($CommandsPath -and (Test-Path -LiteralPath $CommandsPath)) {
+    Get-ChildItem -File -LiteralPath $CommandsPath -Filter '*.md' |
+      ForEach-Object {
+        $fm = Get-MarkdownFrontmatter $_.FullName
+        # .Contains, not dot-access: Set-StrictMode -Version Latest throws
+        # PropertyNotFoundStrict on an absent OrderedDictionary key.
+        $skip = $fm.Contains('codex-skip') -and $fm['codex-skip'] -eq 'true'
+        if (-not $skip) {
+          $names.Add("source-command-$($_.BaseName)")
+        }
+      }
+  }
   return @($names | Sort-Object -Unique)
 }
 
@@ -136,15 +157,20 @@ foreach ($source in $sourceAgents) {
   Assert-Parity (Test-Path -LiteralPath $bridgePath) "Missing native agent bridge: $bridgePath"
   if (Test-Path -LiteralPath $bridgePath) {
     $content = Get-Content -Raw -Encoding UTF8 -LiteralPath $bridgePath
-    Assert-Parity ($content -match [regex]::Escape($source.FullName)) "Native agent bridge does not point to its Claude source: $bridgePath"
-    Assert-Parity ($content -match [regex]::Escape($charter)) "Native agent bridge does not load the shared charter: $bridgePath"
+    # Repo-relative, not absolute: these bridges are committed, so an embedded
+    # 'D:\Work\...' breaks in any other checkout or a Linux Codex container. Asserting the
+    # relative form also catches an absolute path creeping back in.
+    $relSource = $source.FullName.Substring($WorkRoot.TrimEnd([char]92).Length + 1).Replace([char]92, '/')
+    Assert-Parity ($content -match [regex]::Escape($relSource)) "Native agent bridge does not point to its Claude source (repo-relative): $bridgePath"
+    Assert-Parity ($content -match [regex]::Escape('mcp/claude-userlevel/SUBAGENT_CHARTER.md')) "Native agent bridge does not load the shared charter: $bridgePath"
+    Assert-Parity (-not ($content -match '[A-Za-z]:\\')) "Native agent bridge embeds an absolute Windows path, which will not resolve on another machine: $bridgePath"
   }
 }
 $generatedNative = @(Get-ChildItem -File -LiteralPath $nativeAgents -Filter '*.toml' |
   Where-Object { (Get-Content -Encoding UTF8 -LiteralPath $_.FullName -TotalCount 1) -eq '# GENERATED: Claude-first native agent bridge. Do not edit by hand.' })
 Assert-Parity ($generatedNative.Count -eq $sourceAgents.Count) "Generated native agent count differs (Claude=$($sourceAgents.Count), Codex=$($generatedNative.Count))."
 
-$skillNames = @(Get-SourceSkillNames (Join-Path $ClaudeHome 'skills'))
+$skillNames = @(Get-SourceSkillNames -Path (Join-Path $ClaudeHome 'skills') -CommandsPath (Join-Path $ClaudeHome 'commands'))
 foreach ($skillName in $skillNames) {
   $wrapper = Join-Path $repoSkills (Join-Path $skillName 'SKILL.md')
   Assert-Parity (Test-Path -LiteralPath $wrapper) "Missing repo skill bridge: $wrapper"

@@ -1,3 +1,8 @@
+---
+name: recap
+description: Show today's work summary before deciding whether to close out.
+---
+
 Show today's work summary before deciding whether to close.
 
 Run from the monorepo root:

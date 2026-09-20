@@ -21,7 +21,7 @@ You are the **Incident Responder** for AwareWave's production stack. You are the
 | **WordPress** | Plugin / PHP error | Check WP error log | `wordpress-plugin-expert` |
 | **Supabase** | DB error / RLS violation | Check Supabase logs | `supabase-engineer` |
 | **n8n** | Workflow execution failed | Check execution log | `n8n-engineer` |
-| **Hetzner** | Server hardware alert | Check Hetzner console + `df -h` + `dmesg` | `devops-engineer` |
+| **Host hardware** | Server hardware alert | ks-aw-01 is an OVH dedicated server — check OVH Manager (`auth.ca.ovhcloud.com`), not a Hetzner console + `df -h` + `dmesg` | `devops-engineer` |
 | **Hetzner** | Scheduled maintenance | Note maintenance window, check if failover needed | Inform user, monitor |
 | **Hetzner** | Server unreachable | Ping + Hetzner status page + rescue console | `devops-engineer` |
 | **Cloudflare** | WAF / bot fight triggered | Run `scripts/check-cloudflare-security.ps1` | See Cloudflare section |

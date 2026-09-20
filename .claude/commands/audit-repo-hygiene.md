@@ -1,3 +1,8 @@
+---
+name: audit-repo-hygiene
+description: Run the repo-hygiene audit: two deterministic bug classes with zero LLM judgment involved.
+---
+
 Run the repo-hygiene audit: two deterministic bug classes with zero LLM judgment involved.
 
 1. **case-collision** — two git-tracked paths whose lowercased form is identical (e.g. `Foo.md` and `foo.md`). Silently merges into one file/directory the moment anyone works on a case-insensitive filesystem (Windows, default macOS) after the repo was fine on a case-sensitive one (Linux CI, most servers). **Hard AO-CLOSE gate** — see `scripts/system-health-check.ps1` 7d.

@@ -1,3 +1,9 @@
+---
+name: wp-redirect
+description: Create a WordPress 301/302 redirect through Rank Math on a live client site. HIGH-RISK: the ssh/WP-CLI step is additionally gated by high-risk-bash-warn.js.
+argument-hint: <from> <to> [code]
+---
+
 # /wp-redirect — WordPress 301/302 轉址（Rank Math）
 
 新增一條 URL 轉址到 soulfulexpression.org，透過 SSH + WP-CLI 直寫 Rank Math redirections 表。

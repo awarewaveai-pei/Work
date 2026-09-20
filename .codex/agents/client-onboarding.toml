@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\client-onboarding.md
+# source: .claude/agents/client-onboarding.md
 name = "client-onboarding"
-description = "Onboard a new client into the Ops Dashboard. Creates the Supabase organizations record, sets client_config (platform/SSH/MainWP/waves), stores SSH key on SG server if needed, and verifies the client appears correctly at /ops/clients. Use when adding any new WordPress or SaaS client to the system."
+description = "Onboard a new client into the Ops Dashboard. Creates the Supabase organizations record, sets client_config (platform/SSH/MainWP/waves), stores SSH key on ks-aw-01 if needed, and verifies the client appears correctly at /ops/clients. Use when adding any new WordPress or SaaS client to the system."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'client-onboarding'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\client-onboarding.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/client-onboarding.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

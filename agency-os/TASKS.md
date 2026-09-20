@@ -108,6 +108,10 @@
 
 ### 未完成
 
+- [ ] **【oracle 工具層】兩支 cross-model oracle 的 packet 會被無關 untracked 檔灌爆，導致 review 靜默失敗** — 2026-09-20 實測：`/codex-review`（companion `adversarial-review`）與第二層 fallback `scripts/codex-oracle.ps1 -Mode review` 對同一份 130 檔改動**雙雙回不出 final message**。根因不是額度（log 0 bytes、無任何 `429`／`rate limit` 字樣），是 packet 4.97MB：兩支的 builder 都只按「可審檔案型別 + 512KB 單檔上限 + 名稱像 secret」過濾，沒有「與本次改動無關的 untracked 檔要排除」，於是 100+ 個 `.claude/sessions/*.md` session transcript、`agency-os/reports/{governance,monthly}/**`、`.next/trace` 全被 inline 進去，把真正要審的 130 檔淹掉。**失效模式最糟的地方是靜默**：companion 開跑 8 秒吐一個 `findings: []` 的空殼就卡住，看起來像「審過且沒問題」。治本方向：packet builder 加一層「untracked 檔須與 tracked 改動同目錄樹或明確 allowlist」的過濾，並讓「no final message」變成明確的 FAIL 而非空 findings；同時 companion 那個 8 秒空殼要能被識別為未完成而非 pass。
+  - 影響：每次大批改動的 R0 Review 動作都會退化成書面自審（2026-09-20 就是這樣結案的，見 WORKLOG 2026-09-20 續86 的 `ORACLE_WAIVED`）。
+- [ ] **Codex `/hooks` trust 未執行，Codex 側等同零機械閘** — `check-claude-codex-parity.ps1` 444/446，唯二失敗就是這條（`0/8 hook handlers trusted` + 無 heartbeat）。2026-09-20 的共用資產成果（41 個 command wrapper、25 個 agent bridge、相對路徑、model 分層）在 Codex session 內全都沒有機械強制。**需操作者在 Codex 開 `D:\Work` 跑 `/hooks` 並 trust AwareWave hooks**，之後 `check-claude-codex-parity.ps1` 應轉 446/446。
+
 #### A. ⏰ 有外部時鐘（死線／到期日）
 
 > 外部時鐘不等人。這一區由上往下就是先後順序。
@@ -1088,12 +1092,15 @@
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
-- [ ] **【2026-09-20 開出｜部署】`/root/lobster-phase1/docker-compose.yml` 與 repo 版本已知 drift，需決定治本方式**
-  - **【未開始】**
-  - **背景**：修 `/ops/collect` Perplexity→Serper 時發現，`sg-deploy.sh` 只 rsync `apps/<APP>` 原始碼，`docker-compose.yml` 本身是 machine-local、不被同步（腳本自己的檔頭註解即這樣寫）。改 repo 內 `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 的環境變數對 prod **完全無效**，除非額外手動 SSH 同步。當場清查兩份檔案的變數集合差異（非本次改動造成，屬既存）：**只在 prod 有**：`GOOGLE_OAUTH_CLIENT_ID`／`GOOGLE_OAUTH_CLIENT_SECRET`／`MEDIA_OUTCOME_WEBHOOK_ENABLED`／`MEDIA_OUTCOME_WEBHOOK_TOKEN`／`MEDIA_PRODUCTION_PERSISTENCE_ENABLED`／`MEDIA_PROVIDER_ALLOWLIST`／`WPBRIDGE_BASE_URL`／`WPBRIDGE_KEY_ID`／`WPBRIDGE_PRIVATE_KEY`；**只在 repo 有**：`OPS_INBOX_DUAL_ACCEPT_LEGACY`／`OPS_INBOX_FINGERPRINT_SALT`／`OPS_INBOX_GRAFANA_TOKEN`／`OPS_INBOX_NETDATA_TOKEN`／`OPS_INBOX_POSTHOG_TOKEN`／`OPS_INBOX_SENTRY_TOKEN`／`OPS_INBOX_UPTIME_KUMA_TOKEN`／`PORTAL_SIGNUP_ENABLED`／`PORTAL_SIGNUP_RATE_LIMIT_SALT`。
-  - **待決定**：(a) repo 版本改列為唯一 SSOT，`sg-deploy.sh` 新增 compose 檔同步步驟（含差異審查，因為部分變數可能是刻意 prod-only）；或 (b) 明確拆成「repo 管 app 邏輯需要的變數」+「機器管的 ops-only 變數」兩層並各自寫文件，不強求單一檔案。兩者都需要先逐一確認上面兩份清單中每個變數是「該同步但漏掉」還是「刻意只留一邊」。
-  - **順帶檢查**：`/check-drift` 是否已涵蓋 compose 檔差異偵測；若沒有，是否該納入。
-  - 見 WORKLOG 2026-09-20（續86）。
+- [ ] **【2026-09-20 開出，同日大部分解決｜部署】docker-compose.yml repo/prod drift——已查明機制、已補齊 repo、機械偵測已上線；剩一個 High-STOP 動作待操作者授權**
+  - **【進行中，剩最後一步卡在你】**
+  - **根因查明**（非猜測，讀 `sg-deploy.sh`+`safe-infra-patch.sh`+`DEPLOY_ROLLBACK_RUNBOOK.md §2.6` 全文確認）：這不是意外遺漏，是既有兩軌架構——app 程式碼走 git→`sg-deploy.sh`；nginx／Dockerfile／**compose** 走 Auto-Repair 紅線規定的 `safe-infra-patch.sh compose <file> <service>`，直接在伺服器 backup→apply→health→（失敗）rollback，不經 git。這條路徑本身正確且已用超過 4 個月（`/root/lobster-phase1/` 下 70+ 個 `.bak-*`/`.bak.safe-patch-*` 檔可查），只是 repo 那份 docker-compose.yml 從未被回寫更新，導致兩邊各自累積了對方沒有的宣告。
+  - **已修**：
+    1. repo `docker-compose.yml` 補齊 9 個「prod 有、repo 沒有」但程式碼真的會讀的變數（`GOOGLE_OAUTH_CLIENT_ID/SECRET`、`WPBRIDGE_BASE_URL/KEY_ID/PRIVATE_KEY`、`MEDIA_PRODUCTION_PERSISTENCE_ENABLED`、`MEDIA_OUTCOME_WEBHOOK_ENABLED/TOKEN`、`MEDIA_PROVIDER_ALLOWLIST`）——每個都先用 Grep 確認過真的有 `process.env.X` 讀取，不是猜測。
+    2. `scripts/check-deploy-drift.ps1`（`/check-drift`）新增獨立的 compose 變數集合比對（`composeVarDrift`），不依賴 commit-behind 數（commit 對齊≠compose 對齊，這正是這次踩到的坑）；過程中抓到自己寫的 bug：`Get-Content` 沒指定 `-Encoding utf8`，CJK 註解旁的變數被誤判——已修並用真實 SSH 重跑驗證兩次（修前誤報 4 個 false positive，修後 0）。
+    3. `AGENTS.md` §0 新增硬事實：docker-compose.yml 是機器本地檔，改動一律走 `safe-infra-patch.sh compose`，不是手動 SSH 編輯（我這次 Serper 部署當下就繞過了這個規定手動編輯，事後才讀到 `safe-infra-patch.sh`——已記取，往後同類任務照規定走）。
+  - **剩一步，High-STOP，需操作者明示 go-ahead**：目前 prod 仍缺 9 個 repo 有、prod 沒有的變數（`OPS_INBOX_DUAL_ACCEPT_LEGACY`／`FINGERPRINT_SALT`／`GRAFANA_TOKEN`／`NETDATA_TOKEN`／`POSTHOG_TOKEN`／`SENTRY_TOKEN`／`UPTIME_KUMA_TOKEN`、`PORTAL_SIGNUP_ENABLED`／`RATE_LIMIT_SALT`）——這些功能目前在 prod 上宣告不存在，`process.env` 讀不到，M2 per-source webhook token 與 portal signup rate-limit salt 這兩個 critic 當初就點名要設的東西實際上一直沒生效。修法：SSH 執行 `safe-infra-patch.sh compose docker-compose.yml next-admin`（帶 repo 現有內容，該腳本自帶 backup+health+失敗自動還原）。值本身仍是空的（`.env` 沒有真值），這步只讓宣告存在、不會改變任何行為，但需要一次 prod 變更動作，屬 High-STOP，已在對話中詢問操作者。
+  - 見 WORKLOG 2026-09-20（續86、續87）。
 
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。
   - ✅ **Stage 1 接通入口完成 2026-06-14**：trigger-build 403 修復（dual-path auth, 8b1d6d86）+ dispatcher kick fallback（TRIGGER_ACCESS_TOKEN, 000f068c）+ dispatch-action-run-schedule 部署（每分鐘 cron）。
@@ -1225,6 +1232,14 @@
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-09-20 — Claude+Codex 共用資產稽核（結案）
+
+- [x] **【✅ 2026-09-20 結案】skills／commands／agents／tools 全面稽核與機械化** — 13 項全處理。最大收穫：**生成器與檢查器各有一份硬編三筆名單**，對同一個錯誤集合達成共識，所以沒人報警 —— 42/45 commands 從未到 Codex（含 `/claude-review`，而它正是 Codex 寫的改動必須用的 oracle）。41 個已 commit 的 wrapper 內嵌 `D:\Work` 絕對路徑（換機／Linux container 直接斷）；AGENT_INDEX 宣稱 critic／db-expert／vuln-verifier／debugger／planner 是 `opus` 但那 5 個檔案根本沒有 `model:` 行 —— 文件宣稱 ≠ 實際設定，最吃判斷力的 5 個 agent 一直跑「父層剛好是什麼」。
+  - 新增 `scripts/verify-asset-mcp-refs.mjs` + `scripts/verify-asset-parity.mjs`（共 30 tests，全套 hooks 測試 228 綠）+ `.github/workflows/shared-asset-gates.yml`。兩支閘刻意寫 `.mjs` 不寫 `.ps1` —— Codex 容器沒 pwsh，只有 pwsh 版的閘等於只在筆電有效。
+  - **初判訂正**：原報告說 `/decide` 會被 `subagent-budget.js` 的 >10 BLOCK 擋死。解開 skill zip 實查 33 檔後確認**錯誤**：那 12–19 個「agent」是單一 agent 依序扮演的 persona，skill 內 0 處 spawn，該 agent 連 Agent tool 都沒有。真正的缺口是「成本前置告知」從未落地，已補進 command 與 agent 兩處。
+  - **剩下的阻塞（非本次造成）**：Codex `/hooks` trust 未跑，parity 444/446，Codex 側等同無閘 —— 需操作者在 Codex 開 `D:\Work` 跑 `/hooks`。
+  - 完整發現、每項根因、四動作證據與殘餘風險：**WORKLOG.md 2026-09-20（續86）**。
 
 ### 2026-08-26 整理：自「未完成」區移入（78 條，依結案月份分組）
 

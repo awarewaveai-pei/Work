@@ -1,3 +1,8 @@
+---
+name: auto-reboot-status
+description: Check the ks-aw-01 daily auto-reboot health: last run, next run, and whether the 16-hour escalation window was breached.
+---
+
 # Check ks-aw-01 auto-reboot health
 
 Read-only diagnostic for the only production host: **ks-aw-01** (`145.239.195.47`,

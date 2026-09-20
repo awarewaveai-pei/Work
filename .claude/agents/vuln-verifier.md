@@ -1,6 +1,7 @@
 ---
 name: vuln-verifier
 description: "Vulnerability verifier. Takes the critic's findings and writes actual PoC code to prove each vulnerability is real (or a false positive). Produces verification reports suitable for security advisories, issues, and PRs. Use AFTER critic flags a suspected security issue."
+model: opus
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

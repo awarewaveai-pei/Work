@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-description: "DevOps / infrastructure engineer for AwareWave's SG and EU VPS. SSH into servers, manage Docker Compose services, fix nginx config, restart services, read logs, and resolve infra incidents. Use when a service is down, Docker container is unhealthy, nginx is misconfigured, or any VPS-level operation is needed. Trigger phrases: 'SG 服務掛了', 'EU server', 'docker restart', 'nginx 設定', 'service is down', 'container crashed', 'VPS ops'."
+description: "DevOps / infrastructure engineer for AwareWave's only live host, ks-aw-01 (OVH dedicated; the former SG and EU VPS were folded into it on 2026-08-31). SSH into servers, manage Docker Compose services, fix nginx config, restart services, read logs, and resolve infra incidents. Use when a service is down, Docker container is unhealthy, nginx is misconfigured, or any VPS-level operation is needed. Trigger phrases: 'SG 服務掛了', 'EU server', 'docker restart', 'nginx 設定', 'service is down', 'container crashed', 'VPS ops'."
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 ---

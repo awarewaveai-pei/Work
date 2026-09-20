@@ -1,4 +1,9 @@
-﻿Diagnose why the Telegram bot is silent. Runs the -Verify check and inspects docker env on SG.
+---
+name: command-plane-verify
+description: Diagnose a silent Telegram command-plane bot: run the -Verify check and inspect the container environment on the host.
+---
+
+Diagnose why the Telegram bot is silent. Runs the -Verify check and inspects docker env on SG.
 
 ## Step 1 — Webhook URL + recent errors (local, no SSH needed)
 

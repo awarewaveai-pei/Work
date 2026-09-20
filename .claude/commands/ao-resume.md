@@ -1,4 +1,9 @@
-﻿> **[預授權]** AO-RESUME 為完整預授權操作。`reports/ao-resume/*.md` 存檔寫入及 handoff packet 修剪**直接執行**，R0 逐項批准不適用。
+---
+name: ao-resume
+description: Run the AO-RESUME start-of-work report (sections 0-8) from the hook's state file: open tasks, mainline parity, smoke results, blockers, next steps. Trigger on a greeting or any opening message under ~15 characters with no clear goal.
+---
+
+> **[預授權]** AO-RESUME 為完整預授權操作。`reports/ao-resume/*.md` 存檔寫入及 handoff packet 修剪**直接執行**，R0 逐項批准不適用。
 
 > **[CAVEMAN DEFAULT]** AO-RESUME 完成後，立即宣告：`🦴 Caveman mode ON — 本 session 全程壓縮回覆，直到你說 "stop caveman"。` 無需使用者觸發。
 

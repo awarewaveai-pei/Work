@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\tool-expert.md
+# source: .claude/agents/tool-expert.md
 name = "tool-expert"
 description = "Tool expert who picks the right tools, chains complex workflows, and troubleshoots tool failures. Knows when to use built-in tools vs MCP servers vs shell commands. Use for complex tool chaining, MCP server issues, or when you're unsure which tool fits the job."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'tool-expert'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\tool-expert.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/tool-expert.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

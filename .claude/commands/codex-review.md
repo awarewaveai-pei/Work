@@ -1,3 +1,8 @@
+---
+name: codex-review
+description: Cross-model oracle review for a change WRITTEN BY CLAUDE -- the primary R0 verification Review action. Produces an ORACLE gate artifact.
+---
+
 Run the standard cross-model oracle review for R0 [驗證計畫] Review 動作 (AGENTS.md §跨模型 oracle, primary entry point since 2026-08-30). This command exists so two things are never left to memory: the two mandatory focus-text additions in Step 2, and the capture-before-review sequencing in Step 1.5 (2026-08-30 rewrite, closing a critic Critical finding — see Step 1.5's own note).
 
 ## Step 0 — Quota circuit breaker (2026-09-04, operator: 撞到額度就停)

@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\repair-agent.md
+# source: .claude/agents/repair-agent.md
 name = "repair-agent"
 description = "Read-only diagnostic agent for system health issues. Use when health checks fail, scripts error, MCP connections drop, or governance cross-references break. Reads logs, config files, and script output — never writes or commits. Reports root cause + fix recipe for the main agent to apply."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'repair-agent'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\repair-agent.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/repair-agent.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

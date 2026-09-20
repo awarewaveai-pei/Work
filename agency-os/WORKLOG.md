@@ -20931,3 +20931,56 @@ WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈�
 [rollback] `git revert` 本 commit；prod 若需臨時退回：`/root/lobster-phase1/docker-compose.yml` 手動把 `PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}` 加回、刪除 Serper/Brave 兩行，`docker compose up -d --force-recreate next-admin` 重建 container。
 
 WORKLOG_DONE: /ops/collect 搜尋全網 Perplexity→Serper 切換完成並已在 prod 驗證生效（含 staging compose 手動同步這個未預期的額外步驟）；剩 staging/repo compose 其餘既存 drift 待操作者決定治本方向（TASKS.md G 段）
+
+## 2026-09-20（續86）Claude+Codex 共用資產全面稽核與機械化（操作者：「看所有的 skills 和 commands 和 tools 是否有需要進化的地方」→「全部處理好, 要記得 以後這些東西都是要給 claude code 和 codex 共用的」）
+
+**盤點範圍**：45 commands／13 skills（+16 Codex wrapper）／25 agents／34 hook rules／22 MCP servers。共 13 項可進化，全數處理。
+
+**C 級（會直接失效）**
+- C1 **我的初判錯了，需訂正**：報告說 `/decide` 宣告 8–13 agents、會被 `subagent-budget.js` 的 >10 無條件 BLOCK 擋死。實查 `.claude/skills/ai-decision-intelligence.skill`（33 檔全解開）→ **skill 內 0 處 spawn／Agent tool**，且 `decision-intelligence.md` 的 `tools:` 根本沒有 Agent tool：那 12–19 個「agent」是單一 agent 依序扮演的 persona。閘擋不到它，`/decide` 沒有跑不起來的問題。真正的缺口是另一件：memory `feedback_decision_panel_cost_awareness`（「已有初判時別默默跑全套」）從未落進任何檔案 → 已在 `commands/decide.md` 加 Step 0 成本前置告知、在 `agents/decision-intelligence.md` 的 Entry behavior 加第 0 步（agent 檔才是真正執行的地方），並加 Step 0.5 明寫「roster 是 persona 不是 spawn」——這個措辭本身就是誤導我的來源。
+- C2 `skills/browser-test/SKILL.md` + `commands/browser-test.md` 用 `mcp__Claude_in_Chrome__*`（8 處）。真實 server id 是 `claude-in-chrome`（小寫連字號）→ 該 skill 第一個工具呼叫**每次都失敗**。另 `__screenshot` 根本不是工具（screenshot 是 `computer` 的 action）、`javascript_tool` 參數是 `action=javascript_exec` + `text` 不是 `script`。順手補「工具是 deferred，要先一次 ToolSearch 全載」。
+- C3 `agents/decision-intelligence.md:4` 的 `tools:` 掛 `mcp__perplexity__perplexity_search`，但 perplexity MCP 已退役（不在 `registry.template.json`／`.mcp.json`，且 `check-perplexity-search-only.mjs` 現在禁 perplexity MCP 套件）→ 該 agent 永遠拿不到它宣告的研究工具，**靜默降級無任何報錯**。同時修 `AGENT_INDEX.md:55`、`tool-expert.md` 的 MCP 表（perplexity／canva／posthog／Gmail 四列皆為不可解析或錯誤工具名）。
+
+**M 級（結構性）**
+- M1 42/45 commands 無 frontmatter（只有 caveman／wp-bridge-release／zoom-out 有）→ description 靠 body 第一行猜，所以注入清單長出 `# Check ks-aw-01...`、`**⚠️ SUPERSEDED`；也無法宣告 `argument-hint`／`disable-model-invocation`。已為 38 支補 frontmatter（name/description/argument-hint），4 支去 BOM（`ao-close`／`ao-resume`／`command-plane-verify`／`tomo`，違反 AGENTS.md §8 且 BOM 在 `---` 前會直接讓 frontmatter 解析失效）。
+  **`disable-model-invocation` 只給 5 支，理由寫進腳本註解**：`build-tenant`／`client-onboarding`／`provision-client`／`wp-bridge-release`／`apply-audit`——這些透過 MCP 呼叫或檔案編輯造成不可逆外部效果，model 與該效果之間**沒有任何下游機械閘**。反之 `sg-deploy`／`ks-aw-01-reboot`／`vault-sync`／`wp-redirect` 雖是 High risk，但真正危險的那一步已被 `high-risk-bash-warn.js` 在 PreToolUse BLOCK（需 `# CONFIRMED-HIGH-RISK:` 解鎖），再加 `disable-model-invocation` 只會打斷 TOOL_TRIGGER_MAP 的既有路由而不增加安全。改在 description 標 HIGH-RISK 讓選取時就看得到。
+- M2 三個索引 + 兩組 parity 全手維護、零機械閘。新增 `scripts/verify-asset-parity.mjs`（+19 tests）：command↔Codex wrapper、agent↔toml、skill↔wrapper、孤兒 wrapper/toml、command frontmatter 完整性與 name-vs-filename、BOM、以及三份索引的**表格列**覆蓋。首跑即抓到我報告裡那 3 項 index 漏列（活體證明）。
+- M3 刪 4 支死 command：`/fix-sidebars`（`scripts/fix-cursor-ai-sidebars.mjs` 不存在，Cursor 2026-08-26 退場）、`/sg-reboot`＋`/eu-reboot`（墓碑，12.5KB，仍每輪進指令清單）、`/origin-lockdown`（指向已刪 SG 主機）。`SKILL_AND_COMMAND_INDEX.md` 加「已退役」表讓舊引用查得到去路；TOOL_TRIGGER_MAP、SITE_MIGRATION_RUNBOOK、SCANNER-ATTACK-RESPONSE-RUNBOOK、claude-code-file-reference、KS-AW-01-HOST-SWITCH-RUNBOOK 的引用一併更新。
+- M4 `agents/trigger-deploy-agent.md:15` 說 WAF skip rule 只對 IPv4 `204.168.175.41` 生效，該機 2026-08-30 已刪；同檔 :105 早已寫 `145.239.195.47` → **同檔自我矛盾**，照 :15 排 deploy 403 會查一條永遠不可能命中的規則。
+- M5（原判為 frontmatter 篩選，**實為硬編**）`sync-claude-to-codex.ps1:798-800` 是一張硬編三筆的 hash table → 42/45 commands 從未到 Codex，包含 `/claude-review`（§4 規定 Codex 寫的東西必須用它覆審，Codex session 卻叫不到）。改成列舉 `.claude/commands/*.md`，`codex-skip: true` 可退出，description 取自 frontmatter。**抓蟲抓到另一半根因**：`check-claude-codex-parity.ps1:51` 有一份一模一樣的硬編三筆 → 檢查器與生成器對同一個錯誤集合達成共識，所以沒人報警。兩邊都改成讀目錄。
+
+**m 級**
+- m1 backup retention 是 count-based（keep 15），被 burst 打爆：今天 11:35–12:22 跑了 15 次，整個備份歷史只剩 47 分鐘。備份要救的是「早上改壞的」。抽出 `scripts/lib/backup-retention.ps1`（可單獨 dot-source ⇒ 可測），改為「保留 14 天內全部 + 最近 10 個有備份的日子各留最新一份」——後者是長期空窗的下限，純時間式在三週沒動後會一個不剩。日期鍵取自**目錄名**不取 mtime（複製／還原會改寫 mtime）。
+- m2 40+ 檔常態 phantom-dirty。根因不是 `.gitattributes` 缺規則而是**它本身**：`*.ps1 text eol=crlf` 讓 generator 的 here-string 帶 CRLF，產出的 `.md`/`.toml` 就帶 CRLF，而 `.gitattributes` 要那些是 LF。在 `Write-Utf8NoBom` 這唯一寫入點正規化成 LF，整類消失（`git add --renormalize` 只能撐到下一次 sync）。另修 `codex-bridge-lib.ps1` 本身是 LF（違反自家 .ps1 規則）。
+- m3 41 個已 commit 的 wrapper／toml 內嵌 `D:\Work\...` 絕對路徑（原報告漏了這項，抓蟲補上）→ 換機或 Linux container 直接斷，正是操作者「以後共用」要求的核心衝突。改為 repo-relative；checker 的期望值同步改成相對形式，並加一條「toml 不得出現 `[A-Za-z]:\` 絕對路徑」的斷言。
+- m4 agent model 分層不成文，而且 **`AGENT_INDEX.md` 一直宣稱 critic／db-expert／vuln-verifier／debugger／planner 是 `opus`，但那 5 個檔案根本沒有 `model:` 行** → 文件宣稱 ≠ 實際設定，最吃判斷力的 5 個 agent 一直跑「父層剛好是什麼」。照文件意圖訂正為 `model: opus`，其餘 5 個 orchestrator 明寫 `model: inherit`，25/25 全部有宣告；`SUBAGENT_CHARTER.md` 寫下四層判準（用「錯的時候會怎樣」選層，不用成本選層）；parity 閘拒絕未宣告或非法 tier。
+- m5 見上。
+
+**新增機械閘（兩支都寫 `.mjs` 不寫 `.ps1`）**：Codex 容器沒 pwsh（CLAUDE.md 已記需自行安裝），共用資產的閘若只有 pwsh 版就只在這台筆電跑得動——這正是要關掉的單執行環境盲區。
+- `scripts/verify-asset-mcp-refs.mjs`（+11 tests）：資產內每個 `mcp__server__tool` 的 server 必須在 registry（且 enabled）或屬 host 注入清單，**大小寫與標點視為 id 的一部分**；另擋硬編 UUID connector id。刻意不驗 tool 名：上游每次改版就會 stale，而 stale 正是這支閘要消滅的失效模式。
+- `.github/workflows/shared-asset-gates.yml`：push/PR 都跑兩支閘 + 規則層測試。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | result=228 tests pass（原 198 + 新 30）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/verify-asset-mcp-refs.mjs` + `--self-test` | exit=0 | result=184 檔 0 違規；self-test 10 案例全過
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/verify-asset-parity.mjs` | exit=0 | result=41 commands／25 agents／13 skills／54 wrappers／25 bridges 全齊
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變測試 ①把 browser-test 改回 `mcp__Claude_in_Chrome__` ②拿掉 critic 的 `model:` | exit=1→0 | result=兩者皆被點名且訊息指出正解（「did you mean "claude-in-chrome"」），還原後綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File <scratchpad>/test-backup-retention.ps1`（含真實目錄 end-to-end） | exit=0 | result=9/9，含「15 次 burst 不得驅逐 3 天前與 10 天前備份」這條回歸案例
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sync-claude-to-codex.ps1` 實跑 + `check-claude-codex-parity.ps1` | exit=0／1 | result=55 wrapper 全 ok；parity 444/446。**剩下 2 項是既有阻塞非本次造成**：Codex `/hooks` trust 未跑（memory `project_codex_lead_parity_gap` 已記，需操作者在 Codex 內執行）
+- REALTEST_EVIDENCE: tool=Bash | cmd=5 支改動的 `.ps1` 逐一 `[Parser]::ParseFile` | exit=0 | result=全部 PARSE OK
+- ORACLE_WAIVED: `/codex-review` 與第二層 fallback `codex-oracle.ps1 -Mode review` **連續失敗**，非額度問題故**未設斷路器**（log 0 bytes，無 `429`／`rate limit`／`usage limit`／`try again at` 任何字樣；依 AGENTS.md §4，在非額度失敗上設斷路器會錯誤封鎖 5 小時）。① companion `adversarial-review` 卡在 `starting` 10 分鐘，唯一 assistant message 是開跑 8 秒就吐出的 `{"verdict":"needs-attention","findings":[],"summary":"Reviewing the working-tree diff and tracing changed behavior..."}` —— summary 只是重述意圖，8 秒對 130 檔／892 行不可能是真 review，故不採計為 pass ② `codex-oracle.ps1` 兩次 attempt 皆 `no final message (exit=0)`。**共同根因（工具層問題，非本次改動）**：oracle packet 4.97MB，其中 100+ 檔是無關的 untracked `.claude/sessions/*.md` transcript 與 `agency-os/reports/**`，把真正要審的 130 檔淹掉。兩支 oracle 的 packet builder 都只按「可審檔案型別」過濾，沒有「與本次改動無關的 untracked 檔要排除」這條 —— 已登記為待辦（見 TASKS.md）。
+- REVIEW_DONE: critic=書面對抗自審（oracle 不可用時的替代路徑，AGENTS.md §4）| verdict=warn→fixed | findings=1C/1M/2m，**全部是針對我自己這次改動**：
+  - **C1（我改壞的回歸，自審才抓到）** `backup-retention.ps1` 第一版寫「保留 14 天內全部」→ 一個失控迴圈在一個下午產生幾百個目錄，**兩週內沒有任何機制會清**，嚴格比它取代的 count-based 規則更糟（後者至少有總量上限）。修法：加 `-MaxPerDay 12`（當天超出上限的舊份即使只有幾分鐘大也清），並加 regression test「同日 40 筆洪水必須被砍到 12 筆且最新那份永遠存活」。
+  - **M1** `verify-asset-parity.mjs` 在掃到 0 個 command 時會回報 OK —— 路徑改名或部分 checkout 就讓閘無聲變綠，正是本日已踩過一次的假綠形狀。加 `MIN_COMMANDS/MIN_AGENTS/MIN_SKILLS` 下限（20/10/5，遠低於實際 41/25/13，不會被日常增刪誤觸）+ 指名測試。
+  - **m1** `hasCommandRow` 的 regex 不容忍第一格加粗（`| **`/health`**  |`）→ 純格式調整會讓閘誤報。改為容忍前導 `*`/backtick。
+  - **m2** `.skill` 壓縮檔的 wrapper 名假設「top folder == basename」，generator 是真的開 zip 讀。已在註解寫明此差異的失效方向是**誤報而非漏報**（會指名檔案），是便宜檢查該有的錯法。
+- 突變測試（證明測試套件非空跑，三組，每組皆「拔掉 → 指名測試變紅 → 還原變綠」）：① `browser-test/SKILL.md` 的 `mcp__claude-in-chrome__` 改回 `mcp__Claude_in_Chrome__` → mcp-refs 閘 exit 1 且訊息指出正解「did you mean "claude-in-chrome"」，還原後 exit 0 ② 拿掉 `critic.md` 的 `model:` → parity 閘 exit 1 點名該檔，還原後綠 ③ 把 count-floor guard 改成 `if (false && ...)` → **指名測試 `an almost-empty scan fails instead of reporting OK` 由綠變紅（20 tests: pass 19 / fail 1）**，還原後 20/20 全綠。
+- BUGHUNT_DONE: scope=`agency-os,scripts,.claude,.agents,.codex,mcp,runbooks,.github,tests` | grep=`fix-cursor-ai-sidebars|commands/(origin-lockdown|sg-reboot|eu-reboot)|commandSkillMap|source-command-caveman|caps retention at 15|Claude_in_Chrome|mcp__perplexity|SG VPS|EU server|Hetzner (VPS|主機|console)` | hits=**7 處實際命中並全部修掉**：`check-claude-codex-parity.ps1:51` 硬編三筆（M5 另一半根因）、`claude-code-file-reference.md:74,82` 列出已刪檔、`SCANNER-ATTACK-RESPONSE-RUNBOOK.md:137` 指向已刪 command、`ao-close.ps1:868` 註解仍寫「caps retention at 15」、`KS-AW-01-HOST-SWITCH-RUNBOOK.md:271` 說兩支 reboot 指令改成 stub（實已刪除）、16 處退租主機命名
+- 另修 StrictMode 潛伏 bug：`$fm.'codex-skip'` 在 `Set-StrictMode -Version Latest` 下對缺少的 key 會丟 PropertyNotFoundStrict。checker 有開 StrictMode 所以實跑就炸；generator 沒開所以同一個寫法一直沒事——兩邊改用 `.Contains()`。順手把 `Get-MarkdownFrontmatter` 從 generator 搬進兩邊共用的 `codex-bridge-lib.ps1`（一份定義兩個消費者，否則兩邊對 `codex-skip` 的解讀會各自漂移）。
+- **測試假綠一則（自己踩到、值得記）**：`tests/hooks/asset-mcp-refs.test.mjs` 第一版 `import` 那支腳本時執行了它的 `process.exit(0)`，測試進程在任何 test 註冊前就被殺掉，**exit code 0 讓整個 run 報綠**。靠核對「回報的 test 數是 1 不是 11」才發現，不是靠 exit code。兩支腳本都加 `invokedDirectly` 守衛。教訓：CLI 腳本被 import 當模組測時，頂層副作用會偽造成功——看數量不要看 exit code。
+
+**[剩餘風險]** ① Codex `/hooks` trust 仍未跑，Codex 側的閘等同沒有，本次所有共用化成果在 Codex session 內無機械強制（需操作者在 Codex 開 `D:\Work` 跑 `/hooks`）② `.claude/skills/ai-decision-intelligence.skill` 仍是 zip，BUGHUNT 的 grep 看不進去，只能靠解壓人工查（本次已解壓核對過 33 檔）③ `agency-os/reports/status/*-LATEST.*` 11 檔仍 CRLF phantom-dirty——那是別的產生者寫的，與本次 generator 無關，未處理 ④ `sync-claude-userlevel.ps1 -Mode verify` 報 `permissions.additionalDirectories` drift 與 23 個 target-only hook rule，為既有狀態、本次未動 settings
+
+[rollback] `git revert` 本 commit，然後重跑 `powershell -File mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1` 讓 wrapper/toml 回到舊形式（generator 是產生者，revert 原始碼後必須再跑一次才會真的回退產出）。刪掉的 4 支 command 由 revert 一併復原。
+
+WORKLOG_DONE: Claude+Codex 共用資產 13 項全處理；新增 2 支 `.mjs` 機械閘（+30 tests）+ CI workflow；C1 初判經實查訂正為錯誤並已在檔案裡說清楚

@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\wordpress-maintenance-agent.md
+# source: .claude/agents/wordpress-maintenance-agent.md
 name = "wordpress-maintenance-agent"
 description = "Operate WordPress client maintenance through MainWP, WPvivid, SSH/WP-CLI, and the Ops Dashboard. Use for backup status checks, MainWP sync review, plugin update planning, and backup-gated safe update routines."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'wordpress-maintenance-agent'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\wordpress-maintenance-agent.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/wordpress-maintenance-agent.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

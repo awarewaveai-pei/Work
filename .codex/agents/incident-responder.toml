@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\incident-responder.md
+# source: .claude/agents/incident-responder.md
 name = "incident-responder"
 description = "First-responder for production alerts from Sentry, Uptime Kuma, Netdata, Grafana, Hetzner, Cloudflare, or any Telegram/Slack alert. Triages the alert, identifies root cause category, and dispatches the right specialist agent to fix it. Use when an alert arrives and you're not sure what to do first. Trigger phrases: 'Sentry 報錯', 'Uptime Kuma DOWN', 'Netdata CPU 飆高', 'service down', '告警來了', 'alert fired', '服務掛了', '有 error', 'production issue', 'Hetzner', 'Cloudflare', 'WAF', 'DDoS', 'DNS 問題', 'SSL 過期'."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'incident-responder'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\incident-responder.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/incident-responder.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

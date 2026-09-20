@@ -1,3 +1,8 @@
+---
+name: claude-review
+description: Cross-model oracle review for a change WRITTEN BY CODEX -- the R0 verification Review action when Codex is the author. Produces an ORACLE gate artifact.
+---
+
 Cross-model oracle for a change **written by Codex** — the R0 [驗證計畫] Review 動作 when Codex is the writer. AGENTS.md §4: the reviewer is always the model that did NOT write the change, so a Claude session uses `/codex-review` and a Codex session uses this command. Codex reaches this file through the `claude-compat` command index.
 
 ## Step 0 — Quota circuit breaker

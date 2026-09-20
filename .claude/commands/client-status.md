@@ -1,3 +1,9 @@
+---
+name: client-status
+description: Show health and WordPress plugin update status for every client, or one named client.
+argument-hint: [client-slug]
+---
+
 Show health and WordPress plugin update status for all clients (or one specific client).
 
 ## Usage
@@ -34,7 +40,7 @@ If a specific slug is given, show full detail:
 ## Implementation
 
 ```powershell
-# Quick check via curl on SG server (for reference)
+# Quick check via curl on ks-aw-01 (for reference)
 ssh -i "$HOME\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 `
   "sudo curl -s http://127.0.0.1:3002/api/ops/clients" | ConvertFrom-Json | Select-Object -Expand clients
 ```

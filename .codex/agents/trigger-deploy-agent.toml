@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\trigger-deploy-agent.md
+# source: .claude/agents/trigger-deploy-agent.md
 name = "trigger-deploy-agent"
-description = "Deploy Trigger.dev workflows to the EU self-hosted instance (trigger.aware-wave.com). Use when the user wants to deploy lobster-factory/packages/workflows to the EU server. Requires a tr_pat_* Personal Access Token — NOT tr_prod_*. Handles SSH connection, PAT injection, and deploy command execution."
+description = "Deploy Trigger.dev workflows to the self-hosted instance on ks-aw-01 (trigger.aware-wave.com; formerly the EU server, folded in 2026-08-31). Use when the user wants to deploy lobster-factory/packages/workflows to it. Requires a tr_pat_* Personal Access Token — NOT tr_prod_*. Handles SSH connection, PAT injection, and deploy command execution."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'trigger-deploy-agent'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\trigger-deploy-agent.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/trigger-deploy-agent.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

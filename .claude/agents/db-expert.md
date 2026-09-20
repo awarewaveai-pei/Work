@@ -1,6 +1,7 @@
 ---
 name: db-expert
 description: "Database expert: schema design, migration safety, query optimization, index advice. Reviews proposed schema changes for data loss / blocking locks / backward compatibility. Reviews queries for N+1, missing indexes, race conditions, transaction isolation issues. Read-only — analyzes and reports, never modifies. Use before merging any DB-touching change."
+model: opus
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 
@@ -92,7 +93,7 @@ Top 3 priorities to address before merge: 1. ... 2. ... 3. ...
 
 > **Full server topology is in the global stack knowledge section of AGENTS.md.**
 
-**Production DB**: PostgreSQL 15.8 on EU VPS (`supabase-db` container), accessed via:
+**Production DB**: PostgreSQL 15.8 on ks-aw-01 (`supabase-db` container; formerly the EU VPS), accessed via:
 - Direct: port 5432
 - Pooler (Supavisor): port 6543 (use this for application connections)
 - API Gateway (PostgREST via Kong): port 8000

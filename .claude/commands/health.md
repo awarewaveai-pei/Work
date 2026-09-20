@@ -1,3 +1,8 @@
+---
+name: health
+description: Run the system health check and report the score plus every failing item.
+---
+
 Run the system health check and report results.
 
 ```powershell

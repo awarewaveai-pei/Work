@@ -1,3 +1,8 @@
+---
+name: vault-sync
+description: Sync every vault secret into the Windows user environment variables and report alignment against the MCP registry. HIGH-RISK: writes credentials into the machine environment.
+---
+
 Sync all vault secrets to Windows user environment variables and report alignment with `mcp/registry.template.json`.
 
 ## 步驟 1：user-env.ps1 → vault

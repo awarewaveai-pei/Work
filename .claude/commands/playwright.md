@@ -1,3 +1,9 @@
+---
+name: playwright
+description: Headless Playwright automation: post-deploy smoke, full QA flows, per-client site verification, and delivery screenshots. Complementary to /browser-test, which drives real Chrome.
+argument-hint: [smoke|qa|client <slug>|screenshot <url>]
+---
+
 Playwright browser-automation skill — smoke testing, QA flows, client site verification, screenshots, accessibility, and performance checks.
 
 ## Usage

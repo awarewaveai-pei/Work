@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\fullstack-engineer.md
+# source: .claude/agents/fullstack-engineer.md
 name = "fullstack-engineer"
 description = "Senior full-stack engineer operating the P7 methodology: read reality → design solution → impact analysis → implement → three-question self-review → [P7-COMPLETION] delivery. Ships features across frontend, backend, and DevOps. Use for single-feature implementation and cross-module changes."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'fullstack-engineer'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\fullstack-engineer.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/fullstack-engineer.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

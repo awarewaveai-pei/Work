@@ -1,4 +1,6 @@
 ---
+name: wp-bridge-release
+disable-model-invocation: true
 description: Release a new aware-wave-wp-bridge plugin version — sync Work monorepo to the release repo, tag, and verify the GitHub Release + installable zip published.
 ---
 

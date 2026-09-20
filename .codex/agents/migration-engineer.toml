@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\migration-engineer.md
+# source: .claude/agents/migration-engineer.md
 name = "migration-engineer"
 description = "Framework / library / language version upgrades. Handles breaking changes, deprecation removals, major-version bumps. Reads the upstream changelog, audits every usage of changed APIs, executes the upgrade incrementally with verification at each step. Use for Next.js 13→14, Vue 2→3, Tailwind 3→4, React 18→19, TypeScript major versions, etc."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'migration-engineer'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\migration-engineer.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/migration-engineer.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

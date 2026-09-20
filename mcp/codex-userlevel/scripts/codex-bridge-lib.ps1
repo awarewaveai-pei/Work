@@ -5,6 +5,30 @@
 # A .skill package is a zip. Read it in-process: shelling out to `tar` resolves
 # to Git Bash's GNU tar under the Claude hook shell, which parses `D:\...` as
 # host:path and fails (froze the Codex bridge sync from 2026-09-01 to 09-19).
+# Shared by the generator and the parity checker: both have to read `codex-skip:` and
+# `description:` the same way, or one reports a wrapper the other never meant to make.
+function Get-MarkdownFrontmatter {
+  param([string]$Path)
+
+  $content = Get-Content -Raw -Encoding UTF8 -LiteralPath $Path
+  $match = [regex]::Match($content, "(?s)^---\s*(.*?)\s*---")
+  $result = [ordered]@{}
+  if (-not $match.Success) {
+    return $result
+  }
+
+  foreach ($line in ($match.Groups[1].Value -split "`r?`n")) {
+    if ($line -match "^\s*([A-Za-z0-9_-]+):\s*(.*)\s*$") {
+      $key = $matches[1]
+      $value = $matches[2].Trim()
+      $value = $value.Trim('"')
+      $result[$key] = $value
+    }
+  }
+
+  return $result
+}
+
 function Get-SkillArchiveTopFolder {
   param([Parameter(Mandatory)][string]$Path)
   Add-Type -AssemblyName System.IO.Compression.FileSystem

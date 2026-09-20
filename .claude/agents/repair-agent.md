@@ -1,6 +1,7 @@
 ---
 name: repair-agent
 description: Read-only diagnostic agent for system health issues. Use when health checks fail, scripts error, MCP connections drop, or governance cross-references break. Reads logs, config files, and script output — never writes or commits. Reports root cause + fix recipe for the main agent to apply.
+model: inherit
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

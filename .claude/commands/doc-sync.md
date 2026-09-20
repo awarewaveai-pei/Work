@@ -1,3 +1,8 @@
+---
+name: doc-sync
+description: Run the doc-sync automation to realign cross-references and synced sections across the governance documents.
+---
+
 Run the doc-sync automation to align cross-references and synced sections across governance documents.
 
 ```powershell

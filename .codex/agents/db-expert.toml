@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\db-expert.md
+# source: .claude/agents/db-expert.md
 name = "db-expert"
 description = "Database expert: schema design, migration safety, query optimization, index advice. Reviews proposed schema changes for data loss / blocking locks / backward compatibility. Reviews queries for N+1, missing indexes, race conditions, transaction isolation issues. Read-only — analyzes and reports, never modifies. Use before merging any DB-touching change."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'db-expert'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\db-expert.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/db-expert.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''

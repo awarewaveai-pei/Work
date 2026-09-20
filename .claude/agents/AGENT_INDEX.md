@@ -15,12 +15,12 @@
 
 | Agent | Model | 工具 | 描述 |
 |---|---|---|---|
-| [devops-engineer](devops-engineer.md) | sonnet | Read, Grep, Glob, Bash, WebSearch, WebFetch | AwareWave SG/EU VPS 基礎設施工程師：SSH、Docker Compose、nginx、重啟服務、讀 log、infra incident。 |
+| [devops-engineer](devops-engineer.md) | sonnet | Read, Grep, Glob, Bash, WebSearch, WebFetch | ks-aw-01 基礎設施工程師（原 SG/EU 已整併）：SSH、Docker Compose、nginx、重啟服務、讀 log、infra incident。 |
 | [incident-responder](incident-responder.md) | sonnet | Read, Grep, Glob, Bash, WebSearch, WebFetch | 生產告警第一響應者（Sentry/Uptime Kuma/Netdata/Grafana/Hetzner/Cloudflare/Telegram/Slack）：分流→定位根因類別→派對的專家 agent。 |
-| [repair-agent](repair-agent.md) | (inherit) | Read, Grep, Glob, Bash, WebSearch, WebFetch | 唯讀診斷：health check 失敗、腳本報錯、MCP 斷線、治理交叉引用斷裂時讀 log/config，回根因+修法，不寫不 commit。 |
-| [mainwp-engineer](mainwp-engineer.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | EU server 上 MainWP dashboard 管理：增刪 child site、token、修 sync、設定 extension、跨站 bulk 操作。 |
+| [repair-agent](repair-agent.md) | inherit | Read, Grep, Glob, Bash, WebSearch, WebFetch | 唯讀診斷：health check 失敗、腳本報錯、MCP 斷線、治理交叉引用斷裂時讀 log/config，回根因+修法，不寫不 commit。 |
+| [mainwp-engineer](mainwp-engineer.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | ks-aw-01 上 MainWP dashboard 管理（原 EU）：增刪 child site、token、修 sync、設定 extension、跨站 bulk 操作。 |
 | [n8n-engineer](n8n-engineer.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | 自建 n8n（ks-aw-01 145.239.195.47）workflow 工程師：建/除錯/維護自動化、憑證、webhook/trigger。 |
-| [trigger-deploy-agent](trigger-deploy-agent.md) | (inherit) | Read, Grep, Glob, Bash, mcp__hetzner-ssh__ssh_connect, ssh_exec, ssh_disconnect, ssh_list_connections | 部署 Trigger.dev workflow 到 EU（trigger.aware-wave.com）；需 `tr_pat_*`（非 `tr_prod_*`）。 |
+| [trigger-deploy-agent](trigger-deploy-agent.md) | inherit | Read, Grep, Glob, Bash, mcp__hetzner-ssh__ssh_connect, ssh_exec, ssh_disconnect, ssh_list_connections | 部署 Trigger.dev workflow 到 EU（trigger.aware-wave.com）；需 `tr_pat_*`（非 `tr_prod_*`）。 |
 
 ## 資料庫 / Supabase
 
@@ -52,14 +52,14 @@
 | Agent | Model | 工具 | 描述 |
 |---|---|---|---|
 | [planner](planner.md) | opus | Read, Grep, Glob, Bash, WebSearch, WebFetch | P9 方法論 tech lead：把模糊需求拆成可並行 Task Prompt（六要素契約）。動 3+ 檔或 2+ 模組前用。只出 prompt 不寫 code。 |
-| [decision-intelligence](decision-intelligence.md) | (inherit) | Read, Bash, Glob, Grep, WebSearch, WebFetch, mcp__perplexity__perplexity_search | 多 agent 決策智囊團：19 階段、8–13 個專家辯論，出排序建議+取捨矩陣+pre-mortem+rollout+風險登記+ADR skeleton。 |
+| [decision-intelligence](decision-intelligence.md) | inherit | Read, Bash, Glob, Grep, WebSearch, WebFetch | 多 agent 決策智囊團：19 階段、8–13 個專家辯論，出排序建議+取捨矩陣+pre-mortem+rollout+風險登記+ADR skeleton。 |
 
 ## 客戶 / 佈建
 
 | Agent | Model | 工具 | 描述 |
 |---|---|---|---|
-| [client-onboarding](client-onboarding.md) | (inherit) | Read, Grep, Glob, Bash, WebSearch, WebFetch | 新客戶上線到 Ops Dashboard：建 Supabase organizations、設 client_config、必要時存 SSH key 到 SG，驗證 /ops/clients。 |
-| [site-builder](site-builder.md) | (inherit) | Read, Grep, Glob, Bash, WebSearch, WebFetch, mcp__github__create_repository, create_branch, push_files | Lobster Factory 租戶佈建：建 GitHub repo/Sentry/PostHog/Supabase schema/n8n workflow。需明示授權，失敗 rollback。 |
+| [client-onboarding](client-onboarding.md) | inherit | Read, Grep, Glob, Bash, WebSearch, WebFetch | 新客戶上線到 Ops Dashboard：建 Supabase organizations、設 client_config、必要時存 SSH key 到 SG，驗證 /ops/clients。 |
+| [site-builder](site-builder.md) | inherit | Read, Grep, Glob, Bash, WebSearch, WebFetch, mcp__github__create_repository, create_branch, push_files | Lobster Factory 租戶佈建：建 GitHub repo/Sentry/PostHog/Supabase schema/n8n workflow。需明示授權，失敗 rollback。 |
 | [wordpress-maintenance-agent](wordpress-maintenance-agent.md) | sonnet | Read, Grep, Glob, Bash, WebSearch, WebFetch | WP 客戶維護（MainWP/WPvivid/SSH/WP-CLI/Ops Dashboard）：備份狀態、sync 檢視、plugin 更新規劃、backup-gated 安全更新。 |
 | [wordpress-plugin-expert](wordpress-plugin-expert.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | WP plugin 專家：Kadence、WooCommerce、Fluent 全家桶。診斷衝突、設定、寫 snippet、WP-CLI/SSH 修。 |
 

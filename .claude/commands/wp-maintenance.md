@@ -1,3 +1,9 @@
+---
+name: wp-maintenance
+description: WordPress client maintenance: backup status, MainWP sync review, update planning, and backup-gated safe updates.
+argument-hint: [status|backup-status <client>|update-plan|maintain]
+---
+
 Run WordPress maintenance status, backup checks, update planning, or a backup-gated safe update workflow.
 
 ## Usage

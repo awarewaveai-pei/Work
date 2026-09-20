@@ -16,7 +16,15 @@ function Write-Utf8NoBom {
     [string]$Value
   )
 
-  [System.IO.File]::WriteAllText($Path, $Value, $script:Utf8NoBom)
+  # Normalize to LF before writing. Root cause of a 40-file phantom-dirty `git status`
+  # (found 2026-09-20): `.gitattributes` stores `*.ps1` as CRLF, so every here-string in
+  # THIS script carries CRLF, and the generated `.md`/`.toml` inherited it -- while
+  # `.gitattributes` wants those as LF. Git then reported 40+ files modified with an
+  # empty `git diff`, which is both noise and a real hazard for AO-CLOSE partial staging.
+  # Normalizing at the single write point fixes the whole class instead of the files we
+  # happened to notice; `git add --renormalize` only cleans up until the next sync run.
+  $normalized = $Value -replace "`r`n", "`n"
+  [System.IO.File]::WriteAllText($Path, $normalized, $script:Utf8NoBom)
 }
 
 function Resolve-ExistingPath {
@@ -90,28 +98,6 @@ function Escape-TableCell {
   return ($Value -replace "`r?`n", " " -replace "\|", "\|" -replace "\s+", " ").Trim()
 }
 
-function Get-MarkdownFrontmatter {
-  param([string]$Path)
-
-  $content = Get-Content -Raw -Encoding UTF8 -LiteralPath $Path
-  $match = [regex]::Match($content, "(?s)^---\s*(.*?)\s*---")
-  $result = [ordered]@{}
-  if (-not $match.Success) {
-    return $result
-  }
-
-  foreach ($line in ($match.Groups[1].Value -split "`r?`n")) {
-    if ($line -match "^\s*([A-Za-z0-9_-]+):\s*(.*)\s*$") {
-      $key = $matches[1]
-      $value = $matches[2].Trim()
-      $value = $value.Trim('"')
-      $result[$key] = $value
-    }
-  }
-
-  return $result
-}
-
 function ConvertTo-TomlBasicString {
   param([AllowNull()][string]$Value)
 
@@ -131,14 +117,17 @@ function Write-NativeAgentBridge {
   $frontmatter = Get-MarkdownFrontmatter $SourcePath
   $name = if ($frontmatter.name) { [string]$frontmatter.name } else { [IO.Path]::GetFileNameWithoutExtension($SourcePath) }
   $description = if ($frontmatter.description) { [string]$frontmatter.description } else { "Use the shared Claude agent '$name' through its direct source prompt." }
-  $relativeSource = $SourcePath.Substring($WorkRoot.Length).TrimStart('\')
-  $charterPath = Join-Path $WorkRoot 'mcp\claude-userlevel\SUBAGENT_CHARTER.md'
+  # Repo-relative, not absolute: these bridges are COMMITTED, so a baked-in `D:\Work\...`
+  # sends any other checkout -- notably a Linux Codex container -- at a path that does not
+  # exist. The `# source:` comment already used the relative form; the instructions did not.
+  $relativeSource = Get-RepoRelativePath -Path $SourcePath -WorkRoot $WorkRoot
+  $charterPath = 'mcp/claude-userlevel/SUBAGENT_CHARTER.md'
   $instructions = @"
 This is a generated Codex bridge for Claude agent '$name'. Before any task work,
-read the complete source prompt at '$SourcePath' and the shared engineering charter
-at '$charterPath'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '$relativeSource' and the shared engineering charter
+at '$charterPath' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 "@.Trim()
 
   $content = @(
@@ -212,27 +201,52 @@ function Get-AgentBridgeBackupFolder {
   return 'native-agent-bridges'
 }
 
+# Emit a path the wrapper can still resolve on another machine. The wrappers are
+# COMMITTED, so an absolute `D:\Work\...` inside one breaks the moment it is read from a
+# different checkout or a Linux container -- which is exactly where Codex runs. Repo-
+# relative is the form every other reference in this repo already uses.
+function Get-RepoRelativePath {
+  param(
+    [string]$Path,
+    [string]$WorkRoot
+  )
+
+  $full = [IO.Path]::GetFullPath($Path)
+  $root = [IO.Path]::GetFullPath($WorkRoot).TrimEnd('\', '/')
+  if ($full.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    return $full.Substring($root.Length + 1).Replace('\', '/')
+  }
+  # Outside the repo (e.g. a user-level Claude home on a machine without the junction):
+  # an absolute path is the only thing that resolves, so say so rather than emit a
+  # relative path that silently points at nothing.
+  return $full
+}
+
 function Write-ClaudeCommandSkillWrapper {
   param(
     [string]$SkillPath,
     [string]$Name,
     [string]$CommandPath,
-    [string]$CommandName
+    [string]$CommandName,
+    [string]$Description
   )
 
   Ensure-Directory $SkillPath
+  if ([string]::IsNullOrWhiteSpace($Description)) {
+    $Description = "Execute the shared Claude command /$CommandName using its direct source."
+  }
   $content = @"
 ---
 name: $Name
 description: >-
-  Execute the shared Claude command /$CommandName using its direct source.
+  $Description
 ---
 
 # $Name
 
-This is a generated Codex wrapper. Read ``$CommandPath`` in full, then execute
-the command with current Codex tools, permissions, and project instructions.
-The Claude command file remains the only human-maintained source.
+This is a generated Codex wrapper for the shared Claude command ``/$CommandName``. Read
+``$CommandPath`` in full, then execute it with current Codex tools, permissions, and
+project instructions. The Claude command file remains the only human-maintained source.
 "@
   Write-Utf8NoBom -Path (Join-Path $SkillPath 'SKILL.md') -Value $content
 }
@@ -660,9 +674,9 @@ function Write-WrapperSkill {
 
   Ensure-Directory $SkillPath
   $sourceInstruction = if ($IsArchive) {
-    "The source is a Claude ``.skill`` archive (zip) at ``$SourcePath``. When this wrapper triggers, list it with ``& `"`$env:SystemRoot\System32\tar.exe`" -tf <archive>`` and read files with ``-xOf <archive> <path>``, starting with the packaged ``SKILL.md``; then follow the source workflow. Use the System32 tar explicitly: a bare ``tar`` may resolve to Git Bash's GNU tar, which cannot open ``D:\`` paths."
+    "The source is a Claude ``.skill`` archive (zip) at ``$SourcePath`` (relative to the repo root). When this wrapper triggers, list it with ``& `"`$env:SystemRoot\System32\tar.exe`" -tf <archive>`` and read files with ``-xOf <archive> <path>``, starting with the packaged ``SKILL.md``; then follow the source workflow. On Windows use the System32 tar explicitly: a bare ``tar`` may resolve to Git Bash's GNU tar, which cannot open ``D:\`` paths."
   } else {
-    "The source skill lives at ``$SourcePath``. When this wrapper triggers, read that ``SKILL.md`` and follow the source workflow directly."
+    "The source skill lives at ``$SourcePath`` (relative to the repo root). When this wrapper triggers, read that ``SKILL.md`` and follow the source workflow directly."
   }
 
   $content = @"
@@ -779,7 +793,8 @@ Get-ChildItem -Directory -LiteralPath $claudeSkills |
     Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot (Get-SkillBridgeBackupFolder -Destination $destination)) -CodexRoot $WorkRoot
     $sourceSkillMd = Join-Path $_.FullName "SKILL.md"
     $description = Get-CodexSkillDescription -Name $_.Name -SourceSkillMd $sourceSkillMd
-    Write-WrapperSkill -SkillPath $destination -Name $_.Name -Description $description -SourcePath $sourceSkillMd
+    Write-WrapperSkill -SkillPath $destination -Name $_.Name -Description $description `
+      -SourcePath (Get-RepoRelativePath -Path $sourceSkillMd -WorkRoot $WorkRoot)
     $installedSkills.Add($_.Name)
   }
 
@@ -790,24 +805,48 @@ Get-ChildItem -File -LiteralPath $claudeSkills -Filter "*.skill" |
     $destination = Join-Path $repoSkillRoot $topLevel
     Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot (Get-SkillBridgeBackupFolder -Destination $destination)) -CodexRoot $WorkRoot
     $description = Get-CodexSkillDescription -Name $topLevel -SourceSkillMd ""
-    Write-WrapperSkill -SkillPath $destination -Name $topLevel -Description $description -SourcePath $_.FullName -IsArchive
+    Write-WrapperSkill -SkillPath $destination -Name $topLevel -Description $description `
+      -SourcePath (Get-RepoRelativePath -Path $_.FullName -WorkRoot $WorkRoot) -IsArchive
     $installedSkills.Add($topLevel)
   }
 
-$commandSkillMap = @{
-  "source-command-caveman" = "caveman.md"
-  "source-command-wp-bridge-release" = "wp-bridge-release.md"
-  "source-command-zoom-out" = "zoom-out.md"
+# Every shared slash command gets a Codex wrapper.
+#
+# This used to be a hardcoded three-entry table (caveman, wp-bridge-release, zoom-out), so
+# 42 of 45 commands were Claude-only -- including `/claude-review`, which AGENTS.md section 4
+# names as the required oracle for anything CODEX writes. The reversed-oracle rule could
+# therefore only be honoured if the operator remembered it by hand. Enumerating the
+# directory means a new command is shared the moment it is committed, with nothing to
+# remember and nothing to keep in sync.
+#
+# Opt out with `codex-skip: true` in a command's frontmatter (for Claude-UI-only macros).
+$commandsDir = Join-Path $ClaudeHome "commands"
+if (-not (Test-Path -LiteralPath $commandsDir)) {
+  throw "Claude commands directory is missing: $commandsDir"
 }
-foreach ($entry in $commandSkillMap.GetEnumerator() | Sort-Object Key) {
-  $commandPath = Join-Path $ClaudeHome (Join-Path "commands" $entry.Value)
-  if (-not (Test-Path -LiteralPath $commandPath)) {
-    throw "Expected Claude command source is missing: $commandPath"
+$commandFiles = @(Get-ChildItem -File -LiteralPath $commandsDir -Filter "*.md" | Sort-Object Name)
+if ($commandFiles.Count -eq 0) {
+  throw "No Claude commands found under $commandsDir -- refusing to wipe the generated command wrappers."
+}
+foreach ($commandFile in $commandFiles) {
+  $commandName = [IO.Path]::GetFileNameWithoutExtension($commandFile.Name)
+  $fm = Get-MarkdownFrontmatter $commandFile.FullName
+  # .Contains, not dot-access: the same expression throws under StrictMode Latest, which
+  # check-claude-codex-parity.ps1 does set. Keep both readers identical.
+  if ($fm.Contains('codex-skip') -and $fm['codex-skip'] -eq 'true') {
+    Write-Host "  skip (codex-skip): /$commandName"
+    continue
   }
-  $destination = Join-Path $repoSkillRoot $entry.Key
+  $skillName = "source-command-$commandName"
+  $destination = Join-Path $repoSkillRoot $skillName
+  $description = if ($fm.Contains('description') -and $fm['description']) {
+    ($fm['description'] -replace "[<>]", "" -replace "\s+", " ").Trim()
+  } else { "" }
   Backup-And-ReplaceDirectory -Path $destination -BackupRoot (Join-Path $backupRoot (Get-SkillBridgeBackupFolder -Destination $destination)) -CodexRoot $WorkRoot
-  Write-ClaudeCommandSkillWrapper -SkillPath $destination -Name $entry.Key -CommandPath $commandPath -CommandName ([IO.Path]::GetFileNameWithoutExtension($entry.Value))
-  $installedSkills.Add($entry.Key)
+  Write-ClaudeCommandSkillWrapper -SkillPath $destination -Name $skillName `
+    -CommandPath (Get-RepoRelativePath -Path $commandFile.FullName -WorkRoot $WorkRoot) `
+    -CommandName $commandName -Description $description
+  $installedSkills.Add($skillName)
 }
 
 # The repo skill root is the only Codex-discovered bridge location for shared

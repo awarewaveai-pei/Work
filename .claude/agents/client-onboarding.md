@@ -1,6 +1,7 @@
 ---
 name: client-onboarding
-description: Onboard a new client into the Ops Dashboard. Creates the Supabase organizations record, sets client_config (platform/SSH/MainWP/waves), stores SSH key on SG server if needed, and verifies the client appears correctly at /ops/clients. Use when adding any new WordPress or SaaS client to the system.
+description: Onboard a new client into the Ops Dashboard. Creates the Supabase organizations record, sets client_config (platform/SSH/MainWP/waves), stores SSH key on ks-aw-01 if needed, and verifies the client appears correctly at /ops/clients. Use when adding any new WordPress or SaaS client to the system.
+model: inherit
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 
@@ -108,7 +109,7 @@ Use when the agency controls the server credentials.
 )
 ```
 
-### Store SSH key on SG server
+### Store SSH key on ks-aw-01
 
 ```powershell
 # Run on LOCAL machine
@@ -158,7 +159,7 @@ Use when the client controls their own server (agency cannot SSH in).
 
 ### Requirements
 
-1. `lobster-wordpress` container on SG server must have **MainWP Dashboard** plugin installed.
+1. `lobster-wordpress` container on ks-aw-01 must have **MainWP Dashboard** plugin installed.
 2. Client's WP site must have **MainWP Child** plugin installed.
 
 ### Steps

@@ -1,11 +1,11 @@
 # GENERATED: Claude-first native agent bridge. Do not edit by hand.
-# source: .claude\agents\refactor-specialist.md
+# source: .claude/agents/refactor-specialist.md
 name = "refactor-specialist"
 description = "Large-scale safe refactoring: rename across many files, extract module, move files, restructure folders. Differs from fullstack-engineer by being more cautious, scoped, and verification-heavy. Use for refactors that touch 10+ files where regression risk is real."
 developer_instructions = '''
 This is a generated Codex bridge for Claude agent 'refactor-specialist'. Before any task work,
-read the complete source prompt at 'D:\Work\.claude\agents\refactor-specialist.md' and the shared engineering charter
-at 'D:\Work\mcp\claude-userlevel\SUBAGENT_CHARTER.md'. Follow both as developer instructions, then perform the assigned
-task using Codex tools and the current parent sandbox/approval policy. Do not maintain
-or infer a second copy of either source.
+read the complete source prompt at '.claude/agents/refactor-specialist.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
 '''
