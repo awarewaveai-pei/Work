@@ -1,9 +1,24 @@
 """Regression test for the authenticate() timing side-channel a critic pass found 2026-09-12
 (nonexistent-email path returned near-instantly while wrong-password-for-a-real-identity took a
 full PBKDF2 hash, ~182ms gap -- trivially distinguishable over a network, enabling email/tenant
-enumeration). This test MEASURES wall-clock time (matching the critic's own verification method),
-not just the return value shape -- a test asserting only ``is None`` for both paths would have
-passed both before and after the fix and caught nothing.
+enumeration). This test MEASURES wall-clock time (matching the critic's own verification method
+and the attacker's own instrument), not just the return value shape -- a test asserting only
+``is None`` for both paths would have passed both before and after the fix and caught nothing.
+
+Sampling method matters as much as the thresholds (2026-09-20). The first version timed all
+samples of one path and then all samples of the other; on a laptop with heterogeneous cores that
+puts every bit of frequency/scheduling drift between the two batches straight into the result,
+and it failed at 3.9x while the code was provably correct (counting PBKDF2 calls, not timing
+them, showed all three paths doing exactly one hash at the same iteration count). So:
+
+* the two paths are sampled **interleaved and order-balanced** (A,B then B,A), so drift and any
+  second-call cache advantage hit both paths equally instead of one of them;
+* the statistic is the **median**, which a single GC pause or preemption cannot move;
+* one warm-up call per path is discarded (first call also pays sqlite open + page cache).
+
+The thresholds below are deliberately unchanged from the version that caught the original bug --
+widening them to make a red test go green would silence the detector, which is the failure mode
+this file exists to prevent.
 
 PBKDF2_ITERATIONS is real (600,000) so each call is genuinely slow (~150-250ms depending on
 hardware) -- keep sample counts modest to keep this test's own runtime reasonable while still
@@ -21,9 +36,9 @@ from pathlib import Path
 
 from ai_lego.platform.identity.store import IdentityStore
 
-SAMPLES = 8
+PAIRS = 12
 # Generous tolerance -- this is a regression guard against a ~730x/182ms gap, not a precise
-# cryptographic timing-attack benchmark. Anything under 3x mean ratio or under 60ms absolute
+# cryptographic timing-attack benchmark. Anything under 3x median ratio or under 60ms absolute
 # difference is nowhere near the magnitude the original vulnerability had.
 MAX_ACCEPTABLE_RATIO = 3.0
 MAX_ACCEPTABLE_ABSOLUTE_DELTA_SECONDS = 0.06
@@ -46,35 +61,52 @@ class AuthenticateTimingTests(unittest.TestCase):
     def tearDown(self):
         self._tmpdir.cleanup()
 
-    def _time_calls(self, email: str, password: str) -> list[float]:
-        durations = []
-        for _ in range(SAMPLES):
-            start = time.perf_counter()
-            result = self.store.authenticate(self.tenant_id, email, password)
-            durations.append(time.perf_counter() - start)
-            self.assertIsNone(result)  # every call in this test is a deliberate failure case
-        return durations
+    def _time_one(self, email: str, password: str) -> float:
+        start = time.perf_counter()
+        result = self.store.authenticate(self.tenant_id, email, password)
+        elapsed = time.perf_counter() - start
+        self.assertIsNone(result)  # every call in this test is a deliberate failure case
+        return elapsed
 
-    def test_nonexistent_email_and_wrong_password_take_comparable_time(self):
-        nonexistent_email_durations = self._time_calls("nobody@example.com", "irrelevant-password-1")
-        wrong_password_durations = self._time_calls("real@example.com", "wrong-password-here-2")
+    def _interleaved(self, left: tuple[str, str], right: tuple[str, str]) -> tuple[list[float], list[float]]:
+        """Alternating samples of the two failure paths, swapping which goes first each pair."""
+        self._time_one(*left)
+        self._time_one(*right)
+        left_durations: list[float] = []
+        right_durations: list[float] = []
+        for index in range(PAIRS):
+            if index % 2 == 0:
+                left_durations.append(self._time_one(*left))
+                right_durations.append(self._time_one(*right))
+            else:
+                right_durations.append(self._time_one(*right))
+                left_durations.append(self._time_one(*left))
+        return left_durations, right_durations
 
-        mean_nonexistent = statistics.mean(nonexistent_email_durations)
-        mean_wrong_password = statistics.mean(wrong_password_durations)
-        ratio = max(mean_nonexistent, mean_wrong_password) / min(mean_nonexistent, mean_wrong_password)
-        absolute_delta = abs(mean_nonexistent - mean_wrong_password)
-
+    def _assert_comparable(self, label: str, first: list[float], second: list[float], check_absolute: bool) -> None:
+        median_first = statistics.median(first)
+        median_second = statistics.median(second)
+        ratio = max(median_first, median_second) / min(median_first, median_second)
+        detail = f"{label} median={median_first:.4f}s vs wrong-password median={median_second:.4f}s"
         self.assertLess(
             ratio,
             MAX_ACCEPTABLE_RATIO,
-            f"nonexistent-email mean={mean_nonexistent:.4f}s vs wrong-password mean={mean_wrong_password:.4f}s "
-            f"-- ratio {ratio:.1f}x exceeds {MAX_ACCEPTABLE_RATIO}x, timing side-channel may have regressed",
+            f"{detail} -- ratio {ratio:.1f}x exceeds {MAX_ACCEPTABLE_RATIO}x, timing side-channel may have regressed",
         )
-        self.assertLess(
-            absolute_delta,
-            MAX_ACCEPTABLE_ABSOLUTE_DELTA_SECONDS,
-            f"absolute delta {absolute_delta:.4f}s exceeds {MAX_ACCEPTABLE_ABSOLUTE_DELTA_SECONDS}s tolerance",
+        if check_absolute:
+            absolute_delta = abs(median_first - median_second)
+            self.assertLess(
+                absolute_delta,
+                MAX_ACCEPTABLE_ABSOLUTE_DELTA_SECONDS,
+                f"{detail} -- absolute delta {absolute_delta:.4f}s exceeds {MAX_ACCEPTABLE_ABSOLUTE_DELTA_SECONDS}s tolerance",
+            )
+
+    def test_nonexistent_email_and_wrong_password_take_comparable_time(self):
+        nonexistent, wrong_password = self._interleaved(
+            ("nobody@example.com", "irrelevant-password-1"),
+            ("real@example.com", "wrong-password-here-2"),
         )
+        self._assert_comparable("nonexistent-email", nonexistent, wrong_password, check_absolute=True)
 
     def test_suspended_identity_and_wrong_password_take_comparable_time(self):
         with self.store._connect() as conn:  # noqa: SLF001
@@ -85,18 +117,11 @@ class AuthenticateTimingTests(unittest.TestCase):
                 (second_id, row["identity_id"]),
             )
 
-        suspended_durations = self._time_calls("suspended@example.com", "irrelevant-password-3")
-        wrong_password_durations = self._time_calls("real@example.com", "wrong-password-here-4")
-
-        mean_suspended = statistics.mean(suspended_durations)
-        mean_wrong_password = statistics.mean(wrong_password_durations)
-        ratio = max(mean_suspended, mean_wrong_password) / min(mean_suspended, mean_wrong_password)
-
-        self.assertLess(
-            ratio,
-            MAX_ACCEPTABLE_RATIO,
-            f"suspended-identity mean={mean_suspended:.4f}s vs wrong-password mean={mean_wrong_password:.4f}s -- ratio {ratio:.1f}x too high",
+        suspended, wrong_password = self._interleaved(
+            ("suspended@example.com", "irrelevant-password-3"),
+            ("real@example.com", "wrong-password-here-4"),
         )
+        self._assert_comparable("suspended-identity", suspended, wrong_password, check_absolute=False)
 
 
 if __name__ == "__main__":

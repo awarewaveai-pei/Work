@@ -1,4 +1,17 @@
 # Worklog
+## 2026-09-20（續87）auth timing 測試改成交錯取樣：修的是量測方法，不是門檻
+
+- [操作者請求] 「所有的事處理好!」。承續86 開出的治本項。
+- [根因] `tests/unit/test_authenticate_timing.py` 量的是對的東西（wall clock，攻擊者用的就是這把尺），但取樣方式錯：先連跑 8 次 A 再連跑 8 次 B，兩批之間的 CPU 降頻／排程漂移**整份**落在「兩條路徑的差」上。在異質核心筆電上穩定誤判（實測 3.9x > 3.0x），而 `store.py:authenticate` 三條失敗路徑其實各做剛好 1 次 PBKDF2、迭代數相同（用計數驗過，非計時）。
+- [已修改] `tests/unit/test_authenticate_timing.py`：A/B **交錯取樣並左右輪流先後**（漂移與「第二次呼叫比較熱」的偏差平均分給兩邊）、統計量改**中位數**（單次 GC 或被搶佔動不了它）、每條路徑丟掉 1 次暖身（首呼叫多付 sqlite open + page cache）、樣本 8 → 12 對。**三個門檻一字未動**（3.0x ratio、0.06s 絕對差）——把紅的測試調成綠的就是消音偵測器，這支檔案存在的目的正是防這件事。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_authenticate_timing.py -q` | exit=0 | ms=10480 | result=2 passed（同一台先前穩定失敗的筆電）
+  - REALTEST_EVIDENCE: tool=Bash | cmd=突變測試：把 `store.py` 查無帳號／停用分支的 `_hash_password(...)` 拿掉（＝還原 2026-09-12 原漏洞）後重跑 | exit=1 | result=**2 failed，ratio 375.1x / 371.2x**（median 0.0005s vs 0.1920s）；`git checkout --` 還原後再跑 2 passed。偵測器仍抓得到真的不等長。
+  - REVIEW_WAIVED: NA -- critic 帳號 session rate limit 未解、codex 額度到 19:44；改以突變測試（紅→綠雙向）作為機械證據
+  - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`SAMPLES\|_time_calls\|MAX_ACCEPTABLE_RATIO` | hits=0（舊的 `SAMPLES`／`_time_calls` 只此檔使用，無其他 call site；門檻常數同檔）
+- [剩餘風險] 交錯取樣消除漂移，但若整機在測試全程持續重載，兩邊會一起變慢（比值仍正確，這是設計上想要的）。真正無法量測的極端情況（單核 100% 被別的程序佔滿）會讓 12 對取樣的中位數也失真，屆時是機器問題不是程式問題。
+- [rollback] `git revert` 本 commit 即回到批次取樣版本（門檻從未變動，回退不會放寬任何安全條件）。
+
 ## 2026-09-20（續86）方法頁上的「為什麼有效」與「填表範例」：把我自己寫壞的工程語改成白話，範例改成會直接填進表單的真實資料
 
 - [操作者請求] 承續83。修完表單後我自己回讀頁面，發現上方兩段說明是本 session 稍早（280+ 方法內容深化那批）寫壞的：「為什麼有效」181／285 夾著欄位名與錯誤碼（5W1H 那段直接出現 `FIVEWONEH_UNKNOWN_HAS_ANSWER`、`GENUINE_COMPUTE`），「填表範例」280／285 用舊英文 key 與 JSON 片段寫成——那是在描述舊的裸 JSON 表單，跟新表單對不起來。操作者：「繼續修」。
