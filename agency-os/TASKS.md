@@ -252,7 +252,7 @@
 - [ ] **【2026-09-28 觸發】aware-wave.com DMARC 升級第一階段（p=none → p=quarantine;pct=25）** — 決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md)：機械分階段（pct=25→100→reject，各 14 天），前提是操作者查看 `peijingartstudio@gmail.com` 收到的 DMARC rua 聚合報表，確認 Cloudflare Email Routing／Amazon SES／Resend 三個已知寄件來源皆對齊、零未解釋失敗。任一階段出現未解釋失敗 → 凍結，不得跳過原因逕自往下推進。
 
 - [x] **【2026-09-19 開出、2026-09-20 整類解決｜Cognitive OS dashboard】結構化欄位只修了 5W1H 一個，其餘方法仍是裸 JSON textarea** — 表單改由每個方法自己的 typed-object record schema 產生（新 `ai_lego/apps/api/method_form.py`），不再反射 Python 簽名，特例 registry 已刪除。284 個方法逐一驗證「表單 → 真實 builder → 所有 gate」通過；1386 個欄位標籤 + 608 個選項標籤全中文（`methods/registry/method-input-forms.yaml`）；從 dashboard.html 抽出的真 JS 序列化器與測試鏡像 282/282 相同。詳見 WORKLOG 2026-09-20（續83）。
-- [ ] **【2026-09-19 開出｜Cognitive OS 部署】cognitive.aware-wave.com prod 落後 repo（至少 f358f1a83／1acc4ab9e 兩個 commit）** — 285/285 方法內容深化今天完成，但 prod 上即時 fetch `/methods/framing.five_w_one_h/form` 證實 `why_zh`/`example_zh`/`url` 缺失（deploy 未跟上這兩個 commit）。需在 ks-aw-01 上 `git pull` + 重跑 `Projects/internal/cognitive-engineering-os/deploy/deploy.sh`（prod deploy，High-risk，需操作者 go-ahead，本 session 未執行）。詳見 WORKLOG 2026-09-19。（2026-09-20 追加：表單整類修復 續83 也要靠同一次部署才會生效）
+- [x] **【2026-09-19 開出、2026-09-20 部署完成｜Cognitive OS 部署】cognitive.aware-wave.com prod 落後 repo** — 操作者 go-ahead 後在 ks-aw-01 fast-forward 到 `dd204ff65` 並跑 `deploy/deploy.sh`：test-gate PASS、healthcheck 6 秒健康、本機與對外 smoke 皆 PASS。線上實測 `/methods/framing.five_w_one_h/form` 已回 `schema_source=record_schema` 與中文欄位，`why_zh`/`example_zh` 也一併上線。保留 `cognitive-os-api:rollback` 映像可一鍵回退。詳見 WORKLOG 2026-09-20（續83）。
 
 #### B. 🔒 卡在你（你動手才會動，我做不了）
 

@@ -31,6 +31,12 @@
   - 方法頁上方的「為什麼有效」與「填表範例」兩段文字仍是本 session 稍早自己寫壞的工程語（181／285 含欄位名或錯誤碼；280／285 的範例用舊英文 key），下一批修，不在本 commit。
   - prod（cognitive.aware-wave.com）仍落後：本次改動要生效需在 ks-aw-01 重新部署，屬 High-risk，未執行，等操作者 go-ahead。
 - [rollback] `git revert` 本 commit 即可；`method_form.py`／`method-input-forms.yaml`／`test_method_form.py` 為新增檔，revert 後 `/methods/{id}/form` 回到反射簽名的舊行為，無資料遷移、無 schema 變更。
+- [部署到正式環境｜操作者明示 go-ahead「要」] `/opt/cognitive-os` fast-forward 到 `dd204ff65` 後跑 `deploy/deploy.sh`（六道關卡：typecheck → test-gate → 先打 `:rollback` 標籤 → build → healthcheck → 本機+對外 smoke）。
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh`（detached，log `/tmp/cos-deploy-20260920.log`）| exit=0 | result=test-gate PASS → healthcheck healthy after 6s → local smoke PASS → public smoke PASS → done（04:00:00Z 起、04:03:47Z 結束）
+  - REALTEST_EVIDENCE: tool=curl | cmd=`GET https://cognitive.aware-wave.com/methods/framing.five_w_one_h/form` | exit=0 | result=部署前 `schema_source=builder_signature_only` + 7 個原始參數、`display` 缺 `why_zh`/`example_zh`；部署後 `schema_source=record_schema`、欄位＝要釐清的主題／六何（5W1H）／延伸的問題陳述紀錄，六列 label 為「Who（何人）：主角、參與者或對象是誰」等，狀態選項＝已知／未知（資訊缺口），`why_zh`/`example_zh` 同時補上（這兩個欄位自 2026-09-18 起就寫好了，一直沒部署）
+  - REALTEST_EVIDENCE: tool=curl | cmd=`GET https://cognitive.aware-wave.com/`（dashboard HTML，81740 bytes）| exit=0 | result=含 `renderFieldList`／`collectPayload`／`fx-row-card`；`renderFiveW1HDimensions`／`STRUCTURED_ARRAY_FIELDS`／`fivew1h-grid` 三個舊特例字串皆已消失
+  - [rollback] 主機上保留 `cognitive-os-api:rollback`（43 小時前的映像）：`docker tag cognitive-os-api:rollback cognitive-os-api:latest && docker compose -f Projects/internal/cognitive-engineering-os/docker-compose.yml up -d`；deploy.sh 自己在 healthcheck 失敗時也會自動做這件事。
+  - [容器狀態] `cognitive-os-api | Up (healthy)`，新映像；資料無遷移。
 
 ## 2026-09-19（續81）HCI 採用為證據：DISCOVERED 來源 → 案件 EVIDENCE 的人工晉升路徑
 
