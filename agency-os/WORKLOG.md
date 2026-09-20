@@ -20805,3 +20805,17 @@ WORKLOG_DONE: Perplexity Search-only CI 守門 + 定期任務排查
 
 [rollback] `git revert` 本 commit；`~/.codex` 全部變動皆先備份於 `~/.codex/backups/claude-migration-<timestamp>/`(含 24 份舊 agent 副本)；`~/.claude/hooks` 由 `scripts/sync-claude-userlevel.ps1 -Mode merge` 從 repo 重建。
 WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈修復
+
+## 2026-09-20(續83)Perplexity console 帳號層盤點與加固(操作者：「你去處理這些」，經其 Chrome 已登入 session)
+
+現場查核(console.perplexity.ai，專案 `Soulful Expression` / 95e2cf43-fd96-4f92-8fbb-93f3f42bb65b)：
+- **專案只有一個**(切換器僅列 Soulful Expression)，**API 金鑰只有一把**：`pplx-Ztp***tSbW`(9/12 21:39 建立，最後使用「從不」)。**燒掉 $9.86 的 fWoh 已不存在於帳號**——「撤銷所有舊 key」「只留一把 key」實際上已達成，非本次動作。
+- **自動儲值：已停用**(帳單頁字面「自動儲值 已停用」)；付款方式 MasterCard 8602 仍存。餘額 US$0。用量(過去 30 天)US$10.06。
+- **消費上限：console 無此功能**(首頁／帳單／設定三頁皆無)。**用量提醒：亦無**。第三方文章宣稱的 API Groups 上限與 50/75/90% 提醒，在此帳號 UI 不存在。→ 實質上限 = 餘額本身 + 自動儲值關閉。
+- **key 無法限定只用某個 API**：console 首頁明寫 "one key for all APIs"(Router/Agent/Search/Embeddings 共用同一把)。Search-only 只能由我方程式閘達成(續78/續80 已完成)。
+- **本次實際變更(唯一一項)**：設定頁 `停用 API 金鑰建立` 切為開啟(toast「已更新 API 金鑰建立設定」)。效果：任何人/任何 session 都無法再為此專案新建金鑰，既有金鑰不受影響。**可逆**：同一開關關掉即可。
+
+- REALTEST_EVIDENCE: tool=Chrome(claude-in-chrome) | cmd=navigate console keys/billing/settings + read_page/get_page_text | exit=0 | result=1 專案 / 1 金鑰(Ztpe) / 自動儲值已停用 / 無上限與提醒功能 / 金鑰建立已停用
+- REVIEW_WAIVED: NA -- 外部 SaaS 設定變更，無程式碼
+- BUGHUNT_WAIVED: NA -- 無程式碼變更
+[剩餘風險] ① 卡片 8602 仍在帳號(自動儲值關閉下不會被自動扣款；要完全斷金流需操作者自行移除)② 9/12 的 Agent API 呼叫端仍未定位，該 key 已刪除故無法再追；若未來重新儲值後又出現非 Search 用量，立即撤銷當時的 key 並回查此條目 ③ console 無硬上限 → 儲值請小額
