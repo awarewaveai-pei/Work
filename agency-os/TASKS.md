@@ -1087,6 +1087,13 @@
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
 
+- [ ] **【2026-09-20 開出｜部署】`/root/lobster-phase1/docker-compose.yml` 與 repo 版本已知 drift，需決定治本方式**
+  - **【未開始】**
+  - **背景**：修 `/ops/collect` Perplexity→Serper 時發現，`sg-deploy.sh` 只 rsync `apps/<APP>` 原始碼，`docker-compose.yml` 本身是 machine-local、不被同步（腳本自己的檔頭註解即這樣寫）。改 repo 內 `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 的環境變數對 prod **完全無效**，除非額外手動 SSH 同步。當場清查兩份檔案的變數集合差異（非本次改動造成，屬既存）：**只在 prod 有**：`GOOGLE_OAUTH_CLIENT_ID`／`GOOGLE_OAUTH_CLIENT_SECRET`／`MEDIA_OUTCOME_WEBHOOK_ENABLED`／`MEDIA_OUTCOME_WEBHOOK_TOKEN`／`MEDIA_PRODUCTION_PERSISTENCE_ENABLED`／`MEDIA_PROVIDER_ALLOWLIST`／`WPBRIDGE_BASE_URL`／`WPBRIDGE_KEY_ID`／`WPBRIDGE_PRIVATE_KEY`；**只在 repo 有**：`OPS_INBOX_DUAL_ACCEPT_LEGACY`／`OPS_INBOX_FINGERPRINT_SALT`／`OPS_INBOX_GRAFANA_TOKEN`／`OPS_INBOX_NETDATA_TOKEN`／`OPS_INBOX_POSTHOG_TOKEN`／`OPS_INBOX_SENTRY_TOKEN`／`OPS_INBOX_UPTIME_KUMA_TOKEN`／`PORTAL_SIGNUP_ENABLED`／`PORTAL_SIGNUP_RATE_LIMIT_SALT`。
+  - **待決定**：(a) repo 版本改列為唯一 SSOT，`sg-deploy.sh` 新增 compose 檔同步步驟（含差異審查，因為部分變數可能是刻意 prod-only）；或 (b) 明確拆成「repo 管 app 邏輯需要的變數」+「機器管的 ops-only 變數」兩層並各自寫文件，不強求單一檔案。兩者都需要先逐一確認上面兩份清單中每個變數是「該同步但漏掉」還是「刻意只留一邊」。
+  - **順帶檢查**：`/check-drift` 是否已涵蓋 compose 檔差異偵測；若沒有，是否該納入。
+  - 見 WORKLOG 2026-09-20（續86）。
+
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。
   - ✅ **Stage 1 接通入口完成 2026-06-14**：trigger-build 403 修復（dual-path auth, 8b1d6d86）+ dispatcher kick fallback（TRIGGER_ACCESS_TOKEN, 000f068c）+ dispatch-action-run-schedule 部署（每分鐘 cron）。
   - ✅ **Stage 2 n8n 橋接完成 2026-07-03**（workflow `RbrHNu3BUEmpNWeT` active，e2e 驗過；剩 WP 端裝 Fluent Forms+建表單+webhook feed+FluentCRM）。✅ Stage 3 程式+migration 0055 均已套（剩前端報價頁）。

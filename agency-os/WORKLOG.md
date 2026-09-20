@@ -20874,6 +20874,8 @@ WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`sync-claude-to-codex.ps1 -WorkRoot D:\Work -Mode linked` | exit=0 | result=generated bridges validated; Codex hooks unchanged
 - REALTEST_EVIDENCE: tool=Bash | cmd=`check-claude-codex-parity.ps1 -WorkRoot D:\Work` | exit=0 | result=Claude/Codex parity PASSED: 278 checks; 25 agents; 45 commands; 16 skills; 19 MCP servers
 - REVIEW_WAIVED: DOC_ONLY -- source policy wording read back and cross-file grep verified
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,.agents,.codex,mcp | grep=`唯一人類維護來源|ai-decision-intelligence|sync-claude-to-codex|check-claude-codex-parity` | hits=expected source references only
+[rollback] revert `CLAUDE.md` and this WORKLOG entry; rerun parity to confirm the generated surface remains valid.
 
 ## 2026-09-20(續85)/ops/collect 搜尋全網改用 Serper 取代 Perplexity；app 內現用 Perplexity 設定同步排查
 
@@ -20882,7 +20884,7 @@ WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈�
 - 已修改：
   - `lib/collect/net/providers.ts` — 新增 `serper` provider（origin `google.serper.dev`、`SERPER_API_KEY`、`x-api-key` header、`allowedPaths:["/search"]`）；perplexity 條目保留但註解標明「僅供顯式 `COLLECT_SEARCH_PROVIDER=perplexity` override，不再被自動偵測選中」。
   - `lib/collect/collectors/web-search.ts` — `searchProviderId()` 自動偵測優先序改為 serper → brave →（無 perplexity fallback，最終 fallback 值改成 "serper"）；`SEARCH_KEYS` 移除 `PERPLEXITY_API_KEY`；新增 `serper` driver（POST `/search`，回應 `organic:[{title,link,snippet,date}]`，形狀對真實 API 實測確認，見下）；brave／serper 兩個 driver 的網域限定字串補上括號（`(site:a OR site:b)`），避免操作者自己的查詢文字打斷這段語法（critic 抓到，兩個 driver 原本都有這個 gap，本次一併修）；`SEARCH_KEYS` 旁補註記 catalogue 與 `match()` 對 Perplexity-only 環境判讀不一致的已知取捨。
-  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（next-admin service）— 新增 `SERPER_API_KEY`／`BRAVE_SEARCH_API_KEY` 傳遞；移除 `PERPLEXITY_API_KEY` 傳遞（critic 抓到：改前這支功能部署後會因為容器根本拿不到新 key 而完全無法運作——功能對操作者無效；同時，留著 Perplexity key 傳遞等於留一條「未來有人補上 `COLLECT_SEARCH_PROVIDER` 傳遞」就會被殘留設定值復活的路徑，直接拔掉比只是不預設選中更乾淨）。
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（next-admin service，repo 版）— 新增 `SERPER_API_KEY`／`BRAVE_SEARCH_API_KEY` 傳遞；移除 `PERPLEXITY_API_KEY` 傳遞（critic 抓到：改前這支功能部署後會因為容器根本拿不到新 key 而完全無法運作——功能對操作者無效；同時，留著 Perplexity key 傳遞等於留一條「未來有人補上 `COLLECT_SEARCH_PROVIDER` 傳遞」就會被殘留設定值復活的路徑，直接拔掉比只是不預設選中更乾淨）。
   - `lib/collect/__tests__/collect-web-search.test.ts` — 更新 vendor 優先序測試、catalogue 可用性測試；新增「a third search vendor」serper 測試區塊（4 個測試，含關鍵回歸案例：`{SERPER_API_KEY,PERPLEXITY_API_KEY 同時存在}` 必須選 serper）；補強兩個網域限定測試斷言含括號 + path/method 斷言。
   - `lib/collect/__tests__/collect-web-search-live.test.ts` — 兩處錯誤訊息由 PERPLEXITY_API_KEY 改 SERPER_API_KEY（測試邏輯本身 vendor-agnostic，未變）。
   - `lib/content/blocks/README.md:114`、`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md`（4 處）— BUGHUNT 掃到的既有 doc drift：trending-sources.ts 的 search block 早已是 `search/serper`，兩份文件仍寫 `search/perplexity` 與舊行號，對齊現狀修正。
@@ -20896,13 +20898,18 @@ WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈�
 - REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/2m(+3 minor+3 suggestion)：Major×2（docker-compose 缺 key 傳遞會讓功能部署後對操作者無效；PERPLEXITY_API_KEY 殘留傳遞是復活路徑）本條目已修；Minor 的網域字串括號化、serper allowedPaths、缺少的 path/method 斷言、catalogue/match() 落差註解，本條目一併採納修掉；`createProviderCall` header 大小寫合併理論缺口（現無任何 driver 觸發）記為後續觀察，不在本次範圍內處理。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`PERPLEXITY_API_KEY\|searchProviderId\|search/perplexity\|SEARCH_KEYS` | hits=docker-compose.yml 傳遞缺口 + 2 份 doc drift 已修；`scripts/check-perplexity-search-only.mjs`／`perplexity-cli.ps1`／歷史 WORKLOG 條目命中均為既有已知、與本次無關
 
+[追記] 操作者「跑」授權部署後執行 `sg-deploy.sh next-admin`：exit=0，image built，`lobster-next-admin healthy after 9s`，smoke 5/5 200，`.deployed-commit`=a19507b6f（含本次 commit 7dbdc4efe + 其他並行 session 的 commits）。**部署後另外發現**：`docker exec lobster-next-admin printenv SERPER_API_KEY` 回傳空、`PERPLEXITY_API_KEY` 仍在（54 字元）——repo 的 docker-compose.yml 改動對 prod 無效。查證根因：`/root/lobster-phase1/docker-compose.yml` 是 `sg-deploy.sh` 自己文件記載的 machine-local staging 檔，只有 `apps/<APP>` 原始碼被 rsync，compose 檔本身不同步；兩份檔案已存在其他既存 drift（詳見 `TASKS.md` G 段新開項）。已直接 SSH 對 `/root/lobster-phase1/docker-compose.yml` 套用相同 3 行改動（python3 精確字串替換，`assert count==1` 防呆）、`docker compose config --quiet` 驗語法、`docker compose up -d --force-recreate next-admin` 重建容器。已補一條 AGENTS.md §0 硬事實記錄這個 gotcha，避免下次重蹈。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`（ubuntu@ks-aw-01:58122，`ssh_connect`+`ssh_exec`）| exit=0 | result=healthy 9s，smoke 5/5 200，deployed a19507b6f
+- REALTEST_EVIDENCE: tool=SSH | cmd=部署後 `docker exec lobster-next-admin printenv {SERPER,BRAVE_SEARCH,PERPLEXITY}_API_KEY` | exit=0 | result=發現 SERPER/BRAVE 皆空、PERPLEXITY 仍在 54 字元 → 定位到 staging compose 未同步
+- REALTEST_EVIDENCE: tool=SSH | cmd=手動同步 `/root/lobster-phase1/docker-compose.yml` 後 `docker compose config --quiet` + `--force-recreate next-admin` + 重新 `printenv` | exit=0 | result=SERPER 尾碼 134f4（與真實 key 相符）、BRAVE 空（無金鑰，符合預期）、PERPLEXITY printenv exit=1（完全不存在，非僅空字串）、container healthy、`/login`+`/api/ops/summary`（正確埠 3002，非我誤猜的 3000）皆 200
+- REVIEW_WAIVED: NA -- 伺服器端手動同步為既有程式邏輯的字面重放，非新邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`lobster-phase1/docker-compose.yml` | hits=新增的 AGENTS.md §0 條目與 TASKS.md G 段條目為僅有命中，無其他文件對此路徑做出會被推翻的假設
+
 [剩餘風險]
-- 尚未部署到 prod（`sg-deploy.sh` 未跑）——目前僅本機 commit，ks-aw-01 容器仍在跑舊版（傳 perplexity、未傳 serper）。部署前這個變更對線上完全無效。
-- Perplexity provider/driver 保留在程式碼中，僅自動偵測與（部署後）容器環境變數都不會選中它；若未來有人手動在伺服器 `.env` 同時加回 `COLLECT_SEARCH_PROVIDER=perplexity` 與 compose 的 key 傳遞，仍可手動復活——已在三處程式碼/compose 註解與本條目寫明原因，非靜默風險。
+- `/root/lobster-phase1/docker-compose.yml` 與 repo 版本其餘既存 drift（`GOOGLE_OAUTH_*`／`MEDIA_*`／`WPBRIDGE_*`／`OPS_INBOX_*`／`PORTAL_SIGNUP_*`，見 TASKS.md G 段新開項）本次未處理，非本次改動造成，需操作者決定治本方向。
+- Perplexity provider/driver 保留在程式碼中，僅自動偵測與（現已同步的）容器環境變數都不會選中它；若未來有人手動在伺服器同時加回 `.env` 的 `COLLECT_SEARCH_PROVIDER=perplexity` 與 staging compose 的 key 傳遞，仍可手動復活——已在三處程式碼/compose 註解與本條目寫明原因，非靜默風險。
 - `createProviderCall` 的 header 大小寫合併（critic Minor）未處理，目前無任何 driver 觸發，留待未來若真的需要非小寫 header 時一併修。
 
-[rollback] `git revert` 本 commit；docker-compose.yml 若需臨時退回，手動把 `PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}` 加回、刪除 Serper/Brave 兩行即可回到部署前狀態（compose 本身無需重建 image，只需 `docker compose up -d` 重建 container）。
+[rollback] `git revert` 本 commit；prod 若需臨時退回：`/root/lobster-phase1/docker-compose.yml` 手動把 `PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}` 加回、刪除 Serper/Brave 兩行，`docker compose up -d --force-recreate next-admin` 重建 container。
 
-WORKLOG_DONE: /ops/collect 搜尋全網 Perplexity→Serper 切換完成，app 內現用設定同步排查與修正；尚待操作者授權 sg-deploy 上線
-- BUGHUNT_DONE: scope=agency-os,scripts,.claude,.agents,.codex,mcp | grep=`唯一人類維護來源|ai-decision-intelligence|sync-claude-to-codex|check-claude-codex-parity` | hits=expected source references only
-[rollback] revert `CLAUDE.md` and this WORKLOG entry; rerun parity to confirm the generated surface remains valid.
+WORKLOG_DONE: /ops/collect 搜尋全網 Perplexity→Serper 切換完成並已在 prod 驗證生效（含 staging compose 手動同步這個未預期的額外步驟）；剩 staging/repo compose 其餘既存 drift 待操作者決定治本方向（TASKS.md G 段）
