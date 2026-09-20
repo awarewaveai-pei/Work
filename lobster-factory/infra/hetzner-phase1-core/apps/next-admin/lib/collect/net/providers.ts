@@ -47,6 +47,9 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
   // — COLLECT_SEARCH_PROVIDER already selects between them.
   // Search API only. Chat/agent endpoints bill per token by model (sonar-pro, reasoning, deep
   // research) and drained the account twice (2026-06-21, 2026-09-12) — they must stay unreachable.
+  // Kept for an explicit COLLECT_SEARCH_PROVIDER=perplexity override only: collectors/web-search.ts's
+  // auto-detect no longer picks this vendor on its own (operator directive, 2026-09-20 — a leftover
+  // key must not be enough to bring it back).
   perplexity: {
     id: "perplexity",
     origin: "https://api.perplexity.ai",
@@ -61,6 +64,22 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     origin: "https://api.search.brave.com",
     apiKeyEnv: "BRAVE_SEARCH_API_KEY",
     authHeader: (key) => ({ "x-subscription-token": key }),
+  },
+
+  // A third vendor for the same job, and the operator's chosen default (2026-09-20, replacing
+  // perplexity above). Already paid for and proven elsewhere in this app — see
+  // lib/content/article/generate-core.ts and lib/content/trending-sources.ts — so this reuses a
+  // working account rather than opening a new one. Locked to /search, same as perplexity above —
+  // not because this vendor is known to have an expensive alternate mode (it does not appear to),
+  // but because /search is the only endpoint collectors/web-search.ts's driver ever calls, and this
+  // codebase has been burned once already by trusting an unverified assumption about a vendor's full
+  // pricing surface. Widen this only alongside a caller that actually needs another path.
+  serper: {
+    id: "serper",
+    origin: "https://google.serper.dev",
+    apiKeyEnv: "SERPER_API_KEY",
+    authHeader: (key) => ({ "x-api-key": key }),
+    allowedPaths: ["/search"],
   },
 };
 

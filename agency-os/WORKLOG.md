@@ -20830,3 +20830,43 @@ WORKLOG_DONE: Codex 接手所需的 hook／同步／審查／部署 hook 全鏈�
 - REVIEW_WAIVED: NA -- 外部 SaaS 設定變更，無程式碼
 - BUGHUNT_WAIVED: NA -- 無程式碼變更
 [剩餘風險] ① 卡片 8602 仍在帳號(自動儲值關閉下不會被自動扣款；要完全斷金流需操作者自行移除)② 9/12 的 Agent API 呼叫端仍未定位，該 key 已刪除故無法再追；若未來重新儲值後又出現非 Search 用量，立即撤銷當時的 key 並回查此條目 ③ console 無硬上限 → 儲值請小額
+
+## 2026-09-20(續84)Claude/Codex 單一來源與低 token 路由規則
+
+根因：Claude 與 Codex 已共用 generated bridge，但「source 只能維護一份」與「一般架構問題不啟動重型多代理決策」尚未寫入 Claude-first source，容易造成重複規則與不必要 token 消耗。
+- 已修改：`CLAUDE.md` R1 後新增 Claude／Codex 單一來源、共享 TASKS/WORKLOG/handoff、generated-only、sync/parity、低 token 路由規則；未修改兩個 `AGENTS.md` 責任邊界。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sync-claude-to-codex.ps1 -WorkRoot D:\Work -Mode linked` | exit=0 | result=generated bridges validated; Codex hooks unchanged
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-claude-codex-parity.ps1 -WorkRoot D:\Work` | exit=0 | result=Claude/Codex parity PASSED: 278 checks; 25 agents; 45 commands; 16 skills; 19 MCP servers
+- REVIEW_WAIVED: DOC_ONLY -- source policy wording read back and cross-file grep verified
+
+## 2026-09-20(續85)/ops/collect 搜尋全網改用 Serper 取代 Perplexity；app 內現用 Perplexity 設定同步排查
+
+操作者明確指示「不要用 perplexity」（9/12 帳號無故燒 $10，原因不明）+「都改成 Serper」。查證 `/ops/collect` 的 web-search 收集器（`lib/collect/collectors/web-search.ts`）是唯一真正呼叫 Perplexity 的現用路徑；`lib/content/trending-sources.ts`／`lib/content/article/generate-core.ts` 的 Serper 使用是既有、與本次無關的既定架構（trending-sources.ts 早已把即時 block 從 perplexity 換成 serper，只是兩份參考文件描述落後，一併修正）。
+
+- 已修改：
+  - `lib/collect/net/providers.ts` — 新增 `serper` provider（origin `google.serper.dev`、`SERPER_API_KEY`、`x-api-key` header、`allowedPaths:["/search"]`）；perplexity 條目保留但註解標明「僅供顯式 `COLLECT_SEARCH_PROVIDER=perplexity` override，不再被自動偵測選中」。
+  - `lib/collect/collectors/web-search.ts` — `searchProviderId()` 自動偵測優先序改為 serper → brave →（無 perplexity fallback，最終 fallback 值改成 "serper"）；`SEARCH_KEYS` 移除 `PERPLEXITY_API_KEY`；新增 `serper` driver（POST `/search`，回應 `organic:[{title,link,snippet,date}]`，形狀對真實 API 實測確認，見下）；brave／serper 兩個 driver 的網域限定字串補上括號（`(site:a OR site:b)`），避免操作者自己的查詢文字打斷這段語法（critic 抓到，兩個 driver 原本都有這個 gap，本次一併修）；`SEARCH_KEYS` 旁補註記 catalogue 與 `match()` 對 Perplexity-only 環境判讀不一致的已知取捨。
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（next-admin service）— 新增 `SERPER_API_KEY`／`BRAVE_SEARCH_API_KEY` 傳遞；移除 `PERPLEXITY_API_KEY` 傳遞（critic 抓到：改前這支功能部署後會因為容器根本拿不到新 key 而完全無法運作——功能對操作者無效；同時，留著 Perplexity key 傳遞等於留一條「未來有人補上 `COLLECT_SEARCH_PROVIDER` 傳遞」就會被殘留設定值復活的路徑，直接拔掉比只是不預設選中更乾淨）。
+  - `lib/collect/__tests__/collect-web-search.test.ts` — 更新 vendor 優先序測試、catalogue 可用性測試；新增「a third search vendor」serper 測試區塊（4 個測試，含關鍵回歸案例：`{SERPER_API_KEY,PERPLEXITY_API_KEY 同時存在}` 必須選 serper）；補強兩個網域限定測試斷言含括號 + path/method 斷言。
+  - `lib/collect/__tests__/collect-web-search-live.test.ts` — 兩處錯誤訊息由 PERPLEXITY_API_KEY 改 SERPER_API_KEY（測試邏輯本身 vendor-agnostic，未變）。
+  - `lib/content/blocks/README.md:114`、`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md`（4 處）— BUGHUNT 掃到的既有 doc drift：trending-sources.ts 的 search block 早已是 `search/serper`，兩份文件仍寫 `search/perplexity` 與舊行號，對齊現狀修正。
+  - `mcp/user-env.template.ps1` — 補 `SERPER_API_KEY`／`BRAVE_SEARCH_API_KEY` 範本欄位（換機 SSOT 缺漏，critic 建議）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=本 session Bash 工具本身故障（`unexpected EOF while looking for matching` 於任何指令，含 `pwd`）改用 Desktop Commander(PowerShell) 執行 `npx tsc --noEmit` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=Desktop Commander(PowerShell) `npx vitest run lib/collect/__tests__/{collect-web-search,collect-provider-tier,collect-block-hygiene}.test.ts` | exit=0 | result=44/44 綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=Desktop Commander(PowerShell) `COLLECT_SEARCH_LIVE=1 npx vitest run lib/collect/__tests__/collect-web-search-live.test.ts`（真實打 Serper API + 真實網站端到端）| exit=0 | result=兩輪皆綠；log 證實選中 `via serper`（非 perplexity，即便 PERPLEXITY_API_KEY 仍在本機環境），5/5 usable，實際抓到 6～7 頁
+- REALTEST_EVIDENCE: tool=Bash | cmd=Desktop Commander(PowerShell) `Invoke-RestMethod https://google.serper.dev/search`（寫 driver 前對真實 API 的形狀查證，非猜測）| exit=0 | result=確認 `organic:[{title,link,snippet,position,date?}]`，與 driver `parse()` 完全一致
+- REALTEST_EVIDENCE: tool=Bash | cmd=Desktop Commander(PowerShell) `node scripts/check-perplexity-search-only.mjs`（既有 governance guard，改動前後各跑一次）| exit=0 | result=6795 tracked files 0 violation，含新增的 providers.ts serper 條目與測試檔均未誤觸 KEY_READER
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/2m(+3 minor+3 suggestion)：Major×2（docker-compose 缺 key 傳遞會讓功能部署後對操作者無效；PERPLEXITY_API_KEY 殘留傳遞是復活路徑）本條目已修；Minor 的網域字串括號化、serper allowedPaths、缺少的 path/method 斷言、catalogue/match() 落差註解，本條目一併採納修掉；`createProviderCall` header 大小寫合併理論缺口（現無任何 driver 觸發）記為後續觀察，不在本次範圍內處理。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`PERPLEXITY_API_KEY\|searchProviderId\|search/perplexity\|SEARCH_KEYS` | hits=docker-compose.yml 傳遞缺口 + 2 份 doc drift 已修；`scripts/check-perplexity-search-only.mjs`／`perplexity-cli.ps1`／歷史 WORKLOG 條目命中均為既有已知、與本次無關
+
+[剩餘風險]
+- 尚未部署到 prod（`sg-deploy.sh` 未跑）——目前僅本機 commit，ks-aw-01 容器仍在跑舊版（傳 perplexity、未傳 serper）。部署前這個變更對線上完全無效。
+- Perplexity provider/driver 保留在程式碼中，僅自動偵測與（部署後）容器環境變數都不會選中它；若未來有人手動在伺服器 `.env` 同時加回 `COLLECT_SEARCH_PROVIDER=perplexity` 與 compose 的 key 傳遞，仍可手動復活——已在三處程式碼/compose 註解與本條目寫明原因，非靜默風險。
+- `createProviderCall` 的 header 大小寫合併（critic Minor）未處理，目前無任何 driver 觸發，留待未來若真的需要非小寫 header 時一併修。
+
+[rollback] `git revert` 本 commit；docker-compose.yml 若需臨時退回，手動把 `PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}` 加回、刪除 Serper/Brave 兩行即可回到部署前狀態（compose 本身無需重建 image，只需 `docker compose up -d` 重建 container）。
+
+WORKLOG_DONE: /ops/collect 搜尋全網 Perplexity→Serper 切換完成，app 內現用設定同步排查與修正；尚待操作者授權 sg-deploy 上線
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,.agents,.codex,mcp | grep=`唯一人類維護來源|ai-decision-intelligence|sync-claude-to-codex|check-claude-codex-parity` | hits=expected source references only
+[rollback] revert `CLAUDE.md` and this WORKLOG entry; rerun parity to confirm the generated surface remains valid.

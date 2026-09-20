@@ -31,7 +31,7 @@ describe.skipIf(!LIVE)("web search, live", () => {
   it(
     "finds real pages and reads them",
     async () => {
-      expect(process.env.PERPLEXITY_API_KEY, "PERPLEXITY_API_KEY is not set").toBeTruthy();
+      expect(process.env.SERPER_API_KEY, "SERPER_API_KEY is not set").toBeTruthy();
 
       const budget = createBudget({ fetches: 12, bytes: 12_000_000, ms: 180_000 });
       const log: string[] = [];
@@ -78,7 +78,7 @@ describe.skipIf(!LIVE)("web search, live", () => {
       // A rejected credential must say so. Without this the next assertion fails as "the block
       // never reported a search", which sends the reader looking for a bug in the block.
       const authFail = [...result.report.dirty, ...result.report.quarantined].find((d) => /http_40[12]/.test(d.reason));
-      expect(authFail?.reason, `search provider rejected the credential: ${authFail?.reason} — check PERPLEXITY_API_KEY`).toBeUndefined();
+      expect(authFail?.reason, `search provider rejected the credential: ${authFail?.reason} — check SERPER_API_KEY`).toBeUndefined();
 
       // The search returned usable URLs…
       expect(searchLine, "the block never reported a search").toBeTruthy();

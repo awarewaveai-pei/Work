@@ -35,7 +35,7 @@
 | # | 項目 | 證據 file:line / commit |
 |---|---|---|
 | A1 | 積木 registry 合約（register/byKind/listAll/geoMatch）| registry.ts:18,40,51,56,66 |
-| A2 | **search 積木家族**（google-news/reddit/ptt/perplexity/env-feed/DB 臨時源）| trending-sources.ts:251,266,284,312,334,205 |
+| A2 | **search 積木家族**（google-news/reddit/ptt/serper/env-feed/DB 臨時源）| trending-sources.ts:246,261,279,307,342,200 |
 | A3 | **article route ×7**（generate 串流/title/keywords/outline/related-posts/humanize/drafts）；generate P2 後抽成 core，route 為薄殼、積木共用 | article/generate-core.ts `prepareArticleGeneration`/`streamArticleGeneration`、generate/route.ts（HTTP 殼）、blocks/article-generate.ts（積木）；title:8、keywords:8、outline:10、related-posts:15、humanize:22、drafts:72 |
 | A4 | brand-voice route | brand-voice/route.ts:34 |
 | A5 | **quality route ×3**（seo-check RankMath 16 點/seo-fix/image Flux）；seo-check P3 後抽成 core，route 為薄殼、積木共用 | quality/seo-check-core.ts `runSeoCheck`、seo-check/route.ts（HTTP 殼）、blocks/seo-check.ts（積木）；seo-fix:28、image:67 |
@@ -102,7 +102,7 @@
 │    trending / sources                                                            (search, 同時走積木)
 │
 └─ 積木 registry 層（registry.ts）── headless 自動化骨架
-     byKind("search") ✅ 已收斂（5 積木：google-news/reddit/ptt/perplexity/env-feeds + DB 臨時源）
+     byKind("search") ✅ 已收斂（5 積木：google-news/reddit/ptt/serper/env-feeds + DB 臨時源）
      byKind("article"|"quality"|"publish") ✅ P4 已收斂進 pipeline.ts（headless article→quality→publish→WP draft）
      byKind("video") ❌ 尚未收斂（P7）
 ```
@@ -124,16 +124,16 @@
 ### search ✅（唯一已收斂的積木家族，`lib/content/trending-sources.ts`）
 | 積木 | file:line |
 |---|---|
-| google-news / reddit / ptt / perplexity | :251 / :266 / :284 / :312（perplexity `enabled:!!PERPLEXITY_API_KEY :317`）|
-| env 自訂 feed / DB 臨時源 / 彙整入口 runTrending | :334 / buildDbSearchBlocks:205 / :364 |
+| google-news / reddit / ptt / serper | :246 / :261 / :279 / :307（serper `enabled:!!SERPER_API_KEY :312`，取代原 perplexity 即時 block）|
+| env 自訂 feed / DB 臨時源 / 彙整入口 runTrending | :342 / buildDbSearchBlocks:200 / :372 |
 | SSRF guard isSafePublicHttps | :77 |
 
 ### Route 管線（20 route，`app/api/content/*/route.ts`；幾乎全 production）
 | kind | route | file:line | 做什麼 | 外部依賴 |
 |---|---|---|---|---|
-| search | trending | trending/route.ts:97 | 熱搜/suggest/questions | 積木 + Google Suggest + Perplexity + Supabase content_sources |
+| search | trending | trending/route.ts:97 | 熱搜/suggest/questions | 積木 + Google Suggest + Serper + Supabase content_sources |
 | search | sources | sources/route.ts:57+ | 營運自訂 feed CRUD（migration 0042）| Supabase |
-| article | generate | generate-core.ts（route.ts 薄殼）| 全文串流生成（E-E-A-T/GEO/RankMath）；P2 抽 core，route 薄殼 + 積木 headless 共用 | Claude Haiku/Sonnet/Opus + Perplexity 來源 |
+| article | generate | generate-core.ts（route.ts 薄殼）| 全文串流生成（E-E-A-T/GEO/RankMath）；P2 抽 core，route 薄殼 + 積木 headless 共用 | Claude Haiku/Sonnet/Opus + Serper 來源 |
 | article | title / keywords / outline | :8 / :8 / :10 | 標題×5 / NLP 關鍵字×20 / H2-H4 大綱 | Claude Haiku |
 | article | related-posts | :15 | 抓站內真實文章供內鏈 | WP REST |
 | article | humanize | :22 | 人性化/改寫（串流）| Claude Sonnet |

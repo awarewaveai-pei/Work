@@ -38,6 +38,9 @@ function ctx(): CollectCtx {
 }
 
 beforeEach(() => {
+  // Named explicitly so these generic tests stay valid regardless of which vendor auto-detect
+  // would otherwise pick — they exercise the collector's own logic, not vendor selection.
+  vi.stubEnv("COLLECT_SEARCH_PROVIDER", "perplexity");
   vi.stubEnv("PERPLEXITY_API_KEY", "test-key");
   callProvider = vi.fn(async () => ({ json: async () => RESPONSE }) as unknown as Response);
 });
@@ -158,7 +161,8 @@ describe("a second search vendor", () => {
     // URLSearchParams encodes a space as '+', which decodeURIComponent does not undo — decode the
     // way a server would, or this asserts against a string nobody ever sees.
     const q = new URLSearchParams(init.path.split("?")[1]).get("q");
-    expect(q).toContain("site:gov.tw OR site:who.int");
+    // Parenthesized: the operator's own query text must not be able to swallow or reinterpret this.
+    expect(q).toContain("(site:gov.tw OR site:who.int)");
   });
 
   it("maps recency onto Brave's own vocabulary", async () => {
@@ -168,11 +172,17 @@ describe("a second search vendor", () => {
 
   it("picks whichever vendor has a key when none is named", () => {
     vi.stubEnv("COLLECT_SEARCH_PROVIDER", "");
-    // Defaulting to perplexity while only the Brave key is set would make the source look broken
-    // for a reason the operator has no way to see.
+    // Defaulting to a stray key present for the wrong reason would make the source silently use a
+    // vendor the operator did not choose.
     expect(searchProviderId({ BRAVE_SEARCH_API_KEY: "k" })).toBe("brave");
-    expect(searchProviderId({ PERPLEXITY_API_KEY: "k" })).toBe("perplexity");
+    expect(searchProviderId({ SERPER_API_KEY: "k" })).toBe("serper");
+    // Perplexity is excluded from auto-detect entirely (operator directive, 2026-09-20) — a leftover
+    // PERPLEXITY_API_KEY alone must not resurrect it, even with no other vendor key present.
+    expect(searchProviderId({ PERPLEXITY_API_KEY: "k" })).toBe("serper");
+    expect(searchProviderId({ SERPER_API_KEY: "k", PERPLEXITY_API_KEY: "k" })).toBe("serper");
     expect(searchProviderId({ COLLECT_SEARCH_PROVIDER: "brave", PERPLEXITY_API_KEY: "k" })).toBe("brave");
+    // Only a deliberate, explicit override reaches perplexity now.
+    expect(searchProviderId({ COLLECT_SEARCH_PROVIDER: "perplexity", PERPLEXITY_API_KEY: "k" })).toBe("perplexity");
   });
 
   it("refuses a vendor it has no driver for instead of calling it blindly", async () => {
@@ -182,12 +192,61 @@ describe("a second search vendor", () => {
   });
 });
 
+describe("a third search vendor", () => {
+  // Serper answers the same job with its own shape: POST like Perplexity, but results nested under
+  // `organic`, `link` instead of `url`, and Google's own tbs=qdr:{d,w,m,y} recency vocabulary since
+  // Serper proxies Google Search directly. Shape confirmed against the live API, 2026-09-20.
+  const SERPER = {
+    organic: [
+      { title: "退貨規定", link: "https://gov.example/returns", snippet: "七天…", date: "2026-01-02" },
+      { title: "沒有連結", snippet: "vendor returned a row with no link" },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.stubEnv("PERPLEXITY_API_KEY", "");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("SERPER_API_KEY", "test-key");
+    vi.stubEnv("COLLECT_SEARCH_PROVIDER", "serper");
+    callProvider = vi.fn(async () => ({ json: async () => SERPER }) as unknown as Response);
+  });
+
+  it("reads Serper's shape into the same result the crawler gets from any vendor", async () => {
+    const out = await webSearchCollector.run(target("退貨"), ctx());
+    expect(out.docs).toEqual([]);
+    expect(out.discovered.map((d) => d.uri)).toEqual(["https://gov.example/returns"]);
+    expect(out.discovered[0].meta?.searchSnippet).toBe("七天…");
+    expect(out.discovered[0].meta?.searchProvider).toBe("serper");
+    expect(out.discovered[0].scope?.hosts).toEqual(["gov.example"]);
+  });
+
+  it("folds the operator's domain restriction into the query — Serper has no filter parameter either", async () => {
+    await webSearchCollector.run(target("退貨", { domains: "gov.tw, who.int" }), ctx());
+    const call = callProvider.mock.calls[0][1];
+    // Parenthesized: the operator's own query text must not be able to swallow or reinterpret this.
+    expect(call.body.q).toContain("(site:gov.tw OR site:who.int)");
+    expect(call.path).toBe("/search");
+    expect(call.method).toBe("POST");
+  });
+
+  it("maps recency onto Google's own tbs vocabulary", async () => {
+    await webSearchCollector.run(target("退貨", { recency: "month" }), ctx());
+    const body = callProvider.mock.calls[0][1].body;
+    expect(body.tbs).toBe("qdr:m");
+  });
+
+  it("is chosen over a leftover Perplexity key — the exact scenario this switch exists for", () => {
+    vi.stubEnv("COLLECT_SEARCH_PROVIDER", "");
+    expect(searchProviderId({ SERPER_API_KEY: "k", PERPLEXITY_API_KEY: "k" })).toBe("serper");
+  });
+});
+
 describe("the catalogue tells the truth about interchangeable keys", () => {
   it("is available on one key, and names both only when neither is set", async () => {
     const { describeBlock } = await import("@/lib/collect/catalogue");
 
-    const withPerplexity = describeBlock(webSearchCollector, { PERPLEXITY_API_KEY: "k" })!;
-    expect([withPerplexity.available, withPerplexity.missing]).toEqual([true, []]);
+    const withSerper = describeBlock(webSearchCollector, { SERPER_API_KEY: "k" })!;
+    expect([withSerper.available, withSerper.missing]).toEqual([true, []]);
 
     const withBrave = describeBlock(webSearchCollector, { BRAVE_SEARCH_API_KEY: "k" })!;
     expect([withBrave.available, withBrave.missing]).toEqual([true, []]);
@@ -195,7 +254,12 @@ describe("the catalogue tells the truth about interchangeable keys", () => {
     // Neither: unavailable, and BOTH options named so the operator can choose an account to open.
     const withNeither = describeBlock(webSearchCollector, {})!;
     expect(withNeither.available).toBe(false);
-    expect(withNeither.missing.sort()).toEqual(["BRAVE_SEARCH_API_KEY", "PERPLEXITY_API_KEY"]);
+    expect(withNeither.missing.sort()).toEqual(["BRAVE_SEARCH_API_KEY", "SERPER_API_KEY"]);
+
+    // Perplexity alone must NOT show as available — SEARCH_KEYS deliberately excludes it (operator
+    // directive, 2026-09-20), matching searchProviderId's own exclusion above.
+    const withPerplexityOnly = describeBlock(webSearchCollector, { PERPLEXITY_API_KEY: "k" })!;
+    expect(withPerplexityOnly.available).toBe(false);
   });
 
   it("still treats a single-vendor source as all-or-nothing", async () => {
