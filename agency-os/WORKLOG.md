@@ -1,4 +1,38 @@
 ﻿# Worklog
+## 2026-09-20（續91）背景調查蒐集器：相關性成為第二條品質軸，搜尋結果不再變成整站抓取
+
+- [操作者請求] 「用 Theo Farrell 搜尋只找到 2 筆無關緊要的資料，我何不用 Google 就好」→ 追問後確認真實需求是「給個人／公司／事件的背景資料搜尋」。決定範圍：「最完善完整，1-3 項都要處理妥當，不准用補丁」。
+- [根因] run `manual-2026-09-20051728` 實際數字：`fetched=190 written=161 dirty=23 quarantined=3 stopped_by=budget`，資料夾內 2 筆、未分類 159 筆（141 penguin.com.au 目錄頁）。三個獨立缺口疊加：
+  1. `collectors/web-search.ts` 的 discovered targets 經 `as unknown as Target[]` 沒有 `depth` 欄位 → orchestrator 的深度比較全是 `NaN` → **搜尋那一支的深度上限等於不存在**，只有 budget 擋得住。
+  2. `lib/collect/quality.ts` 只有長度／密度／soft-404 三條軸，**沒有相關性**。`penguin.com.au/browse/romance` 三關全過。
+  3. `sinks/kb.ts` 的歸檔條件要 `doc.meta.searchQuery`，而 `http-html` 的 discovered 不帶它 → 159/161 落進未分類。
+  附帶：`http-html` 宣告的 per-source `maxDepth` 選項全 repo 零讀取點（`run.ts` 對所有來源傳同一個全域 2），UI 上是個不會動的旋鈕。
+- [已修改]（決策記錄 [ADR 014](docs/architecture/decisions/014-entity-dossier-relevance-axis.md)）
+  1. `lib/collect/entity.ts`（新）：實體比對純函式。token-window 比對而非拼寫枚舉——「Theo Gerard Farrell」「Farrell, Theo G.」自動命中，「Theo Smith…Bob Farrell」隔三段不命中；CJK 名不拆字；公司法人尾綴可略。
+  2. `lib/collect/relevance.ts`（新）：相關性閘，orchestrator 擁有（比照 quality.ts：積木自評必然寬鬆）。Target 沒帶 `meta.entity` 時 `applicable:false`，既有來源行為零改變。
+  3. `lib/collect/search/query-plan.ts`（新）：角度是資料不是分支。person/company/event 各 7-8 個角度 × 語言，`MAX_QUERIES=16` 上限，角度優先於語言截斷。
+  4. `lib/collect/collectors/entity-dossier.ts`（新）：實體 → 多角度查詢 → 結果當 root（`depth:0`、`maxDepth:0`）→ 蓋 `meta.entity`。budget 中途用盡時保留已付費查到的結果而非整批丟棄。
+  5. `lib/collect/orchestrator.ts`：四個不變量——per-target `maxDepth` 真的生效（`INHERITED_META` 明列，**不含 etag/lastModified**，否則子頁會拿父頁 etag 發條件式 GET）／grade 全失敗的頁面不得提名下一批頁面／相關性閘 + `offEntity` bucket／`searchQuery` 由 orchestrator 統一從 target 帶到 doc（原本只有 http-html 自己複製）。
+  6. `lib/collect/search/drivers.ts`（新，自 web-search 抽出）：兩個積木共用同一份 vendor driver map。
+  7. migration `0090`：`collection_runs.off_entity` + `collection_issues.kind` 擴充。CHECK 用 catalogue 查詢置換而非猜名字（db-expert 指出：猜錯時 `DROP CONSTRAINT IF EXISTS` 靜默 no-op、ADD 用新名字成功、表上兩個 CHECK、psql 回報成功、runtime 全部 23514）。
+  8. UI：`select`／`multiselect` 一律渲染成看得見的按鈕與核取方格（操作者長期偏好，且與本頁 ScheduleControls 既有慣例一致）；run report 分開顯示「非本人」；知識庫列表每筆顯示命中的名字／定位詞／片段（回應「搜尋下來的資料裡面沒有顯示 Theo Farrell」——內容其實有，是列表只顯示標題）。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`COLLECT_DOSSIER_LIVE=1 npx vitest run lib/collect/__tests__/collect-entity-dossier-live.test.ts`（真 SERPER key、真網站） | exit=0 | ms=24883 | result=3 queries → 15 unique pages → `抓到 11 入庫 1 非本人 0 品質擋下 9 robots 4`；入庫那筆 `entityConfidence=anchored`；**零筆目錄頁被收**（斷言 `/browse|category|collections|tag/` 為空）
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全套） | exit=0 | result=1388 passed / 10 skipped / 144 files；`npx tsc --noEmit` exit=0
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -c "SELECT conname,pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='public.collection_issues'::regclass AND contype='c'"` | exit=0 | result=恰好 1 列、名為 `collection_issues_kind_check`、四值版——0090 的假設在 live DB 上證實，且改寫後的 DO-block 版本連名字錯都不會靜默通過
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv FIRECRAWL_API_KEY` | exit=1 | result=變數在容器內完全不存在 → 渲染階沒開，`too_short` 其實是「讀不到」不是「沒內容」
+  - REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/1m/0n | artifact=`agency-os/reports/oracle/2026-09-20-review-10b025cf.md`（external oracle = Codex CLI `codex exec -s read-only`）。**第一層 `/codex-review` companion 回的是空殼**——verdict approve 但自述 "repository inspection was blocked, so no code- or migration-specific issue can be supported with file/line evidence"，不採信，改走第二層 `codex-oracle.ps1`。兩個 finding 逐一自行驗證後都成立、都已修：
+    - **C1 單字定位詞永遠不可能命中**（`entity.ts:118` `requiredTokenCount` 的 `Math.max(2,…)` 對 anchor 也套用，anchor 卻幾乎都是單字）。後果最惡：嚴格模式預設開，於是「Wollongong」「校長」這種定位詞會讓**每一頁正確的資料都被判 `entity_anchor_missing`**。live test 沒抓到是因為它用的兩個 anchor 剛好都是兩個字。已 clamp 成 `Math.min(tokens.length, …)` 並補單字 anchor（含 CJK）測試。
+    - **M1 down migration 第二次回滾會永久刪資料**（`0090_..._down.sql:26`）：`CREATE TABLE IF NOT EXISTS … AS SELECT` 在備份表已存在時整段 SELECT 不執行，接著的 DELETE 就刪掉沒備份的新列。已改成 `CREATE TABLE (LIKE …)` + `INSERT INTO … SELECT`（append）。
+  - 突變測試（證明新閘不是空跑，5/5 拔掉即變紅、還原即變綠）：relevance gate 改 `if (false && …)` → `collect-entity.test.ts > assessRelevance > refuses a page that never names the entity` 與 `collect-orchestrator-entity.test.ts > refuses a clean page that is about somebody else, in its own bucket` 變紅；另四項（depth-0 root 豁免、拒收頁不得擴散連結、etag 不繼承、per-source maxDepth）同樣各自變紅
+  - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`maxDepth|offEntity|off_entity|searchQuery|RunReport|SourceOption` | hits=5 真實命中並同批修掉：`CollectionSourcesPanel.tsx` 的 RunResult 型別與 RunReport 元件（缺 offEntity → 操作者看不到被判非本人的是哪幾頁）、`explainReason` 缺新理由的白話解釋、`DATA_COLLECTION_PLAN.md:114` 的虛擬碼深度濾條與實作不符、ADR_INDEX 未登錄
+  - 資料清理：prod 刪除該 run 產生的 159 筆未分類文件 + 2551 chunks（cascade 驗證 orphan=0），刪除前備份至 `public.kb_cleanup_20260920_bad_crawl`（159 列）
+- [剩餘風險]
+  1. **收得準了，但收得少**：live run 15 筆候選只入庫 1 筆，9 筆被品質閘擋下，其中 7 筆是 `*_no_heavier_tier`（JS 渲染／低密度），包含最權威的 `scholars.latrobe.edu.au/tgfarrell`。瓶頸已從「收到垃圾」變成「讀不到頁面」——**這需要操作者開通渲染供應商帳號**（`FIRECRAWL_API_KEY`），不是程式能自己解決的。未擅自調低門檻：`quality.ts` 自己寫明 per-host 豁免＝改偵測器而非修問題。
+  2. 尚未部署。migration 0090 需先套用再部署新 code（順序寫在 migration header；反序會讓整份 run report 遺失）。
+  3. `0090` 的 down migration 具破壞性（刪 off_entity 列、DROP COLUMN），已加 `LOCK TABLE` 前置與備份表，但仍需明示確認才可執行。
+- [rollback] `git revert` 本 commit（新檔全刪、既有檔回原狀，既有來源行為本來就逐位元不變）；DB 側 `packages/db/scripts/0090_collection_off_entity_down.sql`；已刪的 159 筆文件可從 `kb_cleanup_20260920_bad_crawl` 還原。
+
 ## 2026-09-20（續90）英文版「為什麼有效」186 筆重寫：英文介面開張前先把工程語清乾淨
 
 - [操作者請求] 「處理好」——把續86 標為剩餘風險、續87 開成 TASKS 的 `why_en`／`blurb_en` 一併處理掉。

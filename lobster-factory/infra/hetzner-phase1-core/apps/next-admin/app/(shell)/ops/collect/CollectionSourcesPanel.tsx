@@ -24,7 +24,7 @@ interface CatalogueEntry {
   options?: Array<{
     key: string;
     label: string;
-    type: "string" | "number" | "boolean" | "select";
+    type: "string" | "number" | "boolean" | "select" | "multiselect";
     required?: boolean;
     default?: string | number | boolean;
     choices?: Array<{ value: string; label: string }>;
@@ -67,6 +67,7 @@ interface RunResult {
     dirty: Array<{ uri: string; reason: string }>;
     quarantined: Array<{ uri: string; reason: string }>;
     disallowed: Array<{ uri: string; reason: string }>;
+    offEntity: Array<{ uri: string; reason: string }>;
     gone: string[];
     stoppedBy: string | null;
   };
@@ -610,14 +611,13 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
                     return (
                       <label key={opt.key} style={labelStyle}>
                         {opt.label}
-                        {opt.type === "select" ? (
-                          <select value={String(val ?? opt.default ?? "")} onChange={(e) => set(e.target.value)} style={inputStyle}>
-                            {(opt.choices ?? []).map((ch) => (
-                              <option key={ch.value} value={ch.value}>
-                                {ch.label}
-                              </option>
-                            ))}
-                          </select>
+                        {opt.type === "select" || opt.type === "multiselect" ? (
+                          <ChoiceChips
+                            choices={opt.choices ?? []}
+                            value={String(val ?? opt.default ?? "")}
+                            multiple={opt.type === "multiselect"}
+                            onChange={set}
+                          />
                         ) : opt.type === "boolean" ? (
                           <input type="checkbox" checked={Boolean(val ?? opt.default)} onChange={(e) => set(e.target.checked)} />
                         ) : (
@@ -643,6 +643,68 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
           )}
         </section>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Choices as visible buttons, never a native <select> — the house convention on this screen (see
+ * ScheduleControls below, and the catalogue's own comment on why a dropdown was rejected for source
+ * types). A dropdown hides how many options exist and how many are currently on, which for
+ * something like "which angles should this search cover" is exactly the information being chosen.
+ *
+ * One value shape for both modes: a comma-separated string, matching SourceOption's contract, so
+ * `options` jsonb never holds an array here and a string there.
+ */
+function ChoiceChips({
+  choices,
+  value,
+  multiple,
+  onChange,
+}: {
+  choices: Array<{ value: string; label: string }>;
+  value: string;
+  multiple: boolean;
+  onChange: (v: string) => void;
+}) {
+  const selected = new Set(
+    value
+      .split(/[,\s]+/)
+      .map((v) => v.trim())
+      .filter(Boolean),
+  );
+  const toggle = (v: string) => {
+    // Single choice: clicking IS the answer. There is no un-picking, because "none" is itself one
+    // of the choices whenever a source has a meaningful empty state (a recency of "不限").
+    if (!multiple) return onChange(v);
+    const next = new Set(selected);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    // Emitted in the DECLARED order, not click order, so the stored string is stable and two
+    // operators who ticked the same boxes produce the same row.
+    onChange(choices.filter((c) => next.has(c.value)).map((c) => c.value).join(","));
+  };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {choices.map((ch) => {
+        const on = selected.has(ch.value) || (!multiple && !selected.size && ch.value === "");
+        return (
+          <button
+            key={ch.value || "__empty"}
+            type="button"
+            onClick={() => toggle(ch.value)}
+            style={{
+              ...buttonStyle(on),
+              fontSize: 11,
+              padding: "4px 9px",
+              opacity: on ? 1 : 0.65,
+            }}
+          >
+            {multiple ? (on ? "☑ " : "☐ ") : ""}
+            {ch.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -816,6 +878,12 @@ function SourceRow({
  * cannot happen is how a message ends up describing the wrong failure.
  */
 export function explainReason(reason: string): string | null {
+  // Entity refusals first: they are the common case in a dossier run and the ONE the operator can
+  // act on (loosen the anchors, or confirm the tool is right and the page really is somebody else).
+  if (reason === "entity_absent") return "這頁完全沒提到你要查的對象——搜尋引擎回了不相關的結果，已丟掉。";
+  if (reason === "entity_anchor_missing") return "有出現名字，但沒出現你填的定位詞，可能是同名的另一個人。要收的話把「嚴格模式」關掉。";
+  if (reason.endsWith("_no_heavier_tier")) return "這頁讀不到內容（多半是 JavaScript 才會長出正文），而且目前沒有開通能讀它的抽取供應商。";
+
   const provider = /provider_([a-z0-9-]+)_http_(\d{3})/.exec(reason);
   if (provider) {
     const [, vendor, status] = provider;
@@ -837,6 +905,7 @@ export function explainReason(reason: string): string | null {
 
 function RunReport({ run }: { run: RunResult }) {
   const refused = run.report.dirty.length + run.report.quarantined.length;
+  const offEntity = (run.report.offEntity ?? []).length;
   return (
     <div style={{ marginTop: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, fontSize: 13 }}>
       <div style={{ fontWeight: 600, marginBottom: 6 }}>
@@ -847,6 +916,10 @@ function RunReport({ run }: { run: RunResult }) {
         <span>入庫 {run.sink.written}</span>
         <span>未變更 {run.sink.skipped}</span>
         <span style={{ color: refused ? "#b45309" : undefined }}>被擋下 {refused}</span>
+        {/* Counted apart from 被擋下 because it means something entirely different: nothing failed,
+            the search engine returned pages about somebody else and they were refused on purpose.
+            Shown only when it happened, so a source that makes no entity claim reads as before. */}
+        {offEntity ? <span style={{ color: "#6b7280" }}>非本人 {offEntity}</span> : null}
         <span>已下架 {run.report.gone.length}</span>
         <span style={{ color: "#6b7280" }}>結束原因 {run.report.stoppedBy}</span>
       </div>
@@ -854,7 +927,9 @@ function RunReport({ run }: { run: RunResult }) {
       {/* Refusals listed with their reason: a run that stored nothing while refusing pages must not
           be able to look like a quiet day. Each one is explained in words first, with the raw
           reason kept underneath — that string is what you search for when the explanation runs out. */}
-      {[...run.report.quarantined, ...run.report.dirty, ...run.report.disallowed].slice(0, 12).map((i) => {
+      {[...run.report.quarantined, ...run.report.dirty, ...run.report.disallowed, ...(run.report.offEntity ?? [])]
+        .slice(0, 12)
+        .map((i) => {
         const said = explainReason(i.reason);
         return (
           <div key={i.uri + i.reason} style={{ fontSize: 11, marginBottom: 6, overflowWrap: "anywhere" }}>

@@ -26,6 +26,7 @@ import type {
 import { canonicalize, inScope } from "@/lib/collect/canonical";
 import { collectors as registeredCollectors } from "@/lib/collect/registry";
 import { grade } from "@/lib/collect/quality";
+import { assessRelevance, relevanceMetadata } from "@/lib/collect/relevance";
 import { rawAsText, screenForInjection, stampProvenance } from "@/lib/collect/provenance";
 import { NO_RUN_STORE } from "@/lib/collect/state";
 import { CollectFetchError } from "@/lib/collect/net/fetcher";
@@ -70,6 +71,49 @@ export interface CrawlResult {
 }
 
 const ATTEMPTS_KEY = "_attempts";
+
+/**
+ * Target meta that describes the CRAWL rather than one URL, and therefore must reach the pages a
+ * page links to.
+ *
+ * An explicit list, never a spread of the parent's whole meta: `etag` and `lastModified` are also
+ * in there, they belong to ONE url, and handing a child its parent's etag makes the next fetch send
+ * a conditional GET for the wrong document — a 304 on a page nobody has ever read.
+ *
+ *   maxDepth    — the operator's own "follow links N deep", which until now was collected by the UI,
+ *                 stored, and read by nothing (run.ts passed one global 2 for every source).
+ *   entity      — what this crawl is researching; lib/collect/relevance.ts refuses pages that are
+ *                 about something else, and a child page must face the same test as its parent.
+ *   searchQuery — which search filed this run, so sink/kb.ts can auto-file the whole run into one
+ *                 folder. Without inheritance only the direct search hits were ever filed and
+ *                 everything found one hop later landed unfiled (159 of 161 documents, run
+ *                 manual-2026-09-20051728).
+ *   sourceId    — which configured source is answerable for this document.
+ */
+const INHERITED_META = ["maxDepth", "entity", "searchQuery", "sourceId"] as const;
+
+/**
+ * The depth limit for THIS target: what its source configured, else the run's default.
+ *
+ * Clamped rather than trusted — `options` is operator-typed jsonb, and a maxDepth of 9 on a news
+ * site is a crawl that never ends. 0 is meaningful and must survive the clamp: it is how an entity
+ * search says "read exactly the pages the search engine named, follow nothing".
+ */
+function depthLimitOf(target: Target, fallback: number): number {
+  const raw = target.meta?.maxDepth;
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(Math.floor(n), 5);
+}
+
+function inheritedMeta(parent: Record<string, unknown> | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!parent) return out;
+  for (const key of INHERITED_META) {
+    if (parent[key] !== undefined) out[key] = parent[key];
+  }
+  return out;
+}
 
 function seedToTarget(seed: SeedInput): Target | null {
   let host: string;
@@ -155,6 +199,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
     dirty: [],
     quarantined: [],
     disallowed: [],
+    offEntity: [],
     retried: 0,
     stoppedBy: null,
   };
@@ -250,9 +295,26 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
     // Shared by the live-discovery path below AND the 304-replay path: a link found just now and a
     // link replayed from cache must be filtered by the exact same depth/seen/scope rules, or the
     // cached path would silently behave more (or less) permissively than a live fetch ever does.
+    const depthLimit = depthLimitOf(target, maxDepth);
+    const carried = inheritedMeta(target.meta);
     const enqueueDiscovered = (items: Array<Partial<Target> & { uri: string; depth: number }>) => {
       for (const d of items) {
-        if (d.depth >= maxDepth) continue;
+        // `maxDepth` counts LEVELS OF PAGES, seed included — the meaning it has had since the
+        // orchestrator was written (2 = the seed and one hop), kept exactly so that raising the
+        // per-source knob is the only thing that ever widens a crawl.
+        //
+        // Depth 0 is a ROOT the source itself named rather than a link somebody followed: a
+        // `search://…` target is not a page, so its results are not one hop away from anything, and
+        // without this exemption "read exactly these, follow nothing" (limit 0) could not be
+        // expressed at all — it would refuse the results too.
+        //
+        // A non-finite depth is treated as one hop rather than trusted: collect/web-search used to
+        // return targets with no depth field at all through an `as unknown as Target[]` cast, which
+        // made every later comparison NaN, every comparison false, and the depth limit inoperative
+        // for the entire search branch of the crawl (run manual-2026-09-20051728: 190 fetches, 159
+        // of them a bookshop's browse tree, stopped only by the budget).
+        const depth = Number.isFinite(d.depth) ? d.depth : target.depth + 1;
+        if (depth > 0 && depth >= depthLimit) continue;
         const canonicalUri = canonicalize(d.uri);
         if (seen.has(canonicalUri)) continue;
         const scope = d.scope ?? target.scope;
@@ -260,7 +322,9 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
           report.outOfScope++;
           continue;
         }
-        frontier.push({ ...d, canonicalUri, scope, tier: 0 });
+        // The child's own meta wins: a block that deliberately stamped something (web-search's
+        // per-result searchQuery, its own scope) knows more about that target than its parent does.
+        frontier.push({ ...d, canonicalUri, scope, tier: 0, depth, meta: { ...carried, ...d.meta } });
       }
     };
 
@@ -361,11 +425,31 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         continue;
       }
 
+      let admitted = 0;
       for (const { doc, verdict } of graded) {
         if (!verdict.ok) {
           // Only the identifiers and the reason: pushing the whole RawDoc would put raw page bytes
           // into memory and into logs.
-          report.dirty.push({ uri: doc.uri, reason: verdict.reason ?? "unknown", checks: verdict.checks });
+          //
+          // `_no_heavier_tier` when a thin extraction was the LAST word available: a JavaScript-
+          // rendered profile page (a university's Pure portal, say) yields a 4KB shell, fails on
+          // length, and is recorded as "too_short" — which reads as "that page had nothing on it"
+          // when the truth is "nothing here can read that page". The two need different actions
+          // from the operator, so they must not share a label. Block-agnostic on purpose: the
+          // orchestrator states what it observed (no further strategy existed), never which vendor
+          // would have to be configured.
+          const thin = verdict.reason === "too_short" || verdict.reason === "low_text_density";
+          const reason = thin && !hasNextTier ? `${verdict.reason}_no_heavier_tier` : (verdict.reason ?? "unknown");
+          report.dirty.push({ uri: doc.uri, reason, checks: verdict.checks });
+          continue;
+        }
+        // Relevance is judged only AFTER extraction quality, and never triggers the degrade-to-a-
+        // heavier-strategy path above: a page that is about somebody else does not become about the
+        // right person when a renderer extracts it more completely. Quality can be fixed by trying
+        // harder; relevance cannot.
+        const relevance = assessRelevance(doc, target.meta);
+        if (!relevance.ok) {
+          report.offEntity.push({ uri: doc.uri, reason: relevance.reason ?? "off_entity" });
           continue;
         }
         const screen = screenForInjection(doc.text, rawAsText(doc));
@@ -373,11 +457,31 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
           report.quarantined.push({ uri: doc.uri, reason: `injection_${screen.hits.join("+")}` });
           continue; // never automatically stored; a human decides
         }
-        pending.push(stampProvenance(doc));
+        const evidence = relevanceMetadata(relevance);
+        // Which search filed this document, carried from the TARGET onto the document, once, here.
+        // It used to be copied by collect/http-html alone, which meant every other collector that
+        // could be reached from a search silently lost it — and losing it means sink/kb.ts cannot
+        // file the document, which is how 159 of 161 documents ended up unfiled.
+        const provenanceOfSearch: Record<string, unknown> = {};
+        for (const key of ["searchQuery", "searchAngle", "searchLang"] as const) {
+          if (doc.meta[key] === undefined && target.meta?.[key] !== undefined) provenanceOfSearch[key] = target.meta[key];
+        }
+        // Why this document is in the dossier, stored WITH the document: six months later the run
+        // report is a row nobody opens, and "it names her and mentions La Trobe" is what makes the
+        // collection auditable rather than a pile of URLs somebody has to re-read.
+        const extra = { ...provenanceOfSearch, ...(evidence ?? {}) };
+        pending.push(stampProvenance(Object.keys(extra).length ? { ...doc, meta: { ...doc.meta, ...extra } } : doc));
         delivered.add(doc.canonicalUrl);
+        admitted++;
       }
 
-      enqueueDiscovered(result.discovered);
+      // A page whose every document was refused does not get to nominate the next pages. Its links
+      // are the links of a navigation shell, a soft-404 or a stranger's homepage — which is how one
+      // rejected think-tank profile page put its cookie policy, ethics statement and DEI strategy
+      // into the crawl (run manual-2026-09-20051728). A block that produced no documents at all
+      // (a search, a sitemap, a feed index) is unaffected: discovery is its entire job.
+      if (graded.length === 0 || admitted > 0) enqueueDiscovered(result.discovered);
+      else log(`not expanding ${target.uri}: every extracted document was refused`);
 
       handled = true;
       break;
@@ -431,6 +535,7 @@ export function summarize(result: CrawlResult): string {
     `fetched=${r.fetched}`,
     `written=${result.sink.written}`,
     `dirty=${r.dirty.length}`,
+    `offEntity=${r.offEntity.length}`,
     `quarantined=${r.quarantined.length}`,
     `gone=${r.gone.length}`,
     `outOfScope=${r.outOfScope}`,

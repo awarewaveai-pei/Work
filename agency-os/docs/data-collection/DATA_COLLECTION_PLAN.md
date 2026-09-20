@@ -110,8 +110,14 @@ run(seeds, { sink, budget, tenantRef, maxDepth, flushEvery }):
       }
       graded = r.docs.map(d => [d, grade(d)])                    // 編排器算，不是積木自報
       if (graded.every(([,q]) => !q.ok) && hasNextTier) continue // 全不合格 → 升級策略再試
-      for ([d,q] of graded) q.ok ? pending.push(stampTrust(d)) : report.dirty.push({uri:d.uri, ...q})
-      frontier.push(...r.discovered.filter(x => x.depth < maxDepth && inScope(x)).map(withCanonical))
+      for ([d,q] of graded):                                     // 兩條獨立品質軸，見 ADR 014
+        if (!q.ok)                     report.dirty.push({uri:d.uri, ...q})
+        else if (!relevant(d, t.meta)) report.offEntity.push({uri:d.uri})  // 抽得好，但講的是別人
+        else                           pending.push(stampTrust(d))
+      if (graded.length === 0 || admittedAny)                    // 全被拒的頁面不得提名下一批頁面
+        frontier.push(...r.discovered
+          .filter(x => (x.depth === 0 || x.depth < depthLimitOf(t)) && inScope(x))  // depth 0 = 來源自己指名的 root
+          .map(withCarriedMeta))                                 // entity/searchQuery/maxDepth 隨著走
       break
 
     if pending.length >= flushEvery:                             // 增量落地，不是最後才寫

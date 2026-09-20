@@ -36,6 +36,19 @@ export interface KnowledgeInput {
    * defaulting crawled text to "a fact we wrote" is the mislabelling this field exists to prevent.
    */
   provenance?: KnowledgeProvenance;
+  /**
+   * Free-form facts about HOW this document was collected, written to cs_knowledge_sources.metadata
+   * (jsonb, migration 0051 — no schema change needed for a new key).
+   *
+   * Today's only writer is the collection pipeline's relevance gate: which entity the document was
+   * collected for, how confidently it matched, and the fragment that matched. Kept WITH the
+   * document rather than only in the run report, because six months later the run report is a row
+   * nobody opens and "why is this page in my dossier" is the question actually being asked.
+   *
+   * Not for anything a query needs to filter on: a jsonb blob nobody indexes is the right home for
+   * evidence, and the wrong home for a field that later grows a WHERE clause.
+   */
+  metadata?: Record<string, unknown> | null;
   /** Citation fields. Unknowable later — a page that changed takes its byline and date with it. */
   author?: string | null;
   publishedAt?: string | null;

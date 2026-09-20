@@ -141,10 +141,16 @@ export type SourceKind = "web" | "feed" | "sitemap" | "file" | "api" | "video" |
 export interface SourceOption {
   key: string;
   label: string;
-  type: "string" | "number" | "boolean" | "select";
+  /**
+   * `multiselect` is several of `choices` at once, stored as ONE comma-separated string rather than
+   * an array: `collection_sources.options` is jsonb that other code already reads as flat scalars,
+   * and a type that is a string here and an array there is the shape every downstream reader
+   * eventually gets wrong. Blocks parse it with entity.ts's parseTermList.
+   */
+  type: "string" | "number" | "boolean" | "select" | "multiselect";
   required?: boolean;
   default?: string | number | boolean;
-  /** For `select` — the allowed values, each with a label. */
+  /** For `select` and `multiselect` — the allowed values, each with a label. */
   choices?: Array<{ value: string; label: string }>;
   help?: string;
 }
@@ -265,6 +271,13 @@ export interface RunReport {
   /** Refused by robots.txt or by the SSRF gate — correct behaviour, kept out of `dirty` so an
    *  alert on extraction failures does not fire on it. */
   disallowed: CollectIssue[];
+  /**
+   * Fetched and extracted cleanly, then refused for not being about the entity the source asserted
+   * (lib/collect/relevance.ts). Its own bucket for the same reason `disallowed` has one: this is
+   * the system working — a search engine returning something irrelevant — and counting it as a
+   * failure would raise an incident on correct behaviour until somebody muted the alert.
+   */
+  offEntity: CollectIssue[];
   retried: number;
   stoppedBy: "frontier_empty" | "budget" | null;
 }

@@ -304,6 +304,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
     docType: input.docType ?? null,
     authorityTier: input.authorityTier ?? null,
     domainPack: input.domainPack ?? null,
+    metadata: input.metadata ?? {},
     epistemicType: provenance.epistemicType,
     authorshipState: provenance.authorshipState,
     locked: provenance.locked ?? null,

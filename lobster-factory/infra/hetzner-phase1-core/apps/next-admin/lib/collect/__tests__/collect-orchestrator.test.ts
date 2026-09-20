@@ -232,7 +232,10 @@ describe("crawl — surrounding guarantees", () => {
     const r = await crawl(seeds, { ...baseOpts(), sink, blocks: [block] });
 
     expect(sink.received).toHaveLength(0);
-    expect(r.report.dirty[0]).toMatchObject({ uri: `https://${HOST}/a`, reason: "too_short" });
+    // `_no_heavier_tier`: this crawl had exactly one strategy, so a thin extraction is the last
+    // word rather than something a renderer might still read. The two cases need different actions
+    // from the operator and therefore carry different labels.
+    expect(r.report.dirty[0]).toMatchObject({ uri: `https://${HOST}/a`, reason: "too_short_no_heavier_tier" });
     expect(r.report.dirty[0].checks?.script).toBe("cjk");
   });
 

@@ -17,7 +17,7 @@ const spies = vi.hoisted(() => ({
 vi.mock("@/lib/collect/blocks", () => ({}));
 vi.mock("@/lib/collect/orchestrator", () => ({
   crawl: vi.fn(async () => ({
-    report: { fetched: 0, outOfScope: 0, unhandled: [], gone: [], dirty: [], quarantined: [], disallowed: [], retried: 0, stoppedBy: "frontier_empty" },
+    report: { fetched: 0, outOfScope: 0, unhandled: [], gone: [], dirty: [], quarantined: [], disallowed: [], offEntity: [], retried: 0, stoppedBy: "frontier_empty" },
     sink: { written: 0, skipped: 0 },
   })),
 }));

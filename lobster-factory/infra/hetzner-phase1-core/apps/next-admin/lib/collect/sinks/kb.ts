@@ -96,6 +96,32 @@ export interface KbSinkOptions {
   maxBodyChars?: number;
 }
 
+/**
+ * The entity-evidence keys, picked out by name rather than passing `doc.meta` wholesale.
+ *
+ * doc.meta also carries etag, last-modified and whatever else a collector happened to stash there;
+ * writing all of it into the knowledge base would put HTTP plumbing into a table the customer-
+ * service prompt reads from, and would grow silently every time a collector adds a key.
+ */
+const ENTITY_META_KEYS = [
+  "entityName",
+  "entityKind",
+  "entityConfidence",
+  "entityHits",
+  "entityAnchorsHit",
+  "entitySnippet",
+  "searchQuery",
+  "searchAngle",
+] as const;
+
+export function entityMetadata(meta: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of ENTITY_META_KEYS) {
+    if (meta[key] !== undefined) out[key] = meta[key];
+  }
+  return out;
+}
+
 export function createKbSink(opts: KbSinkOptions = {}): SinkBlock {
   const orgOf = opts.organizationIdFor ?? ((tenantRef: string) => tenantRef);
   const maxBodyChars = opts.maxBodyChars ?? 100_000;
@@ -140,6 +166,10 @@ export function createKbSink(opts: KbSinkOptions = {}): SinkBlock {
               authorshipState: doc.provenance.authorship_state,
               locked: doc.provenance.locked,
             },
+            // Why this document is in the dossier: stamped by the orchestrator's relevance gate
+            // (lib/collect/relevance.ts -> relevanceMetadata). Absent for every source that makes
+            // no entity claim, which is every source that existed before entity research did.
+            metadata: entityMetadata(doc.meta),
             author: doc.author,
             publishedAt: doc.publishedAt,
             venue: typeof doc.meta.venue === "string" ? doc.meta.venue : null,

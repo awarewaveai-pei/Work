@@ -116,6 +116,17 @@ export function validateSourceConfig(
     if (opt.type === "select" && !(opt.choices ?? []).some((c) => c.value === given)) {
       errors.push(`option_not_a_choice:${opt.key}`);
     }
+    if (opt.type === "multiselect") {
+      // One comma-separated string (see SourceOption's note on why it is not an array). Validated
+      // value by value: a typo'd angle id would otherwise be stored, silently produce no query, and
+      // look exactly like a search engine with nothing to say about that angle.
+      const values = String(given)
+        .split(/[,\s]+/)
+        .map((v) => v.trim())
+        .filter(Boolean);
+      const unknown = values.filter((v) => !(opt.choices ?? []).some((c) => c.value === v));
+      if (unknown.length) errors.push(`option_not_a_choice:${opt.key}:${unknown.join("/")}`);
+    }
   }
 
   return { ok: errors.length === 0, errors };

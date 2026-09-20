@@ -204,6 +204,7 @@ describe("severityFor", () => {
     dirty: [],
     quarantined: [],
     disallowed: [],
+    offEntity: [],
     retried: 0,
     stoppedBy: "frontier_empty",
     ...over,

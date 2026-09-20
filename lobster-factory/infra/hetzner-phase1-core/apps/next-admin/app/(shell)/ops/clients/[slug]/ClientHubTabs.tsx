@@ -1339,6 +1339,47 @@ export function groupByFolder<T extends { folderId: string | null }>(items: T[])
 // Exported for __tests__/groupByFolder.test.ts's sibling render test (KnowledgeTab.render.test.tsx) —
 // matches this directory's own convention of jsdom-rendering a "use client" component directly
 // (KnowledgeDetailModal.test.tsx), not a new testing approach.
+/**
+ * Why this document is in the dossier, on the row itself.
+ *
+ * The title of a real collected page is 〈The path to peace in Afghanistan〉 — nothing in it says the
+ * page is about the person the folder is named after, so a correct collection reads as a wrong one
+ * (operator, 2026-09-20: "搜尋下來的資料裡面沒有顯示 Theo Farrell"). This shows the matched name, how
+ * firmly it matched, and the fragment that matched it.
+ *
+ * Renders nothing at all for a document collected without an entity claim, which is most of them.
+ */
+function EntityEvidence({ metadata }: { metadata?: Record<string, unknown> | null }) {
+  const name = typeof metadata?.entityName === "string" ? metadata.entityName : null;
+  if (!name) return null;
+  const confidence = typeof metadata?.entityConfidence === "string" ? metadata.entityConfidence : null;
+  const anchors = Array.isArray(metadata?.entityAnchorsHit) ? (metadata.entityAnchorsHit as string[]) : [];
+  const hits = typeof metadata?.entityHits === "number" ? metadata.entityHits : null;
+  const snippet = typeof metadata?.entitySnippet === "string" ? metadata.entitySnippet : null;
+
+  // weak = the name matched but none of the operator's disambiguation terms did, i.e. this may be a
+  // different person with the same name. Amber, because it is a real finding that needs a human eye,
+  // not an error.
+  const weak = confidence === "weak";
+  const label = weak ? `可能不是本人：${name}` : `✓ ${name}${anchors.length ? `・${anchors.join("/")}` : ""}${hits ? `（${hits} 處）` : ""}`;
+
+  return (
+    <span
+      title={snippet ? `命中片段：${snippet}` : label}
+      style={{
+        fontSize: 10,
+        padding: "2px 7px",
+        borderRadius: 5,
+        whiteSpace: "nowrap",
+        background: weak ? "var(--badge-amber-bg, var(--bg-canvas))" : "var(--badge-green-bg)",
+        color: weak ? "var(--amber, var(--text-secondary))" : "var(--badge-green-text)",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
   const [sources, setSources] = useState<
@@ -1351,6 +1392,7 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
       folderId: string | null;
       keywordMode: string;
       chunks: number;
+      metadata?: Record<string, unknown> | null;
       cognitiveOsProjectId: string | null;
       cognitiveOsImportedAt: string | null;
       hciSourceId: string | null;
@@ -1795,6 +1837,7 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
                               已送 HCI
                             </span>
                           ) : null}
+                          <EntityEvidence metadata={s.metadata} />
                           <span style={{ color: "var(--text-muted)" }}>{s.chunks} 塊</span>
                           <select
                             value={s.folderId ?? ""}

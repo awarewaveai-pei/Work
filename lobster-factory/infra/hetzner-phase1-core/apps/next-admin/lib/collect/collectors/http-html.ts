@@ -289,12 +289,9 @@ export const httpHtmlCollector: CollectBlock = {
         lastModified: res.headers.get("last-modified") ?? undefined,
         declaredCanonicalRejected: rejectedCanonical ?? undefined,
         language: /<html\b[^>]*\blang\s*=\s*["']?([a-z-]+)/i.exec(html)?.[1] ?? undefined,
-        // Carried forward, not computed here: collect/web-search.ts stamps this on the Targets it
-        // discovers so sink/kb.ts can auto-file a search run's results into a folder (operator,
-        // 2026-09-18). Absent for every other path that reaches this collector (a directly-added
-        // URL, an RSS/sitemap discovery) — this is the ONLY hop where that field would otherwise be
-        // silently dropped, since a Target's own `meta` never survives into its RawDoc by default.
-        searchQuery: typeof t.meta?.searchQuery === "string" ? t.meta.searchQuery : undefined,
+        // searchQuery used to be copied here, by this collector alone. The orchestrator now carries
+        // it (and searchAngle/searchLang) from the target onto EVERY collector's documents, so a
+        // page read by the rendered tier or the API tier is filed the same as one read here.
       },
     };
 

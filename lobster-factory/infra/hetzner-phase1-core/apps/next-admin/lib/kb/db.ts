@@ -99,7 +99,7 @@ export async function listKnowledgeSources(organizationId: string, opts?: ListSo
   let query = sb
     .from("cs_knowledge_sources")
     .select(
-      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,cognitive_os_project_id,cognitive_os_imported_at,hci_source_id,hci_imported_at",
+      "id,title,kind,is_sensitive,status,source_version,doc_family_id,canonical_url,folder_id,keyword_mode,metadata,cognitive_os_project_id,cognitive_os_imported_at,hci_source_id,hci_imported_at",
       { count: "exact" },
     )
     .eq("organization_id", organizationId)
@@ -139,6 +139,10 @@ export async function listKnowledgeSources(organizationId: string, opts?: ListSo
     folderId: (s.folder_id as string | null) ?? null,
     keywordMode: (s.keyword_mode as string | null) ?? "inherit",
     chunks: counts.get(s.id as string) ?? 0,
+    // Collection evidence, for the list to answer "why is this page here?" without opening it. A
+    // title like 〈The path to peace in Afghanistan〉 carries no sign that the document names the
+    // person the dossier is about (operator, 2026-09-20: "搜尋下來的資料裡面沒有顯示 Theo Farrell").
+    metadata: (s.metadata as Record<string, unknown> | null) ?? {},
     cognitiveOsProjectId: (s.cognitive_os_project_id as string | null) ?? null,
     cognitiveOsImportedAt: (s.cognitive_os_imported_at as string | null) ?? null,
     hciSourceId: (s.hci_source_id as string | null) ?? null,
@@ -457,6 +461,7 @@ export interface SourceInput {
   docType?: string | null;
   authorityTier?: string | null;
   domainPack?: string | null;
+  metadata?: Record<string, unknown> | null;
   epistemicType?: string;
   authorshipState?: string;
   locked?: string | null;
@@ -490,6 +495,9 @@ export async function insertSource(input: SourceInput): Promise<string | null> {
       doc_type: input.docType ?? null,
       authority_tier: input.authorityTier ?? null,
       domain_pack: input.domainPack ?? null,
+      // Defaults to {} rather than null: the column is NOT NULL DEFAULT '{}' (0051), and every
+      // reader treats "no metadata" as an empty object.
+      metadata: input.metadata ?? {},
       epistemic_type: input.epistemicType ?? null,
       authorship_state: input.authorshipState ?? null,
       locked: input.locked ?? null,

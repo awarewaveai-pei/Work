@@ -36,11 +36,12 @@ function issueRows(report: RunReport): Array<{ kind: CollectIssueKind; issue: Co
     ...report.dirty.map((issue) => ({ kind: "dirty" as const, issue })),
     ...report.quarantined.map((issue) => ({ kind: "quarantined" as const, issue })),
     ...report.disallowed.map((issue) => ({ kind: "disallowed" as const, issue })),
+    ...report.offEntity.map((issue) => ({ kind: "off_entity" as const, issue })),
     ...report.gone.map((uri) => ({ kind: "gone" as const, issue: { uri, reason: "http_gone" } })),
   ];
 }
 
-type CollectIssueKind = "dirty" | "quarantined" | "disallowed" | "gone";
+type CollectIssueKind = "dirty" | "quarantined" | "disallowed" | "gone" | "off_entity";
 
 /**
  * Decide whether this run is worth waking someone for, and how loudly.
@@ -51,6 +52,11 @@ type CollectIssueKind = "dirty" | "quarantined" | "disallowed" | "gone";
  */
 export function severityFor(report: RunReport, sink: SinkReport): "low" | "medium" | "high" | null {
   const refused = report.dirty.length + report.quarantined.length;
+  // Off-entity is NOT a refusal for alerting purposes — the crawler worked and the search engine
+  // was noisy. But a run where it is the ONLY outcome is a real fault of a different kind: the
+  // operator's anchors exclude everything, so the source will keep costing money and storing
+  // nothing until somebody looks. Reported as medium, not high: nothing is broken, a setting is.
+  if (refused === 0 && report.offEntity.length > 0 && sink.written === 0) return "medium";
   if (refused === 0) return null;
   const attempted = report.fetched + refused + report.gone.length;
 
@@ -89,6 +95,7 @@ export async function persistRunReport(args: PersistArgs): Promise<PersistResult
         dirty: args.report.dirty.length,
         quarantined: args.report.quarantined.length,
         disallowed: args.report.disallowed.length,
+        off_entity: args.report.offEntity.length,
         gone: args.report.gone.length,
         retried: args.report.retried,
         budget_spent: spent,
@@ -175,7 +182,7 @@ async function raiseCollectionIncident(args: {
       message: [
         `run=${args.runKey} (${args.runId ?? "unsaved"})`,
         `stored=${args.sink.written} refused=${args.report.dirty.length} quarantined=${args.report.quarantined.length}`,
-        `disallowed=${args.report.disallowed.length} gone=${args.report.gone.length} stoppedBy=${args.report.stoppedBy}`,
+        `disallowed=${args.report.disallowed.length} offEntity=${args.report.offEntity.length} gone=${args.report.gone.length} stoppedBy=${args.report.stoppedBy}`,
         ...sample.map((i) => `- ${i.uri} :: ${i.reason}`),
       ].join("\n"),
       last_seen_at: new Date().toISOString(),

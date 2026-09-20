@@ -38,7 +38,13 @@ import "@/lib/collect/blocks"; // registering the built-in sources is the point 
 export function runStatusSummary(result: Pick<CrawlResult, "report" | "sink">): string {
   const base = result.report.stoppedBy === "budget" ? "stopped_by_budget" : "ok";
   const refused = result.report.dirty.length + result.report.quarantined.length + result.report.disallowed.length;
-  return `${base} · 抓${result.report.fetched} 入庫${result.sink.written} 未變${result.sink.skipped} 擋${refused}`;
+  // Off-entity is counted SEPARATELY from `擋`: they are refusals of a different kind (the page was
+  // fine, it was about somebody else) and an operator reading "擋 159" cannot tell whether their
+  // crawler is broken or their search engine is noisy. Shown only when it happened, so a source
+  // that makes no entity claim keeps exactly the status string it had before.
+  const offEntity = result.report.offEntity.length;
+  const tail = offEntity ? ` 非本人${offEntity}` : "";
+  return `${base} · 抓${result.report.fetched} 入庫${result.sink.written} 未變${result.sink.skipped} 擋${refused}${tail}`;
 }
 
 export interface RunCollectionOptions {
@@ -99,7 +105,7 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
       // tenant with no approved sources looks identical to a tenant whose crawl is broken.
       report: {
         fetched: 0, outOfScope: 0, unhandled: [], gone: [], dirty: [], quarantined: [],
-        disallowed: [], retried: 0, stoppedBy: "frontier_empty",
+        disallowed: [], offEntity: [], retried: 0, stoppedBy: "frontier_empty",
       },
       sink: { written: 0, skipped: 0 },
       persistedRunId: null,

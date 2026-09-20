@@ -9,6 +9,7 @@
 
 import "@/lib/collect/collectors/http-html";
 import "@/lib/collect/collectors/web-search";
+import "@/lib/collect/collectors/entity-dossier";
 import "@/lib/collect/collectors/academic";
 import "@/lib/collect/collectors/local-file";
 import "@/lib/collect/collectors/video";
