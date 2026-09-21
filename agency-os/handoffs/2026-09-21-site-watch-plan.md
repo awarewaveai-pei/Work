@@ -18,6 +18,8 @@ source_session_summary: "Entity dossier + self-hosted renderer 上線後，操�
 
 - 自建網站接入：唯一動作 = 在系統新增客戶（填網址）；onboard wizard（`app/(shell)/onboard/OnboardWizard.tsx`，已有 Uptime Kuma 等整合清單）加「網站巡檢」項，預設勾。安全網：總覽表列出「MainWP 有、系統沒有」的網站（next-admin 目前無 MainWP 站點清單讀取，需新增唯讀 MainWP API 讀取，P1 末或 P1.5）。
 
+- MainWP 自動接入：已有 `lobster-factory/packages/workflows/src/integrations/integration-steps.ts:347 addSiteToMainWp`（POST `/wp-json/mainwp/v2/site/add`），被 `create-wp-site.ts:430`、`adopt-client-os.ts:425` 呼叫。WORKLOG/TASKS 無任何實跑證據 → 先對真 MainWP 驗證（body 只送 url+admin_url，是否缺 admin 帳號欄位待查官方文件）。前提：站上已裝啟用 mainwp-child；自建站無 SSH 時需操作者手動裝這一個外掛。操作者要：勾選即自動接上。
+
 ## 3. 重用（已查證，不建新輪子）
 - 排程：照 collection-schedule 模式。`lib/collect/schedule-store.ts` + `schedule.ts isDueNow` + `app/api/internal/collect/run-due-schedules/route.ts`（專用 bearer token、lastRunAt 成功後才寫）+ Trigger.dev 每小時 heartbeat `packages/workflows/src/trigger/collect-scheduled-crawl.ts`。
 - 通知：失敗 = 開 ops-inbox incident，恢復 = resolve；`lib/ops-inbox/notify/dispatcher.ts:34 dispatchNotifications` 已有 Telegram 與 transition 去重語意。
