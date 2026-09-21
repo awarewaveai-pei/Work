@@ -137,6 +137,12 @@ export COLLECT_SCHEDULE_INGEST_TOKEN='$cstTok'
 export LOBSTER_EXECUTE_MANIFEST_STEPS='$execSteps'
 export LOBSTER_WP_SSH_PRIVATE_KEY='$wpSshKey'
 
+# MainWP (create-wp-site addSiteToMainWp) - read here on the host, never leaves it
+# One variable at a time (the .env is Docker syntax, not shell): values are never evaluated.
+for v in MAINWP_DASHBOARD_URL MAINWP_CONSUMER_KEY MAINWP_CONSUMER_SECRET; do
+  export "`$v=`$(grep -m1 "^`$v=" /root/lobster-phase1/.env | cut -d= -f2-)"
+done
+
 echo '=== Env ready ==='
 echo "  TRIGGER_API_URL (CLI):          `$TRIGGER_API_URL"
 echo "  LOBSTER_TRIGGER_PUBLIC_API_URL: `$LOBSTER_TRIGGER_PUBLIC_API_URL"
@@ -148,6 +154,7 @@ echo "  N8N_URL:                        `$N8N_URL"
 echo "  UPTIME_KUMA_URL:                `$UPTIME_KUMA_URL"
 echo "  LOBSTER_EXECUTE_MANIFEST_STEPS: `$LOBSTER_EXECUTE_MANIFEST_STEPS"
 if [ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ]; then echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: yes"; else echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: no"; fi
+if [ -n "`$MAINWP_CONSUMER_SECRET" ]; then echo "  MAINWP_* set: yes (`$MAINWP_DASHBOARD_URL)"; else echo "  MAINWP_* set: no"; fi
 
 cd /root/Work/lobster-factory/packages/workflows
 

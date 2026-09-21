@@ -24,9 +24,12 @@ JSON body:
 {
   "organizationId": "<uuid>",
   "siteId": "<uuid>",
-  "siteName": "<string>"
+  "siteName": "<string>",
+  "mainwpChildUniqueId": "<optional hex>"
 }
 ```
+
+`mainwpChildUniqueId` (optional): the bridge installs mainwp-child, sets it as the child's Unique Security ID and turns password auth off for `wpAdminUser`, so MainWP can connect without the admin password. Request only — never echo it in the response or notes.
 
 ## Success response
 HTTP **2xx** with JSON body:

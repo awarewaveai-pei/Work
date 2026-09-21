@@ -775,7 +775,7 @@ export default function BuildConsole() {
                   form.integrations?.sentry?.org           ? "Sentry" : null,
                   form.integrations?.postHog?.projectApiKey ? "PostHog" : null,
                   form.integrations?.n8n?.onboardingWebhookUrl ? "n8n" : null,
-                  form.integrations?.mainWp?.dashboardUrl  ? "MainWP" : null,
+                  form.integrations?.mainWp?.enabled !== false ? "MainWP" : null,
                 ].filter(Boolean).join(" · ") || "none configured"}
               </span>
             </button>
@@ -875,25 +875,15 @@ export default function BuildConsole() {
               {/* MainWP */}
               <div className="build-integration-group">
                 <div className="build-integration-label">MainWP Dashboard</div>
+                <label className="build-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.integrations?.mainWp?.enabled !== false}
+                    onChange={(event) => updateIntegration("mainWp", "enabled", event.target.checked)}
+                  />
+                  <span>建好後自動接上 MainWP（金鑰在伺服器上，不用填）</span>
+                </label>
                 <div className="build-form-grid">
-                  <TextInput
-                    label="Dashboard URL"
-                    value={form.integrations?.mainWp?.dashboardUrl}
-                    onChange={(v) => updateIntegration("mainWp", "dashboardUrl", v)}
-                    placeholder="https://mainwp.aware-wave.com"
-                  />
-                  <TextInput
-                    label="Consumer Key"
-                    value={form.integrations?.mainWp?.consumerKey}
-                    onChange={(v) => updateIntegration("mainWp", "consumerKey", v)}
-                    placeholder="ck_xxxxxxxxxxxx"
-                  />
-                  <TextInput
-                    label="Consumer Secret"
-                    value={form.integrations?.mainWp?.consumerSecret}
-                    onChange={(v) => updateIntegration("mainWp", "consumerSecret", v)}
-                    placeholder="cs_xxxxxxxxxxxx"
-                  />
                   <TextInput
                     label="網站管理員帳號（留空 = 用系統建站時建立的帳號）"
                     value={form.integrations?.mainWp?.adminUsername}

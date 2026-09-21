@@ -8,7 +8,7 @@ import { supabaseRestInsert, supabaseRestPatch } from "../db/supabase/supabaseRe
 import { resolveStagingProvisioning } from "../hosting/resolveStagingProvisioning";
 import { captureWorkflowException } from "../observability/sentry";
 import { captureWorkflowEvent } from "../observability/posthog";
-import { runAllIntegrations, type BuildIntegrations } from "../integrations/integration-steps";
+import { newMainWpChildUniqueId, runAllIntegrations, type BuildIntegrations } from "../integrations/integration-steps";
 
 const SUPPORTED_MANIFEST_SLUGS = ["wp-basic", "wp-business", "wp-tourism", "wc-core", "wc-custom"] as const;
 
@@ -120,7 +120,7 @@ const IntegrationsSchema = z.object({
   sentry:     z.object({ org: z.string(), authToken: z.string(), team: z.string().optional() }).optional(),
   postHog:    z.object({ projectApiKey: z.string(), host: ssrfSafeUrl.optional() }).optional(),
   n8n:        z.object({ onboardingWebhookUrl: ssrfSafeUrl, bearerToken: z.string().optional() }).optional(),
-  mainWp:     z.object({ dashboardUrl: ssrfSafeUrl, consumerKey: z.string(), consumerSecret: z.string(), adminUsername: z.string().optional() }).optional(),
+  mainWp:     z.object({ enabled: z.boolean().optional(), adminUsername: z.string().optional() }).optional(),
 }).optional();
 
 const InputSchema = z.preprocess(
@@ -207,6 +207,9 @@ export const createWpSite = task({
         siteId: input.siteId,
       });
 
+      // Generated here and held in memory only: it reaches the bridge in the request and MainWP in
+      // the registration call, never the task payload, the staging ref or any log.
+      const mainwpChildUniqueId = newMainWpChildUniqueId((input.integrations as BuildIntegrations | undefined)?.mainWp);
       const hosting = await resolveStagingProvisioning({
         siteId: input.siteId,
         siteName: input.siteName,
@@ -216,6 +219,7 @@ export const createWpSite = task({
         manifestSlug: input.manifestSlug,
         pluginSlugs: input.pluginSlugs,
         websiteSpecId: input.websiteSpecId,
+        mainwpChildUniqueId,
       });
 
     if (hosting.outcome === "blocked") {
@@ -435,6 +439,7 @@ export const createWpSite = task({
           clientName: input.siteName,
           profile: "profile_b",
           wpAdminUser: stagingRef?.wpAdminUser,
+          mainWpChildUniqueId: stagingRef ? mainwpChildUniqueId : undefined,
           clientSlug: input.clientSlug,
         }
       );

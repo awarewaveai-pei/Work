@@ -49,14 +49,11 @@ export interface N8nConfig {
   bearerToken?: string;
 }
 
-export interface MainWpConfig {
-  /** URL of your MainWP Dashboard, e.g. https://mainwp.aware-wave.com */
-  dashboardUrl: string;
-  /** MainWP Consumer Key */
-  consumerKey: string;
-  /** MainWP Consumer Secret */
-  consumerSecret: string;
-  /** Override for the child-site admin username; empty = the one the provisioner installed */
+/** MainWP credentials live in the Trigger.dev environment (MAINWP_*), never in this payload. */
+export interface MainWpOptions {
+  /** Registration is on unless explicitly false */
+  enabled?: boolean;
+  /** Child-site admin username override; empty = the one the provisioner installed */
   adminUsername?: string;
 }
 
@@ -65,7 +62,7 @@ export interface BuildIntegrations {
   sentry?: SentryConfig;
   postHog?: PostHogConfig;
   n8n?: N8nConfig;
-  mainWp?: MainWpConfig;
+  mainWp?: MainWpOptions;
 }
 
 export interface BuildRunRequest {

@@ -20,6 +20,8 @@ export async function resolveStagingProvisioning(input: {
   manifestSlug?: string;
   pluginSlugs?: string[];
   websiteSpecId?: string;
+  /** Set on mainwp-child (with password auth off for the admin) so MainWP can connect without the password. */
+  mainwpChildUniqueId?: string;
 }): Promise<StagingHostingProvisionResult> {
   const raw = process.env.LOBSTER_HOSTING_ADAPTER?.trim();
   const mode = (raw || "none").toLowerCase();

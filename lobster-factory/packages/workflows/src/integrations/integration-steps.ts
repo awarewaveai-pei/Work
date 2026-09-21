@@ -9,6 +9,8 @@
  * return status: "skipped" so the workflow doesn't break.
  */
 
+import { randomBytes } from "node:crypto";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types shared with contracts.ts (duplicated to avoid circular imports)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,21 +42,34 @@ export type N8nConfig = {
   bearerToken?: string;
 };
 
+/** Server-side only: read from the Trigger.dev environment (MAINWP_*), never from the run payload. */
 export type MainWpConfig = {
   dashboardUrl: string;
   consumerKey: string;
   consumerSecret: string;
-  /** Username of an administrator ON THE CHILD SITE. MainWP hands it to mainwp-child, which
-   *  refuses the connection without it. Not a secret. */
+};
+
+/** What a run payload may say about MainWP. Registration is ON unless `enabled === false`. */
+export type MainWpOptions = {
+  enabled?: boolean;
+  /** Administrator username ON THE CHILD SITE (mainwp-child refuses without it). Overrides the
+   *  one the provisioner reports; needed for adopted sites. Not a secret. */
   adminUsername?: string;
 };
+
+export function mainWpConfigFromEnv(env: Record<string, string | undefined> = process.env): MainWpConfig | undefined {
+  const dashboardUrl = env.MAINWP_DASHBOARD_URL?.trim();
+  const consumerKey = env.MAINWP_CONSUMER_KEY?.trim();
+  const consumerSecret = env.MAINWP_CONSUMER_SECRET?.trim();
+  return dashboardUrl && consumerKey && consumerSecret ? { dashboardUrl, consumerKey, consumerSecret } : undefined;
+}
 
 export type BuildIntegrations = {
   uptimeKuma?: UptimeKumaConfig;
   sentry?: SentryConfig;
   postHog?: PostHogConfig;
   n8n?: N8nConfig;
-  mainWp?: MainWpConfig;
+  mainWp?: MainWpOptions;
 };
 
 export type IntegrationResult = {
@@ -348,15 +363,17 @@ export async function triggerN8nOnboarding(
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Contract verified against the installed MainWP 6.0.12 source (class-mainwp-rest-sites-controller.php):
-// route `sites/add` (not `site/add`), fields url / name / admin (child-site admin username), Basic
-// auth over HTTPS only. A refused add still answers HTTP 200 with `{success: 0, error}` — res.ok
-// alone reports every failure as success.
+// route `sites/add` (not `site/add`), fields url / name / admin (child-site admin username) /
+// uniqueid, Basic auth over HTTPS only. A refused add still answers HTTP 200 with
+// `{success: 0, error}` — res.ok alone reports every failure as success.
+// mainwp-child 6.x verifies the connecting admin by password unless the provisioner turned
+// password auth off for that user and set a Unique Security ID — then `uniqueid` must match.
 export async function addSiteToMainWp(
   cfg: MainWpConfig | undefined,
   siteUrl: string,
   siteName: string,
-  /** Admin the provisioner installed; an explicit cfg.adminUsername overrides it. */
-  provisionedAdminUser?: string
+  adminUsername: string | undefined,
+  childUniqueId?: string
 ): Promise<IntegrationResult> {
   if (!cfg?.dashboardUrl || !cfg?.consumerKey || !cfg?.consumerSecret) {
     return { service: "mainwp", status: "skipped", detail: "mainWp config not provided" };
@@ -364,7 +381,7 @@ export async function addSiteToMainWp(
   if (!siteUrl) {
     return { service: "mainwp", status: "error", detail: "no site URL to register" };
   }
-  const admin = cfg.adminUsername?.trim() || provisionedAdminUser?.trim();
+  const admin = adminUsername?.trim();
   if (!admin) {
     return {
       service: "mainwp",
@@ -383,7 +400,7 @@ export async function addSiteToMainWp(
         "Content-Type": "application/json",
         Authorization: `Basic ${credentials}`,
       },
-      body: JSON.stringify({ url: siteUrl, name: siteName, admin }),
+      body: JSON.stringify({ url: siteUrl, name: siteName, admin, ...(childUniqueId ? { uniqueid: childUniqueId } : {}) }),
     });
 
     if (!res.ok) {
@@ -427,10 +444,13 @@ export async function runAllIntegrations(
     profile: string;
     /** Administrator username the hosting provisioner installed (stagingRef.wpAdminUser). */
     wpAdminUser?: string;
+    /** Unique Security ID this run generated and the provisioner set on mainwp-child. In memory only. */
+    mainWpChildUniqueId?: string;
     /** organizations.slug — threads client attribution into monitor tags + Sentry project slug */
     clientSlug?: string;
   }
 ): Promise<IntegrationResult[]> {
+  const mainWp = registerWithMainWp(integrations?.mainWp, site);
   if (!integrations) {
     return [
       { service: "uptime_kuma",     status: "skipped", detail: "no integrations config" },
@@ -438,7 +458,7 @@ export async function runAllIntegrations(
       { service: "sentry",          status: "skipped", detail: "no integrations config" },
       { service: "posthog",         status: "skipped", detail: "no integrations config" },
       { service: "n8n",             status: "skipped", detail: "no integrations config" },
-      { service: "mainwp",          status: "skipped", detail: "no integrations config" },
+      await mainWp,
     ];
   }
 
@@ -453,7 +473,7 @@ export async function runAllIntegrations(
       clientName: site.clientName,
       profile: site.profile,
     }),
-    addSiteToMainWp(integrations.mainWp, site.siteUrl, site.clientName, site.wpAdminUser),
+    mainWp,
   ]);
 
   return results.map((r) =>
@@ -461,4 +481,31 @@ export async function runAllIntegrations(
       ? r.value
       : { service: "unknown", status: "error" as const, detail: String((r as PromiseRejectedResult).reason) }
   );
+}
+
+// MainWP is on by default: its credentials live server-side, so unlike the other integrations it
+// does not need the payload to carry anything. An adopted site with no known admin is skipped
+// (not an error) unless the operator explicitly asked for registration.
+async function registerWithMainWp(
+  opts: MainWpOptions | undefined,
+  site: { siteUrl: string; clientName: string; wpAdminUser?: string; mainWpChildUniqueId?: string }
+): Promise<IntegrationResult> {
+  if (opts?.enabled === false) {
+    return { service: "mainwp", status: "skipped", detail: "MainWP registration unchecked for this run" };
+  }
+  const admin = opts?.adminUsername?.trim() || site.wpAdminUser?.trim();
+  if (!admin && opts?.enabled !== true) {
+    return { service: "mainwp", status: "skipped", detail: "no child-site admin known (set mainWp.adminUsername)" };
+  }
+  const cfg = mainWpConfigFromEnv();
+  if (!cfg && opts?.enabled === true) {
+    return { service: "mainwp", status: "error", detail: "MainWP registration requested but MAINWP_* is not set on the server" };
+  }
+  return addSiteToMainWp(cfg, site.siteUrl, site.clientName, admin, site.mainWpChildUniqueId);
+}
+
+/** A fresh Unique Security ID for mainwp-child, or undefined when MainWP registration will not run. */
+export function newMainWpChildUniqueId(opts: MainWpOptions | undefined): string | undefined {
+  if (opts?.enabled === false || !mainWpConfigFromEnv()) return undefined;
+  return randomBytes(24).toString("hex");
 }

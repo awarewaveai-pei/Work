@@ -121,6 +121,17 @@ export default defineConfig({
         if (uptimeApiKey.trim())  out.UPTIME_KUMA_API_KEY                        = uptimeApiKey.trim();
         if (supAccessTkn.trim())  out.TENANT_PROVISION_SUPABASE_ACCESS_TOKEN     = supAccessTkn.trim();
 
+        // ── MainWP (create-wp-site / adopt-client-os → addSiteToMainWp) ──────
+        // Credentials come only from here, never from the run payload (it is persisted).
+        const mainWpUrl    = process.env.MAINWP_DASHBOARD_URL   ?? "";
+        const mainWpKey    = process.env.MAINWP_CONSUMER_KEY    ?? "";
+        const mainWpSecret = process.env.MAINWP_CONSUMER_SECRET ?? "";
+        if (mainWpUrl.trim() && mainWpKey.trim() && mainWpSecret.trim()) {
+          out.MAINWP_DASHBOARD_URL   = mainWpUrl.trim().replace(/\/$/, "");
+          out.MAINWP_CONSUMER_KEY    = mainWpKey.trim();
+          out.MAINWP_CONSUMER_SECRET = mainWpSecret.trim();
+        }
+
         // ── AO org ID for scheduled infra checks ─────────────────────────────
         const aoOrgId = process.env.LOBSTER_AO_ORG_ID ?? "";
         if (aoOrgId.trim()) out.LOBSTER_AO_ORG_ID = aoOrgId.trim();

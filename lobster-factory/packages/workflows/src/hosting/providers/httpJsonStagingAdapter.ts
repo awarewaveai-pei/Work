@@ -21,6 +21,7 @@ export async function provisionHttpJsonStaging(input: {
   manifestSlug?: string;
   pluginSlugs?: string[];
   websiteSpecId?: string;
+  mainwpChildUniqueId?: string;
 }): Promise<StagingHostingProvisionResult> {
   const baseUrl = process.env.LOBSTER_HOSTING_PROVIDER_BASE_URL?.trim();
   const token = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
@@ -75,6 +76,7 @@ export async function provisionHttpJsonStaging(input: {
         manifestSlug: input.manifestSlug ?? "wp-basic",
         pluginSlugs: input.pluginSlugs ?? [],
         websiteSpecId: input.websiteSpecId, // bridge fetches spec_data + seeds content when present
+        mainwpChildUniqueId: input.mainwpChildUniqueId, // request only; the bridge must never echo it back
       }),
     });
 
