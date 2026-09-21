@@ -12,7 +12,7 @@
 #   clean   <service> [days]       remove snapshots older than N days (default: 30)
 #   n8n-pin <semver-tag>           update N8N_IMAGE_TAG in .env and restart n8n
 #
-# LOCAL-BUILD services: wordpress | node-api | next-admin | hci-app
+# LOCAL-BUILD services: wordpress | node-api | next-admin | hci-app | renderer
 # EXTERNAL services (n8n): use n8n-pin.
 # Other external (nginx, redis, mariadb): manual .env image tag edit + docker compose pull.
 #
@@ -38,6 +38,7 @@ declare -A IMAGE_MAP=(
   [node-api]="lobster-phase1-node-api"
   [next-admin]="lobster-phase1-next-admin"
   [hci-app]="hci30-app"
+  [renderer]="lobster-phase1-renderer"
 )
 
 # ---------- helpers ----------

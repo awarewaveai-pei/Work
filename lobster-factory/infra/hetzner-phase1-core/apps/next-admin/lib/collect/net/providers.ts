@@ -30,11 +30,29 @@ export interface ProviderSpec {
 }
 
 export const PROVIDERS: Record<string, ProviderSpec> = {
-  // Fetch-and-extract for pages the cheap tier cannot read (JavaScript-rendered sites, PDFs).
-  // Chosen over a self-hosted headless browser because a browser farm is permanent infrastructure
-  // plus an ongoing anti-bot arms race, while this is a per-call API with no standing footprint —
-  // and over Apify because that is an actor marketplace aimed at bespoke platform scraping, which
-  // is a later tier, not this one.
+  // Self-hosted headless browser on the same host (apps/renderer, operator decision 2026-09-21).
+  // The default rendered tier: measured on 10 pages the cheap tier could not read, it recovered 4
+  // where Cloudflare's hosted browser recovered 2 — including the one authoritative source — at no
+  // per-call cost and without a vendor rate limit. The decision this reverses (see firecrawl below)
+  // was about standing infrastructure next to a web app; the renderer answers it with its own
+  // container, its own network, and an egress policy that only reaches the public internet
+  // (apps/renderer/entrypoint.sh). Returns rendered HTML, never extracted text: extraction stays
+  // collectors/http-html.ts's docFromHtml, so a page reads the same whichever tier fetched it.
+  //
+  // Origin from the environment only so a developer can reach the prod renderer through an SSH
+  // tunnel for a live end-to-end test; it is still ONE origin per process, never per call.
+  renderer: {
+    id: "renderer",
+    origin: process.env.RENDERER_URL || "http://renderer:3000",
+    apiKeyEnv: "RENDERER_SHARED_SECRET",
+    authHeader: (key) => ({ "x-renderer-secret": key }),
+    allowedPaths: ["/render"],
+  },
+
+  // Hosted fetch-and-extract, kept as the second vendor for the same tier (and the only one that can
+  // read PDFs today). Originally chosen over a self-hosted headless browser because a browser farm
+  // is permanent infrastructure plus an anti-bot arms race; superseded as the DEFAULT by `renderer`
+  // above on 2026-09-21, still selectable with COLLECT_EXTRACT_PROVIDER=firecrawl.
   firecrawl: {
     id: "firecrawl",
     origin: "https://api.firecrawl.dev",

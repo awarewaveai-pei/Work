@@ -1,4 +1,33 @@
 ﻿# Worklog
+## 2026-09-21（續96）自架隔離 renderer（Playwright 1.60）接成蒐集的渲染後備層
+
+- [決策] 操作者選 D：renderer 放在 ks-aw-01，隔離執行（比較表見本日對話；A=Cloudflare 2/10、D=自架 4/10）。
+- [設計] 沿用 ADR-0029（HCI fetch-runner）的隔離規則，**只有一處刻意不同**：egress 規則由容器自己在**每次啟動時**套用（`apps/renderer/entrypoint.sh`），套完用 `setpriv` 永久降為 pwuser、清空 capability bounding set、設 no_new_privs，之後才 exec node。原因：HCI 那個一次性 sidecar（`restart:"no"`）在容器重啟或主機重開機後不會再跑，規則就消失了（實測 `hci-network-guard Exited 2 days ago`）；HCI 的問題已另開任務卡，不在本次範圍。
+  - 網路：`renderer-net` 10.240.2.0/24、關閉 IPv6，成員只有 renderer＋next-admin；OUTPUT 預設 DROP，擋 RFC1918、loopback（自己的 API port 和 127.0.0.11 DNS 除外）、link-local／metadata、CGNAT → 等同「一般網路使用者能連到的範圍」；DNS rebinding 在封包層就被擋掉
+  - port 只綁 127.0.0.1:3190（4/20 入侵就是從 0.0.0.0 的 publish 進來的）；cap_drop ALL；記憶體 2G、CPU 2、pids 上限 1024
+  - UA 照實報：瀏覽器原本的 `HeadlessChrome` 字串再附上 `AwareWaveCollector/1.0`；robots.txt 已經在便宜階先檢查過，被 robots 拒絕的網址不會降級到這一層
+- [已修改]
+  - `apps/renderer/`（新）：`server.mjs`（`/render`、`/healthz`、共用密鑰、併發 2、整次 render 的硬性截止時間、回應大小上限）、`lib.mjs`（URL／私有 IP／docker 內部名稱拒絕、常數時間比對密鑰、Semaphore）、`entrypoint.sh`、`Dockerfile`（官方映像以 digest 鎖定 `sha256:9bd26ad9…`）、`test/lib.test.mjs`
+  - next-admin：`http-html.ts` 抽出 `docFromHtml`（**全系統只剩一套抽取標準**）、`stripElements` 可指定 tags、新增 `NON_RENDERED_TAGS`；`extract-provider.ts` 改成兩個 driver（renderer 優先、firecrawl 保留，目前只有它能讀 PDF）；`providers.ts` 新增 `renderer` spec（只允許 `/render`、`x-renderer-secret`），並修正「選 Firecrawl 而不自架」的過時說明
+  - density 計算基準的定義：renderer 取得的頁面，density 以「渲染後 DOM 去掉 script/style/noscript/template」為分母（nav/header/footer 保留）。這是重新定義分母，不是調門檻，`MIN_DENSITY` 沒動
+  - 部署 SOP 6 項：sg-deploy 加 node --check／sh -n／node --test 閘門、smoke 加 `/healthz` 加**一次真實 render**、`RESTORABLE_APPS`；rollback-phase1 的 `IMAGE_MAP`；DEPLOY_ROLLBACK_RUNBOOK 新增一列；GHA sg-deploy.yml 兩處 allowlist；compose 的 repo 版與 prod 版用同一支錨點插入 patcher 修改（兩邊都是 +61 行；prod 版有既存差異，所以不用整檔覆蓋）
+  - DATA_COLLECTION_PLAN.md:233 的過時說法已更新
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`（apps/renderer） | exit=0 | result=12/12 pass（私有 IP、metadata、docker 名稱、file:/data:/javascript:、帶帳密的 URL、垃圾輸入、常數時間比對、逾時夾限、UA、semaphore）
+  - REALTEST_EVIDENCE: tool=Bash | cmd=本機 `node server.mjs` + curl | exit=0 | result=`/healthz` ok；沒帶密鑰 401；`169.254.169.254` → url_private_address；`supabase-db:5432` → url_internal_hostname；`file:///etc/passwd` → url_scheme_not_allowed；**`scholars.latrobe.edu.au/tgfarrell` 渲染成功，52,988 B，Farrell ×10，9.5 s**
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`RENDERER_LIVE=1 … vitest run collect-renderer-live.test.ts`（完整流程：真 robots → 便宜階 → renderer → 同一套抽取／品質／相關性閘） | exit=0 | ms=47265 | result=**2/10 經 renderer 入庫**，兩筆都是 anchored：官方學術檔案 2,103 字、皇家學會公告 1,700 字。smallwarsjournal、thepienews 附上 bot 身分後回 403（先前用預設 UA 探測時是 200）→ **這是照實報身分的代價，尊重對方的選擇，不偽裝**；JSTOR 挑戰頁 → too_short_no_heavier_tier；Scholar 429
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` + `npx tsc --noEmit`（next-admin） | exit=0 | result=1443 passed；新的 `collect-renderer-tier.test.ts` 10/10（vendor 選擇、PDF 不送 renderer、密鑰不可被覆蓋、只允許 /render、403→renderer→同一套抽取器、density 分母、404 仍判 tombstone、截斷拒收、renderer 失敗會回報）
+  - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n | artifact=`agency-os/reports/oracle/2026-09-21-review-406c02bd.md`（Codex CLI）
+    - M1 回應包含 JSON 跳脫後可能超過呼叫端 5 MB 上限 → **修**：改成限制整包回應大小（4.5 MB），超過就回 truncated 且不帶 body
+    - M2 隱藏文字（display:none）會算進 density → **不改，理由**：這是便宜階本來就有的共同行為；在瀏覽器端刪掉隱藏元素會把收合的 FAQ 答案一起刪掉；隱藏指令由 `screenForInjection` 擋，它讀的 raw 仍包含隱藏元素
+    - M3 smoke 的 curl 把密鑰放在命令列，`ps` 看得到 → **修**：改成 `printf | curl --config -`（printf 是 builtin），本機用 httpbin 實測 header 正確送出。GHA sg-deploy.yml 的 ops-inbox token 也有同類問題，屬既存，未處理
+  - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`self-hosted headless browser|browser farm|needs FIRECRAWL_API_KEY|JS 渲染網頁 / PDF|FIRECRAWL_API_KEY is not set` | hits=2（DATA_COLLECTION_PLAN.md:233 已修；WORKLOG 舊紀錄屬歷史不回改）
+- [剩餘風險]
+  1. Chromium 在 no-sandbox 下執行（容器內沒有 user namespace；Playwright 預設 `chromiumSandbox:false`），隔離完全靠容器層 + 網路層
+  2. renderer 的 healthcheck 以 root 身分 exec（compose 沒有 user 選項），但只執行固定的 node 指令，不接受外部輸入
+  3. 首次上線沒有前一版可 restore，保底是 safe-infra-patch 的 compose 備份
+- [rollback] 見 DEPLOY_ROLLBACK_RUNBOOK 的 `renderer` 列；next-admin 移除 `RENDERER_SHARED_SECRET` 後渲染後備層自動停用，蒐集退回純 HTTP 階
+
 ## 2026-09-21（續95）自架 Playwright 對照實測：救回 4/10，勝過 Cloudflare 的 2/10
 
 - [事實] 操作者說「前幾天裝了 Playwright」：實際是**筆電**上的測試套件（`lobster-factory/infra/hetzner-phase1-core/tests/`，`@playwright/test ^1.49`，runtime playwright-core 1.60.0，Chromium build 1243 安裝於 2026-09-18，用於 `scripts/playwright-runner.ps1` post-deploy smoke）。**ks-aw-01 上沒有任何 Playwright／Chromium 容器或映像**（`docker ps -a`／`docker images` 皆無）。prod 蒐集在伺服器上跑，筆電這套無法直接供應。

@@ -263,9 +263,19 @@ describe("the catalogue tells the truth about interchangeable keys", () => {
   });
 
   it("still treats a single-vendor source as all-or-nothing", async () => {
+    // collect/local-file is the `requires` (every key needed) case today; the rendered tier moved to
+    // `requiresAny` when it gained a second vendor (2026-09-21).
+    const { describeBlock } = await import("@/lib/collect/catalogue");
+    const { localFileCollector } = await import("@/lib/collect/collectors/local-file");
+    expect(describeBlock(localFileCollector, {})!.missing).toEqual(["COLLECT_LOCAL_ROOTS"]);
+    expect(describeBlock(localFileCollector, { COLLECT_LOCAL_ROOTS: "/x" })!.available).toBe(true);
+  });
+
+  it("makes the rendered tier available with EITHER vendor's key", async () => {
     const { describeBlock } = await import("@/lib/collect/catalogue");
     const { extractProviderCollector } = await import("@/lib/collect/collectors/extract-provider");
-    expect(describeBlock(extractProviderCollector, {})!.missing).toEqual(["FIRECRAWL_API_KEY"]);
+    expect(describeBlock(extractProviderCollector, {})!.missing).toEqual(["RENDERER_SHARED_SECRET", "FIRECRAWL_API_KEY"]);
+    expect(describeBlock(extractProviderCollector, { RENDERER_SHARED_SECRET: "s" })!.available).toBe(true);
     expect(describeBlock(extractProviderCollector, { FIRECRAWL_API_KEY: "k" })!.available).toBe(true);
   });
 });

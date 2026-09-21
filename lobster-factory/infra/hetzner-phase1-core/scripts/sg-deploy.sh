@@ -113,7 +113,7 @@ RESTORABLE_APPS=()
 NON_RESTORABLE_APPS=()
 for _app in "${APPS[@]}"; do
   case "$_app" in
-    wordpress|node-api|next-admin|hci-app) RESTORABLE_APPS+=("$_app") ;;
+    wordpress|node-api|next-admin|hci-app|renderer) RESTORABLE_APPS+=("$_app") ;;
     *) NON_RESTORABLE_APPS+=("$_app") ;;
   esac
 done
@@ -210,6 +210,19 @@ if [[ " ${APPS[*]} " =~ " hci-app " && $DRY_RUN -eq 0 ]]; then
   node --test "$HCI_SRC_ROOT/tests/architecture/"*.mjs 2>&1 | tee -a "$LOG_FILE" \
     || fail "hci-app architecture tests FAILED — deploy aborted; fix before re-deploying hci-app"
   log "hci-app architecture tests passed"
+fi
+
+# 1.7. pre-build gate for renderer -- same Node-native shape as hci-app's above (no tsc: plain .mjs).
+# Only the pure refusals are unit-tested here (test/lib.test.mjs); the part that actually contains a
+# hostile page -- entrypoint.sh's egress policy and privilege drop -- can only be proven inside the
+# running container, which is why step 7's renderer smoke performs a REAL render, not just /healthz.
+if [[ " ${APPS[*]} " =~ " renderer " && $DRY_RUN -eq 0 ]]; then
+  RENDERER_SRC="$(app_git_source_root renderer)"
+  log "--- node --check gate (renderer) ---"
+  node --check "$RENDERER_SRC/server.mjs" 2>&1 | tee -a "$LOG_FILE"     && node --check "$RENDERER_SRC/lib.mjs" 2>&1 | tee -a "$LOG_FILE"     && sh -n "$RENDERER_SRC/entrypoint.sh" 2>&1 | tee -a "$LOG_FILE"     || fail "syntax check FAILED on renderer -- deploy aborted"
+  log "--- node --test gate (renderer) ---"
+  node --test "$RENDERER_SRC/test/"*.test.mjs 2>&1 | tee -a "$LOG_FILE"     || fail "renderer unit tests FAILED -- deploy aborted"
+  log "renderer gates passed"
 fi
 
 for APP in "${APPS[@]}"; do
@@ -458,6 +471,24 @@ if [[ " ${APPS[*]} " =~ " hci-app " ]]; then
   hci_app_port=$(docker port hci-app 4030/tcp 2>/dev/null | head -1 | sed 's/.*://')
   hci_app_port="${hci_app_port:-4030}"
   _smoke_check "hci-app health"              "http://127.0.0.1:${hci_app_port}/health"
+fi
+
+# renderer (2026-09-21): /healthz only proves node is up -- the browser is launched lazily, so a
+# Chromium that cannot start under the dropped capabilities would still pass it. The second probe
+# performs one REAL render of a public page, which exercises the launch, the egress policy (DNS +
+# public internet must work) and the secret check together. Published on 127.0.0.1 only.
+if [[ " ${APPS[*]} " =~ " renderer " ]]; then
+  renderer_port=$(docker port lobster-renderer 3000/tcp 2>/dev/null | head -1 | sed 's/.*://')
+  renderer_port="${renderer_port:-3190}"
+  _smoke_check "renderer healthz" "http://127.0.0.1:${renderer_port}/healthz"
+  renderer_secret=$(grep -m1 '^RENDERER_SHARED_SECRET=' "$STAGING_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')
+  # The secret goes in through curl's --config on stdin, never as an argument: arguments are readable
+  # by any local user via ps / /proc/<pid>/cmdline for as long as the request runs (cross-model
+  # review, 2026-09-21). printf is a bash builtin, so it never appears in a process list either.
+  render_ok=$(printf 'header = "x-renderer-secret: %s"
+' "$renderer_secret"     | curl -s --max-time 60 --config - -X POST -H "content-type: application/json"       --data '{"url":"https://example.com/","timeoutMs":30000}'       "http://127.0.0.1:${renderer_port}/render" 2>/dev/null | grep -c '"ok":true' || true)
+  if [[ "$render_ok" -ge 1 ]]; then log "  smoke OK: renderer real render (example.com)"
+  else log "  SMOKE_WARN: renderer real render failed"; _smoke_errors=$((_smoke_errors + 1)); fi
 fi
 
 if [[ "$_smoke_errors" -gt 0 ]]; then

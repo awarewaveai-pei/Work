@@ -40,6 +40,9 @@ const target = (uri: string): Target => ({ uri, canonicalUri: canonicalize(uri),
 beforeEach(() => {
   delete process.env[KEY_ENV];
   delete process.env.COLLECT_EXTRACT_PROVIDER;
+  // The self-hosted renderer now wins vendor auto-detection (2026-09-21); a developer shell that has
+  // its secret set would otherwise silently route every test in this file to the other driver.
+  delete process.env.RENDERER_SHARED_SECRET;
 });
 
 describe("provider configuration", () => {

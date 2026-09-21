@@ -67,7 +67,7 @@ jobs:
 
           # 1. Allowlist-validate every app token (also neutralises any injection attempt).
           #    Keep this list in sync with sg-deploy.sh:60-65 RESTORABLE_APPS case.
-          ALLOWED="next-admin node-api wordpress"
+          ALLOWED="next-admin node-api wordpress renderer"
           for app in $APPS; do
             case " $ALLOWED " in
               *" $app "*) : ;;
@@ -116,7 +116,7 @@ jobs:
           # deploy step's validation may not have completed, and app names are
           # interpolated into the JSON payload.
           for app in $APPS; do
-            case " next-admin node-api wordpress " in
+            case " next-admin node-api wordpress renderer " in
               *" $app "*) : ;;
               *) echo "ops-inbox skipped for '$app': not in allowlist"; continue ;;
             esac

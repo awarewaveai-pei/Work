@@ -488,6 +488,9 @@ services:
       # shared HCI-30 review queue. CollectionSourcesPanel.tsx's button surfaces this to the operator
       # directly rather than leaving it as a comment only she'd have to already know to go read.
       HCI_IMPORT_TENANT: ${HCI_IMPORT_TENANT:-a}
+      # Rendered collection tier (lib/collect/collectors/extract-provider.ts, apps/renderer).
+      # Empty = the tier falls back to FIRECRAWL_API_KEY if set, otherwise stays inert.
+      RENDERER_SHARED_SECRET: ${RENDERER_SHARED_SECRET:-}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:
@@ -506,11 +509,61 @@ services:
     networks:
       - lobster-net
       - observability
+      - renderer-net
     deploy:
       resources:
         limits:
           memory: 1G
           cpus: '1.00'
+    logging: *lobster-logging
+
+  # Headless-browser render service for next-admin's rendered collection tier (apps/renderer,
+  # operator decision 2026-09-21). Every page it opens is attacker-controlled, so:
+  #   * its own network, renderer-net, shared ONLY with next-admin (the one caller);
+  #   * apps/renderer/entrypoint.sh installs an OUTPUT policy in this netns that reaches the public
+  #     internet and nothing else (no RFC1918, loopback, link-local/metadata, CGNAT) on EVERY start,
+  #     then drops to pwuser with an empty capability bounding set before node runs;
+  #   * cap_drop ALL; the caps added back exist only for that entrypoint and are gone from the
+  #     process tree before any page is opened;
+  #   * published on 127.0.0.1 only (host-side smoke/debug) - never 0.0.0.0: the 2026-04-20
+  #     intrusion came in through a 0.0.0.0 publish (runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md).
+  renderer:
+    build:
+      context: ./apps/renderer
+    image: lobster-phase1-renderer:local
+    container_name: lobster-renderer
+    restart: unless-stopped
+    environment:
+      RENDERER_SHARED_SECRET: ${RENDERER_SHARED_SECRET:?renderer requires a generated shared secret}
+      RENDERER_PORT: "3000"
+      RENDERER_MAX_CONCURRENCY: "2"
+    ports:
+      - "127.0.0.1:${RENDERER_HOST_PORT:-3190}:3000"
+    networks:
+      - renderer-net
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SETUID
+      - SETGID
+      - SETPCAP
+    security_opt:
+      - no-new-privileges:true
+    shm_size: "1gb"
+    pids_limit: 1024
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.00'
     logging: *lobster-logging
 
   # HCI-30 (ADR-0021: dedicated Postgres, physically isolated from the shared Supabase instance
@@ -740,6 +793,14 @@ networks:
     ipam:
       config:
         - subnet: ${HCI_FETCH_RUNNER_SUBNET:-10.240.1.0/24}
+  # renderer's network: members are renderer + next-admin (its only caller), nothing else. Same shape
+  # as hci-fetch-runner-net above: explicit /24 outside 172.16.0.0/12, no IPv6.
+  renderer-net:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${RENDERER_NET_SUBNET:-10.240.2.0/24}
 
 volumes:
   redis_data:

@@ -84,8 +84,10 @@ describe("source catalogue", () => {
     // it, when in fact one environment variable is empty.
     const provider = entries.find((e) => e.id === "collect/extract-provider")!;
     expect(provider.available).toBe(false);
-    expect(provider.missing).toEqual(["FIRECRAWL_API_KEY"]);
-    expect(provider.metered).toBe(true);
+    // Either vendor makes the rendered tier usable, so both are named when neither is set. Not
+    // metered as a whole: the default vendor is the self-hosted browser, which bills nothing.
+    expect(provider.missing).toEqual(["RENDERER_SHARED_SECRET", "FIRECRAWL_API_KEY"]);
+    expect(provider.metered).toBeFalsy();
 
     const web = entries.find((e) => e.id === "collect/http-html")!;
     expect(web.available).toBe(true); // needs nothing
@@ -105,7 +107,7 @@ describe("source catalogue", () => {
       expect.arrayContaining(["missing_option:itemsPath", "missing_option:titleField", "missing_option:textField"]),
     );
     expect(validateSourceConfig("collect/extract-provider", { entry: "https://x.test/" }, {}).errors[0]).toMatch(
-      /unavailable:missing_FIRECRAWL_API_KEY/,
+      /unavailable:missing_RENDERER_SHARED_SECRET,FIRECRAWL_API_KEY/,
     );
     expect(
       validateSourceConfig("collect/academic", { entry: "retrieval augmented generation", options: { registry: "openalex" } }, {}).ok,

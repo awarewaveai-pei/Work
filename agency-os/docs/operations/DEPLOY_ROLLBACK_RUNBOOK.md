@@ -35,6 +35,7 @@
 | `next-admin` | 本地建置（`lobster-phase1-next-admin:local`） | `save` / `restore` |
 | `wordpress` | 本地建置（`lobster-phase1-wordpress:local`） | `save` / `restore` |
 | `hci-app`（2026-09-18 起）| 本地建置（`hci30-app:local`，source root `Projects/internal/hci30/` 整棵，非 `apps/` 底下） | `save` / `restore`。同一 commit 也加了 `hci-postgres`/`hci-fetch-runner`/`hci-network-guard`/`hci-object-storage`（見 `docker-compose.yml`）——這四個是基礎設施服務，透過 `safe-infra-patch.sh compose` 套用，不隨 `hci-app` 的程式碼部署重建，此表的 `save`/`restore` 只涵蓋 `hci-app` 本身 |
+| `renderer`（2026-09-21 起）| 本地建置（`lobster-phase1-renderer:local`，source `apps/renderer/`） | `save` / `restore`，已入 `IMAGE_MAP` 與 sg-deploy `RESTORABLE_APPS`。**首次上線不經 sg-deploy**：先手動 `docker build`、再 `safe-infra-patch.sh compose … renderer` 套 compose（首次沒有前一版可 restore，保底是 safe-infra-patch 的 compose 備份）。移除：`docker compose stop renderer && docker compose rm -f renderer`，再用 safe-infra-patch 拿掉 compose 的 `renderer` service、`renderer-net` 與 next-admin 的 `renderer-net`／`RENDERER_SHARED_SECRET` 兩行——next-admin 沒有這個 secret 時渲染後備層自動停用（`extract-provider` match()=0），蒐集退回純 HTTP 階。smoke 會做一次**真實 render**（example.com），因為 `/healthz` 只證明 node 活著、證明不了 Chromium 在降權後能啟動 |
 | `n8n` | 外部映像，版本由 `.env` `N8N_IMAGE_TAG` 控制 | `n8n-pin <old-semver>` |
 | `nginx` | `nginx:stable`（upstream tag） | 改 compose image tag → `docker compose pull nginx && up -d nginx` |
 | `redis` | `redis:7-alpine`（upstream tag） | 同上 |
@@ -77,7 +78,7 @@
 | 4 | `docker compose up -d <APP>`（race-condition 自動重試一次） | up fail → fail（容器名衝突時自動 stop/rm-f/up 重試；兩次皆失敗才 abort） |
 | 5 | 寫 `/root/lobster-phase1/.deployed-commit` + `.deployed-at`（drift 偵測用） | — |
 | 6 | 等 healthcheck 60s | unhealthy／逾時 → **自動 rollback**（與 Step 7 共用 `do_rollback`，2026-09-19 起；之前只 fail，壞 container 會留在 prod） |
-| 7 | **HTTP smoke check + 自動 rollback**（curl 端點見 sg-deploy.sh Step 7）；**致命**：任一 endpoint 非 2xx → `do_rollback` 以 `rollback-phase1.sh restore <app> <本次 Step 2.5 的 tag>` 逐一還原 RESTORABLE_APPS（wordpress/node-api/next-admin/hci-app；不是「最新的 rollback-*」；restore 後 health 失敗算 ROLLBACK_FAILED）+ 寫 `.rollback-triggered` flag + `.deployed-commit` 還原為 PREVIOUS_COMMIT + `fail`（exit non-zero）。**Drill mode**：`AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false ./sg-deploy.sh <app>` 保留舊「非致命 warn」行為供刻意降級演練。2026-05-23 Tier 3 audit C1 fix：實現 Plan v3.2 §五 第 3 層承諾的自動 rollback | 失敗 → SMOKE_WARN log + `.smoke-warn` + ROLLBACK fail + `.rollback-triggered`；`auto-deploy-next-admin.sh` 同時讀兩個 flag 在 Slack/Telegram 附加 SMOKE_WARN 與「🔴 AUTO-ROLLBACK FIRED」prefix |
+| 7 | **HTTP smoke check + 自動 rollback**（curl 端點見 sg-deploy.sh Step 7）；**致命**：任一 endpoint 非 2xx → `do_rollback` 以 `rollback-phase1.sh restore <app> <本次 Step 2.5 的 tag>` 逐一還原 RESTORABLE_APPS（wordpress/node-api/next-admin/hci-app/renderer；不是「最新的 rollback-*」；restore 後 health 失敗算 ROLLBACK_FAILED）+ 寫 `.rollback-triggered` flag + `.deployed-commit` 還原為 PREVIOUS_COMMIT + `fail`（exit non-zero）。**Drill mode**：`AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false ./sg-deploy.sh <app>` 保留舊「非致命 warn」行為供刻意降級演練。2026-05-23 Tier 3 audit C1 fix：實現 Plan v3.2 §五 第 3 層承諾的自動 rollback | 失敗 → SMOKE_WARN log + `.smoke-warn` + ROLLBACK fail + `.rollback-triggered`；`auto-deploy-next-admin.sh` 同時讀兩個 flag 在 Slack/Telegram 附加 SMOKE_WARN 與「🔴 AUTO-ROLLBACK FIRED」prefix |
 
 ### 2.2 客戶端 drift 檢查
 

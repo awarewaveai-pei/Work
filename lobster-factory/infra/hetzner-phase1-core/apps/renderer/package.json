@@ -1,0 +1,14 @@
+{
+  "name": "lobster-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated headless-browser render service for next-admin's collect/extract-provider tier.",
+  "scripts": {
+    "check": "node --check server.mjs && node --check lib.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.60.0"
+  }
+}

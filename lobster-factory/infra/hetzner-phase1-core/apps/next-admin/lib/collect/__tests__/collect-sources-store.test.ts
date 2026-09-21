@@ -153,7 +153,7 @@ describe("approval", () => {
   it("lets discovery propose a source whose key has not arrived yet, but not switch it on", async () => {
     const proposed = await addSource({
       organizationId: ORG,
-      blockId: "collect/extract-provider", // needs FIRECRAWL_API_KEY, which is not set here
+      blockId: "collect/extract-provider", // needs RENDERER_SHARED_SECRET or FIRECRAWL_API_KEY; neither is set here
       entry: "https://js-heavy.example/",
       proposedBy: "discovery:openalex",
     });
@@ -169,7 +169,7 @@ describe("approval", () => {
       approvedBy: "admin",
     });
     expect(byHuman.ok).toBe(false);
-    expect(byHuman.errors[0]).toMatch(/unavailable:missing_FIRECRAWL_API_KEY/);
+    expect(byHuman.errors[0]).toMatch(/unavailable:missing_RENDERER_SHARED_SECRET,FIRECRAWL_API_KEY/);
   });
 });
 

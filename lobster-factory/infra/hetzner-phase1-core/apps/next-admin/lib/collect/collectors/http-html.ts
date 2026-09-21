@@ -31,7 +31,7 @@ const DROP_TAGS = [
  * An unclosed element here drops everything to the end of the document instead, which is both fast
  * and the safe direction.
  */
-export function stripElements(html: string): string {
+export function stripElements(html: string, tags: readonly string[] = DROP_TAGS): string {
   let out = "";
   let i = 0;
   const lower = html.toLowerCase();
@@ -41,7 +41,7 @@ export function stripElements(html: string): string {
       out += html.slice(i);
       break;
     }
-    const tag = DROP_TAGS.find(
+    const tag = tags.find(
       (t) => lower.startsWith(t, lt + 1) && /[\s/>]/.test(lower[lt + 1 + t.length] ?? ">"),
     );
     if (!tag) {
@@ -57,6 +57,13 @@ export function stripElements(html: string): string {
   }
   return out;
 }
+/**
+ * Elements a browser never renders as text: executable code, styling, and templates. Removing ONLY
+ * these (not nav/header/footer) gives the payload a rendered page's text was actually drawn from —
+ * see collectors/extract-provider.ts's renderer driver for why the quality gate needs that.
+ */
+export const NON_RENDERED_TAGS = ["script", "style", "noscript", "template"] as const;
+
 const SELF_CLOSING_NOISE = /<(br|hr|img|input|source|track)\b[^>]*\/?>/gi;
 const BLOCK_END = /<\/(p|div|section|article|h[1-6]|li|tr|blockquote|pre)\s*>/gi;
 
@@ -168,6 +175,99 @@ function publishedAtOf(html: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+export interface HtmlPageInput {
+  html: string;
+  /** The payload the text was extracted from — kept so the quality gate can measure density. */
+  bytes: Uint8Array;
+  finalUrl: string;
+  target: Target;
+  ctx: CollectCtx;
+  /** Which strategy produced the HTML: the cheap HTTP tier, or a rendered tier that ran the page's JS. */
+  collector: string;
+  etag?: string | null;
+  lastModified?: string | null;
+}
+
+/**
+ * HTML in, one document and its in-scope links out. The ONE definition of "readable content from an
+ * HTML page" in the system: the cheap tier calls it with the bytes it fetched, and the rendered tier
+ * (collectors/extract-provider.ts, renderer driver) calls it with the HTML a real browser produced
+ * after running the page's JavaScript. Two extractors would mean a page's text depends on which tier
+ * happened to read it, and the quality gate would be judging two different things under one name.
+ */
+export function docFromHtml(p: HtmlPageInput): { doc: RawDoc; discovered: Target[] } {
+  const { html, bytes, finalUrl, ctx } = p;
+  const t = p.target;
+
+  const text = extractText(html);
+  let rejectedCanonical: string | null = null;
+  // The page's own canonical link wins when it has one — but ONLY within its own origin.
+  //
+  // Downstream, canonicalUrl IS the document's identity (lib/kb/family.ts hashes it into the
+  // document family id), so an unchecked value lets a page decide which document it supersedes.
+  // Two ways that ends badly, one of them not even an attack:
+  //   * a CMS misconfigured to emit `canonical=<home page>` on every page — crawl 200 pages, all
+  //     200 land in one family, each archiving the last, and the knowledge base keeps exactly one
+  //     of them, with no error anywhere;
+  //   * a user-generated or compromised page declaring `canonical=/refund-policy`, which makes it
+  //     the next version of the real refund policy and archives the real one.
+  const declaredCanonical = (() => {
+    for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+      if (!/rel\s*=\s*["']?canonical/i.test(m[0])) continue;
+      const href = attr(m[0], "href");
+      if (!href) continue;
+      try {
+        const claimed = new URL(href, finalUrl);
+        if (claimed.origin !== new URL(finalUrl).origin) {
+          ctx.log(`ignoring cross-origin canonical on ${finalUrl}: ${claimed.toString()}`);
+          rejectedCanonical = claimed.toString();
+          return null;
+        }
+        return claimed.toString();
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  })();
+
+  const doc: RawDoc = {
+    uri: finalUrl,
+    canonicalUrl: ctx.canonicalize(declaredCanonical ?? finalUrl),
+    contentHash: createHash("sha256").update(text, "utf8").digest("hex"),
+    mime: "text/html",
+    title: extractTitle(html),
+    author: extractAuthor(html),
+    contentType: metaContent(html, /^og:type$/i) === "article" ? "article" : "web_page",
+    text,
+    raw: { bytes, mime: "text/html" },
+    fetchedAt: new Date().toISOString(),
+    publishedAt: publishedAtOf(html),
+    collector: p.collector,
+    tenantRef: ctx.tenantRef,
+    provenance: { ...COLLECTED_PROVENANCE }, // re-stamped by the orchestrator; never trusted here
+    meta: {
+      etag: p.etag ?? undefined,
+      lastModified: p.lastModified ?? undefined,
+      declaredCanonicalRejected: rejectedCanonical ?? undefined,
+      language: /<html\b[^>]*\blang\s*=\s*["']?([a-z-]+)/i.exec(html)?.[1] ?? undefined,
+      // searchQuery used to be copied here, by this collector alone. The orchestrator now carries
+      // it (and searchAngle/searchLang) from the target onto EVERY collector's documents, so a
+      // page read by the rendered tier or the API tier is filed the same as one read here.
+    },
+  };
+
+  const discovered: Target[] = extractLinks(html, finalUrl).map((uri) => ({
+    uri,
+    canonicalUri: ctx.canonicalize(uri), // the orchestrator recomputes this; kept consistent here
+    scope: t.scope,
+    tier: 0,
+    depth: t.depth + 1,
+  }));
+
+  return { doc, discovered };
+}
+
 export const httpHtmlCollector: CollectBlock = {
   id: "collect/http-html",
   title: "網頁",
@@ -237,72 +337,16 @@ export const httpHtmlCollector: CollectBlock = {
     const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
     const finalUrl = res.url || t.uri;
 
-    const text = extractText(html);
-    let rejectedCanonical: string | null = null;
-    // The page's own canonical link wins when it has one — but ONLY within its own origin.
-    //
-    // Downstream, canonicalUrl IS the document's identity (lib/kb/family.ts hashes it into the
-    // document family id), so an unchecked value lets a page decide which document it supersedes.
-    // Two ways that ends badly, one of them not even an attack:
-    //   * a CMS misconfigured to emit `canonical=<home page>` on every page — crawl 200 pages, all
-    //     200 land in one family, each archiving the last, and the knowledge base keeps exactly one
-    //     of them, with no error anywhere;
-    //   * a user-generated or compromised page declaring `canonical=/refund-policy`, which makes it
-    //     the next version of the real refund policy and archives the real one.
-    const declaredCanonical = (() => {
-      for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
-        if (!/rel\s*=\s*["']?canonical/i.test(m[0])) continue;
-        const href = attr(m[0], "href");
-        if (!href) continue;
-        try {
-          const claimed = new URL(href, finalUrl);
-          if (claimed.origin !== new URL(finalUrl).origin) {
-            ctx.log(`ignoring cross-origin canonical on ${finalUrl}: ${claimed.toString()}`);
-            rejectedCanonical = claimed.toString();
-            return null;
-          }
-          return claimed.toString();
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    })();
-
-    const doc: RawDoc = {
-      uri: finalUrl,
-      canonicalUrl: ctx.canonicalize(declaredCanonical ?? finalUrl),
-      contentHash: createHash("sha256").update(text, "utf8").digest("hex"),
-      mime: "text/html",
-      title: extractTitle(html),
-      author: extractAuthor(html),
-      contentType: metaContent(html, /^og:type$/i) === "article" ? "article" : "web_page",
-      text,
-      raw: { bytes, mime: "text/html" },
-      fetchedAt: new Date().toISOString(),
-      publishedAt: publishedAtOf(html),
+    const { doc, discovered } = docFromHtml({
+      html,
+      bytes,
+      finalUrl,
+      target: t,
+      ctx,
       collector: "collect/http-html",
-      tenantRef: ctx.tenantRef,
-      provenance: { ...COLLECTED_PROVENANCE }, // re-stamped by the orchestrator; never trusted here
-      meta: {
-        etag: res.headers.get("etag") ?? undefined,
-        lastModified: res.headers.get("last-modified") ?? undefined,
-        declaredCanonicalRejected: rejectedCanonical ?? undefined,
-        language: /<html\b[^>]*\blang\s*=\s*["']?([a-z-]+)/i.exec(html)?.[1] ?? undefined,
-        // searchQuery used to be copied here, by this collector alone. The orchestrator now carries
-        // it (and searchAngle/searchLang) from the target onto EVERY collector's documents, so a
-        // page read by the rendered tier or the API tier is filed the same as one read here.
-      },
-    };
-
-    const discovered: Target[] = extractLinks(html, finalUrl).map((uri) => ({
-      uri,
-      canonicalUri: ctx.canonicalize(uri), // the orchestrator recomputes this; kept consistent here
-      scope: t.scope,
-      tier: 0,
-      depth: t.depth + 1,
-    }));
-
+      etag: res.headers.get("etag"),
+      lastModified: res.headers.get("last-modified"),
+    });
     return { docs: [doc], discovered };
   },
 };

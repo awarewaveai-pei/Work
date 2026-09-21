@@ -231,6 +231,7 @@ run(seeds, { sink, budget, tenantRef, maxDepth, flushEvery }):
 > ② **gzip 壓縮的 sitemap 明確不支援**（丟 `status: 415`），不假裝解析後回報「零個 URL」。
 > ③ **`dirty` 的告警走既有 ops-inbox incident 管線**（`0073` 把 `collection` 加進 `ops_incidents.source`，比照 `0031` 加 `deploy` 的作法），不自建第二套通知：那條管線已經有 fingerprint 去重、storm 關聯、severity 規則與 Telegram/Slack 扇出。告警規則本身（`severityFor`）刻意不對 `disallowed` 出聲——robots 擋下是正常行為，對它告警等於訓練人把告警關掉。
 > ④ 新增 **`collect/extract-provider`** 階（JS 渲染站台、PDF）：`match()` 給 0.5 分，排在 `http-html` 的 1 分之後，所以只有便宜階讀不到時才會花錢。無 API key 時 `match()` 回 0，整階等於不存在。供應商選 **Firecrawl**（理由寫在 `net/providers.ts`：per-call API 沒有長駐足跡，browser farm 有；Apify 是 actor 市集，屬更後面的特殊平台階）。
+>   **2026-09-21 更新**：預設供應商改為自架 `renderer`（`apps/renderer`，Playwright 1.60 + 隔離網路＋每次啟動重套 egress 規則），Firecrawl 保留為第二供應商（目前唯一能讀 PDF）。實測 10 頁：自架 4、Cloudflare 2。renderer 回傳渲染後 HTML，走 `http-html` 的 `docFromHtml`，抽取標準只有一套（WORKLOG 2026-09-21 續95／續96）。
 >
 > **C0／C1 覆審後補進實作的規則**（critic 1c/8h/13m，全數處理；細節見 WORKLOG 2026-09-11）：
 > ⓐ **失敗分類讀 `status` 欄位不讀錯誤訊息**——訊息裡有 URL，`/blog/404-explained` 回 500 會被字串比對判成「頁面已刪除」。積木契約因此明訂：有 HTTP 狀態就用 `Object.assign(new Error(msg), { status })` 丟。
