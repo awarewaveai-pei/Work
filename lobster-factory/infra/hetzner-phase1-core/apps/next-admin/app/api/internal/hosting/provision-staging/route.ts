@@ -306,6 +306,18 @@ async function handleSeedMode(body: { websiteSpecId?: string; wpPath?: string; s
   }
 }
 
+async function prepareMainWpChild(conn: SshClient, wpPath: string, uniqueId: string | undefined): Promise<string | null> {
+  if (uniqueId === undefined) return null;
+  if (!/^[0-9a-f]{32,128}$/.test(uniqueId)) return "WARN: mainwpChildUniqueId malformed; MainWP child not prepared";
+  const res = await sshExec(
+    conn,
+    `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} option update mainwp_child_uniqueId ${uniqueId} --path=${wpPath}/ --quiet && ${WP_CLI} user meta update ${STAGING_ADMIN_USER} mainwp_child_user_enable_passwd_auth_connect 0 --path=${wpPath}/ --quiet" >/dev/null 2>&1`
+  );
+  return res.code === 0
+    ? "MainWP child prepared (unique security id set; password auth off for the admin)"
+    : "WARN: MainWP child preparation failed; MainWP registration will be refused";
+}
+
 export async function POST(request: Request) {
   // Auth
   const apiToken = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
@@ -318,7 +330,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { organizationId?: string; siteId?: string; siteName?: string; manifestSlug?: string; pluginSlugs?: string[]; websiteSpecId?: string; mode?: string; wpPath?: string };
+  let body: { organizationId?: string; siteId?: string; siteName?: string; manifestSlug?: string; pluginSlugs?: string[]; websiteSpecId?: string; mode?: string; wpPath?: string; mainwpChildUniqueId?: string };
   try {
     body = await request.json();
   } catch {
@@ -430,12 +442,17 @@ export async function POST(request: Request) {
       : [];
     const crmPlugins = pluginSlugs.includes("fluent-crm") ? ["fluent-crm"] : [];
     const formPlugins = ["fluentform"];
+    // The catalog marks mainwp-child installSource "manifest", but the manifest runner is off in prod,
+    // so this is the only path that installs it. Without it MainWP registration (create-wp-site
+    // addSiteToMainWp) is refused with "child plugin not detected".
+    const managementPlugins = ["mainwp-child"];
 
     const allPlugins = [...new Set([
       ...basePlugins,
       ...ecommercePlugins,
       ...crmPlugins,
       ...formPlugins,
+      ...managementPlugins,
       ...pluginSlugs.filter((s) => s && s.length > 2),
     ])];
 
@@ -445,6 +462,12 @@ export async function POST(request: Request) {
       `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} plugin install ${pluginList} --activate --path=${wpPath}/ --quiet 2>&1"`
     );
     const pluginsOk = pluginResult.code === 0;
+
+    // 7b. Let MainWP connect without the admin password: mainwp-child accepts the Unique Security ID
+    // only when password auth is off for the connecting user. Runs on every call — a retry reaching
+    // an installed site must carry THIS run's id, the one create-wp-site sends to MainWP.
+    // The id is a credential: request-only, never in the response, notes or error text.
+    const mainwpNote = await prepareMainWpChild(conn, wpPath, body.mainwpChildUniqueId);
 
     // Wire this client into the content toolchain (app-password + wp_sites + site_url) so SEO
     // Content / Video can target it. Synchronous (~2s) and best-effort — never fails the provision.
@@ -471,6 +494,7 @@ export async function POST(request: Request) {
         `DB: ${dbName} on lobster-wordpress-db`,
         // Never the password: these notes land in Trigger.dev run output + ops_action_runs.
         adminCredNote,
+        ...(mainwpNote ? [mainwpNote] : []),
         `Org: ${organizationId ?? "n/a"} Site: ${siteId}`,
       ],
     });
