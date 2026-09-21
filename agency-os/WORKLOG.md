@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-21（續95）自架 Playwright 對照實測：救回 4/10，勝過 Cloudflare 的 2/10
+
+- [事實] 操作者說「前幾天裝了 Playwright」：實際是**筆電**上的測試套件（`lobster-factory/infra/hetzner-phase1-core/tests/`，`@playwright/test ^1.49`，runtime playwright-core 1.60.0，Chromium build 1243 安裝於 2026-09-18，用於 `scripts/playwright-runner.ps1` post-deploy smoke）。**ks-aw-01 上沒有任何 Playwright／Chromium 容器或映像**（`docker ps -a`／`docker images` 皆無）。prod 蒐集在伺服器上跑，筆電這套無法直接供應。
+- [結果] 同一批 10 個 URL，本機 headless Chromium、誠實身分不偽裝：
+  - 救回 4：`scholars.latrobe.edu.au/tgfarrell`（官方學術檔案，Cloudflare 回 422；2,770 字、Farrell ×7）、`thepienews.com`（Cloudflare 只拿到 meta；6,371 字 ×2）、`smallwarsjournal.com`（36,398 字 ×7）、`royalsoc.org.au`（2,670 字 ×6）
+  - 仍擋 6：latrobe.edu.au ×2「Just a moment...」（Cloudflare 挑戰頁）、ResearchGate 403、Google Scholar 429、JSTOR「Client Challenge」、iru.edu.au 觸發下載
+- [限制] 筆電是住宅 IP，伺服器是機房 IP；JS 渲染類（scholars.latrobe、royalsoc）在伺服器上應同樣救得回，IP 類封鎖（thepienews 原 403）在伺服器上**未驗證**。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scratchpad/pw-probe.cjs`（playwright-core 1.60，10 URL，robots 已確認允許） | exit=0 | result=200×5（4 筆有實質正文）、403×3、429×1、ERR×1
+- REVIEW_WAIVED: NA -- 查詢實測，無 code 改動
+- BUGHUNT_WAIVED: NA -- 無 code 改動
+- [下一步] 以相同 Playwright 版本在 ks-aw-01 起隔離網路的渲染容器，接成 `collect/extract-provider` 的 vendor；需操作者同意（prod 新服務）。
+
 ## 2026-09-21（續94）Cloudflare Browser Run 實測：讀不到的 10 頁救回 2 頁
 
 - [目的] 決定渲染階要不要接 Cloudflare Browser Run（續93 剩餘風險 1）。
