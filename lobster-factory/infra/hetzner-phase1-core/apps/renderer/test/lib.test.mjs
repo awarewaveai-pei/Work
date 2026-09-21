@@ -4,10 +4,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  SNAPSHOT_FAILURE_CODES,
   Semaphore,
   clampTimeout,
+  classifyNavigationError,
+  classifyStatus,
   honestUserAgent,
   isPrivateAddress,
+  publicUrlOnly,
+  pushCapped,
   secretMatches,
   validateTargetUrl,
 } from "../lib.mjs";
@@ -98,4 +103,45 @@ test("semaphore never runs more than max at once and drains its queue", async ()
   assert.equal(peak, 2);
   assert.equal(s.active, 0);
   assert.equal(s.pending, 0);
+});
+
+// ── /snapshot classifiers (site-watch) ──────────────────────────────────────
+
+test("navigation errors map to site failure codes", () => {
+  const cases = {
+    "page.goto: Timeout 15000ms exceeded.": "timeout",
+    "net::ERR_TIMED_OUT at https://x.com/": "timeout",
+    "net::ERR_NAME_NOT_RESOLVED at https://nope.example/": "dns",
+    "net::ERR_BLOCKED_BY_CLIENT at http://10.0.0.1/": "blocked",
+    "net::ERR_CONNECTION_REFUSED at https://x.com/": "connect",
+    "net::ERR_CERT_DATE_INVALID at https://x.com/": "connect",
+    "net::ERR_SSL_PROTOCOL_ERROR at https://x.com/": "connect",
+    "net::ERR_TOO_MANY_REDIRECTS at https://x.com/": "connect",
+    "something unexpected": "navigation",
+  };
+  for (const [msg, code] of Object.entries(cases)) {
+    assert.equal(classifyNavigationError(msg), code, msg);
+    assert.ok(SNAPSHOT_FAILURE_CODES.includes(code), code);
+  }
+});
+
+test("main-document status: 2xx/3xx up, 4xx and 5xx down, missing status is a navigation failure", () => {
+  assert.equal(classifyStatus(200), null);
+  assert.equal(classifyStatus(304), null);
+  assert.equal(classifyStatus(404), "http_4xx");
+  assert.equal(classifyStatus(503), "http_5xx");
+  assert.equal(classifyStatus(0), "navigation");
+  assert.equal(classifyStatus(undefined), "navigation");
+});
+
+test("error lists are capped in count and length", () => {
+  const list = [];
+  for (let i = 0; i < 50; i++) pushCapped(list, "x".repeat(1000));
+  assert.equal(list.length, 20);
+  assert.equal(list[0].length, 300);
+});
+
+test("reported URLs drop query and fragment (tokens live there)", () => {
+  assert.equal(publicUrlOnly("https://a.example.com/shop?session=abc#top"), "https://a.example.com/shop");
+  assert.equal(publicUrlOnly("not a url"), "");
 });

@@ -45,6 +45,7 @@ High：renderer 新 endpoint 上線、compose 不變、Trigger.dev deploy、migr
 1. 讀本檔 + `git log --oneline -10`。
 2. 出 R0 七段（依 §3 事實 + §8 contract），等 go-ahead。§8 標「預設」者操作者可改，未改即照做。
 3. 實作 slice 1，驗證四動作，critic 1 個。
+4. **2026-09-21 進度**：slice 1 已實作約 70%，接手照 `agency-os/handoffs/2026-09-21-site-watch-slice1-progress.md` §4；該檔 §3 列出相對本檔 §8 的 13 項偏差（已實作，勿改回）。
 
 ## 8. 實作前 contract（2026-09-21 GPT 審查 11 點全數查證成立 + 1 點補充）
 - 不變量（C3／C8 被同一 reviewer 連報 2 次，AGENTS.md §4 要求第三次修正前先寫；下列規則由它推導，不逐點補）：

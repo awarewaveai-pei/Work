@@ -9,6 +9,7 @@ const SOURCE_LABEL: Record<string, string> = {
   grafana: "Grafana",
   netdata: "Netdata",
   posthog: "PostHog",
+  site_watch: "網站巡檢",
 };
 
 const SOURCE_COLOR: Record<string, { bg: string; text: string }> = {
@@ -17,6 +18,7 @@ const SOURCE_COLOR: Record<string, { bg: string; text: string }> = {
   grafana: { bg: "#fff7ed", text: "#c2410c" },
   netdata: { bg: "#fefce8", text: "#a16207" },
   posthog: { bg: "#fdf4ff", text: "#86198f" },
+  site_watch: { bg: "#ecfdf5", text: "#047857" },
 };
 
 const SEV_COLOR: Record<string, string> = {
@@ -46,6 +48,8 @@ function getSourceUrl(incident: Incident): string | null {
       return r?.alarm_url ?? "https://app.netdata.cloud";
     case "posthog":
       return "https://us.posthog.com";
+    case "site_watch":
+      return incident.client_slug ? `/ops/clients/${incident.client_slug}` : null;
     default:
       return null;
   }

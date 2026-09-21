@@ -12,6 +12,34 @@ const SEVERITY_RANK: Record<IncidentSeverity, number> = {
   critical: 3,
 };
 
+/**
+ * One Telegram delivery in the three states site-watch's notifier needs (handoff
+ * 2026-09-21-site-watch-plan.md §8 I2). sendMessage has no idempotency key, so anything that MAY have
+ * reached Telegram counts as delivered:
+ *   sent      — HTTP 2xx
+ *   rejected  — HTTP 4xx: Telegram answered and refused; surely not delivered
+ *   uncertain — HTTP 5xx, timeout/abort, network error
+ */
+export type TelegramDelivery =
+  | { kind: "sent" }
+  | { kind: "rejected"; code: string }
+  | { kind: "uncertain"; code: string };
+
+/** On the fetch itself — an outer Promise.race would not stop a late delivery. */
+export const TELEGRAM_SEND_TIMEOUT_MS = 10_000;
+
+/**
+ * Many chats → one outcome. "rejected" only when NO chat could have received it; any sent/uncertain
+ * chat next to a failure makes the whole send uncertain (a retry re-sends to all: at most one
+ * duplicate, never a lost message).
+ */
+export function combineDeliveries(results: TelegramDelivery[]): TelegramDelivery {
+  if (results.length === 0) return { kind: "rejected", code: "telegram_no_chats" };
+  if (results.every((r) => r.kind === "sent")) return { kind: "sent" };
+  const code = results.flatMap((r) => (r.kind === "sent" ? [] : [r.code])).join(";");
+  return results.every((r) => r.kind === "rejected") ? { kind: "rejected", code } : { kind: "uncertain", code };
+}
+
 export class TelegramNotifier implements Notifier {
   constructor(
     public readonly id: string,
@@ -20,32 +48,62 @@ export class TelegramNotifier implements Notifier {
     private readonly minSeverity: IncidentSeverity,
   ) {}
 
+  /** Chats one send fans out to; each can take up to TELEGRAM_SEND_TIMEOUT_MS. */
+  get chatCount(): number {
+    return parseChatIds(this.chatIds).length;
+  }
+
+  meetsMinSeverity(severity: IncidentSeverity): boolean {
+    return SEVERITY_RANK[severity] >= SEVERITY_RANK[this.minSeverity];
+  }
+
+  /** Pre-formatted text to every chat. Missing config = rejected: no request left this process. */
+  async sendText(text: string): Promise<TelegramDelivery> {
+    if (!this.botToken) return { kind: "rejected", code: "telegram_bot_token_missing" };
+    const chats = parseChatIds(this.chatIds);
+    if (!chats.length) return { kind: "rejected", code: "telegram_chat_ids_missing" };
+    const results: TelegramDelivery[] = [];
+    for (const chatId of chats) {
+      const r = await sendTelegram(this.botToken, chatId, clip(text));
+      results.push(r.kind === "sent" ? r : { ...r, code: `${chatId}:${r.code}` });
+    }
+    return combineDeliveries(results);
+  }
+
   async send(ctx: NotificationContext): Promise<NotificationResult> {
     if (!this.botToken) return { status: "failed", error: "telegram_bot_token_missing" };
 
     const chats = parseChatIds(this.chatIds);
     if (!chats.length) return { status: "failed", error: "telegram_chat_ids_missing" };
 
-    if (SEVERITY_RANK[ctx.incident.severity] < SEVERITY_RANK[this.minSeverity]) {
+    if (!this.meetsMinSeverity(ctx.incident.severity)) {
       return {
         status: "skipped",
         reason: `below_min_severity:${this.minSeverity}`,
       };
     }
 
-    const text = formatTelegramIncident(ctx);
-    const errors: string[] = [];
-
-    for (const chatId of chats) {
-      const result = await sendTelegram(this.botToken, chatId, text);
-      if (result) errors.push(`${chatId}:${result}`);
-    }
-
-    if (errors.length) {
-      return { status: "failed", error: errors.join(";") };
-    }
+    const result = await this.sendText(formatTelegramIncident(ctx));
+    if (result.kind !== "sent") return { status: "failed", error: result.code };
     return { status: "sent", externalRef: `telegram:${chats.length}` };
   }
+}
+
+/**
+ * The operator channel as configured for ops-inbox, or null when switched off
+ * (OPS_INBOX_TELEGRAM_NOTIFY_ENABLED). One reader for the dispatcher and site-watch: same switch,
+ * token, chats and minimum severity.
+ */
+export function buildOperatorTelegramNotifier(env: NodeJS.ProcessEnv = process.env): TelegramNotifier | null {
+  const raw = env.OPS_INBOX_TELEGRAM_NOTIFY_ENABLED?.trim().toLowerCase();
+  if (!(raw === "true" || raw === "1" || raw === "yes" || raw === "on")) return null;
+  const chatIds = env.OPS_INBOX_TELEGRAM_CHAT_IDS?.trim() || env.TELEGRAM_ALLOWED_CHAT_IDS?.trim() || "";
+  return new TelegramNotifier(
+    "telegram:operator",
+    env.TELEGRAM_BOT_TOKEN ?? "",
+    chatIds,
+    parseTelegramMinSeverity(env.OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY),
+  );
 }
 
 export function parseTelegramMinSeverity(raw: string | undefined): IncidentSeverity {
@@ -105,11 +163,14 @@ function formatTelegramIncident(ctx: NotificationContext): string {
     incidentUrl,
   ].filter(Boolean);
 
-  const text = lines.join("\n");
+  return lines.join("\n");
+}
+
+function clip(text: string): string {
   return text.length > MAX_LEN ? `${text.slice(0, MAX_LEN)}\n\n...[truncated]` : text;
 }
 
-async function sendTelegram(token: string, chatId: string, text: string): Promise<string | null> {
+export async function sendTelegram(token: string, chatId: string, text: string): Promise<TelegramDelivery> {
   const body = new URLSearchParams({
     chat_id: chatId,
     text,
@@ -121,10 +182,12 @@ async function sendTelegram(token: string, chatId: string, text: string): Promis
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body,
+      signal: AbortSignal.timeout(TELEGRAM_SEND_TIMEOUT_MS),
     });
-    if (!r.ok) return `telegram_${r.status}`;
-    return null;
+    if (r.ok) return { kind: "sent" };
+    const code = `telegram_${r.status}`;
+    return r.status >= 400 && r.status < 500 ? { kind: "rejected", code } : { kind: "uncertain", code };
   } catch (e: any) {
-    return String(e?.message ?? e);
+    return { kind: "uncertain", code: String(e?.message ?? e) };
   }
 }

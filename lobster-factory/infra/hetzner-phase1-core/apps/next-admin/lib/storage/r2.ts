@@ -117,31 +117,146 @@ export function parseImageDataUrl(dataUrl: string): { mime: string; buffer: Buff
   }
 }
 
+// ── Bucket-generic object transport ─────────────────────────────────────────
+// One implementation of PUT/GET/DELETE/LIST for every bucket. The designs helpers below delegate
+// here; site-watch (lib/site-watch/storage.ts) uses a PRIVATE bucket through the same functions.
+
+type R2Fail = { ok: false; error: string; status?: number };
+
+function r2Credentials(): { apiToken: string; accountId: string } | null {
+  const apiToken = process.env.R2_API_TOKEN;
+  const accountId = process.env.R2_ACCOUNT_ID;
+  return apiToken && accountId ? { apiToken, accountId } : null;
+}
+
+function bucketBase(accountId: string, bucket: string): string {
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;
+}
+
+/** Keys keep their "/" separators; everything else is percent-encoded once. */
+function objectUrl(accountId: string, bucket: string, objectKey: string): string {
+  return `${bucketBase(accountId, bucket)}/objects/${encodeURIComponent(objectKey).replace(/%2F/g, "/")}`;
+}
+
+export async function r2PutObject(
+  bucket: string,
+  objectKey: string,
+  body: Buffer,
+  contentType: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<{ ok: true } | R2Fail> {
+  const cred = r2Credentials();
+  if (!cred) return { ok: false, error: "r2_not_configured" };
+  let res: Response;
+  try {
+    res = await fetch(objectUrl(cred.accountId, bucket, objectKey), {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${cred.apiToken}`, "Content-Type": contentType },
+      body: new Uint8Array(body),
+      signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
+    });
+  } catch {
+    return { ok: false, error: "r2_network_error" };
+  }
+  return res.ok ? { ok: true } : { ok: false, error: `r2_put_failed_${res.status}`, status: res.status };
+}
+
+export async function r2GetObject(
+  bucket: string,
+  objectKey: string,
+  opts: { timeoutMs?: number; maxBytes?: number } = {},
+): Promise<{ ok: true; body: Buffer; contentType: string } | R2Fail> {
+  const cred = r2Credentials();
+  if (!cred) return { ok: false, error: "r2_not_configured" };
+  let res: Response;
+  try {
+    res = await fetch(objectUrl(cred.accountId, bucket, objectKey), {
+      headers: { Authorization: `Bearer ${cred.apiToken}` },
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000),
+    });
+  } catch {
+    return { ok: false, error: "r2_network_error" };
+  }
+  if (!res.ok) return { ok: false, error: res.status === 404 ? "r2_not_found" : `r2_get_failed_${res.status}`, status: res.status };
+  const body = Buffer.from(await res.arrayBuffer());
+  if (opts.maxBytes && body.byteLength > opts.maxBytes) return { ok: false, error: "r2_object_too_large" };
+  return { ok: true, body, contentType: res.headers.get("content-type") ?? "application/octet-stream" };
+}
+
+/** 404 = already gone = success (idempotent). */
+export async function r2DeleteObject(
+  bucket: string,
+  objectKey: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<{ ok: true } | R2Fail> {
+  const cred = r2Credentials();
+  if (!cred) return { ok: false, error: "r2_not_configured" };
+  let res: Response;
+  try {
+    res = await fetch(objectUrl(cred.accountId, bucket, objectKey), {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${cred.apiToken}` },
+      signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
+    });
+  } catch {
+    return { ok: false, error: "r2_network_error" };
+  }
+  if (!res.ok && res.status !== 404) return { ok: false, error: `r2_delete_failed_${res.status}`, status: res.status };
+  return { ok: true };
+}
+
+export interface R2ListedObject {
+  key: string;
+  /** null when the API did not report it — callers must treat that as "age unknown", never "old". */
+  lastModified: Date | null;
+}
+
+/** Every object under `prefix` (follows the cursor). `prefix` is the raw key prefix, encoded once here. */
+export async function r2ListObjects(
+  bucket: string,
+  prefix: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<{ ok: true; objects: R2ListedObject[] } | R2Fail> {
+  const cred = r2Credentials();
+  if (!cred) return { ok: false, error: "r2_not_configured" };
+  const objects: R2ListedObject[] = [];
+  let cursor: string | undefined;
+  do {
+    const u = new URL(`${bucketBase(cred.accountId, bucket)}/objects`);
+    u.searchParams.set("per_page", "1000");
+    u.searchParams.set("prefix", prefix);
+    if (cursor) u.searchParams.set("cursor", cursor);
+    let res: Response;
+    try {
+      res = await fetch(u.toString(), {
+        headers: { Authorization: `Bearer ${cred.apiToken}` },
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
+      });
+    } catch {
+      return { ok: false, error: "r2_list_network_error" };
+    }
+    if (!res.ok) return { ok: false, error: `r2_list_failed_${res.status}`, status: res.status };
+    const j = (await res.json()) as {
+      result?: Array<{ key: string; last_modified?: string }>;
+      result_info?: { cursor?: string; is_truncated?: boolean };
+    };
+    for (const o of j.result ?? []) {
+      const t = o.last_modified ? new Date(o.last_modified) : null;
+      objects.push({ key: o.key, lastModified: t && !Number.isNaN(t.getTime()) ? t : null });
+    }
+    cursor = j.result_info?.is_truncated ? j.result_info.cursor : undefined;
+  } while (cursor);
+  return { ok: true, objects };
+}
+
 /** Delete one object from the designs bucket. Returns ok:true on success or 404 (already gone). */
 export async function deleteDesignObject(
   objectKey: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const config = getR2Config();
   if (!config) return { ok: false, error: "r2_not_configured" };
-
-  const url =
-    `https://api.cloudflare.com/client/v4/accounts/${config.accountId}` +
-    `/r2/buckets/${config.bucket}/objects/${encodeURIComponent(objectKey).replace(/%2F/g, "/")}`;
-
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${config.apiToken}` },
-    });
-  } catch {
-    return { ok: false, error: "r2_network_error" };
-  }
-  // 404 = already deleted; treat as success (idempotent delete).
-  if (!res.ok && res.status !== 404) {
-    return { ok: false, error: `r2_delete_failed_${res.status}` };
-  }
-  return { ok: true };
+  const r = await r2DeleteObject(config.bucket, objectKey);
+  return "error" in r ? { ok: false, error: r.error } : { ok: true };
 }
 
 /**
@@ -226,27 +341,8 @@ export async function putDesignObject(
 ): Promise<R2PutResult | R2PutError> {
   const config = getR2Config();
   if (!config) return { ok: false, error: "r2_not_configured" };
-
-  const url =
-    `https://api.cloudflare.com/client/v4/accounts/${config.accountId}` +
-    `/r2/buckets/${config.bucket}/objects/${encodeURIComponent(objectKey).replace(/%2F/g, "/")}`;
-
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${config.apiToken}`,
-        "Content-Type": contentType,
-      },
-      body: new Uint8Array(body),
-    });
-  } catch {
-    return { ok: false, error: "r2_network_error" };
-  }
-  if (!res.ok) {
-    return { ok: false, error: `r2_put_failed_${res.status}` };
-  }
+  const put = await r2PutObject(config.bucket, objectKey, body, contentType);
+  if ("error" in put) return { ok: false, error: put.error };
   return {
     ok: true,
     objectKey,

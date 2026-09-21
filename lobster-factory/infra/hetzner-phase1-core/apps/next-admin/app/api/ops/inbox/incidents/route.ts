@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
   }
 
-  const ALLOWED_SOURCES = new Set(["sentry", "uptime_kuma", "grafana", "netdata", "posthog", "manual", "deploy"]);
+  const ALLOWED_SOURCES = new Set(["sentry", "uptime_kuma", "grafana", "netdata", "posthog", "manual", "deploy", "site_watch"]);
   if (sourceParam && !ALLOWED_SOURCES.has(sourceParam)) {
     return NextResponse.json({ ok: false, error: "invalid source param" }, { status: 400 });
   }

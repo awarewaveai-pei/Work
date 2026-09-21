@@ -18,8 +18,12 @@ import { chromium } from "playwright-core";
 import {
   Semaphore,
   clampTimeout,
+  classifyNavigationError,
+  classifyStatus,
   codeError,
   honestUserAgent,
+  publicUrlOnly,
+  pushCapped,
   secretMatches,
   validateTargetUrl,
 } from "./lib.mjs";
@@ -43,7 +47,22 @@ if (!SECRET) {
   process.exit(1);
 }
 
+// /snapshot (site-watch, handoff 2026-09-21-site-watch-plan.md §8 C5). Fixed server-side, not
+// caller-controlled: a monitoring check is only comparable run to run if every run is taken the same way.
+const SNAPSHOT_VIEWPORT = { width: 1366, height: 900 };
+const SNAPSHOT_MAX_HEIGHT = 8_000;
+const SNAPSHOT_LOAD_TIMEOUT_MS = 15_000;
+const SNAPSHOT_IDLE_TIMEOUT_MS = 15_000;
+const SNAPSHOT_SHOT_TIMEOUT_MS = 30_000;
+const SNAPSHOT_MAX_IMAGE_BYTES = 5_000_000;
+// JPEG, not PNG: a 1366x8000 full-page PNG of an image-heavy site routinely exceeds 5MB; JPEG q80 stays
+// ~1-3MB, and the pixel comparison's 0.1 threshold absorbs encoder noise on an unchanged page.
+const SNAPSHOT_JPEG_QUALITY = 80;
+
 const slots = new Semaphore(MAX_CONCURRENCY);
+// Snapshots also take a general slot (acquired second, so there is no lock-order cycle with /render):
+// at most one full-page capture at a time, and never more than MAX_CONCURRENCY pages in total.
+const snapshotSlots = new Semaphore(1);
 /** @type {Promise<{ browser: import("playwright-core").Browser, userAgent: string }> | null} */
 let browserState = null;
 
@@ -87,63 +106,34 @@ function allowSubrequest(url) {
 
 const SKIPPED_RESOURCE_TYPES = new Set(["image", "media", "font"]);
 
-async function render(targetUrl, timeoutMs) {
-  const started = Date.now();
+/**
+ * One fresh browser context under a hard deadline for the WHOLE job. goto has its own timeout, but
+ * page.content(), screenshots and a hostile page's event loop do not — one page that never yields
+ * would hold a concurrency slot forever and, after MAX_CONCURRENCY of them, the service would accept
+ * work it can never do. Closing the context makes every pending operation on it reject, which
+ * unwinds into `finally`. Every subrequest is re-checked (allowSubrequest); `skipTypes` additionally
+ * drops resource types the job does not need.
+ */
+async function withContext({ viewport, skipTypes, deadlineMs }, job) {
   const { browser, userAgent } = await getBrowser();
   const context = await browser.newContext({
     userAgent,
     acceptDownloads: false,
     serviceWorkers: "block",
-    viewport: { width: 1280, height: 900 },
+    viewport,
   });
-  // Hard deadline for the WHOLE render. goto has its own timeout, but page.content(), title() and a
-  // hostile page's event loop do not — one page that never yields would hold a concurrency slot
-  // forever and, after MAX_CONCURRENCY of them, the service would accept work it can never do.
-  // Closing the context makes every pending operation on it reject, which unwinds into `finally`.
   let deadlineHit = false;
   const deadline = setTimeout(() => {
     deadlineHit = true;
     context.close().catch(() => {});
-  }, timeoutMs + 15_000);
+  }, deadlineMs);
   try {
     await context.route("**/*", (route) => {
       const req = route.request();
-      if (SKIPPED_RESOURCE_TYPES.has(req.resourceType())) return route.abort();
+      if (skipTypes?.has(req.resourceType())) return route.abort();
       return allowSubrequest(req.url()) ? route.continue() : route.abort("blockedbyclient");
     });
-
-    const page = await context.newPage();
-    let response;
-    try {
-      response = await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    } catch (e) {
-      const msg = String(e?.message || e);
-      if (msg.includes("Download is starting")) throw codeError("download_not_page", 415);
-      if (msg.includes("Timeout")) throw codeError("navigation_timeout", 504);
-      if (msg.includes("ERR_BLOCKED_BY_CLIENT")) throw codeError("blocked_by_policy", 403);
-      throw codeError(`navigation_failed:${msg.split("\n")[0].slice(0, 120)}`, 502);
-    }
-    // Best effort: many pages keep a socket open forever, so this is never allowed to fail a render.
-    const remaining = Math.max(1_000, timeoutMs - (Date.now() - started));
-    await page.waitForLoadState("networkidle", { timeout: Math.min(8_000, remaining) }).catch(() => {});
-
-    let html = await page.content();
-    let truncated = false;
-    if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) {
-      html = Buffer.from(html, "utf8").subarray(0, MAX_HTML_BYTES).toString("utf8");
-      truncated = true;
-    }
-    const headers = response ? await response.allHeaders().catch(() => ({})) : {};
-    return {
-      ok: true,
-      status: response ? response.status() : 0,
-      finalUrl: page.url(),
-      title: await page.title().catch(() => ""),
-      contentType: headers["content-type"] || "text/html",
-      html,
-      truncated,
-      ms: Date.now() - started,
-    };
+    return await job(await context.newPage());
   } catch (e) {
     if (deadlineHit) throw codeError("render_deadline_exceeded", 504);
     throw e;
@@ -151,6 +141,122 @@ async function render(targetUrl, timeoutMs) {
     clearTimeout(deadline);
     await context.close().catch(() => {});
   }
+}
+
+async function render(targetUrl, timeoutMs) {
+  const started = Date.now();
+  return withContext(
+    { viewport: { width: 1280, height: 900 }, skipTypes: SKIPPED_RESOURCE_TYPES, deadlineMs: timeoutMs + 15_000 },
+    async (page) => {
+      let response;
+      try {
+        response = await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      } catch (e) {
+        const msg = String(e?.message || e);
+        if (msg.includes("Download is starting")) throw codeError("download_not_page", 415);
+        if (msg.includes("Timeout")) throw codeError("navigation_timeout", 504);
+        if (msg.includes("ERR_BLOCKED_BY_CLIENT")) throw codeError("blocked_by_policy", 403);
+        throw codeError(`navigation_failed:${msg.split("\n")[0].slice(0, 120)}`, 502);
+      }
+      // Best effort: many pages keep a socket open forever, so this is never allowed to fail a render.
+      const remaining = Math.max(1_000, timeoutMs - (Date.now() - started));
+      await page.waitForLoadState("networkidle", { timeout: Math.min(8_000, remaining) }).catch(() => {});
+
+      let html = await page.content();
+      let truncated = false;
+      if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) {
+        html = Buffer.from(html, "utf8").subarray(0, MAX_HTML_BYTES).toString("utf8");
+        truncated = true;
+      }
+      const headers = response ? await response.allHeaders().catch(() => ({})) : {};
+      return {
+        ok: true,
+        status: response ? response.status() : 0,
+        finalUrl: page.url(),
+        title: await page.title().catch(() => ""),
+        contentType: headers["content-type"] || "text/html",
+        html,
+        truncated,
+        ms: Date.now() - started,
+      };
+    },
+  );
+}
+
+/**
+ * Open a public page the way a visitor would (images, fonts and media included — unlike /render) and
+ * report what a monitor needs: main-document status, JS errors, a full-page screenshot. `ok: true`
+ * means the renderer did its job; whether the SITE is healthy is `failureCode` (null = up).
+ * `screenshotSkipped` is not a site failure: the page loaded, we just have no comparable image.
+ */
+async function snapshot(targetUrl) {
+  const started = Date.now();
+  const deadlineMs = SNAPSHOT_LOAD_TIMEOUT_MS + SNAPSHOT_IDLE_TIMEOUT_MS + SNAPSHOT_SHOT_TIMEOUT_MS + 10_000;
+  return withContext({ viewport: SNAPSHOT_VIEWPORT, skipTypes: null, deadlineMs }, async (page) => {
+    const consoleErrors = [];
+    const pageErrors = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") pushCapped(consoleErrors, msg.text());
+    });
+    page.on("pageerror", (err) => pushCapped(pageErrors, err?.message || err));
+
+    const base = { ok: true, consoleErrors, pageErrors, screenshotBase64: null, screenshotBytes: 0, screenshotSkipped: null };
+    let response;
+    try {
+      response = await page.goto(targetUrl, { waitUntil: "load", timeout: SNAPSHOT_LOAD_TIMEOUT_MS });
+    } catch (e) {
+      const msg = String(e?.message || e);
+      return {
+        ...base,
+        status: 0,
+        finalUrl: publicUrlOnly(page.url()),
+        failureCode: classifyNavigationError(msg),
+        detail: msg.split("\n")[0].slice(0, 200),
+        screenshotSkipped: "not_loaded",
+        timingMs: Date.now() - started,
+      };
+    }
+    await page.waitForLoadState("networkidle", { timeout: SNAPSHOT_IDLE_TIMEOUT_MS }).catch(() => {});
+    const status = response ? response.status() : 0;
+    const failureCode = classifyStatus(status);
+
+    let screenshotBase64 = null;
+    let screenshotBytes = 0;
+    let screenshotSkipped = null;
+    try {
+      const fullHeight = await page
+        .evaluate(() => Math.max(document.documentElement?.scrollHeight ?? 0, document.body?.scrollHeight ?? 0))
+        .catch(() => SNAPSHOT_VIEWPORT.height);
+      const height = Math.min(Math.max(Number(fullHeight) || SNAPSHOT_VIEWPORT.height, 1), SNAPSHOT_MAX_HEIGHT);
+      const shot = await page.screenshot({
+        type: "jpeg",
+        quality: SNAPSHOT_JPEG_QUALITY,
+        fullPage: true,
+        clip: { x: 0, y: 0, width: SNAPSHOT_VIEWPORT.width, height },
+        animations: "disabled",
+        timeout: SNAPSHOT_SHOT_TIMEOUT_MS,
+      });
+      if (shot.byteLength > SNAPSHOT_MAX_IMAGE_BYTES) screenshotSkipped = "too_large";
+      else {
+        screenshotBase64 = shot.toString("base64");
+        screenshotBytes = shot.byteLength;
+      }
+    } catch (e) {
+      screenshotSkipped = `screenshot_failed:${String(e?.message || e).split("\n")[0].slice(0, 120)}`;
+    }
+
+    return {
+      ...base,
+      status,
+      finalUrl: publicUrlOnly(page.url()),
+      failureCode,
+      detail: failureCode ? `HTTP ${status}` : null,
+      screenshotBase64,
+      screenshotBytes,
+      screenshotSkipped,
+      timingMs: Date.now() - started,
+    };
+  });
 }
 
 function send(res, status, body) {
@@ -181,8 +287,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/healthz") {
     return send(res, 200, { ok: true, active: slots.active, pending: slots.pending });
   }
-  if (req.method !== "POST" || req.url !== "/render") return send(res, 404, { ok: false, error: "not_found" });
+  if (req.method !== "POST" || (req.url !== "/render" && req.url !== "/snapshot")) {
+    return send(res, 404, { ok: false, error: "not_found" });
+  }
   if (!secretMatches(req.headers["x-renderer-secret"], SECRET)) return send(res, 401, { ok: false, error: "unauthorized" });
+  if (req.url === "/snapshot") return handleSnapshot(req, res);
   if (slots.pending >= MAX_QUEUE) return send(res, 503, { ok: false, error: "busy" });
 
   let targetUrl;
@@ -212,6 +321,31 @@ const server = http.createServer(async (req, res) => {
     slots.release();
   }
 });
+
+async function handleSnapshot(req, res) {
+  if (snapshotSlots.pending >= MAX_QUEUE) return send(res, 503, { ok: false, error: "busy" });
+  let targetUrl;
+  try {
+    const body = JSON.parse(await readBody(req));
+    targetUrl = validateTargetUrl(body?.url).toString();
+  } catch (e) {
+    return send(res, e?.status || 400, { ok: false, error: e?.code || "bad_request" });
+  }
+
+  await snapshotSlots.acquire();
+  await slots.acquire();
+  try {
+    const result = await snapshot(targetUrl);
+    console.log(`snapshot ${result.status} ${result.failureCode ?? "up"} ${result.timingMs}ms ${result.screenshotBytes}B ${publicUrlOnly(targetUrl)}`);
+    return send(res, 200, result);
+  } catch (e) {
+    console.log(`snapshot FAIL ${e?.code || e?.message} ${publicUrlOnly(targetUrl)}`);
+    return send(res, e?.status || 502, { ok: false, error: e?.code || "snapshot_failed" });
+  } finally {
+    slots.release();
+    snapshotSlots.release();
+  }
+}
 
 server.listen(PORT, "0.0.0.0", () => console.log(`renderer listening on :${PORT} (concurrency ${MAX_CONCURRENCY})`));
 

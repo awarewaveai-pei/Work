@@ -37,6 +37,9 @@ export function decideNotification(args: DecideArgs): Decision {
   if (incident.status === "ignored") return { shouldSend: false, reason: "status_ignored" };
   // Deploy events: VPS auto-deploy script sends Telegram/Slack directly to avoid double-notification.
   if (incident.source === "deploy") return { shouldSend: false, reason: "deploy_direct_notify" };
+  // Site-watch owns its Telegram delivery state (lib/site-watch/notify.ts): one alert + one recovery
+  // per episode, resumed from DB state. A dispatcher send would be a second, untracked copy.
+  if (incident.source === "site_watch") return { shouldSend: false, reason: "site_watch_direct_notify" };
 
   if (transition.kind === "severity_escalated") return { shouldSend: true, rule: "severity_escalation" };
   if (transition.kind === "reopened") return { shouldSend: true, rule: "reopen" };

@@ -60,6 +60,14 @@ const REPAIR_SOURCE_POLICY_BY_SOURCE = {
     rationale: "部署成功 / 失敗為操作性事件，不屬於 code regression，由 VPS auto-deploy 腳本直接通知，Repair Center 不介入。",
     can_escalate_to_pr: false,
   },
+  site_watch: {
+    source: "site_watch",
+    label: "網站巡檢",
+    policy: "human_only",
+    family: "availability_slo",
+    rationale: "客戶網站打不開或畫面大幅變動，原因多在客戶主機、外掛或內容，不是本 repo 的程式；由操作者判斷。",
+    can_escalate_to_pr: false,
+  },
   manual: {
     source: "manual",
     label: "手動",

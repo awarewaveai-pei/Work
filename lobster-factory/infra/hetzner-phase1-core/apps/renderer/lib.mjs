@@ -125,6 +125,52 @@ export function clampTimeout(value, { min = 5_000, max = 45_000, fallback = 30_0
 }
 
 /**
+ * /snapshot failure codes (site-watch, handoff 2026-09-21-site-watch-plan.md §8 C5). About the SITE,
+ * not about us: a page that loads fine but is too big to screenshot is not a failure (see
+ * SNAPSHOT_SKIP), and a renderer crash surfaces as an HTTP error, not as one of these.
+ */
+export const SNAPSHOT_FAILURE_CODES = ["timeout", "http_4xx", "http_5xx", "dns", "connect", "blocked", "navigation"];
+
+/** Map a Playwright page.goto() error message to a failure code. */
+export function classifyNavigationError(message) {
+  const m = String(message || "");
+  if (/Timeout \d+ms exceeded|ERR_TIMED_OUT|ERR_CONNECTION_TIMED_OUT/.test(m)) return "timeout";
+  if (/ERR_NAME_NOT_RESOLVED|ERR_NAME_RESOLUTION_FAILED/.test(m)) return "dns";
+  if (/ERR_BLOCKED_BY_CLIENT/.test(m)) return "blocked";
+  if (/ERR_CONNECTION_(REFUSED|RESET|CLOSED|FAILED)|ERR_ADDRESS_UNREACHABLE|ERR_SSL_|ERR_CERT_|ERR_EMPTY_RESPONSE|ERR_TOO_MANY_REDIRECTS/.test(m)) {
+    return "connect";
+  }
+  return "navigation";
+}
+
+/** HTTP status of the main document → failure code, or null when the page is up. */
+export function classifyStatus(status) {
+  const n = Number(status);
+  if (!Number.isInteger(n) || n <= 0) return "navigation";
+  if (n >= 500) return "http_5xx";
+  if (n >= 400) return "http_4xx";
+  return null;
+}
+
+/** Keep at most `max` entries of at most `len` chars — a noisy page must not bloat the response. */
+export function pushCapped(list, text, max = 20, len = 300) {
+  if (list.length < max) list.push(String(text ?? "").slice(0, len));
+}
+
+/**
+ * The URL a snapshot reports back: no query string or fragment. Query strings are where tracking
+ * and session tokens live, and this value is stored and shown in the ops console (C12).
+ */
+export function publicUrlOnly(raw) {
+  try {
+    const u = new URL(raw);
+    return `${u.protocol}//${u.host}${u.pathname}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
  * The User-Agent: the browser's own (it already says HeadlessChrome — nothing is disguised) plus the
  * same bot identity the crawler presents, so a site's robots.txt and its logs see who is asking.
  * Pretending to be a person's browser would be evading detection, which this service never does.

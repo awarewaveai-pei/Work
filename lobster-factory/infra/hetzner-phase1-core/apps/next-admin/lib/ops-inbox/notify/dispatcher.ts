@@ -3,7 +3,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { Incident, IncidentTransition, NotificationLogEntry } from "../types";
 import type { Notifier } from "./types";
 import { SlackNotifier } from "./slack";
-import { TelegramNotifier, parseTelegramMinSeverity } from "./telegram";
+import { buildOperatorTelegramNotifier } from "./telegram";
 import { decideNotification } from "./rules";
 
 const NOTIFIERS: Notifier[] = buildNotifiers();
@@ -12,22 +12,8 @@ function buildNotifiers(): Notifier[] {
   const notifiers: Notifier[] = [
     new SlackNotifier("slack:ops-incidents", process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK ?? ""),
   ];
-
-  const raw = process.env.OPS_INBOX_TELEGRAM_NOTIFY_ENABLED?.trim().toLowerCase();
-  const telegramEnabled = raw === "true" || raw === "1" || raw === "yes" || raw === "on";
-  if (telegramEnabled) {
-    const telegramChatIds =
-      process.env.OPS_INBOX_TELEGRAM_CHAT_IDS?.trim() || process.env.TELEGRAM_ALLOWED_CHAT_IDS?.trim() || "";
-    notifiers.push(
-      new TelegramNotifier(
-        "telegram:operator",
-        process.env.TELEGRAM_BOT_TOKEN ?? "",
-        telegramChatIds,
-        parseTelegramMinSeverity(process.env.OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY),
-      ),
-    );
-  }
-
+  const telegram = buildOperatorTelegramNotifier();
+  if (telegram) notifiers.push(telegram);
   return notifiers;
 }
 
