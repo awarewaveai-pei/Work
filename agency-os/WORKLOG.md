@@ -21369,3 +21369,35 @@ WORKLOG_DONE: Codex 兩項回報驗真 —— hooks trust 未做（憑據層確�
 - BUGHUNT_DONE: scope=`mcp/codex-userlevel/scripts` | grep=`trusted_hash|heartbeat|Assert-Parity` | hits=checker trust pre-check plus authoritative heartbeat gate；未移除 runtime fail gate。
 
 [剩餘風險] Codex UI 的 `/hooks` trust 仍須在目前 Codex 視窗確認；目前最新 session 沒有 `PreToolUse` heartbeat，不能宣稱機械閘已啟用。
+
+## 2026-09-21（續）provision-staging 明文回傳 WP admin 密碼 → 改存 Supabase Vault
+
+**根因**：`app/api/internal/hosting/provision-staging/route.ts` 在 `provisioningNotes` 放 `Admin: admin / <密碼>`（自 2af74c490 2026-06-03 起），違反 `docs/hosting/HTTP_JSON_HOSTING_ADAPTER.md:47`「Never return passwords」。另 `randomPass()` 用 `Math.random`（非 CSPRNG）。
+**Sink 追蹤**（file:line）：
+- S1 Trigger.dev run output：`httpJsonStagingAdapter.ts:127` → `create-wp-site.ts:325`（`next.createStagingEnvironmentRecord.notes`）+ `:531`（`vendorStaging`）。**已洩漏**：trigger-postgres `TaskRun.output` 9 筆 + `TaskEvent` 9 筆（2026-06-03～06-27，env `env_ae34ebe5ed4b8ae2`，全 COMPLETED）。
+- S2 `ops_action_runs.output_payload`：`build/runs/route.ts:247` + `onboarding/trigger-build/route.ts:487` 自 bd135952e（2026-07-03）起寫入前 redact。Supabase 全 public schema text/json 欄掃描：3 筆含 `Admin: admin / `，**0 筆明文**。
+- S3 `workflow_runs`：`create-wp-site.ts:247/290` 只寫 `{hosting}`（blocked 無 ref）或 `{}` → 乾淨。environments 表未實作寫入（`:364` TODO）。PostHog/Sentry 事件不含 notes（`:509-519`、`:545`）。
+- S4 next-admin UI：`build/runs/[id]/route.ts:24` 回 `output_payload` → 同 S2，已 redact。
+- 受影響 9 站：7 站已拆除；**仍在線 2 站**：`staging/green-valley-farm-28ba09/`、`staging/ssasd-8ebcd4/`（`wp-config.php` 存在）。
+**修法（治本：來源不再產出密碼）**：新增 `lib/hosting/staging-admin-credential.ts` —— CSPRNG 密碼；以既有 `client_credentials`（migration 0050，category `hosting`）+ `lib/secret-vault.ts` `clientCredSecretRef(id)` 入 Vault，note 只帶 credential id；attach 失敗 compensate 刪 vault+row；錯誤訊息遮蔽密碼；note 不以 `Admin:` 開頭（否則被舊 redactor 覆寫掉 id）。WP 回 `already installed`（重試）時不入庫——WP 保留的是第一次密碼。codebase 無 reveal 端點（`credentials/route.ts:57-63` 只回 `secretSet`），不新造；取用 = `wp user update admin --user_pass=...`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/hosting`（next-admin） | exit=0 | ms=1515
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全套 1457 pass/13 skip）| exit=0 | ms=12245（`npx tsc --noEmit` 另跑 exit=0）
+- REALTEST_EVIDENCE: tool=SSH | cmd=trigger-postgres read-only `SELECT count(*) FROM "TaskRun" WHERE taskIdentifier='create-wp-site' AND output ~ 'Admin: admin / Stg[a-z0-9]{16}!'` → 9 | exit=0 | ms=5302
+- 突變測試：把 note 改回 `Admin: ${STAGING_ADMIN_USER} / ${adminPass}` → `never interpolates adminPass into the JSON response` 紅；還原 → 7/7 綠。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex `codex-oracle.ps1 -Mode review` 限 3 檔，ms=91401，artifact `agency-os/reports/oracle/2026-09-21-partialreview-7460ecde.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands,.claude/agents,.claude/skills | grep=`randomPass` | hits=0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`adminPass` | hits=6（route.ts 3 處＝生成／wp-cli 參數／vault 呼叫；其餘為新測試斷言），repo 無 `Stg[a-z0-9]{16}!` 明文。
+**critic 覆審（/verify-recent，commit gate 要求）**：1M/2m，全修。
+- M1 `route.ts` 重試判定是死碼：wp-cli `core install` 以 `WP_CLI::log` 印 already installed，`--quiet` 抑制 → stdout 永遠空、exit 0 → 重試會把**錯的**密碼入庫（原始碼亦同，早於本修）。改：先跑 `wp core is-installed` 以 exit code 判定，已安裝則跳過 install 與入庫。
+- m1 `putSecret` RPC 已 commit 後才 throw（timeout）→ catch 只刪 row、vault 殘留明文。改：`compensate()` 同刪 vault + row。
+- m2 `deleteCredential` 吞 Supabase error → 改回傳錯誤，失敗時 note 標 `[orphan: ...]`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（next-admin 全套 1462 pass） | exit=0 | ms=12678
+- 突變測試：拿掉 compensate 的 `deleteSecret` → 3 紅；還原 → 12/12 綠。`verify-head-typecheck.ps1` a88fa3430 HEAD_TYPECHECK_OK。
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1m/2n
+- 附註：a88fa3430 因共用 worktree 競態，WORKLOG 實際提交的是 MainWP session 的續100 條目，本條目改於後續 commit 提交；無內容遺失。
+**未執行（High，待操作者 go-ahead）**：① 2 個在線站輪換密碼 + 清 session ② trigger-postgres 9+9 筆 redaction ③ next-admin sg-deploy + Trigger.dev deploy（`create-wp-site` 本身無改動，只需 next-admin）。指令見 TASKS 同名條目。
+**同檔並行**：route.ts 的 `managementPlugins = ["mainwp-child"]` hunk 屬 MainWP session，未納入本 commit。
+[剩餘風險] 舊 redactor（build/runs:247、trigger-build:487）現為冗餘，保留作縱深；密碼仍經 SSH 命令列傳給 wp-cli（host `ps` 短暫可見）。
+[rollback] `git revert` 本 commit（回到明文 note；不建議）。已入 Vault 的 `client_credentials` 列可由 `/api/ops/clients/credentials` DELETE 清掉。
+
+WORKLOG_DONE: provision-staging 不再回傳密碼；sink 全數定位，洩漏限於 Trigger.dev 9 run，修補/輪換待操作者批准

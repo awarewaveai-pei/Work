@@ -26,7 +26,7 @@ function fakeDeps(over: Partial<StagingAdminVaultDeps> = {}) {
   const deps: StagingAdminVaultDeps = {
     insertCredential: vi.fn(async (row) => { rows.set("cred-1", { ...row }); return { id: "cred-1" }; }),
     attachSecretRef: vi.fn(async (id, ref) => { rows.get(id)!.secret_ref = ref; return null; }),
-    deleteCredential: vi.fn(async (id) => { rows.delete(id); }),
+    deleteCredential: vi.fn(async (id) => { rows.delete(id); return null; }),
     putSecret: vi.fn(async (name, value) => { vault.set(name, value); return name; }),
     deleteSecret: vi.fn(async (name) => vault.delete(name)),
     ...over,
@@ -77,6 +77,29 @@ describe("vaultStagingAdminPassword", () => {
     expect(rows.size).toBe(0);
   });
 
+  it("removes a vault entry committed before putSecret threw (timeout after RPC)", async () => {
+    const vault = new Map<string, string>();
+    const { deps, rows } = fakeDeps({
+      putSecret: vi.fn(async (name, value) => { vault.set(name, value); throw new Error("timeout"); }),
+      deleteSecret: vi.fn(async (name) => vault.delete(name)),
+    });
+    const note = await vaultStagingAdminPassword(args, deps);
+    expect(note).toMatch(/^WARN admin password not vaulted: timeout;/);
+    expect(vault.size).toBe(0);
+    expect(rows.size).toBe(0);
+  });
+
+  it("reports orphans when compensation itself fails", async () => {
+    const { deps } = fakeDeps({
+      attachSecretRef: vi.fn(async () => "update failed"),
+      deleteSecret: vi.fn(async () => { throw new Error("vault down"); }),
+      deleteCredential: vi.fn(async () => "row delete failed"),
+    });
+    const note = await vaultStagingAdminPassword(args, deps);
+    expect(note).toContain("[orphan: vault client_cred:cred-1, client_credentials cred-1]");
+    expect(note).not.toContain(PASS);
+  });
+
   it("degrades to WARN without organizationId or DB client", async () => {
     expect(await vaultStagingAdminPassword({ ...args, organizationId: undefined }, fakeDeps().deps)).toMatch(/no organizationId/);
     expect(await vaultStagingAdminPassword(args, null)).toMatch(/no DB client/);
@@ -93,6 +116,10 @@ describe("provision-staging route source", () => {
     expect(start).toBeGreaterThan(0);
     const response = src.slice(start);
     expect(response.slice(0, response.indexOf("});"))).not.toMatch(/adminPass/);
+    // retry detection must use the exit code of `core is-installed`: `core install --quiet` hides
+    // its "already installed" log line, so a stdout match can never fire.
+    expect(src).toMatch(/core is-installed/);
+    expect(src).not.toMatch(/installResult\.stdout\.includes\("already installed"\)/);
     // the only uses: generation, the wp-cli install arg, the vault call
     expect(src.match(/\badminPass\b/g)?.length).toBe(3);
   });

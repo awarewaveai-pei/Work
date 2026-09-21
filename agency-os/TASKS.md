@@ -119,6 +119,13 @@
   - **下一步**：操作者在 MainWP → Settings → REST API 啟用並建 key；治本改為 key 存伺服器 env／vault，由 workflow 讀取，不再經 Build Console 表單與 Trigger payload；之後 Trigger.dev deploy + sg-deploy next-admin，真加一個 staging 站驗證。
   - **完成定義**：真實建站後 MainWP 出現該站且 sync 成功；payload／run log 不含 consumer secret。
 
+- [ ] **【資安｜待操作者】staging WP admin 密碼曾明文進 Trigger.dev run output：輪換 2 站 + redact 9 run + deploy**
+  - `🔴 現行` · `2026-09-21` · `卡在操作者（High：prod DB 寫入 + deploy）`
+  - **一句話**：provision-staging 自 2026-06-03 把 admin 密碼放進 provisioningNotes；源頭已修（改存 Vault），但舊資料仍在 trigger-postgres `TaskRun`/`TaskEvent` 各 9 筆，其中 2 站仍在線。
+  - **下一步**：① 在線 2 站（green-valley-farm-28ba09、ssasd-8ebcd4）`wp user update admin --user_pass=<random> --skip-email` + `wp user session destroy admin --all` ② trigger-postgres 以 `regexp_replace(..., 'Admin: admin / Stg[a-z0-9]{16}!', 'Admin: admin / [redacted]')` 更新 9+9 筆（預期列數 9） ③ sg-deploy next-admin。
+  - **完成定義**：上述 regex 查詢 0 筆；兩站舊密碼失效；新建站 note 為 `Admin password vaulted: client_credentials <id>`。
+  - **證據**：WORKLOG 2026-09-21（續）provision-staging 明文回傳 WP admin 密碼。
+
 - [ ] **Codex `/hooks` trust 未執行，Codex 側等同零機械閘** — `check-claude-codex-parity.ps1` 444/446，唯二失敗就是這條（`0/8 hook handlers trusted` + 無 heartbeat）。2026-09-20 的共用資產成果（41 個 command wrapper、25 個 agent bridge、相對路徑、model 分層）在 Codex session 內全都沒有機械強制。**需操作者在 Codex 開 `D:\Work` 跑 `/hooks` 並 trust AwareWave hooks**，之後 `check-claude-codex-parity.ps1` 應轉 446/446。
 
 #### A. ⏰ 有外部時鐘（死線／到期日）

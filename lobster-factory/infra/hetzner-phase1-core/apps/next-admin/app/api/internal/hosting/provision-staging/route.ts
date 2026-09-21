@@ -406,17 +406,24 @@ export async function POST(request: Request) {
       throw new Error(`wp config create failed: ${configResult.stdout} ${configResult.stderr}`);
     }
 
-    // 5. Install WordPress
-    const installResult = await sshExec(
+    // 5. Install WordPress. Detect "already installed" by `core is-installed` exit code: `core install`
+    // reports it via WP_CLI::log, which --quiet suppresses (exit 0, empty stdout). A retry
+    // (fetchWithRetry in trigger-build) reaching an installed site must not vault this call's fresh
+    // password — WP kept the FIRST one.
+    const isInstalled = await sshExec(
       conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core install --url='${stagingSiteUrl}' --title='${siteName.replace(/'/g, "")} Staging' --admin_user=${STAGING_ADMIN_USER} --admin_password='${adminPass}' --admin_email=${STAGING_ADMIN_EMAIL} --path=${wpPath}/ --skip-email --quiet 2>&1"`
+      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core is-installed --path=${wpPath}/ >/dev/null 2>&1"`
     );
-    const alreadyInstalled = installResult.stdout.includes("already installed");
-    if (installResult.code !== 0 && !alreadyInstalled) {
-      throw new Error(`wp core install failed: ${installResult.stdout} ${installResult.stderr}`);
+    const alreadyInstalled = isInstalled.code === 0;
+    if (!alreadyInstalled) {
+      const installResult = await sshExec(
+        conn,
+        `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core install --url='${stagingSiteUrl}' --title='${siteName.replace(/'/g, "")} Staging' --admin_user=${STAGING_ADMIN_USER} --admin_password='${adminPass}' --admin_email=${STAGING_ADMIN_EMAIL} --path=${wpPath}/ --skip-email --quiet 2>&1"`
+      );
+      if (installResult.code !== 0) {
+        throw new Error(`wp core install failed: ${installResult.stdout} ${installResult.stderr}`);
+      }
     }
-    // Retry (fetchWithRetry in trigger-build) hits an installed site: WP kept the FIRST password,
-    // so vaulting this call's fresh password would store a wrong credential.
     const adminCredNote = alreadyInstalled
       ? `Admin password unchanged (site already installed; user ${STAGING_ADMIN_USER})`
       : await vaultStagingAdminPassword({
