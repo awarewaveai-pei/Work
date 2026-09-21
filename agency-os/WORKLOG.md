@@ -21197,3 +21197,6 @@ WORKLOG_DONE: Claude+Codex 共用資產 13 項全處理；新增 2 支 `.mjs` �
 - 這支檢查器是 `ao-close.ps1:899` 的 closeout gate，所以該回歸今晚收工時會擋下 AO-CLOSE；提早修掉。
 
 WORKLOG_DONE: Codex 兩項回報驗真 —— hooks trust 未做（憑據層確認），oracle packet 只修了 untracked 一半，tracked 門與空殼 fail-closed 兩處補完並以真 review 跑通（4 findings/72s/148KB）
+
+## 2026-09-21
+- 01:00 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-21.md
