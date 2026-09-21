@@ -25,7 +25,19 @@
     - 修正了現況性的錯誤敘述：ADR-0007:36 的服務清單、DEPLOY_ROLLBACK_RUNBOOK:37、renderer/entrypoint.sh 的檔頭（原本指向已刪除的檔案）
     - 保留為歷史記錄：HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md:61（完成紀錄）
     - `.claude/` 另外呼叫一次，0 命中
-- [prod] 待部署（見下方續記）
+- [prod 部署]（ks-aw-01，04:12–04:15Z）
+  1. 先把舊映像 tag 成 `lobster-phase1-hci-fetch-runner:rollback-20260921-preentrypoint`（guard 映像也同樣 tag）。
+  2. 先跑 `sg-deploy --dry-run hci-app`：只 rsync 本次改動的檔案，app 程式碼沒變。接著正式跑 `sg-deploy hci-app`：10 tests 通過、healthy 1s、smoke 6/6。
+     - 部署前遇到另一個 session 的 `sg-deploy next-admin` 正在執行（PID 649218），等它跑完才開始，沒有用 --force。
+  3. `docker compose build hci-fetch-runner` 只建映像，沒有動正在跑的容器。
+  4. compose 的新內容是在主機上以最新讀到的 live 檔為基礎產生的（mtime 03:44，超過 5 分鐘，確認沒被其他 session 覆寫），先過 `docker compose config --quiet` 再交給 `safe-infra-patch.sh compose … hci-fetch-runner`：套用後 healthy 6s，備份檔為 `docker-compose.yml.bak.safe-patch-20260921-041338`。
+  5. `docker rm hci-network-guard`：只刪這個已結束的容器。compose 另外回報的 orphan（lobster-grafana-obs、promtail、loki）不是本次範圍，沒有動。
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`sudo bash -s < prod-verify.sh`（部署後一輪、`docker restart hci-fetch-runner` 後再一輪） | exit=0 | ms=56134 | result=兩輪都 fail=0：netns 的 iptables/ip6tables 規則完整；PID1 為 `node /app/server.mjs`，Uid 1000、5 個 cap set 全 0、NoNewPrivs 1；uid node 改不了 iptables；169.254.169.254、10.1.2.3、172.17.0.1、192.168.99.99、127.0.0.1:12345 都被擋；example.com 回 200；真實經 API 的 fetch job 兩輪都 completed；重啟後 `restart=unless-stopped`
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec hci-app wget -qO- http://hci-fetch-runner:8090/healthz` | exit=0 | result=`{"status":"ok"}`（hci-app 到 runner 的呼叫路徑正常）
+- [剩餘風險]
+  1. 沒有清掉的 named volume `hci_fetch_runner_ready`，只剩一個舊 ready-file，無害；刪 volume 不可逆，所以不在本次做。
+  2. `docker exec` 進 runner 預設是 root＋NET_ADMIN。這需要主機 docker 權限，而有這個權限本來就等於全部失守。
+  3. 本機在查 setpriv 時 pull 了較新的 `node:20-alpine`；prod 也在同一次查詢時 pull 了，所以本次 build 用的就是這個較新的 base。
 - [rollback] repo：`git revert`。prod：將 `lobster-phase1-hci-fetch-runner:rollback-20260921-preentrypoint` 重新 tag 回 `:latest`，還原 safe-infra-patch 的 compose 備份，然後執行 `up -d hci-fetch-runner hci-network-guard`
 
 ## 2026-09-21（續97）renderer 上線 prod＋隔離實測；過程中抓到 robots.txt 多群組 bug（既存，已修並審計全庫）
