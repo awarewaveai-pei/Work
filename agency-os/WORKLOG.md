@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-21（續101）MainWP 鏈部署上線；真建站 E2E 被既存 SG_SSH_HOST（退租主機）擋下
+
+- [部署] 操作者「yes」→ Trigger.dev workflows v20260921.3（`MAINWP_*` 三變數同步，trigger-postgres `EnvironmentVariable` 05:27 寫入）；`sg-deploy.sh next-admin` 部署 HEAD 33251522a（含本線 363a505f4 + 另一 session 密碼 vault 修正 a88fa3430/33251522a，該 session 事先確認可隨同部署、操作者明示 yes）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | result=healthy after 9s；smoke 5/5 200；`.deployed-commit`=33251522a
+- REALTEST_EVIDENCE: tool=SSH+Trigger API | cmd=POST `/api/v1/tasks/create-wp-site/trigger`（test org E2E-Verify-0704 既有站，`integrations.mainWp.enabled=true`） | exit=0 | result=run_cmuatt4cc02a021lnlhrm5drl COMPLETED，`hosting.outcome=blocked`：`provisioning_failed: Timed out while waiting for handshake`；run output 掃描無 48 位 hex（unique id 未外洩）
+- [根因（既存，非本線）] prod next-admin `SG_SSH_HOST=5.223.93.113`（2026-08-31 已退租）；ks-aw-01 sshd 只聽 58122 且拒 root；provision-staging 寫死 port 22＋root。→ 整併後自動建 staging 站全壞。已登記 TASKS（`compose SG_SSH_HOST` 條目升 🔴，附 A/B/C 選項）；屬「web 容器對主機 docker 的存取身分」安全架構決策 → 依 R0 停止回報，不自行改。
+- MainWP 端：`GET sites` total=2（未新增殘留）。
+- REVIEW_WAIVED: NA -- 本 entry 僅部署與實測，無新程式碼
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`SG_SSH_HOST` | hits=compose:395、next-admin provision-staging、TASKS:1218、WORKLOG 續26、APP_AWARE_WAVE_COMPLETE_REFERENCE.md:1214
+- [rollback] next-admin：`sg-deploy.sh` 自帶 snapshot（previous a284545a0）；Trigger.dev：重新部署前一版。
+
 ## 2026-09-21（續100）MainWP 自動加站接通：REST API 開啟 + 金鑰改伺服器端 + Unique Security ID 免密碼連線（E2E 已通過）
 
 - [決策] 操作者「去完美處理好」→ 建 MainWP REST v2 key 並接通全鏈。

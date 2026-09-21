@@ -113,11 +113,10 @@
 - [x] **【蒐集｜擋路中】背景調查收得準但收得少：沒有渲染階，最權威的頁面讀不到**（2026-09-21 已解：自架隔離 renderer 上線 prod，WORKLOG 續96/續97） — 2026-09-20 live dossier 實測（WORKLOG 續91）：15 筆候選、抓到 11、入庫 1，9 筆被品質閘擋下，其中 7 筆 `*_no_heavier_tier`（JS 渲染或低密度），含 `scholars.latrobe.edu.au/tgfarrell`（本人最權威檔案）、`scholar.google.com` 引用頁、`rusi.org/people/farrell`。prod 容器 `printenv FIRECRAWL_API_KEY` exit=1，`collect/extract-provider` 因此 match()=0，永遠不會被叫到。**需操作者決定是否開通渲染供應商帳號**；未開通前背景調查的覆蓋率就是這個水準。禁止改門檻替代（`quality.ts` 檔尾自己寫明 per-host 豁免＝改偵測器而非修問題）。
 - [ ] **【蒐集｜設計問題，需判斷】density 是不是該有單獨否決權** — 同一批實測裡 `rusi.org/people/farrell`、`royalsoc.org.au/...`被 `low_text_density` 擋下，但那些頁面的抽取其實是對的：正文短、站本身 HTML 很重（605KB）。`MIN_DENSITY` 的用意是「抽到的是導覽列而不是正文」，可是對「短但完整的個人檔案頁」它會誤判，而個人檔案頁正是背景調查最需要的東西。可能的治本方向：density 改成第二訊號（只在 textBytes 貼近下限時才否決），與 soft-404 的 weak-marker 邏輯同構——但這會放寬所有來源的入庫條件，影響客戶 KB，**不是可以順手改的東西**。需要先蒐集實際 textBytes/density 分布再決定。
 - [ ] **【DB 治理｜30 年尺度】94 個 migration 沒有 ledger，「prod 套到哪一號」無法機械回答** — db-expert 2026-09-20 review 指出（WORKLOG 續91）：`packages/db` 沒有 `schema_migrations` 表，`scripts/apply-lobster-rls-migrations-eu.mjs:25-28` 是硬寫死清單不是通用 runner。搭配 repo 慣用的 `CREATE TABLE IF NOT EXISTS`／`ADD COLUMN IF NOT EXISTS`／`DROP CONSTRAINT IF EXISTS`，結果是「檔案內容 = live schema」變成一個無法從檔案證明的假設。0090 已用 catalogue 查詢繞過其中一個實例（不猜約束名），但那是逐案繞道不是治本。
-- [ ] **【MainWP｜待操作者】自動加站：Dashboard REST API 未開 + API key 經表單/Trigger payload 傳送**
-  - `🟠 未開始` · `2026-09-21` · `卡在操作者`
-  - **一句話**：`addSiteToMainWp` contract 已依 6.0.12 原始碼修好（WORKLOG 續99），但 mainwp.aware-wave.com 的 REST API v2 沒啟用（`/wp-json/` 無 mainwp namespace），所以仍不會成功。
-  - **下一步**：操作者在 MainWP → Settings → REST API 啟用並建 key；治本改為 key 存伺服器 env／vault，由 workflow 讀取，不再經 Build Console 表單與 Trigger payload；之後 Trigger.dev deploy + sg-deploy next-admin，真加一個 staging 站驗證。
-  - **完成定義**：真實建站後 MainWP 出現該站且 sync 成功；payload／run log 不含 consumer secret。
+- [ ] **【MainWP｜被 SG_SSH_HOST 擋】建站自動接上 MainWP：MainWP 端全通，卡在建站器本身 SSH 目標是退租主機**
+  - `🔴 現行` · `2026-09-21` · `卡在下方 SG_SSH_HOST 條目（操作者決定 bridge 存取主機的方式）`
+  - **現在到哪**：REST key（server env）＋Unique Security ID＋child 安裝全上線（Trigger v20260921.3、next-admin 33251522a）；真 MainWP 以同一份碼註冊 staging 成功（WORKLOG 續100）。真建站 E2E run_cmuatt4cc02a021lnlhrm5drl → `provisioning_failed: Timed out while waiting for handshake`（SG_SSH_HOST=5.223.93.113）。
+  - **完成定義**：真實建站後 MainWP 出現該站且 connected；run output 無 unique id／secret。
 
 - [ ] **【資安｜待操作者】staging WP admin 密碼曾明文進 Trigger.dev run output：輪換 2 站 + redact 9 run + deploy**
   - `🔴 現行` · `2026-09-21` · `卡在操作者（High：prod DB 寫入 + deploy）`
@@ -1216,7 +1215,8 @@
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「F08 strategy 家族收官 10/14→14/14」條目；交接包 `agency-os/handoffs/2026-09-10-1737-f08-strategy-closeout.md`（歷史記錄保留）
 
 - [ ] **compose `SG_SSH_HOST` 預設仍指退租 SG 5.223.93.113 — ks-aw-01 需 port 58122 + ubuntu，改預設不夠**
-  - `🟡 潛伏` · `2026-09-04 開` · `操作者（Medium：動 next-admin 讀 env 程式碼＋伺服器 .env）`
+  - `🔴 現行` · `2026-09-04 開；2026-09-21 升級` · `操作者（安全架構：bridge 以何身分碰主機 docker）`
+  - **2026-09-21 實測**：prod next-admin `printenv SG_SSH_HOST`=5.223.93.113；ks-aw-01 sshd 只聽 58122、root 登入被拒 → 整併後「自動建 staging 站」全壞（run_cmuatt4cc02a021lnlhrm5drl）。bridge 指令是 `docker exec`（=主機 root 等價）；選項：A ubuntu+sudo docker 經 58122 回連自己、B 限定指令的 forced-command key、C 專用受限 sidecar 代跑 wp-cli。擋住 MainWP 條目。
   - **一句話**：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:370` `${SG_SSH_HOST:-5.223.93.113}` 是 hosting bridge 的 SSH 目標；整併後現役主機非 22 port／非 root，compose 沒有 `SG_SSH_PORT`/`SG_SSH_USER` 變數
   - **現在到哪**：2026-09-04 續26 掃描發現；伺服器 `.env` 是否已覆蓋 `SG_SSH_HOST` 未在遠端 session 驗證
   - **下一步**：① SSH ks-aw-01 `grep SG_SSH /root/lobster-phase1/.env` ② next-admin `grep -rn SG_SSH_HOST lib/` 看是否硬編 port 22／root ③ 若需要，加 `SG_SSH_PORT`/`SG_SSH_USER` env + compose 預設改 `145.239.195.47`/`58122`/`ubuntu` ④ 走 sg-deploy.sh
