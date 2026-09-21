@@ -1,4 +1,19 @@
 ﻿# Worklog
+## 2026-09-21（續94）Cloudflare Browser Run 實測：讀不到的 10 頁救回 2 頁
+
+- [目的] 決定渲染階要不要接 Cloudflare Browser Run（續93 剩餘風險 1）。
+- [發現] 現有 `CLOUDFLARE_API_TOKEN` 已具 Browser Rendering 權限（`/browser-rendering/markdown` 對 example.com success=True），**不需另開 token／帳號**。免費方案限制每 10 秒 1 個 Quick Action 請求（首輪連發全 429，改 12 秒間隔後正常）。
+- [結果] 10 個 robots 允許、先前讀不到的 URL（`rocketreach.co` 刻意排除：個人聯絡資料販售站）：
+  - 救回 2：`smallwarsjournal.com` 2011 訪談（原 403 → 48,472 字、Farrell ×9）；`royalsoc.org.au` 任命公告（原 low_density → 17,670 字、Farrell ×12）
+  - 仍擋 7：JSTOR 回「Client Challenge」反機器人頁；latrobe.edu.au ×2、iru.edu.au、ResearchGate、Google Scholar 回空殼或挑戰頁；The PIE News 只拿到 meta（99 字）
+  - 渲染失敗 1：`scholars.latrobe.edu.au/tgfarrell` → Cloudflare 422
+- [判斷] 剩下 7 筆是刻意的反自動化牆，跨過去要住宅代理／指紋偽裝＝規避偵測，不做；JSTOR／Google Scholar 條款也禁止爬取。學術內容的合法路徑是既有 `collect/academic`（OpenAlex/Crossref）。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scratchpad/cf-read2.ps1`（11 URL，12 秒間隔，真 Cloudflare API） | exit=0 | result=control OK；2/10 取得實質正文；7 挑戰頁；1 筆 422
+  - REVIEW_WAIVED: NA -- 純查詢實測，無 code 改動
+  - BUGHUNT_WAIVED: NA -- 無 code 改動
+- [下一步] 把 Cloudflare 接成 `collect/extract-provider` 的第二個 vendor（`/content` 回渲染後 HTML → 走既有 http-html 抽取器），需操作者同意部署。
+
 ## 2026-09-20（續93）套用 0090 + 部署 + prod 實跑：閘做對了，但讀不到頁面；而我的 passing-mention 規則被真實資料打臉
 
 - [操作者授權] 「全部去做好」——套 migration、部署、跑通。
