@@ -44,6 +44,9 @@ export type MainWpConfig = {
   dashboardUrl: string;
   consumerKey: string;
   consumerSecret: string;
+  /** Username of an administrator ON THE CHILD SITE. MainWP hands it to mainwp-child, which
+   *  refuses the connection without it. Not a secret. */
+  adminUsername?: string;
 };
 
 export type BuildIntegrations = {
@@ -344,40 +347,63 @@ export async function triggerN8nOnboarding(
 // 5. MainWP — add site via REST API
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Contract verified against the installed MainWP 6.0.12 source (class-mainwp-rest-sites-controller.php):
+// route `sites/add` (not `site/add`), fields url / name / admin (child-site admin username), Basic
+// auth over HTTPS only. A refused add still answers HTTP 200 with `{success: 0, error}` — res.ok
+// alone reports every failure as success.
 export async function addSiteToMainWp(
   cfg: MainWpConfig | undefined,
   siteUrl: string,
-  adminUrl: string
+  siteName: string,
+  /** Admin the provisioner installed; an explicit cfg.adminUsername overrides it. */
+  provisionedAdminUser?: string
 ): Promise<IntegrationResult> {
   if (!cfg?.dashboardUrl || !cfg?.consumerKey || !cfg?.consumerSecret) {
     return { service: "mainwp", status: "skipped", detail: "mainWp config not provided" };
   }
+  if (!siteUrl) {
+    return { service: "mainwp", status: "error", detail: "no site URL to register" };
+  }
+  const admin = cfg.adminUsername?.trim() || provisionedAdminUser?.trim();
+  if (!admin) {
+    return {
+      service: "mainwp",
+      status: "error",
+      detail: "no child-site administrator username (mainWp.adminUsername unset and provisioner reported none)",
+    };
+  }
 
-  // MainWP REST API v2: POST /wp-json/mainwp/v2/site/add
-  // Requires Basic auth with consumer key:secret
   const credentials = Buffer.from(`${cfg.consumerKey}:${cfg.consumerSecret}`).toString("base64");
+  const dashboard = cfg.dashboardUrl.replace(/\/+$/, "");
 
   try {
-    const res = await fetch(`${cfg.dashboardUrl}/wp-json/mainwp/v2/site/add`, {
+    const res = await fetch(`${dashboard}/wp-json/mainwp/v2/sites/add`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Basic ${credentials}`,
       },
-      body: JSON.stringify({ url: siteUrl, admin_url: adminUrl }),
+      body: JSON.stringify({ url: siteUrl, name: siteName, admin }),
     });
 
     if (!res.ok) {
       return { service: "mainwp", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
 
-    const json = (await res.json()) as { id?: number; site_url?: string };
+    const json = (await res.json()) as { success?: number; error?: string; data?: { id?: number | string } };
+    if (json.success !== 1 || json.data?.id == null) {
+      return {
+        service: "mainwp",
+        status: "error",
+        detail: `MainWP refused the site: ${String(json.error ?? "no error given").slice(0, 300)}`,
+      };
+    }
     return {
       service: "mainwp",
       status: "ok",
       detail: `Site added to MainWP Dashboard`,
-      resourceId: String(json.id ?? ""),
-      resourceUrl: `${cfg.dashboardUrl}/wp-admin/admin.php?page=mainwp_tab`,
+      resourceId: String(json.data.id),
+      resourceUrl: `${dashboard}/wp-admin/admin.php?page=managesites&dashboard=${encodeURIComponent(String(json.data.id))}`,
     };
   } catch (err) {
     return {
@@ -399,6 +425,8 @@ export async function runAllIntegrations(
     adminUrl: string;
     clientName: string;
     profile: string;
+    /** Administrator username the hosting provisioner installed (stagingRef.wpAdminUser). */
+    wpAdminUser?: string;
     /** organizations.slug — threads client attribution into monitor tags + Sentry project slug */
     clientSlug?: string;
   }
@@ -425,7 +453,7 @@ export async function runAllIntegrations(
       clientName: site.clientName,
       profile: site.profile,
     }),
-    addSiteToMainWp(integrations.mainWp, site.siteUrl, site.adminUrl),
+    addSiteToMainWp(integrations.mainWp, site.siteUrl, site.clientName, site.wpAdminUser),
   ]);
 
   return results.map((r) =>

@@ -36,11 +36,12 @@ HTTP **2xx** with JSON body:
   "wpRootPath": "/var/www/...",
   "stagingSiteUrl": "https://staging.example/...",
   "wpAdminUrl": "https://staging.example/.../wp-admin/",
+  "wpAdminUser": "admin",
   "provisioningNotes": ["optional", "strings"]
 }
 ```
 
-All URL fields must be absolute URLs (`https://...`). `provisioningNotes` may be omitted.
+All URL fields must be absolute URLs (`https://...`). `provisioningNotes` may be omitted. `wpAdminUser` (optional) = the administrator username installed; MainWP registration needs it. Never return passwords.
 
 ## Errors
 Non-2xx: Lobster returns `blocked_hosting_configuration` with the response body snippet when possible. Invalid JSON or schema mismatch is also blocked (no partial apply).

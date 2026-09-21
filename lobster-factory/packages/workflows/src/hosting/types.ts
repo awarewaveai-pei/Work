@@ -7,6 +7,8 @@ export type MockStagingSiteRef = {
   wpRootPath: string;
   stagingSiteUrl: string;
   wpAdminUrl: string;
+  /** Administrator username the provisioner installed (MainWP registration needs it). */
+  wpAdminUser?: string;
   provisioningNotes: string[];
   /** Set when a server-provisioning layer created the host (machine layer → site layer handoff). */
   sshHost?: string;
@@ -21,6 +23,8 @@ export type VendorStagingSiteRef = {
   wpRootPath: string;
   stagingSiteUrl: string;
   wpAdminUrl: string;
+  /** Administrator username the provisioner installed (MainWP registration needs it). */
+  wpAdminUser?: string;
   provisioningNotes: string[];
   /** Set when a server-provisioning layer created the host (machine layer → site layer handoff). */
   sshHost?: string;

@@ -120,7 +120,7 @@ const IntegrationsSchema = z.object({
   sentry:     z.object({ org: z.string(), authToken: z.string(), team: z.string().optional() }).optional(),
   postHog:    z.object({ projectApiKey: z.string(), host: ssrfSafeUrl.optional() }).optional(),
   n8n:        z.object({ onboardingWebhookUrl: ssrfSafeUrl, bearerToken: z.string().optional() }).optional(),
-  mainWp:     z.object({ dashboardUrl: ssrfSafeUrl, consumerKey: z.string(), consumerSecret: z.string() }).optional(),
+  mainWp:     z.object({ dashboardUrl: ssrfSafeUrl, consumerKey: z.string(), consumerSecret: z.string(), adminUsername: z.string().optional() }).optional(),
 }).optional();
 
 const InputSchema = z.preprocess(
@@ -434,6 +434,7 @@ export const createWpSite = task({
           adminUrl,
           clientName: input.siteName,
           profile: "profile_b",
+          wpAdminUser: stagingRef?.wpAdminUser,
           clientSlug: input.clientSlug,
         }
       );

@@ -1,4 +1,19 @@
 ﻿# Worklog
+## 2026-09-21（續99）MainWP 自動加站：從未能跑通 → 依已安裝 6.0.12 原始碼修正 contract；Dashboard REST API 未啟用（待操作者）
+
+- [根因] `packages/workflows/src/integrations/integration-steps.ts addSiteToMainWp` 三錯：route `site/add`（實為 `sites/add`，rest_base='sites'）；未送 `admin`（child-site 管理員帳號，MainWP 交 mainwp-child 驗證，缺則拒連）；只看 `res.ok` —— MainWP 拒絕時仍回 HTTP 200 `{success:0,error}`，失敗被報成功。依據：伺服器 `mainwp_mainwp_files` volume 內 `class-mainwp-rest-sites-controller.php`（route 註冊 L304-315、`prepare_object_for_database` 欄位映射、`create_item` 回應形狀）。
+- [更深一層] Dashboard 的 REST API v2 根本沒開：`class-mainwp-rest-server.php:51` 只在 `mainwp_rest_api_v2_enabled` 為真時註冊路由；`/wp-json/` 無 mainwp namespace，`site/add`、`sites/add` 都 404 `rest_no_route`。全 repo／伺服器 .env 無 MainWP API key。→ 此整合自寫成以來不可能成功。開啟 REST API + 建 key = 帳號設定／憑證，操作者執行。
+- [修正] `addSiteToMainWp(cfg, siteUrl, siteName, provisionedAdminUser?)`：`sites/add`、body `{url,name,admin}`、`success===1 && data.id!=null` 才算成功、空 siteUrl 不呼叫。admin 來源：provisioner 回報的 `wpAdminUser`（`provision-staging/route.ts` 新常數 `STAGING_ADMIN_USER`，core install 與 response 共用）→ `httpJsonStagingAdapter` BodySchema → `types.ts` ref → `create-wp-site.ts runAllIntegrations`；`mainWp.adminUsername` 僅作覆寫（接管既有站時用），Build Console 加欄位、zod（create-wp-site:123、adopt-client-os:57）接受。contract 文件 `docs/hosting/HTTP_JSON_HOSTING_ADAPTER.md` 加 `wpAdminUser`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（packages/workflows） | exit=0 | ms=~4000 | result=13 files / 87 tests；新檔 integration-steps.mainwp.test.ts 10 cases
+- REALTEST_EVIDENCE: tool=curl | cmd=`curl -X POST https://mainwp.aware-wave.com/wp-json/mainwp/v2/{site,sites}/add` + `/wp-json/` namespaces | exit=0 | result=兩者 404 rest_no_route、namespaces 無 mainwp → 證實 REST API 未啟用
+- 突變：route 改回 `site/add` + 拿掉 success 檢查 → 2 tests 紅；還原綠。`npx tsc --noEmit`（next-admin）exit 0。
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0C/1M/3m — M1 admin 已知卻要人手填（provision-staging:405 固定 admin）→ 改為 provisioner 回報；m1 null id、m2 空 URL、m3 測試缺口 → 全修＋補 6 測試
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`addSiteToMainWp|mainwp/v2|consumerSecret|wpAdminUser` | hits=單一呼叫點 integration-steps.ts:456；next-admin 僅 BuildConsole/contracts 引用 mainWp
+- ORACLE_WAIVED: critic 子代理已覆審並全數處理；未另跑 codex（非 auth/金流/個資範疇）
+- [附帶發現] provision-staging 回應 `provisioningNotes` 含明文 WP admin 密碼 → 另開任務（task chip「Stop leaking staging WP admin password in notes」）；Build Console 讓操作者手填 MainWP consumer key/secret 並隨 Trigger payload 傳送 → TASKS。
+- [未部署] workflows 需 Trigger.dev deploy、next-admin 需 sg-deploy；在 MainWP REST API 開啟前部署無效益，待操作者開啟後一併做並實測真加站。
+- [rollback] `git revert` 本 commit。
+
 ## 2026-09-21（續98）HCI fetch-runner：runner 每次重啟後 egress 規則就消失 → 改由 runner 自己的 entrypoint 在每次啟動時套用（ADR-0029 Amendment）
 
 - [根因] iptables 規則存在 `hci-fetch-runner` 的 netns 裡；只要 runner 重啟或重建，就換成一個沒有任何規則的新 netns。原本負責套規則的一次性 sidecar `hci-network-guard`（`restart:"no"`）不會再跑一次。runner 的 CMD 會刪掉舊的 ready-file，所以之後每次 fetch 都報 `network_guard_not_ready`。這是 fail-closed，但不會有任何警示（`/healthz` 仍然是綠的）。另外 runner 被禁止設定 restart policy（原本的防呆），所以主機重開機後 runner 根本不會回來。prod 當時的狀態：guard `Exited (0) 2 days ago`；runner 的 netns 規則還在，只是任何一次重啟就會壞掉。

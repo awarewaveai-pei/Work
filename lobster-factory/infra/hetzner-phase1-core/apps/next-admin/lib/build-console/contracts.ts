@@ -56,6 +56,8 @@ export interface MainWpConfig {
   consumerKey: string;
   /** MainWP Consumer Secret */
   consumerSecret: string;
+  /** Override for the child-site admin username; empty = the one the provisioner installed */
+  adminUsername?: string;
 }
 
 export interface BuildIntegrations {

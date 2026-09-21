@@ -6,7 +6,7 @@
  *
  * Auth: Authorization: Bearer {LOBSTER_HOSTING_API_TOKEN}
  * Input: { organizationId, siteId, siteName }
- * Output: { environmentId, wpRootPath, stagingSiteUrl, wpAdminUrl }
+ * Output: { environmentId, wpRootPath, stagingSiteUrl, wpAdminUrl, wpAdminUser }
  */
 
 import { NextResponse } from "next/server";
@@ -24,6 +24,8 @@ const STAGING_BASE_URL = "https://aware-wave.com/staging";
 const WP_ROOT_BASE = "/var/www/html/staging";
 const WP_CLI = "php -d memory_limit=256M /usr/local/bin/wp";
 const STAGING_ADMIN_EMAIL = "staging@aware-wave.com";
+// Returned as wpAdminUser: MainWP registration (workflows addSiteToMainWp) must name this exact user.
+const STAGING_ADMIN_USER = "admin";
 
 function toSlug(name: string, siteId: string): string {
   // All-CJK names produce an empty base → fall back to "site" so the slug isn't "-<id>".
@@ -402,7 +404,7 @@ export async function POST(request: Request) {
     // 5. Install WordPress
     const installResult = await sshExec(
       conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core install --url='${stagingSiteUrl}' --title='${siteName.replace(/'/g, "")} Staging' --admin_user=admin --admin_password='${adminPass}' --admin_email=${STAGING_ADMIN_EMAIL} --path=${wpPath}/ --skip-email --quiet 2>&1"`
+      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core install --url='${stagingSiteUrl}' --title='${siteName.replace(/'/g, "")} Staging' --admin_user=${STAGING_ADMIN_USER} --admin_password='${adminPass}' --admin_email=${STAGING_ADMIN_EMAIL} --path=${wpPath}/ --skip-email --quiet 2>&1"`
     );
     if (installResult.code !== 0 && !installResult.stdout.includes("already installed")) {
       throw new Error(`wp core install failed: ${installResult.stdout} ${installResult.stderr}`);
@@ -459,13 +461,14 @@ export async function POST(request: Request) {
       wpRootPath: wpPath,
       stagingSiteUrl,
       wpAdminUrl,
+      wpAdminUser: STAGING_ADMIN_USER,
       provisioningNotes: [
         ...(!themeOk ? ["WARN: Kadence theme install had issues"] : []),
         ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
         wiringNote,
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
         `DB: ${dbName} on lobster-wordpress-db`,
-        `Admin: admin / ${adminPass}`,
+        `Admin: ${STAGING_ADMIN_USER} / ${adminPass}`,
         `Org: ${organizationId ?? "n/a"} Site: ${siteId}`,
       ],
     });

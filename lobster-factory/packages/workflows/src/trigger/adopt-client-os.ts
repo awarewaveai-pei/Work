@@ -54,7 +54,7 @@ const InputSchema = z.object({
     sentry:     z.object({ org: z.string(), authToken: z.string(), team: z.string().optional() }).optional(),
     postHog:    z.object({ projectApiKey: z.string(), host: z.string().optional() }).optional(),
     n8n:        z.object({ onboardingWebhookUrl: z.string(), bearerToken: z.string().optional() }).optional(),
-    mainWp:     z.object({ dashboardUrl: z.string(), consumerKey: z.string(), consumerSecret: z.string() }).optional(),
+    mainWp:     z.object({ dashboardUrl: z.string(), consumerKey: z.string(), consumerSecret: z.string(), adminUsername: z.string().optional() }).optional(),
   }).optional(),
   // dispatcher passthrough
   _dispatchedFromActionRunId: z.string().optional(),

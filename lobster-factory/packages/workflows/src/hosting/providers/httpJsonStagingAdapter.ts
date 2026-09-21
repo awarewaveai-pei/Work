@@ -6,6 +6,7 @@ const BodySchema = z.object({
   wpRootPath: z.string().min(1),
   stagingSiteUrl: z.string().url(),
   wpAdminUrl: z.string().url(),
+  wpAdminUser: z.string().min(1).optional(),
   provisioningNotes: z.array(z.string()).optional(),
 });
 
@@ -122,6 +123,7 @@ export async function provisionHttpJsonStaging(input: {
         wpRootPath: data.wpRootPath,
         stagingSiteUrl: data.stagingSiteUrl,
         wpAdminUrl: data.wpAdminUrl,
+        wpAdminUser: data.wpAdminUser,
         provisioningNotes: data.provisioningNotes ?? [
           "LOBSTER_HOSTING_ADAPTER=http_json: values returned by vendor HTTP API.",
         ],

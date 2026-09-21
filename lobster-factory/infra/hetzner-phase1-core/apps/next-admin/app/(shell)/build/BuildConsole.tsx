@@ -894,6 +894,12 @@ export default function BuildConsole() {
                     onChange={(v) => updateIntegration("mainWp", "consumerSecret", v)}
                     placeholder="cs_xxxxxxxxxxxx"
                   />
+                  <TextInput
+                    label="網站管理員帳號（留空 = 用系統建站時建立的帳號）"
+                    value={form.integrations?.mainWp?.adminUsername}
+                    onChange={(v) => updateIntegration("mainWp", "adminUsername", v)}
+                    placeholder="只有接管既有網站時才需要填"
+                  />
                 </div>
               </div>
 
