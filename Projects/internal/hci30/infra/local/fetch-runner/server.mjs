@@ -7,20 +7,13 @@
 // tests/architecture/fetch-runner-network-isolation.test.ps1 have a live
 // service running inside the container whose network namespace they probe.
 //
-// Startup race, closed by Task 7 (previously documented here as a "KNOWN
-// GAP", harmless only while this server made zero outbound calls of its
-// own -- no longer true): network-guard's iptables rules land in this
-// container's OWN network namespace (`network_mode: service:runner`) but
-// network-guard cannot start until `runner` has already started, and
-// nothing in compose's dependency graph can express "runner refuses to
-// fetch until network-guard, which depends on runner, has finished" as an
-// ordering constraint alone. `waitForNetworkGuardReady()` below closes it
-// with a file-based signal instead: network-guard writes a ready-file
-// (entrypoint.sh's last line, only after every iptables rule has applied)
-// to a volume shared with `runner` (compose.fetch-runner.yml), and every
-// real outbound fetch waits for that file before dialling out. `/healthz`
-// and `/enqueue` still respond immediately either way -- only the actual
-// fetch execution blocks.
+// Egress-policy gate: entrypoint.sh installs the OUTPUT policy in this container's netns on every
+// start, writes a fresh ready-file, then drops privileges and execs this file (ADR-0029 "Where the
+// egress policy is applied", 2026-09-21; replaced the one-shot network-guard sidecar, which never
+// re-ran after a runner restart). So under the real entrypoint the file always exists before node
+// starts. `waitForNetworkGuardReady()` still gates every outbound fetch as defense in depth: any
+// start path that bypasses the entrypoint fails closed instead of fetching with no policy.
+// `/healthz` and `/enqueue` respond regardless -- only fetch execution blocks.
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -33,7 +26,7 @@ const NETWORK_GUARD_READY_TIMEOUT_MS = Number(process.env.HCI_FETCH_RUNNER_NETWO
 const NETWORK_GUARD_READY_POLL_MS = 200;
 
 /**
- * Poll for network-guard's ready-file. Fail-closed: a timeout throws rather
+ * Poll for the egress-policy ready-file (written by entrypoint.sh). Fail-closed: a timeout throws rather
  * than letting the caller silently proceed to fetch with an unknown egress
  * policy state -- the one failure mode ADR-0029 cannot tolerate is "fetched
  * something before we could prove the SSRF/isolation policy was actually
@@ -149,7 +142,7 @@ function sendJson(res, status, body) {
  *
  * Object-storage upload lives HERE, not in Task 8/9 as an earlier version of
  * this comment assumed: only this runner has network access to its own
- * dedicated MinIO instance (network-guard's iptables policy allowlists
+ * dedicated MinIO instance (entrypoint.sh's iptables policy allowlists
  * exactly that one peer) -- Task 8's write-path module and Task 9's
  * Trigger.dev orchestrator run OUTSIDE the isolated runner (deliberately --
  * they need real Postgres/Trigger.dev access, which the runner is cut off
@@ -162,7 +155,7 @@ function sendJson(res, status, body) {
  * and http-html-fetch.mjs's `safeFetch`): production code never passes it,
  * tests inject `fetchAndExtractImpl`/`scanImpl`/`waitForReadyImpl`/
  * `putContentAddressedObjectImpl` to drive this state machine without a real
- * network fetch, a real network-guard sidecar, or a real MinIO instance.
+ * network fetch, a real egress-policy ready-file, or a real MinIO instance.
  */
 export async function processJob(job, deps = {}) {
   const fetchAndExtractImpl = deps.fetchAndExtractImpl ?? fetchAndExtract;
@@ -268,7 +261,7 @@ export const SNAPSHOT_TEXT_MAX_CHARS = 200_000;
 
 /**
  * Readable text of an ALREADY-STORED snapshot (evidence promotion, 2026-09-19).
- * The runner is the only process with MinIO access (network-guard allowlist),
+ * The runner is the only process with MinIO access (egress-policy allowlist),
  * so re-extraction lives here; hci-app never sees raw bytes. No
  * waitForNetworkGuardReady(): the only peer contacted is the configured MinIO
  * endpoint, never a caller-supplied URL.
@@ -307,11 +300,10 @@ export async function readStoredSnapshotText(input, deps = {}) {
 // awaits this callback, so ANY future unguarded dereference inside it -- not
 // just the null-body case already fixed below -- would throw a synchronous
 // TypeError, become an unhandled promise rejection, and crash the whole
-// process under Node's default `--unhandled-rejections=throw`. This
-// container has no restart policy (by design -- restarting would silently
-// wipe network-guard's iptables rules), so any such crash is a full outage
-// until a human intervenes. One catch-all here turns "unknown future bug" +
-// "no auto-recovery" into a 500 response instead of a dead process.
+// process under Node's default `--unhandled-rejections=throw`. The restart
+// policy would bring it back (entrypoint.sh re-applies the egress policy), but
+// every in-memory job would be lost. One catch-all here turns "unknown future
+// bug" into a 500 response instead of a dead process.
 // Exported so tests/unit/fetch-runner/server.test.mjs can close it in an
 // `after()` hook -- without an explicit close, `node --test` never observes
 // this process exit naturally (an open TCP listener keeps the event loop

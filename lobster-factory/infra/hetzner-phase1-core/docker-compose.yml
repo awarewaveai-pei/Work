@@ -618,9 +618,9 @@ services:
       # resolves to nothing useful on the real host, where this compose file lives at
       # /root/lobster-phase1/docker-compose.yml with no such git ancestry above it -- caught before
       # any deploy attempt, not after. The staged copy here holds the WHOLE hci30 product tree
-      # (app/, packages/, public-intelligence/, infra/local/fetch-runner, infra/local/network-guard),
+      # (app/, packages/, public-intelligence/, infra/local/fetch-runner),
       # not just app/ -- see this Dockerfile's own header for why the build context must be the
-      # whole tree. hci-fetch-runner/hci-network-guard below build from sub-paths of this SAME
+      # whole tree. hci-fetch-runner below builds from a sub-path of this SAME
       # staged copy, for the identical reason.
       context: ./apps/hci-app
       dockerfile: Dockerfile
@@ -648,7 +648,7 @@ services:
       # runtime call path. Joining hci-fetch-runner-net does not weaken ADR-0029 gate 2 ("no route
       # to the docker-internal bridge network" for the RUNNER's own egress): network membership does
       # not grant the runner any new outbound route to hci-net/lobster-net just because hci-app is
-      # dual-homed, and network-guard's iptables rules (entrypoint.sh) only ever touch the OUTPUT
+      # dual-homed, and the runner's iptables rules (its entrypoint.sh) only ever touch the OUTPUT
       # chain -- inbound reachability to the runner was never the thing gate 2 restricts.
       HCI_FETCH_RUNNER_BASE_URL: http://hci-fetch-runner:8090
       HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?hci-app needs the same value as hci-fetch-runner's own shared secret below}
@@ -678,10 +678,12 @@ services:
   # stack" -- moved here from Projects/internal/hci30/infra/local/compose.fetch-runner.yml's local
   # dev-only file for prod (that file stays local/test-only; ks-aw-01 runs from this block instead,
   # so there is exactly one deployment orchestration surface per ADR-0007 gate 1, not two).
-  # No `restart:` key -- security invariant (network-guard's iptables rules live in this
-  # container's netns and are wiped on any restart; network-guard is a one-shot sidecar that never
-  # re-runs -- see that service's own comment below). Do not add one without also making
-  # network-guard re-apply on every runner start.
+  # Egress policy: applied by this container's OWN entrypoint on every start
+  # (apps/hci-app/infra/local/fetch-runner/entrypoint.sh), which then drops to uid `node` with an empty
+  # capability bounding set + no_new_privs before node runs (ADR-0029 "Where the egress policy is
+  # applied", 2026-09-21). Replaced the one-shot hci-network-guard sidecar, whose rules vanished with
+  # the netns on any runner restart and never came back. The cap_add entries exist only for that
+  # entrypoint; restart: unless-stopped is safe precisely because every start re-applies the policy.
   hci-fetch-runner:
     build:
       # Sub-path of hci-app's own staged copy (./apps/hci-app/...) -- see that service's build
@@ -691,12 +693,11 @@ services:
     environment:
       HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?fetch runner requires a generated shared secret}
       HCI_FETCH_RUNNER_PORT: "8090"
+      HCI_FETCH_RUNNER_MINIO_IP: ${HCI_FETCH_RUNNER_MINIO_IP:?fetch runner requires the object-storage container's static IP to allowlist}
       HCI_FETCH_RUNNER_MINIO_ENDPOINT: http://${HCI_FETCH_RUNNER_MINIO_IP:?fetch runner requires the object-storage container's static IP}:9000
       HCI_FETCH_RUNNER_MINIO_BUCKET: hci-fetch-runner-raw
       HCI_FETCH_RUNNER_MINIO_ACCESS_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_USER:?fetch runner requires the object-storage root user}
       HCI_FETCH_RUNNER_MINIO_SECRET_KEY: ${HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD:?fetch runner requires the object-storage root password}
-    volumes:
-      - hci_fetch_runner_ready:/var/run/network-guard
     ports:
       # 127.0.0.1-only, never 0.0.0.0 -- host-side/SSH debugging only (curl from the host shell).
       # hci-app (the one real caller) reaches this service over hci-fetch-runner-net's internal DNS
@@ -711,34 +712,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
     cap_drop:
       - ALL
-    security_opt:
-      - no-new-privileges:true
-    logging: *lobster-logging
-
-  # One-shot sidecar: applies the OUTPUT egress policy inside hci-fetch-runner's own network
-  # namespace, then exits. `network_mode: service:hci-fetch-runner` is what makes the rules land in
-  # the namespace the isolation tests actually probe -- this is NOT a second, independent network
-  # membership, it shares the runner's own netns by construction.
-  hci-network-guard:
-    build:
-      # Same sub-path pattern as hci-fetch-runner above.
-      context: ./apps/hci-app/infra/local/network-guard
-    container_name: hci-network-guard
-    network_mode: "service:hci-fetch-runner"
-    depends_on:
-      hci-fetch-runner:
-        condition: service_started
-    environment:
-      HCI_FETCH_RUNNER_MINIO_IP: ${HCI_FETCH_RUNNER_MINIO_IP:?network-guard requires the object-storage container's static IP to allowlist}
-      HCI_FETCH_RUNNER_PORT: "8090"
-    volumes:
-      - hci_fetch_runner_ready:/var/run/network-guard
     cap_add:
       - NET_ADMIN
-      - NET_RAW
-    restart: "no"
+      - SETUID
+      - SETGID
+      - SETPCAP
+    security_opt:
+      - no-new-privileges:true
     logging: *lobster-logging
 
   # Dedicated object storage for hci-fetch-runner's raw fetched content -- NOT the same instance as
@@ -810,5 +793,4 @@ volumes:
   wordpress_db_data:
   hci_pgdata:
   hci_fetch_runner_objectstore:
-  hci_fetch_runner_ready:
   wordpress_data:

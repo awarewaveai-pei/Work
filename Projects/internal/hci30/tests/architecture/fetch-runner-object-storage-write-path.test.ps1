@@ -58,23 +58,6 @@ function Wait-ContainerHealthy {
   throw "$ServiceName did not become healthy within ${TimeoutSec}s (last status: $lastStatus)"
 }
 
-function Wait-ContainerExitedZero {
-  param([Parameter(Mandatory)][string]$ServiceName, [int]$TimeoutSec = 30)
-  $containerId = & docker @composeArgs ps -a -q $ServiceName
-  if (-not $containerId) { throw "$ServiceName container not found" }
-  $deadline = (Get-Date).AddSeconds($TimeoutSec)
-  while ((Get-Date) -lt $deadline) {
-    $status = & docker inspect $containerId --format '{{.State.Status}}'
-    if ($status -eq 'exited') {
-      $exitCode = & docker inspect $containerId --format '{{.State.ExitCode}}'
-      if ($exitCode -ne '0') { throw "$ServiceName exited with code $exitCode (expected 0)" }
-      return
-    }
-    Start-Sleep -Seconds 1
-  }
-  throw "$ServiceName did not exit within ${TimeoutSec}s"
-}
-
 # Same EAP-toggle technique as fetch-runner-network-isolation.test.ps1's
 # Test-Blocked: under $ErrorActionPreference = 'Stop', a native command's own
 # stderr text becomes a script-terminating error independent of exit code, so
@@ -107,7 +90,6 @@ try {
   & docker @composeArgs up -d --build
   if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed for compose.fetch-runner.yml' }
 
-  Wait-ContainerExitedZero -ServiceName 'network-guard'
   Wait-ContainerHealthy -ServiceName 'runner' -TimeoutSec 60
   Wait-ContainerHealthy -ServiceName 'object-storage' -TimeoutSec 60
 

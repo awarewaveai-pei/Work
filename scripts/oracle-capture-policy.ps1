@@ -76,7 +76,9 @@ function Get-OracleSkipReason {
 function Invoke-OracleUntrackedCapture {
     param(
         [Parameter(Mandatory)][string]$Root,
-        [Parameter(Mandatory)][string[]]$Candidates,
+        # AllowEmptyCollection: a -Path scope with zero matching untracked files is normal (every
+        # scoped file already staged); Mandatory alone rejects @() and aborted the whole review.
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Candidates,
         [Parameter(Mandatory)][System.Collections.IDictionary]$Policy,
         [string[]]$Path = @()
     )

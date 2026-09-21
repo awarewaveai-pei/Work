@@ -1,4 +1,33 @@
 ﻿# Worklog
+## 2026-09-21（續98）HCI fetch-runner：runner 每次重啟後 egress 規則就消失 → 改由 runner 自己的 entrypoint 在每次啟動時套用（ADR-0029 Amendment）
+
+- [根因] iptables 規則存在 `hci-fetch-runner` 的 netns 裡；只要 runner 重啟或重建，就換成一個沒有任何規則的新 netns。原本負責套規則的一次性 sidecar `hci-network-guard`（`restart:"no"`）不會再跑一次。runner 的 CMD 會刪掉舊的 ready-file，所以之後每次 fetch 都報 `network_guard_not_ready`。這是 fail-closed，但不會有任何警示（`/healthz` 仍然是綠的）。另外 runner 被禁止設定 restart policy（原本的防呆），所以主機重開機後 runner 根本不會回來。prod 當時的狀態：guard `Exited (0) 2 days ago`；runner 的 netns 規則還在，只是任何一次重啟就會壞掉。
+- [決策] 操作者授權「交給你決定」→ 採用方案 A（ADR-0029 新增 Amendment 2026-09-21「Where the egress policy is applied」）。
+  - runner 的 `entrypoint.sh` 以 root 身分套用與原本相同的規則，ip6tables 改為必要步驟。
+  - 套完後執行 `exec setpriv --reuid=node --regid=node --clear-groups --inh-caps=-all --bounding-set=-all --no-new-privs -- node`。
+  - compose：`cap_drop ALL` 之後加回 `NET_ADMIN/SETUID/SETGID/SETPCAP`（只給 entrypoint 用），`restart: unless-stopped`；刪除 guard service 與 ready volume。
+  - 否決方案 B（保留 sidecar，在主機上用 watcher 重跑）：規則仍然不在 runner 的生命週期內，而且會多出一個 compose 和 safe-infra-patch 都管不到的主機元件。
+  - 權限分離從「容器邊界」改成「行程邊界」：node 以 uid 1000 執行，所有 capability set 都是 0，NoNewPrivs=1。比原本「root + cap_drop ALL」更強。
+- [附帶修正] `scripts/oracle-capture-policy.ps1`：`-Candidates` 加上 `[AllowEmptyCollection()]`。在 `-Path` 範圍內沒有 untracked 檔時，原本會因參數綁定錯誤直接中止審查（本次連續失敗 2 次才抓到）。
+- [坑]
+  - `node:20-alpine` 的 `/bin/setpriv` 是 busybox 版，不支援 `--reuid` 和 `--bounding-set`。要 `apk add setpriv`（util-linux 版會覆蓋同一路徑）。Dockerfile 加了 `setpriv --help | grep -q -- --bounding-set` 檢查，不符時直接讓 build 失敗。
+  - setpriv 本身需要 SETUID/SETGID/SETPCAP。iptables-nft 只需要 NET_ADMIN，不需要 NET_RAW。
+  - entrypoint 失敗時的實測行為：容器進入 crash loop（exit 127），node 完全不會啟動，屬於 fail-closed。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/hci30/tests/architecture/fetch-runner-content-isolation.test.ps1`（未修改的程式碼＝重現 bug） | exit=0 | ms=36085 | result=restart runner 後 job 回 `network_guard_not_ready_after_3000ms`（舊版測試把這個 bug 當成預期行為在斷言）
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/hci30/tests/architecture/fetch-runner-network-isolation.test.ps1` | exit=0 | ms=82762 | result=gate 1-3 全部 PASS；新增的 wave6-policy-survives-restart：restart 後 6 個封鎖探測 + 3 個放行探測都通過；`/proc/1/status` 為 Uid 1000、CapInh/Prm/Eff/Bnd/Amb 全 0、NoNewPrivs 1；uid node 執行 `iptables -P OUTPUT ACCEPT` 被拒
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/hci30/tests/architecture/fetch-runner-content-isolation.test.ps1` | exit=0 | ms=27424 | result=restart 後 ready-file uuid 更新（10b6332e→dad54cec），真實 fetch example.com 狀態為 completed
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File Projects/internal/hci30/tests/architecture/fetch-runner-object-storage-write-path.test.ps1` | exit=0 | ms=15691 | result=PASS
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/unit/fetch-runner/server.test.mjs` | exit=0 | ms=121 | result=18/18 pass
+  - 突變測試：拿掉 `--bounding-set=-all` → network-isolation 測試變紅，錯誤為 `ASSERTION FAILED (privilege drop): CapBnd is not empty`；還原後 diff 為空
+  - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n | artifact=`agency-os/reports/oracle/2026-09-21-partialreview-acca5f78.md`（Codex CLI，以 path 限定範圍，結果 NO FINDINGS）
+  - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/hci30,mcp,runbooks,.claude | grep=`hci-network-guard|hci_fetch_runner_ready|infra/local/network-guard` | hits=9
+    - 修正了現況性的錯誤敘述：ADR-0007:36 的服務清單、DEPLOY_ROLLBACK_RUNBOOK:37、renderer/entrypoint.sh 的檔頭（原本指向已刪除的檔案）
+    - 保留為歷史記錄：HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md:61（完成紀錄）
+    - `.claude/` 另外呼叫一次，0 命中
+- [prod] 待部署（見下方續記）
+- [rollback] repo：`git revert`。prod：將 `lobster-phase1-hci-fetch-runner:rollback-20260921-preentrypoint` 重新 tag 回 `:latest`，還原 safe-infra-patch 的 compose 備份，然後執行 `up -d hci-fetch-runner hci-network-guard`
+
 ## 2026-09-21（續97）renderer 上線 prod＋隔離實測；過程中抓到 robots.txt 多群組 bug（既存，已修並審計全庫）
 
 - [部署]（操作者核准 D）

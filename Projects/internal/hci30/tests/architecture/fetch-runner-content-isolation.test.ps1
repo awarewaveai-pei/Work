@@ -74,40 +74,19 @@ function Wait-ContainerHealthy {
   throw "$ServiceName did not become healthy within ${TimeoutSec}s (last status: $lastStatus)"
 }
 
-function Wait-ContainerExitedZero {
-  param([Parameter(Mandatory)][string]$ServiceName, [int]$TimeoutSec = 30)
-  $containerId = & docker @composeArgs ps -a -q $ServiceName
-  if (-not $containerId) { throw "$ServiceName container not found" }
-  $deadline = (Get-Date).AddSeconds($TimeoutSec)
-  while ((Get-Date) -lt $deadline) {
-    $status = & docker inspect $containerId --format '{{.State.Status}}'
-    if ($status -eq 'exited') {
-      $exitCode = & docker inspect $containerId --format '{{.State.ExitCode}}'
-      if ($exitCode -ne '0') { throw "$ServiceName exited with code $exitCode (expected 0)" }
-      return
-    }
-    Start-Sleep -Seconds 1
-  }
-  throw "$ServiceName did not exit within ${TimeoutSec}s"
-}
-
 try {
   Write-Host 'Building and starting the isolated fetch-runner stack...'
   & docker @composeArgs up -d --build
   if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed for compose.fetch-runner.yml' }
 
-  Wait-ContainerExitedZero -ServiceName 'network-guard'
   Wait-ContainerHealthy -ServiceName 'runner' -TimeoutSec 60
   Wait-ContainerHealthy -ServiceName 'object-storage' -TimeoutSec 60
 
-  # Proves network-guard's ready-file actually landed in the shared volume --
-  # if compose.fetch-runner.yml's volume wiring were wrong (wrong mount path,
-  # not actually shared, wrong service), this file would not exist even
-  # though network-guard itself exited 0 above.
-  Write-Host 'Verifying the network-guard ready-file landed in the shared volume'
-  $readyCheck = & docker @composeArgs exec -T runner test -f /var/run/network-guard/ready
-  if ($LASTEXITCODE -ne 0) { throw 'ASSERTION FAILED: /var/run/network-guard/ready does not exist inside the runner container -- the shared volume or the ready-file write is broken' }
-  Write-Host '  ok: network-guard ready-file exists inside the runner container'
+  # entrypoint.sh writes this only after every iptables rule applied, then drops privileges.
+  Write-Host 'Verifying the egress-policy ready-file exists inside the runner container'
+  $readyBefore = & docker @composeArgs exec -T runner cat /var/run/network-guard/ready
+  if ($LASTEXITCODE -ne 0 -or -not $readyBefore) { throw 'ASSERTION FAILED: /var/run/network-guard/ready does not exist inside the runner container -- entrypoint.sh did not complete' }
+  Write-Host "  ok: ready-file exists ($readyBefore)"
 
   # --- real end-to-end: enqueue a real public URL, poll status, expect completed ---
   Write-Host 'End-to-end: enqueue https://example.com/ and poll until the pipeline completes'
@@ -168,39 +147,37 @@ try {
   if ($ssrfFinal.error -notmatch '^ssrf_blocked_') { throw "ASSERTION FAILED: expected error to start with 'ssrf_blocked_', got '$($ssrfFinal.error)'" }
   Write-Host "  ok: cloud-metadata target failed closed with error='$($ssrfFinal.error)' (real createSafeFetch, real network-guard policy, not a mock)"
 
-  # --- stale ready-file fail-closed proof (critic review 2026-09-17 Major) ---
-  # `hci-fetch-runner-ready` is a NAMED, PERSISTENT volume -- restarting
-  # `runner` without a full `down --volumes` would otherwise leave the ready
-  # file from the OLD incarnation sitting there, even though network-guard
-  # (one-shot, restart:"no") never re-runs and the old netns/iptables state
-  # is gone. This proves the fix: the Dockerfile CMD deletes the ready-file
-  # at `runner` startup, so after a restart the system must fail closed
-  # (network_guard_not_ready), never silently trust the stale marker.
-  Write-Host 'Stale ready-file proof: restart runner without network-guard re-running -- must fail closed, not fail open'
+  # --- restart re-applies the policy (ADR-0029 "Where the egress policy is applied", 2026-09-21) ---
+  # Regression test for the hci-network-guard outage: a runner restart gets a NEW netns with no
+  # rules; the old one-shot sidecar never re-ran, so every fetch failed network_guard_not_ready.
+  # entrypoint.sh now re-applies on every start: after a restart the marker must be FRESH (not the
+  # previous incarnation's, which `docker restart` would otherwise keep in the writable layer) and a
+  # real fetch must complete.
+  Write-Host 'Restart proof: restart runner -- policy must be re-applied and fetching must resume'
   & docker @composeArgs restart runner
   if ($LASTEXITCODE -ne 0) { throw 'docker compose restart runner failed' }
   Wait-ContainerHealthy -ServiceName 'runner' -TimeoutSec 30
 
-  $staleCheck = & docker @composeArgs exec -T runner test -f /var/run/network-guard/ready
-  if ($LASTEXITCODE -eq 0) { throw 'ASSERTION FAILED: /var/run/network-guard/ready still exists after a runner restart -- the Dockerfile CMD deletion did not run, a stale ready-file could be misread as current' }
-  Write-Host '  ok: ready-file was deleted on restart (no stale marker survives)'
+  $readyAfter = & docker @composeArgs exec -T runner cat /var/run/network-guard/ready
+  if ($LASTEXITCODE -ne 0 -or -not $readyAfter) { throw 'ASSERTION FAILED: no ready-file after a runner restart -- entrypoint.sh did not re-apply the policy' }
+  if ($readyAfter -eq $readyBefore) { throw "ASSERTION FAILED: ready-file after restart is the previous incarnation's value ($readyAfter) -- stale marker survived" }
+  Write-Host "  ok: ready-file re-written on restart ($readyBefore -> $readyAfter)"
 
   $postRestartBody = '{"targetUrl":"https://example.com/","tenantId":"tenant-1","subject_kind":"ORGANIZATION"}'
   $postRestartResponse = $postRestartBody | & docker @composeArgs exec -T runner curl -s -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
   $postRestartJob = $postRestartResponse | ConvertFrom-Json
 
   $postRestartFinal = $null
-  $postRestartDeadline = (Get-Date).AddSeconds(10) # HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS=3000 above keeps this fast
+  $postRestartDeadline = (Get-Date).AddSeconds(30)
   while ((Get-Date) -lt $postRestartDeadline) {
     $statusResponse = & docker @composeArgs exec -T runner curl -s -H "Authorization: Bearer $sharedSecret" "http://127.0.0.1:8090/status/$($postRestartJob.id)"
     $polled = $statusResponse | ConvertFrom-Json
     if ($polled.status -ne 'queued' -and $polled.status -ne 'fetching') { $postRestartFinal = $polled; break }
     Start-Sleep -Milliseconds 500
   }
-  if (-not $postRestartFinal) { throw "ASSERTION FAILED: post-restart job $($postRestartJob.id) did not leave queued/fetching within 35s" }
-  if ($postRestartFinal.status -ne 'failed') { throw "ASSERTION FAILED: expected status 'failed' after a runner restart with no network-guard re-run (fail-closed), got '$($postRestartFinal.status)' -- this would mean full unrestricted egress with a false 'ready' signal" }
-  if ($postRestartFinal.error -notmatch 'network_guard_not_ready') { throw "ASSERTION FAILED: expected error to mention network_guard_not_ready, got '$($postRestartFinal.error)'" }
-  Write-Host "  ok: post-restart fetch correctly failed closed with error='$($postRestartFinal.error)' -- no stale-ready false positive"
+  if (-not $postRestartFinal) { throw "ASSERTION FAILED: post-restart job $($postRestartJob.id) did not leave queued/fetching within 30s" }
+  if ($postRestartFinal.status -ne 'completed') { throw "ASSERTION FAILED: expected status 'completed' after a runner restart, got '$($postRestartFinal.status)' error='$($postRestartFinal.error)' -- the policy was not re-applied (the 2026-09-21 hci-network-guard outage)" }
+  Write-Host "  ok: post-restart fetch completed -- policy re-applied, fetching resumed"
 
   Write-Host ''
   Write-Host 'HCI-30 fetch-runner content-isolation wiring test PASSED (Task 7).'

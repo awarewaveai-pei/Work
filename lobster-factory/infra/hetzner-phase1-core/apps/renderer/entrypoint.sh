@@ -1,12 +1,13 @@
 #!/bin/sh
 # lobster-renderer entrypoint: install the egress policy, then give up the power to change it, then
-# run the server. Same rule set as HCI-30's network-guard (ADR-0029, Projects/internal/hci30/infra/
-# local/network-guard/entrypoint.sh) minus its MinIO exception — this container has no internal peer.
+# run the server. Same rule set as HCI-30's fetch runner (ADR-0029, Projects/internal/hci30/infra/
+# local/fetch-runner/entrypoint.sh) minus its MinIO exception — this container has no internal peer.
 #
-# DELIBERATE DIFFERENCE FROM ADR-0029: the policy is applied by THIS container at every start, not by
-# a one-shot sidecar. iptables state lives in the network namespace, and a restarted container gets a
-# new one; a sidecar with restart:"no" never runs again, so after a host reboot the policy would be
-# silently gone (observed 2026-09-21: hci-network-guard "Exited 2 days ago"). Privilege separation is
+# The policy is applied by THIS container at every start (HCI-30 moved to the same design on
+# 2026-09-21, ADR-0029 Amendment). iptables state lives in the network namespace, and a restarted
+# container gets a new one; a one-shot sidecar with restart:"no" never runs again, so after a host
+# reboot the policy would be silently gone (observed 2026-09-21: hci-network-guard "Exited 2 days
+# ago"). Privilege separation is
 # kept by construction instead of by container boundary: `setpriv` below drops to an unprivileged user
 # with an EMPTY capability bounding set and no_new_privs before node starts, so neither node nor the
 # Chromium it spawns can ever regain NET_ADMIN to undo these rules.

@@ -42,6 +42,16 @@ Wave 6 may not build the fetch/scan pipeline, and Gate C (`22_HCI_TOP_TIER_IMPLE
 
 None of these gates authorize a live fetch of real-world content, processing of real Subject data, or a production deployment — gates 2–5 are executed against controlled/synthetic targets only until Gate C's own broader production-authorization requirements (backups, security baseline, incident response, restore test per `22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md` §Gate C) are separately satisfied.
 
+## Amendment 2026-09-21 — Where the egress policy is applied
+
+Gates 2–3's OUTPUT policy is installed by the runner's **own entrypoint on every container start** (`Projects/internal/hci30/infra/local/fetch-runner/entrypoint.sh`). That entrypoint then execs `setpriv --reuid=node --regid=node --clear-groups --inh-caps=-all --bounding-set=-all --no-new-privs -- node server.mjs`. It replaces the original one-shot `network-guard` sidecar.
+
+- **Why:** iptables state lives in the runner's netns, and every restart or recreate creates a new netns with no rules. The sidecar (`restart: "no"`) never re-ran, so after any runner restart every fetch failed `network_guard_not_ready` while the healthcheck stayed green. Prod showed `hci-network-guard Exited (0) 2 days ago`. The old workaround was forbidding a restart policy on the runner, which in turn meant a host reboot left the runner down.
+- **Invariant:** there is no start path from a new netns to `node` that skips the policy. `set -e` means a failed rule leaves node unstarted, so the container crash-loops (fail-closed).
+- **Privilege separation (the sidecar's stated reason):** the sidecar was meant to guarantee that the runner never holds NET_ADMIN. That guarantee is now kept per process instead of per container. The container gets `cap_add NET_ADMIN, SETUID, SETGID, SETPCAP` (after `cap_drop ALL`) for the entrypoint only. Node runs as uid/gid 1000 with CapInh, CapPrm, CapEff, CapBnd and CapAmb all 0, and NoNewPrivs=1, so it cannot regain NET_ADMIN short of a kernel exploit. A kernel exploit would defeat the sidecar design as well. Net effect is stronger than before, because node previously ran as root with cap_drop ALL. Remaining exposure: `docker exec` into the runner gets root plus NET_ADMIN, which requires host docker access (already full compromise).
+- **Rejected:** keeping the sidecar and re-running it from a host-side docker-events/systemd watcher. That leaves the policy outside the runner's lifecycle and adds a host component that compose and `safe-infra-patch.sh` don't manage.
+- **Machine-checked:** `tests/architecture/fetch-runner-network-isolation.test.ps1` covers `wave6-policy-survives-restart`: after `docker compose restart runner`, the gate-3 probes run again, `/proc/1/status` must show empty cap sets, a non-root uid and NoNewPrivs=1, and uid `node` must fail to change iptables. `fetch-runner-content-isolation.test.ps1` checks that a real fetch completes after a restart. The runner now requires `restart: unless-stopped`.
+
 ## Consequences
 
 - Wave 6's fetch step gets a bounded, directly testable network-isolation control (gates 1–5) instead of an inherited, unverified assumption about a general-purpose job runner's sandboxing.

@@ -5,8 +5,8 @@ param()
 # HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 3). Real, re-runnable
 # verification -- brings up infra/local/compose.fetch-runner.yml with a
 # fresh project name and generated secrets, probes from inside the running
-# `runner` container (the actual network namespace network-guard's iptables
-# rules apply to, not a separate debug container on the same bridge), then
+# `runner` container (the actual network namespace its own entrypoint.sh's
+# iptables rules apply to, not a separate debug container on the same bridge), then
 # tears everything down. Same orchestration pattern as
 # scripts/test-wave1-local.ps1: unique per-run project name, temp env file,
 # `finally` teardown, local-Docker-endpoint guard.
@@ -69,24 +69,6 @@ function Wait-ContainerHealthy {
   throw "$ServiceName did not become healthy within ${TimeoutSec}s (last status: $lastStatus)"
 }
 
-function Wait-ContainerExitedZero {
-  param([Parameter(Mandatory)][string]$ServiceName, [int]$TimeoutSec = 30)
-  $containerId = & docker @composeArgs ps -a -q $ServiceName
-  if (-not $containerId) { throw "$ServiceName container not found" }
-  $deadline = (Get-Date).AddSeconds($TimeoutSec)
-  while ((Get-Date) -lt $deadline) {
-    $status = & docker inspect $containerId --format '{{.State.Status}}'
-    if ($status -eq 'exited') {
-      $exitCode = & docker inspect $containerId --format '{{.State.ExitCode}}'
-      if ($exitCode -ne '0') { throw "$ServiceName exited with code $exitCode (expected 0) -- egress policy did not apply cleanly" }
-      Write-Host "  ok: $ServiceName applied its egress policy and exited 0"
-      return
-    }
-    Start-Sleep -Seconds 1
-  }
-  throw "$ServiceName did not exit within ${TimeoutSec}s"
-}
-
 # Windows PowerShell 5.1, under $ErrorActionPreference = 'Stop', turns a
 # native command's own stderr text into a script-terminating error --
 # unrelated to exit code, found by real testing here (curl's expected
@@ -122,29 +104,64 @@ function Test-Allowed {
   Write-Host "  ok: $Label reachable ($Url, http_code=$httpCode)"
 }
 
+# The container holds NET_ADMIN/SETUID/SETGID/SETPCAP only for entrypoint.sh; this proves node (PID 1
+# after `exec setpriv ... node`) holds none of them and can never regain them. Replaces the old
+# sidecar design's "runner has no NET_ADMIN" property with a stronger one (node is also non-root now).
+function Test-PrivilegesDropped {
+  param([Parameter(Mandatory)][string]$Label)
+  $statusText = (& docker @composeArgs exec -T runner cat /proc/1/status) -join "`n"
+  if ($LASTEXITCODE -ne 0) { throw "ASSERTION FAILED ($Label): could not read runner /proc/1/status" }
+  $cmdline = ((& docker @composeArgs exec -T runner cat /proc/1/cmdline) -join '') -replace [char]0, ' '
+  if ($cmdline -notmatch '^node /app/server\.mjs') { throw "ASSERTION FAILED ($Label): PID 1 is '$cmdline', expected node /app/server.mjs" }
+  foreach ($field in 'Uid', 'Gid') {
+    if ($statusText -notmatch "(?m)^${field}:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)") { throw "ASSERTION FAILED ($Label): $field missing from /proc/1/status" }
+    if (@($Matches[1], $Matches[2], $Matches[3], $Matches[4]) -contains '0') { throw "ASSERTION FAILED ($Label): node runs with a root $field ($($Matches[0]))" }
+  }
+  foreach ($field in 'CapInh', 'CapPrm', 'CapEff', 'CapBnd', 'CapAmb') {
+    if ($statusText -notmatch "(?m)^${field}:\s+0000000000000000\s*$") { throw "ASSERTION FAILED ($Label): $field is not empty -- node could change the egress policy. /proc/1/status: $statusText" }
+  }
+  if ($statusText -notmatch '(?m)^NoNewPrivs:\s+1\s*$') { throw "ASSERTION FAILED ($Label): NoNewPrivs is not 1" }
+  $previousEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    & docker @composeArgs exec -T -u node runner iptables -P OUTPUT ACCEPT 2>&1 | Out-Null
+  } finally {
+    $ErrorActionPreference = $previousEap
+  }
+  if ($LASTEXITCODE -eq 0) { throw "ASSERTION FAILED ($Label): uid node was able to change the OUTPUT policy" }
+  Write-Host "  ok: $Label -- PID 1 is node, non-root, all capability sets empty, NoNewPrivs=1, uid node cannot alter iptables"
+}
+
+function Test-EgressPolicy {
+  param([Parameter(Mandatory)][AllowEmptyString()][string]$Suffix)
+  Test-Blocked -Label "cloud metadata endpoint$Suffix" -Url 'http://169.254.169.254/latest/meta-data/'
+  Test-Blocked -Label "link-local$Suffix" -Url 'http://169.254.7.7/'
+  Test-Blocked -Label "RFC1918 10.0.0.0/8$Suffix" -Url 'http://10.1.2.3/'
+  Test-Blocked -Label "RFC1918 172.16.0.0/12$Suffix" -Url 'http://172.20.5.5/'
+  Test-Blocked -Label "RFC1918 192.168.0.0/16$Suffix" -Url 'http://192.168.99.99/'
+  Test-Blocked -Label "loopback (non-API port)$Suffix" -Url 'http://127.0.0.1:12345/'
+  # Positive controls -- egress-ONLY to the public internet plus two narrow allowlisted exceptions,
+  # not a blanket DROP that would trivially pass the assertions above for the wrong reason.
+  Test-Allowed -Label "public internet egress$Suffix" -Url 'https://example.com/'
+  $dnsOutput = & docker @composeArgs exec -T runner nslookup example.com 2>&1
+  if ($LASTEXITCODE -ne 0) { throw "ASSERTION FAILED: DNS resolution failed for a legitimate public target$Suffix -- output: $dnsOutput" }
+  Write-Host "  ok: DNS resolution works for a legitimate public target (example.com)$Suffix"
+  Test-Allowed -Label "allowlisted object-storage peer$Suffix" -Url "http://${minioIp}:9000/minio/health/live"
+}
+
 try {
   Write-Host 'Building and starting the isolated fetch-runner stack...'
   & docker @composeArgs up -d --build
   if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed for compose.fetch-runner.yml' }
 
-  Wait-ContainerExitedZero -ServiceName 'network-guard'
   Wait-ContainerHealthy -ServiceName 'runner' -TimeoutSec 60
   Wait-ContainerHealthy -ServiceName 'object-storage' -TimeoutSec 60
 
-  # critic review, 2026-09-17: proves the ip6tables default-deny branch in
-  # entrypoint.sh actually ran (ip6tables found and configured), not just
-  # present in source for an Alpine image where it happened to be missing.
-  # `docker ... logs` returns a multi-line string ARRAY in PowerShell --
-  # `$array -notmatch 'x'` is a FILTER (returns non-matching elements), not
-  # a boolean, so it is truthy whenever ANY line fails to match, which is
-  # every plain-text log with more than one line. Joining to a single
-  # string first is required for -match/-notmatch to test "does this text
-  # appear anywhere", not "filter this array" (found by this exact
-  # assertion throwing a false positive on real output that visibly
-  # contained the expected line, real-Docker run, 2026-09-17).
-  $guardLogsText = (& docker @composeArgs logs network-guard 2>&1) -join "`n"
-  if ($guardLogsText -notmatch 'ip6tables OUTPUT set to default-deny') { throw "ASSERTION FAILED: network-guard log does not show the ip6tables default-deny branch ran -- output: $guardLogsText" }
-  Write-Host '  ok: network-guard applied an ip6tables default-deny policy (not just the IPv4 rule set)'
+  # Proves the ip6tables default-deny step in fetch-runner/entrypoint.sh actually ran. Logs are joined
+  # first: `$array -notmatch 'x'` is a filter, not a boolean (false positive found 2026-09-17).
+  $runnerLogsText = (& docker @composeArgs logs runner 2>&1) -join "`n"
+  if ($runnerLogsText -notmatch 'ip6tables OUTPUT set to default-deny') { throw "ASSERTION FAILED: runner log does not show the ip6tables default-deny step ran -- output: $runnerLogsText" }
+  Write-Host '  ok: runner entrypoint applied an ip6tables default-deny policy (not just the IPv4 rule set)'
 
   # --- fetch-runner-is-separate-service (ADR-0029 gate 1) ---
   Write-Host 'Gate 1: fetch-runner-is-separate-service'
@@ -163,14 +180,12 @@ try {
   if ($portMapping -notmatch '^127\.0\.0\.1:') { throw "ASSERTION FAILED: runner's API port is published as '$portMapping', expected 127.0.0.1-only" }
   Write-Host "  ok: internal API published as '$portMapping' (127.0.0.1-only, not a public-facing port)"
 
-  # critic review, 2026-09-17: "no restart policy" is the actual enforcement
-  # mechanism for iptables rules never silently vanishing on a crash/OOM
-  # restart (network-guard is a one-shot sidecar that never re-runs) --
-  # machine-checked here so a future edit that adds `restart:` for uptime
-  # reasons fails this test instead of silently reopening full egress.
+  # ADR-0029 "Where the egress policy is applied" (2026-09-21): the policy is re-applied by the
+  # runner's own entrypoint on every start, so a restart policy is now REQUIRED (host reboot /
+  # crash must bring the runner back) -- wave6-policy-survives-restart below proves it is safe.
   $restartPolicy = & docker inspect $runnerId --format '{{.HostConfig.RestartPolicy.Name}}'
-  if ($restartPolicy -ne 'no' -and $restartPolicy -ne '') { throw "ASSERTION FAILED: runner has restart policy '$restartPolicy' -- a restart wipes network-guard's iptables rules with no re-apply mechanism; see compose.fetch-runner.yml's comment on the runner service" }
-  Write-Host "  ok: runner has no restart policy (restart='$restartPolicy') -- a crash cannot silently reopen full egress"
+  if ($restartPolicy -ne 'unless-stopped') { throw "ASSERTION FAILED: runner restart policy is '$restartPolicy', expected 'unless-stopped' -- a host reboot would leave fetching down" }
+  Write-Host "  ok: runner restart policy is '$restartPolicy'"
 
   # critic review, 2026-09-17: this repo has already been burned by an
   # IPv4-only firewall on a host where IPv6 defaults to ACCEPT
@@ -218,21 +233,17 @@ try {
 
   # --- wave6-metadata-and-rfc1918-blocked (ADR-0029 gate 3) ---
   Write-Host 'Gate 3: wave6-metadata-and-rfc1918-blocked'
-  Test-Blocked -Label 'cloud metadata endpoint' -Url 'http://169.254.169.254/latest/meta-data/'
-  Test-Blocked -Label 'link-local' -Url 'http://169.254.7.7/'
-  Test-Blocked -Label 'RFC1918 10.0.0.0/8' -Url 'http://10.1.2.3/'
-  Test-Blocked -Label 'RFC1918 172.16.0.0/12' -Url 'http://172.20.5.5/'
-  Test-Blocked -Label 'RFC1918 192.168.0.0/16' -Url 'http://192.168.99.99/'
-  Test-Blocked -Label 'loopback (non-API port)' -Url 'http://127.0.0.1:12345/'
+  Test-EgressPolicy -Suffix ''
+  Test-PrivilegesDropped -Label 'privilege drop'
 
-  # Positive controls -- the policy is egress-ONLY to the public internet
-  # plus two narrow allowlisted exceptions, not a blanket DROP that would
-  # trivially pass the assertions above for the wrong reason.
-  Test-Allowed -Label 'public internet egress' -Url 'https://example.com/'
-  $dnsOutput = & docker @composeArgs exec -T runner nslookup example.com 2>&1
-  if ($LASTEXITCODE -ne 0) { throw "ASSERTION FAILED: DNS resolution failed for a legitimate public target -- output: $dnsOutput" }
-  Write-Host '  ok: DNS resolution works for a legitimate public target (example.com)'
-  Test-Allowed -Label 'allowlisted object-storage peer' -Url "http://${minioIp}:9000/minio/health/live"
+  # --- wave6-policy-survives-restart (2026-09-21 hci-network-guard outage regression) ---
+  # A restart is a NEW netns with no rules. The policy must be back before node runs, every time.
+  Write-Host 'wave6-policy-survives-restart'
+  & docker @composeArgs restart runner
+  if ($LASTEXITCODE -ne 0) { throw 'docker compose restart runner failed' }
+  Wait-ContainerHealthy -ServiceName 'runner' -TimeoutSec 30
+  Test-EgressPolicy -Suffix ' (after restart)'
+  Test-PrivilegesDropped -Label 'privilege drop (after restart)'
 
   # --- internal HTTP API skeleton (ADR-0029 gate 1's API shape) ---
   Write-Host 'Internal API: auth + enqueue/status'
@@ -277,7 +288,7 @@ try {
   # critic review 2026-09-17 (Critical/Major finding): a literal JSON `null`
   # body used to crash the whole process (`body.targetUrl` on `null` threw a
   # synchronous TypeError inside an unawaited async handler -- an unhandled
-  # rejection that kills the process, with no restart policy to recover it).
+  # rejection that kills the process).
   # This is the regression test for that fix: prove it degrades to a clean
   # 400, not a dropped connection / timeout from a dead server.
   $nullBodyResponse = 'null' | & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $sharedSecret" -H 'Content-Type: application/json' -d '@-' http://127.0.0.1:8090/enqueue
@@ -286,7 +297,7 @@ try {
 
   # Prove the server is still alive and healthy after the null-body
   # regression test above -- the whole point of that fix was that a crash
-  # would otherwise take the entire container down with no auto-restart.
+  # would otherwise take the entire container down.
   $stillHealthy = & docker @composeArgs exec -T runner curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/healthz
   if ($stillHealthy -ne '200') { throw "ASSERTION FAILED: runner /healthz expected 200 after the null-body request, got $stillHealthy -- the server may have crashed" }
   Write-Host '  ok: runner still healthy after the null-body request (no crash)'
@@ -307,7 +318,7 @@ try {
   Write-Host '  ok: wrong shared secret rejected (401)'
 
   Write-Host ''
-  Write-Host 'HCI-30 fetch-runner network isolation suite PASSED (ADR-0029 gates 1-3).'
+  Write-Host 'HCI-30 fetch-runner network isolation suite PASSED (ADR-0029 gates 1-3 + policy survives restart).'
 }
 finally {
   & docker @composeArgs down --volumes --remove-orphans

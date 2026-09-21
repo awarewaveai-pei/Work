@@ -16,23 +16,19 @@
 # see tests/architecture/fetch-runner-network-isolation.test.ps1 for the
 # reference invocation (same pattern as scripts/test-wave1-local.ps1).
 services:
-  # No `restart:` key -- this is a security invariant, not an oversight
-  # (critic review, 2026-09-17). network-guard's iptables rules live in this
-  # container's netns and are wiped on any restart of it; network-guard is a
-  # one-shot sidecar that never re-runs. Adding a restart policy here without
-  # also making network-guard re-apply on every `runner` start would
-  # silently reopen full unrestricted egress on the next crash/OOM/host
-  # reboot, with the HEALTHCHECK below staying green throughout (it only
-  # probes the API, never the network policy). Do not add `restart:` to this
-  # service until that re-apply mechanism exists -- see
-  # tests/architecture/fetch-runner-network-isolation.test.ps1's
-  # "no restart policy" assertion, which is what makes this comment
-  # machine-checked instead of just documentation.
+  # Egress policy is applied by the runner's OWN entrypoint on every start (fetch-runner/entrypoint.sh;
+  # ADR-0029 "Where the egress policy is applied", 2026-09-21), then dropped to uid `node` with an empty
+  # capability bounding set + no_new_privs before node runs. That is what makes a restart policy safe
+  # here: a new netns always gets the policy before any fetch code exists. The caps below exist only
+  # for that entrypoint -- gone from the process tree before server.mjs starts (asserted by
+  # tests/architecture/fetch-runner-network-isolation.test.ps1 via /proc/1/status).
   runner:
     build: ./fetch-runner
     environment:
       HCI_FETCH_RUNNER_SHARED_SECRET: ${HCI_FETCH_RUNNER_SHARED_SECRET:?fetch runner requires a generated shared secret}
       HCI_FETCH_RUNNER_PORT: "8090"
+      # entrypoint.sh allowlists this one RFC1918 peer ahead of the private-range DROPs.
+      HCI_FETCH_RUNNER_MINIO_IP: ${HCI_FETCH_RUNNER_MINIO_IP:?fetch runner requires the object-storage container's static IP to allowlist}
       # Task 5 (object-storage-client.mjs): endpoint/credentials for this
       # runner's own dedicated MinIO instance below. Bucket name is
       # duplicated from object-storage's MINIO_DEFAULT_BUCKETS value further
@@ -47,14 +43,6 @@ services:
       # regression check fail closed in single-digit seconds instead of
       # waiting out the real production timeout.
       HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS: ${HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS:-30000}
-    volumes:
-      # Task 7: shared with network-guard below. server.mjs's
-      # waitForNetworkGuardReady() polls for the ready-file network-guard
-      # writes here as the LAST step of entrypoint.sh, only after its
-      # iptables policy has fully applied -- closing the startup race this
-      # file used to only document as harmless (true only while `runner`
-      # made zero outbound calls of its own; Task 7 ends that).
-      - hci-fetch-runner-ready:/var/run/network-guard
     # DNS: the image's own CMD (fetch-runner/Dockerfile) overwrites
     # /etc/resolv.conf to query 1.1.1.1/8.8.8.8 directly, bypassing Docker's
     # embedded 127.0.0.11 proxy -- real testing on this machine found that
@@ -62,8 +50,8 @@ services:
     # Docker Desktop version, independent of which upstream it is pointed
     # at (compose's `dns:` key only changes the proxy's upstream, not
     # whether the proxy itself forwards). 1.1.1.1/8.8.8.8 are public
-    # addresses already covered by network-guard's default-ACCEPT egress
-    # rule, no allowlist entry needed.
+    # addresses already covered by the egress policy's default-ACCEPT
+    # rule (fetch-runner/entrypoint.sh), no allowlist entry needed.
     ports:
       # 127.0.0.1-only, never 0.0.0.0 -- internal API, not a public-facing
       # port (ADR-0029 gate 1). Host side parameterized (2026-09-18,
@@ -81,30 +69,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
     cap_drop:
       - ALL
-    security_opt:
-      - no-new-privileges:true
-
-  # One-shot sidecar: applies the OUTPUT egress policy inside `runner`'s own
-  # network namespace, then exits. `network_mode: service:runner` is what
-  # makes the rules land in the namespace the isolation tests actually
-  # probe. See infra/local/network-guard/entrypoint.sh for the rule set.
-  network-guard:
-    build: ./network-guard
-    network_mode: "service:runner"
-    depends_on:
-      runner:
-        condition: service_started
-    environment:
-      HCI_FETCH_RUNNER_MINIO_IP: ${HCI_FETCH_RUNNER_MINIO_IP:?network-guard requires the object-storage container's static IP to allowlist}
-      HCI_FETCH_RUNNER_PORT: "8090"
-    volumes:
-      - hci-fetch-runner-ready:/var/run/network-guard
     cap_add:
       - NET_ADMIN
-      - NET_RAW
-    restart: "no"
+      - SETUID
+      - SETGID
+      - SETPCAP
+    security_opt:
+      - no-new-privileges:true
 
   # Independent object-storage instance for this runner (Task 3
   # provisioning only; Task 5 wires the write-path client). NOT the same
@@ -143,14 +117,14 @@ networks:
   hci-fetch-runner-net:
     driver: bridge
     # Explicit, not relied-on-by-omission (critic review, 2026-09-17): the
-    # OUTPUT egress policy (network-guard/entrypoint.sh) is IPv4-only by
+    # OUTPUT egress policy (fetch-runner/entrypoint.sh) is IPv4-only by
     # design -- there is no legitimate IPv6 egress need here, and this repo
     # has already been burned by an IPv4-only firewall on a host where IPv6
     # defaults to ACCEPT (lobster-factory/.../hosting/providers/hetzner/
     # cloudInit.ts:16-17). Compose not assigning a v6 address without this
     # key set is today's *implicit* behavior; setting it explicitly makes
     # "no v6 route exists" a stated property instead of an accident, backed
-    # by network-guard's own ip6tables default-deny and the isolation
+    # by the entrypoint's own ip6tables default-deny and the isolation
     # test's IPv6-address-absence assertion.
     enable_ipv6: false
     ipam:
@@ -165,4 +139,3 @@ networks:
 
 volumes:
   hci-fetch-runner-objectstore:
-  hci-fetch-runner-ready:
