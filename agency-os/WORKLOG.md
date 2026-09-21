@@ -1,4 +1,29 @@
 ﻿# Worklog
+## 2026-09-21（續97）renderer 上線 prod＋隔離實測；過程中抓到 robots.txt 多群組 bug（既存，已修並審計全庫）
+
+- [部署]（操作者核准 D）
+  1. 伺服器：`.env` 先備份（`.env.bak.renderer-20260921-033642`），再在主機上產生 `RENDERER_SHARED_SECRET`（64 hex，不列印、不傳輸）；建立 staging dir；預先 pull 釘選的基底映像（3.43 GB）；`docker build`。
+  2. `safe-infra-patch.sh compose … renderer` **第一次失敗並自動還原**：`services.renderer: can't set distinct values on 'pids_limit' and 'deploy.resources.limits.pids'`（safe-infra-patch 把 config 錯誤吞到 /dev/null，改在主機上用暫存檔跑 `docker compose config` 才看到原因）→ 把 pids 移進 `deploy.resources.limits.pids` → 主機驗證 config_exit=0 → 重套成功，6 秒轉 healthy。repo 版 compose 用同一支 patcher 同步修正。
+  3. `sg-deploy next-admin`（tsc＋1443 tests 通過、healthy 9s、smoke 5/5）→ `sg-deploy renderer`（gates 通過、快照 `rollback-20260921-035114`＝第一個回滾點、healthy 6s、smoke 包含 **example.com 真實 render** 通過）。
+- [驗證結果]
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-renderer grep -E "^(Uid|CapEff|CapBnd|NoNewPrivs)" /proc/1/status` | exit=0 | result=`Uid 1001`、`CapEff 0`、`CapBnd 0`、`NoNewPrivs 1`；PID1 是 `node /app/server.mjs`；啟動 log 印出完整 OUTPUT policy（容器重建後同樣重新套用）
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec -u pwuser lobster-renderer node /tmp/egress-probe.mjs` | exit=0 | result=8/8 符合預期：example.com、DNS 可通；169.254.169.254、10.240.2.1（renderer-net 閘道）、172.17.0.1（docker0）、127.0.0.1:3002 全擋；**`10.240.2.1.nip.io`、`127.0.0.1.nip.io`（DNS rebinding）在封包層被擋**
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv RENDERER_SHARED_SECRET` | exit=0 | result=變數存在；next-admin → `http://renderer:3000/healthz` 回 ok
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`server-10.sh`（機房 IP 經 prod renderer 渲染 10 個 URL） | exit=0 | result=2/10 拿到內容：官方學術檔案（Farrell ×10）、皇家學會（×32）；其餘是 Cloudflare 挑戰頁、Sucuri WAF、403、429，JSTOR 回 Client Challenge——結果與筆電一致
+  - REALTEST_EVIDENCE: tool=Bash | cmd=prod `runCollection`（entity-dossier 來源，透過 SSH tunnel 呼叫 prod renderer，寫入 prod DB） | exit=0 | result=6 queries → 21 unique pages；source-class 在抓之前就擋掉 10 筆（LinkedIn×2、Instagram、Facebook、Amazon、penguin.co.uk…）；renderer 呼叫 18 次；**written=6、runId 已寫入**；接著 `buildFolderDossier` 產出報告：ORCID、完整任職時間線、87 篇研究產出、Ramsay Centre 爭議連同具名的批評者，每一段都附 [n]
+  - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n | artifact=`agency-os/reports/oracle/2026-09-21-review-234bff5b.md`（Codex CLI 回 NO FINDINGS；範圍：robots.ts 合併、collect-robots.test.ts、compose pids）
+  - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`groupFor|isAllowed|parseRobots` | hits=3（call site 只有 net/robots.ts 本身與 fetcher 的 RobotsCache；沒有其他實作 robots 的地方）
+- [抓到的 bug：robots.txt 多群組（既存 bug，不是本次改動引入的）]
+  - 根因：`net/robots.ts` 的 `groupFor` 用 `find` 只取**第一個**符合 `*` 的群組。`scholars.latrobe.edu.au` 的第一個 `*` 群組是 `Disallow:`（全部允許），第二個 `*` 群組才是 `Disallow: */publications$` → 我們一直沒讀到那條禁止。RFC 9309 §2.2.1 要求合併所有符合的群組。**影響**：先前對操作者說的「被 robots 禁止的不會讀」實際上沒有做到；這次 prod 實跑也把 `/tgfarrell/publications` 存進了知識庫。
+  - 修法：specific 群組（或全部 `*` 群組）整批合併；crawl-delay 取最大值。新增 `collect-robots.test.ts`（7 項，以 La Trobe 的 robots.txt 原文為案例）。**突變測試**：改回只取第一個 → 4 項指名測試變紅；還原後轉綠。這個解析器之前**沒有任何直接測試**，所以 bug 一直沒被發現。
+  - 全庫審計：用修正後的解析器檢查所有有網址的文件，**51 份、15 個網站，違規 1 份**（就是那個 publications 頁）→ **封存**（可還原，也從 AI 檢索中移除），不做硬刪除 → 重新產生該資料夾的背景檔案（`sourcesUsed=4`、`invalidRefs=[]`、`uncited=[]`）。
+  - 附帶的坑：我在 robots.ts 的 JSDoc 裡寫了 `*/publications$`，那個 `*/` 會把 block comment 提前關掉，導致 transform 失敗 → 改用行註解。
+- [剩餘風險]
+  1. robots 修正在 commit 之前只存在於本機，prod 要在下一次 `sg-deploy next-admin` 之後才生效（本 entry 對應的 commit 會一起部署）
+  2. prod 的報告是用本機 `gpt-5.4` 產的（本機 Anthropic key 回 401）；prod 容器兩把 key 都有，下次從 UI 按按鈕會走 claude-sonnet-4-6
+  3. 2/10 是目前的上限：剩下 8 頁是對方刻意設置的反機器人牆（挑戰頁、WAF、429），不偽裝、不規避
+- [rollback] robots：`git revert`，但會重新打開這個合規漏洞，不建議；renderer：見 DEPLOY_ROLLBACK_RUNBOOK 的 `renderer` 列；被封存的那份文件可以 restore（`PATCH cs-knowledge {action:"restore"}`）
+
 ## 2026-09-21（續96）自架隔離 renderer（Playwright 1.60）接成蒐集的渲染後備層
 
 - [決策] 操作者選 D：renderer 放在 ks-aw-01，隔離執行（比較表見本日對話；A=Cloudflare 2/10、D=自架 4/10）。

@@ -71,13 +71,31 @@ function patternMatches(pattern: string, path: string): number {
   return p.length;
 }
 
+// The rules that apply to this crawler: EVERY group naming it, merged — not the first one.
+//
+// RFC 9309 §2.2.1: "If there is more than one group matching the user-agent, the matching groups'
+// rules MUST be combined into one group." Taking the first match silently ignores the rest, and real
+// sites split their rules this way: scholars.latrobe.edu.au opens with `User-agent: * / Disallow:`
+// (allow all) and only in a SECOND `*` group says `Disallow: */publications$`. Reading only the
+// first, this crawler fetched — and on 2026-09-21 stored — a path the site had asked it not to.
+//
+// Specificity still decides WHICH groups: if any group names this crawler, only those are merged
+// and the `*` groups are ignored; otherwise all `*` groups are merged. Crawl-delay takes the
+// largest value among the merged groups — the most conservative reading of a site that stated two.
 export function groupFor(rules: RobotsRules, userAgent: string): RobotsRules["groups"][number] | null {
   const ua = userAgent.toLowerCase();
   // `a` must be non-empty: a malformed "User-agent:" with no value would otherwise match every
   // crawler as if it were an exact match, and its rules would outrank the real "*" group.
-  const specific = rules.groups.find((g) => g.agents.some((a) => a !== "*" && a.length > 0 && ua.includes(a)));
-  if (specific) return specific;
-  return rules.groups.find((g) => g.agents.includes("*")) ?? null;
+  const specific = rules.groups.filter((g) => g.agents.some((a) => a !== "*" && a.length > 0 && ua.includes(a)));
+  const chosen = specific.length ? specific : rules.groups.filter((g) => g.agents.includes("*"));
+  if (!chosen.length) return null;
+  const delays = chosen.map((g) => g.crawlDelay).filter((d): d is number => d !== null);
+  return {
+    agents: chosen.flatMap((g) => g.agents),
+    allow: chosen.flatMap((g) => g.allow),
+    disallow: chosen.flatMap((g) => g.disallow),
+    crawlDelay: delays.length ? Math.max(...delays) : null,
+  };
 }
 
 export function isAllowed(rules: RobotsRules, userAgent: string, pathname: string): boolean {
