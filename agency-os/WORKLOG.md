@@ -1,4 +1,24 @@
 ﻿# Worklog
+## 2026-09-21（續100）MainWP 自動加站接通：REST API 開啟 + 金鑰改伺服器端 + Unique Security ID 免密碼連線（E2E 已通過）
+
+- [決策] 操作者「去完美處理好」→ 建 MainWP REST v2 key 並接通全鏈。
+- [根因鏈（續99 之後再挖到的兩層）]
+  - C1 建站器從不裝 mainwp-child：catalog 標 `installSource:"manifest"`，但 prod manifest runner 關閉 → 所有 staging 站（7 個實查）都沒有 child → MainWP 必拒。
+  - C2 mainwp-child 6.2 `is_verified_register` 預設要 admin 密碼；替代 = 對該 admin 關 password auth（user option `mainwp_child_user_enable_passwd_auth_connect=0`）＋站台 option `mainwp_child_uniqueId`，MainWP 送 `uniqueid` 驗證。
+- [做法]
+  - MainWP key：用 MainWP 自己的 `insert_rest_api_key()`（read_write，無 delete，key_id=1＝史上第一把 → 舊表單從未送過真 key，無需輪替），值只寫 ks-aw-01 `/root/lobster-phase1/.env`（先備份），未經對話。REST v2 因「存在啟用 key」自動開（`class-mainwp-rest-api-v1.php:148`）。
+  - 憑證改伺服器端：`mainWpConfigFromEnv()` 讀 `MAINWP_*`；payload 只剩 `{enabled?, adminUsername?}`；Build Console 拿掉 key/secret 欄位改勾選框（預設勾）；`trigger.config.ts` syncEnvVars + `scripts/lobster-trigger-deploy.ps1` 在主機端逐變數讀 .env（不 eval）。
+  - Unique ID：`create-wp-site` 每次 run 記憶體內產生 → request 給 bridge、registration 給 MainWP；不進 payload／staging ref／notes／log。
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=`GET mainwp/v2/sites` with new key | exit=0 | result=namespace mainwp/v2 出現；列出既有 2 站 connected
+- REALTEST_EVIDENCE: tool=SSH+node | cmd=bundled real `runAllIntegrations` on host, test-pilot with child+uniqueId | exit=0 | result=`status:ok resourceId:3`，list 顯示 test-pilot connected；未設 uniqueId 前同碼得 MainWP 真實拒絕 `REG_ERROR7`（證明失敗路徑正確回報）
+- 清理：MainWP 自身 `remove_wp_site(3)` → success；test-pilot 卸除 child + option + user meta；list 回到 2 站。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run`（packages/workflows） | exit=0 | result=13 files / 93 tests
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0C/1M/4m — M1 retry 會換 id → bridge 必須每次呼叫都設 child id（含 already-installed）；m1 explicit enabled 無 env → 改 error；m4 .env 不再 source 改逐變數；m3 無需輪替（見上）；m2 UI 字樣不改（伺服器已有 key）
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os | grep=`consumerKey|consumerSecret|MainWpConfig|MAINWP_` | hits=僅 integration-steps.ts（env 版）、測試、trigger.config.ts、deploy script、TASK_REFERENCE.md、歷史 WORKLOG/audit
+- ORACLE_WAIVED: critic 子代理 Standard 覆審已處理；codex 未跑（MainWP key 屬憑證但未碰 auth/RLS 邏輯）
+- [未完] bridge（provision-staging）設 child id 的步驟：該檔另一 session（密碼外洩修正）同 worktree 編輯中，已 SendMessage 協調，待其 idle 再做；之後 Trigger.dev deploy + sg-deploy next-admin + 真建一站 E2E。
+- [rollback] `git revert`；MainWP key：MainWP → REST API 頁停用/刪除 key_id=1，.env 還原 `.bak-mainwp-*`。
+
 ## 2026-09-21（續99）MainWP 自動加站：從未能跑通 → 依已安裝 6.0.12 原始碼修正 contract；Dashboard REST API 未啟用（待操作者）
 
 - [根因] `packages/workflows/src/integrations/integration-steps.ts addSiteToMainWp` 三錯：route `site/add`（實為 `sites/add`，rest_base='sites'）；未送 `admin`（child-site 管理員帳號，MainWP 交 mainwp-child 驗證，缺則拒連）；只看 `res.ok` —— MainWP 拒絕時仍回 HTTP 200 `{success:0,error}`，失敗被報成功。依據：伺服器 `mainwp_mainwp_files` volume 內 `class-mainwp-rest-sites-controller.php`（route 註冊 L304-315、`prepare_object_for_database` 欄位映射、`create_item` 回應形狀）。

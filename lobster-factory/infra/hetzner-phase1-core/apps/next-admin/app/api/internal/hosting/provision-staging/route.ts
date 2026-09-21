@@ -16,6 +16,7 @@ import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
 import type { WebsiteSpec } from "../../../../../lib/onboarding/intake-form";
 import { generateTarotImage } from "../../../../../lib/tarot/image-gen";
 import { isR2Configured, buildWebImageKey, parseImageDataUrl, putDesignObject } from "../../../../../lib/storage/r2";
+import { generateStagingAdminPassword, vaultStagingAdminPassword } from "../../../../../lib/hosting/staging-admin-credential";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -35,14 +36,6 @@ function toSlug(name: string, siteId: string): string {
 
 function toDbName(siteId: string): string {
   return `wp_s_${siteId.replace(/-/g, "").slice(0, 22)}`;
-}
-
-function randomPass(): string {
-  const bytes = Array.from(
-    { length: 16 },
-    () => Math.floor(Math.random() * 36).toString(36)
-  ).join("");
-  return `Stg${bytes}!`;
 }
 
 function connectSsh(opts: { host: string; port: number; username: string; privateKey: string }): Promise<SshClient> {
@@ -357,7 +350,7 @@ export async function POST(request: Request) {
   const wpPath = `${WP_ROOT_BASE}/${slug}`;
   const stagingSiteUrl = `${STAGING_BASE_URL}/${slug}/`;
   const wpAdminUrl = `${stagingSiteUrl}wp-admin/`;
-  const adminPass = randomPass();
+  const adminPass = generateStagingAdminPassword();
   const environmentId = crypto.randomUUID();
 
   let conn: SshClient | null = null;
@@ -406,9 +399,17 @@ export async function POST(request: Request) {
       conn,
       `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core install --url='${stagingSiteUrl}' --title='${siteName.replace(/'/g, "")} Staging' --admin_user=${STAGING_ADMIN_USER} --admin_password='${adminPass}' --admin_email=${STAGING_ADMIN_EMAIL} --path=${wpPath}/ --skip-email --quiet 2>&1"`
     );
-    if (installResult.code !== 0 && !installResult.stdout.includes("already installed")) {
+    const alreadyInstalled = installResult.stdout.includes("already installed");
+    if (installResult.code !== 0 && !alreadyInstalled) {
       throw new Error(`wp core install failed: ${installResult.stdout} ${installResult.stderr}`);
     }
+    // Retry (fetchWithRetry in trigger-build) hits an installed site: WP kept the FIRST password,
+    // so vaulting this call's fresh password would store a wrong credential.
+    const adminCredNote = alreadyInstalled
+      ? `Admin password unchanged (site already installed; user ${STAGING_ADMIN_USER})`
+      : await vaultStagingAdminPassword({
+          organizationId, siteId, slug, stagingSiteUrl, adminUser: STAGING_ADMIN_USER, password: adminPass,
+        });
 
     // 6. Install base theme — skip for wp-tourism (apply-manifest installs TravelWP via localZip step)
     let themeOk = true;
@@ -468,7 +469,8 @@ export async function POST(request: Request) {
         wiringNote,
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
         `DB: ${dbName} on lobster-wordpress-db`,
-        `Admin: ${STAGING_ADMIN_USER} / ${adminPass}`,
+        // Never the password: these notes land in Trigger.dev run output + ops_action_runs.
+        adminCredNote,
         `Org: ${organizationId ?? "n/a"} Site: ${siteId}`,
       ],
     });
