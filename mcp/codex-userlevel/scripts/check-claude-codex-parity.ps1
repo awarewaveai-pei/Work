@@ -245,7 +245,13 @@ if ($attributed.Count -gt 0) { $trusted = $attributed }
 elseif ($trusted.Count -gt 0) {
   Write-Host "Note: no trusted hook key names the user hooks file; counting all $($trusted.Count) trusted keys (attribution unknown). The heartbeat check below is what proves execution." -ForegroundColor DarkYellow
 }
-Assert-Parity ($trusted.Count -ge $expectedHandlers) "Codex has $($trusted.Count)/$expectedHandlers hook handlers trusted; untrusted hooks are skipped silently. Open Codex in $WorkRoot, run /hooks, trust the AwareWave hooks (trusted keys seen: $($trusted -join '; ')). This count is a pre-check only -- the heartbeat check below is the proof that hooks actually ran."
+# Codex versions do not consistently persist hook trust metadata in config.toml.
+# Treat this as diagnostic context only.  The heartbeat checks below are the
+# authoritative runtime proof; otherwise a validly-running hook session would
+# fail parity merely because the UI stores trust outside the config file.
+if ($trusted.Count -lt $expectedHandlers) {
+  Write-Host "Note: Codex trust metadata is unavailable/incomplete ($($trusted.Count)/$expectedHandlers). The per-session heartbeat checks below are authoritative; if they fail, open Codex in $WorkRoot, run /hooks, and trust the AwareWave hooks." -ForegroundColor DarkYellow
+}
 
 # Proof of execution: a Codex session that started after the current hook file
 # but left no heartbeat means the hooks were skipped (stale trust hash).

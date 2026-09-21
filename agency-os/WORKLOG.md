@@ -21215,3 +21215,15 @@ WORKLOG_DONE: Codex 兩項回報驗真 —— hooks trust 未做（憑據層確�
 
 ## 2026-09-21
 - 01:00 UTC : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-21.md
+
+## 2026-09-21（續）Codex parity checker 修正 trust metadata 誤判
+
+根因：`check-claude-codex-parity.ps1` 將 `config.toml` 的 `trusted_hash` 前置讀取結果當成硬失敗；但目前 Codex 版本未把 hook trust 狀態保存在該檔案。真正能證明 hooks 是否執行的是該 session 的 heartbeat，尤其 `PreToolUse`。
+- 已修改：`mcp/codex-userlevel/scripts/check-claude-codex-parity.ps1` — trust metadata 改為 diagnostic note；per-session heartbeat 維持硬驗證，沒有 heartbeat 仍 fail。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`check-claude-codex-parity.ps1 -WorkRoot D:\Work` | exit=1 | result=2/446 → 1/445；移除誤判後唯一失敗是最新 rollout 沒有 heartbeat。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=PowerShell parser + `git diff --check` | exit=0 | result=syntax valid, no whitespace error。
+- REVIEW_DONE: critic=書面自審（Claude oracle 兩次 exit=1，回傳 invalid/incomplete schema） | verdict=warn | findings=0C/1M/0m；未採用無關 dirty worktree finding。
+- ORACLE_WAIVED: Claude oracle returned invalid/incomplete review schema twice; fallback used: direct diff review + parser/parity evidence。
+- BUGHUNT_DONE: scope=`mcp/codex-userlevel/scripts` | grep=`trusted_hash|heartbeat|Assert-Parity` | hits=checker trust pre-check plus authoritative heartbeat gate；未移除 runtime fail gate。
+
+[剩餘風險] Codex UI 的 `/hooks` trust 仍須在目前 Codex 視窗確認；目前最新 session 沒有 `PreToolUse` heartbeat，不能宣稱機械閘已啟用。
