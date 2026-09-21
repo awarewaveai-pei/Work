@@ -21412,3 +21412,22 @@ WORKLOG_DONE: Codex 兩項回報驗真 —— hooks trust 未做（憑據層確�
 [rollback] `git revert` 本 commit（回到明文 note；不建議）。已入 Vault 的 `client_credentials` 列可由 `/api/ops/clients/credentials` DELETE 清掉。
 
 WORKLOG_DONE: provision-staging 不再回傳密碼；sink 全數定位，洩漏限於 Trigger.dev 9 run，修補/輪換待操作者批准
+
+## 2026-09-21（續）site-watch slice 1 實作（未完，交接 GPT/Codex）
+**任務**：照 `handoffs/2026-09-21-site-watch-plan.md` §8 實作 slice 1。操作者週額度 96% → 停在乾淨斷點，交接 `handoffs/2026-09-21-site-watch-slice1-progress.md`（完成清單、13 項偏差、剩餘 8 步、prod 順序）。
+**R0 定案**：renderer 只在 `renderer-net`（compose renderer 區塊註解「shared ONLY with next-admin」）→ Trigger 只做薄層，每 target 一次 `POST /api/internal/site-watch/run/<id>`，截圖/比對/通知全在 next-admin。狀態轉移全在 plpgsql（target row lock + lease_gen/lease_until 檢查），不變量寫成 CHECK。
+**抓到的既有事實**：
+- F1 `ops_incidents_source_check` 現值來自 0073（含 `collection`），plan 寫「照 0031」已過期 → 0091 以 0073 值為基底。
+- F2 `ops_incidents` 另有 UNIQUE(source, external_id)（`0013_ops_inbox.sql:54`）→ harness 首跑撞到；external_id = fingerprint。
+- F3 R2 走 Cloudflare REST、無 S3 金鑰 → signed URL 不可行 → 改 authenticated proxy route；designs bucket 公開 → site-watch 用獨立私有 bucket env、無預設。
+- F4 `sendTelegram` 原本無逾時、回傳分不出 4xx/5xx/abort（`telegram.ts:112-129` 舊版）→ 改三態 + `AbortSignal.timeout(10s)`，dispatcher 行為不變。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/site-watch-local-verify.sh`（docker postgres:16：STATE_OK+OPS_OK、DOWN_OK、re-apply） | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`（apps/renderer，16 pass） | exit=0 | ms=136
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p .`（apps/next-admin） | exit=0 | ms=90000
+- REVIEW_WAIVED: NA -- 未完成的中途 checkpoint；Claude 所寫，review 交給接手的 GPT/Codex（非作者模型＝合格 oracle），列於交接檔 §4 第 7 步
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`TelegramNotifier|parseTelegramMinSeverity|notify/telegram` | hits=4 files（telegram.ts 本身；dispatcher.ts 改用 buildOperatorTelegramNotifier；site-watch notify.ts/wiring.ts 新呼叫者；無其他舊呼叫者）
+- ORACLE_WAIVED: 操作者週額度 96%，本 commit 為交接 checkpoint；完整 review 為交接檔剩餘工作第 7 步
+[剩餘風險] 見交接檔 §5（R1–R5）；next-admin 單元測試、Trigger task、UI 卡、env、renderer 實測、prod 全未做。
+[rollback] 全為新檔 + 向後相容改動；`git revert` 本 commit 即可；prod 未動。
+
+WORKLOG_DONE: site-watch slice 1 核心（DB/renderer/next-admin lib+routes）落地並經 harness/tsc/renderer test 驗證；剩餘工作交接 GPT/Codex
