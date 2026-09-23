@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-23（續122）研究線：第四條線 L4 藝術反思（未來主力）納入計畫 v1.9——Airtable 工具庫→方法家族、判斷主權原則→閘、個案資料 P-P 前置
+- [觸發] 操作者：Art Reflection Framework（Airtable `appbQ5ACPPxMybVvM`）＋ WuSheng Healing Module（soulfulexpression.org）＋ EdD「判斷主權教育架構」全文；「你覺得應該怎麼加入？」「所有的事情都在進行中都沒完成」；另提電商後台 `app.aware-wave.com` 未完成。
+- [已讀（唯讀）] Airtable schema 20 表；`Art Reflection Tools` 樣本 3 筆（欄位：使用情境／詳細流程／時間分段／材料／帶活動者提示用語／個案困難／停止活動訊號（樣本為空）／評估指標／反應紀錄／理論依據／延伸閱讀）；`WuSheng Five Phases` 5 筆 Active（WS-01…05，Guiding Question／Practice Strategy／Progress Indicators；第三階段連 70 個工具、第四 41、第五 47）；`Database Table Registry` 20 筆（Supabase 遷移規劃、Data Sensitivity：Public／Internal Research／Personal Data／Sensitive Clinical Data／Financial；RLS Required）。WuSheng 頁：五階段、個別／團體／線上／材料包，無 coming soon 字樣。
+- [決策，計畫 v1.9] D19 L4 = 同一引擎上的方法家族（一工具一契約＋一課＋帶領腳本；五生階段 = `wusheng-journey-v1`；八步循環 = `reflective-cycle-v1`；Airtable 作者端 SSOT 單向同步，Canonical ID 鍵、Active 過濾、Content Hash 漂移；她的 Supabase 規劃對映 COS P5 Postgres，不建第三 DB）；D20 八條不可妥協原則 → 七閘（participant_final_judgment／no_preset_conclusion／influence_inventory／evidence_conditions／revisit_scheduled／stop_signals／no_belief_scoring）；D21 個案 = 自然人 → P-P 前不進系統，之前只有帶領者／自我模式；D22 順序 PI → P-ARF-data（2d 純資料）→ P1–P4 → P-P → P-ARF-participant（5d）；電商後台不動、進度未查證（VBC：未讀其 WORKLOG，不下判斷）。§1 L4 定位、§3.3 同步＋閘、§5 兩期、R20 圖像 artifact 缺、R21 Airtable 漂移／停止訊號空。
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=airtable get_base_schema + list_records ×3（唯讀）＋ WebFetch soulfulexpression.org/wusheng-healing-module | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文字；critic 留給 PI-a code
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=appbQ5ACPPxMybVvM\|art_reflection\|wusheng | hits=12
+- [下一步] PI-a 開工（七段在對話）。
+
 ## 2026-09-23（續121）退租位址信任稽核：registry SSOT + repo gate + 主機掃描 + CF access rule／DNS 檢查；nginx／fail2ban／.env 的 prod 修正待 go-ahead（接手死亡 session）
 
 - [觸發] 續106 發現 EU IP 204.168.175.41 已被第三方接手且仍在 CF 白名單；「Audit trust lists bound to released IPs + blind fail2ban」session 寫完偵測器、critic 回報 1 Critical + 7 Major 後撞用量上限死亡（M6 修一半）；本 session 接手。
