@@ -506,6 +506,13 @@ if [[ " ${APPS[*]} " =~ " renderer " ]]; then
 ' "$renderer_secret"     | curl -s --max-time 60 --config - -X POST -H "content-type: application/json"       --data '{"url":"https://example.com/","timeoutMs":30000}'       "http://127.0.0.1:${renderer_port}/render" 2>/dev/null | grep -c '"ok":true' || true)
   if [[ "$render_ok" -ge 1 ]]; then log "  smoke OK: renderer real render (example.com)"
   else log "  SMOKE_WARN: renderer real render failed"; _smoke_errors=$((_smoke_errors + 1)); fi
+  # site-watch (2026-09-23): /snapshot is its own code path -- every resource loaded (nothing skipped
+  # like /render does), a full-page JPEG, its own deadline. A deploy that breaks it would make every
+  # monitored client site read as down, so one real snapshot must come back "up" (failureCode null).
+  snap_ok=$(printf 'header = "x-renderer-secret: %s"
+' "$renderer_secret"     | curl -s --max-time 90 --config - -X POST -H "content-type: application/json"       --data '{"url":"https://example.com/"}'       "http://127.0.0.1:${renderer_port}/snapshot" 2>/dev/null | grep -F '"ok":true' | grep -cF '"failureCode":null' || true)
+  if [[ "$snap_ok" -ge 1 ]]; then log "  smoke OK: renderer real snapshot (example.com up)"
+  else log "  SMOKE_WARN: renderer real snapshot failed or example.com not up"; _smoke_errors=$((_smoke_errors + 1)); fi
 fi
 
 if [[ "$_smoke_errors" -gt 0 ]]; then

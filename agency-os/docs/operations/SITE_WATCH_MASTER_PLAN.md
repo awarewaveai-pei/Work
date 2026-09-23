@@ -2,15 +2,15 @@
 
 > **這份是什麼**：客戶網站巡檢系統的完整計畫——範圍與分期（Slice 1／Slice 2／P2／P3）、操作者決策、架構、合約（I1–I3、C1–C12）、驗收矩陣、現況、下一步、操作手冊、回滾。**其他檔一律連結此檔、不複述**：`lobster-factory/packages/db/migrations/0091_site_watch.sql` 檔頭只鏡射 I1–I3（schema 自述；改動兩處同步）；`agency-os/TASKS.md §I` 一列 = 進度指針；`agency-os/WORKLOG.md` = 過程。
 > **給 AI 的開工指南**：接到「site-watch／網站巡檢／Playwright 巡檢」→ 讀 §0 現況 → 照 §7 下一步做；設計問題查 §3–§4；產品問題查 §2，**不重問**；告警處置查 §11；Slice 2 以後查 §8。
-> **建立** 2026-09-23（整併 09-21 plan／progress 兩份 + 實作事實）。**最後更新** 2026-09-23（v2.2：§7 步 1–3 + D1 執行結果；§10 變更紀錄）。
+> **建立** 2026-09-23（整併 09-21 plan／progress 兩份 + 實作事實）。**最後更新** 2026-09-23（v2.3：§7 步 1–4 + D1 執行結果；§10 變更紀錄）。
 > 路徑：`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`DB` = `lobster-factory/packages/db`；`RENDERER` = `lobster-factory/infra/hetzner-phase1-core/apps/renderer`；`INFRA` = `lobster-factory/infra/hetzner-phase1-core`。
 
 ## 0. 現況（每次改動更新此段）
 | 項 | 狀態（2026-09-23） |
 |---|---|
-| Slice 1 程式 | core `deab0f709`（2026-09-21）+ §7 步 1–3、D1（2026-09-23）：DB migration + harness、renderer `/snapshot`、next-admin `lib/site-watch/*` + 6 個 route、Telegram 三態送達、RPC 契約測試、watchdog |
+| Slice 1 程式 | core `deab0f709`（2026-09-21）+ §7 步 1–3、D1（`7e710ae50`）+ 步 4（2026-09-23）：DB migration + harness、renderer `/snapshot`、next-admin `lib/site-watch/*` + 6 個 route、Telegram 三態送達、RPC／Trigger 契約測試、watchdog、Trigger tasks、env 接線、deploy smoke |
 | Slice 1 已驗 | 步 1 renderer 真瀏覽器實測（§5 #14）；步 2 `rpc-contract.test.ts` 3/3（突變紅）；步 3 harness 綠（含 owed_since／heartbeat 斷言，突變紅）＋ watchdog 12 種判定以假時戳實證 ＋ 對 prod 實跑 ⚪ NOT_DEPLOYED；renderer `npm test` 16/16；next-admin `npx tsc --noEmit` 綠 |
-| Slice 1 未做 | §7 步 4–10：Trigger task + env + deploy smoke、UI 卡、單元測試、playwright-runner 檔頭、登記、四動作 + review、prod |
+| Slice 1 未做 | §7 步 5–10：UI 卡、單元測試、playwright-runner 檔頭、登記、四動作 + review、prod |
 | Slice 2／P2／P3 | 未開始（§8） |
 | 待決 | 無（D1 2026-09-23 操作者決定：visual 降 `low`，§6.2） |
 
@@ -35,7 +35,7 @@
 
 ## 3. 架構（實作即 SSOT；`file:line` 以 2026-09-23 為準，改程式時同步 §3／§4）
 ### 3.1 資料流
-Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/internal/site-watch/due`（bearer `SITE_WATCH_INGEST_TOKEN`；先寫 heartbeat 時戳（§7 步 3）；kill switch OFF → 空；`site_watch_sync_targets()` 為每個 active org 且 `client_config.site_url` 為 http(s) 建 target，預設 enabled／daily／22；回「到期 ∪ 欠通知」target id）→ 每 target 一個 child task → `POST /api/internal/site-watch/run/<id>` → `NA/lib/site-watch/runner.ts runTarget()` :52：claim lease → retire 不在清單的頁 → 到期則每頁 renew → renderer `/snapshot` → 比對 → `site_watch_record_check` → `site_watch_complete_run` → 通知步驟（`notify.ts runNotifications` :65）→ release。另每小時 `POST /api/internal/site-watch/cleanup`（每 UTC 日實跑一次）。
+Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-heartbeat`，cron `5 * * * *`）→ `POST /api/internal/site-watch/due`（bearer `SITE_WATCH_INGEST_TOKEN`；先寫 heartbeat 時戳（§7 步 3）；kill switch OFF → 空；`site_watch_sync_targets()` 為每個 active org 且 `client_config.site_url` 為 http(s) 建 target，預設 enabled／daily／22；回「到期 ∪ 欠通知」target id）→ 每 target 一個 child task → `POST /api/internal/site-watch/run/<id>` → `NA/lib/site-watch/runner.ts runTarget()` :52：claim lease → retire 不在清單的頁 → 到期則每頁 renew → renderer `/snapshot` → 比對 → `site_watch_record_check` → `site_watch_complete_run` → 通知步驟（`notify.ts runNotifications` :65）→ release。另每小時 `POST /api/internal/site-watch/cleanup`（每 UTC 日實跑一次）。
 **為何 Trigger 只做薄層**：renderer 只掛 `renderer-net`，只有 next-admin 連得到（`INFRA/docker-compose.yml:522`）。同 collect 模式（`WF/src/trigger/collect-scheduled-crawl.ts` 檔頭）。
 
 ### 3.2 元件
@@ -48,7 +48,7 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 | R2 通用傳輸 | `NA/lib/storage/r2.ts`（`r2PutObject/r2GetObject/r2DeleteObject/r2ListObjects`） | Cloudflare REST；designs 函式改委派，錯誤碼不變 |
 | 核心 lib | `NA/lib/site-watch/`：`config`／`runKey`／`pages`／`diff`／`storage`／`rendererClient`／`store`（只呼叫 RPC）／`messages`／`notify`／`runner`／`objects`／`cleanup`／`console`／`wiring` | 純函式 + 編排；DB 只經 `store.ts` |
 | Routes | `NA/app/api/internal/site-watch/{due,run/[targetId],cleanup}/route.ts`；`NA/app/api/ops/clients/[slug]/site-watch/{route,accept-baseline/route,image/route}.ts` | 內部 = bearer；操作者 = `resolveOpsRole`，寫入需 owner/admin |
-| 排程 | **未寫** `WF/src/trigger/site-watch.ts`（§7 步 4） | heartbeat + per-target child |
+| 排程 | `WF/src/trigger/site-watch.ts`（`site-watch-heartbeat` + `site-watch-run`）、`WF/src/lib/siteWatch/post.ts`（+ `post.test.ts`）；跨套件狀態字串守在 `NA/lib/site-watch/__tests__/trigger-contract.test.ts` | heartbeat → batchTrigger per-target child（`concurrencyLimit: 2`）→ cleanup；兩者 `maxAttempts: 1`；token 未設 → heartbeat 安靜略過（watchdog a 抓） |
 | UI | **未寫** `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（§7 步 5） | 設定卡 |
 | Watchdog | `scripts/check-site-watch-health.ps1` → `agency-os/reports/status/site-watch-LATEST.{md,json}`；`scripts/ao-resume.ps1` capacity 區塊之後呼叫；`TOOL_TRIGGER_MAP.md` 一列 | 監控者的監控（§7 步 3 探針 a–d）；prod 走 SSH ks-aw-01 → `supabase-db` psql（SQL base64 進容器解碼）；`-LocalDbContainer` = 同 SQL 對本機容器（判定實證用） |
 
@@ -59,7 +59,7 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 | 變數 | 讀者 | 設在 | 預設 | 缺了 |
 |---|---|---|---|---|
 | `SITE_WATCH_ENABLED` | next-admin（`config.ts siteWatchEnabled`） | VPS `/root/lobster-phase1/.env` → compose next-admin `environment:` | **OFF** | 全系統靜止（`due` 回空、runner 立即返回、通知不送）；cleanup 仍跑 |
-| `SITE_WATCH_INGEST_TOKEN` | next-admin（`wiring.ts verifySiteWatchToken`）、Trigger worker（`WF` post） | VPS `.env` → compose；Trigger 經 `trigger.config.ts syncEnvVars` | 無 | next-admin 端 401 全拒（fail closed）；Trigger 端 task throw |
+| `SITE_WATCH_INGEST_TOKEN` | next-admin（`wiring.ts verifySiteWatchToken`）、Trigger worker（`WF/src/lib/siteWatch/post.ts`） | VPS `.env` → compose；Trigger 由 `scripts/lobster-trigger-deploy.ps1` 在主機上讀（**選填**，10a 前不擋其他 Trigger 部署）→ `trigger.config.ts syncEnvVars` | 無 | next-admin 端 401 全拒（fail closed）；Trigger 端 heartbeat 安靜略過（上線後 watchdog a 🔴） |
 | `R2_SITE_WATCH_BUCKET` | next-admin（`config.ts siteWatchBucket`） | VPS `.env` → compose | **無**（禁回退 designs bucket） | 只做可用性；visual 全記 `storage_unconfigured`；cleanup 跳過物件 |
 | `R2_API_TOKEN`／`R2_ACCOUNT_ID` | `r2.ts`（既有） | 既有 | 既有 | 同上 |
 | `RENDERER_URL`／`RENDERER_SHARED_SECRET` | `NA/lib/collect/net/providers.ts:44`（既有 renderer 條目） | 既有（compose next-admin + renderer） | `http://renderer:3000` | `RendererUnavailable("not_configured")` → run 不 complete、不算站點失敗 |
@@ -159,6 +159,7 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 - **R6 容量**：renderer snapshot 併發 1、每頁 ≈40s → 上限 ≈90 頁/小時。Slice 1（每客戶 1 頁、daily）遠低於此；Slice 2 hourly × 多頁必須加容量閘：`due` 對 hourly 目標的頁數總和 >60/小時 → 拒開並在卡片提示（§8）。**fan-out 必限流**（§7 步 4 `concurrencyLimit: 2`）：否則首次開啟或每日 22:00 全 target 同時到期，超過 renderer queue（`server.mjs MAX_QUEUE` 20）的 child 得 503、超過 client 150s 的先斷線——renderer 不知道客戶端走了，會把沒人等的截圖做完（`RENDERER/server.mjs` 無 `req.on('close')` 取消；P3 候選：加 abort-on-disconnect）。
 - **R7 備份**：`site_watch_*` 四表在同一 Supabase，由既有備份（`check-backup-health.ps1`）涵蓋；R2 evidence **不備份**（30 天可拋棄）；baseline 不備份（操作者按一次「接受為新基準」即重建）。
 - **R8 XSS 面**：`errors_sample`／`final_url`／`page_url`／`last_message` 是攻擊者（客戶站）可控字串 → 卡片與 ops-inbox 一律當純文字 render（React 預設轉義；**禁** `dangerouslySetInnerHTML`），Telegram 走 plain text（不設 `parse_mode`，`telegram.ts` 現況即是）。
+- **R9 Cloudflare ~100s**：Trigger worker 經公網 `https://app.aware-wave.com` 呼叫（`AWAREWAVE_WEBHOOK_BASE_URL`），Cloudflare 對 origin 約 100s 回 524。單頁 run 通常 <30s；病態頁（載入 15s + idle 15s + 截圖 30s + R2）可能逼近 → client 端 524、該 run 紅一次、Sentry 一則；server 端 route 照跑完、租約保證不重複寫（已接受；常見時改走內網 URL）。
 - 風險等級：renderer 新 endpoint 上線、compose env、Trigger deploy、migration 皆 **High**（§7 步 10 逐項 go-ahead）。
 - 工具坑：Bash 呼叫 `.ps1` 用正斜線；bash heredoc 餵 python 本機會失敗（寫 scratch 檔）；測試產物寫 `$env:TEMP`（auto-checkpoint hook 會 commit repo 內 dirty 檔）；從 `D:\Work` 根 grep 看不到 `.claude/` junction；本機無 `pwsh` 用 `powershell.exe`；Codex 接手時 hooks 可能未 trust（AGENTS.md §4）→ 手動等價執行 git log／風險分級／驗證／WORKLOG／commit。
 
@@ -171,12 +172,12 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
    - 0091：`site_watch_maintenance` 加 `last_heartbeat_at`／`last_enabled_heartbeat_at` + `site_watch_touch_heartbeat(p_enabled)`；`site_watch_page_state` 加 `owed_since` + CHECK（C7）。harness 斷言含「失敗重送不重設 owed 時鐘」（把時戳撥回 5h 再驗，同交易 `now()` 恆等所以必須這樣證）。
    - `due/route.ts`：驗 token 後、kill-switch 判斷**前** `store.touchHeartbeat(siteWatchEnabled())`；契約測試涵蓋。
    - `scripts/check-site-watch-health.ps1` 四探針（相對原設計兩處修正，都是「原定義對它要抓的故障恆綠」）：a heartbeat >2h 🟡、>6h 或從未 🔴；b 開關開著（enabled heartbeat <2h）時**逐 target** 看 `coalesce(last_completed_bucket_start, created_at)` 超過週期 +2h（hourly 3h／6h 8h／daily 26h）→ 🟡——原「全域最新 result >26h」看不到「單一 target 的頁面每次弄垮 renderer、其餘 target 正常」；c 開關開著時 `owed_since` >3h → 🟡——原 `updated_at` 每次送信失敗都被改寫，Telegram 4xx／5xx 無限重試時恆新鮮；d 未套 0091：以未帶 token 的 `POST /api/internal/site-watch/due` 判部署（401 = 已部署 → 🔴；404 = 未部署 → ⚪ `NOT_DEPLOYED`，exit 0，避免上線前每次 AO-RESUME 常駐紅燈）。探測失敗／解析不到 = 盲點 🟡。本機真 Postgres + 假時戳 12 種判定全過（其中一次抓到 `greatest(0, NULL)=0` 讓「從未 heartbeat」讀成「剛剛」的 bug，已修）；對 prod 實跑 ⚪。三個坑已補進 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 2026-09-23 addendum。
-4. **Trigger.dev + env + deploy smoke（prod 價值路徑）**：
-   - `WF/src/lib/siteWatch/post.ts`（仿 `src/lib/collection/postRunDueSchedules.ts`；env `SITE_WATCH_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`；POST due／run/<id>／cleanup；測試仿 `postRunDueSchedules.test.ts`）。
-   - `WF/src/trigger/site-watch.ts`：`schedules.task` id `site-watch-heartbeat` cron `5 * * * *` → post due → `siteWatchRun.batchTrigger(ids.map(targetId => ({ payload: { targetId } })))` → post cleanup；`task` id `site-watch-run`、`retry: { maxAttempts: 1 }`、**`queue: { concurrencyLimit: 2 }`**（renderer snapshot 併發 1、queue 上限 20、client 逾時 150s：不限流時 N>20 個 child 同時打 → 多數 503 busy 或 client 先斷、renderer 卻繼續截沒人等的圖 → 浪費算力 + 每小時 N 則 Sentry；限流後 child 排隊在 Trigger 端，零浪費）、`result.status === "renderer_unavailable"` 時 throw；仿 `collect-scheduled-crawl.ts` 的 `captureWorkflowException`；`src/trigger/index.ts` export。
-   - `WF/trigger.config.ts:55-56` 旁加 `SITE_WATCH_INGEST_TOKEN` syncEnvVars；`lobster-factory/infra/trigger/TASK_REFERENCE.md`（env 表 :29 旁 + task 段 :232 旁）；`scripts/lobster-trigger-deploy.ps1` 仿 `COLLECT_SCHEDULE_INGEST_TOKEN`（讀 VPS `.env` :56-62、export :134）。
-   - repo `INFRA/docker-compose.yml` next-admin `environment:`（:275 旁）加 `SITE_WATCH_ENABLED: ${SITE_WATCH_ENABLED:-}`、`SITE_WATCH_INGEST_TOKEN: ${SITE_WATCH_INGEST_TOKEN:-}`、`R2_SITE_WATCH_BUCKET: ${R2_SITE_WATCH_BUCKET:-}`；`INFRA/.env.example`（:84-87 旁）同步。repo compose 只是對照，prod 由 10d 套。
-   - **deploy smoke**：`INFRA/scripts/sg-deploy.sh` renderer smoke 段（:476-491，現只打 `/render`）加一段同格式 POST `/snapshot` example.com → `"ok":true` 且 `"failureCode":null`，失敗計 `_smoke_errors`（觸發既有 rollback）。sg-deploy.sh 由 `:152` rsync 同步到主機，下次部署即生效。
+4. ✅ **Trigger.dev + env + deploy smoke**（2026-09-23）：
+   - `WF/src/lib/siteWatch/post.ts`（`postSiteWatchDue／Run／Cleanup` + `siteWatchConfigured`；專屬 bearer、`AbortSignal.timeout`：due 60s、run／cleanup 330s > route `maxDuration` 300）+ `post.test.ts` 6 項。
+   - `WF/src/trigger/site-watch.ts`：`site-watch-heartbeat`（cron `5 * * * *`）→ due → `siteWatchRun.batchTrigger` → cleanup；`site-watch-run`（`queue.concurrencyLimit: 2`、`maxDuration` 400、`renderer_unavailable` → throw + Sentry）。相對原設計的偏差：① heartbeat 也 `retry.maxAttempts: 1`（config 預設 3；children 已觸發後重試會再觸發一遍，下一小時才是重試）；② 不加 idempotency key（否則 §11「手動 trigger 立刻跑一次」同小時內無效；重複 child 由租約／bucket 擋）；③ token 未設 → heartbeat 記 warn 後安靜略過（任何 Trigger 部署都會帶上這個排程，10a 前每小時紅燈只是噪音；上線後缺 token 由 watchdog a 抓）；④ `index.ts` export 照做但非必要（`trigger.config.ts dirs` 自動發現）；⑤ 跨套件狀態字串 `renderer_unavailable` 由 `NA/.../trigger-contract.test.ts` 守（兩邊 union 必須相等）。
+   - `WF/trigger.config.ts` syncEnvVars 加 `SITE_WATCH_INGEST_TOKEN`；`TASK_REFERENCE.md` env 表 + task 段；`scripts/lobster-trigger-deploy.ps1` 在主機上讀（MainWP 同模式，值不離開主機）且**選填**——照抄 collect 的必填 throw 會讓 10a 前所有不相關的 Trigger 部署失敗。
+   - repo `INFRA/docker-compose.yml` next-admin（`RENDERER_SHARED_SECRET` 之後）加三鍵、`INFRA/.env.example`（Telegram 區後；原檔沒有 collect／R2 鍵）同步；`docker compose config` 驗過。repo compose 只是對照，prod 由 10d 套；`/check-drift` 在 10d 前會 WARN 這三鍵（預期）。
+   - **deploy smoke**：`sg-deploy.sh` Step 7 renderer 段加真實 `/snapshot` example.com（`"ok":true` 且 `"failureCode":null`，否則計 `_smoke_errors` → 既有自動 rollback）；片段對本機 renderer 實跑：正確 secret 1、錯 secret 0、`set -euo pipefail` 不中止。`DEPLOY_ROLLBACK_RUNBOOK.md` renderer 列同步。
 5. **UI 卡** `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（"use client"），插入 `ClientHubTabs.tsx` `MaintenanceTab`（:747）最上方；**不要**寫進 2896 行的 ClientHubTabs；樣式沿用 `Card` :181、`ChipBtn` :235。GET/PATCH `/api/ops/clients/<slug>/site-watch`；PATCH `{expectedVersion（target null 時 0）, enabled, frequency, hourUtc}`，409 → 重新 GET 提示「別人剛改過」。
    - 5a 最小（所有來自 DB 的字串當純文字，R8）：`globallyEnabled=false` 黃條「SITE_WATCH_ENABLED 未開，目前不會巡檢」；`storageConfigured=false` 提示；開關 checkbox；頻率 chips；時間 input（UTC，旁註台北 +8）；每頁 availability／visual 的 streak／alert_state／recovery_state；最近 10 筆文字列（時間、HTTP、failureCode 中文、JS 錯誤數）。failureCode 中文 map 從 `messages.ts` 移到無 import 的 `lib/site-watch/labels.ts` 供 server/client 共用。
    - 5b 證據：`evidence_key`／`diff_key` → `<img src="/api/ops/clients/<slug>/site-watch/image?result=<id>&which=evidence|diff">`；visual episode 開著 → 「接受為新基準」POST `accept-baseline {pageId}`。
@@ -187,7 +188,8 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 10. **prod（High；每項首行 `# CONFIRMED-HIGH-RISK: <reason>`；逐項 go-ahead）**：
    - a. 建私有 R2 bucket（例 `lobster-site-watch`，**不開 public dev URL**）；VPS `/root/lobster-phase1/.env` 加 `R2_SITE_WATCH_BUCKET`、`SITE_WATCH_INGEST_TOKEN=$(openssl rand -hex 32)`、`SITE_WATCH_ENABLED=false`。
    - b. `node scripts/apply-db-migration.mjs --check 0091` → `node scripts/apply-db-migration.mjs 0091`。**先於 c**：`cleanup` route 不受 kill switch 保護，部署後每小時會碰新表；watchdog 探針 d 在此之前會 🔴（預期）。
-   - c. 主機 `/root/lobster-phase1/scripts/sg-deploy.sh renderer next-admin`（renderer 在 RESTORABLE_APPS `:116`、node gate `:215-225`、`/render` + 新 `/snapshot` smoke；next-admin tsc + vitest gate）。後驗 `docker exec lobster-renderer iptables -L OUTPUT -n | head` egress 仍在。
+   - b2. **解除 deploy hold**：`git rm lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` + commit + push。2026-09-23 設的（`8aa473d63`）；存在時 `sg-deploy.sh` 步驟 1.85 拒絕**所有** app 部署（含手動），c 必定失敗（機制見 `DEPLOY_ROLLBACK_RUNBOOK.md §1.5`）。此步曾在 `ce4374a2a` 加入、v2 重寫時遺失，2026-09-23 補回。
+   - c. 主機 `/root/lobster-phase1/scripts/sg-deploy.sh renderer next-admin`（renderer 在 RESTORABLE_APPS `:116`、node gate `:236-242`、`/render` + `/snapshot` smoke；next-admin tsc + vitest gate）。後驗 `docker exec lobster-renderer iptables -L OUTPUT -n | head` egress 仍在。
    - d. prod compose env：`printf '<environment 區塊>' | /root/lobster-phase1/scripts/safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin`；驗 `docker exec <next-admin> printenv SITE_WATCH_INGEST_TOKEN R2_SITE_WATCH_BUCKET SITE_WATCH_ENABLED`（唯一可信方式）。
    - e. `scripts/lobster-trigger-deploy.ps1`（PAT = `tr_pat_*`）。此後 heartbeat 每小時打 `due` → watchdog 探針 a 轉 🟢（系統仍關）。
    - f. **金絲雀**：全域開關仍 `false` 時，先在 DB 手動 `SELECT public.site_watch_sync_targets();`（建出所有 target 列，預設 enabled）→ 用客戶頁卡片把**除一個測試客戶外**全部關掉（PATCH 不受 kill switch 影響）→ `SITE_WATCH_ENABLED=true`（safe-infra-patch）→ Trigger dashboard 手動 trigger `site-watch-heartbeat` → 只有 1 個 target 跑。驗：`site_watch_results` 1 列、R2 有該頁 baseline.jpg、卡片顯示截圖、Telegram 0 則、watchdog 🟢、Trigger `site-watch-run` 綠、renderer log 一行 `snapshot 200 up`。
@@ -214,7 +216,7 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 - 本檔 = 計畫正本；`0091_site_watch.sql` 檔頭 = I1–I3 鏡像 + 指回本檔；`TASKS.md §I` 一列 = 進度指針；WORKLOG = 過程；`agency-os/reports/oracle/2026-09-21-review-*.md` = 09-21 四輪 Codex 對舊 plan 的審查（歷史）；`RUNNABLE_DEMOS.md`／`MONITORING_SYSTEMS_INVENTORY.md` = 登記（§7 步 8）。
 - **維護規則**：改 `lib/site-watch/*`／0091／renderer `/snapshot` 的 commit 必同步本檔 §3（元件表）與 §4（合約）；`:line` 只在 §3.2／§3.4／§7 出現，其餘以符號名引用；每完成 §7 一步更新 §0；D1 決定後改 §4.2 C8 + §6.2。
 - 2026-09-21：`handoffs/2026-09-21-site-watch-plan.md`（設計 + 4 輪 Codex 修訂）、`handoffs/2026-09-21-site-watch-slice1-progress.md`（進度 + 13 項偏差）——已廢止，可自 commit `80b7897e6` 取回。
-- 2026-09-23：`handoffs/2026-09-23-1116-site-watch-slice1.md`（合規 packet）——已併入本檔並刪除，可自 `76a0a2e3f` 取回。操作者要求「一份完整的」→ 本檔 v1（`67e4db98d`）。同日 v2：補 §1 完成定義、§3.4 env 表、§3.5 安全邊界、§4.3 決策紀錄、§5 #15、§6.1 故障模式、R6 容量、§7 步 3 watchdog／步 4 deploy smoke／步 8 登記、§11 操作手冊。同日 v2.1（設計層對抗審查）：步 4 `concurrencyLimit: 2`（fan-out > renderer queue 會 503／浪費算力）、步 10f 金絲雀放量、R7 備份邊界、R8 XSS 面、§11 ignored 語意、§8 軟開關候選 + abort-on-disconnect。同日 v2.2（執行 §7 步 1–3 + D1）：步 1 指令補 `--network`（預設 bridge 的宿主 DNS 被 renderer 自己的 egress 規則擋，本機每站 `dns`）+ `finalUrl` 只認 http(s)；D1 severity 收斂成 `config.ts severityFor` 單一來源；步 3 探針 b 改逐 target、c 改 `owed_since`（原 `updated_at` 對 Telegram 4xx／5xx 恆綠）、d 加部署判別（⚪ `NOT_DEPLOYED`）；0091 加 `owed_since` + CHECK、heartbeat 兩欄 + `site_watch_touch_heartbeat`；§11 加「多客戶同時同因告警 = 疑監控端」。
+- 2026-09-23：`handoffs/2026-09-23-1116-site-watch-slice1.md`（合規 packet）——已併入本檔並刪除，可自 `76a0a2e3f` 取回。操作者要求「一份完整的」→ 本檔 v1（`67e4db98d`）。同日 v2：補 §1 完成定義、§3.4 env 表、§3.5 安全邊界、§4.3 決策紀錄、§5 #15、§6.1 故障模式、R6 容量、§7 步 3 watchdog／步 4 deploy smoke／步 8 登記、§11 操作手冊。同日 v2.1（設計層對抗審查）：步 4 `concurrencyLimit: 2`（fan-out > renderer queue 會 503／浪費算力）、步 10f 金絲雀放量、R7 備份邊界、R8 XSS 面、§11 ignored 語意、§8 軟開關候選 + abort-on-disconnect。同日 v2.2（執行 §7 步 1–3 + D1）：步 1 指令補 `--network`（預設 bridge 的宿主 DNS 被 renderer 自己的 egress 規則擋，本機每站 `dns`）+ `finalUrl` 只認 http(s)；D1 severity 收斂成 `config.ts severityFor` 單一來源；步 3 探針 b 改逐 target、c 改 `owed_since`（原 `updated_at` 對 Telegram 4xx／5xx 恆綠）、d 加部署判別（⚪ `NOT_DEPLOYED`）；0091 加 `owed_since` + CHECK、heartbeat 兩欄 + `site_watch_touch_heartbeat`；§11 加「多客戶同時同因告警 = 疑監控端」。同日 v2.3（執行 §7 步 4）：Trigger tasks + post 模組 + 跨套件狀態契約測試；Trigger token 選填、未設則 heartbeat 安靜略過（10a 前不讓任何 Trigger 部署變紅或被擋）；heartbeat 也 `maxAttempts: 1`；compose／`.env.example`／TASK_REFERENCE／`DEPLOY_ROLLBACK_RUNBOOK` 同步；`sg-deploy.sh` `/snapshot` smoke；補回遺失的步 10b2（解除 DEPLOY_HOLD）並把 hold 的 `reason=` 改指本檔；R9 Cloudflare 100s。
 
 ## 11. 操作手冊（收到訊息怎麼辦）
 | 訊息 | 意思 | 動作 |

@@ -27,6 +27,7 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
 | `AWAREWAVE_WEBHOOK_BASE_URL` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | `https://app.aware-wave.com` |
 | `MAINWP_DASHBOARD_URL` / `MAINWP_CONSUMER_KEY` / `MAINWP_CONSUMER_SECRET` | `create-wp-site`, `adopt-client-os` (addSiteToMainWp) | read_write MainWP REST v2 key; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1`. Never in the run payload. |
 | `COLLECT_SCHEDULE_INGEST_TOKEN` | `collect-scheduled-crawl` | Dedicated bearer token (never `OPS_INBOX_INGEST_TOKEN`) for `/api/internal/collect/run-due-schedules` |
+| `SITE_WATCH_INGEST_TOKEN` | `site-watch-heartbeat`, `site-watch-run` | Dedicated bearer token (never shared with the collect/ops-inbox tokens) for `/api/internal/site-watch/*`; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1` |
 | `SENTRY_AUTH_TOKEN` | `orchestrate-tenant-provisioning` | Sentry provisioning auth token |
 | `SENTRY_ORG_SLUG` | `orchestrate-tenant-provisioning` | e.g. `aware-wave` |
 | `TENANT_PROVISION_GITHUB_TOKEN` | `orchestrate-tenant-provisioning` | GitHub PAT with org:write scope |
@@ -233,6 +234,24 @@ operator enables a tenant via `PATCH /api/ops/clients/[slug]/collection-schedule
 
 **Test payload**: none (scheduled task, no input). Safe to test-run any time --
 0 schedules enabled returns `{"ok":true,"checked":0,"due":0,"results":[]}` with no side effects.
+
+---
+
+### `site-watch-heartbeat` / `site-watch-run`
+
+**What it does**: Hourly cron (`5 * * * *`) that POSTs next-admin `/api/internal/site-watch/due`
+(stamps the watchdog heartbeat; returns targets due now or owing a notification), batch-triggers one
+`site-watch-run` child per target (`queue.concurrencyLimit: 2` -- renderer takes one snapshot at a
+time), then POSTs `/cleanup` (real work once per UTC day). Both `retry.maxAttempts: 1`: the next
+heartbeat is the retry, and the target lease (C3) makes duplicates harmless. `site-watch-run` fails
+(Sentry) when next-admin reports `renderer_unavailable`. Plan of record:
+`agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`.
+
+**Requires**: `SITE_WATCH_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`
+
+**Test payload**: heartbeat none; run `{"targetId":"<site_watch_targets.id>"}`. With next-admin
+`SITE_WATCH_ENABLED` unset/false (default), the heartbeat returns `{"enabled":false,"targets":[]}`
+and only stamps liveness -- safe to test-run any time.
 
 ---
 

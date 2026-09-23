@@ -491,6 +491,14 @@ services:
       # Rendered collection tier (lib/collect/collectors/extract-provider.ts, apps/renderer).
       # Empty = the tier falls back to FIRECRAWL_API_KEY if set, otherwise stays inert.
       RENDERER_SHARED_SECRET: ${RENDERER_SHARED_SECRET:-}
+      # site-watch (agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md §3.4). SITE_WATCH_ENABLED is the
+      # AGENTS.md §0 kill switch: unset/false = no renderer call, no Telegram (daily cleanup still runs).
+      # SITE_WATCH_INGEST_TOKEN = own bearer for /api/internal/site-watch/*; empty = 401 to everyone.
+      # R2_SITE_WATCH_BUCKET = a PRIVATE bucket, deliberately no default (the designs bucket is public);
+      # empty = availability checks only, no screenshot stored.
+      SITE_WATCH_ENABLED: ${SITE_WATCH_ENABLED:-}
+      SITE_WATCH_INGEST_TOKEN: ${SITE_WATCH_INGEST_TOKEN:-}
+      R2_SITE_WATCH_BUCKET: ${R2_SITE_WATCH_BUCKET:-}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:

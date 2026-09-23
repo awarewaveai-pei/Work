@@ -143,6 +143,12 @@ for v in MAINWP_DASHBOARD_URL MAINWP_CONSUMER_KEY MAINWP_CONSUMER_SECRET; do
   export "`$v=`$(grep -m1 "^`$v=" /root/lobster-phase1/.env | cut -d= -f2-)"
 done
 
+# site-watch (site-watch-heartbeat / site-watch-run) - read on the host the same way. OPTIONAL, unlike
+# COLLECT_SCHEDULE_INGEST_TOKEN above: it is absent until SITE_WATCH_MASTER_PLAN.md step 10a, and a
+# required read would block every unrelated Trigger deploy until then. Empty = not synced; the
+# heartbeat then skips quietly and check-site-watch-health.ps1 reports the missing heartbeat.
+export "SITE_WATCH_INGEST_TOKEN=`$(grep -m1 '^SITE_WATCH_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-)"
+
 echo '=== Env ready ==='
 echo "  TRIGGER_API_URL (CLI):          `$TRIGGER_API_URL"
 echo "  LOBSTER_TRIGGER_PUBLIC_API_URL: `$LOBSTER_TRIGGER_PUBLIC_API_URL"

@@ -55,6 +55,11 @@ export default defineConfig({
         const collectToken = process.env.COLLECT_SCHEDULE_INGEST_TOKEN ?? "";
         if (collectToken.trim()) out.COLLECT_SCHEDULE_INGEST_TOKEN = collectToken.trim();
 
+        // site-watch-heartbeat / site-watch-run -> next-admin /api/internal/site-watch/*. Own token,
+        // same blast-radius rule as the collect one above.
+        const siteWatchToken = process.env.SITE_WATCH_INGEST_TOKEN ?? "";
+        if (siteWatchToken.trim()) out.SITE_WATCH_INGEST_TOKEN = siteWatchToken.trim();
+
         // ── Supabase (Lobster DB writes) ─────────────────────────────────────
         const supabaseUrl = process.env.LOBSTER_SUPABASE_URL ?? "";
         const supabaseSrk = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY ?? "";
