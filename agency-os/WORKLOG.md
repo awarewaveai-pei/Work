@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續123）研究線：教材例子預設改為藝術反思／判斷主權（D18.1，計畫 v1.10）；結果頁示意稿 v2.3 換掉客服測試案例、課程示意稿 v3
+- [觸發] 操作者：「所以剛告訴你下文（ARF／WuSheng／EdD）是因為我們在討論『例子應該以哪一種類型為主』」→ 例子跟未來主力走。VBC：結果頁示意稿 v2.2 仍是她的客服測試輸入（`iceberg-result-mock.html` 舊 h1「客服滿意度從 85 掉到 62」），v1.8.1 只改了課程頁。
+- [決策 D18.1] `edd_research` 例子組 = 藝術反思／判斷主權場景（帶領者側流程與制度案例，合成，不含個案臨床內容；L3 EdD 與 L4 ARF 同主題）；預設 = 這組；示範 Project／課程／結果頁三處同案：課程 2／4／6 步「再檢視被跳過」、課程第 3 步與結果頁「團體 session 主動分享 6→2 人」（等答案迴路：帶領者先解讀→參與者等答案→分享變少→帶領者講更多；信念「參與者需要專家幫他們看見意義」；解法 = 參與者先說、帶領者解讀記為影響來源、紀錄表改量過程 = D20 閘的人話版）。
+- [已改] `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` v1.10（檔頭、D18 列、§3.10 示意稿指標、P-ARF-data lessons 四組改名、§9 已定案、§10）；`mockups/iceberg-result-mock.html` v2.3（全文換案、檢查列加「無預設結論」、專家模式 JSON 加 `no_preset_conclusion` 閘）；`mockups/iceberg-lesson-mock.html` v3（chip `edd` 預設、四層例、做完的例子、好壞例、常見錯誤第 3 條、示範按鈕）。線上：結果 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq v4；課程 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY v3（私人）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_v23.py（每個 replace 計數斷言）+ html.parser 標籤配對（兩檔 unclosed=[] mismatch=[]）+ grep 客服|滿意度|新人（結果頁）=0、學生|工作坊|研習|投訴（課程頁）=0 + build_artifact.py result/lesson + Artifact publish ×2 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字；自審 = 計數斷言＋標籤配對＋殘留字串 grep
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=教師研習|教育研究（你的預設）|客服滿意度從 85|operator's default is education research | hits=2（皆為計畫 §10 變更紀錄／D18 淘汰欄的歷史敘述，非現行主張）
+- [下一步] PI-a 開工。
+
 ## 2026-09-23（續122）研究線：第四條線 L4 藝術反思（未來主力）納入計畫 v1.9——Airtable 工具庫→方法家族、判斷主權原則→閘、個案資料 P-P 前置
 - [觸發] 操作者：Art Reflection Framework（Airtable `appbQ5ACPPxMybVvM`）＋ WuSheng Healing Module（soulfulexpression.org）＋ EdD「判斷主權教育架構」全文；「你覺得應該怎麼加入？」「所有的事情都在進行中都沒完成」；另提電商後台 `app.aware-wave.com` 未完成。
 - [已讀（唯讀）] Airtable schema 20 表；`Art Reflection Tools` 樣本 3 筆（欄位：使用情境／詳細流程／時間分段／材料／帶活動者提示用語／個案困難／停止活動訊號（樣本為空）／評估指標／反應紀錄／理論依據／延伸閱讀）；`WuSheng Five Phases` 5 筆 Active（WS-01…05，Guiding Question／Practice Strategy／Progress Indicators；第三階段連 70 個工具、第四 41、第五 47）；`Database Table Registry` 20 筆（Supabase 遷移規劃、Data Sensitivity：Public／Internal Research／Personal Data／Sensitive Clinical Data／Financial；RLS Required）。WuSheng 頁：五階段、個別／團體／線上／材料包，無 coming soon 字樣。
