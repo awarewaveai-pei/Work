@@ -21522,4 +21522,5 @@ WORKLOG_DONE: site-watch 計畫正本 = docs/operations/SITE_WATCH_MASTER_PLAN.m
 [剩餘風險] G1/G2 是新增的實作工作（步 3、步 4），會讓 Slice 1 多約半天；D1 仍待操作者。
 [rollback] `git revert` 本 commit（回 v1 `67e4db98d`）。
 
+（續 v2.1）操作者再問「只有這些嗎」→ 設計層對抗審查（fan-out→renderer→UI 走一遍）再抓 6 項：① Trigger child 無限流：N>20 同時打 renderer（`server.mjs:34 MAX_QUEUE=20`、`rendererClient.ts:29` client 150s）→ 503／client 先斷而 renderer 仍截沒人等的圖 → 步 4 加 `queue: { concurrencyLimit: 2 }`，R6 補機制、P3 候選 abort-on-disconnect；② 首次開啟無金絲雀 → 步 10f 改：先手動 `site_watch_sync_targets()`、卡片只留 1 個 target 開、全域開、驗 1 列後再放量（10h）；③ 備份邊界未寫 → R7；④ 客戶站可控字串（errors_sample／final_url）XSS 面未寫 → R8 + 步 5a 純文字；⑤ ops-inbox `ignored` 會被下一 episode 重開（`0056:67`）→ §11 說明永久靜音 = 卡片關掉；⑥ env 開關要重建容器 → §8 軟開關候選。migration 編號無碰撞（`ls migrations | grep -c ^0091_` = 1）。
 WORKLOG_DONE: SITE_WATCH_MASTER_PLAN v2：補 watchdog／deploy smoke／登記／env 表／安全邊界／故障模式／決策紀錄／操作手冊／分期 DoD／容量
