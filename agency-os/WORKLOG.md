@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-23（續112）研究線：示意稿依操作者參考圖重做（固定七段骨架）；⑦ 順序與 P0 部署時機依授權定案（D15）
+- [觸發] 操作者：「iceberg-result-mock.html 還是很爛，沒有邏輯性、沒有系統性，進來的人都是第一次接觸」＋ 4 張參考圖（NPC 冰山工作單：左四問／右 React・Anticipate・Design・Transform；可見／不可見金字塔；四問冰山；Anderson & Johnson 理解層次表）；「1 和 2 你是專家你決定而且要記錄下來」。
+- [示意稿 v2] `COS/docs/mockups/iceberg-result-mock.html` 重寫（操作者再回「還是沒看到明確的文字和圖表分析」→ 同日加 ① 文字結論卡：一句話＋三個發現＋建議＋缺口；③ 三張圖：趨勢／因果迴路／槓桿對比）：(0) 方法一句話＋怎麼讀三步 (1) 冰山 SVG，NPC 版式：左＝每層問題＋你填的、右＝介入方式、水面分可見／不可見、越下槓桿越大 (2) 四層卡同骨架：這層問→你填的[n]→這代表→在這層出手＋效果＋槓桿 (3) 總結＋證據缺口 (4) 理解層次對照表 (5) 下一步（標加深哪層；第一顆 = 契約 `recommended_next`）(6) 引註 (7) 來源標記／費用／核准／專家模式。術語首次出現附白話 `<dfn>`。
+- [計畫 v1.6] §3.10 結果頁 = 固定七段骨架（每層問題／介入動詞／時間取向／可見性 = 方法資料不寫碼；無層方法以原生單位套同骨架）；U13 同一骨架、U14 怎麼讀；**D15**：⑦ 順序 P0→PI-a→PI-b→P1 = 是；⑧ P0 部署與 PI-b 同窗（P0 單獨上線無可見價值、多一次 prod 風險；部署當次仍照 AGENTS §3 要 go-ahead）；§9 ⑦⑧ 定案、待拍板無；§5 PI-b 含 next-admin `sg-deploy.sh`。TASKS 一列同步。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python 結構檢查 iceberg-result-mock.html（h2 ①–⑧ 八段、layer 卡 4、svg 4＝冰山＋3 圖、引註 [1]–[4]）＋ 內建瀏覽器 file:// 開啟截圖 | exit=0 | ms=1
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字，critic 留給 PI-a code
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=iceberg-result-mock\|待拍板 | hits=5
+- [下一步] PI-a 開工（七段見對話）。
+
 ## 2026-09-23（續111）研究線：計畫 v1.4→v1.5（解讀層＋接手指南＋critic 折入）、P0 凍結三顆「送去 X」按鈕落地（未部署）
 - [觸發] 操作者：①–⑤ 是、⑥ 討論→B；截圖「執行並驗證」只出閘門表＋JSON；「一個半月了…誰都可以直接接手」；「不准無效益派 agents」。本 session 只派 1 個 critic（plan 接手審）。
 - [事實] `main.py:758-788` invoke = builder + gates，無 LLM；`iceberg_model.py:56-109` 原樣回填四層；`dashboard.html:1394-1410` 結果 = 通過行＋閘門表＋JSON；圖表僅 2 方法 `:1320-1345`；AI 只在起草填格 `draft.py:1-10`。HCI-30 `https://hci.aware-wave.com/health` 200（curl），三處「never deployed」註解為假。
