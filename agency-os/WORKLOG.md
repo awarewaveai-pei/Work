@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-23（續115）研究線：課程層（每個方法開始前 5 分鐘課）；計畫 v1.8（U15／D17，核心 20d）；C11 方案來源四層
+- [觸發] 操作者：「所以在這裡 HCI 不用了？」（答：三條線不用，HCI 保留給查人、選配接入）→「解決方案怎麼來的？」→「使用者之前沒有使用過這個工具，所以你要先幫他上課」＋ thesystemsthinking.com 冰山教學連結。
+- [C11 補] `9558c0967`：方案來源四層（框架來自方法契約介入模式；每條建議引 [n] 否則進 gaps；力道順序交下一個方法算；案例庫演化）＋模型禁止事項（自創目標數字、填負責人期限、無證據因果）。
+- [課程層] 示意稿 `COS/docs/mockups/iceberg-lesson-mock.html`（線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY ）：六步 ≤5 分鐘——這是什麼／何時用不用 → 四層各配日常例子 → 看一個做完的例子（醫院再入院）→ 怎麼填（每步好例／壞例）→ 常見錯誤（怪人、跳層、模式當原因、不看自己假設）→ 開始（準備清單、示範案例、填我的）。參考該文教學結構，內容改寫。分析頁右上角加「怎麼用？」連到課程。
+- [計畫 v1.8] U15 課程層；D17 課文 = 資料（display-metadata + 契約 + `method-form-examples.yaml` + 第 8 種可演化 kind `lessons`；≤10 個預設方法人審，其餘模型起草 AI_SUGGESTED + 首開送人審佇列）；首用流程加 0.5 步；首用測試 ≤20 分鐘含課；P3 4d→5d；核心 20d／含演化 24d。
+- [坑] commit scope guard 第三種誤擋：`-m` 訊息含單一 `'`（thesystemsthinking.com's）→ 閘視為引號未閉合 → 退回 bare-commit 模式被別 session 的 staged 檔擋；改用 `-F` 檔案即過。
+- REALTEST_EVIDENCE: tool=Bash | cmd=內建瀏覽器 file:// 開啟 iceberg-lesson-mock.html 截圖（六步、四層卡、小冰山圖渲染）＋ Artifact publish 200 ×2 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿／計畫文字；critic 留給 PI-a code
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=iceberg-lesson-mock\|653Kt4JtExaujnffNDvygY | hits=3
+- [下一步] PI-a 開工。
+
 ## 2026-09-23（續114）研究線：示意稿加「明確文字結論＋三張圖」與「解決方案三步」；發佈為私人 artifact；計畫 v1.7（C11／D16）
 - [觸發] 操作者三連：「還是沒看到明確的文字和圖表分析」→「給我網址」→「要分析問題也要解決問題啊！解決問題你打算怎麼做？」
 - [示意稿] v2.1 `658ba7a39`：① 結論卡（一句話＋三個發現＋建議＋缺口，每句 [n]）、③ 三張圖（趨勢／訓練債因果迴路／四層槓桿對比）；v2.2 本 commit：⑦ 解決方案 = A 三方案比較（甲救火／乙改制度／丙改制度＋改定位）、B 90 天行動計畫（負責人待確認）、C 三指標＋到期重跑；章節 ①–⑨。線上版 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq（私人；同檔重發即更新；artifact 版由 `scratchpad/build_artifact.py` 從 repo 檔生成：去 skeleton、深色 tokens、SVG 文字走 token）。
