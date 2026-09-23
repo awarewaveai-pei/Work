@@ -120,7 +120,11 @@ const ENTRY_LABEL: Record<string, string> = {
   path: "資料夾或檔案路徑",
 };
 
-export function CollectionSourcesPanel({ slug }: { slug: string }) {
+// `researchBridgesEnabled` comes from the server page (lib/research-bridges.ts): the two "送去 X"
+// blocks below render only when the bridges are switched on. Default false = frozen (plan P0,
+// 2026-09-23); the routes answer 410 in that state anyway, so this only spares the operator a dead
+// button, it is not the security boundary.
+export function CollectionSourcesPanel({ slug, researchBridgesEnabled = false }: { slug: string; researchBridgesEnabled?: boolean }) {
   const [catalogue, setCatalogue] = useState<CatalogueEntry[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [pickedIds, setPickedIds] = useState<string[]>([]);
@@ -542,30 +546,40 @@ export function CollectionSourcesPanel({ slug }: { slug: string }) {
 
           {run ? <RunReport run={run} /> : null}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap", borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-            <button onClick={sendToCognitiveOs} disabled={cognitiveOsBusy} style={buttonStyle(false)}>
-              送去 Cognitive OS 分析
-            </button>
-            <span style={{ fontSize: 11, color: "#6b7280" }}>把已入庫的來源送進 Cognitive OS，之後去那邊挑方法分析</span>
-          </div>
-          {cognitiveOsMessage ? <p style={{ fontSize: 12, color: "#b45309", whiteSpace: "pre-wrap" }}>{cognitiveOsMessage}</p> : null}
-          {cognitiveOsRun ? <CognitiveOsImportReport run={cognitiveOsRun} /> : null}
+          {researchBridgesEnabled ? (
+            <>
+              <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap", borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                <button onClick={sendToCognitiveOs} disabled={cognitiveOsBusy} style={buttonStyle(false)}>
+                  送去 Cognitive OS 分析
+                </button>
+                <span style={{ fontSize: 11, color: "#6b7280" }}>把已入庫的來源送進 Cognitive OS，之後去那邊挑方法分析</span>
+              </div>
+              {cognitiveOsMessage ? <p style={{ fontSize: 12, color: "#b45309", whiteSpace: "pre-wrap" }}>{cognitiveOsMessage}</p> : null}
+              {cognitiveOsRun ? <CognitiveOsImportReport run={cognitiveOsRun} /> : null}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap", borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-            <button onClick={sendToHci} disabled={hciBusy} style={buttonStyle(false)}>
-              送去 HCI 探索來源
-            </button>
-            <span style={{ fontSize: 11, color: "#6b7280" }}>
-              把已入庫來源的網址送給 HCI-30 重新查核，進它自己的候選來源審核佇列。
-              {/* Critic finding, 2026-09-18: HCI-30 has no per-organization tenant mapping yet -- every
-                  client that uses this button shares the SAME HCI-30 review queue. Surfaced here, not
-                  only in a code comment, since this matters most exactly when it's about to be used on
-                  a second real client. */}
-              <strong>注意：目前所有客戶共用同一個 HCI-30 帳號，還沒有客戶區隔。</strong>
-            </span>
-          </div>
-          {hciMessage ? <p style={{ fontSize: 12, color: "#b45309", whiteSpace: "pre-wrap" }}>{hciMessage}</p> : null}
-          {hciRun ? <HciImportReport run={hciRun} /> : null}
+              <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap", borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                <button onClick={sendToHci} disabled={hciBusy} style={buttonStyle(false)}>
+                  送去 HCI 探索來源
+                </button>
+                <span style={{ fontSize: 11, color: "#6b7280" }}>
+                  把已入庫來源的網址送給 HCI-30 重新查核，進它自己的候選來源審核佇列。
+                  {/* Critic finding, 2026-09-18: HCI-30 has no per-organization tenant mapping yet -- every
+                      client that uses this button shares the SAME HCI-30 review queue. Surfaced here, not
+                      only in a code comment, since this matters most exactly when it's about to be used on
+                      a second real client. */}
+                  <strong>注意：目前所有客戶共用同一個 HCI-30 帳號，還沒有客戶區隔。</strong>
+                </span>
+              </div>
+              {hciMessage ? <p style={{ fontSize: 12, color: "#b45309", whiteSpace: "pre-wrap" }}>{hciMessage}</p> : null}
+              {hciRun ? <HciImportReport run={hciRun} /> : null}
+            </>
+          ) : (
+            // Said, not hidden: an operator who used these buttons last week must see why they are
+            // gone and where that work now lives, not a panel that quietly lost two rows.
+            <p data-panel="research-bridges-frozen" style={{ fontSize: 11, color: "#6b7280", marginTop: 12, borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+              「送去 Cognitive OS／HCI」已於 2026-09-23 凍結：研究蒐集改在 Cognitive OS 的專案內進行。這裡只負責客戶知識庫的蒐集。
+            </p>
+          )}
         </section>
 
         <section data-panel="form">
@@ -988,8 +1002,9 @@ function HciImportReport({ run }: { run: HciImportResult }) {
         <span>已送過 {run.alreadyImported}</span>
         <span style={{ color: run.rejected.length ? "#b45309" : undefined }}>不合格 {run.rejected.length}</span>
       </div>
-      {/* No dashboard link here (unlike CognitiveOsImportReport): HCI-30 has no deployed, publicly
-          reachable URL yet -- linking to one would claim it exists. */}
+      {/* No deep link here (unlike CognitiveOsImportReport): HCI-30 is deployed at
+          https://hci.aware-wave.com, but its seed API returns a jobId, not a per-source URL
+          (lib/hci/client.ts HciSeedWritten), so there is nothing precise to link to. */}
       <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px" }}>去 HCI-30 自己的「🔎 探索來源」分頁審核（核准／拒絕）。</p>
       {/* Same "explain the refusal, don't hide it" convention as CognitiveOsImportReport above. */}
       {run.rejected.length ? (

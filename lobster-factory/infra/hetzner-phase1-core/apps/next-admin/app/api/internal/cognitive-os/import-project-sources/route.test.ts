@@ -24,14 +24,28 @@ function req(body?: unknown, auth: string | null = `Bearer ${TOKEN}`): Request {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.COGNITIVE_OS_IMPORT_INGEST_TOKEN = TOKEN;
+  // The bridge is frozen by default since 2026-09-23 (lib/research-bridges.ts); the pre-freeze
+  // behaviour below is exercised with the switch explicitly on.
+  process.env.RESEARCH_BRIDGES_ENABLED = "true";
   isCognitiveOsConfigured.mockReturnValue(true);
 });
 
 afterEach(() => {
   delete process.env.COGNITIVE_OS_IMPORT_INGEST_TOKEN;
+  delete process.env.RESEARCH_BRIDGES_ENABLED;
 });
 
 describe("POST /api/internal/cognitive-os/import-project-sources", () => {
+  it("answers 410 research_bridges_frozen when the kill switch is off (the default), after the token check and before touching Cognitive OS", async () => {
+    delete process.env.RESEARCH_BRIDGES_ENABLED;
+    expect((await POST(req({ organizationId: ORG_ID }, null))).status, "token still checked first").toBe(401);
+    const res = await POST(req({ organizationId: ORG_ID }));
+    expect(res.status).toBe(410);
+    expect((await res.json()).error).toBe("research_bridges_frozen");
+    expect(isCognitiveOsConfigured).not.toHaveBeenCalled();
+    expect(importOrganizationSources).not.toHaveBeenCalled();
+  });
+
   it("rejects a missing or wrong bearer token", async () => {
     expect((await POST(req({ organizationId: ORG_ID }, null))).status).toBe(401);
     expect((await POST(req({ organizationId: ORG_ID }, "Bearer wrong"))).status).toBe(401);

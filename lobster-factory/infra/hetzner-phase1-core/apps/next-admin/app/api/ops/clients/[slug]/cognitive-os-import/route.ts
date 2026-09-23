@@ -15,12 +15,15 @@
 // polls it. Same reasoning as collection-sources' own action:"run" (see run-jobs.ts's header comment)
 // — a real import can call Cognitive OS once per eligible source, which can exceed this app's
 // Cloudflare-fronted edge's ~100s idle timeout well before it's done.
+//
+// Frozen (HTTP 410) unless RESEARCH_BRIDGES_ENABLED=true -- lib/research-bridges.ts (plan P0, 2026-09-23).
 
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { importFolderSources, importOrganizationSources, type ImportSummary } from "@/lib/cognitive-os/import-sources";
 import { isCognitiveOsConfigured } from "@/lib/cognitive-os/client";
+import { isResearchBridgesEnabled, researchBridgesFrozenBody } from "@/lib/research-bridges";
 import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
 
 export const runtime = "nodejs";
@@ -83,6 +86,11 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   const resolved = resolveOpsRole(request);
   if (!canWriteTenantConfig(resolved.role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
+  // Role first (an unauthorized caller learns nothing about the switch), then the kill switch, then
+  // configuration -- so a frozen bridge answers 410 whether or not COGNITIVE_OS_* is set.
+  if (!isResearchBridgesEnabled()) {
+    return NextResponse.json(researchBridgesFrozenBody(), { status: 410 });
   }
   if (!isCognitiveOsConfigured()) {
     return NextResponse.json({ ok: false, error: "cognitive_os_not_configured" }, { status: 503 });

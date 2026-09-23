@@ -9,6 +9,7 @@
 // beside this file.
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { isResearchBridgesEnabled } from "@/lib/research-bridges";
 import { CollectionSourcesPanel } from "./CollectionSourcesPanel";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
               </a>
             ))}
           </nav>
-          {selected ? <CollectionSourcesPanel slug={selected} /> : null}
+          {selected ? <CollectionSourcesPanel slug={selected} researchBridgesEnabled={isResearchBridgesEnabled()} /> : null}
         </>
       )}
     </div>

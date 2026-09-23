@@ -8,12 +8,15 @@
 // polls it. Same reasoning as cognitive-os-import's own header comment: a real import can call
 // HCI-30 once per eligible source (each one a real fetch through HCI-30's isolated runner), which can
 // exceed this app's Cloudflare-fronted edge's ~100s idle timeout well before it's done.
+//
+// Frozen (HTTP 410) unless RESEARCH_BRIDGES_ENABLED=true -- lib/research-bridges.ts (plan P0, 2026-09-23).
 
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { importOrganizationSourcesToHci, type HciImportSummary } from "@/lib/hci/import-sources";
 import { isHciConfigured } from "@/lib/hci/client";
+import { isResearchBridgesEnabled, researchBridgesFrozenBody } from "@/lib/research-bridges";
 import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
 
 export const runtime = "nodejs";
@@ -75,6 +78,10 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   const resolved = resolveOpsRole(request);
   if (!canWriteTenantConfig(resolved.role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
+  // Same order as cognitive-os-import: role, then kill switch, then configuration.
+  if (!isResearchBridgesEnabled()) {
+    return NextResponse.json(researchBridgesFrozenBody(), { status: 410 });
   }
   if (!isHciConfigured()) {
     return NextResponse.json({ ok: false, error: "hci_not_configured" }, { status: 503 });

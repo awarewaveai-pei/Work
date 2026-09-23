@@ -283,6 +283,10 @@ describe("send to Cognitive OS", () => {
       return { json: async () => ({ ok: true, catalogue: CATALOGUE, sources: SOURCES }) } as unknown as Response;
     });
 
+    // The bridges are frozen by default (plan P0, 2026-09-23); this test covers the switched-on path.
+    await act(async () => {
+      root.render(<CollectionSourcesPanel slug="acme" researchBridgesEnabled />);
+    });
     await click(buttonByText("送去 Cognitive OS 分析"));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 2100));
@@ -323,6 +327,10 @@ describe("send to Cognitive OS", () => {
       return { json: async () => ({ ok: true, catalogue: CATALOGUE, sources: SOURCES }) } as unknown as Response;
     });
 
+    // The bridges are frozen by default (plan P0, 2026-09-23); this test covers the switched-on path.
+    await act(async () => {
+      root.render(<CollectionSourcesPanel slug="acme" researchBridgesEnabled />);
+    });
     await click(buttonByText("送去 Cognitive OS 分析"));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 100));
@@ -330,6 +338,17 @@ describe("send to Cognitive OS", () => {
 
     expect(container.textContent).toContain("Untitled Draft");
     expect(container.textContent).toContain("MISSING_AUTHORS");
+  });
+});
+
+describe("research bridges frozen (the default since 2026-09-23)", () => {
+  it("renders neither 送去 button and says where that work moved", () => {
+    const labels = [...container.querySelectorAll("button")].map((b) => b.textContent ?? "");
+    expect(labels.some((t) => t.includes("送去 Cognitive OS")), labels.join(" | ")).toBe(false);
+    expect(labels.some((t) => t.includes("送去 HCI")), labels.join(" | ")).toBe(false);
+    const note = container.querySelector("[data-panel=research-bridges-frozen]");
+    expect(note, "the freeze must be explained, not silent").not.toBeNull();
+    expect(note!.textContent).toContain("Cognitive OS");
   });
 });
 

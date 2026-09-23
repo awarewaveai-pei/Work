@@ -12,6 +12,7 @@ import {
   GROUP_LABELS,
   type ClusterId,
 } from "@/lib/department-catalog";
+import { isResearchBridgesEnabled } from "@/lib/research-bridges";
 import { ClientHubTabs } from "./ClientHubTabs";
 
 export const dynamic = "force-dynamic";
@@ -168,6 +169,7 @@ export default async function ClientDetailPage({
       deptSummary={deptSummary}
       integrations={(integrationsResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["integrations"]}
       wpSites={(wpSitesResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["wpSites"]}
+      researchBridgesEnabled={isResearchBridgesEnabled()}
     />
   );
 }

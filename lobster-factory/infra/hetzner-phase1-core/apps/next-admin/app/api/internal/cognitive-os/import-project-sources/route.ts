@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { isCognitiveOsConfigured } from "@/lib/cognitive-os/client";
 import { importOrganizationSources } from "@/lib/cognitive-os/import-sources";
+import { isResearchBridgesEnabled, researchBridgesFrozenBody } from "@/lib/research-bridges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,8 @@ function verifyToken(request: Request): boolean {
 
 export async function POST(request: Request) {
   if (!verifyToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  // Token first, then the kill switch (lib/research-bridges.ts, plan P0 2026-09-23), then configuration.
+  if (!isResearchBridgesEnabled()) return NextResponse.json(researchBridgesFrozenBody(), { status: 410 });
   if (!isCognitiveOsConfigured()) return NextResponse.json({ ok: false, error: "cognitive_os_not_configured" }, { status: 503 });
 
   let body: unknown;

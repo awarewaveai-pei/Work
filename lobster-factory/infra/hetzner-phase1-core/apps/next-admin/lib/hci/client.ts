@@ -3,12 +3,12 @@
 //
 // No default base URL, by design (unlike a "localhost:PORT convenience default"): this app runs in a
 // container on ks-aw-01, where "localhost" means the container itself, not the operator's laptop.
-// HCI-30 has never been deployed anywhere network-reachable from that container (dev-only Postgres,
-// no production deployment exists yet -- see agency-os/reports/decisions/ for the standing STOP on
-// that deployment) -- silently falling back to some localhost port there could connect to an
-// unrelated process instead of failing loudly. HCI_API_BASE_URL must therefore be set explicitly
-// (e.g. to the operator's own machine's tunnel/address for local testing); isHciConfigured() reports
-// false when it is absent, exactly like lib/cognitive-os/client.ts's own isCognitiveOsConfigured().
+// HCI-30 is deployed at https://hci.aware-wave.com (public /health answered 200 on 2026-09-23), but
+// that is a browser-facing edge, not an address to bake into server-to-server calls, and a localhost
+// fallback here could connect to an unrelated process instead of failing loudly. HCI_API_BASE_URL
+// must therefore be set explicitly; isHciConfigured() reports false when it is absent, exactly like
+// lib/cognitive-os/client.ts's own isCognitiveOsConfigured(). Since 2026-09-23 the import bridge that
+// uses this client is frozen by default anyway (lib/research-bridges.ts, plan P0).
 //
 // Auth: none. HCI-30's resolveTenant() (app/server.mjs) reads a `tenant` field off the request body
 // alone -- there is no real authentication system on the other end yet (its own docs call this out:

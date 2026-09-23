@@ -124,6 +124,8 @@ export interface ClientHubTabsProps {
   deptSummary: DepartmentSummaryPayload;
   integrations: IntegrationBinding[];
   wpSites: WpSiteStub[];
+  /** lib/research-bridges.ts: false (default since 2026-09-23) hides the per-folder 送去 Cognitive OS button. */
+  researchBridgesEnabled: boolean;
 }
 
 // ── Provider catalogue ────────────────────────────────────────────────────────
@@ -1329,7 +1331,7 @@ function EntityEvidence({ metadata }: { metadata?: Record<string, unknown> | nul
   );
 }
 
-export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
+export function KnowledgeTab({ org, researchBridgesEnabled = false }: Pick<ClientHubTabsProps, "org"> & { researchBridgesEnabled?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [sources, setSources] = useState<
     Array<{
@@ -1740,14 +1742,16 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
               >
                 {dossierBusy ? "彙整中…" : "產生背景檔案"}
               </button>
-              <button
-                onClick={() => sendFolderToCognitiveOs(folderFilter)}
-                disabled={cognitiveOsFolderBusy}
-                title="這個資料夾自己的 Cognitive OS Project，不會跟其他資料夾混在一起"
-                style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}
-              >
-                {cognitiveOsFolderBusy ? "送出中…" : "送去 Cognitive OS 分析"}
-              </button>
+              {researchBridgesEnabled ? (
+                <button
+                  onClick={() => sendFolderToCognitiveOs(folderFilter)}
+                  disabled={cognitiveOsFolderBusy}
+                  title="這個資料夾自己的 Cognitive OS Project，不會跟其他資料夾混在一起"
+                  style={{ border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-secondary)", cursor: "pointer", fontSize: 11, padding: "3px 8px", borderRadius: 4 }}
+                >
+                  {cognitiveOsFolderBusy ? "送出中…" : "送去 Cognitive OS 分析"}
+                </button>
+              ) : null}
             </div>
             {cognitiveOsFolderMsg && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>{cognitiveOsFolderMsg}</div>}
             {dossierMsg && <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4, whiteSpace: "pre-line" }}>{dossierMsg}</div>}
@@ -1821,8 +1825,9 @@ export function KnowledgeTab({ org }: Pick<ClientHubTabsProps, "org">) {
                           ) : null}
                           {s.hciSourceId ? (
                             // Plain span, not the badge() helper (no title param) and not an <a> like
-                            // Cognitive OS above: HCI-30 has no deployed, publicly reachable URL yet,
-                            // so a link would claim one exists.
+                            // Cognitive OS above: HCI-30 lives at https://hci.aware-wave.com but its seed
+                            // API returns a jobId, not a per-source URL (lib/hci/client.ts), so there is
+                            // nothing precise to link to.
                             <span
                               title={s.hciImportedAt ? `已於 ${s.hciImportedAt.slice(0, 16).replace("T", " ")} 送去 HCI-30 探索來源佇列` : "已送去 HCI-30 探索來源佇列"}
                               style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, background: "var(--badge-green-bg)", color: "var(--badge-green-text)", whiteSpace: "nowrap" }}
@@ -2826,7 +2831,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "維護" && <MaintenanceTab org={org} cfg={cfg} wp={wp} runs={runs} installRuns={installRuns} />}
         {activeTab === "設定" && <SettingsTab org={org} cfg={cfg} wpSites={wpSites} />}
         {activeTab === "品牌識別" && <BrandIdentityTab org={org} cfg={cfg} />}
-        {activeTab === "知識庫" && <KnowledgeTab org={org} />}
+        {activeTab === "知識庫" && <KnowledgeTab org={org} researchBridgesEnabled={props.researchBridgesEnabled} />}
         {activeTab === "資料蒐集" && <CollectionTab org={org} />}
         {activeTab === "客服" && <CustomerServiceTab org={org} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
