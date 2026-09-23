@@ -130,7 +130,7 @@ docker compose --env-file .env logs -f webapp
 
 ### 7. 本機 deploy 工作流程（`packages/workflows`）
 
-**唯一部署入口（2026-09-23 起）**：repo 根目錄 `powershell -ExecutionPolicy Bypass -File scripts/lobster-trigger-deploy.ps1`；push 到 main 且範圍動到 `packages/workflows` 時，post-push hook（`mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1`）自動跑同一支。它在 ks-aw-01 上 build，`syncEnvVars` 要的部署期 env 集中在它的步驟 3。同步語意：送出的鍵覆寫既有值、沒送的鍵不動（CLI `deploy.js syncEnvVarsWithServer`，`override: true`）→ 輪替 token 要重跑一次部署；刪鍵要到 dashboard 手動刪。以下 §7／§7a 是 2026-05 EU 時期的手動流程，只作除錯參考：照它的 `--env-file`（只含 PostHog）部署，其他 runtime 變數都不會同步。
+**唯一部署入口（2026-09-23 起）**：repo 根目錄 `powershell -ExecutionPolicy Bypass -File scripts/lobster-trigger-deploy.ps1`；push 到 main 且範圍動到 `packages/workflows` 時，post-push hook（`mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1`）自動跑同一支。它在 ks-aw-01 上 build，`syncEnvVars` 要的部署期 env 集中在它的步驟 3。新增 `syncEnvVars` 讀取時要同時在步驟 3 的 `$deployBash` export（或列入 `packages/workflows/src/lib/deployEnv/syncEnvVarsParity.test.ts` 的 `NOT_SYNCED_BY_DEPLOY` 並寫明理由）；腳本部署前先跑該測試，紅就中止。同步語意：送出的鍵覆寫既有值、沒送的鍵不動（CLI `deploy.js syncEnvVarsWithServer`，`override: true`）→ 輪替 token 要重跑一次部署；刪鍵要到 dashboard 手動刪。以下 §7／§7a 是 2026-05 EU 時期的手動流程，只作除錯參考：照它的 `--env-file`（只含 PostHog）部署，其他 runtime 變數都不會同步。
 
 **CLI 版本**：與 `packages/workflows/package.json` 內 **`trigger.dev`** devDependency 對齊（目前 **4.4.6**）。請使用 **`npx trigger.dev@4.4.6`**（勿隨意 `@latest`，避免與已鎖 SDK 漂移）。Server（trigger-webapp）目前為 v4.4.4；CLI 4.4.6 對 Server 4.4.4 相容，已確認（2026-05-21）。
 

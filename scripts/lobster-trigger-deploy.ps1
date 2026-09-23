@@ -38,6 +38,20 @@ if (-not $env:LOBSTER_VAULT_LOADED) {
 
 Write-Host "[deploy] Vault secrets loaded (TRIGGER_DEPLOY_PAT, POSTHOG_API_KEY, OPS_INBOX_INGEST_TOKEN)." -ForegroundColor Green
 
+# ── 1b. Env parity gate (fail closed) ──────────────────────────────────────
+# Every process.env read in trigger.config.ts syncEnvVars must be exported by $deployBash (step 3) or be
+# allowlisted in the test; an unexported read is silently never synced. Runs once on every path (after the
+# vault re-entry above). Missing vitest = no gate = no deploy.
+$wfDir      = Join-Path $repoRoot "lobster-factory\packages\workflows"
+$vitestMjs  = Join-Path $wfDir "node_modules\vitest\vitest.mjs"
+if (-not (Test-Path -LiteralPath $vitestMjs)) { throw "Env parity gate needs vitest: run 'npm install' in $wfDir" }
+Push-Location -LiteralPath $wfDir
+try {
+    & node $vitestMjs run src/lib/deployEnv/syncEnvVarsParity.test.ts
+    $parityExit = $LASTEXITCODE
+} finally { Pop-Location }
+if ($parityExit -ne 0) { throw "Env parity gate failed: a syncEnvVars read is not exported in `$deployBash (see test output above)." }
+
 if (-not $env:TRIGGER_DEPLOY_PAT -or -not $env:TRIGGER_DEPLOY_PAT.StartsWith("tr_pat_")) {
     throw "TRIGGER_DEPLOY_PAT in vault must be a deploy PAT (tr_pat_*).`nRun: scripts\secrets-vault.ps1 -Action set -Name TRIGGER_DEPLOY_PAT -Value <tr_pat_...>"
 }

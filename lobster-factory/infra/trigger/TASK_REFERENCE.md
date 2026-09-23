@@ -8,7 +8,7 @@
 
 ## Environment Variables
 
-Set these in Trigger.dev → Project → **Environment Variables** (or they are auto-synced on each deploy via `syncEnvVars` in `trigger.config.ts`):
+Synced on each deploy by `scripts/lobster-trigger-deploy.ps1` through `syncEnvVars` in `trigger.config.ts`, except the rows marked **not synced** (§Current Prod Env Var Status):
 
 | Variable | Required by | Notes |
 |---|---|---|
@@ -17,7 +17,7 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
 | `LOBSTER_ENABLE_DB_WRITES` | all DB tasks | `"true"` to enable actual DB inserts (default: off) |
 | `LOBSTER_MANIFEST_EXECUTION_MODE` | `apply-manifest` | `"off"` \| `"dry_run"` \| `"apply"` (default: `"off"`) |
 | `LOBSTER_AO_ORG_ID` | `ao-infrastructure-check-schedule` | AwareWave org UUID for audit records |
-| `TRIGGER_API_URL` | `ao-infrastructure-check` | `https://trigger.aware-wave.com` |
+| `TRIGGER_API_URL` | `ao-infrastructure-check` | **not synced**: `syncEnvVars` drops every `TRIGGER_*` key (`@trigger.dev/build` `UNSYNCABLE_ENV_VARS_PREFIXES`) |
 | `N8N_URL` | `ao-infrastructure-check` | n8n base URL |
 | `UPTIME_KUMA_URL` | `ao-infrastructure-check` | Uptime Kuma base URL |
 | `SENTRY_URL` | `ao-infrastructure-check` | Sentry base URL e.g. `https://sentry.aware-wave.com` |
@@ -36,6 +36,8 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
 | `N8N_API_BASE_URL` | `orchestrate-tenant-provisioning` | n8n API base URL |
 | `UPTIME_KUMA_API_KEY` | `orchestrate-tenant-provisioning` | Uptime Kuma API key |
 | `TENANT_PROVISION_SUPABASE_ACCESS_TOKEN` | `orchestrate-tenant-provisioning` | Supabase management API token |
+
+The seven `orchestrate-tenant-provisioning` credentials above (every row from `SENTRY_AUTH_TOKEN` down except `N8N_API_BASE_URL`) are **not synced** by the deploy; see §Current Prod Env Var Status.
 
 ---
 
@@ -308,21 +310,15 @@ curl "https://trigger.aware-wave.com/api/v3/runs/run_xxx" \
 
 ## Current Prod Env Var Status
 
-As of 2026-05-07, the following vars are set in the Trigger.dev prod environment:
+Checked 2026-09-23 (names only, read-only query of trigger-postgres `EnvironmentVariable` for this project's PRODUCTION env): 23 vars set, i.e. every row of the table above plus `LOBSTER_EXECUTE_MANIFEST_STEPS` and the five `LOBSTER_HOSTING_*`, **except**:
 
-| Variable | Status |
+| Variable | Why absent |
 |---|---|
-| `POSTHOG_API_KEY` | ✅ set |
-| `POSTHOG_HOST` | ✅ set |
-| `LOBSTER_SUPABASE_URL` | ❌ missing — sync on next deploy |
-| `LOBSTER_SUPABASE_SERVICE_ROLE_KEY` | ❌ missing — sync on next deploy |
-| `LOBSTER_ENABLE_DB_WRITES` | ❌ missing — sync on next deploy |
-| `TRIGGER_API_URL` | ❌ missing — sync on next deploy |
-| `N8N_URL` | ❌ missing — sync on next deploy |
-| `UPTIME_KUMA_URL` | ❌ missing — sync on next deploy |
-| `SENTRY_URL` | ❌ missing — sync on next deploy |
-| `LOBSTER_AO_ORG_ID` | ❌ missing — must be set before next deploy |
-| All tenant provisioning vars | ❌ missing — sync on next deploy |
+| `SITE_WATCH_INGEST_TOKEN` | lands at SITE_WATCH_MASTER_PLAN step 10d |
+| `TRIGGER_API_URL` | `TRIGGER_*` keys are never synced (see its row) |
+| the seven `orchestrate-tenant-provisioning` credentials | deliberately **not synced**: the task has never run in prod, and syncing them lets it create real GitHub repos / Sentry + PostHog projects / n8n workflows, so wiring them is an operator decision (`agency-os/TASKS.md`). Not set in the dashboard either. |
+
+`lobster-factory/packages/workflows/src/lib/deployEnv/syncEnvVarsParity.test.ts` lists those seven in `NOT_SYNCED_BY_DEPLOY`. The deploy script runs that test first and aborts if any other `syncEnvVars` read is not exported by its `$deployBash`.
 
 To sync vars, deploy through the single entry point (see §Deploy below) — it assembles the env on ks-aw-01.
 

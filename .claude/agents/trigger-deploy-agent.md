@@ -18,7 +18,7 @@ An ad-hoc deploy (e.g. `npx trigger.dev deploy` with only `TRIGGER_ACCESS_TOKEN`
 The production script handles all of this:
 - Loads `TRIGGER_DEPLOY_PAT`, `POSTHOG_API_KEY`, `OPS_INBOX_INGEST_TOKEN` from local Windows vault
 - Reads `LOBSTER_SUPABASE_SERVICE_ROLE_KEY` from VPS `/root/supabase/.env` (never stored locally)
-- Injects all env vars needed by `syncEnvVars` (Supabase URL + key, PostHog, OPS token, AO org ID, N8N, Uptime Kuma, Sentry, webhook base URL…)
+- Injects every env var `syncEnvVars` reads (Supabase URL + key, PostHog, OPS token, AO org ID, N8N, Uptime Kuma, Sentry, webhook base URL…) except the seven tenant-provisioning credentials in `NOT_SYNCED_BY_DEPLOY` (`lobster-factory/infra/trigger/TASK_REFERENCE.md` §Current Prod Env Var Status); an env parity gate (vitest) runs first and aborts the deploy on drift
 - Sets `NODE_OPTIONS=--dns-result-order=ipv4first` to force IPv4 → WAF skip rule fires → Bot Fight Mode bypassed
 - Uses `--api-url http://127.0.0.1:8030` to route CLI auth through VPS-local trigger-webapp
 - **Patches `buildImage.js` after `npm install`** (see below — this is the Cloudflare BFM bypass for the Docker indexer)
@@ -66,6 +66,7 @@ Watch for these milestones in stdout:
 | Output | Meaning |
 |--------|---------|
 | `[deploy] Vault secrets loaded` | TRIGGER_DEPLOY_PAT, POSTHOG_API_KEY, OPS_INBOX_INGEST_TOKEN ✓ |
+| `Tests  6 passed` (right after) | Env parity gate: every `syncEnvVars` read is exported by the deploy ✓ |
 | `[deploy] SERVICE_ROLE_KEY obtained` | Supabase key read from VPS ✓ |
 | `=== Env ready ===` | All env vars set, listing to confirm ✓ |
 | `=== Git pull ===` | Repo synced on VPS ✓ |
@@ -79,7 +80,7 @@ Watch for these milestones in stdout:
 
 After successful deploy, confirm these were synced (they appear in the `=== Env ready ===` output):
 - `POSTHOG_API_KEY`, `LOBSTER_SUPABASE_URL`, `LOBSTER_SUPABASE_SERVICE_ROLE_KEY`
-- `OPS_INBOX_INGEST_TOKEN`, `TRIGGER_API_URL`, `N8N_URL`, `LOBSTER_AO_ORG_ID`
+- `OPS_INBOX_INGEST_TOKEN`, `N8N_URL`, `LOBSTER_AO_ORG_ID` (`TRIGGER_API_URL` is printed but never synced: `syncEnvVars` drops every `TRIGGER_*` key)
 
 Log to `agency-os/WORKLOG.md`:
 ```
@@ -95,6 +96,7 @@ AUTO_TASK_DONE: Trigger workflows 完整 deploy — <trigger.dev deploy URL> —
 | `403 Just a moment` or `cType: 'managed'` during `#16 [indexer 2/2] RUN node` | Docker indexer calling public URL, Cloudflare BFM blocking | sed patch missing or not applied — check `=== Patch buildImage.js ===` milestone in output; see `runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md` |
 | `403 Just a moment` before indexer stage | CLI auth calls blocked by Cloudflare | Confirm `NODE_OPTIONS=--dns-result-order=ipv4first` + IPv4 WAF skip rule enabled for zone `f21b1919632fee2221647908a94fdcac` |
 | syncEnvVars syncs nothing | Running ad-hoc deploy without vault env vars | Always use `lobster-trigger-deploy.ps1` |
+| `Env parity gate failed` | `trigger.config.ts` `syncEnvVars` reads a var that `$deployBash` never exports (it would silently never sync) | Export it in `$deployBash` (step 3) from a real source (vault `-Names` or a host-side read). Only if it must stay unsynced, add it to `NOT_SYNCED_BY_DEPLOY` in `src/lib/deployEnv/syncEnvVarsParity.test.ts` with the reason. Never skip the gate. |
 
 ## Reference
 

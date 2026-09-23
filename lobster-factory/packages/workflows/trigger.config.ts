@@ -28,8 +28,10 @@ export default defineConfig({
     external: ["ssh2", "cpu-features"],
     extensions: [
       // Sync runtime env vars into Trigger prod/staging on each deploy.
-      // Source: export from vault / local env before `npx trigger.dev deploy`.
-      // Only pushes a key if the local value is non-empty — never clears existing Trigger vars.
+      // Source: $deployBash in scripts/lobster-trigger-deploy.ps1, the only deploy path. Every
+      // process.env read below must be exported there or listed in NOT_SYNCED_BY_DEPLOY in
+      // src/lib/deployEnv/syncEnvVarsParity.test.ts, which runs before every deploy.
+      // Only pushes a key if the value is non-empty — never clears existing Trigger vars.
       // See `infra/trigger/TASK_REFERENCE.md` for required vars per task.
       syncEnvVars(async () => {
         const out: Record<string, string> = {};
@@ -149,9 +151,8 @@ export default defineConfig({
         const wpSshKey = process.env.LOBSTER_WP_SSH_PRIVATE_KEY ?? "";
         if (wpSshKey.trim()) out.LOBSTER_WP_SSH_PRIVATE_KEY = wpSshKey.trim();
 
-        // ── Tarot batch generation ────────────────────────────────────────────
-        const batchSecret = process.env.BATCH_INTERNAL_SECRET ?? "";
-        if (batchSecret.trim()) out.BATCH_INTERNAL_SECRET = batchSecret.trim();
+        // No BATCH_INTERNAL_SECRET here: tarot-batch-generate never reads it from env, next-admin
+        // passes it in the run payload (app/api/tools/tarot/batch/route.ts).
 
         return out;
       }),
