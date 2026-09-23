@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續125）研究線：計畫 v1.12——操作者改判「對人直接進系統」（D10.1，專案級抹除進 P1）、四工具改進對照表、知識庫問題待回
+- [觸發] 操作者：「自然人資料…我認為就直接進系統，因為我要知道他會不會跑」；「四個工具都又怪又卡又鈍…你好像有規劃一系列要改進的事情」。
+- [判斷] ADR 011 §決策 10（`agency-os/docs/architecture/decisions/011-collection-ingestion-boundary.md:79`）自列條件 = 抹除路徑打通＋明示批准 → 不是推翻 ADR，是用最小方式滿足：專案級抹除（`DELETE /projects/{id}`：`prov_sources` 列＋`TenantScopedCas.unlink`（`tenant_scoped_cas.py:116`）＋`JsonArtifactStore.delete`（`json_artifact_store.py:71`）＋`ProjectErased` tombstone）進 P1，操作者本則 = 明示批准。範圍：公開來源、單租戶、`CONFIDENTIAL`；ARF 臨床個案（D21）不在放行內；主體級加密與第二租戶留 P-P（改名「主體級保護」）。殘餘風險寫 R5（測試期個資靜態未加密，操作者接受）。
+- [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.12：D10.1、D21 註、§3.3 專案級抹除列、P1 元件＋DoD（自然人 run → 刪專案三處讀不回）、P-P 列、R5、§3.5、§3.9「四工具改進對照」表（蒐集器／分析平台／HCI／知識庫 × 根因／改法／期／不在本計畫）、§9 ② 作廢＋D10.1 已定案＋⑨ 知識庫待回、§10。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python plan_v112.py（每個 replace／row edit 計數斷言；D10.1／四工具計數）+ grep 舊主張 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文字；引用的 ADR 行號與程式碼錨點寫入前 grep 過
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=P-P 前不進系統|自然人等 P-P|P-P 自然人** | hits=2（計畫 §9 ②／§10 歷史行與 D10 淘汰欄保留原文，非現行主張）
+- [下一步] 等操作者回 ⑨（知識庫）；PI-a 卡照 §12.3 開工；P1 產卡時含專案級抹除卡。
+
 ## 2026-09-23（續124）共享檔 commit 機械化：私有 index（helper `stage`）＋ `git-shared-file-guard.js`＋ WORKLOG 續號閘；env 前綴 `git commit` 曾繞過三道 commit 閘
 
 - **問題**（續123 VBC 結論）：`git-commit-scope-guard.js`（08-30）只擋「裸 commit 掃走別人 **staged** 的檔」；今晚三次掃走本 session WORKLOG／TASKS hunk 的是 ① `git commit -- agency-os/WORKLOG.md`（git 語義取 **worktree** 版本＝所有 session 的 hunk；guard 明文豁免 git-verified pathspec）② 整檔 `git add` 共享檔 + 裸 commit；續號互搶 = 寫入前先取 max+1。6 份 memory recipe 全是手工繞法，2026-09-08 一次還把別人 8 行證據抹掉（從 HEAD 重建 worktree）。
