@@ -58,6 +58,9 @@
   .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
   .charts figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px}
   .charts figcaption{font-size:13.5px;margin-bottom:4px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:13px}
+  .kpi b{font-size:14px}.kpi .now{color:var(--muted)}.kpi .goal{color:var(--ok);font-weight:700}.kpi .when{color:var(--muted);font-size:12px}
 </style>
 </head>
 <body>
@@ -73,7 +76,7 @@
     <div class="steps">
       <div class="step"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
       <div class="step"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
-      <div class="step"><b>③ 看總結、對照表與下一步</b>最有力的出手點在哪一層、還缺什麼證據、接下來該跑哪個方法。</div>
+      <div class="step"><b>③ 看總結與解決方案</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；接下來該跑哪個方法。</div>
     </div>
   </div>
 
@@ -266,9 +269,50 @@
     <p class="sub" style="margin:8px 0 0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>
   </div>
 
+  <!-- 4.5 解決方案：從分析到行動 -->
+  <div class="card" style="border-left:6px solid var(--ok)">
+    <h2>⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）</h2>
+
+    <h3 style="margin:6px 0 8px">A. 選方案：三條路比一比</h3>
+    <div style="overflow-x:auto">
+    <table>
+      <tr><th>方案</th><th>做什麼</th><th>見效</th><th>成本</th><th>持久度</th><th>風險</th><th>建議</th></tr>
+      <tr><td>甲 只救火</td><td>加班處理客訴、補償客戶（第 1 層）</td><td>1 個月</td><td>低</td><td>低，下季再掉</td><td>資深更累，流動率再升</td><td>只當急救</td></tr>
+      <tr><td>乙 改制度</td><td>訓練 2 天 → 2 週；帶新人列入資深考核（第 3 層）</td><td>2 到 3 個月</td><td>中（人力時數）</td><td>高</td><td>訓練預算下一輪被砍回去</td><td>先做</td></tr>
+      <tr><td>丙 改制度＋改定位</td><td>乙 ＋ 把客服改記為「留客中心」，用留客率算訓練投資報酬（第 3、4 層）</td><td>3 到 6 個月</td><td>中</td><td>最高</td><td>管理層不買單</td><td><b>建議：乙先動，丙用乙的數字去談</b></td></tr>
+    </table>
+    </div>
+
+    <h3 style="margin:14px 0 8px">B. 90 天行動計畫（AI 起草；負責人與期限請你確認）</h3>
+    <div style="overflow-x:auto">
+    <table>
+      <tr><th>週</th><th>行動</th><th>負責<span class="sub">（待確認）</span></th><th>怎麼證明有效</th><th>目標</th></tr>
+      <tr><td>1 到 2</td><td>補齊三項缺的數據：離職原因、每人案件量、新人首次解決率</td><td>客服主管</td><td>三項數據有基準值</td><td>第 2 週前齊全</td></tr>
+      <tr><td>3 到 4</td><td>設計 2 週上線課程；「帶新人」寫進資深排班與考核</td><td>客服主管＋HR</td><td>課程與排班表上線</td><td>第 4 週上線</td></tr>
+      <tr><td>5 到 8</td><td>第一批新人走完 2 週訓練再接案</td><td>資深客服</td><td>新人首次解決率</td><td>達資深的 80%</td></tr>
+      <tr><td>9 到 12</td><td>用第 5 到 8 週的數字，向管理層提「留客中心」定位與訓練預算保護</td><td>客服總監</td><td>預算列入不可砍項目</td><td>第 12 週前核定</td></tr>
+      <tr><td>13</td><td>用新資料重跑本分析，比較前後</td><td>系統自動</td><td>下方三個指標</td><td>見 C</td></tr>
+    </table>
+    </div>
+    <p class="sub" style="margin:6px 0 0">需要誰點頭：管理層（預算保護）、HR（排班與考核）。這兩個沒點頭，乙做得成、丙做不成。</p>
+
+    <h3 style="margin:14px 0 8px">C. 追蹤驗證：三個指標，90 天後自動重跑</h3>
+    <div class="kpis">
+      <div class="kpi"><b>客服滿意度</b><span class="now">現在 62</span><span class="goal">目標 75</span><span class="when">90 天</span></div>
+      <div class="kpi"><b>新人流動率</b><span class="now">現在 18%（示意）</span><span class="goal">目標 10%</span><span class="when">90 天</span></div>
+      <div class="kpi"><b>新人首次解決率</b><span class="now">現在 未量測</span><span class="goal">基準後 +20%</span><span class="when">第 8 週起</span></div>
+    </div>
+    <div class="btns" style="margin-top:10px">
+      <span class="btn primary">把行動計畫存成任務，設提醒</span>
+      <span class="btn">90 天後自動重跑本分析並比較</span>
+      <span class="btn">改善了就記進案例庫；沒改善回到 A 重選</span>
+    </div>
+    <p class="sub" style="margin:8px 0 0">工具負責想清楚、排出來、盯著看；動手做事的是人。</p>
+  </div>
+
   <!-- 5. 下一步 -->
   <div class="card">
-    <h2>⑦ 下一步：接著跑哪個方法（各自加深哪一層）</h2>
+    <h2>⑧ 下一步：接著跑哪個方法（各自加深哪一層）</h2>
     <div class="btns">
       <span class="btn primary">槓桿點分析<small>第 3、4 層：算出每個出手點的力道</small></span>
       <span class="btn">因果迴路圖<small>第 3 層：把訓練債迴路畫出來</small></span>
@@ -280,7 +324,7 @@
 
   <!-- 6. 引註 -->
   <div class="card">
-    <h2>⑧ 引註（每個 [n] 都指向一段可查的來源）</h2>
+    <h2>⑨ 引註（每個 [n] 都指向一段可查的來源）</h2>
     <ol class="src">
       <li>你的輸入・事件：「本季客服滿意度分數從 85 分掉到 62 分」</li>
       <li>你的輸入・模式：「過去六個月，滿意度分數每季穩定下滑，新進客服人員的流動率也同步上升」</li>
