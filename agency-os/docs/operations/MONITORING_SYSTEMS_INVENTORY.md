@@ -97,5 +97,5 @@ Only sites at `Stage: Live` in a tenant's `SITES_INDEX.md` need production monit
 ## Related Documents (Auto-Synced)
 - `docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md`
 
-_Last synced: 2026-09-05 11:46:38 UTC_
+_Last synced: 2026-09-23 03:45:07 UTC_
 

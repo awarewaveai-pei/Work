@@ -516,7 +516,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-09-04 14:48:33 UTC_
+_Last synced: 2026-09-23 03:45:07 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -599,6 +599,9 @@ _Last synced: 2026-09-04 14:48:33 UTC_
   **後續兩輪 stop-hook 打回**：自動 review 機制本身回傳無效 JSON（機制故障非發現問題）→ 補跑真實 `codex-oracle.ps1 review`，抓到 2 個真 finding（mirror 目錄未被檢查、「01-04 guides」數字範圍縮寫解不開）；第一版修法（教程式碼用「目錄+同名檔案」推測隱含關係）又被打回「undeclared drift pairs」——自己重新推演找到具體反例（矩陣資料裡一個散文用詞被誤 backtick 包住，推測邏輯會生出完全不相關的假配對），改成**撤掉推測邏輯，回頭把矩陣資料本身寫明確**（跟修「01-04 guides」同一個原則：資料不夠明確就修資料，不要教程式碼猜）。
 
   **剩餘未解**：dedicated 機仍未購買（同 08-15 未解項延續）；`memory/daily/2026-08-16.md`～`2026-08-23.md` 8 個 stub 未回填（AO-CLOSE 指示只補今日檔案，這是已知、非本次引入的缺口）；`scripts/ao-resume.ps1` 有 17 個既有的、跟今天工作無關的未受保護 git 輸出擷取點，已用 spawn_task 記錄成獨立任務（task_b82a2211）未動手修。
+
+
+
 
 
 

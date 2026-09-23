@@ -126,6 +126,7 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 3）→ `POST /api/intern
 8. **prod（High；每項首行 `# CONFIRMED-HIGH-RISK: <reason>`；逐項 go-ahead）**：
    - a. 建私有 R2 bucket（例 `lobster-site-watch`，**不開 public dev URL**）；VPS `/root/lobster-phase1/.env` 加 `R2_SITE_WATCH_BUCKET`、`SITE_WATCH_INGEST_TOKEN=$(openssl rand -hex 32)`、`SITE_WATCH_ENABLED=false`。
    - b. `node scripts/apply-db-migration.mjs --check 0091` → `node scripts/apply-db-migration.mjs 0091`。**先於 c**：`cleanup` route 不受 kill switch 保護，部署後每小時會碰新表。
+   - b2. **解除 deploy hold**：`git rm lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` + push。2026-09-23 設的（commit `8aa473d63`），在這之前 `sg-deploy.sh` 步驟 1.85 會拒絕**所有** app 部署（含手動跑），c 必定失敗。機制見 `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md §1.5`。
    - c. 主機 `/root/lobster-phase1/scripts/sg-deploy.sh renderer next-admin`（renderer 在 RESTORABLE_APPS `:116`、node gate `:215-225`、真實 render smoke `:476-491`；next-admin tsc + vitest gate）。後驗 `docker exec lobster-renderer iptables -L OUTPUT -n | head` egress 仍在。
    - d. prod compose env：`printf '<environment 區塊>' | /root/lobster-phase1/scripts/safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin`；驗 `docker exec <next-admin> printenv SITE_WATCH_INGEST_TOKEN R2_SITE_WATCH_BUCKET SITE_WATCH_ENABLED`（唯一可信方式）。
    - e. `scripts/lobster-trigger-deploy.ps1`（PAT = `tr_pat_*`）。

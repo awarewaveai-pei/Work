@@ -666,5 +666,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-09-20 03:31:11 UTC_
+_Last synced: 2026-09-23 03:45:07 UTC_
 
