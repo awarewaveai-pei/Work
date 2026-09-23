@@ -1,5 +1,6 @@
 // Operator-facing text. C12: text summary + ops link only, never an image, never a query string.
 import type { IncidentDraft } from "@/lib/ops-inbox/types";
+import { severityFor } from "./config";
 import type { OrgRef, PageStateRow } from "./store";
 
 const FAILURE_LABEL: Record<string, string> = {
@@ -30,7 +31,7 @@ export function incidentDraft(org: OrgRef, s: PageStateRow): IncidentDraft & { f
     external_id: fingerprint,
     fingerprint,
     signal_type: availability ? "uptime" : "business",
-    severity: availability ? "high" : "medium",
+    severity: severityFor(s.kind),
     service: "site_watch",
     environment: process.env.NODE_ENV === "production" ? "production" : "development",
     title: availability ? `網站打不開：${s.page_url}` : `網站畫面大幅變動：${s.page_url}`,

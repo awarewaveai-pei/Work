@@ -2,24 +2,24 @@
 
 > **這份是什麼**：客戶網站巡檢系統的完整計畫——範圍與分期（Slice 1／Slice 2／P2／P3）、操作者決策、架構、合約（I1–I3、C1–C12）、驗收矩陣、現況、下一步、操作手冊、回滾。**其他檔一律連結此檔、不複述**：`lobster-factory/packages/db/migrations/0091_site_watch.sql` 檔頭只鏡射 I1–I3（schema 自述；改動兩處同步）；`agency-os/TASKS.md §I` 一列 = 進度指針；`agency-os/WORKLOG.md` = 過程。
 > **給 AI 的開工指南**：接到「site-watch／網站巡檢／Playwright 巡檢」→ 讀 §0 現況 → 照 §7 下一步做；設計問題查 §3–§4；產品問題查 §2，**不重問**；告警處置查 §11；Slice 2 以後查 §8。
-> **建立** 2026-09-23（整併 09-21 plan／progress 兩份 + 實作事實）。**最後更新** 2026-09-23（v2：補 watchdog／deploy smoke／env 表／安全邊界／故障模式／決策紀錄／操作手冊／分期 DoD／登記項）。
+> **建立** 2026-09-23（整併 09-21 plan／progress 兩份 + 實作事實）。**最後更新** 2026-09-23（v2.2：§7 步 1–3 + D1 執行結果；§10 變更紀錄）。
 > 路徑：`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`DB` = `lobster-factory/packages/db`；`RENDERER` = `lobster-factory/infra/hetzner-phase1-core/apps/renderer`；`INFRA` = `lobster-factory/infra/hetzner-phase1-core`。
 
 ## 0. 現況（每次改動更新此段）
 | 項 | 狀態（2026-09-23） |
 |---|---|
-| Slice 1 程式 | ~70% 已 commit `deab0f709`（2026-09-21）：DB migration + harness、renderer `/snapshot`、next-admin `lib/site-watch/*` + 6 個 route、Telegram 三態送達 |
-| Slice 1 已驗 | harness 綠（apply／down／re-apply）；renderer `npm test` 16/16；next-admin `npx tsc --noEmit` 綠；RPC `p_*` 參數名 vs 0091 簽名 16/16 一致（手動比對） |
-| Slice 1 未做 | §7 步 1–10 全部：renderer 實測、RPC 契約測試、watchdog（含 schema 補欄）、Trigger task + env + deploy smoke、UI 卡、單元測試、playwright-runner 檔頭、RUNNABLE_DEMOS／監控 inventory 登記、四動作 + review、prod |
+| Slice 1 程式 | core `deab0f709`（2026-09-21）+ §7 步 1–3、D1（2026-09-23）：DB migration + harness、renderer `/snapshot`、next-admin `lib/site-watch/*` + 6 個 route、Telegram 三態送達、RPC 契約測試、watchdog |
+| Slice 1 已驗 | 步 1 renderer 真瀏覽器實測（§5 #14）；步 2 `rpc-contract.test.ts` 3/3（突變紅）；步 3 harness 綠（含 owed_since／heartbeat 斷言，突變紅）＋ watchdog 12 種判定以假時戳實證 ＋ 對 prod 實跑 ⚪ NOT_DEPLOYED；renderer `npm test` 16/16；next-admin `npx tsc --noEmit` 綠 |
+| Slice 1 未做 | §7 步 4–10：Trigger task + env + deploy smoke、UI 卡、單元測試、playwright-runner 檔頭、登記、四動作 + review、prod |
 | Slice 2／P2／P3 | 未開始（§8） |
-| 待決 | D1 visual 告警是否進 Telegram（§6.2） |
+| 待決 | 無（D1 2026-09-23 操作者決定：visual 降 `low`，§6.2） |
 
 ## 1. 目標與分期
 **目標**：客戶網站掛了、JS 壞了、畫面走樣，操作者在上班前收到一則 Telegram；正常時系統零聲音；證據可在客戶頁看到；30 天自動清；一個開關全關；**監控者自己掛了也會被發現**（§7 步 3）。
 
 | 期 | 內容 | 完成定義（缺一不算） | 狀態 |
 |---|---|---|---|
-| **Slice 1** | 每客戶 1 URL（`client_config.site_url` 首頁）、daily（22:00 UTC 桶）、`/snapshot`、pixelmatch、incident（連 2 次）+ Telegram 告警／恢復各 1 則、30 天清理、kill switch、客戶頁設定卡、watchdog | §7 步 10f–g 通過；`check-site-watch-health.ps1` 在 AO-RESUME 出現一次 🟢；RUNNABLE_DEMOS 一列；WORKLOG 四動作 + 非作者模型 review；§0 更新 | 程式 70%，未上線 |
+| **Slice 1** | 每客戶 1 URL（`client_config.site_url` 首頁）、daily（22:00 UTC 桶）、`/snapshot`、pixelmatch、incident（連 2 次）+ Telegram 告警／恢復各 1 則、30 天清理、kill switch、客戶頁設定卡、watchdog | §7 步 10f–g 通過；`check-site-watch-health.ps1` 在 AO-RESUME 出現一次 🟢；RUNNABLE_DEMOS 一列；WORKLOG 四動作 + 非作者模型 review；§0 更新 | 本機 §7 步進行中（見 §0），未上線 |
 | **Slice 2** | 多頁（手填 ≤10／客戶）、hourly／every_6h／update_only、每頁遮罩 selector、總覽表（未開巡檢標黃）、wp-update 前後比對（C11）、OnboardWizard「網站巡檢」＋MainWP 接線、「MainWP 有、系統沒有」安全網清單、容量閘（R6） | ≥1 電商客戶 hourly 多頁跑 7 天，遮罩後 visual 誤報 0；wp-update 真跑一次前後比對；總覽表上線；OnboardWizard 勾選一次真接上 MainWP | 未開始 |
 | **P2** | 登入後流程：另開容器帶憑證（vault）、只連自己與客戶網域 | 一個登入流程真跑；憑證只存 vault、訊息／log 0 洩漏；容器 egress 實測只到白名單 | 未開始 |
 | **P3** | sg-deploy 後瀏覽器 smoke（JS 錯誤 → rollback） | 一次演練：故意注入 pageerror → sg-deploy 自動 rollback 並通知 | 未開始 |
@@ -35,7 +35,7 @@
 
 ## 3. 架構（實作即 SSOT；`file:line` 以 2026-09-23 為準，改程式時同步 §3／§4）
 ### 3.1 資料流
-Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/internal/site-watch/due`（bearer `SITE_WATCH_INGEST_TOKEN`；先寫 heartbeat 時戳（§7 步 3）；kill switch OFF → 空；`site_watch_sync_targets()` 為每個 active org 且 `client_config.site_url` 為 http(s) 建 target，預設 enabled／daily／22；回「到期 ∪ 欠通知」target id）→ 每 target 一個 child task → `POST /api/internal/site-watch/run/<id>` → `NA/lib/site-watch/runner.ts runTarget()` :52：claim lease → retire 不在清單的頁 → 到期則每頁 renew → renderer `/snapshot` → 比對 → `site_watch_record_check` → `site_watch_complete_run` → 通知步驟（`notify.ts runNotifications` :69）→ release。另每小時 `POST /api/internal/site-watch/cleanup`（每 UTC 日實跑一次）。
+Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/internal/site-watch/due`（bearer `SITE_WATCH_INGEST_TOKEN`；先寫 heartbeat 時戳（§7 步 3）；kill switch OFF → 空；`site_watch_sync_targets()` 為每個 active org 且 `client_config.site_url` 為 http(s) 建 target，預設 enabled／daily／22；回「到期 ∪ 欠通知」target id）→ 每 target 一個 child task → `POST /api/internal/site-watch/run/<id>` → `NA/lib/site-watch/runner.ts runTarget()` :52：claim lease → retire 不在清單的頁 → 到期則每頁 renew → renderer `/snapshot` → 比對 → `site_watch_record_check` → `site_watch_complete_run` → 通知步驟（`notify.ts runNotifications` :65）→ release。另每小時 `POST /api/internal/site-watch/cleanup`（每 UTC 日實跑一次）。
 **為何 Trigger 只做薄層**：renderer 只掛 `renderer-net`，只有 next-admin 連得到（`INFRA/docker-compose.yml:522`）。同 collect 模式（`WF/src/trigger/collect-scheduled-crawl.ts` 檔頭）。
 
 ### 3.2 元件
@@ -50,7 +50,7 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 | Routes | `NA/app/api/internal/site-watch/{due,run/[targetId],cleanup}/route.ts`；`NA/app/api/ops/clients/[slug]/site-watch/{route,accept-baseline/route,image/route}.ts` | 內部 = bearer；操作者 = `resolveOpsRole`，寫入需 owner/admin |
 | 排程 | **未寫** `WF/src/trigger/site-watch.ts`（§7 步 4） | heartbeat + per-target child |
 | UI | **未寫** `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（§7 步 5） | 設定卡 |
-| Watchdog | **未寫** `scripts/check-site-watch-health.ps1` → `agency-os/reports/status/site-watch-LATEST.{md,json}`（§7 步 3） | 監控者的監控：照 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 掛進 AO-RESUME |
+| Watchdog | `scripts/check-site-watch-health.ps1` → `agency-os/reports/status/site-watch-LATEST.{md,json}`；`scripts/ao-resume.ps1` capacity 區塊之後呼叫；`TOOL_TRIGGER_MAP.md` 一列 | 監控者的監控（§7 步 3 探針 a–d）；prod 走 SSH ks-aw-01 → `supabase-db` psql（SQL base64 進容器解碼）；`-LocalDbContainer` = 同 SQL 對本機容器（判定實證用） |
 
 ### 3.3 重用（已查證，不建新輪子）
 排程模式 = collect（`NA/app/api/internal/collect/run-due-schedules/route.ts`、`WF/src/lib/collection/postRunDueSchedules.ts`）；incident = `NA/lib/ops-inbox/upsertIncidentAtomic.ts`；瀏覽器 = 既有 renderer 容器（不另開）；儲存 = `r2.ts`；UI 慣例 = `NA/app/(shell)/ops/collect/CollectionSourcesPanel.tsx` `ScheduleControls`；watchdog 慣例 = `scripts/check-backup-health.ps1` 等 5 個 `check-*.ps1`（runbook §2）。既有 e2e `INFRA/tests/e2e/client/wp-site-health.spec.ts` 保留為手動工具，不搬進 prod。
@@ -88,11 +88,11 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 - **C4 執行時限**：一 target 一次 route 呼叫（`run/[targetId]` `maxDuration=300`），heartbeat 不在 route 內迴圈客戶。
 - **C5 renderer `/snapshot`**：獨立 route，不套 `/render` 的 `SKIPPED_RESOURCE_TYPES`（否則畫面殘缺）；egress 同 `/render`。回 `{ok, status, finalUrl（去 query）, failureCode, detail, consoleErrors[], pageErrors[], screenshotBase64, screenshotBytes, screenshotSkipped, timingMs}`；failureCode ∈ `timeout|http_4xx|http_5xx|dns|connect|blocked|navigation`（null = 站點正常）；console 只收 error 級 + pageerror，各 ≤20 條 ≤300 字；`too_large`／截圖失敗 ≠ 站點失敗 → `screenshotSkipped`。renderer 對 `url_*` 回 400 → next-admin 視為站點 `blocked`（網址設定錯）。renderer 掛掉／逾時 = 監控自身故障（`RendererUnavailable`）：不記 result、不算 streak、run 不 complete、同桶下次重試、Trigger run 標紅 + Sentry。
 - **C6 比對**（`diff.ts`）：首次成功即建基準；pixelmatch threshold 0.1；差異像素（含高度差列）> 5% = visual 失敗；寬度不同 = ratio 1（capture 變了，提示重建基準）。基準只在操作者按「接受為新基準」時換（`site_watch_accept_baseline`，只歸零 visual streak）。每頁遮罩 selector = Slice 2。
-- **C7 資料**：專用表 `site_watch_targets`（設定 + lease + `last_completed_run_key/_bucket_start` + `version`）、`site_watch_results`（一行一次）、`site_watch_page_state`（PK `(target_id, page_id, kind)`，kind ∈ `availability|visual`；`failure_streak/episode_id/alert_state/recovery_state/recovery_reason/incident_id/baseline_*`）、`site_watch_maintenance`（單例：cleanup 日期 + heartbeat 時戳，§7 步 3）。**不寫** `organizations.metadata.client_config`（read-merge-write 會互蓋）。設定更新 = `site_watch_update_config` 帶 `version` 樂觀鎖、記 actor、任何改動 streak 歸零、關閉 → 開著的 episode 以 `disabled` 結束。`ops_incidents_source_check` 加 `site_watch`（基底 0073 值）；`IncidentSource` 型別同步。RLS：service_role only。org 刪除 → 4 表 CASCADE；R2 物件由 C9 orphan sweep 收。
+- **C7 資料**：專用表 `site_watch_targets`（設定 + lease + `last_completed_run_key/_bucket_start` + `version`）、`site_watch_results`（一行一次）、`site_watch_page_state`（PK `(target_id, page_id, kind)`，kind ∈ `availability|visual`；`failure_streak/episode_id/alert_state/recovery_state/recovery_reason/incident_id/baseline_*/owed_since`；`owed_since` = 欠訊息起算時間，CHECK `site_watch_owed_since_iff_owed` 綁「非空 ⇔ 有欠訊息」，失敗重送不重設、不確定告警轉恢復時沿用）、`site_watch_maintenance`（單例：cleanup 日期 + `last_heartbeat_at`／`last_enabled_heartbeat_at`，由 `site_watch_touch_heartbeat(p_enabled)` 在 `due` 的 kill-switch 判斷**前**寫）。**不寫** `organizations.metadata.client_config`（read-merge-write 會互蓋）。設定更新 = `site_watch_update_config` 帶 `version` 樂觀鎖、記 actor、任何改動 streak 歸零、關閉 → 開著的 episode 以 `disabled` 結束。`ops_incidents_source_check` 加 `site_watch`（基底 0073 值）；`IncidentSource` 型別同步。RLS：service_role only。org 刪除 → 4 表 CASCADE；R2 物件由 C9 orphan sweep 收。
 - **C8 通知**（`notify.ts` + 0091 `site_watch_notify_begin/finish`、`site_watch_resolve_for_recovery`）：dispatcher 對 `source='site_watch'` skip；site-watch 自己用 `TelegramNotifier.sendText`。fingerprint = external_id = `site_watch:<org>:<page_id>:<kind>`（`ops_incidents` 有 UNIQUE(source, external_id) `0013_ops_inbox.sql:54` 與 UNIQUE(fingerprint, environment)）；新 episode 以 `upsertIncidentAtomic(…, isReopen=true)` 重開同一列。狀態機（每 page_state 列）：
   - 巡檢失敗：streak+1；streak ≥2 且無 episode → 新 `episode_id`、`alert_state='pending'`。episode 結束中（recovery 進行）的新失敗只計 streak；結束後 streak 仍 ≥2 → 下一次失敗開新 episode。
   - 巡檢成功：streak=0；有 episode 且 alert ∈ {sent, uncertain} → `recovery_state='pending_resolve'`；alert ∈ {pending, skipped} → 靜默結束（resolve incident、清 episode、0 則）。
-  - 通知步驟（同一 lease，每次 heartbeat）：`pending` → 確保 incident（`incident_id` 空則 upsert + `site_watch_attach_incident`）→ renew，剩餘 ≥ chats×10s+30s 才送（不足 = `deferred`，狀態不變）→ 送前 `uncertain` → 結果 sent→`sent`／4xx→`pending`／其餘保持 `uncertain`（下次重送，最多多 1 則）。Telegram 關閉或低於 min severity → `skipped`（終態，恢復靜默）。可用性 severity=high、visual=medium（D1 待決）。
+  - 通知步驟（同一 lease，每次 heartbeat）：`pending` → 確保 incident（`incident_id` 空則 upsert + `site_watch_attach_incident`）→ renew，剩餘 ≥ chats×10s+30s 才送（不足 = `deferred`，狀態不變）→ 送前 `uncertain` → 結果 sent→`sent`／4xx→`pending`／其餘保持 `uncertain`（下次重送，最多多 1 則）。Telegram 關閉或低於 min severity → `skipped`（終態，恢復靜默）。Severity 單一來源 `config.ts severityFor(kind)`（incident 列與 Telegram 門檻共讀，不會分歧）：可用性 `high`、visual `low`（D1）→ 預設 min `medium` 下 visual 只開 incident、Telegram `skipped`。
   - 恢復：`pending_resolve` → `UPDATE ops_incidents SET status='resolved', resolved_by='site_watch' WHERE id=? AND status NOT IN ('resolved','ignored')`：1 行 → `pending_send`；0 行（操作者已手動結案）→ 清 episode、0 則。`pending_send` → 送恢復訊息（同三態），只有 `sent` 才清 episode。
 - **C9 清理**（`cleanup.ts`；每 UTC 日一次 `site_watch_claim_daily_cleanup`）：刪 `site_watch_results` >30 天；R2 key `site-watch/<org>/<page_id>/baseline.jpg`（單 key 覆寫）與 `.../evidence/<ts>-<rand>.jpg`／`-diff.jpg`；掃 prefix 刪 DB 未引用且 >24h 的 orphan（含無 live baseline 的 baseline.jpg）；`lastModified` 未知不刪；刪失敗明天再掃，無重試佇列。不受 kill switch 影響（保留期承諾）。
 - **C10 kill switch**：env `SITE_WATCH_ENABLED`（預設 OFF，AGENTS.md §0 慣例；prod 改動走 `safe-infra-patch.sh`）。`due` 回空；runner 每頁開跑前檢查，進行中的頁跑完即停；通知步驟也停。target rows 預設 `enabled=true`（操作者決策）。renderer 資源沿用 compose 現值。
@@ -130,9 +130,9 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 | 10 | Telegram 4xx 三次後成功 | 第 4 次才送、總 1 則；期間站恢復 → 0 則 | ✅ harness（rejected→pending→silent） |
 | 11 | Telegram 卡住／5xx | 10s abort → `uncertain`；期間恢復仍送 1 則恢復；4xx → `pending`、恢復 0 則；租期不足 → 不發、狀態不變 | ✅ harness（uncertain 路徑）；⬜ vitest telegram/notify（abort、deferred） |
 | 12 | 連續 3 天無 heartbeat | 只跑 1 次、`skipped_buckets=2`、同桶不再跑 | ⬜ vitest runKey |
-| 13 | RPC 參數名 vs 0091 簽名 | 全部相等 | ✅ 手動 16/16；⬜ vitest rpc-contract（§7 步 2） |
-| 14 | `/snapshot` 真實頁 | example.com → `failureCode:null` + JPEG；404 → `http_4xx`；不存在網域 → `dns`；`/render` 未退化 | ⬜ §7 步 1；⬜ sg-deploy smoke（§7 步 4） |
-| 15 | 監控者掛了 | heartbeat 停 >2h → watchdog 🟡；>6h → 🔴；開啟中但 26h 無 result → 🟡；通知卡 pending/uncertain >3h → 🟡 | ⬜ §7 步 3（假資料驗四種）；⬜ prod：AO-RESUME 出現一次 🟢 |
+| 13 | RPC 參數名 vs 0091 簽名 | 全部相等 | ✅ vitest `rpc-contract.test.ts`（真呼叫經 JSON 往返取鍵 + 掃描所有呼叫點；改一個鍵名／漏測一個呼叫點 → 指名測試紅） |
+| 14 | `/snapshot` 真實頁 | example.com → `failureCode:null` + JPEG；404 → `http_4xx`；不存在網域 → `dns`；`/render` 未退化 | ✅ §7 步 1（2026-09-23：example.com 200 JPEG `FFD8FF` 17.5KB 看圖正確；`/nope` 404 `http_4xx`；`.invalid` `dns` 且 finalUrl 空；`10.0.0.1` 400 `url_private_address`；`10.0.0.1.nip.io`（rebinding）URL 檢查放行、iptables 丟包 → `timeout`；wikipedia 200 105KB；`/render` 200；錯 secret 401）；⬜ sg-deploy smoke（§7 步 4） |
+| 15 | 監控者掛了 | heartbeat >2h 🟡、>6h 或從未 🔴；開啟中且某 target 超過週期+2h 未完成 🟡；欠訊息 `owed_since` >3h 🟡；已部署但缺 0091 🔴；未部署 ⚪ `NOT_DEPLOYED`；探測失敗 = 盲點 🟡 | ✅ §7 步 3（本機真 Postgres + 假時戳 12 種判定全過；對 prod 實跑 ⚪）；⬜ prod：AO-RESUME 出現一次 🟢 |
 標準：任何路徑都不出現「有告警、無恢復」；允許最多 1 則重複。
 
 ## 6. 風險、故障模式、待決
@@ -141,16 +141,16 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 |---|---|---|
 | Trigger.dev（heartbeat 不打） | 什麼都不跑；欠的通知延後 | watchdog：heartbeat 時戳 >2h 🟡／>6h 🔴（§7 步 3）；Trigger 自身在 Uptime Kuma |
 | next-admin down | heartbeat 打不到 → Trigger run 紅 + Sentry | Uptime Kuma（既有）+ watchdog |
-| renderer down／逾時 | `RendererUnavailable`：不記 result、不算 streak、run 不 complete、同桶下次重試；Trigger run 紅 | Sentry；watchdog「開啟中 26h 無 result」🟡；sg-deploy smoke（部署當下） |
+| renderer down／逾時 | `RendererUnavailable`：不記 result、不算 streak、run 不 complete、同桶下次重試；Trigger run 紅 | Sentry；watchdog b（該 target 超過週期 +2h 未完成）🟡；sg-deploy smoke（部署當下） |
 | DB down | route 5xx → Trigger run 紅；無狀態寫入 = 無誤報 | Sentry；watchdog heartbeat 停（due 寫不進） |
 | R2 down | put 失敗 → `visual='skipped'`／evidence 無圖；availability 照常；cleanup 跳過物件 | `[site-watch]` warn log；卡片顯示 skipped 原因 |
-| Telegram down（5xx／逾時） | `uncertain` → 下次 heartbeat 重送；incident 已開 | 卡片顯示 alert_state；watchdog「通知卡 >3h」🟡 |
-| Telegram 4xx（token／chat 錯） | `pending` 永遠重試不送出 | watchdog「通知卡 >3h」🟡；ops-inbox 既有 Telegram 也會壞 |
+| Telegram down（5xx／逾時） | `uncertain` → 下次 heartbeat 重送；incident 已開 | 卡片顯示 alert_state；watchdog c（`owed_since` >3h）🟡 |
+| Telegram 4xx（token／chat 錯） | `pending` 永遠重試不送出 | watchdog c（`owed_since` >3h）🟡；ops-inbox 既有 Telegram 也會壞 |
 | 客戶站慢／半殘 | timeout／http_5xx → 正常告警路徑 | Telegram（連 2 次） |
 | 操作者填錯 site_url（私網／非 http） | renderer 400 `url_*` → `blocked` 告警 | Telegram（訊息含「請檢查客戶網址設定」） |
 
 ### 6.2 風險與待決
-- **D1（操作者決定）**：Slice 1 visual 告警現況會送 Telegram（`notify.ts severityOf()` visual=medium ≥ 預設 min `medium`）。WP 站輪播／日期等每天可能 >5% → 噪音。建議 Slice 1 visual 降 `low`（改 `messages.ts incidentDraft` + `notify.ts severityOf` 兩處）→ 只開 incident、Telegram `skipped`；Slice 2 加遮罩後升回 `medium`。未回覆 = 照現況。
+- **D1（已決 2026-09-23，操作者）**：Slice 1 visual 降 `low`——WP 站輪播／日期等每天可能 >5%，進 Telegram 即噪音。實作 = `config.ts severityFor()` 單一來源（原本 `messages.ts`／`notify.ts` 各寫一份，會分歧）→ visual 只開 incident（ops-inbox + 卡片可見）、Telegram `skipped`、恢復靜默。Slice 2 加遮罩後升回 `medium`（改 `severityFor` 一處）。
 - R1 Telegram at-least-once：最多 1 則重複（已接受）。
 - R2 lease window 下限 300s = run route `maxDuration`；route 被砍時最長延遲 = window + 1h（已接受）。
 - R3 `IncidentSource` 型別本就缺 `collection`（`NA/lib/collect/report-store.ts:169` 繞過型別）——既有漂移；補時同步 `policy.ts` catalog。
@@ -165,12 +165,12 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 ## 7. 下一步（Slice 1 收尾；順序 = 最大未知先殺 → 監控者先有人看 → 最短路徑到 prod → 補測試）
 步驟 1–9 本機 Low/Medium 直接做；步驟 10 每一子項 High、逐項等操作者 go-ahead。review 由**非作者模型**做（Claude 寫 → `/codex-review`；Codex 寫 → `/claude-review`）。每步完成更新 §0。
 
-1. **renderer 真實測試（~10 分鐘）**：`cd RENDERER && docker build -t sw-renderer-test .`；`docker run --rm --cap-add NET_ADMIN --cap-add NET_RAW --cap-add SETUID --cap-add SETGID --cap-add SETPCAP -e RENDERER_SHARED_SECRET=t -p 127.0.0.1:3999:3000 sw-renderer-test`；`curl -s -X POST localhost:3999/snapshot -H 'x-renderer-secret: t' -H 'content-type: application/json' -d '{"url":"https://example.com"}'` → `failureCode:null`、`screenshotBytes>0`、base64 解出檔頭 `FF D8`（**打開看圖**）；`https://example.com/nope` → `http_4xx`；`https://no-such-host-xyz.invalid` → `dns`；再打 `/render` 確認未退化。不符 → 先修 `server.mjs snapshot()`。
-2. **RPC 契約測試** `NA/lib/site-watch/__tests__/rpc-contract.test.ts`：解析 0091 每個 `CREATE OR REPLACE FUNCTION public.site_watch_*(…)` 的 `p_*` 集合，對照 `store.ts`／`console.ts`／`cleanup.ts` 每個 `rpc("site_watch_*", {…})` 的 key 集合（`stateArgs()` 展開 p_target／p_gen／p_page／p_kind／p_episode）必須相等且函式存在。守 PGRST202 類（參數名錯 = runtime 才炸；WORKLOG 0055 兩週停擺前例）。
-3. **Watchdog（監控者的監控；prod 未套 0091，直接改 0091 不開 0092）**：
-   - 0091：`site_watch_maintenance` 加 `last_heartbeat_at timestamptz`、`last_enabled_heartbeat_at timestamptz`；新函式 `site_watch_touch_heartbeat(p_enabled boolean)`（寫前者；`p_enabled` 時同寫後者）；grants 迴圈自動涵蓋；harness 加斷言；down 不需改（DROP TABLE）。
-   - `due/route.ts`：驗 token 後、kill-switch 判斷**前**呼叫 `site_watch_touch_heartbeat(siteWatchEnabled())`（heartbeat 活著 ≠ 系統開著，兩個訊號分開）。`store.ts` 加對應方法；步 2 契約測試自動涵蓋。
-   - `scripts/check-site-watch-health.ps1`（照 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` §2 三步，含「量機制不量上次事故」addendum）四個探針：a `last_heartbeat_at` 年齡 >2h 🟡／>6h 🔴（Trigger→next-admin→DB 鏈活著）；b `last_enabled_heartbeat_at` <2h 且存在 enabled+active target 但 `max(site_watch_results.created_at)` >26h → 🟡（執行者／renderer 死）；c `site_watch_page_state` 中 `alert_state IN ('pending','uncertain')` 或 `recovery_state <> 'none'` 且 `updated_at` >3h 的列數 >0 → 🟡（通知機制卡住）；d 0091 未套用（表不存在）→ 🔴 且訊息「migration 未套」。輸出 `agency-os/reports/status/site-watch-LATEST.{md,json}`；接進 `scripts/ao-resume.ps1` 現有 check 清單（`check-backup-health` :565、`check-ci-health` :653 同段）；憑證取法照既有 `check-*.ps1`。以假資料（改時戳）驗四種顏色各出現一次。
+1. ✅ **renderer 真實測試**（2026-09-23，結果 §5 #14）：`cd RENDERER && docker build -t sw-renderer-test .`；`docker network create sw-test-net`；`docker run --rm --network sw-test-net --cap-add NET_ADMIN --cap-add NET_RAW --cap-add SETUID --cap-add SETGID --cap-add SETPCAP -e RENDERER_SHARED_SECRET=t -p 127.0.0.1:3999:3000 sw-renderer-test`；`curl -s -X POST localhost:3999/snapshot -H 'x-renderer-secret: t' -H 'content-type: application/json' -d '{"url":"https://example.com"}'` → `failureCode:null`、`screenshotBytes>0`、base64 解出檔頭 `FF D8`（**打開看圖**）；`/nope` → `http_4xx`；`https://no-such-host-xyz.invalid` → `dns`；再打 `/render`。**`--network` 不可省**：預設 bridge 的 DNS 是宿主的（Docker Desktop = `192.168.65.7`），落在 renderer 自己 egress 規則 DROP 的 192.168/16 → 每個站都 `dns`（實測）；user-defined network 用 Docker 內建 DNS `127.0.0.11`（規則放行），prod `renderer-net` 即此型。順修：沒載入的頁 `finalUrl` 原回 `about://blank` 並寫進 DB → `lib.mjs publicUrlOnly` 只認 http(s)，其餘回空字串（有單元測試）。
+2. ✅ **RPC 契約測試** `NA/lib/site-watch/__tests__/rpc-contract.test.ts`（2026-09-23；實作比原設計強：鍵名取自真呼叫經 JSON 往返 = 實際上線的 payload，另掃描所有 `rpc("site_watch_*"` 呼叫點須被測到）：解析 0091 每個 `CREATE OR REPLACE FUNCTION public.site_watch_*(…)` 的 `p_*` 集合，對照 `store.ts`／`console.ts`／`cleanup.ts` 每個 `rpc("site_watch_*", {…})` 的 key 集合（`stateArgs()` 展開 p_target／p_gen／p_page／p_kind／p_episode）必須相等且函式存在。守 PGRST202 類（參數名錯 = runtime 才炸；WORKLOG 0055 兩週停擺前例）。
+3. ✅ **Watchdog（監控者的監控）**（2026-09-23；prod 未套 0091，直接改 0091 不開 0092）：
+   - 0091：`site_watch_maintenance` 加 `last_heartbeat_at`／`last_enabled_heartbeat_at` + `site_watch_touch_heartbeat(p_enabled)`；`site_watch_page_state` 加 `owed_since` + CHECK（C7）。harness 斷言含「失敗重送不重設 owed 時鐘」（把時戳撥回 5h 再驗，同交易 `now()` 恆等所以必須這樣證）。
+   - `due/route.ts`：驗 token 後、kill-switch 判斷**前** `store.touchHeartbeat(siteWatchEnabled())`；契約測試涵蓋。
+   - `scripts/check-site-watch-health.ps1` 四探針（相對原設計兩處修正，都是「原定義對它要抓的故障恆綠」）：a heartbeat >2h 🟡、>6h 或從未 🔴；b 開關開著（enabled heartbeat <2h）時**逐 target** 看 `coalesce(last_completed_bucket_start, created_at)` 超過週期 +2h（hourly 3h／6h 8h／daily 26h）→ 🟡——原「全域最新 result >26h」看不到「單一 target 的頁面每次弄垮 renderer、其餘 target 正常」；c 開關開著時 `owed_since` >3h → 🟡——原 `updated_at` 每次送信失敗都被改寫，Telegram 4xx／5xx 無限重試時恆新鮮；d 未套 0091：以未帶 token 的 `POST /api/internal/site-watch/due` 判部署（401 = 已部署 → 🔴；404 = 未部署 → ⚪ `NOT_DEPLOYED`，exit 0，避免上線前每次 AO-RESUME 常駐紅燈）。探測失敗／解析不到 = 盲點 🟡。本機真 Postgres + 假時戳 12 種判定全過（其中一次抓到 `greatest(0, NULL)=0` 讓「從未 heartbeat」讀成「剛剛」的 bug，已修）；對 prod 實跑 ⚪。三個坑已補進 `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` 2026-09-23 addendum。
 4. **Trigger.dev + env + deploy smoke（prod 價值路徑）**：
    - `WF/src/lib/siteWatch/post.ts`（仿 `src/lib/collection/postRunDueSchedules.ts`；env `SITE_WATCH_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`；POST due／run/<id>／cleanup；測試仿 `postRunDueSchedules.test.ts`）。
    - `WF/src/trigger/site-watch.ts`：`schedules.task` id `site-watch-heartbeat` cron `5 * * * *` → post due → `siteWatchRun.batchTrigger(ids.map(targetId => ({ payload: { targetId } })))` → post cleanup；`task` id `site-watch-run`、`retry: { maxAttempts: 1 }`、**`queue: { concurrencyLimit: 2 }`**（renderer snapshot 併發 1、queue 上限 20、client 逾時 150s：不限流時 N>20 個 child 同時打 → 多數 503 busy 或 client 先斷、renderer 卻繼續截沒人等的圖 → 浪費算力 + 每小時 N 則 Sentry；限流後 child 排隊在 Trigger 端，零浪費）、`result.status === "renderer_unavailable"` 時 throw；仿 `collect-scheduled-crawl.ts` 的 `captureWorkflowException`；`src/trigger/index.ts` export。
@@ -180,7 +180,7 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 5. **UI 卡** `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（"use client"），插入 `ClientHubTabs.tsx` `MaintenanceTab`（:747）最上方；**不要**寫進 2896 行的 ClientHubTabs；樣式沿用 `Card` :181、`ChipBtn` :235。GET/PATCH `/api/ops/clients/<slug>/site-watch`；PATCH `{expectedVersion（target null 時 0）, enabled, frequency, hourUtc}`，409 → 重新 GET 提示「別人剛改過」。
    - 5a 最小（所有來自 DB 的字串當純文字，R8）：`globallyEnabled=false` 黃條「SITE_WATCH_ENABLED 未開，目前不會巡檢」；`storageConfigured=false` 提示；開關 checkbox；頻率 chips；時間 input（UTC，旁註台北 +8）；每頁 availability／visual 的 streak／alert_state／recovery_state；最近 10 筆文字列（時間、HTTP、failureCode 中文、JS 錯誤數）。failureCode 中文 map 從 `messages.ts` 移到無 import 的 `lib/site-watch/labels.ts` 供 server/client 共用。
    - 5b 證據：`evidence_key`／`diff_key` → `<img src="/api/ops/clients/<slug>/site-watch/image?result=<id>&which=evidence|diff">`；visual episode 開著 → 「接受為新基準」POST `accept-baseline {pageId}`。
-6. **單元測試** `NA/lib/site-watch/__tests__/`（vitest，仿 `NA/lib/collect/__tests__/`）。優先：`runKey`（矩陣 #7、#12 + key 格式）、`notify`（fake store：notifier null→skipped；renew 不足→deferred 且不 begin；begin false→stale；rejected→finish('rejected')；closed_by_operator→不送）、`runner`（fake deps：矩陣 #5；RendererUnavailable→不 record/complete；fenced→lease_lost 且 release 仍呼叫；正常→complete 1 次）。其次：`telegram`（`NA/lib/ops-inbox/notify/__tests__/`：mock fetch 200/400/500/abort；combineDeliveries 三組合）、`pages`、`diff`（sharp 合成 100×100：相同 0、半張反色 ≈0.5、高度差計入）、`cleanup`（>30d orphan 刪；被引用不刪；live baseline 不刪；lastModified null 不刪；claim false 不動）。跑 `cd NA && npx vitest run lib/site-watch lib/ops-inbox/notify`，再全套（基準 1462 pass／13 skip）。突變證據：0091 `site_watch__apply` `>= 2`→`>= 3` → harness 紅；`notify.ts:61` 拿掉 deferred → 指名測試紅；皆還原。
+6. **單元測試** `NA/lib/site-watch/__tests__/`（vitest，仿 `NA/lib/collect/__tests__/`）。優先：`runKey`（矩陣 #7、#12 + key 格式）、`notify`（fake store：notifier null→skipped；renew 不足→deferred 且不 begin；begin false→stale；rejected→finish('rejected')；closed_by_operator→不送）、`runner`（fake deps：矩陣 #5；RendererUnavailable→不 record/complete；fenced→lease_lost 且 release 仍呼叫；正常→complete 1 次）。其次：`telegram`（`NA/lib/ops-inbox/notify/__tests__/`：mock fetch 200/400/500/abort；combineDeliveries 三組合）、`pages`、`diff`（sharp 合成 100×100：相同 0、半張反色 ≈0.5、高度差計入）、`cleanup`（>30d orphan 刪；被引用不刪；live baseline 不刪；lastModified null 不刪；claim false 不動）。跑 `cd NA && npx vitest run lib/site-watch lib/ops-inbox/notify`，再全套（基準 1462 pass／13 skip）。突變證據：0091 `site_watch__apply` `>= 2`→`>= 3` → harness 紅；`notify.ts:57` 拿掉 deferred → 指名測試紅；皆還原。
 7. `scripts/playwright-runner.ps1:8` `Also called post-deploy by sg-deploy hooks (Mode=smoke only)` 為假 → 改「Called only by the /playwright skill」。
 8. **登記**：`agency-os/docs/operations/RUNNABLE_DEMOS.md` 加一列（指令 = 步 1 的 docker build/run/curl + `bash DB/scripts/site-watch-local-verify.sh`；你會看到什麼；誠實範圍 = 尚未 prod 時寫明）；`agency-os/docs/operations/MONITORING_SYSTEMS_INVENTORY.md` 加「site-watch」段：分工 = Uptime Kuma 管**我們自家**服務的 public reachability，site-watch 管**客戶網站**的渲染後健康（可用性 + JS + 視覺），資料在 `site_watch_*`，watchdog `site-watch-LATEST.md`。
 9. **四動作 + WORKLOG + commit**：`npx tsc --noEmit`、`npx vitest run`、harness、renderer `npm test`、watchdog 假資料四色；review artifact 落 `agency-os/reports/oracle/`；BUGHUNT grep `sendTelegram|TelegramNotifier|buildOperatorTelegramNotifier|IncidentSource|ops_incidents_source_check|putDesignObject|deleteDesignObject|SITE_WATCH_|site_watch_touch_heartbeat` scope `agency-os,scripts,lobster-factory`；WORKLOG 四行機械證據（AGENTS.md §1）。commit 被 verify gate 擋 → `/verify-recent` 或 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/verify-clear.ps1`。
@@ -208,23 +208,24 @@ Trigger.dev 每小時 heartbeat（**未寫**，§7 步 4）→ `POST /api/intern
 - **P3 部署後 smoke**：sg-deploy 後對 app.aware-wave.com 關鍵頁 `/snapshot`，pageErrors >0 → 觸發 rollback；掛在 `sg-deploy.sh` 步 7 smoke 段（步 4 的 `/snapshot` smoke 是它的雛形）。
 
 ## 9. 回滾
-`SITE_WATCH_ENABLED=false`（立即停，0 renderer 呼叫）→ Trigger 停 `site-watch-heartbeat` → `git revert` → `DB/scripts/0091_site_watch_down.sql`（會刪 source='site_watch' 的 incidents）。renderer `/render` 與 collect 路徑不受影響（`withContext` 重構有 renderer test + §7 步 1 實測 + 部署 smoke）。watchdog 在系統關閉時：探針 a 仍 🟢（heartbeat 照打）、b 不觸發（無 enabled heartbeat）。
+`SITE_WATCH_ENABLED=false`（立即停，0 renderer 呼叫）→ Trigger 停 `site-watch-heartbeat` → `git revert` → `DB/scripts/0091_site_watch_down.sql`（會刪 source='site_watch' 的 incidents）。renderer `/render` 與 collect 路徑不受影響（`withContext` 重構有 renderer test + §7 步 1 實測 + 部署 smoke）。watchdog 在系統關閉時：探針 a 仍 🟢（heartbeat 照打）、b／c 為 SKIP（無 enabled heartbeat；欠的訊息顯示為「暫停」）。
 
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本；`0091_site_watch.sql` 檔頭 = I1–I3 鏡像 + 指回本檔；`TASKS.md §I` 一列 = 進度指針；WORKLOG = 過程；`agency-os/reports/oracle/2026-09-21-review-*.md` = 09-21 四輪 Codex 對舊 plan 的審查（歷史）；`RUNNABLE_DEMOS.md`／`MONITORING_SYSTEMS_INVENTORY.md` = 登記（§7 步 8）。
 - **維護規則**：改 `lib/site-watch/*`／0091／renderer `/snapshot` 的 commit 必同步本檔 §3（元件表）與 §4（合約）；`:line` 只在 §3.2／§3.4／§7 出現，其餘以符號名引用；每完成 §7 一步更新 §0；D1 決定後改 §4.2 C8 + §6.2。
 - 2026-09-21：`handoffs/2026-09-21-site-watch-plan.md`（設計 + 4 輪 Codex 修訂）、`handoffs/2026-09-21-site-watch-slice1-progress.md`（進度 + 13 項偏差）——已廢止，可自 commit `80b7897e6` 取回。
-- 2026-09-23：`handoffs/2026-09-23-1116-site-watch-slice1.md`（合規 packet）——已併入本檔並刪除，可自 `76a0a2e3f` 取回。操作者要求「一份完整的」→ 本檔 v1（`67e4db98d`）。同日 v2：補 §1 完成定義、§3.4 env 表、§3.5 安全邊界、§4.3 決策紀錄、§5 #15、§6.1 故障模式、R6 容量、§7 步 3 watchdog／步 4 deploy smoke／步 8 登記、§11 操作手冊。同日 v2.1（設計層對抗審查）：步 4 `concurrencyLimit: 2`（fan-out > renderer queue 會 503／浪費算力）、步 10f 金絲雀放量、R7 備份邊界、R8 XSS 面、§11 ignored 語意、§8 軟開關候選 + abort-on-disconnect。
+- 2026-09-23：`handoffs/2026-09-23-1116-site-watch-slice1.md`（合規 packet）——已併入本檔並刪除，可自 `76a0a2e3f` 取回。操作者要求「一份完整的」→ 本檔 v1（`67e4db98d`）。同日 v2：補 §1 完成定義、§3.4 env 表、§3.5 安全邊界、§4.3 決策紀錄、§5 #15、§6.1 故障模式、R6 容量、§7 步 3 watchdog／步 4 deploy smoke／步 8 登記、§11 操作手冊。同日 v2.1（設計層對抗審查）：步 4 `concurrencyLimit: 2`（fan-out > renderer queue 會 503／浪費算力）、步 10f 金絲雀放量、R7 備份邊界、R8 XSS 面、§11 ignored 語意、§8 軟開關候選 + abort-on-disconnect。同日 v2.2（執行 §7 步 1–3 + D1）：步 1 指令補 `--network`（預設 bridge 的宿主 DNS 被 renderer 自己的 egress 規則擋，本機每站 `dns`）+ `finalUrl` 只認 http(s)；D1 severity 收斂成 `config.ts severityFor` 單一來源；步 3 探針 b 改逐 target、c 改 `owed_since`（原 `updated_at` 對 Telegram 4xx／5xx 恆綠）、d 加部署判別（⚪ `NOT_DEPLOYED`）；0091 加 `owed_since` + CHECK、heartbeat 兩欄 + `site_watch_touch_heartbeat`；§11 加「多客戶同時同因告警 = 疑監控端」。
 
 ## 11. 操作手冊（收到訊息怎麼辦）
 | 訊息 | 意思 | 動作 |
 |---|---|---|
 | 🔴 網站打不開 — <客戶> | 首頁連續 2 個桶失敗（原因在訊息第 3 行） | 開客戶頁卡片看 failureCode／HTTP／截圖；`dns`／`connect` 先查客戶 DNS／憑證；`http_5xx` 查客戶主機；`blocked` = 你填的網址有問題，改 `site_url`；處理完**不用**手動結案，恢復時自動 resolve + 發恢復訊息；想靜音就在 ops-inbox 結案（之後恢復 0 則） |
-| 🟡 網站畫面大幅變動 — <客戶> | 與基準圖差異 >5% 連續 2 個桶 | 開卡片比對 evidence 與 diff 圖；是預期改版 → 按「接受為新基準」（streak 歸零，下一桶 match 即自動結束 episode）；是真壞 → 同上處理 |
+| （Slice 1 不發 Telegram，D1）ops-inbox 出現 low 級「網站畫面大幅變動」incident | 與基準圖差異 >5% 連續 2 個桶 | 開卡片比對 evidence 與 diff 圖；是預期改版 → 按「接受為新基準」（streak 歸零，下一桶 match 即自動結束 episode）；是真壞 → 同上處理 |
 | ✅ 已恢復 | episode 結束 | 不用動 |
 | （在 ops-inbox 把 site-watch incident 標 ignored） | 只靜音**這一次** episode；下一次連 2 敗會重開同一張 incident（`upsert_incident_atomic` 對 resolved／ignored 同等重開，0056） | 永久不想看某客戶 → 卡片開關關掉，不是 ignored |
 | ⏹ 巡檢已關閉／頁面已移出 | 你關了開關或改了網址，未結的告警在此收尾 | 不用動 |
-| AO-RESUME `site-watch` 🟡／🔴 | 監控者自己出問題（§6.1） | 🔴 heartbeat 停：看 Trigger dashboard `site-watch-heartbeat` 最近 run；🟡 無 result：看 Trigger `site-watch-run` 紅 run 的錯誤（多半 renderer）；🟡 通知卡：查 Telegram token／chat id（ops-inbox 既有告警多半也壞了） |
+| AO-RESUME `site-watch` 🟡／🔴 | 監控者自己出問題（§6.1） | a 🔴 heartbeat 停或從未：看 Trigger dashboard `site-watch-heartbeat` 最近 run；b 🟡 target 逾期：看 Trigger `site-watch-run` 紅 run 的錯誤（多半 renderer，報告列出客戶 slug）；c 🟡 欠訊息 >3h：查 Telegram token／chat id（ops-inbox 既有告警多半也壞了）；d 🔴 已部署缺 0091：步 10b；⚪ `NOT_DEPLOYED` = 尚未上線，不用動 |
+| 同一時間很多客戶同一原因告警 | 多半是**監控端**壞（renderer egress／DNS），不是客戶全掛 | 先 `docker logs lobster-renderer --tail 50`、`docker exec lobster-renderer iptables -L OUTPUT -n`；確認後 `SITE_WATCH_ENABLED=false` 止血（§9） |
 | 想暫停某客戶 | — | 卡片開關關掉（開著的告警會收到 ⏹ 結束訊息） |
 | 想全部暫停 | — | `SITE_WATCH_ENABLED=false` 走 `safe-infra-patch.sh`（§9） |
 | 想馬上跑一次 | — | Trigger dashboard 手動 trigger `site-watch-heartbeat`（只跑到期的；daily 目標同桶不重跑） |

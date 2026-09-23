@@ -1,4 +1,15 @@
-// Site-watch knobs. C-numbers below refer to the glossary in packages/db/migrations/0091_site_watch.sql.
+// Site-watch knobs. C-numbers refer to agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md §4.
+import type { IncidentSeverity } from "@/lib/ops-inbox/types";
+
+/**
+ * C8 severity per check kind — the ONE source for both the incident row and the Telegram gate
+ * (meetsMinSeverity), so the two can never disagree. Visual is `low` (operator D1, 2026-09-23): below
+ * the default OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY `medium`, a visual episode opens an incident and
+ * records its Telegram as `skipped`. Raise to `medium` when slice 2 adds per-page mask selectors.
+ */
+export function severityFor(kind: "availability" | "visual"): IncidentSeverity {
+  return kind === "availability" ? "high" : "low";
+}
 
 /** C10 global kill switch. Default OFF (AGENTS.md §0): unset/anything else = no renderer call at all. */
 export function siteWatchEnabled(env: NodeJS.ProcessEnv = process.env): boolean {

@@ -144,4 +144,8 @@ test("error lists are capped in count and length", () => {
 test("reported URLs drop query and fragment (tokens live there)", () => {
   assert.equal(publicUrlOnly("https://a.example.com/shop?session=abc#top"), "https://a.example.com/shop");
   assert.equal(publicUrlOnly("not a url"), "");
+  // A navigation that never left the blank page reported "about://blank", which was stored as the
+  // result's final URL and shown on the client card as if it were an address.
+  assert.equal(publicUrlOnly("about:blank"), "");
+  assert.equal(publicUrlOnly("chrome-error://chromewebdata/"), "");
 });

@@ -31,6 +31,7 @@ If the check needs to run continuously / on alerts → use Sentry/netdata/uptime
 | VPS auto-reboot config | [`scripts/check-vps-auto-reboot-health.ps1`](../scripts/check-vps-auto-reboot-health.ps1) | `agency-os/reports/status/auto-reboot-LATEST.md` |
 | ClickHouse self-telemetry + merge health | [`scripts/check-clickhouse-health.ps1`](../scripts/check-clickhouse-health.ps1) | `agency-os/reports/status/clickhouse-LATEST.md` |
 | CI health (GitHub Actions on main) | [`scripts/check-ci-health.ps1`](../scripts/check-ci-health.ps1) | `agency-os/reports/status/ci-LATEST.md` |
+| site-watch watchdog (monitor of the client-site monitor; prod DB via SSH) | [`scripts/check-site-watch-health.ps1`](../scripts/check-site-watch-health.ps1) | `agency-os/reports/status/site-watch-LATEST.md` |
 
 All of them follow the same shape. New checks must follow it too.
 
@@ -61,6 +62,21 @@ Two related traps found the same day, both worth copying into a new check:
 - **Name what you actually measured.** The first version of that probe counted a
   server-wide error code and reported it as "merges are failing" — true during the incident,
   false in general, and it would have sent the next reader down the wrong path.
+
+### 2026-09-23 addendum — three traps from the site-watch watchdog (each would have shipped green)
+
+- **An age probe must not read a column the failure itself rewrites.** "Stuck for > 3h" measured on
+  `updated_at` stays fresh while a send is retried and fails every hour — the probe is green for
+  exactly the faults it names. Store *since when* the work has been owed (`owed_since`) and bind it
+  with a schema CHECK so every state transition keeps it honest.
+- **`greatest(0, x)` in PostgreSQL ignores NULL.** `greatest(0, now() - never)` = 0 = "just now": a
+  scheduler that never ran reads healthy. Pass NULL through as `none`; clamp in the script. Prove
+  "never" with a test case, not by reasoning.
+- **No expected-permanent red.** Wiring a check before its system ships makes it red at every
+  AO-RESUME until rollout, which trains the reader to skip it. Detect "not deployed" separately (a
+  cheap, read-only deployment signal, e.g. the route answers 401 vs 404) and report it neutral.
+- Verify every verdict against a real DB with fake timestamps and **delete the previous report
+  before each case** — a run that crashes before writing is otherwise graded on the last one.
 
 ### Step 1 — Write `scripts/check-<thing>.ps1`
 

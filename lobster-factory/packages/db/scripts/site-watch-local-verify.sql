@@ -1,5 +1,5 @@
 -- Behavioural assertions for 0091 (site-watch). Run by site-watch-local-verify.sh against a throwaway
--- Postgres. Each block maps to a row of the plan's acceptance matrix (handoff §8) at the DB layer.
+-- Postgres. Each block maps to a row of the acceptance matrix (SITE_WATCH_MASTER_PLAN.md §5) at the DB layer.
 SET plpgsql.check_asserts = on;
 
 -- fixtures
@@ -34,6 +34,15 @@ BEGIN
   RETURN public.site_watch_notify_finish(pg_temp.tid(), p_gen, s.page_id, s.kind, s.episode_id, p_phase, p_outcome);
 END $$;
 
+-- owed_since age, in hours. now() is constant inside one transaction, so "kept" vs "reset to now()"
+-- is only observable after moving the stamp back by hand.
+CREATE FUNCTION pg_temp.owed_h(p_kind text) RETURNS numeric LANGUAGE sql AS
+  $$ SELECT round(extract(epoch FROM now() - owed_since) / 3600) FROM public.site_watch_page_state
+      WHERE page_id = 'aaaaaaaaaaaaaaaa' AND kind = p_kind $$;
+CREATE FUNCTION pg_temp.age_owed(p_kind text) RETURNS void LANGUAGE sql AS
+  $$ UPDATE public.site_watch_page_state SET owed_since = owed_since - interval '5 hours'
+      WHERE page_id = 'aaaaaaaaaaaaaaaa' AND kind = p_kind $$;
+
 DO $$
 DECLARE g bigint; g2 bigint; s public.site_watch_page_state; ep uuid; r text; n int;
 BEGIN
@@ -65,6 +74,7 @@ BEGIN
   PERFORM pg_temp.chk(g2, 'k2', false);
   s := pg_temp.st('availability');
   ASSERT s.failure_streak = 2 AND s.episode_id IS NOT NULL AND s.alert_state = 'pending', 'two failures open an episode';
+  ASSERT pg_temp.owed_h('availability') = 0, 'an opened episode owes its alert from now';
   ep := s.episode_id;
   PERFORM pg_temp.chk(g2, 'k3', false); PERFORM pg_temp.chk(g2, 'k4', false);
   PERFORM pg_temp.chk(g2, 'k5', false); PERFORM pg_temp.chk(g2, 'k6', false);
@@ -72,23 +82,28 @@ BEGIN
   ASSERT s.failure_streak = 6 AND s.episode_id = ep, 'six failures: still the same single episode';
 
   -- alert rejected (4xx) returns to pending; then sent
+  PERFORM pg_temp.age_owed('availability');
   ASSERT pg_temp.send(g2, 'alert', 'rejected');
   ASSERT (pg_temp.st('availability')).alert_state = 'pending', 'rejected alert goes back to pending';
+  ASSERT pg_temp.owed_h('availability') = 5, 'a failed send must not restart the owed clock (watchdog would go blind)';
   ASSERT pg_temp.send(g2, 'alert', 'sent');
   ASSERT (pg_temp.st('availability')).alert_state = 'sent';
+  ASSERT (pg_temp.st('availability')).owed_since IS NULL, 'a sent alert owes nothing';
   ASSERT (SELECT count(*) FROM public.ops_incidents) = 1, 'one incident per episode';
 
   -- recovery: success → pending_resolve → resolve incident → pending_send → sent → cleared
   PERFORM pg_temp.chk(g2, 'k7', true);
   s := pg_temp.st('availability');
   ASSERT s.failure_streak = 0 AND s.recovery_state = 'pending_resolve' AND s.recovery_reason = 'recovered';
+  ASSERT pg_temp.owed_h('availability') = 0, 'after a sent alert, the close is owed from now';
   ASSERT public.site_watch_resolve_for_recovery(pg_temp.tid(), g2, s.page_id, s.kind, s.episode_id) = 'pending_send';
   ASSERT (SELECT status FROM public.ops_incidents WHERE id = s.incident_id) = 'resolved', 'incident resolved by site_watch';
   ASSERT pg_temp.send(g2, 'recovery', 'uncertain');
   ASSERT (pg_temp.st('availability')).recovery_state = 'uncertain', 'uncertain recovery stays owed';
   ASSERT pg_temp.send(g2, 'recovery', 'sent');
   s := pg_temp.st('availability');
-  ASSERT s.episode_id IS NULL AND s.alert_state = 'none' AND s.incident_id IS NULL, 'recovery sent closes the episode';
+  ASSERT s.episode_id IS NULL AND s.alert_state = 'none' AND s.incident_id IS NULL AND s.owed_since IS NULL,
+    'recovery sent closes the episode';
 
   -- new episode after recovery gets a new id
   PERFORM pg_temp.chk(g2, 'k8', false); PERFORM pg_temp.chk(g2, 'k9', false);
@@ -106,8 +121,10 @@ BEGIN
   PERFORM pg_temp.chk(g2, 'k11', false); PERFORM pg_temp.chk(g2, 'k12', false);
   ASSERT pg_temp.send(g2, 'alert', 'uncertain');
   ASSERT (pg_temp.st('availability')).alert_state = 'uncertain';
+  PERFORM pg_temp.age_owed('availability');
   PERFORM pg_temp.chk(g2, 'k13', true);
   ASSERT (pg_temp.st('availability')).recovery_state = 'pending_resolve', 'uncertain alert must get a recovery';
+  ASSERT pg_temp.owed_h('availability') = 5, 'the close inherits the uncertain alert''s owed age';
 
   -- operator resolved the incident by hand before we did → episode ends with no message
   s := pg_temp.st('availability');
@@ -198,6 +215,14 @@ BEGIN
     RAISE EXCEPTION 'CHECK did not fire';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
+
+  -- watchdog heartbeat: "chain alive" and "switched on" are separate stamps
+  ASSERT (SELECT last_heartbeat_at IS NULL AND last_enabled_heartbeat_at IS NULL FROM public.site_watch_maintenance);
+  PERFORM public.site_watch_touch_heartbeat(false);
+  ASSERT (SELECT last_heartbeat_at IS NOT NULL AND last_enabled_heartbeat_at IS NULL FROM public.site_watch_maintenance),
+    'a heartbeat with the kill switch off stamps liveness only';
+  PERFORM public.site_watch_touch_heartbeat(true);
+  ASSERT (SELECT last_enabled_heartbeat_at IS NOT NULL FROM public.site_watch_maintenance), 'an enabled heartbeat stamps both';
 
   -- cleanup: once per day; results older than 30 days purged
   ASSERT public.site_watch_claim_daily_cleanup();

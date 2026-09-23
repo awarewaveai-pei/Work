@@ -1,6 +1,6 @@
 // POST /api/internal/site-watch/run/<targetId> — one target, one lease (lib/site-watch/runner.ts).
 // Called by one Trigger.dev child task per target, so no route invocation ever loops over clients
-// (handoff §8 C4). Always 200 with the run status; the caller decides what counts as a failed run.
+// (MASTER PLAN §4.2 C4). Always 200 with the run status; the caller decides what counts as a failed run.
 
 import { NextResponse } from "next/server";
 import { runTarget } from "@/lib/site-watch/runner";

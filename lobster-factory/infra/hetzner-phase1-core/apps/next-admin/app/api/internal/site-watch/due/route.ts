@@ -1,7 +1,9 @@
 // POST /api/internal/site-watch/due — the hourly heartbeat's first call (packages/workflows/src/
-// trigger/site-watch.ts). Syncs targets (every active org with a site_url), then returns the targets
-// that are due now OR owe a notification (I2). A hint only: each run re-checks under its own lease.
-// Kill switch off (SITE_WATCH_ENABLED) = empty list, nothing synced, nothing run.
+// trigger/site-watch.ts). Stamps the watchdog heartbeat, syncs targets (every active org with a
+// site_url), then returns the targets that are due now OR owe a notification (I2). A hint only: each
+// run re-checks under its own lease.
+// Kill switch off (SITE_WATCH_ENABLED) = empty list, nothing synced, nothing run — but the heartbeat is
+// stamped FIRST, so scripts/check-site-watch-health.ps1 can tell "switched off" from "scheduler dead".
 
 import { NextResponse } from "next/server";
 import { siteWatchEnabled } from "@/lib/site-watch/config";
@@ -13,9 +15,12 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   if (!verifySiteWatchToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  if (!siteWatchEnabled()) return NextResponse.json({ ok: true, enabled: false, synced: 0, targets: [] });
   const deps = productionDeps();
   if (!deps) return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 503 });
+
+  const enabled = siteWatchEnabled();
+  await deps.store.touchHeartbeat(enabled);
+  if (!enabled) return NextResponse.json({ ok: true, enabled: false, synced: 0, targets: [] });
 
   const now = deps.now();
   const synced = await deps.store.syncTargets();

@@ -696,6 +696,31 @@ if (Test-Path -LiteralPath $capacityHealthScript) {
     $global:LASTEXITCODE = 0
 }
 
+# --- site-watch watchdog (warn-only; the client-site monitor's own monitor) ---
+# Rationale: site-watch (agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md) is silent when every
+# client site is fine -- and exactly as silent when site-watch itself is dead. This check reads the
+# mechanism (heartbeat stamps, per-target overdue runs, notifications owed > 3h) so a dead monitor
+# surfaces here instead of looking like good news. Writes reports/status/site-watch-LATEST.md.
+# Same stale-report guard as capacity: a crash must not leave an old verdict standing.
+$siteWatchHealthScript = Join-Path $WorkRoot "scripts\check-site-watch-health.ps1"
+if (Test-Path -LiteralPath $siteWatchHealthScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: site-watch watchdog (warn-only) ==" -ForegroundColor Cyan
+    $swReport = Join-Path $WorkRoot "agency-os\reports\status\site-watch-LATEST.json"
+    $swBefore = if (Test-Path -LiteralPath $swReport) { (Get-Item -LiteralPath $swReport).LastWriteTimeUtc } else { [datetime]::MinValue }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $siteWatchHealthScript -WorkRoot $WorkRoot
+    $swExit = $LASTEXITCODE
+    $swAfter = if (Test-Path -LiteralPath $swReport) { (Get-Item -LiteralPath $swReport).LastWriteTimeUtc } else { [datetime]::MinValue }
+    if ($swAfter -le $swBefore) {
+        Write-Host "FAIL: site-watch watchdog wrote NO report - the file on disk is STALE; do not report its verdict." -ForegroundColor Red
+    } elseif ($swExit -ge 2) {
+        Write-Host "FAIL: site-watch watchdog reports RED (see agency-os/reports/status/site-watch-LATEST.md)." -ForegroundColor Red
+    } elseif ($swExit -eq 1) {
+        Write-Host "WARN: site-watch watchdog reports YELLOW or a blind spot (see agency-os/reports/status/site-watch-LATEST.md)." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
 # --- Claude routine output freshness (warn-only; surfaces silent routine failure at startup) ---
 # Rationale: a cloud routine whose source drifts / auth lapses / gets disabled stops landing
 # its report — and the operator should learn this at AO-RESUME (when they can act), not only

@@ -45,6 +45,8 @@ export interface PageStateRow {
   incident_id: string | null;
   baseline_set_at: string | null;
   baseline_sha256: string | null;
+  /** Set exactly while a message is owed (0091 CHECK site_watch_owed_since_iff_owed). */
+  owed_since: string | null;
   updated_at: string;
 }
 
@@ -73,6 +75,8 @@ export interface CheckRecord {
 }
 
 export interface SiteWatchStore {
+  /** Watchdog stamp; every heartbeat, before the kill-switch check (enabled = switch state). */
+  touchHeartbeat(enabled: boolean): Promise<void>;
   syncTargets(): Promise<number>;
   listSchedulable(): Promise<TargetRow[]>;
   pendingNotificationTargets(): Promise<string[]>;
@@ -111,6 +115,10 @@ export function createSupabaseStore(sb: SupabaseClient): SiteWatchStore {
   });
 
   return {
+    async touchHeartbeat(enabled) {
+      await rpc<null>("site_watch_touch_heartbeat", { p_enabled: enabled });
+    },
+
     syncTargets: () => rpc<number>("site_watch_sync_targets", {}),
 
     async listSchedulable() {

@@ -125,7 +125,7 @@ export function clampTimeout(value, { min = 5_000, max = 45_000, fallback = 30_0
 }
 
 /**
- * /snapshot failure codes (site-watch C5; glossary in packages/db/migrations/0091_site_watch.sql). About the SITE,
+ * /snapshot failure codes (site-watch C5, agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md §4). About the SITE,
  * not about us: a page that loads fine but is too big to screenshot is not a failure (see
  * SNAPSHOT_SKIP), and a renderer crash surfaces as an HTTP error, not as one of these.
  */
@@ -159,11 +159,14 @@ export function pushCapped(list, text, max = 20, len = 300) {
 
 /**
  * The URL a snapshot reports back: no query string or fragment. Query strings are where tracking
- * and session tokens live, and this value is stored and shown in the ops console (C12).
+ * and session tokens live, and this value is stored and shown in the ops console (C12). Only an
+ * http(s) address is an address: a page that never loaded is still on about:blank (or a Chromium
+ * error page), which is reported as "" rather than as a URL.
  */
 export function publicUrlOnly(raw) {
   try {
     const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
     return `${u.protocol}//${u.host}${u.pathname}`;
   } catch {
     return "";

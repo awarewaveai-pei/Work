@@ -2,7 +2,7 @@
 // transition, three-state delivery. Runs inside the target's lease; every state write is fenced.
 import type { IncidentSeverity } from "@/lib/ops-inbox/types";
 import { TELEGRAM_SEND_TIMEOUT_MS, type TelegramDelivery } from "@/lib/ops-inbox/notify/telegram";
-import { minLeaseForSend } from "./config";
+import { minLeaseForSend, severityFor } from "./config";
 import { alertText, incidentDraft, recoveryText } from "./messages";
 import type { NotifyOutcome, NotifyPhase, OrgRef, PageStateRow, SiteWatchStore } from "./store";
 
@@ -41,17 +41,13 @@ export function needsNotification(s: PageStateRow): boolean {
   return (s.recovery_state === "none" && (s.alert_state === "pending" || s.alert_state === "uncertain")) || s.recovery_state !== "none";
 }
 
-function severityOf(s: PageStateRow): IncidentSeverity {
-  return s.kind === "availability" ? "high" : "medium";
-}
-
 /**
  * One owed message. The state goes to 'uncertain' BEFORE the request leaves, so a crash mid-send is
  * retried as "may have been delivered" (I2); a send starts only while the lease outlives its timeouts.
  */
 async function deliver(ctx: NotifyContext, s: PageStateRow, phase: NotifyPhase, text: string): Promise<NotifyStepResult["outcome"]> {
   const { store, notifier, targetId, gen } = ctx;
-  if (!notifier || !notifier.meetsMinSeverity(severityOf(s))) {
+  if (!notifier || !notifier.meetsMinSeverity(severityFor(s.kind))) {
     if (!(await store.notifyBegin(targetId, gen, s, phase))) return "stale";
     await store.notifyFinish(targetId, gen, s, phase, "skipped");
     return "skipped";

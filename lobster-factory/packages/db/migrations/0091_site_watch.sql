@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS public.site_watch_results (
 CREATE INDEX IF NOT EXISTS site_watch_results_created_at_idx ON public.site_watch_results (created_at);
 CREATE INDEX IF NOT EXISTS site_watch_results_target_created_idx ON public.site_watch_results (target_id, created_at DESC);
 
--- Alert state machine per (page, kind). Invariants of plan §8 I2/I3 are CHECKs, not conventions.
+-- Alert state machine per (page, kind). Invariants I2/I3 (header; plan §4.1) are CHECKs, not conventions.
 CREATE TABLE IF NOT EXISTS public.site_watch_page_state (
   target_id         uuid        NOT NULL REFERENCES public.site_watch_targets(id) ON DELETE CASCADE,
   page_id           text        NOT NULL CHECK (page_id ~ '^[0-9a-f]{16}$'),
@@ -93,17 +93,26 @@ CREATE TABLE IF NOT EXISTS public.site_watch_page_state (
   incident_id       uuid        REFERENCES public.ops_incidents(id) ON DELETE SET NULL,
   baseline_set_at   timestamptz,
   baseline_sha256   text,
+  -- Since when a message has been owed on this row. The watchdog's "notification stuck" probe reads
+  -- this; updated_at cannot answer it, because every failed send attempt rewrites updated_at.
+  owed_since        timestamptz,
   updated_at        timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (target_id, page_id, kind),
   CONSTRAINT site_watch_episode_iff_alert CHECK ((episode_id IS NULL) = (alert_state = 'none')),
   CONSTRAINT site_watch_recovery_needs_episode CHECK (recovery_state = 'none' OR episode_id IS NOT NULL),
-  CONSTRAINT site_watch_recovery_reason_iff CHECK ((recovery_state = 'none') = (recovery_reason IS NULL))
+  CONSTRAINT site_watch_recovery_reason_iff CHECK ((recovery_state = 'none') = (recovery_reason IS NULL)),
+  CONSTRAINT site_watch_owed_since_iff_owed CHECK (
+    (owed_since IS NOT NULL) = (recovery_state <> 'none' OR alert_state IN ('pending','uncertain')))
 );
 
--- Singleton: the UTC day the daily cleanup last ran (claimed atomically, C9).
+-- Singleton: the UTC day the daily cleanup last ran (claimed atomically, C9), and the watchdog's two
+-- heartbeat stamps (scripts/check-site-watch-health.ps1). Two stamps because "Trigger → next-admin →
+-- DB is alive" and "the kill switch is on" are different facts.
 CREATE TABLE IF NOT EXISTS public.site_watch_maintenance (
-  id               int  PRIMARY KEY CHECK (id = 1),
-  last_cleanup_day date
+  id                        int  PRIMARY KEY CHECK (id = 1),
+  last_cleanup_day          date,
+  last_heartbeat_at         timestamptz,
+  last_enabled_heartbeat_at timestamptz
 );
 INSERT INTO public.site_watch_maintenance (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
@@ -142,7 +151,7 @@ CREATE OR REPLACE FUNCTION public.site_watch__clear_episode(p_target uuid, p_pag
 RETURNS void LANGUAGE sql AS $$
   UPDATE public.site_watch_page_state
      SET episode_id = NULL, alert_state = 'none', recovery_state = 'none', recovery_reason = NULL,
-         incident_id = NULL, updated_at = now()
+         incident_id = NULL, owed_since = NULL, updated_at = now()
    WHERE target_id = p_target AND page_id = p_page AND kind = p_kind;
 $$;
 
@@ -157,8 +166,10 @@ BEGIN
   IF NOT FOUND OR s.episode_id IS NULL OR s.recovery_state <> 'none' THEN RETURN; END IF;
 
   IF s.alert_state IN ('sent','uncertain') THEN
+    -- An uncertain alert was already owed; the close inherits its age rather than restarting it.
     UPDATE public.site_watch_page_state
-       SET recovery_state = 'pending_resolve', recovery_reason = p_reason, updated_at = now()
+       SET recovery_state = 'pending_resolve', recovery_reason = p_reason,
+           owed_since = coalesce(owed_since, now()), updated_at = now()
      WHERE target_id = p_target AND page_id = p_page AND kind = p_kind;
   ELSE
     IF s.incident_id IS NOT NULL THEN
@@ -184,7 +195,8 @@ BEGIN
     IF s.episode_id IS NULL AND s.failure_streak + 1 >= 2 THEN
       UPDATE public.site_watch_page_state
          SET failure_streak = s.failure_streak + 1, last_failure_code = p_code, last_message = p_message,
-             episode_id = gen_random_uuid(), alert_state = 'pending', incident_id = NULL, updated_at = now()
+             episode_id = gen_random_uuid(), alert_state = 'pending', incident_id = NULL,
+             owed_since = now(), updated_at = now()
        WHERE target_id = p_target AND page_id = p_page AND kind = p_kind;
     ELSE
       UPDATE public.site_watch_page_state
@@ -357,6 +369,7 @@ BEGIN
   IF p_phase = 'alert' THEN
     UPDATE public.site_watch_page_state
        SET alert_state = CASE p_outcome WHEN 'sent' THEN 'sent' WHEN 'skipped' THEN 'skipped' ELSE 'pending' END,
+           owed_since = CASE WHEN p_outcome IN ('sent','skipped') THEN NULL ELSE owed_since END,
            updated_at = now()
      WHERE target_id = p_target AND page_id = p_page AND kind = p_kind AND episode_id = p_episode
        AND recovery_state = 'none' AND alert_state = 'uncertain';
@@ -472,6 +485,16 @@ BEGIN
    WHERE target_id = p_target AND page_id = p_page AND kind = 'visual';
   RETURN FOUND;
 END $$;
+
+-- Every heartbeat (/api/internal/site-watch/due), BEFORE its kill-switch check: the watchdog must see
+-- the scheduler chain alive even while the system is switched off.
+CREATE OR REPLACE FUNCTION public.site_watch_touch_heartbeat(p_enabled boolean) RETURNS void
+LANGUAGE sql AS $$
+  UPDATE public.site_watch_maintenance
+     SET last_heartbeat_at = now(),
+         last_enabled_heartbeat_at = CASE WHEN p_enabled THEN now() ELSE last_enabled_heartbeat_at END
+   WHERE id = 1;
+$$;
 
 -- At most once per UTC day (C9).
 CREATE OR REPLACE FUNCTION public.site_watch_claim_daily_cleanup() RETURNS boolean

@@ -47,7 +47,7 @@ if (!SECRET) {
   process.exit(1);
 }
 
-// /snapshot (site-watch C5; glossary in packages/db/migrations/0091_site_watch.sql). Fixed server-side, not
+// /snapshot (site-watch C5, agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md §4). Fixed server-side, not
 // caller-controlled: a monitoring check is only comparable run to run if every run is taken the same way.
 const SNAPSHOT_VIEWPORT = { width: 1366, height: 900 };
 const SNAPSHOT_MAX_HEIGHT = 8_000;
