@@ -3,123 +3,230 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>冰山分析示意稿</title>
+<title>冰山模型分析結果</title>
 <style>
-  :root{--bg:#f6f7f9;--card:#fff;--ink:#1b1f24;--muted:#5b6470;--line:#e3e6ea;--accent:#1f5fbf;--ok:#1a7f4b;--warn:#b25e09;--bad:#b3261e;--deep:#0b2a4a;--mid:#245b8a;--shallow:#5a93c4;--surface:#9fc3e0;--tag:#eef3fb}
+  :root{--bg:#f4f6f9;--card:#fff;--ink:#14213d;--muted:#5b6470;--line:#e1e5ea;--accent:#1f5fbf;--ok:#1a7f4b;--warn:#b25e09;
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--tag:#eef3fb}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
-  .wrap{max-width:980px;margin:0 auto;padding:16px}
-  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:10px 14px;border-radius:8px;font-size:14px;margin-bottom:14px}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px}
+  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
-  h2{font-size:16px;margin:0 0 10px;letter-spacing:.02em}
+  h2{font-size:17px;margin:0 0 10px}
+  h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
+  .lead{font-size:16px;margin:10px 0 6px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  @media (max-width:760px){.steps{grid-template-columns:1fr}}
+  .step{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:14px}
+  .step b{display:block;color:var(--accent);margin-bottom:2px}
   .chips span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0}
-  .grid{display:grid;grid-template-columns:1.1fr 1fr;gap:14px}
-  @media (max-width:760px){.grid{grid-template-columns:1fr}}
-  .layer{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:8px;margin-bottom:6px;color:#fff}
-  .layer b{font-size:13px;opacity:.9}
-  .layer p{margin:0;font-size:14px}
-  .l1{background:var(--surface);color:var(--ink)}.l2{background:var(--shallow)}.l3{background:var(--mid)}.l4{background:var(--deep)}
-  .water{border-top:2px dashed #7aa7cc;margin:6px 0;position:relative}
-  .water::after{content:"水面：以下是看不到、但真正決定結果的部分";position:absolute;right:0;top:-10px;background:var(--card);padding:0 6px;font-size:12px;color:var(--muted)}
-  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 12px;background:#fafbfd;border-radius:0 8px 8px 0}
-  .finding b{display:block;margin-bottom:2px}
-  .finding.warn{border-color:var(--warn)}
+  svg{width:100%;height:auto;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  /* layer cards: identical skeleton */
+  .layer{border-left:6px solid var(--l2);padding-left:14px}
+  .layer.l1{border-color:var(--l1)}.layer.l2{border-color:var(--l2)}.layer.l3{border-color:var(--l3)}.layer.l4{border-color:var(--l4)}
+  .layer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:8px}
+  .layer .meta{font-size:12px;color:var(--muted)}
+  .row{display:grid;grid-template-columns:96px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+  .row b{color:var(--muted);font-weight:600;font-size:13px}
+  .row .q{color:var(--ink)}
   cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
-  table{width:100%;border-collapse:collapse;font-size:14px}
+  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:#fff;margin-left:6px}
+  .lever.low{background:#9ca3af}.lever.mid{background:#5a93c4}.lever.high{background:#245b8a}.lever.max{background:#0b2a4a}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
-  th{font-size:12px;color:var(--muted);font-weight:600}
-  .lv{white-space:nowrap;font-weight:600}
+  th{font-size:12px;color:var(--muted);font-weight:600;background:#fafbfd}
+  td:first-child{white-space:nowrap;font-weight:600}
+  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 10px;background:#fafbfd;border-radius:0 8px 8px 0;font-size:14px}
+  .finding b{display:block}
+  .finding.warn{border-color:var(--warn)}
   .btns{display:flex;flex-wrap:wrap;gap:8px}
   .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:14px;cursor:default}
   .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
   .btn.ghost{color:var(--muted)}
-  .meta{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
-  .meta b{color:var(--ink)}
-  .ok{color:var(--ok)} .gap{color:var(--warn)}
+  .btn small{display:block;font-size:11px;color:inherit;opacity:.8}
   ol.src{padding-left:20px;font-size:14px}
-  ol.src li{margin-bottom:4px}
-  .expert{color:var(--muted);font-size:13px}
+  .meta-bar{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+  .meta-bar b{color:var(--ink)}
+  .ok{color:var(--ok)}
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
   pre{background:#0f172a;color:#d6e2f0;font-size:12px;padding:12px;border-radius:8px;overflow:auto}
+  dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <div class="banner"><b>示意稿</b>：這是「執行並驗證」按下去之後<b>應該</b>出現的畫面。目前系統沒有這一層（只回閘門表＋JSON）。內容依你填的四格推出，未連網、未抓外部來源；數字只為示意。</div>
+  <div class="banner"><b>示意稿</b>：這是「執行」按下去之後的目標畫面，用你填的四段話做的。目前系統還沒有這一頁。數字只為示意。</div>
 
+  <!-- 0. 這是什麼、怎麼讀 -->
   <div class="card">
     <h1>冰山模型分析：客服滿意度從 85 掉到 62</h1>
-    <div class="sub">專案「客服品質」・方法：冰山模型（Iceberg Model）・輸入：你填的 4 段陳述・產出時間 2026-09-23</div>
-    <div class="chips" style="margin-top:8px"><span>系統思考</span><span>根因</span><span>4 層皆填</span><span>閘門 3/3 通過</span></div>
-  </div>
-
-  <div class="grid">
-    <div class="card">
-      <h2>冰山圖：症狀在上，槓桿在下</h2>
-      <div class="layer l1"><b>事件<br>看得到</b><p>本季滿意度 85 → 62 <cite>[1]</cite></p></div>
-      <div class="water"></div>
-      <div class="layer l2"><b>模式<br>趨勢</b><p>六個月內每季穩定下滑；新進客服流動率同步上升 <cite>[2]</cite></p></div>
-      <div class="layer l3"><b>結構<br>機制</b><p>上線訓練只有兩天；資深忙緊急案件無法帶人；新人準備不足就獨立接案 <cite>[3]</cite></p></div>
-      <div class="layer l4"><b>心智模型<br>信念</b><p>「客服是成本中心」→ 訓練預算永遠最先被砍 <cite>[4]</cite></p></div>
-    </div>
-
-    <div class="card">
-      <h2>解讀（4 個發現）</h2>
-      <div class="finding"><b>F1 這不是單季意外，是系統性下滑</b>單季掉 23 分是事件 <cite>[1]</cite>；連續六個月每季下滑、且與流動率同步 <cite>[2]</cite>，符合「結構在推」的訊號，救火式處理只會回到原點。</div>
-      <div class="finding"><b>F2 有一條會自我加強的迴路（訓練債）</b>資深忙緊急案件 → 沒空帶新人 → 新人準備不足就接案 → 更多客訴與緊急案件 → 資深更忙 <cite>[3]</cite>。這種迴路不打斷會越轉越快。</div>
-      <div class="finding"><b>F3 最深的槓桿在信念層</b>「成本中心」的定位讓訓練預算優先被砍 <cite>[4]</cite>，等於持續替 F2 的迴路加油。改結構而不改這個信念，預算下一輪還會被砍回去。</div>
-      <div class="finding warn"><b>F4 證據缺口（誠實標記）</b>流動率與滿意度目前只有「同步」<cite>[2]</cite>，沒有因果證據；也沒有每人案件量、首次解決率、離職原因。建議先補這三項再下重手。</div>
+    <div class="sub">方法：冰山模型 Iceberg Model（系統思考 Systems Thinking）・專案「客服品質」・2026-09-23</div>
+    <p class="lead">看得見的只有<b>事件</b>；原因藏在水面下。這個方法把問題由上往下挖四層：<b>事件 → 模式 → 結構 → 心智模型</b>。越深的一層越難改，但改了效果越大、越持久。</p>
+    <div class="steps">
+      <div class="step"><b>① 先看冰山圖</b>你填的四段話各在哪一層；左邊是每一層要回答的問題，右邊是在那一層出手的方式。</div>
+      <div class="step"><b>② 由上往下讀四張卡</b>每張卡同一個格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
+      <div class="step"><b>③ 看總結與下一步</b>最有力的出手點在哪一層、還缺什麼證據、接下來該跑哪個方法。</div>
     </div>
   </div>
 
+  <!-- 1. 冰山圖 -->
   <div class="card">
-    <h2>槓桿點：在哪一層出手，效果差多少</h2>
+    <h2>① 冰山圖：你的問題在四層各是什麼</h2>
+    <svg viewBox="0 0 980 575" role="img" aria-label="冰山模型四層圖">
+      <defs>
+        <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fbe3d6"/><stop offset="0.2" stop-color="#cfe3f3"/><stop offset="0.5" stop-color="#5a93c4"/><stop offset="0.75" stop-color="#245b8a"/><stop offset="1" stop-color="#0b2a4a"/>
+        </linearGradient>
+        <clipPath id="berg"><path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z"/></clipPath>
+      </defs>
+      <!-- water -->
+      <rect x="0" y="150" width="980" height="425" fill="#dbeafe" opacity="0.55"/>
+      <path d="M0,150 q20,-8 40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0" fill="none" stroke="#7aa7cc" stroke-width="2.5"/>
+      <!-- band separators (align text columns with layers, like the worksheet) -->
+      <line x1="30" y1="290" x2="960" y2="290" stroke="#7aa7cc" stroke-dasharray="5 5"/>
+      <line x1="30" y1="420" x2="960" y2="420" stroke="#7aa7cc" stroke-dasharray="5 5"/>
+      <!-- iceberg -->
+      <path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z" fill="url(#ice)" stroke="#1f3b5c" stroke-width="2"/>
+      <g clip-path="url(#berg)">
+        <line x1="400" y1="290" x2="840" y2="290" stroke="#fff" stroke-dasharray="4 4" opacity=".7"/>
+        <line x1="400" y1="420" x2="840" y2="420" stroke="#fff" stroke-dasharray="4 4" opacity=".7"/>
+      </g>
+      <g font-weight="700" text-anchor="middle">
+        <text x="618" y="128" font-size="17" fill="#14213d">事件 Events</text>
+        <text x="618" y="230" font-size="17" fill="#fff">模式 Patterns</text>
+        <text x="618" y="362" font-size="17" fill="#fff">結構 Structures</text>
+        <text x="618" y="490" font-size="17" fill="#fff">心智模型 Mental Models</text>
+      </g>
+      <!-- visible / hidden -->
+      <text x="30" y="62" font-size="12" fill="#5b6470">看得見 Visible</text>
+      <text x="30" y="172" font-size="12" fill="#5b6470">水面以下：看不見 Hidden</text>
+      <!-- left: question + your input -->
+      <g font-size="14.5" fill="#14213d">
+        <text x="30" y="96" font-weight="700">① 事件｜現在發生了什麼？</text>
+        <text x="30" y="118" font-size="13" fill="#5b6470">滿意度 85 → 62 ［1］</text>
+        <text x="30" y="212" font-weight="700">② 模式｜這段時間的趨勢？事件之間有什麼關聯？</text>
+        <text x="30" y="234" font-size="13" fill="#5b6470">六個月每季下滑；新人流動率同步上升 ［2］</text>
+        <text x="30" y="346" font-weight="700">③ 結構｜什麼流程、制度在製造這個模式？</text>
+        <text x="30" y="368" font-size="13" fill="#5b6470">訓練只有 2 天；資深沒空帶；新人硬上 ［3］</text>
+        <text x="30" y="472" font-weight="700">④ 心智模型｜什麼沒說出口的假設造成這些結構？</text>
+        <text x="30" y="494" font-size="13" fill="#5b6470">「客服是成本中心」→ 訓練預算先砍 ［4］</text>
+      </g>
+      <!-- right: how to intervene at each layer -->
+      <g font-size="14.5" fill="#14213d">
+        <text x="830" y="96" font-weight="700">回應 React</text>
+        <text x="830" y="118" font-size="13" fill="#5b6470">救火、補償 → 短期</text>
+        <text x="830" y="212" font-weight="700">預測 Anticipate</text>
+        <text x="830" y="234" font-size="13" fill="#5b6470">追蹤趨勢 → 提早看到</text>
+        <text x="830" y="346" font-weight="700">設計 Design</text>
+        <text x="830" y="368" font-size="13" fill="#5b6470">改流程、改制度 → 持久</text>
+        <text x="830" y="472" font-weight="700">轉化 Transform</text>
+        <text x="830" y="494" font-size="13" fill="#5b6470">改信念、改定位 → 根本</text>
+        <text x="830" y="560" font-size="12" fill="#1f5fbf">↓ 越往下：越難改，效果越大越持久</text>
+      </g>
+    </svg>
+    <div class="legend"><span>左：這一層要回答的問題＋你填的內容</span><span>中：四層冰山</span><span>右：在這一層出手的方式（介入方式）</span></div>
+  </div>
+
+  <!-- 2. 四層逐層解讀，同一骨架 -->
+  <div class="card">
+    <h2>② 由上往下四層解讀（每張卡同一格式）</h2>
+
+    <div class="layer l1 card" style="margin-bottom:12px">
+      <div class="head"><h3>第 1 層／4：事件 Events</h3><span class="meta">看得見 ・ 時間：現在 ・ 出手方式：回應 React</span></div>
+      <div class="row"><b>這層問</b><span class="q">現在發生了什麼？</span></div>
+      <div class="row"><b>你填的</b><span>本季客服滿意度分數從 85 分掉到 62 分 <cite>[1]</cite></span></div>
+      <div class="row"><b>這代表</b><span>一季掉 23 分是警訊，但事件本身不告訴你原因。只看這一層會做出「趕快救火」的決定。</span></div>
+      <div class="row"><b>在這層出手</b><span>加班處理客訴、補償客戶。<b>效果</b>：短期止血，下一季通常再掉。<span class="lever low">槓桿：低</span></span></div>
+    </div>
+
+    <div class="layer l2 card" style="margin-bottom:12px">
+      <div class="head"><h3>第 2 層／4：模式與趨勢 Patterns &amp; Trends</h3><span class="meta">看不見 ・ 時間：過去到現在 ・ 出手方式：預測 Anticipate</span></div>
+      <div class="row"><b>這層問</b><span class="q">這段時間有什麼趨勢？哪些事件互相關聯？</span></div>
+      <div class="row"><b>你填的</b><span>過去六個月，滿意度每季穩定下滑；新進客服人員的流動率也同步上升 <cite>[2]</cite></span></div>
+      <div class="row"><b>這代表</b><span>連續下滑加上「新人流動率同步上升」，代表這不是單季意外，是系統在推。注意：<dfn title="兩件事一起發生，不等於一件造成另一件">同步不等於因果</dfn>，第 4 段還缺證據。</span></div>
+      <div class="row"><b>在這層出手</b><span>每月把滿意度、流動率、新人佔比放在同一張圖看。<b>效果</b>：下一次下滑提早三個月看到，但不會阻止它。<span class="lever mid">槓桿：中低</span></span></div>
+    </div>
+
+    <div class="layer l3 card" style="margin-bottom:12px">
+      <div class="head"><h3>第 3 層／4：結構與流程 Structures &amp; Processes</h3><span class="meta">看不見 ・ 時間：現在到未來 ・ 出手方式：設計 Design</span></div>
+      <div class="row"><b>這層問</b><span class="q">什麼流程、制度、權力安排在製造上面的模式？</span></div>
+      <div class="row"><b>你填的</b><span>新人上線訓練只有兩天；資深人員忙著處理緊急案件沒空帶新人；新人準備不足就要獨立接案 <cite>[3]</cite></span></div>
+      <div class="row"><b>這代表</b><span>這是一條會自己越轉越快的<dfn title="A 造成 B，B 又回頭讓 A 更嚴重">迴路</dfn>（訓練債迴路）：資深忙緊急案件 → 沒空帶新人 → 新人硬上 → 更多客訴與緊急案件 → 資深更忙。第 2 層的下滑就是這條迴路的輸出。</span></div>
+      <div class="row"><b>在這層出手</b><span>訓練 2 天改 2 週；「帶新人」列入資深人員的排班時數與考核，讓帶人變成被計算的工作。<b>效果</b>：切斷迴路的第一環，持久。<span class="lever high">槓桿：高</span></span></div>
+    </div>
+
+    <div class="layer l4 card" style="margin-bottom:0">
+      <div class="head"><h3>第 4 層／4：心智模型 Mental Models</h3><span class="meta">最深、最看不見 ・ 時間：未來 ・ 出手方式：轉化 Transform</span></div>
+      <div class="row"><b>這層問</b><span class="q">什麼沒說出口的假設、信念、價值觀，造就了上面的結構？</span></div>
+      <div class="row"><b>你填的</b><span>管理層把「客服是成本中心」當成預設假設，訓練預算永遠是最先被砍的項目 <cite>[4]</cite></span></div>
+      <div class="row"><b>這代表</b><span>只要「成本中心」這個信念不變，第 3 層的訓練預算下一輪還會被砍回去，結構改了也守不住。這是整座冰山的底。</span></div>
+      <div class="row"><b>在這層出手</b><span>把客服重新定義為「留客中心」：用留客率、再購率計算訓練的投資報酬，讓預算討論換一套算法。<b>效果</b>：最根本、最持久，但最慢，而且需要管理層點頭。<span class="lever max">槓桿：最高</span></span></div>
+    </div>
+  </div>
+
+  <!-- 3. 總結 -->
+  <div class="card">
+    <h2>③ 總結：在哪一層出手</h2>
+    <div class="finding"><b>主要發現：問題在第 3 層的迴路，根在第 4 層的信念</b>第 1、2 層是症狀。訓練債迴路（第 3 層）製造下滑；「成本中心」信念（第 4 層）讓迴路修不好。</div>
+    <div class="finding"><b>建議順序：先第 3 層，同時準備第 4 層</b>第 3 層見效快、能量化（新人首次解決率、客訴量）；第 4 層拿第 3 層的數字去說服管理層。</div>
+    <div class="finding warn"><b>證據缺口（老實說）</b>流動率與滿意度目前只有「同步」<cite>[2]</cite>，沒有因果證據；也沒有每人案件量、首次解決率、離職原因。建議先補這三項再動預算。</div>
+  </div>
+
+  <!-- 4. 理解層次表 -->
+  <div class="card">
+    <h2>④ 理解層次對照表（改編自 Anderson &amp; Johnson）</h2>
     <table>
-      <tr><th>層</th><th>可做的事</th><th>預期</th><th>依據</th></tr>
-      <tr><td class="lv">事件</td><td>加班救火、補償客戶</td><td>短期止血，下季再掉</td><td><cite>[1]</cite></td></tr>
-      <tr><td class="lv">模式</td><td>每月看滿意度＋流動率＋新人佔比同一張圖</td><td>早三個月看到下一次下滑</td><td><cite>[2]</cite></td></tr>
-      <tr><td class="lv">結構</td><td>上線訓練 2 天 → 2 週；「帶新人」列入資深 KPI 與排班時數</td><td>直接切斷 F2 迴路的第一環</td><td><cite>[3]</cite></td></tr>
-      <tr><td class="lv">心智模型</td><td>把客服改記為「留客中心」：用留客率與再購率算訓練投資報酬</td><td>預算不再被優先砍，結構改動才守得住</td><td><cite>[4]</cite></td></tr>
+      <tr><th>層</th><th>出手方式</th><th>時間取向</th><th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr>
+      <tr><td>事件</td><td>回應 React</td><td>現在</td><td>最快的因應是什麼？</td><td>85 → 62 <cite>[1]</cite></td><td>救火、補償（只當急救）</td></tr>
+      <tr><td>模式</td><td>預測 Anticipate</td><td>過去→現在</td><td>什麼趨勢在反覆出現？</td><td>每季下滑、流動率同步升 <cite>[2]</cite></td><td>三指標同圖每月看</td></tr>
+      <tr><td>結構</td><td>設計 Design</td><td>現在→未來</td><td>什麼制度在製造這些模式？</td><td>訓練 2 天、資深沒空帶 <cite>[3]</cite></td><td>訓練 2 週、帶人入考核</td></tr>
+      <tr><td>心智模型</td><td>轉化 Transform</td><td>未來</td><td>這些制度背後的假設是什麼？</td><td>「成本中心」<cite>[4]</cite></td><td>改為留客中心、換算法</td></tr>
     </table>
+    <p class="sub" style="margin:8px 0 0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>
   </div>
 
-  <div class="grid">
-    <div class="card">
-      <h2>建議下一步（一鍵接著跑）</h2>
-      <div class="btns">
-        <span class="btn primary">因果迴路圖：把 F2 畫出來</span>
-        <span class="btn">五問法：驗證 F3 是否真的是根因</span>
-        <span class="btn">行為隨時間圖：把 F4 缺的數據補上</span>
-      </div>
-      <p class="sub" style="margin:10px 0 0">每一個都會沿用本次的 4 段輸入與引註，不用重填。</p>
-    </div>
-    <div class="card">
-      <h2>引註（每個 [n] 都指向一段可查的來源）</h2>
-      <ol class="src">
-        <li>你的輸入・事件：「本季客服滿意度分數從 85 分掉到 62 分」</li>
-        <li>你的輸入・模式：「過去六個月，滿意度分數每季穩定下滑，新進客服人員的流動率也同步上升」</li>
-        <li>你的輸入・結構：「新人上線訓練只有兩天，資深人員因為忙著處理緊急案件沒空帶新人…」</li>
-        <li>你的輸入・心智模型：「管理層把『客服是成本中心』當成預設假設，訓練預算永遠是最先被砍的項目」</li>
-      </ol>
-      <p class="sub">接了蒐集器之後，這裡會多出外部來源（網址、抓取時間、內容指紋）。</p>
-    </div>
-  </div>
-
+  <!-- 5. 下一步 -->
   <div class="card">
-    <div class="meta">
-      <span>來源標記 <b>AI_INFERENCE / AI_GENERATED</b>（AI 推論，尚未經人核准）</span>
+    <h2>⑤ 下一步：接著跑哪個方法（各自加深哪一層）</h2>
+    <div class="btns">
+      <span class="btn primary">槓桿點分析<small>第 3、4 層：算出每個出手點的力道</small></span>
+      <span class="btn">因果迴路圖<small>第 3 層：把訓練債迴路畫出來</small></span>
+      <span class="btn">行為隨時間圖<small>第 2 層：把三個指標的六個月數據補齊</small></span>
+      <span class="btn">五問法<small>第 4 層：驗證「成本中心」是不是真的根因</small></span>
+    </div>
+    <p class="sub" style="margin:10px 0 0">每一個都會沿用本次的四段輸入與引註，不用重填。第一顆是這個方法本身建議的下一步。</p>
+  </div>
+
+  <!-- 6. 引註 -->
+  <div class="card">
+    <h2>⑥ 引註（每個 [n] 都指向一段可查的來源）</h2>
+    <ol class="src">
+      <li>你的輸入・事件：「本季客服滿意度分數從 85 分掉到 62 分」</li>
+      <li>你的輸入・模式：「過去六個月，滿意度分數每季穩定下滑，新進客服人員的流動率也同步上升」</li>
+      <li>你的輸入・結構：「新人上線訓練只有兩天，資深人員因為忙著處理緊急案件沒空帶新人，導致新人準備不足就要獨立接案」</li>
+      <li>你的輸入・心智模型：「管理層把『客服是成本中心』當成預設假設，訓練預算永遠是最先被砍的項目」</li>
+    </ol>
+    <p class="sub">接上資料蒐集之後，這裡會多出外部來源（網址、抓取時間、內容指紋）。</p>
+  </div>
+
+  <!-- 7. 來源標記與核准 -->
+  <div class="card">
+    <div class="meta-bar">
+      <span>這一頁是 <b>AI 推論，尚未經人核准</b></span>
       <span>模型 <b>claude-sonnet-5</b></span>
       <span>費用 <b>約 6k tokens・≈ NT$1</b></span>
-      <span>閘門 <b class="ok">溯源 ✓</b> <b class="ok">層序 ✓</b> <b class="ok">引註完整 ✓</b></span>
+      <span>檢查 <b class="ok">來源 ✓</b> <b class="ok">層序 ✓</b> <b class="ok">引註完整 ✓</b></span>
     </div>
     <div class="btns" style="margin-top:12px">
       <span class="btn primary">核准，存進專案</span>
       <span class="btn">退回並說原因</span>
       <span class="btn">匯出 PDF</span>
-      <span class="btn ghost">專家模式：看閘門表與 JSON</span>
+      <span class="btn ghost">專家模式：閘門表與 JSON</span>
     </div>
     <details style="margin-top:10px"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
 <pre>{
@@ -128,9 +235,9 @@
   "gate_results": [
     {"gate_id": "provenance_required", "status": "PASS"},
     {"gate_id": "top_down_completeness", "status": "PASS"},
-    {"gate_id": "citation_integrity", "status": "PASS", "evidence": {"claims": 9, "cited": 9, "unsupported": 0}}
+    {"gate_id": "citation_integrity", "status": "PASS", "evidence": {"claims": 12, "cited": 12, "unsupported": 0}}
   ],
-  "interpretation": { "findings": ["F1", "F2", "F3", "F4"], "leverage_points": 4, "next_methods": 3 }
+  "interpretation": {"layers": 4, "findings": 3, "gaps": 1, "next_methods": 4}
 }</pre>
     </details>
   </div>

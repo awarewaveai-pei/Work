@@ -2,12 +2,12 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入）；**同日 v1.2**（品質評分 harness §3.7 + 演化迴圈 §3.8）；**同日 v1.3**（首用 UX §3.9 + D13 前端殼）；**同日 v1.4**（解讀層 §3.10 + PI 期 + §11 接手指南；①–⑥ 全部拍板）；**同日 v1.5**（critic 2C/6M/4m 折入：路由 `/api/` 前綴、web 放 `COS/apps/`、PI 拆 a/b、解讀 202 輪詢＋伺服器重跑閘門、視覺綁定記錄路徑、估工 17d→18d），見 §10。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入）；**同日 v1.2**（品質評分 harness §3.7 + 演化迴圈 §3.8）；**同日 v1.3**（首用 UX §3.9 + D13 前端殼）；**同日 v1.4**（解讀層 §3.10 + PI 期 + §11 接手指南；①–⑥ 全部拍板）；**同日 v1.5**（critic 2C/6M/4m 折入：路由 `/api/` 前綴、web 放 `COS/apps/`、PI 拆 a/b、解讀 202 輪詢＋伺服器重跑閘門、視覺綁定記錄路徑、估工 17d→18d）；**同日 v1.6**（示意稿重做為固定七段骨架、U13／U14、D15：⑦ 與 P0 部署時機由工程師依授權決定），見 §10。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 | 項 | 狀態（2026-09-23） |
 |---|---|
-| 計畫 | v1.5；§9 ①–⑥ 拍板（2026-09-23），⑦（PI 排在 P1 前）待拍板；執行順序 P0 → PI-a → PI-b → P1 → P2 → P3 → P4 → P4b → P-E；**目前：P0 開工**；PI-b／P5／P-P 為 High-STOP（prod 部署） |
+| 計畫 | v1.6；§9 ①–⑧ 全部定案（⑦⑧ 依操作者授權由工程師決定，D15）；執行順序 P0 → PI-a → PI-b → P1 → P2 → P3 → P4 → P4b → P-E；**目前：P0 完成（`19f00f9aa`，未部署，與 PI-b 同窗），PI-a 開工**；PI-b／P5／P-P 為 High-STOP（prod 部署） |
 | 可重用（已查證） | 蒐集引擎 `NA/lib/collect`（41 個非測試 .ts；SSRF／DNS pin／robots／限流／品質／相關性／注入隔離／renderer 階）；COS Project+Source+CAS+events（`repo:22-60`）；Recipe 引擎（journal／resume／gates，`exec:236-250,347-361`）；AI gateway（brief→draft→builder→gates，provenance 強制 `draft.py:195-206`）；`ai.draft_record` capability（`SPEC/capabilities/contracts/ai.draft_record.capability.yaml`）；既有 citation gate `COS/ai_lego/modules/research/gates.py:41-63`；dossier prompt／段落表 `NA/lib/dossier/report.ts:76-139`、引註檢查 `:185-206`；`literature_search` ACTIVE 契約（`SPEC/capabilities/contracts/literature_search.capability.yaml:3`）；portal 身分層（`NA/app/portal/*`）；Trigger.dev 內部呼叫樣板 `WF/src/trigger/collect-scheduled-crawl.ts` + `NA/app/api/internal/collect/run-due-schedules/route.ts:27-32`；handoff code 發放／兌換樣板 `COS/ai_lego/platform/identity/store.py:342-385` |
 | 缺（本計畫要蓋） | **解讀層 §3.10**（現況：方法執行 = builder + gates，無 LLM，`main:758-788`；結果頁 = 閘門表 + JSON，`dashboard.html:1394-1410`；圖表僅 2 方法 `:1320-1345`）；Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；**品質評分 harness（§3.7）**；**演化迴圈（§3.8）**；Postgres／object storage；自然人來源的加密與抹除（P-P） |
 | 演化原語（已存在，§3.8 重用） | `SPEC/recipes/validated/champion-challenger.recipe.yaml`（ACTIVE）；prompt 版本重放與回滾 `COS/ai_lego/platform/ai_execution/{replay,rollback_plan}.py`（`replay.py:34-76` `prompt_version`／`restored_prompt_version`；README:27 v12 升級／回滾 replay 測試）；spec-root golden harness `SPEC/tests/run_golden_tests.py`；`ai_usage` 計量表（`store.py:117,465-468`）；`COS/ai_lego/compute/prediction_tracking/error.py`；Claude 雲端 routine（`/schedule`）；行為即資料（`query-plan.ts:38` ANGLES、`source-class.ts`、`methods/registry/method-form-examples.yaml`） |
@@ -146,6 +146,8 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | U10 | 每步右側「這一步在做什麼／為什麼」由 registry 資料生成（`why_zh`／`method-form-examples.yaml` 慣例），不手寫 HTML | 說明面板 |
 | U11 | 控制項：按鈕／chips／核取方格，**禁原生 `<select>`**；鍵盤可操作；狀態不只靠顏色 | 元件庫 |
 | U12 | zh-TW／en 切換；文案外部化（同 registry） | i18n |
+| U13 | 同一骨架：每個方法的結果頁固定七段（§3.10），首用者第二次就能預測 | 結果頁 |
+| U14 | 頁首「怎麼讀這一頁」三步；術語首次出現附一句白話（`<dfn>`） | 結果頁 |
 
 **首用流程（螢幕級）**：0 首頁三卡 → 1 建立（名稱、類型、定位詞；預設角度已勾；成本預覽；主按鈕「開始蒐集」）→ 2 蒐集中（進度、已收 N、擋下 M 與原因、可停）→ 3 彙整（草稿每句 [n] 可點開原文；「有缺口」「來源互相矛盾」用卡片）→ 4 分析（預設方法已選；需要你填的欄位標紅，例如權重；主按鈕「執行分析」）→ 5 報表（預覽、「核准」、匯出 md／pdf）。任何一步失敗：一句人話 + 一個按鈕（重試／調整／跳過）。
 
@@ -157,10 +159,10 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 ### 3.10 解讀層（方法執行後要有分析，不是 JSON）
 - 現況：`main:758-788` invoke = builder + gates，無 LLM；`iceberg_model.py:56-109` 原樣回填輸入；結果頁 `dashboard.html:1394-1410` = 通過行＋閘門表＋JSON；AI 只在起草填格（`draft.py:1-10`）。操作者 2026-09-23 截圖確認。
 - 做法：一個 context-bound capability（D4 同類）吃 invoke kwargs，伺服器重跑 builder+gates（`invoke` 不持久化 record，`main.py:788` 回傳即丟，客戶端給的 record 不可信），用契約＋display-metadata 生成 prompt，產出 C10 typed object，過 gates，record＋解讀同存 artifact；202 + 輪詢。方法專屬知識只來自契約 YAML 與可演化 prompt 片段（`SPEC/evolution/interpretation-prompts/`），**不寫 285 支程式**。
-- 結果頁（web）：發現卡（每句 [n] 可點開來源）→ 視覺（依 kind）→ 建議表 → 缺口 → 下一步方法（一鍵帶入本次輸入）→ 來源標記／模型／費用 → 核准／退回；專家模式收閘門表與 JSON。示意稿 `COS/docs/mockups/iceberg-result-mock.html`（用操作者的冰山案例）。
+- 結果頁（web）**固定七段骨架**（操作者 2026-09-23 駁回第一版「無邏輯、無系統性」，依 NPC 冰山工作單與 Anderson & Johnson 理解層次表重做）：(0) 方法一句話＋「怎麼讀這一頁」三步 → (1) 結構圖：方法原生圖形（冰山／矩陣／樹…），左＝每層要回答的問題＋你填的，右＝該層介入方式，可見／不可見分線 → (2) 逐層卡，同骨架：這層問什麼 → 你填的 [n] → 這代表什麼 → 在這層出手＋效果＋槓桿 → (3) 總結：在哪層出手＋證據缺口 → (4) 對照表（層 × 介入方式 × 時間取向 × 問題 × 你的案例 × 建議）→ (5) 下一步方法（標明加深哪一層；第一顆 = 契約 `recommended_next`）→ (6) 引註 → (7) 來源標記／模型／費用／核准／專家模式。每層的問題、介入動詞、時間取向、可見性 = 方法資料（display-metadata + `SPEC/evolution/interpretation-prompts/`），不寫進程式；沒有「層」的方法（矩陣、清單）以其原生單位（象限、項目）套同一骨架。示意稿 `COS/docs/mockups/iceberg-result-mock.html`（操作者冰山案例，v2）。
 - 驗收：同一支程式對兩個不同 family（`systems.iceberg_model` → layered、`decision.eisenhower_matrix` → quadrant）產出不同視覺；突變：拔 citation gate → 無引註主張 PASS → 紅；拔 `next_methods_resolvable` → 幻覺方法 id PASS → 紅；拔 `visual_bindings_resolvable` → 綁到不存在路徑 PASS → 紅；改 family→kind 表 → 視覺跟著變；送一份閘門會 FAIL 的 kwargs → 422、不呼叫模型、`ai_usage` 無新列。
 
-## 4. 決策紀錄（D1–D14）
+## 4. 決策紀錄（D1–D15）
 | # | 決策 | 為什麼 | 淘汰 |
 |---|---|---|---|
 | D1 | 產品殼 = Cognitive OS | `BP/12:143-151` `app ≠ portal`；COS 已有租戶／身分／entitlement／journal／商業計畫 | next-admin `/ops/research` |
@@ -177,13 +179,14 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | D12 | 分數是閘不是目標；門檻只能人改 | Goodhart：迴圈會學會討好指標；操作者既有裁定禁止改門檻消音偵測器 | 讓迴圈自調門檻「提高通過率」 |
 | D13 | **前端殼 = 新 Web app `COS/apps/cognitive-web`（Next.js 15，與 next-admin／portal 同技術棧；Playwright 在 `lobster-factory/infra/hetzner-phase1-core/tests/` + `scripts/playwright-runner.ps1`）**，操作者 2026-09-23 拍板 B；§3.9 首用流程 + §3.10 結果頁；`dashboard.html` 降為「專家模式」直到 parity 後退場；API 不變 | `BP/12:9-16` Web／API 分離；1443 行單檔 vanilla JS 做不到 i18n、元件庫、a11y、可測；零重工：表單仍由 `method_form.py` 產生 | A 續改 `dashboard.html`（每加一步都是 DOM 手拼，無測試）|
 | D14 | 解讀層 = **一個**通用 context-bound capability + 8 種視覺原語；方法知識只來自契約 YAML 與可演化 prompt 片段 | 285 方法不可能各寫一支；契約已有 `purpose／inputs／outputs／recommended_next`（`systems.iceberg_model.contract.yaml:34-70`）；D4 同類、I2／I3 同規則 | 每方法手寫解讀／圖表（`dashboard.html:1320-1345` 那種）；在 builder 內呼叫 LLM（builder 必須純，`rt:48-52`） |
+| D15 | ⑦ 執行順序 P0 → PI-a → PI-b → P1；**⑧ P0 部署與 PI-b 同窗**（一次 prod 變更、一次 go-ahead） | 操作者 2026-09-23 授權「你是專家你決定而且要記錄下來」；P0 單獨上線無操作者可見價值、多一次 prod 風險；橋在關掉前只有操作者會按且已知凍結；部署當次仍照 AGENTS §3 要 go-ahead | P0 先獨立部署；⑦ 等操作者 |
 
 ## 5. 分期
 | 期 | 內容 | 風險 | 完成定義（缺一不算） | Rollback | 估工 |
 |---|---|---|---|---|---|
 | **P0 凍結** | 三顆「送去 X」按鈕與兩條橋 feature-flag OFF（不刪碼、**不搬資料**）；`lib/hci/client.ts:6-9`、`CollectionSourcesPanel.tsx:991-993`、`ClientHubTabs.tsx:1880-1888` 過期註解改事實 | Low | NA 頁面無「送去 X」；`npx tsc` 綠 | flag ON | 0.5d |
 | **PI-a 解讀層 + 新殼第一片（碼＋本機）** | context-bound adapter 類（`rt:70-100`）；`interpret.method_record` + typed object + 3 gates + `POST /methods/{id}/interpret`（202）+ `GET /interpretations/{id}`；`repo.append_event`；`COS/apps/cognitive-web` 骨架（Next.js 15；同源 `/api/` 呼叫 COS，登入頁；方法挑選最小版；表單渲染移植 `dashboard.html:901-1255` 的 variant／rows／fixedRows／upstream／json／pills／conditions；**結果頁 §3.10** + layered／quadrant／table 三種視覺 + 專家模式 JSON）；Dockerfile；`deploy.sh` 擴成多服務；Playwright `cognitive` project + `COS_TEST_{TENANT_ID,EMAIL,PASSWORD}` env | Medium | 本機 `docker compose up`（api+web）：操作者的冰山案例 → 結果頁如示意稿，每句主張有 [n]；`decision.eisenhower_matrix` 同一支程式出 quadrant；三個突變（§3.10）各紅；閘門 FAIL 的 kwargs → 422 且不呼叫模型；COS unittest + golden 綠；web `tsc` + vitest 綠；Playwright 登入→執行→結果一條；`ai_usage` 有該次記錄 | 契約→DRAFT 即消失；web 目錄獨立可刪；`deploy.sh` 多服務段落為附加 | 5d |
-| **PI-b 上 prod** | nginx `/api/`／`/expert/`／`/` 分流（`safe-infra-patch.sh nginx`）；`dashboard.html:299` `API_PREFIX`；`deploy.sh:15` smoke → `/api/health`；`/opt/cognitive-os` pull + `deploy.sh`（api+web） | **High-STOP**（prod 部署，每次 go-ahead） | `https://cognitive.aware-wave.com/api/health` 200、`/expert/` 舊頁可登入、`/` 新頁跑完冰山案例；deploy.sh 全綠；`printenv` 驗 web 容器 env | nginx 還原（safe-infra-patch 自動）；`cognitive-web:rollback` tag；api 不動 | 0.5d |
+| **PI-b 上 prod** | nginx `/api/`／`/expert/`／`/` 分流（`safe-infra-patch.sh nginx`）；`dashboard.html:299` `API_PREFIX`；`deploy.sh:15` smoke → `/api/health`；`/opt/cognitive-os` pull + `deploy.sh`（api+web）；P0 的 next-admin 經 `sg-deploy.sh`（D15 同窗） | **High-STOP**（prod 部署，每次 go-ahead） | `app.aware-wave.com/ops/collect` 無「送去 X」按鈕；`https://cognitive.aware-wave.com/api/health` 200、`/expert/` 舊頁可登入、`/` 新頁跑完冰山案例；deploy.sh 全綠；`printenv` 驗 web 容器 env | nginx 還原（safe-infra-patch 自動）；`cognitive-web:rollback` tag；api 不動 | 0.5d |
 | **P1 Source + Collection Service** | §3.3 前六列 + egress allowlist + `--tenant-id` bootstrap + journal key mode | Medium | curl 觸發一次真實 company run（操作者真 tenant）→ COS Sources 帶 provenance／fetched_at／collector identity；重跑同 seeds → 全 `unchanged`、0 新列；改一頁內容重跑 → supersede 列 + event；壞 hash → 400；過期 grant → 401；NA `tsc`+vitest 綠；COS pytest + golden 綠；`printenv COGNITIVE_OS_JOURNAL_KEY_MODE` ≠ disabled | 新欄位 nullable；端點下線；sink 檔刪；allowlist 還原 | 3d |
 | **P2 彙整 + 引註閘 + harness** | 重用 PI 的 adapter 類與 `citation_integrity`；三個 synthesis + typed objects + manifest + gate；`literature_search` v2；**§3.7 harness：每線 3 個黃金案例（P-E 前補到 5）、score.py、thresholds.yaml（首次基準線）、CI 接入、突變腳本** | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠；**harness 9 案例全部跑出分數、基準線寫入、拔閘突變讓幻覺率變紅** | 契約 status→DRAFT 即從 catalog 消失；harness 目錄獨立可刪 | 3d |
 | **P3 三線端到端 + 首用流程** | web 三卡 + §3.9 六步流程（骨架與路由已在 PI）+ 其餘 5 種視覺原語（matrix／graph／tree／timeline／scorecard）+ 示範 Project seed + 說明面板（registry 生成）；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1` | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數；**首用測試協定通過（非操作者、L2 ≤15 分鐘零求助、SUS ≥ 70）**；Playwright 走完六步；零原生 `<select>`（grep = 0） | recipe→DRAFT；旗標移除；三卡頁下線回 PI 結果頁 | 4d |
@@ -242,11 +245,13 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
   ④ P5（多租戶 Production Trust）與 P-P（自然人）在第二個租戶或真實人物需求出現時才啟動。
   ⑤ 演化迴圈自動晉升範圍 = 只有 R0–R2 資料級；模型切換與任何門檻永遠人審。
 - 已拍板（2026-09-23，稍後）：⑥ = **B**，前端殼 = 新 `apps/cognitive-web`（D13），舊 dashboard 降為專家模式；解讀層（§3.10、D14）排在 PI 期，先於殼的其餘功能。
-- **待拍板**：⑦ 執行順序 P0 → PI-a → PI-b → P1…（PI 排在 P1 前，因為 ① 只批了 P0＋P1；PI-b 每次 prod 部署仍個別 go-ahead）。建議：是。
+- 已定案（2026-09-23，操作者授權工程師決定並記錄，D15）：⑦ 執行順序 P0 → PI-a → PI-b → P1…（是）；⑧ P0 部署時機 = 與 PI-b 同窗。
+- 待拍板：無。
 
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；決策記錄 §10 指回；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7 出現；每完成 §5 一期更新 §0；契約變更走 ADR（`SPEC/docs/adr/`）。
+- **v1.6（同日）**：操作者駁回示意稿（無邏輯、無系統性、首用者看不懂）並附 4 張參考圖（NPC 冰山工作單、可見／不可見金字塔、四問冰山、Anderson & Johnson 理解層次表）→ 示意稿重做為固定七段骨架、§3.10 結果頁骨架改寫、U13／U14；操作者授權「1 和 2 你決定並記錄」→ D15、§9 ⑦⑧ 定案。
 - **v1.5（同日）**：critic（1 個，plan v1.4 接手審）2C/6M/4m 全折入：C1 nginx 分流改 `/api/` 前綴（FastAPI 全在根路徑）；C2 web 放 `COS/apps/`、compose 走 deploy.sh 多服務、nginx 走 safe-infra-patch；M3 interpret 202+輪詢；M4 伺服器重跑 builder+gates；M5 manifest 葉路徑；M6 visual bindings；M7 PI 拆 a/b（b High-STOP）+ §9 ⑦；M8 估工 PI 5.5d、P3 4d、總 18d/22d；m9 next_methods ⊆ ACTIVE + display-metadata；m10 `append_event` 公開、核准移 P4；m11 chart 3 種、compose env 覆蓋 env_file；m12 §6 表修正。
 - **v1.4（同日）**：操作者截圖「執行並驗證只出 JSON，沒有分析」+ 拍板 ⑥=B + 「誰都可以直接接手」→ 補 §3.10 解讀層、C10、D14、PI 期（排在 P1 前）、§6 PI 欄、R17／R18、§11 接手指南；P2／P3 估工因骨架與閘門前移而減（4d→3d、5d→3d）；D13 Playwright 位置更正；§3.7 黃金案例 P2 先 3 個。
 - **2026-09-23 拍板**：①–⑤ 是；⑥ = B（同日稍後）。
