@@ -612,6 +612,8 @@
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
+- [ ] **【2026-09-23 開出｜小】`doc-link-commit-check.js`（PostToolUse: Bash `git commit`）不會被 script／hook 產生的 commit 觸發** — 該規則只掛在 Bash `git commit` 這個 tool call 上；`auto-checkpoint`（`[claude] checkpoint: ...`，08-25 起 0 次但機制仍在）、`ao-close.ps1` 的收工 sync commit、`scripts/commit-checkpoint.ps1` 都是 script 內部呼叫 git，不經過會被攔截的 Bash 呼叫，所以這些 commit 弄斷的相對連結不會被回報。實例：`3f31d5eec`（2026-07-04 auto-checkpoint）斷了 3 個連結，`node lobster-factory/scripts/validate-doc-integrity.mjs --commit=3f31d5eec` 驗得到，但當時沒有任何機制主動告知。**完成定義**：這幾支 commit-producing 腳本在自己 commit 完成後呼叫 `validate-doc-integrity.mjs --commit=HEAD --json`，結果寫進一個狀態檔（同 smoke-LATEST.json 的機器欄位慣例），由 `scripts/lib/smoke-status-digest.ps1` 讀取併入 `blockers[]`。**依賴已解除**（VBC 覆查 2026-09-23）：`--commit=` 模式與 `doc-link-commit-check.js` 已於 `d1a7f2055`（同日，另一 session）落地進 `mcp/claude-userlevel/hooks/rules.manifest.json` + `lobster-factory/scripts/validate-doc-integrity.mjs`，可直接動工。
+
 - [ ] **【2026-09-19 開出｜Codex 主導前必修】Claude→Codex 同步實際失效：機械閘在 Codex 零觸發 + bridge 同步凍結**
   - `🟠 程式側已完成，卡在操作者一步` · `2026-09-19 開出，2026-09-20 修完` · `卡在你：Codex /hooks trust`
   - **已完成**：runner 加 Codex 轉接層與心跳、使用者層 `~/.codex/hooks.json` 產生器、deny 清單鏡像、同步腧 tar 地雷、parity 新增 trust/心跳/雙向檢查、smoke `codex_parity`、反向 oracle `/claude-review`、部署 hook 治本（詳 WORKLOG 2026-09-20(續84)）

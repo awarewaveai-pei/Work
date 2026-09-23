@@ -747,6 +747,10 @@ if (Test-Path -LiteralPath $siteWatchHealthScript) {
 # Rationale: a cloud routine whose source drifts / auth lapses / gets disabled stops landing
 # its report — and the operator should learn this at AO-RESUME (when they can act), not only
 # buried in the AO-CLOSE health gate. Writes reports/status/routine-freshness-LATEST.md, which
+# 2026-09-23 修正：節流原本讀檔案 mtime，但 staging-orphans-LATEST.json 是 git-tracked 檔，
+# git-align 的 stash/restore（每次 AO-RESUME 都跑）會重寫 mtime 而不改內容 —— 於是這個檢查
+# 實際上兩天沒真的跑過，節流卻一直以為「12 小時內跑過」而持續跳過（WORKLOG 2026-09-23 發現）。
+# 改讀 JSON 自帶的 generated_utc 欄位，該欄位只在腳本自己執行完成時才會更新。
 # Claude reads at AO-RESUME §1 (same zero-effort pattern as backup-health / auto-reboot). The
 # always-on Telegram leg (for when the operator does NOT boot) lives on the EU VPS.
 $routineFreshScript = Join-Path $WorkRoot "scripts\check-routine-freshness.ps1"
@@ -774,8 +778,18 @@ $stagingOrphanReport = Join-Path $WorkRoot "agency-os\reports\status\staging-orp
 if (Test-Path -LiteralPath $stagingOrphanScript) {
     $soFresh = $false
     if (Test-Path -LiteralPath $stagingOrphanReport) {
-        $soAge = (Get-Date) - (Get-Item -LiteralPath $stagingOrphanReport).LastWriteTime
-        if ($soAge.TotalHours -lt 12) { $soFresh = $true }
+        try {
+            $soJson = Get-Content -LiteralPath $stagingOrphanReport -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($soJson.generated_utc) {
+                $soGenUtc = [DateTime]::Parse([string]$soJson.generated_utc, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+                $soAge = [DateTime]::UtcNow - $soGenUtc
+                if ($soAge.TotalHours -lt 12) { $soFresh = $true }
+            }
+        } catch {
+            # Unparsable/missing generated_utc: treat as NOT fresh (fall through and re-run)
+            # rather than trusting a value that could not be verified.
+            $soFresh = $false
+        }
     }
     if ($soFresh) {
         Write-Host ""

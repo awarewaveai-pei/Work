@@ -13,6 +13,10 @@
 **判讀 smoke 結果（2026-08-17 起）**：`smoke-LATEST.json` 自帶 `overall` 與 `blind_spots` 兩個欄位，**直接讀，不要自己心算**。`blind_spots` 非空 = 某個關鍵偵測器這輪「什麼都沒量到」（SSH 掛了 / 金鑰不見 / 解析失敗），此時 `overall` 一律 WARN —— 因為「偵測器啞了」不可以長得像「一切正常」，那正是 2026-08-03 事故的形狀。`client_mail` 除了近 7 天失敗數，另查**距上次成功寄信天數**（門檻 `-MailQuietDayLimit`，預設 10）：只數失敗無法分辨「健康」與「已壞但還沒人用到」。門檻**必須低於 14** —— FluentSMTP 的 `log_saved_interval_days=14` 每日清舊日誌，設 14 以上該分支永遠觸發不到。  
 每 30 天自動執行月度五項檢查（warn-only，2026-08-24 訂正：原文寫「三項」但 `ao-resume.ps1` 早就是四項，今天再加第五項）：`monthly-system-review.ps1` / `check-supabase-memory-monthly.ps1` / `check-governance-docs-drift.ps1`（4 份核心治理文件一致性）/ `refresh-cf-origin-ips.ps1` / `check-change-impact-matrix-drift.ps1`（`docs/CHANGE_IMPACT_MATRIX.md` 全部 ~85 條關係的 mtime 漂移，不只 4 份核心文件）。結果寫 `reports/`，Claude 在 §1 回報。
 
+**2026-09-23 addendum — `blockers[]`：十個 sibling 偵測器統一入口**。稽核發現 `check-ci-health.ps1`（GitHub Actions 連續失敗 workflow）與夜間 `AgencyOS-SystemGuard-Daily`（`reports/health/health-*.json` 的 `critical_gate`／`score`）**完全沒有進 AO-RESUME**——前者只靠 `TOOL_TRIGGER_MAP.md` 一條散文觸發列（使用者要問「CI 過了嗎」才會被查到），後者連散文觸發列都沒有；當時 `LAST_SYSTEM_STATUS.md` 已連續兩週顯示「Doc integrity failed」FAIL，`ci-LATEST.md` 有 3 個 workflow 連紅 8–16 天，都沒有任何一個 agent 看到。另外 8 份既有 sibling 報告（backup／auto-reboot／clickhouse／capacity／site-watch／staging-orphans／routine-freshness／cf-security）雖然各自寫了 `*-LATEST.{json,md}`，但只有 backup／auto-reboot／cf-security 在 §1「系統快照」的涵蓋清單裡被點名，其餘完全沒有機制讀取——staging-orphans 當時已 WARN 兩天（`sg_parse_empty`／`eu_parse_empty` 盲點）、routine-freshness 已 WARN（月報 41 天未更新），同樣沒人看到。
+
+修法：`scripts/lib/smoke-status-digest.ps1` 讀完全部十份報告，攤平成 `smoke-LATEST.json` 的 `blockers[]` 陣列（每行已含來源標籤與原文，例：`CI: 'HCI-30 — Wave 1...' has been failing for 8 consecutive run(s) over 15 day(s)...`）；`ci_health`／`nightly_health` 併入 smoke 既有的 `criticalChecks`（缺報告視同 blind spot，`overall` 強制 WARN，語意與既有 `client_mail`／`docker_watchdog`／`codex_parity` 一致）。`blockers[]` 非空同樣把 `overall` 推成 WARN，讓 §0 燈號與 §6 逐行輸出永遠一致。`ao-resume.md` §1／§6 讀法見該檔本節對應規則；§6 source rules 新增 (d)。順手修：`ao-resume.ps1` 的 staging-orphans 12 小時節流原本讀檔案 mtime，但該檔是 git-tracked，git-align 的 stash/restore 每次 AO-RESUME 都會重寫 mtime 卻不改內容——改讀 JSON 自帶的 `generated_utc` 欄位。
+
 ## 新部署路徑強制清單（SOP）
 
 > 原屬 `AGENTS.md`；2026-09-04 逐字搬入。
@@ -668,5 +672,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-09-23 03:45:07 UTC_
+_Last synced: 2026-09-23 14:30:03 UTC_
 

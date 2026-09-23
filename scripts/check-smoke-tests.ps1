@@ -71,6 +71,16 @@ if (Test-Path -LiteralPath $userEnv) {
 $encHelpers = Join-Path $PSScriptRoot "_console-encoding-helpers.ps1"
 if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
 
+# scripts/lib/smoke-status-digest.ps1 (WORKLOG 2026-09-23): reads the ten sibling
+# warn-only status reports AO-RESUME's own SSOT never surfaced (CI health and the
+# nightly system-guard gate had ZERO prior wiring; the other eight had only ad-hoc
+# prose mentions). $statusDigest.blockers is the single array ao-resume.md §6 reads.
+$digestLib = Join-Path $PSScriptRoot "lib\smoke-status-digest.ps1"
+$statusDigest = $null
+if (Test-Path -LiteralPath $digestLib) {
+    try { . $digestLib; $statusDigest = Get-StatusDigest -WorkRoot $root } catch { $statusDigest = $null }
+}
+
 $results = @{}
 
 # Checks that ran but produced NO measurement this time. Kept separate from $results
@@ -501,18 +511,50 @@ try {
     $noEvidence["deploy_hold"] = $true
 }
 
+# --- Check 9 / 10: CI health + nightly system-guard gate (via smoke-status-digest.ps1) ---
+# These two had NO prior AO-RESUME wiring at all (see the module's own header comment for
+# the WORKLOG incident that found this). BLIND here means the digest library itself could
+# not run, which must not read as PASS.
+if ($null -eq $statusDigest) {
+    $results["ci_health"]      = "warn:digest_unavailable"
+    $noEvidence["ci_health"]   = $true
+    $results["nightly_health"] = "warn:digest_unavailable"
+    $noEvidence["nightly_health"] = $true
+} else {
+    foreach ($pair in @(@{ Key = "ci_health"; Label = "CI" }, @{ Key = "nightly_health"; Label = "Nightly health" })) {
+        $entry = $statusDigest.entries[$pair.Key]
+        switch ($entry.verdict) {
+            "PASS" { $results[$pair.Key] = "ok" }
+            "SKIP" { $results[$pair.Key] = "skip:na" }
+            "BLIND" {
+                $reason = if ($entry.blockers.Count -gt 0) { ($entry.blockers[0] -replace '\s+', '_') } else { "no_evidence" }
+                $results[$pair.Key] = "warn:blind_" + $reason.Substring(0, [Math]::Min(100, $reason.Length))
+                $noEvidence[$pair.Key] = $true
+            }
+            default {
+                # WARN or FAIL: not a blind spot (a real verdict came back), but still a
+                # detector this class treats as critical (its own runbook rationale: a gate
+                # nobody watches is not a gate).
+                $reason = if ($entry.blockers.Count -gt 0) { ($entry.blockers[0] -replace '\s+', '_') } else { $entry.verdict }
+                $results[$pair.Key] = "warn:" + $entry.verdict.ToLowerInvariant() + "_" + $reason.Substring(0, [Math]::Min(100, $reason.Length))
+            }
+        }
+    }
+}
+
 # --- Verdict ---
 # Computed BEFORE the JSON write so the report carries the conclusion. Without it every
 # reader (Claude in AO-RESUME §1, a human skimming the file) has to re-derive the verdict
 # by hand, and each re-derivation is a chance to repeat the swallow-the-skip bug below.
-$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity","deploy_hold")
+$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity","deploy_hold","ci_health","nightly_health")
 
 # Checks that are the ONLY detector of a silent-failure class. For these, "skip" means
 # monitoring has stopped, so reporting PASS would repeat the mistake that caused the
 # 2026-08-03 mail outage: FluentSMTP's own failure notice travelled through wp_mail, so
 # the alarm died with the channel it was watching. A detector that goes quiet must be
-# louder than one that reports nothing wrong.
-$criticalChecks = @("client_mail","docker_watchdog","codex_parity")
+# louder than one that reports nothing wrong. ci_health/nightly_health join this list for
+# the same reason (WORKLOG 2026-09-23): each is the only thing watching its class of gate.
+$criticalChecks = @("client_mail","docker_watchdog","codex_parity","ci_health","nightly_health")
 
 $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" })
 # Keyed on "produced no measurement", not on the verdict prefix: warn:ssh_exit255 and
@@ -520,7 +562,16 @@ $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $result
 # blind_spots list while the detector had in fact learned nothing.
 $blindSpots = @($criticalChecks | Where-Object { $noEvidence.ContainsKey($_) -and $noEvidence[$_] })
 $allSkip    = @($checks | Where-Object { $results[$_] -notlike "skip:*" }).Count -eq 0
-$overall    = if ($hasWarn.Count -gt 0 -or $blindSpots.Count -gt 0) { "WARN" } elseif ($allSkip) { "SKIP" } else { "PASS" }
+
+# blockers[]: the flat, ready-to-print list ao-resume.md §6 reads verbatim. Sourced from ALL
+# TEN status-digest entries (not just the two new $checks keys above) -- the other eight
+# (backup/auto-reboot/clickhouse/capacity/site-watch/staging-orphans/routine-freshness/
+# cf-security) already have their own $results-less verdict computed elsewhere, but had no
+# shared surfacing mechanism before this. Any non-empty blockers[] forces WARN so §0's
+# traffic light can never disagree with what §6 is about to print.
+$blockers = @()
+if ($statusDigest) { $blockers = @($statusDigest.blockers) }
+$overall    = if ($hasWarn.Count -gt 0 -or $blindSpots.Count -gt 0 -or $blockers.Count -gt 0) { "WARN" } elseif ($allSkip) { "SKIP" } else { "PASS" }
 $colour     = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
 
 # --- Write LATEST JSON ---
@@ -529,6 +580,7 @@ $payload = @{
     generated   = $stamp
     overall     = $overall
     blind_spots = @($blindSpots)   # critical detectors that produced no evidence this run
+    blockers    = $blockers        # ready-to-print lines from all 10 sibling status reports
     checks      = $results
 }
 $json = $payload | ConvertTo-Json -Depth 5
@@ -539,6 +591,9 @@ Set-Content -Path (Join-Path $reportDir "smoke-LATEST.json") -Value $json -Encod
 $blindNote = ""
 if ($blindSpots.Count -gt 0) {
     $blindNote = " | BLIND: " + (($blindSpots | ForEach-Object { "$_=$($results[$_])" }) -join ",")
+}
+if ($blockers.Count -gt 0) {
+    $blindNote += " | BLOCKERS: " + $blockers.Count
 }
 
 # Rendered from $checks, not a hand-maintained positional list: the old {0}..{7} format string

@@ -78,6 +78,25 @@ Two related traps found the same day, both worth copying into a new check:
 - Verify every verdict against a real DB with fake timestamps and **delete the previous report
   before each case** — a run that crashes before writing is otherwise graded on the last one.
 
+### 2026-09-23 addendum — a check already read by AO-RESUME still needs Step 2/3 for the DoD; a check nobody reads can register in the digest instead
+
+Wiring the LATEST report into `ao-resume.ps1` output (Step 2) does not by itself guarantee an
+agent acts on it -- CI health and the nightly system-guard health gate both had exactly that
+wiring (or, for CI, a `TOOL_TRIGGER_MAP.md` trigger row) and still went unread for weeks,
+because a trigger row only fires if the agent happens to match the user's wording, and a
+console block only gets summarized if the agent chooses to read past it. Ten sibling checks'
+worth of red/blind results now also flow through `scripts/lib/smoke-status-digest.ps1` into
+`smoke-LATEST.json`'s `blockers[]` array, which `ao-resume.md` §1/§6 read unconditionally
+every run -- see `agency-os/docs/operations/AGENTS_APPENDIX.md` §AO-RESUME 判讀規則
+(2026-09-23 addendum) for the full incident and the ten registered sources.
+
+If your new check is warn-only and its verdict should be visible without the operator having
+to phrase a question that matches a trigger row, add a `Get-<Thing>Entry` function to
+`smoke-status-digest.ps1` and register it in `Get-StatusDigest`'s `$entries` hashtable,
+**in addition to** Steps 1-3 below (the LATEST report is still the data source; the digest
+is just the guaranteed reader). Steps 1-3 alone are still correct for a check whose audience
+is a human skimming the report on demand, not an agent that must act on it every session.
+
 ### Step 1 — Write `scripts/check-<thing>.ps1`
 
 Skeleton (copy-paste from an existing check; do NOT design from scratch):

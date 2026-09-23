@@ -182,6 +182,8 @@ Smoke tests (from `smoke-LATEST.json`):
 - If file exists: 一行摘要 `🟢 Smoke PASS | n8n=ok | repair=ok` 或 `🔴 Smoke WARN | ...`
 - If file missing: 靜默略過
 
+**`blockers[]`（2026-09-23 起，CI／nightly health gate／8 個 sibling 偵測器統一入口）**：`smoke-LATEST.json` 的 `blockers` 陣列是 `scripts/lib/smoke-status-digest.ps1` 讀完 `ci-LATEST.json`（GitHub Actions）、夜間 system-guard 健康閘（`reports/health/health-*.json`，score／critical_gate）、`backup-health`／`auto-reboot`／`clickhouse`／`capacity`／`site-watch`／`staging-orphans`／`routine-freshness`／`cf-security` 十份報告後，攤平成的一份「照原文印」清單——**這是本節（§1）與 §6 共用的唯一資料源，非空必為 WARN（§0 燈號同步反映）**。§1 只印筆數摘要（`blockers=N`，0 則略過此行）；§6 逐行照印全文（見 §6 規則 (d)）。這條取代原本「CI health 靠 TOOL_TRIGGER_MAP.md 散文觸發」的機制——散文觸發列不可靠（agent 不一定會查表），機器欄位才可靠。
+
 Monthly checks (from `monthly-LATEST.json`, 5 項，2026-08-24 補 impact_matrix_drift）:
 - If file exists: 一行摘要 `📅 Monthly YYYY-MM-DD | system_review=ok | supabase=ok | governance=ok | cf_ip=ok | impact_matrix=ok`
 - If file missing: 靜默略過（尚未跑過月度檢查）
@@ -256,7 +258,7 @@ Task count（所有群加總）must match `open-tasks-snapshot.md` Total open。
 **6. 阻塞與風險**（**必印** — 一眼可見，不得埋進別段）
 列出**現在卡住／有風險／需注意**的事（這是「診斷」，不是「要你做的事」——那是 §7）。
 - 每項附 `file:line` 或具體證據；**禁止**只寫「無」二字。
-- **Source rules**：阻塞只能來自 (a) TASKS.md 的 open `- [ ]`、(b) `is_fresh=true` 外部信號、(c) ao-resume-hook health check 失敗。**禁止**從 `- [x]` 推導（已解決 ≠ 阻塞）。
+- **Source rules**：阻塞只能來自 (a) TASKS.md 的 open `- [ ]`、(b) `is_fresh=true` 外部信號、(c) ao-resume-hook health check 失敗、(d) `smoke-LATEST.json` 的 `blockers[]`（CI 連續失敗 workflow、夜間健康閘 critical failure、以及 8 個 sibling 偵測器的 WARN/FAIL/BLIND，逐行照原文印，不摘要不改寫；空陣列則不提這條，不是「查過=無」的例外）。**禁止**從 `- [x]` 推導（已解決 ≠ 阻塞）。
 - 盤點後確無 → 寫「本次盤點：未見需立即處理之阻塞」**並一句說明依據**（如 Strict 結果、WORKLOG／memory 是否曾標記風險）。
 - **雙層**：技術阻塞保留術語＋附白話「這會擋住什麼、嚴不嚴重」。
 - 與 §7 邊界：阻塞若需**你**拍板 → 在 §7 引用，不在此重複全文（同資訊只出現一段）。
@@ -364,5 +366,5 @@ acknowledge the lapse and write the file immediately.
 ## Related Documents (Auto-Synced)
 - `docs/operations/RUNNABLE_DEMOS.md`
 
-_Last synced: 2026-09-04 14:48:33 UTC_
+_Last synced: 2026-09-23 03:45:07 UTC_
 
