@@ -4,8 +4,9 @@
 
 .DESCRIPTION
     Owner: scripts/playwright-runner.ps1 (monorepo canonical, do not duplicate)
-    Called by: .claude/commands/playwright.md (the /playwright skill)
-    Also called post-deploy by sg-deploy hooks (Mode=smoke only)
+    Called by: .claude/commands/playwright.md (the /playwright skill), and as the operator-run
+    follow-up step in .claude/commands/sg-deploy.md (Mode=smoke) and wp-maintenance.md (Mode=client).
+    NOT called by scripts/sg-deploy.sh on the host: that script's own Step 7 smoke is curl-based.
 
     Modes
     -----
