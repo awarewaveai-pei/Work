@@ -1,22 +1,8 @@
 // Operator-facing text. C12: text summary + ops link only, never an image, never a query string.
 import type { IncidentDraft } from "@/lib/ops-inbox/types";
 import { severityFor } from "./config";
+import { failureLabel } from "./labels";
 import type { OrgRef, PageStateRow } from "./store";
-
-const FAILURE_LABEL: Record<string, string> = {
-  timeout: "載入逾時（15 秒內沒載完）",
-  http_4xx: "頁面回應 4xx（找不到或被拒）",
-  http_5xx: "伺服器錯誤 5xx",
-  dns: "網域解析失敗",
-  connect: "連線失敗（拒絕連線或 SSL 憑證問題）",
-  blocked: "網址被安全政策拒絕（請檢查客戶網址設定）",
-  navigation: "頁面無法開啟",
-};
-
-export function failureLabel(code: string | null): string {
-  if (!code) return "正常";
-  return FAILURE_LABEL[code] ?? code;
-}
 
 export function fingerprintFor(orgId: string, s: Pick<PageStateRow, "page_id" | "kind">): string {
   return `site_watch:${orgId}:${s.page_id}:${s.kind}`;

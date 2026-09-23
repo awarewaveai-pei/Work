@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   canApprovePolicy,
@@ -10,16 +12,25 @@ import {
 } from "../policy";
 
 describe("REPAIR_SOURCE_POLICIES", () => {
-  it("covers all 7 sources", () => {
-    const sources = REPAIR_SOURCE_POLICIES.map((p) => p.source);
-    expect(sources).toContain("sentry");
-    expect(sources).toContain("uptime_kuma");
-    expect(sources).toContain("grafana");
-    expect(sources).toContain("posthog");
-    expect(sources).toContain("netdata");
-    expect(sources).toContain("manual");
-    expect(sources).toContain("deploy");
-    expect(sources).toHaveLength(7);
+  // Was "covers all 7 sources" with the list typed out: a copy of IncidentSource that broke the day a
+  // source was added (site_watch, 0091), while the real completeness check is the `satisfies
+  // Record<IncidentSource, …>` in policy.ts. The runtime SSOT for which sources can exist is the
+  // database: the LAST migration that redefines ops_incidents_source_check.
+  it("has a policy for every source the database accepts", () => {
+    const dir = path.resolve(__dirname, "../../..", "../../../../packages/db/migrations");
+    let allowed: string[] | null = null;
+    for (const f of readdirSync(dir).filter((n) => /^\d{4}_.*\.sql$/.test(n)).sort()) {
+      const m = /ops_incidents_source_check\s+CHECK\s*\(\s*source\s+IN\s*\(([^)]*)\)/i.exec(readFileSync(path.join(dir, f), "utf8"));
+      if (m) allowed = [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
+    }
+    expect(allowed, "no ops_incidents_source_check found in migrations").not.toBeNull();
+    const sources = REPAIR_SOURCE_POLICIES.map((p) => p.source as string);
+    expect(sources).toContain("site_watch");
+    expect(sources.filter((s) => !allowed!.includes(s))).toEqual([]);
+    // Known drift (SITE_WATCH_MASTER_PLAN §6.2 R3): lib/collect/report-store.ts writes source
+    // 'collection' around the IncidentSource type, so it has no policy yet. Fixing R3 = add it to
+    // the type and the catalog, then drop it here.
+    expect(allowed!.filter((s) => !sources.includes(s))).toEqual(["collection"]);
   });
 
   it("every entry has non-empty rationale", () => {
