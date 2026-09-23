@@ -43,12 +43,17 @@ async function statRemoteScript(
   keyEnvName: string,
   scriptPath: string,
   timeoutMs: number,
+  hostKeyFingerprint?: string,
 ): Promise<ScriptProbeStatus> {
   const privateKey = readPrivateKeyFromEnv(keyEnvName);
-  if (!host || !privateKey) return "unconfigured";
+  // Fail-closed on the host key, same rule and same reasoning as ssh.ts's readSshTarget()
+  // (WORKLOG 2026-09-23 續116, codex-review round 3): this probe builds its own SshTarget-shaped
+  // object instead of going through readSshTarget, so it needs the identical guard independently
+  // — connectSsh() would otherwise still accept any host key for a probe missing its fingerprint.
+  if (!host || !privateKey || !hostKeyFingerprint) return "unconfigured";
 
   const run = async (): Promise<ScriptProbeStatus> => {
-    const conn = await connectSsh({ host, port, username, privateKey });
+    const conn = await connectSsh({ host, port, username, privateKey, hostKeyFingerprint });
     try {
       const result = await sshExec(conn, `test -f ${scriptPath} && echo OK || echo MISSING`);
       const out = result.stdout.trim();
@@ -75,6 +80,7 @@ async function probeBackupScripts(backupMode: string): Promise<BackupScriptProbe
   const sgUser = envVal("AUTO_REPAIR_SG_SSH_USER") || "root";
   const sgPort = Number(envVal("AUTO_REPAIR_SG_SSH_PORT")) || 22;
   const sgKeyEnv = envVal("AUTO_REPAIR_SG_SSH_KEY_ENV") || "AUTO_REPAIR_SG_SSH_KEY_B64";
+  const sgHostKeyFingerprint = envVal("AUTO_REPAIR_SG_SSH_HOST_KEY_SHA256") || undefined;
   const sgRoot = safePath(envVal("AUTO_REPAIR_SG_PHASE1_ROOT"), "/root/lobster-phase1");
   const sgScript = resolveScriptPath(sgRoot, safePath(envVal("AUTO_REPAIR_SG_BACKUP_SCRIPT"), "scripts/backup-phase1.sh"));
 
@@ -82,14 +88,15 @@ async function probeBackupScripts(backupMode: string): Promise<BackupScriptProbe
   const euUser = envVal("AUTO_REPAIR_EU_SSH_USER") || "root";
   const euPort = Number(envVal("AUTO_REPAIR_EU_SSH_PORT")) || 22;
   const euKeyEnv = envVal("AUTO_REPAIR_EU_SSH_KEY_ENV") || "AUTO_REPAIR_EU_SSH_KEY_B64";
+  const euHostKeyFingerprint = envVal("AUTO_REPAIR_EU_SSH_HOST_KEY_SHA256") || undefined;
   const euScript = safePath(envVal("AUTO_REPAIR_EU_BACKUP_SCRIPT"), "/root/scripts/backup-eu-stack.sh");
 
   const [sg, eu] = await Promise.all([
     sgHost
-      ? statRemoteScript(sgHost, sgPort, sgUser, sgKeyEnv, sgScript, 5000)
+      ? statRemoteScript(sgHost, sgPort, sgUser, sgKeyEnv, sgScript, 5000, sgHostKeyFingerprint)
       : Promise.resolve<ScriptProbeStatus>("unconfigured"),
     euHost
-      ? statRemoteScript(euHost, euPort, euUser, euKeyEnv, euScript, 5000)
+      ? statRemoteScript(euHost, euPort, euUser, euKeyEnv, euScript, 5000, euHostKeyFingerprint)
       : Promise.resolve<ScriptProbeStatus>("unconfigured"),
   ]);
 
@@ -138,6 +145,8 @@ async function probeAutoRebootConfig(backupMode: string): Promise<AutoRebootProb
   const euUser = envVal("AUTO_REPAIR_EU_SSH_USER") || "root";
   const euPort = Number(envVal("AUTO_REPAIR_EU_SSH_PORT")) || 22;
   const euKeyEnv = envVal("AUTO_REPAIR_EU_SSH_KEY_ENV") || "AUTO_REPAIR_EU_SSH_KEY_B64";
+  const sgHostKeyFingerprint = envVal("AUTO_REPAIR_SG_SSH_HOST_KEY_SHA256") || undefined;
+  const euHostKeyFingerprint = envVal("AUTO_REPAIR_EU_SSH_HOST_KEY_SHA256") || undefined;
 
   const target = "/etc/apt/apt.conf.d/52awarewave-auto-reboot";
   const probeFor = async (
@@ -145,18 +154,19 @@ async function probeAutoRebootConfig(backupMode: string): Promise<AutoRebootProb
     port: number,
     username: string,
     keyEnvName: string,
+    hostKeyFingerprint?: string,
   ): Promise<AutoRebootProbeStatus> => {
-    const status = await statRemoteScript(host, port, username, keyEnvName, target, 5000);
+    const status = await statRemoteScript(host, port, username, keyEnvName, target, 5000, hostKeyFingerprint);
     if (status === "not_found") return "missing";
     return status as AutoRebootProbeStatus;
   };
 
   const [sg, eu] = await Promise.all([
     sgHost
-      ? probeFor(sgHost, sgPort, sgUser, sgKeyEnv)
+      ? probeFor(sgHost, sgPort, sgUser, sgKeyEnv, sgHostKeyFingerprint)
       : Promise.resolve<AutoRebootProbeStatus>("unconfigured"),
     euHost
-      ? probeFor(euHost, euPort, euUser, euKeyEnv)
+      ? probeFor(euHost, euPort, euUser, euKeyEnv, euHostKeyFingerprint)
       : Promise.resolve<AutoRebootProbeStatus>("unconfigured"),
   ]);
 

@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-23（續116）Auto-Repair SSH host key pinning 落地：無 fingerprint 的目標＝未設定，絕不無驗證連線（接手死亡 session）
+
+- [觸發] 續106 診斷後由「Fix repair-center backup probe ssh_error」session 實作，撞用量上限死亡（Codex companion 4 輪，第 4 輪「No material findings」）；本 session 接手落地。
+- [根因（不變量）] `connectSsh()` 接受任何 host key，而 prod `.env` 仍指退租位址（204.168.175.41 已被第三方接手且回應 SSH）。不變量：**每條特權 SSH 連線都對 pinned fingerprint 驗證 host key；fingerprint 缺失＝目標未設定（null），不降級成無驗證**。
+- [修法] `lib/repair-center/ssh.ts`：`SshTarget.hostKeyFingerprint`（ssh2 `hostHash:'sha256'` hex，非 ssh-keygen base64）、`connectSsh()` 走 `hostVerifier` 不符即 `HostKeyMismatchError`、`readSshTarget()` 缺 `AUTO_REPAIR_<SG|EU>_SSH_HOST_KEY_SHA256` → 回 null + stderr 警告；`app/api/ops/repairs/health/route.ts` inline 探針同規則；新測試 `__tests__/ssh-host-key-pinning.test.ts`、`__tests__/autorepair-gate-contract.test.ts`；新 `scripts/aw-autorepair-gate.sh`。程式註解原指向「續107」（該 session 預定的號碼，實際被 doc_integrity 佔用）→ 改指本條。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=~120000 | result=0 errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/repair-center app/api/ops/repairs` | exit=0 | ms=~40000 | result=9 files / 175 tests 全綠（原 session 另跑整包 1558 綠）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（`agency-os/reports/oracle/2026-09-23-partialreview-77e528c0.md`，scoped 5 檔；原 session companion round 1-4 修到 0）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`connectSsh\|readSshTarget\|hostKeyFingerprint\|AUTO_REPAIR_SG_SSH_HOST_KEY_SHA256` | hits=6 檔（ssh.ts／route.ts／2 測試／`docker-compose.yml:402` 預設仍指 5.223.93.113＝registry knownViolations 追蹤／TASKS 資安條目）
+- [剩餘風險] prod `.env` 尚無 fingerprint → 兩個目標現在都是 `unconfigured`（設計如此），要等操作者在主機設 `AUTO_REPAIR_*_SSH_HOST_KEY_SHA256`（TASKS go-ahead 項）。
+- [rollback] `git revert <commit>`：回到無驗證連線。
+
 ## 2026-09-23（續115）研究線：課程層（每個方法開始前 5 分鐘課）；計畫 v1.8（U15／D17，核心 20d）；C11 方案來源四層
 - [觸發] 操作者：「所以在這裡 HCI 不用了？」（答：三條線不用，HCI 保留給查人、選配接入）→「解決方案怎麼來的？」→「使用者之前沒有使用過這個工具，所以你要先幫他上課」＋ thesystemsthinking.com 冰山教學連結。
 - [C11 補] `9558c0967`：方案來源四層（框架來自方法契約介入模式；每條建議引 [n] 否則進 gaps；力道順序交下一個方法算；案例庫演化）＋模型禁止事項（自創目標數字、填負責人期限、無證據因果）。
