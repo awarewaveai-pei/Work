@@ -342,7 +342,10 @@ test('parity: PreToolUse Agent spawn also carries the shared charter (2026-09-03
   // real testing proved it never reaches THIS host at all -- PreToolUse
   // ^Agent$ is the confirmed-working path, piggybacking on the same trigger
   // point subagent-budget.js already proved fires reliably for real spawns.
+  // session_id: subagent-budget.js keys its 20-minute Agent window on the sid; without one every
+  // run of this suite shared 'no-sid' and the 11th run inside 20 minutes was BLOCKED (2026-09-23).
   const r = run('PreToolUse', {
+    session_id: freshSid('charter'),
     tool_name: 'Agent',
     tool_input: { description: 'test', prompt: 'test prompt' },
     private_note: 'must-not-echo',
@@ -451,6 +454,69 @@ test('P4-1b: ssh prod systemctl restart → BLOCK; non-prod IP → pass', () => 
   const other = run('PreToolUse', { session_id: freshSid('p4'), tool_name: 'Bash', tool_input: { command: 'ssh root@10.0.0.5 bash sg-deploy.sh' } });
   assert.equal(other.status, 0, 'non-prod IP not in scope');
 });
+
+// P4-1d (2026-09-23): the deploy-script names used to be bare substrings, so
+// read-only diagnostics that merely NAMED a script were blocked (three in one
+// incident session). Names now count only in command position.
+const KS = 'ssh -p 58122 ubuntu@145.239.195.47';
+const P4_1D_CASES = [
+  // [label, command, expected exit status]
+  ['read: tail drift log', `${KS} 'tail -n 50 /var/log/sg-deploy-drift.log'`, 0],
+  ['read: grep auto-deploy script', `${KS} 'grep -c HOLD_PATH /root/lobster-phase1/scripts/auto-deploy-next-admin.sh'`, 0],
+  ['read: cmp live vs git sg-deploy', `${KS} 'cmp /root/lobster-phase1/scripts/sg-deploy.sh /root/git/sg-deploy.sh'`, 0],
+  ['read: stat rollback script', `${KS} 'stat -c %y /root/lobster-phase1/scripts/rollback-phase1.sh'`, 0],
+  ['read: sudo cat + sha256sum chain', `${KS} 'sudo cat /root/lobster-phase1/scripts/sg-deploy.sh | sha256sum'`, 0],
+  ['read: ls/wc/head/diff', `${KS} 'ls -l /root/lobster-phase1/scripts/ && wc -l /root/lobster-phase1/scripts/rollback-phase1.sh && head -5 /root/lobster-phase1/scripts/auto-deploy-next-admin.sh; diff a/sg-deploy.sh b/sg-deploy.sh'`, 0],
+  ['read: git log on script', `${KS} 'cd /root/lobster-phase1 && git log --oneline -3 -- scripts/sg-deploy.sh'`, 0],
+  ['read: less via ks-aw-01 alias', "ssh ks-aw-01 'less /var/log/auto-deploy-next-admin.log'", 0],
+  ['exec: sudo abs path', `${KS} 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'`, 2],
+  ['exec: sudo bash rollback restore', `${KS} 'sudo bash /root/lobster-phase1/scripts/rollback-phase1.sh restore next-admin rollback-x'`, 2],
+  ['exec: rollback save', `${KS} 'sudo /root/lobster-phase1/scripts/rollback-phase1.sh save next-admin'`, 2],
+  ['exec: sudo auto-deploy', `${KS} 'sudo /root/lobster-phase1/scripts/auto-deploy-next-admin.sh'`, 2],
+  ['exec: cd && ./relative', `${KS} 'cd /root/lobster-phase1 && ./scripts/sg-deploy.sh next-admin'`, 2],
+  ['exec: after a read in same chain', `${KS} 'tail /var/log/sg-deploy-drift.log; sudo -u root bash -x /root/lobster-phase1/scripts/sg-deploy.sh next-admin'`, 2],
+  ['exec: env/nohup/timeout wrappers', `${KS} 'sudo env FOO=1 nohup timeout 600 /root/lobster-phase1/scripts/sg-deploy.sh next-admin'`, 2],
+  ['exec: bash -lc nested quotes', `${KS} "sudo bash -lc 'exec /root/lobster-phase1/scripts/sg-deploy.sh next-admin'"`, 2],
+  ['exec: script fed on stdin', `${KS} 'sudo bash -s next-admin' < lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh`, 2],
+  ['exec: ssh opt after host', "ssh ks-aw-01 -t 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'", 2],
+  ['exec: retired IP still covered', "ssh root@5.223.93.113 'bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin'", 2],
+  ['exec: local bash -c wrapper', `bash -c "${KS} 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'"`, 2],
+  ['exec: sudo su - root -c', `${KS} "sudo su - root -c '/root/lobster-phase1/scripts/sg-deploy.sh next-admin'"`, 2],
+  ['exec: xargs', `${KS} 'echo next-admin | xargs sudo /root/lobster-phase1/scripts/sg-deploy.sh'`, 2],
+  ['exec: eval / setsid', `${KS} 'eval /root/lobster-phase1/scripts/rollback-phase1.sh restore x y; setsid /root/lobster-phase1/scripts/auto-deploy-next-admin.sh'`, 2],
+  ['exec: source with dot', `${KS} 'cd /root/lobster-phase1/scripts && . ./sg-deploy.sh next-admin'`, 2],
+  ['exec: if/then (codex finding)', "ssh ks-aw-01 'if test -f /root/flag; then /root/lobster-phase1/scripts/sg-deploy.sh next-admin; fi'", 2],
+  ['exec: for/do loop', `${KS} 'for s in next-admin; do sudo /root/lobster-phase1/scripts/sg-deploy.sh $s; done'`, 2],
+  ['exec: case arm', `${KS} 'case x in x) /root/lobster-phase1/scripts/sg-deploy.sh next-admin;; esac'`, 2],
+  ['exec: negated / subshell', `${KS} '! (cd /root/lobster-phase1 && sudo ./scripts/rollback-phase1.sh restore a b)'`, 2],
+  ['read: if-guarded read', "ssh ks-aw-01 'if test -f /root/lobster-phase1/scripts/sg-deploy.sh; then cat /root/lobster-phase1/scripts/sg-deploy.sh; fi'", 0],
+  ['exec: ssh after local chain (codex r2)', "cd /tmp && ssh ks-aw-01 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'", 2],
+  ['exec: ssh after local ; with timeout', `echo go; timeout 900 ${KS} 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'`, 2],
+  ['exec: remote bash < script', `${KS} 'sudo bash < /root/lobster-phase1/scripts/sg-deploy.sh'`, 2],
+  ['exec: ssh stdin, no remote cmd', 'ssh ks-aw-01 < lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh', 2],
+  ['read: cat < script (codex r2)', "ssh ks-aw-01 'cat < /root/lobster-phase1/scripts/sg-deploy.sh'", 0],
+  ['read: ssh after local chain', `cd /tmp && ${KS} 'tail -n 20 /var/log/sg-deploy-drift.log'`, 0],
+  ['read: interactive su (no -c)', `${KS} 'sudo su - root'`, 0],
+  ['verb: docker compose restart unchanged', `${KS} 'cd /root/lobster-phase1 && sudo docker compose restart next-admin'`, 2],
+  ['non-prod host not in scope', "ssh root@10.0.0.5 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'", 0],
+  // codex round 3 (2026-09-23): quoted remote command spanning lines; script read upstream of a shell in a pipeline
+  ['exec: multi-line remote if/then (codex r3)', "ssh ks-aw-01 'if test -f /root/flag\nthen /root/lobster-phase1/scripts/sg-deploy.sh next-admin\nfi'", 2],
+  ['exec: cat < script | bash (codex r3)', "ssh ks-aw-01 'cat < /root/lobster-phase1/scripts/sg-deploy.sh | bash'", 2],
+  ['exec: cat script | sudo bash', "ssh ks-aw-01 'cat /root/lobster-phase1/scripts/rollback-phase1.sh | sudo bash -s restore a b'", 2],
+  ['exec: second ssh line deploys', `${KS} 'tail -n 5 /var/log/sg-deploy-drift.log'\n${KS} 'sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin'`, 2],
+  ['read: multi-line remote reads only', "ssh ks-aw-01 'if test -f /root/flag\nthen cat /root/lobster-phase1/scripts/sg-deploy.sh\nfi'", 0],
+  ['read: cat script | wc -l', "ssh ks-aw-01 'cat /root/lobster-phase1/scripts/sg-deploy.sh | wc -l'", 0],
+  ['read: script upstream, no shell downstream', "ssh ks-aw-01 'cat < /root/lobster-phase1/scripts/sg-deploy.sh | grep -c HOLD | tee /tmp/x'", 0],
+  // codex round 4: compact `-cCOMMAND` (bash itself rejects it; the gate still treats it as executing)
+  ['exec: bash -c with the command attached (codex r4)', "ssh ks-aw-01 'sudo bash -c/root/lobster-phase1/scripts/sg-deploy.sh next-admin'", 2],
+];
+for (const [label, command, want] of P4_1D_CASES) {
+  test(`P4-1d: ${label} → exit ${want}`, () => {
+    const r = run('PreToolUse', { session_id: freshSid('p4d'), tool_name: 'Bash', tool_input: { command } });
+    assert.equal(r.status, want, `${command}\n${r.stderr}`);
+    if (want === 2) assert.match(r.stderr, /deploy flow first/);
+  });
+}
 
 test('P4-2: VBC prompt trigger → context injected on stdout, raw JSON NOT echoed', () => {
   const r = run('UserPromptSubmit', { session_id: freshSid('p4'), prompt: '別的 AI 已經處理好 WAF 了，你確認一下' });

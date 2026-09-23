@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-23（續119）high-risk gate 規則 4：部署腳本只有「真的執行」才擋，唯讀診斷放行；多行遠端指令與 pipeline 餵 shell 也抓（接手死亡 session）
+
+- [觸發] 「Fix high-risk gate blocking read-only ssh」session（SG next-admin session 開的卡）撞用量上限死亡，Codex round 3 兩個 CONFIRMED 未修；本 session 接手。
+- [根因（不變量）] 舊規則把 `sg-deploy|rollback-phase1|auto-deploy-next-admin` 當子字串比對 → `tail sg-deploy-drift.log`／`grep .. auto-deploy-next-admin.sh` 被擋（一個 session 三次），而部分真執行反而漏。不變量：**腳本只在 command position（命令列表第一個字，跳過 if/then/do、sudo/bash/su -c/env/timeout/xargs 與其選項、VAR=val）或作為 shell 的 stdin 時算執行；其餘位置一律是讀**；掃描整段指令文字的每個 prod ssh 出現處，遠端指令跨行也算。
+- [修法] `mcp/claude-userlevel/hooks/rules/high-risk-bash-warn.js`：`executesDeployScript()` 去引號 tokenizer，命令列表（`&& || ; 換行 $( () {}` 與反引號）×pipeline 段；上游段讀到腳本＝下游 shell 的 stdin（`cat < sg-deploy.sh | bash`）；shell 的緊貼 `-cCOMMAND` 也算執行（bash 本身拒絕該寫法，實測 `bash -c/bin/echo hi` → `-/: invalid option`，仍往安全方向處理）；規則 4 `test()` 改掃整段文字、`PROD_SSH_LINE_RE` 加 `m` 旗標。`tests/hooks/runner-parity.test.mjs` P4-1d 矩陣 44 案例；charter parity 測試補 `session_id`（`subagent-budget.js` 以 sid 計 20 分鐘 Agent 視窗，無 sid 時 20 分鐘內第 11 次跑套件即被擋）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/hooks/runner-parity.test.mjs` | exit=0 | ms=~90000 | result=161/161；`bash scripts/test-hooks.sh` 287/287
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 ① 拔換行分隔 → 多行案例紅；② 忽略 pipeline 上游腳本 → 兩個 pipe 案例紅；③ 只掃第一個 ssh → 「第二行 ssh 部署」紅；還原全綠 | exit=1/0 | result=三個新規則皆非空跑
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -c/bin/echo hi; bash '-c/bin/echo hi'; sh -c/bin/echo hi` | exit=2 | result=三種皆 `-/: invalid option`（round 4 finding 不可執行，仍防禦）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/7m/0n（原 session r1 `a776f5dc`／r2 `d6a03c36` 已修；r3 `95ea3e88` 2 個→本次修；r4 `8ace93c3` 1 個→安全方向處理；r5 `b2660d01` 1 個「`cat script | wc -l` 會被擋」→ 駁回：`sawShell` 為 false 時上游狀態不生效，既有案例 `read: cat script | wc -l` 期望 exit 0 且通過）
+- BUGHUNT_DONE: scope=mcp/claude-userlevel,tests,agency-os,scripts | grep=`executesDeployScript\|PROD_SSH_LINE_RE\|DEPLOY_SCRIPT_RE\|deploy flow first` | hits=4 檔（規則本身、runner-parity 測試、`rules.manifest.json` 描述未變、AGENTS §3 BLOCK 清單語意不變）
+- [剩餘風險] 過度比對方向：ssh 之後同一段文字的本機指令若在 command position 命名部署腳本也會被擋（首行 `# CONFIRMED-HIGH-RISK:` 可解）；live 副本已 `sync-claude-userlevel.ps1 -Mode merge` 同步。
+- [rollback] `git revert <commit>` + 重跑 sync：回到子字串比對。
+
 ## 2026-09-23（續118）研究線：教學例子跟線走（D18）；課程示意稿改教育例＋領域切換
 - [觸發] 操作者：「你認為所有帶入的例子應該以哪一種類型為主？像這個你是用商業行為」。承認：客服例是她的測試輸入被我誤當教材。
 - [決策 D18] 例子跟使用者進來的那條線走：`lessons` 每方法四組 `{edd_research, partnership_risk, decision, everyday}`，顯示 Project.purpose 對應那組、可切換；「這是什麼」步用 everyday；操作者預設教育研究；示範 Project 與課程同一組；永不用真實案例當教材。
