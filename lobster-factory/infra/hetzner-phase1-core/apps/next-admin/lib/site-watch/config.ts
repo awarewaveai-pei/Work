@@ -1,4 +1,4 @@
-// Site-watch knobs. Contract: agency-os/handoffs/2026-09-21-site-watch-plan.md §8 (C-numbers below).
+// Site-watch knobs. C-numbers below refer to the glossary in packages/db/migrations/0091_site_watch.sql.
 
 /** C10 global kill switch. Default OFF (AGENTS.md §0): unset/anything else = no renderer call at all. */
 export function siteWatchEnabled(env: NodeJS.ProcessEnv = process.env): boolean {

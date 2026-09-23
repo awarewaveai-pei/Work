@@ -125,7 +125,7 @@ export function clampTimeout(value, { min = 5_000, max = 45_000, fallback = 30_0
 }
 
 /**
- * /snapshot failure codes (site-watch, handoff 2026-09-21-site-watch-plan.md §8 C5). About the SITE,
+ * /snapshot failure codes (site-watch C5; glossary in packages/db/migrations/0091_site_watch.sql). About the SITE,
  * not about us: a page that loads fine but is too big to screenshot is not a failure (see
  * SNAPSHOT_SKIP), and a renderer crash surfaces as an HTTP error, not as one of these.
  */

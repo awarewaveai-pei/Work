@@ -13,8 +13,8 @@ const SEVERITY_RANK: Record<IncidentSeverity, number> = {
 };
 
 /**
- * One Telegram delivery in the three states site-watch's notifier needs (handoff
- * 2026-09-21-site-watch-plan.md §8 I2). sendMessage has no idempotency key, so anything that MAY have
+ * One Telegram delivery in the three states site-watch's notifier needs (invariant I2 in
+ * packages/db/migrations/0091_site_watch.sql). sendMessage has no idempotency key, so anything that MAY have
  * reached Telegram counts as delivered:
  *   sent      — HTTP 2xx
  *   rejected  — HTTP 4xx: Telegram answered and refused; surely not delivered

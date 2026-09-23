@@ -1208,6 +1208,14 @@
 
 #### I. 📥 收件匣（`/tomo` 落地區，待分類）
 
+- [ ] **site-watch slice 1：核心已落地（deab0f709）未測未上線 — 接手完成測試／Trigger task／UI 卡／env／renderer 實測／review／prod** → handoffs/2026-09-23-1116-site-watch-slice1.md
+  - `🟡 待接手` · `2026-09-21 開；2026-09-23 交接包重擬` · `GPT/Codex（實作＋review）→ 操作者（prod 每步 go-ahead）`
+  - **一句話**：DB fenced 狀態機 + renderer `/snapshot` + next-admin runner/notify/routes 已 commit 並過 harness／tsc／renderer test；無單元測試、無 Trigger task、無 UI 卡、env 未接、`/snapshot` 未真跑、未 review、prod 未動。
+  - **現在到哪**：`git log deab0f709..HEAD -- lobster-factory` 對 site-watch 零新 commit（2026-09-23 確認）；設計 SSOT = `lobster-factory/packages/db/migrations/0091_site_watch.sql` 檔頭。
+  - **下一步**：照 `agency-os/handoffs/2026-09-23-1116-site-watch-slice1.md` §5 第 1–7 步（本機 Low/Medium 直接做）→ 第 8 步 prod a–g 逐項等操作者 go-ahead。
+  - **完成定義**：prod 一個真實客戶跑出 `site_watch_results` 1 列 + R2 baseline 圖 + 客戶頁卡片顯示；`SITE_WATCH_ENABLED=false` 時 renderer 0 呼叫；WORKLOG 四動作證據行齊、review 由非 Claude 模型完成。
+  - **證據**：`agency-os/WORKLOG.md` 2026-09-21「site-watch slice 1 實作（未完，交接 GPT/Codex）」；commit `deab0f709`／`80b7897e6`。
+
 - [x] **F08 strategy 家族收官批次（10/14→14/14）4 個 agent 已派出未回報，操作者主動要求暫停記錄（5 小時額度將盡）** ✅ 2026-09-11 結案
   - `🟢 已結案` · `2026-09-10 開，2026-09-11 完成` · `操作者`
   - **一句話**：4 個 agent 遇 rate limit 全滅，交接包記錄後額度重置重派；2 個方法（business_model_canvas／value_proposition_canvas）從中斷點繼承已驗證正確的部分產出（另 1 個 bcg_matrix 部分檔案含真 YAML 語法錯誤已刪除重建），critic 獨立複驗「繼承並驗證」判斷成立，0 Critical/0 Major/0 Minor。F08 家族正式收官（14/14）。
@@ -1803,4 +1811,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-20 03:31:11 UTC_
+_Last synced: 2026-09-23 02:59:54 UTC_
+

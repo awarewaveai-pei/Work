@@ -21431,3 +21431,22 @@ WORKLOG_DONE: provision-staging 不再回傳密碼；sink 全數定位，洩漏�
 [rollback] 全為新檔 + 向後相容改動；`git revert` 本 commit 即可；prod 未動。
 
 WORKLOG_DONE: site-watch slice 1 核心（DB/renderer/next-admin lib+routes）落地並經 harness/tsc/renderer test 驗證；剩餘工作交接 GPT/Codex
+
+## 2026-09-23 site-watch 交接包重擬：兩份 09-21 檔案廢止，改為單一合規 packet + 程式內永久 SSOT
+**操作者**：「懷疑兩份文件都不優，重新擬定」。**根因（為何兩天零進度）**：
+- C1 兩份都不合 `handoffs/SCHEMA.md`（無 6 段、無 `$WORK_ROOT`、檔名無 HHmm）且 **未登記 TASKS.md `→ handoffs/` 列** → `ao-resume.md:281` 只掃該 pattern → AO-RESUME 完全看不到，接手者無入口。
+- C2 兩份互相矛盾：plan §8 契約 vs progress §3「13 項偏差」，讀者要自行對帳；plan 另含 4 輪 Codex review 敘事（歷史非規格）。
+- C3 5 處程式註解（`0091_site_watch.sql:2`、`telegram.ts:17`、`config.ts:1`、renderer `lib.mjs:128`／`server.mjs:50`）指向 handoff 檔 → packet 90 天 prune（`handoffs/README.md`）後程式自述失效。
+- C4 progress §4.8c 對「sg-deploy 是否處理 renderer」寫成待查 → 實查 `sg-deploy.sh:116`（RESTORABLE_APPS）、`:215-225`（node --check/--test gate）、`:476-491`（真實 render smoke）已完整處理；`apply-db-migration.mjs` 在 `scripts/`（非 lobster-factory/scripts）且支援 `--check`。
+**修法**：
+- 新 packet `handoffs/2026-09-23-1116-site-watch-slice1.md`（SCHEMA 6 段；§2 收錄操作者拍板清單；§3 實作即 SSOT；§5 八步含 prod a–g 的確切指令與驗證；§6 landmines）。TASKS.md §I 新列含 `→ handoffs/` pointer。
+- 設計 glossary（I1–I3、C1–C12）移入 `0091_site_watch.sql` 檔頭 = 永久 SSOT；5 處註解改指該檔。
+- `git rm` 兩份舊 packet（可自 `80b7897e6` 取回）；WORKLOG／memory daily／oracle report 內的舊檔名為歷史記錄，不回改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/site-watch-local-verify.sh`（檔頭改後 apply/down/re-apply 仍綠） | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check server.mjs && node --check lib.mjs && npm test`（apps/renderer，16 pass） | exit=0 | ms=300
+- REVIEW_WAIVED: DOC_ONLY -- 交接包／TASKS／5 處註解／migration 檔頭 glossary，無邏輯改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`site-watch-plan.md|site-watch-slice1-progress.md` | hits=6 files（WORKLOG.md、memory/daily/2026-09-22.md、reports/oracle/2026-09-21-review-{0d59ffb2,a416c9d2,d275d378,fcce772d}.md = 歷史留存；程式碼／新 packet 0 殘留）
+[剩餘風險] packet 內 `:line` 引用以 2026-09-23 程式狀態為準（migration 檔頭增 24 行，packet 對 migration 只引函式名不引行號）。
+[rollback] `git revert` 本 commit 即還原兩份舊檔與註解。
+
+WORKLOG_DONE: site-watch 交接包重擬為單一合規 packet（TASKS 已登記）、設計 glossary 進 0091 檔頭、程式註解不再依賴會被 prune 的 handoff

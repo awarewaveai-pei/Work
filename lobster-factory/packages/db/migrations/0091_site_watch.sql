@@ -1,6 +1,30 @@
--- 0091 — site-watch: public-page monitoring of client sites (slice 1).
--- Contract: agency-os/handoffs/2026-09-21-site-watch-plan.md §8 (I1–I3, C1–C12). Only caller:
--- next-admin lib/site-watch/store.ts.
+-- 0091 — site-watch: public-page monitoring of client sites (slice 1). Only caller: next-admin
+-- lib/site-watch/store.ts. This header is the design SSOT that the I*/C* labels in code comments
+-- refer to (handoff packets are pruned after 90 days; this file is not).
+--
+-- Invariants:
+--   I1 one effective executor per target: every claim gets a new lease_gen; every state write is one
+--      transaction that re-checks lease_gen + lease_until under the target row lock.
+--   I2 notification = state, not event: 'pending' before sending, 'uncertain' before the request
+--      leaves, 'sent' only on a delivered response; uncertain counts as possibly delivered
+--      (at-least-once: at most one duplicate message, never a lost one).
+--   I3 one episode = one alert + one close: an alert that was sent/uncertain always gets a closing
+--      message; one that surely was not (pending/skipped) ends silently.
+-- Contract labels:
+--   C1  pages = the client's site_url home page only; page_id = sha256(canonical url)[0:16].
+--   C2  run buckets per frequency; daily bucket = 24h from hour_utc; only the current bucket runs.
+--   C3  lease claim/renew/release; window = f(page count), 5–15 min; no Trigger.dev retries.
+--   C4  one target per route call; the heartbeat never loops over clients.
+--   C5  renderer POST /snapshot: full-page capture with images/fonts, fixed viewport, failure codes.
+--   C6  visual: first success = baseline; pixelmatch 0.1; >5% differing = visual failure;
+--       baseline replaced only by an operator ("accept as baseline").
+--   C7  dedicated tables (never organizations.metadata); config writes carry an optimistic version.
+--   C8  alert after 2 consecutive failures; site-watch sends Telegram itself (dispatcher skips).
+--   C9  retention 30 days (rows + evidence); orphan objects swept daily with a 24h grace.
+--   C10 global kill switch SITE_WATCH_ENABLED (default OFF); target rows default enabled.
+--   C11 wp-update before/after comparison — slice 2, not here.
+--   C12 privacy: private bucket, images served only through an authenticated route, stored URLs
+--       carry no query string, public pages only.
 --
 -- Why functions, not table writes from TS: every state write must be fenced by the caller's lease
 -- (I1). Each function takes the target row lock first (site_watch__hold, FOR UPDATE) and re-checks
