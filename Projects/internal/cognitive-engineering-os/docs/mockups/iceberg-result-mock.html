@@ -55,6 +55,9 @@
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
   pre{background:#0f172a;color:#d6e2f0;font-size:12px;padding:12px;border-radius:8px;overflow:auto}
   dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
+  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .charts figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .charts figcaption{font-size:13.5px;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -68,15 +71,25 @@
     <div class="sub">方法：冰山模型 Iceberg Model（系統思考 Systems Thinking）・專案「客服品質」・2026-09-23</div>
     <p class="lead">看得見的只有<b>事件</b>；原因藏在水面下。這個方法把問題由上往下挖四層：<b>事件 → 模式 → 結構 → 心智模型</b>。越深的一層越難改，但改了效果越大、越持久。</p>
     <div class="steps">
-      <div class="step"><b>① 先看冰山圖</b>你填的四段話各在哪一層；左邊是每一層要回答的問題，右邊是在那一層出手的方式。</div>
-      <div class="step"><b>② 由上往下讀四張卡</b>每張卡同一個格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
-      <div class="step"><b>③ 看總結與下一步</b>最有力的出手點在哪一層、還缺什麼證據、接下來該跑哪個方法。</div>
+      <div class="step"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
+      <div class="step"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
+      <div class="step"><b>③ 看總結、對照表與下一步</b>最有力的出手點在哪一層、還缺什麼證據、接下來該跑哪個方法。</div>
     </div>
+  </div>
+
+  <!-- 0.5 明確的文字結論 -->
+  <div class="card" style="border-left:6px solid var(--accent)">
+    <h2>① 結論（文字分析）</h2>
+    <p class="lead" style="margin-top:0"><b>一句話：</b>滿意度掉 23 分不是客服人員的問題，是「訓練制度」加上「客服是成本中心」這個信念一起造成的；救火止不住，要改制度，並且換掉那個信念。</p>
+    <div class="finding"><b>發現 1｜這是系統性下滑，不是單季意外</b>連續六個月每季下滑、新人流動率同步上升 <cite>[1]</cite><cite>[2]</cite>。事件層只看到「這季掉了」，模式層看到「一直在掉」。</div>
+    <div class="finding"><b>發現 2｜有一條自我加強的「訓練債迴路」在推</b>資深忙救火 → 沒空帶新人 → 新人準備不足就上線 → 客訴與緊急案件變多 → 資深更忙 <cite>[3]</cite>。迴路不打斷，下滑會越來越快（圖 B）。</div>
+    <div class="finding"><b>發現 3｜「成本中心」信念讓迴路修不好</b>訓練預算永遠最先被砍 <cite>[4]</cite>，等於持續替迴路加油；只改流程、不改信念，下一輪預算又砍回去。</div>
+    <p style="margin:6px 0 0"><b>建議：</b>先改第 3 層（訓練 2 天改 2 週；帶新人列入資深考核），三個月內用「新人首次解決率、客訴量」兩個數字，回頭說服管理層把客服從「成本中心」改成「留客中心」（第 4 層）。<b>證據缺口：</b>流動率與滿意度目前只是同步，不是因果；先補離職原因、每人案件量、首次解決率。</p>
   </div>
 
   <!-- 1. 冰山圖 -->
   <div class="card">
-    <h2>① 冰山圖：你的問題在四層各是什麼</h2>
+    <h2>② 冰山圖：你的問題在四層各是什麼</h2>
     <svg viewBox="0 0 980 575" role="img" aria-label="冰山模型四層圖">
       <defs>
         <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
@@ -132,9 +145,72 @@
     <div class="legend"><span>左：這一層要回答的問題＋你填的內容</span><span>中：四層冰山</span><span>右：在這一層出手的方式（介入方式）</span></div>
   </div>
 
+  <!-- 1.5 圖表分析 -->
+  <div class="card">
+    <h2>③ 圖表分析（三張圖各回答一個問題）</h2>
+    <div class="charts">
+      <figure>
+        <figcaption><b>圖 A｜趨勢：真的在一直掉嗎？</b>（第 2 層）</figcaption>
+        <svg viewBox="0 0 460 230" role="img" aria-label="六個月滿意度與新人流動率趨勢">
+          <line x1="50" y1="20" x2="50" y2="180" stroke="#9ca3af"/><line x1="50" y1="180" x2="420" y2="180" stroke="#9ca3af"/>
+          <g font-size="11" fill="#5b6470">
+            <text x="8" y="24">90</text><text x="8" y="104">70</text><text x="8" y="184">50</text>
+            <text x="426" y="24">20%</text><text x="426" y="104">10%</text><text x="426" y="184">0%</text>
+            <text x="50" y="198">4月</text><text x="120" y="198">5月</text><text x="190" y="198">6月</text><text x="260" y="198">7月</text><text x="330" y="198">8月</text><text x="400" y="198">9月</text>
+          </g>
+          <polyline points="50,40 120,52 190,68 260,84 330,108 400,132" fill="none" stroke="#1f5fbf" stroke-width="3"/>
+          <polyline points="50,156 120,152 190,144 260,136 330,124 400,108" fill="none" stroke="#b25e09" stroke-width="3" stroke-dasharray="6 4"/>
+          <g font-size="12" font-weight="700"><text x="300" y="70" fill="#1f5fbf">滿意度 85 → 62</text><text x="250" y="160" fill="#b25e09">新人流動率 6% → 18%</text></g>
+          <text x="50" y="222" font-size="11" fill="#9ca3af">示意數據：接上真實資料後以你的數字繪製；兩線同步不代表因果。</text>
+        </svg>
+      </figure>
+      <figure>
+        <figcaption><b>圖 B｜因果迴路：是什麼在推？</b>（第 3、4 層）</figcaption>
+        <svg viewBox="0 0 460 250" role="img" aria-label="訓練債因果迴路">
+          <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#245b8a"/></marker></defs>
+          <g fill="#fff" stroke="#245b8a" stroke-width="1.5">
+            <rect x="20" y="30" width="150" height="44" rx="8"/><rect x="290" y="30" width="150" height="44" rx="8"/>
+            <rect x="290" y="150" width="150" height="44" rx="8"/><rect x="20" y="150" width="150" height="44" rx="8"/>
+            <rect x="160" y="200" width="150" height="40" rx="8" stroke="#b25e09" stroke-dasharray="5 3"/>
+          </g>
+          <g font-size="12.5" text-anchor="middle" fill="#14213d">
+            <text x="95" y="57">資深忙著救火</text><text x="365" y="57">沒空帶新人</text>
+            <text x="365" y="177">新人準備不足上線</text><text x="95" y="177">客訴、緊急案件變多</text>
+            <text x="235" y="224" fill="#b25e09">訓練預算先被砍（信念層）</text>
+          </g>
+          <g fill="none" stroke="#245b8a" stroke-width="2" marker-end="url(#arr)">
+            <path d="M170,52 L288,52"/><path d="M365,76 L365,148"/><path d="M288,172 L172,172"/><path d="M95,148 L95,76"/>
+            <path d="M310,214 Q400,214 380,196" stroke="#b25e09"/>
+          </g>
+          <text x="230" y="120" font-size="16" font-weight="700" text-anchor="middle" fill="#245b8a">R 訓練債迴路（自我加強）</text>
+          <text x="230" y="140" font-size="11" text-anchor="middle" fill="#5b6470">箭頭 = 前者讓後者更嚴重；轉一圈回到起點，所以越轉越快</text>
+        </svg>
+      </figure>
+      <figure>
+        <figcaption><b>圖 C｜槓桿對比：在哪一層出手最值得？</b>（四層）</figcaption>
+        <svg viewBox="0 0 460 210" role="img" aria-label="四層改變難度與效果持久度對比">
+          <g font-size="12.5" fill="#14213d">
+            <text x="10" y="42">事件</text><text x="10" y="82">模式</text><text x="10" y="122">結構</text><text x="10" y="162">心智模型</text>
+          </g>
+          <g>
+            <rect x="90" y="28" width="60" height="9" fill="#9ca3af"/><rect x="90" y="39" width="60" height="9" fill="#1f5fbf"/>
+            <rect x="90" y="68" width="120" height="9" fill="#9ca3af"/><rect x="90" y="79" width="120" height="9" fill="#1f5fbf"/>
+            <rect x="90" y="108" width="180" height="9" fill="#9ca3af"/><rect x="90" y="119" width="260" height="9" fill="#1f5fbf"/>
+            <rect x="90" y="148" width="300" height="9" fill="#9ca3af"/><rect x="90" y="159" width="330" height="9" fill="#1f5fbf"/>
+          </g>
+          <g font-size="11" fill="#5b6470">
+            <text x="156" y="36">短期</text><text x="216" y="76">提早看到</text><text x="356" y="127">切斷迴路，持久</text><text x="360" y="156">最難、最慢</text>
+          </g>
+          <g font-size="11"><rect x="90" y="185" width="12" height="9" fill="#9ca3af"/><text x="106" y="193" fill="#5b6470">改變難度</text><rect x="180" y="185" width="12" height="9" fill="#1f5fbf"/><text x="196" y="193" fill="#5b6470">效果與持久度</text></g>
+        </svg>
+      </figure>
+    </div>
+    <p class="sub" style="margin:8px 0 0">三張圖各自對應冰山的一層或幾層；接上真實資料後，圖 A 用你的數字，圖 B、C 由分析結果生成。</p>
+  </div>
+
   <!-- 2. 四層逐層解讀，同一骨架 -->
   <div class="card">
-    <h2>② 由上往下四層解讀（每張卡同一格式）</h2>
+    <h2>④ 由上往下四層解讀（每張卡同一格式）</h2>
 
     <div class="layer l1 card" style="margin-bottom:12px">
       <div class="head"><h3>第 1 層／4：事件 Events</h3><span class="meta">看得見 ・ 時間：現在 ・ 出手方式：回應 React</span></div>
@@ -171,7 +247,7 @@
 
   <!-- 3. 總結 -->
   <div class="card">
-    <h2>③ 總結：在哪一層出手</h2>
+    <h2>⑤ 總結：在哪一層出手</h2>
     <div class="finding"><b>主要發現：問題在第 3 層的迴路，根在第 4 層的信念</b>第 1、2 層是症狀。訓練債迴路（第 3 層）製造下滑；「成本中心」信念（第 4 層）讓迴路修不好。</div>
     <div class="finding"><b>建議順序：先第 3 層，同時準備第 4 層</b>第 3 層見效快、能量化（新人首次解決率、客訴量）；第 4 層拿第 3 層的數字去說服管理層。</div>
     <div class="finding warn"><b>證據缺口（老實說）</b>流動率與滿意度目前只有「同步」<cite>[2]</cite>，沒有因果證據；也沒有每人案件量、首次解決率、離職原因。建議先補這三項再動預算。</div>
@@ -179,7 +255,7 @@
 
   <!-- 4. 理解層次表 -->
   <div class="card">
-    <h2>④ 理解層次對照表（改編自 Anderson &amp; Johnson）</h2>
+    <h2>⑥ 理解層次對照表（改編自 Anderson &amp; Johnson）</h2>
     <table>
       <tr><th>層</th><th>出手方式</th><th>時間取向</th><th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr>
       <tr><td>事件</td><td>回應 React</td><td>現在</td><td>最快的因應是什麼？</td><td>85 → 62 <cite>[1]</cite></td><td>救火、補償（只當急救）</td></tr>
@@ -192,7 +268,7 @@
 
   <!-- 5. 下一步 -->
   <div class="card">
-    <h2>⑤ 下一步：接著跑哪個方法（各自加深哪一層）</h2>
+    <h2>⑦ 下一步：接著跑哪個方法（各自加深哪一層）</h2>
     <div class="btns">
       <span class="btn primary">槓桿點分析<small>第 3、4 層：算出每個出手點的力道</small></span>
       <span class="btn">因果迴路圖<small>第 3 層：把訓練債迴路畫出來</small></span>
@@ -204,7 +280,7 @@
 
   <!-- 6. 引註 -->
   <div class="card">
-    <h2>⑥ 引註（每個 [n] 都指向一段可查的來源）</h2>
+    <h2>⑧ 引註（每個 [n] 都指向一段可查的來源）</h2>
     <ol class="src">
       <li>你的輸入・事件：「本季客服滿意度分數從 85 分掉到 62 分」</li>
       <li>你的輸入・模式：「過去六個月，滿意度分數每季穩定下滑，新進客服人員的流動率也同步上升」</li>
