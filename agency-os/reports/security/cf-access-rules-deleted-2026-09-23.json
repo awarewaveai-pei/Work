@@ -1,0 +1,74 @@
+﻿[
+    {
+        "id":  "b695de4519e74014be4c3fa6f2fd0b7b",
+        "paused":  false,
+        "modified_on":  "2026-08-28T11:27:15.186276Z",
+        "allowed_modes":  [
+                              "whitelist",
+                              "block",
+                              "challenge",
+                              "js_challenge",
+                              "managed_challenge"
+                          ],
+        "mode":  "whitelist",
+        "notes":  "ks-aw-01 IPv6 egress - self-calls (host curl prefers v6; v4-only whitelist missed it) 2026-08-28",
+        "configuration":  {
+                              "target":  "ip_range",
+                              "value":  "2001:41d0:000d:2572:0000:0000:0000:0000/64"
+                          },
+        "scope":  {
+                      "id":  "f21b1919632fee2221647908a94fdcac",
+                      "name":  "aware-wave.com",
+                      "type":  "zone"
+                  },
+        "created_on":  "2026-08-28T11:27:15.185536639Z"
+    },
+    {
+        "id":  "e13fb2f4335543b88e00396649b26ad9",
+        "paused":  false,
+        "modified_on":  "2026-08-28T07:45:42.168686Z",
+        "allowed_modes":  [
+                              "whitelist",
+                              "block",
+                              "challenge",
+                              "js_challenge",
+                              "managed_challenge"
+                          ],
+        "mode":  "whitelist",
+        "notes":  "ks-aw-01 consolidated host - self-calls (trigger tasks / kuma / probes) 2026-08-28",
+        "configuration":  {
+                              "target":  "ip",
+                              "value":  "149.202.64.114"
+                          },
+        "scope":  {
+                      "id":  "f21b1919632fee2221647908a94fdcac",
+                      "name":  "aware-wave.com",
+                      "type":  "zone"
+                  },
+        "created_on":  "2026-08-28T07:45:42.169971114Z"
+    },
+    {
+        "id":  "13e6f511d5694e7bb6d72816a1cd9f58",
+        "paused":  false,
+        "modified_on":  "2026-05-15T08:08:03.734508Z",
+        "allowed_modes":  [
+                              "whitelist",
+                              "block",
+                              "challenge",
+                              "js_challenge",
+                              "managed_challenge"
+                          ],
+        "mode":  "whitelist",
+        "notes":  "Uptime Kuma monitoring - EU VPS",
+        "configuration":  {
+                              "target":  "ip",
+                              "value":  "204.168.175.41"
+                          },
+        "scope":  {
+                      "id":  "f21b1919632fee2221647908a94fdcac",
+                      "name":  "aware-wave.com",
+                      "type":  "zone"
+                  },
+        "created_on":  "2026-05-15T08:08:03.736272152Z"
+    }
+]

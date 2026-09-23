@@ -8,9 +8,10 @@ export interface SshTarget {
   // Expected host key, as ssh2's own `hostHash:'sha256'` digest: lowercase hex
   // sha256 of the raw host public key blob. NOT OpenSSH's `ssh-keygen -lf`
   // format (that's base64, "SHA256:xxxx") — the two are different encodings
-  // of a similar idea and are not interchangeable. Get this value from ssh2
-  // itself (see scripts/fetch-ssh-host-key-fingerprint.mjs), never derive it
-  // by eye from `ssh-keygen -lf` output.
+  // of the same digest and are not interchangeable. Get this value from
+  // `node scripts/fetch-ssh-host-key-fingerprint.mjs <host> <port>` (same
+  // digest ssh2 computes, over ssh-keyscan's key blob; prints both encodings
+  // so the operator can cross-check), never derive it by eye from `ssh-keygen -lf`.
   //
   // 2026-09-23: added after WORKLOG 續106/107 found connectSsh() accepted
   // ANY host key — the same incident class where a retired IP got silently

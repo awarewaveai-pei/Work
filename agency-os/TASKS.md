@@ -108,21 +108,14 @@
 
 ### 未完成
 
-- [ ] **【2026-09-23 事故收尾｜待操作者 go-ahead（High）】6 個 prod／遠端動作，repo 側全部已 commit，機器上一個都還沒動**
-  - `🔴 現行` · `2026-09-23` · `操作者（High：CF／fail2ban／nginx／.env／push）`
-  - **背景**：8 個 session 共用 D:\Work 同時撞用量上限（WORKLOG 續113），6 個死 session 的工作由收尾 session 逐一落地：續110／113／116／117／119／120 與退租位址稽核條目。
-  - **① Cloudflare `aware-wave.com` 3 條 whitelist access rule 刪除**：`2001:41d0:d:2572::/64`（id `b695de4519e74014be4c3fa6f2fd0b7b`）、`149.202.64.114`（id `e13fb2f4335543b88e00396649b26ad9`）、`204.168.175.41`（id `13e6f511d5694e7bb6d72816a1cd9f58`，已被第三方接手）。指令：`DELETE /client/v4/zones/<zone>/firewall/access_rules/rules/<id>` ×3；先 `GET` 存 JSON 當 rollback；驗證 `scripts/check-cloudflare-security.ps1` Released-address = `clean`。
-  - **② ks-aw-01 `/etc/fail2ban/jail.d/ignoreip.local`** 拔 `149.202.64.114` → `fail2ban-client reload`；驗證 `fail2ban-client get sshd ignoreip`。
-  - **③ ks-aw-01 `/root/lobster-phase1/nginx/default.conf`** 兩處 `204.168.175.41/32` 已在 repo 拔除，主機走 `scripts/safe-infra-patch.sh`（backup→apply→`nginx -T`→up -d→失敗自動還原）。
-  - **④ `/root/lobster-phase1/.env`**：`SG_SSH_HOST`／`AUTO_REPAIR_SG_SSH_HOST` 仍指 5.223.93.113 → 改 145.239.195.47 並設 `AUTO_REPAIR_SG_SSH_HOST_KEY_SHA256`／`AUTO_REPAIR_EU_*`（續116 之後缺 fingerprint＝unconfigured，設了才會連）；fingerprint 取法見 `lib/repair-center/ssh.ts` 註解（ssh2 hostHash sha256 hex，非 ssh-keygen）。
-  - **⑤ ks-aw-01 跑一次 `bash /root/lobster-phase1/scripts/sync-host-scripts.sh`**（pull 後；或下一次 sg-deploy step 1.8 自裝）：主機現在仍是舊 cron 呼叫端，DEPLOY_HOLD 期間每 4 小時發一次假「自動部署失敗」警報（續120）。
-  - **⑥ `git push origin main`**：本機 main 領先 origin 20+ commit（含上述全部）；push 前 `git log origin/main..main --oneline` 過目。
-  - **完成定義**：①②③④ 各自驗證指令綠；⑤ 主機 `sync-host-scripts.sh` 印 `scripts == origin/main`；⑥ `git status -sb` = `## main...origin/main`。
-- [ ] **【git stash｜待操作者裁決】64 個 stash 從未清理：8 個 git-align 自動 stash（09-12～09-20）內容不全在 HEAD，56 個更早**
-  - `🟡 潛伏` · `2026-09-23` · `操作者`
-  - **現在到哪**：唯讀 inventory `agency-os/reports/status/stash-inventory-2026-09-23.md`（每個 stash：檔數、與 HEAD 不同的檔、前 4 個檔名）；hook 修好後（續113）不會再新增。
-  - **下一步**：逐個看 `git stash show -p stash@{N}`，確定內容已以別的形式落地才 `git stash drop`；不確定就留著。
-  - **完成定義**：`git stash list` 只剩操作者明確要保留的。
+- [x] **【2026-09-23 事故收尾｜已完成 2026-09-23】6 個 prod／遠端動作全部落地（操作者「全部去處理好…都你決定」授權）**
+  - `✅ 完成` · `2026-09-23` · `收尾 session`
+  - ① CF 3 條 whitelist 刪（備份 `reports/security/cf-access-rules-deleted-2026-09-23.json`，check clean）② fail2ban ignoreip 乾淨 ③ nginx 最小 patch（safe-infra-patch，bak `default.conf.bak.safe-patch-20260923-184411`）④ Auto-Repair SSH 指 ks-aw-01:58122 + pinned host key + forced-command gate（dogfood 10/10）⑤ `sync-host-scripts.sh` → `scripts == origin/main ce8109acf` ⑥ push 完成。
+  - 順手：主機 `backup-eu-stack.sh` 死 OFFSITE 預設、`.env`/`.env.staging` 殘留 n8n 退租 IP 皆清；主機掃描只剩 `/root/{precopy,syslayer,imagepull,cutover-lib}.sh`（操作者確認後自刪）。
+  - 細節／備份路徑／rollback：WORKLOG 2026-09-23 續123。
+- [x] **【git stash｜已裁決 2026-09-23：全部保留】64 個 stash（8 個 git-align 自動 stash 09-12～09-20 + 56 個更早）**
+  - `✅ 裁決` · `2026-09-23` · `收尾 session（操作者「都你決定」）`
+  - 裁決：無一能證明已以別的形式落地 → 不 drop；hook 修好後（續113）不再新增；inventory `reports/status/stash-inventory-2026-09-23.md` 唯讀。要清時逐個 `git stash show -p stash@{N}` 證明已落地才 drop。WORKLOG 2026-09-23 續123。
 
 - [ ] **【研究線｜P0 已完成待部署，下一步 PI-a 解讀層】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流（頂級國際規格）** — 計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` v1.5（§0 現況／§5 分期與 18d 核心時程／§9 ①–⑥ 已拍板、⑦ 待拍板／§11 接手指南）；根因 `reports/decisions/2026-09-23-research-pipeline-architecture.md` §10。—— 進度 2026-09-23：P0 完成（`lib/research-bridges.ts` 單一開關凍結三顆「送去 X」按鈕，tsc + 42 測試綠 + 突變證明；**部署與 PI-b 同窗，D15**）；⑦⑧ 依操作者授權定案；示意稿：分析頁 v2.2（結論＋圖表＋解決方案，線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）＋ 課程頁（每方法開始前 5 分鐘課，線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY ）；計畫 v1.8 核心 20d／含演化 24d；**第四條線 L4 藝術反思 = 未來主力**（Airtable `appbQ5ACPPxMybVvM` 工具庫 → 方法家族＋兩個 recipe，判斷主權原則→閘，個案資料 P-P 前置；D19–D22，P-ARF-data 排在 PI 後）；**目前 PI-a 開工**（解讀層 + 新殼 `COS/apps/cognitive-web`）；細節 WORKLOG 續111／112／114／115／118 與 L4 條目。
 - [x] **【oracle 工具層｜已修 2026-09-20】兩支 cross-model oracle 的 packet 會被無關 untracked 檔灌爆，導致 review 靜默失敗** — 2026-09-20 實測：`/codex-review`（companion `adversarial-review`）與第二層 fallback `scripts/codex-oracle.ps1 -Mode review` 對同一份 130 檔改動**雙雙回不出 final message**。根因不是額度（log 0 bytes、無任何 `429`／`rate limit` 字樣），是 packet 4.97MB：兩支的 builder 都只按「可審檔案型別 + 512KB 單檔上限 + 名稱像 secret」過濾，沒有「與本次改動無關的 untracked 檔要排除」，於是 100+ 個 `.claude/sessions/*.md` session transcript、`agency-os/reports/{governance,monthly}/**`、`.next/trace` 全被 inline 進去，把真正要審的 130 檔淹掉。**失效模式最糟的地方是靜默**：companion 開跑 8 秒吐一個 `findings: []` 的空殼就卡住，看起來像「審過且沒問題」。已修：兩支 capture path 共用 runtime 排除與 2MB hard cap；空/截斷/無 verdict schema 的回覆 fail-closed，不產生 review artifact；real capture 由 4.97MB 收斂至 109KB。
@@ -130,20 +123,25 @@
 - [x] **【蒐集｜擋路中】背景調查收得準但收得少：沒有渲染階，最權威的頁面讀不到**（2026-09-21 已解：自架隔離 renderer 上線 prod，WORKLOG 續96/續97） — 2026-09-20 live dossier 實測（WORKLOG 續91）：15 筆候選、抓到 11、入庫 1，9 筆被品質閘擋下，其中 7 筆 `*_no_heavier_tier`（JS 渲染或低密度），含 `scholars.latrobe.edu.au/tgfarrell`（本人最權威檔案）、`scholar.google.com` 引用頁、`rusi.org/people/farrell`。prod 容器 `printenv FIRECRAWL_API_KEY` exit=1，`collect/extract-provider` 因此 match()=0，永遠不會被叫到。**需操作者決定是否開通渲染供應商帳號**；未開通前背景調查的覆蓋率就是這個水準。禁止改門檻替代（`quality.ts` 檔尾自己寫明 per-host 豁免＝改偵測器而非修問題）。
 - [ ] **【蒐集｜設計問題，需判斷】density 是不是該有單獨否決權** — 同一批實測裡 `rusi.org/people/farrell`、`royalsoc.org.au/...`被 `low_text_density` 擋下，但那些頁面的抽取其實是對的：正文短、站本身 HTML 很重（605KB）。`MIN_DENSITY` 的用意是「抽到的是導覽列而不是正文」，可是對「短但完整的個人檔案頁」它會誤判，而個人檔案頁正是背景調查最需要的東西。可能的治本方向：density 改成第二訊號（只在 textBytes 貼近下限時才否決），與 soft-404 的 weak-marker 邏輯同構——但這會放寬所有來源的入庫條件，影響客戶 KB，**不是可以順手改的東西**。需要先蒐集實際 textBytes/density 分布再決定。
 - [ ] **【DB 治理｜30 年尺度】94 個 migration 沒有 ledger，「prod 套到哪一號」無法機械回答** — db-expert 2026-09-20 review 指出（WORKLOG 續91）：`packages/db` 沒有 `schema_migrations` 表，`scripts/apply-lobster-rls-migrations-eu.mjs:25-28` 是硬寫死清單不是通用 runner。搭配 repo 慣用的 `CREATE TABLE IF NOT EXISTS`／`ADD COLUMN IF NOT EXISTS`／`DROP CONSTRAINT IF EXISTS`，結果是「檔案內容 = live schema」變成一個無法從檔案證明的假設。0090 已用 catalogue 查詢繞過其中一個實例（不猜約束名），但那是逐案繞道不是治本。
-- [ ] **【資安＋Auto-Repair｜待操作者】Auto-Repair SSH 目標仍指退租 SG/EU：pre-repair 備份 gate 23 天全壞，EU IP 已被第三方接手**
-  - `🔴 現行` · `2026-09-23` · `操作者（High：prod .env＋新 key；身分決策與下方「compose SG_SSH_HOST」條目同一個）`
-  - **現在到哪**：唯讀診斷完成（WORKLOG 2026-09-23 續106）：prod `.env:99-111` 指 5.223.93.113／204.168.175.41:22 root；容器 key 未授權於 ks-aw-01；204.168.175.41:22 已有第三方 SSH 回應，next-admin 仍對它嘗試 root 登入。目標定為 `host.docker.internal:58122`。
-  - **下一步**：go-ahead → P0 止血（改 HOST/PORT）→ P1 身分 A／B（建議 B：forced-command gate）→ P2 驗證 → P3 偵測治本；步驟與 rollback 見 WORKLOG 續106。
-  - **完成定義**：prod `/api/ops/repairs/health` 的 `backup_script_probe`＋`auto_reboot` 四項 `ok`；`dogfood-auto-repair.ps1 -Mode HealthOnly` 10/10；next-admin env 無退租 IP；每日 smoke 在探針非 `ok` 時 WARN。
+- [x] **【資安＋Auto-Repair｜已修 2026-09-23】Auto-Repair SSH 目標改指 ks-aw-01（pinned host key + forced-command gate）；pre-repair 備份 gate 恢復**
+  - `✅ 完成` · `2026-09-23` · `收尾 session`
+  - 做法 = 續106 的 P1 選項 B：root `authorized_keys` 一行 `restrict,from="172.16.0.0/12",command=…aw-autorepair-gate.sh`；`.env` SG/EU → 145.239.195.47:58122 + `AUTO_REPAIR_{SG,EU}_SSH_HOST_KEY_SHA256`；compose 補傳遞這兩個變數（原本沒宣告）。`dogfood-auto-repair.ps1 -Mode HealthOnly` 10/10、`backup_script_probe` sg/eu = ok。
+  - 未做（P3）：每日 smoke 在 `backup_script_probe` 非 ok 時 WARN——`check-smoke-tests.ps1:106` 只讀 `ok/system_mode/table_ok`；下方獨立條目。WORKLOG 2026-09-23 續123。
+- [ ] **【監控｜P3】每日 smoke 對 `/api/ops/repairs/health` 只看 `ok`，`backup_script_probe.sg/eu` 非 ok 不會 WARN**
+  - `🟡 潛伏` · `2026-09-23` · `收尾 session 開`
+  - 一句話：`scripts/check-smoke-tests.ps1:106-124` 讀 repair health 只取 `ok/system_mode/table_ok`；Auto-Repair SSH 壞 23 天（續106）沒有任何偵測器叫。修法：加 `backup_script_probe.sg/eu`＋`auto_reboot` 四項到 `repair_detail`，任一非 ok → `warn:probe_<name>`；smoke-status-digest 已會把 WARN 進 blockers。
+  - 完成定義：拔掉 `.env` 的 `*_HOST_KEY_SHA256` 後 smoke 變 WARN（突變證明）。
 
-- [ ] **【資安｜待操作者 go-ahead】4 處 live 設定仍信任退租 IP：CF 白名單（含一條因格式問題連自己的偵測器都漏掉）、fail2ban ignoreip、lobster-nginx trust**
-  - `🔴 現行` · `2026-09-23` · `操作者（High：CF/fail2ban/nginx 改動，與上方 Auto-Repair SSH 條目是同一批稽核發現但範圍不同，各自獨立）`
-  - **現在到哪**：唯讀診斷 + repo 側修復完成（WORKLOG 2026-09-23 續107）。新 SSOT `agency-os/config/released-addresses.json` + `scripts/verify-no-released-addresses.mjs`（repo gate，warn-only，system-health-check.ps1 7e）+ `check-cloudflare-security.ps1` 第 4 項新檢查（IPv6-aware CIDR 比對，修正前字串比對漏掉 CF 用展開格式存的 IPv6 規則）。repo 側已清：`nginx/default.conf`、`cf-origin-lockdown.sh`、`backup-eu-stack.sh`（刪除已死的 OFFSITE_* 變數）。
-  - **prod 仍活著、待 go-ahead**：① CF `aware-wave.com` zone 3 條 whitelist access rule（149.202.64.114、204.168.175.41、其 IPv6 `2001:41d0:000d:2572::/64`，各自 id 見 WORKLOG）+ `soulfulexpression.org` zone 1 條（149.202.64.114）② `/etc/fail2ban/jail.d/ignoreip.local` 仍含 `149.202.64.114` ③ 部署修正後的 `lobster-nginx/default.conf`（走 `safe-infra-patch.sh nginx`）④ 部署修正後的 `backup-eu-stack.sh`（走 `safe-infra-patch.sh file`，該腳本 cron 每日 02:30 UTC 在跑）。可選、非緊急：`/root/{precopy,syslayer,imagepull,cutover-lib}.sh` 四支一次性搬機腳本仍硬編 `root@149.202.64.114`，遷移早已完成，建議操作者自行確認後刪除（未經確認不代刪）。
-  - **完成定義**：`check-cloudflare-security.ps1` 兩個 zone 的 Released-address 檢查皆 `clean`；`ignoreip.local` 不含退租 IP；`verify-no-released-addresses.mjs --host ubuntu@145.239.195.47 --port 58122` 干淨（僅 KNOWN/annotated）。
+- [x] **【資安｜已修 2026-09-23】4 處 live 設定不再信任退租 IP：CF 白名單×3 刪、fail2ban ignoreip、lobster-nginx trust、backup-eu-stack.sh 死預設**
+  - `✅ 完成` · `2026-09-23` · `收尾 session`
+  - `check-cloudflare-security.ps1` Released-address = clean；`fail2ban-client get sshd ignoreip` 無退租 IP；`nginx -T` 只剩註解；`verify-no-released-addresses.mjs --host` new 9→4，剩 `/root/{precopy,syslayer,imagepull,cutover-lib}.sh` 一次性搬機腳本（既定：操作者確認後自刪；刪完該掃描才會 PASS）。WORKLOG 2026-09-23 續123。
+- [ ] **【資安｜輪替】hosting-bridge key `SG_SSH_PRIVATE_KEY_B64`（.env:146）曾整串印進本機 session transcript（2026-09-23，未離開本機）**
+  - `🟡 潛伏` · `2026-09-23` · `操作者`
+  - 一句話：收尾 session 一次 `grep ^SG_SSH` 沒遮罩；transcript 在 `~/.claude/projects/D--Work/*.jsonl`。bridge 目前對 ks-aw-01 本就連不上（下方 SG_SSH_HOST 條目），輪替可與 bridge 身分決策一起做。完成定義：新 key 上線、舊 key 從 `.env` 與目標主機 authorized_keys 移除。
 
 - [ ] **【MainWP｜被 SG_SSH_HOST 擋】建站自動接上 MainWP：MainWP 端全通，卡在建站器本身 SSH 目標是退租主機**
   - `🔴 現行` · `2026-09-21` · `卡在下方 SG_SSH_HOST 條目（操作者決定 bridge 存取主機的方式）`
+  - **2026-09-23**：`SG_SSH_HOST` 預設已清空（容器 `SG_SSH_HOST=[]` → 程式預設 145.239.195.47:22 root，fail-closed，不再對退租主機送 handshake）；建站仍會失敗直到 bridge 身分決定。
   - **現在到哪**：REST key（server env）＋Unique Security ID＋child 安裝全上線（Trigger v20260921.3、next-admin 33251522a）；真 MainWP 以同一份碼註冊 staging 成功（WORKLOG 續100）。真建站 E2E run_cmuatt4cc02a021lnlhrm5drl → `provisioning_failed: Timed out while waiting for handshake`（SG_SSH_HOST=5.223.93.113）。
   - **完成定義**：真實建站後 MainWP 出現該站且 connected；run output 無 unique id／secret。
 
@@ -1259,13 +1257,14 @@
   - **完成定義（已達成）**：F08 14/14、`strategy/__init__.py` 宣告 COMPLETE、全 regression 7190＋golden 3296 皆綠、commit 已 push
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「F08 strategy 家族收官 10/14→14/14」條目；交接包 `agency-os/handoffs/2026-09-10-1737-f08-strategy-closeout.md`（歷史記錄保留）
 
-- [ ] **compose `SG_SSH_HOST` 預設仍指退租 SG 5.223.93.113 — ks-aw-01 需 port 58122 + ubuntu，改預設不夠**
+- [ ] **hosting bridge（provision-staging）對 ks-aw-01 的 SSH 身分未定：port 22／root 硬編在程式，主機只聽 58122；compose 預設已於 2026-09-23 清空（不再指退租 IP）**
   - `🔴 現行` · `2026-09-04 開；2026-09-21 升級` · `操作者（安全架構：bridge 以何身分碰主機 docker）`
   - **2026-09-21 實測**：prod next-admin `printenv SG_SSH_HOST`=5.223.93.113；ks-aw-01 sshd 只聽 58122、root 登入被拒 → 整併後「自動建 staging 站」全壞（run_cmuatt4cc02a021lnlhrm5drl）。bridge 指令是 `docker exec`（=主機 root 等價）；選項：A ubuntu+sudo docker 經 58122 回連自己、B 限定指令的 forced-command key、C 專用受限 sidecar 代跑 wp-cli。擋住 MainWP 條目。
   - **一句話**：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:370` `${SG_SSH_HOST:-5.223.93.113}` 是 hosting bridge 的 SSH 目標；整併後現役主機非 22 port／非 root，compose 沒有 `SG_SSH_PORT`/`SG_SSH_USER` 變數
   - **現在到哪**：2026-09-04 續26 掃描發現；伺服器 `.env` 是否已覆蓋 `SG_SSH_HOST` 未在遠端 session 驗證
   - **下一步**：① SSH ks-aw-01 `grep SG_SSH /root/lobster-phase1/.env` ② next-admin `grep -rn SG_SSH_HOST lib/` 看是否硬編 port 22／root ③ 若需要，加 `SG_SSH_PORT`/`SG_SSH_USER` env + compose 預設改 `145.239.195.47`/`58122`/`ubuntu` ④ 走 sg-deploy.sh
   - **2026-09-23**：Auto-Repair（`AUTO_REPAIR_*_SSH_*`）是同一身分決策的第二個消費者，應一次裁決（見上方「Auto-Repair SSH 目標」條目／WORKLOG 續106）；「root 登入被拒」只對 root 現有那把 cloud-init key 成立（sshd `permitrootlogin without-password`）。
+  - **2026-09-23 晚**：Auto-Repair 已用選項 B 落地（root forced-command gate `aw-autorepair-gate.sh`，WORKLOG 2026-09-23 續123）；bridge 建議同款：第二把 key + 專用 gate 允許清單（`docker exec … wp` 白名單），並在 `provision-staging/route.ts:289,351` 改讀 `SG_SSH_PORT`／`SG_SSH_USER`（compose 也要宣告）。compose 的 `${SG_SSH_HOST:-}` 與 `released-addresses.json` knownViolation 已清，剩身分決策。
   - **完成定義**：hosting bridge 對 ks-aw-01 一次成功 provision（或 dry-run 通過）且 compose 預設無退租 IP
   - **證據**：`agency-os/WORKLOG.md` 2026-09-04 續26 [剩餘風險]①；`grep -rnE "5\.223\.93\.113" lobster-factory/infra` 另含 `eu-backup/backup-eu-stack.sh`、`cf-origin-lockdown.sh`（已退場腳本，同案一併決定刪或改）
 
@@ -1849,5 +1848,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-23 03:45:07 UTC_
+_Last synced: 2026-09-23 14:30:03 UTC_
 

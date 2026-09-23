@@ -30,12 +30,6 @@
   ],
   "knownViolations": [
     {
-      "file": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
-      "line": "SG_SSH_HOST: ${SG_SSH_HOST:-5.223.93.113}",
-      "task": "agency-os/TASKS.md: compose `SG_SSH_HOST` 預設仍指退租 SG 5.223.93.113",
-      "reason": "hosting-bridge SSH identity (port 58122 / non-root) is an open operator decision shared with the Auto-Repair SSH target item; delete this entry when that task lands"
-    },
-    {
       "file": "Projects/internal/cognitive-engineering-os/ai_lego/apps/cli/run_ooda_slice.py",
       "line": "(runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md): wordpress-ubuntu-4gb-sin-1 (5.223.93.113)",
       "task": "permanent — not scheduled for removal",
