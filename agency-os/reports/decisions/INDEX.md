@@ -16,6 +16,7 @@ For each entry: open the linked file for the full report including debate transc
 | 2026-09-10 | aware-wave.com DMARC 何時從 p=none 升到 quarantine/reject | 維持 p=none 至 9/28，之後 pct=25→100→reject 機械分階段推進 | 直接決策 | [2026-09-10-dmarc-enforcement-timeline.md](2026-09-10-dmarc-enforcement-timeline.md) |
 | 2026-09-14 | Art Therapy Library 的 Airtable → Supabase 遷移方法 | 自建 deterministic ETL + raw landing + relational canonical | 0.86 | [2026-09-14-airtable-supabase-migration-method.md](2026-09-14-airtable-supabase-migration-method.md) |
 | 2026-09-17 | HCI-30 C6 跨網域身分/角色模型 + 蒐集器管線 REJECTED 保存期限 | 簽章 handoff token + 延伸既有 per-tenant role 模型；REJECTED retain-forever 列入既有系統性抹除債務 | 直接決策 | [2026-09-17-hci30-c6-and-collector-task1-decisions.md](2026-09-17-hci30-c6-and-collector-task1-decisions.md) |
+| 2026-09-23 | 研究管線（/ops/collect → Cognitive OS／HCI → 報表）三條線為何不順、怎麼重建 | B：研究案聚合根 + 分析積木登錄表 + 報表合成器；三系統改引用式整合；五階段各自可回滾。§7 三題待操作者裁決 | 直接決策（提案） | [2026-09-23-research-pipeline-architecture.md](2026-09-23-research-pipeline-architecture.md) |
 
 ---
 

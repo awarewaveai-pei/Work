@@ -1,4 +1,19 @@
 ﻿# Worklog
+## 2026-09-23（續104）研究管線三條線「不順、怪異」根因調查 → 決策記錄（提案，等操作者裁決）
+
+- [任務] 操作者：`/ops/collect`→Cognitive OS／HCI→報表三條線（合作風險／決策利弊／EdD）「運作起來非常不順，也很怪異」，要深度研究＋最完美建議。全程實讀 next-admin `lib/{collect,kb,cognitive-os,hci,dossier}`、兩個 UI、Cognitive OS `main.py`／`dashboard.html`、HCI `server.mjs`、ADR 011／Blueprint 02／10、五條 WORKLOG 事故；prod 容器＋DB 實查。
+- [結論] 產出 `reports/decisions/2026-09-23-research-pipeline-architecture.md`（§0 TL;DR、§2 八項現況、§3 六項風險、§4 A/B、§5 目標架構、§6 五階段、§7 三題待裁決）。一句話根因：**沒有「研究案」聚合根**——一件事被切成 org→collection_source→run→時間戳資料夾→Cognitive Project→HCI seed 六張表三個 DB 三個 UI，靠兩個回寫欄位黏著；三個「橋」都是複製式（body 拷貝／URL 重抓）不是引用式；「報表」有三種互不引用的 JSON。
+- [prod 實查關鍵數字] 操作者真實研究（Theo Farrell 6 個資料夾／25 文件）全落在測試 fixture 組織 `e2e-verify-0704-5c1356`；`collection_runs` 14 筆；HCI `hci.sources` 17 REJECTED／3 ACCEPTED／2 DISCOVERED、4 cases、1 report；next-admin `HCI_API_BASE_URL` 已設（`lib/hci/client.ts:6-9` 與兩處 UI 註解「never deployed」已過期）；`hci.aware-wave.com`／`cognitive.aware-wave.com` `/health` 皆 200；Cognitive OS `feature-cognitive-os-completion.md:29` current slice 仍為 Source Intake（無「對來源做分析」能力，`sources/brief` 只是貼進表單）。
+- [建議] B：`research_cases`／`research_case_runs`／`research_case_reports` 三表 + `lib/analysis/` 積木登錄表（dossier／cognitive-recipe／hci-case 各一檔）+ 報表合成器（沿用 `lib/dossier/report.ts` `enforceCitations`）+ `/ops/research` 單一畫面；既有 collect／kb／dossier／Cognitive methods／HCI 證據鏈零重寫。P0 資料衛生→P1 聚合根→P2 積木＋報表→P3 Cognitive OS 引用式 `external_ref`→P4 HCI 積木→P5 流程 3（High-STOP）。
+- [待操作者] §7：① HCI 是否開放 Organization 主體（建議否，公司線走 dossier＋Cognitive OS）；② Cognitive OS `CreateSourceRequest` 加 `external_ref`（改 Python，選填）；③ 流程 3 方向依 Blueprint 10（HCI→Cognitive OS）而非操作者口述的反向。**未裁決前不動工。**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh -p 58122 ubuntu@145.239.195.47 'sudo docker exec supabase-db psql … cs_knowledge_sources/cs_knowledge_folders/collection_runs/collection_sources/organizations'`（4 組查詢） | exit=0 | ms=9000 | result=見上「prod 實查關鍵數字」
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo docker ps` + `docker exec lobster-next-admin printenv HCI_API_BASE_URL COGNITIVE_OS_TENANT_ID …` + `docker exec hci-postgres psql -c "SELECT admission_state,count(*) FROM hci.sources…"` | exit=0 | ms=6000 | result=cognitive-os-api／hci-app／hci-fetch-runner／hci-object-storage／lobster-renderer 全 healthy；bridge env 全部已設；FIRECRAWL／PERPLEXITY／BRAVE／TAVILY 未設
+- REALTEST_EVIDENCE: tool=curl | cmd=`curl https://cognitive.aware-wave.com/health` + `curl https://hci.aware-wave.com/health` | exit=0 | ms=1500 | result=200／200
+- REVIEW_WAIVED: DOC_ONLY -- 決策記錄提案，未改任何 code；實作各階段（§6）每階段一個 critic，Cognitive OS 契約段另送 /codex-review
+- BUGHUNT_WAIVED: DOC_ONLY -- 未改任何 symbol；記錄內全部 `file:line` 在寫入前以 sed/grep 讀回（`main.py:1108-1116`、`import-sources.ts:85-107,236-240,482-491`、`hci/import-sources.ts:9-14`、`server.mjs:570-583`、`run-jobs.ts:1-22`、`sinks/kb.ts:46-57`、Blueprint `02:29`／`10:23-47,83`、ADR 011 `:28,32,54,60,79`）
+- [剩餘風險] 記錄是提案非執行授權；P0 資料搬移前需查 `cs_knowledge_chunks` 是否帶 `organization_id`（§5.5 已標「需查證」）。supabase MCP 本機 tunnel（127.0.0.1:5432）未啟，改走 SSH psql。
+- [rollback] 純文件：`git revert`；INDEX.md 表列一行。
+
 ## 2026-09-23（續103）verify-head-typecheck 的同 class 依賴漂移：實體比對取代「node_modules 目錄存在」
 
 - [根因] `scripts/verify-head-typecheck.ps1:43`（修前）`git worktree add` 任意 ref 後，把**本機** `apps/next-admin/node_modules` junction 進去，守衛只有 `Test-Path`。實際驗證的是「ref 原始碼 × 本機當下裝了什麼」，不是「ref 原始碼 × ref 自己 lockfile 宣告的依賴」。ref 新增依賴 → 誤報 `TS2307` 怪到 commit 頭上；本機多裝 → 該 ref 沒宣告也會過。與同日（續102）`sg-deploy.sh` 燒掉 prod 的是**同一個 bug class**：拿目錄存在當依賴集合相等的代理。
