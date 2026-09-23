@@ -13,6 +13,7 @@
 > - 排程全數移植：endpoint-alert timer、eu-backup cron（`/etc/cron.d/ks-stack-backup`）、
 >   mainwp wp-cron、supabase weekly restart、auto-deploy、watchdog、certbot renew
 > - **🔴 前任 `149.202.64.114` 已於 2026-08-31 在 OVH Manager 終止；更早 SG/EU 也已刪除。無回滾主機。**
+> - **⚠️ 退租 IP 會被供應商重新分配**：2026-09-23 實測 `204.168.175.41:22` 已由第三方 SSH 回應 → 任何設定／腳本都不可再指向或信任三個退租 IP（WORKLOG 2026-09-23 續106）
 > - 下方 SG/EU 兩節保留當容器/端口明細參考（內容在 ks 上依然成立），機器歸屬已失效
 
 > 所有伺服器、容器、路徑、端口的事實參考。

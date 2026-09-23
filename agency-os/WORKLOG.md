@@ -1,4 +1,33 @@
 ﻿# Worklog
+## 2026-09-23（續106）Auto-Repair SSH 探針全 `ssh_error`：prod `.env` 仍指退租 SG/EU、容器 key 未授權、EU IP 已被第三方接手（診斷＋提案；prod 修正待 go-ahead）
+
+- [觸發] `scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly` FAIL `backup_script_probe.sg/eu=ok`（`:64-65`）；同端點 `auto_reboot.sg/eu` 也 `ssh_error`（同一組 env，`route.ts:132-140`）。
+- [根因]
+  - C1 設定漂移：ks-aw-01 `/root/lobster-phase1/.env:99-111` = `AUTO_REPAIR_SG_SSH_HOST=5.223.93.113`／`AUTO_REPAIR_EU_SSH_HOST=204.168.175.41`、PORT 22、USER root；容器 printenv 同值。整併時 `.env` 當機器 SSOT 原樣搬（`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md:69`），自指主機位址沒改；2026-08-29 dogfood 仍 10/10（WORKLOG 2026-08-29 續8，SG/EU 尚在）→ 08-30 刪機後 4 個探針＋pre-repair backup gate（`backup.ts:140-200`）＋evidence host_probe（`evidence.ts:176-193`）全失效。Auto-Repair 23 天無法跑任何 repair（fail-closed：備份失敗不建 Issue）。
+  - C2 身分：容器 key（SG/EU 同一把，comment `sg-backup-to-eu`，`SHA256:9R/JvWxh…`）不在 ks-aw-01 root／ubuntu 任一 `authorized_keys` → 只改 HOST/PORT 仍登不進。root 現有唯一一把帶 cloud-init `command="echo…"`；sshd `permitrootlogin without-password` → 另加一行（無 `command=`）即可 root 登入（TASKS「compose `SG_SSH_HOST`」條目的「root 登入被拒」只對現有那把成立）。
+  - C3 偵測盲點：`route.ts:379` `ok` 只看 env 是否存在（`backupConfigured`，`route.ts:347`），探針結果不入判定；每日 smoke `scripts/check-smoke-tests.ps1:109` 只讀 `ok` → 23 天綠燈，只有月度 dogfood 看得到。
+- [資安 M1] `204.168.175.41:22` 回 `SSH-2.0-OpenSSH_10.2p1 Ubuntu-2ubuntu3.6` → IP 已被第三方接手。prod next-admin 正以 `root`＋我方公鑰對它嘗試登入：探針每次刷新（TTL 60s；host nginx log 約 23 次端點命中）＋每次 repair run 的 EU 備份腿。`ssh.ts:27-34` `connectSsh` 無 `hostVerifier` → 對方若接受任意 key（honeypot），next-admin 會在對方主機跑備份指令、把 exit 0 當「EU 備份通過」（`backup.ts:184-191`），探針回 `ok`。私鑰不外洩（publickey 認證不傳私鑰）。`5.223.93.113:22` 目前 timeout；若被重新分配同風險，且 SG 目標 stdout 會進 Auto-Repair LLM prompt（`evidence.ts:176-193` → `renderEvidenceText`）。
+- [sibling auto-reboot probe] 同 env、同修法；`/etc/apt/apt.conf.d/52awarewave-auto-reboot` 在 ks-aw-01 存在 → 修好後 sg/eu 皆 `ok`（兩者探同一台同一檔，冗餘但正確）。4 支備份／驗證腳本（`/root/lobster-phase1/scripts/{backup-phase1,verify-backup}.sh`、`/root/scripts/{backup-eu-stack,verify-backup-eu}.sh`）皆存在。
+- [決定目標] host=`host.docker.internal`（repo `docker-compose.yml:250-251` 已有 `extra_hosts: host-gateway`；容器解析 172.17.0.1，banner 實測通，來源 IP 172.18.0.11）、port=`58122`（ssh.socket ListenStream，22 已撤）。不用 `145.239.195.47`：KS-6 換機免再改（C1 就是這類）、流量不出本機、IP 再分配劫持不到。SG/EU 兩組都指同一主機，標籤保留管線身分（同 `check-backup-health.ps1:227-248`）。user／key 與 TASKS「compose `SG_SSH_HOST`」（hosting bridge）是同一個「web 容器以何身分碰主機」決策 → 待操作者。
+- [排除] 備份腳本的 SG rsync 腿整併時已刪（live `backup-eu-stack.sh:158`，offsite 走 R2）→ 修好 gate 觸發備份不會送往退租 IP。其餘 7 份 stack env 無退租 IP；`lobster-phase1/.env:7-8` `N8N_HOST`／`N8N_WEBHOOK_URL`=SG IP 屬 dead config（live n8n 是 `/root/n8n` 專案，用 n8n.aware-wave.com）。
+- [範圍外 → 背景任務 task_d2f38079] 同 class「信任綁在已釋出 IP」：lobster-nginx live `default.conf:49,75` 仍信任 204.168.175.41（lobster-nginx 只發佈 127.0.0.1:8083 → 目前不可達）；fail2ban `ignoreip` 含 149.202.64.114；fail2ban sshd jail journalmatch `sshd.service`，Ubuntu 24.04 實為 `ssh.service`（24h 0 vs 363 行）→ jail 失明。
+- [已修（文件）] `.claude/agents/incident-responder.md:38`、`devops-engineer.md:15` 寫退租 IP「SSH 會直接失敗」→ 對 204.168.175.41 不成立，改「可能已被第三方接手，禁止連線」；拓樸正本 `AWAREWAVE_STACK_QUICKREF.md` 橫幅加一行。
+- [提案（待 go-ahead；High：prod env＋憑證）]
+  - P0 止血（不依賴身分決策）：主機端 `sed` 改 `.env` 99/101/107/109 行 → HOST=`host.docker.internal`、PORT=`58122`，pipe 進 `safe-infra-patch.sh compose /root/lobster-phase1/.env next-admin`（備份→套用→compose config→`up -d --no-build next-admin`→等 healthy→失敗自動還原）；套用前 `stat` 確認 `.env` 未被並行 session 改動。效果：不再碰第三方 IP；探針仍 `ssh_error` 直到 P1。
+  - P1 身分（二擇一）：A＝主機產生新 ed25519 key（取代 legacy `sg-backup-to-eu`：公鑰已送達第三方、名稱與用途不符、副本去向不明），公鑰以 `from="172.16.0.0/12",restrict` 加入 `/root/.ssh/authorized_keys`，B64 只寫 `.env` 兩個 `*_SSH_KEY_B64`（不經對話）；零改碼；web 容器＝主機 root（同整併前設計，但主機現承載全部服務）。B（建議）＝A＋`command="/usr/local/sbin/aw-autorepair-gate"`：repo 版控 gate 只放行 next-admin 送出的 6 條確切指令（3 條 `test -f`、2 條 backup&&verify、`HOST_PROBE_COMMAND` `evidence.ts:41-42`），其他 exit 126＋logger；remediation（`AUTO_REMEDIATE_ENABLED` 未設）不放行＝fail-closed；next-admin 零改碼。
+  - P2 驗證：printenv 新值；端點 4 個探針 `ok`；dogfood 10/10；`journalctl -u ssh` 見 172.18.0.11 publickey Accepted；gate（B）拒絕非白名單指令一次。
+  - P3 偵測治本（Medium，repo）：`check-smoke-tests.ps1` 探針非 `ok` → WARN；`ssh.ts` host key pinning（fail-closed）；換機 runbook 加「自指主機位址 env」一步；`.env.example:187-194`、`docs/awarewave-repair-center-app-architecture.md:125-130`、`APP_AWARE_WAVE_COMPLETE_REFERENCE.md:1163-1177` 的「預設 22／root」同步。
+- REALTEST_EVIDENCE: tool=curl | cmd=`curl https://app.aware-wave.com/api/ops/repairs/health` | exit=0 | ms=5820 | result=ok=true、backup_script_probe sg/eu=ssh_error、auto_reboot sg/eu=ssh_error（5s 探針逾時拖慢端點）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv AUTO_REPAIR_{SG,EU}_SSH_{HOST,PORT}` | exit=0 | ms=5146 | result=5.223.93.113/22、204.168.175.41/22
+- REALTEST_EVIDENCE: tool=SSH | cmd=容器 key `base64 -d | ssh-keygen -y | ssh-keygen -lf -` 比對 root／ubuntu `authorized_keys` 指紋 | exit=0 | ms=3936 | result=兩處皆 not authorized（私鑰未離開主機、未輸出）
+- REALTEST_EVIDENCE: tool=SSH | cmd=容器內 `node net.connect` → 204.168.175.41:22／5.223.93.113:22／host.docker.internal:58122 | exit=0 | ms=8520 | result=第三方 banner／TIMEOUT／我方 OpenSSH_9.6p1 banner
+- REVIEW_WAIVED: DOC_ONLY -- 診斷＋提案；本次只改文件（WORKLOG／TASKS／QUICKREF／2 個 agent 檔），逐檔讀回
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,docs,.claude | grep=`AUTO_REPAIR_(SG|EU)_(SSH|PHASE1|BACKUP)` | hits=77（11 檔；.claude 0）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects,tests,.claude | grep=`5\.223\.93\.113|204\.168\.175\.41|149\.202\.64\.114`（code/config 副檔名）| hits=45（repo 41 行／24 檔＋.claude/agents 4 行；live 主機另掃 8 份 env，4 行皆在 lobster-phase1/.env）
+- BOM：`scripts/audit-cross-machine-bom.ps1`（report-only）exit=1 ms=681；11 筆既存漂移全在 auto-memory `memory/*.md`，本次 5 檔不在清單（repo `.md` 免 BOM）。
+- [剩餘風險] 修正前 Auto-Repair 仍無法跑 repair；next-admin 持續對 204.168.175.41 嘗試 root 登入（頻率低，但可能被對方回報 abuse 到 OVH）。
+- [rollback] 本條僅文件：`git revert`。P0/P1 的 rollback：`safe-infra-patch.sh` 自動留 `.env.bak.safe-patch-<ts>`／`authorized_keys` 備份，還原後 `docker compose up -d --no-build next-admin`。
+
 ## 2026-09-23（續105）研究線 MASTER PLAN v1→v1.1：頂級規格重定向到 Cognitive OS；critic 3C/8M/1m 全折入
 
 - [操作者] 「我要頂級規格的國際性全球工具」+ 不空燒 agents + 文件 AI 極簡。→ 續104 決策記錄的 next-admin 中心方案作廢，改寫成 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md`（唯一計畫正本；完成計畫、決策記錄 §10、TASKS.md 各掛一行指標）。
@@ -11,6 +40,8 @@
 - [rollback] `git revert`；指標行各一。
 - [v1.2 同日] 操作者「這樣就是最完美完整完善的工具了嗎」→ 答否（缺量尺、缺演化、自然人延後、單租戶、兩個技術假設未實證）；操作者「補進去！…會自行進化的工具」→ 補 §3.7 品質評分 harness（每線 5 黃金案例、8 指標、門檻人定、CI+夜跑、突變）進 P2；§3.8 演化迴圈 = 量測→提案→挑戰→晉升／回滾閉環，只改版本化資料、程式碼永遠人審（I9）、分數是閘不是目標（I10，操作者既有「禁改門檻」裁定）；重用既有原語（查證：`champion-challenger.recipe.yaml` ACTIVE、`ai_execution/replay.py:34-76` prompt 版本重放、README:27 v12 升級／回滾測試、`tests/run_golden_tests.py`、`store.py:117,465` ai_usage、`compute/prediction_tracking/`）；新增 P4b 遙測、P-E 迴圈、R11–R14（Goodhart／漂移／成本／YAML 變邏輯）、§9 ⑤ 自動晉升範圍待拍板。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`sed/grep` 讀回 champion-challenger recipe、replay.py、README、run_golden_tests.py、store.py ai_usage、prediction_tracking 目錄 | exit=0 | ms=300 | result=六個演化原語皆存在，計畫 §0 逐一引用
+- [v1.3 同日] 操作者「原來的工具 UI/UX 很爛，第一次使用的人根本無法知道要怎麼使用」→ 查證三個 UI 的首用卡點（`/ops/collect` 入口是工具不是任務、`ClientHubTabs.tsx` 12 個原生 `<select>` 違反操作者裁定、Cognitive OS dashboard 空狀態要人從 285 個方法選一個、結果是閘門表＋JSON；HCI `index.html:494` 有說明頁可當樣板）→ 補 §3.9（U1–U12、六步首用流程、首用測試協定：非操作者 L2 ≤15 分鐘零求助 SUS≥70、漏斗遙測、`ux-defaults` 可演化 kind）；D13 前端殼改新 `apps/cognitive-web`（`BP/12:9-16` Web／API 分離），舊 dashboard 降專家模式；P3 → 5d 含 UX DoD；R15／R16；§9 改成六題附建議答案（操作者反映沒看到第 ⑤ 題）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -nc "<select"` ClientHubTabs／CollectionSourcesPanel + `grep -n` dashboard.html 155/181/212 + index.html 494 + BP12:9-16 | exit=0 | ms=200 | result=12／2 個原生 select；dashboard 入口為工具選單；HCI 有 explainer；Blueprint 建議 Web／API 分離
 
 ## 2026-09-23（續104）研究管線三條線「不順、怪異」根因調查 → 決策記錄（提案，等操作者裁決）
 
@@ -40,8 +71,6 @@
   - C2 [high] workspace link（`{link:true}` 無 version）會讓每次乾淨 `npm ci` 假紅。**改為 lockfile 有寫 version 才比版本，存在性一律要求。** 先查證：本 lockfile 目前 0 個 link entry、0 個無 version 的非 optional entry ⇒ 潛伏非現行。
   - C3 [medium] 沒有 `package.json` 的裸目錄（`index.js`）TS resolve 得到卻被靜默略過。**按 class 修不按 instance**：三個 finding 是同一個失敗——side 2 一直在量「能 resolve 的集合」的代理。成員資格改由**目錄**決定（node_modules／@scope 下任何非 dot entry），`package.json` 只負責取版本，讀不到本身就是漂移。
   - C4 [medium] 同版本但內容被竄改的套件會過。**列為書面邊界，不修**：證明內容等價＝對 490 個套件重算 integrity＝`npm ci`＝`-Install` 已提供；npm 自己也只在下載／解壓時驗 integrity，不驗既有樹，無更便宜的原語。本閘的不變量是依賴**集合**與版本，當初燒 prod 的是**缺套件**不是被竄改。已寫進 `.mjs` 檔頭「what this does NOT prove」並指向 `-Install`。
-- [v1.3 同日] 操作者「原來的工具 UI/UX 很爛，第一次使用的人根本無法知道要怎麼使用」→ 查證三個 UI 的首用卡點（`/ops/collect` 入口是工具不是任務、`ClientHubTabs.tsx` 12 個原生 `<select>` 違反操作者裁定、Cognitive OS dashboard 空狀態要人從 285 個方法選一個、結果是閘門表＋JSON；HCI `index.html:494` 有說明頁可當樣板）→ 補 §3.9（U1–U12、六步首用流程、首用測試協定：非操作者 L2 ≤15 分鐘零求助 SUS≥70、漏斗遙測、`ux-defaults` 可演化 kind）；D13 前端殼改新 `apps/cognitive-web`（`BP/12:9-16` Web／API 分離），舊 dashboard 降專家模式；P3 → 5d 含 UX DoD；R15／R16；§9 改成六題附建議答案（操作者反映沒看到第 ⑤ 題）。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -nc "<select"` ClientHubTabs／CollectionSourcesPanel + `grep -n` dashboard.html 155/181/212 + index.html 494 + BP12:9-16 | exit=0 | ms=200 | result=12／2 個原生 select；dashboard 入口為工具選單；HCI 有 explainer；Blueprint 建議 Web／API 分離
 - [順手修（R4 寫入後 grep 命中，同 commit）] `scripts/README.md`「Place it here (flat, no subdirectories)」與磁碟實況矛盾——`scripts/lib/` 早有 7 個 helper 且都不進索引表。補一行承認既有慣例，否則新檔一落地文件就在說謊。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`verify-head-typecheck.ps1 -Ref HEAD` | exit=0 | ms=71000 | result=`DEPS_IN_SYNC required=410 on_disk=490` → `tsc OK` → `HEAD_TYPECHECK_OK`（同步分支確實往下走）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`verify-head-typecheck.ps1 -Ref 3ca1cc9d1`（pixelmatch 前一顆） | exit=1 | ms=2000 | result=`DEPS_DRIFT extra=2` 指名 `pixelmatch@7.2.0`／`pngjs@7.0.0`，**tsc 未被執行**（log 內 `tsc OK` 計數 0）

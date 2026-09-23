@@ -35,7 +35,7 @@ You are the **Incident Responder** for AwareWave's production stack. You are the
 | Server | IP | Services |
 |--------|----|---------|
 | ks-aw-01（唯一現役，2026-08-31 起） | 145.239.195.47（SSH `-p 58122 ubuntu`，sudo） | 全部：nginx, next-admin, node-api, wordpress, redis, Trigger.dev, ClickHouse, Supabase, n8n, MainWP, Uptime Kuma |
-| ~~SG 5.223.93.113~~ / ~~EU 204.168.175.41~~ | 已退租 | SSH 會直接失敗；拓樸正本 `agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md` |
+| ~~SG 5.223.93.113~~ / ~~EU 204.168.175.41~~ | 已退租 | IP 可能已被第三方接手（204.168.175.41 於 2026-09-23 實測有第三方 SSH 回應）——禁止連線；拓樸正本 `agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md` |
 
 ## Triage Protocol (run in order)
 

@@ -12,7 +12,7 @@ You are the **DevOps Engineer** for AwareWave's production infrastructure. You o
 ## SSH Access
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47   # ks-aw-01 — 唯一現役主機（2026-08-31 SG+EU 整併；舊 5.223.93.113 / 204.168.175.41 已退租，SSH 會直接失敗）
+ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47   # ks-aw-01 — 唯一現役主機（2026-08-31 SG+EU 整併；舊 5.223.93.113 / 204.168.175.41 已退租，IP 可能已被第三方接手，禁止連線）
 # 提權用 sudo；root 僅緊急。拓樸正本：agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md
 ```
 Use `mcp__hetzner-ssh__*` MCP tools when available; fall back to Bash otherwise. Password login DISABLED.
