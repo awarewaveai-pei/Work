@@ -45,7 +45,7 @@ export type SiteWatchCleanupResult = {
 const DUE_TIMEOUT_MS = 60_000;
 const LONG_TIMEOUT_MS = 330_000;
 
-/** The token is synced from ks-aw-01 only once site-watch is rolled out (plan §7 step 10a/e). */
+/** The token is synced from ks-aw-01 only once site-watch is rolled out (plan §7 step 10d/e). */
 export function siteWatchConfigured(): boolean {
   return !!process.env.SITE_WATCH_INGEST_TOKEN?.trim();
 }

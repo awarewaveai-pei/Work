@@ -130,6 +130,8 @@ docker compose --env-file .env logs -f webapp
 
 ### 7. 本機 deploy 工作流程（`packages/workflows`）
 
+**唯一部署入口（2026-09-23 起）**：repo 根目錄 `powershell -ExecutionPolicy Bypass -File scripts/lobster-trigger-deploy.ps1`；push 到 main 且範圍動到 `packages/workflows` 時，post-push hook（`mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1`）自動跑同一支。它在 ks-aw-01 上 build，`syncEnvVars` 要的部署期 env 集中在它的步驟 3。同步語意：送出的鍵覆寫既有值、沒送的鍵不動（CLI `deploy.js syncEnvVarsWithServer`，`override: true`）→ 輪替 token 要重跑一次部署；刪鍵要到 dashboard 手動刪。以下 §7／§7a 是 2026-05 EU 時期的手動流程，只作除錯參考：照它的 `--env-file`（只含 PostHog）部署，其他 runtime 變數都不會同步。
+
 **CLI 版本**：與 `packages/workflows/package.json` 內 **`trigger.dev`** devDependency 對齊（目前 **4.4.6**）。請使用 **`npx trigger.dev@4.4.6`**（勿隨意 `@latest`，避免與已鎖 SDK 漂移）。Server（trigger-webapp）目前為 v4.4.4；CLI 4.4.6 對 Server 4.4.4 相容，已確認（2026-05-21）。
 
 1. 在 dashboard 建立 **project**，把 **`project`** 寫進 `packages/workflows/trigger.config.ts`。  
@@ -146,19 +148,14 @@ npx trigger.dev@4.4.6 login -a https://trigger.aware-wave.com
 npx trigger.dev@4.4.6 deploy -p "<project ref>" -a https://trigger.aware-wave.com --env-file <僅含 POSTHOG_API_KEY、POSTHOG_HOST 的檔案>
 ```
 
-**Windows（推薦封裝）**：在 **`infra/trigger`** 目錄執行（自動從 `trigger.config.ts` / `package.json` 讀取 ref 與 CLI 版本，並只萃取 PostHog 兩鍵）：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
-# 可選：-PosthogEnvSource "D:\path\to\hetzner-phase1-core\.env"
-```
+**Windows 封裝 `deploy-workflows.ps1`**：2026-09-23 退役（只同步 PostHog、走公網被 Cloudflare BFM 擋、依賴已退租的 EU tunnel），現在執行只會報錯並指向上面的唯一入口。
 
 ### 7a 完整 deploy：`registry:5000` 為何會失敗／怎麼做才對
 
 自架 v4 會在本機 **build** 後 **push** 到 **`https://registry:5000/...`**（映像倉庫在主機名 **`registry`**）。  
 **筆電 Windows** 若未處理 DNS／網路，會出現 **`lookup registry ... no such host`** — 這與 Docker Desktop 是否正常無關。
 
-**路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行 **`deploy-workflows.ps1`（若裝了 PowerShell／複製腳本）** 或上面的 **`npx trigger.dev@4.4.6 deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
+**路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行上面的 **`npx trigger.dev@4.4.6 deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
 
 > **EU VPS 一次性前置設定**（已完成，2026-05-07）：registry hostname 只在 Docker 內部 DNS 可解析，從 VPS host 部署需額外三步：
 >
@@ -238,7 +235,7 @@ ssh -i "$env:USERPROFILE\.ssh\hetzner_trigger" root@<VPS_IP>
 
 | 檔案 | 用途 |
 |------|------|
-| `deploy-workflows.ps1` | Windows：安全萃取 PostHOG、`deploy` 讀取鎖版 CLI／project ref（見 §7） |
+| `deploy-workflows.ps1` | 已退役（2026-09-23）：執行即報錯，指向唯一入口 `scripts/lobster-trigger-deploy.ps1`（見 §7） |
 | `docker-compose.yml` | v4 全 stack（含 ClickHouse、registry、MinIO、supervisor） |
 | `.env.example` | 必填變數範本（命名對齊官方） |
 | `clickhouse/override.xml` | 限縮 ClickHouse RAM（小 VPS） |
