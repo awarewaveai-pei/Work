@@ -425,7 +425,7 @@ Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hoo
 
 **機器前提（2026-08-12 更新）**：**目前僅個人筆電一台**（操作者已離職，公司桌機退場）。環境仍以「repo 共用 + 各機獨立 env/vault」處理 —— 這個設計**不因單機而改**，將來加機器即可直接用；跨機 import 回報「無其他機器較新匯出」是正常狀態。
 
-**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回 AO-RESUME 報告（§0–§8）；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
+**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（每 session 一次；parity = fetch + ff-only，不 stash／reset／push）。代理讀狀態檔回 AO-RESUME 報告（§0–§8）；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
 `ao-resume.ps1` 同時自動跑 smoke（`scripts/check-smoke-tests.ps1` → `reports/status/smoke-LATEST.json`）與每 30 天的月度五項檢查；**判讀規則**（`overall`／`blind_spots` 直接讀不心算、`client_mail` 為何要站外監控、`-MailQuietDayLimit` 必須 < 14）見 [`docs/operations/AGENTS_APPENDIX.md`](AGENTS_APPENDIX.md) §AO-RESUME 判讀規則（2026-09-04 逐字搬移）。
 
 **AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：`.claude/commands/ao-close.md`。
@@ -505,7 +505,7 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 
 #### AO 生命週期
 
-**開工**：對話第一句是問候 / 短句無明確目標（< 15 字）→ 直接執行 AO-RESUME，輸出 AO-RESUME 報告（§0–§8）摘要。Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（300 秒去重）；Claude 讀狀態檔即可。  
+**開工**：對話第一句是問候 / 短句無明確目標（< 15 字）→ 直接執行 AO-RESUME，輸出 AO-RESUME 報告（§0–§8）摘要。Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（每 session 一次；parity = fetch + ff-only，不 stash／reset／push）；Claude 讀狀態檔即可。  
 **收工**：任何關機/結束表達（「收工」「晚安」「bye」「done」「先這樣」「走了」等）→ 直接觸發完整 AO-CLOSE 流程（**預授權**：WORKLOG / memory / daily / reports 寫入及 ao-close.ps1 執行均直接進行，R0 逐項批准在此流程內不適用；gate 失敗時自修後重跑，禁止逐步請使用者同意）。
 
 #### 遠端 session 機械閘自裝（Claude Code web，強制）
@@ -651,7 +651,7 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 
 ### 8. AO 生命週期、Git、記憶、文件
 
-- **AO-RESUME**：hook `ao-resume-on-prompt.ps1` 自動跑 `ao-resume.ps1 -FullMainlineParity`（300 秒去重）→ 讀 `.agency-state/ao-resume-hook-last.json` 回報 §0–§8（SSOT `.claude/commands/ao-resume.md`）。同時跑 smoke → `reports/status/smoke-LATEST.json`：**直接讀 `overall`／`blind_spots`，不心算**；`blind_spots` 非空 = 偵測器啞了 = WARN。禁止叫使用者手動 pull。§AO-RESUME 判讀規則
+- **AO-RESUME**：hook `ao-resume-on-prompt.ps1` 自動跑 `ao-resume.ps1 -FullMainlineParity`（每 session 一次；parity = fetch + ff-only，不 stash／reset／push）→ 讀 `.agency-state/ao-resume-hook-last.json` 回報 §0–§8（SSOT `.claude/commands/ao-resume.md`）。同時跑 smoke → `reports/status/smoke-LATEST.json`：**直接讀 `overall`／`blind_spots`，不心算**；`blind_spots` 非空 = 偵測器啞了 = WARN。禁止叫使用者手動 pull。§AO-RESUME 判讀規則
 - **AO-CLOSE**（收工／晚安／bye／done／先這樣／走了）：**預授權**——WORKLOG 證據行、`memory/CONVERSATION_MEMORY.md`、`memory/daily/`、`reports/ao-close|ao-resume/`、`ao-close.ps1` 直接執行，不逐項問。gate 擋下自補重跑；behind remote 自跑 `git pull --ff-only origin main`。health < 100% 自修後重跑，修不好列具體項問一題；**禁止**提議 `-AllowNonPerfectHealth`。唯一可問：push 被拒需人介入。SSOT `.claude/commands/ao-close.md`、`docs/operations/end-of-day-checklist.md`。
 - **Git**：直接在 `main`；衝突以較新 commit 時間為準（`git log -1 --format=%ci`），禁機械 `-X ours/theirs`。遠端 harness 指派分支的 session 用該分支並開 draft PR，不算違規。
 - **記憶**：日記 `memory/daily/YYYY-MM-DD.md`；長期 `memory/CONVERSATION_MEMORY.md`；禁敏感資訊。**文件**：決策→WORKLOG；任務→TASKS；里程碑→CONVERSATION_MEMORY；治理改動查 `docs/CHANGE_IMPACT_MATRIX.md`，新治理文件跑 `scripts/register-new-governance-doc.ps1`；ADR → `docs/architecture/decisions/ADR_INDEX.md`；deploy drift `/check-drift`；治理 drift 月巡 `scripts/check-governance-docs-drift.ps1`。**細節只留一處**：critic 覆審／完成紀錄的完整發現寫在 WORKLOG 一次；TASKS.md 對應條目只留 3–5 行摘要＋指向該 WORKLOG 日期區塊，不得兩邊各寫一份全文（2026-09-06 稽核：單一 TASKS 條目曾膨脹到 2000+ 字，跟 WORKLOG 內容重複）。

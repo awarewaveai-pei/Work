@@ -98,7 +98,7 @@ Read `log_tail` from `ao-resume-hook-last.json`. If it contains `"non-fast-forwa
 4. **After successful pull --rebase** → `git -C "<WORK_ROOT>" push origin main`
 5. **Only after git state is clean**, proceed to Step 0c.
 
-**Why Step 0b exists**: The hook creates an auto-checkpoint commit (ahead=1) when dirty files exist at startup. If the remote is also ahead (cross-machine work pushed while this machine was idle), push is rejected (non-fast-forward). Without `git pull --rebase`, `ao-resume.ps1` exits at git-align and no state files are generated.
+**Why Step 0b exists**: Since 2026-09-23 the hook never commits, stashes, resets or pushes. `ahead` means commits (this or another session's) that AO-CLOSE has not pushed yet; the automatic parity step (`Invoke-SharedWorktreeParity`: fetch + `merge --ff-only`) only reports `action=ahead|diverged|ff-refused` and continues, so state files ARE generated. Step 0b is for the operator to push or rebase when section 1 shows that state.
 
 ### Step 0c — Regenerate all state files (Case B2, after Step 0b)
 

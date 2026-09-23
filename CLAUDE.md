@@ -32,7 +32,7 @@ SSOT `mcp/registry.template.json`，改後跑 `scripts/sync-mcp-config.ps1`。`~
 
 ## AO 生命週期
 
-**開工**：問候／< 15 字無明確目標 → 執行 AO-RESUME，讀 `agency-os/.agency-state/ao-resume-hook-last.json` 出 §0–§8 報告（hook 已自動跑腳本，300 秒去重）。
+**開工**：問候／< 15 字無明確目標 → 執行 AO-RESUME，讀 `agency-os/.agency-state/ao-resume-hook-last.json` 出 §0–§8 報告（hook 每 session 自動跑一次；parity 只 fetch + ff-only，不 stash／reset／push）。
 **收工**：收工／晚安／bye／done／先這樣／走了 → 完整 AO-CLOSE，**預授權**（細則 AGENTS.md §8），不逐項請批准。
 
 ## 遠端 session 機械閘自裝（Claude Code web）

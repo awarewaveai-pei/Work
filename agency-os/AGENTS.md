@@ -67,6 +67,7 @@
 
 ## 5. Context 與 agent 用量
 
+- **共享工作目錄同時最多 2 個 session**（2026-09-23：8 個並行 → 5 小時額度一次燒光、WORKLOG 續號互搶、hook 互相 stash）。`spawn_task` 卡片只有操作者開的主線 session 可留；由卡片開出的 session 發現範圍外問題寫 `TASKS.md` 一行＋WORKLOG 連結，**不得再留卡**；卡片何時點開由操作者決定，一次一張。§Agent 扇出治理
 - **一任務一 session**：完成 → `/clear`（狀態在檔案不在對話）；進行中不 clear，變鈍用 `/compact`；任務結束主動提醒操作者 `/clear`。
 - **讀法分級**：要改／要驗證的檔**整檔讀**（片段最常漏檔頂全域設定）；只確認一個事實用 grep；20+ 檔掃模式交 Codex；大 log 先 `grep`／`tail`；外部 CLI 輸出一律導檔再取。摘要的邊界 = 問題的邊界。設計討論每三輪自問「該落地成文件了嗎」。§Session 衛生
 - **扇出（機械閘 `subagent-budget.js`，SSOT `mcp/claude-userlevel/hooks/rules/`）**：Agent tool 20 分鐘滑動視窗 0–5 放行、6–10 需 prompt 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`、>10 無條件 block（被擋重試也計入）。**Workflow tool 已在 `permissions.deny` 整個關閉**（`mcp/claude-userlevel/settings.template.json` + `scripts/wire-remote-hooks.sh` 兩處鏡像，`tests/hooks/settings-deny-parity.test.mjs` 守）：它的 `agent()` fan-out 在背景跑，PreToolUse 看不到，閘只能驗自報估計。多代理一律走 Agent tool 的固定角色模板；`subagent-budget.js` 的 Workflow 分支保留為縱深防禦。
@@ -98,7 +99,7 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 
 ## 8. AO 生命週期、Git、記憶、文件
 
-- **AO-RESUME**：hook `ao-resume-on-prompt.ps1` 自動跑 `ao-resume.ps1 -FullMainlineParity`（300 秒去重）→ 讀 `.agency-state/ao-resume-hook-last.json` 回報 §0–§8（SSOT `.claude/commands/ao-resume.md`）。同時跑 smoke → `reports/status/smoke-LATEST.json`：**直接讀 `overall`／`blind_spots`，不心算**；`blind_spots` 非空 = 偵測器啞了 = WARN。禁止叫使用者手動 pull。§AO-RESUME 判讀規則
+- **AO-RESUME**：hook `ao-resume-on-prompt.ps1` 自動跑 `ao-resume.ps1 -FullMainlineParity`（每 session 一次；parity = fetch + ff-only，不 stash／reset／push）→ 讀 `.agency-state/ao-resume-hook-last.json` 回報 §0–§8（SSOT `.claude/commands/ao-resume.md`）。同時跑 smoke → `reports/status/smoke-LATEST.json`：**直接讀 `overall`／`blind_spots`／`blockers[]`，不心算**；`blind_spots` 非空 = 偵測器啞了 = WARN；`blockers[]`（CI／夜間健康閘／8 個 sibling 偵測器統一入口）非空逐行印進 §6，不摘要。禁止叫使用者手動 pull。§AO-RESUME 判讀規則
 - **AO-CLOSE**（收工／晚安／bye／done／先這樣／走了）：**預授權**——WORKLOG 證據行、`memory/CONVERSATION_MEMORY.md`、`memory/daily/`、`reports/ao-close|ao-resume/`、`ao-close.ps1` 直接執行，不逐項問。gate 擋下自補重跑；behind remote 自跑 `git pull --ff-only origin main`。health < 100% 自修後重跑，修不好列具體項問一題；**禁止**提議 `-AllowNonPerfectHealth`。唯一可問：push 被拒需人介入。SSOT `.claude/commands/ao-close.md`、`docs/operations/end-of-day-checklist.md`。
 - **Git**：直接在 `main`；衝突以較新 commit 時間為準（`git log -1 --format=%ci`），禁機械 `-X ours/theirs`。遠端 harness 指派分支的 session 用該分支並開 draft PR，不算違規。
 - **記憶**：日記 `memory/daily/YYYY-MM-DD.md`；長期 `memory/CONVERSATION_MEMORY.md`；禁敏感資訊。**文件**：決策→WORKLOG；任務→TASKS；里程碑→CONVERSATION_MEMORY；治理改動查 `docs/CHANGE_IMPACT_MATRIX.md`，新治理文件跑 `scripts/register-new-governance-doc.ps1`；ADR → `docs/architecture/decisions/ADR_INDEX.md`；deploy drift `/check-drift`；治理 drift 月巡 `scripts/check-governance-docs-drift.ps1`。**細節只留一處**：critic 覆審／完成紀錄的完整發現寫在 WORKLOG 一次；TASKS.md 對應條目只留 3–5 行摘要＋指向該 WORKLOG 日期區塊，不得兩邊各寫一份全文。
@@ -126,5 +127,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-23 03:45:07 UTC_
+_Last synced: 2026-09-23 14:30:03 UTC_
 

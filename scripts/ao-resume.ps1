@@ -17,7 +17,10 @@
     # Optional explicit opt-in for feature-branch flow (works well with nested `powershell -File` calls).
     [switch]$FullMainlineFeature,
     [switch]$FullMainlineAllowStash,
-    # Passed through to `git-align-main-aoresume-feature.ps1`.
+    # The ONLY switch that routes -FullMainlineParity through git-align (stash -> reset --hard -> pop);
+    # pass it only when no other session is editing this worktree. -AllowUnexpectedDirty /
+    # -AllowStashBeforePull never selected that path (the old line was a discarded expression); they
+    # only relax check-three-way-sync below. Default parity = fetch + ff-only (2026-09-23 WORKLOG 續113).
     # Default: missing feature branch (no local, no origin) does not fail the whole AO-RESUME; use `-FullMainlineRequireFeatureBranch` for legacy hard-fail.
     [switch]$FullMainlineRequireFeatureBranch,
     # Destructive: passed to git-align as `-AllowResetAheadOfOrigin` — allows reset --hard to drop unpublished commits on main.
@@ -35,6 +38,8 @@ $ErrorActionPreference = "Stop"
 
 # CP950 protection for ssh/git stdout capture (see scripts/_console-encoding-helpers.ps1).
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+# Shared-worktree-safe parity (fetch + ff-only). SSOT: scripts/lib/git-safe-ops.ps1.
+. (Join-Path $PSScriptRoot "lib\git-safe-ops.ps1")
 
 function Show-AoResumeQuickFix {
     param(
@@ -215,7 +220,8 @@ function Invoke-NonFastForwardRecovery {
 }
 
 # Renamed 2026-08-25 from Invoke-FullMainlineAlignWithAutoCheckpoint. There is no
-# checkpoint any more: a dirty tree is stashed by git-align (-AllowStash, always passed)
+# checkpoint any more. Since 2026-09-23 the automatic path is Invoke-SharedWorktreeParity (fetch + ff-only,
+# no stash); git-align -AllowStash runs only for the explicit flags (see the FullMainlineParity block)
 # and restored in its finally. Keeping the old name would have left the codebase asserting
 # a behaviour it no longer has, which is the same class of defect this whole change set is
 # about. Historical references in WORKLOG/reports are left alone -- they describe what was
@@ -353,7 +359,7 @@ if ($FullMainlineParity) {
             finally { $ErrorActionPreference = $savedEAPRefresh }
         } finally { Pop-Location }
 
-        Write-Host "== AO-RESUME: FullMainlineParity (git align via git-align-main-aoresume-feature.ps1 -SkipAoResume) ==" -ForegroundColor Cyan
+        Write-Host "== AO-RESUME: FullMainlineParity (fetch + ff-only; git-align only behind explicit flags) ==" -ForegroundColor Cyan
         $alignArgs = @(
             "-NoProfile",
             "-ExecutionPolicy", "Bypass",
@@ -394,18 +400,34 @@ if ($FullMainlineParity) {
         if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }
         if ($FullMainlineRequireFeatureBranch) { $alignArgs += "-RequireFeatureBranch" }
         if ($FullMainlineAllowResetAheadOfOrigin) { $alignArgs += "-AllowResetAheadOfOrigin" }
-        # ALWAYS stash. git-align needs a clean tree; the only question is how it gets one.
-        # Until 2026-08-25 the answer was "auto-commit everything", which is how unverified
-        # work reached main and how uncommitted edits were swept into the repo. -AllowStash
-        # now stashes under a unique name and restores it in git-align's finally (all exit
-        # paths), reporting exit 3 if the restore conflicts. The flags below are kept because
-        # they also control other dirty-tree behaviour upstream of this call.
-        $null = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
-        $alignArgs += "-AllowStash"
-        $alignExit = Invoke-FullMainlineAlignWithRetry -Root $WorkRoot -AlignArgs $alignArgs
-        if ($alignExit -ne 0) {
-            Write-Error "ao-resume: FullMainlineParity git align failed (exit $alignExit). Fix dirty tree or pass -FullMainlineAllowStash / -AllowUnexpectedDirty."
-            exit $alignExit
+        # 2026-09-23: git-align (stash -> checkout main -> reset --hard -> pop) is no longer the
+        # AUTOMATIC path. Several sessions share this worktree, and every automatic stash/pop
+        # swept the other sessions' uncommitted edits out and back (49 cycles in 20 minutes,
+        # 8 stashes never restored). Automatic parity is now Invoke-SharedWorktreeParity:
+        # fetch + `merge --ff-only`, which git refuses rather than overwrite a dirty file.
+        # It never stashes, resets, checks out or pushes; what it cannot do safely it reports
+        # (section 1 of the AO-RESUME report) and AO-CLOSE / the operator resolves.
+        # git-align stays available for the EXPLICIT cases only: -FullMainlineAllowStash
+        # (operator asserts no other session is live), feature-branch continuation, or
+        # -FullMainlineAllowResetAheadOfOrigin.
+        $useGitAlign = $FullMainlineAllowStash -or $includeFeature -or $FullMainlineAllowResetAheadOfOrigin
+        if (-not $useGitAlign) {
+            $parity = Invoke-SharedWorktreeParity -WorkRoot $WorkRoot
+            $parityColor = if ($parity.Ok) { 'Green' } else { 'Yellow' }
+            Write-Host ("== AO-RESUME: mainline parity (shared-worktree safe) action={0} branch={1} ahead={2} behind={3} tracked_dirty={4} ==" -f `
+                $parity.Action, $parity.Branch, $parity.Ahead, $parity.Behind, $parity.TrackedDirty) -ForegroundColor $parityColor
+            if ($parity.Message) { Write-Host ("   " + $parity.Message) -ForegroundColor $parityColor }
+            if ($parity.Action -eq 'fetch-failed') {
+                Write-Error "ao-resume: FullMainlineParity fetch failed: $($parity.Message)"
+                exit 1
+            }
+        } else {
+            $alignArgs += "-AllowStash"
+            $alignExit = Invoke-FullMainlineAlignWithRetry -Root $WorkRoot -AlignArgs $alignArgs
+            if ($alignExit -ne 0) {
+                Write-Error "ao-resume: FullMainlineParity git align failed (exit $alignExit). Fix dirty tree or pass -FullMainlineAllowStash / -AllowUnexpectedDirty."
+                exit $alignExit
+            }
         }
     }
 }

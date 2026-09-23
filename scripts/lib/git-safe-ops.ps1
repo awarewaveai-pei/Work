@@ -298,6 +298,87 @@ function Invoke-SafeGitCapture {
 }
 
 # ---------------------------------------------------------------------------
+# Invoke-SharedWorktreeParity -- fetch + fast-forward-only mainline parity
+# ---------------------------------------------------------------------------
+# Invariant (2026-09-23, AO-RESUME churn incident): an AUTOMATIC parity step must never
+# move uncommitted work out of a worktree that other sessions may be editing. So this
+# function only ever does two things: `git fetch origin` and, when HEAD is strictly
+# behind <Remote>/<Branch> while on <Branch>, `git merge --ff-only`. git itself refuses
+# the fast-forward when it would touch a locally modified tracked file (or an untracked
+# file it would create), and that refusal is REPORTED, never worked around. No stash,
+# no checkout, no reset, no push. Every other state (ahead, diverged, not on the
+# branch, refused) is returned for the caller to print and for AO-CLOSE / the operator
+# to resolve. Before this, ao-resume.ps1 always ran git-align -AllowStash: 217 reflog
+# entries and 49 stash/pop cycles in 20 minutes with 8 sessions sharing D:\Work, and
+# 8 stashes that were never restored.
+#
+# Returns [pscustomobject] Action / Ahead / Behind / Branch / TrackedDirty / Ok / Message
+#   Action : up-to-date | fast-forward | ahead | diverged | ff-refused | not-on-branch | fetch-failed
+#   Ok     : $true when no pull is pending after the call (up-to-date, ahead, fast-forward)
+#   TrackedDirty : count of `git status --porcelain --untracked-files=no` lines (info only)
+function Invoke-SharedWorktreeParity {
+    param(
+        [Parameter(Mandatory = $true)][string] $WorkRoot,
+        [string] $Remote = 'origin',
+        [string] $Branch = 'main',
+        [switch] $SkipFetch,
+        [int]    $FetchMaxAttempts = 3
+    )
+    $r = [ordered]@{
+        Action = ''; Ahead = 0; Behind = 0; Branch = ''; TrackedDirty = 0; Ok = $false; Message = ''
+    }
+    if (-not $SkipFetch) {
+        try {
+            Invoke-SafeGitFetch -WorkRoot $WorkRoot -Prune -MaxAttempts $FetchMaxAttempts
+        } catch {
+            $r.Action = 'fetch-failed'; $r.Message = [string]$_
+            return [pscustomobject]$r
+        }
+    }
+    $cur = Invoke-SafeGitCapture -GitArgs @('rev-parse', '--abbrev-ref', 'HEAD') -WorkRoot $WorkRoot
+    $r.Branch = $cur.Text.Trim()
+    $dirty = Invoke-SafeGitCapture -GitArgs @('status', '--porcelain', '--untracked-files=no') -WorkRoot $WorkRoot
+    $r.TrackedDirty = @($dirty.Output | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+
+    $lr = Invoke-SafeGitCapture -GitArgs @('rev-list', '--left-right', '--count', "$Remote/$Branch...HEAD") -WorkRoot $WorkRoot
+    $lrText = $lr.Text.Trim()
+    if ($lr.ExitCode -eq 0 -and $lrText -match '^(\d+)\s+(\d+)$') {
+        $r.Behind = [int]$Matches[1]; $r.Ahead = [int]$Matches[2]
+    } else {
+        $r.Action = 'fetch-failed'
+        $r.Message = "cannot compare HEAD with $Remote/$Branch : $lrText"
+        return [pscustomobject]$r
+    }
+
+    if ($r.Branch -ne $Branch) {
+        $r.Action = 'not-on-branch'
+        $r.Message = "on '$($r.Branch)', not '$Branch'; nothing touched (ahead $($r.Ahead), behind $($r.Behind) vs $Remote/$Branch)"
+    } elseif ($r.Behind -eq 0) {
+        if ($r.Ahead -gt 0) {
+            $r.Action = 'ahead'
+            $r.Message = "$($r.Ahead) local commit(s) not on $Remote/$Branch; push at AO-CLOSE (nothing touched)"
+        } else {
+            $r.Action = 'up-to-date'
+            $r.Message = "HEAD == $Remote/$Branch"
+        }
+        $r.Ok = $true
+    } elseif ($r.Ahead -gt 0) {
+        $r.Action = 'diverged'
+        $r.Message = "ahead $($r.Ahead) / behind $($r.Behind) vs $Remote/$Branch; resolve at AO-CLOSE (git pull --rebase); nothing touched"
+    } else {
+        $ff = Invoke-SafeGitCapture -GitArgs @('merge', '--ff-only', "$Remote/$Branch") -WorkRoot $WorkRoot
+        if ($ff.ExitCode -eq 0) {
+            $r.Action = 'fast-forward'; $r.Ok = $true
+            $r.Message = "fast-forwarded $($r.Behind) commit(s) to $Remote/$Branch"
+        } else {
+            $r.Action = 'ff-refused'
+            $r.Message = "git refused the fast-forward (a modified tracked file or untracked file would be overwritten); nothing touched. git: " + (($ff.Output | Where-Object { $_ }) -join ' | ')
+        }
+    }
+    return [pscustomobject]$r
+}
+
+# ---------------------------------------------------------------------------
 # Self-tests
 # ---------------------------------------------------------------------------
 if ($SelfTest) {

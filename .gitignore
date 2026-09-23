@@ -76,6 +76,7 @@ agency-os/.agency-state/external-signals-digest.json
 agency-os/.agency-state/ao-close-last.txt
 agency-os/.agency-state/ao-close-prev.txt
 agency-os/.agency-state/ao-resume-last-session-id.txt
+agency-os/.agency-state/ao-resume-seen-sessions.txt
 agency-os/.agency-state/monthly-checks-last.txt
 agency-os/.agency-state/closeout-inbox.md
 agency-os/.agency-state/doc-sync-state.json

@@ -409,7 +409,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 |------|------|
 | `rules/session-banner.js` | SessionStart：報告治理狀態（規則/事件數由 manifest 推導，不手寫）|
 | `rules/vbc-reminder.js` | UserPromptSubmit：偵測「他方已完成」語境 → 注入 VBC 協議提醒（2026-07-02 Phase 4，非阻擋）|
-| `ao-resume-on-prompt.ps1` | UserPromptSubmit（僅工作站）：偵測開工關鍵字 → 觸發 AO-RESUME（300 秒去重）|
+| `ao-resume-on-prompt.ps1` | UserPromptSubmit（僅工作站）：偵測開工關鍵字 → 觸發 AO-RESUME（每 session 一次，seen-sessions ledger）|
 | `post-push-trigger-deploy.ps1` | git push 後（僅工作站）：自動觸發 Trigger.dev deploy（若設定）|
 
 ### 環境覆蓋
@@ -434,5 +434,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-09-23 03:45:07 UTC_
+_Last synced: 2026-09-23 14:30:03 UTC_
 

@@ -4,12 +4,12 @@
 #
 # Ported from .cursor/hooks/run-ao-resume-on-prompt.ps1 (Cursor beforeSubmitPrompt).
 # Both hooks call the same scripts/ao-resume.ps1 and write to the same state dir,
-# so the 300-second de-dup guard in ao-resume-hook-last.json works across both IDEs.
+# so the seen-session ledger (ao-resume-seen-sessions.txt) works across both IDEs.
 #
 # -HookHost codex is passed by the generated ~/.codex/hooks.json. Codex sessions
 # include machine-driven ones (Claude's /codex-review and codex-oracle `codex exec`,
-# subagent threads) and AO-RESUME rewrites the working tree (stash / reset --hard /
-# push), so for Codex it runs only for an operator: an explicit AO-RESUME, or a bare
+# subagent threads) and AO-RESUME touches the working tree (fetch + ff-only; state files /
+# reports), so for Codex it runs only for an operator: an explicit AO-RESUME, or a bare
 # greeting from a session that no Claude process launched.
 param(
     [ValidateSet('claude', 'codex')]
@@ -108,6 +108,74 @@ function Get-GitDirtyEntries {
     }
 }
 
+# Seen-session ledger (2026-09-23). The previous single "last session id" file compared
+# the current id with only the most recent one, so two or more concurrent sessions that
+# alternate prompts each looked "new" on every turn and AO-RESUME (then still running
+# git-align stash/reset/pop) fired on nearly every prompt: 217 reflog entries and 49
+# stash cycles in 20 minutes on 2026-09-23. A ledger of every id seen makes "new session"
+# mean exactly that, however many sessions interleave. One id per line, trimmed to the
+# newest $MaxEntries. Read/write failures fail SAFE: unknown => treated as seen => no
+# auto-trigger (the operator can still type AO-RESUME). Two sessions writing at the same
+# instant can lose one append; the loser simply auto-triggers once more, and the parity
+# step it triggers is non-mutating (fetch + ff-only), so that race is benign.
+function Test-AoResumeSessionSeen {
+    param([string]$LedgerPath, [string]$SessionId)
+    if ([string]::IsNullOrWhiteSpace($SessionId)) { return $true }
+    try {
+        if (-not (Test-Path -LiteralPath $LedgerPath -PathType Leaf)) {
+            if (Test-Path -LiteralPath $LedgerPath) { return $true }   # exists but not a file: unreadable => safe
+            return $false
+        }
+        $ids = @([System.IO.File]::ReadAllLines($LedgerPath) | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        return ($ids -contains $SessionId.Trim())
+    } catch { return $true }
+}
+
+function Add-AoResumeSessionSeen {
+    param([string]$LedgerPath, [string]$SessionId, [int]$MaxEntries = 5000)
+    if ([string]::IsNullOrWhiteSpace($SessionId)) { return $false }
+    try {
+        $ids = @()
+        if (Test-Path -LiteralPath $LedgerPath -PathType Leaf) {
+            $ids = @([System.IO.File]::ReadAllLines($LedgerPath) | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        }
+        $id = $SessionId.Trim()
+        if ($ids -contains $id) { return $true }
+        $ids = @($ids) + $id
+        if ($ids.Count -gt $MaxEntries) { $ids = @($ids[($ids.Count - $MaxEntries)..($ids.Count - 1)]) }
+        $dir = Split-Path -Parent $LedgerPath
+        if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        [System.IO.File]::WriteAllLines($LedgerPath, [string[]]$ids, (New-Object System.Text.UTF8Encoding $false))
+        return $true
+    } catch { return $false }
+}
+
+# Check-and-record under one named mutex (codex round 1 F2/F3): two first prompts arriving
+# together cannot both see "unseen", and an id counts as registered only when the append
+# succeeded -- a ledger that cannot be written yields $false (no auto-trigger; the operator
+# can still type AO-RESUME) instead of re-triggering on every later prompt. Mutex wait
+# timeout or any exception => $false, same safe direction.
+function Register-AoResumeSession {
+    param([string]$LedgerPath, [string]$SessionId, [int]$MaxEntries = 5000, [int]$MutexTimeoutMs = 2000)
+    if ([string]::IsNullOrWhiteSpace($SessionId)) { return $false }
+    $mutex = $null; $held = $false
+    try {
+        $mutex = New-Object System.Threading.Mutex($false, 'AwareWave.AoResume.SeenSessions')
+        try { $held = $mutex.WaitOne($MutexTimeoutMs) }
+        catch [System.Threading.AbandonedMutexException] { $held = $true }
+        if (-not $held) { return $false }
+        if (Test-AoResumeSessionSeen -LedgerPath $LedgerPath -SessionId $SessionId) { return $false }
+        return [bool](Add-AoResumeSessionSeen -LedgerPath $LedgerPath -SessionId $SessionId -MaxEntries $MaxEntries)
+    } catch { return $false }
+    finally {
+        if ($held -and $mutex) { try { $mutex.ReleaseMutex() } catch { } }
+        if ($mutex) { $mutex.Dispose() }
+    }
+}
+
+# Library mode: tests dot-source this file for the functions above and stop here.
+if ($MyInvocation.InvocationName -eq '.') { return }
+
 try {
     $stdin = New-Object System.IO.StreamReader([Console]::OpenStandardInput(), [System.Text.Encoding]::UTF8)
     $raw = $stdin.ReadToEnd()
@@ -179,23 +247,22 @@ try {
     # Fix (2026-06-11): use the REAL Claude Code session_id (verified present in the live
     # payload). session_id is stable for an entire conversation (incl. --continue/--resume) and
     # changes only on /clear or a new terminal session — so it is a correct new-session signal,
-    # immune to clock/date/late-night work. We auto-trigger ONLY when session_id changed.
+    # immune to clock/date/late-night work. We auto-trigger ONLY when session_id has never been
+    # seen (ledger, 2026-09-23; "differs from the previous id" ping-ponged under concurrent sessions).
     # Fail-safe: empty session_id (unexpected) => no auto-trigger (the user can type AO-RESUME).
     # DELIBERATE DROP: the old 8h block also force-triggered when ao-resume-hook-last.json was
     # missing/corrupt. That is intentionally gone — the new trigger keys off the separate
-    # ao-resume-last-session-id.txt, so json corruption no longer affects triggering, and a missing
-    # session-id file still triggers (lastSessionId="" != non-empty sessionId). Not an accidental loss.
+    # ao-resume-seen-sessions.txt, so json corruption no longer affects triggering, and a missing
+    # ledger still triggers (an unseen id). Not an accidental loss.
     # ORDERING: MUST run BEFORE the dirty-tree short-circuit below (that branch exits early).
     $autoTriggerAoResume = $false
-    $sessionIdFile = Join-Path $root "agency-os\.agency-state\ao-resume-last-session-id.txt"
-    if (-not $isAoResume -and $sessionId) {
-        $lastSessionId = ""
-        try {
-            if (Test-Path -LiteralPath $sessionIdFile) {
-                $lastSessionId = (Get-Content -LiteralPath $sessionIdFile -Raw -Encoding UTF8).Trim()
-            }
-        } catch { $lastSessionId = "" }
-        if ($sessionId -ne $lastSessionId) { $autoTriggerAoResume = $true }
+    $sessionLedger = Join-Path $root "agency-os\.agency-state\ao-resume-seen-sessions.txt"
+    if ($sessionId) {
+        # One atomic check-and-record per prompt: $true only for a never-seen id whose append
+        # succeeded. An explicit AO-RESUME prompt registers the id too (so a later greeting in the
+        # same session does not auto-trigger a second time) but runs regardless.
+        $registered = Register-AoResumeSession -LedgerPath $sessionLedger -SessionId $sessionId
+        if (-not $isAoResume) { $autoTriggerAoResume = [bool]$registered }
     }
 
     # REMOVED 2026-08-25: per-prompt auto-checkpoint (git add -A + commit on EVERY user
@@ -246,7 +313,7 @@ try {
     # REMOVED 2026-08-25: the pre-AO-RESUME auto-checkpoint that used to live here.
     # This was the THIRD call site of commit-checkpoint (after the per-prompt one above and
     # a fallback inside ao-resume.ps1) and the last one still authoring commits. It existed
-    # because git-align needs a clean tree; ao-resume.ps1 now always passes -AllowStash, so
+    # because git-align needed a clean tree; until 2026-09-23 ao-resume.ps1 passed -AllowStash, so
     # git-align parks the dirty tree in a named stash and restores it in its finally.
     # Committing here would publish the operator's in-progress work to main under a message
     # that describes nothing, on every single AO-RESUME.
@@ -254,17 +321,12 @@ try {
     # now truthfully read "attempted=false" because nothing is attempted.
     $dirtyBefore = Get-GitDirtyEntries -RepoRoot $root
     if (@($dirtyBefore).Count -gt 0) {
-        $allLogLines.Add("== AO-RESUME hook: dirty tree detected; git-align will stash and restore it (no commit) ==") | Out-Null
-        $autoCheckpointSummary = "dirty=$(@($dirtyBefore).Count); handled by git-align -AllowStash (no commit)"
+        $allLogLines.Add("== AO-RESUME hook: dirty tree detected ($(@($dirtyBefore).Count) entries); automatic parity is fetch + ff-only (no stash, no commit) ==") | Out-Null
+        $autoCheckpointSummary = "dirty=$(@($dirtyBefore).Count); left in place (fetch + ff-only parity, no stash, no commit)"
     }
 
 
-    # Record the session_id we are handling so the next prompt in THIS session does not re-trigger
-    # (only a genuinely new session_id should). Written before the run so a failing run still
-    # records the session (prevents a re-trigger loop on a broken session).
-    if ($sessionId) {
-        try { [System.IO.File]::WriteAllText($sessionIdFile, $sessionId, (New-Object System.Text.UTF8Encoding $false)) } catch { }
-    }
+    # (session id already registered above, before the run, so a failing run still counts as seen)
 
     # Skeleton is OPT-IN: ao-resume.ps1 writes the AO-RESUME archive skeleton ONLY when this hook
     # passes -WriteArchiveSkeleton, i.e. only for an explicit "AO-RESUME" prompt where the agent
