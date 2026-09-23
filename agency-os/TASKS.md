@@ -120,6 +120,12 @@
   - **下一步**：go-ahead → P0 止血（改 HOST/PORT）→ P1 身分 A／B（建議 B：forced-command gate）→ P2 驗證 → P3 偵測治本；步驟與 rollback 見 WORKLOG 續106。
   - **完成定義**：prod `/api/ops/repairs/health` 的 `backup_script_probe`＋`auto_reboot` 四項 `ok`；`dogfood-auto-repair.ps1 -Mode HealthOnly` 10/10；next-admin env 無退租 IP；每日 smoke 在探針非 `ok` 時 WARN。
 
+- [ ] **【資安｜待操作者 go-ahead】4 處 live 設定仍信任退租 IP：CF 白名單（含一條因格式問題連自己的偵測器都漏掉）、fail2ban ignoreip、lobster-nginx trust**
+  - `🔴 現行` · `2026-09-23` · `操作者（High：CF/fail2ban/nginx 改動，與上方 Auto-Repair SSH 條目是同一批稽核發現但範圍不同，各自獨立）`
+  - **現在到哪**：唯讀診斷 + repo 側修復完成（WORKLOG 2026-09-23 續107）。新 SSOT `agency-os/config/released-addresses.json` + `scripts/verify-no-released-addresses.mjs`（repo gate，warn-only，system-health-check.ps1 7e）+ `check-cloudflare-security.ps1` 第 4 項新檢查（IPv6-aware CIDR 比對，修正前字串比對漏掉 CF 用展開格式存的 IPv6 規則）。repo 側已清：`nginx/default.conf`、`cf-origin-lockdown.sh`、`backup-eu-stack.sh`（刪除已死的 OFFSITE_* 變數）。
+  - **prod 仍活著、待 go-ahead**：① CF `aware-wave.com` zone 3 條 whitelist access rule（149.202.64.114、204.168.175.41、其 IPv6 `2001:41d0:000d:2572::/64`，各自 id 見 WORKLOG）+ `soulfulexpression.org` zone 1 條（149.202.64.114）② `/etc/fail2ban/jail.d/ignoreip.local` 仍含 `149.202.64.114` ③ 部署修正後的 `lobster-nginx/default.conf`（走 `safe-infra-patch.sh nginx`）④ 部署修正後的 `backup-eu-stack.sh`（走 `safe-infra-patch.sh file`，該腳本 cron 每日 02:30 UTC 在跑）。可選、非緊急：`/root/{precopy,syslayer,imagepull,cutover-lib}.sh` 四支一次性搬機腳本仍硬編 `root@149.202.64.114`，遷移早已完成，建議操作者自行確認後刪除（未經確認不代刪）。
+  - **完成定義**：`check-cloudflare-security.ps1` 兩個 zone 的 Released-address 檢查皆 `clean`；`ignoreip.local` 不含退租 IP；`verify-no-released-addresses.mjs --host ubuntu@145.239.195.47 --port 58122` 干淨（僅 KNOWN/annotated）。
+
 - [ ] **【MainWP｜被 SG_SSH_HOST 擋】建站自動接上 MainWP：MainWP 端全通，卡在建站器本身 SSH 目標是退租主機**
   - `🔴 現行` · `2026-09-21` · `卡在下方 SG_SSH_HOST 條目（操作者決定 bridge 存取主機的方式）`
   - **現在到哪**：REST key（server env）＋Unique Security ID＋child 安裝全上線（Trigger v20260921.3、next-admin 33251522a）；真 MainWP 以同一份碼註冊 staging 成功（WORKLOG 續100）。真建站 E2E run_cmuatt4cc02a021lnlhrm5drl → `provisioning_failed: Timed out while waiting for handshake`（SG_SSH_HOST=5.223.93.113）。

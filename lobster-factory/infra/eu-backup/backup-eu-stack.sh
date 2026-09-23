@@ -5,10 +5,12 @@
 # Environment (from shell or /etc/default/eu-backup):
 #   BACKUP_DIR           — output root (default: /root/backups)
 #   BACKUP_RETAIN_DAYS   — delete local backups older than N days (default: 7)
-#   OFFSITE_HOST         — SG VPS IP for cross-VPS backup (default: 5.223.93.113)
-#   OFFSITE_KEY          — SSH key for offsite (default: /root/.ssh/backup_to_sg)
-#   OFFSITE_DIR          — remote dir (default: /root/lobster-phase1/backups/from-eu)
-#   OFFSITE_RETAIN_DAYS  — delete offsite copies older than N days (default: 14)
+#
+# OFFSITE_HOST/OFFSITE_KEY/OFFSITE_DIR/OFFSITE_RETAIN_DAYS removed 2026-09-23: the peer-VPS
+# rsync leg that read them was deleted outright 2026-08-28 (see "(removed 2026-08-28)" note
+# below) but the now-dead defaults were left in place pointing at the released SG IP
+# 5.223.93.113 — caught by scripts/verify-no-released-addresses.mjs. If a second machine
+# ever exists again, reintroduce the leg with fresh var names and a pinned known_hosts entry.
 #
 # Cron: /etc/cron.d/eu-backup (02:30 UTC daily)
 # Log:  /var/log/eu-backup.log
@@ -28,9 +30,6 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 DATE="$(date +%Y-%m-%d)"
 BACKUP_DIR="${BACKUP_DIR:-/root/backups}"
 BACKUP_RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-7}"
-OFFSITE_HOST="${OFFSITE_HOST:-5.223.93.113}"
-OFFSITE_KEY="${OFFSITE_KEY:-/root/.ssh/backup_to_sg}"
-OFFSITE_DIR="${OFFSITE_DIR:-/root/lobster-phase1/backups/from-eu}"
 OUT="${BACKUP_DIR}/${STAMP}"
 
 log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }

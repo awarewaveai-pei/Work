@@ -65,9 +65,14 @@ REVERT_PID_FILE="/tmp/cf-lockdown-revert.pid"
 #     | sort | uniq -c | sort -rn      # then subtract cloudflare.com/ips-v4
 #
 # Override without editing this file by creating /etc/default/cf-origin-lockdown:
-#   TRUSTED_SRC_V4="204.168.175.41 203.0.113.7"
+#   TRUSTED_SRC_V4="203.0.113.7"
+#
+# 204.168.175.41 (EU VPS) removed from the default 2026-09-23: host released 2026-08-30, now
+# reassigned to a third party. This script is not ks-aw-01's active origin-lockdown mechanism
+# (that's the nginx geo guard, conf.d/cf-edge-geo.conf — confirmed no cf-lockdown ipsets exist
+# on ks-aw-01), but a stale default here would still be wrong if this script is ever re-run.
 TRUSTED_IPSET_V4="origin-trusted-v4"
-TRUSTED_SRC_V4="${TRUSTED_SRC_V4:-204.168.175.41 172.17.0.0/16 172.18.0.0/16 172.21.0.0/16}"
+TRUSTED_SRC_V4="${TRUSTED_SRC_V4:-172.17.0.0/16 172.18.0.0/16 172.21.0.0/16}"
 [[ -f /etc/default/cf-origin-lockdown ]] && source /etc/default/cf-origin-lockdown
 
 # Hardcoded CF IPv4 ranges (fallback if download fails)

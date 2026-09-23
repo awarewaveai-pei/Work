@@ -25,12 +25,12 @@
 
   Overall can be PASS / WARN / SKIP / BLIND. BLIND (added 2026-09-10, found when
   CLOUDFLARE_API_TOKEN had silently expired for an unknown number of days with this
-  script still reporting WARN) means at least one of the 3 CF API calls below produced
+  script still reporting WARN) means at least one of the 4 CF API checks below produced
   NO measurement this run -- auth rejection (401/403) or a network/connection failure
   (DNS, timeout, refused) -- which is a different and more urgent condition than WARN
   (call succeeded, a real posture value came back and it happens to be suboptimal).
   The report names exactly which check(s) are blind vs which completed with real data;
-  it does not claim total blindness when only some of the 3 calls failed.
+  it does not claim total blindness when only some of the 4 checks failed.
   SKIP still means "token not configured", a known/expected state on some machines.
 #>
 param(
@@ -96,6 +96,11 @@ $errorMsg   = ""
 # quiet must be louder than one that reports nothing wrong, not folded into "WARN" --
 # but "louder" must still describe reality, not round every partial failure up to total).
 $blindChecks = @()
+# Initialised here, not inside the token branch: with no token the report block below still
+# reads them, and under StrictMode an unset variable threw and no cf-security-LATEST.md was
+# written at all (critic 2026-09-23) -- a SKIP run must still leave a fresh report.
+$releasedAddrStatus = "skipped (no token)"
+$releasedAddrHits   = @()
 
 if (-not $token) {
     $errorMsg = "CLOUDFLARE_API_TOKEN not found in vault/env — skipped"
@@ -188,6 +193,89 @@ if (-not $token) {
         $rateLimitAdminCarveout = "unknown"
     }
 
+    # 4. Released-address whitelist check (added 2026-09-23). Registry SSOT:
+    # agency-os/config/released-addresses.json (same file scripts/verify-no-released-addresses.mjs
+    # reads for the repo gate). Found live 2026-09-23: 204.168.175.41 (released EU VPS, since
+    # reassigned to a third party) was still whitelisted in this zone's access rules -- a CF
+    # whitelist rule bypasses Bot Fight Mode/WAF/rate-limiting entirely for that source.
+    #
+    # Uses [System.Net.IPAddress] byte-array prefix comparison, not string equality: Cloudflare
+    # stores IPv6 rule values fully expanded (2001:41d0:000d:2572:0000:0000:0000:0000/64) while
+    # the registry uses compressed form (2001:41d0:d:2572::/64) -- a first string-equality version
+    # of this check silently missed that exact live rule (verified 2026-09-23: only the 2 IPv4
+    # hits surfaced, the IPv6 one did not, until this was rewritten as byte comparison).
+    function Test-CidrOverlap {
+        param([string]$A, [string]$B)
+        try {
+            $aParts = $A -split '/', 2; $bParts = $B -split '/', 2
+            $aIp = [System.Net.IPAddress]::Parse($aParts[0]); $bIp = [System.Net.IPAddress]::Parse($bParts[0])
+            if ($aIp.AddressFamily -ne $bIp.AddressFamily) { return $false }
+            $bits = if ($aIp.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) { 32 } else { 128 }
+            $aLen = if ($aParts.Count -eq 2) { [int]$aParts[1] } else { $bits }
+            $bLen = if ($bParts.Count -eq 2) { [int]$bParts[1] } else { $bits }
+            $prefixLen = [Math]::Min($aLen, $bLen)
+            $aBytes = $aIp.GetAddressBytes(); $bBytes = $bIp.GetAddressBytes()
+            $fullBytes = [Math]::Floor($prefixLen / 8); $remBits = $prefixLen % 8
+            for ($i = 0; $i -lt $fullBytes; $i++) { if ($aBytes[$i] -ne $bBytes[$i]) { return $false } }
+            if ($remBits -gt 0) {
+                $mask = [byte]((0xFF -shl (8 - $remBits)) -band 0xFF)
+                if (($aBytes[$fullBytes] -band $mask) -ne ($bBytes[$fullBytes] -band $mask)) { return $false }
+            }
+            return $true
+        } catch { return $false }
+    }
+    $releasedAddrStatus = "unknown"
+    # Every page, not only the first 1000 (codex 2026-09-23 F1): a rule on page 2 must not read clean.
+    function Get-CfAllPages {
+        param([string]$BaseUri, [hashtable]$Headers)
+        $all = @(); $page = 1
+        do {
+            $sep = if ($BaseUri.Contains('?')) { '&' } else { '?' }
+            $resp = Invoke-RestMethod -Uri ("{0}{1}per_page=1000&page={2}" -f $BaseUri, $sep, $page) -Headers $Headers -TimeoutSec 10 -ErrorAction Stop
+            $all += @($resp.result)
+            $totalPages = 1
+            if ($resp.PSObject.Properties['result_info'] -and $resp.result_info -and $resp.result_info.PSObject.Properties['total_pages']) { $totalPages = [int]$resp.result_info.total_pages }
+            $page++
+        } while ($page -le $totalPages -and $page -le 50)
+        # More pages than the cap = this check did NOT see everything: throw so the caller's catch
+        # records it as BLIND instead of reporting clean on a partial list (codex r2 F2).
+        if ($totalPages -gt 50) { throw ("{0}: {1} pages exceed the 50-page cap -- result incomplete" -f $BaseUri, $totalPages) }
+        return $all
+    }
+    try {
+        $registryPath = Join-Path $root "agency-os\config\released-addresses.json"
+        $registry = Get-Content -LiteralPath $registryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $released = @($registry.released | ForEach-Object { $_.cidr })
+        $rules = @(Get-CfAllPages -BaseUri "https://api.cloudflare.com/client/v4/zones/$ZoneId/firewall/access_rules/rules" -Headers $cfH)
+        foreach ($rule in $rules) {
+            # ip6 is a distinct CF target (single IPv6 address); a block/challenge rule on a released
+            # address is the RIGHT posture, only a whitelist is a trust grant.
+            if (@('ip', 'ip_range', 'ip6') -notcontains [string]$rule.configuration.target) { continue }
+            if ([string]$rule.mode -ne 'whitelist') { continue }
+            $val = [string]$rule.configuration.value
+            foreach ($cidr in $released) {
+                if (Test-CidrOverlap -A $val -B $cidr) { $releasedAddrHits += "$($rule.mode):$val (id=$($rule.id))"; break }
+            }
+        }
+        # DNS: a proxied or plain A/AAAA record still pointing at a released address serves a third
+        # party's box under our name (registry description already claimed this check existed).
+        $dnsRecs = @(Get-CfAllPages -BaseUri "https://api.cloudflare.com/client/v4/zones/$ZoneId/dns_records?type=A" -Headers $cfH) +
+                   @(Get-CfAllPages -BaseUri "https://api.cloudflare.com/client/v4/zones/$ZoneId/dns_records?type=AAAA" -Headers $cfH)
+        foreach ($rec in $dnsRecs) {
+            $content = [string]$rec.content
+            foreach ($cidr in $released) {
+                if (Test-CidrOverlap -A $content -B $cidr) { $releasedAddrHits += "dns:$($rec.type) $($rec.name) -> $content (id=$($rec.id))"; break }
+            }
+        }
+        $releasedAddrStatus = if ($releasedAddrHits.Count -gt 0) { "FOUND" } else { "clean" }
+    } catch {
+        $code = $null
+        try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+        $blindChecks += @{ name = "Released-address access rules"; code = $code }
+        $releasedAddrStatus = "error"
+        if (-not $errorMsg) { $errorMsg = "access_rules API: $($_.Exception.Message)" }
+    }
+
     if ($WpLoginProtectedByServerSide) {
         # wp-login/xmlrpc defended server-side (LLAR + nginx + fail2ban) since 2026-06-04.
         # CF wp-login geo rules are intentionally absent; scanner/path rules may exist.
@@ -207,6 +295,9 @@ if (-not $token) {
             $overall = "WARN"
         }
     }
+    # A released-address whitelist rule is a real posture defect (bypasses CF entirely for
+    # that source) -- downgrade PASS, same treatment as $lockdownStatus -eq 'inactive' below.
+    if ($releasedAddrStatus -eq "FOUND" -and $overall -eq "PASS") { $overall = "WARN" }
 }
 
 # Any blind check overrides PASS/WARN (never SKIP -- missing-token is a known, expected
@@ -260,6 +351,7 @@ $lines = @(
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |",
     "| Scanner flood rate-limit rule | $rateLimitRuleStatus |",
     "| WP admin rate-limit carve-outs | $rateLimitAdminCarveout |",
+    "| Released-address access rules | $releasedAddrStatus$(if ($releasedAddrHits.Count -gt 0) { ': ' + ($releasedAddrHits -join '; ') }) |",
     "| Origin lockdown (ks-aw-01 nginx guard) | $lockdownStatus$(if ($lockdownStatus -eq 'inactive') { ' warning: direct-origin attacks possible' }) |",
     "| Direct-origin probe aware-wave (expect 403) | $(if ($lockdownAw) { $lockdownAw } else { 'N/A' }) |",
     "| Direct-origin probe soulful (expect 403) | $(if ($lockdownSf) { $lockdownSf } else { 'N/A' }) |"
@@ -282,7 +374,7 @@ if ($lockdownStatus -ne 'active') {
 }
 $lines += '- Runbook: runbooks/CLOUDFLARE-WAF-SETUP.md #Origin-Lockdown-SOP'
 if ($blindChecks.Count -gt 0) {
-    $allCheckNames  = @('Bot Fight Mode', 'WAF firewall rules', 'Rate-limit ruleset')
+    $allCheckNames  = @('Bot Fight Mode', 'WAF firewall rules', 'Rate-limit ruleset', 'Released-address access rules')
     $blindNames     = @($blindChecks | ForEach-Object { $_.name })
     $healthyNames   = @($allCheckNames | Where-Object { $blindNames -notcontains $_ })
     $authCodes      = @($blindChecks | Where-Object { $_.code -eq 401 -or $_.code -eq 403 } | ForEach-Object { $_.code } | Select-Object -Unique)
@@ -290,7 +382,7 @@ if ($blindChecks.Count -gt 0) {
 
     $lines += ""
     $lines += "## BLIND (not the same as WARN)"
-    $lines += ('- {0} of 3 checks produced ZERO measurement this run: {1}. Their values in the table above are stale/error, not a fresh reading.' -f $blindChecks.Count, ($blindNames -join ', '))
+    $lines += ('- {0} of {1} checks produced ZERO measurement this run: {2}. Their values in the table above are stale/error, not a fresh reading.' -f $blindChecks.Count, $allCheckNames.Count, ($blindNames -join ', '))
     if ($healthyNames.Count -gt 0) {
         $lines += ('- The other {0} check(s) DID complete with real data this run: {1}.' -f $healthyNames.Count, ($healthyNames -join ', '))
     }

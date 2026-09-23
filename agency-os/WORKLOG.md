@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-23（續121）退租位址信任稽核：registry SSOT + repo gate + 主機掃描 + CF access rule／DNS 檢查；nginx／fail2ban／.env 的 prod 修正待 go-ahead（接手死亡 session）
+
+- [觸發] 續106 發現 EU IP 204.168.175.41 已被第三方接手且仍在 CF 白名單；「Audit trust lists bound to released IPs + blind fail2ban」session 寫完偵測器、critic 回報 1 Critical + 7 Major 後撞用量上限死亡（M6 修一半）；本 session 接手。
+- [根因（不變量）] 三台主機 08-30/31 退租，位址散在 CF whitelist、fail2ban ignoreip、nginx `set_real_ip_from`、備份腳本預設、compose 預設，沒有任何檢查看全部。不變量：**任何 live 設定不得信任（allowlist／set_real_ip_from／ignoreip／access rule）或指向（ssh／rsync／webhook／DNS）我們已不擁有的位址**；registry `agency-os/config/released-addresses.json` 只增不刪。
+- [修法] `scripts/verify-no-released-addresses.mjs`（repo gate：git-tracked code/config，註解不算；`--host` 唯讀主機掃描）+ `tests/scripts/verify-no-released-addresses.test.mjs`；`check-cloudflare-security.ps1` 第 4 項 Released-address（access rules whitelist + DNS A/AAAA，byte 比對 CIDR）；`system-health-check.ps1` 7e warn-only；repo 側：nginx `default.conf` 拔 204.168.175.41 兩處、`cf-origin-lockdown.sh` 預設拔除、`backup-eu-stack.sh` 死掉的 OFFSITE_* 預設拔除。接手後修 critic M2（`String.raw` 讓 `\${PIPESTATUS[0]}` 變字面→`${'$'}`，拔 `cut -c1-600`）、M3（反引號算引號、多行 block 只在行首開）、M4（mask 不再遮位址值：`BYPASS`／`PASSTHROUGH`／`PRIVATE_` 曾把要找的 IP 遮成 `***`）、M5（`ip6` target）、M6（SKIP 路徑變數在 token 分支外初始化，否則 StrictMode 炸掉不寫報告）、M7（DNS 檢查補上，registry 描述早就宣稱有）、m3（只算 `whitelist` mode）、m4（byte mask `-band 0xFF`）、m6（knownViolations 一條只抵一行）、m8（顯示 skipped 數）、m10（`--port` 驗證）、m1/m2（health check 反引號 `n 變換行、EAP=Continue）；Codex r1 `76044436`：F1 分頁→`Get-CfAllPages` 逐頁、F2 多行 template literal 內以 `/*` 開頭的行→跨行 inTemplate 狀態、F3 廣 CIDR 忽略→駁回並在 MIN_PREFIX 註明；r2 `aa782b31`：F1 普通字串內反引號→只數引號外反引號、F2 超過 50 頁→throw 進 BLIND 不報 clean。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/scripts/verify-no-released-addresses.test.mjs` | exit=0 | ms=~3000 | result=34/34（含 PIPESTATUS 真 bash -n、MASK_SED 真 sed、template literal、regex literal、known-once）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/verify-no-released-addresses.mjs` | exit=0 | result=`RESULT: PASS new=0 known=3`（files listed=6944 in-scope=2688 candidates=23 skipped=27）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/check-cloudflare-security.ps1`（真 CF API，含分頁） | exit=0 | result=`Released-address access rules | FOUND: whitelist ×3`（2001:41d0:d:2572::/64、149.202.64.114、204.168.175.41），DNS 無命中
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/12m/0n（原 session in-house critic 1C/7M；Codex r1 3 個→2 修 1 駁回；r2 2 個→全修；C1＝CF 白名單仍活著＝操作者 go-ahead 項）
+- BUGHUNT_DONE: scope=scripts,agency-os,lobster-factory,tests | grep=`released-addresses\|verify-no-released\|Released-address\|Test-CidrOverlap\|OFFSITE_HOST` | hits=9 檔（registry、mjs、測試、cf ps1、health ps1、nginx、cf-origin-lockdown、backup-eu-stack、TASKS 資安條目）
+- [剩餘風險／待 go-ahead（High）] prod 仍活著：① CF `aware-wave.com` 3 條 whitelist access rule（id b695de45…／e13fb2f4…／13e6f511…）② ks-aw-01 `/etc/fail2ban/jail.d/ignoreip.local` 含 149.202.64.114 ③ 主機 `/root/lobster-phase1/nginx/default.conf` 仍 `set_real_ip_from 204.168.175.41`（repo 已拔，要 `safe-infra-patch.sh`）④ `/root/lobster-phase1/.env` `SG_SSH_HOST=5.223.93.113` 且無 host key pin。主機側 `--host` 掃描本次未跑（需 ssh）。
+- [rollback] `git revert <commit>`：偵測器與 registry 消失、nginx/lockdown/backup 預設回到含退租位址的舊文字。
+
 ## 2026-09-23（續120）主機腳本新鮮度：cron 呼叫端決策前先同步 origin/main 的 scripts/（假「自動部署失敗」警報根因）；接手死亡 session 修 Codex r2/r3
 
 - [觸發] 07:00Z Telegram「❌ 後台自動部署失敗」實為假警報：主機上的舊 `auto-deploy-next-admin.sh` 沒有 DEPLOY_HOLD 前置檢查，呼叫 `sg-deploy.sh` 被刻意的 hold 拒絕後回報 FAILED。「SG next-admin 自動部署失敗」session 寫完機制後撞用量上限死亡（Codex r2 4 findings 未處理）；本 session 接手。

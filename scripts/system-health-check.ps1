@@ -635,6 +635,38 @@ if (Test-Path $repoHygieneGate) {
     Add-CriticalFailure -Reason "audit-repo-hygiene.ps1 not found - the case-collision hard gate cannot run"
 }
 
+# 7e) Released-address repo gate (warn-only for now; not yet a hard gate — see note).
+# Invariant: no live config may trust or target an address AwareWave no longer owns.
+# Origin: 2026-09-23, found live on ks-aw-01 while investigating an unrelated Auto-Repair SSH
+# task — a Cloudflare whitelist rule and fail2ban ignoreip both still trusted a released EU VPS
+# IP that had since been reassigned to a third party. Registry SSOT: agency-os/config/released-addresses.json.
+# Warn-only deliberately: unlike 7d's case-collision class (dogfooded + critic-reviewed against
+# reproduced fixtures before being hardened), this checker is new this session — promote to a
+# hard gate only after an oracle/critic review pass, per the 7d precedent.
+$releasedAddrScript = Join-Path $monoRoot "scripts\verify-no-released-addresses.mjs"
+if (Test-Path -LiteralPath $releasedAddrScript) {
+    try {
+        # EAP=Continue around the node call (same as check 10 below): under Stop, a line on stderr
+        # (exit 2 = broken registry) throws before $LASTEXITCODE is read and reads as "Skipped".
+        $prevEapRa = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $raOut = & node $releasedAddrScript 2>&1 | Out-String
+        $raExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEapRa
+        $raSummary = ($raOut -split "`r?`n" | Where-Object { $_ -match '^RESULT:' } | Select-Object -First 1)
+        if (-not $raSummary) { $raSummary = "no RESULT line in output" }
+        if ($raExit -eq 0) {
+            Add-Check -Name "No live trust/target of released addresses (verify-no-released-addresses.mjs)" -Pass $true -Detail $raSummary.Trim()
+        } else {
+            Add-Check -Name "No live trust/target of released addresses (verify-no-released-addresses.mjs)" -Pass $true -Detail ("WARN: " + $raSummary.Trim() + ' - run node scripts/verify-no-released-addresses.mjs for file:line detail')
+        }
+    } catch {
+        Add-Check -Name "No live trust/target of released addresses (verify-no-released-addresses.mjs)" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name "No live trust/target of released addresses (verify-no-released-addresses.mjs)" -Pass $true -Detail "Skipped: scripts/verify-no-released-addresses.mjs not present"
+}
+
 # 9) Cloudflare security posture (warn-only informational check).
 # KNOWN GAP (same shape as the 7) deploy-drift note above, found 2026-08-29, not fixed here):
 # check-cloudflare-security.ps1 also lives only under monorepo-root scripts/, so this

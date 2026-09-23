@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "description": "Addresses AwareWave no longer owns. Invariant: no live config may trust (allowlists, set_real_ip_from, ignoreip, Cloudflare access rules) or target (SSH/rsync/webhook/DNS) any of them. When a host is released, APPEND its IPv4 and IPv6 prefix here; never delete an entry. Readers: scripts/verify-no-released-addresses.mjs (repo gate + --host sweep), scripts/check-cloudflare-security.ps1 (CF access rules + DNS).",
+  "lastReviewed": "2026-09-23",
+  "released": [
+    {
+      "cidr": "5.223.93.113/32",
+      "was": "Hetzner Cloud SG VPS wordpress-ubuntu-4gb-sin-1",
+      "releasedOn": "2026-08-30",
+      "evidence": "agency-os/TASKS.md 刪除兩台 Hetzner 伺服器"
+    },
+    {
+      "cidr": "204.168.175.41/32",
+      "was": "Hetzner Cloud EU VPS awarewave-eu-hel1-cpx32",
+      "releasedOn": "2026-08-30",
+      "evidence": "agency-os/TASKS.md 刪除兩台 Hetzner 伺服器; re-assigned to a third party (OpenSSH_10.2p1 banner, WORKLOG 2026-09-23)"
+    },
+    {
+      "cidr": "149.202.64.114/32",
+      "was": "OVH SYS-GAME-2, ks-aw-01 before the 2026-08-31 host switch",
+      "releasedOn": "2026-08-31",
+      "evidence": "runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md (Terminated in OVH Manager)"
+    },
+    {
+      "cidr": "2001:41d0:d:2572::/64",
+      "was": "IPv6 /64 of the same OVH SYS-GAME-2",
+      "releasedOn": "2026-08-31",
+      "evidence": "agency-os/WORKLOG.md 2026-08-28 CF 白名單 IPv6 盲點"
+    }
+  ],
+  "knownViolations": [
+    {
+      "file": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+      "line": "SG_SSH_HOST: ${SG_SSH_HOST:-5.223.93.113}",
+      "task": "agency-os/TASKS.md: compose `SG_SSH_HOST` 預設仍指退租 SG 5.223.93.113",
+      "reason": "hosting-bridge SSH identity (port 58122 / non-root) is an open operator decision shared with the Auto-Repair SSH target item; delete this entry when that task lands"
+    },
+    {
+      "file": "Projects/internal/cognitive-engineering-os/ai_lego/apps/cli/run_ooda_slice.py",
+      "line": "(runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md): wordpress-ubuntu-4gb-sin-1 (5.223.93.113)",
+      "task": "permanent — not scheduled for removal",
+      "reason": "historical-incident citation grounding a Method Atlas OODA example (the real 2026-04-20 crypto-miner incident); not live config, does not trust or target the address"
+    },
+    {
+      "file": "Projects/internal/cognitive-engineering-os/ai_lego/apps/cli/run_ooda_slice.py",
+      "line": "\"wordpress-ubuntu-4gb-sin-1 (5.223.93.113): CPU 99.7%, swap 91.5%, root cause unknown\",",
+      "task": "permanent — not scheduled for removal",
+      "reason": "same historical-incident citation, second occurrence (Orient-stage situation string)"
+    }
+  ]
+}
