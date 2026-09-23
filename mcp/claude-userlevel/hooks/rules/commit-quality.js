@@ -25,8 +25,9 @@ module.exports = {
     const segs = ctx.commandSegments || [];
     // Same tight pattern as verify-gate-commit (critic finding 5): the loose
     // `git\b.*\bcommit\b` also matched `git commit-tree` / `commit-graph`,
-    // silently undoing that rule's careful lookahead exclusion.
-    const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit(?=\s|$|["';|&])/;
+    // silently undoing that rule's careful lookahead exclusion. Since 2026-09-23 the
+    // pattern lives in lib/shared.js (env-prefixed `GIT_INDEX_FILE=... git commit` included).
+    const { RE_GIT_COMMIT } = require('../lib/shared');
     if (!segs.some((s) => RE_GIT_COMMIT.test(s))) return null;
     if (/--amend/.test(ctx.commandExpanded)) return null;
 

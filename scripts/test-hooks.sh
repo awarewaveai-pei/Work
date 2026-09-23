@@ -18,6 +18,7 @@
 #   tests/hooks/codex-adapter.test.mjs — Codex-shaped payloads (--host=codex) reach the same real rules/verdicts
 #   tests/hooks/asset-mcp-refs.test.mjs — every mcp__server__tool ref in the shared Claude+Codex assets names a reachable server
 #   tests/hooks/asset-parity.test.mjs — command/agent/skill parity across Claude+Codex plus index coverage
+#   tests/hooks/shared-file-guard.test.mjs — shared-file commit guard + private-index commits + WORKLOG 續N guard (real helper, scratch repo)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -33,4 +34,4 @@ else
   exit 127
 fi
 
-"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs
+"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs

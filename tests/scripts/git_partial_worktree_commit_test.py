@@ -3,13 +3,15 @@
 
 Run: python tests/scripts/git_partial_worktree_commit_test.py
 Invariants:
-  1. after prep the worktree file is exactly HEAD + my hunks; after commit + restore it is exactly the
-     original worktree content (other sessions' hunks are back in the right place even when my
-     insertions shifted every later line -- codex 2026-09-23 finding on the first version)
-  2. prep refuses a file with staged changes and a file whose previous prep was not restored
-  3. two files with the same basename never share scratch patches
+  1. the private index holds exactly HEAD + my selection (worklog block / hunks) + own files; the worktree and the
+     shared index are never written by `stage`
+  2. a worklog block lands before the next header that exists in HEAD, foreign uncommitted entries excluded,
+     line endings follow HEAD
+  3. stage refuses: entry already in HEAD, header missing/duplicated, no hunk of mine, mode change, file already staged
+     in that index; drop removes index + marker
 """
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -28,9 +30,12 @@ def load_script():
     return mod
 
 
-def git(cwd, *args):
+def git(cwd, *args, env=None):
+    e = dict(os.environ)
+    if env:
+        e.update(env)
     return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "-c", "core.autocrlf=false", *args],
-                          cwd=cwd, capture_output=True, check=True).stdout.decode()
+                          cwd=cwd, capture_output=True, check=True, env=e).stdout.decode("utf-8")
 
 
 def write(path, text):
@@ -43,21 +48,25 @@ def read(path):
         return f.read().decode("utf-8")
 
 
+HEAD_WORKLOG = "# Worklog\n\n## 2026-09-23（續1）old\n\n- old line\n"
+MINE = "## 2026-09-23（續2）mine\n\n- my line\n\n"
+FOREIGN = "## 2026-09-23（續3）foreign\n\n- their line\n\n"
+
+
 class PartialWorktreeCommitTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="gpwc-test-")
         self.repo = os.path.join(self.tmp, "repo")
-        os.makedirs(self.repo)
+        os.makedirs(os.path.join(self.repo, "agency-os"))
         git(self.repo, "init", "-q", "-b", "main")
-        git(self.repo, "config", "core.autocrlf", "false")   # the script's own git calls use the repo config
+        git(self.repo, "config", "core.autocrlf", "false")
         self.scratch = os.path.join(self.tmp, "scratch")
         os.environ["PARTIAL_COMMIT_SCRATCH"] = self.scratch
         self.mod = load_script()
         self.mod.SCRATCH = self.scratch
         self.base = "".join(f"line {i:03d}\n" for i in range(1, 41))
         write(os.path.join(self.repo, "shared.md"), self.base)
-        os.makedirs(os.path.join(self.repo, "sub"))
-        write(os.path.join(self.repo, "sub", "shared.md"), self.base)
+        write(os.path.join(self.repo, "agency-os", "WORKLOG.md"), HEAD_WORKLOG)
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "-q", "-m", "base")
         self.cwd = os.getcwd()
@@ -66,6 +75,14 @@ class PartialWorktreeCommitTest(unittest.TestCase):
     def tearDown(self):
         os.chdir(self.cwd)
         shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def index_path(self):
+        idx = [f for f in os.listdir(self.scratch) if f.endswith(".index")]
+        self.assertEqual(len(idx), 1, idx)
+        return os.path.join(self.scratch, idx[0]).replace("\\", "/")
+
+    def private(self, rel, idx):
+        return git(self.repo, "show", f":{rel}", env={"GIT_INDEX_FILE": idx})
 
     def edited(self):
         """foreign insertion after line 3 (+2), mine insertion after line 10 (+3), foreign replacement of
@@ -86,67 +103,84 @@ class PartialWorktreeCommitTest(unittest.TestCase):
                 out += ["FOREIGN after 35\n"]
         return "".join(out)
 
-    def test_prep_commit_restore_round_trip(self):
-        full = self.edited()
-        write("shared.md", full)
-        rc = self.mod.main(["prep", "shared.md", "--keep-re", "^\\+MINE"])
-        self.assertEqual(rc, 0)
-        expect_mine = "".join(
+    def expect_mine(self):
+        return "".join(
             "".join((["MINE thirty a\n", "MINE thirty b\n"] if i == 30 else [l]) + (["MINE after 10 a\n", "MINE after 10 b\n", "MINE after 10 c\n"] if i == 10 else []))
             for i, l in enumerate(self.base.splitlines(keepends=True), 1)
         )
-        self.assertEqual(read("shared.md"), expect_mine, "worktree must be HEAD + my hunks only")
-        git(self.repo, "commit", "-q", "-m", "mine", "--", "shared.md")
-        self.assertEqual(git(self.repo, "show", "HEAD:shared.md"), expect_mine)
-        rc = self.mod.main(["restore", "shared.md"])
+
+    def test_worklog_block_lands_before_next_head_header_without_foreign(self):
+        head = HEAD_WORKLOG.encode()
+        expect = ("# Worklog\n\n" + MINE + HEAD_WORKLOG[len("# Worklog\n\n"):]).encode()
+        # mine above foreign, and foreign above mine: same result
+        for work in ("# Worklog\n\n" + MINE + FOREIGN + HEAD_WORKLOG[len("# Worklog\n\n"):],
+                     "# Worklog\n\n" + FOREIGN + MINE + HEAD_WORKLOG[len("# Worklog\n\n"):]):
+            self.assertEqual(self.mod.worklog_target(head, work.encode(), "2026-09-23", 2), expect)
+        # no committed header after mine (mine appended at the end, foreign after it): after the title
+        tail = HEAD_WORKLOG + MINE + FOREIGN
+        self.assertEqual(self.mod.worklog_target(head, tail.encode(), "2026-09-23", 2), expect)
+        # CRLF HEAD, LF worktree block -> CRLF block
+        head_crlf = HEAD_WORKLOG.replace("\n", "\r\n").encode()
+        out = self.mod.worklog_target(head_crlf, (HEAD_WORKLOG + MINE).encode(), "2026-09-23", 2)
+        self.assertEqual(out, ("# Worklog\n\n" + MINE + HEAD_WORKLOG[len("# Worklog\n\n"):]).replace("\n", "\r\n").encode())
+        self.assertNotIn(b"\n\n", out.replace(b"\r\n", b""))
+
+    def test_worklog_target_refusals(self):
+        head = HEAD_WORKLOG.encode()
+        with self.assertRaises(SystemExit):
+            self.mod.worklog_target(head, (HEAD_WORKLOG + MINE).encode(), "2026-09-23", 1)      # already in HEAD
+        with self.assertRaises(SystemExit):
+            self.mod.worklog_target(head, HEAD_WORKLOG.encode(), "2026-09-23", 2)               # header missing
+        with self.assertRaises(SystemExit):
+            self.mod.worklog_target(head, (HEAD_WORKLOG + MINE + MINE).encode(), "2026-09-23", 2)  # duplicated
+
+    def test_stage_worklog_entry_and_own_file_into_private_index(self):
+        work = "# Worklog\n\n" + MINE + FOREIGN + HEAD_WORKLOG[len("# Worklog\n\n"):]
+        write("agency-os/WORKLOG.md", work)
+        write("own.txt", "mine\n")
+        rc = self.mod.main(["stage", "agency-os/WORKLOG.md", "--worklog-entry", "2", "--date", "2026-09-23", "--", "own.txt"])
         self.assertEqual(rc, 0)
-        self.assertEqual(read("shared.md"), full, "other sessions' hunks must land where they were, after my insertions shifted the file")
-        self.assertFalse(os.path.exists(self.mod.names("shared.md")["foreign"]), "parked patch is consumed on restore")
+        idx = self.index_path()
+        expect = "# Worklog\n\n" + MINE + HEAD_WORKLOG[len("# Worklog\n\n"):]
+        self.assertEqual(self.private("agency-os/WORKLOG.md", idx), expect)
+        self.assertEqual(self.private("own.txt", idx), "mine\n")
+        marker = json.load(open(idx + ".json", encoding="utf-8"))
+        self.assertEqual(set(marker["entries"]), {"agency-os/WORKLOG.md"})
+        self.assertEqual(marker["own"], ["own.txt"])
+        self.assertEqual(marker["head"], git(self.repo, "rev-parse", "HEAD").strip())
+        self.assertEqual(marker["base"]["agency-os/WORKLOG.md"], git(self.repo, "rev-parse", "HEAD:agency-os/WORKLOG.md").strip())
+        self.assertIsNone(marker["base"]["own.txt"], "untracked own file has no base blob")
+        self.assertEqual(marker["entries"]["agency-os/WORKLOG.md"], git(self.repo, "rev-parse", ":agency-os/WORKLOG.md", env={"GIT_INDEX_FILE": idx}).strip())
+        self.assertEqual(read("agency-os/WORKLOG.md"), work, "worktree untouched")
+        self.assertEqual(git(self.repo, "diff", "--cached", "--name-only"), "", "shared index untouched")
+        git(self.repo, "commit", "-q", "-m", "mine", env={"GIT_INDEX_FILE": idx})
+        self.assertEqual(git(self.repo, "show", "HEAD:agency-os/WORKLOG.md"), expect)
+        self.assertEqual(git(self.repo, "show", "HEAD:own.txt"), "mine\n")
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--range", "1", "--index", idx]), 2, "HEAD moved since the index was created -> refuse")
+        write("shared.md", self.base + "MINE tail\n")
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE", "--index", idx]), 2, "still refused on the moved HEAD even with a real selection")
 
-    def test_mutation_without_reanchoring_would_misplace(self):
-        # Proves the round-trip test is live: rendering the foreign patch against an EMPTY applied
-        # list (the first version's behaviour) makes git apply reject or misplace it.
-        full = self.edited()
-        write("shared.md", full)
-        self.assertEqual(self.mod.main(["prep", "shared.md", "--keep-re", "^\\+MINE"]), 0)
-        git(self.repo, "commit", "-q", "-m", "mine", "--", "shared.md")
-        p = self.mod.names("shared.md")
-        header, hunks = self.mod.parse(open(p["all"], "rb").read())
-        foreign = [h for h in hunks if not any(l.startswith(b"+MINE") for l in h["body"])]
-        with open(p["foreign"], "wb") as f:
-            f.write(self.mod.render(header, foreign, []))   # mutation: no re-anchoring
-        rc = self.mod.main(["restore", "shared.md"])
-        self.assertTrue(rc == 3 or read("shared.md") != full, "un-anchored foreign patch must not silently reproduce the original file")
+    def test_stage_hunks_by_keep_re_and_range(self):
+        write("shared.md", self.edited())
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE"]), 0)
+        idx = self.index_path()
+        self.assertEqual(self.private("shared.md", idx), self.expect_mine())
+        self.assertEqual(read("shared.md"), self.edited(), "worktree untouched")
+        self.assertEqual(self.mod.main(["drop", "--index", idx]), 0)
+        self.assertFalse(os.path.exists(idx) or os.path.exists(idx + ".json"))
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--range", "10", "--range", "30-30"]), 0)
+        self.assertEqual(self.private("shared.md", self.index_path()), self.expect_mine())
 
-    def test_refuses_staged_and_unrestored(self):
-        write("shared.md", self.base + "STAGED\n")
-        git(self.repo, "add", "shared.md")
-        write("shared.md", self.base + "STAGED\nMINE tail\n")
-        self.assertEqual(self.mod.main(["prep", "shared.md", "--keep-re", "^\\+MINE"]), 2, "staged changes must refuse")
-        git(self.repo, "reset", "-q", "--", "shared.md")
-        self.assertEqual(self.mod.main(["prep", "shared.md", "--keep-re", "^\\+MINE"]), 0)
-        self.assertEqual(self.mod.main(["prep", "shared.md", "--keep-re", "^\\+MINE"]), 2, "second prep before restore must refuse")
-        self.assertEqual(self.mod.main(["restore", "shared.md"]), 0)
-        self.assertEqual(read("shared.md"), self.base + "STAGED\nMINE tail\n")
-
-    def test_same_basename_gets_separate_scratch(self):
-        a = self.mod.names("shared.md")
-        b = self.mod.names("sub/shared.md")
-        self.assertNotEqual(a["foreign"], b["foreign"])
-        self.assertNotEqual(a["all"], b["all"])
-        # spelling of the same path never changes its identity (codex r2)
-        self.assertEqual(self.mod.names("./sub/shared.md")["all"], b["all"])
-        self.assertEqual(self.mod.names("sub\\shared.md")["all"], b["all"])
-
-    def test_mode_change_is_refused(self):
+    def test_refusals_and_mode_change(self):
+        write("shared.md", self.base + "FOREIGN tail\n")
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE"]), 2, "no hunk of mine")
+        self.assertEqual(self.mod.main(["stage", "shared.md"]), 2, "no selection")
+        write("shared.md", self.base)
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE"]), 2, "nothing uncommitted")
         diff = b"diff --git a/x.sh b/x.sh\nold mode 100644\nnew mode 100755\nindex 1..2\n--- a/x.sh\n+++ b/x.sh\n@@ -1 +1 @@\n-a\n+b\n"
         self.assertTrue(self.mod.has_mode_change(diff))
         self.assertFalse(self.mod.has_mode_change(b"diff --git a/x b/x\nindex 1..2\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n"))
-
-    def test_no_hunk_of_mine_is_a_noop(self):
-        write("shared.md", self.base + "FOREIGN tail\n")
-        self.assertEqual(self.mod.main(["prep", "shared.md", "--keep-re", "^\\+MINE"]), 2)
-        self.assertEqual(read("shared.md"), self.base + "FOREIGN tail\n", "a refused prep must not touch the worktree")
+        self.assertEqual([f for f in os.listdir(self.scratch)] if os.path.exists(self.scratch) else [], [], "a refused first stage leaves no index behind")
 
 
 if __name__ == "__main__":

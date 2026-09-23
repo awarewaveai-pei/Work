@@ -128,9 +128,11 @@
 //     only gets WARN-level protection here (the operator already accepted
 //     broader trust via the ACK).
 const { spawnSync } = require('child_process');
+const fs = require('fs');
 const addTracker = require('./git-add-scope-tracker');
 
-const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+((?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*)commit(?=\s|$|["';|&])/;
+// One definition for every commit gate (lib/shared.js): env-prefixed `GIT_INDEX_FILE=<idx> git commit` included.
+const { RE_GIT_COMMIT } = require('../lib/shared');
 const VALUE_FLAGS = new Set(['-m', '--message', '-c', '--reuse-message', '--author', '-F', '--file', '--date', '--fixup', '--squash']);
 // A commit segment ending in an open heredoc opener (this repo's mandated
 // `-m "$(cat <<'EOF'` multi-line style) means the real closing `)" -- <files>`
@@ -302,9 +304,9 @@ const PATHSPEC_CHUNK_SIZE = 100;
 // ...tracked])` below, comparing "is this session's tracked set actually what's
 // staged") resolves those pathspecs relative to cwd exactly like isRealPathspec does,
 // so it has the identical latent failure mode once cwd is wrong.
-function gitDiffCachedNamesRaw(extraArgs, cwd) {
+function gitDiffCachedNamesRaw(extraArgs, cwd, env) {
   try {
-    const r = spawnSync('git', ['diff', '--cached', '--name-only', '-z', ...(extraArgs || [])], { cwd, encoding: 'utf8', timeout: 10000 });
+    const r = spawnSync('git', ['diff', '--cached', '--name-only', '-z', ...(extraArgs || [])], { cwd, encoding: 'utf8', timeout: 10000, env: env ? { ...process.env, ...env } : process.env });
     if (r.error || typeof r.status !== 'number' || r.status !== 0) return null;
     return String(r.stdout || '').split('\0').filter(Boolean);
   } catch (_) {
@@ -312,18 +314,149 @@ function gitDiffCachedNamesRaw(extraArgs, cwd) {
   }
 }
 
-function gitDiffCachedNames(extraArgs, cwd) {
-  if (!extraArgs || extraArgs.length <= PATHSPEC_CHUNK_SIZE + 1) return gitDiffCachedNamesRaw(extraArgs, cwd);
+function gitDiffCachedNames(extraArgs, cwd, env) {
+  if (!extraArgs || extraArgs.length <= PATHSPEC_CHUNK_SIZE + 1) return gitDiffCachedNamesRaw(extraArgs, cwd, env);
   // extraArgs is `['--', ...paths]` when scoped — chunk the paths only.
   const [marker, ...paths] = extraArgs;
-  if (marker !== '--') return gitDiffCachedNamesRaw(extraArgs, cwd); // unexpected shape — don't guess
+  if (marker !== '--') return gitDiffCachedNamesRaw(extraArgs, cwd, env); // unexpected shape — don't guess
   const out = [];
   for (let i = 0; i < paths.length; i += PATHSPEC_CHUNK_SIZE) {
-    const chunk = gitDiffCachedNamesRaw(['--', ...paths.slice(i, i + PATHSPEC_CHUNK_SIZE)], cwd);
+    const chunk = gitDiffCachedNamesRaw(['--', ...paths.slice(i, i + PATHSPEC_CHUNK_SIZE)], cwd, env);
     if (chunk === null) return null; // any chunk failing -- fail open for the whole query
     out.push(...chunk);
   }
   return out;
+}
+
+// v7 (2026-09-23): private-index commits. scripts/git-partial-worktree-commit.py builds a PRIVATE index
+// (GIT_INDEX_FILE) = HEAD + explicitly selected hunks of a shared file (WORKLOG/TASKS) + whole own files, and
+// writes a marker <index>.json {root, entries:{path:blob}, own:[path]}. Such a commit is scoped by construction
+// (no other session can write that index), so ownership is proven by the marker instead of the add tracker --
+// but only while the index still equals the marker: a shared-file blob that differs was tampered with, an own
+// file whose worktree moved on after staging would commit stale content, any other path is a sweep. After the
+// commit succeeds (HEAD carries the marker blobs) the PostToolUse phase syncs the SHARED index entries of the
+// committed paths to HEAD (`git reset -q -- <paths>`: index only, worktree untouched -- another session's
+// whole-file add of the same shared file is replaced by HEAD, its worktree hunks stay) and removes index+marker.
+// Companion: git-shared-file-guard.js (blocks the other ways a shared file can reach a commit).
+const RE_PRIVATE_INDEX = /(?:^|[\s;&|(]|\benv\s+(?:-\S+\s+)*)GIT_INDEX_FILE=("[^"]+"|'[^']+'|\S+)/;
+
+function privateIndexOf(commitSegment) {
+  const m = String(commitSegment || '').match(RE_PRIVATE_INDEX);
+  if (!m) return null;
+  return m[1].replace(/^["']|["']$/g, '');
+}
+
+function readMarker(indexPath) {
+  try {
+    const raw = fs.readFileSync(`${indexPath}.json`, 'utf8');
+    const m = JSON.parse(raw);
+    if (!m || typeof m !== 'object' || !m.entries || typeof m.entries !== 'object' || !Array.isArray(m.own)) return null;
+    return m;
+  } catch (_) {
+    return null;
+  }
+}
+
+function gitOut(args, cwd, env) {
+  try {
+    const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 10000, env: env ? { ...process.env, ...env } : process.env });
+    if (r.error || typeof r.status !== 'number' || r.status !== 0) return null;
+    return String(r.stdout || '').trim();
+  } catch (_) {
+    return null;
+  }
+}
+
+function validatePrivateIndex(indexPath, marker, cwd) {
+  const env = { GIT_INDEX_FILE: indexPath };
+  const problems = [];
+  const root = gitOut(['rev-parse', '--show-toplevel'], cwd);
+  if (!root) return { ok: false, problems: ['not inside a git repository'] };
+  const norm = (p) => String(p || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  if (norm(marker.root) !== norm(root)) problems.push(`marker root ${marker.root} is not this repo ${root}`);
+  // The private index was read-tree'd from marker.head; git commit does not check that, so on a moved HEAD the
+  // commit's tree would silently revert everything committed in between (codex 2026-09-24 r2).
+  const head = gitOut(['rev-parse', 'HEAD'], cwd);
+  if (!marker.head || head !== marker.head) problems.push(`HEAD moved since stage (${String(marker.head || '?').slice(0, 12)} -> ${String(head || '?').slice(0, 12)}): drop --index ${indexPath} and stage again on the current HEAD`);
+  const staged = gitDiffCachedNamesRaw(undefined, cwd, env);
+  if (staged === null) return { ok: false, problems: ['cannot read the private index (GIT_INDEX_FILE)'] };
+  if (!staged.length) problems.push('private index equals HEAD -- nothing to commit');
+  const own = new Set(marker.own);
+  for (const p of staged) {
+    const idxBlob = gitOut(['rev-parse', '--verify', '-q', `:${p}`], cwd, env);
+    if (Object.prototype.hasOwnProperty.call(marker.entries, p)) {
+      if (idxBlob !== marker.entries[p]) problems.push(`${p}: private index blob differs from the marker (re-run stage)`);
+    } else if (own.has(p)) {
+      const wt = gitOut(['hash-object', '--', p], cwd);
+      if (wt === null) problems.push(`${p}: own file missing from the worktree`);
+      else if (wt !== idxBlob) problems.push(`${p}: changed after staging (re-run stage -- <files> so the commit carries the current content)`);
+    } else {
+      problems.push(`${p}: in the private index but not in the marker`);
+    }
+  }
+  return { ok: problems.length === 0, problems };
+}
+
+// -> { done, warn[] }. A shared-index entry is reset to HEAD only when it still holds what it held at stage time
+// (marker.base) or the committed blob; anything else was staged by another session in the commit/PostToolUse
+// window and is left alone (codex r2 F3). A failed reset (index.lock held by another git process) keeps index +
+// marker and says so, instead of deleting them over a stale shared index (codex r2 F4).
+function syncSharedIndexAfterPrivateCommit(indexPath, marker, cwd) {
+  for (const [p, blob] of Object.entries(marker.entries)) {
+    if (gitOut(['rev-parse', '--verify', '-q', `HEAD:${p}`], cwd) !== blob) return { done: false, warn: [] }; // commit did not happen; keep for a retry
+  }
+  // Invariant (codex r3): a private-index commit is correct iff its PARENT is the HEAD the index was read from
+  // (marker.head) -- the tree came from that HEAD, so any commit that landed in between is silently reverted by
+  // it. PreToolUse checks HEAD before the commit; this checks the commit itself, which closes the window between
+  // the two (git's ref update is atomic, the parent is a property of the created commit, not a time check).
+  // A stale commit is undone with a compare-and-swap on the branch ref (worktree and shared index untouched).
+  // The commit THIS invocation created is identified by its tree (== the private index's tree), never by
+  // position: if another session already committed on top, HEAD is theirs and must not be rewound (codex r4).
+  const myTree = gitOut(['write-tree'], cwd, { GIT_INDEX_FILE: indexPath });
+  const recent = (gitOut(['log', '--format=%H %T %P', '-n', '10'], cwd) || '').split('\n').filter(Boolean).map((l) => l.split(' '));
+  const mine = myTree ? recent.find(([, tree]) => tree === myTree) : null;
+  if (!mine) return { done: false, warn: [] }; // commit did not land (or is older than 10 commits): keep index + marker
+  const [mySha, , myParent] = mine;
+  const headNow = recent[0][0];
+  if (marker.head && myParent !== marker.head) {
+    const ref = gitOut(['symbolic-ref', '-q', 'HEAD'], cwd);
+    let r = null;
+    if (ref && mySha === headNow) { try { r = spawnSync('git', ['update-ref', ref, myParent, mySha], { cwd, encoding: 'utf8', timeout: 15000 }); } catch (e) { r = { status: -1, stderr: String(e && e.message) }; } }
+    if (r && r.status === 0) {
+      for (const f of [indexPath, `${indexPath}.json`]) { try { fs.unlinkSync(f); } catch (_) { /* already gone */ } }
+      return { done: true, warn: [
+        `[Hook] private-index commit ${mySha.slice(0, 12)} UNDONE: it was prepared on ${marker.head.slice(0, 12)} but HEAD had moved to ${myParent.slice(0, 12)} before it ran, so its tree would have reverted that commit.`,
+        '[Hook]   Nothing is lost (worktree untouched, branch back on the newer commit). Run the stage step again on the current HEAD and commit.',
+      ] };
+    }
+    const why = mySha !== headNow ? `another commit (${headNow.slice(0, 12)}) already sits on top of it` : ((r && (r.stderr || '').split('\n')[0]) || 'detached HEAD or update-ref failed');
+    return { done: false, warn: [
+      `[Hook] private-index commit ${mySha} is based on a stale HEAD (${marker.head} vs its parent ${myParent}) and could NOT be undone automatically: ${why}.`,
+      `[Hook]   Do NOT push. Rebuild it on the current HEAD: git rebase --onto ${myParent} ${myParent} ${headNow} is NOT enough (the tree reverts ${myParent.slice(0, 12)}); drop it (git rebase -i / git replace) and stage again, then commit. Index + marker kept at ${indexPath}.`,
+    ] };
+  }
+  const base = marker.base && typeof marker.base === 'object' ? marker.base : {};
+  const warn = [];
+  const toReset = [];
+  for (const p of [...Object.keys(marker.entries), ...marker.own]) {
+    const cur = gitOut(['rev-parse', '--verify', '-q', `:${p}`], cwd); // null = not in the shared index
+    const committed = gitOut(['rev-parse', '--verify', '-q', `HEAD:${p}`], cwd);
+    const hasBase = Object.prototype.hasOwnProperty.call(base, p);
+    if (cur === null || cur === committed || (hasBase && cur === base[p])) toReset.push(p);
+    else warn.push(`[Hook] ${p}: the shared index holds content staged by another session since this commit was prepared -- left untouched`);
+  }
+  let failed = false;
+  for (let i = 0; i < toReset.length; i += PATHSPEC_CHUNK_SIZE) {
+    const chunk = toReset.slice(i, i + PATHSPEC_CHUNK_SIZE);
+    let r;
+    try { r = spawnSync('git', ['reset', '-q', '--', ...chunk], { cwd, encoding: 'utf8', timeout: 15000 }); } catch (e) { r = { status: -1, stderr: String(e && e.message) }; }
+    if (r.error || r.status !== 0) {
+      failed = true;
+      warn.push(`[Hook] git reset -q -- <${chunk.length} path(s)> failed after the private-index commit (${String(r.stderr || (r.error && r.error.message) || '').split('\n')[0] || 'no stderr'}); private index and marker kept at ${indexPath}. Run by hand: git reset -q -- ${chunk.join(' ')}`);
+    }
+  }
+  if (!failed) for (const f of [indexPath, `${indexPath}.json`]) { try { fs.unlinkSync(f); } catch (_) { /* already gone */ } }
+  return { done: !failed, warn };
 }
 
 module.exports = {
@@ -336,7 +469,14 @@ module.exports = {
     const segments = shared.commandSegmentsBackslashJoined(ctx.commandExpanded);
     const { segment: commitSegment, index: commitIndex } = findCommitSegment(segments);
     if (!commitSegment) return null;
-    if (/--amend\b/.test(ctx.commandExpanded)) return null;
+    if (/--amend\b/.test(ctx.commandExpanded)) {
+      // v7: a private index is never an amend (its tree was read from marker.head; the amended commit's parent
+      // is not that HEAD, so neither the PreToolUse nor the PostToolUse invariant applies) -- refuse (codex r4).
+      if (ctx.event === 'PreToolUse' && privateIndexOf(commitSegment) && readMarker(privateIndexOf(commitSegment))) {
+        return { block: ['[Hook] BLOCKED: `--amend` with a private index (GIT_INDEX_FILE) is not a supported shape; drop the index and stage again, or amend without it.'] };
+      }
+      return null;
+    }
     if (isMidMergeOrCherryPick(ctx.cwd)) return null; // v6 — see isMidMergeOrCherryPick's own header
 
     // -C: check ONLY the commit segment's own captured flag region (v4 fix M1).
@@ -355,13 +495,20 @@ module.exports = {
       // command ran. A blocked/failed commit leaves everything staged (no
       // change); a full commit clears the tracker; a pathspec-scoped commit
       // shrinks it to the remainder.
+      let syncWarn = [];
+      const privIdx = privateIndexOf(commitSegment);
+      if (privIdx) {
+        const marker = readMarker(privIdx);
+        if (marker) syncWarn = syncSharedIndexAfterPrivateCommit(privIdx, marker, ctx.cwd).warn; // v7 -- see header above
+      }
+      const done = syncWarn.length ? { warn: syncWarn } : null;
       const tf = shared.getGitStageTrackerPath(ctx.sid);
       const tracked = shared.readTracker(tf);
-      if (!tracked.length) return null;
+      if (!tracked.length) return done;
       const stillStaged = gitDiffCachedNames(['--', ...tracked], ctx.cwd);
-      if (stillStaged === null) return null; // fail open — don't touch tracker if we can't verify
+      if (stillStaged === null) return done; // fail open — don't touch tracker if we can't verify
       shared.writeTracker(tf, stillStaged);
-      return null;
+      return done;
     }
 
     // PreToolUse from here down.
@@ -383,7 +530,36 @@ module.exports = {
       return null; // real, git-verified pathspec — this commit is scoped, nothing to compare
     }
 
-    const allStaged = gitDiffCachedNames(undefined, ctx.cwd);
+    // v7: private index (GIT_INDEX_FILE=<idx> git commit ...) -- ownership proven by the helper's marker.
+    const privIdx = privateIndexOf(commitSegment);
+    if (privIdx) {
+      const marker = readMarker(privIdx);
+      // The stale-HEAD check runs in PostToolUse, after the whole Bash call: a push in the same call would
+      // publish a stale commit before it can be undone (codex r4 F3). Amend has no "parent == marker.head"
+      // meaning at all (codex r4 F2). Both are refused up front rather than reasoned about after the fact.
+      if (marker && segments.some((s) => /^(?:sudo\s+)?git\s+(?:-[^\s]+\s+)*push\b/.test(s.trim()))) {
+        return { block: [
+          '[Hook] BLOCKED: a private-index commit and `git push` in the same command.',
+          '[Hook]   The stale-HEAD check runs after the command; push in a separate Bash call once it has passed.',
+        ] };
+      }
+      if (marker) {
+        const v = validatePrivateIndex(privIdx, marker, ctx.cwd);
+        if (v.ok) return null;
+        return {
+          block: [
+            '[Hook] BLOCKED: private index no longer matches git-partial-worktree-commit.py\'s marker:',
+            ...v.problems.slice(0, shared.STDERR_MAX_LINES).map((p) => `[Hook]     ${p}`),
+            '[Hook]   Re-run the stage step (or `drop --index <path>` and start over), then commit again.',
+          ],
+        };
+      }
+      // GIT_INDEX_FILE without a marker: an ordinary index nobody vouches for -- fall through and judge it
+      // exactly like the shared index (tracker vs what it holds).
+    }
+    const privEnv = privIdx ? { GIT_INDEX_FILE: privIdx } : undefined;
+
+    const allStaged = gitDiffCachedNames(undefined, ctx.cwd, privEnv);
     if (allStaged === null) return null; // fail open — can't read git state
     if (!allStaged.length) return null;  // nothing staged; verify-gate-commit / dangerous-bash etc. own that case
 
@@ -406,7 +582,7 @@ module.exports = {
       };
     }
 
-    const covered = gitDiffCachedNames(['--', ...tracked], ctx.cwd);
+    const covered = gitDiffCachedNames(['--', ...tracked], ctx.cwd, privEnv);
     if (covered === null) return null; // fail open
     const coveredSet = new Set(covered);
     const unexpected = allStaged.filter((f) => !coveredSet.has(f));
@@ -420,7 +596,21 @@ module.exports = {
         '[Hook]   this working directory\'s git index (see WORKLOG 2026-08-30).',
         '[Hook]   Fix: commit only your own files with a trailing pathspec:',
         '[Hook]     git commit -m "..." -- <files you actually added>',
+        '[Hook]   (agency-os/WORKLOG.md / TASKS.md hunks: scripts/git-partial-worktree-commit.py stage ..., see git-shared-file-guard.js)',
       ],
     };
   },
 };
+
+// Parsing helpers shared with git-shared-file-guard.js (one parser for "which commit, which pathspec").
+Object.assign(module.exports, {
+  RE_GIT_COMMIT,
+  findCommitSegment,
+  hasBroadCommitFlag,
+  extractPathspecTail,
+  isRealPathspec,
+  isMidMergeOrCherryPick,
+  privateIndexOf,
+  readMarker,
+  validatePrivateIndex,
+});

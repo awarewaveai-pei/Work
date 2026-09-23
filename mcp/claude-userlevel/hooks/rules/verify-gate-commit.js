@@ -8,7 +8,9 @@
 // false-positive 2026-07-02 while writing hook docs; the legacy full-text
 // regex had the same latent class). base64-pipe detection stays full-text —
 // its signature IS the pipe chain.
-const RE_GIT_COMMIT = /^(?:sudo\s+)?git\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit(?=\s|$|["';|&])/;
+// lib/shared.js owns the pattern (2026-09-23): env-prefixed `GIT_INDEX_FILE=<idx> git commit` used to slip past
+// the `^git` anchor here and in commit-quality / git-commit-scope-guard.
+const { RE_GIT_COMMIT } = require('../lib/shared');
 const RE_GH_PR_MERGE = /^(?:sudo\s+)?gh\s+pr\s+merge\b/;
 const RE_HUB_COMMIT = /^(?:sudo\s+)?hub\s+commit\b/;
 const RE_BASE64_PIPE_BASH = /\bbase64\s+-d?[^|]*\|\s*(?:bash|sh|zsh|powershell)\b/i;

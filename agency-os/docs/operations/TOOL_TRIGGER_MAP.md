@@ -370,6 +370,8 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | `rules/commit-quality.js` | Bash | BLOCK：git commit 前檢查 staged debugger statements + secrets |
 | `rules/verify-gate-commit.js` | Bash | BLOCK：tracker 有未驗證 code 檔時拒絕 git commit / gh pr merge |
 | `rules/high-risk-bash-warn.js` | Bash | BLOCK：docker compose down/stop、VPS rsync/scp、DB migrate deploy、**ssh→prod VPS 部署/重啟**（sg-deploy/systemctl restart/reboot，2026-07-02 Phase 4）；首行 `# CONFIRMED-HIGH-RISK:` 解鎖；bash -c 包裹也攔 |
+| `rules/git-shared-file-guard.js` | Bash | BLOCK：commit 帶 `agency-os/WORKLOG.md`／`TASKS.md` 而其 blob ≠ HEAD 且不是 `git-partial-worktree-commit.py stage` 私有 index 的 marker blob（pathspec commit 讀 worktree、裸 commit 讀共享 index 都會掃走別人的 hunk，2026-09-23）；首行 `# CONFIRMED-SHARED-FILE-COMMIT: <理由>` 解鎖 |
+| `rules/worklog-entry-number-guard.js` | Write\|Edit | BLOCK：WORKLOG 新增已存在的 `（續N）` header（並行 session 同時取 max+1）；改用 `scripts/worklog-insert-entry.py` |
 | `rules/sensitive-file-block.js` | Write\|Edit | BLOCK：寫入 .env/.pem/.key、/secrets/、credentials 路徑 |
 | `rules/git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示上一完整 session 全部 commits（fallback -10），防並行 session 重工 |
 | `rules/auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
@@ -434,5 +436,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-09-23 14:30:03 UTC_
+_Last synced: 2026-09-23 19:16:21 UTC_
 

@@ -456,9 +456,20 @@ function cFlagTargets(flagRegionText) {
   return out;
 }
 
+// A `git commit` invocation at the start of a command segment. Leading VAR=value assignments (and `env`)
+// are part of the match because `GIT_INDEX_FILE=<idx> git commit ...` is the private-index commit form
+// (scripts/git-partial-worktree-commit.py, 2026-09-23) -- before this every commit-time gate
+// (verify-gate-commit, commit-quality, git-commit-scope-guard) anchored on `^git` and missed exactly that
+// command. Group 1 = git's own flag region before `commit` (git-commit-scope-guard reads `-C <dir>` from it).
+// Tight on purpose: `git commit-tree` / `commit-graph` do not match (lookahead), see verify-gate-commit.js.
+// `env` may carry flags with one argument (`env -u FOO VAR=1 git commit`); the optional argument group backtracks
+// so `env -i git commit` still resolves (codex 2026-09-24 r2).
+const RE_GIT_COMMIT = /^(?:env\s+(?:-\S+(?:\s+[^-\s]\S*)?\s+)*)?(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s"']*)\s+)*(?:sudo\s+)?git\s+((?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*)commit(?=\s|$|["';|&])/;
+
 module.exports = {
   TRACKER_MAX_ENTRIES,
   STDERR_MAX_LINES,
+  RE_GIT_COMMIT,
   getSessionId,
   isAgentTool,
   getTrackerPath,

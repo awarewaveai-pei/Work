@@ -17,6 +17,7 @@
           "high-risk-bash-warn",
           "git-add-scope-tracker",
           "git-commit-scope-guard",
+          "git-shared-file-guard",
           "repeat-failure-guard"
         ]
       },
@@ -38,6 +39,7 @@
         "rules": [
           "sensitive-file-block",
           "git-log-injector",
+          "worklog-entry-number-guard",
           "auto-repair-guard",
           "config-protection",
           "suggest-compact",

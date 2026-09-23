@@ -101,7 +101,7 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 
 - **AO-RESUME**：hook `ao-resume-on-prompt.ps1` 自動跑 `ao-resume.ps1 -FullMainlineParity`（每 session 一次；parity = fetch + ff-only，不 stash／reset／push）→ 讀 `.agency-state/ao-resume-hook-last.json` 回報 §0–§8（SSOT `.claude/commands/ao-resume.md`）。同時跑 smoke → `reports/status/smoke-LATEST.json`：**直接讀 `overall`／`blind_spots`／`blockers[]`，不心算**；`blind_spots` 非空 = 偵測器啞了 = WARN；`blockers[]`（CI／夜間健康閘／8 個 sibling 偵測器統一入口）非空逐行印進 §6，不摘要。禁止叫使用者手動 pull。§AO-RESUME 判讀規則
 - **AO-CLOSE**（收工／晚安／bye／done／先這樣／走了）：**預授權**——WORKLOG 證據行、`memory/CONVERSATION_MEMORY.md`、`memory/daily/`、`reports/ao-close|ao-resume/`、`ao-close.ps1` 直接執行，不逐項問。gate 擋下自補重跑；behind remote 自跑 `git pull --ff-only origin main`。health < 100% 自修後重跑，修不好列具體項問一題；**禁止**提議 `-AllowNonPerfectHealth`。唯一可問：push 被拒需人介入。SSOT `.claude/commands/ao-close.md`、`docs/operations/end-of-day-checklist.md`。
-- **Git**：直接在 `main`；衝突以較新 commit 時間為準（`git log -1 --format=%ci`），禁機械 `-X ours/theirs`。遠端 harness 指派分支的 session 用該分支並開 draft PR，不算違規。
+- **Git**：直接在 `main`；衝突以較新 commit 時間為準（`git log -1 --format=%ci`），禁機械 `-X ours/theirs`。遠端 harness 指派分支的 session 用該分支並開 draft PR，不算違規。**共享檔 `agency-os/WORKLOG.md`／`TASKS.md` 只能經 `scripts/git-partial-worktree-commit.py stage` 的私有 index commit**（閘 `git-shared-file-guard.js`：pathspec commit 讀 worktree、裸 commit 讀共享 index，都會掃走別人的 hunk）；WORKLOG 續號由 `scripts/worklog-insert-entry.py` 配發（閘 `worklog-entry-number-guard.js` 擋重號）。
 - **記憶**：日記 `memory/daily/YYYY-MM-DD.md`；長期 `memory/CONVERSATION_MEMORY.md`；禁敏感資訊。**文件**：決策→WORKLOG；任務→TASKS；里程碑→CONVERSATION_MEMORY；治理改動查 `docs/CHANGE_IMPACT_MATRIX.md`，新治理文件跑 `scripts/register-new-governance-doc.ps1`；ADR → `docs/architecture/decisions/ADR_INDEX.md`；deploy drift `/check-drift`；治理 drift 月巡 `scripts/check-governance-docs-drift.ps1`。**細節只留一處**：critic 覆審／完成紀錄的完整發現寫在 WORKLOG 一次；TASKS.md 對應條目只留 3–5 行摘要＋指向該 WORKLOG 日期區塊，不得兩邊各寫一份全文。
 - **編碼**：走 Google Drive 的 `.md`（`memory/*.md`、`CREDENTIALS.md`）必 UTF-8 + BOM（export/import 腳本自動加）；repo 內 `.md` 免 BOM。
 - 若有 `BOOTSTRAP.md` 先照做。Cursor 已於 2026-08-26 退場，歷史 WORKLOG 敘述保留。
@@ -127,5 +127,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-23 14:30:03 UTC_
+_Last synced: 2026-09-23 19:16:21 UTC_
 

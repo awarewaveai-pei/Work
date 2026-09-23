@@ -436,6 +436,8 @@ Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hoo
 
 ### Git + 記憶 + 文件
 
+**共享檔 commit（2026-09-23 機械化）**：`git-commit-scope-guard.js`（2026-08-30）只擋「裸 commit 掃走別人 **staged** 的檔」；2026-09-23 三次掃走 WORKLOG／TASKS hunk 走的是 pathspec commit（git 語義：取 worktree 版本）與整檔 `git add`，六份 memory recipe 都是手工繞法。現在：`scripts/git-partial-worktree-commit.py stage <共享檔> (--worklog-entry N | --range | --keep-re) [-- 自己的檔]` 建**私有 index**（`GIT_INDEX_FILE`）= HEAD + 明確選取的 hunk，寫 marker `<index>.json`；`GIT_INDEX_FILE=<path> git commit -F msg` 時 scope guard 以 marker 驗證 index（blob 不符／own 檔在 stage 後又改／多出路徑 → BLOCK），commit 成功後 PostToolUse `git reset -q -- <paths>` 同步共享 index 並刪 index+marker；`git-shared-file-guard.js` 擋其餘所有路徑（pathspec 含共享檔且 worktree ≠ HEAD、裸 commit 共享 index 含整檔 add、私有 index 無 marker），首行 `# CONFIRMED-SHARED-FILE-COMMIT:` 解鎖。續號：`worklog-entry-number-guard.js` 擋 Edit/Write 新增已存在的 `（續N）`，配號一律 `scripts/worklog-insert-entry.py`。測試 `tests/hooks/shared-file-guard.test.mjs`、`tests/scripts/git_partial_worktree_commit_test.py`。
+
 **Git**: 直接在 `main` commit/push；合併衝突以較新 commit 時間為準（`git log -1 --format=%ci`），不得機械式 `-X ours/-X theirs`。詳見 `docs/overview/REMOTE_WORKSTATION_STARTUP.md §2.5`。
 
 **記憶**: 日記型 → `memory/daily/YYYY-MM-DD.md`；長期 → `memory/CONVERSATION_MEMORY.md`（對話 8000+ 中文字時濃縮）。禁止寫入敏感資訊。
@@ -672,5 +674,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-09-23 14:30:03 UTC_
+_Last synced: 2026-09-23 19:16:21 UTC_
 
