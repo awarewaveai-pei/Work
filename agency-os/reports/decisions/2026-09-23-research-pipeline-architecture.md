@@ -78,7 +78,7 @@ edd-research            |         4 |         4 |        8 |        3 |        0
 
 ### 2.7 文件與程式碼互相過期
 
-- `lib/hci/client.ts:6-9`「HCI-30 has never been deployed anywhere network-reachable」、`CollectionSourcesPanel.tsx:991-993`／`ClientHubTabs.tsx:1880-1888`「no deployed, publicly reachable URL yet」——prod `HCI_API_BASE_URL=https://…` 已設、`hci.aware-wave.com` 200（WORKLOG 2026-09-18 續63）。
+- `lib/hci/client.ts:6-9`「HCI-30 has never been deployed anywhere network-reachable」、`CollectionSourcesPanel.tsx:991-993`／`ClientHubTabs.tsx:1880-1888`「no deployed, publicly reachable URL yet」——prod `HCI_API_BASE_URL=https://…` 已設、`hci.aware-wave.com` 200（WORKLOG 2026-09-18 續63）。 → **P0 已改正並凍結三顆按鈕（2026-09-23，`lib/research-bridges.ts`，WORKLOG 續110）**。
 - `feature-cognitive-os-completion.md:29` Current slice 仍是「Project + Source Intake」；`:13,15,18` Ingest+Normalize／Knowledge+Research Integrity／Artifact Studio（proposal/thesis outputs）全未勾。**Cognitive OS 今天沒有「對來源做分析」的能力，只有「對表單欄位跑方法」**。
 
 ### 2.8 操作者回報的症狀都指向同一根因
