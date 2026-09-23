@@ -10,7 +10,7 @@
 |---|---|
 | Slice 1 程式 | core `deab0f709`（2026-09-21）+ §7 步 1–3、D1（`7e710ae50`）+ 步 4（`8849676fe`）+ 步 5（`2d86e8548`）+ 步 6–7（2026-09-23）：DB migration + harness、renderer `/snapshot`、next-admin `lib/site-watch/*` + 6 個 route、Telegram 三態送達、RPC／Trigger 契約測試、watchdog、Trigger tasks、env 接線、deploy smoke、客戶頁「網站巡檢」卡 |
 | Slice 1 已驗 | 步 1 renderer 真瀏覽器實測（§5 #14）；步 2 `rpc-contract.test.ts` 3/3（突變紅）；步 3 harness 綠（含 owed_since／heartbeat 斷言，突變紅）＋ watchdog 12 種判定以假時戳實證 ＋ 對 prod 實跑 ⚪ NOT_DEPLOYED；步 4 workflows vitest 99/99 + Trigger 契約測試 + `/snapshot` smoke 片段實跑；步 5 卡片 jsdom 8 項 + 真瀏覽器 harness；步 6 單元測試 57 項 + 3 突變；next-admin 全套 1533 pass／13 skip／0 fail（原 core 遺留的 1 紅已修）；renderer `npm test` 16/16；tsc 綠 |
-| Slice 1 未做 | §7 步 9–10：四動作 + 非作者模型 review + WORKLOG、prod |
+| Slice 1 未做 | §7 步 9 進行中（2026-09-23 暫停於此）：codex review 已跑完 → `agency-os/reports/oracle/2026-09-23-review-e5debd17.md`，verdict needs-attention，1 high 待**先 grep 查證再修**：`lobster-factory/infra/trigger/deploy-workflows.ps1` 這條 Trigger 部署路徑不同步 `SITE_WATCH_INGEST_TOKEN`／`AWAREWAVE_WEBHOOK_BASE_URL` → heartbeat 會永遠安靜略過（修法方向：所有部署路徑都帶 token，或 site-watch 預期上線時缺 token 要硬失敗）；修完需再審一輪。WORKLOG 條目（續107，四動作證據行已齊、REVIEW 行待填）草稿在本 session scratchpad `worklog-entry.md`；TASKS.md site-watch 列待改成「本機完成、等 prod」。之後才是步 10（prod，逐項 go-ahead） |
 | Slice 2／P2／P3 | 未開始（§8） |
 | 待決 | D2 客戶站被 Uptime Kuma 與 site-watch 重複告警（§6.2，建議照現況；未回覆 = 照現況）。D1 已決（visual 降 `low`） |
 

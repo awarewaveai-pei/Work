@@ -200,7 +200,7 @@ claims_with_simulated_fallback + OPS_ALLOW_SIMULATED_ROLE_FALLBACK=true
 ```sql
 ops_incidents (
   id uuid,
-  source text,          -- 'sentry'|'uptime_kuma'|'grafana'|'netdata'|'posthog'|'manual'|'deploy'
+  source text,          -- 'sentry'|'uptime_kuma'|'grafana'|'netdata'|'posthog'|'manual'|'deploy'|'collection'|'site_watch' (CHECK redefined by 0031, 0073, 0091)
   external_id text,
   fingerprint text,     -- UNIQUE(fingerprint, environment)
   signal_type text,     -- 'error'|'uptime'|'latency'|'resource'|'business'|'deployment'
