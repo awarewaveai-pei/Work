@@ -49,7 +49,7 @@
   th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
   td:first-child{white-space:nowrap;font-weight:600}
   .btns{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
   .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
   .btn small{display:block;font-size:11px;opacity:.85}
   ul.check{padding-left:20px;margin:6px 0}
@@ -118,6 +118,7 @@
       <button class="chip on" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
       <button class="chip" data-set="partner" id="chip-partner">合作對象</button>
       <button class="chip" data-set="decision" id="chip-decision">一個決定</button>
+      <button class="chip" data-set="ecom" id="chip-ecom">電商後台</button>
       <button class="chip" data-set="daily" id="chip-daily">日常</button>
     </div>
     <div class="grid2" id="examples">
@@ -125,21 +126,25 @@
         <div class="ex" data-set="edd">例：這期 6 次 session 有 5 次沒做最後的「再檢視」。</div>
         <div class="ex" data-set="partner" hidden>例：合作的畫廊這次又延後付款。</div>
         <div class="ex" data-set="decision" hidden>例：這個月又有 5 位家長問能不能加開平日班。</div>
+        <div class="ex" data-set="ecom" hidden>例：這個月退貨率 12%，上個月 5%。</div>
         <div class="ex" data-set="daily" hidden>例：這週又為了家事吵架。</div></div>
       <div class="layer l2"><b>② 模式 Patterns</b><div class="q">問：以前發生過嗎？多常？什麼時候特別容易發生？</div>
         <div class="ex" data-set="edd">例：每期都這樣；人多的場次更常跳過；線上場幾乎都跳。</div>
         <div class="ex" data-set="partner" hidden>例：近一年每次展覽結束都延 30 到 60 天才付。</div>
         <div class="ex" data-set="decision" hidden>例：每年暑假前詢問暴增，開學後又回落。</div>
+        <div class="ex" data-set="ecom" hidden>例：每次上新品後兩週退貨都衝高；尺寸類商品特別多；促銷檔期更嚴重。</div>
         <div class="ex" data-set="daily" hidden>例：每次都在週日晚上。</div></div>
       <div class="layer l3"><b>③ 結構 Structures</b><div class="q">問：是什麼流程、規則、資源安排讓它一直發生？</div>
         <div class="ex" data-set="edd">例：90 分鐘裡創作 50、分享 30，再檢視排在最後沒有保護時間；紀錄表沒有「再檢視」這一欄。</div>
         <div class="ex" data-set="partner" hidden>例：合約沒寫付款期限；對方會計每季才結一次帳。</div>
         <div class="ex" data-set="decision" hidden>例：現有教室只有週末滿，平日閒置；老師都是兼職，平日排不出人。</div>
+        <div class="ex" data-set="ecom" hidden>例：商品頁的尺寸表直接用供應商給的、沒人核對；退貨流程只有「同意／不同意」，不問原因。</div>
         <div class="ex" data-set="daily" hidden>例：沒有分工表，誰看到誰做。</div></div>
       <div class="layer l4"><b>④ 心智模型 Mental Models（最深）</b><div class="q">問：大家心裡哪個沒說出口的假設，撐住了這些結構？</div>
         <div class="ex" data-set="edd">例：「創作本身就是療癒，回頭講會破壞當下的感覺。」</div>
         <div class="ex" data-set="partner" hidden>例：「小工作室不好意思催款。」</div>
         <div class="ex" data-set="decision" hidden>例：「擴大就是成長。」</div>
+        <div class="ex" data-set="ecom" hidden>例：「退貨是客人的問題，不是我們的問題。」</div>
         <div class="ex" data-set="daily" hidden>例：「這種小事不用講。」</div></div>
     </div>
     <p class="sub" style="margin:10px 0 0">記法：事件是「一次」，模式是「一再」，結構是「為什麼一再」，心智模型是「為什麼沒人改」。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
@@ -156,7 +161,8 @@
       <tr><td>結構</td><td>帶領者先講作品的意義再請人回應；說明佔 35 分；紀錄表只問「達到洞察？」</td><td>參與者先說、紀錄表改量過程（效果持久）</td></tr>
       <tr><td>心智模型</td><td>「參與者需要專家幫他們看見意義」</td><td>帶領者改成「讓判斷看得見的人」（最根本）</td></tr>
     </table>
-    <p class="sub" style="margin:8px 0 0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：<u>看一個完整分析頁 →</u></p>
+    <p class="sub" style="margin:8px 0 0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：</p>
+    <div class="btns" style="margin-top:8px"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small>同一個案例，做完的九段結果</small></a></div>
   </div>
 
   <!-- 4 -->
