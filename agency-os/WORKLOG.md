@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續126）研究線：計畫 v1.13——對人分析內容不設限（D10.2）、知識庫定案不進（⑨）＋跨專案搜尋、§0 進度板五行（每卡 commit 同步）
+- [觸發] 操作者：「我就是在做人的風險分析，東限西限這分析不會準」；「是否存在 /ops/knowledge 比較好？你的專業建議是？」；「接手的 session 只看計畫，怎麼馬上知道做到哪？」
+- [判斷] D10.2：v1.12 的「只限公開來源／不含個案」是我加的範圍限制，會直接降低分析準度 → 全部取消；留下的三件事對分析無感（自動 CONFIDENTIAL、專案級抹除、單租戶事實）。⑨：KB 是客戶客服語料庫且 ADR 011 §決策 12 對任何消費者回證據 → 研究個資混入有外洩面；KB 無專案級溯源鏈與抹除；COS Project Sources 已具 I1–I5 → 不進；她要的「我之前查過誰」用 P4 跨專案搜尋補（+0.5d）。進度板：§0 頂端五行（現在卡／已完成計數／最後 commit／阻塞／下一步），§12.1 規則 1 改為「一卡一 commit 且同 commit 更新五行」，§11 讀序改為先讀進度板。
+- [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.13：D10／D21／R5／§3.5／P1 DoD／P-P 列／P-ARF-participant 列與順序句／§9 D10.2＋⑨ 已定案、待拍板無／P4 元件＋3.5d／總工時 20.5d／24.5d／§0 進度板＋計畫列／§12.1 規則 1／§11 讀序／§10。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python plan_v113.py（每個 replace／row edit 計數斷言）+ git grep 舊主張 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文字
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=只限.{0,6}公開來源|P-P 自然人**|待拍板：⑨ | hits=1（D10 淘汰欄與 §10 歷史行保留原文）
+- [下一步] WC-PIa-01 開工（任何模型皆可）；每卡 commit 更新 §0 進度板。
+
 ## 2026-09-24（續125）研究線：計畫 v1.12——操作者改判「對人直接進系統」（D10.1，專案級抹除進 P1）、四工具改進對照表、知識庫問題待回
 - [觸發] 操作者：「自然人資料…我認為就直接進系統，因為我要知道他會不會跑」；「四個工具都又怪又卡又鈍…你好像有規劃一系列要改進的事情」。
 - [判斷] ADR 011 §決策 10（`agency-os/docs/architecture/decisions/011-collection-ingestion-boundary.md:79`）自列條件 = 抹除路徑打通＋明示批准 → 不是推翻 ADR，是用最小方式滿足：專案級抹除（`DELETE /projects/{id}`：`prov_sources` 列＋`TenantScopedCas.unlink`（`tenant_scoped_cas.py:116`）＋`JsonArtifactStore.delete`（`json_artifact_store.py:71`）＋`ProjectErased` tombstone）進 P1，操作者本則 = 明示批准。範圍：公開來源、單租戶、`CONFIDENTIAL`；ARF 臨床個案（D21）不在放行內；主體級加密與第二租戶留 P-P（改名「主體級保護」）。殘餘風險寫 R5（測試期個資靜態未加密，操作者接受）。
