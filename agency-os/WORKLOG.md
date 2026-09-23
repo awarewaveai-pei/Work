@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續127）研究線：計畫 v1.14——清掉歷史雜訊（版本鏈、§10 變更紀錄、§9 時間軸、D10.x／D18.x 子修訂）、§3.3 研究庫列；push 讓操作者看得到進度板
+- [觸發] 操作者：「那要放在 Cognitive OS 專案裡，設專業頂規級的分析結果庫？」「我沒看到 §0 進度板」（本機已 commit 未 push）「plan 裡不需要再看到的資料就刪除，不然會混淆」。
+- [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.14：檔頭版本鏈 → 一行（歷史在 git log／WORKLOG）；§10 → 只剩文件關係與維護規則＋「不留歷史」規則；§9 → 現行定案清單（不再有 ①–⑨ 時間軸）；D10／D18 改寫為現行規則（子修訂 D10.1／D10.2／D18.1／D18.2 全部併回母列，全檔不再出現）；D21 精簡；§5／§3.10／C11 的 critic／操作者駁回敘事刪除；新增 §3.3「研究庫（分析結果庫）」列 = 一個 Project 的 Sources＋彙整＋解讀＋報表＋解決方案＋案例庫，版本化 artifact＋event，不另建資料庫，P5 換 Postgres＋object storage。
+- [判斷] 歷史留 git 與 WORKLOG 即可；計畫只放現行內容，被否決方案只以名稱留淘汰欄防重提（AGENTS §9「舊檔不回改」是針對已出貨散文，操作者明示要刪則以操作者為準）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python plan_v114.py（每個 replace／regex／row edit 計數斷言；leftover 檢查 D1[08].[12]|作廢|同日 v1）+ git grep 外部引用 + git push | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文字
+- BUGHUNT_DONE: scope=agency-os/TASKS.md,agency-os/docs,agency-os/reports,scripts,Projects/internal/cognitive-engineering-os/docs | grep=RESEARCH_LINES_MASTER_PLAN.md §10|D10.[12]|D18.[12] | hits=1（WORKLOG 歷史條目不在 scope，保留原文）
+- [下一步] WC-PIa-01。
+
 ## 2026-09-24（續126）研究線：計畫 v1.13——對人分析內容不設限（D10.2）、知識庫定案不進（⑨）＋跨專案搜尋、§0 進度板五行（每卡 commit 同步）
 - [觸發] 操作者：「我就是在做人的風險分析，東限西限這分析不會準」；「是否存在 /ops/knowledge 比較好？你的專業建議是？」；「接手的 session 只看計畫，怎麼馬上知道做到哪？」
 - [判斷] D10.2：v1.12 的「只限公開來源／不含個案」是我加的範圍限制，會直接降低分析準度 → 全部取消；留下的三件事對分析無感（自動 CONFIDENTIAL、專案級抹除、單租戶事實）。⑨：KB 是客戶客服語料庫且 ADR 011 §決策 12 對任何消費者回證據 → 研究個資混入有外洩面；KB 無專案級溯源鏈與抹除；COS Project Sources 已具 I1–I5 → 不進；她要的「我之前查過誰」用 P4 跨專案搜尋補（+0.5d）。進度板：§0 頂端五行（現在卡／已完成計數／最後 commit／阻塞／下一步），§12.1 規則 1 改為「一卡一 commit 且同 commit 更新五行」，§11 讀序改為先讀進度板。
