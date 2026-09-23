@@ -1,4 +1,26 @@
 ﻿# Worklog
+## 2026-09-23（續103）verify-head-typecheck 的同 class 依賴漂移：實體比對取代「node_modules 目錄存在」
+
+- [根因] `scripts/verify-head-typecheck.ps1:43`（修前）`git worktree add` 任意 ref 後，把**本機** `apps/next-admin/node_modules` junction 進去，守衛只有 `Test-Path`。實際驗證的是「ref 原始碼 × 本機當下裝了什麼」，不是「ref 原始碼 × ref 自己 lockfile 宣告的依賴」。ref 新增依賴 → 誤報 `TS2307` 怪到 commit 頭上；本機多裝 → 該 ref 沒宣告也會過。與同日（續102）`sg-deploy.sh` 燒掉 prod 的是**同一個 bug class**：拿目錄存在當依賴集合相等的代理。
+- [修法] 不變量本身：**worktree 裡 TypeScript 能 resolve 的 module 集合 == 該 ref `package-lock.json` 宣告的非 optional 套件集合（含版本）**。新增 `scripts/lib/compare-installed-deps.mjs` 走訪真實目錄逐一讀 `package.json`；`.ps1` 在 junction 前呼叫它，漂移就在 tsc 前拒絕並**指名套件**；新增 `-Install` 改在 worktree 內跑 `npm ci --include=dev`（不 junction）。139ms，對 15s 的跑程可忽略。
+- [為什麼是 `.mjs` 不是 PS] Windows PowerShell 5.1 的 `ConvertFrom-Json` **對這個 lockfile 直接炸**——`packages` 有一個 key 是空字串（root entry），5.1 建不出空名 property。實測踩到。附帶好處：Codex container 無 pwsh 也能跑。
+- [呼叫點查證（改 exit 行為前必做）] 全 repo + `.claude/`（junction 另起一次 grep）掃完，**唯一** caller 是 `.claude/commands/verify-recent.md:61` 的文件式手動指令；無 hook／CI／腳本呼叫，`check-smoke-tests.ps1`／`verify-closeout-completeness.ps1` 都沒引用。故改為 fail-loud 不會連鎖擋住任何自動流程。
+- [Codex 四輪，前三輪皆已修]
+  - C1 [high] 第一版比對 `node_modules/.package-lock.json`（npm 的 index）→ 只是把信任邊界搬家，不是移除；事後被刪/改的目錄仍報 in sync。**改為走實體目錄，完全不再讀 hidden lockfile。**
+  - C2 [high] workspace link（`{link:true}` 無 version）會讓每次乾淨 `npm ci` 假紅。**改為 lockfile 有寫 version 才比版本，存在性一律要求。** 先查證：本 lockfile 目前 0 個 link entry、0 個無 version 的非 optional entry ⇒ 潛伏非現行。
+  - C3 [medium] 沒有 `package.json` 的裸目錄（`index.js`）TS resolve 得到卻被靜默略過。**按 class 修不按 instance**：三個 finding 是同一個失敗——side 2 一直在量「能 resolve 的集合」的代理。成員資格改由**目錄**決定（node_modules／@scope 下任何非 dot entry），`package.json` 只負責取版本，讀不到本身就是漂移。
+  - C4 [medium] 同版本但內容被竄改的套件會過。**列為書面邊界，不修**：證明內容等價＝對 490 個套件重算 integrity＝`npm ci`＝`-Install` 已提供；npm 自己也只在下載／解壓時驗 integrity，不驗既有樹，無更便宜的原語。本閘的不變量是依賴**集合**與版本，當初燒 prod 的是**缺套件**不是被竄改。已寫進 `.mjs` 檔頭「what this does NOT prove」並指向 `-Install`。
+- [順手修（R4 寫入後 grep 命中，同 commit）] `scripts/README.md`「Place it here (flat, no subdirectories)」與磁碟實況矛盾——`scripts/lib/` 早有 7 個 helper 且都不進索引表。補一行承認既有慣例，否則新檔一落地文件就在說謊。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-head-typecheck.ps1 -Ref HEAD` | exit=0 | ms=71000 | result=`DEPS_IN_SYNC required=410 on_disk=490` → `tsc OK` → `HEAD_TYPECHECK_OK`（同步分支確實往下走）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-head-typecheck.ps1 -Ref 3ca1cc9d1`（pixelmatch 前一顆） | exit=1 | ms=2000 | result=`DEPS_DRIFT extra=2` 指名 `pixelmatch@7.2.0`／`pngjs@7.0.0`，**tsc 未被執行**（log 內 `tsc OK` 計數 0）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-head-typecheck.ps1 -Ref 3ca1cc9d1 -Install` | exit=0 | ms=146000 | result=`npm ci` 488 packages → `tsc OK` → `HEAD_TYPECHECK_OK`；跑完 0 個殘留 worktree、真 `node_modules` 仍 282 項（未被 `rmdir /s` 跟進 junction 刪掉）
+- REALTEST_EVIDENCE: tool=Bash | cmd=fixture harness 13 case（乾淨樹／目錄被實體刪除／`package.json` 版本被竄改／nested dep 移除／未宣告套件／宣告為 optional 卻有裝／`node_modules` 不存在／workspace link 有無／裸 `index.js` 模組／manifest 被刪／manifest 毀損） | exit=0 | result=13/13 PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變測試（把 drift gate 改成 `if ($false)`，跑 `-Ref 3ca1cc9d1`） | exit=0 | result=印出 `HEAD_TYPECHECK_OK` ——**正是舊腳本的假綠**；還原 gate 後回 exit 1。證明測試不是空跑
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2/2/0（Codex adversarial-review 四輪；C1–C3 已修，C4 列書面邊界；artifact `agency-os/reports/oracle/2026-09-23-review-52b04824.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`verify-head-typecheck|compare-installed-deps|HEAD_TYPECHECK_OK|DEPS_IN_SYNC|DEPS_DRIFT` | hits=7 檔（`scripts/verify-head-typecheck.ps1`、`scripts/lib/compare-installed-deps.mjs`、`scripts/README.md`、`.claude/commands/verify-recent.md`、`agency-os/WORKLOG.md`、`agency-os/TASKS.md`、本次 oracle artifact）皆已同步；唯一 stale 主張是 TASKS.md 該條「未修」，本 commit 一併結案
+- [已知殘留] C4 內容竄改不偵測（見上，`-Install` 是逃生口）。另：`.claude/` 的 grep 必須單獨以 `D:\Work\.claude` 為根跑，從 `D:\Work` 下去會靜默跳過 junction——這次照舊分開跑。
+- [rollback] `git revert` 本 commit 即可：`.ps1` 回到 `Test-Path` 守衛、`-Install` 消失、`.mjs` 刪除；或只把 `.ps1` 內 `$cmpExit -ne 0` 的 throw 改成 warning 即可保留偵測但不擋。
+
 ## 2026-09-23（續102）部署閘擋下未完成的 site-watch WIP：npm ci 取代「node_modules 存在就算數」+ DEPLOY_HOLD 封鎖機制
 
 - [觸發] Telegram「後台自動部署失敗，需要手動處理 — SG next-admin」。**沒有照它說的跑 `sg-deploy.sh`**：待部署的 `deab0f709` 自己的 commit message 就寫「Not yet: ... review, prod」，照做等於跳過 migration 0091／R2 bucket／`SITE_WATCH_*` env 直接上 prod。prod 健康（`/api/health` 401 = 服務活著），deployed 仍 `33251522a`。

@@ -58,7 +58,7 @@ Per extension:
   if ($errs) { Write-Host "PARSE FAIL: $($errs.Count) error(s)"; $errs | Format-List; exit 1 }
   ```
 - `.ts`/`.tsx`: prefer project-level `npx tsc --noEmit -p <nearest-tsconfig>` (full context). Single-file `tsc --noEmit --isolatedModules <path>` only as fallback (lower fidelity — many real type errors will be missed because cross-file types aren't loaded).
-- `.ts`/`.tsx` **after committing**: `powershell -NoProfile -File scripts/verify-head-typecheck.ps1`. The line above checks the WORKING tree; in a shared working directory that can be green while the commit is not, because a concurrent session's uncommitted declaration is satisfying your import (2026-09-11, commit 656216805 — HEAD did not build for one commit). The script typechecks the committed tree in a throwaway worktree.
+- `.ts`/`.tsx` **after committing**: `powershell -NoProfile -File scripts/verify-head-typecheck.ps1`. The line above checks the WORKING tree; in a shared working directory that can be green while the commit is not, because a concurrent session's uncommitted declaration is satisfying your import (2026-09-11, commit 656216805 — HEAD did not build for one commit). The script typechecks the committed tree in a throwaway worktree, and refuses to run at all when the local `node_modules` is not the dependency set that ref's own `package-lock.json` declares — it names the drifting packages. Add `-Install` to `npm ci` the ref's own tree instead (minutes, not seconds).
 - `.js`/`.jsx`: `node --check <path>`
 - `.sh`: `bash -n <path>` (or `shellcheck` if available)
 - `.py`: `python -m py_compile <path>`

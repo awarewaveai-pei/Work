@@ -187,7 +187,9 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 
 ## Adding a new script
 
-1. Place it here (flat, no subdirectories)
+1. Place it here (flat, no subdirectories). Exception, already the convention on disk: helpers
+   that exist only to be called by another script live in `scripts/lib/` and are not indexed in
+   the tables above (`ao-close-gates.ps1`, `git-safe-ops.ps1`, `compare-installed-deps.mjs`, ...).
 2. Name it `verb-noun-context.ps1` (kebab-case)
 3. Add it to the appropriate category table above
 4. If it is called by other scripts, reference it as `Join-Path $WorkRoot "scripts\your-script.ps1"`

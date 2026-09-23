@@ -1208,7 +1208,11 @@
 
 #### I. 📥 收件匣（`/tomo` 落地區，待分類）
 
-- [ ] **`scripts/verify-head-typecheck.ps1:43` 同 class 依賴漂移：拿 node_modules 目錄存在當「依賴符合該 ref 的 lockfile」** → 2026-09-23 修 `sg-deploy.sh` 時發現
+- [x] **`scripts/verify-head-typecheck.ps1:43` 同 class 依賴漂移：拿 node_modules 目錄存在當「依賴符合該 ref 的 lockfile」** ✅ 2026-09-23 結案
+  - **修法**：新增 `scripts/lib/compare-installed-deps.mjs` 走訪實體目錄比對 ref lockfile vs 裝在磁碟上的套件集合；漂移在 tsc 前拒絕並指名套件；`-Install` 可改在 worktree 內跑 `npm ci`。呼叫點查證：唯一 caller 是 `.claude/commands/verify-recent.md:61`（手動指令），無自動流程受影響。
+  - **驗證**：三分支實測（同步→過／漂移→exit 1 指名 pixelmatch＋pngjs／`-Install`→過）＋ 13/13 fixture ＋ 突變測試（拔 gate 回到舊假綠）；Codex 四輪，C1–C3 已修、C4（同版本內容竄改）列書面邊界。
+  - **詳見** `agency-os/WORKLOG.md` 2026-09-23（續103）。
+  - **原始症狀（保留備查）**
   - **症狀**：該腳本 `git worktree add` 任意 ref 後，把**本機** `apps/next-admin/node_modules` junction 進去，只 `Test-Path` 檢查目錄在不在。ref 新增依賴 → 誤報 `TS2307`（怪到 commit 頭上，其實是本機環境）；本機多裝的套件 → 該 ref 其實沒宣告也會過。
   - **修法方向**：比對 worktree 內與本機的 `package-lock.json`，不同就明確拒絕並指出漂移（可加 `-Install` 跑 `npm ci`）；**不要**只把錯誤訊息寫寬。改 exit 行為前先查所有呼叫點（它是 build gate）。
   - **參考**：本次 `sg-deploy.sh` 的同類修法與根因見 `WORKLOG.md` 2026-09-23（續102）。
