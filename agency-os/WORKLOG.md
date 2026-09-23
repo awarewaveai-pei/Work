@@ -1,4 +1,60 @@
 ﻿# Worklog
+## 2026-09-23（續109）site-watch Slice 1 本機收尾：MASTER PLAN §7 步 1–9 + D1（prod 未動、未 push）
+
+- [觸發] 操作者：照 `SITE_WATCH_MASTER_PLAN.md` §7 做步 1–9、每步更新 §0；D1 決定 visual 降 low；步 10 prod 逐項問。
+- [已做] 步 1–3+D1 `7e710ae50`；步 4 `8849676fe`；步 5 `2d86e8548`；步 6–7 `ffef25e9c`；步 8 `acae6db2a`；步 9 review round 1 落地 `41e77578b`、修正 `a58b34758`（round 1）與 `f39559f1d`（round 2）、本條。計畫正本 §0／§5／§7／§10 已同步（v2.8）。
+- [根因／設計修正]（皆已修，細節在計畫 §7 各步與 §10）
+  - C1 探針 c 原定 `updated_at >3h`：每次送信失敗都改寫 `updated_at` → Telegram 4xx／5xx 無限重試時恆綠。改 `page_state.owed_since` + CHECK `site_watch_owed_since_iff_owed`（`0091_site_watch.sql`），harness 以「撥回 5h 再驗」證明失敗重送不重設。
+  - C2 探針 b 原定「全域最新 result >26h」：單一 target 每次弄垮 renderer 時被其他 target 掩蓋 → 改逐 target `週期+2h`。
+  - C3 watchdog SQL `greatest(0, NULL)=0`（PostgreSQL 忽略 NULL）→「從未 heartbeat」讀成「剛剛」＝綠；判定矩陣抓到，改 PS 端夾值。
+  - C4 未部署前 0091 缺 → 每次 AO-RESUME 常駐紅 → 以未帶 token 的 `POST /due` 判部署（401／404），未部署 = ⚪ `NOT_DEPLOYED`。
+  - C5 計畫步 1 的 `docker run` 走預設 bridge：DNS `192.168.65.7` 落在 renderer 自己 DROP 的 192.168/16 → 本機每站判 `dns`；指令補 `--network`。
+  - C6 未載入頁 `finalUrl` = `about://blank` 寫進 DB → `lib.mjs publicUrlOnly` 只認 http(s)。
+  - C7 trigger.config 預設 retries 3：heartbeat 在 children 觸發後重試會再觸發一輪 → heartbeat 也 `maxAttempts: 1`。
+  - C8 Trigger token 照抄 collect 的「必填 throw」會擋 token 寫入前所有 Trigger 部署 → 主機端讀取、選填；未設時 heartbeat 安靜略過（watchdog a 補位）。
+  - C9 `repair-center/policy.test.ts`「covers all 7 sources」自 `deab0f709` 起紅（全套唯一失敗）→ 10c sg-deploy test gate 必擋；改對照最後一版 migration 的 `ops_incidents_source_check`。
+  - C10 計畫 v2 重寫遺失「10b2 解除 DEPLOY_HOLD」（`ce4374a2a` 加過）→ 補回；`DEPLOY_HOLD` `reason=` 原指已刪的 handoff → 改指計畫。
+  - C11 D1 severity 在 `messages.ts`／`notify.ts` 各一份 → `config.ts severityFor` 單一來源（incident 與 Telegram 門檻共讀）。
+  - C12 卡片「接受為新基準」原看最新一筆 → 後續載入失敗會藏起按鈕 → 改看最近一筆有畫面判定者。
+  - C13 單元測試執行期全綠但 tsc 紅（spread 抹掉 mock 型別）→ sg-deploy 先跑 typecheck，同樣會擋部署 → 已補型別。
+  - C14 `playwright-runner.ps1` 檔頭原宣稱與計畫的修正版都是假的（`sg-deploy.md:46`、`wp-maintenance.md:69` 也呼叫）→ 照實寫三個呼叫者。
+  - C15 RUNNABLE_DEMOS 既存兩列 `\apps\next-admin` 被早先 heredoc 吃成 BEL＋換行（表格斷行）→ 位元組還原。
+  - C16 codex round 1 high「`infra/trigger/deploy-workflows.ps1` 只同步 PostHog → heartbeat 永遠安靜略過」查證：該檔確實只萃取 `POSTHOG_*`、README §7 還稱它「推薦封裝」；但它不是現役路徑（公網被 Cloudflare BFM 擋、依賴已退租 EU tunnel）；現役 `scripts/lobster-trigger-deploy.ps1` 已讀 token（`:150`），post-push hook 亦走它（`post-push-trigger-deploy.ps1:51,160`）；`AWAREWAVE_WEBHOOK_BASE_URL` 缺也無害（`post.ts:56` 回退正確網址）；syncEnvVars 只 upsert（CLI `deploy.js:493-503`，`override: true`）。類別根因 = 兩個部署入口各帶不同 env → 舊腳本退役成 tombstone（`Write-Error`＋`exit 1`），README §7 寫明唯一入口與同步語意，AUDIT_REGISTRY 該列退役。
+  - C17 查 C16 時（peer session 提醒 post-push hook）：任何動到 `packages/workflows` 的 push 都跑 prod Trigger 部署 → site-watch task 可能早於步 10e 上 prod；token 若在 10a 寫進 `.env`，Trigger 可能先於 next-admin 拿到 → heartbeat 每小時 401／404 紅。token 寫入移到 10d（緊接 compose patch）；10e 加驗 heartbeat output 非 `{configured:false}`、排程在、watchdog a 🟢；b2 註記 push 的兩個連帶效果（Trigger 部署；hold 消失後主機 cron 單獨部署 next-admin——開關關、token 未進 compose，renderer smoke 只在清單含 renderer 時跑 `sg-deploy.sh:497`，無害）。
+  - C18 codex round 2（2 medium，皆查證屬實）：① `infra/trigger/TASK_REFERENCE.md` §Deploy（:355-367）／:327 與 README PostHog「方式 B」（:201）仍教 EU 時期手跑 `npx trigger.dev deploy` → 改指唯一入口；② 10d 先寫 `.env` 再 safe-infra-patch 非原子（`safe-infra-patch.sh:37,118-130` 只備份／還原 compose 檔）→ patch 失敗時 token 留在 `.env`，下次 push 的部署同步給 Trigger → 每小時 401。同一 reviewer 同區第二次回報 → 先寫不變量（下段）再修：部署腳本改取 `docker exec lobster-next-admin printenv`、不讀 `.env`（`lobster-trigger-deploy.ps1:150` @ `f39559f1d`），部署 log 印是否取到。順收：計畫 §10 記為「已併入並刪除」的 site-watch handoff packet，刪除從未 commit（HEAD 仍在）→ 併入 `f39559f1d`。
+  - C19 codex round 3（審 `f39559f1d`）：companion 兩次無效——第一次被 workspace execution gate 擋（讀不到 diff、未結論）、第二次 0 個指令就 approve（job log 只有 `list_mcp_resources`）→ 皆不計、不落 artifact；依 `codex-review.md` 連兩次失敗改走 `codex-oracle.ps1 -DiffRef f39559f1d`（diff 內嵌 prompt）。F1「next-admin 停機 → `docker exec` 失敗 → `set -e` 中斷部署」駁回：`export "X=$(…)"` 的結束碼是 export 的，實測 `false`、缺執行檔（127）皆續跑、對照組一般賦值中斷，harness「container down」案例亦綠。F2「next-admin 失去 token 時 Trigger 留舊值」屬實，不改碼：自動刪 prod secret 會讓一次短暫停機變成持久移除；改以「會吵」處理（每小時紅 401＋Sentry＋watchdog a），計畫 §6.1 新增兩列、v2.8 不變量寫法收窄為同步方向。另請正在做 env 對帳 gate 的 session 保持該行單一 `export` 寫法（ShellCheck SC2155 式拆開會在 next-admin 停機時中斷部署）。
+- [不變量分析]（token 同步；round 1→2→3 同區連續回報，AGENTS §4）
+  - I-T1 Trigger 只會**拿到**運行中 next-admin 接受的 `SITE_WATCH_INGEST_TOKEN`（可以沒有、不會拿到不同的）。守法 = 唯一部署入口取容器值，不讀 `.env`；涵蓋 10d 半途失敗、輪替未套用、compose 缺映射。反方向（next-admin 事後失去 token）不自動化，見殘餘。
+  - I-T2 Trigger 端只 upsert（CLI `deploy.js:493-503`）：同步過一次後，其他路徑的部署拿不掉；輪替 = `.env` → safe-infra-patch → 重跑部署（中間最多一次紅 heartbeat，計畫 §3.4）。
+  - I-T3 Trigger 沒 token 必須 ≤6h 內變吵：heartbeat 回 `{configured:false}` → 無 stamp → watchdog a 🔴（next-admin 已部署時）。
+  - 殘餘：筆電以 Trigger MCP／CLI 臨時部署不帶 token（拿不掉既有值；全新 project 由 I-T3 抓）；反方向（next-admin 失去 token，例如 compose 被還原）Trigger 仍保有舊值（只 upsert、腳本刪不掉）→ 每小時紅 401＋Sentry，屬「吵」不屬「靜默」，處置 = 計畫 §9 先停 heartbeat 或到 dashboard 刪鍵。
+- [順修] WORKLOG 續106 標題行被 `d1a7f2055` 的拼接吃掉（內文 27 行完整，孤立掛在 續107 下）→ 自 `49a522796` 原樣補回（內文逐行比對相同）。
+- [待決 D2] Uptime Kuma 與 site-watch 對 `soulfulexpression.org` 重複告警（計畫 §6.2，建議照現況，未回覆 = 照現況）。
+- [範圍外 → 背景任務] repair-center 備份探針 `ssh_error`（→ 續106）；workflows CI `doc_integrity` 紅 11 天（→ `89fac46db`）；`trigger.config.ts` syncEnvVars 讀 8 個變數（tenant provisioning／tarot）但唯一部署腳本從不 export（task_f849d3e7）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -X POST localhost:3999/snapshot {"url":"https://example.com"}`（本機 renderer image，`--network sw-test-net`） | exit=0 | ms=1428 | result=200 failureCode=null 17513B magic=ffd8ff；另 /nope http_4xx、.invalid dns、10.0.0.1 400、nip.io rebinding → timeout、/render 200、錯 secret 401
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash lobster-factory/packages/db/scripts/site-watch-local-verify.sh` | exit=0 | ms=7840 | result=STATE_OK+OPS_OK、DOWN_OK、re-apply OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cd next-admin && npx tsc --noEmit && npx vitest run` | exit=0 | ms=16445 | result=tsc 綠；160 files／1533 pass／13 skip／0 fail
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cd apps/renderer && npm test` | exit=0 | ms=671 | result=16/16
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratch `wd-verdicts.sh`（`check-site-watch-health.ps1 -LocalDbContainer`，真 Postgres＋假時戳） | exit=0 | ms=23519 | result=12/12 判定（blind、NOT_DEPLOYED、deployed-no-migration、a never/late/dead、b overdue、c stuck/paused/young、green）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`powershell -File scripts/check-site-watch-health.ps1`（prod ks-aw-01 supabase-db，唯讀） | exit=0 | ms=6732 | result=Overall NOT_DEPLOYED（/due 404、0091 未套）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File lobster-factory/infra/trigger/deploy-workflows.ps1`（無參數＋舊參數 `-PosthogEnvSource x -SkipDockerCheck -TriggerApiUrl …` 各一次） | exit=1 | ms=491 | result=兩次皆 exit 1＋退役訊息、無 docker／npx 呼叫、檔案純 ASCII；`lobster-trigger-deploy.ps1` ParseFile 0 errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cd packages/workflows && npx vitest run`＋next-admin `tsc --noEmit -p tsconfig.sw.json`（site-watch Trigger 檔 strict；修正後重跑） | exit=0 | ms=2779 | result=14 files／99 pass；tsc 綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cd lobster-factory && npm run validate`（修正後重跑） | exit=0 | ms=2842 | result=Bootstrap validation PASSED（Doc integrity PASSED）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratch `sw-token-test.sh scripts/lobster-trigger-deploy.ps1`（抽出真實兩行，`set -e`＋假 docker） | exit=0 | ms=2381 | result=真實行 4/4（有值→同步；容器無此變數／容器沒跑／10d 做一半→空值且續跑、stderr 不外漏）；突變 1（一般賦值）3 紅、突變 2（舊 `.env` 讀法）4 紅
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratch `expand-deploybash.ps1`（整段 `$deployBash` 以假值展開）＋`bash -n` | exit=0 | ms=526 | result=PS parse 0 errors、bash 語法 OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cd lobster-factory && npm run validate`（round 2 修正後） | exit=0 | ms=2914 | result=Doc integrity PASSED、Bootstrap PASSED
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -c 'set -e; export "X=$(false)"; echo reached'`＋缺執行檔版＋對照組 `X="$(false)"`（駁回 round 3 F1） | exit=0 | ms=160 | result=兩種失敗皆 reached（X 空）、對照組 exit 1 中斷；GNU bash 5.2.37
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n | round 1 codex `/codex-review` 範圍 = site-watch 45 檔（`agency-os/reports/oracle/2026-09-23-review-e5debd17.md`）：1 high → C16／C17，修正 `a58b34758`
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n | round 2 codex 審 `a58b34758`（`agency-os/reports/oracle/2026-09-23-review-2eeb48e8.md`）：2 medium → C18，修正 `f39559f1d`
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n | round 3 審 `f39559f1d`：companion 兩次無效（見 C19，不計）→ fallback `codex-oracle.ps1`（`agency-os/reports/oracle/2026-09-23-partialreview-7d5da017.md`）：F1 駁回（實測）、F2 屬實記為計畫 §6.1 已知缺口，不改碼
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`sendTelegram|TelegramNotifier|buildOperatorTelegramNotifier|IncidentSource|ops_incidents_source_check|putDesignObject|deleteDesignObject|SITE_WATCH_|site_watch_touch_heartbeat` | hits=274（79 檔；env 名無變體；`repair-center-smoke.mjs` 子集檢查不受影響；`APP_AWARE_WAVE_COMPLETE_REFERENCE.md:203` source 清單過時已更正）
+- BUGHUNT_DONE: scope=agency-os/docs,scripts,lobster-factory,runbooks | grep=`severityOf\(|updated_at >3h` | hits=0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`deploy-workflows|step 10a|10a 前` | hits=16（9 檔；.claude 0）：現行指引（README §7、AUDIT_REGISTRY:125、計畫 §3.4／§7、兩處程式註解）已改；其餘為歷史紀錄（AUDIT_REGISTRY:229、TASKS:1456、CONVERSATION_MEMORY:94、memory/daily 05-01／05-26、oracle artifact、計畫 §10）
+- BUGHUNT_DONE: scope=agency-os/docs,runbooks,lobster-factory,scripts,.claude | grep=`npx trigger(\.dev)?(@[0-9.]+)? deploy|SITE_WATCH_INGEST_TOKEN=` | hits=8（main 7／.claude 1）：剩「不要手跑」警告（`trigger-deploy-agent.md:14`、TASK_REFERENCE §Deploy、README 方式 B）、README §7／§7a 已標歷史、計畫 v2.8 敘述、token 唯二寫入點（部署腳本 `:150` 取容器值、計畫 10d `openssl`）
+- BOM：`audit-cross-machine-bom.ps1` exit 1 = auto-memory 目錄 11 個既存檔缺 BOM（AGENTS §8：匯出腳本自動補）；本次改動 0 檔在其範圍。
+- [剩餘風險] 客戶頁卡片未在真實登入頁面看過（步 10 看）；Cloudflare ~100s 可能切斷極慢的 run（R9，server 端照跑）；D2 未決前同站會收兩則告警；下一次任何 session 的 push 即 prod Trigger 部署（site-watch task 上 prod，10d 前安靜略過，無害）。
+- [rollback] 本機改動：逐 commit `git revert`（上列 8 個＋本條）；prod 未動。prod 各步 rollback 見計畫 §9。
+
 ## 2026-09-23（續107）doc_integrity 紅 16 天根因：兩顆 commit 的相對連結錯位 + 偵測全是「事後、不歸屬」→ 新增 commit-time 歸屬閘
 
 - [觸發] `.github/workflows/lobster-workflows-validate-main.yml` 連續 4 次 run 失敗 11 天（`agency-os/reports/status/ci-LATEST.md`；run 35564568295 等）。
@@ -16,7 +72,7 @@
 - [剩餘風險] 偵測器仍存在但只有本次新歸屬閘涵蓋「用 `git commit` 指令做的變更」；自動化腳本用 `git commit`（非 `-c`/`spawnSync('git',['commit',...])`）仍會被同一個 hook 攔到，但腳本／AO-CLOSE sync／auto-checkpoint 內建的 commit 呼叫沒有走 Bash 工具，不觸發 PostToolUse——已另立 task_8da4fc43 追蹤（含 3f31d5eec 這個真實案例：09-07-04 auto-checkpoint 弄斷 3 條連結，16 天後才被本次連坐抓到）；`ci-LATEST.md`／夜間 health 仍未接進 AO-RESUME 報告，同一 task 追蹤。
 - [rollback] `git revert` 兩顆 commit（link fix + 本 commit）即可；hook rule 移除只需同時撤 `rules.manifest.json` 該行，runner 對缺失規則 fail-open 不會壞其他 rule。
 
-
+## 2026-09-23（續106）Auto-Repair SSH 探針全 `ssh_error`：prod `.env` 仍指退租 SG/EU、容器 key 未授權、EU IP 已被第三方接手（診斷＋提案；prod 修正待 go-ahead）
 
 - [觸發] `scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly` FAIL `backup_script_probe.sg/eu=ok`（`:64-65`）；同端點 `auto_reboot.sg/eu` 也 `ssh_error`（同一組 env，`route.ts:132-140`）。
 - [根因]
