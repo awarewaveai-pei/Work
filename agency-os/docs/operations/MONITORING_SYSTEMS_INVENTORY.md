@@ -1,6 +1,6 @@
 ﻿# Monitoring Systems Inventory
 
-Updated: 2026-09-05
+Updated: 2026-09-05 (site-watch section 2026-09-23)
 
 ## Why this file exists
 
@@ -79,6 +79,17 @@ Only sites at `Stage: Live` in a tenant's `SITES_INDEX.md` need production monit
 
 `OBSERVABILITY_HOSTINGER.md` documents the **交包（full handover）** observability model for that client (their own Slack/Sentry/Uptime accounts) — that model governs alert *ownership*, not the fact that we also run Kuma monitors 23/24/25 + a MainWP entry for the same site during/pending handover. Both can be true at once; don't read "client owns their observability" as "we run nothing for them."
 
+## site-watch — client sites' rendered health (added 2026-09-23; NOT deployed yet)
+
+Plan of record, status and rollout steps: **`agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`** (§0 = current status).
+
+- **Job**: once per bucket (default daily 22:00 UTC; hourly/every 6h per client) open every active client's `client_config.site_url` home page in the self-hosted renderer (real Chromium, `renderer` container on `ks-aw-01`) and record availability (HTTP / DNS / connect / timeout), JS errors (recorded, never alerted) and a pixel diff against the operator-accepted baseline (> 5% = visual change).
+- **Alerts**: availability → Telegram after 2 consecutive failed buckets, one alert + one recovery per episode (severity `high`). Visual → ops-inbox incident only in slice 1 (severity `low`, operator decision D1). Incidents use source `site_watch`; the ops-inbox dispatcher skips them because site-watch sends its own messages.
+- **Data**: `site_watch_*` tables (Supabase, covered by the existing backup), screenshots in the PRIVATE R2 bucket `R2_SITE_WATCH_BUCKET`, 30-day retention. Kill switch `SITE_WATCH_ENABLED` (default off).
+- **Who watches the watcher**: `scripts/check-site-watch-health.ps1` → `agency-os/reports/status/site-watch-LATEST.md` at every AO-RESUME (heartbeat, overdue targets, notifications owed > 3h, migration). Reads `NOT_DEPLOYED` until rollout.
+- **Split with Uptime Kuma**: Kuma = minute-level HTTP reachability for our own stack (and the client monitors listed above). site-watch = what a visitor's browser actually gets, per client, at bucket cadence. Don't add Kuma monitors to answer "does the page render right", and don't add site-watch pages to answer "is the endpoint up every minute".
+- **Known overlap (open decision D2, MASTER PLAN §6.2)**: `soulfulexpression.org` is covered by both. A real outage raises a Kuma alert within minutes and, if it lasts two site-watch buckets, a second "網站打不開" alert from site-watch. Deliberate and visible, not a hidden duplicate — the D2 options are listed in the plan.
+
 ## Known gaps
 
 - **`soulfulexpression.org` Cloudflare zone Bot Fight Mode: deliberately left OFF, not a gap.** Turned on 2026-09-05, then turned back off the same day after checking: this zone is on the **Free** Cloudflare plan, where (unlike paid Super Bot Fight Mode) Bot Fight Mode does **not** exempt verified good bots — real-world reports confirm Googlebot/Bingbot/GPTBot/ClaudeBot/PerplexityBot can all get challenged/blocked. For a site that depends on organic + AI-search visibility, that risk outweighs blocking scanner noise that can't exploit anything (plugins are already patched, see below). Don't re-enable without either upgrading the plan (unlocks Super Bot Fight Mode's verified-bot allowlist) or writing a narrow custom WAF rule instead of using the blunt toggle.
@@ -93,6 +104,8 @@ Only sites at `Stage: Live` in a tenant's `SITES_INDEX.md` need production monit
 - `agency-os/docs/operations/AWAREWAVE_STACK_QUICKREF.md`
 - `agency-os/tenants/company-soulful-expression/sites/soulfulexpression-org/OBSERVABILITY_HOSTINGER.md`
 - `scripts/check-cloudflare-security.ps1`
+- `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`
+- `scripts/check-site-watch-health.ps1`
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md`
