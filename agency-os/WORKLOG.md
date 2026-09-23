@@ -1,4 +1,29 @@
 ﻿# Worklog
+## 2026-09-23（續114）研究線：示意稿加「明確文字結論＋三張圖」與「解決方案三步」；發佈為私人 artifact；計畫 v1.7（C11／D16）
+- [觸發] 操作者三連：「還是沒看到明確的文字和圖表分析」→「給我網址」→「要分析問題也要解決問題啊！解決問題你打算怎麼做？」
+- [示意稿] v2.1 `658ba7a39`：① 結論卡（一句話＋三個發現＋建議＋缺口，每句 [n]）、③ 三張圖（趨勢／訓練債因果迴路／四層槓桿對比）；v2.2 本 commit：⑦ 解決方案 = A 三方案比較（甲救火／乙改制度／丙改制度＋改定位）、B 90 天行動計畫（負責人待確認）、C 三指標＋到期重跑；章節 ①–⑨。線上版 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq（私人；同檔重發即更新；artifact 版由 `scratchpad/build_artifact.py` 從 repo 檔生成：去 skeleton、深色 tokens、SVG 文字走 token）。
+- [計畫 v1.7] §3.10 (5b) 解決方案三步（選方案 = L2 線可接 `life-decision-v1`；行動計畫 owner／期限 `human_required`；`review_at` 到期用新 Sources 重跑 interpret 比較前後）；C11 `Solution` 契約；D16（工具想清楚、排出來、盯著看，執行是人）；P4 → 報表＋解決方案 3d；核心 19d／含演化 23d。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python 結構檢查（h2 ①–⑨、table 3、kpi 3）＋ 內建瀏覽器 file:// 截圖（結論卡、冰山、圖 A/B/C 渲染）＋ Artifact publish 200 | exit=0 | ms=2
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿／計畫文字；critic 留給 PI-a code
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=iceberg-result-mock\|待拍板 | hits=5
+- [下一步] PI-a 開工。
+
+## 2026-09-23（續113）多 session 共用工作目錄：AO-RESUME hook 每句都跑 git-align 互掃未 commit 工作 → seen-session ledger + parity 改 fetch+ff-only；chip 鏈式開 session 上限規則
+
+- [觸發] 操作者截圖 7 個 ⚠ session「像同一件事一直開新 session」→ 查證：7 張 spawn_task 卡（site-watch→3、其中 repair-center→1、doc_integrity→1；SG next-admin→2，三層鏈）+ 2 條主線 = 8 個 session 同時共用 D:\Work，17:03 同秒撞用量上限（今日第二次）；reflog 217 筆、16:50–17:10 49 次 stash/pop 循環、8 個 git-align stash（09-12～09-20）從未還原且內容不全在 HEAD。
+- [根因（不變量）] ① `ao-resume-on-prompt.ps1:198`（舊）只比「上一個 session id」→ ≥2 個 session 交替送 prompt，每句都被當「新 session」→ 每句跑 `ao-resume.ps1 -FullMainlineParity`；② `ao-resume.ps1:403-404`（舊）永遠 `-AllowStash` → `git-align:214-262` stash 全部 tracked 改動→checkout→reset --hard→pop，其他 session 改到一半的檔消失數秒、pop 衝突就留在 stash。不變量：(I1) 每個 session id 最多自動觸發一次，不論幾個 session 交錯；(I2) 自動 parity 絕不 stash／reset／checkout／push，只 fetch + `merge --ff-only`，git 拒絕覆蓋髒檔就回報不硬做。
+- [修法] `scripts/lib/git-safe-ops.ps1` 新 `Invoke-SharedWorktreeParity`（Action=up-to-date|fast-forward|ahead|diverged|ff-refused|not-on-branch|fetch-failed；只有 fetch-failed 讓 AO-RESUME exit 1）；`scripts/ao-resume.ps1` FullMainlineParity 自動路徑改呼叫它，git-align 只留給 `-FullMainlineAllowStash`／feature branch／`-FullMainlineAllowResetAheadOfOrigin`；hook 新 `Test-/Add-/Register-AoResumeSession`（ledger `agency-os/.agency-state/ao-resume-seen-sessions.txt`、named mutex 原子 check+record、寫入失敗＝不觸發、上限 5000）＋ dot-source library-mode guard；`tests/ao-resume-shared-worktree.test.ps1` 新（ledger L1–L11 + parity P1–P10，$env:TEMP 真 git repo）；docs：CLAUDE.md／AGENTS.md §5 §8／APPENDIX×3／TOOL_TRIGGER_MAP／cursor-enterprise-rules-index／`.claude/commands/ao-resume.md` Step 0b 的「300 秒去重」「auto-checkpoint」過期宣稱全改；AGENTS.md §5 新規則：同一工作目錄 ≤2 session、由卡片開出的 session 不得再 spawn_task。新工具 `scripts/git-partial-worktree-commit.py`（prep/restore：共享檔只 commit 自己的 hunk，且 commit 本身是字面 `git commit -F -- <pathspec>`，閘門全部看得到）。
+- [順手] `.claude/commands/ao-resume.md` BOM 剝除（nightly session 誤加；asset-parity 2 紅→綠）；hook／ao-resume.ps1 兩處「git-align will stash」標頭改實話。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File tests/ao-resume-shared-worktree.test.ps1` | exit=0 | ms=~60000 | result=55 passed, 0 failed
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 ① ledger 改回 last-id 語意 → L3 紅；② 拔 diverged 分支 → P6 紅（got ff-refused）；還原皆 55/55 | exit=1/0 | result=兩個不變量測試皆非空跑
+- REALTEST_EVIDENCE: tool=Bash | cmd=真 hook e2e：`printf '{"prompt":"hi","session_id":"e2e-hooktest-1790173635"}' \| powershell -File mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` ×2 | exit=0 | ms=150000/1000 | result=第 1 次跑完整 AO-RESUME（parity action=ahead ahead=14 behind=0 tracked_dirty=58；reflog 4879→4879、stash 64→64、ledger 含 id）；第 2 次同 id 1 秒即 `{"continue":true}`，state json mtime 不變
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh` | exit=0 | result=286/286；`Invoke-SharedWorktreeParity -WorkRoot D:\Work` 對真 repo：action=ahead ahead=8 behind=0，reflog/stash 計數不變
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（round 1 `agency-os/reports/oracle/2026-09-23-partialreview-572e7302.md` 3 個：ledger 上限逐出／check+record 非原子／寫入失敗永遠重觸發 → 全修；round 2 `2026-09-23-partialreview-c0737e34.md` 1 個：`-AllowUnexpectedDirty` 不再選 git-align → 駁回：舊 `:403` 是被丟棄的運算式，該 switch 文件化的作用只在 check-three-way-sync `:522-524`，改為在 param 註解明說）
+- ORACLE_WAIVED: round-2 artifact c0737e34 之後只改 `ao-resume.ps1` param 註解 4 行與本 WORKLOG（無邏輯變更），不再開第 3 輪
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp/claude-userlevel,runbooks,CLAUDE.md,.claude/{commands,agents,skills} | grep=`ao-resume-last-session-id\|300 秒去重\|300-second de-dup\|always passes -AllowStash\|AllowStash, always passed\|auto-checkpoint commit` | hits=6（ao-resume.ps1:220、hook:288、cursor-enterprise-rules-index.md:15、TOOL_TRIGGER_MAP.md:412 全改；lib/shared.js:262 註解與 agency-os/Backups/ 歷史副本不動）
+- [剩餘風險] ledger 5000 條後逐出 → 該 session 多跑一次非破壞 parity；`tracked_dirty` 幾乎恆 >0（AO-RESUME 自己寫 reports/status），behind 時只有 git 判定不衝突才 ff，否則等 AO-CLOSE；live hook 需 `scripts/sync-claude-userlevel.ps1 -Mode merge`（本 commit 後執行）。
+- [rollback] `git revert <commit>` + 重跑 sync-claude-userlevel；舊行為（stash/reset）即回來。
+
 ## 2026-09-23（續112）研究線：示意稿依操作者參考圖重做（固定七段骨架）；⑦ 順序與 P0 部署時機依授權定案（D15）
 - [觸發] 操作者：「iceberg-result-mock.html 還是很爛，沒有邏輯性、沒有系統性，進來的人都是第一次接觸」＋ 4 張參考圖（NPC 冰山工作單：左四問／右 React・Anticipate・Design・Transform；可見／不可見金字塔；四問冰山；Anderson & Johnson 理解層次表）；「1 和 2 你是專家你決定而且要記錄下來」。
 - [示意稿 v2] `COS/docs/mockups/iceberg-result-mock.html` 重寫（操作者再回「還是沒看到明確的文字和圖表分析」→ 同日加 ① 文字結論卡：一句話＋三個發現＋建議＋缺口；③ 三張圖：趨勢／因果迴路／槓桿對比）：(0) 方法一句話＋怎麼讀三步 (1) 冰山 SVG，NPC 版式：左＝每層問題＋你填的、右＝介入方式、水面分可見／不可見、越下槓桿越大 (2) 四層卡同骨架：這層問→你填的[n]→這代表→在這層出手＋效果＋槓桿 (3) 總結＋證據缺口 (4) 理解層次對照表 (5) 下一步（標加深哪層；第一顆 = 契約 `recommended_next`）(6) 引註 (7) 來源標記／費用／核准／專家模式。術語首次出現附白話 `<dfn>`。
