@@ -2,12 +2,12 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入）；**同日 v1.2**（品質評分 harness §3.7 + 演化迴圈 §3.8），見 §10。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入）；**同日 v1.2**（品質評分 harness §3.7 + 演化迴圈 §3.8）；**同日 v1.3**（首用 UX §3.9 + D13 前端殼），見 §10。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 | 項 | 狀態（2026-09-23） |
 |---|---|
-| 計畫 | v1.2 提案，等操作者批准 §5 P0/P1（Medium）與 §9 ⑤ 演化自動晉升範圍；P5 與 P-P 為 High-STOP |
+| 計畫 | v1.3 提案，等操作者回覆 §9 六題（①–⑥）；P0/P1 未開工；P5 與 P-P 為 High-STOP |
 | 可重用（已查證） | 蒐集引擎 `NA/lib/collect`（41 個非測試 .ts；SSRF／DNS pin／robots／限流／品質／相關性／注入隔離／renderer 階）；COS Project+Source+CAS+events（`repo:22-60`）；Recipe 引擎（journal／resume／gates，`exec:236-250,347-361`）；AI gateway（brief→draft→builder→gates，provenance 強制 `draft.py:195-206`）；`ai.draft_record` capability（`SPEC/capabilities/contracts/ai.draft_record.capability.yaml`）；既有 citation gate `COS/ai_lego/modules/research/gates.py:41-63`；dossier prompt／段落表 `NA/lib/dossier/report.ts:76-139`、引註檢查 `:185-206`；`literature_search` ACTIVE 契約（`SPEC/capabilities/contracts/literature_search.capability.yaml:3`）；portal 身分層（`NA/app/portal/*`）；Trigger.dev 內部呼叫樣板 `WF/src/trigger/collect-scheduled-crawl.ts` + `NA/app/api/internal/collect/run-due-schedules/route.ts:27-32`；handoff code 發放／兌換樣板 `COS/ai_lego/platform/identity/store.py:342-385` |
 | 缺（本計畫要蓋） | Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；**品質評分 harness（§3.7）**；**演化迴圈（§3.8）**；Postgres／object storage；自然人來源的加密與抹除（P-P） |
 | 演化原語（已存在，§3.8 重用） | `SPEC/recipes/validated/champion-challenger.recipe.yaml`（ACTIVE）；prompt 版本重放與回滾 `COS/ai_lego/platform/ai_execution/{replay,rollback_plan}.py`（`replay.py:34-76` `prompt_version`／`restored_prompt_version`；README:27 v12 升級／回滾 replay 測試）；spec-root golden harness `SPEC/tests/run_golden_tests.py`；`ai_usage` 計量表（`store.py:117,465-468`）；`COS/ai_lego/compute/prediction_tracking/error.py`；Claude 雲端 routine（`/schedule`）；行為即資料（`query-plan.ts:38` ANGLES、`source-class.ts`、`methods/registry/method-form-examples.yaml`） |
@@ -112,12 +112,44 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 |---|---|
 | Telemetry events | `repo` events 表新增 `RunScored`／`HumanEdited`／`ReportApproved|Rejected`；`ai_usage` 已有 |
 | 回饋擷取 | dashboard 核准／退回附原因（chips）；draft 與人改後的 diff 存 `HumanEdited` |
-| 版本化資料 | `SPEC/evolution/<kind>/<version>.yaml`（kind = angles／source-classes／synthesis-prompts／model-routing／recipe-defaults）+ `champion.yaml` 指標指向現行版 |
+| 版本化資料 | `SPEC/evolution/<kind>/<version>.yaml`（kind = angles／source-classes／synthesis-prompts／model-routing／recipe-defaults／**ux-defaults**（文案、預設值、步驟順序，§3.9））+ `champion.yaml` 指標指向現行版 |
 | 提案 routine | Claude routine（`/schedule`）：讀 harness 報告 + telemetry 摘要 → 寫 `SPEC/evolution/proposals/<date>-<kind>.yaml` + PR；不直接切換 champion |
 | 挑戰執行 | `COS/scripts/run-challenger.ps1` → harness + replay → `eval-report`；`champion-challenger.recipe.yaml` 記錄裁決 |
 | 演化帳本 | `SPEC/evolution/LEDGER.md`：每次晉升／回滾一行（版本、指標前後、證據、批准者） |
 
-## 4. 決策紀錄（D1–D12）
+### 3.9 首用即上手的 UX（第一次用的人不看文件能走完）
+**現況證據（為什麼第一次用的人卡住）**
+| 介面 | 證據 | 卡點 |
+|---|---|---|
+| `/ops/collect` | `page.tsx:25-27` 先選「客戶」；`CollectionSourcesPanel.tsx:426-476` 九種來源核取方格用實作語（`collect/entity-dossier`、「按次計費」、「缺少 SERPER_API_KEY」）；`:582`「先在左邊勾一個或多個來源」；`:906-944` 拒收原因字串 | 入口是「工具」不是「任務」；不知道該勾哪一個、填什麼、跑完去哪看 |
+| 客戶中心「客服」分頁 | `ClientHubTabs.tsx` 12 個原生 `<select>`（違反操作者「禁 `<select>`」裁定）；`:1795-1811` 兩顆關鍵按鈕藏在「先點一個資料夾」之後 | 主要動作不可見；資料夾名稱是時間戳 |
+| Cognitive OS dashboard | `dashboard.html:181-185` 空狀態要人「左邊選一個工作流或單一方法」（285 個）；`:212-217` `run_id`／「續跑既有 run」；`:1397-1410` 結果 = 閘門表 + 記錄 JSON；`:155` 有搜尋框但沒有「你要做什麼」 | 285 選 1 的牆；術語（工作流／方法／閘門／run）；結果不是報表 |
+| HCI | `index.html:302,494` 有「這個系統怎麼運作？」說明頁 | 唯一有解釋層的介面，當樣板 |
+
+**原則（U1–U12，每條可驗）**
+| # | 原則 | 落點 |
+|---|---|---|
+| U1 | 入口 = 任務，不是工具：首頁三張卡「查一家公司／組織」「評估一個決定」「整理文獻」 | 首頁 |
+| U2 | 一條線性流程 + 進度條：建立 → 蒐集 → 彙整 → 分析 → 報表 → 核准；每步**一顆**主按鈕 | 每個 Project 頁 |
+| U3 | 白話優先：預設介面不出現 recipe／method／gate／capability／binding／run_id；術語只在「專家模式」與 hover 詞彙表 | 文案 registry |
+| U4 | 漸進揭露：角度、預算、模型、嚴格模式收在「進階」，預設值可直接跑 | 建立步 |
+| U5 | 花錢前先講：「會做 12 次搜尋，約 $0.3，3–5 分鐘」+ 確認（§3.4-C7） | 建立步 |
+| U6 | 空狀態教學：每個空面板說「這裡會出現什麼」+ 讓它出現的那顆按鈕 | 每步 |
+| U7 | 拒收用人話 + 一個可做的動作（沿 `explainReason`，`CollectionSourcesPanel.tsx:880-904`） | 蒐集步 |
+| U8 | 狀態是「地方」不是「分頁」：關掉視窗再開，Project 頁顯示走到哪、下一步是什麼（事件驅動，§3.2） | Project 頁 |
+| U9 | 首次登入有一個**已完成的示範 Project**（L2），先看到終點再開始 | 首登 seed |
+| U10 | 每步右側「這一步在做什麼／為什麼」由 registry 資料生成（`why_zh`／`method-form-examples.yaml` 慣例），不手寫 HTML | 說明面板 |
+| U11 | 控制項：按鈕／chips／核取方格，**禁原生 `<select>`**；鍵盤可操作；狀態不只靠顏色 | 元件庫 |
+| U12 | zh-TW／en 切換；文案外部化（同 registry） | i18n |
+
+**首用流程（螢幕級）**：0 首頁三卡 → 1 建立（名稱、類型、定位詞；預設角度已勾；成本預覽；主按鈕「開始蒐集」）→ 2 蒐集中（進度、已收 N、擋下 M 與原因、可停）→ 3 彙整（草稿每句 [n] 可點開原文；「有缺口」「來源互相矛盾」用卡片）→ 4 分析（預設方法已選；需要你填的欄位標紅，例如權重；主按鈕「執行分析」）→ 5 報表（預覽、「核准」、匯出 md／pdf）。任何一步失敗：一句人話 + 一個按鈕（重試／調整／跳過）。
+
+**量測（沒有數字不算做完）**
+- 首用測試協定 `COS/eval/ux/FIRST_RUN_PROTOCOL.md`：一位非操作者測試者，L2 從零到核准報表，**≤15 分鐘、零求助**；記錄每步秒數與卡點；SUS ≥ 70。P3 DoD。
+- 漏斗事件：`started→collected→synthesized→ran→reported→approved`，含每步耗時與放棄點；進 §3.8 遙測。
+- UX 文案／預設值／步驟順序 = §3.8 第 6 種可演化資料 kind（`ux-defaults`），卡點是提案輸入；門檻同 I10 由人定。
+
+## 4. 決策紀錄（D1–D13）
 | # | 決策 | 為什麼 | 淘汰 |
 |---|---|---|---|
 | D1 | 產品殼 = Cognitive OS | `BP/12:143-151` `app ≠ portal`；COS 已有租戶／身分／entitlement／journal／商業計畫 | next-admin `/ops/research` |
@@ -132,6 +164,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | D10 | 自然人來源獨立 P-P（High-STOP），P1–P4 的 L1 只做公司／組織／事件 | ADR 011 §決策 10；CAS／vault 現況（§3.5） | L1 含人一起做（v1） |
 | D11 | 「自行進化」= 量測→提案→挑戰→晉升／回滾的閉環，只改版本化資料；程式碼永遠人審 | 30 年紀律：無界爆炸半徑不可接受；既有原語（champion-challenger、prompt replay／rollback、golden harness）已是這個形狀 | 讓 agent 直接改 prompt／碼並部署 |
 | D12 | 分數是閘不是目標；門檻只能人改 | Goodhart：迴圈會學會討好指標；操作者既有裁定禁止改門檻消音偵測器 | 讓迴圈自調門檻「提高通過率」 |
+| D13 | **前端殼 = 新 Web app `apps/cognitive-web`（Next.js，與 next-admin／portal 同技術棧，Playwright 測試既有）**，只給 §3.9 首用流程；`dashboard.html` 降為「專家模式」直到 parity 後退場；API 不變 | `BP/12:9-16` Web／API 分離；1443 行單檔 vanilla JS 做不到 i18n、元件庫、a11y、可測；零重工：表單仍由 `method_form.py` 產生 | A 續改 `dashboard.html`（每加一步都是 DOM 手拼，無測試）|
 
 ## 5. 分期
 | 期 | 內容 | 風險 | 完成定義（缺一不算） | Rollback | 估工 |
@@ -139,7 +172,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | **P0 凍結** | 三顆「送去 X」按鈕與兩條橋 feature-flag OFF（不刪碼、**不搬資料**）；`lib/hci/client.ts:6-9`、`CollectionSourcesPanel.tsx:991-993`、`ClientHubTabs.tsx:1880-1888` 過期註解改事實 | Low | NA 頁面無「送去 X」；`npx tsc` 綠 | flag ON | 0.5d |
 | **P1 Source + Collection Service** | §3.3 前六列 + egress allowlist + `--tenant-id` bootstrap + journal key mode | Medium | curl 觸發一次真實 company run（操作者真 tenant）→ COS Sources 帶 provenance／fetched_at／collector identity；重跑同 seeds → 全 `unchanged`、0 新列；改一頁內容重跑 → supersede 列 + event；壞 hash → 400；過期 grant → 401；NA `tsc`+vitest 綠；COS pytest + golden 綠；`printenv COGNITIVE_OS_JOURNAL_KEY_MODE` ≠ disabled | 新欄位 nullable；端點下線；sink 檔刪；allowlist 還原 | 3d |
 | **P2 彙整 + 引註閘 + harness** | context-bound adapter 類；三個 synthesis + typed objects + manifest + gate；`literature_search` v2；**§3.7 harness：每線 5 個黃金案例、score.py、thresholds.yaml（首次基準線）、CI 接入、突變腳本** | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠；**harness 15 案例全部跑出分數、基準線寫入、拔閘突變讓幻覺率變紅** | 契約 status→DRAFT 即從 catalog 消失；harness 目錄獨立可刪 | 4d |
-| **P3 三線端到端** | dashboard 新研究流程；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1` | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數 | recipe→DRAFT；旗標移除 | 2d |
+| **P3 三線端到端 + 首用流程** | `apps/cognitive-web` 骨架（D13）+ §3.9 六步流程 + 示範 Project seed + 說明面板（registry 生成）；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1`；nginx 路由（`/` → web，`/expert` → 舊 dashboard） | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數；**首用測試協定通過（非操作者、L2 ≤15 分鐘零求助、SUS ≥ 70）**；Playwright 走完六步；零原生 `<select>`（grep = 0） | recipe→DRAFT；旗標移除；nginx 切回 `dashboard.html` | 5d |
 | **P4 報表** | `artifact.generate_report` + export + 核准 | Medium | 三線各一份 md（+pdf），[n] 全解析到 id/sha256/url/fetched_at；核准翻轉 + 事件含 identity；再跑 = 新版本 | capability 移除 | 2d |
 | **P4b 回饋與遙測** | `RunScored`／`HumanEdited`／`ReportApproved|Rejected` events；核准／退回原因 chips；draft-vs-人改 diff；夜跑 harness 漂移偵測 routine | Low | 每個 run 都有分數事件；退回一次 → 事件含原因；夜跑連續 3 晚有報告 | 事件為附加，關 routine 即停 | 1d |
 | **P-E 演化迴圈** | §3.8：版本化資料目錄 + champion 指標、提案 routine、`run-challenger.ps1`、LEDGER；第一批可演化資料 = 角度表、來源分類、synthesis prompt、模型路由 | Medium（資料級自動晉升需操作者同意範圍） | 一次真實循環：routine 產生提案 → challenger 在 harness + 3 個真實 Project 重放 → 不劣於 champion → 晉升 → LEDGER 一行 → 一鍵回滾成功；劣化提案被丟棄且留紀錄；夜跑紅 → 自動回滾到最後綠版 | 刪 champion 指標即回到硬編預設 | 3d |
@@ -172,17 +205,27 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | R11 | Goodhart：迴圈學會討好指標（例如少寫主張以拉高引註精確率） | 指標成對（精確率×覆蓋率×缺口誠實度）、主指標需人定；門檻只人改（I10）；抽樣人審每月一次 |
 | R12 | 黃金案例過時、模型／供應商漂移 | 夜跑漂移偵測；案例每季由真實 Project 補 1 個；案例來源為快照不連網 |
 | R13 | 演化成本（夜跑 token） | harness 用小模型跑結構指標、人審抽樣用大模型；`ai_usage` 計量 + 月上限 |
-| R14 | 演化把「行為即資料」擴大成第二套程式（YAML 裡寫邏輯） | 可演化資料只限 §3.8 表列五種 kind；新增 kind 走 ADR |
+| R14 | 演化把「行為即資料」擴大成第二套程式（YAML 裡寫邏輯） | 可演化資料只限 §3.8 表列六種 kind；新增 kind 走 ADR |
+| R15 | 兩個前端並存期（web + 舊 dashboard）功能分叉 | 舊 dashboard 只讀不加功能；parity 清單在 §0 追蹤；退場日期 = P4 驗收 |
+| R16 | 首用測試只做一次、只有一位測試者 | 每期 DoD 重跑同協定；測試者輪替；卡點進遙測而非只靠一次觀察 |
 
 ## 8. 退場清單（P0 flag OFF；P4 驗收後刪）
 `NA/lib/cognitive-os/{client,import-sources}.ts`、`NA/lib/hci/{client,import-sources}.ts`、`NA/app/api/ops/clients/[slug]/{cognitive-os-import,hci-import}/route.ts`、`NA/app/api/internal/cognitive-os/import-project-sources/route.ts`、`NA/app/api/cognitive-os/open/route.ts`、`NA/lib/dossier/folder.ts`（`report.ts` 移植後整層刪）、`CollectionSourcesPanel.tsx:545-568`、`ClientHubTabs.tsx:1795-1811`、`SPEC/recipes/validated/edd-literature-search-v1.recipe.yaml`（fixture）、`rt:80-88` offline adapter；migrations 0087／0088／0089 欄位保留標 deprecated 不 drop；`bootstrap_service_identity.py` 的 service tenant 用法退場（改 `--tenant-id`）。`/ops/collect` 與客戶 KB **維持**。
 
 ## 9. 操作者已拍板／待拍板
 - 已拍板：頂級國際規格；不補丁；LEGO；文件 AI 極簡；每 commit 1 critic；HCI 退出三條線；報表停在 AI 草稿；L1 自然人 Confidential（現改為 P-P 前不進系統，更嚴）；**品質評分 harness 進 P2、演化迴圈進計畫（2026-09-23 操作者：「補進去！…會自行進化的工具」）**。
-- **待拍板**：① 批准 P0/P1 開工；② L1 在 P-P 前只做公司／組織／事件，自然人等 P-P（D10）；③ L3 v1 產物 = 文獻矩陣＋證據矩陣＋Toulmin；④ P5／P-P 時程；⑤ **演化迴圈的自動晉升範圍**：預設只有 R0–R2 資料級（角度表、來源分類、prompt 措辭）可自動晉升，模型切換與任何門檻永遠人審。接受？
+- 已拍板（2026-09-23）：**UI/UX 納入計畫，首用者不看文件要能走完**（§3.9，P3 DoD 含首用測試）。
+- **待拍板**（回覆編號＋是／否或替代即可）：
+  ① 批准 P0（凍結三顆按鈕、改註解，Low）與 P1（Source 溯源 + Collection Service，Medium）開工。建議：是。
+  ② L1 在 P-P 前只做公司／組織／事件，自然人等 P-P（D10）。建議：是。
+  ③ L3 第一版產物 = 文獻矩陣＋證據矩陣＋Toulmin，不含文獻回顧章節草稿。建議：是。
+  ④ P5（多租戶 Production Trust）與 P-P（自然人）在第二個租戶或真實人物需求出現時才啟動。建議：是。
+  ⑤ 演化迴圈自動晉升範圍 = 只有 R0–R2 資料級（角度表、來源分類、prompt 措辭、UX 預設）；模型切換與任何門檻永遠人審。建議：是。
+  ⑥ 前端殼 = 新 `apps/cognitive-web`（D13，P3 多 3 天）；舊 dashboard 降為專家模式。建議：是。
 
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；決策記錄 §10 指回；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7 出現；每完成 §5 一期更新 §0；契約變更走 ADR（`SPEC/docs/adr/`）。
+- **v1.3（同日）**：操作者「原來的工具 UI/UX 很爛，第一次使用的人根本無法知道要怎麼使用」→ 補 §3.9（現況證據三表、U1–U12、六步首用流程、首用測試協定與漏斗遙測）、D13 前端殼、P3 改為含首用流程與 UX DoD（5d）、`ux-defaults` 第 6 種可演化 kind、R15／R16、§9 ⑥。
 - **v1.2（同日）**：操作者問「這樣就是最完美完整完善的工具了嗎」→ 答否，缺量尺與演化。補 §3.7 品質評分 harness（進 P2）、§3.8 演化迴圈（P4b 遙測 + P-E 迴圈）、I9／I10、C8／C9、D11／D12、R11–R14、§9 ⑤。
 - 2026-09-23 v1：Recipe 中心。**v1.1（同日，critic 3C/8M/1m 全折入）**：C1 自然人→P-P；C2 collect 移出 Recipe 成 Project 動作；C3 grant + collector identity + egress；M4 synthesis 改 context-bound capability；M5 顯式映射 + `human_required`；M6 necessity 只用 `REQUIRED_BY_RISK`；M7 `literature_search` v2 取代新 capability；M8 manifest 為引註集合 + 擴充既有 gate；M9 P0 不搬資料；M10 supersede 列 + hash 比對；M11 run 分類伺服器端 + journal key mode；m12 檔數、`draft.py:195-206`、C1 欄位、D3 依據改 §決策 1、token 改名。
