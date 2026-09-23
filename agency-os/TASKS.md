@@ -1216,7 +1216,7 @@
   - `🟡 待接手` · `2026-09-21 開；2026-09-23 交接包重擬` · `GPT/Codex（實作＋review）→ 操作者（prod 每步 go-ahead）`
   - **一句話**：DB fenced 狀態機 + renderer `/snapshot` + next-admin runner/notify/routes 已 commit 並過 harness／tsc／renderer test；無單元測試、無 Trigger task、無 UI 卡、env 未接、`/snapshot` 未真跑、未 review、prod 未動。
   - **現在到哪**：`git log deab0f709..HEAD -- lobster-factory` 對 site-watch 零新 commit（2026-09-23 確認）；**計畫正本 = `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`**（範圍／分期／合約／驗收／下一步全在此，§0 現況每次更新）。
-  - **下一步**：照 `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md` §7 第 1–7 步（本機 Low/Medium 直接做）→ 第 8 步 prod a–g 逐項等操作者 go-ahead；待決 D1（§6）操作者回覆。
+  - **下一步**：照 `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md` §7 第 1–9 步（本機 Low/Medium 直接做；含步 3 watchdog、步 4 deploy smoke、步 8 登記）→ 第 10 步 prod a–g 逐項等操作者 go-ahead；待決 D1（§6.2）操作者回覆。
   - **部署已封鎖（2026-09-23）**：`lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` 在 `main`，`sg-deploy.sh` 步驟 1.85 拒絕所有 app 部署、`auto-deploy-next-admin.sh` 靜默跳過（原本每 4 小時噴一次失敗告警）。**§5 第 8 步 c 之前要先 `git rm` 該檔**（它會擋住 renderer/next-admin 部署）。機制說明：`docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md §1.5`。
   - **完成定義**：prod 一個真實客戶跑出 `site_watch_results` 1 列 + R2 baseline 圖 + 客戶頁卡片顯示；`SITE_WATCH_ENABLED=false` 時 renderer 0 呼叫；WORKLOG 四動作證據行齊、review 由非 Claude 模型完成。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-21「site-watch slice 1 實作（未完，交接 GPT/Codex）」；commit `deab0f709`／`80b7897e6`。

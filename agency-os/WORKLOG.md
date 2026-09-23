@@ -21480,3 +21480,24 @@ WORKLOG_DONE: site-watch 交接包重擬為單一合規 packet（TASKS 已登記
 [rollback] `git revert` 本 commit。
 
 WORKLOG_DONE: site-watch 計畫正本 = docs/operations/SITE_WATCH_MASTER_PLAN.md，一份到底（範圍／分期／合約／驗收／下一步／回滾）；handoff 與 0091 檔頭皆退為指針
+
+## 2026-09-23（續）SITE_WATCH_MASTER_PLAN v2 — 操作者問「完整嗎、有優化空間嗎」→ 稽核出 9 個缺口，補齊
+**稽核方法**：對照 AGENTS.md §0/§7 DoD、`runbooks/ADD-PERIODIC-HEALTH-CHECK.md`、`sg-deploy.sh` smoke 段、既有兩份 MASTER_PLAN 結構。**缺口（v1 皆無）**：
+- G1 監控者無人監控：heartbeat 停／renderer 死／通知卡住都不會浮現 → 新 §7 步 3：`site_watch_maintenance` 加 heartbeat 兩欄 + `site_watch_touch_heartbeat`（prod 未套 0091，直接改 0091）、`scripts/check-site-watch-health.ps1` 四探針（量機制不量事故，runbook addendum）掛 AO-RESUME、§5 #15、§6.1 故障模式表。
+- G2 部署 smoke 只打 `/render`（`sg-deploy.sh:476-491`），`/snapshot` 退化不會擋部署 → §7 步 4 加 `/snapshot` smoke（sg-deploy.sh 由 `:152` rsync 同步）。
+- G3 缺 RUNNABLE_DEMOS（AGENTS §7 Product DoD）與 MONITORING_SYSTEMS_INVENTORY 登記（新監控系統、與 Uptime Kuma 分工）→ §7 步 8。
+- G4 env 變數散落 → §3.4 表（誰讀／哪設／預設／缺了會怎樣）。
+- G5 無威脅模型 → §3.5 安全邊界。
+- G6 無操作手冊 → §11（每種 Telegram 訊息／watchdog 顏色 → 動作）。
+- G7 無決策紀錄 → §4.3（12 條決策／理由／放棄的替代）。
+- G8 分期無完成定義 → §1 表加欄。
+- G9 容量未估：snapshot 併發 1 ≈ 90 頁/小時上限 → R6 + §8 容量閘（Slice 2 hourly 多頁必備）。
+另：§7 Trigger fan-out 改 `batchTrigger`；§10 加維護規則（改程式必同步 §3/§4；`:line` 只在 §3.2／§3.4／§7）。TASKS §I 列步數同步（1–9 本機 → 10 prod）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=for-loop `[ -e ]` 對 v2 新增引用的 10 個路徑（runbook、check-*.ps1、ao-resume.ps1、entrypoint.sh、.env.example、RUNNABLE_DEMOS、MONITORING inventory、providers.ts、wiring.ts、secret-vault.ts） | exit=0 | ms=50（0 MISSING）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "check-backup-health\|check-ci-health" scripts/ao-resume.ps1`（:565／:653 = watchdog 掛點確存） | exit=0 | ms=20
+- REVIEW_WAIVED: DOC_ONLY -- 純計畫文件；程式未動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`SITE_WATCH_MASTER_PLAN` | hits=2 files（TASKS.md、0091 檔頭；本檔以「本檔」自稱不含檔名；TASKS 步數已同步）
+[剩餘風險] G1/G2 是新增的實作工作（步 3、步 4），會讓 Slice 1 多約半天；D1 仍待操作者。
+[rollback] `git revert` 本 commit（回 v1 `67e4db98d`）。
+
+WORKLOG_DONE: SITE_WATCH_MASTER_PLAN v2：補 watchdog／deploy smoke／登記／env 表／安全邊界／故障模式／決策紀錄／操作手冊／分期 DoD／容量
