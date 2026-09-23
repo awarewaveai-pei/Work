@@ -215,17 +215,19 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 ## 9. 操作者已拍板／待拍板
 - 已拍板：頂級國際規格；不補丁；LEGO；文件 AI 極簡；每 commit 1 critic；HCI 退出三條線；報表停在 AI 草稿；L1 自然人 Confidential（現改為 P-P 前不進系統，更嚴）；**品質評分 harness 進 P2、演化迴圈進計畫（2026-09-23 操作者：「補進去！…會自行進化的工具」）**。
 - 已拍板（2026-09-23）：**UI/UX 納入計畫，首用者不看文件要能走完**（§3.9，P3 DoD 含首用測試）。
-- **待拍板**（回覆編號＋是／否或替代即可）：
-  ① 批准 P0（凍結三顆按鈕、改註解，Low）與 P1（Source 溯源 + Collection Service，Medium）開工。建議：是。
-  ② L1 在 P-P 前只做公司／組織／事件，自然人等 P-P（D10）。建議：是。
-  ③ L3 第一版產物 = 文獻矩陣＋證據矩陣＋Toulmin，不含文獻回顧章節草稿。建議：是。
-  ④ P5（多租戶 Production Trust）與 P-P（自然人）在第二個租戶或真實人物需求出現時才啟動。建議：是。
-  ⑤ 演化迴圈自動晉升範圍 = 只有 R0–R2 資料級（角度表、來源分類、prompt 措辭、UX 預設）；模型切換與任何門檻永遠人審。建議：是。
-  ⑥ 前端殼 = 新 `apps/cognitive-web`（D13，P3 多 3 天）；舊 dashboard 降為專家模式。建議：是。
+- 已拍板（2026-09-23 操作者回覆「1 是 2 是 3 是 4 是 5 是 6 要討論」）：
+  ① P0（凍結三顆按鈕、改註解，Low）＋ P1（Source 溯源 + Collection Service，Medium）開工。
+  ② L1 在 P-P 前只做公司／組織／事件，自然人等 P-P（D10）。
+  ③ L3 第一版產物 = 文獻矩陣＋證據矩陣＋Toulmin，不含文獻回顧章節草稿。
+  ④ P5（多租戶 Production Trust）與 P-P（自然人）在第二個租戶或真實人物需求出現時才啟動。
+  ⑤ 演化迴圈自動晉升範圍 = 只有 R0–R2 資料級；模型切換與任何門檻永遠人審。
+- **待拍板**：
+  ⑥ 前端殼 = 新 `apps/cognitive-web`（D13）；舊 dashboard 降為專家模式。操作者要求討論（2026-09-23，附截圖：方法執行後只得閘門表＋JSON）。討論前置事實：方法執行**沒有解讀層**——`main.py:758-788` invoke = builder 組裝 + gates，無 LLM 步驟；`iceberg_model.py:56-109` builder 只驗序並原樣回填四層；`dashboard.html:1394-1410` 結果 = 通過行＋閘門表＋JSON；圖表只有 2 個方法（`:1320-1345`）；AI 只在起草階段填格（`draft.py:1-10`）。→ v1.4 先補「解讀層」積木（每方法：findings＋敘事＋引註＋視覺規格＋下一步方法），⑥ 在其後決定。
 
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；決策記錄 §10 指回；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7 出現；每完成 §5 一期更新 §0；契約變更走 ADR（`SPEC/docs/adr/`）。
+- **2026-09-23 拍板**：①–⑤ 是；⑥ 討論中，前置事實見 §9。
 - **v1.3（同日）**：操作者「原來的工具 UI/UX 很爛，第一次使用的人根本無法知道要怎麼使用」→ 補 §3.9（現況證據三表、U1–U12、六步首用流程、首用測試協定與漏斗遙測）、D13 前端殼、P3 改為含首用流程與 UX DoD（5d）、`ux-defaults` 第 6 種可演化 kind、R15／R16、§9 ⑥。
 - **v1.2（同日）**：操作者問「這樣就是最完美完整完善的工具了嗎」→ 答否，缺量尺與演化。補 §3.7 品質評分 harness（進 P2）、§3.8 演化迴圈（P4b 遙測 + P-E 迴圈）、I9／I10、C8／C9、D11／D12、R11–R14、§9 ⑤。
 - 2026-09-23 v1：Recipe 中心。**v1.1（同日，critic 3C/8M/1m 全折入）**：C1 自然人→P-P；C2 collect 移出 Recipe 成 Project 動作；C3 grant + collector identity + egress；M4 synthesis 改 context-bound capability；M5 顯式映射 + `human_required`；M6 necessity 只用 `REQUIRED_BY_RISK`；M7 `literature_search` v2 取代新 capability；M8 manifest 為引註集合 + 擴充既有 gate；M9 P0 不搬資料；M10 supersede 列 + hash 比對；M11 run 分類伺服器端 + journal key mode；m12 檔數、`draft.py:195-206`、C1 欄位、D3 依據改 §決策 1、token 改名。
