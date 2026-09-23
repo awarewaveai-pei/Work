@@ -1,0 +1,145 @@
+# RESEARCH LINES — 蒐集 → 彙整 → 方法 → 報表 MASTER PLAN（唯一計畫正本）
+
+> **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
+> **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
+> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入，見 §10）。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+
+## 0. 現況（每次改動更新此段）
+| 項 | 狀態（2026-09-23） |
+|---|---|
+| 計畫 | v1.1 提案，等操作者批准 §5 P0/P1（Medium）；P5 與 P-P 為 High-STOP |
+| 可重用（已查證） | 蒐集引擎 `NA/lib/collect`（41 個非測試 .ts；SSRF／DNS pin／robots／限流／品質／相關性／注入隔離／renderer 階）；COS Project+Source+CAS+events（`repo:22-60`）；Recipe 引擎（journal／resume／gates，`exec:236-250,347-361`）；AI gateway（brief→draft→builder→gates，provenance 強制 `draft.py:195-206`）；`ai.draft_record` capability（`SPEC/capabilities/contracts/ai.draft_record.capability.yaml`）；既有 citation gate `COS/ai_lego/modules/research/gates.py:41-63`；dossier prompt／段落表 `NA/lib/dossier/report.ts:76-139`、引註檢查 `:185-206`；`literature_search` ACTIVE 契約（`SPEC/capabilities/contracts/literature_search.capability.yaml:3`）；portal 身分層（`NA/app/portal/*`）；Trigger.dev 內部呼叫樣板 `WF/src/trigger/collect-scheduled-crawl.ts` + `NA/app/api/internal/collect/run-due-schedules/route.ts:27-32`；handoff code 發放／兌換樣板 `COS/ai_lego/platform/identity/store.py:342-385` |
+| 缺（本計畫要蓋） | Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；Postgres／object storage；自然人來源的加密與抹除（P-P） |
+| 已由 critic 駁回、不再提 | 把 collect 做成 Recipe step（`exec:236-250` RUNNING 不可 resume、`main:131-133` journal 不含 source、adapter 無法注入依賴）；用舊橋搬資料（分類錯、無溯源、title 去重）；`REQUIRED` necessity（enum 無此值，`SPEC/specs/cognitive/recipe.schema.yaml:355`）；把「移植 enforceCitations」說成等價（原邏輯改寫 [?] 不 FAIL）；P1–P4 含自然人 |
+
+## 1. 定位與映射
+- 產品 = **AI LEGO Cognitive Engineering OS**（母文件 `SPEC/AI_LEGO_Cognitive_Engineering_Os_Global_Master_Plan_v1.md:254-300`）。三條線 = 母文件 §78 使用者流程（`:3062-3095`：Create Project → Upload Sources → Ingest → Normalize → Knowledge Build → … → Compile → Approve → Execute → Human Review → Write）的三個實例。**蒐集與彙整落在 Execute 之前的 Project 階段**，Recipe 只做 Execute（這正是 critic C2 的修法，也是母文件的順序）。
+- 六大 Workspace（`:3019-3050`）：L1 Knowledge→Decision Room；L2 Decision Room；L3 Knowledge→Data Lab→Artifact Studio。
+- 完成計畫 `COS/docs/feature-cognitive-os-completion.md:13,15,18` 切片 2／4／7 = P1／P2／P4；切片 8 = P5。
+- HCI-30 不在關鍵路徑（決策記錄 §10.3-3）。
+
+## 2. 不變量（I1–I8）
+| # | 不變量 | 機械落點 |
+|---|---|---|
+| I1 | 同一 Project 內 `(canonical_url, content_sha256)` 唯一；同 URL 新 hash = 新 Source 列 + `supersedes_source_id`，舊列 `status=superseded`（同一交易）+ event。hash = `sha256(utf8(text))`，NA 端算（`NA/lib/collect/types.ts:51`），COS ingest 重算比對不符即 400（ADR 011 §決策 2，`011-collection-ingestion-boundary.md:52-56`） | §3.4-C2 |
+| I2 | 抓回內容 = `EVIDENCE／SOURCE_QUOTATION`（`types.ts:33-45`）；彙整輸出走 runtime 既有規則 `AI_INFERENCE／AI_GENERATED`（`rt:28-29`），草稿走 `AI_SUGGESTION／AI_SUGGESTED`（`draft.py:195-206`）；永不自動晉升 | 平台既有 |
+| I3 | 彙整每個主張的引註 ⊆ **prompt manifest**（實際送進 prompt 的 Source id + sha256 + 字元範圍）；越界或零引註 = gate FAIL（比 `report.ts:191-200` 的「改寫 [?]」嚴格，刻意） | §3.4-C4 |
+| I4 | 方法 builder 只吃結構化 record；彙整表 → 方法 kwargs 必經顯式映射（`ai.draft_record` + 人填價值判斷欄），不直接 binding | §3.4-C5 |
+| I5 | 報表 = 版本化 artifact，`AI_GENERATED → HUMAN_APPROVED`，每個 [n] 解析到 Source id + sha256 + URL + fetched_at | §3.4-C6 |
+| I6 | 租戶邊界 = COS `Tenant→Workspace→Project`（`BP/12:27-39`）；NA 對 COS 寫入只憑 **per-run ingest grant**（tenant+project+run+scope+exp，伺服器端綁定 project），永不持有靜態全域寫權（`BP/12:62,78`） | §3.4-C3 |
+| I7 | 六個橫切面（路由／預算／禮貌／去重／續傳／重試）由 `NA/lib/collect/orchestrator.ts` 獨佔（ADR 011 §決策 1、5：`:50,64-70`）；COS 不發對外 fetch（`COS/ai_lego/platform/net/egress.py:44-50` deny-by-default） | Collection Service 只暴露 `runs` |
+| I8 | Recipe 引擎（`exec`）**零改動**；新增行為只以「Project 層級動作」與「capability adapter」實作 | §4 D5 |
+
+## 3. 架構
+### 3.1 系統邊界
+```
+cognitive.aware-wave.com (COS, 產品殼)             app.aware-wave.com (NA, 內部營運)
+├ Tenant/Workspace/Project/Identity/Entitlement     ├ Collection Service: POST /api/internal/collect/runs
+├ Sources（研究來源系統紀錄, CAS）                   │   → Trigger task collect-research-run → runCollection
+├ Project 動作: collections / synthesis / reports    │   → sink/cognitive → COS ingest（憑 grant）
+├ Recipes（既有引擎；1 個新 recipe）                 ├ 客戶 KB cs_knowledge_*（客服語料，維持）
+└ Dashboard: 新研究 → 蒐集 → 彙整 → 起草 → 執行 → 報表 → 核准
+lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
+```
+### 3.2 資料流（一條線一次）
+1. `POST /projects`（purpose∈{partnership_risk, decision, edd_research}，subject_kind；`data_classification` 由 purpose+kind 伺服器端決定）。
+2. `POST /projects/{id}/collections`（非同步）：COS 寫 `CollectionRequested` event → 發 **ingest grant**（§3.4-C3）→ 呼叫 NA `POST /api/internal/collect/runs`（bearer + grant）→ NA 啟 Trigger task → `runCollection`（既有）→ `sink/cognitive` 批次 `POST COS /projects/{id}/sources/ingest`（Authorization: Grant）→ 完成 `POST COS /projects/{id}/collections/{run}/complete`（同 grant，附 RunReport 摘要）→ `CollectionCompleted` event。Dashboard 輪詢 `GET /projects/{id}/collections/{run}`。
+3. `POST /projects/{id}/synthesis`（context-bound capability，§3.4-C4；背景執行 + 輪詢）：讀本 Project Sources → 建 prompt manifest → AI gateway 起草 → typed-object builder → gates（含 `citation_integrity`）→ 存 artifact + `SynthesisCreated` event。
+4. Dashboard 選 recipe（既有）→「從彙整表起草」= `ai.draft_record`（brief = 彙整表 JSON）→ 人填價值判斷欄（權重／分數）→ `POST /recipes/{id}/run`（引擎不變；`data_classification` 改由 Project 推導；`async:true` 時 202 + 既有 `GET /recipes/{id}/runs/{run_id}` 輪詢）。
+5. `POST /projects/{id}/reports`（context-bound capability）：讀彙整表 + run 結果 → md（+pdf）→ [n] 經 manifest 解析 → artifact CAS + `ReportGenerated`；`POST …/reports/{id}/approve` → `ReportApproved`（identity_id）。
+### 3.3 元件表
+| 元件 | 狀態 | 位置 | 說明 |
+|---|---|---|---|
+| Source 溯源欄位 + supersede | 新 | `COS/ai_lego/core/domain/source.py`（`source_record` 現固定 `status=active, version=1`）；`repo:36-60`（add-column 慣例 `:114-123`）；`SPEC/specs/domain/source.schema.yaml` | 加 `canonical_url, source_uri, fetched_at, provenance{epistemic_type,authorship_state,locked}, source_class, relevance_json, supersedes_source_id`；repo 加 `supersede()`（同交易 UPDATE 舊列 + append event） |
+| ingest 端點 | 新 | `main`（`:1187` create_source 旁） | `POST /projects/{id}/sources/ingest`，body = §3.4-C1；auth = grant；冪等 §3.4-C2；`created_by_identity_id` = grant 綁的 collector identity |
+| Ingest grant + collector identity | 新 | `COS/ai_lego/platform/identity/store.py`（仿 `:342-385` handoff code：hash 存、單 run、exp）；`apps/cli/bootstrap_service_identity.py` 加 `--tenant-id`（現只會建新 tenant，`:47-58`） | grant = `{tenant_id, project_id, run_id, scope:source.ingest, exp}`，HMAC 或隨機 + hash 存表；每 run 一把；COS 驗 grant 並以 grant 的 project_id 覆寫路徑參數 |
+| Collection run 動作 | 新 | `main`（projects 區）+ `SPEC/specs/domain/collection-run.schema.yaml` | `POST /projects/{id}/collections`、`GET …/{run}`、`POST …/{run}/complete`；狀態 requested→running→completed/failed；events 落 `repo` events 表 |
+| Collection Service | 新（薄） | `NA/app/api/internal/collect/runs/route.ts`（bearer `COLLECT_RESEARCH_RUNS_TOKEN`，樣板 `run-due-schedules/route.ts:27-32`）；`WF/src/trigger/collect-research-run.ts` | 輸入 `{grant, cos_base_url, project_id, run_id, seeds[], budget}`；只轉交，不做決策 |
+| `sink/cognitive` | 新（一檔） | `NA/lib/collect/sinks/cognitive.ts`（形狀同 `sinks/kb.ts:125-246`） | 唯一知道 COS 的檔；批次 ingest；`finalize` 呼叫 complete |
+| Context-bound capability adapter | 新（一類） | `rt:70-100`（現為純函式表，宣告 side-effect-free）→ 加 `build_context_bound_adapters(deps)`，deps = {source repo, artifact store, ai gateway, tenant, project} | **不變量修訂**：registry 分兩類：pure（既有）／context-bound（新，只給 Project 動作與 report 用，不進 Recipe 純步驟）；契約檔標 `binding: context` |
+| `synthesis.*` ×3 | 新（移植） | `COS/ai_lego/modules/research/synthesis_{dossier,decision_evidence,literature}.py`；typed objects `SPEC/specs/cognitive/typed-objects/{dossier-brief,decision-evidence-brief,literature-matrix}.schema.yaml`；capability contracts 同名 | prompt／段落表逐字移植 `report.ts:76-139`；輸出含 `manifest_ref`；每主張 `citations[]`=source_id |
+| `citation_integrity` gate | 新（擴充） | `COS/ai_lego/modules/research/gates.py:41-63` 旁 | 輸入 record + manifest；越界／零引註 FAIL；`uncited_sections[]` 進 evidence 不 FAIL |
+| `literature_search` adapter v2 | 改 | `rt:80-88`（offline fixture）→ project-backed：回本 Project `source_class=academic` Sources | 關 OQ-LITSEARCH-3、OQ-EDD-LITERATURE-1；`edd-literature-search-v1` fixture recipe 退場（§8） |
+| Recipes | 1 新 + 2 既有 | `SPEC/recipes/validated/partnership-risk-v1.recipe.yaml`（新：`stakeholders.stakeholder_map` → `challenge.red_team`，皆 ACTIVE）；L2 用 `life-decision-v1`／`business-feasibility-review-v1`；L3 用 `edd-research-evidence-v1` | necessity 只用 `REQUIRED_BY_RISK`（`SPEC/specs/cognitive/recipe.schema.yaml:355`） |
+| 非同步 run 旗標 | 新（小） | `main:534-655` `run_recipe` | `async:true` → 背景 thread 執行，202 + run_id；狀態走既有 `GET /recipes/{id}/runs/{run_id}`；RUNNING 中斷 = 以新 run_id 重跑（P5 前接受；lease 在 P5） |
+| run 分類伺服器端推導 | 改 | `main:623-632` | 不再讀 body；由 Project `data_classification`（Title_Case）映射到 run 詞彙（UPPER，`main:1095-1098`）；`COGNITIVE_OS_JOURNAL_KEY_MODE≠disabled` 進 P1 DoD |
+| `artifact.generate_report` | 新 | `SPEC/capabilities/contracts/artifact.generate_report.capability.yaml`（context-bound） | md（+pdf）、引註表、`report_state`、export `GET /projects/{id}/artifacts/{id}/export` |
+| Dashboard 「新研究」 | 新 | `COS/ai_lego/apps/api/dashboard.html`（pill 慣例 `:414-425`，不用 `<select>`） | 線別按鈕 → 表單（名稱／定位詞／角度／預算＝成本預覽）→ 蒐集進度 → 彙整 → 起草 → 執行 → 報表 → 核准 |
+| Egress allowlist | 改 | `COS/docker-compose.yml:24-26`；`SPEC/policies/ai-execution/network-egress.yaml` EGRESS-EC99-2 | 加 NA 內部 host（`lobster-next-admin:3000`）；兩處同步 |
+| Postgres／object storage | P5 | `identity/store.py`、`repo`、`custom_workflow_repository.py`、`data/object/tenant_scoped_cas.py` | repository 介面不變；RLS Tier A（`BP/12:41-50`） |
+### 3.4 契約
+- **C1 Source 投影**（sink → ingest）：`{canonical_url, source_uri, content_sha256, mime, content_type, title, author, published_at, fetched_at, text, provenance{epistemic_type, authorship_state, locked}, collector, source_class, relevance{entityConfidence, entityAnchorsHit, searchAngle, searchQuery}, schema_version}`。來源：`RawDoc`（`types.ts:48-81`）去掉 `raw`、`tenantRef`、整包 `meta`；`relevance` 取自 orchestrator 蓋的 `meta`（白名單同 `sinks/kb.ts:106-115`）。`data_classification` 不由 sink 給，由 Project 決定。
+- **C2 冪等／版本**：`(project_id, canonical_url, sha256)` 已存在 → 200 `{unchanged:true}`；同 URL 不同 sha256 → 新 source_id + `supersedes_source_id`，舊列 `status=superseded`，event `SourceSuperseded`；ingest 重算 `sha256(utf8(text))` ≠ 送來的 → 400 `SOURCE_HASH_MISMATCH`。
+- **C3 認證（三把，各自獨立，未設 fail closed）**：① COS→NA `runs`：bearer `COLLECT_RESEARCH_RUNS_TOKEN`（NA 端驗，`run-due-schedules/route.ts:27-32` 樣板）；② NA→COS `ingest`／`complete`：`Authorization: Grant <token>`，COS 驗 hash + exp + run 未關閉，並以 grant 內 project_id 覆寫路徑；grant 只經 Trigger payload 傳遞**參照 id**，token 本體由 NA 於 route 內以 ① 換取（`POST COS /collect-grants/{ref}/exchange`），不落 Trigger DB；③ 對外 fetch 只在 NA。COS 端寫入身分 = collector identity（真 Identity 列）。
+- **C4 彙整與引註**：capability 先建 manifest（n → source_id, sha256, [start,end)，總量上限沿 `report.ts:82-83` 40 篇×6000 字，超過者分批 map-reduce，manifest 記每批）→ prompt 以 `<<<SOURCE n>>>` 包（`report.ts:93-105`）→ builder 驗 typed object → `citation_integrity`：`∀claim.citations ⊆ manifest.ids`，否則 FAIL；`citations=∅` 的 section 列 `uncited_sections`。manifest 與輸出一起存 artifact。
+- **C5 映射**：彙整表 → 方法 kwargs 用 `ai.draft_record`（既有）逐方法起草；價值判斷欄（WDM `weights／scores／scale`，`life-decision-v1.recipe.yaml:60-69`；toulmin `warrant／qualifier`）標 `human_required`，dashboard 未填不准 run；bindings 仍指 `source.*`（引擎不變）。
+- **C6 報表**：sections = 彙整段落 + 各 step record 表 + gate 表；附錄「來源」= `[n] title — url — sha256[:12] — fetched_at`；「本報表的問題」= `invalid_refs／uncited_sections`；`report_state ∈ {AI_GENERATED, HUMAN_APPROVED}`；核准寫 `ReportApproved`（identity_id）。
+- **C7 成本**：`POST /projects/{id}/collections` 先回 plan（查詢數×供應商單價 + 抓取上限）需 `confirm:true` 才執行；entitlement id `research.collect`（`main:1008-1009` 旁）；P5 前恆 true（`COS/ai_lego/platform/entitlement/check.py:5`）。
+### 3.5 租戶、身分、i18n、抹除
+- 操作者用自己的真實 tenant；service-tenant 橋整套廢除（§8）。外部客戶：portal → provisioning（`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/commercial/PROVISIONING_STANDARD.md`），P5。
+- i18n：方法 registry 已 zh/en；synthesis prompt 依 Project `language`；報表欄位雙語預留。
+- 抹除：**自然人來源在 P-P 之前不進系統**（ADR 011 §決策 10，`:79`）。P-P 前提：Source 內容以 per-subject DEK envelope 加密（`COS/ai_lego/security/key_vault/local_key_vault.py` 現為 synthetic-only、未接 API），CAS 定址改為含 subject key id（現為 tenant 級內容定址 `tenant_scoped_cas.py:56-64`，跨 Project 同內容共用 blob，銷毀 DEK 抹不到、unlink 會誤刪），抹除 = 銷毀 DEK + 驗證讀不回；殘留邊界依 README「Not proven」段誠實揭露。
+### 3.6 安全邊界
+- 抓取只在 NA（`NA/lib/collect/net/*`、`provenance.ts`）；COS egress allowlist 只加 NA 內部 host。
+- synthesis prompt 資料塊包裹 + system prompt 宣告非指令；manifest 讓「引用了沒送進去的來源」不可能 PASS。
+- grant 單 run、短效、hash 存；`complete` 後 grant 作廢。
+
+## 4. 決策紀錄（D1–D10）
+| # | 決策 | 為什麼 | 淘汰 |
+|---|---|---|---|
+| D1 | 產品殼 = Cognitive OS | `BP/12:143-151` `app ≠ portal`；COS 已有租戶／身分／entitlement／journal／商業計畫 | next-admin `/ops/research` |
+| D2 | 研究來源系統紀錄 = COS Sources | ADR 011 §脈絡 `:14-20` 三類別不共儲存；產品擁有租戶資料 | KB-as-service（ADR 011 §決策 3 末項 `:57-61` 講的是 KB 服務化，與引擎共用無關） |
+| D3 | 蒐集引擎留在 NA，經內部 API 服務化 | ADR 011 §決策 1（`:50` 取得＋抽取是共用層）；零重工 | 移植到 Python |
+| D4 | 彙整 = context-bound capability（注入 repo + AI gateway），不是 method、不是 NA 的 LLM 呼叫 | method handler 是純 builder（`rt:48-52`）、capability registry 純函式表（`rt:77`）；需要依賴注入就開新一類，不改既有兩類 | synthesis 當 method（v1） |
+| D5 | 蒐集與彙整是 **Project 層級動作**，Recipe 引擎零改動 | `exec:236-250` 只能 resume SUCCEEDED/FAILED；`main:131-133` journal 不含 source；母文件 §78 順序 | collect 當 Recipe step（v1） |
+| D6 | 三條線 = Project.purpose 決定「彙整 schema + 預設 recipe」；只新增 1 個 recipe | L2／L3 既有 recipe 已可用（`life-decision-v1` 真跑 PASS） | 三個新 recipe（v1） |
+| D7 | 報表 `AI_GENERATED→HUMAN_APPROVED` | 決策記錄 X6 | 直接最終版 |
+| D8 | HCI 不在關鍵路徑 | 決策記錄 X1/X2 | — |
+| D9 | P1–P4 SQLite 單租戶；P5 Postgres | repository 介面已隔離（`repo:1`） | 先換 DB |
+| D10 | 自然人來源獨立 P-P（High-STOP），P1–P4 的 L1 只做公司／組織／事件 | ADR 011 §決策 10；CAS／vault 現況（§3.5） | L1 含人一起做（v1） |
+
+## 5. 分期
+| 期 | 內容 | 風險 | 完成定義（缺一不算） | Rollback | 估工 |
+|---|---|---|---|---|---|
+| **P0 凍結** | 三顆「送去 X」按鈕與兩條橋 feature-flag OFF（不刪碼、**不搬資料**）；`lib/hci/client.ts:6-9`、`CollectionSourcesPanel.tsx:991-993`、`ClientHubTabs.tsx:1880-1888` 過期註解改事實 | Low | NA 頁面無「送去 X」；`npx tsc` 綠 | flag ON | 0.5d |
+| **P1 Source + Collection Service** | §3.3 前六列 + egress allowlist + `--tenant-id` bootstrap + journal key mode | Medium | curl 觸發一次真實 company run（操作者真 tenant）→ COS Sources 帶 provenance／fetched_at／collector identity；重跑同 seeds → 全 `unchanged`、0 新列；改一頁內容重跑 → supersede 列 + event；壞 hash → 400；過期 grant → 401；NA `tsc`+vitest 綠；COS pytest + golden 綠；`printenv COGNITIVE_OS_JOURNAL_KEY_MODE` ≠ disabled | 新欄位 nullable；端點下線；sink 檔刪；allowlist 還原 | 3d |
+| **P2 彙整 + 引註閘** | context-bound adapter 類；三個 synthesis + typed objects + manifest + gate；`literature_search` v2 | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠 | 契約 status→DRAFT 即從 catalog 消失 | 3d |
+| **P3 三線端到端** | dashboard 新研究流程；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1` | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數 | recipe→DRAFT；旗標移除 | 2d |
+| **P4 報表** | `artifact.generate_report` + export + 核准 | Medium | 三線各一份 md（+pdf），[n] 全解析到 id/sha256/url/fetched_at；核准翻轉 + 事件含 identity；再跑 = 新版本 | capability 移除 | 2d |
+| **P5 Production Trust** | Postgres + RLS Tier A、object storage、`.runtime` 進 backup routine、SLO／告警、rate limit、restore drill、run lease、portal provisioning、entitlement 真閘 | **High-STOP** | 第二 tenant 端到端 + 跨租戶負向測試綠；restore drill 過；`/check-drift` 綠 | 回 SQLite 映像 + 回填 | 5d+ |
+| **P-P 自然人** | Source envelope 加密 + subject 級定址 + 抹除驗證 + ADR 011 §決策 10 解除的新 ADR + 操作者明示批准 | **High-STOP** | 抹除後 CAS／journal／artifact 三處讀不回；負向測試；ADR 落地 | 不上線即無資料 | 5d+ |
+| **P6 選配** | `apps/collector` 容器；HCI adapter（`BP/10:83`） | Medium／High | 觸發：第二 tenant／要開 HCI 案 | — | — |
+
+## 6. 驗證矩陣（每期四動作 + 突變）
+| 動作 | P1 | P2 | P3 | P4 |
+|---|---|---|---|---|
+| 實測 | curl + `docker exec` 讀 COS sqlite 列數／events | 真 Project + 真模型 | 三線真跑；202 輪詢；容器重啟後新 run 重跑 | 下載 md/pdf、核准事件 |
+| Review | critic 1 + `/codex-review`（TS、PY 各一 artifact） | 同 | 同 | 同 |
+| 抓蟲 | grep `sink/kb\|cognitive_os_project_id\|import-sources` | grep `enforceCitations\|REPORT_SECTIONS\|offline_literature_search` | grep `importOrganizationSources\|hci-import\|data_classification\", \"INTERNAL` | grep `dossier_report\|build_dossier` |
+| 突變 | 拔冪等鍵 → 重複列 → 紅；拔 hash 比對 → 壞 hash 200 → 紅；拔 grant project 綁定 → 跨 project 寫入 → 紅 | 拔閘 → 假引註 PASS → 紅 | 拔 `human_required` → 空權重 run → 紅 | 拔 [n] 解析 → 未解析引註 → 紅 |
+
+## 7. 風險與待驗證
+| # | 風險 | 處置 |
+|---|---|---|
+| R1 | 長 run（synthesis／recipe）超過 Cloudflare ~100s | 背景 thread + 202 + 既有 journal 狀態端點；RUNNING 中斷以新 run_id 重跑（冪等）；lease 進 P5 |
+| R2 | SQLite 單寫入者：ingest 批次 + dashboard 同時寫 | ingest 單交易批次；P5 前單 tenant；量測後決定 |
+| R3 | 成本失控 | C7 plan+confirm；`MAX_QUERIES=16`（`NA/lib/collect/search/query-plan.ts:84`） |
+| R4 | 注入內容 | 蒐集端隔離 + 資料塊包裹 + manifest 閘 + egress allowlist |
+| R5 | 自然人法遵 | D10：P-P 前不進系統 |
+| R6 | 學術全文只到 OA（`NA/lib/collect/collectors/academic.ts:8-13`） | L3 v1 = 摘要＋OA 全文；不假裝 |
+| R7 | NA／COS 兩 deploy 單位漂移 | C1 `schema_version`；契約測試兩邊各一；`/check-drift` 比 env |
+| R8 | `.runtime/` 未入備份 | P5 前先入既有 backup routine |
+| R9 | context-bound adapter 破壞「registry side-effect-free」宣告（`rt:77`） | 分兩類、契約標 `binding: context`、純 Recipe 步驟禁用；golden test 守 |
+| R10 | grant 經 Trigger payload 外洩 | 只傳參照，token 於 NA route 內換取；短效；complete 後作廢 |
+
+## 8. 退場清單（P0 flag OFF；P4 驗收後刪）
+`NA/lib/cognitive-os/{client,import-sources}.ts`、`NA/lib/hci/{client,import-sources}.ts`、`NA/app/api/ops/clients/[slug]/{cognitive-os-import,hci-import}/route.ts`、`NA/app/api/internal/cognitive-os/import-project-sources/route.ts`、`NA/app/api/cognitive-os/open/route.ts`、`NA/lib/dossier/folder.ts`（`report.ts` 移植後整層刪）、`CollectionSourcesPanel.tsx:545-568`、`ClientHubTabs.tsx:1795-1811`、`SPEC/recipes/validated/edd-literature-search-v1.recipe.yaml`（fixture）、`rt:80-88` offline adapter；migrations 0087／0088／0089 欄位保留標 deprecated 不 drop；`bootstrap_service_identity.py` 的 service tenant 用法退場（改 `--tenant-id`）。`/ops/collect` 與客戶 KB **維持**。
+
+## 9. 操作者已拍板／待拍板
+- 已拍板：頂級國際規格；不補丁；LEGO；文件 AI 極簡；每 commit 1 critic；HCI 退出三條線；報表停在 AI 草稿；L1 自然人 Confidential（現改為 P-P 前不進系統，更嚴）。
+- **待拍板**：① 批准 P0/P1 開工；② L1 在 P-P 前只做公司／組織／事件，自然人等 P-P（D10）；③ L3 v1 產物 = 文獻矩陣＋證據矩陣＋Toulmin；④ P5／P-P 時程。
+
+## 10. 文件關係、維護規則、變更紀錄
+- 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；決策記錄 §10 指回；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程。
+- 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7 出現；每完成 §5 一期更新 §0；契約變更走 ADR（`SPEC/docs/adr/`）。
+- 2026-09-23 v1：Recipe 中心。**v1.1（同日，critic 3C/8M/1m 全折入）**：C1 自然人→P-P；C2 collect 移出 Recipe 成 Project 動作；C3 grant + collector identity + egress；M4 synthesis 改 context-bound capability；M5 顯式映射 + `human_required`；M6 necessity 只用 `REQUIRED_BY_RISK`；M7 `literature_search` v2 取代新 capability；M8 manifest 為引註集合 + 擴充既有 gate；M9 P0 不搬資料；M10 supersede 列 + hash 比對；M11 run 分類伺服器端 + journal key mode；m12 檔數、`draft.py:195-206`、C1 欄位、D3 依據改 §決策 1、token 改名。

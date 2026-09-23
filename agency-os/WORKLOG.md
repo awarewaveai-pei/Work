@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-23（續105）研究線 MASTER PLAN v1→v1.1：頂級規格重定向到 Cognitive OS；critic 3C/8M/1m 全折入
+
+- [操作者] 「我要頂級規格的國際性全球工具」+ 不空燒 agents + 文件 AI 極簡。→ 續104 決策記錄的 next-admin 中心方案作廢，改寫成 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md`（唯一計畫正本；完成計畫、決策記錄 §10、TASKS.md 各掛一行指標）。
+- [核心] 產品殼 = Cognitive OS（`BP/12:143-151` app≠portal）；研究來源系統紀錄 = COS Sources（ADR 011 三類別不共儲存）；蒐集引擎留 NA 經內部 API 服務化（ADR 011 §決策 1）；**蒐集與彙整 = Project 層級非同步動作，Recipe 引擎零改動**；三條線 = Project.purpose → 彙整 schema + 預設 recipe（只新增 `partnership-risk-v1`，L2/L3 用既有 recipe）；報表 artifact `AI_GENERATED→HUMAN_APPROVED`；自然人獨立 P-P（High-STOP）。
+- [critic（1 個，Deep）發現全部自驗後折入] C1 CAS 是 tenant 級內容定址（`tenant_scoped_cas.py:56-64`）+ vault synthetic-only 未接 API → 自然人不能靠「銷毀 DEK」抹除 → P-P；C2 `exec:236-250` RUNNING 不可 resume、`main:131-133` journal 不含 source → collect 不能當 Recipe step → Project 動作；C3 COS 無 service grant、egress deny-by-default（`egress.py:44-50`）→ per-run ingest grant + collector identity + allowlist；M4 method handler 純 builder（`rt:48-52`）→ synthesis 改 context-bound capability（新一類 adapter）；M5 bindings 形狀不合 → `ai.draft_record` 映射 + `human_required`；M6 `REQUIRED` 不在 enum（`recipe.schema.yaml:355`，`exec:349-361` fail-open）；M7 `literature_search` ACTIVE 槽位已存在 → v2 project-backed，不開新 capability；M8 `enforceCitations` 是改寫 [?] 非 FAIL、既有 `gates.py:41-63` → manifest 為引註集合、擴充既有 gate；M9 P0 用舊橋搬資料會製造重工 → 不搬；M10 supersede 無實作路徑 + hash 兩份 → 新列 + `supersedes_source_id` + ingest 重算比對；M11 run 分類自報預設 INTERNAL（`main:623-632`）→ 伺服器端由 Project 推導 + journal key mode 進 DoD；m12 五處引用失真已改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sed -n` 逐一讀回 critic 引用的 `tenant_scoped_cas.py:50-66`、`local_key_vault.py:1-20`、`executor.py:236-250,347-362`、`main.py:128-134,618-632`、`egress.py:40-52`、`store.py` token 函式、`recipe_runtime.py:24-100`、`gates.py:38-64`、`literature_search.capability.yaml`、`recipe.schema.yaml:353-357` | exit=0 | ms=600 | result=12 項 finding 的證據行全部與原始碼一致，無一誤報
+- REVIEW_DONE: critic=Deep | verdict=fail→pass | findings=3c/8m/1n（v1 全部駁回點已在 v1.1 改設計；§0「已駁回不再提」列出）
+- BUGHUNT_WAIVED: DOC_ONLY -- 計畫文件；實作階段依 §6 矩陣逐期 grep
+- [剩餘風險] 計畫未批准；R1 長 run 背景 thread 方案未實作驗證；R2 SQLite 寫入衝突未量測。
+- [rollback] `git revert`；指標行各一。
+
 ## 2026-09-23（續104）研究管線三條線「不順、怪異」根因調查 → 決策記錄（提案，等操作者裁決）
 
 - [任務] 操作者：`/ops/collect`→Cognitive OS／HCI→報表三條線（合作風險／決策利弊／EdD）「運作起來非常不順，也很怪異」，要深度研究＋最完美建議。全程實讀 next-admin `lib/{collect,kb,cognitive-os,hci,dossier}`、兩個 UI、Cognitive OS `main.py`／`dashboard.html`、HCI `server.mjs`、ADR 011／Blueprint 02／10、五條 WORKLOG 事故；prod 容器＋DB 實查。

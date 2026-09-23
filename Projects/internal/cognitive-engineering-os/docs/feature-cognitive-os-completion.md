@@ -29,3 +29,7 @@ Keep one modular monolith. Stable domain/application ports sit above replaceable
 ## Current slice
 
 Project + Source Intake. V1 accepts bounded UTF-8 text only. PDF, Office, image, audio and video remain blocked until the isolated document pipeline exists.
+
+## Execution plan for slices 2 / 4 / 7 / 8
+
+`docs/RESEARCH_LINES_MASTER_PLAN.md` (2026-09-23) is the single plan for Ingest+Normalize (P1), Knowledge+Research Integrity (P2–P3), Artifact Studio minimal (P4) and Production Trust (P5), driven by three concrete Recipes (partnership-risk / decision-evidence / edd-literature). Status lives in its §0.
