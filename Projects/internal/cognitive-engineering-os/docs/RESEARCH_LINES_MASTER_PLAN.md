@@ -2,14 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入，見 §10）。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入）；**同日 v1.2**（品質評分 harness §3.7 + 演化迴圈 §3.8），見 §10。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 | 項 | 狀態（2026-09-23） |
 |---|---|
-| 計畫 | v1.1 提案，等操作者批准 §5 P0/P1（Medium）；P5 與 P-P 為 High-STOP |
+| 計畫 | v1.2 提案，等操作者批准 §5 P0/P1（Medium）與 §9 ⑤ 演化自動晉升範圍；P5 與 P-P 為 High-STOP |
 | 可重用（已查證） | 蒐集引擎 `NA/lib/collect`（41 個非測試 .ts；SSRF／DNS pin／robots／限流／品質／相關性／注入隔離／renderer 階）；COS Project+Source+CAS+events（`repo:22-60`）；Recipe 引擎（journal／resume／gates，`exec:236-250,347-361`）；AI gateway（brief→draft→builder→gates，provenance 強制 `draft.py:195-206`）；`ai.draft_record` capability（`SPEC/capabilities/contracts/ai.draft_record.capability.yaml`）；既有 citation gate `COS/ai_lego/modules/research/gates.py:41-63`；dossier prompt／段落表 `NA/lib/dossier/report.ts:76-139`、引註檢查 `:185-206`；`literature_search` ACTIVE 契約（`SPEC/capabilities/contracts/literature_search.capability.yaml:3`）；portal 身分層（`NA/app/portal/*`）；Trigger.dev 內部呼叫樣板 `WF/src/trigger/collect-scheduled-crawl.ts` + `NA/app/api/internal/collect/run-due-schedules/route.ts:27-32`；handoff code 發放／兌換樣板 `COS/ai_lego/platform/identity/store.py:342-385` |
-| 缺（本計畫要蓋） | Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；Postgres／object storage；自然人來源的加密與抹除（P-P） |
+| 缺（本計畫要蓋） | Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；**品質評分 harness（§3.7）**；**演化迴圈（§3.8）**；Postgres／object storage；自然人來源的加密與抹除（P-P） |
+| 演化原語（已存在，§3.8 重用） | `SPEC/recipes/validated/champion-challenger.recipe.yaml`（ACTIVE）；prompt 版本重放與回滾 `COS/ai_lego/platform/ai_execution/{replay,rollback_plan}.py`（`replay.py:34-76` `prompt_version`／`restored_prompt_version`；README:27 v12 升級／回滾 replay 測試）；spec-root golden harness `SPEC/tests/run_golden_tests.py`；`ai_usage` 計量表（`store.py:117,465-468`）；`COS/ai_lego/compute/prediction_tracking/error.py`；Claude 雲端 routine（`/schedule`）；行為即資料（`query-plan.ts:38` ANGLES、`source-class.ts`、`methods/registry/method-form-examples.yaml`） |
 | 已由 critic 駁回、不再提 | 把 collect 做成 Recipe step（`exec:236-250` RUNNING 不可 resume、`main:131-133` journal 不含 source、adapter 無法注入依賴）；用舊橋搬資料（分類錯、無溯源、title 去重）；`REQUIRED` necessity（enum 無此值，`SPEC/specs/cognitive/recipe.schema.yaml:355`）；把「移植 enforceCitations」說成等價（原邏輯改寫 [?] 不 FAIL）；P1–P4 含自然人 |
 
 ## 1. 定位與映射
@@ -18,7 +19,7 @@
 - 完成計畫 `COS/docs/feature-cognitive-os-completion.md:13,15,18` 切片 2／4／7 = P1／P2／P4；切片 8 = P5。
 - HCI-30 不在關鍵路徑（決策記錄 §10.3-3）。
 
-## 2. 不變量（I1–I8）
+## 2. 不變量（I1–I10）
 | # | 不變量 | 機械落點 |
 |---|---|---|
 | I1 | 同一 Project 內 `(canonical_url, content_sha256)` 唯一；同 URL 新 hash = 新 Source 列 + `supersedes_source_id`，舊列 `status=superseded`（同一交易）+ event。hash = `sha256(utf8(text))`，NA 端算（`NA/lib/collect/types.ts:51`），COS ingest 重算比對不符即 400（ADR 011 §決策 2，`011-collection-ingestion-boundary.md:52-56`） | §3.4-C2 |
@@ -29,6 +30,8 @@
 | I6 | 租戶邊界 = COS `Tenant→Workspace→Project`（`BP/12:27-39`）；NA 對 COS 寫入只憑 **per-run ingest grant**（tenant+project+run+scope+exp，伺服器端綁定 project），永不持有靜態全域寫權（`BP/12:62,78`） | §3.4-C3 |
 | I7 | 六個橫切面（路由／預算／禮貌／去重／續傳／重試）由 `NA/lib/collect/orchestrator.ts` 獨佔（ADR 011 §決策 1、5：`:50,64-70`）；COS 不發對外 fetch（`COS/ai_lego/platform/net/egress.py:44-50` deny-by-default） | Collection Service 只暴露 `runs` |
 | I8 | Recipe 引擎（`exec`）**零改動**；新增行為只以「Project 層級動作」與「capability adapter」實作 | §4 D5 |
+| I9 | **演化只改資料、不改碼；任何候選版本必須在 harness 上不劣於 champion 才能晉升，晉升可一鍵回滾**（prompt／角度表／來源分類／模型／recipe 預設皆為版本化資料；程式碼改動一律走人審 PR） | §3.8、§3.4-C9 |
+| I10 | **分數是閘，不是目標**：偵測器門檻（品質、密度、相關性、引註）永不由演化迴圈自動調整，只能提案給人（操作者既有裁定：禁止改門檻消音偵測器） | §3.8、§7 R11 |
 
 ## 3. 架構
 ### 3.1 系統邊界
@@ -75,6 +78,8 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - **C5 映射**：彙整表 → 方法 kwargs 用 `ai.draft_record`（既有）逐方法起草；價值判斷欄（WDM `weights／scores／scale`，`life-decision-v1.recipe.yaml:60-69`；toulmin `warrant／qualifier`）標 `human_required`，dashboard 未填不准 run；bindings 仍指 `source.*`（引擎不變）。
 - **C6 報表**：sections = 彙整段落 + 各 step record 表 + gate 表；附錄「來源」= `[n] title — url — sha256[:12] — fetched_at`；「本報表的問題」= `invalid_refs／uncited_sections`；`report_state ∈ {AI_GENERATED, HUMAN_APPROVED}`；核准寫 `ReportApproved`（identity_id）。
 - **C7 成本**：`POST /projects/{id}/collections` 先回 plan（查詢數×供應商單價 + 抓取上限）需 `confirm:true` 才執行；entitlement id `research.collect`（`main:1008-1009` 旁）；P5 前恆 true（`COS/ai_lego/platform/entitlement/check.py:5`）。
+- **C8 harness 契約**：`score(case, output) → {metric: value}`，指標名固定（§3.7）；`thresholds.yaml` 每線每指標；harness 離線（來源快照，不連網、不用 collect）；報告含每案例每指標與 champion 差值；CI 紅 = commit 不得合併。
+- **C9 演化契約**：候選 = `{kind, version, diff, evidence[run_ids, metrics], risk_tier}`；晉升條件 = `∀metric: challenger ≥ threshold ∧ challenger ≥ champion − ε` 且主指標 > champion；R3+ 或觸及門檻 → `requires_human=true`；晉升與回滾都寫 LEDGER + event；champion 指標檔是唯一切換點（程式讀它，不讀「最新版」）。
 ### 3.5 租戶、身分、i18n、抹除
 - 操作者用自己的真實 tenant；service-tenant 橋整套廢除（§8）。外部客戶：portal → provisioning（`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/commercial/PROVISIONING_STANDARD.md`），P5。
 - i18n：方法 registry 已 zh/en；synthesis prompt 依 Project `language`；報表欄位雙語預留。
@@ -84,7 +89,35 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - synthesis prompt 資料塊包裹 + system prompt 宣告非指令；manifest 讓「引用了沒送進去的來源」不可能 PASS。
 - grant 單 run、短效、hash 存；`complete` 後 grant 作廢。
 
-## 4. 決策紀錄（D1–D10）
+### 3.7 品質評分 harness（把「完善」變成數字）
+| 元素 | 內容 | 位置 |
+|---|---|---|
+| 黃金案例 | 每條線 ≥5 個案例：固定來源快照（Source 檔＋sha256，不連網）+ 人工標註的**期望發現**（L1：關鍵事實／爭議／關聯人；L2：選項／準則／關鍵證據；L3：主張／方法／限制）+ 已知陷阱（同名混淆、購物頁、注入句、矛盾來源） | `COS/eval/cases/<line>/<id>/{sources/, expected.yaml, README.md}`；合成或已公開資料，不含自然人敏感內容 |
+| 指標 | 引註精確率（每個 [n] 指向的來源真的支持該句，抽樣人審＋自動比對）、引註覆蓋率（期望發現被引到的比例）、幻覺率（越界／無來源主張）、矛盾偵出率、缺口誠實度（gaps 列出期望缺口的比例）、拒收正確率（陷阱被擋）、成本（查詢數／token）、時延 | `COS/eval/score.py`；輸出 `eval-report.json` + md |
+| 門檻 | 每線每指標一個門檻，**由操作者定**（初始值 = 首次基準線）；低於門檻 = FAIL | `COS/eval/thresholds.yaml`（版本化） |
+| 觸發 | 每個影響 synthesis／collect／recipe 的 commit（CI）；每夜對 champion 跑一次（漂移偵測，模型或供應商變了會先在這裡紅） | `COS/scripts/test-eval-harness.ps1`；夜跑走 Claude routine |
+| 突變證明 | 拔引註閘 → 幻覺率飆 → 紅；把一個期望發現從來源刪掉 → 覆蓋率降 → 紅 | harness 自己的 mutation 腳本 |
+
+### 3.8 演化迴圈（「應時俱進」的可執行定義）
+不是 AI 改自己的程式。是一條**量測 → 提案 → 挑戰 → 晉升／回滾**的閉環，每一步都是既有原語：
+```
+量測   telemetry（每 run：引註率、拒收原因分布、角度產出率、人改了什麼、核准/退回、成本）→ ai_usage + events
+提案   routine（夜跑）讀 telemetry + harness 報告 → 產出「候選資料版本」：新角度／來源分類新增／prompt 改寫／模型切換／recipe 預設；每個提案附證據（哪些 run、哪些指標）
+挑戰   champion-challenger recipe：challenger 在 harness 全套 + 最近 N 個真實 Project 重放（replay.py）上跑；記分
+晉升   不劣於 champion（所有門檻不降、主指標提升）→ 資料版本切換 + 事件；劣 → 丟棄並留紀錄
+回滾   一鍵回上一版（rollback_plan.py 樣式）；夜跑漂移紅 = 自動回滾到最後綠版
+人審   R3+ 風險（模型換供應商、成本上限、任何門檻）永遠停在提案，操作者批准才晉升；程式碼改動 = PR + critic + oracle
+```
+| 元件 | 位置 |
+|---|---|
+| Telemetry events | `repo` events 表新增 `RunScored`／`HumanEdited`／`ReportApproved|Rejected`；`ai_usage` 已有 |
+| 回饋擷取 | dashboard 核准／退回附原因（chips）；draft 與人改後的 diff 存 `HumanEdited` |
+| 版本化資料 | `SPEC/evolution/<kind>/<version>.yaml`（kind = angles／source-classes／synthesis-prompts／model-routing／recipe-defaults）+ `champion.yaml` 指標指向現行版 |
+| 提案 routine | Claude routine（`/schedule`）：讀 harness 報告 + telemetry 摘要 → 寫 `SPEC/evolution/proposals/<date>-<kind>.yaml` + PR；不直接切換 champion |
+| 挑戰執行 | `COS/scripts/run-challenger.ps1` → harness + replay → `eval-report`；`champion-challenger.recipe.yaml` 記錄裁決 |
+| 演化帳本 | `SPEC/evolution/LEDGER.md`：每次晉升／回滾一行（版本、指標前後、證據、批准者） |
+
+## 4. 決策紀錄（D1–D12）
 | # | 決策 | 為什麼 | 淘汰 |
 |---|---|---|---|
 | D1 | 產品殼 = Cognitive OS | `BP/12:143-151` `app ≠ portal`；COS 已有租戶／身分／entitlement／journal／商業計畫 | next-admin `/ops/research` |
@@ -97,15 +130,19 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | D8 | HCI 不在關鍵路徑 | 決策記錄 X1/X2 | — |
 | D9 | P1–P4 SQLite 單租戶；P5 Postgres | repository 介面已隔離（`repo:1`） | 先換 DB |
 | D10 | 自然人來源獨立 P-P（High-STOP），P1–P4 的 L1 只做公司／組織／事件 | ADR 011 §決策 10；CAS／vault 現況（§3.5） | L1 含人一起做（v1） |
+| D11 | 「自行進化」= 量測→提案→挑戰→晉升／回滾的閉環，只改版本化資料；程式碼永遠人審 | 30 年紀律：無界爆炸半徑不可接受；既有原語（champion-challenger、prompt replay／rollback、golden harness）已是這個形狀 | 讓 agent 直接改 prompt／碼並部署 |
+| D12 | 分數是閘不是目標；門檻只能人改 | Goodhart：迴圈會學會討好指標；操作者既有裁定禁止改門檻消音偵測器 | 讓迴圈自調門檻「提高通過率」 |
 
 ## 5. 分期
 | 期 | 內容 | 風險 | 完成定義（缺一不算） | Rollback | 估工 |
 |---|---|---|---|---|---|
 | **P0 凍結** | 三顆「送去 X」按鈕與兩條橋 feature-flag OFF（不刪碼、**不搬資料**）；`lib/hci/client.ts:6-9`、`CollectionSourcesPanel.tsx:991-993`、`ClientHubTabs.tsx:1880-1888` 過期註解改事實 | Low | NA 頁面無「送去 X」；`npx tsc` 綠 | flag ON | 0.5d |
 | **P1 Source + Collection Service** | §3.3 前六列 + egress allowlist + `--tenant-id` bootstrap + journal key mode | Medium | curl 觸發一次真實 company run（操作者真 tenant）→ COS Sources 帶 provenance／fetched_at／collector identity；重跑同 seeds → 全 `unchanged`、0 新列；改一頁內容重跑 → supersede 列 + event；壞 hash → 400；過期 grant → 401；NA `tsc`+vitest 綠；COS pytest + golden 綠；`printenv COGNITIVE_OS_JOURNAL_KEY_MODE` ≠ disabled | 新欄位 nullable；端點下線；sink 檔刪；allowlist 還原 | 3d |
-| **P2 彙整 + 引註閘** | context-bound adapter 類；三個 synthesis + typed objects + manifest + gate；`literature_search` v2 | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠 | 契約 status→DRAFT 即從 catalog 消失 | 3d |
+| **P2 彙整 + 引註閘 + harness** | context-bound adapter 類；三個 synthesis + typed objects + manifest + gate；`literature_search` v2；**§3.7 harness：每線 5 個黃金案例、score.py、thresholds.yaml（首次基準線）、CI 接入、突變腳本** | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠；**harness 15 案例全部跑出分數、基準線寫入、拔閘突變讓幻覺率變紅** | 契約 status→DRAFT 即從 catalog 消失；harness 目錄獨立可刪 | 4d |
 | **P3 三線端到端** | dashboard 新研究流程；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1` | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數 | recipe→DRAFT；旗標移除 | 2d |
 | **P4 報表** | `artifact.generate_report` + export + 核准 | Medium | 三線各一份 md（+pdf），[n] 全解析到 id/sha256/url/fetched_at；核准翻轉 + 事件含 identity；再跑 = 新版本 | capability 移除 | 2d |
+| **P4b 回饋與遙測** | `RunScored`／`HumanEdited`／`ReportApproved|Rejected` events；核准／退回原因 chips；draft-vs-人改 diff；夜跑 harness 漂移偵測 routine | Low | 每個 run 都有分數事件；退回一次 → 事件含原因；夜跑連續 3 晚有報告 | 事件為附加，關 routine 即停 | 1d |
+| **P-E 演化迴圈** | §3.8：版本化資料目錄 + champion 指標、提案 routine、`run-challenger.ps1`、LEDGER；第一批可演化資料 = 角度表、來源分類、synthesis prompt、模型路由 | Medium（資料級自動晉升需操作者同意範圍） | 一次真實循環：routine 產生提案 → challenger 在 harness + 3 個真實 Project 重放 → 不劣於 champion → 晉升 → LEDGER 一行 → 一鍵回滾成功；劣化提案被丟棄且留紀錄；夜跑紅 → 自動回滾到最後綠版 | 刪 champion 指標即回到硬編預設 | 3d |
 | **P5 Production Trust** | Postgres + RLS Tier A、object storage、`.runtime` 進 backup routine、SLO／告警、rate limit、restore drill、run lease、portal provisioning、entitlement 真閘 | **High-STOP** | 第二 tenant 端到端 + 跨租戶負向測試綠；restore drill 過；`/check-drift` 綠 | 回 SQLite 映像 + 回填 | 5d+ |
 | **P-P 自然人** | Source envelope 加密 + subject 級定址 + 抹除驗證 + ADR 011 §決策 10 解除的新 ADR + 操作者明示批准 | **High-STOP** | 抹除後 CAS／journal／artifact 三處讀不回；負向測試；ADR 落地 | 不上線即無資料 | 5d+ |
 | **P6 選配** | `apps/collector` 容器；HCI adapter（`BP/10:83`） | Medium／High | 觸發：第二 tenant／要開 HCI 案 | — | — |
@@ -116,7 +153,8 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | 實測 | curl + `docker exec` 讀 COS sqlite 列數／events | 真 Project + 真模型 | 三線真跑；202 輪詢；容器重啟後新 run 重跑 | 下載 md/pdf、核准事件 |
 | Review | critic 1 + `/codex-review`（TS、PY 各一 artifact） | 同 | 同 | 同 |
 | 抓蟲 | grep `sink/kb\|cognitive_os_project_id\|import-sources` | grep `enforceCitations\|REPORT_SECTIONS\|offline_literature_search` | grep `importOrganizationSources\|hci-import\|data_classification\", \"INTERNAL` | grep `dossier_report\|build_dossier` |
-| 突變 | 拔冪等鍵 → 重複列 → 紅；拔 hash 比對 → 壞 hash 200 → 紅；拔 grant project 綁定 → 跨 project 寫入 → 紅 | 拔閘 → 假引註 PASS → 紅 | 拔 `human_required` → 空權重 run → 紅 | 拔 [n] 解析 → 未解析引註 → 紅 |
+| 突變 | 拔冪等鍵 → 重複列 → 紅；拔 hash 比對 → 壞 hash 200 → 紅；拔 grant project 綁定 → 跨 project 寫入 → 紅 | 拔閘 → 假引註 PASS → 紅；harness：刪一個期望發現的來源 → 覆蓋率降 → 紅 | 拔 `human_required` → 空權重 run → 紅 | 拔 [n] 解析 → 未解析引註 → 紅 |
+| P4b／P-E | — | — | 夜跑：把 champion prompt 換成故意劣化版 → 漂移紅 → 自動回滾；提案 routine：塞一個劣化提案 → 挑戰失敗 → 不晉升且留紀錄；拔 `requires_human` → R3 提案自動晉升 → 紅 | — |
 
 ## 7. 風險與待驗證
 | # | 風險 | 處置 |
@@ -131,15 +169,20 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | R8 | `.runtime/` 未入備份 | P5 前先入既有 backup routine |
 | R9 | context-bound adapter 破壞「registry side-effect-free」宣告（`rt:77`） | 分兩類、契約標 `binding: context`、純 Recipe 步驟禁用；golden test 守 |
 | R10 | grant 經 Trigger payload 外洩 | 只傳參照，token 於 NA route 內換取；短效；complete 後作廢 |
+| R11 | Goodhart：迴圈學會討好指標（例如少寫主張以拉高引註精確率） | 指標成對（精確率×覆蓋率×缺口誠實度）、主指標需人定；門檻只人改（I10）；抽樣人審每月一次 |
+| R12 | 黃金案例過時、模型／供應商漂移 | 夜跑漂移偵測；案例每季由真實 Project 補 1 個；案例來源為快照不連網 |
+| R13 | 演化成本（夜跑 token） | harness 用小模型跑結構指標、人審抽樣用大模型；`ai_usage` 計量 + 月上限 |
+| R14 | 演化把「行為即資料」擴大成第二套程式（YAML 裡寫邏輯） | 可演化資料只限 §3.8 表列五種 kind；新增 kind 走 ADR |
 
 ## 8. 退場清單（P0 flag OFF；P4 驗收後刪）
 `NA/lib/cognitive-os/{client,import-sources}.ts`、`NA/lib/hci/{client,import-sources}.ts`、`NA/app/api/ops/clients/[slug]/{cognitive-os-import,hci-import}/route.ts`、`NA/app/api/internal/cognitive-os/import-project-sources/route.ts`、`NA/app/api/cognitive-os/open/route.ts`、`NA/lib/dossier/folder.ts`（`report.ts` 移植後整層刪）、`CollectionSourcesPanel.tsx:545-568`、`ClientHubTabs.tsx:1795-1811`、`SPEC/recipes/validated/edd-literature-search-v1.recipe.yaml`（fixture）、`rt:80-88` offline adapter；migrations 0087／0088／0089 欄位保留標 deprecated 不 drop；`bootstrap_service_identity.py` 的 service tenant 用法退場（改 `--tenant-id`）。`/ops/collect` 與客戶 KB **維持**。
 
 ## 9. 操作者已拍板／待拍板
-- 已拍板：頂級國際規格；不補丁；LEGO；文件 AI 極簡；每 commit 1 critic；HCI 退出三條線；報表停在 AI 草稿；L1 自然人 Confidential（現改為 P-P 前不進系統，更嚴）。
-- **待拍板**：① 批准 P0/P1 開工；② L1 在 P-P 前只做公司／組織／事件，自然人等 P-P（D10）；③ L3 v1 產物 = 文獻矩陣＋證據矩陣＋Toulmin；④ P5／P-P 時程。
+- 已拍板：頂級國際規格；不補丁；LEGO；文件 AI 極簡；每 commit 1 critic；HCI 退出三條線；報表停在 AI 草稿；L1 自然人 Confidential（現改為 P-P 前不進系統，更嚴）；**品質評分 harness 進 P2、演化迴圈進計畫（2026-09-23 操作者：「補進去！…會自行進化的工具」）**。
+- **待拍板**：① 批准 P0/P1 開工；② L1 在 P-P 前只做公司／組織／事件，自然人等 P-P（D10）；③ L3 v1 產物 = 文獻矩陣＋證據矩陣＋Toulmin；④ P5／P-P 時程；⑤ **演化迴圈的自動晉升範圍**：預設只有 R0–R2 資料級（角度表、來源分類、prompt 措辭）可自動晉升，模型切換與任何門檻永遠人審。接受？
 
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；決策記錄 §10 指回；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7 出現；每完成 §5 一期更新 §0；契約變更走 ADR（`SPEC/docs/adr/`）。
+- **v1.2（同日）**：操作者問「這樣就是最完美完整完善的工具了嗎」→ 答否，缺量尺與演化。補 §3.7 品質評分 harness（進 P2）、§3.8 演化迴圈（P4b 遙測 + P-E 迴圈）、I9／I10、C8／C9、D11／D12、R11–R14、§9 ⑤。
 - 2026-09-23 v1：Recipe 中心。**v1.1（同日，critic 3C/8M/1m 全折入）**：C1 自然人→P-P；C2 collect 移出 Recipe 成 Project 動作；C3 grant + collector identity + egress；M4 synthesis 改 context-bound capability；M5 顯式映射 + `human_required`；M6 necessity 只用 `REQUIRED_BY_RISK`；M7 `literature_search` v2 取代新 capability；M8 manifest 為引註集合 + 擴充既有 gate；M9 P0 不搬資料；M10 supersede 列 + hash 比對；M11 run 分類伺服器端 + journal key mode；m12 檔數、`draft.py:195-206`、C1 欄位、D3 依據改 §決策 1、token 改名。

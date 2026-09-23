@@ -9,6 +9,8 @@
 - BUGHUNT_WAIVED: DOC_ONLY -- 計畫文件；實作階段依 §6 矩陣逐期 grep
 - [剩餘風險] 計畫未批准；R1 長 run 背景 thread 方案未實作驗證；R2 SQLite 寫入衝突未量測。
 - [rollback] `git revert`；指標行各一。
+- [v1.2 同日] 操作者「這樣就是最完美完整完善的工具了嗎」→ 答否（缺量尺、缺演化、自然人延後、單租戶、兩個技術假設未實證）；操作者「補進去！…會自行進化的工具」→ 補 §3.7 品質評分 harness（每線 5 黃金案例、8 指標、門檻人定、CI+夜跑、突變）進 P2；§3.8 演化迴圈 = 量測→提案→挑戰→晉升／回滾閉環，只改版本化資料、程式碼永遠人審（I9）、分數是閘不是目標（I10，操作者既有「禁改門檻」裁定）；重用既有原語（查證：`champion-challenger.recipe.yaml` ACTIVE、`ai_execution/replay.py:34-76` prompt 版本重放、README:27 v12 升級／回滾測試、`tests/run_golden_tests.py`、`store.py:117,465` ai_usage、`compute/prediction_tracking/`）；新增 P4b 遙測、P-E 迴圈、R11–R14（Goodhart／漂移／成本／YAML 變邏輯）、§9 ⑤ 自動晉升範圍待拍板。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sed/grep` 讀回 champion-challenger recipe、replay.py、README、run_golden_tests.py、store.py ai_usage、prediction_tracking 目錄 | exit=0 | ms=300 | result=六個演化原語皆存在，計畫 §0 逐一引用
 
 ## 2026-09-23（續104）研究管線三條線「不順、怪異」根因調查 → 決策記錄（提案，等操作者裁決）
 
