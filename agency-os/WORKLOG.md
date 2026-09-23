@@ -21449,4 +21449,5 @@ WORKLOG_DONE: site-watch slice 1 核心（DB/renderer/next-admin lib+routes）�
 [剩餘風險] packet 內 `:line` 引用以 2026-09-23 程式狀態為準（migration 檔頭增 24 行，packet 對 migration 只引函式名不引行號）。
 [rollback] `git revert` 本 commit 即還原兩份舊檔與註解。
 
+（續）操作者問「動工用哪份、還能優化嗎」→ packet §5 依風險重排：① renderer 真實測試移到第 1 步（最大未知先殺）② 新增 RPC 契約靜態測試（`p_*` key vs 0091 簽名；今日 scratch 比對 16/16 一致；守 PGRST202 類）③ Trigger+env 合併為第 3 步、UI 卡拆 4a 最小／4b 證據 ④ 8b 註明 migration 必先於部署（`cleanup` route 不受 kill switch 保護）⑤ 8f 註明首次開啟全 target 立即跑一次 ⑥ 待決 D1：slice 1 visual 告警現況會進 Telegram（medium ≥ 預設 min medium），建議降 low 待遮罩 selector。
 WORKLOG_DONE: site-watch 交接包重擬為單一合規 packet（TASKS 已登記）、設計 glossary 進 0091 檔頭、程式註解不再依賴會被 prune 的 handoff
