@@ -108,6 +108,22 @@
 
 ### 未完成
 
+- [ ] **【2026-09-23 事故收尾｜待操作者 go-ahead（High）】6 個 prod／遠端動作，repo 側全部已 commit，機器上一個都還沒動**
+  - `🔴 現行` · `2026-09-23` · `操作者（High：CF／fail2ban／nginx／.env／push）`
+  - **背景**：8 個 session 共用 D:\Work 同時撞用量上限（WORKLOG 續113），6 個死 session 的工作由收尾 session 逐一落地：續110／113／116／117／119／120 與退租位址稽核條目。
+  - **① Cloudflare `aware-wave.com` 3 條 whitelist access rule 刪除**：`2001:41d0:d:2572::/64`（id `b695de4519e74014be4c3fa6f2fd0b7b`）、`149.202.64.114`（id `e13fb2f4335543b88e00396649b26ad9`）、`204.168.175.41`（id `13e6f511d5694e7bb6d72816a1cd9f58`，已被第三方接手）。指令：`DELETE /client/v4/zones/<zone>/firewall/access_rules/rules/<id>` ×3；先 `GET` 存 JSON 當 rollback；驗證 `scripts/check-cloudflare-security.ps1` Released-address = `clean`。
+  - **② ks-aw-01 `/etc/fail2ban/jail.d/ignoreip.local`** 拔 `149.202.64.114` → `fail2ban-client reload`；驗證 `fail2ban-client get sshd ignoreip`。
+  - **③ ks-aw-01 `/root/lobster-phase1/nginx/default.conf`** 兩處 `204.168.175.41/32` 已在 repo 拔除，主機走 `scripts/safe-infra-patch.sh`（backup→apply→`nginx -T`→up -d→失敗自動還原）。
+  - **④ `/root/lobster-phase1/.env`**：`SG_SSH_HOST`／`AUTO_REPAIR_SG_SSH_HOST` 仍指 5.223.93.113 → 改 145.239.195.47 並設 `AUTO_REPAIR_SG_SSH_HOST_KEY_SHA256`／`AUTO_REPAIR_EU_*`（續116 之後缺 fingerprint＝unconfigured，設了才會連）；fingerprint 取法見 `lib/repair-center/ssh.ts` 註解（ssh2 hostHash sha256 hex，非 ssh-keygen）。
+  - **⑤ ks-aw-01 跑一次 `bash /root/lobster-phase1/scripts/sync-host-scripts.sh`**（pull 後；或下一次 sg-deploy step 1.8 自裝）：主機現在仍是舊 cron 呼叫端，DEPLOY_HOLD 期間每 4 小時發一次假「自動部署失敗」警報（續120）。
+  - **⑥ `git push origin main`**：本機 main 領先 origin 20+ commit（含上述全部）；push 前 `git log origin/main..main --oneline` 過目。
+  - **完成定義**：①②③④ 各自驗證指令綠；⑤ 主機 `sync-host-scripts.sh` 印 `scripts == origin/main`；⑥ `git status -sb` = `## main...origin/main`。
+- [ ] **【git stash｜待操作者裁決】64 個 stash 從未清理：8 個 git-align 自動 stash（09-12～09-20）內容不全在 HEAD，56 個更早**
+  - `🟡 潛伏` · `2026-09-23` · `操作者`
+  - **現在到哪**：唯讀 inventory `agency-os/reports/status/stash-inventory-2026-09-23.md`（每個 stash：檔數、與 HEAD 不同的檔、前 4 個檔名）；hook 修好後（續113）不會再新增。
+  - **下一步**：逐個看 `git stash show -p stash@{N}`，確定內容已以別的形式落地才 `git stash drop`；不確定就留著。
+  - **完成定義**：`git stash list` 只剩操作者明確要保留的。
+
 - [ ] **【研究線｜P0 已完成待部署，下一步 PI-a 解讀層】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流（頂級國際規格）** — 計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` v1.5（§0 現況／§5 分期與 18d 核心時程／§9 ①–⑥ 已拍板、⑦ 待拍板／§11 接手指南）；根因 `reports/decisions/2026-09-23-research-pipeline-architecture.md` §10。—— 進度 2026-09-23：P0 完成（`lib/research-bridges.ts` 單一開關凍結三顆「送去 X」按鈕，tsc + 42 測試綠 + 突變證明；**部署與 PI-b 同窗，D15**）；⑦⑧ 依操作者授權定案；示意稿：分析頁 v2.2（結論＋圖表＋解決方案，線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）＋ 課程頁（每方法開始前 5 分鐘課，線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY ）；計畫 v1.8 核心 20d／含演化 24d；**目前 PI-a 開工**（解讀層 + 新殼 `COS/apps/cognitive-web`）；細節 WORKLOG 續111／112／114／115。
 - [x] **【oracle 工具層｜已修 2026-09-20】兩支 cross-model oracle 的 packet 會被無關 untracked 檔灌爆，導致 review 靜默失敗** — 2026-09-20 實測：`/codex-review`（companion `adversarial-review`）與第二層 fallback `scripts/codex-oracle.ps1 -Mode review` 對同一份 130 檔改動**雙雙回不出 final message**。根因不是額度（log 0 bytes、無任何 `429`／`rate limit` 字樣），是 packet 4.97MB：兩支的 builder 都只按「可審檔案型別 + 512KB 單檔上限 + 名稱像 secret」過濾，沒有「與本次改動無關的 untracked 檔要排除」，於是 100+ 個 `.claude/sessions/*.md` session transcript、`agency-os/reports/{governance,monthly}/**`、`.next/trace` 全被 inline 進去，把真正要審的 130 檔淹掉。**失效模式最糟的地方是靜默**：companion 開跑 8 秒吐一個 `findings: []` 的空殼就卡住，看起來像「審過且沒問題」。已修：兩支 capture path 共用 runtime 排除與 2MB hard cap；空/截斷/無 verdict schema 的回覆 fail-closed，不產生 review artifact；real capture 由 4.97MB 收斂至 109KB。
   - 驗證：87 個 `.claude/sessions` transcript 被明確 skipped；`{"findings":[]}` exit 2 且不落 artifact；Claude CLI 本次仍回 invalid/incomplete，無 429/rate-limit，未設斷路器。
