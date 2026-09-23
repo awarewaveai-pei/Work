@@ -550,13 +550,15 @@ ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。
 
 ## AGENTS.md 第三次瘦身前全文存檔（2026-09-07，逐字，去掉 Auto-Synced 區塊）
 
+> 連結相對路徑改以本檔所在 `docs/operations/` 為基準（2026-09-23 補，同上方 2026-09-04 存檔的規則；漏改曾讓 `validate-doc-integrity` 閘紅 16 天），其餘逐字。
+
 #### AGENTS.md - Agency Operating Rules
 
-> **精簡版（2026-09-04 第二次瘦身）**。本檔經 `CLAUDE.md` 首行 `@agency-os/AGENTS.md` 每輪整份注入 prompt，只留每輪都要用的規則。條文末尾的 `§名` 指向 [`docs/operations/AGENTS_APPENDIX.md`](docs/operations/AGENTS_APPENDIX.md)（理由、案例、機制細節與**精簡前逐字全文**，仍為強制）；觸發語／路由／hooks 清單在 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)。規則寫法：一行「做什麼」＋至多一行「為什麼」；事故敘事一律進 APPENDIX 或 WORKLOG，不進本檔。其他文件引用 `AGENTS.md §舊段名` 時，到 APPENDIX「精簡前全文存檔」找同名標題。
+> **精簡版（2026-09-04 第二次瘦身）**。本檔經 `CLAUDE.md` 首行 `@agency-os/AGENTS.md` 每輪整份注入 prompt，只留每輪都要用的規則。條文末尾的 `§名` 指向 [`docs/operations/AGENTS_APPENDIX.md`](AGENTS_APPENDIX.md)（理由、案例、機制細節與**精簡前逐字全文**，仍為強制）；觸發語／路由／hooks 清單在 [`docs/operations/TOOL_TRIGGER_MAP.md`](TOOL_TRIGGER_MAP.md)。規則寫法：一行「做什麼」＋至多一行「為什麼」；事故敘事一律進 APPENDIX 或 WORKLOG，不進本檔。其他文件引用 `AGENTS.md §舊段名` 時，到 APPENDIX「精簡前全文存檔」找同名標題。
 
 ### 0. 硬事實（違反即事故，每次先讀）
 
-- **唯一主機 `ks-aw-01` = `145.239.195.47`，SSH `-p 58122`**。SG + EU 已於 2026-08-31 全數整併到此機；`149.202.64.114`／`5.223.93.113`／`204.168.175.41` 皆已退租，SSH 過去直接失敗，**無回退主機**。拓樸正本 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)；搬機唯一正本 [`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md)。
+- **唯一主機 `ks-aw-01` = `145.239.195.47`，SSH `-p 58122`**。SG + EU 已於 2026-08-31 全數整併到此機；`149.202.64.114`／`5.223.93.113`／`204.168.175.41` 皆已退租，SSH 過去直接失敗，**無回退主機**。拓樸正本 [`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)；搬機唯一正本 [`runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`](../../../runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md)。
 - **ClickHouse 鎖 `25.7.x`**，禁升 latest／24.x。
 - **部署**只走目標機本機 `/root/lobster-phase1/scripts/sg-deploy.sh`（內建 npm test → healthcheck → HTTP smoke → 失敗自動 rollback），**勿**直接 git pull；test 紅先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test`。新增可部署服務必齊 6 項（test gate／healthcheck／smoke／rollback／notification／typecheck）§新部署路徑強制清單。
 - **Secrets**：`scripts/secrets-vault.ps1 -Action get -Name <KEY>` 只回遮罩值；實值走各機 `mcp/user-env.ps1`（不進 git，由 `mcp/user-env.template.ps1` 生成）；**禁硬編**。
@@ -632,7 +634,7 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 
 ### 7. 工作流程
 
-- **宣告執行，不詢問**：使用者不需知道工具名；Low/Medium 直接執行，前置一句話告知；High 仍等 go-ahead。使用者句子命中觸發語先照 [`TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md) 做。
+- **宣告執行，不詢問**：使用者不需知道工具名；Low/Medium 直接執行，前置一句話告知；High 仍等 go-ahead。使用者句子命中觸發語先照 [`TOOL_TRIGGER_MAP.md`](TOOL_TRIGGER_MAP.md) 做。
 - **任務到達**：訊息模糊 → 先讀 `agency-os/TASKS.md` + `agency-os/.agency-state/worklog-excerpt.md`（AO-RESUME 生成）+ `agency-os/memory/CONVERSATION_MEMORY.md`，仍不清楚問**一個**問題。改動 ≥3 模組或有架構影響 → `planner` 先拆；否則直接做。開工前對照 DoD。
 - **三條不查表也要記得**：改 `.ts/.tsx` 完成前 `npx tsc --noEmit` 必綠；完成任何 code 改動跑 `/verify-recent`；改 governance 文件後跑 `/doc-sync`。
 - **Subagent brief 五項缺一不可**：問題陳述（`file:line`）／已知事實／已排除原因／預期輸出格式／邊界。回傳後每個 `file:line` Grep 驗真、對照相鄰慣例；「可能是」要證據。**禁止**以「agent 說了」取代判斷。§Subagent 交接協議
