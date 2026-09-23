@@ -69,7 +69,8 @@
           "audit-log",
           "git-add-scope-tracker",
           "git-commit-scope-guard",
-          "repeat-failure-guard"
+          "repeat-failure-guard",
+          "doc-link-commit-check"
         ]
       },
       {

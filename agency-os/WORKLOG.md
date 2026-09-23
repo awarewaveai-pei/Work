@@ -1,5 +1,22 @@
 ﻿# Worklog
-## 2026-09-23（續106）Auto-Repair SSH 探針全 `ssh_error`：prod `.env` 仍指退租 SG/EU、容器 key 未授權、EU IP 已被第三方接手（診斷＋提案；prod 修正待 go-ahead）
+## 2026-09-23（續107）doc_integrity 紅 16 天根因：兩顆 commit 的相對連結錯位 + 偵測全是「事後、不歸屬」→ 新增 commit-time 歸屬閘
+
+- [觸發] `.github/workflows/lobster-workflows-validate-main.yml` 連續 4 次 run 失敗 11 天（`agency-os/reports/status/ci-LATEST.md`；run 35564568295 等）。
+- [根因] `2ef05af22`（2026-09-07 第三次瘦身）把 09-04 版 AGENTS.md 逐字搬進 `agency-os/docs/operations/AGENTS_APPENDIX.md`，未套用同段落 `:100` 自訂的「連結改以本檔所在 `docs/operations/` 為基準」規則 → 5 條連結仍相對 `agency-os/`；`ea5330ad4`（2026-09-10 ADR 011）`../../WORKLOG.md` 少一層 → 1 條。CI 兩次 run（34681024744、35564568295）與本機重現的 6 條 `broken_link` 完全一致。
+- [VBC：閘沒壞，是沒人看] 夜間 health（`agency-os/reports/health/health-*.md`）從 09-07 22:30 起每天兩次 critical `Doc integrity failed`，連續 16 天；`ao-resume.ps1` 每次都重跑但 `.claude/commands/ao-resume.md` 不讀該檔（另立 task_8da4fc43 追蹤）；唯一會 100% 卡住的 AO-CLOSE 上次跑在 08-24，之後未再跑。三個偵測器都準確回報，只是全部「repo 全域、無歸屬」——沒有一個告訴當時的 committer 是他弄壞的。
+- [修法] ① 直接修 6 條連結（`89fac46db`，href-only，沿用既有相對路徑慣例）。② 治本：`lobster-factory/scripts/validate-doc-integrity.mjs` 新增 `--commit=<rev> [--json]`——只判該 commit 自己 add/modify 的 in-scope `.md` 的 outgoing 連結、與該 commit 刪除路徑的 incoming 連結，對照 commit **自己的 git tree**（`ls-tree`/`cat-file --batch`，非磁碟，跟 CI checkout 同視角、大小寫敏感）；full-mode 重構共用同一份 `LINK_SCAN_ROOTS`／`inLinkScope()`，避免兩套清單漂移。新增 hook rule `mcp/claude-userlevel/hooks/rules/doc-link-commit-check.js`（PostToolUse Bash）：`git commit` 成功後解析 `[branch sha]` 摘要行（Claude 物件／Codex 純字串皆讀），對每個 sha 跑上述 `--commit` 驗證，破壞連結直接回饋給下 commit 的 agent（exit 2 / Codex JSON block），validator 任何失敗 fail-open 並寫 `verify-gate-failures.log`。接入 `rules.manifest.json` PostToolUse Bash 群組（Claude／Codex 共用同一支 runner，無需分別接線）。
+- [Codex 兩輪，round 1 兩個真發現皆已修] C1 merge commit 原本整批 skip——`diff-tree -c` 改判「與每個 parent 都不同」的路徑（衝突解決／雙邊 auto-merge），單邊整段沿用的檔不算在合併者頭上（新增 merge 測試驗證：合併製造的斷link才報，未觸碰那側的既有斷link不報）。C2 `git commit -q`（本 repo 慣用 `-q -F <msgfile>`）不印摘要行——加 HEAD reflog fallback（`commit*` entry 且在 60 秒視窗內），quiet commit 一樣被檢查。round 2 finding「`--author=...`」查證不成立（regex 對 `git commit --author="..." -m x` 仍 match，因 flags 都在 `commit` 之後、前綴 group 出現 0 次一樣通過——親自跑過 regex + `commandSegments()` 切割邏輯確認）；唯一查得到的真缺口是 `--flag=value` 單 token 形式（如 `--git-dir=X`）不被前綴 group 吃到，但這是 `commit-quality.js`／`git-commit-scope-guard.js`／`verify-gate-commit.js` 三支既有規則共用的同一顆 regex 既有行為，非本次新增，不在本次 scope 內單獨修。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node lobster-factory/scripts/validate-doc-integrity.mjs --commit=2ef05af22` / `--commit=ea5330ad4` / `--commit=89fac46db` | exit=1/1/0 | ms=293/276/287 | result=分別精準列出 5／1／0 條，與 CI 6 條 1:1 對應
+- REALTEST_EVIDENCE: tool=Bash | cmd=真實 worktree（`D:/tmp/wteq`）比對 full-mode 重構前後在 default／--skip-agency-canonical／--strict-duplicates+--strict-canonical-dupes 三種旗標下的輸出 | exit=1/1/1（皆預期，既有 6 條斷link未修時） | result=三種模式逐字元 IDENTICAL
+- REALTEST_EVIDENCE: tool=Bash | cmd=真實 `mcp/claude-userlevel/hooks/runner.js PostToolUse`（非合成 rule 呼叫，isolated HOME）餵入 `2ef05af22`／`89fac46db` 的真實 commit 摘要行 | exit=2/0 | ms=445/444 | result=culprit commit 印出完整 5 條 block 訊息、fix commit 靜默
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh`（含新增 12 case） | exit=1（`asset-parity` 2 個既有失敗與本次無關——`ao-resume.md` 帶 BOM，另一並行 session 造成，見下）| ms=35283 | result=`ℹ tests 241 | pass 239 | fail 2`（HEAD 為 103 test，本次 +12）
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變測試 4 組（rule 永不回報／validator 改讀磁碟存在性／incoming 檢查關閉／`--commit` mode 移除 `-c`／reflog fallback 移除／reflog 視窗設 unbounded，逐一還原後 diff 0 bytes） | result=每組各自紅在對應的新 case、其餘 case 綠；還原後 12/12 全綠且檔案與突變前 byte-identical
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/0n（`/codex-review` 兩輪對抗覆審；round 1 `2026-09-23-partialreview-f54d30e1.md` 2 發現皆修好且突變證實；round 2 `2026-09-23-partialreview-ec66d655.md` 1 發現查證不成立，見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,mcp | grep=`validate-doc-integrity|doc-link-commit-check|scanRoot|LINK_SCAN_ROOTS|inLinkScope|runCommitMode` | hits=18 檔（含 `TASKS.md`／`CONVERSATION_MEMORY.md`／`ao-resume-hook-last.json` 舊引用，內容仍正確未改；`.claude` 另跑 0 命中）
+- [剩餘風險] 偵測器仍存在但只有本次新歸屬閘涵蓋「用 `git commit` 指令做的變更」；自動化腳本用 `git commit`（非 `-c`/`spawnSync('git',['commit',...])`）仍會被同一個 hook 攔到，但腳本／AO-CLOSE sync／auto-checkpoint 內建的 commit 呼叫沒有走 Bash 工具，不觸發 PostToolUse——已另立 task_8da4fc43 追蹤（含 3f31d5eec 這個真實案例：09-07-04 auto-checkpoint 弄斷 3 條連結，16 天後才被本次連坐抓到）；`ci-LATEST.md`／夜間 health 仍未接進 AO-RESUME 報告，同一 task 追蹤。
+- [rollback] `git revert` 兩顆 commit（link fix + 本 commit）即可；hook rule 移除只需同時撤 `rules.manifest.json` 該行，runner 對缺失規則 fail-open 不會壞其他 rule。
+
+
 
 - [觸發] `scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly` FAIL `backup_script_probe.sg/eu=ok`（`:64-65`）；同端點 `auto_reboot.sg/eu` 也 `ssh_error`（同一組 env，`route.ts:132-140`）。
 - [根因]

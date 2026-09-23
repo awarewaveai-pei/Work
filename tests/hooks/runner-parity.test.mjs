@@ -1352,3 +1352,146 @@ test('session-edit-tracker: dedups repeated edits to the same file', () => {
   assert.deepEqual(recorded, ['/x/a.md', '/x/b.md']);
   fs.rmSync(sessionEditPathFor(sid), { force: true });
 });
+
+// ---------------------------------------------------------------- doc-link-commit-check (PostToolUse Bash)
+// Scratch repos shaped like Work (lobster-factory/scripts/validate-doc-integrity.mjs + agency-os/), so
+// the rule runs the REAL validator in --commit mode, exactly as in production.
+const DOC_VALIDATOR_SRC = fs.readFileSync(path.join(REPO_ROOT, 'lobster-factory', 'scripts', 'validate-doc-integrity.mjs'), 'utf8');
+
+function docRepo(files, { validator = DOC_VALIDATOR_SRC } = {}) {
+  const all = { 'agency-os/WORKLOG.md': '# Worklog\n', ...files };
+  if (validator !== null) all['lobster-factory/scripts/validate-doc-integrity.mjs'] = validator;
+  const repo = makeGitRepo({ branch: 'feature', files: all });
+  spawnSync('git', ['commit', '-q', '-m', 'base'], { cwd: repo });
+  return repo;
+}
+
+// Applies `change` ({ path: content | null }) as one real commit; returns git's own stdout for it.
+function commitChange(repo, change, { quiet = false, env = {} } = {}) {
+  for (const [rel, content] of Object.entries(change)) {
+    const p = path.join(repo, rel);
+    if (content === null) fs.rmSync(p);
+    else { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, content); }
+  }
+  spawnSync('git', ['add', '-A'], { cwd: repo });
+  const r = spawnSync('git', ['commit', ...(quiet ? ['-q'] : []), '-m', 'change'], {
+    cwd: repo, encoding: 'utf8', env: { ...process.env, ...env },
+  });
+  assert.equal(r.status, 0, `scratch commit failed: ${r.stdout}${r.stderr}`);
+  if (!quiet) assert.match(r.stdout, /^\[[^\s\]]+ [0-9a-f]+\] change/m);
+  return r.stdout;
+}
+
+function postCommit(repo, stdout, { command = 'git commit -m change', home } = {}) {
+  return run('PostToolUse', {
+    session_id: freshSid('dlc'), tool_name: 'Bash', tool_input: { command },
+    tool_response: { stdout, stderr: '', interrupted: false },
+  }, { cwd: repo, home });
+}
+
+test('doc-link-commit-check: one-level-short link (the ADR 011 shape) → fed back to the committing agent', () => {
+  const repo = docRepo({});
+  const out = commitChange(repo, { 'agency-os/docs/architecture/decisions/011-x.md': '[w](../../WORKLOG.md)\n' });
+  const r = postCommit(repo, out);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /DOC LINKS: commit [0-9a-f]+ leaves 1 broken/);
+  assert.match(r.stderr, /011-x\.md -> \.\.\/\.\.\/WORKLOG\.md .*agency-os\/docs\/WORKLOG\.md/);
+});
+
+test('doc-link-commit-check: correct link → silent', () => {
+  const repo = docRepo({});
+  const out = commitChange(repo, { 'agency-os/docs/architecture/decisions/011-x.md': '[w](../../../WORKLOG.md)\n' });
+  const r = postCommit(repo, out);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stderr, /DOC LINKS/);
+});
+
+test('doc-link-commit-check: deleting a linked file blames the deleting commit (the linking file is untouched)', () => {
+  const repo = docRepo({ 'agency-os/docs/a.md': 'see [b](b.md)\n', 'agency-os/docs/b.md': '# b\n' });
+  const out = commitChange(repo, { 'agency-os/docs/b.md': null });
+  const r = postCommit(repo, out);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /agency-os\/docs\/a\.md -> b\.md\s+\(this commit removed the target\)/);
+});
+
+test('doc-link-commit-check: case mismatch is broken (a CI checkout is case-sensitive; the Windows disk scan is not)', () => {
+  const repo = docRepo({});
+  const out = commitChange(repo, { 'agency-os/docs/c.md': '[w](../worklog.md)\n' });
+  const r = postCommit(repo, out);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /c\.md -> \.\.\/worklog\.md/);
+});
+
+test('doc-link-commit-check: markdown outside the gate\'s scan roots is not judged (runbooks/)', () => {
+  const repo = docRepo({});
+  const out = commitChange(repo, { 'runbooks/r.md': '[x](nope.md)\n' });
+  assert.equal(postCommit(repo, out).status, 0);
+});
+
+test('doc-link-commit-check: not a commit command → no check, even with a success-shaped line in its output', () => {
+  const repo = docRepo({});
+  const out = commitChange(repo, { 'agency-os/docs/d.md': '[x](nope.md)\n' });
+  assert.equal(postCommit(repo, out, { command: 'git log -1' }).status, 0);
+});
+
+test('doc-link-commit-check: git commit that made no commit (no success line, no recent reflog commit) → no check', () => {
+  const repo = docRepo({});
+  // Backdated: the reflog entry carries the committer date, so it falls outside the fallback window.
+  commitChange(repo, { 'agency-os/docs/d.md': '[x](nope.md)\n' }, { env: { GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z' } });
+  assert.equal(postCommit(repo, 'nothing to commit, working tree clean\n').status, 0);
+});
+
+test('doc-link-commit-check: `git commit -q` prints no success line → found through HEAD\'s reflog, still reported', () => {
+  const repo = docRepo({});
+  const out = commitChange(repo, { 'agency-os/docs/q.md': '[x](nope.md)\n' }, { quiet: true });
+  assert.equal(out.trim(), '');
+  const r = postCommit(repo, out, { command: 'git commit -q -m change' });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /q\.md -> nope\.md/);
+});
+
+test('doc-link-commit-check: merge → judges the conflict resolution, not a file taken whole from one side', () => {
+  const repo = docRepo({ 'agency-os/docs/m.md': 'base\n' });
+  const g = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+  g('checkout', '-q', '-b', 'other');
+  commitChange(repo, { 'agency-os/docs/m.md': 'theirs\n', 'agency-os/docs/theirs-only.md': '[x](gone.md)\n' });
+  g('checkout', '-q', 'feature');
+  commitChange(repo, { 'agency-os/docs/m.md': 'ours\n' });
+  g('merge', '-q', 'other'); // conflicts on m.md
+  fs.writeFileSync(path.join(repo, 'agency-os', 'docs', 'm.md'), 'resolved [w](../nope.md)\n');
+  g('add', 'agency-os/docs/m.md');
+  const merged = g('commit', '--no-edit');
+  assert.match(merged.stdout, /^\[feature [0-9a-f]+\] Merge branch 'other'/m, merged.stdout + merged.stderr);
+  const r = postCommit(repo, merged.stdout, { command: 'git commit --no-edit' });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /m\.md -> \.\.\/nope\.md/);
+  assert.doesNotMatch(r.stderr, /theirs-only\.md/);
+});
+
+test('doc-link-commit-check: repo without the validator (not Work) → no-op', () => {
+  const repo = docRepo({}, { validator: null });
+  const out = commitChange(repo, { 'agency-os/docs/e.md': '[x](nope.md)\n' });
+  assert.equal(postCommit(repo, out).status, 0);
+});
+
+test('doc-link-commit-check: validator crash → fail-open and logged, never blocks', () => {
+  const repo = docRepo({}, { validator: 'throw new Error("boom");\n' });
+  const out = commitChange(repo, { 'agency-os/docs/f.md': '[x](nope.md)\n' });
+  const home = makeTmpHome();
+  const r = postCommit(repo, out, { home });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(readFileSafe(path.join(home, '.claude', 'verify-gate-failures.log')) || '', /doc-link-commit-check/);
+});
+
+test('doc-link-commit-check: Codex host (plain-string tool_response) → JSON block decision', () => {
+  const repo = docRepo({});
+  const out = commitChange(repo, { 'agency-os/docs/g.md': '[x](nope.md)\n' });
+  const r = runNode(RUNNER, {
+    session_id: freshSid('dlcx'), turn_id: 't1', tool_name: 'shell',
+    tool_input: { command: 'git commit -m change' }, tool_response: out,
+  }, { args: ['PostToolUse', '--host=codex'], cwd: repo });
+  assert.equal(r.status, 0, r.stderr);
+  const decision = JSON.parse(r.stdout);
+  assert.equal(decision.decision, 'block');
+  assert.match(decision.reason, /DOC LINKS/);
+});

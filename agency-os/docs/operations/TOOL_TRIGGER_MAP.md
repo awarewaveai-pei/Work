@@ -385,6 +385,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 |------|---------|------|
 | `rules/log-error.js` | .\* | 記錄 tool 錯誤到 ~/.claude/error-log.md（JS 化，不再依賴 jq）|
 | `rules/audit-log.js` | Bash | 記錄所有 bash 指令（自動 redact secrets）|
+| `rules/doc-link-commit-check.js` | Bash（`git commit` 成功後）| 回報（exit 2）該 commit 改到／弄斷的相對連結：`validate-doc-integrity.mjs --commit=<sha>`，對照 commit 自己的 tree（= CI 視角）|
 | `rules/accumulator.js` | Write\|Edit | 累積修改的 JS/TS 檔，供 Stop 時 batch format |
 | `rules/design-quality.js` | Write\|Edit | 偵測 generic template-like 前端 UI，發出警告 |
 | `rules/test-runner.js` | Write\|Edit | 自動跑相鄰 test 檔並回報失敗 |

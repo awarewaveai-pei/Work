@@ -1,14 +1,18 @@
 /**
- * Doc integrity gate (invoked from agency-os system-health-check + lobster bootstrap).
+ * Doc integrity gate (invoked from agency-os system-health-check + lobster bootstrap; --commit mode from
+ * the post-commit hook rule mcp/claude-userlevel/hooks/rules/doc-link-commit-check.js).
  *
  * Flags:
  *   --strict-duplicates          Fail when the same long powershell/node command line appears in 2+ markdown files.
  *   --strict-canonical-dupes     Fail when charter-grade SSOT filenames appear outside approved doc trees (see scan).
  *   --skip-agency-canonical      Skip agency-os EXECUTION_DASHBOARD canonical assert (or LOBSTER_SKIP_AGENCY_CANONICAL=1).
  *   --workRoot=<abs path>        Monorepo root (parent of lobster-factory/). Default: parent of this script dir.
+ *   --commit=<rev>               Only the links <rev> is responsible for (see runCommitMode); skips every other check.
+ *   --json                       With --commit: print one JSON report on stdout (the hook's protocol).
  */
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,18 +36,20 @@ const skipAgencyCanonical =
   process.env.LOBSTER_SKIP_AGENCY_CANONICAL === "1" ||
   process.argv.includes("--skip-agency-canonical");
 
+// RankMath-KB = third-party RankMath knowledge-base articles imported HTML→MD (2026-06-14).
+// GEO = externally-imported SEO/GEO reference guides (LLMrefs/Ayzeo/Semrush/Profound/Google,
+// 2026-06-15). Both hold scrape artifacts (site-relative paths like /search/docs/...,
+// bare domains, in-page anchor words) that we neither author nor maintain → exclude from
+// link integrity.
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "RankMath-KB", "GEO"]);
+
 function walkMarkdownFiles(rootDir, out = []) {
   if (!fs.existsSync(rootDir)) return out;
   const entries = fs.readdirSync(rootDir, { withFileTypes: true });
   for (const ent of entries) {
     const full = path.join(rootDir, ent.name);
     if (ent.isDirectory()) {
-      // RankMath-KB = third-party RankMath knowledge-base articles imported HTML→MD (2026-06-14).
-      // GEO = externally-imported SEO/GEO reference guides (LLMrefs/Ayzeo/Semrush/Profound/Google,
-      // 2026-06-15). Both hold scrape artifacts (site-relative paths like /search/docs/...,
-      // bare domains, in-page anchor words) that we neither author nor maintain → exclude from
-      // link integrity.
-      if (ent.name === "node_modules" || ent.name === ".git" || ent.name === "dist" || ent.name === "RankMath-KB" || ent.name === "GEO") continue;
+      if (SKIP_DIRS.has(ent.name)) continue;
       walkMarkdownFiles(full, out);
     } else if (ent.isFile() && ent.name.endsWith(".md")) {
       out.push(full);
@@ -138,15 +144,134 @@ function scanMarkdownFile(absFile) {
   }
 }
 
-function scanRoot(label, absRoot) {
-  if (!fs.existsSync(absRoot)) {
-    return;
+/**
+ * The markdown the link check covers. ONE list for both modes: the full scan walks it, --commit
+ * filters a commit's paths through inLinkScope(). A second list would let the commit check and the
+ * CI/health gate disagree about which files count.
+ */
+const LINK_SCAN_ROOTS = [
+  { label: "lobster-factory", dir: lobsterRoot, recursive: true },
+  { label: "agency-os/docs", dir: path.join(workRoot, "agency-os", "docs"), recursive: true },
+  { label: "agency-os/memory", dir: path.join(workRoot, "agency-os", "memory"), recursive: true },
+  { label: "agency-os/tenants", dir: path.join(workRoot, "agency-os", "tenants"), recursive: true },
+  { label: "agency-os/*.md (top-level)", dir: path.join(workRoot, "agency-os"), recursive: false },
+  { label: "docs/spec/raw", dir: path.join(workRoot, "docs", "spec", "raw"), recursive: true },
+];
+
+function rootMarkdownFiles(root) {
+  if (root.recursive) return walkMarkdownFiles(root.dir);
+  return fs
+    .readdirSync(root.dir, { withFileTypes: true })
+    .filter((ent) => ent.isFile() && ent.name.endsWith(".md"))
+    .map((ent) => path.join(root.dir, ent.name));
+}
+
+/** True when the full scan would read absFile (same roots, same SKIP_DIRS). */
+function inLinkScope(absFile) {
+  if (!absFile.endsWith(".md")) return false;
+  for (const root of LINK_SCAN_ROOTS) {
+    const rel = path.relative(root.dir, absFile);
+    if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) continue;
+    const dirs = rel.split(path.sep).slice(0, -1);
+    if (root.recursive ? !dirs.some((d) => SKIP_DIRS.has(d)) : dirs.length === 0) return true;
   }
-  scannedRoots.push(label);
-  const files = walkMarkdownFiles(absRoot);
-  for (const file of files) {
-    scanMarkdownFile(file);
+  return false;
+}
+
+/**
+ * --commit=<rev>: the links one commit is responsible for, judged against that commit's own tree,
+ * not the disk. The answer is a pure function of the commit and matches a CI checkout
+ * (case-sensitive; untracked files do not count), which the Windows disk check does not.
+ *   outgoing: every link in an in-scope .md the commit adds or modifies (touch a file, own its links)
+ *   incoming: links from any in-scope .md to a path the commit deleted or moved away
+ *             (--no-renames reports a move as D + A, so the old path lands in `removed`)
+ * Merges (-c): only paths that differ from every parent, i.e. conflict resolutions and both-sides
+ * auto-merges. A file taken whole from one side was judged at its own commit.
+ */
+function runCommitMode(rev) {
+  const git = (args, input) =>
+    execFileSync("git", args, { cwd: workRoot, input, maxBuffer: 1 << 30, stdio: ["pipe", "pipe", "pipe"] });
+  const text = (args) => git(args).toString("utf8").trim();
+  // Tree paths are repo-relative; mapping them onto LINK_SCAN_ROOTS needs workRoot == the toplevel.
+  if (text(["rev-parse", "--show-prefix"]) !== "") throw new Error(`workRoot ${workRoot} is not the git toplevel`);
+  const sha = text(["rev-parse", "--verify", `${rev}^{commit}`]);
+  const report = { mode: "commit", commit: sha, changedMd: 0, removed: 0, broken: [] };
+
+  // -c: on a merge, one status letter per parent ("MM", "DD"); a path absent from the result is D
+  // against every parent that had it. On a normal commit -c changes nothing.
+  const status = git(["diff-tree", "-r", "-c", "-z", "--root", "--no-commit-id", "--name-status", "--no-renames", sha])
+    .toString("utf8")
+    .split("\0");
+  const changed = [];
+  const removed = new Set();
+  for (let i = 0; i + 1 < status.length; i += 2) {
+    if (/^D+$/.test(status[i])) removed.add(status[i + 1]);
+    else if (status[i]) changed.push(status[i + 1]);
   }
+
+  const inTree = new Set();
+  const scopeMd = [];
+  for (const f of git(["ls-tree", "-r", "-z", "--name-only", sha]).toString("utf8").split("\0")) {
+    if (!f) continue;
+    inTree.add(f);
+    for (let d = path.posix.dirname(f); d !== "."; d = path.posix.dirname(d)) inTree.add(d);
+    if (inLinkScope(path.join(workRoot, f))) scopeMd.push(f);
+  }
+  const gone = new Set(); // removed paths + directories the commit emptied
+  for (const r of removed) {
+    for (let p = r; p !== "." && !inTree.has(p); p = path.posix.dirname(p)) gone.add(p);
+  }
+
+  const own = new Set(changed.filter((f) => inLinkScope(path.join(workRoot, f))));
+  const toRead = gone.size ? scopeMd : [...own];
+  const blobs = readBlobs(git, sha, toRead);
+  for (const rel of toRead) {
+    const content = blobs.get(rel);
+    if (content === undefined) continue;
+    const outgoing = own.has(rel);
+    const fromAbs = path.join(workRoot, rel);
+    for (const href of extractLinks(content)) {
+      const target = resolveLink(fromAbs, href);
+      if (!target) continue;
+      const t = path.relative(workRoot, target).split(path.sep).join("/");
+      const isBroken = outgoing ? t !== "" && !inTree.has(t) : gone.has(t);
+      if (isBroken) {
+        report.broken.push({ from: rel, href, resolved: t, cause: outgoing ? "changed_file" : "target_removed" });
+      }
+    }
+  }
+  report.changedMd = own.size;
+  report.removed = removed.size;
+  return report;
+}
+
+/** `files` at `rev` through one `git cat-file --batch` (a spawn per file is too slow for the tree-wide incoming check). */
+function readBlobs(git, rev, files) {
+  const out = new Map();
+  if (!files.length) return out;
+  const buf = git(["cat-file", "--batch"], files.map((f) => `${rev}:${f}`).join("\n") + "\n");
+  let pos = 0;
+  for (const f of files) {
+    const nl = buf.indexOf(0x0a, pos);
+    if (nl < 0) break;
+    const m = /^\S+ (\S+) (\d+)$/.exec(buf.subarray(pos, nl).toString("utf8"));
+    pos = nl + 1;
+    if (!m) continue; // "<name> missing" has no body
+    const size = Number(m[2]);
+    if (m[1] === "blob") out.set(f, buf.subarray(pos, pos + size).toString("utf8"));
+    pos += size + 1; // body + trailing LF
+  }
+  return out;
+}
+
+function formatCommitReport(r) {
+  const id = r.commit.slice(0, 12);
+  if (!r.broken.length) {
+    return `Doc integrity (commit ${id}) PASSED: ${r.changedMd} changed in-scope .md, ${r.removed} removed path(s)\n`;
+  }
+  const lines = [`Doc integrity (commit ${id}): ${r.broken.length} broken link(s)`];
+  for (const b of r.broken) lines.push(`  broken_link: ${b.from} -> ${b.href} (resolved: ${b.resolved}) [${b.cause}]`);
+  return lines.join("\n") + "\n";
 }
 
 /** Catch disk-corruption / aborted writes (e.g. 0-byte README). */
@@ -340,30 +465,36 @@ function findDuplicateCommandLines() {
   return dups.sort((a, b) => b.files.length - a.files.length).slice(0, 30);
 }
 
+const commitRev = getArg("commit", null);
+if (commitRev) {
+  const jsonOut = process.argv.includes("--json");
+  let out;
+  let code;
+  try {
+    const report = runCommitMode(commitRev);
+    code = report.broken.length ? 1 : 0;
+    out = jsonOut ? JSON.stringify(report) + "\n" : formatCommitReport(report);
+  } catch (e) {
+    const msg = String((e && e.message) || e).split("\n")[0];
+    code = 2;
+    out = jsonOut
+      ? JSON.stringify({ mode: "commit", error: msg }) + "\n"
+      : `Doc integrity (commit mode) could not run: ${msg}\n`;
+  }
+  // Flush before exit: a piped stdout is async on Windows and process.exit() can drop the tail the
+  // hook parses. The top-level await also keeps the full scan below from starting.
+  const stream = code === 0 || jsonOut ? process.stdout : process.stderr;
+  await new Promise((resolve) => stream.write(out, resolve));
+  process.exit(code);
+}
+
 assertCanonical();
 assertNonEmptyMarkdownTrees();
 
-scanRoot("lobster-factory", lobsterRoot);
-scanRoot("agency-os/docs", path.join(workRoot, "agency-os", "docs"));
-scanRoot("agency-os/memory", path.join(workRoot, "agency-os", "memory"));
-const tenantsMd = path.join(workRoot, "agency-os", "tenants");
-if (fs.existsSync(tenantsMd)) {
-  scanRoot("agency-os/tenants", tenantsMd);
-}
-
-const agencyOsTop = path.join(workRoot, "agency-os");
-if (fs.existsSync(agencyOsTop)) {
-  scannedRoots.push("agency-os/*.md (top-level)");
-  for (const ent of fs.readdirSync(agencyOsTop, { withFileTypes: true })) {
-    if (ent.isFile() && ent.name.endsWith(".md")) {
-      scanMarkdownFile(path.join(agencyOsTop, ent.name));
-    }
-  }
-}
-
-const specRaw = path.join(workRoot, "docs", "spec", "raw");
-if (fs.existsSync(specRaw)) {
-  scanRoot("docs/spec/raw", specRaw);
+for (const root of LINK_SCAN_ROOTS) {
+  if (!fs.existsSync(root.dir)) continue;
+  scannedRoots.push(root.label);
+  for (const file of rootMarkdownFiles(root)) scanMarkdownFile(file);
 }
 
 const canonicalDupHits = findCanonicalFilenameDuplicates();

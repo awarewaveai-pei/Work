@@ -22,5 +22,6 @@ This document defines the executable governance gate baseline for H6.
   - execution of `validate-workflow-routing-policy.mjs`
 
 ## Notes
+- `doc_integrity` per commit: `node scripts/validate-doc-integrity.mjs --commit=<sha>` checks only the links that commit changed or orphaned, against its own tree (what a CI checkout sees). The post-commit hook rule `mcp/claude-userlevel/hooks/rules/doc-link-commit-check.js` runs it after every agent `git commit`, so breakage reaches its author instead of waiting for nightly health / CI.
 - H6 is delivered as a baseline and can be extended incrementally by adding checks to the policy file.
 - Production behavior remains approval-gated and unchanged.
