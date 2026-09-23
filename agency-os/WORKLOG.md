@@ -13,6 +13,8 @@
 - BUGHUNT_WAIVED: DOC_ONLY -- 未改任何 symbol；記錄內全部 `file:line` 在寫入前以 sed/grep 讀回（`main.py:1108-1116`、`import-sources.ts:85-107,236-240,482-491`、`hci/import-sources.ts:9-14`、`server.mjs:570-583`、`run-jobs.ts:1-22`、`sinks/kb.ts:46-57`、Blueprint `02:29`／`10:23-47,83`、ADR 011 `:28,32,54,60,79`）
 - [剩餘風險] 記錄是提案非執行授權；P0 資料搬移前需查 `cs_knowledge_chunks` 是否帶 `organization_id`（§5.5 已標「需查證」）。supabase MCP 本機 tunnel（127.0.0.1:5432）未啟，改走 SSH psql。
 - [rollback] 純文件：`git revert`；INDEX.md 表列一行。
+- [操作者質疑，同日補 §10] 「我之前的想法有矛盾或缺口…你寫的沒有完全解決矛盾…或是 3 個工具沒有成熟到可以執行任務」→ 成立。§0–§6 只到「整合層缺聚合根」。§10 補三層：10.1 原構想七個矛盾（X1 HCI 是自然人信任帳本非通用引擎→L3 流程 3 是類別錯誤；X2 org-only 蒐集 × PERSON-only 評估＝空集合；X3 Cognitive OS 是方法執行器非來源分析器，缺「原文→帶引註的方法輸入」整層；X4 三條線橫跨 ADR 011 三類別卻全走 Corpus；X5 報表未定義；X6 要自動管線卻蓋人在迴圈憲法；X7 單人三租戶）；10.2 三工具×三條線成熟度矩陣（唯一成熟格＝Cognitive OS 的 L2 recipe；`research-qualitative-v1` 是訪談逐字稿編碼、`edd-literature-search-v1` 是離線 fixture，**沒有 recipe 吃論文摘要**；HCI 無真實登入 C6 DEFERRED）；10.3 修正結論：缺件是**彙整層**（原文→每句 [n] 的結構化發現，`lib/dossier` 是第一實例，抽成三個 schema），Cognitive OS 降為「結構化透鏡」吃彙整表不吃原文，**HCI 退出三條線**（人工開案連結保留），自動化邊界＝蒐集自動／彙整自動標 AI_INFERENCE／報表停在 AI 草稿等人確認；10.4 撤回 `analysis/hci-case` 與 P4/P5，階段改 P2 彙整層→P3 透鏡→P4 蒐集補洞；10.5 四題取代原三題。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -nE … recipes/validated/{research-qualitative-v1,edd-literature-search-v1}.recipe.yaml` + `grep -rn AI_SUGGESTED ai_gateway/draft.py` + `grep -n "C6" HCI_C1_C10_DECISIONS.md` | exit=0 | ms=400 | result=qualitative=transcribe→coding；literature=Offline Fixture；draft.py:10,174 AI 草稿強制 AI_SUGGESTED；C6 DEFERRED（:152）
 
 ## 2026-09-23（續103）verify-head-typecheck 的同 class 依賴漂移：實體比對取代「node_modules 目錄存在」
 

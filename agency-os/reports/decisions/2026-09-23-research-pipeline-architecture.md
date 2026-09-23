@@ -7,6 +7,8 @@
 
 ## 0. TL;DR
 
+> **先讀 §10（同日修正）。** §0–§6 是第一版，只到「整合層缺聚合根」；操作者質疑後 §10 補上原構想的七個矛盾、三工具成熟度矩陣、修正後結論（缺件是彙整層；HCI 退出三條線；§7 由 §10.5 取代）。§5.2 的 `analysis/hci-case`、§5.3 的 HCI 兩列、§6 的 P4/P5 已撤回。
+
 - **三條線今天都不是「管線」，是三個獨立系統靠人肉搬運。** 沒有任何一個物件代表「我正在對 Theo Farrell 做合作風險分析」；「一件事」被切成 organization → collection_source → collection_run → KB 資料夾（名稱＝關鍵字＋時間戳）→ Cognitive OS Project → HCI seed／case，六張表、三個資料庫、三個 UI，靠 `cognitive_os_project_id`／`hci_source_id` 兩個回寫欄位黏著。
 - **根因不是 bug，是缺一個聚合根（aggregate root）**：研究案（Case）。近 14 天 `lib/collect` 29 commits、`lib/kb` 17、`ClientHubTabs.tsx` 13、hci30 45、cognitive-os 156——高修補速度是設計錯位的症狀（§2.8）。
 - **建議 B：建「研究案」聚合根 + 分析積木登錄表 + 報表合成器，三個既有系統改為「以引用整合」而非「複製整合」**（§4、§5）。分五階段，每階段可獨立上線、獨立回滾；既有 `lib/collect`／`lib/kb`／`lib/dossier`／Cognitive OS methods／HCI 證據鏈**零重寫**，只加接縫。
@@ -198,6 +200,54 @@ interface AnalysisBlock {
 - Review：`REVIEW_WAIVED: DOC_ONLY`（決策記錄；實作階段每階段各一個 critic）。
 - 抓蟲：`BUGHUNT_WAIVED: DOC_ONLY`（未改任何 symbol；引用的 `file:line` 全數在寫入前以 sed／grep 讀回）。
 - 後續：操作者裁決 §7 後，P0/P1 開工前照 AGENTS §1 出七段。
+
+## 10. 操作者質疑後的修正（同日）：原構想的矛盾、三工具成熟度、修正後結論
+
+> 操作者：「我之前的想法有矛盾或缺口…你剛寫的似乎沒有完全解決矛盾、運作流程，或是 3 個工具並沒有真正成熟到可以執行任務」。**成立。** §0–§6 只處理了「整合層缺聚合根」這個表層；下面是被它遮住的三層：構想本身的互斥前提（10.1）、工具本身的能力缺口（10.2）、以及兩者合起來推出的修正結論（10.3–10.5）。§5/§6 未被 10.4 改寫的部分仍有效。
+
+### 10.1 原構想的七個矛盾
+
+| # | 矛盾 | 證據 | 後果 |
+|---|---|---|---|
+| X1 | **HCI 被當成通用分析引擎，但它是「自然人信任帳本」**：Person 主體、14 維度→7 信任構面、人工 ASSESSMENT、同意／抹除義務 | `04_HCI30_PRODUCT_SPEC.md:1-27`（mission：understanding a Subject (Person)… trust, risk, safe collaboration）；`server.mjs:329-`（report = 人工 assessment + rule-engine 合併） | L3「EdD → HCI」是類別錯誤：文獻沒有 Person、沒有信任構面。流程 3 在任何設計下都不成立 |
+| X2 | **L1「搜尋 → HCI」被你自己的兩條 ADR 夾成空集合**：自動蒐集只准 ORGANIZATION（ADR 011 §決策 10，`:79`；`server.mjs:579-581`），評估只認 PERSON（ADR-0011，Blueprint `02:29`） | 同左；prod `hci.sources` 17 REJECTED／3 ACCEPTED，`subject_records` CHECK 死綁 PERSON（`HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md:19`） | 自動送進去的永遠評不了；能評的不准自動送。「搜 → HCI」這條線今天**沒有合法且可行的輸入** |
+| X3 | **Cognitive OS 是「方法執行器」，不是「來源分析器」**：輸入是結構化 record（SWOT factors／criteria+weights／assumptions），閘門驗的是 record 結構合法，**不驗 record 是否反映來源** | `main.py:534-600`（recipe run 只吃 bindings）；`dashboard.html:834-843`（來源=貼進 textarea）；`ai_gateway/draft.py:10,174`（AI 草稿一律 AI_SUGGESTED）；2026-09-17 你裁定 Cognitive OS 不做資料蒐集（TASKS.md:283） | 「送去 Cognitive OS 分析」中間缺一整層：**誰把 40 頁原文變成方法輸入、而且每個欄位帶出處？** 今天沒有人。`sources/brief` 貼進去的東西經 AI 起草後與來源之間**沒有引註鏈** |
+| X4 | **三條線橫跨 ADR 011 的三個類別（Signal／Corpus／Evidence），實作卻全走 Corpus（客服 KB）**：L1 近 Evidence、L3 是文獻 Corpus、L2 近 Signal | `011-collection-ingestion-boundary.md:14-20`（三類「保存期限、合規強度、失敗模式都不同」，「塞進同一條管線＝用最弱的合規契約承載最強的需求」）；§2.4 資料落在 `cs_` 表、fixture 組織 | 你的 ADR 明文禁止的事，就是今天的實作。租戶軸錯位（§2.4）是它的症狀不是根因 |
+| X5 | **「報表」從未被定義**：三條線需要三種完全不同的產物 | L1＝背景檔案＋風險旗標；L2＝選項×準則×權重×敏感度；L3＝證據矩陣／Toulmin／文獻表。今天只有 L1 有實物（`lib/dossier/report.ts:76-80`），L2/L3 只有 JSON record | 「再出分析報表」被當成一個動作，實際是三個不同 schema 的合成 |
+| X6 | **要的是自動管線，蓋的是人在迴圈的憲法**：蒐集要先試跑＋核准來源（ADR 013）；Cognitive OS 每個方法要人填／確認、AI 只能 AI_SUGGESTED；HCI 一切 DISCOVERED 需人工晉升（ADR-011 決策 10；Blueprint `10:45`「does not automatically become HCI fact」） | 同左 | 「搜尋後送 X 再出報表」隱含全自動；系統每一段都刻意停下來等人。**不是 bug，是沒決定哪些步驟准自動** |
+| X7 | **單一操作者，卻是三個為未來多租戶設計的產品**：next-admin org＝客戶、Cognitive OS service tenant≠操作者 tenant（需 handoff route）、HCI 合成租戶 a/b 無真實登入 | `app/api/cognitive-os/open/route.ts:3-9`；`lib/hci/client.ts:13-18`；`HCI_C1_C10_DECISIONS.md:95,152`（C6 DEFERRED） | 沒有一個地方是「我」。每跨一個系統就換一次身分，這是「怪異」感的直接來源 |
+
+### 10.2 三工具 × 三條線：今天能做到什麼（實查）
+
+| | L1 人／公司合作風險 | L2 決策利弊 | L3 EdD 研究 |
+|---|---|---|---|
+| **蒐集器** | 人：可用但脆弱——最近一次 `抓21 入庫6 擋11`（renderer 上線後；之前入庫率≈0）；只設 SERPER 一家搜尋商；**公司角度在 prod 從未跑過**（`collection_sources` 全是 Theo Farrell／學術）。事件：同上未跑 | 主題式 web-search 可用（`stopped_by_budget · 抓190 入庫161`），但**沒有為「一個決策」設計的角度表**（`query-plan.ts:38` 只有 person／company／event） | `collect/academic` 可用（`入庫4`）：**只有摘要＋連結**，全文僅 OA（`academic.ts:8-13`）；PICO 查詢可用 |
+| **Cognitive OS** | 有 stakeholders／challenge 家族方法（`modules/stakeholders/` 10 檔），**沒有從來源填表的路徑**（X3） | `life-decision-v1`／`business-feasibility-review-v1` 真跑 PASS（blueprint §5）——**這是三條線裡唯一「引擎本身成熟」的一格**，但輸入仍要人手填或貼文字 | `edd-research-evidence-v1` 自述「does not discover literature…evidence-input driven」（recipe `:5-10,24`）；`research-qualitative-v1` 是**訪談逐字稿編碼**（transcribe→coding→triangulation），不是文獻分析；`edd-literature-search-v1` 是**離線假資料** fixture。**沒有任何 recipe 吃「一批論文摘要」** |
+| **HCI** | Person：schema 完整、promote 路徑有（續81）、1 份 report；但無真實登入（C6 DEFERRED）、合成租戶、抹除生命週期未接（ADR-0018 gate 5）→ **依你自己的 ADR 不得放真人資料**。公司：評不了（X2） | 無角色 | 無角色（X1） |
+| **報表** | dossier 有（[n] 引註強制） | 無 | 無 |
+| **一句話** | 蒐集勉強、彙整有、HCI 不能用 | 引擎成熟、輸入層缺、報表缺 | 蒐集只到摘要、引擎不對題、報表缺 |
+
+### 10.3 修正後的結論
+
+1. **三條線缺的不是「送去哪個工具」，是同一個缺件：彙整層（synthesis）——把 N 份帶出處的原文變成「每句有 [n] 的結構化發現」。** `lib/dossier` 是它的第一個實例（schema＝person／company／event 的段落表）。L2 需要第二個 schema（選項／準則／每個準則的證據＋出處）、L3 需要第三個（研究問題／每篇：主張／方法／樣本／限制／DOI）。三個都是「資料表驅動的 prompt + 引註強制 + gaps／conflicts」——`report.ts:107-139,185-206` 那套已經寫好，只是 schema 寫死成 REPORT_SECTIONS。
+2. **Cognitive OS 的正確角色是「結構化透鏡」，接在彙整層之後**：彙整層產出的結構化發現（已帶引註）才是 recipe 的 bindings；AI 起草的對象從「一坨貼上的原文」變成「已彙整的表」。這樣 Cognitive OS 的閘門終於驗到有意義的東西，且引註鏈不斷（報表段落回指彙整表，彙整表回指 KB 來源）。L2 直接可用；L3 用 `edd-research-evidence-v1`（證據矩陣→Toulmin）可用，但**文獻表本身由彙整層產，Cognitive OS 不需要新 recipe**。
+3. **HCI 退出三條線。** L3 無角色；L1 公司評不了；L1 自然人依 ADR 不得自動送、且無真實登入。保留一個**人工**入口：從 L1 報表「開 HCI 案（人工）」連結，等 C6＋ADR-0018 gate 5 之後再談自動。§5.2 的 `analysis/hci-case` 積木與 §6 P4/P5 **撤回**。
+4. **自動化邊界明訂為三段**：蒐集＝自動（已核准來源）；彙整＝自動但一律 `AI_INFERENCE／AI_GENERATED`；透鏡（Cognitive OS）＝自動起草＋閘門，**報表狀態停在「AI 草稿」，人按一次「確認」才變 HUMAN_APPROVED**。沿用既有 provenance 詞彙，不發明新狀態。
+5. **租戶與類別**：研究案掛操作者自己的 org（§5.5）；資料仍存 `cs_knowledge_*`（Corpus 儲存體），但研究案的來源以 `research_cases.folder_id` 隔離，且 **L1 自然人來源標 `is_sensitive=true`**（既有欄位，migration 0083 的閘門會自動把它排除在客服檢索之外）——這是 X4 在不新建第二套儲存的前提下最小的合規緩解，不是完整 Evidence 契約。
+
+### 10.4 對 §5／§6 的修正
+
+- §5.2 三個積木改為：`synthesis/dossier`（既有）、`synthesis/decision-inputs`（新 schema）、`synthesis/literature-matrix`（新 schema）；再加一個 `lens/cognitive-recipe`（吃彙整表，不吃原文）。`analysis/hci-case` 刪除。
+- §5.3 「KB → HCI」列刪除；「Cognitive OS ⇄ HCI」列刪除。「KB → Cognitive OS」列改為：**送的是彙整表，不是原文**（原文引註保留在彙整表內），`external_ref` 指向 `research_case_runs.id` + sha256；學術閘整段移除（彙整表沒有 authors 概念）。
+- §6 階段改為：P0 資料衛生（不變）→ P1 聚合根（不變）→ **P2 彙整層通用化**（把 `REPORT_SECTIONS` 抽成三個 schema、`enforceCitations` 共用、報表合成器）→ **P3 透鏡**（`lens/cognitive-recipe` + Cognitive OS `external_ref`，L2 先、L3 次）→ P4 蒐集補洞（company／event 角度 prod 實跑、決策主題角度表、第二家搜尋商）。**HCI 不在計畫內**，另列 TASKS 追蹤觸發條件（C6 完成 + ADR-0018 gate 5）。
+- 估工：P2 2 天、P3 2 天、P4 1 天；P0–P3 完成後 L2 端到端可用，L1 可用（HCI 除外），L3 可用到「文獻表＋證據矩陣＋Toulmin」。
+
+### 10.5 待操作者裁決（取代 §7）
+
+1. **接受「HCI 退出三條線」**（10.3-3）？不接受則需先做 C6 真實登入（12 個 Task，5 個 STOP）＋ Organization-as-Subject ADR，估 2 週以上且法遵未解。
+2. **自動化邊界**依 10.3-4（報表停在 AI 草稿等人確認）？或允許報表直接標最終版？
+3. **L3 的目標產物**：「文獻表＋證據矩陣＋Toulmin」是否就是你要的 EdD 報表？還是要到「文獻回顧章節草稿」（那是 Cognitive OS Artifact Studio 切片 7，未建）？
+4. **L1 自然人來源標 `is_sensitive`**（10.3-5）作為過渡合規措施，可否？
 
 ## 9. 附：本次讀過的檔案（供接手者省一輪）
 
