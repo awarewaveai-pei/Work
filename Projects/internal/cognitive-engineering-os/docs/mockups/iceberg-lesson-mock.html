@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>冰山模型五分鐘課</title>
+<style>
+  :root{--bg:#f4f6f9;--card:#ffffff;--ink:#14213d;--muted:#5b6470;--line:#e1e5ea;--accent:#1f5fbf;--ok:#1a7f4b;--warn:#b25e09;--bad:#b3261e;
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--water:#dbeafe;--tag:#eef3fb;--soft:#fafbfd;--good-bg:#eef8f1;--bad-bg:#fdf0ef;--node:#ffffff;--axis:#9ca3af}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0f1720;--card:#16212e;--ink:#e6edf5;--muted:#9fb0c2;--line:#2a3a4d;--accent:#7fb0ff;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
+        --water:#12304a;--tag:#1d2b3d;--soft:#1b2634;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#1b2634;--axis:#5b6b7d}}
+  :root[data-theme="dark"]{color-scheme:dark;--bg:#0f1720;--card:#16212e;--ink:#e6edf5;--muted:#9fb0c2;--line:#2a3a4d;--accent:#7fb0ff;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
+        --water:#12304a;--tag:#1d2b3d;--soft:#1b2634;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#1b2634;--axis:#5b6b7d}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .top .skip{font-size:13px;color:var(--muted)}
+  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
+  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .progress span.done{background:var(--accent);color:#fff}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:17px;margin:0 0 10px}
+  h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
+  h3{font-size:15px;margin:10px 0 6px}
+  .sub{color:var(--muted);font-size:13px}
+  .lead{font-size:16px;margin:8px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:720px){.grid2{grid-template-columns:1fr}}
+  .layer{border-left:6px solid var(--l2);padding:10px 12px;background:var(--soft);border-radius:0 10px 10px 0}
+  .layer.l1{border-color:var(--l1)}.layer.l2{border-color:var(--l2)}.layer.l3{border-color:var(--l3)}.layer.l4{border-color:var(--l4)}
+  .layer b{display:block;font-size:15px}
+  .layer .q{color:var(--accent);font-size:14px;margin:2px 0}
+  .layer .ex{font-size:13.5px;color:var(--muted)}
+  .gb{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  @media (max-width:720px){.gb{grid-template-columns:1fr}}
+  .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .good{background:var(--good-bg);border:1px solid var(--ok)}
+  .bad{background:var(--bad-bg);border:1px solid var(--bad)}
+  .good b{color:var(--ok)}.bad b{color:var(--bad)}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
+  .step .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:14px}
+  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
+  td:first-child{white-space:nowrap;font-weight:600}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn small{display:block;font-size:11px;opacity:.85}
+  ul.check{padding-left:20px;margin:6px 0}
+  ul.check li{margin-bottom:4px}
+  svg{width:100%;height:auto;display:block}
+  svg text{fill:var(--ink)} svg text.m{fill:var(--muted)} svg .water{fill:var(--water)}
+  dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner"><b>示意稿</b>：這是第一次用「冰山模型」的人，按下方法之前會先看到的一堂課。之後每個方法都有一堂，內容來自方法資料，會隨回饋改進。</div>
+
+  <div class="top">
+    <div>
+      <h1>冰山模型：開始前 5 分鐘</h1>
+      <div class="sub">六步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
+    </div>
+    <span class="skip">用過了？<u>跳過，直接開始</u></span>
+  </div>
+  <div class="progress"><span class="done">1 這是什麼</span><span>2 四層</span><span>3 看一個例子</span><span>4 怎麼填</span><span>5 常見錯誤</span><span>6 開始</span></div>
+
+  <!-- 1 -->
+  <div class="card">
+    <h2>1. 這是什麼<small>30 秒</small></h2>
+    <div class="grid2">
+      <div>
+        <p class="lead">冰山浮在水面上的只有一小角。<b>問題也是</b>：你看到的是「發生了什麼事」，真正決定它一再發生的原因藏在水面下。</p>
+        <p>冰山模型是一種<dfn title="Systems Thinking：把問題當成一個互相牽動的系統來看，而不是單一事件">系統思考</dfn>的方法：把一件事往下挖四層，從「發生什麼」挖到「大家心裡怎麼想」。挖得越深，能改的東西越根本。</p>
+        <p class="sub">什麼時候用：同一種問題一再出現、換人換方法都沒用、大家在互相怪罪的時候。什麼時候不用：一次性的意外、單純缺資料的問題。</p>
+      </div>
+      <svg viewBox="0 0 320 240" role="img" aria-label="冰山：水面上一小角，水面下很大">
+        <rect x="0" y="80" width="320" height="160" class="water" opacity=".55"/>
+        <path d="M0,80 q16,-6 32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0" fill="none" stroke="#7aa7cc" stroke-width="2"/>
+        <path d="M200,80 L215,30 L235,55 L250,80 L300,150 L285,225 L220,235 L160,215 L140,150 Z" fill="#5a93c4" stroke="#1f3b5c" stroke-width="2"/>
+        <path d="M200,80 L215,30 L235,55 L250,80 Z" fill="#dbe9f6" stroke="#1f3b5c" stroke-width="2"/>
+        <text x="16" y="60" font-size="13">看得見：發生了什麼</text>
+        <text x="16" y="120" font-size="13">看不見：</text>
+        <text x="16" y="140" font-size="12" class="m">一直重複的模式</text>
+        <text x="16" y="160" font-size="12" class="m">製造模式的制度</text>
+        <text x="16" y="180" font-size="12" class="m">撐住制度的信念</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="card">
+    <h2>2. 四層，各配一個日常例子<small>1 分鐘</small></h2>
+    <div class="grid2">
+      <div class="layer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div><div class="ex">例：這個月有客戶投訴；這個月業績掉了。</div></div>
+      <div class="layer l2"><b>② 模式 Patterns</b><div class="q">問：以前發生過嗎？多常？什麼時候特別容易發生？</div><div class="ex">例：每一季都趕不上交期；每個星期一投訴特別多。</div></div>
+      <div class="layer l3"><b>③ 結構 Structures</b><div class="q">問：是什麼流程、規則、資源安排讓它一直發生？</div><div class="ex">例：案子太多、人太少；出院流程沒人說清楚誰負責。</div></div>
+      <div class="layer l4"><b>④ 心智模型 Mental Models（最深）</b><div class="q">問：大家心裡哪個沒說出口的假設，撐住了這些結構？</div><div class="ex">例：「成長永遠是好的」；「病人出院，我們的工作就結束了」。</div></div>
+    </div>
+    <p class="sub" style="margin:10px 0 0">記法：事件是「一次」，模式是「一再」，結構是「為什麼一再」，心智模型是「為什麼沒人改」。</p>
+  </div>
+
+  <!-- 3 -->
+  <div class="card">
+    <h2>3. 看一個做完的例子<small>1 分鐘</small></h2>
+    <p class="lead">醫院：同一位病人因為同一個病，出院不久又住進來。</p>
+    <table>
+      <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
+      <tr><td>事件</td><td>病人出院兩週後再次入院</td><td>治療、再出院（下次再來）</td></tr>
+      <tr><td>模式</td><td>再入院率半年來每個月都在升</td><td>開始追蹤數字、提早發現</td></tr>
+      <tr><td>結構</td><td>出院說明不清楚；回診追蹤常常延誤</td><td>改出院流程、設追蹤窗口（效果持久）</td></tr>
+      <tr><td>心智模型</td><td>「病人離開醫院，我們的工作就結束了」</td><td>把「出院後 30 天」納入照護責任（最根本）</td></tr>
+    </table>
+    <p class="sub" style="margin:8px 0 0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：<u>看客服案例的完整分析頁 →</u></p>
+  </div>
+
+  <!-- 4 -->
+  <div class="card">
+    <h2>4. 怎麼填：四步，每步一個好例子和一個壞例子<small>1.5 分鐘</small></h2>
+    <div class="step"><div class="n">1</div><div><b>把事件講清楚</b>：一件具體的事、有時間、有數字。
+      <div class="gb"><div class="good"><b>好</b>：本季客服滿意度從 85 分掉到 62 分。</div><div class="bad"><b>壞</b>：客服最近很爛。（誰？什麼時候？掉多少？）</div></div></div></div>
+    <div class="step"><div class="n">2</div><div><b>找模式</b>：這件事什麼時候發生、多常、跟什麼一起出現。
+      <div class="gb"><div class="good"><b>好</b>：過去六個月每季都在掉；新人流動率同時上升。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div></div></div>
+    <div class="step"><div class="n">3</div><div><b>找結構</b>：哪個流程、規則、人力安排在製造這個模式。寫「制度」，不寫「某個人」。
+      <div class="gb"><div class="good"><b>好</b>：新人訓練只有兩天；資深忙緊急案件沒空帶人。</div><div class="bad"><b>壞</b>：小王不會帶人。（這是怪人，不是結構）</div></div></div></div>
+    <div class="step"><div class="n">4</div><div><b>問信念</b>：大家沒說出口、但決定預算和優先順序的那句話。也問問自己的。
+      <div class="gb"><div class="good"><b>好</b>：管理層把客服當成本中心，訓練預算永遠先砍。</div><div class="bad"><b>壞</b>：管理層不重視。（太籠統，指不出哪個假設）</div></div></div></div>
+    <p class="sub" style="margin:8px 0 0">填不出某一層沒關係，留白比硬湊好；工具會把它列成「證據缺口」，告訴你該去補什麼資料。</p>
+  </div>
+
+  <!-- 5 -->
+  <div class="card">
+    <h2>5. 常見錯誤<small>30 秒</small></h2>
+    <div class="mistake"><i>✕</i><span><b>急著怪人</b>：一直問「是誰」，就挖不到「為什麼」。結構層要寫制度，不寫名字。</span></div>
+    <div class="mistake"><i>✕</i><span><b>跳層</b>：從事件直接跳到「他們心態有問題」。中間的模式和結構才是能動手改的地方。</span></div>
+    <div class="mistake"><i>✕</i><span><b>把模式當原因</b>：「每個星期一投訴多」是模式，不是原因；原因是星期一為什麼人手不夠。</span></div>
+    <div class="mistake"><i>✕</i><span><b>只看別人的假設</b>：你自己也在這個系統裡；你的假設也要寫進第四層。</span></div>
+  </div>
+
+  <!-- 6 -->
+  <div class="card">
+    <h2>6. 開始<small>準備 30 秒</small></h2>
+    <p>手邊有這些會填得比較快，沒有也可以先填、之後補：</p>
+    <ul class="check">
+      <li>一件具體的事（時間、數字）</li>
+      <li>過去半年左右的紀錄或數字（同一件事發生幾次）</li>
+      <li>相關的流程、規則、人力安排</li>
+      <li>你們開會時常常出現的那句話（信念通常藏在口頭禪裡）</li>
+    </ul>
+    <div class="btns">
+      <span class="btn primary">用示範案例試一次<small>客服滿意度那個例子，已填好，按執行就看結果</small></span>
+      <span class="btn">開始填我的案例<small>四個格子，每格旁邊有提示</small></span>
+    </div>
+    <p class="sub" style="margin:10px 0 0">這堂課之後不會再自動出現；想再看，方法頁右上角「怎麼用？」隨時能打開。</p>
+  </div>
+
+  <p class="sub">課程結構參考：The Systems Thinking，Iceberg Model 教學（定義 → 四層 → 例子 → 步驟 → 常見錯誤）。內容為本系統改寫，非轉載。</p>
+</div>
+</body>
+</html>
