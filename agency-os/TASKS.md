@@ -1212,11 +1212,11 @@
   - **症狀**：該腳本 `git worktree add` 任意 ref 後，把**本機** `apps/next-admin/node_modules` junction 進去，只 `Test-Path` 檢查目錄在不在。ref 新增依賴 → 誤報 `TS2307`（怪到 commit 頭上，其實是本機環境）；本機多裝的套件 → 該 ref 其實沒宣告也會過。
   - **修法方向**：比對 worktree 內與本機的 `package-lock.json`，不同就明確拒絕並指出漂移（可加 `-Install` 跑 `npm ci`）；**不要**只把錯誤訊息寫寬。改 exit 行為前先查所有呼叫點（它是 build gate）。
   - **參考**：本次 `sg-deploy.sh` 的同類修法與根因見 `WORKLOG.md` 2026-09-23（續102）。
-- [ ] **site-watch slice 1：核心已落地（deab0f709）未測未上線 — 接手完成測試／Trigger task／UI 卡／env／renderer 實測／review／prod** → handoffs/2026-09-23-1116-site-watch-slice1.md
+- [ ] **site-watch slice 1：核心已落地（deab0f709）未測未上線 — 接手完成測試／Trigger task／UI 卡／env／renderer 實測／review／prod**
   - `🟡 待接手` · `2026-09-21 開；2026-09-23 交接包重擬` · `GPT/Codex（實作＋review）→ 操作者（prod 每步 go-ahead）`
   - **一句話**：DB fenced 狀態機 + renderer `/snapshot` + next-admin runner/notify/routes 已 commit 並過 harness／tsc／renderer test；無單元測試、無 Trigger task、無 UI 卡、env 未接、`/snapshot` 未真跑、未 review、prod 未動。
-  - **現在到哪**：`git log deab0f709..HEAD -- lobster-factory` 對 site-watch 零新 commit（2026-09-23 確認）；設計 SSOT = `lobster-factory/packages/db/migrations/0091_site_watch.sql` 檔頭。
-  - **下一步**：照 `agency-os/handoffs/2026-09-23-1116-site-watch-slice1.md` §5 第 1–7 步（本機 Low/Medium 直接做）→ 第 8 步 prod a–g 逐項等操作者 go-ahead。
+  - **現在到哪**：`git log deab0f709..HEAD -- lobster-factory` 對 site-watch 零新 commit（2026-09-23 確認）；**計畫正本 = `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`**（範圍／分期／合約／驗收／下一步全在此，§0 現況每次更新）。
+  - **下一步**：照 `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md` §7 第 1–7 步（本機 Low/Medium 直接做）→ 第 8 步 prod a–g 逐項等操作者 go-ahead；待決 D1（§6）操作者回覆。
   - **部署已封鎖（2026-09-23）**：`lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` 在 `main`，`sg-deploy.sh` 步驟 1.85 拒絕所有 app 部署、`auto-deploy-next-admin.sh` 靜默跳過（原本每 4 小時噴一次失敗告警）。**§5 第 8 步 c 之前要先 `git rm` 該檔**（它會擋住 renderer/next-admin 部署）。機制說明：`docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md §1.5`。
   - **完成定義**：prod 一個真實客戶跑出 `site_watch_results` 1 列 + R2 baseline 圖 + 客戶頁卡片顯示；`SITE_WATCH_ENABLED=false` 時 renderer 0 呼叫；WORKLOG 四動作證據行齊、review 由非 Claude 模型完成。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-21「site-watch slice 1 實作（未完，交接 GPT/Codex）」；commit `deab0f709`／`80b7897e6`。
@@ -1816,5 +1816,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-23 02:59:54 UTC_
+_Last synced: 2026-09-23 03:45:07 UTC_
 

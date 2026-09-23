@@ -21466,3 +21466,17 @@ WORKLOG_DONE: site-watch slice 1 核心（DB/renderer/next-admin lib+routes）�
 
 （續）操作者問「動工用哪份、還能優化嗎」→ packet §5 依風險重排：① renderer 真實測試移到第 1 步（最大未知先殺）② 新增 RPC 契約靜態測試（`p_*` key vs 0091 簽名；今日 scratch 比對 16/16 一致；守 PGRST202 類）③ Trigger+env 合併為第 3 步、UI 卡拆 4a 最小／4b 證據 ④ 8b 註明 migration 必先於部署（`cleanup` route 不受 kill switch 保護）⑤ 8f 註明首次開啟全 target 立即跑一次 ⑥ 待決 D1：slice 1 visual 告警現況會進 Telegram（medium ≥ 預設 min medium），建議降 low 待遮罩 selector。
 WORKLOG_DONE: site-watch 交接包重擬為單一合規 packet（TASKS 已登記）、設計 glossary 進 0091 檔頭、程式註解不再依賴會被 prune 的 handoff
+
+## 2026-09-23（續）site-watch 計畫改為單一 MASTER PLAN（操作者：「我要完整的，沒頭沒尾」）
+**根因**：計畫被我拆成三處——handoff packet（只講 slice 1 進度）、0091 檔頭（C1–C12 glossary）、被刪的 09-21 plan（唯一寫了 Slice 2／P2／P3 路線圖）。接手者拿到的是碎片，不是計畫。
+**修法**：新建 `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`（沿用 `APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`／`CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` 慣例；兩者皆未登記 DOCS_INDEX／CHANGE_IMPACT_MATRIX，本檔同）：§0 現況、§1 分期總表（Slice 1／2／P2／P3）、§2 操作者拍板、§3 架構（file:line）、§4 完整合約 I1–I3 + C1–C12（as implemented，含 Slice 2 的 C11）、§5 驗收矩陣 14 條各標驗於何處、§6 風險與待決 D1、§7 下一步 8 步、§8 Slice 2／P2／P3 設計備忘（含 `addSiteToMainWp` 正確位置 `packages/workflows/src/integrations/integration-steps.ts:371`，舊 plan 寫的 next-admin 路徑不存在）、§9 回滾、§10 文件關係。
+- 0091 檔頭：C1–C12 glossary 移出，改一行指回 MASTER PLAN §4；I1–I3 保留（schema 自述）。程式 4 處註解「glossary in 0091」經檔頭轉指，不再改。
+- `git rm handoffs/2026-09-23-1116-site-watch-slice1.md`（併入 §7；可自 `76a0a2e3f` 取回）；TASKS.md §I 列改指 MASTER PLAN §7，移除 `→ handoffs/` pointer（packet 已無）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/site-watch-local-verify.sh`（0091 檔頭改後 apply/down/re-apply） | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=for-loop `[ -e ]` 對 MASTER PLAN 引用的 20 個路徑 | exit=0 | ms=50（0 MISSING）
+- REVIEW_WAIVED: DOC_ONLY -- 新文件 + migration 註解 + TASKS 指針，無邏輯改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`site-watch-slice1.md|SITE_WATCH_MASTER_PLAN` | hits=3 files（MASTER PLAN 自身、TASKS.md、0091 檔頭；舊 packet 名僅存於本 WORKLOG）
+[剩餘風險] MASTER PLAN §3/§4 的 `:line` 以 2026-09-23 為準，程式改動後需同步；D1 仍待操作者。
+[rollback] `git revert` 本 commit。
+
+WORKLOG_DONE: site-watch 計畫正本 = docs/operations/SITE_WATCH_MASTER_PLAN.md，一份到底（範圍／分期／合約／驗收／下一步／回滾）；handoff 與 0091 檔頭皆退為指針
