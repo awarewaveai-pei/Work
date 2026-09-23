@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-23（續111）研究線：計畫 v1.4→v1.5（解讀層＋接手指南＋critic 折入）、P0 凍結三顆「送去 X」按鈕落地（未部署）
+- [觸發] 操作者：①–⑤ 是、⑥ 討論→B；截圖「執行並驗證」只出閘門表＋JSON；「一個半月了…誰都可以直接接手」；「不准無效益派 agents」。本 session 只派 1 個 critic（plan 接手審）。
+- [事實] `main.py:758-788` invoke = builder + gates，無 LLM；`iceberg_model.py:56-109` 原樣回填四層；`dashboard.html:1394-1410` 結果 = 通過行＋閘門表＋JSON；圖表僅 2 方法 `:1320-1345`；AI 只在起草填格 `draft.py:1-10`。HCI-30 `https://hci.aware-wave.com/health` 200（curl），三處「never deployed」註解為假。
+- [計畫] v1.4 `d94f47c88`：§3.10 解讀層、C10、D14、PI 期排 P1 前、§11 接手指南、⑥=B；示意稿 `COS/docs/mockups/iceberg-result-mock.html`（用操作者冰山案例）。v1.5 `58f5488ec`：critic 2C/6M/4m 全折入——C1 nginx 分流改 `/api/` 前綴（FastAPI 全在根路徑 `main.py:357-1417`，舊 dashboard `api()` `:299` 絕對路徑）；C2 web 放 `COS/apps/cognitive-web`（prod 是 sparse clone `/opt/cognitive-os`，`deploy.sh:74`、WORKLOG `:1450`）、compose 走 deploy.sh 多服務、nginx 走 safe-infra-patch；M3 interpret 202+輪詢（`provider.py:45`／`default.conf:431` 皆 60s）；M4 伺服器重跑 builder+gates（`main.py:788` 不持久化 record）；M5 manifest 葉路徑、排除系統參數 `main.py:720-722`；M6 visual bindings 只指 record 路徑；M7 PI 拆 a/b、b = High-STOP、§9 新 ⑦；M8 估工 PI 5.5d／P3 4d，核心 18d、含演化 22d；m9 next_methods ⊆ ACTIVE + display-metadata；m10 `append_event` 公開、核准移 P4；m11 `CHART_TYPES` 3 種 `chart_render.py:62`、compose `environment:` 覆蓋 env_file；m12 §6 表列修正。抽查 3 項屬實後才折入。
+- [P0] `19f00f9aa`：`NA/lib/research-bridges.ts` 單一開關（`RESEARCH_BRIDGES_ENABLED === "true"` 才開，其餘一律關）；`cognitive-os-import`／`hci-import`／`internal/cognitive-os/import-project-sources` 三條 route 在 role／token 檢查後、`configured()` 前回 410 `research_bridges_frozen`；`collect/page.tsx`、`clients/[slug]/page.tsx` 伺服器端傳 prop，`CollectionSourcesPanel`／`ClientHubTabs` 改渲染一行說明；`app/api/cognitive-os/open` 刻意不擋（唯讀、不複製）；`lib/hci/client.ts`、`CollectionSourcesPanel` HciImportReport、`ClientHubTabs` HCI badge 三處註解改實情。不搬資料、不刪碼；rollback = 設環境變數。**未 sg-deploy**（High-STOP，等 go-ahead）。
+- [坑] commit scope guard：pathspec 後面接 `2>&1 | tail` 會讓閘把 `2>&1` 當 pathspec、退回 bare-commit 模式而被別 session 的 staged 檔擋下（本日兩次）；已記憶。決策記錄 `2026-09-23-research-pipeline-architecture.md:81` 加「P0 已改正」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit && npx vitest run lib/research-bridges.test.ts app/api/ops/clients/[slug]/{cognitive-os-import,hci-import}/route.test.ts app/api/internal/cognitive-os/import-project-sources/route.test.ts "app/(shell)/ops/collect/__tests__/CollectionSourcesPanel.test.tsx" "app/(shell)/ops/clients/[slug]/__tests__/KnowledgeTab.render.test.tsx" | exit=0 | ms=6210
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://hci.aware-wave.com/health | exit=0 | ms=842
+- REVIEW_DONE: critic=Standard | verdict=fail | findings=2c/6m/4n
+- ORACLE_WAIVED: critic 額度用在 plan v1.4 接手審（上列 findings，全折入 v1.5 `58f5488ec`）；P0 code 為單一開關 + 14 檔一行式守衛，由 10 個新測試 + 突變證明（`cognitive-os-import/route.ts` 開關換 `if (false)` → 「answers 410 … by default」紅：expected 404 to be 410 → 還原綠）覆蓋；`/codex-review` 排在 PI-a 第一個 commit 一併審 P0。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,Projects/internal/cognitive-engineering-os/docs | grep=never been deployed\|no deployed, publicly\|publicly reachable URL yet\|isResearchBridgesEnabled\|research_bridges_frozen\|RESEARCH_BRIDGES_ENABLED | hits=42
+- [下一步] 操作者答 ⑦ → PI-a 七段 → 開工；PI-b／P0 部署各自 go-ahead。
+
 ## 2026-09-23（續109）site-watch Slice 1 本機收尾：MASTER PLAN §7 步 1–9 + D1（prod 未動、未 push）
 
 - [觸發] 操作者：照 `SITE_WATCH_MASTER_PLAN.md` §7 做步 1–9、每步更新 §0；D1 決定 visual 降 low；步 10 prod 逐項問。
