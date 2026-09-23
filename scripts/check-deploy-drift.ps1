@@ -299,6 +299,42 @@ if ($composeProbe.ExitCode -ne 0 -or $serverVars.Count -eq 0) {
     }
 }
 
+# 4.8 Deploy hold (2026-09-23). DEPLOY_HOLD on origin/main means the drift is deliberate --
+# unfinished work is parked on main on purpose and sg-deploy.sh step 1.85 refuses to ship it. The
+# verdict below still reports the real drift (a hold must not hide it), but every message that would
+# otherwise say "run sg-deploy.sh" has to say the opposite while a hold is in force: that advice is
+# exactly what the hold exists to stop.
+# Read from origin/main, the same ref the server resolves -- an uncommitted local DEPLOY_HOLD is not
+# in force anywhere (Codex review, 2026-09-23), so it gets its own explicit warning instead of being
+# reported as a hold that is protecting anything.
+$deployHold = $null
+$holdNote   = ""
+$holdRel    = "lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD"
+$holdLocal  = Test-Path -LiteralPath (Join-Path $repoRoot ($holdRel -replace '/', '\'))
+$holdRes    = Invoke-SafeGitCapture -GitArgs @("show", "origin/main:$holdRel")
+if ($holdRes.ExitCode -eq 0 -and $holdRes.Text.Trim().Length -gt 0) {
+    $holdText = $holdRes.Text
+    $hReason  = @([regex]::Matches($holdText, '(?m)^reason=(.+)$')      | ForEach-Object { $_.Groups[1].Value.Trim() } | Select-Object -First 1)
+    $hCreated = @([regex]::Matches($holdText, '(?m)^created_utc=(.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() } | Select-Object -First 1)
+    $deployHold = @{
+        reason     = if ($hReason.Count  -gt 0) { $hReason[0] }  else { "unspecified" }
+        createdUtc = if ($hCreated.Count -gt 0) { $hCreated[0] } else { "unknown" }
+        file       = $holdRel
+        source     = "origin/main"
+        override   = "DEPLOY_HOLD_OVERRIDE=1 bash /root/lobster-phase1/scripts/sg-deploy.sh <app>"
+    }
+    $holdNote = " DEPLOY HOLD ACTIVE since $($deployHold.createdUtc) -- do NOT run sg-deploy.sh; this drift is intentional. Reason: $($deployHold.reason) To resume: git rm the DEPLOY_HOLD file."
+} elseif ($holdLocal) {
+    $deployHold = @{
+        reason     = "local DEPLOY_HOLD file is NOT committed/pushed -- production reads origin/main and sees no hold"
+        createdUtc = "n/a"
+        file       = $holdRel
+        source     = "working copy only"
+        override   = "n/a"
+    }
+    $holdNote = " WARNING: a DEPLOY_HOLD file exists locally but is NOT on origin/main, so nothing is actually held -- commit and push it, or delete it."
+}
+
 # 5. Verdict
 $data = @{
     server          = $ServerHost
@@ -311,15 +347,16 @@ $data = @{
     appCodeOnly     = [bool]$AppCodeOnly
     composeVarDrift = $composeVarDrift
     composeVarDriftCheckError = $composeVarDriftCheckError
+    deployHold      = $deployHold
 }
 
 if ($behind -ge $FailAt) {
-    Emit-Result -Status "FAIL" -ExitCode 2 -Message ("Production is {0} commit(s) behind origin/main (>= FailAt={1}). Run sg-deploy.sh on the server." -f $behind, $FailAt) -Data $data
+    Emit-Result -Status "FAIL" -ExitCode 2 -Message (("Production is {0} commit(s) behind origin/main (>= FailAt={1}). Run sg-deploy.sh on the server." -f $behind, $FailAt) + $holdNote) -Data $data
 }
 if ($behind -ge $WarnAt) {
     $code = if ($Strict) { 2 } else { 1 }
     $status = if ($Strict) { "FAIL" } else { "WARN" }
-    Emit-Result -Status $status -ExitCode $code -Message ("Production is {0} commit(s) behind origin/main." -f $behind) -Data $data
+    Emit-Result -Status $status -ExitCode $code -Message (("Production is {0} commit(s) behind origin/main." -f $behind) + $holdNote) -Data $data
 }
 if ($composeVarDrift) {
     $code = if ($Strict) { 2 } else { 1 }
@@ -332,4 +369,4 @@ if ($composeVarDriftCheckError) {
     # dropped, unlike the pre-fix behavior this replaced.
     Emit-Result -Status "WARN" -ExitCode 1 -Message ("Production is at origin/main (commit {0}), but the compose-variable-drift check itself failed: {1}" -f $deployedCommit.Substring(0,7), $composeVarDriftCheckError) -Data $data
 }
-Emit-Result -Status "PASS" -ExitCode 0 -Message ("Production is at origin/main (commit {0})." -f $deployedCommit.Substring(0,7)) -Data $data
+Emit-Result -Status "PASS" -ExitCode 0 -Message (("Production is at origin/main (commit {0})." -f $deployedCommit.Substring(0,7)) + $holdNote) -Data $data

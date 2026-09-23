@@ -75,6 +75,16 @@ if [[ "$BEHIND" -lt 1 ]]; then
     exit 0
 fi
 
+# Deploy hold (SSOT: the same origin/main file sg-deploy.sh step 1.85 refuses on). Held drift is
+# intentional, so this path stays silent -- no Slack/Telegram every 4h. It is surfaced once per
+# session instead, by check-smoke-tests.ps1's deploy_hold check in AO-RESUME.
+HOLD_PATH="lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD"
+if git -C "$WORK_DIR" cat-file -e "origin/main:$HOLD_PATH" 2>/dev/null; then
+    HOLD_REASON="$(git -C "$WORK_DIR" show "origin/main:$HOLD_PATH" 2>/dev/null | grep -m1 '^reason=' | cut -d= -f2- || true)"
+    log "HOLD: $HOLD_PATH present, skipping auto-deploy (behind=$BEHIND). reason: ${HOLD_REASON:-unspecified}"
+    exit 0
+fi
+
 log "DRIFT: deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7} app-code behind=$BEHIND -- starting auto-deploy"
 
 post_to_ops_inbox() {

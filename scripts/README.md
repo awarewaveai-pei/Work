@@ -34,7 +34,7 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `check-three-way-sync.ps1` | Verify three-way doc sync consistency |
 | `doc-sync-automation.ps1` | Auto-sync docs after changes |
 | `check-cloudflare-security.ps1` | Verify Cloudflare bot fight mode + WAF rules; outputs reports/status/cf-security-LATEST.md; always exits 0 (warn-only). Auto-called by ao-resume.ps1 and system-health-check.ps1. |
-| `check-deploy-drift.ps1` | Compare SG production deployed commit vs origin/main, plus (2026-09-20) an independent docker-compose.yml variable-set drift check (`composeVarDrift` — commit-behind and compose drift are separate axes); called by system-health-check §7, `ao-close.ps1`, and `/check-drift`. |
+| `check-deploy-drift.ps1` | Compare SG production deployed commit vs origin/main, plus (2026-09-20) an independent docker-compose.yml variable-set drift check (`composeVarDrift` — commit-behind and compose drift are separate axes); called by system-health-check §7, `ao-close.ps1`, and `/check-drift`. Reports `deployHold` when `lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` exists — held drift is deliberate, so the message says do NOT deploy (runbook: DEPLOY_ROLLBACK_RUNBOOK.md §1.5). |
 | `check-governance-docs-drift.ps1` | Monthly cross-ref audit of 4 governance docs (Inventory / Routing Spec / Routing Matrix / Traceability). |
 | `check-backup-health.ps1` | SSH into SG/EU servers and verify backup retention; uses base64-pipe for complex grep patterns. |
 | `fetch-external-signals.ps1` | Fetch Slack + Telegram messages since last AO-CLOSE. Called by ao-resume.ps1; also callable via `/signals [from] [to]` (CST). |

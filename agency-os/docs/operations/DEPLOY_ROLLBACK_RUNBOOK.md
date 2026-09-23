@@ -45,6 +45,22 @@
 
 ---
 
+## 1.5 Deploy hold（2026-09-23 新增；部署前必看）
+
+`lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` 存在於 `main` = **所有 app 部署一律拒絕**，包含手動跑 `sg-deploy.sh`。用途：未完成的工作已經進 `main`（交接中、等 migration、等 env），此時「落後 N commit」是**刻意的**，不是待修。
+
+| 面向 | 位置 |
+|---|---|
+| 強制 | `sg-deploy.sh` 步驟 1.85（讀 `origin/main:DEPLOY_HOLD`，refuse 並印 `reason=`） |
+| 自動路徑 | `auto-deploy-next-admin.sh`（cron `0 3,7,11,15,19,23` UTC）有 hold 就跳過，**不發 Slack／Telegram**；`check-drift-and-alert.sh`（cron `0 1` UTC 每日 drift 提醒）同樣靜音 — 否則兩支都在叫人部署 hold 正要擋的東西 |
+| 浮出 | `check-smoke-tests.ps1` 的 `deploy_hold` → AO-RESUME §1 每次開工都看得到；> 14 天升 `warn:hold_stale_<N>d` |
+| 也會提醒 | `check-deploy-drift.ps1`／`/check-drift`／AO-CLOSE 的 deploy hint：有 hold 時改印「不要跑 sg-deploy」 |
+
+- **設 hold**：新增該檔，`reason=` 單行 ASCII（會進 ssh 捕捉的 log，CJK 會在 zh-TW PowerShell 端變亂碼）、`created_utc=`（ISO 8601，stale 判斷用），commit + push。
+- **解除**：`git rm` 該檔 + push；下一個 cron tick 自動正常部署。
+- **單次繞過**（不解除 hold）：`DEPLOY_HOLD_OVERRIDE=1 bash /root/lobster-phase1/scripts/sg-deploy.sh <app>`。只在操作者明示時用。
+- hold **不會**隱藏 drift：drift 數字照報，只是把「快去部署」換成「這是故意的」。
+
 ## 2. 標準部署流程（本地映像）
 
 > **2026-05-08 起，SG 預設走一鍵腳本 `sg-deploy.sh`**。它把 `git pull → rsync source → build → up -d → health gate → 寫入 `.deployed-commit`` 全包。手動逐步指令僅作為腳本損壞時的 fallback。

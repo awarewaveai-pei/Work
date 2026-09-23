@@ -1,4 +1,19 @@
 ﻿# Worklog
+## 2026-09-23（續102）部署閘擋下未完成的 site-watch WIP：npm ci 取代「node_modules 存在就算數」+ DEPLOY_HOLD 封鎖機制
+
+- [觸發] Telegram「後台自動部署失敗，需要手動處理 — SG next-admin」。**沒有照它說的跑 `sg-deploy.sh`**：待部署的 `deab0f709` 自己的 commit message 就寫「Not yet: ... review, prod」，照做等於跳過 migration 0091／R2 bucket／`SITE_WATCH_*` env 直接上 prod。prod 健康（`/api/health` 401 = 服務活著），deployed 仍 `33251522a`。
+- [根因 C1（真 bug，非本次 WIP 造成）] `sg-deploy.sh` pre-build gate 只在 `node_modules` **整個不存在**時才 `npm install`——拿「目錄在不在」當「依賴等於 lockfile」的代理。於是任何**新增 npm 依賴**的 commit 永遠裝不到那顆套件，typecheck gate 永遠 `TS2307: Cannot find module 'pixelmatch'`，cron（`0 3,7,11,15,19,23` UTC）每 4 小時重噴一次告警。修法＝無條件 `npm ci --include=dev`，即不變量本身（安裝樹 == committed package-lock.json），不是換一個更寬的代理。
+- [根因 C2（設計缺口）] 光修 C1 會讓下一個 tick 直接把 WIP 部署上 prod。新增 `lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD`：存在於 `origin/main` 時 `sg-deploy.sh` 步驟 1.85 拒絕所有 app 部署（含手動跑，因為告警訊息就是叫人手動跑）；`auto-deploy-next-admin.sh` 靜默跳過不發告警。順序關鍵：1.8 腳本自同步＋re-exec → **1.85 hold** → 1.5 npm ci/tsc/vitest，所以本 commit 落地的第一個 tick 就擋得住。
+- [Codex round 1 高風險發現，已修] 偵測器讀本機檔、執行者讀 `origin/main`——未 push 的 hold 會讓 smoke 報「已封鎖」而 prod 照部署（AGENTS.md 的「偵測器說謊」class）。兩支 checker 改成同樣用 `git show origin/main:<path>`，本機獨有的 hold 另報 `warn:hold_local_only_not_on_origin_main`。
+- [浮出] `check-smoke-tests.ps1` 新增 check 8 `deploy_hold` → AO-RESUME §1 每次開工可見；> 14 天升 `warn:hold_stale_<N>d`（刻意暫停 vs 忘了）。`check-deploy-drift.ps1`／AO-CLOSE deploy hint 有 hold 時改印「不要跑 sg-deploy」。smoke console 摘要改由 `$checks` 迭代產生，不再是會漏項的 `{0}..{7}` 手寫清單。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm ci --include=dev`（scratchpad 內只放 package.json+package-lock.json） | exit=0 | result=`node_modules/pixelmatch/package.json` 存在＝C1 確實修好
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=從 `sg-deploy.sh:164-179` 原文抽出 hold gate 跑 4 case（有 hold／override／無 hold／無 reason=） | exit=1,0,0,1（皆符合預期） | 突變證明：拿掉 `fail` 那行 → case1 由 1 變 0，還原後回 1
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-deploy-drift.ps1 -AppCodeOnly -Json`（真連 145.239.195.47） | exit=1 | ms=11035 | result=`behind:2` ＋ hold 訊息正確；hold 只在本機時改報 WARNING「NOT on origin/main」
+- REVIEW_DONE: critic=Deep | verdict=needs-attention（round 1）→ 已修 | findings=1C/0M/0m（Codex adversarial-review 兩輪，artifact 在 `agency-os/reports/oracle/`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`DEPLOY_HOLD|deploy_hold|node_modules 存在性守衛|codex_parity|docker_watchdog` | hits=6 檔皆本次新增且互相一致；smoke check 名稱他處無硬編清單；**另發現同 class 未修**：`scripts/verify-head-typecheck.ps1:43` 把本機 `node_modules` junction 進任意 ref 的 worktree、只檢查目錄存在 → 該 ref 新增依賴時會誤報 TS2307（已開 TASKS 條目，不在本次 scope）
+- [rollback] `git revert` 本 commit 即可：`npm ci` 改回原條件式、hold gate 消失、兩支 checker 回舊行為；或只 `git rm DEPLOY_HOLD` 解除封鎖而保留 npm ci 修正。
+
 ## 2026-09-21（續101）MainWP 鏈部署上線；真建站 E2E 被既存 SG_SSH_HOST（退租主機）擋下
 
 - [部署] 操作者「yes」→ Trigger.dev workflows v20260921.3（`MAINWP_*` 三變數同步，trigger-postgres `EnvironmentVariable` 05:27 寫入）；`sg-deploy.sh next-admin` 部署 HEAD 33251522a（含本線 363a505f4 + 另一 session 密碼 vault 修正 a88fa3430/33251522a，該 session 事先確認可隨同部署、操作者明示 yes）。

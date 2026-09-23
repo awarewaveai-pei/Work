@@ -18,6 +18,13 @@ Use the `hetzner-ssh` MCP server. Connection details:
 - port: `58122`／user: `ubuntu`（遠端指令前加 `sudo`）
 - privateKeyPath: `$env:USERPROFILE\.ssh\id_ed25519`（先展開為絕對路徑；只用 `ubuntu` + `sudo`，不可改用 root）
 
+## Deploy hold (check BEFORE step 1)
+
+If `lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` exists on `main`, deploys are parked on
+purpose and `sg-deploy.sh` step 1.85 refuses. Read that file's `reason=` line, report it, and stop —
+do not deploy and do not set `DEPLOY_HOLD_OVERRIDE=1` without the operator explicitly saying so.
+Releasing the hold is `git rm` on that file, which is the operator's call, not a step in this command.
+
 Steps:
 1. `ssh_connect` to SG with the credentials above (name the connection `sg-prod`).
 2. Run `/root/lobster-phase1/scripts/sg-deploy.sh <args>` with a generous timeout (build + healthcheck can take 4 minutes).

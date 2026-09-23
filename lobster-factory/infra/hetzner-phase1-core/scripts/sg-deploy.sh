@@ -161,6 +161,22 @@ if [[ $SKIP_PULL -eq 0 ]]; then
   log "deploy scripts synced"
 fi
 
+# 1.85. deploy hold. While DEPLOY_HOLD exists on origin/main, every app deploy is refused --
+# manual runs included, because the auto-deploy failure alert tells the operator to run this
+# script by hand, which is exactly how unfinished work reaches prod. Read from origin/main, not
+# the worktree, so --skip-pull (step 1.8 re-exec) and auto-deploy's pre-pull path agree.
+HOLD_PATH="lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD"
+if git -C "$REPO_DIR" cat-file -e "origin/main:$HOLD_PATH" 2>/dev/null; then
+  HOLD_REASON="$(git -C "$REPO_DIR" show "origin/main:$HOLD_PATH" 2>/dev/null | grep -m1 '^reason=' | cut -d= -f2- || true)"
+  [[ -n "$HOLD_REASON" ]] || HOLD_REASON="(no reason= line in $HOLD_PATH)"
+  if [[ "${DEPLOY_HOLD_OVERRIDE:-0}" == "1" ]]; then
+    log "DEPLOY HOLD present, DEPLOY_HOLD_OVERRIDE=1 set -- continuing. reason: $HOLD_REASON"
+  else
+    log "DEPLOY HOLD active. reason: $HOLD_REASON"
+    fail "deploy held by $HOLD_PATH -- git rm that file to resume, or re-run with DEPLOY_HOLD_OVERRIDE=1"
+  fi
+fi
+
 # 2. rsync each app
 # 1.5. pre-build gate — typecheck then tests, only for next-admin, before rsync/snapshot.
 #      Order: tsc first (fast, clean diagnostics) then vitest.
@@ -168,11 +184,12 @@ fi
 #      covers source-level type errors — same scope as GHA next-admin-typecheck.yml.
 if [[ " ${APPS[*]} " =~ " next-admin " && $DRY_RUN -eq 0 ]]; then
   TEST_DIR="$GIT_APPS_ROOT/next-admin"
-  if [[ ! -d "$TEST_DIR/node_modules" ]]; then
-    log "node_modules missing; running npm install --include=dev ..."
-    npm --prefix "$TEST_DIR" install --include=dev 2>&1 | tee -a "$LOG_FILE" \
-      || fail "npm install failed — cannot run pre-build gate"
-  fi
+  # npm ci every run, NOT "install only when node_modules is missing": that old check tested
+  # directory existence as a proxy for "deps match the lockfile", so a commit that ADDED a
+  # dependency left the stale tree untouched and the typecheck gate below failed TS2307 forever,
+  # re-alerting every 4h (pixelmatch, 2026-09-21..23). npm ci IS the invariant: tree == lockfile.
+  log "--- npm ci gate (next-admin deps == package-lock.json) ---"
+  npm --prefix "$TEST_DIR" ci --include=dev 2>&1 | tee -a "$LOG_FILE"     || fail "npm ci failed -- cannot run pre-build gate (lockfile out of sync with package.json, or registry unreachable)"
 
   log "--- tsc typecheck gate (next-admin) ---"
   npm --prefix "$TEST_DIR" run typecheck 2>&1 | tee -a "$LOG_FILE" \

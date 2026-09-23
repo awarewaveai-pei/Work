@@ -83,6 +83,17 @@ if [[ "$BEHIND" -lt "$THRESHOLD_BEHIND" ]]; then
   exit 0
 fi
 
+# 6.5 Deploy hold (same origin/main file sg-deploy.sh step 1.85 refuses on). Held drift is
+# deliberate, so the daily alert stays quiet too -- otherwise this script keeps telling the operator
+# to deploy the exact thing the hold exists to stop. Visibility comes from check-smoke-tests.ps1's
+# deploy_hold check in AO-RESUME instead.
+HOLD_PATH="lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD"
+if git -C "$REPO_DIR" cat-file -e "origin/main:$HOLD_PATH" 2>/dev/null; then
+  HOLD_REASON="$(git -C "$REPO_DIR" show "origin/main:$HOLD_PATH" 2>/dev/null | grep -m1 '^reason=' | cut -d= -f2- || true)"
+  log "HOLD: $HOLD_PATH present, suppressing drift alert (behind=$BEHIND). reason: ${HOLD_REASON:-unspecified}"
+  exit 0
+fi
+
 # 7. Dedupe: only alert if (deployed, origin) pair changed since last alert
 PREV_KEY=""
 if [[ -f "$STATE_FILE" ]]; then PREV_KEY=$(cat "$STATE_FILE"); fi

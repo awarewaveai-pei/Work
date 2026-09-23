@@ -446,11 +446,66 @@ try {
     $noEvidence["codex_parity"] = $true
 }
 
+# --- Check 8: deploy hold ---
+# lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD blocks every lobster-phase1 deploy
+# (sg-deploy.sh step 1.85; auto-deploy-next-admin.sh then skips silently, so a held drift stops
+# alerting every 4h). That silence is only safe if the hold itself shows up somewhere the operator
+# already reads -- this check is that place, via AO-RESUME section 1.
+#
+# Read from origin/main, NOT from the working copy: prod reads `git show origin/main:<path>`, so a
+# hold that exists only as an uncommitted local file is NOT in force even though the file is right
+# there on disk (Codex review, 2026-09-23). A detector that reads a different source than the
+# enforcer reports "held" while prod deploys -- the exact "偵測器說謊" class AGENTS.md warns about.
+# So: origin/main is the verdict, and a local-only copy is its own loud warn, never an ok.
+# A hold older than $holdStaleDays has stopped being a deliberate pause and become a forgotten one.
+$holdStaleDays = 14
+try {
+    $holdRel   = "lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD"
+    $holdLocal = Test-Path -LiteralPath (Join-Path $root ($holdRel -replace '/', '\'))
+    # No network: origin/main is whatever the last fetch left, same ref sg-deploy.sh resolves on the
+    # server after its own fetch. git writes "fatal:" to stderr for a missing path; 2>$null + the
+    # exit code keep that out of the captured text.
+    $holdText  = (& git -C $root show "origin/main:$holdRel" 2>$null | Out-String)
+    $holdOnMain = ($LASTEXITCODE -eq 0 -and $holdText.Trim().Length -gt 0)
+    if (-not $holdOnMain) {
+        if ($holdLocal) {
+            # Dangerous middle state: looks held locally, prod sees no hold and will deploy.
+            $results["deploy_hold"]    = "warn:hold_local_only_not_on_origin_main"
+            $noEvidence["deploy_hold"] = $true
+        } else {
+            $results["deploy_hold"] = "ok:none"
+        }
+    } else {
+        $reasonLine  = @([regex]::Matches($holdText, '(?m)^reason=(.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() } | Select-Object -First 1)
+        $reason      = if ($reasonLine.Count -gt 0) { $reasonLine[0] } else { "unspecified" }
+        $reason      = ($reason -replace '\s+', '_')
+        if ($reason.Length -gt 90) { $reason = $reason.Substring(0, 90) }
+        $createdLine = @([regex]::Matches($holdText, '(?m)^created_utc=(.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() } | Select-Object -First 1)
+        $ageDays = $null
+        if ($createdLine.Count -gt 0) {
+            $parsed = [datetime]::MinValue
+            if ([datetime]::TryParse($createdLine[0], [ref]$parsed)) {
+                $ageDays = [int][Math]::Floor(((Get-Date).ToUniversalTime() - $parsed.ToUniversalTime()).TotalDays)
+            }
+        }
+        if ($null -eq $ageDays) {
+            $results["deploy_hold"] = "warn:hold_no_valid_created_utc:" + $reason
+        } elseif ($ageDays -gt $holdStaleDays) {
+            $results["deploy_hold"] = "warn:hold_stale_" + $ageDays + "d:" + $reason
+        } else {
+            $results["deploy_hold"] = "ok:hold_" + $ageDays + "d:" + $reason
+        }
+    }
+} catch {
+    $results["deploy_hold"]    = "warn:exception"
+    $noEvidence["deploy_hold"] = $true
+}
+
 # --- Verdict ---
 # Computed BEFORE the JSON write so the report carries the conclusion. Without it every
 # reader (Claude in AO-RESUME §1, a human skimming the file) has to re-derive the verdict
 # by hand, and each re-derivation is a chance to repeat the swallow-the-skip bug below.
-$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity")
+$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity","deploy_hold")
 
 # Checks that are the ONLY detector of a silent-failure class. For these, "skip" means
 # monitoring has stopped, so reporting PASS would repeat the mistake that caused the
@@ -486,6 +541,8 @@ if ($blindSpots.Count -gt 0) {
     $blindNote = " | BLIND: " + (($blindSpots | ForEach-Object { "$_=$($results[$_])" }) -join ",")
 }
 
-Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} | mail={5} | docker_wd={6} | codex={7}{8} ==" -f `
-    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"], $results["client_mail"], $results["docker_watchdog"], $results["codex_parity"], $blindNote) -ForegroundColor $colour
+# Rendered from $checks, not a hand-maintained positional list: the old {0}..{7} format string
+# silently omitted any check added to $checks after it was written.
+$summaryPairs = (($checks | ForEach-Object { "{0}={1}" -f $_, $results[$_] }) -join " | ")
+Write-Host ("== Smoke: {0} | {1}{2} ==" -f $overall, $summaryPairs, $blindNote) -ForegroundColor $colour
 exit 0

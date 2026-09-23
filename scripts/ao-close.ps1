@@ -1433,7 +1433,14 @@ Repair it first, then re-run:
             $driftObj = $null
             try { $driftObj = $driftRaw | ConvertFrom-Json -ErrorAction Stop } catch { }
             if ($driftObj -and $driftObj.behind -gt 0) {
-                Write-Host ("DEPLOY HINT: SG production is {0} app-code commit(s) behind. Run sg-deploy.sh when ready." -f $driftObj.behind) -ForegroundColor Yellow
+                # A DEPLOY_HOLD makes the drift deliberate, so the hint must not tell the operator
+                # to deploy -- that advice is what the hold exists to stop (check-deploy-drift.ps1
+                # step 4.8 carries the same reason string; this only picks which sentence to print).
+                if ($driftObj.PSObject.Properties.Name -contains "deployHold" -and $driftObj.deployHold) {
+                    Write-Host ("DEPLOY HOLD: SG production is {0} app-code commit(s) behind ON PURPOSE. Do NOT run sg-deploy.sh. Reason: {1}" -f $driftObj.behind, $driftObj.deployHold.reason) -ForegroundColor Yellow
+                } else {
+                    Write-Host ("DEPLOY HINT: SG production is {0} app-code commit(s) behind. Run sg-deploy.sh when ready." -f $driftObj.behind) -ForegroundColor Yellow
+                }
             }
             # composeVarDrift (2026-09-20) is independent of $behind by design -- a compose-only
             # change can sit at behind=0 (the commit shipped) while docker-compose.yml itself was

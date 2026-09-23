@@ -81,6 +81,7 @@ NA = `$WORK_ROOT/lobster-factory/infra/hetzner-phase1-core/apps/next-admin`。�
 8. **prod（High；每項首行 `# CONFIRMED-HIGH-RISK: <reason>`，逐項等 go-ahead）**：
    - a. Cloudflare 建私有 R2 bucket（例 `lobster-site-watch`，**不開 public dev URL**）；VPS `/root/lobster-phase1/.env` 加 `R2_SITE_WATCH_BUCKET=<bucket>`、`SITE_WATCH_INGEST_TOKEN=$(openssl rand -hex 32)`、`SITE_WATCH_ENABLED=false`。
    - b. `node $WORK_ROOT/scripts/apply-db-migration.mjs --check 0091` → 看 resolve 結果 → `node $WORK_ROOT/scripts/apply-db-migration.mjs 0091`（含 `NOTIFY pgrst`）。**先於 c**：`cleanup` route 不受 kill switch 保護、部署後每小時會碰新表。
+   - b2. **解除 deploy hold**：`git rm lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` + push。2026-09-23 設的，`sg-deploy.sh` 步驟 1.85 在這之前會拒絕**所有** app 部署（含手動跑），c 一定失敗；機制見 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md §1.5`。
    - c. 主機上 `/root/lobster-phase1/scripts/sg-deploy.sh renderer next-admin`：renderer 已在 RESTORABLE_APPS（`sg-deploy.sh:116`）、有 node --check/--test gate（:215-225）與真實 render smoke（:476-491）；next-admin 走 tsc + vitest gate。部署後 `docker exec lobster-renderer iptables -L OUTPUT -n | head` 確認 egress policy 仍在。
    - d. prod compose env：`printf '<新 environment 區塊>' | /root/lobster-phase1/scripts/safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin`（用法 `safe-infra-patch.sh:8`）；驗 `docker exec <next-admin 容器> printenv SITE_WATCH_INGEST_TOKEN R2_SITE_WATCH_BUCKET SITE_WATCH_ENABLED`（唯一可信方式，AGENTS.md §0）。
    - e. `$WORK_ROOT/scripts/lobster-trigger-deploy.ps1`（Trigger deploy；PAT = `tr_pat_*`）。

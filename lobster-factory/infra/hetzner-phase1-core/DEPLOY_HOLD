@@ -1,0 +1,17 @@
+# DEPLOY HOLD -- while this file exists on origin/main, lobster-phase1 deploys are refused.
+#
+# Enforced by:
+#   scripts/sg-deploy.sh step 1.85          -- hard refusal, all apps, manual runs included
+#   scripts/auto-deploy-next-admin.sh       -- 4-hourly cron skips silently (no Slack/Telegram)
+# Surfaced by:
+#   scripts/check-smoke-tests.ps1 deploy_hold -> AO-RESUME section 1 (so a hold cannot be forgotten)
+#   scripts/check-deploy-drift.ps1 / /check-drift
+#
+# To resume deploys: git rm this file, commit, push. Next cron tick deploys normally.
+# One-off bypass without removing the hold: DEPLOY_HOLD_OVERRIDE=1 bash scripts/sg-deploy.sh <app>
+#
+# reason= must stay a single ASCII line: it is echoed into deploy logs read over ssh from a
+# zh-TW PowerShell host, where CJK in captured stdout mojibakes (see AGENTS_APPENDIX CP950 notes).
+reason=site-watch slice 1 (deab0f709) is WIP: unit tests, Trigger tasks, UI card and SITE_WATCH_* env unwritten; migration 0091 not applied; private R2 bucket not created. Local steps 1-7 then the per-step gated prod sequence in agency-os/handoffs/2026-09-23-1116-site-watch-slice1.md section 5 must land first (step 8c is the sg-deploy).
+created_utc=2026-09-23T03:21:50Z
+created_by=Claude Opus 5 (operator-approved, option B)
