@@ -198,7 +198,7 @@ npx trigger.dev@4.4.6 deploy -p "<project ref>" -a https://trigger.aware-wave.co
 `packages/workflows` 內 `captureWorkflowEvent` 使用 **`posthog-node`**，於任務執行時讀 **`process.env.POSTHOG_API_KEY`** 與 **`POSTHOG_HOST`**（見 `src/observability/posthog.ts`）。這些必須出現在 **Trigger 專案的環境變數**（prod／staging），而不是 phase1-core 的 `.env`。
 
 - **方式 A（儀表板）**：Project → **Environment Variables** → 新增 **`POSTHOG_API_KEY`**（可標為 Secret）、**`POSTHOG_HOST`**（例如 `https://us.i.posthog.com`）。  
-- **方式 B（deploy 時同步）**：本 repo 已在 `packages/workflows/trigger.config.ts` 設定 **`syncEnvVars`**。在本機 deploy 前匯出與 phase1 相同的兩個變數（或由 `--env-file` 載入），再執行 **`npx trigger.dev@4.4.6 deploy`**（並遵守 §7a **registry** 可達性），會把值同步到 Trigger（見 [Trigger env docs](https://trigger.dev/docs/deploy-environment-variables)）。若兩個變數皆未設定，extension 不會寫入任何 PostHog 鍵。
+- **方式 B（deploy 時同步）**：本 repo 已在 `packages/workflows/trigger.config.ts` 設定 **`syncEnvVars`**。唯一部署入口 `scripts/lobster-trigger-deploy.ps1`（§7）已帶上這兩個變數（key 取自 vault、host 寫在腳本裡），部署即同步（見 [Trigger env docs](https://trigger.dev/docs/deploy-environment-variables)）；不要自己匯出後手跑 `npx trigger.dev deploy`。若兩個變數皆未設定，extension 不會寫入任何 PostHog 鍵。
 
 ---
 

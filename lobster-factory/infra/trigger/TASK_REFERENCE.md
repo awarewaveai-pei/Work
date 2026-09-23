@@ -27,7 +27,7 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
 | `AWAREWAVE_WEBHOOK_BASE_URL` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | `https://app.aware-wave.com` |
 | `MAINWP_DASHBOARD_URL` / `MAINWP_CONSUMER_KEY` / `MAINWP_CONSUMER_SECRET` | `create-wp-site`, `adopt-client-os` (addSiteToMainWp) | read_write MainWP REST v2 key; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1`. Never in the run payload. |
 | `COLLECT_SCHEDULE_INGEST_TOKEN` | `collect-scheduled-crawl` | Dedicated bearer token (never `OPS_INBOX_INGEST_TOKEN`) for `/api/internal/collect/run-due-schedules` |
-| `SITE_WATCH_INGEST_TOKEN` | `site-watch-heartbeat`, `site-watch-run` | Dedicated bearer token (never shared with the collect/ops-inbox tokens) for `/api/internal/site-watch/*`; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1` |
+| `SITE_WATCH_INGEST_TOKEN` | `site-watch-heartbeat`, `site-watch-run` | Dedicated bearer token (never shared with the collect/ops-inbox tokens) for `/api/internal/site-watch/*`; source = the RUNNING `lobster-next-admin` container (`docker exec … printenv`, i.e. the value next-admin actually accepts; set via `/root/lobster-phase1/.env` + compose in SITE_WATCH_MASTER_PLAN step 10d), synced by `scripts/lobster-trigger-deploy.ps1` |
 | `SENTRY_AUTH_TOKEN` | `orchestrate-tenant-provisioning` | Sentry provisioning auth token |
 | `SENTRY_ORG_SLUG` | `orchestrate-tenant-provisioning` | e.g. `aware-wave` |
 | `TENANT_PROVISION_GITHUB_TOKEN` | `orchestrate-tenant-provisioning` | GitHub PAT with org:write scope |
@@ -324,7 +324,7 @@ As of 2026-05-07, the following vars are set in the Trigger.dev prod environment
 | `LOBSTER_AO_ORG_ID` | ❌ missing — must be set before next deploy |
 | All tenant provisioning vars | ❌ missing — sync on next deploy |
 
-To sync all vars, export them locally then run `npx trigger.dev@4.4.6 deploy` (see §Deploy below).
+To sync vars, deploy through the single entry point (see §Deploy below) — it assembles the env on ks-aw-01.
 
 ---
 
@@ -354,16 +354,4 @@ Auto-chaining (Phase 2) will require SSH execution mode to be configured for the
 
 ## Deploy
 
-```bash
-# From EU VPS (recommended — registry is on the same machine)
-cd /root/Work/lobster-factory/packages/workflows
-export TRIGGER_ACCESS_TOKEN=tr_pat_<your-pat>
-export TRIGGER_API_URL=https://trigger.aware-wave.com
-# Set any env vars you want synced:
-export LOBSTER_SUPABASE_URL=https://supabase.aware-wave.com
-export LOBSTER_SUPABASE_SERVICE_ROLE_KEY=<key>
-export LOBSTER_AO_ORG_ID=<ao-org-uuid>
-npx trigger.dev@4.4.6 deploy
-```
-
-See [README.md §7a](README.md#7a-完整-deploy-registry5000-為何會失敗怎麼做才對) for registry connectivity details.
+Only entry point (2026-09-23): from the repo root, `powershell -ExecutionPolicy Bypass -File scripts/lobster-trigger-deploy.ps1`. The post-push hook runs the same script whenever a push touches `packages/workflows`. It builds on ks-aw-01 and assembles every value `syncEnvVars` receives in its step 3. Do not run `npx trigger.dev deploy` by hand: a hand-built env silently leaves tasks without their tokens (the retired EU-era recipe that used to be here synced only a handful of vars). Sync semantics and the retired paths: [README.md §7](README.md).

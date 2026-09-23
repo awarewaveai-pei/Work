@@ -143,11 +143,11 @@ for v in MAINWP_DASHBOARD_URL MAINWP_CONSUMER_KEY MAINWP_CONSUMER_SECRET; do
   export "`$v=`$(grep -m1 "^`$v=" /root/lobster-phase1/.env | cut -d= -f2-)"
 done
 
-# site-watch (site-watch-heartbeat / site-watch-run) - read on the host the same way. OPTIONAL, unlike
-# COLLECT_SCHEDULE_INGEST_TOKEN above: it is absent until SITE_WATCH_MASTER_PLAN.md step 10d, and a
-# required read would block every unrelated Trigger deploy until then. Empty = not synced; the
-# heartbeat then skips quietly and check-site-watch-health.ps1 reports the missing heartbeat.
-export "SITE_WATCH_INGEST_TOKEN=`$(grep -m1 '^SITE_WATCH_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-)"
+# site-watch token. OPTIONAL (absent until SITE_WATCH_MASTER_PLAN.md step 10d; a required read would block
+# every unrelated deploy until then) and taken from the RUNNING next-admin, not .env: Trigger must only hold
+# a token next-admin accepts, or a half-applied 10d / rotation turns every hourly heartbeat into a red 401.
+# Empty = not synced; the heartbeat skips quietly and check-site-watch-health.ps1 reports it.
+export "SITE_WATCH_INGEST_TOKEN=`$(docker exec lobster-next-admin printenv SITE_WATCH_INGEST_TOKEN 2>/dev/null)"
 
 echo '=== Env ready ==='
 echo "  TRIGGER_API_URL (CLI):          `$TRIGGER_API_URL"
@@ -161,6 +161,7 @@ echo "  UPTIME_KUMA_URL:                `$UPTIME_KUMA_URL"
 echo "  LOBSTER_EXECUTE_MANIFEST_STEPS: `$LOBSTER_EXECUTE_MANIFEST_STEPS"
 if [ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ]; then echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: yes"; else echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: no"; fi
 if [ -n "`$MAINWP_CONSUMER_SECRET" ]; then echo "  MAINWP_* set: yes (`$MAINWP_DASHBOARD_URL)"; else echo "  MAINWP_* set: no"; fi
+if [ -n "`$SITE_WATCH_INGEST_TOKEN" ]; then echo "  SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)"; else echo "  SITE_WATCH_INGEST_TOKEN set: no (next-admin has none; site-watch-heartbeat will skip)"; fi
 
 cd /root/Work/lobster-factory/packages/workflows
 
