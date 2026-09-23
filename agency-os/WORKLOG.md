@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-23（續118）研究線：教學例子跟線走（D18）；課程示意稿改教育例＋領域切換
+- [觸發] 操作者：「你認為所有帶入的例子應該以哪一種類型為主？像這個你是用商業行為」。承認：客服例是她的測試輸入被我誤當教材。
+- [決策 D18] 例子跟使用者進來的那條線走：`lessons` 每方法四組 `{edd_research, partnership_risk, decision, everyday}`，顯示 Project.purpose 對應那組、可切換；「這是什麼」步用 everyday；操作者預設教育研究；示範 Project 與課程同一組；永不用真實案例當教材。
+- [示意稿] `iceberg-lesson-mock.html`：步 2 四組例子 chips（教育：期末專題遲交／合作：畫廊延後付款／決定：加開平日班／日常：家事）；步 3 做完的例子改教師研習出席率；步 4 好例壞例改教育；`build_artifact.py` 改為把 head 內 `<script>` 帶進 artifact（chip 切換）。線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY v2。
+- REALTEST_EVIDENCE: tool=Bash | cmd=內建瀏覽器 file:// 開頁 → find 合作對象 chip → click → find 「畫廊這次又延後付款」出現；Artifact publish 200 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿／計畫文字
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=看客服案例的完整分析頁\|客服滿意度那個例子 | hits=0
+- [下一步] PI-a 開工。
+
 ## 2026-09-23（續116）Auto-Repair SSH host key pinning 落地：無 fingerprint 的目標＝未設定，絕不無驗證連線（接手死亡 session）
 
 - [觸發] 續106 診斷後由「Fix repair-center backup probe ssh_error」session 實作，撞用量上限死亡（Codex companion 4 輪，第 4 輪「No material findings」）；本 session 接手落地。
