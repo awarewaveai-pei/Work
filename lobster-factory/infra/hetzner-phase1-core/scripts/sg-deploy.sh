@@ -53,6 +53,9 @@ SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE"; }
 fail() { log "ERROR: $*"; exit 1; }
+# 75 = EX_TEMPFAIL: refused on purpose (DEPLOY_HOLD, or another deploy holds the lock), not broken.
+# auto-deploy-next-admin.sh skips the tick without an alert on 75; every other non-zero alerts.
+refuse() { log "REFUSED: $*"; exit 75; }
 
 SKIP_PULL=0
 DRY_RUN=0
@@ -75,6 +78,10 @@ done
 # ─── Deploy lock (prevent concurrent runs) ───────────────────────
 LOCK_FILE="/tmp/sg-deploy.lock"
 LOCK_HELD=0
+# Checked and taken inside sync-host-scripts.sh's flock: a cron-side script sync has then either
+# finished before this deploy exists or sees its lock and skips -- it never swaps scripts mid-deploy.
+exec 8>/tmp/sync-host-scripts.lock
+flock -w 120 8 || { echo "[sg-deploy] a host script sync still holds /tmp/sync-host-scripts.lock after 120s"; exit 1; }
 if [ -f "$LOCK_FILE" ] && [ "$FORCE" -eq 0 ]; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
   if [ "$LOCK_PID" = "$$" ]; then
@@ -84,7 +91,7 @@ if [ -f "$LOCK_FILE" ] && [ "$FORCE" -eq 0 ]; then
     :
   elif [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
     echo "[sg-deploy] Another deploy is running (PID $LOCK_PID). Use --force to override."
-    exit 1
+    exit 75
   else
     echo "[sg-deploy] Stale lock found, removing."
     rm -f "$LOCK_FILE"
@@ -92,6 +99,7 @@ if [ -f "$LOCK_FILE" ] && [ "$FORCE" -eq 0 ]; then
 fi
 echo $$ > "$LOCK_FILE"
 LOCK_HELD=1
+exec 8>&-
 trap 'if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi' EXIT INT TERM
 # A previous run's rollback marker must not be reported as THIS run's rollback when this run
 # fails before reaching do_rollback (auto-deploy-next-admin.sh reads it on any failure).
@@ -138,27 +146,24 @@ if [[ $SKIP_PULL -eq 0 ]]; then
   fi
 fi
 
-# 1.8. self-sync deploy scripts from git → staging (prevents script drift without manual copy).
+# 1.8. refresh staging scripts from origin/main via sync-host-scripts.sh, the same block the cron
+#      entry points run before deciding (its header has the contract; no second copy of that logic here).
 #      Runs only after a successful git pull (SKIP_PULL=0) so --skip-pull stays truly isolated.
-#      If sg-deploy.sh itself changed: exec the new version so the rest of the deploy uses
-#      the latest code (avoids bash reading the old script body after self-overwrite).
+#      Then ALWAYS continue in the copy just installed: a cron-side sync may have replaced this file
+#      after this process started, so comparing the file on disk cannot tell whether THIS process is
+#      current (the old cmp-then-exec check skipped the re-exec exactly then).
 if [[ $SKIP_PULL -eq 0 ]]; then
   _git_scripts="$REPO_DIR/lobster-factory/infra/hetzner-phase1-core/scripts"
   _staging_scripts="$STAGING_DIR/scripts"
   [[ -f "$_git_scripts/sg-deploy.sh" ]] || fail "git scripts dir missing: $_git_scripts"
-  _self_changed=0
-  cmp -s "$_git_scripts/sg-deploy.sh" "$SELF_PATH" 2>/dev/null || _self_changed=1
   log "--- sync deploy scripts ---"
-  rsync -a "$_git_scripts/" "$_staging_scripts/" 2>&1 | tee -a "$LOG_FILE"
-  find "$_staging_scripts" -maxdepth 1 -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
-  if [[ "$_self_changed" -eq 1 ]]; then
-    log "sg-deploy.sh updated from git — re-execing new version"
-    _reexec=(--skip-pull)
-    [[ $DRY_RUN -eq 1 ]] && _reexec+=(--dry-run)
-    _reexec+=("${APPS[@]}")
-    exec "$_staging_scripts/sg-deploy.sh" "${_reexec[@]}"
-  fi
-  log "deploy scripts synced"
+  SG_DEPLOY_LOCK_PID=$$ bash "$_git_scripts/sync-host-scripts.sh" 2>&1 | tee -a "$LOG_FILE" \
+    || fail "host script sync failed (see above) -- refusing to deploy with scripts that are not origin/main's"
+  log "re-execing the sg-deploy.sh that step 1.8 just installed"
+  _reexec=(--skip-pull)
+  [[ $DRY_RUN -eq 1 ]] && _reexec+=(--dry-run)
+  _reexec+=("${APPS[@]}")
+  exec "$_staging_scripts/sg-deploy.sh" "${_reexec[@]}"
 fi
 
 # 1.85. deploy hold. While DEPLOY_HOLD exists on origin/main, every app deploy is refused --
@@ -173,7 +178,7 @@ if git -C "$REPO_DIR" cat-file -e "origin/main:$HOLD_PATH" 2>/dev/null; then
     log "DEPLOY HOLD present, DEPLOY_HOLD_OVERRIDE=1 set -- continuing. reason: $HOLD_REASON"
   else
     log "DEPLOY HOLD active. reason: $HOLD_REASON"
-    fail "deploy held by $HOLD_PATH -- git rm that file to resume, or re-run with DEPLOY_HOLD_OVERRIDE=1"
+    refuse "deploy held by $HOLD_PATH -- git rm that file to resume, or re-run with DEPLOY_HOLD_OVERRIDE=1"
   fi
 fi
 

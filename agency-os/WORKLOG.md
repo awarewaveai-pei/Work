@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-23（續120）主機腳本新鮮度：cron 呼叫端決策前先同步 origin/main 的 scripts/（假「自動部署失敗」警報根因）；接手死亡 session 修 Codex r2/r3
+
+- [觸發] 07:00Z Telegram「❌ 後台自動部署失敗」實為假警報：主機上的舊 `auto-deploy-next-admin.sh` 沒有 DEPLOY_HOLD 前置檢查，呼叫 `sg-deploy.sh` 被刻意的 hold 拒絕後回報 FAILED。「SG next-admin 自動部署失敗」session 寫完機制後撞用量上限死亡（Codex r2 4 findings 未處理）；本 session 接手。
+- [根因（不變量）] 主機 `/root/lobster-phase1/scripts` 只在 `sg-deploy.sh` step 1.8（呼叫端已決策之後）才刷新，無 app drift 或 hold 期間永遠不刷新。不變量：**每個部署管線的 cron 進入點都用 origin/main 版本的自己做決策**。
+- [修法] 新 `scripts/sync-host-scripts.sh`（`git archive origin/main:<dir>`、全部 `.sh` 過 `bash -n` 才裝、兩階段 copy→rename、flock、sg-deploy 執行中跳過）；`auto-deploy-next-admin.sh`／`check-drift-and-alert.sh` fetch 後先跑它、自身被換掉就 re-exec；`sg-deploy.sh` step 1.8 改呼叫同一區塊並永遠 re-exec 剛裝好的副本，拒絕（hold／lock busy）改 exit 75，auto-deploy 對 75 靜默跳過。Codex r2：F1 舊主機沒有區塊 → 呼叫端從 origin/main `git show` 取一次性副本自舉；F2 re-exec 前 `rm` lock 有空窗 → lock 存 PID、re-exec（同 PID）接手；F3 安裝非全有全無 → 先全部 copy 成 `.sync-<pid>` 再一起 rename，失敗清 partial；F4「刪除的腳本留在主機」→ 駁回：舊 rsync 本無 `--delete`，契約明寫保留主機獨有檔。Codex r3：F1 lock 建立非原子 → `set -o noclobber` O_EXCL 建立、死掉的 holder 可接手；F2 rename 階段中途失敗 → 接受為殘留並註明（同目錄 cp 成功後 rename 只會因主機既有故障失敗，下一 tick 重跑、sg-deploy 對非零拒絕部署）。`tests/host-scripts/sync.test.sh` +4 案例（自舉×2 呼叫端、re-exec 期間第二 tick 遇 lock、注入 cp 失敗零安裝、stale/live lock）。`DEPLOY_ROLLBACK_RUNBOOK.md` 補 1.8／1.85／腳本新鮮度列。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker run --rm -v D:/Work/lobster-factory/infra/hetzner-phase1-core:/src:ro ubuntu:24.04 bash -c 'apt-get install git; bash /src/tests/host-scripts/sync.test.sh'`（真腳本、真 git、真 cron 呼叫鏈） | exit=0 | ms=~120000 | result=67 passed, 0 failed
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash -n` ×4 腳本 | exit=0 | result=OK（首次容器跑無輸出 exit 2 → 我的新測試 `ls /tmp/tmp.*` 在 set -e 下炸掉，改 `find`）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n（r1 `6deea5b6`／r2 `d484151c` 4 個：3 修 1 駁回；r3 `ca908171` 2 個：1 修 1 接受殘留並註明）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,runbooks | grep=`sync-host-scripts\|AUTO_DEPLOY_REEXEC\|DRIFT_CHECK_REEXEC\|exit 75\|refuse()` | hits=6 檔（4 腳本、測試、runbook；`check-deploy-drift.ps1` 只讀 hold 不受影響）
+- [剩餘風險] **ks-aw-01 主機現在仍是舊呼叫端**，DEPLOY_HOLD 期間每 4 小時會再發一次假 FAILED 警報，直到有人在主機跑一次 `bash /root/Work/lobster-factory/infra/hetzner-phase1-core/scripts/sync-host-scripts.sh`（需 pull 後）或下一次 `sg-deploy.sh`（step 1.8 自裝）——列 TASKS go-ahead 項；未 push、未部署。
+- [rollback] `git revert <commit>`：主機下一次 sg-deploy step 1.8 會裝回舊版（rsync 版），cron 呼叫端回到舊行為。
+
 ## 2026-09-23（續119）high-risk gate 規則 4：部署腳本只有「真的執行」才擋，唯讀診斷放行；多行遠端指令與 pipeline 餵 shell 也抓（接手死亡 session）
 
 - [觸發] 「Fix high-risk gate blocking read-only ssh」session（SG next-admin session 開的卡）撞用量上限死亡，Codex round 3 兩個 CONFIRMED 未修；本 session 接手。

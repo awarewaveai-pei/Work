@@ -53,6 +53,7 @@
 |---|---|
 | 強制 | `sg-deploy.sh` 步驟 1.85（讀 `origin/main:DEPLOY_HOLD`，refuse 並印 `reason=`） |
 | 自動路徑 | `auto-deploy-next-admin.sh`（cron `0 3,7,11,15,19,23` UTC）有 hold 就跳過，**不發 Slack／Telegram**；`check-drift-and-alert.sh`（cron `0 1` UTC 每日 drift 提醒）同樣靜音 — 否則兩支都在叫人部署 hold 正要擋的東西 |
+| 腳本新鮮度 | 上面兩支 cron 腳本決策前先跑 `sync-host-scripts.sh`（主機 `scripts/` = `origin/main`），自身被換掉就 re-exec 新版 → 改它們的邏輯下一個 tick 就生效。2026-09-23 07:00Z 的「auto-deploy FAILED」誤報就是舊版 caller（無 hold 檢查）先決策造成 |
 | 浮出 | `check-smoke-tests.ps1` 的 `deploy_hold` → AO-RESUME §1 每次開工都看得到；> 14 天升 `warn:hold_stale_<N>d` |
 | 也會提醒 | `check-deploy-drift.ps1`／`/check-drift`／AO-CLOSE 的 deploy hint：有 hold 時改印「不要跑 sg-deploy」 |
 
@@ -87,6 +88,8 @@
 | 步驟 | 動作 | 失敗處置 |
 |------|------|---------|
 | 1 | `cd /root/Work && git fetch + git pull --ff-only origin main` | 非 fast-forward → 立即 fail（保留現狀，需要人介入） |
+| 1.8 | `sync-host-scripts.sh`：`origin/main` 的 `scripts/` 裝進 `/root/lobster-phase1/scripts`（全部 `.sh` 過 `bash -n` 才裝、rename 替換、部署進行中不換）；`sg-deploy.sh` 自己變了就 re-exec 新版 | 任一 `.sh` 語法錯 → 一個都不裝、deploy fail（急用：手動 `git pull` 後 `--skip-pull`） |
+| 1.85 | `DEPLOY_HOLD` 在 `origin/main` → 拒絕（§1.5） | fail；auto-deploy 在呼叫前就先靜默跳過 |
 | 1.5 | `npm test`（next-admin 專屬 test gate，35 vitest tests） | test 失敗 → 立即 fail abort deploy，舊版繼續跑 |
 | 2 | `rsync -av --delete --exclude='.env*' --exclude='node_modules' --exclude='.next' /root/Work/.../apps/<APP>/ /root/lobster-phase1/apps/<APP>/` | rsync 錯誤 → fail，staging 保持原狀 |
 | 2.5 | 對每個 RESTORABLE app 執行 `rollback-phase1.sh save`：快照**正在跑的 container 的 image**（沒有 container 才用 `:local`；兩者都沒有＝首次部署，印 `Saved: NONE`），並記下本次 tag（2026-09-19 起） | 腳本不可執行或 save 失敗 → 在 build 前 fail，**不在沒有回滾點的情況下部署** |
@@ -187,7 +190,7 @@ cat /var/lib/awarewave-alert/fail_streak
 ### 2.6 為什麼有兩個目錄（架構決定）
 
 - `/root/Work/`（git clone）— **源碼單一真相（SSOT）**；隨 `git pull` 自動更新；不直接 build
-- `/root/lobster-phase1/`（staging）— 部署艦面；持有本機獨有的 `docker-compose.yml`、`.env`、`nginx/`、`scripts/`；`apps/` 由 `sg-deploy.sh` rsync 自 git
+- `/root/lobster-phase1/`（staging）— 部署艦面；持有本機獨有的 `docker-compose.yml`、`.env`、`nginx/`；`scripts/` 由 `sync-host-scripts.sh` 從 `origin/main` 同步（cron 決策前 + `sg-deploy.sh` 1.8；**手改會被覆蓋**）；`apps/` 由 `sg-deploy.sh` rsync 自 git
 - 中間 rsync `--exclude='.env*'` 確保本機機密永遠不被 git 覆蓋
 
 > 歷史背景：2026-05-07 之前無此 rsync 機制，staging `apps/next-admin/` 自 4/27 凍結 10 天（Build Console、New Client、always-on Command Plane Phase 1 等 19 個 commit、3,785 行更新堆積未上線）。`sg-deploy.sh` 即為此機械化解法。

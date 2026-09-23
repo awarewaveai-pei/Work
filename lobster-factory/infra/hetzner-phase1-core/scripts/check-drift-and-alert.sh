@@ -23,6 +23,8 @@ DEPLOYED_FILE="$STAGING_DIR/.deployed-commit"
 STATE_FILE="$STAGING_DIR/.drift-alert-state"
 LOG_FILE="/var/log/sg-deploy-drift.log"
 THRESHOLD_BEHIND=1   # alert when behind >= this many commits
+# Absolute, resolved before the cd below: the re-exec after the script sync needs it.
+SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 log() { echo "[$(ts)] $*" >> "$LOG_FILE"; }
@@ -53,6 +55,32 @@ ORIGIN_HEAD=$(git rev-parse origin/main 2>/dev/null)
 if [[ -z "$ORIGIN_HEAD" ]]; then
   log "ERROR: cannot resolve origin/main"
   exit 0
+fi
+
+# 3.5 Refresh host scripts from origin/main before deciding; re-run this file if that replaced it, so a
+#     change here takes effect on this run, not after the next app deploy (sync-host-scripts.sh header).
+if [[ "${DRIFT_CHECK_REEXEC:-0}" != "1" ]]; then
+  _self_sum="$(sha256sum < "$SELF_PATH")"
+  _sync="$STAGING_DIR/scripts/sync-host-scripts.sh"; _sync_tmp=""
+  if [[ ! -f "$_sync" ]]; then
+    # Bootstrap (codex r2 F1): run origin/main's copy once when the host has none; it installs itself.
+    _sync_tmp="$(mktemp)"; _sync="$_sync_tmp"
+    git -C "$REPO_DIR" show "origin/main:lobster-factory/infra/hetzner-phase1-core/scripts/sync-host-scripts.sh" > "$_sync" 2>/dev/null || _sync=""
+  fi
+  if [[ -n "$_sync" ]]; then
+    if _sync_out="$(bash "$_sync" 2>&1)"; then _sync_rc=0; else _sync_rc=$?; fi
+  else
+    _sync_rc=127; _sync_out="sync-host-scripts.sh: not installed and not on origin/main"
+  fi
+  [[ -z "$_sync_tmp" ]] || rm -f "$_sync_tmp"
+  while IFS= read -r _line; do if [[ -n "$_line" ]]; then log "$_line"; fi; done <<< "$_sync_out"
+  if [[ "$_sync_rc" -ne 0 ]]; then
+    log "WARN: host script sync failed (rc=$_sync_rc) -- checking with the installed scripts"
+  elif [[ "$(sha256sum < "$SELF_PATH")" != "$_self_sum" ]]; then
+    log "this script changed on origin/main -- re-running the new copy"
+    export DRIFT_CHECK_REEXEC=1
+    exec bash "$SELF_PATH" "$@"
+  fi
 fi
 
 # 4. Read deployed commit

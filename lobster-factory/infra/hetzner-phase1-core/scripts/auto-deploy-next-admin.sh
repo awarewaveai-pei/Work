@@ -4,9 +4,8 @@
 # Safe to run manually: bash /root/lobster-phase1/scripts/auto-deploy-next-admin.sh
 # Notification: mirrors check-drift-and-alert.sh -- Slack + Telegram, sourced from .env.
 #
-# Install (SG VPS):
-#   sudo cp auto-deploy-next-admin.sh /root/lobster-phase1/scripts/
-#   sudo chmod +x /root/lobster-phase1/scripts/auto-deploy-next-admin.sh
+# Install: never by hand -- sync-host-scripts.sh keeps /root/lobster-phase1/scripts == origin/main
+# (this script runs it before deciding; on a fresh host sg-deploy.sh step 1.8 installs everything).
 #
 # Crontab (add via crontab -e):
 #   0 3,7,11,15,19,23 * * * /root/lobster-phase1/scripts/auto-deploy-next-admin.sh >> /root/lobster-phase1/logs/auto-deploy.log 2>&1
@@ -19,16 +18,36 @@ LOG_FILE="$DEPLOY_DIR/logs/auto-deploy.log"
 LOCK_FILE="/tmp/auto-deploy-next-admin.lock"
 ENV_FILE="$DEPLOY_DIR/.env"
 APP="next-admin"
+# Absolute, resolved before the cd below: the re-exec after the script sync needs it.
+SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 ts()  { date -u +%Y-%m-%dT%H:%M:%SZ; }
-log() { echo "[$(ts)] $*" | tee -a "$LOG_FILE"; }
+# cron already appends stdout to $LOG_FILE (crontab line above); tee-ing there too wrote every line
+# twice. Tee only when stdout is somewhere else, i.e. a manual run in a terminal.
+log() {
+    if [[ /proc/self/fd/1 -ef "$LOG_FILE" ]]; then echo "[$(ts)] $*"
+    else echo "[$(ts)] $*" | tee -a "$LOG_FILE"; fi
+}
 
-if [ -f "$LOCK_FILE" ]; then
+# Lock = the PID file, created ATOMICALLY (noclobber -> O_EXCL) so two ticks racing on the same
+# second cannot both pass a "does it exist" test (codex r3 F1). The lock survives the re-exec below
+# (exec keeps the PID), so a second tick arriving in that window still meets a live lock (codex r2
+# F2): only the re-exec'd copy may pass an existing lock, and only when it holds its own PID. A lock
+# whose holder is gone (crashed tick) is taken over, again atomically.
+lock_acquire() {
+    local holder
+    if ( set -o noclobber; echo "$$" > "$LOCK_FILE" ) 2>/dev/null; then return 0; fi
+    holder="$(cat "$LOCK_FILE" 2>/dev/null || true)"
+    if [[ "${AUTO_DEPLOY_REEXEC:-0}" == "1" && "$holder" == "$$" ]]; then return 0; fi
+    if [[ -n "$holder" ]] && kill -0 "$holder" 2>/dev/null; then return 1; fi
+    rm -f "$LOCK_FILE"
+    ( set -o noclobber; echo "$$" > "$LOCK_FILE" ) 2>/dev/null
+}
+if ! lock_acquire; then
     log "SKIP: lock file exists, another deploy may be running"
     exit 0
 fi
 trap "rm -f $LOCK_FILE" EXIT INT TERM
-touch "$LOCK_FILE"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 if [[ ! -f "$DEPLOY_DIR/.deployed-commit" ]]; then
@@ -51,6 +70,35 @@ if [[ -z "$OPS_INBOX_BASE_URL" ]]; then OPS_INBOX_BASE_URL="https://app.aware-wa
 
 cd "$WORK_DIR"
 git fetch origin main --quiet 2>>"$LOG_FILE" || { log "ERROR: git fetch failed"; exit 1; }
+
+# Refresh host scripts from origin/main BEFORE deciding; re-run this file if that replaced it. Without
+# this, a change here reached the host only via sg-deploy.sh step 1.8, after the old copy had decided
+# (2026-09-23 07:00Z: a copy without the hold check below reported a deliberate DEPLOY_HOLD as FAILED).
+if [[ "${AUTO_DEPLOY_REEXEC:-0}" != "1" ]]; then
+    _self_sum="$(sha256sum < "$SELF_PATH")"
+    _sync="$DEPLOY_DIR/scripts/sync-host-scripts.sh"; _sync_tmp=""
+    if [[ ! -f "$_sync" ]]; then
+        # Bootstrap (codex r2 F1): a host that predates the block has no copy, and under a hold nothing
+        # else would ever install one. Run origin/main's copy (fetched above) once; it installs itself.
+        _sync_tmp="$(mktemp)"; _sync="$_sync_tmp"
+        git show "origin/main:lobster-factory/infra/hetzner-phase1-core/scripts/sync-host-scripts.sh" > "$_sync" 2>/dev/null || _sync=""
+    fi
+    if [[ -n "$_sync" ]]; then
+        if _sync_out="$(bash "$_sync" 2>&1)"; then _sync_rc=0; else _sync_rc=$?; fi
+    else
+        _sync_rc=127; _sync_out="sync-host-scripts.sh: not installed and not on origin/main"
+    fi
+    [[ -z "$_sync_tmp" ]] || rm -f "$_sync_tmp"
+    while IFS= read -r _line; do if [[ -n "$_line" ]]; then log "$_line"; fi; done <<< "$_sync_out"
+    if [[ "$_sync_rc" -ne 0 ]]; then
+        log "WARN: host script sync failed (rc=$_sync_rc) -- deciding with the installed scripts"
+    elif [[ "$(sha256sum < "$SELF_PATH")" != "$_self_sum" ]]; then
+        log "this script changed on origin/main -- re-running the new copy"
+        trap - EXIT INT TERM   # the lock stays: the re-exec'd copy (same PID) takes it over
+        export AUTO_DEPLOY_REEXEC=1
+        exec bash "$SELF_PATH" "$@"
+    fi
+fi
 
 DEPLOYED=$(cat "$DEPLOY_DIR/.deployed-commit" | tr -d '[:space:]')
 REMOTE_HEAD=$(git rev-parse origin/main 2>/dev/null)
@@ -127,7 +175,14 @@ if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
     fi
     post_to_ops_inbox "deploy_success"
 else
-    log "FAILED: sg-deploy.sh exited non-zero for $APP"
+    _deploy_rc=$?
+    # 75 = sg-deploy refused on purpose (DEPLOY_HOLD pushed after the check above, or another deploy
+    # holds its lock): not a failure, the next tick re-evaluates. Alerting on it is the 07:00Z shape.
+    if [[ "$_deploy_rc" -eq 75 ]]; then
+        log "REFUSED by sg-deploy (hold or deploy in progress, see above) -- no alert, next tick re-evaluates"
+        exit 0
+    fi
+    log "FAILED: sg-deploy.sh exited non-zero for $APP (rc=$_deploy_rc)"
     # C1 fix: surface auto-rollback in the failure notification.
     # sg-deploy now exits non-zero AFTER firing rollback-phase1.sh restore on smoke fail.
     if [[ -f "$DEPLOY_DIR/.rollback-triggered" ]]; then
