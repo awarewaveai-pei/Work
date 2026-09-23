@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續124）研究線：計畫 v1.11——便宜模型執行協定 §12（PI-a 14 卡、PI-b 5 卡）、I11 示意稿＝規格、D18.2 電商例子；示意稿 v3.1／v2.3.1
+- [觸發] 操作者三點：課程頁要一個電商後台（app.aware-wave.com）案例；問示意稿是否已寫進計畫含檔案位置、要求之後所有工具都照此規格；「之後不可以一直開 Fable，計畫要讓任何便宜模型做得一樣好」。
+- [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.11：I11（兩份示意稿 = 285＋ARF 每個方法的驗收基準，含九段落地期對照）；D18.2（第五組 `ecommerce`，非預設）；§12 六節（規則／卡片格式／PI-a WC-01…14／PI-b WC-01…05／產卡規則／禁區），每張卡的讀／樣板／改／驗收指令／突變／回滾齊全；§3.3 修正 `binding: context` 不是 schema 鍵（`capability-contract.schema.yaml:550` required 只有 id/version/input/output）；§11 讀序加 §12。課程示意稿 v3.1（chip `ecom`＋四層例、「看一個完整分析頁」改 `.btn.primary` 按鈕直連結果頁 artifact）；結果頁 v2.3.1（「怎麼用？」改按鈕）。兩者重新發布（課程 v4、結果 v5）。
+- [卡片錨點本日 grep 驗過] `main.py:758-788／862-905／949-971／296-300／334-340`；`draft.py:33-39／111-168／224-270`；`provider.py:31-41`；`json_artifact_store.py:38-71`；`project_source_repository.py:167／312`；`deploy.sh:105／117-121／130-160／180-186`；`default.conf:427-450`；`NA/Dockerfile:1-60`；`playwright.config.ts:40-58`；`playwright-runner.ps1:161-200`；`SPEC/tests/contracts/specs/cognitive/typed-objects/*.fixtures.yaml`；family 清單 `grep -h "^family:"`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_v24.py（計數斷言）+ plan_v111.py（計數斷言，WC 卡數／I11 計數）+ html.parser 標籤配對兩檔 + grep 殘留 + build_artifact.py ×2 + Artifact publish ×2 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文字與示意稿；每個 file:line 於寫入前 grep/sed 讀過
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/docs | grep=binding: context|四組例子|看一個完整分析頁 →</u> | hits=1（§12 WC-PIa-02 引原文以糾正，非主張；R9 列同 commit 改正）
+- [下一步] 照 §12.3 從 WC-PIa-01 開始；操作者可改用 Sonnet／Codex 執行卡。
+
 ## 2026-09-23（續123）事故收尾 prod 動作全部落地：CF 白名單×3、fail2ban、nginx、Auto-Repair SSH 改指 ks-aw-01（pinned host key＋forced-command gate）、主機腳本同步、EU 備份腳本、n8n 殘值；VBC：搶 commit／WORKLOG 的舊修法仍有效但只擋 staged 掃入
 
 - **範圍**：TASKS「2026-09-23 事故收尾」①–⑥＋「Auto-Repair SSH 目標」＋「4 處 live 設定」④＋主機掃描新發現 2 項；每項 backup→apply→verify，備份路徑列於各項。操作者授權：「全部去處理好…都你決定」。
