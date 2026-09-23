@@ -28,7 +28,31 @@ import subprocess
 import sys
 import tempfile
 
-HUNK = re.compile(rb"^@@ -(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@")
+HUNK = re.compile(rb"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
+
+
+def rewrite_hunk_header(match, delta_kept: int) -> bytes:
+    """Re-anchor a kept hunk's NEW-side start as if only the previously KEPT hunks had been applied.
+
+    Why (2026-09-23, cost one misplaced WORKLOG commit 5f5c3e275): `git diff -U0` numbers every hunk's `+X` on
+    the assumption that all earlier hunks were applied. When an earlier FOREIGN hunk is dropped, `git apply
+    --unidiff-zero` positions a zero-context pure-insertion hunk (`-N,0`) by that stale `+X`, so a hunk meant
+    for old line 13 landed 29 lines further down, inside another session's entry. The old side stays as-is;
+    only the new side is recomputed: `old_start + delta_kept` for a replacement hunk, `old_start + 1 +
+    delta_kept` for an insertion (`-N,0` means "after old line N").
+    """
+    old_start = int(match.group(1))
+    old_len = int(match.group(2)) if match.group(2) is not None else 1
+    new_len = int(match.group(4)) if match.group(4) is not None else 1
+    # Unified-diff convention: a zero-length side is written as "the line AFTER which the hunk sits", so
+    # `-13,0` really means old position 14 and `+73,0` really means new position 74. Convert to real
+    # positions, shift by the kept delta, convert back.
+    pos_old = old_start + (1 if old_len == 0 else 0)
+    pos_new = pos_old + delta_kept
+    new_start = pos_new - (1 if new_len == 0 else 0)
+    old_part = f"-{old_start},{old_len}" if match.group(2) is not None else f"-{old_start}"
+    new_part = f"+{new_start},{new_len}" if match.group(4) is not None else f"+{new_start}"
+    return f"@@ {old_part} {new_part} @@".encode() + match.group(5)
 
 
 def run(*args, check=True, capture=True):
@@ -40,7 +64,7 @@ def run(*args, check=True, capture=True):
 
 
 def filter_hunks(diff: bytes, ranges):
-    out, keep = [], False
+    out, keep, delta_kept = [], False, 0
     for line in diff.split(b"\n"):
         if line.startswith((b"diff --git", b"index ", b"--- ", b"+++ ")):
             out.append(line)
@@ -49,6 +73,14 @@ def filter_hunks(diff: bytes, ranges):
         if match:
             start = int(match.group(1))
             keep = any(lo <= start <= hi for lo, hi in ranges)
+            if keep:
+                # Header re-anchored against KEPT hunks only (see rewrite_hunk_header); a dropped foreign
+                # hunk must not shift where git apply lands this one.
+                out.append(rewrite_hunk_header(match, delta_kept))
+                old_len = int(match.group(2)) if match.group(2) is not None else 1
+                new_len = int(match.group(4)) if match.group(4) is not None else 1
+                delta_kept += new_len - old_len
+            continue
         if keep:
             out.append(line)
     kept = [l for l in out if HUNK.match(l)]

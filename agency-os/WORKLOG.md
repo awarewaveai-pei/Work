@@ -42,6 +42,8 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`sed/grep` 讀回 champion-challenger recipe、replay.py、README、run_golden_tests.py、store.py ai_usage、prediction_tracking 目錄 | exit=0 | ms=300 | result=六個演化原語皆存在，計畫 §0 逐一引用
 - [v1.3 同日] 操作者「原來的工具 UI/UX 很爛，第一次使用的人根本無法知道要怎麼使用」→ 查證三個 UI 的首用卡點（`/ops/collect` 入口是工具不是任務、`ClientHubTabs.tsx` 12 個原生 `<select>` 違反操作者裁定、Cognitive OS dashboard 空狀態要人從 285 個方法選一個、結果是閘門表＋JSON；HCI `index.html:494` 有說明頁可當樣板）→ 補 §3.9（U1–U12、六步首用流程、首用測試協定：非操作者 L2 ≤15 分鐘零求助 SUS≥70、漏斗遙測、`ux-defaults` 可演化 kind）；D13 前端殼改新 `apps/cognitive-web`（`BP/12:9-16` Web／API 分離），舊 dashboard 降專家模式；P3 → 5d 含 UX DoD；R15／R16；§9 改成六題附建議答案（操作者反映沒看到第 ⑤ 題）。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`grep -nc "<select"` ClientHubTabs／CollectionSourcesPanel + `grep -n` dashboard.html 155/181/212 + index.html 494 + BP12:9-16 | exit=0 | ms=200 | result=12／2 個原生 select；dashboard 入口為工具選單；HCI 有 explainer；Blueprint 建議 Web／API 分離
+- [順手修，整類] commit `5f5c3e275` 用 `scripts/git-stage-hunks.py` 只提交本 session 的 WORKLOG hunk 時，另一 session 的 續106（29 行）在檔頭被正確丟掉，但保留 hunk 的 header 仍是 `+42,2`，`git apply --unidiff-zero` 對零上下文純插入用新側行號定位 → 兩行落進 續103。修法：`rewrite_hunk_header` 把兩側換成真實位置（零長度側 = 「之後那一行」）、只依**保留** hunk 的累計 delta 平移、再換回；`filter_hunks` 累計 delta。新測試 `tests/scripts/test_git_stage_hunks.py`（5 例）。本修正 commit 本身即用修好的腳本把兩行搬回 續105。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests/scripts/test_git_stage_hunks.py` + 兩個突變（header 不重寫→4 紅；delta 不累計→1 紅）→ 還原 5 綠 | exit=0 | ms=400 | result=OK / FAILED(4) / FAILED(1) / OK
 
 ## 2026-09-23（續104）研究管線三條線「不順、怪異」根因調查 → 決策記錄（提案，等操作者裁決）
 
