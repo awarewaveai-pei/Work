@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>冰山分析示意稿</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1b1f24;--muted:#5b6470;--line:#e3e6ea;--accent:#1f5fbf;--ok:#1a7f4b;--warn:#b25e09;--bad:#b3261e;--deep:#0b2a4a;--mid:#245b8a;--shallow:#5a93c4;--surface:#9fc3e0;--tag:#eef3fb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:16px}
+  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:10px 14px;border-radius:8px;font-size:14px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:16px;margin:0 0 10px;letter-spacing:.02em}
+  .sub{color:var(--muted);font-size:13px}
+  .chips span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0}
+  .grid{display:grid;grid-template-columns:1.1fr 1fr;gap:14px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .layer{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:8px;margin-bottom:6px;color:#fff}
+  .layer b{font-size:13px;opacity:.9}
+  .layer p{margin:0;font-size:14px}
+  .l1{background:var(--surface);color:var(--ink)}.l2{background:var(--shallow)}.l3{background:var(--mid)}.l4{background:var(--deep)}
+  .water{border-top:2px dashed #7aa7cc;margin:6px 0;position:relative}
+  .water::after{content:"水面：以下是看不到、但真正決定結果的部分";position:absolute;right:0;top:-10px;background:var(--card);padding:0 6px;font-size:12px;color:var(--muted)}
+  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 12px;background:#fafbfd;border-radius:0 8px 8px 0}
+  .finding b{display:block;margin-bottom:2px}
+  .finding.warn{border-color:var(--warn)}
+  cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  th{font-size:12px;color:var(--muted);font-weight:600}
+  .lv{white-space:nowrap;font-weight:600}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:14px;cursor:default}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.ghost{color:var(--muted)}
+  .meta{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+  .meta b{color:var(--ink)}
+  .ok{color:var(--ok)} .gap{color:var(--warn)}
+  ol.src{padding-left:20px;font-size:14px}
+  ol.src li{margin-bottom:4px}
+  .expert{color:var(--muted);font-size:13px}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+  pre{background:#0f172a;color:#d6e2f0;font-size:12px;padding:12px;border-radius:8px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner"><b>示意稿</b>：這是「執行並驗證」按下去之後<b>應該</b>出現的畫面。目前系統沒有這一層（只回閘門表＋JSON）。內容依你填的四格推出，未連網、未抓外部來源；數字只為示意。</div>
+
+  <div class="card">
+    <h1>冰山模型分析：客服滿意度從 85 掉到 62</h1>
+    <div class="sub">專案「客服品質」・方法：冰山模型（Iceberg Model）・輸入：你填的 4 段陳述・產出時間 2026-09-23</div>
+    <div class="chips" style="margin-top:8px"><span>系統思考</span><span>根因</span><span>4 層皆填</span><span>閘門 3/3 通過</span></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>冰山圖：症狀在上，槓桿在下</h2>
+      <div class="layer l1"><b>事件<br>看得到</b><p>本季滿意度 85 → 62 <cite>[1]</cite></p></div>
+      <div class="water"></div>
+      <div class="layer l2"><b>模式<br>趨勢</b><p>六個月內每季穩定下滑；新進客服流動率同步上升 <cite>[2]</cite></p></div>
+      <div class="layer l3"><b>結構<br>機制</b><p>上線訓練只有兩天；資深忙緊急案件無法帶人；新人準備不足就獨立接案 <cite>[3]</cite></p></div>
+      <div class="layer l4"><b>心智模型<br>信念</b><p>「客服是成本中心」→ 訓練預算永遠最先被砍 <cite>[4]</cite></p></div>
+    </div>
+
+    <div class="card">
+      <h2>解讀（4 個發現）</h2>
+      <div class="finding"><b>F1 這不是單季意外，是系統性下滑</b>單季掉 23 分是事件 <cite>[1]</cite>；連續六個月每季下滑、且與流動率同步 <cite>[2]</cite>，符合「結構在推」的訊號，救火式處理只會回到原點。</div>
+      <div class="finding"><b>F2 有一條會自我加強的迴路（訓練債）</b>資深忙緊急案件 → 沒空帶新人 → 新人準備不足就接案 → 更多客訴與緊急案件 → 資深更忙 <cite>[3]</cite>。這種迴路不打斷會越轉越快。</div>
+      <div class="finding"><b>F3 最深的槓桿在信念層</b>「成本中心」的定位讓訓練預算優先被砍 <cite>[4]</cite>，等於持續替 F2 的迴路加油。改結構而不改這個信念，預算下一輪還會被砍回去。</div>
+      <div class="finding warn"><b>F4 證據缺口（誠實標記）</b>流動率與滿意度目前只有「同步」<cite>[2]</cite>，沒有因果證據；也沒有每人案件量、首次解決率、離職原因。建議先補這三項再下重手。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>槓桿點：在哪一層出手，效果差多少</h2>
+    <table>
+      <tr><th>層</th><th>可做的事</th><th>預期</th><th>依據</th></tr>
+      <tr><td class="lv">事件</td><td>加班救火、補償客戶</td><td>短期止血，下季再掉</td><td><cite>[1]</cite></td></tr>
+      <tr><td class="lv">模式</td><td>每月看滿意度＋流動率＋新人佔比同一張圖</td><td>早三個月看到下一次下滑</td><td><cite>[2]</cite></td></tr>
+      <tr><td class="lv">結構</td><td>上線訓練 2 天 → 2 週；「帶新人」列入資深 KPI 與排班時數</td><td>直接切斷 F2 迴路的第一環</td><td><cite>[3]</cite></td></tr>
+      <tr><td class="lv">心智模型</td><td>把客服改記為「留客中心」：用留客率與再購率算訓練投資報酬</td><td>預算不再被優先砍，結構改動才守得住</td><td><cite>[4]</cite></td></tr>
+    </table>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>建議下一步（一鍵接著跑）</h2>
+      <div class="btns">
+        <span class="btn primary">因果迴路圖：把 F2 畫出來</span>
+        <span class="btn">五問法：驗證 F3 是否真的是根因</span>
+        <span class="btn">行為隨時間圖：把 F4 缺的數據補上</span>
+      </div>
+      <p class="sub" style="margin:10px 0 0">每一個都會沿用本次的 4 段輸入與引註，不用重填。</p>
+    </div>
+    <div class="card">
+      <h2>引註（每個 [n] 都指向一段可查的來源）</h2>
+      <ol class="src">
+        <li>你的輸入・事件：「本季客服滿意度分數從 85 分掉到 62 分」</li>
+        <li>你的輸入・模式：「過去六個月，滿意度分數每季穩定下滑，新進客服人員的流動率也同步上升」</li>
+        <li>你的輸入・結構：「新人上線訓練只有兩天，資深人員因為忙著處理緊急案件沒空帶新人…」</li>
+        <li>你的輸入・心智模型：「管理層把『客服是成本中心』當成預設假設，訓練預算永遠是最先被砍的項目」</li>
+      </ol>
+      <p class="sub">接了蒐集器之後，這裡會多出外部來源（網址、抓取時間、內容指紋）。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="meta">
+      <span>來源標記 <b>AI_INFERENCE / AI_GENERATED</b>（AI 推論，尚未經人核准）</span>
+      <span>模型 <b>claude-sonnet-5</b></span>
+      <span>費用 <b>約 6k tokens・≈ NT$1</b></span>
+      <span>閘門 <b class="ok">溯源 ✓</b> <b class="ok">層序 ✓</b> <b class="ok">引註完整 ✓</b></span>
+    </div>
+    <div class="btns" style="margin-top:12px">
+      <span class="btn primary">核准，存進專案</span>
+      <span class="btn">退回並說原因</span>
+      <span class="btn">匯出 PDF</span>
+      <span class="btn ghost">專家模式：看閘門表與 JSON</span>
+    </div>
+    <details style="margin-top:10px"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
+<pre>{
+  "id": "ICEBERG-8197A6CBE8346F64",
+  "generated_by_method": "systems.iceberg_model",
+  "gate_results": [
+    {"gate_id": "provenance_required", "status": "PASS"},
+    {"gate_id": "top_down_completeness", "status": "PASS"},
+    {"gate_id": "citation_integrity", "status": "PASS", "evidence": {"claims": 9, "cited": 9, "unsupported": 0}}
+  ],
+  "interpretation": { "findings": ["F1", "F2", "F3", "F4"], "leverage_points": 4, "next_methods": 3 }
+}</pre>
+    </details>
+  </div>
+
+</div>
+</body>
+</html>

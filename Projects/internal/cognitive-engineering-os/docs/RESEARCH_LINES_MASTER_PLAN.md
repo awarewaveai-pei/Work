@@ -2,14 +2,14 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入）；**同日 v1.2**（品質評分 harness §3.7 + 演化迴圈 §3.8）；**同日 v1.3**（首用 UX §3.9 + D13 前端殼），見 §10。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **建立** 2026-09-23 v1；**同日 v1.1**（critic 對抗審查 3C/8M/1m 全部折入）；**同日 v1.2**（品質評分 harness §3.7 + 演化迴圈 §3.8）；**同日 v1.3**（首用 UX §3.9 + D13 前端殼）；**同日 v1.4**（解讀層 §3.10 + PI 期 + §11 接手指南；①–⑥ 全部拍板），見 §10。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 | 項 | 狀態（2026-09-23） |
 |---|---|
-| 計畫 | v1.3 提案，等操作者回覆 §9 六題（①–⑥）；P0/P1 未開工；P5 與 P-P 為 High-STOP |
+| 計畫 | v1.4；§9 ①–⑥ 全部拍板（2026-09-23）；執行順序 P0 → PI → P1 → P2 → P3 → P4 → P4b → P-E；**目前：P0 開工**；P5 與 P-P 為 High-STOP |
 | 可重用（已查證） | 蒐集引擎 `NA/lib/collect`（41 個非測試 .ts；SSRF／DNS pin／robots／限流／品質／相關性／注入隔離／renderer 階）；COS Project+Source+CAS+events（`repo:22-60`）；Recipe 引擎（journal／resume／gates，`exec:236-250,347-361`）；AI gateway（brief→draft→builder→gates，provenance 強制 `draft.py:195-206`）；`ai.draft_record` capability（`SPEC/capabilities/contracts/ai.draft_record.capability.yaml`）；既有 citation gate `COS/ai_lego/modules/research/gates.py:41-63`；dossier prompt／段落表 `NA/lib/dossier/report.ts:76-139`、引註檢查 `:185-206`；`literature_search` ACTIVE 契約（`SPEC/capabilities/contracts/literature_search.capability.yaml:3`）；portal 身分層（`NA/app/portal/*`）；Trigger.dev 內部呼叫樣板 `WF/src/trigger/collect-scheduled-crawl.ts` + `NA/app/api/internal/collect/run-due-schedules/route.ts:27-32`；handoff code 發放／兌換樣板 `COS/ai_lego/platform/identity/store.py:342-385` |
-| 缺（本計畫要蓋） | Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；**品質評分 harness（§3.7）**；**演化迴圈（§3.8）**；Postgres／object storage；自然人來源的加密與抹除（P-P） |
+| 缺（本計畫要蓋） | **解讀層 §3.10**（現況：方法執行 = builder + gates，無 LLM，`main:758-788`；結果頁 = 閘門表 + JSON，`dashboard.html:1394-1410`；圖表僅 2 方法 `:1320-1345`）；Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；**品質評分 harness（§3.7）**；**演化迴圈（§3.8）**；Postgres／object storage；自然人來源的加密與抹除（P-P） |
 | 演化原語（已存在，§3.8 重用） | `SPEC/recipes/validated/champion-challenger.recipe.yaml`（ACTIVE）；prompt 版本重放與回滾 `COS/ai_lego/platform/ai_execution/{replay,rollback_plan}.py`（`replay.py:34-76` `prompt_version`／`restored_prompt_version`；README:27 v12 升級／回滾 replay 測試）；spec-root golden harness `SPEC/tests/run_golden_tests.py`；`ai_usage` 計量表（`store.py:117,465-468`）；`COS/ai_lego/compute/prediction_tracking/error.py`；Claude 雲端 routine（`/schedule`）；行為即資料（`query-plan.ts:38` ANGLES、`source-class.ts`、`methods/registry/method-form-examples.yaml`） |
 | 已由 critic 駁回、不再提 | 把 collect 做成 Recipe step（`exec:236-250` RUNNING 不可 resume、`main:131-133` journal 不含 source、adapter 無法注入依賴）；用舊橋搬資料（分類錯、無溯源、title 去重）；`REQUIRED` necessity（enum 無此值，`SPEC/specs/cognitive/recipe.schema.yaml:355`）；把「移植 enforceCitations」說成等價（原邏輯改寫 [?] 不 FAIL）；P1–P4 含自然人 |
 
@@ -24,7 +24,7 @@
 |---|---|---|
 | I1 | 同一 Project 內 `(canonical_url, content_sha256)` 唯一；同 URL 新 hash = 新 Source 列 + `supersedes_source_id`，舊列 `status=superseded`（同一交易）+ event。hash = `sha256(utf8(text))`，NA 端算（`NA/lib/collect/types.ts:51`），COS ingest 重算比對不符即 400（ADR 011 §決策 2，`011-collection-ingestion-boundary.md:52-56`） | §3.4-C2 |
 | I2 | 抓回內容 = `EVIDENCE／SOURCE_QUOTATION`（`types.ts:33-45`）；彙整輸出走 runtime 既有規則 `AI_INFERENCE／AI_GENERATED`（`rt:28-29`），草稿走 `AI_SUGGESTION／AI_SUGGESTED`（`draft.py:195-206`）；永不自動晉升 | 平台既有 |
-| I3 | 彙整每個主張的引註 ⊆ **prompt manifest**（實際送進 prompt 的 Source id + sha256 + 字元範圍）；越界或零引註 = gate FAIL（比 `report.ts:191-200` 的「改寫 [?]」嚴格，刻意） | §3.4-C4 |
+| I3 | 彙整**與解讀**每個主張的引註 ⊆ **prompt manifest**（實際送進 prompt 的 Source id + sha256 + 字元範圍）；越界或零引註 = gate FAIL（比 `report.ts:191-200` 的「改寫 [?]」嚴格，刻意） | §3.4-C4／C10 |
 | I4 | 方法 builder 只吃結構化 record；彙整表 → 方法 kwargs 必經顯式映射（`ai.draft_record` + 人填價值判斷欄），不直接 binding | §3.4-C5 |
 | I5 | 報表 = 版本化 artifact，`AI_GENERATED → HUMAN_APPROVED`，每個 [n] 解析到 Source id + sha256 + URL + fetched_at | §3.4-C6 |
 | I6 | 租戶邊界 = COS `Tenant→Workspace→Project`（`BP/12:27-39`）；NA 對 COS 寫入只憑 **per-run ingest grant**（tenant+project+run+scope+exp，伺服器端綁定 project），永不持有靜態全域寫權（`BP/12:62,78`） | §3.4-C3 |
@@ -49,6 +49,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 2. `POST /projects/{id}/collections`（非同步）：COS 寫 `CollectionRequested` event → 發 **ingest grant**（§3.4-C3）→ 呼叫 NA `POST /api/internal/collect/runs`（bearer + grant）→ NA 啟 Trigger task → `runCollection`（既有）→ `sink/cognitive` 批次 `POST COS /projects/{id}/sources/ingest`（Authorization: Grant）→ 完成 `POST COS /projects/{id}/collections/{run}/complete`（同 grant，附 RunReport 摘要）→ `CollectionCompleted` event。Dashboard 輪詢 `GET /projects/{id}/collections/{run}`。
 3. `POST /projects/{id}/synthesis`（context-bound capability，§3.4-C4；背景執行 + 輪詢）：讀本 Project Sources → 建 prompt manifest → AI gateway 起草 → typed-object builder → gates（含 `citation_integrity`）→ 存 artifact + `SynthesisCreated` event。
 4. Dashboard 選 recipe（既有）→「從彙整表起草」= `ai.draft_record`（brief = 彙整表 JSON）→ 人填價值判斷欄（權重／分數）→ `POST /recipes/{id}/run`（引擎不變；`data_classification` 改由 Project 推導；`async:true` 時 202 + 既有 `GET /recipes/{id}/runs/{run_id}` 輪詢）。
+4b. 方法 record 成立後 `POST /methods/{id}/interpret`（§3.10、C10）：manifest = record 欄位 + Project Sources → AI gateway → `MethodInterpretation` → gates → artifact + `InterpretationCreated`；結果頁顯示解讀，JSON 收進專家模式。
 5. `POST /projects/{id}/reports`（context-bound capability）：讀彙整表 + run 結果 → md（+pdf）→ [n] 經 manifest 解析 → artifact CAS + `ReportGenerated`；`POST …/reports/{id}/approve` → `ReportApproved`（identity_id）。
 ### 3.3 元件表
 | 元件 | 狀態 | 位置 | 說明 |
@@ -60,6 +61,8 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | Collection Service | 新（薄） | `NA/app/api/internal/collect/runs/route.ts`（bearer `COLLECT_RESEARCH_RUNS_TOKEN`，樣板 `run-due-schedules/route.ts:27-32`）；`WF/src/trigger/collect-research-run.ts` | 輸入 `{grant, cos_base_url, project_id, run_id, seeds[], budget}`；只轉交，不做決策 |
 | `sink/cognitive` | 新（一檔） | `NA/lib/collect/sinks/cognitive.ts`（形狀同 `sinks/kb.ts:125-246`） | 唯一知道 COS 的檔；批次 ingest；`finalize` 呼叫 complete |
 | Context-bound capability adapter | 新（一類） | `rt:70-100`（現為純函式表，宣告 side-effect-free）→ 加 `build_context_bound_adapters(deps)`，deps = {source repo, artifact store, ai gateway, tenant, project} | **不變量修訂**：registry 分兩類：pure（既有）／context-bound（新，只給 Project 動作與 report 用，不進 Recipe 純步驟）；契約檔標 `binding: context` |
+| **解讀層 `interpret.method_record`** | 新（context-bound） | `COS/ai_lego/modules/research/interpret_method_record.py`；typed object `SPEC/specs/cognitive/typed-objects/method-interpretation.schema.yaml`；contract `SPEC/capabilities/contracts/interpret.method_record.capability.yaml`（`binding: context`）；端點 `main` `POST /methods/{id}/interpret`（`:758` invoke 旁） | 輸入 = 方法 record（＋可選 project_id）；prompt 由方法契約 `purpose／inputs／outputs／recommended_next`（`SPEC/methods/contracts/*.contract.yaml`，例 `systems.iceberg_model.contract.yaml:34-70`）+ typed-object schema 生成，**零方法專屬程式**；輸出 §3.4-C10；gates：`citation_integrity`（同 C4）、`visual_kind_allowed`、`next_methods_resolvable`；artifact CAS + `InterpretationCreated` + `ai_usage` |
+| **視覺原語** | 新（web） | `apps/cognitive-web/components/visual/{layered,quadrant,matrix,graph,tree,timeline,scorecard,table}.tsx`；family→kind 預設表 `SPEC/evolution/interpretation-visuals/v1.yaml`（第 7 種可演化 kind） | 8 種通用圖形涵蓋 285 方法；方法契約可覆寫 kind；`COS/ai_lego/modules/representation/chart_render.py` 現只有 `quadrant_chart`（`:62`），維持給 recipe artifact 用，不擴 |
 | `synthesis.*` ×3 | 新（移植） | `COS/ai_lego/modules/research/synthesis_{dossier,decision_evidence,literature}.py`；typed objects `SPEC/specs/cognitive/typed-objects/{dossier-brief,decision-evidence-brief,literature-matrix}.schema.yaml`；capability contracts 同名 | prompt／段落表逐字移植 `report.ts:76-139`；輸出含 `manifest_ref`；每主張 `citations[]`=source_id |
 | `citation_integrity` gate | 新（擴充） | `COS/ai_lego/modules/research/gates.py:41-63` 旁 | 輸入 record + manifest；越界／零引註 FAIL；`uncited_sections[]` 進 evidence 不 FAIL |
 | `literature_search` adapter v2 | 改 | `rt:80-88`（offline fixture）→ project-backed：回本 Project `source_class=academic` Sources | 關 OQ-LITSEARCH-3、OQ-EDD-LITERATURE-1；`edd-literature-search-v1` fixture recipe 退場（§8） |
@@ -80,6 +83,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - **C7 成本**：`POST /projects/{id}/collections` 先回 plan（查詢數×供應商單價 + 抓取上限）需 `confirm:true` 才執行；entitlement id `research.collect`（`main:1008-1009` 旁）；P5 前恆 true（`COS/ai_lego/platform/entitlement/check.py:5`）。
 - **C8 harness 契約**：`score(case, output) → {metric: value}`，指標名固定（§3.7）；`thresholds.yaml` 每線每指標；harness 離線（來源快照，不連網、不用 collect）；報告含每案例每指標與 champion 差值；CI 紅 = commit 不得合併。
 - **C9 演化契約**：候選 = `{kind, version, diff, evidence[run_ids, metrics], risk_tier}`；晉升條件 = `∀metric: challenger ≥ threshold ∧ challenger ≥ champion − ε` 且主指標 > champion；R3+ 或觸及門檻 → `requires_human=true`；晉升與回滾都寫 LEDGER + event；champion 指標檔是唯一切換點（程式讀它，不讀「最新版」）。
+- **C10 解讀契約**：`MethodInterpretation = {method_id, record_ref(sha256), findings[{id, title, text, citations[]}], recommendations[{level, action, expected, citations[]}], gaps[{text, needed_evidence}], visual{kind ∈ 8 種, data}, next_methods[] ⊆ 契約 recommended_next ∪ catalog ACTIVE, provenance{AI_INFERENCE, AI_GENERATED}, model, usage}`；manifest = record 每個欄位一個可引 id（`r.<field>.<i>`）+ Project Sources（有 project_id 時）；`∀citations ⊆ manifest` 否則 FAIL；`findings=∅` FAIL；語言依 Project／session `language`；成本走 `ai_usage`，日預算 `COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET`（既有）。
 ### 3.5 租戶、身分、i18n、抹除
 - 操作者用自己的真實 tenant；service-tenant 橋整套廢除（§8）。外部客戶：portal → provisioning（`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/commercial/PROVISIONING_STANDARD.md`），P5。
 - i18n：方法 registry 已 zh/en；synthesis prompt 依 Project `language`；報表欄位雙語預留。
@@ -92,7 +96,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 ### 3.7 品質評分 harness（把「完善」變成數字）
 | 元素 | 內容 | 位置 |
 |---|---|---|
-| 黃金案例 | 每條線 ≥5 個案例：固定來源快照（Source 檔＋sha256，不連網）+ 人工標註的**期望發現**（L1：關鍵事實／爭議／關聯人；L2：選項／準則／關鍵證據；L3：主張／方法／限制）+ 已知陷阱（同名混淆、購物頁、注入句、矛盾來源） | `COS/eval/cases/<line>/<id>/{sources/, expected.yaml, README.md}`；合成或已公開資料，不含自然人敏感內容 |
+| 黃金案例 | 每條線 ≥3 個案例（P2）→ ≥5（P-E 前）：固定來源快照（Source 檔＋sha256，不連網）+ 人工標註的**期望發現**（L1：關鍵事實／爭議／關聯人；L2：選項／準則／關鍵證據；L3：主張／方法／限制）+ 已知陷阱（同名混淆、購物頁、注入句、矛盾來源） | `COS/eval/cases/<line>/<id>/{sources/, expected.yaml, README.md}`；合成或已公開資料，不含自然人敏感內容 |
 | 指標 | 引註精確率（每個 [n] 指向的來源真的支持該句，抽樣人審＋自動比對）、引註覆蓋率（期望發現被引到的比例）、幻覺率（越界／無來源主張）、矛盾偵出率、缺口誠實度（gaps 列出期望缺口的比例）、拒收正確率（陷阱被擋）、成本（查詢數／token）、時延 | `COS/eval/score.py`；輸出 `eval-report.json` + md |
 | 門檻 | 每線每指標一個門檻，**由操作者定**（初始值 = 首次基準線）；低於門檻 = FAIL | `COS/eval/thresholds.yaml`（版本化） |
 | 觸發 | 每個影響 synthesis／collect／recipe 的 commit（CI）；每夜對 champion 跑一次（漂移偵測，模型或供應商變了會先在這裡紅） | `COS/scripts/test-eval-harness.ps1`；夜跑走 Claude routine |
@@ -149,7 +153,13 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 漏斗事件：`started→collected→synthesized→ran→reported→approved`，含每步耗時與放棄點；進 §3.8 遙測。
 - UX 文案／預設值／步驟順序 = §3.8 第 6 種可演化資料 kind（`ux-defaults`），卡點是提案輸入；門檻同 I10 由人定。
 
-## 4. 決策紀錄（D1–D13）
+### 3.10 解讀層（方法執行後要有分析，不是 JSON）
+- 現況：`main:758-788` invoke = builder + gates，無 LLM；`iceberg_model.py:56-109` 原樣回填輸入；結果頁 `dashboard.html:1394-1410` = 通過行＋閘門表＋JSON；AI 只在起草填格（`draft.py:1-10`）。操作者 2026-09-23 截圖確認。
+- 做法：一個 context-bound capability（D4 同類）吃任何方法 record，用契約欄位生成 prompt，產出 C10 typed object，過 gates，存 artifact。方法專屬知識只來自契約 YAML 與可演化 prompt 片段（`SPEC/evolution/interpretation-prompts/`），**不寫 285 支程式**。
+- 結果頁（web）：發現卡（每句 [n] 可點開來源）→ 視覺（依 kind）→ 建議表 → 缺口 → 下一步方法（一鍵帶入本次輸入）→ 來源標記／模型／費用 → 核准／退回；專家模式收閘門表與 JSON。示意稿 `COS/docs/mockups/iceberg-result-mock.html`（用操作者的冰山案例）。
+- 驗收：同一支程式對兩個不同 family（`systems.iceberg_model` → layered、`decision.eisenhower_matrix` → quadrant）產出不同視覺；突變：拔 citation gate → 無引註主張 PASS → 紅；拔 `next_methods_resolvable` → 幻覺方法 id PASS → 紅；改 family→kind 表 → 視覺跟著變。
+
+## 4. 決策紀錄（D1–D14）
 | # | 決策 | 為什麼 | 淘汰 |
 |---|---|---|---|
 | D1 | 產品殼 = Cognitive OS | `BP/12:143-151` `app ≠ portal`；COS 已有租戶／身分／entitlement／journal／商業計畫 | next-admin `/ops/research` |
@@ -164,15 +174,17 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | D10 | 自然人來源獨立 P-P（High-STOP），P1–P4 的 L1 只做公司／組織／事件 | ADR 011 §決策 10；CAS／vault 現況（§3.5） | L1 含人一起做（v1） |
 | D11 | 「自行進化」= 量測→提案→挑戰→晉升／回滾的閉環，只改版本化資料；程式碼永遠人審 | 30 年紀律：無界爆炸半徑不可接受；既有原語（champion-challenger、prompt replay／rollback、golden harness）已是這個形狀 | 讓 agent 直接改 prompt／碼並部署 |
 | D12 | 分數是閘不是目標；門檻只能人改 | Goodhart：迴圈會學會討好指標；操作者既有裁定禁止改門檻消音偵測器 | 讓迴圈自調門檻「提高通過率」 |
-| D13 | **前端殼 = 新 Web app `apps/cognitive-web`（Next.js，與 next-admin／portal 同技術棧，Playwright 測試既有）**，只給 §3.9 首用流程；`dashboard.html` 降為「專家模式」直到 parity 後退場；API 不變 | `BP/12:9-16` Web／API 分離；1443 行單檔 vanilla JS 做不到 i18n、元件庫、a11y、可測；零重工：表單仍由 `method_form.py` 產生 | A 續改 `dashboard.html`（每加一步都是 DOM 手拼，無測試）|
+| D13 | **前端殼 = 新 Web app `apps/cognitive-web`（Next.js 15，與 next-admin／portal 同技術棧；Playwright 在 `lobster-factory/infra/hetzner-phase1-core/tests/` + `scripts/playwright-runner.ps1`）**，操作者 2026-09-23 拍板 B；§3.9 首用流程 + §3.10 結果頁；`dashboard.html` 降為「專家模式」直到 parity 後退場；API 不變 | `BP/12:9-16` Web／API 分離；1443 行單檔 vanilla JS 做不到 i18n、元件庫、a11y、可測；零重工：表單仍由 `method_form.py` 產生 | A 續改 `dashboard.html`（每加一步都是 DOM 手拼，無測試）|
+| D14 | 解讀層 = **一個**通用 context-bound capability + 8 種視覺原語；方法知識只來自契約 YAML 與可演化 prompt 片段 | 285 方法不可能各寫一支；契約已有 `purpose／inputs／outputs／recommended_next`（`systems.iceberg_model.contract.yaml:34-70`）；D4 同類、I2／I3 同規則 | 每方法手寫解讀／圖表（`dashboard.html:1320-1345` 那種）；在 builder 內呼叫 LLM（builder 必須純，`rt:48-52`） |
 
 ## 5. 分期
 | 期 | 內容 | 風險 | 完成定義（缺一不算） | Rollback | 估工 |
 |---|---|---|---|---|---|
 | **P0 凍結** | 三顆「送去 X」按鈕與兩條橋 feature-flag OFF（不刪碼、**不搬資料**）；`lib/hci/client.ts:6-9`、`CollectionSourcesPanel.tsx:991-993`、`ClientHubTabs.tsx:1880-1888` 過期註解改事實 | Low | NA 頁面無「送去 X」；`npx tsc` 綠 | flag ON | 0.5d |
+| **PI 解讀層 + 新殼第一片** | context-bound adapter 類（`rt:70-100`）；`interpret.method_record` + typed object + 3 gates + `POST /methods/{id}/interpret`；`apps/cognitive-web` 骨架（登入代理 COS session cookie、方法挑選最小版、表單沿 `method_form.py`、**結果頁 §3.10** + 8 視覺原語 + 專家模式 JSON）；`COS/docker-compose.yml` 加 `cognitive-web` 服務 + nginx `/`→web、`/expert`→舊 dashboard | Medium（compose／nginx 改動為 High：只走 `safe-infra-patch.sh`） | 操作者的冰山案例 → 結果頁如示意稿，每句主張有 [n]；`decision.eisenhower_matrix` 同一支程式出 quadrant；突變：拔 citation gate → 紅、拔 next_methods gate → 紅；COS unittest + golden 綠；web `tsc` + vitest 綠；Playwright 登入→執行→結果一條；`ai_usage` 有該次記錄 | 契約→DRAFT 即消失；nginx 切回；web 服務 down | 4d |
 | **P1 Source + Collection Service** | §3.3 前六列 + egress allowlist + `--tenant-id` bootstrap + journal key mode | Medium | curl 觸發一次真實 company run（操作者真 tenant）→ COS Sources 帶 provenance／fetched_at／collector identity；重跑同 seeds → 全 `unchanged`、0 新列；改一頁內容重跑 → supersede 列 + event；壞 hash → 400；過期 grant → 401；NA `tsc`+vitest 綠；COS pytest + golden 綠；`printenv COGNITIVE_OS_JOURNAL_KEY_MODE` ≠ disabled | 新欄位 nullable；端點下線；sink 檔刪；allowlist 還原 | 3d |
-| **P2 彙整 + 引註閘 + harness** | context-bound adapter 類；三個 synthesis + typed objects + manifest + gate；`literature_search` v2；**§3.7 harness：每線 5 個黃金案例、score.py、thresholds.yaml（首次基準線）、CI 接入、突變腳本** | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠；**harness 15 案例全部跑出分數、基準線寫入、拔閘突變讓幻覺率變紅** | 契約 status→DRAFT 即從 catalog 消失；harness 目錄獨立可刪 | 4d |
-| **P3 三線端到端 + 首用流程** | `apps/cognitive-web` 骨架（D13）+ §3.9 六步流程 + 示範 Project seed + 說明面板（registry 生成）；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1`；nginx 路由（`/` → web，`/expert` → 舊 dashboard） | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數；**首用測試協定通過（非操作者、L2 ≤15 分鐘零求助、SUS ≥ 70）**；Playwright 走完六步；零原生 `<select>`（grep = 0） | recipe→DRAFT；旗標移除；nginx 切回 `dashboard.html` | 5d |
+| **P2 彙整 + 引註閘 + harness** | 重用 PI 的 adapter 類與 `citation_integrity`；三個 synthesis + typed objects + manifest + gate；`literature_search` v2；**§3.7 harness：每線 3 個黃金案例（P-E 前補到 5）、score.py、thresholds.yaml（首次基準線）、CI 接入、突變腳本** | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠；**harness 9 案例全部跑出分數、基準線寫入、拔閘突變讓幻覺率變紅** | 契約 status→DRAFT 即從 catalog 消失；harness 目錄獨立可刪 | 3d |
+| **P3 三線端到端 + 首用流程** | web 三卡 + §3.9 六步流程（骨架與路由已在 PI）+ 示範 Project seed + 說明面板（registry 生成）；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1` | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數；**首用測試協定通過（非操作者、L2 ≤15 分鐘零求助、SUS ≥ 70）**；Playwright 走完六步；零原生 `<select>`（grep = 0） | recipe→DRAFT；旗標移除；三卡頁下線回 PI 結果頁 | 3d |
 | **P4 報表** | `artifact.generate_report` + export + 核准 | Medium | 三線各一份 md（+pdf），[n] 全解析到 id/sha256/url/fetched_at；核准翻轉 + 事件含 identity；再跑 = 新版本 | capability 移除 | 2d |
 | **P4b 回饋與遙測** | `RunScored`／`HumanEdited`／`ReportApproved|Rejected` events；核准／退回原因 chips；draft-vs-人改 diff；夜跑 harness 漂移偵測 routine | Low | 每個 run 都有分數事件；退回一次 → 事件含原因；夜跑連續 3 晚有報告 | 事件為附加，關 routine 即停 | 1d |
 | **P-E 演化迴圈** | §3.8：版本化資料目錄 + champion 指標、提案 routine、`run-challenger.ps1`、LEDGER；第一批可演化資料 = 角度表、來源分類、synthesis prompt、模型路由 | Medium（資料級自動晉升需操作者同意範圍） | 一次真實循環：routine 產生提案 → challenger 在 harness + 3 個真實 Project 重放 → 不劣於 champion → 晉升 → LEDGER 一行 → 一鍵回滾成功；劣化提案被丟棄且留紀錄；夜跑紅 → 自動回滾到最後綠版 | 刪 champion 指標即回到硬編預設 | 3d |
@@ -180,14 +192,16 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | **P-P 自然人** | Source envelope 加密 + subject 級定址 + 抹除驗證 + ADR 011 §決策 10 解除的新 ADR + 操作者明示批准 | **High-STOP** | 抹除後 CAS／journal／artifact 三處讀不回；負向測試；ADR 落地 | 不上線即無資料 | 5d+ |
 | **P6 選配** | `apps/collector` 容器；HCI adapter（`BP/10:83`） | Medium／High | 觸發：第二 tenant／要開 HCI 案 | — | — |
 
+**執行順序** P0 → PI → P1 → P2 → P3 → P4 → P4b → P-E；P5／P-P／P6 觸發式。**核心 P0–P4 = 15.5d；含 P4b + P-E = 19.5d**（1d = 一個完整工作 session，單一工程師）。里程碑（操作者看得到的）：PI 完 = 第一次看到真分析（第 5 天）；P1 完 = 真來源進系統（第 8 天）；P2 完 = 引註彙整（第 11 天）；P3 完 = 三線端到端 + 首用測試（第 14 天）；P4 完 = 報表（第 16 天）。
+
 ## 6. 驗證矩陣（每期四動作 + 突變）
-| 動作 | P1 | P2 | P3 | P4 |
-|---|---|---|---|---|
-| 實測 | curl + `docker exec` 讀 COS sqlite 列數／events | 真 Project + 真模型 | 三線真跑；202 輪詢；容器重啟後新 run 重跑 | 下載 md/pdf、核准事件 |
-| Review | critic 1 + `/codex-review`（TS、PY 各一 artifact） | 同 | 同 | 同 |
-| 抓蟲 | grep `sink/kb\|cognitive_os_project_id\|import-sources` | grep `enforceCitations\|REPORT_SECTIONS\|offline_literature_search` | grep `importOrganizationSources\|hci-import\|data_classification\", \"INTERNAL` | grep `dossier_report\|build_dossier` |
-| 突變 | 拔冪等鍵 → 重複列 → 紅；拔 hash 比對 → 壞 hash 200 → 紅；拔 grant project 綁定 → 跨 project 寫入 → 紅 | 拔閘 → 假引註 PASS → 紅；harness：刪一個期望發現的來源 → 覆蓋率降 → 紅 | 拔 `human_required` → 空權重 run → 紅 | 拔 [n] 解析 → 未解析引註 → 紅 |
-| P4b／P-E | — | — | 夜跑：把 champion prompt 換成故意劣化版 → 漂移紅 → 自動回滾；提案 routine：塞一個劣化提案 → 挑戰失敗 → 不晉升且留紀錄；拔 `requires_human` → R3 提案自動晉升 → 紅 | — |
+| 動作 | PI | P1 | P2 | P3 | P4 |
+|---|---|---|---|---|---|
+| 實測 | 操作者冰山案例真跑（真模型）；兩 family 兩種視覺；`docker exec` 讀 `ai_usage` 列 | curl + `docker exec` 讀 COS sqlite 列數／events | 真 Project + 真模型 | 三線真跑；202 輪詢；容器重啟後新 run 重跑 | 下載 md/pdf、核准事件 |
+| Review | critic 1 + `/codex-review`（PY、TS 各一 artifact） | 同 | 同 | 同 | 同 |
+| 抓蟲 | grep `renderQuadrantChartForMethod\|gate_results\|記錄 JSON`（舊渲染呼叫點） | grep `sink/kb\|cognitive_os_project_id\|import-sources` | grep `enforceCitations\|REPORT_SECTIONS\|offline_literature_search` | grep `importOrganizationSources\|hci-import\|data_classification\", \"INTERNAL` | grep `dossier_report\|build_dossier` |
+| 突變 | 拔 citation gate → 無引註 PASS → 紅；拔 next_methods gate → 假方法 id PASS → 紅；改 family→kind 表 → 視覺跟著變 | 拔冪等鍵 → 重複列 → 紅；拔 hash 比對 → 壞 hash 200 → 紅；拔 grant project 綁定 → 跨 project 寫入 → 紅 | 拔閘 → 假引註 PASS → 紅；harness：刪一個期望發現的來源 → 覆蓋率降 → 紅 | 拔 `human_required` → 空權重 run → 紅 | 拔 [n] 解析 → 未解析引註 → 紅 |
+| P4b／P-E | — | — | — | 夜跑：把 champion prompt 換成故意劣化版 → 漂移紅 → 自動回滾；提案 routine：塞一個劣化提案 → 挑戰失敗 → 不晉升且留紀錄；拔 `requires_human` → R3 提案自動晉升 → 紅 | — |
 
 ## 7. 風險與待驗證
 | # | 風險 | 處置 |
@@ -208,6 +222,8 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | R14 | 演化把「行為即資料」擴大成第二套程式（YAML 裡寫邏輯） | 可演化資料只限 §3.8 表列六種 kind；新增 kind 走 ADR |
 | R15 | 兩個前端並存期（web + 舊 dashboard）功能分叉 | 舊 dashboard 只讀不加功能；parity 清單在 §0 追蹤；退場日期 = P4 驗收 |
 | R16 | 首用測試只做一次、只有一位測試者 | 每期 DoD 重跑同協定；測試者輪替；卡點進遙測而非只靠一次觀察 |
+| R17 | 解讀層幻覺：主張超出 record 與 Sources | manifest 只含 record 欄位 + Sources；`citation_integrity` FAIL；`gaps[]` 讓「不知道」有地方寫（缺口誠實度指標，§3.7） |
+| R18 | 新 compose 服務 + nginx 路由 = prod 改動 | 只走 `safe-infra-patch.sh`（AGENTS §0）；`/expert` 保留舊頁；rollback = nginx 切回 |
 
 ## 8. 退場清單（P0 flag OFF；P4 驗收後刪）
 `NA/lib/cognitive-os/{client,import-sources}.ts`、`NA/lib/hci/{client,import-sources}.ts`、`NA/app/api/ops/clients/[slug]/{cognitive-os-import,hci-import}/route.ts`、`NA/app/api/internal/cognitive-os/import-project-sources/route.ts`、`NA/app/api/cognitive-os/open/route.ts`、`NA/lib/dossier/folder.ts`（`report.ts` 移植後整層刪）、`CollectionSourcesPanel.tsx:545-568`、`ClientHubTabs.tsx:1795-1811`、`SPEC/recipes/validated/edd-literature-search-v1.recipe.yaml`（fixture）、`rt:80-88` offline adapter；migrations 0087／0088／0089 欄位保留標 deprecated 不 drop；`bootstrap_service_identity.py` 的 service tenant 用法退場（改 `--tenant-id`）。`/ops/collect` 與客戶 KB **維持**。
@@ -221,13 +237,25 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
   ③ L3 第一版產物 = 文獻矩陣＋證據矩陣＋Toulmin，不含文獻回顧章節草稿。
   ④ P5（多租戶 Production Trust）與 P-P（自然人）在第二個租戶或真實人物需求出現時才啟動。
   ⑤ 演化迴圈自動晉升範圍 = 只有 R0–R2 資料級；模型切換與任何門檻永遠人審。
-- **待拍板**：
-  ⑥ 前端殼 = 新 `apps/cognitive-web`（D13）；舊 dashboard 降為專家模式。操作者要求討論（2026-09-23，附截圖：方法執行後只得閘門表＋JSON）。討論前置事實：方法執行**沒有解讀層**——`main.py:758-788` invoke = builder 組裝 + gates，無 LLM 步驟；`iceberg_model.py:56-109` builder 只驗序並原樣回填四層；`dashboard.html:1394-1410` 結果 = 通過行＋閘門表＋JSON；圖表只有 2 個方法（`:1320-1345`）；AI 只在起草階段填格（`draft.py:1-10`）。→ v1.4 先補「解讀層」積木（每方法：findings＋敘事＋引註＋視覺規格＋下一步方法），⑥ 在其後決定。
+- 已拍板（2026-09-23，稍後）：⑥ = **B**，前端殼 = 新 `apps/cognitive-web`（D13），舊 dashboard 降為專家模式；解讀層（§3.10、D14）排在 PI 期，先於殼的其餘功能。
+- 待拍板：無。
 
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；決策記錄 §10 指回；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7 出現；每完成 §5 一期更新 §0；契約變更走 ADR（`SPEC/docs/adr/`）。
-- **2026-09-23 拍板**：①–⑤ 是；⑥ 討論中，前置事實見 §9。
+- **v1.4（同日）**：操作者截圖「執行並驗證只出 JSON，沒有分析」+ 拍板 ⑥=B + 「誰都可以直接接手」→ 補 §3.10 解讀層、C10、D14、PI 期（排在 P1 前）、§6 PI 欄、R17／R18、§11 接手指南；P2／P3 估工因骨架與閘門前移而減（4d→3d、5d→3d）；D13 Playwright 位置更正；§3.7 黃金案例 P2 先 3 個。
+- **2026-09-23 拍板**：①–⑤ 是；⑥ = B（同日稍後）。
 - **v1.3（同日）**：操作者「原來的工具 UI/UX 很爛，第一次使用的人根本無法知道要怎麼使用」→ 補 §3.9（現況證據三表、U1–U12、六步首用流程、首用測試協定與漏斗遙測）、D13 前端殼、P3 改為含首用流程與 UX DoD（5d）、`ux-defaults` 第 6 種可演化 kind、R15／R16、§9 ⑥。
 - **v1.2（同日）**：操作者問「這樣就是最完美完整完善的工具了嗎」→ 答否，缺量尺與演化。補 §3.7 品質評分 harness（進 P2）、§3.8 演化迴圈（P4b 遙測 + P-E 迴圈）、I9／I10、C8／C9、D11／D12、R11–R14、§9 ⑤。
 - 2026-09-23 v1：Recipe 中心。**v1.1（同日，critic 3C/8M/1m 全折入）**：C1 自然人→P-P；C2 collect 移出 Recipe 成 Project 動作；C3 grant + collector identity + egress；M4 synthesis 改 context-bound capability；M5 顯式映射 + `human_required`；M6 necessity 只用 `REQUIRED_BY_RISK`；M7 `literature_search` v2 取代新 capability；M8 manifest 為引註集合 + 擴充既有 gate；M9 P0 不搬資料；M10 supersede 列 + hash 比對；M11 run 分類伺服器端 + journal key mode；m12 檔數、`draft.py:195-206`、C1 欄位、D3 依據改 §決策 1、token 改名。
+
+## 11. 接手指南（陌生 agent 從零開工）
+- **讀序**：§0（現況）→ §5 找「目前」期 → §3.3 該期元件列 → §3.4 契約 → §9（不重問）→ §4 淘汰欄（不重提）。
+- **路徑縮寫**：檔頭（COS／SPEC／NA／WF／BP）。spec root 對 runtime 唯讀（`COS/README.md`）。
+- **本機跑**：COS 測試 `cd COS && python -m unittest discover -s tests -t . -v`；golden `python SPEC/tests/run_golden_tests.py`；API `uvicorn ai_lego.apps.api.main:app --port 8420`（= Dockerfile CMD）；NA `npm test` + `npm run typecheck`；Playwright `scripts/playwright-runner.ps1`。
+- **環境變數**（`COS/deploy/.env`，不進 git）：`COGNITIVE_OS_ANTHROPIC_API_KEY`、`COGNITIVE_OS_AI_MODEL`、`COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET`、`COGNITIVE_OS_DB_PATH`、`COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST`、`COGNITIVE_OS_JOURNAL_KEY_MODE`；實值在各機 `mcp/user-env.ps1`，不硬編。
+- **部署**：COS API = 在 ks-aw-01 monorepo root `bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh`（test→health→smoke→rollback→notify）；NA = `sg-deploy.sh`；compose／nginx 改動只走 `safe-infra-patch.sh`（AGENTS §0）；新 `cognitive-web` 服務進 `COS/docker-compose.yml` 同網 `lobster-net`；nginx `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 的 `cognitive.aware-wave.com` 區塊加 `/`→web、`/expert`→api。
+- **每期工作卡**（開工前寫，AI 極簡）：`files`（§3.3 列）／`tests`（新測試檔）／`verify`（一條指令 + 預期輸出）／`mutation`（§6 該欄）／`commit`（根因 + 驗證）／WORKLOG 四行（REALTEST／REVIEW／BUGHUNT／WORKLOG）。
+- **進度指針**：§0 計畫列 + `agency-os/TASKS.md` 研究線一列 + WORKLOG 當日「續N」；三處只寫指標，細節在本檔。
+- **不做**：不改 Recipe 引擎（I8）；不在 builder 內叫 LLM（D14）；不加原生 `<select>`（U11）；不碰自然人（D10）；不調門檻（I10）；每 commit 最多 1 個 critic（AGENTS §4）。
+- **卡住**：架構衝突／缺資訊／無法驗證 → 停，§7 加一列，問操作者一題。
