@@ -164,7 +164,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 結果頁（web）**固定七段骨架**（操作者 2026-09-23 駁回第一版「無邏輯、無系統性」，依 NPC 冰山工作單與 Anderson & Johnson 理解層次表重做）：(0) 方法一句話＋「怎麼用？」（重開 U15 課程）＋「怎麼讀這一頁」三步＋**明確文字結論（一句話＋三個發現＋建議＋證據缺口，每句 [n]）** → (1) 結構圖：方法原生圖形（冰山／矩陣／樹…），左＝每層要回答的問題＋你填的，右＝該層介入方式，可見／不可見分線；**＋圖表分析（每張圖回答一個問題：趨勢／因果迴路／槓桿對比，資料只綁 record 與 Sources，無資料時標示意）** → (2) 逐層卡，同骨架：這層問什麼 → 你填的 [n] → 這代表什麼 → 在這層出手＋效果＋槓桿 → (3) 總結：在哪層出手＋證據缺口 → (4) 對照表（層 × 介入方式 × 時間取向 × 問題 × 你的案例 × 建議）→ **(5b) 解決方案（操作者 2026-09-23：「要分析問題也要解決問題」）：A 選方案（2–3 個方案 × 見效／成本／持久度／風險／建議；即 L2 決策線，可接 `life-decision-v1` WDM）→ B 行動計畫（週次／行動／負責／證明方式／目標；負責人與期限 `human_required`）→ C 追蹤驗證（≤3 個指標：現況／目標／期限；`review_at` 到期自動用新 Sources 重跑同一 interpret 並比較前後；改善→案例庫，未改善→回 A）** → (5) 下一步方法（標明加深哪一層；第一顆 = 契約 `recommended_next`）→ (6) 引註 → (7) 來源標記／模型／費用／核准／專家模式。每層的問題、介入動詞、時間取向、可見性 = 方法資料（display-metadata + `SPEC/evolution/interpretation-prompts/`），不寫進程式；沒有「層」的方法（矩陣、清單）以其原生單位（象限、項目）套同一骨架。示意稿 `COS/docs/mockups/iceberg-result-mock.html`（操作者冰山案例，v2.1；線上版 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ，私人連結，同檔重發即更新）。
 - 驗收：同一支程式對兩個不同 family（`systems.iceberg_model` → layered、`decision.eisenhower_matrix` → quadrant）產出不同視覺；突變：拔 citation gate → 無引註主張 PASS → 紅；拔 `next_methods_resolvable` → 幻覺方法 id PASS → 紅；拔 `visual_bindings_resolvable` → 綁到不存在路徑 PASS → 紅；改 family→kind 表 → 視覺跟著變；送一份閘門會 FAIL 的 kwargs → 422、不呼叫模型、`ai_usage` 無新列。
 
-## 4. 決策紀錄（D1–D17）
+## 4. 決策紀錄（D1–D18）
 | # | 決策 | 為什麼 | 淘汰 |
 |---|---|---|---|
 | D1 | 產品殼 = Cognitive OS | `BP/12:143-151` `app ≠ portal`；COS 已有租戶／身分／entitlement／journal／商業計畫 | next-admin `/ops/research` |
@@ -183,7 +183,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | D14 | 解讀層 = **一個**通用 context-bound capability + 8 種視覺原語；方法知識只來自契約 YAML 與可演化 prompt 片段 | 285 方法不可能各寫一支；契約已有 `purpose／inputs／outputs／recommended_next`（`systems.iceberg_model.contract.yaml:34-70`）；D4 同類、I2／I3 同規則 | 每方法手寫解讀／圖表（`dashboard.html:1320-1345` 那種）；在 builder 內呼叫 LLM（builder 必須純，`rt:48-52`） |
 | D15 | ⑦ 執行順序 P0 → PI-a → PI-b → P1；**⑧ P0 部署與 PI-b 同窗**（一次 prod 變更、一次 go-ahead） | 操作者 2026-09-23 授權「你是專家你決定而且要記錄下來」；P0 單獨上線無操作者可見價值、多一次 prod 風險；橋在關掉前只有操作者會按且已知凍結；部署當次仍照 AGENTS §3 要 go-ahead | P0 先獨立部署；⑦ 等操作者 |
 | D16 | 每個方法結果頁都接「解決方案」三步（選方案→行動計畫→追蹤驗證）；工具負責想清楚、排出來、盯著看，執行是人；負責人／期限人填；到期自動重跑比較 | 操作者 2026-09-23「要分析問題也要解決問題啊」；分析停在診斷 = 無處方；選方案就是 L2 線，零重工；追蹤重跑重用 interpret + Sources + 排程 | 只出分析；AI 自填負責人與期限；工具假裝能執行 |
-| D17 | 課程層 = 資料驅動：課文由 display-metadata（blurb／why zh+en）+ 契約 `purpose／inputs／preconditions` + `method-form-examples.yaml`（示範案例）+ 第 8 種可演化 kind `lessons`（每方法的日常例子／好例壞例／常見錯誤）生成；三條線的預設方法（冰山、WDM、Toulmin、文獻矩陣等 ≤10 個）人審定稿，其餘 275 個由模型起草標 AI_SUGGESTED、首次被開啟時送人審佇列 | 操作者 2026-09-23「使用者之前沒有使用過這個工具，所以你要先幫他上課」；285 支課不可能手寫；課文錯誤的爆炸半徑 = 誤導一次使用，可回滾 | 只給示範 Project（U9）不教方法；285 支全部手寫；課文寫死在前端 |
+| D18 | **教學例子跟著使用者進來的那條線走，不預設商業場景**：`lessons` 每方法四組例子 `{edd_research, partnership_risk, decision, everyday}`；顯示 Project.purpose 對應那組，可切換；「這是什麼」步用 everyday（零領域知識）；操作者預設 = 教育研究；示範 Project（U9）與課程用同一組例子；**永不**拿使用者真實填過的案例當教材 | 操作者 2026-09-23「所有帶入的例子應該以哪一種類型為主？像這個你是用商業行為」——客服例子是她測試輸入被我誤當教材；主要使用者是 EdD 研究者兼工作室經營者，商業通用例最不貼身 | 單一商業例；用真實案例當教材 |\n| D17 | 課程層 = 資料驅動：課文由 display-metadata（blurb／why zh+en）+ 契約 `purpose／inputs／preconditions` + `method-form-examples.yaml`（示範案例）+ 第 8 種可演化 kind `lessons`（每方法的日常例子／好例壞例／常見錯誤）生成；三條線的預設方法（冰山、WDM、Toulmin、文獻矩陣等 ≤10 個）人審定稿，其餘 275 個由模型起草標 AI_SUGGESTED、首次被開啟時送人審佇列 | 操作者 2026-09-23「使用者之前沒有使用過這個工具，所以你要先幫他上課」；285 支課不可能手寫；課文錯誤的爆炸半徑 = 誤導一次使用，可回滾 | 只給示範 Project（U9）不教方法；285 支全部手寫；課文寫死在前端 |
 
 ## 5. 分期
 | 期 | 內容 | 風險 | 完成定義（缺一不算） | Rollback | 估工 |
@@ -255,7 +255,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 ## 10. 文件關係、維護規則、變更紀錄
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；決策記錄 §10 指回；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7 出現；每完成 §5 一期更新 §0；契約變更走 ADR（`SPEC/docs/adr/`）。
-- **v1.8（同日）**：操作者「使用者之前沒有使用過這個工具，所以你要先幫他上課」＋參考 thesystemsthinking.com 冰山教學（定義→四層→例子→步驟→常見錯誤）→ U15 課程層六步、D17 資料驅動課文、首用流程加 0.5 步、P3 +1d（核心 20d／含演化 24d）、首用測試 ≤20 分鐘含課；示意稿 `iceberg-lesson-mock.html`。
+- **v1.8.1（同日）**：操作者「例子應該以哪一種類型為主？像這個你是用商業行為」→ D18 例子跟線走（四組：教育研究／合作對象／決定／日常，預設教育研究，可切換，永不用真實案例）；課程示意稿改為教育例＋領域切換 chips，做完的例子改教師研習出席率。\n- **v1.8（同日）**：操作者「使用者之前沒有使用過這個工具，所以你要先幫他上課」＋參考 thesystemsthinking.com 冰山教學（定義→四層→例子→步驟→常見錯誤）→ U15 課程層六步、D17 資料驅動課文、首用流程加 0.5 步、P3 +1d（核心 20d／含演化 24d）、首用測試 ≤20 分鐘含課；示意稿 `iceberg-lesson-mock.html`。
 - **v1.7（同日）**：操作者「要分析問題也要解決問題啊！解決問題你打算怎麼做？」→ §3.10 (5b) 解決方案三步、C11、D16、P4 擴為報表＋解決方案（2d→3d，核心 19d／含演化 23d）；示意稿 v2.2 加 ⑦ 解決方案（方案比較、90 天行動計畫、三指標、到期重跑）。
 - **v1.6（同日）**：操作者駁回示意稿（無邏輯、無系統性、首用者看不懂）並附 4 張參考圖（NPC 冰山工作單、可見／不可見金字塔、四問冰山、Anderson & Johnson 理解層次表）→ 示意稿重做為固定七段骨架、§3.10 結果頁骨架改寫、U13／U14；操作者授權「1 和 2 你決定並記錄」→ D15、§9 ⑦⑧ 定案。
 - **v1.5（同日）**：critic（1 個，plan v1.4 接手審）2C/6M/4m 全折入：C1 nginx 分流改 `/api/` 前綴（FastAPI 全在根路徑）；C2 web 放 `COS/apps/`、compose 走 deploy.sh 多服務、nginx 走 safe-infra-patch；M3 interpret 202+輪詢；M4 伺服器重跑 builder+gates；M5 manifest 葉路徑；M6 visual bindings；M7 PI 拆 a/b（b High-STOP）+ §9 ⑦；M8 估工 PI 5.5d、P3 4d、總 18d/22d；m9 next_methods ⊆ ACTIVE + display-metadata；m10 `append_event` 公開、核准移 P4；m11 chart 3 種、compose env 覆蓋 env_file；m12 §6 表修正。

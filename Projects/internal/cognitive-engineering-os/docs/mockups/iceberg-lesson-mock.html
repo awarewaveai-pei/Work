@@ -58,7 +58,20 @@
   svg text{fill:var(--ink)} svg text.m{fill:var(--muted)} svg .water{fill:var(--water)}
   dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+  .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style>
+<script>
+  // Example set follows the line the user came in from; the operator's default is education research.
+  document.addEventListener("click", function (e) {
+    var chip = e.target.closest && e.target.closest(".chip");
+    if (!chip) return;
+    var set = chip.getAttribute("data-set");
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); });
+    document.querySelectorAll("#examples .ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
+  });
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -99,41 +112,64 @@
 
   <!-- 2 -->
   <div class="card">
-    <h2>2. 四層，各配一個日常例子<small>1 分鐘</small></h2>
-    <div class="grid2">
-      <div class="layer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div><div class="ex">例：這個月有客戶投訴；這個月業績掉了。</div></div>
-      <div class="layer l2"><b>② 模式 Patterns</b><div class="q">問：以前發生過嗎？多常？什麼時候特別容易發生？</div><div class="ex">例：每一季都趕不上交期；每個星期一投訴特別多。</div></div>
-      <div class="layer l3"><b>③ 結構 Structures</b><div class="q">問：是什麼流程、規則、資源安排讓它一直發生？</div><div class="ex">例：案子太多、人太少；出院流程沒人說清楚誰負責。</div></div>
-      <div class="layer l4"><b>④ 心智模型 Mental Models（最深）</b><div class="q">問：大家心裡哪個沒說出口的假設，撐住了這些結構？</div><div class="ex">例：「成長永遠是好的」；「病人出院，我們的工作就結束了」。</div></div>
+    <h2>2. 四層，各配一個你領域的例子<small>1 分鐘</small></h2>
+    <div class="chips" role="tablist" aria-label="例子領域">
+      <span class="sub">例子領域：</span>
+      <button class="chip on" data-set="edu" id="chip-edu">教育研究（你的預設）</button>
+      <button class="chip" data-set="partner" id="chip-partner">合作對象</button>
+      <button class="chip" data-set="decision" id="chip-decision">一個決定</button>
+      <button class="chip" data-set="daily" id="chip-daily">日常</button>
     </div>
-    <p class="sub" style="margin:10px 0 0">記法：事件是「一次」，模式是「一再」，結構是「為什麼一再」，心智模型是「為什麼沒人改」。</p>
+    <div class="grid2" id="examples">
+      <div class="layer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div>
+        <div class="ex" data-set="edu">例：這學期期末專題有三成學生遲交。</div>
+        <div class="ex" data-set="partner" hidden>例：合作的畫廊這次又延後付款。</div>
+        <div class="ex" data-set="decision" hidden>例：這個月又有 5 位家長問能不能加開平日班。</div>
+        <div class="ex" data-set="daily" hidden>例：這週又為了家事吵架。</div></div>
+      <div class="layer l2"><b>② 模式 Patterns</b><div class="q">問：以前發生過嗎？多常？什麼時候特別容易發生？</div>
+        <div class="ex" data-set="edu">例：每學期期末都這樣；期中報告卻很少遲交；線上課更嚴重。</div>
+        <div class="ex" data-set="partner" hidden>例：近一年每次展覽結束都延 30 到 60 天才付。</div>
+        <div class="ex" data-set="decision" hidden>例：每年暑假前詢問暴增，開學後又回落。</div>
+        <div class="ex" data-set="daily" hidden>例：每次都在週日晚上。</div></div>
+      <div class="layer l3"><b>③ 結構 Structures</b><div class="q">問：是什麼流程、規則、資源安排讓它一直發生？</div>
+        <div class="ex" data-set="edu">例：專題期末一次繳、沒有分段檢查點；老師期末同時要改考卷，沒空提醒。</div>
+        <div class="ex" data-set="partner" hidden>例：合約沒寫付款期限；對方會計每季才結一次帳。</div>
+        <div class="ex" data-set="decision" hidden>例：現有教室只有週末滿，平日閒置；老師都是兼職，平日排不出人。</div>
+        <div class="ex" data-set="daily" hidden>例：沒有分工表，誰看到誰做。</div></div>
+      <div class="layer l4"><b>④ 心智模型 Mental Models（最深）</b><div class="q">問：大家心裡哪個沒說出口的假設，撐住了這些結構？</div>
+        <div class="ex" data-set="edu">例：「大學生應該自己會管理時間。」</div>
+        <div class="ex" data-set="partner" hidden>例：「小工作室不好意思催款。」</div>
+        <div class="ex" data-set="decision" hidden>例：「擴大就是成長。」</div>
+        <div class="ex" data-set="daily" hidden>例：「這種小事不用講。」</div></div>
+    </div>
+    <p class="sub" style="margin:10px 0 0">記法：事件是「一次」，模式是「一再」，結構是「為什麼一再」，心智模型是「為什麼沒人改」。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
   </div>
 
   <!-- 3 -->
   <div class="card">
     <h2>3. 看一個做完的例子<small>1 分鐘</small></h2>
-    <p class="lead">醫院：同一位病人因為同一個病，出院不久又住進來。</p>
+    <p class="lead">學校：教師研習工作坊的出席率，這次只剩四成。</p>
     <table>
       <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
-      <tr><td>事件</td><td>病人出院兩週後再次入院</td><td>治療、再出院（下次再來）</td></tr>
-      <tr><td>模式</td><td>再入院率半年來每個月都在升</td><td>開始追蹤數字、提早發現</td></tr>
-      <tr><td>結構</td><td>出院說明不清楚；回診追蹤常常延誤</td><td>改出院流程、設追蹤窗口（效果持久）</td></tr>
-      <tr><td>心智模型</td><td>「病人離開醫院，我們的工作就結束了」</td><td>把「出院後 30 天」納入照護責任（最根本）</td></tr>
+      <tr><td>事件</td><td>這次工作坊出席率 40%</td><td>催簽到、點名（下次一樣）</td></tr>
+      <tr><td>模式</td><td>三年來每年下滑；線上場次更低；學期末最低</td><td>開始追蹤數字、避開期末</td></tr>
+      <tr><td>結構</td><td>排在週三放學後、沒有代課；主題由上而下決定，老師沒參與選題</td><td>改排課給代課、老師選題（效果持久）</td></tr>
+      <tr><td>心智模型</td><td>「老師的成長是額外的事，不是工作的一部分」</td><td>把研習納入工時與考核（最根本）</td></tr>
     </table>
-    <p class="sub" style="margin:8px 0 0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：<u>看客服案例的完整分析頁 →</u></p>
+    <p class="sub" style="margin:8px 0 0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：<u>看一個完整分析頁 →</u></p>
   </div>
 
   <!-- 4 -->
   <div class="card">
     <h2>4. 怎麼填：四步，每步一個好例子和一個壞例子<small>1.5 分鐘</small></h2>
     <div class="step"><div class="n">1</div><div><b>把事件講清楚</b>：一件具體的事、有時間、有數字。
-      <div class="gb"><div class="good"><b>好</b>：本季客服滿意度從 85 分掉到 62 分。</div><div class="bad"><b>壞</b>：客服最近很爛。（誰？什麼時候？掉多少？）</div></div></div></div>
+      <div class="gb"><div class="good"><b>好</b>：這學期期末專題 30% 遲交，去年同期 12%。</div><div class="bad"><b>壞</b>：學生很懶。（哪些學生？什麼時候？多少？）</div></div></div></div>
     <div class="step"><div class="n">2</div><div><b>找模式</b>：這件事什麼時候發生、多常、跟什麼一起出現。
-      <div class="gb"><div class="good"><b>好</b>：過去六個月每季都在掉；新人流動率同時上升。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div></div></div>
+      <div class="gb"><div class="good"><b>好</b>：每學期期末都遲交，期中報告不會；線上班更嚴重。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div></div></div>
     <div class="step"><div class="n">3</div><div><b>找結構</b>：哪個流程、規則、人力安排在製造這個模式。寫「制度」，不寫「某個人」。
-      <div class="gb"><div class="good"><b>好</b>：新人訓練只有兩天；資深忙緊急案件沒空帶人。</div><div class="bad"><b>壞</b>：小王不會帶人。（這是怪人，不是結構）</div></div></div></div>
-    <div class="step"><div class="n">4</div><div><b>問信念</b>：大家沒說出口、但決定預算和優先順序的那句話。也問問自己的。
-      <div class="gb"><div class="good"><b>好</b>：管理層把客服當成本中心，訓練預算永遠先砍。</div><div class="bad"><b>壞</b>：管理層不重視。（太籠統，指不出哪個假設）</div></div></div></div>
+      <div class="gb"><div class="good"><b>好</b>：專題期末一次繳、沒有分段檢查點；老師期末同時要改考卷。</div><div class="bad"><b>壞</b>：某某老師不管學生。（這是怪人，不是結構）</div></div></div></div>
+    <div class="step"><div class="n">4</div><div><b>問信念</b>：大家沒說出口、但決定規則和優先順序的那句話。也問問自己的。
+      <div class="gb"><div class="good"><b>好</b>：「大學生應該自己會管理時間。」</div><div class="bad"><b>壞</b>：學生態度有問題。（太籠統，指不出哪個假設）</div></div></div></div>
     <p class="sub" style="margin:8px 0 0">填不出某一層沒關係，留白比硬湊好；工具會把它列成「證據缺口」，告訴你該去補什麼資料。</p>
   </div>
 
@@ -157,7 +193,7 @@
       <li>你們開會時常常出現的那句話（信念通常藏在口頭禪裡）</li>
     </ul>
     <div class="btns">
-      <span class="btn primary">用示範案例試一次<small>客服滿意度那個例子，已填好，按執行就看結果</small></span>
+      <span class="btn primary">用示範案例試一次<small>期末專題遲交那個例子，已填好，按執行就看結果</small></span>
       <span class="btn">開始填我的案例<small>四個格子，每格旁邊有提示</small></span>
     </div>
     <p class="sub" style="margin:10px 0 0">這堂課之後不會再自動出現；想再看，方法頁右上角「怎麼用？」隨時能打開。</p>
