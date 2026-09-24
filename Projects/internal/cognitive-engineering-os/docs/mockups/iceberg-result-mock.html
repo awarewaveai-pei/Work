@@ -19,8 +19,7 @@
   h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
   .lead{font-size:16px;margin:10px 0 6px}
-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
-  @media (max-width:760px){.steps{grid-template-columns:1fr}}
+  .steps{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
   .step{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:14px}
   .step b{display:block;color:var(--accent);margin-bottom:2px}
   .chips span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0}
@@ -57,16 +56,16 @@
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
   pre{background:#0f172a;color:#d6e2f0;font-size:12px;padding:12px;border-radius:8px;overflow:auto}
   dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
-  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .charts{display:grid;grid-template-columns:1fr;gap:14px}
+  .charts svg{max-width:640px;margin:0 auto}
   .charts figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px}
   .charts figcaption{font-size:13.5px;margin-bottom:4px}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  .kpis{display:grid;grid-template-columns:1fr;gap:10px}
   .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:13px}
   .kpi b{font-size:14px}.kpi .now{color:var(--muted)}.kpi .goal{color:var(--ok);font-weight:700}.kpi .when{color:var(--muted);font-size:12px}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 8px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
-  .grid2c{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
-  @media (max-width:760px){.grid2c{grid-template-columns:1fr}}
+  .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
   .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}.can{border:1px solid var(--ok)}.cant{border:1px solid var(--warn)}.can b,.cant b{display:block}
   .terms{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}.terms b{color:var(--ink)}
   .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
@@ -80,7 +79,7 @@
   .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
   .journey span.done{background:var(--ok);color:#fff}.journey span.next{background:var(--accent);color:#fff}
   .journey i{color:var(--muted);font-style:normal}
-  .nexts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:10px}
+  .nexts{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
   .next{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
   .next.rec{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
   .next b{font-size:14.5px}.next .k{color:var(--muted);font-size:12px}.next .need{color:var(--warn)}

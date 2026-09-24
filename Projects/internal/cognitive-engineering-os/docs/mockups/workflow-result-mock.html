@@ -19,14 +19,13 @@
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 8px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
-  .grid2c{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
-  @media (max-width:760px){.grid2c{grid-template-columns:1fr}}
+  .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
   .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}.can{border:1px solid var(--ok)}.cant{border:1px solid var(--warn)}.can b,.cant b{display:block}
   .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
   .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
   .journey span.done{background:var(--ok);color:#fff}.journey span.now{background:var(--accent);color:#fff}
   .journey i{color:var(--muted);font-style:normal}
-  .stations{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:10px}
+  .stations{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
   .st{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
   .st.done{border-color:var(--ok)}.st.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
   .st b{font-size:14.5px}.st .k{color:var(--muted);font-size:12px}.st .need{color:var(--warn)}
