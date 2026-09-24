@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-24（續129）研究線：計畫 v1.16——§0 殼 parity 清單（R15 說有卻沒有）、U16 問題路由「不知道用哪個工具」、U17 舊能力零退化（懶人填寫／示範案例／自組工作流／專家模式）、P3 +1d
+- [觸發] 操作者看結果頁⑧：原版有工作流＋單一工具（自動配下一步很好）、可自組工作流調順序、有「⚡ 懶人填寫」（先免費逐行比對、不夠才叫 AI）；問「我根本不知道要用哪個工具怎麼辦」；要「真正可以解決問題的頂規工具」。
+- [VBC] 計畫 R15 寫「parity 清單在 §0 追蹤」但 §0 沒有這張表；懶人填寫（`dashboard.html:197-199`、`:859-864`）、示範案例（`main.py:834`）、自組工作流（`main.py:1385-1455`、`dashboard.html:809-823`）、圖表面板（`:695`）都沒在新殼落點出現 → 新殼會退化。
+- [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.16：§0 parity 清單 11 列（能力／舊證據／新殼落點／期）；§3.9 U16 問題路由（第一層免費比對 metadata＋inventory＋recipes，信心不足才 `route.method`，≤3 建議且 why 引 catalog，一鍵接受 = 可調順序的自組工作流草稿）＋U17 零退化；§3.3 `route.method` 列（contract／端點 `POST /route`／輸出 `MethodRoute`／三閘）；P3 元件＋DoD＋6d→7d（核心 22.5d／26.5d、里程碑第 19／22.5 天）；§12.3 WC-PIa-09 入口、WC-PIa-10 `LazyFill.tsx`＋示範案例、WC-PIa-11 下一步 = 同專案新一步用 `ai.draft_record` 預填；§9 平台句。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python plan_v116.py（每個 replace／row edit 計數斷言）+ grep dashboard.html／main.py 錨點行 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文字
+- BUGHUNT_DONE: scope=agency-os/TASKS.md,agency-os/docs,agency-os/reports,scripts,Projects/internal/cognitive-engineering-os/docs | grep=parity 清單在 §0|route.method|LazyFill | hits=6（全在計畫本檔）
+- [下一步] WC-PIa-01；PI-a 卡 09／10／11 已含 parity 項。
 ## 2026-09-24（續128）研究線：計畫 v1.15——D23 每個方法的知識來自它自己的 dossier（自家蒐集→彙整→引註，285/285 種子 URL 已有）、I11 加 M1–M8 方法齊備檢核、P3 +1d
 - [觸發] 操作者：「你的 iceberg 會這麼優秀是因為我找了很多介紹文和圖給你，之後的其他工具呢？你要怎麼處理？」
 - [判斷] 冰山品質的來源 = 人餵的參考文與工作單圖。要讓其他 284 個方法到同一標準又不靠人逐一餵，唯一零重工的路 = 研究線自己的管線：每方法一個內部 Project（`purpose=method_dossier`），種子 = `SPEC/methods/registry/method-display-metadata.yaml` 的 `url`（`grep -c '^    url: "http'` = 285，方法數 285），加契約 `source_of_truth_for` 與操作者丟的網址 → Collection Service（P1）→ synthesis（P2）→ 起草 `lessons`／`result-skeletons`／`interpretation-prompts` 三份可演化資料，每句 [n]、過 `citation_integrity`。品質不用形容詞，用 I11 的 M1–M8 打分；不過 = 「知識不足」誠實顯示在課程頁與結果頁頂端。≤10 預設方法人審（操作者參考優先），其餘首次開啟懶生成＋送審，演化迴圈改進。圖檔要等 P5 圖像儲存，之前由人把圖轉述成文字進 Sources。
