@@ -6,16 +6,21 @@
 <title>冰山模型分析結果</title>
 <style>
   /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+/* Cognitive OS design system — the ONE stylesheet for every page (mocks now, web/app later).
+   Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
+   same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
+   markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
+   sync-design-system.py copies this file into the four mocks. */
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4}
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4;--ice-tip-ink:#14213d}
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}}
   :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}
   *{box-sizing:border-box}
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
@@ -107,13 +112,14 @@
   svg text.m{fill:var(--muted)}
   svg text.a{fill:var(--accent)}
   svg text.w{fill:var(--on-ice)}
+  svg text.tip{fill:var(--ice-tip-ink)}
+  svg text.warn{fill:var(--warn)}
   svg .node{fill:var(--node)}
   svg .water{fill:var(--water)}
   svg .axis{stroke:var(--axis)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (prefers-reduced-motion: reduce){*{transition:none!important}}
-  /* == shared design system: end == */
-  /* == page-specific == */
+  /* == page components (merged from the four pages; .mcard = method/station card, .filled = filled example) == */
   .todos{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
   .todo{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:14px}
   .todo b{display:block;color:var(--accent);margin-bottom:2px}
@@ -126,7 +132,7 @@
   .layer.l4{border-color:var(--l4)}
   .layer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:8px}
   .layer .meta{font-size:12px;color:var(--muted)}
-  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:#fff;margin-left:6px}
+  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:var(--on-ice);margin-left:6px}
   .lever.low{background:var(--axis)}
   .lever.mid{background:var(--l3)}
   .lever.high{background:var(--l4)}
@@ -141,13 +147,58 @@
   .kpi .now{color:var(--muted)}
   .kpi .goal{color:var(--ok);font-weight:700}
   .kpi .when{color:var(--muted);font-size:12px}
-  .nexts{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
-  .next{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
-  .next.rec{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
-  .next b{font-size:14.5px}
-  .next .k{color:var(--muted);font-size:12px}
-  .next .need{color:var(--warn)}
-  .next .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
+  .mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
+  .mcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
+  .mcard.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
+  .mcard b{font-size:14.5px}
+  .mcard .k{color:var(--muted);font-size:12px}
+  .mcard .need{color:var(--warn)}
+  .mcard .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
+  h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
+  .grid2{display:grid;grid-template-columns:1fr;gap:12px}
+  .exlayer{border-left:6px solid var(--l2);padding:10px 12px;background:var(--soft);border-radius:0 10px 10px 0}
+  .exlayer.l1{border-color:var(--l1)}
+  .exlayer.l2{border-color:var(--l2)}
+  .exlayer.l3{border-color:var(--l3)}
+  .exlayer.l4{border-color:var(--l4)}
+  .exlayer b{display:block;font-size:15px}
+  .exlayer .q{color:var(--accent);font-size:14px;margin:2px 0}
+  .exlayer .ex{font-size:13.5px;color:var(--muted)}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
+  .step .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:14px}
+  ul.check{padding-left:20px;margin:6px 0}
+  ul.check li{margin-bottom:4px}
+  .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+  .quiz details{margin:4px 0;font-size:14px}
+  .quiz summary{cursor:pointer}
+  .mcard.done{border-color:var(--ok)}
+  .station{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:12px}
+  .station h3{margin:0 0 2px;font-size:16px}
+  .station .why{color:var(--muted);font-size:13.5px;margin:0 0 8px}
+  .row b.need{color:var(--warn)}
+  .row a{white-space:nowrap}
+  .row ul{margin:0;padding-left:18px}
+  .row li{margin:2px 0}
+  .filled{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
+  .filled .lab{display:block;color:var(--accent);font-size:12px;font-weight:600;margin-bottom:2px}
+  /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
+  .mt0{margin-top:0}
+  .mt4{margin-top:4px}
+  .mt6{margin-top:6px}
+  .mt8{margin-top:8px}
+  .mt10{margin-top:10px}
+  .mt12{margin-top:12px}
+  .mt14{margin-top:14px}
+  .mb0{margin-bottom:0}
+  .mb8{margin-bottom:8px}
+  .mb12{margin-bottom:12px}
+  .my6{margin:6px 0}
+  .scroll-x{overflow-x:auto}
+  .warn{color:var(--warn)}
+  .card.accent{border-left:6px solid var(--accent)}
+  .card.okline{border-left:6px solid var(--ok)}
+  /* == shared design system: end == */
+  /* == page-specific == */
 </style>
 </head>
 <body>
@@ -170,24 +221,24 @@
       <div class="todo"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
       <div class="todo"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；你在這條路的哪裡、接著做什麼、不做也可以。</div>
     </div>
-    <p class="sub" style="margin:8px 0 0">只有 30 秒？看 ① 的一句話和建議就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
+    <p class="sub mt8 mb0">只有 30 秒？看 ① 的一句話和建議就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
     <div class="terms"><b>四個詞：</b><span><b>事件</b> 這次發生的事</span><span><b>模式</b> 一再發生</span><span><b>結構</b> 為什麼一再</span><span><b>心智模型</b> 為什麼沒人改</span></div>
   </div>
 
   <!-- 0.5 明確的文字結論 -->
-  <div class="card" style="border-left:6px solid var(--accent)">
+  <div class="card accent">
     <h2>① 結論（文字分析）</h2>
     <div class="how"><b>怎麼讀</b>先看一句話；三個發現各自標了信心和理由；「改判條件」是什麼證據出現就要改結論。<b>你要做的</b>在最下面寫你自己的判斷：同意、部分同意或不同意。</div>
-    <p class="lead" style="margin-top:0"><b>一句話：</b>主動分享的人變少，不是參與者不投入，是「帶領者先解讀作品」這個流程，加上「參與者需要專家幫他們看見意義」這個信念一起造成的；多鼓勵沒有用，要改流程順序，並且把那個信念換掉。</p>
+    <p class="lead mt0"><b>一句話：</b>主動分享的人變少，不是參與者不投入，是「帶領者先解讀作品」這個流程，加上「參與者需要專家幫他們看見意義」這個信念一起造成的；多鼓勵沒有用，要改流程順序，並且把那個信念換掉。</p>
     <div class="finding"><b>發現 1｜這是每期都會重演的下滑，不是這一期的特例<span class="conf mid">信心：中——只有你填的一句，沒有逐次數字</span></b>三期以來都從第 4 次 session 開始掉；帶領者先解讀作品的那幾次掉得最多 <cite>[1]</cite><cite>[2]</cite>。事件層只看到「這次很安靜」，模式層看到「每期到後半都安靜」。</div>
     <div class="finding"><b>發現 2｜有一條自我加強的「等答案迴路」在推<span class="conf mid">信心：中——迴路是從流程推出來的，還沒被資料證實</span></b>帶領者先講作品的意義 → 參與者等帶領者說 → 主動分享變少 → 帶領者覺得「他們還沒到位」要多引導 → 帶領者說得更多、更早 <cite>[3]</cite>。迴路不打斷，越到後面越安靜（圖 B）。</div>
     <div class="finding"><b>發現 3｜「專家比較懂」的信念讓迴路修不好<span class="conf low">信心：低——信念只有你的觀察，沒問過帶領者</span></b>紀錄表只有一欄「參與者是否達到本次目標洞察」<cite>[4]</cite>，等於把帶領者的解讀當標準答案在打分；只改流程、不改這一欄，下一期帶領者又會回到先講。</div>
-    <p style="margin:6px 0 0"><b>建議：</b>先改第 3 層（參與者先說；帶領者的解讀之後才講，並記成「附掛的影響來源」；紀錄表改量「判斷過程看不看得見」），一期之內用「主動分享人數、帶領者說明分鐘數」兩個數字，回頭跟帶領者團隊談「參與者才是最終判斷者」（第 4 層）。<b>證據缺口：</b>目前只知道「帶領者先講」和「分享變少」同時發生，還沒有逐次的說明分鐘數、每人發言次數，也沒問過參與者自己為什麼不說；先補這三項。</p>
+    <p class="mt6 mb0"><b>建議：</b>先改第 3 層（參與者先說；帶領者的解讀之後才講，並記成「附掛的影響來源」；紀錄表改量「判斷過程看不看得見」），一期之內用「主動分享人數、帶領者說明分鐘數」兩個數字，回頭跟帶領者團隊談「參與者才是最終判斷者」（第 4 層）。<b>證據缺口：</b>目前只知道「帶領者先講」和「分享變少」同時發生，還沒有逐次的說明分鐘數、每人發言次數，也沒問過參與者自己為什麼不說；先補這三項。</p>
     <div class="finding warn"><b>改判條件（出現這些證據，結論要改）</b>① 逐次說明分鐘數並沒有上升 → 迴路不成立，改查人數或時段；② 參與者匿名回答「不說」的原因與帶領者無關（例如時間、人數、線上）→ 第 3 層改寫；③ 上一期同一流程但分享沒掉 → 不是流程問題，回到第 2 層找差異。</div>
     <div class="judge"><b>你的判斷（你的原話才是記錄；上面 AI 寫的只是附掛）</b>
       <div class="btns"><span class="btn">同意</span><span class="btn">部分同意</span><span class="btn">不同意</span></div>
       <textarea placeholder="你怎麼看？哪裡對、哪裡不對、你手上有什麼上面沒看到的證據？"></textarea>
-      <div class="sub" style="margin-top:4px">沒填也能核准；填了會和這頁一起存，之後的方法會把你的判斷當成最高優先的輸入。</div>
+      <div class="sub mt4">沒填也能核准；填了會和這頁一起存，之後的方法會把你的判斷當成最高優先的輸入。</div>
     </div>
   </div>
 
@@ -215,7 +266,7 @@
         <line x1="400" y1="420" x2="840" y2="420" stroke="#fff" stroke-dasharray="4 4" opacity=".7"/>
       </g>
       <g font-weight="700" text-anchor="middle">
-        <text x="618" y="128" font-size="17" style="fill:#14213d">事件 Events</text>
+        <text class="tip" x="618" y="128" font-size="17">事件 Events</text>
         <text x="618" y="230" font-size="17" class="w">模式 Patterns</text>
         <text x="618" y="362" font-size="17" class="w">結構 Structures</text>
         <text x="618" y="490" font-size="17" class="w">心智模型 Mental Models</text>
@@ -267,7 +318,7 @@
           </g>
           <polyline points="50,60 120,60 190,60 260,100 330,120 400,140" fill="none" stroke="#1f5fbf" stroke-width="3"/>
           <polyline points="50,140 120,132 190,108 260,80 330,60 400,40" fill="none" stroke="#b25e09" stroke-width="3" stroke-dasharray="6 4"/>
-          <g font-size="12" font-weight="700"><text x="270" y="165" class="a">主動分享 6 → 2 人</text><text x="180" y="42" style="fill:var(--warn)">帶領者說明 10 → 35 分</text></g>
+          <g font-size="12" font-weight="700"><text x="270" y="165" class="a">主動分享 6 → 2 人</text><text class="warn" x="180" y="42">帶領者說明 10 → 35 分</text></g>
           <text x="50" y="222" font-size="11" class="m">示意數據：接上真實資料後以你的數字繪製；兩線同時變化不代表因果。</text>
         </svg>
         <div class="read"><b>怎麼看：</b>左軸是人數（實線），右軸是帶領者說明分鐘（虛線）；兩線在第 3–4 次交叉。<b>看到：</b>人數一路掉、說明一路升，同時發生。<b>注意：</b>同時發生不等於一個造成另一個。<b>來源：</b>[1][2]；數字為示意。</div>
@@ -284,7 +335,7 @@
           <g font-size="12.5" text-anchor="middle" >
             <text x="95" y="57">帶領者先講作品的意義</text><text x="365" y="57">參與者等帶領者說</text>
             <text x="365" y="177">主動分享變少</text><text x="95" y="177">帶領者覺得「還沒到位」</text>
-            <text x="235" y="217" font-size="12" style="fill:var(--warn)">紀錄表只問「達到洞察？」</text><text x="235" y="233" font-size="10.5" style="fill:var(--warn)">（信念層）</text>
+            <text class="warn" x="235" y="217" font-size="12">紀錄表只問「達到洞察？」</text><text class="warn" x="235" y="233" font-size="10.5">（信念層）</text>
           </g>
           <g fill="none" stroke="#245b8a" stroke-width="2" marker-end="url(#arr)">
             <path d="M170,52 L288,52"/><path d="M365,76 L365,148"/><path d="M288,172 L172,172"/><path d="M95,148 L95,76"/>
@@ -316,7 +367,7 @@
         <div class="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
       </figure>
     </div>
-    <p class="sub" style="margin:8px 0 0">三張圖各自對應冰山的一層或幾層；接上真實資料後，圖 A 用你的數字，圖 B、C 由分析結果生成。</p>
+    <p class="sub mt8 mb0">三張圖各自對應冰山的一層或幾層；接上真實資料後，圖 A 用你的數字，圖 B、C 由分析結果生成。</p>
   </div>
 
   <!-- 2. 四層逐層解讀，同一骨架 -->
@@ -324,7 +375,7 @@
     <h2>④ 由上往下四層解讀（每張卡同一格式）</h2>
     <div class="how"><b>怎麼讀</b>四張卡同一格式：這層問什麼 → 你填的 → 這代表 → 在這層出手 → 對應 ⑦ 的方案 → 你填的資料厚不厚。<b>你要做的</b>找出你填得最薄的一層，之後補資料（⑧ 有補法）。</div>
 
-    <div class="layer l1 card" style="margin-bottom:12px">
+    <div class="layer l1 card mb12">
       <div class="head"><h3>第 1 層／4：事件 Events</h3><span class="meta">看得見 ・ 時間：現在 ・ 出手方式：回應 React</span></div>
       <div class="row"><b>這層問</b><span class="q">現在發生了什麼？</span></div>
       <div class="row"><b>你填的</b><span>這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位 <cite>[1]</cite></span></div>
@@ -334,17 +385,17 @@
       <div class="row"><b>資料厚度</b><span>你填 1 句＋第 1 次的對照數字・外部 0 筆 → 夠用</span></div>
     </div>
 
-    <div class="layer l2 card" style="margin-bottom:12px">
+    <div class="layer l2 card mb12">
       <div class="head"><h3>第 2 層／4：模式與趨勢 Patterns &amp; Trends</h3><span class="meta">看不見 ・ 時間：過去到現在 ・ 出手方式：預測 Anticipate</span></div>
       <div class="row"><b>這層問</b><span class="q">這段時間有什麼趨勢？哪些事件互相關聯？</span></div>
       <div class="row"><b>你填的</b><span>三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低 <cite>[2]</cite></span></div>
       <div class="row"><b>這代表</b><span>每期重演，加上「先解讀的場次最低」，代表不是這一批人的問題，是流程在推。注意：<dfn title="兩件事一起發生，不等於一件造成另一件">同步不等於因果</dfn>，還缺逐次的說明分鐘數。</span></div>
       <div class="row"><b>在這層出手</b><span>每次 session 記兩個數字：主動分享人數、帶領者說明分鐘數，放同一張圖。<b>效果</b>：第 3 次就看得到苗頭，但不會阻止它。<span class="lever mid">槓桿：中低</span></span></div>
       <div class="row"><b>對應方案</b><span>⑦ C 的追蹤指標（不是方案，是量法）</span></div>
-      <div class="row"><b>資料厚度</b><span>你填 1 句・沒有逐次數字・外部 0 筆 → <span style="color:var(--warn)">最薄</span>，⑧ 行為隨時間圖可補</span></div>
+      <div class="row"><b>資料厚度</b><span>你填 1 句・沒有逐次數字・外部 0 筆 → <span class="warn">最薄</span>，⑧ 行為隨時間圖可補</span></div>
     </div>
 
-    <div class="layer l3 card" style="margin-bottom:12px">
+    <div class="layer l3 card mb12">
       <div class="head"><h3>第 3 層／4：結構與流程 Structures &amp; Processes</h3><span class="meta">看不見 ・ 時間：現在到未來 ・ 出手方式：設計 Design</span></div>
       <div class="row"><b>這層問</b><span class="q">什麼流程、制度、權力安排在製造上面的模式？</span></div>
       <div class="row"><b>你填的</b><span>流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」 <cite>[3]</cite></span></div>
@@ -354,7 +405,7 @@
       <div class="row"><b>資料厚度</b><span>你填 1 句（流程、分鐘、紀錄表三個事實）・外部 0 筆 → 夠用，但迴路本身還沒被數字證實</span></div>
     </div>
 
-    <div class="layer l4 card" style="margin-bottom:0">
+    <div class="layer l4 card mb0">
       <div class="head"><h3>第 4 層／4：心智模型 Mental Models</h3><span class="meta">最深、最看不見 ・ 時間：未來 ・ 出手方式：轉化 Transform</span></div>
       <div class="row"><b>這層問</b><span class="q">什麼沒說出口的假設、信念、價值觀，造就了上面的結構？</span></div>
       <div class="row"><b>你填的</b><span>帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」 <cite>[4]</cite></span></div>
@@ -385,16 +436,16 @@
       <tr><td>結構 ★</td><td>設計 Design</td><td>現在→未來</td><td>什麼制度在製造這些模式？</td><td>帶領者先講、說明 35 分、紀錄表只問「達到洞察」 <cite>[3]</cite></td><td>參與者先說、紀錄表改量過程</td></tr>
       <tr><td>心智模型</td><td>轉化 Transform</td><td>未來</td><td>這些制度背後的假設是什麼？</td><td>「參與者需要專家幫他們看見」<cite>[4]</cite></td><td>帶領者 = 讓判斷看得見的人</td></tr>
     </table>
-    <p class="sub" style="margin:8px 0 0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>
+    <p class="sub mt8 mb0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>
   </div>
 
   <!-- 4.5 解決方案：從分析到行動 -->
-  <div class="card" style="border-left:6px solid var(--ok)">
+  <div class="card okline">
     <h2>⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）</h2>
     <div class="how"><b>怎麼讀</b>A 選一條路、B 排成 90 天、C 定三個數字盯著。表裡的字：見效 = 多久看得到；成本 = 要投入什麼；持久 = 會不會回彈；風險 = 最可能失敗的地方。<b>你要做的</b>選一個方案、填負責人和期限、確認目標數字（目標由你定，系統只帶入現況）。</div>
 
-    <h3 style="margin:6px 0 8px">A. 選方案：三條路比一比</h3>
-    <div style="overflow-x:auto">
+    <h3 class="mt6 mb8">A. 選方案：三條路比一比</h3>
+    <div class="scroll-x">
     <table>
       <tr><th>方案</th><th>做什麼</th><th>見效</th><th>成本</th><th>持久度</th><th>風險</th><th>建議</th></tr>
       <tr><td>甲 只多鼓勵</td><td>開場鼓勵、輪流點名說（第 1 層）</td><td>當次</td><td>低</td><td>低，下次又安靜</td><td>被點到的人更退縮</td><td>只當急救</td></tr>
@@ -403,9 +454,9 @@
     </table>
     </div>
 
-    <div class="finding" style="margin-top:12px"><b>如果只做一件事，明天就做</b>下次 session 開始前跟帶領者約定：參與者先說 3 分鐘，帶領者的話後說。不用預算、不用誰點頭，也正好是乙的第一環。</div>
-    <h3 style="margin:14px 0 8px">B. 90 天行動計畫（AI 起草；負責人與期限請你確認）</h3>
-    <div style="overflow-x:auto">
+    <div class="finding mt12"><b>如果只做一件事，明天就做</b>下次 session 開始前跟帶領者約定：參與者先說 3 分鐘，帶領者的話後說。不用預算、不用誰點頭，也正好是乙的第一環。</div>
+    <h3 class="mt14 mb8">B. 90 天行動計畫（AI 起草；負責人與期限請你確認）</h3>
+    <div class="scroll-x">
     <table>
       <tr><th>週</th><th>行動</th><th>負責<span class="sub">（待確認）</span></th><th>怎麼證明有效</th><th>目標<span class="sub">（待你確認）</span></th></tr>
       <tr><td>1 到 2</td><td>補齊三項缺的數據：每次帶領者說明分鐘數、每人主動發言次數、參與者匿名一句話「為什麼沒說」</td><td>帶領者</td><td>三項數據有基準值</td><td>第 2 週前齊全</td></tr>
@@ -415,20 +466,20 @@
       <tr><td>13</td><td>用新資料重跑本分析，比較前後</td><td>系統自動</td><td>下方三個指標</td><td>見 C</td></tr>
     </table>
     </div>
-    <p class="sub" style="margin:6px 0 0">需要誰點頭：帶領者團隊（角色定義）、課程設計（紀錄表）。這兩個沒點頭，乙做得成、丙做不成。</p>
+    <p class="sub mt6 mb0">需要誰點頭：帶領者團隊（角色定義）、課程設計（紀錄表）。這兩個沒點頭，乙做得成、丙做不成。</p>
 
-    <h3 style="margin:14px 0 8px">C. 追蹤驗證：三個指標，90 天後自動重跑</h3>
+    <h3 class="mt14 mb8">C. 追蹤驗證：三個指標，90 天後自動重跑</h3>
     <div class="kpis">
       <div class="kpi"><b>主動分享人數（8 人團體）</b><span class="now">現在 2 人</span><span class="goal">目標 6 人（待你確認）</span><span class="when">一期（6 次）</span></div>
       <div class="kpi"><b>帶領者說明分鐘數（90 分鐘裡）</b><span class="now">現在 35 分（示意）</span><span class="goal">目標 ≤ 15 分（待你確認）</span><span class="when">一期（6 次）</span></div>
       <div class="kpi"><b>影響來源清單含帶領者本身</b><span class="now">現在 未量測</span><span class="goal">每次 100%（待你確認）</span><span class="when">第 4 週起</span></div>
     </div>
-    <div class="btns" style="margin-top:10px">
+    <div class="btns mt10">
       <span class="btn primary">把行動計畫存成任務，設提醒</span>
       <span class="btn">90 天後自動重跑本分析並比較</span>
       <span class="btn">改善了就記進案例庫；沒改善回到 A 重選</span>
     </div>
-    <p class="sub" style="margin:8px 0 0">工具負責想清楚、排出來、盯著看；動手做事的是人。到期時系統會用新資料自動重跑這一頁、把前後放在一起比較，並通知你；目標數字由你定，AI 不替你定。</p>
+    <p class="sub mt8 mb0">工具負責想清楚、排出來、盯著看；動手做事的是人。到期時系統會用新資料自動重跑這一頁、把前後放在一起比較，並通知你；目標數字由你定，AI 不替你定。</p>
   </div>
 
   <!-- 5. 下一步 -->
@@ -437,14 +488,14 @@
     <div class="how"><b>怎麼讀</b>旅程列是你在哪；每張卡寫做了會得到什麼、要你再填什麼。<b>你要做的</b>選一張，或都不選。</div>
     <div class="journey">
       <span class="done">✓ 冰山模型：問題在第 3 層、根在第 4 層</span><i>→</i>
-      <span class="next">下一步：槓桿點分析（算每個出手點的力道）</span><i>→</i>
+      <span class="mcard">下一步：槓桿點分析（算每個出手點的力道）</span><i>→</i>
       <span>之後：五問法（驗證根因）</span><i>→</i>
       <span>最後：⑦ 解決方案定案與追蹤</span>
     </div>
-    <p class="lead" style="margin:6px 0 0">你已經知道問題在第 3 層的迴路、根在第 4 層的信念。<b>最值得的下一步是算出三個出手點的力道</b>，因為 ⑦ 的甲乙丙現在只有排序、沒有數字。<b>不做下一步也可以</b>：⑦ 的方案已經能用，差別是有沒有數字撐它。</p>
+    <p class="lead mt6 mb0">你已經知道問題在第 3 層的迴路、根在第 4 層的信念。<b>最值得的下一步是算出三個出手點的力道</b>，因為 ⑦ 的甲乙丙現在只有排序、沒有數字。<b>不做下一步也可以</b>：⑦ 的方案已經能用，差別是有沒有數字撐它。</p>
 
-    <div class="nexts">
-      <div class="next rec">
+    <div class="mcards">
+      <div class="mcard now">
         <div><b>槓桿點分析</b><span class="tag">本方法建議的下一步</span></div>
         <div><span class="k">回答什麼：</span>三個出手點（開場鼓勵／改流程順序／改帶領者角色）各自的力道與代價。</div>
         <div><span class="k">帶入什麼：</span>你的四段輸入 <cite>[1]</cite>–<cite>[4]</cite> 與本次 3 個發現 → 自動填 5 個欄位；<span class="need">還要你填 1 個</span>：每個出手點你估的「改變難度」（1–5）。</div>
@@ -452,7 +503,7 @@
         <div class="k">約 2 分鐘・約 NT$1</div>
         <div class="btns"><span class="btn primary">用這次的資料開始</span><a class="btn" href="#" title="這個方法的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
       </div>
-      <div class="next">
+      <div class="mcard">
         <div><b>因果迴路圖</b></div>
         <div><span class="k">回答什麼：</span>等答案迴路有沒有漏掉的環節、有沒有第二條迴路。</div>
         <div><span class="k">帶入什麼：</span>第 3 層你填的 <cite>[3]</cite> 與發現 2 → 自動填 4 個節點；<span class="need">還要你填 0 個</span>。</div>
@@ -460,7 +511,7 @@
         <div class="k">約 1 分鐘・約 NT$0.5</div>
         <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個方法的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
       </div>
-      <div class="next">
+      <div class="mcard">
         <div><b>行為隨時間圖</b></div>
         <div><span class="k">回答什麼：</span>分享人數與說明分鐘數六次的走勢，是不是真的在變。</div>
         <div><span class="k">帶入什麼：</span><cite>[1]</cite><cite>[2]</cite> 的數字 → 自動建 2 條序列；<span class="need">還要你填 12 格</span>：六次 session 的實際數字（現在只有示意）。</div>
@@ -468,7 +519,7 @@
         <div class="k">約 3 分鐘（要填數字）・約 NT$0.5</div>
         <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個方法的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
       </div>
-      <div class="next">
+      <div class="mcard">
         <div><b>五問法</b></div>
         <div><span class="k">回答什麼：</span>「參與者需要專家幫他們看見意義」再往下問五次為什麼，是不是真的根因。</div>
         <div><span class="k">帶入什麼：</span>第 4 層 <cite>[4]</cite> 與發現 3 → 自動填第一個「為什麼」；<span class="need">還要你填 4 個</span>：後面的回答（可讓 AI 起草，你改）。</div>
@@ -478,13 +529,13 @@
       </div>
     </div>
 
-    <div class="btns" style="margin-top:12px">
+    <div class="btns mt12">
       <span class="btn primary">把建議的兩步串成一條工作流，一次跑完<small>每一步停下來給你確認，順序可以改</small></span>
       <span class="btn">不確定選哪個？描述你想知道什麼<small>系統幫你挑，最多三個建議</small></span>
       <span class="btn">分析已經夠了，直接去 ⑦ 解決方案</span>
       <span class="btn ghost">都不做，先核准存檔（⑨ 下方）</span>
     </div>
-    <p class="sub" style="margin:8px 0 0">每一張都帶入本次的輸入與引註，「還要你填」的欄位會標紅；按下去先開預填好的表單，你確認才執行、才花錢。</p>
+    <p class="sub mt8 mb0">每一張都帶入本次的輸入與引註，「還要你填」的欄位會標紅；按下去先開預填好的表單，你確認才執行、才花錢。</p>
   </div>
 
   <!-- 6. 引註 -->
@@ -509,14 +560,14 @@
       <span>檢查 <b class="ok" title="每一句主張都有 [n]">來源 ✓</b> <b class="ok" title="沒有跳層：有模式才寫結構、有結構才寫心智模型">層序 ✓</b> <b class="ok" title="每個 [n] 都找得到來源">引註完整 ✓</b> <b class="ok" title="沒有把 AI 的話當成你的結論；你的判斷欄還在">無預設結論 ✓</b></span>
       <span>你的判斷 <b>尚未填</b>（① 下方）</span>
     </div>
-    <div class="sub" style="margin-top:8px"><b>核准</b> = 這頁成為專案的正式紀錄，可匯出、可被下一步引用；<b>退回</b> = 寫原因後重做，這一版保留；<b>刪除專案</b> = 來源與所有產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
-    <div class="btns" style="margin-top:12px">
+    <div class="sub mt8"><b>核准</b> = 這頁成為專案的正式紀錄，可匯出、可被下一步引用；<b>退回</b> = 寫原因後重做，這一版保留；<b>刪除專案</b> = 來源與所有產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
+    <div class="btns mt12">
       <span class="btn primary">核准，存進專案</span>
       <span class="btn">退回並說原因</span>
       <span class="btn">匯出 PDF</span>
       <span class="btn ghost">專家模式：閘門表與 JSON</span>
     </div>
-    <details style="margin-top:10px"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
+    <details class="mt10"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
 <pre>{
   "id": "ICEBERG-8197A6CBE8346F64",
   "generated_by_method": "systems.iceberg_model",

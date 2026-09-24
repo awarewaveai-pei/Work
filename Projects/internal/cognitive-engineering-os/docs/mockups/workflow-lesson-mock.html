@@ -6,16 +6,21 @@
 <title>工作流三分鐘課</title>
 <style>
   /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+/* Cognitive OS design system — the ONE stylesheet for every page (mocks now, web/app later).
+   Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
+   same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
+   markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
+   sync-design-system.py copies this file into the four mocks. */
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4}
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4;--ice-tip-ink:#14213d}
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}}
   :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}
   *{box-sizing:border-box}
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
@@ -107,31 +112,93 @@
   svg text.m{fill:var(--muted)}
   svg text.a{fill:var(--accent)}
   svg text.w{fill:var(--on-ice)}
+  svg text.tip{fill:var(--ice-tip-ink)}
+  svg text.warn{fill:var(--warn)}
   svg .node{fill:var(--node)}
   svg .water{fill:var(--water)}
   svg .axis{stroke:var(--axis)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (prefers-reduced-motion: reduce){*{transition:none!important}}
-  /* == shared design system: end == */
-  /* == page-specific == */
+  /* == page components (merged from the four pages; .mcard = method/station card, .filled = filled example) == */
+  .todos{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+  .todo{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:14px}
+  .todo b{display:block;color:var(--accent);margin-bottom:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .layer{border-left:6px solid var(--l2);padding-left:14px}
+  .layer.l1{border-color:var(--l1)}
+  .layer.l2{border-color:var(--l2)}
+  .layer.l3{border-color:var(--l3)}
+  .layer.l4{border-color:var(--l4)}
+  .layer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:8px}
+  .layer .meta{font-size:12px;color:var(--muted)}
+  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:var(--on-ice);margin-left:6px}
+  .lever.low{background:var(--axis)}
+  .lever.mid{background:var(--l3)}
+  .lever.high{background:var(--l4)}
+  .lever.max{background:var(--l4d)}
+  .charts{display:grid;grid-template-columns:1fr;gap:14px}
+  .charts svg{max-width:640px;margin:0 auto}
+  .charts figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .charts figcaption{font-size:13.5px;margin-bottom:4px}
+  .kpis{display:grid;grid-template-columns:1fr;gap:10px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:13px}
+  .kpi b{font-size:14px}
+  .kpi .now{color:var(--muted)}
+  .kpi .goal{color:var(--ok);font-weight:700}
+  .kpi .when{color:var(--muted);font-size:12px}
+  .mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
+  .mcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
+  .mcard.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
+  .mcard b{font-size:14.5px}
+  .mcard .k{color:var(--muted);font-size:12px}
+  .mcard .need{color:var(--warn)}
+  .mcard .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
   h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
-  .station{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:12px}
-  .station h3{margin:0 0 2px;font-size:16px}
-  .station .why{color:var(--muted);font-size:13.5px;margin:0 0 8px}
-  .srow{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
-  @media (max-width:560px){.srow{grid-template-columns:1fr;gap:2px}}
-  .srow b{color:var(--muted);font-weight:600;font-size:13px}
-  .srow b.need{color:var(--warn)}
-  .srow a{white-space:nowrap}
-  .srow ul{margin:0;padding-left:18px}
-  .srow li{margin:2px 0}
-  .srow .ex{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
-  .srow .ex .lab{display:block;color:var(--accent);font-size:12px;font-weight:600;margin-bottom:2px}
+  .grid2{display:grid;grid-template-columns:1fr;gap:12px}
+  .exlayer{border-left:6px solid var(--l2);padding:10px 12px;background:var(--soft);border-radius:0 10px 10px 0}
+  .exlayer.l1{border-color:var(--l1)}
+  .exlayer.l2{border-color:var(--l2)}
+  .exlayer.l3{border-color:var(--l3)}
+  .exlayer.l4{border-color:var(--l4)}
+  .exlayer b{display:block;font-size:15px}
+  .exlayer .q{color:var(--accent);font-size:14px;margin:2px 0}
+  .exlayer .ex{font-size:13.5px;color:var(--muted)}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
+  .step .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:14px}
+  ul.check{padding-left:20px;margin:6px 0}
+  ul.check li{margin-bottom:4px}
   .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
   .quiz details{margin:4px 0;font-size:14px}
   .quiz summary{cursor:pointer}
-  ul.check{padding-left:20px;margin:6px 0}
-  ul.check li{margin-bottom:4px}
+  .mcard.done{border-color:var(--ok)}
+  .station{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:12px}
+  .station h3{margin:0 0 2px;font-size:16px}
+  .station .why{color:var(--muted);font-size:13.5px;margin:0 0 8px}
+  .row b.need{color:var(--warn)}
+  .row a{white-space:nowrap}
+  .row ul{margin:0;padding-left:18px}
+  .row li{margin:2px 0}
+  .filled{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
+  .filled .lab{display:block;color:var(--accent);font-size:12px;font-weight:600;margin-bottom:2px}
+  /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
+  .mt0{margin-top:0}
+  .mt4{margin-top:4px}
+  .mt6{margin-top:6px}
+  .mt8{margin-top:8px}
+  .mt10{margin-top:10px}
+  .mt12{margin-top:12px}
+  .mt14{margin-top:14px}
+  .mb0{margin-bottom:0}
+  .mb8{margin-bottom:8px}
+  .mb12{margin-bottom:12px}
+  .my6{margin:6px 0}
+  .scroll-x{overflow-x:auto}
+  .warn{color:var(--warn)}
+  .card.accent{border-left:6px solid var(--accent)}
+  .card.okline{border-left:6px solid var(--ok)}
+  /* == shared design system: end == */
+  /* == page-specific == */
 </style>
 <script>
   // Example set follows the line the user came in from; the operator's default is art reflection (plan D18).
@@ -188,56 +255,56 @@
       <div class="station">
         <h3>第 1 站 問題陳述</h3>
         <p class="why">先把「到底要決定什麼」講清楚。這一站省掉，後面兩站常常在幫不同的問題打分。</p>
-        <div class="srow"><b>你會看到</b><span>三個格子：要決定什麼、誰受影響、成功長什麼樣。每格旁邊有提示，也可以按「用示範案例」。</span></div>
-        <div class="srow"><b>已經幫你填</b><span>你建立專案時寫的那段話，會出現在第一格，你改就好。</span></div>
-        <div class="srow"><b class="need">你要填</b><div>誰受影響（具體到人數或角色）、成功的 2–3 個條件（要看得到、量得到）。
-          <div class="ex" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>要決定什麼：</b>WuSheng 團體課要不要從全實體改成「線上＋實體」混合。<br><b>誰受影響：</b>現有 8 位參與者、2 位帶領者、3 位遠地詢問者。<br><b>成功條件：</b>① 主動分享人數不低於現在（每場 6 人）；② 遠地至少 3 人能參加；③ 帶領者每週準備時間不超過現在的 1.2 倍。</div>
-          <div class="ex" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>要決定什麼：</b>要不要和某藝術治療機構合辦 WuSheng 課程。<br><b>誰受影響：</b>我們的 2 位帶領者、對方的個案、雙方行政。<br><b>成功條件：</b>① 對方 30 天內付款；② 教材著作權留在我們；③ 一期結束後對方有續約意願。</div>
-          <div class="ex" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>要決定什麼：</b>要不要開尺寸類以外的新品類（文具）。<br><b>誰受影響：</b>客服 1 人、倉庫、供應商。<br><b>成功條件：</b>① 三個月退貨率 ≤ 5%；② 毛利不低於現有品類；③ 上架工時每週 ≤ 4 小時。</div>
-          <div class="ex" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>要決定什麼：</b>要不要從郊區搬到市區。<br><b>誰受影響：</b>自己、同住的家人。<br><b>成功條件：</b>① 通勤少一半；② 房租不超過收入三成；③ 一年內不用再搬。</div>
+        <div class="row"><b>你會看到</b><span>三個格子：要決定什麼、誰受影響、成功長什麼樣。每格旁邊有提示，也可以按「用示範案例」。</span></div>
+        <div class="row"><b>已經幫你填</b><span>你建立專案時寫的那段話，會出現在第一格，你改就好。</span></div>
+        <div class="row"><b class="need">你要填</b><div>誰受影響（具體到人數或角色）、成功的 2–3 個條件（要看得到、量得到）。
+          <div class="ex filled" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>要決定什麼：</b>WuSheng 團體課要不要從全實體改成「線上＋實體」混合。<br><b>誰受影響：</b>現有 8 位參與者、2 位帶領者、3 位遠地詢問者。<br><b>成功條件：</b>① 主動分享人數不低於現在（每場 6 人）；② 遠地至少 3 人能參加；③ 帶領者每週準備時間不超過現在的 1.2 倍。</div>
+          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>要決定什麼：</b>要不要和某藝術治療機構合辦 WuSheng 課程。<br><b>誰受影響：</b>我們的 2 位帶領者、對方的個案、雙方行政。<br><b>成功條件：</b>① 對方 30 天內付款；② 教材著作權留在我們；③ 一期結束後對方有續約意願。</div>
+          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>要決定什麼：</b>要不要開尺寸類以外的新品類（文具）。<br><b>誰受影響：</b>客服 1 人、倉庫、供應商。<br><b>成功條件：</b>① 三個月退貨率 ≤ 5%；② 毛利不低於現有品類；③ 上架工時每週 ≤ 4 小時。</div>
+          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>要決定什麼：</b>要不要從郊區搬到市區。<br><b>誰受影響：</b>自己、同住的家人。<br><b>成功條件：</b>① 通勤少一半；② 房租不超過收入三成；③ 一年內不用再搬。</div>
         </div></div>
-        <div class="srow"><b>做完會得到</b><span>一句清楚的問題陳述＋成功條件清單。後面兩站都拿它當基準，總結頁也用它來判斷「決定有沒有達成目的」。</span></div>
-        <div class="srow"><b>常見卡點</b><span>成功條件寫成「希望變好」。改成看得到的數字或事實，例如「每場主動分享 ≥ 6 人」。</span></div>
-        <div class="srow"><b>大約</b><span>2 分鐘・NT$1</span></div>
-        <div class="srow"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">問題陳述：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
+        <div class="row"><b>做完會得到</b><span>一句清楚的問題陳述＋成功條件清單。後面兩站都拿它當基準，總結頁也用它來判斷「決定有沒有達成目的」。</span></div>
+        <div class="row"><b>常見卡點</b><span>成功條件寫成「希望變好」。改成看得到的數字或事實，例如「每場主動分享 ≥ 6 人」。</span></div>
+        <div class="row"><b>大約</b><span>2 分鐘・NT$1</span></div>
+        <div class="row"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">問題陳述：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
       </div>
 
       <div class="station">
         <h3>第 2 站 SWOT</h3>
         <p class="why">看自己（強項、弱項）和外面（機會、威脅）。這四格之後會自動變成第 3 站打分用的準則。</p>
-        <div class="srow"><b>你會看到</b><span>一個「脈絡」欄（已填好）＋四個格子 S／W／O／T，每格可以加多條，旁邊有「讓 AI 起草」。</span></div>
-        <div class="srow"><b>已經幫你填</b><span>第 1 站的問題陳述和三個成功條件，自動放進「脈絡」；你不用重打。</span></div>
-        <div class="srow"><b class="need">你要填</b><div>S／W／O／T 各至少 2 條。寫事實，不寫感覺；每條最好能對到第 1 站的某個成功條件。可以先讓 AI 起草，再刪改。
-          <div class="ex" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>S 強項：</b>帶領者熟線上工具；作品照片流程已經數位化。<br><b>W 弱項：</b>只有一間教室；線上設備老舊。<br><b>O 機會：</b>遠地需求是真的（3 人詢問）；線上場可以錄影回看。<br><b>T 威脅：</b>線上人數一多，主動分享就掉（上一期線上場最低）；混合制兩邊都要顧，帶領者負擔可能超過 1.2 倍。</div>
-          <div class="ex" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>S：</b>課程完整、有帶領者訓練制度。<br><b>W：</b>只有 2 位帶領者，排不出第二班。<br><b>O：</b>對方有場地和穩定的個案來源。<br><b>T：</b>對方過去兩次延後付款；對方曾提出要改教材。</div>
-          <div class="ex" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>S：</b>供應商穩定；後台已能批次上架。<br><b>W：</b>客服只有 1 人；退貨流程不問原因。<br><b>O：</b>文具退貨率行業平均低；客群和現有品類重疊。<br><b>T：</b>尺寸類的退貨經驗可能複製到新品類；旺季倉儲不夠。</div>
-          <div class="ex" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>S：</b>工作在市區；存款夠押金。<br><b>W：</b>東西多，搬家成本高。<br><b>O：</b>市區有朋友、房源多。<br><b>T：</b>房租在漲；市區比較吵。</div>
+        <div class="row"><b>你會看到</b><span>一個「脈絡」欄（已填好）＋四個格子 S／W／O／T，每格可以加多條，旁邊有「讓 AI 起草」。</span></div>
+        <div class="row"><b>已經幫你填</b><span>第 1 站的問題陳述和三個成功條件，自動放進「脈絡」；你不用重打。</span></div>
+        <div class="row"><b class="need">你要填</b><div>S／W／O／T 各至少 2 條。寫事實，不寫感覺；每條最好能對到第 1 站的某個成功條件。可以先讓 AI 起草，再刪改。
+          <div class="ex filled" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>S 強項：</b>帶領者熟線上工具；作品照片流程已經數位化。<br><b>W 弱項：</b>只有一間教室；線上設備老舊。<br><b>O 機會：</b>遠地需求是真的（3 人詢問）；線上場可以錄影回看。<br><b>T 威脅：</b>線上人數一多，主動分享就掉（上一期線上場最低）；混合制兩邊都要顧，帶領者負擔可能超過 1.2 倍。</div>
+          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>S：</b>課程完整、有帶領者訓練制度。<br><b>W：</b>只有 2 位帶領者，排不出第二班。<br><b>O：</b>對方有場地和穩定的個案來源。<br><b>T：</b>對方過去兩次延後付款；對方曾提出要改教材。</div>
+          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>S：</b>供應商穩定；後台已能批次上架。<br><b>W：</b>客服只有 1 人；退貨流程不問原因。<br><b>O：</b>文具退貨率行業平均低；客群和現有品類重疊。<br><b>T：</b>尺寸類的退貨經驗可能複製到新品類；旺季倉儲不夠。</div>
+          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>S：</b>工作在市區；存款夠押金。<br><b>W：</b>東西多，搬家成本高。<br><b>O：</b>市區有朋友、房源多。<br><b>T：</b>房租在漲；市區比較吵。</div>
         </div></div>
-        <div class="srow"><b>做完會得到</b><span>SWOT 表＋每一格的證據強度（哪幾條只是感覺、哪幾條有數字），以及自動整理出來的「第 3 站準則候選」。</span></div>
-        <div class="srow"><b>常見卡點</b><span>把「希望」寫進機會、把「擔心」寫進威脅。機會和威脅是外面已經存在的事，不是心情。</span></div>
-        <div class="srow"><b>大約</b><span>3 分鐘・NT$1</span></div>
-        <div class="srow"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">SWOT：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
+        <div class="row"><b>做完會得到</b><span>SWOT 表＋每一格的證據強度（哪幾條只是感覺、哪幾條有數字），以及自動整理出來的「第 3 站準則候選」。</span></div>
+        <div class="row"><b>常見卡點</b><span>把「希望」寫進機會、把「擔心」寫進威脅。機會和威脅是外面已經存在的事，不是心情。</span></div>
+        <div class="row"><b>大約</b><span>3 分鐘・NT$1</span></div>
+        <div class="row"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">SWOT：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
       </div>
 
       <div class="station">
         <h3>第 3 站 加權決策矩陣</h3>
         <p class="why">幾個選項，按你自己定的準則和權重打分。分數是「按你的權重」算的，所以最重要的是權重由你填。</p>
-        <div class="srow"><b>你會看到</b><span>左邊是準則（已從第 2 站帶入），每個準則旁邊一個權重格（1–5）；上面是選項；中間是分數表；下面有「敏感度」：哪個權重一改，結果就翻。</span></div>
-        <div class="srow"><b>已經幫你填</b><span>準則候選（從第 2 站的四格整理出來）和選項候選（從第 1 站的問題抓出來）。分數可以讓 AI 起草。</span></div>
-        <div class="srow"><b class="need">你要填</b><div>每個準則的權重（1–5）。這是你的價值判斷，系統不會代填，也不會建議數字。
-          <div class="ex" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>選項：</b>維持全實體／全線上／混合（每場線上 ≤ 4 人）。<br><b>準則與權重：</b>主動分享不降 5、遠地可參加 3、帶領者負擔 4、設備成本 2。<br><b>結果：</b>混合最高分；但「主動分享不降」的權重從 5 改成 3，全線上就贏 → 這個權重是關鍵，要想清楚。</div>
-          <div class="ex" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>選項：</b>不合作／合辦一期試水／授權對方自辦。<br><b>準則與權重：</b>付款可靠 5、教材權 5、曝光 2、帶領者負擔 4。<br><b>結果：</b>合辦一期最高分；「付款可靠」權重一降，授權自辦就贏。</div>
-          <div class="ex" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>選項：</b>不開／先上 10 款試賣／全品類上。<br><b>準則與權重：</b>退貨率 5、毛利 4、上架工時 2、客服負擔 3。<br><b>結果：</b>先上 10 款最高分；「客服負擔」權重一升，不開就贏。</div>
-          <div class="ex" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>選項：</b>不搬／搬市區小套房／搬到市區邊緣。<br><b>準則與權重：</b>通勤 4、房租 5、環境 3、搬家成本 2。<br><b>結果：</b>市區邊緣最高分；「房租」權重一降，市區小套房就贏。</div>
+        <div class="row"><b>你會看到</b><span>左邊是準則（已從第 2 站帶入），每個準則旁邊一個權重格（1–5）；上面是選項；中間是分數表；下面有「敏感度」：哪個權重一改，結果就翻。</span></div>
+        <div class="row"><b>已經幫你填</b><span>準則候選（從第 2 站的四格整理出來）和選項候選（從第 1 站的問題抓出來）。分數可以讓 AI 起草。</span></div>
+        <div class="row"><b class="need">你要填</b><div>每個準則的權重（1–5）。這是你的價值判斷，系統不會代填，也不會建議數字。
+          <div class="ex filled" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>選項：</b>維持全實體／全線上／混合（每場線上 ≤ 4 人）。<br><b>準則與權重：</b>主動分享不降 5、遠地可參加 3、帶領者負擔 4、設備成本 2。<br><b>結果：</b>混合最高分；但「主動分享不降」的權重從 5 改成 3，全線上就贏 → 這個權重是關鍵，要想清楚。</div>
+          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>選項：</b>不合作／合辦一期試水／授權對方自辦。<br><b>準則與權重：</b>付款可靠 5、教材權 5、曝光 2、帶領者負擔 4。<br><b>結果：</b>合辦一期最高分；「付款可靠」權重一降，授權自辦就贏。</div>
+          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>選項：</b>不開／先上 10 款試賣／全品類上。<br><b>準則與權重：</b>退貨率 5、毛利 4、上架工時 2、客服負擔 3。<br><b>結果：</b>先上 10 款最高分；「客服負擔」權重一升，不開就贏。</div>
+          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>選項：</b>不搬／搬市區小套房／搬到市區邊緣。<br><b>準則與權重：</b>通勤 4、房租 5、環境 3、搬家成本 2。<br><b>結果：</b>市區邊緣最高分；「房租」權重一降，市區小套房就贏。</div>
         </div></div>
-        <div class="srow"><b>做完會得到</b><span>分數表、敏感度分析（哪個權重是關鍵）、然後是總結頁：三站合一的一句話、最終建議、解決方案與追蹤。</span></div>
-        <div class="srow"><b>常見卡點</b><span>權重讓 AI 填，或所有準則都填 5。權重不一樣，這張表才有意義。</span></div>
-        <div class="srow"><b>大約</b><span>3 分鐘・NT$1</span></div>
-        <div class="srow"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">加權決策矩陣：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
+        <div class="row"><b>做完會得到</b><span>分數表、敏感度分析（哪個權重是關鍵）、然後是總結頁：三站合一的一句話、最終建議、解決方案與追蹤。</span></div>
+        <div class="row"><b>常見卡點</b><span>權重讓 AI 填，或所有準則都填 5。權重不一樣，這張表才有意義。</span></div>
+        <div class="row"><b>大約</b><span>3 分鐘・NT$1</span></div>
+        <div class="row"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">加權決策矩陣：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
       </div>
 
     </div>
-    <p class="sub" style="margin:10px 0 0">記法：第 1 站定「要決定什麼」，第 2 站看「自己和外面」，第 3 站「用你的權重打分」。每一站都只填紅字那一列，其他系統從上一站帶來。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
+    <p class="sub mt10 mb0">記法：第 1 站定「要決定什麼」，第 2 站看「自己和外面」，第 3 站「用你的權重打分」。每一站都只填紅字那一列，其他系統從上一站帶來。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
   </div>
 
   <!-- 3 -->
@@ -286,7 +353,7 @@
       </table>
     </div>
     </div>
-    <div class="btns" style="margin-top:8px"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看完整的工作流總覽 →<small><span class="ex" data-set="edd">同一個案例，三站與總結頁</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span></small></a></div>
+    <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看完整的工作流總覽 →<small><span class="ex" data-set="edd">同一個案例，三站與總結頁</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span></small></a></div>
   </div>
 
   <!-- 4 -->
@@ -297,7 +364,7 @@
       <div class="good"><b>一站一站走</b>：每站停下來給你確認，可以改順序、中途換方法。第一次走建議這個。</div>
       <div class="good"><b>一次跑完</b>：三站自動跑，跑完再逐站看。適合已經走過、只是換資料。</div>
     </div>
-    <div class="gb" style="margin-top:10px">
+    <div class="gb mt10">
       <div class="ex" data-set="edd">
         <div class="good"><b>好</b>：第 1 站把成功條件寫成看得到的數字（分享人數不降、遠地 ≥ 3 人）。</div>
         <div class="bad"><b>壞</b>：第 1 站寫「希望變好」。（好在哪？誰看得到？）</div>
@@ -323,7 +390,7 @@
         <div class="bad"><b>壞</b>：權重讓 AI 填。（那就不是你的決定）</div>
       </div>
     </div>
-    <div class="mistake" style="margin-top:8px"><i>✕</i><span><b>跳過第 1 站</b>：直接做 SWOT，最後發現大家在決定不同的事。</span></div>
+    <div class="mistake mt8"><i>✕</i><span><b>跳過第 1 站</b>：直接做 SWOT，最後發現大家在決定不同的事。</span></div>
     <div class="mistake"><i>✕</i><span><b>退回不重跑</b>：改了第 1 站卻沿用第 3 站的分數；系統會把後面的站標失效，照著重跑就好。</span></div>
     <div class="mistake"><i>✕</i><span><b>把分數當答案</b>：第 3 站的分數是「按你的權重」算的；先看哪個權重一改就翻，再決定。</span></div>
     <div class="quiz"><b>自我檢查（20 秒，點開看答案）</b>
@@ -347,7 +414,7 @@
       <span class="btn">開始我的決定<small>第 1 站三個格子，每格旁邊有提示</small></span>
       <span class="btn">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
     </div>
-    <p class="sub" style="margin:10px 0 0">這堂課之後不會再自動出現；每一站的方法課只在你第一次到那一站時出現一次。想再看，總覽頁右上角「怎麼用？」隨時能打開。</p>
+    <p class="sub mt10 mb0">這堂課之後不會再自動出現；每一站的方法課只在你第一次到那一站時出現一次。想再看，總覽頁右上角「怎麼用？」隨時能打開。</p>
   </div>
 
   <div class="card">

@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-24（續150）研究線：一份樣式表做主題——`design-system.css` 唯一來源；四頁零頁面 CSS、零 inline style、零色碼；同義元件合併；計畫 v1.28
+- [觸發] 操作者：「所有的 css, class 和 style 要統一，因為我想要做 theme 主題」。
+- [已改] 新檔 `COS/docs/mockups/design-system.css`（token 亮暗＋全部元件＋底部 spacing utilities；主題 = 一段 `:root[data-theme="<name>"]` token 區塊）、`sync-design-system.py`（複製進四頁，冪等）。四頁 `<style>` 逐位元等於該檔、page-specific 區為空；48 個 `style=` 全改成 utility／modifier class；`.next`／`.st` 合併成 `.mcard`（`.mcards`、`.now`、`.done`）、`.srow`→`.row`、填好例子框→`.filled`；svg 固定色改 token（`--ice-tip-ink`）＋class。`check-mocks.py`：樣式表必須等於檔案、頁面 CSS 必須為空、任何 `style=` 即缺陷、token 區外零色碼（取消 `.lever` 豁免）、額外主題區塊 key 集合必須齊全；自測 +4。計畫 v1.28：U19 改寫為主題機制、U20、§10、I11。線上：結果 v18、方法課 v17、總覽 v12、工作流課 v14。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python unify_css.py（計數斷言）+ sync-design-system.py（四頁 already in sync）+ check-mocks.py（綠）+ check-mocks-selftest.py（全抓）+ build-artifact.py + render-mocks.cjs 切片 Read 四頁 + node chips_test.js（PASS）+ Artifact publish ×4 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 純樣式重組，無行為變更；閘＋自測＋渲染看圖＋晶片功能測試
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=class="srow"|class="nexts"|class="stations"|class="next rec" | hits=0
+- [下一步] WC-PIa-01；新殼 `web/` 落地時直接引用 `design-system.css`。
 ## 2026-09-24（續149）研究線：工作流課版面跑掉——`.ex` 標記 class 帶了填好例子框的樣式，漏進按鈕與好壞例；限定到 `.srow`，閘禁止直接樣式化 `.ex`
 - [觸發] 操作者截圖：「這什麼鬼東西，版面跑掉？UI/UX 壞掉？」——總覽按鈕與示範按鈕裡出現灰色空框、第 4 步好壞例外多一層框。
 - [根因] `workflow-lesson-mock.html` 頁面 CSS 把第 2 步「填好的例子」的框樣式寫在 `.ex` 上，而 `.ex` 同時是「跟領域切換」的標記，上一筆 commit 把標記套到按鈕說明與好壞例 → 框跟著進去。我改完只看了方法課的圖，沒看工作流課的圖。

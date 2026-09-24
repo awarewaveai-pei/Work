@@ -27,9 +27,10 @@ HCI_DARK = {"--bg": "#1c2b27", "--card": "#243530", "--ink": "#f3efe4", "--muted
 FONT = 'font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif'
 # U20: one column by default; only "several methods side by side" may go 2-up, and only by container width
 CAPPED_2COL = "repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr))"
-TWO_COL_ALLOWED = {".nexts", ".stations"}
-LABEL_ROWS = {".row", ".srow", ".step", ".mistake"}            # "label + content" two-cell rows, not card grids
-HEX_ALLOW = {".lever": "white text on fixed data colours (layer palette is the same in both themes)"}
+TWO_COL_ALLOWED = {".mcards"}                                  # method / station cards, the only 2-up grid
+LABEL_ROWS = {".row", ".step", ".mistake"}                     # "label + content" two-cell rows, not card grids
+HEX_ALLOW = {}                                                 # no colour literal outside the token blocks, anywhere
+DESIGN_SYSTEM = "design-system.css"                            # the one stylesheet; the mocks carry it verbatim
 # D18: five example sets; the workflow lesson has no "decision" chip because the whole route is one decision
 CHIP_SETS = {"iceberg-lesson-mock.html": {"edd", "partner", "decision", "ecom", "daily"},
              "workflow-lesson-mock.html": {"edd", "partner", "ecom", "daily"}}
@@ -311,6 +312,7 @@ class Checker:
         light = [(m, p, b) for m, p, b in rules if m is None and p == ":root"]
         dark_media = [(m, p, b) for m, p, b in rules if m and "prefers-color-scheme: dark" in m and p == ':root:not([data-theme="light"])']
         dark_expl = [(m, p, b) for m, p, b in rules if m is None and p == ':root[data-theme="dark"]']
+        themes = [(p, b) for m, p, b in rules if m is None and p.startswith(':root[data-theme="') and p != ':root[data-theme="dark"]']
         if len(light) != 1: self.bad(f, "theme", f"expected one light :root block in the shared css, found {len(light)}"); return
         if len(dark_media) != 1: self.bad(f, "theme", 'dark block must be `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){…}}`')
         if len(dark_expl) != 1: self.bad(f, "theme", 'explicit dark block `:root[data-theme="dark"]{…}` missing')
@@ -332,6 +334,9 @@ class Checker:
             for k in d:
                 if k.startswith("--") and k not in lt: self.bad(f, "theme", f"{label} defines {k} that the light block does not")
         if dm != de: self.bad(f, "theme", "the two dark blocks differ (system-dark and toggle-dark would render differently)")
+        for p, b in themes:  # any extra theme must define exactly the dark block's key set: a theme is a complete token set
+            keys = {k for k, _ in decls(b)}
+            if keys != set(dm): self.bad(f, "theme", f"{p} defines {sorted(keys ^ set(dm))} differently from the dark token set")
 
     # -- one file
     def check_file(self, f):
@@ -356,6 +361,11 @@ class Checker:
         shared_css, between, page_css = style[a:b], style[b + len(SHARED_END):c], style[c + len(PAGE_MARK):]
         if between.strip(): self.bad(f, "shared", "CSS between the shared end marker and the page marker")
         self.shared_blocks[f] = shared_css
+        ds = pathlib.Path(__file__).resolve().parent / DESIGN_SYSTEM
+        if not ds.exists(): self.bad(f, "theme", f"{DESIGN_SYSTEM} missing")
+        elif shared_css.split("\n", 1)[1].strip() != ds.read_text(encoding="utf-8").strip():  # drop the marker line itself
+            self.bad(f, "theme", f"stylesheet differs from {DESIGN_SYSTEM} (edit the .css, then run sync-design-system.py)")
+        if page_css.strip(): self.bad(f, "theme", "page-specific CSS is not allowed: add the component to design-system.css and sync")
         if FONT not in shared_css: self.bad(f, "U19", "font stack drifted")
         if "[hidden]{display:none!important}" not in shared_css:
             self.bad(f, "D18", "shared css must pin [hidden]{display:none!important}: any display: rule on a switchable element would otherwise un-hide it")
@@ -377,8 +387,7 @@ class Checker:
         for n in nodes:
             if n.tag == "select": self.bad(f, "ux", f"line {n.line}: <select>; ops UI uses visible buttons/chips")
             if n.tag == "svg" and (n.attrs.get("role") != "img" or not n.attrs.get("aria-label")): self.bad(f, "a11y", f"line {n.line}: svg without role=img + aria-label")
-            st = n.attrs.get("style")
-            if st and not in_svg(n) and COLOUR.search(st): self.bad(f, "U19", f"line {n.line}: literal colour in inline style on <{n.tag}>")
+            if "style" in n.attrs: self.bad(f, "theme", f"line {n.line}: inline style on <{n.tag}>; use a class from design-system.css")
             if n.attrs.get("role") == "tablist":
                 tabs = [c for c in n.elements() if "chip" in c.classes()]
                 if any(c.attrs.get("role") != "tab" or c.attrs.get("aria-selected") not in ("true", "false") for c in tabs) \

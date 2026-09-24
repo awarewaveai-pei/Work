@@ -6,16 +6,21 @@
 <title>冰山模型五分鐘課</title>
 <style>
   /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+/* Cognitive OS design system — the ONE stylesheet for every page (mocks now, web/app later).
+   Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
+   same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
+   markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
+   sync-design-system.py copies this file into the four mocks. */
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4}
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4;--ice-tip-ink:#14213d}
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}}
   :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}
   *{box-sizing:border-box}
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
@@ -107,13 +112,48 @@
   svg text.m{fill:var(--muted)}
   svg text.a{fill:var(--accent)}
   svg text.w{fill:var(--on-ice)}
+  svg text.tip{fill:var(--ice-tip-ink)}
+  svg text.warn{fill:var(--warn)}
   svg .node{fill:var(--node)}
   svg .water{fill:var(--water)}
   svg .axis{stroke:var(--axis)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (prefers-reduced-motion: reduce){*{transition:none!important}}
-  /* == shared design system: end == */
-  /* == page-specific == */
+  /* == page components (merged from the four pages; .mcard = method/station card, .filled = filled example) == */
+  .todos{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+  .todo{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:14px}
+  .todo b{display:block;color:var(--accent);margin-bottom:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .layer{border-left:6px solid var(--l2);padding-left:14px}
+  .layer.l1{border-color:var(--l1)}
+  .layer.l2{border-color:var(--l2)}
+  .layer.l3{border-color:var(--l3)}
+  .layer.l4{border-color:var(--l4)}
+  .layer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:8px}
+  .layer .meta{font-size:12px;color:var(--muted)}
+  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:var(--on-ice);margin-left:6px}
+  .lever.low{background:var(--axis)}
+  .lever.mid{background:var(--l3)}
+  .lever.high{background:var(--l4)}
+  .lever.max{background:var(--l4d)}
+  .charts{display:grid;grid-template-columns:1fr;gap:14px}
+  .charts svg{max-width:640px;margin:0 auto}
+  .charts figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .charts figcaption{font-size:13.5px;margin-bottom:4px}
+  .kpis{display:grid;grid-template-columns:1fr;gap:10px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:13px}
+  .kpi b{font-size:14px}
+  .kpi .now{color:var(--muted)}
+  .kpi .goal{color:var(--ok);font-weight:700}
+  .kpi .when{color:var(--muted);font-size:12px}
+  .mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
+  .mcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
+  .mcard.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
+  .mcard b{font-size:14.5px}
+  .mcard .k{color:var(--muted);font-size:12px}
+  .mcard .need{color:var(--warn)}
+  .mcard .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
   h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
   .grid2{display:grid;grid-template-columns:1fr;gap:12px}
   .exlayer{border-left:6px solid var(--l2);padding:10px 12px;background:var(--soft);border-radius:0 10px 10px 0}
@@ -131,6 +171,34 @@
   .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
   .quiz details{margin:4px 0;font-size:14px}
   .quiz summary{cursor:pointer}
+  .mcard.done{border-color:var(--ok)}
+  .station{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:12px}
+  .station h3{margin:0 0 2px;font-size:16px}
+  .station .why{color:var(--muted);font-size:13.5px;margin:0 0 8px}
+  .row b.need{color:var(--warn)}
+  .row a{white-space:nowrap}
+  .row ul{margin:0;padding-left:18px}
+  .row li{margin:2px 0}
+  .filled{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
+  .filled .lab{display:block;color:var(--accent);font-size:12px;font-weight:600;margin-bottom:2px}
+  /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
+  .mt0{margin-top:0}
+  .mt4{margin-top:4px}
+  .mt6{margin-top:6px}
+  .mt8{margin-top:8px}
+  .mt10{margin-top:10px}
+  .mt12{margin-top:12px}
+  .mt14{margin-top:14px}
+  .mb0{margin-bottom:0}
+  .mb8{margin-bottom:8px}
+  .mb12{margin-bottom:12px}
+  .my6{margin:6px 0}
+  .scroll-x{overflow-x:auto}
+  .warn{color:var(--warn)}
+  .card.accent{border-left:6px solid var(--accent)}
+  .card.okline{border-left:6px solid var(--ok)}
+  /* == shared design system: end == */
+  /* == page-specific == */
 </style>
 <script>
   // Example set follows the line the user came in from; the operator's default is art reflection (EdD judgment-sovereignty research, plan D18).
@@ -185,7 +253,7 @@
           <line x1="400" y1="420" x2="840" y2="420" stroke="#fff" stroke-dasharray="4 4" opacity=".7"/>
         </g>
         <g font-weight="700" text-anchor="middle">
-          <text x="618" y="128" font-size="17" style="fill:#14213d">事件 Events</text>
+          <text class="tip" x="618" y="128" font-size="17">事件 Events</text>
           <text x="618" y="230" font-size="17" class="w">模式 Patterns</text>
           <text x="618" y="362" font-size="17" class="w">結構 Structures</text>
           <text x="618" y="490" font-size="17" class="w">心智模型 Mental Models</text>
@@ -255,7 +323,7 @@
         <div class="ex" data-set="ecom" hidden>例：「退貨是客人的問題，不是我們的問題。」</div>
         <div class="ex" data-set="daily" hidden>例：「這種小事不用講。」</div></div>
     </div>
-    <p class="sub" style="margin:10px 0 0">記法：事件是「一次」，模式是「一再」，結構是「為什麼一再」，心智模型是「為什麼沒人改」。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
+    <p class="sub mt10 mb0">記法：事件是「一次」，模式是「一再」，結構是「為什麼一再」，心智模型是「為什麼沒人改」。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
   </div>
 
   <!-- 3 -->
@@ -314,8 +382,8 @@
       </table>
     </div>
     </div>
-    <p class="sub" style="margin:8px 0 0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：</p>
-    <div class="btns" style="margin-top:8px"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small><span class="ex" data-set="edd">同一個案例，做完的九段結果</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span></small></a></div>
+    <p class="sub mt8 mb0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：</p>
+    <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small><span class="ex" data-set="edd">同一個案例，做完的九段結果</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span></small></a></div>
   </div>
 
   <!-- 4 -->
@@ -330,7 +398,7 @@
       <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：帶領者先講意義、說明佔 35 分；紀錄表只問「達到洞察？」。</div><div class="bad"><b>壞</b>：某某帶領者不重視。（這是怪人，不是結構）</div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：合約沒寫逾期條款；對方會計每季結一次帳；我們沒人負責催。</div><div class="bad"><b>壞</b>：他們會計很混。（這是怪人，不是結構）</div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：教室只有週末滿；老師都是兼職，平日排不出人。</div><div class="bad"><b>壞</b>：老師不配合。（這是怪人，不是結構）</div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：尺寸表直接用供應商的、沒人核對；退貨表不問原因。</div><div class="bad"><b>壞</b>：客服不夠細心。（這是怪人，不是結構）</div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：沒有分工表，誰看到誰做；週日晚上兩人都最累。</div><div class="bad"><b>壞</b>：對方很懶。（這是怪人，不是結構）</div></div></div></div></div>
     <div class="step"><div class="n">4</div><div><b>問信念</b>：大家沒說出口、但決定規則和優先順序的那句話。也問問自己的。
       <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：「參與者需要專家幫他們看見意義。」</div><div class="bad"><b>壞</b>：大家心態不對。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：「小工作室不好意思催款。」</div><div class="bad"><b>壞</b>：我們太軟弱。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：「擴大就是成長。」</div><div class="bad"><b>壞</b>：我們不夠有企圖心。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：「退貨是客人的問題，不是我們的問題。」</div><div class="bad"><b>壞</b>：大家不重視品質。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：「這種小事不用講。」</div><div class="bad"><b>壞</b>：我們個性不合。（太籠統，指不出哪個假設）</div></div></div></div></div>
-    <p class="sub" style="margin:8px 0 0">填不出某一層沒關係，留白比硬湊好；工具會把它列成「證據缺口」，告訴你該去補什麼資料。</p>
+    <p class="sub mt8 mb0">填不出某一層沒關係，留白比硬湊好；工具會把它列成「證據缺口」，告訴你該去補什麼資料。</p>
   </div>
 
   <!-- 5 -->
@@ -386,14 +454,14 @@
       <span class="btn">開始填我的案例<small>四個格子，每格旁邊有提示</small></span>
       <span class="btn">這方法適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
     </div>
-    <p class="sub" style="margin:10px 0 0">這堂課之後不會再自動出現；想再看，方法頁右上角「怎麼用？」隨時能打開。</p>
+    <p class="sub mt10 mb0">這堂課之後不會再自動出現；想再看，方法頁右上角「怎麼用？」隨時能打開。</p>
   </div>
 
   <div class="card">
     <h2>教材版：給老師／帶領者<small>同一份資料，另一種排版</small></h2>
     <div class="how"><b>怎麼讀</b>上面六步是學員版（5 分鐘自學）；這裡把同一堂課排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
     <details><summary><b>課堂流程（45 分鐘）</b></summary>
-      <table style="margin-top:6px">
+      <table class="mt6">
         <tr><th>分</th><th>做什麼</th><th>用學員版哪一步</th></tr>
         <tr><td>0–5</td><td>破冰：每人說一件「最近一再發生」的事</td><td>第 1 步「什麼時候用」</td></tr>
         <tr><td>5–15</td><td>講四層，例子換成學員的領域</td><td>第 2 步（切領域）</td></tr>
@@ -427,9 +495,9 @@
       </ul>
     </details>
     <details><summary><b>講義與投影片</b></summary>
-      <p style="margin:6px 0">列印版講義 = 第 2 步四層表（學員領域版）＋第 4 步好壞例＋一張空白四格工作單；投影片大綱 = 六步各一頁＋冰山圖一頁。兩者都從這一頁匯出（正式版在 P4 的匯出功能）。</p>
+      <p class="my6">列印版講義 = 第 2 步四層表（學員領域版）＋第 4 步好壞例＋一張空白四格工作單；投影片大綱 = 六步各一頁＋冰山圖一頁。兩者都從這一頁匯出（正式版在 P4 的匯出功能）。</p>
     </details>
-    <p class="sub" style="margin:8px 0 0">教材版和學員版由同一份方法資料生成（來源 [1]–[3]），改課文就同時改兩版。藝術反思方法的帶領腳本（Airtable 的「帶活動者提示用語」「時間分段」「停止活動訊號」）會直接進這一段。</p>
+    <p class="sub mt8 mb0">教材版和學員版由同一份方法資料生成（來源 [1]–[3]），改課文就同時改兩版。藝術反思方法的帶領腳本（Airtable 的「帶活動者提示用語」「時間分段」「停止活動訊號」）會直接進這一段。</p>
   </div>
 
   <div class="card">
