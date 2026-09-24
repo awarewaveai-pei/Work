@@ -63,6 +63,19 @@
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
   .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:13px}
   .kpi b{font-size:14px}.kpi .now{color:var(--muted)}.kpi .goal{color:var(--ok);font-weight:700}.kpi .when{color:var(--muted);font-size:12px}
+  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 8px;align-items:center}
+  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
+  .grid2c{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+  @media (max-width:760px){.grid2c{grid-template-columns:1fr}}
+  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}.can{border:1px solid var(--ok)}.cant{border:1px solid var(--warn)}.can b,.cant b{display:block}
+  .terms{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}.terms b{color:var(--ink)}
+  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
+  .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
+  .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}.conf.high{border-color:var(--ok);color:var(--ok)}
+  .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}.judge .btns{margin:6px 0}
+  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  .read{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}.read b{color:var(--ink)}
+  .thick{font-size:12.5px;color:var(--muted);margin-top:6px}
   .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin-bottom:8px}
   .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
   .journey span.done{background:var(--ok);color:#fff}.journey span.next{background:var(--accent);color:#fff}
@@ -84,27 +97,42 @@
   <div class="card">
     <div class="top"><h1>冰山模型分析：團體反思 session 主動分享從 6 人掉到 2 人</h1><a class="howto" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">怎麼用？先上 5 分鐘的課 →</a></div>
     <div class="sub">方法：冰山模型 Iceberg Model（系統思考 Systems Thinking）・專案「WuSheng 團體反思・第三期」・2026-09-24 ・ 合成教材案例</div>
+    <div class="status"><span class="pill">AI 草稿・尚未核准</span><span>資料：你填的 4 段話・外部來源 0 筆</span><span>四層完整度 4/4（第 2 層最薄：只有 1 句）</span><span>約 6k tokens・≈ NT$1・讀完約 4 分鐘</span></div>
     <p class="lead">看得見的只有<b>事件</b>；原因藏在水面下。這個方法把問題由上往下挖四層：<b>事件 → 模式 → 結構 → 心智模型</b>。越深的一層越難改，但改了效果越大、越持久。</p>
+    <div class="grid2c">
+      <div class="can"><b>這頁能回答</b>問題為什麼一再發生（哪一層在推）、先在哪一層出手最值得、接下來該做什麼。</div>
+      <div class="cant"><b>這頁不能回答</b>誰對誰錯；你填的四段話以外的事實（外部來源 0 筆）；數字只為示意，正式目標由你定。</div>
+    </div>
     <div class="steps">
       <div class="step"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
       <div class="step"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
       <div class="step"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；你在這條路的哪裡、接著做什麼、不做也可以。</div>
     </div>
+    <p class="sub" style="margin:8px 0 0">只有 30 秒？看 ① 的一句話和建議就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
+    <div class="terms"><b>四個詞：</b><span><b>事件</b> 這次發生的事</span><span><b>模式</b> 一再發生</span><span><b>結構</b> 為什麼一再</span><span><b>心智模型</b> 為什麼沒人改</span></div>
   </div>
 
   <!-- 0.5 明確的文字結論 -->
   <div class="card" style="border-left:6px solid var(--accent)">
     <h2>① 結論（文字分析）</h2>
+    <div class="how"><b>怎麼讀</b>先看一句話；三個發現各自標了信心和理由；「改判條件」是什麼證據出現就要改結論。<b>你要做的</b>在最下面寫你自己的判斷：同意、部分同意或不同意。</div>
     <p class="lead" style="margin-top:0"><b>一句話：</b>主動分享的人變少，不是參與者不投入，是「帶領者先解讀作品」這個流程，加上「參與者需要專家幫他們看見意義」這個信念一起造成的；多鼓勵沒有用，要改流程順序，並且把那個信念換掉。</p>
-    <div class="finding"><b>發現 1｜這是每期都會重演的下滑，不是這一期的特例</b>三期以來都從第 4 次 session 開始掉；帶領者先解讀作品的那幾次掉得最多 <cite>[1]</cite><cite>[2]</cite>。事件層只看到「這次很安靜」，模式層看到「每期到後半都安靜」。</div>
-    <div class="finding"><b>發現 2｜有一條自我加強的「等答案迴路」在推</b>帶領者先講作品的意義 → 參與者等帶領者說 → 主動分享變少 → 帶領者覺得「他們還沒到位」要多引導 → 帶領者說得更多、更早 <cite>[3]</cite>。迴路不打斷，越到後面越安靜（圖 B）。</div>
-    <div class="finding"><b>發現 3｜「專家比較懂」的信念讓迴路修不好</b>紀錄表只有一欄「參與者是否達到本次目標洞察」<cite>[4]</cite>，等於把帶領者的解讀當標準答案在打分；只改流程、不改這一欄，下一期帶領者又會回到先講。</div>
+    <div class="finding"><b>發現 1｜這是每期都會重演的下滑，不是這一期的特例<span class="conf mid">信心：中——只有你填的一句，沒有逐次數字</span></b>三期以來都從第 4 次 session 開始掉；帶領者先解讀作品的那幾次掉得最多 <cite>[1]</cite><cite>[2]</cite>。事件層只看到「這次很安靜」，模式層看到「每期到後半都安靜」。</div>
+    <div class="finding"><b>發現 2｜有一條自我加強的「等答案迴路」在推<span class="conf mid">信心：中——迴路是從流程推出來的，還沒被資料證實</span></b>帶領者先講作品的意義 → 參與者等帶領者說 → 主動分享變少 → 帶領者覺得「他們還沒到位」要多引導 → 帶領者說得更多、更早 <cite>[3]</cite>。迴路不打斷，越到後面越安靜（圖 B）。</div>
+    <div class="finding"><b>發現 3｜「專家比較懂」的信念讓迴路修不好<span class="conf low">信心：低——信念只有你的觀察，沒問過帶領者</span></b>紀錄表只有一欄「參與者是否達到本次目標洞察」<cite>[4]</cite>，等於把帶領者的解讀當標準答案在打分；只改流程、不改這一欄，下一期帶領者又會回到先講。</div>
     <p style="margin:6px 0 0"><b>建議：</b>先改第 3 層（參與者先說；帶領者的解讀之後才講，並記成「附掛的影響來源」；紀錄表改量「判斷過程看不看得見」），一期之內用「主動分享人數、帶領者說明分鐘數」兩個數字，回頭跟帶領者團隊談「參與者才是最終判斷者」（第 4 層）。<b>證據缺口：</b>目前只知道「帶領者先講」和「分享變少」同時發生，還沒有逐次的說明分鐘數、每人發言次數，也沒問過參與者自己為什麼不說；先補這三項。</p>
+    <div class="finding warn"><b>改判條件（出現這些證據，結論要改）</b>① 逐次說明分鐘數並沒有上升 → 迴路不成立，改查人數或時段；② 參與者匿名回答「不說」的原因與帶領者無關（例如時間、人數、線上）→ 第 3 層改寫；③ 上一期同一流程但分享沒掉 → 不是流程問題，回到第 2 層找差異。</div>
+    <div class="judge"><b>你的判斷（你的原話才是記錄；上面 AI 寫的只是附掛）</b>
+      <div class="btns"><span class="btn">同意</span><span class="btn">部分同意</span><span class="btn">不同意</span></div>
+      <textarea placeholder="你怎麼看？哪裡對、哪裡不對、你手上有什麼上面沒看到的證據？"></textarea>
+      <div class="sub" style="margin-top:4px">沒填也能核准；填了會和這頁一起存，之後的方法會把你的判斷當成最高優先的輸入。</div>
+    </div>
   </div>
 
   <!-- 1. 冰山圖 -->
   <div class="card">
     <h2>② 冰山圖：你的問題在四層各是什麼</h2>
+    <div class="how"><b>怎麼讀</b>從上往下；左邊是這一層問的問題和你填的，右邊是在這一層出手的方式；★ 是本次建議先出手的層。<b>你要做的</b>不用做；看你填的四段話各落在哪一層對不對，放錯層可以退回改。</div>
     <svg viewBox="0 0 980 575" role="img" aria-label="冰山模型四層圖">
       <defs>
         <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
@@ -139,7 +167,7 @@
         <text x="30" y="118" font-size="13" fill="#5b6470">第 6 次 session：8 人只有 2 人主動分享 ［1］</text>
         <text x="30" y="212" font-weight="700">② 模式｜這段時間的趨勢？事件之間有什麼關聯？</text>
         <text x="30" y="234" font-size="13" fill="#5b6470">三期都從第 4 次開始掉；帶領者先解讀的場次最低 ［2］</text>
-        <text x="30" y="346" font-weight="700">③ 結構｜什麼流程、制度在製造這個模式？</text>
+        <text x="30" y="346" font-weight="700">③ 結構｜什麼流程、制度在製造這個模式？ ★ 建議先出手</text>
         <text x="30" y="368" font-size="13" fill="#5b6470">帶領者先講意義、說明佔 35 分；紀錄表只問「達到洞察？」［3］</text>
         <text x="30" y="472" font-weight="700">④ 心智模型｜什麼沒說出口的假設造成這些結構？</text>
         <text x="30" y="494" font-size="13" fill="#5b6470">「參與者需要專家幫他們看見意義」［4］</text>
@@ -158,11 +186,13 @@
       </g>
     </svg>
     <div class="legend"><span>左：這一層要回答的問題＋你填的內容</span><span>中：四層冰山</span><span>右：在這一層出手的方式（介入方式）</span></div>
+    <div class="thick"><b>資料厚度</b>（你填了多少）：第 1 層 ●●●　第 2 層 ●○○（最薄：只有一句，沒有逐次數字）　第 3 層 ●●●　第 4 層 ●●○（沒問過帶領者）。薄的層，結論的信心就低。</div>
   </div>
 
   <!-- 1.5 圖表分析 -->
   <div class="card">
     <h2>③ 圖表分析（三張圖各回答一個問題）</h2>
+    <div class="how"><b>怎麼讀</b>每張圖回答一個問題；圖下面寫「怎麼看」「看到什麼」「來源」。<b>你要做的</b>不用做；標「示意」的圖要接上真實資料才算數（⑧ 行為隨時間圖）。</div>
     <div class="charts">
       <figure>
         <figcaption><b>圖 A｜趨勢：真的越來越安靜嗎？</b>（第 2 層）</figcaption>
@@ -178,6 +208,7 @@
           <g font-size="12" font-weight="700"><text x="270" y="165" fill="#1f5fbf">主動分享 7 → 2 人</text><text x="180" y="42" fill="#b25e09">帶領者說明 10 → 35 分</text></g>
           <text x="50" y="222" font-size="11" fill="#9ca3af">示意數據：接上真實資料後以你的數字繪製；兩線同時變化不代表因果。</text>
         </svg>
+        <div class="read"><b>怎麼看：</b>左軸是人數（實線），右軸是帶領者說明分鐘（虛線）；兩線在第 3–4 次交叉。<b>看到：</b>人數一路掉、說明一路升，同時發生。<b>注意：</b>同時發生不等於一個造成另一個。<b>來源：</b>[1][2]；數字為示意。</div>
       </figure>
       <figure>
         <figcaption><b>圖 B｜因果迴路：是什麼在推？</b>（第 3、4 層）</figcaption>
@@ -200,6 +231,7 @@
           <text x="230" y="120" font-size="16" font-weight="700" text-anchor="middle" fill="#245b8a">R 等答案迴路（自我加強）</text>
           <text x="230" y="140" font-size="11" text-anchor="middle" fill="#5b6470">箭頭 = 前者讓後者更嚴重；轉一圈回到起點，所以越轉越安靜</text>
         </svg>
+        <div class="read"><b>怎麼看：</b>四個方框繞一圈是迴路，箭頭方向是「誰讓誰更嚴重」；虛線框是信念層在餵它。<b>看到：</b>四個環節缺一不可，切斷任何一環迴路就停，最省力的是第一環（先講）。<b>來源：</b>[3][4]、發現 2。</div>
       </figure>
       <figure>
         <figcaption><b>圖 C｜槓桿對比：在哪一層出手最值得？</b>（四層）</figcaption>
@@ -218,6 +250,7 @@
           </g>
           <g font-size="11"><rect x="90" y="185" width="12" height="9" fill="#9ca3af"/><text x="106" y="193" fill="#5b6470">改變難度</text><rect x="180" y="185" width="12" height="9" fill="#1f5fbf"/><text x="196" y="193" fill="#5b6470">效果與持久度</text></g>
         </svg>
+        <div class="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
       </figure>
     </div>
     <p class="sub" style="margin:8px 0 0">三張圖各自對應冰山的一層或幾層；接上真實資料後，圖 A 用你的數字，圖 B、C 由分析結果生成。</p>
@@ -226,6 +259,7 @@
   <!-- 2. 四層逐層解讀，同一骨架 -->
   <div class="card">
     <h2>④ 由上往下四層解讀（每張卡同一格式）</h2>
+    <div class="how"><b>怎麼讀</b>四張卡同一格式：這層問什麼 → 你填的 → 這代表 → 在這層出手 → 對應 ⑦ 的方案 → 你填的資料厚不厚。<b>你要做的</b>找出你填得最薄的一層，之後補資料（⑧ 有補法）。</div>
 
     <div class="layer l1 card" style="margin-bottom:12px">
       <div class="head"><h3>第 1 層／4：事件 Events</h3><span class="meta">看得見 ・ 時間：現在 ・ 出手方式：回應 React</span></div>
@@ -233,6 +267,8 @@
       <div class="row"><b>你填的</b><span>這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；上一期同一次是 6 位 <cite>[1]</cite></span></div>
       <div class="row"><b>這代表</b><span>少了 4 個人是警訊，但事件本身不告訴你原因。只看這一層會做出「下次開場多鼓勵大家」的決定。</span></div>
       <div class="row"><b>在這層出手</b><span>開場鼓勵、點名輪流說。<b>效果</b>：當次多一兩個人開口，下一次又安靜。<span class="lever low">槓桿：低</span></span></div>
+      <div class="row"><b>對應方案</b><span>⑦ 甲「只多鼓勵」</span></div>
+      <div class="row"><b>資料厚度</b><span>你填 1 句＋上期對照數字・外部 0 筆 → 夠用</span></div>
     </div>
 
     <div class="layer l2 card" style="margin-bottom:12px">
@@ -241,6 +277,8 @@
       <div class="row"><b>你填的</b><span>三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低 <cite>[2]</cite></span></div>
       <div class="row"><b>這代表</b><span>每期重演，加上「先解讀的場次最低」，代表不是這一批人的問題，是流程在推。注意：<dfn title="兩件事一起發生，不等於一件造成另一件">同步不等於因果</dfn>，還缺逐次的說明分鐘數。</span></div>
       <div class="row"><b>在這層出手</b><span>每次 session 記兩個數字：主動分享人數、帶領者說明分鐘數，放同一張圖。<b>效果</b>：第 3 次就看得到苗頭，但不會阻止它。<span class="lever mid">槓桿：中低</span></span></div>
+      <div class="row"><b>對應方案</b><span>⑦ C 的追蹤指標（不是方案，是量法）</span></div>
+      <div class="row"><b>資料厚度</b><span>你填 1 句・沒有逐次數字・外部 0 筆 → <span style="color:var(--warn)">最薄</span>，⑧ 行為隨時間圖可補</span></div>
     </div>
 
     <div class="layer l3 card" style="margin-bottom:12px">
@@ -249,6 +287,8 @@
       <div class="row"><b>你填的</b><span>流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」 <cite>[3]</cite></span></div>
       <div class="row"><b>這代表</b><span>這是一條會自己越轉越快的<dfn title="A 造成 B，B 又回頭讓 A 更嚴重">迴路</dfn>（等答案迴路）：帶領者先講 → 參與者等答案 → 分享變少 → 帶領者覺得「還沒到位」→ 講得更多更早。第 2 層的下滑就是這條迴路的輸出。它也直接違反判斷主權的第一條：參與者才是最終判斷者，帶領者的話是「影響」，不是「結論」。</span></div>
       <div class="row"><b>在這層出手</b><span>順序反過來：參與者先說；帶領者的解讀之後才講，並記成「影響來源」附在紀錄旁；紀錄表改成三欄「自己的判斷／影響來源／什麼證據會讓我改變判斷」。<b>效果</b>：切斷迴路的第一環，持久。<span class="lever high">槓桿：高</span></span></div>
+      <div class="row"><b>對應方案</b><span>⑦ 乙「改流程」★ 本次建議</span></div>
+      <div class="row"><b>資料厚度</b><span>你填 1 句（流程、分鐘、紀錄表三個事實）・外部 0 筆 → 夠用，但迴路本身還沒被數字證實</span></div>
     </div>
 
     <div class="layer l4 card" style="margin-bottom:0">
@@ -257,12 +297,15 @@
       <div class="row"><b>你填的</b><span>帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」 <cite>[4]</cite></span></div>
       <div class="row"><b>這代表</b><span>只要「專家比較懂」這個信念不變，第 3 層的順序下一期又會被改回去，紀錄表也會偷偷加回「達到洞察」那一欄。這是整座冰山的底。</span></div>
       <div class="row"><b>在這層出手</b><span>把帶領者的角色重新定義為「讓判斷過程看得見的人」：帶領者訓練、紀錄表、框架契約都寫上「參與者是最終判斷者；帶領者與框架本身都在影響來源清單上、都可以被參與者推翻」。<b>效果</b>：最根本、最持久，但最慢，而且要帶領者團隊自己點頭。<span class="lever max">槓桿：最高</span></span></div>
+      <div class="row"><b>對應方案</b><span>⑦ 丙「改流程＋改角色」</span></div>
+      <div class="row"><b>資料厚度</b><span>你的觀察 1 句・沒問過帶領者・外部 0 筆 → 薄，⑧ 五問法可驗</span></div>
     </div>
   </div>
 
   <!-- 3. 總結 -->
   <div class="card">
     <h2>⑤ 總結：在哪一層出手</h2>
+    <div class="how"><b>怎麼讀</b>三句話：問題在哪、先做哪層、還缺什麼。<b>你要做的</b>看「證據缺口」裡的三項，如果你手上就有，回去補再重跑。</div>
     <div class="finding"><b>主要發現：問題在第 3 層的迴路，根在第 4 層的信念</b>第 1、2 層是症狀。等答案迴路（第 3 層）製造下滑；「專家比較懂」信念（第 4 層）讓迴路修不好。</div>
     <div class="finding"><b>建議順序：先第 3 層，同時準備第 4 層</b>第 3 層一期內見效、能量化（主動分享人數、帶領者說明分鐘）；第 4 層拿第 3 層的數字去跟帶領者團隊談。</div>
     <div class="finding warn"><b>證據缺口（老實說）</b>目前只知道「先講」與「分享少」同時發生<cite>[2]</cite>，沒有逐次說明分鐘數、每人發言次數，也沒有參與者自己說為什麼不說。建議先補這三項再改訓練。</div>
@@ -271,11 +314,12 @@
   <!-- 4. 理解層次表 -->
   <div class="card">
     <h2>⑥ 理解層次對照表（改編自 Anderson &amp; Johnson）</h2>
+    <div class="how"><b>怎麼讀</b>每一列是一層，越往下越根本；★ 是本次建議先出手的列。<b>你要做的</b>四列都要有人負責，去 ⑦ B 表填負責人。</div>
     <table>
       <tr><th>層</th><th>出手方式</th><th>時間取向</th><th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr>
       <tr><td>事件</td><td>回應 React</td><td>現在</td><td>最快的因應是什麼？</td><td>8 人只有 2 人分享 <cite>[1]</cite></td><td>開場鼓勵（只當急救）</td></tr>
       <tr><td>模式</td><td>預測 Anticipate</td><td>過去→現在</td><td>什麼趨勢在反覆出現？</td><td>每期第 4 次起下降、先解讀場次最低 <cite>[2]</cite></td><td>兩個數字每次記、同圖看</td></tr>
-      <tr><td>結構</td><td>設計 Design</td><td>現在→未來</td><td>什麼制度在製造這些模式？</td><td>帶領者先講、說明 35 分、紀錄表只問「達到洞察」 <cite>[3]</cite></td><td>參與者先說、紀錄表改量過程</td></tr>
+      <tr><td>結構 ★</td><td>設計 Design</td><td>現在→未來</td><td>什麼制度在製造這些模式？</td><td>帶領者先講、說明 35 分、紀錄表只問「達到洞察」 <cite>[3]</cite></td><td>參與者先說、紀錄表改量過程</td></tr>
       <tr><td>心智模型</td><td>轉化 Transform</td><td>未來</td><td>這些制度背後的假設是什麼？</td><td>「參與者需要專家幫他們看見」<cite>[4]</cite></td><td>帶領者 = 讓判斷看得見的人</td></tr>
     </table>
     <p class="sub" style="margin:8px 0 0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>
@@ -284,6 +328,7 @@
   <!-- 4.5 解決方案：從分析到行動 -->
   <div class="card" style="border-left:6px solid var(--ok)">
     <h2>⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）</h2>
+    <div class="how"><b>怎麼讀</b>A 選一條路、B 排成 90 天、C 定三個數字盯著。表裡的字：見效 = 多久看得到；成本 = 要投入什麼；持久 = 會不會回彈；風險 = 最可能失敗的地方。<b>你要做的</b>選一個方案、填負責人和期限、確認目標數字（目標由你定，系統只帶入現況）。</div>
 
     <h3 style="margin:6px 0 8px">A. 選方案：三條路比一比</h3>
     <div style="overflow-x:auto">
@@ -295,10 +340,11 @@
     </table>
     </div>
 
+    <div class="finding" style="margin-top:12px"><b>如果只做一件事，明天就做</b>下次 session 開始前跟帶領者約定：參與者先說 3 分鐘，帶領者的話後說。不用預算、不用誰點頭，也正好是乙的第一環。</div>
     <h3 style="margin:14px 0 8px">B. 90 天行動計畫（AI 起草；負責人與期限請你確認）</h3>
     <div style="overflow-x:auto">
     <table>
-      <tr><th>週</th><th>行動</th><th>負責<span class="sub">（待確認）</span></th><th>怎麼證明有效</th><th>目標</th></tr>
+      <tr><th>週</th><th>行動</th><th>負責<span class="sub">（待確認）</span></th><th>怎麼證明有效</th><th>目標<span class="sub">（待你確認）</span></th></tr>
       <tr><td>1 到 2</td><td>補齊三項缺的數據：每次帶領者說明分鐘數、每人主動發言次數、參與者匿名一句話「為什麼沒說」</td><td>帶領者</td><td>三項數據有基準值</td><td>第 2 週前齊全</td></tr>
       <tr><td>3 到 4</td><td>改流程順序；紀錄表改成三欄（自己的判斷／影響來源／什麼證據會改變判斷）</td><td>帶領者＋課程設計</td><td>新流程與新紀錄表上線</td><td>第 4 週上線</td></tr>
       <tr><td>5 到 10</td><td>新一期團體用新流程跑完 6 次</td><td>帶領者</td><td>主動分享人數、說明分鐘數</td><td>第 6 次 ≥ 6 人、說明 ≤ 15 分</td></tr>
@@ -310,21 +356,22 @@
 
     <h3 style="margin:14px 0 8px">C. 追蹤驗證：三個指標，90 天後自動重跑</h3>
     <div class="kpis">
-      <div class="kpi"><b>主動分享人數（8 人團體）</b><span class="now">現在 2 人</span><span class="goal">目標 6 人</span><span class="when">一期（6 次）</span></div>
-      <div class="kpi"><b>帶領者說明分鐘數（90 分鐘裡）</b><span class="now">現在 35 分（示意）</span><span class="goal">目標 ≤ 15 分</span><span class="when">一期（6 次）</span></div>
-      <div class="kpi"><b>影響來源清單含帶領者本身</b><span class="now">現在 未量測</span><span class="goal">每次 100%</span><span class="when">第 4 週起</span></div>
+      <div class="kpi"><b>主動分享人數（8 人團體）</b><span class="now">現在 2 人</span><span class="goal">目標 6 人（待你確認）</span><span class="when">一期（6 次）</span></div>
+      <div class="kpi"><b>帶領者說明分鐘數（90 分鐘裡）</b><span class="now">現在 35 分（示意）</span><span class="goal">目標 ≤ 15 分（待你確認）</span><span class="when">一期（6 次）</span></div>
+      <div class="kpi"><b>影響來源清單含帶領者本身</b><span class="now">現在 未量測</span><span class="goal">每次 100%（待你確認）</span><span class="when">第 4 週起</span></div>
     </div>
     <div class="btns" style="margin-top:10px">
       <span class="btn primary">把行動計畫存成任務，設提醒</span>
       <span class="btn">90 天後自動重跑本分析並比較</span>
       <span class="btn">改善了就記進案例庫；沒改善回到 A 重選</span>
     </div>
-    <p class="sub" style="margin:8px 0 0">工具負責想清楚、排出來、盯著看；動手做事的是人。</p>
+    <p class="sub" style="margin:8px 0 0">工具負責想清楚、排出來、盯著看；動手做事的是人。到期時系統會用新資料自動重跑這一頁、把前後放在一起比較，並通知你；目標數字由你定，AI 不替你定。</p>
   </div>
 
   <!-- 5. 下一步 -->
   <div class="card">
     <h2>⑧ 下一步：你在這條路的哪裡、接著做什麼</h2>
+    <div class="how"><b>怎麼讀</b>旅程列是你在哪；每張卡寫做了會得到什麼、要你再填什麼。<b>你要做的</b>選一張，或都不選。</div>
     <div class="journey">
       <span class="done">✓ 冰山模型：問題在第 3 層、根在第 4 層</span><i>→</i>
       <span class="next">下一步：槓桿點分析（算每個出手點的力道）</span><i>→</i>
@@ -384,13 +431,14 @@
   <!-- 6. 引註 -->
   <div class="card">
     <h2>⑨ 引註（每個 [n] 都指向一段可查的來源）</h2>
+    <div class="how"><b>怎麼讀</b>[n] 是那句話的來源；「你的輸入」= 你填的原文，「外部來源」= 抓來的網頁（網址、抓取時間、指紋）。<b>你要做的</b>不用做；發現引錯了，按下方「退回並說原因」。</div>
     <ol class="src">
       <li>你的輸入・事件：「這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；上一期同一次是 6 位」</li>
       <li>你的輸入・模式：「三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低」</li>
       <li>你的輸入・結構：「流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄『參與者是否達到本次目標洞察』」</li>
       <li>你的輸入・心智模型：「帶領者團隊默認『參與者需要專家幫他們看見意義』；訓練教的是怎麼解讀作品，不是怎麼讓人自己看見」</li>
     </ol>
-    <p class="sub">接上資料蒐集之後，這裡會多出外部來源（網址、抓取時間、內容指紋）。</p>
+    <div class="finding warn"><b>本次沒有外部來源</b>結論全部建立在你填的四段話上，所以信心最高只到「中」。要提高：接上資料蒐集，或先在 ⑧ 用「行為隨時間圖」補六次真實數字。</div>
   </div>
 
   <!-- 7. 來源標記與核准 -->
@@ -399,8 +447,10 @@
       <span>這一頁是 <b>AI 推論，尚未經人核准</b></span>
       <span>模型 <b>claude-sonnet-5</b></span>
       <span>費用 <b>約 6k tokens・≈ NT$1</b></span>
-      <span>檢查 <b class="ok">來源 ✓</b> <b class="ok">層序 ✓</b> <b class="ok">引註完整 ✓</b> <b class="ok">無預設結論 ✓</b></span>
+      <span>檢查 <b class="ok" title="每一句主張都有 [n]">來源 ✓</b> <b class="ok" title="沒有跳層：有模式才寫結構、有結構才寫心智模型">層序 ✓</b> <b class="ok" title="每個 [n] 都找得到來源">引註完整 ✓</b> <b class="ok" title="沒有把 AI 的話當成你的結論；你的判斷欄還在">無預設結論 ✓</b></span>
+      <span>你的判斷 <b>尚未填</b>（① 下方）</span>
     </div>
+    <div class="sub" style="margin-top:8px"><b>核准</b> = 這頁成為專案的正式紀錄，可匯出、可被下一步引用；<b>退回</b> = 寫原因後重做，這一版保留；<b>刪除專案</b> = 來源與所有產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
     <div class="btns" style="margin-top:12px">
       <span class="btn primary">核准，存進專案</span>
       <span class="btn">退回並說原因</span>
