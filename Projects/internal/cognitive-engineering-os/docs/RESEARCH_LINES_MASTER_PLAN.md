@@ -2,13 +2,13 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.22（2026-09-24）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.23（2026-09-24）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
 - 現在期／卡：**PI-a**（§12.3）／**WC-PIa-01 未開工**
 - 已完成：P0 碼完成 `19f00f9aa`（2026-09-23，未部署，隨 PI-b 同窗）；PI-a 0/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）
-- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.22（2026-09-24）
+- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.23（2026-09-24）
 - 阻塞／待操作者：無（§9 待拍板：無）
 - 下一步：WC-PIa-01（typed object schema）；執行模型 Sonnet 5／Codex 皆可
 
@@ -191,7 +191,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | U16 | **不知道該用哪個工具：首頁第四張卡「描述你的問題」**：貼一段話（亂寫也可，同懶人填寫）→ 第一層免費比對（display-metadata name／blurb／why、`method-inventory.yaml` family／purpose、recipes 說明）→ 信心不足才叫 `route.method`（§3.3）→ 回 ≤3 個建議：方法或工作流、為什麼（每句引 catalog 條目）、會得到什麼、預估成本；一鍵接受 = 生成一條**可調順序的自組工作流**草稿（`/workflows/custom`，既有），使用者改完順序才跑 | 首頁＋建立步 |
 | U17 | **舊 dashboard 能力零退化**：§0 parity 清單每列在新殼落地並驗過才退場；懶人填寫、示範案例、自組工作流、專家模式原樣移植；「先免費比對、不夠才花 AI 額度」的原則沿用到路由與起草 | 全部 |
 | U18 | **工作流（多個方法串起來）對第一次用的人**：總覽頁 = 站列（✓ 已完成／● 現在／○ 之後／總結頁）＋每站一張卡（回答什麼／從上一站帶入什麼（自動）／還要你填什麼（標紅）／會得到／約多久多少錢／第一次用的站課）＋能回答／不能回答＋兩種走法：**一站一站走**（每站停下確認，可改順序、可換方法）與**一次跑完**（既有引擎，跑完逐站看）；每站 = 同一個九段結果頁（⑧ 的旅程列 = 站列，下一站固定、可分岔）；**總結頁**（一句話三站合一、每站一句＋你的判斷＋信心、最終建議與改判條件、最後一站的 (5b)、跨站引註不重排、成本合計、核准整條／退回某站 → 之後的站失效且重跑不重填）；課程分層：**工作流課 5 步、≤3 分鐘**（1 這條路解什麼＋能／不能回答＋站列＋何時用／不用 → 2 三站各做什麼、帶入什麼、還要你填什麼，例子跟線走（chips）→ 3 看一個走完的（每站一句＋你的判斷＋總結）→ 4 怎麼走：兩種走法、每站好例壞例、常見錯誤三條、自我檢查 → 5 開始：準備清單＋三顆按鈕；狀態列與每步「怎麼讀／你要做的」同方法課；課程來源 = 工作流定義檔＋各站方法課）＋**站課只在第一次到站時出現**（U15，可跳）；**路線課每站只簡述＋一個填好的例子＋連到該方法的正式課（深度在方法頁，一個事實一處，D25）**；示意稿 `COS/docs/mockups/workflow-lesson-mock.html`（v3：每站加「完整介紹」連結）（線上版 https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU ，私人）與 `COS/docs/mockups/workflow-result-mock.html`（線上版 https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk ，私人） | recipes 頁、站頁、總結頁 |
-| U19 | **視覺主色 = 墨綠**（操作者 2026-09-24「主色系是綠色，看起來比較舒服」→「要接近墨綠色」）：accent 亮色 `#1b4d3e`／暗色 `#8fc7b0`，tag 底 `#e6f0ec`／`#16302a`；四份示意稿與新殼的設計 token 同一組（`web/app/globals.css` 的 `:root` 與 dark 兩段）；**資料色不受影響**（冰山的水與四層色、圖表的資料序列色維持，語意固定）；主按鈕、連結、旅程列、進度、標籤都吃 accent | 全部頁面 |
+| U19 | **色調 = HCI（hci.aware-wave.com）整組，含背景**（操作者 2026-09-24：「用 HCI 的色調，包括背景色，比較舒服」）：來源 `Projects/internal/hci30/app/public/index.html:15-19`——bg 米白 `#f6f2e9`、card `#fffdf8`、border `#e3dbc8`、text `#232019`、muted `#7a7261`、accent 藍綠 `#0e5b50`（hover `#093f38`）、tint `#e2eeea`、ok `#1f6b47`、warn `#a3611c`、bad `#a13328`；字體 PingFang TC／Microsoft JhengHei；暗色（HCI 無，自訂同色相）bg `#1c2b27`、card `#243530`、text `#f3efe4`、accent `#8fc7b0`、tint `#22403a`；四份示意稿與新殼的設計 token 同一組（`web/app/globals.css` 的 `:root` 與 dark 兩段）；**資料色不受影響**（冰山的水與四層色、圖表的資料序列色維持，語意固定）；主按鈕、連結、旅程列、進度、標籤都吃 accent | 全部頁面 |
 
 **首用流程（螢幕級）**：0 首頁三卡 → 0.5 該線預設方法的 5 分鐘課（U15，可跳過）→ 1 建立（名稱、類型、定位詞；預設角度已勾；成本預覽；主按鈕「開始蒐集」）→ 2 蒐集中（進度、已收 N、擋下 M 與原因、可停）→ 3 彙整（草稿每句 [n] 可點開原文；「有缺口」「來源互相矛盾」用卡片）→ 4 分析（預設方法已選；需要你填的欄位標紅，例如權重；主按鈕「執行分析」）→ 5 報表（預覽、「核准」、匯出 md／pdf）。任何一步失敗：一句人話 + 一個按鈕（重試／調整／跳過）。
 
