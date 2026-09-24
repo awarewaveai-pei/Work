@@ -6443,6 +6443,27 @@ tier_1:
     mandated_by: "Operator directive 2026-09-18 (build the WuSheng Five Phase method from her existing Airtable framework, base appbQ5ACPPxMybVvM); GROUNDED ORIGINAL DESIGN, no ADR governs the content."
     source: "methods/contracts/art_therapy.wusheng_five_phase.contract.yaml + ai_lego/modules/art_therapy/wusheng_five_phase.py"
     note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-09-18), same pattern as art_therapy.life_wheel (twohundredfortysixth_concrete_entry)."
+  twohundredeightieth_concrete_entry:
+    method_id: "decision.eisenhower_matrix"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator directive 2026-09-18 (commit 9414ac0cc); NOT Atlas-cited (grep-confirmed zero \"Eisenhower\" hits) -- external grounding is Covey's \"7 Habits\" (attributed to Eisenhower), disclosed in the compute module's own docstring per contract description. Same shape as decision.impact_effort (2 axes, 2 thresholds, 4-way quadrant), distinct method (different axes/semantics/citation)."
+    source: "methods/contracts/decision.eisenhower_matrix.contract.yaml + ai_lego/modules/decision/eisenhower_matrix.py + ai_lego/compute/eisenhower_matrix/classification.py"
+    note: "2026-09-25 T0 registration (main's golden runner was red for this method with no matching complete entry -- see this task's commit message). Verified: contract file ACTIVE with id decision.eisenhower_matrix; real implementation + compute modules present; tests.unit.test_eisenhower_matrix -- 17 tests pass, including test_real_catalog_resolves_and_dispatches_the_method_end_to_end and test_method_contract_yaml_validates_against_method_schema. No dedicated typed-object schema file under specs/cognitive/typed-objects/ -- same as research.reporting_guideline_checklist (twohundredseventyeighth_concrete_entry), output shape enforced by the module's own gates (evaluate_quadrant_integrity_gate et al.), not a central schema file."
+  twohundredeightyfirst_concrete_entry:
+    method_id: "divergent.reverse_brainstorming"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator directive 2026-09-18 (commit 9414ac0cc); NOT Atlas-cited (grep-confirmed zero \"reverse brainstorm\"/\"反向腦力\" hits). Same flat-list-plus-referential-integrity shape as divergent.classic_brainstorming, distinct operation (worsening_ideas are never solutions; inversions is the only mechanism that turns one into a solution candidate). Qualitative ideation, no genuine-compute gate."
+    source: "methods/contracts/divergent.reverse_brainstorming.contract.yaml + ai_lego/modules/divergent/reverse_brainstorming.py"
+    note: "2026-09-25 T0 registration (same batch as decision.eisenhower_matrix above -- see that entry's note). Verified: contract file ACTIVE with id divergent.reverse_brainstorming; real implementation module present; tests.unit.test_reverse_brainstorming -- 16 tests pass, including test_real_catalog_resolves_and_dispatches_the_method_end_to_end and test_method_contract_yaml_validates_against_method_schema. No dedicated typed-object schema file, same as research.reporting_guideline_checklist (twohundredseventyeighth_concrete_entry)."
+  twohundredeightysecond_concrete_entry:
+    method_id: "strategy.lean_canvas"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator directive 2026-09-18 (commit c7cfb8ad8); NOT Atlas-cited (grep-confirmed zero \"lean canvas\" hits, case-insensitive, across the whole AI_LEGO_Cognitive_Engineering_OS tree). External grounding is Ash Maurya's Lean Canvas (\"Running Lean\", 2012; https://leanstack.com/lean-canvas), disclosed in the compute module's own docstring. Same closed-block-set shape as strategy.business_model_canvas, distinct block vocabulary (9 named blocks, each an explicit hypothesis)."
+    source: "methods/contracts/strategy.lean_canvas.contract.yaml + ai_lego/modules/strategy/lean_canvas.py"
+    note: "2026-09-25 T0 registration (same batch as decision.eisenhower_matrix above -- see that entry's note). Verified: contract file ACTIVE with id strategy.lean_canvas; real implementation module present; tests.unit.test_lean_canvas -- 52 tests pass, including test_invoke_through_the_catalog_runs_the_real_implementation and test_contract_yaml_validates_against_method_schema. No dedicated typed-object schema file, same as research.reporting_guideline_checklist (twohundredseventyeighth_concrete_entry)."
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

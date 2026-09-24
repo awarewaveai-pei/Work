@@ -113,12 +113,34 @@ class UniqueKeyLoader(yaml.SafeLoader):
     verification scripts (PyYAML silently lets the last key win otherwise)."""
 
 
+# 2026-09-25: this constructor used to replace PyYAML's own
+# construct_yaml_map entirely, which also dropped its flatten_mapping() call
+# -- so any `<<: *anchor` merge key hit `loader.construct_object(key_node)`
+# with no constructor registered for tag:yaml.org,2002:merge and crashed the
+# whole loader (method-input-forms.yaml:167, dd204ff65). Fixed by doing the
+# duplicate check in two passes around flatten_mapping: first pass walks the
+# UNFLATTENED node and only inspects explicit (non-merge) key nodes, so an
+# explicit key legitimately overriding a merge-supplied value (valid YAML
+# merge-key precedence, not a duplicate) is never flagged; flatten_mapping
+# then expands `<<:` the normal PyYAML way (merged pairs first, explicit
+# pairs appended after -- last-write-wins on the second pass keeps explicit
+# values winning); second pass builds the actual mapping.
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
 def _construct_mapping(loader, node, deep=False):
+    seen = set()
+    for key_node, _value_node in node.value:
+        if key_node.tag == _MERGE_TAG:
+            continue
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
+        seen.add(key)
+    loader.flatten_mapping(node)
     mapping = {}
     for key_node, value_node in node.value:
         key = loader.construct_object(key_node, deep=deep)
-        if key in mapping:
-            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
         mapping[key] = loader.construct_object(value_node, deep=deep)
     return mapping
 
@@ -164,6 +186,47 @@ def check(cond, msg):
         passed += 1
     else:
         failures.append(msg)
+
+
+# ---------------------------------------------------------------------------
+# 0. UniqueKeyLoader merge-key regression (2026-09-25) -- this file's own
+#    loader, not a corpus file. No pytest/unittest runner exists for this
+#    suite (see tests/README.md); every check family here is a self-
+#    contained function against the shared check() global, so this follows
+#    that same convention rather than adding a second test framework for one
+#    function.
+# ---------------------------------------------------------------------------
+def run_unique_key_loader_merge_key_semantics():
+    # An explicit key overriding a merge-supplied value is legal YAML
+    # (merge-key precedence), not a duplicate -- must load cleanly, and the
+    # explicit value must win.
+    merge_override_yaml = """
+base: &base
+  a: 1
+  b: 2
+child:
+  <<: *base
+  b: 3
+"""
+    try:
+        data = yaml.load(merge_override_yaml, Loader=UniqueKeyLoader)
+    except Exception as e:  # noqa: BLE001 -- pre-fix this was yaml.constructor.ConstructorError
+        check(False, f"merge-key loader regression: a `<<: *anchor` merge key must expand without raising, got {type(e).__name__}: {e}")
+    else:
+        check(
+            isinstance(data, dict) and data.get("child") == {"a": 1, "b": 3},
+            f"merge-key loader regression: explicit key override should win (b: 3), got {data.get('child') if isinstance(data, dict) else data!r}",
+        )
+
+    # Two literal duplicate EXPLICIT keys in the same mapping (no merge
+    # involved) must still be rejected -- the guard this loader exists for.
+    duplicate_explicit_yaml = "a: 1\na: 2\n"
+    try:
+        yaml.load(duplicate_explicit_yaml, Loader=UniqueKeyLoader)
+    except ValueError as e:
+        check("Duplicate key" in str(e), f"merge-key loader regression: expected a Duplicate key ValueError, got {e!r}")
+    else:
+        check(False, "merge-key loader regression: two literal duplicate explicit keys must raise ValueError, but none was raised")
 
 
 # ---------------------------------------------------------------------------
@@ -664,6 +727,7 @@ def run_contract_backlog_registration_parity():
 
 
 if __name__ == "__main__":
+    run_unique_key_loader_merge_key_semantics()
     run_schema_conformance()
     run_recipe_instance_conformance()
     run_method_contract_conformance()

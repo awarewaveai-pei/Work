@@ -88,12 +88,28 @@ class UniqueKeyLoader(yaml.SafeLoader):
     no error, silently discarding data)."""
 
 
+# 2026-09-25: kept identical to tests/run_golden_tests.py's own fix -- both
+# files independently defined the same constructor and both had the same
+# missing-flatten_mapping bug (a `<<: *anchor` merge key crashes the loader
+# with "could not determine a constructor for the tag
+# 'tag:yaml.org,2002:merge'"). See that file's comment for the full
+# explanation of why the duplicate check runs BEFORE flatten_mapping.
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
 def _construct_mapping(loader, node, deep=False):
+    seen = set()
+    for key_node, _value_node in node.value:
+        if key_node.tag == _MERGE_TAG:
+            continue
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
+        seen.add(key)
+    loader.flatten_mapping(node)
     mapping = {}
     for key_node, value_node in node.value:
         key = loader.construct_object(key_node, deep=deep)
-        if key in mapping:
-            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
         mapping[key] = loader.construct_object(value_node, deep=deep)
     return mapping
 
