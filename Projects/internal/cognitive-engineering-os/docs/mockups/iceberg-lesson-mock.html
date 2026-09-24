@@ -5,66 +5,128 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>冰山模型五分鐘課</title>
 <style>
-  :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--water:#dbeafe;--tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af}
-  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
-        --water:#12304a;--tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d}}
-  :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
-        --water:#12304a;--tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d}
+  /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+  :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
+        --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
+        --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}}
+  :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
-  .wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:16px}
-  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
-  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .top .skip{font-size:13px;color:var(--muted)}
-  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
-  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .progress span.done{background:var(--accent);color:#fff}
+  .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
   h2{font-size:17px;margin:0 0 10px}
-  h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
-  h3{font-size:15px;margin:10px 0 6px}
+  h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
-  .lead{font-size:16px;margin:8px 0}
-  .grid2{display:grid;grid-template-columns:1fr;gap:12px}
-  .layer{border-left:6px solid var(--l2);padding:10px 12px;background:var(--soft);border-radius:0 10px 10px 0}
-  .layer.l1{border-color:var(--l1)}.layer.l2{border-color:var(--l2)}.layer.l3{border-color:var(--l3)}.layer.l4{border-color:var(--l4)}
-  .layer b{display:block;font-size:15px}
-  .layer .q{color:var(--accent);font-size:14px;margin:2px 0}
-  .layer .ex{font-size:13.5px;color:var(--muted)}
-  .gb{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
-  .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
-  .good{background:var(--good-bg);border:1px solid var(--ok)}
-  .bad{background:var(--bad-bg);border:1px solid var(--bad)}
-  .good b{color:var(--ok)}.bad b{color:var(--bad)}
-  .step{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
-  .step .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
-  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:14px}
-  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
+  .lead{font-size:16px;margin:10px 0 6px}
+  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
+  .howto:hover{background:var(--accent-hover)}
+  .top .skip{font-size:13px;color:var(--muted)}
+  .top .skip a{color:var(--accent)}
+  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
+  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
+  .pill.ok{border-color:var(--ok);color:var(--ok)}
+  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}
+  .how b{color:var(--accent);font-weight:600}
+  .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
+  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .can{border:1px solid var(--ok)}
+  .cant{border:1px solid var(--warn)}
+  .can b,.cant b{display:block}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
+  a.btn{cursor:pointer}
+  .btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  a.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn.ghost{color:var(--muted)}
+  .btn small{display:block;font-size:11px;color:inherit;opacity:.85}
+  .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
+  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span.done{background:var(--ok);color:var(--bg)}
+  .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
+  .journey i{color:var(--muted);font-style:normal}
+  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
+  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .progress span.done{background:var(--accent);color:var(--bg)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+  .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  .tags span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0}
+  cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
   th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
   td:first-child{white-space:nowrap;font-weight:600}
-  .btns{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
-  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .btn small{display:block;font-size:11px;opacity:.85}
+  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 10px;background:var(--soft);border-radius:0 8px 8px 0;font-size:14px}
+  .finding b{display:block}
+  .finding.warn{border-color:var(--warn)}
+  .finding.ok{border-color:var(--ok)}
+  .row{display:grid;grid-template-columns:110px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+  .row b{color:var(--muted);font-weight:600;font-size:13px}
+  .row .q{color:var(--ink)}
+  @media (max-width:560px){.row{grid-template-columns:1fr;gap:2px}}
+  .gb{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
+  .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .good{background:var(--good-bg);border:1px solid var(--ok)}
+  .bad{background:var(--bad-bg);border:1px solid var(--bad)}
+  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:14px}
+  .good b{color:var(--ok)}
+  .bad b{color:var(--bad)}
+  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
+  .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+  .judge .btns{margin:6px 0}
+  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
+  .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
+  .conf.high{border-color:var(--ok);color:var(--ok)}
+  .read{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .read b{color:var(--ink)}
+  .thick{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .terms{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}
+  .terms b{color:var(--ink)}
+  ol.src{padding-left:20px;font-size:14px}
+  .meta-bar{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+  .meta-bar b{color:var(--ink)}
+  .ok{color:var(--ok)}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+  pre{background:var(--code-bg);color:var(--code-ink);font-size:12px;padding:12px;border-radius:8px;overflow:auto}
+  dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
+  svg{width:100%;height:auto;display:block}
+  svg text{fill:var(--ink)}
+  svg text.m{fill:var(--muted)}
+  svg text.a{fill:var(--accent)}
+  svg .node{fill:var(--node)}
+  svg .water{fill:var(--water)}
+  svg .axis{stroke:var(--axis)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+  /* == shared design system: end == */
+  /* == page-specific == */
+  h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
+  .grid2{display:grid;grid-template-columns:1fr;gap:12px}
+  .exlayer{border-left:6px solid var(--l2);padding:10px 12px;background:var(--soft);border-radius:0 10px 10px 0}
+  .exlayer.l1{border-color:var(--l1)}
+  .exlayer.l2{border-color:var(--l2)}
+  .exlayer.l3{border-color:var(--l3)}
+  .exlayer.l4{border-color:var(--l4)}
+  .exlayer b{display:block;font-size:15px}
+  .exlayer .q{color:var(--accent);font-size:14px;margin:2px 0}
+  .exlayer .ex{font-size:13.5px;color:var(--muted)}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
+  .step .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:14px}
   ul.check{padding-left:20px;margin:6px 0}
   ul.check li{margin-bottom:4px}
-  svg{width:100%;height:auto;display:block}
-  svg text{fill:var(--ink)} svg text.m{fill:var(--muted)} svg .water{fill:var(--water)}
-  dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
-  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
-  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:-6px 0 12px;align-items:center}
-  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--ok);color:var(--ok)}
-  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
-  cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
-  .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}.quiz details{margin:4px 0;font-size:14px}.quiz summary{cursor:pointer}
-  ol.src{padding-left:20px;font-size:14px}
-  .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
-  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+  .quiz details{margin:4px 0;font-size:14px}
+  .quiz summary{cursor:pointer}
 </style>
 <script>
   // Example set follows the line the user came in from; the operator's default is art reflection (EdD judgment-sovereignty research, plan D18).
@@ -72,7 +134,7 @@
     var chip = e.target.closest && e.target.closest(".chip");
     if (!chip) return;
     var set = chip.getAttribute("data-set");
-    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); });
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
     document.querySelectorAll("#examples .ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
   });
 </script>
@@ -87,10 +149,10 @@
       <h1>冰山模型：開始前 5 分鐘</h1>
       <div class="sub">六步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
     </div>
-    <span class="skip">用過了？<u>跳過，直接開始</u></span>
+    <span class="skip">用過了？<a href="#start">跳過，直接開始</a></span>
   </div>
   <div class="progress"><span class="done">1 這是什麼</span><span>2 四層</span><span>3 看一個例子</span><span>4 怎麼填</span><span>5 常見錯誤</span><span>6 開始</span></div>
-  <div class="status"><span class="pill">方法齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、知道什麼時候不該用</span><span>底部有教材版（給老師／帶領者）</span></div>
+  <div class="status"><span class="pill ok">方法齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、知道什麼時候不該用</span><span>底部有教材版（給老師／帶領者）</span></div>
 
   <!-- 1 -->
   <div class="card">
@@ -122,32 +184,32 @@
     <div class="how"><b>怎麼讀</b>先按你的領域，再從上往下看四層各一個例子；每層的「問」是你之後要回答的問題 <cite>[3]</cite>。<b>你要做的</b>按一個領域；把你自己的問題在心裡套進四層試一次。</div>
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
-      <button class="chip on" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
-      <button class="chip" data-set="partner" id="chip-partner">合作對象</button>
-      <button class="chip" data-set="decision" id="chip-decision">一個決定</button>
-      <button class="chip" data-set="ecom" id="chip-ecom">電商後台</button>
-      <button class="chip" data-set="daily" id="chip-daily">日常</button>
+      <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="partner" id="chip-partner">合作對象</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="decision" id="chip-decision">一個決定</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
     </div>
     <div class="grid2" id="examples">
-      <div class="layer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div>
+      <div class="exlayer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div>
         <div class="ex" data-set="edd">例：這期 6 次 session 有 5 次沒做最後的「再檢視」。</div>
         <div class="ex" data-set="partner" hidden>例：合作的畫廊這次又延後付款。</div>
         <div class="ex" data-set="decision" hidden>例：這個月又有 5 位家長問能不能加開平日班。</div>
         <div class="ex" data-set="ecom" hidden>例：這個月退貨率 12%，上個月 5%。</div>
         <div class="ex" data-set="daily" hidden>例：這週又為了家事吵架。</div></div>
-      <div class="layer l2"><b>② 模式 Patterns</b><div class="q">問：以前發生過嗎？多常？什麼時候特別容易發生？</div>
+      <div class="exlayer l2"><b>② 模式 Patterns</b><div class="q">問：以前發生過嗎？多常？什麼時候特別容易發生？</div>
         <div class="ex" data-set="edd">例：每期都這樣；人多的場次更常跳過；線上場幾乎都跳。</div>
         <div class="ex" data-set="partner" hidden>例：近一年每次展覽結束都延 30 到 60 天才付。</div>
         <div class="ex" data-set="decision" hidden>例：每年暑假前詢問暴增，開學後又回落。</div>
         <div class="ex" data-set="ecom" hidden>例：每次上新品後兩週退貨都衝高；尺寸類商品特別多；促銷檔期更嚴重。</div>
         <div class="ex" data-set="daily" hidden>例：每次都在週日晚上。</div></div>
-      <div class="layer l3"><b>③ 結構 Structures</b><div class="q">問：是什麼流程、規則、資源安排讓它一直發生？</div>
+      <div class="exlayer l3"><b>③ 結構 Structures</b><div class="q">問：是什麼流程、規則、資源安排讓它一直發生？</div>
         <div class="ex" data-set="edd">例：90 分鐘裡創作 50、分享 30，再檢視排在最後沒有保護時間；紀錄表沒有「再檢視」這一欄。</div>
         <div class="ex" data-set="partner" hidden>例：合約沒寫付款期限；對方會計每季才結一次帳。</div>
         <div class="ex" data-set="decision" hidden>例：現有教室只有週末滿，平日閒置；老師都是兼職，平日排不出人。</div>
         <div class="ex" data-set="ecom" hidden>例：商品頁的尺寸表直接用供應商給的、沒人核對；退貨流程只有「同意／不同意」，不問原因。</div>
         <div class="ex" data-set="daily" hidden>例：沒有分工表，誰看到誰做。</div></div>
-      <div class="layer l4"><b>④ 心智模型 Mental Models（最深）</b><div class="q">問：大家心裡哪個沒說出口的假設，撐住了這些結構？</div>
+      <div class="exlayer l4"><b>④ 心智模型 Mental Models（最深）</b><div class="q">問：大家心裡哪個沒說出口的假設，撐住了這些結構？</div>
         <div class="ex" data-set="edd">例：「創作本身就是療癒，回頭講會破壞當下的感覺。」</div>
         <div class="ex" data-set="partner" hidden>例：「小工作室不好意思催款。」</div>
         <div class="ex" data-set="decision" hidden>例：「擴大就是成長。」</div>
@@ -204,7 +266,7 @@
   </div>
 
   <!-- 6 -->
-  <div class="card">
+  <div class="card" id="start">
     <h2>6. 開始<small>準備 30 秒</small></h2>
     <div class="how"><b>怎麼讀</b>準備清單，沒有也能先填。<b>你要做的</b>選一顆按鈕；不確定這方法適不適合你的問題，按第三顆。</div>
     <p>手邊有這些會填得比較快，沒有也可以先填、之後補：</p>

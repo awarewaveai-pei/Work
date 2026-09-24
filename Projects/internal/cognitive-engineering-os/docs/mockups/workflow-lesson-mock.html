@@ -5,39 +5,112 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>工作流三分鐘課</title>
 <style>
-  :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
-        --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8}
-  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
-        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a}}
-  :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
-        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a}
+  /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+  :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
+        --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
+        --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}}
+  :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
-  .wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:16px}
-  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
-  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .top .skip{font-size:13px;color:var(--muted)}
-  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
-  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .progress span.done{background:var(--accent);color:#fff}
-  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:-6px 0 12px;align-items:center}
-  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--ok);color:var(--ok)}
-  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
+  .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
   h2{font-size:17px;margin:0 0 10px}
-  h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
+  h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
-  .lead{font-size:16px;margin:8px 0}
-  cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
+  .lead{font-size:16px;margin:10px 0 6px}
+  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
+  .howto:hover{background:var(--accent-hover)}
+  .top .skip{font-size:13px;color:var(--muted)}
+  .top .skip a{color:var(--accent)}
+  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
+  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
+  .pill.ok{border-color:var(--ok);color:var(--ok)}
+  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}
+  .how b{color:var(--accent);font-weight:600}
   .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
-  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}.can{border:1px solid var(--ok)}.cant{border:1px solid var(--warn)}.can b,.cant b{display:block}
+  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .can{border:1px solid var(--ok)}
+  .cant{border:1px solid var(--warn)}
+  .can b,.cant b{display:block}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
+  a.btn{cursor:pointer}
+  .btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  a.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn.ghost{color:var(--muted)}
+  .btn small{display:block;font-size:11px;color:inherit;opacity:.85}
   .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
   .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span.done{background:var(--ok);color:var(--bg)}
+  .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
+  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
+  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .progress span.done{background:var(--accent);color:var(--bg)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
-  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  .tags span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0}
+  cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
+  td:first-child{white-space:nowrap;font-weight:600}
+  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 10px;background:var(--soft);border-radius:0 8px 8px 0;font-size:14px}
+  .finding b{display:block}
+  .finding.warn{border-color:var(--warn)}
+  .finding.ok{border-color:var(--ok)}
+  .row{display:grid;grid-template-columns:110px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+  .row b{color:var(--muted);font-weight:600;font-size:13px}
+  .row .q{color:var(--ink)}
+  @media (max-width:560px){.row{grid-template-columns:1fr;gap:2px}}
+  .gb{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
+  .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .good{background:var(--good-bg);border:1px solid var(--ok)}
+  .bad{background:var(--bad-bg);border:1px solid var(--bad)}
+  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:14px}
+  .good b{color:var(--ok)}
+  .bad b{color:var(--bad)}
+  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
+  .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+  .judge .btns{margin:6px 0}
+  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
+  .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
+  .conf.high{border-color:var(--ok);color:var(--ok)}
+  .read{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .read b{color:var(--ink)}
+  .thick{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .terms{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}
+  .terms b{color:var(--ink)}
+  ol.src{padding-left:20px;font-size:14px}
+  .meta-bar{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+  .meta-bar b{color:var(--ink)}
+  .ok{color:var(--ok)}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+  pre{background:var(--code-bg);color:var(--code-ink);font-size:12px;padding:12px;border-radius:8px;overflow:auto}
+  dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
+  svg{width:100%;height:auto;display:block}
+  svg text{fill:var(--ink)}
+  svg text.m{fill:var(--muted)}
+  svg text.a{fill:var(--accent)}
+  svg .node{fill:var(--node)}
+  svg .water{fill:var(--water)}
+  svg .axis{stroke:var(--axis)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+  /* == shared design system: end == */
+  /* == page-specific == */
+  h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
   .station{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:12px}
   .station h3{margin:0 0 2px;font-size:16px}
   .station .why{color:var(--muted);font-size:13.5px;margin:0 0 8px}
@@ -45,28 +118,15 @@
   @media (max-width:560px){.srow{grid-template-columns:1fr;gap:2px}}
   .srow b{color:var(--muted);font-weight:600;font-size:13px}
   .srow b.need{color:var(--warn)}
-  .srow ul{margin:0;padding-left:18px}.srow li{margin:2px 0}
+  .srow ul{margin:0;padding-left:18px}
+  .srow li{margin:2px 0}
   .ex{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
   .ex .lab{display:block;color:var(--accent);font-size:12px;font-weight:600;margin-bottom:2px}
-  table{width:100%;border-collapse:collapse;font-size:13.5px}
-  th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
-  th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
-  td:first-child{white-space:nowrap;font-weight:600}
-  .gb{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
-  .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
-  .good{background:var(--good-bg);border:1px solid var(--ok)}.bad{background:var(--bad-bg);border:1px solid var(--bad)}
-  .good b{color:var(--ok)}.bad b{color:var(--bad)}
-  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:14px}
-  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
-  .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}.quiz details{margin:4px 0;font-size:14px}.quiz summary{cursor:pointer}
+  .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+  .quiz details{margin:4px 0;font-size:14px}
+  .quiz summary{cursor:pointer}
   ul.check{padding-left:20px;margin:6px 0}
   ul.check li{margin-bottom:4px}
-  .btns{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
-  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .btn small{display:block;font-size:11px;opacity:.85}
-  ol.src{padding-left:20px;font-size:14px}
-  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 <script>
   // Example set follows the line the user came in from; the operator's default is art reflection (plan D18).
@@ -74,7 +134,7 @@
     var chip = e.target.closest && e.target.closest(".chip");
     if (!chip) return;
     var set = chip.getAttribute("data-set");
-    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); });
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
     document.querySelectorAll("#examples .ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
   });
 </script>
@@ -89,10 +149,10 @@
       <h1>做一個決定（3 站）：開始前 3 分鐘</h1>
       <div class="sub">五步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
     </div>
-    <span class="skip">走過了？<u>跳過，直接開始</u></span>
+    <span class="skip">走過了？<a href="#start">跳過，直接開始</a></span>
   </div>
   <div class="progress"><span class="done">1 這條路解什麼</span><span>2 三站各做什麼</span><span>3 看一個走完的</span><span>4 怎麼走</span><span>5 開始</span></div>
-  <div class="status"><span class="pill">三站方法齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span></div>
+  <div class="status"><span class="pill ok">三站方法齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span></div>
 
   <!-- 1 -->
   <div class="card">
@@ -113,10 +173,10 @@
     <div class="how"><b>怎麼讀</b>先按你的領域，例子就會換成你熟的情境；每一站從上往下看：這站在做什麼 → 你會看到的表單 → 已經幫你填好的 → 你要填的（附一個填好的例子）→ 做完會得到什麼 → 完整介紹的連結。這堂課只講「這條路」，每個方法的深度在它自己的正式課。<b>你要做的</b>按一個領域；把你自己的決定，照例子的樣子在心裡填一次。</div>
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
-      <button class="chip on" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
-      <button class="chip" data-set="partner" id="chip-partner">合作對象</button>
-      <button class="chip" data-set="ecom" id="chip-ecom">電商後台</button>
-      <button class="chip" data-set="daily" id="chip-daily">日常</button>
+      <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="partner" id="chip-partner">合作對象</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
     </div>
     <div id="examples">
 
@@ -214,7 +274,7 @@
   </div>
 
   <!-- 5 -->
-  <div class="card">
+  <div class="card" id="start">
     <h2>5. 開始<small>準備 20 秒</small></h2>
     <div class="how"><b>怎麼讀</b>準備清單，沒有也能先走。<b>你要做的</b>選一顆按鈕；不確定這條路適不適合，按第三顆。</div>
     <ul class="check">

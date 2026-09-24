@@ -5,85 +5,144 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>冰山模型分析結果</title>
 <style>
-  :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--ok:#1f6b47;--warn:#a3611c;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--tag:#e2eeea}
+  /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+  :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
+        --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
+        --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}}
+  :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
-  .wrap{max-width:1000px;margin:0 auto;padding:16px}
-  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
-  .top{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
-  .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   h2{font-size:17px;margin:0 0 10px}
   h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
   .lead{font-size:16px;margin:10px 0 6px}
-  .steps{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
-  .step{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:14px}
-  .step b{display:block;color:var(--accent);margin-bottom:2px}
-  .chips span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0}
-  svg{width:100%;height:auto;display:block}
-  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:8px}
-  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
-  /* layer cards: identical skeleton */
-  .layer{border-left:6px solid var(--l2);padding-left:14px}
-  .layer.l1{border-color:var(--l1)}.layer.l2{border-color:var(--l2)}.layer.l3{border-color:var(--l3)}.layer.l4{border-color:var(--l4)}
-  .layer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:8px}
-  .layer .meta{font-size:12px;color:var(--muted)}
-  .row{display:grid;grid-template-columns:96px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
-  .row b{color:var(--muted);font-weight:600;font-size:13px}
-  .row .q{color:var(--ink)}
+  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
+  .howto:hover{background:var(--accent-hover)}
+  .top .skip{font-size:13px;color:var(--muted)}
+  .top .skip a{color:var(--accent)}
+  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
+  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
+  .pill.ok{border-color:var(--ok);color:var(--ok)}
+  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}
+  .how b{color:var(--accent);font-weight:600}
+  .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
+  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .can{border:1px solid var(--ok)}
+  .cant{border:1px solid var(--warn)}
+  .can b,.cant b{display:block}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
+  a.btn{cursor:pointer}
+  .btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  a.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn.ghost{color:var(--muted)}
+  .btn small{display:block;font-size:11px;color:inherit;opacity:.85}
+  .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
+  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span.done{background:var(--ok);color:var(--bg)}
+  .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
+  .journey i{color:var(--muted);font-style:normal}
+  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
+  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .progress span.done{background:var(--accent);color:var(--bg)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+  .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  .tags span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0}
   cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
-  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:#fff;margin-left:6px}
-  .lever.low{background:#9ca3af}.lever.mid{background:#5a93c4}.lever.high{background:#245b8a}.lever.max{background:#0b2a4a}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
-  th{font-size:12px;color:var(--muted);font-weight:600;background:#fafbfd}
+  th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
   td:first-child{white-space:nowrap;font-weight:600}
-  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 10px;background:#fafbfd;border-radius:0 8px 8px 0;font-size:14px}
+  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 10px;background:var(--soft);border-radius:0 8px 8px 0;font-size:14px}
   .finding b{display:block}
   .finding.warn{border-color:var(--warn)}
-  .btns{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:14px;cursor:default}
-  a.btn{text-decoration:none;color:var(--ink);display:inline-block;cursor:pointer}
-  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .btn.ghost{color:var(--muted)}
-  .btn small{display:block;font-size:11px;color:inherit;opacity:.8}
+  .finding.ok{border-color:var(--ok)}
+  .row{display:grid;grid-template-columns:110px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+  .row b{color:var(--muted);font-weight:600;font-size:13px}
+  .row .q{color:var(--ink)}
+  @media (max-width:560px){.row{grid-template-columns:1fr;gap:2px}}
+  .gb{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
+  .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .good{background:var(--good-bg);border:1px solid var(--ok)}
+  .bad{background:var(--bad-bg);border:1px solid var(--bad)}
+  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:14px}
+  .good b{color:var(--ok)}
+  .bad b{color:var(--bad)}
+  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
+  .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+  .judge .btns{margin:6px 0}
+  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
+  .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
+  .conf.high{border-color:var(--ok);color:var(--ok)}
+  .read{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .read b{color:var(--ink)}
+  .thick{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .terms{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}
+  .terms b{color:var(--ink)}
   ol.src{padding-left:20px;font-size:14px}
   .meta-bar{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
   .meta-bar b{color:var(--ink)}
   .ok{color:var(--ok)}
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
-  pre{background:#0f172a;color:#d6e2f0;font-size:12px;padding:12px;border-radius:8px;overflow:auto}
+  pre{background:var(--code-bg);color:var(--code-ink);font-size:12px;padding:12px;border-radius:8px;overflow:auto}
   dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
+  svg{width:100%;height:auto;display:block}
+  svg text{fill:var(--ink)}
+  svg text.m{fill:var(--muted)}
+  svg text.a{fill:var(--accent)}
+  svg .node{fill:var(--node)}
+  svg .water{fill:var(--water)}
+  svg .axis{stroke:var(--axis)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+  /* == shared design system: end == */
+  /* == page-specific == */
+  .todos{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+  .todo{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:14px}
+  .todo b{display:block;color:var(--accent);margin-bottom:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .layer{border-left:6px solid var(--l2);padding-left:14px}
+  .layer.l1{border-color:var(--l1)}
+  .layer.l2{border-color:var(--l2)}
+  .layer.l3{border-color:var(--l3)}
+  .layer.l4{border-color:var(--l4)}
+  .layer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:8px}
+  .layer .meta{font-size:12px;color:var(--muted)}
+  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:#fff;margin-left:6px}
+  .lever.low{background:var(--axis)}
+  .lever.mid{background:var(--l3)}
+  .lever.high{background:var(--l4)}
+  .lever.max{background:var(--l4d)}
   .charts{display:grid;grid-template-columns:1fr;gap:14px}
   .charts svg{max-width:640px;margin:0 auto}
   .charts figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px}
   .charts figcaption{font-size:13.5px;margin-bottom:4px}
   .kpis{display:grid;grid-template-columns:1fr;gap:10px}
   .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:13px}
-  .kpi b{font-size:14px}.kpi .now{color:var(--muted)}.kpi .goal{color:var(--ok);font-weight:700}.kpi .when{color:var(--muted);font-size:12px}
-  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 8px;align-items:center}
-  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
-  .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
-  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}.can{border:1px solid var(--ok)}.cant{border:1px solid var(--warn)}.can b,.cant b{display:block}
-  .terms{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}.terms b{color:var(--ink)}
-  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
-  .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
-  .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}.conf.high{border-color:var(--ok);color:var(--ok)}
-  .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}.judge .btns{margin:6px 0}
-  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
-  .read{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}.read b{color:var(--ink)}
-  .thick{font-size:12.5px;color:var(--muted);margin-top:6px}
-  .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin-bottom:8px}
-  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .journey span.done{background:var(--ok);color:#fff}.journey span.next{background:var(--accent);color:#fff}
-  .journey i{color:var(--muted);font-style:normal}
+  .kpi b{font-size:14px}
+  .kpi .now{color:var(--muted)}
+  .kpi .goal{color:var(--ok);font-weight:700}
+  .kpi .when{color:var(--muted);font-size:12px}
   .nexts{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
   .next{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
   .next.rec{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
-  .next b{font-size:14.5px}.next .k{color:var(--muted);font-size:12px}.next .need{color:var(--warn)}
+  .next b{font-size:14.5px}
+  .next .k{color:var(--muted);font-size:12px}
+  .next .need{color:var(--warn)}
   .next .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
 </style>
 </head>
@@ -102,10 +161,10 @@
       <div class="can"><b>這頁能回答</b>問題為什麼一再發生（哪一層在推）、先在哪一層出手最值得、接下來該做什麼。</div>
       <div class="cant"><b>這頁不能回答</b>誰對誰錯；你填的四段話以外的事實（外部來源 0 筆）；數字只為示意，正式目標由你定。</div>
     </div>
-    <div class="steps">
-      <div class="step"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
-      <div class="step"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
-      <div class="step"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；你在這條路的哪裡、接著做什麼、不做也可以。</div>
+    <div class="todos">
+      <div class="todo"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
+      <div class="todo"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
+      <div class="todo"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；你在這條路的哪裡、接著做什麼、不做也可以。</div>
     </div>
     <p class="sub" style="margin:8px 0 0">只有 30 秒？看 ① 的一句話和建議就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
     <div class="terms"><b>四個詞：</b><span><b>事件</b> 這次發生的事</span><span><b>模式</b> 一再發生</span><span><b>結構</b> 為什麼一再</span><span><b>心智模型</b> 為什麼沒人改</span></div>
@@ -140,7 +199,7 @@
         <clipPath id="berg"><path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z"/></clipPath>
       </defs>
       <!-- water -->
-      <rect x="0" y="150" width="980" height="425" fill="#dbeafe" opacity="0.55"/>
+      <rect x="0" y="150" width="980" height="425" class="water" opacity="0.55"/>
       <path d="M0,150 q20,-8 40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0" fill="none" stroke="#7aa7cc" stroke-width="2.5"/>
       <!-- band separators (align text columns with layers, like the worksheet) -->
       <line x1="30" y1="290" x2="960" y2="290" stroke="#7aa7cc" stroke-dasharray="5 5"/>
@@ -152,36 +211,36 @@
         <line x1="400" y1="420" x2="840" y2="420" stroke="#fff" stroke-dasharray="4 4" opacity=".7"/>
       </g>
       <g font-weight="700" text-anchor="middle">
-        <text x="618" y="128" font-size="17" fill="#14213d">事件 Events</text>
+        <text x="618" y="128" font-size="17" style="fill:#14213d">事件 Events</text>
         <text x="618" y="230" font-size="17" fill="#fff">模式 Patterns</text>
         <text x="618" y="362" font-size="17" fill="#fff">結構 Structures</text>
         <text x="618" y="490" font-size="17" fill="#fff">心智模型 Mental Models</text>
       </g>
       <!-- visible / hidden -->
-      <text x="30" y="62" font-size="12" fill="#5b6470">看得見 Visible</text>
-      <text x="30" y="172" font-size="12" fill="#5b6470">水面以下：看不見 Hidden</text>
+      <text x="30" y="62" font-size="12" class="m">看得見 Visible</text>
+      <text x="30" y="172" font-size="12" class="m">水面以下：看不見 Hidden</text>
       <!-- left: question + your input -->
-      <g font-size="14.5" fill="#14213d">
+      <g font-size="14.5" >
         <text x="30" y="96" font-weight="700">① 事件｜現在發生了什麼？</text>
-        <text x="30" y="118" font-size="13" fill="#5b6470">第 6 次 session：8 人只有 2 人主動分享 ［1］</text>
+        <text x="30" y="118" font-size="13" class="m">第 6 次 session：8 人只有 2 人主動分享 ［1］</text>
         <text x="30" y="212" font-weight="700">② 模式｜這段時間的趨勢？事件之間有什麼關聯？</text>
-        <text x="30" y="234" font-size="13" fill="#5b6470">三期都從第 4 次開始掉；帶領者先解讀的場次最低 ［2］</text>
+        <text x="30" y="234" font-size="13" class="m">三期都從第 4 次開始掉；帶領者先解讀的場次最低 ［2］</text>
         <text x="30" y="346" font-weight="700">③ 結構｜什麼流程、制度在製造這個模式？ ★ 建議先出手</text>
-        <text x="30" y="368" font-size="13" fill="#5b6470">帶領者先講意義、說明佔 35 分；紀錄表只問「達到洞察？」［3］</text>
+        <text x="30" y="368" font-size="13" class="m">帶領者先講意義、說明佔 35 分；紀錄表只問「達到洞察？」［3］</text>
         <text x="30" y="472" font-weight="700">④ 心智模型｜什麼沒說出口的假設造成這些結構？</text>
-        <text x="30" y="494" font-size="13" fill="#5b6470">「參與者需要專家幫他們看見意義」［4］</text>
+        <text x="30" y="494" font-size="13" class="m">「參與者需要專家幫他們看見意義」［4］</text>
       </g>
       <!-- right: how to intervene at each layer -->
-      <g font-size="14.5" fill="#14213d">
+      <g font-size="14.5" >
         <text x="830" y="96" font-weight="700">回應 React</text>
-        <text x="830" y="118" font-size="13" fill="#5b6470">開場鼓勵、點名 → 短期</text>
+        <text x="830" y="118" font-size="13" class="m">開場鼓勵、點名 → 短期</text>
         <text x="830" y="212" font-weight="700">預測 Anticipate</text>
-        <text x="830" y="234" font-size="13" fill="#5b6470">逐次記數字 → 提早看到</text>
+        <text x="830" y="234" font-size="13" class="m">逐次記數字 → 提早看到</text>
         <text x="830" y="346" font-weight="700">設計 Design</text>
-        <text x="830" y="368" font-size="13" fill="#5b6470">改順序、改紀錄表 → 持久</text>
+        <text x="830" y="368" font-size="13" class="m">改順序、改紀錄表 → 持久</text>
         <text x="830" y="472" font-weight="700">轉化 Transform</text>
-        <text x="830" y="494" font-size="13" fill="#5b6470">改信念、改帶領者角色 → 根本</text>
-        <text x="830" y="560" font-size="12" fill="#0e5b50">↓ 越往下：越難改，效果越大越持久</text>
+        <text x="830" y="494" font-size="13" class="m">改信念、改帶領者角色 → 根本</text>
+        <text x="830" y="560" font-size="12" class="a">↓ 越往下：越難改，效果越大越持久</text>
       </g>
     </svg>
     <div class="legend"><span>左：這一層要回答的問題＋你填的內容</span><span>中：四層冰山</span><span>右：在這一層出手的方式（介入方式）</span></div>
@@ -196,16 +255,16 @@
       <figure>
         <figcaption><b>圖 A｜趨勢：真的越來越安靜嗎？</b>（第 2 層）</figcaption>
         <svg viewBox="0 0 460 230" role="img" aria-label="六次 session 的主動分享人數與帶領者說明分鐘數">
-          <line x1="50" y1="20" x2="50" y2="180" stroke="#9ca3af"/><line x1="50" y1="180" x2="420" y2="180" stroke="#9ca3af"/>
-          <g font-size="11" fill="#5b6470">
+          <line x1="50" y1="20" x2="50" y2="180" class="axis"/><line x1="50" y1="180" x2="420" y2="180" class="axis"/>
+          <g font-size="11" class="m">
             <text x="8" y="24">8 人</text><text x="8" y="104">4 人</text><text x="8" y="184">0 人</text>
             <text x="426" y="24">40 分</text><text x="426" y="104">20 分</text><text x="426" y="184">0 分</text>
             <text x="44" y="198">第1次</text><text x="114" y="198">第2次</text><text x="184" y="198">第3次</text><text x="254" y="198">第4次</text><text x="324" y="198">第5次</text><text x="394" y="198">第6次</text>
           </g>
           <polyline points="50,40 120,60 190,60 260,100 330,120 400,140" fill="none" stroke="#1f5fbf" stroke-width="3"/>
           <polyline points="50,140 120,132 190,108 260,80 330,60 400,40" fill="none" stroke="#b25e09" stroke-width="3" stroke-dasharray="6 4"/>
-          <g font-size="12" font-weight="700"><text x="270" y="165" fill="#1f5fbf">主動分享 7 → 2 人</text><text x="180" y="42" fill="#b25e09">帶領者說明 10 → 35 分</text></g>
-          <text x="50" y="222" font-size="11" fill="#9ca3af">示意數據：接上真實資料後以你的數字繪製；兩線同時變化不代表因果。</text>
+          <g font-size="12" font-weight="700"><text x="270" y="165" class="a">主動分享 7 → 2 人</text><text x="180" y="42" style="fill:var(--warn)">帶領者說明 10 → 35 分</text></g>
+          <text x="50" y="222" font-size="11" class="m">示意數據：接上真實資料後以你的數字繪製；兩線同時變化不代表因果。</text>
         </svg>
         <div class="read"><b>怎麼看：</b>左軸是人數（實線），右軸是帶領者說明分鐘（虛線）；兩線在第 3–4 次交叉。<b>看到：</b>人數一路掉、說明一路升，同時發生。<b>注意：</b>同時發生不等於一個造成另一個。<b>來源：</b>[1][2]；數字為示意。</div>
       </figure>
@@ -213,29 +272,29 @@
         <figcaption><b>圖 B｜因果迴路：是什麼在推？</b>（第 3、4 層）</figcaption>
         <svg viewBox="0 0 460 250" role="img" aria-label="等答案因果迴路">
           <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#245b8a"/></marker></defs>
-          <g fill="#fff" stroke="#245b8a" stroke-width="1.5">
+          <g class="node" stroke="#5a93c4" stroke-width="1.5">
             <rect x="20" y="30" width="150" height="44" rx="8"/><rect x="290" y="30" width="150" height="44" rx="8"/>
             <rect x="290" y="150" width="150" height="44" rx="8"/><rect x="20" y="150" width="150" height="44" rx="8"/>
             <rect x="160" y="200" width="150" height="40" rx="8" stroke="#b25e09" stroke-dasharray="5 3"/>
           </g>
-          <g font-size="12.5" text-anchor="middle" fill="#14213d">
+          <g font-size="12.5" text-anchor="middle" >
             <text x="95" y="57">帶領者先講作品的意義</text><text x="365" y="57">參與者等帶領者說</text>
             <text x="365" y="177">主動分享變少</text><text x="95" y="177">帶領者覺得「還沒到位」</text>
-            <text x="235" y="224" fill="#b25e09">紀錄表只問「達到洞察？」（信念層）</text>
+            <text x="235" y="224" style="fill:var(--warn)">紀錄表只問「達到洞察？」（信念層）</text>
           </g>
           <g fill="none" stroke="#245b8a" stroke-width="2" marker-end="url(#arr)">
             <path d="M170,52 L288,52"/><path d="M365,76 L365,148"/><path d="M288,172 L172,172"/><path d="M95,148 L95,76"/>
             <path d="M160,218 Q110,218 100,196" stroke="#b25e09"/>
           </g>
-          <text x="230" y="120" font-size="16" font-weight="700" text-anchor="middle" fill="#245b8a">R 等答案迴路（自我加強）</text>
-          <text x="230" y="140" font-size="11" text-anchor="middle" fill="#5b6470">箭頭 = 前者讓後者更嚴重；轉一圈回到起點，所以越轉越安靜</text>
+          <text x="230" y="120" font-size="16" font-weight="700" text-anchor="middle" class="a">R 等答案迴路（自我加強）</text>
+          <text x="230" y="140" font-size="11" text-anchor="middle" class="m">箭頭 = 前者讓後者更嚴重；轉一圈回到起點，所以越轉越安靜</text>
         </svg>
         <div class="read"><b>怎麼看：</b>四個方框繞一圈是迴路，箭頭方向是「誰讓誰更嚴重」；虛線框是信念層在餵它。<b>看到：</b>四個環節缺一不可，切斷任何一環迴路就停，最省力的是第一環（先講）。<b>來源：</b>[3][4]、發現 2。</div>
       </figure>
       <figure>
         <figcaption><b>圖 C｜槓桿對比：在哪一層出手最值得？</b>（四層）</figcaption>
         <svg viewBox="0 0 460 210" role="img" aria-label="四層改變難度與效果持久度對比">
-          <g font-size="12.5" fill="#14213d">
+          <g font-size="12.5" >
             <text x="10" y="42">事件</text><text x="10" y="82">模式</text><text x="10" y="122">結構</text><text x="10" y="162">心智模型</text>
           </g>
           <g>
@@ -244,10 +303,10 @@
             <rect x="90" y="108" width="180" height="9" fill="#9ca3af"/><rect x="90" y="119" width="260" height="9" fill="#1f5fbf"/>
             <rect x="90" y="148" width="300" height="9" fill="#9ca3af"/><rect x="90" y="159" width="330" height="9" fill="#1f5fbf"/>
           </g>
-          <g font-size="11" fill="#5b6470">
+          <g font-size="11" class="m">
             <text x="156" y="36">當次有效</text><text x="216" y="76">提早看到</text><text x="356" y="127">切斷迴路，持久</text><text x="300" y="145">最難、最慢，但最根本</text>
           </g>
-          <g font-size="11"><rect x="90" y="185" width="12" height="9" fill="#9ca3af"/><text x="106" y="193" fill="#5b6470">改變難度</text><rect x="180" y="185" width="12" height="9" fill="#1f5fbf"/><text x="196" y="193" fill="#5b6470">效果與持久度</text></g>
+          <g font-size="11"><rect x="90" y="185" width="12" height="9" fill="#9ca3af"/><text x="106" y="193" class="m">改變難度</text><rect x="180" y="185" width="12" height="9" fill="#1f5fbf"/><text x="196" y="193" class="m">效果與持久度</text></g>
         </svg>
         <div class="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
       </figure>

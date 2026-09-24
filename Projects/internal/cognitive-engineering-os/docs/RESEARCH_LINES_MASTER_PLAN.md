@@ -2,13 +2,13 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.25（2026-09-24）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.26（2026-09-24）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
 - 現在期／卡：**PI-a**（§12.3）／**WC-PIa-01 未開工**
 - 已完成：P0 碼完成 `19f00f9aa`（2026-09-23，未部署，隨 PI-b 同窗）；PI-a 0/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）
-- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.25（2026-09-24）
+- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.26（2026-09-24）
 - 阻塞／待操作者：無（§9 待拍板：無）
 - 下一步：WC-PIa-01（typed object schema）；執行模型 Sonnet 5／Codex 皆可
 
@@ -55,7 +55,7 @@
 | I8 | Recipe 引擎（`exec`）**零改動**；新增行為只以「Project 層級動作」與「capability adapter」實作 | §4 D5 |
 | I9 | **演化只改資料、不改碼；任何候選版本必須在 harness 上不劣於 champion 才能晉升，晉升可一鍵回滾**（prompt／角度表／來源分類／模型／recipe 預設皆為版本化資料；程式碼改動一律走人審 PR） | §3.8、§3.4-C9 |
 | I10 | **分數是閘，不是目標**：偵測器門檻（品質、密度、相關性、引註）永不由演化迴圈自動調整，只能提案給人（操作者既有裁定：禁止改門檻消音偵測器） | §3.8、§7 R11 |
-| I11 | **示意稿即規格（操作者 2026-09-24「之後所有工具的規則都按照這個規格」）**：`COS/docs/mockups/iceberg-result-mock.html`（結果頁九段 ①結論 ②結構圖 ③圖表 ④逐層卡 ⑤總結 ⑥對照表 ⑦解決方案 ⑧下一步 ⑨引註＋來源列；線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）、`COS/docs/mockups/iceberg-lesson-mock.html`（課程六步；線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY ）、`COS/docs/mockups/workflow-result-mock.html`（v2：頁首「第一次走這條路？先上 3 分鐘的課」按鈕連到工作流課、每站卡一顆「先看 5 分鐘的課」按鈕連到該站方法課（P3 前為佔位）；工作流總覽＋站卡＋總結頁；線上 https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk ）與 `COS/docs/mockups/workflow-lesson-mock.html`（工作流課五步；線上 https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU ）是**每一個方法與每一條工作流**（285＋`art_reflection.*`）結果頁與課程頁的驗收基準；沒有「層」的方法以原生單位套同骨架（§3.10）。落地期：①②④⑤⑥⑧⑨＋來源列＋③的方法原生圖 = PI-a（WC-PIa-11）；③趨勢／迴路／槓桿圖 = P3（其餘 5 種視覺原語＋資料綁定）；⑦解決方案 = P4（C11）；課程六步 = P3（U15／D17）。任一方法缺一段／一步 = 該期 DoD 不過。**方法齊備檢核 M1–M8（每方法，harness §3.7 計分）**：M1 原生圖形有單位（層／象限／節點…）且每單位一句問題；M2 每單位一個介入動詞＋時間取向＋可見性；M3 發現骨架＋gaps 欄；M4 課程六步齊、四層例子五組；M5 做完的例子 = 操作者領域合成案；M6 每步一組好例壞例；M7 常見錯誤 ≥3；M8 參考來源 ≥2 個網址且每段課文有 [n]；M9 結果頁每段有「怎麼讀／你要做的／來源」；M10 每個發現有信心標籤與改判條件、有「你的判斷」欄；M11（工作流）有總覽站列、每站帶入／還要填、總結頁、五步工作流課且每站連到方法課；M12 預設方法（≤10）有教材版。缺一 = 該方法「知識不足」：仍可用，但結果頁與課程頁頂端顯示缺哪幾項 | §3.10、§12 WC-PIa-11、P3／P4 DoD |
+| I11 | **示意稿即規格（操作者 2026-09-24「之後所有工具的規則都按照這個規格」）**：**四頁共用一段位元相同的設計系統 CSS**（每頁 `<style>` 開頭 `/* == shared design system */`：token＋所有共用元件；頁面專屬規則在 `/* == page-specific == */` 之後，不得重定義共用選擇器）；**機械閘 `COS/docs/mockups/check-mocks.py`**（U19 token／字體、U20 版面、U15 課程入口與假連結、跨頁互連、狀態列、每段怎麼讀／你要做的、svg a11y、D18 chips 逐組、無 `<select>`、標籤配對；自測 `check-mocks-selftest.py` 注入 36 個缺陷必全數抓到，改檢查器先加案例）；**`COS/docs/mockups/build-artifact.py` 先跑檢查器、紅就拒絕建置，只剝殼不改色**（示意稿 = 發布版）；**改任一頁的流程固定**：改 → 共用段複製到其他三頁 → 檢查器綠 → 建置 → 重發四份 → §0；`COS/docs/mockups/iceberg-result-mock.html`（結果頁九段 ①結論 ②結構圖 ③圖表 ④逐層卡 ⑤總結 ⑥對照表 ⑦解決方案 ⑧下一步 ⑨引註＋來源列；線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）、`COS/docs/mockups/iceberg-lesson-mock.html`（課程六步；線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY ）、`COS/docs/mockups/workflow-result-mock.html`（v2：頁首「第一次走這條路？先上 3 分鐘的課」按鈕連到工作流課、每站卡一顆「先看 5 分鐘的課」按鈕連到該站方法課（P3 前為佔位）；工作流總覽＋站卡＋總結頁；線上 https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk ）與 `COS/docs/mockups/workflow-lesson-mock.html`（工作流課五步；線上 https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU ）是**每一個方法與每一條工作流**（285＋`art_reflection.*`）結果頁與課程頁的驗收基準；沒有「層」的方法以原生單位套同骨架（§3.10）。落地期：①②④⑤⑥⑧⑨＋來源列＋③的方法原生圖 = PI-a（WC-PIa-11）；③趨勢／迴路／槓桿圖 = P3（其餘 5 種視覺原語＋資料綁定）；⑦解決方案 = P4（C11）；課程六步 = P3（U15／D17）。任一方法缺一段／一步 = 該期 DoD 不過。**方法齊備檢核 M1–M8（每方法，harness §3.7 計分）**：M1 原生圖形有單位（層／象限／節點…）且每單位一句問題；M2 每單位一個介入動詞＋時間取向＋可見性；M3 發現骨架＋gaps 欄；M4 課程六步齊、四層例子五組；M5 做完的例子 = 操作者領域合成案；M6 每步一組好例壞例；M7 常見錯誤 ≥3；M8 參考來源 ≥2 個網址且每段課文有 [n]；M9 結果頁每段有「怎麼讀／你要做的／來源」；M10 每個發現有信心標籤與改判條件、有「你的判斷」欄；M11（工作流）有總覽站列、每站帶入／還要填、總結頁、五步工作流課且每站連到方法課；M12 預設方法（≤10）有教材版。缺一 = 該方法「知識不足」：仍可用，但結果頁與課程頁頂端顯示缺哪幾項 | §3.10、§12 WC-PIa-11、P3／P4 DoD |
 
 ## 3. 架構
 ### 3.1 系統邊界
@@ -306,6 +306,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 
 ## 10. 文件關係與維護規則
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程；決策記錄 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §10.1–10.3 為前提。
+- 示意稿：任何示意稿改動 → `python COS/docs/mockups/check-mocks.py` 綠才可 commit；共用段四頁同步；新頁面先複製共用段再寫頁面專屬；設計規則新增 = 先加進檢查器再改頁（I11）。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7／§12 出現；每完成一張卡更新 §0 進度板、每完成一期更新 §0 現況表；契約變更走 ADR（`SPEC/docs/adr/`）。
 
 ## 11. 接手指南（陌生 agent 從零開工）
@@ -332,6 +333,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 7. **卡住**（缺資訊／衝突／驗收跑不動）：§7 加一列（R#、卡號、指令、輸出）→ 停 → 問操作者**一題**。不繞路、不補丁。
 8. **期末閘** = 每期最後一張卡：全期驗收指令重跑、§6 該期突變全做、§0／TASKS／WORKLOG 更新；過了才開下一期。下一期的卡由期末閘執行者依 12.5 產生，操作者看卡放行。
 9. **模型分工**：執行卡 = Sonnet 5／Codex；產卡與期末閘審 = Opus 5.5 或 Fable（一期一次，不逐卡）；純資料卡（YAML／範例／課文）= Haiku 4.5 可。
+10. **UI 卡加驗**：任何動到 `web/` 或 `COS/docs/mockups/` 的卡，驗收多一條 `python COS/docs/mockups/check-mocks.py` 綠（新殼落地後同一檢查器指向 `web/app/globals.css` 與頁面）；設計規則只准以「檢查器規則＋四頁同改」落地，不准只改操作者正在看的那一頁。
 
 ### 12.2 卡片格式（缺一欄 = 無效卡，不得執行）
 `WC-<期>-<序>`｜目標（一句）｜前置（指令＋預期）｜讀（`file:line`）｜樣板（照抄哪個 `file:line`）｜改（新／改檔案清單）｜不改｜驗收（指令＋預期輸出，逐條）｜突變（拔什麼 → 哪個測試紅）｜commit 訊息骨架｜回滾。
