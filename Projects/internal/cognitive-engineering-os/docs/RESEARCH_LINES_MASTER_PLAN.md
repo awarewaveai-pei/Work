@@ -2,13 +2,13 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.14（2026-09-24）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.15（2026-09-24）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
 - 現在期／卡：**PI-a**（§12.3）／**WC-PIa-01 未開工**
 - 已完成：P0 碼完成 `19f00f9aa`（2026-09-23，未部署，隨 PI-b 同窗）；PI-a 0/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）
-- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.14（2026-09-24）
+- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.15（2026-09-24）
 - 阻塞／待操作者：無（§9 待拍板：無）
 - 下一步：WC-PIa-01（typed object schema）；執行模型 Sonnet 5／Codex 皆可
 
@@ -40,7 +40,7 @@
 | I8 | Recipe 引擎（`exec`）**零改動**；新增行為只以「Project 層級動作」與「capability adapter」實作 | §4 D5 |
 | I9 | **演化只改資料、不改碼；任何候選版本必須在 harness 上不劣於 champion 才能晉升，晉升可一鍵回滾**（prompt／角度表／來源分類／模型／recipe 預設皆為版本化資料；程式碼改動一律走人審 PR） | §3.8、§3.4-C9 |
 | I10 | **分數是閘，不是目標**：偵測器門檻（品質、密度、相關性、引註）永不由演化迴圈自動調整，只能提案給人（操作者既有裁定：禁止改門檻消音偵測器） | §3.8、§7 R11 |
-| I11 | **示意稿即規格（操作者 2026-09-24「之後所有工具的規則都按照這個規格」）**：`COS/docs/mockups/iceberg-result-mock.html`（結果頁九段 ①結論 ②結構圖 ③圖表 ④逐層卡 ⑤總結 ⑥對照表 ⑦解決方案 ⑧下一步 ⑨引註＋來源列；線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）與 `COS/docs/mockups/iceberg-lesson-mock.html`（課程六步；線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY ）是**每一個方法**（285＋`art_reflection.*`）結果頁與課程頁的驗收基準；沒有「層」的方法以原生單位套同骨架（§3.10）。落地期：①②④⑤⑥⑧⑨＋來源列＋③的方法原生圖 = PI-a（WC-PIa-11）；③趨勢／迴路／槓桿圖 = P3（其餘 5 種視覺原語＋資料綁定）；⑦解決方案 = P4（C11）；課程六步 = P3（U15／D17）。任一方法缺一段／一步 = 該期 DoD 不過 | §3.10、§12 WC-PIa-11、P3／P4 DoD |
+| I11 | **示意稿即規格（操作者 2026-09-24「之後所有工具的規則都按照這個規格」）**：`COS/docs/mockups/iceberg-result-mock.html`（結果頁九段 ①結論 ②結構圖 ③圖表 ④逐層卡 ⑤總結 ⑥對照表 ⑦解決方案 ⑧下一步 ⑨引註＋來源列；線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）與 `COS/docs/mockups/iceberg-lesson-mock.html`（課程六步；線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY ）是**每一個方法**（285＋`art_reflection.*`）結果頁與課程頁的驗收基準；沒有「層」的方法以原生單位套同骨架（§3.10）。落地期：①②④⑤⑥⑧⑨＋來源列＋③的方法原生圖 = PI-a（WC-PIa-11）；③趨勢／迴路／槓桿圖 = P3（其餘 5 種視覺原語＋資料綁定）；⑦解決方案 = P4（C11）；課程六步 = P3（U15／D17）。任一方法缺一段／一步 = 該期 DoD 不過。**方法齊備檢核 M1–M8（每方法，harness §3.7 計分）**：M1 原生圖形有單位（層／象限／節點…）且每單位一句問題；M2 每單位一個介入動詞＋時間取向＋可見性；M3 發現骨架＋gaps 欄；M4 課程六步齊、四層例子五組；M5 做完的例子 = 操作者領域合成案；M6 每步一組好例壞例；M7 常見錯誤 ≥3；M8 參考來源 ≥2 個網址且每段課文有 [n]。缺一 = 該方法「知識不足」：仍可用，但結果頁與課程頁頂端顯示缺哪幾項 | §3.10、§12 WC-PIa-11、P3／P4 DoD |
 
 ## 3. 架構
 ### 3.1 系統邊界
@@ -68,6 +68,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | Ingest grant + collector identity | 新 | `COS/ai_lego/platform/identity/store.py`（仿 `:342-385` handoff code：hash 存、單 run、exp）；`apps/cli/bootstrap_service_identity.py` 加 `--tenant-id`（現只會建新 tenant，`:47-58`） | grant = `{tenant_id, project_id, run_id, scope:source.ingest, exp}`，HMAC 或隨機 + hash 存表；每 run 一把；COS 驗 grant 並以 grant 的 project_id 覆寫路徑參數 |
 | 專案級抹除（D10） | 新 | `main` `DELETE /projects/{id}`（`:1455` `@app.delete` 慣例）；`repo` `erase_project()`：同交易刪 `prov_sources` 列＋追加 `ProjectErased` 事件（events 不刪，留 tombstone）；每個來源的 `cas_path` 走 `TenantScopedCas.unlink`（`tenant_scoped_cas.py:116`）；artifact CAS 同法 `JsonArtifactStore.delete`（`json_artifact_store.py:71`） | 自然人主體進系統的唯一前提；負向測試：刪後 `GET /projects/{id}` 404、`list_sources` 空、CAS `read` 拋錯、events 只剩 tombstone |
 | **研究庫（分析結果庫）** | 既有＋擴 | 一個 Project = Sources（`repo`＋CAS，I1）＋彙整 artifact（P2）＋解讀 artifact＋events（PI-a）＋報表（P4：版本化、`AI_GENERATED → HUMAN_APPROVED`）＋解決方案與追蹤（P4）＋案例庫（§3.8 R0–R2）；讀取 = 專案頁時間軸（events）＋跨專案搜尋 `GET /sources/search?q=`（P4）；儲存 = 現 SQLite＋檔案 CAS → P5 Postgres＋object storage，schema 不變 | 操作者 2026-09-24「Cognitive OS 專案裡設專業頂規級的分析結果庫？」→ 是，但**不另建一個資料庫**：所有產物都是版本化 artifact＋event，同一套溯源與抹除（I1–I6） |
+| **方法知識庫（method dossier，D23）** | 新（資料＋既有管線） | 每方法一個內部 Project（`purpose=method_dossier`，租戶 = 操作者）：Sources = display-metadata `url`（285/285 已有，`SPEC/methods/registry/method-display-metadata.yaml`）＋契約 `source_of_truth_for`＋操作者丟進來的參考文／圖網址 → 走同一條線（Collection Service P1 → synthesis P2）→ 起草三份可演化資料：`lessons`（六步課文）、`result-skeletons`（原生圖的單位／每單位問題／介入動詞／時間取向／可見性）、`interpretation-prompts` 片段；每句 [n]，過 `citation_integrity`；M1–M8（I11）計分 | 冰山的品質來自操作者給的介紹文與圖；其他 284 個用系統自己的蒐集→彙整→引註做同一件事，不靠人逐一餵；缺參考 = 標「知識不足」，不硬湊 |
 | Collection run 動作 | 新 | `main`（projects 區）+ `SPEC/specs/domain/collection-run.schema.yaml` | `POST /projects/{id}/collections`、`GET …/{run}`、`POST …/{run}/complete`；狀態 requested→running→completed/failed；events 落 `repo` events 表 |
 | Collection Service | 新（薄） | `NA/app/api/internal/collect/runs/route.ts`（bearer `COLLECT_RESEARCH_RUNS_TOKEN`，樣板 `run-due-schedules/route.ts:27-32`）；`WF/src/trigger/collect-research-run.ts` | 輸入 `{grant, cos_base_url, project_id, run_id, seeds[], budget}`；只轉交，不做決策 |
 | `sink/cognitive` | 新（一檔） | `NA/lib/collect/sinks/cognitive.ts`（形狀同 `sinks/kb.ts:125-246`） | 唯一知道 COS 的檔；批次 ingest；`finalize` 呼叫 complete |
@@ -209,7 +210,8 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | D20 | **判斷主權核心原則 → 機械閘**（EdD Core Integrity Specification）：`participant_final_judgment`（參與者原話是記錄，AI／帶領者輸出只能 AI_SUGGESTED 附掛，不得覆寫）；`no_preset_conclusion`（輸出無「正確結論」欄，只描述判斷形成過程）；`influence_inventory`（影響來源清單必含 facilitator 與 framework 本身）；`evidence_conditions`（「什麼證據會讓我改判斷」必填，答「沒有」= 標 unrevisable 供研究，不算失敗）；`revisit_scheduled`；`stop_signals`（Airtable 停止訊號 → session 中止）；`no_belief_scoring`（任何評估 artifact 只准量 process visibility／revisability／evidence articulation，禁對 belief 打分）。閘與版本化資料走既有演化迴圈＋LEDGER = 「framework 可被檢查、可被推翻」 | 操作者 EdD 文件 §8 八條不可妥協原則；閘門是這個系統既有原語；讓「原則」變成「機器會擋」而非宣言 | 原則只寫在文件；AI 生成「成熟度分數」 |
 | D21 | **參與者模式排在 P5 圖像儲存之後；資料不設限（D10）**：ARF 真實參與者資料（她 registry 標 Personal Data／Sensitive Clinical Data 的 Clients／Assessment Results／Treatment Plans）在 P-P（加密、抹除、同意）完成前**不進系統**；之前只有「帶領者／自我模式」（操作者本人或合成資料）；soulfulexpression.org 只出 Public／Reference 類內容 | D10 同一條線；她自己的 Data Sensitivity 欄位已標明 | 先接參與者再補個資 |
 | D22 | **順序**：共用引擎（PI）→ P-ARF-data（2d，純資料：同步腳本＋五生階段各前 2 個工具 ≈10 支契約＋課，人審）→ P1–P4 → P-P（High-STOP）→ P-ARF-participant（5d：`reflective-cycle-v1`、圖像 artifact、參與者模式頁、WuSheng 互動流程接 soulfulexpression.org）。電商後台 `app.aware-wave.com`：本計畫不動（P0 凍結除外），進度本 session 未查證 | 操作者「所有的事情都在進行中都沒完成」→ 一次只讓一條線到「可用」；ARF 是主力但依賴引擎與 P-P；資料層工作可先做且零風險 | 平行開 4 條線；ARF 另起爐灶 |
-| D17 | 課程層 = 資料驅動：課文由 display-metadata（blurb／why zh+en）+ 契約 `purpose／inputs／preconditions` + `method-form-examples.yaml`（示範案例）+ 第 8 種可演化 kind `lessons`（每方法的日常例子／好例壞例／常見錯誤）生成；三條線的預設方法（冰山、WDM、Toulmin、文獻矩陣等 ≤10 個）人審定稿，其餘 275 個由模型起草標 AI_SUGGESTED、首次被開啟時送人審佇列 | 操作者 2026-09-23「使用者之前沒有使用過這個工具，所以你要先幫他上課」；285 支課不可能手寫；課文錯誤的爆炸半徑 = 誤導一次使用，可回滾 | 只給示範 Project（U9）不教方法；285 支全部手寫；課文寫死在前端 |
+| D23 | **每個方法的知識來自它自己的 dossier，不靠操作者逐一餵參考**（操作者 2026-09-24：「冰山會這麼優秀是因為我找了很多介紹文和圖，其他工具呢？」）：種子 = display-metadata `url`（285/285）＋契約 `source_of_truth_for`；用自家蒐集→彙整→引註管線起草課文、結果骨架、解讀 prompt 片段；M1–M8 打分，不過 = 「知識不足」誠實顯示；操作者的參考文／圖 = 該 dossier 的 Sources（貼網址即可；圖檔等 P5 圖像儲存，之前由人把圖轉述成文字進 Sources）；≤10 個預設方法人審定稿（操作者參考優先），其餘首次開啟時生成＋送審，演化迴圈（§3.8）依回饋改進 | 零重工：研究線本身就是蒐集→彙整→引註；知識不足必須看得見（R17 缺口誠實度） | 285 支手寫；模型憑記憶生成不引註；等操作者逐一餵參考 |
+| D17 | 課程層 = 資料驅動：課文由 display-metadata（blurb／why zh+en）+ 契約 `purpose／inputs／preconditions` + `method-form-examples.yaml`（示範案例）+ 第 8 種可演化 kind `lessons`（每方法的日常例子／好例壞例／常見錯誤）生成；三條線的預設方法（冰山、WDM、Toulmin、文獻矩陣等 ≤10 個）人審定稿，其餘 275 個由模型起草標 AI_SUGGESTED、首次被開啟時送人審佇列；**課文與骨架的知識來源 = 方法 dossier（D23），每句 [n]，不是模型記憶** | 操作者 2026-09-23「使用者之前沒有使用過這個工具，所以你要先幫他上課」；285 支課不可能手寫；課文錯誤的爆炸半徑 = 誤導一次使用，可回滾 | 只給示範 Project（U9）不教方法；285 支全部手寫；課文寫死在前端 |
 
 ## 5. 分期
 | 期 | 內容 | 風險 | 完成定義（缺一不算） | Rollback | 估工 |
@@ -219,7 +221,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | **PI-b 上 prod** | nginx `/api/`／`/expert/`／`/` 分流（`safe-infra-patch.sh nginx`）；`dashboard.html:299` `API_PREFIX`；`deploy.sh:15` smoke → `/api/health`；`/opt/cognitive-os` pull + `deploy.sh`（api+web）；P0 的 next-admin 經 `sg-deploy.sh`（D15 同窗） | **High-STOP**（prod 部署，每次 go-ahead） | `app.aware-wave.com/ops/collect` 無「送去 X」按鈕；`https://cognitive.aware-wave.com/api/health` 200、`/expert/` 舊頁可登入、`/` 新頁跑完冰山案例；deploy.sh 全綠；`printenv` 驗 web 容器 env | nginx 還原（safe-infra-patch 自動）；`cognitive-web:rollback` tag；api 不動 | 0.5d |
 | **P1 Source + Collection Service** | §3.3 前六列 + egress allowlist + `--tenant-id` bootstrap + journal key mode + **專案級抹除（D10）** | Medium | curl 觸發一次真實 company run（操作者真 tenant）**＋一次自然人 run（任意來源，含操作者自貼的筆記；自動 `CONFIDENTIAL`）→ 刪專案 → sources／CAS／artifact 三處讀不回，events 只剩 tombstone**→ COS Sources 帶 provenance／fetched_at／collector identity；重跑同 seeds → 全 `unchanged`、0 新列；改一頁內容重跑 → supersede 列 + event；壞 hash → 400；過期 grant → 401；NA `tsc`+vitest 綠；COS pytest + golden 綠；`printenv COGNITIVE_OS_JOURNAL_KEY_MODE` ≠ disabled | 新欄位 nullable；端點下線；sink 檔刪；allowlist 還原 | 3d |
 | **P2 彙整 + 引註閘 + harness** | 重用 PI 的 adapter 類與 `citation_integrity`；三個 synthesis + typed objects + manifest + gate；`literature_search` v2；**§3.7 harness：每線 3 個黃金案例（P-E 前補到 5）、score.py、thresholds.yaml（首次基準線）、CI 接入、突變腳本** | Medium | 對 P1 的 Project 跑 `dossier_brief`（company）：每主張引註 ⊆ manifest；突變（拔閘）→ 假引註 PASS → 紅；`literature_search` v2 回真 Sources、`edd-research-evidence-v1` 用它跑 PASS；golden 全綠；**harness 9 案例全部跑出分數、基準線寫入、拔閘突變讓幻覺率變紅** | 契約 status→DRAFT 即從 catalog 消失；harness 目錄獨立可刪 | 3d |
-| **P3 三線端到端 + 首用流程** | web 三卡 + §3.9 六步流程（骨架與路由已在 PI）+ 其餘 5 種視覺原語（matrix／graph／tree／timeline／scorecard）+ **課程層（U15／D17：課程頁元件、`lessons` 資料 kind、≤10 個預設方法人審課文、其餘模型起草＋人審佇列、每人每方法一次的已看紀錄）** + 示範 Project seed + 說明面板（registry 生成）；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1` | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數；**首用測試協定通過（非操作者、L2 ≤15 分鐘零求助、SUS ≥ 70）**；Playwright 走完六步；零原生 `<select>`（grep = 0） | recipe→DRAFT；旗標移除；三卡頁下線回 PI 結果頁；課程層 = 資料，刪 `lessons` 目錄即無課 | 5d |
+| **P3 三線端到端 + 首用流程** | web 三卡 + §3.9 六步流程（骨架與路由已在 PI）+ 其餘 5 種視覺原語（matrix／graph／tree／timeline／scorecard）+ **課程層（U15／D17：課程頁元件、`lessons` 資料 kind、≤10 個預設方法人審課文、其餘模型起草＋人審佇列、每人每方法一次的已看紀錄）** + 示範 Project seed + 說明面板（registry 生成）；draft-from-synthesis + `human_required`；`async:true`；run 分類伺服器端；`partnership-risk-v1` + **方法 dossier 管線（D23）：`method_dossier` purpose、285 個種子 URL 批次蒐集（成本預覽先報）、三份可演化資料起草＋閘、M1–M8 計分器、≤10 預設方法人審** | Medium | L1（公司）／L2／L3 各一次真跑到方法輸出；未填權重不准 run；長 run 走 202 + 輪詢；成本預覽 = 實際查詢數；**首用測試協定通過（非操作者、L2 ≤15 分鐘零求助、SUS ≥ 70）**；Playwright 走完六步；零原生 `<select>`（grep = 0）；**冰山以外至少 3 個預設方法（WDM、Toulmin、文獻矩陣）M1–M8 全過；隨機抽 5 個非預設方法首次開啟 → 課程與骨架自動生成、缺項標示正確** | recipe→DRAFT；旗標移除；三卡頁下線回 PI 結果頁；課程層 = 資料，刪 `lessons` 目錄即無課 | 6d |
 | **P4 報表 + 解決方案** | `artifact.generate_report` + export + 核准；解讀的 `interpretation_state` + 核准／退回 endpoint（C10 移來）；**C11：方案比較／行動計畫（`human_required` 負責人與期限）／指標／`review_at` 排程重跑與前後比較（D16）** + **跨專案來源搜尋** `GET /sources/search?q=`（同租戶全專案，回 Source 列＋所屬專案＋引用它的發現；取代知識庫在研究線的角色，⑨） | Medium | 三線各一份 md（+pdf），[n] 全解析到 id/sha256/url/fetched_at；核准翻轉 + 事件含 identity；再跑 = 新版本；**冰山案例：方案表 3 列、計畫表含 owner 待確認、指標 3、排程一筆；owner 未填 → 存任務被拒；模擬到期 → 重跑產 SolutionReview** | capability 移除；排程刪除即停 | 3.5d |
 | **P4b 回饋與遙測** | `RunScored`／`HumanEdited`／`ReportApproved|Rejected` events；核准／退回原因 chips；draft-vs-人改 diff；夜跑 harness 漂移偵測 routine | Low | 每個 run 都有分數事件；退回一次 → 事件含原因；夜跑連續 3 晚有報告 | 事件為附加，關 routine 即停 | 1d |
 | **P-E 演化迴圈** | §3.8：版本化資料目錄 + champion 指標、提案 routine、`run-challenger.ps1`、LEDGER；第一批可演化資料 = 角度表、來源分類、synthesis prompt、模型路由 | Medium（資料級自動晉升需操作者同意範圍） | 一次真實循環：routine 產生提案 → challenger 在 harness + 3 個真實 Project 重放 → 不劣於 champion → 晉升 → LEDGER 一行 → 一鍵回滾成功；劣化提案被丟棄且留紀錄；夜跑紅 → 自動回滾到最後綠版 | 刪 champion 指標即回到硬編預設 | 3d |
@@ -229,7 +231,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | **P-P 主體級保護** | Source envelope 加密（per-subject DEK）+ subject 級定址 + 主體級抹除驗證 + 第二租戶前的 ADR + 操作者明示批准；**前置對象 = 第二租戶**（別人的資料進同一系統時才需要主體級保護；操作者自己的單租戶不設限，D10） | **High-STOP** | 抹除後 CAS／journal／artifact 三處讀不回；負向測試；ADR 落地 | 不上線即無資料 | 5d+ |
 | **P6 選配** | `apps/collector` 容器；HCI adapter（`BP/10:83`） | Medium／High | 觸發：第二 tenant／要開 HCI 案 | — | — |
 
-**執行順序** P0 → PI-a → PI-b → **P-ARF-data** → P1 → P2 → P3 → P4 → P4b → P-E；P5／P-P／P6 觸發式；**P-ARF-participant 在 P5 之後**。**核心 P0–P4 = 20.5d；含 P4b + P-E = 24.5d**（1d = 一個完整工作 session，單一工程師）。里程碑（操作者看得到的）：PI-b 完 = 第一次在正式站看到真分析（第 6 天）；P1 完 = 真來源進系統（第 9 天）；P2 完 = 引註彙整（第 12 天）；P3 完 = 三線端到端 + 課程 + 首用測試（第 17 天）；P4 完 = 報表 + 解決方案 + 跨專案搜尋（第 20.5 天）。
+**執行順序** P0 → PI-a → PI-b → **P-ARF-data** → P1 → P2 → P3 → P4 → P4b → P-E；P5／P-P／P6 觸發式；**P-ARF-participant 在 P5 之後**。**核心 P0–P4 = 21.5d；含 P4b + P-E = 25.5d**（1d = 一個完整工作 session，單一工程師）。里程碑（操作者看得到的）：PI-b 完 = 第一次在正式站看到真分析（第 6 天）；P1 完 = 真來源進系統（第 9 天）；P2 完 = 引註彙整（第 12 天）；P3 完 = 三線端到端 + 課程 + 方法 dossier + 首用測試（第 18 天）；P4 完 = 報表 + 解決方案 + 跨專案搜尋（第 21.5 天）。
 
 ## 6. 驗證矩陣（每期四動作 + 突變）
 | 動作 | PI-a | P1 | P2 | P3 | P4 |
@@ -274,7 +276,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 三條線：L1 對人／公司／組織／事件，內容不設限（D10）；L3 第一版 = 文獻矩陣＋證據矩陣＋Toulmin，不含文獻回顧草稿；HCI 退出三條線（D8，P6 選配）。
 - 平台：品質評分 harness（P2）與演化迴圈（自動晉升只到 R0–R2 資料級；模型與門檻永遠人審，I9／I10）；首用者不看文件能走完（§3.9）；前端殼 = 新 `cognitive-web`，舊 dashboard 降專家模式（D13）；解讀層先於殼的其餘功能。
 - 執行：P0 → PI-a → PI-b → P-ARF-data → P1 → P2 → P3 → P4 → P4b → P-E；P0 部署與 PI-b 同窗（D15）；P5／P-P／P6 觸發式（第二租戶／HCI 案）；便宜模型照 §12 執行，Fable／Opus 只產卡與期末閘。
-- 教材：例子預設藝術反思、五組可切換、永不用真實案例（D18）；兩份示意稿 = 每個方法的規格（I11）。
+- 教材：例子預設藝術反思、五組可切換、永不用真實案例（D18）；兩份示意稿 = 每個方法的規格（I11，M1–M8）；每個方法的知識來自它自己的 dossier（D23），不靠操作者逐一餵參考。
 - 資料：研究來源與所有分析結果存 COS 研究庫（§3.3），不進 `/ops/knowledge`；跨專案搜尋在 P4。
 - L4：Airtable 單向同步、判斷主權七閘、參與者模式在 P5 之後（D19–D22）。
 - 待拍板：無。
@@ -282,7 +284,6 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 ## 10. 文件關係與維護規則
 - 本檔 = 計畫正本。`COS/docs/feature-cognitive-os-completion.md` 指回；`COS/plan.md` 勾選隨 §0；`agency-os/TASKS.md` 一列 = 進度指針；WORKLOG = 過程；決策記錄 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §10.1–10.3 為前提。
 - 維護：改 §3.3 元件的 commit 必同步 §3.3／§3.4；`:line` 只在 §0／§2／§3／§7／§12 出現；每完成一張卡更新 §0 進度板、每完成一期更新 §0 現況表；契約變更走 ADR（`SPEC/docs/adr/`）。
-- **不留歷史**（操作者 2026-09-24：不需要再看到的資料就刪除）：沒有變更紀錄段、沒有版本鏈、沒有「vX 曾經…」；被否決的方案只以名稱留在 §4 淘汰欄（防重提）；改判 = 改寫該列。
 
 ## 11. 接手指南（陌生 agent 從零開工）
 - **讀序**：**§0 進度板五行（做到哪、下一張卡）** → §12 現在那張卡（有卡就照卡做，不自行設計）→ §5 該期列 → §3.3 該期元件列 → §3.4 契約 → §9（不重問）→ §4 淘汰欄（不重提）。
@@ -421,6 +422,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 產卡者 = 上一期期末閘的執行者；操作者只看卡不看碼；卡放本檔 §12.x；已完成的卡整組收成一行「已完成：commit …」。
 - 卡的大小：≤1 個工作 session、≤5 個檔；超過就拆。
 - 卡的驗收指令必須是「一條指令 + 一行預期輸出」；寫不出來 = 元件定義不夠清楚 → 先回 §3.3 補，不產卡。
+- P3 產卡時 dossier 管線至少三張：`method_dossier` purpose＋285 種子批次蒐集；三份可演化資料起草＋`citation_integrity`；M1–M8 計分器＋「知識不足」顯示。
 
 ### 12.6 便宜模型禁區（遇到就停、問一題）
 prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8）；改門檻或測試期望去配合結果（I10）；自然人資料（D10／D21）；新增依賴（`pyproject.toml`／`package.json` 新套件，卡上沒列的）；改 auth／cookie／session；卡上沒列的檔；任何「可能是」——沒有 `file:line` 證據的判斷。
