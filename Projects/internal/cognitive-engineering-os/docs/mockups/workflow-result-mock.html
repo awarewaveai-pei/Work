@@ -12,6 +12,9 @@
   .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
+  .top{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
+  .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
+  a.btn{text-decoration:none;color:var(--ink);display:inline-block;cursor:pointer}
   h2{font-size:17px;margin:0 0 10px}
   h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
@@ -58,7 +61,7 @@
 
   <!-- 總覽 -->
   <div class="card">
-    <h1>決定：WuSheng 課程要不要改成「線上＋實體」混合</h1>
+    <div class="top"><h1>決定：WuSheng 課程要不要改成「線上＋實體」混合</h1><a class="howto" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU">第一次走這條路？先上 3 分鐘的課 →</a></div>
     <div class="sub">工作流「做一個決定 life-decision-v1」・3 站：問題陳述 → SWOT → 加權決策矩陣・專案「WuSheng 課程形式」・2026-09-24・合成教材案例</div>
     <div class="status"><span class="pill">AI 草稿・第 2 站進行中</span><span>資料：你填的＋上一站自動帶入・外部來源 0 筆</span><span>已完成 1/3 站</span><span>全程約 8 分鐘・≈ NT$3（已用 NT$1）</span></div>
     <div class="how"><b>怎麼讀</b>站列是你在哪；每站一張卡寫它回答什麼、從上一站帶入什麼、還要你填什麼。<b>你要做的</b>選走法；到了每一站，填紅字的欄位再按執行。</div>
@@ -86,7 +89,7 @@
         <div><span class="k">帶入什麼：</span>你在建立專案時寫的一段話 → 自動填 2 欄；<span class="need">你填了 3 欄</span>。</div>
         <div><span class="k">得到：</span>一句清楚的問題陳述＋3 個成功條件 <cite>[1]</cite>。</div>
         <div class="k">用了 2 分鐘・NT$1</div>
-        <div class="btns"><span class="btn">看第 1 站的九段結果 →</span></div>
+        <div class="btns"><span class="btn">看第 1 站的九段結果 →</span><a class="btn ghost" href="#" title="問題陳述的方法課：P3 產出後接上">回頭看問題陳述的 5 分鐘課 →</a></div>
       </div>
       <div class="st now">
         <div><b>第 2 站 SWOT</b><span class="tag">現在</span></div>
@@ -94,8 +97,7 @@
         <div><span class="k">帶入什麼：</span>第 1 站的問題陳述與 3 個成功條件 → 自動填「脈絡」欄；<span class="need">還要你填 4 格</span>：S／W／O／T 各至少 2 條（可讓 AI 起草，你改）。</div>
         <div><span class="k">得到：</span>SWOT 表＋每格的證據強度。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><span class="btn primary">填紅字欄位並執行</span></div>
-        <div class="k">第一次用 SWOT？先看 5 分鐘的課 →</div>
+        <div class="btns"><span class="btn primary">填紅字欄位並執行</span><a class="btn" href="#" title="SWOT 的方法課：P3 產出後接上">第一次用 SWOT？先看 5 分鐘的課 →</a></div>
       </div>
       <div class="st">
         <div><b>第 3 站 加權決策矩陣</b><span class="tag">之後</span></div>
@@ -103,6 +105,7 @@
         <div><span class="k">帶入什麼：</span>第 2 站的 S／W／O／T → 自動變成準則候選；<span class="need">還要你填 1 件事</span>：每個準則的權重（這是你的價值判斷，系統不代填）。</div>
         <div><span class="k">得到：</span>選項 × 準則 × 權重的分數表＋敏感度（哪個權重一改結果就翻）。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
+        <div class="btns"><a class="btn" href="#" title="加權決策矩陣的方法課：P3 產出後接上">第一次用加權決策矩陣？先看 5 分鐘的課 →</a></div>
       </div>
     </div>
   </div>
