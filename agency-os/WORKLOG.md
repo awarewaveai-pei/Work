@@ -1,4 +1,20 @@
 ﻿# Worklog
+## 2026-09-24（續130）每日 smoke 對 Auto-Repair SSH 探針發 WARN；repair_center 升 critical
+
+- **根因**：`scripts/check-smoke-tests.ps1` Check 2 只讀 `/api/ops/repairs/health` 的 `ok`；該 `ok` = tableOk && mode && backupConfigured && githubConfigured（`health/route.ts:389`，「有設定」≠「能用」）。SSH 探針 `backup_script_probe`／`auto_reboot`（`route.ts:403,419`）ssh_error 23 天無偵測器叫（2026-09-23 續123 修好連線時才發現）。
+- **改動**：
+  - 新 `scripts/lib/repair-health-probes.ps1` `Get-RepairProbeFindings`：`{backup_script_probe,auto_reboot}.{sg,eu}` 值 ok／skipped 通過；eu `unconfigured` 僅在 `eu_backup_required` 非 true 時通過；probe 物件或 host 欄位缺 = finding（端點改形狀不靜默過）。
+  - smoke Check 2：`ok` 真但有 finding → `warn:probe_<findings>`；`repair_detail.probe_findings` 落 JSON；catch 設 `$noEvidence`；`repair_center` 加入 `$criticalChecks`（唯一自動偵測器，跳過 = blind spot）。
+  - 新 `tests/repair-health-probes.test.ps1` 10 cases。
+- **踩坑**：`$x = if {…} else {…}` 會把空陣列展開成 `$null`，StrictMode Latest 下 `.Count` 丟例外 → 被 catch 誤標 `skip:unreachable`（第一次實跑抓到）；改 `@(if …)`。單元測試沒涵蓋 smoke 整合層，靠實跑發現。
+- **驗證**：
+  - 單元：`tests/repair-health-probes.test.ps1` PASS 10 cases；突變 3 支（拔 eu-required guard／absent 改放行／ok 判斷改恆真）各自指名 case 變紅。
+  - 實跑：`check-smoke-tests.ps1` → `repair_center=ok`、`probe_findings=[]`、`blind_spots=[]`；Check 2 區塊抽出對 live 回應注入 `backup_script_probe.sg=ssh_error` → `warn:probe_backup_script_probe.sg=ssh_error`。
+- **避免再發生**：「有設定」型 health 欄位不當成「能用」；新探針加進 `RepairProbeFields` 一處即生效。
+- **rollback**：`git revert <本 commit>`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/check-smoke-tests.ps1` (repair_center=ok, blind_spots=[]) + `tests/repair-health-probes.test.ps1` (10 PASS, 3 mutants red) | exit=0 | ms=29126
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex oracle `agency-os/reports/oracle/2026-09-24-partialreview-81dd3d90.md` NO FINDINGS，-Path = 本 commit 3 檔）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`repair_center|criticalChecks|client_mail.*docker_watchdog` | hits=18（repo；`.claude/{commands,agents,skills}` 另跑 0）；無現行文件列舉 critical 清單需同步，AGENTS_APPENDIX:18 為歷史敘述
 ## 2026-09-24（續129）研究線：計畫 v1.16——§0 殼 parity 清單（R15 說有卻沒有）、U16 問題路由「不知道用哪個工具」、U17 舊能力零退化（懶人填寫／示範案例／自組工作流／專家模式）、P3 +1d
 - [觸發] 操作者看結果頁⑧：原版有工作流＋單一工具（自動配下一步很好）、可自組工作流調順序、有「⚡ 懶人填寫」（先免費逐行比對、不夠才叫 AI）；問「我根本不知道要用哪個工具怎麼辦」；要「真正可以解決問題的頂規工具」。
 - [VBC] 計畫 R15 寫「parity 清單在 §0 追蹤」但 §0 沒有這張表；懶人填寫（`dashboard.html:197-199`、`:859-864`）、示範案例（`main.py:834`）、自組工作流（`main.py:1385-1455`、`dashboard.html:809-823`）、圖表面板（`:695`）都沒在新殼落點出現 → 新殼會退化。

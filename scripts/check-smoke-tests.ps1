@@ -14,7 +14,7 @@
 
   Checks:
     1. n8n MCP connectivity  (scripts/n8n-mcp-smoke.ps1)
-    2. Repair Center health  (GET /api/ops/repairs/health)
+    2. Repair Center health  (GET /api/ops/repairs/health; ok + SSH probes) — CRITICAL
     3. Client sites health   (GET /api/ops/clients)
     4. n8n workflow failures (GET n8n/api/v1/executions?status=error — last 24h)
     5. Client outbound mail  (SSH soulful -> wp_fsmpt_email_logs; failures last 7d
@@ -102,7 +102,11 @@ if (Test-Path -LiteralPath $n8nScript) {
     $results["n8n_mcp"] = "skip:script_missing"
 }
 
-# --- Check 2: Repair Center health ---
+# --- Check 2: Repair Center health --- CRITICAL
+# `ok` only means "configured"; the SSH probes are the only automated detector of a broken
+# Auto-Repair SSH path (dead 23 days unseen, WORKLOG 2026-09-24). Verdict: lib\repair-health-probes.ps1.
+$probeLib = Join-Path $PSScriptRoot "lib\repair-health-probes.ps1"
+if (Test-Path -LiteralPath $probeLib) { . $probeLib }
 $repairUrl = "$AppBaseUrl/api/ops/repairs/health"
 $repairStatus = "skip"
 try {
@@ -116,17 +120,25 @@ try {
         $authHeader = @{ Authorization = "Basic $b64" }
     }
     $resp = Invoke-RestMethod -Uri $repairUrl -Headers $authHeader -TimeoutSec 10 -ErrorAction Stop
-    $repairStatus = if ($resp.ok -eq $true) { "ok" } else { "warn:ok_false" }
+    # Outer @(): an if-expression unrolls an empty array to $null, and $null.Count throws under StrictMode.
+    $probeFindings = @(if (Get-Command Get-RepairProbeFindings -ErrorAction SilentlyContinue) {
+        Get-RepairProbeFindings -Health $resp
+    } else { "probe_lib_missing" })
+    $repairStatus = if ($resp.ok -ne $true) { "warn:ok_false" }
+                    elseif ($probeFindings.Count -gt 0) { "warn:probe_" + ($probeFindings -join ",") }
+                    else { "ok" }
     $results["repair_center"] = $repairStatus
     $results["repair_detail"]  = @{
-        ok          = $resp.ok
-        system_mode = $resp.system_mode
-        table_ok    = $resp.table_ok
+        ok             = $resp.ok
+        system_mode    = $resp.system_mode
+        table_ok       = $resp.table_ok
+        probe_findings = $probeFindings
     }
 } catch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch {}
     $results["repair_center"] = if ($code) { "skip:http$code" } else { "skip:unreachable" }
+    $noEvidence["repair_center"] = $true
 }
 
 # --- Check 3: Client sites health ---
@@ -554,7 +566,8 @@ $checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_m
 # the alarm died with the channel it was watching. A detector that goes quiet must be
 # louder than one that reports nothing wrong. ci_health/nightly_health join this list for
 # the same reason (WORKLOG 2026-09-23): each is the only thing watching its class of gate.
-$criticalChecks = @("client_mail","docker_watchdog","codex_parity","ci_health","nightly_health")
+# repair_center: sole automated watcher of the Auto-Repair SSH probes (WORKLOG 2026-09-24).
+$criticalChecks = @("repair_center","client_mail","docker_watchdog","codex_parity","ci_health","nightly_health")
 
 $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" })
 # Keyed on "produced no measurement", not on the verdict prefix: warn:ssh_exit255 and
