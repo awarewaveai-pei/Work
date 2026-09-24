@@ -134,6 +134,8 @@ node --test (Join-Path $root 'tests/unit/fetch-runner/retrieval/http-html-fetch.
 if ($LASTEXITCODE -ne 0) { throw 'fetch-runner fetch+extract tests failed (Task 7).' }
 node --test (Join-Path $root 'tests/unit/fetch-runner/server.test.mjs')
 if ($LASTEXITCODE -ne 0) { throw 'fetch-runner job-processing state-machine tests failed (Task 6/7).' }
+node --test (Join-Path $root 'tests/unit/fetch-runner/job-store.test.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'fetch-runner job store TTL/cap tests failed.' }
 
 # HCI_COLLECTOR_DISCOVERED_PIPELINE_PLAN.md Task 9: Trigger.dev orchestration
 # logic (enqueue/poll/retry state machine + the ONE sanctioned runner-client

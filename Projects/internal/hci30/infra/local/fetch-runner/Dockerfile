@@ -11,6 +11,7 @@ RUN apk add --no-cache curl bind-tools iptables setpriv \
 WORKDIR /app
 COPY server.mjs .
 COPY object-storage-client.mjs .
+COPY job-store.mjs .
 # Task 7: server.mjs now imports these at startup (retrieval/http-html-fetch.mjs
 # transitively imports net/pinned-http-client.mjs, which imports net/ssrf-guard.mjs).
 # Task 4's own critic review already flagged forgetting this COPY step here.
