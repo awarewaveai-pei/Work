@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作流結果總覽</title>
+<style>
+  :root{--bg:#f4f6f9;--card:#fff;--ink:#14213d;--muted:#5b6470;--line:#e1e5ea;--accent:#1f5fbf;--ok:#1a7f4b;--warn:#b25e09;--tag:#eef3fb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px}
+  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:17px;margin:0 0 10px}
+  h3{font-size:15px;margin:0}
+  .sub{color:var(--muted);font-size:13px}
+  .lead{font-size:16px;margin:10px 0 6px}
+  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 8px;align-items:center}
+  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
+  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
+  .grid2c{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+  @media (max-width:760px){.grid2c{grid-template-columns:1fr}}
+  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}.can{border:1px solid var(--ok)}.cant{border:1px solid var(--warn)}.can b,.cant b{display:block}
+  .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
+  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span.done{background:var(--ok);color:#fff}.journey span.now{background:var(--accent);color:#fff}
+  .journey i{color:var(--muted);font-style:normal}
+  .stations{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:10px}
+  .st{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
+  .st.done{border-color:var(--ok)}.st.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
+  .st b{font-size:14.5px}.st .k{color:var(--muted);font-size:12px}.st .need{color:var(--warn)}
+  .st .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:14px;cursor:default}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.ghost{color:var(--muted)}
+  .btn small{display:block;font-size:11px;color:inherit;opacity:.8}
+  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 10px;background:#fafbfd;border-radius:0 8px 8px 0;font-size:14px}
+  .finding b{display:block}.finding.warn{border-color:var(--warn)}.finding.ok{border-color:var(--ok)}
+  .row{display:grid;grid-template-columns:110px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+  .row b{color:var(--muted);font-weight:600;font-size:13px}
+  cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  th{font-size:12px;color:var(--muted);font-weight:600;background:#fafbfd}
+  td:first-child{white-space:nowrap;font-weight:600}
+  ol.src{padding-left:20px;font-size:14px}
+  .meta-bar{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+  .meta-bar b{color:var(--ink)}
+  .ok{color:var(--ok)}
+  .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner"><b>示意稿</b>：這是「工作流」（多個方法串起來）的結果長什麼樣：一頁總覽、每一站各一頁九段（同單一方法）、跑完一頁總結。用你領域的合成案例，數字只為示意。</div>
+
+  <!-- 總覽 -->
+  <div class="card">
+    <h1>決定：WuSheng 課程要不要改成「線上＋實體」混合</h1>
+    <div class="sub">工作流「做一個決定 life-decision-v1」・3 站：問題陳述 → SWOT → 加權決策矩陣・專案「WuSheng 課程形式」・2026-09-24・合成教材案例</div>
+    <div class="status"><span class="pill">AI 草稿・第 2 站進行中</span><span>資料：你填的＋上一站自動帶入・外部來源 0 筆</span><span>已完成 1/3 站</span><span>全程約 8 分鐘・≈ NT$3（已用 NT$1）</span></div>
+    <div class="how"><b>怎麼讀</b>站列是你在哪；每站一張卡寫它回答什麼、從上一站帶入什麼、還要你填什麼。<b>你要做的</b>選走法；到了每一站，填紅字的欄位再按執行。</div>
+    <p class="lead">一條工作流 = 幾個方法排好順序，<b>上一站的結果自動變成下一站的輸入</b>。你只在每一站補它缺的那幾格，不用重填。</p>
+    <div class="grid2c">
+      <div class="can"><b>這條路能回答</b>問題到底是什麼（第 1 站）、我們的強弱與外部機會威脅（第 2 站）、幾個選項按你自己定的準則和權重哪個最好（第 3 站）。</div>
+      <div class="cant"><b>這條路不能回答</b>市場會不會買單（沒有外部資料）；權重不會替你定（那是你的價值判斷，系統只算分）。</div>
+    </div>
+    <div class="journey">
+      <span class="done">✓ 第 1 站 問題陳述</span><i>→</i>
+      <span class="now">● 第 2 站 SWOT（現在）</span><i>→</i>
+      <span>○ 第 3 站 加權決策矩陣</span><i>→</i>
+      <span>○ 總結頁</span>
+    </div>
+    <div class="btns">
+      <span class="btn primary">一站一站走<small>每站停下來給你確認，可以改順序、可以中途換方法</small></span>
+      <span class="btn">一次跑完<small>三站自動跑，跑完再逐站看九段與總結</small></span>
+      <span class="btn ghost">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑</small></span>
+    </div>
+
+    <div class="stations">
+      <div class="st done">
+        <div><b>第 1 站 問題陳述</b><span class="tag">已完成</span></div>
+        <div><span class="k">回答什麼：</span>我們要決定的到底是什麼、誰受影響、成功長什麼樣。</div>
+        <div><span class="k">帶入什麼：</span>你在建立專案時寫的一段話 → 自動填 2 欄；<span class="need">你填了 3 欄</span>。</div>
+        <div><span class="k">得到：</span>一句清楚的問題陳述＋3 個成功條件 <cite>[1]</cite>。</div>
+        <div class="k">用了 2 分鐘・NT$1</div>
+        <div class="btns"><span class="btn">看第 1 站的九段結果 →</span></div>
+      </div>
+      <div class="st now">
+        <div><b>第 2 站 SWOT</b><span class="tag">現在</span></div>
+        <div><span class="k">回答什麼：</span>改成混合制，我們的強項、弱項、外部機會與威脅各是什麼。</div>
+        <div><span class="k">帶入什麼：</span>第 1 站的問題陳述與 3 個成功條件 → 自動填「脈絡」欄；<span class="need">還要你填 4 格</span>：S／W／O／T 各至少 2 條（可讓 AI 起草，你改）。</div>
+        <div><span class="k">得到：</span>SWOT 表＋每格的證據強度。</div>
+        <div class="k">約 3 分鐘・約 NT$1</div>
+        <div class="btns"><span class="btn primary">填紅字欄位並執行</span></div>
+        <div class="k">第一次用 SWOT？先看 5 分鐘的課 →</div>
+      </div>
+      <div class="st">
+        <div><b>第 3 站 加權決策矩陣</b><span class="tag">之後</span></div>
+        <div><span class="k">回答什麼：</span>「維持實體」「全線上」「混合」三個選項，按你的準則和權重哪個分數最高。</div>
+        <div><span class="k">帶入什麼：</span>第 2 站的 S／W／O／T → 自動變成準則候選；<span class="need">還要你填 1 件事</span>：每個準則的權重（這是你的價值判斷，系統不代填）。</div>
+        <div><span class="k">得到：</span>選項 × 準則 × 權重的分數表＋敏感度（哪個權重一改結果就翻）。</div>
+        <div class="k">約 3 分鐘・約 NT$1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第 1 站摘要 -->
+  <div class="card">
+    <h2>第 1 站摘要：問題陳述（已完成）</h2>
+    <div class="how"><b>怎麼讀</b>這裡只放一句話結論和你的判斷；完整九段在它自己那一頁。<b>你要做的</b>不用做；覺得問題定錯了，回去改再重跑後面的站。</div>
+    <div class="finding"><b>一句話：</b>要決定的不是「線上或實體」，是「在不降低參與者主動分享的前提下，能不能用混合制讓遠地的人也參加」；成功條件：主動分享人數不降、遠地參加者 ≥ 3 人、帶領者負擔不增 <cite>[1]</cite>。</div>
+    <div class="row"><b>你的判斷</b><span>部分同意——「帶領者負擔不增」應該改成「不超過現在的 1.2 倍」（你的原話，已成為第 2 站的最高優先輸入）</span></div>
+  </div>
+
+  <!-- 總結頁骨架 -->
+  <div class="card" style="border-left:6px solid var(--ok)">
+    <h2>總結頁（跑完第 3 站後出現；這是骨架）</h2>
+    <div class="how"><b>怎麼讀</b>一句話總結、每站一句、最終建議、解決方案、所有引註。<b>你要做的</b>核准整條工作流，或退回某一站。</div>
+    <div class="finding ok"><b>一句話（三站合一）</b>（跑完才有）例：混合制在你自己定的權重下得分最高，但只有在「每場線上人數 ≤ 4」時，主動分享人數才不會掉——這是第 2 站的威脅與第 3 站的敏感度一起說的。</div>
+    <table>
+      <tr><th>站</th><th>一句話</th><th>你的判斷</th><th>信心</th></tr>
+      <tr><td>1 問題陳述</td><td>要決定的是「不降低分享的混合制」<cite>[1]</cite></td><td>部分同意（負擔 ≤ 1.2 倍）</td><td>高</td></tr>
+      <tr><td>2 SWOT</td><td>（跑完才有）</td><td>—</td><td>—</td></tr>
+      <tr><td>3 加權決策矩陣</td><td>（跑完才有）</td><td>—</td><td>—</td></tr>
+    </table>
+    <p class="sub" style="margin:8px 0 0">總結頁下方會接：最終建議（含改判條件）、解決方案（來自最後一站的 ⑦：選方案 → 90 天計畫 → 追蹤）、跨站引註 [1]–[n]、成本合計、「核准整條工作流」。每站的九段各自可核准或退回；退回第 2 站會讓第 3 站失效並提醒重跑。</p>
+  </div>
+
+  <!-- 引註 + 來源列 -->
+  <div class="card">
+    <h2>引註（跨站累積）</h2>
+    <div class="how"><b>怎麼讀</b>[n] 從第 1 站往後編號，不重排；「上一站帶入」的內容會標它來自哪一站的哪一欄。<b>你要做的</b>不用做。</div>
+    <ol class="src">
+      <li>第 1 站・你的輸入・問題：「WuSheng 課程要不要改成線上＋實體混合，遠地的人一直問」</li>
+      <li>第 1 站・你的輸入・成功條件：「主動分享人數不降、遠地參加者至少 3 人、帶領者負擔不增」</li>
+      <li>第 2 站・上一站帶入・脈絡 ← 第 1 站 [1][2]</li>
+    </ol>
+    <div class="finding warn"><b>本條工作流沒有外部來源</b>三站都建立在你填的內容上；第 2 站的機會與威脅如果接上資料蒐集會更可信。</div>
+    <div class="meta-bar" style="margin-top:10px">
+      <span>整條工作流 <b>AI 草稿，尚未核准</b>（第 1 站你已部分同意）</span>
+      <span>模型 <b>claude-sonnet-5</b></span>
+      <span>已用 <b>≈ NT$1 / 預估 NT$3</b></span>
+      <span>檢查 <b class="ok" title="每一站每一句主張都有 [n]">來源 ✓</b> <b class="ok" title="站與站的帶入都對得到上一站的欄位">帶入可追 ✓</b></span>
+    </div>
+    <div class="btns" style="margin-top:12px">
+      <span class="btn primary">繼續第 2 站</span>
+      <span class="btn">改順序或換一站的方法</span>
+      <span class="btn">退回第 1 站並說原因</span>
+      <span class="btn ghost">專家模式：每站的閘門表與 JSON</span>
+    </div>
+    <div class="sub" style="margin-top:8px"><b>核准</b> = 整條成為專案正式紀錄；<b>退回某站</b> = 那站之後的站失效，重跑時前面的站不用重填；<b>刪除專案</b> = 三站的來源與產出一起刪掉。</div>
+  </div>
+
+</div>
+</body>
+</html>
