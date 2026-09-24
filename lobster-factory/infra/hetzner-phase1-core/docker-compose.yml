@@ -398,14 +398,14 @@ services:
       # SSH keys for web-UI one-click WP plugin updates (base64-encoded private key per client)
       # Naming: SSH_KEY_<ssh_key_name uppercase> — must match client_config.ssh_key_name in Supabase
       SSH_KEY_HOSTINGER_SOULFUL: ${SSH_KEY_HOSTINGER_SOULFUL:-}
-      # Hosting bridge — provision WordPress staging sites
+      # Hosting bridge — provision WordPress staging sites. The key's only power is the forced command
+      # scripts/aw-hosting-gate.sh (root authorized_keys); all five SSH vars required, no DB password here.
       LOBSTER_HOSTING_API_TOKEN: ${LOBSTER_HOSTING_API_TOKEN:-}
-      SG_SSH_PRIVATE_KEY_B64: ${SG_SSH_PRIVATE_KEY_B64:-}
-      # empty = provision-staging's own default (this host); a retired address here targeted a stranger's server (released-addresses.json)
-      SG_SSH_HOST: ${SG_SSH_HOST:-}
-      WP_STAGING_DB_USER: ${WORDPRESS_DB_USER:-wpuser}
-      WP_STAGING_DB_PASS: ${WORDPRESS_DB_PASSWORD:-}
-      WP_STAGING_DB_ROOT_PASS: ${WORDPRESS_DB_ROOT_PASSWORD:-}
+      HOSTING_BRIDGE_SSH_HOST: ${HOSTING_BRIDGE_SSH_HOST:-}
+      HOSTING_BRIDGE_SSH_PORT: ${HOSTING_BRIDGE_SSH_PORT:-}
+      HOSTING_BRIDGE_SSH_USER: ${HOSTING_BRIDGE_SSH_USER:-}
+      HOSTING_BRIDGE_SSH_KEY_B64: ${HOSTING_BRIDGE_SSH_KEY_B64:-}
+      HOSTING_BRIDGE_SSH_HOST_KEY_SHA256: ${HOSTING_BRIDGE_SSH_HOST_KEY_SHA256:-}
       # My Designs gallery (R2 object storage)
       POD_DESIGNS_ENABLED: ${POD_DESIGNS_ENABLED:-false}
       POD_DESIGNS_DEFAULT_ORG_ID: ${POD_DESIGNS_DEFAULT_ORG_ID:-}

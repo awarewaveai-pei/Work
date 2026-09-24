@@ -1051,12 +1051,9 @@ Profile C（adopt-client-os）：
 ### provision-staging（`/api/internal/hosting/provision-staging`）
 Auth：Bearer `LOBSTER_HOSTING_API_TOKEN`，called by create-wp-site Trigger.dev task。
 
-流程（SSH 進 WordPress 容器）：
-1. mkdir staging/`{slug}`（chown www-data）
-2. CREATE DATABASE wp_s_{siteId}
-3. wp core download
-4. wp config create（DB: lobster-wordpress-db）
-5. wp core install（staging URL: `aware-wave.com/staging/{slug}/`）
+流程（SSH `HOSTING_BRIDGE_SSH_*` → forced command `scripts/aw-hosting-gate.sh`，只有 2 個 verb；2026-09-24）：
+1–4. `staging-prepare {slug} wp_s_{siteId}`：mkdir + CREATE DATABASE + 該站自己的 DB 帳號（名 = DB 名）+ wp core download + wp config create；密碼只走 stdin，next-admin 不持有任何 DB 密碼；既有站若仍用主站帳號會被遷移到自己的帳號
+5+. `staging-wp {slug}`（stdin = bash 腳本，www-data 身分）：wp core install（admin 密碼走 `--prompt` stdin；staging URL: `aware-wave.com/staging/{slug}/`）
 6. wp theme install kadence（activate）
 7. wp plugin install `basePlugins + ecommercePlugins + pluginSlugs`（activate）
 8. Return：environmentId / wpRootPath / stagingSiteUrl / wpAdminUrl / adminPass
@@ -1210,9 +1207,7 @@ TRIGGER_SECRET_KEY                      # kick dispatcher（非 SDK token）
 TRIGGER_ACCESS_TOKEN                    # Trigger.dev SDK runtime
 TRIGGER_API_URL                         # 預設 https://api.trigger.dev
 LOBSTER_HOSTING_API_TOKEN               # provision-staging auth
-SG_SSH_PRIVATE_KEY_B64                  # provision-staging SSH key
-SG_SSH_HOST                             # 預設 5.223.93.113
-WP_STAGING_DB_USER / WP_STAGING_DB_PASS / WP_STAGING_DB_ROOT_PASS
+HOSTING_BRIDGE_SSH_HOST / _PORT / _USER / _KEY_B64 / _HOST_KEY_SHA256   # provision-staging；key 只能跑 aw-hosting-gate.sh；缺 host key 指紋 = 503（fail-closed）
 ```
 
 ### PostHog

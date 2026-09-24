@@ -105,6 +105,10 @@ DB_NAME="$(in_wp_cli "$WP_CLI config get DB_NAME --path='$WP_PATH/' 2>/dev/null"
 case "$DB_NAME" in
   mysql|information_schema|performance_schema|sys) deny "目標是系統資料庫：$DB_NAME" ;;
 esac
+# 自己的 DB 帳號（aw-hosting-gate.sh staging-prepare：帳號名 = DB_NAME）一起拆；舊站仍用主站帳號的只拆 DB。
+DB_USER_CFG="$(in_wp_cli "$WP_CLI config get DB_USER --path='$WP_PATH/' 2>/dev/null" | tr -d '\r\n' || true)"
+DROP_DB_USER=""
+[[ "$DB_USER_CFG" == "$DB_NAME" ]] && DROP_DB_USER="$DB_NAME"
 
 # 有沒有第二個安裝共用同一個資料庫？有的話 DROP 會順手弄壞別人。
 SHARED="$(in_wp "grep -l \"DB_NAME.*'$DB_NAME'\" $WP_ROOT_BASE/*/wp-config.php 2>/dev/null || true" \
@@ -129,6 +133,7 @@ SB_ORG="$(printf '%s' "$SB_ROW" | python3 -c 'import json,sys; d=json.load(sys.s
 log "=== deprovision plan: $SLUG ==="
 log "  files    : $WP_PATH  ($DIR_SIZE)"
 log "  database : $DB_NAME  (${DB_SIZE_MB} MB)"
+log "  db user  : ${DROP_DB_USER:-（無自己的帳號；wp-config 用 ${DB_USER_CFG:-?}，不動）}"
 log "  wp_sites : $SB_COUNT row(s) for $SITE_URL  (org=${SB_ORG:-none})"
 log "  org key  : organizations.metadata.client_config.site_url（若指向本站則清除）"
 log "  backup   : $BACKUP_ROOT/$SLUG-<stamp>.tar.gz（保留 ${KEEP_DAYS} 天）"
@@ -223,6 +228,10 @@ fi
 log "--- 4/5 DROP DATABASE $DB_NAME ---"
 in_db -e "DROP DATABASE IF EXISTS \`$DB_NAME\`;"
 log "  dropped"
+if [[ -n "$DROP_DB_USER" ]]; then
+  in_db -e "DROP USER IF EXISTS '$DROP_DB_USER'@'%';"
+  log "  dropped DB user $DROP_DB_USER"
+fi
 
 log "--- 5/5 rm -rf $WP_PATH ---"
 # 刪之前把守衛再跑一次：這是整支腳本唯一不可逆的地方，多花 20ms 再確認一次路徑形狀。

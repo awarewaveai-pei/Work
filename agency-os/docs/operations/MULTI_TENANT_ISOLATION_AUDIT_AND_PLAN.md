@@ -119,7 +119,7 @@
 | 事實 | 證據 | 影響 |
 |---|---|---|
 | 目前 staging 所有客戶站擠同一台 SG `5.223.93.113`，共用 1 個 PHP-FPM + 1 個 MariaDB 容器 | `app/api/internal/hosting/provision-staging/route.ts:23`；`docker-compose.yml` | 一站被駭 → `www-data` → 讀全部客戶 wp-config |
-| DB 各自分庫 `wp_s_<siteId>`（無碰撞）| `provision-staging/route.ts:34` | DB 層隔離 OK，檔案層不 OK |
+| DB 各自分庫 `wp_s_<siteId>`，2026-09-24 起每站自己的 DB 帳號（原共用主站 `wpuser`：staging 的 SQLi = 主站 DB）| `scripts/aw-hosting-gate.sh` `staging-prepare` | DB 層隔離 OK，檔案層不 OK（同一 www-data 讀得到主站 wp-config，解法 = S4）|
 | 正解：Hetzner 每客戶獨立 VPS（真機驗過 cpx12@sin）| `HetznerHostingAdapter.ts` | **未接進 app 按鈕** |
 | 每客戶 SSH 金鑰持久化未接 | `secretStore.ts:70`（預設 sink throw）| Phase 4 blocker，切 dedicated 前必補 |
 | 單一 Cloudflare / Hetzner / Supabase token | 多檔 | 任一外洩 = 全客戶爆炸半徑 |

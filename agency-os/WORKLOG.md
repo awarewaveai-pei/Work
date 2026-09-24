@@ -1,4 +1,29 @@
 ﻿# Worklog
+## 2026-09-24（續136）hosting bridge 身分：forced-command gate `aw-hosting-gate.sh`（2 verb）＋每站自己的 DB 帳號；route 關掉 3 條主機 root 注入；附帶事故：測試誤改主站 wp-config（80 s）
+
+- **根因（bridge 死 + 設計缺陷）**：
+  - C1 `provision-staging/route.ts`（舊 :296,:371）硬編 `root@:22`；ks-aw-01 只聽 58122 → 整併後建站全壞（TASKS「hosting bridge SSH 身分」）。
+  - C2 舊 :421 `siteName` 放進 `bash -c "…"` 雙引號由主機 root shell 解析 → `$(…)` = 主機 root 指令注入；舊 :34/:38 `siteId`、舊 :463/:466 `pluginSlugs` 同樣未驗證直接進主機 shell（SSH 連不上才潛伏）。
+  - M1 route 自己一份 ssh2 client 不驗 host key（舊 :41）；`lib/repair-center/ssh.ts` 已有 pinned 版。
+  - M2 next-admin 持有 DB root + 主站 DB 密碼（compose 舊 WP_STAGING_DB_*），root 密碼在主機 argv（舊 :388）。
+  - M3 7 個 staging 站 wp-config 全用主站帳號 `wpuser`：staging 外掛 SQLi = 主站 DB。
+- **方案（B'）**：原提案「`docker exec … wp` 指令白名單」不可行（每次指令帶路徑/密碼/腳本，無法逐字白名單）→ 動詞 gate：
+  - `scripts/aw-hosting-gate.sh`（root forced command，authorized_keys `restrict,from=172.16.0.0/12,env -u BASH_ENV`，同 aw-autorepair-gate 模式，sync-host-scripts 自動上機）：`staging-prepare <slug> <db>`（dir＋DB＋帳號名=DB 名＋core＋wp-config；冪等；舊站用主站帳號→遷移到自己帳號，讀回＋登入驗證，失敗還原）、`staging-wp <slug>`（stdin 腳本，www-data，≤1 MiB，stdin→暫存檔再以 /dev/null 執行）。密碼/SQL 只走 stdin；root 密碼取 DB 容器自己的 env（MYSQL_PWD）。
+  - key 的權限＝主機 root → 「建/修一個 staging 站的目錄、DB、DB 帳號＋lobster-wordpress 內 www-data 程式」。殘留：同容器也跑主站，檔案層隔離仍靠 S4（MULTI_TENANT_ISOLATION §3 已更新）。
+  - route：`readSshTargetFromEnv("HOSTING_BRIDGE",{explicit:true})`（pinned host key；PORT/USER 必填，codex r1）；siteId／pluginSlugs／wpPath 用 gate 同款 regex 驗（422）；全部插值 `shq()`；admin 密碼 `--prompt` 走 stdin（wp-cli 會把 prompt 值回顯 stdout → stdout 丟棄）；next-admin 不再持有 DB 密碼。
+  - `ssh.ts`：`readSshTargetFromEnv(prefix,{explicit})` 單一讀取器（`readSshTarget` 委派）、`sshExec(conn,cmd,stdin?)`。
+  - `deprovision-staging.sh`：wp-config DB_USER == DB_NAME 時一併 `DROP USER`（不變量：一站 ↔ 一 DB ↔ 一帳號，建立與拆除成對）。
+  - compose／`.env.example`：`SG_SSH_*`、`WP_STAGING_DB_*` → `HOSTING_BRIDGE_SSH_{HOST,PORT,USER,KEY_B64,HOST_KEY_SHA256}`。
+- **附帶事故（我造成，止血完成）**：04:41:03Z 在 prod `lobster-wordpress` 容器內試 `WPConfigTransformer`，`getcwd()`＝容器 WORKDIR `/var/www/html` → 改寫**主站** wp-config `DB_PASSWORD`（並 CRLF→LF）。04:42:20Z 由 `backups/20260924-020001/wp-html.tgz` 取回原檔 byte-exact 還原（sha256 `2c6d410b…` = 備份；`wp option get siteurl` OK；站 200）。影響：04:41:19–04:42:20 共 5 個 500，全來自主機自身監控（145.239.195.47），外部訪客 0。證物 `/root/wp-config.{from-backup,broken}-20260924.php`（600）。治本：gate `config_set` 顯式路徑＋realpath 前綴檢查；整合測試「主站 wp-config sha 全程不變」＝此事故的回歸測試（突變 M2 重現事故形狀 → 紅）；memory `feedback_never_test_against_prod_container`。
+- **驗證**：
+  - 整合：`tests/host-scripts/hosting-gate.test.sh`（丟棄式 mariadb:11＋wordpress:php8.2＋wp-cli 2.11，同容器名、label 守衛；gate 在 docker:cli runner 內以 Linux bash 跑）29/29；突變 M1（拔 DB 歸屬守衛）→ 1 紅、M2（事故形狀 getcwd）→ 4 紅含主站 sha。
+  - 契約：`lib/hosting/__tests__/hosting-gate-contract.test.ts` 11 tests（真 route 捕捉指令→真 gate `--check`；stub php 執行 install 腳本證 `$(…)` 字面、密碼只在 stdin）；突變 3 支（拔 title shq／密碼進 argv／拔 siteId 檢查）各紅。`ssh-target-env.test.ts` 11 tests，突變（停 explicit 驗證）8 紅；route 舊 SITE_ID_RE 突變 1 紅。
+  - next-admin 全套 vitest 1581+ passed、`npx tsc --noEmit` 0、`bash -n` 3 支。
+- **rollback**：`git revert <本 commit>`；prod 步驟見下一條 entry。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`MSYS_NO_PATHCONV=1 bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/hosting-gate.test.sh` (29/29, disposable stack) + `npx vitest run` (all green) | exit=0 | ms=128465
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/0n（Codex oracle 3 輪：r1 `reports/oracle/2026-09-24-partialreview-3e672efc.md` M 缺 PORT 默默回 22；r2 `…-dd4e0e3c.md` M 無效 PORT 被強制成 22、M SITE_ID_RE 非 uuid；r3 `…-3cf7c5dd.md` NO FINDINGS）
+  - 同一 reviewer 同段 code 連 2 次 → 不變量分析：explicit 模式下每個連線值都原樣取自設定且必須合法；讀取器要「補值」(缺) 或「轉型」(NaN→22) 的一律視為未設定 → port 1..65535、user POSIX 名形狀；非逐例補丁。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`SG_SSH_PRIVATE_KEY_B64|WP_STAGING_DB|SG_SSH_HOST|wp_s_|readSshTarget|sshExec\(|deprovision-staging` | hits=180（歷史 WORKLOG/TASKS＋新碼呼叫點；舊名 `SG_SSH_PRIVATE_KEY_B64|WP_STAGING_DB|process.env.SG_SSH` 在 lobster-factory 活碼 0；`.claude/{commands,agents,skills}` 另跑 0）
 ## 2026-09-24（續135）研究線：工作流課示意稿 v2——第 2 步改單欄，每站寫成「填好的範例」（操作者：三欄太擠、內容很爛）
 - [觸發] 操作者截圖第 2 步：「排版太擠，不要分三欄只要一欄，而且內容很爛。」
 - [已改] `mockups/workflow-lesson-mock.html` v2：第 2 步改單欄；每站固定七列（這站在做什麼／你會看到的表單／已經幫你填／你要填（附四個領域各一個填好的完整例子：要決定什麼、誰受影響、成功條件；S／W／O／T 各條；選項、準則與權重、結果與敏感度）／做完會得到／常見卡點／大約多久多少錢）；區塊容器改 div 免 span 包 div。線上 https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU v2。

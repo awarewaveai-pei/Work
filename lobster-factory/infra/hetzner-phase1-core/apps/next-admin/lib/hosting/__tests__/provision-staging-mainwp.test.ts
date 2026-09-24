@@ -17,7 +17,7 @@ describe("provision-staging MainWP preparation", () => {
   });
 
   it("prepares the child on every call, not only on a fresh install", () => {
-    const call = src.indexOf("await prepareMainWpChild(conn, wpPath, body.mainwpChildUniqueId)");
+    const call = src.indexOf("await prepareMainWpChild(conn, slug, body.mainwpChildUniqueId)");
     expect(call).toBeGreaterThan(src.indexOf("const pluginsOk = pluginResult.code === 0;"));
     expect(call).toBeLessThan(src.indexOf("return NextResponse.json({\n      environmentId"));
     expect(src.slice(src.indexOf("const alreadyInstalled"), call)).not.toMatch(/if \(alreadyInstalled\)[\s\S]*prepareMainWpChild/);

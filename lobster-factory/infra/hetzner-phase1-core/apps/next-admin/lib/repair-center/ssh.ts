@@ -89,20 +89,44 @@ export function connectSsh(opts: SshTarget): Promise<SshClient> {
  * keeps the actual production callers from ever reaching that path.
  */
 export function readSshTarget(prefix: "SG" | "EU"): SshTarget | null {
-  const host = process.env[`AUTO_REPAIR_${prefix}_SSH_HOST`]?.trim() ?? "";
-  const username = process.env[`AUTO_REPAIR_${prefix}_SSH_USER`]?.trim() || "root";
-  const keyEnv = process.env[`AUTO_REPAIR_${prefix}_SSH_KEY_ENV`]?.trim() || `AUTO_REPAIR_${prefix}_SSH_KEY_B64`;
+  return readSshTargetFromEnv(`AUTO_REPAIR_${prefix}`);
+}
+
+/**
+ * The one reader for every `<envPrefix>_SSH_*` target (Auto-Repair: AUTO_REPAIR_SG / AUTO_REPAIR_EU;
+ * hosting bridge: HOSTING_BRIDGE). Same fail-closed rule for all: no host-key fingerprint = null.
+ * `explicit`: every value is taken verbatim and must be valid — anything this reader would otherwise
+ * substitute (missing → root/22) or coerce (NaN port → 22) makes the target unconfigured. For targets
+ * with no legacy deployment relying on those defaults (Auto-Repair's prod .env sets no _SSH_USER).
+ */
+export function readSshTargetFromEnv(envPrefix: string, opts: { explicit?: boolean } = {}): SshTarget | null {
+  if (opts.explicit) {
+    const portRaw = process.env[`${envPrefix}_SSH_PORT`]?.trim() ?? "";
+    const userRaw = process.env[`${envPrefix}_SSH_USER`]?.trim() ?? "";
+    const bad = [
+      ...(/^[0-9]{1,5}$/.test(portRaw) && Number(portRaw) >= 1 && Number(portRaw) <= 65535 ? [] : [`${envPrefix}_SSH_PORT`]),
+      ...(/^[a-z_][a-z0-9_-]{0,31}$/.test(userRaw) ? [] : [`${envPrefix}_SSH_USER`]),
+    ];
+    if (bad.length > 0) {
+      // eslint-disable-next-line no-console -- visible, not silent: this is why the SSH target went dark
+      console.warn(`ssh.ts: ${bad.join(", ")} missing or invalid — ${envPrefix} target unconfigured`);
+      return null;
+    }
+  }
+  const host = process.env[`${envPrefix}_SSH_HOST`]?.trim() ?? "";
+  const username = process.env[`${envPrefix}_SSH_USER`]?.trim() || "root";
+  const keyEnv = process.env[`${envPrefix}_SSH_KEY_ENV`]?.trim() || `${envPrefix}_SSH_KEY_B64`;
   const privateKey = readPrivateKeyFromEnv(keyEnv);
   if (!host || !privateKey) return null;
-  const hostKeyFingerprint = process.env[`AUTO_REPAIR_${prefix}_SSH_HOST_KEY_SHA256`]?.trim() || "";
+  const hostKeyFingerprint = process.env[`${envPrefix}_SSH_HOST_KEY_SHA256`]?.trim() || "";
   if (!hostKeyFingerprint) {
     // eslint-disable-next-line no-console -- visible, not silent: this is why the SSH target went dark
     console.warn(
-      `ssh.ts: AUTO_REPAIR_${prefix}_SSH_HOST_KEY_SHA256 is not set — treating the ${prefix} target as unconfigured rather than connecting unpinned`,
+      `ssh.ts: ${envPrefix}_SSH_HOST_KEY_SHA256 is not set — treating the ${envPrefix} target as unconfigured rather than connecting unpinned`,
     );
     return null;
   }
-  const rawPort = Number(process.env[`AUTO_REPAIR_${prefix}_SSH_PORT`]);
+  const rawPort = Number(process.env[`${envPrefix}_SSH_PORT`]);
   const port = Number.isFinite(rawPort) && rawPort > 0 ? Math.floor(rawPort) : 22;
   return { host, username, port, privateKey, hostKeyFingerprint };
 }
@@ -138,10 +162,12 @@ export async function sshExecOnce(
   }
 }
 
-export function sshExec(conn: SshClient, command: string): Promise<SshExecResult> {
+/** `stdin`, when given, is written to the remote command and closed (secrets and scripts travel here, never in `command`). */
+export function sshExec(conn: SshClient, command: string, stdin?: string): Promise<SshExecResult> {
   return new Promise((resolve, reject) => {
     conn.exec(command, (err, stream) => {
       if (err) return reject(err);
+      if (stdin !== undefined) stream.end(stdin);
       let stdout = "";
       let stderr = "";
       stream.on("data", (data: Buffer) => {

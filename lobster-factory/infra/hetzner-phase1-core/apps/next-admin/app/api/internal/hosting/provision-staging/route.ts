@@ -2,15 +2,21 @@
  * POST /api/internal/hosting/provision-staging
  *
  * HTTP_JSON hosting adapter bridge — called by Trigger.dev create-wp-site task.
- * Creates a WordPress subdirectory staging install on the SG VPS via SSH.
+ * Creates a WordPress subdirectory staging install on ks-aw-01 via SSH.
  *
  * Auth: Authorization: Bearer {LOBSTER_HOSTING_API_TOKEN}
  * Input: { organizationId, siteId, siteName }
  * Output: { environmentId, wpRootPath, stagingSiteUrl, wpAdminUrl, wpAdminUser }
+ *
+ * Host access: HOSTING_BRIDGE_SSH_* key, whose only power is the forced command
+ * scripts/aw-hosting-gate.sh (verbs `staging-prepare <slug> <db>`, `staging-wp <slug>`). The command line
+ * carries only the validated slug/db; scripts, passwords and ids travel on stdin. Every value put into a
+ * script goes through shq(). Contract: lib/hosting/__tests__/hosting-gate-contract.test.ts.
  */
 
 import { NextResponse } from "next/server";
-import { Client as SshClient } from "ssh2";
+import type { Client as SshClient } from "ssh2";
+import { connectSsh, readSshTargetFromEnv, sshExec } from "@/lib/repair-center/ssh";
 import { timingSafeEqual } from "../../../../../lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
 import type { WebsiteSpec } from "../../../../../lib/onboarding/intake-form";
@@ -23,10 +29,15 @@ export const maxDuration = 120;
 
 const STAGING_BASE_URL = "https://aware-wave.com/staging";
 const WP_ROOT_BASE = "/var/www/html/staging";
-const WP_CLI = "php -d memory_limit=256M /usr/local/bin/wp";
 const STAGING_ADMIN_EMAIL = "staging@aware-wave.com";
 // Returned as wpAdminUser: MainWP registration (workflows addSiteToMainWp) must name this exact user.
 const STAGING_ADMIN_USER = "admin";
+const BRIDGE_ENV_PREFIX = "HOSTING_BRIDGE";
+// Same patterns as aw-hosting-gate.sh SLUG_RE / DB_RE: a value the gate would refuse is a 422 here.
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const DB_RE = /^wp_[a-z0-9_]{1,60}$/;
+const SITE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i; // = create-wp-site z.string().uuid()
+const PLUGIN_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/; // = workflows/src/tasks/wp-install-plugins.ts pluginSlugs
 
 function toSlug(name: string, siteId: string): string {
   // All-CJK names produce an empty base → fall back to "site" so the slug isn't "-<id>".
@@ -38,35 +49,22 @@ function toDbName(siteId: string): string {
   return `wp_s_${siteId.replace(/-/g, "").slice(0, 22)}`;
 }
 
-function connectSsh(opts: { host: string; port: number; username: string; privateKey: string }): Promise<SshClient> {
-  return new Promise((resolve, reject) => {
-    const conn = new SshClient();
-    conn.on("ready", () => resolve(conn));
-    conn.on("error", reject);
-    conn.connect(opts);
-  });
+function slugFromWpPath(wpPath: string): string | null {
+  const slug = wpPath.startsWith(`${WP_ROOT_BASE}/`) ? wpPath.slice(WP_ROOT_BASE.length + 1) : "";
+  return SLUG_RE.test(slug) ? slug : null;
 }
 
-function sshExec(conn: SshClient, cmd: string): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    conn.exec(cmd, (err, stream) => {
-      if (err) return reject(err);
-      let stdout = "";
-      let stderr = "";
-      stream.on("data", (d: Buffer) => { stdout += d.toString(); });
-      stream.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
-      stream.on("close", (code: number) => resolve({ code, stdout, stderr }));
-    });
-  });
+/** Runs `lines` as www-data in the site's dir via the gate's `staging-wp` verb; `wpcli` is predefined. */
+function gateWp(conn: SshClient, slug: string, lines: string[]) {
+  const wpcli = `wpcli() { php -d memory_limit=256M /usr/local/bin/wp --path=${shq(`${WP_ROOT_BASE}/${slug}/`)} "$@"; }`;
+  return sshExec(conn, `staging-wp ${slug}`, [wpcli, ...lines].join("\n") + "\n");
 }
 
 // ── Content seeding (Stage C) ────────────────────────────────────────────────
 // Turns the provisioned WP shell into a content-filled site using the AI website spec.
-// Mechanism verified on the SG container 2026-06-27: the whole bash script is base64-encoded
-// in Node, single-quoted on the host, and only decoded (`base64 -d`) inside the container's
-// bash stdin — so CJK bytes never pass through the host login shell / SSH / locale layer and
-// cannot mojibake. Every interpolated spec value is shq()-escaped (POSIX single-quote), which
-// was confirmed injection-proof (a `'; echo PWNED;'` probe echoed as a literal, not executed).
+// The script travels as raw bytes on the SSH channel's stdin to the gate (staging-wp), never through a
+// host shell, so CJK cannot mojibake. Every interpolated spec value is shq()-escaped (POSIX single-quote),
+// confirmed injection-proof (a `'; echo PWNED;'` probe echoed as a literal, not executed).
 const MAX_SEED_PAGES = 12; // bound wall time under the Cloudflare ~100s request ceiling
 
 function shq(s: unknown): string {
@@ -97,10 +95,9 @@ function buildHomepageHtml(spec: WebsiteSpec): string {
 // One idempotent bash script. Completion-gated: the `aw_seed_done` option is set LAST, so a
 // half-seed never short-circuits a retry; every create is guarded by slug so a re-run repairs
 // rather than duplicates.
-function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
+function buildSeedScript(spec: WebsiteSpec): string[] {
   const L: string[] = [];
   L.push(`set -e`);
-  L.push(`wpcli() { php -d memory_limit=256M /usr/local/bin/wp --path=${shq(wpPath + "/")} "$@"; }`);
   L.push(`if [ "$(wpcli option get aw_seed_done 2>/dev/null)" = "1" ]; then echo "AW_SEED_SKIP already seeded"; exit 0; fi`);
   if (spec.site_name) L.push(`wpcli option update blogname ${shq(spec.site_name)}`);
   if (spec.tagline) L.push(`wpcli option update blogdescription ${shq(spec.tagline)}`);
@@ -141,14 +138,14 @@ function buildSeedScript(spec: WebsiteSpec, wpPath: string): string {
   }
   L.push(`wpcli option update aw_seed_done 1 >/dev/null`);
   L.push(`echo "AW_SEED_OK home=$HOME_ID pages=${pages.length}"`);
-  return L.join("\n");
+  return L;
 }
 
 // Generate ONE AI hero image from the spec's visual direction and install it at the top of the
 // homepage (+ set as featured). flux-schnell is fast (~5-8s) so this fits inside the seed call's
 // budget. Best-effort + idempotent (aw_hero_done option) — a failure never fails seeding.
 // `media_sideload_image` (core) does the import+insert in one PHP eval, so no bash/php var passing.
-async function generateAndInstallHeroImage(conn: SshClient, wpPath: string, spec: WebsiteSpec): Promise<string> {
+async function generateAndInstallHeroImage(conn: SshClient, slug: string, spec: WebsiteSpec): Promise<string> {
   if (!isR2Configured()) return "hero image skipped: R2 not configured";
   const style = (spec.design?.image_style || "warm natural light, soft handcrafted texture, atmospheric").slice(0, 200);
   // imagen-4 (Google) over flux-schnell: flux-schnell renders gibberish pseudo-text on hero banners
@@ -168,21 +165,18 @@ async function generateAndInstallHeroImage(conn: SshClient, wpPath: string, spec
     `$att=media_sideload_image($url,$h->ID,null,'id');if(is_wp_error($att)){echo 'AW_HERO_ERR '.$att->get_error_message();return;}` +
     `$img=wp_get_attachment_url($att);$b='<!-- wp:image {"id":'.$att.',"sizeSlug":"large","align":"wide"} --><figure class="wp-block-image alignwide size-large"><img src="'.$img.'" alt="" class="wp-image-'.$att.'"/></figure><!-- /wp:image -->';` +
     `wp_update_post(array('ID'=>$h->ID,'post_content'=>$b.$h->post_content));set_post_thumbnail($h->ID,$att);echo 'AW_HERO_OK att='.$att;`;
-  const script = [
-    `wpcli() { php -d memory_limit=256M /usr/local/bin/wp --path=${shq(wpPath + "/")} "$@"; }`,
+  const res = await gateWp(conn, slug, [
     `if [ "$(wpcli option get aw_hero_done 2>/dev/null)" = "1" ]; then echo "AW_HERO_SKIP"; exit 0; fi`,
     `wpcli eval ${shq(heroPhp)}`,
     `wpcli option update aw_hero_done 1 >/dev/null`,
-  ].join("\n");
-  const b64 = Buffer.from(script, "utf8").toString("base64");
-  const res = await sshExec(conn, `echo '${b64}' | base64 -d | docker exec -i -u www-data lobster-wordpress bash`);
+  ]);
   const out = `${res.stdout}${res.stderr}`;
   return out.includes("AW_HERO_OK") || out.includes("AW_HERO_SKIP")
     ? `hero image: ${out.match(/AW_HERO_(OK|SKIP)[^\n]*/)?.[0] ?? "ok"}`
     : `hero image WARN: ${out.replace(/\s+/g, " ").slice(0, 200)}`;
 }
 
-async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecId: string): Promise<string> {
+async function seedContentFromSpec(conn: SshClient, slug: string, websiteSpecId: string): Promise<string> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return "content seed skipped: no DB client";
   const { data, error } = await supabase
@@ -194,9 +188,7 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
     return `content seed skipped: spec not found (${error?.message ?? "no row"})`;
   }
   const spec = data.spec_data as WebsiteSpec;
-  const script = buildSeedScript(spec, wpPath);
-  const b64 = Buffer.from(script, "utf8").toString("base64");
-  const res = await sshExec(conn, `echo '${b64}' | base64 -d | docker exec -i -u www-data lobster-wordpress bash`);
+  const res = await gateWp(conn, slug, buildSeedScript(spec));
   const out = `${res.stdout}${res.stderr}`;
   if (res.code !== 0 || !(out.includes("AW_SEED_OK") || out.includes("AW_SEED_SKIP"))) {
     return `content seed WARN (code ${res.code}): ${out.replace(/\s+/g, " ").slice(0, 300)}`;
@@ -204,7 +196,7 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
   // Best-effort AI hero image (never fails the seed result).
   let heroNote = "hero image skipped";
   try {
-    heroNote = await generateAndInstallHeroImage(conn, wpPath, spec);
+    heroNote = await generateAndInstallHeroImage(conn, slug, spec);
   } catch (e) {
     heroNote = `hero image error: ${e instanceof Error ? e.message : String(e)}`;
   }
@@ -220,7 +212,7 @@ async function seedContentFromSpec(conn: SshClient, wpPath: string, websiteSpecI
 // Best-effort — a wiring failure must NOT fail the provision.
 async function wireClientToContentTools(
   conn: SshClient,
-  wpPath: string,
+  slug: string,
   organizationId: string | undefined,
   siteName: string,
   siteUrl: string,
@@ -255,10 +247,9 @@ async function wireClientToContentTools(
     }
 
     // 2. We won the reservation → mint a WP Application Password (REST API auth for content tools).
-    const apRes = await sshExec(
-      conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} user application-password create admin 'AwareWave Content' --path=${wpPath}/ --porcelain 2>/dev/null"`,
-    );
+    const apRes = await gateWp(conn, slug, [
+      `wpcli user application-password create ${STAGING_ADMIN_USER} 'AwareWave Content' --porcelain 2>/dev/null`,
+    ]);
     const appPw = apRes.stdout.trim().split(/\s+/).pop() ?? "";
     if (appPw.length < 16) {
       // Roll back the placeholder so a later re-run can complete wiring cleanly.
@@ -285,16 +276,18 @@ async function handleSeedMode(body: { websiteSpecId?: string; wpPath?: string; s
   if (!websiteSpecId || !wpPath) {
     return NextResponse.json({ error: "websiteSpecId and wpPath required for seed mode" }, { status: 422 });
   }
-  const keyB64 = process.env.SG_SSH_PRIVATE_KEY_B64?.trim();
-  const sshHost = process.env.SG_SSH_HOST?.trim() || "145.239.195.47";
-  if (!keyB64) {
-    return NextResponse.json({ error: "SG_SSH_PRIVATE_KEY_B64 not configured" }, { status: 503 });
+  const slug = slugFromWpPath(wpPath);
+  if (!slug) {
+    return NextResponse.json({ error: `wpPath must be ${WP_ROOT_BASE}/<slug>` }, { status: 422 });
+  }
+  const target = readSshTargetFromEnv(BRIDGE_ENV_PREFIX, { explicit: true });
+  if (!target) {
+    return NextResponse.json({ error: "hosting bridge SSH not configured (HOSTING_BRIDGE_SSH_*)" }, { status: 503 });
   }
   let conn: SshClient | null = null;
   try {
-    const privateKey = Buffer.from(keyB64, "base64").toString("utf8");
-    conn = await connectSsh({ host: sshHost, port: 22, username: "root", privateKey });
-    const seeded = await seedContentFromSpec(conn, wpPath, websiteSpecId);
+    conn = await connectSsh(target);
+    const seeded = await seedContentFromSpec(conn, slug, websiteSpecId);
     return NextResponse.json({ ok: true, siteId: siteId ?? null, seeded });
   } catch (e) {
     return NextResponse.json(
@@ -306,13 +299,12 @@ async function handleSeedMode(body: { websiteSpecId?: string; wpPath?: string; s
   }
 }
 
-async function prepareMainWpChild(conn: SshClient, wpPath: string, uniqueId: string | undefined): Promise<string | null> {
+async function prepareMainWpChild(conn: SshClient, slug: string, uniqueId: string | undefined): Promise<string | null> {
   if (uniqueId === undefined) return null;
   if (!/^[0-9a-f]{32,128}$/.test(uniqueId)) return "WARN: mainwpChildUniqueId malformed; MainWP child not prepared";
-  const res = await sshExec(
-    conn,
-    `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} option update mainwp_child_uniqueId ${uniqueId} --path=${wpPath}/ --quiet && ${WP_CLI} user meta update ${STAGING_ADMIN_USER} mainwp_child_user_enable_passwd_auth_connect 0 --path=${wpPath}/ --quiet" >/dev/null 2>&1`
-  );
+  const res = await gateWp(conn, slug, [
+    `{ wpcli option update mainwp_child_uniqueId ${uniqueId} --quiet && wpcli user meta update ${STAGING_ADMIN_USER} mainwp_child_user_enable_passwd_auth_connect 0 --quiet; } >/dev/null 2>&1`,
+  ]);
   return res.code === 0
     ? "MainWP child prepared (unique security id set; password auth off for the admin)"
     : "WARN: MainWP child preparation failed; MainWP registration will be refused";
@@ -347,18 +339,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "siteId and siteName required" }, { status: 422 });
   }
 
-  const keyB64 = process.env.SG_SSH_PRIVATE_KEY_B64?.trim();
-  const sshHost = process.env.SG_SSH_HOST?.trim() || "145.239.195.47";
-  const dbUser = process.env.WP_STAGING_DB_USER?.trim() || "wpuser";
-  const dbPass = process.env.WP_STAGING_DB_PASS?.trim() || "";
-  const dbRootPass = process.env.WP_STAGING_DB_ROOT_PASS?.trim() || "";
-
-  if (!keyB64) {
-    return NextResponse.json({ error: "SG_SSH_PRIVATE_KEY_B64 not configured" }, { status: 503 });
+  if (!SITE_ID_RE.test(siteId)) {
+    return NextResponse.json({ error: "siteId must be a uuid" }, { status: 422 });
+  }
+  const slug = toSlug(siteName, siteId.toLowerCase());
+  const dbName = toDbName(siteId.toLowerCase());
+  if (!SLUG_RE.test(slug) || !DB_RE.test(dbName)) {
+    return NextResponse.json({ error: "derived slug/db name invalid" }, { status: 422 });
+  }
+  if (!Array.isArray(pluginSlugs) || pluginSlugs.some((s) => typeof s !== "string" || !PLUGIN_SLUG_RE.test(s))) {
+    return NextResponse.json({ error: "pluginSlugs must be wordpress.org slugs" }, { status: 422 });
+  }
+  const target = readSshTargetFromEnv(BRIDGE_ENV_PREFIX, { explicit: true });
+  if (!target) {
+    return NextResponse.json({ error: "hosting bridge SSH not configured (HOSTING_BRIDGE_SSH_*)" }, { status: 503 });
   }
 
-  const slug = toSlug(siteName, siteId);
-  const dbName = toDbName(siteId);
   const wpPath = `${WP_ROOT_BASE}/${slug}`;
   const stagingSiteUrl = `${STAGING_BASE_URL}/${slug}/`;
   const wpAdminUrl = `${stagingSiteUrl}wp-admin/`;
@@ -367,61 +363,30 @@ export async function POST(request: Request) {
 
   let conn: SshClient | null = null;
   try {
-    const privateKey = Buffer.from(keyB64, "base64").toString("utf8");
-    conn = await connectSsh({ host: sshHost, port: 22, username: "root", privateKey });
+    conn = await connectSsh(target);
 
-    // 1. Create staging directory with correct owner
-    const mkdirResult = await sshExec(
-      conn,
-      `docker exec lobster-wordpress bash -c "mkdir -p ${wpPath} && chown www-data:www-data ${wpPath}"`
-    );
-    if (mkdirResult.code !== 0) {
-      throw new Error(`mkdir failed: ${mkdirResult.stderr}`);
-    }
-
-    // 2. Create MySQL database (dbName is alphanumeric-safe, no quoting needed)
-    const createDbSql = dbRootPass
-      ? `CREATE DATABASE IF NOT EXISTS ${dbName}; GRANT ALL PRIVILEGES ON ${dbName}.* TO '${dbUser}'@'%'; FLUSH PRIVILEGES;`
-      : `CREATE DATABASE IF NOT EXISTS ${dbName};`;
-    const createDbUser = dbRootPass ? "root" : dbUser;
-    const createDbPass = dbRootPass || dbPass;
-    const createDbCmd = `docker exec lobster-wordpress-db mariadb -u ${createDbUser} -p'${createDbPass}' -e "${createDbSql}"`;
-    await sshExec(conn, createDbCmd);
-
-    // 3. Download WordPress core
-    const dlResult = await sshExec(
-      conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core download --path=${wpPath}/ --quiet 2>&1"`
-    );
-    if (dlResult.code !== 0 && !dlResult.stdout.includes("WordPress files seem to already be present")) {
-      throw new Error(`wp core download failed: ${dlResult.stdout} ${dlResult.stderr}`);
-    }
-
-    // 4. Create wp-config.php
-    const configResult = await sshExec(
-      conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} config create --dbname=${dbName} --dbuser=${dbUser} --dbpass='${dbPass}' --dbhost=lobster-wordpress-db --path=${wpPath}/ --quiet 2>&1"`
-    );
-    if (configResult.code !== 0 && !configResult.stdout.includes("already exists")) {
-      throw new Error(`wp config create failed: ${configResult.stdout} ${configResult.stderr}`);
+    // 1–4. Dir + DB + the site's own DB account + WordPress core + wp-config, all inside the gate
+    // (idempotent; next-admin never holds a DB password). One site ↔ one DB ↔ one DB account.
+    const prep = await sshExec(conn, `staging-prepare ${slug} ${dbName}`);
+    const prepState = prep.stdout.match(/AW_PREPARE_OK state=(\w+)/)?.[1];
+    if (prep.code !== 0 || !prepState) {
+      throw new Error(`staging-prepare failed (code ${prep.code}): ${prep.stderr.trim() || prep.stdout.trim()}`);
     }
 
     // 5. Install WordPress. Detect "already installed" by `core is-installed` exit code: `core install`
     // reports it via WP_CLI::log, which --quiet suppresses (exit 0, empty stdout). A retry
     // (fetchWithRetry in trigger-build) reaching an installed site must not vault this call's fresh
     // password — WP kept the FIRST one.
-    const isInstalled = await sshExec(
-      conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core is-installed --path=${wpPath}/ >/dev/null 2>&1"`
-    );
+    const isInstalled = await gateWp(conn, slug, [`wpcli core is-installed >/dev/null 2>&1`]);
     const alreadyInstalled = isInstalled.code === 0;
     if (!alreadyInstalled) {
-      const installResult = await sshExec(
-        conn,
-        `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} core install --url='${stagingSiteUrl}' --title='${siteName.replace(/'/g, "")} Staging' --admin_user=${STAGING_ADMIN_USER} --admin_password='${adminPass}' --admin_email=${STAGING_ADMIN_EMAIL} --path=${wpPath}/ --skip-email --quiet 2>&1"`
-      );
+      // The password goes in on stdin (--prompt), never on an argv; wp-cli echoes prompted values to
+      // stdout, so stdout is discarded and only stderr may reach the error text.
+      const installResult = await gateWp(conn, slug, [
+        `printf '%s\\n' ${shq(adminPass)} | wpcli core install --url=${shq(stagingSiteUrl)} --title=${shq(`${siteName} Staging`)} --admin_user=${STAGING_ADMIN_USER} --admin_email=${STAGING_ADMIN_EMAIL} --skip-email --prompt=admin_password --quiet >/dev/null`,
+      ]);
       if (installResult.code !== 0) {
-        throw new Error(`wp core install failed: ${installResult.stdout} ${installResult.stderr}`);
+        throw new Error(`wp core install failed: ${installResult.stderr.trim()}`);
       }
     }
     const adminCredNote = alreadyInstalled
@@ -433,10 +398,9 @@ export async function POST(request: Request) {
     // 6. Install base theme — skip for wp-tourism (apply-manifest installs TravelWP via localZip step)
     let themeOk = true;
     if (manifestSlug !== "wp-tourism") {
-      const themeResult = await sshExec(
-        conn,
-        `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} theme install kadence kadence-child-theme-two --activate --path=${wpPath}/ --quiet 2>&1 || ${WP_CLI} theme install kadence --activate --path=${wpPath}/ --quiet 2>&1"`
-      );
+      const themeResult = await gateWp(conn, slug, [
+        `wpcli theme install kadence kadence-child-theme-two --activate --quiet 2>&1 || wpcli theme install kadence --activate --quiet 2>&1`,
+      ]);
       themeOk = themeResult.code === 0 || themeResult.stdout.includes("already installed");
     }
 
@@ -460,25 +424,23 @@ export async function POST(request: Request) {
       ...crmPlugins,
       ...formPlugins,
       ...managementPlugins,
-      ...pluginSlugs.filter((s) => s && s.length > 2),
+      ...pluginSlugs, // validated against PLUGIN_SLUG_RE above
     ])];
 
-    const pluginList = allPlugins.join(" ");
-    const pluginResult = await sshExec(
-      conn,
-      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} plugin install ${pluginList} --activate --path=${wpPath}/ --quiet 2>&1"`
-    );
+    const pluginResult = await gateWp(conn, slug, [
+      `wpcli plugin install ${allPlugins.map(shq).join(" ")} --activate --quiet 2>&1`,
+    ]);
     const pluginsOk = pluginResult.code === 0;
 
     // 7b. Let MainWP connect without the admin password: mainwp-child accepts the Unique Security ID
     // only when password auth is off for the connecting user. Runs on every call — a retry reaching
     // an installed site must carry THIS run's id, the one create-wp-site sends to MainWP.
     // The id is a credential: request-only, never in the response, notes or error text.
-    const mainwpNote = await prepareMainWpChild(conn, wpPath, body.mainwpChildUniqueId);
+    const mainwpNote = await prepareMainWpChild(conn, slug, body.mainwpChildUniqueId);
 
     // Wire this client into the content toolchain (app-password + wp_sites + site_url) so SEO
     // Content / Video can target it. Synchronous (~2s) and best-effort — never fails the provision.
-    const wiringNote = await wireClientToContentTools(conn, wpPath, organizationId, siteName, stagingSiteUrl);
+    const wiringNote = await wireClientToContentTools(conn, slug, organizationId, siteName, stagingSiteUrl);
 
     // Content seeding is intentionally NOT done here. Seeding adds ~15-25s of WP-CLI work which,
     // on top of the ~71-90s provision, blew past the hosting-adapter / Cloudflare ~95-100s ceiling
@@ -498,7 +460,7 @@ export async function POST(request: Request) {
         ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
         wiringNote,
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
-        `DB: ${dbName} on lobster-wordpress-db`,
+        `DB: ${dbName} on lobster-wordpress-db (own account; ${prepState})`,
         // Never the password: these notes land in Trigger.dev run output + ops_action_runs.
         adminCredNote,
         ...(mainwpNote ? [mainwpNote] : []),
