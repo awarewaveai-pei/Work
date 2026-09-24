@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-24（續139）研究線：主色改墨綠（U19 token 更新；四份示意稿與計畫 v1.22）
+- [觸發] 操作者：「要接近墨綠色。」
+- [已改] accent 亮 `#1b4d3e`／暗 `#8fc7b0`，tag `#e6f0ec`／`#16302a`；四份示意稿、`build_artifact.py`、計畫 U19；圖表資料色不動。四個 artifact 重新發布。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python token 替換（計數）+ build ×4 + grep 新色各 1 + Artifact publish ×4 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 顏色 token
+- BUGHUNT_WAIVED: DOC_ONLY -- 僅示意稿與計畫 token
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續138）hosting bridge prod 落地（主機側全就緒）＋7 個 staging 站遷到自己的 DB 帳號＋主站帳號收回 16 條 staging 授權；route 部署受 DEPLOY_HOLD 擋（未覆寫）
 
 - **DEPLOY_HOLD**：origin/main 有 site-watch slice 1 的 hold（2026-09-23，未完成工作）→ 不跑 sg-deploy、不設 OVERRIDE；新 route（續136 `3a985c042`）隨 SITE_WATCH_MASTER_PLAN §7 step 10c 部署上線。以下皆為非部署的主機側動作。
