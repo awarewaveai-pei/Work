@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續149）研究線：工作流課版面跑掉——`.ex` 標記 class 帶了填好例子框的樣式，漏進按鈕與好壞例；限定到 `.srow`，閘禁止直接樣式化 `.ex`
+- [觸發] 操作者截圖：「這什麼鬼東西，版面跑掉？UI/UX 壞掉？」——總覽按鈕與示範按鈕裡出現灰色空框、第 4 步好壞例外多一層框。
+- [根因] `workflow-lesson-mock.html` 頁面 CSS 把第 2 步「填好的例子」的框樣式寫在 `.ex` 上，而 `.ex` 同時是「跟領域切換」的標記，上一筆 commit 把標記套到按鈕說明與好壞例 → 框跟著進去。我改完只看了方法課的圖，沒看工作流課的圖。
+- [已改] `.ex{…}`／`.ex .lab{…}` → `.srow .ex`／`.srow .ex .lab`；`check-mocks.py` 新規則：選擇器是 `.ex` 或以 `.ex` 開頭 = 缺陷（標記不准帶外觀），自測 +1（49/49）；共用段加 `.gb .ex{display:grid;gap:10px}` 保持好壞例間距——但這條 display 蓋掉了 UA 的 `[hidden]{display:none}`，四個領域的好壞例在 repo 示意稿全部同時顯示（線上版靠 skeleton 的 `[hidden]` 規則沒露餡），看圖才抓到：共用段加 `[hidden]{display:none!important}` 當不變量，閘要求它存在，chips 功能測試改看 computed display。線上：方法課 v15、工作流課 v12。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python check-mocks.py（綠）+ check-mocks-selftest.py（49/49）+ build-artifact.py + render-mocks.cjs 後 Read 工作流課四張桌機切片（按鈕說明回來、好壞例無多餘框）+ Artifact publish ×2 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 兩行 CSS 選擇器＋一條閘規則；渲染切片逐張看過
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=^\s+\.ex\{ | hits=0（閘自身除外）
+- [避免再發生] 改了哪幾頁就渲染哪幾頁、逐張看，不是只看一頁；標記 class（行為）與樣式 class（外觀）分開，閘已擋。
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續148）研究線：例子領域驅動整堂課（方法課 3–6 步、工作流課 3–5 步各領域一份）；「一個決策」；U21 領域資料＋管理頁；計畫 v1.27
 - [觸發] 操作者：「把 2 的 5 個子領域都做 3、4、5、6？幫助使用者用不同視角理解；子領域將來可增減，是否多做一個統一操作頁面」；「一個決定」改「一個決策」。
 - [已改] `iceberg-lesson-mock.html` v7：第 3 步做完例子（lead＋四層表）、第 4 步四組好壞例、第 5 步錯誤示例＋三題自我檢查、第 6 步示範按鈕說明、第 3 步結果頁按鈕說明，五領域各一份（edd 預設顯示，其餘 hidden）；晶片腳本改切換全頁 `.ex`；晶片標籤「一個決策」（id 仍 `decision`）。`workflow-lesson-mock.html`：第 3 步走完例子（各站一句＋判斷，從第 2 步填好的例子推導）、第 4 步好壞例、第 5 步示範說明，四領域各一份。`check-mocks.py`：D18 加 `MIN_EX_GROUPS`（13／7）、每組預設只顯示 edd、腳本必為全頁切換；自測 +3。計畫 v1.27：D18 修訂、U21 新增（`domains.yaml` 單一來源、方法 dossier 存例子、`/ops/domains` 管理頁＋方法×領域覆蓋表，缺的標紅可直接補）、I11 方法課 v7。線上：方法課 v14、工作流課 v11。

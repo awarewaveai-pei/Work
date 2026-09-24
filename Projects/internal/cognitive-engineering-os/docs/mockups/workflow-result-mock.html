@@ -17,6 +17,7 @@
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
         --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
   .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
@@ -75,6 +76,7 @@
   .row .q{color:var(--ink)}
   @media (max-width:560px){.row{grid-template-columns:1fr;gap:2px}}
   .gb{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
+  .gb .ex{display:grid;gap:10px}
   .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
   .good{background:var(--good-bg);border:1px solid var(--ok)}
   .bad{background:var(--bad-bg);border:1px solid var(--bad)}

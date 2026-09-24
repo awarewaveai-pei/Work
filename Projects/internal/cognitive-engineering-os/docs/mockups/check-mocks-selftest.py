@@ -46,6 +46,8 @@ CASES = [
     ("chip script scoped back to step 2 only", "D18", "iceberg-lesson-mock.html", "str", 'querySelectorAll(".ex")', 'querySelectorAll("#examples .ex")'),
     ("demo button loses its per-domain variants", "D18", "iceberg-lesson-mock.html", "re", r'<small><span class="ex" data-set="edd">主動分享 6 → 2 人那個例子，已填好，按執行就看結果</span>.*?</small>', "<small>主動分享 6 → 2 人那個例子，已填好，按執行就看結果</small>"),
     ("a non-default example left visible", "D18", "iceberg-lesson-mock.html", "re", r'(<div class="ex" data-set="partner") hidden(>\s*<p class="lead">合作對象)', r"\1\2"),
+    ("the .ex marker class gets a box style (leaks into buttons)", "D18", "workflow-lesson-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .ex{border:1px solid var(--line);padding:8px}\n"),
+    ("the [hidden] invariant is dropped from the shared css", "D18", ALL, "str", "  [hidden]{display:none!important}\n", ""),
     ("tablist chip without aria", "a11y", "iceberg-lesson-mock.html", "str", 'role="tab" aria-selected="false" data-set="partner"', 'data-set="partner"'),
     ("svg without aria-label", "a11y", "iceberg-lesson-mock.html", "re", r'<svg([^>]*) aria-label="[^"]*"', r"<svg\1"),
     ("select element", "ux", "workflow-lesson-mock.html", "str", "</body>", "<select></select>\n</body>"),

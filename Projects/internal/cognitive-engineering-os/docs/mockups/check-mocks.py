@@ -291,6 +291,9 @@ class Checker:
         if any(s.startswith(":root") for s in sels):
             if where == "page": self.bad(f, "shared", f"page CSS must not define tokens ({prelude})")
             return
+        for sel in sels:  # `.ex` marks "switches with the domain"; it must never carry looks (2026-09-24: a box style leaked into buttons)
+            if sel == ".ex" or sel.startswith((".ex ", ".ex.", ".ex[", ".ex:", ".ex>")):
+                self.bad(f, "D18", f"{prelude}: the .ex domain marker must not be styled directly; scope the rule to its container")
         ds = decls(body)
         for k, v in ds:
             if k.startswith("--") and where == "page": self.bad(f, "shared", f"page CSS defines token {k}")
@@ -354,6 +357,8 @@ class Checker:
         if between.strip(): self.bad(f, "shared", "CSS between the shared end marker and the page marker")
         self.shared_blocks[f] = shared_css
         if FONT not in shared_css: self.bad(f, "U19", "font stack drifted")
+        if "[hidden]{display:none!important}" not in shared_css:
+            self.bad(f, "D18", "shared css must pin [hidden]{display:none!important}: any display: rule on a switchable element would otherwise un-hide it")
         try:
             shared_rules, page_rules = parse_css(shared_css), parse_css(page_css)
         except CssError as e:
