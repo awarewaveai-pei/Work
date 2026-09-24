@@ -19,7 +19,7 @@
 - **rollback**：`git revert df94a2add 0836c4bee 2bbffe310`；vault `-Action remove` 5 鍵；憑證檔刪 3 行標註。
 - REALTEST_EVIDENCE: tool=SSH | cmd=`update-client-wp-plugins.ps1 -ClientSlug soulful -Plugins wave1 -BackupOnly` + restore into throwaway mariadb:11 (290 tables) + `check-backup-health.ps1` (PASS) + `check-deploy-drift.ps1` (rc0) | exit=0 | ms=14000
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/4m/0n（Codex `agency-os/reports/oracle/2026-09-24-partialreview-4105e812.md`，4 修）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,runbooks | grep=`hetzner_trigger|5\.223\.93\.113 5432|sshKeyName` | hits=12（WAF 歷史段 9、TASKS 命名條 1、WP_MANAGED_UPDATES shared-ssh 說明 1、Soulful config 註解 1）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,runbooks | grep=`hetzner_trigger|5\.223\.93\.113 5432|sshKeyName` | hits=13（WAF 歷史段 9、`update-client-wp-plugins.ps1` shared-ssh 欄位 2、WP_MANAGED_UPDATES shared-ssh 說明 1、TASKS 命名條 1）
 ## 2026-09-24（續154）研究線：首頁改成真正的目錄——285 個方法（30 家族）＋16 條工作流全部由 SPEC 登錄檔生成；新增家族與 recipe 顯示登錄檔；計畫 v1.30
 - [觸發] 操作者：「你知道我有將近 300 個工具嗎？還有將近 20 條工作流，你是不是根本搞不清楚這個系統工具？還有你做的那是什麼狗屎首頁？」
 - [根因] 首頁照計畫 U1 舊條文做成四張抽象「線」卡＋描述問題，把 285 個方法與 16 條工作流全部藏起來（違反 U17 零退化；舊 dashboard 本來就有工作流／單一方法兩頁籤＋搜尋＋家族篩選）。做之前沒讀登錄檔，只讀了計畫。
