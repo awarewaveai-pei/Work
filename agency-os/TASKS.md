@@ -151,8 +151,8 @@
   - `✅ 完成` · `2026-09-24` · `bd85094a2`/`58d017f3f`：host `wp-cron-runner.sh` 每分鐘（首輪清 29 個逾期）＋endpoint-alert 死人開關；alloptions 每請求重寫 1.3MB → 0（2 個每請求寫入的選項＋630KB 殘留改非自動載入，1.1MB→460KB）；nginx 背景更新（過期頁 1.46s→0.039s）、`/wp-cron.php` 403、log 帶 `rt=/urt=/cs=`；慢請求 mu-plugin。卡頓根因未證實 → 下條。WORKLOG 2026-09-24。
 - [ ] **【Soulful｜卡頓】下次 Kuma 23/24/25 慢於 10s 時讀證據定根因**
   - `🟡 等事件` · `2026-09-24` · `docker logs soulful-wp 2>&1 | grep AW_SLOW` ＋ `grep ' rt=[0-9]\{2,\}' /var/log/nginx/soulful-access.log`；看是外部 HTTP（`slow_http=`）、DB（`queries=` 高）還是 PHP。
-- [ ] **【Soulful｜操作者】Hostinger 舊站還活著：自己跑 WP 排程、會自動更新（6.9.7→6.9.9），曾每天 POST 新站 `/wp-cron.php`**
-  - `🟡 操作者` · `2026-09-24` · 新站已擋（403）。請在 hPanel 關掉該站 cron／開維護模式，避免舊 DB 的 FluentCRM 等排程對客戶寄信。11/12 到期即消失。
+- [x] **【Soulful｜舊站上鎖】Hostinger 舊站還活著：自己跑 WP 排程、會自動更新（6.9.7→6.9.9），曾每天 POST 新站 `/wp-cron.php`**
+  - `✅ 完成` · `2026-09-24` · 舊站 `DISABLE_WP_CRON`＋mu-plugin `aw-rollback-copy-guard.php`（`pre_wp_mail`→false，實測 `wp_mail()`=false、log 0）；舊站仍 200 可回滾，解鎖步驟寫進 `SITE_MIGRATION_RUNBOOK.md` 回滾段。hPanel cron 從 SSH 看不到（無 `crontab`），但信已在 WP 層擋死。WORKLOG 2026-09-24。
 - [ ] **【Soulful｜資安】Fluent Forms Pro 是破解版（授權選項 `customer_name=GPL`、`payment_id=12345`），且每次請求改寫自己的選項**
   - `🟠 操作者決定` · `2026-09-24` · 換正版授權或移除；破解版外掛是常見後門來源。另：`update-client-wp-plugins.ps1` 的 `wp-update-config.json` 仍指 Hostinger SSH（會更新回滾副本而非正式站）。
 

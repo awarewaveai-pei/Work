@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-24（續153）Soulful Hostinger 舊站上鎖：WP-Cron 關閉＋`pre_wp_mail` 擋所有寄信（回滾副本不得對客戶寄信）
+
+- **根因**：舊站（回滾副本，11/12 前保留）`DISABLE_WP_CRON` 未設 → 任何訪問 spawn cron（9/11–9/23 POST 新站 `/wp-cron.php` 11 次）；72 個逾期排程（FluentCRM 各級 tasks、`action_scheduler_run_queue`、`wpvivid_main_schedule_event`、`fluentmail_*`）、Action Scheduler pending 20；FluentSMTP 仍可經 `smtp.hostinger.com` 用正式信箱寄信 → 舊 DB 一旦跑排程 = 對客戶重複／錯誤寄信。近 14 天舊站寄信 log 0（尚未發生）。FluentCRM pending campaign emails = 0。hPanel cron 從 SSH 不可見（主機無 `crontab`）。
+- **改動**（Hostinger `~/domains/soulfulexpression.org/public_html`，不刪任何東西）：`wp-config.php` 備份 `wp-config.php.bak-20260924-rollback-guard` → `wp config set DISABLE_WP_CRON true --raw`；新 `wp-content/mu-plugins/aw-rollback-copy-guard.php`（`pre_wp_mail` priority 0 → false＋error_log）；`fix-update-plugin-prop.php` 666→644。`SITE_MIGRATION_RUNBOOK.md` 回滾段加解鎖兩步。
+- **不變量**：擋在 `wp_mail` 層，不依賴觸發來源（web spawn／hPanel 直跑 `wp-cron.php`／WP-CLI 皆寄不出）。
+- **驗證**：舊站 `wp eval wp_mail(...)` → `bool(false)`、fsmpt log 5 分鐘內 0；`DISABLE_WP_CRON`=1；`php -l` ok；舊站 `--resolve 191.101.230.176` 首頁 200（回滾仍可用）；正式站 200。
+- **rollback**：刪 mu-plugin＋`wp config delete DISABLE_WP_CRON`（或還原備份 wp-config）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval 'var_dump(wp_mail(...))'` on Hostinger copy -> bool(false); `wp config get DISABLE_WP_CRON` -> 1; curl old copy 200 | exit=0 | ms=5961
+- REVIEW_WAIVED: NA -- 7 行 mu-plugin＋一個 wp-config 常數，改後讀回（php -l、實呼叫 wp_mail）；非 repo 原始碼
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`aw-rollback-copy-guard` | hits=2（SITE_MIGRATION_RUNBOOK 回滾段、TASKS 結案條）
 ## 2026-09-24（續152）研究線：兩課晶片不一致 → 領域清單單一來源（SPEC `domains.yaml` 生成晶片、partials 同步）；五頁逐項對照補齊（教材版、怎麼讀三步、麵包屑、頁尾）；首頁示意稿；計畫 v1.29
 - [觸發] 操作者截圖：方法課 5 個領域、工作流課 4 個（少「一個決策」）——「為什麼又讓我抓到沒有統一？去檢查四個頁面」；「進入的首頁也還沒做」；「所有的 css、style、class 要統一共用」。
 - [根因] 領域集合寫在檢查器的每頁常數 `CHIP_SETS`（兩頁各一份），閘只驗「頁面 = 自己的常數」，不驗「兩頁相同」；跨頁同類元素（教材版、怎麼讀三步、頁尾來源列、麵包屑、好壞例成對）沒有規則，全靠人記；改完只看被點名的那一頁。

@@ -166,6 +166,8 @@ zcat db-20260815-122353.sql.gz | mysql <dbname>
 
 **把 A 記錄改回 `191.101.230.176`。** 一步完成，幾秒生效。
 
+**2026-09-24 起舊站已上鎖，回滾前先解鎖**（否則舊站寄不出任何信、排程不跑）：在 Hostinger `~/domains/soulfulexpression.org/public_html` 刪 `wp-content/mu-plugins/aw-rollback-copy-guard.php`（擋所有 `wp_mail`），並 `wp config delete DISABLE_WP_CRON`（原檔 `wp-config.php.bak-20260924-rollback-guard`）。上鎖原因：舊 DB 過期，其 FluentCRM／WooCommerce／表單排程會對客戶重複或錯誤寄信。
+
 Hostinger 主機在 2026-11-12 前都還活著，舊站原封不動 —— 這是回滾之所以安全的原因。**因此在 11/12 之前不要刪除舊站任何東西。**
 
 ---
