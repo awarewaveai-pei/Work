@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-24（續134）研究線：工作流課程頁（五步、≤3 分鐘）示意稿＋計畫 v1.20；操作者指出「工作流沒有課程頁」
+- [觸發] 操作者：「工作流的沒有課程頁？」→ v1.19 只寫了「工作流課 3 步」沒有示意稿，違反 I11（示意稿 = 規格）。
+- [已做] 新示意稿 `mockups/workflow-lesson-mock.html`（同方法課標準：狀態列／每步怎麼讀／你要做的／[n]／自我檢查／課程來源；五步：這條路解什麼＋能／不能回答＋站列＋何時用不用 → 三站各做什麼、帶入、還要填（例子跟線走 chips 四組）→ 看一個走完的（每站一句＋你的判斷＋總結）→ 怎麼走（兩種走法、好壞例、常見錯誤三條、自我檢查）→ 開始（準備清單＋三顆按鈕）；案例同總覽示意稿），線上 https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU；`build_artifact.py` 加 wlesson 模式；計畫 v1.20：U18 工作流課改五步＋指標、I11 第四份示意稿＋M11、§0 parity、P3 元件。
+- REALTEST_EVIDENCE: tool=Bash | cmd=html.parser 標籤配對 + build_artifact.py wlesson + Artifact publish + plan_v120.py（計數斷言） | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字
+- BUGHUNT_DONE: scope=agency-os/TASKS.md,agency-os/docs,agency-os/reports,scripts,Projects/internal/cognitive-engineering-os | grep=工作流課 3 步|workflow-lesson-mock | hits=2（「3 步」舊字 0 筆 = 已全改）
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續133）研究線：課程頁照同標準補完（示意稿 v4）；工作流 = 總覽站列＋站頁九段＋總結頁、兩種走法引擎零改動（U18／D24，示意稿新檔）；計畫 v1.19
 - [觸發] 操作者：「課程頁也照這個標準；工作流有很多工具，你打算怎麼做？」
 - [課程頁 v4] 狀態列（方法齊備 M1–M10／課程來源 3 筆／5 分鐘／學完能做什麼）、每步怎麼讀／你要做的、課文段落 [n]、第 5 步自我檢查三題（details 點開答案）、第 6 步第三顆按鈕「這方法適合我的問題嗎？」→ 路由、底部「課程來源」卡。線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY v5。
