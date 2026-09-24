@@ -153,8 +153,10 @@
   - `🟡 等事件` · `2026-09-24` · `docker logs soulful-wp 2>&1 | grep AW_SLOW` ＋ `grep ' rt=[0-9]\{2,\}' /var/log/nginx/soulful-access.log`；看是外部 HTTP（`slow_http=`）、DB（`queries=` 高）還是 PHP。
 - [x] **【Soulful｜舊站上鎖】Hostinger 舊站還活著：自己跑 WP 排程、會自動更新（6.9.7→6.9.9），曾每天 POST 新站 `/wp-cron.php`**
   - `✅ 完成` · `2026-09-24` · 舊站 `DISABLE_WP_CRON`＋mu-plugin `aw-rollback-copy-guard.php`（`pre_wp_mail`→false，實測 `wp_mail()`=false、log 0）；舊站仍 200 可回滾，解鎖步驟寫進 `SITE_MIGRATION_RUNBOOK.md` 回滾段。hPanel cron 從 SSH 看不到（無 `crontab`），但信已在 WP 層擋死。WORKLOG 2026-09-24。
-- [ ] **【Soulful｜資安】Fluent Forms Pro 是破解版（授權選項 `customer_name=GPL`、`payment_id=12345`），且每次請求改寫自己的選項**
-  - `🟠 操作者決定` · `2026-09-24` · 換正版授權或移除；破解版外掛是常見後門來源。另：`update-client-wp-plugins.ps1` 的 `wp-update-config.json` 仍指 Hostinger SSH（會更新回滾副本而非正式站）。
+- [x] **【Soulful｜資安】Fluent Forms Pro 是破解版（授權選項 `customer_name=GPL`、`payment_id=12345`），且每次請求改寫自己的選項**
+  - `✅ 操作者決定：不要動` · `2026-09-24` · 維持現狀、不再提議換／移除。已做的只有把它每請求改寫的授權選項設為非自動載入（不影響功能）。
+- [ ] **【Soulful】`update-client-wp-plugins.ps1` 的 `wp-update-config.json` 仍指 Hostinger SSH（會更新回滾副本而非正式站）**
+  - `🟡 潛伏` · `2026-09-24` · 需改成 ks-aw-01 docker exec 形狀（同 `check-smoke-tests.ps1` Check 5 的 profile 做法）。
 
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
   - `🔴 現行` · `2026-09-21` · `等 site-watch 解除 DEPLOY_HOLD（SITE_WATCH_MASTER_PLAN §7 step 10c）`
