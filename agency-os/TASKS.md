@@ -141,14 +141,20 @@
 - [x] **【資安｜退租位址】SSH 別名指向已退租 IP，7 支腳本預設使用**
   - `✅ 完成` · `2026-09-24` · 別名 3 個自 `~/.ssh/config` 移除（備份 `config.bak-20260924-released-aliases`）＋`known_hosts` 清兩個舊位址；7 支腳本改走 `scripts/lib/prod-host.ps1`（主機事實單一來源），5 支 `sync-hetzner-*` 改名為供應商中立 `sync-*`；守衛 `verify-no-released-addresses.mjs --ssh-config` 接進 `system-health-check.ps1`。WORKLOG 2026-09-24 續147。
 
-- [ ] **【資安｜輪替】root crontab 明文 bearer token（`*/30 … /api/ops/probe`）；2026-09-24 前綴曾印進本機 session transcript**
-  - `🟠 現行` · `2026-09-24` · 下一步：輪替該 token；crontab 改讀 root-only env 檔（不把值寫在 crontab）；同步更新 next-admin 驗證端。
+- [ ] **【資安｜輪替】`OPS_INBOX_INGEST_TOKEN` 輪替（明文已移出 crontab；token 本身 2026-09-24 整串印進本機 session transcript）**
+  - `🟠 等操作者 go（High：憑證，多系統）` · `2026-09-24` · 明文已根治：cron 改呼叫 `scripts/ops-probe-heartbeat.sh`（token 讀 `.env`、走 stdin，不進 crontab/argv），prod 實測 200。輪替要同步的消費者（`verifyIngestToken.ts` 共用）：next-admin `.env`＋容器重建（DEPLOY_HOLD 無關，走 safe-infra-patch compose）、Trigger.dev env、n8n tenant-integration、netdata notify、Grafana／Sentry／PostHog／Kuma webhook（未設 per-source token 者）、`sg-deploy.yml`、vault。WORKLOG 2026-09-24 Soulful 效能條。
 
-- [ ] **【命名】repo 仍有供應商名殘留：目錄 `lobster-factory/infra/hetzner-phase1-core`、MCP server `hetzner-ssh`、`hetzner_trigger` key 名、`lobster-factory/docs/hosting/HETZNER_*.md`**
-  - `🟡 潛伏` · `2026-09-24` · 操作者多次指出主機已不在該供應商。目錄改名影響 sg-deploy／sync-host-scripts／CI／數百處引用，需單獨一輪（`git mv`＋全庫引用更新＋主機 `/root/Work` 同步驗證）。
+- [ ] **【命名】repo 仍有供應商名殘留：目錄 `lobster-factory/infra/hetzner-phase1-core`、`lobster-factory/docs/hosting/HETZNER_*.md`、`hetzner_trigger` 死金鑰文件**
+  - `🟡 潛伏` · `2026-09-24` · MCP `hetzner-ssh`→`server-ssh` ✅（`44a748ff1`）。**目錄改名 DEPLOY_HOLD 期間禁做**：主機已安裝的 `sg-deploy.sh` 以舊路徑讀 `DEPLOY_HOLD`、`sync-host-scripts.sh` 以舊路徑 archive → 改名 = hold 失效（部署 site-watch WIP）＋腳本同步卡死；hold 解除後一輪做（新舊路徑雙讀一版 → 改名 → 移除舊路徑）。`~/.ssh/hetzner_trigger` 實測不在 ks-aw-01 任何 authorized_keys（死金鑰）：引用它的文件（`CLOUDFLARE-WAF-SETUP.md`、`TELEGRAM_OPERATOR_CHEATSHEET.md`、`eu-backup/README.md` 等）描述的是退租主機，整份需改寫或標歷史；`check-{backup,capacity}-health.ps1` 的 `$PrivateKey` 參數未使用。awarewave-ops MCP 仍帶 `HETZNER_API_BASE_URL`（雲端 API，帳號狀態未查）。
 
-- [ ] **【Soulful｜效能】wp-cron 自搬機後失聯＋nginx 快取 60s 無背景更新＋存取日誌無耗時**
-  - `🔴 現行` · `2026-09-24` · `等操作者「做」` · 證據：`DISABLE_WP_CRON=1` 但無觸發（`*/5` crontab 打的是 8090=mainwp-web，Soulful 是 8081；`cutover-sync.sh:324` 搬機時刻意移除、事後沒補）→ 74 個排程逾期、每天只跑 1–2 次（05:05Z 一次＋Hostinger 舊 cron）；Kuma 7 天 4 次卡頓（`/wp-json/` 324.8s／50.7s／37.5s、首頁 17.2s，皆 17:29–18:45Z）；非主機負載（CPU 72% idle）。計畫：容器內 WP-CLI 每分鐘跑 due 事件＋runbook 補步驟＋偵測；`proxy_cache_background_update`＋`use_stale`；nginx log 加 `$request_time`＋慢請求 mu-plugin；操作者刪 Hostinger 舊 cron。
+- [x] **【Soulful｜效能】wp-cron 自搬機後失聯＋nginx 快取 60s 無背景更新＋存取日誌無耗時**
+  - `✅ 完成` · `2026-09-24` · `bd85094a2`/`58d017f3f`：host `wp-cron-runner.sh` 每分鐘（首輪清 29 個逾期）＋endpoint-alert 死人開關；alloptions 每請求重寫 1.3MB → 0（2 個每請求寫入的選項＋630KB 殘留改非自動載入，1.1MB→460KB）；nginx 背景更新（過期頁 1.46s→0.039s）、`/wp-cron.php` 403、log 帶 `rt=/urt=/cs=`；慢請求 mu-plugin。卡頓根因未證實 → 下條。WORKLOG 2026-09-24。
+- [ ] **【Soulful｜卡頓】下次 Kuma 23/24/25 慢於 10s 時讀證據定根因**
+  - `🟡 等事件` · `2026-09-24` · `docker logs soulful-wp 2>&1 | grep AW_SLOW` ＋ `grep ' rt=[0-9]\{2,\}' /var/log/nginx/soulful-access.log`；看是外部 HTTP（`slow_http=`）、DB（`queries=` 高）還是 PHP。
+- [ ] **【Soulful｜操作者】Hostinger 舊站還活著：自己跑 WP 排程、會自動更新（6.9.7→6.9.9），曾每天 POST 新站 `/wp-cron.php`**
+  - `🟡 操作者` · `2026-09-24` · 新站已擋（403）。請在 hPanel 關掉該站 cron／開維護模式，避免舊 DB 的 FluentCRM 等排程對客戶寄信。11/12 到期即消失。
+- [ ] **【Soulful｜資安】Fluent Forms Pro 是破解版（授權選項 `customer_name=GPL`、`payment_id=12345`），且每次請求改寫自己的選項**
+  - `🟠 操作者決定` · `2026-09-24` · 換正版授權或移除；破解版外掛是常見後門來源。另：`update-client-wp-plugins.ps1` 的 `wp-update-config.json` 仍指 Hostinger SSH（會更新回滾副本而非正式站）。
 
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
   - `🔴 現行` · `2026-09-21` · `等 site-watch 解除 DEPLOY_HOLD（SITE_WATCH_MASTER_PLAN §7 step 10c）`
@@ -1169,8 +1175,8 @@
 - [ ] `lobster-factory` A10-2 商業閉環實跑
   - **【未開始】**流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
-  - **【未開始】**
+- [x] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
+  - **✅ 2026-09-24 以不同做法完成**：service `ExecStart` 改指 `/root/lobster-phase1/scripts/endpoint-alert.sh`（`sync-host-scripts.sh` 保持 == origin/main、`bash -n` 閘），不再有手拷的 `/usr/local/bin` 副本，(a)(c) 不需要；unit 本身換機時依 `KS-AW-01-HOST-SWITCH-RUNBOOK.md` 安裝（`bd85094a2`）。
   - **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。
   - **完成定義**：(a) 新 `scripts/sync-endpoint-alert-script.ps1`（仿 `sync-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。
   - **證據**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。

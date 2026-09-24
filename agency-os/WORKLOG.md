@@ -1,4 +1,33 @@
 ﻿# Worklog
+## 2026-09-24（續151）Soulful 慢：WP-Cron 補上真排程器（host `wp-cron-runner.sh`＋死人開關）、alloptions 每請求重寫 1.3MB 歸零、nginx 快取背景更新＋耗時日誌；`safe-infra-patch.sh host-nginx`；crontab 明文 token 移除；MCP `hetzner-ssh`→`server-ssh`
+
+- **根因**（file:line／實測）：
+  - C1 `soulful-wp` wp-config `DISABLE_WP_CRON`（`/* ks-aw-01 migration additions */` 區塊）但搬機後無排程器；root `*/5` 打 8090=mainwp-web。74 個逾期；僅有的執行來自 Hostinger 舊站 POST `/wp-cron.php`（2a02:4780::/32，9/11–9/23 共 11 次）＋MainWP 每日 GET。
+  - C2 兩個自動載入選項每次請求都被改寫（`_ff_fluentform_pro_license_status_checking` = 破解版授權 shim、`permalink-manager`）→ alloptions 1.3MB 每請求 SETEX ~2.7 次（redis 12 天 out 385GB／in 207GB）；自動載入 1.1MB，630KB 為 Astra/zipwp/TEC 殘留。
+  - C3 nginx 60s 微快取無 `proxy_cache_background_update` → 過期後第一位訪客等 PHP；日誌無耗時 → 卡頓（Kuma 24 `/wp-json/` 324.8s 等）無跡可查。
+  - C4 `hostinger-auto-updates` mu-plugin 未依 `SITE_MIGRATION_RUNBOOK.md` §7 移除：關掉全部 WP 自動更新（含核心安全小版）、WP API 走 Hostinger 代理。
+  - C5 `safe-infra-patch.sh` `nginx` 型只 `nginx -t`／reload lobster-nginx 容器；拿去改主機 `/etc/nginx` = 回報成功但沒測、沒生效。
+  - C6 root crontab `*/30` 行明文帶 `OPS_INBOX_INGEST_TOKEN`（argv 可被 `ps` 看見）；本 session `crontab -l` 把整串印進 transcript。
+- **改動**：
+  - `scripts/wp-cron-runner.sh`：自動發現（掛 `/var/www/html`＋有 wp-cli＋WP 回報 DISABLE_WP_CRON）、per-container flock、WP-CLI 在容器內 `timeout`、心跳只在「每個容器都被正面觀察」後寫、pause 檔、`--install`（cron.d＋logrotate＋`/etc/awarewave-alert/fresh.d/`）。
+  - `endpoint-alert.sh`：`fresh.d` 工作新鮮度檢查（同 debounce／指紋／通道）；service `ExecStart` → `/root/lobster-phase1/scripts/endpoint-alert.sh`（同步副本；結案 2026-05-30 TASKS 項）。
+  - `safe-infra-patch.sh host-nginx <file> <vhost>`：限 `/etc/nginx`、`nginx -t`、`systemctl reload`、127.0.0.1 https 探測、失敗還原＋reload；備份放 `/root/lobster-phase1/safe-patch-backups`（`58d017f3f`：放檔旁邊時 `sites-enabled/*` 會載入備份）。
+  - Soulful nginx：`log_format soulful_timed`（combined＋`rt= urt= cs=`）、`proxy_cache_background_update on`、`location = /wp-cron.php { return 403; }`。
+  - Soulful WP（備份 `/root/soulful/prechange-20260924-perf/`：wp_options dump＋mu-plugins＋外掛清單）：8 選項 autoload off、移除 hostinger mu-plugin、停用 `hostinger` 外掛、`fix-update-plugin-prop.php` 666→644、ACPT cache 528 檔 root→www-data、新 mu-plugin `aw-slow-log.php`（>5s 請求／>2s 外呼 → error_log `AW_SLOW`）。
+  - `scripts/ops-probe-heartbeat.sh` 取代 crontab 明文行（token 讀 `.env` 不 source、stdin 給 curl）；crontab 備份已遮罩。
+  - MCP key `hetzner-ssh`→`server-ssh`（`44a748ff1`，17 檔＋重生設定）。
+  - 文件：`KS-AW-01-HOST-SWITCH-RUNBOOK.md`（runner 安裝＋凍結 pause）、Soulful runbook §7 勾選、`SITE_CODE_MANIFEST.md`、AGENTS §6 `host-nginx`。
+- **驗證**：
+  - 測試：`tests/host-scripts/wp-cron-runner.test.sh` 31/31；突變 6 種（拿掉 DISABLE 閘／無條件心跳／拿掉 fresh 迴圈／docker ps 失敗當空／只殺主機端 exec／exec 失敗當非 WP）各自變紅。`safe-infra-patch-host-nginx.test.sh` 14/14；突變（拿掉探測、舊備份位置）變紅。
+  - prod：首輪 `ran=29 in 24s`，之後每分鐘 `ran=2–3 in 3–5s`、心跳刷新；endpoint-alert 換 unit 後 `state=ok`；新鮮度實測（暫存目錄、無通道）stale→`fail:…`、touch→`ok`。
+  - Soulful：alloptions SETEX 8 次／3 請求 → 0 次／4 請求；autoload 1.1MB→460KB；`/services/` MISS 1.46s → HIT 0.039s → 過期後 STALE 0.039s（背景重建）；`/wp-cron.php` GET/POST 403；首頁／contact／shop／wp-login／REST 皆 200；無 PHP fatal。注意：STALE 行的 `rt=` 含背景重建時間，客戶端延遲以 curl 為準。
+  - ops-probe：prod 200 `{"ok":true}`、缺 env rc1、錯 token 401 rc1；crontab 與 cron.d 明文 token 0。
+  - 健康檢查 328/328。Codex 2 輪 4 發現：修 3（docker ps 失敗寫心跳、逾時只殺 exec client、exec 失敗當非 WP）；駁 1（長時間執行心跳過期：每分鐘 tick 遇有界鎖即跳過並刷新）。第 3 次修正前已寫不變量（心跳 = 每容器正面觀察，`wp-cron-runner.sh` 註解）。
+- **未做／剩餘**（TASKS）：卡頓根因未證實（等下次事件讀 `AW_SLOW`／`rt=`）；`OPS_INBOX_INGEST_TOKEN` 輪替等操作者 go（High：多系統）；目錄改名在 DEPLOY_HOLD 期間禁做（舊路徑讀 hold）；Hostinger 舊站 cron、破解版 Fluent Forms Pro、`wp-update-config.json` 仍指 Hostinger → 操作者。WP 核心小版自動更新現已恢復（WP 預設行為）。
+- **rollback**：`git revert 44a748ff1 58d017f3f bd85094a2`；主機：`rm /etc/cron.d/wp-cron-runner /etc/awarewave-alert/fresh.d/wp-cron-runner`、`cp /etc/systemd/system/awarewave-endpoint-alert.service.bak-20260924` 回原位＋daemon-reload、nginx 備份在 `/root/lobster-phase1/safe-patch-backups/`、crontab 以 `/root/lobster-phase1/crontab.bak-20260924-probe`（token 以 `.env` 值填回）；Soulful 以 `/root/soulful/prechange-20260924-perf/` 還原選項與 mu-plugins、`wp plugin activate hostinger`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp-cron-runner.sh` 首輪 prod (ran=29 rc0) + `safe-infra-patch.sh host-nginx` ×2 (rc0) + curl `/services/` MISS/HIT/STALE + `ops-probe-heartbeat.sh` (200) + `tests/host-scripts/wp-cron-runner.test.sh` 31/31 + `safe-infra-patch-host-nginx.test.sh` 14/14 | exit=0 | ms=28766
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/1n（Codex `agency-os/reports/oracle/2026-09-24-partialreview-c04912e1.md`＋`…-87e77743.md`；3 修 1 駁）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,mcp,runbooks | grep=`hetzner-ssh|usr/local/bin/endpoint-alert|safe-infra-patch.sh nginx` | hits=4（TASKS 命名條記錄改名、TASKS 結案條敘述舊路徑、service 註解說明舊路徑、safe-infra-patch 用法註解；皆非執行路徑）
 ## 2026-09-24（續150）研究線：一份樣式表做主題——`design-system.css` 唯一來源；四頁零頁面 CSS、零 inline style、零色碼；同義元件合併；計畫 v1.28
 - [觸發] 操作者：「所有的 css, class 和 style 要統一，因為我想要做 theme 主題」。
 - [已改] 新檔 `COS/docs/mockups/design-system.css`（token 亮暗＋全部元件＋底部 spacing utilities；主題 = 一段 `:root[data-theme="<name>"]` token 區塊）、`sync-design-system.py`（複製進四頁，冪等）。四頁 `<style>` 逐位元等於該檔、page-specific 區為空；48 個 `style=` 全改成 utility／modifier class；`.next`／`.st` 合併成 `.mcard`（`.mcards`、`.now`、`.done`）、`.srow`→`.row`、填好例子框→`.filled`；svg 固定色改 token（`--ice-tip-ink`）＋class。`check-mocks.py`：樣式表必須等於檔案、頁面 CSS 必須為空、任何 `style=` 即缺陷、token 區外零色碼（取消 `.lever` 豁免）、額外主題區塊 key 集合必須齊全；自測 +4。計畫 v1.28：U19 改寫為主題機制、U20、§10、I11。線上：結果 v18、方法課 v17、總覽 v12、工作流課 v14。
