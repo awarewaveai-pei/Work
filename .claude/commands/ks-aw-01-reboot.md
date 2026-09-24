@@ -15,7 +15,7 @@ Use when:
 - A new kernel was installed by `unattended-upgrades` and is waiting for activation, or
 - Forced/emergency reboot needed (kernel panic, disk corruption, post-incident recovery).
 
-Use the `hetzner-ssh` MCP server. Connection:
+Use the `server-ssh` MCP server. Connection:
 - host: `145.239.195.47`
 - port: `58122`
 - user: `ubuntu` (passwordless sudo — **not** `root`; OVH Ubuntu cloud image convention, differs from the old Hetzner boxes which used `root` directly)

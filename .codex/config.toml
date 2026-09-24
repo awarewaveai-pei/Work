@@ -1,4 +1,4 @@
-[mcp_servers.hetzner-ssh]
+[mcp_servers.server-ssh]
 command = "cmd"
 args = [
     "/c",

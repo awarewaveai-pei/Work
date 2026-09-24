@@ -58,7 +58,7 @@
 
 ### 決策 0 — 交付模型：腳本 SSOT + 雙觸發（先 AI、後按鈕），**不用 Trigger.dev 主體**（最高層決策）
 - **任務理解**：provisioning 的「程序」該活在哪、由誰觸發。使用者願景 = app.aware-wave.com 點按鈕自動處理；但現階段「Claude/指令觸發」更省力。
-- **現況分析**：既有 Trigger.dev provisioning（create-wp-site 等）**env-gate 全 OFF = 搭好未上線**。使用者規模 = 代理商偶發接客（operator-in-loop），非客戶自助高頻。已有 `hetzner-ssh` MCP + Hetzner API token 能力。
+- **現況分析**：既有 Trigger.dev provisioning（create-wp-site 等）**env-gate 全 OFF = 搭好未上線**。使用者規模 = 代理商偶發接客（operator-in-loop），非客戶自助高頻。已有 `server-ssh` MCP + Hetzner API token 能力。
 - **關鍵真相**：網頁按鈕只能呼叫**部署好的後端 code**，**無法召喚對話中的 Claude**。「點按鈕自動處理」⇒ 邏輯必須在 code 裡。「Claude 幫我做」⇒ 對話觸發，非按鈕。
 - **30 年紅線**：程序必須**寫死在 code（可測/冪等/rollback）**，**禁止 AI 每次即興**（即興 = 重複開機+孤兒站+不可稽核，違反可驗證可回滾）。
 - **建議方案**：**程序 = 一支冪等+可回滾的 provisioning CLI/腳本（SSOT），復用既有 building-block 函式（resolveStagingProvisioning / runAllIntegrations / wp-install 等，非重寫）。觸發方式可換、與程序解耦：**

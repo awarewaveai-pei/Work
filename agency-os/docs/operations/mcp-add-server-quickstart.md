@@ -101,7 +101,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 ## Hetzner：Cloud API vs SSH
 
 - **Cloud API（機器／Floating IP／防火牆）**：**`awarewave-ops`** 內 **`hetzner`** 服務 + `HETZNER_API_TOKEN`（見 vault／`import-mcp`）。
-- **SSH（VPS 上跑指令／SFTP）**：專案 MCP 鍵 **`hetzner-ssh`** → `npx -y mcp-server-ssh`。連線用工具 **`ssh_connect`**（host、user、port、金鑰路徑或密碼），**不要**把密碼寫進 `mcp.json`。
+- **SSH（VPS 上跑指令／SFTP）**：專案 MCP 鍵 **`server-ssh`** → `npx -y mcp-server-ssh`。連線用工具 **`ssh_connect`**（host、user、port、金鑰路徑或密碼），**不要**把密碼寫進 `mcp.json`。
 
 ## 入口（先記這幾個）
 

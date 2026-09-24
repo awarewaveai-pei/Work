@@ -13,7 +13,7 @@ Default app is `next-admin`. Pass extra args after `/sg-deploy` to override:
 - `/sg-deploy next-admin --dry-run` — preview rsync without rebuilding
 - `/sg-deploy next-admin --skip-pull` — skip the upstream `git pull` step
 
-Use the `hetzner-ssh` MCP server. Connection details:
+Use the `server-ssh` MCP server. Connection details:
 - host: `145.239.195.47`（**現役 ks-aw-01 / OVH KS-6**）
 - port: `58122`／user: `ubuntu`（遠端指令前加 `sudo`）
 - privateKeyPath: `$env:USERPROFILE\.ssh\id_ed25519`（先展開為絕對路徑；只用 `ubuntu` + `sudo`，不可改用 root）

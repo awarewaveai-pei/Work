@@ -72,7 +72,7 @@ $vars = @{
     HETZNER_API_BASE_URL         = "https://api.hetzner.cloud/v1"
     HETZNER_API_TOKEN            = ""
     # Hostinger SSH — Soulful Expression (soulfulexpression.org)
-    # hetzner-ssh MCP passes these at runtime via ssh_connect; stored here for documentation only
+    # server-ssh MCP passes these at runtime via ssh_connect; stored here for documentation only
     HOSTINGER_SOULFUL_SSH_HOST   = "191.101.230.176"
     HOSTINGER_SOULFUL_SSH_PORT   = "65002"
     HOSTINGER_SOULFUL_SSH_USER   = "u942075013"

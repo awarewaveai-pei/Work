@@ -148,7 +148,7 @@ function Extract-McpNames {
     $known = @(
         "n8n", "awarewave-ops", "supabase-awarewave-postgres", "cloudflare", "posthog",
         "github", "resend", "trigger", "wordpress", "airtable", "perplexity", "replicate",
-        "hetzner-ssh", "canva", "claude-fast", "claude-latest", "chatgpt-fast",
+        "server-ssh", "canva", "claude-fast", "claude-latest", "chatgpt-fast",
         "chatgpt-latest", "gemini-fast", "gemini-latest", "grok-fast", "grok-latest",
         "work-global"
     )

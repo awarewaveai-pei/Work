@@ -107,7 +107,7 @@ MCP tools appear as **deferred tools** — you must fetch their schemas before c
 
 | Server prefix | Purpose | Key tools |
 |---------------|---------|-----------|
-| `mcp__hetzner-ssh__` | SSH to SG/EU VPS | `ssh_connect`, `ssh_exec`, `ssh_disconnect`, `sftp_read`, `sftp_write` |
+| `mcp__server-ssh__` | SSH to the production host ks-aw-01 | `ssh_connect`, `ssh_exec`, `ssh_disconnect`, `sftp_read`, `sftp_write` |
 | `mcp__github__` | GitHub operations | `create_repository`, `push_files`, `create_pull_request`, `get_file_contents`, `search_code` |
 | `mcp__airtable__` | Airtable data | `list_records`, `create_record`, `update_record`, `search_records` |
 | ~~`mcp__canva__`~~ | Canva design | **Not available** — `enabled: false` in `mcp/registry.template.json`, so `sync-mcp-config.ps1` never emits it into `.mcp.json`. Same for `supabase` and `wordpress`. |

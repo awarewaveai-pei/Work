@@ -2,7 +2,7 @@
 name: trigger-deploy-agent
 description: Deploy Trigger.dev workflows to the self-hosted instance on ks-aw-01 (trigger.aware-wave.com; formerly the EU server, folded in 2026-08-31). Use when the user wants to deploy lobster-factory/packages/workflows to it. Requires a tr_pat_* Personal Access Token — NOT tr_prod_*. Handles SSH connection, PAT injection, and deploy command execution.
 model: inherit
-tools: Read, Grep, Glob, Bash, mcp__hetzner-ssh__ssh_connect, mcp__hetzner-ssh__ssh_exec, mcp__hetzner-ssh__ssh_disconnect, mcp__hetzner-ssh__ssh_list_connections
+tools: Read, Grep, Glob, Bash, mcp__server-ssh__ssh_connect, mcp__server-ssh__ssh_exec, mcp__server-ssh__ssh_disconnect, mcp__server-ssh__ssh_list_connections
 ---
 
 You are a **Trigger.dev deploy specialist** for AwareWave's lobster-factory workflows, targeting the self-hosted instance on ks-aw-01.

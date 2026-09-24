@@ -15,7 +15,7 @@ Top Skills & Commands:
   /model            ██░░░░░░░░░░░░░░░░░░  1x/month
 
 Top MCP Servers:
-  hetzner-ssh    ████████████████████  427 calls
+  server-ssh    ████████████████████  427 calls
   awarewave-ops  ████░░░░░░░░░░░░░░░░  84 calls
   wizard-tools   ░░░░░░░░░░░░░░░░░░░░  5 calls
   posthog        ░░░░░░░░░░░░░░░░░░░░  4 calls
@@ -26,7 +26,7 @@ Top MCP Servers:
 - [ ] work — github.com/awarewaveai-pei/work
 
 ### MCP Servers to Activate
-- [ ] hetzner-ssh — SSH into AwareWave's Hetzner VPS fleet (SG + EU servers). Ask the team for the SSH private key path and confirm it's in `~/.ssh/`. Configured via `.mcp.json` in the repo root.
+- [ ] server-ssh — SSH into the production host ks-aw-01 (145.239.195.47:58122, user ubuntu + sudo, key ~/.ssh/id_ed25519). Ask the team for the SSH private key path and confirm it's in `~/.ssh/`. Configured via `.mcp.json` in the repo root.
 - [ ] awarewave-ops — Internal ops tools (Supabase, Hetzner Cloud API, n8n, Slack alerts, etc.). Needs several secrets in your local vault. Run `.\scripts\secrets-vault.ps1 -Action import-mcp` after cloning.
 - [ ] posthog — PostHog analytics (Project ID: 385998, host: https://us.i.posthog.com). Get the MCP token from the team vault or PostHog project settings.
 - [ ] wizard-tools — Internal wizard tooling. Ask the team for access details.

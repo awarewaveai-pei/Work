@@ -278,7 +278,7 @@
                                                   "bearer_token_env_var":  "POSTHOG_PERSONAL_API_KEY"
                                               }
                                 },
-                    "hetzner-ssh":  {
+                    "server-ssh":  {
                                         "enabled":  true,
                                         "transport":  "stdio",
                                         "command":  "cmd",

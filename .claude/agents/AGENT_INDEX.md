@@ -20,7 +20,7 @@
 | [repair-agent](repair-agent.md) | inherit | Read, Grep, Glob, Bash, WebSearch, WebFetch | 唯讀診斷：health check 失敗、腳本報錯、MCP 斷線、治理交叉引用斷裂時讀 log/config，回根因+修法，不寫不 commit。 |
 | [mainwp-engineer](mainwp-engineer.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | ks-aw-01 上 MainWP dashboard 管理（原 EU）：增刪 child site、token、修 sync、設定 extension、跨站 bulk 操作。 |
 | [n8n-engineer](n8n-engineer.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | 自建 n8n（ks-aw-01 145.239.195.47）workflow 工程師：建/除錯/維護自動化、憑證、webhook/trigger。 |
-| [trigger-deploy-agent](trigger-deploy-agent.md) | inherit | Read, Grep, Glob, Bash, mcp__hetzner-ssh__ssh_connect, ssh_exec, ssh_disconnect, ssh_list_connections | 部署 Trigger.dev workflow 到 EU（trigger.aware-wave.com）；需 `tr_pat_*`（非 `tr_prod_*`）。 |
+| [trigger-deploy-agent](trigger-deploy-agent.md) | inherit | Read, Grep, Glob, Bash, mcp__server-ssh__ssh_connect, ssh_exec, ssh_disconnect, ssh_list_connections | 部署 Trigger.dev workflow 到 EU（trigger.aware-wave.com）；需 `tr_pat_*`（非 `tr_prod_*`）。 |
 
 ## 資料庫 / Supabase
 
