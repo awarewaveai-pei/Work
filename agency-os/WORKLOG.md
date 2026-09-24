@@ -1,4 +1,25 @@
 ﻿# Worklog
+## 2026-09-24（續155）收尾 5 件：WP 更新工具改指正式站（主機型態 profile）、備份健康只認日期快照、死金鑰／退租主機移出現役文件、新 bridge key 進 vault、憑證檔標退租
+
+- **根因／發現**：
+  - C1 `wp-update-config.json` 仍指 Hostinger（191.101.230.176:65002）→ `update-client-wp-plugins.ps1` 會更新凍結的回滾副本；腳本另有：`StrictHostKeyChecking=no`、備份無 pipefail（`mysqldump` 失敗仍產出合法空 gzip → `BACKUP_OK`；實測 403 bytes 會過）。
+  - C2 `check-backup-health.ps1` 把 BACKUP_DIR 裡「任何最新項目」當最新快照：`backups/deprovision/`（今天 06:41 staging 刪除前備份）→ `unverified_latest=yes` WARN；`video-schema/`（09-10）被當最舊快照。
+  - C3 `~/.ssh/hetzner_trigger` 不在 ks-aw-01 任何 authorized_keys（ubuntu、root 皆查）；13 份現役文件仍教操作者用它連退租主機；最糟：資安手冊 `nc`/`nmap` 掃描目標是退租 IP（已屬他人）。
+  - C4 eu-backup README 寫「是否被取代尚未核實」：實查主機 `/root/scripts/{backup-eu-stack,verify-backup-eu}.sh` sha256 = repo，`/etc/cron.d/ks-stack-backup` 在跑，R2 今天 OK → 是現役管線。
+- **改動**：
+  - `2bbffe310` 更新工具：`host.profile`（`ks-aw-01-docker`：prod-host lib＋`docker exec -u www-data`＋DB 容器內 root dump/restore，不讀網站 DB 密碼；`shared-ssh`：舊平面設定相容）；指令 base64 傳輸；pipefail＋`Dump completed` 尾行；`-BackupOnly`；Codex 4 發現全修（BackupOnly 無備份、wpPath/slug/client 注入 → allow-list、accept-new、scp exit code＋不接受舊檔）。
+  - `0836c4bee` 備份健康：`SNAP_RE='^[0-9]{8}-[0-9]{6}$'`（與 verify-backup.sh、保留期清理同定義）；兩支健康檢查移除 `$SgHost/$EuHost/$SshUser/$PrivateKey`（無呼叫端傳入）。
+  - `df94a2add` 13 檔文件：Telegram 速查（Termius 主機、sudo、手機遺失撤 key）、QUICKREF、跨機 runbook、rollback runbook、sg-deploy.yml、WP 外掛 agent、Trigger README、資安手冊、ao-resume 清單 8→7、eu-backup README（現役部署指令、R2 異地）。WAF lockdown 段已有「歷史禁止執行」橫幅，保留。
+  - 本機（不進 git）：vault 新增 `HOSTING_BRIDGE_SSH_{HOST,PORT,USER,KEY_B64,HOST_KEY_SHA256}`（值由 prod `.env` 管線寫入，未顯示）；`AWARE_WAVE_CREDENTIALS.md` SG/EU／tunnel 段加退租標註 3 行、bridge 小節改「vault 已收錄」。
+- **驗證**：
+  - 更新工具：正式站 `list`（WP 6.9.9、22 個可更新）；`-BackupOnly` 14.4MB → 一次性 MariaDB 還原 290 表／3582 篇 = prod；未知 DB 的 dump 無 `BACKUP_OK`；`shared-ssh` 對 Hostinger 副本唯讀 list OK；注入 wpPath、壞 slug、壞 client、BackupOnly+無備份 → 拒絕。備份檔在 `.gitignore`（`Backups/`）。
+  - 備份健康：同主機改前 WARN → 改後 PASS（latest 02:00:02、oldest 09-17）；容量 PASS。
+  - vault：從 vault 解出算指紋 `SHA256:W1AwtU…` = 現役；暫存私鑰檔已刪、殘留 0。
+  - 文件：`hetzner_trigger` 現役引用只剩 WAF 歷史段；退租位址閘 PASS new=0；`check-deploy-drift.ps1` 實跑 rc0；健康檢查 328/328。
+- **rollback**：`git revert df94a2add 0836c4bee 2bbffe310`；vault `-Action remove` 5 鍵；憑證檔刪 3 行標註。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`update-client-wp-plugins.ps1 -ClientSlug soulful -Plugins wave1 -BackupOnly` + restore into throwaway mariadb:11 (290 tables) + `check-backup-health.ps1` (PASS) + `check-deploy-drift.ps1` (rc0) | exit=0 | ms=14000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/4m/0n（Codex `agency-os/reports/oracle/2026-09-24-partialreview-4105e812.md`，4 修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,runbooks | grep=`hetzner_trigger|5\.223\.93\.113 5432|sshKeyName` | hits=12（WAF 歷史段 9、TASKS 命名條 1、WP_MANAGED_UPDATES shared-ssh 說明 1、Soulful config 註解 1）
 ## 2026-09-24（續154）研究線：首頁改成真正的目錄——285 個方法（30 家族）＋16 條工作流全部由 SPEC 登錄檔生成；新增家族與 recipe 顯示登錄檔；計畫 v1.30
 - [觸發] 操作者：「你知道我有將近 300 個工具嗎？還有將近 20 條工作流，你是不是根本搞不清楚這個系統工具？還有你做的那是什麼狗屎首頁？」
 - [根因] 首頁照計畫 U1 舊條文做成四張抽象「線」卡＋描述問題，把 285 個方法與 16 條工作流全部藏起來（違反 U17 零退化；舊 dashboard 本來就有工作流／單一方法兩頁籤＋搜尋＋家族篩選）。做之前沒讀登錄檔，只讀了計畫。

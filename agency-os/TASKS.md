@@ -144,8 +144,8 @@
 - [ ] **【資安｜輪替】`OPS_INBOX_INGEST_TOKEN` 輪替（明文已移出 crontab；token 本身 2026-09-24 整串印進本機 session transcript）**
   - `🟠 等操作者 go（High：憑證，多系統）` · `2026-09-24` · 明文已根治：cron 改呼叫 `scripts/ops-probe-heartbeat.sh`（token 讀 `.env`、走 stdin，不進 crontab/argv），prod 實測 200。輪替要同步的消費者（`verifyIngestToken.ts` 共用）：next-admin `.env`＋容器重建（DEPLOY_HOLD 無關，走 safe-infra-patch compose）、Trigger.dev env、n8n tenant-integration、netdata notify、Grafana／Sentry／PostHog／Kuma webhook（未設 per-source token 者）、`sg-deploy.yml`、vault。WORKLOG 2026-09-24 Soulful 效能條。
 
-- [ ] **【命名】repo 仍有供應商名殘留：目錄 `lobster-factory/infra/hetzner-phase1-core`、`lobster-factory/docs/hosting/HETZNER_*.md`、`hetzner_trigger` 死金鑰文件**
-  - `🟡 潛伏` · `2026-09-24` · MCP `hetzner-ssh`→`server-ssh` ✅（`44a748ff1`）。**目錄改名 DEPLOY_HOLD 期間禁做**：主機已安裝的 `sg-deploy.sh` 以舊路徑讀 `DEPLOY_HOLD`、`sync-host-scripts.sh` 以舊路徑 archive → 改名 = hold 失效（部署 site-watch WIP）＋腳本同步卡死；hold 解除後一輪做（新舊路徑雙讀一版 → 改名 → 移除舊路徑）。`~/.ssh/hetzner_trigger` 實測不在 ks-aw-01 任何 authorized_keys（死金鑰）：引用它的文件（`CLOUDFLARE-WAF-SETUP.md`、`TELEGRAM_OPERATOR_CHEATSHEET.md`、`eu-backup/README.md` 等）描述的是退租主機，整份需改寫或標歷史；`check-{backup,capacity}-health.ps1` 的 `$PrivateKey` 參數未使用。awarewave-ops MCP 仍帶 `HETZNER_API_BASE_URL`（雲端 API，帳號狀態未查）。
+- [ ] **【命名】repo 仍有供應商名殘留：目錄 `lobster-factory/infra/hetzner-phase1-core`、`lobster-factory/docs/hosting/HETZNER_*.md`、`runbooks/HETZNER-*.md` 檔名**
+  - `🟡 等 DEPLOY_HOLD 解除` · `2026-09-24` · 已做：MCP `hetzner-ssh`→`server-ssh`（`44a748ff1`）；死金鑰／退租主機從所有現役操作文件移除（`df94a2add`，只剩 `CLOUDFLARE-WAF-SETUP.md` 已標「歷史，禁止執行」的 lockdown 段）；兩支健康檢查死參數移除（`0836c4bee`）。**目錄改名 DEPLOY_HOLD 期間禁做**：主機已安裝的 `sg-deploy.sh` 以舊路徑讀 `DEPLOY_HOLD`、`sync-host-scripts.sh` 以舊路徑 archive → 改名 = hold 失效＋腳本同步卡死；hold 解除後一輪做（新舊路徑雙讀一版 → 改名 → 移除舊路徑）。awarewave-ops MCP 仍帶 `HETZNER_API_BASE_URL`（帳號狀態未查）。
 
 - [x] **【Soulful｜效能】wp-cron 自搬機後失聯＋nginx 快取 60s 無背景更新＋存取日誌無耗時**
   - `✅ 完成` · `2026-09-24` · `bd85094a2`/`58d017f3f`：host `wp-cron-runner.sh` 每分鐘（首輪清 29 個逾期）＋endpoint-alert 死人開關；alloptions 每請求重寫 1.3MB → 0（2 個每請求寫入的選項＋630KB 殘留改非自動載入，1.1MB→460KB）；nginx 背景更新（過期頁 1.46s→0.039s）、`/wp-cron.php` 403、log 帶 `rt=/urt=/cs=`；慢請求 mu-plugin。卡頓根因未證實 → 下條。WORKLOG 2026-09-24。
@@ -155,8 +155,8 @@
   - `✅ 完成` · `2026-09-24` · 舊站 `DISABLE_WP_CRON`＋mu-plugin `aw-rollback-copy-guard.php`（`pre_wp_mail`→false，實測 `wp_mail()`=false、log 0）；舊站仍 200 可回滾，解鎖步驟寫進 `SITE_MIGRATION_RUNBOOK.md` 回滾段。hPanel cron 從 SSH 看不到（無 `crontab`），但信已在 WP 層擋死。WORKLOG 2026-09-24。
 - [x] **【Soulful｜資安】Fluent Forms Pro 是破解版（授權選項 `customer_name=GPL`、`payment_id=12345`），且每次請求改寫自己的選項**
   - `✅ 操作者決定：不要動` · `2026-09-24` · 維持現狀、不再提議換／移除。已做的只有把它每請求改寫的授權選項設為非自動載入（不影響功能）。
-- [ ] **【Soulful】`update-client-wp-plugins.ps1` 的 `wp-update-config.json` 仍指 Hostinger SSH（會更新回滾副本而非正式站）**
-  - `🟡 潛伏` · `2026-09-24` · 需改成 ks-aw-01 docker exec 形狀（同 `check-smoke-tests.ps1` Check 5 的 profile 做法）。
+- [x] **【Soulful】`update-client-wp-plugins.ps1` 的 `wp-update-config.json` 仍指 Hostinger SSH（會更新回滾副本而非正式站）**
+  - `✅ 完成` · `2026-09-24` · `2bbffe310`：設定 `host.profile`（`ks-aw-01-docker`｜`shared-ssh`），Soulful 指正式站容器；備份需 `Dump completed` 才算成功；實測 list／BackupOnly（還原到一次性 DB 290 表＝prod）。WORKLOG 2026-09-24。
 
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
   - `🔴 現行` · `2026-09-21` · `等 site-watch 解除 DEPLOY_HOLD（SITE_WATCH_MASTER_PLAN §7 step 10c）`
