@@ -40,8 +40,12 @@
 [CmdletBinding()]
 param(
     [string]$WorkRoot = "D:\Work",
-    [string]$SgHost   = "hetzner-sg",
-    [string]$EuHost   = "hetzner-eu"
+    # Both probes run on ks-aw-01 (SG + EU folded in 2026-08-31). Explicit target, same convention as
+    # check-backup-health.ps1: the old ssh aliases hetzner-sg / hetzner-eu point at released addresses.
+    [string]$KsAw01Host       = "145.239.195.47",
+    [int]$KsAw01SshPort       = 58122,
+    [string]$KsAw01SshUser    = "ubuntu",
+    [string]$KsAw01PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519")
 )
 
 Set-StrictMode -Version Latest
@@ -57,13 +61,13 @@ $stamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 # 遠端腳本一律走這個函式：CRLF→LF、base64、EAP 守衛，三個坑一次處理掉，兩個探測共用同一份。
 function Invoke-RemoteProbe {
-    param([string]$SshHost, [string]$Script)
+    param([string]$Script)
     $lf = $Script.Replace([string][char]13 + [string][char]10, [string][char]10)
     $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($lf))
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        return (Invoke-WithUtf8Console { & ssh -o BatchMode=yes -o ConnectTimeout=25 $SshHost "echo $b64 | base64 -d | bash" 2>&1 } | Out-String)
+        return (Invoke-WithUtf8Console { & ssh -o BatchMode=yes -o ConnectTimeout=25 -o IdentitiesOnly=yes -i $KsAw01PrivateKey -p $KsAw01SshPort "$KsAw01SshUser@$KsAw01Host" "echo $b64 | base64 -d | sudo bash" 2>&1 } | Out-String)
     } catch {
         return "PROBE_ERROR ssh_failed"
     } finally {
@@ -74,27 +78,50 @@ function Invoke-RemoteProbe {
 # ── SG 探測：檔案系統 + 資料庫 ─────────────────────────────────────────────
 # 輸出刻意保持純 ASCII 與 TAB 分隔 —— 這條路徑上任何 CJK 都要經過 ssh → PowerShell 的編碼
 # 轉換，是 CP950 亂碼的經典來源。
+# Invariant (both probes): every remote read either succeeds or the probe prints PROBE_ERROR and stops;
+# PROBE_OK is printed only after every read succeeded. So zero rows after PROBE_OK is a true zero
+# (normal after a full cleanup), and anything short of PROBE_OK is a blind spot.
+# A site dir with NO wp-config.php is data (DB "NONE" -> classified "unknown"); a wp-config.php that exists
+# but cannot be read is a probe failure. pipefail + no pipes inside `bash -c`, so no read can mask a failure.
 $sgProbe = @'
-set -u
-ENV_FILE=/root/lobster-phase1/.env
+set -u -o pipefail
+fail() { echo "PROBE_ERROR $1"; exit 0; }
 BASE=/var/www/html/staging
-RP=$(grep -oP '^WORDPRESS_DB_ROOT_PASSWORD=\K.*' "$ENV_FILE" 2>/dev/null || true)
-PROD=$(grep -oP '^WORDPRESS_DB_NAME=\K.*' "$ENV_FILE" 2>/dev/null || true)
-[ -n "$RP" ] || { echo "PROBE_ERROR db_root_password_unreadable"; exit 0; }
-for d in $(docker exec lobster-wordpress bash -c "ls -1 $BASE 2>/dev/null" | tr -d '\r'); do
-  kb=$(docker exec lobster-wordpress bash -c "du -sk $BASE/$d 2>/dev/null | cut -f1" | tr -d '\r')
-  db=$(docker exec -u www-data lobster-wordpress bash -c "php /usr/local/bin/wp config get DB_NAME --path=$BASE/$d/ 2>/dev/null" | tr -d '\r')
-  printf 'DIR\t%s\t%s\t%s\n' "$d" "${kb:-0}" "${db:-NONE}"
+PROD=$(docker exec lobster-wordpress printenv WORDPRESS_DB_NAME 2>/dev/null) || fail main_db_name_unreadable
+PROD=${PROD//$'\r'/}
+[ -n "$PROD" ] || fail main_db_name_unreadable
+list=$(docker exec lobster-wordpress bash -c "test -d $BASE && ls -1 $BASE" 2>/dev/null) || fail staging_dir_list_failed
+for d in ${list//$'\r'/}; do
+  kb=$(docker exec lobster-wordpress du -sk "$BASE/$d" 2>/dev/null) || fail "du_failed:$d"
+  kb=${kb%%[[:space:]]*}
+  # Absence must be observed, not inferred from a non-zero exit (a failed docker exec also exits non-zero).
+  cfg=$(docker exec lobster-wordpress bash -c 'if [ -f "$1" ]; then echo present; else echo absent; fi' _ "$BASE/$d/wp-config.php" 2>/dev/null) \
+    || fail "wp_config_stat_failed:$d"
+  case "${cfg//$'\r'/}" in
+    present)
+      db=$(docker exec -u www-data lobster-wordpress php /usr/local/bin/wp config get DB_NAME --path="$BASE/$d/" 2>/dev/null) \
+        || fail "wp_config_read_failed:$d"
+      db=${db//$'\r'/} ;;
+    absent) db=NONE ;;
+    *) fail "wp_config_stat_unexpected:$d" ;;
+  esac
+  printf 'DIR\t%s\t%s\t%s\n' "$d" "$kb" "${db:-NONE}"
 done
-docker exec lobster-wordpress-db mariadb -u root -p"$RP" -N -e "select table_schema, round(coalesce(sum(data_length+index_length),0)/1024/1024,1) from information_schema.tables where table_schema rlike '^wp_' and table_schema <> '$PROD' group by table_schema;" 2>/dev/null | tr -d '\r' | while IFS=$'\t' read -r n s; do printf 'DB\t%s\t%s\n' "$n" "$s"; done
+dbout=$(docker exec lobster-wordpress-db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot -N -e "$1"' _ "select table_schema, round(coalesce(sum(data_length+index_length),0)/1024/1024,1) from information_schema.tables where table_schema rlike '^wp_' and table_schema <> '$PROD' group by table_schema;" 2>/dev/null) \
+  || fail db_query_failed
+printf '%s\n' "$dbout" | tr -d '\r' | while IFS=$'\t' read -r n s; do [ -n "$n" ] && printf 'DB\t%s\t%s\n' "$n" "$s"; done
+echo "PROBE_OK"
 '@
 
 $euProbe = @'
-docker exec supabase-db psql -U supabase_admin -d postgres -t -A -F'|' -c "select url, name, active, coalesce(organization_id::text,'') from public.wp_sites order by created_at;"
+out=$(docker exec supabase-db psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -t -A -F'|' -c "select url, name, active, coalesce(organization_id::text,'') from public.wp_sites order by created_at;" 2>/dev/null) \
+  || { echo "PROBE_ERROR wp_sites_query_failed"; exit 0; }
+printf '%s\n' "$out"
+echo "PROBE_OK"
 '@
 
-$sgRaw = Invoke-RemoteProbe -SshHost $SgHost -Script $sgProbe
-$euRaw = Invoke-RemoteProbe -SshHost $EuHost -Script $euProbe
+$sgRaw = Invoke-RemoteProbe -Script $sgProbe
+$euRaw = Invoke-RemoteProbe -Script $euProbe
 
 # ── 解析 ───────────────────────────────────────────────────────────────────
 $blindSpots = New-Object System.Collections.ArrayList
@@ -109,8 +136,9 @@ foreach ($line in ($sgRaw -split "`r?`n")) {
     if ($p.Count -ge 4 -and $p[0] -eq 'DIR') { $dirs[$p[1]] = @{ sizeKb = [int]$p[2]; db = $p[3] } }
     elseif ($p.Count -ge 3 -and $p[0] -eq 'DB') { $dbs[$p[1]] = $p[2] }
 }
-# 一個目錄都沒解析到、但探測沒回錯 → 輸出格式變了。這也是盲點，不能當成「沒有 staging 站」。
-if ($dirs.Count -eq 0 -and $blindSpots -notcontains 'sg_probe') { [void]$blindSpots.Add("sg_parse_empty") }
+# 沒有完成標記 = 探測中途斷掉或輸出格式變了 → 盲點。有標記時 0 個目錄是真的 0（全部拆乾淨後的正常狀態），
+# 不能再用「目錄數 = 0」當盲點判準（2026-09-24 全數清除後會永久誤報）。
+if ($sgRaw -notmatch '(?m)^PROBE_OK\s*$' -and $blindSpots -notcontains 'sg_probe') { [void]$blindSpots.Add("sg_parse_empty") }
 
 $rows = @{}   # slug -> @{ url; name; active; org }
 foreach ($line in ($euRaw -split "`r?`n")) {
@@ -120,7 +148,7 @@ foreach ($line in ($euRaw -split "`r?`n")) {
         $rows[$slug] = @{ url = $p[0]; name = $p[1]; active = $p[2]; org = $p[3] }
     }
 }
-if ($rows.Count -eq 0 -and $blindSpots -notcontains 'eu_probe') { [void]$blindSpots.Add("eu_parse_empty") }
+if ($euRaw -notmatch '(?m)^PROBE_OK\s*$' -and $blindSpots -notcontains 'eu_probe') { [void]$blindSpots.Add("eu_parse_empty") }
 
 # wp_sites 也有非 staging 的站（Soulful / AwareWave 本站）。它們不是 staging 佈建的產物，
 # 拿 staging 的對帳規則去判會產生永久假警報 —— 而永久警報等於被忽略的偵測器。
@@ -219,15 +247,17 @@ foreach ($f in ($findings | Sort-Object class, slug)) {
 [void]$md.Add("")
 [void]$md.Add("## 清理方式")
 [void]$md.Add("")
-[void]$md.Add('唯讀報告。清理走 SG 上的 `deprovision-staging.sh`（先備份、有守衛、要 --confirm）：')
+[void]$md.Add('唯讀報告。清理走被探測那台主機上的 `deprovision-staging.sh`（先備份、有守衛、要 --confirm）：')
 [void]$md.Add("")
 [void]$md.Add('```bash')
-[void]$md.Add('ssh hetzner-sg "/root/lobster-phase1/scripts/deprovision-staging.sh --slug <slug>"   # DRY RUN')
-[void]$md.Add('ssh hetzner-sg "/root/lobster-phase1/scripts/deprovision-staging.sh --slug <slug> --apply --confirm <slug>"')
+# Same target the probes just used (parameters, not a second hard-coded copy).
+$sshCmd = "ssh -i `"$KsAw01PrivateKey`" -p $KsAw01SshPort $KsAw01SshUser@$KsAw01Host `"sudo /root/lobster-phase1/scripts/deprovision-staging.sh"
+[void]$md.Add("$sshCmd --slug <slug>`"   # DRY RUN")
+[void]$md.Add("$sshCmd --slug <slug> --apply --confirm <slug>`"")
+[void]$md.Add("$sshCmd --db <db> --apply --confirm <db>`"   # db_only")
 [void]$md.Add('```')
 [void]$md.Add("")
-[void]$md.Add('`db_only`（只剩資料庫、沒有目錄）那一類拆不動：腳本刻意要求目錄存在且含 wp-config.php，')
-[void]$md.Add("否則它無法證明自己要 DROP 的是哪一個資料庫。這一類請人工確認後手動處理。")
+[void]$md.Add('`db_only` 用 `--db`：只接受 staging 命名、不是主站 DB、且沒有任何 staging wp-config 指向它；先 dump 備份再 DROP（含同名帳號）。')
 Set-Content -Path (Join-Path $reportDir "staging-orphans-LATEST.md") -Value ($md -join "`r`n") -Encoding UTF8
 
 Write-Host "staging-orphans: verdict=$verdict orphans=$orphanTotal disk=${diskMb}MB blind_spots=$($blindSpots.Count)"

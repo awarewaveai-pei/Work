@@ -38,7 +38,7 @@ EOF
 # Docker daemon through the socket (a Git Bash host would not match prod's PATH/tools).
 docker build -q -t aw-gate-test-runner - >/dev/null <<'EOF' || { echo "runner build failed"; exit 2; }
 FROM docker:cli
-RUN apk add --no-cache bash coreutils util-linux
+RUN apk add --no-cache bash coreutils util-linux grep curl python3
 EOF
 hostpath() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi; }
 GATE_DIR="$(hostpath "$(cd "$(dirname "$GATE")" && pwd)")"
@@ -69,6 +69,7 @@ login_ok() {  # <site dir>: the site's own wp-config credentials log in to its o
     '$l=explode("\n",stream_get_contents(STDIN)); mysqli_report(MYSQLI_REPORT_OFF); exit(@mysqli_connect("lobster-wordpress-db",$l[0],$l[1],$l[2]) ? 0 : 1);'
 }
 has() { [[ "$1" == *"$2"* ]]; }
+ok_archive() { [[ "$1" == 0 && "$2" == *"ARCHIVES=1"* ]]; }   # exit 0 AND a backup archive (archive alone exists even on a later abort)
 
 # --- new site ---
 out="$(gate 'staging-prepare site-a wp_s_aaa111' 2>&1)"; rc=$?
@@ -122,6 +123,58 @@ for c in 'staging-wp ../x' 'staging-wp site-a;id' 'staging-prepare site-a wp_s_a
   check "DENY: '$c'" test "$rc" = 126
 done
 check "denied commands executed nothing" not docker exec "$WP" test -e /tmp/denied-ran
+
+# --- deprovision-staging.sh: tears down exactly what staging-prepare built (one site <-> one DB <-> one account) ---
+# Supabase stubs (supabase-stub.py): sb-stub = no rows; sb-html = HTTP 200 with an HTML body; sb-org = a site
+# with a wp_sites row, an org site_url and a vaulted admin credential; writes are logged (docker logs).
+STUB_DIR="$(hostpath "$HERE")"
+for m in stub:empty html:html org:org; do
+  docker run -d --label aw-gate-test=1 --name "sb-${m%%:*}" --network aw-gate-test -e MODE="${m##*:}" \
+    -v "$STUB_DIR:/s:ro" python:3-alpine python -u /s/supabase-stub.py >/dev/null
+done
+sleep 2
+deprov() {  # <supabase url> <args...>: runs the real script as on ks-aw-01; prints its output, then ARCHIVES=<n>
+  local sb="$1"; shift
+  docker run --rm -i --label aw-gate-test=1 --network aw-gate-test -e DEPROVISION_ENV_FILE=/tmp/env \
+    -v /var/run/docker.sock:/var/run/docker.sock -v "$GATE_DIR:/g:ro" aw-gate-test-runner bash -c \
+    'printf "SUPABASE_URL=%s\nSUPABASE_SERVICE_ROLE_KEY=test\n" "$0" > /tmp/env; bash /g/deprovision-staging.sh "$@"; rc=$?;
+     echo "ARCHIVES=$(ls /root/lobster-phase1/backups/deprovision/*.tar.gz 2>/dev/null | wc -l)"; exit $rc' "$sb" "$@"
+}
+sqlq() { printf '%s\n' "$1" | docker exec -i "$DB" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb -uroot --batch --skip-column-names'; }
+SB=http://sb-stub:8080
+out="$(deprov $SB --slug site-a 2>&1)"; rc=$?
+check "deprovision dry run lists the site's own DB account" has "$rc $out" "db user  : wp_s_aaa111"
+check "dry run changes nothing" docker exec "$WP" test -d $ROOT/site-a
+out="$(deprov http://sb-stub:9 --slug site-a --apply --confirm site-a 2>&1)"; rc=$?
+check "Supabase unreachable -> abort (3), not treated as 0 rows" test "$rc" = 3
+check "...and nothing was deleted" docker exec "$WP" test -f $ROOT/site-a/wp-config.php
+out="$(deprov http://sb-html:8080 --slug site-a --apply --confirm site-a 2>&1)"; rc=$?
+check "Supabase HTTP 200 with a non-JSON body -> abort (3), not 0 rows (codex)" test "$rc" = 3
+check "...and nothing was deleted" docker exec "$WP" test -f $ROOT/site-a/wp-config.php
+out="$(deprov $SB --slug site-a --apply --confirm site-a 2>&1)"; rc=$?
+check "deprovision apply succeeds with a backup archive" ok_archive "$rc" "$out"
+check "site dir removed" not docker exec "$WP" test -e $ROOT/site-a
+check "site DB dropped" test "$(sqlq "select count(*) from information_schema.schemata where schema_name='wp_s_aaa111';")" = 0
+check "site DB account dropped" test "$(sqlq "select count(*) from mysql.user where user='wp_s_aaa111';")" = 0
+sqlq "CREATE DATABASE wp_s_ccc333; CREATE USER 'wp_s_ccc333'@'%' IDENTIFIED BY 'x'; CREATE TABLE wp_s_ccc333.t (i int);" >/dev/null
+out="$(deprov $SB --db wp_s_ccc333 --apply --confirm wp_s_ccc333 2>&1)"; rc=$?
+check "--db orphan: backed up and dropped" ok_archive "$rc" "$out"
+check "--db orphan: DB and same-name account gone" test "$(sqlq "select (select count(*) from information_schema.schemata where schema_name='wp_s_ccc333') + (select count(*) from mysql.user where user='wp_s_ccc333');")" = 0
+out="$(deprov $SB --db wp_s_bbb222 --apply --confirm wp_s_bbb222 2>&1)"; rc=$?
+check "--db refuses a DB a site still uses (2)" test "$rc" = 2
+out="$(deprov $SB --db wp_main --apply --confirm wp_main 2>&1)"; rc=$?
+check "--db refuses the main site's DB (2)" test "$rc" = 2
+check "site-b untouched by the refusals" test "$(wpat $ROOT/site-b option get blogname)" = legacy-b
+# Full Supabase path: vault secret -> credential row -> wp_sites row -> org site_url, then DB/account/dir.
+out="$(deprov http://sb-org:8080 --slug site-b --apply --confirm site-b 2>&1)"; rc=$?
+check "deprovision with row + org + vaulted credential succeeds" ok_archive "$rc" "$out"
+w="$(docker logs sb-org 2>&1)"
+check "vault secret deleted via rpc" has "$w" 'POST /rest/v1/rpc/secret_delete {"p_name": "client_cred:cc-1"}'
+check "credential row deleted" has "$w" "DELETE /rest/v1/client_credentials?id=in.(cc-1)"
+check "vault secret deleted before its row" test "$(printf '%s\n' "$w" | grep -n 'secret_delete' | cut -d: -f1)" -lt "$(printf '%s\n' "$w" | grep -n 'client_credentials' | cut -d: -f1)"
+check "wp_sites row deleted" has "$w" "DELETE /rest/v1/wp_sites?url=eq.https%3A%2F%2Faware-wave.com%2Fstaging%2Fsite-b"
+check "org site_url cleared, other keys kept" has "$w" 'PATCH /rest/v1/organizations?id=eq.org-1 {"metadata": {"client_config": {"brandColors": {"primary": "#123456"}}}}'
+check "site-b dir, DB and own account gone" test "$(docker exec "$WP" test -e $ROOT/site-b && echo dir)$(sqlq "select count(*) from information_schema.schemata where schema_name='wp_s_bbb222';")$(sqlq "select count(*) from mysql.user where user='wp_s_bbb222';")" = 00
 
 # --- the invariant behind the 2026-09-24 incident: nothing here may touch the main site's config ---
 check "main site's wp-config.php unchanged by every case" test "$(main_sha)" = "$MAIN0"

@@ -138,6 +138,9 @@
 - [x] **【資安｜輪替】hosting-bridge key `SG_SSH_PRIVATE_KEY_B64`（.env:146）曾整串印進本機 session transcript（2026-09-23，未離開本機）**
   - `✅ 完成` · `2026-09-24` · 新 key `HOSTING_BRIDGE_SSH_KEY_B64`（`SHA256:W1AwtU…`，只能跑 `aw-hosting-gate.sh`）上線；舊 key（ECDSA `MQe2uV…`）從 `.env` 刪除，本就不在任何 authorized_keys。殘留：`.env.bak.20260924-hosting-bridge` 仍含舊 key（零權限），下方 MainWP 條目 E2E 過後刪。WORKLOG 2026-09-24 續136/續138。
 
+- [ ] **【資安｜退租位址】SSH 別名 `hetzner-sg`／`hetzner`／`hetzner-eu` 指向已退租 IP，仍有 2 支腳本預設使用**
+  - `🟠 現行` · `2026-09-24` · 本機 `~/.ssh/config` 三個 Host 指 5.223.93.113／204.168.175.41（root＋`hetzner_trigger` key）；`scripts/sync-hetzner-endpoint-alert-heartbeat.ps1:36`、`scripts/diff-env-vs-vault.ps1:47` 預設仍用它；`agency-os/docs/operations/APP_AWARE_WAVE_CURRENT_STATE.md:130` 仍寫。`check-staging-orphans.ps1` 已改（WORKLOG 2026-09-24 續144）。下一步：兩支腳本改 ks-aw-01 明確參數（同 check-backup-health）；操作者刪 `~/.ssh/config` 三個 Host 區塊（安全設定，不代改）；`verify-no-released-addresses.mjs` 加掃別名名稱。
+
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
   - `🔴 現行` · `2026-09-21` · `等 site-watch 解除 DEPLOY_HOLD（SITE_WATCH_MASTER_PLAN §7 step 10c）`
   - **2026-09-24**：新 route（`3a985c042`）未上 prod（hold 中，未覆寫）；主機側已全就緒：gate、key、`.env`、compose（`printenv HOSTING_BRIDGE_SSH_*` 5/5）、7 站已遷自己的 DB 帳號。hold 期間 prod 舊碼讀不到 `SG_SSH_PRIVATE_KEY_B64` → 建站仍 503（與先前同為壞，只是 fail-closed 更早）。**下一步**：hold 解除部署後跑一次真 create-wp-site → 驗 run output `DB: … (own account; created)`、MainWP connected、`/staging/<slug>/` 200；然後刪 `.env.bak.20260924-hosting-bridge`。

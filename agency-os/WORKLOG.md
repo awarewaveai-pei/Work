@@ -1,4 +1,19 @@
 ﻿# Worklog
+## 2026-09-24（續144）deprovision-staging.sh 補齊拆除面（孤兒 DB `--db`、staging admin 憑證＋vault）並修 3 個讓拆除半途失敗/誤判的 bug；操作者要求「staging 刪乾淨」的前置
+
+- **根因（不變量「provision 建的每種資源都要有拆除」被打破）**：
+  - C1 `client_credentials`＋vault secret（`staging-admin-credential.ts`，`a88fa3430` 加入）沒有拆除 → 每拆一站留孤兒憑證。
+  - M1 `db_only` 孤兒 DB 拆不動（腳本要求目錄存在）；`check-staging-orphans.ps1` 只說「人工處理」。
+  - M2 org `site_url` 步驟從 2026-08-26 起從未跑通：`printf JSON | python3 - <<PYEOF` heredoc 佔用 stdin → `json.load` EOF → `set -e` 中止（codex r2）。有 org 的站根本拆不掉。
+  - M3 Supabase 讀取失敗被當「0 列」：`curl … || echo '[]'`、`json.load … || echo 0`（codex r1：HTTP 200 帶 HTML 也一樣）→ 照拆主機側、留 row_only 孤兒。
+  - m1 DB root 密碼在主機 argv（`-p"$DB_ROOT_PASS"`）；PROD_DB_NAME 取自 `.env` 而非正在跑的容器。
+- **改動**（`lobster-factory/infra/hetzner-phase1-core/scripts/deprovision-staging.sh`）：`--db <name>`（staging 命名、非主站 DB、存在、無任何 wp-config 指向 → dump 備份 → DROP DATABASE＋同名帳號）；slug 模式加 3/6「vault secret → client_credentials 列」（先 secret 後列，非 2xx 中止）；不變量套全部 Supabase 互動：每個讀取 `--fail`＋必須是 JSON 陣列否則中止、org PATCH 檢查狀態碼，全部在 DB/目錄動手前；org JSON 改走 env；`in_db`/`dump_db` 用容器 MYSQL_PWD；PROD_DB_NAME 取主站容器 env；`DEPROVISION_ENV_FILE` 僅測試用。`scripts/check-staging-orphans.ps1`：清理提示改列 `--db`；**偵測器本身是瞎的**——預設 SSH 別名 `hetzner-sg`/`hetzner-eu`（本機 `~/.ssh/config`）指向已退租的 5.223.93.113／204.168.175.41（同 2026-09-23 事故類：對可能已轉租第三方的位址用 root key 連線）→ 改為明確 ks-aw-01 參數（同 check-backup-health 慣例，ubuntu+sudo，58122），遠端 DB 查詢改容器 MYSQL_PWD、主站 DB 名取容器 env。修後實跑：complete 3／unregistered 4／db_only 6／blind 0（與手動盤點一致）。
+- **測試**：`tests/host-scripts/hosting-gate.test.sh` 加 deprovision 段＋`supabase-stub.py`（GET 依 MODE 回固定列；POST/PATCH/DELETE 204 並記錄）→ 51/51：dry-run 不動、Supabase 不可達 → 3 且未刪、HTTP 200 非 JSON → 3 且未刪、slug apply（目錄/DB/自己帳號全消＋備份）、`--db` 孤兒（DB＋同名帳號消）、`--db` 拒絕被站使用的 DB 與主站 DB、完整 Supabase 路徑（vault rpc → 憑證列 → wp_sites → org PATCH 只拿掉 site_url 保留其他鍵、順序正確）、主站 wp-config sha 全程不變。突變：拔 `--db` 使用中守衛 → 2 紅；拔 JSON 陣列檢查 → 1 紅；還原舊 heredoc → 紅；另 d1（只還原 wp_sites `--fail`）存活 = 憑證查詢同樣中止的雙層設計，非漏洞。測試自身修一處：「成功」斷言原本只看有無備份檔（中止前也會有）→ 改為 exit 0 且有備份。
+- **rollback**：`git revert <本 commit>`（腳本經 sync-host-scripts 下次自動回舊版）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`MSYS_NO_PATHCONV=1 bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/hosting-gate.test.sh` (51/51, disposable stack + Supabase stub) + `powershell -File scripts/check-staging-orphans.ps1` (blind 0, orphans=10) | exit=0 | ms=178625
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/9m/0n（deprovision：Codex r1 `reports/oracle/2026-09-24-partialreview-c918e31b.md` 非 JSON 200、r2 `…-a52a82d5.md` heredoc、r3 `…-6545fd4a.md` NO FINDINGS；偵測器 check-staging-orphans：r1 `…-a4bef945.md` DB 探測失敗靜默＋提示寫死主機、r2 `…-6896ef20.md` 目錄列表失敗當空集＋提示缺 key、r3 `…-6c102782.md` 管線遮蔽 du/wp-config 失敗、r4 `…-6a39d8b0.md` test -f 把執行失敗當缺檔、r5 `…-6436d83d.md` NO FINDINGS）
+  - 偵測器同 reviewer 連續回報 → 不變量：每個遠端讀取要嘛成功要嘛整個探測 PROBE_ERROR，PROBE_OK 只在全部讀取成功後才印；盲點判準看 PROBE_OK 標記不看列數（全清後 0 站是真 0）；「不存在」必須是正向觀察（present/absent），不能從非零 exit 推論；`set -o pipefail`＋`bash -c` 內不用管線。主機實測注入 6 種故障（DB 容器、staging 目錄、du、wp binary、stat exec、supabase 容器）→ 各自 PROBE_ERROR；健康 → PROBE_OK。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`deprovision-staging|db_only|hetzner-sg|secret_delete|staging_url` | hits=92（歷史 WORKLOG/TASKS＋呼叫點）；`hetzner-sg` 另有 2 支腳本預設（`sync-hetzner-endpoint-alert-heartbeat.ps1:36`、`diff-env-vs-vault.ps1:47`）＋`APP_AWARE_WAVE_CURRENT_STATE.md:130` → TASKS 新條目（同類未修，範圍外）
 ## 2026-09-24（續143）研究線：四頁示意稿改成單一共用設計系統＋機械閘 check-mocks.py＋repo 內建置腳本；計畫 v1.26
 - [觸發] 操作者：「幾乎什麼事都要我提醒你…丟三落四、不連續、不注意統一規格／排版／UI UX，你要怎麼補救和驗證？」
 - [根因] 四頁各自手改，每條規則只落在她正在看的那頁；13 個共用選擇器已漂移（`.btn` 內距、`.wrap` 寬、`.pill` 色、`.status` 邊距、`.row` 標籤寬、`th` 底色…）；`.step`／`.layer` 同名異義；發布時的改色／深色／svg token 轉換只存在 scratchpad 腳本，repo 示意稿 ≠ 發布版。
