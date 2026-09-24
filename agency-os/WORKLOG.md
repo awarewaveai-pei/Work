@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-24（續137）研究線：教學三層（路線課簡述＋連結／方法課完整／教材版同源）＋主色改綠；計畫 v1.21（D25、U15、U18、U19、I11 M12、P3、P4）
+- [觸發] 操作者：「為什麼內容豐富度比 iceberg 差那麼多？要一樣或更好；希望可成課堂教材；或先簡述再連到單一工具的正式介紹頁？」＋「主色系是綠色，看起來比較舒服」。
+- [判斷] 差距根因：冰山有 dossier（三篇文＋四張圖），三站方法還沒有（D23 P3 才做）；路線課本就不該承載方法深度。定案 D25：路線課每站簡述＋填好的例子＋連到方法課；方法課 = 完整六步（M1–M10）；教材版（45 分鐘課堂流程、講稿要點、討論題、學員常錯與怎麼接、講義與投影片大綱）由同一份 dossier 資料生成，P4 可匯出；ARF 帶領腳本直接進教材版。主色：accent `#177a5c`／暗 `#6fd3a8`，tag `#e8f5ef`／`#173328`；資料色（冰山水與層色、圖表序列）不動。
+- [已改] `iceberg-lesson-mock.html` v5（底部教材版五段 details＋狀態列提示）；`workflow-lesson-mock.html` v3（每站「完整介紹」連結、怎麼讀句）；四份示意稿 accent 改綠；`build_artifact.py` token 同步；計畫 v1.21。線上：結果 v8、方法課 v6、工作流總覽 v2、工作流課 v3。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_teaching_layers.py + apply_green.py + plan_v121.py + plan_color.py（計數斷言）+ html.parser 四檔標籤配對 + build ×4 + Artifact publish ×4 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/docs/mockups | grep=#1f5fbf|--accent:#7fb0ff | hits=7（剩餘 `#1f5fbf` 皆為圖表資料序列色，刻意保留）
+- [下一步] WC-PIa-01；P3 產卡含教材版卡。
 ## 2026-09-24（續136）hosting bridge 身分：forced-command gate `aw-hosting-gate.sh`（2 verb）＋每站自己的 DB 帳號；route 關掉 3 條主機 root 注入；附帶事故：測試誤改主站 wp-config（80 s）
 
 - **根因（bridge 死 + 設計缺陷）**：
