@@ -142,7 +142,7 @@ curl -sf http://127.0.0.1/ -H 'Host: app.aware-wave.com' | grep -c "Build Consol
 
 ### 2.4 自動 drift 告警（cron + Slack）
 
-**為什麼不用 Claude Cloud routine**：routine 在 Anthropic 雲跑，沒辦法 SSH 上 SG 而不把 `hetzner_trigger` 私鑰外帶（新增攻擊面，違反 30 年不外流原則）。改在 SG 本地 cron 跑 + 用既有 Slack webhook 通知，零雲端依賴。
+**為什麼不用 Claude Cloud routine**：routine 在 Anthropic 雲跑，沒辦法 SSH 上主機而不把主機 SSH 私鑰外帶（新增攻擊面，違反 30 年不外流原則）。改在 SG 本地 cron 跑 + 用既有 Slack webhook 通知，零雲端依賴。
 
 | 項目 | 值 |
 |------|-----|
@@ -367,7 +367,7 @@ WORKLOG 格式：
 
 | 方案 | 密鑰是否外帶 | 是否對公網開 22 | 結論 |
 |:---|:---|:---|:---|
-| GHA 雲端 runner SSH 進 VPS | ❌ `hetzner_trigger` 私鑰要進 GitHub Secrets | ❌ 要開 | **否決**（違反 §2.4「30 年不外流」原則） |
+| GHA 雲端 runner SSH 進 VPS | ❌ 主機 SSH 私鑰要進 GitHub Secrets | ❌ 要開 | **否決**（違反 §2.4「30 年不外流」原則） |
 | **self-hosted runner 住 VPS** | ✅ 零外帶（runner 在本機跑 sg-deploy.sh） | ✅ 不用（runner 走 outbound 443 拉任務） | **採用** |
 | Telegram bot `/deploy` | ✅ | ✅ | 備援（command plane，另案） |
 

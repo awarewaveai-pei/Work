@@ -2,7 +2,7 @@ name: SG Deploy (self-hosted runner)
 
 # Manual-trigger production deploy for the SG VPS (lobster-phase1).
 #
-# WHY self-hosted (not GHA SSH): the hetzner_trigger SSH key must NEVER leave the
+# WHY self-hosted (not GHA SSH): the host SSH key must NEVER leave the
 # VPS — DEPLOY_ROLLBACK_RUNBOOK.md §2.4 (30-year no-egress principle). A runner that
 # LIVES on the SG VPS needs no key egress: it just invokes the existing, fully-gated
 # /root/lobster-phase1/scripts/sg-deploy.sh (git pull -> tsc -> npm test -> build ->

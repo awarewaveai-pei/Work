@@ -63,7 +63,8 @@ Common issues: checkout not completing, payment gateway errors, order status stu
 ### WP-CLI (primary tool)
 ```bash
 # SSH in first
-ssh -i ~/.ssh/hetzner_trigger root@<server-ip>
+ssh -p 58122 -i ~/.ssh/id_ed25519 ubuntu@145.239.195.47   # ks-aw-01; client sites run in containers:
+#   sudo docker exec -u www-data <site>-wp wp --path=/var/www/html ...
 
 # Then use WP-CLI
 wp --path=/var/www/html plugin list

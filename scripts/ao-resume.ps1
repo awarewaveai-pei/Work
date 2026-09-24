@@ -1366,7 +1366,6 @@ try {
 | user-env.ps1 | （待 Claude 填寫）|
 | .ssh/config | （待 Claude 填寫）|
 | .ssh/id_ed25519 (+.pub) | （待 Claude 填寫）|
-| .ssh/hetzner_trigger (+.pub) | （待 Claude 填寫）|
 | .ssh/hostinger_soulful | （待 Claude 填寫）|
 | AWARE_WAVE_CREDENTIALS.md | （待 Claude 填寫）|
 | ao-close-last.txt (gap 錨) | （待 Claude 填寫）|

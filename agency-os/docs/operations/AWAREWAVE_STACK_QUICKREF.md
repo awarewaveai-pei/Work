@@ -93,7 +93,7 @@
 
 ## SSH
 
-- Key: `~/.ssh/hetzner_trigger`（SG + EU 兩台共用，password login DISABLED）
+- ks-aw-01：`ssh -p 58122 -i ~/.ssh/id_ed25519 ubuntu@145.239.195.47`（root 操作 sudo；password login DISABLED）。腳本一律經 `scripts/lib/prod-host.ps1`。舊 SG/EU 專用 key 已隨主機退役，不在 ks-aw-01 任何 authorized_keys。
 
 ---
 

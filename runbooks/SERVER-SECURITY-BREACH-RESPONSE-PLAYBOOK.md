@@ -137,7 +137,7 @@ ports:
 
 ```bash
 # 從外部測試（用另一台機器，或請朋友幫測）
-nc -zv 5.223.93.113 5432   # 應該要 Connection refused 或 timeout
+nc -zv 145.239.195.47 5432   # ks-aw-01；應該要 Connection refused 或 timeout（退租 IP 已是別人的機器，勿掃）
 
 # 從本機測試（應該要能連）
 nc -zv 127.0.0.1 5432
@@ -265,7 +265,7 @@ openssl rand -base64 32      # ~44 字元 base64
 ```bash
 # 如果懷疑 SSH key 洩漏
 # 1. 在本機產生新的 key pair
-ssh-keygen -t ed25519 -C "hetzner-trigger-new" -f ~/.ssh/hetzner_trigger_new
+ssh-keygen -t ed25519 -C "ks-aw-01-new" -f ~/.ssh/id_ed25519_new
 
 # 2. 用舊 key 登入，把新公鑰加到 authorized_keys
 # Historical Hetzner command removed: ks-aw-01 recovery uses OVH KVM/rescue only
@@ -424,7 +424,7 @@ iptables -L DOCKER-USER -v -n
 iptables -L INPUT -v -n
 
 # 從外部掃描（用另一台機器）
-nmap -p 5432,3306,6379,27017,9000 5.223.93.113
+nmap -p 5432,3306,6379,27017,9000 145.239.195.47   # ks-aw-01 only
 # 全部應該顯示 filtered 或 closed
 ```
 
@@ -640,4 +640,4 @@ iptables -I DOCKER-USER -i eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j AC
 
 - 本次事件詳細紀錄：[HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md](HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md)
 - 502 / OOM 緊急處理：[HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md](HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md)
-- 伺服器資訊：IP `5.223.93.113`、Server ID `125887340`、SSH key `~/.ssh/hetzner_trigger`
+- 伺服器資訊（現役）：ks-aw-01 `145.239.195.47`、SSH `-p 58122`、`ubuntu@`+sudo、key `~/.ssh/id_ed25519`（`scripts/lib/prod-host.ps1`）。2026-04-20 案例主機 `5.223.93.113` 已退租。

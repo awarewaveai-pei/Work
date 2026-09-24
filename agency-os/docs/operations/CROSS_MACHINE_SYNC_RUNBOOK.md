@@ -117,7 +117,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\mcp\codex-userlevel\script
 
 | 項目 | 位置 | 做法 |
 |------|------|------|
-| SSH key（EU server 連線） | `~/.ssh/hetzner_trigger` | 從筆電手動複製 `hetzner_trigger` + `hetzner_trigger.pub` |
+| SSH key（ks-aw-01 連線） | `~/.ssh/id_ed25519` | 從筆電手動複製 `id_ed25519` + `id_ed25519.pub`（主機資訊見 `scripts/lib/prod-host.ps1`） |
 | DPAPI vault | 機器綁定 | `secrets-vault.ps1 -Action import-mcp`（重新輸入密鑰）|
 | `mcp/user-env.ps1` | gitignore | 從 `mcp/user-env.template.ps1` 建立，填入密鑰 |
 

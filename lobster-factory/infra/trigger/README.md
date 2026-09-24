@@ -226,7 +226,7 @@ v4 不再有獨立 **`provider/docker` + coordinator** 的舊拆法；改為 **s
 ## 本機測試 SSH（Windows PowerShell）
 
 ```powershell
-ssh -i "$env:USERPROFILE\.ssh\hetzner_trigger" root@<VPS_IP>
+ssh -p 58122 -i "$env:USERPROFILE\.ssh\id_ed25519" ubuntu@145.239.195.47   # ks-aw-01; root commands via sudo
 ```
 
 ---

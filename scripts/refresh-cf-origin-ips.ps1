@@ -1,9 +1,9 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-  Monthly CF IP refresh -- updates the ipset on SG with latest CF IP ranges.
+  Monthly CF IP refresh -- runs /root/scripts/refresh-cf-edge-geo.sh on ks-aw-01 (nginx cf-edge-geo map).
   Called by ao-resume.ps1 monthly block. Warn-only, always exits 0.
-  Requires: cf-origin-lockdown.sh --apply already run on SG (ipsets must exist).
+  (The SG-era iptables/ipset lockdown is history; see runbooks/CLOUDFLARE-WAF-SETUP.md banner.)
 #>
 param([string]$WorkRoot = "")
 

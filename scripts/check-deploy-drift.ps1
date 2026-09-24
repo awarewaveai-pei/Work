@@ -25,10 +25,8 @@
     docstring previously said root, which was already stale before today's edit)
 
 .PARAMETER PrivateKey
-    SSH private key path. Default: $env:USERPROFILE\.ssh\id_ed25519 (ks-aw-01 deliberately uses
-    the operator's general-purpose key here rather than the repo's hetzner_trigger convention,
-    see check-backup-health.ps1 for the same rationale; this docstring previously said
-    hetzner_trigger, which was already stale before today's edit)
+    SSH private key path. Default: $env:USERPROFILE\.ssh\id_ed25519 -- the only key authorized on
+    ks-aw-01 for the operator (the old SG/EU key retired with those hosts).
 
 .PARAMETER WarnAt
     Behind count to start warning at. Default: 1 (any drift = warn)

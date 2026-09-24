@@ -15,10 +15,10 @@
 | # | 動作 | 預期 PASS 標誌 |
 |---|------|--------------|
 | 1 | 手機關 wifi / 用 4G | — |
-| 2 | Termius 連 SG（`5.223.93.113` / `root` / key=`hetzner_trigger` / port `22`）| 看到 `root@wordpress-ubuntu-4gb-sin-1:~#` |
-| 3 | `whoami && ls /root/lobster-phase1/scripts/sg-deploy.sh` | `root` + 路徑存在 |
-| 4 | `/root/lobster-phase1/scripts/sg-deploy.sh next-admin --dry-run` | rsync 輸出 + exit 0 |
-| 5 | `docker ps --format '{{.Names}} {{.Status}}'` | `lobster-next-admin Up X (healthy)` |
+| 2 | Termius 連 ks-aw-01（`145.239.195.47` / port `58122` / user `ubuntu`（+sudo）/ key `id_ed25519`）| 看到 `ubuntu@ns31414856:~$` |
+| 3 | `whoami && sudo ls /root/lobster-phase1/scripts/sg-deploy.sh` | `ubuntu` + 路徑存在 |
+| 4 | `sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin --dry-run` | rsync 輸出 + exit 0 |
+| 5 | `sudo docker ps --format '{{.Names}} {{.Status}}'` | `lobster-next-admin Up X (healthy)` |
 
 5 步全綠 = 你出國能應急。任一步卡住，**現在**解決比國外解決容易 10×。
 
@@ -263,7 +263,7 @@ SELECT mode, reason, set_at FROM public.system_modes WHERE scope_type='global';
 cd $env:USERPROFILE\.ssh
 
 # 7zip 加密壓縮（記住密碼）
-7z a -tzip -p"<強密碼>" -mhe=on hetzner_trigger.zip hetzner_trigger
+7z a -tzip -p"<強密碼>" -mhe=on id_ed25519.zip id_ed25519
 
 # 上傳 iCloud Drive / Google Drive
 # 手機開檔 → 解壓（輸入密碼）→ Termius Keychain → Import
@@ -277,29 +277,24 @@ cd $env:USERPROFILE\.ssh
 - desktop 端登入 → import → 同步 → 手機端登入即同步
 - 約 $9 USD/月，solo operator 不必要
 
-### 8.2 SG host 設定
+### 8.2 主機設定（唯一主機 ks-aw-01；舊 SG/EU 已於 2026-08-31 退租）
 
 ```
-Address:   5.223.93.113
-Port:      22
-Username:  root
-Auth:      Key (hetzner_trigger)
-Label:     SG-Production
-```
-
-EU server 同一 key（`204.168.175.41`），用一樣方式加：
-```
-Label:     EU-Supabase-Database
+Address:   145.239.195.47
+Port:      58122
+Username:  ubuntu      (root 操作一律 sudo)
+Auth:      Key (id_ed25519)
+Label:     ks-aw-01
 ```
 
 ### 8.3 雲端裝置遺失時的應變
 
 如果手機掉了 / 被偷：
 
-1. 立刻 Hetzner 管理面板（可在任何電腦登入 https://console.hetzner.com）→ 把 SSH key 從 server 撤下：
+1. 立刻把手機上的 key 從主機撤下（任何能 SSH 的機器；都不能連時用主機商管理面板的 rescue／KVM 主控台）：
    ```bash
-   # 任何能 SSH 的機器先進去
-   sed -i '/<指紋>/d' /root/.ssh/authorized_keys
+   sed -i '/<指紋>/d' /home/ubuntu/.ssh/authorized_keys
+   sudo sed -i '/<指紋>/d' /root/.ssh/authorized_keys
    ```
 2. 同時換 vault 中所有 token（Telegram bot revoke、Anthropic key rotate 等）— 細節見 `agency-os/docs/operations/mcp-secrets-hardening-runbook.md`
 3. 換新 key pair → push 公鑰到 server → 手機端 import 私鑰
