@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續133）研究線：課程頁照同標準補完（示意稿 v4）；工作流 = 總覽站列＋站頁九段＋總結頁、兩種走法引擎零改動（U18／D24，示意稿新檔）；計畫 v1.19
+- [觸發] 操作者：「課程頁也照這個標準；工作流有很多工具，你打算怎麼做？」
+- [課程頁 v4] 狀態列（方法齊備 M1–M10／課程來源 3 筆／5 分鐘／學完能做什麼）、每步怎麼讀／你要做的、課文段落 [n]、第 5 步自我檢查三題（details 點開答案）、第 6 步第三顆按鈕「這方法適合我的問題嗎？」→ 路由、底部「課程來源」卡。線上 https://claude.ai/artifact/653Kt4JtExaujnffNDvygY v5。
+- [工作流設計] 讀 `recipes/validated/life-decision-v1.recipe.yaml:37-60`（3 站 framing.problem_statement → strategy.swot → decision.weighted_decision_matrix，bindings）與 `main.py:417`（`/recipes/{id}/plan` 回 nodes＋bindings）、`:133／:223`（run 結果 `steps`／`outputs`）。設計：總覽頁（站列、每站卡：回答什麼／從上一站帶入／還要填／會得到／時間費用／站課）＋兩種走法（一站一站 = web 依 plan bindings 逐站 invoke＋interpret，每站停下；一次跑完 = 既有 run，完成後用 `steps[i]` 逐站 interpret）＋每站同九段＋總結頁（三站合一、每站一句＋你的判斷＋信心、最終建議與改判條件、最後一站 (5b)、跨站引註不重排、成本合計、核准整條／退回某站則後站失效重跑不重填）；課程分層：工作流課 3 步＋站課只在第一次到站。引擎零改動（I8；executor RUNNING 不可 resume 故停站靠 web）。新示意稿 `mockups/workflow-result-mock.html`（合成案例：WuSheng 課程要不要改混合制），線上 https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk。
+- [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.19：U15 課程標準、U18、D24、C10 `WorkflowInterpretation`＋閘、I11 第三份示意稿＋M11、P3 元件＋DoD、§0 parity 工作流列、§3.10 工作流句；`build_artifact.py` 加 workflow 模式。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_lesson_v4.py + plan_v119.py（計數斷言）+ html.parser 標籤配對（lesson、workflow）+ build_artifact.py lesson／workflow + Artifact publish ×2 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字
+- BUGHUNT_DONE: scope=agency-os/TASKS.md,agency-os/docs,agency-os/reports,scripts,Projects/internal/cognitive-engineering-os | grep=WorkflowInterpretation|workflow-result-mock|一站一站 | hits=7（新詞，全在計畫與示意稿）
+- [下一步] WC-PIa-01；P3 產卡時含工作流頁三張卡（總覽／站頁重用／總結頁）。
 ## 2026-09-24（續132）研究線：結果頁其餘八段照「第一次接觸者」標準逐段補完（示意稿 v2.5）；C10 加信心／改判條件／使用者判斷事件；計畫 v1.18
 - [觸發] 操作者：「其他八段也照這標準檢查，甚至要更完整。」
 - [逐段檢查與補法] 共通：每段開頭「怎麼讀／你要做的（可為不用做）」＋每段標來源。⓪ 狀態列（AI 草稿未核准／資料來源筆數／各層完整度與最薄層／成本與閱讀時間）＋能回答／不能回答＋「只有 30 秒看哪裡」＋四個詞。① 每個發現信心標籤＋理由（依資料厚度與外部證據）、改判條件三條、「你的判斷」欄（D20：使用者原話 = 記錄，AI 附掛；未填可核准）。② ★ 建議出手層＋各層資料厚度 ●○。③ 每圖三句：怎麼看／看到什麼／來源。④ 每卡加「對應 ⑦ 方案」「資料厚度」兩列。⑤ 怎麼讀＋要做的。⑥ ★ 建議列。⑦ 準則人話（見效／成本／持久／風險）、「如果只做一件事，明天就做」、目標數字全標「待你確認」（C11 禁模型定目標）、到期自動重跑說明。⑨ 無外部來源誠實提示＋信心上限＋[n] 種類說明。來源列：檢查項 tooltip 人話、你的判斷狀態、核准／退回／刪除專案各是什麼。
