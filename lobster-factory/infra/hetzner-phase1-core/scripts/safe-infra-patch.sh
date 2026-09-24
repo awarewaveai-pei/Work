@@ -30,8 +30,14 @@ TARGET="${3:-}"
 
 LOGFILE="/root/lobster-phase1/safe-patch.log"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP="${FILE_PATH}.bak.safe-patch-${STAMP}"
 STAGING_DIR="/root/lobster-phase1"
+BACKUP="${FILE_PATH}.bak.safe-patch-${STAMP}"
+# host-nginx: never next to the file -- nginx includes whole directories (sites-enabled/*), so a backup
+# there would load as a second copy of the vhost.
+if [[ "$TYPE" == host-nginx ]]; then
+  mkdir -p "$STAGING_DIR/safe-patch-backups"
+  BACKUP="$STAGING_DIR/safe-patch-backups/$(realpath -m "$FILE_PATH" | tr / _).safe-patch-${STAMP}"
+fi
 HEALTH_TIMEOUT="${SAFE_PATCH_HEALTH_TIMEOUT:-90}"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOGFILE"; }

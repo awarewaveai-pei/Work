@@ -40,6 +40,8 @@ check "baseline serves v1" test "$(body)" = v1
 out="$(vhost 'return 200 "v2";' | patch /etc/nginx/conf.d/t.conf t.test)"; rc=$?
 check "valid change -> exit 0" test "$rc" = 0
 check "valid change is live after reload" test "$(body)" = v2
+check "backup kept outside /etc/nginx (whole-dir includes would load it)" \
+  test "$(docker exec "$C" sh -c 'ls /etc/nginx/conf.d | grep -c safe-patch; ls /root/lobster-phase1/safe-patch-backups | grep -c "_etc_nginx_conf.d_t.conf.safe-patch-"')" = "$(printf '0\n1')"
 
 before="$(sum)"
 out="$(vhost 'return 200 "v3" ;; nonsense_directive on;' | patch /etc/nginx/conf.d/t.conf t.test)"; rc=$?
