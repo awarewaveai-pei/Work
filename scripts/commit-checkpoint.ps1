@@ -135,6 +135,22 @@ try {
         exit $LASTEXITCODE
     }
     Write-Host "commit-checkpoint: local commit created (not pushed)." -ForegroundColor Green
+
+    # TASKS.md:655 -- this commit never goes through a Bash tool call, so
+    # doc-link-commit-check.js (PostToolUse: Bash `git commit`) never sees it. Never blocks: the
+    # commit above already happened; this only records the result for smoke-status-digest.ps1.
+    try {
+        . (Join-Path $PSScriptRoot "lib/post-commit-doc-check.ps1")
+        $docCheck = Invoke-PostCommitDocCheck -ValidatorWorkRoot $WorkRoot -Source "commit-checkpoint.ps1"
+        if (-not $docCheck.ok) {
+            Write-Host "commit-checkpoint: post-commit doc-integrity check could not run: $($docCheck.error)" -ForegroundColor Yellow
+        } elseif ($docCheck.brokenCount -gt 0) {
+            Write-Host "commit-checkpoint: WARNING -- this commit leaves $($docCheck.brokenCount) broken relative doc link(s); see agency-os/reports/status/doc-integrity-commits-LATEST.json" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "commit-checkpoint: post-commit doc-integrity check threw (non-fatal): $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+
     exit 0
 } finally {
     Pop-Location

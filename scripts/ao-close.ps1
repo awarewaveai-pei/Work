@@ -1300,6 +1300,21 @@ Repair it first, then re-run:
             Write-Error "ao-close: git commit failed"
             exit 1
         }
+
+        # TASKS.md:655 -- this commit runs inside PowerShell, never through a Bash tool call, so
+        # doc-link-commit-check.js (PostToolUse: Bash `git commit`) never sees it. Never blocks:
+        # the commit above already succeeded; this only records the result.
+        try {
+            . (Join-Path $PSScriptRoot "lib/post-commit-doc-check.ps1")
+            $docCheck = Invoke-PostCommitDocCheck -ValidatorWorkRoot $WorkRoot -Source "ao-close.ps1 (sync commit)"
+            if (-not $docCheck.ok) {
+                Write-Host "== AO-CLOSE: post-commit doc-integrity check could not run: $($docCheck.error) ==" -ForegroundColor Yellow
+            } elseif ($docCheck.brokenCount -gt 0) {
+                Write-Host "== AO-CLOSE: WARNING -- this commit leaves $($docCheck.brokenCount) broken relative doc link(s); see agency-os/reports/status/doc-integrity-commits-LATEST.json ==" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "== AO-CLOSE: post-commit doc-integrity check threw (non-fatal): $($_.Exception.Message) ==" -ForegroundColor Yellow
+        }
     } else {
         Write-Host "== AO-CLOSE: nothing to commit (working tree clean after add) ==" -ForegroundColor DarkGray
     }
@@ -1395,6 +1410,19 @@ Repair it first, then re-run:
                         if ($LASTEXITCODE -ne 0) {
                             Write-Warning "AO-CLOSE: could not commit report skeleton (non-fatal, will remain staged/uncommitted on disk): git commit exited $LASTEXITCODE"
                         } else {
+                            # TASKS.md:655 -- same reasoning as the main sync commit above: this
+                            # commit never goes through a Bash tool call either.
+                            try {
+                                . (Join-Path $PSScriptRoot "lib/post-commit-doc-check.ps1")
+                                $skeletonDocCheck = Invoke-PostCommitDocCheck -ValidatorWorkRoot $WorkRoot -Source "ao-close.ps1 (report skeleton commit)"
+                                if (-not $skeletonDocCheck.ok) {
+                                    Write-Host "AO-CLOSE: post-commit doc-integrity check could not run: $($skeletonDocCheck.error)" -ForegroundColor Yellow
+                                } elseif ($skeletonDocCheck.brokenCount -gt 0) {
+                                    Write-Host "AO-CLOSE: WARNING -- report skeleton commit leaves $($skeletonDocCheck.brokenCount) broken relative doc link(s); see agency-os/reports/status/doc-integrity-commits-LATEST.json" -ForegroundColor Yellow
+                                }
+                            } catch {
+                                Write-Host "AO-CLOSE: post-commit doc-integrity check threw (non-fatal): $($_.Exception.Message)" -ForegroundColor Yellow
+                            }
                             # m3-6 fix (critic round 3): the push result was never checked --
                             # Invoke-SafeGitPush throws on failure (caught below), but the
                             # bare-git fallback's exit code was silently discarded, so a
