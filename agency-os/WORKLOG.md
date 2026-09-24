@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-24（續141）研究線：版面規則 U20（預設一欄；多方法卡片依寬度 2／1 欄，永不 3 欄）；計畫 v1.24
+- [觸發] 操作者看結果頁 ⑧ 候選卡在寬窗 3 欄、窄窗 2 欄：「不要三欄」→「多個模型下才 2 欄一組」→「依寬度自動變 2 欄或 1 欄」。
+- [根因] `.nexts`／`.stations` 用 `auto-fit,minmax(230px)` 無上限；其他區塊（三步驟、圖表、KPI、能／不能、好／壞例、課程雙欄）寫死 2–3 欄。
+- [已改] 四份示意稿：方法卡格改 `repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr))`（上限 2 欄）；其餘一律 `1fr`；圖表 svg `max-width:640px` 置中；死掉的 media 覆寫刪除。計畫 v1.24：§3.9 新增 U20、I11 結果頁 v2.6。線上：結果 v11、方法課 v9、工作流總覽 v5、工作流課 v6。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_two_col.py（15 處計數斷言＋html.parser 四檔標籤配對）+ build_artifact.py ×4 + grep -c auto-fit/'1fr 1fr'/'repeat(3' 於四份輸出 + Artifact publish ×4 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿 CSS 與計畫文字
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/docs | grep=repeat\(3,1fr\)|minmax\(2[0-9]0px|1fr 1fr | hits=0
+- [下一步] WC-PIa-01；新殼 `web/app/globals.css` 落地時照 U20。
 ## 2026-09-24（續140）研究線：色調改用 HCI 整組（含背景）；四份示意稿、build script、計畫 U19 v1.23
 - [觸發] 操作者：「用 HCI.aware-wave.com 的色調，包括背景色，比較舒服。」
 - [來源] `Projects/internal/hci30/app/public/index.html:15-19`：bg `#f6f2e9`、card `#fffdf8`、border `#e3dbc8`、text `#232019`、muted `#7a7261`、teal `#0e5b50`／`#093f38`、tint `#e2eeea`、狀態 `#1f6b47`／`#a3611c`／`#a13328`；字體 PingFang TC／Microsoft JhengHei。
