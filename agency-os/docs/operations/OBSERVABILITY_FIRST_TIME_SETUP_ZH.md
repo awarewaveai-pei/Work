@@ -11,7 +11,7 @@ VPS 上 Grafana 只綁 **`127.0.0.1:3009`**。你瀏覽器打的 **`http://127.0
 
 **正確順序**：① 開 tunnel（終端機保持開著，或用 `-Background`）→ ② 再開瀏覽器。
 
-1. 確認 `~/.ssh/config`（Windows：`C:\Users\<你>\.ssh\config`）裡有 **`Host hetzner`**（或你慣用的別名），且 `ssh hetzner` 能登入。
+1. 不需要 ssh 別名：腳本經 `scripts/lib/prod-host.ps1` 直連主機（`ubuntu@145.239.195.47:58122`，key `~/.ssh/id_ed25519`）。先確認 `ssh -p 58122 ubuntu@145.239.195.47 true` 能登入。
 2. 在 monorepo **根目錄** PowerShell 執行（**先執行這個，再開網頁**）：
 
 ```powershell
@@ -22,7 +22,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\open-grafana-ssh-t
 4. 進 Grafana 後：**Home** 應直接是 **AwareWave 觀測首頁**（導覽 + Nginx / Syslog 日誌）。若仍是空白 Welcome 頁、或 **Browse → AwareWave** 沒有儀表板，代表 VPS 尚未同步 compose／儀表板檔；在 monorepo 根執行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-hetzner-observability-grafana-content.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-observability-grafana-content.ps1
 ```
 
 5. 若要背景跑（可關掉這個 PowerShell 視窗），改用：
@@ -36,7 +36,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\open-grafana-ssh-t
 6. 帳號 **`admin`**；密碼在 VPS（**只在那裡**，不要貼聊天）：
 
 ```bash
-ssh hetzner "sudo grep GRAFANA_ADMIN_PASSWORD /root/lobster-phase1/observability/.env.observability"
+ssh -p 58122 ubuntu@145.239.195.47 "sudo grep GRAFANA_ADMIN_PASSWORD /root/lobster-phase1/observability/.env.observability"
 ```
 
 7. 用完：foreground 模式在該終端機 **Ctrl+C**；background 模式用工作管理員結束對應 **ssh** 或 `Get-Process ssh | Stop-Process`（會關掉所有 ssh，請謹慎）。
@@ -46,7 +46,7 @@ ssh hetzner "sudo grep GRAFANA_ADMIN_PASSWORD /root/lobster-phase1/observability
 在 vault 已有 **`AGENCY_OS_SLACK_WEBHOOK_URL`** 的前提下，於 monorepo 根執行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-hetzner-grafana-alerting-slack.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-grafana-alerting-slack.ps1
 ```
 
 會在 VPS 寫入 **Unified Alerting** 的 **Slack Contact point**（`infra-alerts-slack`）並把**根通知政策**指到該 Slack。之後你在 Grafana **Alerting → Alert rules** 新增規則（例如 Loki 查詢），**觸發時就會發 Slack**。
@@ -89,7 +89,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\secrets-vault.ps1 
 ### 1.4 同步到 VPS
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-hetzner-pagerduty-endpoint-alert.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-pagerduty-endpoint-alert.ps1
 ```
 
 ### 1.5 驗證

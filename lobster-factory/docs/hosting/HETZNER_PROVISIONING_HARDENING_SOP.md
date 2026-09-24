@@ -69,7 +69,7 @@ Hetzner 是**高 CP 值 unmanaged 主機，不是 managed WordPress**。以下 1
 |------|------------------|
 | 部署 | `/sg-deploy` `/check-drift` slash cmd；`sg-deploy.sh` `check-drift-and-alert.sh` |
 | 健康/監控 | `/health` `/smoke-test` `/signals`；`endpoint-alert.sh`（systemd timer）；Netdata |
-| 安全/vault | `/vault-status` `/vault-sync`；`secrets-vault.ps1`；`sync-hetzner-*.ps1`（vault→/etc/default） |
+| 安全/vault | `/vault-status` `/vault-sync`；`secrets-vault.ps1`；`sync-*.ps1`（vault→/etc/default） |
 | VPS 維運 | `/sg-reboot` `/eu-reboot` `/auto-reboot-status`；`52/53 auto-reboot.conf` |
 | 備份 | `backup-phase1.sh` + `verify-backup.sh`（cron 02:00/02:30 UTC + offsite rclone） |
 | 維護 cron | `install-maintenance-crons.sh`（冪等 + host 偵測） |

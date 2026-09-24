@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Centralises the vault read pattern that was previously duplicated across
-  sync-hetzner-slack-alert-webhooks.ps1, command-plane-smoke.ps1, and others.
+  sync-slack-alert-webhooks.ps1, command-plane-smoke.ps1, and others.
   New scripts SHOULD dot-source this. Older inline copies will be migrated
   on next touch (NOT a forced rewrite — avoids regression risk in working code).
 

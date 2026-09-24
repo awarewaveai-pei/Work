@@ -19,6 +19,11 @@
  *   --host <user@host> [--port N] [--identity FILE]
  *               read-only sweep of a live host over `ssh ... sudo -n bash -s`: /etc /root /home
  *               /opt /srv, crontabs, /usr/local/{bin,sbin}, docker container env. Not a gate.
+ *   --ssh-config [FILE]
+ *               operator machine: every concrete `Host` alias in FILE (default ~/.ssh/config, plus
+ *               its Include files) resolved through `ssh -G` (and DNS when the HostName is a name).
+ *               An alias hides the address from the repo gate -- the 2026-09-24 case: aliases for
+ *               released SG/EU addresses kept being the default target of 7 operator scripts.
  *   --json      machine-readable result.
  *
  * Opt-out per line: `released-ip-ok: <reason>` on the same line (always reported, never silent).
@@ -28,9 +33,11 @@
  * Exit: 0 = no new violation, 1 = new violation(s), 2 = error.
  */
 
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { join, resolve, extname } from 'node:path';
+import { join, resolve, extname, dirname, basename, isAbsolute } from 'node:path';
+import { homedir } from 'node:os';
+import { lookup } from 'node:dns/promises';
 import { fileURLToPath } from 'node:url';
 
 const REPO = join(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -416,13 +423,87 @@ function scanHost(args, ranges) {
   return { scope: `host ${args.host}`, ...parsed };
 }
 
+// ------------------------------------------------------------------ ssh-config mode (operator machine)
+
+/** Concrete aliases (no * ? ! patterns) with their 1-based line and the block's own HostName (static,
+ *  first one wins like ssh), plus Include patterns, from ssh_config text. */
+export function parseSshConfig(text) {
+  const hosts = [], includes = [];
+  let block = [];
+  text.split(/\r?\n/).forEach((l, i) => {
+    const h = /^\s*Host\s+(.+?)\s*$/i.exec(l);
+    if (h) {
+      block = h[1].split(/\s+/).filter((n) => !/[*?!]/.test(n)).map((alias) => ({ alias, line: i + 1, hostName: null }));
+      hosts.push(...block);
+      return;
+    }
+    if (/^\s*Match\s/i.test(l)) { block = []; return; }
+    const hn = /^\s*HostName\s+(\S+)/i.exec(l);
+    if (hn) for (const b of block) b.hostName ??= hn[1];
+    const inc = /^\s*Include\s+(.+?)\s*$/i.exec(l);
+    if (inc) includes.push(...inc[1].split(/\s+/));
+  });
+  return { hosts, includes };
+}
+
+/** `hostname` value of `ssh -G <alias>` output. */
+export function hostnameFromSshG(out) {
+  const m = /^hostname\s+(\S+)/m.exec(out ?? '');
+  return m ? m[1] : null;
+}
+
+// ssh_config Include: relative paths are under ~/.ssh; `*` in the last path segment only (enough for
+// conf.d-style includes; anything fancier still resolves through `ssh -G`, it just is not enumerated).
+function expandInclude(pattern) {
+  const p = isAbsolute(pattern) ? pattern : pattern.startsWith('~') ? join(homedir(), pattern.slice(1)) : join(homedir(), '.ssh', pattern);
+  if (!/[*?]/.test(basename(p))) return existsSync(p) ? [p] : [];
+  const re = new RegExp('^' + basename(p).replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
+  try { return readdirSync(dirname(p)).filter((f) => re.test(f)).map((f) => join(dirname(p), f)); } catch { return []; }
+}
+
+/** Findings for aliases whose resolved HostName (IP literal, or DNS answer) is in a released range. */
+export async function scanSshConfig(file, ranges, deps = {}) {
+  const sshG = deps.sshG ?? ((alias) => spawnSync('ssh', ['-G', '-F', file, alias], { encoding: 'utf8', timeout: 15_000 }));
+  const resolveName = deps.resolveName ?? (async (name) => (await lookup(name, { all: true })).map((a) => a.address));
+  if (!existsSync(file)) return { scope: `ssh-config ${file}`, findings: [], hosts: 0, note: 'no ssh config file' };
+  const seen = new Set(), files = [file], hosts = [];
+  while (files.length) {
+    const f = files.shift();
+    if (seen.has(f)) continue;
+    seen.add(f);
+    const { hosts: h, includes } = parseSshConfig(readFileSync(f, 'utf8'));
+    hosts.push(...h.map((x) => ({ ...x, file: f })));
+    for (const inc of includes) files.push(...expandInclude(inc));
+  }
+  // Both sources are checked: `ssh -G` (Match/Include/defaults exactly as ssh applies them) AND the
+  // block's static HostName (an ssh build that cannot follow an Include path, or no ssh client at all,
+  // must not turn an alias into a silent "unresolvable").
+  const findings = [];
+  let unresolved = 0;
+  for (const { alias, line, hostName, file: f } of hosts) {
+    let viaSsh = null;
+    try { viaSsh = hostnameFromSshG(sshG(alias).stdout); } catch { /* no ssh client: static only */ }
+    const names = [...new Set([viaSsh, hostName].filter((n) => n && n !== alias))];
+    if (!names.length) { unresolved++; continue; }
+    const hits = [];
+    for (const name of names) {
+      let addrs = parseCidr(name) ? [name] : [];
+      if (!addrs.length) { try { addrs = await resolveName(name); } catch { continue; } } // unresolvable name = fails closed
+      for (const a of addrs) { const t = parseCidr(a); const rg = t && ranges.find((x) => overlaps(t, x)); if (rg) hits.push(`${a} in ${rg.text}`); }
+    }
+    if (hits.length) findings.push({ file: `ssh-config:${f}`, line, text: `Host ${alias} -> ${names.join(' | ')}`, hits: [...new Set(hits)], annotation: null });
+  }
+  return { scope: `ssh-config ${file}`, findings, hosts: hosts.length, unresolved };
+}
+
 // ------------------------------------------------------------------ CLI
 
 function parseArgs(argv) {
-  const a = { json: false, host: null, port: null, identity: null };
+  const a = { json: false, host: null, port: null, identity: null, sshConfig: null };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--json') a.json = true;
+    else if (k === '--ssh-config') a.sshConfig = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : join(homedir(), '.ssh', 'config');
     else if (k === '--host') a.host = argv[++i];
     else if (k === '--port') { a.port = Number(argv[++i]); if (!Number.isInteger(a.port) || a.port < 1 || a.port > 65535) throw new Error('--port needs 1-65535'); }
     else if (k === '--identity') a.identity = argv[++i];
@@ -436,7 +517,9 @@ function render(res, cls, ranges) {
   const out = [];
   const head = res.scope === 'repo'
     ? `files listed=${res.filesListed} in-scope=${res.filesInScope} candidates=${res.candidates} skipped(>5MB/binary/unreadable)=${res.skipped}`
-    : `backup-copies(not live)=${res.backups} repo-mirror/doc lines skipped=${res.mirrors}`;
+    : res.scope.startsWith('ssh-config')
+      ? `aliases=${res.hosts} unresolvable(fail closed)=${res.unresolved ?? 0}${res.note ? ' ' + res.note : ''}`
+      : `backup-copies(not live)=${res.backups} repo-mirror/doc lines skipped=${res.mirrors}`;
   out.push(`released-address check | ${ranges.length} ranges from ${REGISTRY_REL} | scope=${res.scope} | ${head}`);
   const row = (tag, f, extra) => out.push(`  ${tag.padEnd(9)} ${f.file}${f.line ? ':' + f.line : ''}  ${f.text.slice(0, 150)}  [${f.hits.join(', ')}]${extra ? '  ' + extra : ''}`);
   cls.newViolations.forEach((f) => row('NEW', f));
@@ -447,7 +530,7 @@ function render(res, cls, ranges) {
   return out.join('\n');
 }
 
-function main() {
+async function main() {
   let args, reg;
   try {
     args = parseArgs(process.argv.slice(2));
@@ -456,9 +539,10 @@ function main() {
     console.error(`ERROR: ${e.message}`);
     return 2;
   }
-  const res = args.host ? scanHost(args, reg.ranges) : scanRepo(REPO, reg.ranges);
+  const res = args.sshConfig ? await scanSshConfig(args.sshConfig, reg.ranges)
+    : args.host ? scanHost(args, reg.ranges) : scanRepo(REPO, reg.ranges);
   if (res.error) { console.error(`ERROR: ${res.error}`); return 2; }
-  const cls = classify(res.findings, args.host ? [] : reg.known);
+  const cls = classify(res.findings, args.host || args.sshConfig ? [] : reg.known);
   if (args.json) console.log(JSON.stringify({ scope: res.scope, ...cls, meta: { ...res, findings: undefined } }, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
   else console.log(render(res, cls, reg.ranges));
   return cls.newViolations.length ? 1 : 0;
@@ -466,4 +550,4 @@ function main() {
 
 const invokedDirectly =
   Boolean(process.argv[1]) && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
-if (invokedDirectly) process.exit(main());
+if (invokedDirectly) main().then((code) => process.exit(code));

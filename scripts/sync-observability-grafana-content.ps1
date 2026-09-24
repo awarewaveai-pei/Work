@@ -1,10 +1,13 @@
 param(
-    [string]$SshTarget = "hetzner",
+    [string]$SshTarget = "",
     [string]$RemoteDir = "/root/lobster-phase1"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "lib\prod-host.ps1")
+$sshArgs = Get-ProdSshArgs $SshTarget
+$scp = Get-ProdScpArgs $SshTarget
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $coreDir = Join-Path $repoRoot "lobster-factory\infra\hetzner-phase1-core"
@@ -26,13 +29,13 @@ if ($dashFiles.Count -eq 0) {
 $rid = [Guid]::NewGuid().ToString("n")
 $remoteStage = "/tmp/aw-grafana-sync-$rid"
 
-Write-Host "== sync: observability compose + Grafana home + $($dashFiles.Count) provisioned dashboard(s) -> ${SshTarget}:$RemoteDir ==" -ForegroundColor Cyan
+Write-Host "== sync: observability compose + Grafana home + $($dashFiles.Count) provisioned dashboard(s) -> $(Get-ProdLabel $SshTarget):$RemoteDir ==" -ForegroundColor Cyan
 
-ssh $SshTarget "mkdir -p '$remoteStage' && chmod 0755 '$remoteStage'"
+ssh @sshArgs "mkdir -p '$remoteStage' && chmod 0755 '$remoteStage'"
 if ($LASTEXITCODE -ne 0) { throw "ssh mkdir failed (exit $LASTEXITCODE)" }
 
 $scpArgs = @($compose, $dashProv, $homeDash) + ($dashFiles | ForEach-Object { $_.FullName })
-scp @scpArgs "${SshTarget}:${remoteStage}/"
+scp @($scp.Options + $scpArgs + "$($scp.Dest):${remoteStage}/")
 if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)" }
 
 $remote = @'
@@ -71,14 +74,14 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($tmpSh, $remote.Replace("`r`n", "`n"), $utf8NoBom)
 
 try {
-    scp $tmpSh "${SshTarget}:/tmp/obs-grafana-content.sh"
+    scp @($scp.Options + @($tmpSh, "$($scp.Dest):/tmp/obs-grafana-content.sh"))
     if ($LASTEXITCODE -ne 0) { throw "scp script failed (exit $LASTEXITCODE)" }
-    ssh $SshTarget "chmod 0755 /tmp/obs-grafana-content.sh && sudo bash /tmp/obs-grafana-content.sh && rm -f /tmp/obs-grafana-content.sh"
+    ssh @sshArgs "chmod 0755 /tmp/obs-grafana-content.sh && sudo bash /tmp/obs-grafana-content.sh && rm -f /tmp/obs-grafana-content.sh"
     if ($LASTEXITCODE -ne 0) { throw "Remote bash failed (exit $LASTEXITCODE)" }
 } finally {
     Remove-Item -LiteralPath $tmpSh -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "sync-hetzner-observability-grafana-content: OK" -ForegroundColor Green
+Write-Host "sync-observability-grafana-content: OK" -ForegroundColor Green
 Write-Host "After reload: Grafana Home = AwareWave landing (Loki). More dashboards: Dashboards -> Browse -> AwareWave." -ForegroundColor DarkGray
 exit 0

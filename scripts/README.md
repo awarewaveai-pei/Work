@@ -98,10 +98,10 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 |--------|---------|
 | `open-grafana-ssh-tunnel.ps1` | Open SSH tunnel to Grafana |
 | `open-supabase-ssh-tunnel.ps1` | Open SSH tunnel to Supabase Postgres |
-| `sync-hetzner-grafana-alerting-slack.ps1` | Sync Grafana alerting → Slack |
-| `sync-hetzner-observability-grafana-content.ps1` | Sync Grafana dashboards/content |
-| `sync-hetzner-pagerduty-endpoint-alert.ps1` | Sync PagerDuty endpoint alerts |
-| `sync-hetzner-slack-alert-webhooks.ps1` | Sync Slack alert webhooks |
+| `sync-grafana-alerting-slack.ps1` | Sync Grafana alerting → Slack |
+| `sync-observability-grafana-content.ps1` | Sync Grafana dashboards/content |
+| `sync-pagerduty-endpoint-alert.ps1` | Sync PagerDuty endpoint alerts |
+| `sync-slack-alert-webhooks.ps1` | Sync Slack alert webhooks |
 | `public-endpoint-smoke.ps1` | Smoke test public endpoints (HTTP-only; Playwright gives browser-level equivalent) |
 | `playwright-runner.ps1` | Playwright E2E orchestrator — smoke / qa / client / screenshot / a11y / perf / install. Called by `/playwright` skill. |
 | `ops-console-bootstrap.ps1` | Bootstrap ops console |

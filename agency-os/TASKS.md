@@ -138,8 +138,17 @@
 - [x] **【資安｜輪替】hosting-bridge key `SG_SSH_PRIVATE_KEY_B64`（.env:146）曾整串印進本機 session transcript（2026-09-23，未離開本機）**
   - `✅ 完成` · `2026-09-24` · 新 key `HOSTING_BRIDGE_SSH_KEY_B64`（`SHA256:W1AwtU…`，只能跑 `aw-hosting-gate.sh`）上線；舊 key（ECDSA `MQe2uV…`）從 `.env` 刪除，本就不在任何 authorized_keys。殘留：`.env.bak.20260924-hosting-bridge` 仍含舊 key（零權限），下方 MainWP 條目 E2E 過後刪。WORKLOG 2026-09-24 續136/續138。
 
-- [ ] **【資安｜退租位址】SSH 別名 `hetzner-sg`／`hetzner`／`hetzner-eu` 指向已退租 IP，仍有 2 支腳本預設使用**
-  - `🟠 現行` · `2026-09-24` · 本機 `~/.ssh/config` 三個 Host 指 5.223.93.113／204.168.175.41（root＋`hetzner_trigger` key）；`scripts/sync-hetzner-endpoint-alert-heartbeat.ps1:36`、`scripts/diff-env-vs-vault.ps1:47` 預設仍用它；`agency-os/docs/operations/APP_AWARE_WAVE_CURRENT_STATE.md:130` 仍寫。`check-staging-orphans.ps1` 已改（WORKLOG 2026-09-24 續144）。下一步：兩支腳本改 ks-aw-01 明確參數（同 check-backup-health）；操作者刪 `~/.ssh/config` 三個 Host 區塊（安全設定，不代改）；`verify-no-released-addresses.mjs` 加掃別名名稱。
+- [x] **【資安｜退租位址】SSH 別名指向已退租 IP，7 支腳本預設使用**
+  - `✅ 完成` · `2026-09-24` · 別名 3 個自 `~/.ssh/config` 移除（備份 `config.bak-20260924-released-aliases`）＋`known_hosts` 清兩個舊位址；7 支腳本改走 `scripts/lib/prod-host.ps1`（主機事實單一來源），5 支 `sync-hetzner-*` 改名為供應商中立 `sync-*`；守衛 `verify-no-released-addresses.mjs --ssh-config` 接進 `system-health-check.ps1`。WORKLOG 2026-09-24 續147。
+
+- [ ] **【資安｜輪替】root crontab 明文 bearer token（`*/30 … /api/ops/probe`）；2026-09-24 前綴曾印進本機 session transcript**
+  - `🟠 現行` · `2026-09-24` · 下一步：輪替該 token；crontab 改讀 root-only env 檔（不把值寫在 crontab）；同步更新 next-admin 驗證端。
+
+- [ ] **【命名】repo 仍有供應商名殘留：目錄 `lobster-factory/infra/hetzner-phase1-core`、MCP server `hetzner-ssh`、`hetzner_trigger` key 名、`lobster-factory/docs/hosting/HETZNER_*.md`**
+  - `🟡 潛伏` · `2026-09-24` · 操作者多次指出主機已不在該供應商。目錄改名影響 sg-deploy／sync-host-scripts／CI／數百處引用，需單獨一輪（`git mv`＋全庫引用更新＋主機 `/root/Work` 同步驗證）。
+
+- [ ] **【Soulful｜效能】wp-cron 自搬機後失聯＋nginx 快取 60s 無背景更新＋存取日誌無耗時**
+  - `🔴 現行` · `2026-09-24` · `等操作者「做」` · 證據：`DISABLE_WP_CRON=1` 但無觸發（`*/5` crontab 打的是 8090=mainwp-web，Soulful 是 8081；`cutover-sync.sh:324` 搬機時刻意移除、事後沒補）→ 74 個排程逾期、每天只跑 1–2 次（05:05Z 一次＋Hostinger 舊 cron）；Kuma 7 天 4 次卡頓（`/wp-json/` 324.8s／50.7s／37.5s、首頁 17.2s，皆 17:29–18:45Z）；非主機負載（CPU 72% idle）。計畫：容器內 WP-CLI 每分鐘跑 due 事件＋runbook 補步驟＋偵測；`proxy_cache_background_update`＋`use_stale`；nginx log 加 `$request_time`＋慢請求 mu-plugin；操作者刪 Hostinger 舊 cron。
 
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
   - `🔴 現行` · `2026-09-21` · `等 site-watch 解除 DEPLOY_HOLD（SITE_WATCH_MASTER_PLAN §7 step 10c）`
@@ -1162,8 +1171,8 @@
 
 - [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
   - **【未開始】**
-  - **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。
-  - **完成定義**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。
+  - **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。
+  - **完成定義**：(a) 新 `scripts/sync-endpoint-alert-script.ps1`（仿 `sync-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。
   - **證據**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
 
 - [x] **【✅ MOOT，2026-08-30 稽核確認】~~SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）~~** — 從未查出輪詢來源（完成定義未達成），但這台 2 核 SG 機器本身已於 2026-08-28 整併進 ks-aw-01（8c/16t）、2026-08-30 刪除退租——「2 核資源被 docker 執行層開銷壓縮」這個前提已不存在。若 ks-aw-01 上出現類似的 containerd/dockerd 異常高 CPU，屬新現象，需另開新項目重新調查，不能直接沿用這條的診斷（核心數、負載特徵都不同）。

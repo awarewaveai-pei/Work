@@ -1,4 +1,18 @@
 ﻿# Worklog
+## 2026-09-24（續147）退租位址 ssh 別名全數移除：7 支腳本改走 `scripts/lib/prod-host.ps1`、5 支改供應商中立名 `sync-*`、新守衛 `--ssh-config` 進健康檢查
+
+- **根因**：本機 `~/.ssh/config` 的 `hetzner-sg`／`hetzner`／`hetzner-eu` 指向已退租 5.223.93.113／204.168.175.41（root＋舊 key），7 支操作腳本預設用它（`sync-*` ×5、`open-grafana-ssh-tunnel.ps1`、`diff-env-vs-vault.ps1`）；`check-staging-orphans.ps1` 同因失明（續144 已修）。repo 閘 `verify-no-released-addresses.mjs` 只掃 IP 字面值，別名把位址藏在機器本地設定 → 整類漏網。操作者第 3 次指出「不用那家供應商了」：舊名留在程式碼就會一直被引用。
+- **改動**：
+  - 新 `scripts/lib/prod-host.ps1`：主機事實單一來源（ks-aw-01 `145.239.195.47:58122` ubuntu＋sudo、`id_ed25519`）；`Get-ProdSshArgs`／`Get-ProdScpArgs`／`Get-ProdLabel`，腳本 `-SshTarget`／`-SshHost` 覆寫仍有效。換主機只改這一檔。
+  - 7 支腳本改用它；`git mv` 5 支 `sync-hetzner-*` → `sync-{endpoint-alert-heartbeat,slack-alert-webhooks,pagerduty-endpoint-alert,observability-grafana-content,grafana-alerting-slack}.ps1`；`diff-env-vs-vault` 目標別名 `prod` = 主機；引用同步：scripts/README、`_vault-helpers.ps1`、2 份 HETZNER_* 規劃文件、endpoint-alert service／.local template 註解、2 個 Grafana 儀表板說明、ALERTING-PROVISIONING、OBSERVABILITY_{P1_P2_ROLLOUT,FIRST_TIME_SETUP_ZH}、slack-notification-routing、AUDIT_REGISTRY、APP_AWARE_WAVE_CURRENT_STATE（容器位址＋SSH 列）、TASKS 2 處。
+  - `~/.ssh/config`：3 個 Host 區塊移除（備份 `config.bak-20260924-released-aliases`）；`known_hosts` 清兩個舊位址（含 `[ip]:22`）與三個別名。
+  - 守衛：`verify-no-released-addresses.mjs --ssh-config [FILE]`：列舉具體 Host（含 Include），**同時**檢查 `ssh -G` 解析結果與區塊靜態 HostName（Windows 版 ssh 不跟 `C:/` Include 路徑、或無 ssh client 時都不會變成「無法解析」而放行），DNS 名稱會解析，解析不到 = fail closed；`system-health-check.ps1` 8b 接入（warn-only，同 8 的升級規則）。
+- **驗證**：8 支 PS parse ok；lib 實連 `ubuntu@ns31414856`、scp 往返；`diff-env-vs-vault -PresetSGNextAdmin` 實讀 7/7 MATCH（只比雜湊）；heartbeat `-DryRun` 目標 = ks-aw-01；Grafana tunnel `-Background` → `/api/health` 200（v10.4.3）後關閉；4 支會寫 prod 的 sync 腳本未實跑（只驗 ssh/scp 參數組成）。守衛：測試 40/40（新 6）；突變「拿掉靜態 HostName」→ 2 紅；舊設定備份實跑 → 3 NEW exit 1；現設定 PASS；健康檢查 328/328 含新項 PASS；repo 閘 PASS new=0。
+- **剩餘**：供應商名殘留（目錄 `hetzner-phase1-core`、MCP `hetzner-ssh`、key `hetzner_trigger`、`HETZNER_*.md`）→ TASKS【命名】；另開 TASKS：root crontab 明文 bearer token 輪替、Soulful wp-cron 失聯／快取（等操作者）。
+- **rollback**：`git revert <本 commit>`；`cp ~/.ssh/config.bak-20260924-released-aliases ~/.ssh/config`（不建議：那三個別名指向別人的位址）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ssh/scp via Get-ProdSshArgs` + `diff-env-vs-vault.ps1 -PresetSGNextAdmin` (7/7 MATCH) + `open-grafana-ssh-tunnel.ps1 -Background` (health 200) + `node scripts/verify-no-released-addresses.mjs --ssh-config <old backup>` (3 NEW) + `system-health-check.ps1` (328/328) | exit=0 | ms=19321
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex oracle `agency-os/reports/oracle/2026-09-24-partialreview-4cdd0222.md` NO FINDINGS，11 檔）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,mcp,runbooks | grep=`sync-hetzner|hetzner-sg|hetzner-eu|ssh hetzner|SshTarget = .hetzner` | hits=4（剩：`check-staging-orphans.ps1:44` 歷史說明、`PHASE_0_ISOLATION…md:77` 2026-09-06 證據列、`cost-model.ts:163-164` 註解掉的舊成本列，皆歷史，不改）
 ## 2026-09-24（續146）研究線：四頁示意稿視覺＋連貫性稽核（真的渲染成圖看、四頁互相對讀）；render-mocks.cjs；檢查器加跨頁事實表
 - [觸發] 操作者重申「丟三落四、不連續、不注意關聯性／排版／視覺舒適性／UI UX」。承認缺口：截圖逾時就放棄，從沒看過渲染後的畫面；四頁從沒互相對讀。
 - [看圖抓到] 冰山圖三個層名深字壓深冰（共用 `svg text{fill:var(--ink)}` 蓋掉 `fill="#fff"`，歷來每一版都有）；右欄文字被 viewBox 裁掉；圖 B 說明字壓兩支箭頭、信念框比字窄；「怎麼讀／你要做的」flex 把標籤和句子拆行；工作流課「完整介紹 →」連結斷字。

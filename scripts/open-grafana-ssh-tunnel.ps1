@@ -13,7 +13,7 @@
   .\scripts\open-grafana-ssh-tunnel.ps1
 
 .EXAMPLE
-  # Different SSH host alias from ~/.ssh/config
+  # A different host (ssh alias or user@host); default is the production host (scripts/lib/prod-host.ps1)
   .\scripts\open-grafana-ssh-tunnel.ps1 -SshHost my-vps
 
 .EXAMPLE
@@ -21,7 +21,7 @@
   .\scripts\open-grafana-ssh-tunnel.ps1 -Background
 #>
 param(
-    [string]$SshHost = "hetzner",
+    [string]$SshHost = "",
     [int]$LocalPort = 3009,
     [string]$RemoteHost = "127.0.0.1",
     [int]$RemotePort = 3009,
@@ -30,11 +30,14 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "lib\prod-host.ps1")
+$sshArgs = @(Get-ProdSshArgs $SshHost)
+$label = Get-ProdLabel $SshHost
 
 $remote = "${RemoteHost}:${RemotePort}"
 $bind = "127.0.0.1:${LocalPort}:${remote}"
 
-Write-Host "Grafana SSH tunnel: localhost:${LocalPort} -> ${SshHost}:${remote}" -ForegroundColor Cyan
+Write-Host "Grafana SSH tunnel: localhost:${LocalPort} -> ${label}:${remote}" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "IMPORTANT: Do not open the browser until this tunnel is running." -ForegroundColor Yellow
 Write-Host "  If you see ERR_CONNECTION_REFUSED, the tunnel is not active (wrong window closed, or never started)." -ForegroundColor Yellow
@@ -53,17 +56,17 @@ try {
 }
 
 if ($Background) {
-    Start-Process -FilePath $sshExe -ArgumentList @("-N", "-L", $bind, $SshHost) -WindowStyle Minimized
-    Write-Host "Started: $sshExe -N -L $bind $SshHost" -ForegroundColor Cyan
+    Start-Process -FilePath $sshExe -ArgumentList (@("-N", "-L", $bind) + $sshArgs) -WindowStyle Minimized
+    Write-Host "Started: $sshExe -N -L $bind $($sshArgs -join ' ')" -ForegroundColor Cyan
     Start-Sleep -Seconds 3
     $probe = Test-NetConnection -ComputerName 127.0.0.1 -Port $LocalPort -WarningAction SilentlyContinue
     if ($probe.TcpTestSucceeded) {
         Write-Host "Local port $LocalPort is accepting connections — open http://127.0.0.1:${LocalPort}/ now." -ForegroundColor Green
     } else {
-        Write-Host "Local port $LocalPort not open yet. Wait a few seconds or check SSH (firewall, Host $SshHost, key)." -ForegroundColor Yellow
+        Write-Host "Local port $LocalPort not open yet. Wait a few seconds or check SSH (firewall, host $label, key)." -ForegroundColor Yellow
     }
     Write-Host "To stop: Task Manager end 'ssh' for this forward, or: Get-Process ssh | Stop-Process" -ForegroundColor DarkGray
     exit 0
 }
 
-& $sshExe -N -L $bind $SshHost
+& $sshExe -N -L $bind @sshArgs

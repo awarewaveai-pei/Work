@@ -6,11 +6,11 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/default/awarewave-endpoint-alert
-# Optional: PAGERDUTY_ROUTING_KEY (Events API v2). Created by scripts/sync-hetzner-pagerduty-endpoint-alert.ps1
+# Optional: PAGERDUTY_ROUTING_KEY (Events API v2). Created by scripts/sync-pagerduty-endpoint-alert.ps1
 EnvironmentFile=-/etc/default/awarewave-endpoint-alert.pagerduty
 # Optional: Telegram phone backup. Create locally on the host; never commit bot tokens.
 EnvironmentFile=-/etc/default/awarewave-endpoint-alert.telegram
 # Operator extension drop-in: HEARTBEAT_URL, RENOTIFY_AFTER_SEC, custom CHECK_URLS overrides etc.
-# Survives sync-hetzner-slack-alert-webhooks.ps1 (which only rewrites the main file).
+# Survives sync-slack-alert-webhooks.ps1 (which only rewrites the main file).
 EnvironmentFile=-/etc/default/awarewave-endpoint-alert.local
 ExecStart=/usr/local/bin/endpoint-alert.sh

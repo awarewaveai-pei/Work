@@ -22,7 +22,8 @@
   How to reach the remote host. Currently supports two patterns:
     -Target docker:<container-name>  -> docker exec on local box (used inside SSH session)
     -Target ssh:<host-alias>:<container-name>  -> SSH to host, then docker exec
-  Default: ssh:hetzner-sg:lobster-next-admin
+  Default: ssh:prod:lobster-next-admin ("prod" = the production host from scripts/lib/prod-host.ps1;
+  any other alias / user@host is passed to ssh as-is)
 
 .PARAMETER Mapping
   Hashtable of "vault-key" -> "container-env-var" pairs. Use this when the names
@@ -38,13 +39,13 @@
 
 .EXAMPLE
   # Custom audit
-  .\scripts\diff-env-vs-vault.ps1 -Target ssh:hetzner-eu:trigger-webapp `
+  .\scripts\diff-env-vs-vault.ps1 -Target ssh:prod:trigger-webapp `
     -Mapping @{ TRIGGER_ACCESS_TOKEN='TRIGGER_ACCESS_TOKEN' }
 #>
 
 [CmdletBinding()]
 param(
-    [string] $Target = 'ssh:hetzner-sg:lobster-next-admin',
+    [string] $Target = 'ssh:prod:lobster-next-admin',
     [hashtable] $Mapping = @{},
     [switch] $PresetSGNextAdmin
 )
@@ -53,7 +54,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot "_vault-helpers.ps1")
-. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")  # CP950 protection for ssh/docker stdout capture
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+. (Join-Path $PSScriptRoot "lib\prod-host.ps1")  # CP950 protection for ssh/docker stdout capture
 
 if ($PresetSGNextAdmin) {
     $Mapping = @{
@@ -115,7 +117,8 @@ if ($useSsh) {
     # OpenSSH on Windows reliably forwards intact. Base64 contains no single
     # quotes so this is safe.
     # Force UTF-8 console — remote `printf` emits UTF-8; CP950 default would mojibake.
-    $rawOutput = Invoke-WithUtf8Console { & ssh $sshAlias "docker exec $container sh -c '$wrapper'" 2>&1 }
+    $sshArgs = Get-ProdSshArgs $(if ($sshAlias -eq 'prod') { '' } else { $sshAlias })
+    $rawOutput = Invoke-WithUtf8Console { & ssh @sshArgs "docker exec $container sh -c '$wrapper'" 2>&1 }
 } else {
     $rawOutput = Invoke-WithUtf8Console { & docker exec $container sh -c $wrapper 2>&1 }
 }

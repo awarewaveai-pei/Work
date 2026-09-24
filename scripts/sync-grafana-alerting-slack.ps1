@@ -1,6 +1,6 @@
 param(
     [string]$VaultSecretName = "AGENCY_OS_SLACK_WEBHOOK_URL",
-    [string]$SshTarget = "hetzner",
+    [string]$SshTarget = "",
     [string]$StorePath = "",
     [string]$RemoteDir = "/root/lobster-phase1",
     [string]$ContactPointName = "infra-alerts-slack"
@@ -8,6 +8,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "lib\prod-host.ps1")
+$sshArgs = Get-ProdSshArgs $SshTarget
+$scp = Get-ProdScpArgs $SshTarget
 
 function Resolve-VaultPath([string]$Custom) {
     if ($Custom) { return $Custom }
@@ -66,7 +69,7 @@ $cpName = $ContactPointName
 $rcvUid = "infra_slack_rcv"
 
 $yaml = @"
-# Managed by sync-hetzner-grafana-alerting-slack.ps1 — do not commit webhook to git.
+# Managed by sync-grafana-alerting-slack.ps1 — do not commit webhook to git.
 apiVersion: 1
 
 contactPoints:
@@ -118,14 +121,14 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
 Write-Host "== sync: Grafana unified alerting (Slack contact + root policy) + restart grafana ==" -ForegroundColor Cyan
 try {
-    scp $tmpSh "${SshTarget}:/tmp/grafana-alert-sync.sh"
+    scp @($scp.Options + @($tmpSh, "$($scp.Dest):/tmp/grafana-alert-sync.sh"))
     if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)" }
-    ssh $SshTarget "chmod 0755 /tmp/grafana-alert-sync.sh && sudo bash /tmp/grafana-alert-sync.sh && rm -f /tmp/grafana-alert-sync.sh"
+    ssh @sshArgs "chmod 0755 /tmp/grafana-alert-sync.sh && sudo bash /tmp/grafana-alert-sync.sh && rm -f /tmp/grafana-alert-sync.sh"
     if ($LASTEXITCODE -ne 0) { throw "Remote bash failed (exit $LASTEXITCODE)" }
 } finally {
     Remove-Item -LiteralPath $tmpSh -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "sync-hetzner-grafana-alerting-slack: OK" -ForegroundColor Green
+Write-Host "sync-grafana-alerting-slack: OK" -ForegroundColor Green
 Write-Host "In Grafana: Alerting -> Contact points -> confirm '$cpName'. Create alert rules under Alerting -> Alert rules (Loki queries)." -ForegroundColor DarkGray
 exit 0

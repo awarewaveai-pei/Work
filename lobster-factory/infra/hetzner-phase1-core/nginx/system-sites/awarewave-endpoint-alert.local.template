@@ -1,5 +1,5 @@
 ﻿# /etc/default/awarewave-endpoint-alert.local
-# Drop-in override - survives sync-hetzner-slack-alert-webhooks.ps1 rewrites.
+# Drop-in override - survives sync-slack-alert-webhooks.ps1 rewrites.
 # Install: copy this to /etc/default/awarewave-endpoint-alert.local on VPS.
 #
 # MONITORING SCOPE (2026-05-18 onwards):

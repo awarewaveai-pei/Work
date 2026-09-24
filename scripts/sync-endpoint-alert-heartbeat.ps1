@@ -1,12 +1,12 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  Sync the Uptime Kuma push monitor URL from local vault to SG VPS as
+  Sync the Uptime Kuma push monitor URL from local vault to the production host as
   /etc/default/awarewave-endpoint-alert.local HEARTBEAT_URL.
 
 .DESCRIPTION
   Closes a 30-year stability gap: today the heartbeat URL only lived on the
-  SG box. If the SG box is rebuilt or the .local file is wiped (parallel
+  host. If the host is rebuilt or the .local file is wiped (parallel
   agent edit, snapshot rollback, manual rm), the heartbeat goes silent
   forever — Kuma marks the monitor DOWN but no one notices. By making the
   vault the single source of truth and providing a one-command sync, the
@@ -18,22 +18,22 @@
 .PARAMETER VaultKey
   Vault entry name. Default: KUMA_HEARTBEAT_SG_ENDPOINT_ALERT.
 .PARAMETER SshTarget
-  SSH alias (resolved via ~/.ssh/config). Default: hetzner-sg.
+  Optional ssh target override (alias or user@host). Default: the production host from scripts/lib/prod-host.ps1.
 .PARAMETER RemoteFile
-  Destination path on SG. Default: /etc/default/awarewave-endpoint-alert.local.
+  Destination path on the host. Default: /etc/default/awarewave-endpoint-alert.local.
 .PARAMETER DryRun
   Preview action without writing.
 
 .EXAMPLE
-  .\scripts\sync-hetzner-endpoint-alert-heartbeat.ps1
+  .\scripts\sync-endpoint-alert-heartbeat.ps1
 .EXAMPLE
-  .\scripts\sync-hetzner-endpoint-alert-heartbeat.ps1 -DryRun
+  .\scripts\sync-endpoint-alert-heartbeat.ps1 -DryRun
 #>
 
 [CmdletBinding()]
 param(
     [string] $VaultKey   = 'KUMA_HEARTBEAT_SG_ENDPOINT_ALERT',
-    [string] $SshTarget  = 'hetzner-sg',
+    [string] $SshTarget  = '',
     [string] $RemoteFile = '/etc/default/awarewave-endpoint-alert.local',
     [switch] $DryRun
 )
@@ -42,6 +42,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot "_vault-helpers.ps1")
+. (Join-Path $PSScriptRoot "lib\prod-host.ps1")
 
 $store = Read-VaultStore (Resolve-VaultPath)
 $url = Get-VaultSecret -Store $store -Name $VaultKey
@@ -54,9 +55,9 @@ if ($url -notmatch '^https://[A-Za-z0-9._-]+/api/push/[A-Za-z0-9_-]+(\?.*)?$') {
 # Build deterministic .local content. Preserves human-facing template.
 # Keep this in sync with the operator drop-in baseline shipped on 2026-05-08.
 $localContent = @"
-# Operator drop-in for awarewave-endpoint-alert. Survives sync-hetzner-slack-alert-webhooks.ps1.
+# Operator drop-in for awarewave-endpoint-alert. Survives sync-slack-alert-webhooks.ps1.
 # Loaded by /etc/systemd/system/awarewave-endpoint-alert.service via EnvironmentFile=-.
-# Managed by scripts/sync-hetzner-endpoint-alert-heartbeat.ps1 — vault is the source of truth.
+# Managed by scripts/sync-endpoint-alert-heartbeat.ps1 — vault is the source of truth.
 # All keys here are OPTIONAL.
 
 # --- HEARTBEAT_URL ---
@@ -71,7 +72,7 @@ HEARTBEAT_URL="$url"
 "@
 
 if ($DryRun) {
-    Write-Host ("DRY RUN -- would write the following to {0}:{1}" -f $SshTarget, $RemoteFile) -ForegroundColor Yellow
+    Write-Host ("DRY RUN -- would write the following to {0}:{1}" -f (Get-ProdLabel $SshTarget), $RemoteFile) -ForegroundColor Yellow
     $localContent | Write-Host
     exit 0
 }
@@ -131,11 +132,12 @@ $remoteScript = $remoteScript.Replace("__B64__", $contentB64).Replace("__DEST__"
 $remoteB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
 $wrapper = "echo $remoteB64 | base64 -d | sudo bash"
 
-Write-Host ("== sync {0} -> {1}:{2} ==" -f $VaultKey, $SshTarget, $RemoteFile) -ForegroundColor Cyan
-& ssh $SshTarget $wrapper
+Write-Host ("== sync {0} -> {1}:{2} ==" -f $VaultKey, (Get-ProdLabel $SshTarget), $RemoteFile) -ForegroundColor Cyan
+$sshArgs = Get-ProdSshArgs $SshTarget
+& ssh @sshArgs $wrapper
 $exit = $LASTEXITCODE
 if ($exit -ne 0) {
     throw "Remote sync exited $exit. Inspect output above."
 }
 
-Write-Host "sync-hetzner-endpoint-alert-heartbeat: OK" -ForegroundColor Green
+Write-Host "sync-endpoint-alert-heartbeat: OK" -ForegroundColor Green

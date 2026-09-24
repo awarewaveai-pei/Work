@@ -8,9 +8,9 @@
 
 - 對外端點探測腳本：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（可選 **PagerDuty Events API v2**）
 - systemd unit：`lobster-factory/infra/hetzner-phase1-core/scripts/awarewave-endpoint-alert.service`（載入可選 `/etc/default/awarewave-endpoint-alert.pagerduty`）
-- Slack + Netdata 同步：`scripts/sync-hetzner-slack-alert-webhooks.ps1`
-- Grafana Unified Alerting → Slack（聯絡點 + 根政策）：`scripts/sync-hetzner-grafana-alerting-slack.ps1`（說明：`lobster-factory/infra/hetzner-phase1-core/observability/grafana/ALERTING-PROVISIONING.md`）
-- PagerDuty routing key 同步：`scripts/sync-hetzner-pagerduty-endpoint-alert.ps1`
+- Slack + Netdata 同步：`scripts/sync-slack-alert-webhooks.ps1`
+- Grafana Unified Alerting → Slack（聯絡點 + 根政策）：`scripts/sync-grafana-alerting-slack.ps1`（說明：`lobster-factory/infra/hetzner-phase1-core/observability/grafana/ALERTING-PROVISIONING.md`）
+- PagerDuty routing key 同步：`scripts/sync-pagerduty-endpoint-alert.ps1`
 - Log stack（可選）：`lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml` + `observability/`  
   - **為什麼留、何時加碼**：見 **[`OBSERVABILITY_STACK_STANCE.md`](OBSERVABILITY_STACK_STANCE.md)**（預設立場：break-glass 日誌、凍結指標擴張）。
 
@@ -37,7 +37,7 @@
 3. 將 **更新後的** `awarewave-endpoint-alert.service` 部署到 VPS（若尚未含第二個 `EnvironmentFile=-` 行）：
    - `sudo install -m 0644 awarewave-endpoint-alert.service /etc/systemd/system/awarewave-endpoint-alert.service`
    - `sudo systemctl daemon-reload`
-4. 從 monorepo 根執行：`powershell -ExecutionPolicy Bypass -File .\scripts\sync-hetzner-pagerduty-endpoint-alert.ps1`  
+4. 從 monorepo 根執行：`powershell -ExecutionPolicy Bypass -File .\scripts\sync-pagerduty-endpoint-alert.ps1`  
    - 會寫入 **`/etc/default/awarewave-endpoint-alert.pagerduty`**（與 Slack 用的 `awarewave-endpoint-alert` **分檔**，避免 Slack 同步覆寫 PD key）。
 5. 啟用 timer：`sudo systemctl enable --now awarewave-endpoint-alert.timer`
 6. 驗證：暫時把 `CHECK_URLS` 其中一個改成必敗 URL（**僅測試**）或等真實故障；PD 應出現 **incident**，恢復後應 **resolve**。
@@ -118,7 +118,7 @@ docker compose -f docker-compose.observability.yml ps
 
 | 鍵名 | 用途 |
 |:---|:---|
-| `AGENCY_OS_SLACK_WEBHOOK_URL` | Slack incoming webhook（已由 `sync-hetzner-slack-alert-webhooks.ps1` 使用） |
+| `AGENCY_OS_SLACK_WEBHOOK_URL` | Slack incoming webhook（已由 `sync-slack-alert-webhooks.ps1` 使用） |
 | `PAGERDUTY_ROUTING_KEY_ENDPOINT_ALERT` | endpoint-alert → PD Events API v2 |
 
 **不要**把 PD routing key 或 Slack webhook 寫進 git 或聊天；輪替後只更新 vault 再跑同步腳本。

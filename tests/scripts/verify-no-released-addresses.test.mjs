@@ -22,6 +22,7 @@ const mod = await import(pathToFileURL(SCRIPT).href);
 const {
   parseCidr, overlaps, findAddressHits, anchorRegex, familyOf, commentRanges, scanText,
   loadRegistry, classify, inRepoScope, scanRepo, parseHostOutput, HOST_SCRIPT, MASK_SED,
+  parseSshConfig, hostnameFromSshG, scanSshConfig,
 } = mod;
 
 const RANGES = loadRegistry({
@@ -376,4 +377,83 @@ test('parseHostOutput: classifies live/backup/mirror lines and container env, re
 test('parseHostOutput: missing @@DONE signals an incomplete sweep', () => {
   const parsed = parseHostOutput('@@GREP_EXIT=0\n', RANGES);
   assert.equal(parsed.done, false);
+});
+
+// ---------------------------------------------------------------- ssh-config mode (2026-09-24)
+
+test('parseSshConfig: concrete aliases with line numbers; wildcard / negated patterns skipped; Include captured', () => {
+  const { hosts, includes } = parseSshConfig('# c\nHost old-sg old-alt\n  HostName 5.223.93.113\nHost * !skip\n  User x\nInclude conf.d/*.conf\n');
+  assert.deepEqual(hosts, [{ alias: 'old-sg', line: 2, hostName: '5.223.93.113' }, { alias: 'old-alt', line: 2, hostName: '5.223.93.113' }]);
+  assert.deepEqual(includes, ['conf.d/*.conf']);
+});
+
+test('hostnameFromSshG: reads the hostname line of `ssh -G` output', () => {
+  assert.equal(hostnameFromSshG('user root\nhostname 5.223.93.113\nport 22\n'), '5.223.93.113');
+  assert.equal(hostnameFromSshG(''), null);
+});
+
+const HAS_SSH = spawnSync('ssh', ['-V']).status === 0;
+
+test('scanSshConfig: real `ssh -G` flags aliases resolving to released addresses (IP literal, DNS, Include)', { skip: !HAS_SSH && 'no ssh client' }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ssh-config-scan-'));
+  try {
+    const inc = join(dir, 'extra.conf').replace(/\\/g, '/');
+    writeFileSync(inc, 'Host inc-eu\n  HostName 204.168.175.41\n');
+    const cfg = join(dir, 'config');
+    writeFileSync(cfg, [
+      'Host old-sg', '  HostName 5.223.93.113', '  User root',
+      'Host fine', '  HostName 10.9.8.7',
+      'Host via-dns', '  HostName stale.example.invalid',
+      'Host gone-dns', '  HostName nothing.example.invalid',
+      'Host *', '  ServerAliveInterval 30',
+      `Include ${inc}`, '',
+    ].join('\n'));
+    const resolveName = async (name) => {
+      if (name === 'stale.example.invalid') return ['204.168.175.41'];
+      throw new Error('ENOTFOUND');
+    };
+    const res = await scanSshConfig(cfg, RANGES, { resolveName });
+    const flagged = res.findings.map((f) => f.text).sort();
+    assert.deepEqual(flagged, ['Host inc-eu -> 204.168.175.41', 'Host old-sg -> 5.223.93.113', 'Host via-dns -> stale.example.invalid']);
+    assert.equal(res.hosts, 5, 'old-sg, fine, via-dns, gone-dns, inc-eu');
+    assert.ok(!res.findings.some((f) => f.text.includes('gone-dns')), 'a name that does not resolve fails closed: not a violation');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('scanSshConfig: no ssh client at all -> static HostName still checked (never silently blind)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ssh-config-nossh-'));
+  try {
+    const cfg = join(dir, 'config');
+    writeFileSync(cfg, 'Host old-eu\n  HostName 204.168.175.41\nHost fine\n  HostName 10.9.8.7\n');
+    const sshG = () => { throw new Error('spawn ssh ENOENT'); };
+    const res = await scanSshConfig(cfg, RANGES, { sshG, resolveName: async () => { throw new Error('x'); } });
+    assert.deepEqual(res.findings.map((f) => f.text), ['Host old-eu -> 204.168.175.41']);
+    assert.ok(res.findings.every((f) => f.line > 0 && f.file.startsWith('ssh-config:')));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('scanSshConfig: missing file is not an error and finds nothing', async () => {
+  const res = await scanSshConfig(join(tmpdir(), 'no-such-ssh-config-' + Date.now()), RANGES);
+  assert.equal(res.findings.length, 0);
+  assert.equal(res.note, 'no ssh config file');
+});
+
+test('CLI --ssh-config: exit 1 and a NEW row for a released alias, exit 0 when clean', { skip: !HAS_SSH && 'no ssh client' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ssh-config-cli-'));
+  try {
+    const bad = join(dir, 'bad'); writeFileSync(bad, 'Host old-sg\n  HostName 5.223.93.113\n');
+    const good = join(dir, 'good'); writeFileSync(good, 'Host prod\n  HostName 10.9.8.7\n');
+    const rb = spawnSync(process.execPath, [SCRIPT, '--ssh-config', bad], { encoding: 'utf8' });
+    assert.equal(rb.status, 1, rb.stdout + rb.stderr);
+    assert.match(rb.stdout, /NEW\s+ssh-config:.*Host old-sg -> 5\.223\.93\.113/);
+    const rg = spawnSync(process.execPath, [SCRIPT, '--ssh-config', good], { encoding: 'utf8' });
+    assert.equal(rg.status, 0, rg.stdout + rg.stderr);
+    assert.match(rg.stdout, /RESULT: PASS new=0/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

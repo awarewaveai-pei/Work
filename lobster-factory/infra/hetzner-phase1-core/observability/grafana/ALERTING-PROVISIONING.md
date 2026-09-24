@@ -9,7 +9,7 @@
 由本機 vault 寫入 VPS：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-hetzner-grafana-alerting-slack.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-grafana-alerting-slack.ps1
 ```
 
 效果：
@@ -29,7 +29,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-hetzner-grafa
 推到 VPS：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-hetzner-observability-grafana-content.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-observability-grafana-content.ps1
 ```
 
 完成後：**Home** 應為 **AwareWave 觀測首頁**；**Dashboards → Browse → AwareWave** 另有預設儀表板。

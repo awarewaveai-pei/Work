@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  Sync the Slack webhook URL from local DPAPI vault to the SG VPS.
+  Sync the Slack webhook URL from local DPAPI vault to the production host.
 
 .DESCRIPTION
   Writes /etc/default/awarewave-endpoint-alert (just WEBHOOK_URL +
@@ -16,7 +16,7 @@
       they put a CHECK_URLS line in /etc/default/awarewave-endpoint-alert.local
       (drop-in survives this sync).
     - HEARTBEAT_URL belongs in .local too — managed by
-      scripts/sync-hetzner-endpoint-alert-heartbeat.ps1.
+      scripts/sync-endpoint-alert-heartbeat.ps1.
     - This sync is now narrowly scoped to "Slack webhook + Netdata Slack
       transport + Netdata -> Ops Inbox secondary route" — no overlap with any
       other sync.
@@ -24,7 +24,7 @@
 .PARAMETER VaultSecretName
   Vault key. Default: AGENCY_OS_SLACK_WEBHOOK_URL.
 .PARAMETER SshTarget
-  SSH alias for the SG VPS. Default: hetzner.
+  Optional ssh target override (alias or user@host). Default: the production host from scripts/lib/prod-host.ps1.
 .PARAMETER StorePath
   Optional override for the vault file path.
 
@@ -36,7 +36,7 @@
 [CmdletBinding()]
 param(
     [string]$VaultSecretName = "AGENCY_OS_SLACK_WEBHOOK_URL",
-    [string]$SshTarget = "hetzner",
+    [string]$SshTarget = "",
     [string]$StorePath = ""
 )
 
@@ -44,6 +44,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "_vault-helpers.ps1")
+. (Join-Path $PSScriptRoot "lib\prod-host.ps1")
 
 $store = Read-VaultStore (Resolve-VaultPath -Custom $StorePath)
 if (-not (Test-VaultSecret -Store $store -Name $VaultSecretName)) {
@@ -64,7 +65,7 @@ HOOK="$(printf '%s' "__HOOK_B64__" | base64 -d)"
 # CHECK_URLS comes from endpoint-alert.sh's hard-coded default (single source).
 # Operator extension keys (HEARTBEAT_URL, RENOTIFY_AFTER_SEC, custom CHECK_URLS
 # overrides) live in /etc/default/awarewave-endpoint-alert.local — managed by
-# scripts/sync-hetzner-endpoint-alert-heartbeat.ps1 and survives this sync.
+# scripts/sync-endpoint-alert-heartbeat.ps1 and survives this sync.
 umask 077
 {
   printf '%s\n' "WEBHOOK_URL=\"${HOOK}\""
@@ -203,10 +204,11 @@ $remoteB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remote))
 $wrapper = "echo $remoteB64 | base64 -d | sudo bash"
 
 Write-Host "== sync: writing VPS env + netdata slack config + restart ==" -ForegroundColor Cyan
-& ssh $SshTarget $wrapper
+$sshArgs = Get-ProdSshArgs $SshTarget
+& ssh @sshArgs $wrapper
 if ($LASTEXITCODE -ne 0) {
     throw "Remote sync failed (ssh exit $LASTEXITCODE)"
 }
 
-Write-Host "sync-hetzner-slack-alert-webhooks: OK" -ForegroundColor Green
+Write-Host "sync-slack-alert-webhooks: OK" -ForegroundColor Green
 exit 0

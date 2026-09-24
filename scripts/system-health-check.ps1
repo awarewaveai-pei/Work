@@ -666,6 +666,24 @@ if (Test-Path -LiteralPath $releasedAddrScript) {
 } else {
     Add-Check -Name "No live trust/target of released addresses (verify-no-released-addresses.mjs)" -Pass $true -Detail "Skipped: scripts/verify-no-released-addresses.mjs not present"
 }
+# 8b) Same registry, this machine's ssh aliases: an alias hides the address from the repo gate
+# (2026-09-24: aliases for the released SG/EU addresses were still the default target of 7 scripts).
+# Warn-only, same promotion rule as 8).
+if (Test-Path -LiteralPath $releasedAddrScript) {
+    try {
+        $prevEapSc = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $scOut = & node $releasedAddrScript --ssh-config 2>&1 | Out-String
+        $scExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEapSc
+        $scSummary = ($scOut -split "`r?`n" | Where-Object { $_ -match '^RESULT:' } | Select-Object -First 1)
+        if (-not $scSummary) { $scSummary = "no RESULT line in output" }
+        $scDetail = if ($scExit -eq 0) { $scSummary.Trim() } else { "WARN: " + $scSummary.Trim() + ' - run node scripts/verify-no-released-addresses.mjs --ssh-config for the alias list' }
+        Add-Check -Name "No ssh alias resolves to a released address (verify-no-released-addresses.mjs --ssh-config)" -Pass $true -Detail $scDetail
+    } catch {
+        Add-Check -Name "No ssh alias resolves to a released address (verify-no-released-addresses.mjs --ssh-config)" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+}
 
 # 9) Cloudflare security posture (warn-only informational check).
 # KNOWN GAP (same shape as the 7) deploy-drift note above, found 2026-08-29, not fixed here):

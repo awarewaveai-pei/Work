@@ -13,7 +13,7 @@
 **三層知識來源（互補，全部整合）：**
 1. **策略政策層** = 使用者提供的 `HETZNER_HOSTING_POLICY_COMPLETE_V2`（v2.1.0，官方源稽核，2597 行）— regions/tiers/RTO-RPO/token/IaC/abuse/compliance/exit。廣。
 2. **事故實證戰術層** = 本團隊真實疤痕換來的 19 條硬化基線（挖礦入侵/ClickHouse OOM/502/auto-deploy 連敗/webhook 全斷）— 精確修法 + file:line 證據。深。
-3. **既有可復用資產層** = `install-maintenance-crons.sh` / `sync-hetzner-*.ps1` / `backup-phase1.sh` / `secrets-vault.ps1` / `52-53 auto-reboot.conf` / `wp-install-plugins.ts` ssh2 pattern。
+3. **既有可復用資產層** = `install-maintenance-crons.sh` / `sync-*.ps1` / `backup-phase1.sh` / `secrets-vault.ps1` / `52-53 auto-reboot.conf` / `wp-install-plugins.ts` ssh2 pattern。
 
 **現況三事實（已盤點驗證）：**
 - 「開機」這層不存在（adapter 只到「主機已存在後開 WP 站」）。
@@ -170,7 +170,7 @@ C1 billable→approval（route.ts+contracts.ts 強制）/ C2 idempotency（label
 `LOBSTER_SERVER_ADAPTER`(預設 none) + `LOBSTER_SERVER_PROVISION_ENABLED`(預設 OFF→dry-run 不花錢)。
 
 ### 復用既有資產
-install-maintenance-crons.sh / backup-phase1.sh / verify-backup.sh / endpoint-alert.sh / sync-hetzner-*.ps1 / secrets-vault.ps1 / 52-53 auto-reboot.conf / wp-install-plugins.ts ssh2。
+install-maintenance-crons.sh / backup-phase1.sh / verify-backup.sh / endpoint-alert.sh / sync-*.ps1 / secrets-vault.ps1 / 52-53 auto-reboot.conf / wp-install-plugins.ts ssh2。
 
 ---
 

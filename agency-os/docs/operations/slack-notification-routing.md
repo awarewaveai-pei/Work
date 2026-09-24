@@ -2,7 +2,7 @@
 
 This is the current AwareWave notification contract. Keep this page aligned with:
 
-- `scripts/sync-hetzner-slack-alert-webhooks.ps1`
+- `scripts/sync-slack-alert-webhooks.ps1`
 - `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`
 - `lobster-factory/infra/hetzner-phase1-core/scripts/check-drift-and-alert.sh`
 - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/notify/*`

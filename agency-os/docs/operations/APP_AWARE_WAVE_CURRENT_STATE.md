@@ -125,9 +125,9 @@ spoof x-ops-claims-role:admin 於 /ops/repairs → 期望 307（被剝除）
 | 公開 URL | `https://app.aware-wave.com`（CF → host nginx :443 → next-admin :3002）|
 | Admin 帳號 | `awarewaveai@gmail.com`（owner）；密碼 vault `APP_AWARE_WAVE_ADMIN_PASSWORD` |
 | Auth / DB project | `supabase.aware-wave.com`（Studio `studio.aware-wave.com/project/default`）|
-| 容器 | SG `5.223.93.113` / `lobster-next-admin`（:3002）|
+| 容器 | ks-aw-01 `145.239.195.47` / `lobster-next-admin`（:3002）|
 | 部署 | `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`（REPO_DIR=`/root/Work`）|
-| SG SSH | `ssh hetzner-sg`（key `~/.ssh/hetzner_trigger`）|
+| 主機 SSH | `ssh -p 58122 ubuntu@145.239.195.47`（root 操作加 sudo；腳本一律經 `scripts/lib/prod-host.ps1`，不用 ssh 別名）|
 | 角色矩陣 | viewer/operator/admin/owner（見 COMPLETE_REFERENCE §3）|
 
 ---

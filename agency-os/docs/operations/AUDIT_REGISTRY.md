@@ -113,7 +113,7 @@ Tool reports **85 remaining unprotected sites** across these files (was 117; 202
 | `scripts/commit-checkpoint.ps1` | 5 | Medium — `git commit -m $Message` (message may have CJK) |
 | `scripts/bootstrap-local-wordpress-windows.ps1` | 5 | Medium — `wp core install --title=...` could have CJK title |
 | `scripts/lobster-trigger-deploy.ps1` | 3 | Low — SSH to EU VPS (deployment output, mostly ASCII) |
-| `scripts/sync-hetzner-*.ps1` (5 scripts) | 8 total | Medium — SSH + scp; remote bash stderr could contain non-ASCII |
+| `scripts/sync-{endpoint-alert-heartbeat,slack-alert-webhooks,pagerduty-endpoint-alert,observability-grafana-content,grafana-alerting-slack}.ps1` (5 scripts) | 8 total | Medium — SSH + scp; remote bash stderr could contain non-ASCII |
 | `scripts/git-prune-merged-local-branches.ps1` | 6 | Low — branch ops, ASCII |
 | `scripts/check-claude-sync.ps1` | 2 | Low |
 | `scripts/fetch-external-signals.ps1` | 1 | Low — `git rev-parse --show-toplevel` (ASCII path) |
