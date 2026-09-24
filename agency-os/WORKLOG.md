@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-24（續128）研究線：計畫 v1.15——D23 每個方法的知識來自它自己的 dossier（自家蒐集→彙整→引註，285/285 種子 URL 已有）、I11 加 M1–M8 方法齊備檢核、P3 +1d
+- [觸發] 操作者：「你的 iceberg 會這麼優秀是因為我找了很多介紹文和圖給你，之後的其他工具呢？你要怎麼處理？」
+- [判斷] 冰山品質的來源 = 人餵的參考文與工作單圖。要讓其他 284 個方法到同一標準又不靠人逐一餵，唯一零重工的路 = 研究線自己的管線：每方法一個內部 Project（`purpose=method_dossier`），種子 = `SPEC/methods/registry/method-display-metadata.yaml` 的 `url`（`grep -c '^    url: "http'` = 285，方法數 285），加契約 `source_of_truth_for` 與操作者丟的網址 → Collection Service（P1）→ synthesis（P2）→ 起草 `lessons`／`result-skeletons`／`interpretation-prompts` 三份可演化資料，每句 [n]、過 `citation_integrity`。品質不用形容詞，用 I11 的 M1–M8 打分；不過 = 「知識不足」誠實顯示在課程頁與結果頁頂端。≤10 預設方法人審（操作者參考優先），其餘首次開啟懶生成＋送審，演化迴圈改進。圖檔要等 P5 圖像儲存，之前由人把圖轉述成文字進 Sources。
+- [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.15：§3.3 方法知識庫列、D23、I11 M1–M8、D17 知識來源句、P3 元件＋DoD＋5d→6d（核心 21.5d／25.5d、里程碑第 18／21.5 天）、§9 教材句、§12.5 P3 產卡三張 dossier 卡。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python plan_v115.py（每個 replace／row edit 計數斷言）+ grep -c url 285/285 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文字
+- BUGHUNT_DONE: scope=agency-os/TASKS.md,agency-os/docs,agency-os/reports,scripts,Projects/internal/cognitive-engineering-os/docs | grep=method_dossier|不是模型記憶|M1–M8 | hits=7（全在計畫本檔，新詞無外部引用）
+- [下一步] WC-PIa-01；P3 產卡時含三張 dossier 卡（§12.5）。
 ## 2026-09-24（續127）研究線：計畫 v1.14——清掉歷史雜訊（版本鏈、§10 變更紀錄、§9 時間軸、D10.x／D18.x 子修訂）、§3.3 研究庫列；push 讓操作者看得到進度板
 - [觸發] 操作者：「那要放在 Cognitive OS 專案裡，設專業頂規級的分析結果庫？」「我沒看到 §0 進度板」（本機已 commit 未 push）「plan 裡不需要再看到的資料就刪除，不然會混淆」。
 - [已改] `RESEARCH_LINES_MASTER_PLAN.md` v1.14：檔頭版本鏈 → 一行（歷史在 git log／WORKLOG）；§10 → 只剩文件關係與維護規則＋「不留歷史」規則；§9 → 現行定案清單（不再有 ①–⑨ 時間軸）；D10／D18 改寫為現行規則（子修訂 D10.1／D10.2／D18.1／D18.2 全部併回母列，全檔不再出現）；D21 精簡；§5／§3.10／C11 的 critic／操作者駁回敘事刪除；新增 §3.3「研究庫（分析結果庫）」列 = 一個 Project 的 Sources＋彙整＋解讀＋報表＋解決方案＋案例庫，版本化 artifact＋event，不另建資料庫，P5 換 Postgres＋object storage。
