@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作流三分鐘課</title>
+<style>
+  :root{--bg:#f4f6f9;--card:#ffffff;--ink:#14213d;--muted:#5b6470;--line:#e1e5ea;--accent:#1f5fbf;--ok:#1a7f4b;--warn:#b25e09;--bad:#b3261e;
+        --tag:#eef3fb;--soft:#fafbfd;--good-bg:#eef8f1;--bad-bg:#fdf0ef}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0f1720;--card:#16212e;--ink:#e6edf5;--muted:#9fb0c2;--line:#2a3a4d;--accent:#7fb0ff;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
+        --tag:#1d2b3d;--soft:#1b2634;--good-bg:#14301f;--bad-bg:#3a1c1a}}
+  :root[data-theme="dark"]{color-scheme:dark;--bg:#0f1720;--card:#16212e;--ink:#e6edf5;--muted:#9fb0c2;--line:#2a3a4d;--accent:#7fb0ff;--ok:#5fcf8f;--warn:#f0a44a;--bad:#ff8a80;
+        --tag:#1d2b3d;--soft:#1b2634;--good-bg:#14301f;--bad-bg:#3a1c1a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .banner{background:#fff4e0;border:1px solid #f1c27a;color:#6b4300;padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .top .skip{font-size:13px;color:var(--muted)}
+  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
+  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .progress span.done{background:var(--accent);color:#fff}
+  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:-6px 0 12px;align-items:center}
+  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--ok);color:var(--ok)}
+  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}.how b{color:var(--accent);font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:17px;margin:0 0 10px}
+  h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
+  .sub{color:var(--muted);font-size:13px}
+  .lead{font-size:16px;margin:8px 0}
+  cite{font-style:normal;color:var(--accent);font-size:12px;vertical-align:super}
+  .grid2c{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+  @media (max-width:720px){.grid2c{grid-template-columns:1fr}}
+  .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}.can{border:1px solid var(--ok)}.cant{border:1px solid var(--warn)}.can b,.cant b{display:block}
+  .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
+  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey i{color:var(--muted);font-style:normal}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+  .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .stations{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+  .st{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
+  .st b{font-size:14.5px}.st .k{color:var(--muted);font-size:12px}.st .need{color:var(--warn)}.st .ex{color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
+  td:first-child{white-space:nowrap;font-weight:600}
+  .gb{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  @media (max-width:720px){.gb{grid-template-columns:1fr}}
+  .good,.bad{border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .good{background:var(--good-bg);border:1px solid var(--ok)}.bad{background:var(--bad-bg);border:1px solid var(--bad)}
+  .good b{color:var(--ok)}.bad b{color:var(--bad)}
+  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:14px}
+  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
+  .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}.quiz details{margin:4px 0;font-size:14px}.quiz summary{cursor:pointer}
+  ul.check{padding-left:20px;margin:6px 0}
+  ul.check li{margin-bottom:4px}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn small{display:block;font-size:11px;opacity:.85}
+  ol.src{padding-left:20px;font-size:14px}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+<script>
+  // Example set follows the line the user came in from; the operator's default is art reflection (plan D18).
+  document.addEventListener("click", function (e) {
+    var chip = e.target.closest && e.target.closest(".chip");
+    if (!chip) return;
+    var set = chip.getAttribute("data-set");
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); });
+    document.querySelectorAll("#examples .ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
+  });
+</script>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner"><b>示意稿</b>：第一次走「做一個決定」這條工作流的人，按下開始之前會先看到的一堂課。每條工作流都有一堂（三分鐘）；每一站的方法課只在第一次到站時才出現，可跳。</div>
+
+  <div class="top">
+    <div>
+      <h1>做一個決定（3 站）：開始前 3 分鐘</h1>
+      <div class="sub">五步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
+    </div>
+    <span class="skip">走過了？<u>跳過，直接開始</u></span>
+  </div>
+  <div class="progress"><span class="done">1 這條路解什麼</span><span>2 三站各做什麼</span><span>3 看一個走完的</span><span>4 怎麼走</span><span>5 開始</span></div>
+  <div class="status"><span class="pill">三站方法齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span></div>
+
+  <!-- 1 -->
+  <div class="card">
+    <h2>1. 這條路解什麼問題<small>40 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>先看「能回答／不能回答」，再看站列。<b>你要做的</b>不用做；你的問題如果不是「幾個選項選一個」，這條路不適合，去第 5 步按第三顆按鈕。</div>
+    <p class="lead">「做一個決定」把一個<b>要在幾個選項裡選一個</b>的問題，走三站：先把問題講清楚，再看自己的強弱與外面的機會威脅，最後用<b>你自己定的準則和權重</b>把選項打分 <cite>[1]</cite>。</p>
+    <div class="grid2c">
+      <div class="can"><b>這條路能回答</b>要決定的到底是什麼、成功長什麼樣；我們的強弱、外面的機會威脅；幾個選項按你的準則哪個最好、哪個權重一改結果就翻。</div>
+      <div class="cant"><b>這條路不能回答</b>市場會不會買單（除非接上資料蒐集）；權重不會替你定，那是你的價值判斷；「該不該」的道德問題。</div>
+    </div>
+    <div class="journey"><span>第 1 站 問題陳述</span><i>→</i><span>第 2 站 SWOT</span><i>→</i><span>第 3 站 加權決策矩陣</span><i>→</i><span>總結頁</span></div>
+    <p class="sub">什麼時候用：選項已經有兩個以上、大家意見不一、想要一個能說清楚理由的決定。什麼時候不用：只有一個選項（那是「做不做」，用可行性那條路）；還不知道問題是什麼（先單獨跑問題陳述）。</p>
+  </div>
+
+  <!-- 2 -->
+  <div class="card">
+    <h2>2. 三站各做什麼、帶入什麼、要你填什麼<small>1 分鐘</small></h2>
+    <div class="how"><b>怎麼讀</b>先按你的領域看例子；每站三行：回答什麼、從上一站帶入什麼（你不用重填）、還要你填什麼（紅字）。<b>你要做的</b>按一個領域；把你的決定在心裡套三站試一次。</div>
+    <div class="chips" role="tablist" aria-label="例子領域">
+      <span class="sub">例子領域：</span>
+      <button class="chip on" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
+      <button class="chip" data-set="partner" id="chip-partner">合作對象</button>
+      <button class="chip" data-set="ecom" id="chip-ecom">電商後台</button>
+      <button class="chip" data-set="daily" id="chip-daily">日常</button>
+    </div>
+    <div class="stations" id="examples">
+      <div class="st">
+        <div><b>第 1 站 問題陳述</b></div>
+        <div><span class="k">回答什麼：</span>要決定的到底是什麼、誰受影響、成功長什麼樣。</div>
+        <div><span class="k">帶入什麼：</span>你建立專案時寫的那段話。</div>
+        <div><span class="need">還要你填：</span>誰受影響、成功的 2–3 個條件。</div>
+        <div class="ex" data-set="edd">例：WuSheng 課程要不要改成線上＋實體混合；成功 = 主動分享不降、遠地能參加。</div>
+        <div class="ex" data-set="partner" hidden>例：要不要和某機構合辦課程；成功 = 對方準時付款、我們保有教材權。</div>
+        <div class="ex" data-set="ecom" hidden>例：要不要開新品類；成功 = 三個月退貨率不高於現有品類。</div>
+        <div class="ex" data-set="daily" hidden>例：要不要搬到市區；成功 = 通勤少一半、房租不超過三成。</div>
+      </div>
+      <div class="st">
+        <div><b>第 2 站 SWOT</b></div>
+        <div><span class="k">回答什麼：</span>做這個決定，我們的強項、弱項、外面的機會與威脅。</div>
+        <div><span class="k">帶入什麼：</span>第 1 站的問題陳述與成功條件，自動變成「脈絡」。</div>
+        <div><span class="need">還要你填：</span>S／W／O／T 各至少 2 條（可讓 AI 起草，你改）。</div>
+        <div class="ex" data-set="edd">例：強項 = 帶領者熟線上工具；威脅 = 線上人多時分享會掉。</div>
+        <div class="ex" data-set="partner" hidden>例：強項 = 我們的課程完整；威脅 = 對方過去延後付款。</div>
+        <div class="ex" data-set="ecom" hidden>例：強項 = 供應商穩；威脅 = 尺寸類退貨高。</div>
+        <div class="ex" data-set="daily" hidden>例：強項 = 工作在市區；威脅 = 房租上漲。</div>
+      </div>
+      <div class="st">
+        <div><b>第 3 站 加權決策矩陣</b></div>
+        <div><span class="k">回答什麼：</span>幾個選項按你的準則和權重，哪個分數最高、哪個權重一改就翻。</div>
+        <div><span class="k">帶入什麼：</span>第 2 站的 S／W／O／T 自動變成準則候選。</div>
+        <div><span class="need">還要你填：</span>每個準則的權重——這是你的價值判斷，系統不代填。</div>
+        <div class="ex" data-set="edd">例：準則 = 分享不降（權重 5）、遠地可參加（3）、帶領者負擔（4）。</div>
+        <div class="ex" data-set="partner" hidden>例：準則 = 付款可靠（5）、教材權（5）、曝光（2）。</div>
+        <div class="ex" data-set="ecom" hidden>例：準則 = 退貨率（5）、毛利（4）、上架工時（2）。</div>
+        <div class="ex" data-set="daily" hidden>例：準則 = 通勤（4）、房租（5）、環境（3）。</div>
+      </div>
+    </div>
+    <p class="sub" style="margin:10px 0 0">記法：第 1 站定「要決定什麼」，第 2 站看「自己和外面」，第 3 站「用你的權重打分」。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
+  </div>
+
+  <!-- 3 -->
+  <div class="card">
+    <h2>3. 看一個走完的例子<small>40 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>每站一句話，最後一句是三站合一。<b>你要做的</b>不用做；想看完整總覽按按鈕。</div>
+    <p class="lead">團體反思：WuSheng 課程要不要改成「線上＋實體」混合。</p>
+    <table>
+      <tr><th>站</th><th>一句話</th><th>你的判斷</th></tr>
+      <tr><td>1 問題陳述</td><td>要決定的是「不降低分享的混合制」，不是「線上或實體」</td><td>部分同意（負擔 ≤ 1.2 倍）</td></tr>
+      <tr><td>2 SWOT</td><td>線上人數一多，主動分享就掉；遠地需求真實存在</td><td>同意</td></tr>
+      <tr><td>3 加權決策矩陣</td><td>混合制最高分，但「每場線上 ≤ 4 人」這個權重一改就翻</td><td>同意</td></tr>
+      <tr><td>總結</td><td>做混合制，條件是每場線上 ≤ 4 人；90 天後看分享人數</td><td>核准</td></tr>
+    </table>
+    <div class="btns" style="margin-top:8px"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看完整的工作流總覽 →<small>同一個案例，三站與總結頁</small></a></div>
+  </div>
+
+  <!-- 4 -->
+  <div class="card">
+    <h2>4. 怎麼走：兩種走法、每站你要做的、常見錯誤<small>40 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>先選走法，再看每站的好例壞例。<b>你要做的</b>決定你要一站一站走，還是一次跑完。</div>
+    <div class="gb">
+      <div class="good"><b>一站一站走</b>：每站停下來給你確認，可以改順序、中途換方法。第一次走建議這個。</div>
+      <div class="good"><b>一次跑完</b>：三站自動跑，跑完再逐站看。適合已經走過、只是換資料。</div>
+    </div>
+    <div class="gb" style="margin-top:10px">
+      <div class="good"><b>好</b>：第 1 站把成功條件寫成看得到的數字（分享人數不降、遠地 ≥ 3 人）。</div>
+      <div class="bad"><b>壞</b>：第 1 站寫「希望變好」。（好在哪？誰看得到？）</div>
+      <div class="good"><b>好</b>：第 3 站的權重自己填，填完看敏感度。</div>
+      <div class="bad"><b>壞</b>：權重讓 AI 填。（那就不是你的決定）</div>
+    </div>
+    <div class="mistake" style="margin-top:8px"><i>✕</i><span><b>跳過第 1 站</b>：直接做 SWOT，最後發現大家在決定不同的事。</span></div>
+    <div class="mistake"><i>✕</i><span><b>退回不重跑</b>：改了第 1 站卻沿用第 3 站的分數；系統會把後面的站標失效，照著重跑就好。</span></div>
+    <div class="mistake"><i>✕</i><span><b>把分數當答案</b>：第 3 站的分數是「按你的權重」算的；先看哪個權重一改就翻，再決定。</span></div>
+    <div class="quiz"><b>自我檢查（20 秒，點開看答案）</b>
+      <details><summary>「權重」在哪一站填、誰填？</summary>第 3 站，你填；AI 只能起草準則候選。</details>
+      <details><summary>改了第 1 站的成功條件，第 3 站要不要重跑？</summary>要；系統會把第 2、3 站標失效並提醒。</details>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="card">
+    <h2>5. 開始<small>準備 20 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>準備清單，沒有也能先走。<b>你要做的</b>選一顆按鈕；不確定這條路適不適合，按第三顆。</div>
+    <ul class="check">
+      <li>你要決定的那件事，一句話</li>
+      <li>兩個以上的選項</li>
+      <li>成功長什麼樣（2–3 個看得到的條件）</li>
+      <li>你在乎什麼（之後變成準則和權重）</li>
+    </ul>
+    <div class="btns">
+      <span class="btn primary">用示範案例走一次<small>混合制那個例子，三站已填好，一站一站看</small></span>
+      <span class="btn">開始我的決定<small>第 1 站三個格子，每格旁邊有提示</small></span>
+      <span class="btn">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
+    </div>
+    <p class="sub" style="margin:10px 0 0">這堂課之後不會再自動出現；每一站的方法課只在你第一次到那一站時出現一次。想再看，總覽頁右上角「怎麼用？」隨時能打開。</p>
+  </div>
+
+  <div class="card">
+    <h2>課程來源（每段課文的 [n]）</h2>
+    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；工作流的課引用它自己的定義檔和三站方法的課。<b>你要做的</b>不用做。</div>
+    <ol class="src">
+      <li>工作流定義 `life-decision-v1.recipe.yaml`（三站順序與站間帶入的欄位）</li>
+      <li>三站方法各自的 5 分鐘課（問題陳述、SWOT、加權決策矩陣；各有自己的來源）</li>
+    </ol>
+  </div>
+</div>
+</body>
+</html>
