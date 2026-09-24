@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-24（續131）研究線：結果頁 ⑧「下一步」重做為旅程列＋候選卡＋四動作（示意稿 v2.4）；C10 加 `next_steps[]` 與確定性 prefill；計畫 v1.17
+- [觸發] 操作者看 ⑧ 截圖：「你是指像你的圖這樣嗎？還是更好更完整？所有進來的人都是第一次接觸。」
+- [判斷] 原 ⑧ 只有方法名＋一句加深哪層，第一次用的人不知道自己在路的哪裡、按下去會帶入什麼／還要填什麼、不做行不行。重做：旅程列（✓ 已完成 → 下一步 → 之後 → 最後 = ⑦）、一句「你在哪、還缺什麼、不做也可以」、每個候選一張卡（回答什麼／帶入 N 欄＋還要填 M 欄標紅／會得到／約多久多少錢／用這次的資料開始／第一次用？5 分鐘課）、底部四動作（串成工作流一次跑且順序可改、不確定→路由、直接去 ⑦、先核准存檔）。「帶入什麼」由伺服器依契約 inputs × manifest 確定性算（`prefill_map`），模型只寫回答什麼／會得到什麼，避免幻覺。
+- [已改] `mockups/iceberg-result-mock.html` v2.4（⑧ 全段＋樣式＋導讀 ③ 句）；`RESEARCH_LINES_MASTER_PLAN.md` v1.17：§3.10 (5)、C10 `next_steps[]`、WC-PIa-01 schema、WC-PIa-04 `prefill_map`＋閘、WC-PIa-11 `NextSteps`、§0 parity 列、示意稿指標。線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq v6。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_v24_next.py + plan_v117.py（計數斷言）+ html.parser 標籤配對 + build_artifact.py result + Artifact publish + 本機瀏覽器截圖 ⑧ | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字
+- BUGHUNT_DONE: scope=agency-os/TASKS.md,agency-os/docs,agency-os/reports,scripts,Projects/internal/cognitive-engineering-os/docs | grep=NextMethods|各自加深哪一層 | hits=0
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續130）每日 smoke 對 Auto-Repair SSH 探針發 WARN；repair_center 升 critical
 
 - **根因**：`scripts/check-smoke-tests.ps1` Check 2 只讀 `/api/ops/repairs/health` 的 `ok`；該 `ok` = tableOk && mode && backupConfigured && githubConfigured（`health/route.ts:389`，「有設定」≠「能用」）。SSH 探針 `backup_script_probe`／`auto_reboot`（`route.ts:403,419`）ssh_error 23 天無偵測器叫（2026-09-23 續123 修好連線時才發現）。
