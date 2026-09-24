@@ -2,17 +2,18 @@
 """Publish helper: turn a repo mock into the Artifact page body (the publisher wraps its own skeleton).
 Runs check-mocks.py first and refuses to build while it is red. No colour or layout rewriting happens here:
 the mock is the spec. Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/build-artifact.py <out-dir> [mock ...]
-Output names: iceberg-result-mock.html -> iceberg-analysis.html, iceberg-lesson-mock.html -> iceberg-lesson.html,
-workflow-result-mock.html -> workflow-overview.html, workflow-lesson-mock.html -> workflow-lesson.html."""
+Output names: home-mock.html -> home.html, iceberg-result-mock.html -> iceberg-analysis.html, iceberg-lesson-mock.html ->
+iceberg-lesson.html, workflow-result-mock.html -> workflow-overview.html, workflow-lesson-mock.html -> workflow-lesson.html."""
 import pathlib, re, subprocess, sys
+import mockkit as mk
 
-HERE = pathlib.Path(__file__).resolve().parent
-OUT_NAME = {"iceberg-result-mock.html": "iceberg-analysis.html", "iceberg-lesson-mock.html": "iceberg-lesson.html",
+OUT_NAME = {"home-mock.html": "home.html", "iceberg-result-mock.html": "iceberg-analysis.html", "iceberg-lesson-mock.html": "iceberg-lesson.html",
             "workflow-result-mock.html": "workflow-overview.html", "workflow-lesson-mock.html": "workflow-lesson.html"}
+assert set(OUT_NAME) == set(mk.FILES), "OUT_NAME must name every mock in mockkit.FILES"
 
 
 def build(name, out_dir):
-    src = (HERE / name).read_text(encoding="utf-8")
+    src = (mk.HERE / name).read_text(encoding="utf-8")
     title = re.search(r"<title>.*?</title>", src, re.S).group(0)
     styles = re.findall(r"<style>.*?</style>", src, re.S)
     head = re.search(r"<head>(.*?)</head>", src, re.S).group(1)
@@ -27,11 +28,15 @@ def build(name, out_dir):
 
 
 def main(argv):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # findings carry CJK; a cp950 pipe must not crash the refusal
+    except Exception:
+        pass
     if not argv or any(a not in OUT_NAME for a in argv[1:]):
         print(f"usage: build-artifact.py <out-dir> [{' | '.join(OUT_NAME)}]"); return 2
-    gate = subprocess.run([sys.executable, str(HERE / "check-mocks.py")], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    gate = subprocess.run([sys.executable, str(mk.HERE / "check-mocks.py")], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if gate.returncode != 0:
-        print(gate.stdout.strip()); print("build-artifact: refused, check-mocks.py is red"); return 1
+        print((gate.stdout + gate.stderr).strip()); print("build-artifact: refused, check-mocks.py is red"); return 1
     out_dir = pathlib.Path(argv[0]); out_dir.mkdir(parents=True, exist_ok=True)
     for name in argv[1:] or list(OUT_NAME): build(name, out_dir)
     return 0

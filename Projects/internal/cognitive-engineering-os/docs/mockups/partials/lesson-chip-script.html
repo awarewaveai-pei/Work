@@ -1,0 +1,10 @@
+<script>
+  // Example set follows the line the user came in from; the operator's default is art reflection (plan D18 / U21).
+  document.addEventListener("click", function (e) {
+    var chip = e.target.closest && e.target.closest(".chip");
+    if (!chip) return;
+    var set = chip.getAttribute("data-set");
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
+    document.querySelectorAll(".ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
+  });
+</script>

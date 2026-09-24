@@ -1,26 +1,48 @@
 #!/usr/bin/env python3
-"""Copy design-system.css (the one stylesheet) into the <style> of the four mocks, verbatim, between the shared
-markers, and leave the page-specific section empty. Edit the .css, run this, run check-mocks.py.
+"""Sync the shared pieces into every mock, verbatim: design-system.css into each <style> (between the shared markers,
+page section left empty) and every partials/<name>.html into its marked fragment. Generated partials (domain-chips,
+from SPEC/methods/examples/domains.yaml) are re-rendered first. Idempotent; a CRLF page is rewritten as LF. Edit the
+.css / .yaml / partial, run this, run check-mocks.py. Exit 1 with one line on bad input (never a traceback).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/sync-design-system.py"""
-import pathlib, re, sys
-
-HERE = pathlib.Path(__file__).resolve().parent
-FILES = ["iceberg-result-mock.html", "iceberg-lesson-mock.html", "workflow-result-mock.html", "workflow-lesson-mock.html"]
-START = "  /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */"
-END = "  /* == shared design system: end == */"
-PAGE = "  /* == page-specific == */"
+import re, sys
+import mockkit as mk
 
 
 def main():
-    css = (HERE / "design-system.css").read_text(encoding="utf-8").rstrip("\n")
-    if "\r" in css: print("design-system.css must be LF"); return 1
-    for f in FILES:
-        p = HERE / f; s = p.read_text(encoding="utf-8")
-        m = re.search(r"<style>.*?</style>", s, re.S)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    try:
+        for name, render in mk.GENERATED.items():          # data -> partial file
+            p = mk.PARTIALS / f"{name}.html"; body = render()
+            if not p.exists() or p.read_bytes() != body.encode("utf-8"):
+                p.write_bytes(body.encode("utf-8")); print(f"partials/{name}.html: regenerated")
+    except Exception as e:                                   # malformed domains.yaml, missing PyYAML, …
+        print(f"{mk.DOMAINS_FILE.name}: {type(e).__name__}: {e}"); return 1
+    css = mk.DESIGN_SYSTEM.read_bytes().decode("utf-8").replace("\r\n", "\n").rstrip("\n")
+    partials = {p.stem: p.read_bytes().decode("utf-8").replace("\r\n", "\n").rstrip("\n") for p in sorted(mk.PARTIALS.glob("*.html"))}
+    for f in mk.FILES:
+        p = mk.HERE / f; raw = p.read_bytes(); new = raw.decode("utf-8").replace("\r\n", "\n")
+        m = re.search(r"<style>.*?</style>", new, re.S)
         if not m: print(f"{f}: no <style>"); return 1
-        block = "<style>\n" + START + "\n" + css + "\n" + END + "\n" + PAGE + "\n</style>"
-        if m.group(0) == block: print(f"{f}: already in sync"); continue
-        p.write_bytes((s[:m.start()] + block + s[m.end():]).encode("utf-8")); print(f"{f}: synced")
+        block = "<style>\n" + mk.CSS_START + "\n" + css + "\n" + mk.CSS_END + "\n" + mk.CSS_PAGE + "\n</style>"
+        new = new[:m.start()] + block + new[m.end():]
+        try:
+            names = set(mk.fragments(new))
+        except ValueError as e:
+            print(f"{f}: {e}"); return 1
+        for name in names:
+            if name not in partials: print(f"{f}: fragment {name} has no partials/{name}.html"); return 1
+        def repl(m):
+            name = m.group(1); indent = re.match(r"[ \t]*", m.group(0)).group(0)
+            return f"{indent}{mk.partial_start(name)}\n{partials[name]}\n{indent}{mk.partial_end(name)}"
+        new = mk.FRAG.sub(repl, new)
+        for name in mk.REQUIRED_PARTIALS.get(f, ()):
+            if name not in names: print(f"{f}: required partial {name} is not marked in the page"); return 1
+        out = new.encode("utf-8")
+        if out == raw: print(f"{f}: already in sync"); continue
+        p.write_bytes(out); print(f"{f}: synced")
     return 0
 
 

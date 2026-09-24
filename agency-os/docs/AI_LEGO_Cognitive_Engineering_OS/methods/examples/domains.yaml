@@ -1,0 +1,15 @@
+# Example domains for every lesson — the ONE list (plan U21 / D18).
+# Lessons render their chips from this file; the mock gate (COS/docs/mockups/check-mocks.py) requires every lesson
+# page to carry exactly the active domains, in this order, and every example group on those pages to hold exactly
+# one variant per active domain. Retire a domain: set `status: retired`, run sync, then delete that domain's variant
+# from every example group (the gate stays red until the groups match the active set). Add a domain: append an entry,
+# run sync, then write one variant per group in every lesson (the red groups are the coverage table of the
+# /ops/domains page, P4). `lessons_key` = the per-method example-set key in the dossier (D23).
+version: 1
+default: edd
+domains:
+  - {id: edd, label: 藝術反思／EdD 研究, status: active, lessons_key: edd_research}
+  - {id: partner, label: 合作對象, status: active, lessons_key: partnership_risk}
+  - {id: decision, label: 一個決策, status: active, lessons_key: decision}
+  - {id: ecom, label: 電商後台, status: active, lessons_key: ecommerce}
+  - {id: daily, label: 日常, status: active, lessons_key: everyday}

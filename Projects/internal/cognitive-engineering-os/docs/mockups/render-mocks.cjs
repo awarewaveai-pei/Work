@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Render the four mocks to PNG slices so a reviewer (human or model) can look at the real page instead of
+/* Render the five mocks to PNG slices so a reviewer (human or model) can look at the real page instead of
    trusting computed styles. Desktop light (1200px), mobile light (375px), desktop dark (1200px); mobile and
    dark are capped at a few slices and the log says TRUNCATED when a page was cut (use --full for everything).
    CommonJS on purpose (.cjs): the repo root package.json is "type":"module", and NODE_PATH resolution only
@@ -22,7 +22,7 @@ let chromium;
 try { ({ chromium } = require("playwright")); }
 catch (e) { console.error("playwright not resolvable: set NODE_PATH to a node_modules that contains it"); process.exit(2); }
 const HERE = __dirname;
-const FILES = ["iceberg-result-mock.html", "iceberg-lesson-mock.html", "workflow-result-mock.html", "workflow-lesson-mock.html"];
+const FILES = ["home-mock.html", "iceberg-result-mock.html", "iceberg-lesson-mock.html", "workflow-result-mock.html", "workflow-lesson-mock.html"];   // = mockkit.FILES
 // [mode, viewport width, colour scheme, slice height, max slices unless --full]
 const MODES = [["desktop", 1200, "light", 1300, 8], ["mobile", 375, "light", 1400, 3], ["dark", 1200, "dark", 1300, 2]];
 (async () => {

@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>工作流結果總覽</title>
 <style>
-  /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+  /* == shared design system: start (byte-identical in every mock; check-mocks.py enforces) == */
 /* Cognitive OS design system — the ONE stylesheet for every page (mocks now, web/app later).
    Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
    same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
    markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
-   sync-design-system.py copies this file into the four mocks. */
+   sync-design-system.py copies this file into every mock. */
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
@@ -32,11 +32,14 @@
   h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
   .lead{font-size:16px;margin:10px 0 6px}
+  a{color:var(--accent)}
+  .crumbs{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+  .crumbs a{text-decoration:none}
+  .crumbs a:hover{text-decoration:underline}
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
   .top .skip{font-size:13px;color:var(--muted)}
-  .top .skip a{color:var(--accent)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -91,7 +94,7 @@
   .mistake i{font-style:normal;color:var(--bad);font-weight:700}
   .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
   .judge .btns{margin:6px 0}
-  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
   .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
   .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
   .conf.high{border-color:var(--ok);color:var(--ok)}
@@ -205,6 +208,7 @@
 <div class="wrap">
 
   <div class="banner"><b>示意稿</b>：這是「工作流」（多個方法串起來）的結果長什麼樣：一頁總覽、每一站各一頁九段（同單一方法）、跑完一頁總結。用你領域的合成案例，數字只為示意。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ">首頁</a> › 專案「WuSheng 課程形式」 › 工作流「做一個決定」</div>
 
   <!-- 總覽 -->
   <div class="card">
@@ -217,6 +221,13 @@
       <div class="can"><b>這條路能回答</b>問題到底是什麼（第 1 站）、我們的強弱與外部機會威脅（第 2 站）、幾個選項按你自己定的準則和權重哪個最好（第 3 站）。</div>
       <div class="cant"><b>這條路不能回答</b>市場會不會買單（沒有外部資料）；權重不會替你定（那是你的價值判斷，系統只算分）。</div>
     </div>
+    <div class="todos">
+      <div class="todo"><b>① 先看站列</b>你在第幾站、哪些已完成、下一站是什麼。</div>
+      <div class="todo"><b>② 看「現在」那張卡</b>它回答什麼、從上一站帶入什麼、還要你填哪幾格（紅字）。</div>
+      <div class="todo"><b>③ 看摘要與總結頁骨架</b>已完成的站只留一句話和你的判斷；跑完第 3 站才有總結頁。</div>
+    </div>
+    <p class="sub mt8 mb0">只有 30 秒？看站列和「現在」那張卡的紅字就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
+    <div class="terms"><b>四個詞：</b><span><b>站</b> 一個方法一站</span><span><b>帶入</b> 上一站的結果自動變成這站的輸入</span><span><b>還要你填</b> 系統填不了的紅字欄位</span><span><b>總結頁</b> 三站合一的結論</span></div>
     <div class="journey">
       <span class="done">✓ 第 1 站 問題陳述</span><i>→</i>
       <span class="now">● 第 2 站 SWOT（現在）</span><i>→</i>
@@ -279,7 +290,7 @@
     <p class="sub mt8 mb0">總結頁下方會接：最終建議（含改判條件）、解決方案（來自最後一站的 ⑦：選方案 → 90 天計畫 → 追蹤）、跨站引註 [1]–[n]、成本合計、「核准整條工作流」。每站的九段各自可核准或退回；退回第 2 站會讓第 3 站失效並提醒重跑。</p>
   </div>
 
-  <!-- 引註 + 來源列 -->
+  <!-- 引註 -->
   <div class="card">
     <h2>引註（跨站累積）</h2>
     <div class="how"><b>怎麼讀</b>[n] 從第 1 站往後編號，不重排；「上一站帶入」的內容會標它來自哪一站的哪一欄。<b>你要做的</b>不用做。</div>
@@ -289,19 +300,35 @@
       <li>第 2 站・上一站帶入・脈絡 ← 第 1 站 [1][2]</li>
     </ol>
     <div class="finding warn"><b>本條工作流沒有外部來源</b>三站都建立在你填的內容上；第 2 站的機會與威脅如果接上資料蒐集會更可信。</div>
-    <div class="meta-bar mt10">
+  </div>
+
+  <!-- 來源列與核准 -->
+  <div class="card">
+    <div class="meta-bar">
       <span>整條工作流 <b>AI 草稿，尚未核准</b>（第 1 站你已部分同意）</span>
       <span>模型 <b>claude-sonnet-5</b></span>
       <span>已用 <b>≈ NT$1 / 預估 NT$3</b></span>
       <span>檢查 <b class="ok" title="每一站每一句主張都有 [n]">來源 ✓</b> <b class="ok" title="站與站的帶入都對得到上一站的欄位">帶入可追 ✓</b></span>
     </div>
+    <div class="sub mt8"><b>核准</b> = 整條成為專案正式紀錄；<b>退回某站</b> = 那站之後的站失效，重跑時前面的站不用重填；<b>刪除專案</b> = 三站的來源與產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
     <div class="btns mt12">
       <span class="btn primary">繼續第 2 站</span>
       <span class="btn">改順序或換一站的方法</span>
       <span class="btn">退回第 1 站並說原因</span>
       <span class="btn ghost">專家模式：每站的閘門表與 JSON</span>
     </div>
-    <div class="sub mt8"><b>核准</b> = 整條成為專案正式紀錄；<b>退回某站</b> = 那站之後的站失效，重跑時前面的站不用重填；<b>刪除專案</b> = 三站的來源與產出一起刪掉。</div>
+    <details class="mt10"><summary>專家模式（每站的閘門表與 JSON，收起來但還在）</summary>
+<pre>{
+  "recipe": "life-decision-v1",
+  "stations": [
+    {"n": 1, "method": "problem_statement", "status": "DRAFT_REVIEWED", "your_judgment": "partial",
+     "gate_results": [{"gate_id": "provenance_required", "status": "PASS"}, {"gate_id": "success_criteria_measurable", "status": "PASS"}]},
+    {"n": 2, "method": "swot", "status": "RUNNING", "carried_in": ["problem_statement", "success_criteria"]},
+    {"n": 3, "method": "weighted_decision_matrix", "status": "PENDING", "human_required": ["weights"]}
+  ],
+  "cost": {"used_ntd": 1, "estimated_ntd": 3}
+}</pre>
+    </details>
   </div>
 
 </div>

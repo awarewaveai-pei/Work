@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>冰山模型五分鐘課</title>
 <style>
-  /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+  /* == shared design system: start (byte-identical in every mock; check-mocks.py enforces) == */
 /* Cognitive OS design system — the ONE stylesheet for every page (mocks now, web/app later).
    Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
    same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
    markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
-   sync-design-system.py copies this file into the four mocks. */
+   sync-design-system.py copies this file into every mock. */
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
@@ -32,11 +32,14 @@
   h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
   .lead{font-size:16px;margin:10px 0 6px}
+  a{color:var(--accent)}
+  .crumbs{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+  .crumbs a{text-decoration:none}
+  .crumbs a:hover{text-decoration:underline}
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
   .top .skip{font-size:13px;color:var(--muted)}
-  .top .skip a{color:var(--accent)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -91,7 +94,7 @@
   .mistake i{font-style:normal;color:var(--bad);font-weight:700}
   .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
   .judge .btns{margin:6px 0}
-  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
   .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
   .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
   .conf.high{border-color:var(--ok);color:var(--ok)}
@@ -200,8 +203,9 @@
   /* == shared design system: end == */
   /* == page-specific == */
 </style>
+<!-- == partial: lesson-chip-script: start (verbatim from partials/lesson-chip-script.html via sync-design-system.py; check-mocks.py enforces) == -->
 <script>
-  // Example set follows the line the user came in from; the operator's default is art reflection (EdD judgment-sovereignty research, plan D18).
+  // Example set follows the line the user came in from; the operator's default is art reflection (plan D18 / U21).
   document.addEventListener("click", function (e) {
     var chip = e.target.closest && e.target.closest(".chip");
     if (!chip) return;
@@ -210,18 +214,20 @@
     document.querySelectorAll(".ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
   });
 </script>
+<!-- == partial: lesson-chip-script: end == -->
 </head>
 <body>
 <div class="wrap">
 
   <div class="banner"><b>示意稿</b>：這是第一次用「冰山模型」的人，按下方法之前會先看到的一堂課。之後每個方法都有一堂，內容來自方法資料，會隨回饋改進。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ">首頁</a> › 方法「冰山模型」 › 5 分鐘課</div>
 
   <div class="top">
     <div>
       <h1>冰山模型：開始前 5 分鐘</h1>
       <div class="sub">六步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
     </div>
-    <span class="skip">用過了？<a href="#start">跳過，直接開始</a></span>
+    <span class="skip">看過了？<a href="#start">跳過，直接開始</a></span>
   </div>
   <div class="progress"><span class="done">1 這是什麼</span><span>2 四層</span><span>3 看一個例子</span><span>4 怎麼填</span><span>5 常見錯誤</span><span>6 開始</span></div>
   <div class="status"><span class="pill ok">方法齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、知道什麼時候不該用</span><span>底部有教材版（給老師／帶領者）</span></div>
@@ -289,6 +295,7 @@
   <div class="card">
     <h2>2. 四層，各配一個你領域的例子<small>1 分鐘</small></h2>
     <div class="how"><b>怎麼讀</b>先按你的領域，再從上往下看四層各一個例子；每層的「問」是你之後要回答的問題 <cite>[3]</cite>。<b>你要做的</b>按一個領域（第 3–6 步的例子會跟著換）；把你自己的問題在心裡套進四層試一次。</div>
+    <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
       <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
@@ -297,6 +304,7 @@
       <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
       <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
     </div>
+    <!-- == partial: domain-chips: end == -->
     <div class="grid2" id="examples">
       <div class="exlayer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div>
         <div class="ex" data-set="edd">例：第 6 次 session，8 人只有 2 人主動說自己的作品；第 1 次是 6 人。</div>

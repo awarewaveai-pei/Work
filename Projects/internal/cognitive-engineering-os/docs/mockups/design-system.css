@@ -2,7 +2,7 @@
    Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
    same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
    markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
-   sync-design-system.py copies this file into the four mocks. */
+   sync-design-system.py copies this file into every mock. */
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
@@ -24,11 +24,14 @@
   h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
   .lead{font-size:16px;margin:10px 0 6px}
+  a{color:var(--accent)}
+  .crumbs{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+  .crumbs a{text-decoration:none}
+  .crumbs a:hover{text-decoration:underline}
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
   .top .skip{font-size:13px;color:var(--muted)}
-  .top .skip a{color:var(--accent)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -83,7 +86,7 @@
   .mistake i{font-style:normal;color:var(--bad);font-weight:700}
   .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
   .judge .btns{margin:6px 0}
-  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
   .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
   .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
   .conf.high{border-color:var(--ok);color:var(--ok)}

@@ -1,4 +1,22 @@
 ﻿# Worklog
+## 2026-09-24（續152）研究線：兩課晶片不一致 → 領域清單單一來源（SPEC `domains.yaml` 生成晶片、partials 同步）；五頁逐項對照補齊（教材版、怎麼讀三步、麵包屑、頁尾）；首頁示意稿；計畫 v1.29
+- [觸發] 操作者截圖：方法課 5 個領域、工作流課 4 個（少「一個決策」）——「為什麼又讓我抓到沒有統一？去檢查四個頁面」；「進入的首頁也還沒做」；「所有的 css、style、class 要統一共用」。
+- [根因] 領域集合寫在檢查器的每頁常數 `CHIP_SETS`（兩頁各一份），閘只驗「頁面 = 自己的常數」，不驗「兩頁相同」；跨頁同類元素（教材版、怎麼讀三步、頁尾來源列、麵包屑、好壞例成對）沒有規則，全靠人記；改完只看被點名的那一頁。
+- [已改]
+  - 資料：`SPEC/methods/examples/domains.yaml`（U21 指定路徑；version 1、default edd、五個 active）。新 `COS/docs/mockups/mockkit.py`（頁面清單、artifact id、`load_domains` 驗格式、`render_chips`、partial 標記與 `fragments`）——sync／checker／build 共用。
+  - partials：`COS/docs/mockups/partials/domain-chips.html`（由 yaml 生成）、`lesson-chip-script.html`；頁面以 `<!-- == partial: <name>: start/end == -->` 標記，`sync-design-system.py` 複製（css＋partials，冪等），檢查器逐位元比對、課程頁必帶。
+  - 五頁逐項對照後補齊：工作流課 +「一個決策」領域（8 組例子）、每領域決策案接續冰山案（畫廊續約／加開平日班／尺寸類改預購／家事服務）、S／W／O／T 全稱、兩種走法 `.todos`（原本誤用好壞例框）、自我檢查第三題跟領域、開始步準備句、教材版卡、狀態列教材版提示、課程來源怎麼讀同方法課、跳過連結同文；總覽頁 + 三步怎麼讀／30 秒／四個詞、頁尾拆成獨立卡＋專家模式 details（同結果頁）；結果頁頂卡 + 怎麼讀；五頁麵包屑 `.crumbs`（首頁 › …）。
+  - 首頁 `COS/docs/mockups/home-mock.html`（U1 四線卡＋U16 描述問題＋U9 示範專案＋U2 六步＋我的專案＋頁尾）；`build-artifact.py`／`render-mocks.cjs` 納入；`chips-test.cjs` 進 repo（原 scratch）。
+  - `design-system.css`：`a{color:var(--accent)}`（工作流課「完整介紹」連結原本是瀏覽器預設藍，看圖才抓到）、`textarea` 全域（原綁 `.judge`）、`.crumbs`。
+  - 檢查器新規則：partials 逐位元＋課程頁必帶；晶片 = yaml 生成結果；每頁一個 h1／banner／crumbs（非首頁連回首頁）；有標題的卡必有怎麼讀；好壞例成對（M6）；結果頁首卡必有狀態列／lead／能不能／三步／30 秒／四個詞、末卡 meta-bar＋details+pre；課程頁 progress／教材版五段／課程來源 ≥2／quiz／mistake ≥3／開始步清單＋三顆按鈕；首頁 textarea／#projects 表／journey／≥3 mcards；`LINKS` 表取代 `PARTNER`；`PAIR_FACTS` 加兩課故事線＋首頁↔兩結果頁；`FORBID` 擋舊案與 `S:` 短標籤。自測 53 → 80 案例。
+  - 計畫 v1.29：I11／U1／U16／U18／U19／U21／D18（故事線表）／§10／§12.1-10。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_unify.py（25 計數斷言）+ sync-design-system.py + check-mocks.py（5 頁綠）+ check-mocks-selftest.py（80/80，每案比對自己規則的訊息）+ node chips-test.cjs（PASS，13／8 組）+ render-mocks.cjs 15 組切片、Read 12 張 + Playwright computed color（`.row a` = rgb(14,91,80)）+ build-artifact.py + Artifact publish ×5 | exit=0
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/8n（全修：M6 從每個好壞框起算並要求在 `.gb` 內；`.ex` 無 `data-set` = 缺陷（閘＋chips-test）；自測改比對「標籤＋訊息文字」且 `--dir` 可帶 css／partials 副本，token 規則可單獨證明；連帶 8 個 minor：站時間 PAIR regex 移除（NUMBER_PINS 已釘）、自測 SETUP 只算一次、label 型別＋escape、yaml 註解改對、sync 讀 bytes 修 CRLF＋錯誤不 traceback、build 印 stderr＋UTF-8、怎麼讀必須是卡內第一個元素）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=CHIP_SETS | hits=0
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=chips_test.js | hits=0
+- [線上] 首頁 v1 https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ ；結果 v19、方法課 v18、總覽 v13、工作流課 v15（連結不變）。
+- [避免再發生] 任何「集合」（領域、站、頁面清單、artifact id）只准一份資料，頁面由它生成、閘用它驗；改一頁前先列另外四頁的同類元素，答案寫成檢查器規則（`check_common`）不是記憶；改了哪頁就渲染哪頁、逐張看。
+- [下一步] WC-PIa-01；P4 `/ops/domains` 直接讀同一份 yaml。
 ## 2026-09-24（續151）Soulful 慢：WP-Cron 補上真排程器（host `wp-cron-runner.sh`＋死人開關）、alloptions 每請求重寫 1.3MB 歸零、nginx 快取背景更新＋耗時日誌；`safe-infra-patch.sh host-nginx`；crontab 明文 token 移除；MCP `hetzner-ssh`→`server-ssh`
 
 - **根因**（file:line／實測）：

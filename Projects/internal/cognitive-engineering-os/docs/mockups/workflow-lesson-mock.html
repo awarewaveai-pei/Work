@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>工作流三分鐘課</title>
 <style>
-  /* == shared design system: start (byte-identical in all four mocks; check-mocks.py enforces) == */
+  /* == shared design system: start (byte-identical in every mock; check-mocks.py enforces) == */
 /* Cognitive OS design system — the ONE stylesheet for every page (mocks now, web/app later).
    Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
    same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
    markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
-   sync-design-system.py copies this file into the four mocks. */
+   sync-design-system.py copies this file into every mock. */
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
@@ -32,11 +32,14 @@
   h3{font-size:15px;margin:0}
   .sub{color:var(--muted);font-size:13px}
   .lead{font-size:16px;margin:10px 0 6px}
+  a{color:var(--accent)}
+  .crumbs{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+  .crumbs a{text-decoration:none}
+  .crumbs a:hover{text-decoration:underline}
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
   .top .skip{font-size:13px;color:var(--muted)}
-  .top .skip a{color:var(--accent)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -91,7 +94,7 @@
   .mistake i{font-style:normal;color:var(--bad);font-weight:700}
   .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px}
   .judge .btns{margin:6px 0}
-  .judge textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
   .conf{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
   .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
   .conf.high{border-color:var(--ok);color:var(--ok)}
@@ -200,8 +203,9 @@
   /* == shared design system: end == */
   /* == page-specific == */
 </style>
+<!-- == partial: lesson-chip-script: start (verbatim from partials/lesson-chip-script.html via sync-design-system.py; check-mocks.py enforces) == -->
 <script>
-  // Example set follows the line the user came in from; the operator's default is art reflection (plan D18).
+  // Example set follows the line the user came in from; the operator's default is art reflection (plan D18 / U21).
   document.addEventListener("click", function (e) {
     var chip = e.target.closest && e.target.closest(".chip");
     if (!chip) return;
@@ -210,21 +214,23 @@
     document.querySelectorAll(".ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
   });
 </script>
+<!-- == partial: lesson-chip-script: end == -->
 </head>
 <body>
 <div class="wrap">
 
   <div class="banner"><b>示意稿</b>：第一次走「做一個決定」這條工作流的人，按下開始之前會先看到的一堂課。每條工作流都有一堂（三分鐘）；每一站的方法課只在第一次到站時才出現，可跳。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ">首頁</a> › 工作流「做一個決定」 › 3 分鐘課</div>
 
   <div class="top">
     <div>
       <h1>做一個決定（3 站）：開始前 3 分鐘</h1>
       <div class="sub">五步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
     </div>
-    <span class="skip">走過了？<a href="#start">跳過，直接開始</a></span>
+    <span class="skip">看過了？<a href="#start">跳過，直接開始</a></span>
   </div>
   <div class="progress"><span class="done">1 這條路解什麼</span><span>2 三站各做什麼</span><span>3 看一個走完的</span><span>4 怎麼走</span><span>5 開始</span></div>
-  <div class="status"><span class="pill ok">三站方法齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span></div>
+  <div class="status"><span class="pill ok">三站方法齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span><span>底部有教材版（給老師／帶領者）</span></div>
 
   <!-- 1 -->
   <div class="card">
@@ -243,13 +249,16 @@
   <div class="card">
     <h2>2. 三站各做什麼、系統幫你填什麼、你要填什麼<small>1.5 分鐘</small></h2>
     <div class="how"><b>怎麼讀</b>先按你的領域，例子就會換成你熟的情境；每一站從上往下看：這站在做什麼 → 你會看到的表單 → 已經幫你填好的 → 你要填的（附一個填好的例子）→ 做完會得到什麼 → 完整介紹的連結。這堂課只講「這條路」，每個方法的深度在它自己的正式課。<b>你要做的</b>按一個領域（第 3–5 步的例子會跟著換）；把你自己的決定，照例子的樣子在心裡填一次。</div>
+    <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
       <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
       <button class="chip" role="tab" aria-selected="false" data-set="partner" id="chip-partner">合作對象</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="decision" id="chip-decision">一個決策</button>
       <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
       <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
     </div>
+    <!-- == partial: domain-chips: end == -->
     <div id="examples">
 
       <div class="station">
@@ -259,9 +268,10 @@
         <div class="row"><b>已經幫你填</b><span>你建立專案時寫的那段話，會出現在第一格，你改就好。</span></div>
         <div class="row"><b class="need">你要填</b><div>誰受影響（具體到人數或角色）、成功的 2–3 個條件（要看得到、量得到）。
           <div class="ex filled" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>要決定什麼：</b>WuSheng 團體課要不要從全實體改成「線上＋實體」混合。<br><b>誰受影響：</b>現有 8 位參與者、2 位帶領者、3 位遠地詢問者。<br><b>成功條件：</b>① 主動分享人數不低於現在（每場 6 人）；② 遠地至少 3 人能參加；③ 帶領者每週準備時間不超過現在的 1.2 倍。</div>
-          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>要決定什麼：</b>要不要和某藝術治療機構合辦 WuSheng 課程。<br><b>誰受影響：</b>我們的 2 位帶領者、對方的個案、雙方行政。<br><b>成功條件：</b>① 對方 30 天內付款；② 教材著作權留在我們；③ 一期結束後對方有續約意願。</div>
-          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>要決定什麼：</b>要不要開尺寸類以外的新品類（文具）。<br><b>誰受影響：</b>客服 1 人、倉庫、供應商。<br><b>成功條件：</b>① 三個月退貨率 ≤ 5%；② 毛利不低於現有品類；③ 上架工時每週 ≤ 4 小時。</div>
-          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>要決定什麼：</b>要不要從郊區搬到市區。<br><b>誰受影響：</b>自己、同住的家人。<br><b>成功條件：</b>① 通勤少一半；② 房租不超過收入三成；③ 一年內不用再搬。</div>
+          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>要決定什麼：</b>下一檔展覽要不要續約那家近一年每檔都延後付款的畫廊。<br><b>誰受影響：</b>工作室的 3 位創作者、負責催款的行政 1 人、對方的展務。<br><b>成功條件：</b>① 展覽結束 30 天內收到款；② 作品曝光不低於現在（每檔到場 ≥ 200 人）；③ 我們的行政時間不增加。</div>
+          <div class="ex filled" data-set="decision" hidden><span class="lab">填好的例子（一個決策）</span><b>要決定什麼：</b>要不要加開平日班（這個月 5 位家長問）。<br><b>誰受影響：</b>詢問的 5 個家庭、3 位兼職老師、教室排程。<br><b>成功條件：</b>① 平日班開課後 ≥ 6 人；② 老師平日排得出來、不加班；③ 半年內不虧錢。</div>
+          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>要決定什麼：</b>退貨率 12% 的尺寸類商品，要不要改成預購制（下單後 7 天出貨、先確認尺寸）。<br><b>誰受影響：</b>客服 1 人、倉庫、常買尺寸類的老客人。<br><b>成功條件：</b>① 三個月內尺寸類退貨率 ≤ 5%；② 毛利不低於現在；③ 客服每週工時不增加。</div>
+          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>要決定什麼：</b>要不要每兩週請一次家事服務，讓週日晚上不再為家事吵架。<br><b>誰受影響：</b>自己、同住的伴侶。<br><b>成功條件：</b>① 一個月內週日晚上零吵架；② 每月多花不超過 NT$3,000；③ 兩個人都同意這個安排。</div>
         </div></div>
         <div class="row"><b>做完會得到</b><span>一句清楚的問題陳述＋成功條件清單。後面兩站都拿它當基準，總結頁也用它來判斷「決定有沒有達成目的」。</span></div>
         <div class="row"><b>常見卡點</b><span>成功條件寫成「希望變好」。改成看得到的數字或事實，例如「每場主動分享 ≥ 6 人」。</span></div>
@@ -276,9 +286,10 @@
         <div class="row"><b>已經幫你填</b><span>第 1 站的問題陳述和三個成功條件，自動放進「脈絡」；你不用重打。</span></div>
         <div class="row"><b class="need">你要填</b><div>S／W／O／T 各至少 2 條。寫事實，不寫感覺；每條最好能對到第 1 站的某個成功條件。可以先讓 AI 起草，再刪改。
           <div class="ex filled" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>S 強項：</b>帶領者熟線上工具；作品照片流程已經數位化。<br><b>W 弱項：</b>只有一間教室；線上設備老舊。<br><b>O 機會：</b>遠地需求是真的（3 人詢問）；線上場可以錄影回看。<br><b>T 威脅：</b>線上人數一多，主動分享就掉（上一期線上場最低）；混合制兩邊都要顧，帶領者負擔可能超過 1.2 倍。</div>
-          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>S：</b>課程完整、有帶領者訓練制度。<br><b>W：</b>只有 2 位帶領者，排不出第二班。<br><b>O：</b>對方有場地和穩定的個案來源。<br><b>T：</b>對方過去兩次延後付款；對方曾提出要改教材。</div>
-          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>S：</b>供應商穩定；後台已能批次上架。<br><b>W：</b>客服只有 1 人；退貨流程不問原因。<br><b>O：</b>文具退貨率行業平均低；客群和現有品類重疊。<br><b>T：</b>尺寸類的退貨經驗可能複製到新品類；旺季倉儲不夠。</div>
-          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>S：</b>工作在市區；存款夠押金。<br><b>W：</b>東西多，搬家成本高。<br><b>O：</b>市區有朋友、房源多。<br><b>T：</b>房租在漲；市區比較吵。</div>
+          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>S 強項：</b>作品有固定藏家；近三檔都完售。<br><b>W 弱項：</b>只有 1 位行政，沒人專門催款。<br><b>O 機會：</b>另一家畫廊主動邀展；自辦展的場地有補助。<br><b>T 威脅：</b>這家畫廊近一年四檔都延 30–60 天付款；換畫廊要重新累積藏家。</div>
+          <div class="ex filled" data-set="decision" hidden><span class="lab">填好的例子（一個決策）</span><b>S 強項：</b>週末班口碑好、候補 8 人。<br><b>W 弱項：</b>老師都是兼職，平日排班不穩。<br><b>O 機會：</b>5 位家長已經在問；暑假前需求最高。<br><b>T 威脅：</b>每年開學後詢問回落；平日班不到 6 人就虧。</div>
+          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>S 強項：</b>供應商穩定；後台能批次改商品設定。<br><b>W 弱項：</b>客服只有 1 人；退貨表不問原因。<br><b>O 機會：</b>同業改預購後，尺寸類退貨率降到 4%。<br><b>T 威脅：</b>預購讓出貨變慢，旺季客訴會增加；老客人可能改買別家。</div>
+          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>S 強項：</b>兩個人都想解決，不是只有一方在意。<br><b>W 弱項：</b>這一季預算緊。<br><b>O 機會：</b>社區有評價好、按次計費的服務。<br><b>T 威脅：</b>費用每年在漲；其中一人不習慣外人進家門。</div>
         </div></div>
         <div class="row"><b>做完會得到</b><span>SWOT 表＋每一格的證據強度（哪幾條只是感覺、哪幾條有數字），以及自動整理出來的「第 3 站準則候選」。</span></div>
         <div class="row"><b>常見卡點</b><span>把「希望」寫進機會、把「擔心」寫進威脅。機會和威脅是外面已經存在的事，不是心情。</span></div>
@@ -293,9 +304,10 @@
         <div class="row"><b>已經幫你填</b><span>準則候選（從第 2 站的四格整理出來）和選項候選（從第 1 站的問題抓出來）。分數可以讓 AI 起草。</span></div>
         <div class="row"><b class="need">你要填</b><div>每個準則的權重（1–5）。這是你的價值判斷，系統不會代填，也不會建議數字。
           <div class="ex filled" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>選項：</b>維持全實體／全線上／混合（每場線上 ≤ 4 人）。<br><b>準則與權重：</b>主動分享不降 5、遠地可參加 3、帶領者負擔 4、設備成本 2。<br><b>結果：</b>混合最高分；但「主動分享不降」的權重從 5 改成 3，全線上就贏 → 這個權重是關鍵，要想清楚。</div>
-          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>選項：</b>不合作／合辦一期試水／授權對方自辦。<br><b>準則與權重：</b>付款可靠 5、教材權 5、曝光 2、帶領者負擔 4。<br><b>結果：</b>合辦一期最高分；「付款可靠」權重一降，授權自辦就贏。</div>
-          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>選項：</b>不開／先上 10 款試賣／全品類上。<br><b>準則與權重：</b>退貨率 5、毛利 4、上架工時 2、客服負擔 3。<br><b>結果：</b>先上 10 款最高分；「客服負擔」權重一升，不開就贏。</div>
-          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>選項：</b>不搬／搬市區小套房／搬到市區邊緣。<br><b>準則與權重：</b>通勤 4、房租 5、環境 3、搬家成本 2。<br><b>結果：</b>市區邊緣最高分；「房租」權重一降，市區小套房就贏。</div>
+          <div class="ex filled" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>選項：</b>續約並加逾期條款／換到邀展的那家畫廊／自辦展覽。<br><b>準則與權重：</b>付款準時 5、曝光 4、行政負擔 3、藏家關係 2。<br><b>結果：</b>續約＋逾期條款最高分；但「曝光」的權重從 4 改成 2，自辦展覽就贏 → 這個權重是關鍵，要想清楚。</div>
+          <div class="ex filled" data-set="decision" hidden><span class="lab">填好的例子（一個決策）</span><b>選項：</b>不開／開一班試半年／找專任老師開兩班。<br><b>準則與權重：</b>老師排得出 5、人數 4、不虧錢 4、品質 3。<br><b>結果：</b>開一班試半年最高分；但「老師排得出」的權重從 5 改成 3，開兩班就贏 → 這個權重是關鍵，要想清楚。</div>
+          <div class="ex filled" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>選項：</b>維持現狀／尺寸類改預購／尺寸類只留無尺寸款。<br><b>準則與權重：</b>退貨率 5、毛利 4、出貨速度 3、客服負擔 3。<br><b>結果：</b>改預購最高分；但「出貨速度」的權重從 3 改成 5，維持現狀就贏 → 這個權重是關鍵，要想清楚。</div>
+          <div class="ex filled" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>選項：</b>不請／每兩週一次／每週一次。<br><b>準則與權重：</b>週日晚上不吵 5、費用 4、隱私 3、公平 3。<br><b>結果：</b>每兩週一次最高分；但「費用」的權重從 4 改成 5，不請就贏 → 這個權重是關鍵，要想清楚。</div>
         </div></div>
         <div class="row"><b>做完會得到</b><span>分數表、敏感度分析（哪個權重是關鍵）、然後是總結頁：三站合一的一句話、最終建議、解決方案與追蹤。</span></div>
         <div class="row"><b>常見卡點</b><span>權重讓 AI 填，或所有準則都填 5。權重不一樣，這張表才有意義。</span></div>
@@ -323,46 +335,56 @@
       </table>
     </div>
     <div class="ex" data-set="partner" hidden>
-      <p class="lead">合作對象：要不要和某藝術治療機構合辦 WuSheng 課程。</p>
+      <p class="lead">合作對象：下一檔展覽要不要續約那家一直延後付款的畫廊。</p>
       <table>
         <tr><th>站</th><th>一句話</th><th>你的判斷</th></tr>
-        <tr><td>1 問題陳述</td><td>要決定的是「教材權和帶領者負擔都守得住的合辦」，不是「合不合作」</td><td>部分同意（教材權是底線）</td></tr>
-        <tr><td>2 SWOT</td><td>對方有場地和穩定個案；我們只有 2 位帶領者，排不出第二班</td><td>同意</td></tr>
-        <tr><td>3 加權決策矩陣</td><td>合辦一期試水最高分，但「付款可靠」的權重從 5 改成 3 就變成授權對方自辦</td><td>同意</td></tr>
-        <tr><td>總結</td><td>合辦一期試水，條件是教材權寫進合約；一期後看付款與負擔</td><td>核准</td></tr>
+        <tr><td>1 問題陳述</td><td>要決定的是「30 天內收得到款、曝光不掉的展出方式」，不是「續不續約」</td><td>同意</td></tr>
+        <tr><td>2 SWOT</td><td>作品有固定藏家、另一家畫廊邀展；這家近一年四檔都延 30–60 天付款</td><td>同意</td></tr>
+        <tr><td>3 加權決策矩陣</td><td>續約＋逾期條款最高分，但「曝光」的權重從 4 改成 2 就變成自辦展覽</td><td>部分同意（逾期條款要寫進合約才算）</td></tr>
+        <tr><td>總結</td><td>續約一檔，條件是合約寫 30 天付款與逾期條款；這檔結束後看實付日</td><td>核准</td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="decision" hidden>
+      <p class="lead">一個決策：要不要加開平日班。</p>
+      <table>
+        <tr><th>站</th><th>一句話</th><th>你的判斷</th></tr>
+        <tr><td>1 問題陳述</td><td>要決定的是「老師排得出、半年不虧的平日班」，不是「開不開」</td><td>同意</td></tr>
+        <tr><td>2 SWOT</td><td>5 位家長在問、週末班候補 8 人；老師都是兼職，開學後詢問會回落</td><td>同意</td></tr>
+        <tr><td>3 加權決策矩陣</td><td>開一班試半年最高分，但「老師排得出」的權重從 5 改成 3 就變成開兩班</td><td>同意</td></tr>
+        <tr><td>總結</td><td>開一班試半年，條件是老師先排定平日時段；半年後看人數與損益</td><td>核准</td></tr>
       </table>
     </div>
     <div class="ex" data-set="ecom" hidden>
-      <p class="lead">電商後台：要不要開尺寸類以外的新品類（文具）。</p>
+      <p class="lead">電商後台：退貨率 12% 的尺寸類商品要不要改成預購制。</p>
       <table>
         <tr><th>站</th><th>一句話</th><th>你的判斷</th></tr>
-        <tr><td>1 問題陳述</td><td>要決定的是「不拉高退貨率的新品類」，不是「開不開」</td><td>同意</td></tr>
-        <tr><td>2 SWOT</td><td>文具退貨率行業平均低；客服只有 1 人、退貨流程不問原因</td><td>同意</td></tr>
-        <tr><td>3 加權決策矩陣</td><td>先上 10 款試賣最高分，但「客服負擔」的權重從 3 改成 5 就變成不開</td><td>部分同意（先補退貨原因欄）</td></tr>
-        <tr><td>總結</td><td>先上 10 款試賣，條件是退貨表先加原因欄；三個月後看退貨率</td><td>核准</td></tr>
+        <tr><td>1 問題陳述</td><td>要決定的是「退貨率降到 5% 以下又不拖慢出貨的做法」，不是「預購或不預購」</td><td>同意</td></tr>
+        <tr><td>2 SWOT</td><td>同業改預購後退貨率降到 4%；客服只有 1 人、退貨表不問原因</td><td>同意</td></tr>
+        <tr><td>3 加權決策矩陣</td><td>改預購最高分，但「出貨速度」的權重從 3 改成 5 就變成維持現狀</td><td>部分同意（先補退貨原因欄）</td></tr>
+        <tr><td>總結</td><td>尺寸類改預購，條件是退貨表先加原因欄；三個月後看退貨率</td><td>核准</td></tr>
       </table>
     </div>
     <div class="ex" data-set="daily" hidden>
-      <p class="lead">日常：要不要從郊區搬到市區。</p>
+      <p class="lead">日常：要不要請家事服務，讓週日晚上不再吵架。</p>
       <table>
         <tr><th>站</th><th>一句話</th><th>你的判斷</th></tr>
-        <tr><td>1 問題陳述</td><td>要決定的是「通勤減半且房租不超過三成的住處」，不是「搬不搬」</td><td>同意</td></tr>
-        <tr><td>2 SWOT</td><td>工作在市區、存款夠押金；東西多搬家貴、市區房租在漲</td><td>同意</td></tr>
-        <tr><td>3 加權決策矩陣</td><td>市區邊緣最高分，但「房租」的權重從 5 改成 3 就變成市區小套房</td><td>同意</td></tr>
-        <tr><td>總結</td><td>搬到市區邊緣，條件是房租 ≤ 收入三成；半年後看通勤與開銷</td><td>核准</td></tr>
+        <tr><td>1 問題陳述</td><td>要決定的是「週日晚上不吵、每月不超過 3,000 元的安排」，不是「請不請」</td><td>同意</td></tr>
+        <tr><td>2 SWOT</td><td>兩個人都想解決、社區有按次計費的服務；預算緊、一方不習慣外人進門</td><td>同意</td></tr>
+        <tr><td>3 加權決策矩陣</td><td>每兩週一次最高分，但「費用」的權重從 4 改成 5 就變成不請</td><td>同意</td></tr>
+        <tr><td>總結</td><td>每兩週請一次，條件是先排好分工表；一個月後看週日晚上還吵不吵</td><td>核准</td></tr>
       </table>
     </div>
     </div>
-    <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看完整的工作流總覽 →<small><span class="ex" data-set="edd">同一個案例，三站與總結頁</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span></small></a></div>
+    <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看完整的工作流總覽 →<small><span class="ex" data-set="edd">同一個案例，三站與總結頁</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span></small></a></div>
   </div>
 
   <!-- 4 -->
   <div class="card">
     <h2>4. 怎麼走：兩種走法、每站你要做的、常見錯誤<small>40 秒</small></h2>
     <div class="how"><b>怎麼讀</b>先選走法，再看每站的好例壞例。<b>你要做的</b>決定你要一站一站走，還是一次跑完。</div>
-    <div class="gb">
-      <div class="good"><b>一站一站走</b>：每站停下來給你確認，可以改順序、中途換方法。第一次走建議這個。</div>
-      <div class="good"><b>一次跑完</b>：三站自動跑，跑完再逐站看。適合已經走過、只是換資料。</div>
+    <div class="todos">
+      <div class="todo"><b>一站一站走</b>每站停下來給你確認，可以改順序、中途換方法。第一次走建議這個。</div>
+      <div class="todo"><b>一次跑完</b>三站自動跑，跑完再逐站看。適合已經走過、只是換資料。</div>
     </div>
     <div class="gb mt10">
       <div class="ex" data-set="edd">
@@ -372,30 +394,41 @@
         <div class="bad"><b>壞</b>：權重讓 AI 填。（那就不是你的決定）</div>
       </div>
       <div class="ex" data-set="partner" hidden>
-        <div class="good"><b>好</b>：第 1 站把成功條件寫成看得到的事實（教材權寫進合約、付款 30 天內）。</div>
+        <div class="good"><b>好</b>：第 1 站把成功條件寫成看得到的事實（30 天內收款、每檔到場 ≥ 200 人）。</div>
         <div class="bad"><b>壞</b>：第 1 站寫「合作愉快」。（好在哪？誰看得到？）</div>
-        <div class="good"><b>好</b>：第 3 站的權重自己填（教材權 5、付款可靠 5），填完看敏感度。</div>
+        <div class="good"><b>好</b>：第 3 站的權重自己填（付款準時 5、曝光 4），填完看敏感度。</div>
+        <div class="bad"><b>壞</b>：權重讓 AI 填。（那就不是你的決定）</div>
+      </div>
+      <div class="ex" data-set="decision" hidden>
+        <div class="good"><b>好</b>：第 1 站把成功條件寫成數字（平日班 ≥ 6 人、半年不虧）。</div>
+        <div class="bad"><b>壞</b>：第 1 站寫「有人來就好」。（幾人？多久？誰看得到？）</div>
+        <div class="good"><b>好</b>：第 3 站的權重自己填（老師排得出 5、人數 4），填完看敏感度。</div>
         <div class="bad"><b>壞</b>：權重讓 AI 填。（那就不是你的決定）</div>
       </div>
       <div class="ex" data-set="ecom" hidden>
-        <div class="good"><b>好</b>：第 1 站把成功條件寫成數字（三個月退貨率不高於現在、毛利不低於現有品類）。</div>
-        <div class="bad"><b>壞</b>：第 1 站寫「賣得好」。（好在哪？誰看得到？）</div>
-        <div class="good"><b>好</b>：第 3 站的權重自己填（退貨率 5、客服負擔 3），填完看敏感度。</div>
+        <div class="good"><b>好</b>：第 1 站把成功條件寫成數字（尺寸類退貨率 ≤ 5%、毛利不低於現在）。</div>
+        <div class="bad"><b>壞</b>：第 1 站寫「退貨變少」。（少多少？多久？誰看得到？）</div>
+        <div class="good"><b>好</b>：第 3 站的權重自己填（退貨率 5、出貨速度 3），填完看敏感度。</div>
         <div class="bad"><b>壞</b>：權重讓 AI 填。（那就不是你的決定）</div>
       </div>
       <div class="ex" data-set="daily" hidden>
-        <div class="good"><b>好</b>：第 1 站把成功條件寫成數字（通勤少一半、房租 ≤ 收入三成）。</div>
-        <div class="bad"><b>壞</b>：第 1 站寫「住得舒服」。（好在哪？誰看得到？）</div>
-        <div class="good"><b>好</b>：第 3 站的權重自己填（房租 5、通勤 4），填完看敏感度。</div>
+        <div class="good"><b>好</b>：第 1 站把成功條件寫成數字（週日晚上零吵架、每月 ≤ NT$3,000）。</div>
+        <div class="bad"><b>壞</b>：第 1 站寫「家裡和平」。（怎麼算和平？誰看得到？）</div>
+        <div class="good"><b>好</b>：第 3 站的權重自己填（不吵 5、費用 4），填完看敏感度。</div>
         <div class="bad"><b>壞</b>：權重讓 AI 填。（那就不是你的決定）</div>
       </div>
     </div>
     <div class="mistake mt8"><i>✕</i><span><b>跳過第 1 站</b>：直接做 SWOT，最後發現大家在決定不同的事。</span></div>
     <div class="mistake"><i>✕</i><span><b>退回不重跑</b>：改了第 1 站卻沿用第 3 站的分數；系統會把後面的站標失效，照著重跑就好。</span></div>
     <div class="mistake"><i>✕</i><span><b>把分數當答案</b>：第 3 站的分數是「按你的權重」算的；先看哪個權重一改就翻，再決定。</span></div>
-    <div class="quiz"><b>自我檢查（20 秒，點開看答案）</b>
+    <div class="quiz"><b>自我檢查（30 秒，點開看答案）</b>
       <details><summary>「權重」在哪一站填、誰填？</summary>第 3 站，你填；AI 只能起草準則候選。</details>
       <details><summary>改了第 1 站的成功條件，第 3 站要不要重跑？</summary>要；系統會把第 2、3 站標失效並提醒。</details>
+      <div class="ex" data-set="edd"><details><summary>「主動分享不降」的權重從 5 改成 3，結果就從混合制變成全線上：這叫什麼？</summary>敏感度：哪個權重一改結果就翻，那個權重就是你要先想清楚的。</details></div>
+      <div class="ex" data-set="partner" hidden><details><summary>「曝光」的權重從 4 改成 2，結果就從續約變成自辦展覽：這叫什麼？</summary>敏感度：哪個權重一改結果就翻，那個權重就是你要先想清楚的。</details></div>
+      <div class="ex" data-set="decision" hidden><details><summary>「老師排得出」的權重從 5 改成 3，結果就從開一班變成開兩班：這叫什麼？</summary>敏感度：哪個權重一改結果就翻，那個權重就是你要先想清楚的。</details></div>
+      <div class="ex" data-set="ecom" hidden><details><summary>「出貨速度」的權重從 3 改成 5，結果就從改預購變成維持現狀：這叫什麼？</summary>敏感度：哪個權重一改結果就翻，那個權重就是你要先想清楚的。</details></div>
+      <div class="ex" data-set="daily" hidden><details><summary>「費用」的權重從 4 改成 5，結果就從每兩週一次變成不請：這叫什麼？</summary>敏感度：哪個權重一改結果就翻，那個權重就是你要先想清楚的。</details></div>
     </div>
   </div>
 
@@ -403,6 +436,7 @@
   <div class="card" id="start">
     <h2>5. 開始<small>準備 20 秒</small></h2>
     <div class="how"><b>怎麼讀</b>準備清單，沒有也能先走。<b>你要做的</b>選一顆按鈕；不確定這條路適不適合，按第三顆。</div>
+    <p>手邊有這些會走得比較快，沒有也可以先走、之後補：</p>
     <ul class="check">
       <li>你要決定的那件事，一句話</li>
       <li>兩個以上的選項</li>
@@ -410,7 +444,7 @@
       <li>你在乎什麼（之後變成準則和權重）</li>
     </ul>
     <div class="btns">
-      <span class="btn primary">用示範案例走一次<small><span class="ex" data-set="edd">混合制那個例子，三站已填好，一站一站看</span><span class="ex" data-set="partner" hidden>合辦試水那個例子，三站已填好，一站一站看</span><span class="ex" data-set="ecom" hidden>新品類文具那個例子，三站已填好，一站一站看</span><span class="ex" data-set="daily" hidden>搬到市區那個例子，三站已填好，一站一站看</span></small></span>
+      <span class="btn primary">用示範案例走一次<small><span class="ex" data-set="edd">混合制那個例子，三站已填好，一站一站看</span><span class="ex" data-set="partner" hidden>續約畫廊那個例子，三站已填好，一站一站看</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，三站已填好，一站一站看</span><span class="ex" data-set="ecom" hidden>尺寸類改預購那個例子，三站已填好，一站一站看</span><span class="ex" data-set="daily" hidden>家事服務那個例子，三站已填好，一站一站看</span></small></span>
       <span class="btn">開始我的決定<small>第 1 站三個格子，每格旁邊有提示</small></span>
       <span class="btn">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
     </div>
@@ -418,8 +452,50 @@
   </div>
 
   <div class="card">
+    <h2>教材版：給老師／帶領者<small>同一份資料，另一種排版</small></h2>
+    <div class="how"><b>怎麼讀</b>上面五步是學員版（3 分鐘自學）；這裡把同一條路排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。每一站的深度用該站方法的教材版，這裡只排「怎麼把三站走一遍」。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
+    <details><summary><b>課堂流程（45 分鐘）</b></summary>
+      <table class="mt6">
+        <tr><th>分</th><th>做什麼</th><th>用學員版哪一步</th></tr>
+        <tr><td>0–5</td><td>破冰：每人說一個還沒做、「幾個選項選一個」的決定</td><td>第 1 步「能／不能回答」</td></tr>
+        <tr><td>5–15</td><td>講三站各做什麼，例子換成學員的領域；每站只講「要你填的那一列」</td><td>第 2 步（切領域）</td></tr>
+        <tr><td>15–30</td><td>分組把自己的決定走一遍：第 1 站三格、第 2 站四格各兩條、第 3 站自己定權重</td><td>第 2 步的填好例子</td></tr>
+        <tr><td>30–40</td><td>各組報告哪個權重一改結果就翻；其他組專門找「跳過第 1 站」和「權重全 5」</td><td>第 4 步</td></tr>
+        <tr><td>40–45</td><td>收尾：改了第 1 站就要重跑後面；預告每站的方法課</td><td>第 5 步、總覽頁</td></tr>
+      </table>
+    </details>
+    <details><summary><b>講稿要點（每步 2–3 句）</b></summary>
+      <ul class="check">
+        <li>這條路解什麼：先問「你們最近有沒有一件事大家意見不一、選項超過一個」，再給站列。不要先講方法名。</li>
+        <li>三站：用「定問題／看自己和外面／用你的權重打分」三個詞帶，每站停 30 秒讓學員對到自己的決定。</li>
+        <li>走完的例子：只講「每站一句、最後一句三站合一」，不要解釋案例細節。</li>
+        <li>怎麼走：把「權重全 5」的壞例投影出來，讓學員說為什麼沒意義。</li>
+        <li>開始：告訴學員第一次走選「一站一站走」，每站都會停下來確認。</li>
+      </ul>
+    </details>
+    <details><summary><b>討論題（3 題）</b></summary>
+      <ol class="src">
+        <li>你的決定裡，哪個成功條件最難寫成數字？為什麼？</li>
+        <li>如果權重全部由別人定，這還算你的決定嗎？</li>
+        <li>哪個權重一改結果就翻？你願意為它去補什麼資料？</li>
+      </ol>
+    </details>
+    <details><summary><b>學員最常錯的三件事，怎麼接</b></summary>
+      <ul class="check">
+        <li>成功條件寫成「希望變好」 → 反問：「三個月後，你怎麼知道成了？」要一個看得到的數字或事實。</li>
+        <li>機會與威脅寫成心情 → 反問：「這件事現在存在嗎？別人也看得到嗎？」是事實才進 O／T。</li>
+        <li>權重全填 5 → 反問：「如果只能保住一個條件，你保哪個？」那個才是 5。</li>
+      </ul>
+    </details>
+    <details><summary><b>講義與投影片</b></summary>
+      <p class="my6">列印版講義 = 第 2 步三站的「你要填」列與填好的例子（學員領域版）＋一張空白三站工作單；投影片大綱 = 五步各一頁＋站列一頁。兩者都從這一頁匯出（正式版在 P4 的匯出功能）。</p>
+    </details>
+    <p class="sub mt8 mb0">教材版和學員版由同一份工作流資料生成（來源 [1]–[2]），改課文就同時改兩版。每一站的方法深度在該站方法課的教材版，這裡不重寫。</p>
+  </div>
+
+  <div class="card">
     <h2>課程來源（每段課文的 [n]）</h2>
-    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；工作流的課引用它自己的定義檔和三站方法的課。<b>你要做的</b>不用做。</div>
+    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；工作流的課引用它自己的定義檔和三站方法的課。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
     <ol class="src">
       <li>工作流定義 `life-decision-v1.recipe.yaml`（三站順序與站間帶入的欄位）</li>
       <li>三站方法各自的 5 分鐘課（問題陳述、SWOT、加權決策矩陣；各有自己的來源）</li>
