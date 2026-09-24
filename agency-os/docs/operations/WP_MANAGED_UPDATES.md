@@ -19,7 +19,7 @@ Provide a safe, repeatable, one-command workflow to update WordPress plugins on 
 
 ```
 Tier 1 (today): scripts/update-client-wp-plugins.ps1
-  └── SSH + WP-CLI on Hostinger/cPanel shared hosting
+  └── WP-CLI via host profile: ks-aw-01-docker (docker exec) | shared-ssh (e.g. cPanel/Hostinger)
   └── Config: tenants/<client>/core/wp-update-config.json
   └── DB creds: read live from wp-config.php via WP-CLI (never in vault)
   └── Backup: mysqldump → gzip → local + checksum
@@ -99,31 +99,24 @@ Hostinger shared hosting provides site-cloning via hPanel (Subdomains). The Day 
 
 Each managed client needs one config at `tenants/<folder>/core/wp-update-config.json`.
 
-**Required fields:**
+**Required fields** — `host.profile` decides how every remote step runs (2026-09-24):
 ```json
 {
   "clientSlug": "soulful",
-  "sshHost": "...",
-  "sshPort": 65002,
-  "sshUser": "...",
-  "sshKeyName": "hostinger_soulful",
-  "wpPath": "/home/.../public_html",
   "siteUrl": "https://...",
-  "waves": {
-    "wave1": ["plugin-slug-a", "plugin-slug-b"],
-    "wave2": ["plugin-slug-c"],
-    "wave3": ["plugin-slug-d"]
-  }
+  "host": { "profile": "ks-aw-01-docker", "wpContainer": "soulful-wp", "dbContainer": "soulful-db" },
+  "waves": { "wave1": ["plugin-slug-a"], "wave2": ["plugin-slug-c"], "wave3": ["plugin-slug-d"] }
 }
 ```
-
-**No credentials in config** — DB password is read live from `wp-config.php` via `wp config get DB_PASSWORD`. SSH key is loaded from `~/.ssh/<sshKeyName>`.
+- `ks-aw-01-docker`: our host (ssh facts from `scripts/lib/prod-host.ps1`); WP-CLI `docker exec -u www-data <wpContainer>`; DB dump/restore as root inside `<dbContainer>` (the site's DB password is never read).
+- `shared-ssh`: `"host": { "profile": "shared-ssh", "sshHost", "sshPort", "sshUser", "sshKeyName", "wpPath" }` — WP-CLI on PATH, DB password read live via `wp config get DB_PASSWORD`. A config with no `host` block (legacy flat fields) = `shared-ssh`.
+- Backup passes only with a `-- Dump completed` trailer (pipefail); `-BackupOnly` takes + downloads the backup and stops.
 
 ### Current clients
 
-| Client slug | Config path | SSH key | Site |
+| Client slug | Config path | Profile | Site |
 |-------------|-------------|---------|------|
-| `soulful` | `tenants/company-soulful-expression/core/wp-update-config.json` | `~/.ssh/hostinger_soulful` | soulfulexpression.org |
+| `soulful` | `tenants/company-soulful-expression/core/wp-update-config.json` | `ks-aw-01-docker`（Hostinger 副本為凍結回滾，勿更新） | soulfulexpression.org |
 
 ---
 

@@ -34,6 +34,9 @@
 .PARAMETER BackupFirst
   Default $true. Set $false only for testing/dry-run scenarios.
 
+.PARAMETER BackupOnly
+  Take and download the pre-update backup, then stop (no updates).
+
 .PARAMETER DryRun
   Show what would be updated. No SSH writes.
 
@@ -56,7 +59,8 @@
 .NOTES
   30-year design:
   - Config file per client (no hard-coded credentials in this script)
-  - DB password read from server wp-config.php via WP-CLI (never stored in vault)
+  - shared-ssh: DB password read from server wp-config.php via WP-CLI (never stored in vault);
+    ks-aw-01-docker: dump/restore as root inside the DB container, the site's DB password is never read
   - Rollback uploads backup file back via SCP then restores — safe even on shared hosting
   - MainWP Tier 2 upgrade: when you have 3+ WP clients, install MainWP Dashboard
     on aware-wave.com WordPress and use this script's config as the connection template.
@@ -69,11 +73,17 @@ param(
   [Parameter(Mandatory = $true)] [string] $Plugins,
   [bool]   $BackupFirst = $true,
   [switch] $DryRun,
+  [switch] $BackupOnly,
   [string] $ReportPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($BackupOnly -and -not $BackupFirst) { throw "-BackupOnly needs the backup: do not combine it with -BackupFirst:`$false" }
+# Every value below reaches a remote shell (paths, WP-CLI args): allow-list them, never escape them.
+if ($ClientSlug -notmatch '^[a-z0-9][a-z0-9-]{0,62}$') { throw "Invalid -ClientSlug '$ClientSlug'" }
+$SlugRe = '^[a-z0-9][a-z0-9._-]{0,99}$'
 
 # CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
@@ -95,43 +105,79 @@ $config = $configFile | Get-Content -Raw -Encoding UTF8 | ConvertFrom-Json
 Write-Host "Config  : $($configFile.FullName)"
 Write-Host "Client  : $($config.clientSlug)  Site: $($config.siteUrl)"
 
-# ── SSH helpers ──────────────────────────────────────────────────────────────
-$sshKey    = Join-Path $env:USERPROFILE ".ssh\$($config.sshKeyName)"
-$sshTarget = "$($config.sshUser)@$($config.sshHost)"
-$sshPort   = [string]$config.sshPort
-$wpPath    = $config.wpPath.TrimEnd('/')
+# ── Hosting profile (config "host.profile") ──────────────────────────────────
+# Where the site lives decides HOW every remote step runs; the update flow below is identical for both.
+#   ks-aw-01-docker : our host (scripts/lib/prod-host.ps1); WP-CLI via `docker exec -u www-data <wpContainer>`,
+#                     DB dump/restore as root inside <dbContainer> (its own MARIADB_ROOT_PASSWORD) -- the site's
+#                     DB password is never read.
+#   shared-ssh      : a client host reached by ssh with WP-CLI on PATH (e.g. shared hosting).
+# A config without "host" is the legacy flat shape = shared-ssh. Until 2026-09-24 Soulful's config still named
+# its pre-migration Hostinger copy, so this tool would have updated the frozen rollback copy, not the live site.
+. (Join-Path $PSScriptRoot "lib\prod-host.ps1")
+$hostCfg = if ($config.PSObject.Properties['host']) { $config.host } else { $config }
+$hostProfile = if ($hostCfg.PSObject.Properties['profile']) { [string]$hostCfg.profile } else { 'shared-ssh' }
+switch ($hostProfile) {
+  'ks-aw-01-docker' {
+    foreach ($k in 'wpContainer', 'dbContainer') {
+      $v = if ($hostCfg.PSObject.Properties[$k]) { [string]$hostCfg.$k } else { '' }
+      if ($v -notmatch '^[a-z0-9][a-z0-9_.-]{0,62}$') { throw "host.$k missing or invalid in $($configFile.FullName)" }
+    }
+    $wpC = [string]$hostCfg.wpContainer; $dbC = [string]$hostCfg.dbContainer
+    $sshArgs = Get-ProdSshArgs
+    $scp     = Get-ProdScpArgs
+    $wpBase  = "sudo docker exec -u www-data $wpC wp --path=/var/www/html"
+  }
+  'shared-ssh' {
+    $rules = @{ sshHost = '^[A-Za-z0-9.-]{1,253}$'; sshPort = '^[0-9]{1,5}$'; sshUser = '^[a-z_][a-z0-9_-]{0,31}$'
+                sshKeyName = '^[A-Za-z0-9._-]{1,64}$'; wpPath = '^/[A-Za-z0-9._/-]{1,250}$' }
+    foreach ($k in $rules.Keys) {
+      $v = if ($hostCfg.PSObject.Properties[$k]) { [string]$hostCfg.$k } else { '' }
+      if ($v -notmatch $rules[$k]) { throw "host.$k missing or invalid in $($configFile.FullName)" }
+    }
+    $sshKey  = Join-Path $env:USERPROFILE ".ssh\$($hostCfg.sshKeyName)"
+    $sshArgs = @('-p', [string]$hostCfg.sshPort, '-i', $sshKey, '-o', 'IdentitiesOnly=yes', "$($hostCfg.sshUser)@$($hostCfg.sshHost)")
+    $scp     = [pscustomobject]@{ Options = @('-P', [string]$hostCfg.sshPort, '-i', $sshKey, '-o', 'IdentitiesOnly=yes'); Dest = "$($hostCfg.sshUser)@$($hostCfg.sshHost)" }
+    $wpBase  = "wp --path='$(([string]$hostCfg.wpPath).TrimEnd('/'))' --allow-root"
+  }
+  default { throw "Unknown host.profile '$hostProfile' in $($configFile.FullName) (ks-aw-01-docker | shared-ssh)" }
+}
+Write-Host "Host    : $hostProfile -> $($sshArgs[-1])"
 
 function Invoke-SSH {
   param([string]$Cmd, [switch]$PassThru)
-  # LogLevel=QUIET suppresses benign SSH warnings (e.g. post-quantum key exchange advisory)
-  # that would be caught as NativeCommandError with $ErrorActionPreference=Stop
-  # Force UTF-8 console — wp-cli on WordPress sites with CJK content (site names, page titles)
-  # would otherwise mojibake on Big5-locale Windows during SSH stdout capture.
+  # The command travels base64-encoded: PowerShell 5.1 strips/mangles embedded double quotes in native
+  # arguments, and the docker profile's sh -c '...MYSQL_PWD="$VAR"...' needs them intact.
+  # LogLevel=QUIET: benign ssh advisories (post-quantum KEX) would otherwise surface as NativeCommandError.
+  # UTF-8 console: CJK site names/titles in WP-CLI output mojibake on Big5-locale Windows otherwise.
+  $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($Cmd -replace "`r", '')))
   $out = Invoke-WithUtf8Console {
-    & ssh -i $sshKey -p $sshPort `
-          -o StrictHostKeyChecking=no -o BatchMode=yes -o LogLevel=QUIET `
-          $sshTarget $Cmd 2>&1
+    & ssh @sshArgs -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o LogLevel=QUIET "echo $b64 | base64 -d | bash" 2>&1
   }
   if ($PassThru) { return $out }
   $out | Write-Verbose
   return $out
 }
 
+function Invoke-Wp {  # WP-CLI arguments only; the profile supplies path, user and transport
+  param([string]$WpArgs)
+  return Invoke-SSH "$wpBase $WpArgs" -PassThru
+}
+
 function Copy-FromServer {
   param([string]$Remote, [string]$Local)
   # CP950 protection — scp stderr (e.g. PQ-KEX advisories) may contain non-ASCII
   Invoke-WithUtf8Console {
-    & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
-          "${sshTarget}:${Remote}" $Local 2>&1
+    & scp @($scp.Options) -o StrictHostKeyChecking=accept-new -o LogLevel=QUIET "$($scp.Dest):$Remote" $Local 2>&1
   } | Write-Verbose
+  if ($LASTEXITCODE -ne 0) { throw "scp from server failed (exit $LASTEXITCODE): $Remote" }
 }
 
 function Copy-ToServer {
   param([string]$Local, [string]$Remote)
   Invoke-WithUtf8Console {
-    & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
-          $Local "${sshTarget}:${Remote}" 2>&1
+    & scp @($scp.Options) -o StrictHostKeyChecking=accept-new -o LogLevel=QUIET $Local "$($scp.Dest):$Remote" 2>&1
   } | Write-Verbose
+  if ($LASTEXITCODE -ne 0) { throw "scp to server failed (exit $LASTEXITCODE): $Remote" }
 }
 
 # ── Health check ─────────────────────────────────────────────────────────────
@@ -164,13 +210,16 @@ $targetSlugs = switch -Wildcard ($pluginGroup) {
   'list'   { @() }
   default  { $Plugins -split ',' | ForEach-Object { $_.Trim() } }
 }
+foreach ($t in @($targetSlugs)) { if ($t -and $t -notmatch $SlugRe) { throw "Invalid plugin slug '$t'" } }
 $batchMode = ($pluginGroup -in @('wave3','all'))
 
 # ── [1/5] Pre-flight ──────────────────────────────────────────────────────────
 Write-Host "`n[1/5] Pre-flight checks..."
 $pingResult = Invoke-SSH "echo pong" -PassThru
-if ($pingResult -notmatch 'pong') { throw "SSH connection failed to $sshTarget" }
-Write-Host "  SSH OK"
+if ($pingResult -notmatch 'pong') { throw "SSH connection failed to $($sshArgs[-1])" }
+$wpVer = Invoke-Wp "core version 2>/dev/null"
+if (-not (($wpVer | Out-String) -match '^\s*\d+\.\d+')) { throw "WP-CLI unreachable through profile $hostProfile. Output: $wpVer" }
+Write-Host "  SSH OK, WordPress $((($wpVer | Out-String).Trim()))"
 
 $preHealth = Test-SiteHealth -Url $config.siteUrl
 Write-Host "  Site health: $($preHealth.detail)"
@@ -205,14 +254,14 @@ function Parse-WpCliJson {
 }
 
 if ($pluginGroup -ne 'theme') {
-  $availRaw  = Invoke-SSH "wp --path='$wpPath' plugin list --update=available --format=json --allow-root 2>/dev/null" -PassThru
+  $availRaw  = Invoke-Wp "plugin list --update=available --format=json 2>/dev/null"
   $available = Parse-WpCliJson $availRaw
   if ($null -eq $available) { $available = @() }
   if ([array]$targetSlugs | Measure-Object | Select-Object -ExpandProperty Count) {
     $available = @($available | Where-Object { $targetSlugs -contains $_.name })
   }
 } else {
-  $availRaw  = Invoke-SSH "wp --path='$wpPath' theme list --update=available --format=json --allow-root 2>/dev/null" -PassThru
+  $availRaw  = Invoke-Wp "theme list --update=available --format=json 2>/dev/null"
   $available = Parse-WpCliJson $availRaw
   if ($null -eq $available) { $available = @() }
 }
@@ -221,19 +270,21 @@ if ($pluginGroup -eq 'list') {
   Write-Host "`nAvailable updates for '$ClientSlug':"
   if ($available.Count -eq 0) { Write-Host "  (none)" }
   $available | ForEach-Object {
-    Write-Host ("  {0,-40} {1} → {2}" -f $_.name, $_.version, $_.update_version)
+    Write-Host ("  {0,-40} {1} -> {2}" -f $_.name, $_.version, $_.update_version)
   }
   exit 0
 }
 
-if ($available.Count -eq 0) {
+$badNames = @($available | Where-Object { [string]$_.name -notmatch $SlugRe })
+if ($badNames.Count -gt 0) { throw "WP-CLI reported an unexpected plugin name: $($badNames[0].name)" }
+if ($available.Count -eq 0 -and -not $BackupOnly) {
   Write-Host "No updates available for the specified group. Nothing to do."
   exit 0
 }
 
 Write-Host "Plugins to update ($($available.Count)):"
 $available | ForEach-Object {
-  Write-Host ("  {0,-40} {1} → {2}" -f $_.name, $_.version, $_.update_version)
+  Write-Host ("  {0,-40} {1} -> {2}" -f $_.name, $_.version, $_.update_version)
 }
 
 if ($DryRun) {
@@ -246,26 +297,32 @@ $timestamp   = (Get-Date -Format 'yyyyMMdd-HHmmss')
 $backupLocal = $null
 $dbHost = $dbName = $dbUser = $dbPass = $null
 
+# DB name comes from the site's own wp-config in both profiles. Only shared-ssh needs the site's DB
+# credentials; ks-aw-01-docker dumps/restores as root inside the DB container with that container's env.
+$dbName = ((Invoke-Wp "config get DB_NAME 2>/dev/null") | Out-String).Trim()
+if ($dbName -notmatch '^[A-Za-z0-9_]{1,64}$') { throw "Could not read a valid DB_NAME through $hostProfile (got '$dbName')" }
+if ($hostProfile -eq 'shared-ssh') {
+  $dbHost = ((Invoke-Wp "config get DB_HOST 2>/dev/null") | Out-String).Trim()
+  $dbUser = ((Invoke-Wp "config get DB_USER 2>/dev/null") | Out-String).Trim()
+  $dbPass = ((Invoke-Wp "config get DB_PASSWORD 2>/dev/null") | Out-String).Trim()
+}
+# Inside the DB container: root password from its own env, whichever image flavour it is.
+$inDb = 'P="${MARIADB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-}}"; [ -n "$P" ] || { echo NO_ROOT_PW >&2; exit 1; }; export MYSQL_PWD="$P"'
+
 if ($BackupFirst) {
   Write-Host "`n[3/5] Taking pre-update backup..."
-
-  # Read DB credentials from server wp-config.php (never stored in vault)
-  $dbHost = (Invoke-SSH "wp --path='$wpPath' config get DB_HOST --allow-root 2>/dev/null" -PassThru).Trim()
-  $dbName = (Invoke-SSH "wp --path='$wpPath' config get DB_NAME --allow-root 2>/dev/null" -PassThru).Trim()
-  $dbUser = (Invoke-SSH "wp --path='$wpPath' config get DB_USER --allow-root 2>/dev/null" -PassThru).Trim()
-  $dbPass = (Invoke-SSH "wp --path='$wpPath' config get DB_PASSWORD --allow-root 2>/dev/null" -PassThru).Trim()
-
-  # Write password to temp file on server (avoids it in process list)
   $backupRemote = "/tmp/pre-update-${ClientSlug}-${pluginGroup}-${timestamp}.sql.gz"
-  $dumpCmd = @"
-printf '[mysqldump]\npassword=%s\n' '$dbPass' > /tmp/.wpmycreds_$timestamp
-mysqldump --defaults-extra-file=/tmp/.wpmycreds_$timestamp -h $dbHost -u $dbUser $dbName 2>/dev/null | gzip > $backupRemote
-rm -f /tmp/.wpmycreds_$timestamp
-gzip -t $backupRemote && echo BACKUP_OK
-"@
+  # pipefail + the dump trailer: a failed dump must not pass as a valid (empty) gzip.
+  $dumpBody = if ($hostProfile -eq 'ks-aw-01-docker') {
+    "sudo docker exec $dbC sh -c '$inDb; exec `$(command -v mariadb-dump || command -v mysqldump) -uroot --single-transaction --routines --triggers $dbName' | gzip > $backupRemote"
+  } else {
+    "printf '[mysqldump]\npassword=%s\n' '$dbPass' > /tmp/.wpmycreds_$timestamp`nmysqldump --defaults-extra-file=/tmp/.wpmycreds_$timestamp --single-transaction -h $dbHost -u $dbUser $dbName | gzip > $backupRemote; rc=`$?`nrm -f /tmp/.wpmycreds_$timestamp`n[ `$rc -eq 0 ]"
+  }
+  $dumpCmd = "set -o pipefail`numask 077`n$dumpBody && gzip -t $backupRemote && gunzip -c $backupRemote | tail -1 | grep -q 'Dump completed' && echo BACKUP_OK"
   $dumpResult = Invoke-SSH $dumpCmd -PassThru
   if ($dumpResult -notmatch 'BACKUP_OK') {
-    throw "Backup integrity check failed. Output: $dumpResult"
+    Invoke-SSH "rm -f $backupRemote" | Out-Null
+    throw "Backup failed or incomplete (no 'Dump completed' trailer). Output: $dumpResult"
   }
 
   # SCP to local
@@ -274,10 +331,13 @@ gzip -t $backupRemote && echo BACKUP_OK
     New-Item -ItemType Directory -Path $tenantBackupDir -Force | Out-Null
   }
   $backupLocal = Join-Path $tenantBackupDir (Split-Path $backupRemote -Leaf)
+  if (Test-Path -LiteralPath $backupLocal) { Remove-Item -LiteralPath $backupLocal -Force }
   Copy-FromServer -Remote $backupRemote -Local $backupLocal
   Invoke-SSH "rm -f $backupRemote" | Out-Null
+  if (-not (Test-Path $backupLocal) -or (Get-Item $backupLocal).Length -lt 1024) { throw "Backup download failed: $backupLocal" }
 
-  Write-Host "  Backup : $backupLocal"
+  Write-Host "  Backup : $backupLocal ($([math]::Round((Get-Item $backupLocal).Length / 1MB, 1)) MB)"
+  if ($BackupOnly) { Write-Host "BackupOnly: done, nothing updated."; exit 0 }
 } else {
   Write-Host "`n[3/5] Backup skipped (BackupFirst=false)"
 }
@@ -292,11 +352,13 @@ function Invoke-Rollback {
   Write-Host "  ROLLBACK: Uploading backup to server..."
   $rollbackRemote = "/tmp/rollback-${ClientSlug}-${timestamp}.sql.gz"
   Copy-ToServer -Local $BackupPath -Remote $rollbackRemote
-  $restoreCmd = @"
-printf '[client]\npassword=%s\n' '$dbPass' > /tmp/.wpmycreds_rb_$timestamp
-gunzip -c $rollbackRemote | mysql --defaults-extra-file=/tmp/.wpmycreds_rb_$timestamp -h $dbHost -u $dbUser $dbName && echo RESTORE_OK
-rm -f /tmp/.wpmycreds_rb_$timestamp $rollbackRemote
-"@
+  $restoreBody = if ($hostProfile -eq 'ks-aw-01-docker') {
+    # -i is fed by the gunzip pipe, never by this script's own stdin.
+    "gunzip -c $rollbackRemote | sudo docker exec -i $dbC sh -c '$inDb; exec `$(command -v mariadb || command -v mysql) -uroot $dbName'"
+  } else {
+    "printf '[client]\npassword=%s\n' '$dbPass' > /tmp/.wpmycreds_rb_$timestamp`ngunzip -c $rollbackRemote | mysql --defaults-extra-file=/tmp/.wpmycreds_rb_$timestamp -h $dbHost -u $dbUser $dbName; rc=`$?`nrm -f /tmp/.wpmycreds_rb_$timestamp`n[ `$rc -eq 0 ]"
+  }
+  $restoreCmd = "set -o pipefail`n$restoreBody && echo RESTORE_OK`nrm -f $rollbackRemote"
   $result = Invoke-SSH $restoreCmd -PassThru
   if ($result -match 'RESTORE_OK') {
     Write-Host "  ROLLBACK: DB restored successfully."
@@ -313,7 +375,7 @@ $rollback = $false
 if ($batchMode) {
   # Batch update (wave3 / all)
   $slugArgs = if (@($targetSlugs).Count -gt 0) { $targetSlugs -join ' ' } else { '--all' }
-  $out = Invoke-SSH "wp --path='$wpPath' plugin update $slugArgs --allow-root 2>&1" -PassThru
+  $out = Invoke-Wp "plugin update $slugArgs 2>&1"
   Write-Host $out
   $health = Test-SiteHealth -Url $config.siteUrl
   Write-Host "  Health: $($health.detail)"
@@ -332,8 +394,8 @@ if ($batchMode) {
 } else {
   # One-by-one update (wave1 / wave2 / explicit slugs)
   foreach ($plugin in $available) {
-    Write-Host "  Updating $($plugin.name): $($plugin.version) → $($plugin.update_version)"
-    $out = Invoke-SSH "wp --path='$wpPath' plugin update $($plugin.name) --allow-root 2>&1" -PassThru
+    Write-Host "  Updating $($plugin.name): $($plugin.version) -> $($plugin.update_version)"
+    $out = Invoke-Wp "plugin update $($plugin.name) 2>&1"
     $outStr = $out -join '; '
     Write-Host "    $outStr"
 
@@ -425,7 +487,7 @@ Write-Host ("Updated : {0}   Skipped(license): {1}   Failed: {2}   Rollback: {3}
   $report.updated_count, $report.skipped_license_count, $report.failed_count, $rollback)
 $results | ForEach-Object {
   $icon = switch ($_.status) { 'updated' { '[OK]' } 'skipped_license' { '[SKIP]' } default { '[FAIL]' } }
-  Write-Host ("  {0} {1,-40} {2} → {3}" -f $icon, $_.plugin, $_.from, $_.to)
+  Write-Host ("  {0} {1,-40} {2} -> {3}" -f $icon, $_.plugin, $_.from, $_.to)
 }
 Write-Host "Health  : $($finalHealth.detail)"
 if ($skippedItems.Count -gt 0) {
