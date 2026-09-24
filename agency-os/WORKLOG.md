@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-24（續140）研究線：色調改用 HCI 整組（含背景）；四份示意稿、build script、計畫 U19 v1.23
+- [觸發] 操作者：「用 HCI.aware-wave.com 的色調，包括背景色，比較舒服。」
+- [來源] `Projects/internal/hci30/app/public/index.html:15-19`：bg `#f6f2e9`、card `#fffdf8`、border `#e3dbc8`、text `#232019`、muted `#7a7261`、teal `#0e5b50`／`#093f38`、tint `#e2eeea`、狀態 `#1f6b47`／`#a3611c`／`#a13328`；字體 PingFang TC／Microsoft JhengHei。
+- [已改] 四份示意稿 token（亮色整組換；暗色 HCI 沒有，自訂同色相：bg `#1c2b27`、card `#243530`、text `#f3efe4`、accent `#8fc7b0`）；圖表資料色不動；`build_artifact.py` 同步；計畫 U19。四個 artifact 重新發布。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python token 替換（每檔計數）+ build ×4 + grep `#f6f2e9` 各 1 + Artifact publish ×4 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 顏色 token
+- BUGHUNT_WAIVED: DOC_ONLY -- 僅示意稿與計畫 token
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續139）研究線：主色改墨綠（U19 token 更新；四份示意稿與計畫 v1.22）
 - [觸發] 操作者：「要接近墨綠色。」
 - [已改] accent 亮 `#1b4d3e`／暗 `#8fc7b0`，tag `#e6f0ec`／`#16302a`；四份示意稿、`build_artifact.py`、計畫 U19；圖表資料色不動。四個 artifact 重新發布。
