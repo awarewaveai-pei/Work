@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-24（續142）研究線：工作流總覽頁補課程入口（頁首工作流課按鈕＋每站方法課按鈕）；計畫 v1.25
+- [觸發] 操作者：「總覽頁連結課程的按鈕在哪裡？」→ 查證：頁面沒有任何進工作流課的入口，只有第 2 站一行灰字非連結。
+- [已改] `workflow-result-mock.html` v2：頁首「第一次走這條路？先上 3 分鐘的課 →」按鈕（同結果頁 `.howto`）連到工作流課線上版；三張站卡各一顆「先看 5 分鐘的課」按鈕（`href="#"`，P3 產出方法課後接上）。抓蟲順手抓到結果頁 ⑧ 四張候選卡的「第一次用？先看 5 分鐘的課 →」是無 href 的 `.lesson` div，同樣改成 `<a class="btn">`。計畫 v1.25：I11 總覽列 v2、U18 加「課程入口」句。線上：總覽 v6、結果 v12。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_wf_btn.py（9 處）+ apply_result_btn.py（6 處，計數斷言＋html.parser 標籤配對）+ build_artifact.py workflow／result + grep -o href（總覽 1 課程 URL＋3 佔位；結果頁 4 顆按鈕、0 個 .lesson）+ Artifact publish ×2 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/docs | grep=先看 5 分鐘的課 →</div> | hits=0（第一輪 4 hits 全在結果頁 ⑧，已改；第二輪 0）
+- [下一步] WC-PIa-01；P3 方法課落地時把三顆佔位按鈕換成真 URL。
 ## 2026-09-24（續141）研究線：版面規則 U20（預設一欄；多方法卡片依寬度 2／1 欄，永不 3 欄）；計畫 v1.24
 - [觸發] 操作者看結果頁 ⑧ 候選卡在寬窗 3 欄、窄窗 2 欄：「不要三欄」→「多個模型下才 2 欄一組」→「依寬度自動變 2 欄或 1 欄」。
 - [根因] `.nexts`／`.stations` 用 `auto-fit,minmax(230px)` 無上限；其他區塊（三步驟、圖表、KPI、能／不能、好／壞例、課程雙欄）寫死 2–3 欄。
