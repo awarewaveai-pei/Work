@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-24（續143）研究線：四頁示意稿改成單一共用設計系統＋機械閘 check-mocks.py＋repo 內建置腳本；計畫 v1.26
+- [觸發] 操作者：「幾乎什麼事都要我提醒你…丟三落四、不連續、不注意統一規格／排版／UI UX，你要怎麼補救和驗證？」
+- [根因] 四頁各自手改，每條規則只落在她正在看的那頁；13 個共用選擇器已漂移（`.btn` 內距、`.wrap` 寬、`.pill` 色、`.status` 邊距、`.row` 標籤寬、`th` 底色…）；`.step`／`.layer` 同名異義；發布時的改色／深色／svg token 轉換只存在 scratchpad 腳本，repo 示意稿 ≠ 發布版。
+- [已改] 四頁 `<style>` 開頭一段位元相同的 `/* == shared design system */`（token 亮暗＋全部共用元件），之後 `/* == page-specific == */`；改名 `.todos/.todo`、`.tags`、`.exlayer`、`.pill.ok`；跳過連結改真 `<a href="#start">`；accent 上的白字改 `var(--bg)`（深色對比）；svg 字色改 token class。新檔 `COS/docs/mockups/check-mocks.py`（U19 亮＋兩個暗色區塊／U20 白名單、共用段也受檢／U15 含跨標籤拆字／跨頁連結／狀態列／每段卡片怎麼讀／svg a11y＋tablist／D18 逐組／無 select／真 DOM 標籤配對／at-rule 解析／永不 traceback）、`check-mocks-selftest.py`（36 個注入缺陷全抓，留在 repo 當迴歸）與 `build-artifact.py`（先跑檢查器、紅就拒建；只剝殼）。critic 抓到示意稿兩個錯一併修：方法課「跳過」連到第 5 步不是第 6 步；chips tablist 沒有 role=tab／aria-selected。計畫 v1.26：I11、§10、§12.1 規則 10。線上：結果 v14、方法課 v11、總覽 v8、工作流課 v8。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python check-mocks.py（綠）+ check-mocks-selftest.py（36/36）+ build-artifact.py ×4（閘先跑）+ before/after body diff + 瀏覽器 javascript_tool 四頁×（1200px／375px／data-theme=dark）讀 computed grid 欄數、scrollWidth 溢出、gutter、按鈕對比 | exit=0 | ms=0
+- REVIEW_DONE: critic=Standard | verdict=fail→fixed | findings=0c/8m/13n（第一版檢查器 27 個突變 23 個假綠：暗色比對死碼、共用段不受檢、`@keyframes` 後全略、U20 黑名單、跳過連結落錯步、每段怎麼讀只數數量、chips 用聯集；全部重寫後自測 36/36，critic 的兩個示意稿錯已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=build_artifact\.py|leftover literal | hits=16（全在 WORKLOG 歷史條目，記的是當時的 scratch 腳本名，歷史不回改；Projects／scripts 0）
+- [避免再發生] 記憶 `feedback_ui_rules_become_checkers_across_all_pages.md`：設計規則先進檢查器→四頁同改→兩種寬度讀實際版面→一起重發；禁止 repo 外的發布轉換。
+- [下一步] WC-PIa-01；新殼落地時同一檢查器指向 `web/app/globals.css`。
 ## 2026-09-24（續142）研究線：工作流總覽頁補課程入口（頁首工作流課按鈕＋每站方法課按鈕）；計畫 v1.25
 - [觸發] 操作者：「總覽頁連結課程的按鈕在哪裡？」→ 查證：頁面沒有任何進工作流課的入口，只有第 2 站一行灰字非連結。
 - [已改] `workflow-result-mock.html` v2：頁首「第一次走這條路？先上 3 分鐘的課 →」按鈕（同結果頁 `.howto`）連到工作流課線上版；三張站卡各一顆「先看 5 分鐘的課」按鈕（`href="#"`，P3 產出方法課後接上）。抓蟲順手抓到結果頁 ⑧ 四張候選卡的「第一次用？先看 5 分鐘的課 →」是無 href 的 `.lesson` div，同樣改成 `<a class="btn">`。計畫 v1.25：I11 總覽列 v2、U18 加「課程入口」句。線上：總覽 v6、結果 v12。
