@@ -1,0 +1,38 @@
+# Display labels for the method families (the `<family>.<name>` prefix of every method id) — the ONE list.
+# The dashboard used to title-case the id (`art_therapy` -> "Art Therapy"); nothing carried a Chinese label. The
+# home page catalogue (COS/docs/mockups/home-mock.html, generated) reads this file; `GET /methods` will merge it the way
+# it merges method-display-metadata.yaml (P3). The mock gate requires an entry for every family present in
+# method-display-metadata.yaml. Note: `stakeholder` (1 method, the regulator lens) and `stakeholders` (10) are both
+# real families in the registry today; merging them is a registry decision, not a label decision.
+version: 1
+families:
+  divergent: {name_zh: 發散思考, name_en: Divergent Thinking, blurb_zh: 先把想法變多再挑：腦力書寫、隨機刺激、SCAMPER 這一類。}
+  strategy: {name_zh: 策略, name_en: Strategy, blurb_zh: 看自己與外面、定位與商業模式：SWOT、五力、商業模式圖。}
+  framing: {name_zh: 問題定義與框架, name_en: Framing, blurb_zh: 先把「到底要解什麼」講清楚：問題陳述、重新框定、OKR。}
+  art_therapy: {name_zh: 藝術治療, name_en: Art Therapy, blurb_zh: 帶領者用的非語言工具：視覺隱喻、隱喻對話、價值澄清。}
+  decision: {name_zh: 決策, name_en: Decision, blurb_zh: 幾個選項選一個、權重由你定：加權決策矩陣、AHP、決策樹。}
+  foresight: {name_zh: 前瞻與情境, name_en: Foresight, blurb_zh: 未來會怎樣、有哪幾種可能：情境規劃、趨勢掃描、預想失敗。}
+  devops_sre: {name_zh: 維運與可靠性, name_en: DevOps / SRE, blurb_zh: 系統上線與運作的工程作法：藍綠部署、事故回顧、錯誤預算。}
+  systems: {name_zh: 系統思考, name_en: Systems Thinking, blurb_zh: 一再發生的問題是哪一層在推：冰山模型、因果迴路、槓桿點。}
+  delivery: {name_zh: 交付與風險, name_en: Delivery, blurb_zh: 把計畫排出來、盯著風險：風險登錄、變更風險矩陣、成果路線圖。}
+  experiment: {name_zh: 實驗, name_en: Experiment, blurb_zh: 用資料驗證而不是猜：A/B 測試、假設檢定、最小可行實驗。}
+  learning: {name_zh: 學習與回顧, name_en: Learning, blurb_zh: 做完之後學到什麼：行動後檢討、回顧會、雙環學習。}
+  architecture: {name_zh: 架構, name_en: Architecture, blurb_zh: 技術決策怎麼做、怎麼留下紀錄：ADR、ATAM、品質屬性。}
+  causal: {name_zh: 因果, name_en: Causal Reasoning, blurb_zh: 什麼造成什麼、反過來會怎樣：反事實推理、因果圖、干擾因子。}
+  challenge: {name_zh: 挑戰與對抗, name_en: Challenge, blurb_zh: 故意找碴讓結論更硬：紅隊、藍隊、魔鬼代言人、預想驗屍。}
+  database_data: {name_zh: 資料庫與資料, name_en: Database & Data, blurb_zh: 資料怎麼存、怎麼遷、怎麼救：備份還原演練、擴張收縮遷移。}
+  epistemic: {name_zh: 論證與知識, name_en: Epistemic, blurb_zh: 你憑什麼這樣說：假設地圖、證據矩陣、Toulmin 論證。}
+  jurisdiction: {name_zh: 法規與管轄, name_en: Jurisdiction, blurb_zh: 哪些法規適用、由誰管：適用法規圖譜、合規對照。}
+  representation: {name_zh: 表徵與呈現, name_en: Representation, blurb_zh: 同一件事換一種看法：對話檢視、圖像化、時間軸。}
+  security: {name_zh: 資安, name_en: Security, blurb_zh: 威脅在哪、怎麼被攻：STRIDE、攻擊樹、LINDDUN。}
+  stakeholders: {name_zh: 利害關係人, name_en: Stakeholders, blurb_zh: 誰在乎、誰有籌碼：利害關係人地圖、BATNA、談判分析。}
+  decomposition: {name_zh: 拆解, name_en: Decomposition, blurb_zh: 大問題拆成能動手的小塊：功能分析、工作分解、問題樹。}
+  feasibility: {name_zh: 可行性與經濟性, name_en: Feasibility, blurb_zh: 做不做得起來、划不划算：損益兩平、NPV、單位經濟。}
+  insight: {name_zh: 洞察與使用者, name_en: Insight, blurb_zh: 從人身上看到什麼：情境訪查、同理心地圖、旅程地圖。}
+  root_cause: {name_zh: 根因, name_en: Root Cause, blurb_zh: 為什麼會發生：五問法、魚骨圖、屏障分析。}
+  association: {name_zh: 聯想與整理, name_en: Association, blurb_zh: 把零散的想法歸類成結構：親和圖、心智圖、概念圖。}
+  research: {name_zh: 研究方法, name_en: Research, blurb_zh: 質性資料怎麼編碼、怎麼驗證：質性編碼、評分者信度。}
+  computation: {name_zh: 計算與模擬, name_en: Computation, blurb_zh: 用數字模擬不確定：蒙地卡羅。}
+  evidence: {name_zh: 證據, name_en: Evidence, blurb_zh: 幾個來源互相印證：三角驗證。}
+  finance: {name_zh: 財務, name_en: Finance, blurb_zh: 企劃背後的數字假設：財務假設。}
+  stakeholder: {name_zh: 利害關係人視角, name_en: Stakeholder Lens, blurb_zh: 站在某一方看：監管者視角。}

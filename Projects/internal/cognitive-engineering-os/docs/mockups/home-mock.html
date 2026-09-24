@@ -184,6 +184,14 @@
   .row li{margin:2px 0}
   .filled{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
   .filled .lab{display:block;color:var(--accent);font-size:12px;font-weight:600;margin-bottom:2px}
+  .search{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit;background:var(--card);color:var(--ink)}
+  .fam{font-size:15px;margin:14px 0 2px;color:var(--accent)}
+  .fam .k{color:var(--muted);font-size:12.5px;font-weight:400;margin-left:6px}
+  .fam small{font-weight:400;color:var(--muted);font-size:12px;margin-left:8px}
+  .tool{padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+  .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
+  .tool .sub{margin-top:1px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -203,68 +211,948 @@
   /* == shared design system: end == */
   /* == page-specific == */
 </style>
+<!-- == partial: home-catalog-script: start (verbatim from partials/home-catalog-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Home catalogue: one search box filters workflows and methods together; family chips are multi-select (plan U11:
+  // visible buttons, no <select>). Hidden rows use the hidden attribute, never style.display.
+  document.addEventListener("DOMContentLoaded", function () {
+    var q = document.getElementById("q"), fams = {};
+    function norm(s) { return (s || "").toLowerCase(); }
+    function apply() {
+      var t = norm(q.value).trim(), any = Object.keys(fams).length > 0;
+      document.querySelectorAll("[data-q]").forEach(function (el) {
+        var f = el.getAttribute("data-fam");
+        var famOk = !any || !f || fams[f];
+        var qOk = !t || norm(el.getAttribute("data-q")).indexOf(t) !== -1;
+        el.hidden = !(famOk && qOk);
+      });
+      document.querySelectorAll(".famgroup").forEach(function (g) { g.hidden = !g.querySelector(".tool:not([hidden])"); });
+      document.querySelectorAll(".wfgroup").forEach(function (g) { g.hidden = !g.querySelector(".wf:not([hidden])"); });
+      document.getElementById("mcount").textContent = document.querySelectorAll(".tool:not([hidden])").length;
+      document.getElementById("wcount").textContent = document.querySelectorAll(".wf:not([hidden])").length;
+    }
+    q.addEventListener("input", apply);
+    document.querySelectorAll(".chip[data-fam]").forEach(function (c) {
+      c.addEventListener("click", function () {
+        var f = c.getAttribute("data-fam");
+        if (fams[f]) delete fams[f]; else fams[f] = true;
+        c.classList.toggle("on", !!fams[f]); c.setAttribute("aria-pressed", fams[f] ? "true" : "false");
+        apply();
+      });
+    });
+  });
+</script>
+<!-- == partial: home-catalog-script: end == -->
 </head>
 <body>
 <div class="wrap">
 
-  <div class="banner"><b>示意稿</b>：這是登入後的第一頁。入口是「你要弄清楚的事」，不是方法名：四張卡 = 四條線，第五張給不知道該用哪個的人。示範專案是合成教材，不是真實個案。</div>
+  <div class="banner"><b>示意稿</b>：登入後的第一頁 = 整套工具的目錄：全部方法與工作流都在這裡（由方法登錄檔與工作流定義檔生成，不是手打的），一個搜尋框、家族晶片、一個「描述你的問題」給不知道該用哪個的人。示範專案是合成教材。</div>
   <div class="crumbs">首頁</div>
 
   <div class="top">
     <div>
       <h1>你今天要弄清楚什麼？</h1>
-      <div class="sub">一件事一個專案：先上一堂短課（可跳）、填幾格、看一頁看得懂的結果。不用先知道方法名。</div>
+      <div class="sub">每個方法與每條工作流都同一套規則：先上短課（可跳）、填幾格、看一頁看得懂的結果。找不到就描述你的問題，系統幫你挑。</div>
     </div>
     <span class="skip">已經有專案？<a href="#projects">看我的專案</a></span>
   </div>
   <div class="status"><span class="pill">示範帳號・第一次登入</span><span>示範專案 2 個（已做完，先看終點）</span><span>本月費用 NT$0</span><span>語言 zh-TW（en 準備中）</span></div>
 
-  <!-- 1 四條線 -->
+  <!-- 1 找工具 -->
   <div class="card">
-    <h2>從一件事開始<small>四條線，各一張卡</small></h2>
-    <div class="how"><b>怎麼讀</b>每張卡寫它回答什麼、怎麼走、會得到什麼、大約多久多少錢；標「你的預設」的那張是系統依你的領域先選好的。<b>你要做的</b>按一張卡的「開始」；第一次用先按那張卡的課（可跳）。</div>
-    <div class="mcards">
-      <div class="mcard now">
-        <div><b>藝術反思／帶領者</b><span class="tag">你的預設</span></div>
-        <div><span class="k">回答什麼：</span>團體 session 裡一再發生的事（例如主動分享變少）是哪一層在推、先在哪一層出手。</div>
-        <div><span class="k">怎麼走：</span>預設方法冰山模型（四層）；之後可接槓桿點分析、五問法。</div>
-        <div><span class="k">會得到：</span>九段結果頁：結論、冰山圖、圖表、逐層卡、方案與 90 天計畫、下一步。</div>
-        <div class="k">填 4 段話・約 6 分鐘・≈ NT$1</div>
-        <div class="btns"><span class="btn primary">開始<small>建立專案，填四段話</small></span><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">第一次用？先上 5 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看示範分析 →</a></div>
-      </div>
-      <div class="mcard">
-        <div><b>評估一個決定</b></div>
-        <div><span class="k">回答什麼：</span>幾個選項選哪個、按你自己定的準則和權重，哪個權重一改結果就翻。</div>
-        <div><span class="k">怎麼走：</span>工作流「做一個決定」3 站：問題陳述 → SWOT → 加權決策矩陣。</div>
-        <div><span class="k">會得到：</span>每站一頁九段＋總結頁（三站合一、最終建議、方案與追蹤）。</div>
-        <div class="k">全程約 8 分鐘・≈ NT$3</div>
-        <div class="btns"><span class="btn primary">開始<small>建立專案，第 1 站三個格子</small></span><a class="btn" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU">第一次走？先上 3 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看示範總覽 →</a></div>
-      </div>
-      <div class="mcard">
-        <div><b>查一家公司／組織</b></div>
-        <div><span class="k">回答什麼：</span>這家公司或機構值不值得合作、風險在哪、還缺什麼證據。</div>
-        <div><span class="k">怎麼走：</span>蒐集公開來源 → 彙整 → 合作風險分析；花錢前先告訴你會做幾次搜尋。</div>
-        <div><span class="k">會得到：</span>來源清單（每筆可查）、彙整、風險報表與改判條件。</div>
-        <div class="k">約 12 次搜尋・3–5 分鐘・≈ NT$10</div>
-        <div class="btns"><span class="btn primary">開始<small>建立專案，填名稱與定位詞</small></span><a class="btn" href="#" title="這條線的 5 分鐘課：P3 隨方法資料產出">第一次用？先上 5 分鐘的課 →</a></div>
-        <div class="k">示範專案：P3 隨這條線產出</div>
-      </div>
-      <div class="mcard">
-        <div><b>整理文獻</b></div>
-        <div><span class="k">回答什麼：</span>這個題目已經有哪些研究、彼此怎麼分、缺口在哪。</div>
-        <div><span class="k">怎麼走：</span>貼題目與關鍵字 → 學術來源蒐集 → 文獻矩陣。</div>
-        <div><span class="k">會得到：</span>來源清單、矩陣（主題 × 方法 × 發現）、缺口清單。</div>
-        <div class="k">約 20 次查詢・5 分鐘・≈ NT$15</div>
-        <div class="btns"><span class="btn primary">開始<small>建立專案，貼題目與關鍵字</small></span><a class="btn" href="#" title="這條線的 5 分鐘課：P3 隨方法資料產出">第一次用？先上 5 分鐘的課 →</a></div>
-        <div class="k">示範專案：P3 隨這條線產出</div>
-      </div>
+    <h2>找工具<small>一個搜尋框管全部；家族晶片可多選</small></h2>
+    <div class="how"><b>怎麼讀</b>搜尋比對中文名、英文名、縮寫、代號和一句話用途，工作流與方法一起濾；晶片是方法的家族（數字 = 該家族幾個方法），只縮小「單一方法」那張卡。<b>你要做的</b>打幾個字看兩張卡的數字變；按一兩個家族只看那幾類方法。</div>
+    <input class="search" id="q" type="search" placeholder="例：SWOT、冰山、決策、根因、五力、質性、資安…" aria-label="搜尋方法與工作流">
+    <div class="mt8">
+    <!-- == partial: catalog-families: start (verbatim from partials/catalog-families.html via sync-design-system.py; check-mocks.py enforces) == -->
+    <div class="chips" role="group" aria-label="方法家族（可多選）">
+      <span class="sub">家族：</span>
+      <button class="chip" aria-pressed="false" data-fam="divergent" title="先把想法變多再挑：腦力書寫、隨機刺激、SCAMPER 這一類。">發散思考 16</button>
+      <button class="chip" aria-pressed="false" data-fam="strategy" title="看自己與外面、定位與商業模式：SWOT、五力、商業模式圖。">策略 16</button>
+      <button class="chip" aria-pressed="false" data-fam="framing" title="先把「到底要解什麼」講清楚：問題陳述、重新框定、OKR。">問題定義與框架 15</button>
+      <button class="chip" aria-pressed="false" data-fam="art_therapy" title="帶領者用的非語言工具：視覺隱喻、隱喻對話、價值澄清。">藝術治療 14</button>
+      <button class="chip" aria-pressed="false" data-fam="decision" title="幾個選項選一個、權重由你定：加權決策矩陣、AHP、決策樹。">決策 14</button>
+      <button class="chip" aria-pressed="false" data-fam="foresight" title="未來會怎樣、有哪幾種可能：情境規劃、趨勢掃描、預想失敗。">前瞻與情境 14</button>
+      <button class="chip" aria-pressed="false" data-fam="devops_sre" title="系統上線與運作的工程作法：藍綠部署、事故回顧、錯誤預算。">維運與可靠性 13</button>
+      <button class="chip" aria-pressed="false" data-fam="systems" title="一再發生的問題是哪一層在推：冰山模型、因果迴路、槓桿點。">系統思考 12</button>
+      <button class="chip" aria-pressed="false" data-fam="delivery" title="把計畫排出來、盯著風險：風險登錄、變更風險矩陣、成果路線圖。">交付與風險 11</button>
+      <button class="chip" aria-pressed="false" data-fam="experiment" title="用資料驗證而不是猜：A/B 測試、假設檢定、最小可行實驗。">實驗 11</button>
+      <button class="chip" aria-pressed="false" data-fam="learning" title="做完之後學到什麼：行動後檢討、回顧會、雙環學習。">學習與回顧 11</button>
+      <button class="chip" aria-pressed="false" data-fam="architecture" title="技術決策怎麼做、怎麼留下紀錄：ADR、ATAM、品質屬性。">架構 10</button>
+      <button class="chip" aria-pressed="false" data-fam="causal" title="什麼造成什麼、反過來會怎樣：反事實推理、因果圖、干擾因子。">因果 10</button>
+      <button class="chip" aria-pressed="false" data-fam="challenge" title="故意找碴讓結論更硬：紅隊、藍隊、魔鬼代言人、預想驗屍。">挑戰與對抗 10</button>
+      <button class="chip" aria-pressed="false" data-fam="database_data" title="資料怎麼存、怎麼遷、怎麼救：備份還原演練、擴張收縮遷移。">資料庫與資料 10</button>
+      <button class="chip" aria-pressed="false" data-fam="epistemic" title="你憑什麼這樣說：假設地圖、證據矩陣、Toulmin 論證。">論證與知識 10</button>
+      <button class="chip" aria-pressed="false" data-fam="jurisdiction" title="哪些法規適用、由誰管：適用法規圖譜、合規對照。">法規與管轄 10</button>
+      <button class="chip" aria-pressed="false" data-fam="representation" title="同一件事換一種看法：對話檢視、圖像化、時間軸。">表徵與呈現 10</button>
+      <button class="chip" aria-pressed="false" data-fam="security" title="威脅在哪、怎麼被攻：STRIDE、攻擊樹、LINDDUN。">資安 10</button>
+      <button class="chip" aria-pressed="false" data-fam="stakeholders" title="誰在乎、誰有籌碼：利害關係人地圖、BATNA、談判分析。">利害關係人 10</button>
+      <button class="chip" aria-pressed="false" data-fam="decomposition" title="大問題拆成能動手的小塊：功能分析、工作分解、問題樹。">拆解 9</button>
+      <button class="chip" aria-pressed="false" data-fam="feasibility" title="做不做得起來、划不划算：損益兩平、NPV、單位經濟。">可行性與經濟性 9</button>
+      <button class="chip" aria-pressed="false" data-fam="insight" title="從人身上看到什麼：情境訪查、同理心地圖、旅程地圖。">洞察與使用者 9</button>
+      <button class="chip" aria-pressed="false" data-fam="root_cause" title="為什麼會發生：五問法、魚骨圖、屏障分析。">根因 9</button>
+      <button class="chip" aria-pressed="false" data-fam="association" title="把零散的想法歸類成結構：親和圖、心智圖、概念圖。">聯想與整理 6</button>
+      <button class="chip" aria-pressed="false" data-fam="research" title="質性資料怎麼編碼、怎麼驗證：質性編碼、評分者信度。">研究方法 2</button>
+      <button class="chip" aria-pressed="false" data-fam="computation" title="用數字模擬不確定：蒙地卡羅。">計算與模擬 1</button>
+      <button class="chip" aria-pressed="false" data-fam="evidence" title="幾個來源互相印證：三角驗證。">證據 1</button>
+      <button class="chip" aria-pressed="false" data-fam="finance" title="企劃背後的數字假設：財務假設。">財務 1</button>
+      <button class="chip" aria-pressed="false" data-fam="stakeholder" title="站在某一方看：監管者視角。">利害關係人視角 1</button>
+    </div>
+    <!-- == partial: catalog-families: end == -->
     </div>
   </div>
 
-  <!-- 2 描述你的問題 -->
+  <!-- 2 工作流 -->
+  <div class="card" id="workflows">
+    <!-- == partial: catalog-workflows: start (verbatim from partials/catalog-workflows.html via sync-design-system.py; check-mocks.py enforces) == -->
+    <h2>工作流<small><span id="wcount">16</span>／16 條：幾個方法排好順序，上一站的結果自動變成下一站的輸入</small></h2>
+    <div class="how"><b>怎麼讀</b>一張卡一條路；站列是它會依序跑的方法，按一站可看那個方法。<b>你要做的</b>找到你的情境按「開始」；第一次走先上那條路的短課（可跳）。自己串的工作流也會出現在這裡。</div>
+    <section class="wfgroup">
+    <h3 class="fam">藝術治療<small>3 條</small></h3>
+    <div class="mcards">
+      <div class="mcard wf" data-q="創作反思 art therapy creative reflection (random stimulus -&gt; mind map) art-therapy-creative-reflection-v1 帶領者需要一個可追溯的創作提示：抽一個隨機刺激，再用心智圖把聯想攤開。 隨機刺激法 心智圖">
+        <div><b>創作反思</b><span class="tag">2 站</span></div>
+        <div class="k">Art Therapy Creative Reflection (Random Stimulus -&gt; Mind Map)</div>
+        <div class="journey"><span>隨機刺激法</span><i>→</i><span>心智圖</span></div>
+        <div>帶領者需要一個可追溯的創作提示：抽一個隨機刺激，再用心智圖把聯想攤開。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="專案發想 art therapy project ideation (frame -&gt; random stimulus -&gt; mind map) art-therapy-project-ideation-v1 早期專案設計：先把目標講清楚，再發散，再整理。 問題陳述 隨機刺激法 心智圖">
+        <div><b>專案發想</b><span class="tag">3 站</span></div>
+        <div class="k">Art Therapy Project Ideation (Frame -&gt; Random Stimulus -&gt; Mind Map)</div>
+        <div class="journey"><span>問題陳述</span><i>→</i><span>隨機刺激法</span><i>→</i><span>心智圖</span></div>
+        <div>早期專案設計：先把目標講清楚，再發散，再整理。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="卡關解套 art therapy unstick art-therapy-unstick-v1 參與者答不出反思提問時，用非語言的路走一遍：隱喻、對話、重新框定、價值澄清。 視覺隱喻創作 隱喻對話 框架轉換 價值澄清">
+        <div><b>卡關解套</b><span class="tag">4 站</span></div>
+        <div class="k">Art Therapy Unstick</div>
+        <div class="journey"><span>視覺隱喻創作</span><i>→</i><span>隱喻對話</span><i>→</i><span>框架轉換</span><i>→</i><span>價值澄清</span></div>
+        <div>參與者答不出反思提問時，用非語言的路走一遍：隱喻、對話、重新框定、價值澄清。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+    </div>
+    </section>
+    <section class="wfgroup">
+    <h3 class="fam">做決定<small>1 條</small></h3>
+    <div class="mcards">
+      <div class="mcard wf" data-q="做一個決定 life decision (frame -&gt; swot -&gt; weighted decision matrix) life-decision-v1 幾個選項選一個：先把問題講清楚，再看自己與外面，最後用你定的權重打分。 問題陳述 swot 分析 加權決策矩陣">
+        <div><b>做一個決定</b><span class="tag">3 站</span></div>
+        <div class="k">Life Decision (Frame -&gt; SWOT -&gt; Weighted Decision Matrix)</div>
+        <div class="journey"><span>問題陳述</span><i>→</i><span>SWOT 分析</span><i>→</i><span>加權決策矩陣</span></div>
+        <div>幾個選項選一個：先把問題講清楚，再看自己與外面，最後用你定的權重打分。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU">第一次走？先上 3 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看示範總覽 →</a></div>
+      </div>
+    </div>
+    </section>
+    <section class="wfgroup">
+    <h3 class="fam">商業企劃<small>6 條</small></h3>
+    <div class="mcards">
+      <div class="mcard wf" data-q="可行性審視 business feasibility review (break-even -&gt; npv) business-feasibility-review-v1 有成本、毛利、現金流數字時，先算撐不撐得住。 損益兩平分析 淨現值分析">
+        <div><b>可行性審視</b><span class="tag">2 站</span></div>
+        <div class="k">Business Feasibility Review (Break-even -&gt; NPV)</div>
+        <div class="journey"><span>損益兩平分析</span><i>→</i><span>淨現值分析</span></div>
+        <div>有成本、毛利、現金流數字時，先算撐不撐得住。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="基礎盤點 business foundation (swot -&gt; tows -&gt; porter -&gt; business model canvas) business-foundation-v1 早期企劃：把事實與策略假設分開標記，四站走完。 swot 分析 tows 矩陣 五力分析 商業模式圖">
+        <div><b>基礎盤點</b><span class="tag">4 站</span></div>
+        <div class="k">Business Foundation (SWOT -&gt; TOWS -&gt; Porter -&gt; Business Model Canvas)</div>
+        <div class="journey"><span>SWOT 分析</span><i>→</i><span>TOWS 矩陣</span><i>→</i><span>五力分析</span><i>→</i><span>商業模式圖</span></div>
+        <div>早期企劃：把事實與策略假設分開標記，四站走完。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="完整企劃鏈 business plan full chain business-plan-full-v1 從問題陳述到路線圖：一份審核過的來源包走成完整、可追溯的企劃，十七站。 問題陳述 同理心地圖 市場分析 3c 分析 swot 分析 pestel 分析 五力分析 stp 市場區隔定位 商業模式圖 tows 矩陣 財務假設 淨現值分析 情境規劃 風險登記表 okr 目標關鍵成果 成果導向路線圖">
+        <div><b>完整企劃鏈</b><span class="tag">17 站</span></div>
+        <div class="k">Business Plan Full Chain</div>
+        <div class="journey"><span>問題陳述</span><i>→</i><span>同理心地圖</span><i>→</i><span>市場分析</span><i>→</i><span>3C 分析</span><i>→</i><span>SWOT 分析</span><i>→</i><span>PESTEL 分析</span><i>→</i><span>五力分析</span><i>→</i><span>STP 市場區隔定位</span><i>→</i><span>商業模式圖</span><i>→</i><span>TOWS 矩陣</span><i>→</i><span>財務假設</span><i>→</i><span>淨現值分析</span><i>→</i><span>情境規劃</span><i>→</i><span>風險登記表</span><i>→</i><span>OKR 目標關鍵成果</span><i>→</i><span>成果導向路線圖</span><i>→</i><span>能力步</span></div>
+        <div>從問題陳述到路線圖：一份審核過的來源包走成完整、可追溯的企劃，十七站。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="企劃可行性 business planning feasibility (foundation -&gt; scenario/risk -&gt; economics) business-planning-feasibility-v1 基礎 → 情境與風險 → 經濟性，十站。 swot 分析 tows 矩陣 五力分析 商業模式圖 情境規劃 風險登記表 總持有成本 單位經濟效益 損益兩平分析 淨現值分析">
+        <div><b>企劃可行性</b><span class="tag">10 站</span></div>
+        <div class="k">Business Planning Feasibility (Foundation -&gt; Scenario/Risk -&gt; Economics)</div>
+        <div class="journey"><span>SWOT 分析</span><i>→</i><span>TOWS 矩陣</span><i>→</i><span>五力分析</span><i>→</i><span>商業模式圖</span><i>→</i><span>情境規劃</span><i>→</i><span>風險登記表</span><i>→</i><span>總持有成本</span><i>→</i><span>單位經濟效益</span><i>→</i><span>損益兩平分析</span><i>→</i><span>淨現值分析</span></div>
+        <div>基礎 → 情境與風險 → 經濟性，十站。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="企劃總檢 business planning review business-planning-review-v1 決策前可重放的企劃審視，十四站。 問題陳述 同理心地圖 swot 分析 pestel 分析 五力分析 stp 市場區隔定位 商業模式圖 tows 矩陣 情境規劃 風險登記表 總持有成本 單位經濟效益 損益兩平分析 淨現值分析">
+        <div><b>企劃總檢</b><span class="tag">14 站</span></div>
+        <div class="k">Business Planning Review</div>
+        <div class="journey"><span>問題陳述</span><i>→</i><span>同理心地圖</span><i>→</i><span>SWOT 分析</span><i>→</i><span>PESTEL 分析</span><i>→</i><span>五力分析</span><i>→</i><span>STP 市場區隔定位</span><i>→</i><span>商業模式圖</span><i>→</i><span>TOWS 矩陣</span><i>→</i><span>情境規劃</span><i>→</i><span>風險登記表</span><i>→</i><span>總持有成本</span><i>→</i><span>單位經濟效益</span><i>→</i><span>損益兩平分析</span><i>→</i><span>淨現值分析</span></div>
+        <div>決策前可重放的企劃審視，十四站。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="策略框架 business planning strategy business-planning-strategy-v1 從問題陳述到商業模式圖的策略前段。 問題陳述 同理心地圖 swot 分析 pestel 分析 五力分析 stp 市場區隔定位 商業模式圖">
+        <div><b>策略框架</b><span class="tag">7 站</span></div>
+        <div class="k">Business Planning Strategy</div>
+        <div class="journey"><span>問題陳述</span><i>→</i><span>同理心地圖</span><i>→</i><span>SWOT 分析</span><i>→</i><span>PESTEL 分析</span><i>→</i><span>五力分析</span><i>→</i><span>STP 市場區隔定位</span><i>→</i><span>商業模式圖</span></div>
+        <div>從問題陳述到商業模式圖的策略前段。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+    </div>
+    </section>
+    <section class="wfgroup">
+    <h3 class="fam">研究<small>3 條</small></h3>
+    <div class="mcards">
+      <div class="mcard wf" data-q="edd 文獻離線夾具 edd offline literature fixture edd-literature-search-v1 用合成 edd 輸入測試能力型步驟的夾具，不是研究流程；p3 文獻線落地後退場。">
+        <div><b>EdD 文獻離線夾具</b><span class="tag">1 站</span></div>
+        <div class="k">EdD Offline Literature Fixture</div>
+        <div class="journey"><span>能力步</span></div>
+        <div>用合成 EdD 輸入測試能力型步驟的夾具，不是研究流程；P3 文獻線落地後退場。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="edd 證據鏈 edd research evidence (assumptions -&gt; evidence matrix -&gt; toulmin argument) edd-research-evidence-v1 把假設、證據、推理橋樑講清楚：假設地圖 → 證據矩陣 → toulmin 論證。 假設地圖 證據矩陣 圖爾敏論證模型">
+        <div><b>EdD 證據鏈</b><span class="tag">3 站</span></div>
+        <div class="k">EdD Research Evidence (Assumptions -&gt; Evidence Matrix -&gt; Toulmin Argument)</div>
+        <div class="journey"><span>假設地圖</span><i>→</i><span>證據矩陣</span><i>→</i><span>圖爾敏論證模型</span></div>
+        <div>把假設、證據、推理橋樑講清楚：假設地圖 → 證據矩陣 → Toulmin 論證。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="質性研究 qualitative research recipe (coding + triangulation + inter-rater reliability) research-qualitative-v1 訪談與逐字稿要編碼、三角驗證、算評分者信度。 質性編碼（開放／軸心／選擇性） 質性編碼（開放／軸心／選擇性） 證據三角驗證">
+        <div><b>質性研究</b><span class="tag">7 站</span></div>
+        <div class="k">Qualitative Research Recipe (Coding + Triangulation + Inter-rater Reliability)</div>
+        <div class="journey"><span>能力步</span><i>→</i><span>質性編碼（開放／軸心／選擇性）</span><i>→</i><span>質性編碼（開放／軸心／選擇性）</span><i>→</i><span>能力步 ×2</span><i>→</i><span>證據三角驗證</span><i>→</i><span>能力步</span></div>
+        <div>訪談與逐字稿要編碼、三角驗證、算評分者信度。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+    </div>
+    </section>
+    <section class="wfgroup">
+    <h3 class="fam">治理與工程<small>3 條</small></h3>
+    <div class="mcards">
+      <div class="mcard wf" data-q="冠軍／挑戰者切換 champion / challenger promotion champion-challenger 模型版本更新前的正式切換流程；全部是能力步，不是方法。">
+        <div><b>冠軍／挑戰者切換</b><span class="tag">4 站</span></div>
+        <div class="k">Champion / Challenger Promotion</div>
+        <div class="journey"><span>能力步 ×4</span></div>
+        <div>模型版本更新前的正式切換流程；全部是能力步，不是方法。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="資料庫遷移（擴張／收縮） database migration — expand/contract (adr-005a) db-migration-expand-contract 任何會改 production schema 的變更都走這條；adr-005a。">
+        <div><b>資料庫遷移（擴張／收縮）</b><span class="tag">15 站</span></div>
+        <div class="k">Database Migration — Expand/Contract (ADR-005a)</div>
+        <div class="journey"><span>能力步 ×15</span></div>
+        <div>任何會改 production schema 的變更都走這條；ADR-005a。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+      <div class="mcard wf" data-q="方法／物件退役 method / object deprecation &amp; retirement method-deprecation-retirement 退役任何 api、方法、能力、schema、政策的正式流程。">
+        <div><b>方法／物件退役</b><span class="tag">7 站</span></div>
+        <div class="k">Method / Object Deprecation &amp; Retirement</div>
+        <div class="journey"><span>能力步 ×7</span></div>
+        <div>退役任何 API、方法、能力、schema、政策的正式流程。</div>
+        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條路的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>
+      </div>
+    </div>
+    </section>
+    <!-- == partial: catalog-workflows: end == -->
+    <p class="sub mt10 mb0">工作流清單 = `recipes/validated/` 裡狀態 ACTIVE 的定義檔（和 `GET /recipes` 同一個過濾）；中文名與分組在 `recipes/registry/recipe-display-metadata.yaml`。你自己串的工作流（`/workflows/custom`）會排在最後一組。</p>
+  </div>
+
+  <!-- 3 單一方法 -->
+  <div class="card" id="methods">
+    <!-- == partial: catalog-methods: start (verbatim from partials/catalog-methods.html via sync-design-system.py; check-mocks.py enforces) == -->
+    <h2>單一方法<small><span id="mcount">285</span>／285 個，30 個家族：一個方法 = 一張表單、一堂短課、一頁結果</small></h2>
+    <div class="how"><b>怎麼讀</b>按家族分組，多的在前；每列是中文名（縮寫）、英文名、一句話用途。<b>你要做的</b>用上面的搜尋或家族晶片縮小範圍；按一列進表單（PI-a 落地後）；有「示範」的那列可以先看課和結果頁長什麼樣。</div>
+    <section class="famgroup" data-fam="divergent">
+    <h3 class="fam" id="fam-divergent">發散思考 <span class="k">Divergent Thinking</span><small>16 個</small></h3>
+    <p class="sub mt0">先把想法變多再挑：腦力書寫、隨機刺激、SCAMPER 這一類。</p>
+    <div class="tool" data-fam="divergent" data-q="6-3-5 腦力書寫法 6-3-5 brainwriting divergent.six_three_five 6 人×3 個想法×5 分鐘，輪流傳遞接力延伸，結構化又快速產生大量變體。想要腦力書寫的效果又要控制時間時用。"><b>6-3-5 腦力書寫法</b><span class="k">6-3-5 Brainwriting</span><div class="sub">6 人×3 個想法×5 分鐘，輪流傳遞接力延伸，結構化又快速產生大量變體。想要腦力書寫的效果又要控制時間時用。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="scamper 檢核表法 scamper scamper divergent.scamper 用 7 個角度（替代／結合／調整／修改／挪用／消除／反轉）系統性改造已有的產品或流程。能產生想法，但不能證明市場需求或商業可行性。"><b>SCAMPER 檢核表法</b><span class="k">SCAMPER</span><div class="sub">用 7 個角度（替代／結合／調整／修改／挪用／消除／反轉）系統性改造已有的產品或流程。能產生想法，但不能證明市場需求或商業可行性。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="六頂思考帽 six thinking hats divergent.six_thinking_hats 讓案主切換多元觀點：情緒、邏輯、批判、創意等，強化整合力。非診斷工具。"><b>六頂思考帽</b><span class="k">Six Thinking Hats</span><div class="sub">讓案主切換多元觀點：情緒、邏輯、批判、創意等，強化整合力。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="創意限制 creative constraints divergent.creative_constraints 以限制媒材方式（只能用紅色、只能用左手）促發非慣性表達與創作彈性。非診斷工具。"><b>創意限制</b><span class="k">Creative Constraints</span><div class="sub">以限制媒材方式（只能用紅色、只能用左手）促發非慣性表達與創作彈性。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="創新理論工具 theory of inventive problem solving triz divergent.triz 系統化解決矛盾問題的方法論。面對看似矛盾的內在衝突，用「矛盾解決思維」打開出路。非診斷工具。"><b>創新理論工具 <small>TRIZ</small></b><span class="k">Theory of Inventive Problem Solving</span><div class="sub">系統化解決矛盾問題的方法論。面對看似矛盾的內在衝突，用「矛盾解決思維」打開出路。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="反向腦力激盪法 reverse brainstorming divergent.reverse_brainstorming 不直接想「怎麼解決 x」，而是先想「怎麼樣會讓 x 更糟」，再把每個答案反過來變成真正的解法。想解決問題卻一直卡在同樣幾個想法時用。"><b>反向腦力激盪法</b><span class="k">Reverse Brainstorming</span><div class="sub">不直接想「怎麼解決 X」，而是先想「怎麼樣會讓 X 更糟」，再把每個答案反過來變成真正的解法。想解決問題卻一直卡在同樣幾個想法時用。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="強制關聯法 forced connections divergent.forced_connections 強制連結兩個不相關概念（列特徵→交叉組合），激發新產品／商業模式創意。卡住、需要真正跳脫的角度時用。"><b>強制關聯法</b><span class="k">Forced Connections</span><div class="sub">強制連結兩個不相關概念（列特徵→交叉組合），激發新產品／商業模式創意。卡住、需要真正跳脫的角度時用。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="星爆法 starbursting divergent.starbursting 用 who/what/when/where/why/how 六個角度發散提問，找出未知與研究問題。需求前期、想找出還不知道的事情時用。"><b>星爆法</b><span class="k">Starbursting</span><div class="sub">用 Who/What/When/Where/Why/How 六個角度發散提問，找出未知與研究問題。需求前期、想找出還不知道的事情時用。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="水平思考 lateral thinking divergent.lateral_thinking 跳脫邏輯慣性，以非線性方式解題。非診斷工具。"><b>水平思考</b><span class="k">Lateral Thinking</span><div class="sub">跳脫邏輯慣性，以非線性方式解題。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="瘋狂 8 法 crazy 8s divergent.crazy_eights 8 分鐘畫出 8 個不同概念，強迫自己跳過第一個答案。適合介面／產品概念發想，不適合當最終方案評選。"><b>瘋狂 8 法</b><span class="k">Crazy 8s</span><div class="sub">8 分鐘畫出 8 個不同概念，強迫自己跳過第一個答案。適合介面／產品概念發想，不適合當最終方案評選。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="經典腦力激盪 classic brainstorming divergent.classic_brainstorming 快速產生大量想法，明確把評判延後到之後獨立的評估步驟。想要大量原始想法、不要邊想邊否決時用。"><b>經典腦力激盪</b><span class="k">Classic Brainstorming</span><div class="sub">快速產生大量想法，明確把評判延後到之後獨立的評估步驟。想要大量原始想法、不要邊想邊否決時用。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="腦力書寫法 brainwriting divergent.brainwriting 先各自寫下想法，再分享合併，降低定錨效應與從眾心理。跨階級／怕外向者主導討論的團隊用。"><b>腦力書寫法</b><span class="k">Brainwriting</span><div class="sub">先各自寫下想法，再分享合併，降低定錨效應與從眾心理。跨階級／怕外向者主導討論的團隊用。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="蓮花座法 lotus blossom divergent.lotus_blossom 中心主題展開 8 個分支，每個分支再各自長出 8 個想法，大量但有結構。想要大量想法但還能事後分群整理時用。"><b>蓮花座法</b><span class="k">Lotus Blossom</span><div class="sub">中心主題展開 8 個分支，每個分支再各自長出 8 個想法，大量但有結構。想要大量想法但還能事後分群整理時用。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="設計思考 design thinking divergent.design_thinking 透過同理、定義、發想、原型、測試解決問題。非診斷工具。"><b>設計思考</b><span class="k">Design Thinking</span><div class="sub">透過同理、定義、發想、原型、測試解決問題。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="隨機刺激法 random stimulus divergent.random_stimulus 用隨機詞或圖強制找出跟問題的關聯，打破慣性思考。之後需要可行性篩選——它是用來打破思路卡住，不是拿來做最終決定。"><b>隨機刺激法</b><span class="k">Random Stimulus</span><div class="sub">用隨機詞或圖強制找出跟問題的關聯，打破慣性思考。之後需要可行性篩選——它是用來打破思路卡住，不是拿來做最終決定。</div>
+    </div>
+    <div class="tool" data-fam="divergent" data-q="類比創意法 synectics divergent.synectics 用直接／個人／象徵類比重構問題，追求更深層的創意突破。對引導技巧要求較高，適合工作坊形式進行。"><b>類比創意法</b><span class="k">Synectics</span><div class="sub">用直接／個人／象徵類比重構問題，追求更深層的創意突破。對引導技巧要求較高，適合工作坊形式進行。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="strategy">
+    <h3 class="fam" id="fam-strategy">策略 <span class="k">Strategy</span><small>16 個</small></h3>
+    <p class="sub mt0">看自己與外面、定位與商業模式：SWOT、五力、商業模式圖。</p>
+    <div class="tool" data-fam="strategy" data-q="3c 分析 3c analysis 3c strategy.three_c 從顧客、競爭者、公司三個角度檢視同一個問題，最後明確寫出三者間的契合度結論。想快速、聚焦地判斷公司的產品／服務是否真的契合顧客需求跟競爭位置時用。"><b>3C 分析</b><span class="k">3C Analysis</span><div class="sub">從顧客、競爭者、公司三個角度檢視同一個問題，最後明確寫出三者間的契合度結論。想快速、聚焦地判斷公司的產品／服務是否真的契合顧客需求跟競爭位置時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="ansoff 矩陣 ansoff matrix strategy.ansoff 把一個成長方案歸類到四個象限之一——市場滲透、市場開發、產品開發、多角化——並標示其相對風險。想為提案的成長策略分類、並立刻看出該象限通常帶有多少風險時用。"><b>Ansoff 矩陣</b><span class="k">Ansoff Matrix</span><div class="sub">把一個成長方案歸類到四個象限之一——市場滲透、市場開發、產品開發、多角化——並標示其相對風險。想為提案的成長策略分類、並立刻看出該象限通常帶有多少風險時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="bcg 成長占有率矩陣 bcg growth-share matrix bcg strategy.bcg_matrix 依成長率×相對市佔率，把投資組合中的每個項目畫在圖上，自動算出落在哪個象限——明星、金牛、問題、狗。想決定投資組合裡的產品或事業單位該加碼、維持還是撤資時用。"><b>BCG 成長占有率矩陣</b><span class="k">BCG Growth-Share Matrix</span><div class="sub">依成長率×相對市佔率，把投資組合中的每個項目畫在圖上，自動算出落在哪個象限——明星、金牛、問題、狗。想決定投資組合裡的產品或事業單位該加碼、維持還是撤資時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="pestel 分析 pestel analysis pestel strategy.pestel 掃描六個總體環境面向——政治、經濟、社會、科技、環境、法律——找出事實、趨勢與意涵。想建立外部環境全貌，餵給情境規劃或 swot 的機會／威脅那一側時用。"><b>PESTEL 分析</b><span class="k">PESTEL Analysis</span><div class="sub">掃描六個總體環境面向——政治、經濟、社會、科技、環境、法律——找出事實、趨勢與意涵。想建立外部環境全貌，餵給情境規劃或 SWOT 的機會／威脅那一側時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="steepv 分析 steepv analysis steepv strategy.steepv 在 pestel 六面向之外再加上第六個維度：價值觀——形塑市場的社會／倫理價值觀。決策對公眾或組織價值觀的變化敏感，不只是受經濟與法規趨勢影響時，用這個取代單純的 pestel。"><b>STEEPV 分析</b><span class="k">STEEPV Analysis</span><div class="sub">在 PESTEL 六面向之外再加上第六個維度：價值觀——形塑市場的社會／倫理價值觀。決策對公眾或組織價值觀的變化敏感，不只是受經濟與法規趨勢影響時，用這個取代單純的 PESTEL。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="stp 市場區隔定位 segmentation, targeting, positioning stp strategy.stp 把市場區隔、目標選擇、定位跑成真正循序的流程，目標選擇的決策必須指向區隔階段實際產出的某個區隔。想從「整個市場有誰」一路走到「我們要佔據什麼定位」、且不跳過任何一步時用。"><b>STP 市場區隔定位</b><span class="k">Segmentation, Targeting, Positioning</span><div class="sub">把市場區隔、目標選擇、定位跑成真正循序的流程，目標選擇的決策必須指向區隔階段實際產出的某個區隔。想從「整個市場有誰」一路走到「我們要佔據什麼定位」、且不跳過任何一步時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="swot 分析 swot analysis swot strategy.swot 經典的 2x2 分析：內部優勢／劣勢對照外部機會／威脅。想對一個策略情境做標準的第一輪框架分析，之後再接 tows 或五力分析做更深入的工具時用。"><b>SWOT 分析</b><span class="k">SWOT Analysis</span><div class="sub">經典的 2x2 分析：內部優勢／劣勢對照外部機會／威脅。想對一個策略情境做標準的第一輪框架分析，之後再接 TOWS 或五力分析做更深入的工具時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="tows 矩陣 tows matrix tows strategy.tows 把既有 swot 分析的因子交叉配對成四種策略類型——so/st/wo/wt——把靜態的 swot 清單變成可執行的策略選項。要接在 swot 之後用，不能單獨使用，因為每個配對都會對照你實際的 swot 紀錄做驗證。"><b>TOWS 矩陣</b><span class="k">TOWS Matrix</span><div class="sub">把既有 SWOT 分析的因子交叉配對成四種策略類型——SO/ST/WO/WT——把靜態的 SWOT 清單變成可執行的策略選項。要接在 SWOT 之後用，不能單獨使用，因為每個配對都會對照你實際的 SWOT 紀錄做驗證。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="vrio 資源分析 vrio resource analysis vrio strategy.vrio 用四個問題檢驗一項資源或能力：有價值嗎、稀有嗎、難以模仿嗎、組織有效運用嗎，並依此算出對應的競爭意涵，而不是讓你自己宣稱。想檢查一個自稱的「競爭優勢」是不是真的通過全部四關，還是只是剛好擁有的能力時用。"><b>VRIO 資源分析</b><span class="k">VRIO Resource Analysis</span><div class="sub">用四個問題檢驗一項資源或能力：有價值嗎、稀有嗎、難以模仿嗎、組織有效運用嗎，並依此算出對應的競爭意涵，而不是讓你自己宣稱。想檢查一個自稱的「競爭優勢」是不是真的通過全部四關，還是只是剛好擁有的能力時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="五力分析 porter&#x27;s five forces strategy.porter_five_forces 從五個經典 porter 構面評估一個產業的競爭強度：同業競爭、供應商議價力、買方議價力、替代品威脅、新進入者威脅。想了解產業層級的獲利壓力時用；但數位平台與網路效應可能需要額外的平台策略視角補充。"><b>五力分析</b><span class="k">Porter&#x27;s Five Forces</span><div class="sub">從五個經典 Porter 構面評估一個產業的競爭強度：同業競爭、供應商議價力、買方議價力、替代品威脅、新進入者威脅。想了解產業層級的獲利壓力時用；但數位平台與網路效應可能需要額外的平台策略視角補充。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="價值主張圖 value proposition canvas strategy.value_proposition_canvas 把顧客輪廓（任務／痛點／獲益）對照價值地圖（產品、痛點解方、獲益創造者），並記錄產生的契合假設。作為商業模式圖的放大鏡版本，專門檢查價值主張是否真的契合顧客需求時用。"><b>價值主張圖</b><span class="k">Value Proposition Canvas</span><div class="sub">把顧客輪廓（任務／痛點／獲益）對照價值地圖（產品、痛點解方、獲益創造者），並記錄產生的契合假設。作為商業模式圖的放大鏡版本，專門檢查價值主張是否真的契合顧客需求時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="價值鏈分析 value chain analysis strategy.value_chain 把一個事業拆成主要活動與支援活動，找出每項活動的成本驅動因子與價值驅動因子。想找出該在哪個環節降低成本或增加差異化，再進一步跟競爭者做標竿比較時用。"><b>價值鏈分析</b><span class="k">Value Chain Analysis</span><div class="sub">把一個事業拆成主要活動與支援活動，找出每項活動的成本驅動因子與價值驅動因子。想找出該在哪個環節降低成本或增加差異化，再進一步跟競爭者做標竿比較時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="商業模式圖 business model canvas strategy.business_model_canvas 把九個標準商業模式區塊（關鍵夥伴、關鍵活動、關鍵資源、價值主張、顧客關係、通路、客群、成本結構、收益流）畫在同一張畫布上，並明確標記為假設，直到對照真實商業運作驗證過為止。想在投入完整商業計畫前，先用一頁描述整個商業模式時用。"><b>商業模式圖</b><span class="k">Business Model Canvas</span><div class="sub">把九個標準商業模式區塊（關鍵夥伴、關鍵活動、關鍵資源、價值主張、顧客關係、通路、客群、成本結構、收益流）畫在同一張畫布上，並明確標記為假設，直到對照真實商業運作驗證過為止。想在投入完整商業計畫前，先用一頁描述整個商業模式時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="市場分析 market analysis strategy.market_analysis 把市場規模拆解成 tam（總體市場）≥ sam（可服務市場）≥ som（可獲得市場）的漏斗，並為每個區隔記錄成長率與支持證據。做商業計畫、想界定實際可觸及的市場規模而不只是產業總量時用。"><b>市場分析</b><span class="k">Market Analysis</span><div class="sub">把市場規模拆解成 TAM（總體市場）≥ SAM（可服務市場）≥ SOM（可獲得市場）的漏斗，並為每個區隔記錄成長率與支持證據。做商業計畫、想界定實際可觸及的市場規模而不只是產業總量時用。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="精實畫布 lean canvas strategy.lean_canvas ash maurya 把 business model canvas 改成新創專用版：拿掉「怎麼經營一家已存在的公司」的 4 個區塊（關鍵夥伴、關鍵活動、關鍵資源、顧客關係），換成「怎麼開始一家新公司」的 4 個區塊（問題、解決方案、關鍵指標、難以模仿的優勢）。剛起步、還沒驗證過的新創點子，bmc 那套營運導向的區塊還用不上時用這個。"><b>精實畫布</b><span class="k">Lean Canvas</span><div class="sub">Ash Maurya 把 Business Model Canvas 改成新創專用版：拿掉「怎麼經營一家已存在的公司」的 4 個區塊（關鍵夥伴、關鍵活動、關鍵資源、顧客關係），換成「怎麼開始一家新公司」的 4 個區塊（問題、解決方案、關鍵指標、難以模仿的優勢）。剛起步、還沒驗證過的新創點子，BMC 那套營運導向的區塊還用不上時用這個。</div>
+    </div>
+    <div class="tool" data-fam="strategy" data-q="藍海策略 blue ocean strategy strategy.blue_ocean 在策略畫布上畫出跟競爭者對照的價值曲線，再把每個競爭因素套進消除／降低／提升／創造（kim 與 mauborgne 的 errc 表）四個動作。想設計一個真正無人競爭的全新市場空間，而不是在既有市場正面競爭時用。"><b>藍海策略</b><span class="k">Blue Ocean Strategy</span><div class="sub">在策略畫布上畫出跟競爭者對照的價值曲線，再把每個競爭因素套進消除／降低／提升／創造（Kim 與 Mauborgne 的 ERRC 表）四個動作。想設計一個真正無人競爭的全新市場空間，而不是在既有市場正面競爭時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="framing">
+    <h3 class="fam" id="fam-framing">問題定義與框架 <span class="k">Framing</span><small>15 個</small></h3>
+    <p class="sub mt0">先把「到底要解什麼」講清楚：問題陳述、重新框定、OKR。</p>
+    <div class="tool" data-fam="framing" data-q="5w1h 問題輪廓 5w1h problem profile 5w1h framing.five_w_one_h 用 who/what/when/where/why/how 快速建立模糊問題的輪廓，明確標出哪些面向還沒答案。資訊不足、連問題都還定義不清楚時，最開始用它。"><b>5W1H 問題輪廓</b><span class="k">5W1H Problem Profile</span><div class="sub">用 Who/What/When/Where/Why/How 快速建立模糊問題的輪廓，明確標出哪些面向還沒答案。資訊不足、連問題都還定義不清楚時，最開始用它。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="grow 模型 grow model grow framing.grow_model 設定目標與具體行動策略。非診斷工具。"><b>GROW 模型</b><span class="k">GROW Model</span><div class="sub">設定目標與具體行動策略。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="okr 目標關鍵成果 objectives and key results okr framing.okr 把方向（o）跟 2-5 個可衡量成果（kr）分開，各自指定負責人與檢視頻率。團隊／季度目標設定，避免只追工作量時用。"><b>OKR 目標關鍵成果</b><span class="k">Objectives and Key Results</span><div class="sub">把方向（O）跟 2-5 個可衡量成果（KR）分開，各自指定負責人與檢視頻率。團隊／季度目標設定，避免只追工作量時用。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="smart 目標 smart goal smart framing.smart 用五個固定標準（明確、可衡量、可達成、相關、有時限）精煉一個已經說出口的目標。在目標陳述之後、覺得目標還不夠具體時用。"><b>SMART 目標</b><span class="k">SMART Goal</span><div class="sub">用五個固定標準（明確、可衡量、可達成、相關、有時限）精煉一個已經說出口的目標。在目標陳述之後、覺得目標還不夠具體時用。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="價值觀排序 value sorting framing.value_sorting 釐清個人或團隊的核心價值。非診斷工具。"><b>價值觀排序</b><span class="k">Value Sorting</span><div class="sub">釐清個人或團隊的核心價值。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="北極星指標 north star metric framing.north_star_metric 找出核心價值主張、其代理指標、以及防造假驗證——代理指標必須真的不同於核心價值本身。想讓產品策略聚焦單一長期價值指標時用。"><b>北極星指標</b><span class="k">North Star Metric</span><div class="sub">找出核心價值主張、其代理指標、以及防造假驗證——代理指標必須真的不同於核心價值本身。想讓產品策略聚焦單一長期價值指標時用。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="問題陳述 problem statement framing.problem_statement 描述現況→預期→落差→影響→限制，建立跨人共同的問題定義。團隊需要先對齊「問題到底是什麼」再吵解法時用。"><b>問題陳述</b><span class="k">Problem Statement</span><div class="sub">描述現況→預期→落差→影響→限制，建立跨人共同的問題定義。團隊需要先對齊「問題到底是什麼」再吵解法時用。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="成功標準 success criteria framing.success_criteria 在高風險決策之前，先定義必須／應該／護欄／停止標準，防止事後改標準。任何你可能事後改口「成功」定義的決策之前用。"><b>成功標準</b><span class="k">Success Criteria</span><div class="sub">在高風險決策之前，先定義必須／應該／護欄／停止標準，防止事後改標準。任何你可能事後改口「成功」定義的決策之前用。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="我們可以如何… how might we hmw framing.how_might_we 把痛點轉成開放、不預設方案的問題（「我們可以如何…」），擴大解法空間。進入創意發想階段之前用，避免不小心先預設了答案。"><b>我們可以如何… <small>HMW</small></b><span class="k">How Might We</span><div class="sub">把痛點轉成開放、不預設方案的問題（「我們可以如何…」），擴大解法空間。進入創意發想階段之前用，避免不小心先預設了答案。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="未來羅盤 future compass framing.future_compass 釐清未來目標與方向感。非診斷工具。"><b>未來羅盤</b><span class="k">Future Compass</span><div class="sub">釐清未來目標與方向感。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="框架轉換 reframing framing.reframing 換角度詮釋痛苦經驗，重新定義「失敗／羞恥／後悔」。非診斷工具。"><b>框架轉換</b><span class="k">Reframing</span><div class="sub">換角度詮釋痛苦經驗，重新定義「失敗／羞恥／後悔」。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="框架風暴 frame storming framing.frame_storming 先產生多個不同的問題框架，再明確選出一個——確保是真的選過，而不是只想到一種角度。要決定用哪個角度看問題之前用。"><b>框架風暴</b><span class="k">Frame Storming</span><div class="sub">先產生多個不同的問題框架，再明確選出一個——確保是真的選過，而不是只想到一種角度。要決定用哪個角度看問題之前用。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="目標陳述 goal statement framing.goal_statement 把模糊願望轉成明確目標：目標→受益者→時間→成功條件→限制。任務起始時用，降低之後的範圍漂移。"><b>目標陳述</b><span class="k">Goal Statement</span><div class="sub">把模糊願望轉成明確目標：目標→受益者→時間→成功條件→限制。任務起始時用，降低之後的範圍漂移。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="邊界批判 boundary critique framing.boundary_critique 檢視誰是決策者、誰受影響、誰被排除、有哪些資源、隱含什麼價值觀，揭露隱藏的權力與價值假設。決策會影響到不在場的人時用。"><b>邊界批判</b><span class="k">Boundary Critique</span><div class="sub">檢視誰是決策者、誰受影響、誰被排除、有哪些資源、隱含什麼價值觀，揭露隱藏的權力與價值假設。決策會影響到不在場的人時用。</div>
+    </div>
+    <div class="tool" data-fam="framing" data-q="非目標清單 non-goals framing.non_goals 明確說出「這次不做什麼」，附理由與重審條件。大型專案想控制範圍與成本時用。"><b>非目標清單</b><span class="k">Non-goals</span><div class="sub">明確說出「這次不做什麼」，附理由與重審條件。大型專案想控制範圍與成本時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="art_therapy">
+    <h3 class="fam" id="fam-art_therapy">藝術治療 <span class="k">Art Therapy</span><small>14 個</small></h3>
+    <p class="sub mt0">帶領者用的非語言工具：視覺隱喻、隱喻對話、價值澄清。</p>
+    <div class="tool" data-fam="art_therapy" data-q="五階段療程系統（五行五階段） wusheng five phase method art_therapy.wusheng_five_phase 把個案安置在五個固定階段（ws-01 至 ws-05）之一，此階段架構源自中醫五行／臟腑理論對應改變假設驗證循環，每個階段都需要治療師親自寫下的進度證據。想追蹤個案在一個結構化多階段改變歷程中的位置時用——系統只負責記錄證據，是否真的達標仍由人判斷。"><b>五階段療程系統（五行五階段）</b><span class="k">WuSheng Five Phase Method</span><div class="sub">把個案安置在五個固定階段（WS-01 至 WS-05）之一，此階段架構源自中醫五行／臟腑理論對應改變假設驗證循環，每個階段都需要治療師親自寫下的進度證據。想追蹤個案在一個結構化多階段改變歷程中的位置時用——系統只負責記錄證據，是否真的達標仍由人判斷。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="價值澄清 value clarification art_therapy.value_clarification 協助案主明確轉化過後最核心的價值與人生方向。非診斷工具。"><b>價值澄清</b><span class="k">Value Clarification</span><div class="sub">協助案主明確轉化過後最核心的價值與人生方向。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="動機矩陣 motivation matrix art_therapy.motivation_matrix 分析推動或阻礙行動的動機來源。非診斷工具。"><b>動機矩陣</b><span class="k">Motivation Matrix</span><div class="sub">分析推動或阻礙行動的動機來源。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="句點分析法 full stop method art_therapy.full_stop_method 把思緒／情緒分段檢視，逐句拆解過度概括或情緒化句型。非診斷工具。"><b>句點分析法</b><span class="k">Full Stop Method</span><div class="sub">把思緒／情緒分段檢視，逐句拆解過度概括或情緒化句型。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="同義詞替換 synonym substitution art_therapy.synonym_substitution 調整負面語言習慣，例如將「我很糟」換成「我正在學習中」。非診斷工具。"><b>同義詞替換</b><span class="k">Synonym Substitution</span><div class="sub">調整負面語言習慣，例如將「我很糟」換成「我正在學習中」。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="工作坊證章畫 workshop certificate drawing art_therapy.workshop_certificate_drawing 創作「療癒旅程完成證明」，象徵性封存與儀式性祝福。非診斷工具。"><b>工作坊證章畫</b><span class="k">Workshop Certificate Drawing</span><div class="sub">創作「療癒旅程完成證明」，象徵性封存與儀式性祝福。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="故事延續 story completion art_therapy.story_completion 設計「未說完的故事」讓案主接續完成，表達內在角色與感受動力。非診斷工具。"><b>故事延續</b><span class="k">Story Completion</span><div class="sub">設計「未說完的故事」讓案主接續完成，表達內在角色與感受動力。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="故事敘說 storytelling art_therapy.storytelling 用敘事建構意義與共享經驗。非診斷工具。"><b>故事敘說</b><span class="k">Storytelling</span><div class="sub">用敘事建構意義與共享經驗。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="生命之輪 life wheel art_therapy.life_wheel 評估生活各面向的平衡狀態，案主自評 0-10 分。非診斷工具。"><b>生命之輪</b><span class="k">Life Wheel</span><div class="sub">評估生活各面向的平衡狀態，案主自評 0-10 分。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="衝突地圖 conflict mapping art_therapy.conflict_mapping 回顧曾經的內外衝突，標示轉化路徑，形成資源記憶。非診斷工具，記錄的是案主自己的話。"><b>衝突地圖</b><span class="k">Conflict Mapping</span><div class="sub">回顧曾經的內外衝突，標示轉化路徑，形成資源記憶。非診斷工具，記錄的是案主自己的話。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="視覺隱喻創作 visual metaphor art_therapy.visual_metaphor 用圖像表達潛意識經驗，將模糊感受具象化，是非語言創作啟動工具。非診斷工具。"><b>視覺隱喻創作</b><span class="k">Visual Metaphor</span><div class="sub">用圖像表達潛意識經驗，將模糊感受具象化，是非語言創作啟動工具。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="角色扮演 role playing art_therapy.role_playing 模擬角色行為以預測與反思。非診斷工具。"><b>角色扮演</b><span class="k">Role Playing</span><div class="sub">模擬角色行為以預測與反思。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="轉折點分析 turning point analysis art_therapy.turning_point_analysis 引導案主覺察生命中的關鍵轉折事件，探索其對情緒與信念的深層影響。非診斷工具。"><b>轉折點分析</b><span class="k">Turning Point Analysis</span><div class="sub">引導案主覺察生命中的關鍵轉折事件，探索其對情緒與信念的深層影響。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="art_therapy" data-q="隱喻對話 metaphor dialogue art_therapy.metaphor_dialogue 與自創象徵角色進行對話，調和衝突、支持轉化。非診斷工具。"><b>隱喻對話</b><span class="k">Metaphor Dialogue</span><div class="sub">與自創象徵角色進行對話，調和衝突、支持轉化。非診斷工具。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="decision">
+    <h3 class="fam" id="fam-decision">決策 <span class="k">Decision</span><small>14 個</small></h3>
+    <p class="sub mt0">幾個選項選一個、權重由你定：加權決策矩陣、AHP、決策樹。</p>
+    <div class="tool" data-fam="decision" data-q="ice 評分法 impact x confidence x ease scoring ice decision.ice 用同一個尺度為每個選項打影響力、信心度、容易度三個分數，快速粗排優先序。想快速排序一大堆候選項目時用。"><b>ICE 評分法</b><span class="k">Impact x Confidence x Ease Scoring</span><div class="sub">用同一個尺度為每個選項打影響力、信心度、容易度三個分數，快速粗排優先序。想快速排序一大堆候選項目時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="moscow 優先分級 moscow method moscow decision.moscow 把一堆項目分到「必須／應該／可以／不做」四類，建立明確的「不做清單」。要鎖定一個版本的範圍時用。"><b>MoSCoW 優先分級</b><span class="k">MoSCoW Method</span><div class="sub">把一堆項目分到「必須／應該／可以／不做」四類，建立明確的「不做清單」。要鎖定一個版本的範圍時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="rice 優先排序法 rice prioritization rice decision.rice 用「觸及人數×影響力×信心度÷努力程度」為產品待辦事項排序。想讓「努力程度」用除的方式真正拉低分數時用。"><b>RICE 優先排序法</b><span class="k">RICE Prioritization</span><div class="sub">用「觸及人數×影響力×信心度÷努力程度」為產品待辦事項排序。想讓「努力程度」用除的方式真正拉低分數時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="加權最短工作優先法 weighted shortest job first wsjf decision.wsjf 用「延遲成本÷工作量」排序一個投資組合，凸顯「拖越久越貴」的項目。在敏捷投資組合裡想依延遲成本（不只是工作量）排序時用。"><b>加權最短工作優先法 <small>WSJF</small></b><span class="k">Weighted Shortest Job First</span><div class="sub">用「延遲成本÷工作量」排序一個投資組合，凸顯「拖越久越貴」的項目。在敏捷投資組合裡想依延遲成本（不只是工作量）排序時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="加權決策矩陣 weighted decision matrix decision.weighted_decision_matrix 用選項×準則×權重、在同一個評分尺度上打分（不像 mcda 需要逐項正規化，更簡單）。所有準則能共用同一個評分尺度時，用它做直接的加權比較。"><b>加權決策矩陣</b><span class="k">Weighted Decision Matrix</span><div class="sub">用選項×準則×權重、在同一個評分尺度上打分（不像 MCDA 需要逐項正規化，更簡單）。所有準則能共用同一個評分尺度時，用它做直接的加權比較。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="卡諾模型 kano model decision.kano 依滿意度曲線形狀（不只是票數）把功能分類成基本／表現／驚喜型。想判斷哪些功能真的對使用者重要時用。"><b>卡諾模型</b><span class="k">Kano Model</span><div class="sub">依滿意度曲線形狀（不只是票數）把功能分類成基本／表現／驚喜型。想判斷哪些功能真的對使用者重要時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="多準則決策分析 multi-criteria decision analysis mcda decision.mcda 用多個自訂加權準則為選項打分（選項→準則→權重→正規化→評分→敏感度）。有多個選項、多個評分標準時，用它算出有依據的排名建議。"><b>多準則決策分析 <small>MCDA</small></b><span class="k">Multi-Criteria Decision Analysis</span><div class="sub">用多個自訂加權準則為選項打分（選項→準則→權重→正規化→評分→敏感度）。有多個選項、多個評分標準時，用它算出有依據的排名建議。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="層級分析法 analytic hierarchy process ahp decision.ahp 建立目標→準則的層級結構，用兩兩比較推導出權重，並檢查比較是否前後一致。要做嚴謹的多準則決策、連權重本身都要站得住腳時用。"><b>層級分析法 <small>AHP</small></b><span class="k">Analytic Hierarchy Process</span><div class="sub">建立目標→準則的層級結構，用兩兩比較推導出權重，並檢查比較是否前後一致。要做嚴謹的多準則決策、連權重本身都要站得住腳時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="影響力-努力矩陣 impact-effort matrix decision.impact_effort 用兩個固定軸（影響力、努力程度）把選項分到四個象限（快贏／大賭注／填補／坑）。只需要兩個維度、想快速視覺化排優先序時用。"><b>影響力-努力矩陣</b><span class="k">Impact-Effort Matrix</span><div class="sub">用兩個固定軸（影響力、努力程度）把選項分到四個象限（快贏／大賭注／填補／坑）。只需要兩個維度、想快速視覺化排優先序時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="期望值 expected value decision.expected_value 把機率乘以結果加總，算出單一期望值。要在動用完整決策樹或蒙地卡羅之前，先算一個簡單基準時用。"><b>期望值</b><span class="k">Expected Value</span><div class="sub">把機率乘以結果加總，算出單一期望值。要在動用完整決策樹或蒙地卡羅之前，先算一個簡單基準時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="柏拉圖前緣 pareto frontier decision.pareto_frontier 找出「沒有其他選項在每個目標上都更好」的一組方案（多目標優勢分析）——跟單一維度的 80/20 不同。同時要優化兩個以上互相拉扯的目標時用。"><b>柏拉圖前緣</b><span class="k">Pareto Frontier</span><div class="sub">找出「沒有其他選項在每個目標上都更好」的一組方案（多目標優勢分析）——跟單一維度的 80/20 不同。同時要優化兩個以上互相拉扯的目標時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="決策樹 decision tree decision.decision_tree 用決策節點與機率節點（含機率與報酬）分支呈現不確定性。多階段決策、後面選擇取決於前面隨機結果時用。"><b>決策樹</b><span class="k">Decision Tree</span><div class="sub">用決策節點與機率節點（含機率與報酬）分支呈現不確定性。多階段決策、後面選擇取決於前面隨機結果時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="艾森豪矩陣 eisenhower matrix decision.eisenhower_matrix 用「緊急程度 x 重要程度」對照你自訂的門檻，把每項任務分到「立即做／排程／委派／刪除」四象限。想快速對一份任務清單做第一輪篩選時用。"><b>艾森豪矩陣</b><span class="k">Eisenhower Matrix</span><div class="sub">用「緊急程度 x 重要程度」對照你自訂的門檻，把每項任務分到「立即做／排程／委派／刪除」四象限。想快速對一份任務清單做第一輪篩選時用。</div>
+    </div>
+    <div class="tool" data-fam="decision" data-q="逼近理想解排序法 technique for order of preference by similarity to ideal solution topsis decision.topsis 用選項跟理想解／最差解的距離排序，不是用加權總分。想要跟 mcda 加權總分不同的排序邏輯時用。"><b>逼近理想解排序法 <small>TOPSIS</small></b><span class="k">Technique for Order of Preference by Similarity to Ideal Solution</span><div class="sub">用選項跟理想解／最差解的距離排序，不是用加權總分。想要跟 MCDA 加權總分不同的排序邏輯時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="foresight">
+    <h3 class="fam" id="fam-foresight">前瞻與情境 <span class="k">Foresight</span><small>14 個</small></h3>
+    <p class="sub mt0">未來會怎樣、有哪幾種可能：情境規劃、趨勢掃描、預想失敗。</p>
+    <div class="tool" data-fam="foresight" data-q="交叉影響分析 cross-impact analysis foresight.cross_impact_analysis 分析一整組事件兩兩之間如何互相改變機率，避免把趨勢誤當獨立事件。多個預測事件彼此可能互相影響時用。"><b>交叉影響分析</b><span class="k">Cross-impact Analysis</span><div class="sub">分析一整組事件兩兩之間如何互相改變機率，避免把趨勢誤當獨立事件。多個預測事件彼此可能互相影響時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="回溯規劃 backcasting foresight.backcasting 從理想的未來狀態往回推導出里程碑，一路推到今天該做的事。做長期路線圖、從現在往前推導不出方向時用。"><b>回溯規劃</b><span class="k">Backcasting</span><div class="sub">從理想的未來狀態往回推導出里程碑，一路推到今天該做的事。做長期路線圖、從現在往前推導不出方向時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="地平線掃描 horizon scanning foresight.horizon_scanning 系統性掃描各領域／來源找出新興變化訊號，每個訊號都要有來源、日期、地區、狀態、影響、信心度。想提早發現外部變化、不要被打措手不及時用。"><b>地平線掃描</b><span class="k">Horizon Scanning</span><div class="sub">系統性掃描各領域／來源找出新興變化訊號，每個訊號都要有來源、日期、地區、狀態、影響、信心度。想提早發現外部變化、不要被打措手不及時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="外卡情境 wild cards foresight.wild_cards 加入一個劇烈的非主流事件，重新跑一次策略，測試是否遇到典範轉移。想用真正顛覆性的意外測試策略韌性時用。"><b>外卡情境</b><span class="k">Wild Cards</span><div class="sub">加入一個劇烈的非主流事件，重新跑一次策略，測試是否遇到典範轉移。想用真正顛覆性的意外測試策略韌性時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="微弱訊號偵測 weak signal detection foresight.weak_signal_detection 找出還沒成為主流的訊號，且必須有兩個以上獨立來源佐證才算數（不只是單一軼事）。想提前偵測趨勢又不想追著每個道聽塗說跑時用。"><b>微弱訊號偵測</b><span class="k">Weak Signal Detection</span><div class="sub">找出還沒成為主流的訊號，且必須有兩個以上獨立來源佐證才算數（不只是單一軼事）。想提前偵測趨勢又不想追著每個道聽塗說跑時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="德爾菲法 delphi method foresight.delphi 匿名多輪專家估計（第一輪→彙整→第二輪→分歧程度），保留少數意見而不是強迫假共識。想在不確定的問題上取得專家判斷、又不想被權威效應或從眾左右時用。"><b>德爾菲法</b><span class="k">Delphi Method</span><div class="sub">匿名多輪專家估計（第一輪→彙整→第二輪→分歧程度），保留少數意見而不是強迫假共識。想在不確定的問題上取得專家判斷、又不想被權威效應或從眾左右時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="情境規劃 scenario planning foresight.scenario_planning 用兩個關鍵不確定因素，建出正好四個完整情境，而不是只押注單一預測。想為多種可能未來做規劃、不依賴單一預測時用。"><b>情境規劃</b><span class="k">Scenario Planning</span><div class="sub">用兩個關鍵不確定因素，建出正好四個完整情境，而不是只押注單一預測。想為多種可能未來做規劃、不依賴單一預測時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="未來輪 futures wheel foresight.futures_wheel 把一個中心事件展開成直接、間接、結構性（一階／二階／三階）影響。想強迫自己想到明顯的一階影響之外時用。"><b>未來輪</b><span class="k">Futures Wheel</span><div class="sub">把一個中心事件展開成直接、間接、結構性（一階／二階／三階）影響。想強迫自己想到明顯的一階影響之外時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="歷史類比 historical analogy foresight.historical_analogy 把現況跟歷史先例比較，抽出機制，並明確標出類比不成立的地方。想借鏡歷史又避免流於表面類比時用。"><b>歷史類比</b><span class="k">Historical Analogy</span><div class="sub">把現況跟歷史先例比較，抽出機制，並明確標出類比不成立的地方。想借鏡歷史又避免流於表面類比時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="異常個案分析 outlier analysis foresight.outlier_analysis 先排除資料錯誤，才深挖異常個案背後的機制，不能跳過驗證就直接編故事。奇怪的資料點可能是真實新現象時用。"><b>異常個案分析</b><span class="k">Outlier Analysis</span><div class="sub">先排除資料錯誤，才深挖異常個案背後的機制，不能跳過驗證就直接編故事。奇怪的資料點可能是真實新現象時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="跨國比較 cross-country comparison foresight.cross_country_comparison 在明確宣告的標準化基準下比較多個國家／地區的指標。想找出地區差異又不想拿蘋果比橘子時用。"><b>跨國比較</b><span class="k">Cross-country Comparison</span><div class="sub">在明確宣告的標準化基準下比較多個國家／地區的指標。想找出地區差異又不想拿蘋果比橘子時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="跨產業移植 cross-industry transfer foresight.cross_industry_transfer 把其他產業針對相同工作／限制的解法機制移植過來。想避免重新發明已經存在的解法時用。"><b>跨產業移植</b><span class="k">Cross-industry Transfer</span><div class="sub">把其他產業針對相同工作／限制的解法機制移植過來。想避免重新發明已經存在的解法時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="鄰近學科搜尋 adjacent discipline search foresight.adjacent_discipline_search 從真正的鄰近學科（不是團隊現有專業）找遺漏變數，並引入其模型。想降低單一專業盲點時用。"><b>鄰近學科搜尋</b><span class="k">Adjacent Discipline Search</span><div class="sub">從真正的鄰近學科（不是團隊現有專業）找遺漏變數，並引入其模型。想降低單一專業盲點時用。</div>
+    </div>
+    <div class="tool" data-fam="foresight" data-q="黑天鵝演練 black swan exercise foresight.black_swan_exercise 串起尾端風險事件→曝險程度→存活能力→避險措施，強化面對低機率高衝擊事件的韌性。想提早準備承受不起的意外時用。"><b>黑天鵝演練</b><span class="k">Black Swan Exercise</span><div class="sub">串起尾端風險事件→曝險程度→存活能力→避險措施，強化面對低機率高衝擊事件的韌性。想提早準備承受不起的意外時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="devops_sre">
+    <h3 class="fam" id="fam-devops_sre">維運與可靠性 <span class="k">DevOps / SRE</span><small>13 個</small></h3>
+    <p class="sub mt0">系統上線與運作的工程作法：藍綠部署、事故回顧、錯誤預算。</p>
+    <div class="tool" data-fam="devops_sre" data-q="作業手冊執行 runbook execution devops_sre.runbook_execution 記錄操作程序的前置條件→步驟→預期結果→停止/繼續→回滾。想降低例行但有風險的手動操作出錯機率時用。"><b>作業手冊執行</b><span class="k">Runbook Execution</span><div class="sub">記錄操作程序的前置條件→步驟→預期結果→停止/繼續→回滾。想降低例行但有風險的手動操作出錯機率時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="壓力測試（工程） stress test devops_sre.stress_test 把負載推到超過正常水位，找出真正的崩潰點以及事後能不能恢復。想知道系統真正的上限，不只是舒適運作範圍時用。"><b>壓力測試（工程）</b><span class="k">Stress Test</span><div class="sub">把負載推到超過正常水位，找出真正的崩潰點以及事後能不能恢復。想知道系統真正的上限，不只是舒適運作範圍時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="容量模型 capacity model devops_sre.capacity_model 用工作量成長對照資源係數，算出還有多少餘裕，同時防容量事故與過度採購。要擴充資源前，或要說明現在還不需要擴充時用。"><b>容量模型</b><span class="k">Capacity Model</span><div class="sub">用工作量成長對照資源係數，算出還有多少餘裕，同時防容量事故與過度採購。要擴充資源前，或要說明現在還不需要擴充時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="復原時間目標／復原點目標 recovery time objective / recovery point objective rto / rpo devops_sre.rto_rpo 定義一個系統最多能停機多久（rto）、最多能損失多少資料（rpo）。想提早訂出具體的災難復原目標時用。"><b>復原時間目標／復原點目標 <small>RTO / RPO</small></b><span class="k">Recovery Time Objective / Recovery Point Objective</span><div class="sub">定義一個系統最多能停機多久（RTO）、最多能損失多少資料（RPO）。想提早訂出具體的災難復原目標時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="服務等級指標／目標／協議 service level indicator / objective / agreement sli / slo / sla devops_sre.sli_slo 定義服務可靠性要量測什麼（sli）、目標值（slo）、對外承諾（sla）。這是用 error budget 或 canary deployment 之前的基礎工作。"><b>服務等級指標／目標／協議 <small>SLI / SLO / SLA</small></b><span class="k">Service Level Indicator / Objective / Agreement</span><div class="sub">定義服務可靠性要量測什麼（SLI）、目標值（SLO）、對外承諾（SLA）。這是用 Error Budget 或 Canary Deployment 之前的基礎工作。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="浸泡測試 soak test devops_sre.soak_test 用穩定負載跑很長一段時間，抓短時間負載測試抓不到的緩慢退化（記憶體洩漏、資源耗盡）。長時間運行的正式環境上線前用。"><b>浸泡測試</b><span class="k">Soak Test</span><div class="sub">用穩定負載跑很長一段時間，抓短時間負載測試抓不到的緩慢退化（記憶體洩漏、資源耗盡）。長時間運行的正式環境上線前用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="混沌工程 chaos engineering devops_sre.chaos_engineering 建立穩態假設、限定影響範圍、注入特定故障、驗證系統是否自動恢復，不如預期立即停止。想在真的出事前主動找出韌性缺口時用。"><b>混沌工程</b><span class="k">Chaos Engineering</span><div class="sub">建立穩態假設、限定影響範圍、注入特定故障、驗證系統是否自動恢復，不如預期立即停止。想在真的出事前主動找出韌性缺口時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="演習日 game day devops_sre.game_day 用預先設計的情境、指派角色、注入問題、事後檢討。想在真正出事前先演練事故應變流程時用。"><b>演習日</b><span class="k">Game Day</span><div class="sub">用預先設計的情境、指派角色、注入問題、事後檢討。想在真正出事前先演練事故應變流程時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="發布就緒審查 release readiness review devops_sre.release_readiness_review 上線前一次檢查變更、資料、安全、可觀測性、回滾、容量，抓出單一團隊會漏掉的跨領域風險。上線前的最終 go/no-go 檢查用。"><b>發布就緒審查</b><span class="k">Release Readiness Review</span><div class="sub">上線前一次檢查變更、資料、安全、可觀測性、回滾、容量，抓出單一團隊會漏掉的跨領域風險。上線前的最終 go/no-go 檢查用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="藍綠部署 blue-green deployment devops_sre.blue_green_deployment 新版本（green）完整部署驗證後才切流量，舊版本（blue）保留做即時備援。需要近乎瞬間回滾能力的上線時用。"><b>藍綠部署</b><span class="k">Blue-Green Deployment</span><div class="sub">新版本（Green）完整部署驗證後才切流量，舊版本（Blue）保留做即時備援。需要近乎瞬間回滾能力的上線時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="負載測試 load test devops_sre.load_test 記錄逐步加壓下的真實負載測試數據（吞吐量、延遲、錯誤率）。上線或預期流量暴增前，想知道系統真實承載能力時用。"><b>負載測試</b><span class="k">Load Test</span><div class="sub">記錄逐步加壓下的真實負載測試數據（吞吐量、延遲、錯誤率）。上線或預期流量暴增前，想知道系統真實承載能力時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="金絲雀部署 canary deployment devops_sre.canary_deployment 分階段放量（1%→5%→25%→50%→100%），任何階段不健康就立刻回滾。要限制風險爆炸半徑的上線時用。"><b>金絲雀部署</b><span class="k">Canary Deployment</span><div class="sub">分階段放量（1%→5%→25%→50%→100%），任何階段不健康就立刻回滾。要限制風險爆炸半徑的上線時用。</div>
+    </div>
+    <div class="tool" data-fam="devops_sre" data-q="錯誤預算 error budget devops_sre.error_budget 從 1-slo 算出燃燒速率，用它決定發布節奏（預算快用完就放慢腳步）。想讓「該衝功能還是顧穩定」變成有數據依據的決定時用。"><b>錯誤預算</b><span class="k">Error Budget</span><div class="sub">從 1-SLO 算出燃燒速率，用它決定發布節奏（預算快用完就放慢腳步）。想讓「該衝功能還是顧穩定」變成有數據依據的決定時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="systems">
+    <h3 class="fam" id="fam-systems">系統思考 <span class="k">Systems Thinking</span><small>12 個</small></h3>
+    <p class="sub mt0">一再發生的問題是哪一層在推：冰山模型、因果迴路、槓桿點。</p>
+    <div class="tool" data-fam="systems" data-q="sipoc（供應者-輸入-流程-輸出-顧客） suppliers-inputs-process-outputs-customers sipoc systems.sipoc 用五個欄位——供應者、輸入、流程、輸出、顧客——完整框定一個流程。想在深入細部流程對照之前，先界定流程範圍跟關鍵因素時用。"><b>SIPOC（供應者-輸入-流程-輸出-顧客）</b><span class="k">Suppliers-Inputs-Process-Outputs-Customers</span><div class="sub">用五個欄位——供應者、輸入、流程、輸出、顧客——完整框定一個流程。想在深入細部流程對照之前，先界定流程範圍跟關鍵因素時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="主體模型模擬 agent-based modeling systems.agent_based_modeling 從個別主體各自的規則出發，在共享環境中跑多次模擬，觀察整體行為如何浮現。系統整體行為沒辦法單從某一個主體的規則推算出來、必須真的跑模擬才看得到湧現結果時用。"><b>主體模型模擬</b><span class="k">Agent-Based Modeling</span><div class="sub">從個別主體各自的規則出發，在共享環境中跑多次模擬，觀察整體行為如何浮現。系統整體行為沒辦法單從某一個主體的規則推算出來、必須真的跑模擬才看得到湧現結果時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="冰山模型 iceberg model systems.iceberg_model 把一個表面事件逐層往下挖——重複發生的型態、系統性結構、支撐這一切的心智模式，一次一層。想避免只針對單一事件反應，而是找出產生一整類類似事件的深層結構時用。"><b>冰山模型</b><span class="k">Iceberg Model</span><div class="sub">把一個表面事件逐層往下挖——重複發生的型態、系統性結構、支撐這一切的心智模式，一次一層。想避免只針對單一事件反應，而是找出產生一整類類似事件的深層結構時用。</div>
+      <div class="btns mt6"><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">示範：5 分鐘課 →</a><a class="btn ghost" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">示範：結果頁 →</a></div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="因果回饋圖 causal loop diagram systems.causal_loop_diagram 畫出變數間的回饋迴路，並根據連結的正負極性獨立重新計算每個迴路是「增強」還是「平衡」，而不是相信使用者自己貼的標籤。想理解一個系統為什麼會不斷放大或自我修正某個趨勢，而不只是看到趨勢本身時用。"><b>因果回饋圖</b><span class="k">Causal Loop Diagram</span><div class="sub">畫出變數間的回饋迴路，並根據連結的正負極性獨立重新計算每個迴路是「增強」還是「平衡」，而不是相信使用者自己貼的標籤。想理解一個系統為什麼會不斷放大或自我修正某個趨勢，而不只是看到趨勢本身時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="場域分析（推力與阻力分析） force field analysis systems.force_field_analysis 列出推動一項改變的力量跟阻礙它的力量，各自評分 1-5，並自動算出淨力。想一眼看出目前一項改變究竟是推力比較大還是阻力比較大時用。"><b>場域分析（推力與阻力分析）</b><span class="k">Force Field Analysis</span><div class="sub">列出推動一項改變的力量跟阻礙它的力量，各自評分 1-5，並自動算出淨力。想一眼看出目前一項改變究竟是推力比較大還是阻力比較大時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="存量與流量圖 stock &amp; flow systems.stock_and_flow 把累積量（存量）跟填入／流出的速率（流量）建模出來，要求每個存量至少被一個真實流量影響。想理解庫存、預算、人口等隨時間變化的動態行為，而靜態快照看不出來時用。"><b>存量與流量圖</b><span class="k">Stock &amp; Flow</span><div class="sub">把累積量（存量）跟填入／流出的速率（流量）建模出來，要求每個存量至少被一個真實流量影響。想理解庫存、預算、人口等隨時間變化的動態行為，而靜態快照看不出來時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="槓桿點分析 leverage point analysis systems.leverage_point_analysis 把一個介入點分類到 donella meadows 五層槓桿點階層之一——參數、回饋迴路、規則、目標、典範——並自動算出其深度等級。想比較不同介入方案的槓桿深度時用，因為淺層修改（參數）通常解決不了系統性問題。"><b>槓桿點分析</b><span class="k">Leverage Point Analysis</span><div class="sub">把一個介入點分類到 Donella Meadows 五層槓桿點階層之一——參數、回饋迴路、規則、目標、典範——並自動算出其深度等級。想比較不同介入方案的槓桿深度時用，因為淺層修改（參數）通常解決不了系統性問題。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="流程圖 flowchart systems.flowchart 把工作流程畫成連續步驟，只有一個起點、至少一個終點，每個決策點至少分岔出兩條有條件的路徑。想找出一個反覆出現的困擾歷程實際卡在哪一步，直接把步驟畫出來看時用。"><b>流程圖</b><span class="k">Flowchart</span><div class="sub">把工作流程畫成連續步驟，只有一個起點、至少一個終點，每個決策點至少分岔出兩條有條件的路徑。想找出一個反覆出現的困擾歷程實際卡在哪一步，直接把步驟畫出來看時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="生活系統圖 life system mapping systems.life_system_mapping 畫出一個人生活中的各個子系統（家庭、工作、人際關係等），以及彼此之間的影響方向。想看出不同生活面向如何互相影響，而不是把每個領域分開來看時用。"><b>生活系統圖</b><span class="k">Life System Mapping</span><div class="sub">畫出一個人生活中的各個子系統（家庭、工作、人際關係等），以及彼此之間的影響方向。想看出不同生活面向如何互相影響，而不是把每個領域分開來看時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="系統原型 systems archetypes systems.systems_archetypes 把觀察到的情況對照到 10 種已知系統原型（如成長的極限、飲鴆止渴）的封閉清單，每個判定都要求引用實際觀察到的症狀作為證據。想辨認出一個熟悉的系統性陷阱、而不是每次都從零重新診斷時用。"><b>系統原型</b><span class="k">Systems Archetypes</span><div class="sub">把觀察到的情況對照到 10 種已知系統原型（如成長的極限、飲鴆止渴）的封閉清單，每個判定都要求引用實際觀察到的症狀作為證據。想辨認出一個熟悉的系統性陷阱、而不是每次都從零重新診斷時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="豐富圖像 rich picture systems.rich_picture 在一個混亂、還套不進正式模型的情境中，自由地畫出角色、流程、衝突，並要求每個記錄的議題都能追溯回真實角色。想對複雜情境先做一次非正式的初步梳理，之後再套進更嚴謹的框架時用。"><b>豐富圖像</b><span class="k">Rich Picture</span><div class="sub">在一個混亂、還套不進正式模型的情境中，自由地畫出角色、流程、衝突，並要求每個記錄的議題都能追溯回真實角色。想對複雜情境先做一次非正式的初步梳理，之後再套進更嚴謹的框架時用。</div>
+    </div>
+    <div class="tool" data-fam="systems" data-q="隨時間變化行為圖 behavior over time graph bot systems.behavior_over_time 把一個追蹤的變數，依嚴格時間順序畫成一條序列，不接受單一個點或順序錯亂的資料。想強迫分析聚焦在「隨時間變化」，而不是只看單一時間點的快照時用。"><b>隨時間變化行為圖 <small>BOT</small></b><span class="k">Behavior Over Time Graph</span><div class="sub">把一個追蹤的變數，依嚴格時間順序畫成一條序列，不接受單一個點或順序錯亂的資料。想強迫分析聚焦在「隨時間變化」，而不是只看單一時間點的快照時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="delivery">
+    <h3 class="fam" id="fam-delivery">交付與風險 <span class="k">Delivery</span><small>11 個</small></h3>
+    <p class="sub mt0">把計畫排出來、盯著風險：風險登錄、變更風險矩陣、成果路線圖。</p>
+    <div class="tool" data-fam="delivery" data-q="raid 日誌 raid log delivery.raid_log 在一個地方管理風險／假設／議題／相依，含負責人、狀態、下一步。防止風險散落在聊天訊息裡時用。"><b>RAID 日誌</b><span class="k">RAID Log</span><div class="sub">在一個地方管理風險／假設／議題／相依，含負責人、狀態、下一步。防止風險散落在聊天訊息裡時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="交付 raci 矩陣 delivery raci matrix raci delivery.raci 為每個交付項目指定負責／當責／諮詢／被告知角色，並附截止日期。想防止責任空洞時用。"><b>交付 RACI 矩陣</b><span class="k">Delivery RACI Matrix</span><div class="sub">為每個交付項目指定負責／當責／諮詢／被告知角色，並附截止日期。想防止責任空洞時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="任務相依圖 dependency graph delivery.dependency_graph 明確建模任務／交付物／里程碑之間的相依，每個關鍵相依都要有負責人與備援方案。降低專案裡隱性 blocker 時用。"><b>任務相依圖</b><span class="k">Dependency Graph</span><div class="sub">明確建模任務／交付物／里程碑之間的相依，每個關鍵相依都要有負責人與備援方案。降低專案裡隱性 blocker 時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="完成的定義 definition of done delivery.definition_of_done 要求 12 個面向（功能、測試、安全、隱私、資料、可觀測性、容量、文件、遷移、回滾、復原、證據）都過了才能宣告完成。防止「能跑就算完成」溜進正式環境時用。"><b>完成的定義</b><span class="k">Definition of Done</span><div class="sub">要求 12 個面向（功能、測試、安全、隱私、資料、可觀測性、容量、文件、遷移、回滾、復原、證據）都過了才能宣告完成。防止「能跑就算完成」溜進正式環境時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="成果導向路線圖 outcome roadmap delivery.outcome_roadmap 用「成果」而不是「功能」排路線圖（主題→成果→賭注→證據），每個賭注都要能追溯到真實成果。想讓路線圖保持策略彈性、不被功能清單綁死時用。"><b>成果導向路線圖</b><span class="k">Outcome Roadmap</span><div class="sub">用「成果」而不是「功能」排路線圖（主題→成果→賭注→證據），每個賭注都要能追溯到真實成果。想讓路線圖保持策略彈性、不被功能清單綁死時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="決策日誌 decision log delivery.decision_log 保存每個重要決策的脈絡、決定、證據、負責人，避免以後重複爭論。團隊老是重新吵一個已經決定過的事情時用。"><b>決策日誌</b><span class="k">Decision Log</span><div class="sub">保存每個重要決策的脈絡、決定、證據、負責人，避免以後重複爭論。團隊老是重新吵一個已經決定過的事情時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="甘特圖 gantt chart delivery.gantt_chart 專案任務與時間進度管理工具。規劃具體行動時程表，適用目標分期計畫與行為追蹤。"><b>甘特圖</b><span class="k">Gantt Chart</span><div class="sub">專案任務與時間進度管理工具。規劃具體行動時程表，適用目標分期計畫與行為追蹤。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="要徑法 critical path method delivery.critical_path_method 用前推／後推法找出真正決定最短工期的任務鏈。想知道哪些任務絕對不能延、一延就拖累整個專案時用。"><b>要徑法</b><span class="k">Critical Path Method</span><div class="sub">用前推／後推法找出真正決定最短工期的任務鏈。想知道哪些任務絕對不能延、一延就拖累整個專案時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="變更風險矩陣 change risk matrix delivery.change_risk_matrix 從範圍、可逆性、資料、流量、安全性五個因子機械式算出一個正式環境變更的風險等級（低／中／高）。任何上線變更前，用它決定要不要加控管。"><b>變更風險矩陣</b><span class="k">Change Risk Matrix</span><div class="sub">從範圍、可逆性、資料、流量、安全性五個因子機械式算出一個正式環境變更的風險等級（低／中／高）。任何上線變更前，用它決定要不要加控管。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="階段關卡法 stage-gate delivery.stage_gate 每個階段用證據決定 go／暫停／重做／中止，go 一定要有證據。防止靠沉沒成本硬撐、做到最後才發現方向錯時用。"><b>階段關卡法</b><span class="k">Stage-Gate</span><div class="sub">每個階段用證據決定 Go／暫停／重做／中止，Go 一定要有證據。防止靠沉沒成本硬撐、做到最後才發現方向錯時用。</div>
+    </div>
+    <div class="tool" data-fam="delivery" data-q="風險登記表 risk register delivery.risk_register 正式管理風險：機率×影響機械式算出曝險程度，附負責人、控制措施、觸發條件。想讓風險可追蹤而不只是嘴上說說時用。"><b>風險登記表</b><span class="k">Risk Register</span><div class="sub">正式管理風險：機率×影響機械式算出曝險程度，附負責人、控制措施、觸發條件。想讓風險可追蹤而不只是嘴上說說時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="experiment">
+    <h3 class="fam" id="fam-experiment">實驗 <span class="k">Experiment</span><small>11 個</small></h3>
+    <p class="sub mt0">用資料驗證而不是猜：A/B 測試、假設檢定、最小可行實驗。</p>
+    <div class="tool" data-fam="experiment" data-q="a/b 測試 a/b test experiment.ab_test 隨機比較兩個版本，事先登記好指標與樣本數，避免偷看結果、多重檢定造假。能做對照實驗、想要最可靠因果證據時用。"><b>A/B 測試</b><span class="k">A/B Test</span><div class="sub">隨機比較兩個版本，事先登記好指標與樣本數，避免偷看結果、多重檢定造假。能做對照實驗、想要最可靠因果證據時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="假門測試 fake door experiment.fake_door 放一個還沒做出來的功能入口，點了會告知尚未開放，量測點擊興趣。低成本量化需求時用。"><b>假門測試</b><span class="k">Fake Door</span><div class="sub">放一個還沒做出來的功能入口，點了會告知尚未開放，量測點擊興趣。低成本量化需求時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="原型測試 prototype experiment.prototype 用低保真原型測試概念／互動，依真實使用者觀察迭代。想低成本先發現問題再動工時用。"><b>原型測試</b><span class="k">Prototype</span><div class="sub">用低保真原型測試概念／互動，依真實使用者觀察迭代。想低成本先發現問題再動工時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="技術試探 technical spike experiment.technical_spike 限時研究一個技術未知數，最後留下決策筆記。想在排期前提升估算可信度時用。"><b>技術試探</b><span class="k">Technical Spike</span><div class="sub">限時研究一個技術未知數，最後留下決策筆記。想在排期前提升估算可信度時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="最小可行產品 minimum viable product mvp experiment.mvp 做出最少的東西，換取足以改變決策的證據——不是把正式產品做爛一點。想縮短學習週期、驗證核心價值時用。"><b>最小可行產品 <small>MVP</small></b><span class="k">Minimum Viable Product</span><div class="sub">做出最少的東西，換取足以改變決策的證據——不是把正式產品做爛一點。想縮短學習週期、驗證核心價值時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="概念驗證 proof of concept experiment.proof_of_concept 用一個獨立於正式環境的實作，對照事先定義的標準驗證技術是否可行。想先排除技術未知數再投入時用。"><b>概念驗證</b><span class="k">Proof of Concept</span><div class="sub">用一個獨立於正式環境的實作，對照事先定義的標準驗證技術是否可行。想先排除技術未知數再投入時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="標竿比較 benchmark experiment.benchmark 在固定的工作負載與環境下，跟基準／競品比較，所有候選都用同一組指標評分。避免憑印象選型時用。"><b>標竿比較</b><span class="k">Benchmark</span><div class="sub">在固定的工作負載與環境下，跟基準／競品比較，所有候選都用同一組指標評分。避免憑印象選型時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="煙霧測試（市場） smoke test experiment.smoke_test 還沒動工前用 landing page／廣告／優惠測市場，對照事先定好的註冊／預購門檻。想快速驗證需求、還沒開始寫程式前用。"><b>煙霧測試（市場）</b><span class="k">Smoke Test</span><div class="sub">還沒動工前用 landing page／廣告／優惠測市場，對照事先定好的註冊／預購門檻。想快速驗證需求、還沒開始寫程式前用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="綠野仙蹤測試 wizard of oz experiment.wizard_of_oz 前台看起來自動化，後台其實是真人操作，驗證互動而不用先蓋完整系統。想先確認大家真的需要這個互動，再投資自動化時用。"><b>綠野仙蹤測試</b><span class="k">Wizard of Oz</span><div class="sub">前台看起來自動化，後台其實是真人操作，驗證互動而不用先蓋完整系統。想先確認大家真的需要這個互動，再投資自動化時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="試點計畫 pilot experiment.pilot 小規模真實試行，開始前一定要先定義成功／停止／回滾標準。想降低全面上線的爆炸半徑時用。"><b>試點計畫</b><span class="k">Pilot</span><div class="sub">小規模真實試行，開始前一定要先定義成功／停止／回滾標準。想降低全面上線的爆炸半徑時用。</div>
+    </div>
+    <div class="tool" data-fam="experiment" data-q="門房測試 concierge test experiment.concierge_test 人工先提供服務（完全不自動化），量測真實使用意願／付費意願再決定要不要蓋。先驗證價值再自動化時用。"><b>門房測試</b><span class="k">Concierge Test</span><div class="sub">人工先提供服務（完全不自動化），量測真實使用意願／付費意願再決定要不要蓋。先驗證價值再自動化時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="learning">
+    <h3 class="fam" id="fam-learning">學習與回顧 <span class="k">Learning</span><small>11 個</small></h3>
+    <p class="sub mt0">做完之後學到什麼：行動後檢討、回顧會、雙環學習。</p>
+    <div class="tool" data-fam="learning" data-q="ooda 循環 ooda loop ooda learning.ooda 觀察→定位→決策→行動，做快速動態決策。高變動環境、pdca 的節奏太慢時用。"><b>OODA 循環</b><span class="k">OODA Loop</span><div class="sub">觀察→定位→決策→行動，做快速動態決策。高變動環境、PDCA 的節奏太慢時用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="pdca 循環 plan-do-check-act pdca learning.pdca 計畫→執行→檢核→行動，用於穩定流程的長期改進。長期漸進式流程改善，不是要應付快速變化的危機時用。"><b>PDCA 循環</b><span class="k">Plan-Do-Check-Act</span><div class="sub">計畫→執行→檢核→行動，用於穩定流程的長期改進。長期漸進式流程改善，不是要應付快速變化的危機時用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="事後檢討 post-mortem learning.post_mortem 事件後檢視時間軸→影響→原因→行動，設計上就不指責個人。任何事故發生後，想防止重發又不搞成互相指責時用。"><b>事後檢討</b><span class="k">Post-mortem</span><div class="sub">事件後檢視時間軸→影響→原因→行動，設計上就不指責個人。任何事故發生後，想防止重發又不搞成互相指責時用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="定義-測量-分析-改善-控制 define-measure-analyze-improve-control dmaic learning.dmaic 六標準差品質改善流程：定義／測量／分析／改善／控制。為重複性困擾建立流程診斷與精進計畫時用。"><b>定義-測量-分析-改善-控制 <small>DMAIC</small></b><span class="k">Define-Measure-Analyze-Improve-Control</span><div class="sub">六標準差品質改善流程：定義／測量／分析／改善／控制。為重複性困擾建立流程診斷與精進計畫時用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="建構-衡量-學習 build-measure-learn learning.build_measure_learn 建構最小測試→衡量→學習，並明確揭露刻意省略了什麼範圍。產品探索階段，想避免先建後驗證時用。"><b>建構-衡量-學習</b><span class="k">Build-Measure-Learn</span><div class="sub">建構最小測試→衡量→學習，並明確揭露刻意省略了什麼範圍。產品探索階段，想避免先建後驗證時用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="欣賞式探詢 appreciative inquiry learning.appreciative_inquiry 聚焦正向經驗與可能性進行改變，導向「什麼對你有用」的正向敘事轉化。非診斷工具。"><b>欣賞式探詢</b><span class="k">Appreciative Inquiry</span><div class="sub">聚焦正向經驗與可能性進行改變，導向「什麼對你有用」的正向敘事轉化。非診斷工具。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="決策日誌 decision journal learning.decision_journal 在結果還未知時就記下脈絡、選項、證據、預測、信心度，防止事後諸葛。做出重大決策的當下就用，不要等結果出來才寫。"><b>決策日誌</b><span class="k">Decision Journal</span><div class="sub">在結果還未知時就記下脈絡、選項、證據、預測、信心度，防止事後諸葛。做出重大決策的當下就用，不要等結果出來才寫。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="決策逆轉條件 reversal criteria learning.reversal_criteria 針對已經做的決策，事先定義「出現什麼新證據該翻案」。大決策做完後，想先講好什麼情況下會改變心意時用。"><b>決策逆轉條件</b><span class="k">Reversal Criteria</span><div class="sub">針對已經做的決策，事先定義「出現什麼新證據該翻案」。大決策做完後，想先講好什麼情況下會改變心意時用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="終止條件 kill criteria learning.kill_criteria 事前定義停止條件（最大損失／時間／品質門檻），控制下行風險。任何可能讓你「騎虎難下」的計畫開始前用。"><b>終止條件</b><span class="k">Kill Criteria</span><div class="sub">事前定義停止條件（最大損失／時間／品質門檻），控制下行風險。任何可能讓你「騎虎難下」的計畫開始前用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="行動後檢討 after action review learning.after_action_review 比較預期與實際結果，問為什麼，訂出下一步——快速的單輪回顧。任何活動或專案結束後，想快速整理學到什麼時用。"><b>行動後檢討</b><span class="k">After Action Review</span><div class="sub">比較預期與實際結果，問為什麼，訂出下一步——快速的單輪回顧。任何活動或專案結束後，想快速整理學到什麼時用。</div>
+    </div>
+    <div class="tool" data-fam="learning" data-q="預測追蹤 prediction tracking learning.prediction_tracking 記錄預測、時間範圍、實際結果，算出真實誤差以改善校準。想長期追蹤自己預測到底準不準時用。"><b>預測追蹤</b><span class="k">Prediction Tracking</span><div class="sub">記錄預測、時間範圍、實際結果，算出真實誤差以改善校準。想長期追蹤自己預測到底準不準時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="architecture">
+    <h3 class="fam" id="fam-architecture">架構 <span class="k">Architecture</span><small>10 個</small></h3>
+    <p class="sub mt0">技術決策怎麼做、怎麼留下紀錄：ADR、ATAM、品質屬性。</p>
+    <div class="tool" data-fam="architecture" data-q="c4 模型 c4 model c4 architecture.system_context_model 用系統脈絡→容器→元件→程式碼四個層次，依聽眾需要的深度解釋同一個架構。要跟不同對象（主管／工程師）溝通架構時用。"><b>C4 模型</b><span class="k">C4 Model</span><div class="sub">用系統脈絡→容器→元件→程式碼四個層次，依聽眾需要的深度解釋同一個架構。要跟不同對象（主管／工程師）溝通架構時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="事件風暴 event storming architecture.event_storming 用「先列出所有領域事件」的方式，由下而上探索一個業務流程的真實樣貌。設計新系統或釐清舊系統邏輯時用。"><b>事件風暴</b><span class="k">Event Storming</span><div class="sub">用「先列出所有領域事件」的方式，由下而上探索一個業務流程的真實樣貌。設計新系統或釐清舊系統邏輯時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="品質屬性情境 quality attribute scenario architecture.quality_attribute_scenario 把模糊的非功能需求（穩定、安全、快）轉成可測試的具體情境（來源→刺激→產物→環境→回應→量測）。寫需求或驗收標準太空泛時用。"><b>品質屬性情境</b><span class="k">Quality Attribute Scenario</span><div class="sub">把模糊的非功能需求（穩定、安全、快）轉成可測試的具體情境（來源→刺激→產物→環境→回應→量測）。寫需求或驗收標準太空泛時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="架構取捨分析法 architecture tradeoff analysis method atam architecture.atam 針對一個架構方案，系統性找出敏感點、取捨點、風險、非風險四類發現。要驗證架構設計禁不禁得起壓力測試時用。"><b>架構取捨分析法 <small>ATAM</small></b><span class="k">Architecture Tradeoff Analysis Method</span><div class="sub">針對一個架構方案，系統性找出敏感點、取捨點、風險、非風險四類發現。要驗證架構設計禁不禁得起壓力測試時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="架構取捨矩陣 architecture trade-off matrix architecture.trade_off_matrix 用權重跟評分比較多個候選架構方案，含敏感度分析。要在多個架構選項之間做決定時用。"><b>架構取捨矩陣</b><span class="k">Architecture Trade-off Matrix</span><div class="sub">用權重跟評分比較多個候選架構方案，含敏感度分析。要在多個架構選項之間做決定時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="架構決策紀錄 architecture decision record adr architecture.adr 記錄一個架構決策：脈絡、考慮過的選項、最後決定、後續影響，讓未來的人知道當初為什麼這樣選。做重大技術選型時用。"><b>架構決策紀錄 <small>ADR</small></b><span class="k">Architecture Decision Record</span><div class="sub">記錄一個架構決策：脈絡、考慮過的選項、最後決定、後續影響，讓未來的人知道當初為什麼這樣選。做重大技術選型時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="架構適應度函數 architecture fitness functions architecture.fitness_functions 把架構的不變量寫成可自動化檢查的測試／指標，持續守住不讓架構隨時間腐化。想長期守住某個架構原則時用。"><b>架構適應度函數</b><span class="k">Architecture Fitness Functions</span><div class="sub">把架構的不變量寫成可自動化檢查的測試／指標，持續守住不讓架構隨時間腐化。想長期守住某個架構原則時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="相依關係地圖 dependency mapping architecture.dependency_mapping 畫出服務／廠商／資料之間的相依關係，找出隱藏的單點故障。想知道「這個東西掛了會拖累誰」時用。"><b>相依關係地圖</b><span class="k">Dependency Mapping</span><div class="sub">畫出服務／廠商／資料之間的相依關係，找出隱藏的單點故障。想知道「這個東西掛了會拖累誰」時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="絞殺者模式 strangler fig pattern architecture.strangler_fig 找一個切入點，逐步用新系統取代舊系統的一小塊，驗證後擴大範圍，最後淘汰舊系統。要漸進式汰換遺留系統、不敢一次重寫時用。"><b>絞殺者模式</b><span class="k">Strangler Fig Pattern</span><div class="sub">找一個切入點，逐步用新系統取代舊系統的一小塊，驗證後擴大範圍，最後淘汰舊系統。要漸進式汰換遺留系統、不敢一次重寫時用。</div>
+    </div>
+    <div class="tool" data-fam="architecture" data-q="領域驅動設計 domain-driven design ddd architecture.ddd 把複雜業務領域拆成子領域、限界脈絡、脈絡地圖。系統邊界模糊、想釐清「這塊該歸誰管」時用。"><b>領域驅動設計 <small>DDD</small></b><span class="k">Domain-Driven Design</span><div class="sub">把複雜業務領域拆成子領域、限界脈絡、脈絡地圖。系統邊界模糊、想釐清「這塊該歸誰管」時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="causal">
+    <h3 class="fam" id="fam-causal">因果 <span class="k">Causal Reasoning</span><small>10 個</small></h3>
+    <p class="sub mt0">什麼造成什麼、反過來會怎樣：反事實推理、因果圖、干擾因子。</p>
+    <div class="tool" data-fam="causal" data-q="反事實推理 counterfactual reasoning causal.counterfactual_reasoning 比較「實際發生的」跟「假設沒介入會怎樣」，建立明確的因果比較基準。想確認一個介入措施是否真的有效時用。"><b>反事實推理</b><span class="k">Counterfactual Reasoning</span><div class="sub">比較「實際發生的」跟「假設沒介入會怎樣」，建立明確的因果比較基準。想確認一個介入措施是否真的有效時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="合成控制法 synthetic control causal.synthetic_control 記錄一個用其他個案加權組合出「虛擬對照組」的研究設計（只記錄設計）。只有一個處理個案、找不到真實對照組時用。"><b>合成控制法</b><span class="k">Synthetic Control</span><div class="sub">記錄一個用其他個案加權組合出「虛擬對照組」的研究設計（只記錄設計）。只有一個處理個案、找不到真實對照組時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="因果圖 causal dag dag causal.dag 用有向圖畫出變數之間的因果關係，找出干擾變數與正確的因果路徑。想釐清「到底是誰影響誰」、避免把相關性當因果時用。"><b>因果圖 <small>DAG</small></b><span class="k">Causal DAG</span><div class="sub">用有向圖畫出變數之間的因果關係，找出干擾變數與正確的因果路徑。想釐清「到底是誰影響誰」、避免把相關性當因果時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="工具變數法 instrumental variables iv causal.instrumental_variables 記錄一個用工具變數處理內生性問題的研究設計（只記錄設計，不跑迴歸）。懷疑變數間有雙向因果時，先把設計寫清楚用。"><b>工具變數法 <small>IV</small></b><span class="k">Instrumental Variables</span><div class="sub">記錄一個用工具變數處理內生性問題的研究設計（只記錄設計，不跑迴歸）。懷疑變數間有雙向因果時，先把設計寫清楚用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="差異中的差異法 difference-in-differences did causal.difference_in_differences 記錄一個「處理組 vs 對照組、介入前 vs 介入後」的研究設計（只記錄設計，不跑迴歸）。想評估政策效果，先把研究設計寫清楚時用。"><b>差異中的差異法 <small>DiD</small></b><span class="k">Difference-in-Differences</span><div class="sub">記錄一個「處理組 vs 對照組、介入前 vs 介入後」的研究設計（只記錄設計，不跑迴歸）。想評估政策效果，先把研究設計寫清楚時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="改變理論 theory of change causal.theory_of_change 用「投入→活動→產出→短期成果→長期成果→影響」六階段，串起假設、證據、指標、風險。做長期專案或社會影響評估規劃時用。"><b>改變理論</b><span class="k">Theory of Change</span><div class="sub">用「投入→活動→產出→短期成果→長期成果→影響」六階段，串起假設、證據、指標、風險。做長期專案或社會影響評估規劃時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="斷點迴歸設計 regression discontinuity design rdd causal.regression_discontinuity 記錄一個利用「切點附近樣本」估計因果效果的研究設計（只記錄設計）。有明確資格門檻可做自然實驗時用。"><b>斷點迴歸設計 <small>RDD</small></b><span class="k">Regression Discontinuity Design</span><div class="sub">記錄一個利用「切點附近樣本」估計因果效果的研究設計（只記錄設計）。有明確資格門檻可做自然實驗時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="過程追蹤法 process tracing causal.process_tracing 用機制證據（不只是統計相關）逐步檢查一條因果鏈是否成立。樣本數很小、無法做統計因果推論時用。"><b>過程追蹤法</b><span class="k">Process Tracing</span><div class="sub">用機制證據（不只是統計相關）逐步檢查一條因果鏈是否成立。樣本數很小、無法做統計因果推論時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="邏輯模型 logic model causal.logic_model 用「投入→活動→產出→短期成果→長期成果」固定五階段，結構化描述一個專案／方案。做專案評估或跟 kpi 對齊時用。"><b>邏輯模型</b><span class="k">Logic Model</span><div class="sub">用「投入→活動→產出→短期成果→長期成果」固定五階段，結構化描述一個專案／方案。做專案評估或跟 KPI 對齊時用。</div>
+    </div>
+    <div class="tool" data-fam="causal" data-q="隨機對照試驗 randomized controlled trial rct causal.rct 記錄一個隨機分派、把樣本分成處理組／對照組的研究設計（只記錄設計，不跑統計分析）。想用最嚴謹方式驗證因果，先把設計寫清楚用。"><b>隨機對照試驗 <small>RCT</small></b><span class="k">Randomized Controlled Trial</span><div class="sub">記錄一個隨機分派、把樣本分成處理組／對照組的研究設計（只記錄設計，不跑統計分析）。想用最嚴謹方式驗證因果，先把設計寫清楚用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="challenge">
+    <h3 class="fam" id="fam-challenge">挑戰與對抗 <span class="k">Challenge</span><small>10 個</small></h3>
+    <p class="sub mt0">故意找碴讓結論更硬：紅隊、藍隊、魔鬼代言人、預想驗屍。</p>
+    <div class="tool" data-fam="challenge" data-q="事前驗屍 pre-mortem challenge.pre_mortem 假設專案已經失敗，每人先獨立列出可能原因，再分群、排序、訂出預防／偵測／復原措施。專案開始前想提早揪出真正隱憂時用。"><b>事前驗屍</b><span class="k">Pre-mortem</span><div class="sub">假設專案已經失敗，每人先獨立列出可能原因，再分群、排序、訂出預防／偵測／復原措施。專案開始前想提早揪出真正隱憂時用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="危害與可操作性分析 hazard and operability study hazop challenge.hazop 用一組標準引導詞（沒有／更多／更少／反向等）系統性找出流程可能的偏差。做高風險流程的完整性風險分析時用。"><b>危害與可操作性分析 <small>HAZOP</small></b><span class="k">Hazard and Operability Study</span><div class="sub">用一組標準引導詞（沒有／更多／更少／反向等）系統性找出流程可能的偏差。做高風險流程的完整性風險分析時用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="反例搜尋 counterexample search challenge.counterexample_search 針對一個規則／主張找邊界案例，篩出真正推翻它的反例。想測試一個規則的適用邊界時用。"><b>反例搜尋</b><span class="k">Counterexample Search</span><div class="sub">針對一個規則／主張找邊界案例，篩出真正推翻它的反例。想測試一個規則的適用邊界時用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="反證搜尋 disconfirming evidence challenge.disconfirming_evidence 主動去找「不支持自己想法」的資料，而不是只找支持的證據，降低確認偏誤。驗證一個自己深信的判斷前用。"><b>反證搜尋</b><span class="k">Disconfirming Evidence</span><div class="sub">主動去找「不支持自己想法」的資料，而不是只找支持的證據，降低確認偏誤。驗證一個自己深信的判斷前用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="壓力測試（情境） stress testing challenge.stress_testing 設計極端但合理的情境，測試方案在壓力下的崩潰點在哪。想知道一個方案的韌性極限時用。"><b>壓力測試（情境）</b><span class="k">Stress Testing</span><div class="sub">設計極端但合理的情境，測試方案在壓力下的崩潰點在哪。想知道一個方案的韌性極限時用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="失效模式與影響分析 failure mode and effects analysis fmea challenge.fmea 逐步檢查功能→失效模式→影響→原因→現有控制→嚴重度→機率→可偵測度→行動優先序，找出最該優先處理的風險點。上線前做風險盤點時用。"><b>失效模式與影響分析 <small>FMEA</small></b><span class="k">Failure Mode and Effects Analysis</span><div class="sub">逐步檢查功能→失效模式→影響→原因→現有控制→嚴重度→機率→可偵測度→行動優先序，找出最該優先處理的風險點。上線前做風險盤點時用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="獨立裁決 independent judge challenge.independent_judge 在 red team 攻擊、blue team 防守都做完後，由第三方角度做最終裁決。想要不偏袒任一方的最終結論時用。"><b>獨立裁決</b><span class="k">Independent Judge</span><div class="sub">在 Red Team 攻擊、Blue Team 防守都做完後，由第三方角度做最終裁決。想要不偏袒任一方的最終結論時用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="紅隊攻擊 red team challenge.red_team 用一份含 11 個面向的檢查清單（假設／邏輯／遺漏變數／反例／資安／隱私／法遵／文化／營運／統計效度／過度自信），系統性攻擊自己的方案找漏洞。方案定案前想找出弱點時用。"><b>紅隊攻擊</b><span class="k">Red Team</span><div class="sub">用一份含 11 個面向的檢查清單（假設／邏輯／遺漏變數／反例／資安／隱私／法遵／文化／營運／統計效度／過度自信），系統性攻擊自己的方案找漏洞。方案定案前想找出弱點時用。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="藍隊防禦 blue team challenge.blue_team 針對已提出的攻擊／風險找出對應的防禦措施。做完 red team 攻擊分析後，用它補上防守方案。"><b>藍隊防禦</b><span class="k">Blue Team</span><div class="sub">針對已提出的攻擊／風險找出對應的防禦措施。做完 Red Team 攻擊分析後，用它補上防守方案。</div>
+    </div>
+    <div class="tool" data-fam="challenge" data-q="魔鬼代言人 devil&#x27;s advocate challenge.devils_advocate 刻意建立「如果主流觀點是錯的」最強反方論證，防止團體迷思。開會意見太一致、想防止盲點時用。"><b>魔鬼代言人</b><span class="k">Devil&#x27;s Advocate</span><div class="sub">刻意建立「如果主流觀點是錯的」最強反方論證，防止團體迷思。開會意見太一致、想防止盲點時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="database_data">
+    <h3 class="fam" id="fam-database_data">資料庫與資料 <span class="k">Database &amp; Data</span><small>10 個</small></h3>
+    <p class="sub mt0">資料怎麼存、怎麼遷、怎麼救：備份還原演練、擴張收縮遷移。</p>
+    <div class="tool" data-fam="database_data" data-q="schema 相容性分析 schema compatibility analysis database_data.schema_compatibility_analysis 在上線前檢查一個 schema 改動是否向前／向後相容。任何可能弄壞現有使用端的 alter 之前用。"><b>Schema 相容性分析</b><span class="k">Schema Compatibility Analysis</span><div class="sub">在上線前檢查一個 schema 改動是否向前／向後相容。任何可能弄壞現有使用端的 ALTER 之前用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="保留與刪除模型 retention / deletion model database_data.retention_deletion_model 定義每種資料要保留多久、怎麼刪除（硬刪除／軟刪除／匿名化）。想規劃合規的資料保留政策時，提早想清楚用。"><b>保留與刪除模型</b><span class="k">Retention / Deletion Model</span><div class="sub">定義每種資料要保留多久、怎麼刪除（硬刪除／軟刪除／匿名化）。想規劃合規的資料保留政策時，提早想清楚用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="備份還原演練 backup / restore drill database_data.backup_restore_drill 記錄一次真實的備份還原演練，證明備份真的能用，而不是等到出事才發現壞了。定期對重要資料做這件事。"><b>備份還原演練</b><span class="k">Backup / Restore Drill</span><div class="sub">記錄一次真實的備份還原演練，證明備份真的能用，而不是等到出事才發現壞了。定期對重要資料做這件事。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="實體關係圖 entity-relationship diagram erd database_data.erd 把實體、屬性、關係建模成結構化的圖表資料紀錄。設計或整理資料庫結構時用。"><b>實體關係圖 <small>ERD</small></b><span class="k">Entity-Relationship Diagram</span><div class="sub">把實體、屬性、關係建模成結構化的圖表資料紀錄。設計或整理資料庫結構時用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="擴張-收縮式遷移 expand-contract migration database_data.expand_contract_migration 把資料庫改動拆成「先擴張（新舊並存）再收縮（確定都遷移完才刪舊的）」兩階段，做零停機的破壞性 schema 變更。正式環境要改資料庫結構時用。"><b>擴張-收縮式遷移</b><span class="k">Expand-Contract Migration</span><div class="sub">把資料庫改動拆成「先擴張（新舊並存）再收縮（確定都遷移完才刪舊的）」兩階段，做零停機的破壞性 schema 變更。正式環境要改資料庫結構時用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="正規化 normalization database_data.normalization 用正規化規則檢查 schema，移除重複資料與更新異常。設計或審查關聯式資料庫結構時用。"><b>正規化</b><span class="k">Normalization</span><div class="sub">用正規化規則檢查 schema，移除重複資料與更新異常。設計或審查關聯式資料庫結構時用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="資料品質維度 data quality dimensions database_data.data_quality_dimensions 用一組標準品質維度（完整性、準確性、一致性、時效性等）評分一份資料集。想有系統地檢查資料能不能信任時用。"><b>資料品質維度</b><span class="k">Data Quality Dimensions</span><div class="sub">用一組標準品質維度（完整性、準確性、一致性、時效性等）評分一份資料集。想有系統地檢查資料能不能信任時用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="資料契約 data contract database_data.data_contract 定義資料生產方與消費方之間約定好的資料格式與語意，避免欄位改動悄悄弄壞對方系統。一個團隊的資料要餵給另一個系統用時用。"><b>資料契約</b><span class="k">Data Contract</span><div class="sub">定義資料生產方與消費方之間約定好的資料格式與語意，避免欄位改動悄悄弄壞對方系統。一個團隊的資料要餵給另一個系統用時用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="資料對帳 reconciliation database_data.reconciliation 比對兩個資料狀態的筆數／checksum／業務不變量，找出差異並解決，證明遷移真的完整。資料遷移或同步完成後用。"><b>資料對帳</b><span class="k">Reconciliation</span><div class="sub">比對兩個資料狀態的筆數／checksum／業務不變量，找出差異並解決，證明遷移真的完整。資料遷移或同步完成後用。</div>
+    </div>
+    <div class="tool" data-fam="database_data" data-q="資料血緣 data lineage database_data.data_lineage 追蹤一個資料欄位從來源、蒐集、轉換、資料集，一路到最後被拿去做決策的完整路徑。想回答「這個數字到底哪裡來的」時用。"><b>資料血緣</b><span class="k">Data Lineage</span><div class="sub">追蹤一個資料欄位從來源、蒐集、轉換、資料集，一路到最後被拿去做決策的完整路徑。想回答「這個數字到底哪裡來的」時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="epistemic">
+    <h3 class="fam" id="fam-epistemic">論證與知識 <span class="k">Epistemic</span><small>10 個</small></h3>
+    <p class="sub mt0">你憑什麼這樣說：假設地圖、證據矩陣、Toulmin 論證。</p>
+    <div class="tool" data-fam="epistemic" data-q="信心校準 confidence calibration epistemic.confidence_calibration 檢查你說的信心程度是不是真的準（預測 vs 實際結果→校準曲線），抓出過度自信。想知道自己說的「9 成把握」歷史上到底準不準時用。"><b>信心校準</b><span class="k">Confidence Calibration</span><div class="sub">檢查你說的信心程度是不是真的準（預測 vs 實際結果→校準曲線），抓出過度自信。想知道自己說的「9 成把握」歷史上到底準不準時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="假設地圖 assumption mapping epistemic.assumption_mapping 依「錯了會怎樣×不確定程度」把假設排進四象限，知道該先驗證哪個。想決定先測試哪個高風險假設時用。"><b>假設地圖</b><span class="k">Assumption Mapping</span><div class="sub">依「錯了會怎樣×不確定程度」把假設排進四象限，知道該先驗證哪個。想決定先測試哪個高風險假設時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="假設登記表 assumption registry epistemic.assumption_registry 正式記錄每個假設的內容、類型、證據、信心度、狀態，讓假設不再藏在文字裡。想維護一份持續可見的「這個計畫在賭什麼」清單時用。"><b>假設登記表</b><span class="k">Assumption Registry</span><div class="sub">正式記錄每個假設的內容、類型、證據、信心度、狀態，讓假設不再藏在文字裡。想維護一份持續可見的「這個計畫在賭什麼」清單時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="圖爾敏論證模型 toulmin model epistemic.toulmin_model 逐欄填寫主張／依據／立論理由／後盾／限定詞／反駁，防止論證缺少從證據到結論的推理橋梁。想檢查一個論證是不是真的站得住腳、還是只是空口斷言時用。"><b>圖爾敏論證模型</b><span class="k">Toulmin Model</span><div class="sub">逐欄填寫主張／依據／立論理由／後盾／限定詞／反駁，防止論證缺少從證據到結論的推理橋梁。想檢查一個論證是不是真的站得住腳、還是只是空口斷言時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="推論階梯 ladder of inference epistemic.ladder_of_inference 依序爬過資料→意義→假設→結論四個階梯，找出認知跳躍發生在哪一步。有人跳到結論、想看清楚推理到底哪裡斷掉時用。"><b>推論階梯</b><span class="k">Ladder of Inference</span><div class="sub">依序爬過資料→意義→假設→結論四個階梯，找出認知跳躍發生在哪一步。有人跳到結論、想看清楚推理到底哪裡斷掉時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="矛盾偵測 contradiction detection epistemic.contradiction_detection 找出來源或模型之間真正互相衝突的地方。多個來源意見不一致、想暴露隱藏的不確定性時用。"><b>矛盾偵測</b><span class="k">Contradiction Detection</span><div class="sub">找出來源或模型之間真正互相衝突的地方。多個來源意見不一致、想暴露隱藏的不確定性時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="論證地圖 argument mapping epistemic.argument_mapping 把主張、支持理由、反對意見、反駁整理成可檢查的論證圖。想讓一個論證的邏輯可被檢視，而不是埋在文字裡時用。"><b>論證地圖</b><span class="k">Argument Mapping</span><div class="sub">把主張、支持理由、反對意見、反駁整理成可檢查的論證圖。想讓一個論證的邏輯可被檢視，而不是埋在文字裡時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="證據強度階層 evidence hierarchy epistemic.evidence_hierarchy 用該領域的證據強度階層排序，避免把不同等級的來源當成同樣可信。權衡品質差很多的證據來回答同一個問題時用。"><b>證據強度階層</b><span class="k">Evidence Hierarchy</span><div class="sub">用該領域的證據強度階層排序，避免把不同等級的來源當成同樣可信。權衡品質差很多的證據來回答同一個問題時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="證據矩陣 evidence matrix epistemic.evidence_matrix 把主張跟證據排成矩陣（列=主張、欄=證據），一眼看出哪個主張證據薄弱。想快速看出哪些主張其實支撐不足時用。"><b>證據矩陣</b><span class="k">Evidence Matrix</span><div class="sub">把主張跟證據排成矩陣（列=主張、欄=證據），一眼看出哪個主張證據薄弱。想快速看出哪些主張其實支撐不足時用。</div>
+    </div>
+    <div class="tool" data-fam="epistemic" data-q="貝氏更新 bayesian updating epistemic.bayesian_updating 隨新證據更新一個信念的機率（先驗→概似→後驗）。想讓信心程度隨證據嚴謹更新，而不是憑感覺調整時用。"><b>貝氏更新</b><span class="k">Bayesian Updating</span><div class="sub">隨新證據更新一個信念的機率（先驗→概似→後驗）。想讓信心程度隨證據嚴謹更新，而不是憑感覺調整時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="jurisdiction">
+    <h3 class="fam" id="fam-jurisdiction">法規與管轄 <span class="k">Jurisdiction</span><small>10 個</small></h3>
+    <p class="sub mt0">哪些法規適用、由誰管：適用法規圖譜、合規對照。</p>
+    <div class="tool" data-fam="jurisdiction" data-q="合規缺口分析 compliance gap analysis jurisdiction.compliance_gap_analysis 機械式算出「要求的控制」跟「已實作的控制」之間的差距，附嚴重度與補救計畫。想快速知道能不能在受規管領域上線時用。"><b>合規缺口分析</b><span class="k">Compliance Gap Analysis</span><div class="sub">機械式算出「要求的控制」跟「已實作的控制」之間的差距，附嚴重度與補救計畫。想快速知道能不能在受規管領域上線時用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="在地化審查 localization review jurisdiction.localization_review 檢查 13 個必要面向（語言、日期時間、貨幣、單位、地址、稅務、無障礙等）——翻譯不等於在地化。要在新地區上線前用。"><b>在地化審查</b><span class="k">Localization Review</span><div class="sub">檢查 13 個必要面向（語言、日期時間、貨幣、單位、地址、稅務、無障礙等）——翻譯不等於在地化。要在新地區上線前用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="市場准入控管 market admission control jurisdiction.market_admission_control 進入新市場的 go/no-go 關卡，涵蓋 7 個階段（法規時效、資料落地、ai 供應商、安全、在地化、產業別控管、真人簽核）——任何關鍵未知一律阻擋。進入任何新地理市場前用。"><b>市場准入控管</b><span class="k">Market Admission Control</span><div class="sub">進入新市場的 go/no-go 關卡，涵蓋 7 個階段（法規時效、資料落地、AI 供應商、安全、在地化、產業別控管、真人簽核）——任何關鍵未知一律阻擋。進入任何新地理市場前用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="文化脈絡審查 cultural context review jurisdiction.cultural_context_review 用在地證據評估 8 個文化因素（信任、權威、隱私觀感等）——是待驗證的假設，不是刻板印象。高風險決策要有在地資料／訪談／問卷／專家審查，不能只靠猜。"><b>文化脈絡審查</b><span class="k">Cultural Context Review</span><div class="sub">用在地證據評估 8 個文化因素（信任、權威、隱私觀感等）——是待驗證的假設，不是刻板印象。高風險決策要有在地資料／訪談／問卷／專家審查，不能只靠猜。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="法律衝突審查 conflict-of-law review jurisdiction.conflict_of_law_review 多個法律衝突時決定適用哪一個，且任何衝突的最終判定都要有真人法務簽核（絕不自動判定）。跨境活動可能受多套法律管轄時用。"><b>法律衝突審查</b><span class="k">Conflict-of-Law Review</span><div class="sub">多個法律衝突時決定適用哪一個，且任何衝突的最終判定都要有真人法務簽核（絕不自動判定）。跨境活動可能受多套法律管轄時用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="法規前瞻掃描 regulatory horizon scan jurisdiction.regulatory_horizon_scan 只從官方來源（政府／主管機關／立法紀錄）追蹤即將上路的法規。想避免被新法規突襲時用。"><b>法規前瞻掃描</b><span class="k">Regulatory Horizon Scan</span><div class="sub">只從官方來源（政府／主管機關／立法紀錄）追蹤即將上路的法規。想避免被新法規突襲時用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="管轄權解析器 jurisdiction resolver jurisdiction.resolver 從 11 個以上維度（實體、使用者位置、資料位置、供應商、產業別等）解析真正適用的管轄權，不只是「使用者在哪個國家」這麼粗略。單純猜國名不夠精確時用。"><b>管轄權解析器</b><span class="k">Jurisdiction Resolver</span><div class="sub">從 11 個以上維度（實體、使用者位置、資料位置、供應商、產業別等）解析真正適用的管轄權，不只是「使用者在哪個國家」這麼粗略。單純猜國名不夠精確時用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="義務對應控制措施 obligation-to-control mapping jurisdiction.obligation_to_control_mapping 把法律義務轉成可追溯的工程控制措施，附負責人、證據、測試。想確保法務跟工程真的對得上焦時用。"><b>義務對應控制措施</b><span class="k">Obligation-to-Control Mapping</span><div class="sub">把法律義務轉成可追溯的工程控制措施，附負責人、證據、測試。想確保法務跟工程真的對得上焦時用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="資料落地評估 data residency assessment jurisdiction.data_residency_assessment 決定每一類資料在法律上能存放／處理在哪裡，涵蓋資料主體、法規、合約。想支援資料主權要求與跨境資料流動決策時用。"><b>資料落地評估</b><span class="k">Data Residency Assessment</span><div class="sub">決定每一類資料在法律上能存放／處理在哪裡，涵蓋資料主體、法規、合約。想支援資料主權要求與跨境資料流動決策時用。</div>
+    </div>
+    <div class="tool" data-fam="jurisdiction" data-q="適用法規圖譜 applicable law graph jurisdiction.applicable_law_graph 建立法規來源與適用條件的圖譜（管轄區→來源→生效日→範圍→衝突）。想支援跨管轄區的版本與衝突法推理時用。"><b>適用法規圖譜</b><span class="k">Applicable Law Graph</span><div class="sub">建立法規來源與適用條件的圖譜（管轄區→來源→生效日→範圍→衝突）。想支援跨管轄區的版本與衝突法推理時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="representation">
+    <h3 class="fam" id="fam-representation">表徵與呈現 <span class="k">Representation</span><small>10 個</small></h3>
+    <p class="sub mt0">同一件事換一種看法：對話檢視、圖像化、時間軸。</p>
+    <div class="tool" data-fam="representation" data-q="因果檢視 causal view representation.causal_view 在既有因果圖／迴路圖上加一層呈現，每個箭頭都要附假設，避免一般圖表被誤當成已驗證的因果。想誠實地視覺化呈現因果推理時用。"><b>因果檢視</b><span class="k">Causal View</span><div class="sub">在既有因果圖／迴路圖上加一層呈現，每個箭頭都要附假設，避免一般圖表被誤當成已驗證的因果。想誠實地視覺化呈現因果推理時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="專家自由組裝模式 expert lego mode representation.expert_lego_mode 讓專家自由拖拉組裝方法積木成自訂鏈，但強制做相容性／政策／管轄權／閘門檢查——是自由組裝，不是自由破壞。你很清楚想串哪些方法、什麼順序時用。"><b>專家自由組裝模式</b><span class="k">Expert LEGO Mode</span><div class="sub">讓專家自由拖拉組裝方法積木成自訂鏈，但強制做相容性／政策／管轄權／閘門檢查——是自由組裝，不是自由破壞。你很清楚想串哪些方法、什麼順序時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="引導模式 guided mode representation.guided_mode 一次問一個問題，依你的答案自動選出合適方法，讓「選哪個工具」的複雜度留在系統裡，不丟給你。不知道該用哪個工具時用。"><b>引導模式</b><span class="k">Guided Mode</span><div class="sub">一次問一個問題，依你的答案自動選出合適方法，讓「選哪個工具」的複雜度留在系統裡，不丟給你。不知道該用哪個工具時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="心智圖檢視 mind map view representation.mind_map_view 把既有知識物件的節點渲染成放射狀心智圖——是呈現層，不是產生新心智圖（那是 association.mind_map）。想用空間方式重新檢視已經建好的東西時用。"><b>心智圖檢視</b><span class="k">Mind Map View</span><div class="sub">把既有知識物件的節點渲染成放射狀心智圖——是呈現層，不是產生新心智圖（那是 association.mind_map）。想用空間方式重新檢視已經建好的東西時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="文字／大綱檢視 text / outline view representation.text_outline_view 把既有知識物件渲染成巢狀大綱（摘要→大綱→細節→證據連結）。想深度、線性閱讀而不是用視覺化方式看時用。"><b>文字／大綱檢視</b><span class="k">Text / Outline View</span><div class="sub">把既有知識物件渲染成巢狀大綱（摘要→大綱→細節→證據連結）。想深度、線性閱讀而不是用視覺化方式看時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="時間軸檢視 timeline view representation.timeline_view 把既有知識物件的事件按真實時間順序渲染（機械式排序，不接受人工亂填順序）。想看事情在時間上的關聯時用。"><b>時間軸檢視</b><span class="k">Timeline View</span><div class="sub">把既有知識物件的事件按真實時間順序渲染（機械式排序，不接受人工亂填順序）。想看事情在時間上的關聯時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="概念圖檢視 concept graph view representation.concept_graph_view 把既有知識物件的關係渲染成圖，不複製也不竄改底層內容。想可視化知識與矛盾，又不想到處複製資料時用。"><b>概念圖檢視</b><span class="k">Concept Graph View</span><div class="sub">把既有知識物件的關係渲染成圖，不複製也不竄改底層內容。想可視化知識與矛盾，又不想到處複製資料時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="表徵切換 representation switching representation.switching 把同一個底層知識物件用不同檢視方式呈現（文字／表格／心智圖／概念圖／時間軸／因果圖／畫布／語音），來源保持一致，不會因換介面就複製出互相衝突的內容。不同人需要用不同方式看同一份資料時用。"><b>表徵切換</b><span class="k">Representation Switching</span><div class="sub">把同一個底層知識物件用不同檢視方式呈現（文字／表格／心智圖／概念圖／時間軸／因果圖／畫布／語音），來源保持一致，不會因換介面就複製出互相衝突的內容。不同人需要用不同方式看同一份資料時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="表格／矩陣檢視 table / matrix view representation.table_matrix_view 把既有資料渲染成實體×準則的比較表，任何算出來的分數都明確標記為檢視層計算，不是儲存的事實。想高效率並排比較很多東西時用。"><b>表格／矩陣檢視</b><span class="k">Table / Matrix View</span><div class="sub">把既有資料渲染成實體×準則的比較表，任何算出來的分數都明確標記為檢視層計算，不是儲存的事實。想高效率並排比較很多東西時用。</div>
+    </div>
+    <div class="tool" data-fam="representation" data-q="語音／對話檢視 audio / conversational view representation.audio_conversational_view 讓使用者用語音操作既有的知識物件，一定要先讀回並經使用者確認才算數。想降低輸入門檻、給喜歡用講的而不是打字的人用。"><b>語音／對話檢視</b><span class="k">Audio / Conversational View</span><div class="sub">讓使用者用語音操作既有的知識物件，一定要先讀回並經使用者確認才算數。想降低輸入門檻、給喜歡用講的而不是打字的人用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="security">
+    <h3 class="fam" id="fam-security">資安 <span class="k">Security</span><small>10 個</small></h3>
+    <p class="sub mt0">威脅在哪、怎麼被攻：STRIDE、攻擊樹、LINDDUN。</p>
+    <div class="tool" data-fam="security" data-q="linddun 隱私威脅模型 linddun privacy threat model linddun security.linddun stride 的隱私版兄弟：逐一檢視資料流，對照七類隱私威脅（可連結性、可識別性、不可否認性、可偵測性、資訊洩露、不知情、不合規）。系統涉及個資、光做安全威脅建模不夠時，搭配 stride 一起用或接著用。"><b>LINDDUN 隱私威脅模型</b><span class="k">LINDDUN Privacy Threat Model</span><div class="sub">STRIDE 的隱私版兄弟：逐一檢視資料流，對照七類隱私威脅（可連結性、可識別性、不可否認性、可偵測性、資訊洩露、不知情、不合規）。系統涉及個資、光做安全威脅建模不夠時，搭配 STRIDE 一起用或接著用。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="pasta 攻擊模擬與威脅分析流程 process for attack simulation and threat analysis pasta security.pasta 把威脅建模跑成 7 個階段的管線：從商業目標出發，經過範圍拆解、威脅分析、弱點、攻擊模擬，最後回到商業衝擊風險。想跟業務端證明資安投資合理性時用，因為每個威脅都連得回真實商業衝擊。"><b>PASTA 攻擊模擬與威脅分析流程</b><span class="k">Process for Attack Simulation and Threat Analysis</span><div class="sub">把威脅建模跑成 7 個階段的管線：從商業目標出發，經過範圍拆解、威脅分析、弱點、攻擊模擬，最後回到商業衝擊風險。想跟業務端證明資安投資合理性時用，因為每個威脅都連得回真實商業衝擊。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="stride 威脅模型 stride threat model stride security.stride 逐一檢視資料流圖的每個元件，對照六類威脅：偽冒、竄改、否認、資訊洩露、阻斷服務、權限提升。想對系統設計做結構化威脅建模時，這是標準起手式。"><b>STRIDE 威脅模型</b><span class="k">STRIDE Threat Model</span><div class="sub">逐一檢視資料流圖的每個元件，對照六類威脅：偽冒、竄改、否認、資訊洩露、阻斷服務、權限提升。想對系統設計做結構化威脅建模時，這是標準起手式。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="供應鏈威脅模型 supply chain threat model security.supply_chain_threat_model 對系統依賴的套件、建置流程、第三方供應商做威脅建模，而不只是看自己的程式碼。新增依賴套件、ci/cd 步驟或供應商整合時用，因為就算自己的程式碼乾淨，這些也可能變成入侵管道。"><b>供應鏈威脅模型</b><span class="k">Supply Chain Threat Model</span><div class="sub">對系統依賴的套件、建置流程、第三方供應商做威脅建模，而不只是看自己的程式碼。新增依賴套件、CI/CD 步驟或供應商整合時用，因為就算自己的程式碼乾淨，這些也可能變成入侵管道。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="安全控制對照表 security control mapping security.security_control_mapping 把每個識別出的威脅對應到實際緩解它的控制措施，找出沒有控制措施的威脅、以及不知道在防什麼的控制措施。做完任何威脅建模後的收尾步驟，用來證明涵蓋率，而不是憑感覺假設有涵蓋。"><b>安全控制對照表</b><span class="k">Security Control Mapping</span><div class="sub">把每個識別出的威脅對應到實際緩解它的控制措施，找出沒有控制措施的威脅、以及不知道在防什麼的控制措施。做完任何威脅建模後的收尾步驟，用來證明涵蓋率，而不是憑感覺假設有涵蓋。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="攻擊樹 attack tree security.attack_tree 把一個攻擊目標拆解成 and/or 子目標，一路拆到最基本的攻擊技巧，每個節點標註攻擊者的成本／技能／可偵測性。想畫出攻擊者達成某個目標的所有路徑、比較哪條路徑對他們最便宜時用。"><b>攻擊樹</b><span class="k">Attack Tree</span><div class="sub">把一個攻擊目標拆解成 AND/OR 子目標，一路拆到最基本的攻擊技巧，每個節點標註攻擊者的成本／技能／可偵測性。想畫出攻擊者達成某個目標的所有路徑、比較哪條路徑對他們最便宜時用。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="機密資訊威脅檢視 secrets threat review security.secrets_threat_review 檢視應用程式的機密資訊（api 金鑰、token、憑證）如何儲存、輪替、存取，找出硬編碼、寫進 log、權限過寬等外洩路徑。新增任何機密資訊或憑證儲存機制前用。"><b>機密資訊威脅檢視</b><span class="k">Secrets Threat Review</span><div class="sub">檢視應用程式的機密資訊（API 金鑰、token、憑證）如何儲存、輪替、存取，找出硬編碼、寫進 log、權限過寬等外洩路徑。新增任何機密資訊或憑證儲存機制前用。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="濫用案例 abuse case security.abuse_case 寫使用者故事的負面鏡像版：一個惡意使用者會如何刻意濫用這個特定功能，而不是泛泛談攻擊者怎麼攻破系統。跟正常使用案例／使用者故事一起寫，讓濫用情境在設計階段就被考慮，而不是上線後才發現。"><b>濫用案例</b><span class="k">Abuse Case</span><div class="sub">寫使用者故事的負面鏡像版：一個惡意使用者會如何刻意濫用這個特定功能，而不是泛泛談攻擊者怎麼攻破系統。跟正常使用案例／使用者故事一起寫，讓濫用情境在設計階段就被考慮，而不是上線後才發現。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="資料保護／隱私影響評估 data protection / privacy impact assessment dpia / pia security.dpia_pia 針對一項資料處理活動，正式評估其目的、必要性／比例原則、受影響當事人、風險與控制措施。要推出任何處理個資的功能或流程前用，尤其是法規要求要有書面評估的情境（如 gdpr 第 35 條）。"><b>資料保護／隱私影響評估 <small>DPIA / PIA</small></b><span class="k">Data Protection / Privacy Impact Assessment</span><div class="sub">針對一項資料處理活動，正式評估其目的、必要性／比例原則、受影響當事人、風險與控制措施。要推出任何處理個資的功能或流程前用，尤其是法規要求要有書面評估的情境（如 GDPR 第 35 條）。</div>
+    </div>
+    <div class="tool" data-fam="security" data-q="零信任架構檢視 zero trust review security.zero_trust_review 依零信任原則檢視系統的存取架構：每次請求都明確驗證、最小權限、假設網路已經被入侵。想稽核設計是否還隱性依賴「內部網路等於可信任」這個假設時用。"><b>零信任架構檢視</b><span class="k">Zero Trust Review</span><div class="sub">依零信任原則檢視系統的存取架構：每次請求都明確驗證、最小權限、假設網路已經被入侵。想稽核設計是否還隱性依賴「內部網路等於可信任」這個假設時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="stakeholders">
+    <h3 class="fam" id="fam-stakeholders">利害關係人 <span class="k">Stakeholders</span><small>10 個</small></h3>
+    <p class="sub mt0">誰在乎、誰有籌碼：利害關係人地圖、BATNA、談判分析。</p>
+    <div class="tool" data-fam="stakeholders" data-q="raci 責任矩陣 raci matrix raci stakeholders.raci 為清單上的每一項任務，指定誰是負責執行（r）、當責（a）、需諮詢（c）、需被告知（i）。專案卡在「這件事到底誰負責」時用。"><b>RACI 責任矩陣</b><span class="k">RACI Matrix</span><div class="sub">為清單上的每一項任務，指定誰是負責執行（R）、當責（A）、需諮詢（C）、需被告知（I）。專案卡在「這件事到底誰負責」時用。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="利害關係人圖 stakeholder map stakeholders.stakeholder_map 列出對一個決策有影響力或利益關係的所有各方，每個都標註關係類型（直接／間接／受益者／風險承擔者）。做任何更深入的利害關係人分析（權力利益、顯著性、聯盟圖）前的基礎第一步——沒先列出來，就沒辦法評分。"><b>利害關係人圖</b><span class="k">Stakeholder Map</span><div class="sub">列出對一個決策有影響力或利益關係的所有各方，每個都標註關係類型（直接／間接／受益者／風險承擔者）。做任何更深入的利害關係人分析（權力利益、顯著性、聯盟圖）前的基礎第一步——沒先列出來，就沒辦法評分。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="利益導向談判 interest-based negotiation stakeholders.interest_based_negotiation 把每一方表面的立場跟底層真正的利益分開，再找出能滿足真正利益的方案，而不是在立場上各退一步。談判卡住、雙方都在捍衛立場而不是講出真正需求時用（fisher 與 ury 經典談判法）。"><b>利益導向談判</b><span class="k">Interest-Based Negotiation</span><div class="sub">把每一方表面的立場跟底層真正的利益分開，再找出能滿足真正利益的方案，而不是在立場上各退一步。談判卡住、雙方都在捍衛立場而不是講出真正需求時用（Fisher 與 Ury 經典談判法）。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="可能同意區間（zopa） zone of possible agreement zopa stakeholders.zopa 比較賣方能接受的最低條件跟買方能接受的最高條件，算出兩者之間是否真的存在可能同意的區間。談判開始前先用，才會知道這筆交易在數學上到底成不成立。"><b>可能同意區間（ZOPA）</b><span class="k">Zone of Possible Agreement</span><div class="sub">比較賣方能接受的最低條件跟買方能接受的最高條件，算出兩者之間是否真的存在可能同意的區間。談判開始前先用，才會知道這筆交易在數學上到底成不成立。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="最佳替代方案（batna） best alternative to a negotiated agreement batna stakeholders.batna 找出如果這次談判破局，你手上最好的替代方案，並用它作為評估任何提案的真實底線。談判前先用，才不會臨場憑感覺猜底線。"><b>最佳替代方案（BATNA）</b><span class="k">Best Alternative To a Negotiated Agreement</span><div class="sub">找出如果這次談判破局，你手上最好的替代方案，並用它作為評估任何提案的真實底線。談判前先用，才不會臨場憑感覺猜底線。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="權力-利益矩陣 power-interest matrix stakeholders.power_interest 把每個利害關係人依權力×利益畫在四象限圖上（由各自的分數計算得出），分成密切管理／保持滿意／保持知情／持續監控四類。想決定該花多少心力經營哪個利害關係人時用。"><b>權力-利益矩陣</b><span class="k">Power-Interest Matrix</span><div class="sub">把每個利害關係人依權力×利益畫在四象限圖上（由各自的分數計算得出），分成密切管理／保持滿意／保持知情／持續監控四類。想決定該花多少心力經營哪個利害關係人時用。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="聯盟關係圖 coalition mapping stakeholders.coalition_mapping 畫出每個利害關係人的利益、權力、資源，並推估在特定議題上誰可能結盟。在有爭議的決策中，結盟關係跟個別立場一樣重要時用。"><b>聯盟關係圖</b><span class="k">Coalition Mapping</span><div class="sub">畫出每個利害關係人的利益、權力、資源，並推估在特定議題上誰可能結盟。在有爭議的決策中，結盟關係跟個別立場一樣重要時用。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="誘因圖 incentive mapping stakeholders.incentive_mapping 為每個利害關係人做一張卡片，涵蓋他的目標、誘因、限制、風險。想預測一個人實際上會怎麼做，而不是你以為他應該怎麼做時用。"><b>誘因圖</b><span class="k">Incentive Mapping</span><div class="sub">為每個利害關係人做一張卡片，涵蓋他的目標、誘因、限制、風險。想預測一個人實際上會怎麼做，而不是你以為他應該怎麼做時用。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="賽局理論 game theory stakeholders.game_theory 把一個策略互動建模成參與者、策略、報酬，並在報酬都揭露後算出均衡解。結果不只取決於自己的選擇、還取決於對方怎麼做時用，想嚴謹推理而不是憑直覺。"><b>賽局理論</b><span class="k">Game Theory</span><div class="sub">把一個策略互動建模成參與者、策略、報酬，並在報酬都揭露後算出均衡解。結果不只取決於自己的選擇、還取決於對方怎麼做時用，想嚴謹推理而不是憑直覺。</div>
+    </div>
+    <div class="tool" data-fam="stakeholders" data-q="顯著性模型 salience model stakeholders.salience_model 針對每個利害關係人評估三個是非題——權力、正當性、急迫性——每一項都要求寫理由，再依符合幾項算出顯著性等級。想在做更完整的利害關係人圖之前先快速分流、決定先關注誰時用。"><b>顯著性模型</b><span class="k">Salience Model</span><div class="sub">針對每個利害關係人評估三個是非題——權力、正當性、急迫性——每一項都要求寫理由，再依符合幾項算出顯著性等級。想在做更完整的利害關係人圖之前先快速分流、決定先關注誰時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="decomposition">
+    <h3 class="fam" id="fam-decomposition">拆解 <span class="k">Decomposition</span><small>9 個</small></h3>
+    <p class="sub mt0">大問題拆成能動手的小塊：功能分析、工作分解、問題樹。</p>
+    <div class="tool" data-fam="decomposition" data-q="mece 檢查 mece check mece decomposition.mece 檢查一組分類是否互斥且完整，找出重疊與遺漏。對任何已經拆好的分類結構做健檢時用。"><b>MECE 檢查</b><span class="k">MECE Check</span><div class="sub">檢查一組分類是否互斥且完整，找出重疊與遺漏。對任何已經拆好的分類結構做健檢時用。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="功能分析系統技術 function analysis system technique fast decomposition.fast 往左問 why、往右問 how，建出功能鏈。想找出冗餘功能與替代方案時用（價值工程）。"><b>功能分析系統技術 <small>FAST</small></b><span class="k">Function Analysis System Technique</span><div class="sub">往左問 Why、往右問 How，建出功能鏈。想找出冗餘功能與替代方案時用（價值工程）。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="功能分解 functional decomposition decomposition.functional_decomposition 按功能拆解系統：頂層功能→子功能→介面。想強化模組邊界與責任劃分時用。"><b>功能分解</b><span class="k">Functional Decomposition</span><div class="sub">按功能拆解系統：頂層功能→子功能→介面。想強化模組邊界與責任劃分時用。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="問題樹 problem tree decomposition.problem_tree 原因在下、核心問題在中、效果在上，把問題結構化排開，避免把症狀當成原因。跳去想解法之前，先確認問題本身抓對了。"><b>問題樹</b><span class="k">Problem Tree</span><div class="sub">原因在下、核心問題在中、效果在上，把問題結構化排開，避免把症狀當成原因。跳去想解法之前，先確認問題本身抓對了。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="工作分解結構 work breakdown structure wbs decomposition.wbs 把交付項目拆成工作包，每包指定負責人與估算。規劃專案、降低遺漏時用。"><b>工作分解結構 <small>WBS</small></b><span class="k">Work Breakdown Structure</span><div class="sub">把交付項目拆成工作包，每包指定負責人與估算。規劃專案、降低遺漏時用。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="目標樹 objective tree decomposition.objective_tree 把 problem tree 的負面狀態逐項轉成正向目標。做完問題樹後，想直接連到方案設計時用。"><b>目標樹</b><span class="k">Objective Tree</span><div class="sub">把 Problem Tree 的負面狀態逐項轉成正向目標。做完問題樹後，想直接連到方案設計時用。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="議題樹 issue tree decomposition.issue_tree 把大問題拆成可分析的分支，深度不設限，檢查有沒有遺漏。要為一個龐大、還沒結構化的問題建立分析計畫時用。"><b>議題樹</b><span class="k">Issue Tree</span><div class="sub">把大問題拆成可分析的分支，深度不設限，檢查有沒有遺漏。要為一個龐大、還沒結構化的問題建立分析計畫時用。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="邏輯樹 logic tree decomposition.logic_tree 先定好單一分類規則，再展開樹狀結構，防止維度混亂。發現自己拆到一半分類標準跑掉時用。"><b>邏輯樹</b><span class="k">Logic Tree</span><div class="sub">先定好單一分類規則，再展開樹狀結構，防止維度混亂。發現自己拆到一半分類標準跑掉時用。</div>
+    </div>
+    <div class="tool" data-fam="decomposition" data-q="階層式任務分析 hierarchical task analysis decomposition.hierarchical_task_analysis 把人類工作拆解成目標→任務→子任務→計畫的樹狀結構。想找出操作負擔或容易出錯的環節時用。"><b>階層式任務分析</b><span class="k">Hierarchical Task Analysis</span><div class="sub">把人類工作拆解成目標→任務→子任務→計畫的樹狀結構。想找出操作負擔或容易出錯的環節時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="feasibility">
+    <h3 class="fam" id="fam-feasibility">可行性與經濟性 <span class="k">Feasibility</span><small>9 個</small></h3>
+    <p class="sub mt0">做不做得起來、划不划算：損益兩平、NPV、單位經濟。</p>
+    <div class="tool" data-fam="feasibility" data-q="telos 可行性檢核 telos feasibility telos feasibility.telos 檢查技術、經濟、法律、營運、時程五個必要面向，每個都要有實際證據，不能只證明「技術做得到」就說可行。想從不只工程角度檢查專案可行性時用。"><b>TELOS 可行性檢核</b><span class="k">TELOS Feasibility</span><div class="sub">檢查技術、經濟、法律、營運、時程五個必要面向，每個都要有實際證據，不能只證明「技術做得到」就說可行。想從不只工程角度檢查專案可行性時用。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="內部報酬率 internal rate of return irr feasibility.irr 算出讓現金流淨現值剛好等於零的折現率，一個直觀的報酬率數字。想拿投資報酬率跟門檻報酬率比較時用。"><b>內部報酬率 <small>IRR</small></b><span class="k">Internal Rate of Return</span><div class="sub">算出讓現金流淨現值剛好等於零的折現率，一個直觀的報酬率數字。想拿投資報酬率跟門檻報酬率比較時用。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="單位經濟效益 unit economics feasibility.unit_economics 檢查每個客戶／交易到底賺不賺錢（客單價／毛利／取得成本／終身價值／回收期／流失率），邊際貢獻是負的就標記不可擴張。想在規模化之前抓出「營收成長但越賣越虧」時用。"><b>單位經濟效益</b><span class="k">Unit Economics</span><div class="sub">檢查每個客戶／交易到底賺不賺錢（客單價／毛利／取得成本／終身價值／回收期／流失率），邊際貢獻是負的就標記不可擴張。想在規模化之前抓出「營收成長但越賣越虧」時用。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="實質選擇權 real options feasibility.real_options 把延後／擴張／退出當成選擇權（觸發條件、成本、未來情境價值），而不是一次性 yes/no。想分階段決策、不想一次全押時用。"><b>實質選擇權</b><span class="k">Real Options</span><div class="sub">把延後／擴張／退出當成選擇權（觸發條件、成本、未來情境價值），而不是一次性 yes/no。想分階段決策、不想一次全押時用。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="成本效果分析 cost-effectiveness feasibility.cost_effectiveness 用「每單位同樣成果的成本」比較方案，適合效益很難換算成金額的情況。效益沒辦法貨幣化、但可以量測時，用它取代成本效益分析。"><b>成本效果分析</b><span class="k">Cost-Effectiveness</span><div class="sub">用「每單位同樣成果的成本」比較方案，適合效益很難換算成金額的情況。效益沒辦法貨幣化、但可以量測時，用它取代成本效益分析。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="成本效益分析 cost-benefit analysis feasibility.cost_benefit_analysis 把方案的成本與效益貨幣化後全生命週期比較，一定要做折現與敏感度分析，無法定價的項目要明確標示，不能硬掰一個數字。用金額比較選項、又想誠實面對算不出價格的東西時用。"><b>成本效益分析</b><span class="k">Cost-Benefit Analysis</span><div class="sub">把方案的成本與效益貨幣化後全生命週期比較，一定要做折現與敏感度分析，無法定價的項目要明確標示，不能硬掰一個數字。用金額比較選項、又想誠實面對算不出價格的東西時用。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="損益兩平分析 break-even analysis feasibility.break_even 算出固定成本剛好被邊際貢獻打平所需的銷售量。想知道一個方案最少要賣多少才不虧錢時用。"><b>損益兩平分析</b><span class="k">Break-even Analysis</span><div class="sub">算出固定成本剛好被邊際貢獻打平所需的銷售量。想知道一個方案最少要賣多少才不虧錢時用。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="淨現值分析 net present value npv feasibility.npv 把未來一系列現金流用折現率換算回今天的價值。想公平比較不同時間點回收的投資時用。"><b>淨現值分析 <small>NPV</small></b><span class="k">Net Present Value</span><div class="sub">把未來一系列現金流用折現率換算回今天的價值。想公平比較不同時間點回收的投資時用。</div>
+    </div>
+    <div class="tool" data-fam="feasibility" data-q="總持有成本 total cost of ownership tco feasibility.tco 加總全生命週期 12 個必要成本類別（取得、導入、營運、人力、退場、遷移等），看出隱性成本與被綁死的風險。選供應商／平台前，牌價背後藏著真實成本時用。"><b>總持有成本 <small>TCO</small></b><span class="k">Total Cost of Ownership</span><div class="sub">加總全生命週期 12 個必要成本類別（取得、導入、營運、人力、退場、遷移等），看出隱性成本與被綁死的風險。選供應商／平台前，牌價背後藏著真實成本時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="insight">
+    <h3 class="fam" id="fam-insight">洞察與使用者 <span class="k">Insight</span><small>9 個</small></h3>
+    <p class="sub mt0">從人身上看到什麼：情境訪查、同理心地圖、旅程地圖。</p>
+    <div class="tool" data-fam="insight" data-q="使用者原型 persona insight.persona 用真實研究資料建立代表性使用者模型（目標／行為／情境）——persona 不等於真實民意。想為「到底在為誰設計」建立共同參考點時用。"><b>使用者原型</b><span class="k">Persona</span><div class="sub">用真實研究資料建立代表性使用者模型（目標／行為／情境）——persona 不等於真實民意。想為「到底在為誰設計」建立共同參考點時用。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="同理心地圖 empathy map insight.empathy_map 從真實訪談／觀察填寫「說／想／做／感受」，每項都要標明是事實還是推論，不可純靠 ai 猜。想找出使用者說的跟做的之間的落差時用。"><b>同理心地圖</b><span class="k">Empathy Map</span><div class="sub">從真實訪談／觀察填寫「說／想／做／感受」，每項都要標明是事實還是推論，不可純靠 AI 猜。想找出使用者說的跟做的之間的落差時用。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="問卷調查 survey / questionnaire insight.survey 大規模量化流程（構念→問題→試測→抽樣→分析），要注意抽樣偏誤；翻譯版本要做語義等值測試，不是直譯。想估計比例或做大規模分群時用。"><b>問卷調查</b><span class="k">Survey / Questionnaire</span><div class="sub">大規模量化流程（構念→問題→試測→抽樣→分析），要注意抽樣偏誤；翻譯版本要做語義等值測試，不是直譯。想估計比例或做大規模分群時用。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="待完成任務理論 jobs to be done jtbd insight.jtbd 用「當〔情境〕，我想要〔動機〕，這樣我就能〔期望結果〕」框出使用者真正想完成的事。做新產品時用，避免陷入 feature-first 而不是 need-first。"><b>待完成任務理論 <small>JTBD</small></b><span class="k">Jobs To Be Done</span><div class="sub">用「當〔情境〕，我想要〔動機〕，這樣我就能〔期望結果〕」框出使用者真正想完成的事。做新產品時用，避免陷入 feature-first 而不是 need-first。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="情境訪查 contextual inquiry insight.contextual_inquiry 在真實環境觀察使用者實際操作，即時追問，發現他們自己不會主動說的隱性需求。b2b 場景特別有效。"><b>情境訪查</b><span class="k">Contextual Inquiry</span><div class="sub">在真實環境觀察使用者實際操作，即時追問，發現他們自己不會主動說的隱性需求。B2B 場景特別有效。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="服務藍圖 service blueprint insight.service_blueprint 把顧客行動對照前台、後台、支援、系統層一起畫出來，不是只改介面。服務型系統、光改 ui 解決不了問題時用。"><b>服務藍圖</b><span class="k">Service Blueprint</span><div class="sub">把顧客行動對照前台、後台、支援、系統層一起畫出來，不是只改介面。服務型系統、光改 UI 解決不了問題時用。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="深度訪談 interview insight.interview 完整質性研究流程：研究問題→抽樣→訪談大綱→同意書→訪談→逐字稿→編碼→主題→反例。不能用少量訪談推估人口比例——是用來理解行為背後的為什麼／怎麼做。"><b>深度訪談</b><span class="k">Interview</span><div class="sub">完整質性研究流程：研究問題→抽樣→訪談大綱→同意書→訪談→逐字稿→編碼→主題→反例。不能用少量訪談推估人口比例——是用來理解行為背後的為什麼／怎麼做。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="焦點團體 focus group insight.focus_group 用 6-10 人的引導式討論探索群體觀點與互動。不能拿來估人口比例——是用來看社會互動，不是做民調。"><b>焦點團體</b><span class="k">Focus Group</span><div class="sub">用 6-10 人的引導式討論探索群體觀點與互動。不能拿來估人口比例——是用來看社會互動，不是做民調。</div>
+    </div>
+    <div class="tool" data-fam="insight" data-q="顧客旅程地圖 customer journey map insight.journey_map 畫出端到端體驗的階段→行動→情緒→痛點→機會。想找出體驗斷點跟最有價值的改善點時用。"><b>顧客旅程地圖</b><span class="k">Customer Journey Map</span><div class="sub">畫出端到端體驗的階段→行動→情緒→痛點→機會。想找出體驗斷點跟最有價值的改善點時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="root_cause">
+    <h3 class="fam" id="fam-root_cause">根因 <span class="k">Root Cause</span><small>9 個</small></h3>
+    <p class="sub mt0">為什麼會發生：五問法、魚骨圖、屏障分析。</p>
+    <div class="tool" data-fam="root_cause" data-q="事件樹分析 event tree root_cause.event_tree 從單一起始事件出發，依序分岔每個屏障成功／失敗的結果，推演出完整的後果分支。想看一個觸發事件的所有可能後果時用，是 fault tree 反向分析的正向對照版。"><b>事件樹分析</b><span class="k">Event Tree</span><div class="sub">從單一起始事件出發，依序分岔每個屏障成功／失敗的結果，推演出完整的後果分支。想看一個觸發事件的所有可能後果時用，是 Fault Tree 反向分析的正向對照版。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="五個為什麼 five whys root_cause.five_whys 針對每個答案反覆追問「為什麼」，從表面症狀一路往下鑽到根本原因，形成單一因果鏈。想用輕量、快速的方式往下鑽、且問題單純到一條線就能講清楚時用。"><b>五個為什麼</b><span class="k">Five Whys</span><div class="sub">針對每個答案反覆追問「為什麼」，從表面症狀一路往下鑽到根本原因，形成單一因果鏈。想用輕量、快速的方式往下鑽、且問題單純到一條線就能講清楚時用。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="凱普納-崔果問題分析 kepner-tregoe problem specification root_cause.kepner_tregoe 用 what/where/when/extent 四個維度的 2x4「是／不是」表格框定問題，再找出能解釋這個型態的特徵與變化。覺得 five whys 太主觀、想先做結構化、證據導向的問題界定時用。"><b>凱普納-崔果問題分析</b><span class="k">Kepner-Tregoe Problem Specification</span><div class="sub">用 What/Where/When/Extent 四個維度的 2x4「是／不是」表格框定問題，再找出能解釋這個型態的特徵與變化。覺得 Five Whys 太主觀、想先做結構化、證據導向的問題界定時用。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="屏障分析 barrier analysis root_cause.barrier_analysis 追蹤危害→目標→屏障→失效，找出哪個控制措施沒能阻止事件，且設計上完全沒有歸咎個人的欄位。出事後想聚焦系統控制、不是怪人時用。"><b>屏障分析</b><span class="k">Barrier Analysis</span><div class="sub">追蹤危害→目標→屏障→失效，找出哪個控制措施沒能阻止事件，且設計上完全沒有歸咎個人的欄位。出事後想聚焦系統控制、不是怪人時用。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="故障樹分析 fault tree root_cause.fault_tree 從頂端事件（已經發生的故障）出發，透過 and/or 邏輯閘往回推到基本事件。想找出會導致某個已知壞結果的所有根本失效組合時用。"><b>故障樹分析</b><span class="k">Fault Tree</span><div class="sub">從頂端事件（已經發生的故障）出發，透過 AND/OR 邏輯閘往回推到基本事件。想找出會導致某個已知壞結果的所有根本失效組合時用。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="柏拉圖分析（80/20 法則） pareto analysis root_cause.pareto 依發生頻率或影響程度排序原因，找出佔多數效果（約 80%）的少數關鍵原因（約 20%）。有很多候選原因但時間有限，需要決定先修哪個時用。"><b>柏拉圖分析（80/20 法則）</b><span class="k">Pareto Analysis</span><div class="sub">依發生頻率或影響程度排序原因，找出佔多數效果（約 80%）的少數關鍵原因（約 20%）。有很多候選原因但時間有限，需要決定先修哪個時用。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="蝴蝶結分析 bow-tie analysis root_cause.bow_tie 左邊威脅（預防）、右邊後果（緩解），中間是頂端事件——每個控制措施都要有真正的負責人跟測試方式。想同時管理同一個風險的預防跟復原時用。"><b>蝴蝶結分析</b><span class="k">Bow-Tie Analysis</span><div class="sub">左邊威脅（預防）、右邊後果（緩解），中間是頂端事件——每個控制措施都要有真正的負責人跟測試方式。想同時管理同一個風險的預防跟復原時用。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="變更分析 change analysis root_cause.change_analysis 比對故障前後狀態，跟變更清單做關聯——關聯不等於因果，這是用來縮小範圍，不是下結論。事故發生後，想快速列出「最近改了什麼」時用。"><b>變更分析</b><span class="k">Change Analysis</span><div class="sub">比對故障前後狀態，跟變更清單做關聯——關聯不等於因果，這是用來縮小範圍，不是下結論。事故發生後，想快速列出「最近改了什麼」時用。</div>
+    </div>
+    <div class="tool" data-fam="root_cause" data-q="魚骨圖（石川圖） fishbone / ishikawa diagram root_cause.fishbone 把一個問題的候選原因，依標準類別（人、流程、設備、物料、環境）分支排列在一條主幹上。想先廣泛腦力激盪、分類原因，再用 five whys 或 pareto 收斂時用。"><b>魚骨圖（石川圖）</b><span class="k">Fishbone / Ishikawa Diagram</span><div class="sub">把一個問題的候選原因，依標準類別（人、流程、設備、物料、環境）分支排列在一條主幹上。想先廣泛腦力激盪、分類原因，再用 Five Whys 或 Pareto 收斂時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="association">
+    <h3 class="fam" id="fam-association">聯想與整理 <span class="k">Association</span><small>6 個</small></h3>
+    <p class="sub mt0">把零散的想法歸類成結構：親和圖、心智圖、概念圖。</p>
+    <div class="tool" data-fam="association" data-q="型態分析法 morphological analysis association.morphological_analysis 列出問題的多個維度與各維度選項，系統性組合出所有「合法組合」再評估。想窮舉龐大解空間、不漏掉組合時用。"><b>型態分析法</b><span class="k">Morphological Analysis</span><div class="sub">列出問題的多個維度與各維度選項，系統性組合出所有「合法組合」再評估。想窮舉龐大解空間、不漏掉組合時用。</div>
+    </div>
+    <div class="tool" data-fam="association" data-q="屬性列舉法 attribute listing association.attribute_listing 把一個產品／方案拆成屬性，逐項嘗試變換再重組出新版本。想改良一個現有東西時用。"><b>屬性列舉法</b><span class="k">Attribute Listing</span><div class="sub">把一個產品／方案拆成屬性，逐項嘗試變換再重組出新版本。想改良一個現有東西時用。</div>
+    </div>
+    <div class="tool" data-fam="association" data-q="心智圖 mind map association.mind_map 從中心主題向外長出主枝、次枝、關鍵詞，自由聯想。想快速發散、整理思緒時用。"><b>心智圖</b><span class="k">Mind Map</span><div class="sub">從中心主題向外長出主枝、次枝、關鍵詞，自由聯想。想快速發散、整理思緒時用。</div>
+    </div>
+    <div class="tool" data-fam="association" data-q="概念圖 concept map association.concept_map 畫出概念之間「有標籤的關係」（不像 mind map 只是無標籤分支），例如「a 導致 b」。想精確表達概念之間邏輯關係時用。"><b>概念圖</b><span class="k">Concept Map</span><div class="sub">畫出概念之間「有標籤的關係」（不像 Mind Map 只是無標籤分支），例如「A 導致 B」。想精確表達概念之間邏輯關係時用。</div>
+    </div>
+    <div class="tool" data-fam="association" data-q="親和圖／kj 法 affinity diagram / kj method association.affinity_diagram 把大量零散想法一張一張卡片寫下來，靜默分群後命名，找出隱藏主題、降低資訊量。腦力激盪完一堆想法但很亂時用。"><b>親和圖／KJ 法</b><span class="k">Affinity Diagram / KJ Method</span><div class="sub">把大量零散想法一張一張卡片寫下來，靜默分群後命名，找出隱藏主題、降低資訊量。腦力激盪完一堆想法但很亂時用。</div>
+    </div>
+    <div class="tool" data-fam="association" data-q="類比映射 analogy mapping association.analogy_mapping 把其他領域的成功機制對應到你的問題上。想跨行業借鏡解法時用。"><b>類比映射</b><span class="k">Analogy Mapping</span><div class="sub">把其他領域的成功機制對應到你的問題上。想跨行業借鏡解法時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="research">
+    <h3 class="fam" id="fam-research">研究方法 <span class="k">Research</span><small>2 個</small></h3>
+    <p class="sub mt0">質性資料怎麼編碼、怎麼驗證：質性編碼、評分者信度。</p>
+    <div class="tool" data-fam="research" data-q="報告規範查核清單 reporting guideline checklist research.reporting_guideline_checklist 逐項對照官方學術報告規範（目前是質性研究的 srqr 標準）檢查論文內容涵蓋度，完成度是即時計算出來的，不是自己宣稱的。寫論文或期刊稿的方法論章節時用，確保投稿前每個規定項目都真的有寫到。"><b>報告規範查核清單</b><span class="k">Reporting Guideline Checklist</span><div class="sub">逐項對照官方學術報告規範（目前是質性研究的 SRQR 標準）檢查論文內容涵蓋度，完成度是即時計算出來的，不是自己宣稱的。寫論文或期刊稿的方法論章節時用，確保投稿前每個規定項目都真的有寫到。</div>
+    </div>
+    <div class="tool" data-fam="research" data-q="質性編碼（開放／軸心／選擇性） qualitative coding (open / axial / selective) research.qualitative_coding 透過開放編碼、軸心編碼、選擇性編碼三階段，從原始質性資料歸納出紮根理論主題。想系統性分析訪談／逐字稿資料，而不是憑印象看時用。"><b>質性編碼（開放／軸心／選擇性）</b><span class="k">Qualitative Coding (Open / Axial / Selective)</span><div class="sub">透過開放編碼、軸心編碼、選擇性編碼三階段，從原始質性資料歸納出紮根理論主題。想系統性分析訪談／逐字稿資料，而不是憑印象看時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="computation">
+    <h3 class="fam" id="fam-computation">計算與模擬 <span class="k">Computation</span><small>1 個</small></h3>
+    <p class="sub mt0">用數字模擬不確定：蒙地卡羅。</p>
+    <div class="tool" data-fam="computation" data-q="蒙地卡羅模擬 monte carlo simulation computation.monte_carlo 用大量隨機抽樣模擬一個不確定結果的分布，得到機率而不是單一數字。有很多不確定因素、想知道最好／最壞／最可能情境的機率時用。"><b>蒙地卡羅模擬</b><span class="k">Monte Carlo Simulation</span><div class="sub">用大量隨機抽樣模擬一個不確定結果的分布，得到機率而不是單一數字。有很多不確定因素、想知道最好／最壞／最可能情境的機率時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="evidence">
+    <h3 class="fam" id="fam-evidence">證據 <span class="k">Evidence</span><small>1 個</small></h3>
+    <p class="sub mt0">幾個來源互相印證：三角驗證。</p>
+    <div class="tool" data-fam="evidence" data-q="證據三角驗證 evidence triangulation evidence.triangulation 把主題跟文獻集合做交叉比對，看哪些發現有可引用的來源佐證。質性編碼完成後，想拿外部文獻檢驗自己的主題、不只靠訪談資料時用。"><b>證據三角驗證</b><span class="k">Evidence Triangulation</span><div class="sub">把主題跟文獻集合做交叉比對，看哪些發現有可引用的來源佐證。質性編碼完成後，想拿外部文獻檢驗自己的主題、不只靠訪談資料時用。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="finance">
+    <h3 class="fam" id="fam-finance">財務 <span class="k">Finance</span><small>1 個</small></h3>
+    <p class="sub mt0">企劃背後的數字假設：財務假設。</p>
+    <div class="tool" data-fam="finance" data-q="財務假設 financial assumptions finance.financial_assumptions 記錄支撐一份商業計畫數字的財務假設（幣別、折現率、期間、現金流預測）。做任何財務預測之前的第一步。"><b>財務假設</b><span class="k">Financial Assumptions</span><div class="sub">記錄支撐一份商業計畫數字的財務假設（幣別、折現率、期間、現金流預測）。做任何財務預測之前的第一步。</div>
+    </div>
+    </section>
+    <section class="famgroup" data-fam="stakeholder">
+    <h3 class="fam" id="fam-stakeholder">利害關係人視角 <span class="k">Stakeholder Lens</span><small>1 個</small></h3>
+    <p class="sub mt0">站在某一方看：監管者視角。</p>
+    <div class="tool" data-fam="stakeholder" data-q="利害關係人／監管者視角 stakeholder / regulator lens stakeholder.regulator 一個可重複套用的「視角」（不是方法），用監管者的優先順序——合規、先例、公共問責——重新檢視既有分析。想用「監管者會怎麼看這件事」來壓力測試一個決策或計畫，又不想整個分析重跑一次時用。"><b>利害關係人／監管者視角</b><span class="k">Stakeholder / Regulator Lens</span><div class="sub">一個可重複套用的「視角」（不是方法），用監管者的優先順序——合規、先例、公共問責——重新檢視既有分析。想用「監管者會怎麼看這件事」來壓力測試一個決策或計畫，又不想整個分析重跑一次時用。</div>
+    </div>
+    </section>
+    <!-- == partial: catalog-methods: end == -->
+    <p class="sub mt10 mb0">方法清單 = `methods/registry/method-display-metadata.yaml`（和 `GET /methods` 同一份）；家族標籤在 `method-family-display.yaml`。每個方法的課、結果頁與例子在它自己的 dossier（P3 起逐一生成，缺的會標「知識不足」）。</p>
+  </div>
+
+  <!-- 4 描述你的問題 -->
   <div class="card">
     <h2>不知道用哪個？描述你的問題<small>亂寫也可以</small></h2>
-    <div class="how"><b>怎麼讀</b>貼一段話，系統先用方法資料免費比對，比不出來才用 AI；回你最多三個建議，每個都說為什麼（引方法資料）、會得到什麼、大約多少錢。<b>你要做的</b>用你的話寫問題，不用寫方法名，按「幫我挑」；看建議時先看「為什麼」那一句對不對。</div>
+    <div class="how"><b>怎麼讀</b>貼一段話，系統先用上面這份方法資料免費比對，比不出來才用 AI；回你最多三個建議，每個都說為什麼（引方法資料）、會得到什麼、大約多少錢。<b>你要做的</b>用你的話寫問題，不用寫方法名，按「幫我挑」；看建議時先看「為什麼」那一句對不對。</div>
     <textarea placeholder="例：我們的團體課後半段大家都不講話，換了帶領者也一樣；我想知道到底是哪裡出了問題。"></textarea>
     <div class="btns mt8"><span class="btn primary">幫我挑<small>最多三個建議；先免費比對，不夠才用 AI</small></span><span class="btn">先看例子<small>下面是用上面那段話跑出來的樣子</small></span></div>
     <p class="sub mt10 mb0">例：上面那段話會得到這三個建議（示意）：</p>
@@ -291,21 +1179,21 @@
     <div class="btns mt10"><span class="btn primary">接受建議 1，串成一條工作流草稿<small>順序可以改；你確認才跑、才花錢</small></span><span class="btn ghost">都不對，我再描述一次</span></div>
   </div>
 
-  <!-- 3 示範專案 -->
+  <!-- 5 示範專案 -->
   <div class="card">
     <h2>先看到終點：兩個做完的示範專案<small>合成教材案例</small></h2>
     <div class="how"><b>怎麼讀</b>第一次登入就有兩個已經跑過的專案；先看結果長什麼樣，再開始自己的。<b>你要做的</b>點開任一個，從頭讀到底一次；你自己的專案之後會是同一個骨架。</div>
     <div class="mcards">
       <div class="mcard done">
         <div><b>冰山模型分析：團體反思 session 主動分享 6 → 2 人</b><span class="tag">AI 草稿・尚未核准</span></div>
-        <div><span class="k">線：</span>藝術反思／帶領者・方法：冰山模型</div>
+        <div><span class="k">用的：</span>單一方法「冰山模型」（系統思考家族）</div>
         <div><span class="k">看到：</span>九段結果頁：結論、冰山圖、三張圖、四層卡、方案、下一步。</div>
         <div class="k">約 6k tokens・≈ NT$1</div>
         <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">打開結果頁 →</a><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">它的 5 分鐘課 →</a></div>
       </div>
       <div class="mcard done">
         <div><b>決定：WuSheng 課程要不要改成「線上＋實體」混合</b><span class="tag">已完成 1/3 站</span></div>
-        <div><span class="k">線：</span>評估一個決定・工作流：問題陳述 → SWOT → 加權決策矩陣</div>
+        <div><span class="k">用的：</span>工作流「做一個決定」：問題陳述 → SWOT → 加權決策矩陣</div>
         <div><span class="k">看到：</span>總覽站列、每站一張卡、第 1 站摘要、總結頁骨架。</div>
         <div class="k">全程約 8 分鐘・≈ NT$3（已用 NT$1）</div>
         <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">打開總覽 →</a><a class="btn" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU">它的 3 分鐘課 →</a></div>
@@ -313,10 +1201,10 @@
     </div>
   </div>
 
-  <!-- 4 同一條線 -->
+  <!-- 6 同一條線 -->
   <div class="card">
     <h2>每個專案都走同一條線<small>六步，每步一顆主按鈕</small></h2>
-    <div class="how"><b>怎麼讀</b>不管哪條線，專案都是這六步；關掉視窗再開，會回到你走到的那一步。<b>你要做的</b>不用做；記住會花錢的步（蒐集、分析）按下去之前都會先告訴你要花多少。</div>
+    <div class="how"><b>怎麼讀</b>不管用哪個方法或哪條工作流，專案都是這六步；關掉視窗再開，會回到你走到的那一步。<b>你要做的</b>不用做；記住會花錢的步（蒐集、分析）按下去之前都會先告訴你要花多少。</div>
     <div class="journey">
       <span>建立</span><i>→</i>
       <span>蒐集</span><i>→</i>
@@ -332,30 +1220,30 @@
     </div>
   </div>
 
-  <!-- 5 我的專案 -->
+  <!-- 7 我的專案 -->
   <div class="card" id="projects">
     <h2>我的專案<small>2 個示範・0 個你自己的</small></h2>
-    <div class="how"><b>怎麼讀</b>一列一個專案：走到哪一步、上次更新、下一步要做什麼。<b>你要做的</b>要繼續就按那一列的按鈕；要開新的，按上面任一張卡的「開始」。</div>
+    <div class="how"><b>怎麼讀</b>一列一個專案：走到哪一步、上次更新、下一步要做什麼。<b>你要做的</b>要繼續就按那一列的按鈕；要開新的，回上面找工具按「開始」。</div>
     <div class="scroll-x">
     <table>
-      <tr><th>專案</th><th>線</th><th>走到哪</th><th>最後更新</th><th>下一步</th></tr>
-      <tr><td>WuSheng 團體反思・第三期</td><td>藝術反思／帶領者</td><td>報表（AI 草稿・尚未核准）</td><td>2026-09-24</td><td><a class="btn" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看結果、核准 →</a></td></tr>
-      <tr><td>WuSheng 課程形式</td><td>評估一個決定</td><td>分析（第 2 站 SWOT 進行中）</td><td>2026-09-24</td><td><a class="btn" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">繼續第 2 站 →</a></td></tr>
+      <tr><th>專案</th><th>用的</th><th>走到哪</th><th>最後更新</th><th>下一步</th></tr>
+      <tr><td>WuSheng 團體反思・第三期</td><td>方法：冰山模型</td><td>報表（AI 草稿・尚未核准）</td><td>2026-09-24</td><td><a class="btn" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看結果、核准 →</a></td></tr>
+      <tr><td>WuSheng 課程形式</td><td>工作流：做一個決定</td><td>分析（第 2 站 SWOT 進行中）</td><td>2026-09-24</td><td><a class="btn" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">繼續第 2 站 →</a></td></tr>
     </table>
     </div>
-    <p class="sub mt8 mb0">你自己建立的專案會出現在這裡；建立第一個：按上面任一張卡的「開始」。刪除專案 = 來源與所有產出一起刪掉，留一筆「已抹除」。</p>
+    <p class="sub mt8 mb0">你自己建立的專案會出現在這裡；建立第一個：上面找到工具按「開始」。刪除專案 = 來源與所有產出一起刪掉，留一筆「已抹除」。</p>
   </div>
 
-  <!-- 6 來源列 -->
+  <!-- 8 來源列 -->
   <div class="card">
     <div class="meta-bar">
       <span>帳號 <b>示範帳號</b>（租戶：你的工作室）</span>
       <span>本月費用 <b>NT$0</b>（示範專案不計費）</span>
       <span>語言 <b>zh-TW</b>（en 準備中）</span>
-      <span>檢查 <b class="ok" title="每一頁的結論都有 [n] 來源">來源 ✓</b> <b class="ok" title="會花錢的步驟都先問過你">成本先問 ✓</b></span>
+      <span>檢查 <b class="ok" title="方法與工作流清單由登錄檔生成，數字不是手打的">目錄同步 ✓</b> <b class="ok" title="會花錢的步驟都先問過你">成本先問 ✓</b></span>
     </div>
     <div class="sub mt8">你的來源與產出只有你的租戶看得到；示範專案是合成教材，不是真實個案。</div>
-    <div class="btns mt12"><span class="btn">設定：語言、預算上限、通知</span><span class="btn ghost">專家模式：舊 dashboard（285 個方法、工作流、閘門表）</span></div>
+    <div class="btns mt12"><span class="btn">設定：語言、預算上限、通知</span><span class="btn ghost">專家模式：舊 dashboard（圖表面板、閘門表、JSON）</span></div>
   </div>
 
 </div>

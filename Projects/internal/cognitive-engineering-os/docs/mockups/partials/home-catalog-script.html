@@ -1,0 +1,30 @@
+<script>
+  // Home catalogue: one search box filters workflows and methods together; family chips are multi-select (plan U11:
+  // visible buttons, no <select>). Hidden rows use the hidden attribute, never style.display.
+  document.addEventListener("DOMContentLoaded", function () {
+    var q = document.getElementById("q"), fams = {};
+    function norm(s) { return (s || "").toLowerCase(); }
+    function apply() {
+      var t = norm(q.value).trim(), any = Object.keys(fams).length > 0;
+      document.querySelectorAll("[data-q]").forEach(function (el) {
+        var f = el.getAttribute("data-fam");
+        var famOk = !any || !f || fams[f];
+        var qOk = !t || norm(el.getAttribute("data-q")).indexOf(t) !== -1;
+        el.hidden = !(famOk && qOk);
+      });
+      document.querySelectorAll(".famgroup").forEach(function (g) { g.hidden = !g.querySelector(".tool:not([hidden])"); });
+      document.querySelectorAll(".wfgroup").forEach(function (g) { g.hidden = !g.querySelector(".wf:not([hidden])"); });
+      document.getElementById("mcount").textContent = document.querySelectorAll(".tool:not([hidden])").length;
+      document.getElementById("wcount").textContent = document.querySelectorAll(".wf:not([hidden])").length;
+    }
+    q.addEventListener("input", apply);
+    document.querySelectorAll(".chip[data-fam]").forEach(function (c) {
+      c.addEventListener("click", function () {
+        var f = c.getAttribute("data-fam");
+        if (fams[f]) delete fams[f]; else fams[f] = true;
+        c.classList.toggle("on", !!fams[f]); c.setAttribute("aria-pressed", fams[f] ? "true" : "false");
+        apply();
+      });
+    });
+  });
+</script>

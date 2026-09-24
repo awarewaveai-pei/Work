@@ -48,7 +48,7 @@ PAIR_FACTS = {
 }
 # PAGE_FACTS: regexes that must match on one page.
 PAGE_FACTS = {
-    "home-mock.html": [r"查一家公司", r"評估一個決定", r"整理文獻", r"藝術反思", r"描述你的問題", r"建立 ?→ ?蒐集 ?→ ?彙整 ?→ ?分析 ?→ ?報表 ?→ ?核准", r"示範專案"],
+    "home-mock.html": [r"工作流", r"單一方法", r"家族", r"描述你的問題", r"建立 ?→ ?蒐集 ?→ ?彙整 ?→ ?分析 ?→ ?報表 ?→ ?核准", r"示範專案"],
     "iceberg-result-mock.html": [r"6 人掉到 2 人", r"主動分享 6 → 2 人", r"8 人團體", r"現在 2 人"],
     # the four plain-language layer lines the operator approved on 2026-09-24 stay on the lesson iceberg
     "iceberg-lesson-mock.html": [r"主動分享 6 → 2 人", r"同一個案例", r"看得見:發生了什麼", r"看不見:", r"一直重複的模式", r"製造模式的制度", r"撐住制度的信念", r"手邊有這些會"],
@@ -254,10 +254,14 @@ class Checker:
         except Exception as e:
             self.bad("*", "U21", f"{mk.DOMAINS_FILE.name}: {e}")
         for p in sorted(self.partials_dir.glob("*.html")): self.partials[p.stem] = p.read_text(encoding="utf-8").rstrip("\n")
-        for name, render in mk.GENERATED.items():   # a generated partial must equal its data (edit the yaml, run sync)
-            if name not in self.partials: self.bad("*", "U21", f"partials/{name}.html missing (run sync-design-system.py)")
-            elif self.domains and self.partials[name] != render().rstrip("\n"):
-                self.bad("*", "U21", f"partials/{name}.html differs from {mk.DOMAINS_FILE.name} (run sync-design-system.py)")
+        for name, render in mk.GENERATED.items():   # a generated partial must equal its registries (edit the data, run sync)
+            tag = "U21" if name == "domain-chips" else "catalog"
+            if name not in self.partials: self.bad("*", tag, f"partials/{name}.html missing (run sync-design-system.py)"); continue
+            try:
+                want = render().rstrip("\n")
+            except Exception as e:   # a registry gap is a finding, never a traceback
+                self.bad("*", tag, f"partials/{name}.html cannot be rendered: {type(e).__name__}: {e}"); continue
+            if self.partials[name] != want: self.bad("*", tag, f"partials/{name}.html differs from its registries (run sync-design-system.py)")
         for f in FILES:
             try:
                 self.check_file(f)
@@ -433,6 +437,9 @@ class Checker:
                 if any(c.attrs.get("role") != "tab" or c.attrs.get("aria-selected") not in ("true", "false") for c in tabs) \
                         or sum(c.attrs.get("aria-selected") == "true" for c in tabs) != 1:
                     self.bad(f, "a11y", f"line {n.line}: tablist chips need role=tab and exactly one aria-selected=true")
+            # a chip is a button with a state: a tab (aria-selected, above) or a toggle (aria-pressed); never a styled span
+            if n.has("chip") and (n.tag != "button" or (n.attrs.get("role") != "tab" and n.attrs.get("aria-pressed") not in ("true", "false"))):
+                self.bad(f, "a11y", f"line {n.line}: chip must be a <button> with role=tab or aria-pressed")
         # lesson mentions must be links (U15); an <a> with no destination must say which phase delivers it
         def lesson_text_ok(n):
             # descend while one child still holds the whole phrase; the element where it stops holding together
@@ -543,11 +550,34 @@ class Checker:
         if len(src) != 1 or not any(len(o.find(tag="li")) >= 2 for o in src[0].find("src", tag="ol")): self.bad(f, "M8", "one 課程來源 card with at least two numbered sources")
 
     def check_home(self, f, root, nodes):
+        # the home page is the catalogue (operator 2026-09-24: ~300 tools, ~20 workflows must be visible, not four abstract cards):
+        # every ACTIVE recipe and every method in the registries is on the page, generated (partials), with one search box and family toggles
+        try:
+            methods, fams, rd = mk.load_catalog(); loaded = True
+        except Exception as e:
+            self.bad(f, "catalog", f"registries: {type(e).__name__}: {e}"); loaded = False
+        tools, wfs = [n for n in nodes if n.has("tool")], [n for n in nodes if n.has("wf")]
+        if loaded:   # load_catalog guarantees non-empty, fully labelled registries; the page must show exactly them
+            if len(tools) != len(methods): self.bad(f, "catalog", f"{len(tools)} method rows on the page, {len(methods)} methods in {mk.METHODS_FILE.name}")
+            if len(wfs) != len(rd["recipes"]): self.bad(f, "catalog", f"{len(wfs)} workflow cards on the page, {len(rd['recipes'])} ACTIVE recipes in {mk.RECIPES_DIR.name}/")
+            famchips = {n.attrs.get("data-fam") for n in nodes if n.has("chip") and n.attrs.get("data-fam")}
+            if famchips != {m.split(".")[0] for m in methods}: self.bad(f, "catalog", "family chips do not match the families in the method registry")
+        search = [n for n in nodes if n.tag == "input" and n.attrs.get("type") == "search"]
+        if len(search) != 1 or search[0].attrs.get("id") != "q": self.bad(f, "U1", "home carries exactly one search box (input type=search id=q)")
         if sum(n.tag == "textarea" for n in nodes) != 1: self.bad(f, "U16", "home carries exactly one 描述你的問題 textarea")
         proj = [n for n in nodes if n.attrs.get("id") == "projects"]
         if len(proj) != 1 or not proj[0].has("card") or not proj[0].find(tag="table"): self.bad(f, "U8", "id=projects must be the card with the project table")
-        if sum(n.has("journey") for n in nodes) != 1: self.bad(f, "U2", "one .journey strip with the six project steps")
-        if sum(n.has("mcards") for n in nodes) < 3: self.bad(f, "U1", "home needs the line cards, the routing suggestions and the demo projects as .mcards")
+        # the hand-written parts, counted outside the generated catalogue (every workflow card carries its own .journey / .mcards)
+        def under(n, pred):
+            a = n.parent
+            while a is not None:
+                if pred(a): return True
+                a = a.parent
+            return False
+        own_journeys = [n for n in nodes if n.has("journey") and not under(n, lambda a: a.has("wf"))]
+        if len(own_journeys) != 1: self.bad(f, "U2", "exactly one six-step .journey strip outside the workflow cards")
+        own_mcards = [n for n in nodes if n.has("mcards") and not under(n, lambda a: a.attrs.get("id") == "workflows")]
+        if len(own_mcards) < 2: self.bad(f, "U1", "home needs the routing suggestions and the demo projects as .mcards outside the workflow catalogue")
         skip = [n for n in nodes if n.tag == "a" and n.attrs.get("href") == "#projects"]
         if not skip: self.bad(f, "U8", "header link to #projects missing")
 

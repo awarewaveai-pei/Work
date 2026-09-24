@@ -1,4 +1,21 @@
 ﻿# Worklog
+## 2026-09-24（續154）研究線：首頁改成真正的目錄——285 個方法（30 家族）＋16 條工作流全部由 SPEC 登錄檔生成；新增家族與 recipe 顯示登錄檔；計畫 v1.30
+- [觸發] 操作者：「你知道我有將近 300 個工具嗎？還有將近 20 條工作流，你是不是根本搞不清楚這個系統工具？還有你做的那是什麼狗屎首頁？」
+- [根因] 首頁照計畫 U1 舊條文做成四張抽象「線」卡＋描述問題，把 285 個方法與 16 條工作流全部藏起來（違反 U17 零退化；舊 dashboard 本來就有工作流／單一方法兩頁籤＋搜尋＋家族篩選）。做之前沒讀登錄檔，只讀了計畫。
+- [系統實況（讀登錄檔）] 方法 285 個（`SPEC/methods/registry/method-display-metadata.yaml`，有 name_zh／name_en／abbr／blurb_zh／url），家族 30 個（id 前綴；`stakeholder` 與 `stakeholders` 兩個都存在，登錄檔自身的不一致，未動）；工作流 = `SPEC/recipes/validated/` 16 個 ACTIVE recipe（12 條方法鏈＋4 條能力步流程：champion-challenger、db-migration、method-deprecation、edd-literature 夾具）＋使用者自組 `/workflows/custom`。recipe 檔只有英文 name／title，家族只有 title-case 的 id，兩者都沒有中文顯示資料。
+- [已改]
+  - 新登錄檔（與 `method-display-metadata.yaml` 同一模式）：`SPEC/methods/registry/method-family-display.yaml`（30 家族 name_zh／name_en／blurb_zh）、`SPEC/recipes/registry/recipe-display-metadata.yaml`（16 條 name_zh／blurb_zh／group_zh，五組）。`GET /methods`／`GET /recipes` P3 合併。
+  - `mockkit.py`：`load_catalog`（家族缺標籤或 ACTIVE recipe 缺顯示資料 = ValueError → 閘紅）、`render_families`（多選晶片 `aria-pressed`＋計數）、`render_workflows`（分組卡、站列 = 方法中文名依序，連續能力步合併「能力步 ×N」、有示範的加課／總覽連結）、`render_methods`（家族分組多的在前、中文名（縮寫去重）、英文名、一句話、冰山列加示範連結）；三段 = 生成 partials；`FRAG` 允許空 body（新頁第一次 sync）。
+  - `home-mock.html` v2：找工具（搜尋框＋家族晶片）→ 工作流 → 單一方法 → 描述你的問題 → 示範專案 → 六步 → 我的專案 → 頁尾；四張線卡刪除。`partials/home-catalog-script.html`：搜尋同時濾方法與工作流、晶片多選、計數即時更新（hidden 屬性，不碰 display）。
+  - `design-system.css`：`.search`、`.fam`、`.tool`。
+  - 檢查器：首頁必帶三段目錄 partials＋腳本；方法列數 = 登錄檔筆數、工作流卡數 = ACTIVE recipe 數、晶片 = 家族集合；唯一搜尋框；晶片必是 `<button>` 且 role=tab 或 aria-pressed；PAGE_FACTS 改為目錄事實。自測 +7 → 87/87。`chips-test.cjs` 加首頁互動（搜尋 swot：285→3 方法、16→6 工作流；按「系統思考」只剩 12 個該家族；再按回 285）。
+  - 計畫 v1.30：U1 整條改寫（首頁 = 目錄；三張任務卡退場）、I11、§10（任何清單由登錄檔生成）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python sync-design-system.py（3 個 partial 重生）+ check-mocks.py（5 頁綠）+ check-mocks-selftest.py（87/87）+ node chips-test.cjs（PASS）+ render-mocks.cjs 後 Read 首頁桌機 3 張＋手機 1 張 + build-artifact.py + Artifact publish 首頁 v2、v3（critic 修正後） | exit=0
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/2m/6n（全修：M1 `load_catalog` 全驗——方法三欄非空、display id = ACTIVE 契約集合（`methods/contracts/` 285）、家族標籤恰三欄、recipe 顯示恰三欄、每個 method 步的 id 必須存在，閘的計數比對不再有空集合豁免；M2 U1／U2 規則排除生成節點（工作流卡自己的 `.journey`／`.mcards`）；m1 生成 partial 的例外變成 finding 不 traceback、訊息指向正確來源；m2 空 body 片段改 lazy，不會吞掉後面同名片段；m3 嚴格 YAML loader 拒絕重複 key；m4 工作流分組加 `.wfgroup`，搜尋後空分組隱藏、文案改「晶片只縮小方法」；m5 互動測試驗 wcount、工作流以 computed display 計、家族全數 12/12；m6 頁面「與 GET /methods 同一份」由契約集合比對背書）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=familyLabel | hits=4（全在舊 `dashboard.html` 自己的 title-case 函式與三個呼叫點；P3 新殼改讀家族顯示檔時退場；`.runtime/scratch` 副本已 git-ignore）
+- [線上] 首頁 v3 https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ（連結不變）。
+- [避免再發生] 做任何「入口／目錄」頁之前先讀登錄檔與舊介面（`GET /methods`、`GET /recipes`、dashboard 的頁籤），數字與清單只准生成；計畫條文若與登錄檔實況衝突，以實況為準並改計畫。
+- [下一步] WC-PIa-01；P3 `GET /recipes` 合併 recipe 顯示檔、`GET /methods` 合併家族顯示檔；`stakeholder`／`stakeholders` 家族合併是登錄檔決策，列 §7。
 ## 2026-09-24（續153）Soulful Hostinger 舊站上鎖：WP-Cron 關閉＋`pre_wp_mail` 擋所有寄信（回滾副本不得對客戶寄信）
 
 - **根因**：舊站（回滾副本，11/12 前保留）`DISABLE_WP_CRON` 未設 → 任何訪問 spawn cron（9/11–9/23 POST 新站 `/wp-cron.php` 11 次）；72 個逾期排程（FluentCRM 各級 tasks、`action_scheduler_run_queue`、`wpvivid_main_schedule_event`、`fluentmail_*`）、Action Scheduler pending 20；FluentSMTP 仍可經 `smtp.hostinger.com` 用正式信箱寄信 → 舊 DB 一旦跑排程 = 對客戶重複／錯誤寄信。近 14 天舊站寄信 log 0（尚未發生）。FluentCRM pending campaign emails = 0。hPanel cron 從 SSH 不可見（主機無 `crontab`）。

@@ -13,13 +13,14 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    try:
-        for name, render in mk.GENERATED.items():          # data -> partial file
-            p = mk.PARTIALS / f"{name}.html"; body = render()
-            if not p.exists() or p.read_bytes() != body.encode("utf-8"):
-                p.write_bytes(body.encode("utf-8")); print(f"partials/{name}.html: regenerated")
-    except Exception as e:                                   # malformed domains.yaml, missing PyYAML, …
-        print(f"{mk.DOMAINS_FILE.name}: {type(e).__name__}: {e}"); return 1
+    for name, render in mk.GENERATED.items():              # registries -> partial file
+        try:
+            body = render()
+        except Exception as e:                               # malformed registry, missing PyYAML, …
+            print(f"partials/{name}.html cannot be rendered: {type(e).__name__}: {e}"); return 1
+        p = mk.PARTIALS / f"{name}.html"
+        if not p.exists() or p.read_bytes() != body.encode("utf-8"):
+            p.write_bytes(body.encode("utf-8")); print(f"partials/{name}.html: regenerated")
     css = mk.DESIGN_SYSTEM.read_bytes().decode("utf-8").replace("\r\n", "\n").rstrip("\n")
     partials = {p.stem: p.read_bytes().decode("utf-8").replace("\r\n", "\n").rstrip("\n") for p in sorted(mk.PARTIALS.glob("*.html"))}
     for f in mk.FILES:

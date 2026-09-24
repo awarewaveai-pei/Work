@@ -41,6 +41,39 @@ const LESSON = ["iceberg-lesson-mock.html", "workflow-lesson-mock.html"];   // =
     }
     await page.close();
   }
+  // home catalogue (plan U1): the search box filters workflows and methods together, family chips are multi-select toggles
+  const home = await browser.newPage();
+  await home.goto(pathToFileURL(path.join(__dirname, "home-mock.html")).href, { waitUntil: "load" });
+  const vis = (sel) => `[...document.querySelectorAll("${sel}")].filter((e) => getComputedStyle(e).display !== "none").length`;
+  const count = () => home.evaluate(`({
+    tools: document.querySelectorAll(".tool").length, wfs: document.querySelectorAll(".wf").length,
+    shownTools: ${vis(".tool")}, shownWfs: ${vis(".wf")}, emptyGroups: [...document.querySelectorAll(".famgroup, .wfgroup")].filter((g) => getComputedStyle(g).display !== "none" && !g.querySelector(".tool:not([hidden]), .wf:not([hidden])")).length,
+    mcount: document.getElementById("mcount").textContent, wcount: document.getElementById("wcount").textContent,
+  })`);
+  const all = await count();
+  await home.fill("#q", "swot");
+  const swot = await count();
+  if (!(swot.shownTools > 0 && swot.shownTools < all.tools && swot.shownWfs > 0 && swot.shownWfs < all.wfs
+        && swot.mcount === String(swot.shownTools) && swot.wcount === String(swot.shownWfs) && swot.emptyGroups === 0)) bad++;
+  console.log(`home-mock.html [search swot] tools ${all.tools}->${swot.shownTools} workflows ${all.wfs}->${swot.shownWfs} counters ${swot.mcount}/${swot.wcount} empty-groups-visible ${swot.emptyGroups}`);
+  await home.fill("#q", "");
+  await home.click('.chip[data-fam="systems"]');
+  const sys = await home.evaluate(() => {
+    const shown = [...document.querySelectorAll(".tool")].filter((e) => getComputedStyle(e).display !== "none");
+    return {
+      pressed: document.querySelector('.chip[data-fam="systems"]').getAttribute("aria-pressed"),
+      total: shown.length, family: document.querySelectorAll('.tool[data-fam="systems"]').length,
+      other: shown.filter((e) => e.getAttribute("data-fam") !== "systems").length,
+      groups: [...document.querySelectorAll(".famgroup")].filter((g) => getComputedStyle(g).display !== "none").length,
+    };
+  });
+  if (!(sys.pressed === "true" && sys.total > 0 && sys.total === sys.family && sys.other === 0 && sys.groups === 1)) bad++;
+  console.log(`home-mock.html [family systems] pressed=${sys.pressed} shown=${sys.total}/${sys.family} other-family=${sys.other} groups=${sys.groups}`);
+  await home.click('.chip[data-fam="systems"]');
+  const back = await count();
+  if (back.shownTools !== all.tools) bad++;
+  console.log(`home-mock.html [toggle off] tools back to ${back.shownTools}/${all.tools}`);
+  await home.close();
   await browser.close();
   console.log(bad ? `chips: FAIL ${bad}` : "chips: PASS");
   process.exit(bad ? 1 : 0);

@@ -83,6 +83,13 @@ CASES = [
     ("crumbs lose the home link", "links|link 首頁", "iceberg-lesson-mock.html", "re", r'<div class="crumbs"><a href="[^"]*">首頁</a>', '<div class="crumbs">首頁'),
     ("second status strip (no pill inside)", "status|status strip missing or duplicated", "iceberg-result-mock.html", "str", "</body>", '<div class="status"><span>x</span></div>\n</body>'),
     ("home loses the problem box", "U16", "home-mock.html", "re", r"<textarea[^>]*></textarea>", ""),
+    ("home loses the search box", "U1|search box", "home-mock.html", "re", r'<input class="search" id="q"[^>]*>', ""),
+    ("a method row hand-deleted from the home catalogue", "partials|catalog-methods differs", "home-mock.html", "re", r'\s*<div class="tool" data-fam="strategy" data-q="[^"]*"><b>SWOT 分析.*?\n    </div>', ""),
+    ("a workflow card hand-deleted from the home catalogue", "partials|catalog-workflows differs", "home-mock.html", "re", r'\s*<div class="mcard wf" data-q="做一個決定.*?\n      </div>', ""),
+    ("a family chip loses its toggle state", "a11y|aria-pressed", "home-mock.html", "str", '<button class="chip" aria-pressed="false" data-fam="systems"', '<button class="chip" data-fam="systems"'),
+    ("catalogue script edited in the page", "partials|home-catalog-script differs", "home-mock.html", "str", 'el.hidden = !(famOk && qOk);', 'el.hidden = !(famOk || qOk);'),
+    ("six-step strip loses its .journey class (the workflow cards' own strips must not satisfy the rule)", "U2|six-step", "home-mock.html", "str", '<div class="journey">\n      <span>建立</span>', '<div class="steps">\n      <span>建立</span>'),
+    ("routing suggestion cards removed (the catalogue's own .mcards must not satisfy the rule)", "U1|.mcards outside", "home-mock.html", "re", r'<div class="mcards">.*?\n    </div>\n(?=    <div class="btns mt10">)', ""),
     ("home project table loses its anchor", "U8|id=projects", "home-mock.html", "str", '<div class="card" id="projects">', '<div class="card">'),
     # continuity: the expected message names the loop each case proves (a mutation may trip more than one loop)
     ("page fact removed (PAGE_FACTS)", "continuity|fact missing", "iceberg-result-mock.html", "str", "主動分享人數（8 人團體）", "主動分享人數（8 人團隊）"),
