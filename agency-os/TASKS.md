@@ -135,12 +135,12 @@
 - [x] **【資安｜已修 2026-09-23】4 處 live 設定不再信任退租 IP：CF 白名單×3 刪、fail2ban ignoreip、lobster-nginx trust、backup-eu-stack.sh 死預設**
   - `✅ 完成` · `2026-09-23` · `收尾 session`
   - `check-cloudflare-security.ps1` Released-address = clean；`fail2ban-client get sshd ignoreip` 無退租 IP；`nginx -T` 只剩註解；`verify-no-released-addresses.mjs --host` new 9→4，剩 `/root/{precopy,syslayer,imagepull,cutover-lib}.sh` 一次性搬機腳本（既定：操作者確認後自刪；刪完該掃描才會 PASS）。WORKLOG 2026-09-23 續123。
-- [ ] **【資安｜輪替】hosting-bridge key `SG_SSH_PRIVATE_KEY_B64`（.env:146）曾整串印進本機 session transcript（2026-09-23，未離開本機）**
-  - `🟡 潛伏` · `2026-09-23` · `操作者`
-  - 一句話：收尾 session 一次 `grep ^SG_SSH` 沒遮罩；transcript 在 `~/.claude/projects/D--Work/*.jsonl`。bridge 目前對 ks-aw-01 本就連不上（下方 SG_SSH_HOST 條目），輪替可與 bridge 身分決策一起做。完成定義：新 key 上線、舊 key 從 `.env` 與目標主機 authorized_keys 移除。
+- [x] **【資安｜輪替】hosting-bridge key `SG_SSH_PRIVATE_KEY_B64`（.env:146）曾整串印進本機 session transcript（2026-09-23，未離開本機）**
+  - `✅ 完成` · `2026-09-24` · 新 key `HOSTING_BRIDGE_SSH_KEY_B64`（`SHA256:W1AwtU…`，只能跑 `aw-hosting-gate.sh`）上線；舊 key（ECDSA `MQe2uV…`）從 `.env` 刪除，本就不在任何 authorized_keys。殘留：`.env.bak.20260924-hosting-bridge` 仍含舊 key（零權限），下方 MainWP 條目 E2E 過後刪。WORKLOG 2026-09-24 續136/續138。
 
-- [ ] **【MainWP｜被 SG_SSH_HOST 擋】建站自動接上 MainWP：MainWP 端全通，卡在建站器本身 SSH 目標是退租主機**
-  - `🔴 現行` · `2026-09-21` · `卡在下方 SG_SSH_HOST 條目（操作者決定 bridge 存取主機的方式）`
+- [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
+  - `🔴 現行` · `2026-09-21` · `等 site-watch 解除 DEPLOY_HOLD（SITE_WATCH_MASTER_PLAN §7 step 10c）`
+  - **2026-09-24**：新 route（`3a985c042`）未上 prod（hold 中，未覆寫）；主機側已全就緒：gate、key、`.env`、compose（`printenv HOSTING_BRIDGE_SSH_*` 5/5）、7 站已遷自己的 DB 帳號。hold 期間 prod 舊碼讀不到 `SG_SSH_PRIVATE_KEY_B64` → 建站仍 503（與先前同為壞，只是 fail-closed 更早）。**下一步**：hold 解除部署後跑一次真 create-wp-site → 驗 run output `DB: … (own account; created)`、MainWP connected、`/staging/<slug>/` 200；然後刪 `.env.bak.20260924-hosting-bridge`。
   - **2026-09-23**：`SG_SSH_HOST` 預設已清空（容器 `SG_SSH_HOST=[]` → 程式預設 145.239.195.47:22 root，fail-closed，不再對退租主機送 handshake）；建站仍會失敗直到 bridge 身分決定。
   - **現在到哪**：REST key（server env）＋Unique Security ID＋child 安裝全上線（Trigger v20260921.3、next-admin 33251522a）；真 MainWP 以同一份碼註冊 staging 成功（WORKLOG 續100）。真建站 E2E run_cmuatt4cc02a021lnlhrm5drl → `provisioning_failed: Timed out while waiting for handshake`（SG_SSH_HOST=5.223.93.113）。
   - **完成定義**：真實建站後 MainWP 出現該站且 connected；run output 無 unique id／secret。
@@ -1257,8 +1257,9 @@
   - **完成定義（已達成）**：F08 14/14、`strategy/__init__.py` 宣告 COMPLETE、全 regression 7190＋golden 3296 皆綠、commit 已 push
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「F08 strategy 家族收官 10/14→14/14」條目；交接包 `agency-os/handoffs/2026-09-10-1737-f08-strategy-closeout.md`（歷史記錄保留）
 
-- [ ] **hosting bridge（provision-staging）對 ks-aw-01 的 SSH 身分未定：port 22／root 硬編在程式，主機只聽 58122；compose 預設已於 2026-09-23 清空（不再指退租 IP）**
-  - `🔴 現行` · `2026-09-04 開；2026-09-21 升級` · `操作者（安全架構：bridge 以何身分碰主機 docker）`
+- [x] **hosting bridge（provision-staging）對 ks-aw-01 的 SSH 身分未定：port 22／root 硬編在程式，主機只聽 58122；compose 預設已於 2026-09-23 清空（不再指退租 IP）**
+  - `✅ 完成` · `2026-09-24` · 選 B'（動詞 gate，非指令白名單）：`scripts/aw-hosting-gate.sh` 2 verb＋`HOSTING_BRIDGE_SSH_*`（pinned、PORT/USER 必填）；真 SSH 路徑（lobster-net 容器→58122→forced command）`staging-prepare` 7 次＋`staging-wp` 通過，DENY 126 正確。route 上 prod 待 DEPLOY_HOLD（見上方 MainWP 條目）。WORKLOG 2026-09-24 續136/續138。
+  - `🔴 原狀態` · `2026-09-04 開；2026-09-21 升級` · `操作者（安全架構：bridge 以何身分碰主機 docker）`
   - **2026-09-21 實測**：prod next-admin `printenv SG_SSH_HOST`=5.223.93.113；ks-aw-01 sshd 只聽 58122、root 登入被拒 → 整併後「自動建 staging 站」全壞（run_cmuatt4cc02a021lnlhrm5drl）。bridge 指令是 `docker exec`（=主機 root 等價）；選項：A ubuntu+sudo docker 經 58122 回連自己、B 限定指令的 forced-command key、C 專用受限 sidecar 代跑 wp-cli。擋住 MainWP 條目。
   - **一句話**：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:370` `${SG_SSH_HOST:-5.223.93.113}` 是 hosting bridge 的 SSH 目標；整併後現役主機非 22 port／非 root，compose 沒有 `SG_SSH_PORT`/`SG_SSH_USER` 變數
   - **現在到哪**：2026-09-04 續26 掃描發現；伺服器 `.env` 是否已覆蓋 `SG_SSH_HOST` 未在遠端 session 驗證

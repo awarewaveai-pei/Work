@@ -1,4 +1,21 @@
 ﻿# Worklog
+## 2026-09-24（續138）hosting bridge prod 落地（主機側全就緒）＋7 個 staging 站遷到自己的 DB 帳號＋主站帳號收回 16 條 staging 授權；route 部署受 DEPLOY_HOLD 擋（未覆寫）
+
+- **DEPLOY_HOLD**：origin/main 有 site-watch slice 1 的 hold（2026-09-23，未完成工作）→ 不跑 sg-deploy、不設 OVERRIDE；新 route（續136 `3a985c042`）隨 SITE_WATCH_MASTER_PLAN §7 step 10c 部署上線。以下皆為非部署的主機側動作。
+- **步驟（每步先備份）**：
+  1. `git fetch`＋`sync-host-scripts.sh` → `installed aw-hosting-gate.sh, deprovision-staging.sh`；主機 sha256 `4c898f48…` = repo；`--check` ALLOW／`id` DENY 126。
+  2. 主機產 ed25519（`SHA256:W1AwtU…`，私鑰只進 `.env` 後 shred）：`.env` 刪 `SG_SSH_PRIVATE_KEY_B64`、加 `HOSTING_BRIDGE_SSH_{HOST,PORT,USER,KEY_B64,HOST_KEY_SHA256}`（host/port/指紋取自 Auto-Repair 同值）；root `authorized_keys` 加 `restrict,from="172.16.0.0/12",command="/usr/bin/env -u BASH_ENV -u ENV …/aw-hosting-gate.sh" … aw-hosting@next-admin`；`sshd -t` ok。備份 `.env.bak.20260924-hosting-bridge`（含舊 key，零權限，E2E 後刪）、`authorized_keys.bak.20260924-hosting-bridge`。
+  3. compose：`safe-infra-patch.sh compose … next-admin`（bak `docker-compose.yml.bak.safe-patch-20260924-051716`）healthy 9s；`printenv` HOSTING_BRIDGE_SSH_* 5/5 有值，`SG_SSH_*`／`WP_STAGING_DB_*` 5 個 rc=1（確實移除）。`/check-drift` composeVarDrift onlyOnServer=[]（onlyInRepo 只剩 site-watch 的 3 個，非本項）。
+  4. 真路徑驗證：拋棄式 `node:20-alpine`（lobster-net，來源 172.18.0.15）＋ssh2＋pinned host key → `staging-wp test-pilot` CODE=0（www-data、wp 7.1.1）；`id`、`staging-wp test-pilot;id` CODE=126；gate syslog ALLOW/DENY 各有記錄。（next-admin 容器內 `/app/node_modules/ssh2` 是 standalone 的不完整拷貝，缺 asn1，故改用拋棄式容器；app 本身用 bundle 內的 ssh2。）
+  5. 遷移 7 站（先備份 `backups/staging-wpconfig-before-own-db-accounts-20260924.tgz` 7 檔）：同一路徑 `staging-prepare <slug> <db>` ×7 → 全部 `state=migrated`；各站 DB_USER = 自己的 DB 名、`core is-installed`、HTTP 200 ×7；授權只剩 `ALL ON <own db>.*`；主站 wp-config sha `2c6d410b…` 前後相同；`grep DB_USER wpuser` staging 剩 0。
+  6. `wpuser`（主站帳號）收回 16 條 `wp_s_*`／`wp_staging_*` 授權（清單存 `backups/wpuser-grants-before-revoke-20260924.sql`；含已不存在 DB 的殘留授權）→ 只剩 `ALL ON wordpress.*`；主站 `option get siteurl` OK、200。
+  7. 清理：probe 目錄 env 檔（含私鑰）shred、其餘逐檔刪；容器內 probe 檔刪除。
+- **不變量達成**：一站 ↔ 一 DB ↔ 一帳號（建立 `staging-prepare`、拆除 `deprovision-staging.sh DROP USER`），主站帳號不再碰任何 staging DB。
+- **剩餘**：① route 上 prod 待 hold 解除（TASKS MainWP 條目含真建站 E2E 步驟）；② 6 個無目錄的孤兒 staging DB 仍在（`check-staging-orphans` 已報，清理走 deprovision／操作者）；③ 檔案層隔離（同容器 www-data）仍待 S4。
+- **rollback**：`.env`／`authorized_keys`／compose 各自 `cp <bak>`＋`safe-infra-patch` 或 `up -d --no-build next-admin`；7 站 `tar -xzf backups/staging-wpconfig-before-own-db-accounts-20260924.tgz -C /var/www/html/staging`（在容器內）；授權 `mariadb < backups/wpuser-grants-before-revoke-20260924.sql`（GRANT 句原樣）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`staging-prepare ×7 + staging-wp` via real bridge path (node:20-alpine on lobster-net, pinned host key) + `curl https://aware-wave.com/staging/<slug>/` ×7 = 200 + `docker exec lobster-next-admin printenv HOSTING_BRIDGE_SSH_*` | exit=0 | ms=240000
+- REVIEW_WAIVED: NA -- 本 entry 為 prod 操作（無新程式碼）；程式碼 review 見續136（Codex r1–r3）
+- BUGHUNT_WAIVED: NA -- 無新程式碼；舊變數名殘留掃描見續136（活碼 0）
 ## 2026-09-24（續137）研究線：教學三層（路線課簡述＋連結／方法課完整／教材版同源）＋主色改綠；計畫 v1.21（D25、U15、U18、U19、I11 M12、P3、P4）
 - [觸發] 操作者：「為什麼內容豐富度比 iceberg 差那麼多？要一樣或更好；希望可成課堂教材；或先簡述再連到單一工具的正式介紹頁？」＋「主色系是綠色，看起來比較舒服」。
 - [判斷] 差距根因：冰山有 dossier（三篇文＋四張圖），三站方法還沒有（D23 P3 才做）；路線課本就不該承載方法深度。定案 D25：路線課每站簡述＋填好的例子＋連到方法課；方法課 = 完整六步（M1–M10）；教材版（45 分鐘課堂流程、講稿要點、討論題、學員常錯與怎麼接、講義與投影片大綱）由同一份 dossier 資料生成，P4 可匯出；ARF 帶領腳本直接進教材版。主色：accent `#177a5c`／暗 `#6fd3a8`，tag `#e8f5ef`／`#173328`；資料色（冰山水與層色、圖表序列）不動。
