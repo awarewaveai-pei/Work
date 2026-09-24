@@ -227,6 +227,29 @@ for url in ${CHECK_URLS_SLOW:-}; do
   probe_url "${url}" "${TIMEOUT_SEC_SLOW}"
 done
 
+# --- Host-job freshness (dead-man switches) ---
+# A host job registers by dropping one line "<stamp-file> <max-age-seconds> <label>" into FRESH_DIR and
+# touching the stamp only after a healthy run. Missing or older stamp = one failure line, through the
+# same debounce / fingerprint / channels as a URL. First user: wp-cron-runner.sh (2026-09-24).
+FRESH_DIR="${FRESH_DIR:-/etc/awarewave-alert/fresh.d}"
+for reg in "${FRESH_DIR}"/*; do
+  [[ -f "${reg}" ]] || continue
+  read -r stamp max_age label _ < "${reg}" || true
+  if [[ -z "${stamp:-}" || ! "${max_age:-}" =~ ^[0-9]+$ ]]; then
+    fail_lines+=("job $(basename "${reg}") -> bad registration")
+    continue
+  fi
+  if [[ ! -e "${stamp}" ]]; then
+    fail_lines+=("job ${label:-$(basename "${reg}")} -> never ran (${stamp} missing)")
+    continue
+  fi
+  age=$(( $(date +%s) - $(stat -c %Y "${stamp}") ))
+  if (( age > max_age )); then
+    echo "endpoint-alert: job ${label:-$(basename "${reg}")} stale ${age}s > ${max_age}s" >&2
+    fail_lines+=("job ${label:-$(basename "${reg}")} -> stale (no healthy run for > ${max_age}s)")
+  fi
+done
+
 # --- Fingerprint + state machine ---
 # fingerprint = sha256 of this run's sorted failing URLs (empty when all OK).
 fingerprint=""
@@ -326,7 +349,7 @@ if [[ "${notify}" == "true" ]]; then
     prefix="🚨"
     [[ "${notify_kind}" == "alert-reminder" ]] && prefix="⚠️ [提醒]"
     fail_detail="$(printf '%s\n' "${fail_lines[@]}")"
-    msg="$(printf '%s 網站端點無回應，服務可能中斷 — %s\n失敗端點：\n%s\n（技術資訊：%s endpoint alert %s）' "${prefix}" "${host}" "${fail_detail}" "${prefix}" "${ts}")"
+    msg="$(printf '%s 網站端點或主機排程異常 — %s\n失敗項目：\n%s\n（技術資訊：%s endpoint alert %s）' "${prefix}" "${host}" "${fail_detail}" "${prefix}" "${ts}")"
     detail_text="$(printf '%s\n' "${fail_lines[@]}")"
     send_webhook "${msg}"
     send_telegram "${msg}"

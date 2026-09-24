@@ -58,7 +58,7 @@
 |---|---|---|
 | `aware-wave-wp-bridge` | 0.17.0 | 我們自己的，從 [`aware-wave-wp-bridge` release repo](https://github.com/awarewaveai-pei/aware-wave-wp-bridge) 取 |
 | `hostinger` | 3.0.66 | **搬走後移除** —— Hostinger 專屬 |
-| `hostinger-auto-updates`（mu-plugin）| 1.0.7 | **搬走後移除** —— Hostinger 專屬 |
+| `hostinger-auto-updates`（mu-plugin）| 1.0.7 | **已移除 2026-09-24** —— Hostinger 專屬 |
 | `fix-update-plugin-prop`（mu-plugin）| — | 自訂修補，需保留；內容只在檔案裡，**務必隨程式備份一起帶走** |
 
 ## ⚠️ 備份涵蓋範圍（2026-08-16 演練查證）

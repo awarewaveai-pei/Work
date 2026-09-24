@@ -7,7 +7,11 @@
 # Usage:
 #   echo "new content" | safe-infra-patch.sh compose <file-path> <service>
 #   echo "new content" | safe-infra-patch.sh nginx   <file-path>
+#   echo "new content" | safe-infra-patch.sh host-nginx /etc/nginx/<file> <vhost-to-probe>
 #   echo "new content" | safe-infra-patch.sh file    <file-path>   # no health check
+#
+# nginx = the lobster-nginx CONTAINER. host-nginx = the host's own /etc/nginx (client vhosts such as
+# soulfulexpression.org); `nginx` on a host file would pass without testing or reloading it.
 #
 # Exit 0 = applied + verified. Exit 1 = failed + rolled back.
 # Audit log: /root/lobster-phase1/safe-patch.log
@@ -104,11 +108,34 @@ case "$TYPE" in
       fi
     fi
     ;;
+  host-nginx)
+    # TARGET = a vhost this file serves, probed over 127.0.0.1 (cf-only.conf admits loopback).
+    case "$(realpath -m "$FILE_PATH")" in /etc/nginx/*) ;; *)
+      log "health-fail | reason=host-nginx file outside /etc/nginx"; health_ok=0 ;; esac
+    [[ "$TARGET" =~ ^[a-z0-9.-]+$ ]] || { log "health-fail | reason=host-nginx needs a vhost to probe"; health_ok=0; }
+    if [[ $health_ok -eq 1 ]]; then
+      if ! nt="$(nginx -t 2>&1)"; then
+        log "health-fail | reason=nginx -t failed: $(printf '%s' "$nt" | tail -2 | tr '\n' ' ')"
+        health_ok=0
+      elif ! systemctl reload nginx; then
+        log "health-fail | reason=systemctl reload nginx failed"
+        health_ok=0
+      else
+        sleep 2
+        http_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 30 \
+          --resolve "${TARGET}:443:127.0.0.1" "https://${TARGET}/" 2>/dev/null || true)
+        if [[ ! "${http_code:-000}" =~ ^[23][0-9][0-9]$ ]]; then
+          log "health-fail | reason=https://${TARGET}/ via 127.0.0.1 returned ${http_code:-000}"
+          health_ok=0
+        fi
+      fi
+    fi
+    ;;
   file)
     log "apply | type=file | health-check=skipped"
     ;;
   *)
-    echo "ERROR: unknown type '$TYPE'. Valid: compose|nginx|file" >&2
+    echo "ERROR: unknown type '$TYPE'. Valid: compose|nginx|host-nginx|file" >&2
     health_ok=0
     ;;
 esac
@@ -124,6 +151,9 @@ if [[ $health_ok -eq 0 ]]; then
       ;;
     nginx)
       docker exec lobster-nginx nginx -s reload 2>/dev/null || true
+      ;;
+    host-nginx)
+      { nginx -t >/dev/null 2>&1 && systemctl reload nginx; } || log "rollback-warn | host nginx not reloaded; run nginx -t"
       ;;
   esac
   log "rollback-done | file=$FILE_PATH | status=restored"

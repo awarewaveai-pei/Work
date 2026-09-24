@@ -13,4 +13,6 @@ EnvironmentFile=-/etc/default/awarewave-endpoint-alert.telegram
 # Operator extension drop-in: HEARTBEAT_URL, RENOTIFY_AFTER_SEC, custom CHECK_URLS overrides etc.
 # Survives sync-slack-alert-webhooks.ps1 (which only rewrites the main file).
 EnvironmentFile=-/etc/default/awarewave-endpoint-alert.local
-ExecStart=/usr/local/bin/endpoint-alert.sh
+# Runs the copy sync-host-scripts.sh keeps equal to origin/main (bash -n gated). Until 2026-09-24 this
+# was a hand-copied /usr/local/bin/endpoint-alert.sh with no deploy path, so repo fixes never arrived.
+ExecStart=/root/lobster-phase1/scripts/endpoint-alert.sh

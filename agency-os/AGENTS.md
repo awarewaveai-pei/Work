@@ -78,7 +78,7 @@
 ## 6. 執行安全與 Auto-Repair 紅線
 
 不做不可逆破壞；prod 先列風險與 rollback；客戶新需求先判 `docs/operations/scope-change-policy.md`。
-Auto-Repair 流程 `incident → triage → backup → repair → health gate → auto-rollback → GitHub issue → WORKLOG`。**絕對禁止**：改 secrets／`.env*`／keys；改 auth／payment／permission／RLS；改 DB migration；未過 health gate 上 prod；空 catch 吞錯；無 pre-repair backup 不建 Issue。nginx／Dockerfile／compose 改動走 `/root/lobster-phase1/scripts/safe-infra-patch.sh`（備份→套用→health→失敗 rollback→WORKLOG）。Issue 含中文摘要；>3 檔／同 fingerprint 第二次／API 格式變更／cron 或第三方 API 變更 → 標 `needs-human-review`。§Auto-Repair 紅線
+Auto-Repair 流程 `incident → triage → backup → repair → health gate → auto-rollback → GitHub issue → WORKLOG`。**絕對禁止**：改 secrets／`.env*`／keys；改 auth／payment／permission／RLS；改 DB migration；未過 health gate 上 prod；空 catch 吞錯；無 pre-repair backup 不建 Issue。nginx／Dockerfile／compose 改動走 `/root/lobster-phase1/scripts/safe-infra-patch.sh`（備份→套用→health→失敗 rollback→WORKLOG）；主機 `/etc/nginx`（客戶 vhost）用 `host-nginx <file> <vhost>` 型，`nginx` 型只測 lobster-nginx 容器。Issue 含中文摘要；>3 檔／同 fingerprint 第二次／API 格式變更／cron 或第三方 API 變更 → 標 `needs-human-review`。§Auto-Repair 紅線
 
 ## 7. 工作流程
 

@@ -172,7 +172,8 @@ Hostinger 主機在 2026-11-12 前都還活著，舊站原封不動 —— 這�
 
 ## 7. 切換後
 
-- [ ] **移除主機專屬外掛**：`hostinger`、`hostinger-auto-updates`（mu-plugin）
+- [x] **移除主機專屬外掛**：`hostinger`、`hostinger-auto-updates`（mu-plugin）—— 2026-09-24 補做（切換後漏了 4 週；該 mu-plugin 把 WP 安全自動更新全關、WP API 走 Hostinger 代理）。`hostinger` 停用未刪，mu-plugin 備份在主機 `/root/soulful/prechange-20260924-perf/`
+- [x] **WP-Cron 要有排程器** —— wp-config 設 `DISABLE_WP_CRON`，新機必須有 host `wp-cron-runner.sh`（自動發現，見 `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md`）；2026-08-28→09-24 沒有，排程全停（WORKLOG 2026-09-24）
 - [ ] **停用 `litespeed-cache`**（見 §1 說明），另排快取方案
 - [ ] **FluentSMTP 不用改** —— 信箱還在 Hostinger（付到 2029），`smtp.hostinger.com:587` / `info@soulfulexpression.org` 設定原樣可用。**但切換後務必實寄一封驗證**
 - [ ] **MainWP 重新接線** —— child site 的連線會因主機變更而失效

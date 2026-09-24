@@ -197,6 +197,18 @@ CREOF
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 3b. WordPress scheduler for DISABLE_WP_CRON sites (every host; the script owns its own schedule)
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "--- WordPress cron runner ---"
+if [[ -f "${COMPOSE_ROOT}/scripts/wp-cron-runner.sh" ]]; then
+  chmod +x "${COMPOSE_ROOT}/scripts/wp-cron-runner.sh"
+  "${COMPOSE_ROOT}/scripts/wp-cron-runner.sh" --install
+else
+  echo "  WARN: ${COMPOSE_ROOT}/scripts/wp-cron-runner.sh not found"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 4. Security hardening
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
