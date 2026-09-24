@@ -137,7 +137,7 @@
     if (!chip) return;
     var set = chip.getAttribute("data-set");
     document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
-    document.querySelectorAll("#examples .ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
+    document.querySelectorAll(".ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
   });
 </script>
 </head>
@@ -218,12 +218,12 @@
   <!-- 2 -->
   <div class="card">
     <h2>2. 四層，各配一個你領域的例子<small>1 分鐘</small></h2>
-    <div class="how"><b>怎麼讀</b>先按你的領域，再從上往下看四層各一個例子；每層的「問」是你之後要回答的問題 <cite>[3]</cite>。<b>你要做的</b>按一個領域；把你自己的問題在心裡套進四層試一次。</div>
+    <div class="how"><b>怎麼讀</b>先按你的領域，再從上往下看四層各一個例子；每層的「問」是你之後要回答的問題 <cite>[3]</cite>。<b>你要做的</b>按一個領域（第 3–6 步的例子會跟著換）；把你自己的問題在心裡套進四層試一次。</div>
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
       <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
       <button class="chip" role="tab" aria-selected="false" data-set="partner" id="chip-partner">合作對象</button>
-      <button class="chip" role="tab" aria-selected="false" data-set="decision" id="chip-decision">一個決定</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="decision" id="chip-decision">一個決策</button>
       <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
       <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
     </div>
@@ -260,16 +260,60 @@
   <div class="card">
     <h2>3. 看一個做完的例子<small>1 分鐘</small></h2>
     <div class="how"><b>怎麼讀</b>左到右：這一層填了什麼、只看這一層會做什麼；越往下的解法越根本。<b>你要做的</b>不用做；想看做完的完整結果按下面的按鈕。</div>
-    <p class="lead">團體反思：第 6 次 session，8 位參與者只有 2 位主動說自己的作品。</p>
-    <table>
-      <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
-      <tr><td>事件</td><td>8 人只有 2 人主動分享；第 1 次是 6 人</td><td>開場多鼓勵、點名（下次一樣）</td></tr>
-      <tr><td>模式</td><td>三期都從第 4 次開始掉；帶領者先解讀作品的場次最低</td><td>每次記人數與說明分鐘、提早看到</td></tr>
-      <tr><td>結構</td><td>帶領者先講作品的意義再請人回應；說明佔 35 分；紀錄表只問「達到洞察？」</td><td>參與者先說、紀錄表改量過程（效果持久）</td></tr>
-      <tr><td>心智模型</td><td>「參與者需要專家幫他們看見意義」</td><td>帶領者改成「讓判斷看得見的人」（最根本）</td></tr>
-    </table>
+    <div id="worked">
+    <div class="ex" data-set="edd">
+      <p class="lead">團體反思：第 6 次 session，8 位參與者只有 2 位主動說自己的作品。</p>
+      <table>
+        <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
+        <tr><td>事件</td><td>8 人只有 2 人主動分享；第 1 次是 6 人</td><td>開場多鼓勵、點名（下次一樣）</td></tr>
+        <tr><td>模式</td><td>三期都從第 4 次開始掉；帶領者先解讀作品的場次最低</td><td>每次記人數與說明分鐘、提早看到</td></tr>
+        <tr><td>結構</td><td>帶領者先講作品的意義再請人回應；說明佔 35 分；紀錄表只問「達到洞察？」</td><td>參與者先說、紀錄表改量過程（效果持久）</td></tr>
+        <tr><td>心智模型</td><td>「參與者需要專家幫他們看見意義」</td><td>帶領者改成「讓判斷看得見的人」（最根本）</td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="partner" hidden>
+      <p class="lead">合作對象：合作的畫廊這次又延後付款。</p>
+      <table>
+        <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
+        <tr><td>事件</td><td>這檔展覽結束 45 天還沒收到款；合約寫 30 天</td><td>再催一次（下次一樣）</td></tr>
+        <tr><td>模式</td><td>近一年四檔展覽都延 30–60 天；小型聯展延最久</td><td>每檔記「約定日／實付日」、提早看到</td></tr>
+        <tr><td>結構</td><td>合約沒寫逾期條款；對方會計每季結一次帳；我們沒人負責催款</td><td>合約加付款期限與逾期條款、指定催款人（效果持久）</td></tr>
+        <tr><td>心智模型</td><td>「小工作室不好意思催款」</td><td>把催款當合約履行，不當人情（最根本）</td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="decision" hidden>
+      <p class="lead">一個決策：這個月又有 5 位家長問能不能加開平日班。</p>
+      <table>
+        <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
+        <tr><td>事件</td><td>這個月 5 位家長問平日班；目前只有週末班</td><td>先回「暫時沒有」（下次一樣）</td></tr>
+        <tr><td>模式</td><td>每年暑假前詢問暴增、開學後回落；三年都一樣</td><td>記每月詢問數、提早看到季節性</td></tr>
+        <tr><td>結構</td><td>教室只有週末滿、平日閒置；老師都是兼職，平日排不出人</td><td>平日班排在兼職老師能接的時段、或找專任（效果持久）</td></tr>
+        <tr><td>心智模型</td><td>「擴大就是成長」</td><td>先定「成長」指什麼：人數、品質還是收入（最根本）</td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="ecom" hidden>
+      <p class="lead">電商後台：這個月退貨率 12%，上個月 5%。</p>
+      <table>
+        <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
+        <tr><td>事件</td><td>本月退貨率 12%（上月 5%）；退的多是尺寸類</td><td>客服加人處理退貨（下次一樣）</td></tr>
+        <tr><td>模式</td><td>每次上新品後兩週退貨衝高；尺寸類特別多；促銷檔期更嚴重</td><td>每週看「新品 × 退貨率」、提早看到</td></tr>
+        <tr><td>結構</td><td>商品頁尺寸表直接用供應商的、沒人核對；退貨流程只有「同意／不同意」，不問原因</td><td>上架前核對尺寸表、退貨表加「原因」欄（效果持久）</td></tr>
+        <tr><td>心智模型</td><td>「退貨是客人的問題，不是我們的問題」</td><td>把退貨當資料，不當麻煩（最根本）</td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="daily" hidden>
+      <p class="lead">日常：這週又為了家事吵架。</p>
+      <table>
+        <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
+        <tr><td>事件</td><td>週日晚上為了誰洗碗吵了 20 分鐘；這個月第 3 次</td><td>道歉、這次我洗（下次一樣）</td></tr>
+        <tr><td>模式</td><td>每次都在週日晚上；一忙就吵</td><td>記下每次吵架的時間和事、提早看到</td></tr>
+        <tr><td>結構</td><td>沒有分工表，誰看到誰做；週日晚上兩人都最累</td><td>排固定分工、把家事移出週日晚上（效果持久）</td></tr>
+        <tr><td>心智模型</td><td>「這種小事不用講」</td><td>小事講出來才不會變大事（最根本）</td></tr>
+      </table>
+    </div>
+    </div>
     <p class="sub" style="margin:8px 0 0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：</p>
-    <div class="btns" style="margin-top:8px"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small>同一個案例，做完的九段結果</small></a></div>
+    <div class="btns" style="margin-top:8px"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small><span class="ex" data-set="edd">同一個案例，做完的九段結果</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span></small></a></div>
   </div>
 
   <!-- 4 -->
@@ -277,13 +321,13 @@
     <h2>4. 怎麼填：四步，每步一個好例子和一個壞例子<small>1.5 分鐘</small></h2>
     <div class="how"><b>怎麼讀</b>每步一好一壞，壞例括號裡寫的是它缺什麼。<b>你要做的</b>拿你的那件事，照「好」的樣子在心裡寫一句；寫不出來的那一層就是你要去補資料的層。</div>
     <div class="step"><div class="n">1</div><div><b>把事件講清楚</b>：一件具體的事、有時間、有數字。
-      <div class="gb"><div class="good"><b>好</b>：第 6 次 session 8 人只有 2 人主動分享；第 1 次是 6 人。</div><div class="bad"><b>壞</b>：大家都不認真。（哪一次？幾人？跟第 1 次比呢？）</div></div></div></div>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：第 6 次 session 8 人只有 2 人主動分享；第 1 次是 6 人。</div><div class="bad"><b>壞</b>：大家都不認真。（哪一次？幾人？跟第 1 次比呢？）</div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：這檔展覽結束 45 天還沒收款，合約寫 30 天；上一檔延了 60 天。</div><div class="bad"><b>壞</b>：他們老是拖。（哪一檔？幾天？合約寫幾天？）</div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：這個月 5 位家長問平日班；去年同月 2 位。</div><div class="bad"><b>壞</b>：很多人在問。（幾位？哪個月？跟去年比呢？）</div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：本月退貨率 12%，上月 5%；退的 70% 是尺寸類。</div><div class="bad"><b>壞</b>：退貨變多了。（多少？哪一類？跟上月比呢？）</div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：週日晚上為了誰洗碗吵了 20 分鐘；這個月第 3 次。</div><div class="bad"><b>壞</b>：我們最近常吵。（哪一天？為了什麼？幾次？）</div></div></div></div></div>
     <div class="step"><div class="n">2</div><div><b>找模式</b>：這件事什麼時候發生、多常、跟什麼一起出現。
-      <div class="gb"><div class="good"><b>好</b>：三期都從第 4 次開始掉；帶領者先解讀的場次最低；線上場更低。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div></div></div>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：三期都從第 4 次開始掉；帶領者先解讀的場次最低；線上場更低。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：近一年四檔都延 30–60 天；小型聯展延最久。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：每年暑假前詢問暴增、開學後回落；三年都一樣。</div><div class="bad"><b>壞</b>：一直都有人問。（多久？多常？有什麼一起變？）</div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：每次上新品後兩週退貨衝高；促銷檔期更嚴重。</div><div class="bad"><b>壞</b>：常常這樣。（多久？多常？有什麼一起變？）</div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：每次都在週日晚上；一忙就吵。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div></div></div></div>
     <div class="step"><div class="n">3</div><div><b>找結構</b>：哪個流程、規則、人力安排在製造這個模式。寫「制度」，不寫「某個人」。
-      <div class="gb"><div class="good"><b>好</b>：帶領者先講意義、說明佔 35 分；紀錄表只問「達到洞察？」。</div><div class="bad"><b>壞</b>：某某帶領者不重視。（這是怪人，不是結構）</div></div></div></div>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：帶領者先講意義、說明佔 35 分；紀錄表只問「達到洞察？」。</div><div class="bad"><b>壞</b>：某某帶領者不重視。（這是怪人，不是結構）</div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：合約沒寫逾期條款；對方會計每季結一次帳；我們沒人負責催。</div><div class="bad"><b>壞</b>：他們會計很混。（這是怪人，不是結構）</div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：教室只有週末滿；老師都是兼職，平日排不出人。</div><div class="bad"><b>壞</b>：老師不配合。（這是怪人，不是結構）</div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：尺寸表直接用供應商的、沒人核對；退貨表不問原因。</div><div class="bad"><b>壞</b>：客服不夠細心。（這是怪人，不是結構）</div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：沒有分工表，誰看到誰做；週日晚上兩人都最累。</div><div class="bad"><b>壞</b>：對方很懶。（這是怪人，不是結構）</div></div></div></div></div>
     <div class="step"><div class="n">4</div><div><b>問信念</b>：大家沒說出口、但決定規則和優先順序的那句話。也問問自己的。
-      <div class="gb"><div class="good"><b>好</b>：「參與者需要專家幫他們看見意義。」</div><div class="bad"><b>壞</b>：大家心態不對。（太籠統，指不出哪個假設）</div></div></div></div>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：「參與者需要專家幫他們看見意義。」</div><div class="bad"><b>壞</b>：大家心態不對。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：「小工作室不好意思催款。」</div><div class="bad"><b>壞</b>：我們太軟弱。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：「擴大就是成長。」</div><div class="bad"><b>壞</b>：我們不夠有企圖心。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：「退貨是客人的問題，不是我們的問題。」</div><div class="bad"><b>壞</b>：大家不重視品質。（太籠統，指不出哪個假設）</div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：「這種小事不用講。」</div><div class="bad"><b>壞</b>：我們個性不合。（太籠統，指不出哪個假設）</div></div></div></div></div>
     <p class="sub" style="margin:8px 0 0">填不出某一層沒關係，留白比硬湊好；工具會把它列成「證據缺口」，告訴你該去補什麼資料。</p>
   </div>
 
@@ -293,12 +337,34 @@
     <div class="how"><b>怎麼讀</b>四條，每條都是「看起來對、其實錯」。<b>你要做的</b>對照你第 4 步心裡寫的那句，看有沒有中。</div>
     <div class="mistake"><i>✕</i><span><b>急著怪人</b>：一直問「是誰」，就挖不到「為什麼」。結構層要寫制度，不寫名字。</span></div>
     <div class="mistake"><i>✕</i><span><b>跳層</b>：從事件直接跳到「他們心態有問題」。中間的模式和結構才是能動手改的地方。</span></div>
-    <div class="mistake"><i>✕</i><span><b>把模式當原因</b>：「每期第 4 次之後分享變少」是模式，不是原因；原因是第 4 次之後流程哪裡變了。</span></div>
+    <div class="mistake"><i>✕</i><span><b>把模式當原因</b>：<span class="ex" data-set="edd">「每期第 4 次之後分享變少」是模式，不是原因；原因是第 4 次之後流程哪裡變了。</span><span class="ex" data-set="partner" hidden>「每檔展覽都延後付款」是模式，不是原因；原因是合約和結帳流程哪裡讓它一再發生。</span><span class="ex" data-set="decision" hidden>「每年暑假前詢問暴增」是模式，不是原因；原因是教室和排班怎麼安排才讓它每年重演。</span><span class="ex" data-set="ecom" hidden>「每次上新品退貨就衝高」是模式，不是原因；原因是上架和退貨流程哪裡漏了。</span><span class="ex" data-set="daily" hidden>「每次都在週日晚上吵」是模式，不是原因；原因是那個晚上的安排哪裡讓兩個人都最累。</span></span></div>
     <div class="mistake"><i>✕</i><span><b>只看別人的假設</b>：你自己也在這個系統裡；你的假設也要寫進第四層。</span></div>
     <div class="quiz"><b>自我檢查（30 秒，點開看答案）</b>
-      <details><summary>「每期第 4 次之後分享變少」是哪一層？</summary>模式：一再發生的型態，不是原因。</details>
-      <details><summary>「紀錄表只問有沒有達到洞察」是哪一層？</summary>結構：是制度在製造模式。</details>
-      <details><summary>「參與者需要專家幫他們看見意義」是哪一層？</summary>心智模型：沒說出口、撐住制度的信念。</details>
+      <div class="ex" data-set="edd">
+        <details><summary>「每期第 4 次之後分享變少」是哪一層？</summary>模式：一再發生的型態，不是原因。</details>
+        <details><summary>「紀錄表只問有沒有達到洞察」是哪一層？</summary>結構：是制度在製造模式。</details>
+        <details><summary>「參與者需要專家幫他們看見意義」是哪一層？</summary>心智模型：沒說出口、撐住制度的信念。</details>
+      </div>
+      <div class="ex" data-set="partner" hidden>
+        <details><summary>「每檔展覽結束都延後付款」是哪一層？</summary>模式：一再發生的型態，不是原因。</details>
+        <details><summary>「合約沒寫逾期條款」是哪一層？</summary>結構：是制度在製造模式。</details>
+        <details><summary>「小工作室不好意思催款」是哪一層？</summary>心智模型：沒說出口、撐住制度的信念。</details>
+      </div>
+      <div class="ex" data-set="decision" hidden>
+        <details><summary>「每年暑假前詢問暴增」是哪一層？</summary>模式：一再發生的型態，不是原因。</details>
+        <details><summary>「老師都是兼職，平日排不出人」是哪一層？</summary>結構：是制度在製造模式。</details>
+        <details><summary>「擴大就是成長」是哪一層？</summary>心智模型：沒說出口、撐住制度的信念。</details>
+      </div>
+      <div class="ex" data-set="ecom" hidden>
+        <details><summary>「每次上新品後兩週退貨衝高」是哪一層？</summary>模式：一再發生的型態，不是原因。</details>
+        <details><summary>「退貨流程不問原因」是哪一層？</summary>結構：是制度在製造模式。</details>
+        <details><summary>「退貨是客人的問題」是哪一層？</summary>心智模型：沒說出口、撐住制度的信念。</details>
+      </div>
+      <div class="ex" data-set="daily" hidden>
+        <details><summary>「每次都在週日晚上吵」是哪一層？</summary>模式：一再發生的型態，不是原因。</details>
+        <details><summary>「沒有分工表，誰看到誰做」是哪一層？</summary>結構：是制度在製造模式。</details>
+        <details><summary>「這種小事不用講」是哪一層？</summary>心智模型：沒說出口、撐住制度的信念。</details>
+      </div>
     </div>
   </div>
 
@@ -314,7 +380,7 @@
       <li>你們開會時常常出現的那句話（信念通常藏在口頭禪裡）</li>
     </ul>
     <div class="btns">
-      <span class="btn primary">用示範案例試一次<small>主動分享 6 → 2 人那個例子，已填好，按執行就看結果</small></span>
+      <span class="btn primary">用示範案例試一次<small><span class="ex" data-set="edd">主動分享 6 → 2 人那個例子，已填好，按執行就看結果</span><span class="ex" data-set="partner" hidden>畫廊延後付款那個例子，已填好，按執行就看結果</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，已填好，按執行就看結果</span><span class="ex" data-set="ecom" hidden>退貨率 12% 那個例子，已填好，按執行就看結果</span><span class="ex" data-set="daily" hidden>週日晚上吵架那個例子，已填好，按執行就看結果</span></small></span>
       <span class="btn">開始填我的案例<small>四個格子，每格旁邊有提示</small></span>
       <span class="btn">這方法適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
     </div>

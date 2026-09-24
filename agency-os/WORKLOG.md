@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-24（續148）研究線：例子領域驅動整堂課（方法課 3–6 步、工作流課 3–5 步各領域一份）；「一個決策」；U21 領域資料＋管理頁；計畫 v1.27
+- [觸發] 操作者：「把 2 的 5 個子領域都做 3、4、5、6？幫助使用者用不同視角理解；子領域將來可增減，是否多做一個統一操作頁面」；「一個決定」改「一個決策」。
+- [已改] `iceberg-lesson-mock.html` v7：第 3 步做完例子（lead＋四層表）、第 4 步四組好壞例、第 5 步錯誤示例＋三題自我檢查、第 6 步示範按鈕說明、第 3 步結果頁按鈕說明，五領域各一份（edd 預設顯示，其餘 hidden）；晶片腳本改切換全頁 `.ex`；晶片標籤「一個決策」（id 仍 `decision`）。`workflow-lesson-mock.html`：第 3 步走完例子（各站一句＋判斷，從第 2 步填好的例子推導）、第 4 步好壞例、第 5 步示範說明，四領域各一份。`check-mocks.py`：D18 加 `MIN_EX_GROUPS`（13／7）、每組預設只顯示 edd、腳本必為全頁切換；自測 +3。計畫 v1.27：D18 修訂、U21 新增（`domains.yaml` 單一來源、方法 dossier 存例子、`/ops/domains` 管理頁＋方法×領域覆蓋表，缺的標紅可直接補）、I11 方法課 v7。線上：方法課 v14、工作流課 v11。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_domains.py（計數斷言）+ check-mocks.py（綠）+ check-mocks-selftest.py（全抓）+ node chips_test.js（Playwright 點每個晶片，兩堂課每組例子恰一份可見且等於點的領域）+ build-artifact.py + render-mocks.cjs 切片看圖 + Artifact publish ×2 | exit=0 | ms=0
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審：新增內容全部走計數斷言＋閘＋功能測試；非 edd 領域的結果頁／總覽尚無示意，按鈕說明如實標「P3 產出」）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=#examples .ex|一個決定</button> | hits=1（自測案例注入的舊選擇器字串本身；WORKLOG 歷史除外）
+- [下一步] WC-PIa-01；P3 產卡時把 U21 的 `domains.yaml`＋覆蓋表納入 dossier 卡。
 ## 2026-09-24（續147）退租位址 ssh 別名全數移除：7 支腳本改走 `scripts/lib/prod-host.ps1`、5 支改供應商中立名 `sync-*`、新守衛 `--ssh-config` 進健康檢查
 
 - **根因**：本機 `~/.ssh/config` 的 `hetzner-sg`／`hetzner`／`hetzner-eu` 指向已退租 5.223.93.113／204.168.175.41（root＋舊 key），7 支操作腳本預設用它（`sync-*` ×5、`open-grafana-ssh-tunnel.ps1`、`diff-env-vs-vault.ps1`）；`check-staging-orphans.ps1` 同因失明（續144 已修）。repo 閘 `verify-no-released-addresses.mjs` 只掃 IP 字面值，別名把位址藏在機器本地設定 → 整類漏網。操作者第 3 次指出「不用那家供應商了」：舊名留在程式碼就會一直被引用。

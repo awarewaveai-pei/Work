@@ -33,6 +33,10 @@ HEX_ALLOW = {".lever": "white text on fixed data colours (layer palette is the s
 # D18: five example sets; the workflow lesson has no "decision" chip because the whole route is one decision
 CHIP_SETS = {"iceberg-lesson-mock.html": {"edd", "partner", "decision", "ecom", "daily"},
              "workflow-lesson-mock.html": {"edd", "partner", "ecom", "daily"}}
+# the chips drive the whole lesson (operator 2026-09-24): at least this many example groups per lesson page
+# method lesson: 4 layers + worked example + its button note + 4 good/bad rows + mistake example + self-check + demo button = 13
+# workflow lesson: 3 stations + walked example + its button note + good/bad + demo button = 7
+MIN_EX_GROUPS = {"iceberg-lesson-mock.html": 13, "workflow-lesson-mock.html": 7}
 # continuity (matched on the visible text of the page, NFKC-normalised, style/script/attributes excluded)
 # PAIR_FACTS: regexes that must match on BOTH pages of a pair — the story is told once, on both sides.
 PAIR_FACTS = {
@@ -409,9 +413,16 @@ class Checker:
             if got != CHIP_SETS[f]: self.bad(f, "D18", f"chip sets {sorted(map(str, got))} != expected {sorted(CHIP_SETS[f])}")
             on = [n for n in chips if "on" in n.classes()]
             if len(on) != 1 or on[0].attrs.get("data-set") != "edd": self.bad(f, "D18", "exactly one chip must be on by default, and it is edd")
+            groups = 0
             for n in nodes:  # every example group must carry every set, or a chip click leaves a blank spot
                 sets = {c.attrs.get("data-set") for c in n.elements() if "ex" in c.classes() and c.attrs.get("data-set")}
-                if sets and sets != got: self.bad(f, "D18", f"line {n.line}: example group has {sorted(map(str, sets))}, chips are {sorted(map(str, got))}")
+                if sets:
+                    groups += 1
+                    if sets != got: self.bad(f, "D18", f"line {n.line}: example group has {sorted(map(str, sets))}, chips are {sorted(map(str, got))}")
+                    shown = [c for c in n.elements() if "ex" in c.classes() and c.attrs.get("data-set") and "hidden" not in c.attrs]
+                    if len(shown) != 1 or shown[0].attrs.get("data-set") != "edd": self.bad(f, "D18", f"line {n.line}: exactly the edd example may be visible before a chip is clicked")
+            if groups < MIN_EX_GROUPS[f]: self.bad(f, "D18", f"only {groups} example groups; the chips must drive every step ({MIN_EX_GROUPS[f]} expected)")
+            if 'querySelectorAll(".ex")' not in s: self.bad(f, "D18", 'chip script must switch every example group (querySelectorAll(".ex"))')
             skip = [n for n in anchors if n.attrs.get("href") == "#start"]
             start = [n for n in nodes if n.attrs.get("id") == "start"]
             if not skip: self.bad(f, "U15", "skip link (href=#start) missing")
