@@ -39,9 +39,16 @@
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .stations{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
-  .st{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
-  .st b{font-size:14.5px}.st .k{color:var(--muted);font-size:12px}.st .need{color:var(--warn)}.st .ex{color:var(--muted)}
+  .station{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:12px}
+  .station h3{margin:0 0 2px;font-size:16px}
+  .station .why{color:var(--muted);font-size:13.5px;margin:0 0 8px}
+  .srow{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  @media (max-width:560px){.srow{grid-template-columns:1fr;gap:2px}}
+  .srow b{color:var(--muted);font-weight:600;font-size:13px}
+  .srow b.need{color:var(--warn)}
+  .srow ul{margin:0;padding-left:18px}.srow li{margin:2px 0}
+  .ex{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
+  .ex .lab{display:block;color:var(--accent);font-size:12px;font-weight:600;margin-bottom:2px}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
   th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft)}
@@ -104,8 +111,8 @@
 
   <!-- 2 -->
   <div class="card">
-    <h2>2. 三站各做什麼、帶入什麼、要你填什麼<small>1 分鐘</small></h2>
-    <div class="how"><b>怎麼讀</b>先按你的領域看例子；每站三行：回答什麼、從上一站帶入什麼（你不用重填）、還要你填什麼（紅字）。<b>你要做的</b>按一個領域；把你的決定在心裡套三站試一次。</div>
+    <h2>2. 三站各做什麼、系統幫你填什麼、你要填什麼<small>1.5 分鐘</small></h2>
+    <div class="how"><b>怎麼讀</b>先按你的領域，例子就會換成你熟的情境；每一站從上往下看：這站在做什麼 → 你會看到的表單 → 已經幫你填好的 → 你要填的（附一個填好的例子）→ 做完會得到什麼。<b>你要做的</b>按一個領域；把你自己的決定，照例子的樣子在心裡填一次。</div>
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
       <button class="chip on" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
@@ -113,39 +120,58 @@
       <button class="chip" data-set="ecom" id="chip-ecom">電商後台</button>
       <button class="chip" data-set="daily" id="chip-daily">日常</button>
     </div>
-    <div class="stations" id="examples">
-      <div class="st">
-        <div><b>第 1 站 問題陳述</b></div>
-        <div><span class="k">回答什麼：</span>要決定的到底是什麼、誰受影響、成功長什麼樣。</div>
-        <div><span class="k">帶入什麼：</span>你建立專案時寫的那段話。</div>
-        <div><span class="need">還要你填：</span>誰受影響、成功的 2–3 個條件。</div>
-        <div class="ex" data-set="edd">例：WuSheng 課程要不要改成線上＋實體混合；成功 = 主動分享不降、遠地能參加。</div>
-        <div class="ex" data-set="partner" hidden>例：要不要和某機構合辦課程；成功 = 對方準時付款、我們保有教材權。</div>
-        <div class="ex" data-set="ecom" hidden>例：要不要開新品類；成功 = 三個月退貨率不高於現有品類。</div>
-        <div class="ex" data-set="daily" hidden>例：要不要搬到市區；成功 = 通勤少一半、房租不超過三成。</div>
+    <div id="examples">
+
+      <div class="station">
+        <h3>第 1 站 問題陳述</h3>
+        <p class="why">先把「到底要決定什麼」講清楚。這一站省掉，後面兩站常常在幫不同的問題打分。</p>
+        <div class="srow"><b>你會看到</b><span>三個格子：要決定什麼、誰受影響、成功長什麼樣。每格旁邊有提示，也可以按「用示範案例」。</span></div>
+        <div class="srow"><b>已經幫你填</b><span>你建立專案時寫的那段話，會出現在第一格，你改就好。</span></div>
+        <div class="srow"><b class="need">你要填</b><div>誰受影響（具體到人數或角色）、成功的 2–3 個條件（要看得到、量得到）。
+          <div class="ex" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>要決定什麼：</b>WuSheng 團體課要不要從全實體改成「線上＋實體」混合。<br><b>誰受影響：</b>現有 8 位參與者、2 位帶領者、3 位遠地詢問者。<br><b>成功條件：</b>① 主動分享人數不低於現在（每場 6 人）；② 遠地至少 3 人能參加；③ 帶領者每週準備時間不超過現在的 1.2 倍。</div>
+          <div class="ex" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>要決定什麼：</b>要不要和某藝術治療機構合辦 WuSheng 課程。<br><b>誰受影響：</b>我們的 2 位帶領者、對方的個案、雙方行政。<br><b>成功條件：</b>① 對方 30 天內付款；② 教材著作權留在我們；③ 一期結束後對方有續約意願。</div>
+          <div class="ex" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>要決定什麼：</b>要不要開尺寸類以外的新品類（文具）。<br><b>誰受影響：</b>客服 1 人、倉庫、供應商。<br><b>成功條件：</b>① 三個月退貨率 ≤ 5%；② 毛利不低於現有品類；③ 上架工時每週 ≤ 4 小時。</div>
+          <div class="ex" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>要決定什麼：</b>要不要從郊區搬到市區。<br><b>誰受影響：</b>自己、同住的家人。<br><b>成功條件：</b>① 通勤少一半；② 房租不超過收入三成；③ 一年內不用再搬。</div>
+        </div></div>
+        <div class="srow"><b>做完會得到</b><span>一句清楚的問題陳述＋成功條件清單。後面兩站都拿它當基準，總結頁也用它來判斷「決定有沒有達成目的」。</span></div>
+        <div class="srow"><b>常見卡點</b><span>成功條件寫成「希望變好」。改成看得到的數字或事實，例如「每場主動分享 ≥ 6 人」。</span></div>
+        <div class="srow"><b>大約</b><span>2 分鐘・NT$1</span></div>
       </div>
-      <div class="st">
-        <div><b>第 2 站 SWOT</b></div>
-        <div><span class="k">回答什麼：</span>做這個決定，我們的強項、弱項、外面的機會與威脅。</div>
-        <div><span class="k">帶入什麼：</span>第 1 站的問題陳述與成功條件，自動變成「脈絡」。</div>
-        <div><span class="need">還要你填：</span>S／W／O／T 各至少 2 條（可讓 AI 起草，你改）。</div>
-        <div class="ex" data-set="edd">例：強項 = 帶領者熟線上工具；威脅 = 線上人多時分享會掉。</div>
-        <div class="ex" data-set="partner" hidden>例：強項 = 我們的課程完整；威脅 = 對方過去延後付款。</div>
-        <div class="ex" data-set="ecom" hidden>例：強項 = 供應商穩；威脅 = 尺寸類退貨高。</div>
-        <div class="ex" data-set="daily" hidden>例：強項 = 工作在市區；威脅 = 房租上漲。</div>
+
+      <div class="station">
+        <h3>第 2 站 SWOT</h3>
+        <p class="why">看自己（強項、弱項）和外面（機會、威脅）。這四格之後會自動變成第 3 站打分用的準則。</p>
+        <div class="srow"><b>你會看到</b><span>一個「脈絡」欄（已填好）＋四個格子 S／W／O／T，每格可以加多條，旁邊有「讓 AI 起草」。</span></div>
+        <div class="srow"><b>已經幫你填</b><span>第 1 站的問題陳述和三個成功條件，自動放進「脈絡」；你不用重打。</span></div>
+        <div class="srow"><b class="need">你要填</b><div>S／W／O／T 各至少 2 條。寫事實，不寫感覺；每條最好能對到第 1 站的某個成功條件。可以先讓 AI 起草，再刪改。
+          <div class="ex" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>S 強項：</b>帶領者熟線上工具；作品照片流程已經數位化。<br><b>W 弱項：</b>只有一間教室；線上設備老舊。<br><b>O 機會：</b>遠地需求是真的（3 人詢問）；線上場可以錄影回看。<br><b>T 威脅：</b>線上人數一多，主動分享就掉（上一期線上場最低）；混合制兩邊都要顧，帶領者負擔可能超過 1.2 倍。</div>
+          <div class="ex" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>S：</b>課程完整、有帶領者訓練制度。<br><b>W：</b>只有 2 位帶領者，排不出第二班。<br><b>O：</b>對方有場地和穩定的個案來源。<br><b>T：</b>對方過去兩次延後付款；對方曾提出要改教材。</div>
+          <div class="ex" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>S：</b>供應商穩定；後台已能批次上架。<br><b>W：</b>客服只有 1 人；退貨流程不問原因。<br><b>O：</b>文具退貨率行業平均低；客群和現有品類重疊。<br><b>T：</b>尺寸類的退貨經驗可能複製到新品類；旺季倉儲不夠。</div>
+          <div class="ex" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>S：</b>工作在市區；存款夠押金。<br><b>W：</b>東西多，搬家成本高。<br><b>O：</b>市區有朋友、房源多。<br><b>T：</b>房租在漲；市區比較吵。</div>
+        </div></div>
+        <div class="srow"><b>做完會得到</b><span>SWOT 表＋每一格的證據強度（哪幾條只是感覺、哪幾條有數字），以及自動整理出來的「第 3 站準則候選」。</span></div>
+        <div class="srow"><b>常見卡點</b><span>把「希望」寫進機會、把「擔心」寫進威脅。機會和威脅是外面已經存在的事，不是心情。</span></div>
+        <div class="srow"><b>大約</b><span>3 分鐘・NT$1</span></div>
       </div>
-      <div class="st">
-        <div><b>第 3 站 加權決策矩陣</b></div>
-        <div><span class="k">回答什麼：</span>幾個選項按你的準則和權重，哪個分數最高、哪個權重一改就翻。</div>
-        <div><span class="k">帶入什麼：</span>第 2 站的 S／W／O／T 自動變成準則候選。</div>
-        <div><span class="need">還要你填：</span>每個準則的權重——這是你的價值判斷，系統不代填。</div>
-        <div class="ex" data-set="edd">例：準則 = 分享不降（權重 5）、遠地可參加（3）、帶領者負擔（4）。</div>
-        <div class="ex" data-set="partner" hidden>例：準則 = 付款可靠（5）、教材權（5）、曝光（2）。</div>
-        <div class="ex" data-set="ecom" hidden>例：準則 = 退貨率（5）、毛利（4）、上架工時（2）。</div>
-        <div class="ex" data-set="daily" hidden>例：準則 = 通勤（4）、房租（5）、環境（3）。</div>
+
+      <div class="station">
+        <h3>第 3 站 加權決策矩陣</h3>
+        <p class="why">幾個選項，按你自己定的準則和權重打分。分數是「按你的權重」算的，所以最重要的是權重由你填。</p>
+        <div class="srow"><b>你會看到</b><span>左邊是準則（已從第 2 站帶入），每個準則旁邊一個權重格（1–5）；上面是選項；中間是分數表；下面有「敏感度」：哪個權重一改，結果就翻。</span></div>
+        <div class="srow"><b>已經幫你填</b><span>準則候選（從第 2 站的四格整理出來）和選項候選（從第 1 站的問題抓出來）。分數可以讓 AI 起草。</span></div>
+        <div class="srow"><b class="need">你要填</b><div>每個準則的權重（1–5）。這是你的價值判斷，系統不會代填，也不會建議數字。
+          <div class="ex" data-set="edd"><span class="lab">填好的例子（藝術反思）</span><b>選項：</b>維持全實體／全線上／混合（每場線上 ≤ 4 人）。<br><b>準則與權重：</b>主動分享不降 5、遠地可參加 3、帶領者負擔 4、設備成本 2。<br><b>結果：</b>混合最高分；但「主動分享不降」的權重從 5 改成 3，全線上就贏 → 這個權重是關鍵，要想清楚。</div>
+          <div class="ex" data-set="partner" hidden><span class="lab">填好的例子（合作對象）</span><b>選項：</b>不合作／合辦一期試水／授權對方自辦。<br><b>準則與權重：</b>付款可靠 5、教材權 5、曝光 2、帶領者負擔 4。<br><b>結果：</b>合辦一期最高分；「付款可靠」權重一降，授權自辦就贏。</div>
+          <div class="ex" data-set="ecom" hidden><span class="lab">填好的例子（電商後台）</span><b>選項：</b>不開／先上 10 款試賣／全品類上。<br><b>準則與權重：</b>退貨率 5、毛利 4、上架工時 2、客服負擔 3。<br><b>結果：</b>先上 10 款最高分；「客服負擔」權重一升，不開就贏。</div>
+          <div class="ex" data-set="daily" hidden><span class="lab">填好的例子（日常）</span><b>選項：</b>不搬／搬市區小套房／搬到市區邊緣。<br><b>準則與權重：</b>通勤 4、房租 5、環境 3、搬家成本 2。<br><b>結果：</b>市區邊緣最高分；「房租」權重一降，市區小套房就贏。</div>
+        </div></div>
+        <div class="srow"><b>做完會得到</b><span>分數表、敏感度分析（哪個權重是關鍵）、然後是總結頁：三站合一的一句話、最終建議、解決方案與追蹤。</span></div>
+        <div class="srow"><b>常見卡點</b><span>權重讓 AI 填，或所有準則都填 5。權重不一樣，這張表才有意義。</span></div>
+        <div class="srow"><b>大約</b><span>3 分鐘・NT$1</span></div>
       </div>
+
     </div>
-    <p class="sub" style="margin:10px 0 0">記法：第 1 站定「要決定什麼」，第 2 站看「自己和外面」，第 3 站「用你的權重打分」。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
+    <p class="sub" style="margin:10px 0 0">記法：第 1 站定「要決定什麼」，第 2 站看「自己和外面」，第 3 站「用你的權重打分」。每一站都只填紅字那一列，其他系統從上一站帶來。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
   </div>
 
   <!-- 3 -->
