@@ -9,13 +9,13 @@
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe}
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4}
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}}
   :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
@@ -34,8 +34,9 @@
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
-  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}
-  .how b{color:var(--accent);font-weight:600}
+  .how{font-size:12.5px;color:var(--muted);margin:-4px 0 10px;line-height:1.55}
+  .how b{color:var(--accent);font-weight:600;margin-right:4px}
+  .how b:not(:first-child){margin-left:12px}
   .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
   .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}
   .can{border:1px solid var(--ok)}
@@ -103,6 +104,7 @@
   svg text{fill:var(--ink)}
   svg text.m{fill:var(--muted)}
   svg text.a{fill:var(--accent)}
+  svg text.w{fill:var(--on-ice)}
   svg .node{fill:var(--node)}
   svg .water{fill:var(--water)}
   svg .axis{stroke:var(--axis)}
@@ -118,6 +120,7 @@
   @media (max-width:560px){.srow{grid-template-columns:1fr;gap:2px}}
   .srow b{color:var(--muted);font-weight:600;font-size:13px}
   .srow b.need{color:var(--warn)}
+  .srow a{white-space:nowrap}
   .srow ul{margin:0;padding-left:18px}
   .srow li{margin:2px 0}
   .ex{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13.5px}
@@ -244,7 +247,7 @@
       <tr><th>站</th><th>一句話</th><th>你的判斷</th></tr>
       <tr><td>1 問題陳述</td><td>要決定的是「不降低分享的混合制」，不是「線上或實體」</td><td>部分同意（負擔 ≤ 1.2 倍）</td></tr>
       <tr><td>2 SWOT</td><td>線上人數一多，主動分享就掉；遠地需求真實存在</td><td>同意</td></tr>
-      <tr><td>3 加權決策矩陣</td><td>混合制最高分，但「每場線上 ≤ 4 人」這個權重一改就翻</td><td>同意</td></tr>
+      <tr><td>3 加權決策矩陣</td><td>混合制最高分，但「主動分享不降」的權重從 5 改成 3 就翻</td><td>同意</td></tr>
       <tr><td>總結</td><td>做混合制，條件是每場線上 ≤ 4 人；90 天後看分享人數</td><td>核准</td></tr>
     </table>
     <div class="btns" style="margin-top:8px"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看完整的工作流總覽 →<small>同一個案例，三站與總結頁</small></a></div>

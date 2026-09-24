@@ -9,13 +9,13 @@
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe}
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4}
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}}
   :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
@@ -34,8 +34,9 @@
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
-  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}
-  .how b{color:var(--accent);font-weight:600}
+  .how{font-size:12.5px;color:var(--muted);margin:-4px 0 10px;line-height:1.55}
+  .how b{color:var(--accent);font-weight:600;margin-right:4px}
+  .how b:not(:first-child){margin-left:12px}
   .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
   .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}
   .can{border:1px solid var(--ok)}
@@ -103,6 +104,7 @@
   svg text{fill:var(--ink)}
   svg text.m{fill:var(--muted)}
   svg text.a{fill:var(--accent)}
+  svg text.w{fill:var(--on-ice)}
   svg .node{fill:var(--node)}
   svg .water{fill:var(--water)}
   svg .axis{stroke:var(--axis)}
@@ -191,7 +193,7 @@
   <div class="card">
     <h2>② 冰山圖：你的問題在四層各是什麼</h2>
     <div class="how"><b>怎麼讀</b>從上往下；左邊是這一層問的問題和你填的，右邊是在這一層出手的方式；★ 是本次建議先出手的層。<b>你要做的</b>不用做；看你填的四段話各落在哪一層對不對，放錯層可以退回改。</div>
-    <svg viewBox="0 0 980 575" role="img" aria-label="冰山模型四層圖">
+    <svg viewBox="0 0 1070 575" role="img" aria-label="冰山模型四層圖">
       <defs>
         <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="#fbe3d6"/><stop offset="0.2" stop-color="#cfe3f3"/><stop offset="0.5" stop-color="#5a93c4"/><stop offset="0.75" stop-color="#245b8a"/><stop offset="1" stop-color="#0b2a4a"/>
@@ -199,11 +201,11 @@
         <clipPath id="berg"><path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z"/></clipPath>
       </defs>
       <!-- water -->
-      <rect x="0" y="150" width="980" height="425" class="water" opacity="0.55"/>
-      <path d="M0,150 q20,-8 40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0" fill="none" stroke="#7aa7cc" stroke-width="2.5"/>
+      <rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55"/>
+      <path d="M0,150 q20,-8 40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0" fill="none" stroke="#7aa7cc" stroke-width="2.5"/>
       <!-- band separators (align text columns with layers, like the worksheet) -->
-      <line x1="30" y1="290" x2="960" y2="290" stroke="#7aa7cc" stroke-dasharray="5 5"/>
-      <line x1="30" y1="420" x2="960" y2="420" stroke="#7aa7cc" stroke-dasharray="5 5"/>
+      <line x1="30" y1="290" x2="1050" y2="290" stroke="#7aa7cc" stroke-dasharray="5 5"/>
+      <line x1="30" y1="420" x2="1050" y2="420" stroke="#7aa7cc" stroke-dasharray="5 5"/>
       <!-- iceberg -->
       <path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z" fill="url(#ice)" stroke="#1f3b5c" stroke-width="2"/>
       <g clip-path="url(#berg)">
@@ -212,9 +214,9 @@
       </g>
       <g font-weight="700" text-anchor="middle">
         <text x="618" y="128" font-size="17" style="fill:#14213d">事件 Events</text>
-        <text x="618" y="230" font-size="17" fill="#fff">模式 Patterns</text>
-        <text x="618" y="362" font-size="17" fill="#fff">結構 Structures</text>
-        <text x="618" y="490" font-size="17" fill="#fff">心智模型 Mental Models</text>
+        <text x="618" y="230" font-size="17" class="w">模式 Patterns</text>
+        <text x="618" y="362" font-size="17" class="w">結構 Structures</text>
+        <text x="618" y="490" font-size="17" class="w">心智模型 Mental Models</text>
       </g>
       <!-- visible / hidden -->
       <text x="30" y="62" font-size="12" class="m">看得見 Visible</text>
@@ -261,9 +263,9 @@
             <text x="426" y="24">40 分</text><text x="426" y="104">20 分</text><text x="426" y="184">0 分</text>
             <text x="44" y="198">第1次</text><text x="114" y="198">第2次</text><text x="184" y="198">第3次</text><text x="254" y="198">第4次</text><text x="324" y="198">第5次</text><text x="394" y="198">第6次</text>
           </g>
-          <polyline points="50,40 120,60 190,60 260,100 330,120 400,140" fill="none" stroke="#1f5fbf" stroke-width="3"/>
+          <polyline points="50,60 120,60 190,60 260,100 330,120 400,140" fill="none" stroke="#1f5fbf" stroke-width="3"/>
           <polyline points="50,140 120,132 190,108 260,80 330,60 400,40" fill="none" stroke="#b25e09" stroke-width="3" stroke-dasharray="6 4"/>
-          <g font-size="12" font-weight="700"><text x="270" y="165" class="a">主動分享 7 → 2 人</text><text x="180" y="42" style="fill:var(--warn)">帶領者說明 10 → 35 分</text></g>
+          <g font-size="12" font-weight="700"><text x="270" y="165" class="a">主動分享 6 → 2 人</text><text x="180" y="42" style="fill:var(--warn)">帶領者說明 10 → 35 分</text></g>
           <text x="50" y="222" font-size="11" class="m">示意數據：接上真實資料後以你的數字繪製；兩線同時變化不代表因果。</text>
         </svg>
         <div class="read"><b>怎麼看：</b>左軸是人數（實線），右軸是帶領者說明分鐘（虛線）；兩線在第 3–4 次交叉。<b>看到：</b>人數一路掉、說明一路升，同時發生。<b>注意：</b>同時發生不等於一個造成另一個。<b>來源：</b>[1][2]；數字為示意。</div>
@@ -275,19 +277,20 @@
           <g class="node" stroke="#5a93c4" stroke-width="1.5">
             <rect x="20" y="30" width="150" height="44" rx="8"/><rect x="290" y="30" width="150" height="44" rx="8"/>
             <rect x="290" y="150" width="150" height="44" rx="8"/><rect x="20" y="150" width="150" height="44" rx="8"/>
-            <rect x="160" y="200" width="150" height="40" rx="8" stroke="#b25e09" stroke-dasharray="5 3"/>
+            <rect x="150" y="200" width="170" height="40" rx="8" stroke="#b25e09" stroke-dasharray="5 3"/>
           </g>
           <g font-size="12.5" text-anchor="middle" >
             <text x="95" y="57">帶領者先講作品的意義</text><text x="365" y="57">參與者等帶領者說</text>
             <text x="365" y="177">主動分享變少</text><text x="95" y="177">帶領者覺得「還沒到位」</text>
-            <text x="235" y="224" style="fill:var(--warn)">紀錄表只問「達到洞察？」（信念層）</text>
+            <text x="235" y="217" font-size="12" style="fill:var(--warn)">紀錄表只問「達到洞察？」</text><text x="235" y="233" font-size="10.5" style="fill:var(--warn)">（信念層）</text>
           </g>
           <g fill="none" stroke="#245b8a" stroke-width="2" marker-end="url(#arr)">
             <path d="M170,52 L288,52"/><path d="M365,76 L365,148"/><path d="M288,172 L172,172"/><path d="M95,148 L95,76"/>
-            <path d="M160,218 Q110,218 100,196" stroke="#b25e09"/>
+            <path d="M150,220 Q105,220 100,196" stroke="#b25e09"/>
           </g>
-          <text x="230" y="120" font-size="16" font-weight="700" text-anchor="middle" class="a">R 等答案迴路（自我加強）</text>
-          <text x="230" y="140" font-size="11" text-anchor="middle" class="m">箭頭 = 前者讓後者更嚴重；轉一圈回到起點，所以越轉越安靜</text>
+          <text x="230" y="113" font-size="16" font-weight="700" text-anchor="middle" class="a">R 等答案迴路（自我加強）</text>
+          <text x="230" y="130" font-size="11" text-anchor="middle" class="m">箭頭 = 前者讓後者更嚴重</text>
+          <text x="230" y="144" font-size="11" text-anchor="middle" class="m">轉一圈回到起點，所以越轉越安靜</text>
         </svg>
         <div class="read"><b>怎麼看：</b>四個方框繞一圈是迴路，箭頭方向是「誰讓誰更嚴重」；虛線框是信念層在餵它。<b>看到：</b>四個環節缺一不可，切斷任何一環迴路就停，最省力的是第一環（先講）。<b>來源：</b>[3][4]、發現 2。</div>
       </figure>
@@ -322,11 +325,11 @@
     <div class="layer l1 card" style="margin-bottom:12px">
       <div class="head"><h3>第 1 層／4：事件 Events</h3><span class="meta">看得見 ・ 時間：現在 ・ 出手方式：回應 React</span></div>
       <div class="row"><b>這層問</b><span class="q">現在發生了什麼？</span></div>
-      <div class="row"><b>你填的</b><span>這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；上一期同一次是 6 位 <cite>[1]</cite></span></div>
+      <div class="row"><b>你填的</b><span>這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位 <cite>[1]</cite></span></div>
       <div class="row"><b>這代表</b><span>少了 4 個人是警訊，但事件本身不告訴你原因。只看這一層會做出「下次開場多鼓勵大家」的決定。</span></div>
       <div class="row"><b>在這層出手</b><span>開場鼓勵、點名輪流說。<b>效果</b>：當次多一兩個人開口，下一次又安靜。<span class="lever low">槓桿：低</span></span></div>
       <div class="row"><b>對應方案</b><span>⑦ 甲「只多鼓勵」</span></div>
-      <div class="row"><b>資料厚度</b><span>你填 1 句＋上期對照數字・外部 0 筆 → 夠用</span></div>
+      <div class="row"><b>資料厚度</b><span>你填 1 句＋第 1 次的對照數字・外部 0 筆 → 夠用</span></div>
     </div>
 
     <div class="layer l2 card" style="margin-bottom:12px">
@@ -487,7 +490,7 @@
     <h2>⑨ 引註（每個 [n] 都指向一段可查的來源）</h2>
     <div class="how"><b>怎麼讀</b>[n] 是那句話的來源；「你的輸入」= 你填的原文，「外部來源」= 抓來的網頁（網址、抓取時間、指紋）。<b>你要做的</b>不用做；發現引錯了，按下方「退回並說原因」。</div>
     <ol class="src">
-      <li>你的輸入・事件：「這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；上一期同一次是 6 位」</li>
+      <li>你的輸入・事件：「這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位」</li>
       <li>你的輸入・模式：「三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低」</li>
       <li>你的輸入・結構：「流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄『參與者是否達到本次目標洞察』」</li>
       <li>你的輸入・心智模型：「帶領者團隊默認『參與者需要專家幫他們看見意義』；訓練教的是怎麼解讀作品，不是怎麼讓人自己看見」</li>

@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-24（續146）研究線：四頁示意稿視覺＋連貫性稽核（真的渲染成圖看、四頁互相對讀）；render-mocks.cjs；檢查器加跨頁事實表
+- [觸發] 操作者重申「丟三落四、不連續、不注意關聯性／排版／視覺舒適性／UI UX」。承認缺口：截圖逾時就放棄，從沒看過渲染後的畫面；四頁從沒互相對讀。
+- [看圖抓到] 冰山圖三個層名深字壓深冰（共用 `svg text{fill:var(--ink)}` 蓋掉 `fill="#fff"`，歷來每一版都有）；右欄文字被 viewBox 裁掉；圖 B 說明字壓兩支箭頭、信念框比字窄；「怎麼讀／你要做的」flex 把標籤和句子拆行；工作流課「完整介紹 →」連結斷字。
+- [對讀抓到] 結果頁一個案例兩組數字（標題 6→2、圖 A 7→2）；方法課宣稱「同一個案例」但預設例子、好壞例、示範按鈕全是另一個案例（再檢視）；工作流總覽第 1 站「自動填 2 欄／你填 3 欄」與課程頁「三格：自動 1、你填 2」不符。
+- [操作者追問] 「為什麼五分鐘課程反而只是簡圖？」→ 課程頁第 1 步是早期扁平多邊形草稿，從沒跟結果頁統一。改成同一張四層冰山 SVG（同多邊形、漸層、水面、層名），側欄換教學文字（左：每層問什麼；右：在這層出手得到什麼）。
+- [已改] 四頁：`--on-ice` token＋`svg text.w`；冰山 viewBox 1070；圖 B 兩行說明＋框加寬；`.how` 改行內；`.srow a` nowrap；圖 A 序列 6,6,6,4,3,2；方法課 edd 例子／好例／表格／示範改成主動分享案；結果頁「上一期同一次」兩處→「第 1 次是 6 位」；總覽第 1 站格數；工作流課第 3 站把選項條件誤稱權重→改「主動分享不降」權重。`check-mocks.py` 連貫性改寫：`PAIR_FACTS`（成對頁面兩邊都要有）、`PAGE_FACTS`、`NUMBER_PINS`（同一數字所有出現處都釘住）、`FORBID`（regex）、`ICEBERG_SHAPE`（兩頁冰山多邊形＋漸層位元相同），比對 NFKC 正規化後的可見文字；操作者留下的四句白話層名釘在課程頁冰山上；自測 45/45（九個連貫性案例各只打中一條迴圈）。新檔 `render-mocks.cjs`（Playwright 切片渲染，桌機／手機／深色；清舊圖、標示截斷、`--full`；exit 1 溢出／2 用法／3 渲染失敗）。計畫 §10「發布前必看圖」、I11 方法課 v6。線上：結果 v16、方法課 v13、總覽 v10、工作流課 v10。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node render-mocks.cjs（切片 Read 逐張看：修前 4 缺陷可見、修後消失；課程頁冰山 = 結果頁冰山）+ python check-mocks.py（綠）+ check-mocks-selftest.py（45/45）+ build-artifact.py ×4 + Artifact publish ×4 | exit=0 | ms=0
+- REVIEW_DONE: critic=Standard | verdict=fail→fixed | findings=0c/2m/7n（第一版事實表每頁各查、未互查 → 結果頁「上一期同一次」漏網；自測分不出 FACTS 迴圈被拔 → 改成每案例只打中一條；render 舊圖殘留／截斷不提示／exit 1 語意混用／範例路徑錯 → 全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=render-mocks\.js|再檢視被跳過|自動填 2 欄|上一期同一次 | hits=2（皆為檢查器 FORBID 表與自測案例裡的禁用字串本身；第一輪 3 hits 中的計畫 D18 仍寫著舊的雙案例設計，已改寫；WORKLOG 歷史除外）
+- [避免再發生] 計畫 §10：改示意稿 → 檢查器綠 → render 看圖 → 才發布；故事數字改 `FACTS`／`FORBID` 兩張表先行。
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續145）操作者「staging 刪掉 刪乾淨」：7 個 staging 站＋6 個孤兒 DB 全數拆除（全走 deprovision-staging.sh，先備份）；偵測器 verdict=OK orphans=0
 
 - **範圍**：盤點（續144 修好的偵測器＋Supabase REST＋MainWP DB）＝7 站（目錄＋DB＋自己帳號；3 站有 wp_sites 列＋org site_url）＋6 孤兒 DB；`client_credentials`（provision-staging）0 列；MainWP 只有 aware-wave.com／soulfulexpression.org（無 staging）。

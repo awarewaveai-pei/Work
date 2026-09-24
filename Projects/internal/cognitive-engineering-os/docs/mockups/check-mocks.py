@@ -4,7 +4,7 @@ Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/check-mocks
 Exit 0 = the four pages obey the same design rules. Exit 1 = one line per finding (never a traceback: a page that
 cannot be parsed is itself a finding). Self-test with mutations: check-mocks-selftest.py (must stay green).
 build-artifact.py runs this first and refuses to build when it is red."""
-import html.parser, pathlib, re, sys
+import html.parser, pathlib, re, sys, unicodedata
 
 RESULT = ["iceberg-result-mock.html", "workflow-result-mock.html"]
 LESSON = ["iceberg-lesson-mock.html", "workflow-lesson-mock.html"]
@@ -33,6 +33,56 @@ HEX_ALLOW = {".lever": "white text on fixed data colours (layer palette is the s
 # D18: five example sets; the workflow lesson has no "decision" chip because the whole route is one decision
 CHIP_SETS = {"iceberg-lesson-mock.html": {"edd", "partner", "decision", "ecom", "daily"},
              "workflow-lesson-mock.html": {"edd", "partner", "ecom", "daily"}}
+# continuity (matched on the visible text of the page, NFKC-normalised, style/script/attributes excluded)
+# PAIR_FACTS: regexes that must match on BOTH pages of a pair — the story is told once, on both sides.
+PAIR_FACTS = {
+    ("iceberg-result-mock.html", "iceberg-lesson-mock.html"): [
+        r"8 (?:人|位參與者)只有 2 (?:人|位)", r"第 1 次是 6 (?:人|位)", r"第 4 次", r"說明佔 35 分", r"參與者需要專家幫他們看見意義", r"達到洞察", r"帶領者先(?:講|解讀)",
+    ],
+    ("workflow-result-mock.html", "workflow-lesson-mock.html"): [
+        r"問題陳述[^。]{0,10}→[^。]{0,10}SWOT[^。]{0,10}→[^。]{0,10}加權決策矩陣", r"線上\+實體", r"主動分享(?:人數)?不降", r"遠地(?:參加者)?至少 3 人",
+        r"帶領者(?:負擔|每週準備時間)不(?:增|超過)", r"S/W/O/T 各至少 2 條", r"每個準則的權重",
+        r"第 1 站[\s\S]{0,900}?2 分鐘", r"第 2 站[\s\S]{0,1400}?3 分鐘", r"第 3 站[\s\S]{0,1400}?3 分鐘",
+    ],
+}
+# PAGE_FACTS: regexes that must match on one page.
+PAGE_FACTS = {
+    "iceberg-result-mock.html": [r"6 人掉到 2 人", r"主動分享 6 → 2 人", r"8 人團體", r"現在 2 人"],
+    # the four plain-language layer lines the operator approved on 2026-09-24 stay on the lesson iceberg
+    "iceberg-lesson-mock.html": [r"主動分享 6 → 2 人", r"同一個案例", r"看得見:發生了什麼", r"看不見:", r"一直重複的模式", r"製造模式的制度", r"撐住制度的信念"],
+    "workflow-result-mock.html": [r"自動填第 1 格", r"你填了 2 格"],
+    "workflow-lesson-mock.html": [r"三個格子"],
+}
+# NUMBER_PINS: every occurrence of the pattern on the listed pages must carry exactly these numbers (drift in one copy fails).
+NUMBER_PINS = [
+    (("iceberg-result-mock.html", "iceberg-lesson-mock.html"), r"第 1 次是 (\d+)", ("6",)),
+    (("iceberg-result-mock.html", "iceberg-lesson-mock.html"), r"(\d+) (?:人|位參與者)只有 (\d+) (?:人|位)", ("8", "2")),
+    (("iceberg-result-mock.html", "iceberg-lesson-mock.html"), r"說明佔 (\d+) 分", ("35",)),
+    (("iceberg-result-mock.html",), r"主動分享 (\d+) → (\d+) 人", ("6", "2")),
+    (("iceberg-result-mock.html",), r"現在 (\d+) 人", ("2",)),
+    (("workflow-result-mock.html", "workflow-lesson-mock.html"), r"遠地(?:參加者)?至少 (\d+) 人", ("3",)),
+    # a list pins the whole ordered sequence of occurrences: station 1 = 2 min, stations 2 and 3 = 3 min, NT$1 each
+    (("workflow-result-mock.html",), r"(?:用了|約) (\d+) 分鐘・(?:約 )?NT\$(\d+)", [("2", "1"), ("3", "1"), ("3", "1")]),
+    (("workflow-lesson-mock.html",), r"(\d+) 分鐘・NT\$(\d+)", [("2", "1"), ("3", "1"), ("3", "1")]),
+]
+# FORBID: the other story and the superseded numbers must not creep back in (regexes).
+FORBID = {
+    "iceberg-result-mock.html": [r"[57]\s*→\s*2", r"上一?期同一次", r"上期對照"],
+    "iceberg-lesson-mock.html": [r"[57]\s*→\s*2", r"上一?期同一次", r"再檢視", r"創作本身就是療癒", r"回頭講"],
+    "workflow-result-mock.html": [r"自動填 2 欄", r"你填了 3 欄"] + [
+        r"加權決策矩陣[^→。]{0,6}→[^→。]{0,12}SWOT", r"SWOT[^→。]{0,6}→[^→。]{0,12}問題陳述", r"加權決策矩陣[^→。]{0,6}→[^→。]{0,12}問題陳述"],
+    "workflow-lesson-mock.html": [
+        r"加權決策矩陣[^→。]{0,6}→[^→。]{0,12}SWOT", r"SWOT[^→。]{0,6}→[^→。]{0,12}問題陳述", r"加權決策矩陣[^→。]{0,6}→[^→。]{0,12}問題陳述"],
+}
+# one drawing on both iceberg pages: the polygon and the gradient must be byte-identical (raw HTML)
+ICEBERG_SHAPE = [
+    '<path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z" fill="url(#ice)"',
+    '<stop offset="0" stop-color="#fbe3d6"/><stop offset="0.2" stop-color="#cfe3f3"/><stop offset="0.5" stop-color="#5a93c4"/><stop offset="0.75" stop-color="#245b8a"/><stop offset="1" stop-color="#0b2a4a"/>',
+    'aria-label="冰山模型四層圖"',
+]
+_known = set(FILES)
+assert all(a in _known and b in _known for a, b in PAIR_FACTS) and set(PAGE_FACTS) <= _known and set(FORBID) <= _known \
+    and all(set(pages) <= _known for pages, _, _ in NUMBER_PINS), "continuity tables name a page that is not checked"
 COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|(?<![\w-])(?:white|black|red|blue|green|gray|grey|orange|yellow)(?![\w-])")
 MINW = re.compile(r"min-width\s*:\s*(\d+)px")
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
@@ -169,6 +219,18 @@ class Dom(html.parser.HTMLParser):
         self.cur.children.append(d)
 
 
+def visible_text(html_src):
+    """Text a reader sees: body text without <style>/<script>, attributes dropped, NFKC (＋ → +, ／ → /), spaces collapsed."""
+    dom = Dom(); dom.feed(html_src); dom.close()
+    out = []
+    def walk(n):
+        for c in n.children:
+            if isinstance(c, str): out.append(c)
+            elif c.tag not in ("style", "script", "title"): walk(c)
+    walk(dom.root)
+    return " ".join(unicodedata.normalize("NFKC", "".join(out)).split())
+
+
 def in_svg(node):
     while node is not None:
         if node.tag == "svg": return True
@@ -179,7 +241,7 @@ def in_svg(node):
 # ---------------- checks ----------------
 class Checker:
     def __init__(self, folder):
-        self.folder = pathlib.Path(folder); self.findings = []; self.shared_blocks = {}
+        self.folder = pathlib.Path(folder); self.findings = []; self.shared_blocks = {}; self.texts = {}; self.raw = {}
 
     def bad(self, f, rule, msg): self.findings.append(f"{f}: [{rule}] {msg}")
 
@@ -191,7 +253,33 @@ class Checker:
                 self.bad(f, "parse", f"{type(e).__name__}: {e}")
         if len(set(self.shared_blocks.values())) > 1:
             self.bad("*", "shared", "shared design-system block differs between files (copy the block from the file you edited to the other three)")
+        self.check_continuity()
         return self.findings
+
+    def check_continuity(self):
+        t = self.texts
+        for (a, b), pats in PAIR_FACTS.items():
+            for pat in pats:
+                for f in (a, b):
+                    if f in t and not re.search(pat, t[f]): self.bad(f, "continuity", f"fact shared with {b if f == a else a} not found: /{pat}/")
+        for f, pats in PAGE_FACTS.items():
+            for pat in pats:
+                if f in t and not re.search(pat, t[f]): self.bad(f, "continuity", f"fact missing: /{pat}/")
+        for pages, pat, want in NUMBER_PINS:
+            for f in pages:
+                got = [m.groups() for m in re.finditer(pat, t.get(f, ""))]
+                if isinstance(want, list):
+                    if got != want: self.bad(f, "continuity", f"sequence drifted for /{pat}/: {got} (pinned {want})")
+                else:
+                    for g in got:
+                        if g != want: self.bad(f, "continuity", f"number drifted: {g} for /{pat}/ (pinned {want})")
+        for f, pats in FORBID.items():
+            for pat in pats:
+                m = re.search(pat, t.get(f, ""))
+                if m: self.bad(f, "continuity", f"superseded text present: {m.group(0)!r} (/{pat}/)")
+        for f in ("iceberg-result-mock.html", "iceberg-lesson-mock.html"):
+            for piece in ICEBERG_SHAPE:
+                if f in self.raw and piece not in self.raw[f]: self.bad(f, "continuity", f"iceberg drawing differs from the shared shape: {piece[:48]}…")
 
     # -- css helpers
     def check_rule(self, f, where, media, prelude, body):
@@ -249,6 +337,7 @@ class Checker:
             if needle not in s: self.bad(f, "skeleton", f"missing {needle}")
         t = re.search(r"<title>(.*?)</title>", s)
         if not t or not (2 <= len(t.group(1)) <= 12): self.bad(f, "title", "title missing or not a 2–12 char name")
+        self.texts[f] = visible_text(s); self.raw[f] = s
         # style block structure (exactly one; starts with the shared block; page rules after the page mark)
         styles = re.findall(r"<style\b([^>]*)>(.*?)</style>", s, re.S)
         if len(styles) != 1: self.bad(f, "shared", f"expected exactly one <style>, found {len(styles)}"); return

@@ -32,7 +32,7 @@ CASES = [
     ("rgb() literal", "U19", "workflow-lesson-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .station{color:rgb(255,0,0)}\n"),
     ("min-width with a space", "responsive", "workflow-lesson-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .station{min-width: 480px}\n"),
     ("literal colour in inline style outside svg", "U19", "iceberg-result-mock.html", "str", '<h3 style="margin:6px 0 8px">', '<h3 style="margin:6px 0 8px;color:#ff0000">'),
-    ("unclosed rect inside svg", "html", "iceberg-result-mock.html", "str", '<rect x="0" y="150" width="980" height="425" class="water" opacity="0.55"/>', '<rect x="0" y="150" width="980" height="425" class="water" opacity="0.55">'),
+    ("unclosed rect inside svg", "html", "iceberg-result-mock.html", "str", '<rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55"/>', '<rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55">'),
     ("self-closing non-void html", "html", "workflow-result-mock.html", "str", '<span class="tag">已完成</span>', '<span class="tag"/>已完成'),
     ("crlf", "eol", "workflow-result-mock.html", "bytes", b"\n", b"\r\n"),
     ("header lesson button removed", "U15", "workflow-result-mock.html", "re", r'<a class="howto" href="[^"]*">([^<]*)</a>', r'<span class="k">\1</span>'),
@@ -48,6 +48,16 @@ CASES = [
     ("select element", "ux", "workflow-lesson-mock.html", "str", "</body>", "<select></select>\n</body>"),
     ("partner link removed", "links", "iceberg-lesson-mock.html", "str", "https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq", "https://claude.ai/artifact/0000000000000000000000"),
     ("second status strip", "status", "iceberg-result-mock.html", "str", "</body>", '<div class="status"><span class="pill">x</span></div>\n</body>'),
+    # continuity: each case exercises exactly one of the four continuity loops
+    ("page fact changed to a value no other rule forbids (PAGE_FACTS)", "continuity", "iceberg-result-mock.html", "str", "主動分享 6 → 2 人", "主動分享 6 → 3 人"),
+    ("one copy of a pinned number drifts (NUMBER_PINS)", "continuity", "iceberg-lesson-mock.html", "re", r"第 1 次是 6 人", "第 1 次是 7 人"),
+    ("the old story's phrase returns (FORBID)", "continuity", "iceberg-lesson-mock.html", "str", "例：「參與者需要專家幫他們看見意義。」", "例：「創作本身就是療癒，回頭講會破壞當下。」"),
+    ("superseded fill count returns (FORBID)", "continuity", "workflow-result-mock.html", "str", "自動填第 1 格（要決定什麼）", "自動填 2 欄"),
+    ("route order differs between the workflow pages (PAIR_FACTS)", "continuity", "workflow-result-mock.html", "str", "問題陳述 → SWOT → 加權決策矩陣", "問題陳述 → 加權決策矩陣 → SWOT"),
+    ("station time drifts on one page (PAIR_FACTS)", "continuity", "workflow-result-mock.html", "re", r"約 3 分鐘・約 NT\$1", "約 6 分鐘・約 NT$1"),
+    ("lesson drops the shared success condition (PAIR_FACTS)", "continuity", "workflow-lesson-mock.html", "re", r"遠地至少 3 人", "遠地至少 5 人"),
+    ("lesson iceberg polygon drifts from the result page's (ICEBERG_SHAPE)", "continuity", "iceberg-lesson-mock.html", "str", 'L420,290 Z" fill="url(#ice)"', 'L420,292 Z" fill="url(#ice)"'),
+    ("an approved plain-language layer line is dropped (PAGE_FACTS)", "continuity", "iceberg-lesson-mock.html", "str", '<text x="30" y="62" font-size="15" font-weight="700">看得見：發生了什麼</text>', '<text x="30" y="62" font-size="12" class="m">看得見 Visible</text>'),
 ]
 
 

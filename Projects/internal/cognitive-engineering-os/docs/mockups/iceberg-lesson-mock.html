@@ -9,13 +9,13 @@
   :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#7a7261;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
         --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
         --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
-        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe}
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4}
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}}
   :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
         --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
-        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a}
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
@@ -34,8 +34,9 @@
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
-  .how{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin:-4px 0 10px}
-  .how b{color:var(--accent);font-weight:600}
+  .how{font-size:12.5px;color:var(--muted);margin:-4px 0 10px;line-height:1.55}
+  .how b{color:var(--accent);font-weight:600;margin-right:4px}
+  .how b:not(:first-child){margin-left:12px}
   .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
   .can,.cant{border-radius:8px;padding:8px 10px;font-size:13.5px}
   .can{border:1px solid var(--ok)}
@@ -103,6 +104,7 @@
   svg text{fill:var(--ink)}
   svg text.m{fill:var(--muted)}
   svg text.a{fill:var(--accent)}
+  svg text.w{fill:var(--on-ice)}
   svg .node{fill:var(--node)}
   svg .water{fill:var(--water)}
   svg .axis{stroke:var(--axis)}
@@ -157,23 +159,58 @@
   <!-- 1 -->
   <div class="card">
     <h2>1. 這是什麼<small>30 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>左邊文字、右邊圖。<b>你要做的</b>不用做；只看「什麼時候不用」那一句：你的問題如果是一次性的意外，這個方法不適合，去第 6 步按第三顆按鈕。</div>
+    <div class="how"><b>怎麼讀</b>先讀三段文字，再看下面那張四層冰山：左邊是每層要問的問題，右邊是在那一層出手會得到什麼；分析結果頁用的是同一張圖，只是填上你的資料。<b>你要做的</b>不用做；只看「什麼時候不用」那一句：你的問題如果是一次性的意外，這個方法不適合，去第 6 步按第三顆按鈕。</div>
     <div class="grid2">
       <div>
         <p class="lead">冰山浮在水面上的只有一小角。<b>問題也是</b>：你看到的是「發生了什麼事」，真正決定它一再發生的原因藏在水面下。</p>
         <p>冰山模型是一種<dfn title="Systems Thinking：把問題當成一個互相牽動的系統來看，而不是單一事件">系統思考</dfn>的方法：把一件事往下挖四層，從「發生什麼」挖到「大家心裡怎麼想」。挖得越深，能改的東西越根本 <cite>[2]</cite>。</p>
         <p class="sub">什麼時候用：同一種問題一再出現、換人換方法都沒用、大家在互相怪罪的時候。什麼時候不用：一次性的意外、單純缺資料的問題 <cite>[1]</cite>。</p>
       </div>
-      <svg viewBox="0 0 320 240" role="img" aria-label="冰山：水面上一小角，水面下很大">
-        <rect x="0" y="80" width="320" height="160" class="water" opacity=".55"/>
-        <path d="M0,80 q16,-6 32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0 t32,0" fill="none" stroke="#7aa7cc" stroke-width="2"/>
-        <path d="M200,80 L215,30 L235,55 L250,80 L300,150 L285,225 L220,235 L160,215 L140,150 Z" fill="#5a93c4" stroke="#1f3b5c" stroke-width="2"/>
-        <path d="M200,80 L215,30 L235,55 L250,80 Z" fill="#dbe9f6" stroke="#1f3b5c" stroke-width="2"/>
-        <text x="16" y="60" font-size="13">看得見：發生了什麼</text>
-        <text x="16" y="120" font-size="13">看不見：</text>
-        <text x="16" y="140" font-size="12" class="m">一直重複的模式</text>
-        <text x="16" y="160" font-size="12" class="m">製造模式的制度</text>
-        <text x="16" y="180" font-size="12" class="m">撐住制度的信念</text>
+      <svg viewBox="0 0 1070 575" role="img" aria-label="冰山模型四層圖">
+        <defs>
+          <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fbe3d6"/><stop offset="0.2" stop-color="#cfe3f3"/><stop offset="0.5" stop-color="#5a93c4"/><stop offset="0.75" stop-color="#245b8a"/><stop offset="1" stop-color="#0b2a4a"/>
+          </linearGradient>
+          <clipPath id="berg"><path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z"/></clipPath>
+        </defs>
+        <rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55"/>
+        <path d="M0,150 q20,-8 40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0 t40,0" fill="none" stroke="#7aa7cc" stroke-width="2.5"/>
+        <line x1="30" y1="290" x2="1050" y2="290" stroke="#7aa7cc" stroke-dasharray="5 5"/>
+        <line x1="30" y1="420" x2="1050" y2="420" stroke="#7aa7cc" stroke-dasharray="5 5"/>
+        <path d="M550,150 L585,40 L620,85 L645,55 L690,150 L810,290 L780,420 L690,540 L560,540 L460,420 L420,290 Z" fill="url(#ice)" stroke="#1f3b5c" stroke-width="2"/>
+        <g clip-path="url(#berg)">
+          <line x1="400" y1="290" x2="840" y2="290" stroke="#fff" stroke-dasharray="4 4" opacity=".7"/>
+          <line x1="400" y1="420" x2="840" y2="420" stroke="#fff" stroke-dasharray="4 4" opacity=".7"/>
+        </g>
+        <g font-weight="700" text-anchor="middle">
+          <text x="618" y="128" font-size="17" style="fill:#14213d">事件 Events</text>
+          <text x="618" y="230" font-size="17" class="w">模式 Patterns</text>
+          <text x="618" y="362" font-size="17" class="w">結構 Structures</text>
+          <text x="618" y="490" font-size="17" class="w">心智模型 Mental Models</text>
+        </g>
+        <text x="30" y="62" font-size="15" font-weight="700">看得見：發生了什麼</text>
+        <text x="30" y="172" font-size="15" font-weight="700">看不見：</text>
+        <g font-size="14.5">
+          <text x="30" y="96" font-weight="700">① 事件｜發生了什麼？</text>
+          <text x="30" y="118" font-size="13" class="m">一件具體的事：時間、人數、數字</text>
+          <text x="30" y="212" font-weight="700">② 模式｜以前發生過嗎？多常？跟什麼一起出現？</text>
+          <text x="30" y="234" font-size="13" class="m">一直重複的模式（是線索，不是原因）</text>
+          <text x="30" y="346" font-weight="700">③ 結構｜什麼流程、規則、資源安排在製造它？</text>
+          <text x="30" y="368" font-size="13" class="m">製造模式的制度（寫制度，不寫某個人）</text>
+          <text x="30" y="472" font-weight="700">④ 心智模型｜哪個沒說出口的假設撐住這些結構？</text>
+          <text x="30" y="494" font-size="13" class="m">撐住制度的信念（常藏在口頭禪裡；自己的也要寫）</text>
+        </g>
+        <g font-size="14.5">
+          <text x="830" y="96" font-weight="700">回應 React</text>
+          <text x="830" y="118" font-size="13" class="m">當次有效，下次一樣</text>
+          <text x="830" y="212" font-weight="700">預測 Anticipate</text>
+          <text x="830" y="234" font-size="13" class="m">提早看到，不會阻止</text>
+          <text x="830" y="346" font-weight="700">設計 Design</text>
+          <text x="830" y="368" font-size="13" class="m">改流程、改規則 → 持久</text>
+          <text x="830" y="472" font-weight="700">轉化 Transform</text>
+          <text x="830" y="494" font-size="13" class="m">改信念、改角色 → 最根本</text>
+          <text x="830" y="560" font-size="12" class="a">↓ 越往下：越難改，效果越大越持久</text>
+        </g>
       </svg>
     </div>
   </div>
@@ -192,25 +229,25 @@
     </div>
     <div class="grid2" id="examples">
       <div class="exlayer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div>
-        <div class="ex" data-set="edd">例：這期 6 次 session 有 5 次沒做最後的「再檢視」。</div>
+        <div class="ex" data-set="edd">例：第 6 次 session，8 人只有 2 人主動說自己的作品；第 1 次是 6 人。</div>
         <div class="ex" data-set="partner" hidden>例：合作的畫廊這次又延後付款。</div>
         <div class="ex" data-set="decision" hidden>例：這個月又有 5 位家長問能不能加開平日班。</div>
         <div class="ex" data-set="ecom" hidden>例：這個月退貨率 12%，上個月 5%。</div>
         <div class="ex" data-set="daily" hidden>例：這週又為了家事吵架。</div></div>
       <div class="exlayer l2"><b>② 模式 Patterns</b><div class="q">問：以前發生過嗎？多常？什麼時候特別容易發生？</div>
-        <div class="ex" data-set="edd">例：每期都這樣；人多的場次更常跳過；線上場幾乎都跳。</div>
+        <div class="ex" data-set="edd">例：三期都從第 4 次開始掉；帶領者先解讀作品的那幾次掉得最多；線上場更低。</div>
         <div class="ex" data-set="partner" hidden>例：近一年每次展覽結束都延 30 到 60 天才付。</div>
         <div class="ex" data-set="decision" hidden>例：每年暑假前詢問暴增，開學後又回落。</div>
         <div class="ex" data-set="ecom" hidden>例：每次上新品後兩週退貨都衝高；尺寸類商品特別多；促銷檔期更嚴重。</div>
         <div class="ex" data-set="daily" hidden>例：每次都在週日晚上。</div></div>
       <div class="exlayer l3"><b>③ 結構 Structures</b><div class="q">問：是什麼流程、規則、資源安排讓它一直發生？</div>
-        <div class="ex" data-set="edd">例：90 分鐘裡創作 50、分享 30，再檢視排在最後沒有保護時間；紀錄表沒有「再檢視」這一欄。</div>
+        <div class="ex" data-set="edd">例：帶領者先講作品的意義再請人回應，說明佔 35 分；紀錄表只問「達到洞察？」。</div>
         <div class="ex" data-set="partner" hidden>例：合約沒寫付款期限；對方會計每季才結一次帳。</div>
         <div class="ex" data-set="decision" hidden>例：現有教室只有週末滿，平日閒置；老師都是兼職，平日排不出人。</div>
         <div class="ex" data-set="ecom" hidden>例：商品頁的尺寸表直接用供應商給的、沒人核對；退貨流程只有「同意／不同意」，不問原因。</div>
         <div class="ex" data-set="daily" hidden>例：沒有分工表，誰看到誰做。</div></div>
       <div class="exlayer l4"><b>④ 心智模型 Mental Models（最深）</b><div class="q">問：大家心裡哪個沒說出口的假設，撐住了這些結構？</div>
-        <div class="ex" data-set="edd">例：「創作本身就是療癒，回頭講會破壞當下的感覺。」</div>
+        <div class="ex" data-set="edd">例：「參與者需要專家幫他們看見意義。」</div>
         <div class="ex" data-set="partner" hidden>例：「小工作室不好意思催款。」</div>
         <div class="ex" data-set="decision" hidden>例：「擴大就是成長。」</div>
         <div class="ex" data-set="ecom" hidden>例：「退貨是客人的問題，不是我們的問題。」</div>
@@ -226,7 +263,7 @@
     <p class="lead">團體反思：第 6 次 session，8 位參與者只有 2 位主動說自己的作品。</p>
     <table>
       <tr><th>層</th><th>填進去的內容</th><th>只看這一層會做什麼</th></tr>
-      <tr><td>事件</td><td>8 人只有 2 人主動分享；上期同一次是 6 人</td><td>開場多鼓勵、點名（下次一樣）</td></tr>
+      <tr><td>事件</td><td>8 人只有 2 人主動分享；第 1 次是 6 人</td><td>開場多鼓勵、點名（下次一樣）</td></tr>
       <tr><td>模式</td><td>三期都從第 4 次開始掉；帶領者先解讀作品的場次最低</td><td>每次記人數與說明分鐘、提早看到</td></tr>
       <tr><td>結構</td><td>帶領者先講作品的意義再請人回應；說明佔 35 分；紀錄表只問「達到洞察？」</td><td>參與者先說、紀錄表改量過程（效果持久）</td></tr>
       <tr><td>心智模型</td><td>「參與者需要專家幫他們看見意義」</td><td>帶領者改成「讓判斷看得見的人」（最根本）</td></tr>
@@ -240,13 +277,13 @@
     <h2>4. 怎麼填：四步，每步一個好例子和一個壞例子<small>1.5 分鐘</small></h2>
     <div class="how"><b>怎麼讀</b>每步一好一壞，壞例括號裡寫的是它缺什麼。<b>你要做的</b>拿你的那件事，照「好」的樣子在心裡寫一句；寫不出來的那一層就是你要去補資料的層。</div>
     <div class="step"><div class="n">1</div><div><b>把事件講清楚</b>：一件具體的事、有時間、有數字。
-      <div class="gb"><div class="good"><b>好</b>：這期 6 次有 5 次跳過再檢視，上期 6 次跳 2 次。</div><div class="bad"><b>壞</b>：大家都不認真。（哪一步？幾次？跟上期比呢？）</div></div></div></div>
+      <div class="gb"><div class="good"><b>好</b>：第 6 次 session 8 人只有 2 人主動分享；第 1 次是 6 人。</div><div class="bad"><b>壞</b>：大家都不認真。（哪一次？幾人？跟第 1 次比呢？）</div></div></div></div>
     <div class="step"><div class="n">2</div><div><b>找模式</b>：這件事什麼時候發生、多常、跟什麼一起出現。
-      <div class="gb"><div class="good"><b>好</b>：每期都跳；人多的場次更常跳；線上場幾乎都跳。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div></div></div>
+      <div class="gb"><div class="good"><b>好</b>：三期都從第 4 次開始掉；帶領者先解讀的場次最低；線上場更低。</div><div class="bad"><b>壞</b>：一直都這樣。（多久？多常？有什麼一起變？）</div></div></div></div>
     <div class="step"><div class="n">3</div><div><b>找結構</b>：哪個流程、規則、人力安排在製造這個模式。寫「制度」，不寫「某個人」。
-      <div class="gb"><div class="good"><b>好</b>：再檢視排在最後 10 分鐘、沒有保護時間；紀錄表沒有這一欄。</div><div class="bad"><b>壞</b>：某某帶領者不重視。（這是怪人，不是結構）</div></div></div></div>
+      <div class="gb"><div class="good"><b>好</b>：帶領者先講意義、說明佔 35 分；紀錄表只問「達到洞察？」。</div><div class="bad"><b>壞</b>：某某帶領者不重視。（這是怪人，不是結構）</div></div></div></div>
     <div class="step"><div class="n">4</div><div><b>問信念</b>：大家沒說出口、但決定規則和優先順序的那句話。也問問自己的。
-      <div class="gb"><div class="good"><b>好</b>：「創作本身就是療癒，回頭講會破壞當下。」</div><div class="bad"><b>壞</b>：大家心態不對。（太籠統，指不出哪個假設）</div></div></div></div>
+      <div class="gb"><div class="good"><b>好</b>：「參與者需要專家幫他們看見意義。」</div><div class="bad"><b>壞</b>：大家心態不對。（太籠統，指不出哪個假設）</div></div></div></div>
     <p class="sub" style="margin:8px 0 0">填不出某一層沒關係，留白比硬湊好；工具會把它列成「證據缺口」，告訴你該去補什麼資料。</p>
   </div>
 
@@ -277,7 +314,7 @@
       <li>你們開會時常常出現的那句話（信念通常藏在口頭禪裡）</li>
     </ul>
     <div class="btns">
-      <span class="btn primary">用示範案例試一次<small>再檢視被跳過那個例子，已填好，按執行就看結果</small></span>
+      <span class="btn primary">用示範案例試一次<small>主動分享 6 → 2 人那個例子，已填好，按執行就看結果</small></span>
       <span class="btn">開始填我的案例<small>四個格子，每格旁邊有提示</small></span>
       <span class="btn">這方法適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
     </div>
