@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-24（續132）研究線：結果頁其餘八段照「第一次接觸者」標準逐段補完（示意稿 v2.5）；C10 加信心／改判條件／使用者判斷事件；計畫 v1.18
+- [觸發] 操作者：「其他八段也照這標準檢查，甚至要更完整。」
+- [逐段檢查與補法] 共通：每段開頭「怎麼讀／你要做的（可為不用做）」＋每段標來源。⓪ 狀態列（AI 草稿未核准／資料來源筆數／各層完整度與最薄層／成本與閱讀時間）＋能回答／不能回答＋「只有 30 秒看哪裡」＋四個詞。① 每個發現信心標籤＋理由（依資料厚度與外部證據）、改判條件三條、「你的判斷」欄（D20：使用者原話 = 記錄，AI 附掛；未填可核准）。② ★ 建議出手層＋各層資料厚度 ●○。③ 每圖三句：怎麼看／看到什麼／來源。④ 每卡加「對應 ⑦ 方案」「資料厚度」兩列。⑤ 怎麼讀＋要做的。⑥ ★ 建議列。⑦ 準則人話（見效／成本／持久／風險）、「如果只做一件事，明天就做」、目標數字全標「待你確認」（C11 禁模型定目標）、到期自動重跑說明。⑨ 無外部來源誠實提示＋信心上限＋[n] 種類說明。來源列：檢查項 tooltip 人話、你的判斷狀態、核准／退回／刪除專案各是什麼。
+- [已改] `mockups/iceberg-result-mock.html` v2.5（線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq v7）；`RESEARCH_LINES_MASTER_PLAN.md` v1.18：§3.10 骨架逐段標準、C10（`confidence`／`revision_conditions`／`data_thickness` 伺服器算／`POST /interpretations/{id}/judgment` → `UserJudgmentRecorded`）、I11 M9–M10、WC-PIa-01 schema、WC-PIa-06 端點、WC-PIa-11 `HowTo`＋`Judgment` 元件與驗收。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_v25.py + plan_v118.py（計數斷言）+ html.parser 標籤配對 + build_artifact.py result + Artifact publish | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿與計畫文字
+- BUGHUNT_DONE: scope=agency-os/TASKS.md,agency-os/docs,agency-os/reports,scripts,Projects/internal/cognitive-engineering-os | grep=revision_conditions|UserJudgmentRecorded|data_thickness | hits=4（新詞，全在計畫；程式碼尚無 = WC-PIa-01／06 要做）
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續131）研究線：結果頁 ⑧「下一步」重做為旅程列＋候選卡＋四動作（示意稿 v2.4）；C10 加 `next_steps[]` 與確定性 prefill；計畫 v1.17
 - [觸發] 操作者看 ⑧ 截圖：「你是指像你的圖這樣嗎？還是更好更完整？所有進來的人都是第一次接觸。」
 - [判斷] 原 ⑧ 只有方法名＋一句加深哪層，第一次用的人不知道自己在路的哪裡、按下去會帶入什麼／還要填什麼、不做行不行。重做：旅程列（✓ 已完成 → 下一步 → 之後 → 最後 = ⑦）、一句「你在哪、還缺什麼、不做也可以」、每個候選一張卡（回答什麼／帶入 N 欄＋還要填 M 欄標紅／會得到／約多久多少錢／用這次的資料開始／第一次用？5 分鐘課）、底部四動作（串成工作流一次跑且順序可改、不確定→路由、直接去 ⑦、先核准存檔）。「帶入什麼」由伺服器依契約 inputs × manifest 確定性算（`prefill_map`），模型只寫回答什麼／會得到什麼，避免幻覺。
