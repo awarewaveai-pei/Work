@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-24（續135）研究線：工作流課示意稿 v2——第 2 步改單欄，每站寫成「填好的範例」（操作者：三欄太擠、內容很爛）
+- [觸發] 操作者截圖第 2 步：「排版太擠，不要分三欄只要一欄，而且內容很爛。」
+- [已改] `mockups/workflow-lesson-mock.html` v2：第 2 步改單欄；每站固定七列（這站在做什麼／你會看到的表單／已經幫你填／你要填（附四個領域各一個填好的完整例子：要決定什麼、誰受影響、成功條件；S／W／O／T 各條；選項、準則與權重、結果與敏感度）／做完會得到／常見卡點／大約多久多少錢）；區塊容器改 div 免 span 包 div。線上 https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU v2。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python apply_wlesson_v2.py（錨點斷言）+ html.parser 標籤配對 + build_artifact.py wlesson + Artifact publish | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 示意稿
+- BUGHUNT_WAIVED: DOC_ONLY -- 單檔示意稿內容，無外部引用
+- [下一步] WC-PIa-01。
 ## 2026-09-24（續134）研究線：工作流課程頁（五步、≤3 分鐘）示意稿＋計畫 v1.20；操作者指出「工作流沒有課程頁」
 - [觸發] 操作者：「工作流的沒有課程頁？」→ v1.19 只寫了「工作流課 3 步」沒有示意稿，違反 I11（示意稿 = 規格）。
 - [已做] 新示意稿 `mockups/workflow-lesson-mock.html`（同方法課標準：狀態列／每步怎麼讀／你要做的／[n]／自我檢查／課程來源；五步：這條路解什麼＋能／不能回答＋站列＋何時用不用 → 三站各做什麼、帶入、還要填（例子跟線走 chips 四組）→ 看一個走完的（每站一句＋你的判斷＋總結）→ 怎麼走（兩種走法、好壞例、常見錯誤三條、自我檢查）→ 開始（準備清單＋三顆按鈕）；案例同總覽示意稿），線上 https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU；`build_artifact.py` 加 wlesson 模式；計畫 v1.20：U18 工作流課改五步＋指標、I11 第四份示意稿＋M11、§0 parity、P3 元件。
