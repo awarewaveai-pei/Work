@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-24（續145）操作者「staging 刪掉 刪乾淨」：7 個 staging 站＋6 個孤兒 DB 全數拆除（全走 deprovision-staging.sh，先備份）；偵測器 verdict=OK orphans=0
+
+- **範圍**：盤點（續144 修好的偵測器＋Supabase REST＋MainWP DB）＝7 站（目錄＋DB＋自己帳號；3 站有 wp_sites 列＋org site_url）＋6 孤兒 DB；`client_credentials`（provision-staging）0 列；MainWP 只有 aware-wave.com／soulfulexpression.org（無 staging）。
+- **步驟**：`sync-host-scripts` 裝上 `3af2de794` → 13 個目標全部 dry-run（同時驗真 Supabase 查詢語法）→ 先拆 1 個有 org 的站驗證 6 層 → 其餘 6 站＋6 孤兒 DB，全部 rc=0。
+- **驗證**：staging 目錄 0、staging DB 0、staging DB 帳號 0（剩 information_schema/performance_schema/mysql/sys/wordpress）；Supabase `wp_sites` /staging/ 0、org site_url /staging/ 0（3 個 org 已清）、client_credentials 0；主站 wp-config sha `2c6d410b…` 前後相同、siteurl OK、https://aware-wave.com/ 200；舊 staging URL 404；`check-staging-orphans.ps1` → `verdict=OK orphans=0 disk=0MB blind_spots=0`。
+- **備份**：`/root/lobster-phase1/backups/deprovision/` 13 份（610 MB，腳本保留 90 天）。今天臨時產生的遷移備份、grants 快照、事故證物 5 檔 shred（皆指向已不存在的東西；細節在續136/138）。
+- **未動**：3 個測試 org（E2E-Verify-0704／Test WP Webhook Co／MONGOLIA-03）本身不是 staging 資源，只清了 site_url；`.env.bak.20260924-hosting-bridge` 依 TASKS MainWP 條目在真建站 E2E 後刪。
+- **rollback**：某站 `tar -xzf backups/deprovision/<slug>-<stamp>.tar.gz -C <tmp>` → `db.sql` 匯回＋`files.tar.gz` 解回 `/var/www/html/staging/`＋`wp_sites.json` 重建列（MANIFEST 有 org）；再跑 `aw-hosting-gate.sh staging-prepare <slug> <db>` 重建自己的 DB 帳號。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`deprovision-staging.sh --slug ×7 / --db ×6 --apply` + layer counts (dirs/DBs/accounts/Supabase = 0) + `check-staging-orphans.ps1` verdict=OK orphans=0 | exit=0 | ms=600000
+- REVIEW_WAIVED: NA -- 本 entry 為 prod 清理操作（無新程式碼）；腳本 review 見續144（Codex deprovision r3、偵測器 r5 NO FINDINGS）
+- BUGHUNT_WAIVED: NA -- 無新程式碼
 ## 2026-09-24（續144）deprovision-staging.sh 補齊拆除面（孤兒 DB `--db`、staging admin 憑證＋vault）並修 3 個讓拆除半途失敗/誤判的 bug；操作者要求「staging 刪乾淨」的前置
 
 - **根因（不變量「provision 建的每種資源都要有拆除」被打破）**：
