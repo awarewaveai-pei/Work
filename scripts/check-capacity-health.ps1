@@ -1,8 +1,7 @@
 ﻿#requires -Version 5.1
 <#
     Capacity health for ks-aw-01 (SG/EU were consolidated into it 2026-08-28 and
-    deleted at Hetzner console 2026-08-30; $SgHost/$EuHost params are kept only for
-    call-site compatibility and are never probed).
+    deleted 2026-08-30; their host/key parameters were removed 2026-09-24 -- no caller passed them).
 
     WHY THIS EXISTS
     ---------------
@@ -60,11 +59,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$SgHost = "",   # retired 2026-08-31 (was 5.223.93.113); kept for signature compat, unused
-    [string]$EuHost = "",   # retired 2026-08-31 (was 204.168.175.41); kept for signature compat, unused
     [string]$KsAw01Host = "145.239.195.47",
-    [string]$SshUser = "root",
-    [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
     [string]$KsAw01SshUser = "ubuntu",
     [int]$KsAw01SshPort = 58122,
     [string]$KsAw01PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
@@ -490,11 +485,10 @@ if (-not (Get-Command ssh.exe -ErrorAction SilentlyContinue)) {
         Port = $KsAw01SshPort; UseSudo = $true
     }
     # 2026-08-28 consolidation, 2026-08-30 deletion: SG/EU were stopped, then the
-    # machines themselves were deleted at Hetzner console. Probing them would be a
+    # machines themselves were deleted at the old provider console. Probing them would be a
     # permanent WARN (SSH to a host that no longer exists) - and a permanent warning
     # is an ignored detector. ks-aw-01 (above) is now the ONLY production machine and
     # carries deliberately strict 60% thresholds so whole-host pressure is surfaced early.
-    # (Params $SgHost/$EuHost kept for signature compatibility; deliberately unused.)
 }
 
 $verdicts = [ordered]@{}

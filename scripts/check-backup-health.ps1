@@ -1,11 +1,7 @@
 ﻿#requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$SgHost = "",   # retired 2026-08-31 (was 5.223.93.113); kept for signature compat
-    [string]$EuHost = "",   # retired 2026-08-31 (was 204.168.175.41); kept for signature compat
     [string]$KsAw01Host = "145.239.195.47",
-    [string]$SshUser = "root",
-    [string]$PrivateKey = (Join-Path $env:USERPROFILE ".ssh\hetzner_trigger"),
     [string]$KsAw01SshUser = "ubuntu",
     [int]$KsAw01SshPort = 58122,
     [string]$KsAw01PrivateKey = (Join-Path $env:USERPROFILE ".ssh\id_ed25519"),
@@ -101,6 +97,10 @@ function Get-HostBackupHealth {
         ("BACKUP_SCRIPT='" + $BackupScriptPath + "'"),
         ("BACKUP_DIR='" + $BackupDir + "'"),
         ("VERIFY_LOG='" + $VerifyLog + "'"),
+        # Snapshot = a dated dir (YYYYMMDD-HHMMSS), the same definition verify-backup.sh and the retention
+        # sweep use. Anything else in BACKUP_DIR (deprovision/ pre-delete archives, video-schema/) is not a
+        # nightly snapshot and must not count as latest/oldest (2026-09-24: deprovision/ read as an unverified backup).
+        "SNAP_RE='^[0-9]{8}-[0-9]{6}$'",
         'if [ -f "$CRON_PATH" ]; then cron_status="present"; cron_lines=$(grep -v ''^[[:space:]]*#'' "$CRON_PATH" | grep -v ''^[[:space:]]*$'' || true); if [ -z "$cron_lines" ]; then cron_lines="(empty)"; fi; else cron_status="missing"; cron_lines="(missing)"; fi',
         'retention_days="(unknown)"',
         'retention_source="unknown"',
@@ -108,15 +108,15 @@ function Get-HostBackupHealth {
         'if [ -z "$retention_days" ] || [ "$retention_days" = "(unknown)" ]; then runtime_retention=$(bash -c ''set +e; set +u; source "$1" >/dev/null 2>&1; for k in RETENTION_DAYS LOCAL_RETENTION_DAYS BACKUP_RETENTION_DAYS BACKUP_RETAIN_DAYS KEEP_DAYS; do eval "v=\${$k:-}"; if [ -n "$v" ]; then printf "%s\n" "$v"; exit 0; fi; done; exit 0'' _ "$BACKUP_SCRIPT" 2>/dev/null | grep -Eo ''[0-9]+'' | head -n 1 || true); if [ -n "$runtime_retention" ]; then retention_days="$runtime_retention"; retention_source="runtime"; fi; fi',
         'if [ -z "$retention_days" ] || [ "$retention_days" = "(unknown)" ]; then delete_rule_days=$(grep -v ''^[[:space:]]*#'' "$BACKUP_SCRIPT" | grep -Eo -- ''-mtime[[:space:]]*\+[0-9]+'' | head -n 1 | grep -Eo ''[0-9]+'' || true); if [ -n "$delete_rule_days" ]; then retention_days="$delete_rule_days"; retention_source="delete-rule"; fi; fi',
         'if [ -z "$retention_days" ]; then retention_days="(unknown)"; fi',
-        'if [ -d "$BACKUP_DIR" ]; then backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | awk ''{print $1}''); latest_file=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); oldest_file=$(ls -1tr "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$latest_file" ]; then latest_time=$(stat -c ''%y'' "$BACKUP_DIR/$latest_file" | cut -d''.'' -f1); else latest_time="(none)"; fi; if [ -n "$oldest_file" ]; then oldest_time=$(stat -c ''%y'' "$BACKUP_DIR/$oldest_file" | cut -d''.'' -f1); else oldest_time="(none)"; fi; else backup_size="(missing)"; latest_time="(missing)"; oldest_time="(missing)"; fi',
-        'backup_age_days="999"; if [ -d "$BACKUP_DIR" ]; then _latest=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$_latest" ]; then _mtime=$(stat -c ''%Y'' "$BACKUP_DIR/$_latest" 2>/dev/null || echo "0"); _now=$(date +%s); backup_age_days=$(( (_now - _mtime) / 86400 )); fi; fi',
+        'if [ -d "$BACKUP_DIR" ]; then backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | awk ''{print $1}''); latest_file=$(ls -1t "$BACKUP_DIR" 2>/dev/null | grep -E "$SNAP_RE" | head -n 1 || true); oldest_file=$(ls -1tr "$BACKUP_DIR" 2>/dev/null | grep -E "$SNAP_RE" | head -n 1 || true); if [ -n "$latest_file" ]; then latest_time=$(stat -c ''%y'' "$BACKUP_DIR/$latest_file" | cut -d''.'' -f1); else latest_time="(none)"; fi; if [ -n "$oldest_file" ]; then oldest_time=$(stat -c ''%y'' "$BACKUP_DIR/$oldest_file" | cut -d''.'' -f1); else oldest_time="(none)"; fi; else backup_size="(missing)"; latest_time="(missing)"; oldest_time="(missing)"; fi',
+        'backup_age_days="999"; if [ -d "$BACKUP_DIR" ]; then _latest=$(ls -1t "$BACKUP_DIR" 2>/dev/null | grep -E "$SNAP_RE" | head -n 1 || true); if [ -n "$_latest" ]; then _mtime=$(stat -c ''%Y'' "$BACKUP_DIR/$_latest" 2>/dev/null || echo "0"); _now=$(date +%s); backup_age_days=$(( (_now - _mtime) / 86400 )); fi; fi',
         'verify_result="UNKNOWN"; verify_time="(none)"; if [ -f "$VERIFY_LOG" ]; then vline=$(grep -E ''=== verify-backup[a-zA-Z0-9_-]* (PASSED|FAILED)'' "$VERIFY_LOG" 2>/dev/null | tail -n 1 || true); if [ -n "$vline" ]; then if printf ''%s'' "$vline" | grep -q PASSED; then verify_result="PASSED"; else verify_result="FAILED"; fi; verify_time=$(printf ''%s'' "$vline" | grep -oE ''^\[[^]]+\]'' | tr -d ''[]'' || true); if [ -z "$verify_time" ]; then verify_time="(?)"; fi; fi; fi',
         # R3-F1/F2 (round-3 review): bind the verify verdict to the snapshot it certifies.
         # A verdict parsed from the log tail may describe an OLDER snapshot than the one
         # sitting newest in BACKUP_DIR. If the newest snapshot has existed >90 min (the
         # verifier cadence is 30 min after backup) and the last 'Checking:' line does not
         # name it, the newest snapshot is UNVERIFIED - same-day, no whole-day blind spot.
-        'unverified_latest="no"; if [ -d "$BACKUP_DIR" ]; then _l=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$_l" ]; then _mt=$(stat -c ''%Y'' "$BACKUP_DIR/$_l" 2>/dev/null || echo 0); _am=$(( ($(date +%s) - _mt) / 60 )); _vt=""; if [ -f "$VERIFY_LOG" ]; then _vt=$(grep -E ''Checking: '' "$VERIFY_LOG" 2>/dev/null | tail -n 1 | sed ''s/.*Checking: //'' | xargs -r basename 2>/dev/null || true); fi; if [ "$_am" -gt 90 ] && [ "$_vt" != "$_l" ]; then unverified_latest="yes"; fi; fi; fi',
+        'unverified_latest="no"; if [ -d "$BACKUP_DIR" ]; then _l=$(ls -1t "$BACKUP_DIR" 2>/dev/null | grep -E "$SNAP_RE" | head -n 1 || true); if [ -n "$_l" ]; then _mt=$(stat -c ''%Y'' "$BACKUP_DIR/$_l" 2>/dev/null || echo 0); _am=$(( ($(date +%s) - _mt) / 60 )); _vt=""; if [ -f "$VERIFY_LOG" ]; then _vt=$(grep -E ''Checking: '' "$VERIFY_LOG" 2>/dev/null | tail -n 1 | sed ''s/.*Checking: //'' | xargs -r basename 2>/dev/null || true); fi; if [ "$_am" -gt 90 ] && [ "$_vt" != "$_l" ]; then unverified_latest="yes"; fi; fi; fi',
         'echo UNVERIFIED_LATEST=$unverified_latest',
         'echo CRON_STATUS=$cron_status',
         'echo "CRON_LINES=$(printf ''%s'' "$cron_lines" | tr ''\n'' ''|'')"',
@@ -185,9 +185,8 @@ $fatalReason = ""
 
 # Per-host degradation, NOT a global fatal: one host's missing key or unreachable
 # SSH must never blind the other two. A global fatal here would mean the newest,
-# least-critical host (ks-aw-01, whose default key is the operator's general-purpose
-# id_ed25519 rather than the repo's hetzner_trigger convention) could take down
-# monitoring for the two hosts that actually hold live customer data.
+# host could take down monitoring for the others. (ks-aw-01 is the only host since
+# 2026-08-31; its key is the operator's id_ed25519.)
 # NOTE: the splat parameter is deliberately NOT named $Args — that collides with
 # PowerShell's automatic $args (the argument array), and under Set-StrictMode
 # -Version Latest, $Args.ServerHost then throws PropertyNotFoundStrict instead of
@@ -225,7 +224,7 @@ if (-not $sshOk) {
     $fatalReason = "ssh.exe not found on PATH"
 } else {
     # 2026-08-28 consolidation, 2026-08-30 deletion: all three pipelines live on
-    # ks-aw-01 now. The old SG/EU machines were deleted at Hetzner console -
+    # ks-aw-01 now. The old SG/EU machines were deleted at the old provider console -
     # probing them would false-alarm forever (SSH to a host that no longer exists).
     # Labels keep their pipeline identity; only the host moved.
     $sg = Invoke-HostCheck -KeyPath $KsAw01PrivateKey -Label "lobster (ex-SG)" -CheckArgs @{
