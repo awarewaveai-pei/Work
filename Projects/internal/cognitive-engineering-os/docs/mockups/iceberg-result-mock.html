@@ -63,6 +63,16 @@
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
   .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:13px}
   .kpi b{font-size:14px}.kpi .now{color:var(--muted)}.kpi .goal{color:var(--ok);font-weight:700}.kpi .when{color:var(--muted);font-size:12px}
+  .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin-bottom:8px}
+  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span.done{background:var(--ok);color:#fff}.journey span.next{background:var(--accent);color:#fff}
+  .journey i{color:var(--muted);font-style:normal}
+  .nexts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:10px}
+  .next{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:4px;align-content:start}
+  .next.rec{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
+  .next b{font-size:14.5px}.next .k{color:var(--muted);font-size:12px}.next .need{color:var(--warn)}
+  .next .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
+  .next .lesson{font-size:12px;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -78,7 +88,7 @@
     <div class="steps">
       <div class="step"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
       <div class="step"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
-      <div class="step"><b>③ 看總結與解決方案</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；接下來該跑哪個方法。</div>
+      <div class="step"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；你在這條路的哪裡、接著做什麼、不做也可以。</div>
     </div>
   </div>
 
@@ -314,14 +324,61 @@
 
   <!-- 5. 下一步 -->
   <div class="card">
-    <h2>⑧ 下一步：接著跑哪個方法（各自加深哪一層）</h2>
-    <div class="btns">
-      <span class="btn primary">槓桿點分析<small>第 3、4 層：算出每個出手點的力道</small></span>
-      <span class="btn">因果迴路圖<small>第 3 層：把等答案迴路畫出來</small></span>
-      <span class="btn">行為隨時間圖<small>第 2 層：把兩個數字的六次資料補齊</small></span>
-      <span class="btn">五問法<small>第 4 層：驗證「專家比較懂」是不是真的根因</small></span>
+    <h2>⑧ 下一步：你在這條路的哪裡、接著做什麼</h2>
+    <div class="journey">
+      <span class="done">✓ 冰山模型：問題在第 3 層、根在第 4 層</span><i>→</i>
+      <span class="next">下一步：槓桿點分析（算每個出手點的力道）</span><i>→</i>
+      <span>之後：五問法（驗證根因）</span><i>→</i>
+      <span>最後：⑦ 解決方案定案與追蹤</span>
     </div>
-    <p class="sub" style="margin:10px 0 0">每一個都會沿用本次的四段輸入與引註，不用重填。第一顆是這個方法本身建議的下一步。</p>
+    <p class="lead" style="margin:6px 0 0">你已經知道問題在第 3 層的迴路、根在第 4 層的信念。<b>最值得的下一步是算出三個出手點的力道</b>，因為 ⑦ 的甲乙丙現在只有排序、沒有數字。<b>不做下一步也可以</b>：⑦ 的方案已經能用，差別是有沒有數字撐它。</p>
+
+    <div class="nexts">
+      <div class="next rec">
+        <div><b>槓桿點分析</b><span class="tag">本方法建議的下一步</span></div>
+        <div><span class="k">回答什麼：</span>三個出手點（開場鼓勵／改流程順序／改帶領者角色）各自的力道與代價。</div>
+        <div><span class="k">帶入什麼：</span>你的四段輸入 <cite>[1]</cite>–<cite>[4]</cite> 與本次 3 個發現 → 自動填 5 個欄位；<span class="need">還要你填 1 個</span>：每個出手點你估的「改變難度」（1–5）。</div>
+        <div><span class="k">會得到：</span>槓桿表（出手點 × 難度 × 效果 × 持久），⑦ 的方案表自動更新。</div>
+        <div class="k">約 2 分鐘・約 NT$1</div>
+        <div class="btns"><span class="btn primary">用這次的資料開始</span></div>
+        <div class="lesson">第一次用？先看 5 分鐘的課 →</div>
+      </div>
+      <div class="next">
+        <div><b>因果迴路圖</b></div>
+        <div><span class="k">回答什麼：</span>等答案迴路有沒有漏掉的環節、有沒有第二條迴路。</div>
+        <div><span class="k">帶入什麼：</span>第 3 層你填的 <cite>[3]</cite> 與發現 2 → 自動填 4 個節點；<span class="need">還要你填 0 個</span>。</div>
+        <div><span class="k">會得到：</span>正式的迴路圖（節點、箭頭、R／B 標記），取代圖 B 的示意。</div>
+        <div class="k">約 1 分鐘・約 NT$0.5</div>
+        <div class="btns"><span class="btn">用這次的資料開始</span></div>
+        <div class="lesson">第一次用？先看 5 分鐘的課 →</div>
+      </div>
+      <div class="next">
+        <div><b>行為隨時間圖</b></div>
+        <div><span class="k">回答什麼：</span>分享人數與說明分鐘數六次的走勢，是不是真的在變。</div>
+        <div><span class="k">帶入什麼：</span><cite>[1]</cite><cite>[2]</cite> 的數字 → 自動建 2 條序列；<span class="need">還要你填 12 格</span>：六次 session 的實際數字（現在只有示意）。</div>
+        <div><span class="k">會得到：</span>正式的趨勢圖（取代圖 A）＋「同步不等於因果」的檢查。</div>
+        <div class="k">約 3 分鐘（要填數字）・約 NT$0.5</div>
+        <div class="btns"><span class="btn">用這次的資料開始</span></div>
+        <div class="lesson">第一次用？先看 5 分鐘的課 →</div>
+      </div>
+      <div class="next">
+        <div><b>五問法</b></div>
+        <div><span class="k">回答什麼：</span>「參與者需要專家幫他們看見意義」再往下問五次為什麼，是不是真的根因。</div>
+        <div><span class="k">帶入什麼：</span>第 4 層 <cite>[4]</cite> 與發現 3 → 自動填第一個「為什麼」；<span class="need">還要你填 4 個</span>：後面的回答（可讓 AI 起草，你改）。</div>
+        <div><span class="k">會得到：</span>根因鏈＋每一層的證據缺口。</div>
+        <div class="k">約 3 分鐘・約 NT$1</div>
+        <div class="btns"><span class="btn">用這次的資料開始</span></div>
+        <div class="lesson">第一次用？先看 5 分鐘的課 →</div>
+      </div>
+    </div>
+
+    <div class="btns" style="margin-top:12px">
+      <span class="btn primary">把建議的兩步串成一條工作流，一次跑完<small>每一步停下來給你確認，順序可以改</small></span>
+      <span class="btn">不確定選哪個？描述你想知道什麼<small>系統幫你挑，最多三個建議</small></span>
+      <span class="btn">分析已經夠了，直接去 ⑦ 解決方案</span>
+      <span class="btn ghost">都不做，先核准存檔（⑨ 下方）</span>
+    </div>
+    <p class="sub" style="margin:8px 0 0">每一張都帶入本次的輸入與引註，「還要你填」的欄位會標紅；按下去先開預填好的表單，你確認才執行、才花錢。</p>
   </div>
 
   <!-- 6. 引註 -->
