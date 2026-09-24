@@ -124,7 +124,7 @@ entries:
     blurb_en: "Reviews past internal/external conflicts and marks the path of transformation, turning it into a resource memory. Non-diagnostic -- holds the client's own words."
     blurb_zh: "回顧曾經的內外衝突，標示轉化路徑，形成資源記憶。非診斷工具，記錄的是案主自己的話。"
     why_en: "A conflict needs at least two sides (for an inner conflict, name two inner voices), and every transformation step has to say what was gained from it. The point of this method is not to restate the conflict but to leave it behind as a remembered resource: a step with no gain written down is a recollection, not a transformation."
-    why_zh: "衝突至少要有兩方（內在衝突就寫出兩個內在聲音），而且每一步轉化都要寫下「從中得到什麼」。這個方法的重點不是重述衝突，是把它留成資源記憶；沒寫下獲得的資源，那一步就只是回憶，不算轉化。"
+    why_zh: "衝突至少要有兩方（內在衝突就寫出兩個內在聲音），而且每一步轉化都要寫下「從中得到什麼」。這個工具的重點不是重述衝突，是把它留成資源記憶；沒寫下獲得的資源，那一步就只是回憶，不算轉化。"
     url: "https://pollackpeacebuilding.com/blog/conflict-mapping/"
   art_therapy.full_stop_method:
     name_en: "Full Stop Method"
@@ -187,7 +187,7 @@ entries:
     blurb_en: "Builds meaning and shared experience through narrative (setting/conflict/resolution/meaning). Non-diagnostic."
     blurb_zh: "用敘事建構意義與共享經驗。非診斷工具。"
     why_en: "A complete narrative needs setting, conflict, resolution and meaning; drop one and you have a fragment. Narrative therapy (White and Epston) holds that meaning emerges across the whole arc, not inside an event report -- an unfinished story belongs to a different method."
-    why_zh: "一個完整敘事要有場景、衝突、解決、意義四塊，缺一塊就只是片段。敘事治療（White 與 Epston）認為意義是在完整的弧線裡長出來的，不是在事件報告裡；還沒說完的故事有另一個專門方法處理。"
+    why_zh: "一個完整敘事要有場景、衝突、解決、意義四塊，缺一塊就只是片段。敘事治療（White 與 Epston）認為意義是在完整的弧線裡長出來的，不是在事件報告裡；還沒說完的故事有另一個專門工具處理。"
     url: "https://dulwichcentre.com.au/writings-by-michael-white/"
   art_therapy.synonym_substitution:
     name_en: "Synonym Substitution"
@@ -205,7 +205,7 @@ entries:
     blurb_en: "Guides awareness of key turning-point events in life and explores their deep effect on emotion and belief. Non-diagnostic."
     blurb_zh: "引導案主覺察生命中的關鍵轉折事件，探索其對情緒與信念的深層影響。非診斷工具。"
     why_en: "events must be in genuinely chronological (non-decreasing) order, compared as real parsed DATES rather than raw strings -- a timeline out of order is not a timeline. Grounded in Dan McAdams' narrative identity theory: turning points are the 'load-bearing' episodes a life story is organized around, and their sequence is part of what gives the story coherence, not an incidental detail."
-    why_zh: "events 必須是真正按時間先後（非遞減）排列，比較的是解析過的真實日期，不是原始字串——一條順序錯亂的時間線，不算時間線。這個方法根據 Dan McAdams 的敘事認同理論：轉折點是一個生命故事賴以組織的「承重」事件，它們的先後順序正是故事連貫性的一部分，不是無關緊要的細節。"
+    why_zh: "events 必須是真正按時間先後（非遞減）排列，比較的是解析過的真實日期，不是原始字串——一條順序錯亂的時間線，不算時間線。這個工具根據 Dan McAdams 的敘事認同理論：轉折點是一個生命故事賴以組織的「承重」事件，它們的先後順序正是故事連貫性的一部分，不是無關緊要的細節。"
     url: "https://journals.sagepub.com/doi/10.1177/0963721413475622"
   art_therapy.value_clarification:
     name_en: "Value Clarification"
@@ -297,7 +297,7 @@ entries:
     blurb_en: "Lists a problem's dimensions and each dimension's options, then systematically combines them into every legal combination for evaluation. Use it to exhaustively explore a huge solution space without missing combinations."
     blurb_zh: "列出問題的多個維度與各維度選項，系統性組合出所有「合法組合」再評估。想窮舉龐大解空間、不漏掉組合時用。"
     why_en: "Manually brainstorming combinations only surfaces the 'obvious' pairings your brain already gravitates to; GENERATING the full cartesian product first (then filtering out illegal pairings with constraints) surfaces combinations you would never have thought to compare side-by-side, and the resulting count tells you honestly how big the real solution space is before you narrow it down with something like MCDA."
-    why_zh: "手動腦力激盪組合，只會冒出你腦中本來就偏好的「顯而易見」配對；先用系統性方式產生完整的笛卡兒乘積組合（再用限制條件濾掉不合法的配對），才會冒出你原本根本不會想到要放在一起比較的組合，而且產生出來的數量會誠實告訴你真實解空間有多大，之後再用 MCDA 之類的方法縮小範圍。"
+    why_zh: "手動腦力激盪組合，只會冒出你腦中本來就偏好的「顯而易見」配對；先用系統性方式產生完整的笛卡兒乘積組合（再用限制條件濾掉不合法的配對），才會冒出你原本根本不會想到要放在一起比較的組合，而且產生出來的數量會誠實告訴你真實解空間有多大，之後再用 MCDA 之類的工具縮小範圍。"
     url: "https://www.swemorph.com/ma.html"
 
   # ---- causal (F11) ----
@@ -418,7 +418,7 @@ entries:
     blurb_en: "Deliberately builds the strongest case for 'what if the mainstream view is wrong', preventing groupthink. Use it when a meeting's opinions are suspiciously unanimous."
     blurb_zh: "刻意建立「如果主流觀點是錯的」最強反方論證，防止團體迷思。開會意見太一致、想防止盲點時用。"
     why_en: "If the opposing view is the mainstream view in different words, the exercise did nothing, so that is refused up front. Beyond that it needs at least one real supporting argument: the job here is to build the strongest version of what if the consensus is wrong, not to object for the sake of objecting."
-    why_zh: "「另一種觀點」如果只是把主流觀點換句話說，這一步就白做了，所以會先擋下來。在那之上還要至少一個真實論證：這個方法要建的是「如果主流是錯的」的最強版本，不是空泛的唱反調。"
+    why_zh: "「另一種觀點」如果只是把主流觀點換句話說，這一步就白做了，所以會先擋下來。在那之上還要至少一個真實論證：這個工具要建的是「如果主流是錯的」的最強版本，不是空泛的唱反調。"
     url: "https://www.psychologynoteshq.com/groupthink/"
   challenge.disconfirming_evidence:
     name_en: "Disconfirming Evidence"
@@ -454,7 +454,7 @@ entries:
     blurb_en: "A third-party final ruling after Red Team attacks and Blue Team defenses are both in. Use it when you want an unbiased final call."
     blurb_zh: "在 Red Team 攻擊、Blue Team 防守都做完後，由第三方角度做最終裁決。想要不偏袒任一方的最終結論時用。"
     why_en: "A ruling has to weigh at least one position, cite at least one criterion, and reach a non-empty conclusion. A verdict decided by which side had more voices, with no criterion anyone can name, is the failure this method exists to prevent."
-    why_zh: "一份裁決至少要權衡過一個立場、引用過一個判準，而且結論不能空白。靠「哪邊人多」做出來、卻說不出憑什麼判準的裁決，正是這個方法要避免的失敗模式。"
+    why_zh: "一份裁決至少要權衡過一個立場、引用過一個判準，而且結論不能空白。靠「哪邊人多」做出來、卻說不出憑什麼判準的裁決，正是這個工具要避免的失敗模式。"
     url: "https://en.wikipedia.org/wiki/Wisdom_of_the_crowd"
   challenge.pre_mortem:
     name_en: "Pre-mortem"
@@ -503,7 +503,7 @@ entries:
     blurb_en: "Records a real drill of restoring from backup, proving the backup actually works before you need it in an emergency. Use it periodically for anything you can't afford to lose."
     blurb_zh: "記錄一次真實的備份還原演練，證明備份真的能用，而不是等到出事才發現壞了。定期對重要資料做這件事。"
     why_en: "A backup that exists is not the same claim as a backup that restores usably within the time and data-loss limits the business actually needs -- this method refuses to let a record say status:passed unless integrity checks genuinely passed AND the real measured recovery time stayed under the RTO target AND (if RPO is tracked) the real measured data age stayed under the RPO target. The check is one-directional on purpose: a cautious status:failed despite good numbers is still allowed, because that is a legitimate human judgment call this method should never override."
-    why_zh: "「備份存在」跟「備份真的能在業務能接受的時間跟資料遺失範圍內還原成可用系統」是兩個不同的主張——這個方法不會讓紀錄寫 status:passed，除非完整性檢查真的通過、而且實際測到的還原時間真的低於 RTO 目標、而且（如果有追蹤 RPO）實際測到的資料落後時間真的低於 RPO 目標。這個檢查是刻意單向的：就算數字都合格，還是可以保守地寫 status:failed，因為這是這個方法永遠不該覆蓋的正當人為判斷。"
+    why_zh: "「備份存在」跟「備份真的能在業務能接受的時間跟資料遺失範圍內還原成可用系統」是兩個不同的主張——這個工具不會讓紀錄寫 status:passed，除非完整性檢查真的通過、而且實際測到的還原時間真的低於 RTO 目標、而且（如果有追蹤 RPO）實際測到的資料落後時間真的低於 RPO 目標。這個檢查是刻意單向的：就算數字都合格，還是可以保守地寫 status:failed，因為這是這個工具永遠不該覆蓋的正當人為判斷。"
     url: "https://oneuptime.com/blog/post/2026-08-06-prove-rpo-rto-with-restore-drills/view"
   database_data.data_contract:
     name_en: "Data Contract"
@@ -575,7 +575,7 @@ entries:
     blurb_en: "Defines how long each kind of data is kept and how it's deleted (hard delete, soft delete, anonymize). Use it to plan compliant data retention before you're forced to answer 'how long do we keep this?' under pressure."
     blurb_zh: "定義每種資料要保留多久、怎麼刪除（硬刪除／軟刪除／匿名化）。想規劃合規的資料保留政策時，提早想清楚用。"
     why_en: "When two or more legal/regulatory holds are active on the same data at once (e.g. a litigation hold AND a regulatory retention requirement), someone has to decide which one governs and WHY -- this method makes that decision structurally mandatory the moment more than one hold is active, and just as structurally forbidden to invent when it is not actually needed, so a resolution never gets fabricated for a non-conflict and never gets silently skipped for a real one."
-    why_zh: "當同一份資料同時有兩個以上的法律／法規保留要求生效（例如訴訟保留跟法規保留要求同時存在），一定要有人決定哪一個優先、為什麼——這個方法在真的有一個以上保留生效的當下，把這個決定變成結構上強制要有；在根本不需要的時候，也結構上禁止捏造一個，這樣一個解決理由就不會在沒有衝突時被憑空生出來，也不會在真的有衝突時被悄悄跳過。"
+    why_zh: "當同一份資料同時有兩個以上的法律／法規保留要求生效（例如訴訟保留跟法規保留要求同時存在），一定要有人決定哪一個優先、為什麼——這個工具在真的有一個以上保留生效的當下，把這個決定變成結構上強制要有；在根本不需要的時候，也結構上禁止捏造一個，這樣一個解決理由就不會在沒有衝突時被憑空生出來，也不會在真的有衝突時被悄悄跳過。"
     url: "https://en.wikipedia.org/wiki/Data_retention"
   database_data.schema_compatibility_analysis:
     name_en: "Schema Compatibility Analysis"
@@ -759,7 +759,7 @@ entries:
     blurb_en: "Classifies by a single, declared-once classification rule before expanding the tree, preventing mixed dimensions. Use it when you keep accidentally mixing classification criteria partway through a breakdown."
     blurb_zh: "先定好單一分類規則，再展開樹狀結構，防止維度混亂。發現自己拆到一半分類標準跑掉時用。"
     why_en: "Siblings under the same parent cannot share a category value, at any level. If two siblings under one rule carry the same value, that level split nothing -- the dimension confusion this method exists to prevent."
-    why_zh: "同一個父節點底下的兄弟不能用同一個分類值，每一層都一樣。如果同一條規則下兩個兄弟值相同，那一層等於沒分到任何東西——也就是這個方法要防的「維度混亂」。"
+    why_zh: "同一個父節點底下的兄弟不能用同一個分類值，每一層都一樣。如果同一條規則下兩個兄弟值相同，那一層等於沒分到任何東西——也就是這個工具要防的「維度混亂」。"
     url: "https://en.wikipedia.org/wiki/Taxonomy_(general)"
   decomposition.mece:
     name_en: "MECE Check"
@@ -786,7 +786,7 @@ entries:
     blurb_en: "Structures causes (below) -> core problem (center) -> effects (above), cleanly separating symptoms from causes. Use it before jumping to solutions, to make sure you're solving the real problem."
     blurb_zh: "原因在下、核心問題在中、效果在上，把問題結構化排開，避免把症狀當成原因。跳去想解法之前，先確認問題本身抓對了。"
     why_en: "causes ids and effects ids must be disjoint sets -- and unique within each of their own lists too. If the same id appeared in both causes and effects, the tree wouldn't have actually separated anything, defeating Atlas's own stated benefit of this method (separate symptoms from causes); a caller can't have it both ways by reusing one id to mean both a cause and an effect."
-    why_zh: "causes 的 id 集合跟 effects 的 id 集合一定要完全不重疊——而且各自在自己的清單裡也要唯一。如果同一個 id 同時出現在 causes 跟 effects 裡，代表這棵樹根本沒有真的分開任何東西，違背了 Atlas 講的這個方法的核心效益（把症狀跟原因分開）；呼叫端不能一魚兩吃，用同一個 id 同時代表一個原因又代表一個後果。"
+    why_zh: "causes 的 id 集合跟 effects 的 id 集合一定要完全不重疊——而且各自在自己的清單裡也要唯一。如果同一個 id 同時出現在 causes 跟 effects 裡，代表這棵樹根本沒有真的分開任何東西，違背了 Atlas 講的這個工具的核心效益（把症狀跟原因分開）；呼叫端不能一魚兩吃，用同一個 id 同時代表一個原因又代表一個後果。"
     url: "https://odi.org/en/publications/planning-tools-problem-tree-analysis/"
   decomposition.wbs:
     name_en: "Work Breakdown Structure"
@@ -842,7 +842,7 @@ entries:
     blurb_en: "Models task/deliverable/milestone dependencies explicitly, with owner+fallback required for every critical edge. Use it to reduce hidden blockers in a project plan."
     blurb_zh: "明確建模任務／交付物／里程碑之間的相依，每個關鍵相依都要有負責人與備援方案。降低專案裡隱性 blocker 時用。"
     why_en: "every edge with critical: true must carry a non-empty owner AND a non-empty fallback -- Atlas's own arrow sequence reads 'critical edges->owner->fallback', and a critical edge with no owner or no fallback IS exactly the hidden blocker this method's own benefit column names. A label alone is not a mitigation."
-    why_zh: "每個標記 critical:true 的邊，都一定要有非空的 owner 跟非空的 fallback——Atlas 自己的箭頭順序寫的是「關鍵邊→負責人→備援方案」，一個沒有負責人或沒有備援方案的關鍵邊，正是這個方法效益欄講的「隱性 blocker」。只貼一個標籤不算緩解措施。"
+    why_zh: "每個標記 critical:true 的邊，都一定要有非空的 owner 跟非空的 fallback——Atlas 自己的箭頭順序寫的是「關鍵邊→負責人→備援方案」，一個沒有負責人或沒有備援方案的關鍵邊，正是這個工具效益欄講的「隱性 blocker」。只貼一個標籤不算緩解措施。"
     url: "https://www.atlassian.com/team-playbook/plays/dependency-mapping"
   delivery.gantt_chart:
     name_en: "Gantt Chart"
@@ -878,7 +878,7 @@ entries:
     blurb_en: "Tracks Risks, Assumptions, Issues, and Dependencies in one place with owner/status/next action, so nothing gets lost in chat. A closed item must carry evidence."
     blurb_zh: "在一個地方管理風險／假設／議題／相依，含負責人、狀態、下一步。防止風險散落在聊天訊息裡時用。"
     why_en: "a RAID item whose status is CLOSED or RESOLVED must carry non-empty evidence -- a RAID item silently closed with no evidence defeats this method's own 'formalize scattered knowledge' benefit, since the closure itself must be checkable, not just a status flip. type must also be one of RISK/ASSUMPTION/ISSUE/DEPENDENCY -- literally what the R-A-I-D acronym names."
-    why_zh: "一個狀態是 CLOSED 或 RESOLVED 的 RAID 項目，一定要有非空的 evidence——一個沒有證據就悄悄關閉的 RAID 項目，會直接破壞這個方法「把散落知識正式化」的效益，因為關閉這個動作本身也要能被檢查，不能只是改個狀態就算數。type 也一定要是 RISK／ASSUMPTION／ISSUE／DEPENDENCY 其中之一——這就是 R-A-I-D 縮寫本身講的四個字。"
+    why_zh: "一個狀態是 CLOSED 或 RESOLVED 的 RAID 項目，一定要有非空的 evidence——一個沒有證據就悄悄關閉的 RAID 項目，會直接破壞這個工具「把散落知識正式化」的效益，因為關閉這個動作本身也要能被檢查，不能只是改個狀態就算數。type 也一定要是 RISK／ASSUMPTION／ISSUE／DEPENDENCY 其中之一——這就是 R-A-I-D 縮寫本身講的四個字。"
     url: "https://www.projectmanager.com/blog/raid-log-use-one"
   delivery.risk_register:
     name_en: "Risk Register"
@@ -1026,7 +1026,7 @@ entries:
     blurb_en: "Everyone writes ideas individually first, then shares/merges -- reduces anchoring and lets introverts contribute equally. Use it for cross-hierarchy groups where the loudest voice tends to dominate."
     blurb_zh: "先各自寫下想法，再分享合併，降低定錨效應與從眾心理。跨階級／怕外向者主導討論的團隊用。"
     why_en: "Contributions have to come from at least two different people. If every idea traces to one person, no number of entries has reduced the dominance of a single voice, which is the problem this method exists to solve. Merged ideas also have to point back to the contributions they came from."
-    why_zh: "貢獻必須來自至少兩個不同的人。如果全部想法都出自同一個人，不管寫了幾條，都沒有真的降低單一聲音主導——那正是這個方法要解決的問題。合併後的想法也要能指回原始貢獻。"
+    why_zh: "貢獻必須來自至少兩個不同的人。如果全部想法都出自同一個人，不管寫了幾條，都沒有真的降低單一聲音主導——那正是這個工具要解決的問題。合併後的想法也要能指回原始貢獻。"
     url: "https://www.lucidmeetings.com/glossary/brainwriting"
   divergent.classic_brainstorming:
     name_en: "Classic Brainstorming"
@@ -1044,7 +1044,7 @@ entries:
     blurb_en: "8 concepts in 8 minutes on an 8-panel grid, forcing you past your first (safest) answer. Use it for UI/interface or product-concept sketching, not for final selection."
     blurb_zh: "8 分鐘畫出 8 個不同概念，強迫自己跳過第一個答案。適合介面／產品概念發想，不適合當最終方案評選。"
     why_en: "Exactly eight cells, each number used once, and no two descriptions identical. Eight in eight minutes is this method's identity, and its effect -- forcing you past your first answer -- assumes eight genuinely different concepts, not one idea pasted eight times."
-    why_zh: "必須剛好八格、八個編號各一次，而且不能有兩格的描述一模一樣。「8 分鐘 8 個」是這個方法的身分，它的效果（逼你跳過第一個答案）預設的是八個真的不同的概念，不是同一個想法貼八次。"
+    why_zh: "必須剛好八格、八個編號各一次，而且不能有兩格的描述一模一樣。「8 分鐘 8 個」是這個工具的身分，它的效果（逼你跳過第一個答案）預設的是八個真的不同的概念，不是同一個想法貼八次。"
     url: "https://designsprintkit.withgoogle.com/methodology/phase3-sketch/crazy-8s"
   divergent.creative_constraints:
     name_en: "Creative Constraints"
@@ -1089,7 +1089,7 @@ entries:
     blurb_en: "A center idea spreads into 8 branches, each branch spawning 8 more ideas -- large volume with real structure. Use it when you want a lot of ideas but still organized enough to cluster afterward."
     blurb_zh: "中心主題展開 8 個分支，每個分支再各自長出 8 個想法，大量但有結構。想要大量想法但還能事後分群整理時用。"
     why_en: "A central theme opens into eight branches, and each branch into eight ideas -- exactly eight at both levels. One too few or one too many is refused, because this method is about volume with structure, and without the full count the shape does not exist."
-    why_zh: "中心主題展開八個分支，每個分支再各自八個想法，兩層都必須剛好八個。少一個或多一個都會被擋下——這個方法要的就是「大量但有結構」，數量不齊就不成形狀。"
+    why_zh: "中心主題展開八個分支，每個分支再各自八個想法，兩層都必須剛好八個。少一個或多一個都會被擋下——這個工具要的就是「大量但有結構」，數量不齊就不成形狀。"
     url: "https://nulab.com/learn/design-and-ux/the-lotus-blossom-technique-creativity-hack-you-need-to-know/"
   divergent.random_stimulus:
     name_en: "Random Stimulus"
@@ -1098,7 +1098,7 @@ entries:
     blurb_en: "Forces a connection between your problem and a random word or image to break habitual thinking. Ideas need a feasibility screen afterward -- it's for breaking ruts, not for final selection."
     blurb_zh: "用隨機詞或圖強制找出跟問題的關聯，打破慣性思考。之後需要可行性篩選——它是用來打破思路卡住，不是拿來做最終決定。"
     why_en: "Every output is permanently marked not yet screened for feasibility, and there is no way to change that state. This method breaks a stuck train of thought; it does not judge whether anything is workable. Mixing the two is exactly how random association ends up treated as a basis for decisions."
-    why_zh: "每一筆產出都固定標成「尚未篩選可行性」，而且沒有任何方式可以改成別的狀態。這個方法只負責打破思路卡住，不負責判斷可不可行；混用兩者，正是隨機聯想被當成決策依據的那種誤用。"
+    why_zh: "每一筆產出都固定標成「尚未篩選可行性」，而且沒有任何方式可以改成別的狀態。這個工具只負責打破思路卡住，不負責判斷可不可行；混用兩者，正是隨機聯想被當成決策依據的那種誤用。"
     url: "https://en.wikipedia.org/wiki/Creativity_techniques"
   divergent.reverse_brainstorming:
     name_en: "Reverse Brainstorming"
@@ -1107,7 +1107,7 @@ entries:
     blurb_en: "Instead of 'how do we solve X', brainstorm 'how could we cause or worsen X', then invert each answer into a real candidate solution. Use it when direct problem-solving keeps circling the same ideas."
     blurb_zh: "不直接想「怎麼解決 X」，而是先想「怎麼樣會讓 X 更糟」，再把每個答案反過來變成真正的解法。想解決問題卻一直卡在同樣幾個想法時用。"
     why_en: "Directly asking 'how do we fix this' often stalls on the same few ideas; asking 'how could we sabotage this' is usually easier to answer freely, and inverting each sabotage into its opposite produces a concrete fix while surfacing failure mechanisms a direct framing tends to route around."
-    why_zh: "直接問「怎麼解決」常常卡住、繞著同幾個想法打轉；反過來問「怎麼樣會搞砸它」通常更容易放開想，再把每個「搞砸的方法」倒過來，就變成一個具體的解法，還能順便揭露原本沒注意到的失敗風險。"
+    why_zh: "直接問「怎麼解決」常常卡住、繞著同幾個想法打轉；反過來問「怎麼樣會搞砸它」通常更容易放開想，再把每個「搞砸的工具」倒過來，就變成一個具體的解法，還能順便揭露原本沒注意到的失敗風險。"
     url: "https://miro.com/brainstorming/what-is-reverse-brainstorming/"
   divergent.scamper:
     name_en: "SCAMPER"
@@ -1134,7 +1134,7 @@ entries:
     blurb_en: "6 people x 3 ideas x 5 minutes, passing sheets around to build on each other's ideas -- structured, fast, high volume. Use it when you want brainwriting's benefits with a tight time-box."
     blurb_zh: "6 人×3 個想法×5 分鐘，輪流傳遞接力延伸，結構化又快速產生大量變體。想要腦力書寫的效果又要控制時間時用。"
     why_en: "Each sheet's rotation must cover every participant exactly once, compared after sorting, which is what catches both a missing person and someone appearing twice. Each round carries exactly three ideas -- six people, three ideas, five minutes is the definition of the method."
-    why_zh: "每張表的輪替必須剛好覆蓋全部參與者一次，用排序後比對，才抓得到「少了一個人」和「同一個人寫了兩次」。每一輪也必須剛好三個想法——六人、三個、五分鐘就是這個方法的定義。"
+    why_zh: "每張表的輪替必須剛好覆蓋全部參與者一次，用排序後比對，才抓得到「少了一個人」和「同一個人寫了兩次」。每一輪也必須剛好三個想法——六人、三個、五分鐘就是這個工具的定義。"
     url: "https://en.wikipedia.org/wiki/6-3-5_Brainwriting"
   divergent.starbursting:
     name_en: "Starbursting"
@@ -1143,7 +1143,7 @@ entries:
     blurb_en: "Diverges through questions across Who/What/When/Where/Why/How to surface unknowns and research questions. Use it early, before you've defined requirements, to find what you don't know yet."
     blurb_zh: "用 Who/What/When/Where/Why/How 六個角度發散提問，找出未知與研究問題。需求前期、想找出還不知道的事情時用。"
     why_en: "Every prompt has to end in a question mark. That is a checkable proxy for having written an open question rather than an answer, and it is also the real difference from 5W1H: 5W1H marks which aspects of a known problem are still unanswered, while this one asks outward. Each of the six angles needs at least one question."
-    why_zh: "每個問句都要真的以問號結尾。這是一個可檢查的代理指標，確認你寫的是開放問題而不是答案，也正是它跟 5W1H 的真正差別：5W1H 是替已知問題標出哪些面向還沒答案，這個方法是向外發問。六個角度每個都至少要問一次。"
+    why_zh: "每個問句都要真的以問號結尾。這是一個可檢查的代理指標，確認你寫的是開放問題而不是答案，也正是它跟 5W1H 的真正差別：5W1H 是替已知問題標出哪些面向還沒答案，這個工具是向外發問。六個角度每個都至少要問一次。"
     url: "https://www.toolshero.com/creativity/starbursting-brainstorming/"
   divergent.synectics:
     name_en: "Synectics"
@@ -1226,7 +1226,7 @@ entries:
     blurb_en: "Ranks evidence by strength on a domain-specific hierarchy so sources aren't all treated as equally reliable. Use it whenever you're weighing evidence of very different quality on the same question."
     blurb_zh: "用該領域的證據強度階層排序，避免把不同等級的來源當成同樣可信。權衡品質差很多的證據來回答同一個問題時用。"
     why_en: "Every level needs a distinct rank, forming a strict order; two levels tied cannot answer which evidence is stronger, which is the all sources are equal failure this method exists to prevent. You also declare the hierarchy each time, because the hierarchy in medicine and the one in market research genuinely differ, and forcing one ruler onto both distorts each."
-    why_zh: "每個層級的排名必須互不相同，形成嚴格順序；兩個層級並列，就答不出「哪個證據比較強」，那正是這個方法要防的「來源一律等價」。而且每次都要自己宣告一套層級，因為醫學的證據階層和市場研究的本來就不一樣，硬套同一把尺會扭曲各自的實況。"
+    why_zh: "每個層級的排名必須互不相同，形成嚴格順序；兩個層級並列，就答不出「哪個證據比較強」，那正是這個工具要防的「來源一律等價」。而且每次都要自己宣告一套層級，因為醫學的證據階層和市場研究的本來就不一樣，硬套同一把尺會扭曲各自的實況。"
     url: "https://www.cebm.ox.ac.uk/resources/levels-of-evidence/ocebm-levels-of-evidence"
   epistemic.evidence_matrix:
     name_en: "Evidence Matrix"
@@ -1235,7 +1235,7 @@ entries:
     blurb_en: "Aligns claims against evidence in a matrix (rows=claims, cols=evidence) so a weakly-supported claim is immediately visible. Use it to quickly spot which of your claims are actually under-supported."
     blurb_zh: "把主張跟證據排成矩陣（列=主張、欄=證據），一眼看出哪個主張證據薄弱。想快速看出哪些主張其實支撐不足時用。"
     why_en: "every declared claim must appear in at least one link before the record is accepted -- a claim floating in the matrix with zero evidence alignment IS the weak claim this method exists to surface, so it can never be silently accepted as part of a 'complete' matrix. This is the opposite failure mode from a dangling reference: instead of a link pointing nowhere, it's a claim nothing points to, and both are refused."
-    why_zh: "每一筆宣告的 claim，在紀錄被接受之前都一定要出現在至少一個 link 裡——一個完全沒有任何證據對齊的 claim，正是這個方法要揭露的「薄弱主張」，不能悄悄被當成一份「完整」矩陣的一部分放行。這跟懸空引用是相反的失敗模式：不是 link 指向不存在的東西，而是有一個 claim 完全沒有任何 link 指向它，兩種情況都會被拒絕。"
+    why_zh: "每一筆宣告的 claim，在紀錄被接受之前都一定要出現在至少一個 link 裡——一個完全沒有任何證據對齊的 claim，正是這個工具要揭露的「薄弱主張」，不能悄悄被當成一份「完整」矩陣的一部分放行。這跟懸空引用是相反的失敗模式：不是 link 指向不存在的東西，而是有一個 claim 完全沒有任何 link 指向它，兩種情況都會被拒絕。"
     url: "https://www.cia.gov/resources/csi/static/Tradecraft-Primer-apr09.pdf"
   epistemic.ladder_of_inference:
     name_en: "Ladder of Inference"
@@ -1244,7 +1244,7 @@ entries:
     blurb_en: "Climbs four fixed rungs -- data, meaning, assumption, conclusion -- in strict order, exposing the exact point a cognitive leap happened. Use it when someone jumped to a conclusion and you want to see where the reasoning actually broke."
     blurb_zh: "依序爬過資料→意義→假設→結論四個階梯，找出認知跳躍發生在哪一步。有人跳到結論、想看清楚推理到底哪裡斷掉時用。"
     why_en: "A rung needs the rung below it filled first: interpretations before assumptions, assumptions before conclusions. Jumping straight from data to a conclusion is refused -- and that jump is exactly what this method exists to make visible."
-    why_zh: "上面一階要有內容，下面一階必須先有：有假設之前要先有意義解讀，有結論之前要先有假設。從資料直接跳到結論會被擋下——那個跳躍正是這個方法要讓你看見的東西。"
+    why_zh: "上面一階要有內容，下面一階必須先有：有假設之前要先有意義解讀，有結論之前要先有假設。從資料直接跳到結論會被擋下——那個跳躍正是這個工具要讓你看見的東西。"
     url: "https://www.pon.harvard.edu/daily/negotiation-skills-daily/the-ladder-of-inference-a-resource-list/"
   epistemic.toulmin_model:
     name_en: "Toulmin Model"
@@ -1284,7 +1284,7 @@ entries:
     blurb_en: "Compares candidates against a baseline/competitor under a fixed workload and environment, all candidates scored on exactly the same metric set. Use it to choose a technology or vendor without relying on impressions."
     blurb_zh: "在固定的工作負載與環境下，跟基準／競品比較，所有候選都用同一組指標評分。避免憑印象選型時用。"
     why_en: "every candidate's results must cover EXACTLY the declared metrics set, no missing metric and no extra metric -- Atlas's own pipeline says 'fixed... metrics', and a candidate scored on a different metric set is exactly the 'choosing by impression' this method's own benefit column exists to prevent. At least 2 candidates are also required -- a benchmark of 1 candidate has nothing to compare against."
-    why_zh: "每個候選方案的 results 一定要剛好涵蓋宣告的 metrics 集合，不能缺一個也不能多一個——Atlas 自己的管線講的是「固定的…指標」，一個用不同指標集合評分的候選方案，正是這個方法的效益欄要防止的「憑印象選型」。也一定要至少 2 個候選方案——只有 1 個候選方案的基準測試沒有東西可以比較。"
+    why_zh: "每個候選方案的 results 一定要剛好涵蓋宣告的 metrics 集合，不能缺一個也不能多一個——Atlas 自己的管線講的是「固定的…指標」，一個用不同指標集合評分的候選方案，正是這個工具的效益欄要防止的「憑印象選型」。也一定要至少 2 個候選方案——只有 1 個候選方案的基準測試沒有東西可以比較。"
     url: "https://www.browserstack.com/guide/benchmark-testing"
   experiment.concierge_test:
     name_en: "Concierge Test"
@@ -1421,7 +1421,7 @@ entries:
     blurb_en: "Treats delay/expand/exit as options with a trigger, cost, and future-state value, instead of forcing a one-time yes/no. Use it for a decision you'd rather stage than commit to all at once."
     blurb_zh: "把延後／擴張／退出當成選擇權（觸發條件、成本、未來情境價值），而不是一次性 yes/no。想分階段決策、不想一次全押時用。"
     why_en: "Every option has to state its trigger -- an option with no trigger is wishful thinking. And at least two genuinely different future scenarios are required: an analysis with one scenario has collapsed back into the single yes-or-no this method exists to avoid."
-    why_zh: "每個選擇權都要寫出觸發條件——沒有觸發條件的「選擇權」只是一廂情願。而且未來情境至少要兩個且真的不同，只有一個情境的分析，等於又退回這個方法本來要避免的一次性是或否。"
+    why_zh: "每個選擇權都要寫出觸發條件——沒有觸發條件的「選擇權」只是一廂情願。而且未來情境至少要兩個且真的不同，只有一個情境的分析，等於又退回這個工具本來要避免的一次性是或否。"
     url: "https://en.wikipedia.org/wiki/Real_options_valuation"
   feasibility.tco:
     name_en: "Total Cost of Ownership"
@@ -1470,7 +1470,7 @@ entries:
     blurb_en: "Finds missing variables by looking at genuinely adjacent fields (not your team's current disciplines) and importing their models. Use it to reduce a single-profession blind spot."
     blurb_zh: "從真正的鄰近學科（不是團隊現有專業）找遺漏變數，並引入其模型。想降低單一專業盲點時用。"
     why_en: "The disciplines you list cannot be ones the team already practises: what you already know is by definition not adjacent, and listing it cancels the point of the search. Every model you import also has to point back at a discipline that was really searched, otherwise the source is fabricated."
-    why_zh: "列出的鄰近領域不能是團隊現有的專業，已經會的東西按定義就不算「鄰近」，硬列進去等於取消了這個方法的目的。每個引進的模型也要指回一個真的被搜尋過的領域，否則是捏造來源。"
+    why_zh: "列出的鄰近領域不能是團隊現有的專業，已經會的東西按定義就不算「鄰近」，硬列進去等於取消了這個工具的目的。每個引進的模型也要指回一個真的被搜尋過的領域，否則是捏造來源。"
     url: "https://www.sciencedirect.com/science/article/abs/pii/S1045235422000600"
   foresight.backcasting:
     name_en: "Backcasting"
@@ -1497,7 +1497,7 @@ entries:
     blurb_en: "Compares a metric across 2+ jurisdictions under an explicitly declared normalization basis. Use it to find local variation without comparing apples to oranges."
     blurb_zh: "在明確宣告的標準化基準下比較多個國家／地區的指標。想找出地區差異又不想拿蘋果比橘子時用。"
     why_en: "At least two countries or regions, or it is not a comparison. Each comparison also has to state its normalisation basis (per capita, purchasing-power adjusted, and so on) -- comparing raw figures with no stated basis is exactly the apples-to-oranges this method exists to block."
-    why_zh: "至少要兩個國家或地區才叫比較。每個比較也要寫出標準化基準（人均、購買力平價調整…）——沒有說明基準就直接比原始數字，正是這個方法要擋的「拿蘋果比橘子」。"
+    why_zh: "至少要兩個國家或地區才叫比較。每個比較也要寫出標準化基準（人均、購買力平價調整…）——沒有說明基準就直接比原始數字，正是這個工具要擋的「拿蘋果比橘子」。"
     url: "https://www.sciencedirect.com/science/article/pii/S0168851013000961"
   foresight.cross_impact_analysis:
     name_en: "Cross-impact Analysis"
@@ -1506,7 +1506,7 @@ entries:
     blurb_en: "Analyzes how a full matrix of event pairs change each other's probability, so trends aren't mistakenly treated as independent. Use it when several forecasted events could plausibly affect each other."
     blurb_zh: "分析一整組事件兩兩之間如何互相改變機率，避免把趨勢誤當獨立事件。多個預測事件彼此可能互相影響時用。"
     why_en: "Every pair of events appears exactly once. A missing cell lets the assumption that trends are independent of each other back in through the gap, which is the very thing this method exists to prevent -- so a gap is refused rather than read as no influence."
-    why_zh: "每一組事件兩兩配對都必須剛好出現一次。矩陣漏掉一組，等於讓「把趨勢當成互不相干的獨立事件」這個假設從缺口鑽回來，而那正是這個方法要防的事——所以漏掉會被擋下，不會被當成「沒有影響」。"
+    why_zh: "每一組事件兩兩配對都必須剛好出現一次。矩陣漏掉一組，等於讓「把趨勢當成互不相干的獨立事件」這個假設從缺口鑽回來，而那正是這個工具要防的事——所以漏掉會被擋下，不會被當成「沒有影響」。"
     url: "https://en.wikipedia.org/wiki/Cross_impact_analysis"
   foresight.cross_industry_transfer:
     name_en: "Cross-industry Transfer"
@@ -1524,7 +1524,7 @@ entries:
     blurb_en: "Anonymous multi-round expert estimation (round 1 -> summary -> round 2 -> dispersion), preserving the minority view instead of forcing false consensus. Use it to get expert judgment on an uncertain question without groupthink or authority bias."
     blurb_zh: "匿名多輪專家估計（第一輪→彙整→第二輪→分歧程度），保留少數意見而不是強迫假共識。想在不確定的問題上取得專家判斷、又不想被權威效應或從眾左右時用。"
     why_en: "Responses are anonymous, and there is nowhere to put a name, affiliation or job title at all -- attributed expert opinion directly reinstates the authority effect this method exists to reduce. Where a consensus summary exists, minority views must be recorded alongside it or their absence explained, so a manufactured consensus cannot be written up as unanimity."
-    why_zh: "回應一律匿名，連姓名、單位、職稱這類欄位都不允許存在——具名的專家意見會直接抵消這個方法要降低的權威效應。有共識摘要時，就必須同時記下少數意見，或明確說明為什麼沒有，避免把假共識寫成全體同意。"
+    why_zh: "回應一律匿名，連姓名、單位、職稱這類欄位都不允許存在——具名的專家意見會直接抵消這個工具要降低的權威效應。有共識摘要時，就必須同時記下少數意見，或明確說明為什麼沒有，避免把假共識寫成全體同意。"
     url: "https://www.rand.org/topics/delphi-method.html"
   foresight.futures_wheel:
     name_en: "Futures Wheel"
@@ -1542,7 +1542,7 @@ entries:
     blurb_en: "Compares a current situation to a historical precedent, extracting the mechanism while explicitly naming where the analogy breaks down. Use it to borrow from history without a superficial 'this is just like X' comparison."
     blurb_zh: "把現況跟歷史先例比較，抽出機制，並明確標出類比不成立的地方。想借鏡歷史又避免流於表面類比時用。"
     why_en: "Every analogy needs its similarities, its differences, the mechanism you extracted, and where the analogy stops holding. Similarities alone, with no differences and no limits, is the surface-level analogy this method exists to prevent, so it is refused before the record is created."
-    why_zh: "每個類比都要有相似點、差異點、抽出的機制，以及「這個類比在哪裡不成立」。只寫相似、不寫差異和限制，就是這個方法要防的表面類比，所以直接擋在建立之前。"
+    why_zh: "每個類比都要有相似點、差異點、抽出的機制，以及「這個類比在哪裡不成立」。只寫相似、不寫差異和限制，就是這個工具要防的表面類比，所以直接擋在建立之前。"
     url: "https://smallwarsjournal.com/2023/01/02/book-review-thinking-time-uses-history-decision-makers/"
   foresight.horizon_scanning:
     name_en: "Horizon Scanning"
@@ -1569,7 +1569,7 @@ entries:
     blurb_en: "Builds exactly 4 scenarios across 2 critical uncertainties, each fully fleshed out, instead of betting on one single forecast. Use it to plan for multiple plausible futures instead of one predicted one."
     blurb_zh: "用兩個關鍵不確定因素，建出正好四個完整情境，而不是只押注單一預測。想為多種可能未來做規劃、不依賴單一預測時用。"
     why_en: "Exactly two critical uncertainties and exactly four scenarios -- that is the shape of this method (two axes, four quadrants), not a general pattern you may extend at will. Each scenario also needs all nine elements; missing one leaves a narrative rather than a complete scenario."
-    why_zh: "剛好兩個關鍵不確定因素、剛好四個情境——這就是這個方法的形狀（兩軸四象限），不是一個可以自由擴張的通則。每個情境也要把九個要素寫齊，缺一個就不是完整的情境，只是一段敘述。"
+    why_zh: "剛好兩個關鍵不確定因素、剛好四個情境——這就是這個工具的形狀（兩軸四象限），不是一個可以自由擴張的通則。每個情境也要把九個要素寫齊，缺一個就不是完整的情境，只是一段敘述。"
     url: "https://en.wikipedia.org/wiki/Scenario_planning"
   foresight.weak_signal_detection:
     name_en: "Weak Signal Detection"
@@ -1578,7 +1578,7 @@ entries:
     blurb_en: "Finds not-yet-mainstream signals and requires 2+ independent corroborating sources before treating one as real (not just an anecdote). Use it to get early warning without chasing every random anecdote."
     blurb_zh: "找出還沒成為主流的訊號，且必須有兩個以上獨立來源佐證才算數（不只是單一軼事）。想提前偵測趨勢又不想追著每個道聽塗說跑時用。"
     why_en: "Corroboration needs at least two genuinely distinct sources (two that are identical once trimmed do not count as two). A weak signal with a single source has been cross-checked by nothing and is an anecdote -- accepting it quietly manufactures false positives, and this method's whole value lies in the balance between early warning and false alarms."
-    why_zh: "佐證來源至少要兩個真的不同的來源（去掉前後空白後還算同一個的不算兩個）。只有一個來源的「微弱訊號」沒有被交叉驗證過，只是一則軼事——默默收下它就會製造誤報，而這個方法的價值正在於提前量與誤報之間的平衡。"
+    why_zh: "佐證來源至少要兩個真的不同的來源（去掉前後空白後還算同一個的不算兩個）。只有一個來源的「微弱訊號」沒有被交叉驗證過，只是一則軼事——默默收下它就會製造誤報，而這個工具的價值正在於提前量與誤報之間的平衡。"
     url: "https://en.wikipedia.org/wiki/Strategic_early_warning_system"
   foresight.wild_cards:
     name_en: "Wild Cards"
@@ -1598,7 +1598,7 @@ entries:
     blurb_en: "Checks who's the decision maker, who's affected, who's excluded, what resources, and what values are in play -- revealing hidden power and value assumptions. Use it when a decision affects people who aren't in the room."
     blurb_zh: "檢視誰是決策者、誰受影響、誰被排除、有哪些資源、隱含什麼價值觀，揭露隱藏的權力與價值假設。決策會影響到不在場的人時用。"
     why_en: "Five perspectives -- decision makers, those affected, those excluded, resources, values -- in fixed order, none omitted. Where a category genuinely has nothing in it you must say so deliberately and give the reason, because in this method nobody is being excluded is itself a claim somebody has to own, not something a blank can carry."
-    why_zh: "五個角度（決策者／受影響者／被排除者／資源／價值觀）固定順序、缺一不可。某一類真的沒有內容時，必須明說「刻意留空」並寫出理由——因為在這個方法裡，「沒有被排除的人」本身就是一個需要負責任的主張，不能用空白帶過。"
+    why_zh: "五個角度（決策者／受影響者／被排除者／資源／價值觀）固定順序、缺一不可。某一類真的沒有內容時，必須明說「刻意留空」並寫出理由——因為在這個工具裡，「沒有被排除的人」本身就是一個需要負責任的主張，不能用空白帶過。"
     url: "https://www.betterevaluation.org/methods-approaches/approaches/critical-system-heuristics"
   framing.five_w_one_h:
     name_en: "5W1H Problem Profile"
@@ -1607,7 +1607,7 @@ entries:
     blurb_en: "Quickly profiles a fuzzy problem across Who/What/When/Where/Why/How, explicitly marking which dimensions are still unanswered. Use it right at the start when information is too thin to even define the problem yet."
     blurb_zh: "用 Who/What/When/Where/Why/How 快速建立模糊問題的輪廓，明確標出哪些面向還沒答案。資訊不足、連問題都還定義不清楚時，最開始用它。"
     why_en: "An aspect marked unknown sends no answer at all, not even an empty one -- an empty answer reads as answered with nothing, which cancels exactly what this method is for: marking what you do not yet know. The list of information gaps is computed from the six aspects as you fill them, so it always matches what you just wrote."
-    why_zh: "標成「未知」的面向不會送出任何答案欄位，連空字串都不送——一個空的答案會被讀成「已回答：什麼都沒有」，剛好抵消這個方法的用處：把還不知道的事標出來。資訊缺口清單是從六個面向的狀態當場算的，所以它永遠跟你剛填的內容一致。"
+    why_zh: "標成「未知」的面向不會送出任何答案欄位，連空字串都不送——一個空的答案會被讀成「已回答：什麼都沒有」，剛好抵消這個工具的用處：把還不知道的事標出來。資訊缺口清單是從六個面向的狀態當場算的，所以它永遠跟你剛填的內容一致。"
     url: "https://en.wikipedia.org/wiki/Five_Ws"
   framing.frame_storming:
     name_en: "Frame Storming"
@@ -1634,7 +1634,7 @@ entries:
     blurb_en: "Turns a vague wish into a concrete goal: goal -> beneficiary -> timeframe -> success condition -> constraints. Use it at the very start of a task to prevent scope drift later."
     blurb_zh: "把模糊願望轉成明確目標：目標→受益者→時間→成功條件→限制。任務起始時用，降低之後的範圍漂移。"
     why_en: "All five fields are required; the one left blank is precisely the vague aspiration this method exists to eliminate. The success condition also has to differ from the goal -- identical text restates the goal instead of giving you something testable. Goal-setting theory (Locke and Latham), across 35 years of research, finds that specific and difficult goals outperform do your best."
-    why_zh: "五個欄位都要填，空著的那一格正是這個方法要消除的模糊願望；而且成功條件必須跟目標真的不同，兩者一樣只是把目標再講一次，不是可以檢驗的條件。目標設定理論（Locke 與 Latham）橫跨 35 年的研究顯示：明確而有難度的目標，表現優於「盡力而為」。"
+    why_zh: "五個欄位都要填，空著的那一格正是這個工具要消除的模糊願望；而且成功條件必須跟目標真的不同，兩者一樣只是把目標再講一次，不是可以檢驗的條件。目標設定理論（Locke 與 Latham）橫跨 35 年的研究顯示：明確而有難度的目標，表現優於「盡力而為」。"
     url: "https://en.wikipedia.org/wiki/Goal_setting"
   framing.grow_model:
     name_en: "GROW Model"
@@ -1652,7 +1652,7 @@ entries:
     blurb_en: "Reframes a pain point into an open, solution-agnostic question ('How might we...') to widen the solution space. Use it right before a creative/ideation session, so you don't accidentally pre-suppose the answer."
     blurb_zh: "把痛點轉成開放、不預設方案的問題（「我們可以如何…」），擴大解法空間。進入創意發想階段之前用，避免不小心先預設了答案。"
     why_en: "The question has to open with How might we and end in a question mark. That is a checkable shape guarding against a question with the answer already baked in; invented synonyms are deliberately not accepted, because they drift beyond what this method is defined to be."
-    why_zh: "問句必須以「我們可以如何」或 how might we 開頭、以問號結尾。這是一個可檢查的形狀，用來擋住「問題裡已經藏著答案」；刻意不接受自創的同義說法，因為那會超出這個方法原本的定義。"
+    why_zh: "問句必須以「我們可以如何」或 how might we 開頭、以問號結尾。這是一個可檢查的形狀，用來擋住「問題裡已經藏著答案」；刻意不接受自創的同義說法，因為那會超出這個工具原本的定義。"
     url: "https://www.designkit.org/methods/how-might-we.html"
   framing.non_goals:
     name_en: "Non-goals"
@@ -1679,7 +1679,7 @@ entries:
     blurb_en: "Separates direction (Objective) from 2-5 measurable Key Results, each with an owner and review cadence. Use it for team/quarterly goal-setting so you don't just track busywork."
     blurb_zh: "把方向（O）跟 2-5 個可衡量成果（KR）分開，各自指定負責人與檢視頻率。團隊／季度目標設定，避免只追工作量時用。"
     why_en: "Between two and five key results, each with a description, a target value and an owner. That is what separates OKRs from SMART, which sharpens a goal you have already stated, and from methods that rank existing items -- OKRs recast direction and measurable outcomes."
-    why_zh: "關鍵成果限定 2 到 5 個，每一個都要有描述、目標值和負責人。這讓 OKR 跟「把已說出口的目標再精煉一次」的 SMART、以及「替既有項目排序」的方法區分開——OKR 是重新鑄造方向與可衡量成果。"
+    why_zh: "關鍵成果限定 2 到 5 個，每一個都要有描述、目標值和負責人。這讓 OKR 跟「把已說出口的目標再精煉一次」的 SMART、以及「替既有項目排序」的工具區分開——OKR 是重新鑄造方向與可衡量成果。"
     url: "https://www.whatmatters.com/articles/the-origin-story"
   framing.problem_statement:
     name_en: "Problem Statement"
@@ -1735,7 +1735,7 @@ entries:
     blurb_en: "Observes a user doing the real task in their real environment, asking questions in the moment, to surface needs they wouldn't think to mention. Especially effective for B2B workflows."
     blurb_zh: "在真實環境觀察使用者實際操作，即時追問，發現他們自己不會主動說的隱性需求。B2B 場景特別有效。"
     why_en: "Every observation records all three: what the user did, what the researcher saw, and what was asked in the moment. Miss one and this is an ordinary note rather than contextual inquiry -- the data of this method lives in that three-step loop."
-    why_zh: "每一則觀察都要同時記下：使用者做了什麼、研究者看到什麼、當下追問了什麼。缺一項就不是情境訪查，只是一則普通筆記——這個方法的資料就長在那三步的循環裡。"
+    why_zh: "每一則觀察都要同時記下：使用者做了什麼、研究者看到什麼、當下追問了什麼。缺一項就不是情境訪查，只是一則普通筆記——這個工具的資料就長在那三步的循環裡。"
     url: "https://www.nngroup.com/articles/contextual-inquiry/"
   insight.empathy_map:
     name_en: "Empathy Map"
@@ -1753,7 +1753,7 @@ entries:
     blurb_en: "Explores group perspective and interaction with 6-10 participants under moderation. Not for estimating population proportions -- use it to see social dynamics, not to poll."
     blurb_zh: "用 6-10 人的引導式討論探索群體觀點與互動。不能拿來估人口比例——是用來看社會互動，不是做民調。"
     why_en: "Six to ten participants, which is the definition of the method rather than an illustration. Every record also states outright that this is qualitative exploration and not an estimate of proportions in a population, making you cannot poll with a focus group structurally impossible to violate."
-    why_zh: "人數限定 6 到 10 人，這是這個方法的定義而不是舉例。而且每筆紀錄都固定寫明「這是質性探索，不是母體比例估計」，讓「焦點團體不能拿來做民調」變成結構上無法違反的事。"
+    why_zh: "人數限定 6 到 10 人，這是這個工具的定義而不是舉例。而且每筆紀錄都固定寫明「這是質性探索，不是母體比例估計」，讓「焦點團體不能拿來做民調」變成結構上無法違反的事。"
     url: "https://www.scribbr.com/methodology/focus-group/"
   insight.interview:
     name_en: "Interview"
@@ -1798,7 +1798,7 @@ entries:
     blurb_en: "Maps customer actions against frontstage, backstage, support, and systems layers together -- not just the UI. Use it for a service system where fixing the interface alone won't fix the experience."
     blurb_zh: "把顧客行動對照前台、後台、支援、系統層一起畫出來，不是只改介面。服務型系統、光改 UI 解決不了問題時用。"
     why_en: "The layers have to cover all five -- customer actions, frontstage, backstage, support processes, systems and data -- at least once each, and repeats are fine. A blueprint missing any layer structurally reproduces the tunnel vision this method exists to prevent: changing only what the customer sees."
-    why_zh: "layers 一定要涵蓋全部 5 個層級（顧客行動／前台／後台／支援流程／系統資料）各至少一次，重複是允許的——一個漏掉其中任何一層的藍圖，等於結構性地重現了這個方法自己要防止的「只改前台畫面」的隧道視野。"
+    why_zh: "layers 一定要涵蓋全部 5 個層級（顧客行動／前台／後台／支援流程／系統資料）各至少一次，重複是允許的——一個漏掉其中任何一層的藍圖，等於結構性地重現了這個工具自己要防止的「只改前台畫面」的隧道視野。"
     url: "https://www.smaply.com/blog/service-blueprint"
   insight.survey:
     name_en: "Survey / Questionnaire"
@@ -1836,7 +1836,7 @@ entries:
     blurb_en: "Decides which law governs when multiple laws conflict -- and REQUIRES human legal sign-off before any conflict is finalized (never auto-resolved). Use it whenever cross-border activity could be governed by more than one legal system."
     blurb_zh: "多個法律衝突時決定適用哪一個，且任何衝突的最終判定都要有真人法務簽核（絕不自動判定）。跨境活動可能受多套法律管轄時用。"
     why_en: "To record which law ultimately applies you first need a human legal review on file: who reviewed it, when, and their conclusion. No sign-off means no determination -- this method exists precisely to stop an automated system making the final legal call for you."
-    why_zh: "要填「最終適用哪一條法」，就必須先有真人法務的審查紀錄（誰審的、什麼時候、結論）。沒有簽核就不能判定——這個方法存在的目的，就是防止自動化系統替你做出法律上的最終判定。"
+    why_zh: "要填「最終適用哪一條法」，就必須先有真人法務的審查紀錄（誰審的、什麼時候、結論）。沒有簽核就不能判定——這個工具存在的目的，就是防止自動化系統替你做出法律上的最終判定。"
     url: "https://www.law.cornell.edu/wex/conflict_of_laws"
   jurisdiction.cultural_context_review:
     name_en: "Cultural Context Review"
@@ -1881,7 +1881,7 @@ entries:
     blurb_en: "Turns a legal obligation into a traceable engineering control with owner, evidence, and test. Use it to make sure legal and engineering are actually talking about the same thing."
     blurb_zh: "把法律義務轉成可追溯的工程控制措施，附負責人、證據、測試。想確保法務跟工程真的對得上焦時用。"
     why_en: "Every legal obligation maps to at least one control, or the record does not stand -- legal wrote the obligation and engineering did nothing is exactly the gap this method exists to catch. Each control also needs an owner, evidence and a test, otherwise it is a name on a page."
-    why_zh: "每一條法律義務都必須至少對應到一項控制措施，否則這份紀錄不成立——法務寫了義務、工程什麼都沒做，正是這個方法要抓的落差。每項控制也要有負責人、證據和測試，不然只是掛名。"
+    why_zh: "每一條法律義務都必須至少對應到一項控制措施，否則這份紀錄不成立——法務寫了義務、工程什麼都沒做，正是這個工具要抓的落差。每項控制也要有負責人、證據和測試，不然只是掛名。"
     url: "https://www.v-comply.com/glossary/control-mapping/"
   jurisdiction.regulatory_horizon_scan:
     name_en: "Regulatory Horizon Scan"
@@ -1899,7 +1899,7 @@ entries:
     blurb_en: "Resolves which jurisdictions jointly govern an activity across 11+ dimensions (entity, user location, data location, provider, sector, etc.) -- not just 'which country is the user in'. Use it whenever a simple country-name guess isn't good enough."
     blurb_zh: "從 11 個以上維度（實體、使用者位置、資料位置、供應商、產業別等）解析真正適用的管轄權，不只是「使用者在哪個國家」這麼粗略。單純猜國名不夠精確時用。"
     why_en: "When 2+ dimensions are declared, the resolution as a whole must trace back to at least 2 distinct dimensions -- so a genuinely multi-factor situation (entity in one country, users in another, data processed in a third) can't collapse into a single 'user's country == the answer' shortcut, which is exactly the naive judgment call this method exists to replace."
-    why_zh: "只要宣告了 2 個以上維度，最終的解析結果就一定要能追溯回至少 2 個不同維度——這樣一個真正牽涉多個因素的情境（實體在一國、使用者在另一國、資料處理又在第三國）就不能被偷偷簡化成「使用者在哪個國家＝答案」這種粗略捷徑，而這正是這個方法存在的目的：取代這種粗判。"
+    why_zh: "只要宣告了 2 個以上維度，最終的解析結果就一定要能追溯回至少 2 個不同維度——這樣一個真正牽涉多個因素的情境（實體在一國、使用者在另一國、資料處理又在第三國）就不能被偷偷簡化成「使用者在哪個國家＝答案」這種粗略捷徑，而這正是這個工具存在的目的：取代這種粗判。"
     url: "https://gdpr-info.eu/art-3-gdpr/"
 
   # ---- learning (F17 learning/reversal) ----
@@ -1937,7 +1937,7 @@ entries:
     blurb_en: "Captures context, options, evidence, forecast, and confidence WHILE the outcome is still unknown, preventing hindsight bias later. Use it right when you make a significant decision, before you know how it turns out."
     blurb_zh: "在結果還未知時就記下脈絡、選項、證據、預測、信心度，防止事後諸葛。做出重大決策的當下就用，不要等結果出來才寫。"
     why_en: "At least two options with exactly one marked chosen -- recording a single option means no choice was ever made. The context, options, evidence, prediction and confidence are fingerprinted the moment you write them and recomputed on every later check, so quietly raising your confidence afterwards is caught. That is the hindsight bias this method exists to prevent."
-    why_zh: "選項至少兩個、而且剛好一個標成選定——只記一個選項，代表根本沒有做過選擇。脈絡、選項、證據、預測、信心度在寫下當下就被算成一枚指紋，之後每次檢查都重算比對，事後偷偷調高信心度會被抓出來，這正是這個方法要防的事後諸葛。"
+    why_zh: "選項至少兩個、而且剛好一個標成選定——只記一個選項，代表根本沒有做過選擇。脈絡、選項、證據、預測、信心度在寫下當下就被算成一枚指紋，之後每次檢查都重算比對，事後偷偷調高信心度會被抓出來，這正是這個工具要防的事後諸葛。"
     url: "https://www.annieduke.com/overcoming-outcome-bias-how-to-improve-learning-decision-making-ft-annie-duke-ovul-sezer/"
   learning.dmaic:
     name_en: "Define-Measure-Analyze-Improve-Control"
@@ -2020,7 +2020,7 @@ entries:
     blurb_en: "A presentation layer over an existing causal DAG/loop diagram where every edge must carry its assumption -- so a generic diagram never gets mistaken for verified causation. Use it to visually present causal reasoning honestly."
     blurb_zh: "在既有因果圖／迴路圖上加一層呈現，每個箭頭都要附假設，避免一般圖表被誤當成已驗證的因果。想誠實地視覺化呈現因果推理時用。"
     why_en: "every rendered causal edge must carry a non-empty declared assumption, or it's refused -- an edge with no stated assumption is exactly the 'ordinary diagram mistaken for causation' failure this method exists to prevent. A causal diagram is only ever as trustworthy as the assumptions behind each arrow, and those assumptions are never statistically testable from the diagram alone -- they have to be written down."
-    why_zh: "每一條被渲染出來的因果邊都一定要附上非空的宣告假設，否則直接拒絕——一條沒有寫明假設的邊，正是這個方法要防止的「把一般圖誤當因果」失敗。一張因果圖的可信度，說到底就是每一支箭頭背後的假設有多站得住腳，而這些假設本來就沒辦法只從圖本身用統計方法驗證，一定要有人明確寫下來。"
+    why_zh: "每一條被渲染出來的因果邊都一定要附上非空的宣告假設，否則直接拒絕——一條沒有寫明假設的邊，正是這個工具要防止的「把一般圖誤當因果」失敗。一張因果圖的可信度，說到底就是每一支箭頭背後的假設有多站得住腳，而這些假設本來就沒辦法只從圖本身用統計工具驗證，一定要有人明確寫下來。"
     url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10712057/"
   representation.concept_graph_view:
     name_en: "Concept Graph View"
@@ -2036,7 +2036,7 @@ entries:
     abbr: ""
     name_zh: "專家自由組裝模式"
     blurb_en: "Lets an expert freely assemble typed method-blocks into a custom chain, with mandatory compatibility/policy/jurisdiction/gate checks -- free assembly, never free destruction. Use it when you know exactly which methods you want chained together, in what order."
-    blurb_zh: "讓專家自由拖拉組裝方法積木成自訂鏈，但強制做相容性／政策／管轄權／閘門檢查——是自由組裝，不是自由破壞。你很清楚想串哪些方法、什麼順序時用。"
+    blurb_zh: "讓專家自由拖拉組裝工具積木成自訂鏈，但強制做相容性／政策／管轄權／閘門檢查——是自由組裝，不是自由破壞。你很清楚想串哪些工具、什麼順序時用。"
     why_en: "A hand-assembled chain compiles only when all seven checks pass -- types, preconditions, policy, jurisdiction, cost, risk, required gates -- and is otherwise rejected. Experts may assemble freely, but not claim a chain that failed its checks is runnable: freedom to assemble is not freedom to break things."
     why_zh: "只有七項檢查（型別、前置條件、政策、管轄、成本、風險、必要閘門）全過，這條自組的鏈才算編譯成功，否則就是被拒絕。專家可以自由組裝，但不能宣稱一條沒通過檢查的鏈可以跑——自由組裝不等於自由破壞。"
     url: "https://www.geeksforgeeks.org/compiler-design/type-checking-in-compiler-design/"
@@ -2045,9 +2045,9 @@ entries:
     abbr: ""
     name_zh: "引導模式"
     blurb_en: "Asks one question at a time and auto-selects the right method from your answer, so tool-choice complexity stays in the engine, not on you. Use it when you don't know which tool to reach for."
-    blurb_zh: "一次問一個問題，依你的答案自動選出合適方法，讓「選哪個工具」的複雜度留在系統裡，不丟給你。不知道該用哪個工具時用。"
+    blurb_zh: "一次問一個問題，依你的答案自動選出合適工具，讓「選哪個工具」的複雜度留在系統裡，不丟給你。不知道該用哪個工具時用。"
     why_en: "The method chosen has to exist in the catalogue and be active, rather than merely being a well-formed-looking name. And at least one real question-and-answer pair is required -- picking a method without asking anything is not keeping the complexity of choosing inside the system."
-    why_zh: "選出來的方法必須在目錄裡真的存在且啟用中，不是一個看起來格式正確的名字。而且至少要有一組真實問答——一個問題都沒問就選好方法，就不是「把選擇的複雜度留在系統裡」。"
+    why_zh: "選出來的工具必須在目錄裡真的存在且啟用中，不是一個看起來格式正確的名字。而且至少要有一組真實問答——一個問題都沒問就選好工具，就不是「把選擇的複雜度留在系統裡」。"
     url: "https://www.nngroup.com/videos/progressive-disclosure/"
   representation.mind_map_view:
     name_en: "Mind Map View"
@@ -2056,7 +2056,7 @@ entries:
     blurb_en: "Renders an EXISTING knowledge object's own nodes as a radial mind map -- a presentation layer, not a new mind map generator (that's association.mind_map). Use it to re-view something you already built, spatially."
     blurb_zh: "把既有知識物件的節點渲染成放射狀心智圖——是呈現層，不是產生新心智圖（那是 association.mind_map）。想用空間方式重新檢視已經建好的東西時用。"
     why_en: "This layer stores node identifiers and coordinates only; titles, topics and keyword content cannot live here. That structurally separates re-laying-out existing content from generating a new mind map: generating belongs to another method, and this one only presents."
-    why_zh: "這一層只存節點編號和座標，不能存標題、主題或關鍵字內容。這在結構上把「重新排版既有內容」跟「產生新的心智圖」分開：想產生新內容要用另一個方法，這裡只負責呈現。"
+    why_zh: "這一層只存節點編號和座標，不能存標題、主題或關鍵字內容。這在結構上把「重新排版既有內容」跟「產生新的心智圖」分開：想產生新內容要用另一個工具，這裡只負責呈現。"
     url: "http://www.mindmapsoft.com/create-radial-mind-map/"
   representation.switching:
     name_en: "Representation Switching"
@@ -2141,7 +2141,7 @@ entries:
     blurb_en: "Compares before/after a failure and correlates it against a change list -- correlation is not causation, so this narrows scope, it doesn't conclude. Use it right after an incident to quickly shortlist 'what changed recently'."
     blurb_zh: "比對故障前後狀態，跟變更清單做關聯——關聯不等於因果，這是用來縮小範圍，不是下結論。事故發生後，想快速列出「最近改了什麼」時用。"
     why_en: "In the middle of an incident, the easiest leap is from we changed X recently to X caused it. That leap is structurally impossible here: no field can assert causation, only correlation strength and how close in time things were. The job is to narrow many candidates into a short list worth investigating, not to reach a verdict."
-    why_zh: "事故當下最容易從「我們最近改了 X」直接跳到「X 就是原因」。這個方法結構上不可能做這個跳躍：沒有任何欄位能宣稱因果，只有關聯強度和時間接近程度。它的工作是把一堆可能原因縮成一份值得深查的短清單，不是下結論。"
+    why_zh: "事故當下最容易從「我們最近改了 X」直接跳到「X 就是原因」。這個工具結構上不可能做這個跳躍：沒有任何欄位能宣稱因果，只有關聯強度和時間接近程度。它的工作是把一堆可能原因縮成一份值得深查的短清單，不是下結論。"
     url: "https://www.bill-wilson.net/root-cause-analysis/rca-tools/change-analysis"
   root_cause.event_tree:
     name_en: "Event Tree"
@@ -2168,7 +2168,7 @@ entries:
     blurb_en: "Organizes candidate causes of one problem into standard categories (people, process, equipment, materials, environment) branching off a central spine. Use it to brainstorm and categorize causes broadly before narrowing down with Five Whys or Pareto."
     blurb_zh: "把一個問題的候選原因，依標準類別（人、流程、設備、物料、環境）分支排列在一條主幹上。想先廣泛腦力激盪、分類原因，再用 Five Whys 或 Pareto 收斂時用。"
     why_en: "Fishbone can only ever produce a set of HYPOTHESES about the cause, never a confirmed root cause -- the system enforces this structurally: there is no code path that lets a fishbone hypothesis jump straight to a confirmed RootCauseFact, that promotion is refused unless the hypothesis set has actually been run through a real validation method (Five Whys, Pareto, or a causal DAG) first. This stops a good-looking brainstorm from being mistaken for proof."
-    why_zh: "魚骨圖永遠只能產出一組「假設」，不能直接產出已確認的根因——系統在結構上強制這件事：沒有任何程式路徑能讓魚骨圖的假設直接升級成已確認的 RootCauseFact，除非這組假設真的先跑過一個真正的驗證方法（Five Whys、Pareto，或因果圖），否則升級會被拒絕。這能避免一場好看的腦力激盪被誤認為是證明。"
+    why_zh: "魚骨圖永遠只能產出一組「假設」，不能直接產出已確認的根因——系統在結構上強制這件事：沒有任何程式路徑能讓魚骨圖的假設直接升級成已確認的 RootCauseFact，除非這組假設真的先跑過一個真正的驗證工具（Five Whys、Pareto，或因果圖），否則升級會被拒絕。這能避免一場好看的腦力激盪被誤認為是證明。"
     url: "https://asq.org/quality-resources/fishbone"
   root_cause.five_whys:
     name_en: "Five Whys"
@@ -2195,7 +2195,7 @@ entries:
     blurb_en: "Ranks causes by frequency or impact and highlights the vital few (typically ~20%) responsible for most of the effect (~80%). Use it to prioritize which causes to fix first when you have many candidates but limited time."
     blurb_zh: "依發生頻率或影響程度排序原因，找出佔多數效果（約 80%）的少數關鍵原因（約 20%）。有很多候選原因但時間有限，需要決定先修哪個時用。"
     why_en: "80/20 is a rule of thumb, not a law of nature -- the real ratio depends entirely on your own data, so this method never assumes a threshold for you. The ranking itself is real computed arithmetic (not an AI guess at percentages), and a 'vital few' list only appears once you explicitly supply your own threshold percentage; leaving it out is a legitimate answer that produces a full ranking with no cutoff, rather than a silently invented 80/20 split."
-    why_zh: "80/20 是經驗法則，不是自然法則——真正的比例完全取決於你自己的資料，所以這個方法不會替你假設一個門檻。排序本身是真實計算出來的（不是 AI 用猜的百分比），「關鍵少數」清單只有在你明確給出自己的門檻百分比時才會出現；不給門檻是合法的答案，會得到完整排序但沒有切點，而不是被悄悄套用一個假設的 80/20 分界。"
+    why_zh: "80/20 是經驗法則，不是自然法則——真正的比例完全取決於你自己的資料，所以這個工具不會替你假設一個門檻。排序本身是真實計算出來的（不是 AI 用猜的百分比），「關鍵少數」清單只有在你明確給出自己的門檻百分比時才會出現；不給門檻是合法的答案，會得到完整排序但沒有切點，而不是被悄悄套用一個假設的 80/20 分界。"
     url: "https://asq.org/quality-resources/pareto"
 
   # ---- security (F20 Security / Privacy Pack) ----
@@ -2251,7 +2251,7 @@ entries:
     blurb_en: "Reviews a system's access architecture against zero-trust principles: verify every request explicitly, grant least privilege, and assume the network is already breached. Use it to audit whether a design still relies on 'trusted internal network' as an implicit security boundary."
     blurb_zh: "依零信任原則檢視系統的存取架構：每次請求都明確驗證、最小權限、假設網路已經被入侵。想稽核設計是否還隱性依賴「內部網路等於可信任」這個假設時用。"
     why_en: "One long-lived shared credential slipping quietly back in makes zero trust fail silently -- however good the rest of the design, a single static key breaks the entire premise that every request is verified. Three specific credential types are refused outright when the record is created (shared passwords, long-lived keys, hardcoded secrets), so a review cannot accidentally certify as zero trust a design that still depends on the very pattern zero trust exists to remove."
-    why_zh: "只要一個長效期的共用憑證悄悄溜回來，零信任就會無聲失效——不管其他部分設計得多好，一把靜態 API 金鑰就能打破「每次請求都要驗證」這整個前提。這個方法在建立紀錄時會硬性拒絕三種特定的禁用憑證類型（共用密碼、長效期 API 金鑰、硬編碼機密），這樣一份審查紀錄就不會不小心把一個其實還依賴著零信任本來就是要消滅的那種模式的設計，記成「符合零信任」。"
+    why_zh: "只要一個長效期的共用憑證悄悄溜回來，零信任就會無聲失效——不管其他部分設計得多好，一把靜態 API 金鑰就能打破「每次請求都要驗證」這整個前提。這個工具在建立紀錄時會硬性拒絕三種特定的禁用憑證類型（共用密碼、長效期 API 金鑰、硬編碼機密），這樣一份審查紀錄就不會不小心把一個其實還依賴著零信任本來就是要消滅的那種模式的設計，記成「符合零信任」。"
     url: "https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=930420"
   security.secrets_threat_review:
     name_en: "Secrets Threat Review"
@@ -2269,7 +2269,7 @@ entries:
     blurb_en: "Threat-models the dependencies, build pipeline, and third-party vendors a system relies on, not just the system's own code. Use it when adding a new dependency, CI/CD step, or vendor integration that could become a compromise vector even if your own code is clean."
     blurb_zh: "對系統依賴的套件、建置流程、第三方供應商做威脅建模，而不只是看自己的程式碼。新增依賴套件、CI/CD 步驟或供應商整合時用，因為就算自己的程式碼乾淨，這些也可能變成入侵管道。"
     why_en: "Your own code can be perfectly clean and still ship a backdoor if a dependency was compromised upstream, or if production accepts an artifact nobody actually verified -- this method requires evaluating a new dependency against all 7 real risk dimensions (maintenance, license, vulnerability history, replaceability, transitive dependencies, size/performance, long-term support) rather than just 'does it work', and structurally refuses a record claiming production deployment happened without the artifact having been verified first."
-    why_zh: "就算自己的程式碼完全乾淨，只要上游有一個依賴套件被入侵、或正式環境接受了一個根本沒人驗證過的產物，後門照樣能被夾帶進來——這個方法要求對新增的依賴套件用全部 7 個真實風險維度（維護狀況、授權條款、漏洞歷史、可替代性、遞移依賴、體積效能、長期支援）評估，而不只是「能不能動」，而且結構上直接拒絕一份宣稱「正式環境已部署」卻沒先驗證過產物的紀錄。"
+    why_zh: "就算自己的程式碼完全乾淨，只要上游有一個依賴套件被入侵、或正式環境接受了一個根本沒人驗證過的產物，後門照樣能被夾帶進來——這個工具要求對新增的依賴套件用全部 7 個真實風險維度（維護狀況、授權條款、漏洞歷史、可替代性、遞移依賴、體積效能、長期支援）評估，而不只是「能不能動」，而且結構上直接拒絕一份宣稱「正式環境已部署」卻沒先驗證過產物的紀錄。"
     url: "https://slsa.dev/"
   security.abuse_case:
     name_en: "Abuse Case"
@@ -2287,7 +2287,7 @@ entries:
     blurb_en: "Maps each identified threat to the specific control that mitigates it, exposing any threat with no control and any control with no clear threat it addresses. Use it as the closing step after any threat-modeling exercise, to prove coverage instead of assuming it."
     blurb_zh: "把每個識別出的威脅對應到實際緩解它的控制措施，找出沒有控制措施的威脅、以及不知道在防什麼的控制措施。做完任何威脅建模後的收尾步驟，用來證明涵蓋率，而不是憑感覺假設有涵蓋。"
     why_en: "This is the only method in the whole catalog whose core job is checking its own claims against a DIFFERENT, already-existing record (a real STRIDE or LINDDUN threat model) rather than being self-contained -- every mapping's own denormalized threat name/category must genuinely match what that external record actually says at that index, not just what the mapper remembers or asserts. That is what turns 'we mapped controls to threats' from a self-reported claim into something checkable against the real source."
-    why_zh: "這是全語料庫裡唯一一個核心工作是拿自己的主張去對照另一份「已經存在」的紀錄（一份真實的 STRIDE 或 LINDDUN 威脅模型）、而不是自成一體的方法——每筆對照裡冗餘記錄的威脅名稱／分類，都必須真的跟那份外部紀錄在那個索引位置實際寫的東西一致，不能只憑對照者自己的記憶或宣稱。這正是讓「我們把控制措施對照到威脅了」從一句自我宣稱，變成真的可以拿外部原始紀錄核對的東西。"
+    why_zh: "這是全語料庫裡唯一一個核心工作是拿自己的主張去對照另一份「已經存在」的紀錄（一份真實的 STRIDE 或 LINDDUN 威脅模型）、而不是自成一體的工具——每筆對照裡冗餘記錄的威脅名稱／分類，都必須真的跟那份外部紀錄在那個索引位置實際寫的東西一致，不能只憑對照者自己的記憶或宣稱。這正是讓「我們把控制措施對照到威脅了」從一句自我宣稱，變成真的可以拿外部原始紀錄核對的東西。"
     url: "https://en.wikipedia.org/wiki/Security_controls"
 
   # ---- stakeholder (singular -- Lens, not Method) ----
@@ -2296,7 +2296,7 @@ entries:
     abbr: ""
     name_zh: "利害關係人／監管者視角"
     blurb_en: "A reusable 'perspective' lens (not a method) that re-reads existing analysis through a regulator's priorities: compliance, precedent, public accountability. Use it to pressure-test a decision or plan by asking 'how would a regulator see this', without re-running the whole analysis from scratch."
-    blurb_zh: "一個可重複套用的「視角」（不是方法），用監管者的優先順序——合規、先例、公共問責——重新檢視既有分析。想用「監管者會怎麼看這件事」來壓力測試一個決策或計畫，又不想整個分析重跑一次時用。"
+    blurb_zh: "一個可重複套用的「視角」（不是工具），用監管者的優先順序——合規、先例、公共問責——重新檢視既有分析。想用「監管者會怎麼看這件事」來壓力測試一個決策或計畫，又不想整個分析重跑一次時用。"
     why_en: "Giving an AI an expert persona makes it sound more authoritative without making it more accurate -- research on role-play prompting finds it changes tone and confidence, not correctness. So this lens still requires claims to carry citations, and the output has to be plainly hypothetical role-play that cannot be mistaken for an actual regulator's position."
     why_zh: "AI 套上專家人設會顯得更有權威，但不代表更準確——角色扮演提示的研究發現，它改變的是語氣和自信，不是正確率。所以這個視角要求主張仍要有引用佐證，而且輸出必須明顯是假設性的角色扮演，不能被當成真正監管者的意見。"
     url: "https://ai-analytics.wharton.upenn.edu/insights/stop-telling-ai-who-to-be-why-personas-dont-improve-accuracy/"
@@ -2336,7 +2336,7 @@ entries:
     blurb_en: "Builds one card per stakeholder covering their goals, incentives, constraints, and risks. Use it to predict how a stakeholder will actually behave, instead of how you assume they should behave."
     blurb_zh: "為每個利害關係人做一張卡片，涵蓋他的目標、誘因、限制、風險。想預測一個人實際上會怎麼做，而不是你以為他應該怎麼做時用。"
     why_en: "every incentive card must have all 5 of its own fields non-empty -- a card missing even one (say, risks) hasn't actually completed that stakeholder's card, regardless of how complete every other card in the list is. This is a per-card check, not a list-wide average: predicting one stakeholder's real behavior from an incomplete card is exactly the guesswork this method exists to replace with a disciplined, complete disclosure."
-    why_zh: "每一張激勵卡都一定要自己 5 個欄位全部非空——就算漏掉其中一個（例如 risks），也代表那位利害關係人的卡片沒有真的完成，不管清單裡其他卡片有多完整都一樣。這是逐卡檢查，不是整份清單的平均值：想從一張不完整的卡片去預測某個人的真實行為，正是這個方法要用嚴謹、完整的揭露取代的臆測。"
+    why_zh: "每一張激勵卡都一定要自己 5 個欄位全部非空——就算漏掉其中一個（例如 risks），也代表那位利害關係人的卡片沒有真的完成，不管清單裡其他卡片有多完整都一樣。這是逐卡檢查，不是整份清單的平均值：想從一張不完整的卡片去預測某個人的真實行為，正是這個工具要用嚴謹、完整的揭露取代的臆測。"
     url: "https://en.wikipedia.org/wiki/Principal%E2%80%93agent_problem"
   stakeholders.interest_based_negotiation:
     name_en: "Interest-Based Negotiation"
@@ -2390,7 +2390,7 @@ entries:
     blurb_en: "Compares the seller's minimum acceptable position against the buyer's maximum, and computes whether a zone of possible agreement even exists. Use it before a negotiation session to know upfront whether a deal is mathematically possible at all."
     blurb_zh: "比較賣方能接受的最低條件跟買方能接受的最高條件，算出兩者之間是否真的存在可能同意的區間。談判開始前先用，才會知道這筆交易在數學上到底成不成立。"
     why_en: "Whether an agreement zone exists, and where it lies, are computed from the seller's floor and the buyer's ceiling. That is not a safety net but the definition of the method: there cannot be a record claiming room to deal when the two numbers do not actually overlap."
-    why_zh: "有沒有成交區間、區間在哪，都是從賣方底價和買方上限算出來的。這不是防呆，而是這個方法的定義：不可能出現一筆紀錄宣稱有成交空間、但兩個數字其實根本沒重疊。"
+    why_zh: "有沒有成交區間、區間在哪，都是從賣方底價和買方上限算出來的。這不是防呆，而是這個工具的定義：不可能出現一筆紀錄宣稱有成交空間、但兩個數字其實根本沒重疊。"
     url: "https://online.hbs.edu/blog/post/understanding-zopa"
 
   # ---- strategy (F08 Context / Strategy Pack) ----
@@ -2419,7 +2419,7 @@ entries:
     blurb_en: "PESTEL plus a sixth dimension, Values -- the social/ethical values shaping a market. Use it instead of plain PESTEL when a decision is sensitive to shifting public or organizational values, not just economic and regulatory trends."
     blurb_zh: "在 PESTEL 六面向之外再加上第六個維度：價值觀——形塑市場的社會／倫理價值觀。決策對公眾或組織價值觀的變化敏感，不只是受經濟與法規趨勢影響時，用這個取代單純的 PESTEL。"
     why_en: "A long-term social-change scan that skips Values will still catch economic and regulatory shifts, but miss the shifting ethics/culture that often drives them in the first place -- this method structurally requires at least one VALUES factor, so that dimension can't be silently skipped the way it is in plain PESTEL."
-    why_zh: "只掃 PESTEL 六面向的長期社會變遷分析，還是抓得到經濟跟法規的變化，但常常抓不到真正在背後推動這些變化的倫理/文化轉變——這個方法結構上強制至少要有 1 筆 VALUES 因子，讓這個面向不會像純 PESTEL 那樣被悄悄跳過。"
+    why_zh: "只掃 PESTEL 六面向的長期社會變遷分析，還是抓得到經濟跟法規的變化，但常常抓不到真正在背後推動這些變化的倫理/文化轉變——這個工具結構上強制至少要有 1 筆 VALUES 因子，讓這個面向不會像純 PESTEL 那樣被悄悄跳過。"
     url: "https://foresightguide.com/horizon-scanning-frameworks/"
   strategy.three_c:
     name_en: "3C Analysis"

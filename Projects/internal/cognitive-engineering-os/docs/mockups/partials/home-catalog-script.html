@@ -1,30 +1,104 @@
 <script>
-  // Home catalogue: one search box filters workflows and methods together; family chips are multi-select (plan U11:
-  // visible buttons, no <select>). Hidden rows use the hidden attribute, never style.display.
-  document.addEventListener("DOMContentLoaded", function () {
-    var q = document.getElementById("q"), fams = {};
-    function norm(s) { return (s || "").toLowerCase(); }
-    function apply() {
-      var t = norm(q.value).trim(), any = Object.keys(fams).length > 0;
-      document.querySelectorAll("[data-q]").forEach(function (el) {
-        var f = el.getAttribute("data-fam");
-        var famOk = !any || !f || fams[f];
-        var qOk = !t || norm(el.getAttribute("data-q")).indexOf(t) !== -1;
-        el.hidden = !(famOk && qOk);
+  // Home = an app with four views (plan U1): the main menu (nav.side) switches them in place and moves aria-current;
+  // A #link and the address (load, back/forward) take one path, reveal(): the target's view, then whatever the search
+  // hid, then its fold; the address also restores each view's own scroll (the views differ in height). href="#" is a
+  // placeholder (its title names the phase) and does nothing, so it never throws the user back to the first view.
+  // The name search (inside the all-tools card) hides non-matching tool rows, opens the folds that still hold a
+  // match and lists matching workflows as links under the box (platform-internal ones labelled apart); an example
+  // situation fills the "say where you are stuck" box only while it is empty or still holds an example — once the user
+  // types their own text the examples hide, so a click can never wipe it; an in-page link whose target the search hid
+  // clears the search first, then opens the fold its target sits in (the link always lands).
+  // Folds: the search closes again only the folds it opened itself (data-auto); a fold the user closes during a search
+  // stays closed until the search is cleared (data-shut). Input is NFKC-folded (full-width ＳＷＯＴ finds SWOT).
+  // Hidden rows use the hidden attribute (plan U11); text is inserted with textContent only.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    var q = document.getElementById("q"), box = document.getElementById("ask"), hits = document.getElementById("hits");
+    var prompts = document.getElementById("prompts"), folds = document.querySelectorAll("details[data-dir]");
+    var views = document.querySelectorAll("section[data-view]"), menu = document.querySelectorAll(".navi[data-view]"), pos = {}, clicked = false;
+    try { history.scrollRestoration = "manual"; } catch (e) {}
+    function viewOf(t) { return t && (t.matches("section[data-view]") ? t : t.closest("section[data-view]")); }
+    function reveal(target) {
+      var v = viewOf(target);
+      if (!v) return null;
+      views.forEach(function (s) { if (!s.hidden && s !== v) pos[s.id] = window.scrollY; s.hidden = s !== v; });
+      menu.forEach(function (a) { if (a.getAttribute("data-view") === v.id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+      if (target !== v) {
+        if (target.closest("[hidden]") && q.value) { q.value = ""; apply(); }   // the search hid it: the link wins
+        var d = target.closest("details");
+        if (d) { d.removeAttribute("data-shut"); d.removeAttribute("data-auto"); d.open = true; }   // opened on purpose: stays open
+      }
+      return v;
+    }
+    function route() {
+      var h = location.hash.slice(1), id = h;
+      try { id = decodeURIComponent(h); } catch (e) {}      // a malformed %-escape: use the raw hash
+      var t = (id && document.getElementById(id)) || views[0], v = reveal(t);
+      if (clicked) { clicked = false; return; }              // a click: the browser's own jump scrolls
+      if (t === v) window.scrollTo(0, pos[v.id] || 0); else t.scrollIntoView();
+    }
+    window.addEventListener("hashchange", route);
+    var examples = Array.prototype.map.call(document.querySelectorAll("[data-prompt]"), function (b) { return b.getAttribute("data-prompt"); });
+    function norm(s) { return (s || "").normalize("NFKC").toLowerCase(); }
+    function say(parts) {
+      while (hits.firstChild) hits.removeChild(hits.firstChild);
+      parts.forEach(function (p) { hits.appendChild(typeof p === "string" ? document.createTextNode(p) : p); });
+    }
+    function links(els, parts) {
+      els.forEach(function (el, i) {
+        var a = document.createElement("a"); a.href = "#" + el.id; a.textContent = el.querySelector("b").textContent;
+        if (i) parts.push("、");
+        parts.push(a);
       });
-      document.querySelectorAll(".famgroup").forEach(function (g) { g.hidden = !g.querySelector(".tool:not([hidden])"); });
-      document.querySelectorAll(".wfgroup").forEach(function (g) { g.hidden = !g.querySelector(".wf:not([hidden])"); });
-      document.getElementById("mcount").textContent = document.querySelectorAll(".tool:not([hidden])").length;
-      document.getElementById("wcount").textContent = document.querySelectorAll(".wf:not([hidden])").length;
+    }
+    function apply() {
+      var t = norm(q.value).trim();
+      document.querySelectorAll(".tool[data-q]").forEach(function (el) { el.hidden = !!t && norm(el.getAttribute("data-q")).indexOf(t) === -1; });
+      folds.forEach(function (d) {
+        var hit = !!d.querySelector(".tool:not([hidden])");
+        d.hidden = !hit;
+        if (t && hit && !d.open && !d.hasAttribute("data-shut")) { d.setAttribute("data-auto", ""); d.open = true; }
+        if (!t) {
+          d.removeAttribute("data-shut");
+          if (d.hasAttribute("data-auto")) { d.removeAttribute("data-auto"); d.open = false; }
+        }
+      });
+      var n = document.querySelectorAll(".tool:not([hidden])").length, count = document.createElement("span");
+      count.id = "mcount"; count.textContent = String(n);
+      if (!t) { say(["共 ", count, " 個工具"]); return; }
+      var user = [], ops = [];
+      document.querySelectorAll(".wf[data-q]").forEach(function (el) {
+        if (norm(el.getAttribute("data-q")).indexOf(t) !== -1) (el.closest("#wf-internal") ? ops : user).push(el);
+      });
+      var parts = ["符合 ", count, n ? " 個工具（所在類別已打開）" : " 個工具"];
+      if (user.length) { parts.push("；符合的工作流："); links(user, parts); }
+      if (ops.length) { parts.push("；平台維運用的工作流："); links(ops, parts); }
+      if (!user.length && !ops.length) parts.push("；沒有符合的工作流");
+      say(parts);
     }
     q.addEventListener("input", apply);
-    document.querySelectorAll(".chip[data-fam]").forEach(function (c) {
-      c.addEventListener("click", function () {
-        var f = c.getAttribute("data-fam");
-        if (fams[f]) delete fams[f]; else fams[f] = true;
-        c.classList.toggle("on", !!fams[f]); c.setAttribute("aria-pressed", fams[f] ? "true" : "false");
-        apply();
+    folds.forEach(function (d) {
+      d.addEventListener("toggle", function () {   // the user closed a fold the search had opened: keep it closed
+        if (!d.open && d.hasAttribute("data-auto")) { d.removeAttribute("data-auto"); if (norm(q.value).trim()) d.setAttribute("data-shut", ""); }
       });
     });
+    function syncPrompts() { var v = box.value.trim(); prompts.hidden = v !== "" && examples.indexOf(v) === -1; }
+    box.addEventListener("input", syncPrompts);
+    document.querySelectorAll("[data-prompt]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        if (prompts.hidden) return;             // the user's own text is in the box
+        box.value = b.getAttribute("data-prompt"); box.focus(); syncPrompts();
+      });
+    });
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest('a[href^="#"]');
+      if (!a) return;
+      var href = a.getAttribute("href");
+      if (href === "#") { e.preventDefault(); return; }
+      var target = document.getElementById(href.slice(1));
+      if (!target) return;
+      clicked = location.hash !== href;                      // a hashchange follows unless the address already says it
+      reveal(target);
+    });
+    route();
   });
 </script>

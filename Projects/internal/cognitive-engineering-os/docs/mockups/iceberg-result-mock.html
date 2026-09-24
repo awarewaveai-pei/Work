@@ -25,6 +25,15 @@
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .app{display:grid;grid-template-columns:216px minmax(0,1fr);align-items:start;min-height:100vh}
+  .side{position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:14px 10px;background:var(--card);border-right:1px solid var(--line)}
+  .side .brand{display:flex;flex-direction:column;padding:4px 12px 14px;color:var(--ink);text-decoration:none;line-height:1.35}
+  .side .brand small{font-size:12px;color:var(--muted)}
+  .navi{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600}
+  .navi:hover{background:var(--soft)}
+  .navi[aria-current]{background:var(--tag);color:var(--accent)}
+  .navi small{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted)}
+  @media (max-width:760px){.app{display:block}.side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;z-index:10;flex-direction:row;gap:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--line)}.side .brand,.navi small{display:none}.navi{flex:1;flex-direction:column;justify-content:center;gap:2px;padding:6px 2px;font-size:12px}.app>.wrap{padding-bottom:88px}}
   .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
@@ -192,6 +201,17 @@
   .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
   .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
   .tool .sub{margin-top:1px}
+  .glyph{width:26px;height:26px;flex:none}
+  .glyph *{fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .shape{width:72px;height:45px;flex:none;background:var(--soft);border-radius:8px;padding:3px}
+  .shape *{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .shape .f{fill:var(--tag)}
+  .gh{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .gh b{font-size:15px}
+  details.dir{border-top:1px dashed var(--line);padding:8px 0}
+  details.dir summary{font-size:15px;color:var(--ink)}
+  details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
+  details.dir .tool{border-top:none;padding-left:12px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -213,18 +233,28 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app">
+  <!-- == partial: app-nav: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <nav class="side" aria-label="主選單">
+    <a class="brand" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home"><b>認知作業系統</b><small>思考工具・示意稿</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home" data-view="home"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>首頁</span></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools" data-view="tools"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>工具</span><small aria-hidden="true">285</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#workflows" data-view="workflows"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.5 12h4M11.5 12c3 0 3-6 5-6M11.5 12c3 0 3 6 5 6"/></svg><span>工作流</span><small aria-hidden="true">12</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects" data-view="projects" aria-current="true"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg><span>我的專案</span></a>
+  </nav>
+  <!-- == partial: app-nav: end == -->
+<main class="wrap">
 
   <div class="banner"><b>示意稿</b>：這是「執行」按下去之後的目標畫面，用你填的四段話做的。目前系統還沒有這一頁。案例是合成的教材（帶領者側的流程問題），不是真實個案；數字只為示意。</div>
-  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ">首頁</a> › 專案「WuSheng 團體反思・第三期」 › 冰山模型分析</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects">我的專案</a> › WuSheng 團體反思・第三期 › 冰山模型分析</div>
 
   <!-- 0. 這是什麼、怎麼讀 -->
   <div class="card">
     <div class="top"><h1>冰山模型分析：團體反思 session 主動分享從 6 人掉到 2 人</h1><a class="howto" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">怎麼用？先上 5 分鐘的課 →</a></div>
-    <div class="sub">方法：冰山模型 Iceberg Model（系統思考 Systems Thinking）・專案「WuSheng 團體反思・第三期」・2026-09-24 ・ 合成教材案例</div>
+    <div class="sub">工具：冰山模型 Iceberg Model（系統思考 Systems Thinking）・專案「WuSheng 團體反思・第三期」・2026-09-24 ・ 合成教材案例</div>
     <div class="status"><span class="pill">AI 草稿・尚未核准</span><span>資料：你填的 4 段話・外部來源 0 筆</span><span>四層完整度 4/4（第 2 層最薄：只有 1 句）</span><span>約 6k tokens・≈ NT$1・讀完約 4 分鐘</span></div>
     <div class="how"><b>怎麼讀</b>先看狀態列（草稿還是已核准、資料有多少），再看「能回答／不能回答」，然後照下面三步走。<b>你要做的</b>不用做；只有 30 秒就直接看 ① 的一句話。</div>
-    <p class="lead">看得見的只有<b>事件</b>；原因藏在水面下。這個方法把問題由上往下挖四層：<b>事件 → 模式 → 結構 → 心智模型</b>。越深的一層越難改，但改了效果越大、越持久。</p>
+    <p class="lead">看得見的只有<b>事件</b>；原因藏在水面下。這個工具把問題由上往下挖四層：<b>事件 → 模式 → 結構 → 心智模型</b>。越深的一層越難改，但改了效果越大、越持久。</p>
     <div class="grid2c">
       <div class="can"><b>這頁能回答</b>問題為什麼一再發生（哪一層在推）、先在哪一層出手最值得、接下來該做什麼。</div>
       <div class="cant"><b>這頁不能回答</b>誰對誰錯；你填的四段話以外的事實（外部來源 0 筆）；數字只為示意，正式目標由你定。</div>
@@ -251,7 +281,7 @@
     <div class="judge"><b>你的判斷（你的原話才是記錄；上面 AI 寫的只是附掛）</b>
       <div class="btns"><span class="btn">同意</span><span class="btn">部分同意</span><span class="btn">不同意</span></div>
       <textarea placeholder="你怎麼看？哪裡對、哪裡不對、你手上有什麼上面沒看到的證據？"></textarea>
-      <div class="sub mt4">沒填也能核准；填了會和這頁一起存，之後的方法會把你的判斷當成最高優先的輸入。</div>
+      <div class="sub mt4">沒填也能核准；填了會和這頁一起存，之後的工具會把你的判斷當成最高優先的輸入。</div>
     </div>
   </div>
 
@@ -509,12 +539,12 @@
 
     <div class="mcards">
       <div class="mcard now">
-        <div><b>槓桿點分析</b><span class="tag">本方法建議的下一步</span></div>
+        <div><b>槓桿點分析</b><span class="tag">本工具建議的下一步</span></div>
         <div><span class="k">回答什麼：</span>三個出手點（開場鼓勵／改流程順序／改帶領者角色）各自的力道與代價。</div>
         <div><span class="k">帶入什麼：</span>你的四段輸入 <cite>[1]</cite>–<cite>[4]</cite> 與本次 3 個發現 → 自動填 5 個欄位；<span class="need">還要你填 1 個</span>：每個出手點你估的「改變難度」（1–5）。</div>
         <div><span class="k">會得到：</span>槓桿表（出手點 × 難度 × 效果 × 持久），⑦ 的方案表自動更新。</div>
         <div class="k">約 2 分鐘・約 NT$1</div>
-        <div class="btns"><span class="btn primary">用這次的資料開始</span><a class="btn" href="#" title="這個方法的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><span class="btn primary">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
       </div>
       <div class="mcard">
         <div><b>因果迴路圖</b></div>
@@ -522,7 +552,7 @@
         <div><span class="k">帶入什麼：</span>第 3 層你填的 <cite>[3]</cite> 與發現 2 → 自動填 4 個節點；<span class="need">還要你填 0 個</span>。</div>
         <div><span class="k">會得到：</span>正式的迴路圖（節點、箭頭、R／B 標記），取代圖 B 的示意。</div>
         <div class="k">約 1 分鐘・約 NT$0.5</div>
-        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個方法的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
       </div>
       <div class="mcard">
         <div><b>行為隨時間圖</b></div>
@@ -530,7 +560,7 @@
         <div><span class="k">帶入什麼：</span><cite>[1]</cite><cite>[2]</cite> 的數字 → 自動建 2 條序列；<span class="need">還要你填 12 格</span>：六次 session 的實際數字（現在只有示意）。</div>
         <div><span class="k">會得到：</span>正式的趨勢圖（取代圖 A）＋「同步不等於因果」的檢查。</div>
         <div class="k">約 3 分鐘（要填數字）・約 NT$0.5</div>
-        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個方法的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
       </div>
       <div class="mcard">
         <div><b>五問法</b></div>
@@ -538,7 +568,7 @@
         <div><span class="k">帶入什麼：</span>第 4 層 <cite>[4]</cite> 與發現 3 → 自動填第一個「為什麼」；<span class="need">還要你填 4 個</span>：後面的回答（可讓 AI 起草，你改）。</div>
         <div><span class="k">會得到：</span>根因鏈＋每一層的證據缺口。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個方法的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
       </div>
     </div>
 
@@ -595,6 +625,7 @@
     </details>
   </div>
 
+</main>
 </div>
 </body>
 </html>

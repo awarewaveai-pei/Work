@@ -25,6 +25,15 @@
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .app{display:grid;grid-template-columns:216px minmax(0,1fr);align-items:start;min-height:100vh}
+  .side{position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:14px 10px;background:var(--card);border-right:1px solid var(--line)}
+  .side .brand{display:flex;flex-direction:column;padding:4px 12px 14px;color:var(--ink);text-decoration:none;line-height:1.35}
+  .side .brand small{font-size:12px;color:var(--muted)}
+  .navi{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600}
+  .navi:hover{background:var(--soft)}
+  .navi[aria-current]{background:var(--tag);color:var(--accent)}
+  .navi small{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted)}
+  @media (max-width:760px){.app{display:block}.side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;z-index:10;flex-direction:row;gap:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--line)}.side .brand,.navi small{display:none}.navi{flex:1;flex-direction:column;justify-content:center;gap:2px;padding:6px 2px;font-size:12px}.app>.wrap{padding-bottom:88px}}
   .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
@@ -192,6 +201,17 @@
   .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
   .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
   .tool .sub{margin-top:1px}
+  .glyph{width:26px;height:26px;flex:none}
+  .glyph *{fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .shape{width:72px;height:45px;flex:none;background:var(--soft);border-radius:8px;padding:3px}
+  .shape *{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .shape .f{fill:var(--tag)}
+  .gh{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .gh b{font-size:15px}
+  details.dir{border-top:1px dashed var(--line);padding:8px 0}
+  details.dir summary{font-size:15px;color:var(--ink)}
+  details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
+  details.dir .tool{border-top:none;padding-left:12px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -213,10 +233,20 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app">
+  <!-- == partial: app-nav: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <nav class="side" aria-label="主選單">
+    <a class="brand" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home"><b>認知作業系統</b><small>思考工具・示意稿</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home" data-view="home"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>首頁</span></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools" data-view="tools"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>工具</span><small aria-hidden="true">285</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#workflows" data-view="workflows"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.5 12h4M11.5 12c3 0 3-6 5-6M11.5 12c3 0 3 6 5 6"/></svg><span>工作流</span><small aria-hidden="true">12</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects" data-view="projects" aria-current="true"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg><span>我的專案</span></a>
+  </nav>
+  <!-- == partial: app-nav: end == -->
+<main class="wrap">
 
-  <div class="banner"><b>示意稿</b>：這是「工作流」（多個方法串起來）的結果長什麼樣：一頁總覽、每一站各一頁九段（同單一方法）、跑完一頁總結。用你領域的合成案例，數字只為示意。</div>
-  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ">首頁</a> › 專案「WuSheng 課程形式」 › 工作流「做一個決定」</div>
+  <div class="banner"><b>示意稿</b>：這是「工作流」（多個工具串起來）的結果長什麼樣：一頁總覽、每一站各一頁九段（同單一工具）、跑完一頁總結。用你領域的合成案例，數字只為示意。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects">我的專案</a> › WuSheng 課程形式 › 工作流「做一個決定」</div>
 
   <!-- 總覽 -->
   <div class="card">
@@ -224,7 +254,7 @@
     <div class="sub">工作流「做一個決定 life-decision-v1」・3 站：問題陳述 → SWOT → 加權決策矩陣・專案「WuSheng 課程形式」・2026-09-24・合成教材案例</div>
     <div class="status"><span class="pill">AI 草稿・第 2 站進行中</span><span>資料：你填的＋上一站自動帶入・外部來源 0 筆</span><span>已完成 1/3 站</span><span>全程約 8 分鐘・≈ NT$3（已用 NT$1）</span></div>
     <div class="how"><b>怎麼讀</b>站列是你在哪；每站一張卡寫它回答什麼、從上一站帶入什麼、還要你填什麼。<b>你要做的</b>選走法；到了每一站，填紅字的欄位再按執行。</div>
-    <p class="lead">一條工作流 = 幾個方法排好順序，<b>上一站的結果自動變成下一站的輸入</b>。你只在每一站補它缺的那幾格，不用重填。</p>
+    <p class="lead">一條工作流 = 幾個工具排好順序，<b>上一站的結果自動變成下一站的輸入</b>。你只在每一站補它缺的那幾格，不用重填。</p>
     <div class="grid2c">
       <div class="can"><b>這條路能回答</b>問題到底是什麼（第 1 站）、我們的強弱與外部機會威脅（第 2 站）、幾個選項按你自己定的準則和權重哪個最好（第 3 站）。</div>
       <div class="cant"><b>這條路不能回答</b>市場會不會買單（沒有外部資料）；權重不會替你定（那是你的價值判斷，系統只算分）。</div>
@@ -235,7 +265,7 @@
       <div class="todo"><b>③ 看摘要與總結頁骨架</b>已完成的站只留一句話和你的判斷；跑完第 3 站才有總結頁。</div>
     </div>
     <p class="sub mt8 mb0">只有 30 秒？看站列和「現在」那張卡的紅字就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
-    <div class="terms"><b>四個詞：</b><span><b>站</b> 一個方法一站</span><span><b>帶入</b> 上一站的結果自動變成這站的輸入</span><span><b>還要你填</b> 系統填不了的紅字欄位</span><span><b>總結頁</b> 三站合一的結論</span></div>
+    <div class="terms"><b>四個詞：</b><span><b>站</b> 一個工具一站</span><span><b>帶入</b> 上一站的結果自動變成這站的輸入</span><span><b>還要你填</b> 系統填不了的紅字欄位</span><span><b>總結頁</b> 三站合一的結論</span></div>
     <div class="journey">
       <span class="done">✓ 第 1 站 問題陳述</span><i>→</i>
       <span class="now">● 第 2 站 SWOT（現在）</span><i>→</i>
@@ -243,7 +273,7 @@
       <span>○ 總結頁</span>
     </div>
     <div class="btns">
-      <span class="btn primary">一站一站走<small>每站停下來給你確認，可以改順序、可以中途換方法</small></span>
+      <span class="btn primary">一站一站走<small>每站停下來給你確認，可以改順序、可以中途換工具</small></span>
       <span class="btn">一次跑完<small>三站自動跑，跑完再逐站看九段與總結</small></span>
       <span class="btn ghost">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑</small></span>
     </div>
@@ -255,7 +285,7 @@
         <div><span class="k">帶入什麼：</span>你在建立專案時寫的一段話 → 自動填第 1 格（要決定什麼）；<span class="need">你填了 2 格</span>（誰受影響、成功條件）。</div>
         <div><span class="k">得到：</span>一句清楚的問題陳述＋3 個成功條件 <cite>[1]</cite>。</div>
         <div class="k">用了 2 分鐘・NT$1</div>
-        <div class="btns"><span class="btn">看第 1 站的九段結果 →</span><a class="btn ghost" href="#" title="問題陳述的方法課：P3 產出後接上">回頭看問題陳述的 5 分鐘課 →</a></div>
+        <div class="btns"><span class="btn">看第 1 站的九段結果 →</span><a class="btn ghost" href="#" title="問題陳述的工具課：P3 產出後接上">回頭看問題陳述的 5 分鐘課 →</a></div>
       </div>
       <div class="mcard now">
         <div><b>第 2 站 SWOT</b><span class="tag">現在</span></div>
@@ -263,7 +293,7 @@
         <div><span class="k">帶入什麼：</span>第 1 站的問題陳述與 3 個成功條件 → 自動填「脈絡」欄；<span class="need">還要你填 4 格</span>：S／W／O／T 各至少 2 條（可讓 AI 起草，你改）。</div>
         <div><span class="k">得到：</span>SWOT 表＋每格的證據強度。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><span class="btn primary">填紅字欄位並執行</span><a class="btn" href="#" title="SWOT 的方法課：P3 產出後接上">第一次用 SWOT？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><span class="btn primary">填紅字欄位並執行</span><a class="btn" href="#" title="SWOT 的工具課：P3 產出後接上">第一次用 SWOT？先看 5 分鐘的課 →</a></div>
       </div>
       <div class="mcard">
         <div><b>第 3 站 加權決策矩陣</b><span class="tag">之後</span></div>
@@ -271,7 +301,7 @@
         <div><span class="k">帶入什麼：</span>第 2 站的 S／W／O／T → 自動變成準則候選；<span class="need">還要你填 1 件事</span>：每個準則的權重（這是你的價值判斷，系統不代填）。</div>
         <div><span class="k">得到：</span>選項 × 準則 × 權重的分數表＋敏感度（哪個權重一改結果就翻）。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><a class="btn" href="#" title="加權決策矩陣的方法課：P3 產出後接上">第一次用加權決策矩陣？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><a class="btn" href="#" title="加權決策矩陣的工具課：P3 產出後接上">第一次用加權決策矩陣？先看 5 分鐘的課 →</a></div>
       </div>
     </div>
   </div>
@@ -321,7 +351,7 @@
     <div class="sub mt8"><b>核准</b> = 整條成為專案正式紀錄；<b>退回某站</b> = 那站之後的站失效，重跑時前面的站不用重填；<b>刪除專案</b> = 三站的來源與產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
     <div class="btns mt12">
       <span class="btn primary">繼續第 2 站</span>
-      <span class="btn">改順序或換一站的方法</span>
+      <span class="btn">改順序或換一站的工具</span>
       <span class="btn">退回第 1 站並說原因</span>
       <span class="btn ghost">專家模式：每站的閘門表與 JSON</span>
     </div>
@@ -339,6 +369,7 @@
     </details>
   </div>
 
+</main>
 </div>
 </body>
 </html>

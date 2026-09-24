@@ -3,10 +3,10 @@
 U21 domain list; U15/U18 lessons; U14/§3.10 result skeleton; U16 home; D18 continuity).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/check-mocks.py [--dir <folder>]
 Exit 0 = the five pages obey the same design rules. Exit 1 = one line per finding (never a traceback: a page that
-cannot be parsed is itself a finding). --dir checks page copies in another folder; that folder's own design-system.css
-and partials/ are used when present, else the real ones; domains.yaml is always the SPEC file (the self-test uses --dir). Self-test with mutations: check-mocks-selftest.py (must stay
+cannot be parsed is itself a finding). --dir checks page copies in another folder, with that folder's own design-system.css and partials/;
+the registries come from SPEC (AI_LEGO_SPEC_ROOT overrides it; the self-test uses both). Self-test with mutations: check-mocks-selftest.py (must stay
 green; a new rule gets its case first). build-artifact.py runs this first and refuses to build when it is red."""
-import html.parser, pathlib, re, sys, unicodedata
+import html.parser, os, pathlib, re, sys, unicodedata
 import mockkit as mk
 from mockkit import HOME, RESULT, LESSON, FILES
 
@@ -23,6 +23,7 @@ FONT = 'font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microso
 # U20: one column by default; only "several methods side by side" may go 2-up, and only by container width
 CAPPED_2COL = "repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr))"
 TWO_COL_ALLOWED = {".mcards"}                                  # method / station / line cards, the only 2-up grid
+SHELL = {".app"}                                               # the app shell: sidebar + content (U1)
 LABEL_ROWS = {".row", ".step", ".mistake"}                     # "label + content" two-cell rows, not card grids
 HEX_ALLOW = {}                                                 # no colour literal outside the token blocks, anywhere
 # D18: the chips drive the whole lesson — at least this many example groups per lesson page
@@ -48,7 +49,7 @@ PAIR_FACTS = {
 }
 # PAGE_FACTS: regexes that must match on one page.
 PAGE_FACTS = {
-    "home-mock.html": [r"工作流", r"單一方法", r"家族", r"描述你的問題", r"建立 ?→ ?蒐集 ?→ ?彙整 ?→ ?分析 ?→ ?報表 ?→ ?核准", r"示範專案"],
+    "home-mock.html": [r"先說你卡在哪", r"按你想做的事找", r"先從這幾個開始", r"工作流:一次走完幾個工具", r"全部 \d+ 個工具", r"建立 ?→ ?蒐集 ?→ ?彙整 ?→ ?分析 ?→ ?報表 ?→ ?核准", r"示範專案"],
     "iceberg-result-mock.html": [r"6 人掉到 2 人", r"主動分享 6 → 2 人", r"8 人團體", r"現在 2 人"],
     # the four plain-language layer lines the operator approved on 2026-09-24 stay on the lesson iceberg
     "iceberg-lesson-mock.html": [r"主動分享 6 → 2 人", r"同一個案例", r"看得見:發生了什麼", r"看不見:", r"一直重複的模式", r"製造模式的制度", r"撐住制度的信念", r"手邊有這些會"],
@@ -70,7 +71,9 @@ NUMBER_PINS = [
 # FORBID: the other story and the superseded numbers must not creep back in (regexes on the NFKC visible text).
 ROUTE_ORDER = [r"加權決策矩陣[^→。]{0,6}→[^→。]{0,12}SWOT", r"SWOT[^→。]{0,6}→[^→。]{0,12}問題陳述", r"加權決策矩陣[^→。]{0,6}→[^→。]{0,12}問題陳述"]
 FORBID = {
-    "home-mock.html": ROUTE_ORDER,
+    # the home page speaks the operator's words (工具／工作流); internal taxonomy (家族) and my invented 路線 stay out;
+    # 路線圖 (roadmap) is a real tool name, hence the look-ahead
+    "home-mock.html": ROUTE_ORDER + [r"家族", r"路線(?!圖)", r"單一方法"],
     "iceberg-result-mock.html": [r"[57]\s*→\s*2", r"上一?期同一次", r"上期對照"],
     "iceberg-lesson-mock.html": [r"[57]\s*→\s*2", r"上一?期同一次", r"再檢視", r"創作本身就是療癒", r"回頭講"],
     "workflow-result-mock.html": [r"自動填 2 欄", r"你填了 3 欄"] + ROUTE_ORDER,
@@ -83,6 +86,7 @@ ICEBERG_SHAPE = [
     '<stop offset="0" stop-color="#fbe3d6"/><stop offset="0.2" stop-color="#cfe3f3"/><stop offset="0.5" stop-color="#5a93c4"/><stop offset="0.75" stop-color="#245b8a"/><stop offset="1" stop-color="#0b2a4a"/>',
     'aria-label="冰山模型四層圖"',
 ]
+COMMON_FORBID = [r"方法(?!論)"]                                  # every page says 工具 (operator's word), never 方法
 _known = set(FILES)
 assert all(a in _known and b in _known for a, b in PAIR_FACTS) and set(PAGE_FACTS) <= _known and set(FORBID) <= _known \
     and set(LINKS) == _known and all(set(v) <= _known for v in LINKS.values()) \
@@ -242,11 +246,13 @@ class Checker:
     def __init__(self, folder):
         self.folder = pathlib.Path(folder); self.findings = []; self.shared_blocks = {}; self.texts = {}; self.raw = {}
         self.domains = None; self.partials = {}
-        # --dir may carry its own design-system.css / partials/ (the self-test mutates copies); otherwise the real ones
-        self.css_path = self.folder / mk.DESIGN_SYSTEM.name if (self.folder / mk.DESIGN_SYSTEM.name).exists() else mk.DESIGN_SYSTEM
-        self.partials_dir = self.folder / "partials" if (self.folder / "partials").is_dir() else mk.PARTIALS
+        # the checked folder carries its own design-system.css and partials/ (--dir: the self-test's mutated copies)
+        self.css_path = self.folder / mk.DESIGN_SYSTEM.name
+        self.partials_dir = self.folder / "partials"
 
-    def bad(self, f, rule, msg): self.findings.append(f"{f}: [{rule}] {msg}")
+    def bad(self, f, rule, msg):
+        site = f"  @site:{sys._getframe(1).f_lineno}" if os.environ.get("CHECK_MOCKS_TRACE") else ""   # the selftest maps findings to rules
+        self.findings.append(f"{f}: [{rule}] {msg}{site}")
 
     def run(self):
         try:
@@ -289,8 +295,8 @@ class Checker:
                 else:
                     for g in got:
                         if g != want: self.bad(f, "continuity", f"number drifted: {g} for /{pat}/ (pinned {want})")
-        for f, pats in FORBID.items():
-            for pat in pats:
+        for f in FILES:
+            for pat in FORBID.get(f, []) + COMMON_FORBID:
                 m = re.search(pat, t.get(f, ""))
                 if m: self.bad(f, "continuity", f"superseded text present: {m.group(0)!r} (/{pat}/)")
         for f in ("iceberg-result-mock.html", "iceberg-lesson-mock.html"):
@@ -313,8 +319,9 @@ class Checker:
                 self.bad(f, "U19", f"literal colour in {where} rule {prelude} ({k}:{v}); use a token")
             if k == "grid-template-columns":
                 ok = v == "1fr" or (v == CAPPED_2COL and set(sels) <= TWO_COL_ALLOWED) \
-                     or (re.fullmatch(r"\d+px 1fr", v) is not None and set(sels) <= LABEL_ROWS)
-                if not ok: self.bad(f, "U20", f"{prelude} grid-template-columns:{v} (allowed: 1fr; capped 2-col only for {sorted(TWO_COL_ALLOWED)}; '<n>px 1fr' only for label rows)")
+                     or (re.fullmatch(r"\d+px 1fr", v) is not None and set(sels) <= LABEL_ROWS) \
+                     or (re.fullmatch(r"\d+px minmax\(0,1fr\)", v) is not None and set(sels) <= SHELL)
+                if not ok: self.bad(f, "U20", f"{prelude} grid-template-columns:{v} (allowed: 1fr; capped 2-col only for {sorted(TWO_COL_ALLOWED)}; '<n>px 1fr' only for label rows; '<n>px minmax(0,1fr)' only for the app shell)")
             if k == "min-width":
                 m = MINW.match(f"min-width:{v}")
                 if m and int(m.group(1)) > 360: self.bad(f, "responsive", f"{prelude} min-width {v} wider than a phone")
@@ -410,7 +417,13 @@ class Checker:
         except ValueError as e:
             self.bad(f, "partials", str(e)); return
         for name, body in frags.items():
-            if name not in self.partials: self.bad(f, "partials", f"fragment {name} has no partials/{name}.html")
+            if name in mk.PER_PAGE:   # rendered for this page (the main menu marks the page's section)
+                try:
+                    want = mk.PER_PAGE[name](f).rstrip("\n")
+                except Exception as e:
+                    self.bad(f, "partials", f"fragment {name} cannot be rendered: {type(e).__name__}: {e}"); continue
+                if body != want: self.bad(f, "partials", f"fragment {name} differs from its render for this page (run sync-design-system.py)")
+            elif name not in self.partials: self.bad(f, "partials", f"fragment {name} has no partials/{name}.html")
             elif body != self.partials[name]: self.bad(f, "partials", f"fragment {name} differs from partials/{name}.html (run sync-design-system.py)")
             if mk.partial_start(name) not in s: self.bad(f, "partials", f"fragment {name}: start marker text drifted (run sync-design-system.py)")
         for name in mk.REQUIRED_PARTIALS.get(f, ()):
@@ -419,18 +432,36 @@ class Checker:
     def check_common(self, f, s, root, nodes):
         # every page: one h1, one banner, one crumbs line (linking home unless this is home), one status strip + pill,
         # no <select>, no inline style, svg a11y, tablist a11y, lesson mentions are links, partner links, section cards open with 怎麼讀／你要做的
-        if sum(n.tag == "h1" for n in nodes) != 1: self.bad(f, "skeleton", "exactly one h1 per page")
+        views = [n for n in nodes if n.tag == "section" and "data-view" in n.attrs]
+        if views:   # an app page shows one view at a time: one h1 per view, none outside them
+            for v in views:
+                if len(v.find(tag="h1")) != 1: self.bad(f, "skeleton", f"view {v.attrs['data-view']}: exactly one h1")
+            if sum(n.tag == "h1" for n in nodes) != sum(len(v.find(tag="h1")) for v in views): self.bad(f, "skeleton", "an h1 outside the views")
+        elif sum(n.tag == "h1" for n in nodes) != 1: self.bad(f, "skeleton", "exactly one h1 per page")
+        # the app shell (U1): div.app = nav.side (the main menu) then main.wrap; one aria-current, on this page's section
+        app, navs = [n for n in nodes if n.has("app")], [n for n in nodes if n.tag == "nav" and n.has("side")]
+        kids = app[0].elements() if len(app) == 1 else []
+        if len(navs) != 1 or [k.tag for k in kids] != ["nav", "main"] or not kids[0].has("side") or not kids[1].has("wrap"):
+            self.bad(f, "U1", "the page is div.app holding exactly nav.side (main menu) then main.wrap")
+        else:
+            items = [a for a in navs[0].find(tag="a") if "data-view" in a.attrs]
+            cur = [(a.attrs["data-view"], a.attrs["aria-current"]) for a in items if a.attrs.get("aria-current")]
+            if [a.attrs["data-view"] for a in items] != [x["id"] for x in mk.NAV] or cur != [(mk.SECTION[f], mk.current_value(f))]:
+                self.bad(f, "U1", f"main menu must list {[x['id'] for x in mk.NAV]} with aria-current={mk.current_value(f)} on {mk.SECTION[f]} only")
         if sum(n.has("banner") for n in nodes) != 1: self.bad(f, "skeleton", "exactly one 示意稿 banner")
+        # the menu shows where a page sits; crumbs only on pages below a menu item, starting with a link to that item
         crumbs = [n for n in nodes if n.has("crumbs")]
-        if len(crumbs) != 1 or not crumbs[0].text().strip().startswith("首頁"): self.bad(f, "links", "exactly one .crumbs line starting with 首頁")
-        elif f not in HOME:
-            first = crumbs[0].elements()[:1]
-            home_id = mk.ARTIFACT["home-mock.html"]
-            if not first or first[0].tag != "a" or first[0].text().strip() != "首頁" or (home_id and home_id not in first[0].attrs.get("href", "")):
-                self.bad(f, "links", "crumbs must start with a link 首頁 to the home page")
+        if f in HOME:
+            if crumbs: self.bad(f, "links", "the home views carry no .crumbs (the main menu shows where you are)")
+        else:
+            sec = next(x for x in mk.NAV if x["id"] == mk.SECTION[f])
+            first = [c for c in crumbs[0].children if not (isinstance(c, str) and not c.strip())][:1] if len(crumbs) == 1 else []   # the very first node, text included
+            if not first or isinstance(first[0], str) or first[0].tag != "a" or first[0].text().strip() != sec["label"] or first[0].attrs.get("href") != mk.nav_href(f, sec["id"]):
+                self.bad(f, "links", f"exactly one .crumbs line starting with a link {sec['label']} to {mk.nav_href(f, sec['id'])}")
         for n in nodes:
             if n.tag == "select": self.bad(f, "ux", f"line {n.line}: <select>; ops UI uses visible buttons/chips")
-            if n.tag == "svg" and (n.attrs.get("role") != "img" or not n.attrs.get("aria-label")): self.bad(f, "a11y", f"line {n.line}: svg without role=img + aria-label")
+            if n.tag == "svg" and n.attrs.get("aria-hidden") != "true" and (n.attrs.get("role") != "img" or not n.attrs.get("aria-label")):
+                self.bad(f, "a11y", f"line {n.line}: svg without role=img + aria-label (or aria-hidden=true beside a text label)")
             if "style" in n.attrs: self.bad(f, "theme", f"line {n.line}: inline style on <{n.tag}>; use a class from design-system.css")
             if n.attrs.get("role") == "tablist":
                 tabs = [c for c in n.elements() if c.has("chip")]
@@ -440,6 +471,11 @@ class Checker:
             # a chip is a button with a state: a tab (aria-selected, above) or a toggle (aria-pressed); never a styled span
             if n.has("chip") and (n.tag != "button" or (n.attrs.get("role") != "tab" and n.attrs.get("aria-pressed") not in ("true", "false"))):
                 self.bad(f, "a11y", f"line {n.line}: chip must be a <button> with role=tab or aria-pressed")
+        ids = {}
+        for n in nodes:
+            if n.attrs.get("id"): ids.setdefault(n.attrs["id"], []).append(n.line)
+        for i, lines in ids.items():
+            if len(lines) > 1: self.bad(f, "links", f"id {i!r} on lines {lines}: ids are unique (a #link lands on the first one only)")
         # lesson mentions must be links (U15); an <a> with no destination must say which phase delivers it
         def lesson_text_ok(n):
             # descend while one child still holds the whole phrase; the element where it stops holding together
@@ -452,6 +488,9 @@ class Checker:
                 self.bad(f, "U15", f"line {n.line}: lesson mention that is not a link: {' '.join(n.text().split())[:40]}")
         lesson_text_ok(root)
         anchors = [n for n in nodes if n.tag == "a"]
+        for n in anchors:   # every in-page #link lands on an id of this page
+            h = n.attrs.get("href", "")
+            if h.startswith("#") and len(h) > 1 and h[1:] not in ids: self.bad(f, "links", f"line {n.line}: in-page link {h} has no target on the page")
         for n in anchors:
             href = n.attrs.get("href", "")
             if href in ("", "#") and "P3" not in n.attrs.get("title", ""): self.bad(f, "U15", f"line {n.line}: placeholder link without a title saying which phase delivers it")
@@ -550,37 +589,68 @@ class Checker:
         if len(src) != 1 or not any(len(o.find(tag="li")) >= 2 for o in src[0].find("src", tag="ol")): self.bad(f, "M8", "one 課程來源 card with at least two numbered sources")
 
     def check_home(self, f, root, nodes):
-        # the home page is the catalogue (operator 2026-09-24: ~300 tools, ~20 workflows must be visible, not four abstract cards):
-        # every ACTIVE recipe and every method in the registries is on the page, generated (partials), with one search box and family toggles
-        try:
-            methods, fams, rd = mk.load_catalog(); loaded = True
-        except Exception as e:
-            self.bad(f, "catalog", f"registries: {type(e).__name__}: {e}"); loaded = False
-        tools, wfs = [n for n in nodes if n.has("tool")], [n for n in nodes if n.has("wf")]
-        if loaded:   # load_catalog guarantees non-empty, fully labelled registries; the page must show exactly them
-            if len(tools) != len(methods): self.bad(f, "catalog", f"{len(tools)} method rows on the page, {len(methods)} methods in {mk.METHODS_FILE.name}")
-            if len(wfs) != len(rd["recipes"]): self.bad(f, "catalog", f"{len(wfs)} workflow cards on the page, {len(rd['recipes'])} ACTIVE recipes in {mk.RECIPES_DIR.name}/")
-            famchips = {n.attrs.get("data-fam") for n in nodes if n.has("chip") and n.attrs.get("data-fam")}
-            if famchips != {m.split(".")[0] for m in methods}: self.bad(f, "catalog", "family chips do not match the families in the method registry")
-        search = [n for n in nodes if n.tag == "input" and n.attrs.get("type") == "search"]
-        if len(search) != 1 or search[0].attrs.get("id") != "q": self.bad(f, "U1", "home carries exactly one search box (input type=search id=q)")
-        if sum(n.tag == "textarea" for n in nodes) != 1: self.bad(f, "U16", "home carries exactly one 描述你的問題 textarea")
-        proj = [n for n in nodes if n.attrs.get("id") == "projects"]
-        if len(proj) != 1 or not proj[0].has("card") or not proj[0].find(tag="table"): self.bad(f, "U8", "id=projects must be the card with the project table")
-        # the hand-written parts, counted outside the generated catalogue (every workflow card carries its own .journey / .mcards)
+        # The home page serves people who do NOT know the tool names (operator 2026-09-24, twice): situation first
+        # (U16 box + example situations), then plain-language goal questions, a few start-here tools with a picture,
+        # the demo projects (U9), the workflows, and only then all tools with the name search. Every list is generated
+        # from the registries (partials) and must show exactly what the registries hold.
         def under(n, pred):
             a = n.parent
             while a is not None:
                 if pred(a): return True
                 a = a.parent
             return False
+        by_id = {n.attrs.get("id"): n for n in nodes if n.attrs.get("id")}
+        try:
+            cat = mk._catalog(); loaded = True   # one parse per run (mockkit caches it)
+        except Exception as e:
+            self.bad(f, "catalog", f"registries: {type(e).__name__}: {e}"); loaded = False
+        if loaded:   # load_catalog guarantees non-empty, fully labelled registries; the page must show exactly them
+            methods, _, recipes, goals = cat
+            n_tools, n_user, n_internal = mk.counts(cat)
+            tools, wfs = [n for n in nodes if n.has("tool")], [n for n in nodes if n.has("wf")]
+            if len(tools) != n_tools: self.bad(f, "catalog", f"{len(tools)} tool rows on the page, {n_tools} methods in {mk.METHODS_FILE.name}")
+            if len(wfs) != len(recipes): self.bad(f, "catalog", f"{len(wfs)} workflow cards on the page, {len(recipes)} ACTIVE recipes in {mk.RECIPES_DIR.name}/")
+            internal = by_id.get("wf-internal")
+            if n_internal and (internal is None or internal.tag != "details" or "open" in internal.attrs or len(internal.find("wf")) != n_internal):
+                self.bad(f, "catalog", f"the {n_internal} platform-internal workflows must sit folded (closed) in details#wf-internal")
+            if sum(n.has("goal") and n.has("mcard") for n in nodes) != len(goals["goals"]): self.bad(f, "catalog", f"goal cards != {len(goals['goals'])} goals in {mk.GOALS_FILE.name}")
+            if sum(n.tag == "details" and "data-dir" in n.attrs for n in nodes) != len(goals["goals"]): self.bad(f, "catalog", "directory folds (details[data-dir]) != goals")
+            pops = [n for n in nodes if n.has("pop") and n.has("mcard")]
+            if len(pops) != len(goals["popular"]) or any(not n.find("shape", tag="svg") for n in pops):
+                self.bad(f, "catalog", f"start-here cards != {len(goals['popular'])} popular tools, each with its picture (svg.shape)")
+            if sum("data-prompt" in n.attrs for n in nodes) != len(goals["prompts"]): self.bad(f, "U16", f"example situation buttons != {len(goals['prompts'])} prompts in {mk.GOALS_FILE.name}")
+            ms = [x.groups() for x in re.finditer(r"(\d+) 個思考工具、(\d+) 條工作流\(另 (\d+) 條平台維運用\)", self.texts.get(f, ""))]
+            if [tuple(map(int, g)) for g in ms] != [(n_tools, n_user, n_internal)]:   # exactly one, and it is right
+                self.bad(f, "catalog", f"hero sentence must appear once and state {n_tools} 個思考工具、{n_user} 條工作流（另 {n_internal} 條平台維運用）, found {ms}")
+        # U16: one box, its example situations and a worked example of the three suggestions, all in the same card
+        ask = [n for n in nodes if n.tag == "textarea"]
+        if len(ask) != 1 or ask[0].attrs.get("id") != "ask": self.bad(f, "U16", "home carries exactly one 說你卡在哪 textarea (id=ask)")
+        else:
+            card = ask[0].parent
+            while card is not None and not card.has("card"): card = card.parent
+            ok = card is not None and any(n.attrs.get("id") == "prompts" for n in card.walk()) \
+                and any(len(ms.find("mcard")) >= 3 for ms in card.find("mcards"))
+            if not ok: self.bad(f, "U16", "the 說你卡在哪 card must hold the example situations (#prompts) and a worked example of three suggestions (.mcards with 3 .mcard)")
+        # U9: the demo projects card
+        demo = [n for n in nodes if n.has("card") and any(x.tag == "h2" and "示範專案" in x.text() for x in n.walk())]
+        if len(demo) != 1 or len([x for x in demo[0].find("mcard") if x.has("done")]) < 2 or not under(demo[0], lambda a: a.attrs.get("data-view") == "projects"):
+            self.bad(f, "U9", "one 示範專案 card with at least two finished (.mcard.done) projects, in the projects view")
+        # U1: the four menu destinations are the four views, in menu order; the first shows, the others wait hidden
+        views = [n for n in nodes if n.tag == "section" and "data-view" in n.attrs]
+        if [v.attrs["data-view"] for v in views] != [x["id"] for x in mk.NAV] or any(v.attrs.get("id") != v.attrs["data-view"] for v in views) \
+                or "hidden" in views[0].attrs or not all("hidden" in v.attrs for v in views[1:]):
+            self.bad(f, "U1", f"views must be section#<id>[data-view=<id>] in menu order {[x['id'] for x in mk.NAV]}, the first visible, the others hidden")
+        def in_view(n, v): return under(n, lambda a: a.attrs.get("data-view") == v)
+        for i, v in (("ask", "home"), ("goals", "home"), ("featured", "home"), ("directory", "tools"), ("wf-internal", "workflows")):
+            if i in by_id and not in_view(by_id[i], v): self.bad(f, "U1", f"#{i} belongs in the {v} view")
+        search = [n for n in nodes if n.tag == "input" and n.attrs.get("type") == "search"]
+        if len(search) != 1 or search[0].attrs.get("id") != "q" or not under(search[0], lambda a: a.attrs.get("id") == "directory"):
+            self.bad(f, "U1", "exactly one search box (input type=search id=q), inside the #directory card")
+        tables = [n for n in nodes if n.tag == "table"]
+        if len(tables) != 1 or not in_view(tables[0], "projects"): self.bad(f, "U8", "the project table sits in the projects view")
+        # U2: the six-step strip, counted outside the generated workflow cards (each carries its own .journey)
         own_journeys = [n for n in nodes if n.has("journey") and not under(n, lambda a: a.has("wf"))]
         if len(own_journeys) != 1: self.bad(f, "U2", "exactly one six-step .journey strip outside the workflow cards")
-        own_mcards = [n for n in nodes if n.has("mcards") and not under(n, lambda a: a.attrs.get("id") == "workflows")]
-        if len(own_mcards) < 2: self.bad(f, "U1", "home needs the routing suggestions and the demo projects as .mcards outside the workflow catalogue")
-        skip = [n for n in nodes if n.tag == "a" and n.attrs.get("href") == "#projects"]
-        if not skip: self.bad(f, "U8", "header link to #projects missing")
-
 
 def main(argv):
     try:

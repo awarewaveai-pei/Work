@@ -33,11 +33,17 @@ def main():
             names = set(mk.fragments(new))
         except ValueError as e:
             print(f"{f}: {e}"); return 1
+        page_partials = dict(partials)
+        for name, render in mk.PER_PAGE.items():            # per-page partials (the main menu marks this page's section)
+            try:
+                page_partials[name] = render(f).rstrip("\n")
+            except Exception as e:
+                print(f"{f}: partial {name} cannot be rendered: {type(e).__name__}: {e}"); return 1
         for name in names:
-            if name not in partials: print(f"{f}: fragment {name} has no partials/{name}.html"); return 1
+            if name not in page_partials: print(f"{f}: fragment {name} has no partials/{name}.html"); return 1
         def repl(m):
             name = m.group(1); indent = re.match(r"[ \t]*", m.group(0)).group(0)
-            return f"{indent}{mk.partial_start(name)}\n{partials[name]}\n{indent}{mk.partial_end(name)}"
+            return f"{indent}{mk.partial_start(name)}\n{page_partials[name]}\n{indent}{mk.partial_end(name)}"
         new = mk.FRAG.sub(repl, new)
         for name in mk.REQUIRED_PARTIALS.get(f, ()):
             if name not in names: print(f"{f}: required partial {name} is not marked in the page"); return 1

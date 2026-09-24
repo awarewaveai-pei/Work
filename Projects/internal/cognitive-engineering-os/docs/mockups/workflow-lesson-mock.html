@@ -25,6 +25,15 @@
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .app{display:grid;grid-template-columns:216px minmax(0,1fr);align-items:start;min-height:100vh}
+  .side{position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:14px 10px;background:var(--card);border-right:1px solid var(--line)}
+  .side .brand{display:flex;flex-direction:column;padding:4px 12px 14px;color:var(--ink);text-decoration:none;line-height:1.35}
+  .side .brand small{font-size:12px;color:var(--muted)}
+  .navi{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600}
+  .navi:hover{background:var(--soft)}
+  .navi[aria-current]{background:var(--tag);color:var(--accent)}
+  .navi small{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted)}
+  @media (max-width:760px){.app{display:block}.side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;z-index:10;flex-direction:row;gap:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--line)}.side .brand,.navi small{display:none}.navi{flex:1;flex-direction:column;justify-content:center;gap:2px;padding:6px 2px;font-size:12px}.app>.wrap{padding-bottom:88px}}
   .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
@@ -192,6 +201,17 @@
   .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
   .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
   .tool .sub{margin-top:1px}
+  .glyph{width:26px;height:26px;flex:none}
+  .glyph *{fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .shape{width:72px;height:45px;flex:none;background:var(--soft);border-radius:8px;padding:3px}
+  .shape *{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .shape .f{fill:var(--tag)}
+  .gh{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .gh b{font-size:15px}
+  details.dir{border-top:1px dashed var(--line);padding:8px 0}
+  details.dir summary{font-size:15px;color:var(--ink)}
+  details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
+  details.dir .tool{border-top:none;padding-left:12px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -225,10 +245,20 @@
 <!-- == partial: lesson-chip-script: end == -->
 </head>
 <body>
-<div class="wrap">
+<div class="app">
+  <!-- == partial: app-nav: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <nav class="side" aria-label="主選單">
+    <a class="brand" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home"><b>認知作業系統</b><small>思考工具・示意稿</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home" data-view="home"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>首頁</span></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools" data-view="tools"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>工具</span><small aria-hidden="true">285</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#workflows" data-view="workflows" aria-current="true"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.5 12h4M11.5 12c3 0 3-6 5-6M11.5 12c3 0 3 6 5 6"/></svg><span>工作流</span><small aria-hidden="true">12</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects" data-view="projects"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg><span>我的專案</span></a>
+  </nav>
+  <!-- == partial: app-nav: end == -->
+<main class="wrap">
 
-  <div class="banner"><b>示意稿</b>：第一次走「做一個決定」這條工作流的人，按下開始之前會先看到的一堂課。每條工作流都有一堂（三分鐘）；每一站的方法課只在第一次到站時才出現，可跳。</div>
-  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ">首頁</a> › 工作流「做一個決定」 › 3 分鐘課</div>
+  <div class="banner"><b>示意稿</b>：第一次走「做一個決定」這條工作流的人，按下開始之前會先看到的一堂課。每條工作流都有一堂（三分鐘）；每一站的工具課只在第一次到站時才出現，可跳。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#workflows">工作流</a> › 做一個決定 › 3 分鐘課</div>
 
   <div class="top">
     <div>
@@ -238,7 +268,7 @@
     <span class="skip">看過了？<a href="#start">跳過，直接開始</a></span>
   </div>
   <div class="progress"><span class="done">1 這條路解什麼</span><span>2 三站各做什麼</span><span>3 看一個走完的</span><span>4 怎麼走</span><span>5 開始</span></div>
-  <div class="status"><span class="pill ok">三站方法齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span><span>底部有教材版（給老師／帶領者）</span></div>
+  <div class="status"><span class="pill ok">三站工具齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span><span>底部有教材版（給老師／帶領者）</span></div>
 
   <!-- 1 -->
   <div class="card">
@@ -256,7 +286,7 @@
   <!-- 2 -->
   <div class="card">
     <h2>2. 三站各做什麼、系統幫你填什麼、你要填什麼<small>1.5 分鐘</small></h2>
-    <div class="how"><b>怎麼讀</b>先按你的領域，例子就會換成你熟的情境；每一站從上往下看：這站在做什麼 → 你會看到的表單 → 已經幫你填好的 → 你要填的（附一個填好的例子）→ 做完會得到什麼 → 完整介紹的連結。這堂課只講「這條路」，每個方法的深度在它自己的正式課。<b>你要做的</b>按一個領域（第 3–5 步的例子會跟著換）；把你自己的決定，照例子的樣子在心裡填一次。</div>
+    <div class="how"><b>怎麼讀</b>先按你的領域，例子就會換成你熟的情境；每一站從上往下看：這站在做什麼 → 你會看到的表單 → 已經幫你填好的 → 你要填的（附一個填好的例子）→ 做完會得到什麼 → 完整介紹的連結。這堂課只講「這條路」，每個工具的深度在它自己的正式課。<b>你要做的</b>按一個領域（第 3–5 步的例子會跟著換）；把你自己的決定，照例子的樣子在心裡填一次。</div>
     <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
@@ -284,7 +314,7 @@
         <div class="row"><b>做完會得到</b><span>一句清楚的問題陳述＋成功條件清單。後面兩站都拿它當基準，總結頁也用它來判斷「決定有沒有達成目的」。</span></div>
         <div class="row"><b>常見卡點</b><span>成功條件寫成「希望變好」。改成看得到的數字或事實，例如「每場主動分享 ≥ 6 人」。</span></div>
         <div class="row"><b>大約</b><span>2 分鐘・NT$1</span></div>
-        <div class="row"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">問題陳述：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
+        <div class="row"><b>完整介紹</b><span>這一站的工具有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個工具都有，格式同冰山模型的課">問題陳述：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
       </div>
 
       <div class="station">
@@ -302,7 +332,7 @@
         <div class="row"><b>做完會得到</b><span>SWOT 表＋每一格的證據強度（哪幾條只是感覺、哪幾條有數字），以及自動整理出來的「第 3 站準則候選」。</span></div>
         <div class="row"><b>常見卡點</b><span>把「希望」寫進機會、把「擔心」寫進威脅。機會和威脅是外面已經存在的事，不是心情。</span></div>
         <div class="row"><b>大約</b><span>3 分鐘・NT$1</span></div>
-        <div class="row"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">SWOT：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
+        <div class="row"><b>完整介紹</b><span>這一站的工具有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個工具都有，格式同冰山模型的課">SWOT：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
       </div>
 
       <div class="station">
@@ -320,7 +350,7 @@
         <div class="row"><b>做完會得到</b><span>分數表、敏感度分析（哪個權重是關鍵）、然後是總結頁：三站合一的一句話、最終建議、解決方案與追蹤。</span></div>
         <div class="row"><b>常見卡點</b><span>權重讓 AI 填，或所有準則都填 5。權重不一樣，這張表才有意義。</span></div>
         <div class="row"><b>大約</b><span>3 分鐘・NT$1</span></div>
-        <div class="row"><b>完整介紹</b><span>這一站的方法有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個方法都有，格式同冰山模型的課">加權決策矩陣：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
+        <div class="row"><b>完整介紹</b><span>這一站的工具有自己的正式課（5 分鐘學員版＋底部教材版），第一次到站時會自動出現，也可以先看：<a href="#" title="P3 時每個工具都有，格式同冰山模型的課">加權決策矩陣：完整介紹 →</a>。這裡只簡述，深度在那一頁。</span></div>
       </div>
 
     </div>
@@ -391,7 +421,7 @@
     <h2>4. 怎麼走：兩種走法、每站你要做的、常見錯誤<small>40 秒</small></h2>
     <div class="how"><b>怎麼讀</b>先選走法，再看每站的好例壞例。<b>你要做的</b>決定你要一站一站走，還是一次跑完。</div>
     <div class="todos">
-      <div class="todo"><b>一站一站走</b>每站停下來給你確認，可以改順序、中途換方法。第一次走建議這個。</div>
+      <div class="todo"><b>一站一站走</b>每站停下來給你確認，可以改順序、中途換工具。第一次走建議這個。</div>
       <div class="todo"><b>一次跑完</b>三站自動跑，跑完再逐站看。適合已經走過、只是換資料。</div>
     </div>
     <div class="gb mt10">
@@ -456,12 +486,12 @@
       <span class="btn">開始我的決定<small>第 1 站三個格子，每格旁邊有提示</small></span>
       <span class="btn">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
     </div>
-    <p class="sub mt10 mb0">這堂課之後不會再自動出現；每一站的方法課只在你第一次到那一站時出現一次。想再看，總覽頁右上角「怎麼用？」隨時能打開。</p>
+    <p class="sub mt10 mb0">這堂課之後不會再自動出現；每一站的工具課只在你第一次到那一站時出現一次。想再看，總覽頁右上角「怎麼用？」隨時能打開。</p>
   </div>
 
   <div class="card">
     <h2>教材版：給老師／帶領者<small>同一份資料，另一種排版</small></h2>
-    <div class="how"><b>怎麼讀</b>上面五步是學員版（3 分鐘自學）；這裡把同一條路排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。每一站的深度用該站方法的教材版，這裡只排「怎麼把三站走一遍」。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
+    <div class="how"><b>怎麼讀</b>上面五步是學員版（3 分鐘自學）；這裡把同一條路排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。每一站的深度用該站工具的教材版，這裡只排「怎麼把三站走一遍」。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
     <details><summary><b>課堂流程（45 分鐘）</b></summary>
       <table class="mt6">
         <tr><th>分</th><th>做什麼</th><th>用學員版哪一步</th></tr>
@@ -469,12 +499,12 @@
         <tr><td>5–15</td><td>講三站各做什麼，例子換成學員的領域；每站只講「要你填的那一列」</td><td>第 2 步（切領域）</td></tr>
         <tr><td>15–30</td><td>分組把自己的決定走一遍：第 1 站三格、第 2 站四格各兩條、第 3 站自己定權重</td><td>第 2 步的填好例子</td></tr>
         <tr><td>30–40</td><td>各組報告哪個權重一改結果就翻；其他組專門找「跳過第 1 站」和「權重全 5」</td><td>第 4 步</td></tr>
-        <tr><td>40–45</td><td>收尾：改了第 1 站就要重跑後面；預告每站的方法課</td><td>第 5 步、總覽頁</td></tr>
+        <tr><td>40–45</td><td>收尾：改了第 1 站就要重跑後面；預告每站的工具課</td><td>第 5 步、總覽頁</td></tr>
       </table>
     </details>
     <details><summary><b>講稿要點（每步 2–3 句）</b></summary>
       <ul class="check">
-        <li>這條路解什麼：先問「你們最近有沒有一件事大家意見不一、選項超過一個」，再給站列。不要先講方法名。</li>
+        <li>這條路解什麼：先問「你們最近有沒有一件事大家意見不一、選項超過一個」，再給站列。不要先講工具名。</li>
         <li>三站：用「定問題／看自己和外面／用你的權重打分」三個詞帶，每站停 30 秒讓學員對到自己的決定。</li>
         <li>走完的例子：只講「每站一句、最後一句三站合一」，不要解釋案例細節。</li>
         <li>怎麼走：把「權重全 5」的壞例投影出來，讓學員說為什麼沒意義。</li>
@@ -498,17 +528,18 @@
     <details><summary><b>講義與投影片</b></summary>
       <p class="my6">列印版講義 = 第 2 步三站的「你要填」列與填好的例子（學員領域版）＋一張空白三站工作單；投影片大綱 = 五步各一頁＋站列一頁。兩者都從這一頁匯出（正式版在 P4 的匯出功能）。</p>
     </details>
-    <p class="sub mt8 mb0">教材版和學員版由同一份工作流資料生成（來源 [1]–[2]），改課文就同時改兩版。每一站的方法深度在該站方法課的教材版，這裡不重寫。</p>
+    <p class="sub mt8 mb0">教材版和學員版由同一份工作流資料生成（來源 [1]–[2]），改課文就同時改兩版。每一站的工具深度在該站工具課的教材版，這裡不重寫。</p>
   </div>
 
   <div class="card">
     <h2>課程來源（每段課文的 [n]）</h2>
-    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；工作流的課引用它自己的定義檔和三站方法的課。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
+    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；工作流的課引用它自己的定義檔和三站工具的課。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
     <ol class="src">
       <li>工作流定義 `life-decision-v1.recipe.yaml`（三站順序與站間帶入的欄位）</li>
-      <li>三站方法各自的 5 分鐘課（問題陳述、SWOT、加權決策矩陣；各有自己的來源）</li>
+      <li>三站工具各自的 5 分鐘課（問題陳述、SWOT、加權決策矩陣；各有自己的來源）</li>
     </ol>
   </div>
+</main>
 </div>
 </body>
 </html>

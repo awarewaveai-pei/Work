@@ -3,8 +3,11 @@
 injects one defect per case and requires the checker to exit 1 with a finding carrying the expected rule tag (and, when
 given, the expected message text — so the case proves ITS rule, not a neighbour that happens to fire too) and no
 traceback; the untouched copies must be green. domains.yaml is always the SPEC file.
+Coverage: the checker runs traced (CHECK_MOCKS_TRACE), so each expected line names the rule (self.bad call site) that
+raised it; every call site must be proven by some case, except the rules in NO_CASE_YET (a list that may only shrink:
+a listed rule that gains a case, or no longer exists, fails the run until it is removed from the list).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/check-mocks-selftest.py"""
-import pathlib, re, shutil, subprocess, sys, tempfile
+import ast, os, pathlib, re, shutil, subprocess, sys, tempfile
 import mockkit as mk
 
 HERE = mk.HERE
@@ -16,7 +19,9 @@ ALL = "*"            # every page
 ALL_CSS = "*+css"    # every page AND the design-system.css copy (token rules must be proven without the "stylesheet differs" rule)
 
 # (label, expected "tag" or "tag|message text", target file | ALL | ALL_CSS, kind, old, new)
-# kind: "str" exact-once replace | "strall" replace every occurrence (>= 1) | "re" first regex match | "bytes" whole-file bytes
+# kind: "str" exact-once replace | "strall" replace every occurrence (>= 1) | "re" first regex match | "reall" every regex match (>= 1)
+#       | "bytes" whole-file bytes | "delete" remove the file. target: a page, ALL, ALL_CSS, "partials/<name>.html", "design-system.css",
+#       or "spec:<path under SPEC>" (the checker then reads a copy of the registries through AI_LEGO_SPEC_ROOT)
 CASES = [
     ("light token drift", "U19|light token --accent", ALL_CSS, "str", "--accent:#0e5b50;--accent-hover", "--accent:#1b4d3e;--accent-hover"),
     ("explicit dark block drifts from media dark block", "theme|two dark blocks differ", ALL_CSS, "str", ':root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27', ':root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b28'),
@@ -44,10 +49,10 @@ CASES = [
     ("unclosed rect inside svg", "html", "iceberg-result-mock.html", "str", '<rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55"/>', '<rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55">'),
     ("self-closing non-void html", "html", "workflow-result-mock.html", "str", '<span class="tag">已完成</span>', '<span class="tag"/>已完成'),
     ("crlf", "eol", "workflow-result-mock.html", "bytes", b"\n", b"\r\n"),
-    ("second h1 on a page", "skeleton|exactly one h1", "home-mock.html", "str", "<h2>我的專案<small>2 個示範・0 個你自己的</small></h2>", "<h1>我的專案<small>2 個示範・0 個你自己的</small></h1>"),
+    ("second h1 on a page", "skeleton|exactly one h1 per page", "iceberg-result-mock.html", "str", "<h1>冰山模型分析", "<h1>另一個標題</h1><h1>冰山模型分析"),
     ("header lesson button moved out of .top (still a link)", "U15|header lesson button", "workflow-result-mock.html", "re", r'(<div class="top">.*?)(<a class="howto"[^>]*>[^<]*</a>)(</div>)', r"\1\3\2"),
-    ("lesson mention split across tags, not a link", "U15|not a link", "workflow-result-mock.html", "str", '<a class="btn" href="#" title="SWOT 的方法課：P3 產出後接上">第一次用 SWOT？先看 5 分鐘的課 →</a>', '<span class="btn">第一次用 SWOT？先看 <b>5 分鐘</b>的課 →</span>'),
-    ("a.btn without href or title", "U15|placeholder link", "workflow-result-mock.html", "str", '<a class="btn" href="#" title="SWOT 的方法課：P3 產出後接上">', '<a class="btn">'),
+    ("lesson mention split across tags, not a link", "U15|lesson mention", "workflow-result-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <p>回頭看 <b>3 分鐘</b>的課</p>\n'),
+    ("a.btn without href or title", "U15|placeholder link", "workflow-result-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <a class="btn" href="#">之後</a>\n'),
     ("fake skip link", "U15|skip link", "iceberg-lesson-mock.html", "str", '<a href="#start">跳過，直接開始</a>', "<u>跳過，直接開始</u>"),
     ("id=start on the wrong card", "U15|id=start", "iceberg-lesson-mock.html", "re", r'(<!-- 5 -->\n  <div class="card")(>.*?<!-- 6 -->\n  <div class="card") id="start"', r'\1 id="start"\2'),
     ("start step loses a button", "U15|three buttons", "workflow-lesson-mock.html", "re", r'\s*<span class="btn">開始我的決定<small>[^<]*</small></span>', ""),
@@ -79,18 +84,89 @@ CASES = [
     ("select element", "ux", "workflow-lesson-mock.html", "str", "</body>", "<select></select>\n</body>"),
     ("partner link removed", "links|no link to", "iceberg-lesson-mock.html", "str", "https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq", "https://claude.ai/artifact/0000000000000000000000"),
     ("home loses every link to the workflow overview", "links|no link to", "home-mock.html", "strall", "7xEwPu9Cp2rWf3P8g9X1Pk", "0000000000000000000000"),
+    ("unlinked text before the crumbs link", "links|starting with a link 工具", "iceberg-lesson-mock.html", "str", '<div class="crumbs"><a', '<div class="crumbs">首頁 › <a'),
+    ("the start-here card lands in the tools view (placement)", "U1|#featured belongs in the home view", "home-mock.html", "str", '<div class="top"><div><h1>工具</h1>', '<div class="top" id="featured"><div><h1>工具</h1>'),
     ("crumbs line removed", "links|.crumbs", "workflow-result-mock.html", "re", r'\s*<div class="crumbs">.*?</div>', ""),
-    ("crumbs lose the home link", "links|link 首頁", "iceberg-lesson-mock.html", "re", r'<div class="crumbs"><a href="[^"]*">首頁</a>', '<div class="crumbs">首頁'),
+    ("crumbs lose the link to their menu item", "links|starting with a link 工具", "iceberg-lesson-mock.html", "re", r'<div class="crumbs"><a href="[^"]*">工具</a>', '<div class="crumbs">工具'),
     ("second status strip (no pill inside)", "status|status strip missing or duplicated", "iceberg-result-mock.html", "str", "</body>", '<div class="status"><span>x</span></div>\n</body>'),
     ("home loses the problem box", "U16", "home-mock.html", "re", r"<textarea[^>]*></textarea>", ""),
     ("home loses the search box", "U1|search box", "home-mock.html", "re", r'<input class="search" id="q"[^>]*>', ""),
-    ("a method row hand-deleted from the home catalogue", "partials|catalog-methods differs", "home-mock.html", "re", r'\s*<div class="tool" data-fam="strategy" data-q="[^"]*"><b>SWOT 分析.*?\n    </div>', ""),
-    ("a workflow card hand-deleted from the home catalogue", "partials|catalog-workflows differs", "home-mock.html", "re", r'\s*<div class="mcard wf" data-q="做一個決定.*?\n      </div>', ""),
-    ("a family chip loses its toggle state", "a11y|aria-pressed", "home-mock.html", "str", '<button class="chip" aria-pressed="false" data-fam="systems"', '<button class="chip" data-fam="systems"'),
-    ("catalogue script edited in the page", "partials|home-catalog-script differs", "home-mock.html", "str", 'el.hidden = !(famOk && qOk);', 'el.hidden = !(famOk || qOk);'),
+    ("a tool row hand-deleted from the directory", "partials|catalog-directory differs", "home-mock.html", "re", r'\s*<div class="tool" id="m-strategy\.swot" data-q="[^"]*">.*?\n    </div>', ""),
+    ("a workflow card hand-deleted", "partials|catalog-workflows differs", "home-mock.html", "re", r'\s*<div class="mcard wf" id="wf-life-decision-v1".*?\n      </div>', ""),
+    ("a goal card hand-deleted", "partials|catalog-goals differs", "home-mock.html", "re", r'\s*<div class="mcard goal" id="goal-law">.*?\n      </div>', ""),
+    ("an example situation button loses its text", "partials|catalog-prompts differs", "home-mock.html", "re", r' data-prompt="[^"]*"', ""),
+    ("catalogue script edited in the page", "partials|home-catalog-script differs", "home-mock.html", "str", 'if (!t) { say(["共 ", count', 'if (!t) { say(["總 ", count'),
+    ("demo project cards lose their finished state (U9)", "U9|示範專案", "home-mock.html", "strall", 'class="mcard done"', 'class="mcard"'),
+    ("the all-tools card loses its id, so the search is no longer inside it (U1)", "U1|inside the #directory card", "home-mock.html", "str", '<div class="card" id="directory">', '<div class="card" id="all-tools">'),
+    ("the project table becomes a div (U8)", "U8|project table", "home-mock.html", "re", r"<table>(.*?)</table>", r"<div>\1</div>"),
+    ("hero states a stale tool count (numbers pinned to the registries)", "catalog|hero sentence", "home-mock.html", "str", '285 個思考工具、12 條工作流', '280 個思考工具、12 條工作流'),
+    ("the invented word 路線 comes back on the home page (FORBID)", "continuity|superseded text", "home-mock.html", "str", '要開新的，按上面「開新專案」', '要開新的，挑一條路線'),
     ("six-step strip loses its .journey class (the workflow cards' own strips must not satisfy the rule)", "U2|six-step", "home-mock.html", "str", '<div class="journey">\n      <span>建立</span>', '<div class="steps">\n      <span>建立</span>'),
-    ("routing suggestion cards removed (the catalogue's own .mcards must not satisfy the rule)", "U1|.mcards outside", "home-mock.html", "re", r'<div class="mcards">.*?\n    </div>\n(?=    <div class="btns mt10">)', ""),
-    ("home project table loses its anchor", "U8|id=projects", "home-mock.html", "str", '<div class="card" id="projects">', '<div class="card">'),
+    ("the worked example of three suggestions removed from the 說你卡在哪 card (U16)", "U16|worked example", "home-mock.html", "re", r'\s*<div class="mcards">\s*<div class="mcard now">\s*<div><b>1 冰山模型</b>.*?\n      </div>\n(?=      <div class="btns mt10">)', ""),
+    ("a view waits visible instead of hidden (U1 views)", "U1|views must be", "home-mock.html", "str", '<section class="view" id="tools" data-view="tools" hidden>', '<section class="view" id="tools" data-view="tools">'),
+    # app shell (U1, operator 2026-09-25): main menu, views, h1 per view, crumbs only below a menu item, in-page links
+    ("main.wrap renamed (app shell)", "U1|div.app holding exactly", "iceberg-result-mock.html", "str", '<main class="wrap">', '<main class="page">'),
+    ("the menu loses its aria-current (per-page menu)", "U1|on workflows only", "workflow-lesson-mock.html", "str", 'data-view="workflows" aria-current="true"', 'data-view="workflows"'),
+    ("the menu brand edited by hand (per-page partial)", "partials|render for this page", "workflow-result-mock.html", "str", "<b>認知作業系統</b>", "<b>認知 OS</b>"),
+    ("a menu icon loses aria-hidden", "a11y|svg without role=img", "iceberg-lesson-mock.html", "re", r' aria-hidden="true"', ""),
+    ("a second h1 in the tools view", "skeleton|view tools: exactly one h1", "home-mock.html", "str", "<h1>工具</h1>", "<h1>工具</h1><h1>全部</h1>"),
+    ("an h1 outside the views", "skeleton|an h1 outside the views", "home-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n<h1>首頁</h1>\n'),
+    ("home gets a crumbs line back", "links|carry no .crumbs", "home-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <div class="crumbs">首頁</div>\n'),
+    ("an in-page link points nowhere", "links|in-page link #projectz", "home-mock.html", "str", '<a href="#projects">示範專案 2 個', '<a href="#projectz">示範專案 2 個'),
+    ("an id used twice", "links|id 'ask' on lines", "home-mock.html", "str", "<h1>把一件事想清楚</h1>", '<h1 id="ask">把一件事想清楚</h1>'),
+    ("the goals card id reappears in the tools view (placement)", "U1|#goals belongs in the home view", "home-mock.html", "str", "<div class=\"top\"><div><h1>工具</h1>", "<div class=\"top\" id=\"goals\"><div><h1>工具</h1>"),
+    ("the projects view renamed: table and demos lose their home (U8/U9)", "U9|in the projects view", "home-mock.html", "str", 'id="projects" data-view="projects"', 'id="projects" data-view="project"'),
+    ("a stale second hero sentence in the footer", "catalog|appear once", "home-mock.html", "str", "<span>語言 <b>zh-TW</b>", "<span>280 個思考工具、9 條工作流（另 7 條平台維運用）</span><span>語言 <b>zh-TW</b>"),
+    ("the internal workflows fold left open", "catalog|folded (closed)", "home-mock.html", "str", 'id="wf-internal">', 'id="wf-internal" open>'),
+    ("方法 comes back on a result page (COMMON_FORBID)", "continuity|方法", "iceberg-result-mock.html", "str", "這個工具把問題", "這個方法把問題"),
+    ("a grid on the sidebar (U20: the shell grid is .app only)", "U20|.side", ALL_CSS, "str", ".side{position:sticky;", ".side{grid-template-columns:200px minmax(0,1fr);position:sticky;"),
+    # one case per rule that had none (coverage gate, 2026-09-25)
+    ("domains.yaml default is not an active domain", "U21|domains.yaml", "spec:methods/examples/domains.yaml", "str", "default: edd", "default: nope"),
+    ("the domain chips cannot be rendered from a broken domains.yaml", "U21|domain-chips.html cannot be rendered", "spec:methods/examples/domains.yaml", "str", "default: edd", "default: nope"),
+    ("a generated partial file deleted", "catalog|catalog-goals.html missing", "partials/catalog-goals.html", "delete", "", ""),
+    ("a page marks a partial that has no file", "partials|fragment catalog-goals has no", "partials/catalog-goals.html", "delete", "", ""),
+    ("a generated partial edited by hand", "catalog|catalog-prompts.html differs from its registries", "partials/catalog-prompts.html", "strall", "要不要開", "要不要辦"),
+    ("a registry gap stops the catalogue", "catalog|registries:", "spec:recipes/registry/recipe-display-metadata.yaml", "str", "champion-challenger: {audience: internal", "champion-challenger: {audience: nobody"),
+    ("a registry gap stops the per-page menu", "partials|app-nav cannot be rendered", "spec:recipes/registry/recipe-display-metadata.yaml", "str", "champion-challenger: {audience: internal", "champion-challenger: {audience: nobody"),
+    ("a page that is not UTF-8", "parse|UnicodeDecodeError", "iceberg-result-mock.html", "bytes", b"<body>", b"<body>\xff"),
+    ("page CSS defines a token", "shared|page CSS defines token --x", "workflow-lesson-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .station{--x:1px}\n"),
+    ("a second light :root block", "theme|expected one light :root block", ALL_CSS, "str", "  *{box-sizing:border-box}\n", "  :root{--bg:#f6f2e9}\n  *{box-sizing:border-box}\n"),
+    ("the explicit dark block removed", "theme|explicit dark block", ALL_CSS, "re", r'\n  :root\[data-theme="dark"\]\{[^}]*\}', ""),
+    ("the explicit dark block loses color-scheme:dark", "theme|dark(explicit) lacks color-scheme:dark", ALL_CSS, "str", ':root[data-theme="dark"]{color-scheme:dark;', ':root[data-theme="dark"]{'),
+    ("both dark blocks drift on one token", "U19|dark(media) token --accent", ALL_CSS, "strall", "--accent:#8fc7b0", "--accent:#8fc7b1"),
+    ("the dark blocks define a token the light block lacks", "theme|defines --zz that the light block does not", ALL_CSS, "strall", "color-scheme:dark;--bg:#1c2b27", "color-scheme:dark;--zz:#000000;--bg:#1c2b27"),
+    ("a page file missing", "exists|missing", "workflow-lesson-mock.html", "delete", "", ""),
+    ("a page loses its charset meta", "skeleton|missing <meta charset", "iceberg-result-mock.html", "str", '<meta charset="utf-8">', ""),
+    ("a one-character title", "title|title missing", "home-mock.html", "str", "<title>認知作業系統首頁</title>", "<title>首</title>"),
+    ("the page-specific marker removed", "shared|shared end / page-specific markers missing", "iceberg-result-mock.html", "str", PAGE_MARK, ""),
+    ("CSS between the shared end and the page marker", "shared|CSS between", "iceberg-result-mock.html", "str", "  /* == shared design system: end == */\n", "  /* == shared design system: end == */\n  .x{color:var(--ink)}\n"),
+    ("the folder's design-system.css missing", "theme|design-system.css missing", "design-system.css", "delete", "", ""),
+    ("the font stack drifts", "U19|font stack drifted", ALL_CSS, "str", "font:15px/1.65 system-ui", "font:16px/1.65 system-ui"),
+    ("page CSS that does not parse", "css|", "workflow-lesson-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .station{color:var(--ink)\n"),
+    ("a partial marked twice", "partials|marked twice", "iceberg-lesson-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->\n  <!-- == partial: domain-chips: end == -->\n'),
+    ("a fragment of a partial that does not exist", "partials|fragment nope has no", "iceberg-result-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <!-- == partial: nope: start (verbatim from partials/nope.html via sync-design-system.py; check-mocks.py enforces) == -->\n  <!-- == partial: nope: end == -->\n'),
+    ("a partial start marker reworded", "partials|start marker text drifted", "iceberg-lesson-mock.html", "str", "domain-chips: start (verbatim", "domain-chips: start (copied"),
+    ("a second banner", "skeleton|示意稿 banner", "iceberg-result-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <div class="banner">另一條</div>\n'),
+    ("a chip that is a span", "a11y|chip must be a <button>", "iceberg-result-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <span class="chip">標籤</span>\n'),
+    ("a second status pill", "status|exactly one status pill", "iceberg-result-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <span class="pill">另一個</span>\n'),
+    ("a result page without cards", "§3.10|no cards", "workflow-result-mock.html", "reall", r'class="card(\b[^"]*)"', r'class="box\1"'),
+    ("the first card loses its status strip", "U14|first card must carry the status strip", "iceberg-result-mock.html", "str", 'class="status"', 'class="stat"'),
+    ("the first card loses its lead", "U14|.lead sentence", "iceberg-result-mock.html", "str", 'class="lead"', 'class="lede"'),
+    ("the first card loses can/cant", "U14|.can/.cant", "iceberg-result-mock.html", "str", 'class="can"', 'class="kan"'),
+    ("the first card forgets the 30-second line", "U14|30 seconds", "iceberg-result-mock.html", "strall", "只有 30 秒", "只有一點時間"),
+    ("the last card loses its source strip", "§3.10|.meta-bar", "iceberg-result-mock.html", "str", 'class="meta-bar"', 'class="metabar"'),
+    ("the last card loses its actions", "§3.10|approve/return actions", "iceberg-result-mock.html", "re", r'<div class="btns mt12">(?![\s\S]*<div class="btns mt12">)', '<div class="row mt12">'),
+    ("no chip on by default", "D18|exactly one chip must be on", "iceberg-lesson-mock.html", "str", 'class="chip on" role="tab" aria-selected="true"', 'class="chip" role="tab" aria-selected="true"'),
+    ("the start step loses its checklist", "U15|ul.check", "iceberg-lesson-mock.html", "strall", '<ul class="check">', '<ul class="list">'),
+    ("the progress strip loses its class", "U15|.progress strip", "iceberg-lesson-mock.html", "str", 'class="progress"', 'class="steps-row"'),
+    ("the mistakes lose their rows", "M7|常見錯誤", "iceberg-lesson-mock.html", "strall", 'class="mistake"', 'class="mis"'),
+    ("the sources card renamed", "M8|課程來源", "iceberg-lesson-mock.html", "str", "<h2>課程來源", "<h2>參考"),
+    ("a tool row hand-deleted (count)", "catalog|tool rows on the page", "home-mock.html", "re", r'\s*<div class="tool" id="m-strategy\.swot" data-q="[^"]*">.*?\n    </div>', ""),
+    ("a workflow card hand-deleted (count)", "catalog|workflow cards on the page", "home-mock.html", "re", r'\s*<div class="mcard wf" id="wf-life-decision-v1".*?\n      </div>', ""),
+    ("a goal card hand-deleted (count)", "catalog|goal cards", "home-mock.html", "re", r'\s*<div class="mcard goal" id="goal-law">.*?\n      </div>', ""),
+    ("a directory fold loses data-dir", "catalog|directory folds", "home-mock.html", "str", 'data-dir="law"', 'data-x="law"'),
+    ("a start-here picture loses its class", "catalog|start-here cards", "home-mock.html", "re", r'<svg class="shape"', '<svg class="picture"'),
+    ("an example situation button loses its data (count)", "U16|example situation buttons", "home-mock.html", "re", r' data-prompt="[^"]*"', ""),
     # continuity: the expected message names the loop each case proves (a mutation may trip more than one loop)
     ("page fact removed (PAGE_FACTS)", "continuity|fact missing", "iceberg-result-mock.html", "str", "主動分享人數（8 人團體）", "主動分享人數（8 人團隊）"),
     ("start step loses its preparation intro (PAGE_FACTS)", "continuity|fact missing", "workflow-lesson-mock.html", "str", "<p>手邊有這些會走得比較快，沒有也可以先走、之後補：</p>\n", ""),
@@ -109,8 +185,15 @@ CASES = [
 ]
 
 
-def run_checker(folder):
-    r = subprocess.run([sys.executable, str(CHECK), "--dir", str(folder)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+# rules that have no mutation case yet (a substring of the rule's source in check-mocks.py). Shrink only: write the case,
+# then delete the entry (the run fails until you do). Filled from the first traced run on 2026-09-25.
+NO_CASE_YET = [
+]
+
+
+def run_checker(folder, spec=None):
+    r = subprocess.run([sys.executable, str(CHECK), "--dir", str(folder)], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       env={**os.environ, "CHECK_MOCKS_TRACE": "1", **({"AI_LEGO_SPEC_ROOT": str(spec)} if spec else {})})
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
@@ -120,6 +203,7 @@ def main():
     except Exception:
         pass
     failures = 0
+    covered = set()
     with tempfile.TemporaryDirectory() as td:
         tmp = pathlib.Path(td)
         def reset():
@@ -131,10 +215,19 @@ def main():
         if rc != 0: print("baseline is not green:\n" + out); return 1
         for label, expect, target, kind, old, new in CASES:
             reset()
+            spec = None
+            if target.startswith("spec:"):   # registry mutation: a copy of the registries the mocks read
+                spec = tmp / "spec"
+                if spec.exists(): shutil.rmtree(spec)
+                for sub in ("methods", "recipes"): shutil.copytree(mk.SPEC / sub, spec / sub)
+                target = "spec/" + target[len("spec:"):]
             targets = FILES + [CSS] if target == ALL_CSS else FILES if target == ALL else [target]
             setup_ok = True
             for f in targets:
                 p = tmp / f
+                if kind == "delete":
+                    if not p.exists(): print(f"SETUP  {label}: {f} does not exist"); setup_ok = False; break
+                    p.unlink(); continue
                 if kind == "bytes":
                     p.write_bytes(p.read_bytes().replace(old, new)); continue
                 s = p.read_text(encoding="utf-8")
@@ -144,20 +237,41 @@ def main():
                 elif kind == "strall":
                     if s.count(old) < 1: print(f"SETUP  {label}: anchor not found in {f}"); setup_ok = False; break
                     s = s.replace(old, new)
+                elif kind == "reall":
+                    s, n = re.subn(old, new, s, flags=re.S)
+                    if n < 1: print(f"SETUP  {label}: regex matched nothing in {f}"); setup_ok = False; break
                 else:
                     s, n = re.subn(old, new, s, count=1, flags=re.S)
                     if n != 1: print(f"SETUP  {label}: regex matched nothing in {f}"); setup_ok = False; break
                 p.write_text(s, encoding="utf-8", newline="\n")
             if not setup_ok: failures += 1; continue
-            rc, out = run_checker(tmp)
+            rc, out = run_checker(tmp, spec)
             tag, _, msg = expect.partition("|")
             hit = [ln for ln in out.splitlines() if f"[{tag}]" in ln and msg in ln]
+            covered |= {int(m) for ln in hit for m in re.findall(r"@site:(\d+)", ln)}
             ok = rc == 1 and "Traceback" not in out and bool(hit)
             failures += 0 if ok else 1
             first = (hit or out.strip().splitlines() or [""])[0]
             print(("CAUGHT " if ok else "MISSED ") + f"{label} -> {first[:120]}")
     print(f"selftest: {len(CASES)} mutations, {len(CASES) - failures} caught, {failures} missed")
-    return 0 if failures == 0 else 1
+    gaps = coverage(covered)
+    return 0 if failures == 0 and not gaps else 1
+
+
+def coverage(covered):
+    """Every self.bad call site in check-mocks.py is proven by a case, or listed in NO_CASE_YET (which may only shrink)."""
+    src = CHECK.read_text(encoding="utf-8")
+    sites = {n.lineno: ast.get_source_segment(src, n) for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "bad"}
+    gaps = []
+    for line, code in sorted(sites.items()):
+        listed = [k for k in NO_CASE_YET if k in code]
+        if line in covered and listed: gaps.append(f"check-mocks.py:{line} now has a case: remove {listed[0]!r} from NO_CASE_YET")
+        elif line not in covered and not listed: gaps.append(f"check-mocks.py:{line} rule has no case: {' '.join(code.split())[:100]}")
+    for k in NO_CASE_YET:
+        if not any(k in code for code in sites.values()): gaps.append(f"NO_CASE_YET entry matches no rule any more: {k!r}")
+    for g in gaps: print("COVERAGE " + g)
+    print(f"coverage: {len(sites)} rules, {len(set(sites) & covered)} proven by a case, {len(NO_CASE_YET)} listed without a case yet, {len(gaps)} gap(s)")
+    return gaps
 
 
 if __name__ == "__main__":

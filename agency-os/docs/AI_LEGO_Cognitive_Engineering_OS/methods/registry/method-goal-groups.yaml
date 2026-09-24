@@ -1,0 +1,113 @@
+# Goal groups: how a person who does NOT know the tool names finds a tool — the ONE list (plan U1 v1.31).
+# Modelled on untools.co (4 plain-language categories, a verb-first line per tool), Atlassian Team Playbook (a
+# recommendation quiz first, "Most popular", goal-based sections) and SessionLab (one card per method with tags and a
+# single action). Each goal is a question in the user's words; its `families` are the registry families it covers
+# (every family in method-display-metadata.yaml belongs to exactly one goal); `featured` are the three tools shown on
+# the goal card (must belong to the goal). `popular` is the "start here" row — hand-picked until usage data exists.
+# `prompts` are example situations for the "say what you are stuck on" box (synthetic, same cases as the lessons).
+# The home page (COS/docs/mockups/home-mock.html) is generated from this file + the display registries; the mock gate
+# validates every reference. Icons are glyph names known to mockkit.GLYPHS.
+version: 1
+goals:
+  - id: why_repeat
+    title_zh: 這件事為什麼一直發生？
+    short_zh: 為什麼一直發生
+    blurb_zh: 找出一再重演的原因，不只處理這一次。
+    icon: layers
+    families: [systems, root_cause, causal]
+    featured: [systems.iceberg_model, root_cause.five_whys, systems.causal_loop_diagram]
+  - id: decide
+    title_zh: 幾個選項，選哪一個？
+    short_zh: 做決定
+    blurb_zh: 把你在乎的準則和權重攤開來打分，看清楚為什麼選它。
+    icon: scale
+    families: [decision]
+    featured: [decision.weighted_decision_matrix, decision.decision_tree, decision.impact_effort]
+  - id: frame
+    title_zh: 問題到底是什麼？
+    short_zh: 定義問題
+    blurb_zh: 先把現況、想要的、落差講清楚，再拆成能動手的小塊。
+    icon: target
+    families: [framing, decomposition]
+    featured: [framing.problem_statement, framing.how_might_we, decomposition.issue_tree]
+  - id: ideas
+    title_zh: 需要更多點子
+    short_zh: 想點子
+    blurb_zh: 先把想法變多、再整理歸類；不急著評價。
+    icon: spark
+    families: [divergent, association]
+    featured: [association.mind_map, divergent.scamper, divergent.six_thinking_hats]
+  - id: strategy
+    title_zh: 看清楚自己和外面的局
+    short_zh: 看局
+    blurb_zh: 強弱、機會威脅、誰在乎、未來有哪幾種可能。
+    icon: compass
+    families: [strategy, foresight, stakeholders, stakeholder]
+    featured: [strategy.swot, foresight.scenario_planning, stakeholders.stakeholder_map]
+  - id: feasible
+    title_zh: 做不做得起來、划不划算？
+    short_zh: 算划不划算
+    blurb_zh: 成本、損益、現金流與不確定性，先算再做。
+    icon: coins
+    families: [feasibility, finance, computation]
+    featured: [feasibility.break_even, feasibility.npv, computation.monte_carlo]
+  - id: argue
+    title_zh: 我的說法站不站得住？
+    short_zh: 檢驗說法
+    blurb_zh: 把假設、證據、推理攤開，故意找碴讓結論更硬。
+    icon: shield
+    families: [epistemic, evidence, challenge]
+    featured: [epistemic.toulmin_model, challenge.pre_mortem, epistemic.assumption_mapping]
+  - id: people
+    title_zh: 使用者、參與者到底怎麼想？
+    short_zh: 懂使用者
+    blurb_zh: 從真實訪談與觀察看到人在說什麼、做什麼、感受什麼。
+    icon: person
+    families: [insight, research, representation]
+    featured: [insight.empathy_map, insight.interview, research.qualitative_coding]
+  - id: facilitate
+    title_zh: 帶一個團體、帶反思
+    short_zh: 帶團體
+    blurb_zh: 帶領者用的非語言工具：隱喻、對話、價值澄清、五階段療程。
+    icon: circle
+    families: [art_therapy]
+    featured: [art_therapy.visual_metaphor, art_therapy.metaphor_dialogue, art_therapy.wusheng_five_phase]
+  - id: deliver
+    title_zh: 計畫怎麼排、風險怎麼盯、做完學到什麼
+    short_zh: 規劃與回顧
+    blurb_zh: 排出來、試一下、回頭看。
+    icon: roadmap
+    families: [delivery, experiment, learning]
+    featured: [delivery.risk_register, experiment.mvp, learning.after_action_review]
+  - id: engineering
+    title_zh: 系統、資料與資安的工程決策
+    short_zh: 工程
+    blurb_zh: 架構怎麼選、怎麼上線、資料怎麼守、威脅在哪。
+    icon: gear
+    families: [architecture, devops_sre, database_data, security]
+    featured: [architecture.adr, security.stride, database_data.expand_contract_migration]
+  - id: law
+    title_zh: 哪些法規管得到？
+    short_zh: 法規
+    blurb_zh: 適用法規、合規缺口、資料落地、市場准入。
+    icon: book
+    families: [jurisdiction]
+    featured: [jurisdiction.applicable_law_graph, jurisdiction.compliance_gap_analysis, jurisdiction.data_residency_assessment]
+# popular = the "start here" row: a picture of the tool's own shape (mockkit.SHAPES) and one verb-first line in plain
+# words (untools style); the registry blurb stays in the full directory.
+popular:
+  - {id: systems.iceberg_model, shape: iceberg, line_zh: 看見一再發生的事背後的四層原因}
+  - {id: strategy.swot, shape: grid2x2, line_zh: 把自己的強弱、外面的機會威脅攤成一張表}
+  - {id: decision.weighted_decision_matrix, shape: matrix, line_zh: 用你定的準則和權重，替幾個選項打分}
+  - {id: framing.problem_statement, shape: gap, line_zh: 先講清楚現況、想要的、中間差多少}
+  - {id: root_cause.five_whys, shape: chain, line_zh: 連問五次「為什麼」，從症狀挖到根因}
+  - {id: association.mind_map, shape: radial, line_zh: 從一個中心往外長出所有想法}
+  - {id: challenge.pre_mortem, shape: premortem, line_zh: 假設已經失敗，提早找出會怎麼失敗}
+  - {id: insight.empathy_map, shape: quadrant, line_zh: 整理對方說、想、做、感受之間的落差}
+prompts:
+  - 我們的團體課後半段大家都不講話，換了帶領者也一樣
+  - 這個月又有 5 位家長問能不能加開平日班，要不要開？
+  - 尺寸類商品的退貨率從 5% 跳到 12%
+  - 合作的畫廊每檔展覽都延後付款，下一檔要不要續約？
+  - 週日晚上老是為家事吵架
+  - 手上有一疊訪談逐字稿，想整理出主題但不知道從哪裡開始

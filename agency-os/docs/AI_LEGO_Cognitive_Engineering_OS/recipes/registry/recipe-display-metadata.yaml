@@ -1,24 +1,25 @@
 # Display metadata for the validated recipes (workflows) — the ONE list, the same pattern as
 # methods/registry/method-display-metadata.yaml. The recipe files carry English `name`/`title` only; this file adds the
-# Chinese name, a one-line blurb and the group the home page lists it under. `GET /recipes` will merge it (P3); the
-# home page catalogue (COS/docs/mockups/home-mock.html, generated) reads it now. The mock gate requires an entry for
-# every ACTIVE recipe in recipes/validated/ (the same filter GET /recipes applies). Groups appear in this order.
+# Chinese name, a one-line blurb and the goal group (methods/registry/method-goal-groups.yaml) the home page lists it
+# under. `GET /recipes` will merge it (P3); the home page catalogue (COS/docs/mockups/home-mock.html, generated) reads
+# it now. The mock gate requires an entry for every ACTIVE recipe in recipes/validated/ (the same filter GET /recipes
+# applies) and a goal that exists. `audience: internal` = platform governance / test fixtures: still listed (nothing is
+# hidden from the catalogue) but folded at the end of the workflow section, never offered to a first-time user.
 version: 1
-groups: [藝術治療, 做決定, 商業企劃, 研究, 治理與工程]
 entries:
-  art-therapy-creative-reflection-v1: {group_zh: 藝術治療, name_zh: 創作反思, blurb_zh: 帶領者需要一個可追溯的創作提示：抽一個隨機刺激，再用心智圖把聯想攤開。}
-  art-therapy-project-ideation-v1: {group_zh: 藝術治療, name_zh: 專案發想, blurb_zh: 早期專案設計：先把目標講清楚，再發散，再整理。}
-  art-therapy-unstick-v1: {group_zh: 藝術治療, name_zh: 卡關解套, blurb_zh: 參與者答不出反思提問時，用非語言的路走一遍：隱喻、對話、重新框定、價值澄清。}
-  life-decision-v1: {group_zh: 做決定, name_zh: 做一個決定, blurb_zh: 幾個選項選一個：先把問題講清楚，再看自己與外面，最後用你定的權重打分。}
-  business-foundation-v1: {group_zh: 商業企劃, name_zh: 基礎盤點, blurb_zh: 早期企劃：把事實與策略假設分開標記，四站走完。}
-  business-planning-strategy-v1: {group_zh: 商業企劃, name_zh: 策略框架, blurb_zh: 從問題陳述到商業模式圖的策略前段。}
-  business-feasibility-review-v1: {group_zh: 商業企劃, name_zh: 可行性審視, blurb_zh: 有成本、毛利、現金流數字時，先算撐不撐得住。}
-  business-planning-feasibility-v1: {group_zh: 商業企劃, name_zh: 企劃可行性, blurb_zh: 基礎 → 情境與風險 → 經濟性，十站。}
-  business-planning-review-v1: {group_zh: 商業企劃, name_zh: 企劃總檢, blurb_zh: 決策前可重放的企劃審視，十四站。}
-  business-plan-full-v1: {group_zh: 商業企劃, name_zh: 完整企劃鏈, blurb_zh: 從問題陳述到路線圖：一份審核過的來源包走成完整、可追溯的企劃，十七站。}
-  edd-research-evidence-v1: {group_zh: 研究, name_zh: EdD 證據鏈, blurb_zh: 把假設、證據、推理橋樑講清楚：假設地圖 → 證據矩陣 → Toulmin 論證。}
-  research-qualitative-v1: {group_zh: 研究, name_zh: 質性研究, blurb_zh: 訪談與逐字稿要編碼、三角驗證、算評分者信度。}
-  edd-literature-search-v1: {group_zh: 研究, name_zh: EdD 文獻離線夾具, blurb_zh: 用合成 EdD 輸入測試能力型步驟的夾具，不是研究流程；P3 文獻線落地後退場。}
-  champion-challenger: {group_zh: 治理與工程, name_zh: 冠軍／挑戰者切換, blurb_zh: 模型版本更新前的正式切換流程；全部是能力步，不是方法。}
-  db-migration-expand-contract: {group_zh: 治理與工程, name_zh: 資料庫遷移（擴張／收縮）, blurb_zh: 任何會改 production schema 的變更都走這條；ADR-005a。}
-  method-deprecation-retirement: {group_zh: 治理與工程, name_zh: 方法／物件退役, blurb_zh: 退役任何 API、方法、能力、schema、政策的正式流程。}
+  art-therapy-creative-reflection-v1: {audience: user, goal: facilitate, name_zh: 創作反思, blurb_zh: 帶領者需要一個可追溯的創作提示：抽一個隨機刺激，再用心智圖把聯想攤開。}
+  art-therapy-project-ideation-v1: {audience: user, goal: facilitate, name_zh: 專案發想, blurb_zh: 早期專案設計：先把目標講清楚，再發散，再整理。}
+  art-therapy-unstick-v1: {audience: user, goal: facilitate, name_zh: 卡關解套, blurb_zh: 參與者答不出反思提問時，用非語言的路走一遍：隱喻、對話、重新框定、價值澄清。}
+  life-decision-v1: {audience: user, goal: decide, name_zh: 做一個決定, blurb_zh: 幾個選項選一個：先把問題講清楚，再看自己與外面，最後用你定的權重打分。}
+  business-foundation-v1: {audience: user, goal: strategy, name_zh: 商業基礎盤點, blurb_zh: 早期企劃：把事實與策略假設分開標記，四站走完。}
+  business-planning-strategy-v1: {audience: user, goal: strategy, name_zh: 商業策略框架, blurb_zh: 從問題陳述到商業模式圖的策略前段。}
+  business-planning-review-v1: {audience: user, goal: strategy, name_zh: 企劃總檢, blurb_zh: 決策前可重放的企劃審視，十四站。}
+  business-plan-full-v1: {audience: user, goal: strategy, name_zh: 完整企劃鏈, blurb_zh: 從問題陳述到路線圖：一份審核過的來源包走成完整、可追溯的企劃，十七站。}
+  business-feasibility-review-v1: {audience: user, goal: feasible, name_zh: 可行性審視, blurb_zh: 有成本、毛利、現金流數字時，先算撐不撐得住。}
+  business-planning-feasibility-v1: {audience: user, goal: feasible, name_zh: 企劃可行性, blurb_zh: 基礎 → 情境與風險 → 經濟性，十站。}
+  edd-research-evidence-v1: {audience: user, goal: argue, name_zh: EdD 證據鏈, blurb_zh: 把假設、證據、推理橋樑講清楚：假設地圖 → 證據矩陣 → Toulmin 論證。}
+  research-qualitative-v1: {audience: user, goal: people, name_zh: 質性研究, blurb_zh: 訪談與逐字稿要編碼、三角驗證、算評分者信度。}
+  edd-literature-search-v1: {audience: internal, goal: people, name_zh: EdD 文獻離線夾具, blurb_zh: 用合成 EdD 輸入測試能力型步驟的夾具，不是研究流程；P3 文獻線落地後退場。}
+  champion-challenger: {audience: internal, goal: engineering, name_zh: 冠軍／挑戰者切換, blurb_zh: 模型版本更新前的正式切換流程；全部是能力步，不是工具。}
+  db-migration-expand-contract: {audience: internal, goal: engineering, name_zh: 資料庫遷移（擴張／收縮）, blurb_zh: 任何會改 production schema 的變更都走這條；ADR-005a。}
+  method-deprecation-retirement: {audience: internal, goal: engineering, name_zh: 工具／物件退役, blurb_zh: 退役任何 API、工具、能力、schema、政策的正式流程。}

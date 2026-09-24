@@ -25,6 +25,15 @@
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
   .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .app{display:grid;grid-template-columns:216px minmax(0,1fr);align-items:start;min-height:100vh}
+  .side{position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:14px 10px;background:var(--card);border-right:1px solid var(--line)}
+  .side .brand{display:flex;flex-direction:column;padding:4px 12px 14px;color:var(--ink);text-decoration:none;line-height:1.35}
+  .side .brand small{font-size:12px;color:var(--muted)}
+  .navi{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600}
+  .navi:hover{background:var(--soft)}
+  .navi[aria-current]{background:var(--tag);color:var(--accent)}
+  .navi small{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted)}
+  @media (max-width:760px){.app{display:block}.side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;z-index:10;flex-direction:row;gap:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--line)}.side .brand,.navi small{display:none}.navi{flex:1;flex-direction:column;justify-content:center;gap:2px;padding:6px 2px;font-size:12px}.app>.wrap{padding-bottom:88px}}
   .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
   h1{font-size:22px;margin:0 0 4px}
@@ -192,6 +201,17 @@
   .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
   .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
   .tool .sub{margin-top:1px}
+  .glyph{width:26px;height:26px;flex:none}
+  .glyph *{fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .shape{width:72px;height:45px;flex:none;background:var(--soft);border-radius:8px;padding:3px}
+  .shape *{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .shape .f{fill:var(--tag)}
+  .gh{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .gh b{font-size:15px}
+  details.dir{border-top:1px dashed var(--line);padding:8px 0}
+  details.dir summary{font-size:15px;color:var(--ink)}
+  details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
+  details.dir .tool{border-top:none;padding-left:12px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -225,10 +245,20 @@
 <!-- == partial: lesson-chip-script: end == -->
 </head>
 <body>
-<div class="wrap">
+<div class="app">
+  <!-- == partial: app-nav: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <nav class="side" aria-label="主選單">
+    <a class="brand" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home"><b>認知作業系統</b><small>思考工具・示意稿</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home" data-view="home"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>首頁</span></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools" data-view="tools" aria-current="true"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>工具</span><small aria-hidden="true">285</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#workflows" data-view="workflows"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.5 12h4M11.5 12c3 0 3-6 5-6M11.5 12c3 0 3 6 5 6"/></svg><span>工作流</span><small aria-hidden="true">12</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects" data-view="projects"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg><span>我的專案</span></a>
+  </nav>
+  <!-- == partial: app-nav: end == -->
+<main class="wrap">
 
-  <div class="banner"><b>示意稿</b>：這是第一次用「冰山模型」的人，按下方法之前會先看到的一堂課。之後每個方法都有一堂，內容來自方法資料，會隨回饋改進。</div>
-  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ">首頁</a> › 方法「冰山模型」 › 5 分鐘課</div>
+  <div class="banner"><b>示意稿</b>：這是第一次用「冰山模型」的人，按下工具之前會先看到的一堂課。之後每個工具都有一堂，內容來自工具資料，會隨回饋改進。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools">工具</a> › 冰山模型 › 5 分鐘課</div>
 
   <div class="top">
     <div>
@@ -238,17 +268,17 @@
     <span class="skip">看過了？<a href="#start">跳過，直接開始</a></span>
   </div>
   <div class="progress"><span class="done">1 這是什麼</span><span>2 四層</span><span>3 看一個例子</span><span>4 怎麼填</span><span>5 常見錯誤</span><span>6 開始</span></div>
-  <div class="status"><span class="pill ok">方法齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、知道什麼時候不該用</span><span>底部有教材版（給老師／帶領者）</span></div>
+  <div class="status"><span class="pill ok">工具齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、知道什麼時候不該用</span><span>底部有教材版（給老師／帶領者）</span></div>
 
   <!-- 1 -->
   <div class="card">
     <h2>1. 這是什麼<small>30 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>先讀三段文字，再看下面那張四層冰山：左邊是每層要問的問題，右邊是在那一層出手會得到什麼；分析結果頁用的是同一張圖，只是填上你的資料。<b>你要做的</b>不用做；只看「什麼時候不用」那一句：你的問題如果是一次性的意外，這個方法不適合，去第 6 步按第三顆按鈕。</div>
+    <div class="how"><b>怎麼讀</b>先讀三段文字，再看下面那張四層冰山：左邊是每層要問的問題，右邊是在那一層出手會得到什麼；分析結果頁用的是同一張圖，只是填上你的資料。<b>你要做的</b>不用做；只看「什麼時候不用」那一句：你的問題如果是一次性的意外，這個工具不適合，去第 6 步按第三顆按鈕。</div>
     <div class="grid2">
       <div>
         <p class="lead">冰山浮在水面上的只有一小角。<b>問題也是</b>：你看到的是「發生了什麼事」，真正決定它一再發生的原因藏在水面下。</p>
-        <p>冰山模型是一種<dfn title="Systems Thinking：把問題當成一個互相牽動的系統來看，而不是單一事件">系統思考</dfn>的方法：把一件事往下挖四層，從「發生什麼」挖到「大家心裡怎麼想」。挖得越深，能改的東西越根本 <cite>[2]</cite>。</p>
-        <p class="sub">什麼時候用：同一種問題一再出現、換人換方法都沒用、大家在互相怪罪的時候。什麼時候不用：一次性的意外、單純缺資料的問題 <cite>[1]</cite>。</p>
+        <p>冰山模型是一種<dfn title="Systems Thinking：把問題當成一個互相牽動的系統來看，而不是單一事件">系統思考</dfn>的工具：把一件事往下挖四層，從「發生什麼」挖到「大家心裡怎麼想」。挖得越深，能改的東西越根本 <cite>[2]</cite>。</p>
+        <p class="sub">什麼時候用：同一種問題一再出現、換人換工具都沒用、大家在互相怪罪的時候。什麼時候不用：一次性的意外、單純缺資料的問題 <cite>[1]</cite>。</p>
       </div>
       <svg viewBox="0 0 1070 575" role="img" aria-label="冰山模型四層圖">
         <defs>
@@ -399,7 +429,7 @@
     </div>
     </div>
     <p class="sub mt8 mb0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：</p>
-    <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small><span class="ex" data-set="edd">同一個案例，做完的九段結果</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨方法資料產出</span></small></a></div>
+    <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small><span class="ex" data-set="edd">同一個案例，做完的九段結果</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span></small></a></div>
   </div>
 
   <!-- 4 -->
@@ -457,7 +487,7 @@
   <!-- 6 -->
   <div class="card" id="start">
     <h2>6. 開始<small>準備 30 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>準備清單，沒有也能先填。<b>你要做的</b>選一顆按鈕；不確定這方法適不適合你的問題，按第三顆。</div>
+    <div class="how"><b>怎麼讀</b>準備清單，沒有也能先填。<b>你要做的</b>選一顆按鈕；不確定這工具適不適合你的問題，按第三顆。</div>
     <p>手邊有這些會填得比較快，沒有也可以先填、之後補：</p>
     <ul class="check">
       <li>一件具體的事（時間、數字）</li>
@@ -468,9 +498,9 @@
     <div class="btns">
       <span class="btn primary">用示範案例試一次<small><span class="ex" data-set="edd">主動分享 6 → 2 人那個例子，已填好，按執行就看結果</span><span class="ex" data-set="partner" hidden>畫廊延後付款那個例子，已填好，按執行就看結果</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，已填好，按執行就看結果</span><span class="ex" data-set="ecom" hidden>退貨率 12% 那個例子，已填好，按執行就看結果</span><span class="ex" data-set="daily" hidden>週日晚上吵架那個例子，已填好，按執行就看結果</span></small></span>
       <span class="btn">開始填我的案例<small>四個格子，每格旁邊有提示</small></span>
-      <span class="btn">這方法適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
+      <span class="btn">這工具適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
     </div>
-    <p class="sub mt10 mb0">這堂課之後不會再自動出現；想再看，方法頁右上角「怎麼用？」隨時能打開。</p>
+    <p class="sub mt10 mb0">這堂課之後不會再自動出現；想再看，工具頁右上角「怎麼用？」隨時能打開。</p>
   </div>
 
   <div class="card">
@@ -483,12 +513,12 @@
         <tr><td>5–15</td><td>講四層，例子換成學員的領域</td><td>第 2 步（切領域）</td></tr>
         <tr><td>15–30</td><td>分組把自己的案例填成四層；用好壞例當互評表</td><td>第 4 步</td></tr>
         <tr><td>30–40</td><td>各組報告；其他組專門找「跳層」和「怪人」</td><td>第 5 步</td></tr>
-        <tr><td>40–45</td><td>收尾：填不出的那一層就是要補資料的層；預告下一步方法</td><td>第 6 步、結果頁 ⑧</td></tr>
+        <tr><td>40–45</td><td>收尾：填不出的那一層就是要補資料的層；預告下一步工具</td><td>第 6 步、結果頁 ⑧</td></tr>
       </table>
     </details>
     <details><summary><b>講稿要點（每步 2–3 句）</b></summary>
       <ul class="check">
-        <li>這是什麼：先問「你們最近有沒有一件事換了人、換了方法還是一直發生」，再給冰山圖。不要先講定義。</li>
+        <li>這是什麼：先問「你們最近有沒有一件事換了人、換了工具還是一直發生」，再給冰山圖。不要先講定義。</li>
         <li>四層：用「一次／一再／為什麼一再／為什麼沒人改」四個詞帶，每層停 30 秒讓學員對到自己的案例。</li>
         <li>做完的例子：只講「每往下一層，解法就不一樣」，不要解釋案例細節。</li>
         <li>怎麼填：把壞例投影出來，讓學員說哪裡缺，再翻出好例。</li>
@@ -513,19 +543,20 @@
     <details><summary><b>講義與投影片</b></summary>
       <p class="my6">列印版講義 = 第 2 步四層表（學員領域版）＋第 4 步好壞例＋一張空白四格工作單；投影片大綱 = 六步各一頁＋冰山圖一頁。兩者都從這一頁匯出（正式版在 P4 的匯出功能）。</p>
     </details>
-    <p class="sub mt8 mb0">教材版和學員版由同一份方法資料生成（來源 [1]–[3]），改課文就同時改兩版。藝術反思方法的帶領腳本（Airtable 的「帶活動者提示用語」「時間分段」「停止活動訊號」）會直接進這一段。</p>
+    <p class="sub mt8 mb0">教材版和學員版由同一份工具資料生成（來源 [1]–[3]），改課文就同時改兩版。藝術反思工具的帶領腳本（Airtable 的「帶活動者提示用語」「時間分段」「停止活動訊號」）會直接進這一段。</p>
   </div>
 
   <div class="card">
     <h2>課程來源（每段課文的 [n]）</h2>
-    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；來源不足的方法會在頂端顯示「知識不足：缺哪幾項」。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
+    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；來源不足的工具會在頂端顯示「知識不足：缺哪幾項」。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
     <ol class="src">
       <li>The Systems Thinking，「Iceberg Model」教學（定義 → 四層 → 例子 → 步驟 → 常見錯誤的課程結構；本課改寫，非轉載）</li>
-      <li>untools.co，「Iceberg Model」（定義與四層名稱；方法資料裡的權威網址）</li>
+      <li>untools.co，「Iceberg Model」（定義與四層名稱；工具資料裡的權威網址）</li>
       <li>NPC 冰山工作單（每層要回答的問題與介入動詞：回應／預測／設計／轉化）</li>
     </ol>
-    <p class="sub">課文由方法自己的資料庫（來源、契約、範例）生成並由人審定；之後每個方法都用同一套規則產生自己的課。</p>
+    <p class="sub">課文由工具自己的資料庫（來源、契約、範例）生成並由人審定；之後每個工具都用同一套規則產生自己的課。</p>
   </div>
+</main>
 </div>
 </body>
 </html>

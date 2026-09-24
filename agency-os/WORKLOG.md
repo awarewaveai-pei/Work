@@ -1,4 +1,55 @@
 ﻿# Worklog
+## 2026-09-25（續1）研究線：首頁改 app 殼（左側主選單＋四個 view）＋home v4 目錄與審查修正＋檢查器每條規則有案例＋全頁「方法」→「工具」；計畫 v1.32
+- [觸發] 操作者 9/24「大部分的使用者根本不知道有什麼工具」「標籤／清單有何用」「不會去看權威工具網站嗎」（v2→v4）；9/25「全部塞同一頁非常爛，應該左側 sidebar 主選單」「順便看有什麼需要優化」。
+- [根因]
+  - R1 v4 把九區疊成一頁長捲動；沒有 app 殼（主選單＋一次一個去處）。
+  - R2 檢查器 121 條規則只有 73 條有突變案例證明；critic 連三輪抓同類（規則沒案例、測試通過靠的是瀏覽器預設行為）＝缺「規則必有案例」「互動測試拔掉程式必紅」兩個不變量。
+- [參考] NN/g left-side vertical nav（桌機常駐、文字標籤、不重複兩套導覽）；Android／Material 3 自適應導覽（compact＝底部導覽列 ≤5 項、永遠顯示文字）；內容排法 untools.co、Atlassian Team Playbook、SessionLab／Miro 範本庫。
+- [已改]
+  - home v4：`SPEC/methods/registry/method-goal-groups.yaml`（新：12 問句、8 起點含小圖、6 例子）；`recipe-display-metadata.yaml` audience user|internal＋goal；`mockkit.py` SHAPES／load_catalog 全驗／counts()／五段 catalog partials；舊 `catalog-families`／`catalog-methods` partial 刪除。
+  - critic v4（Quick，warn，0c/1m/10n）全修：
+    - M1 搜尋藏住目標時頁內連結失效 → 先清搜尋、切到目標 view、再開收合
+    - n1 收合狀態：搜尋只關自己開的（data-auto），使用者關的不重開（data-shut）
+    - n2 0 命中不說「類別已打開」；平台維運用工作流另列
+    - n3 全形輸入 NFKC
+    - n4 使用者自己打字後例子隱藏，點例子不會蓋掉
+    - n5 chips-test 擋瀏覽器原生展開，並加拔腳本對照
+    - n6 內部工作流收合被設成 open 會被抓
+    - n7 id 不重複；首段數字句恰一次
+    - n8 規則覆蓋閘
+    - n9 內部工作流摘要由資料產生
+    - n10 method id 文法（method.schema.yaml:153）
+  - v5 app 殼：
+    - `mockkit.py` NAV／SECTION／nav_href／render_nav／PER_PAGE：主選單每頁產生，aria-current＝該頁所屬去處
+    - `design-system.css` .app／.side／.navi；≤760px 改底部導覽列（safe-area）
+    - `home-mock.html` 四個 section view（首頁／工具／工作流／我的專案），hash 路由（`…/artifact/<home>#tools` 直達），首頁無麵包屑
+    - 深層四頁同一主選單；麵包屑以所屬去處開頭（結果→我的專案、冰山課→工具、工作流課→工作流）
+  - `check-mocks.py`：
+    - 新規則：app 殼結構、主選單項目與 aria-current、view 集合／順序／hidden、每 view 一個 h1、頁內 #連結必有目標、id 唯一、放置（ask／goals／directory／wf-internal／專案表／示範卡）、SHELL 格線只給 .app、svg aria-hidden
+    - 用語：COMMON_FORBID「方法」
+    - 機制：--dir 不再退回真 css／partials；trace（CHECK_MOCKS_TRACE）標出每條發現來自哪條規則
+  - `mockkit.py` SPEC 支援 `AI_LEGO_SPEC_ROOT`（同 `ai_lego/__init__.py:41`）。
+  - `check-mocks-selftest.py`：
+    - 案例 93 → 156
+    - 每條 self.bad 規則須由某案例的預期行證明（@site），NO_CASE_YET 只能縮（現為 0）
+    - 新 kind：delete、reall；新 target：spec:<path>（登錄檔副本）
+  - `chips-test.cjs`：首頁 13 項互動（含真實點擊的佔位連結、上一頁／下一頁），每項在拔掉 home-catalog-script 的副本上必須失敗。
+  - `render-mocks.cjs`：首頁每個 view 分開截圖。
+  - 用語：五頁與 `method-display-metadata.yaml`（name_zh／blurb_zh／why_zh 共 58 行）、`recipe-display-metadata.yaml` 的「方法」→「工具」（方法論除外）。
+  - 計畫 v1.32：U1 改寫。
+- [發現] COS 單元測試整套 14,159 個、本機 2,030 s（34 分），1 失敗（名字待查）；最慢 test_api_main 209 s；主因是約 285 個工具模組各自的 SpecConformanceTests 每次重讀全部 contract（每條約 7 s）。研究線卡前置改「相關模組＋golden」由另一 session 接手（計畫 §12 由它改）；治本＝同 process 快取 catalog（另開卡）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python sync-design-system.py + check-mocks.py（5 頁綠）+ check-mocks-selftest.py（156/156 抓到；規則覆蓋 121/121）+ node chips-test.cjs（PASS：lesson chips + 首頁 13 項，拔腳本 13/13 必紅）+ render-mocks.cjs（首頁 4 view＋4 深層頁 × 桌機／手機／深色，0 overflow）+ 手機 375／深色 1200 viewport 截圖 Read | exit=0
+- critic v5（Quick，fail，1c/2m/9n）：
+  - C1 深層頁選單連到 `…/artifact/<home>#tools` 時 hash 可能進不了 frame（引 claude-code#79520，/code/artifact 路徑）→ Artifact 平台契約寫明純 `#錨點` 會進 `location.hash`；發布後實測（見下行）
+  - M1 `href="#"` 佔位連結把人丟回首頁 view → preventDefault；chips-test 加真實點擊 `placeholder`
+  - M2 partials＋SPEC 登錄檔必須同 commit → 已一併 stage
+  - m1 點擊與網址兩條路徑不一致 → 單一 `reveal()`；m2 hashchange 無測試 → chips-test `history`（上一頁／下一頁＋捲動）；m3 上一頁捲動錯位 → `scrollRestoration=manual`＋每 view 記捲動；m4 深層頁 aria-current 改 `true`（home 用 `page`），CSS 改 `.navi[aria-current]`；m5 壞 %-escape → try/catch；m6 起點卡放置 → `#featured` 納入放置規則；m7 麵包屑第一個節點（含文字）必須是連結；m8 計畫 I11 更新；m9 註解錯位
+  - 建議採用：catalog 每次執行只解析一次（`mockkit._catalog`）；選單數字對螢幕閱讀器隱藏；腳本 readyState 防護
+- 外部 oracle（Codex，`agency-os/reports/oracle/2026-09-25-partialreview-b07d0a96.md`，4 檔）：1 條 PLAUSIBLE「首段數字 regex 用半形括號、頁面是全形」→ 驗證為誤報：`check-mocks.py` visible_text 先做 NFKC（（→(），gate 對真頁綠、selftest「hero states a stale tool count」「a stale second hero sentence」皆抓到。
+- REVIEW_DONE: critic=Quick | verdict=fail | findings=1c/2m/9n（v5；M1、M2、m1–m9 全修，C1 依平台契約＋發布後實測）；v4：critic=Quick | verdict=warn | findings=0c/1m/10n，全修
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=catalog-families|catalog-methods | hits=0（WORKLOG 歷史除外；「單一方法」只剩舊 dashboard.html 與規格原文的正當用法）
+- [線上] 首頁 https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ ＋ 4 深層頁同步重發。
+- [避免再發生] 新頁型先實看 2–3 個權威設計系統／網站；任何新規則同一 commit 帶突變案例（覆蓋閘會擋）；任何互動測試必附拔程式對照。
 ## 2026-09-24（續155）收尾 5 件：WP 更新工具改指正式站（主機型態 profile）、備份健康只認日期快照、死金鑰／退租主機移出現役文件、新 bridge key 進 vault、憑證檔標退租
 
 - **根因／發現**：
