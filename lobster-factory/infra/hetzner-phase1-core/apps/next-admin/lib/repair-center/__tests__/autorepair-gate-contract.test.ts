@@ -25,8 +25,11 @@ vi.mock("@/lib/repair-center/ssh", () => ({
   },
 }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseServerClient: () => null, getSupabaseWriteClient: () => null }));
-vi.mock("@/lib/repair-center/system-mode-gate", () => ({
-  checkRepairAllowed: async () => ({ allowed: true, mode: "normal" }),
+vi.mock("@/lib/system-modes/production-change-gate", () => ({
+  checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }),
+}));
+vi.mock("../../system-modes/production-change-gate", () => ({
+  checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }),
 }));
 
 const GATE = path.resolve(__dirname, "../../../../../scripts/aw-autorepair-gate.sh");

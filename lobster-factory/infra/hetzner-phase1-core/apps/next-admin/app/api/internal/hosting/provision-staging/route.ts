@@ -23,6 +23,7 @@ import type { WebsiteSpec } from "../../../../../lib/onboarding/intake-form";
 import { generateTarotImage } from "../../../../../lib/tarot/image-gen";
 import { isR2Configured, buildWebImageKey, parseImageDataUrl, putDesignObject } from "../../../../../lib/storage/r2";
 import { generateStagingAdminPassword, vaultStagingAdminPassword } from "../../../../../lib/hosting/staging-admin-credential";
+import { checkProductionChangeAllowed } from "../../../../../lib/system-modes/production-change-gate";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -329,7 +330,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
+  // body.organizationId is interpolated into system_modes' PostgREST .or() filter string by
+  // checkProductionChangeAllowed / getActiveMode -- reject anything that isn't a uuid before it
+  // reaches the gate, same rule SITE_ID_RE already enforces on siteId below.
+  if (body.organizationId !== undefined && !SITE_ID_RE.test(body.organizationId)) {
+    return NextResponse.json({ error: "organizationId must be a uuid" }, { status: 422 });
+  }
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), body.organizationId ?? null);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+  }
+
   // Seed-only mode (separate short call from create-wp-site after provision) — see handleSeedMode.
+  // Gated too: emergency_stop must stop SSH seeding the same as it stops staging-prepare.
   if (body.mode === "seed") {
     return handleSeedMode(body);
   }

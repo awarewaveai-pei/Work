@@ -45,12 +45,24 @@ function fakeDb() {
 }
 vi.mock("@/lib/storage/r2", () => ({ isR2Configured: () => false }));
 vi.mock("../../storage/r2", () => ({ isR2Configured: () => false }));
+// T17: provision-staging now gates on system mode before any SSH. This file's concern is the
+// gate script contract, not the system-mode gate (covered by production-change-gate.test.ts and
+// provision-staging-mode-gate.test.ts) -- always allow so every case below still reaches SSH.
+vi.mock("@/lib/system-modes/production-change-gate", () => ({
+  checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }),
+}));
+vi.mock("../../system-modes/production-change-gate", () => ({
+  checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }),
+}));
 
 const GATE = path.resolve(__dirname, "../../../../../scripts/aw-hosting-gate.sh");
 const TOKEN = "contract-token";
 const UNIQUE_ID = "0123456789abcdef0123456789abcdef";
 const EVIL_NAME = "Evil $(touch MARKER) `touch MARKER` 'q\" ;id";
 const SITE_ID = "6f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
+// T17: provision-staging now requires organizationId to be a uuid (it's interpolated into the
+// system-mode gate's PostgREST filter string) -- "org-1" from before that rule no longer passes.
+const ORG_ID = "3a2b1c4d-5e6f-4789-8a9b-0c1d2e3f4a5b";
 
 function gateCheck(cmd: string) {
   const env: NodeJS.ProcessEnv = { ...process.env, SSH_CLIENT: "contract-test 0 0", SSH_ORIGINAL_COMMAND: cmd };
@@ -72,7 +84,7 @@ beforeEach(() => { calls.length = 0; bridge.configured = true; bridge.reads.leng
 
 describe("provision-staging → aw-hosting-gate contract", () => {
   it("every host command is a gate verb the gate accepts, and carries no secret or caller text", async () => {
-    const r = await post({ organizationId: "org-1", siteId: SITE_ID, siteName: EVIL_NAME, pluginSlugs: ["fluent-crm"], mainwpChildUniqueId: UNIQUE_ID });
+    const r = await post({ organizationId: ORG_ID, siteId: SITE_ID, siteName: EVIL_NAME, pluginSlugs: ["fluent-crm"], mainwpChildUniqueId: UNIQUE_ID });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     expect(calls.map((c) => c.command.split(" ")[0])).toEqual(
       expect.arrayContaining(["staging-prepare", "staging-wp"]),

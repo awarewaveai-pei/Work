@@ -613,7 +613,7 @@ Server Component，啟動時並行 fetch：
 
 **⚠️ 重要**：Telegram `/normal_mode` 被 policy 硬擋（high-risk from telegram = block），emergency_stop 無法從 Telegram 解除。
 
-**Repair Center／自動修復**：`startRepairFromIncident`／`tryRemediate` 都經 `lib/repair-center/system-mode-gate.ts` 的 `checkRepairAllowed()` 把關，只在 mode=normal 執行；讀不到模式 → 擋（T16）。
+**Repair Center／自動修復／WP 更新／staging 建站**：`startRepairFromIncident`／`tryRemediate`／`POST /api/ops/clients/[slug]/wp-update`／`POST /api/internal/hosting/provision-staging`（含 `mode:"seed"`）都經 `lib/system-modes/production-change-gate.ts` 的 `checkProductionChangeAllowed()` 把關，只在 mode=normal 執行；讀不到模式 → 擋（T16／T17）。
 
 ---
 

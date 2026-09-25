@@ -22,6 +22,7 @@ import {
 } from "../../../../../../lib/supabase-server";
 import { timingSafeEqual } from "../../../../../../lib/ops-inbox/verifyIngestToken";
 import { beginOpsActionRun, finishOpsActionRun } from "../../../../../../lib/ops-actions/record";
+import { checkProductionChangeAllowed } from "../../../../../../lib/system-modes/production-change-gate";
 import type { ClientConfig } from "../../../../../../app/api/ops/clients/route";
 
 export const dynamic = "force-dynamic";
@@ -181,6 +182,14 @@ export async function POST(
 
   if (!org) {
     return new Response("Org not found", { status: 404 });
+  }
+
+  // Checked once here, before the wave starts -- not re-checked mid-wave (a mode flip during a
+  // running wave does not abort it; the operator's stop button and Wave1's fail-fast are the
+  // in-flight safety net, same as the repair center's tryRemediate does not re-check per step).
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), org.id);
+  if (!gate.allowed) {
+    return Response.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
   }
 
   const meta = (org.metadata as Record<string, unknown>) ?? {};
