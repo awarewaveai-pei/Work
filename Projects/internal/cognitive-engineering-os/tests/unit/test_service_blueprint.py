@@ -32,6 +32,7 @@ from ai_lego.modules.insight.service_blueprint import (
     layer_entry,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SERVICE_BLUEPRINT_SCHEMA = "ai-lego://specs/cognitive/typed-objects/service-blueprint.schema.yaml"
 SERVICE_NAME = "mobile pre-order and in-store pickup coffee service"
@@ -73,13 +74,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(SERVICE_BLUEPRINT_SCHEMA, _valid_blueprint(), "service blueprint")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, blueprint = live.invoke(
             METHOD_ID, generate_service_blueprint, "SVCBLUEPRINT-T-INVOKE", SERVICE_NAME, _layers(), make_provenance("AI_INFERENCE", "AI_SUGGESTED")
         )
@@ -129,7 +130,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "insight.service_blueprint")
 
     def test_service_blueprint_and_porter_five_forces_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.porter_five_forces"])
         self.assertIsNone(resolved["blocked"])
 

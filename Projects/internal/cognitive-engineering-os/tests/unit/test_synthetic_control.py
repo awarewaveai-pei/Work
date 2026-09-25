@@ -34,6 +34,7 @@ from ai_lego.modules.causal.synthetic_control import (
     synthetic_control_weight,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SYNTHETIC_CONTROL_SCHEMA = "ai-lego://specs/cognitive/typed-objects/synthetic-control-record.schema.yaml"
 
@@ -73,7 +74,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(SYNTHETIC_CONTROL_SCHEMA, _valid_record(), "synthetic control record")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -127,7 +128,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "causal.synthetic_control")
 
     def test_synthetic_control_and_causal_dag_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "causal.dag"])
         self.assertIsNone(resolved["blocked"])
 

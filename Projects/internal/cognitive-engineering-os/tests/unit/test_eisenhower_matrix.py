@@ -19,7 +19,7 @@ from ai_lego.modules.decision.eisenhower_matrix import (
     evaluate_eisenhower_matrix_gates,
     generate_eisenhower_matrix_classification,
 )
-from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 _NOW = datetime.datetime.now(datetime.timezone.utc).isoformat()
 _METHOD_SCHEMA = "ai-lego://specs/cognitive/method.schema.yaml"
@@ -158,7 +158,7 @@ class SpecConformanceTests(unittest.TestCase):
         actual dispatch-by-naming-convention resolution (ai_lego.apps.api.dispatch._module_for)."""
         from ai_lego.apps.api.dispatch import invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner
 
-        catalog = MethodCatalog.from_spec_root(resolve_spec_root())
+        catalog = shared_method_catalog(resolve_spec_root())
         self.assertTrue(catalog.is_resolvable("decision.eisenhower_matrix"))
 
         builder = resolve_builder("decision.eisenhower_matrix")

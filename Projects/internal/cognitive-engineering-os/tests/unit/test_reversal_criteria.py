@@ -28,6 +28,7 @@ from ai_lego.modules.learning.reversal_criteria import (
     structured_rule,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 REVERSAL_CRITERIA_SET_SCHEMA = "ai-lego://specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml"
 DECISION_REVERSAL_SINGLE_FORM = "ai-lego://specs/decision/reversal.schema.yaml#/definitions/single_indicator_form"
@@ -124,7 +125,7 @@ class SpecConformanceTests(unittest.TestCase):
             structured_rule("!=", 1, 1)
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

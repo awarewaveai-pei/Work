@@ -34,6 +34,7 @@ from ai_lego.modules.divergent.classic_brainstorming import (
     idea,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CLASSIC_BRAINSTORMING_SESSION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/classic-brainstorming-session.schema.yaml"
 IDEA_PROVENANCE = make_provenance("AI_SUGGESTION", "AI_GENERATED")
@@ -79,13 +80,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(CLASSIC_BRAINSTORMING_SESSION_SCHEMA, _valid_record(), "classic brainstorming session")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, record = live.invoke(METHOD_ID, generate_classic_brainstorming_session, "BRAINSTORM-T-INVOKE", _simple_ideas(), RECORD_PROVENANCE)
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/divergent.classic_brainstorming.contract.yaml")

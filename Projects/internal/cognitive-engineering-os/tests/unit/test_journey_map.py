@@ -35,6 +35,7 @@ from ai_lego.modules.insight.journey_map import (
     stage_entry,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 JOURNEY_SCHEMA = "ai-lego://specs/cognitive/typed-objects/journey-map.schema.yaml"
 JOURNEY_SUBJECT = "SaaS 免費試用轉付費旅程"
@@ -77,13 +78,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(JOURNEY_SCHEMA, _valid_journey_map(), "journey map")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, journey_map = live.invoke(
             METHOD_ID, generate_journey_map, "JOURNEY-T-INVOKE", JOURNEY_SUBJECT, _stages(), make_provenance("HYPOTHESIS", "AI_SUGGESTED")
         )
@@ -151,7 +152,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "insight.journey_map")
 
     def test_journey_map_and_lotus_blossom_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "divergent.lotus_blossom"])
         self.assertIsNone(resolved["blocked"])
 

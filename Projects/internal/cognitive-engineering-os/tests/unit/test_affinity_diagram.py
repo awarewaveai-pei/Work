@@ -34,6 +34,7 @@ from ai_lego.modules.association.affinity_diagram import (
     higher_level_theme_entry,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 AFFINITY_DIAGRAM_SCHEMA = "ai-lego://specs/cognitive/typed-objects/affinity-diagram-record.schema.yaml"
 
@@ -88,7 +89,7 @@ class RecordConformanceTests(unittest.TestCase):
         self.assertEqual(record["ungrouped_card_refs"], [])
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

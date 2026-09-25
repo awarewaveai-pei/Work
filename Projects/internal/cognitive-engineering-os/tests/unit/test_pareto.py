@@ -30,6 +30,7 @@ from ai_lego.modules.root_cause.pareto import (
     generate_pareto_analysis,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 PARETO_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/pareto-analysis.schema.yaml"
 
@@ -120,7 +121,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_pareto_analysis("PA-T-004", _cause_hypothesis_set(), "incident_count", [{"hypothesis_id": "DOES-NOT-EXIST", "metric_value": 1}], make_provenance("CALCULATED_RESULT", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

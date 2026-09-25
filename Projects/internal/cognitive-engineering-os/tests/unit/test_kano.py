@@ -52,6 +52,7 @@ from ai_lego.modules.decision.kano import (
 )
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CLASSIFICATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/kano-classification-record.schema.yaml"
 METHOD_SCHEMA = "ai-lego://specs/cognitive/method.schema.yaml"
@@ -379,7 +380,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(record["generated_by_method"], "decision.kano@test")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

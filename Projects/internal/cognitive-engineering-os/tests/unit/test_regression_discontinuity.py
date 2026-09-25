@@ -31,6 +31,7 @@ from ai_lego.modules.causal.regression_discontinuity import (
     generate_regression_discontinuity_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 RD_SCHEMA = "ai-lego://specs/cognitive/typed-objects/regression-discontinuity-record.schema.yaml"
 
@@ -74,7 +75,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(RD_SCHEMA, record, "regression discontinuity record with analysis_summary")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -120,7 +121,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "causal.regression_discontinuity")
 
     def test_rd_and_causal_rct_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "causal.rct"])
         self.assertIsNone(resolved["blocked"])
 

@@ -31,6 +31,7 @@ from ai_lego.modules.foresight.futures_wheel import (
     impact,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 FUTURES_WHEEL_SCHEMA = "ai-lego://specs/cognitive/typed-objects/futures-wheel.schema.yaml"
 PROVENANCE = make_provenance("AI_INFERENCE", "AI_GENERATED")
@@ -67,12 +68,12 @@ class SpecConformanceTests(unittest.TestCase):
             generate_futures_wheel("FWHEEL-T-003", "x", [], PROVENANCE)
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, wheel = live.invoke(METHOD_ID, generate_futures_wheel, "FWHEEL-T-INVOKE", "x", _well_formed_impacts(), PROVENANCE)
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/foresight.futures_wheel.contract.yaml")

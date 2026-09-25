@@ -31,6 +31,7 @@ from ai_lego.modules.challenge.blue_team import (
 )
 from ai_lego.modules.challenge.red_team import evaluate_evidence_labeling_required_gate, finding, generate_red_team_challenge
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 BLUE_TEAM_REVIEW_SCHEMA = "ai-lego://specs/cognitive/typed-objects/blue-team-review.schema.yaml"
 
@@ -103,7 +104,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_blue_team_review("BTR-T-005D", "PROP-T-005D", ["not-a-dict"], make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

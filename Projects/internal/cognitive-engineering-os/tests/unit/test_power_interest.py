@@ -44,6 +44,7 @@ from ai_lego.modules.stakeholders.power_interest import (
     stakeholder_entry,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 POWER_INTEREST_MATRIX_SCHEMA = "ai-lego://specs/cognitive/typed-objects/power-interest-matrix.schema.yaml"
 PROVENANCE = make_provenance("HYPOTHESIS", "AI_SUGGESTED")
@@ -102,13 +103,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(POWER_INTEREST_MATRIX_SCHEMA, _valid_matrix(), "power interest matrix")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, matrix = live.invoke(METHOD_ID, generate_power_interest_matrix, "POWINT-T-INVOKE", _stakeholders(), PROVENANCE)
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/stakeholders.power_interest.contract.yaml")
@@ -155,7 +156,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "stakeholders.power_interest")
 
     def test_power_interest_and_bcg_matrix_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.bcg_matrix"])
         self.assertIsNone(resolved["blocked"])
 

@@ -34,6 +34,7 @@ from ai_lego.modules.decomposition.logic_tree import (
     logic_tree_node,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 LOGIC_TREE_SCHEMA = "ai-lego://specs/cognitive/typed-objects/logic-tree.schema.yaml"
 RULE = "分類依 客戶規模"
@@ -81,13 +82,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(LOGIC_TREE_SCHEMA, _valid_tree(), "logic tree")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, tree = live.invoke(METHOD_ID, generate_logic_tree, "LOGICTREE-T-INVOKE", RULE, _well_formed_root())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/decomposition.logic_tree.contract.yaml")

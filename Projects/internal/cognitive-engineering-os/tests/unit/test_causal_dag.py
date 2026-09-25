@@ -37,6 +37,7 @@ from ai_lego.modules.root_cause.fishbone import (
     record_validation_applied,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CAUSAL_DAG_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml"
 ROOT_CAUSE_FACT_SCHEMA = "ai-lego://specs/cognitive/typed-objects/root-cause-fact.schema.yaml"
@@ -134,7 +135,7 @@ class SpecConformanceTests(unittest.TestCase):
             self.contracts.validate(CAUSAL_DAG_ANALYSIS_SCHEMA, analysis, "hand-crafted false")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

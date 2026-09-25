@@ -36,6 +36,7 @@ from ai_lego.modules.epistemic.confidence_calibration import (
     generate_confidence_calibration,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CONFIDENCE_CALIBRATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/confidence-calibration.schema.yaml"
 PROVENANCE = make_provenance("AI_INFERENCE", "AI_GENERATED")
@@ -69,13 +70,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(CONFIDENCE_CALIBRATION_SCHEMA, _valid_calibration(), "confidence calibration")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, calibration = live.invoke(METHOD_ID, generate_confidence_calibration, "CALIB-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/epistemic.confidence_calibration.contract.yaml")

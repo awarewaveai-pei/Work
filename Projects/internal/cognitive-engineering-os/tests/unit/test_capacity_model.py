@@ -28,6 +28,7 @@ from ai_lego.modules.devops_sre.capacity_model import (
 )
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CAPACITY_MODEL_RECORD_SCHEMA = "ai-lego://specs/cognitive/typed-objects/capacity-model-record.schema.yaml"
 
@@ -253,7 +254,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_capacity_model_record("CAPMODEL-T-008", "x", -1.0, 0.10, 6, 0.002, 5.0, 0.15, 0.60, make_provenance("CALCULATED_RESULT", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

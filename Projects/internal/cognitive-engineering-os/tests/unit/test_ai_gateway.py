@@ -16,7 +16,7 @@ from ai_lego.apps.api import main as api_main
 from ai_lego.apps.api.dispatch import resolve_builder
 from ai_lego.apps.cli.run_flowchart_slice import fixture_args
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.ai_gateway import draft as draft_mod
 from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs, draft_recipe_source, extract_json_object, method_input_spec, recipe_draft_plan
 from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MODEL_ENV, AiCompletion, AnthropicProvider, provider_from_env
@@ -24,7 +24,7 @@ from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
 
 SPEC_ROOT = resolve_spec_root()
-CATALOG = MethodCatalog.from_spec_root(SPEC_ROOT)
+CATALOG = shared_method_catalog(SPEC_ROOT)
 
 
 def flowchart_kwargs() -> dict:

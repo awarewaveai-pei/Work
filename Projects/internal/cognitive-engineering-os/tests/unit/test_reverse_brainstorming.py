@@ -21,7 +21,7 @@ from ai_lego.modules.divergent.reverse_brainstorming import (
     inversion,
     worsening_idea,
 )
-from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 _NOW = datetime.datetime.now(datetime.timezone.utc).isoformat()
 _METHOD_SCHEMA = "ai-lego://specs/cognitive/method.schema.yaml"
@@ -139,7 +139,7 @@ class SpecConformanceTests(unittest.TestCase):
     def test_real_catalog_resolves_and_dispatches_the_method_end_to_end(self):
         from ai_lego.apps.api.dispatch import invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner
 
-        catalog = MethodCatalog.from_spec_root(resolve_spec_root())
+        catalog = shared_method_catalog(resolve_spec_root())
         self.assertTrue(catalog.is_resolvable("divergent.reverse_brainstorming"))
 
         builder = resolve_builder("divergent.reverse_brainstorming")

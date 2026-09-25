@@ -42,6 +42,7 @@ from ai_lego.modules.decision.topsis import (
     generate_topsis_analysis,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 TOPSIS_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/topsis-analysis.schema.yaml"
 TS = "2026-09-08T00:00:00Z"
@@ -303,7 +304,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(_valid_analysis()["generated_by_method"], METHOD_ID)
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         self.assertIsNone(live.resolve([METHOD_ID])["blocked"])
 
     def test_empty_catalog_blocks_topsis_the_same_way_it_blocks_other_slices(self):

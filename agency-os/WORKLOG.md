@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-25（續5）雲端 T11 併入 main：COS 測試共用 method catalog（整套本機 24→17.5 分鐘）＋巢狀 contract 防污染
+- [來源] 雲端 session（Sonnet 5）`claude/cc-t11-shared-catalog` 020c985e7：`tests/unit/method_testkit.py` 新增 `shared_method_catalog`（lru_cache 以 spec_root 字串為鍵，只掃一次 285 份 contract；每次呼叫新建 MethodCatalog，`contracts` 包 MappingProxyType）；250 個測試模組機械改用；新 `tests/unit/test_method_testkit_shared_catalog.py`。ai_lego 生產碼零改動。
+- [本機修 M1] 防污染只顧到頂層：contract 值是巢狀 dict，兩次呼叫共用同一物件（實測 `is` 為 True）→ 一個測試改了值，之後所有測試都讀到（順序相依污染）。改為每次 `copy.deepcopy`（實測 0.6 ms）；新增 `test_c_nested_contract_mutation_does_not_reach_the_next_caller`；原斷言 `assertIs(first.contracts, second.contracts)` 斷言的正是這個共用（錯誤期望）→ 改為內容相等＋不同物件。
+- [實效] 雲端報 20m36s；本機 1,118 s（前次基準 1,416 s，約 -21%）。任務標題「幾分鐘」未達：單次掃描本機約 1 s（非原估 7 s），剩餘時間是 schema 驗證、gate 推導等既有成本。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest discover -s tests -t .（T11 原版 14,163 OK 1,118 s；加 deepcopy 後 14,164 OK 1,049 s）＋ test_method_testkit_shared_catalog 5/5；突變：拿掉 deepcopy → 2 紅 → 還原綠 | exit=0 | ms=1058000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n（1m＝巢狀 contract 共用，已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=MethodCatalog.from_spec_root | hits=253（tests/ 內只剩 method_testkit.py 的快取本身；249 支 CLI slice＋API＋docs＋WORKLOG 是正式程式／紀錄，每次獨立 process，照舊）
 ## 2026-09-25（續4）研究線計畫 v1.33：§0 進度板寫出真阻塞（golden 紅 → T12）＋§12.1 規則 11 每卡只跑影響範圍測試、全套移到期末閘
 
 - 根因：§0 寫「阻塞：無／下一步 WC-PIa-01」，實際 golden 紅 3 條（3 個 ACTIVE 工具缺 schema＋CLI slice，續2）擋住每張 PI-a 卡的共同前置；§12.3 共同前置要求每卡跑 COS 全套 unit（14,159 個，本機 24–34 分鐘；雲端 T1 就是卡在這裡），操作者 2026-09-25 問為何每卡都跑全套。

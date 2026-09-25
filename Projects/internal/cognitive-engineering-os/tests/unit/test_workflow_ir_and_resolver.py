@@ -5,6 +5,7 @@ from ai_lego import resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation, SchemaValidationError
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog, state_transition
+from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.workflow.executor import missing_workflow_input_paths
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir, project_workflow_ir, workflow_dataflow_issues
 
@@ -155,7 +156,7 @@ class MethodResolverTests(unittest.TestCase):
         self.assertEqual(result["blocked"]["status"], METHOD_RESOLUTION_BLOCKED)
 
     def test_live_catalog_resolves_contracted_methods_and_blocks_unknown_ones(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve(["research.qualitative_coding", "evidence.triangulation"])
         self.contracts.validate(RESOLUTION, resolved, "resolved")
         self.assertIsNone(resolved["blocked"])
@@ -184,7 +185,7 @@ class MethodResolverTests(unittest.TestCase):
             ContractCatalog.empty("abstract").require("anything")
 
     def test_live_catalog_invoke_calls_through_with_the_contract_descriptor_and_logs_only_what_ran(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, value = live.invoke("research.qualitative_coding", lambda a, b: a * b, 6, 7)
         self.assertEqual(value, 42)
         self.assertEqual(descriptor["ref"], "research.qualitative_coding")

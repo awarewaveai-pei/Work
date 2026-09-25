@@ -36,6 +36,7 @@ from ai_lego.modules.decision.rice import (
     generate_rice_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 RICE_SCORE_RECORD_SCHEMA = "ai-lego://specs/cognitive/typed-objects/rice-score-record.schema.yaml"
 GATE_RESULT_SCHEMA = "ai-lego://specs/execution/gate.schema.yaml#/gate_result"
@@ -291,7 +292,7 @@ class GenerateRiceRecordConstructionTests(unittest.TestCase):
         self.assertNotEqual(reach["unit"], "mutated")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(resolve_spec_root())
+        live = shared_method_catalog(resolve_spec_root())
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

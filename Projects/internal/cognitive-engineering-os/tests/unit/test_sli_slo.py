@@ -18,6 +18,7 @@ from ai_lego.modules.devops_sre.sli_slo import (
     generate_sli_slo_set,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SLISLO_SCHEMA = "ai-lego://specs/cognitive/typed-objects/sli-slo-set.schema.yaml"
 
@@ -62,7 +63,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_sli_slo_set("SLO-T-006", "x", [{"id": "IND1", "metric_type": "durability", "sli_description": "x", "slo_target": "x", "sla_required": True, "sla_terms": "   "}], make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

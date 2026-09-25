@@ -47,6 +47,7 @@ from ai_lego.modules.decision.weighted_decision_matrix import (
 )
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 WDM_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/weighted-decision-matrix-record.schema.yaml"
 MCDA_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/mcda-analysis.schema.yaml"
@@ -435,7 +436,7 @@ class SpecConformanceTests(unittest.TestCase):
             self.contracts.validate(WDM_ANALYSIS_SCHEMA, tampered, "stray raw_scores field")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -449,7 +450,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "decision.weighted_decision_matrix")
 
     def test_wdm_and_mcda_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "decision.mcda"])
         self.assertIsNone(resolved["blocked"])
 

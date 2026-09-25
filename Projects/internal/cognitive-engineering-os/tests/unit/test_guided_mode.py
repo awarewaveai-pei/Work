@@ -31,6 +31,7 @@ from ai_lego.modules.representation.guided_mode import (
     generate_guided_mode_session,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 GUIDED_MODE_SESSION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/guided-mode-session.schema.yaml"
 PROVENANCE = make_provenance("AI_INFERENCE", "AI_GENERATED")
@@ -57,7 +58,7 @@ class GuidedModeTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.spec_root = resolve_spec_root()
         cls.contracts = SchemaContracts(cls.spec_root)
-        cls.catalog = MethodCatalog.from_spec_root(cls.spec_root)
+        cls.catalog = shared_method_catalog(cls.spec_root)
 
     def _valid_session(self, *, record_id: str = "GUIDED-T-001", **overrides: object):
         return generate_guided_mode_session(record_id, method_catalog=self.catalog, **_kwargs(**overrides))

@@ -31,6 +31,7 @@ from ai_lego.modules.representation.switching import (
     generate_representation_switch_event,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 REPRESENTATION_SWITCH_EVENT_SCHEMA = "ai-lego://specs/cognitive/typed-objects/representation-switch-event.schema.yaml"
 PROVENANCE = make_provenance("AI_INFERENCE", "AI_GENERATED")
@@ -79,12 +80,12 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(REPRESENTATION_SWITCH_EVENT_SCHEMA, event, "minimal complete switch")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, event = live.invoke(METHOD_ID, generate_representation_switch_event, "REPSWITCH-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/representation.switching.contract.yaml")

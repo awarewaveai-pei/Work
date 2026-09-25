@@ -19,6 +19,7 @@ from ai_lego.modules.devops_sre.chaos_engineering import (
     generate_chaos_experiment,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CHAOS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/chaos-experiment.schema.yaml"
 
@@ -57,7 +58,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_chaos_experiment("CHAOS-T-005", "x", "x", "x", False, "completed", make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

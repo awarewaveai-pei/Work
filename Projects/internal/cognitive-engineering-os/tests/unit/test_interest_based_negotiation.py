@@ -33,6 +33,7 @@ from ai_lego.modules.stakeholders.interest_based_negotiation import (
     generate_interest_based_negotiation_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 IBN_RECORD_SCHEMA = "ai-lego://specs/cognitive/typed-objects/interest-based-negotiation.schema.yaml"
 PROVENANCE = make_provenance("HUMAN_OPINION", "HUMAN_ORIGINAL")
@@ -65,13 +66,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(IBN_RECORD_SCHEMA, _valid_record(), "interest-based negotiation record")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, record = live.invoke(METHOD_ID, generate_interest_based_negotiation_record, "IBN-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/stakeholders.interest_based_negotiation.contract.yaml")

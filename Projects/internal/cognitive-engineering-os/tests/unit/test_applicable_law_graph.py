@@ -31,6 +31,7 @@ from ai_lego.modules.jurisdiction.applicable_law_graph import (
     generate_applicable_law_graph,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 APPLICABLE_LAW_GRAPH_SCHEMA = "ai-lego://specs/cognitive/typed-objects/applicable-law-graph-record.schema.yaml"
 PROVENANCE = make_provenance("AI_INFERENCE", "AI_GENERATED")
@@ -76,12 +77,12 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(APPLICABLE_LAW_GRAPH_SCHEMA, record, "minimal single-entry graph")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, record = live.invoke(METHOD_ID, generate_applicable_law_graph, "ALG-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/jurisdiction.applicable_law_graph.contract.yaml")

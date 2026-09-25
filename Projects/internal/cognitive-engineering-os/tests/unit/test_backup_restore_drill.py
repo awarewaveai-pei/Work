@@ -35,6 +35,7 @@ from ai_lego.modules.database_data.backup_restore_drill import (
     generate_backup_restore_drill_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 BACKUP_DRILL_SCHEMA = "ai-lego://specs/cognitive/typed-objects/backup-restore-drill-record.schema.yaml"
 
@@ -200,7 +201,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_backup_restore_drill_record("DRILL-T-011", "x", "x", True, 3600.0, 5100.0, "passed", make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

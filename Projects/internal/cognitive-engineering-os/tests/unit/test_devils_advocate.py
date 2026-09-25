@@ -32,6 +32,7 @@ from ai_lego.modules.challenge.devils_advocate import (
     generate_devils_advocate_position,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 DEVILS_ADVOCATE_POSITION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/devils-advocate-position.schema.yaml"
 PROVENANCE = make_provenance("AI_INFERENCE", "AI_GENERATED")
@@ -78,13 +79,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(DEVILS_ADVOCATE_POSITION_SCHEMA, _valid_position(), "devils advocate position")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, position = live.invoke(METHOD_ID, generate_devils_advocate_position, "DEVADV-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/challenge.devils_advocate.contract.yaml")
