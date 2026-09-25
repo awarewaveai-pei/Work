@@ -86,7 +86,7 @@ from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_work
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
-from ai_lego.modules.research.interpret_method_record import record_sha256, run_interpretation
+from ai_lego.modules.research.interpret_method_record import build_prompt_manifest, record_sha256, run_interpretation
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -1136,6 +1136,7 @@ def _run_interpretation(
     try:
         reference = artifact_store.put(tenant_id, "MethodInterpretation", {
             "record": record, "interpretation": outcome["interpretation"], "gate_results": outcome["gate_results"],
+            "prompt_manifest": build_prompt_manifest(record, sources),
         })
         repo.save_interpretation(
             tenant_id, project_id, interpretation_id, reference,
@@ -1234,7 +1235,7 @@ def get_interpretation(
         if event["event_type"] == "InterpretationJudged":
             judgment = {"stance": event["payload"]["stance"], "text": event["payload"]["text"]}
             break
-    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "record": artifact["record"], "result": artifact["interpretation"], "gate_results": artifact["gate_results"], "judgment": judgment}
+    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "record": artifact["record"], "result": artifact["interpretation"], "gate_results": artifact["gate_results"], "manifest": artifact.get("prompt_manifest", build_prompt_manifest(artifact["record"])), "judgment": judgment}
 
 
 @app.post("/interpretations/{interpretation_id}/judgment")

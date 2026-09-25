@@ -11,7 +11,7 @@ import { ResultPage } from "../../../components/result/ResultPage";
 
 type FormResponse = { method_id: string; display?: { name_zh?: string }; form: { fields: FormField[]; example?: { scenario?: string; input?: Record<string, unknown> } } };
 type Project = { project_id: string; name: string };
-type InterpretationStatus = { status: "PENDING" | "FAILED" | "DONE"; result?: any; error?: string };
+type InterpretationStatus = { status: "PENDING" | "FAILED" | "DONE"; result?: any; record?: Record<string, unknown>; manifest?: Array<{ id: string; kind?: string; path?: string; value?: string; source_id?: string; sha256?: string }>; gate_results?: Array<{ gate_id: string; status: string }>; error?: string };
 
 export default function MethodPage() {
   const params = useParams<{ id: string }>();
@@ -21,7 +21,7 @@ export default function MethodPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
   const projectSetup = useRef<{ methodId: string; promise: Promise<Project[]> } | null>(null);
-  const [result, setResult] = useState<any>();
+  const [completed, setCompleted] = useState<InterpretationStatus | null>(null);
   const [error, setError] = useState("");
   const [pendingId, setPendingId] = useState("");
   const [suggested, setSuggested] = useState<string[]>([]);
@@ -31,7 +31,12 @@ export default function MethodPage() {
     apiFetch<FormResponse>(`/methods/${encodeURIComponent(methodId)}/form`).then((response) => {
       if (!active) return;
       setForm(response);
-      setState(initialState(response.form.fields, response.form.example?.input));
+      const base = initialState(response.form.fields, response.form.example?.input);
+      const prefillKey = `cos:prefill:${methodId}`;
+      const prefillText = sessionStorage.getItem(prefillKey);
+      sessionStorage.removeItem(prefillKey);
+      try { setState({ ...base, ...(prefillText ? JSON.parse(prefillText) as Record<string, unknown> : {}) }); }
+      catch { setState(base); }
     }).catch((reason) => { if (active) setError(String(reason)); });
     return () => { active = false; };
   }, [methodId]);
@@ -59,14 +64,14 @@ export default function MethodPage() {
       try {
         const update = await apiFetch<InterpretationStatus>(`/interpretations/${pendingId}`);
         if (!active) return;
-        if (update.status === "DONE") { setResult(update.result); setPendingId(""); }
+        if (update.status === "DONE") { setCompleted(update); setPendingId(""); }
         if (update.status === "FAILED") { setError(update.error || "解讀失敗"); setPendingId(""); }
       } catch (reason) { if (active) { setError(String(reason)); setPendingId(""); } }
     }, 2000);
     return () => { active = false; clearInterval(timer); };
   }, [pendingId]);
 
-  if (result) return <ResultPage result={result} />;
+  if (completed?.result) return <ResultPage result={completed.result} record={completed.record} manifest={completed.manifest} gateResults={completed.gate_results} display={form?.display} />;
   if (!form) return <div className="card"><p>{error || "載入中…"}</p></div>;
   return <div>
     <h1>{form.display?.name_zh ?? methodId}</h1>

@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-25（續17）研究線 WC-PIa-20：結果頁對齊示意稿並由同一檢查器驗 web
+
+- 起因：結果頁只有骨架，缺 5b、原生冰山 SVG、來源值、預填卡與專家模式；check-mocks 只審示意稿不審產品輸出。
+- 改：結果頁 0～8＋5b，HowTo 由結果骨架與 display metadata 組成；冰山 SVG、引註 [n]→manifest 路徑與原值、NextSteps 預填/待補、ProvenanceBar 閘門與 details JSON；API 保存並回傳 prompt_manifest；check-mocks 新增 --page result <html>，vitest 渲染實際 HTML 交給它。不改示意稿。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；API 解讀 unittest 10/10；web typecheck；vitest 11/11；npm run build exit 0；check-mocks --page result 綠；check-mocks 五頁綠；selftest 170/170 caught、133/133 covered | exit=0 | ms=240000
+- REVIEW_DONE: 自審來源引註按 manifest 順序編號；layered 用示意稿冰山 polygon；quad fixture data-visual=quadrant；5b 與專家模式由同一檢查器審。
+- BUGHUNT_DONE: 查 ResultPage、MethodVisual、API artifact/GET、check-mocks 原規則與新 CLI；mockup 最新 commit 為 93488df52，未修改示意稿。
+- 突變：從渲染 HTML 拿掉 5b section → --page result 紅 [result-sections] → 還原 HTML 綠。
+- 下一步：WC-PIa-14R。
+
 ## 2026-09-25（續16）研究線 WC-PIa-21：首用者免貼 UUID、Next 修補
 
 - 起因：方法頁要求手貼 Project ID；工具清單沒有問題入口且使用錯誤欄位名；Next 15.2.4 在 npm audit 有 critical/high。

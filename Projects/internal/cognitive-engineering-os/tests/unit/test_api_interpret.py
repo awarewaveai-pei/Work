@@ -88,6 +88,7 @@ class InterpretApiTests(ApiTestCase):
         fetched = self.client.get(f"/interpretations/{interpretation_id}")
         self.assertEqual(fetched.status_code, 200, fetched.text)
         self.assertEqual(fetched.json()["status"], "DONE")
+        self.assertIn("r/events/0", {item["id"] for item in fetched.json()["manifest"]})
         self.assertEqual(fetched.json()["result"]["visual"]["kind"], "layered")
         SchemaContracts(resolve_spec_root()).validate(
             "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml",

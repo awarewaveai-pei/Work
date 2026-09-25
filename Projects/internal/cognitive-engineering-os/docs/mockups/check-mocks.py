@@ -568,12 +568,12 @@ class Checker:
         for n in nodes:
             if n.has("ex") and not n.attrs.get("data-set"): self.bad(f, "D18", f"line {n.line}: .ex without data-set (the chip script would hide it forever)")
 
-    def check_result(self, f, root, nodes):
+    def check_result(self, f, root, nodes, web=False):
         cards = [n for n in nodes if n.has("card") and not n.has("layer")]
         if not cards: self.bad(f, "§3.10", "no cards"); return
         top, last = cards[0], cards[-1]
-        anchors = [n for n in nodes if n.tag == "a"]
-        howto = [n for n in anchors if n.has("howto") and n.attrs.get("href", "").startswith("https://claude.ai/artifact/")]
+        anchors = [n for n in nodes if n.tag == "a" or (web and n.tag == "button")]
+        howto = [n for n in anchors if n.has("howto") and (web or n.attrs.get("href", "").startswith("https://claude.ai/artifact/"))]
         if not howto or not howto[0].parent.has("top") or howto[0].parent.parent is not top: self.bad(f, "U15", "header lesson button (.top > a.howto) missing from the first card")
         # U14 / §3.10 (0): the first card = status, how, lead, can/cant, three reading steps, the 30-second line, four terms
         if not top.find("status"): self.bad(f, "U14", "first card must carry the status strip")
@@ -712,11 +712,42 @@ class Checker:
         own_journeys = [n for n in nodes if n.has("journey") and not under(n, lambda a: a.has("wf"))]
         if len(own_journeys) != 1: self.bad(f, "U2", "exactly one six-step .journey strip outside the workflow cards")
 
+def check_web_result(path):
+    """Apply the mock's result-card rules and its section contract to rendered web HTML."""
+    source = pathlib.Path(path)
+    try:
+        html = source.read_text(encoding="utf-8")
+        dom = Dom(); dom.feed(html); dom.close()
+    except (OSError, UnicodeError, ValueError) as error:
+        return [f"{source}: [parse] {error}"]
+    problems = [f"{source}: [parse] {error}" for error in dom.err]
+    nodes = list(dom.root.walk())
+    checker = Checker(mk.HERE)
+    checker.check_result(source.name, dom.root, nodes, web=True)
+    problems.extend(checker.findings)
+    sections = [node.attrs.get("data-section") for node in nodes if "data-section" in node.attrs]
+    expected = [str(index) for index in range(6)] + ["5b", "6", "7", "8"]
+    if sections != expected: problems.append(f"{source}: [result-sections] expected {expected}, got {sections}")
+    if len([node for node in nodes if node.has("how-to")]) != len(expected): problems.append(f"{source}: [result-howto] every section needs 怎麼讀／你要做的")
+    if not any(node.attrs.get("data-visual") for node in nodes): problems.append(f"{source}: [result-visual] native visual missing")
+    if any(node.attrs.get("data-visual") == "layered" for node in nodes) and not any(node.tag == "svg" and node.attrs.get("aria-label") == "冰山模型四層圖" for node in nodes): problems.append(f"{source}: [result-visual] layered iceberg SVG missing")
+    if not any(node.has("next-steps") for node in nodes): problems.append(f"{source}: [result-next] next-step cards container missing")
+    for anchor in (node for node in nodes if node.tag == "a" and node.attrs.get("href", "").startswith("#citation-")):
+        target = anchor.attrs["href"][1:]
+        if not any(node.attrs.get("id") == target and node.attrs.get("data-source") for node in nodes): problems.append(f"{source}: [result-citation] {target} lacks manifest source")
+    return problems
+
+
 def main(argv):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+    if len(argv) == 3 and argv[:2] == ["--page", "result"]:
+        findings = check_web_result(argv[2])
+        if findings:
+            print("\n".join(findings)); print(f"{len(findings)} finding(s)"); return 1
+        print("check-mocks: rendered result page green"); return 0
     folder = mk.HERE
     if len(argv) == 2 and argv[0] == "--dir": folder = pathlib.Path(argv[1])
     elif argv: print("usage: check-mocks.py [--dir <folder>]"); return 2
