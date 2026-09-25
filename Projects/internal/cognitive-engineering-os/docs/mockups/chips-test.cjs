@@ -2,9 +2,10 @@
 /* Functional test for the domain chips (plan D18 / U21) and the home app (plan U1 / U16).
    Lessons: click every chip; after each click every example group shows exactly one variant, the clicked one, judged by
    the computed display (a display: rule would silently un-hide a group), and exactly one chip is aria-selected.
-   Home: every check runs twice — on the page, where it must pass, and on a copy without home-catalog-script, where it
-   must FAIL — so a pass proves the page's own code, not the browser (Chromium opens a closed <details> on a fragment
-   jump by itself, hence link clicks run with the default action prevented). CommonJS like render-mocks.cjs; from the repo root:
+   Home (views, search, tool pages) and every page's actions (mock-only buttons, links into folds): every check runs
+   twice — on the page, where it must pass, and on a copy without the script it tests (home-catalog-script /
+   page-actions-script), where it must FAIL — so a pass proves the page's own code, not the browser (Chromium opens a
+   closed <details> on a fragment jump by itself, hence link clicks run with the default action prevented). CommonJS like render-mocks.cjs; from the repo root:
      NODE_PATH="<node_modules that holds playwright>" node Projects/internal/cognitive-engineering-os/docs/mockups/chips-test.cjs
    Exit 0 pass, 1 fail, 2 playwright missing, 3 render failed. Plan §10: run with render-mocks.cjs before publishing. */
 const path = require("path");
@@ -24,6 +25,7 @@ async function homeChecks(browser, file) {
   await p.evaluate(() => window.addEventListener("click", (e) => { if (e.target.closest && e.target.closest('a[href^="#"]')) e.preventDefault(); }, true));
   const shown = () => p.evaluate(() => [...document.querySelectorAll("section[data-view]")].filter((s) => s.getClientRects().length).map((s) => s.id).join(","));
   const current = () => p.evaluate(() => [...document.querySelectorAll('.navi[aria-current="page"]')].map((a) => a.dataset.view).join(","));
+  const page = () => p.evaluate(() => [...document.querySelectorAll("article.tpage")].filter((a) => a.getClientRects().length).map((a) => a.id).join(","));
   const state = () => p.evaluate(() => ({
     tools: document.querySelectorAll(".tool").length, hidden: document.querySelectorAll(".tool[hidden]").length,
     rendered: [...document.querySelectorAll(".tool")].filter((e) => e.getClientRects().length).length,
@@ -78,11 +80,33 @@ async function homeChecks(browser, file) {
         && (await p.$eval("#dir-law", (d) => d.open && d.getClientRects().length > 0));
       await p.$eval("#dir-law", (d) => { d.open = false; }); return ok;
     },
-    // a 常用 link in a goal card lands on the tool's row: tools view, row rendered, its fold open
+    // a 常用 link in a goal card opens that tool's own page: the tool view, only that page, the menu still on 工具
     commonLink: async () => {
-      await menu("home"); await p.click('a[href="#m-foresight.scenario_planning"]');
-      const ok = (await shown()) === "tools" && (await p.$eval('[id="m-foresight.scenario_planning"]', (r) => r.getClientRects().length > 0 && r.closest("details").open));
-      await p.$eval('[id="m-foresight.scenario_planning"]', (r) => { r.closest("details").open = false; }); return ok;
+      await menu("home"); await p.click('a[href="#t-foresight.scenario_planning"]');
+      return (await shown()) === "tool" && (await current()) === "tools" && (await page()) === "t-foresight.scenario_planning";
+    },
+    // a directory row opens its tool's page (found by search, so its fold is open)
+    toolRow: async () => {
+      await menu("tools"); await p.fill("#q", "swot"); await p.click('.tool a[href="#t-strategy.swot"]');
+      const ok = (await shown()) === "tool" && (await current()) === "tools" && (await page()) === "t-strategy.swot";
+      await menu("tools"); await p.fill("#q", ""); return ok;
+    },
+    // an address hash (…/artifact/<home>#t-<id>, from another page) opens that tool page on load
+    toolHash: async () => {
+      const q = await browser.newPage(); await q.goto(url + "#t-systems.iceberg_model", { waitUntil: "load" });
+      const ok = await q.evaluate(() => [...document.querySelectorAll("article.tpage")].filter((a) => a.getClientRects().length).map((a) => a.id).join(",") === "t-systems.iceberg_model"
+        && [...document.querySelectorAll('.navi[aria-current="page"]')].map((a) => a.dataset.view).join(",") === "tools");
+      await q.close(); return ok;
+    },
+    // real navigation: row → tool page → back lands on the list where it was scrolled, the search still in place
+    toolBack: async () => {
+      const q = await browser.newPage({ viewport: { width: 1000, height: 360 } }); q.setDefaultTimeout(2500); await q.goto(url + "#tools", { waitUntil: "load" });
+      const view = () => q.evaluate(() => [...document.querySelectorAll("section[data-view]")].filter((s) => s.getClientRects().length).map((s) => s.id).join(","));
+      await q.fill("#q", "swot"); await q.hover('.tool a[href="#t-strategy.swot"]'); const y0 = await q.evaluate(() => window.scrollY);   // hover scrolls the row in first
+      await q.click('.tool a[href="#t-strategy.swot"]'); await q.waitForTimeout(100); const a = await view();
+      await q.goBack(); await q.waitForTimeout(100); const b = await view(); const y1 = await q.evaluate(() => window.scrollY);
+      const kept = await q.$eval("#q", (i) => i.value);
+      await q.close(); return y0 > 0 && a === "tool" && b === "tools" && Math.abs(y1 - y0) < 5 && kept === "swot";
     },
     // a workflow hit that is platform-internal: the workflows view shows and its fold opens
     internal: async () => {
@@ -95,13 +119,6 @@ async function homeChecks(browser, file) {
       await menu("home"); const b = await p.$$("[data-prompt]"); const t = await Promise.all(b.slice(0, 2).map((x) => x.getAttribute("data-prompt")));
       await b[0].click(); const one = await p.$eval("#ask", (a) => a.value); await b[1].click(); const two = await p.$eval("#ask", (a) => a.value);
       await p.fill("#ask", ""); return one === t[0] && two === t[1];
-    },
-    // real navigation (default action kept): a placeholder link (href="#") leaves the view where it is
-    placeholder: async () => {
-      const q = await browser.newPage(); q.setDefaultTimeout(2500); await q.goto(url + "#workflows", { waitUntil: "load" });
-      await q.click('section#workflows a[href="#"]');
-      const ok = await q.evaluate(() => [...document.querySelectorAll("section[data-view]")].filter((s) => s.getClientRects().length).map((s) => s.id).join(",") === "workflows");
-      await q.close(); return ok;
     },
     // real navigation: back/forward switch the views, and back returns to where the view was scrolled
     history: async () => {
@@ -126,6 +143,48 @@ async function homeChecks(browser, file) {
   }
   await p.close();
   return out;
+}
+
+// page-actions-script (every page): a mock-only action says what the product will do; an in-page link opens its fold
+async function actionChecks(browser, file) {
+  const p = await browser.newPage();
+  p.setDefaultTimeout(2500);
+  await p.goto(pathToFileURL(file).href, { waitUntil: "load" });
+  await p.evaluate(() => window.addEventListener("click", (e) => { if (e.target.closest && e.target.closest('a[href^="#"]')) e.preventDefault(); }, true));
+  const checks = {
+    // the first visible mock-only button, clicked, writes one note saying what the product will do
+    mockNote: async () => {
+      let clicked = false;
+      for (const x of await p.$$("button[data-mock]")) if (await x.isVisible()) { await x.click(); clicked = true; break; }
+      const t = await p.evaluate(() => [...document.querySelectorAll(".mocknote")].map((n) => n.textContent));
+      return clicked && t.length === 1 && t[0].startsWith("示意稿：正式版");
+    },
+  };
+  if (await p.$('a[href="#expert"]')) checks.expertOpen = async () => { await p.click('a[href="#expert"]'); return p.$eval("#expert", (d) => d.open); };
+  const out = {};
+  for (const [name, fn] of Object.entries(checks)) {
+    try { out[name] = await fn(); } catch (e) { out[name] = false; }
+  }
+  await p.close();
+  return out;
+}
+
+// run `checks` on the page and on a copy without `partial`: each check must pass on the page and FAIL on the copy
+async function withControl(browser, name, partial, checks) {
+  const file = path.join(__dirname, name), src = fs.readFileSync(file, "utf8");
+  const re = new RegExp(`<!-- == partial: ${partial}: start[\\s\\S]*?<!-- == partial: ${partial}: end == -->`);
+  const stripped = src.replace(re, "");
+  if (stripped === src) { console.log(`${name}: ${partial} markers not found`); return 1; }
+  const bare = path.join(os.tmpdir(), `${name}-without-${partial}.html`);
+  fs.writeFileSync(bare, stripped);
+  const a = await checks(browser, file), b = await checks(browser, bare);
+  let bad = 0;
+  for (const k of Object.keys(a)) {
+    const ok = a[k] === true && b[k] === false;
+    if (!ok) bad++;
+    console.log(`${name} [${k}] ${a[k] ? "pass" : "FAIL"}; without ${partial}: ${b[k] ? "PASSES (the check does not test the page)" : "fails, as it must"}`);
+  }
+  return bad;
 }
 
 (async () => {
@@ -158,19 +217,8 @@ async function homeChecks(browser, file) {
     }
     await page.close();
   }
-  const home = path.join(__dirname, "home-mock.html");
-  const bare = path.join(os.tmpdir(), "home-mock-without-script.html");
-  const src = fs.readFileSync(home, "utf8");
-  const stripped = src.replace(/<!-- == partial: home-catalog-script: start[\s\S]*?<!-- == partial: home-catalog-script: end == -->/, "");
-  if (stripped === src) { console.log("home-mock.html: home-catalog-script markers not found"); bad++; }
-  fs.writeFileSync(bare, stripped);
-  const withScript = await homeChecks(browser, home);
-  const without = await homeChecks(browser, bare);
-  for (const name of Object.keys(withScript)) {
-    const ok = withScript[name] === true && without[name] === false;
-    if (!ok) bad++;
-    console.log(`home-mock.html [${name}] ${withScript[name] ? "pass" : "FAIL"}; without the script: ${without[name] ? "PASSES (the check does not test the page)" : "fails, as it must"}`);
-  }
+  bad += await withControl(browser, "home-mock.html", "home-catalog-script", homeChecks);
+  for (const f of ["home-mock.html", "iceberg-result-mock.html", "workflow-result-mock.html", ...LESSON]) bad += await withControl(browser, f, "page-actions-script", actionChecks);
   await browser.close();
   console.log(bad ? `chips: FAIL ${bad}` : "chips: PASS");
   process.exit(bad ? 1 : 0);

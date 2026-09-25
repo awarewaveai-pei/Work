@@ -61,14 +61,16 @@
   .cant{border:1px solid var(--warn)}
   .can b,.cant b{display:block}
   .btns{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
-  a.btn{cursor:pointer}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;font-family:inherit;line-height:inherit;text-align:left;cursor:pointer;text-decoration:none;display:inline-block}
+  .btn:hover{border-color:var(--accent)}
   .btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-  a.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
   .btn.ghost{color:var(--muted)}
   .btn small{display:block;font-size:11px;color:inherit;opacity:.85}
+  .mocknote{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);border-radius:8px;padding:6px 10px;font-size:12.5px;margin:6px 0 0}
   .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
-  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span,.journey a{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent);text-decoration:none}
+  .journey a:hover{text-decoration:underline}
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
@@ -197,7 +199,11 @@
   .fam{font-size:15px;margin:14px 0 2px;color:var(--accent)}
   .fam .k{color:var(--muted);font-size:12.5px;font-weight:400;margin-left:6px}
   .fam small{font-weight:400;color:var(--muted);font-size:12px;margin-left:8px}
-  .tool{padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  .tool{position:relative;padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  .tool:hover{background:var(--soft)}
+  .tool b a{text-decoration:none}
+  .tool b a::after{content:"";position:absolute;inset:0}
+  .tool:hover b a{text-decoration:underline}
   .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
   .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
   .tool .sub{margin-top:1px}
@@ -231,6 +237,32 @@
   /* == shared design system: end == */
   /* == page-specific == */
 </style>
+<!-- == partial: page-actions-script: start (verbatim from partials/page-actions-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Every page. (1) A control the product wires (start a tool, approve, export…) is a <button data-mock="what it will
+  // do">; a mock cannot do it, so a click writes that sentence under the button's row instead of doing nothing. Anything
+  // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
+  // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
+  // the details itself); the home router does the same for its views.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("button[data-mock]");
+      if (b) {
+        var row = b.closest(".btns") || b, note = row.nextElementSibling;
+        if (!note || !note.classList.contains("mocknote")) {
+          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+          row.parentNode.insertBefore(note, row.nextSibling);
+        }
+        note.textContent = "示意稿：" + b.getAttribute("data-mock");
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
+      var d = t && t.closest("details");
+      if (d) d.open = true;
+    });
+  });
+</script>
+<!-- == partial: page-actions-script: end == -->
 </head>
 <body>
 <div class="app">
@@ -261,7 +293,7 @@
     </div>
     <div class="todos">
       <div class="todo"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
-      <div class="todo"><b>② 看圖表與四張卡</b>趨勢圖、因果迴路圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
+      <div class="todo"><b>② 看圖表與四張卡</b>趨勢圖、因果回饋圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
       <div class="todo"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；你在這條路的哪裡、接著做什麼、不做也可以。</div>
     </div>
     <p class="sub mt8 mb0">只有 30 秒？看 ① 的一句話和建議就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
@@ -279,7 +311,7 @@
     <p class="mt6 mb0"><b>建議：</b>先改第 3 層（參與者先說；帶領者的解讀之後才講，並記成「附掛的影響來源」；紀錄表改量「判斷過程看不看得見」），一期之內用「主動分享人數、帶領者說明分鐘數」兩個數字，回頭跟帶領者團隊談「參與者才是最終判斷者」（第 4 層）。<b>證據缺口：</b>目前只知道「帶領者先講」和「分享變少」同時發生，還沒有逐次的說明分鐘數、每人發言次數，也沒問過參與者自己為什麼不說；先補這三項。</p>
     <div class="finding warn"><b>改判條件（出現這些證據，結論要改）</b>① 逐次說明分鐘數並沒有上升 → 迴路不成立，改查人數或時段；② 參與者匿名回答「不說」的原因與帶領者無關（例如時間、人數、線上）→ 第 3 層改寫；③ 上一期同一流程但分享沒掉 → 不是流程問題，回到第 2 層找差異。</div>
     <div class="judge"><b>你的判斷（你的原話才是記錄；上面 AI 寫的只是附掛）</b>
-      <div class="btns"><span class="btn">同意</span><span class="btn">部分同意</span><span class="btn">不同意</span></div>
+      <div class="btns"><button type="button" class="btn" data-mock="正式版記下你的判斷「同意」和你寫的原話；紀錄是你的話，AI 的解讀只是附掛。">同意</button><button type="button" class="btn" data-mock="正式版記下你的判斷「部分同意」和你寫的原話；紀錄是你的話，AI 的解讀只是附掛。">部分同意</button><button type="button" class="btn" data-mock="正式版記下你的判斷「不同意」和你寫的原話；紀錄是你的話，AI 的解讀只是附掛。">不同意</button></div>
       <textarea placeholder="你怎麼看？哪裡對、哪裡不對、你手上有什麼上面沒看到的證據？"></textarea>
       <div class="sub mt4">沒填也能核准；填了會和這頁一起存，之後的工具會把你的判斷當成最高優先的輸入。</div>
     </div>
@@ -348,7 +380,7 @@
   <!-- 1.5 圖表分析 -->
   <div class="card">
     <h2>③ 圖表分析（三張圖各回答一個問題）</h2>
-    <div class="how"><b>怎麼讀</b>每張圖回答一個問題；圖下面寫「怎麼看」「看到什麼」「來源」。<b>你要做的</b>不用做；標「示意」的圖要接上真實資料才算數（⑧ 行為隨時間圖）。</div>
+    <div class="how"><b>怎麼讀</b>每張圖回答一個問題；圖下面寫「怎麼看」「看到什麼」「來源」。<b>你要做的</b>不用做；標「示意」的圖要接上真實資料才算數（⑧ 隨時間變化行為圖）。</div>
     <div class="charts">
       <figure>
         <figcaption><b>圖 A｜趨勢：真的越來越安靜嗎？</b>（第 2 層）</figcaption>
@@ -435,7 +467,7 @@
       <div class="row"><b>這代表</b><span>每期重演，加上「先解讀的場次最低」，代表不是這一批人的問題，是流程在推。注意：<dfn title="兩件事一起發生，不等於一件造成另一件">同步不等於因果</dfn>，還缺逐次的說明分鐘數。</span></div>
       <div class="row"><b>在這層出手</b><span>每次 session 記兩個數字：主動分享人數、帶領者說明分鐘數，放同一張圖。<b>效果</b>：第 3 次就看得到苗頭，但不會阻止它。<span class="lever mid">槓桿：中低</span></span></div>
       <div class="row"><b>對應方案</b><span>⑦ C 的追蹤指標（不是方案，是量法）</span></div>
-      <div class="row"><b>資料厚度</b><span>你填 1 句・沒有逐次數字・外部 0 筆 → <span class="warn">最薄</span>，⑧ 行為隨時間圖可補</span></div>
+      <div class="row"><b>資料厚度</b><span>你填 1 句・沒有逐次數字・外部 0 筆 → <span class="warn">最薄</span>，⑧ 隨時間變化行為圖可補</span></div>
     </div>
 
     <div class="layer l3 card mb12">
@@ -455,7 +487,7 @@
       <div class="row"><b>這代表</b><span>只要「專家比較懂」這個信念不變，第 3 層的順序下一期又會被改回去，紀錄表也會偷偷加回「達到洞察」那一欄。這是整座冰山的底。</span></div>
       <div class="row"><b>在這層出手</b><span>把帶領者的角色重新定義為「讓判斷過程看得見的人」：帶領者訓練、紀錄表、框架契約都寫上「參與者是最終判斷者；帶領者與框架本身都在影響來源清單上、都可以被參與者推翻」。<b>效果</b>：最根本、最持久，但最慢，而且要帶領者團隊自己點頭。<span class="lever max">槓桿：最高</span></span></div>
       <div class="row"><b>對應方案</b><span>⑦ 丙「改流程＋改角色」</span></div>
-      <div class="row"><b>資料厚度</b><span>你的觀察 1 句・沒問過帶領者・外部 0 筆 → 薄，⑧ 五問法可驗</span></div>
+      <div class="row"><b>資料厚度</b><span>你的觀察 1 句・沒問過帶領者・外部 0 筆 → 薄，⑧ 五個為什麼可驗</span></div>
     </div>
   </div>
 
@@ -483,7 +515,7 @@
   </div>
 
   <!-- 4.5 解決方案：從分析到行動 -->
-  <div class="card okline">
+  <div class="card okline" id="solution">
     <h2>⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）</h2>
     <div class="how"><b>怎麼讀</b>A 選一條路、B 排成 90 天、C 定三個數字盯著。表裡的字：見效 = 多久看得到；成本 = 要投入什麼；持久 = 會不會回彈；風險 = 最可能失敗的地方。<b>你要做的</b>選一個方案、填負責人和期限、確認目標數字（目標由你定，系統只帶入現況）。</div>
 
@@ -518,9 +550,9 @@
       <div class="kpi"><b>影響來源清單含帶領者本身</b><span class="now">現在 未量測</span><span class="goal">每次 100%（待你確認）</span><span class="when">第 4 週起</span></div>
     </div>
     <div class="btns mt10">
-      <span class="btn primary">把行動計畫存成任務，設提醒</span>
-      <span class="btn">90 天後自動重跑本分析並比較</span>
-      <span class="btn">改善了就記進案例庫；沒改善回到 A 重選</span>
+      <button type="button" class="btn primary" data-mock="正式版把行動計畫存成任務：負責人和期限要你填，到期會提醒你。">把行動計畫存成任務，設提醒</button>
+      <button type="button" class="btn" data-mock="正式版排一次 90 天後的重跑，跑完和這次並排比較。">90 天後自動重跑本分析並比較</button>
+      <button type="button" class="btn" data-mock="正式版到期時問你改善了沒：改善了就記進案例庫，沒有就回到方案 A 重選。">改善了就記進案例庫；沒改善回到 A 重選</button>
     </div>
     <p class="sub mt8 mb0">工具負責想清楚、排出來、盯著看；動手做事的是人。到期時系統會用新資料自動重跑這一頁、把前後放在一起比較，並通知你；目標數字由你定，AI 不替你定。</p>
   </div>
@@ -532,51 +564,51 @@
     <div class="journey">
       <span class="done">✓ 冰山模型：問題在第 3 層、根在第 4 層</span><i>→</i>
       <span class="mcard">下一步：槓桿點分析（算每個出手點的力道）</span><i>→</i>
-      <span>之後：五問法（驗證根因）</span><i>→</i>
+      <span>之後：五個為什麼（驗證根因）</span><i>→</i>
       <span>最後：⑦ 解決方案定案與追蹤</span>
     </div>
     <p class="lead mt6 mb0">你已經知道問題在第 3 層的迴路、根在第 4 層的信念。<b>最值得的下一步是算出三個出手點的力道</b>，因為 ⑦ 的甲乙丙現在只有排序、沒有數字。<b>不做下一步也可以</b>：⑦ 的方案已經能用，差別是有沒有數字撐它。</p>
 
     <div class="mcards">
       <div class="mcard now">
-        <div><b>槓桿點分析</b><span class="tag">本工具建議的下一步</span></div>
+        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.leverage_point_analysis">槓桿點分析</a></b><span class="tag">本工具建議的下一步</span></div>
         <div><span class="k">回答什麼：</span>三個出手點（開場鼓勵／改流程順序／改帶領者角色）各自的力道與代價。</div>
         <div><span class="k">帶入什麼：</span>你的四段輸入 <cite>[1]</cite>–<cite>[4]</cite> 與本次 3 個發現 → 自動填 5 個欄位；<span class="need">還要你填 1 個</span>：每個出手點你估的「改變難度」（1–5）。</div>
         <div><span class="k">會得到：</span>槓桿表（出手點 × 難度 × 效果 × 持久），⑦ 的方案表自動更新。</div>
         <div class="k">約 2 分鐘・約 NT$1</div>
-        <div class="btns"><span class="btn primary">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><button type="button" class="btn primary" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
       </div>
       <div class="mcard">
-        <div><b>因果迴路圖</b></div>
+        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.causal_loop_diagram">因果回饋圖</a></b></div>
         <div><span class="k">回答什麼：</span>等答案迴路有沒有漏掉的環節、有沒有第二條迴路。</div>
         <div><span class="k">帶入什麼：</span>第 3 層你填的 <cite>[3]</cite> 與發現 2 → 自動填 4 個節點；<span class="need">還要你填 0 個</span>。</div>
         <div><span class="k">會得到：</span>正式的迴路圖（節點、箭頭、R／B 標記），取代圖 B 的示意。</div>
         <div class="k">約 1 分鐘・約 NT$0.5</div>
-        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><button type="button" class="btn" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
       </div>
       <div class="mcard">
-        <div><b>行為隨時間圖</b></div>
+        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.behavior_over_time">隨時間變化行為圖</a></b></div>
         <div><span class="k">回答什麼：</span>分享人數與說明分鐘數六次的走勢，是不是真的在變。</div>
         <div><span class="k">帶入什麼：</span><cite>[1]</cite><cite>[2]</cite> 的數字 → 自動建 2 條序列；<span class="need">還要你填 12 格</span>：六次 session 的實際數字（現在只有示意）。</div>
         <div><span class="k">會得到：</span>正式的趨勢圖（取代圖 A）＋「同步不等於因果」的檢查。</div>
         <div class="k">約 3 分鐘（要填數字）・約 NT$0.5</div>
-        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><button type="button" class="btn" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
       </div>
       <div class="mcard">
-        <div><b>五問法</b></div>
+        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-root_cause.five_whys">五個為什麼</a></b></div>
         <div><span class="k">回答什麼：</span>「參與者需要專家幫他們看見意義」再往下問五次為什麼，是不是真的根因。</div>
         <div><span class="k">帶入什麼：</span>第 4 層 <cite>[4]</cite> 與發現 3 → 自動填第一個「為什麼」；<span class="need">還要你填 4 個</span>：後面的回答（可讓 AI 起草，你改）。</div>
         <div><span class="k">會得到：</span>根因鏈＋每一層的證據缺口。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><span class="btn">用這次的資料開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 產出後接上">第一次用？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><button type="button" class="btn" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
       </div>
     </div>
 
     <div class="btns mt12">
-      <span class="btn primary">把建議的兩步串成一條工作流，一次跑完<small>每一步停下來給你確認，順序可以改</small></span>
-      <span class="btn">不確定選哪個？描述你想知道什麼<small>系統幫你挑，最多三個建議</small></span>
-      <span class="btn">分析已經夠了，直接去 ⑦ 解決方案</span>
-      <span class="btn ghost">都不做，先核准存檔（⑨ 下方）</span>
+      <button type="button" class="btn primary" data-mock="正式版把建議的兩步串成一條工作流草稿：每一步停下來給你確認，順序可以改。">把建議的兩步串成一條工作流，一次跑完<small>每一步停下來給你確認，順序可以改</small></button>
+      <a class="btn" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">不確定選哪個？描述你想知道什麼<small>系統幫你挑，最多三個建議</small></a>
+      <a class="btn" href="#solution">分析已經夠了，直接去 ⑦ 解決方案</a>
+      <a class="btn ghost" href="#approve">都不做，先核准存檔（⑨ 下方）</a>
     </div>
     <p class="sub mt8 mb0">每一張都帶入本次的輸入與引註，「還要你填」的欄位會標紅；按下去先開預填好的表單，你確認才執行、才花錢。</p>
   </div>
@@ -591,11 +623,11 @@
       <li>你的輸入・結構：「流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄『參與者是否達到本次目標洞察』」</li>
       <li>你的輸入・心智模型：「帶領者團隊默認『參與者需要專家幫他們看見意義』；訓練教的是怎麼解讀作品，不是怎麼讓人自己看見」</li>
     </ol>
-    <div class="finding warn"><b>本次沒有外部來源</b>結論全部建立在你填的四段話上，所以信心最高只到「中」。要提高：接上資料蒐集，或先在 ⑧ 用「行為隨時間圖」補六次真實數字。</div>
+    <div class="finding warn"><b>本次沒有外部來源</b>結論全部建立在你填的四段話上，所以信心最高只到「中」。要提高：接上資料蒐集，或先在 ⑧ 用「隨時間變化行為圖」補六次真實數字。</div>
   </div>
 
   <!-- 7. 來源標記與核准 -->
-  <div class="card">
+  <div class="card" id="approve">
     <div class="meta-bar">
       <span>這一頁是 <b>AI 推論，尚未經人核准</b></span>
       <span>模型 <b>claude-sonnet-5</b></span>
@@ -605,12 +637,12 @@
     </div>
     <div class="sub mt8"><b>核准</b> = 這頁成為專案的正式紀錄，可匯出、可被下一步引用；<b>退回</b> = 寫原因後重做，這一版保留；<b>刪除專案</b> = 來源與所有產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
     <div class="btns mt12">
-      <span class="btn primary">核准，存進專案</span>
-      <span class="btn">退回並說原因</span>
-      <span class="btn">匯出 PDF</span>
-      <span class="btn ghost">專家模式：閘門表與 JSON</span>
+      <button type="button" class="btn primary" data-mock="正式版把這頁存成專案的正式紀錄（記下誰、何時核准），之後可以匯出、可以被下一步引用。">核准，存進專案</button>
+      <button type="button" class="btn" data-mock="正式版請你寫退回的原因，AI 依原因重做；這一版會保留。">退回並說原因</button>
+      <button type="button" class="btn" data-mock="正式版匯出這頁的 PDF，引註和來源清單一起附上。">匯出 PDF</button>
+      <a class="btn ghost" href="#expert">專家模式：閘門表與 JSON</a>
     </div>
-    <details class="mt10"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
+    <details class="mt10" id="expert"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
 <pre>{
   "id": "ICEBERG-8197A6CBE8346F64",
   "generated_by_method": "systems.iceberg_model",

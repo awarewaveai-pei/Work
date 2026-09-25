@@ -23,7 +23,8 @@ try { ({ chromium } = require("playwright")); }
 catch (e) { console.error("playwright not resolvable: set NODE_PATH to a node_modules that contains it"); process.exit(2); }
 const HERE = __dirname;
 const FILES = ["home-mock.html", "iceberg-result-mock.html", "iceberg-lesson-mock.html", "workflow-result-mock.html", "workflow-lesson-mock.html"];   // = mockkit.FILES
-const VIEWS = { "home-mock.html": ["home", "tools", "workflows", "projects"] };   // = mockkit.NAV ids; the page shows one at a time
+// = mockkit.NAV ids (the page shows one at a time) + two tool pages: one with a lesson and a demo, one without
+const VIEWS = { "home-mock.html": ["home", "tools", "workflows", "projects", "t-systems.iceberg_model", "t-strategy.swot"] };
 const TARGETS = FILES.flatMap((f) => (VIEWS[f] || [null]).map((v) => [f, v]));
 // [mode, viewport width, colour scheme, slice height, max slices unless --full]
 const MODES = [["desktop", 1200, "light", 1300, 8], ["mobile", 375, "light", 1400, 3], ["dark", 1200, "dark", 1300, 2]];

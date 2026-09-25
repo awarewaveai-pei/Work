@@ -61,14 +61,16 @@
   .cant{border:1px solid var(--warn)}
   .can b,.cant b{display:block}
   .btns{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
-  a.btn{cursor:pointer}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;font-family:inherit;line-height:inherit;text-align:left;cursor:pointer;text-decoration:none;display:inline-block}
+  .btn:hover{border-color:var(--accent)}
   .btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-  a.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
   .btn.ghost{color:var(--muted)}
   .btn small{display:block;font-size:11px;color:inherit;opacity:.85}
+  .mocknote{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);border-radius:8px;padding:6px 10px;font-size:12.5px;margin:6px 0 0}
   .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
-  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span,.journey a{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent);text-decoration:none}
+  .journey a:hover{text-decoration:underline}
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
@@ -197,7 +199,11 @@
   .fam{font-size:15px;margin:14px 0 2px;color:var(--accent)}
   .fam .k{color:var(--muted);font-size:12.5px;font-weight:400;margin-left:6px}
   .fam small{font-weight:400;color:var(--muted);font-size:12px;margin-left:8px}
-  .tool{padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  .tool{position:relative;padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  .tool:hover{background:var(--soft)}
+  .tool b a{text-decoration:none}
+  .tool b a::after{content:"";position:absolute;inset:0}
+  .tool:hover b a{text-decoration:underline}
   .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
   .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
   .tool .sub{margin-top:1px}
@@ -243,6 +249,32 @@
   });
 </script>
 <!-- == partial: lesson-chip-script: end == -->
+<!-- == partial: page-actions-script: start (verbatim from partials/page-actions-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Every page. (1) A control the product wires (start a tool, approve, export…) is a <button data-mock="what it will
+  // do">; a mock cannot do it, so a click writes that sentence under the button's row instead of doing nothing. Anything
+  // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
+  // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
+  // the details itself); the home router does the same for its views.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("button[data-mock]");
+      if (b) {
+        var row = b.closest(".btns") || b, note = row.nextElementSibling;
+        if (!note || !note.classList.contains("mocknote")) {
+          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+          row.parentNode.insertBefore(note, row.nextSibling);
+        }
+        note.textContent = "示意稿：" + b.getAttribute("data-mock");
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
+      var d = t && t.closest("details");
+      if (d) d.open = true;
+    });
+  });
+</script>
+<!-- == partial: page-actions-script: end == -->
 </head>
 <body>
 <div class="app">
@@ -258,7 +290,7 @@
 <main class="wrap">
 
   <div class="banner"><b>示意稿</b>：這是第一次用「冰山模型」的人，按下工具之前會先看到的一堂課。之後每個工具都有一堂，內容來自工具資料，會隨回饋改進。</div>
-  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools">工具</a> › 冰山模型 › 5 分鐘課</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools">工具</a> › <a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.iceberg_model">冰山模型</a> › 5 分鐘課</div>
 
   <div class="top">
     <div>
@@ -496,9 +528,9 @@
       <li>你們開會時常常出現的那句話（信念通常藏在口頭禪裡）</li>
     </ul>
     <div class="btns">
-      <span class="btn primary">用示範案例試一次<small><span class="ex" data-set="edd">主動分享 6 → 2 人那個例子，已填好，按執行就看結果</span><span class="ex" data-set="partner" hidden>畫廊延後付款那個例子，已填好，按執行就看結果</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，已填好，按執行就看結果</span><span class="ex" data-set="ecom" hidden>退貨率 12% 那個例子，已填好，按執行就看結果</span><span class="ex" data-set="daily" hidden>週日晚上吵架那個例子，已填好，按執行就看結果</span></small></span>
-      <span class="btn">開始填我的案例<small>四個格子，每格旁邊有提示</small></span>
-      <span class="btn">這工具適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></span>
+      <a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">用示範案例試一次<small><span class="ex" data-set="edd">主動分享 6 → 2 人那個例子，已填好，按執行就看結果</span><span class="ex" data-set="partner" hidden>畫廊延後付款那個例子，已填好，按執行就看結果</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，已填好，按執行就看結果</span><span class="ex" data-set="ecom" hidden>退貨率 12% 那個例子，已填好，按執行就看結果</span><span class="ex" data-set="daily" hidden>週日晚上吵架那個例子，已填好，按執行就看結果</span></small></a>
+      <button type="button" class="btn" data-mock="正式版打開冰山模型的填寫頁：四個格子，每格旁邊有提示；你確認才執行。">開始填我的案例<small>四個格子，每格旁邊有提示</small></button>
+      <a class="btn" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這工具適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></a>
     </div>
     <p class="sub mt10 mb0">這堂課之後不會再自動出現；想再看，工具頁右上角「怎麼用？」隨時能打開。</p>
   </div>

@@ -1,8 +1,10 @@
 <script>
   // Home = an app with four views (plan U1): the main menu (nav.side) switches them in place and moves aria-current;
-  // A #link and the address (load, back/forward) take one path, reveal(): the target's view, then whatever the search
-  // hid, then its fold; the address also restores each view's own scroll (the views differ in height). href="#" is a
-  // placeholder (its title names the phase) and does nothing, so it never throws the user back to the first view.
+  // section#tool is a sub-view of 工具 (data-under) holding one article.tpage per tool, shown one at a time — the menu
+  // keeps 工具 current. A #link and the address (load, back/forward) take one path, reveal(): the target's view (a
+  // sub-view without a page falls back to its parent), its page, then whatever the search hid, then its fold; the
+  // address also restores each view's own scroll (the views differ in height), a tool page opens at its top, and coming
+  // back from one lands where the list was.
   // The name search (inside the all-tools card) hides non-matching tool rows, opens the folds that still hold a
   // match and lists matching workflows as links under the box (platform-internal ones labelled apart); an example
   // situation fills the "say where you are stuck" box only while it is empty or still holds an example — once the user
@@ -17,12 +19,16 @@
     var views = document.querySelectorAll("section[data-view]"), menu = document.querySelectorAll(".navi[data-view]"), pos = {}, clicked = false;
     try { history.scrollRestoration = "manual"; } catch (e) {}
     function viewOf(t) { return t && (t.matches("section[data-view]") ? t : t.closest("section[data-view]")); }
+    function shown() { for (var i = 0; i < views.length; i++) if (!views[i].hidden) return views[i]; return null; }
     function reveal(target) {
-      var v = viewOf(target);
+      var v = viewOf(target), page = target && target.closest("article.tpage");
       if (!v) return null;
+      if (v.hasAttribute("data-under") && !page) return reveal(document.getElementById(v.getAttribute("data-under")));
       views.forEach(function (s) { if (!s.hidden && s !== v) pos[s.id] = window.scrollY; s.hidden = s !== v; });
-      menu.forEach(function (a) { if (a.getAttribute("data-view") === v.id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
-      if (target !== v) {
+      if (page) v.querySelectorAll("article.tpage").forEach(function (a) { a.hidden = a !== page; });
+      var cur = v.getAttribute("data-under") || v.id;
+      menu.forEach(function (a) { if (a.getAttribute("data-view") === cur) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+      if (target !== v && target !== page) {
         if (target.closest("[hidden]") && q.value) { q.value = ""; apply(); }   // the search hid it: the link wins
         var d = target.closest("details");
         if (d) { d.removeAttribute("data-shut"); d.removeAttribute("data-auto"); d.open = true; }   // opened on purpose: stays open
@@ -32,9 +38,11 @@
     function route() {
       var h = location.hash.slice(1), id = h;
       try { id = decodeURIComponent(h); } catch (e) {}      // a malformed %-escape: use the raw hash
-      var t = (id && document.getElementById(id)) || views[0], v = reveal(t);
+      var before = shown(), t = (id && document.getElementById(id)) || views[0], v = reveal(t);
       if (clicked) { clicked = false; return; }              // a click: the browser's own jump scrolls
-      if (t === v) window.scrollTo(0, pos[v.id] || 0); else t.scrollIntoView();
+      if (t.matches("article.tpage")) window.scrollTo(0, 0);
+      else if (t === v || (before && before !== v && before.hasAttribute("data-under") && v.id in pos)) window.scrollTo(0, pos[v.id] || 0);
+      else t.scrollIntoView();
     }
     window.addEventListener("hashchange", route);
     var examples = Array.prototype.map.call(document.querySelectorAll("[data-prompt]"), function (b) { return b.getAttribute("data-prompt"); });
@@ -92,11 +100,9 @@
     document.addEventListener("click", function (e) {
       var a = e.target.closest && e.target.closest('a[href^="#"]');
       if (!a) return;
-      var href = a.getAttribute("href");
-      if (href === "#") { e.preventDefault(); return; }
-      var target = document.getElementById(href.slice(1));
+      var target = document.getElementById(a.getAttribute("href").slice(1));
       if (!target) return;
-      clicked = location.hash !== href;                      // a hashchange follows unless the address already says it
+      clicked = location.hash !== a.getAttribute("href");   // a hashchange follows unless the address already says it
       reveal(target);
     });
     route();

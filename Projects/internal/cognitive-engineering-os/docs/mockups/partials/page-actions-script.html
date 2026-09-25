@@ -1,0 +1,24 @@
+<script>
+  // Every page. (1) A control the product wires (start a tool, approve, export…) is a <button data-mock="what it will
+  // do">; a mock cannot do it, so a click writes that sentence under the button's row instead of doing nothing. Anything
+  // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
+  // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
+  // the details itself); the home router does the same for its views.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("button[data-mock]");
+      if (b) {
+        var row = b.closest(".btns") || b, note = row.nextElementSibling;
+        if (!note || !note.classList.contains("mocknote")) {
+          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+          row.parentNode.insertBefore(note, row.nextSibling);
+        }
+        note.textContent = "示意稿：" + b.getAttribute("data-mock");
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
+      var d = t && t.closest("details");
+      if (d) d.open = true;
+    });
+  });
+</script>

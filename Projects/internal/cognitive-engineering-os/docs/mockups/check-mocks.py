@@ -245,7 +245,7 @@ def visible_text(html_src):
 class Checker:
     def __init__(self, folder):
         self.folder = pathlib.Path(folder); self.findings = []; self.shared_blocks = {}; self.texts = {}; self.raw = {}
-        self.domains = None; self.partials = {}
+        self.domains = None; self.partials = {}; self.ids = {}; self.xlinks = {}
         # the checked folder carries its own design-system.css and partials/ (--dir: the self-test's mutated copies)
         self.css_path = self.folder / mk.DESIGN_SYSTEM.name
         self.partials_dir = self.folder / "partials"
@@ -276,7 +276,20 @@ class Checker:
         if len(set(self.shared_blocks.values())) > 1:
             self.bad("*", "shared", "shared design-system block differs between files (run sync-design-system.py)")
         self.check_continuity()
+        self.check_cross_links()
         return self.findings
+
+    def check_cross_links(self):
+        # a link into another mock (…/artifact/<id>#<anchor>) lands on an id of that page, and the anchor is one the
+        # artifact frame passes on (a plain #anchor: letters, digits, . _ ~ -); menu, tool-page and #ask links all go this way
+        page_of = {mk.ARTIFACT[f]: f for f in FILES}
+        for f, links in self.xlinks.items():
+            for line, href in links:
+                art, _, frag = href[len("https://claude.ai/artifact/"):].partition("#")
+                if art not in page_of: self.bad(f, "links", f"line {line}: {href} is not one of the mocks' artifacts"); continue
+                if not frag: continue
+                if not re.fullmatch(r"[A-Za-z0-9._~-]+", frag): self.bad(f, "links", f"line {line}: #{frag} is not a plain anchor; the artifact frame drops it")
+                elif page_of[art] in self.ids and frag not in self.ids[page_of[art]]: self.bad(f, "links", f"line {line}: {href} has no target on {page_of[art]}")
 
     def check_continuity(self):
         t = self.texts
@@ -433,9 +446,17 @@ class Checker:
         # every page: one h1, one banner, one crumbs line (linking home unless this is home), one status strip + pill,
         # no <select>, no inline style, svg a11y, tablist a11y, lesson mentions are links, partner links, section cards open with 怎麼讀／你要做的
         views = [n for n in nodes if n.tag == "section" and "data-view" in n.attrs]
-        if views:   # an app page shows one view at a time: one h1 per view, none outside them
+        def in_tpage(n):
+            a = n.parent
+            while a is not None and not (a.tag == "article" and a.has("tpage")): a = a.parent
+            return a
+        if views:   # an app page shows one view at a time: one h1 per view (per page in a view of pages), none outside
             for v in views:
-                if len(v.find(tag="h1")) != 1: self.bad(f, "skeleton", f"view {v.attrs['data-view']}: exactly one h1")
+                pages = [p for p in v.find(tag="article") if p.has("tpage")]
+                if pages:
+                    if any(len(p.find(tag="h1")) != 1 for p in pages) or len(v.find(tag="h1")) != len(pages):
+                        self.bad(f, "skeleton", f"view {v.attrs['data-view']}: exactly one h1 per page, none outside its pages")
+                elif len(v.find(tag="h1")) != 1: self.bad(f, "skeleton", f"view {v.attrs['data-view']}: exactly one h1")
             if sum(n.tag == "h1" for n in nodes) != sum(len(v.find(tag="h1")) for v in views): self.bad(f, "skeleton", "an h1 outside the views")
         elif sum(n.tag == "h1" for n in nodes) != 1: self.bad(f, "skeleton", "exactly one h1 per page")
         # the app shell (U1): div.app = nav.side (the main menu) then main.wrap; one aria-current, on this page's section
@@ -451,8 +472,13 @@ class Checker:
         if sum(n.has("banner") for n in nodes) != 1: self.bad(f, "skeleton", "exactly one 示意稿 banner")
         # the menu shows where a page sits; crumbs only on pages below a menu item, starting with a link to that item
         crumbs = [n for n in nodes if n.has("crumbs")]
-        if f in HOME:
-            if crumbs: self.bad(f, "links", "the home views carry no .crumbs (the main menu shows where you are)")
+        if f in HOME:   # the menu views carry none; a tool page (a page below 工具) carries exactly one, starting at 工具
+            if any(in_tpage(c) is None for c in crumbs): self.bad(f, "links", "the home menu views carry no .crumbs (the main menu shows where you are)")
+            for p in [n for n in nodes if n.tag == "article" and n.has("tpage")]:
+                cs = p.find("crumbs")
+                first = [c for c in cs[0].children if not (isinstance(c, str) and not c.strip())][:1] if len(cs) == 1 else []
+                if not first or isinstance(first[0], str) or first[0].tag != "a" or first[0].attrs.get("href") != mk.nav_href(f, "tools"):
+                    self.bad(f, "links", f"line {p.line}: a tool page carries exactly one .crumbs line starting with a link to {mk.nav_href(f, 'tools')}")
         else:
             sec = next(x for x in mk.NAV if x["id"] == mk.SECTION[f])
             first = [c for c in crumbs[0].children if not (isinstance(c, str) and not c.strip())][:1] if len(crumbs) == 1 else []   # the very first node, text included
@@ -476,11 +502,21 @@ class Checker:
             if n.attrs.get("id"): ids.setdefault(n.attrs["id"], []).append(n.line)
         for i, lines in ids.items():
             if len(lines) > 1: self.bad(f, "links", f"id {i!r} on lines {lines}: ids are unique (a #link lands on the first one only)")
-        # lesson mentions must be links (U15); an <a> with no destination must say which phase delivers it
+        self.ids[f] = set(ids)
+        # controls (operator 2026-09-25: the tools were "only text"; buttons did nothing): what looks clickable acts.
+        # A link has a destination; a .btn is an <a href> or a <button> with a declared behaviour; an action the mock
+        # cannot perform is <button data-mock="正式版…"> and says so when clicked (partials/page-actions-script.html).
+        for n in nodes:
+            if n.tag == "a" and n.attrs.get("href", "").strip() in ("", "#"): self.bad(f, "controls", f"line {n.line}: link without a destination")
+            if n.has("btn") and n.tag not in ("a", "button"): self.bad(f, "controls", f"line {n.line}: <{n.tag} class=btn> looks clickable and does nothing; use <a href> or <button data-mock>")
+            if n.tag == "button" and not any(k in n.attrs for k in ("data-mock", "data-prompt", "data-set", "aria-pressed")) and n.attrs.get("role") != "tab":
+                self.bad(f, "controls", f"line {n.line}: <button> without a behaviour (data-mock, data-prompt, data-set, aria-pressed or role=tab)")
+            if "data-mock" in n.attrs and not n.attrs["data-mock"].startswith("正式版"): self.bad(f, "controls", f"line {n.line}: data-mock must say what the product will do (start with 正式版)")
+        # lesson mentions must be actionable (U15): a link, or a mock action that says where the lesson will come from
         def lesson_text_ok(n):
             # descend while one child still holds the whole phrase; the element where it stops holding together
             # carries the mention and must be an <a> (a phrase split across <b>/<span> inside a non-link is still not a link)
-            if n.tag == "a": return
+            if n.tag == "a" or (n.tag == "button" and "data-mock" in n.attrs): return
             kids = [c for c in n.elements() if LESSON_PHRASE.search(c.text())]
             if kids:
                 for c in kids: lesson_text_ok(c)
@@ -491,9 +527,18 @@ class Checker:
         for n in anchors:   # every in-page #link lands on an id of this page
             h = n.attrs.get("href", "")
             if h.startswith("#") and len(h) > 1 and h[1:] not in ids: self.bad(f, "links", f"line {n.line}: in-page link {h} has no target on the page")
+        self.xlinks[f] = [(n.line, n.attrs["href"]) for n in anchors if n.attrs.get("href", "").startswith("https://claude.ai/artifact/")]
+        # a link to a tool's page shows that tool's registry name first, so one tool is never called two things
+        try:
+            names = {mid: m["name_zh"] for mid, m in mk._catalog().methods.items()}
+        except Exception:
+            names = {}   # a broken registry is reported by the catalog rules
         for n in anchors:
-            href = n.attrs.get("href", "")
-            if href in ("", "#") and "P3" not in n.attrs.get("title", ""): self.bad(f, "U15", f"line {n.line}: placeholder link without a title saying which phase delivers it")
+            h = n.attrs.get("href", "")
+            base, _, frag = h.partition("#")
+            if frag.startswith("t-") and base in ("", f"https://claude.ai/artifact/{mk.ARTIFACT[HOME[0]]}") and frag[2:] in names \
+                    and not " ".join(n.text().split()).startswith(names[frag[2:]]):
+                self.bad(f, "links", f"line {n.line}: a link to {frag[2:]}'s page must show its name {names[frag[2:]]!r}")
         for target in LINKS[f]:
             if not any(mk.ARTIFACT[target] in n.attrs.get("href", "") for n in anchors): self.bad(f, "links", f"no link to {target} ({mk.ARTIFACT[target]})")
         if sum(n.has("status") for n in nodes) != 1: self.bad(f, "status", "status strip missing or duplicated")
@@ -605,7 +650,7 @@ class Checker:
         except Exception as e:
             self.bad(f, "catalog", f"registries: {type(e).__name__}: {e}"); loaded = False
         if loaded:   # load_catalog guarantees non-empty, fully labelled registries; the page must show exactly them
-            methods, _, recipes, goals = cat
+            methods, recipes, goals = cat.methods, cat.recipes, cat.goals
             n_tools, n_user, n_internal = mk.counts(cat)
             tools, wfs = [n for n in nodes if n.has("tool")], [n for n in nodes if n.has("wf")]
             if len(tools) != n_tools: self.bad(f, "catalog", f"{len(tools)} tool rows on the page, {n_tools} methods in {mk.METHODS_FILE.name}")
@@ -615,6 +660,16 @@ class Checker:
                 self.bad(f, "catalog", f"the {n_internal} platform-internal workflows must sit folded (closed) in details#wf-internal")
             if sum(n.has("goal") and n.has("mcard") for n in nodes) != len(goals["goals"]): self.bad(f, "catalog", f"goal cards != {len(goals['goals'])} goals in {mk.GOALS_FILE.name}")
             if sum(n.tag == "details" and "data-dir" in n.attrs for n in nodes) != len(goals["goals"]): self.bad(f, "catalog", "directory folds (details[data-dir]) != goals")
+            # every tool has its own page (section#tool, a sub-view of 工具) and its directory row opens it
+            tool_view, pages = by_id.get("tool"), [n for n in nodes if n.tag == "article" and n.has("tpage")]
+            if tool_view is None or tool_view.attrs.get("data-under") != "tools" or len(pages) != n_tools \
+                    or {p.attrs.get("id") for p in pages} != {f"t-{mid}" for mid in methods} \
+                    or any("hidden" not in p.attrs or not under(p, lambda a: a is tool_view) for p in pages):
+                self.bad(f, "catalog", f"section#tool[data-under=tools] must hold one hidden article.tpage#t-<id> per tool ({n_tools})")
+            for row in tools:
+                links = row.find(tag="a")
+                if len(links) != 1 or links[0].attrs.get("href") != "#t-" + row.attrs.get("id", "")[2:]:
+                    self.bad(f, "catalog", f"line {row.line}: a tool row opens its own page: exactly one link, to #t-<its id>")
             pops = [n for n in nodes if n.has("pop") and n.has("mcard")]
             if len(pops) != len(goals["popular"]) or any(not n.find("shape", tag="svg") for n in pops):
                 self.bad(f, "catalog", f"start-here cards != {len(goals['popular'])} popular tools, each with its picture (svg.shape)")
@@ -637,9 +692,14 @@ class Checker:
             self.bad(f, "U9", "one 示範專案 card with at least two finished (.mcard.done) projects, in the projects view")
         # U1: the four menu destinations are the four views, in menu order; the first shows, the others wait hidden
         views = [n for n in nodes if n.tag == "section" and "data-view" in n.attrs]
-        if [v.attrs["data-view"] for v in views] != [x["id"] for x in mk.NAV] or any(v.attrs.get("id") != v.attrs["data-view"] for v in views) \
-                or "hidden" in views[0].attrs or not all("hidden" in v.attrs for v in views[1:]):
+        top = [v for v in views if "data-under" not in v.attrs]
+        if [v.attrs["data-view"] for v in top] != [x["id"] for x in mk.NAV] or any(v.attrs.get("id") != v.attrs["data-view"] for v in top) \
+                or "hidden" in top[0].attrs or not all("hidden" in v.attrs for v in top[1:]):
             self.bad(f, "U1", f"views must be section#<id>[data-view=<id>] in menu order {[x['id'] for x in mk.NAV]}, the first visible, the others hidden")
+        # a sub-view (the tool pages) sits after the menu views, hidden, under one menu item (the menu keeps it current)
+        if views[:len(top)] != top or any(v.attrs["data-under"] not in {x["id"] for x in mk.NAV} or "hidden" not in v.attrs
+                                          or v.attrs.get("id") != v.attrs["data-view"] for v in views[len(top):]):
+            self.bad(f, "U1", "a sub-view is section#<id>[data-view=<id>][data-under=<menu item>], hidden, after the menu views")
         def in_view(n, v): return under(n, lambda a: a.attrs.get("data-view") == v)
         for i, v in (("ask", "home"), ("goals", "home"), ("featured", "home"), ("directory", "tools"), ("wf-internal", "workflows")):
             if i in by_id and not in_view(by_id[i], v): self.bad(f, "U1", f"#{i} belongs in the {v} view")

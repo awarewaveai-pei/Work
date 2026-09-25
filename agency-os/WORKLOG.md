@@ -1,4 +1,25 @@
 ﻿# Worklog
+## 2026-09-25（續9）研究線示意稿：每個工具有自己的一頁（285 頁，登錄檔產生）＋五頁「看起來能點就有作用」＋工具名統一用登錄檔；計畫 v1.37 U1
+
+- 起因（操作者 2026-09-25）：工具清單「都沒有連結，只是文字」；檢查時另發現五頁共約 45 個手寫假按鈕（`span.btn`、`href="#"`）與產生器吐出的每個「開始」，點了都沒反應。
+- 不變量：示意稿上看起來能點的東西都要有作用——能連就是真連結，正式版才做得到的動作點了要說明正式版會做什麼；每個工具名連到它自己的頁，且用登錄檔的正式名稱。
+- 改：
+  - `mockkit.py`：`Catalog` namedtuple（加 `nexts`＝ACTIVE 契約 `recommended_next`，未上架的 id 標明不連）；`render_tool_pages`（`section#tool[data-under=tools]` 內一工具一 `article.tpage#t-<id>`：做什麼、開始／課／結果、做完常接、用到它的工作流、同一類常用）；清單列、問句卡常用、先從這幾個開始、工作流站列都連 `#t-<id>`；`mock_button`＋四句 `MOCK_*`。
+  - `partials/page-actions-script.html`（五頁共用）：`button[data-mock]` 點了在按鈕列下寫「示意稿：正式版…」；頁內連結目標在摺疊裡就打開。
+  - `home-catalog-script`：子 view（`data-under`）選單停在「工具」、工具頁開在頂端、從工具頁返回回到清單原位。
+  - 五頁手寫按鈕：能連的改連結（幫我挑→例子、都不對→#ask、⑦／⑨／專家模式→頁內 id、這工具適合我嗎→首頁 #ask、完整介紹→工具頁、示範→結果頁），其餘改 `data-mock`；冰山結果頁「下一步」四張卡改用登錄檔名（因果回饋圖、隨時間變化行為圖、五個為什麼）並連到工具頁。
+  - `check-mocks.py` 新規則：controls（無 `href="#"`、無 span 按鈕、`<button>` 必有行為、`data-mock` 以「正式版」開頭）；一 view 多頁時每頁一個 h1；首頁麵包屑只在工具頁且從「工具」開始；工具 view／每工具一頁／清單列連到自己的頁；子 view 位置；跨頁 `artifact#錨點` 必落在對方頁的 id 且是純錨點；連到工具頁的連結文字以登錄檔名開頭。
+  - selftest：14 個新案例＋4 個舊案例的定位字串跟著新結構更新；chips-test：toolRow／toolHash／toolBack／commonLink（改測工具頁）＋每頁 mockNote、結果頁 expertOpen，每項都在拔掉對應腳本的副本上必須失敗；render-mocks 多拍兩個工具頁。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python COS/docs/mockups/check-mocks.py → `5 pages, shared block identical, all rules green` | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python COS/docs/mockups/check-mocks-selftest.py → `170 mutations, 170 caught, 0 missed; 1 valid variants, 1 accepted`；`coverage: 133 rules, 133 proven` | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node COS/docs/mockups/chips-test.cjs → 22 項互動（首頁 15、五頁 mockNote、兩結果頁 expertOpen）全 pass，拔掉腳本的副本全部 fail；`chips: PASS` | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node COS/docs/mockups/render-mocks.cjs（五頁＋兩個工具頁，桌機／手機／深色）→ 無橫向溢出；逐張看：工具頁、清單列 hover、示意說明、結果頁下一步卡 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-09-25-partialreview-f7af5048.md`：NO FINDINGS；工具名規則與案例修正在審查之後，量小，自審＋selftest 證明）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,.claude/commands | grep=mock-actions-script|placeholder link|_tool_buttons|methods, _, recipes|cat\[3\] | hits=3
+  - 3 = mockkit.py 內 `_tool_buttons` 的定義與兩個呼叫點（皆本次改動）；改名前的 partial 名、舊規則訊息、4 元組拆包在他處零引用。
+- 發布：五個 artifact 已更新（首頁 v6、冰山結果 v21、冰山課 v20、工作流總覽 v15、工作流課 v17）。
+- 避免再發生：新規則進檢查器（假按鈕、死連結、跨頁錨點、工具名）；任何新頁或新按鈕由 selftest＋chips-test 把關。
 ## 2026-09-25（續8）研究線 PI-a 驗收（Claude 覆審 Codex 的 `c7061f16f`／`e28b630ba`）：退回；計畫 v1.36 §12.3b 列發現＋修正卡 WC-PIa-15～21＋14R
 
 - 結論：未通過。2 嚴重（C1 失敗的解讀花 token 不記用量＝日預算可繞過；C2 解讀在請求裡同步呼叫模型，正式站 nginx 60s 會 504 而 token 照扣）＋5 主要（M1 NOT_APPLICABLE 閘被當失敗、250 個模組受影響；M2 視覺綁定閘可繞過；M3 prompt 未照 WC-04；M4 判斷用詞與示意稿不同且吞錯；M5 web WC-09／10／11 是骨架）＋2 次要。細節與 file:line 只寫在計畫 §12.3b（不在此重述）。

@@ -61,14 +61,16 @@
   .cant{border:1px solid var(--warn)}
   .can b,.cant b{display:block}
   .btns{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;cursor:default;text-decoration:none;display:inline-block}
-  a.btn{cursor:pointer}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;font-family:inherit;line-height:inherit;text-align:left;cursor:pointer;text-decoration:none;display:inline-block}
+  .btn:hover{border-color:var(--accent)}
   .btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-  a.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
   .btn.ghost{color:var(--muted)}
   .btn small{display:block;font-size:11px;color:inherit;opacity:.85}
+  .mocknote{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);border-radius:8px;padding:6px 10px;font-size:12.5px;margin:6px 0 0}
   .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0}
-  .journey span{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
+  .journey span,.journey a{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent);text-decoration:none}
+  .journey a:hover{text-decoration:underline}
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
@@ -197,7 +199,11 @@
   .fam{font-size:15px;margin:14px 0 2px;color:var(--accent)}
   .fam .k{color:var(--muted);font-size:12.5px;font-weight:400;margin-left:6px}
   .fam small{font-weight:400;color:var(--muted);font-size:12px;margin-left:8px}
-  .tool{padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  .tool{position:relative;padding:7px 0;border-top:1px dashed var(--line);font-size:14px}
+  .tool:hover{background:var(--soft)}
+  .tool b a{text-decoration:none}
+  .tool b a::after{content:"";position:absolute;inset:0}
+  .tool:hover b a{text-decoration:underline}
   .tool b small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
   .tool .k{color:var(--muted);font-size:12.5px;margin-left:8px}
   .tool .sub{margin-top:1px}
@@ -231,6 +237,32 @@
   /* == shared design system: end == */
   /* == page-specific == */
 </style>
+<!-- == partial: page-actions-script: start (verbatim from partials/page-actions-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Every page. (1) A control the product wires (start a tool, approve, export…) is a <button data-mock="what it will
+  // do">; a mock cannot do it, so a click writes that sentence under the button's row instead of doing nothing. Anything
+  // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
+  // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
+  // the details itself); the home router does the same for its views.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("button[data-mock]");
+      if (b) {
+        var row = b.closest(".btns") || b, note = row.nextElementSibling;
+        if (!note || !note.classList.contains("mocknote")) {
+          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+          row.parentNode.insertBefore(note, row.nextSibling);
+        }
+        note.textContent = "示意稿：" + b.getAttribute("data-mock");
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
+      var d = t && t.closest("details");
+      if (d) d.open = true;
+    });
+  });
+</script>
+<!-- == partial: page-actions-script: end == -->
 </head>
 <body>
 <div class="app">
@@ -273,9 +305,9 @@
       <span>○ 總結頁</span>
     </div>
     <div class="btns">
-      <span class="btn primary">一站一站走<small>每站停下來給你確認，可以改順序、可以中途換工具</small></span>
-      <span class="btn">一次跑完<small>三站自動跑，跑完再逐站看九段與總結</small></span>
-      <span class="btn ghost">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑</small></span>
+      <button type="button" class="btn primary" data-mock="正式版一站一站走：每站停下來給你確認，可以改順序、可以中途換工具。">一站一站走<small>每站停下來給你確認，可以改順序、可以中途換工具</small></button>
+      <button type="button" class="btn" data-mock="正式版三站自動跑完，再讓你逐站看九段結果與總結；會花錢的步驟先問你。">一次跑完<small>三站自動跑，跑完再逐站看九段與總結</small></button>
+      <a class="btn ghost" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑</small></a>
     </div>
 
     <div class="mcards">
@@ -285,7 +317,7 @@
         <div><span class="k">帶入什麼：</span>你在建立專案時寫的一段話 → 自動填第 1 格（要決定什麼）；<span class="need">你填了 2 格</span>（誰受影響、成功條件）。</div>
         <div><span class="k">得到：</span>一句清楚的問題陳述＋3 個成功條件 <cite>[1]</cite>。</div>
         <div class="k">用了 2 分鐘・NT$1</div>
-        <div class="btns"><span class="btn">看第 1 站的九段結果 →</span><a class="btn ghost" href="#" title="問題陳述的工具課：P3 產出後接上">回頭看問題陳述的 5 分鐘課 →</a></div>
+        <div class="btns"><button type="button" class="btn" data-mock="正式版打開第 1 站（問題陳述）的九段結果頁；示意稿只做了冰山模型的結果頁。">看第 1 站的九段結果</button><button type="button" class="btn ghost" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">回頭看問題陳述的 5 分鐘課</button></div>
       </div>
       <div class="mcard now">
         <div><b>第 2 站 SWOT</b><span class="tag">現在</span></div>
@@ -293,7 +325,7 @@
         <div><span class="k">帶入什麼：</span>第 1 站的問題陳述與 3 個成功條件 → 自動填「脈絡」欄；<span class="need">還要你填 4 格</span>：S／W／O／T 各至少 2 條（可讓 AI 起草，你改）。</div>
         <div><span class="k">得到：</span>SWOT 表＋每格的證據強度。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><span class="btn primary">填紅字欄位並執行</span><a class="btn" href="#" title="SWOT 的工具課：P3 產出後接上">第一次用 SWOT？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><button type="button" class="btn primary" data-mock="正式版打開第 2 站 SWOT 的填寫頁：帶入的欄位已填好，紅字的 4 格要你填（可以讓 AI 起草），你確認才執行。">填紅字欄位並執行</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用 SWOT？先看 5 分鐘的課</button></div>
       </div>
       <div class="mcard">
         <div><b>第 3 站 加權決策矩陣</b><span class="tag">之後</span></div>
@@ -301,7 +333,7 @@
         <div><span class="k">帶入什麼：</span>第 2 站的 S／W／O／T → 自動變成準則候選；<span class="need">還要你填 1 件事</span>：每個準則的權重（這是你的價值判斷，系統不代填）。</div>
         <div><span class="k">得到：</span>選項 × 準則 × 權重的分數表＋敏感度（哪個權重一改結果就翻）。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><a class="btn" href="#" title="加權決策矩陣的工具課：P3 產出後接上">第一次用加權決策矩陣？先看 5 分鐘的課 →</a></div>
+        <div class="btns"><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用加權決策矩陣？先看 5 分鐘的課</button></div>
       </div>
     </div>
   </div>
@@ -350,12 +382,12 @@
     </div>
     <div class="sub mt8"><b>核准</b> = 整條成為專案正式紀錄；<b>退回某站</b> = 那站之後的站失效，重跑時前面的站不用重填；<b>刪除專案</b> = 三站的來源與產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
     <div class="btns mt12">
-      <span class="btn primary">繼續第 2 站</span>
-      <span class="btn">改順序或換一站的工具</span>
-      <span class="btn">退回第 1 站並說原因</span>
-      <span class="btn ghost">專家模式：每站的閘門表與 JSON</span>
+      <button type="button" class="btn primary" data-mock="正式版打開第 2 站 SWOT：帶入的欄位已填好，你補紅字的格子再執行。">繼續第 2 站</button>
+      <button type="button" class="btn" data-mock="正式版讓你拖曳改站的順序，或把某一站換成別的工具；已完成的站不用重做。">改順序或換一站的工具</button>
+      <button type="button" class="btn" data-mock="正式版請你寫原因，第 1 站重做；後面的站會失效，重跑時前面的不用重填。">退回第 1 站並說原因</button>
+      <a class="btn ghost" href="#expert">專家模式：每站的閘門表與 JSON</a>
     </div>
-    <details class="mt10"><summary>專家模式（每站的閘門表與 JSON，收起來但還在）</summary>
+    <details class="mt10" id="expert"><summary>專家模式（每站的閘門表與 JSON，收起來但還在）</summary>
 <pre>{
   "recipe": "life-decision-v1",
   "stations": [

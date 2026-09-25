@@ -2,7 +2,7 @@
 """Shared helpers for the mock tooling (sync-design-system.py, check-mocks.py, build-artifact.py): the page list, the
 one domain list (SPEC/methods/examples/domains.yaml), the chip row rendered from it, and the partial markers.
 Logic lives here once; the scripts only call it. Not a CLI."""
-import os, pathlib, re
+import collections, os, pathlib, re
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[4]                                   # COS/docs/mockups -> …/Projects/internal/COS -> repo root
@@ -173,8 +173,13 @@ def picture(name, label):
     return f'<svg class="shape" viewBox="0 0 64 40" role="img" aria-label="{_esc(label)}">{SHAPES[name]}</svg>'
 
 
+Catalog = collections.namedtuple("Catalog", "methods families recipes goals nexts")
+
+
 def load_catalog():
-    """-> (methods, families, recipes, goals) from the SPEC registries, fully validated. ValueError on any gap — a
+    """-> Catalog(methods, families, recipes, goals, nexts) from the SPEC registries, fully validated (nexts = each
+    ACTIVE contract's recommended_next; an id that is not an ACTIVE tool is a tool the Atlas names but nobody has built
+    yet, shown as such, never linked). ValueError on any gap — a
     method or family without its labels, a display list that differs from the ACTIVE contracts GET /methods serves, an
     ACTIVE recipe without display data or with a step whose method id is unknown, a family that belongs to no goal or
     to two, a featured/popular tool that does not exist or sits in another goal, a popular tool without a known
@@ -188,10 +193,16 @@ def load_catalog():
         if not isinstance(m, dict) or not all(_text(m.get(k)) for k in ("name_zh", "name_en", "blurb_zh")):
             raise ValueError(f"{METHODS_FILE.name}: {mid} needs non-empty name_zh, name_en, blurb_zh")
         if m.get("abbr") is not None and not isinstance(m["abbr"], str): raise ValueError(f"{METHODS_FILE.name}: {mid} abbr must be text")
-    active = set()
+    active, nexts = set(), {}
     for p in CONTRACTS_DIR.glob("*.contract.yaml"):
         c = _yaml(p)
-        if isinstance(c, dict) and c.get("status") == "ACTIVE": active.add(c.get("method_id") or c.get("id"))
+        if not isinstance(c, dict) or c.get("status") != "ACTIVE": continue
+        mid = c.get("method_id") or c.get("id")
+        active.add(mid)
+        rn = c.get("recommended_next") or []
+        if not isinstance(rn, list) or not all(isinstance(x, str) and re.fullmatch(r"[a-z_]+\.[a-z_]+", x) for x in rn):
+            raise ValueError(f"{p.name}: recommended_next must be a list of <family>.<name> ids")
+        nexts[mid] = rn
     if active != set(methods):
         raise ValueError(f"{METHODS_FILE.name}: display ids differ from the ACTIVE contracts GET /methods serves: {sorted(active ^ set(methods))[:5]}")
     fams = _yaml(FAMILIES_FILE)
@@ -256,13 +267,12 @@ def load_catalog():
                 steps.append("capability")
         recipes.append({"id": rid, "name": r.get("name") or r.get("title"), "steps": steps, **d})
     if not any(r["audience"] == "user" for r in recipes): raise ValueError(f"{RECIPES_DIR}: no ACTIVE user-facing recipe")
-    return methods, fams, recipes, g
+    return Catalog(methods, fams, recipes, g, nexts)
 
 
 def counts(cat):
     """The numbers the hand-written hero sentence states: tools, user workflows, internal workflows (the gate pins them)."""
-    methods, _, recipes, _ = cat
-    return len(methods), sum(r["audience"] == "user" for r in recipes), sum(r["audience"] == "internal" for r in recipes)
+    return len(cat.methods), sum(r["audience"] == "user" for r in cat.recipes), sum(r["audience"] == "internal" for r in cat.recipes)
 
 
 def _goal_of(goals, mid):
@@ -270,17 +280,42 @@ def _goal_of(goals, mid):
     return next(x for x in goals["goals"] if fam in x["families"])
 
 
+def tool_href(mid):
+    """Every tool name on the home page opens that tool's own page (section#tool, plan U1); a plain #anchor, which the
+    artifact frame passes on to the page."""
+    return f"#t-{mid}"
+
+
+def tool_link(methods, mid):
+    return f'<a href="{tool_href(mid)}">{_esc(methods[mid]["name_zh"])}</a>'
+
+
+# What a control will do in the product. A mock cannot do it, so the button says so under its row when clicked
+# (partials/page-actions-script.html) instead of doing nothing; anything the mock CAN show is a real <a href>.
+MOCK_START_TOOL = "正式版按這裡會打開這個工具的填寫頁：貼上你的情況，系統先免費幫你填欄，不夠才用 AI；你確認才執行、才花錢。"
+MOCK_LESSON_TOOL = "正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。"
+MOCK_START_WF = "正式版按這裡會打開這條工作流的第 1 站：可以一站一站走，也可以一次跑完；會花錢的步驟都先問你。"
+MOCK_LESSON_WF = "正式版每條工作流都有一堂 3 分鐘的課，由工作流資料產生；示意稿只做了「做一個決定」這一堂。"
+
+
+def mock_button(label, does, cls="btn"):
+    return f'<button type="button" class="{cls}" data-mock="{_esc(does)}">{label}</button>'
+
+
 def _tool_buttons(mid, cls="btns"):
     demo = DEMOS.get(mid)
+    out = [mock_button("開始", MOCK_START_TOOL, "btn primary")]
     if demo:
-        return (f'<div class="{cls}"><span class="btn primary">開始</span><a class="btn" href="https://claude.ai/artifact/{ARTIFACT[demo[0]]}">第一次用？先上 5 分鐘的課 →</a>'
-                f'<a class="btn ghost" href="https://claude.ai/artifact/{ARTIFACT[demo[1]]}">看做完的結果頁 →</a></div>')
-    return f'<div class="{cls}"><span class="btn primary">開始</span><a class="btn" href="#" title="這個工具的 5 分鐘課：P3 隨工具資料產出">第一次用？先上 5 分鐘的課 →</a></div>'
+        out.append(f'<a class="btn" href="https://claude.ai/artifact/{ARTIFACT[demo[0]]}">第一次用？先上 5 分鐘的課 →</a>')
+        out.append(f'<a class="btn ghost" href="https://claude.ai/artifact/{ARTIFACT[demo[1]]}">看做完的結果頁 →</a>')
+    else:
+        out.append(mock_button("第一次用？先上 5 分鐘的課", MOCK_LESSON_TOOL))
+    return f'<div class="{cls}">' + "".join(out) + "</div>"
 
 
 def render_prompts(cat):
     """Example situations under the 'say what you are stuck on' box; a click copies the text into the box."""
-    goals = cat[3]
+    goals = cat.goals
     out = ['    <div class="btns" id="prompts">']
     for p in goals["prompts"]:
         out.append(f'      <button class="btn ghost" type="button" data-prompt="{_esc(p)}">{_esc(p)}</button>')
@@ -290,7 +325,7 @@ def render_prompts(cat):
 
 def render_goals(cat):
     """'Find by what you want to do': one card per goal — question, one line, counts, three common tools, see all."""
-    methods, _, recipes, goals = cat
+    methods, recipes, goals = cat.methods, cat.recipes, cat.goals
     out = ['    <h2>按你想做的事找<small>%d 種你可能想做的事；每一種先給三個常用工具，全部 %d 個工具都分在其中一種</small></h2>' % (len(goals["goals"]), len(methods)),
            '    <div class="how"><b>怎麼讀</b>每張卡是一件你可能想做的事，用問句寫；「常用」是這一類最常被用的三個工具，滑過去看它做什麼；「看全部」打開這一類的完整清單。<b>你要做的</b>找到最像你的那個問句，按一個工具；都不像就回到上面說你卡在哪。</div>',
            '    <div class="mcards">']
@@ -301,7 +336,7 @@ def render_goals(cat):
         out.append(f'        <div class="gh">{glyph(gl["icon"], gl["short_zh"])}<b>{_esc(gl["title_zh"])}</b></div>')
         out.append(f'        <div>{_esc(gl["blurb_zh"])}</div>')
         out.append(f'        <div class="k">{len(mids)} 個工具' + (f'・{len(wfs)} 條工作流' if wfs else '') + '</div>')
-        out.append('        <div><span class="k">常用：</span>' + '、'.join(f'<a href="#m-{mid}" title="{_esc(methods[mid]["blurb_zh"])}">{_esc(methods[mid]["name_zh"])}</a>' for mid in gl["featured"]) + '</div>')
+        out.append('        <div><span class="k">常用：</span>' + '、'.join(f'<a href="{tool_href(mid)}" title="{_esc(methods[mid]["blurb_zh"])}">{_esc(methods[mid]["name_zh"])}</a>' for mid in gl["featured"]) + '</div>')
         out.append(f'        <div class="btns"><a class="btn" href="#dir-{gl["id"]}">看全部 {len(mids)} 個 →</a></div>')
         out.append('      </div>')
     out.append('    </div>')
@@ -310,14 +345,14 @@ def render_goals(cat):
 
 def render_featured(cat):
     """'Start here': the popular tools — a picture of the tool's shape, name, goal tag, one plain line, the actions."""
-    methods, _, _, goals = cat
+    methods, goals = cat.methods, cat.goals
     out = ['    <h2>先從這幾個開始<small>%d 個最常見的起點（人工挑選；有使用資料後改成大家最常用的）</small></h2>' % len(goals["popular"]),
            '    <div class="how"><b>怎麼讀</b>每張卡一個工具：小圖是它長的樣子，一句話是它幫你做什麼，標籤是它屬於哪一件你想做的事。<b>你要做的</b>看到像你的情況就按「開始」；第一次用先看它的短課（可跳）。</div>',
            '    <div class="mcards">']
     for x in goals["popular"]:
         mid = x["id"]; m = methods[mid]; gl = _goal_of(goals, mid)
         out.append(f'      <div class="mcard pop" id="pop-{mid}">')
-        out.append(f'        <div class="gh">{picture(x["shape"], m["name_zh"] + "的樣子")}<div><b>{_esc(m["name_zh"])}</b><span class="tag">{_esc(gl["short_zh"])}</span><div class="k">{_esc(m["name_en"])}</div></div></div>')
+        out.append(f'        <div class="gh">{picture(x["shape"], m["name_zh"] + "的樣子")}<div><b>{tool_link(methods, mid)}</b><span class="tag">{_esc(gl["short_zh"])}</span><div class="k">{_esc(m["name_en"])}</div></div></div>')
         out.append(f'        <div>{_esc(x["line_zh"])}</div>')
         out.append('        ' + _tool_buttons(mid))
         out.append('      </div>')
@@ -326,12 +361,13 @@ def render_featured(cat):
 
 
 def _stations(methods, steps):
-    """Method names in order; a run of capability steps collapses to one chip with a count (db-migration has 15)."""
+    """Stations in order: a tool is a link to its page; a run of capability steps collapses to one chip with a count
+    (db-migration has 15) and stays text — a capability has no page."""
     out, run = [], 0
     for s in steps + [None]:
         if s == "capability": run += 1; continue
-        if run: out.append("能力步" if run == 1 else f"能力步 ×{run}"); run = 0
-        if s is not None: out.append(_esc(methods[s]["name_zh"]))
+        if run: out.append("<span>能力步</span>" if run == 1 else f"<span>能力步 ×{run}</span>"); run = 0
+        if s is not None: out.append(tool_link(methods, s))
     return out
 
 
@@ -342,19 +378,20 @@ def _wf_card(methods, goals, r):
     out = [f'      <div class="mcard wf" id="wf-{r["id"]}" data-q="{q}">',
            f'        <div class="gh">{glyph(gl["icon"], gl["short_zh"])}<b>{_esc(r["name_zh"])}</b><span class="tag">{len(r["steps"])} 站</span></div>',
            f'        <div class="k">{_esc(r["name"])}</div>',
-           '        <div class="journey">' + '<i>→</i>'.join(f'<span>{s}</span>' for s in _stations(methods, r["steps"])) + '</div>',
+           '        <div class="journey">' + '<i>→</i>'.join(_stations(methods, r["steps"])) + '</div>',
            f'        <div>{_esc(r["blurb_zh"])}</div>']
+    start = mock_button("開始", MOCK_START_WF, "btn primary")
     if demo:
-        out.append(f'        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="https://claude.ai/artifact/{ARTIFACT[demo[0]]}">第一次走？先上 3 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/{ARTIFACT[demo[1]]}">看走到一半的示範 →</a></div>')
+        out.append(f'        <div class="btns">{start}<a class="btn" href="https://claude.ai/artifact/{ARTIFACT[demo[0]]}">第一次走？先上 3 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/{ARTIFACT[demo[1]]}">看走到一半的示範 →</a></div>')
     else:
-        out.append('        <div class="btns"><span class="btn primary">開始</span><a class="btn" href="#" title="這條工作流的 3 分鐘課：P3 隨工作流資料產出">第一次走？先上 3 分鐘的課 →</a></div>')
+        out.append(f'        <div class="btns">{start}{mock_button("第一次走？先上 3 分鐘的課", MOCK_LESSON_WF)}</div>')
     out.append('      </div>')
     return out
 
 
 def render_workflows(cat):
     """User workflows grouped by goal; the platform-internal ones (governance, fixtures) folded at the end."""
-    methods, _, recipes, goals = cat
+    methods, recipes, goals = cat.methods, cat.recipes, cat.goals
     user = [r for r in recipes if r["audience"] == "user"]
     internal = [r for r in recipes if r["audience"] == "internal"]
     out = ['    <h2>工作流：一次走完幾個工具<small>%d 條；上一站的結果自動變成下一站的輸入</small></h2>' % len(user),
@@ -378,8 +415,9 @@ def render_workflows(cat):
 
 
 def render_directory(cat):
-    """All tools, folded by goal (every method once: name (abbr) · en · one line), with the name search on top."""
-    methods, _, _, goals = cat
+    """All tools, folded by goal (every method once: name (abbr) · en · one line, the row opens the tool's page), with
+    the name search on top."""
+    methods, goals = cat.methods, cat.goals
     n = len(methods)
     out = ['    <h2>全部 %d 個工具<small>按你想做的事分 %d 類；點開一類，或直接搜名字</small></h2>' % (n, len(goals["goals"])),
            '    <div class="how"><b>怎麼讀</b>每一類摺起來，標題就是首頁問句卡上的問句；點開是這一類的全部工具，每列中文名（縮寫）、英文名、一句話。<b>你要做的</b>知道名字就在下面搜，符合的類別會自動打開，符合的工作流列在搜尋框下；不知道名字就回首頁，從問句卡或「先說你卡在哪」進去。</div>',
@@ -392,15 +430,50 @@ def render_directory(cat):
             q = _esc(" ".join(str(x) for x in [m["name_zh"], m["name_en"], m.get("abbr"), mid, m["blurb_zh"]] if x).lower())
             a = m.get("abbr") or ""
             abbr = f' <small>{_esc(a)}</small>' if a and a not in m["name_zh"] and a != m["name_en"] else ""   # no "SCAMPER SCAMPER SCAMPER"
-            out.append(f'    <div class="tool" id="m-{mid}" data-q="{q}"><b>{_esc(m["name_zh"])}{abbr}</b><span class="k">{_esc(m["name_en"])}</span><div class="sub">{_esc(m["blurb_zh"])}</div>')
-            if mid in DEMOS: out.append('      ' + _tool_buttons(mid, "btns mt6"))
-            out.append('    </div>')
+            out.append(f'    <div class="tool" id="m-{mid}" data-q="{q}"><b><a href="{tool_href(mid)}">{_esc(m["name_zh"])}</a>{abbr}</b><span class="k">{_esc(m["name_en"])}</span><div class="sub">{_esc(m["blurb_zh"])}</div></div>')
         out.append('    </details>')
     return "\n".join(out) + "\n"
 
 
+def render_tool_pages(cat):
+    """One page per tool, shown one at a time in section#tool (the home script): what it does, how to start, what
+    usually comes next, the workflows that use it, the common tools of its goal. Every line comes from the registries."""
+    methods, recipes, goals, nexts = cat.methods, cat.recipes, cat.goals, cat.nexts
+    size = {gl["id"]: sum(mid.split(".")[0] in gl["families"] for mid in methods) for gl in goals["goals"]}
+    out = []
+    for mid, m in methods.items():
+        gl = _goal_of(goals, mid)
+        a = m.get("abbr") or ""
+        abbr = f' <small>{_esc(a)}</small>' if a and a not in m["name_zh"] and a != m["name_en"] else ""
+        out += [f'    <article class="tpage" id="t-{mid}" hidden>',
+                f'    <div class="crumbs"><a href="#tools">工具</a> › <a href="#dir-{gl["id"]}">{_esc(gl["title_zh"])}</a> › {_esc(m["name_zh"])}</div>',
+                f'    <div class="top"><div><h1>{_esc(m["name_zh"])}{abbr}</h1><div class="sub">{_esc(m["name_en"])}</div></div></div>',
+                '    <div class="card">',
+                '      <h2>它幫你做什麼</h2>',
+                '      <div class="how"><b>怎麼讀</b>第一句是它做什麼、什麼時候用；下面是做完常接的工具、用到它的工作流、同一類常用的工具，點名字就過去。<b>你要做的</b>像你的情況就按「開始」；第一次用先上它的課；不像就看同一類的其他工具。</div>',
+                f'      <p class="lead">{_esc(m["blurb_zh"])}</p>',
+                '      ' + _tool_buttons(mid),
+                '      <h3 class="fam">做完常接</h3>']
+        nx = nexts.get(mid, [])
+        if nx:   # an id that is not an ACTIVE tool = named by the Atlas, not built yet: say so, never link it
+            out.append('      <p class="my6">' + '、'.join(tool_link(methods, x) if x in methods else f'<span class="k">尚未上架的工具（{_esc(x)}）</span>' for x in nx) + '</p>')
+        else:
+            out.append('      <p class="sub my6">這個工具沒有固定的下一步：看下面同一類常用的，或回<a href="#home">首頁</a>說你卡在哪。</p>')
+        out.append('      <h3 class="fam">用到它的工作流</h3>')
+        wfs = [r for r in recipes if mid in r["steps"]]
+        if wfs:
+            out.append('      <p class="my6">' + '、'.join(f'<a href="#wf-{r["id"]}">{_esc(r["name_zh"])}</a>' + ('（平台維運用）' if r["audience"] == "internal" else '') for r in wfs) + '</p>')
+        else:
+            out.append('      <p class="sub my6">目前沒有工作流用到它；它可以單獨用。</p>')
+        out += [f'      <h3 class="fam">同一類常用<small>{_esc(gl["title_zh"])}</small></h3>',
+                '      <p class="my6">' + '、'.join(tool_link(methods, x) for x in gl["featured"] if x != mid) + f'；<a href="#dir-{gl["id"]}">看這一類全部 {size[gl["id"]]} 個 →</a></p>',
+                '    </div>',
+                '    </article>']
+    return "\n".join(out) + "\n"
+
+
 CATALOG_PARTIALS = {"catalog-prompts": render_prompts, "catalog-goals": render_goals, "catalog-featured": render_featured,
-                    "catalog-workflows": render_workflows, "catalog-directory": render_directory}
+                    "catalog-workflows": render_workflows, "catalog-directory": render_directory, "catalog-tools": render_tool_pages}
 
 
 def _catalog_partials(_cache={}):
@@ -457,4 +530,4 @@ def _catalog(_cache={}):
 
 
 PER_PAGE = {"app-nav": render_nav}   # partials rendered per page (sync writes them, the gate compares); no file in partials/
-for _f in FILES: REQUIRED_PARTIALS.setdefault(_f, set()).add("app-nav")
+for _f in FILES: REQUIRED_PARTIALS.setdefault(_f, set()).update({"app-nav", "page-actions-script"})
