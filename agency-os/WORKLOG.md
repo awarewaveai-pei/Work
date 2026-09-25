@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-25（續7）研究線 WC-PIa-03：建立 30 個方法 family 的視覺原語對照表
+- [已修改] 新增 `docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-visual-kinds.yaml`：30 個實際 contract family 全部有 default；8 種視覺原語依 family 對照；3 個 method-level override。
+- [計畫] `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` v1.34：T12 blocker 改為已解鎖、PI-a `1/14`、下一卡 WC-PIa-01＋02。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`python D:\Work\agency-os\docs\AI_LEGO_Cognitive_Engineering_OS\tests\run_golden_tests.py` | exit=0 | result=generated indexes are fresh; PASSED: 4149; ALL GOLDEN TESTS PASSED
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`python -c` YAML assertion（registry keys、30 families、3 overrides、8 kinds） | exit=0 | result=registry valid
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 registry、計畫 diff）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`method-visual-kinds.yaml|default_by_family|systems.iceberg_model|decision.eisenhower_matrix|decision.impact_effort` | hits=registry＋計畫 WC-PIa-03／§3.3 引用，無 duplicate registry
+- [rollback] 刪除新增 registry、還原計畫 v1.33／§0 五行；不涉及 runtime、schema migration、prod。
 ## 2026-09-25（續6）雲端 T12 併入 main：eisenhower_matrix／reverse_brainstorming／lean_canvas 補齊 typed-object schema＋CLI slice 後登記 complete → golden runner 全綠
 - [來源] 雲端 session（Sonnet 5）`claude/cc-t12-complete-three-methods` 104df8f：3 個 `specs/cognitive/typed-objects/*-record.schema.yaml`、3 支 `ai_lego/apps/cli/run_*_slice.py`、3 個 contract 補 schema 引用、`contract-backlog.yaml` 3 筆 complete（source 列真實 4 類檔）、3 個 test 檔各 +2、`docs/architecture/SPEC_QUICKREF.md` 重生（golden 抓到的 stale index）。
 - [合併] 3 個 test 檔同時被 T11（共用 catalog）改過 → `git merge-file` 三方合併（base = 合併前 main，ours = T11，theirs = T12）。

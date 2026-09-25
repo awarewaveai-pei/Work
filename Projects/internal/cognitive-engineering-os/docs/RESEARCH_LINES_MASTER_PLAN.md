@@ -2,15 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.33（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.34（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-a**（§12.3）／**未開卡**：共同前置 golden 紅（見阻塞）；雲端提示已備 T1–T6 = WC-PIa-03、01＋02、09、04＋05、06＋07、11；本機卡 = 08、10、12、13、14（要本機瀏覽器／帳密／docker）
-- 已完成：P0 碼完成 `19f00f9aa`（2026-09-23，未部署，隨 PI-b 同窗）；PI-a 0/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）
-- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.33（2026-09-25）
-- 阻塞：golden runner 紅 3 條 = 3 個 ACTIVE 工具缺 typed-object schema＋CLI slice（`decision.eisenhower_matrix`、`divergent.reverse_brainstorming`、`strategy.lean_canvas`；`agency-os/TASKS.md` 同名項）→ 雲端 T12 補齊並登記後轉綠；待操作者：無（§9 待拍板：無）
-- 下一步：T12 合併 → golden 綠 → 雲端 T1–T3（03、01＋02、09）→ T4–T6（04＋05、06＋07、11）；本機 08 隨時、10／13 在 09 之後、12 在 11 之後；期末閘 14 本機。執行模型 Sonnet 5／Codex
+- 現在期／卡：**PI-a**（§12.3）／**WC-PIa-03 完成，下一卡 WC-PIa-01＋02**；PI-a 先完成 03，再依序做 01＋02、09、04＋05、06＋07、11；本機卡 08、10、12、13、14 依依賴接續（要本機瀏覽器／帳密／docker）
+- 已完成：P0 碼完成 `19f00f9aa`（2026-09-23，未部署，隨 PI-b 同窗）；T12 `66278d1f9` 已補 3 個 typed-object schema＋CLI slice 並使 golden 綠；PI-a 1/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）
+- 最後一筆程式碼 commit：`66278d1f9` T12；最後一筆計畫版本：v1.34（2026-09-25）
+- 阻塞：無；golden runner 已綠（4149 passed）。PI-a 全部本機、非 prod；PI-b／P5／P-P 仍依 High-STOP 規則。
+- 下一步：WC-PIa-01＋02 → WC-PIa-09 → WC-PIa-04＋05 → WC-PIa-06＋07 → WC-PIa-11；本機 08 隨時、10／13 在 09 之後、12 在 11 之後；期末閘 14 本機。執行模型 Sonnet 5／Codex
 
 | 項 | 狀態（2026-09-24） |
 |---|---|

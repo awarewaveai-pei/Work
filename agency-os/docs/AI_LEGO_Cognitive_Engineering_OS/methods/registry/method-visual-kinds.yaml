@@ -1,0 +1,36 @@
+default_by_family:
+  architecture: tree
+  art_therapy: table
+  association: table
+  causal: graph
+  challenge: table
+  computation: table
+  database_data: table
+  decision: quadrant
+  decomposition: table
+  delivery: table
+  devops_sre: table
+  divergent: table
+  epistemic: table
+  evidence: table
+  experiment: scorecard
+  feasibility: table
+  finance: table
+  foresight: timeline
+  framing: table
+  insight: table
+  jurisdiction: table
+  learning: table
+  representation: table
+  research: table
+  root_cause: table
+  security: table
+  stakeholder: table
+  stakeholders: matrix
+  strategy: table
+  systems: layered
+
+overrides:
+  systems.iceberg_model: layered
+  decision.eisenhower_matrix: quadrant
+  decision.impact_effort: quadrant
