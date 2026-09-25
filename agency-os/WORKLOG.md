@@ -1,4 +1,18 @@
 ﻿# Worklog
+## 2026-09-25（續2）雲端額度第一批 T0/T7/T8/T9/T10 本機驗收後併入 main（squash，一個 commit）
+- [來源] 雲端 session（Sonnet 5）分支：`claude/cc-t0-golden-green` f8bbc7b2f｜`claude/eager-wozniak-70s1i8`（T8）｜`claude/cc-t7-command-plane-tests` 838b57b39｜`claude/cc-t9-doc-check-script-commits` bb7c7b7d2｜`claude/cc-t10-dom-test-infra` f8df7bc5c。操作者 2026-09-25「檢查並合併」；額度 $98 → $64（6 個 session）。
+- [T0] 只收 loader：`run_golden_tests.py`、`tests/architecture/search_content_pack_check.py` 防重複鍵 loader 先查明寫鍵再 `flatten_mapping`（YAML merge key 合法）→ method-input-forms.yaml 解析恢復。**不收** contract-backlog 的 3 筆 complete 登記：critic 查出備註引的前例（reporting_guideline_checklist 無 schema）是假的，3 個工具缺 typed-object schema＋CLI slice（METHOD_ATLAS_SLICE_LEAN_STANDARD.md:14-19）→ 登記 = 改資料消音。golden 現在只剩這 3 條紅（真實），雲端 T12 補齊後登記。
+- [T8] HCI30 fetch-runner `job-store.mjs`：TTL 1h、上限 1000、進行中不淘汰；Dockerfile `COPY job-store.mjs`（TASKS.md:691）。
+- [T7] next-admin `lib/command-plane/__tests__/` 9 檔。本機修 M3：`killSwitch.test.ts` 原本把兩個 main 既有 bug 斷言成正確行為（DB 錯誤回 normal、client 列蓋掉 global emergency_stop；違反 `killSwitch.ts:16-18`）→ 改 `it.fails` 釘文件契約（修好時會轉紅提醒改 `it`），另一條改名不背書 client 優先；源碼修正開 TASKS（資安 Medium+）。
+- [T9] script 產生的 commit 跑斷鏈檢查：`scripts/lib/post-commit-doc-check.ps1` → `ao-close.ps1`、`commit-checkpoint.ps1`；`smoke-status-digest.ps1` 併入 blockers[]（TASKS.md:655）。
+- [本機修 M1] T9 測試在 Windows PowerShell 5.1 4/9：`New-FixtureRepo` 的 bare `Invoke-FixtureGit` 呼叫把 git autocrlf warning 漏進函式回傳值（路徑變陣列）；雲端 Linux 無此 warning。9 處改 `$null =`＋檔加 BOM（含非 ASCII 註解）→ 9/9。另：狀態檔寫入失敗改 `ok=false`（原本 ok 仍 true，digest 會讀舊檔）；錯誤字串去掉絕對路徑（狀態檔是 tracked LATEST）；新增測試 T10 → 10/10。
+- [本機修 M2] T10 加 happy-dom，但 repo 已有 4 個測試檔用 `@vitest-environment jsdom`（jsdom 26.1.0 靠 fabric／vitest 傳遞依賴、未宣告）→ 兩套 DOM 環境。改為宣告 `jsdom ^26.1.0`、移除 happy-dom、T10 測試改 jsdom pragma。
+- [根因] 雲端 = Linux＋pwsh＋乾淨 clone；本機 = Windows PowerShell 5.1＋autocrlf＋既有隱性依賴 → 平台／環境差異只在本機驗得出。
+- [避免再發生] 雲端任務合併前一律本機重跑驗收（.ps1 用 5.1）；任務說明加：測試夾具的外部指令輸出一律丟棄、加新依賴前先查是否已有同類（含傳遞依賴）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=run_golden_tests.py exit 1 僅剩 3 條未登記（merge 解析已綠）；vitest lib/command-plane 78；T9 突變：拿掉 ok=false → T10 紅 → 還原 10/10；node --test fetch-runner 95/95；npx tsc --noEmit 0；npm test 177 files 1674 passed；powershell 5.1 test-post-commit-doc-check.ps1 10/10（修前 4/9）；突變：ContentStudio 繞過 pickInitialSite → 新 DOM 測試 3 紅／純函式 5 綠 → 還原 4/4 綠 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=fail | findings=0c/3m/5n（3m＝T0 假前例、T7 鎖死 fail-open、T9 夾具 5.1 紅，全修；n＝loader `<<: {inline}` 與重複 `<<` 未查、mockkit.py:52 同 bug（mockups 歸另一 session，已告知）、T8 503 路徑無 server 測試、T9 write-failure／絕對路徑已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects | grep=happy-dom|DEFAULT_MAPPING_TAG | hits=happy-dom 6（vitest optional peer metadata 2 lockfile×2、TASKS.md:641 本 commit 關閉、reports 歷史 2）；DEFAULT_MAPPING_TAG 2（兩個都已修）
+- [後續] T9 未接 `scripts/git-stage-hunks.py --commit-file`；兩個 loader 各自一份同樣修法，未抽共用。
 ## 2026-09-25（續1）研究線：首頁改 app 殼（左側主選單＋四個 view）＋home v4 目錄與審查修正＋檢查器每條規則有案例＋全頁「方法」→「工具」；計畫 v1.32
 - [觸發] 操作者 9/24「大部分的使用者根本不知道有什麼工具」「標籤／清單有何用」「不會去看權威工具網站嗎」（v2→v4）；9/25「全部塞同一頁非常爛，應該左側 sidebar 主選單」「順便看有什麼需要優化」。
 - [根因]

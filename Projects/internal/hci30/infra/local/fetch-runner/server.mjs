@@ -20,6 +20,7 @@ import fs from 'node:fs/promises';
 import { fetchAndExtract, extractFromBytes } from './retrieval/http-html-fetch.mjs';
 import { scanForInstructionLikeContent } from './content-isolation/scan.mjs';
 import { putContentAddressedObject, getContentAddressedObject, sha256Hex, loadConfigFromEnv } from './object-storage-client.mjs';
+import { createJobStore, loadJobStoreConfigFromEnv } from './job-store.mjs';
 
 const NETWORK_GUARD_READY_FILE = process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_FILE || '/var/run/network-guard/ready';
 const NETWORK_GUARD_READY_TIMEOUT_MS = Number(process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS || 30_000);
@@ -78,16 +79,15 @@ if (!process.env.HCI_FETCH_RUNNER_SKIP_MINIO_STARTUP_CHECK) {
 
 // In-memory only -- Task 8 owns durable persistence into
 // hci.sources/hci.source_snapshots. A restart loses all queued/status state.
-//
-// KNOWN LIMITATION, tracked not fixed here (critic review 2026-09-17): this
-// Map has no TTL/eviction and now holds real per-job data (title, text
-// length, scanReasons with up to-200-char excerpts) instead of the empty
-// skeleton jobs it held before Task 7 -- under real sustained traffic
-// (Task 9 wiring Trigger.dev to actually call this in a loop) it grows
-// without bound. Acceptable for this task's own local/test verification
-// (single-digit jobs per test run); must be addressed (TTL sweep or LRU
-// cap) before Task 9 exposes this to anything resembling real volume.
-const jobs = new Map();
+// Bounded by TTL + cap (job-store.mjs); an expired/evicted id answers /status with 404.
+let jobStoreConfig;
+try {
+  jobStoreConfig = loadJobStoreConfigFromEnv();
+} catch (err) {
+  console.error(`Job store configuration is invalid -- refusing to start: ${err.message}`);
+  process.exit(1);
+}
+const jobs = createJobStore(jobStoreConfig);
 
 function isAuthorized(req) {
   const header = req.headers['authorization'] || '';
@@ -379,7 +379,10 @@ async function handleRequest(req, res) {
       status: 'queued',
       createdAt: new Date().toISOString(),
     };
-    jobs.set(id, job);
+    // false = every slot holds an in-flight job (never evicted); refuse rather than grow unbounded.
+    if (!jobs.set(id, job)) {
+      return sendJson(res, 503, { error: 'job_store_full' });
+    }
     // Fire-and-forget, deferred via setImmediate -- NOT called directly here.
     // An async function's body runs SYNCHRONOUSLY up to its first `await`,
     // so calling processJob(job) inline would already have mutated

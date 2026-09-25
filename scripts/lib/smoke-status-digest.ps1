@@ -15,6 +15,12 @@
 # (smoke-LATEST.json "blockers") that ao-resume.md reads once instead of remembering ten
 # separate prose rules.
 #
+# 2026-09-24 addendum (TASKS.md:655): an 11th source, doc_integrity_commits, was added on the
+# same "give it a machine field, funnel into blockers[]" model -- see Get-DocIntegrityCommitEntry
+# below for why it is EVENT-DRIVEN rather than periodic like the original ten, which changes its
+# staleness handling. Comments above that still say "ten"/"ALL TEN" describe the 2026-09-23
+# design as it was; not rewritten in place.
+#
 # Contract: Get-StatusDigest returns an ordered hashtable with two NEW smoke check verdicts
 # (ci_health, nightly_health -- these had ZERO prior AO-RESUME wiring) plus a flat
 # "blockers" array of human-readable lines pulled from ALL TEN sources. Three invariants,
@@ -512,6 +518,43 @@ function Get-CfSecurityEntry {
     return New-DigestEntry -Verdict "WARN" -Label "Cloudflare" -RawLines @(("Overall: {0} -- see cf-security-LATEST.md" -f $overall))
 }
 
+# --- 11. Doc-integrity check on script/hook-authored commits (TASKS.md:655) ---
+# Deliberately NOT staleness-gated the way sources 1-10 above are: those are PERIODIC detectors
+# (a scheduled task or every AO-RESUME), so a stale report means "the detector stopped running" --
+# itself a finding. This source is EVENT-DRIVEN (post-commit-doc-check.ps1 only writes when
+# commit-checkpoint.ps1 or ao-close.ps1 actually makes a commit); going days with no write is the
+# normal case (no script-commit happened), not a sign anything died. A missing file means the same
+# thing: PASS, not BLIND. Malformed content (can't trust it) and the check itself failing to run
+# (ok:false) both still read BLIND/FAIL as appropriate, same as every other source here.
+function Get-DocIntegrityCommitEntry {
+    param([string]$StatusDir)
+    $path = Join-Path $StatusDir "doc-integrity-commits-LATEST.json"
+    if (-not (Test-Path -LiteralPath $path)) {
+        return New-DigestEntry -Verdict "PASS" -Label "Doc integrity (script commits)" -RawLines @()
+    }
+    $j = Get-JsonReportSafe -Path $path
+    if ($null -eq $j) {
+        return New-DigestEntry -Verdict "BLIND" -Label "Doc integrity (script commits)" -RawLines @("doc-integrity-commits-LATEST.json exists but is unreadable/malformed")
+    }
+    $shape = Test-ReportShape -Json $j -RequiredKeys @('generatedAtUtc', 'source', 'ok') -Label "Doc integrity (script commits)" -FileName "doc-integrity-commits-LATEST.json"
+    if ($shape) { return $shape }
+
+    $ok = ($j.ok -is [bool] -and $j.ok) -or ([string]$j.ok -eq 'True')
+    if (-not $ok) {
+        $err = if ($j.PSObject.Properties["error"] -and $j.error) { [string]$j.error } else { "check did not complete (no error detail recorded)" }
+        return New-DigestEntry -Verdict "BLIND" -Label "Doc integrity (script commits)" -RawLines @(("{0} on {1}: {2}" -f $j.source, ([string]$j.sha), $err))
+    }
+
+    $brokenCount = if ($j.PSObject.Properties["brokenCount"]) { [int]$j.brokenCount } else { 0 }
+    if ($brokenCount -le 0) {
+        return New-DigestEntry -Verdict "PASS" -Label "Doc integrity (script commits)" -RawLines @()
+    }
+    $shaShort = if ($j.sha) { ([string]$j.sha).Substring(0, [Math]::Min(12, ([string]$j.sha).Length)) } else { "unknown" }
+    $lines = @(@($j.broken) | ForEach-Object { ("{0} ({1}): {2} -> {3} ({4})" -f $shaShort, [string]$j.source, [string]$_.from, [string]$_.href, [string]$_.detail) })
+    if ($lines.Count -eq 0) { $lines = @(("{0} ({1}): {2} broken link(s) (detail not recorded)" -f $shaShort, [string]$j.source, $brokenCount)) }
+    return New-DigestEntry -Verdict "WARN" -Label "Doc integrity (script commits)" -RawLines $lines
+}
+
 # critic M3: isolate each source so one parser's exception cannot blind the other nine.
 # Set-StrictMode makes an absent property or a bad [double]/[DateTime] cast throw, and
 # every Get-*Entry above touches producer-controlled JSON/MD it does not own the shape of.
@@ -539,6 +582,7 @@ function Get-StatusDigest {
         staging_orphans    = Invoke-EntrySafe -SourceLabel "Staging orphans"   { Get-StagingOrphansEntry -StatusDir $statusDir }
         routine_freshness  = Invoke-EntrySafe -SourceLabel "Routine freshness" { Get-RoutineFreshnessEntry -StatusDir $statusDir }
         cf_security_health = Invoke-EntrySafe -SourceLabel "Cloudflare"        { Get-CfSecurityEntry -StatusDir $statusDir }
+        doc_integrity_commits = Invoke-EntrySafe -SourceLabel "Doc integrity (script commits)" { Get-DocIntegrityCommitEntry -StatusDir $statusDir }
     }
 
     $blockers = New-Object System.Collections.Generic.List[string]
