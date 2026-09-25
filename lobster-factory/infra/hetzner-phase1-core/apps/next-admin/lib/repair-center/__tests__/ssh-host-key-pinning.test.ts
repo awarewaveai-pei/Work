@@ -45,8 +45,10 @@ class FakeSshClient extends EventEmitter {
 }
 
 vi.mock("ssh2", () => ({ Client: FakeSshClient }));
-vi.mock("@/lib/supabase-server", () => ({ getSupabaseServerClient: () => null }));
-vi.mock("@/lib/repair-center/service", () => ({ getCurrentSystemMode: async () => "normal" }));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseServerClient: () => null, getSupabaseWriteClient: () => null }));
+vi.mock("@/lib/repair-center/system-mode-gate", () => ({
+  checkRepairAllowed: async () => ({ allowed: true, mode: "normal" }),
+}));
 
 afterEach(() => {
   vi.resetModules();

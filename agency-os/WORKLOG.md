@@ -1,4 +1,24 @@
 ﻿# Worklog
+## 2026-09-25（續20）雲端 T16 驗收後併入 main：修復中心＋自動修復一律過 kill switch（讀不到模式即擋），kill switch 讀取失敗送 Sentry（節流）
+- [來源] 雲端 session（Sonnet 5）`claude/cc-t16-repair-mode-gate` ca696d899；額度 $38 → $30。
+- [根因] 不變量「會改正式環境的修復路徑只在 mode=normal 執行，讀不到＝擋」在 main 上三處違反：
+  - C1 `lib/repair-center/service.ts:18-28`（92f41fc31）`getCurrentSystemMode` 忽略 DB error、maybeSingle 多列也回 "normal"、只讀 global 列 → `startRepairFromIncident` 在 emergency_stop 期間讀取一次失敗即放行。
+  - C2 `lib/repair-center/remediations/engine.ts` `tryRemediate` 完全沒查 system_modes：uptime-kuma webhook 自動路徑（`app/api/webhooks/uptime-kuma/route.ts:77-80`）在 emergency_stop 下照樣重啟容器（TASKS 原只記 C1，寫任務說明時讀碼發現）。
+  - m `killSwitch.ts` 回 unavailable 時丟掉原因。
+- [雲端做法] 新 `lib/repair-center/system-mode-gate.ts` `checkRepairAllowed` = `getActiveMode` + `evaluateKillSwitch(mode,"high")`，唯一把關；`startRepairFromIncident`（讀到 incident 後）與 `tryRemediate` 都走它；刪 `getCurrentSystemMode`；`getActiveMode(client, org|null)` null → 只讀 global；error／未知 mode 送 Sentry；文件 3 處。
+- [本機修（critic）]
+  - M1 wiring 測試只測擋下，「永遠擋下」突變存活 → engine／service 各加放行路徑測試。
+  - m1 真實自動修復的 incident 都沒有 org（`restart-unhealthy-container.ts:72` 只配無 client 的 incident）→ 加 null org 案例。
+  - m2 `tryRemediate` 把關的 org 與記錄 action run 的 org 不同 → 先 `resolveOrgId` 再把關（無 org 時為平台 org，與 command plane 同一組 client＋global）。
+  - m3 `.or()` 過濾字串沒人驗（拿掉 global 條件 → 全 `[]` → "normal"）→ 斷言完整字串。
+  - m4 `/api/ops/repairs/health` 公開被輪詢，DB 故障時每次 poll 一則 Sentry → `reportModeProblem` 同訊息 5 分鐘一次。
+  - m5 health 用 server client（無 service key 時退 anon，RLS 下讀到 `[]` 顯示 normal）→ 改 write client；reason 改 `supabase_not_configured`。
+- [未修 → TASKS] m6 第二道把關擋下時 repair run 無 audit；s1 `confirmCriticalRun` 先寫「已確認」再過把關；s2 手動修復被擋不留 ops_action_runs；s3 `app/api/ops/clients/[slug]/wp-update/route.ts` 以 SSH 更新客戶站卻不查 system_modes（同類）。
+- 未部署（上線走 sg-deploy，另行決定）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 0；vitest lib/command-plane lib/repair-center 309/309；npm test 180 files 1720 passed／13 skipped；8 突變各紅（gate 放行 unavailable、拔 tryRemediate 把關、拔 Sentry、engine 永遠擋、service 永遠擋、拔節流、拿掉 global 條件、改回用 incident org）→ 還原 309 綠 | exit=0 | ms=180000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/6n（M1 m1-m5 已修；m6＋s1-s3 → TASKS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands | grep=getCurrentSystemMode|checkRepairAllowed|system_mode_blocks_remediation|resetModeReportThrottle | hits=getCurrentSystemMode 程式 0（TASKS 本項結案、open-tasks-snapshot 為 AO-RESUME 產物）；checkRepairAllowed 程式 3 處呼叫＋文件 1
+- ORACLE_WAIVED: 寫碼者為雲端 Claude，/codex-review 本輪未跑；以單一 critic＋8 組突變證據代替
 ## 2026-09-25（續19）研究線 14R：本機 E2E tenant 與續跑前提
 
 - 起因：14R 真模型 E2E 缺專用本機測試身分；操作者指定自建，不得借用 next-admin 的 `COGNITIVE_OS_SERVICE_*`。
