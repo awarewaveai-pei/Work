@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-25（續6）雲端 T12 併入 main：eisenhower_matrix／reverse_brainstorming／lean_canvas 補齊 typed-object schema＋CLI slice 後登記 complete → golden runner 全綠
+- [來源] 雲端 session（Sonnet 5）`claude/cc-t12-complete-three-methods` 104df8f：3 個 `specs/cognitive/typed-objects/*-record.schema.yaml`、3 支 `ai_lego/apps/cli/run_*_slice.py`、3 個 contract 補 schema 引用、`contract-backlog.yaml` 3 筆 complete（source 列真實 4 類檔）、3 個 test 檔各 +2、`docs/architecture/SPEC_QUICKREF.md` 重生（golden 抓到的 stale index）。
+- [合併] 3 個 test 檔同時被 T11（共用 catalog）改過 → `git merge-file` 三方合併（base = 合併前 main，ours = T11，theirs = T12）。
+- [揭露] lean_canvas 的 forbidden_transition 只有 schema 層（`additionalProperties: false`），沒有 runtime 防護；全 repo 297 個模組只有 18 個有 `assert_no_automatic_authority_claim`，非完成條件，照實寫在 schema compilation_decisions。
+- [解鎖] golden 綠 → 研究線 T1–T3 可貼；本機 WC-PIa-08 可開工（已通知 session d24dcd）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden runner PASSED 4149 / ALL GOLDEN TESTS PASSED; python -m unittest (eisenhower_matrix, reverse_brainstorming, lean_canvas, impact_effort, method_form, method_form_examples, method_testkit_shared_catalog) 205 OK; 3 CLI slices exit 0 (quadrants / worsening->inverted / 9 blocks) | exit=0 | ms=240000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（lean_canvas 單層防護，已揭露）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=eisenhower-matrix-record|lean-canvas-record|reverse-brainstorming-record | hits=8（新 schema 被 contract＋backlog＋SPEC_QUICKREF＋測試引用，全在本 commit）
 ## 2026-09-25（續5）雲端 T11 併入 main：COS 測試共用 method catalog（整套本機 24→17.5 分鐘）＋巢狀 contract 防污染
 - [來源] 雲端 session（Sonnet 5）`claude/cc-t11-shared-catalog` 020c985e7：`tests/unit/method_testkit.py` 新增 `shared_method_catalog`（lru_cache 以 spec_root 字串為鍵，只掃一次 285 份 contract；每次呼叫新建 MethodCatalog，`contracts` 包 MappingProxyType）；250 個測試模組機械改用；新 `tests/unit/test_method_testkit_shared_catalog.py`。ai_lego 生產碼零改動。
 - [本機修 M1] 防污染只顧到頂層：contract 值是巢狀 dict，兩次呼叫共用同一物件（實測 `is` 為 True）→ 一個測試改了值，之後所有測試都讀到（順序相依污染）。改為每次 `copy.deepcopy`（實測 0.6 ms）；新增 `test_c_nested_contract_mutation_does_not_reach_the_next_caller`；原斷言 `assertIs(first.contracts, second.contracts)` 斷言的正是這個共用（錯誤期望）→ 改為內容相等＋不同物件。

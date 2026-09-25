@@ -29,6 +29,7 @@ inputs:
   optional: []
 
 outputs: [EisenhowerMatrixClassification]
+# see specs/cognitive/typed-objects/eisenhower-matrix-record.schema.yaml (2026-09-25, T12)
 
 preconditions:
   - "record_id (EISENHOWER- prefix), subject non-empty strings; version is a string"

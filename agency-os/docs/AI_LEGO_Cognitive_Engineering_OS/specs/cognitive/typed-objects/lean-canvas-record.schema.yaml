@@ -1,0 +1,176 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/lean-canvas-record.schema.yaml"
+title: Lean Canvas
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  Canonical machine-readable definition of `LeanCanvas` -- the declared `outputs` of
+  `strategy.lean_canvas`'s Method Contract (methods/contracts/strategy.lean_canvas.contract.yaml,
+  `outputs: [LeanCanvas]`). NOT Atlas-cited (grep-confirmed zero "lean canvas" hits, case-
+  insensitive, anywhere in the Atlas or the whole agency-os/docs/AI_LEGO_Cognitive_Engineering_OS
+  tree) -- external grounding is Ash Maurya's own Lean Canvas (Maurya, "Running Lean", 2012;
+  https://leanstack.com/lean-canvas), disclosed in ai_lego/modules/strategy/lean_canvas.py's own
+  module docstring, not repeated here. Same closed-block-set shape as
+  business-model-canvas.schema.yaml (read in full before writing this file), scaled to Lean
+  Canvas's own 9-block vocabulary -- see that method's module docstring due-diligence comparison
+  for exactly which 4 of BMC's blocks these replace (only Customer Segments/Channels/Revenue
+  Streams/Cost Structure are shared).
+
+  Field provenance:
+    * `blocks[].block` (Ash Maurya's own 9-block vocabulary, SCREAMING_SNAKE_CASE, transcribed from
+      `ai_lego/modules/strategy/lean_canvas.py`'s own `BLOCK_NAMES`) -- a CLOSED set of exactly 9
+      names, each REQUIRED to appear EXACTLY ONCE, same class business-model-canvas.schema.yaml's
+      own `blocks[].block` already establishes, scaled from BMC's own vocabulary to a distinct one.
+    * `blocks[].content` -- the actual disclosed content for this block, free-text, never templated.
+    * `validation_status` (top-level, required) -- module docstring's own "Validation-status
+      handling": every Lean Canvas block is, by Maurya's own framing, a best-guess hypothesis, not
+      a settled fact. A single-legal-value enum, same structural-elimination pattern
+      business-model-canvas.schema.yaml's own `validation_status` already establishes.
+
+source_of_truth_for:
+  - "methods/contracts/strategy.lean_canvas.contract.yaml (outputs, preconditions, quality, forbidden_transition)"
+  - "ai_lego/modules/strategy/lean_canvas.py (generate_lean_canvas -- the real builder this schema's shape is transcribed from field-for-field; BLOCK_NAMES -- this schema's block enum; VALIDATION_STATUS -- this schema's validation_status enum)"
+  - "specs/cognitive/typed-objects/business-model-canvas.schema.yaml -- same closed-set-with-completeness precedent this file scales from 9 BMC blocks to 9 distinct Lean Canvas blocks"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents; same non-Atlas-cited class every 2026-09-18 operator-directed method in this family already establishes."
+
+compilation_decisions:
+  - question: "Closed set with completeness (business-model-canvas-style) or positional tuple?"
+    decision: "Closed set, completeness required, no position -- blocks: minItems 9, maxItems 9, each blocks[].block a value from the 9-name enum; genuine distinctness/completeness is runtime-only (see below), same limitation class business-model-canvas.schema.yaml already documents."
+  - question: "additionalProperties: false at the top level, and on each blocks[] item?"
+    decision: "Yes, both -- baseline hygiene this directory converges on, matching business-model-canvas.schema.yaml's own identical choice."
+  - question: "Does JSON Schema itself express 'all 9 distinct block names present, order-independent'?"
+    decision: "No -- plain JSON Schema has no cross-item set-equality operator. minItems:9/maxItems:9 plus the per-item enum bounds the SHAPE; genuine distinctness-and-completeness (LEANCANVAS_INCOMPLETE_BLOCK_SET) is a runtime-only invariant, enforced at construction AND independently re-derived by evaluate_lean_canvas_integrity_gate -- same limitation-and-workaround class business-model-canvas.schema.yaml's own identical compilation_decision already documents."
+  - question: "How does this forbidden_transition (LeanCanvas -> AutomaticProductionDeployment) get enforced, given the module has no separate runtime assert function the way decision.eisenhower_matrix's assert_no_automatic_authority_claim does?"
+    decision: "Structurally, via additionalProperties:false alone -- ai_lego/modules/strategy/lean_canvas.py has no analogous guard function (grep-confirmed), so a caller-supplied 'approved'/'automatic_production_deployment'-style key on a record has exactly one place it can be refused: schema validation. Disclosed here rather than fabricating a runtime check that does not exist in the builder (this task's own scope is the schema + CLI slice, not a new ai_lego invariant); run_lean_canvas_slice.py demonstrates the schema-layer refusal only, not a two-layer one."
+
+type: object
+required: [id, version, blocks, validation_status, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^LEANCANVAS-"
+    description: "NEW DESIGN. ai_lego/modules/strategy/lean_canvas.py's own RECORD_ID_PREFIX -- deliberately record_id (not BMC's own domain-specific canvas_id), see that module's own docstring 'Record-identity parameter naming choice'."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "strategy.lean_canvas"
+
+  blocks:
+    type: array
+    minItems: 9
+    maxItems: 9
+    description: >
+      Ash Maurya's own 9-block Lean Canvas, transcribed from ai_lego/modules/strategy/lean_canvas.py's
+      own BLOCK_NAMES. SHAPE-bounded here to exactly 9 items; genuine completeness (all 9 distinct
+      names present, order-independent -- no duplicates, no unrecognized name) is a runtime-only
+      invariant this schema cannot express (see compilation_decisions) -- enforced by
+      ai_lego/modules/strategy/lean_canvas.py at both the builder and an independent gate.
+    items:
+      type: object
+      required: [block, content, provenance]
+      additionalProperties: false
+      properties:
+        block:
+          type: string
+          enum: [PROBLEM, CUSTOMER_SEGMENTS, UNIQUE_VALUE_PROPOSITION, SOLUTION, CHANNELS, REVENUE_STREAMS, COST_STRUCTURE, KEY_METRICS, UNFAIR_ADVANTAGE]
+          description: "ai_lego/modules/strategy/lean_canvas.py's own BLOCK_NAMES verbatim -- Ash Maurya's Lean Canvas vocabulary (leanstack.com/lean-canvas), SCREAMING_SNAKE_CASE."
+        content:
+          type: string
+          minLength: 1
+          pattern: "\\S"
+          description: "The actual disclosed content for this block, in natural language -- what this block contains for the specific business being modeled."
+        supporting_evidence_refs:
+          type: array
+          items:
+            type: string
+            pattern: "^E-[0-9]+$"
+          description: >
+            Soft reference to real `evidence/evidence.schema.yaml` record ids. Same convention
+            business-model-canvas.schema.yaml's own blocks[].supporting_evidence_refs already uses --
+            required in practice by the `evidence_labeling_required` gate whenever
+            `provenance.epistemic_type == EVIDENCE`, not by this schema itself.
+        provenance:
+          description: "Per-block provenance. Full provenance_record, same pattern business-model-canvas.schema.yaml's blocks[].provenance already uses."
+          $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+  validation_status:
+    type: string
+    enum: [UNVALIDATED_HYPOTHESIS]
+    default: UNVALIDATED_HYPOTHESIS
+    description: >
+      REQUIRED, single-legal-value enum. ai_lego/modules/strategy/lean_canvas.py's own module
+      docstring "Validation-status handling": every block is, by Ash Maurya's own Build-Measure-Learn
+      framing, a best-guess assumption to be tested, never a settled fact -- structurally impossible
+      to construct a record claiming otherwise, same enforcement shape
+      business-model-canvas.schema.yaml's own validation_status already establishes.
+      ai_lego/modules/strategy/lean_canvas.py's own builder does not expose this as a caller-settable
+      parameter at all (structural elimination, module docstring's own VALIDATION_STATUS constant).
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "A completed Lean Canvas for an early-stage SaaS accounts-payable automation startup, pre-validation"
+    value:
+      id: "LEANCANVAS-2026-09-25-001"
+      version: "1.0.0"
+      generated_by_method: "strategy.lean_canvas"
+      blocks:
+        - block: PROBLEM
+          content: "中小企業應付帳款仍靠人工比對發票，每月耗費 20+ 小時且常出錯"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - block: CUSTOMER_SEGMENTS
+          content: "50-200 人規模的中小型製造業／貿易公司財務部門"
+          supporting_evidence_refs: ["E-601"]
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+        - block: UNIQUE_VALUE_PROPOSITION
+          content: "發票自動比對＋異常標記，人工核對時間降低 80%"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - block: SOLUTION
+          content: "OCR 擷取發票欄位＋規則比對引擎＋異常人工複核佇列"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - block: CHANNELS
+          content: "會計師事務所轉介、財務長社群直接推廣"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - block: REVENUE_STREAMS
+          content: "月費訂閱，依每月處理發票量分級"
+          supporting_evidence_refs: ["E-602"]
+          provenance: {epistemic_type: EVIDENCE, authorship_state: HUMAN_APPROVED, locked: null}
+        - block: COST_STRUCTURE
+          content: "OCR API 用量費、雲端基礎設施、客服支援人力"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - block: KEY_METRICS
+          content: "月活躍公司數、每月處理發票總量、異常標記準確率"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - block: UNFAIR_ADVANTAGE
+          content: "創辦團隊過去 5 年深耕該產業財務系統整合，累積真實客戶關係"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+      validation_status: UNVALIDATED_HYPOTHESIS
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+
+verification:
+  method: >
+    Read ai_lego/modules/strategy/lean_canvas.py and specs/cognitive/typed-objects/business-model-canvas.schema.yaml
+    in full; this schema's shape is transcribed field-for-field from generate_lean_canvas's own return
+    dict and BLOCK_NAMES/VALIDATION_STATUS, scaled from BMC's own identical closed-set-with-completeness
+    template. Grepped specs/cognitive/typed-objects/ for "lean_canvas"/"lean canvas" before writing -- no
+    existing or competing typed object found. Cross-checked against
+    methods/contracts/strategy.lean_canvas.contract.yaml's own outputs/preconditions/quality/
+    forbidden_transition. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_lean_canvas.py's own builder-output-against-schema test (this task's own new
+    addition).
+  note: >
+    No mother document was modified (this method is not Atlas-cited). Field names are transcribed
+    verbatim from the real builder's own parameter names, return dict keys, and BLOCK_NAMES -- none
+    invented. The additionalProperties:false closed-key-set shape mirrors
+    business-model-canvas.schema.yaml's own identical compilation decision, scaled to a distinct
+    9-block vocabulary the two canvases share only 4 names with (Customer Segments, Channels, Revenue
+    Streams, Cost Structure -- see module docstring's own due-diligence comparison).

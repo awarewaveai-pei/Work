@@ -41,6 +41,7 @@ from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOC
 from tests.unit.method_testkit import shared_method_catalog
 
 _NOW = "2026-09-18T00:00:00Z"
+_CANVAS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/lean-canvas-record.schema.yaml"
 
 
 def _blocks(**overrides: dict) -> list[dict]:
@@ -109,6 +110,25 @@ class SpecConformanceTests(unittest.TestCase):
         contract_path = self.spec_root / "methods" / "contracts" / "strategy.lean_canvas.contract.yaml"
         instance = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
         self.contracts.validate("ai-lego://specs/cognitive/method.schema.yaml", instance, "strategy.lean_canvas contract")
+
+    def test_builder_output_validates_against_the_real_typed_object_schema(self):
+        """T12: lean-canvas-record.schema.yaml (the 2nd of the 4 required files, previously
+        missing) actually accepts the real builder's own output -- same pattern
+        test_impact_effort.py's own test_valid_classification_validates_against_the_real_schema
+        establishes."""
+        self.contracts.validate(_CANVAS_SCHEMA, _valid_canvas(), "lean canvas")
+
+    def test_cli_slice_runs_end_to_end(self):
+        """T12: run_lean_canvas_slice.py (the 4th of the 4 required files, previously missing)
+        actually runs -- real method resolution, real dispatch through the catalog, real schema
+        validation, real gates, and the forbidden_transition's schema-layer-only refusal proven
+        (this module has no separate runtime guard, disclosed in the CLI slice's own docstring)."""
+        from ai_lego.apps.cli.run_lean_canvas_slice import SliceConfig, run_lean_canvas_slice
+
+        result = run_lean_canvas_slice(SliceConfig())
+        self.assertEqual(result["milestones"][-1], "VERIFYING")
+        self.assertTrue(all_gates_pass(result["gate_results"]), result["gate_results"])
+        self.assertTrue(result["no_automatic_authority_verification"]["schema_layer_blocked"])
 
 
 class BlockVocabularyTests(unittest.TestCase):

@@ -1,0 +1,145 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/eisenhower-matrix-record.schema.yaml"
+title: Eisenhower Matrix Classification
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `EisenhowerMatrixClassification` -- `decision.eisenhower_matrix`'s declared output. NOT
+  Atlas-cited (grep-confirmed zero "Eisenhower" hits) -- external grounding is the urgent/important
+  distinction attributed to Eisenhower and popularized by Covey's "7 Habits", disclosed in
+  `ai_lego/compute/eisenhower_matrix/classification.py`'s own docstring, not repeated here.
+  Structurally the same shape as `impact-effort-classification.schema.yaml` (2 numeric axes, 2
+  thresholds, 4-way quadrant split, both read in full before writing this file) but a DISTINCT
+  method: urgency/importance axes (not impact/effort), action-verb quadrant semantics (do_first/
+  schedule/delegate/eliminate, not quick_wins/major_projects/fill_ins/avoid_reconsider). Each
+  task's `quadrant` is COMPUTED, never a constructor input -- see
+  `methods/contracts/decision.eisenhower_matrix.contract.yaml`'s own preconditions.
+
+source_of_truth_for:
+  - "methods/contracts/decision.eisenhower_matrix.contract.yaml (outputs, preconditions, quality, forbidden_transition)"
+  - "ai_lego/modules/decision/eisenhower_matrix.py (generate_eisenhower_matrix_classification -- the real builder this schema's shape is transcribed from field-for-field)"
+  - "ai_lego/compute/eisenhower_matrix/classification.py (the real deterministic classify_quadrant this schema's `quadrant` field records the result of, and VALID_QUADRANTS -- this schema's enum)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents; same non-Atlas-cited class impact-effort-classification.schema.yaml's own decided_by already establishes for a structurally identical shape."
+
+$defs:
+  scale:
+    type: object
+    required: [min, max]
+    additionalProperties: false
+    properties:
+      min: {type: number}
+      max: {type: number}
+    description: "min MUST be strictly less than max -- enforced at the runtime layer (EISENHOWER_INVALID_SCALE), not by this schema (JSON Schema cannot express a cross-field min<max comparison). Same disclosed gap impact-effort-classification.schema.yaml's own scale $def documents."
+  task:
+    type: object
+    required: [id, label, urgency, importance, quadrant]
+    additionalProperties: false
+    properties:
+      id: {type: string, minLength: 1, pattern: "\\S"}
+      label: {type: string, minLength: 1, pattern: "\\S"}
+      urgency: {type: number, description: "Raw value on the record's own declared urgency_scale -- range checked at the runtime layer (EISENHOWER_VALUE_OUT_OF_SCALE), not by this schema."}
+      importance: {type: number, description: "Raw value on the record's own declared importance_scale."}
+      quadrant:
+        enum: [do_first, schedule, delegate, eliminate]
+        description: "COMPUTED -- ai_lego/compute/eisenhower_matrix/classification.py's own VALID_QUADRANTS. Never a constructor input; re-derived and cross-checked at the gate layer (evaluate_quadrant_integrity_gate), never trusted as stored."
+
+type: object
+required: [id, version, subject, urgency_scale, importance_scale, urgency_threshold, importance_threshold, tasks, engine, computation_provenance_ref, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^EISENHOWER-"
+    description: "NEW DESIGN. Same id-prefix convention rationale as impact-effort-classification.schema.yaml's IMPACTEFFORT- prefix (ai_lego/modules/decision/eisenhower_matrix.py's own RECORD_ID_PREFIX)."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "decision.eisenhower_matrix"
+
+  subject:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "What is being triaged, e.g. 'Q4 backlog 初篩' -- same first-round-screening framing impact-effort-classification.schema.yaml's own `subject` field documents."
+
+  urgency_scale:
+    $ref: "#/$defs/scale"
+    description: "The declared finite range every task's urgency is validated against. A SEPARATE declared range from importance_scale -- same two-independent-axes design impact-effort-classification.schema.yaml's own impact_scale/effort_scale pair establishes."
+
+  importance_scale:
+    $ref: "#/$defs/scale"
+    description: "The declared finite range every task's importance is validated against."
+
+  urgency_threshold:
+    type: number
+    description: "At or above this value on urgency_scale = High Urgency. Caller-supplied, no invented default -- no external source gives a numeric split point for this axis. Range-checked against urgency_scale at the runtime layer (EISENHOWER_THRESHOLD_OUT_OF_SCALE)."
+
+  importance_threshold:
+    type: number
+    description: "At or above this value on importance_scale = High Importance. Same caller-supplied, no-invented-default reasoning as urgency_threshold."
+
+  tasks:
+    type: array
+    minItems: 1
+    description: "The tasks being triaged. minItems 1 -- each task is classified INDEPENDENTLY against fixed external thresholds, same single-item-is-meaningful reasoning impact-effort-classification.schema.yaml's own `ideas` field documents for the identical shape."
+    items:
+      $ref: "#/$defs/task"
+
+  engine:
+    const: "local_python_deterministic_compute"
+    description: "Same literal value every genuine-compute typed object in this directory already uses (impact-effort-classification.schema.yaml, mcda-analysis.schema.yaml, ahp-analysis.schema.yaml, ...) -- genuine compute, never an LLM 'mental calculation'."
+
+  computation_provenance_ref:
+    type: string
+    pattern: "^ai_lego\\.compute\\."
+    description: "Dotted path to the real Python function that computed each task's quadrant -- same convention every genuine-compute typed object in this directory establishes. ai_lego/modules/decision/eisenhower_matrix.py's own COMPUTATION_PROVENANCE_REF constant."
+
+  provenance:
+    description: "epistemic_type is ALWAYS normalized to CALCULATED_RESULT by the builder regardless of the caller-supplied value (authorship_state passes through unchanged) -- ai_lego/modules/decision/eisenhower_matrix.py's own module docstring discloses this fixes a real bug found in the sibling decision.impact_effort, which embeds caller-supplied provenance verbatim."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "5 tasks on a shared 1-5 urgency/importance scale split at 3, one task landing in each of the 4 quadrants plus a second do_first entry"
+    value:
+      id: "EISENHOWER-2026-09-25-001"
+      version: "1.0.0"
+      generated_by_method: "decision.eisenhower_matrix"
+      subject: "本週任務分流"
+      urgency_scale: {min: 1, max: 5}
+      importance_scale: {min: 1, max: 5}
+      urgency_threshold: 3
+      importance_threshold: 3
+      tasks:
+        - {id: "TASK-1", label: "回覆客戶緊急工單", urgency: 5, importance: 5, quadrant: do_first}
+        - {id: "TASK-2", label: "季度策略規劃", urgency: 2, importance: 5, quadrant: schedule}
+        - {id: "TASK-3", label: "整理過期票根報帳", urgency: 5, importance: 1, quadrant: delegate}
+        - {id: "TASK-4", label: "瀏覽競品部落格", urgency: 1, importance: 1, quadrant: eliminate}
+        - {id: "TASK-5", label: "修復生產環境告警", urgency: 5, importance: 4, quadrant: do_first}
+      engine: "local_python_deterministic_compute"
+      computation_provenance_ref: "ai_lego.compute.eisenhower_matrix.classification.classify_quadrant"
+      provenance: {epistemic_type: CALCULATED_RESULT, authorship_state: AI_GENERATED, locked: null}
+
+open_questions:
+  - "OQ-EISENHOWERSCHEMA-1: no schema-level constraint ties quadrant to urgency/importance/thresholds (JSON Schema cannot express that arithmetic) -- left as a runtime invariant (evaluate_quadrant_integrity_gate re-derives and compares), same disclosed gap impact-effort-classification.schema.yaml's own OQ-IMPACTEFFORTSCHEMA-1 already documents for the structurally identical field.（owner: operator, or whoever next hardens this schema's cross-field guarantees）"
+
+verification:
+  method: >
+    Read ai_lego/modules/decision/eisenhower_matrix.py and ai_lego/compute/eisenhower_matrix/classification.py
+    in full; this schema's shape is transcribed field-for-field from generate_eisenhower_matrix_classification's
+    own return dict and evaluate_quadrant_integrity_gate's own required_task_keys, not invented. Grepped
+    specs/cognitive/typed-objects/ for "eisenhower"/"urgency"/"importance" before writing -- no existing or
+    competing typed object found. Cross-checked against methods/contracts/decision.eisenhower_matrix.contract.yaml's
+    own outputs/preconditions/quality. Validated against jsonschema Draft202012Validator via
+    tests/unit/test_eisenhower_matrix.py's own builder-output-against-schema test (this task's own new addition).
+  note: >
+    No mother document was modified (this method is not Atlas-cited). Field names are transcribed verbatim
+    from the real builder's own parameter names and return dict keys, and from the compute module's own
+    VALID_QUADRANTS -- none invented. The per-axis (not shared) scale/threshold design and the
+    additionalProperties:false closed-key-set-per-task shape mirror impact-effort-classification.schema.yaml's
+    own Phase 3 compilation decisions for the identical structural shape, disclosed there, not re-derived here.

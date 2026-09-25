@@ -29,6 +29,7 @@ inputs:
   optional: [Inversions]
 
 outputs: [ReverseBrainstormingSession]
+# see specs/cognitive/typed-objects/reverse-brainstorming-record.schema.yaml (2026-09-25, T12)
 
 preconditions:
   - "record_id (REVERSEBRAINSTORM- prefix), problem_statement non-empty strings; version is a string; record-level provenance schema-valid"

@@ -33,6 +33,7 @@ inputs:
   optional: []
 
 outputs: [LeanCanvas]
+# see specs/cognitive/typed-objects/lean-canvas-record.schema.yaml (2026-09-25, T12)
 
 preconditions:
   - "record_id (LEANCANVAS- prefix) is a non-empty string; version is a string"
