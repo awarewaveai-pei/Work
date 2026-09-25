@@ -1,0 +1,1 @@
+{"decision_context":"Choose one option","root":{"node_type":"decision","label":"Choice","branches":[{"label":"A","child":{"node_type":"terminal","label":"Outcome A","payoff":10}},{"label":"B","child":{"node_type":"terminal","label":"Outcome B","payoff":5}}]}}

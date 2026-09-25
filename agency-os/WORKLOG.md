@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-25（續15）研究線 WC-PIa-19：表單種類移植
+
+- 起因：web 表單把多種結構化欄位塞進 JSON textarea；變體只有按鈕沒有分支，示範案例讀錯 API，AI 草稿只顯示訊息不填欄。
+- 改：移植 dashboard collectFields/collectValue 語意；list、rows、fixed_rows、group/conditions、variant、recursive、map、upstream 都有專用控制，json 只供真無結構欄；LazyFill draft 填欄標 AI_SUGGESTED，使用者確認後可送；示範案例讀 `/form` 的 example.input。新增三份 payload fixture 與真 `/invoke` 測試。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；test_web_form_payloads+test_method_form 7/7；三方法 `/invoke` 200 且 fixture 等於 dashboard serializer；vitest 8/8；typecheck exit 0；JSON.stringify(value 只有 1 處 | exit=0 | ms=60000
+- REVIEW_DONE: 自審固定列最少列與條件刪欄；schema 無結構才退到 JSON；上游方法欄經自己的 /form、/invoke 產生 record。
+- BUGHUNT_DONE: 對照 dashboard.html:901-1255、method_form.py kinds、form example API、draft 回傳形狀；未改 API。
+- 突變：variant 永遠選第一分支 → form-model `serializes the selected variant branch` 紅（decision != leaf）→ 還原綠。
+- 下一步：WC-PIa-21。
+
 ## 2026-09-25（續14）研究線 WC-PIa-18：判斷用詞與錯誤可見
 
 - 起因：API accept/revise/reject 與示意稿同意／部分同意／不同意不符；前端吞掉送出失敗，GET 不帶人工判斷。
