@@ -9,7 +9,7 @@
 - 現在期／卡：**PI-a 完成**（§12.3 WC-PIa-01～14）；下一期是 **PI-b**，但每張皆 High-STOP，必須取得操作者逐張正式部署 go-ahead。
 - 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T12 `66278d1f9`；PI-a `c7061f16f`（視覺原語登錄）＋`e28b630ba`（schema／解讀 API／web／本機部署支援與 gate）；PI-a 14/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）。
 - 最後一筆程式碼 commit：`e28b630ba` PI-a；最後一筆計畫版本：v1.35（2026-09-25）。
-- 阻塞：PI-a 無。golden `4158 passed`、COS full unittest `14180 tests / 1124.115s / OK`；Playwright cognitive 在無測試帳密／project id 時正確 skip；本機 compose 完整啟動受既有 `127.0.0.1:8420` port 佔用阻擋，web image build 已綠。PI-b／P5／P-P 仍依 High-STOP 規則。
+- 阻塞：PI-a 無。golden `4158 passed`、COS final full unittest `14186 tests / 991.668s / OK`；Playwright cognitive 在無測試帳密／project id 時正確 skip；本機 compose 完整啟動受既有 `127.0.0.1:8420` port 佔用阻擋，web image build 已綠。PI-b／P5／P-P 仍依 High-STOP 規則。
 - 下一步：只在操作者逐張 go-ahead 後開 WC-PIb-01 nginx 分流；不得把 PI-a 的本機容器／web image 當成正式部署。執行模型 Sonnet 5／Codex。
 
 | 項 | 狀態（2026-09-24） |
