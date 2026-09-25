@@ -13,6 +13,8 @@ function Section({ id, read, act, children }: { id: string; read: string; act: s
 
 export function ResultPage({ result }: { result: Interpretation }) {
   const [judgment, setJudgment] = useState("");
+  const [judgmentText, setJudgmentText] = useState("");
+  const [judgmentError, setJudgmentError] = useState("");
   const findings = result.findings ?? [];
   return <div>
     <Section id="0" read="先看一句話與資料狀態。" act="確認這次分析回答的是你的問題。"><h2>{result.method_id}</h2><p className="muted">AI 草稿／{result.model}／輸入 {result.usage?.input_tokens ?? 0} tokens</p></Section>
@@ -23,6 +25,6 @@ export function ResultPage({ result }: { result: Interpretation }) {
     <Section id="5" read="下一步是候選，不是命令。" act="選一個你願意補資料的方法。"><ul>{(result.next_steps ?? []).map((step, index) => <li key={index}>{String(step.method_id ?? "下一步")}：{String(step.yields ?? "補充分析")}</li>)}</ul></Section>
     <Section id="6" read="解決方案在 P4 才會正式生成。" act="此階段先保留人工判斷。"><p className="muted">解決方案比較尚未啟用。</p></Section>
     <Section id="7" read="引註是 prompt manifest 的實際路徑。" act="回到來源確認範圍與時間。"><ul>{findings.flatMap((item) => item.citations).map((citation) => <li id={`citation-${citation}`} key={citation}>{citation}</li>)}</ul></Section>
-    <Section id="8" read="最後看 AI 狀態與人工判斷。" act="接受、要求修改或拒絕這次解讀。"><p>Provenance：{String(result.provenance?.authorship_state ?? "AI_GENERATED")}</p><div className="grid">{["accept", "revise", "reject"].map((stance) => <button type="button" className={judgment === stance ? "" : "secondary"} key={stance} onClick={async () => { setJudgment(stance); await apiFetch(`/interpretations/${result.interpretation_id}/judgment`, { method: "POST", body: JSON.stringify({ stance, note: "user judgment" }) }).catch(() => undefined); }}>{stance}</button>)}</div></Section>
+    <Section id="8" read="最後看 AI 狀態與人工判斷。" act="同意、部分同意或不同意這次解讀。"><p>Provenance：{String(result.provenance?.authorship_state ?? "AI_GENERATED")}</p><label htmlFor="judgment-text">你的判斷</label><textarea id="judgment-text" value={judgmentText} onChange={(event) => setJudgmentText(event.target.value)} /><div className="grid">{([ ["agree", "同意"], ["partial", "部分同意"], ["disagree", "不同意"] ] as const).map(([stance, label]) => <button type="button" className={judgment === stance ? "" : "secondary"} key={stance} onClick={async () => { setJudgmentError(""); try { await apiFetch(`/interpretations/${result.interpretation_id}/judgment`, { method: "POST", body: JSON.stringify({ stance, text: judgmentText }) }); setJudgment(stance); } catch (error) { setJudgmentError(error instanceof Error ? error.message : "送出失敗"); } }}>{label}</button>)}</div>{judgmentError && <p role="alert">判斷送出失敗：{judgmentError}</p>}</Section>
   </div>;
 }

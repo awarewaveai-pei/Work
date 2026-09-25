@@ -1229,7 +1229,12 @@ def get_interpretation(
         artifact = artifact_store.read(session["tenant_id"], stored["artifact_reference"])
     except InvariantViolation as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
-    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "record": artifact["record"], "result": artifact["interpretation"], "gate_results": artifact["gate_results"]}
+    judgment = None
+    for event in reversed(events):
+        if event["event_type"] == "InterpretationJudged":
+            judgment = {"stance": event["payload"]["stance"], "text": event["payload"]["text"]}
+            break
+    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "record": artifact["record"], "result": artifact["interpretation"], "gate_results": artifact["gate_results"], "judgment": judgment}
 
 
 @app.post("/interpretations/{interpretation_id}/judgment")
@@ -1243,12 +1248,12 @@ def judge_interpretation(
     if stored is None:
         raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
     stance = body.get("stance")
-    if stance not in {"accept", "revise", "reject"}:
+    if stance not in {"agree", "partial", "disagree"}:
         raise HTTPException(status_code=400, detail="JUDGMENT_STANCE_INVALID")
-    note = body.get("note", "")
-    if not isinstance(note, str):
-        raise HTTPException(status_code=400, detail="JUDGMENT_NOTE_INVALID")
-    repo.append_event(session["tenant_id"], f"project:{stored['project_id']}", "InterpretationJudged", {"interpretation_id": interpretation_id, "stance": stance, "note": note[:2000]})
+    text = body.get("text", "")
+    if not isinstance(text, str):
+        raise HTTPException(status_code=400, detail="JUDGMENT_TEXT_INVALID")
+    repo.append_event(session["tenant_id"], f"project:{stored['project_id']}", "InterpretationJudged", {"interpretation_id": interpretation_id, "stance": stance, "text": text[:2000]})
     return {"status": "recorded", "stance": stance}
 
 

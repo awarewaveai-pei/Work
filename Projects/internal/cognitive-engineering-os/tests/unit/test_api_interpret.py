@@ -94,8 +94,11 @@ class InterpretApiTests(ApiTestCase):
             fetched.json()["result"],
             "MethodInterpretation API result",
         )
-        judged = self.client.post(f"/interpretations/{interpretation_id}/judgment", json={"stance": "accept", "note": "verified"})
+        judged = self.client.post(f"/interpretations/{interpretation_id}/judgment", json={"stance": "agree", "text": "verified"})
         self.assertEqual(judged.status_code, 200, judged.text)
+        self.assertEqual(self.client.get(f"/interpretations/{interpretation_id}").json()["judgment"], {"stance": "agree", "text": "verified"})
+        rejected = self.client.post(f"/interpretations/{interpretation_id}/judgment", json={"stance": "accept", "text": "old vocabulary"})
+        self.assertEqual(rejected.status_code, 400, rejected.text)
         events = self.repo.list_events(self.tenant["tenant_id"], f"project:{self.project_id}")
         self.assertEqual([event["event_type"] for event in events][-1], "InterpretationJudged")
         self.assertEqual(api_main.app.dependency_overrides[api_main.get_store]().ai_usage_totals(self.tenant["tenant_id"])["output_tokens"], 23)

@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-25（續14）研究線 WC-PIa-18：判斷用詞與錯誤可見
+
+- 起因：API accept/revise/reject 與示意稿同意／部分同意／不同意不符；前端吞掉送出失敗，GET 不帶人工判斷。
+- 改：POST judgment 收 agree／partial／disagree＋text；GET DONE 帶最後判斷；前端三顆中文按鈕、文字欄與可見錯誤。依 12.1-13 更新 test_interpret_get_judge_and_audit 的舊值，保留舊結果與用量斷言。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；test_api_interpret 10/10；npm run typecheck exit 0；vitest 4/4 | exit=0 | ms=150000
+- REVIEW_DONE: 自審事件末筆為 InterpretationJudged 時 GET 仍能讀 artifact 並回最後一筆 judgment；無事件表結構變動。
+- BUGHUNT_DONE: 檢查 API judgment、GET、ResultPage 互動與舊測試；無隱藏錯誤。
+- 突變：恢復 `.catch(() => undefined)` 吞錯 → vitest `shows three judgment labels and reports API failure` 紅（alert 缺失）→ 還原綠。
+- 下一步：WC-PIa-19。
+
 ## 2026-09-25（續13）研究線 WC-PIa-17：解讀 prompt 與純函式
 
 - 起因：prompt 未指定中文、未列 ACTIVE 方法，輸出上限 1800，JSON 解析自行重寫，data_thickness 信任模型。
