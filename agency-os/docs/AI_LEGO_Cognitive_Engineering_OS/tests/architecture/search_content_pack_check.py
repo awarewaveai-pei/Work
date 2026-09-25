@@ -25,9 +25,9 @@ the CRITICAL and MAJOR ones directly rather than patching around them:
     enumerate every fenced yaml block by actually parsing it, then classify
     the parsed object -- there is no longer a regex standing between "block
     exists" and "block is checked".
-  - All YAML loads now use the same UniqueKeyLoader tests/run_golden_tests.py
-    already defined for exactly this reason (plain yaml.safe_load lets a
-    duplicate key silently overwrite the first value).
+  - All YAML loads now use the shared tests/strict_yaml.py UniqueKeyLoader
+    (plain yaml.safe_load lets a duplicate key silently overwrite the first
+    value).
   - Baseline hygiene (fence/YAML parsing, /mnt/data and stale-label checks)
     now runs against every markdown file in the pack, including the two
     narrative documents and README, which were previously exempted for no
@@ -47,6 +47,14 @@ import sys
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# tests/ (this file's grandparent) first on sys.path so `from strict_yaml
+# import ...` resolves whether this file is run standalone, `import`ed, or
+# loaded via importlib.util.spec_from_file_location (as run_golden_tests.py's
+# check family 5 does -- none of which reliably puts tests/ on sys.path).
+_TESTS_DIR = os.path.join(ROOT, "tests")
+if _TESTS_DIR not in sys.path:
+    sys.path.insert(0, _TESTS_DIR)
 SC = os.path.join(ROOT, "docs", "architecture", "search-content")
 ADR = os.path.join(ROOT, "docs", "adr", "ADR-021-search-content-boundary-and-ownership.md")
 COMMON = os.path.join(SC, "SEARCH_CONTENT_PACK_COMMON.md")
@@ -82,39 +90,7 @@ def read(p):
     return io.open(p, encoding="utf-8").read()
 
 
-class UniqueKeyLoader(yaml.SafeLoader):
-    """Same duplicate-key guard as tests/run_golden_tests.py's UniqueKeyLoader
-    (PyYAML's safe_load otherwise lets the last of two duplicate keys win with
-    no error, silently discarding data)."""
-
-
-# 2026-09-25: kept identical to tests/run_golden_tests.py's own fix -- both
-# files independently defined the same constructor and both had the same
-# missing-flatten_mapping bug (a `<<: *anchor` merge key crashes the loader
-# with "could not determine a constructor for the tag
-# 'tag:yaml.org,2002:merge'"). See that file's comment for the full
-# explanation of why the duplicate check runs BEFORE flatten_mapping.
-_MERGE_TAG = "tag:yaml.org,2002:merge"
-
-
-def _construct_mapping(loader, node, deep=False):
-    seen = set()
-    for key_node, _value_node in node.value:
-        if key_node.tag == _MERGE_TAG:
-            continue
-        key = loader.construct_object(key_node, deep=deep)
-        if key in seen:
-            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
-        seen.add(key)
-    loader.flatten_mapping(node)
-    mapping = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        mapping[key] = loader.construct_object(value_node, deep=deep)
-    return mapping
-
-
-UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
+from strict_yaml import UniqueKeyLoader  # noqa: E402 -- needs sys.path set up above
 
 
 def load_yaml_text(text):

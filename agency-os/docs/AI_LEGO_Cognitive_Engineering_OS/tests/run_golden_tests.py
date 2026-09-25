@@ -107,45 +107,15 @@ if hasattr(sys.stdout, "reconfigure"):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Own directory (tests/) first on sys.path so `from strict_yaml import ...`
+# resolves regardless of cwd (this file's own directory is normally added by
+# the interpreter when run as `python3 tests/run_golden_tests.py`, but this
+# makes it explicit rather than relying on that).
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
 
-class UniqueKeyLoader(yaml.SafeLoader):
-    """Same duplicate-key guard used throughout this session's ad hoc
-    verification scripts (PyYAML silently lets the last key win otherwise)."""
-
-
-# 2026-09-25: this constructor used to replace PyYAML's own
-# construct_yaml_map entirely, which also dropped its flatten_mapping() call
-# -- so any `<<: *anchor` merge key hit `loader.construct_object(key_node)`
-# with no constructor registered for tag:yaml.org,2002:merge and crashed the
-# whole loader (method-input-forms.yaml:167, dd204ff65). Fixed by doing the
-# duplicate check in two passes around flatten_mapping: first pass walks the
-# UNFLATTENED node and only inspects explicit (non-merge) key nodes, so an
-# explicit key legitimately overriding a merge-supplied value (valid YAML
-# merge-key precedence, not a duplicate) is never flagged; flatten_mapping
-# then expands `<<:` the normal PyYAML way (merged pairs first, explicit
-# pairs appended after -- last-write-wins on the second pass keeps explicit
-# values winning); second pass builds the actual mapping.
-_MERGE_TAG = "tag:yaml.org,2002:merge"
-
-
-def _construct_mapping(loader, node, deep=False):
-    seen = set()
-    for key_node, _value_node in node.value:
-        if key_node.tag == _MERGE_TAG:
-            continue
-        key = loader.construct_object(key_node, deep=deep)
-        if key in seen:
-            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
-        seen.add(key)
-    loader.flatten_mapping(node)
-    mapping = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        mapping[key] = loader.construct_object(value_node, deep=deep)
-    return mapping
-
-
-UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
+from strict_yaml import UniqueKeyLoader, load_strict  # noqa: E402 -- needs sys.path set up above
 
 urllib.parse.uses_relative.append("ai-lego")
 urllib.parse.uses_netloc.append("ai-lego")
@@ -157,8 +127,7 @@ def load(path):
     path = os.path.normpath(path)
     if path in _load_cache:
         return _load_cache[path]
-    with open(path, encoding="utf-8") as f:
-        data = yaml.load(f, Loader=UniqueKeyLoader)
+    data = load_strict(path)
     _load_cache[path] = data
     return data
 
