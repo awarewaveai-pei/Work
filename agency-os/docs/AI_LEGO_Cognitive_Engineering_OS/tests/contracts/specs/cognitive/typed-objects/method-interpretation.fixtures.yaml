@@ -1,0 +1,56 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
+target_ref: ""
+description: "MethodInterpretation required fields, citation, visual kind, and record hash guards."
+valid:
+  - name: minimal_layered_interpretation
+    instance:
+      interpretation_id: "INTERP-2026-09-25-001"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings:
+        - id: "F1"
+          title: "Surface pattern"
+          text: "The repeated event is associated with a release cycle."
+          citations: ["manifest:source-1:0-42"]
+          confidence: {level: mid, reason: "One source and one record pattern."}
+      visual: {kind: layered, bindings: {levels: [{label: "Events", path: "events"}]}}
+      next_methods: ["systems.leverage_point_analysis"]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+invalid:
+  - name: findings_empty
+    instance:
+      interpretation_id: "INTERP-2026-09-25-002"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: []
+      visual: {kind: layered, bindings: {}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 0, output_tokens: 0}
+    reason: "findings requires minItems: 1"
+  - name: invalid_visual_kind
+    instance:
+      interpretation_id: "INTERP-2026-09-25-003"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["m"], confidence: {level: low, reason: "x"}}]
+      visual: {kind: "invented", bindings: {}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 0, output_tokens: 0}
+    reason: "visual.kind is closed to the eight visual primitives"
+  - name: missing_record_hash
+    instance:
+      interpretation_id: "INTERP-2026-09-25-004"
+      method_id: "systems.iceberg_model"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["m"], confidence: {level: low, reason: "x"}}]
+      visual: {kind: table, bindings: {}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 0, output_tokens: 0}
+    reason: "record_sha256 is required for replay binding"

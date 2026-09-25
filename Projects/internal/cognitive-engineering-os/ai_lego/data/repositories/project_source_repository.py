@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS ix_platform_projects_workspace ON platform_projects (tenant_id, workspace_id, created_at, project_id);
 CREATE INDEX IF NOT EXISTS ix_prov_sources_project ON prov_sources (tenant_id, project_id, created_at, source_id);
+CREATE TABLE IF NOT EXISTS project_interpretations (
+    tenant_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    interpretation_id TEXT NOT NULL,
+    artifact_reference_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, interpretation_id),
+    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS ix_project_interpretations_project ON project_interpretations (tenant_id, project_id, created_at);
 """
 
 _PROJECT_COLUMNS = (
@@ -321,3 +331,28 @@ class ProjectSourceRepository:
             event["payload"] = json.loads(event.pop("payload_json"))
             events.append(event)
         return events
+
+    def append_event(self, tenant_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any]) -> None:
+        """Public transactional event seam for project-bound artifacts."""
+        with self._connection() as connection:
+            self._append_event(connection, tenant_id, aggregate_id, event_type, payload)
+
+    def save_interpretation(self, tenant_id: str, project_id: str, interpretation_id: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO project_interpretations (tenant_id, project_id, interpretation_id, artifact_reference_json, created_at) VALUES (?,?,?,?,?)",
+                (tenant_id, project_id, interpretation_id, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
+            )
+            self._append_event(connection, tenant_id, f"project:{project_id}", "InterpretationCreated", {"interpretation_id": interpretation_id, "artifact_reference": dict(artifact_reference)})
+
+    def get_interpretation(self, tenant_id: str, interpretation_id: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT tenant_id, project_id, interpretation_id, artifact_reference_json, created_at FROM project_interpretations WHERE tenant_id=? AND interpretation_id=?",
+                (tenant_id, interpretation_id),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
+        return result

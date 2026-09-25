@@ -86,6 +86,7 @@ from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_work
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
+from ai_lego.modules.research.interpret_method_record import record_sha256, run_interpretation
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -1090,6 +1091,119 @@ def redeem_handoff(code: str, store: IdentityStore = Depends(get_store)) -> Redi
 
 def _domain_error_status(error: InvariantViolation) -> int:
     return 404 if "NOT_FOUND" in str(error) else 400
+
+
+@app.post("/methods/{method_id}/interpret", status_code=202)
+def interpret_method(
+    method_id: str,
+    body: dict[str, Any],
+    response: Response,
+    session: dict[str, Any] = Depends(require_session),
+    catalog: MethodCatalog = Depends(get_catalog),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+    provider: AiProvider | None = Depends(get_ai_provider),
+) -> dict[str, Any]:
+    """Interpret one validated method record and persist the immutable result to a Project."""
+    if not catalog.is_resolvable(method_id):
+        raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
+    project_id = body.get("project_id")
+    if not isinstance(project_id, str) or not project_id:
+        raise HTTPException(status_code=400, detail="PROJECT_ID_REQUIRED: interpretation is project-bound")
+    _project_or_404(repo, session["tenant_id"], project_id)
+    provider = _require_ai(provider, store, session)
+    builder_body = dict(body)
+    builder_body.pop("project_id", None)
+    try:
+        builder = resolve_builder(method_id)
+        gate_runner = resolve_gate_runner(method_id)
+        record_id = f"{record_id_prefix(method_id, required=builder_takes_record_id(builder)) or ''}{secrets.token_hex(8).upper()}"
+        provenance = builder_body.pop("provenance", None) or make_provenance("AI_INFERENCE", "AI_GENERATED")
+        record = invoke_builder(builder, record_id, provenance, builder_body, {"method_catalog": catalog})
+        gate_results = run_gate_runner(gate_runner, record, "api.interpret", datetime.datetime.now(datetime.timezone.utc).isoformat(), {"method_catalog": catalog}, builder_body)
+    except MethodDispatchError as error:
+        raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
+    except InvariantViolation as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if any(not isinstance(gate, dict) or gate.get("status") != "PASS" for gate in gate_results):
+        raise HTTPException(status_code=422, detail={"error": "METHOD_GATES_FAILED", "gate_results": gate_results})
+
+    entry = catalog.require(method_id)
+    contract_path = resolve_spec_root() / entry["path"]
+    contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+    if not isinstance(contract, dict):
+        raise HTTPException(status_code=500, detail="METHOD_CONTRACT_INVALID")
+    try:
+        interpretation_id = f"INTERP-{uuid.uuid4().hex.upper()}"
+        sources = repo.list_sources(session["tenant_id"], project_id)
+        repo.append_event(
+            session["tenant_id"],
+            f"project:{project_id}",
+            "InterpretationRequested",
+            {"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record)},
+        )
+        interpretation, interpretation_gates, input_tokens, output_tokens = run_interpretation(
+            method_id=method_id,
+            contract=contract,
+            display=_method_display_metadata().get(method_id),
+            record=record,
+            sources=sources,
+            provider=provider,
+            spec_root=resolve_spec_root(),
+            schema_contracts=SchemaContracts(resolve_spec_root()),
+            active_method_ids=set(catalog.contracts),
+            interpretation_id=interpretation_id,
+        )
+    except InvariantViolation as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    artifact_reference = artifact_store.put(session["tenant_id"], "MethodInterpretation", interpretation)
+    repo.save_interpretation(
+        session["tenant_id"],
+        project_id,
+        interpretation_id,
+        artifact_reference,
+        datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    )
+    store.record_ai_usage(session["tenant_id"], session["identity_id"], f"interpret:{method_id}", interpretation["model"], input_tokens, output_tokens)
+    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "gate_results": interpretation_gates}
+
+
+@app.get("/interpretations/{interpretation_id}")
+def get_interpretation(
+    interpretation_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    stored = repo.get_interpretation(session["tenant_id"], interpretation_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
+    try:
+        result = artifact_store.read(session["tenant_id"], stored["artifact_reference"])
+    except InvariantViolation as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": stored["project_id"], "result": result}
+
+
+@app.post("/interpretations/{interpretation_id}/judgment")
+def judge_interpretation(
+    interpretation_id: str,
+    body: dict[str, Any],
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, str]:
+    stored = repo.get_interpretation(session["tenant_id"], interpretation_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
+    stance = body.get("stance")
+    if stance not in {"accept", "revise", "reject"}:
+        raise HTTPException(status_code=400, detail="JUDGMENT_STANCE_INVALID")
+    note = body.get("note", "")
+    if not isinstance(note, str):
+        raise HTTPException(status_code=400, detail="JUDGMENT_NOTE_INVALID")
+    repo.append_event(session["tenant_id"], f"project:{stored['project_id']}", "InterpretationJudged", {"interpretation_id": interpretation_id, "stance": stance, "note": note[:2000]})
+    return {"status": "recorded", "stance": stance}
 
 
 # NOTE: `data_classification` values here (Public/Internal/Confidential/Restricted, defined by

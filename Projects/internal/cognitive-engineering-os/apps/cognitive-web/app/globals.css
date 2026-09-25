@@ -1,0 +1,16 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; background: #f7f5ef; color: #1e293b; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+a { color: #155e75; }
+button, input, textarea { font: inherit; }
+button { cursor: pointer; border: 1px solid #155e75; border-radius: 8px; padding: 8px 12px; background: #155e75; color: white; }
+button.secondary { background: white; color: #155e75; }
+.card { background: white; border: 1px solid #d8d4ca; border-radius: 12px; padding: 16px; margin: 12px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.muted { color: #64748b; }
+.error { color: #b91c1c; white-space: pre-wrap; }
+.field { display: grid; gap: 6px; margin: 10px 0; }
+.field input, .field textarea { width: 100%; border: 1px solid #b8b4aa; border-radius: 8px; padding: 8px; }
+.section { background: white; border: 1px solid #d8d4ca; border-radius: 12px; padding: 16px; margin: 12px 0; }
+.how-to { background: #eff6ff; border-left: 4px solid #0284c7; padding: 8px 12px; margin-bottom: 12px; }

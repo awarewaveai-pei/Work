@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
+<meta name="api-prefix" content="">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>認知工程 OS</title>
@@ -297,7 +298,8 @@ function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.
 function pretty(v) { return JSON.stringify(v, null, 2); }
 function familyLabel(fam) { return (fam || '').split('_').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' '); }
 async function api(path, opts) {
-  const r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts || {}));
+  const API_PREFIX = (document.querySelector('meta[name="api-prefix"]') || {}).content || '';
+  const r = await fetch(API_PREFIX + path, Object.assign({ credentials: 'same-origin' }, opts || {}));
   let body = null; try { body = await r.json(); } catch (e) { body = null; }
   return { ok: r.ok, status: r.status, body };
 }

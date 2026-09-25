@@ -27,7 +27,7 @@
     Copied to     -> agency-os/reports/e2e/YYYY-MM-DD/<Mode>/
 
 .PARAMETER Mode
-    One of: smoke | qa | client | screenshot | a11y | perf | all | install
+    One of: smoke | qa | client | screenshot | a11y | perf | cognitive | all | install
 
 .PARAMETER ClientSlug
     Tenant slug (e.g. soulful-expression). Resolves URL from ENVIRONMENT_REGISTRY.md.
@@ -68,7 +68,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('smoke','qa','client','screenshot','a11y','perf','all','install')]
+    [ValidateSet('smoke','qa','client','screenshot','a11y','perf','cognitive','all','install')]
     [string]$Mode = 'smoke',
 
     [string]$ClientSlug  = '',
@@ -92,6 +92,7 @@ $MonoRoot  = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')
 $TestsDir  = Join-Path $MonoRoot 'lobster-factory\infra\hetzner-phase1-core\tests'
 $TenantsDir= Join-Path $MonoRoot 'agency-os\tenants'
 $ArchiveBase = Join-Path $MonoRoot 'agency-os\reports\e2e'
+$CognitiveUserEnv = Join-Path $MonoRoot 'mcp\user-env.ps1'
 
 if (-not $ReportDir) {
     $ReportDir = Join-Path $TestsDir 'playwright-output'
@@ -316,12 +317,25 @@ switch ($Mode) {
         $overallExit = $r.ExitCode
     }
 
+    'cognitive' {
+        if (Test-Path -LiteralPath $CognitiveUserEnv) {
+            . $CognitiveUserEnv
+        }
+        if (-not $env:COS_TEST_TENANT_ID -or -not $env:COS_TEST_EMAIL -or -not $env:COS_TEST_PASSWORD -or -not $env:COS_TEST_PROJECT_ID) {
+            Write-Warn 'COS_TEST_TENANT_ID / COS_TEST_EMAIL / COS_TEST_PASSWORD / COS_TEST_PROJECT_ID not set - cognitive E2E test will skip'
+        }
+        $r = Invoke-PlaywrightProject -Projects @('cognitive') -ExtraEnv @{ PLAYWRIGHT_COS_URL = $BaseUrl }
+        Format-Summary (Read-PlaywrightResults $r.ResultsJson) 'cognitive'
+        $overallExit = $r.ExitCode
+    }
+
     'all' {
         $modes = @(
             @{ Projects = @('smoke','mobile-smoke'); Env = @{} },
             @{ Projects = @('qa');                   Env = @{} },
             @{ Projects = @('a11y');                 Env = @{} },
-            @{ Projects = @('perf');                 Env = @{} }
+            @{ Projects = @('perf');                 Env = @{} },
+            @{ Projects = @('cognitive');            Env = @{ PLAYWRIGHT_COS_URL = $BaseUrl } }
         )
         if ($resolvedClientUrl) {
             $modes += @{ Projects = @('client'); Env = @{ PLAYWRIGHT_CLIENT_URL = $resolvedClientUrl } }

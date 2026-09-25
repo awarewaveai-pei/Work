@@ -10,8 +10,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 PRODUCT_ROOT="$REPO_ROOT/Projects/internal/cognitive-engineering-os"
 COMPOSE_FILE="$PRODUCT_ROOT/docker-compose.yml"
-SERVICE="cognitive-os-api"
-HEALTH_URL="http://127.0.0.1:8420/health"
+SERVICES=(cognitive-os-api cognitive-os-web)
+HEALTH_URLS=("http://127.0.0.1:8420/health" "http://127.0.0.1:8421/login")
+HEALTH_URL="${HEALTH_URLS[0]}"
 SMOKE_URL="https://cognitive.aware-wave.com/health"
 LOG="$PRODUCT_ROOT/deploy/deploy.log"
 SLACK_WEBHOOK="${COGNITIVE_OS_SLACK_WEBHOOK:-}"
@@ -115,18 +116,20 @@ log "test-gate | running pytest for the Phase 1 test files"
 
 # -- Tag the currently-running image as :rollback BEFORE building the new one, so a failed
 #    deploy can restore the last-known-good image (mirrors oracle-web's own rollback recipe). --
-if docker image inspect cognitive-os-api:latest >/dev/null 2>&1; then
-  docker tag cognitive-os-api:latest cognitive-os-api:rollback
-  log "rollback-tag | tagged current cognitive-os-api:latest as :rollback"
-fi
+for service in "${SERVICES[@]}"; do
+  if docker image inspect "$service:latest" >/dev/null 2>&1; then
+    docker tag "$service:latest" "$service:rollback"
+    log "rollback-tag | tagged current $service:latest as :rollback"
+  fi
+done
 
 # -- AI gateway env: docker-compose.yml env_file needs the file to exist even when no key is configured
 #    (short env_file syntax works on every Compose v2; the long `required: false` form needs >= 2.24). --
 touch "$PRODUCT_ROOT/deploy/.env"
 
 # -- 3. Build + up. --
-log "build | docker compose build"
-docker compose -f "$COMPOSE_FILE" build || { log "build | FAIL"; notify "FAILED at build"; exit 1; }
+log "build | docker compose build ${SERVICES[*]}"
+docker compose -f "$COMPOSE_FILE" build "${SERVICES[@]}" || { log "build | FAIL"; notify "FAILED at build"; exit 1; }
 log "up | docker compose up -d"
 docker compose -f "$COMPOSE_FILE" up -d || { log "up | FAIL"; notify "FAILED at docker compose up -d"; exit 1; }
 
@@ -134,40 +137,29 @@ docker compose -f "$COMPOSE_FILE" up -d || { log "up | FAIL"; notify "FAILED at 
 #    120s, comfortably clearing two of compose.yml's 30s healthcheck intervals (Docker's first
 #    probe fires at t=~30s, not t=0) so ordinary cold-start variance doesn't trigger a false
 #    rollback. --
-log "healthcheck | waiting up to 120s for $SERVICE to report healthy"
-elapsed=0
-while true; do
-  status="$(docker inspect --format='{{.State.Health.Status}}' "$SERVICE" 2>/dev/null || echo "unknown")"
-  [[ "$status" == "healthy" ]] && break
-  if [[ "$elapsed" -ge 120 ]]; then
-    log "healthcheck | FAIL | last status=$status"
-    notify "FAILED healthcheck (status=$status) -- rolling back"
-    if docker image inspect cognitive-os-api:rollback >/dev/null 2>&1; then
-      docker tag cognitive-os-api:rollback cognitive-os-api:latest
-      docker compose -f "$COMPOSE_FILE" up -d || { log "rollback | up -d FAILED"; notify "ROLLBACK FAILED: docker compose up -d errored -- service is down, needs human"; exit 1; }
-      rb_elapsed=0
-      while true; do
-        rb_status="$(docker inspect --format='{{.State.Health.Status}}' "$SERVICE" 2>/dev/null || echo "unknown")"
-        [[ "$rb_status" == "healthy" ]] && { log "rollback | restored image is healthy after ${rb_elapsed}s"; notify "rolled back to previous image, confirmed healthy"; break; }
-        if [[ "$rb_elapsed" -ge 30 ]]; then
-          log "rollback | restored image did NOT become healthy (status=$rb_status)"
-          notify "ROLLBACK DID NOT HEAL: restored :rollback image but it is not healthy either (status=$rb_status) -- service may be down, needs human"
-          break
+for index in "${!SERVICES[@]}"; do
+  service="${SERVICES[$index]}"
+  log "healthcheck | waiting up to 120s for $service to report healthy"
+  elapsed=0
+  while true; do
+    status="$(docker inspect --format='{{.State.Health.Status}}' "$service" 2>/dev/null || echo "unknown")"
+    [[ "$status" == "healthy" ]] && break
+    if [[ "$elapsed" -ge 120 ]]; then
+      log "healthcheck | FAIL | service=$service last status=$status"
+      notify "FAILED healthcheck for $service -- rolling back"
+      for rollback_service in "${SERVICES[@]}"; do
+        if docker image inspect "$rollback_service:rollback" >/dev/null 2>&1; then
+          docker tag "$rollback_service:rollback" "$rollback_service:latest"
         fi
-        sleep 3
-        rb_elapsed=$((rb_elapsed + 3))
       done
-    else
-      log "rollback | no :rollback image exists (first deploy) -- stopping the unhealthy container instead of leaving it crash-looping"
-      docker compose -f "$COMPOSE_FILE" down || true
-      notify "first deploy failed healthcheck, no rollback image available -- stopped the service"
+      docker compose -f "$COMPOSE_FILE" up -d || { log "rollback | up -d FAILED"; notify "ROLLBACK FAILED: service is down, needs human"; exit 1; }
+      exit 1
     fi
-    exit 1
-  fi
-  sleep 3
-  elapsed=$((elapsed + 3))
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  log "healthcheck | $service healthy after ${elapsed}s"
 done
-log "healthcheck | healthy after ${elapsed}s"
 
 # -- 5. Smoke test -- local container port first (works even before DNS/nginx are wired up),
 #    then the real public domain if it resolves (skipped, not failed, if it doesn't yet -- DNS
@@ -175,6 +167,9 @@ log "healthcheck | healthy after ${elapsed}s"
 log "smoke | local: curl $HEALTH_URL"
 curl -sf "$HEALTH_URL" | grep -q '"status":"ok"' || { log "smoke | local FAIL"; notify "FAILED local smoke test"; exit 1; }
 log "smoke | local: PASS"
+log "smoke | local: curl ${HEALTH_URLS[1]}"
+curl -sf "${HEALTH_URLS[1]}" >/dev/null || { log "smoke | web local FAIL"; notify "FAILED web local smoke test"; exit 1; }
+log "smoke | web local: PASS"
 
 if getent hosts cognitive.aware-wave.com >/dev/null 2>&1; then
   log "smoke | public: curl $SMOKE_URL"

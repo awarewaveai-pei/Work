@@ -1,0 +1,32 @@
+$id: "ai-lego://capabilities/contracts/interpret.method_record.capability.yaml"
+title: "interpret.method_record -- Project-bound AI interpretation of a validated method record"
+status: ACTIVE
+description: >
+  Context-bound capability for the dedicated interpretation endpoint. It is
+  not a Recipe node and is never registered in the pure Recipe capability
+  adapters. The server re-runs the method builder and gates, constructs a
+  prompt manifest from the record's leaf paths and Project Sources, then
+  stores a MethodInterpretation artifact with citation and resolvability gates.
+  Runtime is POST /methods/{id}/interpret (202) plus GET /interpretations/{id}.
+source_of_truth_for:
+  - "RESEARCH_LINES_MASTER_PLAN.md §3.4-C10 and WC-PIa-02"
+decided_by: "PI-a WC-PIa-02: context-bound interpretation capability"
+id: interpret.method_record
+version: "1.0.0"
+input:
+  type: [MethodInvokeKwargs]
+output:
+  type: [MethodInterpretation]
+preconditions:
+  - "kwargs pass the target method builder and gates"
+  - "Project Sources are available for the prompt manifest"
+  - "provider configured, otherwise 503"
+  - "daily AI token budget has not been exceeded"
+quality:
+  provenance_required: true
+  method_specific_gate_required: true
+security:
+  external_ai: policy_controlled
+rollback:
+  side_effect_free_preferred: false
+  artifact_is_immutable: true

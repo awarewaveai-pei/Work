@@ -8,6 +8,7 @@ const BASE_URL  = process.env.PLAYWRIGHT_BASE_URL  || 'https://app.aware-wave.co
 const API_URL   = process.env.PLAYWRIGHT_API_URL   || 'https://api.aware-wave.com';
 const N8N_URL   = process.env.PLAYWRIGHT_N8N_URL   || 'https://n8n.aware-wave.com';
 const CLIENT_URL = process.env.PLAYWRIGHT_CLIENT_URL || '';
+const COGNITIVE_URL = process.env.PLAYWRIGHT_COS_URL || 'http://127.0.0.1:8421';
 
 // Screenshot output dir — runner passes this; tests import from env.ts helper
 const SCREENSHOTS_DIR = process.env.PLAYWRIGHT_SCREENSHOTS_DIR ||
@@ -90,6 +91,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: BASE_URL,
+      },
+    },
+    {
+      name: 'cognitive',
+      testMatch: '**/cognitive/**/*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: COGNITIVE_URL,
       },
     },
     // ── Mobile smoke: same smoke suite on a Pixel 5 viewport ─────────────
