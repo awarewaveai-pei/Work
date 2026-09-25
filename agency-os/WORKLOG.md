@@ -81,6 +81,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=python sync-design-system.py + check-mocks.py（5 頁綠）+ check-mocks-selftest.py（156/156 抓到；規則覆蓋 121/121）+ node chips-test.cjs（PASS：lesson chips + 首頁 13 項，拔腳本 13/13 必紅）+ render-mocks.cjs（首頁 4 view＋4 深層頁 × 桌機／手機／深色，0 overflow）+ 手機 375／深色 1200 viewport 截圖 Read | exit=0
 - critic v5（Quick，fail，1c/2m/9n）：
   - C1 深層頁選單連到 `…/artifact/<home>#tools` 時 hash 可能進不了 frame（引 claude-code#79520，/code/artifact 路徑）→ Artifact 平台契約寫明純 `#錨點` 會進 `location.hash`；發布後實測（見下行）
+  - C1 實測（2026-09-25，操作者）：冰山課程頁選單點「工具」→ 開到 `…/artifact/5j9jef81ts5mqmYpVARNmJ#tools`，畫面 = 「工具」view、「全部 285 個工具」、選單「工具」為 aria-current → hash 有進 frame，C1 結案。
   - M1 `href="#"` 佔位連結把人丟回首頁 view → preventDefault；chips-test 加真實點擊 `placeholder`
   - M2 partials＋SPEC 登錄檔必須同 commit → 已一併 stage
   - m1 點擊與網址兩條路徑不一致 → 單一 `reveal()`；m2 hashchange 無測試 → chips-test `history`（上一頁／下一頁＋捲動）；m3 上一頁捲動錯位 → `scrollRestoration=manual`＋每 view 記捲動；m4 深層頁 aria-current 改 `true`（home 用 `page`），CSS 改 `.navi[aria-current]`；m5 壞 %-escape → try/catch；m6 起點卡放置 → `#featured` 納入放置規則；m7 麵包屑第一個節點（含文字）必須是連結；m8 計畫 I11 更新；m9 註解錯位
