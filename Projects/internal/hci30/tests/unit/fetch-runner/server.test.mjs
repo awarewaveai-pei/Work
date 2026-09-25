@@ -33,6 +33,21 @@ process.env.HCI_FETCH_RUNNER_PORT = '0';
 // touches real MinIO, so it opts out of that startup check rather than
 // fabricating 4 more dummy values with no real meaning.
 process.env.HCI_FETCH_RUNNER_SKIP_MINIO_STARTUP_CHECK = '1';
+// job-store-full (TASKS.md:691) HTTP-layer tests below hit the real
+// POST /enqueue route (the only public entry point to server.mjs's internal
+// `jobs` store, which is not exported), so they can't inject
+// waitForReadyImpl the way every processJob(...) test above does. Set a
+// small cap so filling it takes only 2 jobs, and a short network-guard-ready
+// timeout so those real jobs reach a terminal ('failed') status in ~200-
+// 400ms instead of the real default's up to 30s (the ready-file this polls
+// for, /var/run/network-guard/ready, does not exist in a plain test/sandbox
+// run) -- keeps this file fast and lets `server.close()` in test.after below
+// drain cleanly instead of leaving 2 open sockets/timers past the test.
+// Every OTHER test in this file calls processJob(...) directly with its own
+// injected waitForReadyImpl, so it never reaches this code path or the
+// `jobs` store at all -- these two env vars change nothing for them.
+process.env.HCI_FETCH_RUNNER_JOB_MAX = '2';
+process.env.HCI_FETCH_RUNNER_NETWORK_GUARD_READY_TIMEOUT_MS = '250';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -51,6 +66,47 @@ test.after(() => new Promise((resolve) => server.close(resolve)));
 
 function makeJob(overrides = {}) {
   return { id: 'test-job-id', targetUrl: 'https://example.com/', status: 'queued', ...overrides };
+}
+
+// ---- HTTP-layer helpers for the job-store-full tests below ----
+async function serverUrl(path) {
+  if (!server.listening) {
+    await new Promise((resolve) => server.once('listening', resolve));
+  }
+  return `http://127.0.0.1:${server.address().port}${path}`;
+}
+
+async function enqueue(targetUrl) {
+  const res = await fetch(await serverUrl('/enqueue'), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: 'Bearer test-secret-for-processjob-unit-tests',
+    },
+    body: JSON.stringify({ targetUrl, subject_kind: 'ORGANIZATION' }),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+async function getJobStatus(id) {
+  const res = await fetch(await serverUrl(`/status/${id}`), {
+    headers: { authorization: 'Bearer test-secret-for-processjob-unit-tests' },
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+// Polls until the real (non-injected) processJob path started by /enqueue
+// reaches a terminal status -- see the HCI_FETCH_RUNNER_NETWORK_GUARD_READY_
+// TIMEOUT_MS=250 comment above for why this resolves quickly instead of
+// hanging on a real outbound fetch.
+async function waitForTerminal(id, maxMs = 5000) {
+  const deadline = Date.now() + maxMs;
+  for (;;) {
+    const { body } = await getJobStatus(id);
+    if (body.status !== 'queued' && body.status !== 'fetching') return body;
+    if (Date.now() >= deadline) throw new Error(`job ${id} did not reach a terminal status within ${maxMs}ms (stuck at ${body.status})`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
 }
 
 const noopWaitForReady = async () => {};
@@ -375,4 +431,42 @@ test('readStoredSnapshotText: an object-storage failure propagates (the route ma
     () => readStoredSnapshotText({ snapshotRef: snap.snapshotRef, contentHash: snap.contentHash }, { getObjectImpl: async () => { throw new Error('object storage request failed: HTTP 404'); } }),
     /HTTP 404/,
   );
+});
+
+// ---- POST /enqueue: job store at capacity (TASKS.md:691, job-store.mjs's
+// set() returning false when every slot holds an in-flight job) ----
+test('POST /enqueue: 503 job_store_full once every slot (HCI_FETCH_RUNNER_JOB_MAX=2 above) holds a running job', async () => {
+  const r1 = await enqueue('https://example.com/job-store-full-1');
+  const r2 = await enqueue('https://example.com/job-store-full-2');
+  assert.equal(r1.status, 202);
+  assert.equal(r2.status, 202);
+  assert.equal(r1.body.status, 'queued');
+  assert.equal(r2.body.status, 'queued');
+
+  const r3 = await enqueue('https://example.com/job-store-full-3');
+  assert.equal(r3.status, 503);
+  assert.equal(r3.body.error, 'job_store_full');
+
+  // Drain both filler jobs to a terminal status before the next test (and
+  // before test.after's server.close()) instead of leaving them in flight.
+  await Promise.all([waitForTerminal(r1.body.id), waitForTerminal(r2.body.id)]);
+});
+
+test('POST /enqueue: a freed slot (job reached a terminal status) can be enqueued into again', async () => {
+  const r1 = await enqueue('https://example.com/job-store-reopen-1');
+  const r2 = await enqueue('https://example.com/job-store-reopen-2');
+  assert.equal(r1.status, 202);
+  assert.equal(r2.status, 202);
+
+  // Let one filler job finish (network-guard-ready timeout, ~250ms) so it no
+  // longer counts as in-flight and job-store.mjs's set() can evict it to
+  // make room, per its own evictOldestFinished() -- it does not wait for TTL.
+  const finished = await waitForTerminal(r1.body.id);
+  assert.equal(finished.status, 'failed');
+
+  const r3 = await enqueue('https://example.com/job-store-reopen-3');
+  assert.equal(r3.status, 202, `expected the original success status once a slot freed up, got ${r3.status}: ${JSON.stringify(r3.body)}`);
+  assert.equal(r3.body.status, 'queued');
+
+  await Promise.all([waitForTerminal(r2.body.id), waitForTerminal(r3.body.id)]);
 });

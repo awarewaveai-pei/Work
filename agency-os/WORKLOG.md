@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-25（續10）雲端 T13／T14／T15 驗收後併入 main：kill switch 失效關閉＋取最嚴格、SPEC 防重複鍵 loader 單一模組、fetch-runner 503 伺服器測試
+- [來源] 雲端 session（Sonnet 5）：`claude/cc-t13-killswitch-fail-closed`、`claude/cc-t14-strict-yaml-module`、`claude/cc-t15-fetch-runner-503-test`；額度 $48 起算。
+- [T13 資安] `lib/command-plane/killSwitch.ts`：DB 錯誤回 `"unavailable"`（`ModeLookup`），只有 `FAIL_OPEN_FOR`（空）內的等級放行 → 一律擋；client／global 取最嚴格（emergency_stop > maintenance > read_only > normal）；`types.ts` 加型別；兩條 `it.fails` 轉 `it`＋表格／unavailable 案例。本機修（critic）：未知或 null mode 原本仍 fail open（`MODE_STRICTNESS[undefined]`）→ `getActiveMode` 遇不認得的 mode 回 unavailable、`evaluateKillSwitch` 改 switch＋never 預設擋下；commandRouter 的 unavailable 測試原本 mock 掉 kill switch（刪掉修法照樣過）→ 改用 `vi.importActual` 的真函式＋失敗的 system_modes 讀取。runbook（en／zh-TW）寫明新行為。未部署（上線走 sg-deploy，另行決定）。
+- [T14] `SPEC/tests/strict_yaml.py` 取代兩份複製的 UniqueKeyLoader；補抓 inline `<<` 內重複、重複 `<<`；巢狀 merge 鏈不誤報。本機修 M1：`test_strict_yaml.py` 沒接進任何執行路徑（只有手動跑）→ 加 `TESTS` 清單，golden 以 `run_strict_yaml_tests()` 併入，取代 T0 的 2 案 `run_unique_key_loader_merge_key_semantics`（同一 owner）。mockkit.py 第三份歸 session d24dcd，未動。
+- [T14 本機修（critic）] 巢狀 merge 鏈測試原本用 `v: 2` 碰不到 memo（拿掉 memo 照樣過）→ 改 `w: 2`（與 z 的 w 衝突）並斷言 `{"w": 2}`；memo 由 `id(node)` 改存 node 物件（`load_all` 多文件時被釋放的 id 會重用）。
+- [T15] `server.test.mjs` +2：全部格子進行中 → 503 job_store_full；有 job 結束後可再 enqueue。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 0；vitest lib/command-plane 98/98；突變 error 分支回 normal → 2 紅 → 還原綠；vitest lib/command-plane 101/101；突變：拿掉未知 mode 防護 → 2 紅、unavailable 分支放行 → killSwitch 多案＋commandRouter 1 紅、拿掉 memo → nested 紅，皆還原綠；golden PASSED 4163（含 test_strict_yaml）；突變拿掉 flatten_mapping → golden FAILED 4 → 還原綠；search_content_pack_check 直跑 1606/0；node --test fetch-runner 97/97 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/4n（T13 merge；T14 fix first：nested 測試沒測到 memo、test_strict_yaml 沒人跑——都已修；m 另一＝repair-center 同款失效開放 → TASKS；n：未知 mode fail open、router 測試 mock 掉、id 重用 已修；DB 錯誤未上報 → TASKS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects | grep=DEFAULT_MAPPING_TAG|getActiveMode | hits=getActiveMode 8（程式 5＋runbook 2＋COMPLETE_REFERENCE 1，文件描述仍正確、runbook 補新行為）；DEFAULT_MAPPING_TAG 2（mockkit.py 歸 d24dcd＋WORKLOG；SPEC 只剩 strict_yaml.py）
 ## 2026-09-25（續9）研究線示意稿：每個工具有自己的一頁（285 頁，登錄檔產生）＋五頁「看起來能點就有作用」＋工具名統一用登錄檔；計畫 v1.37 U1
 
 - 起因（操作者 2026-09-25）：工具清單「都沒有連結，只是文字」；檢查時另發現五頁共約 45 個手寫假按鈕（`span.btn`、`href="#"`）與產生器吐出的每個「開始」，點了都沒反應。

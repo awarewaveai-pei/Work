@@ -51,7 +51,7 @@ Migration: `lobster-factory/packages/db/migrations/0025_always_on_command_plane.
 | Table | Purpose | Notes |
 |---|---|---|
 | `command_requests` | Ingress layer; one row per external event | unique `(source, source_event_id)` enforces idempotency |
-| `system_modes` | Global + per-scope kill switch | seed row scope=`global`, mode=`normal` is created on migration |
+| `system_modes` | Global + per-scope kill switch -- the most restrictive of the org's client row and the global row applies (emergency_stop > maintenance > read_only > normal); if the table cannot be read or holds a mode the code does not know, every command is blocked with `system_modes unreadable (fail closed)` (only risk levels listed in `FAIL_OPEN_FOR`, `lib/command-plane/killSwitch.ts`, would pass; it is empty) | seed row scope=`global`, mode=`normal` is created on migration |
 | `workflow_runs.command_request_id` | Backref for Phase 2 dispatched runs | nullable; legacy runs unaffected |
 | `workflow_runs.idempotency_key` | Optional dedupe key for Phase 2 dispatch | nullable; unique-where-not-null |
 | `error_events.source_type` | DLQ via existing table | values: `command_ingress_failed`, `command_dispatch_failed`, `command_handler_failed`, `telegram_auth_failed` |
@@ -186,7 +186,7 @@ Data store: `organizations.metadata.client_config` + `organizations.metadata.wp_
 
 ### 10.2 Telegram — `/client_status`
 
-Risk: **low** (read-only). Available from Telegram at any time, any kill-switch mode except `emergency_stop`.
+Risk: **low** (read-only). Available from Telegram at any time, any kill-switch mode except `emergency_stop` (and not while `system_modes` is unreadable -- fail closed).
 
 ```
 /client_status              # all clients — compact summary table

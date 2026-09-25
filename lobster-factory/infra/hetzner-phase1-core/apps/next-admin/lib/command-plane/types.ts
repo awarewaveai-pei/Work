@@ -27,6 +27,10 @@ export type CommandStatus =
 
 export type SystemMode = "normal" | "maintenance" | "read_only" | "emergency_stop";
 
+// "unavailable" is never persisted -- it is what getActiveMode returns when
+// system_modes could not be read, so evaluateKillSwitch can fail closed on it.
+export type ModeLookup = SystemMode | "unavailable";
+
 export interface NormalizedCommand {
   source: CommandSource;
   sourceEventId: string;

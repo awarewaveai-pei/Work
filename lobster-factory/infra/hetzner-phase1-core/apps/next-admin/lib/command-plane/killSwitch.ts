@@ -2,48 +2,82 @@
 // Modifications must go through ops console SSO (never via command plane).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { RiskLevel, SystemMode } from "./types";
+import type { ModeLookup, RiskLevel, SystemMode } from "./types";
 
-const FAIL_OPEN_FOR = new Set<RiskLevel>([]); // No risk level fails open.
+// Exported (not just module-private) so tests can inject a fail-open risk level without a real DB.
+export const FAIL_OPEN_FOR = new Set<RiskLevel>([]); // Empty: nothing fails open, including while system_modes is unreadable.
 
 export interface KillSwitchDecision {
-  mode: SystemMode;
+  mode: ModeLookup;
   blocks: boolean;
   reason?: string;
 }
 
+// emergency_stop > maintenance > read_only > normal. maintenance outranks
+// read_only because FAIL_OPEN_FOR is empty: maintenance blocks every risk
+// level while read_only only blocks non-low.
+const MODE_STRICTNESS: Record<SystemMode, number> = {
+  normal: 0,
+  read_only: 1,
+  maintenance: 2,
+  emergency_stop: 3,
+};
+
+function stricterOf(a: SystemMode, b: SystemMode): SystemMode {
+  return MODE_STRICTNESS[b] > MODE_STRICTNESS[a] ? b : a;
+}
+
 /**
- * Returns the most-restrictive active mode for the given org (org → global).
- * Defaults to 'normal' when DB unreachable for low-risk reads only;
- * medium/high/critical commands fail closed.
+ * Returns the most-restrictive of the client-scoped and global-scoped rows
+ * for this org. No rows at all -> 'normal' (no mode configured is legal).
+ * A DB error -> 'unavailable', so the caller fails closed rather than
+ * silently treating an unreadable table as 'normal'.
  */
 export async function getActiveMode(
   client: SupabaseClient,
   organizationId: string,
-): Promise<SystemMode> {
+): Promise<ModeLookup> {
   const { data, error } = await client
     .from("system_modes")
     .select("scope_type, scope_id, mode")
     .or(
       `and(scope_type.eq.client,scope_id.eq.${organizationId}),and(scope_type.eq.global,scope_id.is.null)`,
     );
-  if (error || !data || data.length === 0) {
+  if (error || !data) {
+    return "unavailable";
+  }
+  if (data.length === 0) {
     return "normal";
   }
-  // Prefer scope='client' over 'global'.
-  const scoped = data.find((r) => r.scope_type === "client");
-  return ((scoped ?? data[0]).mode as SystemMode) ?? "normal";
+  // A mode this code does not know (null, or a value a future migration added before SystemMode
+  // was updated) cannot be ranked -- treat the table as unreadable rather than as 'normal'.
+  if (data.some((row) => typeof row.mode !== "string" || !Object.prototype.hasOwnProperty.call(MODE_STRICTNESS, row.mode))) {
+    return "unavailable";
+  }
+  return data.reduce<SystemMode>(
+    (strictest, row) => stricterOf(strictest, row.mode as SystemMode),
+    "normal",
+  );
 }
 
-export function evaluateKillSwitch(mode: SystemMode, riskLevel: RiskLevel): KillSwitchDecision {
-  if (mode === "emergency_stop") {
-    return { mode, blocks: true, reason: "system in emergency_stop" };
+export function evaluateKillSwitch(mode: ModeLookup, riskLevel: RiskLevel): KillSwitchDecision {
+  switch (mode) {
+    case "unavailable":
+      return FAIL_OPEN_FOR.has(riskLevel)
+        ? { mode, blocks: false }
+        : { mode, blocks: true, reason: "system_modes unreadable (fail closed)" };
+    case "emergency_stop":
+      return { mode, blocks: true, reason: "system in emergency_stop" };
+    case "maintenance":
+      return FAIL_OPEN_FOR.has(riskLevel) ? { mode, blocks: false } : { mode, blocks: true, reason: "system in maintenance" };
+    case "read_only":
+      return riskLevel === "low" ? { mode, blocks: false } : { mode, blocks: true, reason: "system in read_only" };
+    case "normal":
+      return { mode, blocks: false };
+    default: {
+      // Unreachable by type; at runtime a mode string nobody added here blocks instead of passing.
+      const unknown: never = mode;
+      return { mode: unknown, blocks: true, reason: `unknown mode ${String(unknown)} (fail closed)` };
+    }
   }
-  if (mode === "maintenance" && !FAIL_OPEN_FOR.has(riskLevel)) {
-    return { mode, blocks: true, reason: "system in maintenance" };
-  }
-  if (mode === "read_only" && riskLevel !== "low") {
-    return { mode, blocks: true, reason: "system in read_only" };
-  }
-  return { mode, blocks: false };
 }

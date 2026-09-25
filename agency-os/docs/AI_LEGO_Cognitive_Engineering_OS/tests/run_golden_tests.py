@@ -107,45 +107,15 @@ if hasattr(sys.stdout, "reconfigure"):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Own directory (tests/) first on sys.path so `from strict_yaml import ...`
+# resolves regardless of cwd (this file's own directory is normally added by
+# the interpreter when run as `python3 tests/run_golden_tests.py`, but this
+# makes it explicit rather than relying on that).
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
 
-class UniqueKeyLoader(yaml.SafeLoader):
-    """Same duplicate-key guard used throughout this session's ad hoc
-    verification scripts (PyYAML silently lets the last key win otherwise)."""
-
-
-# 2026-09-25: this constructor used to replace PyYAML's own
-# construct_yaml_map entirely, which also dropped its flatten_mapping() call
-# -- so any `<<: *anchor` merge key hit `loader.construct_object(key_node)`
-# with no constructor registered for tag:yaml.org,2002:merge and crashed the
-# whole loader (method-input-forms.yaml:167, dd204ff65). Fixed by doing the
-# duplicate check in two passes around flatten_mapping: first pass walks the
-# UNFLATTENED node and only inspects explicit (non-merge) key nodes, so an
-# explicit key legitimately overriding a merge-supplied value (valid YAML
-# merge-key precedence, not a duplicate) is never flagged; flatten_mapping
-# then expands `<<:` the normal PyYAML way (merged pairs first, explicit
-# pairs appended after -- last-write-wins on the second pass keeps explicit
-# values winning); second pass builds the actual mapping.
-_MERGE_TAG = "tag:yaml.org,2002:merge"
-
-
-def _construct_mapping(loader, node, deep=False):
-    seen = set()
-    for key_node, _value_node in node.value:
-        if key_node.tag == _MERGE_TAG:
-            continue
-        key = loader.construct_object(key_node, deep=deep)
-        if key in seen:
-            raise ValueError(f"Duplicate key {key!r} at line {key_node.start_mark.line + 1}")
-        seen.add(key)
-    loader.flatten_mapping(node)
-    mapping = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        mapping[key] = loader.construct_object(value_node, deep=deep)
-    return mapping
-
-
-UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
+from strict_yaml import UniqueKeyLoader, load_strict  # noqa: E402 -- needs sys.path set up above
 
 urllib.parse.uses_relative.append("ai-lego")
 urllib.parse.uses_netloc.append("ai-lego")
@@ -157,8 +127,7 @@ def load(path):
     path = os.path.normpath(path)
     if path in _load_cache:
         return _load_cache[path]
-    with open(path, encoding="utf-8") as f:
-        data = yaml.load(f, Loader=UniqueKeyLoader)
+    data = load_strict(path)
     _load_cache[path] = data
     return data
 
@@ -196,42 +165,26 @@ def check(cond, msg):
 #    that same convention rather than adding a second test framework for one
 #    function.
 # ---------------------------------------------------------------------------
-def run_unique_key_loader_merge_key_semantics():
-    # An explicit key overriding a merge-supplied value is legal YAML
-    # (merge-key precedence), not a duplicate -- must load cleanly, and the
-    # explicit value must win.
-    merge_override_yaml = """
-base: &base
-  a: 1
-  b: 2
-child:
-  <<: *base
-  b: 3
-"""
+def run_strict_yaml_tests():
+    # The loader's own tests live in tests/test_strict_yaml.py (one owner); folded in here so every
+    # golden run exercises them -- a test file nobody runs protects nothing.
+    global passed
+    import importlib.util
+    spec_path = os.path.join(ROOT, "tests", "test_strict_yaml.py")
     try:
-        data = yaml.load(merge_override_yaml, Loader=UniqueKeyLoader)
-    except Exception as e:  # noqa: BLE001 -- pre-fix this was yaml.constructor.ConstructorError
-        check(False, f"merge-key loader regression: a `<<: *anchor` merge key must expand without raising, got {type(e).__name__}: {e}")
-    else:
-        check(
-            isinstance(data, dict) and data.get("child") == {"a": 1, "b": 3},
-            f"merge-key loader regression: explicit key override should win (b: 3), got {data.get('child') if isinstance(data, dict) else data!r}",
-        )
-
-    # Two literal duplicate EXPLICIT keys in the same mapping (no merge
-    # involved) must still be rejected -- the guard this loader exists for.
-    duplicate_explicit_yaml = "a: 1\na: 2\n"
-    try:
-        yaml.load(duplicate_explicit_yaml, Loader=UniqueKeyLoader)
-    except ValueError as e:
-        check("Duplicate key" in str(e), f"merge-key loader regression: expected a Duplicate key ValueError, got {e!r}")
-    else:
-        check(False, "merge-key loader regression: two literal duplicate explicit keys must raise ValueError, but none was raised")
+        spec = importlib.util.spec_from_file_location("test_strict_yaml", spec_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        for test in mod.TESTS:
+            test()
+    except Exception as e:  # noqa: BLE001 -- a crash must not hide the other families' results
+        failures.append(f"test_strict_yaml: CRASHED -- {type(e).__name__}: {e}")
+        return
+    passed += mod.passed
+    for f in mod.failures:
+        failures.append(f"test_strict_yaml.{f}")
 
 
-# ---------------------------------------------------------------------------
-# 1. Schema conformance via tests/contracts/**/*.fixtures.yaml
-# ---------------------------------------------------------------------------
 def run_schema_conformance():
     # Searches all of tests/ (not just tests/contracts/) so the same fixture
     # mechanism also drives tests/governance/ai-execution/**/golden scenario
@@ -727,7 +680,7 @@ def run_contract_backlog_registration_parity():
 
 
 if __name__ == "__main__":
-    run_unique_key_loader_merge_key_semantics()
+    run_strict_yaml_tests()
     run_schema_conformance()
     run_recipe_instance_conformance()
     run_method_contract_conformance()

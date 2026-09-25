@@ -51,7 +51,7 @@ Migration：`lobster-factory/packages/db/migrations/0025_always_on_command_plane
 | Table | 目的 | 備註 |
 |---|---|---|
 | `command_requests` | Ingress layer；每個外部事件一 row | unique `(source, source_event_id)` 強制 idempotency |
-| `system_modes` | Global + per-scope kill switch | migration 會建立 seed row：scope=`global`、mode=`normal` |
+| `system_modes` | Global + per-scope kill switch——該 org 的 client 列與 global 列取最嚴格者（emergency_stop > maintenance > read_only > normal）；表讀不到或出現程式不認得的 mode → 所有指令擋下，原因 `system_modes unreadable (fail closed)`（只有 `lib/command-plane/killSwitch.ts` 的 `FAIL_OPEN_FOR` 列出的風險等級會放行，目前為空） | migration 會建立 seed row：scope=`global`、mode=`normal` |
 | `workflow_runs.command_request_id` | Phase 2 dispatched runs 的 backref | nullable；legacy runs 不受影響 |
 | `workflow_runs.idempotency_key` | Phase 2 dispatch 的可選 dedupe key | nullable；unique-where-not-null |
 | `error_events.source_type` | 透過既有 table 做 DLQ | values：`command_ingress_failed`、`command_dispatch_failed`、`command_handler_failed`、`telegram_auth_failed` |
@@ -186,7 +186,7 @@ Data store：`organizations.metadata.client_config` + `organizations.metadata.wp
 
 ### 10.2 Telegram — `/client_status`
 
-Risk：**low**（read-only）。可隨時從 Telegram 使用；除了 `emergency_stop` 以外，任何 kill-switch mode 都可用。
+Risk：**low**（read-only）。可隨時從 Telegram 使用；除了 `emergency_stop` 以外，任何 kill-switch mode 都可用（`system_modes` 讀不到時也會被擋下——fail closed）。
 
 ```
 /client_status              # all clients — compact summary table
