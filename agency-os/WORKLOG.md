@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-25（續4）研究線計畫 v1.33：§0 進度板寫出真阻塞（golden 紅 → T12）＋§12.1 規則 11 每卡只跑影響範圍測試、全套移到期末閘
+
+- 根因：§0 寫「阻塞：無／下一步 WC-PIa-01」，實際 golden 紅 3 條（3 個 ACTIVE 工具缺 schema＋CLI slice，續2）擋住每張 PI-a 卡的共同前置；§12.3 共同前置要求每卡跑 COS 全套 unit（14,159 個，本機 24–34 分鐘；雲端 T1 就是卡在這裡），操作者 2026-09-25 問為何每卡都跑全套。
+- 改：§0 三行（現在卡＝未開卡＋雲端 T1–T6／本機 08、10、12、13、14 的分工；阻塞＝golden 紅→T12；下一步＝相依順序）；§12.1 新規則 11（golden＋本卡新測試＋`tests/unit` 裡 import 改動模組的測試檔，一條 grep 選取指令；只改 SPEC 資料的卡不跑 unit；間接依賴的紅由期末閘全套抓）；§12.3 共同前置拿掉全套；WC-PIa-14 加「全套綠一次」。本機卡 08／10／12／13 維持本機（fork 確認：要本機瀏覽器、帳密、docker）。
+- 卡片 `file:line` 抽查（產卡後這些檔未被改動，`git log --since=2026-09-23T12:00` 只有 NA package.json +4 行）：`capability-contract.schema.yaml:550` required、`main.py:758` invoke、`main.py:834` demo、`draft.py:153` extract_json_object、`repo:167` _append_event／`:312` list_events、`dashboard.html:299` api()、`deploy.sh:105` import 清單、NA package.json next ^15.2.4／react ^19／typescript ^5.7／vitest ^2.1.9——全部仍對。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd COS && grep -rlE "apps\.api\.main|apps\.api import main" tests/unit --include="test_*.py"（再用 sed 轉成模組名）→ 5 個模組（test_ai_gateway、test_api_main、test_custom_workflow_api、test_method_form、test_project_source_api） | exit=0 | ms=300
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n
+  - 讀回 diff；1n = 規則 11 例子原寫「選到 9 檔」（未加 `--include`），實跑為 5，已改。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,.claude/commands | grep=WC-PIa-01 未開工|unittest discover -s tests -t . -q | hits=5
+  - 5 行皆預期：WORKLOG 4 行 = 歷史 REALTEST 證據；計畫 1 行 = WC-PIa-14 期末閘的全套（本次新增）；計畫檔外無進度板副本；`agency-os/TASKS.md:120` 只指向計畫（「下一步 PI-a」仍正確）。
+- 下一步：T12 合併 → golden 綠 → 雲端 T1–T6；本機卡照 §0 相依順序。
 ## 2026-09-25（續3）研究線示意稿：mockkit 防重複鍵 loader 接受 YAML 合併鍵（golden runner 同一 bug 的第三份拷貝）＋selftest 加「合法變體必過」
 
 - 根因：`COS/docs/mockups/mockkit.py:49-59`（HEAD）覆寫 `SafeLoader.construct_mapping`，查重複鍵時對 `<<:` 鍵也呼叫 `construct_object` → 無 merge 建構子 → `ConstructorError`；跟 golden runner（40366864a，`SPEC/tests/run_golden_tests.py:131-146`）同一 bug，fork session 的 critic 重現後通報。目前示意稿讀的登錄檔都沒用 `<<:`，屬潛伏 bug。

@@ -2,15 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.32（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.33（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-a**（§12.3）／**WC-PIa-01 未開工**
+- 現在期／卡：**PI-a**（§12.3）／**未開卡**：共同前置 golden 紅（見阻塞）；雲端提示已備 T1–T6 = WC-PIa-03、01＋02、09、04＋05、06＋07、11；本機卡 = 08、10、12、13、14（要本機瀏覽器／帳密／docker）
 - 已完成：P0 碼完成 `19f00f9aa`（2026-09-23，未部署，隨 PI-b 同窗）；PI-a 0/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）
-- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.32（2026-09-25）
-- 阻塞／待操作者：無（§9 待拍板：無）
-- 下一步：WC-PIa-01（typed object schema）；執行模型 Sonnet 5／Codex 皆可
+- 最後一筆程式碼 commit：`19f00f9aa` P0；最後一筆計畫版本：v1.33（2026-09-25）
+- 阻塞：golden runner 紅 3 條 = 3 個 ACTIVE 工具缺 typed-object schema＋CLI slice（`decision.eisenhower_matrix`、`divergent.reverse_brainstorming`、`strategy.lean_canvas`；`agency-os/TASKS.md` 同名項）→ 雲端 T12 補齊並登記後轉綠；待操作者：無（§9 待拍板：無）
+- 下一步：T12 合併 → golden 綠 → 雲端 T1–T3（03、01＋02、09）→ T4–T6（04＋05、06＋07、11）；本機 08 隨時、10／13 在 09 之後、12 在 11 之後；期末閘 14 本機。執行模型 Sonnet 5／Codex
 
 | 項 | 狀態（2026-09-24） |
 |---|---|
@@ -335,12 +335,13 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 8. **期末閘** = 每期最後一張卡：全期驗收指令重跑、§6 該期突變全做、§0／TASKS／WORKLOG 更新；過了才開下一期。下一期的卡由期末閘執行者依 12.5 產生，操作者看卡放行。
 9. **模型分工**：執行卡 = Sonnet 5／Codex；產卡與期末閘審 = Opus 5.5 或 Fable（一期一次，不逐卡）；純資料卡（YAML／範例／課文）= Haiku 4.5 可。
 10. **UI 卡加驗**：任何動到 `web/` 或 `COS/docs/mockups/` 的卡，驗收多一條 `python COS/docs/mockups/check-mocks.py` 綠（新殼落地後同一檢查器指向 `web/app/globals.css` 與頁面）；設計規則只准以「檢查器規則＋五頁同改」落地，不准只改操作者正在看的那一頁。
+11. **測試範圍**（2026-09-25：COS 全套 14,159 個測試本機 24–34 分鐘，每卡各跑一次太慢）：每卡跑 golden ＋ 本卡新測試 ＋ `tests/unit` 裡 import 本卡改動模組的測試檔——`cd COS && python -m unittest <本卡新測試模組> $(grep -rlE "<型樣>" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q` 綠；型樣 = 每個改動模組寫兩種 import 形式，多個用 `|` 接（例：改 `ai_lego/apps/api/main.py` → `apps\.api\.main|apps\.api import main`，選到 5 檔，含 `test_api_main` 約 3.5 分鐘，照跑）；只改 SPEC 資料／schema 的卡不跑 unit。間接依賴造成的紅由期末閘的全套抓，在期末閘修，不回頭改已合併卡的驗收。
 
 ### 12.2 卡片格式（缺一欄 = 無效卡，不得執行）
 `WC-<期>-<序>`｜目標（一句）｜前置（指令＋預期）｜讀（`file:line`）｜樣板（照抄哪個 `file:line`）｜改（新／改檔案清單）｜不改｜驗收（指令＋預期輸出，逐條）｜突變（拔什麼 → 哪個測試紅）｜commit 訊息骨架｜回滾。
 
 ### 12.3 PI-a 工作卡（解讀層＋新殼第一片；全本機，無 prod）
-**共同前置**（每卡先跑）：`cd Projects/internal/cognitive-engineering-os && python -m unittest discover -s tests -t . -q` 綠；在 repo root `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` 綠；`git log --oneline -5` 看過。路徑縮寫見檔頭；`web` = `COS/apps/cognitive-web`。
+**共同前置**（每卡先跑）：在 repo root `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` 綠；`git log --oneline -5` 看過。unit 測試照 §12.1 規則 11（每卡只跑影響範圍，全套在期末閘）。路徑縮寫見檔頭；`web` = `COS/apps/cognitive-web`。
 
 **WC-PIa-01 解讀 typed object schema**
 - 目標：`MethodInterpretation`（C10）成為 spec root 的正式 typed object。
@@ -436,7 +437,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 回滾：compose 刪 web 服務；deploy.sh 陣列退回單服務。
 - commit：`build(cognitive-os): web Dockerfile + compose service + deploy.sh multi-service loop`。
 
-**WC-PIa-14 期末閘**：WC-01…13 驗收指令全部重跑一遍貼輸出；§6 PI-a 四個突變；`/codex-review` PY 與 TS 各一份 `agency-os/reports/oracle/` artifact；WORKLOG 四行；§0 改「PI-a 完（commit 清單）」；`agency-os/TASKS.md` 研究線一列；確認 12.4 前置後才開 PI-b。
+**WC-PIa-14 期末閘**：COS 全套 `python -m unittest discover -s tests -t . -q` 綠一次（§12.1 規則 11）；WC-01…13 驗收指令全部重跑一遍貼輸出；§6 PI-a 四個突變；`/codex-review` PY 與 TS 各一份 `agency-os/reports/oracle/` artifact；WORKLOG 四行；§0 改「PI-a 完（commit 清單）」；`agency-os/TASKS.md` 研究線一列；確認 12.4 前置後才開 PI-b。
 
 ### 12.4 PI-b 工作卡（prod；每張 **High-STOP**，逐張 go-ahead）
 **WC-PIb-01 nginx 分流**：`ssh -p 58122 ks-aw-01`（AGENTS §0）→ 只走 `/root/lobster-phase1/scripts/safe-infra-patch.sh nginx`；把 `hetzner-phase1-core/nginx/default.conf:427-450` 區塊的 `location /` 改三段：`location /api/ { … proxy_pass http://cognitive-os-api:8420/; }`（尾斜線 = 去前綴）、`location /expert/ { … proxy_pass http://cognitive-os-api:8420/; }`、`location / { … proxy_pass http://cognitive-os-web:3000; }`；`limit_req`、五個 `proxy_set_header`、`$is_trusted_source`、timeout 逐段照抄不動。repo 內 `default.conf` 同 commit 改（對照用）。驗收：`curl -s https://cognitive.aware-wave.com/api/health` 含 `"status":"ok"`；`curl -s https://cognitive.aware-wave.com/expert/ | grep -c api-prefix` = 1；`curl -sI https://cognitive.aware-wave.com/` 200 且是 web。回滾：safe-infra-patch 自動還原。
