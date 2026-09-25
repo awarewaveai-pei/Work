@@ -28,9 +28,9 @@ class FakeInterpretProvider:
     def complete(self, system: str, user: str, *, max_tokens: int) -> AiCompletion:
         self.calls += 1
         if "decision.eisenhower_matrix" in user:
-            text = '{"visual":{"bindings":{"items":"record.tasks","x":"record.tasks.0.urgency","y":"record.tasks.0.importance","x_threshold":"record.urgency_threshold","y_threshold":"record.importance_threshold"}},"findings":[{"id":"F1","title":"Priority task","text":"One task is urgent and important.","citations":["record.tasks.0.urgency"],"confidence":{"level":"mid","reason":"one classified task"}}],"next_methods":[]}'
+            text = '{"visual":{"bindings":{"items":"r/tasks","x":"r/tasks/0/urgency","y":"r/tasks/0/importance","x_threshold":"r/urgency_threshold","y_threshold":"r/importance_threshold"}},"findings":[{"id":"F1","title":"Priority task","text":"One task is urgent and important.","citations":["r/tasks/0/urgency"],"confidence":{"level":"mid","reason":"one classified task"}}],"next_methods":[]}'
         else:
-            text = '{"visual":{"bindings":{"levels":[{"label":"Events","path":"record.events.0"}]}},"findings":[{"id":"F1","title":"Recurring event","text":"Release incidents recur.","citations":["record.events.0"],"confidence":{"level":"mid","reason":"one observed event"}}],"next_methods":["systems.leverage_point_analysis"]}'
+            text = '{"visual":{"bindings":{"levels":[{"label":"r/events/0","path":"r/events/0"}]}},"findings":[{"id":"F1","title":"Recurring event","text":"Release incidents recur.","citations":["r/events/0"],"confidence":{"level":"mid","reason":"one observed event"}}],"next_methods":["systems.leverage_point_analysis"]}'
         return AiCompletion(
             text=text,
             model=self.model,
@@ -127,6 +127,15 @@ class InterpretApiTests(ApiTestCase):
             })
         self.assertEqual(response.status_code, 422, response.text)
         self.assertEqual(self.provider.calls, 0)
+
+    def test_not_applicable_gate_is_accepted(self):
+        with patch("ai_lego.apps.api.main.run_gate_runner", return_value=[{"gate_id": "optional", "status": "NOT_APPLICABLE"}]), patch("ai_lego.apps.api.main._launch_interpretation"):
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={
+                "project_id": self.project_id, "events": ["release incidents"], "patterns": ["weekly spike"],
+                "structures": [], "mental_models": [], "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
+            })
+        self.assertEqual(response.status_code, 202, response.text)
+        self.assertEqual(response.json()["status"], "PENDING")
 
     def test_unconfigured_provider_returns_503(self):
         api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: None

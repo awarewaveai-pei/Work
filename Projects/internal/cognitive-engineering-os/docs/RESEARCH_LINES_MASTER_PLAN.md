@@ -2,15 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.38（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.39（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-a 修正中，WC-PIa-15 已完成自審，下一張 WC-PIa-16**；14R 仍須 Claude oracle artifact。**PI-b 不得開始**。
-- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 初版 14/14 期末驗收退回；修正卡 1/7 完成；PI-b 0/5。
-- 最後一筆 PI-a 程式碼：WC-PIa-15 本次 commit（hash 見 git log）；計畫版本 v1.38（2026-09-25）。
+- 現在期／卡：**PI-a 修正中，WC-PIa-16 本次提交，下一張 WC-PIa-17**；14R 仍須 Claude oracle artifact。**PI-b 不得開始**。
+- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 初版 14/14 期末驗收退回；修正卡 2/7 完成；PI-b 0/5。
+- 最後一筆 PI-a 程式碼：WC-PIa-15 `a3dc37a14`；WC-PIa-16 本次 commit（hash 見 git log）；計畫版本 v1.39（2026-09-25）。
 - 阻塞：無（WC-PIa-15 操作者准許自審後 commit；§7 R24 原 oracle 失敗保留紀錄）。14R 的 oracle 要求沒有豁免。
-- 下一步：WC-PIa-16→17→18→19→21→20→14R；不得跳卡。
+- 下一步：WC-PIa-17→18→19→21→20→14R；不得跳卡。
 
 | 項 | 狀態（2026-09-24） |
 |---|---|
@@ -472,7 +472,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 前置：WC-PIa-15 已合併。
 - 讀：`main.py:668`；`interpret_method_record.py:24-57`、`:109-142`。
 - 樣板：`main.py:668`。
-- 改：method gates 的狀態不在 `{"PASS","NOT_APPLICABLE"}` 才 422；manifest id 改成 `r/<path>`（`/` 分隔，陣列索引用數字），並排除頂層 id／version／provenance／generated_by_method；visual 綁定裡**每個**字串葉值都必須在 manifest ids 裡（不再看前綴）。`web/fixtures/iceberg-interpretation.json` 跟著改成 `r/` id。
+- 改：method gates 的狀態不在 `{"PASS","NOT_APPLICABLE"}` 才 422；manifest id 改成 `r/<path>`（`/` 分隔，陣列索引用數字），並排除頂層 id／version／provenance／generated_by_method；visual 綁定裡**每個**字串葉值都必須在 manifest ids 裡（不再看前綴）。`web/fixtures/iceberg-interpretation.json` 跟著改成 `r/` id。依 12.1-13 更新 `test_interpret_method_record.py` 的 `test_nested_leaf_path_exists`、`test_manifest_contains_record_and_project_sources`、`test_citation_out_of_manifest_fails`、`test_visual_binding_out_of_record_fails`、`test_next_method_out_of_catalog_fails`、`test_bad_json_then_repair_passes`、`test_schema_failure_after_repair_is_refused`，以及 `test_api_interpret.py` 的 FakeInterpretProvider 路徑測試資料；舊斷言保留。
 - 不改：method gate 模組本身。
 - 驗收：新增 `test_not_applicable_gate_is_accepted`（patch 成 NOT_APPLICABLE → 202）、`test_bare_binding_path_fails`、`test_manifest_excludes_system_keys`；兩個解讀測試模組全綠。
 - 突變：visual 閘改回看前綴 → `test_bare_binding_path_fails` 紅。

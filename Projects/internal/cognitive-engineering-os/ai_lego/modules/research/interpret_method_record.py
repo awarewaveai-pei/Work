@@ -21,19 +21,19 @@ def record_sha256(record: Mapping[str, Any]) -> str:
     return hashlib.sha256(canonical_json(dict(record)).encode("utf-8")).hexdigest()
 
 
-def record_leaf_paths(value: Any, prefix: str = "record") -> set[str]:
+def record_leaf_paths(value: Any, prefix: str = "r") -> set[str]:
     if isinstance(value, Mapping):
         # Keep both collection nodes and scalar leaves. A visual such as a
         # quadrant binds its item collection (``record.tasks``), while a
         # citation normally points at a scalar (``record.tasks.0.urgency``).
         paths: set[str] = {prefix}
         for key, child in value.items():
-            paths |= record_leaf_paths(child, f"{prefix}.{key}")
+            paths |= record_leaf_paths(child, f"{prefix}/{key}")
         return paths
     if isinstance(value, list):
         paths: set[str] = {prefix}
         for index, child in enumerate(value):
-            paths |= record_leaf_paths(child, f"{prefix}.{index}")
+            paths |= record_leaf_paths(child, f"{prefix}/{index}")
         return paths
     return {prefix}
 
@@ -41,12 +41,13 @@ def record_leaf_paths(value: Any, prefix: str = "record") -> set[str]:
 def build_prompt_manifest(record: Mapping[str, Any], sources: list[Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
     def value_at(path: str) -> Any:
         current: Any = record
-        for component in path.removeprefix("record.").split(".") if path != "record" else []:
+        for component in path.removeprefix("r/").split("/") if path != "r" else []:
             current = current[int(component)] if isinstance(current, list) else current[component]
         return current
 
     manifest = []
-    for path in sorted(record_leaf_paths(record)):
+    included = {key: value for key, value in record.items() if key not in {"id", "version", "provenance", "generated_by_method"}}
+    for path in sorted(record_leaf_paths(included)):
         value = value_at(path)
         rendered = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         manifest.append({"id": path, "kind": "record", "path": path, "value": rendered[:400], "sha256": record_sha256(record)})
@@ -79,7 +80,7 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "method_id": method_id, "purpose": contract.get("purpose"), "description": contract.get("description"),
         "display": display or {}, "visual_kind": kind, "record": record, "prompt_manifest": manifest,
         "recommended_next": contract.get("recommended_next") or [],
-        "output_shape": {"findings": [{"id": "F1", "title": "", "text": "", "citations": ["record.foo"], "confidence": {"level": "mid", "reason": ""}}], "visual": {"kind": kind, "bindings": {}}, "next_methods": contract.get("recommended_next") or [], "next_steps": [], "data_thickness": {}, "recommendations": [], "gaps": []},
+        "output_shape": {"findings": [{"id": "F1", "title": "", "text": "", "citations": ["r/foo"], "confidence": {"level": "mid", "reason": ""}}], "visual": {"kind": kind, "bindings": {}}, "next_methods": contract.get("recommended_next") or [], "next_steps": [], "data_thickness": {}, "recommendations": [], "gaps": []},
     }, ensure_ascii=False)
     return system, user
 
@@ -113,14 +114,13 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
     bindings = interpretation.get("visual", {}).get("bindings", {}) if isinstance(interpretation.get("visual"), Mapping) else {}
     binding_paths: list[str] = []
     def collect(value: Any) -> None:
-        if isinstance(value, str) and (value.startswith("record") or value.startswith("source:")): binding_paths.append(value)
+        if isinstance(value, str): binding_paths.append(value)
         elif isinstance(value, Mapping):
             for child in value.values(): collect(child)
         elif isinstance(value, list):
             for child in value: collect(child)
     collect(bindings)
-    leaf_paths = record_leaf_paths(record)
-    visual_ok = all(path in leaf_paths or path in manifest_ids for path in binding_paths)
+    visual_ok = all(path in manifest_ids for path in binding_paths)
     next_methods = interpretation.get("next_methods", [])
     next_steps = interpretation.get("next_steps", [])
     next_ok = isinstance(next_methods, list) and all(isinstance(method_id, str) and method_id in active_method_ids for method_id in next_methods)

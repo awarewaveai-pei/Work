@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-25（續12）研究線 WC-PIa-16：閘門語意與 manifest 綁定
+
+- 起因：NOT_APPLICABLE 被誤拒；視覺綁定只驗帶前綴的值，可繞過；record 路徑格式未符合 r/<path>。
+- 改：method gate 接受 PASS／NOT_APPLICABLE；manifest 改 r/ 路徑並排除四個系統頂層欄位；視覺每個字串葉值均須命中 manifest；fixture 與守舊路徑的測試同步換值，斷言保留；新增三項驗收測試。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；python -m unittest tests.unit.test_interpret_method_record tests.unit.test_api_interpret -q → 21/21 | exit=0 | ms=30000
+- REVIEW_DONE: 自審 schema 要求 layered levels 的 label 必填，故 fixture 與 FakeProvider 使用合法 manifest ID，避免文字 label 繞過綁定閘門。
+- BUGHUNT_DONE: 檢查所有 manifest/citation/binding 測試與 API fake provider 的舊路徑；未改 method gate 模組。
+- 突變：綁定改回只看 r/ 前綴 → test_bare_binding_path_fails 紅（PASS!=FAIL）→ 還原後綠。
+- 下一步：WC-PIa-17。
+
 ## 2026-09-25（續11）研究線 WC-PIa-15：非同步解讀與失敗用量記錄
 
 - 起因：PI-a 驗收 C1/C2；同步端點與失敗後遺失模型用量違反新契約。R22/R23 操作者准許更新四個只守舊契約的測試。

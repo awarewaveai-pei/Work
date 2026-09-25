@@ -1174,7 +1174,7 @@ def interpret_method(
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
     except InvariantViolation as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    if any(not isinstance(gate, dict) or gate.get("status") != "PASS" for gate in gate_results):
+    if any(not isinstance(gate, dict) or gate.get("status") not in {"PASS", "NOT_APPLICABLE"} for gate in gate_results):
         raise HTTPException(status_code=422, detail={"error": "METHOD_GATES_FAILED", "gate_results": gate_results})
     provider = _require_ai(provider, store, session)
 

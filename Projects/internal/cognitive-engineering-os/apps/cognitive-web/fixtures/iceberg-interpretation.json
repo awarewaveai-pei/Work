@@ -4,12 +4,12 @@
   "record_sha256": "a3f5f4c5a2c6f9c3d5a1e6f8b7c4d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5",
   "visual": {
     "kind": "layered",
-    "bindings": {"levels": [{"label": "Events", "path": "record.events.0"}]},
+    "bindings": {"levels": [{"label": "r/events/0", "path": "r/events/0"}]},
     "payload": {"event": "release incidents"}
   },
-  "findings": [{"id": "finding-1", "title": "Visible event", "text": "Release incidents are recurring.", "citations": ["record.events.0"], "confidence": {"level": "medium", "reason": "fixture"}}],
+  "findings": [{"id": "finding-1", "title": "Visible event", "text": "Release incidents are recurring.", "citations": ["r/events/0"], "confidence": {"level": "medium", "reason": "fixture"}}],
   "summary": "The visible event indicates a deeper recurring system pattern.",
-  "recommendations": [{"action": "Map the reinforcing structure", "citations": ["record.events.0"]}],
+  "recommendations": [{"action": "Map the reinforcing structure", "citations": ["r/events/0"]}],
   "next_methods": ["systems.leverage_point_analysis"],
   "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": null},
   "model": "fixture",
