@@ -27,7 +27,7 @@ class FakeInterpretProvider:
 
     def complete(self, system: str, user: str, *, max_tokens: int) -> AiCompletion:
         self.calls += 1
-        if "decision.eisenhower_matrix" in user:
+        if "METHOD: decision.eisenhower_matrix" in user:
             text = '{"visual":{"bindings":{"items":"r/tasks","x":"r/tasks/0/urgency","y":"r/tasks/0/importance","x_threshold":"r/urgency_threshold","y_threshold":"r/importance_threshold"}},"findings":[{"id":"F1","title":"Priority task","text":"One task is urgent and important.","citations":["r/tasks/0/urgency"],"confidence":{"level":"mid","reason":"one classified task"}}],"next_methods":[]}'
         else:
             text = '{"visual":{"bindings":{"levels":[{"label":"r/events/0","path":"r/events/0"}]}},"findings":[{"id":"F1","title":"Recurring event","text":"Release incidents recur.","citations":["r/events/0"],"confidence":{"level":"mid","reason":"one observed event"}}],"next_methods":["systems.leverage_point_analysis"]}'

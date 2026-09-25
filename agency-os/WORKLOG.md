@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-25（續13）研究線 WC-PIa-17：解讀 prompt 與純函式
+
+- 起因：prompt 未指定中文、未列 ACTIVE 方法，輸出上限 1800，JSON 解析自行重寫，data_thickness 信任模型。
+- 改：按 WC-04 段落組 prompt，預設 zh-TW，ACTIVE `id — name_zh`、record schema、manifest 與規則；上限 6000；重用 draft.extract_json_object；新增 prefill_map 與伺服器端 data_thickness；API worker 載入 metadata、schema。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；python -m unittest tests.unit.test_interpret_method_record tests.unit.test_api_interpret -q → 23/23 | exit=0 | ms=180000
+- REVIEW_DONE: 自審 FakeProvider 不能再只搜尋方法 id（catalog 含所有 id），改搜尋 METHOD 標頭；資料厚度由 manifest 決定。
+- BUGHUNT_DONE: 檢查 draft 共用 extractor、schema lookup、ACTIVE catalog 與 prompt fake provider；未改 draft.py。
+- 突變：刪 zh-TW 語言規則 → test_prompt_language_catalog_and_token_budget 紅（找不到 zh-TW）→ 還原綠。
+- 下一步：WC-PIa-18。
+
 ## 2026-09-25（續12）研究線 WC-PIa-16：閘門語意與 manifest 綁定
 
 - 起因：NOT_APPLICABLE 被誤拒；視覺綁定只驗帶前綴的值，可繞過；record 路徑格式未符合 r/<path>。

@@ -61,7 +61,7 @@ import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import MethodDispatchError, builder_takes_record_id, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner, run_gate_runner
-from ai_lego.apps.api.method_form import describe_method_form, load_forms
+from ai_lego.apps.api.method_form import TYPED_OBJECTS, describe_method_form, load_forms, record_schema_name
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import read_json
@@ -1106,11 +1106,18 @@ def _run_interpretation(
     with _ai_budget_lock_for(tenant_id):
         try:
             _require_ai(provider, store, session)
+            display_metadata = _method_display_metadata()
+            spec_root = resolve_spec_root()
+            contract_text = (spec_root / catalog.require(method_id)["path"]).read_text(encoding="utf-8")
+            schema_name = record_schema_name(spec_root, method_id, contract, contract_text)
+            schema_path = spec_root / TYPED_OBJECTS / schema_name if schema_name else None
             outcome = run_interpretation(
                 method_id=method_id, contract=contract, display=display, record=record,
-                sources=sources, provider=provider, spec_root=resolve_spec_root(),
-                schema_contracts=SchemaContracts(resolve_spec_root()),
-                active_method_ids=set(catalog.contracts), interpretation_id=interpretation_id,
+                sources=sources, provider=provider, spec_root=spec_root,
+                schema_contracts=SchemaContracts(spec_root),
+                active_method_ids={key for key in catalog.contracts if catalog.is_resolvable(key)}, interpretation_id=interpretation_id,
+                catalog_lines=[f"{key} — {display_metadata.get(key, {}).get('name_zh', key)}" for key in sorted(catalog.contracts) if catalog.is_resolvable(key)],
+                record_schema_text=schema_path.read_text(encoding="utf-8") if schema_path and schema_path.exists() else "",
             )
             error = outcome["error"]
         except HTTPException as failure:

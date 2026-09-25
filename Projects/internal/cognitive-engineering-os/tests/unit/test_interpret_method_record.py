@@ -10,6 +10,7 @@ from ai_lego.core.support import canonical_json
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.interpret_method_record import (
     build_prompt_manifest,
+    prefill_map,
     evaluate_interpretation_gates,
     record_leaf_paths,
     record_sha256,
@@ -38,14 +39,27 @@ class FakeProvider:
     def __init__(self, responses: list[str]):
         self.responses = responses
         self.calls = 0
+        self.requests: list[tuple[str, str, int]] = []
 
     def complete(self, system: str, user: str, *, max_tokens: int) -> AiCompletion:
+        self.requests.append((system, user, max_tokens))
         text = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
         return AiCompletion(text=text, model=self.model, input_tokens=10, output_tokens=20)
 
 
 class InterpretationTests(unittest.TestCase):
+    def test_prompt_language_catalog_and_token_budget(self):
+        provider = FakeProvider([valid_response()])
+        run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={"name_zh": "冰山模型"}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-PROMPT-001", catalog_lines=["systems.iceberg_model — 冰山模型"])
+        self.assertIn("zh-TW", provider.requests[0][1])
+        self.assertIn("systems.iceberg_model — 冰山模型", provider.requests[0][1])
+        self.assertEqual(provider.requests[0][2], 6000)
+
+    def test_prefill_map_same_name_and_missing(self):
+        prefill, needs_input = prefill_map({"properties": {"patterns": {"type": "array"}, "missing": {"type": "string"}}}, build_prompt_manifest(RECORD))
+        self.assertEqual(prefill, {"patterns": "r/patterns"})
+        self.assertEqual(needs_input, ["missing"])
     def test_record_hash_is_canonical(self):
         self.assertEqual(record_sha256({"b": 2, "a": 1}), record_sha256({"a": 1, "b": 2}))
 

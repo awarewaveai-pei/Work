@@ -12,9 +12,12 @@ import yaml
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import canonical_json
 from ai_lego.errors import InvariantViolation
+from ai_lego.platform.ai_gateway.draft import extract_json_object
 
 INTERPRETATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
 _VISUAL_KINDS = {"layered", "quadrant", "table", "matrix", "graph", "tree", "timeline", "scorecard"}
+INTERPRET_MAX_TOKENS = 6000
+MAX_SCHEMA_CHARS = 12000
 
 
 def record_sha256(record: Mapping[str, Any]) -> str:
@@ -74,28 +77,51 @@ def visual_kind(spec_root: Path, method_id: str, contract: Mapping[str, Any]) ->
     return kind
 
 
-def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], manifest: list[Mapping[str, Any]], kind: str) -> tuple[str, str]:
-    system = "You interpret a validated Cognitive Engineering method record. Reply with exactly one JSON object, no markdown. Do not invent facts, coordinates, scores, or sources. Every finding citation must be one manifest id. Every next_methods id must be active."
-    user = json.dumps({
-        "method_id": method_id, "purpose": contract.get("purpose"), "description": contract.get("description"),
-        "display": display or {}, "visual_kind": kind, "record": record, "prompt_manifest": manifest,
-        "recommended_next": contract.get("recommended_next") or [],
-        "output_shape": {"findings": [{"id": "F1", "title": "", "text": "", "citations": ["r/foo"], "confidence": {"level": "mid", "reason": ""}}], "visual": {"kind": kind, "bindings": {}}, "next_methods": contract.get("recommended_next") or [], "next_steps": [], "data_thickness": {}, "recommendations": [], "gaps": []},
-    }, ensure_ascii=False)
-    return system, user
+def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], manifest: list[Mapping[str, Any]], kind: str, *, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "") -> tuple[str, str]:
+    system = "You interpret a validated Cognitive Engineering method record. Reply with exactly one JSON object, no markdown. Do not invent facts, coordinates, scores, or sources."
+    lines = [
+        f"METHOD: {method_id} — {(display or {}).get('name_zh', '')} / {(display or {}).get('name_en', '')}",
+        f"BLURB / WHY: {(display or {}).get('blurb_zh', '')} / {(display or {}).get('why', '')}",
+        "CONTRACT: " + json.dumps({key: contract.get(key) for key in ("purpose", "inputs", "outputs", "preconditions", "recommended_next")}, ensure_ascii=False),
+        "RECORD SCHEMA: " + record_schema_text[:MAX_SCHEMA_CHARS],
+        "MANIFEST:\n" + "\n".join(f"[{item['id']}] {item.get('value', '')}" for item in manifest if item.get("kind") == "record"),
+        "SOURCES:\n" + "\n".join(str(item["id"]) for item in manifest if item.get("kind") == "project_source"),
+        "AVAILABLE ACTIVE METHODS:\n" + "\n".join(catalog_lines or []),
+        "OUTPUT JSON SHAPE: " + json.dumps({"findings": [{"id": "F1", "title": "", "text": "", "citations": ["r/foo"], "confidence": {"level": "mid", "reason": ""}}], "visual": {"kind": kind, "bindings": {}}, "next_methods": [], "next_steps": [], "recommendations": [], "gaps": [], "revision_conditions": []}, ensure_ascii=False),
+        f"RULES: Write all narrative in {language}. Citations and every visual binding string must be a manifest id. next_methods may only use AVAILABLE ACTIVE METHODS ids. Never invent numbers or sources.",
+    ]
+    return system, "\n\n".join(lines)
 
 
-def parse_interpretation(text: str) -> dict[str, Any]:
-    start = text.find("{")
-    if start < 0:
-        raise InvariantViolation("INTERPRET_NOT_JSON")
-    try:
-        value, _ = json.JSONDecoder().raw_decode(text[start:])
-    except json.JSONDecodeError as error:
-        raise InvariantViolation(f"INTERPRET_NOT_JSON: {error.msg}") from None
-    if not isinstance(value, dict):
-        raise InvariantViolation("INTERPRET_OBJECT_REQUIRED")
-    return value
+def prefill_map(target_record_schema: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> tuple[dict[str, str], list[str]]:
+    """Map same-named top-level fields to known manifest ids; report every unmatched field."""
+    properties = target_record_schema.get("properties", {})
+    if not isinstance(properties, Mapping):
+        return {}, []
+    ids = {str(item.get("id")) for item in manifest}
+    prefill: dict[str, str] = {}
+    needs_input: list[str] = []
+    for field in properties:
+        candidate = f"r/{field}"
+        if candidate in ids:
+            prefill[str(field)] = candidate
+        else:
+            needs_input.append(str(field))
+    return prefill, needs_input
+
+
+def data_thickness_from_manifest(manifest: list[Mapping[str, Any]]) -> dict[str, Any]:
+    units: dict[str, dict[str, int]] = {}
+    source_count = sum(item.get("kind") == "project_source" for item in manifest)
+    for item in manifest:
+        identifier = str(item.get("id", ""))
+        if item.get("kind") != "record" or not identifier.startswith("r/"):
+            continue
+        unit = identifier.split("/")[1]
+        units.setdefault(unit, {"own_statements": 0, "external_sources": source_count})
+        if not any(other.get("kind") == "record" and str(other.get("id", "")).startswith(identifier + "/") for other in manifest):
+            units[unit]["own_statements"] += 1
+    return units
 
 
 def _citation_ids(interpretation: Mapping[str, Any]) -> list[str]:
@@ -146,25 +172,25 @@ def validate_interpretation(schema_contracts: SchemaContracts, interpretation: M
     schema_contracts.validate(INTERPRETATION_SCHEMA, dict(interpretation), "MethodInterpretation")
 
 
-def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str) -> dict[str, Any]:
+def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "") -> dict[str, Any]:
     kind = visual_kind(spec_root, method_id, contract)
     manifest = build_prompt_manifest(record, sources)
-    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind)
+    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind, language=language, catalog_lines=catalog_lines, record_schema_text=record_schema_text)
     total_input = total_output = 0
     previous_error = ""
     gates: list[dict[str, Any]] = []
     for attempt in range(2):
         retry_user = user if not previous_error else user + "\n\nPrevious response was refused. Correct exactly this failure: " + previous_error
         try:
-            completion = provider.complete(system, retry_user, max_tokens=1800)
+            completion = provider.complete(system, retry_user, max_tokens=INTERPRET_MAX_TOKENS)
         except InvariantViolation as error:
             return {"interpretation": None, "gate_results": gates, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}
         total_input += completion.input_tokens
         total_output += completion.output_tokens
         try:
-            interpretation = parse_interpretation(completion.text)
+            interpretation = extract_json_object(completion.text)
             supplied_visual = interpretation.get("visual") if isinstance(interpretation.get("visual"), Mapping) else {}
-            interpretation.update({"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record), "visual": {**supplied_visual, "kind": kind}, "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}, "model": completion.model, "usage": {"input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens}})
+            interpretation.update({"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record), "visual": {**supplied_visual, "kind": kind}, "data_thickness": data_thickness_from_manifest(manifest), "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}, "model": completion.model, "usage": {"input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens}})
             gates = evaluate_interpretation_gates(interpretation, record, manifest, active_method_ids)
             if any(g["status"] != "PASS" for g in gates):
                 raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(g["gate_id"] for g in gates if g["status"] != "PASS"))
