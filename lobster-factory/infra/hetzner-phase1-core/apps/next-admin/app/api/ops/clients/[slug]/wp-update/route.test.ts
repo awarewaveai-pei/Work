@@ -109,3 +109,26 @@ describe("POST /api/ops/clients/[slug]/wp-update -- system-mode gate", () => {
     expect(checkProductionChangeAllowed).toHaveBeenCalledWith(expect.anything(), ORG_ROW.id);
   });
 });
+
+// WpUpdateButtons.tsx (line ~58) calls this route as
+// `POST .../wp-update?wave=${wave}` with NO body -- the route used to only read a JSON body, so
+// request.json() on the empty body threw and every click was a 400 "Invalid JSON". Query now wins
+// when present; the body read only happens as a fallback.
+describe("POST /api/ops/clients/[slug]/wp-update -- wave from query parameter (button fix)", () => {
+  function postQuery(wave: string | null) {
+    const url = `http://localhost/api/ops/clients/acme/wp-update${wave !== null ? `?wave=${wave}` : ""}`;
+    const request = new Request(url, { method: "POST" }); // no body -- exactly what WpUpdateButtons.tsx sends
+    return POST(request as unknown as NextRequest, { params: Promise.resolve({ slug: "acme" }) });
+  }
+
+  it("?wave=wave1 with no body is not a 400 (reaches the gate/SSH path, same as a JSON-body call)", async () => {
+    const res = await postQuery("wave1");
+    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
+  });
+
+  it("no query and no body: 400 (both are missing, same as before)", async () => {
+    const res = await postQuery(null);
+    expect(res.status).toBe(400);
+  });
+});

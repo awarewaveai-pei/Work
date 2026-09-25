@@ -157,14 +157,23 @@ export async function POST(
 
   const { slug } = await params;
 
-  let body: { wave?: string };
-  try {
-    body = (await request.json()) as { wave?: string };
-  } catch {
-    return new Response("Invalid JSON", { status: 400 });
+  // WpUpdateButtons.tsx sends the wave as a query param and no body at all --
+  // query wins when present, so the JSON-body path (the route's original contract,
+  // kept for any other caller) is only read as a fallback, and an empty body there
+  // is not an error (just no wave, which fails validation below the same as before).
+  let wave: string | undefined = new URL(request.url).searchParams.get("wave") ?? undefined;
+  if (!wave) {
+    const raw = await request.text();
+    if (raw) {
+      let body: { wave?: string };
+      try {
+        body = JSON.parse(raw) as { wave?: string };
+      } catch {
+        return new Response("Invalid JSON", { status: 400 });
+      }
+      wave = body.wave;
+    }
   }
-
-  const wave = body.wave;
   if (wave !== "wave1" && wave !== "wave2" && wave !== "wave3") {
     return new Response("wave must be wave1 | wave2 | wave3", { status: 400 });
   }
