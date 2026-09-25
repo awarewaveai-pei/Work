@@ -259,6 +259,7 @@ if ($Mode -eq 'install') {
 Install-PlaywrightDeps
 
 $resolvedClientUrl = Resolve-ClientUrl
+$cognitiveUrl = if ($env:PLAYWRIGHT_COS_URL) { $env:PLAYWRIGHT_COS_URL } else { 'http://127.0.0.1:8421' }
 $overallExit = 0
 
 switch ($Mode) {
@@ -321,10 +322,10 @@ switch ($Mode) {
         if (Test-Path -LiteralPath $CognitiveUserEnv) {
             . $CognitiveUserEnv
         }
-        if (-not $env:COS_TEST_TENANT_ID -or -not $env:COS_TEST_EMAIL -or -not $env:COS_TEST_PASSWORD -or -not $env:COS_TEST_PROJECT_ID) {
-            Write-Warn 'COS_TEST_TENANT_ID / COS_TEST_EMAIL / COS_TEST_PASSWORD / COS_TEST_PROJECT_ID not set - cognitive E2E test will skip'
+        if ($env:COS_TEST_MOCK_API -ne '1' -and (-not $env:COS_TEST_TENANT_ID -or -not $env:COS_TEST_EMAIL -or -not $env:COS_TEST_PASSWORD)) {
+            Write-Warn 'COS_TEST_TENANT_ID / COS_TEST_EMAIL / COS_TEST_PASSWORD not set - cognitive E2E test will skip'
         }
-        $r = Invoke-PlaywrightProject -Projects @('cognitive') -ExtraEnv @{ PLAYWRIGHT_COS_URL = $BaseUrl }
+        $r = Invoke-PlaywrightProject -Projects @('cognitive') -ExtraEnv @{ PLAYWRIGHT_COS_URL = $cognitiveUrl }
         Format-Summary (Read-PlaywrightResults $r.ResultsJson) 'cognitive'
         $overallExit = $r.ExitCode
     }
@@ -335,7 +336,7 @@ switch ($Mode) {
             @{ Projects = @('qa');                   Env = @{} },
             @{ Projects = @('a11y');                 Env = @{} },
             @{ Projects = @('perf');                 Env = @{} },
-            @{ Projects = @('cognitive');            Env = @{ PLAYWRIGHT_COS_URL = $BaseUrl } }
+            @{ Projects = @('cognitive');            Env = @{ PLAYWRIGHT_COS_URL = $cognitiveUrl } }
         )
         if ($resolvedClientUrl) {
             $modes += @{ Projects = @('client'); Env = @{ PLAYWRIGHT_CLIENT_URL = $resolvedClientUrl } }

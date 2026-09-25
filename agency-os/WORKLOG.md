@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-25（續18）研究線 WC-PIa-14R：期末閘實測與發現修正（未結案）
+
+- 起因：15～21 完成後重做期末閘，不能把 mock、skip 或無 oracle artifact 寫成 PI-a 完。
+- 改：web Dockerfile 讓 standalone 綁 0.0.0.0，修容器 loopback healthcheck；更新 tests/e2e/cognitive/iceberg.spec.ts 的 `login -> iceberg -> result page sections including 5b` 至中文 h1、自動專案及 5b 十區塊，保留登入／搜尋／示範／執行／引註數量斷言；加 COS_TEST_MOCK_API=1 獨立驗 UI 契約。playwright-runner cognitive 使用 PLAYWRIGHT_COS_URL 或本機 8421，取消過時的 COS_TEST_PROJECT_ID 必填。計畫 v1.45 記尚未通過；TASKS 不標完成。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；python -m unittest discover -s tests -t . -q 14194/14194（1067.488s）；解讀 23/23；web vitest 11/11、typecheck、build、npm audit --omit=dev 0 漏洞；check-mocks 五頁與 rendered result 綠；Playwright mock 模式 1 passed；Docker API+web healthy（本機 8420 既有程序佔用，臨時 override 8422，正式 compose 未改） | exit=0 | ms=1100000
+- REVIEW_DONE: 自審 E2E 原測試仍找 Project ID／原始 id／九段，並發現未限 h1 的 heading 斷言可誤中清單 h2，已加 level:1；web Dockerfile HOSTNAME 缺省使容器內 loopback 拒絕；runner 原本把 cognitive URL 指向 ops BaseUrl。Claude oracle 兩次實試：繼承 key 為 401；單次移除 key 後 Not logged in，未取得 artifact，14R 不豁免。
+- BUGHUNT_DONE: §6 四突變在獨立 Python 程序完成：citation_integrity、visual_bindings_resolvable、next_methods_resolvable 各改為放行，對應 test_citation_out_of_manifest_fails／test_visual_binding_out_of_record_fails／test_next_method_out_of_catalog_fails 皆紅，還原皆綠；systems family→kind 改 scorecard 時 layered→scorecard，還原 layered。Docker 修前 web health `starting`／127.0.0.1 refused，修後 `healthy`。
+- 突變：把方法頁 h1 改回原始 methodId → `tests/e2e/cognitive/iceberg.spec.ts::login -> iceberg -> result page sections including 5b` 在 mock-API 模式紅（冰山模型 h1 不存在）→ 還原中文標題後綠；原本寬鬆 heading 斷言會假綠，已收緊並重測。
+- 未過：真模型冰山案例、舊 dashboard 真模型手測、Playwright 真模型 `1 passed` 缺有效 COGNITIVE_OS_ANTHROPIC_API_KEY 與 COS_TEST_* 身分（無憑證實跑為 1 skipped）；14R PY／TS Claude oracle artifact 缺 Claude CLI 登入。mock 1 passed 不替代真測。
+- 下一步：取得本機測試憑證與 Claude CLI 登入後重跑缺項；未全過前 PI-a 不結案、PI-b 不開始。
 ## 2026-09-25（續17）研究線 WC-PIa-20：結果頁對齊示意稿並由同一檢查器驗 web
 
 - 起因：結果頁只有骨架，缺 5b、原生冰山 SVG、來源值、預填卡與專家模式；check-mocks 只審示意稿不審產品輸出。
