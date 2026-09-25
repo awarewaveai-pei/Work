@@ -2,15 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.42（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.43（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-a 修正中，WC-PIa-19 本次提交，下一張 WC-PIa-21**；14R 仍須 Claude oracle artifact。**PI-b 不得開始**。
-- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 初版 14/14 期末驗收退回；修正卡 5/7 完成；PI-b 0/5。
-- 最後一筆 PI-a 程式碼：WC-PIa-18 `db900ea3e`；WC-PIa-19 本次 commit（hash 見 git log）；計畫版本 v1.42（2026-09-25）。
+- 現在期／卡：**PI-a 修正中，WC-PIa-21 本次提交，下一張 WC-PIa-20**；14R 仍須 Claude oracle artifact。**PI-b 不得開始**。
+- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 初版 14/14 期末驗收退回；修正卡 6/7 完成；PI-b 0/5。
+- 最後一筆 PI-a 程式碼：WC-PIa-19 `aaaa53682`；WC-PIa-21 本次 commit（hash 見 git log）；計畫版本 v1.43（2026-09-25）。
 - 阻塞：無（WC-PIa-15 操作者准許自審後 commit；§7 R24 原 oracle 失敗保留紀錄）。14R 的 oracle 要求沒有豁免。
-- 下一步：WC-PIa-21→20→14R；不得跳卡。
+- 下一步：WC-PIa-20→14R；不得跳卡。
 
 | 項 | 狀態（2026-09-24） |
 |---|---|

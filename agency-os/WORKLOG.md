@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-25（續16）研究線 WC-PIa-21：首用者免貼 UUID、Next 修補
+
+- 起因：方法頁要求手貼 Project ID；工具清單沒有問題入口且使用錯誤欄位名；Next 15.2.4 在 npm audit 有 critical/high。
+- 改：無專案時 GET 後只 POST 一次，名稱為工具中文名＋日期；有專案則以按鈕選；方法頁標題中文化；清單「說你卡在哪」入口與最多三個文字候選。Next 升 15.5.26，override postcss 8.5.28，鎖檔更新。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；vitest 9/9；typecheck exit 0；npm audit --omit=dev found 0 vulnerabilities；npm run build exit 0 | exit=0 | ms=120000
+- REVIEW_DONE: 自審 POST /projects 必填 name/purpose/data_classification，first-use Promise ref 避免 StrictMode 重複建立；官方 Next 15.5.26 安全版本與本機 audit 交叉核對。
+- BUGHUNT_DONE: 檢查 /methods 清單實際 method_id/display、/projects API 形狀、Next lockfile、首次使用測試。
+- 突變：移除無專案時的自動 POST → first-use vitest 紅（0!=1）→ 還原綠。
+- 下一步：WC-PIa-20。
+
 ## 2026-09-25（續15）研究線 WC-PIa-19：表單種類移植
 
 - 起因：web 表單把多種結構化欄位塞進 JSON textarea；變體只有按鈕沒有分支，示範案例讀錯 API，AI 草稿只顯示訊息不填欄。
