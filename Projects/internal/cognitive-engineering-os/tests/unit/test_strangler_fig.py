@@ -19,6 +19,7 @@ from ai_lego.modules.architecture.strangler_fig import (
     generate_strangler_fig_plan,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SFP_SCHEMA = "ai-lego://specs/cognitive/typed-objects/strangler-fig-plan.schema.yaml"
 
@@ -64,7 +65,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_strangler_fig_plan("SFP-T-006", "x", [{"id": "S1", "label": "x"}], [{"id": "SL1", "seam_id": "S1", "label": "x", "status": "in_progress"}], make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

@@ -25,6 +25,7 @@ from ai_lego.modules.systems.stock_and_flow import (
     stock,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 STOCK_AND_FLOW_MODEL_SCHEMA = "ai-lego://specs/cognitive/typed-objects/stock-and-flow-model.schema.yaml"
 
@@ -57,7 +58,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(STOCK_AND_FLOW_MODEL_SCHEMA, model, "two-stock model")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

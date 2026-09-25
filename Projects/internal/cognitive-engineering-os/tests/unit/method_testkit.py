@@ -13,6 +13,9 @@ from __future__ import annotations
 import copy
 import re
 import unittest
+from functools import lru_cache
+from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable
 
 from ai_lego import resolve_spec_root
@@ -25,6 +28,68 @@ from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 GARBAGE = (None, "not-a-dict", 42, 3.14, True, [], {}, {"junk": 1})
 
 
+# ---------------------------------------------------------------------------
+# Shared per-process method catalog (2026-09-25, perf).
+#
+# `MethodCatalog.from_spec_root` scans all 285 methods/contracts/*.contract.yaml files from disk
+# (~7s). Every one of the ~285 tool test modules calls it at least once (SpecConformanceTests'
+# `test_method_resolves_through_the_unmodified_shared_resolver` /
+# `test_invoke_through_the_catalog_runs_the_real_implementation`), and this mixin's own
+# `setUpClass` called it once per test CLASS on top of that -- the dominant cost of the full
+# 14,159-test suite (24-34 min locally, >20 min / 2.4GB in the cloud runner).
+#
+# `shared_method_catalog(spec_root)` below scans ONCE per process per spec_root (cached in
+# `_cached_catalog_parts`) and returns a bare (label, contracts) pair; every CALL to
+# `shared_method_catalog` then builds a fresh `MethodCatalog` dataclass instance from those cached
+# parts. This is deliberately NOT "cache and return the same MethodCatalog object" -- see the
+# contamination note below for why.
+#
+# Contamination (the actual risk a shared cache introduces, task step 2): `MethodCatalog` is a
+# frozen dataclass, so `catalog.label = ...` / `catalog.contracts = ...` already can't happen. The
+# two real mutation vectors are (a) `catalog.contracts[k] = v` -- direct dict mutation, frozen does
+# NOT block this since it only blocks attribute reassignment -- and (b) `catalog.invoke(...)`,
+# which APPENDS to `catalog.invocations` (a plain mutable list field) on every call; several test
+# modules (test_workflow_executor.py, test_guided_mode.py, SpecConformanceTests'
+# `test_invoke_through_the_catalog_runs_the_real_implementation` in ~250 tool modules) call
+# `.invoke(...)` and then assert on `len(catalog.invocations)` or its contents. If every caller
+# shared ONE literal MethodCatalog instance, module B's invocation count would include module A's
+# leftover invocations from a prior test -- order-dependent test pollution, the exact failure mode
+# a "shared cache" must not introduce.
+#
+# Two independent defenses, addressing (a) and (b) separately -- both are real, neither alone is
+# enough:
+#   (a) `contracts` is wrapped in `MappingProxyType` before caching, so `catalog.contracts[k] = v`
+#       raises `TypeError` from ANY caller, not just a documented convention.
+#   (b) Every `shared_method_catalog(...)` call constructs a NEW `MethodCatalog(...)`. Dataclass
+#       field `invocations: list = field(default_factory=list, ...)` means each new instance gets
+#       its own empty list for free -- `.invoke()` on one caller's instance can never be visible to
+#       another's, even though both instances share the same (read-only) `contracts` mapping and
+#       `label` string. The expensive part (the disk scan) is cached; the part that must never be
+#       shared (`invocations`) never is.
+#
+# `lru_cache` keys on the (hashable) `str(spec_root)`, not the `Path` object itself, so two equal
+# but non-identical `Path`s (rare, but `resolve_spec_root()` vs. a caller's own re-derived Path)
+# still hit the same cache entry.
+@lru_cache(maxsize=None)
+def _cached_catalog_parts(spec_root_str: str) -> tuple[str, "MappingProxyType[str, dict]"]:
+    catalog = MethodCatalog.from_spec_root(Path(spec_root_str))
+    return catalog.label, MappingProxyType(dict(catalog.contracts))
+
+
+def shared_method_catalog(spec_root) -> MethodCatalog:
+    """Fresh, read-only-`contracts` `MethodCatalog` backed by a per-process cached disk scan.
+
+    Behaves identically to `MethodCatalog.from_spec_root(spec_root)` for every existing caller --
+    `.resolve(...)`, `.require(...)`, `.invoke(...)`, `.is_resolvable(...)` are all unchanged
+    (`MethodCatalog`/`ContractCatalog` themselves are NOT modified; see this module's own docstring
+    update) -- except that the 285-file disk scan itself runs at most once per process per
+    spec_root, and `.contracts` is a `MappingProxyType` (attempted mutation raises `TypeError`
+    instead of silently corrupting the cache for every other test that will read it this process).
+    """
+    label, contracts = _cached_catalog_parts(str(spec_root))
+    return MethodCatalog(label=label, contracts=contracts)
+
+
 class MethodSliceMixin:
     SPEC: MethodSliceSpec
     REFUSALS: list[tuple[str, Callable[[], Any]]] = []
@@ -34,7 +99,7 @@ class MethodSliceMixin:
     def setUpClass(cls):
         cls.spec_root = resolve_spec_root()
         cls.contracts = SchemaContracts(cls.spec_root)
-        cls.catalog = MethodCatalog.from_spec_root(cls.spec_root)
+        cls.catalog = shared_method_catalog(cls.spec_root)
 
     def build(self) -> dict[str, Any]:
         args, kwargs = self.SPEC.fixture_args()

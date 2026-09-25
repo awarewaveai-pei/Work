@@ -39,6 +39,7 @@ from ai_lego.modules.decision.wsjf import (
     generate_wsjf_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 WSJF_SCORE_RECORD_SCHEMA = "ai-lego://specs/cognitive/typed-objects/wsjf-score-record.schema.yaml"
 GATE_RESULT_SCHEMA = "ai-lego://specs/execution/gate.schema.yaml#/gate_result"
@@ -299,7 +300,7 @@ class GenerateWsjfRecordConstructionTests(unittest.TestCase):
         self.assertNotEqual(cost_of_delay["business_value"], 999)
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(resolve_spec_root())
+        live = shared_method_catalog(resolve_spec_root())
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

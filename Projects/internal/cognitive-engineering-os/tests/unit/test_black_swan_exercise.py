@@ -35,6 +35,7 @@ from ai_lego.modules.foresight.black_swan_exercise import (
     tail_event,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 BLACK_SWAN_SCHEMA = "ai-lego://specs/cognitive/typed-objects/black-swan-exercise.schema.yaml"
 PROVENANCE = make_provenance("HYPOTHESIS", "HUMAN_ORIGINAL")
@@ -82,13 +83,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(BLACK_SWAN_SCHEMA, _valid_exercise(), "black swan exercise")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, exercise = live.invoke(METHOD_ID, generate_black_swan_exercise, "BSWAN-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/foresight.black_swan_exercise.contract.yaml")

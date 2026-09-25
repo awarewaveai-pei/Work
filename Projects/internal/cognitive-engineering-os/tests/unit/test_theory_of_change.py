@@ -33,6 +33,7 @@ from ai_lego.modules.causal.theory_of_change import (
     transition_entry,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 THEORY_OF_CHANGE_SCHEMA = "ai-lego://specs/cognitive/typed-objects/theory-of-change-record.schema.yaml"
 
@@ -82,7 +83,7 @@ class RecordConformanceTests(unittest.TestCase):
         self.contracts.validate(THEORY_OF_CHANGE_SCHEMA, _valid_record(), "theory of change record")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

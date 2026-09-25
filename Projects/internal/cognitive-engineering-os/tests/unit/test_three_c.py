@@ -37,6 +37,7 @@ from ai_lego.modules.strategy.three_c import (
     three_c_finding,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 THREE_C_SCHEMA = "ai-lego://specs/cognitive/typed-objects/three-c-analysis.schema.yaml"
 
@@ -63,13 +64,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(THREE_C_SCHEMA, _valid_analysis(), "3C analysis")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, analysis = live.invoke(METHOD_ID, generate_three_c_analysis, "3C-T-INVOKE", _findings(), "fit found")
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/strategy.three_c.contract.yaml")
@@ -97,7 +98,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "strategy.three_c")
 
     def test_three_c_and_swot_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.swot"])
         self.assertIsNone(resolved["blocked"])
 

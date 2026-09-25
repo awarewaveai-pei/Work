@@ -35,6 +35,7 @@ from ai_lego.modules.challenge.independent_judge import (
     position,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 INDEPENDENT_JUDGE_RULING_SCHEMA = "ai-lego://specs/cognitive/typed-objects/independent-judge-ruling.schema.yaml"
 
@@ -153,7 +154,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_independent_judge_ruling("IJR-T-012", "PROP-T-012", [_position()], ["x"], "approved", make_provenance("AI_INFERENCE", "AI_GENERATED"), reversal_conditions=["real", "   "])
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

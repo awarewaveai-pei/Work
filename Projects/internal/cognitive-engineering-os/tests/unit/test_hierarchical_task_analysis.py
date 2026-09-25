@@ -35,6 +35,7 @@ from ai_lego.modules.decomposition.hierarchical_task_analysis import (
     task_node,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 HTA_SCHEMA = "ai-lego://specs/cognitive/typed-objects/hierarchical-task-analysis.schema.yaml"
 
@@ -67,13 +68,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(HTA_SCHEMA, _valid_analysis(), "Hierarchical Task Analysis")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, analysis = live.invoke(METHOD_ID, generate_hierarchical_task_analysis, "HTA-T-INVOKE", _well_formed_goal())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/decomposition.hierarchical_task_analysis.contract.yaml")
@@ -102,7 +103,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "decomposition.hierarchical_task_analysis")
 
     def test_hta_and_bcg_matrix_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.bcg_matrix"])
         self.assertIsNone(resolved["blocked"])
 

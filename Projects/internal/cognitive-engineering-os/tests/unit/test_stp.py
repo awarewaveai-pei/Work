@@ -33,6 +33,7 @@ from ai_lego.modules.strategy.stp import (
     targeting_decision,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 STP_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/stp-analysis.schema.yaml"
 
@@ -61,7 +62,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(STP_ANALYSIS_SCHEMA, _valid_analysis(), "stp analysis")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -71,7 +72,7 @@ class SpecConformanceTests(unittest.TestCase):
             empty.require(METHOD_ID)
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         segments = _valid_segments("STP-T-INVOKE")
         target = targeting_decision("STP-T-INVOKE-S2", "rationale")
         descriptor, analysis = live.invoke(METHOD_ID, generate_stp_analysis, "STP-T-INVOKE", segments, target, "positioning", make_provenance("AI_INFERENCE", "AI_SUGGESTED"))

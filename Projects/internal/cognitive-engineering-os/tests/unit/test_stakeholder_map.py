@@ -38,6 +38,7 @@ from ai_lego.modules.stakeholders.stakeholder_map import (
     stakeholder_entry,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 STAKEHOLDER_MAP_SCHEMA = "ai-lego://specs/cognitive/typed-objects/stakeholder-map.schema.yaml"
 PROVENANCE = make_provenance("EVIDENCE", "HUMAN_ORIGINAL")
@@ -72,13 +73,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(STAKEHOLDER_MAP_SCHEMA, _valid_map(entries=entries), "stakeholder map, null category")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, record = live.invoke(METHOD_ID, generate_stakeholder_map, "STKMAP-T-INVOKE", _entries(), PROVENANCE)
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/stakeholders.stakeholder_map.contract.yaml")

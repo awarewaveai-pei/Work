@@ -28,6 +28,7 @@ from ai_lego.modules.challenge.red_team import (
     generate_red_team_challenge,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 RED_TEAM_CHALLENGE_SCHEMA = "ai-lego://specs/cognitive/typed-objects/red-team-challenge.schema.yaml"
 
@@ -73,7 +74,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_red_team_challenge("RTC-T-006", "PROP-T-006", ["OPERATIONS"], [unexamined_finding], make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

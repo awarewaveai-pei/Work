@@ -31,6 +31,7 @@ from ai_lego.modules.decision.mcda import (
 )
 from ai_lego.modules.research.gates import evaluate_statistical_gate
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 MCDA_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/mcda-analysis.schema.yaml"
 
@@ -142,7 +143,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_mcda_analysis("MCDA-T-003", _options(), _criteria(), _raw_scores(), _weights(), "   ", make_provenance("CALCULATED_RESULT", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -155,7 +156,7 @@ class SpecConformanceTests(unittest.TestCase):
         inputs/outputs/forbidden_transition/cognitive_primitives still equal this contract's own."""
         import yaml
 
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve(["architecture.trade_off_matrix"])
         self.assertIsNone(resolved["blocked"])
 

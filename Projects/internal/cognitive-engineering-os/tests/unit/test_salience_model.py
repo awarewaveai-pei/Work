@@ -39,6 +39,7 @@ from ai_lego.modules.stakeholders.salience_model import (
     salience_dimension,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SALIENCE_ASSESSMENT_SCHEMA = "ai-lego://specs/cognitive/typed-objects/salience-model.schema.yaml"
 PROVENANCE = make_provenance("HYPOTHESIS", "AI_SUGGESTED")
@@ -86,13 +87,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(SALIENCE_ASSESSMENT_SCHEMA, statement, "salience assessment, none present")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, statement = live.invoke(METHOD_ID, generate_salience_assessment, "SALNCE-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/stakeholders.salience_model.contract.yaml")

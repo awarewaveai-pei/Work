@@ -24,6 +24,7 @@ from ai_lego.modules.architecture.event_storming import (
     generate_event_storming_session,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 EVENT_STORMING_SCHEMA = "ai-lego://specs/cognitive/typed-objects/event-storming-session.schema.yaml"
 
@@ -89,7 +90,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_event_storming_session("ES-T-006", "an event with no cause", [{"id": "E_ORPHAN", "type": "domain_event", "label": "appears from nowhere"}], [], make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

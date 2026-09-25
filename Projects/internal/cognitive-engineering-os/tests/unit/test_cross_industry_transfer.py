@@ -27,6 +27,7 @@ from ai_lego.modules.foresight.cross_industry_transfer import (
     transfer,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CROSS_INDUSTRY_TRANSFER_SCHEMA = "ai-lego://specs/cognitive/typed-objects/cross-industry-transfer.schema.yaml"
 
@@ -49,7 +50,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(CROSS_INDUSTRY_TRANSFER_SCHEMA, _valid_record(), "cross-industry transfer set")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

@@ -35,6 +35,7 @@ from ai_lego.modules.root_cause.fishbone import (
     record_validation_applied,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 FIVE_WHYS_VALIDATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/five-whys-validation.schema.yaml"
 ROOT_CAUSE_FACT_SCHEMA = "ai-lego://specs/cognitive/typed-objects/root-cause-fact.schema.yaml"
@@ -92,7 +93,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_five_whys_validation("FWV-T-005", _cause_hypothesis_set(), "CHS-T-FW-001-H1", _why_chain(), ["RAN_OUT_OF_TIME"], make_provenance("EVIDENCE", "HUMAN_APPROVED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

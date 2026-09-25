@@ -35,6 +35,7 @@ from ai_lego.modules.strategy.value_proposition_canvas import (
     generate_value_proposition_canvas,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 VPC_CANVAS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/value-proposition-canvas.schema.yaml"
 
@@ -83,7 +84,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(VPC_CANVAS_SCHEMA, _valid_canvas(), "value proposition canvas")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -93,7 +94,7 @@ class SpecConformanceTests(unittest.TestCase):
             empty.require(METHOD_ID)
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         arrays = _valid_arrays("VPC-T-INVOKE")
         hyps = _valid_fit_hypotheses("VPC-T-INVOKE")
         descriptor, canvas = live.invoke(

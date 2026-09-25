@@ -18,6 +18,7 @@ from ai_lego.modules.architecture.fitness_functions import (
     generate_fitness_function_set,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 FFS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/fitness-function-set.schema.yaml"
 
@@ -48,7 +49,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_fitness_function_set("FFS-T-003", "x", [{"id": "FF1", "invariant": "x", "test_or_metric": "x", "ci_gate": ""}], make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

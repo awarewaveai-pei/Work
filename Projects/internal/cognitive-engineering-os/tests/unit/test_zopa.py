@@ -29,6 +29,7 @@ from ai_lego.modules.stakeholders.zopa import (
     generate_zopa_analysis,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 ZOPA_SCHEMA = "ai-lego://specs/cognitive/typed-objects/zopa.schema.yaml"
 PROVENANCE = make_provenance("CALCULATED_RESULT", "AI_GENERATED")
@@ -62,13 +63,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(ZOPA_SCHEMA, statement, "zopa analysis (no overlap)")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, statement = live.invoke(METHOD_ID, generate_zopa_analysis, "ZOPA-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/stakeholders.zopa.contract.yaml")

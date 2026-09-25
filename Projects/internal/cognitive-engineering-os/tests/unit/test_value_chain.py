@@ -38,6 +38,7 @@ from ai_lego.modules.strategy.value_chain import (
     value_chain_activity,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 VALUE_CHAIN_SCHEMA = "ai-lego://specs/cognitive/typed-objects/value-chain-analysis.schema.yaml"
 
@@ -76,13 +77,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(VALUE_CHAIN_SCHEMA, _valid_analysis(), "value chain analysis")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, analysis = live.invoke(METHOD_ID, generate_value_chain_analysis, "VALUECHAIN-T-INVOKE", _activities(), "leverage found")
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/strategy.value_chain.contract.yaml")
@@ -110,7 +111,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "strategy.value_chain")
 
     def test_value_chain_and_three_c_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.three_c"])
         self.assertIsNone(resolved["blocked"])
 

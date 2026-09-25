@@ -26,6 +26,7 @@ from ai_lego.modules.foresight.adjacent_discipline_search import (
     imported_model,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 ADJACENT_DISCIPLINE_SEARCH_SCHEMA = "ai-lego://specs/cognitive/typed-objects/adjacent-discipline-search.schema.yaml"
 
@@ -56,7 +57,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(ADJACENT_DISCIPLINE_SEARCH_SCHEMA, record, "adjacent discipline search with zero imported models")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

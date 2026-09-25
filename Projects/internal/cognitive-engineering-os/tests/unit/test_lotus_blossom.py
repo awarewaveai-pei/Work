@@ -32,6 +32,7 @@ from ai_lego.modules.divergent.lotus_blossom import (
     generate_lotus_blossom_session,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 LOTUS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/lotus-blossom-session.schema.yaml"
 CENTER_THEME = "提升新用戶 onboarding 留存率"
@@ -72,13 +73,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(LOTUS_SCHEMA, _valid_session(), "lotus blossom session")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, session = live.invoke(
             METHOD_ID, generate_lotus_blossom_session, "LOTUS-T-INVOKE", CENTER_THEME, _branches(), make_provenance("HYPOTHESIS", "AI_SUGGESTED")
         )
@@ -118,7 +119,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "divergent.lotus_blossom")
 
     def test_lotus_blossom_and_ansoff_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.ansoff"])
         self.assertIsNone(resolved["blocked"])
 

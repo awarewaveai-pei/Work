@@ -37,6 +37,7 @@ from ai_lego.modules.strategy.business_model_canvas import (
     generate_business_model_canvas,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 BMC_SCHEMA = "ai-lego://specs/cognitive/typed-objects/business-model-canvas.schema.yaml"
 
@@ -82,13 +83,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(BMC_SCHEMA, _valid_canvas(), "business model canvas")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, canvas = live.invoke(
             METHOD_ID, generate_business_model_canvas, "BMC-T-INVOKE", _blocks(), make_provenance("AI_INFERENCE", "AI_SUGGESTED")
         )
@@ -130,7 +131,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "strategy.business_model_canvas")
 
     def test_bmc_and_porter_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.porter_five_forces"])
         self.assertIsNone(resolved["blocked"])
 

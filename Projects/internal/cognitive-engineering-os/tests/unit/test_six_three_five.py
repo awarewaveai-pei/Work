@@ -33,6 +33,7 @@ from ai_lego.modules.divergent.six_three_five import (
     sheet,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SESSION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/six-three-five-session.schema.yaml"
 METHOD_SCHEMA = "ai-lego://specs/cognitive/method.schema.yaml"
@@ -291,12 +292,12 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(SESSION_SCHEMA, _valid_session(), "six-three-five session")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         p, s = _clean_participants_and_sheets()
         descriptor, session = live.invoke(METHOD_ID, generate_six_three_five_session, "SIXTHREEFIVE-T-INVOKE", p, s, _prov())
         self.assertEqual(descriptor["ref"], METHOD_ID)

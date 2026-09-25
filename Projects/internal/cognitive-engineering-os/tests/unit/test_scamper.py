@@ -39,6 +39,7 @@ from ai_lego.modules.divergent.scamper import (
     generate_scamper_session,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SCAMPER_SESSION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/scamper-session.schema.yaml"
 
@@ -77,13 +78,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(SCAMPER_SESSION_SCHEMA, _valid_session(), "scamper session")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, session = live.invoke(METHOD_ID, generate_scamper_session, "SCAMPER-T-INVOKE", _entries(), make_provenance("AI_INFERENCE", "AI_SUGGESTED"))
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/divergent.scamper.contract.yaml")
@@ -135,7 +136,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "divergent.scamper")
 
     def test_scamper_and_morphological_analysis_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "association.morphological_analysis"])
         self.assertIsNone(resolved["blocked"])
 

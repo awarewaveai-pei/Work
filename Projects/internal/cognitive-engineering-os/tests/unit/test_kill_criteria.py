@@ -32,6 +32,7 @@ from ai_lego.modules.learning.kill_criteria import (
     kill_threshold,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 KILL_CRITERIA_SET_SCHEMA = "ai-lego://specs/cognitive/typed-objects/kill-criteria-set.schema.yaml"
 
@@ -186,7 +187,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(KILL_CRITERIA_SET_SCHEMA, _valid_set(), "kill criteria set")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

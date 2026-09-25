@@ -29,6 +29,7 @@ from ai_lego.modules.delivery.outcome_roadmap import (
     generate_outcome_roadmap,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 OUTCOME_ROADMAP_SCHEMA = "ai-lego://specs/cognitive/typed-objects/outcome-roadmap-record.schema.yaml"
 PROVENANCE = make_provenance("DECISION", "HUMAN_APPROVED")
@@ -77,12 +78,12 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(OUTCOME_ROADMAP_SCHEMA, roadmap, "bet-less minimal roadmap")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, roadmap = live.invoke(METHOD_ID, generate_outcome_roadmap, "OROAD-T-INVOKE", **_kwargs())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/delivery.outcome_roadmap.contract.yaml")

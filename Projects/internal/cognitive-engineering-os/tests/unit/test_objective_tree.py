@@ -32,6 +32,7 @@ from ai_lego.modules.decomposition.objective_tree import (
     source_problem_item,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 OBJECTIVE_TREE_SCHEMA = "ai-lego://specs/cognitive/typed-objects/objective-tree.schema.yaml"
 
@@ -79,13 +80,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(OBJECTIVE_TREE_SCHEMA, _valid_tree(), "objective tree")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, tree = live.invoke(METHOD_ID, generate_objective_tree, "OBJTREE-T-INVOKE", _source_items(), _objectives())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/decomposition.objective_tree.contract.yaml")
@@ -129,7 +130,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "decomposition.objective_tree")
 
     def test_objective_tree_and_bcg_matrix_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.bcg_matrix"])
         self.assertIsNone(resolved["blocked"])
 

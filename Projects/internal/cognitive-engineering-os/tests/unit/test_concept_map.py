@@ -31,6 +31,7 @@ from ai_lego.modules.association.concept_map import (
     generate_concept_map_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 CONCEPT_MAP_SCHEMA = "ai-lego://specs/cognitive/typed-objects/concept-map-record.schema.yaml"
 
@@ -78,7 +79,7 @@ class RecordConformanceTests(unittest.TestCase):
         self.assertEqual(record["orphan_node_ids"], [])
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

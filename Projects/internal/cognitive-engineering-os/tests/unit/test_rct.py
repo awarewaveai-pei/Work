@@ -32,6 +32,7 @@ from ai_lego.modules.causal.rct import (
     generate_rct_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 RCT_SCHEMA = "ai-lego://specs/cognitive/typed-objects/rct-record.schema.yaml"
 
@@ -66,7 +67,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(RCT_SCHEMA, _valid_record(), "rct record")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -110,7 +111,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "causal.rct")
 
     def test_rct_and_causal_dag_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "causal.dag"])
         self.assertIsNone(resolved["blocked"])
 

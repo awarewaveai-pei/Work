@@ -36,6 +36,7 @@ from ai_lego.modules.strategy.tows import (
     tows_pairing,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 SWOT_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/swot-analysis.schema.yaml"
 TOWS_MATRIX_SCHEMA = "ai-lego://specs/cognitive/typed-objects/tows-matrix.schema.yaml"
@@ -78,12 +79,12 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(TOWS_MATRIX_SCHEMA, _valid_matrix(), "tows matrix")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
     def test_tows_and_swot_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.swot"])
         self.assertIsNone(resolved["blocked"])
 
@@ -93,7 +94,7 @@ class SpecConformanceTests(unittest.TestCase):
             empty.require(METHOD_ID)
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         swot_analysis = _real_swot_analysis()
         prefix = swot_analysis["id"]
         pairing = tows_pairing("TOWS-T-INVOKE-P1", f"{prefix}-F1", f"{prefix}-F3", "an option")

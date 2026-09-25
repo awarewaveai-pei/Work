@@ -32,6 +32,7 @@ from ai_lego.modules.association.attribute_listing import (
     transformed_variant,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 ATTRIBUTE_LISTING_SCHEMA = "ai-lego://specs/cognitive/typed-objects/attribute-listing-record.schema.yaml"
 
@@ -93,7 +94,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(record["informs_scamper_ref"], "SCAMPER-001")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

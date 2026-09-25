@@ -28,6 +28,7 @@ from ai_lego.modules.root_cause.barrier_analysis import (
     generate_barrier_analysis_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 RECORD_SCHEMA = "ai-lego://specs/cognitive/typed-objects/barrier-analysis-record.schema.yaml"
 TS = "2026-09-07T00:00:00Z"
@@ -349,7 +350,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(record["provenance"]["epistemic_type"], "AI_INFERENCE")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         self.assertIsNone(live.resolve([METHOD_ID])["blocked"])
 
     def test_empty_catalog_blocks_barrier_analysis_the_same_way_it_blocks_the_other_slices(self):

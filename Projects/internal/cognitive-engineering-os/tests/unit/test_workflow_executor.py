@@ -9,6 +9,7 @@ from ai_lego import resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.workflow.executor import execute_workflow_ir
 
 
@@ -147,7 +148,7 @@ class WorkflowExecutorTests(unittest.TestCase):
 
     def test_live_catalog_descriptor_is_recorded_for_successful_invocation(self):
         ir = {"id": "research-v1", "nodes": [{"node_kind": "method", "method_id": "research.qualitative_coding"}]}
-        catalog = MethodCatalog.from_spec_root(resolve_spec_root())
+        catalog = shared_method_catalog(resolve_spec_root())
         result = execute_workflow_ir(
             ir,
             {},

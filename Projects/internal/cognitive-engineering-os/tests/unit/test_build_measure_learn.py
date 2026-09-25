@@ -34,6 +34,7 @@ from ai_lego.modules.learning.build_measure_learn import (
     resolve_learned_metrics,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 BUILD_MEASURE_LEARN_CYCLE_SCHEMA = "ai-lego://specs/cognitive/typed-objects/build-measure-learn-cycle.schema.yaml"
 T = "2026-09-07T00:00:00Z"
@@ -722,7 +723,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(BUILD_MEASURE_LEARN_CYCLE_SCHEMA, record, "build-measure-learn record")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

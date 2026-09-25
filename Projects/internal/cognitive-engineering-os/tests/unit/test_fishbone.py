@@ -32,6 +32,7 @@ from ai_lego.modules.root_cause.fishbone import (
     record_validation_applied,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 PROBLEM_STATEMENT_SCHEMA = "ai-lego://specs/cognitive/typed-objects/problem-statement.schema.yaml"
 CAUSE_HYPOTHESIS_SET_SCHEMA = "ai-lego://specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml"
@@ -89,13 +90,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(ROOT_CAUSE_FACT_SCHEMA, rcf, "root cause fact")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, chs = live.invoke(METHOD_ID, generate_cause_hypothesis_set, "CHS-T-INVOKE", _validated_problem_statement(), _hypotheses())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/root_cause.fishbone.contract.yaml")

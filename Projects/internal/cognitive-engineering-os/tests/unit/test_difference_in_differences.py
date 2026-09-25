@@ -33,6 +33,7 @@ from ai_lego.modules.causal.difference_in_differences import (
     generate_difference_in_differences_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 DID_SCHEMA = "ai-lego://specs/cognitive/typed-objects/difference-in-differences-record.schema.yaml"
 
@@ -69,7 +70,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.contracts.validate(DID_SCHEMA, _valid_record(), "difference-in-differences record")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 
@@ -115,7 +116,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "causal.difference_in_differences")
 
     def test_did_and_causal_rct_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "causal.rct"])
         self.assertIsNone(resolved["blocked"])
 

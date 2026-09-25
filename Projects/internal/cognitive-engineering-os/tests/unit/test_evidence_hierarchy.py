@@ -30,6 +30,7 @@ from ai_lego.modules.epistemic.evidence_hierarchy import (
     hierarchy_level,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 EVIDENCE_HIERARCHY_SCHEMA = "ai-lego://specs/cognitive/typed-objects/evidence-hierarchy.schema.yaml"
 
@@ -66,7 +67,7 @@ class RecordConformanceTests(unittest.TestCase):
         self.contracts.validate(EVIDENCE_HIERARCHY_SCHEMA, record, "hierarchy with no assignments yet")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

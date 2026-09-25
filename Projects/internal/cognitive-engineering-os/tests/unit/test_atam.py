@@ -18,6 +18,7 @@ from ai_lego.modules.architecture.atam import (
     generate_atam_analysis,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 ATAM_SCHEMA = "ai-lego://specs/cognitive/typed-objects/atam-analysis.schema.yaml"
 
@@ -54,7 +55,7 @@ class SpecConformanceTests(unittest.TestCase):
             generate_atam_analysis("ATAM-T-004", "x", [{"id": "F1", "category": "concern", "description": "x"}], make_provenance("AI_INFERENCE", "AI_GENERATED"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

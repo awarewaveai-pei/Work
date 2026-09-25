@@ -31,6 +31,7 @@ from ai_lego.modules.strategy.swot import (
     swot_factor,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 EVIDENCE_SCHEMA = "ai-lego://specs/evidence/evidence.schema.yaml"
 SWOT_ANALYSIS_SCHEMA = "ai-lego://specs/cognitive/typed-objects/swot-analysis.schema.yaml"
@@ -83,13 +84,13 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertFalse(is_internal("THREAT"))
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, analysis = live.invoke(METHOD_ID, generate_swot_analysis, "SWOT-T-INVOKE", "KS-T-INVOKE", _knowledge_set(), _factors())
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/strategy.swot.contract.yaml")
@@ -128,7 +129,7 @@ class ForbiddenDeploymentPathTests(unittest.TestCase):
     """Atlas L3550-3552: SWOTAnalysis -> AutomaticProductionDeployment (direct) is FORBIDDEN."""
 
     def test_live_catalog_already_blocks_the_hazard_id_today(self):
-        live = MethodCatalog.from_spec_root(resolve_spec_root())
+        live = shared_method_catalog(resolve_spec_root())
         resolution = assert_forbidden_deployment_path_blocked(live)
         self.assertEqual(resolution["blocked"]["status"], METHOD_RESOLUTION_BLOCKED)
 

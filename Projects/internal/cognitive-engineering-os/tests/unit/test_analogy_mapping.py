@@ -28,6 +28,7 @@ from ai_lego.modules.association.analogy_mapping import (
     generate_analogy_mapping_record,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 ANALOGY_MAPPING_SCHEMA = "ai-lego://specs/cognitive/typed-objects/analogy-mapping-record.schema.yaml"
 
@@ -78,7 +79,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(record["informs_historical_analogy_ref"], "HISTANALOGY-001")
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
 

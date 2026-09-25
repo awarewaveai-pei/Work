@@ -38,6 +38,7 @@ from ai_lego.modules.strategy.lean_canvas import (
     generate_lean_canvas,
 )
 from ai_lego.platform.ai_execution.method_resolver import METHOD_RESOLUTION_BLOCKED, MethodCatalog
+from tests.unit.method_testkit import shared_method_catalog
 
 _NOW = "2026-09-18T00:00:00Z"
 
@@ -76,13 +77,13 @@ class SpecConformanceTests(unittest.TestCase):
         cls.contracts = SchemaContracts(cls.spec_root)
 
     def test_method_resolves_through_the_unmodified_shared_resolver(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID])
         self.assertIsNone(resolved["blocked"])
         self.assertEqual([c["method_id"] for c in resolved["candidate_methods"]], [METHOD_ID])
 
     def test_invoke_through_the_catalog_runs_the_real_implementation(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         descriptor, canvas = live.invoke(METHOD_ID, generate_lean_canvas, "LEANCANVAS-T-INVOKE", _blocks(), make_provenance("AI_INFERENCE", "AI_SUGGESTED"))
         self.assertEqual(descriptor["ref"], METHOD_ID)
         self.assertEqual(descriptor["path"], "methods/contracts/strategy.lean_canvas.contract.yaml")
@@ -98,7 +99,7 @@ class SpecConformanceTests(unittest.TestCase):
         self.assertEqual(METHOD_ID, "strategy.lean_canvas")
 
     def test_lean_canvas_and_bmc_both_resolve_as_separate_entries(self):
-        live = MethodCatalog.from_spec_root(self.spec_root)
+        live = shared_method_catalog(self.spec_root)
         resolved = live.resolve([METHOD_ID, "strategy.business_model_canvas"])
         self.assertIsNone(resolved["blocked"])
 
