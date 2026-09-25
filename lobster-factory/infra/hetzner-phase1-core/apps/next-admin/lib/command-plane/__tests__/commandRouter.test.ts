@@ -102,6 +102,32 @@ describe("routeCommand -- kill switch", () => {
       expect.objectContaining({ status: "blocked_by_killswitch", rejection_reason: "system in emergency_stop" }),
     );
   });
+
+  it("blocks a medium-risk command as blocked_by_killswitch when system_modes is unreadable, without calling the handler", async () => {
+    vi.mocked(evaluatePolicy).mockReturnValue({ outcome: "allow", riskLevel: "medium" });
+    vi.mocked(claimCommandRequest).mockResolvedValue({ request: row({ risk_level: "medium" }), isNew: true });
+    vi.mocked(getActiveMode).mockResolvedValue("unavailable");
+    vi.mocked(evaluateKillSwitch).mockReturnValue({
+      mode: "unavailable",
+      blocks: true,
+      reason: "system_modes unreadable (fail closed)",
+    });
+    const handler = vi.fn();
+
+    const result = await routeCommand(sb, INPUT, { handlers: { "/status": handler } });
+
+    expect(result.status).toBe("blocked_by_killswitch");
+    expect(result.reason).toBe("system_modes unreadable (fail closed)");
+    expect(handler).not.toHaveBeenCalled();
+    expect(updateRequestStatus).toHaveBeenCalledWith(
+      sb,
+      "req-1",
+      expect.objectContaining({
+        status: "blocked_by_killswitch",
+        rejection_reason: "system_modes unreadable (fail closed)",
+      }),
+    );
+  });
 });
 
 describe("routeCommand -- policy block (unknown command / policy-denied)", () => {

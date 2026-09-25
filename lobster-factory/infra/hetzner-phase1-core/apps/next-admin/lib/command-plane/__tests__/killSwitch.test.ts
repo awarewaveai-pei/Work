@@ -3,7 +3,7 @@
 // so the "command blocked" cases below are the security-relevant ones to pin.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
-import { evaluateKillSwitch, getActiveMode } from "../killSwitch";
+import { evaluateKillSwitch, FAIL_OPEN_FOR, getActiveMode } from "../killSwitch";
 import type { RiskLevel, SystemMode } from "../types";
 
 function fakeSb(rows: Array<{ scope_type: string; scope_id: string | null; mode: SystemMode }> | null, error: unknown = null) {
@@ -45,11 +45,12 @@ describe("evaluateKillSwitch", () => {
 });
 
 describe("getActiveMode", () => {
-  // KNOWN BUG on main (TASKS.md: kill switch fails open): killSwitch.ts:16-18 promises that
-  // medium/high/critical commands fail closed when system_modes is unreadable, but getActiveMode
-  // returns "normal" on a DB error. `it.fails` pins the documented contract: when the source is
-  // fixed this starts passing, vitest reports it, and it must become a plain `it`.
-  it.fails("a DB error blocks medium/high/critical commands (documented fail-closed contract)", async () => {
+  it("returns 'unavailable' (not a real mode) when the query errors", async () => {
+    const { sb } = fakeSb(null, { message: "boom" });
+    expect(await getActiveMode(sb, "org-1")).toBe("unavailable");
+  });
+
+  it("a DB error blocks medium/high/critical commands (documented fail-closed contract)", async () => {
     const { sb } = fakeSb(null, { message: "boom" });
     const mode = await getActiveMode(sb, "org-1");
     for (const risk of ["medium", "high", "critical"] as RiskLevel[]) {
@@ -62,9 +63,7 @@ describe("getActiveMode", () => {
     expect(await getActiveMode(sb, "org-1")).toBe("normal");
   });
 
-  // KNOWN BUG on main: killSwitch.ts:16 promises the MOST-RESTRICTIVE mode across org and global;
-  // the code prefers the client row, so a client "normal" row cancels a global emergency_stop.
-  it.fails("a global emergency_stop is not overridden by a client-scoped normal row (most-restrictive contract)", async () => {
+  it("a global emergency_stop is not overridden by a client-scoped normal row (most-restrictive contract)", async () => {
     const { sb } = fakeSb([
       { scope_type: "global", scope_id: null, mode: "emergency_stop" },
       { scope_type: "client", scope_id: "org-1", mode: "normal" },
@@ -83,5 +82,45 @@ describe("getActiveMode", () => {
   it("falls back to the global row when only a global row is returned", async () => {
     const { sb } = fakeSb([{ scope_type: "global", scope_id: null, mode: "read_only" }]);
     expect(await getActiveMode(sb, "org-1")).toBe("read_only");
+  });
+});
+
+describe("getActiveMode -- client x global takes the strictest (emergency_stop > maintenance > read_only > normal)", () => {
+  const STRICTNESS_ORDER: SystemMode[] = ["normal", "read_only", "maintenance", "emergency_stop"];
+
+  for (const clientMode of STRICTNESS_ORDER) {
+    for (const globalMode of STRICTNESS_ORDER) {
+      const expected =
+        STRICTNESS_ORDER.indexOf(clientMode) >= STRICTNESS_ORDER.indexOf(globalMode) ? clientMode : globalMode;
+      it(`client=${clientMode} x global=${globalMode} -> ${expected}`, async () => {
+        const { sb } = fakeSb([
+          { scope_type: "global", scope_id: null, mode: globalMode },
+          { scope_type: "client", scope_id: "org-1", mode: clientMode },
+        ]);
+        expect(await getActiveMode(sb, "org-1")).toBe(expected);
+      });
+    }
+  }
+});
+
+describe("evaluateKillSwitch -- unavailable (system_modes unreadable)", () => {
+  it("blocks every risk level, including low, since FAIL_OPEN_FOR is empty", () => {
+    for (const risk of ["low", "medium", "high", "critical"] as RiskLevel[]) {
+      expect(evaluateKillSwitch("unavailable", risk)).toEqual({
+        mode: "unavailable",
+        blocks: true,
+        reason: "system_modes unreadable (fail closed)",
+      });
+    }
+  });
+
+  it("fails open only for a risk level present in FAIL_OPEN_FOR (injected via the exported Set)", () => {
+    FAIL_OPEN_FOR.add("low");
+    try {
+      expect(evaluateKillSwitch("unavailable", "low")).toEqual({ mode: "unavailable", blocks: false });
+      expect(evaluateKillSwitch("unavailable", "medium").blocks).toBe(true);
+    } finally {
+      FAIL_OPEN_FOR.delete("low");
+    }
   });
 });
