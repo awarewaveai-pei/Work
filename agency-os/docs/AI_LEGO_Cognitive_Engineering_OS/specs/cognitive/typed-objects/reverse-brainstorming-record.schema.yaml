@@ -1,0 +1,133 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/reverse-brainstorming-record.schema.yaml"
+title: Reverse Brainstorming Session
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `ReverseBrainstormingSession` -- `divergent.reverse_brainstorming`'s declared output. NOT
+  Atlas-cited (grep-confirmed zero "reverse brainstorm"/"反向腦力" hits) -- external grounding is a
+  well-documented creativity technique (inversion / "prospective hindsight" family), disclosed in
+  `ai_lego/modules/divergent/reverse_brainstorming.py`'s own module docstring, not repeated here.
+  Same flat-list-plus-referential-integrity shape as `divergent.classic_brainstorming` (a distinct
+  method, not a sibling schema in this directory to reuse) but a different operation:
+  `worsening_ideas` are never solutions, `inversions` is the only mechanism that turns one into a
+  candidate solution. No genuine-compute gate -- qualitative ideation, no `engine`/
+  `computation_provenance_ref` fields (unlike this session's own sibling additions
+  eisenhower-matrix-record.schema.yaml / impact-effort-classification.schema.yaml, which ARE
+  genuine compute); same simpler, non-compute shape
+  reporting-guideline-checklist-record.schema.yaml already establishes for a qualitative record.
+
+source_of_truth_for:
+  - "methods/contracts/divergent.reverse_brainstorming.contract.yaml (outputs, preconditions, quality -- this contract declares no forbidden_transition)"
+  - "ai_lego/modules/divergent/reverse_brainstorming.py (generate_reverse_brainstorming_session -- the real builder this schema's shape is transcribed from field-for-field)"
+
+decided_by: "No ADR governs this file. Same class of decision every sibling typed-object schema in this directory documents."
+
+$defs:
+  worsening_idea:
+    type: object
+    required: [id, text, provenance]
+    additionalProperties: false
+    properties:
+      id: {type: string, minLength: 1, pattern: "\\S"}
+      text: {type: string, minLength: 1, pattern: "\\S", description: "A way to CAUSE or WORSEN problem_statement -- never a solution. Judging happens later, via inversion, not a stored score/verdict (module docstring's own 'don't reject while generating' discipline -- no score/verdict key exists on this shape by design)."}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+  inversion:
+    type: object
+    required: [worsening_idea_ref, inverted_solution, provenance]
+    additionalProperties: false
+    properties:
+      worsening_idea_ref:
+        type: string
+        minLength: 1
+        pattern: "\\S"
+        description: "Must resolve to a real worsening_ideas[].id in the same record (REVERSEBRAINSTORM_DANGLING_IDEA_REF) -- a runtime-only referential-integrity invariant JSON Schema cannot express cross-array, re-derived independently by evaluate_idea_referential_integrity_gate, never trusted as stored."
+      inverted_solution: {type: string, minLength: 1, pattern: "\\S", description: "The genuine candidate solution produced by inverting the referenced worsening idea."}
+      provenance:
+        $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+type: object
+required: [id, version, problem_statement, worsening_ideas, inversions, provenance]
+additionalProperties: false
+properties:
+
+  id:
+    type: string
+    pattern: "^REVERSEBRAINSTORM-"
+    description: "NEW DESIGN. ai_lego/modules/divergent/reverse_brainstorming.py's own RECORD_ID_PREFIX."
+
+  version:
+    type: string
+
+  generated_by_method:
+    type: string
+    default: "divergent.reverse_brainstorming"
+
+  problem_statement:
+    type: string
+    minLength: 1
+    pattern: "\\S"
+    description: "The problem being reverse-brainstormed, e.g. '新客戶 onboarding 流失率過高'."
+
+  worsening_ideas:
+    type: array
+    minItems: 1
+    description: "Answers to 'how could we CAUSE or WORSEN problem_statement' -- REVERSEBRAINSTORM_INVALID_IDEAS requires at least one. Every id must be unique in the record (REVERSEBRAINSTORM_DUPLICATE_IDEA_ID, re-derived independently by evaluate_idea_integrity_gate, not expressible as a JSON Schema cross-item uniqueness constraint on an object array)."
+    items:
+      $ref: "#/$defs/worsening_idea"
+
+  inversions:
+    type: array
+    description: "Each worsening idea inverted into a genuine candidate solution. MAY be empty -- ai_lego/modules/divergent/reverse_brainstorming.py's own module docstring: a session that has only generated worsening ideas so far, inversion deferred to a later pass, is a legal, incomplete-but-valid state."
+    items:
+      $ref: "#/$defs/inversion"
+
+  provenance:
+    description: "Overall record provenance -- same full provenance_record pattern every sibling typed-object schema in this directory uses for the record as a whole. Unlike this session's own genuine-compute siblings, the builder does NOT normalize epistemic_type here (module docstring: 'qualitative ideation, not deterministic compute')."
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Reverse-brainstorming a customer-onboarding drop-off problem: 3 worsening ideas, 2 inverted into solutions, 1 still pending inversion"
+    value:
+      id: "REVERSEBRAINSTORM-2026-09-25-001"
+      version: "1.0.0"
+      generated_by_method: "divergent.reverse_brainstorming"
+      problem_statement: "新客戶 onboarding 流失率過高"
+      worsening_ideas:
+        - id: "IDEA-1"
+          text: "第一步就要求填 20 個欄位的表單"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - id: "IDEA-2"
+          text: "完全不寄任何引導 email，讓使用者自己摸索"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - id: "IDEA-3"
+          text: "把最有價值的功能藏在第三層選單裡"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+      inversions:
+        - worsening_idea_ref: "IDEA-1"
+          inverted_solution: "只問 2 個必要欄位，其餘留到之後漸進收集"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+        - worsening_idea_ref: "IDEA-2"
+          inverted_solution: "註冊後立即寄出 3 封分階段的引導 email"
+          provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+      provenance: {epistemic_type: HYPOTHESIS, authorship_state: AI_SUGGESTED, locked: null}
+
+open_questions:
+  - "OQ-REVERSEBRAINSTORMSCHEMA-1: worsening_ideas[].id uniqueness and inversions[].worsening_idea_ref referential integrity are both runtime-only invariants (JSON Schema has no cross-item uniqueness-by-field or cross-array reference operator) -- same disclosed class of gap every closed-set/referential-integrity typed object in this directory already documents for its own structurally analogous fields.（owner: operator, or whoever next hardens this schema's cross-field guarantees）"
+
+verification:
+  method: >
+    Read ai_lego/modules/divergent/reverse_brainstorming.py in full; this schema's shape is transcribed
+    field-for-field from generate_reverse_brainstorming_session's own return dict and
+    _WORSENING_IDEA_KEYS/_INVERSION_KEYS. Grepped specs/cognitive/typed-objects/ for "brainstorm"/"reverse"
+    before writing -- no existing or competing typed object found (divergent.classic_brainstorming's own
+    typed object exists but is a distinct shape, not reused). Validated against jsonschema
+    Draft202012Validator via tests/unit/test_reverse_brainstorming.py's own builder-output-against-schema
+    test (this task's own new addition).
+  note: >
+    No mother document was modified (this method is not Atlas-cited). Field names are transcribed verbatim
+    from the real builder's own parameter names and return dict keys -- none invented. The
+    additionalProperties:false closed-key-set shape for worsening_idea/inversion mirrors the builder's own
+    exact-key-match validation (_WORSENING_IDEA_KEYS / _INVERSION_KEYS), not a separately invented rule.

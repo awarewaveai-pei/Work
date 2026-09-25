@@ -123,6 +123,7 @@
 | `specs/cognitive/typed-objects/disconfirming-evidence-search.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, current_belief, falsifier_criteria, search_results, provenance] properties[7] |
 | `specs/cognitive/typed-objects/dmaic-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement, phases, provenance] properties[6] |
 | `specs/cognitive/typed-objects/dpia-pia-impact-assessment-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, stages, provenance] properties[6] |
+| `specs/cognitive/typed-objects/eisenhower-matrix-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, urgency_scale, importance_scale, urgency_threshold, importance_threshold, tasks, engine, computation_provenance_ref, provenance] properties[12] |
 | `specs/cognitive/typed-objects/empathy-map.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, entries, provenance] properties[6] |
 | `specs/cognitive/typed-objects/erd-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_database, entities, relationships, constraints, provenance] properties[9] |
 | `specs/cognitive/typed-objects/error-budget-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, service_under_measurement, slo_target_ratio, observed_failure_rate, error_budget_ratio, burn_rate, budget_exhausted, release_policy, engine, computation_provenance_ref, provenance] properties[14] |
@@ -178,6 +179,7 @@
 | `specs/cognitive/typed-objects/kill-criteria-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, decision_ref, thresholds, provenance] properties[6] |
 | `specs/cognitive/typed-objects/ladder-of-inference-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, observed_data, provenance] properties[8] |
 | `specs/cognitive/typed-objects/lateral-thinking-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement, dominant_assumption, provocations, provenance] properties[7] |
+| `specs/cognitive/typed-objects/lean-canvas-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, blocks, validation_status, provenance] properties[6] |
 | `specs/cognitive/typed-objects/leverage-point-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, intervention_points, provenance] properties[5] |
 | `specs/cognitive/typed-objects/life-system-mapping-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, focal_person, subsystems, provenance] properties[6] |
 | `specs/cognitive/typed-objects/life-wheel-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, dimensions, provenance] properties[6] |
@@ -241,6 +243,7 @@
 | `specs/cognitive/typed-objects/representation-switch-event.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, views, provenance] properties[5] |
 | `specs/cognitive/typed-objects/retention-deletion-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, data_class, purpose, retention_rule, deletion_trigger, holds, compliance_evidence, provenance] properties[13] |
 | `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, decision_ref, criteria, provenance] properties[6] |
+| `specs/cognitive/typed-objects/reverse-brainstorming-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement, worsening_ideas, inversions, provenance] properties[7] |
 | `specs/cognitive/typed-objects/rice-score-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, idea, reach, impact, confidence, effort, rice_score, engine, computation_provenance_ref, provenance] properties[12] |
 | `specs/cognitive/typed-objects/rich-picture.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, context, actors, issues, provenance] properties[7] |
 | `specs/cognitive/typed-objects/risk-register-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, risks, provenance] properties[5] |

@@ -23,6 +23,7 @@ from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 
 _NOW = datetime.datetime.now(datetime.timezone.utc).isoformat()
 _METHOD_SCHEMA = "ai-lego://specs/cognitive/method.schema.yaml"
+_CLASSIFICATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/eisenhower-matrix-record.schema.yaml"
 
 
 def _provenance(epistemic_type="AI_INFERENCE", authorship_state="AI_GENERATED"):
@@ -175,3 +176,23 @@ class SpecConformanceTests(unittest.TestCase):
         })
         gates = gate_runner(record, "test", _NOW)
         self.assertTrue(all_gates_pass(gates), gates)
+
+    def test_builder_output_validates_against_the_real_typed_object_schema(self):
+        """T12: eisenhower-matrix-record.schema.yaml (the 2nd of the 4 required files, previously
+        missing) actually accepts the real builder's own output -- same pattern
+        test_impact_effort.py's own test_valid_classification_validates_against_the_real_schema
+        establishes for the structurally identical sibling shape."""
+        contracts = SchemaContracts(resolve_spec_root())
+        contracts.validate(_CLASSIFICATION_SCHEMA, _build(), "eisenhower matrix classification")
+
+    def test_cli_slice_runs_end_to_end(self):
+        """T12: run_eisenhower_matrix_slice.py (the 4th of the 4 required files, previously
+        missing) actually runs -- real method resolution, real dispatch through the catalog, real
+        schema validation, real gates, and the no-automatic-authority guard proven at both layers."""
+        from ai_lego.apps.cli.run_eisenhower_matrix_slice import SliceConfig, run_eisenhower_matrix_slice
+
+        result = run_eisenhower_matrix_slice(SliceConfig())
+        self.assertEqual(result["milestones"][-1], "VERIFYING")
+        self.assertTrue(all_gates_pass(result["gate_results"]), result["gate_results"])
+        v = result["no_automatic_authority_verification"]
+        self.assertTrue(v["runtime_layer_blocked"] and v["schema_layer_blocked"], v)
