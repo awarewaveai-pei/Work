@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-25（續8）研究線 PI-a 驗收（Claude 覆審 Codex 的 `c7061f16f`／`e28b630ba`）：退回；計畫 v1.36 §12.3b 列發現＋修正卡 WC-PIa-15～21＋14R
+
+- 結論：未通過。2 嚴重（C1 失敗的解讀花 token 不記用量＝日預算可繞過；C2 解讀在請求裡同步呼叫模型，正式站 nginx 60s 會 504 而 token 照扣）＋5 主要（M1 NOT_APPLICABLE 閘被當失敗、250 個模組受影響；M2 視覺綁定閘可繞過；M3 prompt 未照 WC-04；M4 判斷用詞與示意稿不同且吞錯；M5 web WC-09／10／11 是骨架）＋2 次要。細節與 file:line 只寫在計畫 §12.3b（不在此重述）。
+- 根因（流程）：卡片驗收指令是代理指標（vitest 只驗 `data-section` 存在；API 測試沒測失敗路徑的記帳）；WC-10 卡片本身寫錯 demo 端點的回傳。治本：§12.1 新規則 12（驗收審交付物本身：UI 用示意稿檢查器審渲染輸出、API 用探針打失敗路徑與成本記帳）；WC-PIa-20 讓 `check-mocks.py` 能審 web 輸出。
+- 雲端：fork 確認研究線 T1–T6 從未派出，沒有重複花額度；T11 `a15d2f05b`、T12 `66278d1f9` 已在 Codex 之前合併，檔案無重疊。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py → PASSED: 4158 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd COS && python -m unittest tests.unit.test_interpret_method_record tests.unit.test_api_interpret → Ran 16 OK；web npx vitest run → 3 passed；npx tsc --noEmit → exit 0 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/probe_pia.py（探針打真 API）→ P1 壞 JSON 兩次：422、provider 2 次、ai_usage calls=0；P2 NOT_APPLICABLE 閘 → 422；P3 POST 202 但 body.status=DONE；P4 stance=agree → 400；P5 綁定 patterns.99 → visual 閘 PASS | exit=0 | ms=30000
+- REVIEW_DONE: critic=Deep | verdict=fail | findings=2c/5m/2n
+  - 審查者 = Claude（非作者）；Codex 自標的 REVIEW_WAIVED 由本次覆審取代。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=NOT_APPLICABLE | hits=672
+  - 672 檔（.py/.yaml/.md/.ts/.tsx）；其中 `ai_lego/modules` 250 個模組檔會回 `"NOT_APPLICABLE"`＝M1 的影響面；`main.py:668` recipe 路徑已把它當通過。
+- 下一步：Codex 照 §12.3b 做 WC-PIa-15→21，再 14R；PI-b 在那之前不得開始。
 ## 2026-09-25（續7）研究線 WC-PIa-03：建立 30 個方法 family 的視覺原語對照表
 - [已修改] 新增 `docs/AI_LEGO_Cognitive_Engineering_OS/methods/registry/method-visual-kinds.yaml`：30 個實際 contract family 全部有 default；8 種視覺原語依 family 對照；3 個 method-level override。
 - [計畫] `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` v1.34：T12 blocker 改為已解鎖、PI-a `1/14`、下一卡 WC-PIa-01＋02。

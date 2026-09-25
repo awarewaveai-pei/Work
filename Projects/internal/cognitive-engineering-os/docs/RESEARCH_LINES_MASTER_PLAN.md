@@ -2,15 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.35（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.36（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-a 完成**（§12.3 WC-PIa-01～14）；下一期是 **PI-b**，但每張皆 High-STOP，必須取得操作者逐張正式部署 go-ahead。
-- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T12 `66278d1f9`；PI-a `c7061f16f`（視覺原語登錄）＋`e28b630ba`（schema／解讀 API／web／本機部署支援與 gate）；PI-a 14/14；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）。
-- 最後一筆程式碼 commit：`e28b630ba` PI-a；最後一筆計畫版本：v1.35（2026-09-25）。
-- 阻塞：PI-a 無。golden `4158 passed`、COS final full unittest `14186 tests / 991.668s / OK`；Playwright cognitive 在無測試帳密／project id 時正確 skip；本機 compose 完整啟動受既有 `127.0.0.1:8420` port 佔用阻擋，web image build 已綠。PI-b／P5／P-P 仍依 High-STOP 規則。
-- 下一步：只在操作者逐張 go-ahead 後開 WC-PIb-01 nginx 分流；不得把 PI-a 的本機容器／web image 當成正式部署。執行模型 Sonnet 5／Codex。
+- 現在期／卡：**PI-a 驗收退回**（2026-09-25 Claude 覆審，§12.3b）：WC-PIa-01～14 已提交（`c7061f16f`、`e28b630ba`），但未達卡片規格；修正卡 WC-PIa-15～21 未開工。**PI-b 不得開始**，直到 15～21 全過並重跑期末閘（WC-PIa-14R）。
+- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 已提交 14/14、驗收通過 0/14（退回，§12.3b）；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）。
+- 最後一筆程式碼 commit：`e28b630ba` PI-a（未通過驗收）；最後一筆計畫版本：v1.36（2026-09-25）。
+- 阻塞：PI-a 驗收退回——2 個嚴重（失敗的解讀花了 token 卻不記用量＝日預算可被繞過；解讀在請求裡同步呼叫模型最多 2 次、每次 60s，正式站 nginx 60s 會 504 而錢照扣）＋5 個主要（§12.3b）。golden 4158／unittest 14186／vitest 3 全綠，但那些測試只驗「東西存在」，是代理指標。
+- 下一步：WC-PIa-15（非同步＋失敗也記用量），照 §12.3b 順序 15→21，再 14R；執行 Codex／Sonnet 5；每張卡的驗收包含這次探針改寫成的測試。
 
 | 項 | 狀態（2026-09-24） |
 |---|---|
@@ -336,6 +336,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 9. **模型分工**：執行卡 = Sonnet 5／Codex；產卡與期末閘審 = Opus 5.5 或 Fable（一期一次，不逐卡）；純資料卡（YAML／範例／課文）= Haiku 4.5 可。
 10. **UI 卡加驗**：任何動到 `web/` 或 `COS/docs/mockups/` 的卡，驗收多一條 `python COS/docs/mockups/check-mocks.py` 綠（新殼落地後同一檢查器指向 `web/app/globals.css` 與頁面）；設計規則只准以「檢查器規則＋五頁同改」落地，不准只改操作者正在看的那一頁。
 11. **測試範圍**（2026-09-25：COS 全套 14,159 個測試本機 24–34 分鐘，每卡各跑一次太慢）：每卡跑 golden ＋ 本卡新測試 ＋ `tests/unit` 裡 import 本卡改動模組的測試檔——`cd COS && python -m unittest <本卡新測試模組> $(grep -rlE "<型樣>" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q` 綠；型樣 = 每個改動模組寫兩種 import 形式，多個用 `|` 接（例：改 `ai_lego/apps/api/main.py` → `apps\.api\.main|apps\.api import main`，選到 5 檔，含 `test_api_main` 約 3.5 分鐘，照跑）；只改 SPEC 資料／schema 的卡不跑 unit。間接依賴造成的紅由期末閘的全套抓，在期末閘修，不回頭改已合併卡的驗收。
+12. **驗收要審交付物本身，不審代理指標**（2026-09-25：PI-a 14 張卡全綠卻交出骨架，§12.3b）：UI 卡用示意稿檢查器審渲染後的 HTML；API 卡用探針打真端點，失敗路徑與成本記帳必測；只驗「元素存在／測試跑過」的測試不算驗收。卡片寫錯（例：WC-10 以為 `GET /methods/{id}/demo` 回表單輸入）時，執行者先查證再照做，查到不符就停下回報（規則 7）。
 
 ### 12.2 卡片格式（缺一欄 = 無效卡，不得執行）
 `WC-<期>-<序>`｜目標（一句）｜前置（指令＋預期）｜讀（`file:line`）｜樣板（照抄哪個 `file:line`）｜改（新／改檔案清單）｜不改｜驗收（指令＋預期輸出，逐條）｜突變（拔什麼 → 哪個測試紅）｜commit 訊息骨架｜回滾。
@@ -438,6 +439,97 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - commit：`build(cognitive-os): web Dockerfile + compose service + deploy.sh multi-service loop`。
 
 **WC-PIa-14 期末閘**：COS 全套 `python -m unittest discover -s tests -t . -q` 綠一次（§12.1 規則 11）；WC-01…13 驗收指令全部重跑一遍貼輸出；§6 PI-a 四個突變；`/codex-review` PY 與 TS 各一份 `agency-os/reports/oracle/` artifact；WORKLOG 四行；§0 改「PI-a 完（commit 清單）」；`agency-os/TASKS.md` 研究線一列；確認 12.4 前置後才開 PI-b。
+
+### 12.3b PI-a 驗收退回（2026-09-25 Claude 覆審；修正卡照 12.2 格式）
+覆審方法：讀 `e28b630ba` 全部程式對照 §12.3；重跑 golden（4158 PASS）、兩個解讀測試模組（16 OK）、web vitest（3）／tsc（0 錯）；再用探針打真 API。發現（行號＝`e28b630ba`）：
+- **C1 失敗的解讀不記用量**：`main.py:1168` 只在成功路徑 `record_ai_usage`；`interpret_method_record.py:170-173` 兩次都失敗就 raise，已花的 token 被丟掉。探針：壞 JSON 兩次 → 422、provider 呼叫 2 次、`ai_usage` 0 筆 → 日預算可無限繞過；事件只剩 `InterpretationRequested`，沒有結束事件。
+- **C2 請求裡同步呼叫模型**：`main.py:1096-1170` 在請求內跑最多 2 次 `provider.complete`（每次逾時 60s，`provider.py:25`），回 202 但 body `status: DONE`；正式站 `hetzner-phase1-core/nginx/default.conf:431` `proxy_read_timeout 60s` → 504 且 token 照扣（§7 R1／R19）。WC-06 原規格＝背景 thread＋`_ai_budget_lock_for`（`main.py:868`）＋ GET 回 PENDING／FAILED／DONE，未照做；沒有預算鎖 → 同租戶並發可超過日預算。
+- **M1 閘門 `NOT_APPLICABLE` 被當失敗**：interpret 端點 `gate.get("status") != "PASS"` → 422；`grep -rl '"NOT_APPLICABLE"' ai_lego/modules` = 250 個模組會回這個狀態，它們的合法 record 永遠解讀不了（recipe 路徑 `main.py:668` 已把它當通過）。
+- **M2 視覺綁定閘可繞過**：`interpret_method_record.py:116` 只檢查以 `record`／`source:` 開頭的字串；`{"path":"patterns.99"}` → PASS（探針）。
+- **M3 prompt 未照 WC-04**：沒有語言（中文產品，模型可以回英文）、沒有可用工具清單（`catalog_lines`）、`max_tokens=1800`（卡寫 6000，`:157`）、自己寫 JSON 解析（卡：重用 `draft.py:153` `extract_json_object`）、manifest id 用 `record.a.b` 且沒排除 id／version／provenance／generated_by_method（卡：`r/a/b`＋排除）、沒有 `prefill_map`、`data_thickness` 交給模型自己填。
+- **M4 判斷用詞與示意稿不同**：judgment 收 accept／revise／reject＋`note`（卡：agree／partial／disagree＋`text`；示意稿 `COS/docs/mockups/iceberg-result-mock.html:282` 同意／部分同意／不同意）；web 按鈕直接顯示英文；`.catch(() => undefined)` 吞錯（AGENTS §6 禁止）；GET 的 DONE 沒帶 judgment。
+- **M5 web 三張卡是骨架**：WC-10 `web/components/MethodForm.tsx` 把 list／rows／fixed_rows／json／map／recursive／upstream 全變成 JSON 文字框，group 的 conditions 沒做，variant 不切換子欄位；`LazyFill.tsx` 送出 AI 起草卻丟掉回覆；「用示範案例試一次」把 `GET /methods/{id}/demo` 的回應（CLI 的 stdout，`main.py:834-851`——**卡片本身寫錯**）塞進表單。WC-11 `ResultPage.tsx`（28 行）沒有 5b、HowTo 文字寫死、沒有狀態列／能回答不能回答／四個詞、引註沒解析成路徑＋值、下一步不是卡、沒有專家模式 JSON、layered 是 `<ol>` 不是冰山圖。WC-09 方法頁 h1 是原始 id、要人手貼 Project UUID（殼裡沒有建專案的地方，`POST /projects` 在 `main.py:1233` 卻沒用），沒有「描述你的問題」入口。vitest 只驗 `data-section` 存在。
+- m1 Next 15.2.4 安裝時報上游安全公告（Codex 的 WORKLOG 自述）；PI-b 前升到已修版本。
+- m2 WC-12／13 驗收未達（E2E skip、compose 沒到 healthy），屬環境問題；PI-b 前在本機補跑。
+
+**WC-PIa-15 解讀改非同步＋失敗也記用量**（修 C1、C2）
+- 目標：模型不在請求裡跑；每一次模型呼叫都記進 `ai_usage`。
+- 前置：§12.3 共同前置。
+- 讀：`main.py:1096-1170`；`main.py:868`（預算鎖）；`main.py:950-972`（draft 端點失敗也記用量＝樣板）；`interpret_method_record.py:149-174`。
+- 樣板：`main.py:950-972`。
+- 改：`run_interpretation` 不再 raise，改回傳 `{interpretation 或 None, gate_results, error 或 None, input_tokens, output_tokens}`（token 是所有嘗試的累計）；端點：builder＋閘門的 422 不變 → `_require_ai` → `InterpretationRequested` → 回 **202 `{interpretation_id, status:"PENDING"}`**；主體抽成 `_run_interpretation(...)`，由 `threading.Thread(daemon=True)` 在 `_ai_budget_lock_for(tenant)` 裡跑：成功 → artifact＋`InterpretationCreated`；失敗 → `InterpretationFailed {error}`；**兩條路都 `record_ai_usage`**。GET 依最後一筆事件回 PENDING／FAILED（含 error）／DONE。web 方法頁每 2 秒輪詢，直到 DONE 或 FAILED。
+- 不改：builder、method gates、`draft.py`。
+- 驗收：新增 `test_failed_interpretation_records_usage`（壞 JSON 兩次 → GET 回 FAILED；`ai_usage_totals` = 兩次 token 的總和）、`test_interpret_is_pending_until_run`（POST 的 body.status == PENDING；同步呼叫 `_run_interpretation` 後 GET == DONE）；兩個解讀測試模組全綠。
+- 突變：刪掉失敗路徑的 `record_ai_usage` → `test_failed_interpretation_records_usage` 紅。
+- commit：`fix(cognitive-os): interpretation runs in the background; usage recorded on failure too (PI-a C1/C2)`。回滾：revert 該 commit。
+
+**WC-PIa-16 閘門語意**（修 M1、M2，以及 M3 的 manifest 部分）
+- 目標：合法 record 不被誤擋；視覺綁定不能被繞過。
+- 前置：WC-PIa-15 已合併。
+- 讀：`main.py:668`；`interpret_method_record.py:24-57`、`:109-142`。
+- 樣板：`main.py:668`。
+- 改：method gates 的狀態不在 `{"PASS","NOT_APPLICABLE"}` 才 422；manifest id 改成 `r/<path>`（`/` 分隔，陣列索引用數字），並排除頂層 id／version／provenance／generated_by_method；visual 綁定裡**每個**字串葉值都必須在 manifest ids 裡（不再看前綴）。`web/fixtures/iceberg-interpretation.json` 跟著改成 `r/` id。
+- 不改：method gate 模組本身。
+- 驗收：新增 `test_not_applicable_gate_is_accepted`（patch 成 NOT_APPLICABLE → 202）、`test_bare_binding_path_fails`、`test_manifest_excludes_system_keys`；兩個解讀測試模組全綠。
+- 突變：visual 閘改回看前綴 → `test_bare_binding_path_fails` 紅。
+- commit：`fix(cognitive-os): interpretation gates accept NOT_APPLICABLE, every binding must resolve, manifest ids r/<path> (PI-a M1/M2)`。回滾：revert。
+
+**WC-PIa-17 prompt 照 WC-04**（修 M3 其餘）
+- 目標：模型用中文回答、只推薦存在的工具，輸出空間夠。
+- 前置：WC-PIa-16 已合併。
+- 讀：§12.3 WC-PIa-04 全文；`draft.py:111-168`。
+- 樣板：`draft.py:111-152`（prompt 段落結構）。
+- 改：語言參數（預設 zh-TW，寫進 prompt 規則）；`catalog_lines`（ACTIVE 的 `id — name_zh`）；`INTERPRET_MAX_TOKENS=6000`；刪掉 `parse_interpretation`，改 import `draft.extract_json_object`；新增純函式 `prefill_map(target_record_schema, manifest) -> (prefill, needs_input)`；`data_thickness` 改由伺服器依 manifest 計算。
+- 不改：`draft.py`。
+- 驗收：FakeProvider 收到的 prompt 含「zh-TW」和 `systems.iceberg_model — 冰山模型` 這一行，且 `max_tokens == 6000`；`prefill_map` 兩個案例（同名欄位帶入、缺的欄位進 needs_input）。
+- 突變：拿掉語言規則 → 對應測試紅。
+- commit：`fix(cognitive-os): interpretation prompt per WC-04 (language, catalog, 6000 tokens, shared JSON extractor, prefill_map) (PI-a M3)`。回滾：revert。
+
+**WC-PIa-18 判斷用詞**（修 M4）
+- 目標：判斷的用詞與示意稿一致，送出失敗看得到。
+- 前置：WC-PIa-15 已合併。
+- 讀：`main.py:1189-1206`；`COS/docs/mockups/iceberg-result-mock.html:282`；`web/components/result/ResultPage.tsx`。
+- 樣板：示意稿 `:282` 的三顆按鈕。
+- 改：stance 只收 agree／partial／disagree，body 為 `{stance, text}`；GET 的 DONE 帶最後一筆 judgment；web 按鈕文字改成 同意／部分同意／不同意；送出失敗要在畫面上顯示錯誤，不可吞掉。
+- 不改：事件表結構。
+- 驗收：agree → 200、accept → 400；vitest：三顆按鈕文字正確，API 失敗時畫面出現錯誤訊息。
+- 突變：恢復 `.catch(() => undefined)` → vitest 紅。
+- commit：`fix(cognitive-os): judgment vocabulary matches the result mock; errors surface (PI-a M4)`。回滾：revert。
+
+**WC-PIa-19 表單真的移植**（修 M5 的表單部分）
+- 目標：每種欄位都有真正的輸入介面，不是 JSON 文字框。
+- 前置：WC-PIa-15 已合併。
+- 讀：`dashboard.html:901-1255`（整段）；`method_form.py:271-420`（每個 kind 的節點形狀）。
+- 樣板：`dashboard.html:901-1255`。
+- 改：`MethodForm` 每個 kind 一個元件：list（逐行增刪）、rows／fixed_rows（表格列）、group＋conditions（依條件顯示或隱藏欄位）、variant（切換後顯示該分支的欄位）、recursive；json 只留給 schema 真的沒有結構的欄位。LazyFill 用 AI 起草的回覆填欄，標成 AI_SUGGESTED，使用者確認才算；示範案例改用 `GET /methods/{id}/form` 回應裡的 `example`。
+- 不改：API。
+- 驗收：WC-PIa-10 原驗收（三個方法 `/invoke` 皆 200，`web/fixtures/payload-<method>.json` 與 dashboard 送出的 body 相同）；`grep -c "JSON.stringify(value" web/components/MethodForm.tsx` ≤ 1。
+- 突變：variant 不切換分支 → payload fixture 比對紅。
+- commit：`fix(cognitive-web): method form ported per kind from dashboard.html (PI-a M5)`。回滾：revert。
+
+**WC-PIa-20 結果頁照示意稿，並讓示意稿檢查器審 web 輸出**（修 M5 的結果頁；結構修法）
+- 目標：結果頁內容對齊示意稿，而且由同一個檢查器把關。
+- 前置：WC-PIa-16、18 已合併。
+- 讀：`COS/docs/mockups/iceberg-result-mock.html`（整檔＝規格）；`COS/docs/mockups/check-mocks.py` 的 `check_common`、`check_result`。
+- 樣板：同上。
+- 改：`ResultPage` 九段（含 5b）照示意稿；HowTo 文字來自 display-metadata／結果骨架資料；引註 `[n]` 解析成 manifest 路徑＋值；NextSteps 卡（prefill 帶入 N 欄、needs_input 標紅）；ProvenanceBar 含閘門結果與 `<details>` 專家 JSON；layered 用示意稿的冰山 SVG 結構。**新增** `check-mocks.py --page result <html>`：對任意 HTML 跑 result 規則；vitest 把 fixture 渲染成 HTML 存檔後呼叫它。
+- 不改：示意稿本身。
+- 驗收：`python COS/docs/mockups/check-mocks.py --page result web/.artifacts/iceberg-result.html` 綠；eisenhower fixture → `data-visual="quadrant"`。
+- 突變：拿掉 5b 段 → 檢查器紅。
+- commit：`fix(cognitive-web): result page per the result mock, checked by check-mocks (PI-a M5)`。回滾：revert。
+
+**WC-PIa-21 第一次用不用貼 UUID**（修 M5 的方法頁與 m1）
+- 目標：第一次登入的人能直接開始用一個工具。
+- 前置：WC-PIa-19 已合併。
+- 讀：`main.py:1233-1290`（projects）；`web/app/methods/[id]/page.tsx`；`web/app/methods/page.tsx`。
+- 樣板：`COS/docs/mockups/home-mock.html` 的「說你卡在哪」卡片。
+- 改：方法頁 h1 用工具中文名；沒有專案時自動 `POST /projects`（名稱＝工具名＋日期），有專案就列出來用按鈕選（不用 `<select>`）；方法清單頁加「不知道用哪個？描述你的問題」入口；Next 升到沒有安全公告的版本（m1）。
+- 不改：API。
+- 驗收：vitest：沒有專案時只呼叫一次 `POST /projects`，畫面不出現「Project ID」；`npm audit --omit=dev` 沒有 high。
+- 突變：拿掉自動建專案 → vitest 紅。
+- commit：`fix(cognitive-web): first use needs no project id; Next patched (PI-a M5/m1)`。回滾：revert。
+
+**WC-PIa-14R 期末閘重跑**：15～21 全過後，WC-PIa-14 全部重做，包括全套 unittest，以及 `/claude-review` 真的產出 oracle artifact（不得再 waive）；做完 §0 才可以寫「PI-a 完成」。
 
 ### 12.4 PI-b 工作卡（prod；每張 **High-STOP**，逐張 go-ahead）
 **WC-PIb-01 nginx 分流**：`ssh -p 58122 ks-aw-01`（AGENTS §0）→ 只走 `/root/lobster-phase1/scripts/safe-infra-patch.sh nginx`；把 `hetzner-phase1-core/nginx/default.conf:427-450` 區塊的 `location /` 改三段：`location /api/ { … proxy_pass http://cognitive-os-api:8420/; }`（尾斜線 = 去前綴）、`location /expert/ { … proxy_pass http://cognitive-os-api:8420/; }`、`location / { … proxy_pass http://cognitive-os-web:3000; }`；`limit_req`、五個 `proxy_set_header`、`$is_trusted_source`、timeout 逐段照抄不動。repo 內 `default.conf` 同 commit 改（對照用）。驗收：`curl -s https://cognitive.aware-wave.com/api/health` 含 `"status":"ok"`；`curl -s https://cognitive.aware-wave.com/expert/ | grep -c api-prefix` = 1；`curl -sI https://cognitive.aware-wave.com/` 200 且是 web。回滾：safe-infra-patch 自動還原。
