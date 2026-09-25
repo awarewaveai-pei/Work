@@ -1,4 +1,19 @@
 ﻿# Worklog
+## 2026-09-25（續3）研究線示意稿：mockkit 防重複鍵 loader 接受 YAML 合併鍵（golden runner 同一 bug 的第三份拷貝）＋selftest 加「合法變體必過」
+
+- 根因：`COS/docs/mockups/mockkit.py:49-59`（HEAD）覆寫 `SafeLoader.construct_mapping`，查重複鍵時對 `<<:` 鍵也呼叫 `construct_object` → 無 merge 建構子 → `ConstructorError`；跟 golden runner（40366864a，`SPEC/tests/run_golden_tests.py:131-146`）同一 bug，fork session 的 critic 重現後通報。目前示意稿讀的登錄檔都沒用 `<<:`，屬潛伏 bug。
+- 修法：改成跟 golden runner 同一結構的建構子函式（只查明寫鍵 → `flatten_mapping` → 建 dict）；不可沿用 SafeLoader 的延後 generator：先試過，巢狀合併鏈（`y: {<<: *a}`，而 `&a` 本身又 `<<: *z` 並覆寫）會在 `&a` 自己的檢查前就被攤平，誤報重複鍵。不可 hash 的鍵 → ValueError（原本是 TypeError traceback）；重複鍵的行號改成第二個鍵所在行（原本是 mapping 起點）。
+- selftest：抽出 `mutate()`；新增 CASES「登錄檔重複鍵」（157 案）＋ `ACCEPT` 清單（合法變體必須 exit 0；第一筆 = recipe-display-metadata.yaml 用 `&eng`／`<<: *eng`，明寫的 name_zh／blurb_zh 覆寫合併值）。計畫 I11 去掉寫死的案例數（改「每個缺陷必抓、合法變體必過」）。
+- 後續：三份相同的 strict loader（golden runner、`search_content_pack_check.py`、mockkit）之後應收成一個模組；SPEC tests 由 fork 在動，T12 合併後再做。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/mockkit_merge_probe.py（6 案：合併＋覆寫／合併旁重複／一般重複／巢狀合併鏈／合併清單／不可 hash 鍵） | exit=0 | ms=900
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scratchpad/accept_mutation_proof.py（ACCEPT 變體：修後 exit=0 全綠；HEAD 版 mockkit exit=1 `ConstructorError: could not determine a constructor for the tag 'tag:yaml.org,2002:merge'`） | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python COS/docs/mockups/check-mocks-selftest.py → `157 mutations, 157 caught, 0 missed; 1 valid variants, 1 accepted, 0 rejected`；`coverage: 121 rules, 121 proven` | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python COS/docs/mockups/check-mocks.py → `5 pages, shared block identical, all rules green`；sync 五頁 already in sync（頁面零變動） | exit=0 | ms=4000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-09-25-partialreview-8d297b64.md`：NO FINDINGS）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=flatten_mapping|construct_mapping|duplicate key | hits=4
+  - 4 檔 = 三份 strict loader（run_golden_tests.py、search_content_pack_check.py 已修；mockkit 本次修）＋ check-mocks-selftest.py 的新案例；ai_lego 產品端全用 `yaml.safe_load`（不查重複鍵，靠 golden 在 commit 前擋）。
+- 避免再發生：ACCEPT 清單 = 誤紅也是缺陷；新 loader 行為一律加一筆合法變體。
 ## 2026-09-25（續2）雲端額度第一批 T0/T7/T8/T9/T10 本機驗收後併入 main（squash，一個 commit）
 - [來源] 雲端 session（Sonnet 5）分支：`claude/cc-t0-golden-green` f8bbc7b2f｜`claude/eager-wozniak-70s1i8`（T8）｜`claude/cc-t7-command-plane-tests` 838b57b39｜`claude/cc-t9-doc-check-script-commits` bb7c7b7d2｜`claude/cc-t10-dom-test-infra` f8df7bc5c。操作者 2026-09-25「檢查並合併」；額度 $98 → $64（6 個 session）。
 - [T0] 只收 loader：`run_golden_tests.py`、`tests/architecture/search_content_pack_check.py` 防重複鍵 loader 先查明寫鍵再 `flatten_mapping`（YAML merge key 合法）→ method-input-forms.yaml 解析恢復。**不收** contract-backlog 的 3 筆 complete 登記：critic 查出備註引的前例（reporting_guideline_checklist 無 schema）是假的，3 個工具缺 typed-object schema＋CLI slice（METHOD_ATLAS_SLICE_LEAN_STANDARD.md:14-19）→ 登記 = 改資料消音。golden 現在只剩這 3 條紅（真實），雲端 T12 補齊後登記。

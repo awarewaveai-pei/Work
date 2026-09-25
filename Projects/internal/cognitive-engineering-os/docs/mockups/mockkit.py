@@ -50,12 +50,24 @@ def _yaml(path):
     """yaml.safe_load that rejects a duplicate key (PyYAML silently keeps the last one) and returns the document."""
     import yaml
 
-    class Strict(yaml.SafeLoader):
-        def construct_mapping(self, node, deep=False):
-            keys = [self.construct_object(k, deep=True) for k, _ in node.value]
-            for k in keys:
-                if keys.count(k) > 1: raise ValueError(f"{path.name}: duplicate key {k!r} at line {node.start_mark.line + 1}")
-            return super().construct_mapping(node, deep)
+    def mapping(loader, node, deep=False):
+        # same constructor as SPEC tests/run_golden_tests.py _construct_mapping: explicit keys are checked, then
+        # flatten_mapping expands `<<: *anchor` (an explicit key overriding a merged one is precedence, not a duplicate).
+        # A plain function, not SafeLoader's deferred generator: a merge source must be checked before a later merge
+        # flattens it in place, or its own override reads as a duplicate.
+        seen = set()
+        for k, _ in node.value:
+            if k.tag == "tag:yaml.org,2002:merge": continue
+            key = loader.construct_object(k, deep=deep)
+            try: dup = key in seen
+            except TypeError: raise ValueError(f"{path.name}: unhashable key at line {k.start_mark.line + 1}") from None
+            if dup: raise ValueError(f"{path.name}: duplicate key {key!r} at line {k.start_mark.line + 1}")
+            seen.add(key)
+        loader.flatten_mapping(node)
+        return {loader.construct_object(k, deep=deep): loader.construct_object(v, deep=deep) for k, v in node.value}
+
+    class Strict(yaml.SafeLoader): pass
+    Strict.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
     return yaml.load(path.read_text(encoding="utf-8"), Loader=Strict)
 
 

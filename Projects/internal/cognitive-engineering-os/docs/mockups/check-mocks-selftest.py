@@ -2,7 +2,8 @@
 """Mutation self-test for check-mocks.py: copies the five mocks plus design-system.css and partials/ to a temp folder,
 injects one defect per case and requires the checker to exit 1 with a finding carrying the expected rule tag (and, when
 given, the expected message text — so the case proves ITS rule, not a neighbour that happens to fire too) and no
-traceback; the untouched copies must be green. domains.yaml is always the SPEC file.
+traceback; the untouched copies must be green, and so must every ACCEPT variant (valid input the checker once rejected — a
+false red is a defect too). domains.yaml is always the SPEC file.
 Coverage: the checker runs traced (CHECK_MOCKS_TRACE), so each expected line names the rule (self.bad call site) that
 raised it; every call site must be proven by some case, except the rules in NO_CASE_YET (a list that may only shrink:
 a listed rule that gains a case, or no longer exists, fails the run until it is removed from the list).
@@ -128,6 +129,7 @@ CASES = [
     ("a generated partial edited by hand", "catalog|catalog-prompts.html differs from its registries", "partials/catalog-prompts.html", "strall", "要不要開", "要不要辦"),
     ("a registry gap stops the catalogue", "catalog|registries:", "spec:recipes/registry/recipe-display-metadata.yaml", "str", "champion-challenger: {audience: internal", "champion-challenger: {audience: nobody"),
     ("a registry gap stops the per-page menu", "partials|app-nav cannot be rendered", "spec:recipes/registry/recipe-display-metadata.yaml", "str", "champion-challenger: {audience: internal", "champion-challenger: {audience: nobody"),
+    ("a registry repeats a key (PyYAML would keep the last one)", "catalog|duplicate key 'goal'", "spec:recipes/registry/recipe-display-metadata.yaml", "str", "champion-challenger: {audience: internal, goal: engineering,", "champion-challenger: {audience: internal, goal: engineering, goal: engineering,"),
     ("a page that is not UTF-8", "parse|UnicodeDecodeError", "iceberg-result-mock.html", "bytes", b"<body>", b"<body>\xff"),
     ("page CSS defines a token", "shared|page CSS defines token --x", "workflow-lesson-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .station{--x:1px}\n"),
     ("a second light :root block", "theme|expected one light :root block", ALL_CSS, "str", "  *{box-sizing:border-box}\n", "  :root{--bg:#f6f2e9}\n  *{box-sizing:border-box}\n"),
@@ -190,6 +192,15 @@ CASES = [
 NO_CASE_YET = [
 ]
 
+# valid variants the checker must accept: (label, target, kind, old, new), same mutation format as CASES, run must exit 0
+ACCEPT = [
+    # 2026-09-25: mockkit._yaml's duplicate-key loader crashed on `<<:` (same bug as the golden runner, 40366864a);
+    # explicit name_zh/blurb_zh overriding the merged ones is merge precedence, not a duplicate
+    ("a registry uses a YAML merge key", "spec:recipes/registry/recipe-display-metadata.yaml", "re",
+     r"  champion-challenger: \{audience: internal, goal: engineering, (name_zh: [^\n]*\n)  db-migration-expand-contract: \{audience: internal, goal: engineering, ",
+     r"  champion-challenger: &eng {audience: internal, goal: engineering, \1  db-migration-expand-contract: {<<: *eng, "),
+]
+
 
 def run_checker(folder, spec=None):
     r = subprocess.run([sys.executable, str(CHECK), "--dir", str(folder)], capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -197,65 +208,80 @@ def run_checker(folder, spec=None):
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
+def reset(tmp):
+    for f in FILES + [CSS]: shutil.copyfile(HERE / f, tmp / f)
+    if (tmp / "partials").exists(): shutil.rmtree(tmp / "partials")
+    shutil.copytree(mk.PARTIALS, tmp / "partials")
+
+
+def mutate(tmp, label, target, kind, old, new):
+    """Fresh copies in tmp with one mutation applied -> (spec root copy or None, setup ok)."""
+    reset(tmp)
+    spec = None
+    if target.startswith("spec:"):   # registry mutation: a copy of the registries the mocks read
+        spec = tmp / "spec"
+        if spec.exists(): shutil.rmtree(spec)
+        for sub in ("methods", "recipes"): shutil.copytree(mk.SPEC / sub, spec / sub)
+        target = "spec/" + target[len("spec:"):]
+    targets = FILES + [CSS] if target == ALL_CSS else FILES if target == ALL else [target]
+    for f in targets:
+        p = tmp / f
+        if kind == "delete":
+            if not p.exists(): print(f"SETUP  {label}: {f} does not exist"); return spec, False
+            p.unlink(); continue
+        if kind == "bytes":
+            p.write_bytes(p.read_bytes().replace(old, new)); continue
+        s = p.read_text(encoding="utf-8")
+        if kind == "str":
+            if s.count(old) != 1: print(f"SETUP  {label}: anchor found {s.count(old)}x in {f}"); return spec, False
+            s = s.replace(old, new)
+        elif kind == "strall":
+            if s.count(old) < 1: print(f"SETUP  {label}: anchor not found in {f}"); return spec, False
+            s = s.replace(old, new)
+        elif kind == "reall":
+            s, n = re.subn(old, new, s, flags=re.S)
+            if n < 1: print(f"SETUP  {label}: regex matched nothing in {f}"); return spec, False
+        else:
+            s, n = re.subn(old, new, s, count=1, flags=re.S)
+            if n != 1: print(f"SETUP  {label}: regex matched nothing in {f}"); return spec, False
+        p.write_text(s, encoding="utf-8", newline="\n")
+    return spec, True
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    failures = 0
+    missed = rejected = 0
     covered = set()
     with tempfile.TemporaryDirectory() as td:
         tmp = pathlib.Path(td)
-        def reset():
-            for f in FILES + [CSS]: shutil.copyfile(HERE / f, tmp / f)
-            if (tmp / "partials").exists(): shutil.rmtree(tmp / "partials")
-            shutil.copytree(mk.PARTIALS, tmp / "partials")
-        reset()
+        reset(tmp)
         rc, out = run_checker(tmp)
         if rc != 0: print("baseline is not green:\n" + out); return 1
         for label, expect, target, kind, old, new in CASES:
-            reset()
-            spec = None
-            if target.startswith("spec:"):   # registry mutation: a copy of the registries the mocks read
-                spec = tmp / "spec"
-                if spec.exists(): shutil.rmtree(spec)
-                for sub in ("methods", "recipes"): shutil.copytree(mk.SPEC / sub, spec / sub)
-                target = "spec/" + target[len("spec:"):]
-            targets = FILES + [CSS] if target == ALL_CSS else FILES if target == ALL else [target]
-            setup_ok = True
-            for f in targets:
-                p = tmp / f
-                if kind == "delete":
-                    if not p.exists(): print(f"SETUP  {label}: {f} does not exist"); setup_ok = False; break
-                    p.unlink(); continue
-                if kind == "bytes":
-                    p.write_bytes(p.read_bytes().replace(old, new)); continue
-                s = p.read_text(encoding="utf-8")
-                if kind == "str":
-                    if s.count(old) != 1: print(f"SETUP  {label}: anchor found {s.count(old)}x in {f}"); setup_ok = False; break
-                    s = s.replace(old, new)
-                elif kind == "strall":
-                    if s.count(old) < 1: print(f"SETUP  {label}: anchor not found in {f}"); setup_ok = False; break
-                    s = s.replace(old, new)
-                elif kind == "reall":
-                    s, n = re.subn(old, new, s, flags=re.S)
-                    if n < 1: print(f"SETUP  {label}: regex matched nothing in {f}"); setup_ok = False; break
-                else:
-                    s, n = re.subn(old, new, s, count=1, flags=re.S)
-                    if n != 1: print(f"SETUP  {label}: regex matched nothing in {f}"); setup_ok = False; break
-                p.write_text(s, encoding="utf-8", newline="\n")
-            if not setup_ok: failures += 1; continue
+            spec, setup_ok = mutate(tmp, label, target, kind, old, new)
+            if not setup_ok: missed += 1; continue
             rc, out = run_checker(tmp, spec)
             tag, _, msg = expect.partition("|")
             hit = [ln for ln in out.splitlines() if f"[{tag}]" in ln and msg in ln]
             covered |= {int(m) for ln in hit for m in re.findall(r"@site:(\d+)", ln)}
             ok = rc == 1 and "Traceback" not in out and bool(hit)
-            failures += 0 if ok else 1
+            missed += 0 if ok else 1
             first = (hit or out.strip().splitlines() or [""])[0]
             print(("CAUGHT " if ok else "MISSED ") + f"{label} -> {first[:120]}")
-    print(f"selftest: {len(CASES)} mutations, {len(CASES) - failures} caught, {failures} missed")
+        for label, target, kind, old, new in ACCEPT:
+            spec, setup_ok = mutate(tmp, label, target, kind, old, new)
+            if not setup_ok: rejected += 1; continue
+            rc, out = run_checker(tmp, spec)
+            ok = rc == 0
+            rejected += 0 if ok else 1
+            print(("ACCEPTED " if ok else "REJECTED ") + f"{label} -> {(out.strip().splitlines() or [''])[0][:120]}")
+    print(f"selftest: {len(CASES)} mutations, {len(CASES) - missed} caught, {missed} missed; "
+          f"{len(ACCEPT)} valid variants, {len(ACCEPT) - rejected} accepted, {rejected} rejected")
     gaps = coverage(covered)
-    return 0 if failures == 0 and not gaps else 1
+    return 0 if missed == 0 and rejected == 0 and not gaps else 1
 
 
 def coverage(covered):
