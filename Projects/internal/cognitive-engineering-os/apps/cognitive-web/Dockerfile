@@ -5,6 +5,8 @@ RUN npm ci --no-audit --no-fund
 
 FROM deps AS builder
 COPY . .
+ARG COS_API_ORIGIN=http://cognitive-os-api:8420
+ENV COS_API_ORIGIN=$COS_API_ORIGIN
 RUN npm run build
 
 FROM node:22-alpine AS runner

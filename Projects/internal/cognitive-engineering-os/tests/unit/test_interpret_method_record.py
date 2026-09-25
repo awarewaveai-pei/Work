@@ -54,6 +54,14 @@ class InterpretationTests(unittest.TestCase):
         run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={"name_zh": "冰山模型"}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-PROMPT-001", catalog_lines=["systems.iceberg_model — 冰山模型"])
         self.assertIn("zh-TW", provider.requests[0][1])
         self.assertIn("systems.iceberg_model — 冰山模型", provider.requests[0][1])
+        self.assertIn("every next_steps.method_id must also appear in next_methods", provider.requests[0][1])
+        shape = json.loads(provider.requests[0][1].split("OUTPUT JSON SHAPE: ", 1)[1].split("\n\nRULES:", 1)[0])
+        self.assertNotIn("revision_conditions", shape)
+        self.assertIn("revision_conditions", shape["findings"][0])
+        self.assertIn("est_cost", shape["next_steps"][0])
+        self.assertEqual(set(shape["recommendations"][0]), {"level", "action", "expected", "citations"})
+        self.assertEqual(set(shape["gaps"][0]), {"text", "needed_evidence"})
+        self.assertEqual(shape["visual"]["bindings"]["levels"][0]["path"], "r/events")
         self.assertEqual(provider.requests[0][2], 6000)
 
     def test_prefill_map_same_name_and_missing(self):
@@ -79,6 +87,7 @@ class InterpretationTests(unittest.TestCase):
         self.assertNotIn("r/version", ids)
         self.assertNotIn("r/provenance", ids)
         self.assertNotIn("r/generated_by_method", ids)
+        self.assertNotIn("r", ids)
         self.assertIn("r/events/0", ids)
 
     def test_visual_kind_uses_override(self):
@@ -100,6 +109,85 @@ class InterpretationTests(unittest.TestCase):
     def test_next_method_out_of_catalog_fails(self):
         result = evaluate_interpretation_gates({"findings": [{"citations": ["r/events/0"]}], "visual": {"bindings": {}}, "next_methods": ["fake.missing"]}, RECORD, build_prompt_manifest(RECORD), set())
         self.assertEqual(result[2]["status"], "FAIL")
+
+    def test_orphan_next_step_repair_is_explicit(self):
+        orphan = json.loads(valid_response())
+        orphan["next_steps"] = [{"method_id": "fake.missing"}]
+        provider = FakeProvider([json.dumps(orphan), valid_response()])
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-REPAIR-001")
+        self.assertEqual(provider.calls, 2)
+        self.assertIsNone(result["error"])
+        self.assertIn('next_steps.method_id=["fake.missing"]', provider.requests[1][1])
+        self.assertEqual((result["input_tokens"], result["output_tokens"]), (20, 40))
+
+    def test_unresolvable_prefill_becomes_needs_input_without_loosening_gate(self):
+        response = json.loads(valid_response())
+        response["next_steps"] = [{
+            "method_id": "systems.leverage_point_analysis", "answers": "Where to intervene?", "deepens": "the pattern",
+            "prefill": {"patterns": "invented source", "events": "r/events/0"}, "needs_input": [],
+            "yields": "leverage points", "est_cost": "one session",
+        }]
+        raw_gates = evaluate_interpretation_gates(response, RECORD, build_prompt_manifest(RECORD), {"systems.leverage_point_analysis"})
+        self.assertEqual(raw_gates[2]["status"], "FAIL")
+        provider = FakeProvider([json.dumps(response)])
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-PREFILL-001")
+        self.assertEqual(provider.calls, 1)
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["gate_results"][2]["status"], "PASS")
+        step = result["interpretation"]["next_steps"][0]
+        self.assertEqual(step["prefill"], {"events": "r/events/0"})
+        self.assertEqual(step["needs_input"], ["patterns"])
+
+    def test_malformed_prefill_and_needs_input_are_empty_not_claimed(self):
+        response = json.loads(valid_response())
+        response["next_steps"] = [{
+            "method_id": "systems.leverage_point_analysis", "answers": "Where to intervene?", "deepens": "the pattern",
+            "prefill": "unsupported source", "needs_input": None, "yields": "leverage points", "est_cost": "one session",
+        }]
+        provider = FakeProvider([json.dumps(response)])
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-PREFILL-002")
+        self.assertEqual(provider.calls, 1)
+        self.assertIsNone(result["error"])
+        step = result["interpretation"]["next_steps"][0]
+        self.assertEqual(step["prefill"], {})
+        self.assertEqual(step["needs_input"], [])
+
+    def test_gaps_missing_evidence_are_explicit_without_losing_text(self):
+        response = json.loads(valid_response())
+        response["gaps"] = [
+            {"id": "G1", "text": "No field measurement"},
+            {"text": "No timeline", "needed_evidence": "dated observations"},
+        ]
+        provider = FakeProvider([json.dumps(response)])
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-GAPS-001")
+        self.assertEqual(provider.calls, 1)
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["interpretation"]["gaps"], [
+            {"text": "No field measurement", "needed_evidence": "未指定；需使用者補充證據"},
+            {"text": "No timeline", "needed_evidence": "dated observations"},
+        ])
+
+    def test_layer_name_bindings_keep_exact_manifest_paths(self):
+        response = json.loads(valid_response())
+        response["visual"]["bindings"] = {"events": "r/events/0", "patterns": "r/patterns/0"}
+        provider = FakeProvider([json.dumps(response)])
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-LAYERS-001")
+        self.assertEqual(provider.calls, 1)
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["interpretation"]["visual"]["bindings"], {"levels": [
+            {"label": "events", "path": "r/events/0"},
+            {"label": "patterns", "path": "r/patterns/0"},
+        ]})
+
+    def test_layer_name_binding_with_unknown_path_still_fails_gate(self):
+        response = json.loads(valid_response())
+        response["visual"]["bindings"] = {"events": "r/unknown"}
+        provider = FakeProvider([json.dumps(response)] * 2)
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-LAYERS-002")
+        self.assertEqual(provider.calls, 2)
+        self.assertIsNone(result["interpretation"])
+        self.assertEqual(result["gate_results"][1]["status"], "FAIL")
+        self.assertEqual((result["input_tokens"], result["output_tokens"]), (20, 40))
 
     def test_bad_json_then_repair_passes(self):
         provider = FakeProvider(["not json", valid_response()])

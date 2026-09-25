@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('login -> iceberg -> result page sections including 5b', async ({ page }) => {
+  test.setTimeout(180_000);
   const mockApi = process.env.COS_TEST_MOCK_API === '1';
   const tenant = mockApi ? 'tenant-local' : process.env.COS_TEST_TENANT_ID;
   const email = mockApi ? 'local@example.test' : process.env.COS_TEST_EMAIL;
@@ -41,15 +42,23 @@ test('login -> iceberg -> result page sections including 5b', async ({ page }) =
   await page.getByLabel('Email').fill(email!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: '登入' }).click();
+  await expect(page).toHaveURL(/\/methods$/);
   await page.goto('/methods');
   await page.getByPlaceholder('搜尋工具').fill('iceberg');
   await page.getByRole('link', { name: '開始使用' }).first().click();
   await expect(page.getByRole('heading', { level: 1, name: '冰山模型' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '我的專案' }).locator('..').getByRole('button').first()).toBeVisible();
   await page.getByRole('button', { name: '用示範案例試一次' }).click();
+  const doneResponse = page.waitForResponse(async (response) => {
+    if (!/\/api\/interpretations\/INTERP-/.test(response.url()) || !response.ok()) return false;
+    return (await response.json()).status === 'DONE';
+  }, { timeout: 150_000 });
   await page.getByRole('button', { name: '開始解讀' }).click();
-  await expect(page.locator('[data-section="0"]')).toBeVisible();
+  const completed = await (await doneResponse).json() as { result: { findings: Array<{ citations: string[] }> } };
+  await expect(page.locator('[data-section="0"]')).toBeVisible({ timeout: 150_000 });
   await expect(page.locator('[data-section]')).toHaveCount(10);
   await expect(page.locator('[data-section="5b"]')).toBeVisible();
-  await expect(page.locator('[data-section="1"] a[href^="#citation-"]')).toHaveCount(1);
+  const citationLinks = page.locator('[data-section="1"] a[href^="#citation-"]');
+  if (mockApi) await expect(citationLinks).toHaveCount(1);
+  else await expect(citationLinks).toHaveCount(completed.result.findings.reduce((count, finding) => count + finding.citations.length, 0));
 });

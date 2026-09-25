@@ -200,6 +200,28 @@ class InterpretApiTests(ApiTestCase):
         usage = api_main.app.dependency_overrides[api_main.get_store]().ai_usage_totals(self.tenant["tenant_id"])
         self.assertEqual((usage["input_tokens"], usage["output_tokens"]), (22, 46))
 
+    def test_usage_write_failure_finishes_as_failed_not_pending(self):
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={
+                "project_id": self.project_id,
+                "events": ["release incidents"],
+                "patterns": ["weekly spike"],
+                "structures": [],
+                "mental_models": [],
+                "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
+            })
+        self.assertEqual(response.status_code, 202, response.text)
+        interpretation_id = response.json()["interpretation_id"]
+        store = launch.call_args.kwargs["store"]
+        with patch.object(store, "record_ai_usage", side_effect=RuntimeError("disk unavailable")):
+            api_main._run_interpretation(**launch.call_args.kwargs)
+        fetched = self.client.get(f"/interpretations/{interpretation_id}")
+        self.assertEqual(fetched.status_code, 200, fetched.text)
+        self.assertEqual(fetched.json()["status"], "FAILED")
+        self.assertIn("AI_USAGE_RECORD_FAILED", fetched.json()["error"])
+        failure = [event for event in self.repo.list_events(self.tenant["tenant_id"], f"project:{self.project_id}") if event["event_type"] == "InterpretationFailed"][-1]
+        self.assertEqual((failure["payload"]["input_tokens"], failure["payload"]["output_tokens"]), (11, 23))
+
     def test_interpret_is_pending_until_run(self):
         with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
             response = self.client.post("/methods/systems.iceberg_model/interpret", json={

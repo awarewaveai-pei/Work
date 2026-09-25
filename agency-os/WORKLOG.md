@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-26（續21）研究線 WC-PIa-14R：真模型／舊頁／官方 E2E 通過，oracle 仍待額度重置
+
+- 起因：操作者已提供有效本機模型 key、健康 API、Claude CLI 登入；14R 不得以 mock 或 skip 代替真驗收。
+- 修正：web 建置時綁容器內 API origin；解讀 prompt 示範 typed shape，manifest 不含根節點與系統鍵；冰山顯示 label 不當路徑、合法層名→manifest 路徑轉為 `levels[]`，未知路徑仍拒絕；非法 prefill 轉待補、gaps 未指定證據明示；用量寫入失敗改為 FAILED 事件而不永遠 PENDING；結果頁顯示 finding-level 改判條件。E2E 登入導航等待與模型輪詢時間調整；原 mock 引註 `==1` 保留，真模型以 API findings 引註數精確相等。
+- REALTEST_EVIDENCE: tool=Playwright/Docker/Python | cmd=舊 dashboard 真 AI 草稿＋執行成立；官方 `scripts/playwright-runner.ps1 -Mode cognitive -SkipInstall` 真模型 1 passed／0 failed／0 skipped（evidence: `agency-os/reports/e2e/2026-09-26/cognitive`）；mock 1 passed；Docker API＋web healthy；golden 4163/4163；COS unittest 14201/14201（1115.211s）；解讀／API 定向 30/30；web vitest 12/12、typecheck 綠 | exit=0。
+- REVIEW_DONE: Claude Python 首份 scoped oracle `agency-os/reports/oracle/2026-09-25-review-2ec42aab.md` 的 4 項已逐一核對並修正（用量失敗、manifest 根、unused Response、未知事件）；此 artifact verdict=needs-attention，不當作最終通過。最終 Python／TypeScript oracle 需等 Claude CLI 04:00 Asia/Taipei 額度重置，絕不 waive。
+- BUGHUNT_DONE: 結果頁拔 finding-level 改判條件顯示→對應 vitest 紅→還原綠；原 E2E 固定引註 1 在真模型 4 筆時紅，改為 mock `==1` ＋真模型與 API 精確相等後綠；層 label 誤查 manifest 的單元測試先紅→只查 path 後綠，未知 path 反例仍紅。
+- 未過：PY／TS Claude 最終 oracle 尚待完成；PI-a／14R 不標完成，PI-b 不開始。
+
 ## 2026-09-25（續20）雲端 T16 驗收後併入 main：修復中心＋自動修復一律過 kill switch（讀不到模式即擋），kill switch 讀取失敗送 Sentry（節流）
 - [來源] 雲端 session（Sonnet 5）`claude/cc-t16-repair-mode-gate` ca696d899；額度 $38 → $30。
 - [根因] 不變量「會改正式環境的修復路徑只在 mode=normal 執行，讀不到＝擋」在 main 上三處違反：

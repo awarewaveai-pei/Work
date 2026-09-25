@@ -63,4 +63,9 @@ describe("ResultPage", () => {
     expect(html).toContain("還要你填：objective");
     expect(html).toContain("Release incidents increased");
   });
+  it("renders finding-level revision conditions from the typed contract", () => {
+    const withCondition = { ...fixture, findings: [{ ...fixture.findings[0], revision_conditions: [{ text: "New evidence", would_change: "Confidence level" }] }] };
+    const html = renderToStaticMarkup(<ResultPage result={withCondition} record={record} />);
+    expect(html).toContain("改判條件：New evidence；Confidence level");
+  });
 });

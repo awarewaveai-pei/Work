@@ -1126,12 +1126,18 @@ def _run_interpretation(
             error = str(failure)
         finally:
             if outcome is not None:
-                store.record_ai_usage(
-                    tenant_id, session["identity_id"], f"interpret:{method_id}",
-                    outcome["model"], outcome["input_tokens"], outcome["output_tokens"],
-                )
+                try:
+                    store.record_ai_usage(
+                        tenant_id, session["identity_id"], f"interpret:{method_id}",
+                        outcome["model"], outcome["input_tokens"], outcome["output_tokens"],
+                    )
+                except Exception as usage_failure:
+                    error = f"AI_USAGE_RECORD_FAILED: {type(usage_failure).__name__}"
     if error is not None or outcome is None or outcome["interpretation"] is None:
-        repo.append_event(tenant_id, aggregate_id, "InterpretationFailed", {"interpretation_id": interpretation_id, "error": error or "INTERPRETATION_FAILED"})
+        failure = {"interpretation_id": interpretation_id, "error": error or "INTERPRETATION_FAILED"}
+        if outcome is not None:
+            failure.update({"input_tokens": outcome["input_tokens"], "output_tokens": outcome["output_tokens"]})
+        repo.append_event(tenant_id, aggregate_id, "InterpretationFailed", failure)
         return
     try:
         reference = artifact_store.put(tenant_id, "MethodInterpretation", {
@@ -1154,7 +1160,6 @@ def _launch_interpretation(**kwargs: Any) -> None:
 def interpret_method(
     method_id: str,
     body: dict[str, Any],
-    response: Response,
     session: dict[str, Any] = Depends(require_session),
     catalog: MethodCatalog = Depends(get_catalog),
     store: IdentityStore = Depends(get_store),
@@ -1223,6 +1228,8 @@ def get_interpretation(
         return {"interpretation_id": interpretation_id, "status": "PENDING", "project_id": project_id}
     if latest["event_type"] == "InterpretationFailed":
         return {"interpretation_id": interpretation_id, "status": "FAILED", "project_id": project_id, "error": latest["payload"]["error"]}
+    if latest["event_type"] not in {"InterpretationCreated", "InterpretationJudged"}:
+        raise HTTPException(status_code=500, detail=f"INTERPRETATION_EVENT_UNKNOWN: {latest['event_type']}")
     stored = repo.get_interpretation(session["tenant_id"], interpretation_id)
     if stored is None:
         raise HTTPException(status_code=500, detail="INTERPRETATION_ARTIFACT_MISSING")

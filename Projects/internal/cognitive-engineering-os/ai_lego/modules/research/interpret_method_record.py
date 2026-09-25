@@ -50,7 +50,7 @@ def build_prompt_manifest(record: Mapping[str, Any], sources: list[Mapping[str, 
 
     manifest = []
     included = {key: value for key, value in record.items() if key not in {"id", "version", "provenance", "generated_by_method"}}
-    for path in sorted(record_leaf_paths(included)):
+    for path in sorted(record_leaf_paths(included) - {"r"}):
         value = value_at(path)
         rendered = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         manifest.append({"id": path, "kind": "record", "path": path, "value": rendered[:400], "sha256": record_sha256(record)})
@@ -79,6 +79,12 @@ def visual_kind(spec_root: Path, method_id: str, contract: Mapping[str, Any]) ->
 
 def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], manifest: list[Mapping[str, Any]], kind: str, *, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "") -> tuple[str, str]:
     system = "You interpret a validated Cognitive Engineering method record. Reply with exactly one JSON object, no markdown. Do not invent facts, coordinates, scores, or sources."
+    example_path = next((str(item["id"]) for item in manifest if item.get("kind") == "record"), "r/example")
+    binding_examples: dict[str, dict[str, Any]] = {
+        "layered": {"levels": [{"label": "record layer", "path": example_path}]},
+        "quadrant": {"items": example_path, "x": example_path, "y": example_path, "x_threshold": example_path, "y_threshold": example_path},
+        "table": {"rows": example_path, "columns": example_path},
+    }
     lines = [
         f"METHOD: {method_id} — {(display or {}).get('name_zh', '')} / {(display or {}).get('name_en', '')}",
         f"BLURB / WHY: {(display or {}).get('blurb_zh', '')} / {(display or {}).get('why', '')}",
@@ -87,8 +93,14 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "MANIFEST:\n" + "\n".join(f"[{item['id']}] {item.get('value', '')}" for item in manifest if item.get("kind") == "record"),
         "SOURCES:\n" + "\n".join(str(item["id"]) for item in manifest if item.get("kind") == "project_source"),
         "AVAILABLE ACTIVE METHODS:\n" + "\n".join(catalog_lines or []),
-        "OUTPUT JSON SHAPE: " + json.dumps({"findings": [{"id": "F1", "title": "", "text": "", "citations": ["r/foo"], "confidence": {"level": "mid", "reason": ""}}], "visual": {"kind": kind, "bindings": {}}, "next_methods": [], "next_steps": [], "recommendations": [], "gaps": [], "revision_conditions": []}, ensure_ascii=False),
-        f"RULES: Write all narrative in {language}. Citations and every visual binding string must be a manifest id. next_methods may only use AVAILABLE ACTIVE METHODS ids. Never invent numbers or sources.",
+        "OUTPUT JSON SHAPE: " + json.dumps({
+            "findings": [{"id": "F1", "title": "", "text": "", "citations": ["r/foo"], "confidence": {"level": "mid", "reason": ""}, "revision_conditions": [{"text": "", "would_change": ""}]}],
+            "visual": {"kind": kind, "bindings": binding_examples.get(kind, {})}, "next_methods": [],
+            "next_steps": [{"method_id": "", "answers": "", "deepens": "", "prefill": {}, "needs_input": [], "yields": "", "est_cost": ""}],
+            "recommendations": [{"level": "", "action": "", "expected": "", "citations": []}],
+            "gaps": [{"text": "", "needed_evidence": ""}],
+        }, ensure_ascii=False),
+        f"RULES: Write all narrative in {language}. The JSON shape is illustrative: omit optional arrays rather than emit empty-string examples. revision_conditions belongs inside each finding, never at the root. recommendations must contain objects, never bare strings; next_steps objects require every shown key including est_cost. Citations and every visual binding string must be a manifest id. next_methods may only use exact AVAILABLE ACTIVE METHODS ids; every next_steps.method_id must also appear in next_methods, and every next_steps.prefill value must be a MANIFEST id. If unsure of a valid next method, set both next_methods and next_steps to []. Never invent numbers or sources.",
     ]
     return system, "\n\n".join(lines)
 
@@ -133,6 +145,53 @@ def _citation_ids(interpretation: Mapping[str, Any]) -> list[str]:
     return ids
 
 
+def move_unresolvable_prefills_to_needs_input(interpretation: dict[str, Any], manifest: list[Mapping[str, Any]]) -> None:
+    """Preserve a next step without claiming unsupported record data is prefilled."""
+    manifest_ids = {str(item.get("id")) for item in manifest}
+    steps = interpretation.get("next_steps")
+    if not isinstance(steps, list):
+        return
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        if not isinstance(step.get("prefill"), dict):
+            step["prefill"] = {}
+        if not isinstance(step.get("needs_input"), list):
+            step["needs_input"] = []
+        invalid_fields = [field for field, value in step["prefill"].items() if not isinstance(value, str) or value not in manifest_ids]
+        for field in invalid_fields:
+            del step["prefill"][field]
+            if isinstance(field, str) and field not in step["needs_input"]:
+                step["needs_input"].append(field)
+
+
+def normalize_gaps_without_inventing_evidence(interpretation: dict[str, Any], language: str) -> None:
+    """Keep model-identified gaps while stating when required evidence was not specified."""
+    gaps = interpretation.get("gaps")
+    if not isinstance(gaps, list):
+        return
+    unspecified = "未指定；需使用者補充證據" if language.startswith("zh") else "Not specified; user must supply evidence"
+    normalized: list[dict[str, str]] = []
+    for gap in gaps:
+        if not isinstance(gap, Mapping) or not isinstance(gap.get("text"), str) or not gap["text"].strip():
+            continue
+        needed = gap.get("needed_evidence")
+        normalized.append({"text": gap["text"], "needed_evidence": needed if isinstance(needed, str) and needed.strip() else unspecified})
+    interpretation["gaps"] = normalized
+
+
+def normalize_layered_visual_bindings(interpretation: dict[str, Any]) -> None:
+    """Convert a model's layer-name → manifest-path map to the typed levels array."""
+    visual = interpretation.get("visual")
+    if not isinstance(visual, dict) or visual.get("kind") != "layered":
+        return
+    bindings = visual.get("bindings")
+    if not isinstance(bindings, dict) or "levels" in bindings or not bindings:
+        return
+    if all(isinstance(label, str) and label and isinstance(path, str) for label, path in bindings.items()):
+        visual["bindings"] = {"levels": [{"label": label, "path": path} for label, path in bindings.items()]}
+
+
 def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Mapping[str, Any], manifest: list[Mapping[str, Any]], active_method_ids: set[str]) -> list[dict[str, Any]]:
     manifest_ids = {str(item.get("id")) for item in manifest}
     citations = _citation_ids(interpretation)
@@ -142,7 +201,9 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
     def collect(value: Any) -> None:
         if isinstance(value, str): binding_paths.append(value)
         elif isinstance(value, Mapping):
-            for child in value.values(): collect(child)
+            for key, child in value.items():
+                if key != "label":
+                    collect(child)
         elif isinstance(value, list):
             for child in value: collect(child)
     collect(bindings)
@@ -191,9 +252,21 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
             interpretation = extract_json_object(completion.text)
             supplied_visual = interpretation.get("visual") if isinstance(interpretation.get("visual"), Mapping) else {}
             interpretation.update({"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record), "visual": {**supplied_visual, "kind": kind}, "data_thickness": data_thickness_from_manifest(manifest), "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}, "model": completion.model, "usage": {"input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens}})
+            move_unresolvable_prefills_to_needs_input(interpretation, manifest)
+            normalize_gaps_without_inventing_evidence(interpretation, language)
+            normalize_layered_visual_bindings(interpretation)
             gates = evaluate_interpretation_gates(interpretation, record, manifest, active_method_ids)
             if any(g["status"] != "PASS" for g in gates):
-                raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(g["gate_id"] for g in gates if g["status"] != "PASS"))
+                failed = [g["gate_id"] for g in gates if g["status"] != "PASS"]
+                detail = ""
+                if "next_methods_resolvable" in failed:
+                    steps = interpretation.get("next_steps", [])
+                    step_ids = [step.get("method_id") for step in steps if isinstance(step, Mapping)] if isinstance(steps, list) else []
+                    detail = "; next_methods=" + json.dumps(interpretation.get("next_methods"), ensure_ascii=False) + "; next_steps.method_id=" + json.dumps(step_ids, ensure_ascii=False)
+                    if isinstance(steps, list):
+                        detail += "; next_steps.prefill_types=" + json.dumps([type(step.get("prefill")).__name__ for step in steps if isinstance(step, Mapping)])
+                    detail += ". Use exact ACTIVE ids and matching next_steps, or set both arrays to []."
+                raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(failed) + detail)
             validate_interpretation(schema_contracts, interpretation)
             interpretation["usage"] = {"input_tokens": total_input, "output_tokens": total_output}
             return {"interpretation": interpretation, "gate_results": gates, "error": None, "model": completion.model, "input_tokens": total_input, "output_tokens": total_output}
