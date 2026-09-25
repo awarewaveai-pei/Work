@@ -22365,3 +22365,18 @@ WORKLOG_DONE: site-watch 計畫正本 = docs/operations/SITE_WATCH_MASTER_PLAN.m
 
 （續 v2.1）操作者再問「只有這些嗎」→ 設計層對抗審查（fan-out→renderer→UI 走一遍）再抓 6 項：① Trigger child 無限流：N>20 同時打 renderer（`server.mjs:34 MAX_QUEUE=20`、`rendererClient.ts:29` client 150s）→ 503／client 先斷而 renderer 仍截沒人等的圖 → 步 4 加 `queue: { concurrencyLimit: 2 }`，R6 補機制、P3 候選 abort-on-disconnect；② 首次開啟無金絲雀 → 步 10f 改：先手動 `site_watch_sync_targets()`、卡片只留 1 個 target 開、全域開、驗 1 列後再放量（10h）；③ 備份邊界未寫 → R7；④ 客戶站可控字串（errors_sample／final_url）XSS 面未寫 → R8 + 步 5a 純文字；⑤ ops-inbox `ignored` 會被下一 episode 重開（`0056:67`）→ §11 說明永久靜音 = 卡片關掉；⑥ env 開關要重建容器 → §8 軟開關候選。migration 編號無碰撞（`ls migrations | grep -c ^0091_` = 1）。
 WORKLOG_DONE: SITE_WATCH_MASTER_PLAN v2：補 watchdog／deploy smoke／登記／env 表／安全邊界／故障模式／決策紀錄／操作手冊／分期 DoD／容量
+
+## 2026-09-25（續）Cognitive OS PI-a WC-PIa-01～14 完成（僅本機，未部署）
+**任務**：在 Claude 額度耗盡後，完成 `RESEARCH_LINES_MASTER_PLAN.md` 的 PI-a 解讀層與新殼全部工作卡；PI-b nginx／正式部署保持 High-STOP，未執行。
+
+- `e28b630ba`：新增 `MethodInterpretation` typed object、fixtures、`interpret.method_record` capability contract；解讀模組從 validated record 生成 manifest／prompt、強制 schema + citation／visual binding／next method gates，修復回合後才儲存。
+- API：`POST /methods/{id}/interpret` 重新執行 builder + method gates、記錄 `InterpretationRequested`／`InterpretationCreated`／`InterpretationJudged` events、artifact CAS 與 `ai_usage`；`GET /interpretations/{id}` 與 judgment endpoint 均為 tenant/project scoped。
+- Web：新增 Next 15 standalone shell（login、method discovery、middleware）、受控表單與 LazyFill、demo、固定九段 result page + method-native layered/quadrant/table visual + judgment；無 `<select>`。
+- Runtime：compose 加 web service、web Dockerfile／`.dockerignore`、deploy multi-service rollback/health loop、Playwright `cognitive` project。Docker image build 成功；完整 local compose 啟動未能取得既有程序佔用的 `127.0.0.1:8420`，已 `docker compose down` 清除本次建立的 containers，未動既有 listener。
+- REALTEST_EVIDENCE: `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` → `PASSED: 4158`；`python -m unittest discover -s tests -t . -q` → `Ran 14180 tests in 1124.115s / OK`；`python -m unittest tests.unit.test_interpret_method_record tests.unit.test_api_interpret -q` → `Ran 16 tests / OK`；web `npm test -- --run && npm run typecheck && npm run build` → 3 tests / typecheck / production build OK；`docker compose build cognitive-os-web` → image built；`docker compose config --quiet && bash -n deploy/deploy.sh` → OK；Playwright cognitive listed and correctly skipped without required test credentials/project.
+- REVIEW_WAIVED: `/claude-review` attempted under `claude-oracle.ps1`; Claude returned invalid/incomplete review schema (exit 1), so no valid oracle artifact exists. Manual adversarial review + mutation evidence used instead.
+- BUGHUNT_DONE: schema mutation made an invalid `findings_empty` fixture unexpectedly valid → golden red; citation / visual bindings / next-method gates each temporarily removed → their named unit test red; family→kind override changed → visual-kind test red; endpoint pre-gate check removed → `test_gate_fail_returns_422_without_provider_call` red. Each mutation was restored and the relevant test re-green.
+[剩餘風險] Playwright full E2E needs `COS_TEST_TENANT_ID`／`COS_TEST_EMAIL`／`COS_TEST_PASSWORD`／`COS_TEST_PROJECT_ID`; PI-b is intentionally not started. Next 15.2.4 reports its upstream security advisory during npm install; version remains the plan-specified baseline and production must take a patched version decision during PI-b.
+[rollback] `git revert e28b630ba` removes PI-a implementation; `git revert` this documentation commit restores the pointer. No production state changed.
+
+WORKLOG_DONE: PI-a 14/14 local implementation and period gate complete; waiting only for explicit per-card PI-b deployment go-ahead.
