@@ -1093,6 +1093,55 @@ def _domain_error_status(error: InvariantViolation) -> int:
     return 404 if "NOT_FOUND" in str(error) else 400
 
 
+def _run_interpretation(
+    *, interpretation_id: str, method_id: str, project_id: str, session: dict[str, Any],
+    record: dict[str, Any], contract: dict[str, Any], display: dict[str, Any] | None,
+    sources: list[dict[str, Any]], catalog: MethodCatalog, provider: AiProvider,
+    store: IdentityStore, repo: ProjectSourceRepository, artifact_store: JsonArtifactStore,
+) -> None:
+    tenant_id = session["tenant_id"]
+    aggregate_id = f"project:{project_id}"
+    outcome: dict[str, Any] | None = None
+    error: str | None = None
+    with _ai_budget_lock_for(tenant_id):
+        try:
+            _require_ai(provider, store, session)
+            outcome = run_interpretation(
+                method_id=method_id, contract=contract, display=display, record=record,
+                sources=sources, provider=provider, spec_root=resolve_spec_root(),
+                schema_contracts=SchemaContracts(resolve_spec_root()),
+                active_method_ids=set(catalog.contracts), interpretation_id=interpretation_id,
+            )
+            error = outcome["error"]
+        except HTTPException as failure:
+            error = str(failure.detail)
+        except Exception as failure:
+            error = str(failure)
+        finally:
+            if outcome is not None:
+                store.record_ai_usage(
+                    tenant_id, session["identity_id"], f"interpret:{method_id}",
+                    outcome["model"], outcome["input_tokens"], outcome["output_tokens"],
+                )
+    if error is not None or outcome is None or outcome["interpretation"] is None:
+        repo.append_event(tenant_id, aggregate_id, "InterpretationFailed", {"interpretation_id": interpretation_id, "error": error or "INTERPRETATION_FAILED"})
+        return
+    try:
+        reference = artifact_store.put(tenant_id, "MethodInterpretation", {
+            "record": record, "interpretation": outcome["interpretation"], "gate_results": outcome["gate_results"],
+        })
+        repo.save_interpretation(
+            tenant_id, project_id, interpretation_id, reference,
+            datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        )
+    except Exception as failure:
+        repo.append_event(tenant_id, aggregate_id, "InterpretationFailed", {"interpretation_id": interpretation_id, "error": str(failure)})
+
+
+def _launch_interpretation(**kwargs: Any) -> None:
+    threading.Thread(target=_run_interpretation, daemon=True, kwargs=kwargs).start()
+
+
 @app.post("/methods/{method_id}/interpret", status_code=202)
 def interpret_method(
     method_id: str,
@@ -1112,7 +1161,6 @@ def interpret_method(
     if not isinstance(project_id, str) or not project_id:
         raise HTTPException(status_code=400, detail="PROJECT_ID_REQUIRED: interpretation is project-bound")
     _project_or_404(repo, session["tenant_id"], project_id)
-    provider = _require_ai(provider, store, session)
     builder_body = dict(body)
     builder_body.pop("project_id", None)
     try:
@@ -1128,45 +1176,27 @@ def interpret_method(
         raise HTTPException(status_code=422, detail=str(error)) from error
     if any(not isinstance(gate, dict) or gate.get("status") != "PASS" for gate in gate_results):
         raise HTTPException(status_code=422, detail={"error": "METHOD_GATES_FAILED", "gate_results": gate_results})
+    provider = _require_ai(provider, store, session)
 
     entry = catalog.require(method_id)
     contract_path = resolve_spec_root() / entry["path"]
     contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
     if not isinstance(contract, dict):
         raise HTTPException(status_code=500, detail="METHOD_CONTRACT_INVALID")
-    try:
-        interpretation_id = f"INTERP-{uuid.uuid4().hex.upper()}"
-        sources = repo.list_sources(session["tenant_id"], project_id)
-        repo.append_event(
-            session["tenant_id"],
-            f"project:{project_id}",
-            "InterpretationRequested",
-            {"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record)},
-        )
-        interpretation, interpretation_gates, input_tokens, output_tokens = run_interpretation(
-            method_id=method_id,
-            contract=contract,
-            display=_method_display_metadata().get(method_id),
-            record=record,
-            sources=sources,
-            provider=provider,
-            spec_root=resolve_spec_root(),
-            schema_contracts=SchemaContracts(resolve_spec_root()),
-            active_method_ids=set(catalog.contracts),
-            interpretation_id=interpretation_id,
-        )
-    except InvariantViolation as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-    artifact_reference = artifact_store.put(session["tenant_id"], "MethodInterpretation", interpretation)
-    repo.save_interpretation(
-        session["tenant_id"],
-        project_id,
-        interpretation_id,
-        artifact_reference,
-        datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    interpretation_id = f"INTERP-{uuid.uuid4().hex.upper()}"
+    sources = repo.list_sources(session["tenant_id"], project_id)
+    repo.append_event(
+        session["tenant_id"], f"project:{project_id}", "InterpretationRequested",
+        {"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record)},
     )
-    store.record_ai_usage(session["tenant_id"], session["identity_id"], f"interpret:{method_id}", interpretation["model"], input_tokens, output_tokens)
-    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "gate_results": interpretation_gates}
+    worker_kwargs = {
+        "interpretation_id": interpretation_id, "method_id": method_id, "project_id": project_id,
+        "session": dict(session), "record": record, "contract": contract,
+        "display": _method_display_metadata().get(method_id), "sources": sources,
+        "catalog": catalog, "provider": provider, "store": store, "repo": repo, "artifact_store": artifact_store,
+    }
+    _launch_interpretation(**worker_kwargs)
+    return {"interpretation_id": interpretation_id, "status": "PENDING", "project_id": project_id}
 
 
 @app.get("/interpretations/{interpretation_id}")
@@ -1176,14 +1206,23 @@ def get_interpretation(
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
     artifact_store: JsonArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
+    events = repo.interpretation_events(session["tenant_id"], interpretation_id)
+    if not events:
+        raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
+    latest = events[-1]
+    project_id = latest["aggregate_id"].removeprefix("project:")
+    if latest["event_type"] == "InterpretationRequested":
+        return {"interpretation_id": interpretation_id, "status": "PENDING", "project_id": project_id}
+    if latest["event_type"] == "InterpretationFailed":
+        return {"interpretation_id": interpretation_id, "status": "FAILED", "project_id": project_id, "error": latest["payload"]["error"]}
     stored = repo.get_interpretation(session["tenant_id"], interpretation_id)
     if stored is None:
-        raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
+        raise HTTPException(status_code=500, detail="INTERPRETATION_ARTIFACT_MISSING")
     try:
-        result = artifact_store.read(session["tenant_id"], stored["artifact_reference"])
+        artifact = artifact_store.read(session["tenant_id"], stored["artifact_reference"])
     except InvariantViolation as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
-    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": stored["project_id"], "result": result}
+    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "record": artifact["record"], "result": artifact["interpretation"], "gate_results": artifact["gate_results"]}
 
 
 @app.post("/interpretations/{interpretation_id}/judgment")

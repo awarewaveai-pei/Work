@@ -146,15 +146,19 @@ def validate_interpretation(schema_contracts: SchemaContracts, interpretation: M
     schema_contracts.validate(INTERPRETATION_SCHEMA, dict(interpretation), "MethodInterpretation")
 
 
-def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str) -> tuple[dict[str, Any], list[dict[str, Any]], int, int]:
+def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str) -> dict[str, Any]:
     kind = visual_kind(spec_root, method_id, contract)
     manifest = build_prompt_manifest(record, sources)
     system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind)
     total_input = total_output = 0
     previous_error = ""
+    gates: list[dict[str, Any]] = []
     for attempt in range(2):
         retry_user = user if not previous_error else user + "\n\nPrevious response was refused. Correct exactly this failure: " + previous_error
-        completion = provider.complete(system, retry_user, max_tokens=1800)
+        try:
+            completion = provider.complete(system, retry_user, max_tokens=1800)
+        except InvariantViolation as error:
+            return {"interpretation": None, "gate_results": gates, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}
         total_input += completion.input_tokens
         total_output += completion.output_tokens
         try:
@@ -166,9 +170,7 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
                 raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(g["gate_id"] for g in gates if g["status"] != "PASS"))
             validate_interpretation(schema_contracts, interpretation)
             interpretation["usage"] = {"input_tokens": total_input, "output_tokens": total_output}
-            return interpretation, gates, total_input, total_output
+            return {"interpretation": interpretation, "gate_results": gates, "error": None, "model": completion.model, "input_tokens": total_input, "output_tokens": total_output}
         except (InvariantViolation, KeyError, TypeError) as error:
             previous_error = str(error)
-            if attempt == 1:
-                raise InvariantViolation(f"INTERPRETATION_REJECTED_AFTER_REPAIR: {previous_error}") from error
-    raise InvariantViolation("INTERPRETATION_REJECTED")
+    return {"interpretation": None, "gate_results": gates, "error": f"INTERPRETATION_REJECTED_AFTER_REPAIR: {previous_error}", "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}

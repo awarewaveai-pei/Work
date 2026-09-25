@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-25（續11）研究線 WC-PIa-15：非同步解讀與失敗用量記錄
+
+- 起因：PI-a 驗收 C1/C2；同步端點與失敗後遺失模型用量違反新契約。R22/R23 操作者准許更新四個只守舊契約的測試。
+- 改：run_interpretation 回傳結果與兩次嘗試累計 token；POST 回 PENDING 並由 worker 執行；GET 依事件回 PENDING／FAILED／DONE；失敗也記 ai_usage；web 輪詢。更新 R22/R23 四個舊測試，新增失敗用量與 PENDING 測試。
+- REALTEST_EVIDENCE: tool=Bash | cmd=golden 4163/4163；相關 unittest 213/213；web typecheck exit 0；vitest 3/3；check-mocks 5 pages green | exit=0 | ms=120000
+- REVIEW_DONE: 操作者 2026-09-25 明示准許先自我審查並 commit+push；自審確認改動範圍、API 狀態轉移、事件持久化與失敗用量；Claude oracle 曾 exit 1，並無有效 artifact，不冒稱外審通過。14R 仍須實際 oracle artifact。
+- BUGHUNT_DONE: 檢查 interpret_method_record、API worker/事件儲存、web 輪詢與現有呼叫點；無新增阻斷問題。
+- 突變證據：失敗回 0 token → test_schema_failure_after_repair_is_refused 紅 (0,0)!=(20,40) → 還原綠。
+- 突變證據：失敗改回 raise → test_schema_failure_after_repair_is_refused 紅 InvariantViolation → 還原綠。
+- 突變證據：POST 改回同步 DONE → test_interpret_get_judge_and_audit 紅 DONE!=PENDING → 還原綠。
+- 突變證據：刪失敗路徑 ai_usage → test_failed_interpretation_records_usage 紅 (0,0)!=(22,46) → 還原綠。
+- 下一步：WC-PIa-16；PI-b 不得開始。
+
 ## 2026-09-25（續10）雲端 T13／T14／T15 驗收後併入 main：kill switch 失效關閉＋取最嚴格、SPEC 防重複鍵 loader 單一模組、fetch-runner 503 伺服器測試
 - [來源] 雲端 session（Sonnet 5）：`claude/cc-t13-killswitch-fail-closed`、`claude/cc-t14-strict-yaml-module`、`claude/cc-t15-fetch-runner-503-test`；額度 $48 起算。
 - [T13 資安] `lib/command-plane/killSwitch.ts`：DB 錯誤回 `"unavailable"`（`ModeLookup`），只有 `FAIL_OPEN_FOR`（空）內的等級放行 → 一律擋；client／global 取最嚴格（emergency_stop > maintenance > read_only > normal）；`types.ts` 加型別；兩條 `it.fails` 轉 `it`＋表格／unavailable 案例。本機修（critic）：未知或 null mode 原本仍 fail open（`MODE_STRICTNESS[undefined]`）→ `getActiveMode` 遇不認得的 mode 回 unavailable、`evaluateKillSwitch` 改 switch＋never 預設擋下；commandRouter 的 unavailable 測試原本 mock 掉 kill switch（刪掉修法照樣過）→ 改用 `vi.importActual` 的真函式＋失敗的 system_modes 讀取。runbook（en／zh-TW）寫明新行為。未部署（上線走 sg-deploy，另行決定）。

@@ -337,6 +337,17 @@ class ProjectSourceRepository:
         with self._connection() as connection:
             self._append_event(connection, tenant_id, aggregate_id, event_type, payload)
 
+    def interpretation_events(self, tenant_id: str, interpretation_id: str) -> list[dict[str, Any]]:
+        """Read one interpretation's lifecycle from the tenant's project event stream."""
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT aggregate_id, sequence, event_type, payload_json FROM events "
+                "WHERE tenant_id=? AND event_type IN ('InterpretationRequested', 'InterpretationCreated', 'InterpretationFailed', 'InterpretationJudged') "
+                "AND json_extract(payload_json, '$.interpretation_id')=? ORDER BY rowid",
+                (tenant_id, interpretation_id),
+            ).fetchall()
+        return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
+
     def save_interpretation(self, tenant_id: str, project_id: str, interpretation_id: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
         with self._connection() as connection:
             connection.execute(

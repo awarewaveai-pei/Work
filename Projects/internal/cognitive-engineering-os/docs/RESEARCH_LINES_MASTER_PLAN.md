@@ -2,15 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.37（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.38（2026-09-25）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-a 驗收退回**（2026-09-25 Claude 覆審，§12.3b）：WC-PIa-01～14 已提交（`c7061f16f`、`e28b630ba`），但未達卡片規格；修正卡 WC-PIa-15～21 未開工。**PI-b 不得開始**，直到 15～21 全過並重跑期末閘（WC-PIa-14R）。
-- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 已提交 14/14、驗收通過 0/14（退回，§12.3b）；PI-b 0/5；P-ARF-data／P1 之後尚未產卡（§12.5）。
-- 最後一筆程式碼 commit：`e28b630ba` PI-a（未通過驗收）；最後一筆計畫版本：v1.37（2026-09-25）。
-- 阻塞：PI-a 驗收退回——2 個嚴重（失敗的解讀花了 token 卻不記用量＝日預算可被繞過；解讀在請求裡同步呼叫模型最多 2 次、每次 60s，正式站 nginx 60s 會 504 而錢照扣）＋5 個主要（§12.3b）。golden 4158／unittest 14186／vitest 3 全綠，但那些測試只驗「東西存在」，是代理指標。
-- 下一步：WC-PIa-15（非同步＋失敗也記用量），照 §12.3b 順序 15→21，再 14R；執行 Codex／Sonnet 5；每張卡的驗收包含這次探針改寫成的測試。
+- 現在期／卡：**PI-a 修正中，WC-PIa-15 已完成自審，下一張 WC-PIa-16**；14R 仍須 Claude oracle artifact。**PI-b 不得開始**。
+- 已完成：P0 碼完成 `19f00f9aa`（未部署，隨 PI-b 同窗）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 初版 14/14 期末驗收退回；修正卡 1/7 完成；PI-b 0/5。
+- 最後一筆 PI-a 程式碼：WC-PIa-15 本次 commit（hash 見 git log）；計畫版本 v1.38（2026-09-25）。
+- 阻塞：無（WC-PIa-15 操作者准許自審後 commit；§7 R24 原 oracle 失敗保留紀錄）。14R 的 oracle 要求沒有豁免。
+- 下一步：WC-PIa-16→17→18→19→21→20→14R；不得跳卡。
 
 | 項 | 狀態（2026-09-24） |
 |---|---|
@@ -291,8 +291,9 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | R19 | 解讀單次呼叫 > 60s（provider `provider.py:45` 與 nginx `default.conf:431` 皆 60s）→ 504 但 token 已扣 | 202 + 輪詢；單次呼叫不做修復回合；`ai_usage` 先記後回 |
 | R20 | ARF 外化步驟產出作品照片；COS artifact 現只有 JSON、Sources 只有文字 | 圖像 artifact 型別 + object storage 在 P5；P-ARF-data 階段只用文字紀錄（反應紀錄建議方式）；參與者層等 P5 |
 | R21 | Airtable 與 SPEC 漂移；停止訊號欄多筆為空 | 單向同步＋Content Hash 標 drift；`stop_signals` 為空的工具在 recipe 中標 `requires_facilitator_review`，不上參與者模式 |
-| R22（已解決） | WC-PIa-15 契約與兩個舊測試衝突：舊測試解包 tuple／要求失敗 raise，卡要求 dict 且不 raise | 操作者 2026-09-25 准許只更新 `test_interpret_method_record.py:77-88` 兩個舊測試至新契約；原成功斷言保留，失敗加錯誤類別／兩次呼叫／兩次 token 累計；兩種失敗突變各做紅→綠，其餘舊測試不動 |
-| R23 | WC-PIa-15 非同步契約與 `test_api_interpret.py:83-90,150-151` 兩個舊測試衝突：POST 後立即 GET 要求 DONE/result；`python -m unittest tests.unit.test_interpret_method_record tests.unit.test_api_interpret -q` → 16 tests，1 failure／3 errors（R22 兩項已修，API 兩項仍紅） | 停在 WC-PIa-15；等操作者決定是否准許這兩個 API 舊測試改成 PENDING → 同步 worker → DONE，保留結果／用量斷言 |
+| R22（依 12.1-13 解決） | WC-PIa-15 契約與兩個舊測試衝突：舊測試解包 tuple／要求失敗 raise，卡要求 dict 且不 raise | 操作者 2026-09-25 准許只更新 `test_interpret_method_record.py:77-88` 兩個舊測試至新契約；原成功斷言保留，失敗加錯誤類別／兩次呼叫／兩次 token 累計；兩種失敗突變各做紅→綠 |
+| R23（依 12.1-13 解決） | WC-PIa-15 非同步契約與 `test_api_interpret.py:83-90,150-151` 兩個舊測試衝突：POST 後立即 GET 要求 DONE/result | 操作者 2026-09-25 准許只更新這兩個舊測試為 POST 202/PENDING → 同步 `_run_interpretation` → GET DONE；原結果與用量斷言保留；以突變驗證舊同步行為會使測試紅 |
+| R24 | WC-PIa-15 `/claude-review`：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/claude-oracle.ps1 -Context 'WC-PIa-15 asynchronous interpretation; all attempts metered and failure events persisted' -Model sonnet` → exit 1：`claude -p failed or returned an invalid/incomplete review schema`；stderr 0 bytes、無 oracle artifact；審查快照 161538 bytes，含共用工作區其他改動 | 操作者 2026-09-25 明示「先自我審查並 commit+push」：僅 WC-PIa-15 改以自審提交；14R 的 Claude oracle artifact 仍為必備，不宣稱已通過。 |
 
 ## 8. 退場清單（P0 flag OFF；P4 驗收後刪）
 `NA/lib/cognitive-os/{client,import-sources}.ts`、`NA/lib/hci/{client,import-sources}.ts`、`NA/app/api/ops/clients/[slug]/{cognitive-os-import,hci-import}/route.ts`、`NA/app/api/internal/cognitive-os/import-project-sources/route.ts`、`NA/app/api/cognitive-os/open/route.ts`、`NA/lib/dossier/folder.ts`（`report.ts` 移植後整層刪）、`CollectionSourcesPanel.tsx:545-568`、`ClientHubTabs.tsx:1795-1811`、`SPEC/recipes/validated/edd-literature-search-v1.recipe.yaml`（fixture）、`rt:80-88` offline adapter；migrations 0087／0088／0089 欄位保留標 deprecated 不 drop；`bootstrap_service_identity.py` 的 service tenant 用法退場（改 `--tenant-id`）。`/ops/collect` 與客戶 KB **維持**。
@@ -339,6 +340,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 10. **UI 卡加驗**：任何動到 `web/` 或 `COS/docs/mockups/` 的卡，驗收多一條 `python COS/docs/mockups/check-mocks.py` 綠（新殼落地後同一檢查器指向 `web/app/globals.css` 與頁面）；設計規則只准以「檢查器規則＋五頁同改」落地，不准只改操作者正在看的那一頁。
 11. **測試範圍**（2026-09-25：COS 全套 14,159 個測試本機 24–34 分鐘，每卡各跑一次太慢）：每卡跑 golden ＋ 本卡新測試 ＋ `tests/unit` 裡 import 本卡改動模組的測試檔——`cd COS && python -m unittest <本卡新測試模組> $(grep -rlE "<型樣>" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q` 綠；型樣 = 每個改動模組寫兩種 import 形式，多個用 `|` 接（例：改 `ai_lego/apps/api/main.py` → `apps\.api\.main|apps\.api import main`，選到 5 檔，含 `test_api_main` 約 3.5 分鐘，照跑）；只改 SPEC 資料／schema 的卡不跑 unit。間接依賴造成的紅由期末閘的全套抓，在期末閘修，不回頭改已合併卡的驗收。
 12. **驗收要審交付物本身，不審代理指標**（2026-09-25：PI-a 14 張卡全綠卻交出骨架，§12.3b）：UI 卡用示意稿檢查器審渲染後的 HTML；API 卡用探針打真端點，失敗路徑與成本記帳必測；只驗「元素存在／測試跑過」的測試不算驗收。卡片寫錯（例：WC-10 以為 `GET /methods/{id}/demo` 回表單輸入）時，執行者先查證再照做，查到不符就停下回報（規則 7）。
+13. **卡片明文換契約時，同卡更新守舊契約的測試，不必再問**（回傳形狀、raise→回傳 error、同步→非同步等）：(a) 只改失敗原因正是被換掉契約的測試，其他行為測試不動；(b) 每條舊斷言保留對應新斷言，只換取值方式，不刪、不放寬比較；(c) 新契約也加斷言，例如 PENDING→worker→DONE，用量數字不變；(d) 把行為突變回舊契約→測試紅→還原綠，三行進 commit message；(e) commit message 和卡片「改」欄列出更新的測試，§7 對應列標「依 12.1-13 解決」。若必須刪／放寬斷言，或衝突非契約變更所致，仍停下回報。
 
 ### 12.2 卡片格式（缺一欄 = 無效卡，不得執行）
 `WC-<期>-<序>`｜目標（一句）｜前置（指令＋預期）｜讀（`file:line`）｜樣板（照抄哪個 `file:line`）｜改（新／改檔案清單）｜不改｜驗收（指令＋預期輸出，逐條）｜突變（拔什麼 → 哪個測試紅）｜commit 訊息骨架｜回滾。
@@ -459,7 +461,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 前置：§12.3 共同前置。
 - 讀：`main.py:1096-1170`；`main.py:868`（預算鎖）；`main.py:950-972`（draft 端點失敗也記用量＝樣板）；`interpret_method_record.py:149-174`。
 - 樣板：`main.py:950-972`。
-- 改：`run_interpretation` 不再 raise，改回傳 `{interpretation 或 None, gate_results, error 或 None, input_tokens, output_tokens}`（token 是所有嘗試的累計）；端點：builder＋閘門的 422 不變 → `_require_ai` → `InterpretationRequested` → 回 **202 `{interpretation_id, status:"PENDING"}`**；主體抽成 `_run_interpretation(...)`，由 `threading.Thread(daemon=True)` 在 `_ai_budget_lock_for(tenant)` 裡跑：成功 → artifact＋`InterpretationCreated`；失敗 → `InterpretationFailed {error}`；**兩條路都 `record_ai_usage`**。GET 依最後一筆事件回 PENDING／FAILED（含 error）／DONE。web 方法頁每 2 秒輪詢，直到 DONE 或 FAILED。依 R22 更新 `test_interpret_method_record.py:77-88` 兩個舊測試至新契約，其餘舊測試不動。
+- 改：`run_interpretation` 不再 raise，改回傳 `{interpretation 或 None, gate_results, error 或 None, input_tokens, output_tokens}`（token 是所有嘗試的累計）；端點：builder＋閘門的 422 不變 → `_require_ai` → `InterpretationRequested` → 回 **202 `{interpretation_id, status:"PENDING"}`**；主體抽成 `_run_interpretation(...)`，由 `threading.Thread(daemon=True)` 在 `_ai_budget_lock_for(tenant)` 裡跑：成功 → artifact＋`InterpretationCreated`；失敗 → `InterpretationFailed {error}`；**兩條路都 `record_ai_usage`**。GET 依最後一筆事件回 PENDING／FAILED（含 error）／DONE。web 方法頁每 2 秒輪詢，直到 DONE 或 FAILED。依 R22／R23 更新 `test_interpret_method_record.py` 的 `test_bad_json_then_repair_passes`、`test_schema_failure_after_repair_is_refused`，及 `test_api_interpret.py` 的 `test_interpret_get_judge_and_audit`、`test_eisenhower_uses_quadrant_visual_kind` 至新契約；其他舊測試不動。
 - 不改：builder、method gates、`draft.py`。
 - 驗收：新增 `test_failed_interpretation_records_usage`（壞 JSON 兩次 → GET 回 FAILED；`ai_usage_totals` = 兩次 token 的總和）、`test_interpret_is_pending_until_run`（POST 的 body.status == PENDING；同步呼叫 `_run_interpretation` 後 GET == DONE）；兩個解讀測試模組全綠。
 - 突變：刪掉失敗路徑的 `record_ai_usage` → `test_failed_interpretation_records_usage` 紅。

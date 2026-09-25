@@ -71,18 +71,23 @@ class InterpretApiTests(ApiTestCase):
         super().tearDown()
 
     def test_interpret_get_judge_and_audit(self):
-        response = self.client.post("/methods/systems.iceberg_model/interpret", json={
-            "project_id": self.project_id,
-            "events": ["release incidents"],
-            "patterns": ["weekly spike"],
-            "structures": [],
-            "mental_models": [],
-            "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
-        })
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={
+                "project_id": self.project_id,
+                "events": ["release incidents"],
+                "patterns": ["weekly spike"],
+                "structures": [],
+                "mental_models": [],
+                "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
+            })
         self.assertEqual(response.status_code, 202, response.text)
+        self.assertEqual(response.json()["status"], "PENDING")
         interpretation_id = response.json()["interpretation_id"]
+        self.assertEqual(self.client.get(f"/interpretations/{interpretation_id}").json()["status"], "PENDING")
+        api_main._run_interpretation(**launch.call_args.kwargs)
         fetched = self.client.get(f"/interpretations/{interpretation_id}")
         self.assertEqual(fetched.status_code, 200, fetched.text)
+        self.assertEqual(fetched.json()["status"], "DONE")
         self.assertEqual(fetched.json()["result"]["visual"]["kind"], "layered")
         SchemaContracts(resolve_spec_root()).validate(
             "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml",
@@ -136,19 +141,70 @@ class InterpretApiTests(ApiTestCase):
         self.assertEqual(response.status_code, 503, response.text)
 
     def test_eisenhower_uses_quadrant_visual_kind(self):
-        response = self.client.post("/methods/decision.eisenhower_matrix/interpret", json={
-            "project_id": self.project_id,
-            "subject": "This week's tasks",
-            "tasks": [{"id": "T1", "label": "Reply to customer", "urgency": 9, "importance": 8}],
-            "urgency_scale": {"min": 0, "max": 10},
-            "importance_scale": {"min": 0, "max": 10},
-            "urgency_threshold": 5,
-            "importance_threshold": 5,
-            "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
-        })
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/decision.eisenhower_matrix/interpret", json={
+                "project_id": self.project_id,
+                "subject": "This week's tasks",
+                "tasks": [{"id": "T1", "label": "Reply to customer", "urgency": 9, "importance": 8}],
+                "urgency_scale": {"min": 0, "max": 10},
+                "importance_scale": {"min": 0, "max": 10},
+                "urgency_threshold": 5,
+                "importance_threshold": 5,
+                "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
+            })
         self.assertEqual(response.status_code, 202, response.text)
-        result = self.client.get(f"/interpretations/{response.json()['interpretation_id']}").json()["result"]
+        self.assertEqual(response.json()["status"], "PENDING")
+        interpretation_id = response.json()["interpretation_id"]
+        self.assertEqual(self.client.get(f"/interpretations/{interpretation_id}").json()["status"], "PENDING")
+        api_main._run_interpretation(**launch.call_args.kwargs)
+        fetched = self.client.get(f"/interpretations/{interpretation_id}").json()
+        self.assertEqual(fetched["status"], "DONE")
+        result = fetched["result"]
         self.assertEqual(result["visual"]["kind"], "quadrant")
+
+    def test_failed_interpretation_records_usage(self):
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch, patch.object(
+            self.provider, "complete", return_value=AiCompletion(text="bad JSON", model=self.provider.model, input_tokens=11, output_tokens=23),
+        ) as complete:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={
+                "project_id": self.project_id,
+                "events": ["release incidents"],
+                "patterns": ["weekly spike"],
+                "structures": [],
+                "mental_models": [],
+                "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
+            })
+            self.assertEqual(response.status_code, 202, response.text)
+            self.assertEqual(response.json()["status"], "PENDING")
+            interpretation_id = response.json()["interpretation_id"]
+            self.assertEqual(self.client.get(f"/interpretations/{interpretation_id}").json()["status"], "PENDING")
+            api_main._run_interpretation(**launch.call_args.kwargs)
+        self.assertEqual(complete.call_count, 2)
+        fetched = self.client.get(f"/interpretations/{interpretation_id}")
+        self.assertEqual(fetched.status_code, 200, fetched.text)
+        self.assertEqual(fetched.json()["status"], "FAILED")
+        self.assertIn("NOT_JSON", fetched.json()["error"])
+        usage = api_main.app.dependency_overrides[api_main.get_store]().ai_usage_totals(self.tenant["tenant_id"])
+        self.assertEqual((usage["input_tokens"], usage["output_tokens"]), (22, 46))
+
+    def test_interpret_is_pending_until_run(self):
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={
+                "project_id": self.project_id,
+                "events": ["release incidents"],
+                "patterns": ["weekly spike"],
+                "structures": [],
+                "mental_models": [],
+                "provenance": make_provenance("EVIDENCE", "HUMAN_APPROVED"),
+            })
+        self.assertEqual(response.status_code, 202, response.text)
+        self.assertEqual(response.json()["status"], "PENDING")
+        interpretation_id = response.json()["interpretation_id"]
+        self.assertEqual(self.client.get(f"/interpretations/{interpretation_id}").json()["status"], "PENDING")
+        api_main._run_interpretation(**launch.call_args.kwargs)
+        fetched = self.client.get(f"/interpretations/{interpretation_id}")
+        self.assertEqual(fetched.status_code, 200, fetched.text)
+        self.assertEqual(fetched.json()["status"], "DONE")
 
     def test_unknown_method_is_404(self):
         response = self.client.post("/methods/unknown.nope/interpret", json={"project_id": self.project_id})

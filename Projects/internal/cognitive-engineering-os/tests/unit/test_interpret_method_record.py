@@ -76,16 +76,21 @@ class InterpretationTests(unittest.TestCase):
 
     def test_bad_json_then_repair_passes(self):
         provider = FakeProvider(["not json", valid_response()])
-        result, gates, input_tokens, output_tokens = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-TEST-001")
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-TEST-001")
         self.assertEqual(provider.calls, 2)
-        self.assertEqual(result["interpretation_id"], "INTERP-TEST-001")
-        self.assertEqual([gate["status"] for gate in gates], ["PASS", "PASS", "PASS"])
-        self.assertEqual((input_tokens, output_tokens), (20, 40))
+        self.assertEqual(result["interpretation"]["interpretation_id"], "INTERP-TEST-001")
+        self.assertEqual([gate["status"] for gate in result["gate_results"]], ["PASS", "PASS", "PASS"])
+        self.assertIsNone(result["error"])
+        self.assertEqual((result["input_tokens"], result["output_tokens"]), (20, 40))
 
     def test_schema_failure_after_repair_is_refused(self):
         provider = FakeProvider([valid_response().replace('"record.patterns.0"', '"record.missing"')] * 2)
-        with self.assertRaises(InvariantViolation):
-            run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-TEST-002")
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-TEST-002")
+        self.assertIsNone(result["interpretation"])
+        self.assertTrue(result["error"])
+        self.assertIn("citation_integrity", result["error"])
+        self.assertEqual(provider.calls, 2)
+        self.assertEqual((result["input_tokens"], result["output_tokens"]), (20, 40))
 
 
 if __name__ == "__main__":
