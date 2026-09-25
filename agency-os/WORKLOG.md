@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-25（續19）研究線 14R：本機 E2E tenant 與續跑前提
+
+- 起因：14R 真模型 E2E 缺專用本機測試身分；操作者指定自建，不得借用 next-admin 的 `COGNITIVE_OS_SERVICE_*`。
+- 改：本機 `cognitive-os-api` 執行 `bootstrap_service_identity`，不傳 `--password`；自動產生的 tenant id／email／password 僅寫入 Git 忽略的 `mcp/user-env.ps1` 的 `COS_TEST_*`，template 新增三個空值鍵；計畫 v1.46 更新 R26。密碼與 tenant id 不進 Git、不印終端。
+- REALTEST_EVIDENCE: tool=PowerShell/Docker | cmd=本機 bootstrap 一次、`POST http://127.0.0.1:8422/auth/login` | exit=0，HTTP 200；`git check-ignore mcp/user-env.ps1` 命中；template diff 僅空值鍵。
+- 未過：`COGNITIVE_OS_ANTHROPIC_API_KEY` 尚缺，真模型／Playwright／舊頁與 PY／TS oracle artifact 未驗收；移除繼承的無效 `ANTHROPIC_API_KEY` 後 `claude auth status` 顯示已登入，後續 oracle 呼叫須同樣避開無效 key；14R／PI-a 不標完成。
+
 ## 2026-09-25（續18）研究線 WC-PIa-14R：期末閘實測與發現修正（未結案）
 
 - 起因：15～21 完成後重做期末閘，不能把 mock、skip 或無 oracle artifact 寫成 PI-a 完。

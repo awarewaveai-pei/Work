@@ -128,6 +128,10 @@ $vars = @{
     # Bearer token for POST /api/internal/cognitive-os/import-project-sources — own dedicated
     # token, never shared with an unrelated internal-route caller.
     COGNITIVE_OS_IMPORT_INGEST_TOKEN = ""
+    # Local Cognitive OS E2E tenant; do not reuse next-admin service credentials.
+    COS_TEST_TENANT_ID = ""
+    COS_TEST_EMAIL = ""
+    COS_TEST_PASSWORD = ""
     # HCI-30 (ADR-0021 gate 3): hci-postgres's own dedicated secret, distinct from the shared
     # ${POSTGRES_PASSWORD} every Supabase-instance service already reuses — never the same vault
     # entry as that one. See docker-compose.yml (hetzner-phase1-core) hci-postgres/hci-app blocks.
