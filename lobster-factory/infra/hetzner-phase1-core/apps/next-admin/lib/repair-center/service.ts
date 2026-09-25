@@ -12,20 +12,9 @@ import {
   severityRequiresHumanReview,
 } from "./policy";
 import { escalateGuard, isStrictTerminalState, TERMINAL_STATES } from "./run-state";
+import { checkRepairAllowed } from "./system-mode-gate";
 import { REPAIR_RUN_STATES, REPAIR_DEPLOY_STATUSES } from "./types";
 import type { RepairRun, RepairRunWithIncident } from "./types";
-
-export async function getCurrentSystemMode(): Promise<string> {
-  const supabase = getSupabaseServerClient();
-  if (!supabase) return "unknown";
-  const { data } = await supabase
-    .from("system_modes")
-    .select("mode")
-    .eq("scope_type", "global")
-    .is("scope_id", null)
-    .maybeSingle();
-  return String((data as any)?.mode ?? "normal");
-}
 
 export async function fetchRepairRunWithIncident(id: string): Promise<RepairRunWithIncident | null> {
   const supabase = getSupabaseServerClient();
@@ -48,11 +37,6 @@ export async function startRepairFromIncident(args: {
    */
   forceCriticalApproval?: boolean;
 }): Promise<{ ok: boolean; run?: RepairRunWithIncident; error?: string; details?: unknown }> {
-  const mode = await getCurrentSystemMode();
-  if (mode !== "normal") {
-    return { ok: false, error: "system_mode_blocks_repair", details: { mode } };
-  }
-
   const supabase = getSupabaseWriteClient();
   if (!supabase) return { ok: false, error: "supabase_write_not_configured" };
 
@@ -65,6 +49,12 @@ export async function startRepairFromIncident(args: {
   if (!incident) return { ok: false, error: "incident_not_found" };
 
   const i = incident as Incident & { client_slug?: string | null };
+
+  const gate = await checkRepairAllowed(supabase, i.organization_id ?? null);
+  if (!gate.allowed) {
+    return { ok: false, error: "system_mode_blocks_repair", details: { mode: gate.mode } };
+  }
+
   const policy = policyForIncident(i.source, i.severity);
   const target = resolveGithubTarget({
     id: "pending",

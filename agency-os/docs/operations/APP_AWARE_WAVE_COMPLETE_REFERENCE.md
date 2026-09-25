@@ -613,6 +613,8 @@ Server Component，啟動時並行 fetch：
 
 **⚠️ 重要**：Telegram `/normal_mode` 被 policy 硬擋（high-risk from telegram = block），emergency_stop 無法從 Telegram 解除。
 
+**Repair Center／自動修復**：`startRepairFromIncident`／`tryRemediate` 都經 `lib/repair-center/system-mode-gate.ts` 的 `checkRepairAllowed()` 把關，只在 mode=normal 執行；讀不到模式 → 擋（T16）。
+
 ---
 
 ### Integrations（`/ops/integrations`）
@@ -844,6 +846,7 @@ maintenance → block（fail-open set = 空，所以所有 risk 都 block）
 read_only → 非 low 全 block
 normal → 不 block
 ```
+unavailable（讀不到 system_modes 或出現不認得的 mode）→ 全 block；兩種情況都會各呼叫一次 `Sentry.captureMessage`（tags `{component:"kill-switch"}`）帶原因，DB 讀取本身不寫入。
 
 ### build-console/contracts.ts（3 個 Profile 的 plan 邏輯）
 - Profile A：actionKey `ops.profile-a.ao-infrastructure-check`，applyMode=internal_setup

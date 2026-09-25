@@ -25,7 +25,9 @@ vi.mock("@/lib/repair-center/ssh", () => ({
   },
 }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseServerClient: () => null }));
-vi.mock("@/lib/repair-center/service", () => ({ getCurrentSystemMode: async () => "normal" }));
+vi.mock("@/lib/repair-center/system-mode-gate", () => ({
+  checkRepairAllowed: async () => ({ allowed: true, mode: "normal" }),
+}));
 
 const GATE = path.resolve(__dirname, "../../../../../scripts/aw-autorepair-gate.sh");
 

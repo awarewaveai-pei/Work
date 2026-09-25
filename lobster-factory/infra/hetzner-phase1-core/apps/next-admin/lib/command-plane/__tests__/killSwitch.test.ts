@@ -2,16 +2,25 @@
 // FAIL_OPEN_FOR is empty -- no risk level is ever exempt from emergency_stop/maintenance,
 // so the "command blocked" cases below are the security-relevant ones to pin.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { describe, expect, it, vi } from "vitest";
+import * as Sentry from "@sentry/nextjs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { evaluateKillSwitch, FAIL_OPEN_FOR, getActiveMode } from "../killSwitch";
 import type { RiskLevel, SystemMode } from "../types";
 import type { ModeLookup } from "../types";
 
+vi.mock("@sentry/nextjs", () => ({ captureMessage: vi.fn(), captureException: vi.fn() }));
+
+beforeEach(() => {
+  vi.mocked(Sentry.captureMessage).mockClear();
+});
+
 function fakeSb(rows: Array<{ scope_type: string; scope_id: string | null; mode: SystemMode }> | null, error: unknown = null) {
   const or = vi.fn(async () => ({ data: rows, error }));
-  const select = vi.fn(() => ({ or }));
+  const is = vi.fn(async () => ({ data: rows, error }));
+  const eq = vi.fn(() => ({ is }));
+  const select = vi.fn(() => ({ or, eq }));
   const from = vi.fn(() => ({ select }));
-  return { sb: { from } as unknown as SupabaseClient, from, select, or };
+  return { sb: { from } as unknown as SupabaseClient, from, select, or, eq, is };
 }
 
 describe("evaluateKillSwitch", () => {
@@ -57,6 +66,32 @@ describe("getActiveMode", () => {
     for (const risk of ["medium", "high", "critical"] as RiskLevel[]) {
       expect(evaluateKillSwitch(mode, risk).blocks).toBe(true);
     }
+  });
+
+  it("a DB error reports the error message to Sentry before returning unavailable", async () => {
+    const { sb } = fakeSb(null, { message: "boom" });
+    await getActiveMode(sb, "org-1");
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining("boom"),
+      expect.objectContaining({ level: "error", tags: { component: "kill-switch" } }),
+    );
+  });
+
+  it("an unrecognized mode reports the offending value to Sentry before returning unavailable", async () => {
+    const { sb } = fakeSb([{ scope_type: "global", scope_id: null, mode: "lockdown" as unknown as SystemMode }]);
+    await getActiveMode(sb, "org-1");
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining("lockdown"),
+      expect.objectContaining({ level: "error", tags: { component: "kill-switch" } }),
+    );
+  });
+
+  it("organizationId null queries only the global scope (no client-scope condition, no .or())", async () => {
+    const { sb, or, eq, is } = fakeSb([{ scope_type: "global", scope_id: null, mode: "read_only" }]);
+    expect(await getActiveMode(sb, null)).toBe("read_only");
+    expect(or).not.toHaveBeenCalled();
+    expect(eq).toHaveBeenCalledWith("scope_type", "global");
+    expect(is).toHaveBeenCalledWith("scope_id", null);
   });
 
   it("defaults to normal when no row matches org or global scope", async () => {
