@@ -151,22 +151,48 @@ try {
 
 # --- Check 2b: paid Woo orders waiting in pod_order_inbox --- CRITICAL
 # WooCommerce never re-sends a delivery, so the inbox is the only record of an order whose Printful
-# draft is deferred, failing or stuck. Verdict: lib\pod-order-inbox-probe.ps1.
+# draft is deferred, failing or stuck. The buckets come from next-admin's own
+# GET /api/internal/pod-orders/stats, called INSIDE the next-admin container with the container's own
+# POD_INBOX_SWEEP_TOKEN (the token never leaves the host; the node script travels base64 in an env var,
+# the check-site-watch-health.ps1 transport). Verdict: lib\pod-order-inbox-probe.ps1.
 $podProbeLib = Join-Path $PSScriptRoot "lib\pod-order-inbox-probe.ps1"
 if (Test-Path -LiteralPath $podProbeLib) { . $podProbeLib }
 try {
-    if (-not $authHeader) { $authHeader = @{} }
-    $modesResp = Invoke-RestMethod -Uri "$AppBaseUrl/api/ops/system-modes" -Headers $authHeader -TimeoutSec 10 -ErrorAction Stop
-    $podFindings = @(if (Get-Command Get-PodOrderInboxFindings -ErrorAction SilentlyContinue) {
-        Get-PodOrderInboxFindings -Modes $modesResp
-    } else { "probe_lib_missing" })
-    $results["pod_order_inbox"] = if ($podFindings.Count -gt 0) { "warn:" + ($podFindings -join ",") } else { "ok" }
-    $results["pod_order_inbox_detail"] = $modesResp.podOrderInbox
-    if (@($podFindings | Where-Object { $_ -like "pod_order_inbox=*" -or $_ -eq "probe_lib_missing" }).Count -gt 0) { $noEvidence["pod_order_inbox"] = $true }
+    $podHost = $env:AWAREWAVE_SSH_HOST; if (-not $podHost) { $podHost = "145.239.195.47" }
+    $podPort = $env:AWAREWAVE_SSH_PORT; if (-not $podPort) { $podPort = "58122" }
+    $podUser = $env:AWAREWAVE_SSH_USER; if (-not $podUser) { $podUser = "ubuntu" }
+    $podKey  = Join-Path $env:USERPROFILE ".ssh\id_ed25519"
+    $podJs = "const t=process.env.POD_INBOX_SWEEP_TOKEN||'';" +
+             "if(!t){console.log('POD_STATS_NO_TOKEN');process.exit(0);}" +
+             "fetch('http://127.0.0.1:3000/api/internal/pod-orders/stats',{headers:{authorization:'Bearer '+t},signal:AbortSignal.timeout(20000)})" +
+             ".then(async r=>{console.log('POD_STATS_HTTP '+r.status);console.log(await r.text());})" +
+             ".catch(e=>{console.log('POD_STATS_ERR '+e.message);});"
+    $podB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($podJs))
+    $podRemote = "sudo -n docker exec -e B64=$podB64 lobster-next-admin sh -c 'echo `$B64 | base64 -d | node'"
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $podOut = & ssh -o BatchMode=yes -o ConnectTimeout=10 -p $podPort -i $podKey ("{0}@{1}" -f $podUser, $podHost) $podRemote 2>&1
+    } finally { $ErrorActionPreference = $prevEap }
+    $podText = (($podOut | ForEach-Object { [string]$_ }) -join "`n")
+    if ($podText -match 'POD_STATS_NO_TOKEN') {
+        $results["pod_order_inbox"] = "skip:token_unset"
+        $noEvidence["pod_order_inbox"] = $true
+    } elseif ($podText -match 'POD_STATS_HTTP 200\s*\n(?<json>\{[\s\S]*\})') {
+        $modesResp = $Matches['json'] | ConvertFrom-Json
+        $podFindings = @(if (Get-Command Get-PodOrderInboxFindings -ErrorAction SilentlyContinue) {
+            Get-PodOrderInboxFindings -Modes $modesResp
+        } else { "probe_lib_missing" })
+        $results["pod_order_inbox"] = if ($podFindings.Count -gt 0) { "warn:" + ($podFindings -join ",") } else { "ok" }
+        $results["pod_order_inbox_detail"] = $modesResp.podOrderInbox
+        if (@($podFindings | Where-Object { $_ -like "pod_order_inbox=*" -or $_ -eq "probe_lib_missing" }).Count -gt 0) { $noEvidence["pod_order_inbox"] = $true }
+    } else {
+        $podCode = if ($podText -match 'POD_STATS_HTTP (\d+)') { "http" + $Matches[1] } elseif ($LASTEXITCODE -ne 0) { "ssh_exit$LASTEXITCODE" } else { "unparsed" }
+        $results["pod_order_inbox"] = "warn:$podCode"
+        $noEvidence["pod_order_inbox"] = $true
+    }
 } catch {
-    $code = $null
-    try { $code = [int]$_.Exception.Response.StatusCode } catch {}
-    $results["pod_order_inbox"] = if ($code) { "skip:http$code" } else { "skip:unreachable" }
+    $results["pod_order_inbox"] = "skip:exception"
     $noEvidence["pod_order_inbox"] = $true
 }
 

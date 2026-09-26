@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-26（續53）T26 部署與後續：next-admin `2c0604708` 上線；smoke 改在 next-admin 容器內讀收件匣統計（system-modes GET 要 session，原寫法永遠 401）
+- [部署] sg-deploy next-admin `2c0604708`（T19–T27）：host npm test 215 files 2025 passed、healthy 9 s、smoke 5/5；sync-host-scripts 裝上新 sg-deploy.sh（T25）。live：woo-order 無簽章 401、sweep 無／錯 token 401、vector-editor 7 個 sha384、imagetracer 原檔。
+- [根因] 部署後實測：`/api/ops/system-modes` 不在 middleware `PUBLIC_API_PATHS`（`middleware.ts:28-45`），smoke 的 Basic header 從未生效（`/api/ops/repairs/health` 是公開端點）→ 續51 的 Check 2b 會永遠 `skip:http401`，CRITICAL 清單中＝永久盲點。
+- [改] `GET /api/internal/pod-orders/stats`（唯讀，與 sweep 共用 `lib/studio/pod-inbox-auth.ts` bearer）；smoke 以 SSH 在 lobster-next-admin 容器內跑 base64 傳入的 node 腳本打 127.0.0.1:3000，用容器自己的 POD_INBOX_SWEEP_TOKEN（token 不離開主機；傳輸同 check-site-watch-health.ps1）。token 未設 → `skip:token_unset`（盲點，不假綠）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=容器內 self-fetch 127.0.0.1:3000 → 401（token 未設）；check-smoke-tests.ps1 實跑：repair_center ok、pod_order_inbox skip:token_unset（blind_spots 列出）；next-admin tsc 0；vitest internal/pod-orders＋system-modes＋security 62 passed；probe 9/9 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/0m（Codex adversarial approve，artifact `agency-os/reports/oracle/2026-09-26-review-267c91a9.md`）
+- ORACLE_WAIVED: scripts/lib/pod-order-inbox-probe.ps1 檔頭註解（改指 stats 端點）在 Codex capture 之後才改，僅註解；其餘檔案皆為 267c91a9 審過的內容
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/ops/system-modes | hits=8（UI、route、clients route、測試、command-plane-smoke.ps1、COMPLETE_REFERENCE 皆合法使用；probe lib 檔頭改指 stats）
 ## 2026-09-26（續52）研究線 WC-P1-14 進行中：COS 端上 prod（部署＋token＋collector）；WC-13 缺口修正（Trigger 不會收到 execute token）
 - [操作者] 「WC-P1-14，上 prod，之後是 09 和 15」。
 - [分工] next-admin 程式由 `d2996616` 的 T19–T27 部署一起帶上（21:39 起 `sg-deploy.sh next-admin`），本 session 不碰 NA 部署；prod compose／Trigger 部署兩 session 都要動 → 已發訊息請它做完 `POD_INBOX_SWEEP_TOKEN` 的 compose＋Trigger 後通知，本 session 再做 ④⑤。

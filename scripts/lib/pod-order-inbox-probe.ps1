@@ -1,4 +1,4 @@
-# Verdict for GET /api/ops/system-modes `podOrderInbox` (lib/studio/pod-order-inbox.ts getPodOrderInboxStats).
+# Verdict for `podOrderInbox` from GET /api/internal/pod-orders/stats (lib/studio/pod-order-inbox.ts getPodOrderInboxStats).
 # Paid Woo orders live there until a Printful draft exists; WooCommerce never re-sends, so a row that
 # stops moving is a lost sale unless someone sees it. Findings, not a pass, when the field is missing or
 # unreadable -- a silent probe is the failure this exists to catch.
