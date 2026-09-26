@@ -12,7 +12,7 @@
 - 阻塞：PI-a 無。Windows 全套曾紅的 1 項（`test_ai_gateway` 預算鎖測試：把「5 秒內到達」當成不會卡死）已修：改用事件與鎖內觀察＋`tests/unit/thread_testkit.py` 的 hang guard；負載下舊版重現同一失敗、新版通過（WORKLOG 2026-09-26）。容器前兩輪的唯讀／noexec 設定錯誤不列為產品測試通過證據（詳 WORKLOG 2026-09-26 14R 結案）。
 - 下一步：PI-b 05（操作者親眼驗收）→ P1（先產 P1 工作卡，§12.5）。**P-ARF-data 暫緩**：操作者 2026-09-26「還沒整理好」（Airtable 資料），整理好再排，不擋 P1。
   - P1 卡已產（§12.7 WC-P1-01～15，待操作者看卡放行）：A＝COS 軌、B＝NA／WF 軌可並行；並行期卡不改本檔，進度看 WORKLOG `WC-P1-xx 完`。
-  - P2 卡已產（§12.8 WC-P2-01～09＋提前的 P3-01）：01–04 雲端 T28–T31 現在並行（只依賴已合併的 P1 碼），05／P3-01 第二波，06–09 本機排在既有兩條線後；卡 commit 不改本檔，合併者回填。
+  - P2 卡已產（§12.8 WC-P2-01～09＋提前的 P3-01）：01–04 雲端 T28–T31 現在並行（只依賴已合併的 P1 碼），05／P3-01 第二波；本機 07a、P4-01 現在由兩個新 session 在獨立目錄 `D:\tmp\wt-l1`／`wt-l2` 做，06／07b／08／09 排在既有兩條線後；卡 commit 不改本檔，合併者回填。
 
 | 項 | 狀態（各列查證於 2026-09-24；現況以上方進度板為準） |
 |---|---|
@@ -770,8 +770,11 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 | 05 | 雲端 T32 | 01、02、03 合併後 |
 | P3-01 | 雲端 T33 | 03、04 合併後 |
 | 雲端合併 | [a574b2] 或接手者 | 每支到齊：本機重驗（Windows PS 5.1＋autocrlf）→ critic 1 → 合併 → WORKLOG |
-| 06 → 07 → 09 | P1 那條線（WC-P1-15 完、`/clear` 後） | 05 合併後 |
+| 07a | 本機新 session L1，獨立目錄 `D:\tmp\wt-l1` | 現在 |
+| P4-01（提前） | 本機新 session L2，獨立目錄 `D:\tmp\wt-l2` | 現在 |
+| 06 → 07b → 09 | P1 那條線（WC-P1-15 完、`/clear` 後） | 06：05 合併後；07b：07a 合併且網站那批 commit 後 |
 | 08；`POST /route` 端點＋首頁「先說你卡在哪」改呼叫它、刪 TS `pickTools` | 網站那條線（結果頁這批 commit 後） | 08：01 合併後；route：P3-01 合併後 |
+**本機獨立目錄**（L1／L2）：合併者建 `git worktree add --detach D:/tmp/wt-l<N> origin/main`（不建分支，settings 禁）；session 只在該目錄工作，commit 在 detached HEAD、不 push；照一般本機規則（R0／R4、WORKLOG 條目用 `worklog-insert-entry.py`、`/codex-review` 或 `ORACLE_WAIVED`）；完成回報 sha，合併者在 `D:\Work` cherry-pick（objects 共用）並重配 WORKLOG 續號。不在共用目錄 → 不佔 AGENTS §5 的 2 個上限、不碰執行中 session 的未提交檔。
 **雲端前置**（每卡）：`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` exit 0；unit 只跑卡上列的（12.1-11，不跑全套）；分支 `claude/cc-t<N>-*`；卡 commit 不改本檔／WORKLOG／TASKS，證據寫 commit message（合併時回填 §0）。
 **本期不碰（P-K8）**：`COS/apps/cognitive-web/**`、`COS/docs/mockups/**`、`main`（06／07 除外）、`COS/ai_lego/modules/research/interpret_method_record.py`（08 除外）、`COS/ai_lego/platform/ai_gateway/provider.py`、`SPEC/specs/cognitive/typed-objects/method-interpretation.schema.yaml`＋其 fixtures（網站 session 未提交改動中）；T19–T27 與 §12.7 表內的檔。
 
@@ -784,6 +787,7 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 - P-K6 harness 離線（C8）：評「已存的 synthesis artifact」對「案例 expected」，不呼叫模型；案例來源檔當 Source，`source_id = src:<檔名去副檔名>`；門檻初值 `null` = 未定 → 報 `UNSET`（不算 PASS）；基準線由 09 真跑後提出、操作者定（I10）。
 - P-K7 `SPEC/docs/architecture/SPEC_QUICKREF.md` 是產生檔（檔頭 `:3`）：卡內跑 `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/gen_spec_index.py`，不手改；合併時在乾淨樹重產。
 - P-K8 見上「本期不碰」。CI 接線與 `COS/scripts/test-eval-harness.ps1` 歸 09（本機），雲端不改 CI。
+- P-K9 §5 P2 DoD「`edd-research-evidence-v1` 用 `literature_search` v2 跑 PASS」與碼不符：該 recipe 只有三個方法節點（`epistemic.assumption_mapping`／`evidence_matrix`／`toulmin_model`，`SPEC/recipes/validated/edd-research-evidence-v1.recipe.yaml:32,41,52`），不呼叫 `literature_search`；呼叫它的是 `research-qualitative-v1`（同目錄，`:18` `literature_search` → `evidence.triangulation`）與 fixture `edd-literature-search-v1`（§8 退場）。07 驗收改用 `research-qualitative-v1`；09 改寫 §5 該句。
 
 **介面釘死**（各卡依此寫，不等彼此合併；要改表 = 停、相關卡同改）
 | # | 名 | 形狀 |
@@ -853,6 +857,15 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 - 突變：拿掉 `methods_resolvable` → 幻覺案紅；門檻寫死 → champion 案紅。
 - commit：`feat(cognitive-os): route.method -- free catalog match first, AI only below the operator-owned confidence, every suggestion cites the catalog (P3 WC-01 early, U16)`。回滾：revert。
 
+**WC-P4-01（提前）報表產生器 `artifact.generate_report`（純函式，不含端點與 PDF）**（本機 L2，`D:\tmp\wt-l2`；現在）
+- 目標：C6／I5：synthesis artifact（P-c）＋recipe run 結果 → 版本化報表物件＋markdown；每個 [n] 解析到 source_id＋sha256＋URL＋fetched_at，解析不到 = 閘 FAIL（比 `report.ts:185-206` 的改寫 `[?]` 嚴格，I3）。
+- 讀：§3.4 C6、I5、I3；§3.3 `artifact.generate_report` 列；§6 P4 欄（突變：拔 [n] 解析 → 紅）；P-a／P-c／P-d／P-e；`NA/lib/dossier/report.ts:185-206`（對照用，不照抄其放寬）；run 結果形狀 `main` HEAD `:782-803`（`GET /recipes/{id}/runs/{run_id}/result`）與 `_journal_run_result`（錨點 `def _journal_run_result`：`workflow.steps[{index, …, output}]`、`workflow_gates`）；`SPEC/specs/cognitive/typed-objects/method-interpretation.schema.yaml` HEAD `:1-30`（檔頭慣例，只讀）；`SPEC/capabilities/contracts/interpret.method_record.capability.yaml`（契約樣板）。
+- 改：新 `COS/ai_lego/modules/research/report_render.py`：`render_research_report(*, report_id, project_id, synthesis_artifact, run_results, language="zh-TW") -> {report, gate_results}`；`report = {report_id:"RPT-…", project_id, version:int, report_state:"AI_GENERATED", synthesis_ref{synthesis_id, manifest_sha256}, run_refs[{recipe_id, run_id, status}], sections[{heading, markdown}]（彙整段落 → 各 run 每站 record 表 → gate 表）, sources_appendix[{n, source_id, title, url, sha256_12, fetched_at}]（只列被引用者，n 沿 manifest）, problems{invalid_refs[], uncited_sections[]}, markdown, provenance{AI_INFERENCE, AI_GENERATED, locked:null}}`；閘 `report_refs_resolvable`（每個引註 id 在 manifest 且 appendix 有對應列；否則 FAIL）；核准翻轉不在本卡（端點與事件歸 P4）。新 `SPEC/specs/cognitive/typed-objects/research-report.schema.yaml`＋fixtures（≥2 valid、≥4 invalid：未知 report_state、appendix 缺 sha256_12、多餘鍵、HUMAN_APPROVED 卻無核准者欄——schema 加 `approved_by:str|null`，`HUMAN_APPROVED` 時必填）；`SPEC/capabilities/contracts/artifact.generate_report.capability.yaml`（DRAFT，description：context-bound、非 Recipe 節點）；跑 `gen_spec_index.py`。新 `COS/tests/unit/test_report_render.py`（≥10 案：好 synthesis＋一個 run → appendix 只含被引者且順序依 n、未解析引註 → FAIL、uncited_sections 進 problems、run 失敗站仍列表且標狀態、markdown 含每個 [n]、`sha256_12` = sha256 前 12 碼、零 run 也能出、schema 驗證通過、HUMAN_APPROVED 無 approved_by → schema 拒、輸入 artifact 不被改動）。
+- 不改：`main`、`interpret_method_record.py`、NA `report.ts`（§8 P4 退場時才刪）。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_report_render -q 2>&1 | tail -1` → `OK`；golden exit 0；`gen_spec_index.py --check` exit 0。
+- 突變：拔 [n] 解析檢查 → 未解析案紅（§6 P4 欄）；appendix 改列全部 manifest → 「只列被引者」案紅。
+- commit：`feat(cognitive-os): report renderer -- every [n] resolves to source id, sha256, url and fetched_at or the report fails (P4 WC-01 early, C6/I5)`。回滾：revert（DRAFT 契約、無端點）。
+
 **WC-P2-06 synthesis 端點**（本機，P1 那條線；05 合併後）
 - 目標：`POST /projects/{id}/synthesis`（body `{kind, subject}`；202＋`synthesis_id`，背景 thread）、`GET /projects/{id}/synthesis/{sid}`（PENDING／DONE／FAILED）；`ai_usage` purpose `synthesis:<kind>`（成功與失敗都記）；事件 `SynthesisCreated`／`SynthesisFailed`（payload 只放 id／hash／計數，K8）；artifact 存 CAS；三契約 DRAFT → ACTIVE。
 - 讀：`main` HEAD `:1174-1291`、`:1549-1595`；P-h。
@@ -861,11 +874,18 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 - 突變：worker 不記失敗用量 → 案紅；GET 別的 tenant → 404 案紅；零 Sources → 400 且不呼叫模型案紅。
 - commit：`feat(cognitive-os): POST/GET /projects/{id}/synthesis -- background run, metered, gated artifact (P2 WC-06)`。回滾：revert。
 
-**WC-P2-07 `literature_search` v2（project-backed）**（本機，06 後）
-- 目標：有 project 時回本專案 `source_class=academic` 的 active Sources（P-a 形狀摘要）；無 project → 既有 offline fixture 並標 synthetic（§8 P4 刪）；`edd-research-evidence-v1` 以真 Sources 跑 PASS。
-- 讀：`COS/ai_lego/apps/recipe_runtime.py:73-99`（錨點 `def build_registered_capability_adapters`）；`COS/ai_lego/modules/research/evidence_triangulation.py:40`（`offline_literature_search`）；`main` `run_recipe`（P1 WC-07 已帶 project）。先判定：依賴注入能否只加一個 kw-only 參數做完；不能 → 停，§7 加列（P-K1）。
-- 驗收：新 `tests/unit/test_literature_search_v2.py`＋`recipe_runtime` importers → `OK`；突變：不過濾 `source_class` → 案紅。
-- commit：`feat(cognitive-os): literature_search returns the project's academic Sources (P2 WC-07)`。
+**WC-P2-07a `literature_search` v2 adapter（不含 `main` 接線）**（本機 L1，`D:\tmp\wt-l1`；現在）
+- 目標：有專案來源時 `literature_search` 回本專案 `source_class=academic` 的 active Sources，形狀與 offline 版相同，下游 `evidence.triangulation` 可引用；無專案來源 → 既有 offline fixture 原樣（§8 P4 刪）。
+- 讀：`COS/ai_lego/apps/recipe_runtime.py:73-99`（錨點 `def build_registered_capability_adapters`；呼叫者 `main.py:125`、`COS/ai_lego/apps/cli/run_recipe.py:85`）；`COS/ai_lego/modules/research/evidence_triangulation.py:17-67`（`offline_literature_search` 輸出形狀、`_CITABLE_SOURCE_KINDS` `:22`）、`:70-120`（triangulation 如何讀 items）；`SPEC/recipes/validated/research-qualitative-v1.recipe.yaml:17-19,43-50`；`SPEC/capabilities/contracts/literature_search.capability.yaml`；`repo:564`（`list_sources`，欄位 `:163`）；P-K1、P-K9。
+- 改：`recipe_runtime.py` `build_registered_capability_adapters` 加 kw-only `project_sources: list[dict] | None = None`（預設 None = 行為不變，兩個呼叫者不改）；非 None → 註冊 `evidence_triangulation.project_literature_search(project_sources)` 回的 adapter：`items[{literature_id: source_id, title, citation: canonical_url 或 source_uri, source_kind: "PROJECT_SOURCE", fetched_at, content_sha256, provenance: SOURCE_FACT／SOURCE_QUOTATION}]`，只收 `status='active'` 且 `source_class='academic'`；`retrieval.mode = "PROJECT_SOURCES"`、`freshness_claim` = 最舊 `fetched_at`；零筆 → `InvariantViolation("LITERATURE_NO_PROJECT_SOURCES")`（不默默退回 fixture）；`_CITABLE_SOURCE_KINDS` 加 `PROJECT_SOURCE`（triangulation 仍 `NEEDS_HUMAN_REVIEW`）；`literature_search.capability.yaml` description 補 project-backed 一句。新 `COS/tests/unit/test_literature_search_v2.py`（≥8 案：只回 academic、排除 superseded、零筆拋錯、None → offline 原樣、形狀與 offline 同鍵、triangulation 能引 PROJECT_SOURCE、`research-qualitative-v1` 以 in-process runtime 帶專案來源跑到 triangulation PASS、兩個既有呼叫者不帶參數行為不變）。
+- 不改：`main.py`（07b）、`interpret_method_record.py`、任何 recipe YAML。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_literature_search_v2 $(grep -rlE "apps\.recipe_runtime|apps import recipe_runtime|research\.evidence_triangulation|research import evidence_triangulation" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`；golden exit 0。
+- 突變：不過濾 `source_class` → 案紅；零筆改回退 fixture → 案紅；`_CITABLE_SOURCE_KINDS` 拿掉 PROJECT_SOURCE → triangulation 案紅。
+- commit：`feat(cognitive-os): literature_search returns the project's academic Sources when the run has a project (P2 WC-07a, P-K9)`。回滾：revert（預設 None，無呼叫者帶參數）。
+
+**WC-P2-07b `run_recipe` 帶專案來源**（本機，P1 那條線；07a 合併且網站那批 commit 後）
+- 目標：`main` `run_recipe` 有 `project_id` 時讀本專案 Sources 傳 `project_sources`（錨點 `def run_recipe`、`build_registered_capability_adapters(` `main.py:125`）；真跑 `research-qualitative-v1` 用真專案來源 PASS。
+- 驗收：`tests/unit/test_api_main` 相關案＋新案 → `OK`；突變：不傳 `project_sources` → 真來源案紅。
 
 **WC-P2-08 interpret 改用共用閘**（本機，網站那條線；01 合併且結果頁這批 commit 後）
 - 目標：P-K3：`evaluate_interpretation_gates` 的 `citation_integrity` 改呼叫 `gates.evaluate_citation_integrity`，刪內聯；gate id 與 FAIL 語意不變。現有合法輸出若有空 `citations` 的物件（P-b 會 FAIL）→ 停、回報，不放寬 P-b。

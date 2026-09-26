@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-26（續58）研究線 §12.8 補本機現在就能做的兩張卡（07a、P4-01），各在獨立 worktree；抓到 §5 P2 DoD 與 recipe 不符
+- [操作者] 「不是說也要開給 LOCAL SESSION 做嗎？」——續57 只把本機卡排在兩條執行中的線後面，本機沒有新工作。
+- [做] 本機 L1／L2 用 `git worktree add --detach D:/tmp/wt-l<N>`（不建分支；不在共用目錄 → 不佔 AGENTS §5 上限、不碰未提交檔）；commit 在 detached HEAD 不 push，合併者 cherry-pick＋重配續號。
+  - WC-P2-07 拆 07a（adapter：`recipe_runtime.py` 加 kw-only `project_sources`，預設 None 行為不變；`evidence_triangulation.py` 加 project-backed adapter；不碰 `main.py`）＋07b（`run_recipe` 接線，排 P1 線、等網站那批 commit）
+  - WC-P4-01 提前：報表產生器純函式＋`research-report` typed object＋DRAFT 契約；[n] 解析不到 = FAIL（§6 P4 突變）
+- [發現] P-K9：§5 P2 DoD 寫「`edd-research-evidence-v1` 用 `literature_search` v2 跑 PASS」，但該 recipe 只有三個方法節點（`edd-research-evidence-v1.recipe.yaml:32,41,52`），呼叫 `literature_search` 的是 `research-qualitative-v1`（`:18`）→ 07 驗收改用後者，09 改寫 §5。
+- REALTEST_WAIVED: DOC_ONLY -- 只改計畫 §12.8／§0；新引用的 file:line 以 grep／`git show HEAD:` 驗；表 21 列欄數一致
+- REVIEW_WAIVED: DOC_ONLY -- 讀回自審；卡的取捨由各卡突變與合併時 critic 把關
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`project_literature_search|render_research_report|report_refs_resolvable|LITERATURE_NO_PROJECT_SOURCES` | hits=4（全在計畫檔新卡；程式 0；原名 render_report 與 scripts/phase4-checks.py:603 同名 → 改名）
 ## 2026-09-26（續57）研究線 P2 工作卡（計畫 §12.8，v1.52）：雲端 T28–T31 現在並行、T32／T33 第二波、本機 06–09 排在 P1／網站兩條線後
 - [操作者] 「PLAN 太大，多派工作給雲端和本機 session；不能影響其他執行中的 session」。
 - [現況] 執行中：P1 線 [ca73f8]（剩 WC-P1-15）；網站線 [53caf4]（結果頁一批未提交：`apps/cognitive-web/**`、`docs/mockups/check-mocks.py`、`main.py`、`interpret_method_record.py`、`provider.py`、`method-interpretation.*`）。AGENTS §5 共用工作目錄上限 2 → 不開第三個本機 session，本機卡排在兩條線後。
