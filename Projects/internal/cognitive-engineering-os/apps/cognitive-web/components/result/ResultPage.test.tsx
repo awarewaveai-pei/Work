@@ -62,6 +62,12 @@ describe("ResultPage", () => {
     expect(html).toContain("已帶入 1 欄");
     expect(html).toContain("還要你填：objective");
     expect(html).toContain("Release incidents increased");
+    expect(html).toContain('<a class="btn" href="/methods/systems.leverage_point_analysis/run">開啟預填表單</a>');   // the run page reads the prefill
+  });
+  it("with a lesson, the header opens it in a new tab; without one it toggles the reading note", () => {
+    const withLesson = renderToStaticMarkup(<ResultPage result={fixture} lesson="/learn/systems.iceberg_model" />);
+    expect(withLesson).toContain('<div class="top"><h1>systems.iceberg_model分析</h1><a class="howto" href="/learn/systems.iceberg_model" target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a></div>');
+    expect(renderToStaticMarkup(<ResultPage result={fixture} />)).toContain('<button type="button" class="howto secondary">怎麼用？先看讀圖說明</button>');
   });
   it("renders finding-level revision conditions from the typed contract", () => {
     const withCondition = { ...fixture, findings: [{ ...fixture.findings[0], revision_conditions: [{ text: "New evidence", would_change: "Confidence level" }] }] };

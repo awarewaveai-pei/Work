@@ -3,11 +3,13 @@ import type { ReactNode } from "react";
 import { Glyph } from "../../../components/Svg";
 import type { Catalog, Recipe } from "../../../lib/catalog";
 import { loadCatalog, stations, toolHref } from "../../../lib/catalog";
+import { lessonHref } from "../../../lib/lessons";
 
 // 工作流 (mockkit render_workflows, docs/mockups/home-mock.html section#workflows): user workflows grouped by goal, the
 // platform-internal ones folded at the end. A station that is a tool links to the tool; capability steps are text.
 function WorkflowCard({ catalog, r }: { catalog: Catalog; r: Recipe }) {
   const goal = catalog.goals.find((g) => g.id === r.goal)!;
+  const lesson = lessonHref(r.id, "workflow");
   const parts: ReactNode[] = [];
   stations(r.steps).forEach((s, i) => {
     if (i) parts.push(<i key={`a${i}`}>→</i>);
@@ -21,6 +23,7 @@ function WorkflowCard({ catalog, r }: { catalog: Catalog; r: Recipe }) {
       <div className="k">{r.name}</div>
       <div className="journey">{parts}</div>
       <div>{r.blurb_zh}</div>
+      {lesson && <div className="btns"><a className="btn" href={lesson} target="_blank" rel="noopener">第一次走？先上 3 分鐘的課 ↗</a></div>}
     </div>
   );
 }

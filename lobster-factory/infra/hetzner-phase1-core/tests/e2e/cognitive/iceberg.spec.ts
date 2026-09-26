@@ -57,6 +57,13 @@ test('login -> iceberg -> result page sections including 5b', async ({ page }) =
   await expect(page).toHaveURL(/\/methods\/systems\.iceberg_model\/run$/);
   await expect(page.getByRole('heading', { level: 1, name: '冰山模型' })).toBeVisible();
   await expect(page.locator('.status').getByRole('button').first()).toBeVisible();   // the project the run is saved in
+  // the header opens the tool's lesson in a new tab (docs/mockups/iceberg-result-mock.html .top > a.howto); the lesson is served
+  const lesson = page.locator('.top a.howto');
+  await expect(lesson).toHaveAttribute('href', '/learn/systems.iceberg_model');
+  await expect(lesson).toHaveAttribute('target', '_blank');
+  const lessonPage = await page.request.get('/learn/systems.iceberg_model');
+  expect(lessonPage.status()).toBe(200);
+  expect(await lessonPage.text()).toContain('開始：填你自己的案例');
   await page.getByRole('button', { name: '用示範案例填入' }).click();
   const doneResponse = page.waitForResponse(async (response) => {
     if (!/\/api\/interpretations\/INTERP-/.test(response.url()) || !response.ok()) return false;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation self-test for check-mocks.py: copies the five mocks plus design-system.css and partials/ to a temp folder,
+"""Mutation self-test for check-mocks.py: copies the five mocks plus design-system.css, partials/ and the web app's copies to a temp folder,
 injects one defect per case and requires the checker to exit 1 with a finding carrying the expected rule tag (and, when
 given, the expected message text — so the case proves ITS rule, not a neighbour that happens to fire too) and no
 traceback; the untouched copies must be green, and so must every ACCEPT variant (valid input the checker once rejected — a
@@ -205,6 +205,10 @@ CASES = [
     ("one field of the saved-run form shows only before a run (nested data-when)", "U14|fields must be visible in both states", "workflow-result-mock.html", "re", r'<div class="field">(\s*<label for="s2-s">)', r'<div class="field" data-when="empty" hidden>\1'),
     ("a second primary link elsewhere in the start card", "U15|start step needs exactly three buttons", "iceberg-lesson-mock.html", "re", r'(之後補：</p>\s*)<ul class="check">', r'\1<p><a class="btn primary" href="#panel-fill">先看怎麼填</a></p><ul class="check">'),
     ("the web app's stylesheet drifts from the design system", "U19|web copy of design-system.css", "web-design-system.css", "str", "[hidden]{display:none!important}", "[hidden]{display:none}"),
+    ("a lesson is edited without exporting it to the web app", "I11|differ from the lesson mocks", "iceberg-lesson-mock.html", "str", "<h1>冰山模型：開始前 5 分鐘</h1>", "<h1>冰山模型：開始前五分鐘</h1>"),
+    ("a lesson links to a home anchor the web app has no route for", "I11|no web route", "workflow-lesson-mock.html", "str", 'href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask"', 'href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#goals"'),
+    ("mock-only wording in a lesson would reach the web app", "I11|mock-only wording", "iceberg-lesson-mock.html", "str", "<h1>冰山模型：開始前 5 分鐘</h1>", "<h1>冰山模型：開始前 5 分鐘（示意稿）</h1>"),
+    ("a mock-only control in a lesson would reach the web app", "I11|a mock-only control", "workflow-lesson-mock.html", "re", r'<a class="btn ghost" href="https://claude\.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">', '<button type="button" class="btn ghost" data-mock="x">x</button><a class="btn ghost" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">'),
     # continuity: the expected message names the loop each case proves (a mutation may trip more than one loop)
     ("page fact removed (PAGE_FACTS)", "continuity|fact missing", "iceberg-result-mock.html", "str", "主動分享人數（8 人團體）", "主動分享人數（8 人團隊）"),
     ("start step loses its preparation intro (PAGE_FACTS)", "continuity|fact missing", "workflow-lesson-mock.html", "str", "<p>手邊有這些會走得比較快，沒有也可以先走、之後補：</p>\n", ""),
@@ -247,6 +251,7 @@ def run_checker(folder, spec=None):
 def reset(tmp):
     for f in FILES + [CSS]: shutil.copyfile(HERE / f, tmp / f)
     shutil.copyfile(mk.WEB_DESIGN_SYSTEM, tmp / "web-design-system.css")   # the web app's copy (check-mocks.py --dir reads it here)
+    shutil.copyfile(mk.WEB_LESSONS, tmp / "web-lessons.generated.ts")       # the web app's lessons (same)
     if (tmp / "partials").exists(): shutil.rmtree(tmp / "partials")
     shutil.copytree(mk.PARTIALS, tmp / "partials")
 

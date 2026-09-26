@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Sync the shared pieces into every mock, verbatim: design-system.css into each <style> (between the shared markers,
-page section left empty) and every partials/<name>.html into its marked fragment. Generated partials (domain-chips,
+page section left empty) and every partials/<name>.html into its marked fragment; then export the lessons to the web app
+(mockkit.WEB_LESSONS). Generated partials (domain-chips,
 from SPEC/methods/examples/domains.yaml) are re-rendered first. Idempotent; a CRLF page is rewritten as LF. Edit the
 .css / .yaml / partial, run this, run check-mocks.py. Exit 1 with one line on bad input (never a traceback).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/sync-design-system.py"""
@@ -52,6 +53,12 @@ def main():
         out = new.encode("utf-8")
         if out == raw: print(f"{f}: already in sync"); continue
         p.write_bytes(out); print(f"{f}: synced")
+    try:                                                     # the web app's lessons = the synced lesson pages
+        lessons = mk.render_web_lessons().encode("utf-8")
+    except (OSError, ValueError) as e:
+        print(f"lessons cannot be exported to the web app: {e}"); return 1
+    if not mk.WEB_LESSONS.exists() or mk.WEB_LESSONS.read_bytes() != lessons:
+        mk.WEB_LESSONS.write_bytes(lessons); print(f"{mk.WEB_LESSONS}: exported")
     return 0
 
 

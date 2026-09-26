@@ -1,4 +1,18 @@
 ﻿# Worklog
+## 2026-09-26（續39）Cognitive OS 網站課程頁照示意稿（第三批）：冰山、做一個決定兩堂課由示意稿匯出；各頁連到課程；開啟預填表單改開填寫頁
+- [操作者] 網站缺示意稿的課程頁（653Kt4JtExaujnffNDvygY、TP18Q3Xif2BphmAfbxxrKU）。
+- [根因] C1 網站沒有課程路由，示意稿課程只存在 artifact。C2 若在網站手寫一份課程＝第二份內容，示意稿改了不會跟（類同 C2 續36：無閘就漂移）。C3 課程內文含示意稿自述（「示意稿只做了…」「正式版在 P4…」），搬上網站即為假話。C4（續36 引入）ResultPage「開啟預填表單」開 `/methods/<id>`，預填只在 `/run` 讀。
+- [改] 匯出＝唯一來源：`mockkit.export_lesson`／`render_web_lessons` 取課程 `<main>`（去 banner、partial 註解），每個 artifact 連結經 `web_target` 對到網站路由；網站還沒有的頁（示範結果頁、工作流逐站頁）變 `button[data-note]` 說「還在做」；無對應連結、`data-mock`、「示意稿」「正式版」一律擋下匯出。`sync-design-system.py` 寫 `apps/cognitive-web/lib/lessons.generated.ts`，`check-mocks.py` 比對（I11），自測＋4 例。
+- [改] 示意稿課程 10 處自述改成兩邊都成立的句子（「這個領域的完整結果頁還在做」「匯出功能還在做」）。
+- [改] 網站：`/learn/[id]`（工具課）、`/learn/workflow/[id]`（工作流課）；`LessonView` 移植示意稿 tabs／chips／page-actions 三段腳本（範圍限容器、卸載移除監聽）；`lib/lessons.ts` 只在 server 用，填寫頁拆成 server 外殼＋`components/RunPage.tsx`（課程連結當 prop，課程 HTML 不進瀏覽器 JS：實測 3 頁 client js 0 命中）。
+- [改] 課程連結（另開分頁）：工具頁、首頁「先從這幾個開始」、工作流卡、填寫頁表頭＋怎麼讀、結果頁表頭；填寫頁麵包屑改示意稿「我的專案 › X分析」＋工具英文名；工具頁「開始」拿掉示意稿沒有的小字。
+- [修] C4：「開啟預填表單」改 `<a href=/methods/<id>/run>`，點擊先寫 sessionStorage。
+- [Codex] `codex-oracle.ps1`（只含本批改動的暫存 worktree，83KB 產生檔不送）1 finding：F1 `/learn/%E0` 的 `decodeURIComponent` 會丟 URIError → 500。實測不成立：Next 在進頁面前就對壞的百分比編碼回 400（`/learn/%E0`、`/learn/workflow/%E0`、`/methods/%E0`、`/methods/%E0/run` 皆 400；未知 id 404；`%2E` 編碼的合法 id 200），不改。
+- [已知] ① 課程「用示範案例試一次」各領域寫不同例子，填寫頁只有預設領域示範（示意稿同缺；P3 各領域例子）。② `button.btn` 撐高時內容垂直置中、`a.btn` 靠上，差約 5px（示意稿本身同樣）。③ 首頁／工具／工作流頁仍無渲染 HTML 閘（`--page` 只有 result）；兩處程式註解原寫「check-mocks --page home 會檢查」為假，已改正。
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 API :8420＋next dev :3930：Playwright 桌機＋手機 6 頁 200／無橫向捲動／無 console 錯誤，tab・chip・data-note・#panel-read・連結進摺疊，兩堂課 11 個連結全 200 且錨點存在、#demo 填好 4 格，4 頁的課程連結皆 target=_blank，無課程工具 /learn 404；client js 無課程文字；`playwright-runner.ps1 -Mode cognitive` 真模型 e2e（含課程檢查）1 passed（51.4s）；web vitest 34 passed、tsc 0；check-mocks 綠；自測 194/194 抓到、146/146 規則有例 | exit=0 | ms=51400
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`agency-os/reports/oracle/2026-09-26-review-827de06e.md`；F1 實測不成立，見 [Codex]）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs,scripts,.claude/commands,lobster-factory/infra/hetzner-phase1-core/tests | grep=`示意稿只做了|正式版在 P4|--page home|window.location.href = .?/methods|useParams` | hits=619（全在首頁／結果頁示意稿的 `data-mock` 按鈕文字與 mockkit 常數；課程頁 0；其餘四個 pattern 0）
+- BUGHUNT_SCOPE_NARROW: 改動只在 COS 網站、示意稿工具鏈與 e2e；agency-os 取 COS 規格文件子樹
 ## 2026-09-26（續38）Cognitive OS 網站填寫頁照示意稿（第二批）：四格表單、提示＋例子、三顆按鈕、結果在格子下方；一次點擊一次分析
 - [操作者] 網站與示意稿 `iceberg-result-mock.html`（7JLjM7mGyqTMLJmCMUmWqq）差很多。
 - [根因] C1 `MethodForm` 的文字清單是「一項一框＋新增一項」，示意稿是一格一段、每行一項；提示／例子不在登錄檔（`method-input-forms.yaml` 冰山無 label/hint，`method-form-examples.yaml` 冰山例子不是示意稿的藝術反思案例）。C2 填寫頁沒有表頭卡／狀態列／怎麼讀，結果出現後表單消失。C3 `.wrap` 是 grid item＋auto margin → 縮成內容寬度（填寫頁窄一截）。

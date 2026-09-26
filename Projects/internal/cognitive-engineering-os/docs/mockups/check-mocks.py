@@ -291,6 +291,15 @@ class Checker:
                 self.check_file(f)
             except Exception as e:  # a page that cannot be checked is a finding, never a traceback
                 self.bad(f, "parse", f"{type(e).__name__}: {e}")
+        # plan I11: the web app's lessons are these pages' exports (sync writes them; a --dir copy carries web-lessons.generated.ts)
+        web_lessons = mk.WEB_LESSONS if self.folder.resolve() == mk.HERE else self.folder / "web-lessons.generated.ts"
+        try:
+            want = mk.render_web_lessons(self.folder).encode("utf-8")
+        except (OSError, ValueError) as e:
+            self.bad("*", "I11", f"lessons cannot be exported to the web app: {e}")
+        else:
+            if not web_lessons.exists() or web_lessons.read_bytes() != want:
+                self.bad("*", "I11", f"web lessons ({web_lessons.name}) are missing or differ from the lesson mocks (run sync-design-system.py)")
         if len(set(self.shared_blocks.values())) > 1:
             self.bad("*", "shared", "shared design-system block differs between files (run sync-design-system.py)")
         self.check_continuity()

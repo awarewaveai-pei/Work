@@ -1,6 +1,6 @@
 // The display catalog (API GET /catalog = ai_lego/platform/catalog/display_catalog.py, the loader the mocks are
 // checked with) and the pure helpers the pages list tools and workflows with. Mirrors docs/mockups/mockkit.py's
-// renderers; check-mocks.py --page holds the rendered HTML to the same rules as the mocks.
+// renderers (only the result page has a rendered-HTML gate so far, check-mocks.py --page result; the rest: TASKS).
 
 export type Method = { name_zh: string; name_en: string; abbr?: string | null; blurb_zh: string; url?: string; family: string; goal: string; next: string[] };
 export type Goal = { id: string; title_zh: string; short_zh: string; blurb_zh: string; icon: string; families: string[]; featured: string[] };

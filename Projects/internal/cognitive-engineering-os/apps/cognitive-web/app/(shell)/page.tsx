@@ -2,9 +2,10 @@ import Link from "next/link";
 import { Glyph, Picture } from "../../components/Svg";
 import { StuckBox } from "../../components/StuckBox";
 import { dirHref, goalOf, loadCatalog, runHref, toolHref, toolsOfGoal } from "../../lib/catalog";
+import { lessonHref } from "../../lib/lessons";
 
 // Home (docs/mockups/home-mock.html section#home): the one sentence, 先說你卡在哪, the goal cards, the popular starts.
-// Same markup and classes as mockkit render_goals / render_featured; check-mocks.py --page home checks this output.
+// Same markup and classes as mockkit render_goals / render_featured (no rendered-HTML gate for this page yet: TASKS).
 export default async function HomePage() {
   const catalog = await loadCatalog();
   const { counts, goals, popular, methods, recipes, glyphs, shapes } = catalog;
@@ -45,11 +46,14 @@ export default async function HomePage() {
         <div className="mcards">
           {popular.map((p) => {
             const m = methods[p.id];
+            const lesson = lessonHref(p.id, "tool");
             return (
               <div className="mcard pop" id={`pop-${p.id}`} key={p.id}>
                 <div className="gh"><Picture paths={shapes[p.shape]} label={`${m.name_zh}的樣子`} /><div><b><Link href={toolHref(p.id)}>{m.name_zh}</Link></b><span className="tag">{goalOf(catalog, p.id).short_zh}</span><div className="k">{m.name_en}</div></div></div>
                 <div>{p.line_zh}</div>
-                <div className="btns"><Link className="btn primary" href={runHref(p.id)}>開始 →</Link><Link className="btn" href={toolHref(p.id)}>看它做什麼</Link></div>
+                <div className="btns"><Link className="btn primary" href={runHref(p.id)}>開始 →</Link>{lesson
+                  ? <a className="btn" href={lesson} target="_blank" rel="noopener">第一次用？先上 5 分鐘的課 ↗</a>
+                  : <Link className="btn" href={toolHref(p.id)}>看它做什麼</Link>}</div>
               </div>
             );
           })}
