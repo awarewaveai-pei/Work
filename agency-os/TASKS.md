@@ -1188,6 +1188,7 @@
 
 - [ ] **【部署 env｜續110 延後 ①–③】Trigger 部署 env 三個殘留：`TRIGGER_*` 同步不到、`triggerUrl` 型別、可選值不隨輪替傳播**
   - `🟡 潛伏` · `2026-09-23 發現；2026-09-26 補登` · `續110 寫了「開 TASKS G」但該條從未 commit（b443b77d3 只含 WORKLOG 與程式）`
+  - ④（2026-09-26 補）parity 閘只驗「config 讀 == deploy 匯出」，不驗「task runtime 讀 ⊆ syncEnvVars」：32 個 runtime 讀不在 syncEnvVars（多為本機 CLI／手設），WC-P1-13 因此漏 `COLLECT_RESEARCH_EXECUTE_TOKEN`（已補，WORKLOG 續52）。修法：parity 測試加「task 讀 ⊆ 同步 ∪ 明列不同步（附理由）」並逐一分類。
   - ① `@trigger.dev/build` `dist/esm/extensions/core/syncEnvVars.js:49,101` 丟掉所有 `TRIGGER_*` 鍵 → `scripts/lobster-trigger-deploy.ps1` 的 `LOBSTER_TRIGGER_PUBLIC_API_URL` export 是死碼 ② `trigger.config.ts` 的 `triggerUrl` 不在 sdk 4.5.10 `TriggerConfig` 型別（既存 tsc 錯），CLI 是否採用未驗 ③ `$deployBash` 的 `LOBSTER_HOSTING_API_TOKEN`／`LOBSTER_WP_SSH_PRIVATE_KEY`／`LOBSTER_EXECUTE_MANIFEST_STEPS` 取自呼叫端 ambient `$env:`、不在 vault `-Names` → 輪替不會傳播。細節 WORKLOG 2026-09-23 續110。
 
 - [x] **【✅ 2026-09-20 開出並同日完成｜部署】docker-compose.yml repo/prod drift——查明機制、repo 補齊、機械偵測上線、prod 同步完成**

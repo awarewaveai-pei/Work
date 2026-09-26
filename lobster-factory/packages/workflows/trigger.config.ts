@@ -66,6 +66,11 @@ export default defineConfig({
         const podSweepToken = process.env.POD_INBOX_SWEEP_TOKEN ?? "";
         if (podSweepToken.trim()) out.POD_INBOX_SWEEP_TOKEN = podSweepToken.trim();
 
+        // collect-research-run -> next-admin /api/internal/collect/runs/execute (RESEARCH_LINES_MASTER_PLAN
+        // WC-P1-13). Own token, same rule.
+        const researchExecuteToken = process.env.COLLECT_RESEARCH_EXECUTE_TOKEN ?? "";
+        if (researchExecuteToken.trim()) out.COLLECT_RESEARCH_EXECUTE_TOKEN = researchExecuteToken.trim();
+
         // ── Supabase (Lobster DB writes) ─────────────────────────────────────
         const supabaseUrl = process.env.LOBSTER_SUPABASE_URL ?? "";
         const supabaseSrk = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY ?? "";

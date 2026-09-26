@@ -164,6 +164,9 @@ done
 export "SITE_WATCH_INGEST_TOKEN=`$(docker exec lobster-next-admin printenv SITE_WATCH_INGEST_TOKEN 2>/dev/null)"
 # pod-order-inbox-sweep token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
 export "POD_INBOX_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv POD_INBOX_SWEEP_TOKEN 2>/dev/null)"
+# collect-research-run token: same rule -- optional, from the RUNNING next-admin; empty = the relay task fails and
+# Cognitive OS reads the run as failed at its deadline.
+export "COLLECT_RESEARCH_EXECUTE_TOKEN=`$(docker exec lobster-next-admin printenv COLLECT_RESEARCH_EXECUTE_TOKEN 2>/dev/null)"
 
 echo '=== Env ready ==='
 echo "  TRIGGER_API_URL (CLI):          `$TRIGGER_API_URL"
@@ -179,6 +182,7 @@ if [ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ]; then echo "  LOBSTER_WP_SSH_PRIVATE_KE
 if [ -n "`$MAINWP_CONSUMER_SECRET" ]; then echo "  MAINWP_* set: yes (`$MAINWP_DASHBOARD_URL)"; else echo "  MAINWP_* set: no"; fi
 if [ -n "`$SITE_WATCH_INGEST_TOKEN" ]; then echo "  SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)"; else echo "  SITE_WATCH_INGEST_TOKEN set: no (next-admin has none; site-watch-heartbeat will skip)"; fi
 if [ -n "`$POD_INBOX_SWEEP_TOKEN" ]; then echo "  POD_INBOX_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  POD_INBOX_SWEEP_TOKEN set: no (next-admin has none; pod-order-inbox-sweep will skip)"; fi
+if [ -n "`$COLLECT_RESEARCH_EXECUTE_TOKEN" ]; then echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: yes (from running next-admin)"; else echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: no (next-admin has none; collect-research-run will fail at the relay)"; fi
 
 cd /root/Work/lobster-factory/packages/workflows
 

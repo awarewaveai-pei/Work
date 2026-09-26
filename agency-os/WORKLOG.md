@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-26（續52）研究線 WC-P1-14 進行中：COS 端上 prod（部署＋token＋collector）；WC-13 缺口修正（Trigger 不會收到 execute token）
+- [操作者] 「WC-P1-14，上 prod，之後是 09 和 15」。
+- [分工] next-admin 程式由 `d2996616` 的 T19–T27 部署一起帶上（21:39 起 `sg-deploy.sh next-admin`），本 session 不碰 NA 部署；prod compose／Trigger 部署兩 session 都要動 → 已發訊息請它做完 `POD_INBOX_SWEEP_TOKEN` 的 compose＋Trigger 後通知，本 session 再做 ④⑤。
+- [① token] `COLLECT_RESEARCH_RUNS_TOKEN` 在主機產生直接寫 COS `deploy/.env`（600，len 43，值未經 Claude）；vault 由 scratch `vault-from-host.ps1` 經 ssh 讀入 `secrets-vault.ps1 set`（值不上指令列、不回顯；`get` 只見遮罩）。
+- [② COS] 備份 3 庫（SQLite backup API，integrity ok）`/home/ubuntu/cos-predeploy-p1-20260926T134314Z`；`/opt/cognitive-os` ff 到 `2c060470`；`deploy.sh`：測試關卡 208 passed、api 13:47:38 重建 healthy、本機＋公開 smoke PASS；容器內 token 有、allowlist `api.anthropic.com,app.aware-wave.com`、`COGNITIVE_OS_COLLECTION_SERVICE_URL` 有；新路由無憑證 401。開庫 migration 在觀察下跑：`collection_runs.deadline_at` 加上，列數不變（platform_projects 5、prov_sources 15、events 24、interpretations 2），兩庫 integrity ok。
+- [③ collector] `bootstrap_service_identity --tenant-id efa91107…`（操作者 tenant）→ identity `79661433-7ada-4455-9ed0-243761a31889`；tenant 3→3、identity 3→4；自動密碼那行在管線濾掉未落紀錄（機器帳號，走 grant 不登入）。
+- [WC-13 缺口] `postResearchRunExecute.ts:25` 讀 `COLLECT_RESEARCH_EXECUTE_TOKEN`，但 `trigger.config.ts` syncEnvVars 與 `lobster-trigger-deploy.ps1` 都沒帶 → 研究 run 必在 relay 失敗。修：照 `POD_INBOX_SWEEP_TOKEN` 同形（config 非空才推；deploy 從 running next-admin 取、只印 set yes/no）。parity 閘只驗「config 讀 == deploy 匯出」，不驗「task 讀 ⊆ config 同步」→ 類別缺口 32 個（多為本機 CLI／手設）寫 TASKS，不在本卡擴大。
+- REALTEST_EVIDENCE: tool=Bash | cmd=vitest syncEnvVarsParity＋src/lib/collection 13 passed；突變（拿掉 export）→ parity 紅、還原綠；PS parser 0；COS deploy.sh exit 0（208 passed）＋容器 printenv／PRAGMA／列數 | exit=0 | ms=180000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex scoped `agency-os/reports/oracle/2026-09-26-partialreview-7ced9540.md`）
+- ORACLE_WAIVED: 全樹 review 不可用（工作樹含他 session 未提交檔）；改用只涵蓋本修正 5 檔的 Codex scoped review（上列）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os | grep=`COLLECT_RESEARCH_EXECUTE_TOKEN` | hits=23（12 檔：WF 讀取＋測試＋task、config、deploy 腳本、NA execute route＋測試、repo compose、計畫、WORKLOG／excerpt、本修正 oracle 報告；讀取點皆有供給）
+- [下一步] 等 `d2996616` 通知 → ④ NA `.env`＋`safe-infra-patch.sh compose` → ⑤ `lobster-trigger-deploy.ps1` → 驗收 SAME＋錯 token 401 → 09 → 15。
 ## 2026-09-26（續51）合併雲端 T26：Printful 寫入過系統模式閘；Woo 付款訂單先落收件匣、一律 2xx、回應後建草稿、自己重試（0093 已套；next-admin／Trigger 未部署）
 - [根因] Printful 寫入不查模式；Woo webhook 被擋只能回非 2xx，而 WooCommerce 不重送、>5 次停用 webhook（`class-wc-webhook.php:331,544,562-570`）→ 模式擋下＝漏單。
 - [來源] `claude/cc-t26-pod-mode-inbox` fe295668c：tools/publish link／pfcreate／pforder、printful/sync PUT 過 gate（pfcreate 用 bridge 站 org）；0093 `pod_order_inbox`；webhook 先 upsert 再查 gate，擋下 deferred＋200；system-modes 切 normal 時補做。
