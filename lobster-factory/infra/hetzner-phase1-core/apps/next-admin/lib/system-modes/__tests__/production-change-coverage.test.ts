@@ -22,6 +22,7 @@ const TARGET_MODULES = [
   path.join(ROOT, "lib", "repair-center", "ssh"),
   path.join(ROOT, "lib", "studio", "wp-bridge-client"),
   path.join(ROOT, "lib", "content", "publish", "wordpress-core"),
+  path.join(ROOT, "lib", "cs", "chatwoot-client"),
 ].map((p) => p.replace(/\\/g, "/"));
 
 // Relative path (forward-slash, from ROOT) -> one-line reason this file is exempt.
@@ -42,6 +43,8 @@ const ALLOWLIST: Record<string, string> = {
     "imports wp-bridge-client only for createNewsletter(); the gate lives in bridgePost() (the shared dispatch function every bridge write goes through), not in this route.",
   "app/api/tools/publish/route.ts":
     "imports wp-bridge-client only for createWooProduct(); the gate lives in bridgePost(), not in this route.",
+  "lib/cs/chatwoot-client.ts":
+    "primitive Chatwoot HTTP transport -- not a call site; the one caller (app/api/webhooks/chatwoot/route.ts) gates before the AI pipeline runs, not inside sendReply/sendPrivateDraft/handoffToHuman themselves (those are also called AFTER an allowed gate, from the decision-delivery branch further down the same route).",
 };
 
 function walk(dir: string, out: string[]): void {
@@ -164,8 +167,13 @@ const IMP = 'import { checkProductionChangeAllowed } from "@/lib/system-modes/pr
 describe("production-change gate coverage", () => {
   it("scans the real tree and detects the known write paths (a detector that sees nothing passes vacuously)", () => {
     expect(files.length).toBeGreaterThan(400);
-    const known = ["lib/content/publish/wordpress-core.ts", "app/api/content/wp-post/route.ts", "lib/studio/wp-bridge-client.ts"];
-    for (const rel of [...known, "lib/repair-center/ssh.ts", "app/api/video/embed-to-wp/route.ts"]) {
+    const known = [
+      "lib/content/publish/wordpress-core.ts",
+      "app/api/content/wp-post/route.ts",
+      "lib/studio/wp-bridge-client.ts",
+      "app/api/webhooks/chatwoot/route.ts",
+    ];
+    for (const rel of [...known, "lib/repair-center/ssh.ts", "app/api/video/embed-to-wp/route.ts", "lib/cs/chatwoot-client.ts"]) {
       expect(needsGate(factsOf(rel), path.join(ROOT, rel)), `${rel} no longer detected`).toBe(true);
     }
     for (const rel of known) expect(factsOf(rel).callsGate, `${rel} lost its gate call`).toBe(true);

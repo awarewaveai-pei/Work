@@ -6,6 +6,8 @@ import { claimMessage, findOrganizationIdByChatwootAccountId } from "@/lib/cs/db
 import { handoffToHuman, sendPrivateDraft, sendReply, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { InboundMessage } from "@/lib/cs/types";
 
 export const runtime = "nodejs";
@@ -102,6 +104,25 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const cis = await loadCis(organizationId);
+
+  // T27 (agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md): a blocking system
+  // mode pauses the AI and hands the conversation to a human -- no AI call, no credit reserved while
+  // paused. Placed AFTER claimMessage (above) so a Chatwoot retry of the SAME message hits "duplicate"
+  // and never re-runs this — i.e. never posts the pause note twice. blockedChangeMessage
+  // (lib/system-modes/blocked-change.ts) reads as an operator-facing 423 body ("this change was
+  // blocked; go to /ops/system-modes and retry"), which doesn't fit a private note read by a human
+  // agent taking over a conversation — a purpose-written message instead. Failed delivery of the note
+  // or the handoff itself must not turn into a 5xx (same .catch(() => undefined) shape the
+  // credit_exhausted branch below already uses) — the claim already committed above, so a 5xx here
+  // would just make Chatwoot retry into the same claimed row forever.
+  const modeGate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
+  if (!modeGate.allowed) {
+    if (cis.chatwoot) {
+      await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, `AI 暫停：系統處於 ${modeGate.mode} 模式，已轉真人`).catch(() => undefined);
+      await handoffToHuman(organizationId, cis.chatwoot, conversationId).catch(() => undefined);
+    }
+    return NextResponse.json({ ok: true, action: "handoff", reason: "system_mode_blocked", mode: modeGate.mode });
+  }
 
   // Opt-in metering (lib/cs/billing.ts) — unmetered orgs (no billing account row) always proceed.
   const credit = await reserveCsCredit(organizationId, messageId);
