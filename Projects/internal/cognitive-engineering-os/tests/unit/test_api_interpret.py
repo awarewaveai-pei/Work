@@ -244,6 +244,7 @@ class InterpretApiTests(ApiTestCase):
         self.assertEqual(fetched.status_code, 200, fetched.text)
         self.assertEqual(fetched.json()["status"], "FAILED")
         self.assertIn("NOT_JSON", fetched.json()["error"])
+        self.assertIn("AI_USAGE_RECORD_FAILED", fetched.json()["error"])
         failure = [event for event in self.repo.list_events(self.tenant["tenant_id"], f"project:{self.project_id}") if event["event_type"] == "InterpretationFailed"][-1]
         self.assertIn("NOT_JSON", failure["payload"]["error"])
         self.assertIn("AI_USAGE_RECORD_FAILED", failure["payload"]["error"])
