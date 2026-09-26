@@ -40,17 +40,31 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb()
 vi.mock("../../supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb() }));
 function fakeDb() {
   const q = { select: () => q, eq: () => q, single: async () => ({ data: { spec_data: spec, metadata: {} }, error: null }),
+    // website_specs row for the seed org lookup (provision-staging resolveTargetOrg)
+    maybeSingle: async () => ({ data: { organization_id: ORG_ID, intake_form_id: null }, error: null }),
     insert: async () => ({ error: { code: "23505", message: "dup" } }), update: () => q, delete: () => q };
   return { from: () => q };
 }
 vi.mock("@/lib/storage/r2", () => ({ isR2Configured: () => false }));
 vi.mock("../../storage/r2", () => ({ isR2Configured: () => false }));
+// T17: provision-staging now gates on system mode before any SSH. This file's concern is the
+// gate script contract, not the system-mode gate (covered by production-change-gate.test.ts and
+// provision-staging-mode-gate.test.ts) -- always allow so every case below still reaches SSH.
+vi.mock("@/lib/system-modes/production-change-gate", () => ({
+  checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }),
+}));
+vi.mock("../../system-modes/production-change-gate", () => ({
+  checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }),
+}));
 
 const GATE = path.resolve(__dirname, "../../../../../scripts/aw-hosting-gate.sh");
 const TOKEN = "contract-token";
 const UNIQUE_ID = "0123456789abcdef0123456789abcdef";
 const EVIL_NAME = "Evil $(touch MARKER) `touch MARKER` 'q\" ;id";
 const SITE_ID = "6f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
+// T17: provision-staging now requires organizationId to be a uuid (it's interpolated into the
+// system-mode gate's PostgREST filter string) -- "org-1" from before that rule no longer passes.
+const ORG_ID = "3a2b1c4d-5e6f-4789-8a9b-0c1d2e3f4a5b";
 
 function gateCheck(cmd: string) {
   const env: NodeJS.ProcessEnv = { ...process.env, SSH_CLIENT: "contract-test 0 0", SSH_ORIGINAL_COMMAND: cmd };
@@ -72,7 +86,7 @@ beforeEach(() => { calls.length = 0; bridge.configured = true; bridge.reads.leng
 
 describe("provision-staging → aw-hosting-gate contract", () => {
   it("every host command is a gate verb the gate accepts, and carries no secret or caller text", async () => {
-    const r = await post({ organizationId: "org-1", siteId: SITE_ID, siteName: EVIL_NAME, pluginSlugs: ["fluent-crm"], mainwpChildUniqueId: UNIQUE_ID });
+    const r = await post({ organizationId: ORG_ID, siteId: SITE_ID, siteName: EVIL_NAME, pluginSlugs: ["fluent-crm"], mainwpChildUniqueId: UNIQUE_ID });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     expect(calls.map((c) => c.command.split(" ")[0])).toEqual(
       expect.arrayContaining(["staging-prepare", "staging-wp"]),
@@ -87,7 +101,7 @@ describe("provision-staging → aw-hosting-gate contract", () => {
   });
 
   it("every staging-wp script parses, and no other verb gets stdin", async () => {
-    await post({ siteId: SITE_ID, siteName: EVIL_NAME, mainwpChildUniqueId: UNIQUE_ID });
+    await post({ organizationId: ORG_ID, siteId: SITE_ID, siteName: EVIL_NAME, mainwpChildUniqueId: UNIQUE_ID });
     for (const c of calls) {
       if (c.command.startsWith("staging-wp ")) {
         const r = spawnSync("bash", ["-n"], { input: c.stdin, encoding: "utf8" });
@@ -99,7 +113,7 @@ describe("provision-staging → aw-hosting-gate contract", () => {
   });
 
   it("install script: the site name stays literal and the admin password arrives on stdin, never argv", async () => {
-    await post({ siteId: SITE_ID, siteName: EVIL_NAME });
+    await post({ organizationId: ORG_ID, siteId: SITE_ID, siteName: EVIL_NAME });
     const install = calls.find((c) => c.stdin?.includes("core install"));
     expect(install).toBeDefined();
     const dir = mkdtempSync(path.join(tmpdir(), "aw-install-"));
@@ -132,11 +146,11 @@ describe("provision-staging → aw-hosting-gate contract", () => {
 
 describe("provision-staging refuses what the gate would refuse, before any SSH", () => {
   it.each([
-    ["siteId with shell text", { siteId: "abc;id-1234", siteName: "x" }, 422],
-    ["siteId not hex (derived names would still pass the gate)", { siteId: "zzzzzz-zzzz", siteName: "x" }, 422],
-    ["siteId hex but not a uuid (codex r2)", { siteId: "abcdef", siteName: "x" }, 422],
-    ["plugin slug with shell text", { siteId: SITE_ID, siteName: "x", pluginSlugs: ["ok", "a;b"] }, 422],
-    ["pluginSlugs not an array", { siteId: SITE_ID, siteName: "x", pluginSlugs: "fluent-crm" }, 422],
+    ["siteId with shell text", { organizationId: ORG_ID, siteId: "abc;id-1234", siteName: "x" }, 422],
+    ["siteId not hex (derived names would still pass the gate)", { organizationId: ORG_ID, siteId: "zzzzzz-zzzz", siteName: "x" }, 422],
+    ["siteId hex but not a uuid (codex r2)", { organizationId: ORG_ID, siteId: "abcdef", siteName: "x" }, 422],
+    ["plugin slug with shell text", { organizationId: ORG_ID, siteId: SITE_ID, siteName: "x", pluginSlugs: ["ok", "a;b"] }, 422],
+    ["pluginSlugs not an array", { organizationId: ORG_ID, siteId: SITE_ID, siteName: "x", pluginSlugs: "fluent-crm" }, 422],
     ["seed wpPath outside staging", { mode: "seed", websiteSpecId: SITE_ID, wpPath: "/var/www/html" }, 422],
     ["seed wpPath traversal", { mode: "seed", websiteSpecId: SITE_ID, wpPath: "/var/www/html/staging/../x" }, 422],
   ])("%s", async (_n, body, status) => {
@@ -147,7 +161,7 @@ describe("provision-staging refuses what the gate would refuse, before any SSH",
 
   it("no HOSTING_BRIDGE_SSH_* target (incl. no pinned host key) → 503, no SSH", async () => {
     bridge.configured = false;
-    expect((await post({ siteId: SITE_ID, siteName: "x" })).status).toBe(503);
+    expect((await post({ organizationId: ORG_ID, siteId: SITE_ID, siteName: "x" })).status).toBe(503);
     expect(calls).toHaveLength(0);
   });
 });

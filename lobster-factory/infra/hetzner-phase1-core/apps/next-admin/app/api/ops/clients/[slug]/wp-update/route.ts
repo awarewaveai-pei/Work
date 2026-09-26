@@ -22,6 +22,7 @@ import {
 } from "../../../../../../lib/supabase-server";
 import { timingSafeEqual } from "../../../../../../lib/ops-inbox/verifyIngestToken";
 import { beginOpsActionRun, finishOpsActionRun } from "../../../../../../lib/ops-actions/record";
+import { checkProductionChangeAllowed } from "../../../../../../lib/system-modes/production-change-gate";
 import type { ClientConfig } from "../../../../../../app/api/ops/clients/route";
 
 export const dynamic = "force-dynamic";
@@ -156,14 +157,23 @@ export async function POST(
 
   const { slug } = await params;
 
-  let body: { wave?: string };
-  try {
-    body = (await request.json()) as { wave?: string };
-  } catch {
-    return new Response("Invalid JSON", { status: 400 });
+  // WpUpdateButtons.tsx sends the wave as a query param and no body at all --
+  // query wins when present, so the JSON-body path (the route's original contract,
+  // kept for any other caller) is only read as a fallback, and an empty body there
+  // is not an error (just no wave, which fails validation below the same as before).
+  let wave: string | undefined = new URL(request.url).searchParams.get("wave") ?? undefined;
+  if (!wave) {
+    const raw = await request.text();
+    if (raw) {
+      let body: { wave?: string } | null;
+      try {
+        body = JSON.parse(raw) as { wave?: string } | null;
+      } catch {
+        return new Response("Invalid JSON", { status: 400 });
+      }
+      wave = body !== null && typeof body === "object" ? body.wave : undefined;
+    }
   }
-
-  const wave = body.wave;
   if (wave !== "wave1" && wave !== "wave2" && wave !== "wave3") {
     return new Response("wave must be wave1 | wave2 | wave3", { status: 400 });
   }
@@ -181,6 +191,14 @@ export async function POST(
 
   if (!org) {
     return new Response("Org not found", { status: 404 });
+  }
+
+  // Checked once here, before the wave starts -- not re-checked mid-wave (a mode flip during a
+  // running wave does not abort it; the operator's stop button and Wave1's fail-fast are the
+  // in-flight safety net, same as the repair center's tryRemediate does not re-check per step).
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), org.id);
+  if (!gate.allowed) {
+    return Response.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
   }
 
   const meta = (org.metadata as Record<string, unknown>) ?? {};

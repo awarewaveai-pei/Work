@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-server";
-import { checkRepairAllowed } from "@/lib/repair-center/system-mode-gate";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { REPAIR_SOURCE_POLICIES, repairPolicyLabel } from "@/lib/repair-center/policy";
 import { connectSsh, readPrivateKeyFromEnv, sshExec } from "@/lib/repair-center/ssh";
 import type { RepairPolicy } from "@/lib/repair-center/types";
@@ -350,7 +350,7 @@ async function getExpensiveProbes(
 export async function GET() {
   const supabase = getSupabaseServerClient();
   // Same client the repair paths gate with: the anon fallback reads [] under RLS and would show 'normal'.
-  const { mode } = await checkRepairAllowed(getSupabaseWriteClient(), null);
+  const { mode } = await checkProductionChangeAllowed(getSupabaseWriteClient(), null);
   const backupWebhook = configured("AUTO_REPAIR_BACKUP_WEBHOOK_URL");
   const sgSsh = configured("AUTO_REPAIR_SG_SSH_HOST") && (configured("AUTO_REPAIR_SG_SSH_KEY_B64") || configured(process.env.AUTO_REPAIR_SG_SSH_KEY_ENV ?? ""));
   const euRequired = process.env.AUTO_REPAIR_REQUIRE_EU_BACKUP?.trim().toLowerCase() !== "false";

@@ -10,7 +10,7 @@
 //   - AUTO_REMEDIATE_ENABLED defaults to OFF — auto mode does nothing until
 //     the operator explicitly turns it on. Manual mode (RBAC-gated route)
 //     works regardless, because a human already approved that click.
-//   - System-mode gate (checkRepairAllowed): both auto and manual mode run
+//   - System-mode gate (checkProductionChangeAllowed): both auto and manual mode run
 //     only while the org's (or global's) system mode is normal. A human
 //     clicking "Run Remediation" does not bypass this -- they must flip the
 //     mode back to normal at /ops/system-modes first, same as any repair.
@@ -23,7 +23,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Incident } from "@/lib/ops-inbox/types";
 import { beginOpsActionRun, finishOpsActionRun } from "@/lib/ops-actions/record";
-import { checkRepairAllowed } from "../system-mode-gate";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import type { Remediation, RemediationStepResult } from "./types";
 import { REMEDIATIONS } from "./index";
 
@@ -96,7 +96,7 @@ export async function tryRemediate(
     // Gate on the org the action run is recorded under (platform org when the incident has none):
     // the same client + global pair the command plane checks for that org.
     const organizationId = await resolveOrgId(supabase, incident);
-    const gate = await checkRepairAllowed(supabase, organizationId);
+    const gate = await checkProductionChangeAllowed(supabase, organizationId);
     if (!gate.allowed) {
       return { attempted: false, key: remediation.key, reason: "system_mode_blocks_remediation" };
     }

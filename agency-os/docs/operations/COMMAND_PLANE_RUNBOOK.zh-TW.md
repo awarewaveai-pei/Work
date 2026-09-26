@@ -51,7 +51,7 @@ Migration：`lobster-factory/packages/db/migrations/0025_always_on_command_plane
 | Table | 目的 | 備註 |
 |---|---|---|
 | `command_requests` | Ingress layer；每個外部事件一 row | unique `(source, source_event_id)` 強制 idempotency |
-| `system_modes` | Global + per-scope kill switch——該 org 的 client 列與 global 列取最嚴格者（emergency_stop > maintenance > read_only > normal）；表讀不到或出現程式不認得的 mode → 所有指令擋下，原因 `system_modes unreadable (fail closed)`（只有 `lib/command-plane/killSwitch.ts` 的 `FAIL_OPEN_FOR` 列出的風險等級會放行，目前為空）。修復中心與自動修復（`lib/repair-center/system-mode-gate.ts`）只在 mode=normal 執行；讀不到模式 → 擋，同一套 fail-closed 規則 | migration 會建立 seed row：scope=`global`、mode=`normal` |
+| `system_modes` | Global + per-scope kill switch——該 org 的 client 列與 global 列取最嚴格者（emergency_stop > maintenance > read_only > normal）；表讀不到或出現程式不認得的 mode → 所有指令擋下，原因 `system_modes unreadable (fail closed)`（只有 `lib/command-plane/killSwitch.ts` 的 `FAIL_OPEN_FOR` 列出的風險等級會放行，目前為空）。修復中心、自動修復、WP 外掛更新與 staging 建站（都經 `lib/system-modes/production-change-gate.ts` 把關）只在 mode=normal 執行；讀不到模式 → 擋，同一套 fail-closed 規則 | migration 會建立 seed row：scope=`global`、mode=`normal` |
 | `workflow_runs.command_request_id` | Phase 2 dispatched runs 的 backref | nullable；legacy runs 不受影響 |
 | `workflow_runs.idempotency_key` | Phase 2 dispatch 的可選 dedupe key | nullable；unique-where-not-null |
 | `error_events.source_type` | 透過既有 table 做 DLQ | values：`command_ingress_failed`、`command_dispatch_failed`、`command_handler_failed`、`telegram_auth_failed` |

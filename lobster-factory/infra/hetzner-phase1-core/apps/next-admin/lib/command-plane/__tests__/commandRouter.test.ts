@@ -27,7 +27,7 @@ const INPUT: NormalizedCommand = {
   actorRef: "111",
   command: "/status",
   args: {},
-  organizationId: "org-1",
+  organizationId: "00000000-0000-4000-8000-000000000001",
   workspaceId: null,
   metadata: {},
 };
@@ -35,7 +35,7 @@ const INPUT: NormalizedCommand = {
 function row(overrides: Partial<CommandRequestRow> = {}): CommandRequestRow {
   return {
     id: "req-1",
-    organization_id: "org-1",
+    organization_id: "00000000-0000-4000-8000-000000000001",
     workspace_id: null,
     source: "telegram",
     source_event_id: "evt-1",
@@ -220,7 +220,7 @@ describe("routeCommand -- dispatch failure (handler throws, e.g. on bad/missing 
     expect(result.reason).toBe("missing required arg: client_slug");
     expect(reportCommandError).toHaveBeenCalledWith(
       sb,
-      expect.objectContaining({ error_code: "handler_threw", organizationId: "org-1" }),
+      expect.objectContaining({ error_code: "handler_threw", organizationId: "00000000-0000-4000-8000-000000000001" }),
     );
     expect(updateRequestStatus).toHaveBeenCalledWith(
       sb,
@@ -249,7 +249,7 @@ describe("routeCommand -- idempotency claim itself fails", () => {
     await expect(routeCommand(sb, INPUT, { handlers: {} })).rejects.toThrow("db unreachable");
     expect(reportCommandError).toHaveBeenCalledWith(
       sb,
-      expect.objectContaining({ error_code: "claim_failed", organizationId: "org-1" }),
+      expect.objectContaining({ error_code: "claim_failed", organizationId: "00000000-0000-4000-8000-000000000001" }),
     );
     expect(getActiveMode).not.toHaveBeenCalled();
   });

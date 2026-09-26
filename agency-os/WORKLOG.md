@@ -1,4 +1,25 @@
 ﻿# Worklog
+## 2026-09-26（續22）雲端 T17 驗收後併入 main：WP 更新與 staging 建站過 production-change gate（依被改動的 org 把關），gate 搬到 lib/system-modes；WP 更新按鈕 400 修正
+- [來源] 雲端 session（Sonnet 5）`claude/cc-t17-production-change-gate` 1b8003c10＋36c30bcae；額度 $30 起算。
+- [根因] 不變量「改動正式環境的伺服器路徑只在 mode=normal 執行」T16 只蓋修復中心；同類兩條沒把關：
+  - `app/api/ops/clients/[slug]/wp-update/route.ts`：SSH＋WP-CLI 更新客戶正式站外掛。
+  - `app/api/internal/hosting/provision-staging/route.ts`：SSH 建 staging 站＋seed。
+  - 另：`WpUpdateButtons.tsx:58` 送 `?wave=` 不帶 body，route 只讀 JSON → 按鈕每次 400（唯一呼叫端）。
+- [雲端做法] gate 搬到 `lib/system-modes/production-change-gate.ts` `checkProductionChangeAllowed`（刪舊檔不留轉接）；兩 route 被擋回 423 `system_mode_blocks_change`；wp-update 先讀 query 再退 body。
+- [本機修（critic warn 0c/2m/7n）]
+  - M1 seed 三個呼叫端都不帶 org → gate 只看 global，client 層 emergency_stop 擋不到 → `resolveTargetOrg`：建站必帶 uuid `organizationId`（所有呼叫端都送：create-wp-site.ts:129、build/runs、onboarding/trigger-build），seed 由 `website_specs.organization_id`、再退 `intake_forms.organization_id`（0034 可空）取得；查詢失敗 → 423 unavailable；與 body 不符 → 422。
+  - m3 org id 串進 PostgREST `.or()`，防線只在呼叫端 → `getActiveMode` 收到非 uuid 一律 unavailable（注入 payload 測過）；測試夾具 `org-1` 改 uuid（killSwitch／production-change-gate／commandRouter，斷言不動）。
+  - m1 wp-update 測試兩個 client 同一個假物件，改用 server client 的突變存活 → 分開 sentinel、斷言 write client。
+  - m2 `["uuid"]` 可過 regex、JSON null 回 422 → `isUuid` 先驗 typeof，null＝未給。
+  - m4 body 為 `null` → 500 → 400。
+  - header 自稱「唯一把關」與實況不符 → 改寫實際範圍＋未把關清單；423 在按鈕顯示可讀訊息。
+  - `hosting-gate-contract.test.ts` 建站 body 補 `organizationId`（422 仍由原本要測的欄位觸發）、假 DB 補 `maybeSingle`。
+- [未修 → TASKS] M2 寫入客戶站內容的路徑（content/wp-post、content/publish、video/embed-to-wp、wp-bridge-client 呼叫端、social-publish、syndicate）與租戶佈建派送（build/provision-services）未把關；m7 `/api/ops/*` 非 GET 無 CSRF 防護（staging 與 app 同站，T17 的 query 參數讓無 body POST 可觸發）。
+- 未部署（上線走 sg-deploy，另行決定）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 0；vitest lib/system-modes lib/repair-center lib/command-plane lib/hosting app/api/ops/clients 415/415；npm test 182 files 1745 passed／13 skipped（乾淨樹）；11 突變各紅（兩 route 拔 gate、seed 繞過、忽略 query、seed 不取 spec org、拿掉 typeof、spec 查詢失敗不擋、建站 org 改回選填、sink uuid 檢查拿掉、wp-update 改用 server client、null body）→ 還原 220 綠 | exit=0 | ms=240000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/7n（M1 m1-m5 已修；M2＋m6 provision-services＋m7 CSRF → TASKS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=checkRepairAllowed|repair-center/system-mode-gate|checkProductionChangeAllowed | hits=舊名程式 0（TASKS 本項結案）；新名 5 程式呼叫端＋1 文件；.claude 0
+- ORACLE_WAIVED: 寫碼者為雲端 Claude；單一 critic＋11 組突變證據代替 /codex-review
 ## 2026-09-26（續21）研究線 WC-PIa-14R：真模型／舊頁／官方 E2E 通過，oracle 仍待額度重置
 
 - 起因：操作者已提供有效本機模型 key、健康 API、Claude CLI 登入；14R 不得以 mock 或 skip 代替真驗收。

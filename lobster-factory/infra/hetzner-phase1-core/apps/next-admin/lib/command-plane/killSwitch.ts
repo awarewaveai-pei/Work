@@ -31,6 +31,7 @@ function stricterOf(a: SystemMode, b: SystemMode): SystemMode {
 // One Sentry report per distinct message per window: /api/ops/repairs/health is public and polled,
 // so an outage must not turn every poll into a Sentry event (the SDK does not dedupe server-side).
 const REPORT_WINDOW_MS = 5 * 60_000;
+const ORG_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const lastReportedAt = new Map<string, number>();
 
 function reportModeProblem(message: string): void {
@@ -61,6 +62,12 @@ export async function getActiveMode(
   client: SupabaseClient,
   organizationId: string | null,
 ): Promise<ModeLookup> {
+  // organizationId is interpolated into the .or() filter below: anything but a uuid could rewrite it
+  // (close the client clause, wrap the global one in a false and() -> [] -> 'normal'). Fail closed.
+  if (organizationId !== null && !ORG_ID_RE.test(organizationId)) {
+    reportModeProblem("[kill-switch] organization id is not a uuid; system_modes not queried");
+    return "unavailable";
+  }
   const query = client.from("system_modes").select("scope_type, scope_id, mode");
   const { data, error } = organizationId
     ? await query.or(

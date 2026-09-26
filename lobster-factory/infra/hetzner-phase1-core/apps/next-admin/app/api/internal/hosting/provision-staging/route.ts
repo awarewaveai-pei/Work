@@ -23,6 +23,7 @@ import type { WebsiteSpec } from "../../../../../lib/onboarding/intake-form";
 import { generateTarotImage } from "../../../../../lib/tarot/image-gen";
 import { isR2Configured, buildWebImageKey, parseImageDataUrl, putDesignObject } from "../../../../../lib/storage/r2";
 import { generateStagingAdminPassword, vaultStagingAdminPassword } from "../../../../../lib/hosting/staging-admin-credential";
+import { checkProductionChangeAllowed } from "../../../../../lib/system-modes/production-change-gate";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -310,6 +311,66 @@ async function prepareMainWpChild(conn: SshClient, slug: string, uniqueId: strin
     : "WARN: MainWP child preparation failed; MainWP registration will be refused";
 }
 
+function isUuid(v: unknown): v is string {
+  return typeof v === "string" && SITE_ID_RE.test(v);
+}
+
+const unreadableScope = () => NextResponse.json({ error: "system_mode_blocks_change", mode: "unavailable" }, { status: 423 });
+
+/**
+ * Which org a call changes. Provision: body.organizationId, required (every caller sends a uuid:
+ * packages/workflows create-wp-site.ts:129, build/runs, onboarding/trigger-build). Seed callers send
+ * none, so it is read from the website spec being seeded, then from that spec's intake form
+ * (website_specs.organization_id is nullable, migration 0034); neither -> null = global mode only,
+ * the pre-T17 scope. A failed lookup fails closed. JSON null counts as absent.
+ */
+async function resolveTargetOrg(body: { organizationId?: unknown; mode?: unknown; websiteSpecId?: unknown }):
+  Promise<{ ok: true; organizationId: string | null } | { ok: false; response: Response }> {
+  const raw = body.organizationId;
+  let given: string | undefined;
+  if (raw !== undefined && raw !== null) {
+    if (!isUuid(raw)) {
+      return { ok: false, response: NextResponse.json({ error: "organizationId must be a uuid" }, { status: 422 }) };
+    }
+    given = raw;
+  }
+  if (body.mode !== "seed") {
+    if (given === undefined) {
+      return { ok: false, response: NextResponse.json({ error: "organizationId required" }, { status: 422 }) };
+    }
+    return { ok: true, organizationId: given };
+  }
+  if (!isUuid(body.websiteSpecId)) {
+    return { ok: false, response: NextResponse.json({ error: "websiteSpecId must be a uuid" }, { status: 422 }) };
+  }
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return { ok: false, response: unreadableScope() };
+  const spec = await supabase
+    .from("website_specs")
+    .select("organization_id, intake_form_id")
+    .eq("id", body.websiteSpecId)
+    .maybeSingle();
+  if (spec.error) return { ok: false, response: unreadableScope() };
+  const specRow = spec.data as { organization_id?: unknown; intake_form_id?: unknown } | null;
+  const specOrg = specRow?.organization_id;
+  const intakeFormId = specRow?.intake_form_id;
+  let owner: string | null = isUuid(specOrg) ? specOrg : null;
+  if (!owner && isUuid(intakeFormId)) {
+    const intake = await supabase
+      .from("intake_forms")
+      .select("organization_id")
+      .eq("id", intakeFormId)
+      .maybeSingle();
+    if (intake.error) return { ok: false, response: unreadableScope() };
+    const intakeOrg = (intake.data as { organization_id?: unknown } | null)?.organization_id;
+    owner = isUuid(intakeOrg) ? intakeOrg : null;
+  }
+  if (owner && given !== undefined && owner.toLowerCase() !== given.toLowerCase()) {
+    return { ok: false, response: NextResponse.json({ error: "organizationId does not match the website spec" }, { status: 422 }) };
+  }
+  return { ok: true, organizationId: owner ?? given ?? null };
+}
+
 export async function POST(request: Request) {
   // Auth
   const apiToken = process.env.LOBSTER_HOSTING_API_TOKEN?.trim();
@@ -329,7 +390,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
+  // Gate on the org this call changes, so a client-scoped stop applies and not only the global one.
+  const scope = await resolveTargetOrg(body);
+  if ("response" in scope) return scope.response;
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), scope.organizationId);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+  }
+
   // Seed-only mode (separate short call from create-wp-site after provision) — see handleSeedMode.
+  // Gated too: emergency_stop must stop SSH seeding the same as it stops staging-prepare.
   if (body.mode === "seed") {
     return handleSeedMode(body);
   }

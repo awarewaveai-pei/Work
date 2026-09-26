@@ -12,7 +12,7 @@ import {
   severityRequiresHumanReview,
 } from "./policy";
 import { escalateGuard, isStrictTerminalState, TERMINAL_STATES } from "./run-state";
-import { checkRepairAllowed } from "./system-mode-gate";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { REPAIR_RUN_STATES, REPAIR_DEPLOY_STATUSES } from "./types";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
@@ -50,7 +50,7 @@ export async function startRepairFromIncident(args: {
 
   const i = incident as Incident & { client_slug?: string | null };
 
-  const gate = await checkRepairAllowed(supabase, i.organization_id ?? null);
+  const gate = await checkProductionChangeAllowed(supabase, i.organization_id ?? null);
   if (!gate.allowed) {
     return { ok: false, error: "system_mode_blocks_repair", details: { mode: gate.mode } };
   }
