@@ -128,8 +128,8 @@
   - `✅ 完成` · `2026-09-23` · `收尾 session`
   - 做法 = 續106 的 P1 選項 B：root `authorized_keys` 一行 `restrict,from="172.16.0.0/12",command=…aw-autorepair-gate.sh`；`.env` SG/EU → 145.239.195.47:58122 + `AUTO_REPAIR_{SG,EU}_SSH_HOST_KEY_SHA256`；compose 補傳遞這兩個變數（原本沒宣告）。`dogfood-auto-repair.ps1 -Mode HealthOnly` 10/10、`backup_script_probe` sg/eu = ok。
   - 未做（P3）：每日 smoke 在 `backup_script_probe` 非 ok 時 WARN——`check-smoke-tests.ps1:106` 只讀 `ok/system_mode/table_ok`；下方獨立條目。WORKLOG 2026-09-23 續123。
-- [ ] **【監控｜P3】每日 smoke 對 `/api/ops/repairs/health` 只看 `ok`，`backup_script_probe.sg/eu` 非 ok 不會 WARN**
-  - `🟡 潛伏` · `2026-09-23` · `收尾 session 開`
+- [x] **【監控｜已修 2026-09-24】每日 smoke 對 `/api/ops/repairs/health` 只看 `ok`，`backup_script_probe.sg/eu` 非 ok 不會 WARN**
+  - `✅ 完成` · `2026-09-23 開；2026-09-24 修；2026-09-26 補勾` · `495fd267d`（`scripts/check-smoke-tests.ps1:135` `probe_findings`），WORKLOG 2026-09-24 續130：單元 10 case＋3 支突變各自變紅（代替 prod `.env` 突變）；2026-09-26 smoke `repair_center` ok、`probe_findings` 空
   - 一句話：`scripts/check-smoke-tests.ps1:106-124` 讀 repair health 只取 `ok/system_mode/table_ok`；Auto-Repair SSH 壞 23 天（續106）沒有任何偵測器叫。修法：加 `backup_script_probe.sg/eu`＋`auto_reboot` 四項到 `repair_detail`，任一非 ok → `warn:probe_<name>`；smoke-status-digest 已會把 WARN 進 blockers。
   - 完成定義：拔掉 `.env` 的 `*_HOST_KEY_SHA256` 後 smoke 變 WARN（突變證明）。
 
@@ -475,6 +475,10 @@
 #### D. ▶️ 可直接做 — 安全與資料正確性
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
+
+- [ ] **【資安｜tarot】`BATCH_INTERNAL_SECRET` 經 Trigger run payload 傳遞（payload 會持久化、dashboard 看得到）**
+  - `🟡 潛伏` · `2026-09-23 發現；2026-09-26 補登` · `續110 寫了「開 TASKS D」但該條從未 commit（b443b77d3 只含 WORKLOG 與程式）`
+  - 一句話：`next-admin/app/api/tools/tarot/batch/route.ts:72` 把 secret 放進 payload → `packages/workflows/src/trigger/tarot-batch-generate.ts:41,45-46` 取出當 Bearer；MainWP 已定憑證不得進 payload。細節 WORKLOG 2026-09-23 續110「剩餘風險／延後」④。
 
 - [x] **【✅ 2026-09-07 完成，2026-09-05 開出｜critic 覆審 CAP-RETURNS 時抓到的類別風險】System Foundry v1.6：6 個題目在明確答「不要線上付款」時仍悄悄拉進 `CAP-PAYMENTS`**
   - `🟢 已結案` · `2026-09-05 開，2026-09-07 完成` · `可直接做`
@@ -1173,6 +1177,10 @@
   - [x] **【repo 衛生，2026-09-04 發現，2026-09-05 VBC 查證後補勾——三個子項皆非本次修復所動，由其他 session 的後續工作順手解決，僅文件漏更新】** ① `Projects/internal/hci30`（git index 小寫）vs 磁碟 `Projects/internal/HCI30/`（大寫）路徑不一致：**已解**——現況磁碟上僅存小寫 `Projects/internal/hci30/`，無大寫目錄；`0002_wave1_case_aggregate_up.sql` 已正確落在小寫路徑並隨 `7cf14f7bf`（fix(hci30): close ADR-0020 Wave 1 Case aggregate gate，2026-09-05）進 git，`git ls-files` 確認為追蹤狀態。② `~/.claude/worktrees/` 舊拷貝：本行原始文字內已標 ✅ 2026-09-04 完成，非新債。③ repo 根 3 個不明散檔 `t.sh`／`e3`／`agency-os/.._used.txt`：**已解**——`ls`/`find` 全庫掃描確認磁碟上三者皆已不存在，未追蹤過故 git log 無刪除紀錄可查，視為已被清除。
 
 #### G. ▶️ 可直接做 — 基礎建設與客戶站
+
+- [ ] **【部署 env｜續110 延後 ①–③】Trigger 部署 env 三個殘留：`TRIGGER_*` 同步不到、`triggerUrl` 型別、可選值不隨輪替傳播**
+  - `🟡 潛伏` · `2026-09-23 發現；2026-09-26 補登` · `續110 寫了「開 TASKS G」但該條從未 commit（b443b77d3 只含 WORKLOG 與程式）`
+  - ① `@trigger.dev/build` `dist/esm/extensions/core/syncEnvVars.js:49,101` 丟掉所有 `TRIGGER_*` 鍵 → `scripts/lobster-trigger-deploy.ps1` 的 `LOBSTER_TRIGGER_PUBLIC_API_URL` export 是死碼 ② `trigger.config.ts` 的 `triggerUrl` 不在 sdk 4.5.10 `TriggerConfig` 型別（既存 tsc 錯），CLI 是否採用未驗 ③ `$deployBash` 的 `LOBSTER_HOSTING_API_TOKEN`／`LOBSTER_WP_SSH_PRIVATE_KEY`／`LOBSTER_EXECUTE_MANIFEST_STEPS` 取自呼叫端 ambient `$env:`、不在 vault `-Names` → 輪替不會傳播。細節 WORKLOG 2026-09-23 續110。
 
 - [x] **【✅ 2026-09-20 開出並同日完成｜部署】docker-compose.yml repo/prod drift——查明機制、repo 補齊、機械偵測上線、prod 同步完成**
   - **【已完成】操作者「要」授權後，透過 `safe-infra-patch.sh compose` 把 9 個變數宣告推上 prod。REALTEST：`safe-infra-patch.sh` 輸出 exit=0（backup→apply→`next-admin` healthy after 9s→success）；`docker exec lobster-next-admin printenv OPS_INBOX_GRAFANA_TOKEN`/`PORTAL_SIGNUP_ENABLED` 兩者 exit=0（宣告存在，值仍空，符合預期）；`/login`+`/api/ops/summary` 皆 200；`check-deploy-drift.ps1` 重跑確認 `composeVarDrift` 為空（雙向皆已一致）。用的是先前上傳整份合併後內容做逐項比對驗證（YAML 語法+9 個目標變數各恰 1 次宣告+12 個服務名各恰 1 次+多個既有變數抽查未受影響），而非未經驗證就推送。見 WORKLOG 續88 續篇。
