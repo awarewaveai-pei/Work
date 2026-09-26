@@ -1,4 +1,10 @@
 ﻿# Worklog
+## 2026-09-26（續56）POD 收件匣補做排程上線：token 由操作者在主機產生；next-admin 重建、自架 Trigger 20260926.6；訂單監控 ok
+- [操作者] 跑 `pod-sweep-env.sh`：主機 `.env` 加 POD_INBOX_SWEEP_TOKEN（64 字元，主機產生、未顯示）。
+- [部署] safe-infra-patch 以未變更的 compose 重建 next-admin（備份 `.bak.safe-patch-20260926-140545`，healthy）；P1 session 同分鐘也 patch 了 compose（`-140522`，COLLECT_RESEARCH_*）→ 事後查證兩邊行都在（:287-288、:427）、`docker compose config` 通過、容器三個 token 皆有值。`lobster-trigger-deploy.ps1` → 20260926.6（16 tasks），POD_INBOX_SWEEP_TOKEN／COLLECT_RESEARCH_EXECUTE_TOKEN 皆「set: yes (from running next-admin)」。兩個 session 以 SendMessage 排序 compose／Trigger 操作。
+- REALTEST_EVIDENCE: tool=SSH | cmd=手動觸發 pod-order-inbox-sweep → COMPLETED v20260926.6 output {"configured":true,"ok":true,"scheduled":true}；check-smoke-tests.ps1 → pod_order_inbox ok（deferred 0／retrying 0／overdue 0／gaveUp 0／stuck 0），blind_spots 只剩既有 ci_health（CI 報告過期，與本次無關） | exit=0 | ms=90000
+- REVIEW_WAIVED: NA -- 無程式改動，僅部署與設定（程式已於續51／續53 審過）
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-09-26（續55）研究線 WC-P1-14 完：next-admin token＋compose、自架 Trigger 同步 execute token；驗收 SAME＋錯 token 401
 - [接續] 續52（COS 端 ①②③＋WC-13 缺口 `ca341ddc6`）。
 - [④ NA .env] 主機內：RUNS 從 COS `deploy/.env` 原樣複製、EXECUTE 新產生（`secrets.token_urlsafe(32)`），值未經 Claude；比對 NA==COS RUNS、EXECUTE≠RUNS；`.env` 先 `cp -p` 備份、驗證後刪。
