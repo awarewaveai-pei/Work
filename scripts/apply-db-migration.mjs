@@ -4,6 +4,9 @@
  *
  *   node scripts/apply-db-migration.mjs --check 0072 0073      # resolve + print, touch nothing
  *   node scripts/apply-db-migration.mjs 0072 0073 0074 0075    # apply, in the order given
+ *   node scripts/apply-db-migration.mjs --force-reapply 0072   # apply + upsert the ledger row even if already recorded
+ *   node scripts/apply-db-migration.mjs --status               # read-only: local files vs ledger rows
+ *   node scripts/apply-db-migration.mjs --record-only 0001 0002 ... --i-verified   # backfill ledger rows for pre-ledger history; runs no SQL file
  *
  * Why not the tunnel + DSN that the older one-off appliers use: every public table here is owned by
  * `supabase_admin`, and the pooler DSN connects as `postgres`, which is not a member of it. DDL dies
@@ -17,91 +20,378 @@
  *
  * Refuses a file containing CONCURRENTLY: Postgres rejects it inside the file's own transaction, so
  * it would fail mid-migration. Split such a migration by hand.
+ *
+ * LEDGER (0092_schema_migrations_ledger.sql, public.schema_migrations): each applied file gets one
+ * INSERT ... ON CONFLICT DO UPDATE injected into ITS OWN transaction, immediately before its last
+ * top-level `COMMIT;` (found by blanking comments/strings/dollar-quoted bodies to same-length
+ * whitespace first, so a COMMIT mentioned inside a DO $$ body or a comment is never mistaken for the
+ * real one -- see findLastTopLevelCommitOffset). The row therefore commits atomically with the
+ * migration: both happen or neither does. Applying a number already in the ledger is refused unless
+ * --force-reapply is given.
+ *
+ * TRANSPORT: every psql interaction goes through a `transport(input) -> {status, stdout, stderr}`
+ * function, injectable via the exported `run*` functions' last parameter -- so this file's decision
+ * logic (which files to apply, where to inject, how to classify --status) is unit-testable without
+ * SSH (see scripts/__tests__/apply-db-migration.test.mjs). `main()` builds the real one from
+ * AWAREWAVE_SSH_HOST/_USER/_PORT (unchanged env vars).
  */
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+import os from "node:os";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const MIGRATIONS = path.join(root, "lobster-factory/packages/db/migrations");
+export const MIGRATIONS = path.join(root, "lobster-factory/packages/db/migrations");
 
 const SSH_HOST = process.env.AWAREWAVE_SSH_HOST || "145.239.195.47";
 const SSH_USER = process.env.AWAREWAVE_SSH_USER || "ubuntu"; // root login is refused on this host
 const SSH_PORT = process.env.AWAREWAVE_SSH_PORT || "58122";
 const PSQL = "sudo -n docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1";
+const PSQL_STATUS = "sudo -n docker exec -i supabase-db psql -U supabase_admin -d postgres -tA";
 
-const argv = process.argv.slice(2);
-const check = argv.includes("--check");
-const nums = argv.filter((a) => !a.startsWith("--"));
+// ─────────────────────────────────────────────
+// Pure helpers (no fs, no network) -- exported for the test file.
+// ─────────────────────────────────────────────
 
-if (nums.length === 0) {
-  console.error("usage: node scripts/apply-db-migration.mjs [--check] <number>...   e.g. 0072 0073");
-  process.exit(2);
+export function containsConcurrently(body) {
+  // Strip line comments first, or a comment that merely mentions CONCURRENTLY blocks a migration
+  // that does not use it (0072 has exactly such a comment).
+  return /\bCONCURRENTLY\b/i.test(body.replace(/--[^\n]*/g, ""));
 }
 
-/** Resolve "0072" to exactly one file. Ambiguity is a mistake, not something to pick a winner for. */
-function resolveOne(num) {
+export function hasOwnTransaction(body) {
+  return /^\s*BEGIN\s*;/im.test(body) && /^\s*COMMIT\s*;/im.test(body);
+}
+
+/** Resolve "0072" against an in-memory filename list. Ambiguity is a mistake, not a winner to pick. */
+export function resolveOneIn(num, availableFilenames) {
   if (!/^\d{4}$/.test(num)) throw new Error(`not a 4-digit migration number: ${num}`);
-  // .endsWith(".sql") alone also matches that number's own *.down.sql sibling (0069, 0077, 0079 all
-  // have one) -- excluded explicitly, not by requiring callers to name down-files differently.
-  const hits = fs.readdirSync(MIGRATIONS).filter((f) => f.startsWith(`${num}_`) && f.endsWith(".sql") && !f.endsWith(".down.sql"));
+  // .endsWith(".sql") alone also matches that number's own *.down.sql sibling -- excluded
+  // explicitly, not by requiring callers to name down-files differently.
+  const hits = availableFilenames.filter((f) => f.startsWith(`${num}_`) && f.endsWith(".sql") && !f.endsWith(".down.sql"));
   if (hits.length !== 1) throw new Error(`${num}: expected exactly 1 migration file, found ${hits.length}: ${hits.join(", ")}`);
-  return path.join(MIGRATIONS, hits[0]);
+  return hits[0];
 }
 
-let files;
-try {
-  files = nums.map((n) => ({ num: n, file: resolveOne(n) }));
-} catch (e) {
-  console.error("resolve FAILED:", e.message);
-  process.exit(2);
+export function sha256Hex(bufferOrString) {
+  return crypto.createHash("sha256").update(bufferOrString).digest("hex");
 }
 
-for (const { num, file } of files) {
-  const body = fs.readFileSync(file, "utf8");
-  // Strip line comments before looking, or a comment that merely mentions CONCURRENTLY blocks a
-  // migration that does not use it (0072 has exactly such a comment).
-  if (/\bCONCURRENTLY\b/i.test(body.replace(/--[^\n]*/g, ""))) {
-    console.error(`${num}: contains CONCURRENTLY, which cannot run inside the file's transaction. Split it by hand.`);
-    process.exit(2);
+/** Blanks comments, single-quoted strings, and dollar-quoted bodies to same-length whitespace
+ * (offsets survive) so a COMMIT keyword inside any of them is never mistaken for a real statement.
+ * Duplicated from lib/db/security-definer-grants.ts's redact() rather than shared: scripts/ and
+ * next-admin are separate runtimes (one plain Node ESM, one TypeScript/Next.js) with no existing
+ * shared-code path between them. */
+export function redactSql(sql) {
+  let out = "";
+  let i = 0;
+  const n = sql.length;
+  const blank = (s) => s.replace(/[^\n]/g, " ");
+  while (i < n) {
+    const two = sql.slice(i, i + 2);
+    if (two === "--") {
+      const end = sql.indexOf("\n", i);
+      const stop = end === -1 ? n : end;
+      out += blank(sql.slice(i, stop));
+      i = stop;
+      continue;
+    }
+    if (two === "/*") {
+      const end = sql.indexOf("*/", i + 2);
+      const stop = end === -1 ? n : end + 2;
+      out += blank(sql.slice(i, stop));
+      i = stop;
+      continue;
+    }
+    if (sql[i] === "'") {
+      let j = i + 1;
+      while (j < n) {
+        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue; }
+        if (sql[j] === "'") { j += 1; break; }
+        j++;
+      }
+      out += blank(sql.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (sql[i] === "$") {
+      const tagMatch = /^\$([a-zA-Z_][a-zA-Z0-9_]*)?\$/.exec(sql.slice(i));
+      if (tagMatch) {
+        const opener = tagMatch[0];
+        const closerIdx = sql.indexOf(opener, i + opener.length);
+        const stop = closerIdx === -1 ? n : closerIdx + opener.length;
+        out += blank(sql.slice(i, stop));
+        i = stop;
+        continue;
+      }
+    }
+    out += sql[i];
+    i++;
   }
-  if (!/^\s*BEGIN\s*;/im.test(body) || !/^\s*COMMIT\s*;/im.test(body)) {
-    console.error(`${num}: no BEGIN;/COMMIT; of its own. This runner adds none, so it would apply statement by statement.`);
-    process.exit(2);
-  }
-  console.log(`resolved ${num} -> ${path.relative(root, file).replace(/\\/g, "/")} (${body.length} bytes)`);
+  return out;
 }
 
-if (check) {
-  console.log("--check: nothing applied.");
-  process.exit(0);
+/** Offset of the file's LAST top-level `COMMIT;` (its own line, ignoring leading/trailing
+ * whitespace). Throws if none is found after redaction -- refusing rather than guessing. */
+export function findLastTopLevelCommitOffset(sql) {
+  const redacted = redactSql(sql);
+  const re = /^[ \t]*COMMIT[ \t]*;[ \t]*$/gim;
+  let m;
+  let last = null;
+  while ((m = re.exec(redacted))) last = m;
+  if (!last) throw new Error("no top-level COMMIT; found -- cannot identify the ledger injection point unambiguously");
+  return last.index;
 }
 
-let applied = 0;
-for (const { num, file } of files) {
-  process.stdout.write(`applying ${num} ... `);
-  const t0 = Date.now();
-  const r = spawnSync(
-    "ssh",
-    ["-p", SSH_PORT, "-o", "BatchMode=yes", `${SSH_USER}@${SSH_HOST}`, PSQL],
-    { input: fs.readFileSync(file), encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
+export function buildLedgerInsertSql({ number, filename, sha256, appliedBy }) {
+  const esc = (s) => String(s).replace(/'/g, "''");
+  return (
+    `INSERT INTO public.schema_migrations (number, filename, sha256, applied_by) ` +
+    `VALUES ('${esc(number)}', '${esc(filename)}', '${esc(sha256)}', '${esc(appliedBy)}') ` +
+    `ON CONFLICT (number) DO UPDATE SET filename = excluded.filename, sha256 = excluded.sha256, ` +
+    `applied_at = now(), applied_by = excluded.applied_by;\n`
   );
-  const out = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
-  if (r.status !== 0) {
-    console.log("FAILED");
-    console.error(out.split("\n").slice(-25).join("\n"));
-    console.error(`\nFAILED after ${applied}/${files.length} at ${num}. ON_ERROR_STOP rolled that file back whole; earlier files are committed.`);
-    process.exit(1);
-  }
-  if (!/^COMMIT$/m.test(out)) {
-    // psql exits 0 on an empty or comment-only input too. No COMMIT line means nothing was committed.
-    console.log("NO COMMIT");
-    console.error(out.split("\n").slice(-25).join("\n"));
-    process.exit(1);
-  }
-  console.log(`OK (${Date.now() - t0} ms)`);
-  applied += 1;
 }
 
-console.log(`APPLY_OK ${applied}/${files.length}: ${nums.join(" ")}`);
+/** Splices the ledger INSERT immediately before the file's last top-level COMMIT;. */
+export function injectLedgerInsert(sql, entry) {
+  const offset = findLastTopLevelCommitOffset(sql);
+  return sql.slice(0, offset) + buildLedgerInsertSql(entry) + sql.slice(offset);
+}
+
+/** One line of `psql -tA` output ("number|filename|sha256|applied_at|applied_by") -> a row, or
+ * null for a blank line. */
+export function parseLedgerLine(line) {
+  const parts = line.split("|");
+  if (parts.length < 5) return null;
+  const [number, filename, sha256, appliedAt, appliedBy] = parts;
+  return { number: number.trim(), filename: filename.trim(), sha256: sha256.trim(), appliedAt: appliedAt.trim(), appliedBy: appliedBy.trim() };
+}
+
+export function parseLedgerRows(output) {
+  return output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map(parseLedgerLine)
+    .filter((r) => r !== null);
+}
+
+/** --status's classification: local files vs ledger rows -> applied / missing / sha-mismatch /
+ * ledger-only. Pure -- no fs, no network; `localFiles` and `ledgerRows` are plain data. */
+export function classifyStatus(localFiles, ledgerRows) {
+  const ledgerByNumber = new Map(ledgerRows.map((r) => [r.number, r]));
+  const localByNumber = new Map(localFiles.map((f) => [f.number, f]));
+  const results = [];
+  for (const f of localFiles) {
+    const row = ledgerByNumber.get(f.number);
+    if (!row) {
+      results.push({ number: f.number, filename: f.filename, status: "missing" });
+    } else if (row.sha256 !== f.sha256) {
+      results.push({ number: f.number, filename: f.filename, status: "sha-mismatch", ledgerSha256: row.sha256, localSha256: f.sha256 });
+    } else {
+      results.push({ number: f.number, filename: f.filename, status: "applied" });
+    }
+  }
+  for (const row of ledgerRows) {
+    if (!localByNumber.has(row.number)) results.push({ number: row.number, filename: row.filename, status: "ledger-only" });
+  }
+  return results.sort((a, b) => a.number.localeCompare(b.number));
+}
+
+// ─────────────────────────────────────────────
+// Transport (the only part that touches the network)
+// ─────────────────────────────────────────────
+
+/** Default transport: ssh -> docker exec -i supabase-db psql, piping `input` to its stdin. */
+export function sshTransport(psqlCmd) {
+  return (input) => {
+    const r = spawnSync("ssh", ["-p", SSH_PORT, "-o", "BatchMode=yes", `${SSH_USER}@${SSH_HOST}`, psqlCmd], {
+      input,
+      encoding: "utf8",
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+  };
+}
+
+// ─────────────────────────────────────────────
+// Modes (each takes an explicit transport so tests never touch ssh)
+// ─────────────────────────────────────────────
+
+function localMigrationFiles(migrationsDir) {
+  return fs
+    .readdirSync(migrationsDir)
+    .filter((f) => /^\d{4}_.*\.sql$/.test(f) && !f.endsWith(".down.sql"))
+    .sort()
+    .map((filename) => ({
+      number: filename.slice(0, 4),
+      filename,
+      sha256: sha256Hex(fs.readFileSync(path.join(migrationsDir, filename))),
+    }));
+}
+
+export function runStatus(transport, migrationsDir = MIGRATIONS) {
+  const local = localMigrationFiles(migrationsDir);
+  const rep = transport("SELECT number, filename, sha256, applied_at, applied_by FROM public.schema_migrations ORDER BY number;\n");
+  if (rep.status !== 0) throw new Error(`--status query failed: ${(rep.stderr || rep.stdout || "").slice(0, 2000)}`);
+  const ledgerRows = parseLedgerRows(rep.stdout);
+  return classifyStatus(local, ledgerRows);
+}
+
+export function runRecordOnly(nums, { transport, appliedBy, iVerified, migrationsDir = MIGRATIONS }) {
+  if (!iVerified) throw new Error("--record-only requires --i-verified (confirms each number was verified live-applied before running this)");
+  const available = fs.readdirSync(migrationsDir);
+  const entries = nums.map((num) => {
+    const filename = resolveOneIn(num, available);
+    const sha256 = sha256Hex(fs.readFileSync(path.join(migrationsDir, filename)));
+    return { number: num, filename, sha256, appliedBy };
+  });
+  const sql = "BEGIN;\n" + entries.map(buildLedgerInsertSql).join("") + "COMMIT;\n";
+  const rep = transport(sql);
+  if (rep.status !== 0 || !/^COMMIT$/m.test(`${rep.stdout}${rep.stderr}`)) {
+    throw new Error(`--record-only failed: ${(rep.stderr || rep.stdout || "").slice(0, 2000)}`);
+  }
+  return entries;
+}
+
+export function runApply(nums, { transport, statusTransport, appliedBy, forceReapply, migrationsDir = MIGRATIONS }) {
+  const available = fs.readdirSync(migrationsDir);
+  const files = nums.map((num) => {
+    const filename = resolveOneIn(num, available);
+    return { number: num, filename, file: path.join(migrationsDir, filename) };
+  });
+
+  for (const { number, filename, file } of files) {
+    const body = fs.readFileSync(file, "utf8");
+    if (containsConcurrently(body)) throw new Error(`${number}: contains CONCURRENTLY, which cannot run inside the file's transaction. Split it by hand.`);
+    if (!hasOwnTransaction(body)) throw new Error(`${number}: no BEGIN;/COMMIT; of its own. This runner adds none, so it would apply statement by statement.`);
+    findLastTopLevelCommitOffset(body); // throws if the injection point is ambiguous -- fail before applying anything
+    void filename;
+  }
+
+  if (!forceReapply) {
+    const inClause = files.map((f) => `'${f.number}'`).join(",");
+    const rep = statusTransport(`SELECT number FROM public.schema_migrations WHERE number IN (${inClause});\n`);
+    if (rep.status !== 0) throw new Error(`ledger conflict check failed: ${(rep.stderr || rep.stdout || "").slice(0, 2000)}`);
+    const already = rep.stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (already.length > 0) {
+      throw new Error(`already in the ledger, refusing (use --force-reapply to re-apply and upsert): ${already.join(", ")}`);
+    }
+  }
+
+  const results = [];
+  for (const { number, filename, file } of files) {
+    const buf = fs.readFileSync(file);
+    const sha256 = sha256Hex(buf);
+    const withLedger = injectLedgerInsert(buf.toString("utf8"), { number, filename, sha256, appliedBy });
+    const rep = transport(withLedger);
+    const out = `${rep.stdout ?? ""}${rep.stderr ?? ""}`.trim();
+    if (rep.status !== 0) {
+      throw new Error(`FAILED at ${number} after ${results.length}/${files.length}. ON_ERROR_STOP rolled that file back whole; earlier files are committed.\n${out.split("\n").slice(-25).join("\n")}`);
+    }
+    if (!/^COMMIT$/m.test(out)) {
+      // psql exits 0 on an empty or comment-only input too. No COMMIT line means nothing was committed.
+      throw new Error(`NO COMMIT for ${number}.\n${out.split("\n").slice(-25).join("\n")}`);
+    }
+    results.push({ number, filename, sha256 });
+  }
+  return results;
+}
+
+// ─────────────────────────────────────────────
+// CLI
+// ─────────────────────────────────────────────
+
+function main() {
+  const argv = process.argv.slice(2);
+  const check = argv.includes("--check");
+  const status = argv.includes("--status");
+  const recordOnly = argv.includes("--record-only");
+  const forceReapply = argv.includes("--force-reapply");
+  const iVerified = argv.includes("--i-verified");
+  const nums = argv.filter((a) => !a.startsWith("--"));
+  const appliedBy = process.env.MIGRATION_APPLIED_BY || os.userInfo().username || "apply-db-migration.mjs";
+
+  const transport = sshTransport(PSQL);
+  const statusTransport = sshTransport(PSQL_STATUS);
+
+  if (status) {
+    let rows;
+    try {
+      rows = runStatus(statusTransport);
+    } catch (e) {
+      console.error("--status FAILED:", e.message);
+      process.exit(1);
+    }
+    for (const r of rows) {
+      const extra = r.status === "sha-mismatch" ? ` (ledger=${r.ledgerSha256.slice(0, 12)} local=${r.localSha256.slice(0, 12)})` : "";
+      console.log(`${r.number} ${r.filename} -- ${r.status}${extra}`);
+    }
+    const counts = rows.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] ?? 0) + 1 }), {});
+    console.log(`STATUS_OK ${JSON.stringify(counts)}`);
+    process.exit(0);
+  }
+
+  if (recordOnly) {
+    if (nums.length === 0) {
+      console.error("usage: node scripts/apply-db-migration.mjs --record-only <number>... --i-verified");
+      process.exit(2);
+    }
+    try {
+      const entries = runRecordOnly(nums, { transport, appliedBy, iVerified });
+      console.log(`RECORD_ONLY_OK ${entries.length}: ${entries.map((e) => e.number).join(" ")}`);
+      process.exit(0);
+    } catch (e) {
+      console.error("--record-only FAILED:", e.message);
+      process.exit(1);
+    }
+  }
+
+  if (nums.length === 0) {
+    console.error("usage: node scripts/apply-db-migration.mjs [--check] <number>...   e.g. 0072 0073");
+    process.exit(2);
+  }
+
+  let files;
+  try {
+    const available = fs.readdirSync(MIGRATIONS);
+    files = nums.map((n) => ({ num: n, file: path.join(MIGRATIONS, resolveOneIn(n, available)) }));
+  } catch (e) {
+    console.error("resolve FAILED:", e.message);
+    process.exit(2);
+  }
+
+  for (const { num, file } of files) {
+    const body = fs.readFileSync(file, "utf8");
+    if (containsConcurrently(body)) {
+      console.error(`${num}: contains CONCURRENTLY, which cannot run inside the file's transaction. Split it by hand.`);
+      process.exit(2);
+    }
+    if (!hasOwnTransaction(body)) {
+      console.error(`${num}: no BEGIN;/COMMIT; of its own. This runner adds none, so it would apply statement by statement.`);
+      process.exit(2);
+    }
+    console.log(`resolved ${num} -> ${path.relative(root, file).replace(/\\/g, "/")} (${body.length} bytes)`);
+  }
+
+  if (check) {
+    console.log("--check: nothing applied.");
+    process.exit(0);
+  }
+
+  try {
+    const results = runApply(nums, { transport, statusTransport, appliedBy, forceReapply });
+    for (const r of results) console.log(`applied ${r.number} -> ${r.filename} OK`);
+    console.log(`APPLY_OK ${results.length}/${files.length}: ${nums.join(" ")}`);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
