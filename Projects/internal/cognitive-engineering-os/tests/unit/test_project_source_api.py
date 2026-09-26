@@ -51,7 +51,7 @@ class ProjectSourceApiTestCase(ApiTestCase):
 class ProjectApiTests(ProjectSourceApiTestCase):
     def test_routes_require_a_session(self):
         self.assertEqual(self.client.post("/projects", json={}).status_code, 401)
-        for path in ("/projects", "/projects/x", "/projects/x/history"):
+        for path in ("/projects", "/projects/x", "/projects/x/history", "/projects/x/analyses"):
             self.assertEqual(self.client.get(path).status_code, 401, path)
 
     def test_create_project_auto_resolves_the_tenants_sole_default_workspace(self):
@@ -134,6 +134,7 @@ class ProjectApiTests(ProjectSourceApiTestCase):
         self._login_as_a_different_tenant()
         self.assertEqual(self.client.get(f"/projects/{project['project_id']}").status_code, 404)
         self.assertEqual(self.client.get(f"/projects/{project['project_id']}/history").status_code, 404)
+        self.assertEqual(self.client.get(f"/projects/{project['project_id']}/analyses").status_code, 404)
         self.assertEqual(self.client.get("/projects").json(), [], "a second tenant must not see the first tenant's project in its own list")
 
     def test_entitlement_denied_tenant_cannot_create_a_project(self):

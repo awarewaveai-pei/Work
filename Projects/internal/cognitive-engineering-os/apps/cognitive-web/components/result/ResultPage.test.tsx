@@ -137,4 +137,15 @@ describe("ResultPage", () => {
     const html = renderToStaticMarkup(<ResultPage result={withCondition} record={record} />);
     expect(html).toContain("<span>① New evidence → Confidence level</span>");
   });
+
+  it("a finding that cites the same line twice shows its [n] once, without React's duplicate-key error", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const id = fixture.findings[0].citations[0];
+    const twice = { ...fixture, findings: [{ ...fixture.findings[0], citations: [id, id] }] };
+    const html = renderToStaticMarkup(<ResultPage result={twice} record={record} />);
+    const finding = html.split('<div class="finding">')[1].split("</div>")[0];
+    expect(finding.match(/href="#citation-/g)).toHaveLength(1);
+    expect(errors.mock.calls.filter(([message]) => String(message).includes("same key"))).toEqual([]);
+    errors.mockRestore();
+  });
 });

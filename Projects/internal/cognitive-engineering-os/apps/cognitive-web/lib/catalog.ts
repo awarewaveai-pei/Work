@@ -26,8 +26,16 @@ export async function loadCatalog(): Promise<Catalog> {
   return (await response.json()) as Catalog;
 }
 
+/** tool id -> its name, for pages that show tools by id (next steps, 我的專案); without a catalog: none, the ids show. */
+export function toolNames(catalog: Catalog | null): Record<string, string> {
+  return catalog ? Object.fromEntries(Object.entries(catalog.methods).map(([key, method]) => [key, method.name_zh])) : {};
+}
+
 export const toolHref = (id: string) => `/methods/${encodeURIComponent(id)}`;
-export const runHref = (id: string) => `/methods/${encodeURIComponent(id)}/run`;
+/** The run page; with a project, the analysis goes into that project instead of a new one. */
+export const runHref = (id: string, project?: string) => `/methods/${encodeURIComponent(id)}/run${project ? `?project=${encodeURIComponent(project)}` : ""}`;
+export const projectHref = (id: string) => `/projects/${encodeURIComponent(id)}`;
+export const analysisHref = (project: string, analysis: string) => `${projectHref(project)}/analyses/${encodeURIComponent(analysis)}`;
 export const dirHref = (goalId: string) => `/methods#dir-${goalId}`;
 export const workflowHref = (id: string) => `/workflows#wf-${id}`;
 

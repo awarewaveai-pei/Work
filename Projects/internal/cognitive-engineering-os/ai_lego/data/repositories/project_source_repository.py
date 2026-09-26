@@ -606,6 +606,45 @@ class ProjectSourceRepository:
             ).fetchall()
         return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
 
+    def analyses(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+        """project_id -> its analyses, oldest first, read from the event stream (their one record): the tool, when it was
+        asked for and when it finished, PENDING / DONE / FAILED (GET /interpretations/{id} reads the same events), and
+        the user's latest judgment. ``project_id`` limits it to one Project."""
+        query = (
+            "SELECT aggregate_id, event_type, occurred_at, payload_json FROM events WHERE tenant_id=? "
+            "AND event_type IN ('InterpretationRequested', 'InterpretationCreated', 'InterpretationFailed', 'InterpretationJudged')"
+        )
+        parameters: tuple[Any, ...] = (tenant_id,)
+        if project_id is not None:
+            query += " AND aggregate_id=?"
+            parameters += (f"project:{project_id}",)
+        with self._connection() as connection:
+            rows = connection.execute(query + " ORDER BY rowid", parameters).fetchall()
+        projects: dict[str, list[dict[str, Any]]] = {}
+        by_id: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            key = payload.get("interpretation_id")
+            if row["event_type"] == "InterpretationRequested":
+                by_id[key] = {"interpretation_id": key, "method_id": payload.get("method_id"), "status": "PENDING", "requested_at": row["occurred_at"], "finished_at": None, "error": None, "judgment": None}
+                projects.setdefault(row["aggregate_id"].removeprefix("project:"), []).append(by_id[key])
+            elif key in by_id and row["event_type"] == "InterpretationJudged":
+                by_id[key]["judgment"] = payload.get("stance")
+            elif key in by_id:
+                by_id[key].update(status="DONE" if row["event_type"] == "InterpretationCreated" else "FAILED", finished_at=row["occurred_at"], error=payload.get("error"))
+        return projects
+
+    def last_activity(self, tenant_id: str, project_id: str | None = None) -> dict[str, str]:
+        """project_id -> when its own event stream last moved (created, collections, analyses, judgments)."""
+        query = "SELECT aggregate_id, MAX(occurred_at) AS at FROM events WHERE tenant_id=? AND aggregate_id LIKE 'project:%'"
+        parameters: tuple[Any, ...] = (tenant_id,)
+        if project_id is not None:
+            query += " AND aggregate_id=?"
+            parameters += (f"project:{project_id}",)
+        with self._connection() as connection:
+            rows = connection.execute(query + " GROUP BY aggregate_id", parameters).fetchall()
+        return {row["aggregate_id"].removeprefix("project:"): row["at"] for row in rows}
+
     def save_interpretation(self, tenant_id: str, project_id: str, interpretation_id: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
         with self._connection() as connection:
             connection.execute(

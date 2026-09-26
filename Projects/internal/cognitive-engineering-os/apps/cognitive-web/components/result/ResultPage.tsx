@@ -6,6 +6,8 @@ import Link from "next/link";
 import { apiFetch } from "../../lib/api";
 import { runHref, toolHref } from "../../lib/catalog";
 import type { FormField } from "../../lib/form-model";
+import { STANCE, type Stance } from "../../lib/projects";
+import { plain, recordValue } from "../../lib/record";
 import { RunHeader } from "../RunHeader";
 import { LeverageChart, LoopChart, TrendChart, type Loop, type TrendSeries } from "./Charts";
 import { HowTo } from "./HowTo";
@@ -40,7 +42,9 @@ type Props = {
   lesson?: string | null;          // the tool's lesson page, when it has one
   fields?: FormField[];            // the run form's fields: a layer's question is its field's label
   names?: Record<string, string>;  // tool id -> name, for the next steps
-  project?: string;                // the project this run is saved in
+  project?: { id: string; name: string };   // the project this analysis is saved in
+  analyzedAt?: string;             // when it finished (UTC ISO)
+  judgment?: { stance: Stance; text: string } | null;   // the judgment saved with it, if any
 };
 
 const CONFIDENCE: Record<string, [string, string]> = { high: ["high", "高"], mid: ["mid", "中"], medium: ["mid", "中"], low: ["low", "低"] };
@@ -57,15 +61,6 @@ const DROPPED: Record<string, string> = {
 const NOT_BUILT = "核准存檔、退回重做、匯出 PDF 還在做；這次分析已經存在專案裡，隨時可以回來看。";
 const PLAN_NOT_BUILT = "把計畫存成任務、到期自動重跑還在做；計畫已經跟這次分析一起存在專案裡。";
 
-function recordValue(record: Record<string, unknown>, id: string): unknown {
-  if (!id.startsWith("r/")) return undefined;
-  let value: unknown = record;
-  for (const part of id.slice(2).split("/")) value = Array.isArray(value) ? value[Number(part)] : value && typeof value === "object" ? (value as Record<string, unknown>)[part] : undefined;
-  return value;
-}
-function printable(value: unknown): string { return typeof value === "string" ? value : value === undefined ? "未提供" : JSON.stringify(value); }
-// what you filled in, as text: a list reads as its items (one per line in the form), never as JSON
-function plain(value: unknown): string { return Array.isArray(value) ? value.map(plain).filter(Boolean).join("；") || "（沒填）" : value === undefined || value === null || value === "" ? "（沒填）" : printable(value); }
 const dots = (n: number) => "●".repeat(Math.min(n, 3)) + "○".repeat(Math.max(0, 3 - n));
 const keyOf = (path: string) => path.split("/")[1] ?? path;
 
@@ -73,9 +68,9 @@ function Card({ id, title, read, act, className = "card", anchor, children }: { 
   return <div className={className} id={anchor} data-section={id}><h2>{title}</h2><HowTo read={read} act={act} />{children}</div>;
 }
 
-export function ResultPage({ result, record = {}, manifest = [], gateResults = [], display, children, lesson = null, fields = [], names = {}, project }: Props) {
-  const [judgment, setJudgment] = useState("");
-  const [judgmentText, setJudgmentText] = useState("");
+export function ResultPage({ result, record = {}, manifest = [], gateResults = [], display, children, lesson = null, fields = [], names = {}, project, analyzedAt, judgment: saved = null }: Props) {
+  const [judgment, setJudgment] = useState<string>(saved?.stance ?? "");
+  const [judgmentText, setJudgmentText] = useState(saved?.text ?? "");
   const [judgmentError, setJudgmentError] = useState("");
   const [note, setNote] = useState("");
   const [planNote, setPlanNote] = useState("");
@@ -94,7 +89,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const citationNumber = new Map(citationIds.map((id, index) => [id, index + 1]));
   const manifestById = new Map(manifest.map((item) => [item.id, item]));
   const resolved = (id: string) => { const fromRecord = recordValue(record, id); const item = manifestById.get(id); return fromRecord === undefined ? item?.value ?? item?.sha256 ?? "來源尚未載入" : plain(fromRecord); };
-  const cites = (ids: string[] = []) => ids.filter((id) => citationNumber.has(id)).map((id) => <cite key={id}><a href={`#citation-${citationNumber.get(id)}`}>[{citationNumber.get(id)}]</a></cite>);
+  // a sentence that cites the same line twice shows its [n] once
+  const cites = (ids: string[] = []) => [...new Set(ids)].filter((id) => citationNumber.has(id)).map((id) => <cite key={id}><a href={`#citation-${citationNumber.get(id)}`}>[{citationNumber.get(id)}]</a></cite>);
   const citeText = (id: string) => (citationNumber.has(id) ? `［${citationNumber.get(id)}］` : "");
   // what a whole field is cited as: the analysis cites the field or its lines (r/events or r/events/0)
   const citedUnder = (path: string) => citationIds.filter((id) => id === path || id.startsWith(`${path}/`));
@@ -122,11 +118,11 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const steps = (result.next_steps ?? []).filter((step) => step.method_id);
   const name = display?.name_zh ?? result.method_id;
   const tokens = (result.usage?.input_tokens ?? 0) + (result.usage?.output_tokens ?? 0);
-  const stance = { agree: "同意", partial: "部分同意", disagree: "不同意" } as const;
+  const stance = STANCE;
   const focusLayer = layers.find((layer) => keyOf(layer.path) === focusKey);
 
   return <div className="result-page">
-    <RunHeader methodId={result.method_id} name={name} nameEn={display?.name_en} lesson={lesson} project={project} guide status={<>
+    <RunHeader methodId={result.method_id} name={name} nameEn={display?.name_en} lesson={lesson} project={project} analyzedAt={analyzedAt} guide status={<>
       <span className="pill">AI 草稿・尚未核准</span>
       <span>資料：你填的 {own} 段話・外部來源 {sources} 筆</span>
       {thickness.length > 1 && <span>完整度 {filled}/{thickness.length}{thinnest ? `（${inputName(`r/${thinnest[0]}`)} 最薄：${thinnest[1].own_statements ?? 0} 句）` : ""}</span>}

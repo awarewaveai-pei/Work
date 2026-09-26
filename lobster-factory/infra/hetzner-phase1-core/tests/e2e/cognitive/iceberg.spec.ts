@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-test('login -> iceberg -> result page, cards in the mock order', async ({ page }) => {
+test('login -> iceberg -> result page, cards in the mock order -> my projects -> the project -> the saved result', async ({ page }) => {
   test.setTimeout(600_000);   // a full result page (schema 1.1.0) takes 2-3 minutes, and the analysis may retry once
   const mockApi = process.env.COS_TEST_MOCK_API === '1';
   const tenant = mockApi ? 'tenant-local' : process.env.COS_TEST_TENANT_ID;
   const email = mockApi ? 'local@example.test' : process.env.COS_TEST_EMAIL;
   const password = mockApi ? 'local-only' : process.env.COS_TEST_PASSWORD;
   test.skip(!mockApi && (!tenant || !email || !password), 'COS_TEST_TENANT_ID / COS_TEST_EMAIL / COS_TEST_PASSWORD missing');
+  let created: Record<string, unknown> | null = null;
+  const analysis = { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', status: 'DONE', requested_at: '2026-09-26T15:51:00Z', finished_at: '2026-09-26T15:52:00Z', error: null, judgment: null };
   if (mockApi) {
     await page.route('**/api/**', async (route) => {
       const path = new URL(route.request().url()).pathname.replace(/^\/api/, '');
@@ -22,14 +24,21 @@ test('login -> iceberg -> result page, cards in the mock order', async ({ page }
       } else if (path === '/methods/systems.iceberg_model/form') {
         body = { method_id: 'systems.iceberg_model', display: { name_zh: '冰山模型' }, form: { fields: [], example: { input: {} } } };
       } else if (path === '/projects' && method === 'GET') {
-        body = [];
+        body = created ? [created] : [];
       } else if (path === '/projects' && method === 'POST') {
-        body = { project_id: 'PROJECT-LOCAL', name: '冰山模型 本機測試' };
+        created = { project_id: 'PROJECT-LOCAL', name: JSON.parse(route.request().postData() ?? '{}').name, created_at: '2026-09-26T15:51:00Z', updated_at: '2026-09-26T15:52:00Z', analysis_count: 1, methods: ['systems.iceberg_model'], latest_analysis: analysis };
+        body = created;
+      } else if (path === '/projects/PROJECT-LOCAL') {
+        body = created;
+      } else if (path === '/projects/PROJECT-LOCAL/analyses') {
+        body = [analysis];
+      } else if (path === '/projects/PROJECT-LOCAL/sources') {
+        body = [];
       } else if (path === '/methods/systems.iceberg_model/interpret' && method === 'POST') {
         status = 202;
         body = { interpretation_id: 'INTERP-LOCAL', status: 'PENDING' };
       } else if (path === '/interpretations/INTERP-LOCAL') {
-        body = { status: 'DONE', record: { events: ['release incidents'] }, manifest: [{ id: 'r/events/0', kind: 'record', path: 'r/events/0', value: 'release incidents' }], gate_results: [{ gate_id: 'citation_integrity', status: 'PASS' }], result: { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', summary: 'Recurring incident', findings: [{ id: 'F1', title: 'Visible event', text: 'Release incidents recur.', citations: ['r/events/0'], confidence: { level: 'mid', reason: 'record' } }], visual: { kind: 'layered', bindings: { levels: [{ label: 'r/events/0', path: 'r/events/0' }] } }, next_methods: [], next_steps: [], recommendations: [], gaps: [], model: 'local-fixture', usage: { input_tokens: 10, output_tokens: 20 }, provenance: { authorship_state: 'AI_GENERATED' } } };
+        body = { status: 'DONE', project_id: 'PROJECT-LOCAL', method_id: 'systems.iceberg_model', created_at: '2026-09-26T15:52:00Z', judgment: null, record: { events: ['release incidents'] }, manifest: [{ id: 'r/events/0', kind: 'record', path: 'r/events/0', value: 'release incidents' }], gate_results: [{ gate_id: 'citation_integrity', status: 'PASS' }], result: { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', summary: 'Recurring incident', findings: [{ id: 'F1', title: 'Visible event', text: 'Release incidents recur.', citations: ['r/events/0'], confidence: { level: 'mid', reason: 'record' } }], visual: { kind: 'layered', bindings: { levels: [{ label: 'r/events/0', path: 'r/events/0' }] } }, next_methods: [], next_steps: [], recommendations: [], gaps: [], model: 'local-fixture', usage: { input_tokens: 10, output_tokens: 20 }, provenance: { authorship_state: 'AI_GENERATED' } } };
       } else {
         status = 404;
         body = { detail: `Unexpected mock API request: ${method} ${path}` };
@@ -56,7 +65,7 @@ test('login -> iceberg -> result page, cards in the mock order', async ({ page }
   }
   await expect(page).toHaveURL(/\/methods\/systems\.iceberg_model\/run$/);
   await expect(page.getByRole('heading', { level: 1, name: '冰山模型' })).toBeVisible();
-  await expect(page.locator('.status').getByRole('button').first()).toBeVisible();   // the project the run is saved in
+  await expect(page.locator('#input')).toContainText('存到：新專案');   // opening the page makes no project; 執行分析 makes one
   // the header opens the tool's lesson in a new tab (docs/mockups/iceberg-result-mock.html .top > a.howto); the lesson is served
   const lesson = page.locator('.top a.howto');
   await expect(lesson).toHaveAttribute('href', '/learn/systems.iceberg_model');
@@ -78,4 +87,23 @@ test('login -> iceberg -> result page, cards in the mock order', async ({ page }
   const citationLinks = page.locator('[data-section="1"] .finding a[href^="#citation-"]');   // the findings' own [n]
   if (mockApi) await expect(citationLinks).toHaveCount(1);
   else await expect(citationLinks).toHaveCount(completed.result.findings.reduce((count, finding) => count + finding.citations.length, 0));
+
+  // the analysis has its own address, and 我的專案 opens it again: the list -> the project -> the saved result
+  await expect(page).toHaveURL(/\/projects\/[^/]+\/analyses\/INTERP-[^/]+$/);
+  const saved = new URL(page.url()).pathname;
+  const projectPath = saved.replace(/\/analyses\/.*$/, '');
+  const projectName = await page.locator(`.crumbs a[href="${projectPath}"]`).innerText();
+  expect(projectName).toMatch(/^冰山模型 \d{4}-\d{2}-\d{2} \d{2}:\d{2}( \(\d+\))?$/);
+  await page.getByRole('navigation', { name: '主選單' }).getByRole('link', { name: '我的專案', exact: true }).click();
+  await expect(page).toHaveURL(/\/projects$/);
+  const row = page.locator('tbody tr').filter({ has: page.locator(`a[href="${projectPath}"]`) });
+  await expect(row).toHaveCount(1);
+  await expect(row.locator('td').nth(3)).toHaveText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);   // 建立: date and time
+  await row.locator(`a[href="${projectPath}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`${projectPath}$`));
+  await expect(page.getByRole('heading', { level: 1, name: projectName })).toBeVisible();
+  await page.locator(`a[href="${saved}"]`).first().click();
+  await expect(page).toHaveURL(new RegExp(`${saved}$`));
+  await expect(page.locator('[data-section]')).toHaveCount(11, { timeout: 30_000 });
+  if (!mockApi) await expect(page.locator('#f-events')).not.toHaveValue('');   // the fields come back with what was analyzed
 });

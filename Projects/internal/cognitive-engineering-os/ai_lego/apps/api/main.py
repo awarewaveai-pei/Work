@@ -1310,10 +1310,11 @@ def get_interpretation(
         raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
     latest = events[-1]
     project_id = latest["aggregate_id"].removeprefix("project:")
+    method_id = next((event["payload"].get("method_id") for event in events if event["event_type"] == "InterpretationRequested"), None)
     if latest["event_type"] == "InterpretationRequested":
-        return {"interpretation_id": interpretation_id, "status": "PENDING", "project_id": project_id}
+        return {"interpretation_id": interpretation_id, "status": "PENDING", "project_id": project_id, "method_id": method_id}
     if latest["event_type"] == "InterpretationFailed":
-        return {"interpretation_id": interpretation_id, "status": "FAILED", "project_id": project_id, "error": latest["payload"]["error"]}
+        return {"interpretation_id": interpretation_id, "status": "FAILED", "project_id": project_id, "method_id": method_id, "error": latest["payload"]["error"]}
     if latest["event_type"] not in {"InterpretationCreated", "InterpretationJudged"}:
         raise HTTPException(status_code=500, detail=f"INTERPRETATION_EVENT_UNKNOWN: {latest['event_type']}")
     stored = repo.get_interpretation(session["tenant_id"], interpretation_id)
@@ -1328,7 +1329,7 @@ def get_interpretation(
         if event["event_type"] == "InterpretationJudged":
             judgment = {"stance": event["payload"]["stance"], "text": event["payload"]["text"]}
             break
-    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "record": artifact["record"], "result": artifact["interpretation"], "gate_results": artifact["gate_results"], "manifest": artifact.get("prompt_manifest", build_prompt_manifest(artifact["record"])), "judgment": judgment}
+    return {"interpretation_id": interpretation_id, "status": "DONE", "project_id": project_id, "method_id": method_id, "created_at": stored["created_at"], "record": artifact["record"], "result": artifact["interpretation"], "gate_results": artifact["gate_results"], "manifest": artifact.get("prompt_manifest", build_prompt_manifest(artifact["record"])), "judgment": judgment}
 
 
 @app.post("/interpretations/{interpretation_id}/judgment")
@@ -1420,7 +1421,31 @@ def list_projects(
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> list[dict[str, Any]]:
-    return repo.list_projects(session["tenant_id"], workspace_id)
+    tenant_id = session["tenant_id"]
+    analyses = repo.analyses(tenant_id)
+    activity = repo.last_activity(tenant_id)
+    return [_project_with_activity(project, analyses, activity) for project in repo.list_projects(tenant_id, workspace_id)]
+
+
+def _project_with_activity(project: dict[str, Any], analyses: dict[str, list[dict[str, Any]]], activity: dict[str, str]) -> dict[str, Any]:
+    """A Project with what it holds (GET /projects and GET /projects/{id} alike): when it last moved, how many analyses,
+    the tools they used, the latest one."""
+    own = analyses.get(project["project_id"], [])
+    return {
+        **project, "updated_at": activity.get(project["project_id"], project["created_at"]), "analysis_count": len(own),
+        "methods": list(dict.fromkeys(item["method_id"] for item in own if item["method_id"])), "latest_analysis": own[-1] if own else None,
+    }
+
+
+@app.get("/projects/{project_id}/analyses")
+def project_analyses(
+    project_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> list[dict[str, Any]]:
+    """The Project's analyses, newest first (each opens with GET /interpretations/{interpretation_id})."""
+    _project_or_404(repo, session["tenant_id"], project_id)
+    return list(reversed(repo.analyses(session["tenant_id"], project_id).get(project_id, [])))
 
 
 @app.get("/projects/{project_id}")
@@ -1429,7 +1454,8 @@ def get_project(
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
-    return _project_or_404(repo, session["tenant_id"], project_id)
+    project = _project_or_404(repo, session["tenant_id"], project_id)
+    return _project_with_activity(project, repo.analyses(session["tenant_id"], project_id), repo.last_activity(session["tenant_id"], project_id))
 
 
 @app.get("/projects/{project_id}/history")
