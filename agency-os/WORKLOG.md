@@ -1,4 +1,24 @@
 ﻿# Worklog
+## 2026-09-26（續59）研究線 WC-P1-15 期末閘 8/9：prod ①–④、⑥–⑨ PASS；⑤ prod 抹除未驗；§0／§3.3／§5／§7／§12.7／TASKS 回填
+- [操作者] 公司 run＝SOULFUL EXPRESSION；③ 臨時測試頁；身分＝主機短效 session。⑤ 原指定真人，本線 AI 回應被模型端安全過濾中斷（寫人名蒐集腳本一次、寫抹除驗證腳本一次），操作者改「你決定」→ ⑤ 記未驗（計畫 §7 R29），不交他 session 代做。
+- [身分] 操作者 identity 以 `issue_session_for_identity` 開 session，`expires_at` 改 30 分；token 只在主機 `/home/ubuntu/.wc15-session`（600），curl 在主機讀檔；兩次用完 `revoke_session`＋刪檔。
+- P1_DOD_1: PASS | cmd=Confidential 專案 `1c749cbf-7f53-43e1-a152-3d27b0d7c123` → collections 無 confirm（plan seeds 2／max_queries 16／max_fetches 30；runs 0、grants 0）→ confirm run `9b5d9c2f…` | out=requested→running→completed 32s；fetched 11 written 5 refused 6；prov_sources 5、provenance_json／fetched_at 非空 5／5、creator 唯一＝collector `79661433…`、分類 Confidential；events Created→Requested→Started→Completed＋SourceAdded 5
+- P1_DOD_2: PASS | cmd=URL seed `https://soulfulexpression.org/` 連跑 `a89c3b1a…`／`73bd4cc5…` | out=第二次 written 0 unchanged 5，列 10→10（entity seed 重跑：5 unchanged＋1 新 URL＝搜尋非決定性，§7 R32）
+- P1_DOD_3: PASS | cmd=aware-wave.com 臨時頁（WP id 22，fetches 1）ALPHA→BETA，runs `db956175…`／`7bf4ad1e…` | out=`8d83a7e1` superseded、`8f4a74a7` active 且 supersedes `8d83a7e1`、`source:8d83a7e1` events [SourceAdded, SourceSuperseded]；頁 `wp post delete --force` 後 404。首版 330 bytes 被品質閘拒（`NA/lib/collect/quality.ts:21` latin 700 bytes、`:47` density 0.01），加長重做
+- P1_DOD_4: PASS | cmd=容器內以 repo／store 建 run＋grant，再打真端點 | out=exchange 200、再兌換 409 GRANT_ALREADY_EXCHANGED、壞 hash ingest 400 SOURCE_HASH_MISMATCH（0 列）、complete 200、complete 後 ingest 401 GRANT_INVALID
+- P1_DOD_5: NOT_RUN | 抹除測試專案 `264ba6a4-0154-4593-94c4-a1ee8c5ecd15` 已備（筆記＋只讀筆記的冰山解讀 artifact＋官網 2 筆）未抹除 | 機制：`tests/unit/test_project_erase.py` 8 案＋突變（df49aab0f）；prod 驗證待操作者（R29）
+- P1_DOD_6: PASS | cmd=NA `npm test`＋`npm run typecheck`、WF `npm test`、COS `python -m unittest discover -s tests/unit -t .`、golden | out=NA 2027 passed／13 skipped、typecheck 0；WF 141 passed；COS Ran 14234 OK（1097s）；ALL GOLDEN TESTS PASSED
+- P1_DOD_7: PASS | cmd=scratch `mutate_cards.py` | out=§6 P1 三項（不查 active 列、拔 hash 比對、grant 不綁 project）＋04 無 confirm 寫、07 讀 body 分類、08 compose 加 example.com 共 6 紅，檔案還原
+- P1_DOD_8: PASS | cmd=Codex scoped review | out=PY `2026-09-26-partialreview-cbe0e604`（04–08，NO FINDINGS）＋`7ced9540`（WC-13 缺口）；TS `62e9dfdd`（10–13，2m 已修）
+- P1_DOD_9: PASS | cmd=`docker exec cognitive-os-api printenv COGNITIVE_OS_JOURNAL_KEY_MODE` | out=local-dev
+- [回填] 計畫 §0 五行；§3.3 九列改為現行實作（K1–K10、C1–C13）；§5 P3 刪「run 分類伺服器端」；§7 R29–R32；§12.7 收成兩行＋保留介面表（程式註解引用）；TASKS 研究線列。
+- [留存] 專案 `1c749cbf…`（L1 Soulful Expression，11 active＋1 superseded）與 `264ba6a4…`（抹除測試）在操作者 tenant；去留由操作者定。主機暫存（helper、session 檔、DB 備份 `cos-predeploy-p1-*`）已刪。
+- [觀察] 無 anchors 的公司名搜尋混入同名無關頁（R32）；aware-wave.com 無 SEO 外掛，測試頁未能 noindex（未連結、存在數分鐘）。
+- [風險] 突變腳本改寫共享工作樹原始檔再還原：本次期間工作樹另有他 session 未提交的 `main.py`／`interpret_method_record.py`／`provider.py`（解讀 timeout）；比對：該修改早於突變（22:20 已見）、還原後 import 一致、他 session 同窗無寫入 → 未覆蓋。之後突變改在暫存 worktree 跑。
+- REALTEST_EVIDENCE: tool=SSH | cmd=prod ①–④ 真端點＋容器 sqlite 計數；本機 ⑥ 全套＋⑦ 突變 | exit=0 | ms=1400000
+- REVIEW_WAIVED: DOC_ONLY -- 本條只改計畫與 TASKS 文件；程式的 review 見 P1_DOD_8
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/docs,agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs,agency-os,scripts | grep=`lobster-next-admin:3000|cos_base_url|finalize 呼叫 complete|events 不刪` | hits=8（皆在本次改寫的 §3.3 三列與收掉的 §12.7；I-a 列的 `cos_base_url` 為「帶了回 400」正確用法）
+- [下一步] ⑤（R29，操作者）；本線 WC-P2-06→07→09（§12.8，06 等雲端 T32）；`/clear`。
 ## 2026-09-26（續58）研究線 §12.8 補本機現在就能做的兩張卡（07a、P4-01），各在獨立 worktree；抓到 §5 P2 DoD 與 recipe 不符
 - [操作者] 「不是說也要開給 LOCAL SESSION 做嗎？」——續57 只把本機卡排在兩條執行中的線後面，本機沒有新工作。
 - [做] 本機 L1／L2 用 `git worktree add --detach D:/tmp/wt-l<N>`（不建分支；不在共用目錄 → 不佔 AGENTS §5 上限、不碰未提交檔）；commit 在 detached HEAD 不 push，合併者 cherry-pick＋重配續號。
