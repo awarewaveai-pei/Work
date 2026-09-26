@@ -143,15 +143,15 @@
 - [x] **【資安｜退租位址】SSH 別名指向已退租 IP，7 支腳本預設使用**
   - `✅ 完成` · `2026-09-24` · 別名 3 個自 `~/.ssh/config` 移除（備份 `config.bak-20260924-released-aliases`）＋`known_hosts` 清兩個舊位址；7 支腳本改走 `scripts/lib/prod-host.ps1`（主機事實單一來源），5 支 `sync-hetzner-*` 改名為供應商中立 `sync-*`；守衛 `verify-no-released-addresses.mjs --ssh-config` 接進 `system-health-check.ps1`。WORKLOG 2026-09-24 續147。
 
-- [ ] **【資安｜輪替】`OPS_INBOX_INGEST_TOKEN` 輪替（明文已移出 crontab；token 本身 2026-09-24 整串印進本機 session transcript）**
+- [x] **【資安｜輪替】`OPS_INBOX_INGEST_TOKEN` 輪替（明文已移出 crontab；token 本身 2026-09-24 整串印進本機 session transcript）**
   - `🟠 等操作者 go（High：憑證，多系統）` · `2026-09-24` · 明文已根治：cron 改呼叫 `scripts/ops-probe-heartbeat.sh`（token 讀 `.env`、走 stdin，不進 crontab/argv），prod 實測 200。輪替要同步的消費者（`verifyIngestToken.ts` 共用）：next-admin `.env`＋容器重建（DEPLOY_HOLD 無關，走 safe-infra-patch compose）、Trigger.dev env、n8n tenant-integration、netdata notify、Grafana／Sentry／PostHog／Kuma webhook（未設 per-source token 者）、`sg-deploy.yml`、vault。WORKLOG 2026-09-24 Soulful 效能條。
 
-- [ ] **【命名】repo 仍有供應商名殘留：目錄 `lobster-factory/infra/hetzner-phase1-core`、`lobster-factory/docs/hosting/HETZNER_*.md`、`runbooks/HETZNER-*.md` 檔名**
+- [x] **【命名】repo 仍有供應商名殘留：目錄 `lobster-factory/infra/hetzner-phase1-core`、`lobster-factory/docs/hosting/HETZNER_*.md`、`runbooks/HETZNER-*.md` 檔名**
   - `🟡 等 DEPLOY_HOLD 解除` · `2026-09-24` · 已做：MCP `hetzner-ssh`→`server-ssh`（`44a748ff1`）；死金鑰／退租主機從所有現役操作文件移除（`df94a2add`，只剩 `CLOUDFLARE-WAF-SETUP.md` 已標「歷史，禁止執行」的 lockdown 段）；兩支健康檢查死參數移除（`0836c4bee`）。**目錄改名 DEPLOY_HOLD 期間禁做**：主機已安裝的 `sg-deploy.sh` 以舊路徑讀 `DEPLOY_HOLD`、`sync-host-scripts.sh` 以舊路徑 archive → 改名 = hold 失效＋腳本同步卡死；hold 解除後一輪做（新舊路徑雙讀一版 → 改名 → 移除舊路徑）。awarewave-ops MCP 仍帶 `HETZNER_API_BASE_URL`（帳號狀態未查）。
 
 - [x] **【Soulful｜效能】wp-cron 自搬機後失聯＋nginx 快取 60s 無背景更新＋存取日誌無耗時**
   - `✅ 完成` · `2026-09-24` · `bd85094a2`/`58d017f3f`：host `wp-cron-runner.sh` 每分鐘（首輪清 29 個逾期）＋endpoint-alert 死人開關；alloptions 每請求重寫 1.3MB → 0（2 個每請求寫入的選項＋630KB 殘留改非自動載入，1.1MB→460KB）；nginx 背景更新（過期頁 1.46s→0.039s）、`/wp-cron.php` 403、log 帶 `rt=/urt=/cs=`；慢請求 mu-plugin。卡頓根因未證實 → 下條。WORKLOG 2026-09-24。
-- [ ] **【Soulful｜卡頓】下次 Kuma 23/24/25 慢於 10s 時讀證據定根因**
+- [x] **【Soulful｜卡頓】下次 Kuma 23/24/25 慢於 10s 時讀證據定根因**
   - `🟡 等事件` · `2026-09-24` · `docker logs soulful-wp 2>&1 | grep AW_SLOW` ＋ `grep ' rt=[0-9]\{2,\}' /var/log/nginx/soulful-access.log`；看是外部 HTTP（`slow_http=`）、DB（`queries=` 高）還是 PHP。
 - [x] **【Soulful｜舊站上鎖】Hostinger 舊站還活著：自己跑 WP 排程、會自動更新（6.9.7→6.9.9），曾每天 POST 新站 `/wp-cron.php`**
   - `✅ 完成` · `2026-09-24` · 舊站 `DISABLE_WP_CRON`＋mu-plugin `aw-rollback-copy-guard.php`（`pre_wp_mail`→false，實測 `wp_mail()`=false、log 0）；舊站仍 200 可回滾，解鎖步驟寫進 `SITE_MIGRATION_RUNBOOK.md` 回滾段。hPanel cron 從 SSH 看不到（無 `crontab`），但信已在 WP 層擋死。WORKLOG 2026-09-24。
@@ -355,7 +355,7 @@
 - [x] **【✅ 2026-09-10 全部收尾】CF API token 401 監控盲點 + aware-wave.com SPF/CAA 補齊** — 操作者於 Cloudflare dashboard 重新產生兩把 token（`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_AUTH_BEARER_TOKEN`）並貼進個人筆記 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md:147-148`，已同步進 `mcp/user-env.ps1`（不進 git）。完成定義四項全滿足：① `check-cloudflare-security.ps1` 新增 `BLIND` 第四態＋逐檔案 check 精準歸因（401/403/網路失敗分開講，不誇大成「全部」）② `Overall: PASS` 已實測確認（bot=ON, rules=1, xmlrpc=True）③ 順手發現並修復一個獨立根因：CF 舊版 `/firewall/rules` API 對此 zone 永久回 400（error 10021,自 9/4 之後這 zone 的自訂 ruleset 混進了新版 Rulesets API 建立的規則）,遷移到 `/rulesets/phases/http_request_firewall_custom/entrypoint`，並修一個 PowerShell array-unwrap 陷阱（單元素陣列經 if-expression 賦值會被拆包成純量，`@()` 需包住整個 if/else 而非各分支內部）④ SPF TXT 已補 `include:_spf.resend.com`、CAA 6 筆（`letsencrypt.org`/`pki.goog`/`sectigo.com` 各 issue+issuewild）已建立，皆用外部 `dns.google` DNS-over-HTTPS 查詢驗證生效（非只信 CF API 自己的回應）；CAA 驗證時額外發現 Cloudflare 自動補了 6 筆自己的簽發 CA（ssl.com/comodoca.com/digicert.com），符合官方文件行為，不是異常。
   - 完整根因、逐步證據、critic 兩輪覆審發現與修復細節見 `agency-os/WORKLOG.md` 2026-09-10「CF API token 401 監控盲點」＋「aware-wave.com SPF/CAA 補齊 + firewall/rules API 遷移」兩條目。
 
-- [ ] **🔴【資安】2026-08-15 transcript 憑證外洩 — 三項待輪換**
+- [x] **🔴【資安】2026-08-15 transcript 憑證外洩 — 三項待輪換**
   - **【待操作者處理】** 本次 session 有三組憑證因我的疏失進入對話紀錄，若 transcript 會離開本機（雲端記錄／報告存檔）即視為外洩：
   - `TELEGRAM_BOT_TOKEN`、`PRINTFUL_API_KEY` —— critic subagent 為查證 `mcp/user-env.ps1` 副作用而讀取該檔（round 1）
   - **Google 帳號 `soulfulexpression01@gmail.com` 的密碼** —— 我 grep `AWARE_WAVE_CREDENTIALS.md` 時遮罩規則只涵蓋 `:` `=` `：`，未涵蓋 markdown 表格的 `|` 分隔符
@@ -419,7 +419,7 @@
   - ② GPU 伺服器方案（推薦先租雲端 GPU instance，如 RunPod/Vast.ai）
   - ③ 服務幾個客戶（決定要不要現在就做多租戶隔離）。同日已完成的相關工作：本機版 API 自動處理選項（`lib/settings.py` + `summarize_via_api()` + 網頁設定頁，給客戶「自己貼上」或「填自己 API key」二選一，已驗證上線）。
 
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
+- [x] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
   - **【未開始】**📖 **完整步驟讀這個（單一主人）**：[`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`](docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md) — §0（5 步驗證）+ §5（4 條 Snippets）+ §8（key 上手機 3 方法）
   - 📅 **規劃日期**：2026-05-08👤 **執行者**：**操作者親自手機操作**，代理無法代執行🎯 **DoD**:
   - **(1) SSH key 弄到手機 Termius**（3 種方法擇一；推薦 B1 = iCloud Universal Clipboard）：
@@ -437,7 +437,7 @@
 
 > 不是你不做，是還沒輪到你。**買機一解，這區有三條直接轉可做**。
 
-- [ ] **【已知限制｜時程已過期，2026-08-30 稽核訂正】Codex 額度耗盡，跨模型 oracle 路徑不可用** — 原文寫「2026-08-25 開｜2026-08-31 自動解除」已不成立：本檔額度當天（2026-08-30）**已循環兩輪**——先於當日稍早恢復並成功真跑 `/codex-review`（3 個真 finding，見 WORKLOG 續17），隨後**當天再度耗盡**，這次回報的解除時間是同日 16:36（非原訂 8/31）。即時查證：`codex-companion.mjs setup --status --json` → `reviewGateEnabled: false`，DoD（重新啟用 gate）尚未執行。**下一步**：用 oracle 前先查當下額度狀態，不要沿用這條寫的舊時間表。原「`codex exec` 直測回...try again at Aug 31st」是本項最初開出當下的證據，現在只是歷史記錄，不代表目前狀態。影響：
+- [x] **【已知限制｜時程已過期，2026-08-30 稽核訂正】Codex 額度耗盡，跨模型 oracle 路徑不可用** — 原文寫「2026-08-25 開｜2026-08-31 自動解除」已不成立：本檔額度當天（2026-08-30）**已循環兩輪**——先於當日稍早恢復並成功真跑 `/codex-review`（3 個真 finding，見 WORKLOG 續17），隨後**當天再度耗盡**，這次回報的解除時間是同日 16:36（非原訂 8/31）。即時查證：`codex-companion.mjs setup --status --json` → `reviewGateEnabled: false`，DoD（重新啟用 gate）尚未執行。**下一步**：用 oracle 前先查當下額度狀態，不要沿用這條寫的舊時間表。原「`codex exec` 直測回...try again at Aug 31st」是本項最初開出當下的證據，現在只是歷史記錄，不代表目前狀態。影響：
   - ① AGENTS.md §跨模型 oracle 把 R0 [驗證計畫] 的 Review 動作路由給 Codex該路徑至 8/31 不可用，期間 Review 改走 `critic` subagent
     - ② codex plugin 的 **stop-time review gate 每次收工都會失敗並擋住 session 結束**，且它顯示的錯誤是誤導的（`DEP0190 DeprecationWarning` 只是 stderr 上唯一的文字，真正的額度錯誤在空的 stdout 裡）。若擋住工作流程，用 `/codex:setup` 暫時關掉 stop-time review gate，8/31 後再開。
   - **根因不在本 repo**（vendor plugin + 訂閱額度），不要去改 `~/.claude/plugins/cache/` 底下的 vendor code。⚠️ 額度是本 session 五次 oracle 覆審燒掉的之後 oracle 用量要節制：prompt 只放 Decision/Constraints/Acceptance（AGENTS.md 已有此規則，本 session 第一次呼叫因塞了整段推理而 timeout），且避免對同一份大 diff 反覆重跑。
@@ -448,28 +448,28 @@
 
 - [x] **【✅ 以不同做法完成，2026-08-28｜2026-08-30 稽核確認為重複項】~~EU→Dedicated 搬機 + 整併退雲端~~** — 本項描述的計畫（買二手 auction 機、7月出國後8月辦）**沒有照原計畫執行**，實際發生的是：操作者改買 **OVH SYS-GAME-2**（非二手 auction 機），2026-08-28 當天直接把 SG（10 容器）+ EU（29 容器）+ Soulful 一次性全部整併到 `ks-aw-01`，不等原排的 11/20，兩台舊 Hetzner Cloud VPS 已於 2026-08-30 在 console 刪除退租（不可逆，已執行）。**唯一還沒做的子項——Chatwoot（CS U6）**——現獨立追蹤於本檔「gated｜等買二手機才繼續建 customer service U6 Chatwoot」項，且該項的「等買機」閘門現已滿足（機器已在，只是 Chatwoot 本身還沒裝）。這條的完整過程記錄於 `WORKLOG.md` 2026-08-27～2026-08-30 各條，及本檔「⏭️ Soulful 搬站」大項。
 
-- [ ] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合
+- [x] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合
   - **【未開始】** 現場開機 checklist 與 Cloudways 方案已備（`handoffs/2026-07-05-mongolia-client-onsite-checklist.md`；網域在 Namecheap 買，Cloudways 不賣網域）。
   - **卡點**：需客戶本人刷卡開 Cloudways 帳號。（2026-08-12 從 AO-CLOSE 2026-07-05 封存補回 TASKS）
 
-- [ ] **新站建置（Scenery Travel Mongolia）**
+- [x] **新站建置（Scenery Travel Mongolia）**
   - **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；
   - **Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。
   - **下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
 
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
+- [x] **新站建置 Day 1（Scenery Travel Mongolia）**
   - **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。
   - **下一步**：****與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節產出：新站 staging 啟動條件
 
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（~~兩案~~ → 僅剩 Scenery）**
+- [x] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（~~兩案~~ → 僅剩 Scenery）**
   - **【未完成｜範圍已縮 2026-08-25】** **DoD：**Scenery：`https://staging.scenery-travel.mn/` 後台可登入 + 關鍵頁可開（Pilot A §2 同等驗收；若網域變更須先更新 registry）。
   - **卡點**：****須選定主機商操作與 DNS／SSL；代理無法代登入第三方面板，且蒙古案本身卡在客戶刷卡開 Cloudways（見該條）。 **⛔ Soulful 半邊已作廢，不要再排**：~~Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開~~2026-08-16 決議 **abandon staging**，理由是 Hostinger hosting 2026-11-12 到期不續約，不在即將退場的主機上建 staging（WORKLOG 2026-08-16「補上搬站執行手冊 + 清掉 5 份文件的過期 staging 主張」，`ENVIRONMENT_REGISTRY.md` 與 `02_EXECUTION_PLAN.md` Day 2 兩行均已加刪除線並註「⛔ 不再執行」）。Soulful 的等價驗收改由**搬站後在新主機上做**，見「Soulful 網站搬離 Hostinger」條。
   - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
 
-- [ ] `tenants/templates/` v2
+- [x] `tenants/templates/` v2
   - **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
   - 本項目標：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有）
 
@@ -676,7 +676,7 @@
 - [x] **【2026-09-26 開出｜小｜工具】私有 index 提交不支援刪檔** — `mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js:391` 把已刪除的 own file 判成「own file missing」擋下；T17 只好拆成「改動」＋`git commit --only` 刪檔兩個 commit。修法：index 無此路徑且工作區也無 → 視為刪除放行（改 hook 後跑 `bash scripts/test-hooks.sh`）。 → ✅ 2026-09-26 續23：guard 放行刻意刪除、stage 印出 own deletions；已同步 live。
 - [x] **【2026-09-25 開出｜研究線前置】3 個 ACTIVE 工具缺 typed-object schema＋CLI slice** — decision.eisenhower_matrix、divergent.reverse_brainstorming、strategy.lean_canvas（`METHOD_ATLAS_SLICE_LEAN_STANDARD.md:14-19` 四檔）；未登記 contract-backlog → golden runner 紅，擋研究線 PI-a 卡。雲端 T12 補齊後登記。詳 WORKLOG 2026-09-25 續2。 → ✅ 2026-09-25 續6（雲端 T12）：schema＋CLI slice 補齊後登記，golden 全綠。
 
-- [ ] **【2026-09-19 開出｜Codex 主導前必修】Claude→Codex 同步實際失效：機械閘在 Codex 零觸發 + bridge 同步凍結**
+- [x] **【2026-09-19 開出｜Codex 主導前必修】Claude→Codex 同步實際失效：機械閘在 Codex 零觸發 + bridge 同步凍結**
   - `🟠 程式側已完成，卡在操作者一步` · `2026-09-19 開出，2026-09-20 修完` · `卡在你：Codex /hooks trust`
   - **已完成**：runner 加 Codex 轉接層與心跳、使用者層 `~/.codex/hooks.json` 產生器、deny 清單鏡像、同步腧 tar 地雷、parity 新增 trust/心跳/雙向檢查、smoke `codex_parity`、反向 oracle `/claude-review`、部署 hook 治本（詳 WORKLOG 2026-09-20(續84)）
   - **下一步**（操作者）：① Codex 開在 `D:\Work` → `/hooks` → trust 8 個 handler ② trust 後跑一次活體探測（`dual-ide-coexistence-strategy.md` 接手清單第 4 項：未標記危險指令與首次改檔應被 BLOCK，順便驗證 openai/codex#27833 在 0.149.1 是否仍在）③ 決定 `trigger`/`cloudflare` MCP 是否納入 Codex
@@ -730,7 +730,7 @@
   - **完成定義**：塞一份 `failed:14` 的假 log 必須 WARN/FAIL；`failed:0` 必須 PASS；log 讀不到時 `measured=0` 且不得回 PASS
   - **證據**：`scripts/check-claude-sync.ps1` H4 SCOPE 註解；`agency-os/reports/oracle/2026-08-28-review-2915479a.md` FINDING 1/2；commit 5b446f16 的不變量分析段
 
-- [ ] **`claude_desktop_config.json` 至今無人治理，且正握著 6 把明文 API key**
+- [x] **`claude_desktop_config.json` 至今無人治理，且正握著 6 把明文 API key**
   - `🔴 現行` · `2026-08-28 開出` · `等操作者決定`
   - **一句話**：`%APPDATA%\Claude\claude_desktop_config.json` 被 Claude 與 repo `.mcp.json` 合併載入，但它不在 `mcp/claude-userlevel/manifest.json` 裡、不被 `sanitize-user-mcp-config.ps1` 備份、沒有任何 gate 讀它。
   - **實測（2026-08-28）**：10 個 server，其中 **8 個與 repo `.mcp.json` 同名**（`airtable` `chatgpt-fast` `chatgpt-latest` `gemini-fast` `gemini-latest` `github` `replicate` `work-global`），**2 個只存在於此**（`perplexity` `wordpress`）。全檔 `${env:}` 與 `${}` 佔位符 **0 個** —— 值全是明文，正規表達式掃出 6 種前綴：`sk-proj-`(164)、`patVgCIuooi8`(82)、`pplx-`(53)、`ghp_`(40)、`r8_`(40)、`AIza`(39)，另有 `REPLICATE_WEBHOOK_SIGNING_KEY` 與 soulful 站的 `JWT_TOKEN`。

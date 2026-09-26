@@ -1,4 +1,20 @@
 ﻿# Worklog
+## 2026-09-26（續42）TASKS.md 依操作者指示勾選 13 條（勾選＝操作者裁定，我沒逐條驗證完成度）
+- [操作者] 「以下去打勾」：146／149／154／358／422／440／451／455／461／466／472／679／733（C 區整區 6 條＝440／451／455／461／466／472）。
+- 做法：只把 13 行 `- [ ]` 翻成 `- [x]`，標題與內文不動；不搬進「已完成歷程」（歸檔自動化另有待辦）；沒寫 `AUTO_TASK_DONE`（已直接勾，AO-CLOSE 的 apply-closeout-task-checkmarks 不需重打）。
+- 落差（記錄，不擋勾）：
+  - 679：DoD＝smoke `codex_parity=ok`＋活體探測確認 BLOCK，未達。程式側 09-20 已完成；trust 一步仍由 178 追蹤；勾掉後「活體探測」與「trigger／cloudflare MCP 是否納入 Codex」（679 步驟②③）不再有開放項。
+  - 149：`lobster-factory/infra/hetzner-phase1-core/` 目錄仍在（Glob 確認）。勾掉＝放棄／延後改名，不是改完；DEPLOY_HOLD 09-26 已解（163 條）。
+  - 146／358／733：輪替／明文 key 清理是否已做，未驗證（不讀 secrets）。
+  - 154：勾掉＝不再等 Kuma 慢事件；取證指令仍在該條內文。
+- REALTEST_EVIDENCE: tool=Bash | cmd=git diff -U0 -- agency-os/TASKS.md 加 grep 計數加 removed／added 內文逐行比對 | exit=0 | ms=303
+  - 結果：14 hunk＝13 個核取框翻轉（removed-open 13／added-done 13，內文逐行 IDENTICAL）＋1 個自動同步頁尾 hunk（`_Last synced_`，非我的，私有 index 排除）。
+- REVIEW_WAIVED: DOC_ONLY -- 13 個核取框翻轉，無程式／設定變更
+- BUGHUNT_WAIVED: DOC_ONLY -- 只翻轉核取框；`open-tasks-snapshot.md` 由 ao-resume 重生，非手動維護
+- [剩餘風險] 勾選是操作者裁定；上列落差若日後被當「已完成」引用會誤導，以本條為準。
+- [rollback] `git revert` 本 commit（只含 13 個核取框翻轉＋本條目）。
+- WORKLOG_DONE: TASKS.md 13 條依操作者指示勾選
+
 ## 2026-09-26（續41）研究線 P1 第二批：WC-P1-04～08（COS）落碼；接手誤刪的 session
 - [狀態] WC-P1-04／05／06／07／08 完（本 commit；一個 commit：main.py 與 repo 五卡 hunk 交錯，同 續37 C5 理由）；14／09／15 High-STOP 未動。
 - [接手] 原 session `530b5f28` 被操作者誤刪，停在 Codex 第三輪 finding 修正中（92 測 1 錯）。本 session 查活著的 `28b602e8`（網站課程頁）、`d2996616`（T19–T27 合併，只動 lobster-factory）皆未做／未排 04～08 → 接手。
