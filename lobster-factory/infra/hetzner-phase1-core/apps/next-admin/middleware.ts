@@ -220,6 +220,38 @@ export function isWrongHostForPortal(request: NextRequest): boolean {
   return host !== "portal.aware-wave.com" && !isDevelopment();
 }
 
+// CSRF: a cookie-authenticated write must come from this app's own pages. Staging sites live on aware-wave.com,
+// which is SAME-SITE to app.aware-wave.com, so the SameSite=Lax session cookie rides along on their POSTs -- a
+// script on a client's staging WordPress could act as the logged-in operator. Only requests that reach the
+// session gate are checked (see the call site): token-authenticated callers never rely on the cookie. Page POSTs
+// are Next server actions: Next compares their Origin with the host itself but lets a request WITHOUT Origin
+// through (next/dist/server/app-render/action-handler.js), so do not read that as fail-closed.
+// A write is allowed only on positive same-origin evidence.
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+function firstHeaderValue(request: NextRequest, name: string): string {
+  return (request.headers.get(name) ?? "").split(",")[0].trim().toLowerCase();
+}
+export function isCrossSiteWrite(request: NextRequest): boolean {
+  if (SAFE_METHODS.has(request.method.toUpperCase())) return false;
+  if (!isApiPath(request.nextUrl.pathname)) return false;
+  // Only "same-origin" counts: "none" is what a resubmitted form can carry (Chromium issue 40638997), and no
+  // legitimate API write is typed into the address bar.
+  const site = request.headers.get("sec-fetch-site");
+  if (site) return site !== "same-origin";
+  // Browsers without Fetch Metadata: fall back to Origin (scheme + host). Neither header: a non-browser client
+  // is fine without a session cookie (it gets 401 anyway); with one, it is an old browser -> refuse.
+  const origin = request.headers.get("origin");
+  if (!origin) return readSessionCacheKey(request) !== null;
+  const host = firstHeaderValue(request, "x-forwarded-host") || firstHeaderValue(request, "host");
+  const proto = firstHeaderValue(request, "x-forwarded-proto") || request.nextUrl.protocol.replace(/:$/, "");
+  try {
+    const o = new URL(origin);
+    return o.host.toLowerCase() !== host || o.protocol.replace(/:$/, "") !== proto;
+  } catch {
+    return true; // "null" (sandboxed frame, file:, cross-origin redirect) or garbage from a browser context
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -247,6 +279,13 @@ export async function middleware(request: NextRequest) {
   // call. Authorization is enforced by the route's own token check.
   if (PUBLIC_API_PATHS.has(pathname) || hasValidSyncKey(request)) {
     return passthrough();
+  }
+
+  // Everything below authenticates by the session cookie: refuse a cross-site write before touching it.
+  if (isCrossSiteWrite(request)) {
+    // Visible in the container log so a wrongly blocked legitimate caller shows up; never log cookies.
+    console.warn(`[csrf] blocked ${request.method} ${pathname} sec-fetch-site=${request.headers.get("sec-fetch-site") ?? "-"} origin=${request.headers.get("origin") ?? "-"}`);
+    return NextResponse.json({ error: "cross_site_request_blocked" }, { status: 403 });
   }
 
   // Auth not configured: explicit dev-only convenience (simulated-role fallback still works

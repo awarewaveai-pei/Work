@@ -1,4 +1,22 @@
 ﻿# Worklog
+## 2026-09-26（續24）next-admin CSRF：靠 session cookie 的 API 寫入只在有同源正面證據時放行（未部署）
+- [根因] staging 站在 `https://aware-wave.com/staging/<slug>/`（`app/api/internal/hosting/provision-staging/route.ts:31`），與 app.aware-wave.com 同站；Supabase session cookie 為 SameSite=Lax、httpOnly:false、host-only（`@supabase/ssr` 預設，`lib/supabase/ssr.ts:27` 未覆寫）；`middleware.ts` 無 Origin／Sec-Fetch-Site 檢查 → 客戶 staging WP 上的 JS 可用 simple POST 帶操作者 cookie 打 `/api/*`。
+- [暴露面（critic m4 更正）]
+  - POST 早就可打：舊 wp-update 用 `request.json()` 不驗 Content-Type，`text/plain` 的 `{"wave":"wave1"}` 就是 simple request；T17 的 `?wave=` 只是讓它更容易。
+  - DELETE／PATCH 從未可打：非 simple method 需 preflight，全 app 與 nginx 無 `Access-Control-Allow-*`（grep 0）。
+- [修] `middleware.ts` `isCrossSiteWrite`，放在 PORTAL_PUBLIC_PATHS／PUBLIC_API_PATHS／x-ops-sync-key 放行之後、session gate 之前：
+  - 非 GET/HEAD/OPTIONS 且為 `/api/*`、`/portal/api/*`：只有 `Sec-Fetch-Site: same-origin` 放行（`none` 也擋：表單重送會帶 none，Chromium 40638997；未知值也擋）。
+  - 無 Fetch Metadata：`Origin` 的 scheme＋host 須等於 `x-forwarded-proto`／`x-forwarded-host`（app vhost 設 `X-Forwarded-Proto $scheme`、`Host $host`，`nginx/system-sites/aware-wave-app-api-subdomains.conf:38,41`）；`Origin: null` 擋。
+  - 兩者都無：無 session cookie → 放行（腳本，之後 401）；有 cookie → 擋（舊瀏覽器）。
+  - 擋下回 403 `cross_site_request_blocked`，容器 log `[csrf] blocked <method> <path> sec-fetch-site origin`（不記 cookie）。
+  - 頁面 POST（server action，`app/(shell)/ops/inbox/actions.ts`）交給 Next 自己的 Origin 檢查（缺 Origin 時 Next 放行，已寫進註解）。
+- [critic Deep：warn 0c/0m/5n＋4s] m1 `none` 放行、m2 帶 cookie 無標頭放行、s1 四個會存活的突變（denylist、OPTIONS、portal 公開路徑之前、hostname vs host）、s2 不比 scheme、s3 無 log、s4 註解 → 全修。未修 → TASKS：m3 有副作用的 GET 可被同站 subresource 觸發；m5 `public/vector-editor.html` CDN script 無 SRI＋無 HSTS／cookie 非 Secure；m4 撈 nginx log 查過去是否被利用。
+- 文件：`APP_AWARE_WAVE_CURRENT_STATE.md` §1.2 加 CSRF 性質、§3.4 加部署後兩條 smoke。
+- 未部署：上線走 sg-deploy，部署後跑 §3.4 smoke（含新兩條）。rollback＝revert 本 commit，無資料遷移。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 0；vitest middleware-csrf＋middleware-portal-guards 46/46；npm test 183 files 1769 passed／13 skipped；10 突變各紅（call site 停用、none 放行、移到 token 放行之前、cookie 無標頭放行、Origin null 放行、denylist、OPTIONS 非安全、移到 portal 公開路徑之前、忽略 port、不比 scheme）→ 還原 46 綠 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/0m/5n（m1 m2 s1-s4 已修；m3 m4 m5 → TASKS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=Access-Control-Allow|credentials: "include"|isCrossSiteWrite | hits=Access-Control-Allow 0、credentials include 0（無合法跨站帶 cookie 呼叫端）；isCrossSiteWrite 2（定義＋呼叫）＋文件 1
+- ORACLE_WAIVED: Deep critic 逐項重新推導（含在 D:\tmp 起 Next 15.5 實測編碼路徑與 method 大小寫）＋10 組突變
 ## 2026-09-26（續23）私有 index 提交支援刪檔：刪除自己的檔可經 git-partial-worktree-commit.py 提交，且一律印出
 - [根因] `mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js:391`（validatePrivateIndex）對每個 own file 做 `hash-object`，檔案不在工作區就判「own file missing」擋下；刪檔無法走私有 index，T17（續22）只好拆成改動＋另建臨時 index 刪檔兩個 commit，並手動 `git reset` 共用 index 的殘留項。
 - [修]

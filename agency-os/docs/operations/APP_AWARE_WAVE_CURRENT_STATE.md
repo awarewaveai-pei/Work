@@ -32,6 +32,7 @@ app.aware-wave.com = AwareWave 的維運後台（Next.js 15 + React 19，部署�
 ### 1.2 安全性質（不可破壞）
 - **Fail-closed**：getUser 失敗 / 無 session / auth 未設定（prod 或 NODE_ENV unset）→ 一律擋（page → 302/login，API → 401）。
 - **Anti-spoof**：middleware **無條件先剝除** inbound `x-ops-claims-role` / `x-user-role` / `x-clerk-role` / `x-ops-simulated-role`，再依 session 注入真實角色。**已實測**：帶 `x-ops-claims-role: admin` 經公開 CF 路徑仍 307→/login。
+- **CSRF（2026-09-26）**：靠 session cookie 的 API 寫入（非 GET/HEAD/OPTIONS、`/api/*`、`/portal/api/*`）只在有同源正面證據時放行——`Sec-Fetch-Site: same-origin`；沒有 Fetch Metadata 時 `Origin` 的 scheme＋host 須等於 `x-forwarded-proto`／`x-forwarded-host`；兩者都無但帶 session cookie → 擋。否則 403 `cross_site_request_blocked`，容器 log 記 `[csrf] blocked`（`middleware.ts` `isCrossSiteWrite`）。原因：staging 在 `aware-wave.com/staging/`，與 app 同站，SameSite=Lax cookie 會被帶上。§1.3 的 token 呼叫端在這之前放行，不受影響。
 - **保護範圍**：整個 console（matcher 排除 `_next/static`、`login`、`api/auth`、`api/webhooks`、`api/internal`）。首頁 `/`、`/build`、`/onboard`、`/ops-console` 等全部 gate（大修前這些頁從未 gate = 已修補的安全洞）。
 
 ### 1.3 Server-to-server 端點（豁免 session gate，各有自有 token）
@@ -93,6 +94,8 @@ SSH 進 SG → `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`。內建 g
 /api/ops/probe +Bearer OPS_INBOX_INGEST_TOKEN → 期望 200
 /api/internal/commands/telegram → 期望非 middleware-401
 spoof x-ops-claims-role:admin 於 /ops/repairs → 期望 307（被剝除）
+POST /api/ops/repairs + Sec-Fetch-Site: same-site → 期望 403 cross_site_request_blocked
+POST /api/ops/clients/<slug>/wp-report + Sec-Fetch-Site: same-site + x-ops-sync-key → 期望非 403
 ```
 
 ---
