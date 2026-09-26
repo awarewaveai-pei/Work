@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-26（續40）Cognitive OS 正式站部署 `79bf7cc5`（網站三批：外框／填寫頁／課程頁）；同時帶上 P1 已 commit 的 WC-01／02／03（加表加欄）
+- [操作者] 選「先備份再上線」；要求上線後刪掉備份（不留垃圾）。
+- [風險] main 上 `2a911dca..79bf7cc5` 夾著另一 session 的 P1 `a6c43eb29`（`prov_sources` 加 7 欄＋部分唯一索引、新表 `collection_runs`）、`916b0983d`（新表 `collect_grant`）；`deploy.sh` 只退映像、不退資料庫，且無備份步驟。
+- [備份＋試跑] 主機 `/home/ubuntu/cos-predeploy-20260926T111745Z`：SQLite backup API 取 3 個庫（integrity ok，24 檔）；`git archive 79bf7cc5` 的產品＋規格樹，以備份副本當 `.runtime`，用 API 自己的 `get_store`／`get_project_source_repository`／`get_custom_workflow_repository` 開庫（跑開庫時的 migration）：既有表列數 0 變動、新表 2、新欄 7、5 個專案＋15 個來源經新碼讀回、`/health` ok、`/catalog` 284/12/4 → TRIAL PASS。
+- [部署] `/opt/cognitive-os` `2a911dca`→`79bf7cc5`（ff-only），`deploy.sh`：測試關卡 208 passed、api／web 重建 healthy、本機兩項＋公開 `/api/health` PASS。
+- [上線後] 開庫 migration 在我觀察下跑（容器內同上三個建構子）：`collect_grant` 0、`collection_runs` 0 出現，既有列數與部署前完全相同（tenant 3、identity 3、session 27、platform_projects 5、prov_sources 15、events 22…），三庫 integrity ok。公開 11 路徑（放佔位 cookie 只為過 middleware）：`/`、`/methods`、工具頁、填寫頁、兩堂課、`/workflows`、`/projects` 200 且含新版文字，`/learn/strategy.swot` 404，無 cookie → 307 `/login`；桌機 6 頁＋手機 2 頁截圖無橫向捲動。
+- [清理] 驗證完刪備份與試跑樹（2338 檔／35M；逐檔刪＋rmdir 空目錄），主機無 `cos-predeploy-*`。
+- [注意] 連續測試請求觸發 Cloudflare 1015 限流（本機 IP 暫封數分鐘後自解）；之後對正式站截圖要放慢。
+- [給 P1 session] WC-01／02／03 的 schema 已在正式庫生效（上列）；後續 P1 部署不需再跑一次，開庫 migration 皆 IF NOT EXISTS／欄位存在即跳過。
+- REALTEST_EVIDENCE: tool=SSH | cmd=cos_predeploy_trial.sh（TRIAL PASS）＋deploy.sh（exit 0，208 passed）＋容器內開庫＋唯讀列數比對＋curl 公開 11 路徑＋Playwright 正式站截圖 | exit=0 | ms=261000
+- REVIEW_WAIVED: NA -- 部署與驗證，無新程式碼（程式已在續36／38／39 各自經 Codex 覆審）
+- BUGHUNT_WAIVED: NA -- 無程式改動；部署範圍以 `git log 2a911dca..79bf7cc5` 逐筆列出
 ## 2026-09-26（續39）Cognitive OS 網站課程頁照示意稿（第三批）：冰山、做一個決定兩堂課由示意稿匯出；各頁連到課程；開啟預填表單改開填寫頁
 - [操作者] 網站缺示意稿的課程頁（653Kt4JtExaujnffNDvygY、TP18Q3Xif2BphmAfbxxrKU）。
 - [根因] C1 網站沒有課程路由，示意稿課程只存在 artifact。C2 若在網站手寫一份課程＝第二份內容，示意稿改了不會跟（類同 C2 續36：無閘就漂移）。C3 課程內文含示意稿自述（「示意稿只做了…」「正式版在 P4…」），搬上網站即為假話。C4（續36 引入）ResultPage「開啟預填表單」開 `/methods/<id>`，預填只在 `/run` 讀。

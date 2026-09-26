@@ -6,7 +6,7 @@
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-b 01–04 完成，已上正式站（2026-09-26，`2a911dca1`）**；05 待操作者親眼看結果頁；正式站自動 E2E 需正式站測試身分（agent 不在正式站建帳號，由操作者建）。
+- 現在期／卡：**PI-b 01–04 完成，已上正式站（2026-09-26，`2a911dca1`）**；05 待操作者親眼看結果頁；正式站自動 E2E 需正式站測試身分（agent 不在正式站建帳號，由操作者建）。網站照示意稿（I11）第 1–3 批（外框、填寫頁、課程頁）已上正式站 `79bf7cc5`（同批帶上 P1 WC-01／02／03 的加表加欄，先備份試跑；WORKLOG 續40）；剩結果頁照示意稿＋其他頁渲染閘（TASKS）。
 - 已完成：P0 `19f00f9aa` 已上 prod（2026-09-26 隨 next-admin `b8c191698`；早於 PI-b，見 D15 備註）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 修正卡 7/7、14R 通過；PI-b 4/5（01 nginx 分流、02 `/api` 前綴、03 部署＋真模型冰山 5 findings 全引註、三閘 PASS、`ai_usage` `interpret:systems.iceberg_model`；04 已隨 P0）。14R：golden 4163/4163、完整 COS unittest `Ran 14204 ... OK (skipped=34)`、解讀/API 定向 33/33、web vitest 12/12、typecheck／build／audit 0 漏洞、check-mocks、§6 四突變、Docker API＋web 本機 `healthy`、舊 dashboard 真 AI 草稿＋執行成立、官方 Playwright 真模型 `1 passed／0 failed／0 skipped`（另 mock 模式 1 passed）。
 - 最後一筆 PI-a 程式碼：`475ec80dc`、`d7cdf1010`、`7cfd90bd3`；14R Claude Python／TypeScript 真 oracle 各一份，核對修正後最終 `approve`（`2026-09-26-review-28ae67cc.md`）。完整 COS unittest 在隔離 Linux 容器 14204 項 OK（1612.765s）；8420 既有程序占用，測試 override 用 8422；`COS_TEST_*` 實值只在 Git 忽略的 `mcp/user-env.ps1`，正式 compose 埠未改。
 - 阻塞：PI-a 無。Windows 全套曾紅的 1 項（`test_ai_gateway` 預算鎖測試：把「5 秒內到達」當成不會卡死）已修：改用事件與鎖內觀察＋`tests/unit/thread_testkit.py` 的 hang guard；負載下舊版重現同一失敗、新版通過（WORKLOG 2026-09-26）。容器前兩輪的唯讀／noexec 設定錯誤不列為產品測試通過證據（詳 WORKLOG 2026-09-26 14R 結案）。
