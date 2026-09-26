@@ -128,11 +128,18 @@ try {
                     elseif ($probeFindings.Count -gt 0) { "warn:probe_" + ($probeFindings -join ",") }
                     else { "ok" }
     $results["repair_center"] = $repairStatus
+    # T25: repair_detail carries every probe the endpoint returns (raw values), not just the
+    # derived probe_findings summary -- so an operator reading smoke-LATEST.json sees WHICH probe
+    # said what, not only that something warned.
     $results["repair_detail"]  = @{
-        ok             = $resp.ok
-        system_mode    = $resp.system_mode
-        table_ok       = $resp.table_ok
-        probe_findings = $probeFindings
+        ok                   = $resp.ok
+        system_mode          = $resp.system_mode
+        table_ok             = $resp.table_ok
+        backup_script_probe  = $resp.backup_script_probe
+        auto_reboot          = $resp.auto_reboot
+        github_configured    = $resp.github_configured
+        github_app_status    = $resp.github_app_status
+        probe_findings       = $probeFindings
     }
 } catch {
     $code = $null

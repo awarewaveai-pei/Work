@@ -9,7 +9,20 @@ $script:RepairProbeFields = [ordered]@{
     auto_reboot         = @("sg", "eu")
 }
 
-# Returns "<probe>.<host>=<status>" lines, unrolled: callers wrap in @(). Empty = every probe healthy.
+# GAP-03 (health/route.ts): github_app_status. Single-value, unlike the two multi-host probes above,
+# and gated by github_configured -- "not configured" is a real, intentional state there (the route's
+# own `ok` already requires github_configured to be true), not a shape regression, so it must not
+# read the same as a probe silently vanishing. A fixture that never mentions github_configured at all
+# (every one of this file's original 10 cases, T25 2026-09-26) is read as "this fixture does not
+# describe github", not as a finding -- only a fixture that says github_configured=true is held to
+# the bar of also carrying a real, verified github_app_status. no_issues counts as a finding (not
+# "ok"): it means the probe could not determine whether the Claude GitHub App is installed at all,
+# which is exactly the kind of unverified state T25's "blind-spot warn, not silent pass" is about --
+# treating it as a silent pass would hide the same class of gap this whole file exists to catch.
+$script:GithubOkStatuses = @("confirmed_by_operator", "auto_detected")
+
+# Returns "<probe>.<host>=<status>" / "github_app_status=<status>" lines, unrolled: callers wrap in
+# @(). Empty = every probe healthy.
 function Get-RepairProbeFindings {
     param([Parameter(Mandatory)] $Health)
     $findings = New-Object System.Collections.Generic.List[string]
@@ -25,5 +38,11 @@ function Get-RepairProbeFindings {
             $findings.Add("$probe.$hostKey=$v")
         }
     }
+
+    if (($names -contains "github_configured") -and $Health.github_configured -eq $true) {
+        $v = if ($names -contains "github_app_status") { [string]$Health.github_app_status } else { "absent" }
+        if ($script:GithubOkStatuses -notcontains $v) { $findings.Add("github_app_status=$v") }
+    }
+
     return $findings.ToArray()
 }

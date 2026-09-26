@@ -35,9 +35,32 @@ Assert-Eq "backup_script_probe.eu=absent" (Findings (New-Health '{"backup_script
 # Cloudflare interstitial: a non-JSON 200 arrives as a string.
 Assert-Eq "backup_script_probe=absent,auto_reboot=absent" (Findings "<html>challenge</html>") "string body"
 
+# --- T25 (2026-09-26): GAP-03 github_app_status was a probe the endpoint computes and returns
+# (same "GAP-0N" labeling as backup_script_probe/auto_reboot above) but this file never checked --
+# a route.ts drift wouldn't drop `ok` to false (github_configured only gates `ok`, not app_status),
+# so a real "GitHub App not confirmed" state passed smoke-tests silently. ---
+$healthyBase = '"backup_script_probe":{"sg":"ok","eu":"ok"},"auto_reboot":{"sg":"ok","eu":"ok"},"eu_backup_required":true'
+
+Assert-Eq "" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_app_status`":`"confirmed_by_operator`"}"))) "github confirmed_by_operator -> ok"
+Assert-Eq "" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_app_status`":`"auto_detected`"}"))) "github auto_detected -> ok"
+Assert-Eq "github_app_status=unverified" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_app_status`":`"unverified`"}"))) "github unverified -> finding"
+Assert-Eq "github_app_status=error" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_app_status`":`"error`"}"))) "github error -> finding"
+Assert-Eq "github_app_status=no_issues" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_app_status`":`"no_issues`"}"))) "github no_issues -> finding (unverified, not a silent pass)"
+
+# Not configured at all: the route's own `error` value here is expected and must not warn (matches
+# backup/auto_reboot's own "unconfigured -> not applicable" treatment).
+Assert-Eq "" (Findings (New-Health ("{$healthyBase,`"github_configured`":false,`"github_app_status`":`"error`"}"))) "github not configured -> no finding even though app_status shows error"
+
+# Endpoint shape drift: github_configured=true but app_status missing entirely is never a silent pass.
+Assert-Eq "github_app_status=absent" (Findings (New-Health ("{$healthyBase,`"github_configured`":true}"))) "github_app_status absent while configured=true -> finding"
+
+# A fixture that never mentions github at all (pre-T25 shape) must produce IDENTICAL findings to
+# before this change -- the github check is skipped entirely, not evaluated-and-passed.
+Assert-Eq "" (Findings (New-Health ("{$healthyBase}"))) "fixture omitting github entirely -> unaffected (backward compatible)"
+
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Host "FAIL: $_" -ForegroundColor Red }
     exit 1
 }
-Write-Host "PASS: repair-health-probes (10 cases)" -ForegroundColor Green
+Write-Host "PASS: repair-health-probes (18 cases)" -ForegroundColor Green
 exit 0
