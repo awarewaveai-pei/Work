@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-26（續29）site-watch 上線 step 10b＋10b2：prod 套 0091、解除 DEPLOY_HOLD（操作者 go：「你去把所有的事情處理好」）
+- [根因] `DEPLOY_HOLD`（`8aa473d63`，9/23）擋所有部署直到 `SITE_WATCH_MASTER_PLAN.md` §7 步 10；本機步 1–9 9/23 已完，之後無人接手 → hold 連擋 3 天，CSRF／T13–T18／423 契約無法上線（auto-deploy log：behind=18）。
+- [10b] 事前唯讀查證：prod 無 site_watch 表／函式；0091 唯一碰既有物件 = `ops_incidents_source_check`（`0091_site_watch.sql:133-136`，新值 = 舊清單＋site_watch），現有 79 筆 source 全在清單內；RLS 只對 4 張新表（service_role only）；單一 BEGIN/COMMIT。`node scripts/apply-db-migration.mjs 0091` → APPLY_OK。驗：4 表、21 函式、約束含 site_watch、incidents 79 筆不變。rollback＝`packages/db/scripts/0091_site_watch_down.sql`。
+- [10b2] `git rm DEPLOY_HOLD`。site-watch 仍關：容器無 `SITE_WATCH_ENABLED` = 停用（`lib/site-watch/config.ts:15-18`）。
+- [未做] 10a R2 bucket、10d ingest token＋compose env、10e Trigger 部署、10f–h 金絲雀／放量；10c 部署見下一條。
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0091 → APPLY_OK 1/1；psql to_regclass 4 表＋pg_proc 21＋pg_get_constraintdef 含 site_watch＋ops_incidents 79 | exit=0 | ms=4935
+- REVIEW_WAIVED: NA -- 套用既有且已審（§7 步 9 codex 三輪）的 migration＋刪 hold 檔，無新程式
+- BUGHUNT_WAIVED: NA -- 無程式改動；hold 的讀取端（sg-deploy.sh 1.85、auto-deploy、check-smoke-tests deploy_hold）以檔案存在判斷，刪檔即解除
 ## 2026-09-26（續27）系統模式擋下的變更只有一個 423 定義，每個出口（HTTP、聊天、畫面）都顯示可讀原因（未部署）
 - [根因] T16–T18 在 13 處各自手寫 `{error:"system_mode_blocks_change", mode}`（content/publish 多一個 ok:false，形狀不一）；修復中心更另外回 409 `system_mode_blocks_repair`、remediate 回 200＋reason。UI 多半直接顯示 `json.error` → 畫面出現機器碼（RepairActions「已阻擋：system_mode_blocks_repair」）；ContentStudio 社群推送固定「推送失敗，請重試」、批次發佈只顯示「推送失敗」；WpUpdateButtons 自拼文字。T18 critic s1／s3＋本輪 critic m1。
 - [修]
