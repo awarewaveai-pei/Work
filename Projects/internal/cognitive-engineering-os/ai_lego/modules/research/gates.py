@@ -307,3 +307,61 @@ def evaluate_research_workflow_integrity_gate(
         )
     passed = all(value is True for key, value in checks.items() if key != "coding_nodes") and checks["coding_nodes"] >= 1
     return [_result("research_workflow_integrity", passed, [checks], validator, timestamp)]
+
+
+def evaluate_citation_integrity(obj: Any, manifest_ids: list[str] | set[str]) -> dict[str, Any]:
+    """The one ``citation_integrity`` gate for every AI-produced claim (P2 WC-01, P-b/P-e).
+
+    Walks ``obj`` recursively: any dict carrying a ``citations`` list is a
+    claim (P-b), wherever it is nested. An item that sits directly inside a
+    ``conflicts`` list additionally needs >=2 *distinct* citations. FAILs on
+    any out-of-manifest citation, any zero-citation claim, any under-two
+    conflict, or zero claims total; ``uncited_sections`` (manifest ids no
+    claim ever cites) is informational only and never causes FAIL (C4).
+    """
+    ids = set(manifest_ids)
+    out_of_manifest: list[dict[str, Any]] = []
+    zero_citation: list[dict[str, Any]] = []
+    conflicts_under_two: list[dict[str, Any]] = []
+    cited: set[Any] = set()
+    claims_total = 0
+
+    def visit(node: Any, path: str, in_conflicts: bool) -> None:
+        nonlocal claims_total
+        if isinstance(node, dict):
+            citations = node.get("citations")
+            if isinstance(citations, list):
+                claims_total += 1
+                if not citations:
+                    zero_citation.append({"path": path, "claim": node})
+                else:
+                    bad = [citation for citation in citations if citation not in ids]
+                    if bad:
+                        out_of_manifest.append({"path": path, "citations": bad})
+                    cited.update(citation for citation in citations if citation in ids)
+                    if in_conflicts and len(set(citations)) < 2:
+                        conflicts_under_two.append({"path": path, "citations": citations})
+            for key, value in node.items():
+                child_in_conflicts = key == "conflicts" and isinstance(value, list)
+                visit(value, f"{path}.{key}", in_conflicts=child_in_conflicts)
+        elif isinstance(node, list):
+            for index, item in enumerate(node):
+                visit(item, f"{path}[{index}]", in_conflicts=in_conflicts)
+
+    visit(obj, "$", in_conflicts=False)
+
+    status = "PASS"
+    if out_of_manifest or zero_citation or conflicts_under_two or claims_total == 0:
+        status = "FAIL"
+
+    return {
+        "gate_id": "citation_integrity",
+        "status": status,
+        "evidence": {
+            "out_of_manifest": out_of_manifest,
+            "zero_citation": zero_citation,
+            "conflicts_under_two": conflicts_under_two,
+            "uncited_sections": sorted(ids - cited),
+            "claims_total": claims_total,
+        },
+    }
