@@ -58,7 +58,11 @@ vi.mock("@/lib/collect/url-state", () => ({
   createSupabaseUrlStateStore: vi.fn(() => ({ __marker: "durable-url-state-store" })),
 }));
 
-const { runCollection } = await import("@/lib/collect/run");
+const { runCollection, runResearchCollection, RESEARCH_MAX_MS } = await import("@/lib/collect/run");
+const { createBudget } = await import("@/lib/collect/budget");
+const { crawl } = await import("@/lib/collect/orchestrator");
+const { persistRunReport } = await import("@/lib/collect/report-store");
+const { recordRunOutcome } = await import("@/lib/collect/sources-store");
 
 beforeEach(() => {
   spies.fetchOptions = [];
@@ -91,5 +95,39 @@ describe("runCollection × rate limiter wiring", () => {
     await runCollection({ organizationId: "11111111-1111-4111-8111-111111111111", dryRun: true });
     expect(spies.supabaseStoreBuilds).toBe(0);
     expect(spies.rateLimiterStores).toEqual([undefined]);
+  });
+});
+
+// runResearchCollection (RESEARCH_LINES_MASTER_PLAN WC-P1-12): same assembly, research-specific switches.
+describe("runResearchCollection wiring", () => {
+  const research = (budget?: { ms?: number; fetches?: number }) =>
+    runResearchCollection({ projectId: "p1", runId: "run_1", seeds: [{ uri: "https://example.com" }], sink: { id: "sink/test", title: "t", run: vi.fn() }, budget });
+
+  beforeEach(() => {
+    vi.mocked(createBudget).mockClear();
+    vi.mocked(crawl).mockClear();
+    vi.mocked(persistRunReport).mockClear();
+    vi.mocked(recordRunOutcome).mockClear();
+  });
+
+  it("caps the crawl time so the execute route can still send the completion (Codex review F2)", async () => {
+    await research({ ms: 60 * 60_000, fetches: 50 });
+    const limits = vi.mocked(createBudget).mock.calls[0][0] as { ms: number; fetches: number };
+    expect(limits.ms).toBe(RESEARCH_MAX_MS);
+    expect(limits.fetches).toBe(50);
+    await research();
+    expect((vi.mocked(createBudget).mock.calls[1][0] as { ms: number }).ms).toBe(RESEARCH_MAX_MS);
+    expect(RESEARCH_MAX_MS).toBeLessThan(300_000); // the execute route's maxDuration
+  });
+
+  it("keeps the durable rate limiter, drops url state, and writes none of this app's run bookkeeping", async () => {
+    await research();
+    expect(spies.rateLimiterStores).toEqual([{ __marker: "durable-rate-limit-store" }]);
+    const opts = vi.mocked(crawl).mock.calls[0][1] as { urlState?: unknown; tenantRef: string; runId: string };
+    expect(opts.urlState).toBeUndefined();
+    expect(opts.tenantRef).toBe("research:p1");
+    expect(opts.runId).toBe("run_1");
+    expect(persistRunReport).not.toHaveBeenCalled();
+    expect(recordRunOutcome).not.toHaveBeenCalled();
   });
 });

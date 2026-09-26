@@ -89,6 +89,80 @@ export function defaultRunKey(): string {
   return `manual-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "")}-${suffix}`;
 }
 
+interface CrawlWithOptions {
+  seeds: SeedInput[];
+  sink: SinkBlock;
+  budget: ReturnType<typeof createBudget>;
+  tenantRef: string;
+  runKey: string;
+  maxDepth: number;
+  durableRateLimit: boolean;
+  urlState: boolean;
+  log: (msg: string) => void;
+}
+
+/** The one crawl assembly (fetch, rate limit, url state, providers, blocks); every run kind goes through it. */
+function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
+  // A durable store here is WHY per-host politeness holds across two concurrently scheduled runs
+  // (DATA_COLLECTION_PLAN.md C3 DoD) — an omitted rateLimiter would make createCollectFetch fall
+  // back to `new RateLimiter()`, i.e. a fresh in-memory bucket THIS call alone can see, same gap a
+  // dry run already accepts on purpose.
+  const rateLimiter = new RateLimiter({ store: o.durableRateLimit ? createSupabaseRateLimitStore(o.log) : undefined });
+  return crawl(o.seeds, {
+    sink: o.sink,
+    budget: o.budget,
+    tenantRef: o.tenantRef,
+    runId: o.runKey,
+    maxDepth: o.maxDepth,
+    flushEvery: 10,
+    blocks: collectors(),
+    log: o.log,
+    // Off ⇒ the orchestrator's own NO_URL_STATE default: every page is fetched and delivered in full.
+    urlState: o.urlState ? createSupabaseUrlStateStore() : undefined,
+    fetch: createCollectFetch({ budget: o.budget, log: o.log, rateLimiter }),
+    // Present only so a provider-backed tier CAN run; it still scores 0 without a key.
+    callProvider: createProviderCall({ budget: o.budget, log: o.log }),
+  });
+}
+
+/**
+ * A research run's crawl-time ceiling, not overridable by the caller. It must end the crawl early enough for the
+ * execute route to still send the run's completion: crawl 240 s < route maxDuration 300 s < the Trigger task's
+ * request timeout 330 s < task maxDuration 400 s. Without it the 10-minute default outlives every one of those.
+ */
+export const RESEARCH_MAX_MS = 240_000;
+
+export interface ResearchCollectionOptions {
+  projectId: string;
+  runId: string;
+  seeds: SeedInput[];
+  sink: SinkBlock;
+  budget?: BudgetLimits;
+  log?: (msg: string) => void;
+}
+
+/**
+ * A Cognitive OS research run (RESEARCH_LINES_MASTER_PLAN §12.7 WC-P1-12): seeds come from the request, not from
+ * an organization's approved sources, and nothing is written to this app's own run bookkeeping — the run belongs to
+ * the COS Project. No url state: a 304 would deliver nothing, and COS must see every page to answer "unchanged"
+ * itself (plan K6, I1). The rate limiter stays durable: politeness toward a host does not depend on who asked.
+ */
+export async function runResearchCollection(opts: ResearchCollectionOptions): Promise<Pick<CrawlResult, "report" | "sink">> {
+  const budget = createBudget({ ...DEFAULT_BUDGET, ...opts.budget, ms: Math.min(opts.budget?.ms ?? RESEARCH_MAX_MS, RESEARCH_MAX_MS) });
+  const result = await crawlWith({
+    seeds: opts.seeds,
+    sink: opts.sink,
+    budget,
+    tenantRef: `research:${opts.projectId}`,
+    runKey: opts.runId,
+    maxDepth: 2,
+    durableRateLimit: true,
+    urlState: false,
+    log: opts.log ?? (() => {}),
+  });
+  return { report: result.report, sink: result.sink };
+}
+
 export async function runCollection(opts: RunCollectionOptions): Promise<RunCollectionResult> {
   const log = opts.log ?? (() => {});
   const runKey = opts.runKey ?? defaultRunKey();
@@ -118,27 +192,17 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
   const sink: SinkBlock = opts.dryRun ? createNullSink() : createKbSink();
   const seeds: SeedInput[] = chosen.map((p) => p.seed);
 
-  // A durable store here is WHY per-host politeness holds across two concurrently scheduled runs
-  // (DATA_COLLECTION_PLAN.md C3 DoD) — an omitted rateLimiter would make createCollectFetch fall
-  // back to `new RateLimiter()`, i.e. a fresh in-memory bucket THIS call alone can see, same gap a
-  // dry run already accepts on purpose (see the urlState comment just below).
-  const rateLimiter = new RateLimiter({ store: opts.dryRun ? undefined : createSupabaseRateLimitStore(log) });
-
-  const result = await crawl(seeds, {
+  const result = await crawlWith({
+    seeds,
     sink,
     budget,
     tenantRef: opts.organizationId,
-    runId: runKey,
+    runKey,
     maxDepth: opts.maxDepth ?? 2,
-    flushEvery: 10,
-    blocks: collectors(),
+    durableRateLimit: !opts.dryRun,
+    // "A dry run leaves no trace anywhere" (see below) — a cached etag IS a trace.
+    urlState: !opts.dryRun,
     log,
-    // "A dry run leaves no trace anywhere" (see below) — a cached etag IS a trace, so a dry run gets
-    // undefined here and falls back to the orchestrator's own NO_URL_STATE default instead.
-    urlState: opts.dryRun ? undefined : createSupabaseUrlStateStore(),
-    fetch: createCollectFetch({ budget, log, rateLimiter }),
-    // Present only so a provider-backed tier CAN run; it still scores 0 without a key.
-    callProvider: createProviderCall({ budget, log }),
   });
 
   // A dry run leaves no trace anywhere, including here: writing a run row for something that stored

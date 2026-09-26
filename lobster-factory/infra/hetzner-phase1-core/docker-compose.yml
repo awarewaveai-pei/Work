@@ -273,6 +273,11 @@ services:
       # token across unrelated callers is a blast-radius mistake already paid for once.
       # Empty = the endpoint fails closed (401 to every caller) until set.
       COLLECT_SCHEDULE_INGEST_TOKEN: ${COLLECT_SCHEDULE_INGEST_TOKEN:-}
+      # Cognitive OS research runs (RESEARCH_LINES_MASTER_PLAN §12.7): RUNS = COS -> /api/internal/collect/runs and
+      # this app -> COS grant exchange (same value in COS deploy/.env); EXECUTE = Trigger worker -> runs/execute.
+      # Empty = both endpoints 401 (fail closed).
+      COLLECT_RESEARCH_RUNS_TOKEN: ${COLLECT_RESEARCH_RUNS_TOKEN:-}
+      COLLECT_RESEARCH_EXECUTE_TOKEN: ${COLLECT_RESEARCH_EXECUTE_TOKEN:-}
       # Migration window: accept the legacy shared token too while platforms are
       # re-pointed one at a time. Set "false" once every platform sends its own token.
       OPS_INBOX_DUAL_ACCEPT_LEGACY: ${OPS_INBOX_DUAL_ACCEPT_LEGACY:-}
