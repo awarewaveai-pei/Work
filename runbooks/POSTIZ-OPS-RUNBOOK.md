@@ -52,6 +52,8 @@ curl -s "https://supabase.aware-wave.com/rest/v1/social_postiz_connections?selec
 
 或至 `app.aware-wave.com/ops/clients/[slug]` → **社群頻道** tab 查看。
 
+連線以 org 為鍵（`client_id` = organizations.id）。內容工作室選的是 WordPress 站，route 用該站的 `wp_sites.organization_id` 找 org（`lib/content/social-org.ts`）；畫面顯示「此網站尚未綁定客戶組織」（HTTP 422）= 該站沒有 organization_id（env 設定的站一律如此）→ 在 DB 補上 organization_id 再試。
+
 ### 2.3 Admin UI
 
 `app.aware-wave.com/ops/clients/[slug]` → 社群頻道 tab：

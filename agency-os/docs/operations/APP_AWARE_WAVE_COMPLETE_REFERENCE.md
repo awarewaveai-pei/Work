@@ -613,7 +613,7 @@ Server Component，啟動時並行 fetch：
 
 **⚠️ 重要**：Telegram `/normal_mode` 被 policy 硬擋（high-risk from telegram = block），emergency_stop 無法從 Telegram 解除。
 
-**Repair Center／自動修復／WP 更新／staging 建站**：`startRepairFromIncident`／`tryRemediate`／`POST /api/ops/clients/[slug]/wp-update`／`POST /api/internal/hosting/provision-staging`（含 `mode:"seed"`）都經 `lib/system-modes/production-change-gate.ts` 的 `checkProductionChangeAllowed()` 把關，只在 mode=normal 執行；讀不到模式 → 擋（T16／T17）。把關用「被改動的那個 org」：建站必帶 `organizationId`（uuid，否則 422）；seed 由 `website_specs.organization_id`、再退 `intake_forms.organization_id` 取得，查詢失敗 → 423 `unavailable`。`getActiveMode` 收到非 uuid 的 org id 一律回 `unavailable`（org id 會串進 PostgREST 過濾字串）。被擋回 423 `system_mode_blocks_change`。尚未把關：寫入客戶站內容的路徑、租戶佈建派送（TASKS 2026-09-25）。
+**Repair Center／自動修復／WP 更新／staging 建站**：`startRepairFromIncident`／`tryRemediate`／`POST /api/ops/clients/[slug]/wp-update`／`POST /api/internal/hosting/provision-staging`（含 `mode:"seed"`）都經 `lib/system-modes/production-change-gate.ts` 的 `checkProductionChangeAllowed()` 把關，只在 mode=normal 執行；讀不到模式 → 擋（T16／T17）。把關用「被改動的那個 org」：建站必帶 `organizationId`（uuid，否則 422）；seed 由 `website_specs.organization_id`、再退 `intake_forms.organization_id` 取得，查詢失敗 → 423 `unavailable`。`getActiveMode` 收到非 uuid 的 org id 一律回 `unavailable`（org id 會串進 PostgREST 過濾字串）。被擋回 423 `system_mode_blocks_change`。T18 起另含 WordPress 文章寫入、WP Bridge、社群發文（org＝所選站的 organization_id）、付費佈建派送；完整清單以 gate 檔頭為準，`lib/system-modes/__tests__/production-change-coverage.test.ts` 擋新增未把關的寫入檔。尚未把關：build/runs＋workflows 派送器、Printful／Chatwoot（TASKS 2026-09-26）。
 
 ---
 

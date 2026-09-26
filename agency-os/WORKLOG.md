@@ -1,4 +1,25 @@
 ﻿# Worklog
+## 2026-09-26（續26）合併雲端 T18：內容寫入／WP Bridge／佈建派送過 production-change gate＋本機修兩輪 critic 發現（未部署）
+- [來源] `claude/cc-t18-content-write-gate` 915fb197d（雲端）；本機重跑後 critic warn 0c/5M/7m/4s，修完再審一輪 warn 0c/1M/3m/2s，兩輪全修才合併。
+- [T18 本體] 把關加在：wordpress-core `publishToWordPress`、content/wp-post PATCH＋DELETE、video/embed-to-wp、social-publish、wp-bridge-client `bridgePost`（所有 bridge 寫入唯一出口）、build/provision-services、provision（僅 hetzner_cloud 派送分支）；結構測試 `lib/system-modes/__tests__/production-change-coverage.test.ts`。
+- [第一輪修]
+  - M1 社群發文用錯 id：ContentStudio 把 WP「站 id」當 clientId 送（`ContentStudio.tsx:1847,1876`），Postiz 連線以 organizations.id 為鍵（`packages/db/migrations/0011_social_postiz_connections.sql:7`）→ 查不到帳號、把關查錯 org。新增 `lib/content/social-org.ts` `resolveSocialOrg`：siteId → 該站 organization_id（env 站無 org → 422）；clientId → 須為 uuid＋assertOrgAccess；兩者擇一。social-publish／social-channels 的 gate、listIntegrations、delivery receipt、createSocialPost 用同一個 org；ContentStudio 改送 siteId，422 顯示「此網站尚未綁定客戶組織」。
+  - M3 結構測試：刪 6 個從未命中的豁免（calendar／categories／patterns／related-posts／tags／sites/[id]/test）；每個豁免須仍被偵測且自身無 gate；目標模組本身也要 gate（原本 bridge client 自己漏掉）；正向對照（>400 檔、已知寫入路徑被偵測）。
+  - M5 gate 檔頭只列實際有把關的路徑＋已知缺口；m1 wordpress-core Bridge 路徑被擋回 423（原 502）；m4 syndicate 把關移除（只呼叫 LLM 產草稿）；s2 wordpress-core／wp-post PATCH 把關移到欄位驗證之後；m2 補測 newsletter、tools/publish create、Bridge 路徑的 423。
+  - m6 `/api/provision` hetzner_cloud：先查 `sites` 確認 siteId 屬於傳入 org（同 build/runs `site_scope_mismatch`），不符 422、查無 404、讀取錯誤 423 unavailable。
+  - m7 embed-to-wp 必填 siteId：原本空值落到「第一個可存取站」改寫同 postId 的文章。
+- [第二輪修]
+  - M1＋m2 bridge 站 org 單一來源：第一輪用 `WPBRIDGE_*ORG_ID` env，但 compose 未宣告（`docker-compose.yml:369-371` 只有三個 WPBRIDGE 變數）→ 進不了容器，且與 `wp_sites.organization_id` 成兩個來源。改為 `bridgePost` 以 bridge 網址 host 查 active `wp_sites` 列取 org（wordpress-core 用的同一來源）；無列 → null（只看 global）；讀取錯誤或同 host 兩個 org → 擋（unavailable）。env 做法整個移除，不需改 compose。
+  - m1 結構測試改用 TypeScript compiler API（AST）：註解、字串內容不算 import／呼叫；re-export、`import()`、`require()` 算觸及原語；`import type` 不算；gate 須從 gate 模組 import（支援別名、namespace）並實際呼叫；`method` 非字面讀取方法（變數、條件式、shorthand）一律視為可能寫入。探針確認判定 15 檔 = 7 有把關＋8 豁免，與預期一致。
+  - m3 ContentStudio 切換網站時清空社群頻道清單、勾選與上次結果（useEffect on selectedSiteId）。無專屬測試：面板須先產文＋產社群文案才出現，DOM 測試成本過高；以 tsc＋既有 ContentStudio 測試驗證。
+  - s1 被擋改用結構化 `blockedMode`（只有 gate 會設），不再比對錯誤字串；plugin 回傳同字串仍是 502（有測）。
+- [文件] `runbooks/POSTIZ-OPS-RUNBOOK.md` §2.2 加 422 處置一行；`COMMAND_PLANE_RUNBOOK.md`／`.zh-TW.md` §54 與 `APP_AWARE_WAVE_COMPLETE_REFERENCE.md:616` 的 gate 範圍改為「以 gate 檔頭為準」＋T18 現況。
+- [未做 → TASKS] M4 build/runs 入列＋workflows 派送器再查（需 Trigger.dev 部署）；M5 Printful／Chatwoot（需操作者決定）；env 設定的 WP 站搬進 wp_sites 綁 org。s1 共用 423 回應＋s3 UI 可讀 423 訊息 → 下一個 commit。
+- 未部署：上線走 sg-deploy。rollback＝revert 本 commit，無資料遷移。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 0；vitest 受影響 14 檔全綠；npm test 195 files 1832 passed／13 skipped；26 組突變各紅（social-org 回站 id、無 422、兩參數並收、非 uuid clientId、social-publish 用原始 clientId 把關、用 siteId 發文、social-channels 用 siteId 查、Bridge 被擋回 502、wordpress-core 驗證前把關、wp-post 驗證前把關、bridge 忽略站 org、wp_sites 讀不到當無 org、同 host 兩 org 任選、字串比對擋、目標模組不要求、不要求 import、re-export 不算、method 分大小寫、只算寫入字面值、import type 算、死豁免、newsletter／tools-publish 回 502、embed-to-wp siteId 選填、provision 不查站 org、sites 讀不到放行）→ 還原全綠 | exit=0 | ms=19000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1M/3m（第二輪；第一輪 0c/5M/7m/4s；兩輪 M／m／s 全修，M4 M5 → TASKS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=WPBRIDGE_(SITE_\d+_)?ORG_ID|failed\.mode|clientId: selectedSiteId|looksLikeDirectWpRestWrite|production-change-gate | hits=舊寫法 0；gate 範圍文件 3 處已改（COMMAND_PLANE_RUNBOOK 中英、COMPLETE_REFERENCE）
+- ORACLE_WAIVED: Codex 正在本機跑 PI-a 14R，不同時佔用；以兩輪 critic＋26 組突變取代
 ## 2026-09-26（續24）next-admin CSRF：靠 session cookie 的 API 寫入只在有同源正面證據時放行（未部署）
 - [根因] staging 站在 `https://aware-wave.com/staging/<slug>/`（`app/api/internal/hosting/provision-staging/route.ts:31`），與 app.aware-wave.com 同站；Supabase session cookie 為 SameSite=Lax、httpOnly:false、host-only（`@supabase/ssr` 預設，`lib/supabase/ssr.ts:27` 未覆寫）；`middleware.ts` 無 Origin／Sec-Fetch-Site 檢查 → 客戶 staging WP 上的 JS 可用 simple POST 帶操作者 cookie 打 `/api/*`。
 - [暴露面（critic m4 更正）]

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { resolveSocialOrg } from "@/lib/content/social-org";
 import { listIntegrations, getPostizConfig } from "@/lib/content/postiz";
 
 export const runtime = "nodejs";
@@ -13,11 +13,11 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const url = new URL(req.url);
-  const clientId = url.searchParams.get("clientId");
-  if (!clientId) return new NextResponse("clientId required", { status: 400 });
-
-  try { assertOrgAccess(req, clientId); }
-  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  const scope = await resolveSocialOrg(req, {
+    siteId: url.searchParams.get("siteId") ?? undefined,
+    clientId: url.searchParams.get("clientId") ?? undefined,
+  });
+  if ("response" in scope) return scope.response; // strict:false -- `!scope.ok` does not narrow
 
   try {
     getPostizConfig();
@@ -29,7 +29,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   try {
-    const channels = await listIntegrations(clientId);
+    const channels = await listIntegrations(scope.organizationId);
     return NextResponse.json({ ok: true, channels });
   } catch (err) {
     console.error("[social-channels] failed:", err instanceof Error ? err.message : err);

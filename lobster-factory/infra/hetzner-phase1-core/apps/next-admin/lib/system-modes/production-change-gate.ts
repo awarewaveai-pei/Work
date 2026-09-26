@@ -1,13 +1,20 @@
-// The system-mode gate for server paths that change production at the HOST level (SSH / WP-CLI):
-// each runs only when the org's (or global's) system mode is "normal"; an unreadable mode fails
-// closed -- same contract as lib/command-plane/killSwitch.ts, which does the DB read.
-// Gated: lib/repair-center/service.ts (startRepairFromIncident), lib/repair-center/remediations/
-// engine.ts (tryRemediate), app/api/ops/clients/[slug]/wp-update/route.ts, app/api/internal/hosting/
-// provision-staging/route.ts (provision and seed). app/api/ops/repairs/health/route.ts only reads the
-// mode through it for display.
-// NOT yet gated (TASKS 2026-09-25): content writes to client sites (content/wp-post, content/publish,
-// video/embed-to-wp, lib/studio/wp-bridge-client.ts callers) and tenant-provisioning dispatch
-// (build/provision-services). Display-only readers of system_modes do not use this gate.
+// The one gate for server paths that change production: a gated path runs only while the org's (and
+// global's) system mode is "normal"; an unreadable mode fails closed -- same contract as
+// lib/command-plane/killSwitch.ts, which does the DB read. Blocked callers answer HTTP 423
+// {error:"system_mode_blocks_change", mode}.
+//
+// Gated (org in parentheses):
+//   - repair-center service.ts startRepairFromIncident, remediations/engine.ts tryRemediate (incident)
+//   - ops/clients/[slug]/wp-update (client row); internal/hosting/provision-staging (body / spec)
+//   - lib/content/publish/wordpress-core.ts publishToWordPress (resolved WpSite)
+//   - content/wp-post PATCH+DELETE, video/embed-to-wp (resolved WpSite)
+//   - content/social-publish (lib/content/social-org.ts: the site's org, or the given org id)
+//   - lib/studio/wp-bridge-client.ts bridgePost -- every bridge write (wp_sites row on the bridge host)
+//   - build/provision-services, provision (hetzner_cloud dispatch only) (validated body)
+// Not gated yet (agency-os/TASKS.md, T18 follow-ups): build/runs + the workflows dispatcher, Printful
+// and Chatwoot writes. repairs/health only reads the mode for display.
+// lib/system-modes/__tests__/production-change-coverage.test.ts fails the build when a new SSH / WP
+// Bridge / WordPress-REST-writing file lacks this call or a justified allowlist entry.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { evaluateKillSwitch, getActiveMode } from "@/lib/command-plane/killSwitch";

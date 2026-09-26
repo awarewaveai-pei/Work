@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { isBridgeConfigured, createNewsletter } from "@/lib/studio/wp-bridge-client";
+import { isBridgeConfigured, createNewsletter, BRIDGE_BLOCKED_ERROR } from "@/lib/studio/wp-bridge-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -210,7 +210,11 @@ export async function POST(req: Request): Promise<Response> {
   if (!r.ok) {
     // bridge_not_configured handled above; surface the plugin's reason (e.g. fluentcrm_not_active).
     // tsconfig strict:false → `!r.ok` does not narrow to the error arm; cast (same idiom as publish route).
-    return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
+    const failed = r as { ok: false; error: string; blockedMode?: string };
+    if (failed.blockedMode !== undefined) {
+      return NextResponse.json({ error: BRIDGE_BLOCKED_ERROR, mode: failed.blockedMode }, { status: 423 });
+    }
+    return NextResponse.json({ ok: false, error: failed.error }, { status: 502 });
   }
 
   const v = r.value;

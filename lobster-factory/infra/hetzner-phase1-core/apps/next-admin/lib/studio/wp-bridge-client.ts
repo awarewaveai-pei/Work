@@ -23,12 +23,47 @@
  * compatible with the original single-site behaviour.
  */
 import { createHash, createPrivateKey, randomUUID, sign as edSign, type KeyObject } from "node:crypto";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 
 const REST_NAMESPACE = "/aware-wave-bridge/v1";
 // RFC 8410 PKCS#8 prefix for an Ed25519 private key; append the 32-byte seed.
 const PKCS8_ED25519_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 
-export type BridgeResult<T> = { ok: true; value: T } | { ok: false; error: string };
+/** bridgePost's error when the system-mode gate blocks the write. Callers tell it from a real bridge
+ *  failure by `blockedMode` (set only by the gate, never from plugin output) and answer 423, not 502. */
+export const BRIDGE_BLOCKED_ERROR = "system_mode_blocks_change";
+
+export type BridgeResult<T> = { ok: true; value: T } | { ok: false; error: string; blockedMode?: string };
+
+type WriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>>;
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The bridge site's owning org = the org of the active wp_sites row on the same host -- the source
+ * wordpress-core gates on too. No row -> null (global mode only). Unreadable, or rows on that host
+ * naming different orgs -> undefined: the org cannot be told, so the caller blocks.
+ */
+async function bridgeSiteOrg(db: WriteClient, baseUrl: string): Promise<string | null | undefined> {
+  const host = hostOf(baseUrl);
+  if (!host) return undefined;
+  const { data, error } = await db.from("wp_sites").select("url, organization_id").eq("active", true);
+  if (error) {
+    console.error("[wp-bridge] wp_sites lookup failed; bridge write blocked:", error.message);
+    return undefined;
+  }
+  const rows = (data ?? []) as Array<{ url: string; organization_id: string | null }>;
+  const orgs = new Set(rows.filter((r) => hostOf(r.url) === host).map((r) => r.organization_id ?? null));
+  if (orgs.size > 1) return undefined;
+  return orgs.size === 1 ? [...orgs][0] : null;
+}
 
 /** A configured bridge client the publish UI can target. `id` = "" for default, "1".."10" for extras. */
 export interface BridgeClient {
@@ -128,6 +163,17 @@ export async function bridgePost<T>(
 ): Promise<BridgeResult<T>> {
   const config = getConfig(options?.clientId);
   if (!config) return { ok: false, error: "bridge_not_configured" };
+
+  // Every bridge write funnels through this one function -- gate here once, so it covers every
+  // current and future caller (createWooProduct/createPost/createNewsletter), on the org that owns
+  // the bridge site (bridgeSiteOrg). No DB client -> org null -> the gate answers unavailable.
+  const db = getSupabaseWriteClient();
+  const orgId = db ? await bridgeSiteOrg(db, config.baseUrl) : null;
+  if (orgId === undefined) return { ok: false, error: BRIDGE_BLOCKED_ERROR, blockedMode: "unavailable" };
+  const gate = await checkProductionChangeAllowed(db, orgId);
+  if (!gate.allowed) {
+    return { ok: false, error: BRIDGE_BLOCKED_ERROR, blockedMode: gate.mode };
+  }
 
   const fullPath = `${REST_NAMESPACE}${path}`;
   const body = JSON.stringify(payload);

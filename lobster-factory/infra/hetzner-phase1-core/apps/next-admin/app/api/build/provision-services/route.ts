@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole } from "../../../../lib/ops-role";
+import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +48,11 @@ export async function POST(request: Request) {
   );
   if (providers.length === 0) {
     return NextResponse.json({ ok: false, error: "at least one provider required" }, { status: 400 });
+  }
+
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), input.organizationId);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
   }
 
   const secret = process.env.TRIGGER_SECRET_KEY?.trim();

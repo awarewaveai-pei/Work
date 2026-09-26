@@ -9,6 +9,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole } from "@/lib/ops-role";
 import { timingSafeEqual } from "@/lib/ops-inbox/verifyIngestToken";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,6 +136,25 @@ export async function POST(req: Request): Promise<Response> {
         },
         { status: 503 },
       );
+    }
+    // Only this branch actually dispatches (a billable Hetzner machine) -- "none"/"mock" above
+    // never make an outbound call, so they are not gated. The gate scopes to organizationId, so it
+    // must own siteId (same rule as build/runs site_scope_mismatch): a normal-mode org id must not
+    // unlock a blocked org's site. Unreadable -> blocked, like an unreadable mode.
+    const db = getSupabaseWriteClient();
+    if (db) {
+      const { data: site, error } = await db.from("sites").select("organization_id").eq("id", siteId).maybeSingle();
+      if (error) {
+        return NextResponse.json({ error: "system_mode_blocks_change", mode: "unavailable" }, { status: 423 });
+      }
+      if (!site) return NextResponse.json({ ok: false, error: "site_not_found" }, { status: 404 });
+      if (site.organization_id !== organizationId) {
+        return NextResponse.json({ ok: false, error: "site_org_mismatch" }, { status: 422 });
+      }
+    }
+    const gate = await checkProductionChangeAllowed(db, organizationId);
+    if (!gate.allowed) {
+      return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
     }
     let triggerData: { id?: string } = {};
     try {

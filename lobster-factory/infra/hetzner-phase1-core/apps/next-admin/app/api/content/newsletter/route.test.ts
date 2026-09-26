@@ -1,0 +1,49 @@
+// T18: the newsletter write goes through bridgePost (gated there). A gate block must answer 423 with the
+// mode; any other bridge failure stays 502.
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "owner" }), canCreateAiImageJob: () => true }));
+
+const createNewsletter = vi.hoisted(() =>
+  vi.fn(async (): Promise<{ ok: boolean; error?: string; blockedMode?: string; value?: unknown }> => ({
+    ok: true,
+    value: { campaign_id: 1, campaign_status: "draft", edit_url: "u" },
+  })),
+);
+vi.mock("@/lib/studio/wp-bridge-client", () => ({
+  BRIDGE_BLOCKED_ERROR: "system_mode_blocks_change",
+  isBridgeConfigured: () => true,
+  createNewsletter,
+}));
+
+const { POST } = await import("./route");
+
+const post = () =>
+  POST(new Request("http://localhost/api/content/newsletter", { method: "POST", body: JSON.stringify({ subject: "S", markdown: "# T\n\nbody" }) }));
+
+beforeEach(() => createNewsletter.mockClear());
+
+describe("POST /api/content/newsletter -- bridge gate result", () => {
+  it("bridge blocked by the system mode: 423 with the mode", async () => {
+    createNewsletter.mockResolvedValueOnce({ ok: false, error: "system_mode_blocks_change", blockedMode: "maintenance" });
+    const res = await post();
+    expect(res.status).toBe(423);
+    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "maintenance" });
+  });
+
+  it("other bridge failure: 502", async () => {
+    createNewsletter.mockResolvedValueOnce({ ok: false, error: "fluentcrm_not_active" });
+    const res = await post();
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ ok: false, error: "fluentcrm_not_active" });
+  });
+
+  it("a plugin reason that happens to equal the block string is still 502: only blockedMode means blocked", async () => {
+    createNewsletter.mockResolvedValueOnce({ ok: false, error: "system_mode_blocks_change" });
+    expect((await post()).status).toBe(502);
+  });
+
+  it("allowed: 201", async () => {
+    expect((await post()).status).toBe(201);
+  });
+});

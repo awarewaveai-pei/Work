@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { resolveSocialOrg } from "@/lib/content/social-org";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import {
   getPostizConfig,
   listIntegrations,
@@ -23,7 +25,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type RequestBody = {
-  clientId: string;
+  /** Organization id, or siteId = a WordPress site whose owning org is used (exactly one). */
+  clientId?: string;
+  siteId?: string;
   mode: "draft" | "now";
   platforms: Array<{ platform: string; content: string }>;
   imageUrl?: string;
@@ -50,19 +54,17 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const { clientId, mode, platforms, imageUrl, videoUrls, confirmPublishNow = false, releaseId, variant = "default" } = body;
+  const { mode, platforms, imageUrl, videoUrls, confirmPublishNow = false, releaseId, variant = "default" } = body;
 
-  if (!clientId || typeof clientId !== "string") {
-    return new NextResponse("clientId required", { status: 400 });
-  }
   if (releaseId !== undefined && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(releaseId)) {
     return new NextResponse("releaseId must be a UUID", { status: 400 });
   }
   if (typeof variant !== "string" || !variant.trim() || variant.length > 64) {
     return new NextResponse("variant must be a non-empty string up to 64 characters", { status: 400 });
   }
-  try { assertOrgAccess(req, clientId); }
-  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  const scope = await resolveSocialOrg(req, { siteId: body.siteId, clientId: body.clientId });
+  if ("response" in scope) return scope.response; // strict:false -- `!scope.ok` does not narrow
+  const orgId = scope.organizationId;
 
   if (!mode || (mode !== "draft" && mode !== "now")) {
     return new NextResponse("mode must be 'draft' or 'now'", { status: 400 });
@@ -104,6 +106,12 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  // All input validated (incl. org access above) -- gate before any outbound Postiz call.
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), orgId);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+  }
+
   try {
     getPostizConfig();
   } catch (err) {
@@ -115,7 +123,7 @@ export async function POST(req: Request): Promise<Response> {
 
   let channels;
   try {
-    channels = await listIntegrations(clientId);
+    channels = await listIntegrations(orgId);
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "failed to list integrations" },
@@ -159,7 +167,7 @@ export async function POST(req: Request): Promise<Response> {
     try {
       for (const post of requestedPosts) {
         const receipt = await ensureDeliveryReceipt({
-          organizationId: clientId,
+          organizationId: orgId,
           releaseId,
           destination: "postiz",
           variant: `${variant}:${post.platform}`,
@@ -263,7 +271,7 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  const results = await createSocialPost({ clientId, mode, posts: dispatchPosts, media, mediaPerPlatform });
+  const results = await createSocialPost({ clientId: orgId, mode, posts: dispatchPosts, media, mediaPerPlatform });
 
   let receiptError: string | undefined;
   if (receipts.size > 0) {

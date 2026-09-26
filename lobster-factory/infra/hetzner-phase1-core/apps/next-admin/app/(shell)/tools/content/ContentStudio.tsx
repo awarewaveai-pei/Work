@@ -758,6 +758,13 @@ export default function ContentStudio() {
   const [postizPushResults,  setPostizPushResults]  = useState<Array<{ platform: string; status: "ok" | "error"; error?: string }>>([]);
   const [postizShowConfirm,  setPostizShowConfirm]  = useState(false);
 
+  // Channels belong to the selected site's org: another site = another org's accounts, so a loaded
+  // list, the selection and the last push result are all stale.
+  useEffect(() => {
+    setPostizChannels([]); setPostizSelected(new Set()); setPostizChError("");
+    setPostizPushStatus("idle"); setPostizPushResults([]); setPostizShowConfirm(false);
+  }, [selectedSiteId]);
+
   // Mark copy stale when distribution media type changes after copy already generated
   useEffect(() => {
     if (synStatus === "done") setSynStale(true);
@@ -1844,8 +1851,12 @@ export default function ContentStudio() {
     if (postizChLoading) return;
     setPostizChLoading(true); setPostizChError("");
     try {
-      const res = await fetch(`/api/content/social-channels?clientId=${encodeURIComponent(selectedSiteId)}`);
-      if (!res.ok) { setPostizChError("載入社群帳號失敗"); return; }
+      const res = await fetch(`/api/content/social-channels?siteId=${encodeURIComponent(selectedSiteId)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null) as { error?: string } | null;
+        setPostizChError(res.status === 422 ? "此網站尚未綁定客戶組織，無法使用社群發文" : `載入社群帳號失敗${err?.error ? `：${err.error}` : ""}`);
+        return;
+      }
       const json = await res.json() as { ok: boolean; channels?: PostizChannel[] };
       setPostizChannels(json.channels ?? []);
       if ((json.channels ?? []).length === 0) setPostizChError("此客戶尚無連結的 Postiz 帳號，請至客戶 Hub「社群頻道」設定");
@@ -1873,7 +1884,7 @@ export default function ContentStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientId: selectedSiteId,
+          siteId: selectedSiteId,
           mode: postizMode,
           platforms: posts,
           imageUrl: distMediaType === "image" && imgResult ? imgResult.imageUrl : undefined,
