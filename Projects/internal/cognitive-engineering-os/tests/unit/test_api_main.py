@@ -4,6 +4,7 @@ temp-file SQLite identity store."""
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import tempfile
@@ -263,6 +264,53 @@ class HealthTests(ApiTestCase):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
+
+class ApiPrefixTests(ApiTestCase):
+    """`/api/<path>` and `/<path>` are the same route (api_main.ApiPrefixMiddleware): prod nginx and the web
+    app reach the API under /api, a local uvicorn at the root; the dashboard always calls /api."""
+
+    def test_health_and_login_answer_the_same_under_api(self):
+        self.assertEqual(self.client.get("/api/health").json(), {"status": "ok"})
+        body = {"tenant_id": self.tenant["tenant_id"], "email": "user@example.com", "password": "correct-horse-battery"}
+        login = self.client.post("/api/auth/login", json=body)
+        self.assertEqual(login.status_code, 200)
+        self.assertIn(api_main.SESSION_COOKIE, login.cookies)
+        self.assertEqual(self.client.post("/api/auth/login", json={**body, "password": "wrong-password-here"}).status_code, 401)
+
+    def test_the_session_works_across_both_paths(self):
+        self._login()
+        self.client.post("/api/auth/logout")
+        self.assertEqual(self.client.post("/methods/foresight.cross_impact_analysis/invoke", json={}).status_code, 401)
+
+    def test_only_the_exact_prefix_is_stripped(self):
+        self.assertEqual(self.client.get("/api").status_code, 200)  # the dashboard, like "/"
+        self.assertEqual(self.client.get("/apihealth").status_code, 404)
+        self.assertEqual(self.client.get("/api-x/health").status_code, 404)
+        self.assertEqual(self.client.get("/x/api/health").status_code, 404)
+
+    def test_the_dashboard_calls_the_api_under_api(self):
+        self.assertIn('<meta name="api-prefix" content="/api">', self.client.get("/").text)
+
+    def test_path_and_raw_path_are_stripped_together_or_not_at_all(self):
+        seen: list[dict] = []
+
+        async def downstream(scope, receive, send):
+            seen.append(scope)
+
+        def run(path: str, raw_path: bytes | None) -> dict:
+            scope = {"type": "http", "path": path}
+            if raw_path is not None:
+                scope["raw_path"] = raw_path
+            asyncio.run(api_main.ApiPrefixMiddleware(downstream)(scope, None, None))
+            return seen[-1]
+
+        self.assertEqual((run("/api/health", b"/api/health")["path"], run("/api/health", b"/api/health")["raw_path"]), ("/health", b"/health"))
+        self.assertEqual((run("/api", b"/api")["path"], run("/api", b"/api")["raw_path"]), ("/", b"/"))
+        self.assertEqual(run("/api/health", None)["path"], "/health")
+        encoded = run("/api/health", b"/%61pi/health")  # decodes to the prefix but is not it
+        self.assertEqual((encoded["path"], encoded["raw_path"]), ("/api/health", b"/%61pi/health"))
+        self.assertEqual(run("/apix", b"/apix")["path"], "/apix")
 
 
 class CorsConfigurationTests(unittest.TestCase):

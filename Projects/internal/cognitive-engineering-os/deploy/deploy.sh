@@ -13,7 +13,7 @@ COMPOSE_FILE="$PRODUCT_ROOT/docker-compose.yml"
 SERVICES=(cognitive-os-api cognitive-os-web)
 HEALTH_URLS=("http://127.0.0.1:8420/health" "http://127.0.0.1:8421/login")
 HEALTH_URL="${HEALTH_URLS[0]}"
-SMOKE_URL="https://cognitive.aware-wave.com/health"
+SMOKE_URL="https://cognitive.aware-wave.com/api/health"  # nginx: /api/ -> api, / -> web (PI-b)
 LOG="$PRODUCT_ROOT/deploy/deploy.log"
 SLACK_WEBHOOK="${COGNITIVE_OS_SLACK_WEBHOOK:-}"
 

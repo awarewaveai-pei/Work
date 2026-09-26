@@ -14,6 +14,7 @@ from ai_lego.apps.api import main as api_main
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from tests.unit.test_api_main import ApiTestCase
+from urllib.parse import urljoin
 
 
 class ProjectSourceApiTestCase(ApiTestCase):
@@ -473,7 +474,10 @@ class HandoffApiTests(ProjectSourceApiTestCase):
         anon = TestClient(api_main.app, base_url="https://testserver")
         redirect = anon.get("/auth/handoff", params={"code": code}, follow_redirects=False)
         self.assertEqual(redirect.status_code, 302)
-        self.assertEqual(redirect.headers["location"], f"/?project={project['project_id']}")
+        self.assertEqual(redirect.headers["location"], f"../?project={project['project_id']}")
+        # the invariant behind the relative path: it lands on the dashboard's project view at every mount point
+        for handoff_url, dashboard in (("https://h/auth/handoff", "https://h/"), ("https://h/expert/auth/handoff", "https://h/expert/"), ("https://h/api/auth/handoff", "https://h/api/")):
+            self.assertEqual(urljoin(handoff_url, redirect.headers["location"]), f"{dashboard}?project={project['project_id']}")
         self.assertIn("cognitive_os_session", redirect.cookies)
 
         listed = anon.get("/projects")

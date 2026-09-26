@@ -126,6 +126,40 @@ def build_api_workflow_gate_registry() -> WorkflowGateRegistry:
 
 
 CONFIGURED_CORS_ORIGINS = configure_cors(app)
+
+
+class ApiPrefixMiddleware:
+    """`/api/<path>` is the public path of every route: prod nginx routes `/api/` here and the web app
+    rewrites `/api/*` here; a local uvicorn serves the same routes at the root. Accepting both lets the
+    dashboard call `/api` in every environment with no per-environment setting (RESEARCH_LINES_MASTER_PLAN
+    WC-PIb-02). Outermost, so every other middleware and every route sees the unprefixed path."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    @staticmethod
+    def _strip(value: Any) -> Any:
+        """`/api` or `/api/...` without the prefix, else None (str path and bytes raw_path alike)."""
+        prefix, slash = ("/api", "/") if isinstance(value, str) else (b"/api", b"/")
+        if value == prefix:
+            return slash
+        return value[len(prefix):] if value.startswith(prefix + slash) else None
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope.get("type") in ("http", "websocket"):
+            path = self._strip(scope.get("path", ""))
+            raw_path = scope.get("raw_path")
+            raw_stripped = self._strip(raw_path) if isinstance(raw_path, bytes) else None
+            # both or neither: an encoded prefix (/%61pi/...) decodes to /api/ but is not the prefix --
+            # stripping by the decoded length would corrupt raw_path, so it is left as sent (404)
+            if path is not None and (raw_path is None or raw_stripped is not None):
+                scope = dict(scope, path=path)
+                if raw_stripped is not None:
+                    scope["raw_path"] = raw_stripped
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(ApiPrefixMiddleware)
 JOURNAL_KEY_RESOLVER: Callable[[str, str], bytes] | None = None
 
 
@@ -1070,7 +1104,9 @@ def mint_handoff(
     except InvariantViolation as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     _project_or_404(repo, session["tenant_id"], payload.project_id)
-    code = store.issue_handoff_code(session["identity_id"], session["tenant_id"], f"/?project={payload.project_id}")
+    # Relative on purpose: resolved against /auth/handoff it lands on the dashboard wherever the API is
+    # mounted -- "/" locally, "/expert/" behind the prod nginx split (which 302s /auth/handoff there).
+    code = store.issue_handoff_code(session["identity_id"], session["tenant_id"], f"../?project={payload.project_id}")
     return {"code": code}
 
 

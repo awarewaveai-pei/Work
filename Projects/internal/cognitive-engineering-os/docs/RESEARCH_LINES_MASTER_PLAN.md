@@ -547,6 +547,8 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 **WC-PIb-04 P0 next-admin 同窗部署**（D15）：`/root/lobster-phase1/scripts/sg-deploy.sh`；驗收 `curl -s https://app.aware-wave.com/ops/collect`（登入後）含 `data-panel="research-bridges-frozen"` 且無「送去」。回滾：`RESEARCH_BRIDGES_ENABLED=true` 重部署。
 **WC-PIb-05 期末閘**：`scripts/playwright-runner.ps1 -Mode cognitive`（`PLAYWRIGHT_COS_URL=https://cognitive.aware-wave.com`）1 passed；§0／TASKS／WORKLOG；操作者親眼看到結果頁（里程碑「第一次在正式站看到真分析」）。
 
+**PI-b 執行修正（2026-09-26，照此執行）**：順序改 02 → 03 → 01 → 05（先部署再分流）。01 upstream 保持變數＋`resolver`，前綴用 `rewrite … break` 去掉（靜態 `proxy_pass http://…/;` 在容器不在時讓 `nginx -t` 失敗、影響主機所有站）；主機檔含 repo 沒有的 `hci.aware-wave.com` 區塊 → 只改主機檔的 cognitive 區塊，不以 repo 檔覆蓋。02 API 加 `ApiPrefixMiddleware`（`main.py`，`/api/<path>` ≡ `/<path>`，路徑與 raw_path 同時才去前綴），meta 改 `/api` 後本機 uvicorn 仍可用、分流前後都無斷窗；`deploy.sh` 公開 smoke 改 `/api/health`。03 `NEXT_PUBLIC_API_PREFIX` 不設（`apps/cognitive-web/lib/api.ts:6` 預設 `/api`），驗收改 `curl …/api/health` 與 `/` 回 web。next-admin「在 Cognitive OS 開啟」導向 `/auth/handoff`（`NA/app/api/cognitive-os/open/route.ts:69`，未被 P0 凍結）→ nginx `= /auth/handoff` 302 到 `/expert/auth/handoff`，API 導向改相對 `../?project=`；另 `= /api`、`= /expert` 301 補尾斜線。
+
 ### 12.5 後續期的卡怎麼產生（P-ARF-data → P1 → …）
 - 來源：§5 該期列（元件）→ §3.3 對應列（位置、樣板）→ §3.4 契約 → §6 該期欄（突變）→ **一元件一卡**，照 12.2；每個 `file:line` 產卡當下 grep 驗過，不抄舊行號。
 - 產卡者 = 上一期期末閘的執行者；操作者只看卡不看碼；卡放本檔 §12.x；已完成的卡整組收成一行「已完成：commit …」。
