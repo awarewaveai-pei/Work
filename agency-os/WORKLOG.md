@@ -1,4 +1,21 @@
 ﻿# Worklog
+## 2026-09-26（續37）研究線 P1 第一批：WC-P1-01／02／03（COS）＋10／11／12／13（next-admin／workflows）落碼
+- [狀態] 01＋03、02、10、11、12、13 已 commit（各卡驗收＋突變）；08（egress 兩處＋parity 測試）已寫、待下一批 review 一起 commit；04–07 要改 `main.py`，另一 session 正改同檔（`/catalog`，未提交）→ 等它提交再做；14／09／15 High-STOP 未動。
+- [卡修正]（§12.7 回填由 WC-P1-15 做）
+  - C1 sink 不能自己 fetch：`lib/collect/__tests__/collect-block-hygiene.test.ts:40-50` 禁 lib/collect 碰網路 → 新 `NA/lib/cognitive-os/research.ts`（I-d／I-e／I-f 唯一線路，sink 與 execute 路由共用），同 `sinks/kb.ts` 委派 `@/lib/kb` 的前例
+  - C2 `meta.sourceClass` 只蓋在 target（`entity-dossier.ts:300`），orchestrator 只帶 searchQuery/Angle/Lang 到文件（`orchestrator.ts:465-467`）→ sink 用 `classifySource(canonicalUrl)`（`source-class.ts:66`，純函式、同一規則）
+  - C3 I1 改由 DB 保證：partial UNIQUE index（每 project 每 canonical_url 只一筆 active），建在遷移 ALTER 之後
+  - C4 I-a／I-c 請求形狀抽 `runs/research-run-request.ts` 白名單（五鍵以外一律 400），不用黑名單
+  - C5 01＋03 同 commit：repo 同一插入點相鄰、SPEC_QUICKREF 兩行相鄰，hunk 不可拆；03 另加 `core/domain/collection_run.py`（domain 驗證、repo 儲存慣例）
+  - C6 卡上驗收 `grep "Tests +N passed"` 會被 vitest ANSI 色碼打斷 → 一律加 `NO_COLOR=1`
+- [Codex] scoped review 2 major，皆修＋突變證明：F1 execute 只把 401／403 當失敗，ingest 500／連不上仍報 completed → 任何 `ingest_*` 即 failed；F2 研究 run 沿用 10 分鐘預算，超過路由 300 s／呼叫端 330 s，complete 可能送不出 → `RESEARCH_MAX_MS=240000` 硬上限（240<300<330<400）。
+- [index] 上一 commit（15587970a）後共享 index 殘留舊 blob（計畫檔、WORKLOG），會倒回 PI-b §0 → `git reset -q -- <兩檔>`（只動 index）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin 全套 vitest（1874 passed／13 skipped）＋B 軌定向 58/58＋workflows 全套 109/109＋tsx 載入 task；COS 定向 unittest 83/215/90 OK；golden 4171 PASS | exit=0 | ms=180000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex `agency-os/reports/oracle/2026-09-26-partialreview-62e9dfdd.md`；F1／F2 已修，突變紅→綠）
+- ORACLE_WAIVED: 全樹 review 不可用——工作樹含其他 session 45 個未提交檔（capture 519 KB）；改用只涵蓋本批 22 檔的 Codex scoped review（上列 artifact），兩個 finding 已修並以突變證明
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`bootstrap_service_identity\(|\.add_source\(|runCollection\(|COLLECT_RESEARCH_(RUNS|EXECUTE)_TOKEN|COGNITIVE_OS_COLLECTION_SERVICE_URL` | hits=68（既有呼叫點 main.py create_source、run-due-schedules、collection-sources、run-jobs 簽名未變且全套綠；.claude 0）
+- 突變（每卡紅→綠）：10 text 截斷；11 拿掉白名單；12 complete 只在成功送／F1 只認 401／403／F2 拿掉上限；13 拿掉缺 token throw；01 supersede 無 UPDATE；02 拿掉一次性雙防線；03 invalid fixture 標 valid；08 compose 加 example.com。
+- [下一步] main.py 乾淨後做 04→05→06→07＋08 一批 review；再停下問 14（上 prod）。
 ## 2026-09-26（續36）Cognitive OS 網站照示意稿（第一批：主選單、首頁、工具、工具頁、工作流、我的專案）；目錄載入器單一來源；285→284
 - [操作者] 正式站 `/methods` 與示意稿差很多（「為什麼變成這種狗屎」「你在耍我嗎」）。
 - [根因] C1 PI-a 卡只做登入／最小方法清單／表單／結果頁，示意稿的主選單、首頁、目錄、課程、工作流頁從未移植（`apps/cognitive-web/app/methods/page.tsx` 26 行、`globals.css` 41 行）。C2 計畫 I11「示意稿＝規格」只有結果頁有閘（`check-mocks.py --page result`），其他頁缺了也不會紅。C3 示意稿目錄把 Atlas 視角 `stakeholder.regulator`（`type: perspective`，`method_resolver.py` from_spec_root 排除）算成工具：顯示 285、API 只能跑 284。

@@ -1,9 +1,9 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://specs/domain/source.schema.yaml"
 title: Source
-version: "1.1.0"
+version: "1.2.0"
 status: ACTIVE
-description: "Shared-kernel Source metadata. Raw content remains in tenant-scoped CAS; runtime table: prov_sources (ADR-010). v1.1.0 (2026-09-18) adds optional doi/authors/venue/published_at citation metadata for imported academic literature Sources, backward compatible (not required, default null)."
+description: "Shared-kernel Source metadata. Raw content remains in tenant-scoped CAS; runtime table: prov_sources (ADR-010). v1.1.0 (2026-09-18) adds optional doi/authors/venue/published_at citation metadata for imported academic literature Sources, backward compatible (not required, default null). v1.2.0 (2026-09-26) adds optional collection provenance (canonical_url..supersedes_source_id, RESEARCH_LINES_MASTER_PLAN §3.4 C1) and status superseded: same canonical_url with a new content_sha256 is a new row pointing at the one it replaced; null for hand-entered Sources."
 source_of_truth_for:
   - "Master Plan §3 Source object, §35 instruction/data boundary, §59 Portable Artifact URI, §78 Upload Sources"
   - "REPOSITORY_ARCHITECTURE.md Source -> /core/domain/source"
@@ -22,7 +22,7 @@ properties:
   artifact_uri: {$ref: "ai-lego://specs/artifact/portable-uri.schema.yaml#/definitions/artifact_uri"}
   content_role: {const: RETRIEVED_SOURCE_DATA}
   verification_status: {type: string, enum: [UNVERIFIED, HUMAN_VERIFIED, QUARANTINED]}
-  status: {type: string, enum: [active, quarantined, deleted]}
+  status: {type: string, enum: [active, quarantined, deleted, superseded]}
   version: {type: integer, minimum: 1}
   created_by_identity_id: {type: string, format: uuid}
   created_at: {type: string, format: date-time}
@@ -30,3 +30,14 @@ properties:
   authors: {type: ["array", "null"], default: null, items: {type: string, minLength: 1}, description: "Author names in citation order. Optional citation metadata."}
   venue: {type: ["string", "null"], minLength: 1, maxLength: 300, default: null, description: "Publication venue (journal/conference/publisher). Optional citation metadata."}
   published_at: {type: ["string", "null"], minLength: 1, maxLength: 40, default: null, description: "Free-text publication date (year, year-month, or full date) -- not a strict timestamp like created_at."}
+  canonical_url: {type: ["string", "null"], minLength: 1, maxLength: 2048, default: null, description: "The collector's canonical URL; with content_sha256 the idempotency key inside a Project."}
+  source_uri: {type: ["string", "null"], minLength: 1, maxLength: 2048, default: null, description: "The URI actually fetched (may differ from canonical_url)."}
+  fetched_at: {type: ["string", "null"], format: date-time, default: null}
+  provenance:
+    default: null
+    oneOf:
+      - {type: "null"}
+      - {$ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"}
+  source_class: {type: ["string", "null"], pattern: "^[a-z][a-z_]{0,39}$", default: null, description: "The collector's source classification (retail/social/aggregator/reference/unknown today)."}
+  relevance: {type: ["object", "null"], default: null, description: "Why the collector admitted this document (entityConfidence, entityAnchorsHit, searchAngle, searchQuery)."}
+  supersedes_source_id: {type: ["string", "null"], format: uuid, default: null, description: "The Source row this one replaced (same canonical_url, new content_sha256)."}

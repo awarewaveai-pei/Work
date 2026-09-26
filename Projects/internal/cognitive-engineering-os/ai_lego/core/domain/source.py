@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Mapping
 
@@ -11,7 +12,11 @@ from ai_lego.errors import InvariantViolation
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _ARTIFACT_URI = re.compile(r"^artifact://(?:[a-z][a-z0-9_]*/[A-Za-z0-9_-]+)(?:/[a-z][a-z0-9_]*/[A-Za-z0-9_-]+)*$")
+_SOURCE_CLASS = re.compile(r"^[a-z][a-z_]{0,39}$")
 TEXT_MEDIA_TYPES = frozenset({"text/plain", "text/markdown", "text/csv", "application/json"})
+# Everything fetched from the web proves only that someone SAID it (RESEARCH_LINES_MASTER_PLAN I2).
+COLLECTED_PROVENANCE = {"epistemic_type": "EVIDENCE", "authorship_state": "SOURCE_QUOTATION", "locked": None}
+MAX_RELEVANCE_BYTES = 4096
 
 
 def source_record(
@@ -31,12 +36,21 @@ def source_record(
     authors: list[str] | None = None,
     venue: str | None = None,
     published_at: str | None = None,
+    canonical_url: str | None = None,
+    source_uri: str | None = None,
+    fetched_at: str | None = None,
+    provenance: Mapping[str, Any] | None = None,
+    source_class: str | None = None,
+    relevance: Mapping[str, Any] | None = None,
+    supersedes_source_id: str | None = None,
 ) -> dict[str, Any]:
     """Build metadata for one V1 UTF-8 Source without embedding its content.
 
     ``doi``/``authors``/``venue``/``published_at`` are optional citation metadata for
     imported academic literature Sources; ``None`` (the default) for every other Source,
-    kept out of ``required`` in source.schema.yaml.
+    kept out of ``required`` in source.schema.yaml. ``canonical_url`` .. ``supersedes_source_id``
+    are the collection provenance a collected Source carries (plan §3.4 C1); ``None`` for a
+    hand-entered Source.
     """
     if media_type not in TEXT_MEDIA_TYPES:
         raise InvariantViolation("SOURCE_MEDIA_TYPE_UNSUPPORTED")
@@ -72,6 +86,30 @@ def source_record(
         if not isinstance(authors, list) or not all(isinstance(author, str) and author.strip() for author in authors):
             raise InvariantViolation("SOURCE_AUTHORS_INVALID")
         authors = [author.strip() for author in authors]
+    if canonical_url is not None:
+        canonical_url = require_text("SOURCE", "canonical_url", canonical_url, maximum=2048)
+    if source_uri is not None:
+        source_uri = require_text("SOURCE", "source_uri", source_uri, maximum=2048)
+    if fetched_at is not None:
+        fetched_at = require_timestamp("SOURCE", fetched_at, "fetched_at")
+    if provenance is not None:
+        if dict(provenance) != COLLECTED_PROVENANCE:
+            raise InvariantViolation("SOURCE_PROVENANCE_INVALID")
+        provenance = dict(COLLECTED_PROVENANCE)
+    if source_class is not None and (not isinstance(source_class, str) or _SOURCE_CLASS.fullmatch(source_class) is None):
+        raise InvariantViolation("SOURCE_CLASS_INVALID")
+    if relevance is not None:
+        if not isinstance(relevance, Mapping):
+            raise InvariantViolation("SOURCE_RELEVANCE_INVALID")
+        try:
+            encoded = json.dumps(dict(relevance), ensure_ascii=False, sort_keys=True)
+        except (TypeError, ValueError) as error:
+            raise InvariantViolation("SOURCE_RELEVANCE_INVALID") from error
+        if len(encoded.encode("utf-8")) > MAX_RELEVANCE_BYTES:
+            raise InvariantViolation("SOURCE_RELEVANCE_INVALID")
+        relevance = json.loads(encoded)
+    if supersedes_source_id is not None:
+        supersedes_source_id = require_uuid("SOURCE", "supersedes_source_id", supersedes_source_id)
     return {
         "source_id": require_uuid("SOURCE", "source_id", source_id),
         "project_id": require_uuid("SOURCE", "project_id", project_id),
@@ -92,4 +130,11 @@ def source_record(
         "authors": authors,
         "venue": venue,
         "published_at": published_at,
+        "canonical_url": canonical_url,
+        "source_uri": source_uri,
+        "fetched_at": fetched_at,
+        "provenance": provenance,
+        "source_class": source_class,
+        "relevance": relevance,
+        "supersedes_source_id": supersedes_source_id,
     }

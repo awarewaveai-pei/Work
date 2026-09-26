@@ -1,0 +1,33 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/domain/collection-run.schema.yaml"
+title: CollectionRun
+version: "1.0.0"
+status: ACTIVE
+description: "One research collection run of a Project (RESEARCH_LINES_MASTER_PLAN §3.2 step 2, §12.7 WC-P1-03). Runtime table: collection_runs. requested -> running (grant exchanged) -> completed | failed. Seeds are kept in the table for the run's audit but never returned here (they may name a person); report is the collector's summary, null until the run ends."
+source_of_truth_for:
+  - "RESEARCH_LINES_MASTER_PLAN §3.3 Collection run 動作, §12.7 I-g/I-h"
+type: object
+additionalProperties: false
+required: [run_id, project_id, tenant_id, status, seeds_count, max_fetches, requested_by_identity_id, requested_at, completed_at, report]
+properties:
+  run_id: {type: string, pattern: "^[A-Za-z0-9_-]{1,80}$"}
+  project_id: {type: string, format: uuid}
+  tenant_id: {type: string, format: uuid}
+  status: {type: string, enum: [requested, running, completed, failed]}
+  seeds_count: {type: integer, minimum: 1, maximum: 10}
+  max_fetches: {type: integer, minimum: 1, maximum: 200}
+  requested_by_identity_id: {type: string, format: uuid}
+  requested_at: {type: string, format: date-time}
+  completed_at: {type: ["string", "null"], format: date-time}
+  report:
+    oneOf:
+      - {type: "null"}
+      - type: object
+        additionalProperties: false
+        required: [fetched, written, unchanged, refused, stopped_by]
+        properties:
+          fetched: {type: integer, minimum: 0}
+          written: {type: integer, minimum: 0}
+          unchanged: {type: integer, minimum: 0}
+          refused: {type: integer, minimum: 0}
+          stopped_by: {type: string, minLength: 1, maxLength: 40}

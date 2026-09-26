@@ -1,0 +1,144 @@
+"""Collected-Source provenance fields and same-transaction supersede (RESEARCH_LINES_MASTER_PLAN WC-P1-01, I1/I2)."""
+
+from __future__ import annotations
+
+import sqlite3
+import tempfile
+import unittest
+from pathlib import Path
+
+from ai_lego import resolve_spec_root
+from ai_lego.core.contracts.schema_contracts import SchemaContracts
+from ai_lego.core.domain.project import project_record
+from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
+from ai_lego.errors import InvariantViolation
+
+TENANT = "22222222-2222-4222-8222-222222222222"
+PROJECT = "11111111-1111-4111-8111-111111111111"
+IDENTITY = "44444444-4444-4444-8444-444444444444"
+URL = "https://example.com/about"
+
+
+def _project() -> dict:
+    return project_record(PROJECT, TENANT, "33333333-3333-4333-8333-333333333333", "Acme dossier", "Partnership risk.", "Confidential", IDENTITY, "2026-09-26T00:00:00Z")
+
+
+def _collected(source_id: str, sha: str, *, supersedes: str | None = None, **overrides) -> dict:
+    fields = dict(
+        canonical_url=URL,
+        source_uri=URL + "?utm=x",
+        fetched_at="2026-09-26T01:02:03.456Z",
+        provenance=dict(COLLECTED_PROVENANCE),
+        source_class="reference",
+        relevance={"entityConfidence": 0.9, "searchAngle": "career"},
+        supersedes_source_id=supersedes,
+    )
+    fields.update(overrides)
+    return source_record(
+        source_id, PROJECT, TENANT, "About Acme", "text/plain", "Confidential", sha, 42,
+        {
+            "uri": f"artifact://tenant/{TENANT}/project/{PROJECT}/source/{source_id}",
+            "segments": [
+                {"segment_type": "tenant", "segment_id": TENANT},
+                {"segment_type": "project", "segment_id": PROJECT},
+                {"segment_type": "source", "segment_id": source_id},
+            ],
+        },
+        IDENTITY, "2026-09-26T01:02:04Z", **fields,
+    )
+
+
+def _cas(sha: str) -> dict:
+    return {"tenant_segment": TENANT, "hash": sha}
+
+
+OLD = "55555555-5555-4555-8555-555555555555"
+NEW = "66666666-6666-4666-8666-666666666666"
+
+
+class SourceProvenanceTests(unittest.TestCase):
+    def setUp(self):
+        self._dir = tempfile.TemporaryDirectory()
+        self.path = Path(self._dir.name) / "projects.sqlite3"
+        self.repo = ProjectSourceRepository(self.path)
+        self.repo.create_project(_project())
+
+    def tearDown(self):
+        self._dir.cleanup()
+
+    def test_collected_fields_round_trip(self):
+        source = _collected(OLD, "a" * 64)
+        self.repo.add_source(source, _cas("a" * 64))
+        self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD), source)
+        self.assertEqual(self.repo.find_active_source(TENANT, PROJECT, URL)["source_id"], OLD)
+
+    def test_collected_source_matches_the_schema(self):
+        contracts = SchemaContracts(resolve_spec_root())
+        contracts.validate("ai-lego://specs/domain/source.schema.yaml", _collected(OLD, "a" * 64), "source")
+        contracts.validate("ai-lego://specs/domain/source.schema.yaml", {**_collected(NEW, "b" * 64, supersedes=OLD), "status": "superseded"}, "source")
+
+    def test_supersede_swaps_the_active_row_in_one_transaction(self):
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        self.repo.supersede(OLD, _collected(NEW, "b" * 64, supersedes=OLD), _cas("b" * 64))
+        self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD)["status"], "superseded")
+        new = self.repo.get_source(TENANT, PROJECT, NEW)
+        self.assertEqual((new["status"], new["supersedes_source_id"]), ("active", OLD))
+        self.assertEqual(self.repo.find_active_source(TENANT, PROJECT, URL)["source_id"], NEW)
+        events = self.repo.list_events(TENANT, f"source:{OLD}")
+        self.assertEqual([e["event_type"] for e in events], ["SourceAdded", "SourceSuperseded"])
+        self.assertEqual(set(events[-1]["payload"]), {"source_id", "superseded_by", "project_id"})
+
+    def test_superseding_a_row_that_is_no_longer_active_writes_nothing(self):
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        self.repo.supersede(OLD, _collected(NEW, "b" * 64, supersedes=OLD), _cas("b" * 64))
+        third = "77777777-7777-4777-8777-777777777777"
+        with self.assertRaisesRegex(InvariantViolation, "SOURCE_SUPERSEDE_CONFLICT"):
+            self.repo.supersede(OLD, _collected(third, "c" * 64, supersedes=OLD), _cas("c" * 64))
+        self.assertIsNone(self.repo.get_source(TENANT, PROJECT, third))
+        self.assertEqual(self.repo.find_active_source(TENANT, PROJECT, URL)["source_id"], NEW)
+
+    def test_a_failed_insert_rolls_the_old_row_back_to_active(self):
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        with self.assertRaisesRegex(InvariantViolation, "SOURCE_STORAGE_REFERENCE_INVALID"):
+            self.repo.supersede(OLD, _collected(NEW, "b" * 64, supersedes=OLD), _cas("not-the-hash"))
+        self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD)["status"], "active")
+        self.assertEqual(self.repo.list_events(TENANT, f"source:{OLD}")[-1]["event_type"], "SourceAdded")
+
+    def test_the_database_refuses_two_active_versions_of_one_url(self):
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.repo.add_source(_collected(NEW, "b" * 64), _cas("b" * 64))
+
+    def test_non_evidence_provenance_is_refused(self):
+        bad = {"epistemic_type": "SOURCE_FACT", "authorship_state": "SOURCE_QUOTATION", "locked": None}
+        with self.assertRaisesRegex(InvariantViolation, "SOURCE_PROVENANCE_INVALID"):
+            _collected(OLD, "a" * 64, provenance=bad)
+
+    def test_an_old_file_gains_the_columns_and_the_active_url_index_on_open(self):
+        old_path = Path(self._dir.name) / "old.sqlite3"
+        raw = sqlite3.connect(old_path)
+        try:
+            raw.executescript(
+                "CREATE TABLE prov_sources (tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, source_id TEXT NOT NULL, title TEXT NOT NULL, "
+                "media_type TEXT NOT NULL, data_classification TEXT NOT NULL, content_sha256 TEXT NOT NULL, size_bytes INTEGER NOT NULL, "
+                "artifact_uri_json TEXT NOT NULL, content_role TEXT NOT NULL, verification_status TEXT NOT NULL, status TEXT NOT NULL, "
+                "version INTEGER NOT NULL, created_by_identity_id TEXT NOT NULL, created_at TEXT NOT NULL, cas_path_json TEXT NOT NULL, "
+                "PRIMARY KEY (tenant_id, project_id, source_id));"
+            )
+            raw.commit()
+        finally:
+            raw.close()
+        ProjectSourceRepository(old_path)
+        raw = sqlite3.connect(old_path)
+        try:
+            columns = {row[1] for row in raw.execute("PRAGMA table_info(prov_sources)")}
+            indexes = {row[1] for row in raw.execute("PRAGMA index_list(prov_sources)")}
+        finally:
+            raw.close()
+        self.assertTrue({"canonical_url", "provenance_json", "relevance_json", "supersedes_source_id"} <= columns)
+        self.assertIn("ux_prov_sources_active_canonical", indexes)
+
+
+if __name__ == "__main__":
+    unittest.main()
