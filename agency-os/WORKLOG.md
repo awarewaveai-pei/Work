@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-26（續63）研究線 WC-P2-07a 併入 main：`literature_search` 有專案時回本專案的學術來源（本機 L1，獨立 worktree）；計畫 P-K10／P-K11、卡 07b／08 補寫
+- [來源] 本機 L1 = 背景 Sonnet agent 在 `D:\tmp\wt-l1`（detached worktree，操作者不會選資料夾，改由本 session 啟動）；提交 `6ff5b596c`，合併者 cherry-pick。
+- [改] `recipe_runtime.build_registered_capability_adapters` 加 kw-only `project_sources`（預設 None，`main.py:125`、`cli/run_recipe.py:85` 不變），只有 run 真的要 `literature_search` 才建專案版；`evidence_triangulation.project_literature_search`：只收 active＋`source_class=academic`、零筆拋 `LITERATURE_NO_PROJECT_SOURCES`（不退回合成資料）、status_code 維持已登記的 `OFFLINE_SOURCE_STALE`（`mode=PROJECT_SOURCES` 區分）、每筆可引（canonical_url→source_uri→doi:→source:<id>）、triangulation 可引 PROJECT_SOURCE 且說明文字不再宣稱合成資料。
+- [審查] 我審 diff 退回 2 項（F1 登錄時就建 adapter → 專案零學術來源時不用文獻搜尋的 recipe 也壞；F2 真實來源寫「合成資料已過期」）；critic Standard warn 0c/1m/3n：M1 = 系統沒有任何路徑寫 `source_class=academic`（NA `source-class.ts:19` 五值、COS 手動來源無此欄）→ 設計裁定 P-K11（寫入時標：NA sink 對學術收集器、COS 有 DOI），歸卡 07b；3 個 minor 已修。Codex `2026-09-26-partialreview-718ed725.md` NO FINDINGS。
+- [計畫] §12.8：P-K10（手動來源 URL／fetched_at 可 null，sha256 必有）、P-K11、卡 07b 加 academic 寫入、卡 08 保留網站 session `1fbb021fe` 加的「發現數字須在紀錄裡」規則（網站 session 提醒）。
+- 突變（紅→綠）：拔 `source_class` 過濾；零筆改退回 fixture；citable 拿掉 PROJECT_SOURCE；登錄時就建 adapter；拔 PROJECT_SOURCES 說明分支；triangulation 閘強制 FAIL（端對端測試現在檢查每道閘）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=D:\Work 合併後樹：python -m unittest tests.unit.test_literature_search_v2＋所有 import recipe_runtime／evidence_triangulation 的 unit 模組（65 tests OK）＋run_golden_tests.py（ALL GOLDEN TESTS PASSED）；worktree 內 import 路徑確認為 wt-l1 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/3n（M1 = 設計缺口，轉 P-K11／07b；minor 全修；Codex `2026-09-26-partialreview-718ed725.md` 0 findings）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`project_literature_search|LITERATURE_NO_PROJECT_SOURCES|PROJECT_SOURCES` | hits=29（程式 7、測試 19、契約 1、計畫 1、WORKLOG 1；呼叫端只有 recipe_runtime，main.py／CLI 未傳參數 = 行為不變；scripts／lobster-factory／.claude 0）
 ## 2026-09-26（續62）Cognitive OS 正式站部署 `1fbb021f`：結果頁照示意稿＋解讀契約 1.1.0（續61）
 - [操作者] 「照上次方式上線（先備份）」。
 - [範圍] 正式站 `2c060470`→`1fbb021f`：本批（網站結果頁、解讀 1.1.0、detail_integrity、閘道 with_timeout）＋文件 commit＋`8614a97dd`（只改 .env.example）。無資料庫變更。

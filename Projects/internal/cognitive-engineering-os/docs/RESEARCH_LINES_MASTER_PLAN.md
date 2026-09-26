@@ -617,6 +617,8 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 - P-K7 `SPEC/docs/architecture/SPEC_QUICKREF.md` 是產生檔（檔頭 `:3`）：卡內跑 `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/gen_spec_index.py`，不手改；合併時在乾淨樹重產。
 - P-K8 見上「本期不碰」。CI 接線與 `COS/scripts/test-eval-harness.ps1` 歸 09（本機），雲端不改 CI。
 - P-K9 §5 P2 DoD「`edd-research-evidence-v1` 用 `literature_search` v2 跑 PASS」與碼不符：該 recipe 只有三個方法節點（`epistemic.assumption_mapping`／`evidence_matrix`／`toulmin_model`，`SPEC/recipes/validated/edd-research-evidence-v1.recipe.yaml:32,41,52`），不呼叫 `literature_search`；呼叫它的是 `research-qualitative-v1`（同目錄，`:18` `literature_search` → `evidence.triangulation`）與 fixture `edd-literature-search-v1`（§8 退場）。07 驗收改用 `research-qualitative-v1`；09 改寫 §5 該句。
+- P-K10 I5「每個 [n] 解析到 source id＋sha256＋URL＋fetched_at」：手動來源的 URL／fetched_at 可為 null（P-a），附錄照實顯示「—」，不算解析失敗；sha256（64 hex）與 source id 缺一即失敗。09 把這句寫回 §2 I5。
+- P-K11 `source_class=academic` 目前沒有任何寫入路徑（critic 2026-09-26：NA `lib/collect/source-class.ts:19` 只有 retail／social／aggregator／reference／unknown，`sinks/cognitive.ts:42` 以 URL 分類；COS 手動來源 `CreateSourceRequest` 無此欄；`SPEC/specs/domain/source.schema.yaml:41` 同五值）→ **寫入時決定、讀取端只讀欄位**：NA `SourceClass` 加 `academic`，sink 對學術收集器抓回的文件標 academic；COS `create_source` 有 `doi` 即標 academic；schema 描述同步。歸 07b。
 
 **介面釘死**（各卡依此寫，不等彼此合併；要改表 = 停、相關卡同改）
 | # | 名 | 形狀 |
@@ -732,11 +734,13 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 
 **WC-P2-07b `run_recipe` 帶專案來源**（本機，P1 那條線；07a 合併且網站那批 commit 後）
 - 目標：`main` `run_recipe` 有 `project_id` 時讀本專案 Sources 傳 `project_sources`（錨點 `def run_recipe`、`build_registered_capability_adapters(` `main.py:125`）；真跑 `research-qualitative-v1` 用真專案來源 PASS。
-- 驗收：`tests/unit/test_api_main` 相關案＋新案 → `OK`；突變：不傳 `project_sources` → 真來源案紅。
+- ＋P-K11：academic 在寫入時標好（NA `source-class.ts`＋`sinks/cognitive.ts`＋其測試；COS `create_source` 有 DOI → academic；`source.schema.yaml:41` 描述）；NA 改動要 sg-deploy 才生效（High-STOP，隨 09 部署窗）。
+- 驗收：`tests/unit/test_api_main` 相關案＋新案 → `OK`；NA `npx vitest run lib/collect/sinks` 綠；突變：不傳 `project_sources` → 真來源案紅；sink 不標 academic → 學術收集器案紅。
 
 **WC-P2-08 interpret 改用共用閘**（本機，網站那條線；01 合併且結果頁這批 commit 後）
 - 目標：P-K3：`evaluate_interpretation_gates` 的 `citation_integrity` 改呼叫 `gates.evaluate_citation_integrity`，刪內聯；gate id 與 FAIL 語意不變。現有合法輸出若有空 `citations` 的物件（P-b 會 FAIL）→ 停、回報，不放寬 P-b。
-- 驗收：`test_interpret_method_record`＋`test_api_interpret` → `OK`；突變：共用閘拿掉 ⊆ → interpret 越界案紅。
+- **保留 interpret 專屬的數字規則**（`1fbb021fe` 起）：interpret 的 `citation_integrity` 另會 FAIL「發現寫了紀錄裡沒有的數字」（`interpret_method_record.py:245` `_numbers`、`:250` `_record_numbers`、evidence `unstated_numbers` `:359`）。改法 = 共用閘結果 AND 這條數字規則，合成同一個 gate id，evidence 保留 `unstated_numbers`；不得因換成共用閘而掉規則（掉了結果頁會再出現捏造的數字）。
+- 驗收：`test_interpret_method_record`＋`test_api_interpret` → `OK`；突變：共用閘拿掉 ⊆ → interpret 越界案紅；拿掉數字規則 → 捏造數字案紅。
 
 **WC-P2-09 期末閘**（本機 Opus；部署 High-STOP）
 - ① `/opt/cognitive-os` 部署（`deploy.sh`）；② 在 P1 的操作者專案（真 Sources）跑 `dossier_brief`：每主張引註 ⊆ manifest、`ai_usage` 有 `synthesis:` 列；③ 9 案真模型跑 harness → 基準線報告給操作者定門檻（I10），定了才寫 `thresholds.yaml`；④ CI 接線＋`COS/scripts/test-eval-harness.ps1`；⑤ §6 P2 三突變；⑥ `edd-research-evidence-v1` 用 v2 PASS；⑦ §0／§3.3（P-K1 兩列）／§5／§7 回填、TASKS 指針；⑧ 產 P3 卡（§12.9；P3-01 已完成的部分收一行）。

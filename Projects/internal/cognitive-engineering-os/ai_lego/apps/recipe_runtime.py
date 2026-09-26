@@ -9,7 +9,7 @@ from ai_lego.apps.api.dispatch import invoke_builder, invoke_gate_runner, resolv
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.capability_adapters import pre_transcribed_input_adapter, research_paper_artifact_adapter, run_statistics_adapter
-from ai_lego.modules.research.evidence_triangulation import offline_literature_search
+from ai_lego.modules.research.evidence_triangulation import offline_literature_search, project_literature_search
 from ai_lego.modules.representation.chart_render import generate_chart_artifact
 from ai_lego.modules.strategy.proposal_artifact import proposal_artifact_adapter
 from ai_lego.modules.research.gates import evaluate_research_workflow_integrity_gate
@@ -73,19 +73,33 @@ def build_method_components(
 def build_registered_capability_adapters(
     capability_catalog: CapabilityCatalog,
     capability_ids: list[str],
+    *,
+    project_sources: list[dict[str, Any]] | None = None,
 ) -> CapabilityAdapterRegistry:
     """Build the explicit, side-effect-free adapter set shared by API and CLI.
 
     Raw-media transcription is intentionally not registered here.
     ``literature_search`` is the deterministic offline synthetic-corpus adapter
-    only -- Cognitive OS does not reach out to any external network provider
+    by default -- Cognitive OS does not reach out to any external network provider
     for data search (operator directive 2026-09-17: data collection is
     `/ops/collect`'s job, not a capability duplicated here; see
-    `agency-os/memory/feedback_route_data_fetch_through_ops_collect.md`).
+    `agency-os/memory/feedback_route_data_fetch_through_ops_collect.md`). When
+    ``project_sources`` is given (RESEARCH_LINES_MASTER_PLAN WC-P2-07a), the run has a
+    Project, and ``literature_search`` instead returns that Project's own active
+    ``source_class=academic`` Sources -- still no network call, just a different local
+    corpus. Both existing callers (``main.py``, ``run_recipe.py``) omit the argument and
+    keep the offline-fixture behaviour unchanged.
     """
     adapters = CapabilityAdapterRegistry(capability_catalog)
+    # Built only when actually requested: project_literature_search(project_sources) is
+    # fail-closed (raises on zero matching Sources), so building it for every call --
+    # including recipes that never invoke literature_search, e.g. life-decision-v1 -- would
+    # wrongly break an unrelated run whose Project simply has no academic Sources yet.
+    literature_search_handler = offline_literature_search
+    if project_sources is not None and "literature_search" in capability_ids:
+        literature_search_handler = project_literature_search(project_sources)
     registered = {
-        "literature_search": offline_literature_search,
+        "literature_search": literature_search_handler,
         "transcribe": pre_transcribed_input_adapter,
         "run_statistics": run_statistics_adapter,
         "artifact.generate_research_paper": research_paper_artifact_adapter,
