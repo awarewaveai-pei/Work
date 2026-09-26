@@ -1,5 +1,5 @@
 /**
- * GET /api/video/status?jobId=<id>
+ * POST /api/video/status?jobId=<id>
  *
  * 前端輪詢。每次呼叫：若 job running 且有 euJobId → 查 EU /job 一次（短請求）。
  *   - EU running → 回 running
@@ -9,6 +9,11 @@
  *
  * 授權兩層：① 角色閘 canCreateAiImageJob（viewer 擋掉）② 租戶閘 assertOrgAccess，讀 job 之後
  * 立刻執行、在任何回傳資料的分支之前（見下方註解）。
+ *
+ * T20: was GET -- moved to POST. The "done"/"error" branches finalize the job (media_assets
+ * insert, R2 cleanup, job-store write); a GET must never risk a side effect (SameSite=Lax cookie
+ * + <img>/<script> can force a same-site page to send an authenticated GET; the CSRF guard only
+ * covers non-GET). No GET is exported here any more -- Next.js answers a GET to this route 405.
  */
 import { NextRequest, NextResponse } from "next/server";
 import type { RenderOutputMeta, RenderOutputs } from "@/lib/content/video/render-client";
@@ -41,7 +46,7 @@ function validateRenderOutputs(
   return null;
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });

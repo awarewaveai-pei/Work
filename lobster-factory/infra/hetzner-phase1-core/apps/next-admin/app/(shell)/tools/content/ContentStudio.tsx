@@ -1011,7 +1011,7 @@ export default function ContentStudio() {
     setTrendLoading(true);
     const hl = (form.language === "繁體中文" || form.language === "簡體中文") ? "zh-TW" : "en";
     try {
-      const res  = await fetch(`/api/content/trending?type=suggest&q=${encodeURIComponent(kw)}&hl=${hl}`);
+      const res  = await fetch(`/api/content/trending?type=suggest&q=${encodeURIComponent(kw)}&hl=${hl}`, { method: "POST" });
       const data = await res.json() as { ok: boolean; suggestions?: string[] };
       if (data.ok) setSuggestResults(data.suggestions ?? []);
     } catch { /* silent */ }
@@ -1023,7 +1023,7 @@ export default function ContentStudio() {
     setTrendLoading(true);
     const hl = (form.language === "繁體中文" || form.language === "簡體中文") ? "zh-TW" : "en";
     try {
-      const res  = await fetch(`/api/content/trending?type=questions&q=${encodeURIComponent(kw)}&hl=${hl}`);
+      const res  = await fetch(`/api/content/trending?type=questions&q=${encodeURIComponent(kw)}&hl=${hl}`, { method: "POST" });
       const data = await res.json() as { ok: boolean; questions?: string[] };
       if (data.ok) setQuestionResults(data.questions ?? []);
     } catch { /* silent */ }
@@ -1788,7 +1788,7 @@ export default function ContentStudio() {
       if (videoPollRef.current) clearInterval(videoPollRef.current);
       videoPollRef.current = setInterval(async () => {
         try {
-          const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
+          const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`, { method: "POST" });
           const sj = await sr.json() as { ok: boolean; status?: string; video?: { outputs?: Record<string, string> }; error?: string };
           if (!sj.ok || sj.status === "error") {
             clearInterval(videoPollRef.current!); videoPollRef.current = null;

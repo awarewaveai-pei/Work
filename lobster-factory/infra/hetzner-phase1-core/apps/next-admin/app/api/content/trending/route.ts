@@ -94,7 +94,30 @@ async function loadDbSourceBlocks() {
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
+// GET stays read-only: only type=trending (built-in blocks + operator DB sources, both pure
+// external/DB reads). type=suggest and type=questions each fall back to a paid aiChat call when
+// their free source returns nothing (fetchAiSuggest / fetchRelatedQuestions -> fetchAiQuestions) --
+// a GET must never risk spending money (T20: the session cookie is SameSite=Lax, so a same-site
+// page can force these via <img>/<script>, and the CSRF guard only covers non-GET). Both move to POST.
 export async function GET(req: Request): Promise<Response> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+
+  const url  = new URL(req.url);
+  const type = url.searchParams.get("type") ?? "trending";
+  if (type !== "trending") {
+    return NextResponse.json({ ok: false, error: "use POST for type=suggest or type=questions" }, { status: 405 });
+  }
+
+  const geo = url.searchParams.get("geo") ?? "TW";
+  // Operator-managed DB sources (migration 0042) run alongside the built-in blocks. Built ephemerally
+  // per request so a UI deletion takes effect immediately (best-effort: DB miss falls back to built-ins).
+  const extra = await loadDbSourceBlocks();
+  const items = await runTrending(geo, extra);   // 搜尋積木：跑所有啟用且符合 geo 的來源
+  return NextResponse.json({ ok: true, items, geo });
+}
+
+export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -105,10 +128,8 @@ export async function GET(req: Request): Promise<Response> {
   const hl    = url.searchParams.get("hl") ?? (geo === "TW" || geo === "HK" ? "zh-TW" : "en");
 
   if (type === "trending") {
-    // Operator-managed DB sources (migration 0042) run alongside the built-in blocks. Built ephemerally
-    // per request so a UI deletion takes effect immediately (best-effort: DB miss falls back to built-ins).
     const extra = await loadDbSourceBlocks();
-    const items = await runTrending(geo, extra);   // 搜尋積木：跑所有啟用且符合 geo 的來源
+    const items = await runTrending(geo, extra);
     return NextResponse.json({ ok: true, items, geo });
   }
 
