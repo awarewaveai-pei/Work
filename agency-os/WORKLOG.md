@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-26（續55）研究線 WC-P1-14 完：next-admin token＋compose、自架 Trigger 同步 execute token；驗收 SAME＋錯 token 401
+- [接續] 續52（COS 端 ①②③＋WC-13 缺口 `ca341ddc6`）。
+- [④ NA .env] 主機內：RUNS 從 COS `deploy/.env` 原樣複製、EXECUTE 新產生（`secrets.token_urlsafe(32)`），值未經 Claude；比對 NA==COS RUNS、EXECUTE≠RUNS；`.env` 先 `cp -p` 備份、驗證後刪。
+- [④ compose] 主機跑 scratch `p1-compose-insert.py`（錨點 `COLLECT_SCHEDULE_INGEST_TOKEN` 恰 1 次、目標鍵不存在才輸出）→ diff 只多 5 行（= repo compose 同段）→ `safe-infra-patch.sh compose … next-admin`：backup `docker-compose.yml.bak.safe-patch-20260926-140522`、healthy 9s、success。
+- [並行] `d2996616` 同一分鐘以 safe-infra-patch 重建 next-admin 取 `POD_INBOX_SWEEP_TOKEN`（backup `-140545`）；雙方事後驗：`:287-288`（本 session）與 `:427`（它的）皆在、`docker compose config` ok、容器三 token 皆有。協調經 SendMessage（它先做 compose＋Trigger，再交還）。
+- [⑤ Trigger] 由 `d2996616` 的 `lobster-trigger-deploy.ps1` 一併完成：version 20260926.6、16 tasks、build 自 origin/main `8614a97dd`（含 `ca341ddc6`），輸出 `COLLECT_RESEARCH_EXECUTE_TOKEN set: yes (from running next-admin)`；本 session 不重複部署。
+- [vault] `COLLECT_RESEARCH_RUNS_TOKEN`（續52）；EXECUTE 只在 NA `.env`＋Trigger（輪替＝重產寫 `.env`→safe-infra-patch 重建→Trigger 重部署，值從 running next-admin 取）。
+- [驗收] `a=$(docker exec lobster-next-admin printenv COLLECT_RESEARCH_RUNS_TOKEN); b=$(docker exec cognitive-os-api …)` → `SAME`；`COLLECT_RESEARCH_EXECUTE_TOKEN` 在 next-admin；公開 `POST https://app.aware-wave.com/api/internal/collect/runs`、`/runs/execute` 帶 `Bearer wrong` → 401／401；next-admin deployed `2a86de2c4`（含 WC-10～12）。
+- [未刪] COS 3 庫備份 `/home/ubuntu/cos-predeploy-p1-20260926T134314Z` 留到 WC-15 抹除驗完再刪（安全網）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch compose next-admin（success 9s）＋SAME 檢查＋curl 錯 token 401×2＋Trigger 20260926.6 deploy log | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 主機設定與部署，程式已在 df49aab0f／ca341ddc6 經 Codex 覆審
+- BUGHUNT_WAIVED: NA -- 無程式改動；設定以 printenv／compose config／curl 實測
+- [下一步] WC-P1-15：操作者已選自然人對象、臨時測試頁、短效 session；公司 run 的公司待操作者給。
 ## 2026-09-26（續54）研究線 WC-P1-09 完：prod journal 金鑰 local-dev（Confidential 專案的 recipe run 不再 503）
 - [順序] 卡序 14→09；14 的 NA／Trigger 兩步在等 `d2996616` 做完 prod compose／Trigger（續52），09 只動 COS，先做。
 - [金鑰] 主機產生 32 bytes（base64）直接寫 COS `deploy/.env`（600，值未經 Claude）→ **先** vault（`vault-from-host.ps1` → `COGNITIVE_OS_JOURNAL_KEY_B64`，`get` 只見遮罩）→ 才加 `COGNITIVE_OS_JOURNAL_KEY_MODE=local-dev`。
