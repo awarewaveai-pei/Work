@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-26（續54）研究線 WC-P1-09 完：prod journal 金鑰 local-dev（Confidential 專案的 recipe run 不再 503）
+- [順序] 卡序 14→09；14 的 NA／Trigger 兩步在等 `d2996616` 做完 prod compose／Trigger（續52），09 只動 COS，先做。
+- [金鑰] 主機產生 32 bytes（base64）直接寫 COS `deploy/.env`（600，值未經 Claude）→ **先** vault（`vault-from-host.ps1` → `COGNITIVE_OS_JOURNAL_KEY_B64`，`get` 只見遮罩）→ 才加 `COGNITIVE_OS_JOURNAL_KEY_MODE=local-dev`。
+- [部署] `deploy.sh`：測試關卡 208 passed、api 13:59:20 重建 healthy、本機＋公開 smoke PASS。
+- [驗證] `docker exec cognitive-os-api printenv COGNITIVE_OS_JOURNAL_KEY_MODE` = `local-dev`（卡片驗收）；容器內 `build_api_journal_protector(<操作者 tenant>, probe)` → `CasJournalContextProtector`（key 32 bytes 有效）。「disabled → 503」由 `tests/unit/test_run_classification.py` Confidential 案守（df49aab0f）。
+- [影響] local-dev 下**每個** recipe run 的 journal 都加密（`main.py:183-200` 非 disabled 即建 protector），不只 Confidential；啟用前開始、之後 resume 的舊 run 未驗。
+- [改] `deploy/.env.example` 記兩鍵與「先 vault 再開 mode、遺失＝journal 讀不回」。
+- 回滾：主機 `.env` 刪 `COGNITIVE_OS_JOURNAL_KEY_MODE` 行 → `deploy.sh`（Confidential run 回到 503；已加密 journal 需 key 才讀得回，key 在 `.env`＋vault 兩處）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy.sh（208 passed、smoke PASS）＋docker exec printenv＋容器內 build_api_journal_protector | exit=0 | ms=200000
+- REVIEW_WAIVED: DOC_ONLY -- 程式未改；repo 只改 `.env.example` 註解與兩個空鍵
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`COGNITIVE_OS_JOURNAL_KEY_MODE` | hits=22（main.py 讀取 1、journal_protection 1、.env.example 1、測試 10、計畫 6、DEPLOYMENT_BLUEPRINT 1（external 模式敘述，仍正確）、WORKLOG 2）
 ## 2026-09-26（續53）T26 部署與後續：next-admin `2c0604708` 上線；smoke 改在 next-admin 容器內讀收件匣統計（system-modes GET 要 session，原寫法永遠 401）
 - [部署] sg-deploy next-admin `2c0604708`（T19–T27）：host npm test 215 files 2025 passed、healthy 9 s、smoke 5/5；sync-host-scripts 裝上新 sg-deploy.sh（T25）。live：woo-order 無簽章 401、sweep 無／錯 token 401、vector-editor 7 個 sha384、imagetracer 原檔。
 - [根因] 部署後實測：`/api/ops/system-modes` 不在 middleware `PUBLIC_API_PATHS`（`middleware.ts:28-45`），smoke 的 Basic header 從未生效（`/api/ops/repairs/health` 是公開端點）→ 續51 的 Check 2b 會永遠 `skip:http401`，CRITICAL 清單中＝永久盲點。
