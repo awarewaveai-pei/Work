@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-26（續46）合併雲端 T22：SECURITY DEFINER 函式不會悄悄重新開放 anon／authenticated EXECUTE（migration 掃描＋正式庫 proacl 檢查）（未部署：純檢查）
+- [根因] Supabase ALTER DEFAULT PRIVILEGES 對每個新 public 函式授 EXECUTE 給 anon/authenticated；DROP＋CREATE 產生新物件即重開。發生過兩次（0035/0036/0056 → 0064 修），之前只有註解防線。
+- [來源] `claude/cc-t22-secdef-grants` d1df51b11：`lib/db/security-definer-grants.ts` 逐 migration 追蹤簽章（REPLACE 保留 ACL、DROP 重置）；`scripts/check-security-definer-grants.mjs` 讀正式庫 proacl；allowlist `{}`。
+- [本機修] M1 GRANT 沒追蹤：之後 `GRANT EXECUTE ... TO authenticated`（或 TO PUBLIC、ON ALL FUNCTIONS IN SCHEMA）仍判鎖住 → GRANT 事件重開指名角色（PUBLIC 兩者皆開）；刪 dead `paramType()`。
+- [本機修] M2 正式庫檢查 psql 無 ON_ERROR_STOP：查詢失敗 exit 0、0 列、印「OK: 0 checked」→ 加 ON_ERROR_STOP；0 列 exit 2「nothing checked」。
+- [正式庫] `node scripts/check-security-definer-grants.mjs` → OK: 8 functions（與 migration 掃描同 8 支）；空輸出 → exit 2；psql 錯 → exit 1。
+- REALTEST_EVIDENCE: tool=Bash | cmd=vitest security-definer-grants 20/20；node --test check-security-definer-grants 14/14；正式庫 live check OK 8；突變 GRANT 分支關閉 → 2 紅 → 還原綠 | exit=0 | ms=40000
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/2M/0m（本機 GRANT 未追蹤、live check 失效開放；Codex 三輪此區無發現；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=security-definer-allowlist|check-security-definer-grants | hits=5（實作、測試、allowlist；TASKS:535 同步結案）
 ## 2026-09-26（續45）合併雲端 T21：修復中心被系統模式擋下時，在被擋的對象上留一筆持久紀錄（未部署）
 - [根因] service.ts 自動修復分支被擋時無聲落回 repairing；confirmCriticalRun 先寫 confirmed 再過 gate；engine.ts 被擋時不建 ops_action_runs。
 - [來源] `claude/cc-t21-repair-block-audit` 49aa2184a：自動修復被擋 → triage_needed＋audit（mode、key、action_run_id），回 409 帶 run；confirm 前先查，擋下寫 confirmation_blocked＋423；tryRemediate 被擋 → ops_action_runs 開一筆並以 failed＋mode 結束。
