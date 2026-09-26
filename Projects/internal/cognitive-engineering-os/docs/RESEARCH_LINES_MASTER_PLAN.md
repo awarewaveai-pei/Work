@@ -596,6 +596,8 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 | 01／02／03／04 | 雲端 T28／T29／T30／T31 | 現在，四支並行（檔案零交集，除產生檔 SPEC_QUICKREF） |
 | 05 | 雲端 T32 | 01、02、03 合併後 |
 | P3-01 | 雲端 T33 | 03、04 合併後 |
+| P3-02 | 雲端 T34 | 現在可開（`run_recipe` 區段與網站那批未提交的 `main.py` 改動不重疊） |
+| P3-03 | 雲端 T35 | 01 合併後 |
 | 雲端合併 | [a574b2] 或接手者 | 每支到齊：本機重驗（Windows PS 5.1＋autocrlf）→ critic 1 → 合併 → WORKLOG |
 | 07a | 本機新 session L1，獨立目錄 `D:\tmp\wt-l1` | 現在 |
 | P4-01（提前） | 本機新 session L2，獨立目錄 `D:\tmp\wt-l2` | 現在 |
@@ -692,6 +694,24 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 - 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_report_render -q 2>&1 | tail -1` → `OK`；golden exit 0；`gen_spec_index.py --check` exit 0。
 - 突變：拔 [n] 解析檢查 → 未解析案紅（§6 P4 欄）；appendix 改列全部 manifest → 「只列被引者」案紅。
 - commit：`feat(cognitive-os): report renderer -- every [n] resolves to source id, sha256, url and fetched_at or the report fails (P4 WC-01 early, C6/I5)`。回滾：revert（DRAFT 契約、無端點）。
+
+**WC-P3-02（提前）`run_recipe`：`async:true`＋價值判斷欄 `human_required`**（雲端 T34；現在）
+- 目標：§3.3「非同步 run 旗標」列＋C5：① body `async:true` → 所有既有檢查照舊同步做完，再以背景 thread 執行，回 202 `{status:"RUNNING", run_id, journal_ref}`，進度走既有 `GET /recipes/{id}/runs/{run_id}`；② 價值判斷欄（人才能決定的權重／分數／量尺、論證的 warrant／qualifier）未填 → 422 `{code:"HUMAN_REQUIRED_MISSING", fields:[{index, method_id, param, path}]}`，不執行、不寫 journal；③ AI 起草永不填這些欄（C5「人填」）。
+- 讀：`main` HEAD `:619-765`（錨點 `def run_recipe`；`:693-700` `missing_workflow_input_paths` 檢查處、`:737-750` `execute_workflow_ir`）、`:766-780`（run 狀態端點）；`COS/ai_lego/platform/workflow/executor.py:126`（`missing_workflow_input_paths`）；`COS/ai_lego/platform/ai_gateway/draft.py:224-232`（`draft_method_kwargs` 已有 `exclude_params`）、`:308`（`draft_recipe_source`）；`SPEC/recipes/validated/life-decision-v1.recipe.yaml:56-69`（WDM bindings）；`SPEC/methods/contracts/epistemic.toulmin_model.contract.yaml:9-14,59`；`main` HEAD `:1174-1235`（背景 thread 樣板 `_launch_interpretation`）。
+- 改：新 `SPEC/methods/registry/method-human-required.yaml`（`decision.weighted_decision_matrix: [weights, scores, scale_min, scale_max]`、`epistemic.toulmin_model: [warrant, qualifier]`；檔頭一行：只列「沒有人就不存在正確值」的欄）；新 `COS/ai_lego/platform/workflow/human_required.py`（`load_human_required(spec_root)`，用 `display_catalog.py:15` 的 strict loader；未知 method id 或該方法 builder 無此參數 → `InvariantViolation`；`missing_human_required(workflow_ir, source)`：依 node bindings 把參數對到 source 路徑，缺或空值（None、""、[]、{}）即列入）；`main` `run_recipe`：在 `missing_source_paths` 檢查之後、journal 之前呼叫；`async` 非 bool → 400；`async:true` → 背景 thread 跑 `execute_workflow_ir`（樣板 `_launch_interpretation`），thread 內任何例外都要留下可讀的失敗（先查 executor／journal 有無既有「寫入失敗狀態」的函式並用它；沒有 → 停，§7 加列，不自創第二套狀態儲存）；`draft.py`：`draft_recipe_source` 對每站把該方法的 human_required 參數放進 `exclude_params`。新測試 `COS/tests/unit/test_human_required.py`（≥8 案）、`test_run_recipe_async.py`（≥6 案：202＋RUNNING、輪詢到終態、同步路徑行為與回傳不變、async 非 bool 400、背景例外可讀、human_required 缺 → 422 且無 journal 檔）。
+- 不改：`main` 的 import 區、`get_ai_provider` 附近、interpret 區段（網站那批未提交，P-K8）；`executor.py`（I8 引擎零改動）；`dashboard.html`／`apps/cognitive-web`（前端「未填不准 run」歸網站線）。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_human_required tests.unit.test_run_recipe_async $(grep -rlE "apps\.api\.main|apps\.api import main|ai_gateway\.draft|ai_gateway import draft" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`；golden exit 0。
+- 突變（§6 P3 欄）：拔 `human_required` 檢查 → 空權重 run 案紅；`draft_recipe_source` 不傳 exclude → 「起草不填權重」案紅；async 在檢查前就開 thread → 「422 不寫 journal」案紅。
+- commit：`feat(cognitive-os): recipe runs can go async (202 + existing status endpoint) and refuse to run while a human-only field is empty; AI drafting never fills those fields (P3 WC-02 early, C5)`。回滾：revert（`async` 預設 false、清單檔刪除即不擋）。
+
+**WC-P3-03（提前）工作流總結 `WorkflowInterpretation`（模組＋typed object，不含端點）**（雲端 T35；01 合併後）
+- 目標：C10 工作流部分：把各站的 `MethodInterpretation` 收成一份總結；引註 ⊆ 各站 manifest 聯集；使用者判斷是人的紀錄，由伺服器照抄，模型不寫。
+- 讀：§3.4 C10（工作流段）、D20、D24、U18；`interpret_method_record.py` HEAD `:238-277`（兩次嘗試樣板，只讀）；`SPEC/specs/cognitive/typed-objects/method-interpretation.schema.yaml` HEAD（站的形狀，只讀）；01 的 `evaluate_citation_integrity`（P-e）。
+- 改：新 `COS/ai_lego/modules/research/workflow_interpretation.py`：`run_workflow_interpretation(*, workflow_id, run_or_chain_id, stations:[{station_index, method_id, interpretation, manifest, judgment|None}], provider, schema_contracts, interpretation_id, language="zh-TW")`：模型只寫 `summary`、`final_recommendation{text, citations}`、`revision_conditions[]`、每站 `one_liner`；伺服器填 `stations[].{station_index, method_id, interpretation_id, confidence（取該站 findings 最低信心）, judgment（照抄 `{stance, text}` 或 null）}`、`citations_all`（各站 citations 聯集，不重排）、`usage_total`、`solution:null`（C11 在 P4）；閘：`stations_complete`（站數 = 輸入站數、index 連續、每站有 interpretation_id）、`citation_integrity`（呼叫 01 的函式，manifest = 各站聯集）、`no_preset_conclusion`（`revision_conditions` 至少 1 條；物件內無 `conclusion`／`verdict`／`correct_answer` 鍵）；兩次嘗試、token 累計。新 `SPEC/specs/cognitive/typed-objects/workflow-interpretation.schema.yaml`＋fixtures（`judgment` 只能是 null 或 `{stance∈agree|partial|disagree, text}`）；跑 `gen_spec_index.py`。新 `COS/tests/unit/test_workflow_interpretation.py`（≥10 案：三站成功、模型寫了 judgment → 伺服器覆蓋回人的紀錄、跨站越界引註 → 修復、缺站 → FAIL、零改判條件 → FAIL、token 累計、solution 為 null、confidence 取最低、schema 驗證、輸入站物件不被改動）。
+- 不改：`interpret_method_record.py`、`main`、前端。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_workflow_interpretation -q 2>&1 | tail -1` → `OK`；golden exit 0；`gen_spec_index.py --check` exit 0。
+- 突變：拔 `no_preset_conclusion` → 零改判條件案紅；judgment 改用模型輸出 → 覆蓋案紅；manifest 只取最後一站 → 跨站引註案紅。
+- commit：`feat(cognitive-os): WorkflowInterpretation -- one summary over the stations, citations bound to every station's manifest, the user's judgment copied from the human record (P3 WC-03 early, C10)`。回滾：revert。
 
 **WC-P2-06 synthesis 端點**（本機，P1 那條線；05 合併後）
 - 目標：`POST /projects/{id}/synthesis`（body `{kind, subject}`；202＋`synthesis_id`，背景 thread）、`GET /projects/{id}/synthesis/{sid}`（PENDING／DONE／FAILED）；`ai_usage` purpose `synthesis:<kind>`（成功與失敗都記）；事件 `SynthesisCreated`／`SynthesisFailed`（payload 只放 id／hash／計數，K8）；artifact 存 CAS；三契約 DRAFT → ACTIVE。

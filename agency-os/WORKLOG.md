@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-26（續60）研究線 §12.8 加兩張提前的 P3 雲端卡（T34 `run_recipe` async＋human_required、T35 WorkflowInterpretation）；雲端額度 $60 分配
+- [操作者] 要 3 天做完整份計畫；選「不額外花錢，照現有額度」；雲端 credit $60；准許請網站 session 先提交。
+- [分配] T28–T31 約 $25（T30 用 Opus）＋第二波 T32／T33／T34／T35 約 $24 → 約 $50，留約 $10 餘裕；本機不再多開（5 小時額度）。
+- [做] WC-P3-02：`run_recipe` 的 `async:true`（檢查全做完才開 thread，202＋既有狀態端點）＋`SPEC/methods/registry/method-human-required.yaml`（WDM 權重／分數／量尺、Toulmin warrant／qualifier）未填 → 422 不寫 journal；AI 起草以既有 `exclude_params`（`draft.py:224-232`）永不填這些欄。改的 `main.py` 區段（`run_recipe`）與網站那批未提交區段（import、`get_ai_provider`、interpret）不重疊。
+- [做] WC-P3-03：WorkflowInterpretation 模組＋typed object；引註 ⊆ 各站 manifest 聯集；使用者判斷由伺服器照抄人的紀錄；`no_preset_conclusion` = 至少一條改判條件且無結論類鍵。
+- [本機 L1／L2 審查] 兩支背景 agent 完成後我審 diff，退回修正：L1 F1 專案零學術來源時對「不用文獻搜尋」的 recipe 也會拋錯（adapter 在登錄時就建）、F2 真實來源仍寫「合成資料已過期」；L2 F1 結構段（關係人／選項／研究）裡的壞引註不進 invalid_refs → 閘放行、F2 sha256 缺也算可解析、F3 匯出 markdown 缺來源附錄與「本報表的問題」、F4 表格格內 `|` 未跳脫。修正中。
+- REALTEST_WAIVED: DOC_ONLY -- 只加計畫卡；新引用 file:line 以 `git show HEAD:` 與 grep 驗
+- REVIEW_WAIVED: DOC_ONLY -- 讀回自審；程式由各卡突變與合併時 critic 把關
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`HUMAN_REQUIRED_MISSING|missing_human_required|run_workflow_interpretation|method-human-required` | hits=3（3 行，全在計畫檔新卡；程式 0）
 ## 2026-09-26（續59）研究線 WC-P1-15 期末閘 8/9：prod ①–④、⑥–⑨ PASS；⑤ prod 抹除未驗；§0／§3.3／§5／§7／§12.7／TASKS 回填
 - [操作者] 公司 run＝SOULFUL EXPRESSION；③ 臨時測試頁；身分＝主機短效 session。⑤ 原指定真人，本線 AI 回應被模型端安全過濾中斷（寫人名蒐集腳本一次、寫抹除驗證腳本一次），操作者改「你決定」→ ⑤ 記未驗（計畫 §7 R29），不交他 session 代做。
 - [身分] 操作者 identity 以 `issue_session_for_identity` 開 session，`expires_at` 改 30 分；token 只在主機 `/home/ubuntu/.wc15-session`（600），curl 在主機讀檔；兩次用完 `revoke_session`＋刪檔。
