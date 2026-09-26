@@ -1,4 +1,10 @@
 ﻿# Worklog
+## 2026-09-26（續50）合併雲端 T27：Chatwoot——系統模式擋下時暫停 AI、轉真人（未部署）
+- [根因] webhooks/chatwoot 不讀系統模式，emergency_stop（停下失常自動化的開關）期間 AI 照樣自動回覆、花額度。決策 `agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md`。
+- [來源] `claude/cc-t27-cs-mode-handoff` 6075df1f0：claimMessage 之後（重送同訊息走 duplicate，不會重發備註）、reserveCsCredit／handleInbound 之前查 gate；擋下（含讀不到）→ 私密備註「AI 暫停：系統處於 <mode> 模式，已轉真人」→ handoffToHuman，一律 2xx。production-change-coverage 的 chatwoot-client 目標併入 T26 commit（同檔）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit 0；npm test 215 files 2025 passed；route.test.ts 8/8；突變（拔 gate、gate 移到 handleInbound 後）紅→還原綠 | exit=0 | ms=180000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/0m（Codex 三輪此區無發現；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=system_mode_blocked | hits=3（route、測試、決策紀錄）
 ## 2026-09-26（續49）合併雲端 T25：sg-deploy 以實際發布埠探 next-admin；修復健康探針檢查 GitHub repo 可達（不看外觀用的 App 狀態）（未部署）
 - [根因] sg-deploy.sh next-admin smoke 寫死 127.0.0.1:3002（compose 可覆寫發布埠）；repairs/health 的 GAP-03 GitHub 欄位無 smoke 讀。
 - [來源] `claude/cc-t25-detector-gaps` dfd5e0037：`docker port lobster-next-admin 3000/tcp`（fallback 3002）＋host-script 測試 8 例；Get-RepairProbeFindings 加 GitHub 檢查。
