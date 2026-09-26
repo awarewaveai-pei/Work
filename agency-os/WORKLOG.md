@@ -1,4 +1,18 @@
 ﻿# Worklog
+## 2026-09-26（續35）研究線 P1 工作卡 15 張（計畫 §12.7）；計畫 v1.51
+- [做] `RESEARCH_LINES_MASTER_PLAN.md` 新 §12.7：WC-P1-01～15（照 §12.2 格式）＋產卡裁定 K1–K10＋介面釘死表 I-a～I-h；A 軌（COS／SPEC）01–08、B 軌（next-admin／workflows）10–13，程式檔零交集可兩人並行；閘 14→09→15 為 High-STOP；§0 下一步加一行子項；檔頭 v1.51。只文件，未動程式。
+- [產卡發現] §3.3 照字面不可執行，卡以裁定為準（WC-P1-15 回寫 §3.3）：
+  - C1 egress 只准 https 且 allowlist 拒 port（`egress.py:89-90,38-39`）→ `lobster-next-admin:3000` 不可能；COS→NA 改走 `https://app.aware-wave.com`（K1，WF 已同路）
+  - C2 orchestrator 只在健康 run 呼叫 `sink.finalize`（`orchestrator.ts:505-520`）→ complete 放 finalize 會讓失敗 run 永遠 running；改由 execute 路由 finally 呼叫（K2）
+  - C3 CAS 內容定址、租戶內跨專案共用 blob（`tenant_scoped_cas.py:46-64`）→ 抹除只 unlink 無他列引用者，先 blob 後列（K7）
+  - C4 `run_recipe` 加 repo 依賴必須先上移 `get_project_source_repository`（Depends 在 def 時求值，`main.py:1091-1094`）
+  - C5 §5 P1 DoD「自然人 run 自動 CONFIDENTIAL」無 §3.3 元件 → 本期明填 Confidential，歸期待操作者（K10）
+- [行號] PI-b routing（`2a911dca1`）在產卡中途提交 → `main.py`／`test_api_main.py` 引用全部重核到該 HEAD；每處附 grep 錨點。
+- [未動] 程式；`apps/cognitive-web`、`dashboard.html`、`deploy.sh`；T19／T26／T27 的檔；§0 PI-b 各列。`agency-os/TASKS.md:120` 仍寫計畫 v1.49（本 session 前已漂移，不在本次 commit 範圍，WC-P1-15 回填）。
+- REALTEST_WAIVED: DOC_ONLY -- 只新增計畫章節；cited anchors 以腳本逐條對工作樹／HEAD 2a911dca1 驗 110/110
+- REVIEW_WAIVED: DOC_ONLY -- 讀回自審抓 3 處（I-h 鍵數、schema required、已關 grant 兌換行為）已修；K1–K10 設計取捨交操作者看卡放行，auth 卡（02／04／05／11／12）執行時 Deep review
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`COLLECT_RESEARCH_RUNS_TOKEN|COLLECT_RESEARCH_EXECUTE_TOKEN|collect-research-run|research-collector@|sinks/cognitive|collect-grants|COGNITIVE_OS_COLLECTION_SERVICE_URL` | hits=44（全在計畫檔，無既有碼撞名；.claude 0）；另 anchor 腳本 110 條，修 4 條差一行（`run.ts:74`、`provider.py:44-60`、`test_project_source_api.py:20-48`）
+- [下一步] 操作者看卡放行 → A、B 兩軌並行；PI-b 期末閘過才開 A 軌。
 ## 2026-09-26（續34）研究線 PI-b：分流碼（API 接受 /api 前綴、舊面板 meta /api、handoff 相對導向、nginx cognitive 區塊）＋卡片執行修正
 - [操作者] 「都要做」→ PI-b 授權；P-ARF-data 暫緩。
 - [卡片問題] C1 WC-PIb-01 先分流再部署 → `/` 在 web 容器存在前指向它；靜態 `proxy_pass http://…/;` 在容器不在時 `nginx -t` 失敗、主機所有站一起受影響。C2 WC-PIb-02 meta 寫死 `/api` → 本機 uvicorn（無 nginx）舊面板全 404。C3 WC-PIb-03 驗收 `printenv NEXT_PUBLIC_API_PREFIX` 必空（compose 未設，`apps/cognitive-web/lib/api.ts:6` 預設 `/api`）。C4 next-admin 三處「在 Cognitive OS 開啟」（`ClientHubTabs.tsx:1817`、`CollectionSourcesPanel.tsx:972`、`knowledge/page.tsx:196` → `app/api/cognitive-os/open/route.ts:69`）導向公開 `/auth/handoff`，未被 P0 凍結；分流後會落在 web。C5 主機 `/root/lobster-phase1/nginx/default.conf` 有 repo 沒有的 `hci.aware-wave.com` 區塊（漂移）。

@@ -2,7 +2,7 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.50（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.51（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
@@ -11,6 +11,7 @@
 - 最後一筆 PI-a 程式碼：`475ec80dc`、`d7cdf1010`、`7cfd90bd3`；14R Claude Python／TypeScript 真 oracle 各一份，核對修正後最終 `approve`（`2026-09-26-review-28ae67cc.md`）。完整 COS unittest 在隔離 Linux 容器 14204 項 OK（1612.765s）；8420 既有程序占用，測試 override 用 8422；`COS_TEST_*` 實值只在 Git 忽略的 `mcp/user-env.ps1`，正式 compose 埠未改。
 - 阻塞：PI-a 無。Windows 全套曾紅的 1 項（`test_ai_gateway` 預算鎖測試：把「5 秒內到達」當成不會卡死）已修：改用事件與鎖內觀察＋`tests/unit/thread_testkit.py` 的 hang guard；負載下舊版重現同一失敗、新版通過（WORKLOG 2026-09-26）。容器前兩輪的唯讀／noexec 設定錯誤不列為產品測試通過證據（詳 WORKLOG 2026-09-26 14R 結案）。
 - 下一步：PI-b（操作者 2026-09-26 已授權）→ P1。**P-ARF-data 暫緩**：操作者 2026-09-26「還沒整理好」（Airtable 資料），整理好再排，不擋 P1。
+  - P1 卡已產（§12.7 WC-P1-01～15，待操作者看卡放行）：A＝COS 軌、B＝NA／WF 軌可並行；並行期卡不改本檔，進度看 WORKLOG `WC-P1-xx 完`。
 
 | 項 | 狀態（各列查證於 2026-09-24；現況以上方進度板為準） |
 |---|---|
@@ -558,3 +559,203 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 
 ### 12.6 便宜模型禁區（遇到就停、問一題）
 prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8）；改門檻或測試期望去配合結果（I10）；自然人資料（D10／D21）；新增依賴（`pyproject.toml`／`package.json` 新套件，卡上沒列的）；改 auth／cookie／session；卡上沒列的檔；任何「可能是」——沒有 `file:line` 證據的判斷。
+
+### 12.7 P1 工作卡（Source＋Collection Service；A＝COS 軌、B＝NA／WF 軌，可兩人並行）
+**依據**：§5 P1 列、§3.3、§3.4 C1–C3／C7、§6 P1 欄；`file:line` 2026-09-26 產卡時 grep 驗。**`main`＝HEAD `2a911dca1` 行號**（PI-b routing 已提交；之後若再有 commit 改 `main.py`／`tests/unit/test_api_main.py`，行號會漂），每處附錨點：執行前 `grep -n '<錨點>'`，行號漂移但錨點中 = 照錨點做；錨點不中 = 停（12.1-7）。其餘檔工作樹 = HEAD。
+**A 軌前置**（每卡）：repo root `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` 綠；`git log --oneline -5`；WC-PIb-05 已過且 `git diff --quiet -- Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py Projects/internal/cognitive-engineering-os/tests/unit/test_api_main.py` exit 0。unit 範圍照 12.1-11。
+**B 軌前置**（每卡）：`cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit` 綠（WF 無 tsconfig，只跑 vitest）；`git log --oneline -5`；不碰雲端 T19／T26／T27 的檔（`NA/app/api/build/runs/route.ts`、`NA/lib/kick-dispatcher.ts`、`WF/src/trigger/{dispatch-action-run,orchestrate-tenant-provisioning}.ts`、printful／chatwoot 路由）。
+**並行規則（P1 覆寫 12.1-1）**：兩軌程式檔零交集（下表）；卡 commit **不改本檔**，進度只寫 WORKLOG 條目首行 `WC-P1-xx 完 <sha>`；§0／§3.3／§12.7 由 WC-P1-15 一次回填。兩軌只經「介面釘死」表溝通，要改表 = 停、兩軌同改。auth 卡（02／04／05／11／12）只新增 grant／bearer，不改既有 auth／cookie／session（12.6）；Review 用 Deep（AGENTS §4）。
+| 軌 | 卡（依序） | 只此軌可改的檔 |
+|---|---|---|
+| A COS（Python） | 01→02→03→04→05→06→07→08 | `COS/ai_lego/**`、`COS/tests/unit/**`、`COS/docker-compose.yml`、`COS/deploy/.env.example`、`SPEC/specs/domain/{source,collection-run}.schema.yaml`、`SPEC/tests/contracts/specs/domain/collection-run.fixtures.yaml` |
+| B NA／WF（TS） | 10→11→12→13 | `NA/lib/collect/run.ts`、`NA/lib/collect/sinks/{cognitive.ts,__tests__/cognitive.test.ts}`、`NA/app/api/internal/collect/runs/**`、`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（next-admin 兩行 env）、`WF/src/lib/collection/postResearchRunExecute{,.test}.ts`、`WF/src/trigger/{collect-research-run,index}.ts` |
+| 閘（High-STOP） | 14→09→15 | 主機 env／vault／部署；A、B 全完後 |
+
+**產卡裁定**（§3.3 與現碼不符處；卡以此為準，WC-P1-15 回寫 §3.3）
+- K1 COS→NA 走 `https://app.aware-wave.com`，不走 `lobster-next-admin:3000`：`COS/ai_lego/platform/net/egress.py:89-90` 只准 https、`:38-39` allowlist 拒 port；WF 已走同一路（`WF/src/lib/collection/postRunDueSchedules.ts:15`）。allowlist 只加 `app.aware-wave.com`（EC99-2 已列，`SPEC/policies/ai-execution/network-egress.yaml:354`）。
+- K2 `complete` 由 NA execute 路由在 crawl 回來後（finally）呼叫，不放 `sink.finalize`：orchestrator 只在健康 run 呼叫 finalize（`NA/lib/collect/orchestrator.ts:505-520`），失敗 run 會讓 COS run 卡 running；finalize 的語意是 tombstone 歸檔，研究來源版本由 COS supersede 管。
+- K3 grant 一次兌換、token 兌換時才鑄：COS 只存 sha256（同 handoff code `COS/ai_lego/platform/identity/store.py:342-382`）；Trigger payload 只帶 `grant_ref`，token 只在 NA 記憶體。
+- K4 WF→NA execute 用獨立 bearer `COLLECT_RESEARCH_EXECUTE_TOKEN`（一呼叫者一 token，`NA/app/api/internal/collect/run-due-schedules/route.ts:7-9`）；C3 ① `COLLECT_RESEARCH_RUNS_TOKEN` 兼作 NA→COS exchange 認證（C3「以 ① 換取」）。
+- K5 NA 不收外給的 COS 位址（§3.3 輸入的 `cos_base_url` 刪）：讀既有 env `COGNITIVE_OS_API_BASE_URL`（`NA/lib/cognitive-os/client.ts:22,47`、`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:471`），否則持 bearer 者可把 grant 導去任意主機；不 import `client.ts`（§8 退場）。
+- K6 研究 run 不用 url-state（etag）：304 不送件 → COS 無從回 `unchanged`；冪等權威只在 COS（I1）。`runCollection` 組裝抽 `crawlWith()` 共用（`NA/lib/collect/run.ts:7-9` 同一路徑原則）。
+- K7 抹除刪「本專案 aggregate」的事件列、追加一筆 `ProjectErased`（§3.3「events 不刪」= 表不清空；DoD「只剩 tombstone」照字面）；CAS blob 只在租戶內無他列引用同 hash 時 unlink（`COS/ai_lego/data/object/tenant_scoped_cas.py:46-64` 內容定址跨專案共用，§3.5）；先刪 blob 後刪列（失敗可重跑補完；反序留下無列可尋的孤兒 blob）。
+- K8 P1 新事件 payload 只放 id／hash／計數／狀態，不放 title／URL／text／seeds。
+- K9 run 分類：body 帶 `data_classification` → 400（默默忽略 CONFIDENTIAL 會丟掉 journal 加密要求）；無 `project_id` → `INTERNAL`（= 現行預設 `main:658`）。「run 分類」自 §5 P3 列提前到 P1（操作者 2026-09-26 指定），WC-P1-15 刪 P3 列該項。
+- K10 §5 P1 DoD「自然人 run 自動 `CONFIDENTIAL`」無 §3.3 元件（§3.2 步驟 1 purpose→分類未排期）：本期建專案時明填 `Confidential` 驗 D10 ①；自動推導歸期由操作者定（WC-P1-15 加 §7 列）。
+
+**介面釘死**（兩軌共用；錯誤碼即測試斷言）
+| # | 呼叫 | 認證 | 請求 | 回應 |
+|---|---|---|---|---|
+| I-a | COS→NA `POST {COGNITIVE_OS_COLLECTION_SERVICE_URL}/api/internal/collect/runs` | `Bearer <COLLECT_RESEARCH_RUNS_TOKEN>` | `{grant_ref, project_id, run_id, seeds:[{uri, meta?}], budget:{fetches}}`；seeds 1–10、`uri` 以 `entity://` 或 `https://` 起、`meta` 物件；fetches 1–200 | 202 `{ok:true, trigger_run_id}`；400 `{ok:false,error:"bad_request"}`（含 body 帶 `grant_token`／`cos_base_url`）；401；502 `{ok:false,error:"trigger_unavailable"}` |
+| I-b | NA→Trigger task `collect-research-run` | `TRIGGER_ACCESS_TOKEN` | payload = I-a body（無 token） | Trigger run id |
+| I-c | WF→NA `POST {AWAREWAVE_WEBHOOK_BASE_URL}/api/internal/collect/runs/execute` | `Bearer <COLLECT_RESEARCH_EXECUTE_TOKEN>` | = I-b payload | 200 `{ok:true, status:"completed"\|"failed", report}`；401；502 `{ok:false,error:"grant_exchange_<status>"}` |
+| I-d | NA→COS `POST {COGNITIVE_OS_API_BASE_URL}/collect-grants/{grant_ref}/exchange` | `Bearer <COLLECT_RESEARCH_RUNS_TOKEN>` | 無 | 200 `{grant_token, project_id, run_id, expires_at}`；401 `COLLECT_TOKEN_INVALID`；404 `GRANT_NOT_FOUND`；409 `GRANT_ALREADY_EXCHANGED`；410 `GRANT_EXPIRED` |
+| I-e | NA→COS `POST /projects/{project_id}/sources/ingest` | `Authorization: Grant <grant_token>` | `{run_id, sources:[C1 ×1–25]}` | 200 `{results:[{canonical_url, outcome:"created"\|"unchanged"\|"superseded", source_id}]}`；400 `SOURCE_HASH_MISMATCH`（整批零寫入）；401 `GRANT_INVALID`；403 `GRANT_PROJECT_MISMATCH`；409 `COLLECTION_RUN_NOT_RUNNING` |
+| I-f | NA→COS `POST /projects/{project_id}/collections/{run_id}/complete` | Grant | `{status:"completed"\|"failed", report:{fetched, written, unchanged, refused, stopped_by}, error?}` | 200 `{run_id, status}`；之後同 grant → 401 |
+| I-g | 人→COS `POST /projects/{id}/collections` | session | `{seeds, budget?, confirm?}` | 無 `confirm:true` → 200 `{plan:{seeds, max_queries, max_fetches}}` 零寫入；`confirm:true` → 202 `{run_id, status:"requested"}`；409 `COLLECTOR_IDENTITY_MISSING`；502 `COLLECTION_SERVICE_UNAVAILABLE`（run=failed）；503 `COLLECTION_SERVICE_UNCONFIGURED` |
+| I-h | 人→COS `GET /projects/{id}/collections/{run_id}` | session | — | 200 = `collection-run.schema.yaml` 物件（WC-03；status ∈ requested\|running\|completed\|failed；不含 seeds）；404 |
+
+**WC-P1-01 Source 溯源欄位＋supersede**（A）
+- 目標：Source 列帶 C1 溯源欄位；同 URL 新 hash 以同交易 supersede 換版（I1）。
+- 前置：A 軌前置。
+- 讀：`COS/ai_lego/core/domain/source.py:17-95`（`:87-88` 固定 active／1）；`SPEC/specs/domain/source.schema.yaml:1-32`（`:12` required、`:25` status enum）；`repo:21-85`（`prov_sources :36-59`）、`:100-133`、`:152-165`、`:176-198`、`:240-296`；`SPEC/specs/cognitive/typed-objects/iceberg-model-analysis.schema.yaml:81-83`（provenance `$ref`）；`COS/tests/unit/test_intake_schemas.py:47,87`（schema 驗 source）。
+- 樣板：`doi…published_at` 加欄法（`source.py:30-33,65-74`；schema `:29-32`；`repo:124-133,152-157`）；舊庫升級測試 `COS/tests/unit/test_project_source_repository.py:126-160`。
+- 改：`source.py` `source_record` 加 kw-only `canonical_url, source_uri, fetched_at, provenance, source_class, relevance, supersedes_source_id`（預設 None；provenance 非 None 必 == `{epistemic_type:"EVIDENCE", authorship_state:"SOURCE_QUOTATION", locked:None}`，否則 `SOURCE_PROVENANCE_INVALID`，I2）；schema → `1.2.0`、七欄 nullable（provenance = `oneOf [null, $ref provenance_record]`、relevance = object|null）、status enum 加 `superseded`；`repo` 七欄進 `CREATE TABLE`＋`_SOURCE_MIGRATION_COLUMNS`（`provenance_json`／`relevance_json` 存 JSON）＋`_SOURCE_COLUMNS`／`_SOURCE_SELECT`／INSERT／`_source_from_row`，新欄讀 `record.get(col)`（舊呼叫端 dict 無此鍵）；index `ix_prov_sources_canonical (tenant_id, project_id, canonical_url, status)` **建在 `_migrate_source_columns` 的 ALTER 之後**（放 `_SCHEMA` 會在舊庫因欄位不存在而炸）；insert 抽私有 `_insert_source(connection, …)`，`add_source` 改呼叫它；新 `find_active_source(tenant_id, project_id, canonical_url)`；新 `supersede(old_source_id, record, cas_path)`：同交易 `UPDATE … SET status='superseded' WHERE … AND status='active'`（rowcount≠1 → `SOURCE_SUPERSEDE_CONFLICT`）＋`_insert_source`（`record["supersedes_source_id"]` 必 = old）＋`SourceAdded`（新）＋`SourceSuperseded`（aggregate `source:<old>`，payload `{source_id, superseded_by, project_id}`，K8）。新 `COS/tests/unit/test_source_provenance.py` ≥6 案：七欄 round-trip；舊庫重開自動升級且 index 存在；supersede 後舊 superseded、新 active 且指向舊；舊列非 active → 衝突且零寫入；provenance 非 EVIDENCE → `SOURCE_PROVENANCE_INVALID`；新列過 `source.schema.yaml`。
+- 不改：`main.py`；`create_source`（手動來源七欄 None）。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_source_provenance $(grep -rlE "core\.domain\.source|core\.domain import source|project_source_repository" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`
+- 突變（§6 欄外，本卡自訂）：supersede 拿掉舊列 UPDATE → 「舊 superseded」案紅。
+- commit：`feat(cognitive-os): Source provenance fields + same-transaction supersede (P1 WC-01, I1)`。回滾：revert（新欄 nullable，舊碼不讀）。
+
+**WC-P1-02 Ingest grant＋collector identity＋bootstrap `--tenant-id`**（A，auth）
+- 目標：每 run 一把短效、一次兌換、只存 hash 的 grant（K3）；寫入身分 = 操作者 tenant 內的 collector identity。
+- 前置：01 已合併。
+- 讀：`COS/ai_lego/platform/identity/store.py:41-46`（TTL 慣例）、`:52-127`（`_SCHEMA`；`handoff_code :101-109`）、`:186`、`:220`、`:244`、`:316-382`；`COS/ai_lego/apps/cli/bootstrap_service_identity.py:1-89`（`:47-58` 只會建新 tenant；`:64` `--legal-name` 必填）；`COS/tests/unit/test_identity_store.py:18-36`。
+- 樣板：`store.py:342-382`。
+- 改：`store.py`：`COLLECT_GRANT_TTL = timedelta(minutes=30)`、`COLLECTOR_EMAIL = "research-collector@cognitive-os.local"`；表 `collect_grant(grant_ref TEXT PRIMARY KEY, tenant_id, project_id, run_id, collector_identity_id REFERENCES identity(identity_id), scope TEXT NOT NULL DEFAULT 'source.ingest', created_at, expires_at, token_hash TEXT UNIQUE, exchanged_at, closed_at)`；`find_collector_identity(tenant_id)`（包 `_find_identity_by_email`）；`issue_collect_grant(tenant_id, project_id, run_id, collector_identity_id) -> grant_ref`（`secrets.token_urlsafe(16)`）；`exchange_collect_grant(grant_ref)`：一次性，token = `secrets.token_urlsafe(32)` 只存 sha256，錯誤 `InvariantViolation("GRANT_NOT_FOUND"|"GRANT_ALREADY_EXCHANGED"|"GRANT_EXPIRED")`（已關 = `GRANT_EXPIRED`：COS 已判 run 失敗後 Trigger 仍啟動的情形），回 `{grant_token, project_id, run_id, expires_at}`；`resolve_collect_grant(raw_token)` → `{grant_ref, tenant_id, project_id, run_id, collector_identity_id}`，未兌換／過期／已關 = None；`close_collect_grant(grant_ref)`；`close_collect_grants_for_project(tenant_id, project_id)`。`bootstrap_service_identity.py`：函式加 `tenant_id: str | None = None`——給了就 `store.get_tenant`，無 → `InvariantViolation("TENANT_NOT_FOUND")`，有 → 不建 tenant／workspace、只建 identity；argparse 加 `--tenant-id`，`--legal-name` 改「無 `--tenant-id` 時必填」（手動檢查，stderr＋exit 2）。新 `COS/tests/unit/test_collect_grant.py` ≥8 案：發放→兌換→resolve 得同 project／run；二次兌換 → ALREADY_EXCHANGED；過期兌換 → EXPIRED 且 resolve None；已關未兌換 → EXPIRED；close 後 resolve None；DB 只有 hash（`token_hash` ≠ raw）；`close_collect_grants_for_project` 只關該專案；`--tenant-id` 既有 → tenant 數不變、identity +1；`--tenant-id` 不存在 → exit 1 且零寫入。
+- 不改：handoff／session／password 路徑；`main.py`。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_collect_grant $(grep -rlE "identity\.store|identity import store|bootstrap_service_identity" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`
+- 突變（欄外）：exchange 拿掉「`exchanged_at IS NULL`」條件 → 二次兌換案紅。
+- commit：`feat(cognitive-os): one-shot ingest grants + collector identity in an existing tenant (P1 WC-02, C3/K3)`。回滾：revert（新表無人讀）。
+
+**WC-P1-03 Collection run schema＋repo 狀態機**（A）
+- 目標：collection run 成為 domain 物件（schema、表、狀態轉移、事件）。
+- 前置：01 已合併。
+- 讀：`SPEC/specs/domain/source.schema.yaml:1-12`（檔頭慣例）；`SPEC/tests/contracts/specs/domain/tenant.fixtures.yaml:1-25`（fixtures 格式）；`repo:21-85,176-219,335-338`；`main:650-652`（run_id 規則，錨點 `WORKFLOW_RUN_ID_INVALID: use 1-80`）。
+- 樣板：`repo:200-219`（寫列＋同交易事件）；fixtures 同上。
+- 改：新 `SPEC/specs/domain/collection-run.schema.yaml`（`$id ai-lego://specs/domain/collection-run.schema.yaml`、1.0.0、`additionalProperties:false`、required `[run_id, project_id, tenant_id, status, seeds_count, max_fetches, requested_by_identity_id, requested_at, completed_at, report]`（completed_at／report 可 null）；status enum 四值；`run_id` pattern `^[A-Za-z0-9_-]{1,80}$`；report = null 或 `{fetched, written, unchanged, refused: int≥0, stopped_by: string}`）；新 `SPEC/tests/contracts/specs/domain/collection-run.fixtures.yaml`（valid：requested、completed；invalid：status 不在 enum、run_id 含空白、report 缺鍵）；`repo` `_SCHEMA` 加 `collection_runs(tenant_id, project_id, run_id, status, seeds_json, budget_json, requested_by_identity_id, requested_at, completed_at, report_json, PRIMARY KEY (tenant_id, run_id), FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects)`；`create_collection_run(...)`（同交易 `CollectionRequested` @ `project:<pid>`，payload `{run_id, seeds_count, max_fetches}`，K8）；`get_collection_run(tenant_id, project_id, run_id)`（I-h 形狀，不回 seeds）；`mark_collection_running(tenant_id, run_id)`（requested→running＋`CollectionStarted`）；`finish_collection_run(tenant_id, run_id, status, report)`（requested|running→completed|failed＋`CollectionCompleted`／`CollectionFailed`）；非法轉移 → `COLLECTION_RUN_STATE_INVALID`。新 `COS/tests/unit/test_collection_run_repository.py` ≥6 案：三事件順序；completed 再 finish → STATE_INVALID；get 過 schema（`self.contracts.validate` 同 `test_intake_schemas.py:47`）；跨租戶 get → None；不存在的 project → 拒；事件 payload 鍵 ⊆ `{run_id, seeds_count, max_fetches, status, report}`。
+- 不改：`main.py`。
+- 驗收：`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py >/dev/null && cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_collection_run_repository -q 2>&1 | tail -1` → `OK`
+- 突變（欄外）：一個 invalid fixture 改標 valid → golden 紅（`&&` 前段非 0，無 `OK`）。
+- commit：`feat(cognitive-os): collection-run domain schema + repository state machine (P1 WC-03)`。回滾：revert（新表）。
+
+**WC-P1-04 Collection run 端點＋grant 兌換＋呼叫 Collection Service**（A，auth）
+- 目標：I-g／I-h／I-d／I-f 四端點；confirm 前零寫入（C7）；NA 失敗 → run=failed。
+- 前置：02、03 已合併。
+- 讀：`main:331`、`:338-340`（可覆寫依賴，錨點 `def get_ai_provider`）、`:1052-1074`（repo／CAS 依賴、`_project_or_404`）、`:1077-1110`（`mint_handoff`；`:1091-1094` Depends 在 def 時求值）、`:1128`、`:1329-1365`（`create_project`：entitlement→驗證→寫）；`COS/ai_lego/platform/net/egress.py:73-118`；`COS/ai_lego/platform/ai_gateway/provider.py:44-60`（fetch 注入）；`COS/tests/unit/test_project_source_api.py:20-48`；I-a、I-d、I-f、I-g、I-h。
+- 樣板：`provider.py:44-60`；`main:1077-1110`。
+- 改：新 `COS/ai_lego/platform/net/collection_service.py`：`CollectionServiceClient(base_url, token, *, fetch=fetch_json).start_run(grant_ref, project_id, run_id, seeds, budget)`（`fetch(base_url+"/api/internal/collect/runs", 20.0, method="POST", headers={"Authorization": f"Bearer {token}"}, body=…, error_prefix="COLLECTION_SERVICE")`）；`collection_service_from_env()`：`COGNITIVE_OS_COLLECTION_SERVICE_URL`（預設 `https://app.aware-wave.com`）＋`COLLECT_RESEARCH_RUNS_TOKEN`，缺 token → None。`main.py`（錨點 `def create_source` 之後；加 `import hmac`）：`get_collection_service()` 依賴；`RESEARCH_COLLECT_CAPABILITY="research.collect"`（C7）；`MAX_RESEARCH_SEEDS=10`、`MAX_RESEARCH_FETCHES=200`（= `NA/lib/collect/run.ts:74`）、`RESEARCH_MAX_QUERIES_PER_ENTITY=16`（= `NA/lib/collect/search/query-plan.ts:84`；上限非精算，精算 P3）；`POST /projects/{id}/collections`：entitlement → `_project_or_404` → seeds 驗證（I-a 規則，meta JSON ≤4096 bytes）→ 無 `confirm:true` 回 plan（`max_queries` = entity seed 數×16）→ service None → 503 → `store.find_collector_identity` 無 → 409（訊息指 `bootstrap_service_identity --tenant-id`）→ `run_id=uuid4().hex` → `create_collection_run` → `issue_collect_grant` → `start_run`；`InvariantViolation` → `finish_collection_run(failed, None)`＋`close_collect_grant`＋502 → 成功 202；`GET …/collections/{run_id}`（tenant scope，無 → 404）；`POST /collect-grants/{grant_ref}/exchange`：`hmac.compare_digest` 比 env `COLLECT_RESEARCH_RUNS_TOKEN`（未設 → 401，fail closed，同 `NA/app/api/internal/collect/run-due-schedules/route.ts:27-32`）→ 錯誤碼照 I-d → `mark_collection_running`；`require_grant` 依賴（I-e／I-f 共用）：`Authorization: Grant <t>` → `resolve_collect_grant` None → 401、path project ≠ grant → 403；`POST …/collections/{run_id}/complete`：run_id ≠ grant → 403 → `finish_collection_run`＋`close_collect_grant`。新 `COS/tests/unit/test_api_collections.py`（繼承 `ProjectSourceApiTestCase`；`dependency_overrides[get_collection_service]` = 記錄呼叫的 FakeClient）≥10 案：未登入 401；無 confirm → plan 且 run 表／grant 表／FakeClient 皆 0；無 collector → 409；confirm → 202、FakeClient 收到 `grant_ref` 而非 token、run=requested；FakeClient 拋 → 502、run=failed、grant 已關；exchange 錯 bearer → 401；exchange 兩次 → 200 後 409；exchange 後 GET = running；complete 後 GET = completed 且同 grant 再 complete → 401；別專案路徑 → 403；跨租戶 GET → 404。
+- 不改：既有 auth／cookie／session；`create_source`；`egress.py`。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_api_collections $(grep -rlE "apps\.api\.main|apps\.api import main" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`
+- 突變（欄外）：`create_collection_run` 移到 confirm 判斷前 → 「無 confirm 零寫入」案紅。
+- commit：`feat(cognitive-os): project collection runs -- plan/confirm, grant exchange, complete; calls the Collection Service (P1 WC-04, C3/C7)`。回滾：revert（端點下線；表留著無害）。
+
+**WC-P1-05 ingest 端點**（A，auth）
+- 目標：I-e：grant 綁專案、hash 重算、冪等／supersede、整批單交易（C1／C2、R2）。
+- 前置：04 已合併。
+- 讀：`main:1397-1446`（`create_source`：先驗後寫 CAS、`cas_path_for` 無 I/O；錨點 `def create_source`）、`:1318-1326`；`repo` 的 `find_active_source`／`supersede`／`_insert_source`（WC-01）；§3.4 C1、C2；I-e。
+- 樣板：`main:1397-1446`。
+- 改：`main.py`（錨點 `def create_source` 之後）：`IngestSource`／`IngestRequest` pydantic（C1 十五鍵；`sources` 1–25；`schema_version=="1"`）；`POST /projects/{project_id}/sources/ingest`（`Depends(require_grant)`，無 session）：①全批先驗：`hashlib.sha256(text.encode("utf-8")).hexdigest()==content_sha256` 否則 400（零寫入）、bytes ≤ `MAX_SOURCE_CONTENT_BYTES`、run 必 running 否則 409；②同批同 canonical_url 取最後一筆；③CAS put 在交易前（`cas_path_for`／`artifact_uri` 同 `create_source`）；④`repo` 新 `ingest_batch(tenant_id, project_id, items)` 一個 `_connection()` 內逐筆：`find_active_source` 同 sha → `unchanged`（不 put）、異 sha → `supersede`、無 → insert；欄位：`data_classification` = project 的、`media_type="text/plain"`、`created_by_identity_id` = grant 的 collector、`title[:300]`（空 → canonical_url[:300]）、`authors=[author]` 或 None、`published_at` >40 字 → None；mime／content_type／collector 只驗型別不落欄（§3.3 欄位表未列）。新 `COS/tests/unit/test_api_ingest.py` ≥10 案：created → 重送全 `unchanged` 且列數不變；改 text → `superseded`＋`SourceSuperseded`；壞 hash → 400 且 CAS 物件數與列數不變；無 header／亂 token → 401；過期 grant → 401；grant 屬 A、路徑 B → 403 且 B 零列；complete 後 ingest → 401；`created_by_identity_id` = collector；provenance 非 EVIDENCE → 400；Confidential 專案 → 來源 `Confidential`。
+- 不改：`create_source`；`source.py`。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_api_ingest $(grep -rlE "apps\.api\.main|apps\.api import main|project_source_repository" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`
+- 突變（§6 P1 欄三項皆在本卡）：不查 `find_active_source` → 冪等案紅；拔 hash 比對 → 壞 hash 案紅；`require_grant` 拔 project 比對 → 403 案紅。
+- commit：`feat(cognitive-os): POST /projects/{id}/sources/ingest -- grant-bound, hash re-verified, idempotent, supersede in one transaction (P1 WC-05, C1/C2)`。回滾：revert。
+
+**WC-P1-06 專案級抹除（D10）**（A）
+- 目標：`DELETE /projects/{id}` 刪來源列、CAS、artifact、run、本專案事件，留 `ProjectErased`；共用 blob 不誤刪（K7）。
+- 前置：05 已合併。
+- 讀：`repo:21-85`、`:322-333`、`:351-369`；`COS/ai_lego/data/object/tenant_scoped_cas.py:37-64,103-124`（`unlink :116-124`）；`COS/ai_lego/data/object/json_artifact_store.py:49-77`（`delete :71-77`）；`main:1043`、`:1665-1673`（錨點 `@app.delete("/workflows/custom`）；§3.3 抹除列；§3.5。
+- 樣板：`main:1665-1673`。
+- 改：`repo` 新 `erase_plan(tenant_id, project_id)`（唯讀：本專案 source 的 cas_path，**排除**租戶內他專案仍有列引用同 `content_sha256` 者；`project_interpretations` 的 artifact_reference）與 `erase_project(tenant_id, project_id, erased_by_identity_id, counts)`（單交易：`DELETE FROM events WHERE tenant_id=? AND aggregate_id IN ('project:<pid>','source:<sid>'…)` → 刪 `prov_sources`／`project_interpretations`／`collection_runs`／`platform_projects` 列 → `ProjectErased` @ `project:<pid>`，payload `{project_id, erased_by_identity_id, sources, blobs_unlinked, artifacts_deleted, events_deleted}`）；`main.py` `DELETE /projects/{project_id}`（session＋`PROJECT_MANAGE_CAPABILITY`＋`_project_or_404`）：erase_plan → 逐一 `source_cas.unlink`（`CAS_OBJECT_NOT_FOUND` = 已刪；其他錯 → 500 不動 DB）→ 逐一 `artifact_store.delete`（同）→ `store.close_collect_grants_for_project` → `erase_project` → 200 `{project_id, erased:{…}}`。新 `COS/tests/unit/test_project_erase.py`（繼承 `ProjectSourceApiTestCase`）≥8 案（= §5 P1 DoD 負向）：刪後 `GET /projects/{id}` 404；`list_sources` 空；`source_cas.read` 拋 `InvariantViolation`；解讀 artifact `read` 拋；`list_events(project:<pid>)` 只剩 `ProjectErased`、`list_events(source:<sid>)` 空；同租戶他專案同內容來源仍可讀；刪後原 grant ingest → 401；跨租戶 DELETE → 404 且原專案完好。
+- 不改：`TenantScopedCas`／`JsonArtifactStore`；recipe journal（以 tenant＋run_id 存、不以 project 索引，`main:656`；範圍外，WC-P1-15 加 §7 列）。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_project_erase $(grep -rlE "apps\.api\.main|apps\.api import main|project_source_repository" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`
+- 突變（欄外）：erase_plan 拿掉「他專案仍引用」排除 → 共用 blob 案紅。
+- commit：`feat(cognitive-os): DELETE /projects/{id} -- sources, CAS, artifacts, runs and project events erased; ProjectErased tombstone (P1 WC-06, D10/K7)`。回滾：revert（端點下線；已刪資料不回 = 本卡目的）。
+
+**WC-P1-07 run 分類伺服器端推導**（A）
+- 目標：recipe run 分類由 Project 決定，不讀 body（K9）。
+- 前置：06 已合併。
+- 讀：`main:569-703`（`run_recipe`；`:658-666` 錨點 `classification = body.get("data_classification"`）、`:1052-1074`、`:1091-1094`、`:1305-1308`（兩套分類詞彙）；`COS/tests/unit/test_api_main.py`（HEAD）`:34-68`（`ApiTestCase`）、`:1320-1342`、`:1360-1388`（三個 `"data_classification": "CONFIDENTIAL"` 舊測試）。
+- 樣板：`main:1397-1408`（`Depends(get_project_source_repository)`＋`_project_or_404`）。
+- 改：`get_project_source_repository`、`get_source_cas`、`_project_or_404`（`main:1052-1074`）原樣上移到 `run_recipe` 前（`get_artifact_store` `:331` 旁）——不上移則 NameError（`:1091-1094`）；`run_recipe` 加 `repo=Depends(get_project_source_repository)`；`:658-660` 改：body 有 `data_classification` → 400 `WORKFLOW_DATA_CLASSIFICATION_SERVER_DERIVED`；無 `project_id` → `"INTERNAL"`；有 → `_project_or_404(...)["data_classification"].upper()`；`:661-666` 不動。依 12.1-13 更新三舊測試（`test_protected_recipe_run_result_restores_outputs_and_fails_closed_without_key`、`test_confidential_source_requires_encrypted_journal_provider`、`test_local_dev_provider_writes_encrypted_cas_checkpoint`）：`"data_classification": "CONFIDENTIAL"` → `"project_id": self._confidential_project_id()`（`ApiTestCase` 新 helper：`dependency_overrides[get_project_source_repository]` 指 `self._tmpdir` 內 repo，`POST /projects` 建 `Confidential`），原斷言全留。新 `COS/tests/unit/test_run_classification.py` ≥4 案：Confidential 專案＋key mode disabled → 503 `WORKFLOW_JOURNAL_PROTECTION_REQUIRED`；body 帶分類 → 400；無 project_id＋disabled → 200；未知 project → 404。
+- 不改：`build_api_journal_protector`；`dashboard.html`／`apps/cognitive-web`（兩者 run body 不帶分類：`grep -c data_classification COS/ai_lego/apps/api/dashboard.html` = 0）。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_run_classification $(grep -rlE "apps\.api\.main|apps\.api import main" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`
+- 突變（欄外）：改回讀 body → 「body 帶分類 400」「Confidential 專案 503」兩案紅；三舊測試改回舊值 → 紅（12.1-13 d）。
+- commit：`fix(cognitive-os): recipe run classification comes from the Project, never the request body (P1 WC-07, K9); 3 tests moved to the new contract per 12.1-13`。回滾：revert。
+
+**WC-P1-08 Egress allowlist（兩處）＋COS 端 env**（A）
+- 目標：COS 能呼叫 Collection Service；compose 與 policy 兩處一致由測試守（K1）。
+- 前置：04 已合併。
+- 讀：`COS/docker-compose.yml:20-30`（`:22-23` 註解要求兩處同步、`:24` 現值）；`SPEC/policies/ai-execution/network-egress.yaml:340-377`（EC99-2，`:354` 已含 `app.aware-wave.com`）；`egress.py:28-41`；`COS/deploy/.env.example:1-8`。
+- 樣板：`.env.example:2-3`。
+- 改：`COS/docker-compose.yml:24` → `COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST=api.anthropic.com,app.aware-wave.com`，下一行加 `COGNITIVE_OS_COLLECTION_SERVICE_URL=https://app.aware-wave.com`（非機密；`environment:` 覆蓋 env_file，§11）；`.env.example` 加 `COLLECT_RESEARCH_RUNS_TOKEN=`（註：與 NA 同值，C3 ①；缺 → collections 503）；yaml 不改（已列）。新 `COS/tests/unit/test_egress_allowlist_parity.py` ≥2 案：compose（`PRODUCT_ROOT/"docker-compose.yml"`，`yaml.safe_load`，`services.cognitive-os-api.environment` 取鍵）的 allowlist 經 `egress_allowlist({...})` 不拋且 ⊆ EC99-2 allowlist（`resolve_spec_root()/"policies/ai-execution/network-egress.yaml"`）；`app.aware-wave.com` ∈ 兩處。
+- 不改：`egress.py`（https-only 與拒 port 是安全性質，不為內部呼叫開洞）；yaml。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_egress_allowlist_parity -q 2>&1 | tail -1` → `OK`
+- 突變（欄外）：compose allowlist 加 `example.com` → parity 案紅。
+- commit：`feat(cognitive-os): egress allowlist adds app.aware-wave.com; compose subset of policy EC99-2 is a test (P1 WC-08, K1)`。回滾：revert（prod 於 WC-P1-14 重部署才生效）。
+
+**WC-P1-09 journal key mode ≠ disabled（prod，High-STOP）**（A 端；閘階段在 14 後執行）
+- 目標：prod `COGNITIVE_OS_JOURNAL_KEY_MODE=local-dev`＋32-byte key；Confidential 專案的 recipe run 不再 503（§5 P1 DoD）。
+- 前置：WC-P1-14 完成；操作者 go-ahead（prod secret＋`.env`，AGENTS §3）。
+- 讀：`COS/ai_lego/platform/workflow/journal_protection.py:53-70`（local-dev 讀 `COGNITIVE_OS_JOURNAL_KEY_B64`，須 32 bytes）；`main:178-198`（`external` 需注入 resolver，prod 無 → 只剩 local-dev）、`:664-666`；`COS/deploy/.env.example:1-8`；AGENTS §0 Secrets。
+- 樣板：`.env.example:6-8`。
+- 改：`.env.example` 加 `COGNITIVE_OS_JOURNAL_KEY_MODE=local-dev`、`COGNITIVE_OS_JOURNAL_KEY_B64=`（註：32 bytes base64；遺失 = 已加密 journal 讀不回，先入 vault）；主機：`python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"` → `scripts/secrets-vault.ps1` 存 `COGNITIVE_OS_JOURNAL_KEY_B64` → `/opt/cognitive-os/Projects/internal/cognitive-engineering-os/deploy/.env` 加兩行 → `bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh`（此鍵不在 compose `environment:`，不被覆蓋）。
+- 不改：`journal_protection.py`、`build_api_journal_protector`、compose。
+- 驗收：`ssh -p 58122 ks-aw-01 'docker exec cognitive-os-api printenv COGNITIVE_OS_JOURNAL_KEY_MODE'` → `local-dev`
+- 突變（欄外）：主機不做破壞性突變；「disabled → 503」由 WC-07 `test_run_classification` Confidential 案在本機守（貼該案紅→綠三行）。
+- commit：`ops(cognitive-os): journal key mode local-dev on prod; .env.example documents it (P1 WC-09)`。回滾：主機 `.env` 刪兩行 → `deploy.sh`（Confidential 專案 run 回到 503；已加密 journal 需 key 才讀得回）。
+
+**WC-P1-10 `sink/cognitive`**（B）
+- 目標：唯一知道 COS 的檔：RawDoc → C1、批次 I-e、計數入 SinkReport；不實作 finalize（K2）。
+- 前置：B 軌前置。
+- 讀：`NA/lib/collect/types.ts:41-81`（ProvenanceRecord、RawDoc）、`:121-132`、`:226-241`（SinkBlock）；`NA/lib/collect/sinks/kb.ts:106-123`（meta 白名單取法）、`:125-248`；`NA/lib/collect/collectors/entity-dossier.ts:297-306`（`meta.sourceClass`）；`NA/lib/collect/orchestrator.ts:505-520`；§3.4 C1；I-e。
+- 樣板：`kb.ts:106-123,125-248`；測試 `NA/lib/collect/sinks/__tests__/kb.test.ts:1-30`。
+- 改：新 `NA/lib/collect/sinks/cognitive.ts`：`createCognitiveSink({baseUrl, projectId, runId, grantToken, fetchImpl?}): SinkBlock`（id `sink/cognitive`）；匯出 `toSourceProjection(doc)`：C1 十五鍵（`canonical_url←canonicalUrl, source_uri←uri, content_sha256←contentHash, mime, content_type←contentType, title←(title ?? canonicalUrl).slice(0,300), author, published_at←publishedAt, fetched_at←fetchedAt, text`（原樣，**禁截斷**：截斷即 hash 不符）`, provenance, collector, source_class←meta.sourceClass ?? null, relevance←{entityConfidence, entityAnchorsHit, searchAngle, searchQuery} 有值者, schema_version:"1"`）；`run`：text 空或 UTF-8 >5 MiB → 不送、`errors.push("too_large:"+canonicalUrl)`；每 25 筆 `POST {baseUrl}/projects/{projectId}/sources/ingest`（`Authorization: Grant <token>`、body `{run_id, sources}`、`AbortSignal.timeout(30_000)`）；200 → created＋superseded 計 written、unchanged 計 skipped；非 200 → `errors.push("ingest_"+status)`，不拋。新 `NA/lib/collect/sinks/__tests__/cognitive.test.ts` ≥7 案：投影鍵集合恰為 C1 十五鍵（無 raw／tenantRef／整包 meta）；relevance 只含白名單；text 不截斷；26 筆 → 2 次 POST；header `Grant <token>`；401 → errors 含 `ingest_401` 且不拋；`finalize` 為 undefined。
+- 不改：`kb.ts`、`run.ts`（WC-12）、orchestrator。
+- 驗收：`cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit && npx vitest run lib/collect/sinks/__tests__/cognitive.test.ts 2>&1 | grep -E "Tests +[0-9]+ passed"` → `Tests  N passed (N)`（N ≥ 7）
+- 突變（欄外）：text 改 `.slice(0, 100000)` → 「不截斷」案紅。
+- commit：`feat(next-admin): sink/cognitive -- RawDoc to Source projection, batched grant-bound ingest (P1 WC-10, C1)`。回滾：刪兩檔（WC-12 前無人 import）。
+
+**WC-P1-11 NA `runs` 路由（COS→NA，觸發 WF）**（B，auth）
+- 目標：I-a／I-b：驗 bearer ①與 body、觸發 `collect-research-run`，payload 無 token（K3／K5）。
+- 前置：B 軌前置。
+- 讀：`NA/app/api/internal/collect/run-due-schedules/route.ts:1-35`（`verifyToken :27-32` fail closed）；`NA/app/api/tools/tarot/batch/route.ts:19-26,57-91`（Trigger REST 觸發）；`NA/lib/collect/orchestrator.ts:35-41`（SeedInput）；I-a、I-b。
+- 樣板：`run-due-schedules/route.ts:16-35`＋`tarot/batch/route.ts:57-91`；測試 `NA/app/api/internal/collect/run-due-schedules/route.test.ts:1-40`。
+- 改：新 `NA/app/api/internal/collect/runs/route.ts`：`verifyToken` 讀 `COLLECT_RESEARCH_RUNS_TOKEN`；body 驗證照 I-a（`run_id` 符 `^[A-Za-z0-9_-]{1,80}$`；budget 預設 200）；**body 含 `grant_token` 或 `cos_base_url` → 400**；`TRIGGER_API_URL`／`TRIGGER_ACCESS_TOKEN` 缺 → 502；`POST {TRIGGER_API_URL}/api/v1/tasks/collect-research-run/trigger` body `{payload:{grant_ref, project_id, run_id, seeds, budget}}`、timeout 20s；非 2xx／拋 → 502；成功 202 `{ok:true, trigger_run_id}`。新 `NA/app/api/internal/collect/runs/route.test.ts` ≥7 案：無／錯 bearer → 401 且零 fetch；token env 未設 → 401；seeds 0 或 11 → 400；`http://` uri → 400；帶 `grant_token` → 400；Trigger 500 → 502；成功 → 202 且 payload 鍵恰為五鍵。
+- 不改：`NA/lib/kick-dispatcher.ts`、`NA/app/api/build/runs/route.ts`（T19）；printful／chatwoot（T26／T27）；`run-due-schedules`。
+- 驗收：`cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit && npx vitest run app/api/internal/collect/runs/route.test.ts 2>&1 | grep -E "Tests +[0-9]+ passed"` → `Tests  N passed (N)`（N ≥ 7）
+- 突變（欄外）：拿掉 `grant_token` 拒收 → 對應案紅。
+- commit：`feat(next-admin): POST /api/internal/collect/runs -- bearer-gated, triggers collect-research-run with a grant reference only (P1 WC-11, C3/K3)`。回滾：刪兩檔。
+
+**WC-P1-12 NA `runs/execute`＋`runResearchCollection`**（B，auth）
+- 目標：I-c：兌換 grant（I-d）→ `sink/cognitive` 跑研究 crawl → finally 必呼叫 complete（I-f，K2）。
+- 前置：10、11 已合併。
+- 讀：`NA/lib/collect/run.ts:1-181`（`:7-9` 單一路徑、`:74` DEFAULT_BUDGET、`:117-142` 組裝、`:118` sink 寫死 kb、`:138` url-state）；`NA/lib/cognitive-os/client.ts:13-22,47`；`NA/lib/collect/orchestrator.ts:505-528`；`NA/lib/collect/__tests__/{collect-url-state-wiring,collect-run-rate-limit-wiring,run-status-summary}.test.ts`（重構守門）；`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml:235,248,275,354-355,471`（next-admin env 慣例）；I-c、I-d、I-f。
+- 樣板：`run-due-schedules/route.ts:27-55`；`run.ts:117-142`。
+- 改：`run.ts`：`:117-142` 組裝原樣抽成非匯出 `crawlWith({seeds, sink, tenantRef, runKey, budget, maxDepth, useUrlState, dryRun, log})`，`runCollection` 改呼叫它（行為不變）；新匯出 `runResearchCollection({projectId, runId, seeds, sink, budget?, log?}) -> {report, sink}`（`tenantRef="research:"+projectId`、`useUrlState:false`（K6）、rate limiter 用 durable store、不寫 `persistRunReport`／`recordRunOutcome`）。新 `NA/app/api/internal/collect/runs/execute/route.ts`（`maxDuration=300`）：bearer `COLLECT_RESEARCH_EXECUTE_TOKEN`（K4）→ body 同 I-a 驗證 → `POST {COGNITIVE_OS_API_BASE_URL ?? "http://cognitive-os-api:8420"}/collect-grants/{grant_ref}/exchange`（`Bearer COLLECT_RESEARCH_RUNS_TOKEN`）非 200 → 502 `grant_exchange_<status>`（不 run、不 complete；COS run 留 requested，grant 30 分過期）→ `runResearchCollection({…, sink: createCognitiveSink(...)})` 包 try／**finally 必 complete**：`status` = 拋錯或 `sink.errors` 含 `ingest_401`／`ingest_403` ? failed : completed；report = `{fetched, written, unchanged: sink.skipped, refused: dirty+quarantined+disallowed+offEntity 長度和, stopped_by}`；`error` 截 200 字 → 200 `{ok:true, status, report}`。`docker-compose.yml`（next-admin 區塊 `:275` 下）加 `COLLECT_RESEARCH_RUNS_TOKEN: ${COLLECT_RESEARCH_RUNS_TOKEN:-}`、`COLLECT_RESEARCH_EXECUTE_TOKEN: ${COLLECT_RESEARCH_EXECUTE_TOKEN:-}`（repo 對照；prod 由 WC-P1-14 走 `safe-infra-patch.sh compose`，AGENTS §0）。新 `NA/app/api/internal/collect/runs/execute/route.test.ts` ≥7 案（mock `@/lib/collect/run` 的 `runResearchCollection`＋global fetch）：錯 bearer → 401 且零 fetch；exchange 409 → 502、未 run、未 complete；成功 → exchange／run／complete 各一次且 status completed；run 拋 → 仍 complete 且 failed；sink.errors 含 `ingest_401` → failed；exchange URL 用 env 不用 body；回應 body 不含 grant token。
+- 不改：`runCollection` 行為（三個 wiring 測試不改）；`kb.ts`；T19／T26／T27 的檔。
+- 驗收：`cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit && npx vitest run app/api/internal/collect/runs/execute lib/collect/__tests__/collect-url-state-wiring.test.ts lib/collect/__tests__/collect-run-rate-limit-wiring.test.ts lib/collect/__tests__/run-status-summary.test.ts 2>&1 | grep -E "Tests +[0-9]+ passed"` → `Tests  N passed (N)`
+- 突變（欄外）：complete 從 finally 移到 try 末 → 「run 拋仍 complete」案紅。
+- commit：`feat(next-admin): research-run executor -- grant exchange, sink/cognitive crawl, complete always sent; runCollection assembly shared via crawlWith (P1 WC-12, K2/K6)`。回滾：revert。
+
+**WC-P1-13 WF task `collect-research-run`**（B）
+- 目標：I-b→I-c 薄轉交；單次嘗試（grant 一次兌換，重試無用）。
+- 前置：B 軌前置（WF 不跑 tsc）。
+- 讀：`WF/src/trigger/site-watch.ts:14-44`（有 payload 的 task、`retry.maxAttempts:1`、`queue`、`maxDuration`、Sentry）；`WF/src/lib/collection/postRunDueSchedules.ts:1-31`＋`.test.ts:1-30`；`WF/src/trigger/index.ts:1-10`；`WF/trigger.config.ts:12`。
+- 樣板：同上。
+- 改：新 `WF/src/lib/collection/postResearchRunExecute.ts`（`COLLECT_RESEARCH_EXECUTE_TOKEN` 缺 → throw 且不 fetch；`AWAREWAVE_WEBHOOK_BASE_URL` 預設 `https://app.aware-wave.com`；`POST …/api/internal/collect/runs/execute`、body = payload 原樣、`AbortSignal.timeout(330_000)`；非 2xx → throw 截 400 字）＋`postResearchRunExecute.test.ts` ≥4 案（無 token 零 fetch；URL＋bearer；body 原樣；500 → throw）；新 `WF/src/trigger/collect-research-run.ts`：`task({id:"collect-research-run", retry:{maxAttempts:1}, queue:{concurrencyLimit:2}, maxDuration:400, run})`，錯誤 `captureWorkflowException` 後 rethrow；`index.ts` 加一行 export。
+- 不改：`dispatch-action-run.ts`、`orchestrate-tenant-provisioning.ts`（T19）；其他 task。
+- 驗收：`cd lobster-factory/packages/workflows && npx vitest run src/lib/collection/postResearchRunExecute.test.ts 2>&1 | grep -E "Tests +[0-9]+ passed"` → `Tests  N passed (N)`（N ≥ 4）
+- 突變（欄外）：拿掉 token 缺失的 throw → 「無 token 零 fetch」案紅。
+- commit：`feat(workflows): collect-research-run task -- one-attempt relay to the next-admin executor (P1 WC-13)`。回滾：revert（部署前無作用）。
+
+**WC-P1-14 部署與主機設定（High-STOP，逐步 go-ahead）**
+- 目標：A、B 上 prod；token 兩端同值；collector identity 建在操作者 tenant。
+- 前置：01–08、10–13 全合併且各自驗收重跑綠；操作者 go-ahead（prod 部署＋secret＋身分，AGENTS §3）。
+- 讀：AGENTS §0（部署、compose、secret）；§11 部署段；`COS/deploy/deploy.sh`（PI-b 後現行版）；WC-P1-02 的 bootstrap 用法。
+- 樣板：site-watch 上線序（token → compose → 自架 Trigger → 金絲雀；commit `ed283e2ff`、WORKLOG 2026-09-26 續31）。
+- 改（主機；每步一行 WORKLOG）：① 兩個 token 各 `python -c "import secrets;print(secrets.token_urlsafe(32))"` → `scripts/secrets-vault.ps1` 入庫；② COS：`/opt/cognitive-os` `git pull --ff-only` → `deploy/.env` 加 `COLLECT_RESEARCH_RUNS_TOKEN` → `bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh`；③ `docker exec cognitive-os-api python -m ai_lego.apps.cli.bootstrap_service_identity --tenant-id <操作者 tenant> --email research-collector@cognitive-os.local --display-name "Research Collector"`；④ NA：`/root/lobster-phase1/scripts/safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin`（stdin 加兩個 token env）→ `/root/lobster-phase1/scripts/sg-deploy.sh`；⑤ 自架 Trigger（ks-aw-01）worker env 加 `COLLECT_RESEARCH_EXECUTE_TOKEN` → `scripts/lobster-trigger-deploy.ps1` 部署 workflows。
+- 不改：repo 檔（主機與 vault 狀態；repo compose 已由 WC-12 對齊）。
+- 驗收：`ssh -p 58122 ks-aw-01 'a=$(docker exec lobster-next-admin printenv COLLECT_RESEARCH_RUNS_TOKEN); b=$(docker exec cognitive-os-api printenv COLLECT_RESEARCH_RUNS_TOKEN); [ -n "$a" ] && [ "$a" = "$b" ] && echo SAME'` → `SAME`
+- 突變：`curl -s -o /dev/null -w '%{http_code}' -X POST https://app.aware-wave.com/api/internal/collect/runs -H 'Authorization: Bearer wrong'` → `401`（錯 token 必拒，非破壞）。
+- commit：無程式；WORKLOG 條目 `WC-P1-14 完`。回滾：COS `cognitive-os-api:rollback` tag；NA safe-infra-patch 自動還原＋sg-deploy rollback；Trigger 退上一版；token 自 `.env`／compose 移除 = 端點 401（fail closed）。
+
+**WC-P1-15 期末閘**（執行者 = Opus／Fable，12.1-9；⑤ 自然人 run 屬 12.6 禁區，操作者 go-ahead 下由本卡執行者做）
+- 目標：§5 P1 DoD 逐條在 prod 真跑；§6 P1 三突變；回填文件。
+- 前置：14、09 完成。
+- 讀：§5 P1 列；§6 P1 欄；K1–K10；介面釘死表。
+- 樣板：WC-PIa-14R（§12.3b）的期末閘寫法。
+- 改（每項一行 WORKLOG `- P1_DOD_<n>: PASS | cmd=… | out=…`）：① 操作者 tenant 建 `Confidential` 專案（L1 公司）→ `POST /projects/{id}/collections` 無 confirm 見 plan → confirm → 輪詢 I-h 至 completed；`docker exec cognitive-os-api python -c` 讀 `prov_sources`：列數 >0、`provenance_json`／`fetched_at` 非空數 = 列數、`created_by_identity_id` 唯一且 = collector；② 同 seeds 重跑 → 全 `unchanged`、列數不變；③ seed 指向操作者自有一頁、改一字重跑 → 一筆 `superseded`＋`SourceSuperseded`；④ 壞 hash curl → 400；已 complete 的 grant curl → 401；⑤ 自然人 run（`Confidential` 專案，含 `POST /projects/{id}/sources` 自貼筆記）→ `DELETE /projects/{id}` → sources／CAS／artifact 讀不回、events 只剩 `ProjectErased`；⑥ NA `npm test`＋`npm run typecheck`、WF `npm test`、COS 全套 unittest＋golden 綠（12.1-11 全套在此）；⑦ §6 P1 三突變本機重跑貼三行；⑧ `/codex-review` PY 與 TS 各一 artifact（auth 卡 Deep）；⑨ WC-09 `printenv` = `local-dev`。回填：§0 五行；§3.3（K1 egress 列、K2 sink 列、K5 Collection Service 輸入、run 分類列標 P1）；§5 P3 列刪「run 分類伺服器端」；§7 加兩列（K10 自動分類歸期、recipe journal 未綁 project 的抹除缺口）；§12.7 收成一行「已完成：commit …」；`agency-os/TASKS.md` 研究線一列。
+- 不改：程式碼（發現缺陷 → 修正卡，12.3b 樣式）。
+- 驗收：`grep -cE "^- P1_DOD_[1-9]: PASS" agency-os/WORKLOG.md` → `9`
+- 突變：§6 P1 欄三項（⑦）。
+- commit：`docs(research-lines): P1 period gate -- DoD 1-9 on prod, 3 mutations, oracle review; §0/§3.3/§5/§7 backfilled (P1 WC-15)`。回滾：文件 revert；功能回滾見 WC-14。
