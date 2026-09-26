@@ -44,6 +44,11 @@ PASSWORD_RESET_TTL = timedelta(hours=1)
 # proxy log, browser history) a meaningfully usable window -- unlike PASSWORD_RESET_TTL, which must
 # survive a human reading an email.
 HANDOFF_CODE_TTL = timedelta(seconds=60)
+# A research collection run's grant (RESEARCH_LINES_MASTER_PLAN §3.4 C3, §12.7 K3): long enough for Trigger to queue
+# the run and the crawl to finish (next-admin caps a run at 10 min), short enough that a leaked token dies the same hour.
+COLLECT_GRANT_TTL = timedelta(minutes=30)
+# The identity every collected Source is written as, one per tenant (bootstrap_service_identity --tenant-id).
+COLLECTOR_EMAIL = "research-collector@cognitive-os.local"
 # Fixed (not secret, not per-identity) salt used ONLY to give the "no such identity"/"no such
 # credential row" authenticate() failure paths a real PBKDF2 hash of equal cost to the genuine
 # "wrong password" path -- closes the timing side-channel a critic pass found 2026-09-12 (see
@@ -106,6 +111,19 @@ CREATE TABLE IF NOT EXISTS handoff_code (
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     consumed_at TEXT
+);
+CREATE TABLE IF NOT EXISTS collect_grant (
+    grant_ref TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenant(tenant_id),
+    project_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    collector_identity_id TEXT NOT NULL REFERENCES identity(identity_id),
+    scope TEXT NOT NULL DEFAULT 'source.ingest',
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    token_hash TEXT UNIQUE,
+    exchanged_at TEXT,
+    closed_at TEXT
 );
 CREATE TABLE IF NOT EXISTS entitlement_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -380,6 +398,74 @@ class IdentityStore:
             if marked != 1 or now >= expires_at:
                 return None
         return {"identity_id": row["identity_id"], "tenant_id": row["tenant_id"], "redirect_path": row["redirect_path"]}
+
+    # -- Research collection grants (plan §3.4 C3) -----------------------------------
+    #
+    # One grant per collection run. The REFERENCE travels (COS -> next-admin -> Trigger payload); the TOKEN is minted
+    # only when next-admin exchanges the reference, exactly once, and only its sha256 is kept -- the handoff-code shape
+    # above, so the token never sits in Trigger's run history. A grant is closed when its run completes or its Project
+    # is erased; a closed, expired or unexchanged grant resolves to nothing.
+
+    def find_collector_identity(self, tenant_id: str) -> dict[str, Any] | None:
+        return self._find_identity_by_email(tenant_id, COLLECTOR_EMAIL)
+
+    def issue_collect_grant(self, tenant_id: str, project_id: str, run_id: str, collector_identity_id: str) -> str:
+        grant_ref = secrets.token_urlsafe(16)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO collect_grant (grant_ref, tenant_id, project_id, run_id, collector_identity_id, created_at, expires_at) VALUES (?,?,?,?,?,?,?)",
+                (grant_ref, tenant_id, project_id, run_id, collector_identity_id, now.isoformat().replace("+00:00", "Z"), (now + COLLECT_GRANT_TTL).isoformat().replace("+00:00", "Z")),
+            )
+        return grant_ref
+
+    def exchange_collect_grant(self, grant_ref: str) -> dict[str, str]:
+        """One-shot. Raises GRANT_NOT_FOUND / GRANT_ALREADY_EXCHANGED / GRANT_EXPIRED (a closed grant counts as
+        expired: COS already failed that run, a late Trigger start must not revive it)."""
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT tenant_id, project_id, run_id, expires_at, exchanged_at, closed_at FROM collect_grant WHERE grant_ref = ?",
+                (grant_ref,),
+            ).fetchone()
+            if row is None:
+                raise InvariantViolation("GRANT_NOT_FOUND")
+            if row["exchanged_at"] is not None:
+                raise InvariantViolation("GRANT_ALREADY_EXCHANGED")
+            if row["closed_at"] is not None or now >= datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00")):
+                raise InvariantViolation("GRANT_EXPIRED")
+            token = secrets.token_urlsafe(32)
+            marked = conn.execute(
+                "UPDATE collect_grant SET token_hash = ?, exchanged_at = ? WHERE grant_ref = ? AND exchanged_at IS NULL AND closed_at IS NULL",
+                (hashlib.sha256(token.encode("utf-8")).hexdigest(), now.isoformat().replace("+00:00", "Z"), grant_ref),
+            ).rowcount
+            if marked != 1:
+                raise InvariantViolation("GRANT_ALREADY_EXCHANGED")
+        return {"grant_token": token, "tenant_id": row["tenant_id"], "project_id": row["project_id"], "run_id": row["run_id"], "expires_at": row["expires_at"]}
+
+    def resolve_collect_grant(self, raw_token: str) -> dict[str, str] | None:
+        if not isinstance(raw_token, str) or not raw_token:
+            return None
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT grant_ref, tenant_id, project_id, run_id, collector_identity_id, expires_at FROM collect_grant WHERE token_hash = ? AND closed_at IS NULL",
+                (hashlib.sha256(raw_token.encode("utf-8")).hexdigest(),),
+            ).fetchone()
+        if row is None or now >= datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00")):
+            return None
+        return {key: row[key] for key in ("grant_ref", "tenant_id", "project_id", "run_id", "collector_identity_id")}
+
+    def close_collect_grant(self, grant_ref: str) -> None:
+        with self._connect() as conn:
+            conn.execute("UPDATE collect_grant SET closed_at = ? WHERE grant_ref = ? AND closed_at IS NULL", (_now_iso(), grant_ref))
+
+    def close_collect_grants_for_project(self, tenant_id: str, project_id: str) -> int:
+        with self._connect() as conn:
+            return conn.execute(
+                "UPDATE collect_grant SET closed_at = ? WHERE tenant_id = ? AND project_id = ? AND closed_at IS NULL",
+                (_now_iso(), tenant_id, project_id),
+            ).rowcount
 
     # -- Password reset -----------------------------------------------------------
 
