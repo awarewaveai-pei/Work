@@ -1,4 +1,21 @@
 ﻿# Worklog
+## 2026-09-26（續41）研究線 P1 第二批：WC-P1-04～08（COS）落碼；接手誤刪的 session
+- [狀態] WC-P1-04／05／06／07／08 完（本 commit；一個 commit：main.py 與 repo 五卡 hunk 交錯，同 續37 C5 理由）；14／09／15 High-STOP 未動。
+- [接手] 原 session `530b5f28` 被操作者誤刪，停在 Codex 第三輪 finding 修正中（92 測 1 錯）。本 session 查活著的 `28b602e8`（網站課程頁）、`d2996616`（T19–T27 合併，只動 lobster-factory）皆未做／未排 04～08 → 接手。
+- [卡修正]（§12.7 回填由 WC-P1-15 做；接 續37 C1–C6）
+  - C7 run 與 grant 同一個 deadline：`collection_runs.deadline_at = requested_at + RUN_TTL(30m)`，grant 以同一時刻到期（`issue_collect_grant(..., expires_at)`，刪 `COLLECT_GRANT_TTL`）；`effective_status()` 讀時推導 failed、不寫回；transition 在 UPDATE 內拒逾期。Codex 第二輪（`93bc40b0`）：grant 過期未兌換／建 run 後崩潰 → run 永遠 open。
+  - C8 blob 生命週期一條規則：committed rows 是唯一依據；內容只在 `_write_transaction`（BEGIN IMMEDIATE）內、列之後、commit 前寫（`add_source`／`supersede`／`ingest_batch` 的 `put_content`，每 hash 一次）；垃圾只由 `collect_unreferenced_blobs` 在同鎖內收，`erase_project` 在自身交易內跑。刪 `content_hash_referenced`、`erase_plan`、ingest 失敗逐檔補救。Codex 第三輪（`da5b7c7f`）F1 同 blob unlink 兩次、F2 引用檢查與 unlink 間競態。
+  - C9 接受：內容寫入與 commit 之間崩潰／I/O 錯 → 留垃圾到下次收集（每次專案抹除收整個租戶，D10 仍成立）；寫進 repo 模組 docstring。
+  - C10 SQLite `secure_delete=ON`：抹除後文字不留在檔案 free pages（D10 對磁碟位元組成立）。
+  - C11 WC-06 卡「不改 TenantScopedCas／JsonArtifactStore」→ 加 `exists`／`delete_if_present`（重跑抹除冪等，取代比對錯誤字串）。
+  - C12 `run_recipe` 分類：`get_project_source_repository`／`get_source_cas`／`_project_or_404` 上移到 `run_recipe` 前（Depends 在 def 時求值）；三舊測試改 `project_id` 照 12.1-13。
+- [Codex] 第四輪 scoped review（16 檔）NO FINDINGS：`agency-os/reports/oracle/2026-09-26-partialreview-cbe0e604.md`。
+- 突變（紅→綠，檔案已還原）：04 無 confirm 仍寫；05 不查 active 列／拔 hash 比對／grant 不綁專案；06 收集器不看引用 → 共用 blob 案紅；07 讀 body 分類；08 compose 加 example.com；C8 內容先於列 → 拒收批次案紅、BEGIN 改 deferred → 收集器夾在寫入與 commit 間案紅。
+- REALTEST_EVIDENCE: tool=Bash | cmd=COS unittest 144 模組（凡 import API／repo／identity store／collection_run／egress 者）6520 tests OK 541s＋golden 4171 PASS＋突變 9 個紅→綠 | exit=0 | ms=545333
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（Codex 第四輪 `cbe0e604`；第三輪 0c/2m/0n 已由 C8 重設計修掉）
+- ORACLE_WAIVED: 全樹 review 不可用——工作樹含其他 session 大量未提交檔；改用只涵蓋本批 16 檔的 Codex scoped review（上列 artifact）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`content_hash_referenced|erase_plan\(|COLLECT_GRANT_TTL|issue_collect_grant\(|\bsupersede\(|collect_unreferenced_blobs|delete_if_present` | hits=31（COS 26：程式／測試的定義與呼叫點全在本批、4 個 `__pycache__`、計畫 §12.7 卡片原文 `COLLECT_GRANT_TTL`／`erase_plan` 待 WC-15 回填；agency-os 5 = 本日 oracle 報告 3 份；scripts／lobster-factory／.claude 0）
+- [下一步] WC-P1-14（上 prod：token 入 vault、COS／NA 部署、collector identity、自架 Trigger）High-STOP，等操作者 go-ahead；之後 09 → 15。
 ## 2026-09-26（續40）Cognitive OS 正式站部署 `79bf7cc5`（網站三批：外框／填寫頁／課程頁）；同時帶上 P1 已 commit 的 WC-01／02／03（加表加欄）
 - [操作者] 選「先備份再上線」；要求上線後刪掉備份（不留垃圾）。
 - [風險] main 上 `2a911dca..79bf7cc5` 夾著另一 session 的 P1 `a6c43eb29`（`prov_sources` 加 7 欄＋部分唯一索引、新表 `collection_runs`）、`916b0983d`（新表 `collect_grant`）；`deploy.sh` 只退映像、不退資料庫，且無備份步驟。

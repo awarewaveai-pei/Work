@@ -44,9 +44,6 @@ PASSWORD_RESET_TTL = timedelta(hours=1)
 # proxy log, browser history) a meaningfully usable window -- unlike PASSWORD_RESET_TTL, which must
 # survive a human reading an email.
 HANDOFF_CODE_TTL = timedelta(seconds=60)
-# A research collection run's grant (RESEARCH_LINES_MASTER_PLAN §3.4 C3, §12.7 K3): long enough for Trigger to queue
-# the run and the crawl to finish (next-admin caps a run at 10 min), short enough that a leaked token dies the same hour.
-COLLECT_GRANT_TTL = timedelta(minutes=30)
 # The identity every collected Source is written as, one per tenant (bootstrap_service_identity --tenant-id).
 COLLECTOR_EMAIL = "research-collector@cognitive-os.local"
 # Fixed (not secret, not per-identity) salt used ONLY to give the "no such identity"/"no such
@@ -409,13 +406,14 @@ class IdentityStore:
     def find_collector_identity(self, tenant_id: str) -> dict[str, Any] | None:
         return self._find_identity_by_email(tenant_id, COLLECTOR_EMAIL)
 
-    def issue_collect_grant(self, tenant_id: str, project_id: str, run_id: str, collector_identity_id: str) -> str:
+    def issue_collect_grant(self, tenant_id: str, project_id: str, run_id: str, collector_identity_id: str, expires_at: str) -> str:
+        """``expires_at`` = the run's own ``deadline_at`` (core/domain/collection_run.py): one deadline, stored where
+        each side checks it, never computed twice."""
         grant_ref = secrets.token_urlsafe(16)
-        now = datetime.now(timezone.utc).replace(microsecond=0)
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO collect_grant (grant_ref, tenant_id, project_id, run_id, collector_identity_id, created_at, expires_at) VALUES (?,?,?,?,?,?,?)",
-                (grant_ref, tenant_id, project_id, run_id, collector_identity_id, now.isoformat().replace("+00:00", "Z"), (now + COLLECT_GRANT_TTL).isoformat().replace("+00:00", "Z")),
+                (grant_ref, tenant_id, project_id, run_id, collector_identity_id, _now_iso(), expires_at),
             )
         return grant_ref
 

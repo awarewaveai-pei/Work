@@ -107,6 +107,9 @@ class TenantScopedCas:
             raise InvariantViolation("CAS_TENANT_ACCESS_DENIED")
         return target.read_bytes()
 
+    def exists(self, tenant_id: str, cas_path: dict[str, str]) -> bool:
+        return self._resolve_owned(tenant_id, cas_path).is_file()
+
     def list_objects(self, tenant_id: str) -> list[str]:
         tenant_root = self.root / "objects" / tenant_id
         if not tenant_root.exists():

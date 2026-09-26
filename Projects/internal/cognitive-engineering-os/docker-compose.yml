@@ -20,8 +20,12 @@ services:
     environment:
       - COGNITIVE_OS_DB_PATH=/app/Projects/internal/cognitive-engineering-os/.runtime/identity.sqlite3
       # EC §99 runtime egress allowlist (deny-by-default). Hosts here must also be listed in
-      # agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/network-egress.yaml EGRESS-EC99-2.
-      - COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST=api.anthropic.com
+      # agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/network-egress.yaml EGRESS-EC99-2
+      # (tests/unit/test_egress_allowlist_parity.py). app.aware-wave.com = the Collection Service: egress is
+      # https-only and host-only, so the internal http://lobster-next-admin:3000 cannot be allowlisted.
+      - COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST=api.anthropic.com,app.aware-wave.com
+      # Where POST /projects/{id}/collections hands a run to next-admin (not secret; its bearer token is in deploy/.env).
+      - COGNITIVE_OS_COLLECTION_SERVICE_URL=https://app.aware-wave.com
     # AI gateway credentials: COGNITIVE_OS_ANTHROPIC_API_KEY (and optional COGNITIVE_OS_AI_MODEL) live in
     # deploy/.env on the host only (gitignored; see deploy/.env.example). Absent key => /ai/* answers 503
     # AI_PROVIDER_UNCONFIGURED; every other route is unaffected.

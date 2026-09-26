@@ -41,6 +41,8 @@ from __future__ import annotations
 import datetime
 import threading
 import hashlib
+import hmac
+import json
 import os
 import re
 import secrets
@@ -50,13 +52,13 @@ import sys
 import uuid
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 from urllib.parse import urlparse
 
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
@@ -73,9 +75,11 @@ from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHA
 from ai_lego.platform.ai_gateway.provider import AiProvider, daily_token_budget, provider_from_env
 from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
 from ai_lego.core.domain._intake_validation import require_uuid
 from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import TEXT_MEDIA_TYPES, source_record
+from ai_lego.core.domain.collection_run import MAX_FETCHES, MAX_SEEDS, collection_run_record
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.core.domain.custom_workflow import custom_workflow_record
@@ -334,6 +338,24 @@ def get_artifact_store() -> JsonArtifactStore:
     ``workflow-cas`` (journal encryption): different lifecycle, different reader (any authenticated tenant
     request vs. only the journal machinery)."""
     return JsonArtifactStore(TenantScopedCas(PRODUCT_ROOT / ".runtime" / "artifact-cas"))
+
+
+def get_project_source_repository() -> ProjectSourceRepository:
+    return ProjectSourceRepository(PRODUCT_ROOT / ".runtime" / "projects.sqlite3")
+
+
+def get_source_cas() -> TenantScopedCas:
+    """Separate CAS root from ``artifact-cas`` (capability-emitted artifacts) and ``workflow-cas`` (journal
+    encryption): Source content has its own lifecycle (a Project's raw intake material, not a workflow
+    byproduct) and its own reader (any project member, not only the journal machinery)."""
+    return TenantScopedCas(PRODUCT_ROOT / ".runtime" / "source-cas")
+
+
+def _project_or_404(repo: ProjectSourceRepository, tenant_id: str, project_id: str) -> dict[str, Any]:
+    project = repo.get_project(tenant_id, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}")
+    return project
 
 
 def get_ai_provider() -> AiProvider | None:
@@ -602,10 +624,11 @@ def run_recipe(
     catalog: MethodCatalog = Depends(get_catalog),
     store: IdentityStore = Depends(get_store),
     artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
     """Execute a Recipe through the shared durable Workflow runtime.
 
-    ``body`` is ``{"source": {...}, "run_id": "optional", "resume": false}``.
+    ``body`` is ``{"source": {...}, "run_id": "optional", "resume": false, "project_id": "optional"}``.
     Bindings in the compiled IR are the only builder arguments; there is no
     positional guessing or fallback to the single-method API.
     """
@@ -683,9 +706,18 @@ def run_recipe(
         raise HTTPException(status_code=400, detail="WORKFLOW_RESUME_INVALID: resume must be boolean")
     journal = workflow_journal_path(session["tenant_id"], run_id)
     journal_ref = workflow_journal_ref(session["tenant_id"], run_id)
-    classification = body.get("data_classification", "INTERNAL")
-    if classification not in {"PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"}:
-        raise HTTPException(status_code=400, detail="WORKFLOW_DATA_CLASSIFICATION_INVALID")
+    # The classification is the Project's, never the caller's (RESEARCH_LINES_MASTER_PLAN K9): a body value is refused
+    # rather than ignored, because silently ignoring CONFIDENTIAL would drop the encrypted-journal requirement below.
+    # No Project = INTERNAL. Project vocabulary is Title_Case, run vocabulary UPPER (see the NOTE above CreateProjectRequest).
+    if "data_classification" in body:
+        raise HTTPException(status_code=400, detail="WORKFLOW_DATA_CLASSIFICATION_SERVER_DERIVED: send project_id; the run takes that Project's classification")
+    project_id = body.get("project_id")
+    if project_id is None:
+        classification = "INTERNAL"
+    elif isinstance(project_id, str):
+        classification = _project_or_404(repo, session["tenant_id"], project_id)["data_classification"].upper()
+    else:
+        raise HTTPException(status_code=400, detail="WORKFLOW_PROJECT_ID_INVALID")
     try:
         journal_protector = build_api_journal_protector(session["tenant_id"], run_id)
     except InvariantViolation as error:
@@ -1077,29 +1109,11 @@ MAX_SOURCE_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MiB; Phase 1 Source Import is UT
 MAX_SOURCE_BRIEF_CHARS = MAX_BRIEF_CHARS
 
 
-def get_project_source_repository() -> ProjectSourceRepository:
-    return ProjectSourceRepository(PRODUCT_ROOT / ".runtime" / "projects.sqlite3")
-
-
 def get_custom_workflow_repository() -> CustomWorkflowRepository:
     """Own SQLite file, not ``projects.sqlite3`` -- a Custom Workflow is an ordered list of
     method_ids the tenant picked, not a Project/Source aggregate; see
     ``ai_lego/core/domain/custom_workflow.py`` for the full separation rationale."""
     return CustomWorkflowRepository(PRODUCT_ROOT / ".runtime" / "custom_workflows.sqlite3")
-
-
-def get_source_cas() -> TenantScopedCas:
-    """Separate CAS root from ``artifact-cas`` (capability-emitted artifacts) and ``workflow-cas`` (journal
-    encryption): Source content has its own lifecycle (a Project's raw intake material, not a workflow
-    byproduct) and its own reader (any project member, not only the journal machinery)."""
-    return TenantScopedCas(PRODUCT_ROOT / ".runtime" / "source-cas")
-
-
-def _project_or_404(repo: ProjectSourceRepository, tenant_id: str, project_id: str) -> dict[str, Any]:
-    project = repo.get_project(tenant_id, project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}")
-    return project
 
 
 @app.post("/auth/handoff/mint")
@@ -1422,6 +1436,32 @@ def project_history(
     return repo.list_events(session["tenant_id"], f"project:{project_id}")
 
 
+@app.delete("/projects/{project_id}")
+def erase_project(
+    project_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    source_cas: TenantScopedCas = Depends(get_source_cas),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """Project-level erasure (RESEARCH_LINES_MASTER_PLAN D10, K7): interpretation artifacts, then -- in one repository
+    transaction -- Source rows, runs, the Project's events and every Source blob no other Project still references;
+    one ProjectErased tombstone stays. Artifacts go first so a failure leaves rows that still point at what is left:
+    a retry finishes the job."""
+    tenant_id = session["tenant_id"]
+    if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
+    _project_or_404(repo, tenant_id, project_id)
+    store.close_collect_grants_for_project(tenant_id, project_id)
+    artifacts = 0
+    for reference in repo.project_artifact_references(tenant_id, project_id):
+        if artifact_store.delete_if_present(tenant_id, reference):
+            artifacts += 1
+    erased = repo.erase_project(tenant_id, project_id, session["identity_id"], source_cas, artifacts)
+    return {"project_id": project_id, "erased": erased}
+
+
 @app.post("/projects/{project_id}/sources")
 def create_source(
     project_id: str,
@@ -1470,8 +1510,7 @@ def create_source(
         )
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
-    source_cas.put(session["tenant_id"], content_bytes)
-    return repo.add_source(record, cas_path)
+    return repo.add_source(record, cas_path, put_content=lambda: source_cas.put(session["tenant_id"], content_bytes))
 
 
 @app.get("/projects/{project_id}/sources")
@@ -1600,6 +1639,286 @@ def source_history(
     if repo.get_source(session["tenant_id"], project_id, source_id) is None:
         raise HTTPException(status_code=404, detail=f"SOURCE_NOT_FOUND: {source_id!r}")
     return repo.list_events(session["tenant_id"], f"source:{source_id}")
+
+
+# ---------------------------------------------------------------------------
+# Research collection runs (RESEARCH_LINES_MASTER_PLAN §3.2 step 2, §12.7 I-d/I-f/I-g/I-h). The operator asks for a
+# run -- plan first, confirm second (C7); COS issues a one-shot grant and hands only its REFERENCE to the Collection
+# Service (next-admin), which exchanges it for the token, ingests Sources and completes the run.
+# ---------------------------------------------------------------------------
+
+RESEARCH_COLLECT_CAPABILITY = "research.collect"
+# = next-admin lib/collect/search/query-plan.ts MAX_QUERIES per entity seed: the plan shows this ceiling, not an exact
+# count (the exact preview is P3).
+RESEARCH_MAX_QUERIES_PER_ENTITY = 16
+MAX_RESEARCH_SEED_META_BYTES = 4096
+_GRANT_ERROR_STATUS = {"GRANT_NOT_FOUND": 404, "GRANT_ALREADY_EXCHANGED": 409, "GRANT_EXPIRED": 410}
+
+
+class CollectionSeed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    uri: str
+    meta: dict[str, Any] | None = None
+
+
+class CollectionBudget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fetches: int = MAX_FETCHES
+
+
+class CollectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    seeds: list[CollectionSeed]
+    budget: CollectionBudget | None = None
+    confirm: bool = False
+
+
+class CollectionCompleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["completed", "failed"]
+    report: dict[str, Any] | None = None
+    # Accepted for the caller's own logs, never stored: it can quote a URL (plan K8).
+    error: str | None = None
+
+
+def get_collection_service() -> CollectionServiceClient | None:
+    """``None`` = COLLECT_RESEARCH_RUNS_TOKEN unset; a confirmed run answers 503. Tests override this dependency."""
+    return collection_service_from_env()
+
+
+def _research_seeds(payload: CollectionRequest) -> list[dict[str, Any]]:
+    if not 1 <= len(payload.seeds) <= MAX_SEEDS:
+        raise HTTPException(status_code=400, detail=f"COLLECTION_SEEDS_INVALID: 1..{MAX_SEEDS} seeds")
+    seeds: list[dict[str, Any]] = []
+    for seed in payload.seeds:
+        if not seed.uri.startswith(("entity://", "https://")) or len(seed.uri) > 2048:
+            raise HTTPException(status_code=400, detail="COLLECTION_SEEDS_INVALID: a seed uri starts with entity:// or https://")
+        if seed.meta is None:
+            seeds.append({"uri": seed.uri})
+            continue
+        if len(json.dumps(seed.meta, ensure_ascii=False).encode("utf-8")) > MAX_RESEARCH_SEED_META_BYTES:
+            raise HTTPException(status_code=400, detail=f"COLLECTION_SEEDS_INVALID: meta over {MAX_RESEARCH_SEED_META_BYTES} bytes")
+        seeds.append({"uri": seed.uri, "meta": seed.meta})
+    return seeds
+
+
+@app.post("/projects/{project_id}/collections")
+def request_collection(
+    project_id: str,
+    payload: CollectionRequest,
+    response: Response,
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    service: CollectionServiceClient | None = Depends(get_collection_service),
+) -> dict[str, Any]:
+    """Without ``confirm: true`` this only returns the plan and writes nothing (C7)."""
+    tenant_id = session["tenant_id"]
+    if not check_entitlement(store, tenant_id, RESEARCH_COLLECT_CAPABILITY):
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {RESEARCH_COLLECT_CAPABILITY!r}")
+    _project_or_404(repo, tenant_id, project_id)
+    seeds = _research_seeds(payload)
+    fetches = (payload.budget or CollectionBudget()).fetches
+    if not 1 <= fetches <= MAX_FETCHES:
+        raise HTTPException(status_code=400, detail=f"COLLECTION_BUDGET_INVALID: fetches 1..{MAX_FETCHES}")
+    entity_seeds = sum(1 for seed in seeds if seed["uri"].startswith("entity://"))
+    plan = {"seeds": len(seeds), "max_queries": entity_seeds * RESEARCH_MAX_QUERIES_PER_ENTITY, "max_fetches": fetches}
+    if not payload.confirm:
+        return {"plan": plan, "confirm_required": True}
+    if service is None:
+        raise HTTPException(status_code=503, detail="COLLECTION_SERVICE_UNCONFIGURED: COLLECT_RESEARCH_RUNS_TOKEN is not set")
+    collector = store.find_collector_identity(tenant_id)
+    if collector is None:
+        raise HTTPException(status_code=409, detail="COLLECTOR_IDENTITY_MISSING: run bootstrap_service_identity --tenant-id <this tenant> --email research-collector@cognitive-os.local")
+    run_id = uuid.uuid4().hex
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    # One deadline for the run and its grant (core/domain/collection_run.py RUN_TTL): whatever happens after this line
+    # -- a crash, a grant nobody exchanges, a Collection Service that never calls back -- the run reads as failed once
+    # the deadline passes, and the grant stops working at the same instant.
+    run = repo.create_collection_run(collection_run_record(run_id, project_id, tenant_id, len(seeds), fetches, session["identity_id"], now), seeds)
+    grant_ref = store.issue_collect_grant(tenant_id, project_id, run_id, collector["identity_id"], run["deadline_at"])
+    try:
+        service.start_run(grant_ref, project_id, run_id, seeds, {"fetches": fetches})
+    except InvariantViolation as error:
+        # A known refusal: the run fails now instead of waiting out its deadline.
+        repo.finish_collection_run(tenant_id, run_id, "failed", None)
+        store.close_collect_grant(grant_ref)
+        raise HTTPException(status_code=502, detail=f"COLLECTION_SERVICE_UNAVAILABLE: {error}") from error
+    response.status_code = 202
+    return {"run_id": run_id, "status": "requested", "plan": plan}
+
+
+@app.get("/projects/{project_id}/collections/{run_id}")
+def get_collection(
+    project_id: str,
+    run_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, Any]:
+    _project_or_404(repo, session["tenant_id"], project_id)
+    run = repo.get_collection_run(session["tenant_id"], project_id, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"COLLECTION_RUN_NOT_FOUND: {run_id!r}")
+    return run
+
+
+def _collection_bearer_ok(authorization: str | None) -> bool:
+    expected = os.environ.get("COLLECT_RESEARCH_RUNS_TOKEN", "").strip()
+    scheme, _, value = (authorization or "").partition(" ")
+    return bool(expected) and scheme.lower() == "bearer" and hmac.compare_digest(value.strip().encode("utf-8"), expected.encode("utf-8"))
+
+
+@app.post("/collect-grants/{grant_ref}/exchange")
+def exchange_collect_grant(
+    grant_ref: str,
+    authorization: str | None = Header(default=None),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, str]:
+    """next-admin trades the run's grant reference for its token, once (I-d). Bearer = COLLECT_RESEARCH_RUNS_TOKEN."""
+    if not _collection_bearer_ok(authorization):
+        raise HTTPException(status_code=401, detail="COLLECT_TOKEN_INVALID")
+    try:
+        grant = store.exchange_collect_grant(grant_ref)
+    except InvariantViolation as error:
+        code = str(error).split(":")[0]
+        raise HTTPException(status_code=_GRANT_ERROR_STATUS.get(code, 400), detail=code) from error
+    try:
+        repo.mark_collection_running(grant["tenant_id"], grant["run_id"])
+    except InvariantViolation as error:
+        store.close_collect_grant(grant_ref)  # the run already ended; its grant dies with it
+        raise HTTPException(status_code=410, detail="GRANT_EXPIRED") from error
+    return {"grant_token": grant["grant_token"], "project_id": grant["project_id"], "run_id": grant["run_id"], "expires_at": grant["expires_at"]}
+
+
+def require_grant(project_id: str, authorization: str | None = Header(default=None), store: IdentityStore = Depends(get_store)) -> dict[str, str]:
+    """``Authorization: Grant <token>`` for the Collection Service's writes (I-e/I-f); bound to one project and run."""
+    scheme, _, token = (authorization or "").partition(" ")
+    grant = store.resolve_collect_grant(token.strip()) if scheme.lower() == "grant" else None
+    if grant is None:
+        raise HTTPException(status_code=401, detail="GRANT_INVALID")
+    if grant["project_id"] != project_id:
+        raise HTTPException(status_code=403, detail="GRANT_PROJECT_MISMATCH")
+    return grant
+
+
+@app.post("/projects/{project_id}/collections/{run_id}/complete")
+def complete_collection(
+    project_id: str,
+    run_id: str,
+    payload: CollectionCompleteRequest,
+    grant: dict[str, str] = Depends(require_grant),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, str]:
+    """Ends the run and voids its grant (I-f). A malformed report still ends it, as failed -- never left running."""
+    if grant["run_id"] != run_id:
+        raise HTTPException(status_code=403, detail="GRANT_RUN_MISMATCH")
+    try:
+        run = repo.finish_collection_run(grant["tenant_id"], run_id, payload.status, payload.report)
+    except InvariantViolation as error:
+        if "REPORT_INVALID" in str(error):
+            repo.finish_collection_run(grant["tenant_id"], run_id, "failed", None)
+        store.close_collect_grant(grant["grant_ref"])
+        raise HTTPException(status_code=400 if "REPORT_INVALID" in str(error) else 409, detail=str(error)) from error
+    store.close_collect_grant(grant["grant_ref"])
+    return {"run_id": run_id, "status": run["status"]}
+
+
+MAX_INGEST_BATCH = 25  # = next-admin sink/cognitive INGEST_BATCH
+
+
+class IngestSource(BaseModel):
+    """One collected document as next-admin's sink/cognitive projects it (plan §3.4 C1)."""
+
+    model_config = ConfigDict(extra="forbid")
+    canonical_url: str
+    source_uri: str
+    content_sha256: str
+    mime: str
+    content_type: str
+    title: str
+    author: str | None = None
+    published_at: str | None = None
+    fetched_at: str
+    text: str
+    provenance: dict[str, Any]
+    collector: str
+    source_class: str | None = None
+    relevance: dict[str, Any] = {}
+    schema_version: Literal["1"]
+
+
+class IngestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str
+    sources: list[IngestSource]
+
+
+@app.post("/projects/{project_id}/sources/ingest")
+def ingest_sources(
+    project_id: str,
+    payload: IngestRequest,
+    grant: dict[str, str] = Depends(require_grant),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    source_cas: TenantScopedCas = Depends(get_source_cas),
+) -> dict[str, Any]:
+    """The Collection Service's Sources for one run (I-e). The whole batch is checked before anything is written;
+    what counts as new, unchanged or a new version is decided by the repository inside one transaction (C2)."""
+    tenant_id = grant["tenant_id"]
+    if payload.run_id != grant["run_id"]:
+        raise HTTPException(status_code=403, detail="GRANT_RUN_MISMATCH")
+    if not 1 <= len(payload.sources) <= MAX_INGEST_BATCH:
+        raise HTTPException(status_code=400, detail=f"SOURCE_INGEST_BATCH_INVALID: 1..{MAX_INGEST_BATCH} sources")
+    run = repo.get_collection_run(tenant_id, project_id, payload.run_id)
+    if run is None or run["status"] != "running":
+        raise HTTPException(status_code=409, detail="COLLECTION_RUN_NOT_RUNNING")
+    project = _project_or_404(repo, tenant_id, project_id)
+    latest: dict[str, tuple[IngestSource, bytes]] = {}
+    for item in payload.sources:
+        content = item.text.encode("utf-8")
+        if hashlib.sha256(content).hexdigest() != item.content_sha256:
+            raise HTTPException(status_code=400, detail=f"SOURCE_HASH_MISMATCH: {item.canonical_url[:200]!r}")
+        if not content or len(content) > MAX_SOURCE_CONTENT_BYTES:
+            raise HTTPException(status_code=400, detail=f"SOURCE_CONTENT_SIZE_INVALID: {item.canonical_url[:200]!r}")
+        latest[item.canonical_url] = (item, content)  # the last copy of a URL in the batch wins
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    items: list[tuple[dict[str, Any], dict[str, str]]] = []
+    contents: dict[str, bytes] = {}
+    for item, content in latest.values():
+        source_id = str(uuid.uuid4())
+        cas_path = TenantScopedCas.cas_path_for(tenant_id, content)
+        try:
+            record = source_record(
+                source_id,
+                project_id,
+                tenant_id,
+                (item.title.strip() or item.canonical_url)[:300],
+                "text/plain",
+                project["data_classification"],
+                cas_path["hash"],
+                len(content),
+                TenantScopedCas.artifact_uri(tenant_id, project_id, source_id, cas_path),
+                grant["collector_identity_id"],
+                now,
+                authors=[item.author.strip()] if item.author and item.author.strip() else None,
+                published_at=item.published_at if item.published_at and len(item.published_at) <= 40 else None,
+                canonical_url=item.canonical_url,
+                source_uri=item.source_uri,
+                fetched_at=item.fetched_at,
+                provenance=item.provenance,
+                source_class=item.source_class,
+                relevance=item.relevance,
+            )
+        except InvariantViolation as error:
+            raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+        items.append((record, cas_path))
+        contents[cas_path["hash"]] = content
+    try:
+        results = repo.ingest_batch(tenant_id, project_id, items, put_content=lambda cas_path: source_cas.put(tenant_id, contents[cas_path["hash"]]))
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail=f"SOURCE_INGEST_REFUSED: {error}") from error
+    return {"results": results}
 
 
 # ---------------------------------------------------------------------------

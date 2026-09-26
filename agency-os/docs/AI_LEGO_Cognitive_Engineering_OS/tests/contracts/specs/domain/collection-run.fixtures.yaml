@@ -14,6 +14,7 @@ valid:
       max_fetches: 200
       requested_by_identity_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
       requested_at: "2026-09-26T10:00:00Z"
+      deadline_at: "2026-09-26T10:30:00Z"
       completed_at: null
       report: null
   - name: completed_run
@@ -26,6 +27,7 @@ valid:
       max_fetches: 50
       requested_by_identity_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
       requested_at: "2026-09-26T10:00:00Z"
+      deadline_at: "2026-09-26T10:30:00Z"
       completed_at: "2026-09-26T10:06:00Z"
       report: {fetched: 12, written: 9, unchanged: 1, refused: 2, stopped_by: frontier_empty}
 invalid:
@@ -39,6 +41,7 @@ invalid:
       max_fetches: 200
       requested_by_identity_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
       requested_at: "2026-09-26T10:00:00Z"
+      deadline_at: "2026-09-26T10:30:00Z"
       completed_at: null
       report: null
   - name: run_id_with_a_space
@@ -51,6 +54,7 @@ invalid:
       max_fetches: 200
       requested_by_identity_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
       requested_at: "2026-09-26T10:00:00Z"
+      deadline_at: "2026-09-26T10:30:00Z"
       completed_at: null
       report: null
   - name: report_missing_a_counter
@@ -63,5 +67,6 @@ invalid:
       max_fetches: 200
       requested_by_identity_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
       requested_at: "2026-09-26T10:00:00Z"
+      deadline_at: "2026-09-26T10:30:00Z"
       completed_at: "2026-09-26T10:06:00Z"
       report: {fetched: 12, written: 9, refused: 2, stopped_by: frontier_empty}

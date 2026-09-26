@@ -68,6 +68,16 @@ class JsonArtifactStore:
             raise InvariantViolation("JSON_ARTIFACT_OBJECT_REQUIRED")
         return value
 
+    def delete_if_present(self, tenant_id: str, reference: Mapping[str, Any]) -> bool:
+        """Idempotent delete (a retried erasure): ``False`` when the object is already gone, else ``delete``."""
+        cas_path = reference.get("cas_path") if isinstance(reference, Mapping) else None
+        if not isinstance(cas_path, Mapping):
+            raise InvariantViolation("JSON_ARTIFACT_CAS_PATH_REQUIRED")
+        if not self.cas.exists(tenant_id, dict(cas_path)):
+            return False
+        self.delete(tenant_id, reference)
+        return True
+
     def delete(self, tenant_id: str, reference: Mapping[str, Any]) -> str:
         """Delete only after verifying the reference and content hash."""
         self.read(tenant_id, reference)

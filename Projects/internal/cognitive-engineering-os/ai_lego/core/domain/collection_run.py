@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
 from ai_lego.core.domain._intake_validation import require_timestamp, require_uuid
@@ -12,7 +13,25 @@ RUN_ID = re.compile(r"^[A-Za-z0-9_-]{1,80}$")  # = the Recipe run_id rule
 MAX_SEEDS = 10
 MAX_FETCHES = 200  # = next-admin lib/collect/run.ts DEFAULT_BUDGET.fetches
 RUN_STATUSES = ("requested", "running", "completed", "failed")
+OPEN_STATUSES = ("requested", "running")
 REPORT_COUNTERS = ("fetched", "written", "unchanged", "refused")
+# How long a run may stay open. The one deadline: the run row stores it and the run's grant is issued to expire at the
+# same instant, so "the grant is dead" and "the run is over" can never disagree. Long enough for Trigger to queue the run
+# and for the crawl (capped at 240 s in next-admin) to finish; a leaked grant token dies within the hour.
+RUN_TTL = timedelta(minutes=30)
+
+
+def _instant(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def effective_status(stored_status: str, deadline_at: str, now: datetime | None = None) -> str:
+    """The run's status as every reader must see it: an open run past its deadline is failed -- nobody can finish it
+    any more (its grant expired at the same instant). Derived, never written back."""
+    now = now or datetime.now(timezone.utc)
+    if stored_status in OPEN_STATUSES and now >= _instant(deadline_at):
+        return "failed"
+    return stored_status
 
 
 def run_report(report: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -46,6 +65,7 @@ def collection_run_record(
     for value, maximum, code in ((seeds_count, MAX_SEEDS, "COLLECTION_RUN_SEEDS_INVALID"), (max_fetches, MAX_FETCHES, "COLLECTION_RUN_BUDGET_INVALID")):
         if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= maximum:
             raise InvariantViolation(code)
+    requested = require_timestamp("COLLECTION_RUN", requested_at, "requested_at")
     return {
         "run_id": run_id,
         "project_id": require_uuid("COLLECTION_RUN", "project_id", project_id),
@@ -54,7 +74,8 @@ def collection_run_record(
         "seeds_count": seeds_count,
         "max_fetches": max_fetches,
         "requested_by_identity_id": require_uuid("COLLECTION_RUN", "requested_by_identity_id", requested_by_identity_id),
-        "requested_at": require_timestamp("COLLECTION_RUN", requested_at, "requested_at"),
+        "requested_at": requested,
+        "deadline_at": (_instant(requested) + RUN_TTL).astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "completed_at": None,
         "report": None,
     }

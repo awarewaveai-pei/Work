@@ -8,9 +8,11 @@ import sqlite3
 import tempfile
 import unittest
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ai_lego.apps.cli.bootstrap_service_identity import main as bootstrap_main
+from ai_lego.core.domain.collection_run import RUN_TTL
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.identity.store import COLLECTOR_EMAIL, IdentityStore
 
@@ -30,7 +32,8 @@ class CollectGrantTests(unittest.TestCase):
         self._dir.cleanup()
 
     def _issue(self, project_id: str = PROJECT_A, run_id: str = "run1") -> str:
-        return self.store.issue_collect_grant(self.tenant["tenant_id"], project_id, run_id, self.collector["identity_id"])
+        deadline = (datetime.now(timezone.utc) + RUN_TTL).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        return self.store.issue_collect_grant(self.tenant["tenant_id"], project_id, run_id, self.collector["identity_id"], deadline)
 
     def _sql(self, statement: str, params: tuple = ()) -> list:
         conn = sqlite3.connect(self.db)

@@ -25,6 +25,7 @@ from ai_lego.apps.api import main as api_main
 from ai_lego.apps.cli.run_life_decision_slice import fixture_source
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.modules.research.review import fixture_review
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.support import b64
@@ -67,6 +68,15 @@ class ApiTestCase(unittest.TestCase):
     def _login(self) -> None:
         response = self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "user@example.com", "password": "correct-horse-battery"})
         self.assertEqual(response.status_code, 200, response.text)
+
+    def _confidential_project_id(self) -> str:
+        """A real Confidential Project in this test's own temp repository: a run takes its classification from here
+        (RESEARCH_LINES_MASTER_PLAN K9), never from the request body."""
+        repo = ProjectSourceRepository(Path(self._tmpdir.name) / "projects.sqlite3")
+        api_main.app.dependency_overrides[api_main.get_project_source_repository] = lambda: repo
+        response = self.client.post("/projects", json={"name": f"Confidential {uuid.uuid4().hex[:8]}", "purpose": "Run classification.", "data_classification": "Confidential"})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()["project_id"]
 
 
 def business_foundation_source() -> dict:
@@ -1365,7 +1375,7 @@ class RecipeRunTests(ApiTestCase):
             run_id = "api-protected-result-" + uuid.uuid4().hex[:12]
             response = self.client.post(
                 "/recipes/life-decision-v1/run",
-                json={"source": fixture_source(), "data_classification": "CONFIDENTIAL", "run_id": run_id},
+                json={"source": fixture_source(), "project_id": self._confidential_project_id(), "run_id": run_id},
             )
             self.assertEqual(response.status_code, 200, response.text)
 
@@ -1399,7 +1409,7 @@ class RecipeRunTests(ApiTestCase):
         self._login()
         response = self.client.post(
             "/recipes/life-decision-v1/run",
-            json={"source": fixture_source(), "data_classification": "CONFIDENTIAL", "run_id": "api-confidential-test"},
+            json={"source": fixture_source(), "project_id": self._confidential_project_id(), "run_id": "api-confidential-test"},
         )
         self.assertEqual(response.status_code, 503)
         self.assertIn("WORKFLOW_JOURNAL_PROTECTION_REQUIRED", response.text)
@@ -1413,7 +1423,7 @@ class RecipeRunTests(ApiTestCase):
         ):
             response = self.client.post(
                 "/recipes/life-decision-v1/run",
-                json={"source": fixture_source(), "data_classification": "CONFIDENTIAL", "run_id": "api-encrypted-test"},
+                json={"source": fixture_source(), "project_id": self._confidential_project_id(), "run_id": "api-encrypted-test"},
             )
             self.assertEqual(response.status_code, 200, response.text)
             result_payload = response.json()

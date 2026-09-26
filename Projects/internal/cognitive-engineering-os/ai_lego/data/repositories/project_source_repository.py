@@ -1,7 +1,15 @@
 """Local-first Project/Source repository using the canonical relational table names.
 
 Current-state rows and their append-only event are committed in one SQLite
-transaction. Raw Source bytes are never accepted by this adapter.
+transaction. Raw Source bytes are never accepted by this adapter: the caller passes a
+``put_content`` callback, which runs inside the write transaction.
+
+Blob lifecycle (one rule): committed rows are the only record of which Source blobs are live.
+Content is written only under SQLite's write lock (``_write_transaction``), after its rows and
+before commit; a blob no committed row references is garbage (a refused batch writes none, a
+crash or failed write between content and commit can leave one). ``collect_unreferenced_blobs``
+removes garbage under the same lock -- so it never sees another write in flight -- and every
+Project erasure runs it. There is no per-request cleanup.
 """
 
 from __future__ import annotations
@@ -11,11 +19,12 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 from uuid import uuid4
 
-from ai_lego.core.domain.collection_run import run_report
+from ai_lego.core.domain.collection_run import OPEN_STATUSES, effective_status, run_report
 from ai_lego.core.support import canonical_json, sha256_bytes
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.errors import InvariantViolation
 
 
@@ -99,6 +108,7 @@ CREATE TABLE IF NOT EXISTS collection_runs (
     budget_json TEXT NOT NULL,
     requested_by_identity_id TEXT NOT NULL,
     requested_at TEXT NOT NULL,
+    deadline_at TEXT NOT NULL,
     completed_at TEXT,
     report_json TEXT,
     PRIMARY KEY (tenant_id, run_id),
@@ -152,24 +162,28 @@ _PROVENANCE_COLUMNS = frozenset({"canonical_url", "source_uri", "fetched_at", "p
 
 _SOURCE_SELECT = "source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at, doi, authors_json, venue, published_at, canonical_url, source_uri, fetched_at, provenance_json, source_class, relevance_json, supersedes_source_id"
 
-# 2026-09-18: doi/authors_json/venue/published_at added to an already-deployed table.
-# ``CREATE TABLE IF NOT EXISTS`` above is a no-op against an existing table, so a
-# pre-existing database file never gains these columns without this explicit migration
-# (see ProjectSourceRepository._migrate_source_columns).
-_SOURCE_MIGRATION_COLUMNS: tuple[tuple[str, str], ...] = (
-    ("doi", "TEXT"),
-    ("authors_json", "TEXT"),
-    ("venue", "TEXT"),
-    ("published_at", "TEXT"),
-    # 2026-09-26: collection provenance (RESEARCH_LINES_MASTER_PLAN WC-P1-01).
-    ("canonical_url", "TEXT"),
-    ("source_uri", "TEXT"),
-    ("fetched_at", "TEXT"),
-    ("provenance_json", "TEXT"),
-    ("source_class", "TEXT"),
-    ("relevance_json", "TEXT"),
-    ("supersedes_source_id", "TEXT"),
-)
+# Columns added after a table first shipped. ``CREATE TABLE IF NOT EXISTS`` above is a no-op against an existing table,
+# so a pre-existing database file gains them only here (ProjectSourceRepository._migrate_columns), per table.
+_MIGRATION_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
+    # 2026-09-18: citation metadata.
+    "prov_sources": (
+        ("doi", "TEXT"),
+        ("authors_json", "TEXT"),
+        ("venue", "TEXT"),
+        ("published_at", "TEXT"),
+        # 2026-09-26: collection provenance (RESEARCH_LINES_MASTER_PLAN WC-P1-01).
+        ("canonical_url", "TEXT"),
+        ("source_uri", "TEXT"),
+        ("fetched_at", "TEXT"),
+        ("provenance_json", "TEXT"),
+        ("source_class", "TEXT"),
+        ("relevance_json", "TEXT"),
+        ("supersedes_source_id", "TEXT"),
+    ),
+    # 2026-09-26: a run's deadline. A row from before it existed has no grant that could still finish it, so it reads
+    # as past its deadline.
+    "collection_runs": (("deadline_at", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'"),),
+}
 
 
 class ProjectSourceRepository:
@@ -180,20 +194,24 @@ class ProjectSourceRepository:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connection() as connection:
             connection.executescript(_SCHEMA)
-            self._migrate_source_columns(connection)
+            self._migrate_columns(connection)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        # Deleted rows are overwritten, not just unlinked: without this an erased Project's text stays readable in the
+        # file's free pages (plan D10 -- erasure has to hold for the bytes on disk, not only for queries).
+        connection.execute("PRAGMA secure_delete = ON")
         return connection
 
     @staticmethod
-    def _migrate_source_columns(connection: sqlite3.Connection) -> None:
-        existing_columns = {row["name"] for row in connection.execute("PRAGMA table_info(prov_sources)")}
-        for column, column_type in _SOURCE_MIGRATION_COLUMNS:
-            if column not in existing_columns:
-                connection.execute(f"ALTER TABLE prov_sources ADD COLUMN {column} {column_type}")
+    def _migrate_columns(connection: sqlite3.Connection) -> None:
+        for table, columns in _MIGRATION_COLUMNS.items():
+            existing_columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
+            for column, column_type in columns:
+                if column not in existing_columns:
+                    connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
         # One ACTIVE version per canonical URL per Project (plan I1), enforced by the database itself; a superseded
         # row keeps its canonical_url, so the index is partial. Created here, not in _SCHEMA, because an old file
         # only gains the column in the loop above.
@@ -219,6 +237,23 @@ class ProjectSourceRepository:
         try:
             with connection:
                 yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
+    def _write_transaction(self):
+        """SQLite's write lock taken up front (BEGIN IMMEDIATE): the one writer at a time for Source content."""
+        connection = self._connect()
+        connection.isolation_level = None
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                yield connection
+            except BaseException:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
+            connection.execute("COMMIT")
         finally:
             connection.close()
 
@@ -348,9 +383,12 @@ class ProjectSourceRepository:
             },
         )
 
-    def add_source(self, record: Mapping[str, Any], cas_path: Mapping[str, str]) -> dict[str, Any]:
-        with self._connection() as connection:
+    def add_source(self, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None) -> dict[str, Any]:
+        """Row first, then the content, then commit: a failing insert writes no blob; ``put`` is atomic."""
+        with self._write_transaction() as connection:
             self._insert_source(connection, record, cas_path)
+            if put_content is not None:
+                put_content()
         return dict(record)
 
     @classmethod
@@ -389,12 +427,62 @@ class ProjectSourceRepository:
             {"source_id": old_source_id, "superseded_by": record["source_id"], "project_id": record["project_id"]},
         )
 
-    def supersede(self, old_source_id: str, record: Mapping[str, Any], cas_path: Mapping[str, str]) -> dict[str, Any]:
+    def supersede(self, old_source_id: str, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None) -> dict[str, Any]:
         """Replace the active version of a collected URL: old row -> superseded, new row -> active, both events,
-        one transaction (plan I1). Any failure leaves the old row active."""
-        with self._connection() as connection:
+        one write transaction (plan I1); content as in ``add_source``. Any failure leaves the old row active."""
+        with self._write_transaction() as connection:
             self._supersede(connection, old_source_id, record, cas_path)
+            if put_content is not None:
+                put_content()
         return dict(record)
+
+    def ingest_batch(
+        self,
+        tenant_id: str,
+        project_id: str,
+        items: list[tuple[Mapping[str, Any], Mapping[str, str]]],
+        put_content: Callable[[Mapping[str, str]], Any],
+    ) -> list[dict[str, str]]:
+        """Collected Sources, one write transaction for the whole batch (plan C2, R2). Per item, decided under the lock:
+        same canonical_url + same sha256 = unchanged (nothing written); same URL + new sha256 = supersede; new URL =
+        insert. All rows first, then each new content once (``put_content(cas_path)``), then commit.
+        ``items`` = (record with supersedes_source_id None, cas_path)."""
+        results: list[dict[str, str]] = []
+        to_write: dict[str, Mapping[str, str]] = {}
+        with self._write_transaction() as connection:
+            for record, cas_path in items:
+                if record["tenant_id"] != tenant_id or record["project_id"] != project_id or not record.get("canonical_url"):
+                    raise InvariantViolation("SOURCE_INGEST_SCOPE_INVALID")
+                current = self._find_active_source(connection, tenant_id, project_id, record["canonical_url"])
+                if current is not None and current["content_sha256"] == record["content_sha256"]:
+                    results.append({"canonical_url": record["canonical_url"], "outcome": "unchanged", "source_id": current["source_id"]})
+                elif current is not None:
+                    self._supersede(connection, current["source_id"], {**record, "supersedes_source_id": current["source_id"]}, cas_path)
+                    results.append({"canonical_url": record["canonical_url"], "outcome": "superseded", "source_id": record["source_id"]})
+                    to_write[cas_path["hash"]] = cas_path
+                else:
+                    self._insert_source(connection, record, cas_path)
+                    results.append({"canonical_url": record["canonical_url"], "outcome": "created", "source_id": record["source_id"]})
+                    to_write[cas_path["hash"]] = cas_path
+            for cas_path in to_write.values():
+                put_content(cas_path)
+        return results
+
+    @staticmethod
+    def _collect_unreferenced_blobs(connection: sqlite3.Connection, tenant_id: str, cas: TenantScopedCas) -> int:
+        referenced = {row["content_sha256"] for row in connection.execute("SELECT DISTINCT content_sha256 FROM prov_sources WHERE tenant_id=?", (tenant_id,))}
+        removed = 0
+        for object_path in cas.list_objects(tenant_id):
+            if object_path.rsplit("/", 1)[-1] not in referenced:
+                cas.unlink(tenant_id, {"path": object_path, "tenant_segment": tenant_id})
+                removed += 1
+        return removed
+
+    def collect_unreferenced_blobs(self, tenant_id: str, cas: TenantScopedCas) -> int:
+        """Remove every Source blob of the tenant that no committed row references (the blob lifecycle rule above);
+        under the write lock, so nothing in flight can be mistaken for garbage. Returns how many were removed."""
+        with self._write_transaction() as connection:
+            return self._collect_unreferenced_blobs(connection, tenant_id, cas)
 
     # -- Collection runs (specs/domain/collection-run.schema.yaml) ---------------------------------------------
     # Events go on the Project's own aggregate and carry ids, counts and status only -- never seeds, which may name a
@@ -408,11 +496,12 @@ class ProjectSourceRepository:
             "run_id": row["run_id"],
             "project_id": row["project_id"],
             "tenant_id": row["tenant_id"],
-            "status": row["status"],
+            "status": effective_status(row["status"], row["deadline_at"]),
             "seeds_count": len(seeds),
             "max_fetches": budget["fetches"],
             "requested_by_identity_id": row["requested_by_identity_id"],
             "requested_at": row["requested_at"],
+            "deadline_at": row["deadline_at"],
             "completed_at": row["completed_at"],
             "report": None if row["report_json"] is None else json.loads(row["report_json"]),
         }
@@ -422,8 +511,8 @@ class ProjectSourceRepository:
             raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
         with self._connection() as connection:
             connection.execute(
-                "INSERT INTO collection_runs (tenant_id, project_id, run_id, status, seeds_json, budget_json, requested_by_identity_id, requested_at, completed_at, report_json) VALUES (?,?,?,?,?,?,?,?,NULL,NULL)",
-                (record["tenant_id"], record["project_id"], record["run_id"], "requested", canonical_json([dict(seed) for seed in seeds]), canonical_json({"fetches": record["max_fetches"]}), record["requested_by_identity_id"], record["requested_at"]),
+                "INSERT INTO collection_runs (tenant_id, project_id, run_id, status, seeds_json, budget_json, requested_by_identity_id, requested_at, deadline_at, completed_at, report_json) VALUES (?,?,?,?,?,?,?,?,?,NULL,NULL)",
+                (record["tenant_id"], record["project_id"], record["run_id"], "requested", canonical_json([dict(seed) for seed in seeds]), canonical_json({"fetches": record["max_fetches"]}), record["requested_by_identity_id"], record["requested_at"], record["deadline_at"]),
             )
             self._append_event(connection, record["tenant_id"], f"project:{record['project_id']}", "CollectionRequested", {"run_id": record["run_id"], "seeds_count": record["seeds_count"], "max_fetches": record["max_fetches"]})
         return dict(record)
@@ -433,21 +522,17 @@ class ProjectSourceRepository:
             row = connection.execute("SELECT * FROM collection_runs WHERE tenant_id=? AND project_id=? AND run_id=?", (tenant_id, project_id, run_id)).fetchone()
         return None if row is None else self._run_from_row(row)
 
-    def collection_run_seeds(self, tenant_id: str, run_id: str) -> list[dict[str, Any]]:
-        """The seeds as requested -- only for the call that hands the run to the Collection Service."""
-        with self._connection() as connection:
-            row = connection.execute("SELECT seeds_json FROM collection_runs WHERE tenant_id=? AND run_id=?", (tenant_id, run_id)).fetchone()
-        return [] if row is None else json.loads(row["seeds_json"])
-
     def _transition(self, tenant_id: str, run_id: str, allowed_from: tuple[str, ...], to: str, event_type: str, payload: Mapping[str, Any], completed_at: str | None, report_json: str | None) -> dict[str, Any]:
         with self._connection() as connection:
-            row = connection.execute("SELECT project_id, status FROM collection_runs WHERE tenant_id=? AND run_id=?", (tenant_id, run_id)).fetchone()
-            if row is None or row["status"] not in allowed_from:
+            row = connection.execute("SELECT project_id FROM collection_runs WHERE tenant_id=? AND run_id=?", (tenant_id, run_id)).fetchone()
+            if row is None:
                 raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
+            # Only an open run before its deadline moves; past it the run IS failed (effective_status) and stays so.
+            now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
             placeholders = ",".join("?" for _ in allowed_from)
             changed = connection.execute(
-                f"UPDATE collection_runs SET status=?, completed_at=COALESCE(?, completed_at), report_json=COALESCE(?, report_json) WHERE tenant_id=? AND run_id=? AND status IN ({placeholders})",
-                (to, completed_at, report_json, tenant_id, run_id, *allowed_from),
+                f"UPDATE collection_runs SET status=?, completed_at=COALESCE(?, completed_at), report_json=COALESCE(?, report_json) WHERE tenant_id=? AND run_id=? AND status IN ({placeholders}) AND deadline_at > ?",
+                (to, completed_at, report_json, tenant_id, run_id, *allowed_from, now),
             ).rowcount
             if changed != 1:
                 raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
@@ -466,7 +551,7 @@ class ProjectSourceRepository:
         clean = run_report(report)
         now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         event_type = "CollectionCompleted" if status == "completed" else "CollectionFailed"
-        return self._transition(tenant_id, run_id, ("requested", "running"), status, event_type, {"status": status, "report": clean}, now, None if clean is None else canonical_json(clean))
+        return self._transition(tenant_id, run_id, OPEN_STATUSES, status, event_type, {"status": status, "report": clean}, now, None if clean is None else canonical_json(clean))
 
     def get_source(self, tenant_id: str, project_id: str, source_id: str) -> dict[str, Any] | None:
         with self._connection() as connection:
@@ -540,3 +625,30 @@ class ProjectSourceRepository:
         result = dict(row)
         result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
         return result
+
+    # -- Project erasure (plan D10, K7) ---------------------------------------------------------------------------
+
+    def project_artifact_references(self, tenant_id: str, project_id: str) -> list[dict[str, Any]]:
+        """The Project's interpretation artifacts (their own CAS, one per interpretation, never shared)."""
+        with self._connection() as connection:
+            rows = connection.execute("SELECT artifact_reference_json FROM project_interpretations WHERE tenant_id=? AND project_id=?", (tenant_id, project_id)).fetchall()
+        return [json.loads(row["artifact_reference_json"]) for row in rows]
+
+    def erase_project(self, tenant_id: str, project_id: str, erased_by_identity_id: str, cas: TenantScopedCas, artifacts_deleted: int) -> dict[str, int]:
+        """One write transaction: the Project's events (its own aggregate + each of its Sources'), Sources, interpretation
+        references, collection runs and the Project row go; the tenant's now-unreferenced blobs are removed before
+        commit (content shared with another Project stays referenced, so it stays); one ProjectErased tombstone.
+        A failure rolls the rows back, and a retry finishes the job."""
+        with self._write_transaction() as connection:
+            if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=? AND project_id=?", (tenant_id, project_id)).fetchone() is None:
+                raise InvariantViolation("PROJECT_NOT_FOUND")
+            source_ids = [row["source_id"] for row in connection.execute("SELECT source_id FROM prov_sources WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))]
+            events_deleted = 0
+            for aggregate_id in [f"project:{project_id}", *(f"source:{source_id}" for source_id in source_ids)]:
+                events_deleted += connection.execute("DELETE FROM events WHERE tenant_id=? AND aggregate_id=?", (tenant_id, aggregate_id)).rowcount
+            for table in ("prov_sources", "project_interpretations", "collection_runs", "platform_projects"):
+                connection.execute(f"DELETE FROM {table} WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))
+            blobs_unlinked = self._collect_unreferenced_blobs(connection, tenant_id, cas)
+            counts = {"sources": len(source_ids), "blobs_unlinked": blobs_unlinked, "artifacts_deleted": artifacts_deleted, "events_deleted": events_deleted}
+            self._append_event(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts})
+        return counts
