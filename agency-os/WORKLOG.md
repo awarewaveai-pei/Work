@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-26（續47）合併雲端 T23：public/vector-editor.html 每支外部 script 都有驗證過的 SRI（未部署）
+- [根因] vector-editor.html 在 app origin、不需登入，session cookie JS 可讀；7 支 CDN script 無 integrity → CDN 檔被竄改即 session 外洩。
+- [來源] `claude/cc-t23-sri` ea321928b：crossorigin＋空 integrity 佔位（雲端出網擋 CDN）、`lib/security/public-html-sri.ts`、public/**/*.html 測試＋待補 hash allowlist。
+- [本機] 7 個 sha384 本機計算，並與 CDN 官方公布值交叉比對（cdnjs API sri、jsDelivr data API sha256）全部一致。`imagetracer_v1.2.6.min.js` 不在 npm 套件內（jsDelivr 臨時壓縮、無官方 hash）→ 改載套件原檔 `imagetracer_v1.2.6.js`。佔位註解與 allowlist 移除，測試無 allowlist。
+- [未做] HSTS（host nginx）與 cookie Secure 仍在 TASKS:674（repo 外）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=vitest public-html-sri 13/13；瀏覽器：7 個全域物件載入、integrity 皆設；故意錯 hash 被擋（console: Failed to find a valid digest ... blocked，瀏覽器算出的 SHA-384 與頁面值相同） | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/0m（Codex 三輪此區無發現；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=imagetracer_v1.2.6.min.js | hits=0
 ## 2026-09-26（續46）合併雲端 T22：SECURITY DEFINER 函式不會悄悄重新開放 anon／authenticated EXECUTE（migration 掃描＋正式庫 proacl 檢查）（未部署：純檢查）
 - [根因] Supabase ALTER DEFAULT PRIVILEGES 對每個新 public 函式授 EXECUTE 給 anon/authenticated；DROP＋CREATE 產生新物件即重開。發生過兩次（0035/0036/0056 → 0064 修），之前只有註解防線。
 - [來源] `claude/cc-t22-secdef-grants` d1df51b11：`lib/db/security-definer-grants.ts` 逐 migration 追蹤簽章（REPLACE 保留 ACL、DROP 重置）；`scripts/check-security-definer-grants.mjs` 讀正式庫 proacl；allowlist `{}`。
