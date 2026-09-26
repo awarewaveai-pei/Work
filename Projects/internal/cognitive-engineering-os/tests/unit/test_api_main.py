@@ -9,6 +9,7 @@ import base64
 import io
 import tempfile
 import unittest
+import yaml
 import uuid
 import json
 import os
@@ -311,6 +312,43 @@ class ApiPrefixTests(ApiTestCase):
         encoded = run("/api/health", b"/%61pi/health")  # decodes to the prefix but is not it
         self.assertEqual((encoded["path"], encoded["raw_path"]), ("/api/health", b"/%61pi/health"))
         self.assertEqual(run("/apix", b"/apix")["path"], "/apix")
+
+
+class CatalogTests(ApiTestCase):
+    """GET /catalog = the display catalog the mocks are checked with (ai_lego/platform/catalog/display_catalog.py)."""
+
+    def setUp(self):
+        super().setUp()
+        api_main._CATALOG_CACHE.clear()
+
+    def test_catalog_lists_every_served_method_and_the_page_data(self):
+        body = self.client.get("/catalog").json()
+        self.assertEqual(set(body["methods"]), {m["method_id"] for m in self.client.get("/methods").json()})
+        self.assertEqual(body["counts"]["tools"], len(body["methods"]))
+        self.assertEqual(body["counts"]["user_workflows"], sum(r["audience"] == "user" for r in body["recipes"]))
+        for goal in body["goals"]:
+            self.assertIn(goal["icon"], body["glyphs"])
+            self.assertTrue(all(body["methods"][mid]["goal"] == goal["id"] for mid in goal["featured"]))
+        self.assertTrue(all(p["shape"] in body["shapes"] for p in body["popular"]))
+
+    def test_an_unchanged_registry_is_served_from_the_cache(self):
+        self.client.get("/catalog")
+        with patch.object(api_main, "load_catalog", side_effect=AssertionError("reloaded")):
+            self.assertEqual(self.client.get("/catalog").status_code, 200)
+
+    def test_a_registry_gap_is_a_503_that_names_it(self):
+        with patch.object(api_main, "load_catalog", side_effect=ValueError("method-goal-groups.yaml: families in no goal: ['x']")):
+            response = self.client.get("/catalog")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("CATALOG_INVALID: ValueError: method-goal-groups.yaml", response.json()["detail"])
+
+    def test_a_missing_or_unparsable_registry_is_a_503_too(self):
+        for error in (FileNotFoundError("method-goal-groups.yaml"), yaml.YAMLError("bad indent")):
+            api_main._CATALOG_CACHE.clear()
+            with patch.object(api_main, "load_catalog", side_effect=error):
+                response = self.client.get("/catalog")
+            self.assertEqual(response.status_code, 503, error)
+            self.assertIn(f"CATALOG_INVALID: {type(error).__name__}", response.json()["detail"])
 
 
 class CorsConfigurationTests(unittest.TestCase):

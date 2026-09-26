@@ -1,21 +1,17 @@
-:root { color-scheme: light; font-family: system-ui, sans-serif; background: #f7f5ef; color: #1e293b; }
-* { box-sizing: border-box; }
-body { margin: 0; }
-main { max-width: 1180px; margin: 0 auto; padding: 24px; }
-a { color: #155e75; }
-button, input, textarea { font: inherit; }
-button { cursor: pointer; border: 1px solid #155e75; border-radius: 8px; padding: 8px 12px; background: #155e75; color: white; }
-button.secondary { background: white; color: #155e75; }
-.card { background: white; border: 1px solid #d8d4ca; border-radius: 12px; padding: 16px; margin: 12px 0; }
+/* Web-only rules on top of design-system.css (the one stylesheet; byte-identical to docs/mockups/design-system.css,
+   check-mocks.py enforces). Colours only through its tokens. */
+button:not(.btn):not(.tab):not(.chip) { cursor: pointer; border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; background: var(--accent); color: var(--bg); font: inherit; }
+button.secondary:not(.btn) { background: var(--card); color: var(--accent); }
+input, textarea { font: inherit; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-.muted { color: #64748b; }
-.error { color: #b91c1c; white-space: pre-wrap; }
-.field { display: grid; gap: 6px; margin: 10px 0; }
-.field input, .field textarea { width: 100%; border: 1px solid #b8b4aa; border-radius: 8px; padding: 8px; }
-.section { background: white; border: 1px solid #d8d4ca; border-radius: 12px; padding: 16px; margin: 12px 0; }
-.how-to { background: #eff6ff; border-left: 4px solid #0284c7; padding: 8px 12px; margin-bottom: 12px; }
-.result-page { --result-ink: #232019; --result-muted: #7a7261; --result-line: #e3dbc8; --result-accent: #0e5b50; color: var(--result-ink); }
-.result-page .card { background: #fffdf8; border-color: var(--result-line); border-radius: 14px; }
+.muted { color: var(--muted); }
+.error { color: var(--bad); white-space: pre-wrap; }
+.field input, .field textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--card); color: var(--ink); }
+.section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 12px 0; }
+.how-to { background: var(--soft); border-left: 4px solid var(--accent); padding: 8px 12px; margin-bottom: 12px; }
+.search { width: 100%; }
+.result-page { --result-ink: var(--ink); --result-muted: var(--muted); --result-line: var(--line); --result-accent: var(--accent); color: var(--result-ink); }
+.result-page .card { background: var(--card); border-color: var(--result-line); border-radius: 14px; }
 .result-page .section { padding: clamp(18px, 3vw, 30px); margin: 18px 0; }
 .result-page .top { display: flex; align-items: start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .result-page h1 { margin: 0; font-size: clamp(24px, 3vw, 36px); }
@@ -23,12 +19,12 @@ button.secondary { background: white; color: #155e75; }
 .result-page h3 { margin: 0 0 8px; font-size: 17px; }
 .result-page .status, .result-page .meta-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; border-block: 1px solid var(--result-line); color: var(--result-muted); }
 .result-page .lead { font-size: 1.12rem; line-height: 1.75; }
-.result-page .can, .result-page .cant { border-left: 4px solid var(--result-accent); padding: 6px 12px; margin: 8px 0; background: #e2eeea; }
-.result-page .cant { border-color: #a3611c; background: #f3efe4; }
+.result-page .can, .result-page .cant { border-left: 4px solid var(--result-accent); padding: 6px 12px; margin: 8px 0; background: var(--tag); }
+.result-page .cant { border-color: var(--warn); background: var(--soft); }
 .result-page .todos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
-.result-page .todo { background: #f3efe4; padding: 12px; border-radius: 9px; margin: 0; }
+.result-page .todo { background: var(--soft); padding: 12px; border-radius: 9px; margin: 0; }
 .result-page .terms { color: var(--result-muted); }
-.result-page .how-to { background: #f3efe4; border-left-color: var(--result-accent); }
+.result-page .how-to { background: var(--soft); border-left-color: var(--result-accent); }
 .result-page table { width: 100%; border-collapse: collapse; }
 .result-page th, .result-page td { padding: 8px 10px; border: 1px solid var(--result-line); text-align: left; }
 .result-page .next-step { border-left: 4px solid var(--result-accent); }
@@ -37,5 +33,5 @@ button.secondary { background: white; color: #155e75; }
 .result-page .btns { margin: 12px 0; }
 .result-page textarea { display: block; width: 100%; min-height: 88px; margin-top: 6px; border: 1px solid var(--result-line); border-radius: 8px; padding: 9px; }
 .result-page details { margin-top: 16px; }
-.result-page pre { overflow: auto; max-height: 420px; background: #f3efe4; padding: 14px; border-radius: 8px; }
+.result-page pre { overflow: auto; max-height: 420px; background: var(--soft); padding: 14px; border-radius: 8px; }
 @media (max-width: 640px) { .result-page .section { padding: 16px; } .result-page .grid { grid-template-columns: 1fr; } }

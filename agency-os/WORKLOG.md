@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-26（續36）Cognitive OS 網站照示意稿（第一批：主選單、首頁、工具、工具頁、工作流、我的專案）；目錄載入器單一來源；285→284
+- [操作者] 正式站 `/methods` 與示意稿差很多（「為什麼變成這種狗屎」「你在耍我嗎」）。
+- [根因] C1 PI-a 卡只做登入／最小方法清單／表單／結果頁，示意稿的主選單、首頁、目錄、課程、工作流頁從未移植（`apps/cognitive-web/app/methods/page.tsx` 26 行、`globals.css` 41 行）。C2 計畫 I11「示意稿＝規格」只有結果頁有閘（`check-mocks.py --page result`），其他頁缺了也不會紅。C3 示意稿目錄把 Atlas 視角 `stakeholder.regulator`（`type: perspective`，`method_resolver.py` from_spec_root 排除）算成工具：顯示 285、API 只能跑 284。
+- [改] 目錄載入器 `mockkit.load_catalog` 搬到 `ai_lego/platform/catalog/display_catalog.py`（逐字搬，路徑改為 spec root 函式；明給的 root 照用，自測的 methods/recipes 副本才不被 `resolve_spec_root` 的 specs/ 檢查擋）；工具＝`MethodCatalog` 同一定義（視角保留顯示資料、不算工具）；`method-goal-groups.yaml` strategy 拿掉只有視角的 `stakeholder` 家族；首頁手寫數字 284，partials 重產。
+- [改] API `GET /catalog`（公開同 /methods；以登錄檔數量＋最新 mtime 為快取鍵；登錄缺口 503 `CATALOG_INVALID`）。
+- [改] 網站：`app/(shell)/` 主選單外框（讀不到目錄時照常顯示，只有列工具的頁面顯示錯誤卡）、首頁（卡在哪＋免費第一層比對、問句卡、先從這幾個開始）、`/methods` 目錄＋搜尋、`/methods/[id]` 工具頁、`/workflows`、`/projects`；填寫頁移到 `/methods/[id]/run`；登入後進首頁；`design-system.css` 位元組同步進網站（`sync-design-system.py` 寫、`check-mocks.py` 比、自測新例）；`globals.css` 只留網站專屬規則且顏色全走 token。
+- [e2e] `tests/e2e/cognitive/iceberg.spec.ts` 改新路徑（首頁→工具→冰山→開始→填寫頁）；該檔工作區版本含 PI-a 14R 驗證過但未 commit 的改動（R25），一併 commit。
+- [Codex] `codex-oracle.ps1`（只含本批改動的暫存 worktree）2 findings 皆修：F1 缺檔／YAML 壞只接 ValueError → 500 → 改接 ValueError/OSError/YAMLError/InvariantViolation 一律 503＋測試；F2 網站 fetch `revalidate: 300` 讓目錄最久 5 分鐘不更新 → `cache: "no-store"`（API 已以 mtime 指紋即時重建）。
+- [註] 計畫文件 15 處「285」指顯示資料筆數（含視角一筆），描述正確不改；可執行工具 284。
+- [未做→下一批] 填寫頁照示意稿的四格表單、課程頁（開始卡＋分頁）、工作流站頁與總覽、網站各頁的 check-mocks 規則（`--page` 擴到每頁）；部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 API :8420＋next dev :3930，Playwright 截圖 5 頁×桌機/手機（全 200、無橫向捲動）＋`playwright-runner.ps1 -Mode cognitive` 真模型 1 passed（58.8s）＋pytest test_display_catalog＋test_api_main 107 passed＋web vitest 21 passed、tsc 0、next build OK＋check-mocks 綠＋自測 190/190 抓到、144/144 規則有例 | exit=0 | ms=58800
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（`agency-os/reports/oracle/2026-09-26-review-55c2526d.md`，皆修）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/tests | grep=`app/methods/\[id\]/page|開始使用|router.push\("/methods"\)|stakeholder.regulator|285 個` | hits=0（程式、測試、示意稿；計畫文件的 285 見 [註]）
 ## 2026-09-26（續35）研究線 P1 工作卡 15 張（計畫 §12.7）；計畫 v1.51
 - [做] `RESEARCH_LINES_MASTER_PLAN.md` 新 §12.7：WC-P1-01～15（照 §12.2 格式）＋產卡裁定 K1–K10＋介面釘死表 I-a～I-h；A 軌（COS／SPEC）01–08、B 軌（next-admin／workflows）10–13，程式檔零交集可兩人並行；閘 14→09→15 為 High-STOP；§0 下一步加一行子項；檔頭 v1.51。只文件，未動程式。
 - [產卡發現] §3.3 照字面不可執行，卡以裁定為準（WC-P1-15 回寫 §3.3）：

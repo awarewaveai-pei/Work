@@ -71,6 +71,7 @@ from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog,
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.provider import AiProvider, daily_token_budget, provider_from_env
+from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.domain._intake_validation import require_uuid
 from ai_lego.core.domain.project import project_record
@@ -434,6 +435,33 @@ def list_methods(catalog: MethodCatalog = Depends(get_catalog)) -> list[dict[str
         {"method_id": method_id, **{k: v for k, v in entry.items() if k != "content_sha256"}, "display": display.get(method_id)}
         for method_id, entry in sorted(catalog.contracts.items())
     ]
+
+
+_CATALOG_CACHE: dict[str, Any] = {}
+
+
+def _catalog_fingerprint() -> tuple[int, int]:
+    """(file count, newest mtime) of every file the display catalog reads -- a registry edit changes it, so the cached
+    payload is rebuilt without a restart (same freshness as /methods), while an unchanged tree costs a few stat calls
+    instead of a 1.3 s parse of every contract."""
+    paths = registry_paths()
+    files = [paths[key] for key in ("METHODS_FILE", "FAMILIES_FILE", "GOALS_FILE", "RECIPE_DISPLAY_FILE")]
+    files += list(paths["CONTRACTS_DIR"].glob("*.contract.yaml")) + list(paths["RECIPES_DIR"].glob("*.recipe.yaml"))
+    return len(files), max((path.stat().st_mtime_ns for path in files if path.exists()), default=0)
+
+
+@app.get("/catalog")
+def display_catalog() -> dict[str, Any]:
+    """Everything the web app's home page, tool directory and workflow list show, from the loader the mocks are checked
+    with (ai_lego/platform/catalog/display_catalog.py). Public like /methods. A registry gap is a 503 that names it --
+    never a half-labelled page."""
+    try:
+        fingerprint = _catalog_fingerprint()
+        if _CATALOG_CACHE.get("fingerprint") != fingerprint:
+            _CATALOG_CACHE.update(fingerprint=fingerprint, payload=catalog_payload(load_catalog()))
+    except (ValueError, OSError, yaml.YAMLError, InvariantViolation) as error:   # a gap, a missing or unparsable file
+        raise HTTPException(status_code=503, detail=f"CATALOG_INVALID: {type(error).__name__}: {error}") from error
+    return _CATALOG_CACHE["payload"]
 
 
 @app.get("/recipes")

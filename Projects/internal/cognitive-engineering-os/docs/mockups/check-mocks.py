@@ -273,6 +273,10 @@ class Checker:
             self.domains = mk.load_domains()
         except Exception as e:
             self.bad("*", "U21", f"{mk.DOMAINS_FILE.name}: {e}")
+        # the web app uses the same stylesheet byte for byte (a --dir copy carries it as web-design-system.css)
+        web_css = mk.WEB_DESIGN_SYSTEM if self.folder.resolve() == mk.HERE else self.folder / "web-design-system.css"
+        if not web_css.exists() or not self.css_path.exists() or web_css.read_bytes() != self.css_path.read_bytes():
+            self.bad("*", "U19", f"web copy of {mk.DESIGN_SYSTEM.name} ({web_css.name}) is missing or differs (run sync-design-system.py)")
         for p in sorted(self.partials_dir.glob("*.html")): self.partials[p.stem] = p.read_text(encoding="utf-8").rstrip("\n")
         for name, render in mk.GENERATED.items():   # a generated partial must equal its registries (edit the data, run sync)
             tag = "U21" if name == "domain-chips" else "catalog"

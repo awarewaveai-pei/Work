@@ -42,7 +42,7 @@ goals:
     short_zh: 看局
     blurb_zh: 強弱、機會威脅、誰在乎、未來有哪幾種可能。
     icon: compass
-    families: [strategy, foresight, stakeholders, stakeholder]
+    families: [strategy, foresight, stakeholders]   # stakeholder.* = the regulator lens (type: perspective), not a tool
     featured: [strategy.swot, foresight.scenario_planning, stakeholders.stakeholder_map]
   - id: feasible
     title_zh: 做不做得起來、划不划算？

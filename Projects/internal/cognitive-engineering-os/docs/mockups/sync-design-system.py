@@ -21,6 +21,8 @@ def main():
         p = mk.PARTIALS / f"{name}.html"
         if not p.exists() or p.read_bytes() != body.encode("utf-8"):
             p.write_bytes(body.encode("utf-8")); print(f"partials/{name}.html: regenerated")
+    if not mk.WEB_DESIGN_SYSTEM.exists() or mk.WEB_DESIGN_SYSTEM.read_bytes() != mk.DESIGN_SYSTEM.read_bytes():   # the web app's copy
+        mk.WEB_DESIGN_SYSTEM.write_bytes(mk.DESIGN_SYSTEM.read_bytes()); print(f"{mk.WEB_DESIGN_SYSTEM}: synced")
     css = mk.DESIGN_SYSTEM.read_bytes().decode("utf-8").replace("\r\n", "\n").rstrip("\n")
     partials = {p.stem: p.read_bytes().decode("utf-8").replace("\r\n", "\n").rstrip("\n") for p in sorted(mk.PARTIALS.glob("*.html"))}
     for f in mk.FILES:

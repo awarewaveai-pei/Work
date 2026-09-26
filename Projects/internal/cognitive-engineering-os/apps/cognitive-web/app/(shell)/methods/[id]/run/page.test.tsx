@@ -1,11 +1,11 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch } from "../../../lib/api";
+import { apiFetch } from "../../../../../lib/api";
 import MethodPage from "./page";
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "systems.iceberg_model" }) }));
-vi.mock("../../../lib/api", () => ({ apiFetch: vi.fn() }));
+vi.mock("../../../../../lib/api", () => ({ apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => vi.resetAllMocks());
 

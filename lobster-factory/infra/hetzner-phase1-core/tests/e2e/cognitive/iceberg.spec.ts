@@ -42,10 +42,19 @@ test('login -> iceberg -> result page sections including 5b', async ({ page }) =
   await page.getByLabel('Email').fill(email!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: '登入' }).click();
-  await expect(page).toHaveURL(/\/methods$/);
-  await page.goto('/methods');
-  await page.getByPlaceholder('搜尋工具').fill('iceberg');
-  await page.getByRole('link', { name: '開始使用' }).first().click();
+  await expect(page).toHaveURL(/\/$/);
+  if (mockApi) {
+    // the tool list and the tool page render on the server from GET /catalog, which page.route() cannot answer;
+    // mock mode starts at the run page (client-side, every call goes through /api)
+    await page.goto('/methods/systems.iceberg_model/run');
+  } else {
+    await page.getByRole('navigation', { name: '主選單' }).getByRole('link', { name: '工具', exact: true }).click();
+    await page.getByPlaceholder(/知道名字就直接搜/).fill('冰山');
+    await page.getByRole('link', { name: '冰山模型', exact: true }).first().click();
+    await expect(page.getByRole('heading', { level: 1, name: '冰山模型' })).toBeVisible();
+    await page.getByRole('link', { name: /^開始/ }).first().click();
+  }
+  await expect(page).toHaveURL(/\/methods\/systems\.iceberg_model\/run$/);
   await expect(page.getByRole('heading', { level: 1, name: '冰山模型' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '我的專案' }).locator('..').getByRole('button').first()).toBeVisible();
   await page.getByRole('button', { name: '用示範案例試一次' }).click();

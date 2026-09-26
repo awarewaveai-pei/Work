@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import React from "react";
 import { useParams } from "next/navigation";
-import { apiFetch } from "../../../lib/api";
-import { FormField, initialState } from "../../../lib/form-model";
-import { LazyFill } from "../../../components/LazyFill";
-import { MethodForm } from "../../../components/MethodForm";
-import { ResultPage } from "../../../components/result/ResultPage";
+import { apiFetch } from "../../../../../lib/api";
+import { FormField, initialState } from "../../../../../lib/form-model";
+import { LazyFill } from "../../../../../components/LazyFill";
+import { MethodForm } from "../../../../../components/MethodForm";
+import { ResultPage } from "../../../../../components/result/ResultPage";
 
 type FormResponse = { method_id: string; display?: { name_zh?: string }; form: { fields: FormField[]; example?: { scenario?: string; input?: Record<string, unknown> } } };
 type Project = { project_id: string; name: string };

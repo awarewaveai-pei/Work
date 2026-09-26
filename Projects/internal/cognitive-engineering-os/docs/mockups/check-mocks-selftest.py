@@ -101,7 +101,7 @@ CASES = [
     ("demo project cards lose their finished state (U9)", "U9|示範專案", "home-mock.html", "strall", 'class="mcard done"', 'class="mcard"'),
     ("the all-tools card loses its id, so the search is no longer inside it (U1)", "U1|inside the #directory card", "home-mock.html", "str", '<div class="card" id="directory">', '<div class="card" id="all-tools">'),
     ("the project table becomes a div (U8)", "U8|project table", "home-mock.html", "re", r"<table>(.*?)</table>", r"<div>\1</div>"),
-    ("hero states a stale tool count (numbers pinned to the registries)", "catalog|hero sentence", "home-mock.html", "str", '285 個思考工具、12 條工作流', '280 個思考工具、12 條工作流'),
+    ("hero states a stale tool count (numbers pinned to the registries)", "catalog|hero sentence", "home-mock.html", "str", '284 個思考工具、12 條工作流', '285 個思考工具、12 條工作流'),
     ("the invented word 路線 comes back on the home page (FORBID)", "continuity|superseded text", "home-mock.html", "str", '要開新的，按上面「開新專案」', '要開新的，挑一條路線'),
     ("six-step strip loses its .journey class (the workflow cards' own strips must not satisfy the rule)", "U2|six-step", "home-mock.html", "str", '<div class="journey">\n      <span>建立</span>', '<div class="steps">\n      <span>建立</span>'),
     ("the worked example of three suggestions removed from the 說你卡在哪 card (U16)", "U16|worked example", "home-mock.html", "re", r'\s*<div class="mcards">\s*<div class="mcard now">\s*<div><b>1 <a href="#t-systems\.iceberg_model">冰山模型</a></b>.*?\n      </div>\n(?=      <div class="btns mt10">)', ""),
@@ -204,6 +204,7 @@ CASES = [
     ("a run form hidden outright (a [hidden] ancestor the run script never toggles)", "U14|fields must be visible in both states", "iceberg-result-mock.html", "str", '<form class="runform" aria-label="冰山模型的四個格子">', '<form class="runform" aria-label="冰山模型的四個格子" hidden>'),
     ("one field of the saved-run form shows only before a run (nested data-when)", "U14|fields must be visible in both states", "workflow-result-mock.html", "re", r'<div class="field">(\s*<label for="s2-s">)', r'<div class="field" data-when="empty" hidden>\1'),
     ("a second primary link elsewhere in the start card", "U15|start step needs exactly three buttons", "iceberg-lesson-mock.html", "re", r'(之後補：</p>\s*)<ul class="check">', r'\1<p><a class="btn primary" href="#panel-fill">先看怎麼填</a></p><ul class="check">'),
+    ("the web app's stylesheet drifts from the design system", "U19|web copy of design-system.css", "web-design-system.css", "str", "[hidden]{display:none!important}", "[hidden]{display:none}"),
     # continuity: the expected message names the loop each case proves (a mutation may trip more than one loop)
     ("page fact removed (PAGE_FACTS)", "continuity|fact missing", "iceberg-result-mock.html", "str", "主動分享人數（8 人團體）", "主動分享人數（8 人團隊）"),
     ("start step loses its preparation intro (PAGE_FACTS)", "continuity|fact missing", "workflow-lesson-mock.html", "str", "<p>手邊有這些會走得比較快，沒有也可以先走、之後補：</p>\n", ""),
@@ -245,6 +246,7 @@ def run_checker(folder, spec=None):
 
 def reset(tmp):
     for f in FILES + [CSS]: shutil.copyfile(HERE / f, tmp / f)
+    shutil.copyfile(mk.WEB_DESIGN_SYSTEM, tmp / "web-design-system.css")   # the web app's copy (check-mocks.py --dir reads it here)
     if (tmp / "partials").exists(): shutil.rmtree(tmp / "partials")
     shutil.copytree(mk.PARTIALS, tmp / "partials")
 
