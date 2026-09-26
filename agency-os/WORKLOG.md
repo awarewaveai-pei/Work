@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-27（續3）Cognitive OS 正式站部署 `b6936ecc`：我的專案（續1）
+- [操作者] 「照上次方式上線（建議）」。
+- [範圍] 正式站 `1fbb021f`→`b6936ecc`：本批（續1）＋部署紀錄 `014ecae7b`＋研究線兩筆（`209b65221` 文獻搜尋有專案時讀本專案學術來源；`339f576e3` 報表產生器模組，API 還沒接）。無資料庫結構變更（範圍內無 CREATE／ALTER）。
+- [備份＋試跑] `cos_predeploy_trial2.sh`：3 庫 SQLite backup API（integrity ok，40 檔）；目標 commit 的樹以副本開庫：列數 0 變動、無新表新欄、7 專案＋30 來源讀回、4 次分析經新碼讀出且狀態與 GET /interpretations 判讀一致、每個專案都有最後更新、`/health` ok、`/catalog` 284/12/4 → TRIAL PASS。
+- [部署] ff-only＋`deploy.sh`：測試關卡 208 passed、api 0 s／web 6 s healthy、本機兩項＋公開 `/api/health` PASS。
+- [上線後] 公開 14 路徑（含新 `/projects/x`、`/projects/x/analyses/INTERP-X`、`run?project=x`）如預期；無登入 `GET /api/projects/x/analyses` 401；三庫列數與部署前完全相同（identity 4、session 28、platform_projects 7、prov_sources 30、events 76、project_interpretations 4、collection_runs 10），integrity ok。容器內以部署碼（端點自己的 `_project_with_activity`）讀：操作者租戶 3 個專案——「冰山模型 2026-09-26」2 次分析（台北 19:41、23:51，皆完成）、研究線測試的 WC-P1-15 兩個。
+- [清理] 驗證完刪備份與試跑樹（2396 檔／36M），主機無 `cos-predeploy-*`。
+- [未驗] 正式站登入後的畫面（正式站測試身分仍待操作者建）；同一份碼本機真模型 e2e 已走完整條（續1）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=cos_predeploy_trial2.sh（TRIAL PASS）＋deploy.sh（exit 0，208 passed）＋live_check2.sh（14 路徑＋401）＋唯讀列數比對＋容器內 prod_projects_check.py | exit=0 | ms=258000
+- REVIEW_WAIVED: NA -- 部署與驗證，無新程式碼（程式已在續1 經 Codex 兩輪）
+- BUGHUNT_WAIVED: NA -- 無程式改動；部署範圍以 `git log 1fbb021fe..b6936ecc7` 逐筆列出
 ## 2026-09-27（續2）研究線 WC-P2-07b 併入 main：recipe 執行帶專案來源給 literature_search；academic 在寫入時標（NA sink＋COS 手動來源有 DOI）（本機 L3，獨立 worktree）
 - [來源] 本機 L3 = 背景 Sonnet agent 在 `D:\tmp\wt-l3`（detached worktree；next-admin node_modules 以 junction 唯讀借用 D:\Work）；提交 `e00f3e10e`，合併者 cherry-pick；與網站 session 同時段提交的 `b6936ecc7`（亦改 main.py、test_project_source_api）git 自動合併，合併後全部重跑。
 - [改] COS `run_recipe`：project_id 屬本租戶 → `repo.list_sources` 經 `build_api_capability_adapters(project_sources=…)` 給 adapter（存在檢查不拋錯，既有 404／400 位置不變）；`create_source` 有 DOI → `source_class=academic`。NA `sinks/cognitive.ts`：collector `collect/academic:<registry>`（`collectors/academic.ts:393`）→ academic，其他照 `classifySource`；`SourceClass` 加 academic（`classifySource` 永不回傳）；`source.schema.yaml:41` 描述。
