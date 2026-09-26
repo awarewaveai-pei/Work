@@ -7,6 +7,16 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0091 → APPLY_OK 1/1；psql to_regclass 4 表＋pg_proc 21＋pg_get_constraintdef 含 site_watch＋ops_incidents 79 | exit=0 | ms=4935
 - REVIEW_WAIVED: NA -- 套用既有且已審（§7 步 9 codex 三輪）的 migration＋刪 hold 檔，無新程式
 - BUGHUNT_WAIVED: NA -- 無程式改動；hold 的讀取端（sg-deploy.sh 1.85、auto-deploy、check-smoke-tests deploy_hold）以檔案存在判斷，刪檔即解除
+## 2026-09-26（續28）研究線 WC-PIa-14R：PI-a 期末閘通過（未部署）
+- [根因] 兩份獨立 Claude 全量 diff 覆審共同抓到：解讀失敗後若用量寫入也失敗，`_run_interpretation` 會覆蓋原始錯誤；另 `visual_bindings_resolvable` 對所有 `label` 一律豁免，超出 layered levels 顯示欄位的契約。`web/Dockerfile` 的 API origin 是 build-time 設定，原本未說明。
+- [修] `d7cdf1010` 保留原始解讀錯誤並附用量寫入失敗訊號、只豁免 layered `levels[]` 顯示 label、補 Docker build-time 說明及正反例測試；`7cfd90bd3` 再釘住 GET 錯誤回應。失敗路徑回傳 0 token／改回 raise、錯誤覆蓋、一般 binding label 豁免等突變各自紅→還原綠（詳各 commit）。
+- [驗證] 原 golden 4163/4163；解讀/API 定向 33/33；web Vitest 12/12、typecheck/build/audit 0 漏洞、check-mocks；Docker API＋web healthy、舊 dashboard 真 AI 草稿與執行、官方 cognitive Playwright 真模型 1 passed／0 failed／0 skipped（mock 另 1 passed）。本輪完整 COS unittest 在隔離 Linux 容器 `cognitive-os-14r-unit-verified-20260926`：退出碼 0、`Ran 14204 tests in 1612.765s`、`OK (skipped=34)`。Windows 全套曾僅有無關併發測試的固定 5 秒逾時紅 1 項；未改該測試。前兩次 Linux 容器的唯讀 `.runtime`／noexec 暫存區導致測試環境錯誤，已修測試容器設定並在最終輪確認 `IMPORTS_OK`，不把失敗輪算通過。
+- [Review] Python／TypeScript bound whole-commit diff 真 Claude artifact `2026-09-26-review-60edab1b.md`、`2026-09-26-review-23199f3f.md` 的有效 findings 均修；修正 diff `2026-09-26-review-8ed7da44.md` 與最終 `2026-09-26-review-28ae67cc.md` 均 approve。末份唯一 low 指向現行 schema 禁止的巢狀 level item，無當前可執行路徑；若將來擴充 schema，須重審 path gate。
+- [避免再發生] 容器驗收先做依賴載入與可寫路徑預檢，再跑全套；看實際 `Ran` 數量、退出碼與 `OK`，不可用有環境錯誤的測試輪替代。PI-b 與正式站部署仍屬 High-STOP，本次未做。
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker inspect cognitive-os-14r-unit-verified-20260926 State.ExitCode=0; docker logs Ran 14204 tests in 1612.765s OK (skipped=34); golden 4163/4163; official real-model Playwright 1 passed 0 skipped | exit=0 | ms=1612765
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m（最終 low 為現行 schema 不可達）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=AI_USAGE_RECORD_FAILED|level_item|WC-PIa-14R | hits=27
+- [rollback] 若需退回，只 revert `d7cdf1010`／`7cfd90bd3` 與本結案文件 commit；無 DB migration 或正式部署。
 ## 2026-09-26（續27）系統模式擋下的變更只有一個 423 定義，每個出口（HTTP、聊天、畫面）都顯示可讀原因（未部署）
 - [根因] T16–T18 在 13 處各自手寫 `{error:"system_mode_blocks_change", mode}`（content/publish 多一個 ok:false，形狀不一）；修復中心更另外回 409 `system_mode_blocks_repair`、remediate 回 200＋reason。UI 多半直接顯示 `json.error` → 畫面出現機器碼（RepairActions「已阻擋：system_mode_blocks_repair」）；ContentStudio 社群推送固定「推送失敗，請重試」、批次發佈只顯示「推送失敗」；WpUpdateButtons 自拼文字。T18 critic s1／s3＋本輪 critic m1。
 - [修]

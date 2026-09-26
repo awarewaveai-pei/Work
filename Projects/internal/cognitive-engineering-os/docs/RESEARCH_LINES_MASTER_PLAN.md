@@ -2,15 +2,15 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.48（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.49（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
-- 現在期／卡：**PI-a 修正卡 15～21 完成；WC-PIa-14R 驗證中，尚未通過**。**PI-b 不得開始**。
-- 已完成：P0 碼完成 `19f00f9aa`（未部署）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 修正卡 7/7；PI-b 0/5。14R 已驗 golden 4163/4163、完整 COS unittest 14201/14201、解讀/API 定向 30/30、web vitest 12/12、typecheck／build／audit 0 漏洞、check-mocks、§6 四突變、Docker API＋web 本機 `healthy`、舊 dashboard 真 AI 草稿＋執行成立、官方 Playwright 真模型 `1 passed／0 failed／0 skipped`（另 mock 模式 1 passed）。
-- 最後一筆 PI-a 程式碼：14R 本機真模型修正 prompt schema 範例、冰山 bindings／gaps 正規化、失敗用量事件與結果頁改判條件顯示；完整 COS unittest 14201/14201（1115.211s）。8420 既有程序占用，測試 override 用 8422；`COS_TEST_*` 實值只在 Git 忽略的 `mcp/user-env.ps1`，正式 compose 埠未改。
-- 阻塞：Claude Python 初次真 oracle artifact 指出 4 項，程式已修、待覆審；Claude CLI 額度在 2026-09-26 04:00（Asia/Taipei）重置，Python 最終與 TypeScript oracle 尚缺。不得記為 waived／passed。
-- 下一步：04:00 額度重置後跑 PY／TS Claude oracle，處理 findings；全部過才寫「PI-a 完」並更新 TASKS 研究線。PI-b 仍須另行 High-STOP 授權。
+- 現在期／卡：**PI-a 完成；WC-PIa-14R 期末閘通過**。**PI-b 尚未開始，須另行 High-STOP 授權**。
+- 已完成：P0 碼完成 `19f00f9aa`（未部署）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 修正卡 7/7、14R 通過；PI-b 0/5。14R：golden 4163/4163、完整 COS unittest `Ran 14204 ... OK (skipped=34)`、解讀/API 定向 33/33、web vitest 12/12、typecheck／build／audit 0 漏洞、check-mocks、§6 四突變、Docker API＋web 本機 `healthy`、舊 dashboard 真 AI 草稿＋執行成立、官方 Playwright 真模型 `1 passed／0 failed／0 skipped`（另 mock 模式 1 passed）。
+- 最後一筆 PI-a 程式碼：`475ec80dc`、`d7cdf1010`、`7cfd90bd3`；14R Claude Python／TypeScript 真 oracle 各一份，核對修正後最終 `approve`（`2026-09-26-review-28ae67cc.md`）。完整 COS unittest 在隔離 Linux 容器 14204 項 OK（1612.765s）；8420 既有程序占用，測試 override 用 8422；`COS_TEST_*` 實值只在 Git 忽略的 `mcp/user-env.ps1`，正式 compose 埠未改。
+- 阻塞：PI-a 無。Windows 全套曾因 5 秒併發測試逾時紅 1 項；隔離 Linux 全套綠，未修改該無關測試。容器前兩輪的唯讀／noexec 設定錯誤不列為產品測試通過證據（詳 WORKLOG 2026-09-26 14R 結案）。
+- 下一步：PI-b 仍須依 §12 卡片及 High-STOP 另行授權；本次未做正式站部署。
 
 | 項 | 狀態（2026-09-24） |
 |---|---|
@@ -297,7 +297,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | R25（依 12.1-13 解決） | 14R 重跑發現 `tests/e2e/cognitive/iceberg.spec.ts::login -> iceberg -> result page sections including 5b` 守舊 UI 契約（原始 method id h1、手貼 Project ID、九區塊），與 WC-PIa-20／21 明文新契約衝突；原寬鬆 heading 斷言還會誤中清單 h2 | 同卡更新該測試與 runner，保留原登入／搜尋／示範／執行斷言及 mock 模式引註 `toHaveCount(1)`；真模型模式改以 API findings 的引註數做 `toHaveCount(精確數量)`，不放寬比較。mock 與官方真模型 Playwright 各 1 passed；方法頁 h1 暫改回原始 id 時測試紅、還原綠。 |
 | R26（已解決） | 14R 真模型與 oracle 外部前提：本機 `COS_TEST_*` 身分已建且登入 HTTP 200；操作者已放入有效 `COGNITIVE_OS_ANTHROPIC_API_KEY`，Claude CLI 已登入。 | 舊 dashboard 真 AI 草稿＋執行成立，官方真模型 Playwright 1 passed、0 skipped；不再借用 next-admin `COGNITIVE_OS_SERVICE_*`。Claude oracle 額度暫時不足另見 R28。 |
 | R27（已解決） | 14R 真模型回傳暴露 prompt 範例與 schema 不一致：頂層 `revision_conditions`、空 recommendations／next_steps 範例、layered 空 bindings；gate 又把層顯示 label 誤當 manifest path。 | prompt 示範 typed shape；把名稱→有效路徑映射轉為 `levels[]`，未知路徑仍拒絕；`gaps` 缺證據明示未指定；結果頁顯示 finding-level 改判條件。單元正反例及 UI 顯示突變紅→綠；真模型官方 E2E 通過。 |
-| R28（待解除） | Claude Python 首次 oracle artifact 已產出、4 項 findings 已核對修正；重跑最終 Python／TypeScript oracle 時 CLI 回 `You've hit your limit`，2026-09-26 04:00（Asia/Taipei）重置。 | 額度重置後免再詢問，重跑兩份真 Claude artifact 並處理 findings；不得以自審或首份 needs-attention artifact 宣稱 14R 通過。 |
+| R28（已解決） | Claude Python／TypeScript 全量 bound diff 複審各產真 artifact（`2026-09-26-review-60edab1b.md`、`2026-09-26-review-23199f3f.md`），共同指出失敗用量寫入覆蓋原始解讀錯誤，另指出 binding `label` 豁免過寬及 Docker build-time origin 說明不足。 | 修正並做失敗路徑／非 layered `label` 反例測試，Dockerfile 說明 build-time 設定；修正 diff 再審 `2026-09-26-review-8ed7da44.md`、最終 `2026-09-26-review-28ae67cc.md` 均 `approve`；最後低風險提示僅涉及現行 schema 不容許的巢狀 level。完整 unittest `Ran 14204 ... OK (skipped=34)`，14R 通過。 |
 
 ## 8. 退場清單（P0 flag OFF；P4 驗收後刪）
 `NA/lib/cognitive-os/{client,import-sources}.ts`、`NA/lib/hci/{client,import-sources}.ts`、`NA/app/api/ops/clients/[slug]/{cognitive-os-import,hci-import}/route.ts`、`NA/app/api/internal/cognitive-os/import-project-sources/route.ts`、`NA/app/api/cognitive-os/open/route.ts`、`NA/lib/dossier/folder.ts`（`report.ts` 移植後整層刪）、`CollectionSourcesPanel.tsx:545-568`、`ClientHubTabs.tsx:1795-1811`、`SPEC/recipes/validated/edd-literature-search-v1.recipe.yaml`（fixture）、`rt:80-88` offline adapter；migrations 0087／0088／0089 欄位保留標 deprecated 不 drop；`bootstrap_service_identity.py` 的 service tenant 用法退場（改 `--tenant-id`）。`/ops/collect` 與客戶 KB **維持**。
