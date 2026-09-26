@@ -1220,6 +1220,61 @@ class RecipeRunTests(ApiTestCase):
         )
         self.assertTrue(all(gate["status"] == "PASS" for gate in payload["workflow_gates"]))
 
+    def test_research_qualitative_recipe_with_a_project_cites_its_own_academic_source(self):
+        """RESEARCH_LINES_MASTER_PLAN WC-P2-07b: run_recipe threads a real Project's Sources into
+        literature_search (07a) end to end through /recipes/{id}/run -- not just the in-process wiring
+        test_literature_search_v2.py already covers -- and the Source becomes academic at write time
+        (P-K11) via a plain POST /projects/{id}/sources with a doi, no fixture backdoor."""
+        self._login()
+        repo = ProjectSourceRepository(Path(self._tmpdir.name) / "projects.sqlite3")
+        source_cas = TenantScopedCas(Path(self._tmpdir.name) / "source-cas")
+        api_main.app.dependency_overrides[api_main.get_project_source_repository] = lambda: repo
+        api_main.app.dependency_overrides[api_main.get_source_cas] = lambda: source_cas
+        project = self.client.post(
+            "/projects",
+            json={"name": "Qual study", "purpose": "cite a real academic source", "data_classification": "Internal"},
+        )
+        self.assertEqual(project.status_code, 200, project.text)
+        project_id = project.json()["project_id"]
+        created = self.client.post(
+            f"/projects/{project_id}/sources",
+            json={
+                "title": "A boundary-erosion study",
+                "media_type": "text/plain",
+                "data_classification": "Internal",
+                "content": "remote work boundary erosion findings",
+                "doi": "10.1000/boundary-erosion",
+            },
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        self.assertEqual(created.json()["source_class"], "academic")
+
+        locked_code, ai_review = fixture_review()
+        source = {
+            "question": "How do remote workers describe after-hours boundaries?",
+            "transcript": {
+                "status": "normalized",
+                "text": "A reviewed transcript input.",
+                "provenance": make_provenance("SOURCE_FACT", "SOURCE_QUOTATION"),
+            },
+            "coder_one": {"locked_code": locked_code, "ai_review": ai_review, "at": "2026-09-14T00:00:00Z"},
+            "coder_two": {"locked_code": locked_code, "ai_review": ai_review, "at": "2026-09-14T00:00:00Z"},
+        }
+        response = self.client.post(
+            "/recipes/research-qualitative-v1/run",
+            json={"source": source, "project_id": project_id, "run_id": "api-research-qualitative-project-test"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        literature_step = next(step for step in payload["workflow"]["steps"] if step["ref"] == "literature_search")
+        self.assertEqual(literature_step["output"]["literature"]["retrieval"]["mode"], "PROJECT_SOURCES")
+        self.assertEqual(literature_step["output"]["literature"]["items"][0]["literature_id"], created.json()["source_id"])
+        for step in payload["workflow"]["steps"]:
+            for gate in step.get("gates") or []:
+                self.assertIn(gate["status"], {"PASS", "NOT_APPLICABLE"})
+        for gate in payload["workflow_gates"]:
+            self.assertIn(gate["status"], {"PASS", "NOT_APPLICABLE"})
+
     def test_life_recipe_runs_through_shared_executor_and_gates(self):
         self._login()
         source = fixture_source()

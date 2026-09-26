@@ -38,8 +38,10 @@ export function toSourceProjection(doc: RawDoc): SourceProjection {
     text: doc.text,
     provenance: doc.provenance,
     collector: doc.collector,
-    // Classified from the URL actually stored, by the same rule the dossier used to pick it.
-    source_class: classifySource(doc.canonicalUrl),
+    // A document collect/academic actually fetched IS academic literature -- that is a fact about
+    // where it came from, not a guess from its URL shape (which the fallback below still is).
+    // RESEARCH_LINES_MASTER_PLAN WC-P2-07b, P-K11.
+    source_class: doc.collector.startsWith("collect/academic:") ? "academic" : classifySource(doc.canonicalUrl),
     relevance,
     schema_version: "1",
   };

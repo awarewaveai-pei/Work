@@ -16,7 +16,10 @@
 // carry more weight than the host list, because a /dp/ path is a product page on any storefront
 // that ever existed, including the ones not listed here.
 
-export type SourceClass = "retail" | "social" | "aggregator" | "reference" | "unknown";
+// "academic" is stamped only by sink/cognitive.ts, from the collector that produced the document
+// (RESEARCH_LINES_MASTER_PLAN WC-P2-07b, P-K11) -- classifySource() below never returns it, because a
+// URL alone cannot tell a paper's landing page from any other page on that host.
+export type SourceClass = "retail" | "social" | "aggregator" | "reference" | "academic" | "unknown";
 
 /** Storefronts. The listing exists to sell a thing, whoever the thing is about. */
 const RETAIL_HOSTS = [
@@ -93,5 +96,5 @@ export function classifySource(url: string): SourceClass {
 export const DOSSIER_EXCLUDED_BY_DEFAULT: SourceClass[] = ["retail", "social", "aggregator"];
 
 export function sourceClassLabel(c: SourceClass): string {
-  return { retail: "購物／書店", social: "社群個人頁", aggregator: "列表／標籤頁", reference: "百科", unknown: "一般網頁" }[c];
+  return { retail: "購物／書店", social: "社群個人頁", aggregator: "列表／標籤頁", reference: "百科", academic: "學術論文", unknown: "一般網頁" }[c];
 }

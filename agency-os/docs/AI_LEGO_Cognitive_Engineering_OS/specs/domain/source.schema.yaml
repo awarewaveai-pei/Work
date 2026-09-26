@@ -38,6 +38,6 @@ properties:
     oneOf:
       - {type: "null"}
       - {$ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"}
-  source_class: {type: ["string", "null"], pattern: "^[a-z][a-z_]{0,39}$", default: null, description: "The collector's source classification (retail/social/aggregator/reference/unknown today)."}
+  source_class: {type: ["string", "null"], pattern: "^[a-z][a-z_]{0,39}$", default: null, description: "The collector's source classification (retail/social/aggregator/reference/academic/unknown today)."}
   relevance: {type: ["object", "null"], default: null, description: "Why the collector admitted this document (entityConfidence, entityAnchorsHit, searchAngle, searchQuery)."}
   supersedes_source_id: {type: ["string", "null"], format: uuid, default: null, description: "The Source row this one replaced (same canonical_url, new content_sha256)."}

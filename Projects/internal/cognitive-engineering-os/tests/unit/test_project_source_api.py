@@ -180,6 +180,19 @@ class SourceApiTests(ProjectSourceApiTestCase):
         self.assertIsNone(source["venue"])
         self.assertIsNone(source["published_at"])
 
+    def test_create_source_with_a_doi_is_classed_academic(self):
+        # RESEARCH_LINES_MASTER_PLAN WC-P2-07b, P-K11: source_class is decided at write time.
+        self._login()
+        project = self._create_project()
+        source = self._create_source(project["project_id"], doi="10.1000/xyz123")
+        self.assertEqual(source["source_class"], "academic")
+
+    def test_create_source_without_a_doi_has_no_source_class(self):
+        self._login()
+        project = self._create_project()
+        source = self._create_source(project["project_id"])
+        self.assertIsNone(source["source_class"])
+
     def test_create_source_with_citation_metadata(self):
         self._login()
         project = self._create_project()

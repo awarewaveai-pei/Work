@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-27（續2）研究線 WC-P2-07b 併入 main：recipe 執行帶專案來源給 literature_search；academic 在寫入時標（NA sink＋COS 手動來源有 DOI）（本機 L3，獨立 worktree）
+- [來源] 本機 L3 = 背景 Sonnet agent 在 `D:\tmp\wt-l3`（detached worktree；next-admin node_modules 以 junction 唯讀借用 D:\Work）；提交 `e00f3e10e`，合併者 cherry-pick；與網站 session 同時段提交的 `b6936ecc7`（亦改 main.py、test_project_source_api）git 自動合併，合併後全部重跑。
+- [改] COS `run_recipe`：project_id 屬本租戶 → `repo.list_sources` 經 `build_api_capability_adapters(project_sources=…)` 給 adapter（存在檢查不拋錯，既有 404／400 位置不變）；`create_source` 有 DOI → `source_class=academic`。NA `sinks/cognitive.ts`：collector `collect/academic:<registry>`（`collectors/academic.ts:393`）→ academic，其他照 `classifySource`；`SourceClass` 加 academic（`classifySource` 永不回傳）；`source.schema.yaml:41` 描述。
+- [已知] 已存的來源不重新分類：同內容重收 = unchanged 不改列；補分類 = 資料遷移，不在本卡。
+- [計畫] §0 P2 列加「已併」指標（07a／P4-01／07b）。
+- 突變（紅→綠）：run_recipe 不傳 project_sources → API 端對端 research-qualitative-v1 案紅（OFFLINE_LOCAL_CORPUS≠PROJECT_SOURCES）；sink 不看 collector → 學術收集器案紅；create_source 不看 DOI → DOI 案紅。
+- REALTEST_EVIDENCE: tool=Bash | cmd=D:\Work 合併後樹：COS 所有 import apps.api.main 的 unit 模組＋test_literature_search_v2（Ran 272 tests OK）＋NA npx tsc --noEmit（0）＋vitest lib/collect（331 passed／11 skipped）＋run_golden_tests.py（ALL GOLDEN TESTS PASSED）；合併前在 wt-l3 另行重跑 tsc／sinks 20 passed／COS 定向 OK | exit=0 | ms=160000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（合併者逐行讀 diff＋查證 collector id 格式；Codex `2026-09-27-partialreview-60417341.md` NO FINDINGS）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`collect/academic:|project_sources=|"academic"` | hits=23（新碼與測試 14；NA 既有 `SourceKind` academic、URI scheme academic 為不同概念、用字一致；scripts／.claude 0）
+- [下一步] NA 改動隨 P2 期末閘 sg-deploy（High-STOP）；COS 隨下次 deploy.sh。
 ## 2026-09-27（續1）Cognitive OS 我的專案：每個專案點得進去、每次分析看得到、每次「執行分析」開自己的專案、時間到分鐘
 - [操作者] 「我的專案進去根本無法點擊觀看；我剛多做一個，應該要有 4 個；建立除了日期還要時間，同一天好幾個同名怎麼辦」。
 - [根因] C1 `apps/cognitive-web/app/(shell)/projects/page.tsx:26`（舊）表格列沒有連結，網站沒有 `projects/[id]` 路由：專案裡的分析做完就再也打不開。C2 `components/RunPage.tsx:51`（舊）只有租戶一個專案都沒有才開新專案，否則每次分析塞進清單第一個專案；正式站唯讀查證：操作者 2026-09-26 23:51 那次分析進了既有的「冰山模型 2026-09-26」成為它的第 2 次分析，不是第 4 個專案（本機測試帳號同一個專案堆了 17 次）。C3 `.slice(0, 10)` 只取 UTC 日期：沒有時間，台北 00:00–08:00 還顯示前一天。

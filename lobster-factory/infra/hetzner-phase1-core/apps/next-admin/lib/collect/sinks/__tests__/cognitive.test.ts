@@ -68,6 +68,18 @@ describe("toSourceProjection", () => {
     expect(p.source_class).toBe("retail");
     expect(p.title).toBe("https://www.amazon.com/dp/123");
   });
+
+  it("tags a document the academic collector fetched as academic, regardless of its URL", () => {
+    // The registry's landing page is an ordinary web page by URL shape alone -- the collector is
+    // what makes it academic literature (RESEARCH_LINES_MASTER_PLAN WC-P2-07b, P-K11).
+    const p = toSourceProjection(doc({ collector: "collect/academic:openalex", canonicalUrl: "https://doi.org/10.1000/xyz123" }));
+    expect(p.source_class).toBe("academic");
+  });
+
+  it("keeps classifySource's value for a document from any other collector", () => {
+    const p = toSourceProjection(doc({ collector: "collect/http-html", canonicalUrl: "https://www.amazon.com/dp/123" }));
+    expect(p.source_class).toBe("retail");
+  });
 });
 
 describe("createCognitiveSink", () => {

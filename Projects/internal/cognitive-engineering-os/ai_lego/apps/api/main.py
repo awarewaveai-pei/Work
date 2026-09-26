@@ -120,9 +120,20 @@ def configure_cors(target_app: FastAPI, raw_origins: str | None = None) -> tuple
     return origins
 
 
-def build_api_capability_adapters(capability_catalog: CapabilityCatalog, capability_ids: list[str]) -> CapabilityAdapterRegistry:
-    """Build the API's explicit adapter set once for both plan and run paths."""
-    return build_registered_capability_adapters(capability_catalog, capability_ids)
+def build_api_capability_adapters(
+    capability_catalog: CapabilityCatalog,
+    capability_ids: list[str],
+    *,
+    project_sources: list[dict[str, Any]] | None = None,
+) -> CapabilityAdapterRegistry:
+    """Build the API's explicit adapter set once for both plan and run paths.
+
+    ``project_sources`` (RESEARCH_LINES_MASTER_PLAN WC-P2-07b) is forwarded to
+    ``build_registered_capability_adapters`` unchanged; ``None`` keeps every existing
+    caller's offline-fixture ``literature_search`` behaviour (``recipe_plan``, the direct
+    capability-invoke endpoint, and a ``run_recipe`` with no ``project_id``).
+    """
+    return build_registered_capability_adapters(capability_catalog, capability_ids, project_sources=project_sources)
 
 
 def build_api_workflow_gate_registry() -> WorkflowGateRegistry:
@@ -678,7 +689,15 @@ def run_recipe(
         if not executability["executable"]:
             raise HTTPException(status_code=409, detail={"code": "CAPABILITY_PLAN_NOT_EXECUTABLE", "plan_executability": executability, "resolution": capability_resolution["blocked"]})
     resolvable_capability_ids = [ref for ref in capability_ids if capability_catalog.is_resolvable(ref)]
-    capability_adapters = build_api_capability_adapters(capability_catalog, resolvable_capability_ids)
+    project_id = body.get("project_id")
+    # Existence-only check (never raises): the authoritative 404/400 for a bad project_id is still
+    # below, at the classification derivation, unchanged in order relative to every other check in
+    # this function. An unknown project_id gets no project_sources, same as no project_id at all
+    # (RESEARCH_LINES_MASTER_PLAN WC-P2-07b, P-K9).
+    project_sources: list[dict[str, Any]] | None = None
+    if isinstance(project_id, str) and repo.get_project(session["tenant_id"], project_id) is not None:
+        project_sources = repo.list_sources(session["tenant_id"], project_id)
+    capability_adapters = build_api_capability_adapters(capability_catalog, resolvable_capability_ids, project_sources=project_sources)
     workflow_gate_registry = build_api_workflow_gate_registry()
     workflow_gate_refs = list(workflow_ir.get("workflow_gate_refs", []))
     if "workflow_execution_integrity" not in workflow_gate_refs:
@@ -717,7 +736,6 @@ def run_recipe(
     # No Project = INTERNAL. Project vocabulary is Title_Case, run vocabulary UPPER (see the NOTE above CreateProjectRequest).
     if "data_classification" in body:
         raise HTTPException(status_code=400, detail="WORKFLOW_DATA_CLASSIFICATION_SERVER_DERIVED: send project_id; the run takes that Project's classification")
-    project_id = body.get("project_id")
     if project_id is None:
         classification = "INTERNAL"
     elif isinstance(project_id, str):
@@ -1540,6 +1558,9 @@ def create_source(
             authors=payload.authors,
             venue=payload.venue,
             published_at=payload.published_at,
+            # A manually-entered Source with a DOI is citable literature by definition (RESEARCH_LINES_MASTER_PLAN
+            # WC-P2-07b, P-K11); without one there is no fact to stamp, so it stays null as before.
+            source_class="academic" if payload.doi else None,
         )
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
