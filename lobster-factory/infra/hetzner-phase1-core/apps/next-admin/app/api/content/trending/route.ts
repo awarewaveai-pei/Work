@@ -94,7 +94,30 @@ async function loadDbSourceBlocks() {
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
+async function trendingResponse(geo: string): Promise<Response> {
+  // Operator-managed DB sources (migration 0042) run alongside the built-in blocks. Built ephemerally
+  // per request so a UI deletion takes effect immediately (best-effort: DB miss falls back to built-ins).
+  const extra = await loadDbSourceBlocks();
+  const items = await runTrending(geo, extra);   // 搜尋積木：跑所有啟用且符合 geo 的來源
+  return NextResponse.json({ ok: true, items, geo });
+}
+
+// GET serves only type=trending (external/DB reads). suggest/questions fall back to a paid aiChat
+// call, and a same-site page can force an authenticated GET (Lax cookie; the CSRF guard covers only
+// non-GET) -- so they are POST-only (lib/security/__tests__/get-no-side-effects.test.ts).
 export async function GET(req: Request): Promise<Response> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+
+  const url  = new URL(req.url);
+  const type = url.searchParams.get("type") ?? "trending";
+  if (type !== "trending") {
+    return NextResponse.json({ ok: false, error: "use POST for type=suggest or type=questions" }, { status: 405 });
+  }
+  return trendingResponse(url.searchParams.get("geo") ?? "TW");
+}
+
+export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -104,13 +127,7 @@ export async function GET(req: Request): Promise<Response> {
   const query = url.searchParams.get("q") ?? "";
   const hl    = url.searchParams.get("hl") ?? (geo === "TW" || geo === "HK" ? "zh-TW" : "en");
 
-  if (type === "trending") {
-    // Operator-managed DB sources (migration 0042) run alongside the built-in blocks. Built ephemerally
-    // per request so a UI deletion takes effect immediately (best-effort: DB miss falls back to built-ins).
-    const extra = await loadDbSourceBlocks();
-    const items = await runTrending(geo, extra);   // 搜尋積木：跑所有啟用且符合 geo 的來源
-    return NextResponse.json({ ok: true, items, geo });
-  }
+  if (type === "trending") return trendingResponse(geo);
 
   if (type === "suggest") {
     if (!query) return NextResponse.json({ ok: false, error: "q required" }, { status: 400 });

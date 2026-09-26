@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-26（續44）合併雲端 T20：/api 底下的 GET 不改狀態、不花錢；trending suggest／questions 與兩個影片狀態輪詢改 POST（未部署）
+- [根因] session cookie SameSite=Lax，同站頁面可用 <img>/<script> 送帶 cookie 的 GET；CSRF 閘只管非 GET。`content/trending` suggest／questions 會退回付費 aiChat；`video/status`、`video/remotion-job-status` 在 GET 裡收尾 job（寫 media_assets、刪 R2、寫 job-store）。
+- [來源] `claude/cc-t20-side-effect-gets` cc063766f：GET trending 只服務 type=trending；兩個 status route 只 export POST；ContentStudio／VideoStudio 改 POST；`lib/security/__tests__/get-no-side-effects.test.ts`（AST）擋 GET 觸及付費／寫入原語，allowlist 1 筆（Gmail OAuth callback，HMAC state 授權）。
+- [本機修] trending GET／POST 共用 `trendingResponse()`；`video/render-draft/route.ts:5` 註解 GET→POST。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit 0；npm test 215 files 2025 passed；全 repo grep 三個路徑無其他呼叫端；突變：加回呼叫 finishJob 的 GET → 2 紅 → 還原綠 | exit=0 | ms=180000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/1m（本機：重複 trending 分支；Codex 三輪此區無發現；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=GET /api/video/status|GET /api/video/remotion-job-status | hits=0（唯一舊寫法 render-draft:5 已改）
 ## 2026-09-26（續43）合併雲端 T19：建站派送在入列、派送、任務開跑三處查系統模式；被擋以終態結束、不進 Trigger 重試（未部署）
 - [來源] `claude/cc-t19-build-dispatch-gate` 321ff2ca5：build/runs 入列前 gate；workflows `src/lib/systemMode.ts`（killSwitch 平行實作，共用 fixture 12 例由兩邊測試同時驗）；dispatch-action-run claim 前查，擋下 → dispatch_failed。
 - [本機修] Codex high：派送時查 ≠ 執行時查（Trigger run 可能晚開跑）→ `gateTaskStart()` 放在 create-wp-site／adopt-client-os／orchestrate-tenant-provisioning 開頭，擋下時原 ops_action_runs 標 `blocked`＋模式。

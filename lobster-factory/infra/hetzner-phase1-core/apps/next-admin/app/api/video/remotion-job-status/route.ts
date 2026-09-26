@@ -3,8 +3,16 @@ import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { pollRemotion } from "@/lib/content/video/remotion-client";
 
-/** Tenant-safe Remotion status boundary. The public identifier is video_jobs.id, never EU jobId. */
-export async function GET(req: NextRequest): Promise<NextResponse> {
+/**
+ * Tenant-safe Remotion status boundary. The public identifier is video_jobs.id, never EU jobId.
+ *
+ * T20: was GET -- moved to POST. The "done"/"error" branches finalize the job (media_assets
+ * insert via recordVideoAsset, job-store write via finishJob); a GET must never risk a side
+ * effect (SameSite=Lax cookie + <img>/<script> can force a same-site page to send an
+ * authenticated GET; the CSRF guard only covers non-GET). No GET is exported here any more --
+ * Next.js answers a GET to this route 405.
+ */
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   const jobId = new URL(req.url).searchParams.get("jobId");

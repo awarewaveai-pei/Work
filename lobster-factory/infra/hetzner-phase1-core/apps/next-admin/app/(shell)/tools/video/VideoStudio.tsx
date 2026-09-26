@@ -376,7 +376,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       }
       let sj: StatusResp;
       try {
-        const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
+        const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`, { method: "POST" });
         sj = (await sr.json()) as StatusResp;
       } catch {
         pollRef.current = setTimeout(() => void poll(), 5000);
@@ -1966,7 +1966,7 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
     const poll = async (): Promise<void> => {
       if (Date.now() > deadline) { setStatus("error"); setError("渲染逾時（>15 分鐘）"); return; }
       try {
-        const r = await fetch(`/api/video/remotion-job-status?jobId=${encodeURIComponent(jobId)}`);
+        const r = await fetch(`/api/video/remotion-job-status?jobId=${encodeURIComponent(jobId)}`, { method: "POST" });
         const j = (await r.json()) as { ok: boolean; status?: string; video?: { outputs?: Record<string, string> }; error?: string };
         if (!j.ok || j.status === "error") { setStatus("error"); setError(j.error ?? "渲染失敗"); return; }
         const outputUrl = j.video?.outputs?.remotion;

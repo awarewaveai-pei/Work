@@ -6,6 +6,11 @@
  * 分支順序 —— 2026-08-26 原始 finding 指的位置（recordVideoAsset 之前）就是被這一點推翻的。
  *
  * job-store 被 mock：本檔驗授權決策，不驗 Supabase。
+ *
+ * T20: the handler moved from GET to POST (it finalizes the job -- media_assets insert + R2
+ * cleanup -- on the done/error branches, which a GET must never risk). Calls below now go
+ * through POST; a dedicated test confirms GET is no longer exported (Next.js then answers a raw
+ * GET to this route 405 on its own -- outside what a handler-level unit test can exercise).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -20,14 +25,14 @@ const ORG_B = "bbbbbbbb-0000-4000-8000-00000000000b";
 
 /** middleware 注入的身分標頭（middleware.ts:118-122）。client 無 org 時該標頭不存在。 */
 function req(headers: Record<string, string>): NextRequest {
-  return new NextRequest("http://localhost/api/video/status?jobId=j1", { headers });
+  return new NextRequest("http://localhost/api/video/status?jobId=j1", { method: "POST", headers });
 }
 const staff = { "x-ops-claims-role": "operator", "x-ops-user-kind": "staff" };
 const clientA = { "x-ops-claims-role": "operator", "x-ops-user-kind": "client", "x-ops-org-id": ORG_A };
 
-async function GET(r: NextRequest) {
+async function POST(r: NextRequest) {
   const mod = await import("@/app/api/video/status/route");
-  return mod.GET(r);
+  return mod.POST(r);
 }
 
 const doneJob = (organizationId?: string) => ({
@@ -44,20 +49,20 @@ describe("/api/video/status — 租戶邊界", () => {
 
   it("staff 讀任一 org 的 job → 200（staff = full access，tenant-guard.ts:92）", async () => {
     getJob.mockResolvedValue(doneJob(ORG_B));
-    const res = await GET(req(staff));
+    const res = await POST(req(staff));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ ok: true, status: "done", title: "機密標題" });
   });
 
   it("client 讀自己 org 的 job → 200", async () => {
     getJob.mockResolvedValue(doneJob(ORG_A));
-    const res = await GET(req(clientA));
+    const res = await POST(req(clientA));
     expect(res.status).toBe(200);
   });
 
   it("client 讀別的 org 的 job → 403，且**不得**洩漏 video/title", async () => {
     getJob.mockResolvedValue(doneJob(ORG_B));
-    const res = await GET(req(clientA));
+    const res = await POST(req(clientA));
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body).toMatchObject({ ok: false });
@@ -75,28 +80,33 @@ describe("/api/video/status — 租戶邊界", () => {
       error: "prepare 例外：Anthropic 429", statusCode: 500, createdAt: Date.now(),
       recordParams: undefined,
     });
-    const res = await GET(req(clientA));
+    const res = await POST(req(clientA));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ ok: true, status: "error", error: "prepare 例外：Anthropic 429" });
   });
 
   it("organizationId 為 null 的舊列：staff 放行、client 擋下（fail-closed）", async () => {
     getJob.mockResolvedValue(doneJob(undefined));
-    expect((await GET(req(staff))).status).toBe(200);
+    expect((await POST(req(staff))).status).toBe(200);
     getJob.mockResolvedValue(doneJob(undefined));
-    expect((await GET(req(clientA))).status).toBe(403);
+    expect((await POST(req(clientA))).status).toBe(403);
   });
 
   it("viewer 在角色閘就被擋，租戶閘之前（getJob 不該被呼叫）", async () => {
-    const res = await GET(req({ "x-ops-claims-role": "viewer", "x-ops-user-kind": "staff" }));
+    const res = await POST(req({ "x-ops-claims-role": "viewer", "x-ops-user-kind": "staff" }));
     expect(res.status).toBe(403);
     expect(getJob).not.toHaveBeenCalled();
   });
 
   it("job 不存在 → 404（租戶閘不改變這個既有行為）", async () => {
     getJob.mockResolvedValue(undefined);
-    const res = await GET(req(staff));
+    const res = await POST(req(staff));
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toMatchObject({ error: "job_not_found" });
+  });
+
+  it("T20: no GET is exported -- Next.js answers a raw GET to this route 405 on its own", async () => {
+    const mod = await import("@/app/api/video/status/route");
+    expect((mod as Record<string, unknown>).GET).toBeUndefined();
   });
 });

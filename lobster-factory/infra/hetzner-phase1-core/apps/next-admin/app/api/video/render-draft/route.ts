@@ -2,7 +2,7 @@
  * POST /api/video/render-draft
  *
  * 接收使用者編輯後的草稿 scenes + 原始 imageUrls，提交 EU 渲染。
- * 立即回 202 + jobId；前端輪詢 GET /api/video/status?jobId= 取進度。
+ * 立即回 202 + jobId；前端輪詢 POST /api/video/status?jobId= 取進度。
  *
  * Body: {
  *   scenes: { id: number; narration: string }[];
