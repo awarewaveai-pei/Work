@@ -2,7 +2,7 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.51（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.52（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
@@ -12,6 +12,7 @@
 - 阻塞：PI-a 無。Windows 全套曾紅的 1 項（`test_ai_gateway` 預算鎖測試：把「5 秒內到達」當成不會卡死）已修：改用事件與鎖內觀察＋`tests/unit/thread_testkit.py` 的 hang guard；負載下舊版重現同一失敗、新版通過（WORKLOG 2026-09-26）。容器前兩輪的唯讀／noexec 設定錯誤不列為產品測試通過證據（詳 WORKLOG 2026-09-26 14R 結案）。
 - 下一步：PI-b 05（操作者親眼驗收）→ P1（先產 P1 工作卡，§12.5）。**P-ARF-data 暫緩**：操作者 2026-09-26「還沒整理好」（Airtable 資料），整理好再排，不擋 P1。
   - P1 卡已產（§12.7 WC-P1-01～15，待操作者看卡放行）：A＝COS 軌、B＝NA／WF 軌可並行；並行期卡不改本檔，進度看 WORKLOG `WC-P1-xx 完`。
+  - P2 卡已產（§12.8 WC-P2-01～09＋提前的 P3-01）：01–04 雲端 T28–T31 現在並行（只依賴已合併的 P1 碼），05／P3-01 第二波，06–09 本機排在既有兩條線後；卡 commit 不改本檔，合併者回填。
 
 | 項 | 狀態（各列查證於 2026-09-24；現況以上方進度板為準） |
 |---|---|
@@ -759,3 +760,117 @@ prod 部署／nginx／compose 上主機（High-STOP）；改 Recipe 引擎（I8�
 - 驗收：`grep -cE "^- P1_DOD_[1-9]: PASS" agency-os/WORKLOG.md` → `9`
 - 突變：§6 P1 欄三項（⑦）。
 - commit：`docs(research-lines): P1 period gate -- DoD 1-9 on prod, 3 mutations, oracle review; §0/§3.3/§5/§7 backfilled (P1 WC-15)`。回滾：文件 revert；功能回滾見 WC-14。
+
+### 12.8 P2 工作卡（彙整＋引註閘＋品質 harness）＋提前的 P3-01；雲端與本機並行
+**依據**：§5 P2 列、§3.3（`synthesis.*`／`citation_integrity`／`literature_search` v2／`route.method` 列）、§3.4 C4／C8／C9、§3.7、§3.8、§6 P2 欄；產卡 2026-09-26（[a574b2]，操作者「PLAN 太大，多派給雲端和本機 session，不影響執行中的 session」）。`file:line` = HEAD `b513ac4b0`，附錨點；錨點不中 = 停（12.1-7）。**產卡者**：本期 = 本節作者，WC-P1-15 執行者不再產 P2 卡（覆寫 12.5 該句）。
+**分派**（AGENTS §5：共用工作目錄最多 2 個 session → 本機卡排在既有兩條線後面，不開第三個本機 session）
+| 卡 | 誰 | 何時 |
+|---|---|---|
+| 01／02／03／04 | 雲端 T28／T29／T30／T31 | 現在，四支並行（檔案零交集，除產生檔 SPEC_QUICKREF） |
+| 05 | 雲端 T32 | 01、02、03 合併後 |
+| P3-01 | 雲端 T33 | 03、04 合併後 |
+| 雲端合併 | [a574b2] 或接手者 | 每支到齊：本機重驗（Windows PS 5.1＋autocrlf）→ critic 1 → 合併 → WORKLOG |
+| 06 → 07 → 09 | P1 那條線（WC-P1-15 完、`/clear` 後） | 05 合併後 |
+| 08；`POST /route` 端點＋首頁「先說你卡在哪」改呼叫它、刪 TS `pickTools` | 網站那條線（結果頁這批 commit 後） | 08：01 合併後；route：P3-01 合併後 |
+**雲端前置**（每卡）：`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` exit 0；unit 只跑卡上列的（12.1-11，不跑全套）；分支 `claude/cc-t<N>-*`；卡 commit 不改本檔／WORKLOG／TASKS，證據寫 commit message（合併時回填 §0）。
+**本期不碰（P-K8）**：`COS/apps/cognitive-web/**`、`COS/docs/mockups/**`、`main`（06／07 除外）、`COS/ai_lego/modules/research/interpret_method_record.py`（08 除外）、`COS/ai_lego/platform/ai_gateway/provider.py`、`SPEC/specs/cognitive/typed-objects/method-interpretation.schema.yaml`＋其 fixtures（網站 session 未提交改動中）；T19–T27 與 §12.7 表內的檔。
+
+**產卡裁定**
+- P-K1 synthesis 照 interpret 的先例：模組函式（樣板 `interpret_method_record.py` HEAD `:238-277`，錨點 `def run_interpretation`）＋`main` 端點＋背景 thread（樣板 `main` HEAD `:1174-1291`，錨點 `def _run_interpretation`）。§3.3 的 `build_context_bound_adapters(deps)` 不建：interpret 已走同路而不需要它（零重工）；07 若證明 recipe 步驟必須注入依賴再議。三條線 = **一支** `synthesis.py` 依 `kind` 選 prompt 與 schema（D14 同理，不寫三支）。09 回寫 §3.3 兩列。
+- P-K2 全系統一套引註 id = manifest `id` 字串（interpret 已用 `source:<id>`，HEAD `:57-60`）；prompt 內模型寫 `[n]`，runner 以 manifest 換成 id 再過閘；typed object 只存 id。
+- P-K3 `citation_integrity` 只有一個定義，在 `COS/ai_lego/modules/research/gates.py`（`:41-63` 旁）；interpret 內聯版（HEAD `:195-199`，錨點 `citation_ok =`）由 08 改呼叫它並刪內聯。
+- P-K4 prompt 是版本化資料（I9）：dossier 系統 prompt 與段落表逐字搬 `NA/lib/dossier/report.ts:76-80,111-125`（錨點 `REPORT_SECTIONS`、`你是盡職調查分析師`）進 `SPEC/evolution/synthesis-prompts/v1.yaml`；runner 只讀 champion，`.py` 不含 prompt 文字。
+- P-K5 spec root 對 runtime 唯讀（`COS/README.md:3`）：runtime 只 `load_champion`；晉升／回滾 = 離線 CLI 寫 SPEC＋LEDGER，由人跑；R3+（模型、成本、任何門檻）必帶 `--approved-by`（C9、I10）。YAML 一律用現成 strict loader `COS/ai_lego/platform/catalog/display_catalog.py:15`（`_yaml`），不寫新 loader。
+- P-K6 harness 離線（C8）：評「已存的 synthesis artifact」對「案例 expected」，不呼叫模型；案例來源檔當 Source，`source_id = src:<檔名去副檔名>`；門檻初值 `null` = 未定 → 報 `UNSET`（不算 PASS）；基準線由 09 真跑後提出、操作者定（I10）。
+- P-K7 `SPEC/docs/architecture/SPEC_QUICKREF.md` 是產生檔（檔頭 `:3`）：卡內跑 `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/gen_spec_index.py`，不手改；合併時在乾淨樹重產。
+- P-K8 見上「本期不碰」。CI 接線與 `COS/scripts/test-eval-harness.ps1` 歸 09（本機），雲端不改 CI。
+
+**介面釘死**（各卡依此寫，不等彼此合併；要改表 = 停、相關卡同改）
+| # | 名 | 形狀 |
+|---|---|---|
+| P-a | manifest 項（01 產；05 用；04 評） | `{n:int≥1, id:"source:<source_id>", source_id, sha256, start:int, end:int, title, url:str\|null, fetched_at:str\|null, source_class:str\|null}`；`0 ≤ start < end`、`end−start ≤ 6000`；每批 ≤40 項（`report.ts:82-83`）；只收 `status='active'`；n 依 `created_at, source_id` 穩定排序 |
+| P-b | 主張（02 定；01 閘；04 評） | 任一含 `citations` 鍵的物件；`citations` 非空、⊆ manifest `id`、不重複；`conflicts[]` 的 `citations` ≥2 個不同 id；`gaps[]` 無 `citations` |
+| P-c | synthesis artifact（05 產；04 評） | `{synthesis:<P-d>, manifest:{entries:[P-a], batches:[[n]], sha256}, gate_results:[P-e]}` |
+| P-d | synthesis 共同核心（02 定） | `{synthesis_id:"SYN-…", project_id, kind ∈ dossier_brief\|decision_evidence\|literature_matrix, language, summary{text, citations}, sections[{heading, claims[{claim_id, text, citations}]}], gaps[{text, needed_evidence}], conflicts[{text, citations}], uncited_sections[str], manifest_ref{sha256, count, batches:int}, provenance{epistemic_type:AI_INFERENCE, authorship_state:AI_GENERATED, locked:null}, model, usage{input_tokens, output_tokens}}`＋各線結構段 |
+| P-e | 閘結果（01） | `{gate_id:"citation_integrity", status:"PASS"\|"FAIL", evidence{out_of_manifest[], zero_citation[], conflicts_under_two[], uncited_sections[], claims_total:int}}`；FAIL ⟺ 前三者任一非空或 `claims_total=0`；`uncited_sections` 只列不 FAIL（C4） |
+| P-f | 指標名（04；C8 固定） | `citation_precision_auto, citation_coverage, hallucination_rate, contradiction_detection, gap_honesty, trap_rejection, cost_tokens, latency_ms` |
+| P-g | champion（03 定；05、P3-01 用） | `load_champion(spec_root, kind) -> tuple[str, dict]`；kind 必在 `SPEC/evolution/kinds.yaml`；缺檔／壞 yaml／版本檔不存在 → `InvariantViolation("EVOLUTION_…")`，不回預設 |
+| P-h | runner（05 定；06 用） | `run_synthesis(*, kind, project_id, subject:dict, sources:[{row, text}], provider, spec_root, schema_contracts, synthesis_id, language="zh-TW") -> {artifact:<P-c>\|None, error:str\|None, model, input_tokens, output_tokens}` |
+| P-i | 詞切分（04 定；P3-01 用） | `COS/ai_lego/platform/text/terms.py` `terms_of(text) -> list[str]`：行為同 `COS/apps/cognitive-web/components/StuckBox.tsx:15-22`（CJK 連續字切兩字、拉丁數字 ≥2 字元整詞、小寫、去重保序） |
+
+**WC-P2-01 Source manifest＋`citation_integrity` 閘**（雲端 T28）
+- 目標：P-a、P-e 兩組純函式；synthesis／interpret／harness 共用。
+- 讀：`COS/ai_lego/modules/research/gates.py:37-63`；`interpret_method_record.py` HEAD `:44-61`（record manifest 與 id 慣例，只讀）；`NA/lib/dossier/report.ts:82-105`；`repo:163`（`_SOURCE_SELECT`）、`:402`（active 列定義）、`:564-578`（`list_sources`、`get_source_content_reference`）；`main` HEAD `:1574-1579`（讀 CAS 全文）。
+- 樣板：`report.ts:93-105`（區塊格式逐字：`<<<SOURCE n BEGIN>>>`…`<<<SOURCE n END>>>`）；`gates.py:37-38`。
+- 改：新 `COS/ai_lego/modules/research/source_manifest.py`：`build_source_manifest(sources, *, max_chars=6000, batch_size=40)`（P-c 的 manifest 形狀；superseded 排除；`sha256` = entries canonical json 的 sha256）、`render_source_block(entry, text)`、`resolve_citation_numbers(obj, entries)`（`citations` 內的 int n 換成 id；未知 n 原樣保留讓閘 FAIL，不丟）；`gates.py` 加 `evaluate_citation_integrity(obj, manifest_ids)`（P-b／P-e，遞迴走整個物件）。新測試 `COS/tests/unit/test_source_manifest.py`、`test_citation_integrity.py`（合計 ≥12 案：越界、零引註、conflicts 只 1 個、零主張、重複 id、巢狀、uncited 不 FAIL、superseded 排除、6000 截斷、41 篇兩批、排序穩定、未知 n 保留）。
+- 不改：`interpret_method_record.py`（08 接）；`main`。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_source_manifest tests.unit.test_citation_integrity $(grep -rlE "modules\.research\.gates|modules\.research import gates" tests/unit --include="test_*.py" | sed 's#/#.#g; s#\.py$##') -q 2>&1 | tail -1` → `OK`
+- 突變：閘拿掉「⊆ manifest」→ 越界案紅；拿掉 conflicts ≥2 → 對應案紅；manifest 收 superseded → 對應案紅。
+- commit：`feat(cognitive-os): source prompt manifest + one citation_integrity gate for every AI claim (P2 WC-01, C4/I3)`。回滾：revert（新檔無人 import）。
+
+**WC-P2-02 三個 synthesis typed object＋能力契約**（雲端 T29）
+- 目標：P-d 共同核心＋三線結構段的 schema、fixtures、DRAFT capability contract。
+- 讀：`SPEC/specs/cognitive/typed-objects/method-interpretation.schema.yaml` HEAD `:1-30`（檔頭慣例，只讀）；`SPEC/tests/contracts/specs/cognitive/typed-objects/method-interpretation.fixtures.yaml` HEAD `:1-20`（fixtures 格式，只讀）；`SPEC/capabilities/contracts/interpret.method_record.capability.yaml`（契約樣板）；`SPEC/specs/domain/capability-contract.schema.yaml`（必填鍵）；`report.ts:76-80`；§3.7 黃金案例列（期望發現三線各三類）。
+- 改：新 `SPEC/specs/cognitive/typed-objects/{dossier-brief,decision-evidence-brief,literature-matrix}.schema.yaml`（1.0.0、`additionalProperties:false`；共同核心放 `dossier-brief` 的 `$defs`，另兩檔 `$ref`——golden／`SchemaContracts` 不支援跨檔 `$ref` 時三檔各寫一份，另加一個測試比對三份共同段逐字一致；commit 寫選哪個與證據）；結構段：dossier `subject{name, kind∈person|company|event, anchors[]}`＋`related_entities[{name, relation, citations}]`（section `heading` ∈ `report.ts:76-80` 該 kind 的表）；decision `options[{option_id, name, citations}]`、`criteria[{criterion_id, name, citations}]`、`evidence[{text, option_ids[], criterion_ids[], stance∈supports|opposes|mixed, citations}]`；literature `studies[{study_id, source_id, claim, method, sample:str|null, limitations[], citations}]`；fixtures 三檔各 ≥2 valid、≥4 invalid（零 citations、未知 kind、多餘鍵、conflicts 單一 citation）；`SPEC/capabilities/contracts/synthesis.{dossier_brief,decision_evidence,literature_matrix}.capability.yaml`（`status: DRAFT`；description：context-bound、非 Recipe 節點、端點見 WC-P2-06）；跑 `gen_spec_index.py`。
+- 不改：`method-interpretation.*`；COS 程式。
+- 驗收：`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py >/dev/null 2>&1; a=$?; python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/gen_spec_index.py --check >/dev/null 2>&1; echo "$a $?"` → `0 0`
+- 突變：一個 invalid fixture 移到 valid → golden 紅；拿掉 `citations` 的 `minItems` → 零引註 invalid 案紅。
+- commit：`feat(spec): dossier-brief / decision-evidence-brief / literature-matrix typed objects + DRAFT synthesis contracts (P2 WC-02, C4)`。回滾：revert（DRAFT 不進 catalog）。
+
+**WC-P2-03 可演化資料登錄＋`synthesis-prompts` v1**（雲端 T30）
+- 目標：§3.8 的版本化資料機制（kind 清單、版本檔、champion 指標、LEDGER、離線晉升／回滾）＋第一份資料。
+- 讀：§3.8、C9、I9／I10、R14；`COS/ai_lego/platform/ai_execution/replay.py:34-76`（prompt_version／restored_prompt_version）、`rollback_plan.py:16`；`SPEC/recipes/validated/champion-challenger.recipe.yaml`；`COS/README.md:3`；`display_catalog.py:15-38`；`report.ts:76-80,111-136`；`SPEC/methods/registry/method-visual-kinds.yaml`（第 7 種 kind 現址，本卡不搬）。
+- 改：新 `SPEC/evolution/kinds.yaml`（angles、source-classes、synthesis-prompts、model-routing、recipe-defaults、ux-defaults、interpretation-visuals（`legacy_path` = 現址）、lessons；每種 `risk_tier`（R0–R4）、`owner`；檔頭註明新增 kind = ADR，R14）；`SPEC/evolution/synthesis-prompts/v1.yaml`（dossier：system 逐字自 `report.ts:111-125`、段落表 `:76-80`；decision、literature：同規則骨架的新 prompt，引註規則與注入防護兩句逐字共用；各帶 `output_schema_id` = 02 的 `$id`）＋`SPEC/evolution/synthesis-prompts/champion.yaml`（`{kind, version:"v1", promoted_at, ledger_line}`）；`SPEC/evolution/LEDGER.md`（表頭＋v1 初始一行）；新 `COS/ai_lego/platform/evolution/registry.py`（`load_champion` P-g、`list_versions`）；新 `COS/ai_lego/apps/cli/evolution.py`：`promote --kind --version --evidence FILE [--approved-by]`、`rollback --kind`（依 LEDGER 回上一版）；R3+ 無 `--approved-by` → exit 2；寫檔原子（暫存檔＋`os.replace`）；每次寫 LEDGER 一行（版本前後、證據 sha256、批准者、UTC 時間）。新 `COS/tests/unit/test_evolution_registry.py`（≥10 案：讀 champion、未知 kind、版本檔缺、壞 yaml、重複鍵、promote 寫 LEDGER、rollback 回上一版、R3 無批准拒絕、中途例外不留半檔、同版重複 promote 冪等；spec root 一律注入暫存目錄，不寫真 SPEC）。
+- 不改：`method-visual-kinds.yaml` 與 interpret 的讀法（搬遷另卡）；任何門檻。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_evolution_registry -q 2>&1 | tail -1; python -c "from pathlib import Path; from ai_lego.platform.evolution.registry import load_champion; print(load_champion(Path('../../../agency-os/docs/AI_LEGO_Cognitive_Engineering_OS'), 'synthesis-prompts')[0])"` → `OK` 與 `v1` 兩行
+- 突變：rollback 固定回 v1（不讀 LEDGER）→ 「回上一版」案紅；拿掉 R3 批准檢查 → 對應案紅。
+- commit：`feat(cognitive-os): versioned evolvable data -- kinds, champion pointer, ledger, offline promote/rollback; synthesis prompts v1 ported verbatim (P2 WC-03, I9/C9)`。回滾：revert（runtime 尚無讀者）。
+
+**WC-P2-04 品質評分 harness＋9 個黃金案例**（雲端 T31）
+- 目標：§3.7／C8：離線評分器、案例格式、門檻檔、報告、突變腳本；三線各 3 案（合成資料）。
+- 讀：§3.7、C8、I10、R11、R12；P-b／P-c／P-d／P-f／P-i；`StuckBox.tsx:15-22`。
+- 改：新 `COS/eval/`：`README.md`（格式與跑法，AI 極簡）；`cases/{L1,L2,L3}/<id>/{sources/*.txt, expected.yaml, golden-output.json, README.md}`（合成、無自然人敏感內容；三線合計四種陷阱各至少一次：同名混淆、購物頁、注入句、矛盾來源；`golden-output.json` = 手寫的好輸出，P-c）；`expected.yaml`：`findings[{id, terms[], sources[]}]`、`conflicts[{id, terms[], sources[≥2]}]`、`gaps[{id, terms[]}]`、`traps[{source, kind}]`；`score.py`：`score(case_dir, artifact) -> {P-f 八項}`（每指標定義一行 docstring；precision_auto = 被引來源片段含主張的 ≥1 個 `terms_of` 詞）；`run.py`：`--artifacts DIR`（`<line>/<id>.json`）或 `--golden`，`--out DIR`，`[--champion REPORT]` → `eval-report.json`＋`.md`（每案每指標、與 champion 差值、PASS／FAIL／UNSET；任一 FAIL → exit 1）；`thresholds.yaml`（每線每指標 `null`＋`set_by: operator`）；`mutate.py`（刪一個期望發現的來源檔 → 覆蓋率降；餵越界引註 artifact → 幻覺率升；兩者對「門檻已填」的暫存副本必 exit 1）；新 `COS/ai_lego/platform/text/terms.py`（P-i）。新 `COS/tests/unit/test_eval_harness.py`（≥14 案：每指標一正一負、UNSET 不算 PASS、champion 差值、陷阱被引 → trap_rejection 降、expected 格式錯 → 明確錯誤、兩突變、`terms_of` 對照 StuckBox 規則 5 例）。
+- 不改：thresholds.yaml 以外不出現門檻數字；CI（09）。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_eval_harness -q 2>&1 | tail -1; python eval/run.py --golden --out "${TMPDIR:-/tmp}/evalrep" >/dev/null; echo $?` → `OK` 與 `0` 兩行
+- 突變：`mutate.py` 兩項；score 的 coverage 拿掉「引到期望來源」條件 → 對應案紅。
+- commit：`feat(cognitive-os): offline quality harness -- 9 golden cases, 8 fixed metrics, thresholds unset until the operator sets them (P2 WC-04, §3.7/C8)`。回滾：刪 `COS/eval`＋`terms.py`。
+
+**WC-P2-05 synthesis runner（三線一支）**（雲端 T32；01／02／03 合併後）
+- 目標：P-h：manifest → champion prompt → provider → 解析 → `[n]`→id → typed object 驗證 → `citation_integrity` → artifact；兩次嘗試、token 累計；超過一批走 map→reduce。
+- 讀：`interpret_method_record.py` HEAD `:238-277`（只讀）；`COS/ai_lego/platform/ai_gateway/draft.py:153`（`extract_json_object`）；`provider.py` HEAD `:31-41`（只讀）；01／02／03 產物。
+- 樣板：`run_interpretation`。
+- 改：新 `COS/ai_lego/modules/research/synthesis.py`（`run_synthesis`；map 每批一次呼叫、reduce 一次呼叫且輸入含同一 manifest；`uncited_sections`、provenance、usage 伺服器算）；新 `COS/tests/unit/test_synthesis.py`（假 provider；≥10 案：三線各一成功、越界 → 修復成功且 token 累計、兩次都錯 → error＋token、provider 例外 → error＋已用 token、41 篇 → 呼叫數 = 批數＋1、schema 不符 → 修復、prompt 來自 champion（暫存副本改 prompt → 送出內容跟著變）、SOURCE 區塊內注入句原樣、`uncited_sections`、artifact = P-c 且過 04 的 `score.py` 不報錯）。
+- 不改：`provider.py`、`interpret_method_record.py`、`main`。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_synthesis tests.unit.test_source_manifest tests.unit.test_citation_integrity -q 2>&1 | tail -1` → `OK`
+- 突變：拿掉閘呼叫 → 越界案紅；第一次 token 不累計 → 對應案紅；prompt 寫死 → champion 案紅。
+- commit：`feat(cognitive-os): one synthesis runner for three lines -- champion prompt, manifest-bound citations, two attempts, map-reduce past 40 sources (P2 WC-05, C4)`。回滾：revert。
+
+**WC-P3-01（提前）問題路由 `route.method`**（雲端 T33；03／04 合併後）
+- 目標：U16／§3.3 列：免費層＋AI 層＋三閘＋typed object＋DRAFT 契約；端點與首頁接線歸網站那條線。
+- 讀：`StuckBox.tsx:15-31`（現行免費層）；`display_catalog.py:95`（`load_catalog`）、`:210`（`catalog_payload`）；`COS/ai_lego/platform/ai_execution/contract_catalog.py:133`（`is_resolvable`）；`draft.py:153`；`run_interpretation`（兩次嘗試樣板）；§3.3 route 列、U16。
+- 改：新 `COS/ai_lego/modules/research/route_method.py`：`free_layer(catalog, text)`（P-i 比對 name_zh／blurb_zh／name_en；recipes 用其顯示資料；排序同 `StuckBox.tsx:29-31`）；`route(text, *, catalog, provider, spec_root, schema_contracts)`：免費層最高分 ≥ `ux-defaults` champion 的 `route.free_layer_min_confidence` → 直接回、不叫模型；否則 AI 層（manifest = 每條目錄一行 `catalog:<id>`，why 必引）；無 provider 且低信心 → 回免費層結果＋`needs_ai:true`；閘 `methods_resolvable`（⊆ `is_resolvable`）、`rationale_cited`、`max_three`；新 `SPEC/evolution/ux-defaults/v1.yaml`（`route.free_layer_min_confidence: 0.5`，`set_by: operator`）＋`champion.yaml`＋LEDGER 一行（用 03 的 CLI）；`SPEC/specs/cognitive/typed-objects/method-route.schema.yaml`＋fixtures；`SPEC/capabilities/contracts/route.method.capability.yaml`（DRAFT）；`gen_spec_index.py`。新 `COS/tests/unit/test_route_method.py`（≥10 案：免費層與 `pickTools` 同輸入同輸出 5 例、高信心不叫模型、低信心叫模型、幻覺 id → 修復、why 未引 → FAIL、>3 → FAIL、門檻讀 champion（暫存副本改值 → 行為變）、無 provider、recipe 候選、空字串 → 錯誤）。
+- 驗收：`cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_route_method -q 2>&1 | tail -1` → `OK`；golden exit 0。
+- 突變：拿掉 `methods_resolvable` → 幻覺案紅；門檻寫死 → champion 案紅。
+- commit：`feat(cognitive-os): route.method -- free catalog match first, AI only below the operator-owned confidence, every suggestion cites the catalog (P3 WC-01 early, U16)`。回滾：revert。
+
+**WC-P2-06 synthesis 端點**（本機，P1 那條線；05 合併後）
+- 目標：`POST /projects/{id}/synthesis`（body `{kind, subject}`；202＋`synthesis_id`，背景 thread）、`GET /projects/{id}/synthesis/{sid}`（PENDING／DONE／FAILED）；`ai_usage` purpose `synthesis:<kind>`（成功與失敗都記）；事件 `SynthesisCreated`／`SynthesisFailed`（payload 只放 id／hash／計數，K8）；artifact 存 CAS；三契約 DRAFT → ACTIVE。
+- 讀：`main` HEAD `:1174-1291`、`:1549-1595`；P-h。
+- 樣板：`_run_interpretation`／`interpret_method`。
+- 驗收：新 `tests/unit/test_api_synthesis.py`＋`main` importers（12.1-11 型樣 `apps\.api\.main|apps\.api import main`）→ `OK`
+- 突變：worker 不記失敗用量 → 案紅；GET 別的 tenant → 404 案紅；零 Sources → 400 且不呼叫模型案紅。
+- commit：`feat(cognitive-os): POST/GET /projects/{id}/synthesis -- background run, metered, gated artifact (P2 WC-06)`。回滾：revert。
+
+**WC-P2-07 `literature_search` v2（project-backed）**（本機，06 後）
+- 目標：有 project 時回本專案 `source_class=academic` 的 active Sources（P-a 形狀摘要）；無 project → 既有 offline fixture 並標 synthetic（§8 P4 刪）；`edd-research-evidence-v1` 以真 Sources 跑 PASS。
+- 讀：`COS/ai_lego/apps/recipe_runtime.py:73-99`（錨點 `def build_registered_capability_adapters`）；`COS/ai_lego/modules/research/evidence_triangulation.py:40`（`offline_literature_search`）；`main` `run_recipe`（P1 WC-07 已帶 project）。先判定：依賴注入能否只加一個 kw-only 參數做完；不能 → 停，§7 加列（P-K1）。
+- 驗收：新 `tests/unit/test_literature_search_v2.py`＋`recipe_runtime` importers → `OK`；突變：不過濾 `source_class` → 案紅。
+- commit：`feat(cognitive-os): literature_search returns the project's academic Sources (P2 WC-07)`。
+
+**WC-P2-08 interpret 改用共用閘**（本機，網站那條線；01 合併且結果頁這批 commit 後）
+- 目標：P-K3：`evaluate_interpretation_gates` 的 `citation_integrity` 改呼叫 `gates.evaluate_citation_integrity`，刪內聯；gate id 與 FAIL 語意不變。現有合法輸出若有空 `citations` 的物件（P-b 會 FAIL）→ 停、回報，不放寬 P-b。
+- 驗收：`test_interpret_method_record`＋`test_api_interpret` → `OK`；突變：共用閘拿掉 ⊆ → interpret 越界案紅。
+
+**WC-P2-09 期末閘**（本機 Opus；部署 High-STOP）
+- ① `/opt/cognitive-os` 部署（`deploy.sh`）；② 在 P1 的操作者專案（真 Sources）跑 `dossier_brief`：每主張引註 ⊆ manifest、`ai_usage` 有 `synthesis:` 列；③ 9 案真模型跑 harness → 基準線報告給操作者定門檻（I10），定了才寫 `thresholds.yaml`；④ CI 接線＋`COS/scripts/test-eval-harness.ps1`；⑤ §6 P2 三突變；⑥ `edd-research-evidence-v1` 用 v2 PASS；⑦ §0／§3.3（P-K1 兩列）／§5／§7 回填、TASKS 指針；⑧ 產 P3 卡（§12.9；P3-01 已完成的部分收一行）。
+- 驗收：`grep -cE "^- P2_DOD_[1-8]: PASS" agency-os/WORKLOG.md` → `8`

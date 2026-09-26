@@ -1,4 +1,18 @@
 ﻿# Worklog
+## 2026-09-26（續57）研究線 P2 工作卡（計畫 §12.8，v1.52）：雲端 T28–T31 現在並行、T32／T33 第二波、本機 06–09 排在 P1／網站兩條線後
+- [操作者] 「PLAN 太大，多派工作給雲端和本機 session；不能影響其他執行中的 session」。
+- [現況] 執行中：P1 線 [ca73f8]（剩 WC-P1-15）；網站線 [53caf4]（結果頁一批未提交：`apps/cognitive-web/**`、`docs/mockups/check-mocks.py`、`main.py`、`interpret_method_record.py`、`provider.py`、`method-interpretation.*`）。AGENTS §5 共用工作目錄上限 2 → 不開第三個本機 session，本機卡排在兩條線後。
+- [做] 計畫 §12.8：裁定 P-K1–K8、介面釘死 P-a–P-i、卡 WC-P2-01～09＋WC-P3-01（提前）；§0 一行；檔頭 v1.52。雲端卡的檔與上列未提交檔零交集（唯一共用 = 產生檔 SPEC_QUICKREF，合併時乾淨樹重產）。
+- [裁定摘要]
+  - K1 synthesis 照 interpret 先例（模組函式＋端點＋背景 thread），不建 §3.3 的 context-bound adapter 類；三線一支 `synthesis.py`
+  - K2 全系統一套引註 id（manifest id）；K3 `citation_integrity` 單一定義，interpret 內聯版由 08 收
+  - K4 prompt = 版本化資料（`report.ts:76-80,111-125` 逐字搬進 `SPEC/evolution/synthesis-prompts/v1.yaml`）；K5 runtime 只讀 champion，晉升／回滾走離線 CLI
+  - K6 harness 門檻初值 null = UNSET，基準線由 09 提出、操作者定（I10）
+- [順手] 共享 index 殘留 16 條舊版（T22／T23／T27 新檔被記成刪除、5 檔是前一版 blob）→ 任一 session 裸 `git commit` 會把 main 上這些檔刪掉；逐條比對皆為對應 commit 的前一版後 `git reset -q -- <16 檔>`（只動 index，工作樹未變，之後 `git diff --cached` 0 行）。
+- REALTEST_WAIVED: DOC_ONLY -- 只加計畫章節；卡內 file:line 逐一以 grep／`git show HEAD:` 對 b513ac4b0 驗（修 1 處：`offline_literature_search` 在 `evidence_triangulation.py:40`）；新表 19 列欄數一致
+- REVIEW_WAIVED: DOC_ONLY -- 讀回自審；卡的設計取捨由各卡突變與合併時 critic 把關
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`evaluate_citation_integrity|build_source_manifest|load_champion|run_synthesis|route_method|terms_of\(` | hits=12（全在計畫檔：新卡＋§3.3 既有 `route_method.py` 列；程式 0，無撞名；.claude 三目錄 0）
+- [下一步] 操作者把 T28–T31 貼進四個新雲端 session；到齊後本機重驗→合併→發 T32／T33。
 ## 2026-09-26（續56）POD 收件匣補做排程上線：token 由操作者在主機產生；next-admin 重建、自架 Trigger 20260926.6；訂單監控 ok
 - [操作者] 跑 `pod-sweep-env.sh`：主機 `.env` 加 POD_INBOX_SWEEP_TOKEN（64 字元，主機產生、未顯示）。
 - [部署] safe-infra-patch 以未變更的 compose 重建 next-admin（備份 `.bak.safe-patch-20260926-140545`，healthy）；P1 session 同分鐘也 patch 了 compose（`-140522`，COLLECT_RESEARCH_*）→ 事後查證兩邊行都在（:287-288、:427）、`docker compose config` 通過、容器三個 token 皆有值。`lobster-trigger-deploy.ps1` → 20260926.6（16 tasks），POD_INBOX_SWEEP_TOKEN／COLLECT_RESEARCH_EXECUTE_TOKEN 皆「set: yes (from running next-admin)」。兩個 session 以 SendMessage 排序 compose／Trigger 操作。
