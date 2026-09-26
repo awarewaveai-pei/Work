@@ -9,7 +9,12 @@ $script:RepairProbeFields = [ordered]@{
     auto_reboot         = @("sg", "eu")
 }
 
-# Returns "<probe>.<host>=<status>" lines, unrolled: callers wrap in @(). Empty = every probe healthy.
+# GAP-03 (health/route.ts): with GitHub configured, the repo must be reachable with the token --
+# repairs file their GitHub issue there. github_app_status is NOT checked: "unverified" is prod's
+# steady state and cosmetic (the PR path uses the workflow's github.token; dogfood-auto-repair.ps1).
+# A fixture without github_configured does not describe GitHub and yields no finding.
+# Returns "<probe>.<host>=<status>" / "github_repo_accessible=<value>" lines, unrolled: callers wrap
+# in @(). Empty = every probe healthy.
 function Get-RepairProbeFindings {
     param([Parameter(Mandatory)] $Health)
     $findings = New-Object System.Collections.Generic.List[string]
@@ -25,5 +30,11 @@ function Get-RepairProbeFindings {
             $findings.Add("$probe.$hostKey=$v")
         }
     }
+
+    if (($names -contains "github_configured") -and $Health.github_configured -eq $true) {
+        $v = if ($names -contains "github_repo_accessible") { $Health.github_repo_accessible } else { "absent" }
+        if ($v -ne $true) { $findings.Add("github_repo_accessible=$(if ($null -eq $v) { 'null' } else { $v })") }
+    }
+
     return $findings.ToArray()
 }

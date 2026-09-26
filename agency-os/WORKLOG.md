@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-26（續49）合併雲端 T25：sg-deploy 以實際發布埠探 next-admin；修復健康探針檢查 GitHub repo 可達（不看外觀用的 App 狀態）（未部署）
+- [根因] sg-deploy.sh next-admin smoke 寫死 127.0.0.1:3002（compose 可覆寫發布埠）；repairs/health 的 GAP-03 GitHub 欄位無 smoke 讀。
+- [來源] `claude/cc-t25-detector-gaps` dfd5e0037：`docker port lobster-next-admin 3000/tcp`（fallback 3002）＋host-script 測試 8 例；Get-RepairProbeFindings 加 GitHub 檢查。
+- [本機修] M1 雲端版以 github_app_status 非 confirmed 為發現；正式庫常態 unverified，dogfood-auto-repair.ps1 判為 cosmetic（PR 走 workflow github.token）→ 合併即永久 WARN。改為 GitHub 已設定時要求 `github_repo_accessible = true`（修復在該 repo 開 issue）；正式庫現況 configured／accessible true／push true／app unverified。測試印實際斷言數。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n sg-deploy.sh；sg-deploy-smoke-ports.test.sh 8/8；repair-health-probes.test.ps1 16/16；突變 github 區塊關閉 → 3 紅 → 還原綠 | exit=0 | ms=15000
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/1M/0m（本機：永久 WARN；Codex 三輪此區無發現；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=127.0.0.1:3002|github_app_status | hits=82（皆為歷史文件／備份／註解；live 程式僅 sg-deploy.sh 已改）
 ## 2026-09-26（續48）合併雲端 T24：migration ledger 上線——「正式庫套到哪一號」可直接查；補登 88 筆、另查出 4 個從未套用（0092 已套）
 - [根因] 94 個 migration 無 ledger，靠 schema 反推猜哪些已套（TASKS:127／209）。
 - [來源] `claude/cc-t24-migration-ledger` d5a3688f9：0092 `schema_migrations`；runner 在每個檔自己的交易內（最後一個 COMMIT 前）注入 ledger INSERT；--status／--record-only／--force-reapply。

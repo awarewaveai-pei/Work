@@ -458,8 +458,14 @@ log "--- HTTP smoke check ---"
 # unauthenticated curl gets 302→/login, which is HEALTHY but not 2xx and would wrongly
 # trip the smoke-fail auto-rollback. /login renders 200 and proves the app + routing are up;
 # /api/ops/summary (exempt server-to-server endpoint) covers API liveness.
-_smoke_check "next-admin /login"           "http://127.0.0.1:3002/login"
-_smoke_check "next-admin /api/ops/summary" "http://127.0.0.1:3002/api/ops/summary"
+# 2026-09-26 fix (T25): hardcoded 127.0.0.1:3002 confused the CONTAINER-internal port with the
+# HOST-published one, the exact same class of bug already fixed for node-api above (see that
+# comment) -- docker-compose.yml publishes next-admin as `${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000`,
+# so the published port can be overridden. Resolved at runtime, same pattern as node-api/hci-app/renderer.
+next_admin_port=$(docker port lobster-next-admin 3000/tcp 2>/dev/null | head -1 | sed 's/.*://')
+next_admin_port="${next_admin_port:-3002}"
+_smoke_check "next-admin /login"           "http://127.0.0.1:${next_admin_port}/login"
+_smoke_check "next-admin /api/ops/summary" "http://127.0.0.1:${next_admin_port}/api/ops/summary"
 _smoke_check "nginx/wordpress"             "https://aware-wave.com/" "" "aware-wave.com"
 # 2026-09-12 fix: this used to go through the outer host-nginx (port 80, Certbot-managed) with a
 # Host header, same wrong-layer bug as safe-infra-patch.sh's nginx smoke check (fixed same day,

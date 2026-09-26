@@ -5,8 +5,10 @@ $ErrorActionPreference = 'Stop'
 . (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\scripts\lib\repair-health-probes.ps1')).Path
 
 $failures = New-Object System.Collections.Generic.List[string]
+$script:asserts = 0
 function Assert-Eq {
     param($Expected, $Actual, [string]$Message)
+    $script:asserts++
     if ("$Expected" -ne "$Actual") { $script:failures.Add("$Message (expected=[$Expected] actual=[$Actual])") }
 }
 # Same object shape Invoke-RestMethod hands check-smoke-tests.ps1.
@@ -35,9 +37,23 @@ Assert-Eq "backup_script_probe.eu=absent" (Findings (New-Health '{"backup_script
 # Cloudflare interstitial: a non-JSON 200 arrives as a string.
 Assert-Eq "backup_script_probe=absent,auto_reboot=absent" (Findings "<html>challenge</html>") "string body"
 
+# --- T25 (2026-09-26): GAP-03 -- with GitHub configured, the repo must be reachable (repairs file
+# their issue there). app_status is cosmetic and never a finding, whatever its value.
+$healthyBase = '"backup_script_probe":{"sg":"ok","eu":"ok"},"auto_reboot":{"sg":"ok","eu":"ok"},"eu_backup_required":true'
+Assert-Eq "" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_repo_accessible`":true,`"github_app_status`":`"unverified`"}"))) "github reachable + app unverified -> ok (prod steady state)"
+Assert-Eq "github_repo_accessible=False" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_repo_accessible`":false}"))) "github repo 404 -> finding"
+Assert-Eq "github_repo_accessible=null" (Findings (New-Health ("{$healthyBase,`"github_configured`":true,`"github_repo_accessible`":null}"))) "github token/network error (null) -> finding"
+Assert-Eq "" (Findings (New-Health ("{$healthyBase,`"github_configured`":false,`"github_repo_accessible`":null}"))) "github not configured -> no finding"
+# Endpoint shape drift: configured but the field is gone is never a silent pass.
+Assert-Eq "github_repo_accessible=absent" (Findings (New-Health ("{$healthyBase,`"github_configured`":true}"))) "github_repo_accessible absent while configured=true -> finding"
+
+# A fixture that never mentions github at all (pre-T25 shape) must produce IDENTICAL findings to
+# before this change -- the github check is skipped entirely, not evaluated-and-passed.
+Assert-Eq "" (Findings (New-Health ("{$healthyBase}"))) "fixture omitting github entirely -> unaffected (backward compatible)"
+
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Host "FAIL: $_" -ForegroundColor Red }
     exit 1
 }
-Write-Host "PASS: repair-health-probes (10 cases)" -ForegroundColor Green
+Write-Host ("PASS: repair-health-probes ({0} cases)" -f $script:asserts) -ForegroundColor Green
 exit 0
