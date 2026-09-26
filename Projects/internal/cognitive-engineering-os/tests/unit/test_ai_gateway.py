@@ -7,7 +7,6 @@ from __future__ import annotations
 import inspect
 import json
 import threading
-import time
 import unittest
 from unittest.mock import patch
 
@@ -22,6 +21,7 @@ from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs,
 from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MODEL_ENV, AiCompletion, AnthropicProvider, provider_from_env
 from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
+from tests.unit.thread_testkit import HANG_GUARD_S, join_all
 
 SPEC_ROOT = resolve_spec_root()
 CATALOG = shared_method_catalog(SPEC_ROOT)
@@ -330,22 +330,43 @@ class ApiRouteTests(ApiTestCase):
                 self.assertIn("AI_DAILY_TOKEN_BUDGET_INVALID", response.json()["detail"])
 
     def test_ai_budget_lock_serializes_concurrent_requests_for_the_same_tenant(self):
-        """Deterministic proof (not timing-luck-dependent) of the critic-found TOCTOU fix (2026-09-17): a
-        second concurrent request for the SAME tenant must not reach the provider at all while the first is
-        still inside the check-budget/call-provider/record-usage critical section. Without
-        api_main._ai_budget_lock_for actually being held across that whole section, both requests would read
-        the same pre-call usage total and both proceed immediately."""
+        """Proof of the critic-found TOCTOU fix (2026-09-17): while the first request is inside the tenant's
+        check-budget/call-provider/record-usage section, a second request for the SAME tenant must not take
+        the tenant's lock. Observed inside the lock, with no timing window: the lock factory is wrapped, and
+        the request arriving while the first is in the provider first tries a non-blocking acquire -- it
+        must find the lock taken. Every wait is a hang guard (tests/unit/thread_testkit.py)."""
         self._login()
-        entered_count: list[int] = []
-        count_lock = threading.Lock()
+        first_in_provider = threading.Event()
+        second_at_lock = threading.Event()
+        contender_found_lock_free: list[bool] = []
         release = threading.Event()
+        entered: list[int] = []
 
         class BlockingProvider(ScriptedProvider):
             def complete(self, system, user, *, max_tokens):
-                with count_lock:
-                    entered_count.append(1)
-                release.wait(timeout=5)
+                entered.append(1)
+                first_in_provider.set()
+                release.wait(HANG_GUARD_S)
                 return super().complete(system, user, max_tokens=max_tokens)
+
+        real_lock_for = api_main._ai_budget_lock_for
+
+        class ObservedLock:
+            def __init__(self, lock):
+                self._lock = lock
+
+            def __enter__(self):
+                if first_in_provider.is_set() and not release.is_set():  # the second request
+                    took_it = self._lock.acquire(blocking=False)
+                    contender_found_lock_free.append(took_it)
+                    second_at_lock.set()
+                    if took_it:
+                        return self
+                self._lock.acquire()
+                return self
+
+            def __exit__(self, *exc):
+                self._lock.release()
 
         self._use(BlockingProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False), json.dumps(flowchart_kwargs(), ensure_ascii=False)))
         results: dict[str, int] = {}
@@ -353,23 +374,21 @@ class ApiRouteTests(ApiTestCase):
         def call(key):
             results[key] = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"}).status_code
 
-        first = threading.Thread(target=call, args=("first",))
-        first.start()
-        deadline = time.monotonic() + 5
-        while not entered_count and time.monotonic() < deadline:
-            time.sleep(0.01)
-        self.assertEqual(entered_count, [1], "first request never reached the provider")
-
-        second = threading.Thread(target=call, args=("second",))
-        second.start()
-        time.sleep(0.3)
-        self.assertEqual(entered_count, [1], "second request reached the provider while the first still held the tenant's budget lock -- the TOCTOU race is back")
-
-        release.set()
-        first.join(timeout=5)
-        second.join(timeout=5)
-        self.assertEqual(results.get("first"), 200)
-        self.assertEqual(results.get("second"), 200)
+        first = threading.Thread(target=call, args=("first",), name="budget-lock-first")
+        second = threading.Thread(target=call, args=("second",), name="budget-lock-second")
+        with patch.object(api_main, "_ai_budget_lock_for", lambda tenant_id: ObservedLock(real_lock_for(tenant_id))):
+            try:
+                first.start()
+                self.assertTrue(first_in_provider.wait(HANG_GUARD_S), "first request never reached the provider")
+                second.start()
+                self.assertTrue(second_at_lock.wait(HANG_GUARD_S), "second request never reached the tenant's budget lock")
+                self.assertEqual(contender_found_lock_free, [False], "second request found the tenant's budget lock free while the first was in the provider -- the TOCTOU race is back")
+                self.assertEqual(entered, [1])
+            finally:
+                release.set()
+                join_all(self, first, second)
+        self.assertEqual(results, {"first": 200, "second": 200})
+        self.assertEqual(entered, [1, 1])
 
     def test_ai_budget_lock_does_not_serialize_different_tenants(self):
         self.assertIsNot(api_main._ai_budget_lock_for("tenant-a"), api_main._ai_budget_lock_for("tenant-b"))

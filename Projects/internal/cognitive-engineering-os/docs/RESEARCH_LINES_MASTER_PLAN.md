@@ -2,19 +2,19 @@
 
 > **這份是什麼**：把 L1 合作風險／L2 決策利弊／L3 EdD 研究三條線做成 **Cognitive OS 上的 Project 工作流**（Project 層級蒐集與彙整 + 既有 Recipe 引擎 + 報表 artifact），達到國際級產品規格（多租戶、溯源、可重放、可匯出、可抹除）。取代 `agency-os/reports/decisions/2026-09-23-research-pipeline-architecture.md` §5–§6 的 next-admin 中心方案（該檔 §10.1 七個矛盾與 §10.2 成熟度矩陣仍為前提，不重述）。
 > **給 AI 的開工指南**：接到「研究線／三條線／partnership-risk／彙整層／Collection Service」→ 讀 §0 → 照 §5 當前階段做；設計問題查 §3–§4；產品問題查 §9 **不重問**；退場清單 §8；critic 已駁回的設計見 §4 淘汰欄，**不重提**。每完成一階段更新 §0。
-> **版本** v1.49（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
+> **版本** v1.50（2026-09-26）。本檔只寫現行內容：決策改判就直接改寫該 D# 列，歷史在 `git log -- Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` 與 WORKLOG（續N），不留在這裡。路徑：`COS` = `Projects/internal/cognitive-engineering-os`；`SPEC` = `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`；`WF` = `lobster-factory/packages/workflows`；`BP` = `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2`；`rt` = `COS/ai_lego/apps/recipe_runtime.py`；`main` = `COS/ai_lego/apps/api/main.py`；`repo` = `COS/ai_lego/data/repositories/project_source_repository.py`；`exec` = `COS/ai_lego/platform/workflow/executor.py`。
 
 ## 0. 現況（每次改動更新此段）
 **進度板（接手先讀這五行，不必再翻別的檔；每張卡的 commit 必同步更新，§12.1 規則 1）**
 - 現在期／卡：**PI-a 完成；WC-PIa-14R 期末閘通過**。**PI-b 尚未開始，須另行 High-STOP 授權**。
 - 已完成：P0 `19f00f9aa` 已上 prod（2026-09-26 隨 next-admin `b8c191698`；早於 PI-b，見 D15 備註）；T11 `a15d2f05b`；T12 `66278d1f9`；PI-a 修正卡 7/7、14R 通過；PI-b 0/5。14R：golden 4163/4163、完整 COS unittest `Ran 14204 ... OK (skipped=34)`、解讀/API 定向 33/33、web vitest 12/12、typecheck／build／audit 0 漏洞、check-mocks、§6 四突變、Docker API＋web 本機 `healthy`、舊 dashboard 真 AI 草稿＋執行成立、官方 Playwright 真模型 `1 passed／0 failed／0 skipped`（另 mock 模式 1 passed）。
 - 最後一筆 PI-a 程式碼：`475ec80dc`、`d7cdf1010`、`7cfd90bd3`；14R Claude Python／TypeScript 真 oracle 各一份，核對修正後最終 `approve`（`2026-09-26-review-28ae67cc.md`）。完整 COS unittest 在隔離 Linux 容器 14204 項 OK（1612.765s）；8420 既有程序占用，測試 override 用 8422；`COS_TEST_*` 實值只在 Git 忽略的 `mcp/user-env.ps1`，正式 compose 埠未改。
-- 阻塞：PI-a 無。Windows 全套曾因 5 秒併發測試逾時紅 1 項；隔離 Linux 全套綠，未修改該無關測試。容器前兩輪的唯讀／noexec 設定錯誤不列為產品測試通過證據（詳 WORKLOG 2026-09-26 14R 結案）。
-- 下一步：PI-b 仍須依 §12 卡片及 High-STOP 另行授權；本次未做正式站部署。
+- 阻塞：PI-a 無。Windows 全套曾紅的 1 項（`test_ai_gateway` 預算鎖測試：把「5 秒內到達」當成不會卡死）已修：改用事件與鎖內觀察＋`tests/unit/thread_testkit.py` 的 hang guard；負載下舊版重現同一失敗、新版通過（WORKLOG 2026-09-26）。容器前兩輪的唯讀／noexec 設定錯誤不列為產品測試通過證據（詳 WORKLOG 2026-09-26 14R 結案）。
+- 下一步：PI-b（操作者 2026-09-26 已授權）→ P1。**P-ARF-data 暫緩**：操作者 2026-09-26「還沒整理好」（Airtable 資料），整理好再排，不擋 P1。
 
-| 項 | 狀態（2026-09-24） |
+| 項 | 狀態（各列查證於 2026-09-24；現況以上方進度板為準） |
 |---|---|
-| 計畫 | v1.14；§9 全部定案；執行順序 P0 → PI-a → PI-b → P-ARF-data → P1 → P2 → P3 → P4 → P4b → P-E；**目前：見上方進度板**；PI-b／P5／P-P 為 High-STOP（prod 部署） |
+| 計畫 | 版本見檔頭；§9 全部定案；執行順序 P0 → PI-a → PI-b → P-ARF-data → P1 → P2 → P3 → P4 → P4b → P-E；**目前：見上方進度板**；PI-b／P5／P-P 為 High-STOP（prod 部署） |
 | 可重用（已查證） | 蒐集引擎 `NA/lib/collect`（41 個非測試 .ts；SSRF／DNS pin／robots／限流／品質／相關性／注入隔離／renderer 階）；COS Project+Source+CAS+events（`repo:22-60`）；Recipe 引擎（journal／resume／gates，`exec:236-250,347-361`）；AI gateway（brief→draft→builder→gates，provenance 強制 `draft.py:195-206`）；`ai.draft_record` capability（`SPEC/capabilities/contracts/ai.draft_record.capability.yaml`）；既有 citation gate `COS/ai_lego/modules/research/gates.py:41-63`；dossier prompt／段落表 `NA/lib/dossier/report.ts:76-139`、引註檢查 `:185-206`；`literature_search` ACTIVE 契約（`SPEC/capabilities/contracts/literature_search.capability.yaml:3`）；portal 身分層（`NA/app/portal/*`）；Trigger.dev 內部呼叫樣板 `WF/src/trigger/collect-scheduled-crawl.ts` + `NA/app/api/internal/collect/run-due-schedules/route.ts:27-32`；handoff code 發放／兌換樣板 `COS/ai_lego/platform/identity/store.py:342-385` |
 | 缺（本計畫要蓋） | **L4 藝術反思線（§1，D19–D22）**：Airtable→SPEC 同步、`art_reflection.*` 契約家族、`wusheng-journey-v1`／`reflective-cycle-v1` recipe、判斷主權閘、圖像 artifact（P5 object storage）、參與者模式（P-P 後）；**課程層 §3.9 U15／D17**（每個方法首次使用前的 5 分鐘課，資料驅動）；**解決方案層 §3.10(5b)／C11**（分析後的方案比較、行動計畫、追蹤與到期重跑）；**解讀層 §3.10**（現況：方法執行 = builder + gates，無 LLM，`main:758-788`；結果頁 = 閘門表 + JSON，`dashboard.html:1394-1410`；圖表僅 2 方法 `:1320-1345`）；Source 溯源欄位＋supersede；Project 層級 collection run（非同步）＋ ingest grant＋service identity；`sink/cognitive`；三個彙整 typed object＋prompt manifest＋`citation_integrity` gate；context-bound capability adapter 這一類；`literature_search` project-backed adapter；`partnership-risk-v1` recipe；非同步 recipe run 旗標；`artifact.generate_report`；**品質評分 harness（§3.7）**；**演化迴圈（§3.8）**；Postgres／object storage；自然人來源的加密與抹除（P-P） |
 | 演化原語（已存在，§3.8 重用） | `SPEC/recipes/validated/champion-challenger.recipe.yaml`（ACTIVE）；prompt 版本重放與回滾 `COS/ai_lego/platform/ai_execution/{replay,rollback_plan}.py`（`replay.py:34-76` `prompt_version`／`restored_prompt_version`；README:27 v12 升級／回滾 replay 測試）；spec-root golden harness `SPEC/tests/run_golden_tests.py`；`ai_usage` 計量表（`store.py:117,465-468`）；`COS/ai_lego/compute/prediction_tracking/error.py`；Claude 雲端 routine（`/schedule`）；行為即資料（`query-plan.ts:38` ANGLES、`source-class.ts`、`methods/registry/method-form-examples.yaml`） |
@@ -255,7 +255,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 | **P-P 主體級保護** | Source envelope 加密（per-subject DEK）+ subject 級定址 + 主體級抹除驗證 + 第二租戶前的 ADR + 操作者明示批准；**前置對象 = 第二租戶**（別人的資料進同一系統時才需要主體級保護；操作者自己的單租戶不設限，D10） | **High-STOP** | 抹除後 CAS／journal／artifact 三處讀不回；負向測試；ADR 落地 | 不上線即無資料 | 5d+ |
 | **P6 選配** | `apps/collector` 容器；HCI adapter（`BP/10:83`） | Medium／High | 觸發：第二 tenant／要開 HCI 案 | — | — |
 
-**執行順序** P0 → PI-a → PI-b → **P-ARF-data** → P1 → P2 → P3 → P4 → P4b → P-E；P5／P-P／P6 觸發式；**P-ARF-participant 在 P5 之後**。**核心 P0–P4 = 22.5d；含 P4b + P-E = 26.5d**（1d = 一個完整工作 session，單一工程師）。里程碑（操作者看得到的）：PI-b 完 = 第一次在正式站看到真分析（第 6 天）；P1 完 = 真來源進系統（第 9 天）；P2 完 = 引註彙整（第 12 天）；P3 完 = 三線端到端 + 課程 + 方法 dossier + 問題路由 + 首用測試（第 19 天）；P4 完 = 報表 + 解決方案 + 跨專案搜尋（第 22.5 天）。
+**執行順序** P0 → PI-a → PI-b → **P-ARF-data**（暫緩，見 §0）→ P1 → P2 → P3 → P4 → P4b → P-E；P5／P-P／P6 觸發式；**P-ARF-participant 在 P5 之後**。**核心 P0–P4 = 22.5d；含 P4b + P-E = 26.5d**（1d = 一個完整工作 session，單一工程師）。里程碑（操作者看得到的）：PI-b 完 = 第一次在正式站看到真分析（第 6 天）；P1 完 = 真來源進系統（第 9 天）；P2 完 = 引註彙整（第 12 天）；P3 完 = 三線端到端 + 課程 + 方法 dossier + 問題路由 + 首用測試（第 19 天）；P4 完 = 報表 + 解決方案 + 跨專案搜尋（第 22.5 天）。
 
 ## 6. 驗證矩陣（每期四動作 + 突變）
 | 動作 | PI-a | P1 | P2 | P3 | P4 |
@@ -306,7 +306,7 @@ lobster-net：兩容器同網（COS egress allowlist 加 NA 內部 host）
 - 規格：頂級國際規格；不補丁；LEGO；文件 AI 極簡；每 commit 1 critic；報表停在 AI 草稿，人核准才成立。
 - 三條線：L1 對人／公司／組織／事件，內容不設限（D10）；L3 第一版 = 文獻矩陣＋證據矩陣＋Toulmin，不含文獻回顧草稿；HCI 退出三條線（D8，P6 選配）。
 - 平台：品質評分 harness（P2）與演化迴圈（自動晉升只到 R0–R2 資料級；模型與門檻永遠人審，I9／I10）；首用者不看文件能走完（§3.9）；不知道用哪個工具 → 問題路由（U16）；舊 dashboard 能力零退化，parity 清單在 §0（U17）；前端殼 = 新 `cognitive-web`，舊 dashboard 降專家模式（D13）；解讀層先於殼的其餘功能。
-- 執行：P0 → PI-a → PI-b → P-ARF-data → P1 → P2 → P3 → P4 → P4b → P-E；P0 部署與 PI-b 同窗（D15）；P5／P-P／P6 觸發式（第二租戶／HCI 案）；便宜模型照 §12 執行，Fable／Opus 只產卡與期末閘。
+- 執行：P0 → PI-a → PI-b → P-ARF-data（暫緩，見 §0）→ P1 → P2 → P3 → P4 → P4b → P-E；P0 部署與 PI-b 同窗（D15）；P5／P-P／P6 觸發式（第二租戶／HCI 案）；便宜模型照 §12 執行，Fable／Opus 只產卡與期末閘。
 - 教材：例子預設藝術反思、五組可切換、永不用真實案例（D18）；兩份示意稿 = 每個方法的規格（I11，M1–M8）；每個方法的知識來自它自己的 dossier（D23），不靠操作者逐一餵參考。
 - 資料：研究來源與所有分析結果存 COS 研究庫（§3.3），不進 `/ops/knowledge`；跨專案搜尋在 P4。
 - L4：Airtable 單向同步、判斷主權七閘、參與者模式在 P5 之後（D19–D22）。

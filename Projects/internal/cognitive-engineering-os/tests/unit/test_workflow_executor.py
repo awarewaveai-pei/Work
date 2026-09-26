@@ -11,6 +11,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.workflow.executor import execute_workflow_ir
+from tests.unit.thread_testkit import HANG_GUARD_S
 
 
 class WorkflowExecutorTests(unittest.TestCase):
@@ -235,7 +236,7 @@ class WorkflowExecutorTests(unittest.TestCase):
 
         def synchronized_first_write(path, payload, *, create_only=False):
             if create_only:
-                journal_barrier.wait(timeout=5)
+                journal_barrier.wait(HANG_GUARD_S)
             return original_first_write(path, payload, create_only=create_only)
 
         with tempfile.TemporaryDirectory() as directory:
@@ -252,7 +253,7 @@ class WorkflowExecutorTests(unittest.TestCase):
                     outcomes = []
                     for future in futures:
                         try:
-                            outcomes.append(("SUCCEEDED", future.result(timeout=5).status))
+                            outcomes.append(("SUCCEEDED", future.result(HANG_GUARD_S).status))
                         except InvariantViolation as error:
                             outcomes.append(("ERROR", str(error)))
 

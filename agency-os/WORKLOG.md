@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-26（續33）COS：Windows 偶發紅的預算鎖測試改成確定性；共用 index 清理；計畫 v1.50（P-ARF-data 暫緩）；系統模式實作撤回交雲端
+- [根因] `tests/unit/test_ai_gateway.py` 預算鎖測試把「5 秒內到達 provider」當成沒卡死；Windows 全套 3415 s，冷啟動第一個請求 >5 s → 紅（`%TEMP%/pia14r-full-unit-20260926.err.log:115-130`）。失敗後執行緒未 release／join，續跑寫進已刪的 temp DB（同檔開頭 `sqlite3.OperationalError: unable to open database file`）。同類：`test_workflow_executor.py` barrier／future 5 s。
+- [修] 新 `tests/unit/thread_testkit.py`（`HANG_GUARD_S=300`、`join_all`）。預算鎖測試：事件驅動；包裝鎖工廠，第二個請求在第一個還在 provider 時做 non-blocking acquire，必須拿不到（無時間窗）；finally 一律 release＋join。executor 測試改用 hang guard。
+- [證] 72 個 CPU burner（24 核）下舊版冷啟動重現同一訊息 FAIL、新版 PASS（冷啟動 168 s）；突變 `_ai_budget_lock_for` 每次回新鎖 → 紅（`[True] != [False]`）；兩檔 46 測試 OK。
+- [Codex] 1 high：原 0.3 s 觀察窗在排程延遲下會漏抓回歸 → 改 non-blocking acquire，突變仍紅。
+- [index] 共用 index 在 COS 下 23 筆過期暫存（7 筆標刪除，磁碟檔與 HEAD blob 相同）→ `git reset -q -- Projects/internal/cognitive-engineering-os/`（只動 index，不動檔案）。
+- [計畫 v1.50] §0 阻塞列改為已修；表頭改「各列查證於 2026-09-24」、版本改指向檔頭；P-ARF-data 暫緩（操作者「還沒整理好」），PI-b 後接 P1。
+- [撤回] 系統模式把關（Printful／Chatwoot／建站派送）本 session 已實作並驗證（next-admin 1864、workflows 117、8 突變全紅），發現 `ec2bcedb8` 已派雲端 T19／T26／T27 → 操作者「別的 session 在做就不要插手」→ 全數還原，repo 無殘留。給 T19 的兩點：Trigger 端改正式環境的 4 個任務（create-wp-site、adopt-client-os、apply-manifest、orchestrate-tenant-provisioning）啟動時也要查；派送器 `limit 10` 會被被擋組織的單占滿。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_ai_gateway tests.unit.test_workflow_executor（46 OK）＋load_run.py 72 burners（舊 FAIL 同訊息／新 PASS）＋突變 _ai_budget_lock_for 新鎖→FAIL | exit=0 | ms=17195
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1（Codex artifact `agency-os/reports/oracle/2026-09-26-review-75872b88.md`；1 high 已修並以突變證明）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`\.wait\(timeout=\d|\.join\(timeout=\d|\.result\(timeout=\d|monotonic\(\) \+ \d` | hits=1（System Foundry e2e 的 terminate→wait→kill 清理，非速度斷言；兩個測試的 7 處已改）
 ## 2026-09-26（續32）決策：系統模式 × 外部事件（Printful／Woo／Chatwoot）＋建站派送；雲端 T19–T27 發出；P0 已上線補記
 - [決策] `agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md`（操作者「都你決定」）。不變量：模式只擋我們發起的變更，客戶事件永不因模式遺失。
   - 操作者發起的 Printful 寫入（tools/publish link:466／pfcreate:545／pforder:737、printful/sync PUT:83）→ 共用 423。
