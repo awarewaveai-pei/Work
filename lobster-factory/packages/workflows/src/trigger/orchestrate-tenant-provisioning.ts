@@ -17,6 +17,7 @@ import { z } from "zod";
 import { postTenantIntegrationWebhook } from "../lib/tenant-provisioning/postTenantIntegrationWebhook";
 import { runProviderStep } from "../lib/tenant-provisioning/providers/registry";
 import type { ProvisioningProvider } from "../lib/tenant-provisioning/types";
+import { checkOrgSystemMode } from "../lib/systemMode";
 import { captureWorkflowEvent } from "../observability/posthog";
 import { captureWorkflowException } from "../observability/sentry";
 
@@ -63,6 +64,22 @@ export const orchestrateTenantProvisioning = task({
   run: async (payload: unknown) => {
     try {
       const input = InputSchema.parse(payload);
+
+      // System-mode gate: checked at the very start, before any provider is touched. Same
+      // semantics as next-admin's lib/command-plane/killSwitch.ts (mirrored here, not imported --
+      // this package cannot import next-admin code at runtime); see src/lib/systemMode.ts header.
+      const supabaseUrl = process.env.LOBSTER_SUPABASE_URL || "";
+      const serviceRoleKey = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY || "";
+      if (!supabaseUrl || !serviceRoleKey) {
+        throw new Error(
+          "Missing LOBSTER_SUPABASE_URL or LOBSTER_SUPABASE_SERVICE_ROLE_KEY (required for the system-mode gate)",
+        );
+      }
+      const gate = await checkOrgSystemMode({ supabaseUrl, serviceRoleKey }, input.organizationId);
+      if (gate.blocks) {
+        throw new Error(`system_mode_blocks_change: ${gate.mode}`);
+      }
+
       const ctx = {
         organizationId: input.organizationId,
         workspaceId: input.workspaceId,

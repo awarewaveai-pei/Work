@@ -11,8 +11,17 @@
 //   - content/social-publish (lib/content/social-org.ts: the site's org, or the given org id)
 //   - lib/studio/wp-bridge-client.ts bridgePost -- every bridge write (wp_sites row on the bridge host)
 //   - build/provision-services, provision (hetzner_cloud dispatch only) (validated body)
-// Not gated yet (agency-os/TASKS.md, T18 follow-ups): build/runs + the workflows dispatcher, Printful
-// and Chatwoot writes. repairs/health only reads the mode for display.
+//   - build/runs (caller-supplied organizationId, checked before org resolution/creation)
+//   - the workflows package (lobster-factory/packages/workflows) re-checks at dispatch time via its
+//     own src/lib/systemMode.ts, which mirrors this module's semantics exactly (kept in lockstep by
+//     a shared fixture -- see lib/system-modes/__tests__/system-mode-fixture-parity.test.ts and
+//     packages/workflows/src/lib/systemMode.test.ts). It cannot import next-admin code at runtime,
+//     so it is a deliberate parallel implementation, not a wrapper around this function.
+//     dispatch-action-run.ts's dispatchRun gates each run's org right before triggering (a run
+//     queued while normal must not execute after the mode flips); orchestrate-tenant-provisioning
+//     gates at the start, before any provider call.
+// Not gated yet (agency-os/TASKS.md, T18 follow-ups): Printful and Chatwoot writes.
+// repairs/health only reads the mode for display.
 // lib/system-modes/__tests__/production-change-coverage.test.ts fails the build when a new SSH / WP
 // Bridge / WordPress-REST-writing file lacks this call or a justified allowlist entry.
 

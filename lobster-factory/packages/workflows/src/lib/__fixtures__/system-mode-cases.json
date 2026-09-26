@@ -1,0 +1,107 @@
+[
+  {
+    "name": "no rows at all -> normal (no mode configured is legal)",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [],
+    "dbError": false,
+    "expectedMode": "normal",
+    "expectedBlocks": false
+  },
+  {
+    "name": "global read_only blocks at risk high",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [{ "scope_type": "global", "scope_id": null, "mode": "read_only" }],
+    "dbError": false,
+    "expectedMode": "read_only",
+    "expectedBlocks": true
+  },
+  {
+    "name": "global maintenance blocks",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [{ "scope_type": "global", "scope_id": null, "mode": "maintenance" }],
+    "dbError": false,
+    "expectedMode": "maintenance",
+    "expectedBlocks": true
+  },
+  {
+    "name": "global emergency_stop blocks",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [{ "scope_type": "global", "scope_id": null, "mode": "emergency_stop" }],
+    "dbError": false,
+    "expectedMode": "emergency_stop",
+    "expectedBlocks": true
+  },
+  {
+    "name": "global normal allows",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [{ "scope_type": "global", "scope_id": null, "mode": "normal" }],
+    "dbError": false,
+    "expectedMode": "normal",
+    "expectedBlocks": false
+  },
+  {
+    "name": "db error -> unavailable, fail closed",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": null,
+    "dbError": true,
+    "expectedMode": "unavailable",
+    "expectedBlocks": true
+  },
+  {
+    "name": "unrecognized mode value -> unavailable, fail closed",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [{ "scope_type": "global", "scope_id": null, "mode": "lockdown" }],
+    "dbError": false,
+    "expectedMode": "unavailable",
+    "expectedBlocks": true
+  },
+  {
+    "name": "non-uuid organizationId -> unavailable without querying, fail closed",
+    "organizationId": "not-a-uuid",
+    "rows": [],
+    "dbError": false,
+    "expectedMode": "unavailable",
+    "expectedBlocks": true
+  },
+  {
+    "name": "organizationId null: only the global row applies",
+    "organizationId": null,
+    "rows": [{ "scope_type": "global", "scope_id": null, "mode": "read_only" }],
+    "dbError": false,
+    "expectedMode": "read_only",
+    "expectedBlocks": true
+  },
+  {
+    "name": "client row stricter than global: client emergency_stop wins over global normal",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [
+      { "scope_type": "global", "scope_id": null, "mode": "normal" },
+      { "scope_type": "client", "scope_id": "00000000-0000-4000-8000-000000000001", "mode": "emergency_stop" }
+    ],
+    "dbError": false,
+    "expectedMode": "emergency_stop",
+    "expectedBlocks": true
+  },
+  {
+    "name": "global row stricter than client: global maintenance wins over client read_only",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [
+      { "scope_type": "global", "scope_id": null, "mode": "maintenance" },
+      { "scope_type": "client", "scope_id": "00000000-0000-4000-8000-000000000001", "mode": "read_only" }
+    ],
+    "dbError": false,
+    "expectedMode": "maintenance",
+    "expectedBlocks": true
+  },
+  {
+    "name": "client and global both normal -> allowed",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "rows": [
+      { "scope_type": "global", "scope_id": null, "mode": "normal" },
+      { "scope_type": "client", "scope_id": "00000000-0000-4000-8000-000000000001", "mode": "normal" }
+    ],
+    "dbError": false,
+    "expectedMode": "normal",
+    "expectedBlocks": false
+  }
+]

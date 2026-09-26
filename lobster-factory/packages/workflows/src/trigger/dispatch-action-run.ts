@@ -13,6 +13,7 @@
 import { task, tasks, logger, schedules } from "@trigger.dev/sdk";
 import { z } from "zod";
 import { supabaseRestQuery, supabaseRestPatch } from "../db/supabase/supabaseRestInsert";
+import { checkOrgSystemMode } from "../lib/systemMode";
 import { captureWorkflowEvent } from "../observability/posthog";
 import { captureWorkflowException } from "../observability/sentry";
 
@@ -148,6 +149,20 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     logger.warn("dispatcher: unknown action_key, skipping", { runId: run.id, actionKey });
     await updateRunStatus(creds, run.id, "dispatch_failed", {
       error_summary: `unknown action_key: ${actionKey}`,
+    });
+    return;
+  }
+
+  // System-mode gate, re-checked here (not only at enqueue in NA/app/api/build/runs/route.ts):
+  // a run queued while the org's mode was "normal" must not execute after it flips to something
+  // else. A blocked run must NOT stay "pending" -- that would just execute the moment the mode
+  // flips back, silently ignoring the operator's intent. Finish it now, the same way every other
+  // guard clause above does.
+  const gate = await checkOrgSystemMode(creds, run.organization_id ?? null);
+  if (gate.blocks) {
+    logger.warn("dispatcher: run blocked by system mode", { runId: run.id, mode: gate.mode });
+    await updateRunStatus(creds, run.id, "dispatch_failed", {
+      error_summary: `system_mode_blocks_change: ${gate.mode}`,
     });
     return;
   }
