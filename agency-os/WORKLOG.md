@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-26（續31）site-watch slice 1 上線完成：§7 步 10d–10h（token、compose、自架 Trigger、金絲雀、開關演練、放量）
+- [10d] token 由操作者跑一行（主機 `openssl rand` 產生、寫 `.env`，值未經 Claude；scp＋ssh 兩步，先以無害腳本實測 PowerShell 傳送，發現 PS 在 stdin 尾加 `\r` → 腳本末行改 `exit 0`）；Claude 以 `safe-infra-patch.sh compose` 在 prod compose next-admin 加 `SITE_WATCH_ENABLED`／`SITE_WATCH_INGEST_TOKEN`／`R2_SITE_WATCH_BUCKET`（與 repo compose 同段）→ 9s healthy；printenv：false／lobster-site-watch／token present。`/api/internal/site-watch/due`：錯 token 401、無 token 401、正確 200 `enabled:false`。
+- [10e] `scripts/lobster-trigger-deploy.ps1` → 自架 Trigger（ks-aw-01，127.0.0.1:8030）version 20260926.1、14 tasks、`SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)`。Trigger MCP 未登入不用，改主機 REST（next-admin 的 `TRIGGER_ACCESS_TOKEN`，未印出）手動觸發 heartbeat → COMPLETED `{enabled:false, triggered:0, cleanup:{claimed:true…}}`；排程 `site-watch-heartbeat` `5 * * * *` active；watchdog PASS。
+- [10f 金絲雀] `site_watch_sync_targets()` = 2（awarewave-ops、soulful-expression，僅此兩個 org 有 site_url）；`site_watch_update_config` 關 soulful（v2）→ 開關 true（sw-switch：.env＋safe-infra-patch 重建）→ heartbeat `triggered:1` → site-watch-run COMPLETED `ran`、`baseline_created`、notifications []；results 1 列（200→/login、page errors 0）；R2 baseline.jpg 19KB；renderer `snapshot 200 up`；incidents 0。
+- [10g] 關 → heartbeat `enabled:false triggered:0`、renderer 2 分鐘內 0 snapshot → 開回 true。
+- [10h] soulful 開（v3）→ heartbeat `triggered:1` → run COMPLETED、200、page errors 0、baseline 968KB（1366×7654）；incidents 0。兩張 baseline 下載實看：登入頁、客戶首頁整頁長圖，皆真實渲染。卡片 API（sync key）`globallyEnabled/storageConfigured/target.enabled` 皆 true。
+- [現況] 每日 UTC 22:05（台北 06:05）巡檢 2 站；連 2 桶失敗 → incident＋Telegram（可用性 high）；visual 只開 low incident（D1）。D2（與 Uptime Kuma 重複告警）未回覆 = 照現況。關閉＝`SITE_WATCH_ENABLED=false`（`sw-switch` 同法）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch compose×4 success；Trigger runs run_cmui3wm11…（off）、run_cmui3yms5…（canary）、run_cmui4196…（off drill）、run_cmui42h9f…（rollout）COMPLETED；site_watch_results 2 列 ok；R2 2 物件；check-site-watch-health Overall PASS（a/b/c/d） | exit=0 | ms=600000
+- REVIEW_WAIVED: NA -- 依已審計畫（§7 步 9 codex 三輪）執行 prod 步驟，無新程式
+- BUGHUNT_WAIVED: NA -- 無程式改動；設定與資料變更皆以 printenv／DB／R2／watchdog 實測驗證
 ## 2026-09-26（續30）正式部署 b8c191698（CSRF、T13–T18、423 契約、site-watch slice 1 關閉狀態）＋ site-watch 10a 私有 bucket ＋ CSRF 利用稽核
 - [部署 10c] 主機 `sg-deploy.sh renderer next-admin`（setsid 背景；log `/root/lobster-phase1/logs/manual-deploy-20260926.out`）：33251522a → b8c191698（next-admin 18 個 commit）；測試關卡綠、兩容器 5s healthy、內建 smoke 全 OK（含 renderer render＋snapshot）；renderer egress `OUTPUT policy DROP` 仍在。
 - [同批上線的他人 commit] site-watch slice 1（容器無 `SITE_WATCH_ENABLED` = 停用，`lib/site-watch/config.ts:15-18`）；Auto-Repair SSH 釘 host key（prod 已有 `AUTO_REPAIR_{SG,EU}_SSH_HOST_KEY_SHA256`）；研究橋接預設凍結（無 `RESEARCH_BRIDGES_ENABLED` → 送去 COS／HCI 回 410，操作者決策①）；hosting-bridge gate。

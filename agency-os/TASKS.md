@@ -160,7 +160,8 @@
   - `✅ 完成` · `2026-09-24` · `2bbffe310`：設定 `host.profile`（`ks-aw-01-docker`｜`shared-ssh`），Soulful 指正式站容器；備份需 `Dump completed` 才算成功；實測 list／BackupOnly（還原到一次性 DB 290 表＝prod）。WORKLOG 2026-09-24。
 
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
-  - `🔴 現行` · `2026-09-21` · `等 site-watch 解除 DEPLOY_HOLD（SITE_WATCH_MASTER_PLAN §7 step 10c）`
+  - `🟡 等 E2E` · `2026-09-21` · `hold 已解除；剩真建站 E2E`
+  - **2026-09-26**：DEPLOY_HOLD 解除，next-admin `b8c191698` 已上 prod（含 `3a985c042` 新 route）；自架 Trigger 20260926.1。剩：真建站 E2E（WORKLOG 續30、31）。
   - **2026-09-24**：新 route（`3a985c042`）未上 prod（hold 中，未覆寫）；主機側已全就緒：gate、key、`.env`、compose（`printenv HOSTING_BRIDGE_SSH_*` 5/5）、7 站已遷自己的 DB 帳號。hold 期間 prod 舊碼讀不到 `SG_SSH_PRIVATE_KEY_B64` → 建站仍 503（與先前同為壞，只是 fail-closed 更早）。**下一步**：hold 解除部署後跑一次真 create-wp-site → 驗 run output `DB: … (own account; created)`、MainWP connected、`/staging/<slug>/` 200；然後刪 `.env.bak.20260924-hosting-bridge`。
   - **2026-09-23**：`SG_SSH_HOST` 預設已清空（容器 `SG_SSH_HOST=[]` → 程式預設 145.239.195.47:22 root，fail-closed，不再對退租主機送 handshake）；建站仍會失敗直到 bridge 身分決定。
   - **現在到哪**：REST key（server env）＋Unique Security ID＋child 安裝全上線（Trigger v20260921.3、next-admin 33251522a）；真 MainWP 以同一份碼註冊 staging 成功（WORKLOG 續100）。真建站 E2E run_cmuatt4cc02a021lnlhrm5drl → `provisioning_failed: Timed out while waiting for handshake`（SG_SSH_HOST=5.223.93.113）。
@@ -1281,7 +1282,7 @@
   - **症狀**：該腳本 `git worktree add` 任意 ref 後，把**本機** `apps/next-admin/node_modules` junction 進去，只 `Test-Path` 檢查目錄在不在。ref 新增依賴 → 誤報 `TS2307`（怪到 commit 頭上，其實是本機環境）；本機多裝的套件 → 該 ref 其實沒宣告也會過。
   - **修法方向**：比對 worktree 內與本機的 `package-lock.json`，不同就明確拒絕並指出漂移（可加 `-Install` 跑 `npm ci`）；**不要**只把錯誤訊息寫寬。改 exit 行為前先查所有呼叫點（它是 build gate）。
   - **參考**：本次 `sg-deploy.sh` 的同類修法與根因見 `WORKLOG.md` 2026-09-23（續102）。
-- [ ] **site-watch slice 1：本機完成（§7 步 1–9），等 prod 步 10 逐項 go-ahead**
+- [x] **site-watch slice 1：本機完成（§7 步 1–9），等 prod 步 10 逐項 go-ahead** → ✅ 2026-09-26 prod 步 10a–h 全完成（WORKLOG 續29、30、31）：0091、hold 解除、部署 b8c191698、私有 bucket、token＋compose、自架 Trigger 20260926.1、金絲雀→開關演練→放量；2 站每日 UTC 22:05 巡檢，watchdog PASS。D2 未回覆＝照現況。
   - `🟡 等操作者` · `2026-09-21 開；2026-09-23 本機收尾` · `操作者（prod a–h 每步 go-ahead）`
   - **現在到哪**：計畫正本 `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md` §0；本機各步根因與證據 → `WORKLOG.md` 2026-09-23（續109）。prod 未動、未 push（任何 session 的 push 只要動到 `packages/workflows` 就是 prod Trigger 部署；10d 前無害，見計畫 §7 10b2／e）。
   - **下一步**：§7 步 10 a → b → b2（解除 `DEPLOY_HOLD`）→ c → d（token 在此才寫）→ e → f 金絲雀 → g → h 放量，每項首行 `# CONFIRMED-HIGH-RISK`、逐項等操作者 go-ahead；待決 D2（§6.2，未回覆 = 照現況）。
