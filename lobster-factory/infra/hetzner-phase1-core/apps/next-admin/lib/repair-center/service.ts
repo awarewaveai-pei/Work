@@ -36,7 +36,7 @@ export async function startRepairFromIncident(args: {
    * and the default web "Approve" button MUST NOT pass this.
    */
   forceCriticalApproval?: boolean;
-}): Promise<{ ok: boolean; run?: RepairRunWithIncident; error?: string; details?: unknown }> {
+}): Promise<{ ok: boolean; run?: RepairRunWithIncident; error?: string; details?: unknown; blockedMode?: string }> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return { ok: false, error: "supabase_write_not_configured" };
 
@@ -52,7 +52,7 @@ export async function startRepairFromIncident(args: {
 
   const gate = await checkProductionChangeAllowed(supabase, i.organization_id ?? null);
   if (!gate.allowed) {
-    return { ok: false, error: "system_mode_blocks_repair", details: { mode: gate.mode } };
+    return { ok: false, error: "system_mode_blocks_repair", details: { mode: gate.mode }, blockedMode: gate.mode };
   }
 
   const policy = policyForIncident(i.source, i.severity);
@@ -372,7 +372,7 @@ export async function startRepairFromIncident(args: {
 export async function confirmCriticalRun(args: {
   runId: string;
   actor: string;
-}): Promise<{ ok: boolean; run?: RepairRunWithIncident; error?: string; details?: unknown }> {
+}): Promise<{ ok: boolean; run?: RepairRunWithIncident; error?: string; details?: unknown; blockedMode?: string }> {
   const run = await fetchRepairRunWithIncident(args.runId);
   if (!run) return { ok: false, error: "repair_run_not_found" };
   if (!run.needs_human_review) return { ok: false, error: "run_not_in_critical_review_hold" };

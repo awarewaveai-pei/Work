@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canApproveCommand, resolveOpsRole } from "@/lib/ops-role";
 import { confirmCriticalRun } from "@/lib/repair-center/service";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,5 +22,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const result = await confirmCriticalRun({ runId: id, actor: resolved.role });
+  if (result.blockedMode !== undefined) return blockedChangeResponse(result.blockedMode);
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });
 }

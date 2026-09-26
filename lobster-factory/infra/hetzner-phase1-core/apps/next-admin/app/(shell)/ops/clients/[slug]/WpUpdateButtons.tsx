@@ -6,6 +6,7 @@
 
 import { useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { blockedChangeMessage } from "@/lib/system-modes/blocked-change";
 
 type Wave = "wave1" | "wave2" | "wave3";
 interface WaveConfig {
@@ -62,7 +63,7 @@ export function WpUpdateButtons({ slug, waves }: Props) {
 
         if (resp.status === 423) {
           const info = (await resp.json().catch(() => ({}))) as { mode?: string };
-          appendLog(`⛔ 系統模式為 ${info.mode ?? "未知"}，已擋下更新；到 /ops/system-modes 切回 normal 後再試`);
+          appendLog(`⛔ ${blockedChangeMessage(info.mode)}`);
           setRunning(null);
           return;
         }

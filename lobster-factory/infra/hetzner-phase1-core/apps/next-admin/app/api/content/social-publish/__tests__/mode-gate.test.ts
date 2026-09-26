@@ -3,6 +3,7 @@
 // org keys the Postiz lookup and the post. checkProductionChangeAllowed itself is mocked (covered by
 // lib/system-modes/__tests__/production-change-gate.test.ts); this file only proves the wiring.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 vi.mock("@/lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "owner" }), canCreateAiImageJob: () => true }));
 
@@ -55,7 +56,7 @@ describe("POST /api/content/social-publish -- system-mode gate", () => {
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "maintenance" });
     const res = await POST(req(BODY));
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "maintenance" });
+    expect(await res.json()).toEqual(blockedChangeBody("maintenance"));
     expect(listIntegrations).not.toHaveBeenCalled();
   });
 

@@ -5,6 +5,7 @@ import {
   type WordPressPublishInput,
   type WordPressPublishFailure,
 } from "@/lib/content/publish/wordpress-core";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,8 @@ export async function POST(req: Request): Promise<Response> {
   // 失敗：保留原 route 的 text vs json 序列化（wire 欄位，見 wordpress-core 說明）。text 回應會讓
   // 單篇 UI 的 res.json() throw → 顯示「網路錯誤」，這是現行行為，刻意不改。
   const fail = result as WordPressPublishFailure;
+  if (fail.mode !== undefined) return blockedChangeResponse(fail.mode); // gate block: the shared 423 contract
   return fail.wire === "text"
     ? new NextResponse(fail.error, { status: fail.status })
-    : NextResponse.json({ ok: false, error: fail.error, ...(fail.mode ? { mode: fail.mode } : {}) }, { status: fail.status });
+    : NextResponse.json({ ok: false, error: fail.error }, { status: fail.status });
 }

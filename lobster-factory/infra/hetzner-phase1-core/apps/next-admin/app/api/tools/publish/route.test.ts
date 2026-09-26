@@ -2,6 +2,7 @@
 // 423 with the mode; any other bridge failure stays 502. Every heavy dependency is a stub: only the
 // create branch's response mapping is under test.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 vi.mock("../../../../lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "owner" }), canCreateAiImageJob: () => true }));
 vi.mock("../../../../lib/storage/r2", () => ({
@@ -41,7 +42,6 @@ const createWooProduct = vi.hoisted(() =>
   })),
 );
 vi.mock("../../../../lib/studio/wp-bridge-client", () => ({
-  BRIDGE_BLOCKED_ERROR: "system_mode_blocks_change",
   createWooProduct,
   isBridgeConfigured: () => true,
   listBridgeClients: () => [],
@@ -72,7 +72,7 @@ describe("POST /api/tools/publish action=create -- bridge gate result", () => {
     createWooProduct.mockResolvedValueOnce({ ok: false, error: "system_mode_blocks_change", blockedMode: "emergency_stop" });
     const res = await create();
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "emergency_stop" });
+    expect(await res.json()).toEqual(blockedChangeBody("emergency_stop"));
   });
 
   it("other bridge failure: 502", async () => {

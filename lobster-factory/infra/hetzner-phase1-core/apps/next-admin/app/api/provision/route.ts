@@ -11,6 +11,7 @@ import { resolveOpsRole } from "@/lib/ops-role";
 import { timingSafeEqual } from "@/lib/ops-inbox/verifyIngestToken";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -145,7 +146,7 @@ export async function POST(req: Request): Promise<Response> {
     if (db) {
       const { data: site, error } = await db.from("sites").select("organization_id").eq("id", siteId).maybeSingle();
       if (error) {
-        return NextResponse.json({ error: "system_mode_blocks_change", mode: "unavailable" }, { status: 423 });
+        return blockedChangeResponse("unavailable");
       }
       if (!site) return NextResponse.json({ ok: false, error: "site_not_found" }, { status: 404 });
       if (site.organization_id !== organizationId) {
@@ -154,7 +155,7 @@ export async function POST(req: Request): Promise<Response> {
     }
     const gate = await checkProductionChangeAllowed(db, organizationId);
     if (!gate.allowed) {
-      return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+      return blockedChangeResponse(gate.mode);
     }
     let triggerData: { id?: string } = {};
     try {

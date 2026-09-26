@@ -11,13 +11,14 @@
  */
 import { resolveWpSite, getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { OrgAccessError } from "@/lib/tenant-guard";
-import { isBridgeConfigured, bridgeBaseUrl, createPost, BRIDGE_BLOCKED_ERROR } from "@/lib/studio/wp-bridge-client";
+import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/studio/wp-bridge-client";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
 import { normalizeManyForWp } from "@/lib/studio/wp-web-image";
 import { isDesignsAsset } from "@/lib/storage/r2";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { BLOCKED_CHANGE_CODE } from "@/lib/system-modes/blocked-change";
 
 /** 發佈輸入。欄位型別刻意保持 unknown（與原 route body 同形），coercion 在 core 內統一做 → route 與積木共用同一套寬鬆解析。 */
 export interface WordPressPublishInput {
@@ -54,7 +55,7 @@ export interface WordPressPublishFailure {
    *  "text" = new NextResponse(error, {status})；"json" = NextResponse.json({ok:false,error},{status})。
    *  關鍵：單篇 UI 對 text 回應會 res.json() throw → 顯示「網路錯誤」（非真實訊息），這是現行行為，必須保留。 */
   wire: "text" | "json";
-  /** Only set when error === "system_mode_blocks_change" -- the system_modes value the gate read. */
+  /** Only set when the system-mode gate blocked the write (error = BLOCKED_CHANGE_CODE) -- the mode it read. */
   mode?: string;
 }
 
@@ -365,7 +366,7 @@ export async function publishToWordPress(
   // the standard-REST path, the signed /post on the Bridge path; bridgePost gates again on its own org).
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
   if (!gate.allowed) {
-    return { ok: false, status: 423, error: "system_mode_blocks_change", wire: "json", mode: gate.mode };
+    return { ok: false, status: 423, error: BLOCKED_CHANGE_CODE, wire: "json", mode: gate.mode };
   }
 
   // Resolve publish status. Bridge only supports "draft"/"publish" (no scheduled posts yet).
@@ -454,7 +455,7 @@ export async function publishToWordPress(
       // expose `.error`; cast to the error arm (same idiom as app/api/tools/publish/route.ts:292).
       const failed = result as { ok: false; error: string; blockedMode?: string };
       if (failed.blockedMode !== undefined) {
-        return { ok: false, status: 423, error: BRIDGE_BLOCKED_ERROR, wire: "json", mode: failed.blockedMode };
+        return { ok: false, status: 423, error: BLOCKED_CHANGE_CODE, wire: "json", mode: failed.blockedMode };
       }
       return { ok: false, status: 502, error: `bridge: ${failed.error}`, wire: "json" };
     }

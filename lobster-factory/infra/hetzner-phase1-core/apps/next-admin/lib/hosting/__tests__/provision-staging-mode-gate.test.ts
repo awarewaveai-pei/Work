@@ -5,6 +5,7 @@
 // Mocking style (ssh2/staging-admin-credential/storage/r2/supabase-server) mirrors
 // hosting-gate-contract.test.ts, which covers the gate script contract, not this gate.
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 const calls = vi.hoisted(() => [] as { command: string; stdin?: string }[]);
 const checkProductionChangeAllowed = vi.hoisted(() =>
@@ -98,7 +99,7 @@ describe("provision-staging -- system-mode gate (provision)", () => {
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop", reason: "system in emergency_stop" });
     const r = await post({ siteId: SITE_ID, siteName: "Acme", organizationId: ORG_A });
     expect(r.status).toBe(423);
-    expect(r.json).toEqual({ error: "system_mode_blocks_change", mode: "emergency_stop" });
+    expect(r.json).toEqual(blockedChangeBody("emergency_stop"));
     expect(calls).toHaveLength(0);
   });
 
@@ -132,7 +133,7 @@ describe("provision-staging -- system-mode gate (seed)", () => {
     const r = await post(SEED);
     expect(checkProductionChangeAllowed).toHaveBeenCalledWith(expect.anything(), ORG_A);
     expect(r.status).toBe(423);
-    expect(r.json).toEqual({ error: "system_mode_blocks_change", mode: "maintenance" });
+    expect(r.json).toEqual(blockedChangeBody("maintenance"));
     expect(calls).toHaveLength(0);
   });
 
@@ -159,7 +160,7 @@ describe("provision-staging -- system-mode gate (seed)", () => {
     }
     const r = await post(SEED);
     expect(r.status).toBe(423);
-    expect(r.json).toEqual({ error: "system_mode_blocks_change", mode: "unavailable" });
+    expect(r.json).toEqual(blockedChangeBody("unavailable"));
     expect(checkProductionChangeAllowed).not.toHaveBeenCalled();
     expect(calls).toHaveLength(0);
   });

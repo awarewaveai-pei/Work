@@ -24,6 +24,7 @@ import { generateTarotImage } from "../../../../../lib/tarot/image-gen";
 import { isR2Configured, buildWebImageKey, parseImageDataUrl, putDesignObject } from "../../../../../lib/storage/r2";
 import { generateStagingAdminPassword, vaultStagingAdminPassword } from "../../../../../lib/hosting/staging-admin-credential";
 import { checkProductionChangeAllowed } from "../../../../../lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "../../../../../lib/system-modes/blocked-change";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -315,7 +316,7 @@ function isUuid(v: unknown): v is string {
   return typeof v === "string" && SITE_ID_RE.test(v);
 }
 
-const unreadableScope = () => NextResponse.json({ error: "system_mode_blocks_change", mode: "unavailable" }, { status: 423 });
+const unreadableScope = () => blockedChangeResponse("unavailable");
 
 /**
  * Which org a call changes. Provision: body.organizationId, required (every caller sends a uuid:
@@ -395,7 +396,7 @@ export async function POST(request: Request) {
   if ("response" in scope) return scope.response;
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), scope.organizationId);
   if (!gate.allowed) {
-    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+    return blockedChangeResponse(gate.mode);
   }
 
   // Seed-only mode (separate short call from create-wp-site after provision) — see handleSeedMode.

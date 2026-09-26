@@ -355,6 +355,7 @@ interface BulkRow {
   error: string;
   pubStatus: "idle" | "publishing" | "done" | "error";
   pubUrl: string;
+  pubError?: string;
   seoTitle?: string;
   metaDesc?: string;
   focusKeyword?: string;
@@ -757,12 +758,17 @@ export default function ContentStudio() {
   const [postizPushStatus,   setPostizPushStatus]   = useState<"idle" | "pushing" | "done" | "error">("idle");
   const [postizPushResults,  setPostizPushResults]  = useState<Array<{ platform: string; status: "ok" | "error"; error?: string }>>([]);
   const [postizShowConfirm,  setPostizShowConfirm]  = useState(false);
+  const [postizPushError,    setPostizPushError]    = useState("");
 
   // Channels belong to the selected site's org: another site = another org's accounts, so a loaded
   // list, the selection and the last push result are all stale.
+  // A push still in flight when the site changes resolves into the new site's panel -- it compares
+  // the site it started for against this ref and drops its result.
+  const postizSiteRef = useRef(selectedSiteId);
   useEffect(() => {
+    postizSiteRef.current = selectedSiteId;
     setPostizChannels([]); setPostizSelected(new Set()); setPostizChError("");
-    setPostizPushStatus("idle"); setPostizPushResults([]); setPostizShowConfirm(false);
+    setPostizPushStatus("idle"); setPostizPushResults([]); setPostizShowConfirm(false); setPostizPushError("");
   }, [selectedSiteId]);
 
   // Mark copy stale when distribution media type changes after copy already generated
@@ -1879,6 +1885,7 @@ export default function ContentStudio() {
 
     setPostizPushStatus("pushing");
     setPostizShowConfirm(false);
+    const pushSite = selectedSiteId;
     try {
       const res = await fetch("/api/content/social-publish", {
         method: "POST",
@@ -1894,20 +1901,28 @@ export default function ContentStudio() {
           confirmPublishNow: postizMode === "now" && confirmed ? true : undefined,
         }),
       });
-      const json = await res.json() as {
+      // Text first: some refusals are plain text (publish-now denied, Postiz not configured).
+      const text = await res.text();
+      let json: {
         ok: boolean;
+        error?: string;
         results?: Array<{ platform: string; status: "ok" | "error"; error?: string }>;
         skipped?: Array<{ platform: string; status: string; error: string }>;
       };
+      try { json = JSON.parse(text); } catch { json = { ok: false, error: text.trim().slice(0, 200) }; }
+      if (postizSiteRef.current !== pushSite) return;
       if (json.ok) {
         setPostizPushStatus("done");
         const skippedAsResults = (json.skipped ?? []).map(s => ({ platform: s.platform, status: "error" as const, error: s.error }));
         setPostizPushResults([...(json.results ?? []), ...skippedAsResults]);
       } else {
         setPostizPushStatus("error");
+        setPostizPushError(json.error || `HTTP ${res.status}`);
       }
     } catch {
+      if (postizSiteRef.current !== pushSite) return;
       setPostizPushStatus("error");
+      setPostizPushError("");
     }
   }
 
@@ -2070,11 +2085,11 @@ export default function ContentStudio() {
           tags:            tags.length ? tags : undefined,
         }),
       });
-      const json = await res.json() as { ok: boolean; edit_url?: string };
-      if (json.ok) setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "done", pubUrl: json.edit_url ?? "" } : r));
-      else         setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "error" } : r));
+      const json = await res.json().catch(() => ({ ok: false })) as { ok: boolean; edit_url?: string; error?: string };
+      if (json.ok) setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "done", pubUrl: json.edit_url ?? "", pubError: undefined } : r));
+      else         setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "error", pubError: json.error || `HTTP ${res.status}` } : r));
     } catch {
-      setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "error" } : r));
+      setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "error", pubError: "連線失敗" } : r));
     }
   }
 
@@ -3856,7 +3871,7 @@ export default function ContentStudio() {
                             </div>
                           )}
                           {postizPushStatus === "error" && (
-                            <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6 }}>推送失敗，請重試</div>
+                            <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6 }}>推送失敗：{postizPushError || "連線失敗，請重試"}</div>
                           )}
                         </>
                       )}
@@ -4463,7 +4478,7 @@ export default function ContentStudio() {
                             {row.pubStatus === "done" && row.pubUrl && (
                               <a href={row.pubUrl} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#22c55e" }}>✓ 草稿 ↗</a>
                             )}
-                            {row.pubStatus === "error" && <span style={{ fontSize: "11px", color: "var(--color-error, #ef4444)" }}>推送失敗</span>}
+                            {row.pubStatus === "error" && <span style={{ fontSize: "11px", color: "var(--color-error, #ef4444)" }}>推送失敗{row.pubError ? `：${row.pubError}` : ""}</span>}
                           </>
                         )}
                       </div>

@@ -2,6 +2,7 @@
 // validation, before any WP request. checkProductionChangeAllowed itself is mocked (covered by
 // lib/system-modes/__tests__/production-change-gate.test.ts); this file only proves the wiring.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 vi.mock("@/lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "owner" }), canCreateAiImageJob: () => true }));
 
@@ -45,7 +46,7 @@ describe("PATCH /api/content/wp-post -- system-mode gate", () => {
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop" });
     const res = await PATCH(req("PATCH", { siteId: "1", postId: 5, title: "x" }));
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "emergency_stop" });
+    expect(await res.json()).toEqual(blockedChangeBody("emergency_stop"));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -73,7 +74,7 @@ describe("DELETE /api/content/wp-post -- system-mode gate", () => {
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "read_only" });
     const res = await DELETE(req("DELETE", { siteId: "1", postId: 5 }));
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "read_only" });
+    expect(await res.json()).toEqual(blockedChangeBody("read_only"));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

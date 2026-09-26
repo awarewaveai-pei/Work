@@ -4,6 +4,7 @@ import { resolveWpSite } from "@/lib/content/wp-sites";
 import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 import {
   ensureDeliveryReceipt,
   claimDeliveryReceipt,
@@ -57,7 +58,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), resolved.site.organizationId);
   if (!gate.allowed) {
-    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+    return blockedChangeResponse(gate.mode);
   }
 
   let receipt: DeliveryReceipt | null = null;

@@ -4,6 +4,7 @@ import { resolveWpSite } from "@/lib/content/wp-sites";
 import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export async function PATCH(req: Request): Promise<Response> {
 
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.organizationId);
   if (!gate.allowed) {
-    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+    return blockedChangeResponse(gate.mode);
   }
 
   const endpoint = `${site.url}/wp-json/wp/v2/posts/${postId}`;
@@ -114,7 +115,7 @@ export async function DELETE(req: Request): Promise<Response> {
 
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.organizationId);
   if (!gate.allowed) {
-    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+    return blockedChangeResponse(gate.mode);
   }
 
   let res: Response;

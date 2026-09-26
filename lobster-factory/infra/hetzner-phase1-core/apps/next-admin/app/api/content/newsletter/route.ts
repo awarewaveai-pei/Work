@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { isBridgeConfigured, createNewsletter, BRIDGE_BLOCKED_ERROR } from "@/lib/studio/wp-bridge-client";
+import { isBridgeConfigured, createNewsletter } from "@/lib/studio/wp-bridge-client";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -212,7 +213,7 @@ export async function POST(req: Request): Promise<Response> {
     // tsconfig strict:false → `!r.ok` does not narrow to the error arm; cast (same idiom as publish route).
     const failed = r as { ok: false; error: string; blockedMode?: string };
     if (failed.blockedMode !== undefined) {
-      return NextResponse.json({ error: BRIDGE_BLOCKED_ERROR, mode: failed.blockedMode }, { status: 423 });
+      return blockedChangeResponse(failed.blockedMode);
     }
     return NextResponse.json({ ok: false, error: failed.error }, { status: 502 });
   }

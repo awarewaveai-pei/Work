@@ -5,6 +5,7 @@
 // checkProductionChangeAllowed itself is mocked (covered by
 // lib/system-modes/__tests__/production-change-gate.test.ts); this file only proves the wiring.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 vi.mock("@/lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "owner" }) }));
 vi.mock("@/lib/ops-inbox/verifyIngestToken", () => ({ timingSafeEqual: () => false }));
@@ -65,7 +66,7 @@ describe("POST /api/provision -- system-mode gate (hetzner_cloud dispatch only)"
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop" });
     const res = await POST(req(BODY));
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "emergency_stop" });
+    expect(await res.json()).toEqual(blockedChangeBody("emergency_stop"));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -96,7 +97,7 @@ describe("POST /api/provision -- system-mode gate (hetzner_cloud dispatch only)"
     db.error = { message: "boom" };
     const res = await POST(req(BODY));
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "unavailable" });
+    expect(await res.json()).toEqual(blockedChangeBody("unavailable"));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

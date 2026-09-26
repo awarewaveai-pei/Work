@@ -25,15 +25,14 @@
 import { createHash, createPrivateKey, randomUUID, sign as edSign, type KeyObject } from "node:crypto";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { BLOCKED_CHANGE_CODE } from "@/lib/system-modes/blocked-change";
 
 const REST_NAMESPACE = "/aware-wave-bridge/v1";
 // RFC 8410 PKCS#8 prefix for an Ed25519 private key; append the 32-byte seed.
 const PKCS8_ED25519_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 
-/** bridgePost's error when the system-mode gate blocks the write. Callers tell it from a real bridge
- *  failure by `blockedMode` (set only by the gate, never from plugin output) and answer 423, not 502. */
-export const BRIDGE_BLOCKED_ERROR = "system_mode_blocks_change";
-
+/** `blockedMode` is set only when the system-mode gate blocks the write (never from plugin output):
+ *  callers answer the shared 423 (lib/system-modes/blocked-change.ts), not a 502 bridge failure. */
 export type BridgeResult<T> = { ok: true; value: T } | { ok: false; error: string; blockedMode?: string };
 
 type WriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>>;
@@ -169,10 +168,10 @@ export async function bridgePost<T>(
   // the bridge site (bridgeSiteOrg). No DB client -> org null -> the gate answers unavailable.
   const db = getSupabaseWriteClient();
   const orgId = db ? await bridgeSiteOrg(db, config.baseUrl) : null;
-  if (orgId === undefined) return { ok: false, error: BRIDGE_BLOCKED_ERROR, blockedMode: "unavailable" };
+  if (orgId === undefined) return { ok: false, error: BLOCKED_CHANGE_CODE, blockedMode: "unavailable" };
   const gate = await checkProductionChangeAllowed(db, orgId);
   if (!gate.allowed) {
-    return { ok: false, error: BRIDGE_BLOCKED_ERROR, blockedMode: gate.mode };
+    return { ok: false, error: BLOCKED_CHANGE_CODE, blockedMode: gate.mode };
   }
 
   const fullPath = `${REST_NAMESPACE}${path}`;

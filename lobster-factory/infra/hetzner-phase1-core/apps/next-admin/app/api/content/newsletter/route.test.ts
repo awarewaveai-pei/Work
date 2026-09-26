@@ -1,6 +1,7 @@
 // T18: the newsletter write goes through bridgePost (gated there). A gate block must answer 423 with the
 // mode; any other bridge failure stays 502.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 vi.mock("@/lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "owner" }), canCreateAiImageJob: () => true }));
 
@@ -11,7 +12,6 @@ const createNewsletter = vi.hoisted(() =>
   })),
 );
 vi.mock("@/lib/studio/wp-bridge-client", () => ({
-  BRIDGE_BLOCKED_ERROR: "system_mode_blocks_change",
   isBridgeConfigured: () => true,
   createNewsletter,
 }));
@@ -28,7 +28,7 @@ describe("POST /api/content/newsletter -- bridge gate result", () => {
     createNewsletter.mockResolvedValueOnce({ ok: false, error: "system_mode_blocks_change", blockedMode: "maintenance" });
     const res = await post();
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "maintenance" });
+    expect(await res.json()).toEqual(blockedChangeBody("maintenance"));
   });
 
   it("other bridge failure: 502", async () => {

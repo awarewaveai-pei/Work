@@ -1,7 +1,7 @@
 // The one gate for server paths that change production: a gated path runs only while the org's (and
 // global's) system mode is "normal"; an unreadable mode fails closed -- same contract as
-// lib/command-plane/killSwitch.ts, which does the DB read. Blocked callers answer HTTP 423
-// {error:"system_mode_blocks_change", mode}.
+// lib/command-plane/killSwitch.ts, which does the DB read. Blocked callers answer the 423 built by
+// lib/system-modes/blocked-change.ts.
 //
 // Gated (org in parentheses):
 //   - repair-center service.ts startRepairFromIncident, remediations/engine.ts tryRemediate (incident)

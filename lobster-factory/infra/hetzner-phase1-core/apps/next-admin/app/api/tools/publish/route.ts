@@ -7,7 +7,8 @@ import { toProductImage } from "../../../../lib/studio/to-product-image";
 import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
-import { createWooProduct, isBridgeConfigured, listBridgeClients, BRIDGE_BLOCKED_ERROR } from "../../../../lib/studio/wp-bridge-client";
+import { createWooProduct, isBridgeConfigured, listBridgeClients } from "../../../../lib/studio/wp-bridge-client";
+import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import { podModelById } from "../../../../lib/studio/pod-catalog-config";
 import { fetchProductTierPricing, fetchProductSizeGuide } from "../../../../lib/studio/printful-catalog";
@@ -409,7 +410,7 @@ export async function POST(request: Request) {
     if (!r.ok) {
       const failed = r as { ok: false; error: string; blockedMode?: string };
       if (failed.blockedMode !== undefined) {
-        return NextResponse.json({ error: BRIDGE_BLOCKED_ERROR, mode: failed.blockedMode }, { status: 423 });
+        return blockedChangeResponse(failed.blockedMode);
       }
       return NextResponse.json({ ok: false, error: failed.error }, { status: 502 });
     }

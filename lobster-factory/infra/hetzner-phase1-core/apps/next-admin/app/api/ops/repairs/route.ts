@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, canModifyIncidentStatus, resolveOpsRole } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { startRepairFromIncident } from "@/lib/repair-center/service";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,5 +100,6 @@ export async function POST(request: Request) {
     actor: resolved.role,
     source: "web",
   });
+  if (result.blockedMode !== undefined) return blockedChangeResponse(result.blockedMode);
   return NextResponse.json(result, { status: result.ok ? 200 : 409 });
 }

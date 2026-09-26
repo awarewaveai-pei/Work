@@ -35,6 +35,8 @@ export interface RemediationOutcome {
   ok?: boolean;
   key?: string;
   reason?: string;
+  /** Set only when the system-mode gate blocked the remediation: the mode it read. */
+  blockedMode?: string;
   action_run_id?: string | null;
   steps?: Array<{ step: string; ok: boolean; detail: string }>;
 }
@@ -98,7 +100,7 @@ export async function tryRemediate(
     const organizationId = await resolveOrgId(supabase, incident);
     const gate = await checkProductionChangeAllowed(supabase, organizationId);
     if (!gate.allowed) {
-      return { attempted: false, key: remediation.key, reason: "system_mode_blocks_remediation" };
+      return { attempted: false, key: remediation.key, reason: "system_mode_blocks_remediation", blockedMode: gate.mode };
     }
 
     if (await inCooldown(supabase, incident, remediation.key)) {

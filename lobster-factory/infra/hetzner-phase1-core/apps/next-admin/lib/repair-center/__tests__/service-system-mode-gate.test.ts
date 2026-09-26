@@ -58,7 +58,7 @@ describe("startRepairFromIncident -- system-mode gate", () => {
 
   it("blocks with system_mode_blocks_repair carrying the gate's mode, and never touches repair_runs", async () => {
     const result = await startRepairFromIncident({ incidentId: incidentRow.id, actor: "tester", source: "web" });
-    expect(result).toEqual({ ok: false, error: "system_mode_blocks_repair", details: { mode: "unavailable" } });
+    expect(result).toEqual({ ok: false, error: "system_mode_blocks_repair", details: { mode: "unavailable" }, blockedMode: "unavailable" });
     expect(fromCalls).not.toContain("repair_runs");
   });
 

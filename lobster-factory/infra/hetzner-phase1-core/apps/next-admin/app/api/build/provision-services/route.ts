@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
 
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), input.organizationId);
   if (!gate.allowed) {
-    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+    return blockedChangeResponse(gate.mode);
   }
 
   const secret = process.env.TRIGGER_SECRET_KEY?.trim();

@@ -10,6 +10,7 @@
 
 import type { CommandHandler } from "../commandRouter";
 import { startRepairFromIncident } from "@/lib/repair-center/service";
+import { blockedChangeMessage } from "@/lib/system-modes/blocked-change";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,6 +39,9 @@ export const approveRepairHandler: CommandHandler = async (request) => {
   });
 
   if (!result.ok) {
+    if (result.blockedMode !== undefined) {
+      return { text: `⛔ ${blockedChangeMessage(result.blockedMode)}`, error: result.error ?? "system_mode_blocks_repair" };
+    }
     return {
       text: `❌ 核准失敗：${result.error ?? "unknown"}${result.details ? `\n${JSON.stringify(result.details).slice(0, 300)}` : ""}`,
       error: result.error ?? "approve_failed",

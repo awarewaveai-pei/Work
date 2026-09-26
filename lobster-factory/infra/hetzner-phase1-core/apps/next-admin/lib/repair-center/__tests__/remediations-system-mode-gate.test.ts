@@ -84,7 +84,7 @@ describe("tryRemediate -- system-mode gate blocks both auto and manual", () => {
   it("auto mode: blocked with system_mode_blocks_remediation, precheck/execute/healthcheck never called", async () => {
     process.env.AUTO_REMEDIATE_ENABLED = "true";
     const outcome = await tryRemediate({} as SupabaseClient, baseIncident(), { mode: "auto", actor: "system" });
-    expect(outcome).toEqual({ attempted: false, key: "fake-remediation", reason: "system_mode_blocks_remediation" });
+    expect(outcome).toEqual({ attempted: false, key: "fake-remediation", reason: "system_mode_blocks_remediation", blockedMode: "emergency_stop" });
     expect(precheck).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
     expect(healthcheck).not.toHaveBeenCalled();
@@ -92,7 +92,7 @@ describe("tryRemediate -- system-mode gate blocks both auto and manual", () => {
 
   it("manual mode: blocked the same way -- a human clicking Remediate does not bypass the gate", async () => {
     const outcome = await tryRemediate({} as SupabaseClient, baseIncident(), { mode: "manual", actor: "ops-console:owner" });
-    expect(outcome).toEqual({ attempted: false, key: "fake-remediation", reason: "system_mode_blocks_remediation" });
+    expect(outcome).toEqual({ attempted: false, key: "fake-remediation", reason: "system_mode_blocks_remediation", blockedMode: "emergency_stop" });
     expect(precheck).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
   });

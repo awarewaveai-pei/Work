@@ -333,7 +333,7 @@ async function runLocalDirectBuild(args: {
 
     if (!provisionResponse.ok) {
       return fail(
-        String(provision.error ?? "provision_failed"),
+        String(provision.code ?? provision.error ?? "provision_failed"),
         String(provision.detail ?? provision.error ?? `HTTP ${provisionResponse.status}`),
         provisionResponse.status,
         provision,

@@ -8,6 +8,7 @@ import { canApproveCommand, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { Incident } from "@/lib/ops-inbox/types";
 import { tryRemediate } from "@/lib/repair-center/remediations/engine";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
     actor: `ops-console:${resolved.role}`,
   });
 
+  if (outcome.blockedMode !== undefined) return blockedChangeResponse(outcome.blockedMode);
   return NextResponse.json(
     { ok: outcome.attempted ? outcome.ok === true : false, outcome },
     { status: 200 },

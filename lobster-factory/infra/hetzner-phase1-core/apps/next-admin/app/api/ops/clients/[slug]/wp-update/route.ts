@@ -23,6 +23,7 @@ import {
 import { timingSafeEqual } from "../../../../../../lib/ops-inbox/verifyIngestToken";
 import { beginOpsActionRun, finishOpsActionRun } from "../../../../../../lib/ops-actions/record";
 import { checkProductionChangeAllowed } from "../../../../../../lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "../../../../../../lib/system-modes/blocked-change";
 import type { ClientConfig } from "../../../../../../app/api/ops/clients/route";
 
 export const dynamic = "force-dynamic";
@@ -198,7 +199,7 @@ export async function POST(
   // in-flight safety net, same as the repair center's tryRemediate does not re-check per step).
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), org.id);
   if (!gate.allowed) {
-    return Response.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+    return blockedChangeResponse(gate.mode);
   }
 
   const meta = (org.metadata as Record<string, unknown>) ?? {};

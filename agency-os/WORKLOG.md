@@ -1,4 +1,21 @@
 ﻿# Worklog
+## 2026-09-26（續27）系統模式擋下的變更只有一個 423 定義，每個出口（HTTP、聊天、畫面）都顯示可讀原因（未部署）
+- [根因] T16–T18 在 13 處各自手寫 `{error:"system_mode_blocks_change", mode}`（content/publish 多一個 ok:false，形狀不一）；修復中心更另外回 409 `system_mode_blocks_repair`、remediate 回 200＋reason。UI 多半直接顯示 `json.error` → 畫面出現機器碼（RepairActions「已阻擋：system_mode_blocks_repair」）；ContentStudio 社群推送固定「推送失敗，請重試」、批次發佈只顯示「推送失敗」；WpUpdateButtons 自拼文字。T18 critic s1／s3＋本輪 critic m1。
+- [修]
+  - 新增 `lib/system-modes/blocked-change.ts`：423 `{ok:false, error:<可讀訊息>, code:"system_mode_blocks_change", mode}`；`error` 可讀（各 UI 本來就顯示它），機器看 `code`／`mode`；不 import next/server，前端共用訊息。T16–T18 皆未部署，改契約無相容負擔；伺服器端消費者（onboarding/trigger-build、build/runs、workflows httpJsonStagingAdapter）只把 error／message 當文字。
+  - 13 處 route 改用 `blockedChangeResponse`；content/publish 把帶 mode 的 wordpress-core 失敗轉成同一契約；bridge、wordpress-core 改 import `BLOCKED_CHANGE_CODE`，移除 `BRIDGE_BLOCKED_ERROR`。
+  - 修復中心：`startRepairFromIncident`／`tryRemediate` 被擋時多帶 `blockedMode`（只有 gate 會設）；`/api/ops/repairs`（原 409）、confirm-critical（原 400）、remediate（原 200）→ 共用 423；Slack、Telegram `/approve_repair` 顯示 `blockedChangeMessage`。內部 reason 碼保留（稽核用）。
+  - UI：ContentStudio 社群推送先讀文字再解析（純文字拒絕如 Postiz 未設定也顯示原因）、推送中切站則丟棄舊結果（原有 race）、批次發佈每列保留原因；WpUpdateButtons 用 `blockedChangeMessage`。其餘 UI 本來就顯示 json.error。
+  - build/runs 失敗碼欄位改取 `provision.code ?? provision.error`（否則可讀句子會落進 code 欄）。
+  - 結構測試 `blocked-change.test.ts`：字面值釘死契約；機器碼只准在 blocked-change.ts；`status: 423` 只准在 blocked-change.ts 與 wordpress-core（內部失敗物件）。
+- [critic Quick：warn 0c/0M/1m/4s] m1 修復中心不在契約內、s1 423 規則未受測、s2 純文字錯誤被吞、s3 切站 race、s4 build/runs code 欄 → 全修。修復中心路徑事前檢查：dogfood-auto-repair HealthOnly 10/10 不變量通過（1 warn github_app_status cosmetic）；未動 C1–C5 回歸面。
+- [文件] `APP_AWARE_WAVE_COMPLETE_REFERENCE.md` 423 回應格式一句。
+- [無專屬測試] ContentStudio 三處（面板須先產文）、Slack 路徑（簽章驗證）；以 tsc＋既有測試＋程式閱讀驗證。
+- 未部署：隨下次 sg-deploy。rollback＝revert 本 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 0；npm test 199 files 1844 passed／13 skipped；14 組突變各紅（訊息改字、body 少 code、wp-post 手寫 423、content/publish 不轉、WpUpdateButtons 自拼、newsletter／provision-staging 舊 body、repairs 409、confirm-critical 400、remediate 200、engine／service 不標 blockedMode、Telegram 顯示機器碼、route 手寫 status 423）→ 還原全綠 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0M/1m（＋4s，全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=system_mode_blocks_change|BRIDGE_BLOCKED_ERROR|status === 423|system_mode_blocks_repair | hits=程式內機器碼只剩 blocked-change.ts（測試強制）；BRIDGE_BLOCKED_ERROR 0；UI 讀 423 只有 WpUpdateButtons；修復中心內部 reason 碼 2（service、engine，出口已轉契約）；文件 1 處已改
+- ORACLE_WAIVED: Codex 正在本機跑 PI-a 14R，不同時佔用；以 critic＋14 組突變取代
 ## 2026-09-26（續26）合併雲端 T18：內容寫入／WP Bridge／佈建派送過 production-change gate＋本機修兩輪 critic 發現（未部署）
 - [來源] `claude/cc-t18-content-write-gate` 915fb197d（雲端）；本機重跑後 critic warn 0c/5M/7m/4s，修完再審一輪 warn 0c/1M/3m/2s，兩輪全修才合併。
 - [T18 本體] 把關加在：wordpress-core `publishToWordPress`、content/wp-post PATCH＋DELETE、video/embed-to-wp、social-publish、wp-bridge-client `bridgePost`（所有 bridge 寫入唯一出口）、build/provision-services、provision（僅 hetzner_cloud 派送分支）；結構測試 `lib/system-modes/__tests__/production-change-coverage.test.ts`。

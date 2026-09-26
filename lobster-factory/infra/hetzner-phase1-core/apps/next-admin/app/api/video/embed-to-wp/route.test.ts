@@ -3,6 +3,7 @@
 // checkProductionChangeAllowed itself is mocked (covered by
 // lib/system-modes/__tests__/production-change-gate.test.ts); this file only proves the wiring.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 vi.mock("@/lib/ops-role", () => ({ resolveOpsRole: () => ({ role: "owner" }), canCreateAiImageJob: () => true }));
 
@@ -55,7 +56,7 @@ describe("POST /api/video/embed-to-wp -- system-mode gate", () => {
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop" });
     const res = await POST(req(BODY));
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "emergency_stop" });
+    expect(await res.json()).toEqual(blockedChangeBody("emergency_stop"));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

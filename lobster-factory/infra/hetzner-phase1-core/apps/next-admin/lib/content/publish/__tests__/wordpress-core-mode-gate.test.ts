@@ -36,7 +36,6 @@ const bridge = vi.hoisted(() => ({
   createPost: vi.fn(async (): Promise<{ ok: boolean; error?: string; blockedMode?: string; value?: unknown }> => ({ ok: true, value: {} })),
 }));
 vi.mock("@/lib/studio/wp-bridge-client", () => ({
-  BRIDGE_BLOCKED_ERROR: "system_mode_blocks_change",
   isBridgeConfigured: () => bridge.configured,
   bridgeBaseUrl: () => (bridge.configured ? "https://acme.example" : null),
   createPost: bridge.createPost,

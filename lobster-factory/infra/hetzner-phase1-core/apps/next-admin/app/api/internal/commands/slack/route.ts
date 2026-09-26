@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { startRepairFromIncident } from "@/lib/repair-center/service";
+import { blockedChangeMessage } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,9 +69,11 @@ export async function POST(request: Request) {
 
   if (!result.ok) {
     const errorText =
-      result.error === "backup_failed"
-        ? "Pre-repair backup failed. No GitHub issue or PR was created."
-        : `Repair start failed: ${result.error ?? "unknown"}`;
+      result.blockedMode !== undefined
+        ? blockedChangeMessage(result.blockedMode)
+        : result.error === "backup_failed"
+          ? "Pre-repair backup failed. No GitHub issue or PR was created."
+          : `Repair start failed: ${result.error ?? "unknown"}`;
     return NextResponse.json({
       response_type: "ephemeral",
       text: errorText,

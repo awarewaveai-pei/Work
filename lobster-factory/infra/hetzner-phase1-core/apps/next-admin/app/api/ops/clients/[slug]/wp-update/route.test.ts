@@ -5,6 +5,7 @@
 // connection attempt was made, not to run a real WP-CLI update.
 import type { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
 
 const checkProductionChangeAllowed = vi.hoisted(() =>
   vi.fn(async (_client: unknown, _org: string | null): Promise<{ allowed: boolean; mode: string; reason?: string }> => ({
@@ -96,7 +97,7 @@ describe("POST /api/ops/clients/[slug]/wp-update -- system-mode gate", () => {
     checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop", reason: "system in emergency_stop" });
     const res = await post();
     expect(res.status).toBe(423);
-    expect(await res.json()).toEqual({ error: "system_mode_blocks_change", mode: "emergency_stop" });
+    expect(await res.json()).toEqual(blockedChangeBody("emergency_stop"));
     expect(sshConnect).not.toHaveBeenCalled();
     expect(beginOpsActionRun).not.toHaveBeenCalled();
   });

@@ -3,6 +3,7 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { resolveSocialOrg } from "@/lib/content/social-org";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 import {
   getPostizConfig,
   listIntegrations,
@@ -109,7 +110,7 @@ export async function POST(req: Request): Promise<Response> {
   // All input validated (incl. org access above) -- gate before any outbound Postiz call.
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), orgId);
   if (!gate.allowed) {
-    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+    return blockedChangeResponse(gate.mode);
   }
 
   try {
