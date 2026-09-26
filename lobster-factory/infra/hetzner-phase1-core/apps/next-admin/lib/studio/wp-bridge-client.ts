@@ -50,7 +50,7 @@ function hostOf(url: string): string | null {
  * wordpress-core gates on too. No row -> null (global mode only). Unreadable, or rows on that host
  * naming different orgs -> undefined: the org cannot be told, so the caller blocks.
  */
-async function bridgeSiteOrg(db: WriteClient, baseUrl: string): Promise<string | null | undefined> {
+export async function bridgeSiteOrg(db: WriteClient, baseUrl: string): Promise<string | null | undefined> {
   const host = hostOf(baseUrl);
   if (!host) return undefined;
   const { data, error } = await db.from("wp_sites").select("url, organization_id").eq("active", true);

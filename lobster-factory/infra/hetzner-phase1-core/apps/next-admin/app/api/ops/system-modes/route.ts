@@ -5,9 +5,10 @@
 // Source-of-truth: public.system_modes (global scope; one active row per scope).
 // Phase 2c (2026-05-08).
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { canChangeSystemMode, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseServerClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { drainPodOrderInbox, getPodOrderInboxStats } from "../../../../lib/studio/pod-order-inbox";
 
 const VALID_MODES = ["normal", "maintenance", "read_only", "emergency_stop"] as const;
 type Mode = (typeof VALID_MODES)[number];
@@ -27,6 +28,10 @@ export async function GET(request: Request) {
     .is("scope_id", null)
     .single();
 
+  // Paid Woo orders waiting on a mode or a retry (lib/studio/pod-order-inbox.ts); also read by the AO
+  // smoke check (scripts/check-smoke-tests.ps1).
+  const podOrderInbox = await getPodOrderInboxStats(supabase);
+
   if (error || !data) {
     // No row yet — surface as default 'normal'.
     return NextResponse.json({
@@ -34,6 +39,7 @@ export async function GET(request: Request) {
       role: resolveOpsRole(request).role,
       current: { mode: "normal", reason: "no_row_default", set_at: null },
       note: "No global system_modes row found — defaulting to 'normal'. POST will create.",
+      podOrderInbox,
     });
   }
 
@@ -41,6 +47,7 @@ export async function GET(request: Request) {
     ok: true,
     role: resolveOpsRole(request).role,
     current: data,
+    podOrderInbox,
   });
 }
 
@@ -129,6 +136,10 @@ export async function POST(request: Request) {
       );
     }
   }
+
+  // Back to normal: replay the Woo orders the mode deferred, after the response (a drain is many
+  // Printful round trips; Cloudflare cuts the request at 100 s).
+  if (mode === "normal") after(() => drainPodOrderInbox(supabase).then(() => undefined));
 
   return NextResponse.json({ ok: true, current: { mode, reason, set_at: setAt } });
 }

@@ -62,6 +62,10 @@ export default defineConfig({
         const siteWatchToken = process.env.SITE_WATCH_INGEST_TOKEN ?? "";
         if (siteWatchToken.trim()) out.SITE_WATCH_INGEST_TOKEN = siteWatchToken.trim();
 
+        // pod-order-inbox-sweep -> next-admin /api/internal/pod-orders/sweep. Own token, same rule.
+        const podSweepToken = process.env.POD_INBOX_SWEEP_TOKEN ?? "";
+        if (podSweepToken.trim()) out.POD_INBOX_SWEEP_TOKEN = podSweepToken.trim();
+
         // ── Supabase (Lobster DB writes) ─────────────────────────────────────
         const supabaseUrl = process.env.LOBSTER_SUPABASE_URL ?? "";
         const supabaseSrk = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY ?? "";

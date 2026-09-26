@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canChangeSystemMode, readOpsRole } from "@/lib/ops-role";
+import { getPodOrderInboxStats, type PodOrderInboxStats } from "@/lib/studio/pod-order-inbox";
 import { SystemModeControl } from "./SystemModeControl";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function SystemModesPage() {
   const supabase = getSupabaseServerClient();
   let current: ModeRow | null = null;
   let dbError: string | null = null;
+  let inbox: PodOrderInboxStats | null = null;
 
   if (!supabase) {
     dbError = "Supabase client not configured.";
@@ -37,7 +39,9 @@ export default async function SystemModesPage() {
       .maybeSingle();
     if (error) dbError = error.message;
     else current = (data as ModeRow | null) ?? null;
+    inbox = await getPodOrderInboxStats(supabase);
   }
+  const inboxOpen = inbox && (!inbox.ok || inbox.deferred + inbox.retrying + inbox.gaveUp + inbox.stuckPending > 0);
 
   const effectiveMode = current?.mode ?? "normal";
   const isLocked = effectiveMode !== "normal";
@@ -115,6 +119,34 @@ export default async function SystemModesPage() {
         )}
       </div>
 
+      {inboxOpen && inbox && (
+        <div
+          style={{
+            background: "var(--badge-yellow-bg, var(--bg-subtle))",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: "12px 16px",
+            marginBottom: 24,
+            fontSize: 13,
+          }}
+        >
+          <strong>Woo 付款訂單收件匣：</strong>
+          {inbox.ok ? (
+            <>
+              等模式恢復 {inbox.deferred} 筆
+              {inbox.oldestDeferredAgeSeconds !== null && `（最舊 ${Math.round(inbox.oldestDeferredAgeSeconds / 60)} 分鐘）`}
+              ・自動重試中 {inbox.retrying} 筆{inbox.overdueRetries > 0 && `（其中 ${inbox.overdueRetries} 筆逾期沒人重試）`}・需手動處理 {inbox.gaveUp} 筆・卡住 {inbox.stuckPending} 筆
+              {inbox.capped && "（超過 500 筆，只顯示前 500）"}
+              <div style={{ color: "var(--text-muted)", marginTop: 4 }}>
+                切回 normal 會自動補做等候中的訂單；需手動的訂單到「商品發布」用訂單號轉 Printful 草稿。
+              </div>
+            </>
+          ) : (
+            <>讀不到（{inbox.error}）</>
+          )}
+        </div>
+      )}
+
       {canAct && <SystemModeControl currentMode={effectiveMode} />}
 
       <div
@@ -143,6 +175,9 @@ export default async function SystemModesPage() {
             <code>emergency_stop</code> — 🛑 所有指令全部擋下。解鎖路徑：<strong>本頁（owner / admin）</strong>或 SQL editor。
           </li>
         </ul>
+        <div style={{ marginTop: 12 }}>
+          非 normal 時，客戶那邊進來的事件不會被擋掉：Woo 付款訂單先存進收件匣、切回 normal 自動補建 Printful 草稿；Chatwoot 客服訊息暫停 AI、直接轉真人。
+        </div>
         <div style={{ marginTop: 12 }}>
           <strong>重要：</strong>從 <code>emergency_stop</code> 解鎖回 <code>normal</code>，{" "}
           <strong>Telegram 永遠不能直接做</strong>（<code>/normal_mode</code> 被 policy 硬擋）。只能用本頁或從{" "}

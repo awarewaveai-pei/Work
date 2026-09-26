@@ -8,6 +8,9 @@ import {
   listSyncProducts,
 } from "../../../../../lib/studio/print-provider";
 import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
+import { checkProductionChangeAllowed } from "../../../../../lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "../../../../../lib/system-modes/blocked-change";
+import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -106,6 +109,11 @@ export async function PUT(request: Request) {
   if (body.retailPrice !== undefined && !/^\d+(\.\d{1,2})?$/.test(body.retailPrice)) {
     return NextResponse.json({ ok: false, error: "retailPrice must look like 24.99" }, { status: 400 });
   }
+
+  // No per-client selector on this legacy Woo-platform sync route (single shared PRINTFUL_STORE_ID) --
+  // no site host to resolve, so this is a global-mode-only write (same as publish/route.ts's `link`).
+  const modeGate = await checkProductionChangeAllowed(getSupabaseWriteClient(), null);
+  if (!modeGate.allowed) return blockedChangeResponse(modeGate.mode);
 
   const r = await linkSyncVariant(
     body.syncVariantId as number,

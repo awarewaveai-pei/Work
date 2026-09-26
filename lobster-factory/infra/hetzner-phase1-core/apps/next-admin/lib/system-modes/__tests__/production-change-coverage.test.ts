@@ -22,6 +22,8 @@ const TARGET_MODULES = [
   path.join(ROOT, "lib", "repair-center", "ssh"),
   path.join(ROOT, "lib", "studio", "wp-bridge-client"),
   path.join(ROOT, "lib", "content", "publish", "wordpress-core"),
+  path.join(ROOT, "lib", "studio", "print-provider"),
+  path.join(ROOT, "lib", "cs", "chatwoot-client"),
 ].map((p) => p.replace(/\\/g, "/"));
 
 // Relative path (forward-slash, from ROOT) -> one-line reason this file is exempt.
@@ -39,9 +41,13 @@ const ALLOWLIST: Record<string, string> = {
   "lib/content/blocks/publish-wordpress.ts":
     "imports wordpress-core only for publishToWordPress(); the gate lives inside that function, not in this block wrapper.",
   "app/api/content/newsletter/route.ts":
-    "imports wp-bridge-client only for createNewsletter(); the gate lives in bridgePost() (the shared dispatch function every bridge write goes through), not in this route.",
-  "app/api/tools/publish/route.ts":
-    "imports wp-bridge-client only for createWooProduct(); the gate lives in bridgePost(), not in this route.",
+    "imports wp-bridge-client only for createNewsletter(); the gate lives in bridgePost(), not in this route.",
+  "lib/studio/print-provider.ts":
+    "primitive Printful HTTP transport -- not a call site; every real caller (tools/publish link/pfcreate/pforder, tools/printful/sync PUT, lib/studio/pod-order-inbox.ts for the Woo webhook) gates before calling it. Same pattern as lib/repair-center/ssh.ts.",
+  "app/api/tools/studio/mockup/route.ts":
+    "imports print-provider only for getCatalogVariants() (a read, used to resolve a mockup image variant) -- never calls a write function (createSyncProductOnNative / createDraftOrderOnNative / linkSyncVariant).",
+  "lib/cs/chatwoot-client.ts":
+    "primitive Chatwoot HTTP transport -- not a call site; its one caller (app/api/webhooks/chatwoot/route.ts) gates before the AI pipeline, and the same functions are also called after an allowed gate, so the gate cannot live inside them.",
 };
 
 function walk(dir: string, out: string[]): void {
@@ -164,8 +170,22 @@ const IMP = 'import { checkProductionChangeAllowed } from "@/lib/system-modes/pr
 describe("production-change gate coverage", () => {
   it("scans the real tree and detects the known write paths (a detector that sees nothing passes vacuously)", () => {
     expect(files.length).toBeGreaterThan(400);
-    const known = ["lib/content/publish/wordpress-core.ts", "app/api/content/wp-post/route.ts", "lib/studio/wp-bridge-client.ts"];
-    for (const rel of [...known, "lib/repair-center/ssh.ts", "app/api/video/embed-to-wp/route.ts"]) {
+    const known = [
+      "lib/content/publish/wordpress-core.ts",
+      "app/api/content/wp-post/route.ts",
+      "lib/studio/wp-bridge-client.ts",
+      "app/api/tools/publish/route.ts",
+      "app/api/tools/printful/sync/route.ts",
+      "lib/studio/pod-order-inbox.ts",
+      "app/api/webhooks/chatwoot/route.ts",
+    ];
+    for (const rel of [
+      ...known,
+      "lib/repair-center/ssh.ts",
+      "app/api/video/embed-to-wp/route.ts",
+      "lib/studio/print-provider.ts",
+      "lib/cs/chatwoot-client.ts",
+    ]) {
       expect(needsGate(factsOf(rel), path.join(ROOT, rel)), `${rel} no longer detected`).toBe(true);
     }
     for (const rel of known) expect(factsOf(rel).callsGate, `${rel} lost its gate call`).toBe(true);

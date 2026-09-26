@@ -128,17 +128,46 @@ try {
                     elseif ($probeFindings.Count -gt 0) { "warn:probe_" + ($probeFindings -join ",") }
                     else { "ok" }
     $results["repair_center"] = $repairStatus
+    # T25: repair_detail carries every probe the endpoint returns (raw values), not just the
+    # derived probe_findings summary -- so an operator reading smoke-LATEST.json sees WHICH probe
+    # said what, not only that something warned.
     $results["repair_detail"]  = @{
-        ok             = $resp.ok
-        system_mode    = $resp.system_mode
-        table_ok       = $resp.table_ok
-        probe_findings = $probeFindings
+        ok                   = $resp.ok
+        system_mode          = $resp.system_mode
+        table_ok             = $resp.table_ok
+        backup_script_probe  = $resp.backup_script_probe
+        auto_reboot          = $resp.auto_reboot
+        github_configured    = $resp.github_configured
+        github_repo_accessible = $resp.github_repo_accessible
+        github_app_status    = $resp.github_app_status
+        probe_findings       = $probeFindings
     }
 } catch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch {}
     $results["repair_center"] = if ($code) { "skip:http$code" } else { "skip:unreachable" }
     $noEvidence["repair_center"] = $true
+}
+
+# --- Check 2b: paid Woo orders waiting in pod_order_inbox --- CRITICAL
+# WooCommerce never re-sends a delivery, so the inbox is the only record of an order whose Printful
+# draft is deferred, failing or stuck. Verdict: lib\pod-order-inbox-probe.ps1.
+$podProbeLib = Join-Path $PSScriptRoot "lib\pod-order-inbox-probe.ps1"
+if (Test-Path -LiteralPath $podProbeLib) { . $podProbeLib }
+try {
+    if (-not $authHeader) { $authHeader = @{} }
+    $modesResp = Invoke-RestMethod -Uri "$AppBaseUrl/api/ops/system-modes" -Headers $authHeader -TimeoutSec 10 -ErrorAction Stop
+    $podFindings = @(if (Get-Command Get-PodOrderInboxFindings -ErrorAction SilentlyContinue) {
+        Get-PodOrderInboxFindings -Modes $modesResp
+    } else { "probe_lib_missing" })
+    $results["pod_order_inbox"] = if ($podFindings.Count -gt 0) { "warn:" + ($podFindings -join ",") } else { "ok" }
+    $results["pod_order_inbox_detail"] = $modesResp.podOrderInbox
+    if (@($podFindings | Where-Object { $_ -like "pod_order_inbox=*" -or $_ -eq "probe_lib_missing" }).Count -gt 0) { $noEvidence["pod_order_inbox"] = $true }
+} catch {
+    $code = $null
+    try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+    $results["pod_order_inbox"] = if ($code) { "skip:http$code" } else { "skip:unreachable" }
+    $noEvidence["pod_order_inbox"] = $true
 }
 
 # --- Check 3: Client sites health ---
@@ -558,7 +587,7 @@ if ($null -eq $statusDigest) {
 # Computed BEFORE the JSON write so the report carries the conclusion. Without it every
 # reader (Claude in AO-RESUME §1, a human skimming the file) has to re-derive the verdict
 # by hand, and each re-derivation is a chance to repeat the swallow-the-skip bug below.
-$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity","deploy_hold","ci_health","nightly_health")
+$checks    = @("n8n_mcp","repair_center","pod_order_inbox","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity","deploy_hold","ci_health","nightly_health")
 
 # Checks that are the ONLY detector of a silent-failure class. For these, "skip" means
 # monitoring has stopped, so reporting PASS would repeat the mistake that caused the
@@ -567,7 +596,8 @@ $checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures","client_m
 # louder than one that reports nothing wrong. ci_health/nightly_health join this list for
 # the same reason (WORKLOG 2026-09-23): each is the only thing watching its class of gate.
 # repair_center: sole automated watcher of the Auto-Repair SSH probes (WORKLOG 2026-09-24).
-$criticalChecks = @("repair_center","client_mail","docker_watchdog","codex_parity","ci_health","nightly_health")
+# pod_order_inbox: sole watcher of paid Woo orders whose Printful draft has not happened (2026-09-26).
+$criticalChecks = @("repair_center","pod_order_inbox","client_mail","docker_watchdog","codex_parity","ci_health","nightly_health")
 
 $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" })
 # Keyed on "produced no measurement", not on the verdict prefix: warn:ssh_exit255 and

@@ -162,6 +162,8 @@ done
 # a token next-admin accepts, or a half-applied 10d / rotation turns every hourly heartbeat into a red 401.
 # Empty = not synced; the heartbeat skips quietly and check-site-watch-health.ps1 reports it.
 export "SITE_WATCH_INGEST_TOKEN=`$(docker exec lobster-next-admin printenv SITE_WATCH_INGEST_TOKEN 2>/dev/null)"
+# pod-order-inbox-sweep token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
+export "POD_INBOX_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv POD_INBOX_SWEEP_TOKEN 2>/dev/null)"
 
 echo '=== Env ready ==='
 echo "  TRIGGER_API_URL (CLI):          `$TRIGGER_API_URL"
@@ -176,6 +178,7 @@ echo "  LOBSTER_EXECUTE_MANIFEST_STEPS: `$LOBSTER_EXECUTE_MANIFEST_STEPS"
 if [ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ]; then echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: yes"; else echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: no"; fi
 if [ -n "`$MAINWP_CONSUMER_SECRET" ]; then echo "  MAINWP_* set: yes (`$MAINWP_DASHBOARD_URL)"; else echo "  MAINWP_* set: no"; fi
 if [ -n "`$SITE_WATCH_INGEST_TOKEN" ]; then echo "  SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)"; else echo "  SITE_WATCH_INGEST_TOKEN set: no (next-admin has none; site-watch-heartbeat will skip)"; fi
+if [ -n "`$POD_INBOX_SWEEP_TOKEN" ]; then echo "  POD_INBOX_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  POD_INBOX_SWEEP_TOKEN set: no (next-admin has none; pod-order-inbox-sweep will skip)"; fi
 
 cd /root/Work/lobster-factory/packages/workflows
 

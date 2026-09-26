@@ -1,13 +1,23 @@
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock the fulfillment seam so handler tests can assert it is (or is NOT) called — the kill-switch
-// regression guard for the money red-line.
-const createDraftOrderOnNative = vi.fn();
-vi.mock("../../../../lib/studio/print-provider", () => ({
-  createDraftOrderOnNative: (...a: unknown[]) => createDraftOrderOnNative(...a),
-  isNativeStoreConfigured: () => true,
-}));
+// The route's seam is lib/studio/pod-order-inbox.ts (record -> process -> drain after the response);
+// that module's own behaviour (gate, claim, Printful, retries) is lib/studio/__tests__/pod-order-inbox.test.ts.
+type Outcome = { kind: string } & Record<string, unknown>;
+const recordPodOrder = vi.hoisted(() => vi.fn());
+const processPodOrder = vi.hoisted(() => vi.fn());
+const drainPodOrderInbox = vi.hoisted(() => vi.fn(async () => ({ processed: 0, blocked: false })));
+const recordUnfulfillablePodOrder = vi.hoisted(() => vi.fn(async (): Promise<{ ok: boolean; error?: string }> => ({ ok: true })));
+const cancelPodOrderIfOpen = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("../../../../lib/studio/pod-order-inbox", () => ({ recordPodOrder, processPodOrder, drainPodOrderInbox, recordUnfulfillablePodOrder, cancelPodOrderIfOpen }));
+
+// next/server's after() needs a request scope; collect the callbacks instead and run them on demand.
+const afterCallbacks = vi.hoisted(() => [] as Array<() => unknown | Promise<unknown>>);
+vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => void afterCallbacks.push(fn) }));
+
+const fakeDb = vi.hoisted(() => ({}));
+const getSupabaseWriteClient = vi.hoisted(() => vi.fn((): unknown => fakeDb));
+vi.mock("../../../../lib/supabase-server", () => ({ getSupabaseWriteClient }));
 
 import { parseWooOrder, verifyWooSignature } from "../../../../lib/studio/woo-webhook";
 import { POST } from "./route";
@@ -96,63 +106,130 @@ describe("verifyWooSignature", () => {
   });
 });
 
-describe("POST handler — safety gates", () => {
+describe("POST handler", () => {
   const secret = "shh-secret";
   const sign = (b: string) => createHmac("sha256", secret).update(b).digest("base64");
-  const post = (body: string, headers: Record<string, string> = {}) =>
-    POST(new Request("http://x/api/webhooks/woo-order", { method: "POST", headers, body }));
+  const post = (body: string, sig: string | null = sign(body)) =>
+    POST(new Request("http://x/api/webhooks/woo-order", { method: "POST", headers: sig ? { "x-wc-webhook-signature": sig } : {}, body }));
+  const ROW = { woo_order_id: "7164", status: "pending", attempts: 0 };
+  const runAfter = async () => {
+    for (const fn of afterCallbacks.splice(0)) await fn();
+  };
 
   beforeEach(() => {
-    createDraftOrderOnNative.mockReset();
-    createDraftOrderOnNative.mockResolvedValue({ ok: true, value: { printfulOrderId: 1, status: "draft", alreadyExisted: false } });
+    process.env.POD_AUTO_FULFILL_ENABLED = "true";
     process.env.WC_WEBHOOK_SECRET = secret;
+    afterCallbacks.length = 0;
+    recordPodOrder.mockReset();
+    recordPodOrder.mockResolvedValue({ ok: true, row: ROW });
+    processPodOrder.mockReset();
+    processPodOrder.mockResolvedValue({ kind: "done", printfulOrderId: 1, status: "draft", alreadyExisted: false });
+    drainPodOrderInbox.mockClear();
+    recordUnfulfillablePodOrder.mockClear();
+    cancelPodOrderIfOpen.mockClear();
+    getSupabaseWriteClient.mockReturnValue(fakeDb);
   });
   afterEach(() => {
     delete process.env.POD_AUTO_FULFILL_ENABLED;
     delete process.env.WC_WEBHOOK_SECRET;
   });
 
-  it("KILL SWITCH OFF (default): ignores and NEVER calls the fulfillment seam (money red-line guard)", async () => {
-    delete process.env.POD_AUTO_FULFILL_ENABLED; // default off
-    const body = JSON.stringify(baseOrder);
-    const res = await post(body, { "x-wc-webhook-signature": sign(body) });
-    const json = await res.json();
-    expect(res.status).toBe(200);
-    expect(json).toMatchObject({ ok: true, ignored: true, reason: "auto_fulfill_disabled" });
-    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+  it("KILL SWITCH OFF (default): ignored, nothing recorded or fulfilled (money red-line guard)", async () => {
+    delete process.env.POD_AUTO_FULFILL_ENABLED;
+    const res = await post(JSON.stringify(baseOrder));
+    expect(await res.json()).toMatchObject({ ok: true, ignored: true, reason: "auto_fulfill_disabled" });
+    expect(recordPodOrder).not.toHaveBeenCalled();
+    expect(afterCallbacks).toHaveLength(0);
   });
 
   it("non-'true' flag values stay dormant (fail-closed)", async () => {
-    process.env.POD_AUTO_FULFILL_ENABLED = "TRUE"; // not the exact literal
-    const body = JSON.stringify(baseOrder);
-    await post(body, { "x-wc-webhook-signature": sign(body) });
-    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+    process.env.POD_AUTO_FULFILL_ENABLED = "TRUE";
+    await post(JSON.stringify(baseOrder));
+    expect(recordPodOrder).not.toHaveBeenCalled();
   });
 
-  it("ON + bad signature: 401, never fulfills", async () => {
-    process.env.POD_AUTO_FULFILL_ENABLED = "true";
-    const body = JSON.stringify(baseOrder);
-    const res = await post(body, { "x-wc-webhook-signature": "wrong" });
+  it("bad signature: 401, nothing recorded", async () => {
+    const res = await post(JSON.stringify(baseOrder), "wrong");
     expect(res.status).toBe(401);
-    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+    expect(recordPodOrder).not.toHaveBeenCalled();
   });
 
-  it("ON + good signature + refunded status: ignored, never fulfills", async () => {
-    process.env.POD_AUTO_FULFILL_ENABLED = "true";
-    const body = JSON.stringify({ ...baseOrder, status: "refunded" });
-    const res = await post(body, { "x-wc-webhook-signature": sign(body) });
-    const json = await res.json();
-    expect(json).toMatchObject({ ignored: true, reason: "status_not_paid" });
-    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+  it("paid order: recorded (global org) and answered 200 BEFORE any Printful work; the draft and the backlog run after the response", async () => {
+    const res = await post(JSON.stringify(baseOrder));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, recorded: true, wooOrderId: "7164" });
+    expect(recordPodOrder).toHaveBeenCalledWith(fakeDb, "7164", null, {
+      recipient: expect.objectContaining({ address1: "Ship Rd 2" }),
+      items: [{ sku: "TEE-BLK-M", quantity: 2 }, { sku: "TEE-WHT-L", quantity: 1 }],
+    });
+    expect(processPodOrder).not.toHaveBeenCalled();
+    expect(drainPodOrderInbox).not.toHaveBeenCalled();
+    await runAfter();
+    expect(processPodOrder).toHaveBeenCalledWith(fakeDb, ROW);
+    expect(drainPodOrderInbox).toHaveBeenCalledWith(fakeDb);
   });
 
-  it("ON + good signature + paid order: creates exactly one DRAFT", async () => {
-    process.env.POD_AUTO_FULFILL_ENABLED = "true";
-    const body = JSON.stringify(baseOrder);
-    const res = await post(body, { "x-wc-webhook-signature": sign(body) });
-    const json = await res.json();
-    expect(json).toMatchObject({ ok: true, draft: true, printfulOrderId: 1 });
-    expect(createDraftOrderOnNative).toHaveBeenCalledTimes(1);
-    expect(createDraftOrderOnNative).toHaveBeenCalledWith(expect.objectContaining({ externalId: "7164" }));
+  it("a failing or throwing draft after the response is logged, and the backlog still drains", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    processPodOrder.mockRejectedValueOnce(new Error("boom"));
+    await post(JSON.stringify(baseOrder));
+    await runAfter();
+    expect(drainPodOrderInbox).toHaveBeenCalledTimes(1);
+    processPodOrder.mockResolvedValueOnce({ kind: "failed", error: "printful_502", attempts: 1 });
+    await post(JSON.stringify(baseOrder));
+    await runAfter();
+    expect(err).toHaveBeenCalledWith("[woo-order] 7164: failed", expect.objectContaining({ kind: "failed" }));
+  });
+
+  it("recorded but not read back: still 200 (the sweep takes the pending row once stale), no inline processing", async () => {
+    recordPodOrder.mockResolvedValueOnce({ ok: true, row: null });
+    const res = await post(JSON.stringify(baseOrder));
+    expect(res.status).toBe(200);
+    await runAfter();
+    expect(processPodOrder).not.toHaveBeenCalled();
+    expect(drainPodOrderInbox).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["cancelled", "refunded", "failed", "trash"])("status %s closes a waiting inbox row and never records", async (status) => {
+    const res = await post(JSON.stringify({ ...baseOrder, status }));
+    expect(await res.json()).toMatchObject({ ignored: true, reason: "status_not_paid" });
+    expect(cancelPodOrderIfOpen).toHaveBeenCalledWith(fakeDb, "7164", status);
+    expect(recordPodOrder).not.toHaveBeenCalled();
+  });
+
+  it("pending / on-hold (not paid yet) neither records nor cancels", async () => {
+    await post(JSON.stringify({ ...baseOrder, status: "on-hold" }));
+    expect(cancelPodOrderIfOpen).not.toHaveBeenCalled();
+    expect(recordPodOrder).not.toHaveBeenCalled();
+  });
+
+  it("paid but unfulfillable as delivered (no address): kept for the operator, 200 needsManual", async () => {
+    const res = await post(JSON.stringify({ ...baseOrder, shipping: {}, billing: {} }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: false, error: "recipient_incomplete", needsManual: true });
+    expect(recordUnfulfillablePodOrder).toHaveBeenCalledWith(fakeDb, "7164", "recipient_incomplete");
+    expect(recordPodOrder).not.toHaveBeenCalled();
+  });
+
+  it("missing order id: 400 (nothing to key the inbox row on)", async () => {
+    const res = await post(JSON.stringify({ ...baseOrder, id: undefined }));
+    expect(res.status).toBe(400);
+    expect(recordUnfulfillablePodOrder).not.toHaveBeenCalled();
+  });
+
+  it("inbox write failure: 502 and nothing scheduled (nothing durable exists)", async () => {
+    recordPodOrder.mockResolvedValueOnce({ ok: false, error: "conn refused" });
+    const res = await post(JSON.stringify(baseOrder));
+    expect(res.status).toBe(502);
+    expect(afterCallbacks).toHaveLength(0);
+    recordUnfulfillablePodOrder.mockResolvedValueOnce({ ok: false, error: "conn refused" });
+    expect((await post(JSON.stringify({ ...baseOrder, shipping: {}, billing: {} }))).status).toBe(502);
+  });
+
+  it("supabase not configured: 503 before anything", async () => {
+    getSupabaseWriteClient.mockReturnValueOnce(null);
+    const res = await post(JSON.stringify(baseOrder));
+    expect(res.status).toBe(503);
+    expect(recordPodOrder).not.toHaveBeenCalled();
   });
 });

@@ -368,6 +368,8 @@ services:
       # when on. WC_WEBHOOK_SECRET = the WooCommerce webhook secret used to HMAC-verify the payload.
       POD_AUTO_FULFILL_ENABLED: ${POD_AUTO_FULFILL_ENABLED:-false}
       WC_WEBHOOK_SECRET: ${WC_WEBHOOK_SECRET:-}
+      # Own bearer for /api/internal/pod-orders/sweep (the 10-minute pod_order_inbox replay); empty = 401.
+      POD_INBOX_SWEEP_TOKEN: ${POD_INBOX_SWEEP_TOKEN:-}
       # wp-bridge signing client (one-click publish; lib/studio/wp-bridge-client.ts). Was live on the
       # server since before this file tracked it (2026-09-20 compose-drift audit) -- added here so a
       # fresh deploy of this file no longer silently omits it.

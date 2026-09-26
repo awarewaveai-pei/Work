@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-26（續51）合併雲端 T26：Printful 寫入過系統模式閘；Woo 付款訂單先落收件匣、一律 2xx、回應後建草稿、自己重試（0093 已套；next-admin／Trigger 未部署）
+- [根因] Printful 寫入不查模式；Woo webhook 被擋只能回非 2xx，而 WooCommerce 不重送、>5 次停用 webhook（`class-wc-webhook.php:331,544,562-570`）→ 模式擋下＝漏單。
+- [來源] `claude/cc-t26-pod-mode-inbox` fe295668c：tools/publish link／pfcreate／pforder、printful/sync PUT 過 gate（pfcreate 用 bridge 站 org）；0093 `pod_order_inbox`；webhook 先 upsert 再查 gate，擋下 deferred＋200；system-modes 切 normal 時補做。
+- [本機修] 一律 2xx（Printful 失敗原回 502，Woo 不重送只累積停用次數）；收件匣改為樂觀鎖（status＋attempts）＋重試退避 5/10/20/40 分、上限 5；插入不覆寫既有列；位址不全的付款單記為需手動（原回 400 = 漏單）；pforder 手動轉單關閉該列；smoke `pod_order_inbox`（CRITICAL）＋系統模式頁面板。
+- [本機修 critic] M1 失敗單只在下一筆訂單時重試、smoke 不看 → 新增 `POST /api/internal/pod-orders/sweep`（POD_INBOX_SWEEP_TOKEN）＋自架 Trigger 排程 `pod-order-inbox-sweep` 每 10 分；stats overdueRetries＋探針 retry_overdue。M2 webhook 在回應前呼叫 Printful（最壞 >60 s）→ 落庫即回 200，草稿與積壓都在 after()。m1 讀回失敗仍 200；m2 未到期的 failed 不重試（order.updated 連發不燒次數）；m3 system-modes 補做移到 after()（Cloudflare 100 s）；m4 取消／退款關閉等待中的列（新 status cancelled）；m5 0093 down 有未完成訂單時拒絕，並刪自己的 ledger 列。
+- [正式庫] 0093 已套（續 T24 條）；down 閘實測：交易內放一筆 deferred → RAISE 拒絕；空表 → DO／DROP 後 ROLLBACK；事後表在、0 列、ledger 列在。
+- [待部署] ① 操作者在主機跑一次 token 腳本（POD_INBOX_SWEEP_TOKEN，主機產生、不顯示）② prod compose 加該變數（safe-infra-patch）③ sg-deploy ④ lobster-trigger-deploy.ps1（T19＋sweep）。
+- [TASKS] Woo 端對帳（webhook status／failure_count，需沿用 client_mail 的 profile 傳輸）另開。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit 0；npm test 215 files 2025 passed；inbox 19／webhook 25／system-modes 9／sweep route 6；workflows 21 files 141；pod-order-inbox-probe 9/9；突變 21 組紅→還原綠（本機 9＋critic 12） | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2M/5m（critic M1 M2 m1–m5，全修；Codex r1–r3 此區無發現，r3 approve；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=pod_order_inbox|drainDeferredPodOrders|getDeferredPodOrderStats|deferredPodOrders | hits=12（舊 API 名稱 0 殘留；smoke、probe、頁面、route 同步）
 ## 2026-09-26（續50）合併雲端 T27：Chatwoot——系統模式擋下時暫停 AI、轉真人（未部署）
 - [根因] webhooks/chatwoot 不讀系統模式，emergency_stop（停下失常自動化的開關）期間 AI 照樣自動回覆、花額度。決策 `agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md`。
 - [來源] `claude/cc-t27-cs-mode-handoff` 6075df1f0：claimMessage 之後（重送同訊息走 duplicate，不會重發備註）、reserveCsCredit／handleInbound 之前查 gate；擋下（含讀不到）→ 私密備註「AI 暫停：系統處於 <mode> 模式，已轉真人」→ handoffToHuman，一律 2xx。production-change-coverage 的 chatwoot-client 目標併入 T26 commit（同檔）。
