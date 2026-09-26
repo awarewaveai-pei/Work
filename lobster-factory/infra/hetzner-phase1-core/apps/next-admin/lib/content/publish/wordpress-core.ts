@@ -16,6 +16,8 @@ import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
 import { normalizeManyForWp } from "@/lib/studio/wp-web-image";
 import { isDesignsAsset } from "@/lib/storage/r2";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 
 /** 發佈輸入。欄位型別刻意保持 unknown（與原 route body 同形），coercion 在 core 內統一做 → route 與積木共用同一套寬鬆解析。 */
 export interface WordPressPublishInput {
@@ -52,6 +54,8 @@ export interface WordPressPublishFailure {
    *  "text" = new NextResponse(error, {status})；"json" = NextResponse.json({ok:false,error},{status})。
    *  關鍵：單篇 UI 對 text 回應會 res.json() throw → 顯示「網路錯誤」（非真實訊息），這是現行行為，必須保留。 */
   wire: "text" | "json";
+  /** Only set when error === "system_mode_blocks_change" -- the system_modes value the gate read. */
+  mode?: string;
 }
 
 export type WordPressPublishResult = WordPressPublishSuccess | WordPressPublishFailure;
@@ -322,6 +326,7 @@ export async function publishToWordPress(
   let wpApiUrl: string | undefined;
   let wpToken: string | undefined;
   let wpUsername = "";
+  let organizationId: string | null = null;
 
   const { sites } = await getWpSites();
   if (siteId || sites.length > 0) {
@@ -341,14 +346,23 @@ export async function publishToWordPress(
     wpApiUrl   = resolved.site.url;
     wpToken    = resolved.token || undefined;
     wpUsername = resolved.username;
+    organizationId = resolved.site.organizationId;
   } else {
-    // Last-resort legacy env vars (single-site deployments without WP_SITE_i_* scheme)
+    // Last-resort legacy env vars (single-site deployments without WP_SITE_i_* scheme) --
+    // no DB row, so no org: organizationId stays null (only the global mode applies).
     wpApiUrl = process.env.WP_API_URL;
     wpToken  = process.env.WORDPRESS_JWT_TOKEN;
   }
 
   if (!wpApiUrl || !wpToken) {
     return { ok: false, status: 503, error: "WP_API_URL or WORDPRESS_JWT_TOKEN not configured", wire: "text" };
+  }
+
+  // Site resolved -- gate before any write to it (draft creation below is a real WP write on
+  // both the Bridge and standard-REST paths).
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
+  if (!gate.allowed) {
+    return { ok: false, status: 423, error: "system_mode_blocks_change", wire: "json", mode: gate.mode };
   }
 
   const markdown = (typeof body.markdown === "string" ? body.markdown : "").trim();

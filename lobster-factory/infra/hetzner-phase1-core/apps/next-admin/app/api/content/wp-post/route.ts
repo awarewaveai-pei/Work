@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { resolveWpSite } from "@/lib/content/wp-sites";
 import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,10 +15,10 @@ export const dynamic = "force-dynamic";
 async function getSiteAuth(
   req: Request,
   siteId: string,
-): Promise<{ url: string; authHeader: string } | null> {
+): Promise<{ url: string; authHeader: string; organizationId: string | null } | null> {
   const resolved = await resolveWpSite(req, siteId);
   if (!resolved || !resolved.token) return null;
-  return { url: resolved.site.url, authHeader: resolved.authHeader };
+  return { url: resolved.site.url, authHeader: resolved.authHeader, organizationId: resolved.site.organizationId };
 }
 
 // PATCH /api/content/wp-post — update WP post (date, status, title)
@@ -37,6 +39,11 @@ export async function PATCH(req: Request): Promise<Response> {
   try { site = await getSiteAuth(req, siteId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!site) return NextResponse.json({ ok: false, error: "Site not found or token missing" }, { status: 404 });
+
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.organizationId);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+  }
 
   // Build WP patch payload — only include explicitly provided fields
   const wpPatch: Record<string, unknown> = {};
@@ -104,6 +111,11 @@ export async function DELETE(req: Request): Promise<Response> {
   try { site = await getSiteAuth(req, siteId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!site) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
+
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.organizationId);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+  }
 
   let res: Response;
   try {

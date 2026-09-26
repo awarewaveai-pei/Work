@@ -9,6 +9,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole } from "@/lib/ops-role";
 import { timingSafeEqual } from "@/lib/ops-inbox/verifyIngestToken";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,6 +136,12 @@ export async function POST(req: Request): Promise<Response> {
         },
         { status: 503 },
       );
+    }
+    // Only this branch actually dispatches (a billable Hetzner machine) -- "none"/"mock" above
+    // never make an outbound call, so they are not gated.
+    const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
+    if (!gate.allowed) {
+      return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
     }
     let triggerData: { id?: string } = {};
     try {

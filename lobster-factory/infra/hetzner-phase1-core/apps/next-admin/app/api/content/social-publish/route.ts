@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import {
   getPostizConfig,
   listIntegrations,
@@ -102,6 +104,12 @@ export async function POST(req: Request): Promise<Response> {
         { status: 400 }
       );
     }
+  }
+
+  // All input validated (incl. assertOrgAccess above) -- gate before any outbound Postiz call.
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), clientId);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
   }
 
   try {

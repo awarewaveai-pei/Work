@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +71,14 @@ export async function POST(req: Request): Promise<Response> {
     .filter(p => p in PLATFORM_SPECS);
 
   if (platforms.length === 0) return new NextResponse("no valid platforms", { status: 400 });
+
+  // This route has no per-client target (it only drafts copy for later publishing elsewhere,
+  // which is where the real per-target gate lives) -- org null, global mode only. Gated because
+  // the Anthropic call below is itself an outbound request.
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), null);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+  }
 
   const articleUrl = typeof body.articleUrl === "string" ? body.articleUrl.trim() : "";
   const urlLine = articleUrl ? `\nArticle URL (use as [LINK] where indicated): ${articleUrl}` : "";

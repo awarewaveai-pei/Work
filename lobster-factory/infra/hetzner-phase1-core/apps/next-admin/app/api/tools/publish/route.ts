@@ -7,7 +7,7 @@ import { toProductImage } from "../../../../lib/studio/to-product-image";
 import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
-import { createWooProduct, isBridgeConfigured, listBridgeClients } from "../../../../lib/studio/wp-bridge-client";
+import { createWooProduct, isBridgeConfigured, listBridgeClients, BRIDGE_BLOCKED_ERROR } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import { podModelById } from "../../../../lib/studio/pod-catalog-config";
 import { fetchProductTierPricing, fetchProductSizeGuide } from "../../../../lib/studio/printful-catalog";
@@ -407,7 +407,11 @@ export async function POST(request: Request) {
     const payload = buildPodProductPayload(params);
     const r = await createWooProduct(payload, clientId);
     if (!r.ok) {
-      return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
+      const failed = r as { ok: false; error: string; mode?: string };
+      if (failed.error === BRIDGE_BLOCKED_ERROR) {
+        return NextResponse.json({ error: failed.error, mode: failed.mode }, { status: 423 });
+      }
+      return NextResponse.json({ ok: false, error: failed.error }, { status: 502 });
     }
     const value = r.value;
     // Pair returned variation_ids (creation order) with our deterministic plan order.

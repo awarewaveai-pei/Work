@@ -23,12 +23,18 @@
  * compatible with the original single-site behaviour.
  */
 import { createHash, createPrivateKey, randomUUID, sign as edSign, type KeyObject } from "node:crypto";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 
 const REST_NAMESPACE = "/aware-wave-bridge/v1";
 // RFC 8410 PKCS#8 prefix for an Ed25519 private key; append the 32-byte seed.
 const PKCS8_ED25519_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 
-export type BridgeResult<T> = { ok: true; value: T } | { ok: false; error: string };
+/** bridgePost's error string when the system-mode gate blocks the write. Callers that need to
+ *  distinguish this from a real bridge failure (to answer HTTP 423 instead of 502) check for it. */
+export const BRIDGE_BLOCKED_ERROR = "system_mode_blocks_change";
+
+export type BridgeResult<T> = { ok: true; value: T } | { ok: false; error: string; mode?: string };
 
 /** A configured bridge client the publish UI can target. `id` = "" for default, "1".."10" for extras. */
 export interface BridgeClient {
@@ -128,6 +134,14 @@ export async function bridgePost<T>(
 ): Promise<BridgeResult<T>> {
   const config = getConfig(options?.clientId);
   if (!config) return { ok: false, error: "bridge_not_configured" };
+
+  // Every bridge write funnels through this one function -- gate here once, so it covers every
+  // current and future caller (createWooProduct/createPost/createNewsletter). The bridge site is
+  // env-configured, never tied to a Supabase organizations row, so there is no org to scope to.
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), null);
+  if (!gate.allowed) {
+    return { ok: false, error: BRIDGE_BLOCKED_ERROR, mode: gate.mode };
+  }
 
   const fullPath = `${REST_NAMESPACE}${path}`;
   const body = JSON.stringify(payload);

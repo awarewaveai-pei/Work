@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { resolveWpSite } from "@/lib/content/wp-sites";
 import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import {
   ensureDeliveryReceipt,
   claimDeliveryReceipt,
@@ -49,6 +51,11 @@ export async function POST(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!resolved) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
   if (!resolved.token) return NextResponse.json({ ok: false, error: "No token for site" }, { status: 503 });
+
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), resolved.site.organizationId);
+  if (!gate.allowed) {
+    return NextResponse.json({ error: "system_mode_blocks_change", mode: gate.mode }, { status: 423 });
+  }
 
   let receipt: DeliveryReceipt | null = null;
   if (releaseId && mediaPersistenceEnabled()) {

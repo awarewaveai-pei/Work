@@ -39,5 +39,5 @@ export async function POST(req: Request): Promise<Response> {
   const fail = result as WordPressPublishFailure;
   return fail.wire === "text"
     ? new NextResponse(fail.error, { status: fail.status })
-    : NextResponse.json({ ok: false, error: fail.error }, { status: fail.status });
+    : NextResponse.json({ ok: false, error: fail.error, ...(fail.mode ? { mode: fail.mode } : {}) }, { status: fail.status });
 }
