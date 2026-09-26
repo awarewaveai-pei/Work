@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-26（續62）Cognitive OS 正式站部署 `1fbb021f`：結果頁照示意稿＋解讀契約 1.1.0（續61）
+- [操作者] 「照上次方式上線（先備份）」。
+- [範圍] 正式站 `2c060470`→`1fbb021f`：本批（網站結果頁、解讀 1.1.0、detail_integrity、閘道 with_timeout）＋文件 commit＋`8614a97dd`（只改 .env.example）。無資料庫變更。
+- [備份＋試跑] `cos_predeploy_trial.sh`：3 庫 SQLite backup API（integrity ok，39 檔）；目標 commit 的樹以副本當 `.runtime` 開庫：既有表列數 0 變動、無新表新欄、7 專案＋30 來源經新碼讀回、`/health` ok、`/catalog` 284/12/4 → TRIAL PASS。
+- [部署] ff-only＋`deploy.sh`：測試關卡 208 passed、api／web healthy、本機兩項＋公開 `/api/health` PASS。
+- [上線後] 公開 11 路徑（佔位 cookie 過 middleware）200／404／307 皆如預期；三庫列數與部署前完全相同（identity 4、session 28、platform_projects 7、prov_sources 30、events 74、project_interpretations 3、collection_runs 10），integrity ok。正式容器內真模型一次（`prod_interpret_check.py`，不寫庫、不記 ai_usage）：51 s、1 次呼叫、7980／3839 tokens、7 段全出、3 則發現、四閘 PASS、無丟段。
+- [清理] 驗證完刪備份與試跑樹（2378 檔／36M），主機無 `cos-predeploy-*`。
+- [未驗] 正式站結果頁的瀏覽器畫面（要登入；正式站測試身分仍待操作者建）；同一份網站碼本機真 HTML 已過結果頁閘。
+- REALTEST_EVIDENCE: tool=SSH | cmd=cos_predeploy_trial.sh（TRIAL PASS）＋deploy.sh（exit 0，208 passed）＋live_check.sh（11 路徑）＋唯讀列數比對＋容器內真模型解讀（四閘 PASS） | exit=0 | ms=51000
+- REVIEW_WAIVED: NA -- 部署與驗證，無新程式碼（程式已在續61 經 Codex 三輪）
+- BUGHUNT_WAIVED: NA -- 無程式改動；部署範圍以 `git log 2c060470..1fbb021f` 逐筆列出
 ## 2026-09-26（續61）Cognitive OS 結果頁照示意稿（第四批）：網站卡片①–⑨＋核准卡；解讀契約 1.1.0 產出示意稿的內容（一句話、逐層解讀、★、建議順序、方案／計畫／指標、因果迴路、趨勢）；新閘 detail_integrity
 - [操作者] 正式站結果頁（舊 PI-a 版）與示意稿 7JLjM7mGyqTMLJmCMUmWqq「內容、排版和版面都差很多」。
 - [根因] C1 網站 `ResultPage` 只照 §3.10 段落清單，沒照示意稿卡片／元件類別（`.how`、`.finding`＋`.conf`、`.judge`、`.layer .row`、`.mcard`、`#approve`）；`globals.css` 另有 25 條 `.result-page` 覆寫把示意稿元件改樣。C2 內容缺口是契約造成的：`method-interpretation.schema.yaml` 1.0.0 `additionalProperties: false` 且無 summary；提示也沒要逐層解讀／方案／迴路 → 示意稿的一句話、③④⑤⑦ 永遠不可能出現。C3 `MethodVisual` layered 一律畫冰山（`systems: layered` → 整個 systems 家族拿到冰山）。C4 綁整個清單時「你填的」印 JSON。C5 `--page result` 對 web 固定 lesson=None（放寬）。
