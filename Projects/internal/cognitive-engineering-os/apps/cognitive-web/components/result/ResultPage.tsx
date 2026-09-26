@@ -11,7 +11,7 @@ type Step = { method_id?: string; answers?: string; deepens?: string; prefill?: 
 type Interpretation = { interpretation_id: string; method_id: string; findings: Finding[]; summary?: string; visual: { kind: string; bindings: Record<string, unknown> }; next_methods?: string[]; next_steps?: Step[]; recommendations?: Array<{ action?: string; citations?: string[] }>; gaps?: Array<{ text?: string; needed_evidence?: string }>; data_thickness?: Record<string, { own_statements?: number; external_sources?: number }>; provenance: Record<string, unknown>; model: string; usage: Record<string, number> };
 type ManifestItem = { id: string; kind?: string; path?: string; value?: string; source_id?: string; sha256?: string };
 type Gate = { gate_id: string; status: string; evidence?: unknown };
-type Props = { result: Interpretation; record?: Record<string, unknown>; manifest?: ManifestItem[]; gateResults?: Gate[]; display?: { name_zh?: string; blurb_zh?: string } };
+type Props = { result: Interpretation; record?: Record<string, unknown>; manifest?: ManifestItem[]; gateResults?: Gate[]; display?: { name_zh?: string; blurb_zh?: string }; children?: ReactNode };   // children: the run form, shown under the header (plan U14)
 
 const SKELETON: Record<string, [string, string]> = {
   "0": ["先看狀態、能回答與不能回答的範圍。", "先確認本次解讀的工具與資料範圍。"],
@@ -34,7 +34,7 @@ function recordValue(record: Record<string, unknown>, id: string): unknown {
 }
 function printable(value: unknown): string { return typeof value === "string" ? value : value === undefined ? "未提供" : JSON.stringify(value); }
 
-export function ResultPage({ result, record = {}, manifest = [], gateResults = [], display }: Props) {
+export function ResultPage({ result, record = {}, manifest = [], gateResults = [], display, children }: Props) {
   const [judgment, setJudgment] = useState("");
   const [judgmentText, setJudgmentText] = useState("");
   const [judgmentError, setJudgmentError] = useState("");
@@ -49,6 +49,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const title = display?.name_zh ?? result.method_id;
   return <div className="result-page">
     <div className="card section" data-section="0"><div className="top"><h1>{title}分析</h1><button type="button" className="howto secondary" onClick={() => setGuideOpen(!guideOpen)}>怎麼用？先看讀圖說明</button></div><div className="status"><span>AI 草稿・尚未核准</span><span>資料 {Object.keys(record).length} 欄</span><span>約 {result.usage?.input_tokens ?? 0} input tokens</span></div><HowTo read={SKELETON["0"][0]} act={SKELETON["0"][1]} />{guideOpen && <p role="note">依序讀結論、結構圖、逐單位解讀、下一步與引註；最後由你判斷。</p>}<p className="lead">{display?.blurb_zh ?? result.summary ?? findings[0]?.text ?? "這是一份待人工核對的分析草稿。"}</p><p className="can"><strong>能回答：</strong>這筆方法紀錄支持哪些發現。</p><p className="cant"><strong>不能回答：</strong>紀錄之外的事實、未驗證的數字或自動核准。</p><div className="todos"><p className="todo">① 讀一句結論與引註</p><p className="todo">② 對照圖形和原始輸入</p><p className="todo">③ 看總結、下一步與人工判斷</p></div><p>只有 30 秒？先讀 ① 的結論，再看引註。</p><p className="terms">四個詞：發現・引註・資料厚度・人工判斷</p></div>
+    {children}
     <Section id="1" title="① 一句結論與發現"><p className="lead">{result.summary ?? findings.map((item) => item.text).join(" ")}</p><div className="grid">{findings.map((finding) => <article className="card" key={finding.id}><h3>{finding.title}</h3><p>{finding.text}</p><p>信心：{finding.confidence.level} — {finding.confidence.reason}</p><p>{finding.citations.map((id) => <a href={`#citation-${citationNumber.get(id)}`} key={id}>[{citationNumber.get(id)}] </a>)}</p>{(finding.revision_conditions ?? []).map((condition, index) => <p key={index}>改判條件：{condition.text}；{condition.would_change}</p>)}</article>)}</div></Section>
     <Section id="2" title="② 結構圖"><MethodVisual kind={result.visual.kind} bindings={result.visual.bindings} /></Section>
     <Section id="3" title="③ 圖表分析"><p>原生圖形：{result.visual.kind}。每一個綁定只指向本次 manifest，不表示額外推測。</p></Section>

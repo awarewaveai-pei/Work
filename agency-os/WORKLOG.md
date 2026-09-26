@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-26（續38）Cognitive OS 網站填寫頁照示意稿（第二批）：四格表單、提示＋例子、三顆按鈕、結果在格子下方；一次點擊一次分析
+- [操作者] 網站與示意稿 `iceberg-result-mock.html`（7JLjM7mGyqTMLJmCMUmWqq）差很多。
+- [根因] C1 `MethodForm` 的文字清單是「一項一框＋新增一項」，示意稿是一格一段、每行一項；提示／例子不在登錄檔（`method-input-forms.yaml` 冰山無 label/hint，`method-form-examples.yaml` 冰山例子不是示意稿的藝術反思案例）。C2 填寫頁沒有表頭卡／狀態列／怎麼讀，結果出現後表單消失。C3 `.wrap` 是 grid item＋auto margin → 縮成內容寬度（填寫頁窄一截）。
+- [改] `MethodForm`：文字清單＝一個 textarea（每行一項，空行送出時丟掉，`form-model.ts`）；label＋hint＋placeholder「例：<示範第一項>」；`form.runform`；三顆按鈕 執行分析／用示範案例填入／清空，填我自己的。
+- [改] 填寫頁 `/methods/[id]/run`：表頭卡（麵包屑、`{名稱}分析`、狀態列＋專案按鈕、怎麼讀）→ 輸入卡 `#input`（貼描述先幫填收在 details）→ 結果卡；有結果後輸入卡留在 ResultPage 第 0 段下方（`children`）；預設空白，`#demo` 才帶示範。
+- [改] 登錄檔：冰山四格 label/hint 取示意稿 ①–④ 問句；示範改成示意稿的團體反思案例。`design-system.css` `.wrap{width:100%}`，示意稿 6 頁重同步、網站副本位元組相同。
+- [Codex] `codex-oracle.ps1`（只含本批改動的暫存 worktree）1 finding 已修：F1 連點「執行分析」在第一個 POST 回來前會送兩次 `/interpret`（兩次計費）→ `MethodForm` 送出中 `useRef` 鎖＋按鈕 disabled「分析中…」；頁面 `busy={pendingId}` 並在 onSubmit 再擋一次。突變：拔掉 `inFlight` 鎖 → `one analysis per click` 測試紅，還原綠。
+- [未做→下一批] 課程頁（冰山、做一個決定）上網站＋各頁連到課程；結果頁 U14（有課程時讀圖說明移到課程「看懂結果」分頁）；部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 API :8420＋next dev :3930：Playwright 填寫頁空白／示範／真模型執行截圖（結果 10 段、輸入卡仍在、無橫向捲動）＋`playwright-runner.ps1 -Mode cognitive` 真模型 e2e 1 passed（1.3m）＋web vitest 24 passed、tsc 0＋check-mocks 綠＋自測 190/190 抓到、144/144 規則有例 | exit=0 | ms=78000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`agency-os/reports/oracle/2026-09-26-review-4a8f2755.md`，已修）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os/apps,agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/docs,scripts,.claude/commands,lobster-factory/infra/hetzner-phase1-core/tests | grep=`開始解讀|strings\.interpret|examplePlaceholder` | hits=2（`MethodForm.tsx:76,87` 定義與使用；舊標籤 0）
+- BUGHUNT_SCOPE_NARROW: 改動只在網站元件、兩個登錄檔與 e2e；agency-os 取 COS 規格文件子樹
 ## 2026-09-26（續37）研究線 P1 第一批：WC-P1-01／02／03（COS）＋10／11／12／13（next-admin／workflows）落碼
 - [狀態] 01＋03、02、10、11、12、13 已 commit（各卡驗收＋突變）；08（egress 兩處＋parity 測試）已寫、待下一批 review 一起 commit；04–07 要改 `main.py`，另一 session 正改同檔（`/catalog`，未提交）→ 等它提交再做；14／09／15 High-STOP 未動。
 - [卡修正]（§12.7 回填由 WC-P1-15 做）

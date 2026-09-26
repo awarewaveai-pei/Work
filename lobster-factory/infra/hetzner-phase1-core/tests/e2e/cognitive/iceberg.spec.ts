@@ -37,7 +37,7 @@ test('login -> iceberg -> result page sections including 5b', async ({ page }) =
       await route.fulfill({ status, contentType: 'application/json', headers, body: JSON.stringify(body) });
     });
   }
-  await page.goto('/login');
+  await page.goto('/login', { waitUntil: 'networkidle' });   // a click before hydration submits the bare HTML form
   await page.getByLabel('Tenant ID').fill(tenant!);
   await page.getByLabel('Email').fill(email!);
   await page.getByLabel('Password').fill(password!);
@@ -56,13 +56,13 @@ test('login -> iceberg -> result page sections including 5b', async ({ page }) =
   }
   await expect(page).toHaveURL(/\/methods\/systems\.iceberg_model\/run$/);
   await expect(page.getByRole('heading', { level: 1, name: '冰山模型' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '我的專案' }).locator('..').getByRole('button').first()).toBeVisible();
-  await page.getByRole('button', { name: '用示範案例試一次' }).click();
+  await expect(page.locator('.status').getByRole('button').first()).toBeVisible();   // the project the run is saved in
+  await page.getByRole('button', { name: '用示範案例填入' }).click();
   const doneResponse = page.waitForResponse(async (response) => {
     if (!/\/api\/interpretations\/INTERP-/.test(response.url()) || !response.ok()) return false;
     return (await response.json()).status === 'DONE';
   }, { timeout: 150_000 });
-  await page.getByRole('button', { name: '開始解讀' }).click();
+  await page.getByRole('button', { name: '執行分析' }).click();
   const completed = await (await doneResponse).json() as { result: { findings: Array<{ citations: string[] }> } };
   await expect(page.locator('[data-section="0"]')).toBeVisible({ timeout: 150_000 });
   await expect(page.locator('[data-section]')).toHaveCount(10);

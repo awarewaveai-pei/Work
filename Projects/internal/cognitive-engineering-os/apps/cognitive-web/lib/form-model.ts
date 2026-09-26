@@ -79,6 +79,8 @@ function serializeValue(field: FormField, value: unknown, defs: Record<string, F
     const branch = serializeFields(chosen.fields ?? [], source, defs, chosen.conditions, depth + 1);
     return field.synthetic ? branch : { [field.discriminator ?? "type"]: chosen.value, ...branch };
   }
+  // a text list is edited one item per line: a blank line is not an item
+  if (kind === "list") return (Array.isArray(value) ? value : []).map((item) => (typeof item === "string" ? item.trim() : item)).filter((item) => item !== "" && item !== null && item !== undefined);
   if (kind === "group") return serializeFields(field.fields ?? [], object(value), defs, field.conditions, depth + 1);
   if (kind === "rows") return (Array.isArray(value) ? value : []).map((item) => serializeValue(field.item ?? { kind: "json" }, item, defs, depth + 1));
   if (kind === "fixed_rows") {

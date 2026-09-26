@@ -23,6 +23,11 @@ _evidence_refs: &evidence_refs
   items: {type: string, pattern: "^E-[0-9]+$"}
 
 methods:
+  systems.iceberg_model:   # the four questions of docs/mockups/iceberg-result-mock.html
+    events: {label: "① 事件：發生了什麼？", hint: "一件具體的事，有時間、有數字；跟上次比多少。"}
+    patterns: {label: "② 模式：以前發生過嗎？多常？跟什麼一起出現？", hint: "一再發生的型態：多久一次、什麼時候特別多。這是線索，不是原因。"}
+    structures: {label: "③ 結構：什麼流程、規則、人力安排在製造它？", hint: "寫制度，不寫某個人：順序、時間分配、表單、權責。"}
+    mental_models: {label: "④ 心智模型：哪個沒說出口的假設撐住這些結構？", hint: "常藏在口頭禪裡；用引號寫一句話，自己的假設也要寫。"}
   framing.five_w_one_h:
     topic: {label: 要釐清的主題, hint: 這六個面向共同在問的那一件事。}
     dimensions: {label: 六何（5W1H）, hint: 每一列：知道答案就選「已知」並寫下來；還不知道就選「未知」，可以寫缺什麼資訊。系統會自動列出資訊缺口。}

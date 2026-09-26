@@ -3,7 +3,7 @@ export const strings = {
   login: "登入",
   methods: "工具",
   projects: "我的專案",
-  interpret: "開始解讀",
+  interpret: "執行分析",
   howToRead: "怎麼讀",
   whatToDo: "你要做的",
 };

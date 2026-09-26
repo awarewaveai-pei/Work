@@ -24,7 +24,7 @@
   *{box-sizing:border-box}
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
-  .wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}
+  .wrap{width:100%;max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:16px}   /* width: a grid item with auto margins would shrink to its content */
   .app{display:grid;grid-template-columns:216px minmax(0,1fr);align-items:start;min-height:100vh}
   .side{position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:14px 10px;background:var(--card);border-right:1px solid var(--line)}
   .side .brand{display:flex;flex-direction:column;padding:4px 12px 14px;color:var(--ink);text-decoration:none;line-height:1.35}
