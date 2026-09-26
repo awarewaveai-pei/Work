@@ -13,7 +13,8 @@ deletes index + marker.
   python scripts/git-partial-worktree-commit.py stage <shared-file> (--worklog-entry N [--date D] | --range A-B ... | --keep-re REGEX)
                                                      [--index PATH] [-- <own files>...]
       first call creates <scratch>/<roottag>-<rand>.index (+ .json marker); later calls pass --index to add to it.
-      <own files> are added whole from the worktree (git add under the private index; untracked is fine).
+      <own files> are added whole from the worktree (git add under the private index; untracked is fine; a tracked
+      file missing from the worktree is staged as a deletion and listed as "own deletions staged").
   python scripts/git-partial-worktree-commit.py show --index PATH      what the private index would commit
   python scripts/git-partial-worktree-commit.py drop --index PATH      discard index + marker (nothing committed)
   then, exactly as printed:  GIT_INDEX_FILE=<path> git commit -F <msg>
@@ -248,6 +249,12 @@ def stage(args):
                 marker["base"][p] = head_blob(p)
     save_marker(index_path, marker)
     print(f"staged {rel}: {what} -> blob {blob[:12]}; own files: {len(own)}")
+    if own:
+        # An own file missing from the worktree is staged as a deletion; say so, since a file removed by
+        # accident (another session, a reset) would otherwise ride along silently.
+        gone = run("git", "diff", "--cached", "--name-only", "--diff-filter=D", "--", *own, env=env).stdout.decode().splitlines()
+        if gone:
+            print(f"own deletions staged ({len(gone)}): {' '.join(gone)}")
     print(f"private index: {index_path}")
     print(f"next: GIT_INDEX_FILE={index_path} git commit -F <msg>")
     print(f"more: python scripts/git-partial-worktree-commit.py stage <file> ... --index {index_path} [-- <own files>]")

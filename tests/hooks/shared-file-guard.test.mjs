@@ -130,6 +130,37 @@ test('private index tampered after stage (shared-file blob != marker) -> BLOCK; 
   assert.match(t.reason, /private index blob is not the one git-partial-worktree-commit\.py built|private index blob differs from the marker/);
 });
 
+test('an own file deleted on purpose is committed through the private index; restored after staging -> BLOCK', () => {
+  const { dir, scratch } = makeRepo();
+  fs.writeFileSync(path.join(dir, 'gone.txt'), 'old\n');
+  g(dir, ['add', '--', 'gone.txt']);
+  g(dir, ['commit', '-q', '-m', 'add gone']);
+  dirtyBoth(dir);
+  fs.unlinkSync(path.join(dir, 'gone.txt'));
+  const s1 = helper(dir, scratch, ['stage', WORKLOG, '--worklog-entry', '2', '--date', '2026-09-23', '--', 'own.txt', 'gone.txt']);
+  assert.equal(s1.status, 0, s1.out + s1.err);
+  assert.match(s1.out, /^own deletions staged \(1\): gone\.txt$/m, 'a deletion is announced, never silent');
+  const idx = (s1.out.match(/^private index: (.+)$/m) || [])[1];
+  assert.ok(idx, s1.out);
+  const cmd = `GIT_INDEX_FILE=${idx} git commit -q -m mine`;
+
+  fs.writeFileSync(path.join(dir, 'gone.txt'), 'old\n'); // came back after the deletion was staged
+  const back = verdict(bash('PreToolUse', cmd, dir, scratch));
+  assert.equal(back.deny, true);
+  assert.match(back.reason, /gone\.txt: changed after staging/);
+  fs.unlinkSync(path.join(dir, 'gone.txt'));
+
+  const pre = verdict(bash('PreToolUse', cmd, dir, scratch));
+  assert.equal(pre.deny, false, pre.reason);
+  const c = g(dir, ['commit', '-q', '-m', 'mine'], { GIT_INDEX_FILE: idx });
+  assert.equal(c.status, 0, c.err);
+  assert.equal(g(dir, ['ls-tree', '--name-only', 'HEAD', 'gone.txt']).out, '', 'deletion committed');
+  assert.equal(g(dir, ['show', 'HEAD:own.txt']).out, 'mine');
+  bash('PostToolUse', cmd, dir, scratch);
+  assert.equal(g(dir, ['diff', '--cached', '--name-only']).out, '', 'shared index synced: no stale gone.txt entry left behind');
+  assert.equal(fs.existsSync(idx), false, 'index removed after the commit');
+});
+
 test('env-prefixed commit is still a commit for the other gates: GIT_INDEX_FILE=... git commit with an unverified file -> verify-gate-commit BLOCK', () => {
   const { dir, scratch } = makeRepo();
   const sid = freshSid('sfg-vgc');

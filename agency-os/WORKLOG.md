@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-26（續23）私有 index 提交支援刪檔：刪除自己的檔可經 git-partial-worktree-commit.py 提交，且一律印出
+- [根因] `mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js:391`（validatePrivateIndex）對每個 own file 做 `hash-object`，檔案不在工作區就判「own file missing」擋下；刪檔無法走私有 index，T17（續22）只好拆成改動＋另建臨時 index 刪檔兩個 commit，並手動 `git reset` 共用 index 的殘留項。
+- [修]
+  - guard：私有 index 無此路徑且工作區也無 → 視為刻意刪除放行；刪了又放回工作區 → 照舊判「changed after staging」。
+  - `scripts/git-partial-worktree-commit.py` stage：own 中被暫存為刪除的路徑印成 `own deletions staged (N): ...`（舊規則其實也在攔意外刪除，改成可見而非靜默）；docstring 同步。
+  - 提交後同步共用 index 不用改：own file 的 base 記 HEAD blob（:248），刪除路徑的共用 index 舊項等於 base → 被 reset。
+- [部署] `scripts/sync-claude-userlevel.ps1 -Mode merge`（只更新這支 hook）→ `-Mode verify` PASS；live 與 SSOT 逐位元組相同。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/shared-file-guard.test.mjs 12/12（新案例：刪除可提交＋PostToolUse 後共用 index 無殘留；放回 → BLOCK；刪除必印出）；bash scripts/test-hooks.sh 299/299；pytest tests/scripts/git_partial_worktree_commit_test.py 5/5；突變 拿掉放行條件 → 新案例紅、拿掉印出 → 新案例紅，還原 12 綠 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（書面對抗自審，未另派 subagent：3 行 guard 分支＋印出；n1 放寬會讓意外刪除靜默提交 → 已改為印出）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=own file missing|untracked is fine | hits=2（guard 本身的錯誤訊息仍保留給「有 index 項但工作區缺檔」；docstring 已改）；.claude 0
 ## 2026-09-26（續22）雲端 T17 驗收後併入 main：WP 更新與 staging 建站過 production-change gate（依被改動的 org 把關），gate 搬到 lib/system-modes；WP 更新按鈕 400 修正
 - [來源] 雲端 session（Sonnet 5）`claude/cc-t17-production-change-gate` 1b8003c10＋36c30bcae；額度 $30 起算。
 - [根因] 不變量「改動正式環境的伺服器路徑只在 mode=normal 執行」T16 只蓋修復中心；同類兩條沒把關：

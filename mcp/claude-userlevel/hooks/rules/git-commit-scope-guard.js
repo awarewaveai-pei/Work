@@ -388,6 +388,9 @@ function validatePrivateIndex(indexPath, marker, cwd) {
       if (idxBlob !== marker.entries[p]) problems.push(`${p}: private index blob differs from the marker (re-run stage)`);
     } else if (own.has(p)) {
       const wt = gitOut(['hash-object', '--', p], cwd);
+      // An own file deleted on purpose: gone from the private index and from the worktree alike. If it came back
+      // after staging, wt !== idxBlob (null) below reports it like any other post-stage change.
+      if (idxBlob === null && wt === null) continue;
       if (wt === null) problems.push(`${p}: own file missing from the worktree`);
       else if (wt !== idxBlob) problems.push(`${p}: changed after staging (re-run stage -- <files> so the commit carries the current content)`);
     } else {
