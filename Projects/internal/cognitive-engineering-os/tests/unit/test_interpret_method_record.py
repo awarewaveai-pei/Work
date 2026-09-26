@@ -106,6 +106,16 @@ class InterpretationTests(unittest.TestCase):
         result = evaluate_interpretation_gates({"findings": [{"citations": ["r/events/0"]}], "visual": {"bindings": {"path": "events/0"}}, "next_methods": []}, RECORD, build_prompt_manifest(RECORD), set())
         self.assertEqual(result[1]["status"], "FAIL")
 
+    def test_generic_binding_label_is_not_exempt_from_path_gate(self):
+        result = evaluate_interpretation_gates({"findings": [{"citations": ["r/events/0"]}], "visual": {"kind": "graph", "bindings": {"label": "r/missing"}}, "next_methods": []}, RECORD, build_prompt_manifest(RECORD), set())
+        self.assertEqual(result[1]["status"], "FAIL")
+        self.assertIn("r/missing", result[1]["evidence"]["paths"])
+
+    def test_layered_level_label_is_display_text_not_path(self):
+        result = evaluate_interpretation_gates({"findings": [{"citations": ["r/events/0"]}], "visual": {"kind": "layered", "bindings": {"levels": [{"label": "Events", "path": "r/events/0"}]}}, "next_methods": []}, RECORD, build_prompt_manifest(RECORD), set())
+        self.assertEqual(result[1]["status"], "PASS")
+        self.assertEqual(result[1]["evidence"]["paths"], ["r/events/0"])
+
     def test_next_method_out_of_catalog_fails(self):
         result = evaluate_interpretation_gates({"findings": [{"citations": ["r/events/0"]}], "visual": {"bindings": {}}, "next_methods": ["fake.missing"]}, RECORD, build_prompt_manifest(RECORD), set())
         self.assertEqual(result[2]["status"], "FAIL")

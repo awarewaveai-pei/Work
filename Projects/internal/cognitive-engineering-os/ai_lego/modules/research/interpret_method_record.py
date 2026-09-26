@@ -196,16 +196,18 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
     manifest_ids = {str(item.get("id")) for item in manifest}
     citations = _citation_ids(interpretation)
     citation_ok = bool(interpretation.get("findings")) and bool(citations) and all(c in manifest_ids for c in citations)
-    bindings = interpretation.get("visual", {}).get("bindings", {}) if isinstance(interpretation.get("visual"), Mapping) else {}
+    visual = interpretation.get("visual")
+    bindings = visual.get("bindings", {}) if isinstance(visual, Mapping) else {}
+    is_layered = isinstance(visual, Mapping) and visual.get("kind") == "layered"
     binding_paths: list[str] = []
-    def collect(value: Any) -> None:
+    def collect(value: Any, *, level_item: bool = False) -> None:
         if isinstance(value, str): binding_paths.append(value)
         elif isinstance(value, Mapping):
             for key, child in value.items():
-                if key != "label":
-                    collect(child)
+                if not (level_item and key == "label"):
+                    collect(child, level_item=is_layered and key == "levels")
         elif isinstance(value, list):
-            for child in value: collect(child)
+            for child in value: collect(child, level_item=level_item)
     collect(bindings)
     visual_ok = all(path in manifest_ids for path in binding_paths)
     next_methods = interpretation.get("next_methods", [])

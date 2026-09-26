@@ -1132,7 +1132,8 @@ def _run_interpretation(
                         outcome["model"], outcome["input_tokens"], outcome["output_tokens"],
                     )
                 except Exception as usage_failure:
-                    error = f"AI_USAGE_RECORD_FAILED: {type(usage_failure).__name__}"
+                    usage_error = f"AI_USAGE_RECORD_FAILED: {type(usage_failure).__name__}"
+                    error = f"{error}; {usage_error}" if error else usage_error
     if error is not None or outcome is None or outcome["interpretation"] is None:
         failure = {"interpretation_id": interpretation_id, "error": error or "INTERPRETATION_FAILED"}
         if outcome is not None:
