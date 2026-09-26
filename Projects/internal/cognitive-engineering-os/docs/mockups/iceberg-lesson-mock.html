@@ -48,7 +48,6 @@
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
-  .top .skip{font-size:13px;color:var(--muted)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -74,9 +73,6 @@
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
-  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
-  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .progress span.done{background:var(--accent);color:var(--bg)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
@@ -218,6 +214,21 @@
   details.dir summary{font-size:15px;color:var(--ink)}
   details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
   details.dir .tool{border-top:none;padding-left:12px}
+  /* == lesson tabs (plan U15: one kind of content per tab; WAI-ARIA tabs: button[role=tab] + section[role=tabpanel]) == */
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 14px}
+  .tab{border:0;border-bottom:3px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 12px;cursor:pointer}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab small{font-weight:400;font-size:11.5px;margin-left:4px}
+  .tabnext{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  /* == the one action a page exists for (start a case, fill the fields): a thick accent frame and a big button == */
+  .card.cta{border:2px solid var(--accent)}
+  .btn.big{font-size:16px;font-weight:700;padding:12px 22px}
+  /* == run form (the tool page's input, plan U14): label, one-line hint, the field; .layer .lN colours a layer field == */
+  .field{display:grid;gap:4px;padding:8px 0 8px 14px;border-left:6px solid var(--line);margin-top:10px}
+  .field label,.field>b{font-weight:700}
+  .field .hint{font-size:12.5px;color:var(--muted);margin:0}
+  .carried{background:var(--soft);border-radius:8px;padding:8px 10px;font-size:13.5px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -256,18 +267,19 @@
   // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
   // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
   // the details itself); the home router does the same for its views.
+  // window.mockNote is the one note writer (run-form-script uses it too): one p.mocknote right after `row`, reused.
+  window.mockNote = function (row, text) {
+    var note = row.nextElementSibling;
+    if (!note || !note.classList.contains("mocknote")) {
+      note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+      row.parentNode.insertBefore(note, row.nextSibling);
+    }
+    note.textContent = text;
+  };
   (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
     document.addEventListener("click", function (e) {
       var b = e.target.closest && e.target.closest("button[data-mock]");
-      if (b) {
-        var row = b.closest(".btns") || b, note = row.nextElementSibling;
-        if (!note || !note.classList.contains("mocknote")) {
-          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
-          row.parentNode.insertBefore(note, row.nextSibling);
-        }
-        note.textContent = "示意稿：" + b.getAttribute("data-mock");
-        return;
-      }
+      if (b) { window.mockNote(b.closest(".btns") || b, "示意稿：" + b.getAttribute("data-mock")); return; }
       var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
       var d = t && t.closest("details");
       if (d) d.open = true;
@@ -275,6 +287,60 @@
   });
 </script>
 <!-- == partial: page-actions-script: end == -->
+<!-- == partial: tabs-script: start (verbatim from partials/tabs-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Lessons (plan U15, operator 2026-09-25: one kind of content per tab, not one long page). .tabs[role=tablist] holds
+  // button[role=tab][aria-controls] tabs; each controls one section[role=tabpanel] (WAI-ARIA tabs, automatic activation:
+  // click, or ←/→/Home/End on the focused tab; roving tabindex). The address picks a tab too — #panel-<id> or any id
+  // inside a panel (the tool page links to #panel-read), on load and on hashchange — and so does an in-page link or a
+  // [data-tab-go="<id>"] button pointing into a hidden panel. Visibility uses the hidden attribute only.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs [role="tab"]'));
+    if (!tabs.length) return;
+    var bar = tabs[0].parentNode;
+    function select(tab, focus) {
+      tabs.forEach(function (t) {
+        var on = t === tab, p = document.getElementById(t.getAttribute("aria-controls"));
+        t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1;
+        if (p) p.hidden = !on;
+      });
+      if (focus) tab.focus();
+    }
+    function tabFor(el) {
+      var p = el && el.closest && el.closest('[role="tabpanel"]');
+      return p ? tabs.filter(function (t) { return t.getAttribute("aria-controls") === p.id; })[0] : null;
+    }
+    function route() {
+      var id = location.hash.slice(1);
+      try { id = decodeURIComponent(id); } catch (e) {}          // a malformed %-escape: use the raw hash
+      var el = id && document.getElementById(id), t = tabFor(el);
+      if (!t) return;
+      select(t);
+      (el.getAttribute("role") === "tabpanel" ? bar : el).scrollIntoView();
+    }
+    document.addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest('.tabs [role="tab"]');
+      if (t) { select(t); return; }
+      var go = e.target.closest && e.target.closest("[data-tab-go]");
+      if (go) {
+        var g = document.getElementById("tab-" + go.getAttribute("data-tab-go"));
+        if (g) { select(g, true); bar.scrollIntoView(); }
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), at = a && tabFor(document.getElementById(a.getAttribute("href").slice(1)));
+      if (at) select(at);
+    });
+    bar.addEventListener("keydown", function (e) {
+      var i = tabs.indexOf(document.activeElement);
+      var n = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : null;
+      if (i < 0 || n === null) return;
+      e.preventDefault(); select(tabs[(n + tabs.length) % tabs.length], true);
+    });
+    window.addEventListener("hashchange", route);
+    route();
+  });
+</script>
+<!-- == partial: tabs-script: end == -->
 </head>
 <body>
 <div class="app">
@@ -289,23 +355,61 @@
   <!-- == partial: app-nav: end == -->
 <main class="wrap">
 
-  <div class="banner"><b>示意稿</b>：這是第一次用「冰山模型」的人，按下工具之前會先看到的一堂課。之後每個工具都有一堂，內容來自工具資料，會隨回饋改進。</div>
+  <div class="banner"><b>示意稿</b>：這是第一次用「冰山模型」的人，按下工具之前會先看到的一堂課：最上面一張「開始」卡，下面的分頁按內容分開，不用一次看完。之後每個工具都照這個樣子有一堂，內容來自工具資料，會隨回饋改進。</div>
   <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools">工具</a> › <a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.iceberg_model">冰山模型</a> › 5 分鐘課</div>
 
   <div class="top">
     <div>
       <h1>冰山模型：開始前 5 分鐘</h1>
-      <div class="sub">六步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
+      <div class="sub">想直接做，按下面的「開始填我的案例」；想先學，照分頁一頁一頁看，每頁不到兩分鐘。</div>
     </div>
-    <span class="skip">看過了？<a href="#start">跳過，直接開始</a></span>
   </div>
-  <div class="progress"><span class="done">1 這是什麼</span><span>2 四層</span><span>3 看一個例子</span><span>4 怎麼填</span><span>5 常見錯誤</span><span>6 開始</span></div>
-  <div class="status"><span class="pill ok">工具齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、知道什麼時候不該用</span><span>底部有教材版（給老師／帶領者）</span></div>
+  <div class="status"><span class="pill ok">工具齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、看懂結果頁、知道什麼時候不該用</span><span>教材版在「教材版」分頁（給老師／帶領者）</span></div>
 
-  <!-- 1 -->
+  <!-- 開始：這堂課唯一的主要動作，永遠在最上面 -->
+  <div class="card cta" id="start">
+    <h2>開始：填你自己的案例<small>準備 30 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>這張卡一直在最上面；下面的分頁是課程，看完或看到一半都能回來按。<b>你要做的</b>按「開始填我的案例」；還不確定，先用示範案例試一次，或按第三顆讓系統幫你挑。</div>
+    <div class="btns">
+      <a class="btn primary big" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →<small>四個空格子，每格旁邊有提示和例子；按「執行分析」才開始</small></a>
+      <a class="btn" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#demo">用示範案例試一次<small><span class="ex" data-set="edd">主動分享 6 → 2 人那個例子，已填好，按執行就看結果</span><span class="ex" data-set="partner" hidden>畫廊延後付款那個例子，已填好，按執行就看結果</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，已填好，按執行就看結果</span><span class="ex" data-set="ecom" hidden>退貨率 12% 那個例子，已填好，按執行就看結果</span><span class="ex" data-set="daily" hidden>週日晚上吵架那個例子，已填好，按執行就看結果</span></small></a>
+      <a class="btn ghost" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這工具適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></a>
+    </div>
+    <p class="sub mt10 mb0">手邊有這些會填得比較快，沒有也可以先填、之後補：</p>
+    <ul class="check">
+      <li>一件具體的事（時間、數字）</li>
+      <li>過去半年左右的紀錄或數字（同一件事發生幾次）</li>
+      <li>相關的流程、規則、人力安排</li>
+      <li>你們開會時常常出現的那句話（信念通常藏在口頭禪裡）</li>
+    </ul>
+    <p class="sub mb0">這堂課之後不會再自動出現；想再看，工具頁右上角「怎麼用？」隨時能打開，會另開一個分頁，填到一半的格子不會不見。</p>
+  </div>
+
+  <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
+    <div class="chips" role="tablist" aria-label="例子領域">
+      <span class="sub">例子領域：</span>
+      <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="partner" id="chip-partner">合作對象</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="decision" id="chip-decision">一個決策</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
+    </div>
+  <!-- == partial: domain-chips: end == -->
+  <!-- == partial: lesson-tabs: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <div class="tabs" role="tablist" aria-label="課程內容">
+    <button class="tab" type="button" role="tab" id="tab-learn" aria-controls="panel-learn" aria-selected="true" tabindex="0">認識<small>1.5 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-example" aria-controls="panel-example" aria-selected="false" tabindex="-1">看例子<small>1 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-fill" aria-controls="panel-fill" aria-selected="false" tabindex="-1">怎麼填<small>1.5 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-read" aria-controls="panel-read" aria-selected="false" tabindex="-1">看懂結果<small>1 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-teach" aria-controls="panel-teach" aria-selected="false" tabindex="-1">教材版</button>
+    <button class="tab" type="button" role="tab" id="tab-sources" aria-controls="panel-sources" aria-selected="false" tabindex="-1">來源</button>
+  </div>
+  <!-- == partial: lesson-tabs: end == -->
+
+  <section class="tabpanel" id="panel-learn" role="tabpanel" aria-labelledby="tab-learn">
   <div class="card">
-    <h2>1. 這是什麼<small>30 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>先讀三段文字，再看下面那張四層冰山：左邊是每層要問的問題，右邊是在那一層出手會得到什麼；分析結果頁用的是同一張圖，只是填上你的資料。<b>你要做的</b>不用做；只看「什麼時候不用」那一句：你的問題如果是一次性的意外，這個工具不適合，去第 6 步按第三顆按鈕。</div>
+    <h2>這是什麼<small>30 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>先讀三段文字，再看下面那張四層冰山：左邊是每層要問的問題，右邊是在那一層出手會得到什麼；結果頁用的是同一張圖，只是填上你的資料。<b>你要做的</b>不用做；只看「什麼時候不用」那一句：你的問題如果是一次性的意外，這個工具不適合，去最上面「開始」卡按第三顆按鈕。</div>
     <div class="grid2">
       <div>
         <p class="lead">冰山浮在水面上的只有一小角。<b>問題也是</b>：你看到的是「發生了什麼事」，真正決定它一再發生的原因藏在水面下。</p>
@@ -359,22 +463,15 @@
         </g>
       </svg>
     </div>
+    <div class="grid2c">
+      <div class="can"><b>這工具能回答</b>問題為什麼一再發生（哪一層在推）、先在哪一層出手最值得、接下來該做什麼。</div>
+      <div class="cant"><b>這工具不能回答</b>誰對誰錯；你填的內容以外的事實（除非接上資料蒐集）；數字目標由你定，AI 不替你定。</div>
+    </div>
   </div>
 
-  <!-- 2 -->
   <div class="card">
-    <h2>2. 四層，各配一個你領域的例子<small>1 分鐘</small></h2>
-    <div class="how"><b>怎麼讀</b>先按你的領域，再從上往下看四層各一個例子；每層的「問」是你之後要回答的問題 <cite>[3]</cite>。<b>你要做的</b>按一個領域（第 3–6 步的例子會跟著換）；把你自己的問題在心裡套進四層試一次。</div>
-    <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
-    <div class="chips" role="tablist" aria-label="例子領域">
-      <span class="sub">例子領域：</span>
-      <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
-      <button class="chip" role="tab" aria-selected="false" data-set="partner" id="chip-partner">合作對象</button>
-      <button class="chip" role="tab" aria-selected="false" data-set="decision" id="chip-decision">一個決策</button>
-      <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
-      <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
-    </div>
-    <!-- == partial: domain-chips: end == -->
+    <h2>四層，各配一個你領域的例子<small>1 分鐘</small></h2>
+    <div class="how"><b>怎麼讀</b>先在分頁上面按你的領域，再從上往下看四層各一個例子；每層的「問」是你之後要回答的問題 <cite>[3]</cite>。<b>你要做的</b>按一個領域（每個分頁的例子都會跟著換）；把你自己的問題在心裡套進四層試一次。</div>
     <div class="grid2" id="examples">
       <div class="exlayer l1"><b>① 事件 Events（看得見）</b><div class="q">問：發生了什麼？</div>
         <div class="ex" data-set="edd">例：第 6 次 session，8 人只有 2 人主動說自己的作品；第 1 次是 6 人。</div>
@@ -403,10 +500,12 @@
     </div>
     <p class="sub mt10 mb0">記法：事件是「一次」，模式是「一再」，結構是「為什麼一再」，心智模型是「為什麼沒人改」。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
   </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="example">下一個分頁：看例子 →</button><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a></div>
+  </section>
 
-  <!-- 3 -->
+  <section class="tabpanel" id="panel-example" role="tabpanel" aria-labelledby="tab-example" hidden>
   <div class="card">
-    <h2>3. 看一個做完的例子<small>1 分鐘</small></h2>
+    <h2>看一個做完的例子<small>1 分鐘</small></h2>
     <div class="how"><b>怎麼讀</b>左到右：這一層填了什麼、只看這一層會做什麼；越往下的解法越根本。<b>你要做的</b>不用做；想看做完的完整結果按下面的按鈕。</div>
     <div id="worked">
     <div class="ex" data-set="edd">
@@ -463,10 +562,12 @@
     <p class="sub mt8 mb0">每往下一層，看得到的解法就不一樣。工具做完分析後，你會得到一頁像這樣、但更完整的結果：</p>
     <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small><span class="ex" data-set="edd">同一個案例，做完的九段結果</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的結果頁；這個領域的結果頁在 P3 隨工具資料產出</span></small></a></div>
   </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="fill">下一個分頁：怎麼填 →</button><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a></div>
+  </section>
 
-  <!-- 4 -->
+  <section class="tabpanel" id="panel-fill" role="tabpanel" aria-labelledby="tab-fill" hidden>
   <div class="card">
-    <h2>4. 怎麼填：四步，每步一個好例子和一個壞例子<small>1.5 分鐘</small></h2>
+    <h2>怎麼填：四格，每格一個好例子和一個壞例子<small>1 分鐘</small></h2>
     <div class="how"><b>怎麼讀</b>每步一好一壞，壞例括號裡寫的是它缺什麼。<b>你要做的</b>拿你的那件事，照「好」的樣子在心裡寫一句；寫不出來的那一層就是你要去補資料的層。</div>
     <div class="step"><div class="n">1</div><div><b>把事件講清楚</b>：一件具體的事、有時間、有數字。
       <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：第 6 次 session 8 人只有 2 人主動分享；第 1 次是 6 人。</div><div class="bad"><b>壞</b>：大家都不認真。（哪一次？幾人？跟第 1 次比呢？）</div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：這檔展覽結束 45 天還沒收款，合約寫 30 天；上一檔延了 60 天。</div><div class="bad"><b>壞</b>：他們老是拖。（哪一檔？幾天？合約寫幾天？）</div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：這個月 5 位家長問平日班；去年同月 2 位。</div><div class="bad"><b>壞</b>：很多人在問。（幾位？哪個月？跟去年比呢？）</div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：本月退貨率 12%，上月 5%；退的 70% 是尺寸類。</div><div class="bad"><b>壞</b>：退貨變多了。（多少？哪一類？跟上月比呢？）</div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：週日晚上為了誰洗碗吵了 20 分鐘；這個月第 3 次。</div><div class="bad"><b>壞</b>：我們最近常吵。（哪一天？為了什麼？幾次？）</div></div></div></div></div>
@@ -479,10 +580,9 @@
     <p class="sub mt8 mb0">填不出某一層沒關係，留白比硬湊好；工具會把它列成「證據缺口」，告訴你該去補什麼資料。</p>
   </div>
 
-  <!-- 5 -->
   <div class="card">
-    <h2>5. 常見錯誤<small>30 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>四條，每條都是「看起來對、其實錯」。<b>你要做的</b>對照你第 4 步心裡寫的那句，看有沒有中。</div>
+    <h2>常見錯誤<small>30 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>四條，每條都是「看起來對、其實錯」。<b>你要做的</b>對照你上面心裡寫的那幾句，看有沒有中。</div>
     <div class="mistake"><i>✕</i><span><b>急著怪人</b>：一直問「是誰」，就挖不到「為什麼」。結構層要寫制度，不寫名字。</span></div>
     <div class="mistake"><i>✕</i><span><b>跳層</b>：從事件直接跳到「他們心態有問題」。中間的模式和結構才是能動手改的地方。</span></div>
     <div class="mistake"><i>✕</i><span><b>把模式當原因</b>：<span class="ex" data-set="edd">「每期第 4 次之後分享變少」是模式，不是原因；原因是第 4 次之後流程哪裡變了。</span><span class="ex" data-set="partner" hidden>「每檔展覽都延後付款」是模式，不是原因；原因是合約和結帳流程哪裡讓它一再發生。</span><span class="ex" data-set="decision" hidden>「每年暑假前詢問暴增」是模式，不是原因；原因是教室和排班怎麼安排才讓它每年重演。</span><span class="ex" data-set="ecom" hidden>「每次上新品退貨就衝高」是模式，不是原因；原因是上架和退貨流程哪裡漏了。</span><span class="ex" data-set="daily" hidden>「每次都在週日晚上吵」是模式，不是原因；原因是那個晚上的安排哪裡讓兩個人都最累。</span></span></div>
@@ -516,36 +616,47 @@
     </div>
   </div>
 
-  <!-- 6 -->
-  <div class="card" id="start">
-    <h2>6. 開始<small>準備 30 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>準備清單，沒有也能先填。<b>你要做的</b>選一顆按鈕；不確定這工具適不適合你的問題，按第三顆。</div>
-    <p>手邊有這些會填得比較快，沒有也可以先填、之後補：</p>
-    <ul class="check">
-      <li>一件具體的事（時間、數字）</li>
-      <li>過去半年左右的紀錄或數字（同一件事發生幾次）</li>
-      <li>相關的流程、規則、人力安排</li>
-      <li>你們開會時常常出現的那句話（信念通常藏在口頭禪裡）</li>
-    </ul>
-    <div class="btns">
-      <a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">用示範案例試一次<small><span class="ex" data-set="edd">主動分享 6 → 2 人那個例子，已填好，按執行就看結果</span><span class="ex" data-set="partner" hidden>畫廊延後付款那個例子，已填好，按執行就看結果</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，已填好，按執行就看結果</span><span class="ex" data-set="ecom" hidden>退貨率 12% 那個例子，已填好，按執行就看結果</span><span class="ex" data-set="daily" hidden>週日晚上吵架那個例子，已填好，按執行就看結果</span></small></a>
-      <button type="button" class="btn" data-mock="正式版打開冰山模型的填寫頁：四個格子，每格旁邊有提示；你確認才執行。">開始填我的案例<small>四個格子，每格旁邊有提示</small></button>
-      <a class="btn" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這工具適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></a>
-    </div>
-    <p class="sub mt10 mb0">這堂課之後不會再自動出現；想再看，工具頁右上角「怎麼用？」隨時能打開。</p>
-  </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="read">下一個分頁：看懂結果 →</button><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a></div>
+  </section>
 
+  <section class="tabpanel" id="panel-read" role="tabpanel" aria-labelledby="tab-read" hidden>
+  <div class="card">
+    <h2>看懂結果：按「執行分析」之後那一頁怎麼讀<small>1 分鐘</small></h2>
+    <div class="how"><b>怎麼讀</b>先看三步讀法，再對照下面的九段；結果頁每段開頭只留一句，詳細讀法都在這裡。<b>你要做的</b>不用做；結果頁哪一段看不懂，回這個分頁找同一個編號。</div>
+    <div class="todos">
+      <div class="todo"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
+      <div class="todo"><b>② 看圖表與四張卡</b>趨勢圖、因果回饋圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
+      <div class="todo"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；接著做什麼，不做也可以。</div>
+    </div>
+    <p class="sub mt8">只有 30 秒？看 ① 的一句話和建議就夠。</p>
+    <div class="terms"><b>四個詞：</b><span><b>事件</b> 這次發生的事</span><span><b>模式</b> 一再發生</span><span><b>結構</b> 為什麼一再</span><span><b>心智模型</b> 為什麼沒人改</span></div>
+    <h3 class="fam">頁首和九段，每段回答一件事</h3>
+    <div class="row"><b>頁首</b><span>上面是你填的四個格子（改了可以重跑），右上角「怎麼用？」開這堂課。狀態列說草稿還是已核准、資料有多少（你填的幾段、外部來源幾筆）、四層完整度、花費；資料少，結論的信心就低。</span></div>
+    <div class="row"><b>① 結論</b><span>一句話＋三個發現，每個發現標信心（高／中／低）和理由；「改判條件」= 出現哪些證據就要改結論。最下面寫你自己的判斷（同意／部分同意／不同意）：你的原話才是紀錄，AI 寫的只是附掛。</span></div>
+    <div class="row"><b>② 冰山圖</b><span>左邊是每層要回答的問題和你填的內容，右邊是在這層出手的方式；★ 是建議先出手的層。圖下的「資料厚度」說哪一層填得最薄；放錯層就回上面改，再執行一次。</span></div>
+    <div class="row"><b>③ 圖表分析</b><span>三張圖各回答一個問題：趨勢（真的在變嗎）、因果迴路（是什麼在推）、槓桿（在哪一層出手最值得）。每張圖下有「怎麼看／看到／注意／來源」；標「示意」的圖要接上真實資料才算數。</span></div>
+    <div class="row"><b>④ 四層解讀</b><span>四張卡同一格式：這層問 → 你填的 → 這代表 → 在這層出手（附槓桿：低／中低／高／最高）→ 對應 ⑦ 的方案 → 資料厚度。找出最薄的一層，之後補資料。</span></div>
+    <div class="row"><b>⑤ 總結</b><span>三句話：問題在哪、先做哪層、還缺什麼（證據缺口）。缺口裡的資料你手上有，就回上面補、再執行一次。</span></div>
+    <div class="row"><b>⑥ 對照表</b><span>一列一層：出手方式、時間取向、這層問的問題、你的案例、建議動作。越往下越慢越難，但越根本；四列都要有人負責，負責人填在 ⑦ 的 B 表。</span></div>
+    <div class="row"><b>⑦ 解決方案</b><span>A 三條路比一比 → B 排成 90 天行動計畫 → C 三個指標盯著、90 天後自動重跑。表裡的字：見效 = 多久看得到；成本 = 要投入什麼；持久度 = 會不會回彈；風險 = 最可能失敗的地方。目標數字由你定，系統只帶入現況。</span></div>
+    <div class="row"><b>⑧ 下一步</b><span>旅程列是你在哪；每張卡寫做了會得到什麼、會自動帶入什麼、還要你填幾格。可以選一張、把建議的幾步串成工作流，或都不做。</span></div>
+    <div class="row"><b>⑨ 引註與核准</b><span>[n] 是那句話的來源：「你的輸入」= 你填的原文，「外部來源」= 抓來的網頁（網址、抓取時間、指紋）。最下面：核准 = 成為專案的正式紀錄；退回 = 寫原因重做，這一版保留；專家模式收著閘門表與 JSON。</span></div>
+  </div>
+  <div class="tabnext"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a><a class="btn" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">對照一個做完的結果頁 →</a></div>
+  </section>
+
+  <section class="tabpanel" id="panel-teach" role="tabpanel" aria-labelledby="tab-teach" hidden>
   <div class="card">
     <h2>教材版：給老師／帶領者<small>同一份資料，另一種排版</small></h2>
-    <div class="how"><b>怎麼讀</b>上面六步是學員版（5 分鐘自學）；這裡把同一堂課排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
+    <div class="how"><b>怎麼讀</b>其他分頁是學員版（5 分鐘自學）；這裡把同一堂課排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
     <details><summary><b>課堂流程（45 分鐘）</b></summary>
       <table class="mt6">
-        <tr><th>分</th><th>做什麼</th><th>用學員版哪一步</th></tr>
-        <tr><td>0–5</td><td>破冰：每人說一件「最近一再發生」的事</td><td>第 1 步「什麼時候用」</td></tr>
-        <tr><td>5–15</td><td>講四層，例子換成學員的領域</td><td>第 2 步（切領域）</td></tr>
-        <tr><td>15–30</td><td>分組把自己的案例填成四層；用好壞例當互評表</td><td>第 4 步</td></tr>
-        <tr><td>30–40</td><td>各組報告；其他組專門找「跳層」和「怪人」</td><td>第 5 步</td></tr>
-        <tr><td>40–45</td><td>收尾：填不出的那一層就是要補資料的層；預告下一步工具</td><td>第 6 步、結果頁 ⑧</td></tr>
+        <tr><th>分</th><th>做什麼</th><th>用學員版哪一頁</th></tr>
+        <tr><td>0–5</td><td>破冰：每人說一件「最近一再發生」的事</td><td>「認識」的「什麼時候用」</td></tr>
+        <tr><td>5–15</td><td>講四層，例子換成學員的領域</td><td>「認識」（切領域）</td></tr>
+        <tr><td>15–30</td><td>分組把自己的案例填成四層；用好壞例當互評表</td><td>「怎麼填」</td></tr>
+        <tr><td>30–40</td><td>各組報告；其他組專門找「跳層」和「怪人」</td><td>「怎麼填」的常見錯誤</td></tr>
+        <tr><td>40–45</td><td>收尾：填不出的那一層就是要補資料的層；帶大家看一次結果頁；預告下一步工具</td><td>「開始」卡、「看懂結果」、結果頁 ⑧</td></tr>
       </table>
     </details>
     <details><summary><b>講稿要點（每步 2–3 句）</b></summary>
@@ -577,7 +688,9 @@
     </details>
     <p class="sub mt8 mb0">教材版和學員版由同一份工具資料生成（來源 [1]–[3]），改課文就同時改兩版。藝術反思工具的帶領腳本（Airtable 的「帶活動者提示用語」「時間分段」「停止活動訊號」）會直接進這一段。</p>
   </div>
+  </section>
 
+  <section class="tabpanel" id="panel-sources" role="tabpanel" aria-labelledby="tab-sources" hidden>
   <div class="card">
     <h2>課程來源（每段課文的 [n]）</h2>
     <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；來源不足的工具會在頂端顯示「知識不足：缺哪幾項」。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
@@ -588,6 +701,7 @@
     </ol>
     <p class="sub">課文由工具自己的資料庫（來源、契約、範例）生成並由人審定；之後每個工具都用同一套規則產生自己的課。</p>
   </div>
+  </section>
 </main>
 </div>
 </body>

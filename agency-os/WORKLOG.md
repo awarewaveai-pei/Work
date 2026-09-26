@@ -37,6 +37,20 @@
 - REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1M/3m（第二輪；第一輪 0c/5M/7m/4s；兩輪 M／m／s 全修，M4 M5 → TASKS）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=WPBRIDGE_(SITE_\d+_)?ORG_ID|failed\.mode|clientId: selectedSiteId|looksLikeDirectWpRestWrite|production-change-gate | hits=舊寫法 0；gate 範圍文件 3 處已改（COMMAND_PLANE_RUNBOOK 中英、COMPLETE_REFERENCE）
 - ORACLE_WAIVED: Codex 正在本機跑 PI-a 14R，不同時佔用；以兩輪 critic＋26 組突變取代
+## 2026-09-26（續25）Cognitive OS 示意稿：課程 = 開始卡＋分頁、工具頁有填寫格子、課程連結另開分頁（plan v1.47 U14／U15／U18）
+- [操作者 2026-09-25] 五分鐘課「開始填我的案例」點了沒東西且不顯眼；「怎麼用？」要另開分頁；工具頁（`iceberg-result-mock.html`）沒有可填的格子；工具頁講解太多，詳解移到課裡、課用分頁，之後所有工具照這個範本。
+- [根因] C1 課程的「開始」是 `data-mock` 按鈕，且主按鈕給了示範案例；C2 結果頁規則（舊 `check_result` U14）要求第一張卡放能／不能、三步、30 秒、四個詞，把教學綁在工具頁；C3 沒有任何規則要求工具頁有輸入欄位，示意稿只畫了「執行後」；C4 連到課程的連結無 `target`。四個都是規格（檢查器）層的缺，不是單頁手誤。
+- [改] 共用層：`design-system.css` 加 `.tabs/.tab/.tabnext`、`.card.cta`、`.btn.big`、`.field/.carried`，刪無人用的 `.progress`、`.top .skip`；新 partial `tabs-script.html`（WAI-ARIA tabs、方向鍵、#panel-* 網址）、`run-form-script.html`（#new 空格子／#demo 填好未執行／預設＝已存的執行；執行、填入示範、清空）；`page-actions-script.html` 抽出 `window.mockNote`。
+- [改] `mockkit.py`：`LESSON_TABS`（工具課六頁、工作流課七頁）→ PER_PAGE partial `lesson-tabs`；`RUN_STATES`；`lesson_link`（`target=_blank rel=noopener`＋↗）；示範工具／工作流的「開始」改真連結到 `#new`。
+- [改] 頁面：兩堂課＝最上面開始卡（唯一主按鈕→工具頁 #new、示範→#demo）＋領域晶片＋分頁；新「看懂結果／看懂總覽」分頁收下工具頁移出的讀法（三步、30 秒、四個詞、逐段）；能／不能移到「認識」。冰山工具頁＝精簡頁首＋四格表單＋結果（`data-when`）；工作流頁＝現在這一站的格子緊接頁首（#new 顯示第 1 站三格、執行後落到第 2 站），「一站一站走」降為次要鈕；怎麼讀條全部 ≤60 字。
+- [改] `check-mocks.py`：讀法只在一處（有課→課的 read 分頁，工具頁不得有 `.can/.cant/.todos/.terms`；沒課的 web 結果頁→第一張卡，PI-a 的 `--page result` 閘照舊綠）；run form（標籤＋範例 placeholder＋執行／填入／清空）、兩種狀態都看得到格子、`data-when` 起始狀態、`#result`；課程開始卡、晶片→分頁→面板順序、卡片不得落在面板外、教材版／來源所在分頁；開課連結另開分頁；`HOW_MAX=60`。selftest 改寫 11 例、新增 18 例；`chips-test.cjs` 加分頁與表單行為（各自對照拿掉腳本的副本必須失敗）；`render-mocks.cjs` 加分頁與 #new 視圖。
+- [發布] 四頁已更新同一連結：課 v21、工作流課 v18、工作流頁 v16、工具頁 v22。首頁（852 KB）未發布：發布器要求先完整讀入線上版，首頁讀不進 context；需操作者同意以 force 覆蓋（線上版＝commit 93488df52 的本 repo 輸出），或另開新連結。
+- [web 待跟，已寫進 plan U14] `web/app/methods/[id]/page.tsx:74` 執行後只回 ResultPage、表單消失；P3 課程層落地時改為表單留在結果上方、讀法移到課。
+- [Codex 對抗審查 3 findings，全數屬實、已修] 在只含本改動的暫時 worktree（HEAD 05917c3b7＋tree b59e65a4）審，避開共享 worktree 他人未 commit 的改動。H1 `check-mocks.py` run form 可見性只看最近一層 `data-when`：巢狀矛盾或無 data-when 的 `[hidden]` 祖先會讓格子兩態都看不到仍過閘 → 改逐格計算有效可見狀態（所有祖先交集、其他 hidden＝兩態都不可見），一張表單在某態算可見＝它每格都可見。M1 開始卡只數第一個 `.btns` 裡的按鈕，卡內他處第二顆主按鈕漏網 → 改數整張卡的 `.btn`。M2 `chips-test.cjs` 沒測 ←、Home、載入後 hashchange → 補，每步驗只剩一個面板＋焦點。證明：新增 3 突變例在修前 checker 上 3 個全 MISSED、修後全 CAUGHT；在副本分別弄壞 tabs-script 的 ArrowLeft／Home／hashchange 分支，chips-test 各自變紅。
+- [剩餘] 課程示範鈕依領域顯示不同案例文字，但工具頁只有藝術反思案（原本就如此）；artifact 檢視器裡 `target=_blank` 未實測（內建瀏覽器未登入 claude.ai）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python check-mocks.py（綠）＋check-mocks.py --page result apps/cognitive-web/.artifacts/iceberg-result.html（綠）＋python check-mocks-selftest.py（189 突變 189 抓到、143 規則 143 有例、0 gap）＋node chips-test.cjs（PASS，40 項各在拿掉腳本的副本上失敗）＋node render-mocks.cjs（無水平溢出，逐張看課 1200/375 px、工具頁 #new／預設、工作流頁、看懂結果分頁）＋build-artifact.py＋Artifact publish ×4 | exit=0 | ms=539333
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=3（Codex `/codex:adversarial-review`，artifact `agency-os/reports/oracle/2026-09-26-review-93246912.md`；1 high 2 medium 全修，見上；另書面自審 1m 已先修）
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts,.claude/commands | grep=skip link|href="#start"|class="progress|progress strip|正式版打開冰山模型的填寫頁|正式版打開「做一個決定」的第 1 站|底部有教材版|check_result(|first card must carry | hits=29（href="#start" 1＝自動生成的 worklog-excerpt 歷史；check_result( 26＝ai_lego reconciliation 同名函式＋檢查器本身；first card must carry 2＝現行規則＋其突變例；其餘 0）
 ## 2026-09-26（續24）next-admin CSRF：靠 session cookie 的 API 寫入只在有同源正面證據時放行（未部署）
 - [根因] staging 站在 `https://aware-wave.com/staging/<slug>/`（`app/api/internal/hosting/provision-staging/route.ts:31`），與 app.aware-wave.com 同站；Supabase session cookie 為 SameSite=Lax、httpOnly:false、host-only（`@supabase/ssr` 預設，`lib/supabase/ssr.ts:27` 未覆寫）；`middleware.ts` 無 Origin／Sec-Fetch-Site 檢查 → 客戶 staging WP 上的 JS 可用 simple POST 帶操作者 cookie 打 `/api/*`。
 - [暴露面（critic m4 更正）]

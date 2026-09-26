@@ -18,12 +18,57 @@ FILES = HOME + RESULT + LESSON
 ARTIFACT = {"home-mock.html": "5j9jef81ts5mqmYpVARNmJ",
             "iceberg-result-mock.html": "7JLjM7mGyqTMLJmCMUmWqq", "iceberg-lesson-mock.html": "653Kt4JtExaujnffNDvygY",
             "workflow-result-mock.html": "7xEwPu9Cp2rWf3P8g9X1Pk", "workflow-lesson-mock.html": "TP18Q3Xif2BphmAfbxxrKU"}
+# Result pages are the tool's run page (plan U14, operator 2026-09-25 「工具頁完全沒看到可以填表的空格」): the fields you
+# fill, then the result. The address picks the state (partials/run-form-script.html): #new = empty fields, #demo = the
+# demo filled in, both before any result; other links may use these two fragments although no element carries them.
+RUN_STATES = ("new", "demo")
+# plan U15 (operator 2026-09-25 「怎麼用？先上 5 分鐘的課 所有的按鍵應該都要用另開新頁面」): a link that opens a lesson
+# opens a new tab, so the page behind it (a half-filled form) stays; the ↗ says so before the click.
+NEW_TAB = ' target="_blank" rel="noopener"'
+
+
+def artifact_href(page, fragment=""):
+    return f"https://claude.ai/artifact/{ARTIFACT[page]}" + (f"#{fragment}" if fragment else "")
+
+
+def lesson_link(page, label, cls="btn", fragment=""):
+    return f'<a class="{cls}" href="{artifact_href(page, fragment)}"{NEW_TAB}>{label} ↗</a>'
+
+
+# plan U15/U18 (operator 2026-09-25 「不要塞一整頁，用 Tab 方式安排不同性質的內容；之後其他的工具就要以這個為範本」):
+# a lesson = the start card (its one action, above everything) + the domain chips + these tabs, one kind of content each,
+# in learning order; the tool page's reading guide lives in the "read" tab (the run page keeps one line per section).
+# (id, label, time or None). The tab row is rendered from here (PER_PAGE "lesson-tabs"); check-mocks.py holds each
+# lesson's panels to it.
+LESSON_TABS = {
+    "tool": [("learn", "認識", "1.5 分"), ("example", "看例子", "1 分"), ("fill", "怎麼填", "1.5 分"),
+             ("read", "看懂結果", "1 分"), ("teach", "教材版", None), ("sources", "來源", None)],
+    "workflow": [("learn", "認識", "30 秒"), ("stations", "各站", "1 分"), ("example", "看例子", "30 秒"),
+                 ("walk", "怎麼走", "30 秒"), ("read", "看懂總覽", "30 秒"), ("teach", "教材版", None), ("sources", "來源", None)],
+}
+LESSON_KIND = {"iceberg-lesson-mock.html": "tool", "workflow-lesson-mock.html": "workflow"}
+assert set(LESSON_KIND) == set(LESSON)
+
+
+def render_lesson_tabs(page):
+    """The tab row exactly as `page` carries it (the first tab selected); empty for a page that is not a lesson."""
+    if page not in LESSON_KIND: return ""
+    out = ['  <div class="tabs" role="tablist" aria-label="課程內容">']
+    for i, (tid, label, time) in enumerate(LESSON_TABS[LESSON_KIND[page]]):
+        on = i == 0
+        out.append(f'    <button class="tab" type="button" role="tab" id="tab-{tid}" aria-controls="panel-{tid}" aria-selected="{"true" if on else "false"}" '
+                   f'tabindex="{0 if on else -1}">{label}' + (f"<small>{time}</small>" if time else "") + '</button>')
+    out.append('  </div>')
+    return "\n".join(out) + "\n"
+
+
 # <style> layout: marker line, design-system.css verbatim, end marker, page marker (page section must stay empty)
 CSS_START = "  /* == shared design system: start (byte-identical in every mock; check-mocks.py enforces) == */"
 CSS_END = "  /* == shared design system: end == */"
 CSS_PAGE = "  /* == page-specific == */"
 # partials: <!-- == partial: <name>: start … == --> body <!-- == partial: <name>: end == -->; body == partials/<name>.html
-REQUIRED_PARTIALS = {f: {"domain-chips", "lesson-chip-script"} for f in LESSON}
+REQUIRED_PARTIALS = {f: {"domain-chips", "lesson-chip-script", "lesson-tabs", "tabs-script"} for f in LESSON}
+REQUIRED_PARTIALS.update({f: {"run-form-script"} for f in RESULT})
 FRAG = re.compile(r"^[ \t]*<!-- == partial: ([a-z0-9-]+): start[^\n]*-->\n(?:(.*?)\n)??[ \t]*<!-- == partial: \1: end == -->", re.S | re.M)  # body may be empty (a fresh page before its first sync); lazy so it never reaches a later copy
 
 
@@ -303,13 +348,14 @@ def mock_button(label, does, cls="btn"):
 
 
 def _tool_buttons(mid, cls="btns"):
+    """開始 opens the tool's run page with empty fields where the mock has one (#new), else says what the product will
+    open; the lesson opens in a new tab."""
     demo = DEMOS.get(mid)
-    out = [mock_button("開始", MOCK_START_TOOL, "btn primary")]
     if demo:
-        out.append(f'<a class="btn" href="https://claude.ai/artifact/{ARTIFACT[demo[0]]}">第一次用？先上 5 分鐘的課 →</a>')
-        out.append(f'<a class="btn ghost" href="https://claude.ai/artifact/{ARTIFACT[demo[1]]}">看做完的結果頁 →</a>')
+        out = [f'<a class="btn primary" href="{artifact_href(demo[1], "new")}">開始 →</a>', lesson_link(demo[0], "第一次用？先上 5 分鐘的課"),
+               f'<a class="btn ghost" href="{artifact_href(demo[1])}">看做完的結果頁 →</a>']
     else:
-        out.append(mock_button("第一次用？先上 5 分鐘的課", MOCK_LESSON_TOOL))
+        out = [mock_button("開始", MOCK_START_TOOL, "btn primary"), mock_button("第一次用？先上 5 分鐘的課", MOCK_LESSON_TOOL)]
     return f'<div class="{cls}">' + "".join(out) + "</div>"
 
 
@@ -380,11 +426,11 @@ def _wf_card(methods, goals, r):
            f'        <div class="k">{_esc(r["name"])}</div>',
            '        <div class="journey">' + '<i>→</i>'.join(_stations(methods, r["steps"])) + '</div>',
            f'        <div>{_esc(r["blurb_zh"])}</div>']
-    start = mock_button("開始", MOCK_START_WF, "btn primary")
     if demo:
-        out.append(f'        <div class="btns">{start}<a class="btn" href="https://claude.ai/artifact/{ARTIFACT[demo[0]]}">第一次走？先上 3 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/{ARTIFACT[demo[1]]}">看走到一半的示範 →</a></div>')
+        out.append(f'        <div class="btns"><a class="btn primary" href="{artifact_href(demo[1], "new")}">開始 →</a>{lesson_link(demo[0], "第一次走？先上 3 分鐘的課")}'
+                   f'<a class="btn ghost" href="{artifact_href(demo[1])}">看走到一半的示範 →</a></div>')
     else:
-        out.append(f'        <div class="btns">{start}{mock_button("第一次走？先上 3 分鐘的課", MOCK_LESSON_WF)}</div>')
+        out.append(f'        <div class="btns">{mock_button("開始", MOCK_START_WF, "btn primary")}{mock_button("第一次走？先上 3 分鐘的課", MOCK_LESSON_WF)}</div>')
     out.append('      </div>')
     return out
 
@@ -529,5 +575,5 @@ def _catalog(_cache={}):
     return _cache["v"]
 
 
-PER_PAGE = {"app-nav": render_nav}   # partials rendered per page (sync writes them, the gate compares); no file in partials/
+PER_PAGE = {"app-nav": render_nav, "lesson-tabs": render_lesson_tabs}   # partials rendered per page (sync writes them, the gate compares); no file in partials/
 for _f in FILES: REQUIRED_PARTIALS.setdefault(_f, set()).update({"app-nav", "page-actions-script"})

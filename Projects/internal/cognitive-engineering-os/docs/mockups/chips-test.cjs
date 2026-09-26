@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-/* Functional test for the domain chips (plan D18 / U21) and the home app (plan U1 / U16).
+/* Functional test for the domain chips (plan D18 / U21), the home app (plan U1 / U16), the lesson tabs (U15:
+   tabs-script) and the run form (U14: run-form-script — #new, #demo, run, fill, clear).
    Lessons: click every chip; after each click every example group shows exactly one variant, the clicked one, judged by
    the computed display (a display: rule would silently un-hide a group), and exactly one chip is aria-selected.
    Home (views, search, tool pages) and every page's actions (mock-only buttons, links into folds): every check runs
@@ -16,6 +17,7 @@ let chromium;
 try { ({ chromium } = require("playwright")); }
 catch (e) { console.error("playwright not resolvable: set NODE_PATH to a node_modules that contains it"); process.exit(2); }
 const LESSON = ["iceberg-lesson-mock.html", "workflow-lesson-mock.html"];   // = mockkit.LESSON
+const RESULT = ["iceberg-result-mock.html", "workflow-result-mock.html"];   // = mockkit.RESULT
 
 async function homeChecks(browser, file) {
   const url = pathToFileURL(file).href;
@@ -151,14 +153,14 @@ async function actionChecks(browser, file) {
   p.setDefaultTimeout(2500);
   await p.goto(pathToFileURL(file).href, { waitUntil: "load" });
   await p.evaluate(() => window.addEventListener("click", (e) => { if (e.target.closest && e.target.closest('a[href^="#"]')) e.preventDefault(); }, true));
-  const checks = {
-    // the first visible mock-only button, clicked, writes one note saying what the product will do
-    mockNote: async () => {
-      let clicked = false;
-      for (const x of await p.$$("button[data-mock]")) if (await x.isVisible()) { await x.click(); clicked = true; break; }
-      const t = await p.evaluate(() => [...document.querySelectorAll(".mocknote")].map((n) => n.textContent));
-      return clicked && t.length === 1 && t[0].startsWith("示意稿：正式版");
-    },
+  const checks = {};
+  // the first visible mock-only button, clicked, writes one note saying what the product will do (the lessons have none
+  // since 2026-09-25: their one action, 開始, is a real link to the run page)
+  if (await p.$("button[data-mock]")) checks.mockNote = async () => {
+    let clicked = false;
+    for (const x of await p.$$("button[data-mock]")) if (await x.isVisible()) { await x.click(); clicked = true; break; }
+    const t = await p.evaluate(() => [...document.querySelectorAll(".mocknote")].map((n) => n.textContent));
+    return clicked && t.length === 1 && t[0].startsWith("示意稿：正式版");
   };
   if (await p.$('a[href="#expert"]')) checks.expertOpen = async () => { await p.click('a[href="#expert"]'); return p.$eval("#expert", (d) => d.open); };
   const out = {};
@@ -166,6 +168,75 @@ async function actionChecks(browser, file) {
     try { out[name] = await fn(); } catch (e) { out[name] = false; }
   }
   await p.close();
+  return out;
+}
+
+// tabs-script (lessons, plan U15): a tab click, ←/→ (wrapping both ways), Home/End, a "next tab" button, an address hash on
+// load and a hash change after load each leave exactly one panel showing, the selected tab's (keys also move focus)
+async function tabChecks(browser, file) {
+  const url = pathToFileURL(file).href;
+  const p = await browser.newPage();
+  p.setDefaultTimeout(2500);
+  await p.goto(url, { waitUntil: "load" });
+  const shown = (q) => q.evaluate(() => [...document.querySelectorAll('[role="tabpanel"]')].filter((s) => s.getClientRects().length).map((s) => s.id).join(","));
+  const selected = () => p.evaluate(() => [...document.querySelectorAll('.tabs [aria-selected="true"]')].map((t) => t.id).join(","));
+  const ids = await p.evaluate(() => [...document.querySelectorAll('.tabs [role="tab"]')].map((t) => t.id.slice(4)));
+  const on = async (id) => (await shown(p)) === `panel-${id}` && (await selected()) === `tab-${id}`;
+  const checks = {
+    click: async () => { await p.click("#tab-read"); return on("read"); },
+    keys: async () => {
+      const last = ids[ids.length - 1];
+      const step = async (key, id) => { await p.keyboard.press(key); return (await on(id)) && (await p.evaluate(() => document.activeElement.id)) === `tab-${id}`; };
+      await p.click(`#tab-${ids[0]}`);
+      return (await step("ArrowRight", ids[1])) && (await step("ArrowLeft", ids[0])) && (await step("ArrowLeft", last))
+        && (await step("Home", ids[0])) && (await step("End", last)) && (await step("ArrowRight", ids[0]));
+    },
+    next: async () => { await p.click(`#tab-${ids[0]}`); await p.click(`#panel-${ids[0]} [data-tab-go]`); return on(ids[1]); },
+    hash: async () => { const q = await browser.newPage(); await q.goto(url + "#panel-read", { waitUntil: "load" }); const ok = (await shown(q)) === "panel-read"; await q.close(); return ok; },
+    hashchange: async () => {
+      await p.click(`#tab-${ids[0]}`); await p.evaluate(() => { location.hash = "#panel-read"; });
+      await p.waitForFunction(() => !document.getElementById("panel-read").hidden).catch(() => {});
+      return on("read");
+    },
+  };
+  const out = {};
+  for (const [name, fn] of Object.entries(checks)) {
+    try { out[name] = await fn(); } catch (e) { out[name] = false; }
+  }
+  await p.close();
+  return out;
+}
+
+// run-form-script (run pages, plan U14): #new empties the fields and waits for a run, #demo fills the demo, a blank run is
+// refused with a note, a filled run shows the result with the product sentence, fill then clear act on the fields
+async function runChecks(browser, file) {
+  const url = pathToFileURL(file).href;
+  const open = async (hash) => { const q = await browser.newPage(); q.setDefaultTimeout(2500); await q.goto(url + hash, { waitUntil: "load" }); return q; };
+  const state = (q) => q.evaluate(() => {
+    const vis = (e) => e.getClientRects().length > 0, ts = [...document.querySelectorAll("form.runform textarea")].filter(vis);
+    return { values: ts.map((t) => t.value), demo: ts.map((t) => (t.hasAttribute("data-demo") ? t.getAttribute("data-demo") : t.defaultValue)),
+      all: [...document.querySelectorAll("form.runform textarea")].map((t) => t.value),
+      result: [...document.querySelectorAll('[data-when="result"]')].some(vis), empty: [...document.querySelectorAll('[data-when="empty"]')].some(vis),
+      notes: [...document.querySelectorAll(".mocknote")].map((n) => n.textContent) };
+  });
+  const press = async (q, sel) => { for (const h of await q.$$(sel)) if (await h.isVisible()) { await h.click(); return true; } return false; };
+  const run = async (hash, fn) => { const q = await open(hash); try { return await fn(q); } finally { await q.close(); } };
+  const same = (a, b) => a.length > 0 && a.length === b.length && a.every((x, i) => x === b[i]);
+  const checks = {
+    newEmpty: () => run("#new", async (q) => { const s = await state(q); return s.all.every((v) => v === "") && !s.result && s.empty; }),
+    demoFilled: () => run("#demo", async (q) => { const s = await state(q); return same(s.values, s.demo) && s.values.some((v) => v) && !s.result && s.empty; }),
+    blankRunRefused: () => run("#new", async (q) => { const ok = await press(q, "form.runform [data-run]"); const s = await state(q); return ok && !s.result && s.notes.some((n) => n.includes("先填")); }),
+    runShows: () => run("#demo", async (q) => { const ok = await press(q, "form.runform [data-run]"); const s = await state(q); return ok && s.result && !s.empty && s.notes.some((n) => n.startsWith("示意稿：正式版")); }),
+    fillClear: () => run("", async (q) => {
+      await press(q, "form.runform [data-fill]"); const a = await state(q);
+      await press(q, "form.runform [data-clear]"); const b = await state(q);
+      return same(a.values, a.demo) && a.values.some((v) => v) && b.values.length > 0 && b.values.every((v) => v === "");
+    }),
+  };
+  const out = {};
+  for (const [name, fn] of Object.entries(checks)) {
+    try { out[name] = await fn(); } catch (e) { out[name] = false; }
+  }
   return out;
 }
 
@@ -218,7 +289,9 @@ async function withControl(browser, name, partial, checks) {
     await page.close();
   }
   bad += await withControl(browser, "home-mock.html", "home-catalog-script", homeChecks);
-  for (const f of ["home-mock.html", "iceberg-result-mock.html", "workflow-result-mock.html", ...LESSON]) bad += await withControl(browser, f, "page-actions-script", actionChecks);
+  for (const f of LESSON) bad += await withControl(browser, f, "tabs-script", tabChecks);
+  for (const f of RESULT) bad += await withControl(browser, f, "run-form-script", runChecks);
+  for (const f of ["home-mock.html", ...RESULT, ...LESSON]) bad += await withControl(browser, f, "page-actions-script", actionChecks);
   await browser.close();
   console.log(bad ? `chips: FAIL ${bad}` : "chips: PASS");
   process.exit(bad ? 1 : 0);

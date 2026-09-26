@@ -1,0 +1,52 @@
+<script>
+  // Lessons (plan U15, operator 2026-09-25: one kind of content per tab, not one long page). .tabs[role=tablist] holds
+  // button[role=tab][aria-controls] tabs; each controls one section[role=tabpanel] (WAI-ARIA tabs, automatic activation:
+  // click, or ←/→/Home/End on the focused tab; roving tabindex). The address picks a tab too — #panel-<id> or any id
+  // inside a panel (the tool page links to #panel-read), on load and on hashchange — and so does an in-page link or a
+  // [data-tab-go="<id>"] button pointing into a hidden panel. Visibility uses the hidden attribute only.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs [role="tab"]'));
+    if (!tabs.length) return;
+    var bar = tabs[0].parentNode;
+    function select(tab, focus) {
+      tabs.forEach(function (t) {
+        var on = t === tab, p = document.getElementById(t.getAttribute("aria-controls"));
+        t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1;
+        if (p) p.hidden = !on;
+      });
+      if (focus) tab.focus();
+    }
+    function tabFor(el) {
+      var p = el && el.closest && el.closest('[role="tabpanel"]');
+      return p ? tabs.filter(function (t) { return t.getAttribute("aria-controls") === p.id; })[0] : null;
+    }
+    function route() {
+      var id = location.hash.slice(1);
+      try { id = decodeURIComponent(id); } catch (e) {}          // a malformed %-escape: use the raw hash
+      var el = id && document.getElementById(id), t = tabFor(el);
+      if (!t) return;
+      select(t);
+      (el.getAttribute("role") === "tabpanel" ? bar : el).scrollIntoView();
+    }
+    document.addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest('.tabs [role="tab"]');
+      if (t) { select(t); return; }
+      var go = e.target.closest && e.target.closest("[data-tab-go]");
+      if (go) {
+        var g = document.getElementById("tab-" + go.getAttribute("data-tab-go"));
+        if (g) { select(g, true); bar.scrollIntoView(); }
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), at = a && tabFor(document.getElementById(a.getAttribute("href").slice(1)));
+      if (at) select(at);
+    });
+    bar.addEventListener("keydown", function (e) {
+      var i = tabs.indexOf(document.activeElement);
+      var n = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : null;
+      if (i < 0 || n === null) return;
+      e.preventDefault(); select(tabs[(n + tabs.length) % tabs.length], true);
+    });
+    window.addEventListener("hashchange", route);
+    route();
+  });
+</script>

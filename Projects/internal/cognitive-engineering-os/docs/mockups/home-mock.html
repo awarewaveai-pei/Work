@@ -48,7 +48,6 @@
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
-  .top .skip{font-size:13px;color:var(--muted)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -74,9 +73,6 @@
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
-  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
-  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .progress span.done{background:var(--accent);color:var(--bg)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
@@ -218,6 +214,21 @@
   details.dir summary{font-size:15px;color:var(--ink)}
   details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
   details.dir .tool{border-top:none;padding-left:12px}
+  /* == lesson tabs (plan U15: one kind of content per tab; WAI-ARIA tabs: button[role=tab] + section[role=tabpanel]) == */
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 14px}
+  .tab{border:0;border-bottom:3px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 12px;cursor:pointer}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab small{font-weight:400;font-size:11.5px;margin-left:4px}
+  .tabnext{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  /* == the one action a page exists for (start a case, fill the fields): a thick accent frame and a big button == */
+  .card.cta{border:2px solid var(--accent)}
+  .btn.big{font-size:16px;font-weight:700;padding:12px 22px}
+  /* == run form (the tool page's input, plan U14): label, one-line hint, the field; .layer .lN colours a layer field == */
+  .field{display:grid;gap:4px;padding:8px 0 8px 14px;border-left:6px solid var(--line);margin-top:10px}
+  .field label,.field>b{font-weight:700}
+  .field .hint{font-size:12.5px;color:var(--muted);margin:0}
+  .carried{background:var(--soft);border-radius:8px;padding:8px 10px;font-size:13.5px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -356,18 +367,19 @@
   // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
   // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
   // the details itself); the home router does the same for its views.
+  // window.mockNote is the one note writer (run-form-script uses it too): one p.mocknote right after `row`, reused.
+  window.mockNote = function (row, text) {
+    var note = row.nextElementSibling;
+    if (!note || !note.classList.contains("mocknote")) {
+      note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+      row.parentNode.insertBefore(note, row.nextSibling);
+    }
+    note.textContent = text;
+  };
   (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
     document.addEventListener("click", function (e) {
       var b = e.target.closest && e.target.closest("button[data-mock]");
-      if (b) {
-        var row = b.closest(".btns") || b, note = row.nextElementSibling;
-        if (!note || !note.classList.contains("mocknote")) {
-          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
-          row.parentNode.insertBefore(note, row.nextSibling);
-        }
-        note.textContent = "示意稿：" + b.getAttribute("data-mock");
-        return;
-      }
+      if (b) { window.mockNote(b.closest(".btns") || b, "示意稿：" + b.getAttribute("data-mock")); return; }
       var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
       var d = t && t.closest("details");
       if (d) d.open = true;
@@ -546,7 +558,7 @@
       <div class="mcard pop" id="pop-systems.iceberg_model">
         <div class="gh"><svg class="shape" viewBox="0 0 64 40" role="img" aria-label="冰山模型的樣子"><path d="M2 14H62"/><path class="f" d="M24 14 32 3l8 11 10 12-9 11H23l-9-11z"/><path d="M17 22h30M19 30h26"/></svg><div><b><a href="#t-systems.iceberg_model">冰山模型</a></b><span class="tag">為什麼一直發生</span><div class="k">Iceberg Model</div></div></div>
         <div>看見一再發生的事背後的四層原因</div>
-        <div class="btns"><button type="button" class="btn primary" data-mock="正式版按這裡會打開這個工具的填寫頁：貼上你的情況，系統先免費幫你填欄，不夠才用 AI；你確認才執行、才花錢。">開始</button><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">第一次用？先上 5 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看做完的結果頁 →</a></div>
+        <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始 →</a><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY" target="_blank" rel="noopener">第一次用？先上 5 分鐘的課 ↗</a><a class="btn ghost" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看做完的結果頁 →</a></div>
       </div>
       <div class="mcard pop" id="pop-strategy.swot">
         <div class="gh"><svg class="shape" viewBox="0 0 64 40" role="img" aria-label="SWOT 分析的樣子"><rect class="f" x="10" y="3" width="21" height="16" rx="2"/><rect x="33" y="3" width="21" height="16" rx="2"/><rect x="10" y="21" width="21" height="16" rx="2"/><rect x="33" y="21" width="21" height="16" rx="2"/></svg><div><b><a href="#t-strategy.swot">SWOT 分析</a></b><span class="tag">看局</span><div class="k">SWOT Analysis</div></div></div>
@@ -929,7 +941,7 @@
         <div class="k">Life Decision (Frame -&gt; SWOT -&gt; Weighted Decision Matrix)</div>
         <div class="journey"><a href="#t-framing.problem_statement">問題陳述</a><i>→</i><a href="#t-strategy.swot">SWOT 分析</a><i>→</i><a href="#t-decision.weighted_decision_matrix">加權決策矩陣</a></div>
         <div>幾個選項選一個：先把問題講清楚，再看自己與外面，最後用你定的權重打分。</div>
-        <div class="btns"><button type="button" class="btn primary" data-mock="正式版按這裡會打開這條工作流的第 1 站：可以一站一站走，也可以一次跑完；會花錢的步驟都先問你。">開始</button><a class="btn" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU">第一次走？先上 3 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看走到一半的示範 →</a></div>
+        <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#new">開始 →</a><a class="btn" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU" target="_blank" rel="noopener">第一次走？先上 3 分鐘的課 ↗</a><a class="btn ghost" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看走到一半的示範 →</a></div>
       </div>
     </div>
     </section>
@@ -1099,14 +1111,14 @@
         <div><span class="k">用的：</span>工具「<a href="#t-systems.iceberg_model">冰山模型</a>」（這件事為什麼一直發生？）</div>
         <div><span class="k">看到：</span>九段結果頁：結論、冰山圖、三張圖、四層卡、方案、下一步。</div>
         <div class="k">約 6k tokens・≈ NT$1</div>
-        <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">打開結果頁 →</a><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">它的 5 分鐘課 →</a></div>
+        <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">打開結果頁 →</a><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY" target="_blank" rel="noopener">它的 5 分鐘課 ↗</a></div>
       </div>
       <div class="mcard done">
         <div><b>決定：WuSheng 課程要不要改成「線上＋實體」混合</b><span class="tag">已完成 1/3 站</span></div>
         <div><span class="k">用的：</span>工作流「<a href="#wf-life-decision-v1">做一個決定</a>」：問題陳述 → SWOT → 加權決策矩陣</div>
         <div><span class="k">看到：</span>總覽站列、每站一張卡、第 1 站摘要、總結頁骨架。</div>
         <div class="k">全程約 8 分鐘・≈ NT$3（已用 NT$1）</div>
-        <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">打開總覽 →</a><a class="btn" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU">它的 3 分鐘課 →</a></div>
+        <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">打開總覽 →</a><a class="btn" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU" target="_blank" rel="noopener">它的 3 分鐘課 ↗</a></div>
       </div>
     </div>
   </div>
@@ -5557,7 +5569,7 @@
       <h2>它幫你做什麼</h2>
       <div class="how"><b>怎麼讀</b>第一句是它做什麼、什麼時候用；下面是做完常接的工具、用到它的工作流、同一類常用的工具，點名字就過去。<b>你要做的</b>像你的情況就按「開始」；第一次用先上它的課；不像就看同一類的其他工具。</div>
       <p class="lead">把一個表面事件逐層往下挖——重複發生的型態、系統性結構、支撐這一切的心智模式，一次一層。想避免只針對單一事件反應，而是找出產生一整類類似事件的深層結構時用。</p>
-      <div class="btns"><button type="button" class="btn primary" data-mock="正式版按這裡會打開這個工具的填寫頁：貼上你的情況，系統先免費幫你填欄，不夠才用 AI；你確認才執行、才花錢。">開始</button><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">第一次用？先上 5 分鐘的課 →</a><a class="btn ghost" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看做完的結果頁 →</a></div>
+      <div class="btns"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始 →</a><a class="btn" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY" target="_blank" rel="noopener">第一次用？先上 5 分鐘的課 ↗</a><a class="btn ghost" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看做完的結果頁 →</a></div>
       <h3 class="fam">做完常接</h3>
       <p class="my6"><a href="#t-systems.leverage_point_analysis">槓桿點分析</a></p>
       <h3 class="fam">用到它的工作流</h3>

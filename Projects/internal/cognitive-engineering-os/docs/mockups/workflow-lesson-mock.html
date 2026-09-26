@@ -48,7 +48,6 @@
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
-  .top .skip{font-size:13px;color:var(--muted)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -74,9 +73,6 @@
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
-  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
-  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .progress span.done{background:var(--accent);color:var(--bg)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
@@ -218,6 +214,21 @@
   details.dir summary{font-size:15px;color:var(--ink)}
   details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
   details.dir .tool{border-top:none;padding-left:12px}
+  /* == lesson tabs (plan U15: one kind of content per tab; WAI-ARIA tabs: button[role=tab] + section[role=tabpanel]) == */
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 14px}
+  .tab{border:0;border-bottom:3px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 12px;cursor:pointer}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab small{font-weight:400;font-size:11.5px;margin-left:4px}
+  .tabnext{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  /* == the one action a page exists for (start a case, fill the fields): a thick accent frame and a big button == */
+  .card.cta{border:2px solid var(--accent)}
+  .btn.big{font-size:16px;font-weight:700;padding:12px 22px}
+  /* == run form (the tool page's input, plan U14): label, one-line hint, the field; .layer .lN colours a layer field == */
+  .field{display:grid;gap:4px;padding:8px 0 8px 14px;border-left:6px solid var(--line);margin-top:10px}
+  .field label,.field>b{font-weight:700}
+  .field .hint{font-size:12.5px;color:var(--muted);margin:0}
+  .carried{background:var(--soft);border-radius:8px;padding:8px 10px;font-size:13.5px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -256,18 +267,19 @@
   // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
   // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
   // the details itself); the home router does the same for its views.
+  // window.mockNote is the one note writer (run-form-script uses it too): one p.mocknote right after `row`, reused.
+  window.mockNote = function (row, text) {
+    var note = row.nextElementSibling;
+    if (!note || !note.classList.contains("mocknote")) {
+      note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+      row.parentNode.insertBefore(note, row.nextSibling);
+    }
+    note.textContent = text;
+  };
   (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
     document.addEventListener("click", function (e) {
       var b = e.target.closest && e.target.closest("button[data-mock]");
-      if (b) {
-        var row = b.closest(".btns") || b, note = row.nextElementSibling;
-        if (!note || !note.classList.contains("mocknote")) {
-          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
-          row.parentNode.insertBefore(note, row.nextSibling);
-        }
-        note.textContent = "示意稿：" + b.getAttribute("data-mock");
-        return;
-      }
+      if (b) { window.mockNote(b.closest(".btns") || b, "示意稿：" + b.getAttribute("data-mock")); return; }
       var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
       var d = t && t.closest("details");
       if (d) d.open = true;
@@ -275,6 +287,60 @@
   });
 </script>
 <!-- == partial: page-actions-script: end == -->
+<!-- == partial: tabs-script: start (verbatim from partials/tabs-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Lessons (plan U15, operator 2026-09-25: one kind of content per tab, not one long page). .tabs[role=tablist] holds
+  // button[role=tab][aria-controls] tabs; each controls one section[role=tabpanel] (WAI-ARIA tabs, automatic activation:
+  // click, or ←/→/Home/End on the focused tab; roving tabindex). The address picks a tab too — #panel-<id> or any id
+  // inside a panel (the tool page links to #panel-read), on load and on hashchange — and so does an in-page link or a
+  // [data-tab-go="<id>"] button pointing into a hidden panel. Visibility uses the hidden attribute only.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs [role="tab"]'));
+    if (!tabs.length) return;
+    var bar = tabs[0].parentNode;
+    function select(tab, focus) {
+      tabs.forEach(function (t) {
+        var on = t === tab, p = document.getElementById(t.getAttribute("aria-controls"));
+        t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1;
+        if (p) p.hidden = !on;
+      });
+      if (focus) tab.focus();
+    }
+    function tabFor(el) {
+      var p = el && el.closest && el.closest('[role="tabpanel"]');
+      return p ? tabs.filter(function (t) { return t.getAttribute("aria-controls") === p.id; })[0] : null;
+    }
+    function route() {
+      var id = location.hash.slice(1);
+      try { id = decodeURIComponent(id); } catch (e) {}          // a malformed %-escape: use the raw hash
+      var el = id && document.getElementById(id), t = tabFor(el);
+      if (!t) return;
+      select(t);
+      (el.getAttribute("role") === "tabpanel" ? bar : el).scrollIntoView();
+    }
+    document.addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest('.tabs [role="tab"]');
+      if (t) { select(t); return; }
+      var go = e.target.closest && e.target.closest("[data-tab-go]");
+      if (go) {
+        var g = document.getElementById("tab-" + go.getAttribute("data-tab-go"));
+        if (g) { select(g, true); bar.scrollIntoView(); }
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), at = a && tabFor(document.getElementById(a.getAttribute("href").slice(1)));
+      if (at) select(at);
+    });
+    bar.addEventListener("keydown", function (e) {
+      var i = tabs.indexOf(document.activeElement);
+      var n = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : null;
+      if (i < 0 || n === null) return;
+      e.preventDefault(); select(tabs[(n + tabs.length) % tabs.length], true);
+    });
+    window.addEventListener("hashchange", route);
+    route();
+  });
+</script>
+<!-- == partial: tabs-script: end == -->
 </head>
 <body>
 <div class="app">
@@ -295,31 +361,31 @@
   <div class="top">
     <div>
       <h1>做一個決定（3 站）：開始前 3 分鐘</h1>
-      <div class="sub">五步，每步不到一分鐘。看完直接開始，或先用示範案例試一次。</div>
+      <div class="sub">想直接走，按下面的「開始我的決定」；想先學，照分頁一頁一頁看，每頁不到一分鐘。</div>
     </div>
-    <span class="skip">看過了？<a href="#start">跳過，直接開始</a></span>
   </div>
-  <div class="progress"><span class="done">1 這條路解什麼</span><span>2 三站各做什麼</span><span>3 看一個走完的</span><span>4 怎麼走</span><span>5 開始</span></div>
-  <div class="status"><span class="pill ok">三站工具齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、什麼時候該停下來改</span><span>底部有教材版（給老師／帶領者）</span></div>
+  <div class="status"><span class="pill ok">三站工具齊備 M1–M11 ✓</span><span>課程來源 2 筆 <cite>[1]</cite><cite>[2]</cite></span><span>約 3 分鐘</span><span>學完你會：知道這條路解哪種決定、每站要你填什麼、看懂總覽頁、什麼時候該停下來改</span><span>教材版在「教材版」分頁（給老師／帶領者）</span></div>
 
-  <!-- 1 -->
-  <div class="card">
-    <h2>1. 這條路解什麼問題<small>40 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>先看「能回答／不能回答」，再看站列。<b>你要做的</b>不用做；你的問題如果不是「幾個選項選一個」，這條路不適合，去第 5 步按第三顆按鈕。</div>
-    <p class="lead">「做一個決定」把一個<b>要在幾個選項裡選一個</b>的問題，走三站：先把問題講清楚，再看自己的強弱與外面的機會威脅，最後用<b>你自己定的準則和權重</b>把選項打分 <cite>[1]</cite>。</p>
-    <div class="grid2c">
-      <div class="can"><b>這條路能回答</b>要決定的到底是什麼、成功長什麼樣；我們的強弱、外面的機會威脅；幾個選項按你的準則哪個最好、哪個權重一改結果就翻。</div>
-      <div class="cant"><b>這條路不能回答</b>市場會不會買單（除非接上資料蒐集）；權重不會替你定，那是你的價值判斷；「該不該」的道德問題。</div>
+  <!-- 開始：這堂課唯一的主要動作，永遠在最上面 -->
+  <div class="card cta" id="start">
+    <h2>開始：走你自己的決定<small>準備 20 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>這張卡一直在最上面；下面的分頁是課程，看完或看到一半都能回來按。<b>你要做的</b>按「開始我的決定」；還不確定，先用示範案例走一次，或按第三顆讓系統幫你挑。</div>
+    <div class="btns">
+      <a class="btn primary big" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#new">開始我的決定 →<small>第 1 站三個空格子，每格旁邊有提示和例子；按「執行這一站」才開始</small></a>
+      <a class="btn" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#demo">用示範案例走一次<small><span class="ex" data-set="edd">混合制那個例子，第 1 站已填好，按執行就走到第 2 站</span><span class="ex" data-set="partner" hidden>續約畫廊那個例子，第 1 站已填好，按執行就走到第 2 站</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，第 1 站已填好，按執行就走到第 2 站</span><span class="ex" data-set="ecom" hidden>尺寸類改預購那個例子，第 1 站已填好，按執行就走到第 2 站</span><span class="ex" data-set="daily" hidden>家事服務那個例子，第 1 站已填好，按執行就走到第 2 站</span></small></a>
+      <a class="btn ghost" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></a>
     </div>
-    <div class="journey"><span>第 1 站 問題陳述</span><i>→</i><span>第 2 站 SWOT</span><i>→</i><span>第 3 站 加權決策矩陣</span><i>→</i><span>總結頁</span></div>
-    <p class="sub">什麼時候用：選項已經有兩個以上、大家意見不一、想要一個能說清楚理由的決定。什麼時候不用：只有一個選項（那是「做不做」，用可行性那條路）；還不知道問題是什麼（先單獨跑問題陳述）。</p>
+    <p>手邊有這些會走得比較快，沒有也可以先走、之後補：</p>
+    <ul class="check">
+      <li>你要決定的那件事，一句話</li>
+      <li>兩個以上的選項</li>
+      <li>成功長什麼樣（2–3 個看得到的條件）</li>
+      <li>你在乎什麼（之後變成準則和權重）</li>
+    </ul>
+    <p class="sub mb0">這堂課之後不會再自動出現；每一站的工具課只在你第一次到那一站時出現一次。想再看，總覽頁右上角「怎麼用？」隨時能打開，會另開一個分頁，填到一半的格子不會不見。</p>
   </div>
 
-  <!-- 2 -->
-  <div class="card">
-    <h2>2. 三站各做什麼、系統幫你填什麼、你要填什麼<small>1.5 分鐘</small></h2>
-    <div class="how"><b>怎麼讀</b>先按你的領域，例子就會換成你熟的情境；每一站從上往下看：這站在做什麼 → 你會看到的表單 → 已經幫你填好的 → 你要填的（附一個填好的例子）→ 做完會得到什麼 → 完整介紹的連結。這堂課只講「這條路」，每個工具的深度在它自己的正式課。<b>你要做的</b>按一個領域（第 3–5 步的例子會跟著換）；把你自己的決定，照例子的樣子在心裡填一次。</div>
-    <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
+  <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
     <div class="chips" role="tablist" aria-label="例子領域">
       <span class="sub">例子領域：</span>
       <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
@@ -328,7 +394,38 @@
       <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
       <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
     </div>
-    <!-- == partial: domain-chips: end == -->
+  <!-- == partial: domain-chips: end == -->
+  <!-- == partial: lesson-tabs: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <div class="tabs" role="tablist" aria-label="課程內容">
+    <button class="tab" type="button" role="tab" id="tab-learn" aria-controls="panel-learn" aria-selected="true" tabindex="0">認識<small>30 秒</small></button>
+    <button class="tab" type="button" role="tab" id="tab-stations" aria-controls="panel-stations" aria-selected="false" tabindex="-1">各站<small>1 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-example" aria-controls="panel-example" aria-selected="false" tabindex="-1">看例子<small>30 秒</small></button>
+    <button class="tab" type="button" role="tab" id="tab-walk" aria-controls="panel-walk" aria-selected="false" tabindex="-1">怎麼走<small>30 秒</small></button>
+    <button class="tab" type="button" role="tab" id="tab-read" aria-controls="panel-read" aria-selected="false" tabindex="-1">看懂總覽<small>30 秒</small></button>
+    <button class="tab" type="button" role="tab" id="tab-teach" aria-controls="panel-teach" aria-selected="false" tabindex="-1">教材版</button>
+    <button class="tab" type="button" role="tab" id="tab-sources" aria-controls="panel-sources" aria-selected="false" tabindex="-1">來源</button>
+  </div>
+  <!-- == partial: lesson-tabs: end == -->
+
+  <section class="tabpanel" id="panel-learn" role="tabpanel" aria-labelledby="tab-learn">
+  <div class="card">
+    <h2>這條路解什麼問題<small>30 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>先看「能回答／不能回答」，再看站列。<b>你要做的</b>不用做；你的問題如果不是「幾個選項選一個」，這條路不適合，去最上面「開始」卡按第三顆按鈕。</div>
+    <p class="lead">「做一個決定」把一個<b>要在幾個選項裡選一個</b>的問題，走三站：先把問題講清楚，再看自己的強弱與外面的機會威脅，最後用<b>你自己定的準則和權重</b>把選項打分 <cite>[1]</cite>。</p>
+    <div class="grid2c">
+      <div class="can"><b>這條路能回答</b>要決定的到底是什麼、成功長什麼樣；我們的強弱、外面的機會威脅；幾個選項按你的準則哪個最好、哪個權重一改結果就翻。</div>
+      <div class="cant"><b>這條路不能回答</b>市場會不會買單（除非接上資料蒐集）；權重不會替你定，那是你的價值判斷；「該不該」的道德問題。</div>
+    </div>
+    <div class="journey"><span>第 1 站 問題陳述</span><i>→</i><span>第 2 站 SWOT</span><i>→</i><span>第 3 站 加權決策矩陣</span><i>→</i><span>總結頁</span></div>
+    <p class="sub">什麼時候用：選項已經有兩個以上、大家意見不一、想要一個能說清楚理由的決定。什麼時候不用：只有一個選項（那是「做不做」，用可行性那條路）；還不知道問題是什麼（先單獨跑問題陳述）。</p>
+  </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="stations">下一個分頁：各站 →</button><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#new">開始我的決定 →</a></div>
+  </section>
+
+  <section class="tabpanel" id="panel-stations" role="tabpanel" aria-labelledby="tab-stations" hidden>
+  <div class="card">
+    <h2>三站各做什麼、系統幫你填什麼、你要填什麼<small>1 分鐘</small></h2>
+    <div class="how"><b>怎麼讀</b>先在分頁上面按你的領域，例子就會換成你熟的情境；每一站從上往下看：這站在做什麼 → 你會看到的表單 → 已經幫你填好的 → 你要填的（附一個填好的例子）→ 做完會得到什麼 → 完整介紹的連結。這堂課只講「這條路」，每個工具的深度在它自己的正式課。<b>你要做的</b>按一個領域（每個分頁的例子都會跟著換）；把你自己的決定，照例子的樣子在心裡填一次。</div>
     <div id="examples">
 
       <div class="station">
@@ -388,10 +485,12 @@
     </div>
     <p class="sub mt10 mb0">記法：第 1 站定「要決定什麼」，第 2 站看「自己和外面」，第 3 站「用你的權重打分」。每一站都只填紅字那一列，其他系統從上一站帶來。例子跟著你進來的那條線走；不會拿你真實填過的案例當教材。</p>
   </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="example">下一個分頁：看例子 →</button><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#new">開始我的決定 →</a></div>
+  </section>
 
-  <!-- 3 -->
+  <section class="tabpanel" id="panel-example" role="tabpanel" aria-labelledby="tab-example" hidden>
   <div class="card">
-    <h2>3. 看一個走完的例子<small>40 秒</small></h2>
+    <h2>看一個走完的例子<small>30 秒</small></h2>
     <div class="how"><b>怎麼讀</b>每站一句話，最後一句是三站合一。<b>你要做的</b>不用做；想看完整總覽按按鈕。</div>
     <div id="walked">
     <div class="ex" data-set="edd">
@@ -447,10 +546,12 @@
     </div>
     <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">看完整的工作流總覽 →<small><span class="ex" data-set="edd">同一個案例，三站與總結頁</span><span class="ex" data-set="partner" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="decision" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="ecom" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span><span class="ex" data-set="daily" hidden>示意稿只做了藝術反思案的總覽；這個領域的總覽在 P3 隨工作流資料產出</span></small></a></div>
   </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="walk">下一個分頁：怎麼走 →</button><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#new">開始我的決定 →</a></div>
+  </section>
 
-  <!-- 4 -->
+  <section class="tabpanel" id="panel-walk" role="tabpanel" aria-labelledby="tab-walk" hidden>
   <div class="card">
-    <h2>4. 怎麼走：兩種走法、每站你要做的、常見錯誤<small>40 秒</small></h2>
+    <h2>怎麼走：兩種走法、每站你要做的、常見錯誤<small>30 秒</small></h2>
     <div class="how"><b>怎麼讀</b>先選走法，再看每站的好例壞例。<b>你要做的</b>決定你要一站一站走，還是一次跑完。</div>
     <div class="todos">
       <div class="todo"><b>一站一站走</b>每站停下來給你確認，可以改順序、中途換工具。第一次走建議這個。</div>
@@ -502,36 +603,43 @@
     </div>
   </div>
 
-  <!-- 5 -->
-  <div class="card" id="start">
-    <h2>5. 開始<small>準備 20 秒</small></h2>
-    <div class="how"><b>怎麼讀</b>準備清單，沒有也能先走。<b>你要做的</b>選一顆按鈕；不確定這條路適不適合，按第三顆。</div>
-    <p>手邊有這些會走得比較快，沒有也可以先走、之後補：</p>
-    <ul class="check">
-      <li>你要決定的那件事，一句話</li>
-      <li>兩個以上的選項</li>
-      <li>成功長什麼樣（2–3 個看得到的條件）</li>
-      <li>你在乎什麼（之後變成準則和權重）</li>
-    </ul>
-    <div class="btns">
-      <a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">用示範案例走一次<small><span class="ex" data-set="edd">混合制那個例子，三站已填好，一站一站看</span><span class="ex" data-set="partner" hidden>續約畫廊那個例子，三站已填好，一站一站看</span><span class="ex" data-set="decision" hidden>加開平日班那個例子，三站已填好，一站一站看</span><span class="ex" data-set="ecom" hidden>尺寸類改預購那個例子，三站已填好，一站一站看</span><span class="ex" data-set="daily" hidden>家事服務那個例子，三站已填好，一站一站看</span></small></a>
-      <button type="button" class="btn" data-mock="正式版打開「做一個決定」的第 1 站：三個格子，每格旁邊有提示；你確認才執行。">開始我的決定<small>第 1 站三個格子，每格旁邊有提示</small></button>
-      <a class="btn" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></a>
-    </div>
-    <p class="sub mt10 mb0">這堂課之後不會再自動出現；每一站的工具課只在你第一次到那一站時出現一次。想再看，總覽頁右上角「怎麼用？」隨時能打開。</p>
-  </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="read">下一個分頁：看懂總覽 →</button><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#new">開始我的決定 →</a></div>
+  </section>
 
+  <section class="tabpanel" id="panel-read" role="tabpanel" aria-labelledby="tab-read" hidden>
+  <div class="card">
+    <h2>看懂總覽：走這條路時那一頁怎麼讀<small>30 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>先看三步讀法，再對照下面每一塊；總覽頁每塊開頭只留一句，詳細讀法都在這裡。<b>你要做的</b>不用做；總覽頁哪一塊看不懂，回這個分頁找同一個名字。</div>
+    <div class="todos">
+      <div class="todo"><b>① 先看站列</b>你在第幾站、哪些已完成、下一站是什麼。</div>
+      <div class="todo"><b>② 看現在這一站的格子</b>它回答什麼、從上一站帶入什麼（已經填好）、還要你填哪幾格；填好按「執行這一站」。</div>
+      <div class="todo"><b>③ 看摘要與總結頁骨架</b>已完成的站只留一句話和你的判斷；跑完第 3 站才有總結頁。</div>
+    </div>
+    <p class="sub mt8">只有 30 秒？看站列和現在這一站要你填的格子就夠。</p>
+    <div class="terms"><b>四個詞：</b><span><b>站</b> 一個工具一站</span><span><b>帶入</b> 上一站的結果自動變成這站的輸入</span><span><b>還要你填</b> 系統填不了的格子</span><span><b>總結頁</b> 三站合一的結論</span></div>
+    <h3 class="fam">總覽頁每一塊回答一件事</h3>
+    <div class="row"><b>頁首</b><span>狀態列說草稿還是已核准、走到第幾站、資料有多少、全程大約多少錢（已用多少）；右上角「怎麼用？」開這堂課。兩種走法：一站一站走（每站停下來給你確認，第一次走選這個）、一次跑完（跑完再逐站看）。</span></div>
+    <div class="row"><b>站卡</b><span>每站一張：回答什麼、從上一站帶入什麼、還要你填幾格（紅字）、會得到什麼、大約多久多少錢；第一次到站會跳出那一站工具的課，可跳。</span></div>
+    <div class="row"><b>現在這一站</b><span>「脈絡」是上一站帶入的，不用填；下面的格子你填，可以先按「用示範案例填入」看看長什麼樣。按「執行這一站」才花錢。</span></div>
+    <div class="row"><b>已完成站的摘要</b><span>只放一句話結論和你的判斷；完整九段在那一站自己的結果頁。覺得問題定錯了，回去改，後面的站會標失效、重跑時前面的不用重填。</span></div>
+    <div class="row"><b>總結頁</b><span>跑完最後一站才出現：三站合一的一句話、每站一句＋你的判斷＋信心、最終建議與改判條件、解決方案、跨站引註、成本合計。</span></div>
+    <div class="row"><b>引註與核准</b><span>[n] 從第 1 站往後編號，不重排；「上一站帶入」的內容標它來自哪一站的哪一欄。最下面：核准整條、退回某一站（之後的站失效）、專家模式收著每站的閘門表與 JSON。</span></div>
+  </div>
+  <div class="tabnext"><a class="btn primary" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk#new">開始我的決定 →</a><a class="btn" href="https://claude.ai/artifact/7xEwPu9Cp2rWf3P8g9X1Pk">對照走到一半的示範 →</a></div>
+  </section>
+
+  <section class="tabpanel" id="panel-teach" role="tabpanel" aria-labelledby="tab-teach" hidden>
   <div class="card">
     <h2>教材版：給老師／帶領者<small>同一份資料，另一種排版</small></h2>
-    <div class="how"><b>怎麼讀</b>上面五步是學員版（3 分鐘自學）；這裡把同一條路排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。每一站的深度用該站工具的教材版，這裡只排「怎麼把三站走一遍」。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
+    <div class="how"><b>怎麼讀</b>其他分頁是學員版（3 分鐘自學）；這裡把同一條路排成 45 分鐘課堂：流程、講稿要點、討論題、學員常錯、講義。每一站的深度用該站工具的教材版，這裡只排「怎麼把三站走一遍」。<b>你要做的</b>只在你要教別人時展開；可整份匯出成講義與投影片大綱。</div>
     <details><summary><b>課堂流程（45 分鐘）</b></summary>
       <table class="mt6">
-        <tr><th>分</th><th>做什麼</th><th>用學員版哪一步</th></tr>
-        <tr><td>0–5</td><td>破冰：每人說一個還沒做、「幾個選項選一個」的決定</td><td>第 1 步「能／不能回答」</td></tr>
-        <tr><td>5–15</td><td>講三站各做什麼，例子換成學員的領域；每站只講「要你填的那一列」</td><td>第 2 步（切領域）</td></tr>
-        <tr><td>15–30</td><td>分組把自己的決定走一遍：第 1 站三格、第 2 站四格各兩條、第 3 站自己定權重</td><td>第 2 步的填好例子</td></tr>
-        <tr><td>30–40</td><td>各組報告哪個權重一改結果就翻；其他組專門找「跳過第 1 站」和「權重全 5」</td><td>第 4 步</td></tr>
-        <tr><td>40–45</td><td>收尾：改了第 1 站就要重跑後面；預告每站的工具課</td><td>第 5 步、總覽頁</td></tr>
+        <tr><th>分</th><th>做什麼</th><th>用學員版哪一頁</th></tr>
+        <tr><td>0–5</td><td>破冰：每人說一個還沒做、「幾個選項選一個」的決定</td><td>「認識」的「能／不能回答」</td></tr>
+        <tr><td>5–15</td><td>講三站各做什麼，例子換成學員的領域；每站只講「要你填的那一列」</td><td>「各站」（切領域）</td></tr>
+        <tr><td>15–30</td><td>分組把自己的決定走一遍：第 1 站三格、第 2 站四格各兩條、第 3 站自己定權重</td><td>「各站」的填好例子</td></tr>
+        <tr><td>30–40</td><td>各組報告哪個權重一改結果就翻；其他組專門找「跳過第 1 站」和「權重全 5」</td><td>「怎麼走」</td></tr>
+        <tr><td>40–45</td><td>收尾：改了第 1 站就要重跑後面；帶大家看一次總覽頁；預告每站的工具課</td><td>「開始」卡、「看懂總覽」、總覽頁</td></tr>
       </table>
     </details>
     <details><summary><b>講稿要點（每步 2–3 句）</b></summary>
@@ -562,7 +670,9 @@
     </details>
     <p class="sub mt8 mb0">教材版和學員版由同一份工作流資料生成（來源 [1]–[2]），改課文就同時改兩版。每一站的工具深度在該站工具課的教材版，這裡不重寫。</p>
   </div>
+  </section>
 
+  <section class="tabpanel" id="panel-sources" role="tabpanel" aria-labelledby="tab-sources" hidden>
   <div class="card">
     <h2>課程來源（每段課文的 [n]）</h2>
     <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；工作流的課引用它自己的定義檔和三站工具的課。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
@@ -571,6 +681,7 @@
       <li>三站工具各自的 5 分鐘課（問題陳述、SWOT、加權決策矩陣；各有自己的來源）</li>
     </ol>
   </div>
+  </section>
 </main>
 </div>
 </body>

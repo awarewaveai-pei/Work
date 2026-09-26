@@ -48,7 +48,6 @@
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
-  .top .skip{font-size:13px;color:var(--muted)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -74,9 +73,6 @@
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
-  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
-  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .progress span.done{background:var(--accent);color:var(--bg)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
@@ -218,6 +214,21 @@
   details.dir summary{font-size:15px;color:var(--ink)}
   details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
   details.dir .tool{border-top:none;padding-left:12px}
+  /* == lesson tabs (plan U15: one kind of content per tab; WAI-ARIA tabs: button[role=tab] + section[role=tabpanel]) == */
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 14px}
+  .tab{border:0;border-bottom:3px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 12px;cursor:pointer}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab small{font-weight:400;font-size:11.5px;margin-left:4px}
+  .tabnext{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  /* == the one action a page exists for (start a case, fill the fields): a thick accent frame and a big button == */
+  .card.cta{border:2px solid var(--accent)}
+  .btn.big{font-size:16px;font-weight:700;padding:12px 22px}
+  /* == run form (the tool page's input, plan U14): label, one-line hint, the field; .layer .lN colours a layer field == */
+  .field{display:grid;gap:4px;padding:8px 0 8px 14px;border-left:6px solid var(--line);margin-top:10px}
+  .field label,.field>b{font-weight:700}
+  .field .hint{font-size:12.5px;color:var(--muted);margin:0}
+  .carried{background:var(--soft);border-radius:8px;padding:8px 10px;font-size:13.5px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -244,18 +255,19 @@
   // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
   // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
   // the details itself); the home router does the same for its views.
+  // window.mockNote is the one note writer (run-form-script uses it too): one p.mocknote right after `row`, reused.
+  window.mockNote = function (row, text) {
+    var note = row.nextElementSibling;
+    if (!note || !note.classList.contains("mocknote")) {
+      note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+      row.parentNode.insertBefore(note, row.nextSibling);
+    }
+    note.textContent = text;
+  };
   (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
     document.addEventListener("click", function (e) {
       var b = e.target.closest && e.target.closest("button[data-mock]");
-      if (b) {
-        var row = b.closest(".btns") || b, note = row.nextElementSibling;
-        if (!note || !note.classList.contains("mocknote")) {
-          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
-          row.parentNode.insertBefore(note, row.nextSibling);
-        }
-        note.textContent = "示意稿：" + b.getAttribute("data-mock");
-        return;
-      }
+      if (b) { window.mockNote(b.closest(".btns") || b, "示意稿：" + b.getAttribute("data-mock")); return; }
       var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
       var d = t && t.closest("details");
       if (d) d.open = true;
@@ -263,6 +275,45 @@
   });
 </script>
 <!-- == partial: page-actions-script: end == -->
+<!-- == partial: run-form-script: start (verbatim from partials/run-form-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Run pages (plan U14, operator 2026-09-25: the tool page must show the fields you fill). form.runform holds one
+  // labelled textarea per input; its markup value is the saved run, and data-demo overrides it where the saved run left
+  // the field empty (the workflow's current station). The address sets the state a lesson's buttons ask for (mockkit
+  // RUN_STATES): #new = every field empty, #demo = the demo values, both "no result yet"; any other address = the saved
+  // run. "No result yet" hides [data-when="result"] and shows [data-when="empty"]. [data-run] needs one filled field,
+  // then shows the result (a mock has only the demo's; its data-run says what the product does) — scrolled to #result
+  // when it was hidden, else the note sits under the button; [data-fill] puts the demo back, [data-clear] empties.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    if (!document.querySelector("form.runform")) return;
+    function fields(scope) { return Array.prototype.slice.call(scope.querySelectorAll("textarea")); }
+    function demo(t) { return t.hasAttribute("data-demo") ? t.getAttribute("data-demo") : t.defaultValue; }
+    function show(result) {
+      document.querySelectorAll("[data-when]").forEach(function (el) { el.hidden = (el.getAttribute("data-when") === "result") !== result; });
+    }
+    document.querySelectorAll("form.runform").forEach(function (f) { f.addEventListener("submit", function (e) { e.preventDefault(); }); });
+    var h = location.hash.slice(1);
+    if (h === "new" || h === "demo") {
+      document.querySelectorAll("form.runform").forEach(function (f) { fields(f).forEach(function (t) { t.value = h === "new" ? "" : demo(t); }); });
+      show(false);
+    }
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("form.runform button");
+      if (!b) return;
+      var ts = fields(b.closest("form")), row = b.closest(".btns") || b;
+      if (b.hasAttribute("data-fill")) { ts.forEach(function (t) { t.value = demo(t); }); return; }
+      if (b.hasAttribute("data-clear")) { ts.forEach(function (t) { t.value = ""; }); if (ts[0]) ts[0].focus(); return; }
+      if (!b.hasAttribute("data-run")) return;
+      if (ts.every(function (t) { return !t.value.trim(); })) { window.mockNote(row, "示意稿：先填至少一格，再按執行。"); if (ts[0]) ts[0].focus(); return; }
+      var target = document.getElementById("result"), was = target && target.hidden;
+      show(true);
+      var text = "示意稿：" + b.getAttribute("data-run");
+      if (was) { window.mockNote(target.querySelector(".how") || target, text); target.scrollIntoView(); }
+      else window.mockNote(row, text);
+    });
+  });
+</script>
+<!-- == partial: run-form-script: end == -->
 </head>
 <body>
 <div class="app">
@@ -277,40 +328,34 @@
   <!-- == partial: app-nav: end == -->
 <main class="wrap">
 
-  <div class="banner"><b>示意稿</b>：這是「工作流」（多個工具串起來）的結果長什麼樣：一頁總覽、每一站各一頁九段（同單一工具）、跑完一頁總結。用你領域的合成案例，數字只為示意。</div>
-  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects">我的專案</a> › WuSheng 課程形式 › 工作流「做一個決定」</div>
+  <div class="banner"><b>示意稿</b>：「做一個決定」工作流的頁面。上面是站列，下面是現在這一站要填的格子，按「執行這一站」往下一站走。直接打開是示範專案（第 1 站走完、停在第 2 站）；從課程按「開始我的決定」是第 1 站的空格子，按「用示範案例走一次」是第 1 站填好、還沒執行。合成教材案例，數字只為示意。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects">我的專案</a> › <span data-when="result">WuSheng 課程形式 › </span>工作流「做一個決定」</div>
 
-  <!-- 總覽 -->
+  <!-- 總覽：課程另開分頁，讀法細節在課程的「看懂總覽」分頁 -->
   <div class="card">
-    <div class="top"><h1>決定：WuSheng 課程要不要改成「線上＋實體」混合</h1><a class="howto" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU">第一次走這條路？先上 3 分鐘的課 →</a></div>
-    <div class="sub">工作流「做一個決定 life-decision-v1」・3 站：問題陳述 → SWOT → 加權決策矩陣・專案「WuSheng 課程形式」・2026-09-24・合成教材案例</div>
-    <div class="status"><span class="pill">AI 草稿・第 2 站進行中</span><span>資料：你填的＋上一站自動帶入・外部來源 0 筆</span><span>已完成 1/3 站</span><span>全程約 8 分鐘・≈ NT$3（已用 NT$1）</span></div>
-    <div class="how"><b>怎麼讀</b>站列是你在哪；每站一張卡寫它回答什麼、從上一站帶入什麼、還要你填什麼。<b>你要做的</b>選走法；到了每一站，填紅字的欄位再按執行。</div>
-    <p class="lead">一條工作流 = 幾個工具排好順序，<b>上一站的結果自動變成下一站的輸入</b>。你只在每一站補它缺的那幾格，不用重填。</p>
-    <div class="grid2c">
-      <div class="can"><b>這條路能回答</b>問題到底是什麼（第 1 站）、我們的強弱與外部機會威脅（第 2 站）、幾個選項按你自己定的準則和權重哪個最好（第 3 站）。</div>
-      <div class="cant"><b>這條路不能回答</b>市場會不會買單（沒有外部資料）；權重不會替你定（那是你的價值判斷，系統只算分）。</div>
-    </div>
-    <div class="todos">
-      <div class="todo"><b>① 先看站列</b>你在第幾站、哪些已完成、下一站是什麼。</div>
-      <div class="todo"><b>② 看「現在」那張卡</b>它回答什麼、從上一站帶入什麼、還要你填哪幾格（紅字）。</div>
-      <div class="todo"><b>③ 看摘要與總結頁骨架</b>已完成的站只留一句話和你的判斷；跑完第 3 站才有總結頁。</div>
-    </div>
-    <p class="sub mt8 mb0">只有 30 秒？看站列和「現在」那張卡的紅字就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
-    <div class="terms"><b>四個詞：</b><span><b>站</b> 一個工具一站</span><span><b>帶入</b> 上一站的結果自動變成這站的輸入</span><span><b>還要你填</b> 系統填不了的紅字欄位</span><span><b>總結頁</b> 三站合一的結論</span></div>
-    <div class="journey">
+    <div class="top"><h1>做一個決定<span data-when="result">：WuSheng 課程要不要改成「線上＋實體」混合</span></h1><a class="howto" href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU" target="_blank" rel="noopener">第一次走這條路？先上 3 分鐘的課 ↗</a></div>
+    <div class="sub">工作流「做一個決定 life-decision-v1」・3 站：問題陳述 → SWOT → 加權決策矩陣<span data-when="result">・專案「WuSheng 課程形式」・2026-09-24・合成教材案例</span></div>
+    <div class="status"><span class="pill" data-when="result">AI 草稿・第 2 站進行中</span><span data-when="empty" hidden>還沒開始：填好第 1 站的格子按「執行這一站」，按之前不花錢</span><span data-when="result">資料：你填的＋上一站自動帶入・外部來源 0 筆</span><span data-when="result">已完成 1/3 站</span><span>全程約 8 分鐘・≈ NT$3<span data-when="result">（已用 NT$1）</span></span></div>
+    <div class="how"><b>怎麼讀</b>站列是你在哪；每一塊的讀法在<a href="https://claude.ai/artifact/TP18Q3Xif2BphmAfbxxrKU#panel-read" target="_blank" rel="noopener">課程的「看懂總覽」分頁 ↗</a>。<b>你要做的</b>填現在這一站的格子，按「執行這一站」。</div>
+    <div class="journey" data-when="result">
       <span class="done">✓ 第 1 站 問題陳述</span><i>→</i>
       <span class="now">● 第 2 站 SWOT（現在）</span><i>→</i>
       <span>○ 第 3 站 加權決策矩陣</span><i>→</i>
       <span>○ 總結頁</span>
     </div>
+    <div class="journey" data-when="empty" hidden>
+      <span class="now">● 第 1 站 問題陳述（現在）</span><i>→</i>
+      <span>○ 第 2 站 SWOT</span><i>→</i>
+      <span>○ 第 3 站 加權決策矩陣</span><i>→</i>
+      <span>○ 總結頁</span>
+    </div>
     <div class="btns">
-      <button type="button" class="btn primary" data-mock="正式版一站一站走：每站停下來給你確認，可以改順序、可以中途換工具。">一站一站走<small>每站停下來給你確認，可以改順序、可以中途換工具</small></button>
+      <button type="button" class="btn" data-mock="正式版一站一站走：每站停下來給你確認，可以改順序、可以中途換工具。">一站一站走<small>每站停下來給你確認，可以改順序、可以中途換工具</small></button>
       <button type="button" class="btn" data-mock="正式版三站自動跑完，再讓你逐站看九段結果與總結；會花錢的步驟先問你。">一次跑完<small>三站自動跑，跑完再逐站看九段與總結</small></button>
       <a class="btn ghost" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這條路適合我的問題嗎？<small>描述你的問題，系統幫你挑</small></a>
     </div>
 
-    <div class="mcards">
+    <div class="mcards" data-when="result">
       <div class="mcard done">
         <div><b>第 1 站 問題陳述</b><span class="tag">已完成</span></div>
         <div><span class="k">回答什麼：</span>我們要決定的到底是什麼、誰受影響、成功長什麼樣。</div>
@@ -325,7 +370,7 @@
         <div><span class="k">帶入什麼：</span>第 1 站的問題陳述與 3 個成功條件 → 自動填「脈絡」欄；<span class="need">還要你填 4 格</span>：S／W／O／T 各至少 2 條（可讓 AI 起草，你改）。</div>
         <div><span class="k">得到：</span>SWOT 表＋每格的證據強度。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><button type="button" class="btn primary" data-mock="正式版打開第 2 站 SWOT 的填寫頁：帶入的欄位已填好，紅字的 4 格要你填（可以讓 AI 起草），你確認才執行。">填紅字欄位並執行</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用 SWOT？先看 5 分鐘的課</button></div>
+        <div class="btns"><a class="btn primary" href="#result">填這四格並執行 ↓</a><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用 SWOT？先看 5 分鐘的課</button></div>
       </div>
       <div class="mcard">
         <div><b>第 3 站 加權決策矩陣</b><span class="tag">之後</span></div>
@@ -338,18 +383,83 @@
     </div>
   </div>
 
+  <!-- 開新決定時：第 1 站的三個格子（課程的「開始我的決定」打開這裡） -->
+  <div class="card cta" data-when="empty" hidden>
+    <h2>第 1 站 問題陳述：三個格子<small>先把「到底要決定什麼」講清楚</small></h2>
+    <div class="how"><b>怎麼讀</b>一格一件事，每格一句提示；空的格子裡有例子。<b>你要做的</b>填好按「執行這一站」。</div>
+    <form class="runform" aria-label="第 1 站問題陳述的三個格子">
+      <div class="field">
+        <label for="s1-what">要決定什麼</label>
+        <p class="hint" id="h-s1-what">一句話，寫成「要不要…」或「在幾個選項裡選一個」。</p>
+        <textarea id="s1-what" name="decision" rows="2" aria-describedby="h-s1-what" placeholder="例：WuSheng 團體課要不要從全實體改成「線上＋實體」混合。">WuSheng 團體課要不要從全實體改成「線上＋實體」混合。</textarea>
+      </div>
+      <div class="field">
+        <label for="s1-who">誰受影響</label>
+        <p class="hint" id="h-s1-who">具體到人數或角色。</p>
+        <textarea id="s1-who" name="stakeholders" rows="2" aria-describedby="h-s1-who" placeholder="例：現有 8 位參與者、2 位帶領者、3 位遠地詢問者。">現有 8 位參與者、2 位帶領者、3 位遠地詢問者。</textarea>
+      </div>
+      <div class="field">
+        <label for="s1-ok">成功長什麼樣</label>
+        <p class="hint" id="h-s1-ok">2–3 個看得到、量得到的條件；不寫「希望變好」。</p>
+        <textarea id="s1-ok" name="success" rows="3" aria-describedby="h-s1-ok" placeholder="例：主動分享人數不低於現在（每場 6 人）；遠地至少 3 人能參加。">① 主動分享人數不低於現在（每場 6 人）；② 遠地至少 3 人能參加；③ 帶領者每週準備時間不超過現在的 1.2 倍。</textarea>
+      </div>
+      <div class="btns mt12">
+        <button type="button" class="btn primary big" data-run="正式版跑第 1 站：用你填的三格寫出問題陳述與成功條件，花費先告訴你、你確認才跑；示意稿接著顯示示範案例走完第 1 站的樣子。">執行這一站</button>
+        <button type="button" class="btn" data-fill>用示範案例填入</button>
+        <button type="button" class="btn ghost" data-clear>清空，填我自己的</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 現在這一站：第 2 站 SWOT 的四個格子 -->
+  <div class="card cta" id="result" data-when="result">
+    <h2>第 2 站 SWOT：填這四格<small>現在這一站</small></h2>
+    <div class="how"><b>怎麼讀</b>「脈絡」是第 1 站帶入的；四格各至少 2 條。<b>你要做的</b>填好按「執行這一站」。</div>
+    <form class="runform" aria-label="第 2 站 SWOT 的四個格子">
+      <div class="field">
+        <b>脈絡（第 1 站帶入，不用填）</b>
+        <div class="carried">要決定的是「在不降低參與者主動分享的前提下，能不能用混合制讓遠地的人也參加」；成功條件三個：主動分享人數不降、遠地參加者 ≥ 3 人、帶領者負擔不超過現在的 1.2 倍 <cite>[1]</cite><cite>[2]</cite></div>
+      </div>
+      <div class="field">
+        <label for="s2-s">S 強項（我們自己做得好的）</label>
+        <p class="hint" id="h-s2-s">寫事實，不寫感覺；最好對到上面某個成功條件。</p>
+        <textarea id="s2-s" name="strengths" rows="2" aria-describedby="h-s2-s" placeholder="例：帶領者熟線上工具；作品照片流程已經數位化。" data-demo="帶領者熟線上工具；作品照片流程已經數位化。"></textarea>
+      </div>
+      <div class="field">
+        <label for="s2-w">W 弱項（我們自己的不足）</label>
+        <p class="hint" id="h-s2-w">一樣寫事實：缺什麼、少什麼。</p>
+        <textarea id="s2-w" name="weaknesses" rows="2" aria-describedby="h-s2-w" placeholder="例：只有一間教室；線上設備老舊。" data-demo="只有一間教室；線上設備老舊。"></textarea>
+      </div>
+      <div class="field">
+        <label for="s2-o">O 機會（外面已經存在的好事）</label>
+        <p class="hint" id="h-s2-o">外面現在就有的事，不是「希望」。</p>
+        <textarea id="s2-o" name="opportunities" rows="2" aria-describedby="h-s2-o" placeholder="例：遠地需求是真的（3 人詢問）；線上場可以錄影回看。" data-demo="遠地需求是真的（3 人詢問）；線上場可以錄影回看。"></textarea>
+      </div>
+      <div class="field">
+        <label for="s2-t">T 威脅（外面已經存在的風險）</label>
+        <p class="hint" id="h-s2-t">外面現在就有的事，不是「擔心」。</p>
+        <textarea id="s2-t" name="threats" rows="2" aria-describedby="h-s2-t" placeholder="例：線上人數一多，主動分享就掉（上一期線上場最低）。" data-demo="線上人數一多，主動分享就掉（上一期線上場最低）；混合制兩邊都要顧，帶領者負擔可能超過 1.2 倍。"></textarea>
+      </div>
+      <div class="btns mt12">
+        <button type="button" class="btn primary big" data-run="正式版跑第 2 站 SWOT：用你填的四格加上帶入的脈絡，做出 SWOT 表和每格的證據強度，花費先告訴你、你確認才跑；示意稿只做到第 1 站。">執行這一站</button>
+        <button type="button" class="btn" data-fill>用示範案例填入</button>
+        <button type="button" class="btn ghost" data-clear>清空，填我自己的</button>
+      </div>
+    </form>
+  </div>
+
   <!-- 第 1 站摘要 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>第 1 站摘要：問題陳述（已完成）</h2>
-    <div class="how"><b>怎麼讀</b>這裡只放一句話結論和你的判斷；完整九段在它自己那一頁。<b>你要做的</b>不用做；覺得問題定錯了，回去改再重跑後面的站。</div>
+    <div class="how"><b>怎麼讀</b>只放一句話結論和你的判斷。<b>你要做的</b>問題定錯了就回去改，後面的站重跑。</div>
     <div class="finding"><b>一句話：</b>要決定的不是「線上或實體」，是「在不降低參與者主動分享的前提下，能不能用混合制讓遠地的人也參加」；成功條件：主動分享人數不降、遠地參加者 ≥ 3 人、帶領者負擔不增 <cite>[1]</cite>。</div>
     <div class="row"><b>你的判斷</b><span>部分同意——「帶領者負擔不增」應該改成「不超過現在的 1.2 倍」（你的原話，已成為第 2 站的最高優先輸入）</span></div>
   </div>
 
   <!-- 總結頁骨架 -->
-  <div class="card okline">
+  <div class="card okline" data-when="result">
     <h2>總結頁（跑完第 3 站後出現；這是骨架）</h2>
-    <div class="how"><b>怎麼讀</b>一句話總結、每站一句、最終建議、解決方案、所有引註。<b>你要做的</b>核准整條工作流，或退回某一站。</div>
+    <div class="how"><b>怎麼讀</b>跑完第 3 站才有；這裡是骨架。<b>你要做的</b>之後核准整條，或退回某一站。</div>
     <div class="finding ok"><b>一句話（三站合一）</b>（跑完才有）例：混合制在你自己定的權重下得分最高，但只有在「每場線上人數 ≤ 4」時，主動分享人數才不會掉——這是第 2 站的威脅與第 3 站的敏感度一起說的。</div>
     <table>
       <tr><th>站</th><th>一句話</th><th>你的判斷</th><th>信心</th></tr>
@@ -361,9 +471,9 @@
   </div>
 
   <!-- 引註 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>引註（跨站累積）</h2>
-    <div class="how"><b>怎麼讀</b>[n] 從第 1 站往後編號，不重排；「上一站帶入」的內容會標它來自哪一站的哪一欄。<b>你要做的</b>不用做。</div>
+    <div class="how"><b>怎麼讀</b>[n] 從第 1 站往後編號，不重排。<b>你要做的</b>不用做。</div>
     <ol class="src">
       <li>第 1 站・你的輸入・問題：「WuSheng 課程要不要改成線上＋實體混合，遠地的人一直問」</li>
       <li>第 1 站・你的輸入・成功條件：「主動分享人數不降、遠地參加者至少 3 人、帶領者負擔不增」</li>
@@ -373,7 +483,7 @@
   </div>
 
   <!-- 來源列與核准 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <div class="meta-bar">
       <span>整條工作流 <b>AI 草稿，尚未核准</b>（第 1 站你已部分同意）</span>
       <span>模型 <b>claude-sonnet-5</b></span>
@@ -382,7 +492,7 @@
     </div>
     <div class="sub mt8"><b>核准</b> = 整條成為專案正式紀錄；<b>退回某站</b> = 那站之後的站失效，重跑時前面的站不用重填；<b>刪除專案</b> = 三站的來源與產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
     <div class="btns mt12">
-      <button type="button" class="btn primary" data-mock="正式版打開第 2 站 SWOT：帶入的欄位已填好，你補紅字的格子再執行。">繼續第 2 站</button>
+      <a class="btn primary" href="#result">繼續第 2 站 ↑</a>
       <button type="button" class="btn" data-mock="正式版讓你拖曳改站的順序，或把某一站換成別的工具；已完成的站不用重做。">改順序或換一站的工具</button>
       <button type="button" class="btn" data-mock="正式版請你寫原因，第 1 站重做；後面的站會失效，重跑時前面的不用重填。">退回第 1 站並說原因</button>
       <a class="btn ghost" href="#expert">專家模式：每站的閘門表與 JSON</a>

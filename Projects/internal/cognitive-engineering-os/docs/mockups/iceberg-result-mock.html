@@ -48,7 +48,6 @@
   .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
   .howto{font-size:13px;color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
   .howto:hover{background:var(--accent-hover)}
-  .top .skip{font-size:13px;color:var(--muted)}
   .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin:6px 0 10px;align-items:center}
   .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
   .pill.ok{border-color:var(--ok);color:var(--ok)}
@@ -74,9 +73,6 @@
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
   .journey i{color:var(--muted);font-style:normal}
-  .progress{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
-  .progress span{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tag);color:var(--accent)}
-  .progress span.done{background:var(--accent);color:var(--bg)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
@@ -218,6 +214,21 @@
   details.dir summary{font-size:15px;color:var(--ink)}
   details.dir summary small{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
   details.dir .tool{border-top:none;padding-left:12px}
+  /* == lesson tabs (plan U15: one kind of content per tab; WAI-ARIA tabs: button[role=tab] + section[role=tabpanel]) == */
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 14px}
+  .tab{border:0;border-bottom:3px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 12px;cursor:pointer}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab small{font-weight:400;font-size:11.5px;margin-left:4px}
+  .tabnext{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  /* == the one action a page exists for (start a case, fill the fields): a thick accent frame and a big button == */
+  .card.cta{border:2px solid var(--accent)}
+  .btn.big{font-size:16px;font-weight:700;padding:12px 22px}
+  /* == run form (the tool page's input, plan U14): label, one-line hint, the field; .layer .lN colours a layer field == */
+  .field{display:grid;gap:4px;padding:8px 0 8px 14px;border-left:6px solid var(--line);margin-top:10px}
+  .field label,.field>b{font-weight:700}
+  .field .hint{font-size:12.5px;color:var(--muted);margin:0}
+  .carried{background:var(--soft);border-radius:8px;padding:8px 10px;font-size:13.5px}
   /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
   .mt0{margin-top:0}
   .mt4{margin-top:4px}
@@ -244,18 +255,19 @@
   // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
   // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
   // the details itself); the home router does the same for its views.
+  // window.mockNote is the one note writer (run-form-script uses it too): one p.mocknote right after `row`, reused.
+  window.mockNote = function (row, text) {
+    var note = row.nextElementSibling;
+    if (!note || !note.classList.contains("mocknote")) {
+      note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+      row.parentNode.insertBefore(note, row.nextSibling);
+    }
+    note.textContent = text;
+  };
   (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
     document.addEventListener("click", function (e) {
       var b = e.target.closest && e.target.closest("button[data-mock]");
-      if (b) {
-        var row = b.closest(".btns") || b, note = row.nextElementSibling;
-        if (!note || !note.classList.contains("mocknote")) {
-          note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
-          row.parentNode.insertBefore(note, row.nextSibling);
-        }
-        note.textContent = "示意稿：" + b.getAttribute("data-mock");
-        return;
-      }
+      if (b) { window.mockNote(b.closest(".btns") || b, "示意稿：" + b.getAttribute("data-mock")); return; }
       var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
       var d = t && t.closest("details");
       if (d) d.open = true;
@@ -263,6 +275,45 @@
   });
 </script>
 <!-- == partial: page-actions-script: end == -->
+<!-- == partial: run-form-script: start (verbatim from partials/run-form-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Run pages (plan U14, operator 2026-09-25: the tool page must show the fields you fill). form.runform holds one
+  // labelled textarea per input; its markup value is the saved run, and data-demo overrides it where the saved run left
+  // the field empty (the workflow's current station). The address sets the state a lesson's buttons ask for (mockkit
+  // RUN_STATES): #new = every field empty, #demo = the demo values, both "no result yet"; any other address = the saved
+  // run. "No result yet" hides [data-when="result"] and shows [data-when="empty"]. [data-run] needs one filled field,
+  // then shows the result (a mock has only the demo's; its data-run says what the product does) — scrolled to #result
+  // when it was hidden, else the note sits under the button; [data-fill] puts the demo back, [data-clear] empties.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    if (!document.querySelector("form.runform")) return;
+    function fields(scope) { return Array.prototype.slice.call(scope.querySelectorAll("textarea")); }
+    function demo(t) { return t.hasAttribute("data-demo") ? t.getAttribute("data-demo") : t.defaultValue; }
+    function show(result) {
+      document.querySelectorAll("[data-when]").forEach(function (el) { el.hidden = (el.getAttribute("data-when") === "result") !== result; });
+    }
+    document.querySelectorAll("form.runform").forEach(function (f) { f.addEventListener("submit", function (e) { e.preventDefault(); }); });
+    var h = location.hash.slice(1);
+    if (h === "new" || h === "demo") {
+      document.querySelectorAll("form.runform").forEach(function (f) { fields(f).forEach(function (t) { t.value = h === "new" ? "" : demo(t); }); });
+      show(false);
+    }
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("form.runform button");
+      if (!b) return;
+      var ts = fields(b.closest("form")), row = b.closest(".btns") || b;
+      if (b.hasAttribute("data-fill")) { ts.forEach(function (t) { t.value = demo(t); }); return; }
+      if (b.hasAttribute("data-clear")) { ts.forEach(function (t) { t.value = ""; }); if (ts[0]) ts[0].focus(); return; }
+      if (!b.hasAttribute("data-run")) return;
+      if (ts.every(function (t) { return !t.value.trim(); })) { window.mockNote(row, "示意稿：先填至少一格，再按執行。"); if (ts[0]) ts[0].focus(); return; }
+      var target = document.getElementById("result"), was = target && target.hidden;
+      show(true);
+      var text = "示意稿：" + b.getAttribute("data-run");
+      if (was) { window.mockNote(target.querySelector(".how") || target, text); target.scrollIntoView(); }
+      else window.mockNote(row, text);
+    });
+  });
+</script>
+<!-- == partial: run-form-script: end == -->
 </head>
 <body>
 <div class="app">
@@ -277,33 +328,61 @@
   <!-- == partial: app-nav: end == -->
 <main class="wrap">
 
-  <div class="banner"><b>示意稿</b>：這是「執行」按下去之後的目標畫面，用你填的四段話做的。目前系統還沒有這一頁。案例是合成的教材（帶領者側的流程問題），不是真實個案；數字只為示意。</div>
-  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects">我的專案</a> › WuSheng 團體反思・第三期 › 冰山模型分析</div>
+  <div class="banner"><b>示意稿</b>：冰山模型的工具頁。上面填四個格子，按「執行分析」，下面出現結果。直接打開是示範專案（已經跑過一次）；從課程按「開始填我的案例」是空格子，按「用示範案例試一次」是填好、還沒執行。案例是合成教材，數字只為示意。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects">我的專案</a> › <span data-when="result">WuSheng 團體反思・第三期 › </span>冰山模型分析</div>
 
-  <!-- 0. 這是什麼、怎麼讀 -->
+  <!-- 0. 頁首：課程另開分頁，讀法細節在課程的「看懂結果」分頁 -->
   <div class="card">
-    <div class="top"><h1>冰山模型分析：團體反思 session 主動分享從 6 人掉到 2 人</h1><a class="howto" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY">怎麼用？先上 5 分鐘的課 →</a></div>
-    <div class="sub">工具：冰山模型 Iceberg Model（系統思考 Systems Thinking）・專案「WuSheng 團體反思・第三期」・2026-09-24 ・ 合成教材案例</div>
-    <div class="status"><span class="pill">AI 草稿・尚未核准</span><span>資料：你填的 4 段話・外部來源 0 筆</span><span>四層完整度 4/4（第 2 層最薄：只有 1 句）</span><span>約 6k tokens・≈ NT$1・讀完約 4 分鐘</span></div>
-    <div class="how"><b>怎麼讀</b>先看狀態列（草稿還是已核准、資料有多少），再看「能回答／不能回答」，然後照下面三步走。<b>你要做的</b>不用做；只有 30 秒就直接看 ① 的一句話。</div>
-    <p class="lead">看得見的只有<b>事件</b>；原因藏在水面下。這個工具把問題由上往下挖四層：<b>事件 → 模式 → 結構 → 心智模型</b>。越深的一層越難改，但改了效果越大、越持久。</p>
-    <div class="grid2c">
-      <div class="can"><b>這頁能回答</b>問題為什麼一再發生（哪一層在推）、先在哪一層出手最值得、接下來該做什麼。</div>
-      <div class="cant"><b>這頁不能回答</b>誰對誰錯；你填的四段話以外的事實（外部來源 0 筆）；數字只為示意，正式目標由你定。</div>
-    </div>
-    <div class="todos">
-      <div class="todo"><b>① 先看結論與冰山圖</b>一句話結論、三個發現；再看你填的四段話各在哪一層。</div>
-      <div class="todo"><b>② 看圖表與四張卡</b>趨勢圖、因果回饋圖、槓桿對比；四張卡同一格式：這層問什麼 → 你填了什麼 → 這代表什麼 → 在這層出手會怎樣。</div>
-      <div class="todo"><b>③ 看總結、解決方案、下一步</b>最有力的出手點在哪一層；三個方案比一比；90 天行動計畫與三個追蹤指標；你在這條路的哪裡、接著做什麼、不做也可以。</div>
-    </div>
-    <p class="sub mt8 mb0">只有 30 秒？看 ① 的一句話和建議就夠。每一段的開頭都有「怎麼讀」和「你要做的」。</p>
-    <div class="terms"><b>四個詞：</b><span><b>事件</b> 這次發生的事</span><span><b>模式</b> 一再發生</span><span><b>結構</b> 為什麼一再</span><span><b>心智模型</b> 為什麼沒人改</span></div>
+    <div class="top"><h1>冰山模型分析<span data-when="result">：團體反思 session 主動分享從 6 人掉到 2 人</span></h1><a class="howto" href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY" target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a></div>
+    <div class="sub">工具：冰山模型 Iceberg Model（系統思考 Systems Thinking）<span data-when="result">・專案「WuSheng 團體反思・第三期」・2026-09-24 ・ 合成教材案例</span></div>
+    <div class="status"><span class="pill" data-when="result">AI 草稿・尚未核准</span><span data-when="empty" hidden>還沒執行：填好格子按「執行分析」，按之前不花錢</span><span data-when="result">資料：你填的 4 段話・外部來源 0 筆</span><span data-when="result">四層完整度 4/4（第 2 層最薄：只有 1 句）</span><span>約 6k tokens・≈ NT$1</span></div>
+    <div class="how"><b>怎麼讀</b>上面填、下面看；每段的讀法在<a href="https://claude.ai/artifact/653Kt4JtExaujnffNDvygY#panel-read" target="_blank" rel="noopener">課程的「看懂結果」分頁 ↗</a>。<b>你要做的</b>填好或改好四格，按「執行分析」。</div>
+  </div>
+
+  <!-- 填寫：四個格子（工具頁的主要動作） -->
+  <div class="card cta" id="input">
+    <h2>你的案例：四個格子<small>從上往下填；填不出來的留白</small></h2>
+    <div class="how"><b>怎麼讀</b>一格一層，每格一句提示；空的格子裡有例子。<b>你要做的</b>填好按「執行分析」；留白的層會列成證據缺口。</div>
+    <form class="runform" aria-label="冰山模型的四個格子">
+      <div class="field layer l1">
+        <label for="f-event">① 事件：發生了什麼？</label>
+        <p class="hint" id="h-event">一件具體的事，有時間、有數字；跟上次比多少。</p>
+        <textarea id="f-event" name="event" rows="2" aria-describedby="h-event" placeholder="例：第 6 次 session，8 人只有 2 人主動分享；第 1 次是 6 人。">這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位</textarea>
+      </div>
+      <div class="field layer l2">
+        <label for="f-pattern">② 模式：以前發生過嗎？多常？跟什麼一起出現？</label>
+        <p class="hint" id="h-pattern">一再發生的型態：多久一次、什麼時候特別多。這是線索，不是原因。</p>
+        <textarea id="f-pattern" name="pattern" rows="2" aria-describedby="h-pattern" placeholder="例：三期都從第 4 次開始掉；帶領者先解讀作品的場次最低。">三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低</textarea>
+      </div>
+      <div class="field layer l3">
+        <label for="f-structure">③ 結構：什麼流程、規則、人力安排在製造它？</label>
+        <p class="hint" id="h-structure">寫制度，不寫某個人：順序、時間分配、表單、權責。</p>
+        <textarea id="f-structure" name="structure" rows="2" aria-describedby="h-structure" placeholder="例：帶領者先講作品的意義，說明佔 35 分；紀錄表只問「達到洞察？」。">流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」</textarea>
+      </div>
+      <div class="field layer l4">
+        <label for="f-model">④ 心智模型：哪個沒說出口的假設撐住這些結構？</label>
+        <p class="hint" id="h-model">常藏在口頭禪裡；用引號寫一句話，自己的假設也要寫。</p>
+        <textarea id="f-model" name="model" rows="2" aria-describedby="h-model" placeholder="例：「參與者需要專家幫他們看見意義。」">帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」</textarea>
+      </div>
+      <div class="btns mt12">
+        <button type="button" class="btn primary big" data-run="正式版用你填的四格分析，約 6k tokens・≈ NT$1，你確認才花；示意稿只有示範案例的結果，就是這一份。">執行分析</button>
+        <button type="button" class="btn" data-fill>用示範案例填入</button>
+        <button type="button" class="btn ghost" data-clear>清空，填我自己的</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 還沒執行時：結果的位置 -->
+  <div class="card" data-when="empty" hidden>
+    <h2>結果</h2>
+    <div class="how"><b>怎麼讀</b>按「執行分析」後，九段結果出現在這裡。<b>你要做的</b>先填上面的格子。</div>
+    <p class="sub mb0">執行之前不花錢；正式版按下去會先說要花多少，你確認才跑。</p>
   </div>
 
   <!-- 0.5 明確的文字結論 -->
-  <div class="card accent">
+  <div class="card accent" id="result" data-when="result">
     <h2>① 結論（文字分析）</h2>
-    <div class="how"><b>怎麼讀</b>先看一句話；三個發現各自標了信心和理由；「改判條件」是什麼證據出現就要改結論。<b>你要做的</b>在最下面寫你自己的判斷：同意、部分同意或不同意。</div>
+    <div class="how"><b>怎麼讀</b>先看一句話，再看三個發現各自的信心。<b>你要做的</b>在最下面寫你自己的判斷。</div>
     <p class="lead mt0"><b>一句話：</b>主動分享的人變少，不是參與者不投入，是「帶領者先解讀作品」這個流程，加上「參與者需要專家幫他們看見意義」這個信念一起造成的；多鼓勵沒有用，要改流程順序，並且把那個信念換掉。</p>
     <div class="finding"><b>發現 1｜這是每期都會重演的下滑，不是這一期的特例<span class="conf mid">信心：中——只有你填的一句，沒有逐次數字</span></b>三期以來都從第 4 次 session 開始掉；帶領者先解讀作品的那幾次掉得最多 <cite>[1]</cite><cite>[2]</cite>。事件層只看到「這次很安靜」，模式層看到「每期到後半都安靜」。</div>
     <div class="finding"><b>發現 2｜有一條自我加強的「等答案迴路」在推<span class="conf mid">信心：中——迴路是從流程推出來的，還沒被資料證實</span></b>帶領者先講作品的意義 → 參與者等帶領者說 → 主動分享變少 → 帶領者覺得「他們還沒到位」要多引導 → 帶領者說得更多、更早 <cite>[3]</cite>。迴路不打斷，越到後面越安靜（圖 B）。</div>
@@ -318,9 +397,9 @@
   </div>
 
   <!-- 1. 冰山圖 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>② 冰山圖：你的問題在四層各是什麼</h2>
-    <div class="how"><b>怎麼讀</b>從上往下；左邊是這一層問的問題和你填的，右邊是在這一層出手的方式；★ 是本次建議先出手的層。<b>你要做的</b>不用做；看你填的四段話各落在哪一層對不對，放錯層可以退回改。</div>
+    <div class="how"><b>怎麼讀</b>從上往下；★ 是建議先出手的層。<b>你要做的</b>看你填的四段話有沒有放錯層。</div>
     <svg viewBox="0 0 1070 575" role="img" aria-label="冰山模型四層圖">
       <defs>
         <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
@@ -378,9 +457,9 @@
   </div>
 
   <!-- 1.5 圖表分析 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>③ 圖表分析（三張圖各回答一個問題）</h2>
-    <div class="how"><b>怎麼讀</b>每張圖回答一個問題；圖下面寫「怎麼看」「看到什麼」「來源」。<b>你要做的</b>不用做；標「示意」的圖要接上真實資料才算數（⑧ 隨時間變化行為圖）。</div>
+    <div class="how"><b>怎麼讀</b>每張圖回答一個問題，讀法寫在圖下。<b>你要做的</b>不用做；標「示意」的要接上真實資料。</div>
     <div class="charts">
       <figure>
         <figcaption><b>圖 A｜趨勢：真的越來越安靜嗎？</b>（第 2 層）</figcaption>
@@ -446,9 +525,9 @@
   </div>
 
   <!-- 2. 四層逐層解讀，同一骨架 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>④ 由上往下四層解讀（每張卡同一格式）</h2>
-    <div class="how"><b>怎麼讀</b>四張卡同一格式：這層問什麼 → 你填的 → 這代表 → 在這層出手 → 對應 ⑦ 的方案 → 你填的資料厚不厚。<b>你要做的</b>找出你填得最薄的一層，之後補資料（⑧ 有補法）。</div>
+    <div class="how"><b>怎麼讀</b>四張卡同一格式，由上往下。<b>你要做的</b>找出資料最薄的一層，之後補。</div>
 
     <div class="layer l1 card mb12">
       <div class="head"><h3>第 1 層／4：事件 Events</h3><span class="meta">看得見 ・ 時間：現在 ・ 出手方式：回應 React</span></div>
@@ -492,18 +571,18 @@
   </div>
 
   <!-- 3. 總結 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>⑤ 總結：在哪一層出手</h2>
-    <div class="how"><b>怎麼讀</b>三句話：問題在哪、先做哪層、還缺什麼。<b>你要做的</b>看「證據缺口」裡的三項，如果你手上就有，回去補再重跑。</div>
+    <div class="how"><b>怎麼讀</b>三句話：問題在哪、先做哪層、還缺什麼。<b>你要做的</b>手上有缺口的資料，就回上面補、再執行。</div>
     <div class="finding"><b>主要發現：問題在第 3 層的迴路，根在第 4 層的信念</b>第 1、2 層是症狀。等答案迴路（第 3 層）製造下滑；「專家比較懂」信念（第 4 層）讓迴路修不好。</div>
     <div class="finding"><b>建議順序：先第 3 層，同時準備第 4 層</b>第 3 層一期內見效、能量化（主動分享人數、帶領者說明分鐘）；第 4 層拿第 3 層的數字去跟帶領者團隊談。</div>
     <div class="finding warn"><b>證據缺口（老實說）</b>目前只知道「先講」與「分享少」同時發生<cite>[2]</cite>，沒有逐次說明分鐘數、每人發言次數，也沒有參與者自己說為什麼不說。建議先補這三項再改訓練。</div>
   </div>
 
   <!-- 4. 理解層次表 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>⑥ 理解層次對照表（改編自 Anderson &amp; Johnson）</h2>
-    <div class="how"><b>怎麼讀</b>每一列是一層，越往下越根本；★ 是本次建議先出手的列。<b>你要做的</b>四列都要有人負責，去 ⑦ B 表填負責人。</div>
+    <div class="how"><b>怎麼讀</b>一列一層，★ 是建議先出手的列。<b>你要做的</b>四列都要有人負責，填在 ⑦ B 表。</div>
     <table>
       <tr><th>層</th><th>出手方式</th><th>時間取向</th><th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr>
       <tr><td>事件</td><td>回應 React</td><td>現在</td><td>最快的因應是什麼？</td><td>8 人只有 2 人分享 <cite>[1]</cite></td><td>開場鼓勵（只當急救）</td></tr>
@@ -515,9 +594,9 @@
   </div>
 
   <!-- 4.5 解決方案：從分析到行動 -->
-  <div class="card okline" id="solution">
+  <div class="card okline" id="solution" data-when="result">
     <h2>⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）</h2>
-    <div class="how"><b>怎麼讀</b>A 選一條路、B 排成 90 天、C 定三個數字盯著。表裡的字：見效 = 多久看得到；成本 = 要投入什麼；持久 = 會不會回彈；風險 = 最可能失敗的地方。<b>你要做的</b>選一個方案、填負責人和期限、確認目標數字（目標由你定，系統只帶入現況）。</div>
+    <div class="how"><b>怎麼讀</b>A 選一條路、B 排成 90 天、C 三個數字盯著。<b>你要做的</b>選方案、填負責人和期限、確認目標數字。</div>
 
     <h3 class="mt6 mb8">A. 選方案：三條路比一比</h3>
     <div class="scroll-x">
@@ -558,7 +637,7 @@
   </div>
 
   <!-- 5. 下一步 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>⑧ 下一步：你在這條路的哪裡、接著做什麼</h2>
     <div class="how"><b>怎麼讀</b>旅程列是你在哪；每張卡寫做了會得到什麼、要你再填什麼。<b>你要做的</b>選一張，或都不選。</div>
     <div class="journey">
@@ -614,9 +693,9 @@
   </div>
 
   <!-- 6. 引註 -->
-  <div class="card">
+  <div class="card" data-when="result">
     <h2>⑨ 引註（每個 [n] 都指向一段可查的來源）</h2>
-    <div class="how"><b>怎麼讀</b>[n] 是那句話的來源；「你的輸入」= 你填的原文，「外部來源」= 抓來的網頁（網址、抓取時間、指紋）。<b>你要做的</b>不用做；發現引錯了，按下方「退回並說原因」。</div>
+    <div class="how"><b>怎麼讀</b>[n] 是那句話的來源。<b>你要做的</b>引錯了，按下方「退回並說原因」。</div>
     <ol class="src">
       <li>你的輸入・事件：「這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位」</li>
       <li>你的輸入・模式：「三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低」</li>
@@ -627,7 +706,7 @@
   </div>
 
   <!-- 7. 來源標記與核准 -->
-  <div class="card" id="approve">
+  <div class="card" id="approve" data-when="result">
     <div class="meta-bar">
       <span>這一頁是 <b>AI 推論，尚未經人核准</b></span>
       <span>模型 <b>claude-sonnet-5</b></span>

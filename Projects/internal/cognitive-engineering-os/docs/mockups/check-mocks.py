@@ -87,6 +87,13 @@ ICEBERG_SHAPE = [
     'aria-label="冰山模型四層圖"',
 ]
 COMMON_FORBID = [r"方法(?!論)"]                                  # every page says 工具 (operator's word), never 方法
+# U14 (operator 2026-09-25 「講解塞太多…詳解主要放在五分鐘課程裡」): a run page keeps one short line per section; the
+# reading guide (three steps, 30 seconds, four terms, the per-section detail) lives in its lesson's "read" tab
+HOW_MAX = 60                                                    # characters of a run page's 怎麼讀／你要做的 strip (NFKC, spaces collapsed)
+TEACHING = ("can", "cant", "todos", "terms")                   # teaching blocks that belong in the lesson, never on a run page
+RUN_OF = {lesson: run for lesson, run in mk.DEMOS.values()}     # each lesson's run page (its start buttons land there)
+LESSON_OF = {run: lesson for lesson, run in RUN_OF.items()}
+BEHAVIOUR = ("data-mock", "data-prompt", "data-set", "aria-pressed", "data-run", "data-fill", "data-clear", "data-tab-go")
 _known = set(FILES)
 assert all(a in _known and b in _known for a, b in PAIR_FACTS) and set(PAGE_FACTS) <= _known and set(FORBID) <= _known \
     and set(LINKS) == _known and all(set(v) <= _known for v in LINKS.values()) \
@@ -250,6 +257,13 @@ class Checker:
         self.css_path = self.folder / mk.DESIGN_SYSTEM.name
         self.partials_dir = self.folder / "partials"
 
+    @staticmethod
+    def _ancestors(n):
+        a = n.parent
+        while a is not None:
+            yield a
+            a = a.parent
+
     def bad(self, f, rule, msg):
         site = f"  @site:{sys._getframe(1).f_lineno}" if os.environ.get("CHECK_MOCKS_TRACE") else ""   # the selftest maps findings to rules
         self.findings.append(f"{f}: [{rule}] {msg}{site}")
@@ -289,7 +303,8 @@ class Checker:
                 if art not in page_of: self.bad(f, "links", f"line {line}: {href} is not one of the mocks' artifacts"); continue
                 if not frag: continue
                 if not re.fullmatch(r"[A-Za-z0-9._~-]+", frag): self.bad(f, "links", f"line {line}: #{frag} is not a plain anchor; the artifact frame drops it")
-                elif page_of[art] in self.ids and frag not in self.ids[page_of[art]]: self.bad(f, "links", f"line {line}: {href} has no target on {page_of[art]}")
+                elif page_of[art] in self.ids and frag not in self.ids[page_of[art]] and not (page_of[art] in RESULT and frag in mk.RUN_STATES):
+                    self.bad(f, "links", f"line {line}: {href} has no target on {page_of[art]}")
 
     def check_continuity(self):
         t = self.texts
@@ -489,8 +504,8 @@ class Checker:
             if n.tag == "svg" and n.attrs.get("aria-hidden") != "true" and (n.attrs.get("role") != "img" or not n.attrs.get("aria-label")):
                 self.bad(f, "a11y", f"line {n.line}: svg without role=img + aria-label (or aria-hidden=true beside a text label)")
             if "style" in n.attrs: self.bad(f, "theme", f"line {n.line}: inline style on <{n.tag}>; use a class from design-system.css")
-            if n.attrs.get("role") == "tablist":
-                tabs = [c for c in n.elements() if c.has("chip")]
+            if n.attrs.get("role") == "tablist":   # the domain chips and the lesson tabs alike
+                tabs = [c for c in n.elements() if c.has("chip") or c.has("tab")]
                 if any(c.attrs.get("role") != "tab" or c.attrs.get("aria-selected") not in ("true", "false") for c in tabs) \
                         or sum(c.attrs.get("aria-selected") == "true" for c in tabs) != 1:
                     self.bad(f, "a11y", f"line {n.line}: tablist chips need role=tab and exactly one aria-selected=true")
@@ -509,9 +524,10 @@ class Checker:
         for n in nodes:
             if n.tag == "a" and n.attrs.get("href", "").strip() in ("", "#"): self.bad(f, "controls", f"line {n.line}: link without a destination")
             if n.has("btn") and n.tag not in ("a", "button"): self.bad(f, "controls", f"line {n.line}: <{n.tag} class=btn> looks clickable and does nothing; use <a href> or <button data-mock>")
-            if n.tag == "button" and not any(k in n.attrs for k in ("data-mock", "data-prompt", "data-set", "aria-pressed")) and n.attrs.get("role") != "tab":
-                self.bad(f, "controls", f"line {n.line}: <button> without a behaviour (data-mock, data-prompt, data-set, aria-pressed or role=tab)")
-            if "data-mock" in n.attrs and not n.attrs["data-mock"].startswith("正式版"): self.bad(f, "controls", f"line {n.line}: data-mock must say what the product will do (start with 正式版)")
+            if n.tag == "button" and not any(k in n.attrs for k in BEHAVIOUR) and n.attrs.get("role") != "tab":
+                self.bad(f, "controls", f"line {n.line}: <button> without a behaviour ({', '.join(BEHAVIOUR)} or role=tab)")
+            for k in ("data-mock", "data-run"):   # a mock action (and a run, which the mock can only show the demo of) says what the product does
+                if k in n.attrs and not (n.attrs[k] or "").startswith("正式版"): self.bad(f, "controls", f"line {n.line}: {k} must say what the product will do (start with 正式版)")
         # lesson mentions must be actionable (U15): a link, or a mock action that says where the lesson will come from
         def lesson_text_ok(n):
             # descend while one child still holds the whole phrase; the element where it stops holding together
@@ -524,6 +540,13 @@ class Checker:
                 self.bad(f, "U15", f"line {n.line}: lesson mention that is not a link: {' '.join(n.text().split())[:40]}")
         lesson_text_ok(root)
         anchors = [n for n in nodes if n.tag == "a"]
+        # a link that opens a lesson opens a new tab (operator 2026-09-25): the page behind it keeps a half-filled form
+        lessons = {mk.ARTIFACT[x] for x in LESSON}
+        for n in anchors:
+            h = n.attrs.get("href", "")
+            to_lesson = h.startswith("https://claude.ai/artifact/") and h[len("https://claude.ai/artifact/"):].partition("#")[0] in lessons
+            if (to_lesson or LESSON_PHRASE.search(n.text())) and (n.attrs.get("target") != "_blank" or "noopener" not in (n.attrs.get("rel") or "").split()):
+                self.bad(f, "U15", f"line {n.line}: a link to a lesson opens a new tab (target=_blank rel=noopener)")
         for n in anchors:   # every in-page #link lands on an id of this page
             h = n.attrs.get("href", "")
             if h.startswith("#") and len(h) > 1 and h[1:] not in ids: self.bad(f, "links", f"line {n.line}: in-page link {h} has no target on the page")
@@ -575,18 +598,72 @@ class Checker:
         anchors = [n for n in nodes if n.tag == "a" or (web and n.tag == "button")]
         howto = [n for n in anchors if n.has("howto") and (web or n.attrs.get("href", "").startswith("https://claude.ai/artifact/"))]
         if not howto or not howto[0].parent.has("top") or howto[0].parent.parent is not top: self.bad(f, "U15", "header lesson button (.top > a.howto) missing from the first card")
-        # U14 / §3.10 (0): the first card = status, how, lead, can/cant, three reading steps, the 30-second line, four terms
         if not top.find("status"): self.bad(f, "U14", "first card must carry the status strip")
-        if not top.find("lead"): self.bad(f, "U14", "first card must carry a .lead sentence")
-        if not (top.find("can") and top.find("cant")): self.bad(f, "U14", "first card must carry 能回答／不能回答 (.can/.cant)")
-        todos = [n for n in top.find("todos") if len(n.find("todo")) >= 3]
-        if not todos: self.bad(f, "U14", "first card must carry 怎麼讀這一頁 as .todos with three .todo steps")
-        if "30 秒" not in top.text(): self.bad(f, "U14", "first card must say what to read with only 30 seconds")
-        if not top.find("terms"): self.bad(f, "U14", "first card must carry the 四個詞 .terms line")
+        # U14 (operator 2026-09-25 「講解塞太多…詳解主要放在五分鐘課程裡」): the reading guide lives in exactly one place —
+        # its lesson's read tab when the run page has a lesson (the mocks), else the page's first card (the web result
+        # page until its lesson lands in P3); a page that has a lesson carries no teaching block and short strips only
+        lesson = None if web else LESSON_OF.get(f)
+        if lesson is None:
+            self.check_scope(f, top, "first card")
+            self.check_reading_guide(f, top, "first card")
+        else:
+            for n in nodes:
+                hit = [c for c in TEACHING if n.has(c)]
+                if hit: self.bad(f, "U14", f"line {n.line}: .{hit[0]} is teaching; it lives in {lesson}'s read tab, not on the run page")
+            want = mk.artifact_href(lesson, "panel-read")
+            if not any(a.attrs.get("href") == want for a in top.find(tag="a")): self.bad(f, "U14", f"first card must link to the lesson's reading tab {want}")
+            for n in nodes:
+                k = len(" ".join(unicodedata.normalize("NFKC", n.text()).split())) if n.has("how") else 0
+                if k > HOW_MAX: self.bad(f, "U14", f"line {n.line}: 怎麼讀 strip has {k} characters (max {HOW_MAX}); the detail goes in the lesson's read tab")
+            self.check_run_form(f, cards, nodes)
         # the last card = source strip, what approve/return/delete mean, actions, expert mode folded in a <details><pre>
         if not last.find("meta-bar"): self.bad(f, "§3.10", "last card must carry the .meta-bar source strip")
         if not last.find("btns"): self.bad(f, "§3.10", "last card must carry the approve/return actions")
         if not any(d.find(tag="pre") for d in last.find(tag="details")): self.bad(f, "expert", "last card must fold expert mode into <details> with a <pre>")
+
+    def check_scope(self, f, box, where):
+        # what the tool can and cannot answer (.can/.cant): the lesson's 認識 tab, or a run page that has no lesson yet
+        if not (box.find("can") and box.find("cant")): self.bad(f, "U14", f"{where} must carry 能回答／不能回答 (.can/.cant)")
+
+    def check_reading_guide(self, f, box, where):
+        # how to read the result: three reading steps, the 30-second line, the four terms (the lesson's read tab, or a run
+        # page that has no lesson yet)
+        missing = [x for x, ok in (("three .todo reading steps", any(len(n.find("todo")) >= 3 for n in box.find("todos"))),
+                                   ("the 30-second line", "30 秒" in box.text()), ("the 四個詞 .terms line", bool(box.find("terms")))) if not ok]
+        if missing: self.bad(f, "U14", f"{where} lacks the reading guide: {', '.join(missing)}")
+
+    def check_run_form(self, f, cards, nodes):
+        # the tool page is the fields you fill, then the result (operator 2026-09-25 「完全沒看到可以填表的空格」): the card
+        # after the header holds a form.runform; each form is labelled textareas with an example placeholder and one
+        # primary [data-run], one [data-fill], one [data-clear]; every later card shows with a result or before one
+        # (data-when, driven by partials/run-form-script.html); #result is where a run lands
+        if len(cards) < 2 or not cards[1].find("runform", tag="form"): self.bad(f, "U14", "the card after the header must hold the input form (form.runform)")
+        forms = [n for n in nodes if n.tag == "form" and n.has("runform")]
+        def states(n):   # where n is visible: every data-when on n or an ancestor must match (nested ones intersect); any
+            s = {"result", "empty"}   # other [hidden] ancestor hides it in both, since the script only toggles data-when
+            for a in [n, *self._ancestors(n)]:
+                if "data-when" in a.attrs: s &= {a.attrs["data-when"]}
+                elif "hidden" in a.attrs: return set()
+            return s
+        shown = set()   # a form counts in a state only when all of its fields show there
+        for fm in forms:
+            ts = fm.find(tag="textarea")
+            shown |= set.intersection(*(states(t) for t in ts)) if ts else set()
+        if shown != {"result", "empty"}: self.bad(f, "U14", f"fields must be visible in both states (saved run, no result yet); a run form shows only in {sorted(shown) or 'neither'}")
+        for fm in forms:
+            labels = {x.attrs.get("for") for x in fm.find(tag="label")}
+            ts, kinds = fm.find(tag="textarea"), {k: [b for b in fm.find(tag="button") if k in b.attrs] for k in ("data-run", "data-fill", "data-clear")}
+            if not ts or any(t.attrs.get("id") not in labels or not (t.attrs.get("placeholder") or "").strip() for t in ts) \
+                    or any(len(v) != 1 for v in kinds.values()) or not kinds["data-run"][0].has("primary"):
+                self.bad(f, "U14", f"line {fm.line}: a run form = labelled textareas with an example placeholder + one primary [data-run], one [data-fill], one [data-clear]")
+        for c in cards[2:]:
+            if c.attrs.get("data-when") not in ("result", "empty"): self.bad(f, "U14", f"line {c.line}: a card after the form shows with a result or before one (data-when=result|empty)")
+        for n in nodes:
+            w = n.attrs.get("data-when")
+            if w is not None and (w not in ("result", "empty") or ("hidden" in n.attrs) != (w == "empty")):
+                self.bad(f, "U14", f"line {n.line}: data-when=result starts shown, data-when=empty starts hidden (the saved run is the page's default)")
+        if not any(n.attrs.get("id") == "result" and n.attrs.get("data-when") == "result" and n.has("card") for n in nodes):
+            self.bad(f, "U14", "one result card carries id=result (a run from the empty state lands there)")
 
     def check_lesson(self, f, s, root, nodes):
         d = self.domains
@@ -607,20 +684,44 @@ class Checker:
                 if len(shown) != 1 or shown[0].attrs.get("data-set") != default: self.bad(f, "D18", f"line {n.line}: exactly the default ({default}) example may be visible before a chip is clicked")
         if groups < MIN_EX_GROUPS[f]: self.bad(f, "D18", f"only {groups} example groups; the chips must drive every step ({MIN_EX_GROUPS[f]} expected)")
         if 'querySelectorAll(".ex")' not in s: self.bad(f, "D18", 'chip script must switch every example group (querySelectorAll(".ex"))')
-        anchors = [n for n in nodes if n.tag == "a"]
-        if not [n for n in anchors if n.attrs.get("href") == "#start"]: self.bad(f, "U15", "skip link (href=#start) missing")
+        # U15 (operator 2026-09-25 「開始填我的案例…重點中的重點，卻非常不顯眼」「用 Tab 方式安排不同性質的內容，之後其他的工具
+        #以這個為範本」): main = header → the start card (.card.cta#start, above everything) → the domain chips (they drive
+        # every tab) → the tab row (mockkit.LESSON_TABS) → one panel per tab; every other card sits inside a panel
+        run = RUN_OF[f]
         start = [n for n in nodes if n.attrs.get("id") == "start"]
-        if len(start) != 1 or not start[0].has("card") or not any(x.tag == "h2" and "開始" in x.text() for x in start[0].walk()):
-            self.bad(f, "U15", "id=start must be the card whose h2 says 開始 (the skip link must land on the start step)")
-        else:  # the start step: preparation list + exactly three buttons (demo / mine / is this for me)
+        if len(start) != 1 or not (start[0].has("card") and start[0].has("cta")) or not any(x.tag == "h2" and "開始" in x.text() for x in start[0].walk()):
+            self.bad(f, "U15", "id=start must be the .card.cta whose h2 says 開始")
+            start = []
+        else:  # preparation list + exactly three buttons: your own case (primary, lands on the empty fields) / the demo / is this for me
             st = start[0]
             if not any(len(u.find(tag="li")) >= 3 for u in st.find("check", tag="ul")): self.bad(f, "U15", "start step needs a ul.check with at least three items")
-            btns = st.find("btns")
-            if not btns or len(btns[0].find("btn")) != 3: self.bad(f, "U15", "start step needs exactly three buttons")
-        prog = [n for n in nodes if n.has("progress")]
-        if len(prog) != 1 or not prog[0].elements() or not prog[0].elements()[0].has("done"): self.bad(f, "U15", "one .progress strip whose first step is done")
+            bs = st.find("btn")   # every button in the card, not one row: a second primary anywhere in it breaks "only"
+            if len(bs) != 3: self.bad(f, "U15", "start step needs exactly three buttons")
+            elif not (bs[0].tag == "a" and bs[0].has("primary") and bs[0].attrs.get("href") == mk.artifact_href(run, "new") and bs[0].text().strip().startswith("開始")) \
+                    or bs[1].attrs.get("href") != mk.artifact_href(run, "demo") or any(b.has("primary") for b in bs[1:]):
+                self.bad(f, "U15", f"the start card's only primary button is the first, 開始… linking to {mk.artifact_href(run, 'new')}; the second links to the demo (#demo)")
+        main = next((n for n in nodes if n.tag == "main"), None)
+        kids = main.elements() if main else []
+        want = [t for t, _, _ in mk.LESSON_TABS[mk.LESSON_KIND[f]]]
+        row = [k for k in kids if k.has("tabs")]
+        chips = [k for k in kids if k.has("chips")]
+        panels = [k for k in kids if k.tag == "section" and k.has("tabpanel")]
+        if not (start and len(row) == 1 and len(chips) == 1 and start[0] in kids
+                and kids.index(start[0]) < kids.index(chips[0]) < kids.index(row[0]) < min((kids.index(p) for p in panels), default=len(kids))):
+            self.bad(f, "U15", "main holds the start card, then the domain chips, then the tab row, then the panels (the chips drive every tab)")
+        if [p.attrs.get("id") for p in panels] != [f"panel-{t}" for t in want] \
+                or any(p.attrs.get("role") != "tabpanel" or p.attrs.get("aria-labelledby") != f"tab-{t}" or ("hidden" in p.attrs) != (i > 0) for i, (p, t) in enumerate(zip(panels, want))):
+            self.bad(f, "U15", f"one section.tabpanel#panel-<id> per tab, in order {want}, role=tabpanel, aria-labelledby=tab-<id>, only the first visible")
+        loose = [n for n in nodes if n.has("card") and n not in start and not any(p in panels for p in self._ancestors(n))]
+        if loose: self.bad(f, "U15", f"line {loose[0].line}: a lesson card outside the tab panels (only the start card sits above the tabs)")
+        by = {p.attrs.get("id", "")[len("panel-"):]: p for p in panels}
+        def holds(tid, h2):
+            return tid in by and any(n.has("card") and any(x.tag == "h2" and h2 in x.text() for x in n.walk()) for n in by[tid].walk())
+        if not (holds("teach", "教材版") and holds("sources", "課程來源")): self.bad(f, "U15", "the 教材版 card sits in panel-teach and the 課程來源 card in panel-sources")
+        if "learn" in by: self.check_scope(f, by["learn"], "the 認識 tab")
+        if "read" in by: self.check_reading_guide(f, by["read"], "the read tab")
         status = [n for n in nodes if n.has("status")]
-        if status and "教材版" not in status[0].text(): self.bad(f, "U15", "status strip must point to the teaching-material card at the bottom")
+        if status and "教材版" not in status[0].text(): self.bad(f, "U15", "status strip must point to the 教材版 tab")
         quiz = [n for n in nodes if n.has("quiz")]
         if len(quiz) != 1 or len(quiz[0].find(tag="details")) < 2: self.bad(f, "U15", "one self-check .quiz with at least two questions")
         if sum(n.has("mistake") for n in nodes) < 3: self.bad(f, "M7", "at least three 常見錯誤 rows")

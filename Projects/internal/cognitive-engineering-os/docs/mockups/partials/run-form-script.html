@@ -1,0 +1,37 @@
+<script>
+  // Run pages (plan U14, operator 2026-09-25: the tool page must show the fields you fill). form.runform holds one
+  // labelled textarea per input; its markup value is the saved run, and data-demo overrides it where the saved run left
+  // the field empty (the workflow's current station). The address sets the state a lesson's buttons ask for (mockkit
+  // RUN_STATES): #new = every field empty, #demo = the demo values, both "no result yet"; any other address = the saved
+  // run. "No result yet" hides [data-when="result"] and shows [data-when="empty"]. [data-run] needs one filled field,
+  // then shows the result (a mock has only the demo's; its data-run says what the product does) — scrolled to #result
+  // when it was hidden, else the note sits under the button; [data-fill] puts the demo back, [data-clear] empties.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    if (!document.querySelector("form.runform")) return;
+    function fields(scope) { return Array.prototype.slice.call(scope.querySelectorAll("textarea")); }
+    function demo(t) { return t.hasAttribute("data-demo") ? t.getAttribute("data-demo") : t.defaultValue; }
+    function show(result) {
+      document.querySelectorAll("[data-when]").forEach(function (el) { el.hidden = (el.getAttribute("data-when") === "result") !== result; });
+    }
+    document.querySelectorAll("form.runform").forEach(function (f) { f.addEventListener("submit", function (e) { e.preventDefault(); }); });
+    var h = location.hash.slice(1);
+    if (h === "new" || h === "demo") {
+      document.querySelectorAll("form.runform").forEach(function (f) { fields(f).forEach(function (t) { t.value = h === "new" ? "" : demo(t); }); });
+      show(false);
+    }
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("form.runform button");
+      if (!b) return;
+      var ts = fields(b.closest("form")), row = b.closest(".btns") || b;
+      if (b.hasAttribute("data-fill")) { ts.forEach(function (t) { t.value = demo(t); }); return; }
+      if (b.hasAttribute("data-clear")) { ts.forEach(function (t) { t.value = ""; }); if (ts[0]) ts[0].focus(); return; }
+      if (!b.hasAttribute("data-run")) return;
+      if (ts.every(function (t) { return !t.value.trim(); })) { window.mockNote(row, "示意稿：先填至少一格，再按執行。"); if (ts[0]) ts[0].focus(); return; }
+      var target = document.getElementById("result"), was = target && target.hidden;
+      show(true);
+      var text = "示意稿：" + b.getAttribute("data-run");
+      if (was) { window.mockNote(target.querySelector(".how") || target, text); target.scrollIntoView(); }
+      else window.mockNote(row, text);
+    });
+  });
+</script>
