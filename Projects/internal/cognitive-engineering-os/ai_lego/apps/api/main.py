@@ -87,7 +87,8 @@ from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowR
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegistry
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
-from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths
+from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths, _atomic_write_journal, _journal_record
+from ai_lego.platform.workflow.human_required import load_human_required, missing_human_required
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
@@ -622,10 +623,80 @@ def recipe_form(recipe_id: str) -> dict[str, Any]:
     return {"recipe_id": recipe_id, "workflow_id": workflow_ir["id"], "source_fields": list(fields.values()), "schema_source": "compiled_workflow_bindings"}
 
 
+def _fail_recipe_journal(
+    *,
+    journal_path: Path,
+    workflow_ir: dict[str, Any],
+    initial_context: dict[str, Any],
+    journal_context_projector: Callable[[dict[str, Any]], Any] | None,
+    journal_context_protector: Any,
+    error: BaseException,
+) -> None:
+    """Leave a readable FAILED journal after ``execute_workflow_ir`` raises past its own per-step handling.
+
+    ``execute_workflow_ir`` already turns almost every failure into a ``FAILED`` journal record itself (one
+    per node, via the same ``_atomic_write_journal``/``_journal_record`` pair reused here); the residual gap is
+    an exception it raises without having written one yet -- an early guard clause before the run's first
+    journal write, or the ``workflow_gate_runner`` call, which is not wrapped in its per-step try/except. In a
+    synchronous run that gap still reaches the caller as an HTTP error; in an async run there is no HTTP
+    response left to carry it, so polling ``GET /recipes/{id}/runs/{run_id}`` must see it instead. Reusing the
+    executor's own journal writer (rather than a second status store) keeps the encrypted-journal path
+    (``journal_context_protector``) correct for CONFIDENTIAL/RESTRICTED runs.
+    """
+    message = str(error) or error.__class__.__name__
+    # node_kind is schema-constrained to {method, capability} (specs/execution/workflow-journal.schema.yaml);
+    # this synthetic marker step is neither, but "method" is the closest valid choice, and the label/ref/error
+    # below make it unambiguous this came from the async wrapper rather than a real recipe node.
+    failed_step = {"index": 0, "label": "async-run", "node_kind": "method", "ref": "run_recipe", "status": "FAILED", "input_paths": [], "error": message}
+    try:
+        existing = read_json(journal_path) if journal_path.exists() else None
+    except Exception:
+        existing = None
+    if isinstance(existing, dict) and isinstance(existing.get("steps"), list):
+        failed_step["index"] = existing.get("next_index", len(existing["steps"]))
+        existing["status"] = "FAILED"
+        existing["steps"].append(failed_step)
+        _atomic_write_journal(journal_path, existing)
+        return
+    context = dict(initial_context)
+    context.setdefault("steps", {})
+    context.setdefault("outputs", {})
+    record = _journal_record(workflow_ir, initial_context, "FAILED", context, [], 0, journal_context_projector, journal_context_protector)
+    record["steps"].append(failed_step)
+    _atomic_write_journal(journal_path, record)
+
+
+def _run_recipe_async(**kwargs: Any) -> None:
+    """Background-thread target for ``async:true`` runs (template: ``_launch_interpretation``)."""
+    fail_kwargs = {
+        "journal_path": kwargs["journal_path"],
+        "workflow_ir": kwargs["workflow_ir"],
+        "initial_context": kwargs["initial_context"],
+        "journal_context_projector": kwargs["journal_context_projector"],
+        "journal_context_protector": kwargs["journal_context_protector"],
+    }
+    try:
+        execute_workflow_ir(
+            kwargs["workflow_ir"],
+            kwargs["initial_context"],
+            kwargs["handlers"],
+            catalogs=kwargs["catalogs"],
+            gate_runners=kwargs["gate_runners"],
+            workflow_gate_runner=kwargs["workflow_gate_runner"],
+            journal_path=kwargs["journal_path"],
+            resume=kwargs["resume"],
+            journal_context_projector=kwargs["journal_context_projector"],
+            journal_context_protector=kwargs["journal_context_protector"],
+        )
+    except Exception as error:
+        _fail_recipe_journal(**fail_kwargs, error=error)
+
+
 @app.post("/recipes/{recipe_id}/run")
 def run_recipe(
     recipe_id: str,
     body: dict[str, Any],
+    response: Response,
     session: dict[str, Any] = Depends(require_session),
     catalog: MethodCatalog = Depends(get_catalog),
     store: IdentityStore = Depends(get_store),
@@ -634,9 +705,11 @@ def run_recipe(
 ) -> dict[str, Any]:
     """Execute a Recipe through the shared durable Workflow runtime.
 
-    ``body`` is ``{"source": {...}, "run_id": "optional", "resume": false, "project_id": "optional"}``.
+    ``body`` is ``{"source": {...}, "run_id": "optional", "resume": false, "project_id": "optional", "async": false}``.
     Bindings in the compiled IR are the only builder arguments; there is no
-    positional guessing or fallback to the single-method API.
+    positional guessing or fallback to the single-method API. ``async:true``
+    runs the same execution in a background thread and returns 202 immediately;
+    progress is read through the existing ``GET /recipes/{id}/runs/{run_id}``.
     """
     try:
         workflow_ir = compile_recipe_to_workflow_ir(resolve_spec_root(), recipe_id, "R0")
@@ -704,12 +777,21 @@ def run_recipe(
             status_code=400,
             detail={"code": "WORKFLOW_SOURCE_FIELDS_MISSING", "paths": list(missing_source_paths)},
         )
+    # A value-judgment field (weights/scores/scale, an argument's warrant/qualifier) has no correct value
+    # without a human (RESEARCH_LINES_MASTER_PLAN §3.4 C5); refused before journal so a half-run is never
+    # recorded for one, and AI drafting (draft_recipe_source) separately never fills it.
+    human_required_missing = missing_human_required(workflow_ir, source, load_human_required(resolve_spec_root()))
+    if human_required_missing:
+        raise HTTPException(status_code=422, detail={"code": "HUMAN_REQUIRED_MISSING", "fields": human_required_missing})
     run_id = body.get("run_id") or uuid.uuid4().hex
     if not isinstance(run_id, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) is None:
         raise HTTPException(status_code=400, detail="WORKFLOW_RUN_ID_INVALID: use 1-80 ASCII letters, numbers, '_' or '-'")
     resume = body.get("resume", False)
     if not isinstance(resume, bool):
         raise HTTPException(status_code=400, detail="WORKFLOW_RESUME_INVALID: resume must be boolean")
+    async_run = body.get("async", False)
+    if not isinstance(async_run, bool):
+        raise HTTPException(status_code=400, detail="WORKFLOW_ASYNC_INVALID: async must be boolean")
     journal = workflow_journal_path(session["tenant_id"], run_id)
     journal_ref = workflow_journal_ref(session["tenant_id"], run_id)
     # The classification is the Project's, never the caller's (RESEARCH_LINES_MASTER_PLAN K9): a body value is refused
@@ -740,6 +822,23 @@ def run_recipe(
 
     def evaluate_api_workflow_gate(context: dict[str, Any], workflow: dict[str, Any]) -> list[dict[str, Any]]:
         return workflow_gate_registry.evaluate(workflow_gate_refs, context, workflow)
+
+    execution_kwargs = {
+        "workflow_ir": workflow_ir,
+        "initial_context": {"source": source},
+        "handlers": handlers,
+        "catalogs": {"method": catalog, "capability": capability_catalog},
+        "gate_runners": gate_runners,
+        "workflow_gate_runner": evaluate_api_workflow_gate,
+        "journal_path": journal,
+        "resume": resume,
+        "journal_context_projector": None if journal_protector is not None else _api_journal_context,
+        "journal_context_protector": journal_protector,
+    }
+    if async_run:
+        threading.Thread(target=_run_recipe_async, daemon=True, kwargs=execution_kwargs).start()
+        response.status_code = 202
+        return {"status": "RUNNING", "run_id": run_id, "journal_ref": journal_ref}
 
     try:
         result = execute_workflow_ir(

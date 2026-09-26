@@ -28,6 +28,7 @@ from ai_lego.core.domain.provenance import AUTHORSHIP_STATES, EPISTEMIC_TYPES, m
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_gateway.provider import AiProvider
+from ai_lego.platform.workflow.human_required import load_human_required
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 
 AI_DRAFT_CAPABILITY = "ai.draft_record"
@@ -320,6 +321,7 @@ def draft_recipe_source(
     ``source`` (a partially drafted Source from an earlier call) is extended, so the UI can draft node by node."""
     brief = require_brief(brief)
     plan = recipe_draft_plan(spec_root, recipe_id)
+    human_required = load_human_required(spec_root)
     if labels is not None:
         known = {p["label"] for p in plan}
         unknown = [label for label in labels if label not in known]
@@ -336,8 +338,11 @@ def draft_recipe_source(
         if not node["source_params"]:
             nodes.append({"label": node["label"], "method_id": node["method_id"], "ok": None, "error": "no source-bound params", "attempts": 0})
             continue
+        # A value-judgment param (weights/scores/scale, warrant/qualifier -- §3.4 C5) is excluded from the
+        # prompt the same way an upstream-bound one is: the model must never fill either, only a human can.
+        exclude_params = tuple(dict.fromkeys([*node["upstream_params"], *human_required.get(node["method_id"], [])]))
         try:
-            result = draft_method_kwargs(node["method_id"], brief, provider=provider, spec_root=spec_root, catalog=catalog, exclude_params=tuple(node["upstream_params"]))
+            result = draft_method_kwargs(node["method_id"], brief, provider=provider, spec_root=spec_root, catalog=catalog, exclude_params=exclude_params)
         except AiDraftProviderError as error:
             usage["input_tokens"] += error.input_tokens
             usage["output_tokens"] += error.output_tokens
