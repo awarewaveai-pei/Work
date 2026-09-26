@@ -1,22 +1,22 @@
 "use client";
 
 // The run page (docs/mockups/iceberg-result-mock.html): header card, the fields you fill (they stay above the result),
-// then the result. `lesson` = the tool's lesson page or null (resolved on the server: app/(shell)/methods/[id]/run/page.tsx).
+// then the result. `lesson` = the tool's lesson page or null, `names` = tool id -> name for the next steps (both resolved on
+// the server: app/(shell)/methods/[id]/run/page.tsx).
 import { useEffect, useRef, useState } from "react";
 import React from "react";
-import Link from "next/link";
 import { apiFetch } from "../lib/api";
-import { toolHref } from "../lib/catalog";
 import { FormField, initialState } from "../lib/form-model";
 import { LazyFill } from "./LazyFill";
 import { MethodForm } from "./MethodForm";
 import { ResultPage } from "./result/ResultPage";
+import { RunHeader } from "./RunHeader";
 
-type FormResponse = { method_id: string; display?: { name_zh?: string; name_en?: string }; form: { fields: FormField[]; example?: { scenario?: string; input?: Record<string, unknown> } } };
+type FormResponse = { method_id: string; display?: { name_zh?: string; name_en?: string; blurb_zh?: string }; form: { fields: FormField[]; example?: { scenario?: string; input?: Record<string, unknown> } } };
 type Project = { project_id: string; name: string };
 type InterpretationStatus = { status: "PENDING" | "FAILED" | "DONE"; result?: any; record?: Record<string, unknown>; manifest?: Array<{ id: string; kind?: string; path?: string; value?: string; source_id?: string; sha256?: string }>; gate_results?: Array<{ gate_id: string; status: string }>; error?: string };
 
-export function RunPage({ methodId, lesson }: { methodId: string; lesson: string | null }) {
+export function RunPage({ methodId, lesson, names = {} }: { methodId: string; lesson: string | null; names?: Record<string, string> }) {
   const [form, setForm] = useState<FormResponse | null>(null);
   const [state, setState] = useState<Record<string, unknown>>({});
   const [projects, setProjects] = useState<Project[]>([]);
@@ -95,22 +95,13 @@ export function RunPage({ methodId, lesson }: { methodId: string; lesson: string
           setError(""); setCompleted(null); setPendingId(accepted.interpretation_id);
         } catch (reason) { setError(String(reason)); }
       }} />
-      {pendingId && <p role="status" className="sub mt10">正在分析，約一分鐘；完成後結果會出現在下面。</p>}{error && <p className="error">{error}</p>}
+      {pendingId && <p role="status" className="sub mt10">正在分析，約兩到三分鐘（整頁結果：結論、逐層解讀、圖、方案）；完成後結果會出現在下面。</p>}{error && <p className="error">{error}</p>}
     </div>
   );
-  if (completed?.result) return <ResultPage result={completed.result} record={completed.record} manifest={completed.manifest} gateResults={completed.gate_results} display={form.display} lesson={lesson}>{inputCard}</ResultPage>;
+  const project = projects.find((item) => item.project_id === projectId)?.name;
+  if (completed?.result) return <ResultPage result={completed.result} record={completed.record} manifest={completed.manifest} gateResults={completed.gate_results} display={form.display} lesson={lesson} fields={form.form.fields} names={names} project={project}>{inputCard}</ResultPage>;
   return <>
-    <div className="crumbs"><Link href="/projects">我的專案</Link> › {name}分析</div>
-    <div className="card">
-      <div className="top"><h1>{name}分析</h1>{lesson
-        ? <a className="howto" href={lesson} target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a>
-        : <Link className="howto" href={toolHref(methodId)}>它做什麼？</Link>}</div>
-      <div className="sub">工具：{name}{form.display?.name_en ? ` ${form.display.name_en}` : ""}</div>
-      <div className="status"><span className="pill">還沒執行</span><span>專案：</span>{projects.map((project) => <button type="button" key={project.project_id} className={`btn${projectId === project.project_id ? " primary" : " ghost"}`} aria-pressed={projectId === project.project_id} onClick={() => setProjectId(project.project_id)}>{project.name}</button>)}{!projects.length && <span>正在準備專案…</span>}</div>
-      {lesson
-        ? <div className="how"><b>怎麼讀</b>上面填、下面看；每段的讀法在<a href={`${lesson}#panel-read`} target="_blank" rel="noopener">課程的「看懂結果」分頁 ↗</a>。<b>你要做的</b>填好或改好格子，按「執行分析」。</div>
-        : <div className="how"><b>怎麼讀</b>先填下面的格子，按「執行分析」；結果出現在格子下方。<b>你要做的</b>填不出來的留白；執行之前不花錢。</div>}
-    </div>
+    <RunHeader methodId={methodId} name={name} nameEn={form.display?.name_en} lesson={lesson} status={<><span className="pill">還沒執行</span><span>專案：</span>{projects.map((project) => <button type="button" key={project.project_id} className={`btn${projectId === project.project_id ? " primary" : " ghost"}`} aria-pressed={projectId === project.project_id} onClick={() => setProjectId(project.project_id)}>{project.name}</button>)}{!projects.length && <span>正在準備專案…</span>}</>} />
     {inputCard}
     <div className="card" id="result">
       <h2>結果</h2>

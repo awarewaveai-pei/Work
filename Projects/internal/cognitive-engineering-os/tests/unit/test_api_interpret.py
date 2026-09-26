@@ -104,6 +104,43 @@ class InterpretApiTests(ApiTestCase):
         self.assertEqual([event["event_type"] for event in events][-1], "InterpretationJudged")
         self.assertEqual(api_main.app.dependency_overrides[api_main.get_store]().ai_usage_totals(self.tenant["tenant_id"])["output_tokens"], 23)
 
+    def test_result_page_sections_survive_the_endpoint_numbers_from_the_record_pass(self):
+        """The sections of schema 1.1.0 go through the real endpoint and worker; numbers the record states are accepted."""
+        import json as _json
+        answer = {
+            "findings": [{"id": "F1", "title": "流程", "text": "先講讓分享變少。", "citations": ["r/structures/0"], "confidence": {"level": "mid", "reason": "一句紀錄"}}],
+            "visual": {"kind": "layered", "bindings": {"levels": [{"label": "事件", "path": "r/events"}]}}, "next_methods": [], "next_steps": [],
+            "summary": "從第 1 次 6 位到第 6 次 2 位。",
+            "loop": {"kind": "reinforcing", "name": "等答案", "reading": "90 分鐘裡說明佔 35 分鐘，越轉越安靜。",
+                     "nodes": [{"id": "a", "text": "說明佔 35 分鐘", "citations": ["r/structures/0"]}, {"id": "b", "text": "只剩 2 位分享", "citations": ["r/events/0"]}],
+                     "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "a"}]},
+            "trend": {"reading": "6 位降到 2 位", "series": [{"name": "主動分享", "unit": "位", "points": [{"label": "第 1 次", "value": 6, "citation": "r/events/0"}, {"label": "第 6 次", "value": 2, "citation": "r/events/0"}]}]},
+        }
+
+        class Detailed:
+            model = "test-detail-model"
+            def complete(self, system, user, *, max_tokens):
+                return AiCompletion(text=_json.dumps(answer, ensure_ascii=False), model=self.model, input_tokens=5, output_tokens=7)
+
+        api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: Detailed()
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={
+                "project_id": self.project_id,
+                "events": ["第 6 次 session，8 位只有 2 位主動分享；第 1 次是 6 位"],
+                "patterns": ["每期第 4 次起下降"],
+                "structures": ["帶領者先講，90 分鐘裡說明佔 35 分鐘"],
+                "mental_models": ["參與者需要專家"],
+            })
+        self.assertEqual(response.status_code, 202, response.text)
+        api_main._run_interpretation(**launch.call_args.kwargs)
+        fetched = self.client.get(f"/interpretations/{response.json()['interpretation_id']}").json()
+        self.assertEqual(fetched["status"], "DONE", fetched)
+        detail = [gate for gate in fetched["gate_results"] if gate["gate_id"] == "detail_integrity"][0]
+        self.assertEqual(detail["status"], "PASS")
+        self.assertEqual(detail["evidence"]["dropped"], {})
+        for key in ("summary", "loop", "trend"):
+            self.assertIn(key, fetched["result"])
+
     def test_interpret_requires_a_session(self):
         self.client.cookies.clear()
         response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id})

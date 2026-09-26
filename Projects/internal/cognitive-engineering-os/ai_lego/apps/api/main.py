@@ -72,7 +72,7 @@ from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import AiProvider, daily_token_budget, provider_from_env
+from ai_lego.platform.ai_gateway.provider import AiProvider, AnthropicProvider, daily_token_budget, provider_from_env
 from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
@@ -91,7 +91,7 @@ from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_work
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
-from ai_lego.modules.research.interpret_method_record import build_prompt_manifest, record_sha256, run_interpretation
+from ai_lego.modules.research.interpret_method_record import INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, run_interpretation
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -361,6 +361,12 @@ def _project_or_404(repo: ProjectSourceRepository, tenant_id: str, project_id: s
 def get_ai_provider() -> AiProvider | None:
     """``None`` = no key configured; /ai/* answers 503 AI_PROVIDER_UNCONFIGURED. Tests override this dependency."""
     return provider_from_env()
+
+
+def get_interpretation_provider(provider: AiProvider | None = Depends(get_ai_provider)) -> AiProvider | None:
+    """The interpretation runs in the background and writes a whole result page: the real provider gets the long
+    timeout; a test's provider (overriding get_ai_provider) passes through unchanged."""
+    return provider.with_timeout(INTERPRET_TIMEOUT_SECONDS) if isinstance(provider, AnthropicProvider) else provider
 
 
 @lru_cache(maxsize=4)
@@ -1221,6 +1227,7 @@ def _run_interpretation(
     try:
         reference = artifact_store.put(tenant_id, "MethodInterpretation", {
             "record": record, "interpretation": outcome["interpretation"], "gate_results": outcome["gate_results"],
+            "attempts": outcome.get("attempts", []),   # per model call: output size and why it was refused
             "prompt_manifest": build_prompt_manifest(record, sources),
         })
         repo.save_interpretation(
@@ -1244,7 +1251,7 @@ def interpret_method(
     store: IdentityStore = Depends(get_store),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
     artifact_store: JsonArtifactStore = Depends(get_artifact_store),
-    provider: AiProvider | None = Depends(get_ai_provider),
+    provider: AiProvider | None = Depends(get_interpretation_provider),
 ) -> dict[str, Any]:
     """Interpret one validated method record and persist the immutable result to a Project."""
     if not catalog.is_resolvable(method_id):

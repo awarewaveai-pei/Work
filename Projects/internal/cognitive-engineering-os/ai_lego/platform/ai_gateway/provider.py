@@ -52,6 +52,10 @@ class AnthropicProvider:
         self._fetch = fetch or fetch_json
         self._timeout = timeout
 
+    def with_timeout(self, timeout: float) -> "AnthropicProvider":
+        """The same key, model and transport with another per-request timeout (a background job that writes a long answer)."""
+        return AnthropicProvider(self._api_key, self.model, fetch=self._fetch, timeout=timeout)
+
     def complete(self, system: str, user: str, *, max_tokens: int = MAX_OUTPUT_TOKENS) -> AiCompletion:
         if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or not 1 <= max_tokens <= MAX_OUTPUT_TOKENS:
             raise InvariantViolation(f"AI_MAX_TOKENS_INVALID: expected 1..{MAX_OUTPUT_TOKENS}, got {max_tokens!r}")

@@ -1,5 +1,6 @@
 /* Web-only rules on top of design-system.css (the one stylesheet; byte-identical to docs/mockups/design-system.css,
-   check-mocks.py enforces). Colours only through its tokens. */
+   check-mocks.py enforces). Only for elements the mocks do not have; never restyle a mock component here (the result
+   page's old overrides made it look unlike the mock). Colours only through its tokens. */
 button:not(.btn):not(.tab):not(.chip) { cursor: pointer; border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; background: var(--accent); color: var(--bg); font: inherit; }
 button.secondary:not(.btn) { background: var(--card); color: var(--accent); }
 input, textarea { font: inherit; }
@@ -7,31 +8,3 @@ input, textarea { font: inherit; }
 .muted { color: var(--muted); }
 .error { color: var(--bad); white-space: pre-wrap; }
 .field input, .field textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--card); color: var(--ink); }
-.section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 12px 0; }
-.how-to { background: var(--soft); border-left: 4px solid var(--accent); padding: 8px 12px; margin-bottom: 12px; }
-.search { width: 100%; }
-.result-page { --result-ink: var(--ink); --result-muted: var(--muted); --result-line: var(--line); --result-accent: var(--accent); color: var(--result-ink); }
-.result-page .card { background: var(--card); border-color: var(--result-line); border-radius: 14px; }
-.result-page .section { padding: clamp(18px, 3vw, 30px); margin: 18px 0; }
-.result-page .top { display: flex; align-items: start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.result-page h1 { margin: 0; font-size: clamp(24px, 3vw, 36px); }
-.result-page h2 { margin: 0 0 12px; font-size: clamp(19px, 2vw, 26px); }
-.result-page h3 { margin: 0 0 8px; font-size: 17px; }
-.result-page .status, .result-page .meta-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; border-block: 1px solid var(--result-line); color: var(--result-muted); }
-.result-page .lead { font-size: 1.12rem; line-height: 1.75; }
-.result-page .can, .result-page .cant { border-left: 4px solid var(--result-accent); padding: 6px 12px; margin: 8px 0; background: var(--tag); }
-.result-page .cant { border-color: var(--warn); background: var(--soft); }
-.result-page .todos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
-.result-page .todo { background: var(--soft); padding: 12px; border-radius: 9px; margin: 0; }
-.result-page .terms { color: var(--result-muted); }
-.result-page .how-to { background: var(--soft); border-left-color: var(--result-accent); }
-.result-page table { width: 100%; border-collapse: collapse; }
-.result-page th, .result-page td { padding: 8px 10px; border: 1px solid var(--result-line); text-align: left; }
-.result-page .next-step { border-left: 4px solid var(--result-accent); }
-.result-page [data-source] { padding: 8px 0; overflow-wrap: anywhere; }
-.result-page code { overflow-wrap: anywhere; }
-.result-page .btns { margin: 12px 0; }
-.result-page textarea { display: block; width: 100%; min-height: 88px; margin-top: 6px; border: 1px solid var(--result-line); border-radius: 8px; padding: 9px; }
-.result-page details { margin-top: 16px; }
-.result-page pre { overflow: auto; max-height: 420px; background: var(--soft); padding: 14px; border-radius: 8px; }
-@media (max-width: 640px) { .result-page .section { padding: 16px; } .result-page .grid { grid-template-columns: 1fr; } }

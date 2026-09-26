@@ -1,15 +1,23 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
 title: Method Interpretation
-version: "1.0.0"
+version: "1.1.0"
 status: ACTIVE
 description: >
   Versioned AI interpretation of one validated method record. Every finding
   cites the project prompt manifest; visual bindings and recommended methods
   are structural references, not model-invented coordinates or executable
-  authority.
+  authority. 1.1.0 (additive, all optional; the result page of
+  COS/docs/mockups/iceberg-result-mock.html): the one-line conclusion, a reading
+  of each unit of the picture, where to act first, the order of action, a
+  solution draft whose owners and targets the user confirms, a causal loop, and
+  a trend drawn only from numbers the record states. Every claim cites the
+  manifest; interpret_method_record.detail_integrity enforces what a schema
+  cannot (paths in the manifest, a number only with the record line that says
+  it, a loop that closes).
 source_of_truth_for:
   - "RESEARCH_LINES_MASTER_PLAN.md §3.4-C10 and WC-PIa-01"
+  - "RESEARCH_LINES_MASTER_PLAN.md §3.10 result skeleton (0b one-line conclusion, (2) per-unit reading, (3) order of action, (5b) solutions)"
 decided_by: "PI-a WC-PIa-01: typed interpretation contract"
 type: object
 additionalProperties: false
@@ -133,6 +141,135 @@ properties:
       properties:
         text: {type: string, minLength: 1}
         needed_evidence: {type: string, minLength: 1}
+  summary: {type: string, minLength: 1}
+  units:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [path, meaning, action, effect, leverage, citations]
+      properties:
+        path: {type: string, minLength: 1}
+        meaning: {type: string, minLength: 1}
+        action: {type: string, minLength: 1}
+        effect: {type: string, minLength: 1}
+        leverage: {type: string, enum: [low, mid, high]}
+        citations: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+  focus:
+    type: object
+    additionalProperties: false
+    required: [path, why]
+    properties:
+      path: {type: string, minLength: 1}
+      why: {type: string, minLength: 1}
+  priority: {type: string, minLength: 1}
+  solutions:
+    type: object
+    additionalProperties: false
+    required: [options, first_step]
+    properties:
+      options:
+        type: array
+        minItems: 2
+        maxItems: 3
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, what, takes, cost, durability, risk, advice, paths]
+          properties:
+            name: {type: string, minLength: 1}
+            what: {type: string, minLength: 1}
+            takes: {type: string, minLength: 1}
+            cost: {type: string, minLength: 1}
+            durability: {type: string, minLength: 1}
+            risk: {type: string, minLength: 1}
+            advice: {type: string, minLength: 1}
+            paths: {type: array, items: {type: string, minLength: 1}}
+      first_step: {type: string, minLength: 1}
+      plan:
+        type: array
+        maxItems: 6
+        items:
+          type: object
+          additionalProperties: false
+          required: [when, action, owner, proof, target]
+          properties:
+            when: {type: string, minLength: 1}
+            action: {type: string, minLength: 1}
+            owner: {type: string, minLength: 1}
+            proof: {type: string, minLength: 1}
+            target: {type: string, minLength: 1}
+      metrics:
+        type: array
+        maxItems: 3
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, now, target, when]
+          properties:
+            name: {type: string, minLength: 1}
+            now: {type: string, minLength: 1}
+            now_citation: {type: string, minLength: 1}
+            target: {type: string, minLength: 1}
+            when: {type: string, minLength: 1}
+  loop:
+    type: object
+    additionalProperties: false
+    required: [kind, name, reading, nodes, edges]
+    properties:
+      kind: {type: string, enum: [reinforcing, balancing]}
+      name: {type: string, minLength: 1}
+      reading: {type: string, minLength: 1}
+      nodes:
+        type: array
+        minItems: 2
+        maxItems: 6
+        items:
+          type: object
+          additionalProperties: false
+          required: [id, text, citations]
+          properties:
+            id: {type: string, minLength: 1}
+            text: {type: string, minLength: 1}
+            citations: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+      edges:
+        type: array
+        minItems: 2
+        items:
+          type: object
+          additionalProperties: false
+          required: [from, to]
+          properties:
+            from: {type: string, minLength: 1}
+            to: {type: string, minLength: 1}
+  trend:
+    type: object
+    additionalProperties: false
+    required: [reading, series]
+    properties:
+      reading: {type: string, minLength: 1}
+      series:
+        type: array
+        minItems: 1
+        maxItems: 2
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, unit, points]
+          properties:
+            name: {type: string, minLength: 1}
+            unit: {type: string, minLength: 1}
+            points:
+              type: array
+              minItems: 2
+              items:
+                type: object
+                additionalProperties: false
+                required: [label, value, citation]
+                properties:
+                  label: {type: string, minLength: 1}
+                  value: {type: number}
+                  citation: {type: string, minLength: 1}
   provenance:
     $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
   model: {type: string, minLength: 1}

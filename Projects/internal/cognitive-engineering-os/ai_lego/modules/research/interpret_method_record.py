@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -13,10 +16,12 @@ from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import canonical_json
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gateway.draft import extract_json_object
+from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS
 
 INTERPRETATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
 _VISUAL_KINDS = {"layered", "quadrant", "table", "matrix", "graph", "tree", "timeline", "scorecard"}
-INTERPRET_MAX_TOKENS = 6000
+INTERPRET_MAX_TOKENS = MAX_OUTPUT_TOKENS   # the gateway's ceiling: the result page's sections (schema 1.1.0) roughly double the answer, and a cut-off answer is unparseable
+INTERPRET_TIMEOUT_SECONDS = 240.0         # an answer that long takes 2-3 minutes; the interactive 60 s default would cut it off (the job runs in the background)
 MAX_SCHEMA_CHARS = 12000
 
 
@@ -99,8 +104,27 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
             "next_steps": [{"method_id": "", "answers": "", "deepens": "", "prefill": {}, "needs_input": [], "yields": "", "est_cost": ""}],
             "recommendations": [{"level": "", "action": "", "expected": "", "citations": []}],
             "gaps": [{"text": "", "needed_evidence": ""}],
+            "summary": "",
+            "units": [{"path": example_path, "meaning": "", "action": "", "effect": "", "leverage": "mid", "citations": [example_path]}],
+            "focus": {"path": example_path, "why": ""},
+            "priority": "",
+            "solutions": {"options": [{"name": "", "what": "", "takes": "", "cost": "", "durability": "", "risk": "", "advice": "", "paths": [example_path]}],
+                          "first_step": "", "plan": [{"when": "", "action": "", "owner": "", "proof": "", "target": ""}],
+                          "metrics": [{"name": "", "now": "", "now_citation": example_path, "target": "", "when": ""}]},
+            "loop": {"kind": "reinforcing", "name": "", "reading": "", "nodes": [{"id": "n1", "text": "", "citations": [example_path]}], "edges": [{"from": "n1", "to": "n2"}]},
+            "trend": {"reading": "", "series": [{"name": "", "unit": "", "points": [{"label": "", "value": 0, "citation": example_path}]}]},
         }, ensure_ascii=False),
         f"RULES: Write all narrative in {language}. The JSON shape is illustrative: omit optional arrays rather than emit empty-string examples. revision_conditions belongs inside each finding, never at the root. recommendations must contain objects, never bare strings; next_steps objects require every shown key including est_cost. Citations and every visual binding string must be a manifest id. next_methods may only use exact AVAILABLE ACTIVE METHODS ids; every next_steps.method_id must also appear in next_methods, and every next_steps.prefill value must be a MANIFEST id. If unsure of a valid next method, set both next_methods and next_steps to []. Never invent numbers or sources.",
+        "RESULT PAGE SECTIONS (each optional; omit a section you cannot support from the record): summary = one sentence saying what is really going on. "
+        "units = one entry per unit of the picture (layered: one per level, path = that level's binding path): meaning = what the unit tells, action = how to act at that unit, "
+        "effect = what that action achieves, leverage = low|mid|high, citations = manifest ids. focus = the units path to act on first, and why. priority = the order of action in one or two sentences. "
+        "solutions: 2-3 options (paths = the units each acts on) compared by what, takes (time to effect), cost, durability, risk, advice; first_step = one thing doable tomorrow with no budget and no approval; "
+        "plan = at most 5 rows (when, action, owner, proof, target) - owner and target are suggestions the user confirms; metrics = at most 3 (name, now, target, when): now may contain a number only when "
+        "the record states it, with now_citation = the manifest id whose text states it, otherwise say it is not measured yet; target is a suggestion. "
+        "loop = the feedback loop the record shows - causes that come back around and feed themselves (usual in systems tools; omit only when the record shows none): 2-6 nodes, each citing the record, and edges that close the loop (every node has an arrow in and out); kind reinforcing|balancing. "
+        "trend = only numbers written in the record: every point's value must appear in the text of the manifest id it cites; omit trend when the record has fewer than two such numbers.",
+        "NUMBERS: findings (title, text), summary, priority, focus.why, units[].meaning, loop texts and trend.reading state only numbers written in the record (no differences, sums or percentages you work out); suggestions (actions, plan, targets) may propose numbers. "
+        "LENGTH: the whole JSON must close well inside the output limit. At most 3 findings; every text field is one or two short sentences (about 60 Chinese characters); at most 2 recommendations, 3 gaps, 4 plan rows, 5 loop nodes, 2 next_steps; no indentation or line breaks outside strings.",
     ]
     return system, "\n\n".join(lines)
 
@@ -192,10 +216,117 @@ def normalize_layered_visual_bindings(interpretation: dict[str, Any]) -> None:
         visual["bindings"] = {"levels": [{"label": label, "path": path} for label, path in bindings.items()]}
 
 
+# Sections of the result page (schema 1.1.0). What a schema cannot check: every path/citation is a manifest id, a
+# number stated as a current value or plotted comes from the record line it cites, a loop closes. A section that fails
+# is dropped from what is returned (never shown unverified); the gate's evidence names what was dropped and why.
+DETAIL_KEYS = ("summary", "units", "focus", "priority", "solutions", "loop", "trend")
+
+
+def _record_text(record: Mapping[str, Any], path: str) -> str:
+    current: Any = record
+    try:
+        for component in path.removeprefix("r/").split("/") if path != "r" else []:
+            current = current[int(component)] if isinstance(current, list) else current[component]
+    except (KeyError, IndexError, ValueError, TypeError):
+        return ""
+    return current if isinstance(current, str) else json.dumps(current, ensure_ascii=False)
+
+
+# One reading of a number everywhere (Codex 2026-09-26): full-width digits and separators (NFKC), thousands commas,
+# a minus sign only when it is not a range dash ("1-5" is 1 and 5), one canonical text (6.0 -> "6", -1.5 -> "-1.5").
+_NUMBER = re.compile(r"(?:(?<![\d.])-)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?")
+
+
+def _number_text(value: Any) -> str:
+    if isinstance(value, bool) or not isinstance(value, (int, float)): return str(value)
+    return str(int(value)) if float(value).is_integer() else repr(float(value))
+
+
+def _numbers(text: str) -> list[str]:
+    normal = unicodedata.normalize("NFKC", text).replace("\u2212", "-")
+    return [_number_text(float(match.group(0).replace(",", ""))) for match in _NUMBER.finditer(normal)]
+
+
+def _record_numbers(record: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> set[str]:
+    """Every number the record states (its full text, not the manifest's 400-character preview)."""
+    return {n for item in manifest if item.get("kind") == "record" for n in _numbers(_record_text(record, str(item.get("id", ""))))}
+
+
+def detail_problems(interpretation: Mapping[str, Any], record: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> dict[str, list[str]]:
+    """-> {section: [problem, ...]} for the result-page sections present; empty when every one holds."""
+    ids = {str(item.get("id")) for item in manifest}
+    problems: dict[str, list[str]] = {}
+    def bad(section: str, message: str) -> None: problems.setdefault(section, []).append(message)
+    # the fact fields of these sections may only state numbers the record states (suggestions -- actions, plans, targets --
+    # are proposals the user confirms and are not held to this)
+    in_record = frozenset(_record_numbers(record, manifest))   # its own name: a closure reads it at call time (a reused name once made it the last metric's numbers)
+    def facts(section: str, where: str, text: Any) -> None:
+        unknown = [n for n in _numbers(text) if n not in in_record] if isinstance(text, str) else []
+        if unknown: bad(section, f"{where} states {unknown}, which the record does not (the record states {sorted(in_record, key=float)})")
+    facts("summary", "summary", interpretation.get("summary"))
+    facts("priority", "priority", interpretation.get("priority"))
+    def cites(section: str, where: str, citations: Any) -> None:
+        unknown = [c for c in (citations if isinstance(citations, list) else []) if c not in ids]
+        if unknown: bad(section, f"{where} cites {unknown}, not manifest ids")
+    for index, unit in enumerate(interpretation.get("units") or []):
+        if isinstance(unit, Mapping):
+            if unit.get("path") not in ids: bad("units", f"units[{index}].path {unit.get('path')!r} is not a manifest id")
+            cites("units", f"units[{index}]", unit.get("citations"))
+            facts("units", f"units[{index}].meaning", unit.get("meaning"))
+    focus = interpretation.get("focus")
+    if isinstance(focus, Mapping):
+        if focus.get("path") not in ids: bad("focus", f"focus.path {focus.get('path')!r} is not a manifest id")
+        facts("focus", "focus.why", focus.get("why"))
+    solutions = interpretation.get("solutions")
+    if isinstance(solutions, Mapping):
+        for index, option in enumerate(solutions.get("options") or []):
+            if isinstance(option, Mapping):
+                unknown = [path for path in option.get("paths") or [] if path not in ids]
+                if unknown: bad("solutions", f"solutions.options[{index}].paths {unknown} are not manifest ids")
+        for index, metric in enumerate(solutions.get("metrics") or []):
+            if not isinstance(metric, Mapping): continue
+            claimed, cite = _numbers(str(metric.get("now", ""))), metric.get("now_citation")
+            if cite is not None and cite not in ids: bad("solutions", f"solutions.metrics[{index}].now_citation {cite!r} is not a manifest id")
+            elif claimed and cite is None: bad("solutions", f"solutions.metrics[{index}].now states {claimed} without now_citation")
+            elif claimed:
+                missing = [n for n in claimed if n not in _numbers(_record_text(record, cite))]
+                if missing: bad("solutions", f"solutions.metrics[{index}].now {missing} is not stated in {cite}")
+    loop = interpretation.get("loop")
+    if isinstance(loop, Mapping):
+        nodes = [node for node in loop.get("nodes") or [] if isinstance(node, Mapping)]
+        edges = [edge for edge in loop.get("edges") or [] if isinstance(edge, Mapping)]
+        node_ids = {node.get("id") for node in nodes}
+        for index, node in enumerate(nodes):
+            cites("loop", f"loop.nodes[{index}]", node.get("citations"))
+            facts("loop", f"loop.nodes[{index}].text", node.get("text"))
+        facts("loop", "loop.reading", loop.get("reading"))
+        if len(node_ids) != len(nodes): bad("loop", "loop.nodes ids repeat")
+        if any(edge.get("from") not in node_ids or edge.get("to") not in node_ids for edge in edges): bad("loop", "loop.edges name a node that does not exist")
+        elif not (node_ids <= {edge.get("from") for edge in edges} and node_ids <= {edge.get("to") for edge in edges}): bad("loop", "loop does not close: every node needs an arrow in and out")
+    trend = interpretation.get("trend")
+    if isinstance(trend, Mapping):
+        facts("trend", "trend.reading", trend.get("reading"))
+        for s_index, series in enumerate(trend.get("series") or []):
+            for p_index, point in enumerate((series or {}).get("points") or [] if isinstance(series, Mapping) else []):
+                if not isinstance(point, Mapping): continue
+                cite = point.get("citation")
+                if cite not in ids: bad("trend", f"trend.series[{s_index}].points[{p_index}].citation {cite!r} is not a manifest id")
+                elif _number_text(point.get("value")) not in _numbers(_record_text(record, cite)): bad("trend", f"trend value {point.get('value')!r} is not stated in {cite}")
+    return problems
+
+
+def without_sections(interpretation: Mapping[str, Any], sections: set[str]) -> dict[str, Any]:
+    return {key: value for key, value in copy.deepcopy(dict(interpretation)).items() if key not in sections}
+
+
 def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Mapping[str, Any], manifest: list[Mapping[str, Any]], active_method_ids: set[str]) -> list[dict[str, Any]]:
     manifest_ids = {str(item.get("id")) for item in manifest}
+    detail = detail_problems(interpretation, record, manifest)
     citations = _citation_ids(interpretation)
-    citation_ok = bool(interpretation.get("findings")) and bool(citations) and all(c in manifest_ids for c in citations)
+    in_record = frozenset(_record_numbers(record, manifest))
+    unstated = {str(finding.get("id")): missing for finding in interpretation.get("findings", []) if isinstance(finding, Mapping)
+                for missing in [[n for field in ("title", "text") for n in _numbers(str(finding.get(field, ""))) if n not in in_record]] if missing}
+    citation_ok = bool(interpretation.get("findings")) and bool(citations) and all(c in manifest_ids for c in citations) and not unstated
     visual = interpretation.get("visual")
     bindings = visual.get("bindings", {}) if isinstance(visual, Mapping) else {}
     is_layered = isinstance(visual, Mapping) and visual.get("kind") == "layered"
@@ -225,9 +356,10 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
                 next_ok = False
                 break
     return [
-        {"gate_id": "citation_integrity", "status": "PASS" if citation_ok else "FAIL", "evidence": {"citations": citations, "manifest_count": len(manifest)}},
+        {"gate_id": "citation_integrity", "status": "PASS" if citation_ok else "FAIL", "evidence": {"citations": citations, "manifest_count": len(manifest), "unstated_numbers": unstated}},
         {"gate_id": "visual_bindings_resolvable", "status": "PASS" if visual_ok else "FAIL", "evidence": {"paths": binding_paths}},
         {"gate_id": "next_methods_resolvable", "status": "PASS" if next_ok else "FAIL", "evidence": {"next_methods": next_methods}},
+        {"gate_id": "detail_integrity", "status": "PASS" if not detail else "FAIL", "evidence": {"problems": detail}},
     ]
 
 
@@ -242,14 +374,37 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
     total_input = total_output = 0
     previous_error = ""
     gates: list[dict[str, Any]] = []
+    fallback: tuple[dict[str, Any], list[dict[str, Any]], str] | None = None   # an earlier answer whose core held, its failing detail dropped
+    attempts: list[dict[str, Any]] = []   # per model call: output size and why it was refused (a retry is paid for twice)
+
+    def settle(interpretation: dict[str, Any], gates: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Drop the detail sections that failed their gate or the schema; the returned gates describe what is returned."""
+        dropped: dict[str, list[str]] = dict(gates[3]["evidence"]["problems"])
+        kept = without_sections(interpretation, set(dropped))
+        try:
+            validate_interpretation(schema_contracts, kept)
+        except InvariantViolation:   # which detail sections does the schema refuse? each is checked alone on the core
+            present = [key for key in DETAIL_KEYS if key in kept]
+            validate_interpretation(schema_contracts, without_sections(kept, set(present)))   # the core itself refused: not ours to trim
+            for key in present:
+                try:
+                    validate_interpretation(schema_contracts, without_sections(kept, set(present) - {key}))
+                except InvariantViolation as error:
+                    dropped[key] = [f"schema: {error}"]
+            kept = without_sections(kept, set(dropped))
+            validate_interpretation(schema_contracts, kept)   # sections valid alone are valid together (the schema has no cross-section rule)
+        return kept, gates[:3] + [{"gate_id": "detail_integrity", "status": "PASS", "evidence": {"problems": {}, "dropped": dropped}}]
+
     for attempt in range(2):
         retry_user = user if not previous_error else user + "\n\nPrevious response was refused. Correct exactly this failure: " + previous_error
         try:
             completion = provider.complete(system, retry_user, max_tokens=INTERPRET_MAX_TOKENS)
         except InvariantViolation as error:
-            return {"interpretation": None, "gate_results": gates, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}
+            if fallback is not None: break
+            return {"interpretation": None, "gate_results": gates, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output, "attempts": attempts}
         total_input += completion.input_tokens
         total_output += completion.output_tokens
+        attempts.append({"output_tokens": completion.output_tokens, "refused": None})
         try:
             interpretation = extract_json_object(completion.text)
             supplied_visual = interpretation.get("visual") if isinstance(interpretation.get("visual"), Mapping) else {}
@@ -258,20 +413,36 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
             normalize_gaps_without_inventing_evidence(interpretation, language)
             normalize_layered_visual_bindings(interpretation)
             gates = evaluate_interpretation_gates(interpretation, record, manifest, active_method_ids)
-            if any(g["status"] != "PASS" for g in gates):
-                failed = [g["gate_id"] for g in gates if g["status"] != "PASS"]
+            core_failed = [g["gate_id"] for g in gates[:3] if g["status"] != "PASS"]
+            if core_failed:
                 detail = ""
-                if "next_methods_resolvable" in failed:
+                if "next_methods_resolvable" in core_failed:
                     steps = interpretation.get("next_steps", [])
                     step_ids = [step.get("method_id") for step in steps if isinstance(step, Mapping)] if isinstance(steps, list) else []
                     detail = "; next_methods=" + json.dumps(interpretation.get("next_methods"), ensure_ascii=False) + "; next_steps.method_id=" + json.dumps(step_ids, ensure_ascii=False)
                     if isinstance(steps, list):
                         detail += "; next_steps.prefill_types=" + json.dumps([type(step.get("prefill")).__name__ for step in steps if isinstance(step, Mapping)])
                     detail += ". Use exact ACTIVE ids and matching next_steps, or set both arrays to []."
-                raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(failed) + detail)
-            validate_interpretation(schema_contracts, interpretation)
-            interpretation["usage"] = {"input_tokens": total_input, "output_tokens": total_output}
-            return {"interpretation": interpretation, "gate_results": gates, "error": None, "model": completion.model, "input_tokens": total_input, "output_tokens": total_output}
+                unstated = gates[0]["evidence"].get("unstated_numbers") if "citation_integrity" in core_failed else None
+                if unstated:
+                    detail += "; findings state numbers the record does not: " + json.dumps(unstated, ensure_ascii=False) + " (state only numbers written in the record)"
+                raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(core_failed) + detail)
+            kept, settled = settle(interpretation, gates)
+            kept["usage"] = {"input_tokens": total_input, "output_tokens": total_output}
+            dropped = settled[3]["evidence"]["dropped"]
+            if dropped and attempt == 0:   # the core holds; ask once more for the dropped sections, keep this answer if that fails
+                fallback = (kept, settled, completion.model)
+                previous_error = "DETAIL_INTEGRITY: " + json.dumps(dropped, ensure_ascii=False)
+                attempts[-1]["refused"] = previous_error
+                continue
+            return {"interpretation": kept, "gate_results": settled, "error": None, "model": completion.model, "input_tokens": total_input, "output_tokens": total_output, "attempts": attempts}
         except (InvariantViolation, KeyError, TypeError) as error:
             previous_error = str(error)
-    return {"interpretation": None, "gate_results": gates, "error": f"INTERPRETATION_REJECTED_AFTER_REPAIR: {previous_error}", "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}
+            if completion.output_tokens >= INTERPRET_MAX_TOKENS:   # it ran into the ceiling: the JSON never closed
+                previous_error = f"ANSWER_CUT_OFF at {completion.output_tokens} output tokens before the JSON closed; answer again far more briefly (see LENGTH). Parser: {error}"
+            attempts[-1]["refused"] = previous_error
+    if fallback is not None:
+        kept, settled, model = fallback
+        kept["usage"] = {"input_tokens": total_input, "output_tokens": total_output}
+        return {"interpretation": kept, "gate_results": settled, "error": None, "model": model, "input_tokens": total_input, "output_tokens": total_output, "attempts": attempts}
+    return {"interpretation": None, "gate_results": gates, "error": f"INTERPRETATION_REJECTED_AFTER_REPAIR: {previous_error}", "model": provider.model, "input_tokens": total_input, "output_tokens": total_output, "attempts": attempts}

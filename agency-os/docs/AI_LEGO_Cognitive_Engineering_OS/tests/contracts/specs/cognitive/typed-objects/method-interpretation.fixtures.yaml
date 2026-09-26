@@ -18,6 +18,44 @@ valid:
       provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
       model: "test-model"
       usage: {input_tokens: 10, output_tokens: 20}
+  - name: full_result_detail_1_1_0
+    instance:
+      interpretation_id: "INTERP-2026-09-26-010"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      summary: "分享變少是流程造成的。"
+      units:
+        - {path: "r/events", meaning: "警訊", action: "開場鼓勵", effect: "當次", leverage: low, citations: ["r/events/0"]}
+      focus: {path: "r/events", why: "最容易先動"}
+      priority: "先改流程，再談角色。"
+      solutions:
+        options:
+          - {name: "甲 只多鼓勵", what: "開場鼓勵", takes: "當次", cost: "低", durability: "低", risk: "更退縮", advice: "只當急救", paths: ["r/events"]}
+          - {name: "乙 改流程", what: "參與者先說", takes: "1 期", cost: "中", durability: "高", risk: "被改回去", advice: "先做", paths: ["r/structures"]}
+        first_step: "下次先讓參與者說 3 分鐘。"
+        plan:
+          - {when: "1 到 2 週", action: "補數據", owner: "帶領者", proof: "有基準值", target: "第 2 週前"}
+        metrics:
+          - {name: "主動分享人數", now: "2 人", now_citation: "r/events/0", target: "6 人", when: "一期"}
+          - {name: "影響來源清單", now: "未量測", target: "每次", when: "第 4 週起"}
+      loop:
+        kind: reinforcing
+        name: "等答案迴路"
+        reading: "越轉越安靜"
+        nodes:
+          - {id: "a", text: "帶領者先講", citations: ["r/events/0"]}
+          - {id: "b", text: "參與者等答案", citations: ["r/events/0"]}
+        edges: [{from: "a", to: "b"}, {from: "b", to: "a"}]
+      trend:
+        reading: "人數一路掉"
+        series:
+          - {name: "主動分享", unit: "人", points: [{label: "第 1 次", value: 6, citation: "r/events/0"}, {label: "第 6 次", value: 2, citation: "r/events/0"}]}
 invalid:
   - name: findings_empty
     instance:
@@ -54,3 +92,49 @@ invalid:
       model: "test-model"
       usage: {input_tokens: 0, output_tokens: 0}
     reason: "record_sha256 is required for replay binding"
+  - name: unit_leverage_outside_enum
+    instance:
+      interpretation_id: "INTERP-2026-09-26-011"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      units:
+        - {path: "r/events", meaning: "x", action: "x", effect: "x", leverage: huge, citations: ["r/events/0"]}
+    reason: "units[].leverage is low, mid or high"
+  - name: solutions_with_one_option
+    instance:
+      interpretation_id: "INTERP-2026-09-26-012"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      solutions:
+        options:
+          - {name: "甲", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+        first_step: "x"
+    reason: "solutions.options compares two or three paths (minItems: 2)"
+  - name: trend_point_value_is_text
+    instance:
+      interpretation_id: "INTERP-2026-09-26-013"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      trend:
+        reading: "x"
+        series:
+          - {name: "x", unit: "人", points: [{label: "a", value: "6 人", citation: "r/events/0"}, {label: "b", value: 2, citation: "r/events/0"}]}
+    reason: "trend points carry a number; the unit lives on the series"

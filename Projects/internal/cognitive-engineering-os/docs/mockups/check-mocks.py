@@ -2,6 +2,7 @@
 """Cross-page parity gate for the Cognitive OS mockups (plan I11: mocks = spec; U19 theme + palette; U20 layout;
 U21 domain list; U15/U18 lessons; U14/§3.10 result skeleton; U16 home; D18 continuity).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/check-mocks.py [--dir <folder>]
+      python …/check-mocks.py --page result <rendered.html> [--lesson <the tool's lesson path>]   (the web result page)
 Exit 0 = the five pages obey the same design rules. Exit 1 = one line per finding (never a traceback: a page that
 cannot be parsed is itself a finding). --dir checks page copies in another folder, with that folder's own design-system.css and partials/;
 the registries come from SPEC (AI_LEGO_SPEC_ROOT overrides it; the self-test uses both). Self-test with mutations: check-mocks-selftest.py (must stay
@@ -604,7 +605,7 @@ class Checker:
         for n in nodes:
             if n.has("ex") and not n.attrs.get("data-set"): self.bad(f, "D18", f"line {n.line}: .ex without data-set (the chip script would hide it forever)")
 
-    def check_result(self, f, root, nodes, web=False):
+    def check_result(self, f, root, nodes, web=False, lesson=None):
         cards = [n for n in nodes if n.has("card") and not n.has("layer")]
         if not cards: self.bad(f, "§3.10", "no cards"); return
         top, last = cards[0], cards[-1]
@@ -613,9 +614,10 @@ class Checker:
         if not howto or not howto[0].parent.has("top") or howto[0].parent.parent is not top: self.bad(f, "U15", "header lesson button (.top > a.howto) missing from the first card")
         if not top.find("status"): self.bad(f, "U14", "first card must carry the status strip")
         # U14 (operator 2026-09-25 「講解塞太多…詳解主要放在五分鐘課程裡」): the reading guide lives in exactly one place —
-        # its lesson's read tab when the run page has a lesson (the mocks), else the page's first card (the web result
-        # page until its lesson lands in P3); a page that has a lesson carries no teaching block and short strips only
-        lesson = None if web else LESSON_OF.get(f)
+        # its lesson's read tab when the run page has a lesson, else the page's first card; a page that has a lesson
+        # carries no teaching block and short strips only. Same rule for the web (`lesson` = the tool's lesson path, from
+        # --lesson) as for the mocks (their lesson mock).
+        if not web: lesson = LESSON_OF.get(f)
         if lesson is None:
             self.check_scope(f, top, "first card")
             self.check_reading_guide(f, top, "first card")
@@ -623,12 +625,12 @@ class Checker:
             for n in nodes:
                 hit = [c for c in TEACHING if n.has(c)]
                 if hit: self.bad(f, "U14", f"line {n.line}: .{hit[0]} is teaching; it lives in {lesson}'s read tab, not on the run page")
-            want = mk.artifact_href(lesson, "panel-read")
+            want = f"{lesson}#panel-read" if web else mk.artifact_href(lesson, "panel-read")
             if not any(a.attrs.get("href") == want for a in top.find(tag="a")): self.bad(f, "U14", f"first card must link to the lesson's reading tab {want}")
             for n in nodes:
                 k = len(" ".join(unicodedata.normalize("NFKC", n.text()).split())) if n.has("how") else 0
                 if k > HOW_MAX: self.bad(f, "U14", f"line {n.line}: 怎麼讀 strip has {k} characters (max {HOW_MAX}); the detail goes in the lesson's read tab")
-            self.check_run_form(f, cards, nodes)
+            if not web: self.check_run_form(f, cards, nodes)   # the web form: components/MethodForm.test.tsx
         # the last card = source strip, what approve/return/delete mean, actions, expert mode folded in a <details><pre>
         if not last.find("meta-bar"): self.bad(f, "§3.10", "last card must carry the .meta-bar source strip")
         if not last.find("btns"): self.bad(f, "§3.10", "last card must carry the approve/return actions")
@@ -826,8 +828,11 @@ class Checker:
         own_journeys = [n for n in nodes if n.has("journey") and not under(n, lambda a: a.has("wf"))]
         if len(own_journeys) != 1: self.bad(f, "U2", "exactly one six-step .journey strip outside the workflow cards")
 
-def check_web_result(path):
-    """Apply the mock's result-card rules and its section contract to rendered web HTML."""
+RESULT_SECTIONS = [str(n) for n in range(10)] + ["approve"]   # header, ① … ⑨, the approve card (mock order)
+
+
+def check_web_result(path, lesson=None):
+    """Apply the mock's result-page rules (check_result, lesson-aware) and its card order to rendered web HTML."""
     source = pathlib.Path(path)
     try:
         html = source.read_text(encoding="utf-8")
@@ -837,14 +842,21 @@ def check_web_result(path):
     problems = [f"{source}: [parse] {error}" for error in dom.err]
     nodes = list(dom.root.walk())
     checker = Checker(mk.HERE)
-    checker.check_result(source.name, dom.root, nodes, web=True)
+    checker.check_result(source.name, dom.root, nodes, web=True, lesson=lesson)
     problems.extend(checker.findings)
-    sections = [node.attrs.get("data-section") for node in nodes if "data-section" in node.attrs]
-    expected = [str(index) for index in range(6)] + ["5b", "6", "7", "8"]
-    if sections != expected: problems.append(f"{source}: [result-sections] expected {expected}, got {sections}")
-    if len([node for node in nodes if node.has("how-to")]) != len(expected): problems.append(f"{source}: [result-howto] every section needs 怎麼讀／你要做的")
-    if not any(node.attrs.get("data-visual") for node in nodes): problems.append(f"{source}: [result-visual] native visual missing")
-    if any(node.attrs.get("data-visual") == "layered" for node in nodes) and not any(node.tag == "svg" and node.attrs.get("aria-label") == "冰山模型四層圖" for node in nodes): problems.append(f"{source}: [result-visual] layered iceberg SVG missing")
+    sections = [node for node in nodes if "data-section" in node.attrs]
+    got = [node.attrs["data-section"] for node in sections]
+    if got != RESULT_SECTIONS: problems.append(f"{source}: [result-sections] expected {RESULT_SECTIONS}, got {got}")
+    for node in sections:
+        if node.attrs["data-section"] != "approve" and not node.find("how"): problems.append(f"{source}: [result-howto] card {node.attrs['data-section']} needs 怎麼讀／你要做的 (.how)")
+    # Codex 2026-09-26: a data-visual anywhere used to count; the picture is card 2's, and it is a drawing (svg/table/dl/pre)
+    card2 = next((node for node in sections if node.attrs["data-section"] == "2"), None)
+    visuals = [node for node in (card2.walk() if card2 else []) if node.attrs.get("data-visual")]
+    if not visuals or not any(node.tag in ("svg", "table", "dl", "pre") for node in [visuals[0], *visuals[0].walk()]): problems.append(f"{source}: [result-visual] card 2 must hold the tool's picture (a data-visual element that draws: svg, table, dl or pre)")
+    for visual in (node for node in nodes if node.attrs.get("data-visual") == "layered"):   # a picture, and the iceberg's own for the iceberg
+        pictures = [node for node in visual.walk() if node.tag == "svg" and node.attrs.get("role") == "img" and node.attrs.get("aria-label")]
+        if not pictures: problems.append(f"{source}: [result-visual] a layered picture needs an svg role=img with aria-label")
+        elif visual.attrs.get("data-method") == "systems.iceberg_model" and pictures[0].attrs["aria-label"] != "冰山模型四層圖": problems.append(f"{source}: [result-visual] layered iceberg SVG missing")
     if not any(node.has("next-steps") for node in nodes): problems.append(f"{source}: [result-next] next-step cards container missing")
     for anchor in (node for node in nodes if node.tag == "a" and node.attrs.get("href", "").startswith("#citation-")):
         target = anchor.attrs["href"][1:]
@@ -857,14 +869,14 @@ def main(argv):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    if len(argv) == 3 and argv[:2] == ["--page", "result"]:
-        findings = check_web_result(argv[2])
+    if len(argv) in (3, 5) and argv[:2] == ["--page", "result"] and (len(argv) == 3 or argv[3] == "--lesson"):
+        findings = check_web_result(argv[2], argv[4] if len(argv) == 5 else None)
         if findings:
             print("\n".join(findings)); print(f"{len(findings)} finding(s)"); return 1
         print("check-mocks: rendered result page green"); return 0
     folder = mk.HERE
     if len(argv) == 2 and argv[0] == "--dir": folder = pathlib.Path(argv[1])
-    elif argv: print("usage: check-mocks.py [--dir <folder>]"); return 2
+    elif argv: print("usage: check-mocks.py [--dir <folder>] | --page result <html> [--lesson <path>]"); return 2
     findings = Checker(folder).run()
     if findings:
         print("\n".join(findings)); print(f"{len(findings)} finding(s)"); return 1

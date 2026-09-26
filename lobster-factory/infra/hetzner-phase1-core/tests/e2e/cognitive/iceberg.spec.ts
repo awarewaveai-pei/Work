@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-test('login -> iceberg -> result page sections including 5b', async ({ page }) => {
-  test.setTimeout(180_000);
+test('login -> iceberg -> result page, cards in the mock order', async ({ page }) => {
+  test.setTimeout(600_000);   // a full result page (schema 1.1.0) takes 2-3 minutes, and the analysis may retry once
   const mockApi = process.env.COS_TEST_MOCK_API === '1';
   const tenant = mockApi ? 'tenant-local' : process.env.COS_TEST_TENANT_ID;
   const email = mockApi ? 'local@example.test' : process.env.COS_TEST_EMAIL;
@@ -68,13 +68,14 @@ test('login -> iceberg -> result page sections including 5b', async ({ page }) =
   const doneResponse = page.waitForResponse(async (response) => {
     if (!/\/api\/interpretations\/INTERP-/.test(response.url()) || !response.ok()) return false;
     return (await response.json()).status === 'DONE';
-  }, { timeout: 150_000 });
+  }, { timeout: 540_000 });
   await page.getByRole('button', { name: '執行分析' }).click();
   const completed = await (await doneResponse).json() as { result: { findings: Array<{ citations: string[] }> } };
-  await expect(page.locator('[data-section="0"]')).toBeVisible({ timeout: 150_000 });
-  await expect(page.locator('[data-section]')).toHaveCount(10);
-  await expect(page.locator('[data-section="5b"]')).toBeVisible();
-  const citationLinks = page.locator('[data-section="1"] a[href^="#citation-"]');
+  await expect(page.locator('[data-section="0"]')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('[data-section]')).toHaveCount(11);   // header, ① … ⑨, approve (docs/mockups/iceberg-result-mock.html)
+  await expect(page.locator('[data-section="7"]')).toBeVisible();   // ⑦ 解決方案
+  await expect(page.getByRole('img', { name: '冰山模型四層圖' })).toBeVisible();
+  const citationLinks = page.locator('[data-section="1"] .finding a[href^="#citation-"]');   // the findings' own [n]
   if (mockApi) await expect(citationLinks).toHaveCount(1);
   else await expect(citationLinks).toHaveCount(completed.result.findings.reduce((count, finding) => count + finding.citations.length, 0));
 });
