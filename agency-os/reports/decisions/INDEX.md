@@ -17,6 +17,7 @@ For each entry: open the linked file for the full report including debate transc
 | 2026-09-14 | Art Therapy Library 的 Airtable → Supabase 遷移方法 | 自建 deterministic ETL + raw landing + relational canonical | 0.86 | [2026-09-14-airtable-supabase-migration-method.md](2026-09-14-airtable-supabase-migration-method.md) |
 | 2026-09-17 | HCI-30 C6 跨網域身分/角色模型 + 蒐集器管線 REJECTED 保存期限 | 簽章 handoff token + 延伸既有 per-tenant role 模型；REJECTED retain-forever 列入既有系統性抹除債務 | 直接決策 | [2026-09-17-hci30-c6-and-collector-task1-decisions.md](2026-09-17-hci30-c6-and-collector-task1-decisions.md) |
 | 2026-09-23 | 研究管線（/ops/collect → Cognitive OS／HCI → 報表）三條線為何不順、怎麼重建 | 缺件＝彙整層（原文→每句帶 [n] 的結構化發現，三個 schema）；研究案聚合根；Cognitive OS 降為結構化透鏡；**HCI 退出三條線**（原構想七個矛盾見 §10.1）；§10.5 四題待操作者裁決 | 直接決策（提案，§10 修正版） | [2026-09-23-research-pipeline-architecture.md](2026-09-23-research-pipeline-architecture.md) |
+| 2026-09-26 | 系統模式遇到外部進來的事件（Printful／Woo 訂單／Chatwoot）與建站派送怎麼處理 | 模式只擋我們發起的變更；客戶事件先落 DB 再延後或轉人工，永不回 423；操作者發起的 Printful 寫入與建站派送照常把關 | 直接決策（操作者全權委派） | [2026-09-26-system-mode-inbound-events.md](2026-09-26-system-mode-inbound-events.md) |
 
 ---
 

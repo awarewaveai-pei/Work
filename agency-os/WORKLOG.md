@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-26（續32）決策：系統模式 × 外部事件（Printful／Woo／Chatwoot）＋建站派送；雲端 T19–T27 發出；P0 已上線補記
+- [決策] `agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md`（操作者「都你決定」）。不變量：模式只擋我們發起的變更，客戶事件永不因模式遺失。
+  - 操作者發起的 Printful 寫入（tools/publish link:466／pfcreate:545／pforder:737、printful/sync PUT:83）→ 共用 423。
+  - Woo 訂單 webhook → 一律 2xx、落 `pod_order_inbox`（0093）、延後補做（下一筆 webhook、system-modes POST 切回 normal）。證據：soulful-wp WooCommerce `class-wc-webhook.php:544` 只認 200–302、`:562-570` 連續 >5 次失敗停用且不重送；prod `POD_AUTO_FULFILL_ENABLED=true`。
+  - Chatwoot → 模式擋下時不呼叫 AI、轉真人＋私密備註；一律 2xx。
+  - 建站派送 → 入列＋執行前都查；執行前被擋以終態結束，不留 pending。
+- [雲端] T19–T27 任務說明（file:line 已 grep 驗證、檔案不重疊；migration 編號指定 T24=0092、T26=0093）；操作者額度 $101。
+- [P0 補記] 研究橋接凍結 `19f00f9aa` 已隨 `b8c191698` 上 prod（早於 PI-b，D15「同窗」未照做）：無功能影響（橋只有操作者按、已知凍結）；`RESEARCH_LINES_MASTER_PLAN.md` §0／D15／PI-b 列已更新。
+- REALTEST_WAIVED: DOC_ONLY -- 決策與任務說明；證據為唯讀查證（WooCommerce 原始碼、prod printenv、git 歷史）
+- REVIEW_WAIVED: DOC_ONLY -- 決策紀錄；實作於 T19／T26／T27 各自審查
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式改動
 ## 2026-09-26（續31）site-watch slice 1 上線完成：§7 步 10d–10h（token、compose、自架 Trigger、金絲雀、開關演練、放量）
 - [10d] token 由操作者跑一行（主機 `openssl rand` 產生、寫 `.env`，值未經 Claude；scp＋ssh 兩步，先以無害腳本實測 PowerShell 傳送，發現 PS 在 stdin 尾加 `\r` → 腳本末行改 `exit 0`）；Claude 以 `safe-infra-patch.sh compose` 在 prod compose next-admin 加 `SITE_WATCH_ENABLED`／`SITE_WATCH_INGEST_TOKEN`／`R2_SITE_WATCH_BUCKET`（與 repo compose 同段）→ 9s healthy；printenv：false／lobster-site-watch／token present。`/api/internal/site-watch/due`：錯 token 401、無 token 401、正確 200 `enabled:false`。
 - [10e] `scripts/lobster-trigger-deploy.ps1` → 自架 Trigger（ks-aw-01，127.0.0.1:8030）version 20260926.1、14 tasks、`SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)`。Trigger MCP 未登入不用，改主機 REST（next-admin 的 `TRIGGER_ACCESS_TOKEN`，未印出）手動觸發 heartbeat → COMPLETED `{enabled:false, triggered:0, cleanup:{claimed:true…}}`；排程 `site-watch-heartbeat` `5 * * * *` active；watchdog PASS。
