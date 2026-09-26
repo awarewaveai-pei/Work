@@ -15,6 +15,15 @@ const checkProductionChangeAllowed = vi.hoisted(() =>
 vi.mock("../../system-modes/production-change-gate", () => ({ checkProductionChangeAllowed }));
 vi.mock("@/lib/system-modes/production-change-gate", () => ({ checkProductionChangeAllowed }));
 
+// T21 gap 3: a blocked remediation (auto or manual) now records an ops_action_runs row too --
+// defaults to null (matching the real beginOpsActionRun's fail-open return when
+// SUPABASE_SERVICE_ROLE_KEY is unset, exactly this test env) so the pre-existing tests below,
+// which assert the outcome via exact toEqual with no action_run_id key, are untouched.
+const beginOpsActionRun = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null));
+const finishOpsActionRun = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("../../ops-actions/record", () => ({ beginOpsActionRun, finishOpsActionRun }));
+vi.mock("@/lib/ops-actions/record", () => ({ beginOpsActionRun, finishOpsActionRun }));
+
 const precheck = vi.hoisted(() => vi.fn(async () => ({ ok: true, detail: "must not run" })));
 const execute = vi.hoisted(() => vi.fn(async () => ({ ok: true, detail: "must not run" })));
 const healthcheck = vi.hoisted(() => vi.fn(async () => ({ ok: true, detail: "must not run" })));
@@ -75,6 +84,8 @@ describe("tryRemediate -- system-mode gate blocks both auto and manual", () => {
     precheck.mockClear();
     execute.mockClear();
     healthcheck.mockClear();
+    beginOpsActionRun.mockClear();
+    finishOpsActionRun.mockClear();
   });
   afterEach(() => {
     if (savedFlag === undefined) delete process.env.AUTO_REMEDIATE_ENABLED;
@@ -124,5 +135,48 @@ describe("tryRemediate -- system-mode gate blocks both auto and manual", () => {
     const outcome = await tryRemediate(sb, baseIncident(), { mode: "manual", actor: "x" });
     expect(outcome).toEqual({ attempted: false, reason: "past-gate" });
     expect(precheck).not.toHaveBeenCalled();
+  });
+
+  it("T21: manual mode blocked -- records one ops_action_runs row with a blocked outcome (begin + finish, not silently skipped)", async () => {
+    beginOpsActionRun.mockResolvedValueOnce("blocked-run-manual");
+    const outcome = await tryRemediate({} as SupabaseClient, baseIncident({ organization_id: "org-7" }), { mode: "manual", actor: "ops-console:owner" });
+
+    expect(beginOpsActionRun).toHaveBeenCalledTimes(1);
+    expect(beginOpsActionRun).toHaveBeenCalledWith(
+      expect.objectContaining({ actionKey: "ops.remediation.fake-remediation", organizationId: "org-7", actorRole: "operator" }),
+    );
+    expect(finishOpsActionRun).toHaveBeenCalledWith(
+      "blocked-run-manual",
+      false,
+      expect.anything(),
+      expect.stringContaining("system_mode_blocks_remediation: emergency_stop"),
+    );
+    expect(outcome).toEqual({
+      attempted: false,
+      key: "fake-remediation",
+      reason: "system_mode_blocks_remediation",
+      blockedMode: "emergency_stop",
+      action_run_id: "blocked-run-manual",
+    });
+  });
+
+  it("T21: auto mode blocked -- the same fix applies (shared gate code path)", async () => {
+    process.env.AUTO_REMEDIATE_ENABLED = "true";
+    beginOpsActionRun.mockResolvedValueOnce("blocked-run-auto");
+    await tryRemediate({} as SupabaseClient, baseIncident(), { mode: "auto", actor: "system" });
+    expect(beginOpsActionRun).toHaveBeenCalledTimes(1);
+    expect(finishOpsActionRun).toHaveBeenCalledWith("blocked-run-auto", false, expect.anything(), expect.stringContaining("emergency_stop"));
+  });
+
+  it("no resolvable organization -- no ops_action_runs row is attempted (matches the pre-existing no_organization outcome's own silence)", async () => {
+    const sb = {
+      from: (table: string) => {
+        if (table !== "organizations") throw new Error(`unexpected table ${table}`);
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) };
+      },
+    } as unknown as SupabaseClient;
+    const outcome = await tryRemediate(sb, baseIncident({ organization_id: null }), { mode: "manual", actor: "x" });
+    expect(beginOpsActionRun).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ attempted: false, key: "fake-remediation", reason: "system_mode_blocks_remediation", blockedMode: "emergency_stop" });
   });
 });
