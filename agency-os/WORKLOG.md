@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-26（續43）合併雲端 T19：建站派送在入列、派送、任務開跑三處查系統模式；被擋以終態結束、不進 Trigger 重試（未部署）
+- [來源] `claude/cc-t19-build-dispatch-gate` 321ff2ca5：build/runs 入列前 gate；workflows `src/lib/systemMode.ts`（killSwitch 平行實作，共用 fixture 12 例由兩邊測試同時驗）；dispatch-action-run claim 前查，擋下 → dispatch_failed。
+- [本機修] Codex high：派送時查 ≠ 執行時查（Trigger run 可能晚開跑）→ `gateTaskStart()` 放在 create-wp-site／adopt-client-os／orchestrate-tenant-provisioning 開頭，擋下時原 ops_action_runs 標 `blocked`＋模式。
+- [本機修] Codex r2：env 缺時無法回寫（回寫要的就是那組憑證）→ 仍擋，`writebackError` 點名該 run；dispatched 列不會被重派（派送器只撈 pending）。r3 approve。
+- [本機修] 擋下改回傳終態、不 throw：`trigger.config.ts:162-165` 預設重試 3 次，雲端版 throw 會在模式切回 normal 後由重試把被擋的佈建跑掉。Supabase env 缺 = 讀不到 = 擋。
+- [已知] workflows 套件無 typecheck 步驟；ad-hoc strict tsc 3 個既有錯（dispatch-action-run:198/213、httpJsonStagingAdapter:51，非本次）→ TASKS。
+- 未部署：next-admin 走 sg-deploy；workflows 走 `scripts/lobster-trigger-deploy.ps1`（自架 Trigger ks-aw-01）。rollback＝revert 本 commit＋重部署 Trigger 前一版。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit 0；npm test 215 files 2025 passed；workflows npx vitest run 21 files 141 passed；突變 6 組紅→還原綠（build/runs gate、派送 gate、fixture 翻一例兩套同紅、create-wp-site 開跑 gate、orchestrate 改 throw、blocked 回寫拿掉） | exit=0 | ms=95000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2M/0m（Codex r1 high 執行時未查、r2 high env 缺無回寫；r3 approve；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=checkOrgSystemMode|gateTaskStart | hits=7（systemMode.ts、3 任務、派送器、2 測試；production-change-gate.ts 檔頭同步）
 ## 2026-09-26（續42）TASKS.md 依操作者指示勾選 13 條（勾選＝操作者裁定，我沒逐條驗證完成度）
 - [操作者] 「以下去打勾」：146／149／154／358／422／440／451／455／461／466／472／679／733（C 區整區 6 條＝440／451／455／461／466／472）。
 - 做法：只把 13 行 `- [ ]` 翻成 `- [x]`，標題與內文不動；不搬進「已完成歷程」（歸檔自動化另有待辦）；沒寫 `AUTO_TASK_DONE`（已直接勾，AO-CLOSE 的 apply-closeout-task-checkmarks 不需重打）。

@@ -10,6 +10,8 @@ import {
 import { resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { kickActionRunDispatcher } from "../../../../lib/kick-dispatcher";
+import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
+import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
 
 type SupabaseWriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>>;
 
@@ -453,6 +455,14 @@ export async function POST(request: Request) {
       );
     }
     executionClient = supabase;
+
+    // Gated on the caller-supplied organizationId (org resolution/creation happens right below,
+    // in ensureBuildRegistryRows -- checking here, before it, means the gate always runs before
+    // the FIRST row this request could write, not just before the ops_action_runs insert).
+    const gate = await checkProductionChangeAllowed(supabase, input.organizationId ?? null);
+    if (!gate.allowed) {
+      return blockedChangeResponse(gate.mode);
+    }
 
     const registry = await ensureBuildRegistryRows(supabase, input);
     if ("error" in registry) {

@@ -20,6 +20,7 @@
  */
 
 import { task, logger } from "@trigger.dev/sdk";
+import { gateTaskStart } from "../lib/systemMode";
 import { z } from "zod";
 import { newUuid } from "../utils/uid";
 import { buildWorkflowRunRow, buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
@@ -208,6 +209,13 @@ export const adoptClientOs = task({
   run: async (payload: unknown) => {
     try {
       const input = InputSchema.parse(payload);
+
+      // Before any audit/write; blocked is a terminal result, not a throw (src/lib/systemMode.ts).
+      const modeGate = await gateTaskStart(input.organizationId, input._dispatchedFromActionRunId);
+      if (modeGate.blocks) {
+        logger.warn("adopt-client-os: blocked by system mode", { organizationId: input.organizationId, mode: modeGate.mode, writebackError: modeGate.writebackError });
+        return { status: "blocked_system_mode" as const, mode: modeGate.mode };
+      }
       const creds = getSupabaseCreds();
 
       logger.info("adopt-client-os: starting", {

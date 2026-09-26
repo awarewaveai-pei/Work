@@ -17,6 +17,7 @@ import { z } from "zod";
 import { postTenantIntegrationWebhook } from "../lib/tenant-provisioning/postTenantIntegrationWebhook";
 import { runProviderStep } from "../lib/tenant-provisioning/providers/registry";
 import type { ProvisioningProvider } from "../lib/tenant-provisioning/types";
+import { gateTaskStart } from "../lib/systemMode";
 import { captureWorkflowEvent } from "../observability/posthog";
 import { captureWorkflowException } from "../observability/sentry";
 
@@ -63,6 +64,14 @@ export const orchestrateTenantProvisioning = task({
   run: async (payload: unknown) => {
     try {
       const input = InputSchema.parse(payload);
+
+      // Before any provider is touched; blocked is a terminal result, not a throw (src/lib/systemMode.ts).
+      const gate = await gateTaskStart(input.organizationId);
+      if (gate.blocks) {
+        logger.warn("orchestrate-tenant-provisioning: blocked by system mode", { organizationId: input.organizationId, mode: gate.mode });
+        return { status: "blocked_system_mode" as const, mode: gate.mode, results: [] };
+      }
+
       const ctx = {
         organizationId: input.organizationId,
         workspaceId: input.workspaceId,

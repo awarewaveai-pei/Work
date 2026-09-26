@@ -1,4 +1,5 @@
 import { task, logger, tasks } from "@trigger.dev/sdk";
+import { gateTaskStart } from "../lib/systemMode";
 import { z } from "zod";
 import { newUuid } from "../utils/uid";
 import { buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
@@ -196,6 +197,13 @@ export const createWpSite = task({
   run: async (payload: unknown) => {
     try {
       const input = InputSchema.parse(payload);
+
+      // Before any hosting/bridge call; blocked is a terminal result, not a throw (src/lib/systemMode.ts).
+      const modeGate = await gateTaskStart(input.organizationId, input._dispatchedFromActionRunId);
+      if (modeGate.blocks) {
+        logger.warn("create-wp-site: blocked by system mode", { organizationId: input.organizationId, mode: modeGate.mode, writebackError: modeGate.writebackError });
+        return { status: "blocked_system_mode" as const, mode: modeGate.mode };
+      }
 
       logger.info("Starting WP site creation", input);
 
