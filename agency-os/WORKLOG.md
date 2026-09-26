@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-26（續30）正式部署 b8c191698（CSRF、T13–T18、423 契約、site-watch slice 1 關閉狀態）＋ site-watch 10a 私有 bucket ＋ CSRF 利用稽核
+- [部署 10c] 主機 `sg-deploy.sh renderer next-admin`（setsid 背景；log `/root/lobster-phase1/logs/manual-deploy-20260926.out`）：33251522a → b8c191698（next-admin 18 個 commit）；測試關卡綠、兩容器 5s healthy、內建 smoke 全 OK（含 renderer render＋snapshot）；renderer egress `OUTPUT policy DROP` 仍在。
+- [同批上線的他人 commit] site-watch slice 1（容器無 `SITE_WATCH_ENABLED` = 停用，`lib/site-watch/config.ts:15-18`）；Auto-Repair SSH 釘 host key（prod 已有 `AUTO_REPAIR_{SG,EU}_SSH_HOST_KEY_SHA256`）；研究橋接預設凍結（無 `RESEARCH_BRIDGES_ENABLED` → 送去 COS／HCI 回 410，操作者決策①）；hosting-bridge gate。
+- [§3.4 smoke，主機 localhost:3002] 307／401／probe POST+Bearer 200（無 Bearer 401）／telegram 非 middleware 401（secret 失敗依設計回 ok:true 不處理，`route.ts:58-76`）／偽造角色 307／same-site POST 403 `cross_site_request_blocked`／sync-key 放行（400 缺欄位）／repairs/health 200。文件 §3.4 的 probe 原寫 GET（實際只有 POST）→ 改正。
+- [公開網址 CSRF] same-origin 401（過 CSRF、無 session）、same-site 403、Origin=app 401、Origin=aware-wave.com 403、http Origin 403；容器 log 4 筆 `[csrf] blocked` 全為本次測試，部署後 0 錯誤。
+- [CSRF 利用稽核（TASKS 結案）] nginx log 只留 14 天（9/12–9/26）；/api 寫入依 Referer：staging 路徑 0；aware-wave.com／www 63 筆全是 `POST /api/graphql` 404（掃描器）；studio.* = Supabase Studio（pg-meta），非 next-admin。未見利用。
+- [site-watch 10a] 私有 R2 bucket `lobster-site-watch`：用容器既有 `R2_API_TOKEN` 打 Cloudflare REST 建立（無新憑證、未印出）；r2.dev 公開 = false、自訂網域 0。順序偏差：計畫 a 在 b 前，實際 b→b2→c→a（bucket 只在開啟巡檢後才被寫）。
+- [watchdog] `check-site-watch-health.ps1`：d 0091 PASS；a heartbeat FAIL（從未）＝預期，待 10d token＋10e Trigger 部署；b／c SKIP（開關關）。
+- [未做] 10d token（操作者跑一行，值只在主機產生）＋ compose 映射（`safe-infra-patch`）、10e `lobster-trigger-deploy.ps1`、10f–h 金絲雀／放量。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh renderer next-admin → smoke all OK＋§3.4 8 項＋公開網址 CSRF 5 項＋R2 bucket create success＋watchdog d PASS | exit=0 | ms=420000
+- REVIEW_WAIVED: NA -- 部署已審過的 commit（各自 WORKLOG 有 critic）；本條為部署與驗證紀錄
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=/api/ops/probe|未部署 | hits=probe 文件 1 處（§3.4 GET→POST 已改）；TASKS 未部署 5 條已改為已部署
 ## 2026-09-26（續29）site-watch 上線 step 10b＋10b2：prod 套 0091、解除 DEPLOY_HOLD（操作者 go：「你去把所有的事情處理好」）
 - [根因] `DEPLOY_HOLD`（`8aa473d63`，9/23）擋所有部署直到 `SITE_WATCH_MASTER_PLAN.md` §7 步 10；本機步 1–9 9/23 已完，之後無人接手 → hold 連擋 3 天，CSRF／T13–T18／423 契約無法上線（auto-deploy log：behind=18）。
 - [10b] 事前唯讀查證：prod 無 site_watch 表／函式；0091 唯一碰既有物件 = `ops_incidents_source_check`（`0091_site_watch.sql:133-136`，新值 = 舊清單＋site_watch），現有 79 筆 source 全在清單內；RLS 只對 4 張新表（service_role only）；單一 BEGIN/COMMIT。`node scripts/apply-db-migration.mjs 0091` → APPLY_OK。驗：4 表、21 函式、約束含 site_watch、incidents 79 筆不變。rollback＝`packages/db/scripts/0091_site_watch_down.sql`。

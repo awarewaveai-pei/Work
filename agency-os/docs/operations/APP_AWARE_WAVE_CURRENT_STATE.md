@@ -91,7 +91,7 @@ SSH 進 SG → `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`。內建 g
 # 在 SG localhost:3002 跑（容器內 env 提供 token）
 /ops/repairs 無 session → 期望 307→/login
 /api/ops/repairs 無 session → 期望 401
-/api/ops/probe +Bearer OPS_INBOX_INGEST_TOKEN → 期望 200
+POST /api/ops/probe +Bearer OPS_INBOX_INGEST_TOKEN → 期望 200（GET = 405；無 Bearer = 401）
 /api/internal/commands/telegram → 期望非 middleware-401
 spoof x-ops-claims-role:admin 於 /ops/repairs → 期望 307（被剝除）
 POST /api/ops/repairs + Sec-Fetch-Site: same-site → 期望 403 cross_site_request_blocked
