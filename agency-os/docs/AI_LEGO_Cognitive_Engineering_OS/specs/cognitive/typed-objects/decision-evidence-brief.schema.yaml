@@ -1,0 +1,87 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/decision-evidence-brief.schema.yaml"
+title: Decision Evidence Brief
+version: "1.0.0"
+status: DRAFT
+description: >
+  Synthesis artifact for the L2 decision-利弊 line: an AI-assembled evidence
+  brief comparing options against criteria, built from a project's Source
+  prompt manifest (P-a, source_manifest.py). Every option, criterion, and
+  piece of evidence cites manifest ids; the citation_integrity gate
+  (gates.evaluate_citation_integrity) enforces the citations are real and
+  non-empty before this object is treated as valid output. The fields
+  shared with dossier-brief.schema.yaml and literature-matrix.schema.yaml
+  (synthesis_id, project_id, language, summary, sections, gaps, conflicts,
+  uncited_sections, manifest_ref, provenance, model, usage) are `$ref`'d
+  from dossier-brief.schema.yaml's `$defs` -- that file is the single
+  source of truth for their shape, this file only adds the
+  decision-specific `options`/`criteria`/`evidence` fields.
+source_of_truth_for:
+  - "RESEARCH_LINES_MASTER_PLAN.md §12.8 P-d (synthesis common core) and P2 WC-P2-02"
+decided_by: "P2 WC-P2-02: three synthesis typed objects + DRAFT capability contracts"
+
+type: object
+additionalProperties: false
+required:
+  - synthesis_id
+  - project_id
+  - kind
+  - language
+  - summary
+  - sections
+  - gaps
+  - conflicts
+  - uncited_sections
+  - manifest_ref
+  - provenance
+  - model
+  - usage
+  - options
+  - criteria
+  - evidence
+properties:
+  synthesis_id: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/synthesis_id"}
+  project_id: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/project_id"}
+  kind: {const: decision_evidence}
+  language: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/language"}
+  summary: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/summary"}
+  sections: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/sections"}
+  gaps: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/gaps"}
+  conflicts: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/conflicts"}
+  uncited_sections: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/uncited_sections"}
+  manifest_ref: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/manifest_ref"}
+  provenance: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/provenance"}
+  model: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/model"}
+  usage: {$ref: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml#/$defs/usage"}
+  options:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [option_id, name, citations]
+      properties:
+        option_id: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+        citations: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+  criteria:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [criterion_id, name, citations]
+      properties:
+        criterion_id: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+        citations: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+  evidence:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [text, option_ids, criterion_ids, stance, citations]
+      properties:
+        text: {type: string, minLength: 1}
+        option_ids: {type: array, items: {type: string, minLength: 1}}
+        criterion_ids: {type: array, items: {type: string, minLength: 1}}
+        stance: {type: string, enum: [supports, opposes, mixed]}
+        citations: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}

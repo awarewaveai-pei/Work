@@ -1,0 +1,152 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/dossier-brief.schema.yaml"
+target_ref: ""
+description: "DossierBrief required fields, citation-manifest shape, per-kind section heading table, and additionalProperties:false guards."
+valid:
+  - name: minimal_person_dossier
+    instance:
+      synthesis_id: "SYN-2026-09-26-001"
+      project_id: "proj-001"
+      kind: "dossier_brief"
+      language: "zh-TW"
+      summary: {text: "調查對象曾任某公司要職。", citations: ["source:src-1"]}
+      sections:
+        - heading: "身分與現況"
+          claims:
+            - {claim_id: "C1", text: "現任某基金會顧問。", citations: ["source:src-1"]}
+      gaps:
+        - {text: "教育背景未涵蓋", needed_evidence: "學歷來源"}
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      subject: {name: "王小明", kind: "person", anchors: ["某公司前員工"]}
+      related_entities:
+        - {name: "某公司", relation: "雇主", citations: ["source:src-1"]}
+  - name: company_dossier_with_conflict_and_gap
+    instance:
+      synthesis_id: "SYN-2026-09-26-002"
+      project_id: "proj-002"
+      kind: "dossier_brief"
+      language: "zh-TW"
+      summary: {text: "公司成立年份來源不一致。", citations: ["source:src-2"]}
+      sections:
+        - heading: "公司概況"
+          claims:
+            - {claim_id: "C1", text: "登記於 2018 年或 2019 年。", citations: ["source:src-2", "source:src-3"]}
+      gaps: []
+      conflicts:
+        - {text: "兩來源對成立年份有分歧", citations: ["source:src-2", "source:src-3"]}
+      uncited_sections: ["財務與募資"]
+      manifest_ref: {sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", count: 2, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 15, output_tokens: 25}
+      subject: {name: "某公司", kind: "company", anchors: []}
+      related_entities: []
+invalid:
+  - name: zero_citations
+    instance:
+      synthesis_id: "SYN-2026-09-26-003"
+      project_id: "proj-001"
+      kind: "dossier_brief"
+      language: "zh-TW"
+      summary: {text: "無來源的結論。", citations: []}
+      sections: []
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", count: 0, batches: 0}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 0, output_tokens: 0}
+      subject: {name: "王小明", kind: "person", anchors: []}
+      related_entities: []
+    reason: "summary.citations requires minItems: 1"
+  - name: unknown_kind
+    instance:
+      synthesis_id: "SYN-2026-09-26-004"
+      project_id: "proj-001"
+      kind: "dossier_summary"
+      language: "zh-TW"
+      summary: {text: "調查對象曾任某公司要職。", citations: ["source:src-1"]}
+      sections:
+        - heading: "身分與現況"
+          claims:
+            - {claim_id: "C1", text: "現任某基金會顧問。", citations: ["source:src-1"]}
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      subject: {name: "王小明", kind: "person", anchors: []}
+      related_entities: []
+    reason: "kind is closed to the const dossier_brief"
+  - name: extra_top_level_key
+    instance:
+      synthesis_id: "SYN-2026-09-26-005"
+      project_id: "proj-001"
+      kind: "dossier_brief"
+      language: "zh-TW"
+      summary: {text: "調查對象曾任某公司要職。", citations: ["source:src-1"]}
+      sections:
+        - heading: "身分與現況"
+          claims:
+            - {claim_id: "C1", text: "現任某基金會顧問。", citations: ["source:src-1"]}
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      subject: {name: "王小明", kind: "person", anchors: []}
+      related_entities: []
+      confidence_score: 0.9
+    reason: "additionalProperties:false rejects a key not in the schema"
+  - name: conflicts_single_citation
+    instance:
+      synthesis_id: "SYN-2026-09-26-006"
+      project_id: "proj-002"
+      kind: "dossier_brief"
+      language: "zh-TW"
+      summary: {text: "公司成立年份來源不一致。", citations: ["source:src-2"]}
+      sections:
+        - heading: "公司概況"
+          claims:
+            - {claim_id: "C1", text: "登記於 2018 年或 2019 年。", citations: ["source:src-2"]}
+      gaps: []
+      conflicts:
+        - {text: "只引了一個來源卻宣稱矛盾", citations: ["source:src-2"]}
+      uncited_sections: []
+      manifest_ref: {sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      subject: {name: "某公司", kind: "company", anchors: []}
+      related_entities: []
+    reason: "conflicts[].citations requires minItems: 2 (a conflict needs at least two disagreeing sources)"
+  - name: heading_not_in_kind_table
+    instance:
+      synthesis_id: "SYN-2026-09-26-007"
+      project_id: "proj-001"
+      kind: "dossier_brief"
+      language: "zh-TW"
+      summary: {text: "調查對象曾任某公司要職。", citations: ["source:src-1"]}
+      sections:
+        - heading: "公司概況"
+          claims:
+            - {claim_id: "C1", text: "現任某基金會顧問。", citations: ["source:src-1"]}
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      subject: {name: "王小明", kind: "person", anchors: []}
+      related_entities: []
+    reason: "subject.kind=person restricts sections[].heading to the person table (report.ts:76-80); 公司概況 is the company heading"

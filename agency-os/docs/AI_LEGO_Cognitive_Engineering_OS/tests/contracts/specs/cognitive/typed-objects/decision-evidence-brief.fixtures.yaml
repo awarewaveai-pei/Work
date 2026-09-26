@@ -1,0 +1,140 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/decision-evidence-brief.schema.yaml"
+target_ref: ""
+description: "DecisionEvidenceBrief required fields, citation-manifest shape, and additionalProperties:false guards."
+valid:
+  - name: two_options_one_criterion
+    instance:
+      synthesis_id: "SYN-2026-09-26-101"
+      project_id: "proj-101"
+      kind: "decision_evidence"
+      language: "zh-TW"
+      summary: {text: "方案甲在成本上優於方案乙。", citations: ["source:src-1"]}
+      sections:
+        - heading: "方案比較"
+          claims:
+            - {claim_id: "C1", text: "方案甲的建置成本較低。", citations: ["source:src-1"]}
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      options:
+        - {option_id: "O1", name: "方案甲", citations: ["source:src-1"]}
+        - {option_id: "O2", name: "方案乙", citations: ["source:src-1"]}
+      criteria:
+        - {criterion_id: "CR1", name: "成本", citations: ["source:src-1"]}
+      evidence:
+        - {text: "方案甲成本較低", option_ids: ["O1"], criterion_ids: ["CR1"], stance: "supports", citations: ["source:src-1"]}
+  - name: mixed_stance_with_conflict
+    instance:
+      synthesis_id: "SYN-2026-09-26-102"
+      project_id: "proj-102"
+      kind: "decision_evidence"
+      language: "zh-TW"
+      summary: {text: "兩來源對方案丙的風險評估不一致。", citations: ["source:src-2"]}
+      sections: []
+      gaps:
+        - {text: "缺乏長期維運成本資料", needed_evidence: "三年期維運報價"}
+      conflicts:
+        - {text: "風險評估分歧", citations: ["source:src-2", "source:src-3"]}
+      uncited_sections: []
+      manifest_ref: {sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", count: 2, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 12, output_tokens: 22}
+      options:
+        - {option_id: "O3", name: "方案丙", citations: ["source:src-2"]}
+      criteria:
+        - {criterion_id: "CR2", name: "風險", citations: ["source:src-2"]}
+      evidence:
+        - {text: "方案丙風險偏高", option_ids: ["O3"], criterion_ids: ["CR2"], stance: "mixed", citations: ["source:src-2", "source:src-3"]}
+invalid:
+  - name: zero_citations
+    instance:
+      synthesis_id: "SYN-2026-09-26-103"
+      project_id: "proj-101"
+      kind: "decision_evidence"
+      language: "zh-TW"
+      summary: {text: "無來源的結論。", citations: []}
+      sections: []
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", count: 0, batches: 0}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 0, output_tokens: 0}
+      options: []
+      criteria: []
+      evidence: []
+    reason: "summary.citations requires minItems: 1"
+  - name: unknown_kind
+    instance:
+      synthesis_id: "SYN-2026-09-26-104"
+      project_id: "proj-101"
+      kind: "decision_comparison"
+      language: "zh-TW"
+      summary: {text: "方案甲在成本上優於方案乙。", citations: ["source:src-1"]}
+      sections: []
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      options:
+        - {option_id: "O1", name: "方案甲", citations: ["source:src-1"]}
+      criteria:
+        - {criterion_id: "CR1", name: "成本", citations: ["source:src-1"]}
+      evidence:
+        - {text: "方案甲成本較低", option_ids: ["O1"], criterion_ids: ["CR1"], stance: "supports", citations: ["source:src-1"]}
+    reason: "kind is closed to the const decision_evidence"
+  - name: extra_top_level_key
+    instance:
+      synthesis_id: "SYN-2026-09-26-105"
+      project_id: "proj-101"
+      kind: "decision_evidence"
+      language: "zh-TW"
+      summary: {text: "方案甲在成本上優於方案乙。", citations: ["source:src-1"]}
+      sections: []
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      options:
+        - {option_id: "O1", name: "方案甲", citations: ["source:src-1"]}
+      criteria:
+        - {criterion_id: "CR1", name: "成本", citations: ["source:src-1"]}
+      evidence:
+        - {text: "方案甲成本較低", option_ids: ["O1"], criterion_ids: ["CR1"], stance: "supports", citations: ["source:src-1"]}
+      recommendation: "選方案甲"
+    reason: "additionalProperties:false rejects a key not in the schema"
+  - name: conflicts_single_citation
+    instance:
+      synthesis_id: "SYN-2026-09-26-106"
+      project_id: "proj-102"
+      kind: "decision_evidence"
+      language: "zh-TW"
+      summary: {text: "兩來源對方案丙的風險評估不一致。", citations: ["source:src-2"]}
+      sections: []
+      gaps: []
+      conflicts:
+        - {text: "只引了一個來源卻宣稱矛盾", citations: ["source:src-2"]}
+      uncited_sections: []
+      manifest_ref: {sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 12, output_tokens: 22}
+      options:
+        - {option_id: "O3", name: "方案丙", citations: ["source:src-2"]}
+      criteria:
+        - {criterion_id: "CR2", name: "風險", citations: ["source:src-2"]}
+      evidence:
+        - {text: "方案丙風險偏高", option_ids: ["O3"], criterion_ids: ["CR2"], stance: "mixed", citations: ["source:src-2"]}
+    reason: "conflicts[].citations requires minItems: 2 (a conflict needs at least two disagreeing sources)"

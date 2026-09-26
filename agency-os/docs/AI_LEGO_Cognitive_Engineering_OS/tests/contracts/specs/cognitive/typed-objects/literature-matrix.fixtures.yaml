@@ -1,0 +1,117 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/literature-matrix.schema.yaml"
+target_ref: ""
+description: "LiteratureMatrix required fields, citation-manifest shape, and additionalProperties:false guards."
+valid:
+  - name: two_studies
+    instance:
+      synthesis_id: "SYN-2026-09-26-201"
+      project_id: "proj-201"
+      kind: "literature_matrix"
+      language: "zh-TW"
+      summary: {text: "兩篇研究皆支持介入措施的正向效果。", citations: ["source:src-1"]}
+      sections:
+        - heading: "研究發現"
+          claims:
+            - {claim_id: "C1", text: "介入組表現優於對照組。", citations: ["source:src-1"]}
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      studies:
+        - {study_id: "S1", source_id: "src-1", claim: "介入組表現優於對照組", method: "RCT", sample: "n=120", limitations: ["樣本地區單一"], citations: ["source:src-1"]}
+  - name: study_with_null_sample_and_conflict
+    instance:
+      synthesis_id: "SYN-2026-09-26-202"
+      project_id: "proj-202"
+      kind: "literature_matrix"
+      language: "zh-TW"
+      summary: {text: "兩篇研究對效果量的估計不一致。", citations: ["source:src-2"]}
+      sections: []
+      gaps:
+        - {text: "缺乏長期追蹤資料", needed_evidence: "五年後追蹤研究"}
+      conflicts:
+        - {text: "效果量估計分歧", citations: ["source:src-2", "source:src-3"]}
+      uncited_sections: []
+      manifest_ref: {sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", count: 2, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 12, output_tokens: 22}
+      studies:
+        - {study_id: "S2", source_id: "src-2", claim: "效果量中等", method: "後設分析", sample: null, limitations: [], citations: ["source:src-2"]}
+invalid:
+  - name: zero_citations
+    instance:
+      synthesis_id: "SYN-2026-09-26-203"
+      project_id: "proj-201"
+      kind: "literature_matrix"
+      language: "zh-TW"
+      summary: {text: "無來源的結論。", citations: []}
+      sections: []
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", count: 0, batches: 0}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 0, output_tokens: 0}
+      studies: []
+    reason: "summary.citations requires minItems: 1"
+  - name: unknown_kind
+    instance:
+      synthesis_id: "SYN-2026-09-26-204"
+      project_id: "proj-201"
+      kind: "literature_review"
+      language: "zh-TW"
+      summary: {text: "兩篇研究皆支持介入措施的正向效果。", citations: ["source:src-1"]}
+      sections: []
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      studies:
+        - {study_id: "S1", source_id: "src-1", claim: "介入組表現優於對照組", method: "RCT", sample: "n=120", limitations: [], citations: ["source:src-1"]}
+    reason: "kind is closed to the const literature_matrix"
+  - name: extra_top_level_key
+    instance:
+      synthesis_id: "SYN-2026-09-26-205"
+      project_id: "proj-201"
+      kind: "literature_matrix"
+      language: "zh-TW"
+      summary: {text: "兩篇研究皆支持介入措施的正向效果。", citations: ["source:src-1"]}
+      sections: []
+      gaps: []
+      conflicts: []
+      uncited_sections: []
+      manifest_ref: {sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      studies:
+        - {study_id: "S1", source_id: "src-1", claim: "介入組表現優於對照組", method: "RCT", sample: "n=120", limitations: [], citations: ["source:src-1"]}
+      research_gap: "缺乏跨文化樣本"
+    reason: "additionalProperties:false rejects a key not in the schema"
+  - name: conflicts_single_citation
+    instance:
+      synthesis_id: "SYN-2026-09-26-206"
+      project_id: "proj-202"
+      kind: "literature_matrix"
+      language: "zh-TW"
+      summary: {text: "兩篇研究對效果量的估計不一致。", citations: ["source:src-2"]}
+      sections: []
+      gaps: []
+      conflicts:
+        - {text: "只引了一個來源卻宣稱矛盾", citations: ["source:src-2"]}
+      uncited_sections: []
+      manifest_ref: {sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", count: 1, batches: 1}
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 12, output_tokens: 22}
+      studies:
+        - {study_id: "S2", source_id: "src-2", claim: "效果量中等", method: "後設分析", sample: null, limitations: [], citations: ["source:src-2"]}
+    reason: "conflicts[].citations requires minItems: 2 (a conflict needs at least two disagreeing sources)"
