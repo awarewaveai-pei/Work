@@ -1,0 +1,142 @@
+{
+  "gate_results": [
+    {
+      "evidence": {
+        "claims_total": 2,
+        "conflicts_under_two": [],
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    }
+  ],
+  "manifest": {
+    "batches": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "entries": [
+      {
+        "end": 71,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:bio_main",
+        "n": 1,
+        "sha256": "e8c53a828e9150c978ccc30d3c741cf9a179b4a624257ced9e69081852b6e5d1",
+        "source_class": "profile",
+        "source_id": "src:bio_main",
+        "start": 0,
+        "title": "晨曦科技創辦人背景資料（合成）",
+        "url": null
+      },
+      {
+        "end": 58,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:wrong_person",
+        "n": 2,
+        "sha256": "c45deac2eedff268c20771fbb073029f9c8c0ee49cf35ffcb9b8732da9ae6142",
+        "source_class": "news",
+        "source_id": "src:wrong_person",
+        "start": 0,
+        "title": "高雄餐飲業陳曉明主廚報導（合成，同名混淆陷阱）",
+        "url": "https://example-synthetic.test/news/chef-chen"
+      },
+      {
+        "end": 61,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:company_overview",
+        "n": 3,
+        "sha256": "e654fbdc0f11c85ca1d2a3388dcdc4d1177d0786ccd6be4186ccc4fc73f82551",
+        "source_class": "profile",
+        "source_id": "src:company_overview",
+        "start": 0,
+        "title": "晨曦科技公司簡介（合成）",
+        "url": null
+      }
+    ],
+    "sha256": "9cabb0ca9f820bf69440cfdc6a131b98af7e4ecb28d5b6a297aa7a883c113e95"
+  },
+  "synthesis": {
+    "conflicts": [],
+    "gaps": [
+      {
+        "needed_evidence": "財報或營收公開資料",
+        "text": "目前公開資料未揭露晨曦科技的實際營收數字。"
+      }
+    ],
+    "kind": "dossier_brief",
+    "language": "zh-TW",
+    "manifest_ref": {
+      "batches": 1,
+      "count": 3,
+      "sha256": "9cabb0ca9f820bf69440cfdc6a131b98af7e4ecb28d5b6a297aa7a883c113e95"
+    },
+    "model": "golden-fixture",
+    "project_id": "proj-eval-l1-founder-bio",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "related_entities": [
+      {
+        "citations": [
+          "source:src:bio_main"
+        ],
+        "name": "晨曦科技",
+        "relation": "founded"
+      }
+    ],
+    "sections": [
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:bio_main"
+            ],
+            "claim_id": "founder_bg",
+            "text": "陳曉明是「晨曦科技」的創辦人，此前任職於台北科技大學資訊工程系。"
+          }
+        ],
+        "heading": "創辦人背景"
+      },
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:bio_main",
+              "source:src:company_overview"
+            ],
+            "claim_id": "company_found",
+            "text": "晨曦科技成立於 2019 年，主打雲端庫存管理系統「晨曦雲倉」。"
+          }
+        ],
+        "heading": "公司概況"
+      }
+    ],
+    "subject": {
+      "anchors": [
+        "晨曦科技"
+      ],
+      "kind": "person",
+      "name": "陳曉明"
+    },
+    "summary": {
+      "citations": [
+        "source:src:bio_main",
+        "source:src:company_overview"
+      ],
+      "text": "陳曉明是「晨曦科技」的創辦人，此前任職於台北科技大學資訊工程系。；晨曦科技成立於 2019 年，主打雲端庫存管理系統「晨曦雲倉」。。"
+    },
+    "synthesis_id": "SYN-l1-founder-bio",
+    "uncited_sections": [],
+    "usage": {
+      "input_tokens": 1200,
+      "output_tokens": 400
+    }
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "gate_results": [
+    {
+      "evidence": {
+        "claims_total": 2,
+        "conflicts_under_two": [],
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    }
+  ],
+  "manifest": {
+    "batches": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "entries": [
+      {
+        "end": 67,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:study_m",
+        "n": 1,
+        "sha256": "b4b4c1a44197d23010ef9955d24d63e6fa6aa89ad8b3410cc5dc3cf63e36278f",
+        "source_class": "academic",
+        "source_id": "src:study_m",
+        "start": 0,
+        "title": "study_m（合成研究摘要）",
+        "url": null
+      },
+      {
+        "end": 63,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:study_n",
+        "n": 2,
+        "sha256": "9c6553da1013c778656681e0d25f060598dc3952c0e46b2411d3867adedc73b9",
+        "source_class": "academic",
+        "source_id": "src:study_n",
+        "start": 0,
+        "title": "study_n（合成研究摘要）",
+        "url": null
+      },
+      {
+        "end": 39,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:shop_supplement",
+        "n": 3,
+        "sha256": "e4406316d596dab468b19434784639900848232a5ef437b21ded42db688f51f1",
+        "source_class": "shopping",
+        "source_id": "src:shop_supplement",
+        "start": 0,
+        "title": "褪黑激素軟糖特賣頁（合成，購物頁陷阱）",
+        "url": "https://example-synthetic.test/shop/melatonin-gummy"
+      }
+    ],
+    "sha256": "56fd2fb8abfaf3a1417fcef936f8a51cb46360f89bbde54699b8dc80871b7b05"
+  },
+  "synthesis": {
+    "conflicts": [],
+    "gaps": [
+      {
+        "needed_evidence": "長期追蹤安全性研究",
+        "text": "現有研究缺乏長期安全性資料。"
+      }
+    ],
+    "kind": "literature_matrix",
+    "language": "zh-TW",
+    "manifest_ref": {
+      "batches": 1,
+      "count": 3,
+      "sha256": "56fd2fb8abfaf3a1417fcef936f8a51cb46360f89bbde54699b8dc80871b7b05"
+    },
+    "model": "golden-fixture",
+    "project_id": "proj-eval-l3-shopping-trap",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "sections": [
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:study_m"
+            ],
+            "claim_id": "onset_time",
+            "text": "study_m 發現睡前服用 3mg 褪黑激素的組別，入睡所需時間平均縮短 8 分鐘。"
+          }
+        ],
+        "heading": "入睡時間"
+      },
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:study_n"
+            ],
+            "claim_id": "meta_analysis",
+            "text": "study_n 的後設分析彙整 12 篇研究，顯示褪黑激素對入睡時間有小幅但一致的正向效果。"
+          }
+        ],
+        "heading": "後設分析"
+      }
+    ],
+    "studies": [
+      {
+        "citations": [
+          "source:src:study_m"
+        ],
+        "claim": "睡前服用 3mg 褪黑激素的組別，入睡所需時間平均縮短 8 分鐘",
+        "limitations": [],
+        "method": "雙盲對照試驗",
+        "sample": "60 人",
+        "source_id": "source:src:study_m",
+        "study_id": "study_m"
+      },
+      {
+        "citations": [
+          "source:src:study_n"
+        ],
+        "claim": "褪黑激素對入睡時間有小幅但一致的正向效果，對總睡眠時數影響不顯著",
+        "limitations": [],
+        "method": "後設分析",
+        "sample": "12 篇研究",
+        "source_id": "source:src:study_n",
+        "study_id": "study_n"
+      }
+    ],
+    "summary": {
+      "citations": [
+        "source:src:study_m",
+        "source:src:study_n"
+      ],
+      "text": "study_m 發現睡前服用 3mg 褪黑激素的組別，入睡所需時間平均縮短 8 分鐘。；study_n 的後設分析彙整 12 篇研究，顯示褪黑激素對入睡時間有小幅但一致的正向效果。。"
+    },
+    "synthesis_id": "SYN-l3-shopping-trap",
+    "uncited_sections": [],
+    "usage": {
+      "input_tokens": 1200,
+      "output_tokens": 400
+    }
+  }
+}

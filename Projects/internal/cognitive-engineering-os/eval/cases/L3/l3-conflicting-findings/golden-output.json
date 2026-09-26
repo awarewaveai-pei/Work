@@ -1,0 +1,159 @@
+{
+  "gate_results": [
+    {
+      "evidence": {
+        "claims_total": 1,
+        "conflicts_under_two": [],
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    }
+  ],
+  "manifest": {
+    "batches": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "entries": [
+      {
+        "end": 62,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:study_x",
+        "n": 1,
+        "sha256": "4cb354e29ebf0ec21166921cbe1013170b9fb95d0d517b6c7756548af2bb3108",
+        "source_class": "academic",
+        "source_id": "src:study_x",
+        "start": 0,
+        "title": "study_x（合成研究摘要）",
+        "url": null
+      },
+      {
+        "end": 83,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:study_y",
+        "n": 2,
+        "sha256": "531aefc78e8703d1a1536aef9a79dd7491f882e56504e398489d5650000adbbc",
+        "source_class": "academic",
+        "source_id": "src:study_y",
+        "start": 0,
+        "title": "study_y（合成研究摘要，矛盾來源）",
+        "url": null
+      },
+      {
+        "end": 54,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:study_z",
+        "n": 3,
+        "sha256": "67e49e59bf74165c20418221faecc0c4a202cd18a5b129d902a3855363568ec5",
+        "source_class": "academic",
+        "source_id": "src:study_z",
+        "start": 0,
+        "title": "study_z（合成研究摘要）",
+        "url": null
+      }
+    ],
+    "sha256": "6ca1921355f251fd0e90b6a25d09a3cf478af33121299afbc9ed0e610f5d3304"
+  },
+  "synthesis": {
+    "conflicts": [
+      {
+        "citations": [
+          "source:src:study_x",
+          "source:src:study_y"
+        ],
+        "text": "睡眠時數與工作記憶表現的關聯性研究結果矛盾：study_x 發現顯著下降，study_y 的重複實驗未觀察到睡眠時數與工作記憶測驗分數有顯著關聯。"
+      }
+    ],
+    "gaps": [
+      {
+        "needed_evidence": "機制性研究（如神經影像）",
+        "text": "現有研究未建立睡眠與工作記憶之間的因果機制。"
+      }
+    ],
+    "kind": "literature_matrix",
+    "language": "zh-TW",
+    "manifest_ref": {
+      "batches": 1,
+      "count": 3,
+      "sha256": "6ca1921355f251fd0e90b6a25d09a3cf478af33121299afbc9ed0e610f5d3304"
+    },
+    "model": "golden-fixture",
+    "project_id": "proj-eval-l3-conflicting-findings",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "sections": [
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:study_z"
+            ],
+            "claim_id": "shift_quality",
+            "text": "study_z 發現睡眠品質（而非單純時數）與隔日反應時間有中度相關。"
+          }
+        ],
+        "heading": "睡眠品質與反應時間"
+      }
+    ],
+    "studies": [
+      {
+        "citations": [
+          "source:src:study_x"
+        ],
+        "claim": "每晚睡眠少於 6 小時者，工作記憶測驗分數平均下降 15%",
+        "limitations": [],
+        "method": "橫斷研究",
+        "sample": "200 人",
+        "source_id": "source:src:study_x",
+        "study_id": "study_x"
+      },
+      {
+        "citations": [
+          "source:src:study_y"
+        ],
+        "claim": "未觀察到睡眠時數與工作記憶測驗分數有顯著關聯",
+        "limitations": [
+          "可能受咖啡因攝取量干擾"
+        ],
+        "method": "對照實驗",
+        "sample": "80 人",
+        "source_id": "source:src:study_y",
+        "study_id": "study_y"
+      },
+      {
+        "citations": [
+          "source:src:study_z"
+        ],
+        "claim": "睡眠品質（而非單純時數）與隔日反應時間有中度相關",
+        "limitations": [],
+        "method": "縱貫研究",
+        "sample": "輪班工作者",
+        "source_id": "source:src:study_z",
+        "study_id": "study_z"
+      }
+    ],
+    "summary": {
+      "citations": [
+        "source:src:study_x",
+        "source:src:study_y",
+        "source:src:study_z"
+      ],
+      "text": "study_z 發現睡眠品質（而非單純時數）與隔日反應時間有中度相關。。"
+    },
+    "synthesis_id": "SYN-l3-conflicting-findings",
+    "uncited_sections": [],
+    "usage": {
+      "input_tokens": 1200,
+      "output_tokens": 400
+    }
+  }
+}

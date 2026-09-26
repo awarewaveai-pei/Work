@@ -1,0 +1,206 @@
+{
+  "gate_results": [
+    {
+      "evidence": {
+        "claims_total": 2,
+        "conflicts_under_two": [],
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    }
+  ],
+  "manifest": {
+    "batches": [
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "entries": [
+      {
+        "end": 22,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:pricing_page",
+        "n": 1,
+        "sha256": "33fd65172b494c32dd6d12d6f104ff00f59581e29cd6751e394831bd0417f392",
+        "source_class": "profile",
+        "source_id": "src:pricing_page",
+        "start": 0,
+        "title": "潮汐支付官網費率頁（合成）",
+        "url": null
+      },
+      {
+        "end": 60,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:partner_doc",
+        "n": 2,
+        "sha256": "f897a23870488d41325f2023372d69db5e0a6e14a6c9352245249822dc883def",
+        "source_class": "profile",
+        "source_id": "src:partner_doc",
+        "start": 0,
+        "title": "潮汐支付合作夥伴文件（合成，矛盾來源）",
+        "url": null
+      },
+      {
+        "end": 32,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:feature_list",
+        "n": 3,
+        "sha256": "c532e018a84a5014ca80919af2ba77f87d59553d35e4b3591fb9b50efa321ec0",
+        "source_class": "profile",
+        "source_id": "src:feature_list",
+        "start": 0,
+        "title": "潮汐支付功能列表（合成）",
+        "url": null
+      },
+      {
+        "end": 27,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:harbor_review",
+        "n": 4,
+        "sha256": "225523615f8556acdc4bc9cb9dd6a9efbd30c32fa0f742b02843f6ca6b0eeea0",
+        "source_class": "review",
+        "source_id": "src:harbor_review",
+        "start": 0,
+        "title": "港灣金流評測（合成）",
+        "url": null
+      }
+    ],
+    "sha256": "d4a0b3f1485c0e7ac98007b52edf16c4f00a0ad69bf748ea48756df32d3d6077"
+  },
+  "synthesis": {
+    "conflicts": [
+      {
+        "citations": [
+          "source:src:pricing_page",
+          "source:src:partner_doc"
+        ],
+        "text": "潮汐支付手續費說法矛盾：官網稱 2.5%，合作夥伴文件稱標準交易手續費其實是每筆 2.8%。"
+      }
+    ],
+    "criteria": [
+      {
+        "citations": [
+          "source:src:pricing_page",
+          "source:src:partner_doc",
+          "source:src:harbor_review"
+        ],
+        "criterion_id": "crit-fee",
+        "name": "交易手續費"
+      }
+    ],
+    "evidence": [
+      {
+        "citations": [
+          "source:src:pricing_page",
+          "source:src:partner_doc"
+        ],
+        "criterion_ids": [
+          "crit-fee"
+        ],
+        "option_ids": [
+          "opt-tide"
+        ],
+        "stance": "mixed",
+        "text": "潮汐支付手續費說法不一：官網稱 2.5%，合作夥伴文件稱標準交易應為 2.8%。"
+      },
+      {
+        "citations": [
+          "source:src:harbor_review"
+        ],
+        "criterion_ids": [
+          "crit-fee"
+        ],
+        "option_ids": [
+          "opt-harbor"
+        ],
+        "stance": "supports",
+        "text": "港灣金流交易手續費統一為每筆 2.6%。"
+      }
+    ],
+    "gaps": [
+      {
+        "needed_evidence": "月費公開資料",
+        "text": "目前資料未揭露兩家廠商是否收取月費。"
+      }
+    ],
+    "kind": "decision_evidence",
+    "language": "zh-TW",
+    "manifest_ref": {
+      "batches": 1,
+      "count": 4,
+      "sha256": "d4a0b3f1485c0e7ac98007b52edf16c4f00a0ad69bf748ea48756df32d3d6077"
+    },
+    "model": "golden-fixture",
+    "options": [
+      {
+        "citations": [
+          "source:src:pricing_page",
+          "source:src:partner_doc",
+          "source:src:feature_list"
+        ],
+        "name": "潮汐支付",
+        "option_id": "opt-tide"
+      },
+      {
+        "citations": [
+          "source:src:harbor_review"
+        ],
+        "name": "港灣金流",
+        "option_id": "opt-harbor"
+      }
+    ],
+    "project_id": "proj-eval-l2-pricing-conflict",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "sections": [
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:feature_list"
+            ],
+            "claim_id": "tide_features",
+            "text": "潮汐支付支援信用卡、行動支付與跨境交易，並提供即時對帳 API。"
+          }
+        ],
+        "heading": "潮汐支付"
+      },
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:harbor_review"
+            ],
+            "claim_id": "harbor_fee",
+            "text": "港灣金流交易手續費統一為每筆 2.6%，不分商家規模。"
+          }
+        ],
+        "heading": "港灣金流"
+      }
+    ],
+    "summary": {
+      "citations": [
+        "source:src:feature_list",
+        "source:src:harbor_review",
+        "source:src:partner_doc",
+        "source:src:pricing_page"
+      ],
+      "text": "潮汐支付支援信用卡、行動支付與跨境交易，並提供即時對帳 API。；港灣金流交易手續費統一為每筆 2.6%，不分商家規模。。"
+    },
+    "synthesis_id": "SYN-l2-pricing-conflict",
+    "uncited_sections": [],
+    "usage": {
+      "input_tokens": 1200,
+      "output_tokens": 400
+    }
+  }
+}

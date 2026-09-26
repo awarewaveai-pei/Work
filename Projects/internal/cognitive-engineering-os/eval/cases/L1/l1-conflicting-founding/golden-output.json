@@ -1,0 +1,130 @@
+{
+  "gate_results": [
+    {
+      "evidence": {
+        "claims_total": 1,
+        "conflicts_under_two": [],
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    }
+  ],
+  "manifest": {
+    "batches": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "entries": [
+      {
+        "end": 37,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:site_official",
+        "n": 1,
+        "sha256": "74d2d133bcb439c3be3e19d9c20bde1014ea1ab3922fce26aa106405f77cf579",
+        "source_class": "profile",
+        "source_id": "src:site_official",
+        "start": 0,
+        "title": "晴空數位官網關於我們（合成）",
+        "url": null
+      },
+      {
+        "end": 49,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:press_2020",
+        "n": 2,
+        "sha256": "9fe4d73f3e3d293977fb1358813e3dd025725e68a86d945552786df9936bc3b9",
+        "source_class": "news",
+        "source_id": "src:press_2020",
+        "start": 0,
+        "title": "2020 年媒體報導（合成，矛盾來源）",
+        "url": null
+      },
+      {
+        "end": 28,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:team_page",
+        "n": 3,
+        "sha256": "1b6d86d8b1b98e4f1bcfef6b3fd2c5c49183c2e9cbcd5faa09e8cd40340cb9ad",
+        "source_class": "profile",
+        "source_id": "src:team_page",
+        "start": 0,
+        "title": "晴空數位團隊頁（合成）",
+        "url": null
+      }
+    ],
+    "sha256": "18d9ef79769965f85a33f244c5346023af351a38f578d3b4d6640ea5fe5063f3"
+  },
+  "synthesis": {
+    "conflicts": [
+      {
+        "citations": [
+          "source:src:site_official",
+          "source:src:press_2020"
+        ],
+        "text": "成立年份說法不一：官網稱 2018 年成立；但 2020 年報導稱晴空數位其實是在 2017 年低調成立，2018 年才正式對外公開。"
+      }
+    ],
+    "gaps": [
+      {
+        "needed_evidence": "財務或獲利公開資料",
+        "text": "目前公開資料未揭露晴空數位是否已獲利。"
+      }
+    ],
+    "kind": "dossier_brief",
+    "language": "zh-TW",
+    "manifest_ref": {
+      "batches": 1,
+      "count": 3,
+      "sha256": "18d9ef79769965f85a33f244c5346023af351a38f578d3b4d6640ea5fe5063f3"
+    },
+    "model": "golden-fixture",
+    "project_id": "proj-eval-l1-conflicting-founding",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "related_entities": [],
+    "sections": [
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:team_page"
+            ],
+            "claim_id": "team_size",
+            "text": "晴空數位目前團隊約 35 人，專注於零售業點數系統開發。"
+          }
+        ],
+        "heading": "團隊"
+      }
+    ],
+    "subject": {
+      "anchors": [
+        "晴空數位"
+      ],
+      "kind": "company",
+      "name": "晴空數位"
+    },
+    "summary": {
+      "citations": [
+        "source:src:press_2020",
+        "source:src:site_official",
+        "source:src:team_page"
+      ],
+      "text": "晴空數位目前團隊約 35 人，專注於零售業點數系統開發。。"
+    },
+    "synthesis_id": "SYN-l1-conflicting-founding",
+    "uncited_sections": [],
+    "usage": {
+      "input_tokens": 1200,
+      "output_tokens": 400
+    }
+  }
+}
