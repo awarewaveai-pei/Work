@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-26（續48）合併雲端 T24：migration ledger 上線——「正式庫套到哪一號」可直接查；補登 88 筆、另查出 4 個從未套用（0092 已套）
+- [根因] 94 個 migration 無 ledger，靠 schema 反推猜哪些已套（TASKS:127／209）。
+- [來源] `claude/cc-t24-migration-ledger` d5a3688f9：0092 `schema_migrations`；runner 在每個檔自己的交易內（最後一個 COMMIT 前）注入 ledger INSERT；--status／--record-only／--force-reapply。
+- [本機修] M1 以編號為主鍵，但 0011 有兩個檔 → 改以檔名為主鍵（number 欄 = 檔名前 4 碼）；CLI 可給編號或檔名，重號拒絕。M2 讀取交易無 ON_ERROR_STOP（SQL 錯 exit 0 → 讀成「沒套過」）→ 全部 ON_ERROR_STOP；ledger 不存在時只接受以 0092 開頭的批次。0092 的佔位 hash 列刪除（建表與 runner 注入同交易，直接寫真值）。
+- [本機修 critic] m6 最後 COMMIT 之後有敘述 → 拒絕（0056 有 trailing COMMENT，--check 也擋）；m7 --record-only 不覆寫既有列（DO NOTHING＋先查衝突）；m8 hash 以 CRLF→LF 正規化（8 個工作樹檔為 CRLF）；m9 同批重複檔拒絕；m10 --check 不可與寫入旗標並用。
+- [正式庫] `apply-db-migration.mjs 0092 0093` APPLY_OK 2/2（ledger hash 與本機一致、RLS on、僅 service_role）。補登前逐檔實測：603 個物件查詢（表／函式／欄／索引／policy／trigger，後續 migration 刪除者視為正常）→ 73 OK；16 個無 DDL 的逐一查證（seed 列、RLS、search_path、constraint、convalidated、0064 以 live proacl）→ 14 OK；0045 效果被 0067 覆蓋、無法證明 → 另以 applied_by=superseded 記錄（防止重套破壞 0067 constraint）。
+- [發現] 0022（7 表＋sites.apply_mode）、0037（派送 index，CONCURRENTLY 需手動）、0024（ws index）、0057（wp-update 目錄列，首次使用會自動 upsert）從未套用 → ledger 未記、`--status` 顯示 missing；開 TASKS（新增 migration 屬正式庫變更，另案處理）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test apply-db-migration 31/31；突變 7 組紅→還原綠（fail-open existence、status 以編號、無 bootstrap 閘、record-only 覆寫、重複、trailing、raw hash）；正式庫 --status STATUS_OK applied 90 missing 4 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2M/5m（本機 M1 M2；critic m6–m10；Codex 三輪；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=schema_migrations|--record-only|--force-reapply | hits=10（runner、測試、0092/0093 down、TASKS:127/209 同步）
 ## 2026-09-26（續47）合併雲端 T23：public/vector-editor.html 每支外部 script 都有驗證過的 SRI（未部署）
 - [根因] vector-editor.html 在 app origin、不需登入，session cookie JS 可讀；7 支 CDN script 無 integrity → CDN 檔被竄改即 session 外洩。
 - [來源] `claude/cc-t23-sri` ea321928b：crossorigin＋空 integrity 佔位（雲端出網擋 CDN）、`lib/security/public-html-sri.ts`、public/**/*.html 測試＋待補 hash allowlist。
