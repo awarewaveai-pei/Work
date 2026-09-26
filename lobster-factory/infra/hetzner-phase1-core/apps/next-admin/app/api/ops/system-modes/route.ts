@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { canChangeSystemMode, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseServerClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { drainDeferredPodOrders, getDeferredPodOrderStats } from "../../../../lib/studio/pod-order-inbox";
 
 const VALID_MODES = ["normal", "maintenance", "read_only", "emergency_stop"] as const;
 type Mode = (typeof VALID_MODES)[number];
@@ -27,6 +28,10 @@ export async function GET(request: Request) {
     .is("scope_id", null)
     .single();
 
+  // T26: surfaced where modes are changed, so an operator flipping back to normal sees the backlog
+  // this unblocks. Never blocks the response (getDeferredPodOrderStats itself never throws).
+  const deferredPodOrders = await getDeferredPodOrderStats(supabase);
+
   if (error || !data) {
     // No row yet — surface as default 'normal'.
     return NextResponse.json({
@@ -34,6 +39,7 @@ export async function GET(request: Request) {
       role: resolveOpsRole(request).role,
       current: { mode: "normal", reason: "no_row_default", set_at: null },
       note: "No global system_modes row found — defaulting to 'normal'. POST will create.",
+      deferredPodOrders,
     });
   }
 
@@ -41,6 +47,7 @@ export async function GET(request: Request) {
     ok: true,
     role: resolveOpsRole(request).role,
     current: data,
+    deferredPodOrders,
   });
 }
 
@@ -127,6 +134,17 @@ export async function POST(request: Request) {
         { ok: false, error: "insert_failed", details: error.message },
         { status: 500 },
       );
+    }
+  }
+
+  // T26: process the deferred-Woo-order backlog now that the mode allows it, so an operator does not
+  // have to wait for the next webhook delivery. Best-effort only -- a drain failure must never make
+  // an otherwise-successful mode change look like it failed.
+  if (mode === "normal") {
+    try {
+      await drainDeferredPodOrders(supabase);
+    } catch (e) {
+      console.error("[system-modes] drain failed:", e);
     }
   }
 

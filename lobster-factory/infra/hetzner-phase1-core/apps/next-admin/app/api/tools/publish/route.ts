@@ -7,8 +7,10 @@ import { toProductImage } from "../../../../lib/studio/to-product-image";
 import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
-import { createWooProduct, isBridgeConfigured, listBridgeClients } from "../../../../lib/studio/wp-bridge-client";
+import { createWooProduct, isBridgeConfigured, listBridgeClients, bridgeSiteOrg, bridgeBaseUrl } from "../../../../lib/studio/wp-bridge-client";
 import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
+import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
+import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import { podModelById } from "../../../../lib/studio/pod-catalog-config";
 import { fetchProductTierPricing, fetchProductSizeGuide } from "../../../../lib/studio/printful-catalog";
@@ -473,6 +475,10 @@ export async function POST(request: Request) {
     if (!body.printFileUrl || !body.printFileUrl.startsWith(designsBase)) {
       return NextResponse.json({ ok: false, error: "printFileUrl must be a My Designs asset URL" }, { status: 400 });
     }
+    // Legacy path predates the multi-client clientId (no site selector here) -- no bridge host to
+    // resolve, so this is a global-mode-only write (same as pforder / printful/sync PUT below).
+    const linkGate = await checkProductionChangeAllowed(getSupabaseWriteClient(), null);
+    if (!linkGate.allowed) return blockedChangeResponse(linkGate.mode);
     const list = await listSyncProducts();
     if (!list.ok) {
       return NextResponse.json({ ok: false, error: (list as { ok: false; error: string }).error }, { status: 502 });
@@ -615,6 +621,21 @@ export async function POST(request: Request) {
         );
       }
     }
+    // Namespace the Printful externalId by client so two different client sites can each have a Woo
+    // product with the same numeric id without colliding in the ONE shared native store. Resolved here
+    // (not just before createSyncProductOnNative) because it also drives the gate's org below.
+    const pfClientId = normalizeClientId(body.clientId);
+    // clientId identifies the bridge site whose Woo catalog this product will be linked to -- resolve
+    // its org the same way bridgePost does (bridgeSiteOrg). No clientId, or no bridge configured for
+    // it, means there is no site host to resolve -> global mode gate (mirrors bridgePost's own
+    // "no DB client -> null" short-circuit: checkProductionChangeAllowed fails closed on a null client
+    // regardless of orgId, so a missing db here still blocks rather than silently passing).
+    const pfBridgeBase = bridgeBaseUrl(pfClientId);
+    const pfDb = getSupabaseWriteClient();
+    const pfOrgId = pfBridgeBase && pfDb ? await bridgeSiteOrg(pfDb, pfBridgeBase) : null;
+    if (pfOrgId === undefined) return blockedChangeResponse("unavailable");
+    const pfcreateGate = await checkProductionChangeAllowed(pfDb, pfOrgId);
+    if (!pfcreateGate.allowed) return blockedChangeResponse(pfcreateGate.mode);
     // Bind on HEX — the SSOT join key (pod-catalog-config), immune to Printful colour renames. Legacy
     // rows without a hex (White/Black, colorHex="") fall back to NAME. getCatalogVariants' dual match
     // resolves either; we then look each vmap row up by its hex (model) or name (legacy).
@@ -668,10 +689,8 @@ export async function POST(request: Request) {
     const thumb = (body.mockupUrls ?? []).find(
       (u) => typeof u === "string" && u.startsWith(designsBase) && /\.(png|jpe?g)$/i.test(u.split("?")[0]),
     );
-    // Namespace the Printful externalId by client so two different client sites can each have a Woo
-    // product with the same numeric id without colliding in the ONE shared native store. Default site
-    // (clientId="") keeps the bare numeric id → existing sync products are untouched (idempotent).
-    const pfClientId = normalizeClientId(body.clientId);
+    // pfClientId resolved above (drives the gate's org too). Default site (clientId="") keeps the bare
+    // numeric id → existing sync products are untouched (idempotent).
     const created = await createSyncProductOnNative({
       name: body.title.trim(),
       externalId: pfClientId ? `${pfClientId}-${body.wooProductId}` : String(body.wooProductId),
@@ -814,6 +833,12 @@ export async function POST(request: Request) {
       ...(typeof r.email === "string" && r.email.trim() ? { email: r.email.trim() } : {}),
       ...(typeof r.phone === "string" && r.phone.trim() ? { phone: r.phone.trim() } : {}),
     };
+    // No clientId here (operator-initiated one-off order forward) -- the native store is a single
+    // shared resource (PRINTFUL_NATIVE_STORE_ID), not tied to one bridge site host -> global mode gate.
+    // (The Woo-webhook path that also calls createDraftOrderOnNative has its own gate + durable inbox --
+    // app/api/webhooks/woo-order/route.ts.)
+    const pforderGate = await checkProductionChangeAllowed(getSupabaseWriteClient(), null);
+    if (!pforderGate.allowed) return blockedChangeResponse(pforderGate.mode);
     const order = await createDraftOrderOnNative({ externalId: String(body.wooOrderId), recipient, items });
     if (!order.ok) {
       const e = (order as { ok: false; error: string }).error;
