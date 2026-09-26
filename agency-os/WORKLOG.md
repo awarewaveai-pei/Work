@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-26（續45）合併雲端 T21：修復中心被系統模式擋下時，在被擋的對象上留一筆持久紀錄（未部署）
+- [根因] service.ts 自動修復分支被擋時無聲落回 repairing；confirmCriticalRun 先寫 confirmed 再過 gate；engine.ts 被擋時不建 ops_action_runs。
+- [來源] `claude/cc-t21-repair-block-audit` 49aa2184a：自動修復被擋 → triage_needed＋audit（mode、key、action_run_id），回 409 帶 run；confirm 前先查，擋下寫 confirmation_blocked＋423；tryRemediate 被擋 → ops_action_runs 開一筆並以 failed＋mode 結束。
+- [本機修] 刪 service.ts 重複的 9 行註解。
+- [已知] startRepairFromIncident 第一道 gate（查 run 之前）對第二次啟動仍不留紀錄——既有測試刻意鎖定，雲端 commit 已註明。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit 0；npm test 215 files 2025 passed；三個分支各拔掉 → 指名測試紅 → 還原綠；前置 dogfood-auto-repair.ps1 -Mode HealthOnly 10/10（1 cosmetic warn） | exit=0 | ms=180000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/1m（本機：重複註解；Codex 三輪此區無發現；artifact `agency-os/reports/oracle/2026-09-26-review-1938485f.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=confirmation_blocked|auto_remediation_blocked_by_system_mode | hits=4（service.ts＋3 測試）
 ## 2026-09-26（續44）合併雲端 T20：/api 底下的 GET 不改狀態、不花錢；trending suggest／questions 與兩個影片狀態輪詢改 POST（未部署）
 - [根因] session cookie SameSite=Lax，同站頁面可用 <img>/<script> 送帶 cookie 的 GET；CSRF 閘只管非 GET。`content/trending` suggest／questions 會退回付費 aiChat；`video/status`、`video/remotion-job-status` 在 GET 裡收尾 job（寫 media_assets、刪 R2、寫 job-store）。
 - [來源] `claude/cc-t20-side-effect-gets` cc063766f：GET trending 只服務 type=trending；兩個 status route 只 export POST；ContentStudio／VideoStudio 改 POST；`lib/security/__tests__/get-no-side-effects.test.ts`（AST）擋 GET 觸及付費／寫入原語，allowlist 1 筆（Gmail OAuth callback，HMAC state 授權）。

@@ -52,6 +52,20 @@ describe("repair exits when the system mode blocks", () => {
     expect((await repairs.POST(post("/api/ops/repairs"))).status).toBe(409);
   });
 
+  it("POST /api/ops/repairs: an auto-remediation blocked mid-pipeline (T21 gap 1) is 409, not the shared 423 -- the run already exists with real state and must not be discarded", async () => {
+    const runWithRealState = { id: "run-1", state: "triage_needed", audit_log: [{ action: "auto_remediation_blocked_by_system_mode" }] };
+    startRepairFromIncident.mockResolvedValueOnce({
+      ok: false,
+      run: runWithRealState,
+      error: "system_mode_blocks_remediation",
+      details: { mode: "emergency_stop" },
+      // deliberately no top-level blockedMode -- see route.ts's `result.blockedMode !== undefined` check
+    });
+    const res = await repairs.POST(post("/api/ops/repairs"));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ run: runWithRealState, error: "system_mode_blocks_remediation" });
+  });
+
   it("POST confirm-critical: the shared 423", async () => {
     confirmCriticalRun.mockResolvedValueOnce(BLOCKED);
     const res = await confirm.POST(post("/api/ops/repairs/r1/confirm-critical"), { params: Promise.resolve({ id: "r1" }) });

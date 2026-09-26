@@ -100,7 +100,41 @@ export async function tryRemediate(
     const organizationId = await resolveOrgId(supabase, incident);
     const gate = await checkProductionChangeAllowed(supabase, organizationId);
     if (!gate.allowed) {
-      return { attempted: false, key: remediation.key, reason: "system_mode_blocks_remediation", blockedMode: gate.mode };
+      // T21: every other outcome (attempted or not) leaves an ops_action_runs row except this
+      // one -- record it too, the same way an attempted-and-failed run does, so a blocked
+      // remediation is never invisible to the ops_action_runs audit trail. Best-effort (no
+      // organizationId -> no row, same as the pre-existing "no_organization" outcome below).
+      let blockedRunId: string | null = null;
+      if (organizationId) {
+        blockedRunId = await beginOpsActionRun({
+          actionKey: `ops.remediation.${remediation.key}`,
+          displayName: remediation.title,
+          riskLevel: "medium",
+          organizationId,
+          actorRole: "operator",
+          inputPayload: {
+            incident_id: incident.id,
+            incident_title: incident.title,
+            service: incident.service,
+            mode: opts.mode,
+            actor: opts.actor,
+          },
+          metadata: {
+            incident_fingerprint: incident.fingerprint,
+            remediation_service: incident.service?.trim() ?? null,
+            client_slug: incident.client_slug ?? null,
+            source: opts.mode === "auto" ? "auto_remediate" : "manual_remediate",
+          },
+        });
+        await finishOpsActionRun(blockedRunId, false, { steps: [] }, `system_mode_blocks_remediation: ${gate.mode}`);
+      }
+      return {
+        attempted: false,
+        key: remediation.key,
+        reason: "system_mode_blocks_remediation",
+        blockedMode: gate.mode,
+        ...(blockedRunId ? { action_run_id: blockedRunId } : {}),
+      };
     }
 
     if (await inCooldown(supabase, incident, remediation.key)) {

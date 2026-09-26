@@ -355,7 +355,36 @@ export async function startRepairFromIncident(args: {
         error: "catalog_remediation_failed",
       };
     }
-    // !rem.attempted (flag off / cooldown / no_organization) → fall through to repairing
+    // Gate blocked the auto-remediation: the run already has real state (backup, GitHub issue), so it
+    // goes to triage_needed with an audit entry naming the mode -- no top-level blockedMode, which
+    // would make POST /api/ops/repairs answer a bare 423 and drop the run object (it answers 409).
+    if (!rem.attempted && rem.reason === "system_mode_blocks_remediation") {
+      const { data: blockedData } = await supabase
+        .from("repair_runs")
+        .update({
+          state: "triage_needed",
+          audit_log: appendAudit(repaired.audit_log, {
+            actor: "system",
+            action: "auto_remediation_blocked_by_system_mode",
+            detail: `Auto-remediation blocked: system mode is ${rem.blockedMode}.`,
+            data: { key: rem.key, mode: rem.blockedMode, action_run_id: rem.action_run_id ?? null },
+          }),
+        })
+        .eq("id", run.id)
+        .eq("state", "repairing")
+        .select("*")
+        .maybeSingle();
+      const autoBlocked = blockedData as RepairRun | null;
+      return {
+        ok: false,
+        run: { ...(autoBlocked ?? repaired), incident: i as any },
+        error: "system_mode_blocks_remediation",
+        details: { mode: rem.blockedMode },
+      };
+    }
+    // !rem.attempted for any other reason (flag off / cooldown / no_organization -- not
+    // no_matching_remediation, already ruled out by the findRemediation(i) check above) →
+    // fall through to repairing, unchanged from before this fix.
   }
 
   return { ok: true, run: { ...repaired, incident: i as any } };
@@ -377,6 +406,29 @@ export async function confirmCriticalRun(args: {
   if (!run) return { ok: false, error: "repair_run_not_found" };
   if (!run.needs_human_review) return { ok: false, error: "run_not_in_critical_review_hold" };
   if (run.state !== "triage_needed") return { ok: false, error: "run_not_in_triage_needed_state", details: { state: run.state } };
+
+  // T21 (gap 2): gate BEFORE writing "confirmed", not after. startRepairFromIncident (below)
+  // re-checks the mode independently right before actually resuming the pipeline, but that
+  // check used to run strictly after this function had already written
+  // "critical_severity_gate_confirmed" -- a blocked confirmation still read as confirmed, with
+  // nothing recording that it was refused. Chose this over writing a distinct
+  // "confirmation_blocked" entry AFTER "confirmed" (the task's other option) because
+  // "critical_severity_gate_confirmed" should mean the pipeline actually proceeded, not merely
+  // that the button was clicked -- a blocked confirmation must never carry that entry at all.
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return { ok: false, error: "supabase_write_not_configured" };
+  const gate = await checkProductionChangeAllowed(supabase, run.organization_id ?? null);
+  if (!gate.allowed) {
+    await updateRun(args.runId, {
+      audit_log: appendAudit(run.audit_log, {
+        actor: args.actor,
+        action: "confirmation_blocked",
+        detail: `Critical-severity confirmation blocked: system mode is ${gate.mode}.`,
+        data: { mode: gate.mode },
+      }),
+    });
+    return { ok: false, error: "system_mode_blocks_repair", details: { mode: gate.mode }, blockedMode: gate.mode };
+  }
 
   // Audit the explicit confirmation BEFORE re-entering the pipeline.
   await updateRun(args.runId, {
