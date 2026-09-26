@@ -1,0 +1,94 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/research-report.schema.yaml"
+title: Research Report
+version: "1.0.0"
+status: DRAFT
+description: >
+  Versioned research report rendered from one synthesis artifact and its
+  recipe run results. Every citation in `sections[].markdown` resolves to a
+  `sources_appendix` entry (source id, sha256, url, fetched_at) via the
+  `report_refs_resolvable` gate, or the render records it in
+  `problems.invalid_refs` instead of softening it away -- stricter than
+  NA/lib/dossier/report.ts's `[?]` rewrite (RESEARCH_LINES_MASTER_PLAN.md
+  §2-I3). `report_state` starts AI_GENERATED; the HUMAN_APPROVED endpoint
+  and `ReportApproved` event are later P4 work, not built by this file's
+  producer (WC-P4-01, early).
+source_of_truth_for:
+  - "RESEARCH_LINES_MASTER_PLAN.md §3.4-C6, §2-I5 and WC-P4-01"
+decided_by: "P4 WC-P4-01 (early): report renderer typed object"
+type: object
+additionalProperties: false
+required: [report_id, project_id, version, report_state, synthesis_ref, run_refs, sections, sources_appendix, problems, markdown, provenance]
+properties:
+  report_id: {type: string, pattern: "^RPT-"}
+  project_id: {type: string, minLength: 1}
+  version: {type: integer, minimum: 1}
+  report_state: {type: string, enum: [AI_GENERATED, HUMAN_APPROVED]}
+  approved_by: {type: [string, "null"]}
+  synthesis_ref:
+    type: object
+    additionalProperties: false
+    required: [synthesis_id, manifest_sha256]
+    properties:
+      synthesis_id: {type: string, pattern: "^SYN-"}
+      manifest_sha256: {type: string, pattern: "^[a-f0-9]{64}$"}
+  run_refs:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [recipe_id, run_id, status]
+      properties:
+        recipe_id: {type: string, minLength: 1}
+        run_id: {type: string, minLength: 1}
+        status: {type: string, enum: [PASS, GATE_FAILED, FAILED]}
+  sections:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [heading, markdown]
+      properties:
+        heading: {type: string, minLength: 1}
+        markdown: {type: string}
+  sources_appendix:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [n, source_id, title, url, sha256_12, fetched_at]
+      properties:
+        n: {type: integer, minimum: 1}
+        source_id: {type: string, minLength: 1}
+        title: {type: string}
+        url: {type: [string, "null"]}
+        sha256_12: {type: string, pattern: "^[a-f0-9]{12}$"}
+        fetched_at: {type: [string, "null"]}
+  problems:
+    type: object
+    additionalProperties: false
+    required: [invalid_refs, uncited_sections]
+    properties:
+      invalid_refs: {type: array, items: {type: string}}
+      uncited_sections: {type: array, items: {type: string}}
+  markdown: {type: string}
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+allOf:
+  - if:
+      properties: {report_state: {const: HUMAN_APPROVED}}
+      required: [report_state]
+    then:
+      required: [approved_by]
+      properties:
+        approved_by: {type: string, minLength: 1}
+        problems:
+          type: object
+          properties:
+            invalid_refs: {maxItems: 0}
+  - if:
+      properties: {report_state: {const: AI_GENERATED}}
+      required: [report_state]
+    then:
+      properties:
+        approved_by: {const: null}

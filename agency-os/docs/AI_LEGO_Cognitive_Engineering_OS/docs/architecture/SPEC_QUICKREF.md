@@ -242,6 +242,7 @@
 | `specs/cognitive/typed-objects/release-readiness-review-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, release_ref, domain_assessments, overall_status, provenance] properties[7] |
 | `specs/cognitive/typed-objects/reporting-guideline-checklist-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, guideline_id, guideline_citation, items, provenance] properties[7] |
 | `specs/cognitive/typed-objects/representation-switch-event.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, views, provenance] properties[5] |
+| `specs/cognitive/typed-objects/research-report.schema.yaml` | DRAFT | 1.0.0 | `(root)`: type=object required=[report_id, project_id, version, report_state, synthesis_ref, run_refs, sections, sources_appendix, problems, markdown, provenance] properties[12] allOf[2] |
 | `specs/cognitive/typed-objects/retention-deletion-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, data_class, purpose, retention_rule, deletion_trigger, holds, compliance_evidence, provenance] properties[13] |
 | `specs/cognitive/typed-objects/reversal-criteria-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, decision_ref, criteria, provenance] properties[6] |
 | `specs/cognitive/typed-objects/reverse-brainstorming-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement, worsening_ideas, inversions, provenance] properties[7] |

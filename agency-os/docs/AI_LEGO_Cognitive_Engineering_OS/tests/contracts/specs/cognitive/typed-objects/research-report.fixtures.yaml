@@ -1,0 +1,117 @@
+schema_id: "ai-lego://specs/cognitive/typed-objects/research-report.schema.yaml"
+target_ref: ""
+description: "ResearchReport required fields, report_state/approved_by coupling, and appendix/problems shape guards."
+valid:
+  - name: minimal_ai_generated_report
+    instance:
+      report_id: "RPT-2026-09-26-001"
+      project_id: "proj-1"
+      version: 1
+      report_state: AI_GENERATED
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs:
+        - {recipe_id: "edd-research-evidence-v1", run_id: "run-1", status: PASS}
+      sections:
+        - {heading: "彙整摘要", markdown: "調查對象有明確身分。[1]"}
+      sources_appendix:
+        - {n: 1, source_id: "S1", title: "Example Source", url: "https://example.com/1", sha256_12: "aaaaaaaaaaaa", fetched_at: "2026-09-25T00:00:00Z"}
+      problems: {invalid_refs: [], uncited_sections: []}
+      markdown: "## 彙整摘要\n\n調查對象有明確身分。[1]"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - name: human_approved_report_with_approver
+    instance:
+      report_id: "RPT-2026-09-26-002"
+      project_id: "proj-1"
+      version: 2
+      report_state: HUMAN_APPROVED
+      approved_by: "identity:operator-1"
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs: []
+      sections: []
+      sources_appendix: []
+      problems: {invalid_refs: [], uncited_sections: []}
+      markdown: ""
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+invalid:
+  - name: unknown_report_state
+    instance:
+      report_id: "RPT-2026-09-26-003"
+      project_id: "proj-1"
+      version: 1
+      report_state: DRAFT
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs: []
+      sections: []
+      sources_appendix: []
+      problems: {invalid_refs: [], uncited_sections: []}
+      markdown: ""
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - name: appendix_entry_missing_sha256_12
+    instance:
+      report_id: "RPT-2026-09-26-004"
+      project_id: "proj-1"
+      version: 1
+      report_state: AI_GENERATED
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs: []
+      sections: []
+      sources_appendix:
+        - {n: 1, source_id: "S1", title: "Example Source", url: null, fetched_at: null}
+      problems: {invalid_refs: [], uncited_sections: []}
+      markdown: ""
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - name: unknown_top_level_key_rejected
+    instance:
+      report_id: "RPT-2026-09-26-005"
+      project_id: "proj-1"
+      version: 1
+      report_state: AI_GENERATED
+      extra_field: "not allowed"
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs: []
+      sections: []
+      sources_appendix: []
+      problems: {invalid_refs: [], uncited_sections: []}
+      markdown: ""
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - name: human_approved_without_approver_rejected
+    instance:
+      report_id: "RPT-2026-09-26-006"
+      project_id: "proj-1"
+      version: 3
+      report_state: HUMAN_APPROVED
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs: []
+      sections: []
+      sources_appendix: []
+      problems: {invalid_refs: [], uncited_sections: []}
+      markdown: ""
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - name: human_approved_with_nonempty_invalid_refs_rejected
+    instance:
+      report_id: "RPT-2026-09-26-007"
+      project_id: "proj-1"
+      version: 1
+      report_state: HUMAN_APPROVED
+      approved_by: "identity:operator-1"
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs: []
+      sections: []
+      sources_appendix: []
+      problems: {invalid_refs: ["source:MISSING"], uncited_sections: []}
+      markdown: ""
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+  - name: ai_generated_with_approved_by_set_rejected
+    instance:
+      report_id: "RPT-2026-09-26-008"
+      project_id: "proj-1"
+      version: 1
+      report_state: AI_GENERATED
+      approved_by: "identity:operator-1"
+      synthesis_ref: {synthesis_id: "SYN-2026-09-26-001", manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      run_refs: []
+      sections: []
+      sources_appendix: []
+      problems: {invalid_refs: [], uncited_sections: []}
+      markdown: ""
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}

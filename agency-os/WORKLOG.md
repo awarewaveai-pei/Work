@@ -1,4 +1,15 @@
 ﻿# Worklog
+## 2026-09-26（續64）研究線 WC-P4-01（提前）併入 main：報表產生器——每個引註都要解析到來源 id＋sha256，否則報表不通過；資料只能以純文字進報表（本機 L2，獨立 worktree）
+- [來源] 本機 L2 = 背景 Sonnet agent 在 `D:\tmp\wt-l2`（detached worktree）；最後提交 `fbdd9bee2`，合併者 cherry-pick。
+- [改] 新 `ai_lego/modules/research/report_render.py` `render_research_report`（純函式；輸入 = synthesis artifact P-c＋`GET /recipes/{id}/runs/{run_id}/result` 回應）＋閘 `report_refs_resolvable`；typed object `research-report`（HUMAN_APPROVED 必須零 invalid_refs 且有核准者、AI_GENERATED 無核准者）；DRAFT 契約 `artifact.generate_report`。
+- [閘 FAIL 條件] synthesis 任何位置的引註（含各線結構段；非字串／非清單／null／空清單視為格式錯）解析不到含 64 hex sha256 的 manifest 項；synthesis 自己的 `citation_integrity` 缺或非 PASS；manifest 與 `manifest_ref` 不符（sha256 須合法且相等、筆數相等）。run 判定照 `main.py:760-763` 由 journal 狀態推（RUNNING 拒絕）。
+- [審查] 我審 diff 退回 4 項（結構段壞引註不進閘、sha256 缺也算可解析、匯出缺來源附錄與「本報表的問題」、表格 `|` 未跳脫）；critic Standard fail 3M/5m 全修（run 形狀對不上 GET、型別不對的引註放行、結構段沒輸出、manifest 沒綁、核准狀態 schema 太鬆、行內可注入）；Codex 五輪：1 來源標題換行造標題、2 run_id 標題＋非清單引註內文不可見、3 null 引註＋連結／HTML 仍可注入＋`\|` 破表格、4 空清單、5 gap 引註內文不可見＋manifest digest 格式。
+- [不變量]（同一 reviewer 同類三次，AGENTS §4，第三次修正前寫）資料值一律以純文字呈現、markdown 語法只由本模組產生：唯一出口 `_literal`（換行成空白＋所有 ASCII 標點含反斜線加跳脫），段落 = (標題, 行) 由 `_seal_section` 封裝並拒收含 CR/LF 的行；類別測試對每個輸入字串注入空行＋標題＋表格列＋連結＋HTML＋粗體＋預先跳脫的 `|`，報表結構不變。
+- 突變（紅→綠）：拔 [n] 解析；附錄列全部 manifest；原始 journal 狀態直通；格式錯引註略過；結構段不輸出；內文標記移除；附錄標題不跳脫；主張文字不跳脫；拔封裝檢查；非清單引註不標；標點不跳脫；只跳脫 `|`；null 略過；空清單略過；gap 標記丟失；digest 格式不檢。
+- REALTEST_EVIDENCE: tool=Bash | cmd=D:\Work 合併後樹：python -m unittest tests.unit.test_report_render（33 tests OK）＋run_golden_tests.py（ALL GOLDEN TESTS PASSED）＋gen_spec_index.py --check（fresh）；worktree 內 import 路徑確認為 wt-l2 | exit=0 | ms=30000
+- REVIEW_DONE: critic=Standard | verdict=fail | findings=0c/3m/5n（全修）；Codex 五輪 artifact `2026-09-26-partialreview-{d074cb7b,13fa3f4e,f88784bc,d5efa175,439fad21}.md` 共 9 項，全修
+- ORACLE_WAIVED: 第五輪兩項（gap 引註標記、manifest digest 格式）的修正在最後一份 artifact 之後；兩項各有測試且突變紅→綠；前五輪已把同一類問題收斂到單一出口，再開第六輪只會找到更窄的邊角
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`render_research_report|report_refs_resolvable|REPORT_LINE_BREAK_FROM_DATA|research-report\.schema` | hits=59（程式 5、測試 35、SPEC 5、oracle 報告 12、計畫 1、WORKLOG 1；無其他呼叫端，端點歸 P4）
 ## 2026-09-26（續63）研究線 WC-P2-07a 併入 main：`literature_search` 有專案時回本專案的學術來源（本機 L1，獨立 worktree）；計畫 P-K10／P-K11、卡 07b／08 補寫
 - [來源] 本機 L1 = 背景 Sonnet agent 在 `D:\tmp\wt-l1`（detached worktree，操作者不會選資料夾，改由本 session 啟動）；提交 `6ff5b596c`，合併者 cherry-pick。
 - [改] `recipe_runtime.build_registered_capability_adapters` 加 kw-only `project_sources`（預設 None，`main.py:125`、`cli/run_recipe.py:85` 不變），只有 run 真的要 `literature_search` 才建專案版；`evidence_triangulation.project_literature_search`：只收 active＋`source_class=academic`、零筆拋 `LITERATURE_NO_PROJECT_SOURCES`（不退回合成資料）、status_code 維持已登記的 `OFFLINE_SOURCE_STALE`（`mode=PROJECT_SOURCES` 區分）、每筆可引（canonical_url→source_uri→doi:→source:<id>）、triangulation 可引 PROJECT_SOURCE 且說明文字不再宣稱合成資料。
