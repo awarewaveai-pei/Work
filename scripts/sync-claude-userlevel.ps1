@@ -84,6 +84,12 @@ if (-not [string]::IsNullOrWhiteSpace($MonorepoRootOverride)) {
 } else {
   $MonorepoRoot = Resolve-MonorepoRoot
 }
+# This script copies repo hooks/settings INTO ~/.claude, so the source must be the MAIN checkout.
+# `git rev-parse --show-toplevel` inside a linked worktree (git worktree add) returns the worktree,
+# whose `.git` is a FILE; installing from there would push a detached snapshot into ~/.claude (2026-09-27).
+if (-not (Test-Path -LiteralPath (Join-Path $MonorepoRoot '.git') -PathType Container)) {
+  throw "Refusing: $MonorepoRoot is a linked worktree or not a git checkout (.git is not a directory). Run from the main checkout (D:\Work) or pass -MonorepoRootOverride."
+}
 $UserProfile = $env:USERPROFILE
 $ClaudeRoot = Join-Path $UserProfile '.claude'
 $SsotRoot = Join-Path $MonorepoRoot 'mcp\claude-userlevel'

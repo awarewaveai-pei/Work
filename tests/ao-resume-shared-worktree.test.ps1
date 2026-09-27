@@ -157,6 +157,53 @@ try {
     $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
     Assert-Eq $r.Action 'ff-refused' 'P10 action'
     Assert-Eq (Read-File (Join-Path $f.Wt 'c.txt')) "c-local-untracked`n" 'P10 untracked file untouched'
+
+    # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
+    # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook
+    # state / reports into D:\tmp\<wt> and ensure-claude-junction replaced the worktree's tracked
+    # .claude with a junction to ~/.claude. Fixture: main clone + sentinel scripts\ao-resume.ps1 +
+    # tracked .claude\settings.json + a linked worktree of it. Twin: tests/hooks/linked-worktree-root.test.mjs.
+    $f = New-Fixture 'w1'
+    New-Item -ItemType Directory -Path (Join-Path $f.Wt 'scripts') | Out-Null
+    Set-File (Join-Path $f.Wt 'scripts\ao-resume.ps1') "# sentinel`n"
+    New-Item -ItemType Directory -Path (Join-Path $f.Wt '.claude') | Out-Null
+    Set-File (Join-Path $f.Wt '.claude\settings.json') "{}`n"
+    G $f.Wt @('add', '-A') | Out-Null; G $f.Wt @('commit', '-q', '-m', 'sentinel') | Out-Null
+    $linked = Join-Path $tmp 'w1-linked'
+    G $f.Wt @('worktree', 'add', '--detach', $linked, 'HEAD') | Out-Null
+    Assert-True (Test-Path -LiteralPath (Join-Path $linked '.git') -PathType Leaf) 'W1 fixture: linked worktree .git is a file'
+    Assert-True (Test-Path -LiteralPath (Join-Path $f.Wt '.git') -PathType Container) 'W1 fixture: main .git is a directory'
+    # The resolver also tries (Get-Location): stand in $tmp (no sentinel anywhere above) so only the candidate counts.
+    Push-Location -LiteralPath $tmp
+    try {
+        Assert-Eq (Resolve-MonorepoRootWithAoResume -WorkspaceRoots @($f.Wt)) $f.Wt 'W1 main checkout resolves as root'
+        Assert-Eq (Resolve-MonorepoRootWithAoResume -WorkspaceRoots @((Join-Path $f.Wt 'scripts'))) $f.Wt 'W1 subdir of main resolves to main'
+        Assert-Eq (Resolve-MonorepoRootWithAoResume -WorkspaceRoots @($linked)) $null 'W2 linked worktree is NOT a root'
+        Assert-Eq (Resolve-MonorepoRootWithAoResume -WorkspaceRoots @((Join-Path $linked 'scripts'))) $null 'W2 subdir of linked worktree is NOT a root'
+        # Nested INSIDE the main checkout (what Claude Code's own worktree isolation creates under
+        # .claude\worktrees\): the walk must stop at the worktree's .git FILE, not climb to main (Codex F1).
+        $nested = Join-Path $f.Wt 'nested\wt'
+        G $f.Wt @('worktree', 'add', '--detach', $nested, 'HEAD') | Out-Null
+        Assert-True (Test-Path -LiteralPath (Join-Path $nested '.git') -PathType Leaf) 'W2n fixture: nested worktree .git is a file'
+        Assert-Eq (Resolve-MonorepoRootWithAoResume -WorkspaceRoots @($nested)) $null 'W2n nested worktree does NOT resolve to the main checkout above it'
+        Assert-Eq (Resolve-MonorepoRootWithAoResume -WorkspaceRoots @((Join-Path $nested 'scripts'))) $null 'W2n subdir of nested worktree => null'
+        Assert-Eq (Resolve-MonorepoRootWithAoResume -WorkspaceRoots @((Join-Path $f.Wt 'nested'))) $f.Wt 'W2n a plain subdir of main (no .git of its own) still resolves to main'
+    } finally { Pop-Location }
+    # ensure-claude-junction in APPLY mode against the linked worktree: refuses, exit 0, touches nothing.
+    # -UserProfile points at a fixture so the real ~/.claude is never a target, even by accident.
+    $ecj = Join-Path $repoRoot 'scripts\ensure-claude-junction.ps1'
+    $fakeProfile = Join-Path $tmp 'w1-profile'; New-Item -ItemType Directory -Path (Join-Path $fakeProfile '.claude') -Force | Out-Null
+    $out = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ecj -WorkRoot $linked -UserProfile $fakeProfile -EmitState 2>&1)
+    Assert-Eq $LASTEXITCODE 0 'W3 ensure-claude-junction in a linked worktree exits 0'
+    Assert-True (($out -join "`n") -match 'skipped .*linked worktree') 'W3 one-line note names the linked worktree'
+    $it = Get-Item -LiteralPath (Join-Path $linked '.claude') -Force
+    Assert-True ([string]::IsNullOrEmpty($it.LinkType)) 'W3 linked worktree .claude stays a real folder (no junction)'
+    Assert-True (Test-Path -LiteralPath (Join-Path $linked '.claude\settings.json')) 'W3 tracked content untouched'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $linked 'agency-os'))) 'W3 no state file written into the worktree (-EmitState ignored)'
+    # Main checkout is still evaluated: real folder with content where the junction belongs => exit 2 (dry-run, no change).
+    $out = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ecj -WorkRoot $f.Wt -UserProfile $fakeProfile -DryRun 2>&1)
+    Assert-Eq $LASTEXITCODE 2 'W4 main checkout still evaluated (real .claude folder => exit 2 in dry-run)'
+    Assert-True (Test-Path -LiteralPath (Join-Path $f.Wt '.claude\settings.json')) 'W4 dry-run changed nothing'
 }
 finally {
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }

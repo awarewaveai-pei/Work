@@ -47,8 +47,16 @@ function Resolve-MonorepoRootWithAoResume {
             # 2026-09-05: 4 orphan debris trees from exactly this).
             $scriptPath = Join-Path $cur "scripts\ao-resume.ps1"
             $gitPath = Join-Path $cur ".git"
-            if ((Test-Path -LiteralPath $scriptPath) -and (Test-Path -LiteralPath $gitPath)) {
-                return (Resolve-Path -LiteralPath $cur).Path
+            # The FIRST .git met on the way up decides. A FILE = linked worktree (git worktree add)
+            # or submodule: stop with $null, do not keep walking -- a worktree nested inside the
+            # main checkout (D:\Work\.claude\worktrees\<x>) would otherwise resolve to D:\Work and a
+            # worktree session would drive the main checkout's AO-RESUME (Codex 2026-09-27 F1).
+            # Accepting the worktree itself was the original bug: hook state / reports landed in
+            # D:\tmp\<wt> and ensure-claude-junction replaced its tracked .claude with a junction
+            # to ~/.claude (2026-09-27). Hooks act on the main checkout only; anywhere else => $null.
+            if (Test-Path -LiteralPath $gitPath) {
+                if (-not (Test-Path -LiteralPath $gitPath -PathType Container)) { return $null }
+                if (Test-Path -LiteralPath $scriptPath) { return (Resolve-Path -LiteralPath $cur).Path }
             }
             $parent = [System.IO.Path]::GetDirectoryName($cur)
             if (-not $parent -or ($parent -eq $cur)) { break }

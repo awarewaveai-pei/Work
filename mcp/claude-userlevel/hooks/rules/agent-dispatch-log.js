@@ -45,15 +45,22 @@ function extractResult(response) {
 // always failed (no nested agency-os dir there) and mkdirSync then CREATED
 // one, which is exactly the orphan agency-os/ debris found 2026-09-05. This
 // walk finds the real root instead of testing only the exact cwd.
+// The FIRST `.git` met on the way up decides: a DIRECTORY (+ sentinel) is the main checkout;
+// a FILE = linked worktree (git worktree add) or submodule => null, and the walk stops there so
+// a worktree nested inside the main checkout does not resolve to it (Codex 2026-09-27 F1).
+// Accepting the worktree itself was the original bug: reports written into D:\tmp\<wt>.
+function isDirectory(p) {
+  try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
+}
+
 function findMonorepoRoot(startDir) {
   if (!startDir || !path.isAbsolute(startDir)) return null;
   let cur = startDir;
   for (let i = 0; i < 16; i++) {
-    if (
-      fs.existsSync(path.join(cur, 'scripts', 'ao-resume.ps1')) &&
-      fs.existsSync(path.join(cur, '.git'))
-    ) {
-      return cur;
+    const gitEntry = path.join(cur, '.git');
+    if (fs.existsSync(gitEntry)) {
+      if (!isDirectory(gitEntry)) return null;
+      if (fs.existsSync(path.join(cur, 'scripts', 'ao-resume.ps1'))) return cur;
     }
     const parent = path.dirname(cur);
     if (!parent || parent === cur) break;

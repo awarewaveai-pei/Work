@@ -14,7 +14,7 @@
 | hooks／settings.json／mcp.json（user-level） | `mcp/claude-userlevel/` | `git pull` + `scripts/sync-claude-userlevel.ps1 -Mode merge` |
 | memory `~/.claude/projects/*/memory/` | 無 | 手動複製，不進 git |
 
-**禁止**在 `~/.claude/` 建不在 repo 的副本。新機一鍵 `scripts/bootstrap-mcp-machine.ps1`。現況單機（筆電 `LAPTOP-R7I86OR5`）；機制保留休眠，勿刪。前公司桌機憑證善後已於 2026-08-15 結案（`agency-os/TASKS.md` 該項）。
+**`.claude` junction 只存在 main checkout**（`.git` 為目錄）：hooks／`ensure-claude-junction.ps1`／`sync-claude-userlevel.ps1` 在 linked worktree（`.git` 為檔案）一律不解析為 root、no-op（2026-09-27 v-int2 事故）。**禁止**在 `~/.claude/` 建不在 repo 的副本。新機一鍵 `scripts/bootstrap-mcp-machine.ps1`。現況單機（筆電 `LAPTOP-R7I86OR5`）；機制保留休眠，勿刪。前公司桌機憑證善後已於 2026-08-15 結案（`agency-os/TASKS.md` 該項）。
 
 ## R2：任務完成強制
 

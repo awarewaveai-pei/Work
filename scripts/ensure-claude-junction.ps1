@@ -31,6 +31,8 @@
 
 .PARAMETER WorkRoot
   Monorepo root. Defaults to the parent directory of this script's parent.
+  Must be the MAIN checkout (`.git` is a directory); a linked worktree or a
+  non-git directory is skipped as a no-op with exit 0 (2026-09-27).
 
 .PARAMETER UserProfile
   User profile root. Defaults to $env:USERPROFILE.
@@ -78,6 +80,18 @@ if (-not $WorkRoot) {
 }
 if (-not $UserProfile) { $UserProfile = $env:USERPROFILE }
 if (-not $UserProfile) { throw "USERPROFILE not set and -UserProfile not passed" }
+
+# Main checkout only, whoever calls (hook, ao-close, system-health-check, operator). A linked
+# worktree (git worktree add) has `.git` as a FILE and its tracked `.claude/` is real content:
+# junction-ing it to ~/.claude means a later `git worktree remove --force` / recursive delete
+# follows the junction into ~/.claude, and `git add -A` there stages ~/.claude state as the
+# worktree's .claude (observed 2026-09-27, D:\tmp\v-int2). No-op, exit 0, one line, no state file.
+$gitEntry = Join-Path $WorkRoot '.git'
+if (-not (Test-Path -LiteralPath $gitEntry -PathType Container)) {
+  $why = if (Test-Path -LiteralPath $gitEntry) { 'linked worktree (.git is a file)' } else { 'not a git checkout (.git missing)' }
+  Write-Host "ensure-claude-junction: skipped -- $WorkRoot is a $why; the .claude junction belongs to the main checkout only (no-op, exit 0)"
+  exit 0
+}
 
 $junctionPath = Join-Path $WorkRoot '.claude'
 $targetPath   = Join-Path $UserProfile '.claude'
