@@ -307,3 +307,133 @@ def evaluate_research_workflow_integrity_gate(
         )
     passed = all(value is True for key, value in checks.items() if key != "coding_nodes") and checks["coding_nodes"] >= 1
     return [_result("research_workflow_integrity", passed, [checks], validator, timestamp)]
+
+
+def iter_claims(obj: Any, path: str = "$", in_conflicts: bool = False):
+    """Every claim in ``obj`` as ``(path, claim, in_conflicts)`` -- the one P-b definition (P-K3): any dict carrying a
+    ``citations`` key, wherever it is nested; ``in_conflicts`` = the dict sits directly inside a ``conflicts`` list.
+    The gate below and the eval harness (``COS/eval/score.py``) both walk claims through this."""
+    if isinstance(obj, dict):
+        if "citations" in obj:
+            yield path, obj, in_conflicts
+        for key, value in obj.items():
+            yield from iter_claims(value, f"{path}.{key}", key == "conflicts" and isinstance(value, list))
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            yield from iter_claims(item, f"{path}[{index}]", in_conflicts)
+
+
+def claim_citations(claim: dict[str, Any]) -> list[Any]:
+    """A claim's citations as a list ([] when the value is missing or not a list: that claim has zero citations)."""
+    citations = claim.get("citations")
+    return citations if isinstance(citations, list) else []
+
+
+def evaluate_citation_integrity(obj: Any, manifest_ids: list[str] | set[str]) -> dict[str, Any]:
+    """The one ``citation_integrity`` gate for every AI-produced claim (P2 WC-01, P-b/P-e).
+
+    Claims come from ``iter_claims``; a ``citations`` value that is not a non-empty list counts as zero citations, a
+    non-string item as out of manifest. A claim directly inside a ``conflicts`` list additionally needs >=2 *distinct*
+    citations. FAILs on any out-of-manifest citation, any zero-citation claim, any under-two conflict, or zero claims.
+    ``uncited_sections`` = headings of top-level ``sections[]`` with no cited claim (C4, ``report.ts:204``),
+    informational only. Evidence items carry paths and counts, never a ``citations`` key, so gate output stored next
+    to the object (P-c ``gate_results``) is never itself read back as a claim.
+    """
+    ids = set(manifest_ids)
+    out_of_manifest: list[dict[str, Any]] = []
+    zero_citation: list[dict[str, Any]] = []
+    conflicts_under_two: list[dict[str, Any]] = []
+    claims_total = 0
+    for path, claim, in_conflicts in iter_claims(obj):
+        claims_total += 1
+        citations = claim_citations(claim)
+        if not citations:
+            zero_citation.append({"path": path})
+            continue
+        # a non-string item is kept as its repr: evidence must hold no dict that could itself carry `citations`
+        bad = [citation if isinstance(citation, str) else repr(citation)[:80] for citation in citations if not isinstance(citation, str) or citation not in ids]
+        if bad:
+            out_of_manifest.append({"path": path, "bad": bad})
+        distinct = len({citation for citation in citations if isinstance(citation, str)})
+        if in_conflicts and distinct < 2:
+            conflicts_under_two.append({"path": path, "distinct": distinct})
+
+    sections = obj.get("sections") if isinstance(obj, dict) else None
+    uncited_sections = [
+        section["heading"] if isinstance(section.get("heading"), str) and section["heading"] else f"sections[{index}]"
+        for index, section in enumerate(sections if isinstance(sections, list) else [])
+        if isinstance(section, dict) and not any(claim_citations(claim) for _, claim, _ in iter_claims(section))
+    ]
+
+    status = "PASS"
+    if out_of_manifest or zero_citation or conflicts_under_two or claims_total == 0:
+        status = "FAIL"
+
+    return {
+        "gate_id": "citation_integrity",
+        "status": status,
+        "evidence": {
+            "out_of_manifest": out_of_manifest,
+            "zero_citation": zero_citation,
+            "conflicts_under_two": conflicts_under_two,
+            "uncited_sections": uncited_sections,
+            "claims_total": claims_total,
+        },
+    }
+
+
+def synthesis_reference_errors(synthesis: Any) -> list[str]:
+    """References inside a synthesis typed object that its schema cannot express (P-d structure sections).
+
+    Every id is unique in its list (``claim_id`` across all sections, ``study_id``, ``option_id``, ``criterion_id``).
+    literature_matrix: every study cites exactly one source -- the study itself -- and ``source_id`` is that
+    citation's source id (``source:<source_id>``); the model never writes ``source_id``, the runner derives it.
+    decision_evidence: every evidence item names at least one option or criterion, and only ones present.
+    Total over any JSON value -- messages, never an exception: the runner calls it inside its repair loop and the
+    harness on artifacts it has not validated yet.
+    """
+    if not isinstance(synthesis, dict):
+        return ["synthesis is not an object"]
+    errors: list[str] = []
+
+    def objects(value: Any, where: str) -> list[dict[str, Any]]:
+        if value is None:
+            return []
+        if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+            errors.append(f"{where} must be a list of objects")
+            return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+        return value
+
+    def unique_ids(rows: list[dict[str, Any]], id_key: str, where: str) -> set[str]:
+        ids = [row.get(id_key) for row in rows]
+        if not all(isinstance(value, str) and value for value in ids):
+            errors.append(f"{where}[].{id_key} must be non-empty strings")
+        named = [value for value in ids if isinstance(value, str)]
+        repeated = sorted({value for value in named if named.count(value) > 1})
+        if repeated:
+            errors.append(f"{where}[].{id_key} repeats {repeated}")
+        return set(named)
+
+    claims = [claim for section in objects(synthesis.get("sections"), "sections") for claim in objects(section.get("claims"), "sections[].claims")]
+    unique_ids(claims, "claim_id", "sections[].claims")
+    studies = objects(synthesis.get("studies"), "studies")
+    unique_ids(studies, "study_id", "studies")
+    for index, study in enumerate(studies):
+        citations = claim_citations(study)
+        if len(citations) != 1 or not isinstance(citations[0], str) or not citations[0].startswith("source:"):
+            errors.append(f"studies[{index}] must cite exactly one source (the study itself)")
+        elif study.get("source_id") != citations[0].removeprefix("source:"):
+            errors.append(f"studies[{index}].source_id {study.get('source_id')!r} is not its citation's source id {citations[0].removeprefix('source:')!r}")
+    if synthesis.get("kind") == "decision_evidence":
+        option_ids = unique_ids(objects(synthesis.get("options"), "options"), "option_id", "options")
+        criterion_ids = unique_ids(objects(synthesis.get("criteria"), "criteria"), "criterion_id", "criteria")
+        for index, item in enumerate(objects(synthesis.get("evidence"), "evidence")):
+            option_refs, criterion_refs = item.get("option_ids"), item.get("criterion_ids")
+            if not isinstance(option_refs, list) or not isinstance(criterion_refs, list):
+                errors.append(f"evidence[{index}].option_ids / criterion_ids must be lists")
+                continue
+            if not option_refs and not criterion_refs:
+                errors.append(f"evidence[{index}] is bound to no option and no criterion")
+            errors += [f"evidence[{index}].option_ids names unknown option {ref!r}" for ref in option_refs if not isinstance(ref, str) or ref not in option_ids]
+            errors += [f"evidence[{index}].criterion_ids names unknown criterion {ref!r}" for ref in criterion_refs if not isinstance(ref, str) or ref not in criterion_ids]
+    return errors
