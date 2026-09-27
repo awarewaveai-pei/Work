@@ -1,0 +1,71 @@
+findings:
+- id: onset_time
+  terms:
+  - 睡前
+  - 前服
+  - 服用
+  - 3mg
+  - 褪黑
+  - 黑激
+  - 激素
+  - 素的
+  - 的組
+  - 組別
+  - 入睡
+  - 睡所
+  - 所需
+  - 需時
+  - 時間
+  - 間平
+  - 平均
+  - 均縮
+  - 縮短
+  - 分鐘
+  sources:
+  - source:src:study_m
+- id: meta_analysis
+  terms:
+  - 後設
+  - 設分
+  - 分析
+  - 析彙
+  - 彙整
+  - '12'
+  - 篇研
+  - 研究
+  - 顯示
+  - 示褪
+  - 褪黑
+  - 黑激
+  - 激素
+  - 素對
+  - 對入
+  - 入睡
+  - 睡時
+  - 時間
+  - 間有
+  - 有小
+  - 小幅
+  - 幅但
+  - 但一
+  - 一致
+  - 致的
+  - 的正
+  - 正向
+  - 向效
+  - 效果
+  sources:
+  - source:src:study_n
+conflicts: []
+gaps:
+- id: gap-1
+  terms:
+  - 長期
+  - 期安
+  - 安全
+  - 全性
+  - 性資
+  - 資料
+traps:
+- source: source:src:shop_supplement
+  kind: shopping_page

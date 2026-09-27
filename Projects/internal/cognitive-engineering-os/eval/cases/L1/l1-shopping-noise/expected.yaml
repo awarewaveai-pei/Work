@@ -1,0 +1,40 @@
+findings:
+- id: company_bg
+  terms:
+  - 藍鯨
+  - 鯨雲
+  - 雲端
+  - 端成
+  - 成立
+  - 立於
+  - '2021'
+  sources:
+  - source:src:overview
+- id: funding_round
+  terms:
+  - 藍鯨
+  - 鯨雲
+  - 雲端
+  - 端於
+  - '2023'
+  - 年完
+  - 完成
+  - 成新
+  - 新台
+  - 台幣
+  - '8000'
+  - 萬元
+  - 元的
+  - 輪募
+  - 募資
+  sources:
+  - source:src:funding
+conflicts: []
+gaps:
+- id: gap-1
+  terms:
+  - 客戶
+  - 戶數
+traps:
+- source: source:src:shop_listing
+  kind: shopping_page

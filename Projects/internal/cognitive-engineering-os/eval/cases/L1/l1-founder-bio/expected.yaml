@@ -1,0 +1,34 @@
+findings:
+- id: founder_bg
+  terms:
+  - 陳曉
+  - 曉明
+  - 明是
+  - 晨曦
+  - 曦科
+  - 科技
+  - 的創
+  - 創辦
+  - 辦人
+  sources:
+  - source:src:bio_main
+- id: company_found
+  terms:
+  - 晨曦
+  - 曦科
+  - 科技
+  - 技成
+  - 成立
+  - 立於
+  - '2019'
+  sources:
+  - source:src:bio_main
+  - source:src:company_overview
+conflicts: []
+gaps:
+- id: gap-1
+  terms:
+  - 營收
+traps:
+- source: source:src:wrong_person
+  kind: homonym

@@ -1,0 +1,133 @@
+{
+  "gate_results": [
+    {
+      "evidence": {
+        "claims_total": 3,
+        "conflicts_under_two": [],
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    }
+  ],
+  "manifest": {
+    "batches": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "entries": [
+      {
+        "end": 41,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:overview",
+        "n": 1,
+        "sha256": "552780abc4bfb1414b4eb13377f29e1ac6c6891cee932d5a95f3614d34d2554f",
+        "source_class": "profile",
+        "source_id": "src:overview",
+        "start": 0,
+        "title": "藍鯨雲端公司簡介（合成）",
+        "url": null
+      },
+      {
+        "end": 43,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:funding",
+        "n": 2,
+        "sha256": "7189d24f9c37d390ea816eac8b07c70492fb8a4df39d64ce6128acc93537ca93",
+        "source_class": "news",
+        "source_id": "src:funding",
+        "start": 0,
+        "title": "藍鯨雲端募資報導（合成）",
+        "url": null
+      },
+      {
+        "end": 47,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:shop_listing",
+        "n": 3,
+        "sha256": "f072e2e2df601050638323cb2850e9b59d8253e73311b13716331152130836ec",
+        "source_class": "shopping",
+        "source_id": "src:shop_listing",
+        "start": 0,
+        "title": "藍鯨牌保溫瓶特賣頁（合成，購物頁陷阱）",
+        "url": "https://example-synthetic.test/shop/blue-whale-bottle"
+      }
+    ],
+    "sha256": "fdb61a769bd86f2afc0bdfba660b9c38e253b3c30fbb65c81cb56d054cc6f7a3"
+  },
+  "synthesis": {
+    "conflicts": [],
+    "gaps": [
+      {
+        "needed_evidence": "客戶數或使用量公開資料",
+        "text": "目前公開資料未揭露藍鯨雲端的客戶數。"
+      }
+    ],
+    "kind": "dossier_brief",
+    "language": "zh-TW",
+    "manifest_ref": {
+      "batches": 1,
+      "count": 3,
+      "sha256": "fdb61a769bd86f2afc0bdfba660b9c38e253b3c30fbb65c81cb56d054cc6f7a3"
+    },
+    "model": "golden-fixture",
+    "project_id": "proj-eval-l1-shopping-noise",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "related_entities": [],
+    "sections": [
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:overview"
+            ],
+            "claim_id": "company_bg",
+            "text": "藍鯨雲端成立於 2021 年，提供中小企業數據分析 SaaS 平台。"
+          }
+        ],
+        "heading": "公司概況"
+      },
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:funding"
+            ],
+            "claim_id": "funding_round",
+            "text": "藍鯨雲端於 2023 年完成新台幣 8000 萬元的 A 輪募資。"
+          }
+        ],
+        "heading": "財務與募資"
+      }
+    ],
+    "subject": {
+      "anchors": [
+        "藍鯨雲端"
+      ],
+      "kind": "company",
+      "name": "藍鯨雲端"
+    },
+    "summary": {
+      "citations": [
+        "source:src:funding",
+        "source:src:overview"
+      ],
+      "text": "藍鯨雲端成立於 2021 年，提供中小企業數據分析 SaaS 平台。；藍鯨雲端於 2023 年完成新台幣 8000 萬元的 A 輪募資。。"
+    },
+    "synthesis_id": "SYN-l1-shopping-noise",
+    "uncited_sections": [],
+    "usage": {
+      "input_tokens": 1200,
+      "output_tokens": 400
+    }
+  }
+}

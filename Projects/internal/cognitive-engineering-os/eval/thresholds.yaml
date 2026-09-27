@@ -1,0 +1,37 @@
+# Per-line, per-metric pass/fail thresholds for COS/eval/run.py (P2 WC-04, plan §3.7/C8, invariant I10).
+#
+# Every value here MUST stay null until the operator sets it from a real basline (WC-P2-09 step 3: run the
+# harness against real-model output, hand the operator the basline report, they decide the number). null means
+# "no threshold yet" -- run.py reports the metric as UNSET (never PASS) and never fails the run over it.
+# Tests and mutate.py's mutation proofs use a temporary copy of this file with values filled in; they must
+# never edit this one.
+L1:
+  set_by: operator
+  citation_precision_auto: null
+  citation_coverage: null
+  hallucination_rate: null
+  contradiction_detection: null
+  gap_honesty: null
+  trap_rejection: null
+  cost_tokens: null
+  latency_ms: null
+L2:
+  set_by: operator
+  citation_precision_auto: null
+  citation_coverage: null
+  hallucination_rate: null
+  contradiction_detection: null
+  gap_honesty: null
+  trap_rejection: null
+  cost_tokens: null
+  latency_ms: null
+L3:
+  set_by: operator
+  citation_precision_auto: null
+  citation_coverage: null
+  hallucination_rate: null
+  contradiction_detection: null
+  gap_honesty: null
+  trap_rejection: null
+  cost_tokens: null
+  latency_ms: null

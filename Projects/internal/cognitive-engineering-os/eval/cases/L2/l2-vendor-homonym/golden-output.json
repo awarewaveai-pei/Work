@@ -1,0 +1,193 @@
+{
+  "gate_results": [
+    {
+      "evidence": {
+        "claims_total": 8,
+        "conflicts_under_two": [],
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    }
+  ],
+  "manifest": {
+    "batches": [
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "entries": [
+      {
+        "end": 43,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:aurora_cloud",
+        "n": 1,
+        "sha256": "4116f70db5f8aea53c2f6285b2385cc7a2bbd11c5042c411d0524902d0fc6cfd",
+        "source_class": "profile",
+        "source_id": "src:aurora_cloud",
+        "start": 0,
+        "title": "極光雲端服務報價（合成）",
+        "url": null
+      },
+      {
+        "end": 26,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:aurora_alt",
+        "n": 2,
+        "sha256": "178ae48d4156a3a3a17b95601fe71cacf46bdb22990588d74ed4907a3855fb56",
+        "source_class": "profile",
+        "source_id": "src:aurora_alt",
+        "start": 0,
+        "title": "極光雲端異地備援方案（合成）",
+        "url": null
+      },
+      {
+        "end": 36,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:aurora_cosmetics",
+        "n": 3,
+        "sha256": "adf4bbfd7b520ae1293ccfa1ece29f8b1a29493d85b362a91a33cbdb2e61c799",
+        "source_class": "shopping",
+        "source_id": "src:aurora_cosmetics",
+        "start": 0,
+        "title": "極光美妝新品頁（合成，同名混淆陷阱）",
+        "url": "https://example-synthetic.test/shop/aurora-cosmetics"
+      },
+      {
+        "end": 36,
+        "fetched_at": "2026-09-01T00:00:00Z",
+        "id": "source:src:pine_cloud",
+        "n": 4,
+        "sha256": "86d946773df5628f2109e5e6d288d413cbfecb2e427df51ef013d4dafbc61cd1",
+        "source_class": "profile",
+        "source_id": "src:pine_cloud",
+        "start": 0,
+        "title": "松果雲端服務報價（合成）",
+        "url": null
+      }
+    ],
+    "sha256": "265587c3843d59bf89809f4630a15d01ba7f2570b1ef1d4fa7967df2cb269ad0"
+  },
+  "synthesis": {
+    "conflicts": [],
+    "criteria": [
+      {
+        "citations": [
+          "source:src:aurora_cloud",
+          "source:src:pine_cloud"
+        ],
+        "criterion_id": "crit-price",
+        "name": "儲存空間報價"
+      }
+    ],
+    "evidence": [
+      {
+        "citations": [
+          "source:src:aurora_cloud"
+        ],
+        "criterion_ids": [
+          "crit-price"
+        ],
+        "option_ids": [
+          "opt-aurora"
+        ],
+        "stance": "supports",
+        "text": "極光雲端每 100GB 每月報價新台幣 150 元，較松果雲端便宜。"
+      },
+      {
+        "citations": [
+          "source:src:pine_cloud"
+        ],
+        "criterion_ids": [
+          "crit-price"
+        ],
+        "option_ids": [
+          "opt-pine"
+        ],
+        "stance": "mixed",
+        "text": "松果雲端每 100GB 每月報價新台幣 180 元，但提供在地客服支援。"
+      }
+    ],
+    "gaps": [
+      {
+        "needed_evidence": "SLA 條款公開資料",
+        "text": "目前資料未揭露兩家廠商的 SLA 保證內容。"
+      }
+    ],
+    "kind": "decision_evidence",
+    "language": "zh-TW",
+    "manifest_ref": {
+      "batches": 1,
+      "count": 4,
+      "sha256": "265587c3843d59bf89809f4630a15d01ba7f2570b1ef1d4fa7967df2cb269ad0"
+    },
+    "model": "golden-fixture",
+    "options": [
+      {
+        "citations": [
+          "source:src:aurora_cloud",
+          "source:src:aurora_alt"
+        ],
+        "name": "極光雲端",
+        "option_id": "opt-aurora"
+      },
+      {
+        "citations": [
+          "source:src:pine_cloud"
+        ],
+        "name": "松果雲端",
+        "option_id": "opt-pine"
+      }
+    ],
+    "project_id": "proj-eval-l2-vendor-homonym",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "sections": [
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:aurora_alt"
+            ],
+            "claim_id": "aurora_backup",
+            "text": "極光雲端另一項服務為異地備援，年約可享 9 折優惠。"
+          }
+        ],
+        "heading": "極光雲端"
+      },
+      {
+        "claims": [
+          {
+            "citations": [
+              "source:src:pine_cloud"
+            ],
+            "claim_id": "pine_price",
+            "text": "松果雲端每 100GB 每月報價新台幣 180 元，並提供在地客服支援。"
+          }
+        ],
+        "heading": "松果雲端"
+      }
+    ],
+    "summary": {
+      "citations": [
+        "source:src:aurora_alt",
+        "source:src:pine_cloud"
+      ],
+      "text": "極光雲端另一項服務為異地備援，年約可享 9 折優惠。；松果雲端每 100GB 每月報價新台幣 180 元，並提供在地客服支援。。"
+    },
+    "synthesis_id": "SYN-l2-vendor-homonym",
+    "uncited_sections": [],
+    "usage": {
+      "input_tokens": 1200,
+      "output_tokens": 400
+    }
+  }
+}
