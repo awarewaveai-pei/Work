@@ -1,0 +1,90 @@
+# Evolvable data registry -- the closed list (R14: RESEARCH_LINES_MASTER_PLAN.md §7
+# "可演化資料只限 §3.8 表列六種 kind；新增 kind 走 ADR"). ADDING A KIND HERE THAT ISN'T
+# ALREADY LISTED BELOW REQUIRES AN ADR FIRST -- this file is the enforcement point:
+# ai_lego.platform.evolution.registry.load_champion() refuses any kind not listed here,
+# so a kind added without going through that process fails closed instead of silently
+# working.
+#
+# Each kind is a directory under this one (evolution/<kind>/), holding one immutable
+# <version>.yaml file per version plus a champion.yaml pointer (the ONLY switch point
+# runtime code reads -- C9, P-g). Promotion and rollback are the offline CLI
+# (ai_lego.apps.cli.evolution); nothing else may write inside this directory.
+#
+# risk_tier follows specs/execution/risk-tier.schema.yaml's R0-R4 enum. R3/R4 kinds
+# require --approved-by on every promote/rollback (I10, P-K5: "R3+（模型、成本、任何
+# 門檻）必帶 --approved-by"); model-routing and ux-defaults (route threshold) are R3.
+# A kind whose data comes to hold a model, cost or threshold moves to R3 first.
+#
+# 2026-09-26 (WC-P2-03): kinds beyond the original six named in §3.8's table
+# (angles/source-classes/synthesis-prompts/model-routing/recipe-defaults/ux-defaults)
+# are interpretation-visuals and lessons, added by this same card per its own
+# instruction (RESEARCH_LINES_MASTER_PLAN.md §12.8 WC-P2-03 "改" list) -- recorded
+# here rather than silently smuggled in as an undocumented extension of the six.
+
+kinds:
+  angles:
+    risk_tier: R1
+    owner: operator
+    description: >
+      Search-angle definitions Collection uses to plan queries (identity/news/
+      controversy/... per entity kind). Config data, not code; a bad angle set
+      degrades recall, it does not change what runs.
+
+  source-classes:
+    risk_tier: R1
+    owner: operator
+    description: >
+      Source classification rules (academic/news/social/primary/... ) used by
+      literature_search v2 and manifest building to decide which Sources count
+      as which class.
+
+  synthesis-prompts:
+    risk_tier: R2
+    owner: operator
+    description: >
+      System prompts and section tables for synthesis.run_synthesis (dossier_brief,
+      decision_evidence, literature_matrix). Changes what the model is told to do;
+      does not touch citation_integrity or any other gate, which stay code.
+
+  model-routing:
+    risk_tier: R3
+    owner: operator
+    description: >
+      Which provider/model serves which capability. risk-tier.schema.yaml names
+      "AI routing" as an R3 example directly; every promote/rollback here requires
+      --approved-by regardless of how the CLI is invoked.
+
+  recipe-defaults:
+    risk_tier: R2
+    owner: operator
+    description: >
+      Default parameter values Recipe steps fall back to when a caller does not
+      supply them. Changes workflow behavior for every run that relies on the
+      default, not just the one that authored the change.
+
+  ux-defaults:
+    risk_tier: R3
+    owner: operator
+    description: >
+      Copy, default values and step ordering for the first-use UX (§3.9), e.g.
+      route.method's route.free_layer_min_confidence threshold. R3 because it
+      holds that threshold: it decides when a request goes to the model (AI
+      routing, risk-tier.schema.yaml R3) and P-K5 puts any threshold at R3+.
+
+  interpretation-visuals:
+    risk_tier: R1
+    owner: operator
+    legacy_path: methods/registry/method-visual-kinds.yaml
+    description: >
+      The visual-kind-per-method-family table. NOT migrated by this card (P-K8):
+      interpret_method_record.py keeps reading legacy_path directly. This entry
+      only records where the real data currently lives, so kinds.yaml stays the
+      complete list R14 requires without pretending the migration already happened.
+
+  lessons:
+    risk_tier: R1
+    owner: operator
+    description: >
+      Per-method/per-workflow six-step lesson content (I11 M4). Placeholder kind:
+      no version file exists yet under evolution/lessons/ as of this card; listed
+      here so its eventual first version needs no new ADR to add the kind itself.

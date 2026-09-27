@@ -1,0 +1,9 @@
+# The ONLY switch point (C9): ai_lego.platform.evolution.registry.load_champion reads
+# this file, never "the newest version file". Written by ai_lego.apps.cli.evolution
+# promote/rollback; this seed row is the one exception (v1 is the first version ever,
+# there is nothing to promote FROM).
+kind: synthesis-prompts
+version: "v1"
+version_sha256: "1b149a9c8cd378922a2b7d475e6ccf95f08859961f034c707280ebcf829ecdb5"
+promoted_at: "2026-09-26T00:00:00Z"
+ledger_line: 13
