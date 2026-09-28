@@ -69,18 +69,40 @@ def _flatten_sources(sources: list[Mapping[str, Any]]) -> tuple[list[dict[str, A
 
 
 SUBJECT_KINDS = {"person", "company", "event"}
+SYNTHESIS_KINDS = ("dossier_brief", "decision_evidence", "literature_matrix")
+# The subject is repeated in every map, reduce and repair prompt: bounded here, not by the budget after the fact.
+MAX_SUBJECT_TEXT = 500
+MAX_SUBJECT_ITEMS = 20
+_SUBJECT_KEYS = {"dossier_brief": {"name", "kind", "anchors"}, "decision_evidence": {"question", "options"}, "literature_matrix": {"question"}}
 
 
-def _server_subject(subject: Mapping[str, Any]) -> dict[str, Any]:
-    """The dossier subject is the caller's, never the model's -- a renamed subject would be a different
-    dossier. Validated here, before any paid call, so a bad subject cannot burn two repair attempts."""
-    name = subject.get("name") if isinstance(subject, Mapping) else None
-    subject_kind = subject.get("kind") if isinstance(subject, Mapping) else None
-    anchors = subject.get("anchors") if isinstance(subject, Mapping) else None
-    anchors_ok = anchors is None or (isinstance(anchors, list) and all(isinstance(a, str) and a.strip() for a in anchors))
-    if not isinstance(name, str) or not name.strip() or subject_kind not in SUBJECT_KINDS or not anchors_ok:
-        raise InvariantViolation(f"SYNTHESIS_SUBJECT_INVALID: dossier_brief needs subject{{name, kind in {sorted(SUBJECT_KINDS)}, anchors: list of non-empty strings}}, got {subject!r}")
-    return {"name": name, "kind": subject_kind, "anchors": list(anchors or [])}
+def _text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip()) and len(value) <= MAX_SUBJECT_TEXT
+
+
+def _texts(value: Any) -> bool:
+    return value is None or (isinstance(value, list) and len(value) <= MAX_SUBJECT_ITEMS and all(_text(item) for item in value))
+
+
+def validate_subject(kind: str, subject: Any) -> dict[str, Any]:
+    """P-j, the one check of a synthesis request (the runner and POST /projects/{id}/synthesis both call it, before any
+    paid call): the subject is the caller's, never the model's -- a renamed subject would be a different synthesis.
+    An unknown key is refused, not dropped (a misspelt ``anchors`` would silently lose the disambiguation). Messages
+    never echo the subject (a dossier subject names a person; the endpoint returns the message)."""
+    if kind not in SYNTHESIS_KINDS:
+        raise InvariantViolation(f"SYNTHESIS_UNKNOWN_KIND: {kind!r} not in {list(SYNTHESIS_KINDS)}")
+    shape = f"{kind} subject is {{{', '.join(sorted(_SUBJECT_KEYS[kind]))}}}: non-empty strings of at most {MAX_SUBJECT_TEXT} characters, lists of at most {MAX_SUBJECT_ITEMS}"
+    if not isinstance(subject, Mapping) or not set(subject) <= _SUBJECT_KEYS[kind]:
+        raise InvariantViolation(f"SYNTHESIS_SUBJECT_INVALID: {shape}")
+    if kind == "dossier_brief":
+        if not _text(subject.get("name")) or subject.get("kind") not in SUBJECT_KINDS or not _texts(subject.get("anchors")):
+            raise InvariantViolation(f"SYNTHESIS_SUBJECT_INVALID: {shape}; kind in {sorted(SUBJECT_KINDS)}")
+        return {"name": subject["name"], "kind": subject["kind"], "anchors": list(subject.get("anchors") or [])}
+    if not _text(subject.get("question")) or not _texts(subject.get("options")):
+        raise InvariantViolation(f"SYNTHESIS_SUBJECT_INVALID: {shape}")
+    if kind == "literature_matrix":
+        return {"question": subject["question"]}
+    return {"question": subject["question"], "options": list(subject.get("options") or [])}
 
 
 def _kind_headings(kind: str, subject: Mapping[str, Any], prompt: Mapping[str, Any]) -> list[str]:
@@ -154,6 +176,7 @@ def run_synthesis(
     synthesis_id: str,
     language: str = "zh-TW",
 ) -> dict[str, Any]:
+    server_subject = validate_subject(kind, subject)
     flattened, text_by_id = _flatten_sources(sources)
     manifest = build_source_manifest(flattened)
     problems = manifest_errors(manifest)
@@ -168,7 +191,6 @@ def run_synthesis(
         # would fail the gate -- two paid attempts would only prove that (WC-P2-06: 零 Sources 不呼叫模型).
         return {"artifact": None, "error": "SYNTHESIS_NO_SOURCES: the project has no active Source to synthesize from", "model": provider.model, "input_tokens": 0, "output_tokens": 0}
     call_batches = raw_batches
-    server_subject = _server_subject(subject) if kind == "dossier_brief" else None
 
     version, champion_doc = load_champion(spec_root, EVOLUTION_KIND)
     prompts = champion_doc.get("prompts") if isinstance(champion_doc, Mapping) else None
@@ -180,7 +202,7 @@ def run_synthesis(
     if not isinstance(system, str) or not system.strip() or not isinstance(schema_id, str) or not schema_id.strip():
         raise InvariantViolation(f"SYNTHESIS_PROMPT_MALFORMED: {kind!r} champion entry has no system/output_schema_id")
 
-    subject_lines = _subject_lines(kind, server_subject if server_subject is not None else subject, prompt, language, source_count=len(entries))
+    subject_lines = _subject_lines(kind, server_subject, prompt, language, source_count=len(entries))
     started = time.monotonic()
 
     def fenced_prompt(batch_ns: list[int], *, prefix: list[str]) -> str:
@@ -234,7 +256,7 @@ def run_synthesis(
                 "model": completion.model,
                 "usage": {"input_tokens": total_input, "output_tokens": total_output},
             })
-            if server_subject is not None:
+            if kind == "dossier_brief":
                 synthesis["subject"] = dict(server_subject)
             if kind == "literature_matrix":
                 _derive_study_source_ids(synthesis)

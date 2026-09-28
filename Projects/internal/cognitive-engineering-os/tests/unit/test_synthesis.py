@@ -145,7 +145,7 @@ class SynthesisSuccessTests(unittest.TestCase):
     def test_decision_evidence_succeeds(self):
         provider = FakeProvider([(_decision_response("source:s1"), 10, 20)])
         result = run_synthesis(
-            kind="decision_evidence", project_id="PROJ-1", subject={"topic": "選址"}, sources=[_source_item("s1")],
+            kind="decision_evidence", project_id="PROJ-1", subject={"question": "選址", "options": ["方案一"]}, sources=[_source_item("s1")],
             provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-TEST-002",
         )
         self.assertIsNone(result["error"])
@@ -156,7 +156,7 @@ class SynthesisSuccessTests(unittest.TestCase):
     def test_literature_matrix_succeeds(self):
         provider = FakeProvider([(_literature_response("source:s1", "s1"), 10, 20)])
         result = run_synthesis(
-            kind="literature_matrix", project_id="PROJ-1", subject={"topic": "教育介入研究"}, sources=[_source_item("s1")],
+            kind="literature_matrix", project_id="PROJ-1", subject={"question": "教育介入研究"}, sources=[_source_item("s1")],
             provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-TEST-003",
         )
         self.assertIsNone(result["error"])
@@ -297,10 +297,10 @@ class SynthesisReportRenderCompatibilityTests(unittest.TestCase):
     def test_dossier_subject_is_the_callers_not_the_models(self):
         # The scripted answer says "Jane Doe"; the caller asked about someone else. The artifact keeps the caller's.
         provider = FakeProvider([(_dossier_response("source:s1"), 10, 20)])
-        result = run_synthesis(kind="dossier_brief", project_id="proj-1", subject={"name": "Real Person", "kind": "person", "anchors": ["real-co"], "extra": "ignored"}, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-SUBJECT")
+        result = run_synthesis(kind="dossier_brief", project_id="proj-1", subject={"name": "Real Person", "kind": "person", "anchors": ["real-co"]}, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-SUBJECT")
         self.assertIsNone(result["error"], result["error"])
         self.assertEqual(result["artifact"]["synthesis"]["subject"], {"name": "Real Person", "kind": "person", "anchors": ["real-co"]})
-        self.assertNotIn('"extra"', provider.calls[0]["user"], "the prompt shows the validated subject, not the raw request")
+        self.assertIn('"name": "Real Person"', provider.calls[0]["user"], "the prompt shows the caller's subject")
 
     def test_invalid_dossier_subject_is_refused_before_any_model_call(self):
         provider = FakeProvider([(_dossier_response("source:s1"), 10, 20)])
@@ -310,6 +310,25 @@ class SynthesisReportRenderCompatibilityTests(unittest.TestCase):
         for anchors in ("abc", [""], [1], {"a": 1}):  # Codex 2026-09-28: a string was split into characters
             with self.assertRaises(InvariantViolation, msg=repr(anchors)):
                 run_synthesis(kind="dossier_brief", project_id="proj-1", subject={"name": "X", "kind": "person", "anchors": anchors}, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-BAD-ANCHORS")
+        self.assertEqual(provider.calls, [])
+
+    def test_decision_and_literature_subjects_are_checked_before_any_model_call(self):
+        """P-j for the other two kinds (WC-P2-06): a question is required, decision options are non-empty strings,
+        an unknown kind is refused; the message never echoes the subject."""
+        provider = FakeProvider([])
+        for kind, subject in (("decision_evidence", {}), ("decision_evidence", {"question": " "}), ("decision_evidence", {"question": "Q", "options": "A"}),
+                              ("decision_evidence", {"question": "Q", "options": [""]}), ("literature_matrix", {"topic": "Q"}), ("literature_matrix", None),
+                              ("decision_evidence", {"question": "Q", "option": ["A"]}), ("dossier_brief", {"name": "X", "kind": "person", "anchor": ["L"]}),
+                              ("literature_matrix", {"question": "Q" * 501}), ("decision_evidence", {"question": "Q", "options": ["A"] * 21})):
+            with self.assertRaises(InvariantViolation, msg=f"{kind} {subject!r}") as ctx:
+                run_synthesis(kind=kind, project_id="p", subject=subject, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-BAD")
+            self.assertTrue(str(ctx.exception).startswith("SYNTHESIS_SUBJECT_INVALID"), str(ctx.exception))
+        with self.assertRaises(InvariantViolation) as ctx:
+            run_synthesis(kind="swot", project_id="p", subject={"question": "Q"}, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-BAD")
+        self.assertTrue(str(ctx.exception).startswith("SYNTHESIS_UNKNOWN_KIND"))
+        with self.assertRaises(InvariantViolation) as ctx:
+            run_synthesis(kind="dossier_brief", project_id="p", subject={"name": "Secret Name", "kind": "planet"}, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-BAD")
+        self.assertNotIn("Secret Name", str(ctx.exception))
         self.assertEqual(provider.calls, [])
 
     def test_zero_active_sources_fails_closed_without_calling_the_model(self):
@@ -359,7 +378,7 @@ class SynthesisReportRenderCompatibilityTests(unittest.TestCase):
         bad = json.loads(_decision_response("source:s1"))
         bad["evidence"][0]["option_ids"] = ["OPT-GHOST"]
         provider = FakeProvider([(json.dumps(bad, ensure_ascii=False), 10, 20), (_decision_response("source:s1"), 10, 20)])
-        result = run_synthesis(kind="decision_evidence", project_id="proj-1", subject={"decision": "d"}, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-EVID")
+        result = run_synthesis(kind="decision_evidence", project_id="proj-1", subject={"question": "d"}, sources=[_source_item("s1")], provider=provider, spec_root=SPEC_ROOT, schema_contracts=SCHEMA_CONTRACTS, synthesis_id="SYN-EVID")
         self.assertIsNone(result["error"], result["error"])
         self.assertIn("SYNTHESIS_REFERENCE_ERRORS", provider.calls[1]["user"])
         self.assertIn("unknown option", provider.calls[1]["user"])

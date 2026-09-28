@@ -97,6 +97,8 @@ from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.modules.research.interpret_method_record import INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, run_interpretation
+from ai_lego.modules.research.source_manifest import DEFAULT_MAX_CHARS
+from ai_lego.modules.research.synthesis import run_synthesis, validate_subject
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -1813,6 +1815,204 @@ def list_reruns(
     return repo.reruns(session["tenant_id"], project_id).get(project_id, [])
 
 
+# -- Synthesis (RESEARCH_LINES_MASTER_PLAN §12.8 WC-P2-06; runner P-h, subject P-j): the interpret shape, one runner for
+# three kinds. Events carry ids, counts and error codes only (K8): a runner message can quote model text about the
+# subject, so SynthesisFailed keeps its leading codes, never the message.
+
+_ERROR_CODES = re.compile(r"([A-Z][A-Z0-9_]{2,})(?=:|$)(?:: ([A-Z][A-Z0-9_]{2,})(?=:|$))?")
+
+
+def _error_code(message: str) -> str:
+    """``"SYNTHESIS_REJECTED_AFTER_REPAIR: SYNTHESIS_GATE_FAILED: {...}"`` -> the first two codes; no code -> SYNTHESIS_FAILED."""
+    match = _ERROR_CODES.match(message or "")
+    return ": ".join(code for code in match.groups() if code) if match else "SYNTHESIS_FAILED"
+
+
+def _failure_code(failure: BaseException) -> str:
+    """A domain error keeps its codes; anything else (the provider raises urllib's HTTPError/URLError as they come)
+    keeps its class name and HTTP status -- neither carries request or model text."""
+    if isinstance(failure, InvariantViolation):
+        return _error_code(str(failure))
+    status = getattr(failure, "code", None)
+    return f"SYNTHESIS_FAILED: {type(failure).__name__}" + (f" {status}" if isinstance(status, int) else "")
+
+
+class _MeteredProvider:
+    """One background run's provider, one paid call at a time under the tenant's AI lock: the day's budget is checked
+    right before each call and the call's tokens are recorded right after it. Metering therefore holds whatever the
+    caller does next -- raises, repairs, or makes one call per map batch -- and a run cannot outspend the budget by
+    more than one call. The runner reads a refusal as a provider error and returns what it has."""
+
+    def __init__(self, inner: AiProvider, store: IdentityStore, session: dict[str, Any], purpose: str) -> None:
+        self._inner, self._store, self._session, self._purpose = inner, store, session, purpose
+        self.model = inner.model
+        self.input_tokens = 0
+        self.output_tokens = 0
+
+    def complete(self, system: str, user: str, *, max_tokens: int) -> Any:
+        tenant_id = self._session["tenant_id"]
+        with _ai_budget_lock_for(tenant_id):
+            try:
+                _require_ai(self._inner, self._store, self._session)
+            except HTTPException as refusal:
+                raise InvariantViolation(str(refusal.detail)) from refusal
+            completion = self._inner.complete(system, user, max_tokens=max_tokens)
+            self.input_tokens += completion.input_tokens
+            self.output_tokens += completion.output_tokens
+            try:
+                self._store.record_ai_usage(tenant_id, self._session["identity_id"], self._purpose, completion.model, completion.input_tokens, completion.output_tokens)
+            except Exception as failure:
+                raise InvariantViolation("AI_USAGE_RECORD_FAILED") from failure
+        return completion
+
+
+def _synthesis_lock_path(tenant_id: str, project_id: str) -> Path:
+    """One synthesis at a time per Project (plan P-k run lock, tagged with the running synthesis_id)."""
+    tenant_key = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
+    project_key = hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:32]
+    return PRODUCT_ROOT / ".runtime" / "synthesis" / tenant_key / f"{project_key}.lock"
+
+
+def _run_synthesis(
+    *, synthesis_id: str, kind: str, project_id: str, session: dict[str, Any], subject: dict[str, Any],
+    sources: list[dict[str, Any]], artifact_type: str, provider: AiProvider,
+    store: IdentityStore, repo: ProjectSourceRepository, artifact_store: JsonArtifactStore, lock: RunLock,
+) -> None:
+    tenant_id = session["tenant_id"]
+    aggregate_id = f"project:{project_id}"
+    metered = _MeteredProvider(provider, store, session, f"synthesis:{kind}")
+    try:
+        try:
+            spec_root = resolve_spec_root()
+            outcome = run_synthesis(
+                kind=kind, project_id=project_id, subject=subject, sources=sources, provider=metered,
+                spec_root=spec_root, schema_contracts=SchemaContracts(spec_root), synthesis_id=synthesis_id,
+            )
+            error = None if outcome["error"] is None else _error_code(outcome["error"])
+        except Exception as failure:
+            outcome, error = None, _failure_code(failure)
+        if error is None and outcome is not None and outcome["artifact"] is not None:
+            try:
+                reference = artifact_store.put(tenant_id, artifact_type, outcome["artifact"])
+                repo.save_synthesis(
+                    tenant_id, project_id, synthesis_id, kind, reference,
+                    datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                )
+                return
+            except Exception as failure:
+                error = _failure_code(failure)
+        repo.append_event(tenant_id, aggregate_id, "SynthesisFailed", {
+            "synthesis_id": synthesis_id, "kind": kind, "error": error or "SYNTHESIS_FAILED",
+            "input_tokens": metered.input_tokens, "output_tokens": metered.output_tokens,
+        })
+    finally:
+        lock.release()
+
+
+def _launch_synthesis(**kwargs: Any) -> None:
+    threading.Thread(target=_run_synthesis, daemon=True, kwargs=kwargs).start()
+
+
+@app.post("/projects/{project_id}/synthesis", status_code=202)
+def create_synthesis(
+    project_id: str,
+    body: dict[str, Any],
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    source_cas: TenantScopedCas = Depends(get_source_cas),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+    provider: AiProvider | None = Depends(get_interpretation_provider),
+) -> dict[str, Any]:
+    """Synthesize the Project's active Sources into a ``kind`` typed object, in the background (GET the id for the
+    result). Everything that can be refused is refused here, before a paid call: body, subject (P-j), an ACTIVE
+    ``synthesis.<kind>`` contract, at least one active Source, provider and budget."""
+    tenant_id = session["tenant_id"]
+    _project_or_404(repo, tenant_id, project_id)
+    unknown = sorted(set(body) - {"kind", "subject"})
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"SYNTHESIS_REQUEST_INVALID: unknown keys {unknown}; body is {{kind, subject}}")
+    kind = body.get("kind")
+    try:
+        subject = validate_subject(kind, body.get("subject"))
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    capability_id = f"synthesis.{kind}"
+    capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
+    if not capability_catalog.is_resolvable(capability_id):
+        raise HTTPException(status_code=404, detail=f"CAPABILITY_RESOLUTION_BLOCKED: no ACTIVE contract for {capability_id!r}")
+    contract = yaml.safe_load((resolve_spec_root() / capability_catalog.require(capability_id)["path"]).read_text(encoding="utf-8"))
+    artifact_type = contract["output"]["type"][0]   # DossierBrief / DecisionEvidenceBrief / LiteratureMatrix
+    # Only active rows are read (a superseded blob is never cited), and only the part a manifest entry can span
+    # (DEFAULT_MAX_CHARS) is kept for the background run; the runner still decides what enters the manifest.
+    sources = []
+    for row in repo.list_sources(tenant_id, project_id):
+        if row["status"] != "active":
+            continue
+        try:
+            text = source_cas.read(tenant_id, repo.get_source_content_reference(tenant_id, project_id, row["source_id"])).decode("utf-8")
+        except InvariantViolation as error:
+            raise HTTPException(status_code=500, detail=f"SOURCE_CONTENT_UNREADABLE: {row['source_id']}") from error
+        sources.append({"row": row, "text": text[:DEFAULT_MAX_CHARS]})
+    if not sources:
+        raise HTTPException(status_code=400, detail="SYNTHESIS_NO_SOURCES: the project has no active Source to synthesize from")
+    provider = _require_ai(provider, store, session)
+    synthesis_id = f"SYN-{uuid.uuid4().hex.upper()}"
+    lock = acquire_run_lock(_synthesis_lock_path(tenant_id, project_id), tag=synthesis_id)
+    if lock is None:
+        raise HTTPException(status_code=409, detail="SYNTHESIS_IN_FLIGHT: this project already has a synthesis running; GET it, then retry")
+    try:
+        repo.append_event(tenant_id, f"project:{project_id}", "SynthesisRequested", {"synthesis_id": synthesis_id, "kind": kind, "source_count": len(sources)})
+        _launch_synthesis(
+            synthesis_id=synthesis_id, kind=kind, project_id=project_id, session=dict(session), subject=subject,
+            sources=sources, artifact_type=artifact_type, provider=provider, store=store, repo=repo, artifact_store=artifact_store,
+            lock=lock,
+        )
+    except BaseException:
+        lock.release()   # the worker never started, so it cannot release
+        raise
+    return {"synthesis_id": synthesis_id, "status": "PENDING", "project_id": project_id, "kind": kind}
+
+
+@app.get("/projects/{project_id}/synthesis/{synthesis_id}")
+def get_synthesis(
+    project_id: str,
+    synthesis_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    tenant_id = session["tenant_id"]
+    _project_or_404(repo, tenant_id, project_id)
+    events = repo.synthesis_events(tenant_id, project_id, synthesis_id)
+    if not events:
+        raise HTTPException(status_code=404, detail=f"SYNTHESIS_NOT_FOUND: {synthesis_id!r}")
+    latest = events[-1]
+    base = {"synthesis_id": synthesis_id, "project_id": project_id, "kind": events[0]["payload"].get("kind"), "requested_at": events[0]["occurred_at"]}
+    if latest["event_type"] == "SynthesisRequested":
+        lock_path = _synthesis_lock_path(tenant_id, project_id)
+        running = run_lock_state(lock_path) == "held" and run_lock_tag(lock_path) == synthesis_id
+        if not running and repo.synthesis_events(tenant_id, project_id, synthesis_id)[-1]["event_type"] == "SynthesisRequested":
+            # its worker died before a terminal event (plan P-k): not PENDING forever; POST again
+            return {**base, "status": "LOST"}
+        if running:
+            return {**base, "status": "PENDING"}
+        return get_synthesis(project_id, synthesis_id, session, repo, artifact_store)  # it finished between the reads
+    if latest["event_type"] == "SynthesisFailed":
+        return {**base, "status": "FAILED", "error": latest["payload"]["error"], "finished_at": latest["occurred_at"]}
+    stored = repo.get_synthesis(tenant_id, project_id, synthesis_id)
+    if stored is None:
+        raise HTTPException(status_code=500, detail="SYNTHESIS_ARTIFACT_MISSING")
+    try:
+        artifact = artifact_store.read(tenant_id, stored["artifact_reference"])
+    except InvariantViolation as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    return {
+        **base, "status": "DONE", "finished_at": stored["created_at"], "result": artifact["synthesis"], "gate_results": artifact["gate_results"],
+        "manifest": artifact["manifest"], "prompt_version": artifact["prompt_version"], "latency_ms": artifact["latency_ms"],
+    }
+
+
 # NOTE: `data_classification` values here (Public/Internal/Confidential/Restricted, defined by
 # ai_lego.core.domain._intake_validation.DATA_CLASSIFICATIONS) are Title_Case and a DIFFERENT vocabulary from
 # the Recipe run classification check a few hundred lines above (PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED) --
@@ -1944,7 +2144,7 @@ def erase_project(
     source_cas: TenantScopedCas = Depends(get_source_cas),
     artifact_store: JsonArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
-    """Project-level erasure (RESEARCH_LINES_MASTER_PLAN D10, K7): interpretation artifacts, then -- in one repository
+    """Project-level erasure (RESEARCH_LINES_MASTER_PLAN D10, K7): AI artifacts (interpretations, syntheses), then -- in one repository
     transaction -- Source rows, runs, the Project's events and every Source blob no other Project still references;
     one ProjectErased tombstone stays. Artifacts go first so a failure leaves rows that still point at what is left:
     a retry finishes the job."""

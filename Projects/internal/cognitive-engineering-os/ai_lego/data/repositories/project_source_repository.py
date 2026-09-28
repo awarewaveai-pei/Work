@@ -99,6 +99,17 @@ CREATE TABLE IF NOT EXISTS project_interpretations (
     FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
 );
 CREATE INDEX IF NOT EXISTS ix_project_interpretations_project ON project_interpretations (tenant_id, project_id, created_at);
+CREATE TABLE IF NOT EXISTS project_syntheses (
+    tenant_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    synthesis_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    artifact_reference_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, synthesis_id),
+    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS ix_project_syntheses_project ON project_syntheses (tenant_id, project_id, created_at);
 CREATE TABLE IF NOT EXISTS collection_runs (
     tenant_id TEXT NOT NULL,
     project_id TEXT NOT NULL,
@@ -714,17 +725,53 @@ class ProjectSourceRepository:
         result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
         return result
 
+    # -- Syntheses (P2 WC-06): same lifecycle shape as interpretations, their own table ---------------------------
+
+    def synthesis_events(self, tenant_id: str, project_id: str, synthesis_id: str) -> list[dict[str, Any]]:
+        """One synthesis's lifecycle (Requested -> Created | Failed) on its Project's event stream."""
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT event_type, occurred_at, payload_json FROM events WHERE tenant_id=? AND aggregate_id=? "
+                "AND event_type IN ('SynthesisRequested', 'SynthesisCreated', 'SynthesisFailed') "
+                "AND json_extract(payload_json, '$.synthesis_id')=? ORDER BY rowid",
+                (tenant_id, f"project:{project_id}", synthesis_id),
+            ).fetchall()
+        return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
+
+    def save_synthesis(self, tenant_id: str, project_id: str, synthesis_id: str, kind: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
+        """Row and SynthesisCreated in one transaction; the event carries ids and hashes only (K8)."""
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO project_syntheses (tenant_id, project_id, synthesis_id, kind, artifact_reference_json, created_at) VALUES (?,?,?,?,?,?)",
+                (tenant_id, project_id, synthesis_id, kind, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
+            )
+            self._append_event(connection, tenant_id, f"project:{project_id}", "SynthesisCreated", {"synthesis_id": synthesis_id, "kind": kind, "artifact_reference": dict(artifact_reference)})
+
+    def get_synthesis(self, tenant_id: str, project_id: str, synthesis_id: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT project_id, synthesis_id, kind, artifact_reference_json, created_at FROM project_syntheses WHERE tenant_id=? AND project_id=? AND synthesis_id=?",
+                (tenant_id, project_id, synthesis_id),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
+        return result
+
     # -- Project erasure (plan D10, K7) ---------------------------------------------------------------------------
 
+    _ARTIFACT_TABLES = ("project_interpretations", "project_syntheses")
+
     def project_artifact_references(self, tenant_id: str, project_id: str) -> list[dict[str, Any]]:
-        """The Project's interpretation artifacts (their own CAS, one per interpretation, never shared)."""
+        """The Project's AI artifacts -- interpretations and syntheses (their own CAS, one per result, never shared)."""
         with self._connection() as connection:
-            rows = connection.execute("SELECT artifact_reference_json FROM project_interpretations WHERE tenant_id=? AND project_id=?", (tenant_id, project_id)).fetchall()
+            rows = [row for table in self._ARTIFACT_TABLES for row in connection.execute(f"SELECT artifact_reference_json FROM {table} WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))]
         return [json.loads(row["artifact_reference_json"]) for row in rows]
 
     def erase_project(self, tenant_id: str, project_id: str, erased_by_identity_id: str, cas: TenantScopedCas, artifacts_deleted: int) -> dict[str, int]:
-        """One write transaction: the Project's events (its own aggregate + each of its Sources'), Sources, interpretation
-        references, collection runs and the Project row go; the tenant's now-unreferenced blobs are removed before
+        """One write transaction: the Project's events (its own aggregate + each of its Sources'), Sources, AI artifact
+        references (interpretations, syntheses), collection runs and the Project row go; the tenant's now-unreferenced blobs are removed before
         commit (content shared with another Project stays referenced, so it stays); one ProjectErased tombstone.
         A failure rolls the rows back, and a retry finishes the job."""
         with self._write_transaction() as connection:
@@ -734,7 +781,7 @@ class ProjectSourceRepository:
             events_deleted = 0
             for aggregate_id in [f"project:{project_id}", *(f"source:{source_id}" for source_id in source_ids)]:
                 events_deleted += connection.execute("DELETE FROM events WHERE tenant_id=? AND aggregate_id=?", (tenant_id, aggregate_id)).rowcount
-            for table in ("prov_sources", "project_interpretations", "collection_runs", "platform_projects"):
+            for table in ("prov_sources", *self._ARTIFACT_TABLES, "collection_runs", "platform_projects"):
                 connection.execute(f"DELETE FROM {table} WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))
             blobs_unlinked = self._collect_unreferenced_blobs(connection, tenant_id, cas)
             counts = {"sources": len(source_ids), "blobs_unlinked": blobs_unlinked, "artifacts_deleted": artifacts_deleted, "events_deleted": events_deleted}

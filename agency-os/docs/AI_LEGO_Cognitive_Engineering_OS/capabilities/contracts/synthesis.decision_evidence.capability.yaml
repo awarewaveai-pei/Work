@@ -1,6 +1,6 @@
 $id: "ai-lego://capabilities/contracts/synthesis.decision_evidence.capability.yaml"
 title: "synthesis.decision_evidence -- Project-bound AI decision-evidence synthesis from the Source prompt manifest"
-status: DRAFT
+status: ACTIVE
 description: >
   Context-bound capability for the dedicated decision-evidence-synthesis
   endpoint. It is not a Recipe node and is never registered in the pure
@@ -11,12 +11,13 @@ description: >
   `[n]` citations against the manifest, validates the result against
   decision-evidence-brief.schema.yaml, and gates it with
   citation_integrity before storing a DecisionEvidenceBrief artifact.
-  Status is DRAFT (not ACTIVE) because the runtime endpoint
-  (POST /projects/{id}/synthesis, WC-P2-06) does
-  not exist yet; the runner it calls is
-  ai_lego.modules.research.synthesis.run_synthesis (WC-P2-05).
+  Runtime:
+  POST /projects/{id}/synthesis with body {kind, subject} (202, background
+  run; GET /projects/{id}/synthesis/{synthesis_id} reads PENDING / DONE /
+  FAILED) calls ai_lego.modules.research.synthesis.run_synthesis (WC-P2-05)
+  and refuses the request while this contract is not ACTIVE (WC-P2-06).
 source_of_truth_for:
-  - "RESEARCH_LINES_MASTER_PLAN.md §12.8 P2 WC-P2-02 (this contract) and WC-P2-06 (the endpoint that will promote it to ACTIVE)"
+  - "RESEARCH_LINES_MASTER_PLAN.md §12.8 P2 WC-P2-02 (this contract) and WC-P2-06 (the endpoint; promoted it to ACTIVE)"
 decided_by: "P2 WC-P2-02: three synthesis typed objects + DRAFT capability contracts"
 id: synthesis.decision_evidence
 version: "1.0.0"

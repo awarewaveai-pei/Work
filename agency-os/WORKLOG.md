@@ -1,4 +1,26 @@
 ﻿# Worklog
+## 2026-09-28（續9）研究線 WC-P2-06：POST/GET /projects/{id}/synthesis（背景、逐次計量、閘過的 artifact）；三契約 ACTIVE
+- [範圍] worktree `D:\tmp\wt-l4`（detached，origin/main `6d739c642`）；commit 不 push，sha 交合併者 cherry-pick（§12.8 本機獨立目錄規則；共用樹 `main.py` 有網站線未提交改動）。
+- [改] `main` `create_synthesis`／`get_synthesis`／`_run_synthesis`／`_MeteredProvider`／`_error_code`／`_failure_code`；`repo` 表 `project_syntheses`＋index、`synthesis_events`／`save_synthesis`／`get_synthesis`、`_ARTIFACT_TABLES`（抹除與 artifact 列舉共用）；`synthesis.py` 公開 `validate_subject`（P-j 三 kind 一處定義；runner 與端點共用；未知鍵拒、長度上限 500／清單 20、訊息不回顯 subject）；三 `synthesis.*.capability.yaml` DRAFT→ACTIVE（端點要求 ACTIVE 才收）。
+- [順序] 404 project → 400 body／subject → 404 契約非 ACTIVE → 讀 active Source（只留 `DEFAULT_MAX_CHARS`）→ 400 零 Source → `_require_ai`（503／403／429）→ 409 同專案已有一支在跑（T34 in-flight 集合，鍵 `synthesis:<pid>`）→ `SynthesisRequested` → thread。拒絕前零寫入、零 thread。
+- [K8] 事件只放 id／kind／計數／錯誤碼；`SynthesisFailed.error` 只留前兩個碼（`_error_code`），非領域例外留類名＋HTTP 狀態；原先的無鹽 `subject_sha256` 拿掉（人名字典可反推、跨租戶可連結）。
+- [critic] 1 輪（Codex 額度擋到 09-29 01:51 → critic agent 代，`ORACLE_WAIVED`）：M1 runner 在付費呼叫後拋錯（深巢 JSON → `RecursionError`）→ 用量沒記、繞過每日預算；M2 預算每 run 只查一次，多批 map＋repair 可超支數倍；M3 租戶 AI 鎖整個 run 持有、無 in-flight 上限、thread 持有整份 Source 全文；m4 錯誤碼 regex 把 `URLError` 切成 `URLE`；m5 subject 未知鍵默默丟；m6 無鹽 subject hash；m7 缺 index。全修。
+- [不變量 M1+M2] 「每次付費呼叫：呼叫前在租戶鎖內查當日預算、呼叫後立刻記用量」→ `_MeteredProvider` 包 provider，不再由 worker 事後依回傳值記；鎖只包單次呼叫（M3 鎖時長一併解）。runner 把預算拒絕讀成 provider 錯誤、回已用 token。
+- P2_06_TEST: PASS | cmd=`python -m unittest tests.unit.test_api_synthesis tests.unit.test_synthesis tests.unit.test_project_erase tests.unit.test_capability_resolver <11 個 main importer> -q` | out=Ran 353 OK（625s）；golden `run_golden_tests.py` PASSED 4244、`gen_spec_index.py` fresh
+- P2_06_MUT: PASS | cmd=scratch `mutate_wc06.py`（本 worktree，套用→跑指名測試→還原位元組） | out=12/12 RED：卡三項（失敗不計量／GET 不看租戶／零 Source 不拒）＋K8 事件留原訊息、抹除漏 syntheses、端點跳過 subject 檢查、契約非 ACTIVE 仍收、critic M1（proxy 不記）、M2（每呼叫不查預算）、M3a（無 in-flight）、M3b（留全文）、m4（regex 無邊界）；還原後全綠
+- [改 T32 測試] `test_synthesis.py` 三處 subject 由 `{"topic"}`／`{"decision"}` 改 P-j `{question}`；`extra` 鍵案改為「顯示呼叫者的 subject」（未知鍵現在拒）；新案 decision／literature subject 檢查＋上限＋未知鍵。
+- [剩餘風險]
+  - R1 run 進行中抹除專案：可留一個 artifact＋一筆 Failed 事件（interpret 同一 race；抹除「先刪 artifact 再交易」本身對並行新增不封閉）。
+  - R2 行程重啟：進行中的 synthesis 永遠 PENDING（interpret 同；in-flight 集合隨行程清空，不會卡 409）。
+  - R3 單次呼叫仍可超支至多一次呼叫的量（預算在呼叫前查）。
+  - R4 interpret 與 `/ai/draft/*` 仍是「回傳後才記量」同一類 → 改用 `_MeteredProvider`：interpret 歸 WC-P2-08 那條線（P-K8：interpret 區段屬網站線未提交），draft 另開。
+- REALTEST_EVIDENCE: tool=Bash | cmd=unittest 驗收集＋golden＋突變 12 | exit=0 | ms=637918
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/4n（全修，突變證明）
+- ORACLE_WAIVED: Codex 額度斷路器 BLOCKED 至 2026-09-29 01:51（`oracle-quota.ps1 -Action check -Tool codex` exit 3）；以 critic agent＋12 突變代
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`_server_subject|SynthesisRequested|SynthesisCreated|SynthesisFailed|project_syntheses|validate_subject|synthesis.*(DRAFT|does not exist yet|will promote)` | hits=39（`_server_subject` 0；其餘皆在本次改動檔：main／repo／synthesis.py／三契約／兩測試檔；`decided_by: ... DRAFT capability contracts` ×6 = WC-02 歷史，留）
+- [下一步] 合併者 cherry-pick；09 部署時 prod 真跑 dossier（P2_DOD）；計畫 §3.3 P-K1 兩列由 09 回寫。
+- [合併者] 352d79d1b 疊在 run lock（dc43e2e3a，續8）之上合併：它沿用的行程內 `_RUNS_IN_FLIGHT`（key `synthesis:<pid>`）已被 P-k 取代 → 改 `run_lock`（每個 Project 一把 `.runtime/synthesis/<tenant>/<sha(project)>.lock`，tag = synthesis_id）；GET：`SynthesisRequested` 且鎖不是由它持有 → `LOST`（worker 死，不再永遠 PENDING），新測試 `test_a_synthesis_whose_worker_died_reads_lost_not_pending_forever`。main.py 與網站線 4fa192896 的核准／估價區塊同點插入 → 兩段都保留。驗證：`python -m unittest tests.unit.test_api_synthesis tests.unit.test_synthesis tests.unit.test_run_lock tests.unit.test_no_process_local_run_registry tests.unit.test_run_recipe_async tests.unit.test_project_erase` 77 OK。
+- [轉交 WC-P2-08] interpret 與 `/ai/draft/*` 仍只依回傳值記 ai_usage（呼叫後 raise → 未計量，critic M1 同類）→ 改走 `_MeteredProvider`。
 ## 2026-09-28（續8）Recipe run 改用 OS run lock：跨 worker 一個 run_id 只一個 runner、runner 死由 kernel 釋放；LOST／runner lost 可見，resume 從斷點接續；D:\Work 本機 main 對齊 origin
 - [操作者] 「去處理好」剩餘風險（in-flight 行程內）＋本機 main 的 449feb401＋兩個 worktree 殘留。
 - [根因] Codex r3（`reports/oracle/2026-09-28-review-3895ca65.md`）只看到「多 worker／行程死 → 404」；讀 `executor.py` `_restore_journal`（拒 resume RUNNING）後範圍更大：任何路徑 runner 中途死 → journal 永遠 RUNNING，resume 被拒、重送被拒（journal 已存在），無恢復路徑。journal 記「做了什麼」，沒有東西記「runner 還活著嗎」。
