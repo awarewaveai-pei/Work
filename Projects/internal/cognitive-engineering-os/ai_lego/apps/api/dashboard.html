@@ -1426,7 +1426,7 @@ $('run-btn').onclick = async () => {
       Object.keys(steps).forEach(k => {
         const s = steps[k]; const row = el('tr');
         row.appendChild(el('td', null, (s.label || s.ref || k)));
-        row.appendChild(el('td', (s.status === 'SUCCEEDED' || s.status === 'PASS') ? 'ok' : 'bad', s.status || ''));
+        row.appendChild(el('td', (s.status === 'SUCCEEDED' || s.status === 'PASS') ? 'ok' : s.status === 'NOT_INVOKED' ? 'warn' : 'bad', s.status || ''));
         const gs = (b.gates && b.gates[k]) || [];
         const bad = gs.filter(g => g.status !== 'PASS' && g.status !== 'NOT_APPLICABLE').map(g => g.gate_id + ': ' + pretty(g.evidence)).join('\n');
         row.appendChild(el('td', null, (s.error ? String(s.error) + '\n' : '') + (bad || (gs.length ? gs.length + ' 閘門通過' : ''))));

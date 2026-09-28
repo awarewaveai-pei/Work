@@ -693,6 +693,11 @@
 - [x] **【2026-09-12 開出｜低優先】`sg-deploy.sh` next-admin 兩個 smoke 探針硬編 host port，同款漂移風險已知但未動** → ✅ 2026-09-26 續49（雲端 T25）：`docker port lobster-next-admin 3000/tcp`，fallback 3002。
   - `🟡 未開始` · `2026-09-12 開出` · `不卡誰，目前 prod .env 未設 override 故未觸發`
   - **一句話**：修 node-api 健康探針打錯 nginx 層那次（見 WORKLOG 2026-09-12），critic 覆審抓到 `sg-deploy.sh:311-312` 的 `next-admin /login`／`/api/ops/summary` 兩個探針一樣硬編 `127.0.0.1:3002`，而 `docker-compose.yml:437` 該埠其實是 `${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000`——跟當時 node-api 那個已修掉的 bug 同一種脆弱（host port 可被 env var 覆寫，硬編值只是「今天 prod .env 剛好沒設」才沒事）。node-api 已改成 `docker port lobster-node-api 3001/tcp` runtime 解析；next-admin 這兩行維持原樣未動，因為不是本次事故的觸發點，屬於刻意劃定的範圍外項目，非遺漏。修法方向：套同一個 `docker port lobster-next-admin 3000/tcp` 解析。細節見 WORKLOG 2026-09-12。
+- [ ] **【2026-09-28 開出｜Cognitive OS｜低優先】run_recipe_async 終態 FAILED flake：`test_async_run_reaches_a_terminal_state_via_the_existing_status_endpoint` 高負載下 async run 以 FAILED 收尾**
+  - `🟡 未開始` · `2026-09-28 開出` · `不卡誰`
+  - **一句話**：全套 `pytest tests/unit` 14521 passed／1 failed，只有此測試；單獨重跑 HEAD 3/3、HEAD+diff 3/3 皆綠，耗時 39 s→176 s 隨負載上升。與 2026-09-28 續2 修過的 15 s 逾時 flake 不同型（這次是終態 FAILED，不是逾時）。
+  - **下一步**：負載下重現時讀該 run journal 的 FAILED step `error`（`_fail_recipe_journal` 寫入），判斷是 runner 例外還是 run_lock 回收誤判。
+  - **證據**：WORKLOG 2026-09-28 續7。
 - [ ] **【2026-09-11 開出｜HCI30｜低優先】mutation-check-wave1.ps1 的 `drop-all-subject-records-referencing-fks` 疑似 flaky**
   - `🟡 未開始` · `2026-09-11 開出` · `不卡誰`
   - **一句話**：該 mutation 用動態 OID 查找刪 FK（`SELECT conname INTO c ... WHERE ...`，多筆同型 FK 存在時任選一筆），單次真跑出現過兩個無關測試（`EPISTEMIC-PROMOTE-01`／`EPISTEMIC-INHERIT-01` 等）意外失敗，同一份程式碼立刻重跑就消失（127/127 全殺）。未深查根因，僅記錄以免未來誤判為新回歸。細節見 WORKLOG 2026-09-11（規則式評分引擎條目）。

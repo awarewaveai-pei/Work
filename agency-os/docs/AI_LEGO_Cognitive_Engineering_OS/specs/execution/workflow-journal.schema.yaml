@@ -1,11 +1,16 @@
 $id: "ai-lego://specs/execution/workflow-journal.schema.yaml"
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Durable Workflow Journal"
+version: "1.1.0"
+status: ACTIVE
 description: >
   Checkpoint record for a linear Workflow IR execution. A journal is an
   operational recovery record, not an authorization record: the executor
   still resolves every node through its Method/Capability catalog before
-  invoking a handler.
+  invoking a handler. v1.1.0 (2026-09-28) adds step status NOT_INVOKED (an
+  unresolvable non-REQUIRED capability the executor skipped); the executor
+  already wrote it, every reader rejected it. Additive: every v1.0.0
+  (previously unversioned) journal stays valid, so journal_version stays 1.
 
 type: object
 additionalProperties: false
@@ -73,7 +78,11 @@ $defs:
         minLength: 1
       status:
         type: string
-        enum: [SUCCEEDED, FAILED]
+        description: >
+          SUCCEEDED and NOT_INVOKED are completed steps (resume skips them);
+          FAILED is not. Mirrored by executor.STEP_STATUSES /
+          COMPLETED_STEP_STATUSES, parity-tested against this enum.
+        enum: [SUCCEEDED, NOT_INVOKED, FAILED]
       input_paths:
         type: array
         items: {type: string}

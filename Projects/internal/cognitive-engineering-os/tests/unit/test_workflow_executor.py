@@ -10,7 +10,7 @@ from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from tests.unit.method_testkit import shared_method_catalog
-from ai_lego.platform.workflow.executor import execute_workflow_ir
+from ai_lego.platform.workflow.executor import COMPLETED_STEP_STATUSES, STEP_STATUSES, WorkflowStepResult, execute_workflow_ir
 from tests.unit.thread_testkit import HANG_GUARD_S
 
 
@@ -226,6 +226,57 @@ class WorkflowExecutorTests(unittest.TestCase):
             completed_again = execute_workflow_ir(ir, {}, {"one.step": first, "two.step": second}, journal_path=journal, resume=True)
             self.assertEqual(completed_again.status, "SUCCEEDED")
             self.assertEqual(calls, ["first", "second", "second"])
+
+    def test_failed_journal_with_not_invoked_step_resumes_to_succeeded(self):
+        class _Catalog:
+            def is_resolvable(self, ref):
+                return ref != "optional.capability"
+
+            def invoke(self, ref, handler, payload, node):
+                return None, handler(payload, node)
+
+        ir = {
+            "id": "not-invoked-resume-v1",
+            "nodes": [
+                {"node_kind": "capability", "ref": "optional.capability", "label": "optional", "necessity": "RECOMMENDED"},
+                {"node_kind": "method", "method_id": "one.step", "label": "one"},
+            ],
+        }
+        catalog = _Catalog()
+        attempts = []
+
+        def flaky(_payload, _node):
+            attempts.append("one")
+            if len(attempts) == 1:
+                raise InvariantViolation("temporary failure")
+            return {"value": 1}
+
+        contracts = SchemaContracts(resolve_spec_root())
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "run.json"
+            first = execute_workflow_ir(ir, {}, {"one.step": flaky}, catalogs={"capability": catalog, "method": catalog}, journal_path=journal)
+            self.assertEqual(first.status, "FAILED")
+            self.assertEqual([step.status for step in first.steps], ["NOT_INVOKED", "FAILED"])
+            contracts.validate("ai-lego://specs/execution/workflow-journal.schema.yaml", __import__("json").loads(journal.read_text(encoding="utf-8")), "failed journal with NOT_INVOKED step")
+            resumed = execute_workflow_ir(ir, {}, {"one.step": flaky}, catalogs={"capability": catalog, "method": catalog}, journal_path=journal, resume=True)
+            self.assertEqual(resumed.status, "SUCCEEDED")
+            self.assertEqual([step.status for step in resumed.steps], ["NOT_INVOKED", "SUCCEEDED"])
+            self.assertEqual(resumed.context["outputs"]["optional"]["status"], "NOT_INVOKED")
+            self.assertEqual(attempts, ["one", "one"])
+            contracts.validate("ai-lego://specs/execution/workflow-journal.schema.yaml", __import__("json").loads(journal.read_text(encoding="utf-8")), "resumed journal with NOT_INVOKED step")
+
+    def test_step_status_constants_match_journal_schema_enum(self):
+        import yaml
+
+        schema = yaml.safe_load((resolve_spec_root() / "specs" / "execution" / "workflow-journal.schema.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(set(schema["$defs"]["step"]["properties"]["status"]["enum"]), set(STEP_STATUSES))
+        self.assertEqual(STEP_STATUSES - COMPLETED_STEP_STATUSES, {"FAILED"})
+
+    def test_step_result_rejects_a_status_the_journal_schema_does_not_know(self):
+        for status in sorted(STEP_STATUSES):
+            WorkflowStepResult(0, "one", "method", "one.step", status, ())
+        with self.assertRaisesRegex(InvariantViolation, "WORKFLOW_STEP_STATUS_INVALID"):
+            WorkflowStepResult(0, "one", "method", "one.step", "SKIPPED", ())
 
     def test_concurrent_new_runs_atomically_claim_one_journal(self):
         ir = {"id": "atomic-claim-v1", "nodes": [{"node_kind": "method", "method_id": "one.step"}]}

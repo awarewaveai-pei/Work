@@ -1570,7 +1570,7 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(payload["workflow"]["steps"][0]["ref"], "literature_search")
         self.assertEqual(payload["workflow"]["context"]["outputs"]["offline_literature_search"]["literature"]["retrieval"]["status_code"], "OFFLINE_SOURCE_STALE")
 
-    def test_api_skips_unresolved_recommended_capability_without_registering_an_uncontracted_adapter(self):
+    def _run_with_unresolved_optional_literature(self, run_id: str):
         from ai_lego import resolve_spec_root
         from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
 
@@ -1587,15 +1587,29 @@ class RecipeRunTests(ApiTestCase):
         with patch.object(api_main, "compile_recipe_to_workflow_ir", side_effect=optional_fixture_compile), patch.object(
             api_main.CapabilityCatalog, "from_spec_root", classmethod(lambda cls, spec_root: catalog)
         ):
-            response = self.client.post(
+            return self.client.post(
                 "/recipes/edd-literature-search-v1/run",
-                json={"source": {"research_question": "How do educators describe reflective practice?"}, "run_id": "api-optional-capability-test"},
+                json={"source": {"research_question": "How do educators describe reflective practice?"}, "run_id": run_id},
             )
+
+    def test_api_skips_unresolved_recommended_capability_without_registering_an_uncontracted_adapter(self):
+        response = self._run_with_unresolved_optional_literature("api-optional-capability-test")
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["status"], "PASS")
         self.assertEqual(payload["workflow"]["steps"][0]["status"], "NOT_INVOKED")
         self.assertEqual(payload["workflow"]["steps"][0]["ref"], "literature_search")
+
+    def test_run_status_and_result_read_a_journal_with_a_not_invoked_step(self):
+        run_id = "api-optional-capability-status-test"
+        self.assertEqual(self._run_with_unresolved_optional_literature(run_id).status_code, 200)
+        status = self.client.get(f"/recipes/edd-literature-search-v1/runs/{run_id}")
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertEqual(status.json()["status"], "SUCCEEDED")
+        self.assertEqual(status.json()["steps"][0]["status"], "NOT_INVOKED")
+        result = self.client.get(f"/recipes/edd-literature-search-v1/runs/{run_id}/result")
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json()["workflow"]["steps"][0]["output"]["reason"], "CAPABILITY_NOT_RESOLVED")
 
     def test_art_reflection_recipe_preserves_non_diagnostic_boundary(self):
         self._login()

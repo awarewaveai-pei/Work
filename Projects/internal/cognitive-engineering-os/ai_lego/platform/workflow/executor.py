@@ -30,6 +30,11 @@ JournalContextProjector = Callable[[dict[str, Any]], Mapping[str, Any]]
 GateRunner = Callable[[dict[str, Any], dict[str, Any], dict[str, Any]], list[Mapping[str, Any]]]
 WorkflowGateRunner = Callable[[dict[str, Any], dict[str, Any]], list[Mapping[str, Any]]]
 
+# Step statuses a journal may carry; must equal workflow-journal.schema.yaml $defs.step.status.enum
+# (parity test). NOT_INVOKED = skipped unresolvable non-REQUIRED capability: completed, not a failure.
+COMPLETED_STEP_STATUSES = frozenset({"SUCCEEDED", "NOT_INVOKED"})
+STEP_STATUSES = COMPLETED_STEP_STATUSES | {"FAILED"}
+
 
 @dataclass(frozen=True)
 class WorkflowStepResult:
@@ -45,6 +50,11 @@ class WorkflowStepResult:
     error: str | None = None
     contract: dict[str, Any] | None = None
     gates: tuple[dict[str, Any], ...] | None = None
+
+    def __post_init__(self) -> None:
+        # Writer side of the schema parity: a status readers do not know must never reach a journal.
+        if self.status not in STEP_STATUSES:
+            raise InvariantViolation(f"WORKFLOW_STEP_STATUS_INVALID: {self.status!r}")
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -68,7 +78,7 @@ class WorkflowStepResult:
 
 @dataclass(frozen=True)
 class WorkflowRunResult:
-    """Complete run result; ``SUCCEEDED`` is only possible when every node ran."""
+    """Complete run result; ``SUCCEEDED`` is only possible when every node completed (``COMPLETED_STEP_STATUSES``)."""
 
     workflow_id: str
     status: str
@@ -252,7 +262,7 @@ def _restore_journal(path: Path, workflow_ir: Mapping[str, Any], initial_context
         raise InvariantViolation("WORKFLOW_JOURNAL_STEPS_INCOMPLETE")
     restored: list[WorkflowStepResult] = []
     for raw in raw_steps[:expected]:
-        if not isinstance(raw, dict) or raw.get("status") != "SUCCEEDED":
+        if not isinstance(raw, dict) or raw.get("status") not in COMPLETED_STEP_STATUSES:
             raise InvariantViolation("WORKFLOW_JOURNAL_COMPLETED_STEP_INVALID")
         restored.append(WorkflowStepResult(int(raw["index"]), raw["label"], raw["node_kind"], raw["ref"], raw["status"], tuple(raw.get("input_paths", [])), raw.get("output"), raw.get("error"), raw.get("contract"), tuple(raw.get("gates", [])) if raw.get("gates") is not None else None))
     context = journal.get("context")
