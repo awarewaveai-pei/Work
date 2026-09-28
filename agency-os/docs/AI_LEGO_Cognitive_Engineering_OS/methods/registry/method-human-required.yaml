@@ -1,0 +1,10 @@
+# Only params where "there is no correct value without a human" (plan §3.4 C5) -- a Recipe run refuses to
+# execute while any bound source.* path for these is missing or empty, and AI drafting never fills them.
+decision.weighted_decision_matrix:
+  - weights
+  - scores
+  - scale_min
+  - scale_max
+epistemic.toulmin_model:
+  - warrant
+  - qualifier

@@ -262,6 +262,40 @@ class RecipeDraftTests(unittest.TestCase):
             draft_recipe_source("art-therapy-unstick-v1", "x", provider=provider, spec_root=SPEC_ROOT, catalog=CATALOG, labels=["nope"])
         del good
 
+    def test_value_judgment_params_are_never_filled_by_drafting(self):
+        """decision.weighted_decision_matrix's weights/scores/scale_min/scale_max are human-only (C5):
+        draft_recipe_source must pass them to draft_method_kwargs as exclude_params, the same treatment an
+        upstream-bound param already gets, so the model is never even asked to fill them
+        (RESEARCH_LINES_MASTER_PLAN §12.8 WC-P3-02).
+
+        Spies on draft_method_kwargs directly rather than inspecting the drafted source: this node's builder
+        requires genuine-compute provenance that an AI draft's stamped AI_SUGGESTED provenance can never satisfy,
+        so validation fails and the repair loop's second (unscripted, "{}") attempt overwrites result.kwargs --
+        an unrelated, pre-existing quirk that would make a black-box assertion on the final kwargs flaky.
+        """
+        captured_exclude_params: list[tuple] = []
+        real_draft_method_kwargs = draft_mod.draft_method_kwargs
+
+        def spy(method_id, brief, *, exclude_params=(), **kwargs):
+            if method_id == "decision.weighted_decision_matrix":
+                captured_exclude_params.append(exclude_params)
+            return real_draft_method_kwargs(method_id, brief, exclude_params=exclude_params, **kwargs)
+
+        with patch.object(draft_mod, "draft_method_kwargs", side_effect=spy):
+            draft_recipe_source("life-decision-v1", "我在猶豫要不要換工作", provider=ScriptedProvider("{}"), spec_root=SPEC_ROOT, catalog=CATALOG, labels=["weighted_decision_matrix"])
+        self.assertEqual(len(captured_exclude_params), 1)
+        self.assertEqual(set(captured_exclude_params[0]), {"weights", "scores", "scale_min", "scale_max"})
+
+    def test_direct_method_draft_also_never_fills_value_judgment_params(self):
+        # POST /ai/draft/method/{id} calls draft_method_kwargs with no exclude_params (critic M11): the exclusion
+        # lives in draft_method_kwargs itself, so a model answer that fills weights is dropped, not returned.
+        answer = json.dumps({"weights": {"cost": 0.9}, "scores": {"a": {"cost": 5}}, "scale_min": 1, "scale_max": 5})
+        provider = ScriptedProvider(answer)
+        result = draft_method_kwargs("decision.weighted_decision_matrix", "要不要換工作", provider=provider, spec_root=SPEC_ROOT, catalog=CATALOG)
+        self.assertTrue({"weights", "scores", "scale_min", "scale_max"} <= set(result.excluded_params))
+        self.assertFalse({"weights", "scores", "scale_min", "scale_max"} & set(result.kwargs))
+        self.assertIn("DO NOT produce these keys", provider.prompts[0][1])
+
 
 class ApiRouteTests(ApiTestCase):
     def _use(self, provider):

@@ -1,4 +1,18 @@
 ﻿# Worklog
+## 2026-09-28（續2）研究線 WC-P3-02（T34）併入 main：async recipe run＋human_required；一個 run_id 只對應一次 run
+- [來源] 雲端 `claude/cc-t34-recipe-async-human-required`（1654d178b）；合併者在 `D:\tmp\v-p2c`（base fb9587462）重驗，Codex 2026-09-27＋critic 發現後修，squash 成一個 commit。
+- [根因／修]
+  - C1 async 在 journal 寫出前回 202（該窗口 status=404）；重送已完成 run_id → 背景 thread 把 JOURNAL_EXISTS 錯誤寫蓋掉已完成 journal。修：`main.py` 行程內 in-flight 集合＋鎖；202 前檢查（journal 在且非 resume → 409 `WORKFLOW_RUN_EXISTS_REQUIRES_RESUME`；resume 無 journal → 404 `WORKFLOW_RUN_NOT_FOUND`；進行中 → 409 `WORKFLOW_RUN_IN_FLIGHT`）；status 在 in-flight 無 journal 時回 RUNNING；thread 不改寫他人 journal；錯誤文字去主機路徑。
+  - M11 價值判斷欄排除只在 `draft_recipe_source`；`POST /ai/draft/method/{id}` 會填 weights。修：`draft_method_kwargs` 自己併入 human_required（新測試 `test_direct_method_draft_also_never_fills_value_judgment_params`）。
+  - M12/m10 登錄檔打錯方法／參數 → 靜默不排除；「   」算有填。修：`load_human_required` 對 builder 簽名驗證；純空白 = 缺。
+  - Codex 2026-09-28 M1：in-flight 守衛只在 async 分支 → async 進行中、同 run_id 走 sync 會再跑一次。不變量＝一個 (tenant, run_id) 同時最多一次執行，不分路徑。修：守衛移出 async 分支（`_mark_run_in_flight`，改名去 async）；sync 在 finally 釋放；thread 啟動失敗即釋放。測試：duplicate 案加 sync 重送 → 409 IN_FLIGHT；sync 跑完重送 → 409 EXISTS（證明已釋放）。
+  - 測試 flaky：`_poll_until_terminal` 寫死 15 s（負載下 >15 s 仍 RUNNING）→ 改 `HANG_GUARD_S`（`tests/unit/thread_testkit.py:1-5` 不變量：等待只防死鎖不量速度）。
+- 突變（`mut_t34c` 11 項＋修 M1 後 `mut_t34d` 4 項，全紅→還原綠）：422 檢查拔、recipe 起草不排除、method 起草不排除、journal 在 409 拔、resume 404 拔、in-flight 409 拔、守衛只管 async（M1 原狀）、sync 不釋放、RUNNING stub 拔、他人 journal 改寫、路徑不去除、登錄檔簽名檢查拔、純空白算有填。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_run_recipe_async tests.unit.test_human_required tests.unit.test_ai_gateway | exit=0 | ms=139701
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/1n
+  - external oracle = Codex CLI（`codex-oracle.ps1` 三輪；`/codex-review` 在 worktree 被 policy 擋、零讀檔，不計）：r1 `reports/oracle/2026-09-28-review-c5d5c209.md` M（in-flight 只管 async）已修；r2 `2026-09-28-review-83b2ddce.md` m（anchors 字串被拆字）已修；r3 `2026-09-28-review-3895ca65.md` n（in-flight 為行程內，多 worker／行程死亡）= 設計邊界不修：部署單一行程（`Dockerfile:40` uvicorn 無 --workers；`main.py:1155` interpret 路徑同假設），行程死 → 無 journal → 誠實 404（`main.py:637-640` 註解），列剩餘風險
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`WORKFLOW_RUN_IN_FLIGHT|WORKFLOW_RUN_NOT_FOUND|_redact_host_paths|load_human_required` | hits=25
+- [剩餘風險] async run 存活靠單一行程；改多 worker／行程外 queue 前須先把 in-flight 移到持久層（Codex r3）。
 ## 2026-09-28（續1）研究線 P2 第一波雲端合併：T28–T31（WC-P2-01～04）本機重驗、critic 兩輪＋Codex oracle 三輪、不變量分析後併入 main；第二波 T32／T33／T36 卡與 prompt
 - [操作者] 「fetch 四個分支重新驗證（T29 schema 決策證據、T30 spec-root 唯讀邊界、T31 案例覆蓋率），讀 commit message 的 root cause／verification 核對，再合併、重產 SPEC_QUICKREF，才寫 wave 2」；中途問「為什麼每次給雲端做都問題一堆？那還要雲端做？」。
 - [核對 commit 聲稱] T28 1310 tests OK 屬實；T29 決策只證了 golden runner，另以 runtime `SchemaContracts` 驗 19 fixture＋共用 `$defs` minItems 突變三檔同翻 → 成立；T30／T31 測試屬實，但卡片驗收 `… -q 2>&1 | tail -1` 在本機印 CLI 輸出而非 `OK`（雲端 stdout 不緩衝）；T31 陷阱四類屬實、`terms_of` 以 node 跑真 `StuckBox.tsx` 15 例 0 差異；T31 突變證明在本機是假綠（暫存副本 import 不到 ai_lego，未突變也 exit 1）。
