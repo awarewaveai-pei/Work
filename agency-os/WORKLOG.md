@@ -1,4 +1,11 @@
 ﻿# Worklog
+## 2026-09-29（續2）測試範圍定案（計畫 v1.56 §12.1 規則 11 唯一正本）：本機永不手動跑全套
+- [根因] v1.55 規則 11 同時寫「只跑受影響」與「正式站部署前跑全套」→ 兩個 session 照後者排全套 → 操作者「我真的不要動不動就跑全套」。
+- [定案] ① 每卡：`affected_tests.py --run`＋golden；② 部署前：`--base <最近全套綠 SHA>`＋golden＋`deploy.sh` 關卡（夜間 CI 上線前＝63e96ffe6）；③ 全套只在 GitHub CI（依賴／執行環境變更＋每晚），期末閘看 CI 結果。
+- [本次部署實例] `affected_tests.py --base 63e96ffe6 --run`（295c29d51）38 模組 722 tests OK 536 s；golden ALL PASSED。
+- REALTEST_WAIVED: DOC_ONLY -- 規則文字；同日部署證據見上行
+- REVIEW_WAIVED: DOC_ONLY -- 一條規則改寫
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`全套` | hits=6（計畫內其餘為歷史卡片與規則 11 引用，由本條「其他處以本條為準」涵蓋）
 ## 2026-09-29（續1）Cognitive OS：AI 每日額度的保留改存資料庫（行程死掉、記帳失敗、多行程都不漏帳）；刪除行程記憶體的保留與鎖；未上線
 - [操作者] 「我不要一直增加 tasks，很爛！去徹底處理好」→ a7713d61e 列的 TASKS 項（在途保留改 DB 層）本批做完並刪除該列。
 - [根因] C1 在途保留 `_AI_RESERVED` 在 API 行程記憶體（main.py），`_ai_budget_lock_for` 也是行程內鎖：呼叫中行程被殺／重啟，那次的帳記不到；多 worker 時各算各的（Codex 2026-09-28 第 8 輪）。C2 同類：上一批改成逐次記帳後，估價 `ai_usage_recent` 把「最近 5 筆呼叫」當「最近 5 次分析」，有重問的分析被低估。
