@@ -1,5 +1,5 @@
 import React from "react";
-import { linesFor, lineHeight, Wrap } from "./svgtext";
+import { linesFor, lineHeight, textWidth, Wrap } from "./svgtext";
 
 // ③ of docs/mockups/iceberg-result-mock.html: each chart answers one question and says how to read it, what it shows
 // and where it comes from. A: the numbers your record states (the interpretation's `trend`; its gate checks every value
@@ -20,14 +20,16 @@ export function TrendChart({ series, cite }: { series: TrendSeries[]; cite: (id:
   const low = series.map((line) => Math.min(0, ...line.points.map((point) => point.value)));
   const nice = (value: number) => { if (value <= 0) return 1; const power = 10 ** Math.floor(Math.log10(value)); return ([1, 2, 4, 5, 8, 10].find((k) => k * power >= value) ?? 10) * power; };   // 6 -> 8, 35 -> 40: round ticks (the mock's 8 人 / 40 分)
   const top = series.map((line, index) => nice(Math.max(...line.points.map((point) => point.value), low[index] + 1)));
-  const y = (value: number, index: number) => 180 - ((value - low[index]) / (top[index] - low[index])) * 150;
+  const y = (value: number, index: number) => 180 - ((value - low[index]) / (top[index] - low[index])) * 160;
   const labelLines = Math.max(...labels.map((label) => linesFor(label, Math.min(slot, 90), 11)));
   const foot = `每個點都來自你填的內容 ${series.flatMap((line) => line.points.map((point) => cite(point.citation))).filter((v, i, all) => v && all.indexOf(v) === i).join("")}${series.length > 1 ? "；兩線同時變化不代表因果。" : ""}`;
   const footLines = linesFor(foot, 400, 11);
   const footTop = 186 + labelLines * lineHeight(11) + 6;
   const height = footTop + footLines * lineHeight(11) + 8;
   const ticks = (index: number) => [top[index], (top[index] + low[index]) / 2, low[index]];
-  return <svg viewBox={`0 0 460 ${height}`} role="img" aria-label={`${series.map((line) => line.name).join("與")}的變化`}>
+  const rightTickLabels = series[1] ? ticks(1).map((value) => `${tidy(value)} ${series[1].unit}`) : [];
+  const viewWidth = rightTickLabels.length ? Math.max(460, 424 + Math.ceil(Math.max(...rightTickLabels.map((label) => textWidth(label, 11)))) + 8) : 460;
+  return <svg viewBox={`0 0 ${viewWidth} ${height}`} role="img" aria-label={`${series.map((line) => line.name).join("與")}的變化`}>
     <line x1="50" y1="20" x2="50" y2="180" className="axis" /><line x1="50" y1="180" x2="420" y2="180" className="axis" />
     <g fontSize="11" className="m">
       {ticks(0).map((value, index) => <text key={index} x="46" textAnchor="end" y={[24, 104, 184][index]}>{tidy(value)} {series[0].unit}</text>)}
@@ -60,7 +62,10 @@ export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; da
   const height = 2 * ry + tallest + 24;
   const layout = loopLayout(n, rx, ry, cx, cy);
   const where = new Map(loop.nodes.map((node, index) => [node.id, layout[index]]));
-  const centreW = 2 * rx - BOX_W - 20;   // between the boxes' inner edges
+  // When every box clears the central text band vertically (the four-node diamond), use the actual left/right centre
+  // span. Other layouts retain the inner-edge width so a title can never grow into a box sitting beside it.
+  const centreSpan = Math.max(...layout.map((point) => point.cx)) - Math.min(...layout.map((point) => point.cx)) - 20;
+  const centreW = layout.every((point) => Math.abs(point.cy - cy) > tallest / 2 + 34) ? centreSpan : 2 * rx - BOX_W - 20;
   const title = `${loop.kind === "reinforcing" ? "R" : "B"} ${loop.name}（${loop.kind === "reinforcing" ? "自我加強" : "自我平衡"}）`;
   const note1 = "箭頭 = 前者讓後者更嚴重", note2 = loop.kind === "reinforcing" ? "轉一圈回到起點，所以越轉越強" : "轉一圈回到起點，會被拉回來";
   const titleH = linesFor(title, centreW, 16) * lineHeight(16) + 2, noteH = (linesFor(note1, centreW, 11) + linesFor(note2, centreW, 11)) * lineHeight(11) + 2;

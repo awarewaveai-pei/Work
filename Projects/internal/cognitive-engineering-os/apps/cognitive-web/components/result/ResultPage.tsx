@@ -63,6 +63,7 @@ const GATE_TIP: Record<string, string> = { citation_integrity: "每個發現的 
 const PICTURE: Record<string, string> = { layered: "你的問題在每一層各是什麼", quadrant: "每一項落在哪一格" };
 const COST: Record<string, string> = { S: "小", M: "中", L: "大", XS: "很小", XL: "很大", low: "低", medium: "中", high: "高" };   // the model's size codes, spelled out
 const NUMERAL = ["", "一", "兩", "三", "四", "五", "六", "七", "八", "九"];
+const UNSPECIFIED_EVIDENCE = new Set(["未指定；需使用者補充證據", "Not specified; user must supply evidence"]);
 // a section the gate dropped says why in plain words (the evidence itself stays in the expert JSON)
 const DROPPED: Record<string, string> = {
   trend: "這次的趨勢圖有數字對不上你填的內容，所以不畫。", loop: "這次找到的因果迴路有環節沒有出處或接不起來，所以不畫。",
@@ -170,6 +171,16 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const loopFindings = findings.map((finding, index) => index + 1).filter((number) => findings[number - 1].citations.some((id) => loopCites.has(id)));
   const saveJudgmentText = async () => { if (judgment && judgmentText !== savedText) { await apiFetch(`/interpretations/${result.interpretation_id}/judgment`, { method: "POST", body: JSON.stringify({ stance: judgment, text: judgmentText }) }); setSavedText(judgmentText); } };
   const removedNote = (section: string, what: string) => (removed[section]?.length ? <p className="sub mt6 mb0">{removed[section].length} 個{what}沒有出處，已拿掉（專家模式有細節）。</p> : null);
+  const missingLayerReading = removed.units?.length ? "這一層的解讀沒有出處，已拿掉" : "這次的分析沒有寫這一層";
+  const gapNeed = (needed?: string) => needed && !UNSPECIFIED_EVIDENCE.has(needed) ? `（需要：${needed}）` : "";
+  const gapSeparator = (previous?: string) => previous && !/[。！？；.!?;]\s*$/.test(previous) ? "；" : "";
+  const gapText = (result.gaps ?? []).map((gap, index) => `${index ? gapSeparator(result.gaps?.[index - 1]?.text) : ""}${gap.text ?? ""}`).join("");
+  const expertSummary = {
+    id: result.interpretation_id,
+    generated_by_method: result.method_id,
+    gate_results: gateResults.map(({ gate_id, status, evidence }) => ({ gate_id, status, evidence: evidence ?? {} })),
+    interpretation: { layers: layers.length, findings: findings.length, gaps: (result.gaps ?? []).length, next_methods: (result.next_methods ?? []).length },
+  };
 
   useEffect(() => {   // what each next step would cost (花錢前先講), from the API's estimate for that tool
     let active = true;
@@ -223,7 +234,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       {findings.map((finding, index) => { const [cls, zh] = CONFIDENCE[finding.confidence?.level] ?? ["mid", finding.confidence?.level ?? "未標"]; return <div className="finding" key={finding.id}><b>發現 {index + 1}｜{finding.title}<span className={`conf ${cls}`}>信心：{zh}——{finding.confidence?.reason}</span></b>{finding.text} {cites(finding.citations)}</div>; })}
       {((result.recommendations ?? []).some((item) => item.action) || (result.gaps ?? []).length > 0) && <p className="mt6 mb0">
         {(result.recommendations ?? []).some((item) => item.action) && <><b>建議：</b>{(result.recommendations ?? []).filter((item) => item.action).map((item, index) => <span key={index}>{index ? "；" : ""}{item.action} {cites(item.citations)}</span>)}{(result.gaps ?? []).length > 0 ? "。" : ""}</>}
-        {(result.gaps ?? []).length > 0 && <><b>證據缺口：</b>{(result.gaps ?? []).map((gap) => gap.text).join("；")}。</>}
+        {gapText && <><b>證據缺口：</b>{gapText}{/[。！？.!?]\s*$/.test(gapText) ? "" : "。"}</>}
       </p>}
       {conditions.length > 0 && <div className="finding warn"><b>改判條件（出現這些證據，結論要改）</b>{conditions.map((condition, index) => <span key={index}>{"①②③④⑤⑥⑦⑧⑨"[index] ?? `${index + 1}.`} {condition.text} → {condition.would_change}{index < conditions.length - 1 ? "；" : ""}</span>)}</div>}
       <div className="judge"><b>你的判斷（你的原話才是記錄；上面 AI 寫的只是附掛）</b>
@@ -270,18 +281,17 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
           <div className="head"><h3>第 {index + 1} 層／{layers.length}：{layer.label}</h3>{facts && <span className="meta">{facts.seen} ・ 時間：{facts.time} ・ 出手方式：{facts.mode}</span>}</div>
           <div className="row"><b>這層問</b><span className="q">{facts?.ask4 ?? question(layer.path)}</span></div>
           <div className="row"><b>你填的</b><span>{resolved(layer.path)} {cites(citedUnder(layer.path))}</span></div>
-          {reading && <div className="row"><b>這代表</b><span>{reading.meaning} {cites(reading.citations)}</span></div>}
-          {reading && <div className="row"><b>在這層出手</b><span>{reading.action}{/[。！？]$/.test(reading.action) ? "" : "。"}<b>效果</b>：{reading.effect}<span className={`lever ${reading.leverage}`}>槓桿：{LEVER[reading.leverage] ?? reading.leverage}</span></span></div>}
+          <div className="row"><b>這代表</b>{reading ? <span>{reading.meaning} {cites(reading.citations)}</span> : <span className="sub">{missingLayerReading}</span>}</div>
+          <div className="row"><b>在這層出手</b>{reading ? <span>{reading.action}{/[。！？]$/.test(reading.action) ? "" : "。"}<b>效果</b>：{reading.effect}<span className={`lever ${reading.leverage}`}>槓桿：{LEVER[reading.leverage] ?? reading.leverage}</span></span> : <span className="sub">{missingLayerReading}</span>}</div>
           <div className="row"><b>對應方案</b><span>{opts.length ? opts.map((option) => `⑦ ${optionTag(option)}`).join("、") : iceberg && index === 1 && solutions?.metrics?.length ? "⑦ C 的追蹤指標（不是方案，是量法）" : solutions ? "—（⑦ 沒有方案在這層出手）" : "這次沒有方案草稿"}{focusKey === unit ? (opts.length ? "★ 本次建議" : "　★ 本次建議先在這層出手") : ""}</span></div>
           <div className="row"><b>資料厚度</b><span>你填 {result.data_thickness?.[unit]?.own_statements ?? 0} 句・外部 {result.data_thickness?.[unit]?.external_sources ?? 0} 筆 → {verdict(unit) === "最薄" ? <span className="warn">最薄</span> : verdict(unit)}</span></div>
         </div>; }) : <p className="mb0">這個工具的結果是一張圖，不分層；請對照上面的圖逐項看。</p>}
-      {layers.length > 0 && !readings.length && <p className="sub mt8 mb0">{missing("units", "每一層「這代表什麼、在這層怎麼出手」的解讀")}</p>}
     </Card>
 
     <Card id="5" title={focusLayer ? "⑤ 總結：在哪一層出手" : "⑤ 總結"} read="三句話：問題在哪、先做哪層、還缺什麼。" act="手上有缺口的資料，就回上面補、再執行。">
       <div className="finding"><b>主要發現</b>{result.summary ?? findings.map((item) => item.title || item.text).join("；")}</div>
       {result.priority ? <div className="finding"><b>建議順序{focusLayer ? `：先第 ${layers.indexOf(focusLayer) + 1} 層` : ""}</b>{result.priority}</div> : <div className="finding"><b>建議順序</b>{missing("priority", "出手順序")}</div>}
-      {(result.gaps ?? []).length > 0 ? <div className="finding warn"><b>證據缺口（老實說）</b>{(result.gaps ?? []).map((gap, index) => <span key={index}>{index ? "；" : ""}{gap.text}{gap.needed_evidence ? `（需要：${gap.needed_evidence}）` : ""}</span>)}</div> : <div className="finding warn"><b>證據缺口（老實說）</b>這次分析沒有列出缺口；沒有外部來源時，結論全靠你填的內容。</div>}
+      {(result.gaps ?? []).length > 0 ? <div className="finding warn"><b>證據缺口（老實說）</b>{(result.gaps ?? []).map((gap, index) => <span key={index}>{index ? gapSeparator(result.gaps?.[index - 1]?.text) : ""}{gap.text}{gapNeed(gap.needed_evidence)}</span>)}</div> : <div className="finding warn"><b>證據缺口（老實說）</b>這次分析沒有列出缺口；沒有外部來源時，結論全靠你填的內容。</div>}
     </Card>
 
     <Card id="6" title={iceberg ? "⑥ 理解層次對照表（改編自 Anderson & Johnson）" : "⑥ 對照表"} read={focusLayer ? "一列一層，★ 是建議先出手的列。" : "一列一個你填的欄位。"} act={solutions ? "四列都要有人負責，填在 ⑦ B 表。" : "看哪一列最薄，就先補那一列。"}>
@@ -399,7 +409,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       {actionError && <p className="error" role="alert">沒有成功：{actionError}</p>}
       <details className="mt10" id="expert"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
         <table><thead><tr><th>閘門</th><th>狀態</th><th>證據</th></tr></thead><tbody>{gateResults.map((gate) => <tr key={gate.gate_id}><td>{GATE_LABEL[gate.gate_id] ?? gate.gate_id}</td><td className={gate.status === "PASS" ? "ok" : "warn"}>{gate.status}</td><td><code>{JSON.stringify(gate.evidence ?? {})}</code></td></tr>)}</tbody></table>
-        <pre>{JSON.stringify({ result, gateResults, manifest }, null, 2)}</pre>
+        <pre>{JSON.stringify(expertSummary, null, 2)}</pre>
+        <details><summary>完整 JSON</summary><pre>{JSON.stringify({ result, gateResults, manifest }, null, 2)}</pre></details>
       </details>
     </div>
     {project && <p className="sub mt8"><Link href={projectHref(project.id)}>← 回專案「{project.name}」</Link></p>}

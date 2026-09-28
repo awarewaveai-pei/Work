@@ -5,11 +5,15 @@ import type { ReactNode } from "react";
 // block inside the SVG (foreignObject) so the browser wraps it; `linesFor` estimates the lines it will take (a CJK
 // character is one em wide, latin about half), so a band or a box can be sized by its text before it is drawn.
 const wide = (ch: string) => /[←-⯿①-⓿⺀-￿]/.test(ch);   // CJK, circled digits, arrows and stars draw one em wide
+export function textWidth(text: string, size: number): number {
+  return Array.from(text).reduce((sum, ch) => sum + (wide(ch) ? size : size * 0.55), 0);
+}
+
 export function linesFor(text: string, width: number, size: number): number {
   let line = 0;
   let count = 1;
   for (const token of text.match(/[A-Za-z0-9.,%$-]+|[\s\S]/gu) ?? []) {   // a latin word or number moves to the next line whole
-    const w = Array.from(token).reduce((sum, ch) => sum + (wide(ch) ? size : size * 0.55), 0);
+    const w = textWidth(token, size);
     if (line > 0 && line + w > width) { count += 1; line = w; } else line += w;
   }
   return count;

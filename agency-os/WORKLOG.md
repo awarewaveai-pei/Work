@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-28（續5）Cognitive OS 結果頁安全顯示批次：C3-08／C3-09／C3-20／M-15／M-39／N-51
+- [任務] 只處理 6 個低風險顯示缺口；不改 API／DB／契約、不部署。報告帳目由 FIXED 198／PARTIAL 17／OPEN 95 更新為 204／14／92，6 列移入 FIXED。
+- [改] `Charts.tsx`：y 軸完整使用 20–180、右軸依共用 `textWidth()` 擴張 viewBox、四節點中央標題依實際節點中心距取寬且其他布局維持內緣保護。`ResultPage.tsx`：缺層固定保留兩列並明示原因；證據 sentinel／重複標點不進一般畫面；專家第一份 JSON 改固定摘要，完整 JSON 無損留在第二層 details。測試先紅 6 項再綠。
+- [對抗自審] 攻擊：長中文右軸、負值／零值趨勢、2–6 節點布局、單層缺解讀與 gate 移除、中文／英文 sentinel、句末中英標點、摘要遺漏 gate evidence、完整 JSON 資料遺失。發現摘要初稿漏 `gate_results[].evidence` 1 項，已補並加斷言；其餘 0 finding。回滾：revert 本批 commit，無資料遷移。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck`＋`npm test`（apps/cognitive-web）＋`python docs/mockups/check-mocks.py` | exit=0 | result=tsc clean；10 檔／56 tests passed；5 pages all rules green
+- REVIEW_DONE: critic=Manual adversarial | verdict=pass_after_fix | findings=0c/1m_fixed | evidence=修正前聚焦測試 6 failed／11 passed；修正後 2 檔／17 passed；完整套件 56 passed；`git diff --check` exit 0
+- ORACLE_WAIVED: `scripts/claude-oracle.ps1` exit 1（Claude 回傳 invalid/incomplete review schema）；依操作者既有授權改書面對抗自審＋紅→綠 mutation 證據，不宣稱 oracle 通過
+- BUGHUNT_DONE: scope=`apps/cognitive-web/components/result`＋`docs/RESULT_PAGE_GAP_REPORT.md` | grep=`舊 y=30／固定 460 右軸／固定 centreW／reading 條件列／無條件 sentinel／單一 full JSON／六個 ID 殘留 OPEN-PARTIAL` | result=實作舊式樣 0；6 ID 僅在 FIXED 批次註記
+
 ## 2026-09-28（續4）Cognitive OS 結果頁照示意稿：契約 1.2.0＋逐項修復閘＋核准／任務／重跑／估價＋確認執行＋parity 閘；310 筆稽核逐筆驗證 → 交接報告 `docs/RESULT_PAGE_GAP_REPORT.md`
 - [操作者] 「內容、邏輯、分析出來的結果、排版和版面都和原設計差很多；不是每個按鈕都可以使用；文字也被截斷；每一個步驟、細節、按鈕都去核對清楚；繼續完成所有缺點盤點，寫一份詳細報告我要讓其他 AI 做」。示意稿 = 規格（`docs/mockups/iceberg-result-mock.html`）。
 - [根因] C1 契約 1.1.0 沒有示意稿要的欄位（headline／每層 brief,step／四級槓桿／horizon,signoff／trend.question）→ 頁面只能猜或留白。C2 `detail_problems` 段級：一個 metric 的空 `now_citation` 丟掉整張 ⑦。C3 模型回 NOT_JSON（文字裡的引號）整份失敗 → `complete_json` 走 tool use 拿 API 解析過的 JSON。C4 SVG `<text>` 用 `…` 截字 → foreignObject 換行、畫布跟文字長。C5 示意稿的按鈕（核准／退回／任務／到期重跑／估價／比較／PDF）沒有後端 → 事件流加事件、讀時推導，無新表。C6 人工清單核對漏掉整張 ⑧ → `check-mocks.py --parity` 機械比對示意稿每張卡（標題／怎麼讀粗體／h3／row 標籤／表頭／圖說／按鈕）。C7（真跑才看到）模型漏畫 圖 A 而記錄明明有 6 位→2 位、無人察覺 → `trend_candidates` + `TREND_MISSING` 重問一次；計畫列 `when` 非週數 → 提示規定週數；⑦ strip 超 U14 60 字。

@@ -97,6 +97,9 @@ describe("ResultPage", () => {
     for (const text of ["<b>一句話：</b>分享變少是流程造成的。", "<b>這代表</b><span>等答案迴路", '<span class="lever high">槓桿：高</span>', "<b>對應方案</b><span>⑦ 乙「改流程」★ 本次建議</span>",
       '<span style="display:inline-block"> ★ 建議先出手</span>', '<td>結構 ★</td><td>設計 Design</td><td>現在→未來</td>', 'aria-label="主動分享的變化"', 'aria-label="等答案因果迴路"', 'aria-label="四層改變難度與效果持久度對比"',
       "<b>如果只做一件事，明天就做</b>下次先讓參與者說 3 分鐘。", '<span class="goal">目標 6 人（待你確認）</span>', "<b>建議順序：先第 3 層</b>先改流程，再談角色。"]) expect(html).toContain(text);
+    expect(html.match(/<b>這代表<\/b>/g)).toHaveLength(4);
+    expect(html.match(/<b>在這層出手<\/b>/g)).toHaveLength(4);
+    expect(html.match(/這次的分析沒有寫這一層/g)).toHaveLength(6);
     expect(html).not.toContain("這次的分析沒有產出");   // every section is there
     const artifact = path.resolve(process.cwd(), ".artifacts/iceberg-detail.html");
     mkdirSync(path.dirname(artifact), { recursive: true });
@@ -116,6 +119,9 @@ describe("ResultPage", () => {
     expect(without).toContain("圖 A 趨勢：這次的趨勢圖有數字對不上你填的內容，所以不畫。");
     expect(without).toContain("這次的分析沒有產出方案比較與行動計畫。");
     expect(without).toContain("數字與環節都有出處 ✓");
+
+    const removedUnit = renderToStaticMarkup(<ResultPage result={{ ...detailed, units: [] } as unknown as React.ComponentProps<typeof ResultPage>["result"]} record={rec} fields={fields} gateResults={[{ gate_id: "detail_integrity", status: "PASS", evidence: { removed: { units: ["units[0] cites an unknown source; removed"] } } }]} />);
+    expect(removedUnit.match(/這一層的解讀沒有出處，已拿掉/g)).toHaveLength(8);
   });
   it("shows a visible reason when saving tasks is unavailable and renders the gate table", () => {
     const noProject = renderToStaticMarkup(<ResultPage result={{ ...fixture, solutions: { options: [], first_step: "x", plan: [] } } as any} />);
@@ -159,6 +165,28 @@ describe("ResultPage", () => {
     const withCondition = { ...fixture, findings: [{ ...fixture.findings[0], revision_conditions: [{ text: "New evidence", would_change: "Confidence level" }] }] };
     const html = renderToStaticMarkup(<ResultPage result={withCondition} record={record} />);
     expect(html).toContain("<span>① New evidence → Confidence level</span>");
+  });
+
+  it("omits the unspecified evidence sentinel and does not add a separator after sentence punctuation", () => {
+    const html = renderToStaticMarkup(<ResultPage result={{ ...fixture, gaps: [
+      { text: "第一個缺口。", needed_evidence: "未指定；需使用者補充證據" },
+      { text: "第二個缺口", needed_evidence: "逐次觀察紀錄" },
+    ] }} record={record} />);
+    expect(html).not.toContain("（需要：未指定；需使用者補充證據）");
+    expect(html).not.toContain("第一個缺口。；");
+    expect(html).toContain("第二個缺口（需要：逐次觀察紀錄）");
+  });
+
+  it("shows a compact expert summary first and preserves the complete JSON in a nested disclosure", () => {
+    const gates = [{ gate_id: "citation_integrity", status: "PASS", evidence: { cited: 1 } }];
+    const html = renderToStaticMarkup(<ResultPage result={fixture} record={record} manifest={[{ id: "source-1", value: "完整資料" }]} gateResults={gates} />);
+    const decode = (value: string) => value.replaceAll("&quot;", '"').replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">");
+    const blocks = [...html.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/g)].map((match) => JSON.parse(decode(match[1])) as Record<string, unknown>);
+    expect(blocks).toHaveLength(2);
+    expect(Object.keys(blocks[0])).toEqual(["id", "generated_by_method", "gate_results", "interpretation"]);
+    expect(blocks[0]).toMatchObject({ id: fixture.interpretation_id, generated_by_method: fixture.method_id, gate_results: [{ gate_id: "citation_integrity", status: "PASS", evidence: { cited: 1 } }] });
+    expect(blocks[1]).toMatchObject({ result: { interpretation_id: fixture.interpretation_id }, manifest: [{ id: "source-1", value: "完整資料" }] });
+    expect(html).toContain("<summary>完整 JSON</summary>");
   });
 
   it("a finding that cites the same line twice shows its [n] once, without React's duplicate-key error", () => {
