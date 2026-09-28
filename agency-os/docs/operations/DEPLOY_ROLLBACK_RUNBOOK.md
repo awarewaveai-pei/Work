@@ -191,7 +191,8 @@ cat /var/lib/awarewave-alert/fail_streak
 
 - `/root/Work/`（git clone）— **源碼單一真相（SSOT）**；隨 `git pull` 自動更新；不直接 build
 - `/root/lobster-phase1/`（staging）— 部署艦面；持有本機獨有的 `docker-compose.yml`、`.env`、`nginx/`；`scripts/` 由 `sync-host-scripts.sh` 從 `origin/main` 同步（cron 決策前 + `sg-deploy.sh` 1.8；**手改會被覆蓋**）；`apps/` 由 `sg-deploy.sh` rsync 自 git
-- 中間 rsync `--exclude='.env*'` 確保本機機密永遠不被 git 覆蓋
+- 中間 rsync `--exclude='.env*'` 確保本機機密永遠不被 git 覆蓋（只同步追蹤中的 `.env.example`；2026-09-29 前實作只列三個名字，`--delete` 刪掉了 `apps/video-service/.env.video`，見 WORKLOG 2026-09-29）
+- **有自己 compose 的 app 不走 sg-deploy.sh**（它在 rsync 前就拒絕非 staging compose 服務）。video-service：`/root/Work` 已 pull 後，`rsync -a --delete --include='.env.example' --exclude='.env*' /root/Work/lobster-factory/infra/hetzner-phase1-core/apps/video-service/ /root/lobster-phase1/apps/video-service/`，再在該目錄 `docker compose -f docker-compose.video.yml --env-file .env.video up -d --build`；回滾＝先 `docker tag lobster-video-service:local lobster-video-service:pre-<tag>`，失敗時把該 tag 標回 `:local` 後 `up -d --no-build`
 
 > 歷史背景：2026-05-07 之前無此 rsync 機制，staging `apps/next-admin/` 自 4/27 凍結 10 天（Build Console、New Client、always-on Command Plane Phase 1 等 19 個 commit、3,785 行更新堆積未上線）。`sg-deploy.sh` 即為此機械化解法。
 

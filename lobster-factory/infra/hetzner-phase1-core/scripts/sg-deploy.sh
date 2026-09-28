@@ -247,6 +247,14 @@ if [[ " ${APPS[*]} " =~ " renderer " && $DRY_RUN -eq 0 ]]; then
   log "renderer gates passed"
 fi
 
+# Every app must be a service of the staging compose BEFORE anything is rsynced: an app run by its
+# own compose (video-service: apps/video-service/docker-compose.video.yml) used to be rsynced first
+# and only then fail at `docker compose build` ("no such service") -- 2026-09-29.
+STAGING_SERVICES="$(cd "$STAGING_DIR" && docker compose config --services 2>/dev/null)" || fail "cannot read staging compose services"
+for APP in "${APPS[@]}"; do
+  grep -qx "$APP" <<<"$STAGING_SERVICES" || fail "$APP is not a service in $STAGING_DIR/docker-compose.yml -- deploy it with its own compose; nothing was changed"
+done
+
 for APP in "${APPS[@]}"; do
   SRC="$(app_git_source_root "$APP")/"
   DST="$STAGING_DIR/apps/$APP/"
@@ -257,9 +265,10 @@ for APP in "${APPS[@]}"; do
   RSYNC_ARGS=(
     -av
     --delete
-    --exclude='.env'
-    --exclude='.env.local'
-    --exclude='.env.*.local'
+    # Every .env* on the host is machine-local (secrets); --delete must never remove one. Only the
+    # tracked example is synced. (Listing names instead let --delete remove .env.video, 2026-09-29.)
+    --include='.env.example'
+    --exclude='.env*'
     --exclude='.next'
     --exclude='node_modules'
     --exclude='tsconfig.tsbuildinfo'
