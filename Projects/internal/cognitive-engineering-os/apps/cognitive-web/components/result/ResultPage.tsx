@@ -134,11 +134,15 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const optionLabel = (option: { name: string }) => "甲乙丙"[(solutions?.options ?? []).indexOf(option as never)] ?? "";
   const optionTag = (option: { name: string }) => `${optionLabel(option)}「${optionName(option)}」`;
   const iceberg = result.method_id === "systems.iceberg_model";
+  const icebergFacts = (path: string) => ICEBERG_LAYERS.find((layer) => layer.key === keyOf(path));
+  const externalSourceCount = (reading?: UnitReading) => new Set(
+    (reading?.citations ?? []).filter((id) => manifestById.get(id)?.kind === "project_source"),
+  ).size;
   const levels = Array.isArray(result.visual?.bindings?.levels) ? result.visual.bindings.levels as Array<{ label?: string; path?: string }> : [];
   // the layers, top to bottom: the iceberg's are its four form fields in order (a layer the model did not bind still shows
   // what you filled in); any other layered tool's are the layers the model bound
   const layers: Array<{ path: string; label: string }> = iceberg && fields.length
-    ? fields.map((field, index) => ({ path: String(levels.find((item) => keyOf(String(item.path ?? "")) === field.key)?.path ?? `r/${field.key}`), label: ICEBERG_LAYERS[index]?.title ?? String(field.label ?? field.key) }))
+    ? fields.map((field) => ({ path: String(levels.find((item) => keyOf(String(item.path ?? "")) === field.key)?.path ?? `r/${field.key}`), label: icebergFacts(`r/${field.key}`)?.title ?? String(field.label ?? field.key) }))
     : levels.map((level) => ({ path: String(level.path ?? ""), label: level.label ?? inputName(String(level.path ?? "")) }));
   const layerIndex = (id: string) => layers.findIndex((layer) => keyOf(layer.path) === keyOf(id));
   const layerNumbers = (ids: string[]) => [...new Set(ids.map(layerIndex).filter((index) => index >= 0))].sort().map((index) => index + 1);
@@ -267,7 +271,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         {iceberg && <figure>
           <figcaption><b>圖 C｜槓桿對比：在哪一層出手最值得？</b>（四層）</figcaption>
           <LeverageChart />
-          <div className="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。{focusLayer ? `這次建議先出手的是「${ICEBERG_LAYERS[layers.indexOf(focusLayer)]?.short ?? focusLayer.label}」：${result.focus?.why}` : ""}<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
+          <div className="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。{focusLayer ? `這次建議先出手的是「${icebergFacts(focusLayer.path)?.short ?? focusLayer.label}」：${result.focus?.why}` : ""}<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
         </figure>}
       </div>
       {!result.trend && <p className="sub mt8 mb0">圖 A 趨勢：{dropped.trend ? DROPPED.trend : "這次沒有畫：分析沒有從你填的內容裡挑出同一件事在兩個時間點的數字；有的話，回上面把它們寫在同一格再執行。"}{removed.trend?.length ? "（有數字對不上你填的內容，已拿掉）" : ""}</p>}
@@ -276,7 +280,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     </Card>
 
     <Card id="4" title={`④ 由上往下${layerCount}解讀（每張卡同一格式）`} read={`${layers.length ? `${NUMERAL[layers.length] ?? layers.length}張` : "每張"}卡同一格式，由上往下。`} act="找出資料最薄的一層，之後補。">
-      {layers.length ? layers.map((layer, index) => { const reading = readingOf(layer.path); const unit = keyOf(layer.path); const facts = iceberg ? ICEBERG_LAYERS[index] : undefined; const opts = optionsFor(layer.path);
+      {layers.length ? layers.map((layer, index) => { const reading = readingOf(layer.path); const unit = keyOf(layer.path); const facts = iceberg ? icebergFacts(layer.path) : undefined; const opts = optionsFor(layer.path);
         return <div className={`layer l${Math.min(index + 1, 4)} card ${index === layers.length - 1 ? "mb0" : "mb12"}`} key={index}>
           <div className="head"><h3>第 {index + 1} 層／{layers.length}：{layer.label}</h3>{facts && <span className="meta">{facts.seen} ・ 時間：{facts.time} ・ 出手方式：{facts.mode}</span>}</div>
           <div className="row"><b>這層問</b><span className="q">{facts?.ask4 ?? question(layer.path)}</span></div>
@@ -284,7 +288,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
           <div className="row"><b>這代表</b>{reading ? <span>{reading.meaning} {cites(reading.citations)}</span> : <span className="sub">{missingLayerReading}</span>}</div>
           <div className="row"><b>在這層出手</b>{reading ? <span>{reading.action}{/[。！？]$/.test(reading.action) ? "" : "。"}<b>效果</b>：{reading.effect}<span className={`lever ${reading.leverage}`}>槓桿：{LEVER[reading.leverage] ?? reading.leverage}</span></span> : <span className="sub">{missingLayerReading}</span>}</div>
           <div className="row"><b>對應方案</b><span>{opts.length ? opts.map((option) => `⑦ ${optionTag(option)}`).join("、") : iceberg && index === 1 && solutions?.metrics?.length ? "⑦ C 的追蹤指標（不是方案，是量法）" : solutions ? "—（⑦ 沒有方案在這層出手）" : "這次沒有方案草稿"}{focusKey === unit ? (opts.length ? "★ 本次建議" : "　★ 本次建議先在這層出手") : ""}</span></div>
-          <div className="row"><b>資料厚度</b><span>你填 {result.data_thickness?.[unit]?.own_statements ?? 0} 句・外部 {result.data_thickness?.[unit]?.external_sources ?? 0} 筆 → {verdict(unit) === "最薄" ? <span className="warn">最薄</span> : verdict(unit)}</span></div>
+          <div className="row"><b>資料厚度</b><span>你填 {result.data_thickness?.[unit]?.own_statements ?? 0} 句・外部 {externalSourceCount(reading)} 筆 → {verdict(unit) === "最薄" ? <span className="warn">最薄</span> : verdict(unit)}</span></div>
         </div>; }) : <p className="mb0">這個工具的結果是一張圖，不分層；請對照上面的圖逐項看。</p>}
     </Card>
 
@@ -297,7 +301,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     <Card id="6" title={iceberg ? "⑥ 理解層次對照表（改編自 Anderson & Johnson）" : "⑥ 對照表"} read={focusLayer ? "一列一層，★ 是建議先出手的列。" : "一列一個你填的欄位。"} act={solutions ? "四列都要有人負責，填在 ⑦ B 表。" : "看哪一列最薄，就先補那一列。"}>
       <div className="scroll-x"><table>
         <thead><tr>{iceberg ? <><th>層</th><th>出手方式</th><th>時間取向</th></> : <th>欄位</th>}<th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr></thead>
-        <tbody>{layers.map((layer, index) => { const facts = iceberg ? ICEBERG_LAYERS[index] : undefined; const star = focusKey === keyOf(layer.path) ? " ★" : ""; const reading = readingOf(layer.path);
+        <tbody>{layers.map((layer, index) => { const facts = iceberg ? icebergFacts(layer.path) : undefined; const star = focusKey === keyOf(layer.path) ? " ★" : ""; const reading = readingOf(layer.path);
           return <tr key={index}>{facts ? <><td>{facts.short}{star}</td><td>{facts.mode}</td><td>{facts.when}</td></> : <td>{inputName(layer.path)}{star}</td>}<td>{facts?.asks ?? question(layer.path)}</td><td>{reading?.brief ?? resolved(layer.path)} {cites(citedUnder(layer.path))}</td><td>{reading?.step ?? reading?.action ?? "—"}</td></tr>; })}</tbody>
       </table></div>
       {iceberg && <p className="sub mt8 mb0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>}
@@ -353,7 +357,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
 
     <Card id="8" title="⑧ 下一步：你在這條路的哪裡、接著做什麼" read="旅程列是你在哪；每張卡寫做了會得到什麼、要你再填什麼。" act="選一張，或都不選。">
       <div className="journey"><span className="done">✓ {name}{result.headline ? `：${result.headline}` : result.summary ? `：${result.summary}` : ""}</span>{steps.map((step, index) => <React.Fragment key={index}><i>→</i><span className={index === 0 ? "mcard" : undefined}>{index === 0 ? "下一步：" : "之後："}{names[step.method_id!] ?? step.method_id}{step.answers ? `（${step.answers}）` : ""}</span></React.Fragment>)}{solutions && <><i>→</i><span>最後：⑦ 解決方案定案與追蹤</span></>}</div>
-      {steps.length > 0 && <p className="lead mt6 mb0">{result.summary ? `你已經知道${result.summary}` : ""}<b>最值得的下一步是「{names[steps[0].method_id!] ?? steps[0].method_id}」</b>{steps[0].deepens ? `：${steps[0].deepens}` : ""}。<b>不做下一步也可以</b>：{solutions ? "⑦ 的方案已經能用，差別是有沒有數字撐它。" : "① 的建議已經能用。"}</p>}
+      {steps.length > 0 && <p className="lead mt6 mb0">{result.summary ? `你已經知道${result.summary}` : ""}<b>最值得的下一步是「{names[steps[0].method_id!] ?? steps[0].method_id}」</b>{steps[0].deepens ? `：${steps[0].deepens}` : ""}。<b>不做下一步也可以</b>：{solutions ? "⑦ 的方案已經能用。" : "① 的建議已經能用。"}</p>}
       <div className="mcards next-steps">{steps.map((step, index) => {
         const prefill = Object.fromEntries(Object.entries(step.prefill ?? {}).map(([key, id]) => [key, recordValue(record, id) ?? manifestById.get(id)?.value ?? ""]));
         const carried = Object.values(step.prefill ?? {});
@@ -376,7 +380,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         <a className="btn ghost" href="#approve">都不做，先核准存檔（⑨ 下方）</a>
       </div>
       {note && <p className="mocknote" role="status">{note}</p>}
-      <p className="sub mt8 mb0">每一張都帶入本次的輸入與引註，「還要你填」的欄位會標紅；按下去先開預填好的表單，你確認才執行、才花錢。</p>
+      <p className="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去先開預填好的表單，你確認才執行、才花錢。</p>
     </Card>
 
     <Card id="9" title="⑨ 引註（每個 [n] 都指向一段可查的來源）" read="[n] 是那句話的來源。" act="引錯了，按下方「退回並說原因」。">

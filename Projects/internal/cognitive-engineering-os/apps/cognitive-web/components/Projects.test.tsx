@@ -79,6 +79,27 @@ describe("one project", () => {
     await finish();
   });
 
+  it("keeps the project visible and shows an inline error when a task toggle fails", async () => {
+    const analysis = done("I-1", "2026-09-26T11:42:11Z");
+    const task = { task_id: "T1", interpretation_id: "I-1", title: "補資料", owner: "A", due: "2026-10-01", proof: "有紀錄", target: "完成", when: "本週", created_at: "2026-09-26T12:00:00Z", done: false, done_at: null };
+    vi.mocked(apiFetch).mockImplementation(async (path) => {
+      if (path === "/projects/P-OLD") return OLD as never;
+      if (path === "/projects/P-OLD/analyses") return [analysis] as never;
+      if (path === "/projects/P-OLD/sources") return [] as never;
+      if (path === "/projects/P-OLD/tasks") return [task] as never;
+      if (path === "/projects/P-OLD/reruns") return [] as never;
+      if (path === "/projects/P-OLD/tasks/T1") throw new Error("toggle failed");
+      throw new Error(`unexpected: ${path}`);
+    });
+    const { host, done: finish } = await mount(<ProjectPage projectId="P-OLD" />);
+    const checkbox = host.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    await act(async () => { checkbox.click(); await Promise.resolve(); });
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("toggle failed");
+    expect(host.textContent).toContain("補資料");
+    expect(host.textContent).toContain("看結果 →");
+    await finish();
+  });
+
   it("an analysis opened under the wrong project is refused, not shown", async () => {
     vi.mocked(apiFetch).mockResolvedValue({ interpretation_id: "I-1", status: "DONE", project_id: "P-OTHER", method_id: "systems.iceberg_model" } as never);
     const { host, done: finish } = await mount(<AnalysisPage projectId="P-OLD" analysisId="I-1" />);

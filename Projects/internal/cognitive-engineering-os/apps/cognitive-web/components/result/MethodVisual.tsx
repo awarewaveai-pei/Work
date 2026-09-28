@@ -10,10 +10,10 @@ export type Unit = { label: string; question: string; text: string; brief?: stri
 // asks (the mock's ②), whether it shows, its time frame, how you act there and how long that lasts. One table for the
 // picture, the layer cards (④) and the comparison table (⑥).
 export const ICEBERG_LAYERS = [
-  { name: "事件 Events", title: "事件 Events", short: "事件", question: "現在發生了什麼？", ask4: "現在發生了什麼？", asks: "最快的因應是什麼？", seen: "看得見", time: "現在", when: "現在", mode: "回應 React", effect: "當下的因應", lasting: "短期" },
-  { name: "模式 Patterns", title: "模式與趨勢 Patterns & Trends", short: "模式", question: "這段時間的趨勢？事件之間有什麼關聯？", ask4: "這段時間有什麼趨勢？哪些事件互相關聯？", asks: "什麼趨勢在反覆出現？", seen: "看不見", time: "過去到現在", when: "過去→現在", mode: "預測 Anticipate", effect: "看出趨勢", lasting: "提早看到" },
-  { name: "結構 Structures", title: "結構與流程 Structures & Processes", short: "結構", question: "什麼流程、制度在製造這個模式？", ask4: "什麼流程、制度、權力安排在製造上面的模式？", asks: "什麼制度在製造這些模式？", seen: "看不見", time: "現在到未來", when: "現在→未來", mode: "設計 Design", effect: "改流程、改制度", lasting: "持久" },
-  { name: "心智模型 Mental Models", title: "心智模型 Mental Models", short: "心智模型", question: "什麼沒說出口的假設造成這些結構？", ask4: "什麼沒說出口的假設、信念、價值觀，造就了上面的結構？", asks: "這些制度背後的假設是什麼？", seen: "最深、最看不見", time: "未來", when: "未來", mode: "轉化 Transform", effect: "改信念", lasting: "根本" },
+  { key: "events", name: "事件 Events", title: "事件 Events", short: "事件", question: "現在發生了什麼？", ask4: "現在發生了什麼？", asks: "最快的因應是什麼？", seen: "看得見", time: "現在", when: "現在", mode: "回應 React", effect: "當下的因應", lasting: "短期" },
+  { key: "patterns", name: "模式 Patterns", title: "模式與趨勢 Patterns & Trends", short: "模式", question: "這段時間的趨勢？事件之間有什麼關聯？", ask4: "這段時間有什麼趨勢？哪些事件互相關聯？", asks: "什麼趨勢在反覆出現？", seen: "看不見", time: "過去到現在", when: "過去→現在", mode: "預測 Anticipate", effect: "看出趨勢", lasting: "提早看到" },
+  { key: "structures", name: "結構 Structures", title: "結構與流程 Structures & Processes", short: "結構", question: "什麼流程、制度在製造這個模式？", ask4: "什麼流程、制度、權力安排在製造上面的模式？", asks: "什麼制度在製造這些模式？", seen: "看不見", time: "現在到未來", when: "現在→未來", mode: "設計 Design", effect: "改流程、改制度", lasting: "持久" },
+  { key: "mental_models", name: "心智模型 Mental Models", title: "心智模型 Mental Models", short: "心智模型", question: "什麼沒說出口的假設造成這些結構？", ask4: "什麼沒說出口的假設、信念、價值觀，造就了上面的結構？", asks: "這些制度背後的假設是什麼？", seen: "最深、最看不見", time: "未來", when: "未來", mode: "轉化 Transform", effect: "改信念", lasting: "根本" },
 ];
 
 // The mock's iceberg (docs/mockups/iceberg-result-mock.html ②) as a polygon whose four bands can grow: the water line

@@ -1,4 +1,13 @@
 ﻿# Worklog
+## 2026-09-28（續6）Cognitive OS 結果頁誠實顯示與錯誤隔離：H-05／N-09／N-27／M-30／P-30／M-29
+- [任務] 只處理 6 個低風險缺口；不改 API／DB／契約、不部署。報告帳目由 FIXED 204／PARTIAL 14／OPEN 92 更新為 210／13／87，6 列移入 FIXED。
+- [改] 冰山四層加穩定 key，④／⑥／焦點不再按輸出位置套規格；每層外部筆數改算該 reading 實際引用的唯一 project source；刪除非數字下一步的數字宣稱與未實作標紅承諾；mock 時間補到分鐘；ProjectPage 拆 load/action error，任務失敗不再覆蓋整頁。測試先紅 2 項再綠。
+- [對抗自審] 攻擊：稀疏／亂序層、重複外部引註、未引用專案來源、非數字 yields、缺 reading、任務 POST／成功後 reload 失敗、第二次重試清錯。0 finding；回滾為 revert 本批 commit，無資料遷移。
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck`＋`npm test`（apps/cognitive-web）＋`python docs/mockups/check-mocks.py` | exit=0 | result=tsc clean；10 檔／58 tests passed；5 pages all rules green
+- REVIEW_DONE: critic=Manual adversarial | verdict=pass | findings=0c/0m | evidence=修正前聚焦測試 2 failed／16 passed；修正後 2 檔／18 passed；完整套件 58 passed；scoped `git diff --check` exit 0
+- ORACLE_WAIVED: `scripts/claude-oracle.ps1` exit 1（Claude 回傳 invalid/incomplete review schema，未產生有效 artifact）；依操作者既有授權改書面對抗自審＋紅→綠證據，不重試、不宣稱 oracle 通過
+- BUGHUNT_DONE: scope=`apps/cognitive-web/components/{ProjectPage,Projects.test,result}`＋`docs/{RESULT_PAGE_GAP_REPORT.md,mockups/iceberg-result-mock.html}` | grep=`位置式 ICEBERG_LAYERS／data_thickness external_sources 顯示／數字撐它／欄位會標紅／任務 setError／六個 ID 殘留 OPEN-PARTIAL` | result=ResultPage 舊實作 0；殘留命中只在固定四層 SVG index、數字案例 mock、否定測試與無關 RunPage；6 ID 僅在 FIXED 批次註記
+
 ## 2026-09-28（續5）Cognitive OS 結果頁安全顯示批次：C3-08／C3-09／C3-20／M-15／M-39／N-51
 - [任務] 只處理 6 個低風險顯示缺口；不改 API／DB／契約、不部署。報告帳目由 FIXED 198／PARTIAL 17／OPEN 95 更新為 204／14／92，6 列移入 FIXED。
 - [改] `Charts.tsx`：y 軸完整使用 20–180、右軸依共用 `textWidth()` 擴張 viewBox、四節點中央標題依實際節點中心距取寬且其他布局維持內緣保護。`ResultPage.tsx`：缺層固定保留兩列並明示原因；證據 sentinel／重複標點不進一般畫面；專家第一份 JSON 改固定摘要，完整 JSON 無損留在第二層 details。測試先紅 6 項再綠。

@@ -18,7 +18,8 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
   const [tasks, setTasks] = useState<Task[]>([]);
   const [reruns, setReruns] = useState<Rerun[]>([]);
   const [sources, setSources] = useState<number | null>(null);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const base = `/projects/${encodeURIComponent(projectId)}`;
 
   const load = () => Promise.all([apiFetch<Project>(base), apiFetch<Analysis[]>(`${base}/analyses`), apiFetch<Task[]>(`${base}/tasks`), apiFetch<Rerun[]>(`${base}/reruns`)])
@@ -26,7 +27,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
   useEffect(() => {
     let active = true;
     Promise.all([load(), apiFetch<unknown[]>(`${base}/sources`).then((held) => { if (active) setSources(held.length); })])
-      .catch((reason) => { if (active) setError(reason instanceof ApiError && reason.status === 404 ? "找不到這個專案：可能已經刪除，或不在你的帳號裡。" : String(reason)); });
+      .catch((reason) => { if (active) setLoadError(reason instanceof ApiError && reason.status === 404 ? "找不到這個專案：可能已經刪除，或不在你的帳號裡。" : String(reason)); });
     return () => { active = false; };
   }, [base]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -37,14 +38,22 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
     return () => clearInterval(timer);
   }, [base, running]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (error) return <><div className="crumbs"><Link href="/projects">我的專案</Link></div><div className="card"><p className="error">{error}</p></div></>;
+  if (loadError) return <><div className="crumbs"><Link href="/projects">我的專案</Link></div><div className="card"><p className="error">{loadError}</p></div></>;
   if (!project || !analyses) return <div className="card"><p>載入中…</p></div>;
   const latest = analyses[0];
   const methods = project.methods ?? [];
   const today = todayIso();
   const openTasks = tasks.filter((task) => !task.done);
   const dueReruns = reruns.filter((item) => !item.fulfilled_by && item.due <= today);
-  const mark = async (task: Task, done: boolean) => { try { await apiFetch(`${base}/tasks/${encodeURIComponent(task.task_id)}`, { method: "POST", body: JSON.stringify({ done }) }); await load(); } catch (reason) { setError(String(reason)); } };
+  const mark = async (task: Task, done: boolean) => {
+    setActionError("");
+    try {
+      await apiFetch(`${base}/tasks/${encodeURIComponent(task.task_id)}`, { method: "POST", body: JSON.stringify({ done }) });
+      await load();
+    } catch (reason) {
+      setActionError(String(reason));
+    }
+  };
   return <>
     <div className="crumbs"><Link href="/projects">我的專案</Link> › {project.name}</div>
     <div className="card">
@@ -94,6 +103,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
           <td>{task.proof}</td><td>{task.target}</td>
         </tr>)}</tbody>
       </table></div> : <p className="sub mb0">還沒有任務。</p>}
+      {actionError && <p className="error" role="alert">任務沒有更新：{actionError}</p>}
     </div>
     {reruns.length > 0 && <div className="card">
       <h2>到期重跑<small>{reruns.filter((item) => !item.fulfilled_by).length} 個等著</small></h2>

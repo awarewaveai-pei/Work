@@ -72,6 +72,32 @@ describe("ResultPage", () => {
     const wrong = spawnSync("python", [checker, "--page", "result", artifact], { encoding: "utf8" });
     expect([wrong.status, wrong.stdout.includes("layered iceberg SVG missing")]).toEqual([1, true]);
   });
+  it("uses layer keys for iceberg facts, counts only that layer's external citations, and makes no unbuilt-form promise", () => {
+    const sparse = {
+      ...fixture,
+      visual: { kind: "layered", bindings: { levels: [{ label: "事件", path: "r/events" }, { label: "結構", path: "r/structures" }] } },
+    };
+    const sparseHtml = renderToStaticMarkup(<ResultPage result={sparse} record={record} />);
+    expect(sparseHtml).toContain('<h3>第 2 層／2：結構</h3><span class="meta">看不見 ・ 時間：現在到未來 ・ 出手方式：設計 Design</span>');
+    expect(sparseHtml).toContain("<td>結構</td><td>設計 Design</td><td>現在→未來</td>");
+
+    const sourced = {
+      ...fixture,
+      data_thickness: { events: { own_statements: 1, external_sources: 2 } },
+      units: [{ ...fixture.units![0], citations: ["r/events/0", "source:S1", "source:S1"] }],
+    };
+    const sourcedHtml = renderToStaticMarkup(<ResultPage result={sourced} record={record} manifest={[
+      { id: "source:S1", kind: "project_source", value: "來源一" },
+      { id: "source:S2", kind: "project_source", value: "來源二" },
+    ]} />);
+    expect(sourcedHtml).toContain("你填 1 句・外部 1 筆");
+
+    const nonNumeric = { ...fixture, next_steps: [{ ...fixture.next_steps![0], yields: "根因鏈" }] };
+    const nonNumericHtml = renderToStaticMarkup(<ResultPage result={nonNumeric} record={record} />);
+    expect(nonNumericHtml).toContain("⑦ 的方案已經能用。");
+    expect(nonNumericHtml).not.toContain("差別是有沒有數字撐它");
+    expect(nonNumericHtml).not.toContain("欄位會標紅");
+  });
   it("the result page sections of schema 1.1.0 render as the mock: layer readings, ★ focus, three charts, solutions, metrics", () => {
     const fields = ["events", "patterns", "structures", "mental_models"].map((key, index) => ({ key, kind: "list", label: `${"①②③④"[index]} ${["事件", "模式", "結構", "心智模型"][index]}：問題 ${index + 1}？` }));
     const rec = { events: ["第 6 次只有 2 位；第 1 次是 6 位"], patterns: ["每期第 4 次起下降"], structures: ["帶領者先講，說明佔 35 分鐘"], mental_models: ["專家比較懂"] };
