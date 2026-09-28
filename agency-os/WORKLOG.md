@@ -1,4 +1,14 @@
 ﻿# Worklog
+## 2026-09-28（續10）防白工：受影響測試一條指令（傳遞 import）、規則 15／16、優先序「先做完一個工具」
+- [操作者] 「要怎麼做才不會一直做白工」→ 交由 AI 決定。
+- [根因（本日實例）] ① 帶已知風險交接：T34 行程內 in-flight → WC-P2-06 照用 → 重改。② 共用元件未先釘 P 表：WC-P2-06 自挑 in-flight。③ 先寫碼後找設計洞：TTL lease → critic 重現雙持有 → 改 OS 鎖重做。④ 驗證浪費：§12.1 規則 11 早已規定只跑受影響測試，本 session 沒照做、跑全套 4 次（25–55 分）；規則 11 是手拼 grep、只抓直接 import，容易被跳過。⑤ 做廣不做深：`tests/unit` 14,341 測試中 13,413（93.5%）屬 290 個方法 slice 檔，平台／API／網頁 928；304 個方法、0 個完整上線工具。
+- [改] 新 `COS/scripts/affected_tests.py`（依傳遞 import 關係挑 `tests/unit` 模組；SPEC 資料檔改動挑引用者；`--base`、`--run`）；計畫 v1.55：§12.1 規則 11 改用此腳本，並寫明全套只在四種情況跑（期末閘／正式站部署前／依賴或執行環境變更／夜間）、新增規則 15（剩餘風險落在共用元件 → 不合併、不通知下游）、規則 16（共用機制先進 P 表；並行／一致性設計先交 critic 審設計再寫碼）；§0 加優先序：冰山模型照 `RESULT_PAGE_GAP_REPORT.md` §7 做到正式站可用前，不新增方法 slice。
+- [暫緩] `main.py` 依領域拆 router（今日 3 個 session 同改 → 3 次 rebase、WORKLOG 撞號）：網站線正在改，待其告一段落再協調。
+- [事後確認] run lock＋WC-P2-06 推送後，全套 `Ran 14635 tests … OK`（3317 s）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=affected_test_modules(git diff c6a53876a dc43e2e3a) → 25 模組，含 test_run_recipe_async／test_run_lock／test_workflow_executor／test_api_main／test_no_process_local_run_registry，方法 slice 0，挑選 2.3 s；本 diff 自身 → 0 模組＋golden 0 | exit=0 | ms=2300
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（自審：n1 從非 COS 路徑執行時 `REPO` 由檔案位置推得，不依 cwd；漏選風險＝動態 import（importlib 字串）不在 AST 裡 → 期末閘全套兜底，寫在規則 11）
+- ORACLE_WAIVED: codex quota blocked until 2026-09-29 01:51（`scripts/oracle-quota.ps1` exit 3）；工具＋文件，低風險，自審見上。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`affected_tests` | hits=2（腳本本身＋計畫規則 11）
 ## 2026-09-28（續9）研究線 WC-P2-06：POST/GET /projects/{id}/synthesis（背景、逐次計量、閘過的 artifact）；三契約 ACTIVE
 - [範圍] worktree `D:\tmp\wt-l4`（detached，origin/main `6d739c642`）；commit 不 push，sha 交合併者 cherry-pick（§12.8 本機獨立目錄規則；共用樹 `main.py` 有網站線未提交改動）。
 - [改] `main` `create_synthesis`／`get_synthesis`／`_run_synthesis`／`_MeteredProvider`／`_error_code`／`_failure_code`；`repo` 表 `project_syntheses`＋index、`synthesis_events`／`save_synthesis`／`get_synthesis`、`_ARTIFACT_TABLES`（抹除與 artifact 列舉共用）；`synthesis.py` 公開 `validate_subject`（P-j 三 kind 一處定義；runner 與端點共用；未知鍵拒、長度上限 500／清單 20、訊息不回顯 subject）；三 `synthesis.*.capability.yaml` DRAFT→ACTIVE（端點要求 ACTIVE 才收）。
