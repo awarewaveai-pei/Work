@@ -129,6 +129,7 @@ export async function runAgenticTurn(opts: {
       timeoutMs: CS_TIMEOUTS.generateMs,
     });
 
+    if (msg.stop_reason === "refusal") return { text: "", toolCalls, needsHandoff: true };   // declined: hand to a human
     const uses = extractToolUses(msg);
     if (msg.stop_reason !== "tool_use" || uses.length === 0) {
       return { text: extractText(msg), toolCalls, needsHandoff };

@@ -72,7 +72,7 @@ enabled = true
 
 [mcp_servers.claude-latest.env]
 ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY}"
-ANTHROPIC_MODEL = "claude-sonnet-4-6"
+ANTHROPIC_MODEL = "claude-opus-5-5"
 
 [mcp_servers.gemini-fast]
 command = "powershell"

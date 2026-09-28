@@ -118,7 +118,7 @@
       ],
       "env": {
         "ANTHROPIC_API_KEY": "<PASTE_ANTHROPIC_KEY>",
-        "ANTHROPIC_MODEL": "claude-sonnet-4-6"
+        "ANTHROPIC_MODEL": "claude-opus-5-5"
       }
     },
     "gemini-fast": {

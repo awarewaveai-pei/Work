@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/claude-request";
 import { selectPackage } from "./package-selector";
 import type { IntakeForm, WebsiteSpec } from "./intake-form";
 
@@ -28,7 +29,7 @@ REQUIRED OUTPUT STRUCTURE (follow exactly):
   "package_slug": "${packageSlug}",
   "packs": ${JSON.stringify(packs)},
   "generated_at": "${new Date().toISOString()}",
-  "generated_by": "claude-sonnet-4-6",
+  "generated_by": "${CLAUDE_DEFAULT_MODEL}",
   "sitemap": [{ "slug": "home", "title": "首頁", "template": "home", "is_homepage": true }, ...],
   "homepage": {
     "hero": { "headline": "...", "subheadline": "...", "cta_text": "...", "cta_url": "/" },
@@ -99,22 +100,20 @@ export async function generateWebsiteSpec(
 
   let raw: string;
   try {
-    const message = await client.messages.create(
+    const message = await client.beta.messages.create(
       {
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
+        ...claudeParams(CLAUDE_DEFAULT_MODEL, 4096),
+        ...claudeFallback(CLAUDE_DEFAULT_MODEL),
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: buildUserPrompt(form, package_slug, packs) }],
       },
       { signal: controller.signal }
     );
 
-    // C2: safe content access (.find instead of [0])
-    const block = message.content.find((b) => b.type === "text");
-    if (!block || block.type !== "text") {
-      return { ok: false, error: "unexpected_response_type" };
-    }
-    raw = block.text.trim();
+    const incomplete = claudeIncomplete(message);
+    if (incomplete) return { ok: false, error: incomplete };
+    raw = claudeText(message).trim();
+    if (!raw) return { ok: false, error: "unexpected_response_type" };
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e) };
   } finally {
@@ -136,7 +135,7 @@ export async function generateWebsiteSpec(
   // Overwrite non-negotiable server-side fields
   parsed.package_slug = package_slug;
   parsed.packs = packs;
-  parsed.generated_by = "claude-sonnet-4-6";
+  parsed.generated_by = CLAUDE_DEFAULT_MODEL;
   if (intakeFormId) parsed.intake_form_id = intakeFormId;
 
   return { ok: true, spec: parsed };

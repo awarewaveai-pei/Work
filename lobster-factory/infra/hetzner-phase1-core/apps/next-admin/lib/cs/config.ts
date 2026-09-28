@@ -10,7 +10,7 @@ export const CS_MODELS = {
   classify: "claude-haiku-4-5-20251001",
   supervisor: "claude-haiku-4-5-20251001",
   /** Main customer-facing generation. */
-  generate: "claude-sonnet-4-6",
+  generate: "claude-opus-5-5",
   /** Cross-provider failover when Claude errors/times out. */
   geminiFallback: "gemini-2.0-flash-lite",
 } as const;

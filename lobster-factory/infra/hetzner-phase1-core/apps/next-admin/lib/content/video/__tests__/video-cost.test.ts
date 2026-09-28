@@ -10,10 +10,10 @@ describe("computeVideoCost", () => {
 
   it("default 6-scene (4 custom + 2 broll, flux-schnell): exact USD + NT$", () => {
     const r = computeVideoCost(base);
-    // script: 1200in*$3/M + 2200out*$15/M = 0.0036 + 0.033 = 0.0366
+    // script (claude-opus-5-5): 1200in*$4/M + 2200out*$20/M = 0.0048 + 0.044 = 0.0488
     // image:  4 * $0.003 = 0.012 ; broll/tts/render = 0
-    expect(r.totalUsd).toBeCloseTo(0.0486, 6);
-    expect(r.totalNtd).toBeCloseTo(1.56, 2);
+    expect(r.totalUsd).toBeCloseTo(0.0608, 6);
+    expect(r.totalNtd).toBeCloseTo(1.95, 2);
     expect(r.imageModel).toBe("flux-schnell");
   });
 
@@ -31,8 +31,8 @@ describe("computeVideoCost", () => {
   it("flux-dev raises only the image line", () => {
     const r = computeVideoCost({ ...base, imageModel: "flux-dev" });
     expect(r.lines.find((l) => l.id === "image")!.unitUsd).toBeCloseTo(0.025, 6);
-    // 0.0366 script + 4*0.025 = 0.1366
-    expect(r.totalUsd).toBeCloseTo(0.1366, 6);
+    // 0.0488 script + 4*0.025 = 0.1488
+    expect(r.totalUsd).toBeCloseTo(0.1488, 6);
   });
 
   it("可刪減：移除 image 步驟 → 成本不再含生圖（只剩 script）", () => {
@@ -41,7 +41,7 @@ describe("computeVideoCost", () => {
     );
     const r = computeVideoCost(base, steps);
     expect(r.lines.find((l) => l.id === "image")).toBeUndefined();
-    expect(r.totalUsd).toBeCloseTo(0.0366, 6);
+    expect(r.totalUsd).toBeCloseTo(0.0488, 6);
   });
 
   it("可擴充：加一步付費步驟 → 流程與成本同時含入", () => {
@@ -51,8 +51,8 @@ describe("computeVideoCost", () => {
     ];
     const r = computeVideoCost(base, steps);
     expect(r.lines.find((l) => l.id === "music")).toBeDefined();
-    // extra music line = 4 * 0.003 = 0.012 on top of default 0.0486
-    expect(r.totalUsd).toBeCloseTo(0.0606, 6);
+    // extra music line = 4 * 0.003 = 0.012 on top of default 0.0608
+    expect(r.totalUsd).toBeCloseTo(0.0728, 6);
   });
 
   it("enabled:false publish step excluded by default", () => {
@@ -68,7 +68,7 @@ describe("computeVideoCost", () => {
     expect(tts.count).toBe(300);
     expect(tts.unitUsd).toBeCloseTo(15 / 1_000_000, 10);
     expect(tts.totalUsd).toBeCloseTo(0.0045, 6);
-    expect(r.totalUsd).toBeCloseTo(0.0531, 6);
+    expect(r.totalUsd).toBeCloseTo(0.0653, 6);
   });
 
   it("OpenAI TTS HD uses the higher rate", () => {

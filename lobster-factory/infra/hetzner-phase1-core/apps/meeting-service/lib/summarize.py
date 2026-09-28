@@ -26,6 +26,8 @@ import json
 import re
 import time
 
+from lib.speaker_notes import WPM_ZH
+
 MAX_TRANSCRIPT_CHARS = 60_000  # 貼上到聊天視窗的合理上限，避免單則訊息過長
 
 SCHEMA = """{
@@ -69,9 +71,8 @@ INSTRUCTIONS = f"""你是會議記錄助手兼報告教練。輸入是一份繁�
    + topics 每個一頁(最多 6 個) + open(1，僅當 open_questions 或 risks 非空)。
    也就是說：你在上面的 decisions/actions/topics/open_questions/risks 寫了什麼，
    per_slide 就要對應幾頁講稿，順序一致。這是硬性要求，數量不對整份輸出視為壞的。
-7. per_slide 的 seconds 要讓 script 字數除以 240 字/分鐘接近該秒數（誤差 25% 內）。
-8. qa 至少 3 題，若逐字稿含推定/不確定成分，必須有一題是「這份記錄準不準/講者標籤準不準」。
-9. 只輸出符合以下 schema 的單一 JSON 物件，不要有任何 schema 以外的文字、
+7. qa 至少 3 題，若逐字稿含推定/不確定成分，必須有一題是「這份記錄準不準/講者標籤準不準」。
+8. 只輸出符合以下 schema 的單一 JSON 物件，不要有任何 schema 以外的文字、
    不要用 markdown code fence、不要加註解。
 
 Schema:
@@ -133,7 +134,11 @@ def parse_pasted_json(text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-opus-5-5"
+# Opus 5.5 always thinks; effort is the only control (its API default is medium, set explicitly here).
+EFFORT = "medium"
+# A safety-classifier decline is re-run by the API on the model it picks for that category.
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 # 兩種重試**刻意分開計數**，不共用預算：
 #   內容重試 = 模型輸出不合規（解析失敗／驗證不過），要帶著錯誤訊息請它修正。
@@ -147,8 +152,9 @@ API_TRANSPORT_RETRIES = 3  # 每次請求各自擁有的傳輸層重試額度
 # 字元，內容以中文為主約等於同量級的 token 數。原本設 8192 會讓每一場真實會議
 # 都在輸出中途被截斷 —— 截斷後 parse_pasted_json 的 rfind("}") 會落在內層物件、
 # json.loads 拋 JSONDecodeError，而重試用的是同一個上限，於是必然二次失敗，
-# 使用者被計費兩次仍退回人工貼上。32000 對最長的實測值留約 2 倍餘裕。
-API_MAX_TOKENS = 32000
+# 使用者被計費兩次仍退回人工貼上。32000 對最長的實測值留約 2 倍餘裕；
+# claude-opus-5-5 的 thinking 也算進 max_tokens，另加 8000 給思考。
+API_MAX_TOKENS = 32000 + 8000
 
 
 def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: str,
@@ -173,10 +179,14 @@ def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: 
         """送一次請求，傳輸層錯誤自行重試（獨立額度）。回傳 resp 或丟 RuntimeError。"""
         for t in range(1, API_TRANSPORT_RETRIES + 1):
             try:
-                return client.messages.create(
+                # 串流：32k 上限的非串流請求會撞 SDK 的 10 分鐘非串流保護；get_final_message() 回完整結果
+                with client.beta.messages.stream(
                     model=MODEL, max_tokens=API_MAX_TOKENS,
+                    output_config={"effort": EFFORT},
+                    betas=[FALLBACK_BETA], fallbacks="default",
                     messages=[{"role": "user", "content": user_msg}],
-                )
+                ) as stream:
+                    return stream.get_final_message()
             except (anthropic.APIConnectionError, anthropic.RateLimitError,
                     anthropic.InternalServerError, anthropic.OverloadedError,
                     anthropic.ConflictError) as e:
@@ -219,9 +229,15 @@ def summarize_via_api(transcript_text: str, audio_duration_sec: float, api_key: 
                 f"這場會議的摘要比預期長，請改用手動貼上模式，或調高 summarize.API_MAX_TOKENS。"
             )
 
-        if not resp.content:
-            raise RuntimeError(f"API 回應沒有任何內容（stop_reason={getattr(resp, 'stop_reason', '?')}）")
-        text = resp.content[0].text
+        if getattr(resp, "stop_reason", None) == "refusal":
+            details = getattr(resp, "stop_details", None)
+            raise RuntimeError(
+                f"模型拒答（類別 {getattr(details, 'category', None)!r}），fallback 模型也未接手；請改用手動貼上模式。"
+            )
+        # Opus 5.5 回應開頭是 thinking block：依 type 取文字，不可用 content[0]
+        text = "".join(b.text for b in (resp.content or []) if getattr(b, "type", None) == "text")
+        if not text.strip():
+            raise RuntimeError(f"API 回應沒有任何文字內容（stop_reason={getattr(resp, 'stop_reason', '?')}）")
         try:
             minutes = parse_pasted_json(text)
         except ValueError as e:
@@ -281,9 +297,9 @@ def normalize(minutes: dict) -> dict:
             for n in per:
                 if not isinstance(n, dict):
                     continue
-                n["seconds"] = _num(n.get("seconds"), 0)
                 for k in ("goal", "script", "transition", "watch_out"):
                     n[k] = _str(n.get(k))
+                n["seconds"] = round(len(n["script"]) / WPM_ZH * 60)   # the script length decides, not the model
         coaching["opening_hook"] = _str(coaching.get("opening_hook"))
 
     if isinstance(minutes.get("attendees"), list):

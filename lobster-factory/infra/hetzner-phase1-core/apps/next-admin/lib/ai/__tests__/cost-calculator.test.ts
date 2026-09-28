@@ -7,7 +7,7 @@ import {
   estimateMonthly,
   usdToNtd,
 } from "../cost-calculator";
-import { TEXT_FEATURES, TWD_RATE } from "../cost-model";
+import { FALLBACK_TEXT_MODEL, TEXT_FEATURES, TWD_RATE } from "../cost-model";
 
 describe("textCallCostUsd", () => {
   it("computes sonnet input+output exactly ($3/$15 per 1M)", () => {
@@ -32,10 +32,11 @@ describe("textCallCostUsd", () => {
     expect(textCallCostUsd({ model: "claude-sonnet-4-6", inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000 })).toBeCloseTo(3.75, 6);
   });
 
-  it("falls back to sonnet rate for unknown model", () => {
+  it("falls back to the default model rate for an unknown model", () => {
     const unknown = textCallCostUsd({ model: "made-up-model", inputTokens: 1_000_000, outputTokens: 0 });
-    const sonnet = textCallCostUsd({ model: "claude-sonnet-4-6", inputTokens: 1_000_000, outputTokens: 0 });
-    expect(unknown).toBeCloseTo(sonnet, 6);
+    const fallback = textCallCostUsd({ model: FALLBACK_TEXT_MODEL, inputTokens: 1_000_000, outputTokens: 0 });
+    expect(unknown).toBeCloseTo(fallback, 6);
+    expect(fallback).toBeCloseTo(4, 6);   // claude-opus-5-5 input $4/M
   });
 });
 

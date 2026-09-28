@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { AiProviderAdapter, InterpretRequest, Reading } from '../types';
 import { buildPrompt } from '../prompts';
-import { MAX_TOKENS, modelFor } from '../models';
+import { ALWAYS_THINKS, ANTHROPIC_EFFORT, MAX_TOKENS, THINKING_HEADROOM_TOKENS, modelFor } from '../models';
 import { AiCallError } from '../errors';
 
 /**
@@ -31,12 +31,18 @@ export const anthropicAdapter: AiProviderAdapter = {
     try {
       const res = await getClient().messages.create({
         model,
-        max_tokens: MAX_TOKENS[req.tier],
+        max_tokens: MAX_TOKENS[req.tier] + (ALWAYS_THINKS.test(model) ? THINKING_HEADROOM_TOKENS : 0),
+        ...(ANTHROPIC_EFFORT[req.tier] && !model.startsWith('claude-haiku-')
+          ? { output_config: { effort: ANTHROPIC_EFFORT[req.tier] } }
+          : {}),
         system: [
           { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
         ],
         messages: [{ role: 'user', content: user }],
       });
+      // 拒答或截斷都不是完整報告(半句話不可交付)
+      if (res.stop_reason === 'refusal') throw new AiCallError('anthropic', '模型拒答(refusal)');
+      if (res.stop_reason === 'max_tokens') throw new AiCallError('anthropic', '輸出超過上限被截斷(max_tokens)');
       const text = res.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
         .map((b) => b.text)

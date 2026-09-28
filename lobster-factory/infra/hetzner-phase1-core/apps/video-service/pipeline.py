@@ -62,6 +62,31 @@ def _claude() -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=config.CLAUDE_API_KEY)
 
 
+# Opus 5.5 always thinks (thinking counts toward max_tokens) and effort is its only control; models without
+# effort (Haiku) reject it. A safety-classifier decline is re-run by the API on the model it picks.
+NO_EFFORT_MODEL_PREFIXES = ("claude-haiku-",)
+FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-1")
+
+
+def _claude_text(prompt: str) -> str:
+    """One Claude call -> the answer text (read by block type: a thinking block comes first on Opus 5.5)."""
+    model = config.CLAUDE_MODEL
+    extra: dict = {}
+    if not model.startswith(NO_EFFORT_MODEL_PREFIXES):
+        extra["output_config"] = {"effort": "medium"}
+    if model in FALLBACK_MODELS:
+        extra.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+    response = _claude().beta.messages.create(
+        model=model,
+        max_tokens=16000,
+        messages=[{"role": "user", "content": prompt}],
+        **extra,
+    )
+    if response.stop_reason in ("refusal", "max_tokens"):
+        raise RuntimeError(f"Claude 未完成回答（stop_reason={response.stop_reason}）")
+    return "".join(b.text for b in response.content if b.type == "text")
+
+
 def _openai() -> OpenAI:
     config.require("OPENAI_API_KEY")
     return OpenAI(api_key=config.OPENAI_API_KEY)
@@ -105,12 +130,7 @@ def generate_from_topic(topic: str) -> dict:
 scenes 需要 6-8 個，每個 image_prompt 要描述具體的卡通場景畫面。
 不要輸出任何其他文字。
 """
-    response = _claude().messages.create(
-        model=config.CLAUDE_MODEL,
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    data = _parse_json(response.content[0].text)
+    data = _parse_json(_claude_text(prompt))
     print(f"   article: {data['article']['title']}")
     print(f"   scenes : {len(data['video']['scenes'])}")
     return data
@@ -159,12 +179,7 @@ def generate_from_existing(article_title: str, article_content: str) -> dict:
 scenes 需要 6-8 個，內容要忠實反映文章重點。
 不要輸出任何其他文字。
 """
-    response = _claude().messages.create(
-        model=config.CLAUDE_MODEL,
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    data = _parse_json(response.content[0].text)
+    data = _parse_json(_claude_text(prompt))
     print(f"   reuse article: {data['article']['title']}")
     print(f"   scenes       : {len(data['video']['scenes'])}")
     return data

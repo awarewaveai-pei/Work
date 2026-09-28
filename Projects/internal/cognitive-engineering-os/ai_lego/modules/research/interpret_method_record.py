@@ -21,8 +21,8 @@ from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS, ProviderCall
 INTERPRETATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
 INTERPRETATION_SCHEMA_FILE = Path("specs") / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml"
 _VISUAL_KINDS = {"layered", "quadrant", "table", "matrix", "graph", "tree", "timeline", "scorecard"}
-# Thinking counts against max_tokens and is billed as output (claude-sonnet-5 thinks at effort=high by default). Measured
-# 2026-09-28 on the demo record (effort unset): one answer = 5.8k-7.5k output tokens; the ceiling leaves room for a long
+# Thinking counts against max_tokens and is billed as output (claude-opus-5-5 always thinks; its API default effort is medium, INTERPRET_EFFORT sets it explicitly). Measured
+# 2026-09-28 on the demo record (claude-sonnet-5, effort unset): one answer = 5.8k-7.5k output tokens; the ceiling leaves room for a long
 # record, and INTERPRET_EFFORT keeps the thinking share bounded. A cut-off answer is asked once more (run_interpretation).
 INTERPRET_MAX_TOKENS = min(16000, MAX_OUTPUT_TOKENS)
 INTERPRET_EFFORT = "medium"
@@ -148,14 +148,14 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "LENGTH: the whole JSON must close well inside the output limit. At most 3 findings; a text field is at most three sentences (about 100 Chinese characters); at most 2 recommendations, 3 gaps, 5 plan rows, 5 loop nodes, 4 next_steps; no indentation or line breaks outside strings.",
     ]
     lines.append(
-        "MORE OF THE PAGE (schema 1.3.0, each optional): diagnosis = where the problem sits and where its root is, title at most 24 Chinese characters "
+        "MORE OF THE PAGE (each optional): diagnosis = where the problem sits and where its root is, title at most 24 Chinese characters "
         "(問題在第 3 層，根在第 4 層), text one or two sentences, citations = manifest ids. priority_short = the order of action in at most 20 characters. "
         "units[].thickness = how well the record covers that unit: verdict enough|thin|thinnest|empty (thinnest = the one thinnest unit; empty = the user left it blank), "
         "note = why in at most 30 characters (沒有逐次數字), fill_by = the next_steps method that would fill it. gaps[].path = the unit a gap is about, "
         "gaps[].citations = the lines it is about. solutions.recommended = the name of the option you recommend (one of options[].name). "
         "next_steps[].short = the step in at most 12 characters for the journey row, on_path = true for the 1-2 steps on the recommended path (the others are "
         "alternatives), why = why this step now, in one sentence. loop.feeders = at most 2 beliefs or rules that feed a loop node from outside the loop "
-        "(the mock's dashed box), each citing the record, to = the node it feeds; a feeder is not a loop node.")
+        "each citing the record, to = the node it feeds; a feeder is not a loop node.")
     if feedback:
         lines.append("THE USER RETURNED THE PREVIOUS VERSION. Reason, in the user's words: " + feedback[:MAX_FEEDBACK_CHARS] + "\nPREVIOUS VERSION (headline, summary, findings): "
                      + json.dumps({key: (previous or {}).get(key) for key in ("headline", "summary", "findings")}, ensure_ascii=False)[:6000]

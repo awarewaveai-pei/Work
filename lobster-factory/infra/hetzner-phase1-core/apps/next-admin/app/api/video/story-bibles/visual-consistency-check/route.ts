@@ -13,8 +13,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { isDesignsAsset } from "@/lib/storage/r2";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/claude-request";
 
-const CLAUDE_MODEL = "claude-sonnet-4-6";
+const CLAUDE_MODEL = CLAUDE_DEFAULT_MODEL;
 const MAX_PAIRS = 12; // 成本閘：草稿場景數通常 3-12，超過只比對前 12 對，其餘視為未檢查
 const TIMEOUT_MS = 45_000; // 多張圖 vision 比對可能較慢；逾時回明確錯誤，不讓前端 loading 卡死
 
@@ -60,13 +61,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   try {
-    const msg = await client.messages.create(
-      { model: CLAUDE_MODEL, max_tokens: 1024, messages: [{ role: "user", content }] },
+    const msg = await client.beta.messages.create(
+      { ...claudeParams(CLAUDE_MODEL, 1024, "low"), ...claudeFallback(CLAUDE_MODEL), messages: [{ role: "user", content }] },
       { timeout: TIMEOUT_MS },
     );
-    const textBlock = msg.content.find((b): b is Anthropic.TextBlock => b.type === "text");
-    if (!textBlock) return NextResponse.json({ ok: false, error: "Claude 回應無文字內容" }, { status: 502 });
-    const match = textBlock.text.match(/\{[\s\S]*\}/);
+    const incomplete = claudeIncomplete(msg);
+    if (incomplete) return NextResponse.json({ ok: false, error: `Claude 未完成回答（${incomplete}）` }, { status: 502 });
+    const text = claudeText(msg);
+    if (!text) return NextResponse.json({ ok: false, error: "Claude 回應無文字內容" }, { status: 502 });
+    const match = text.match(/\{[\s\S]*\}/);
     if (!match) return NextResponse.json({ ok: false, error: "無法解析 Claude 回應為 JSON" }, { status: 502 });
     const parsed = JSON.parse(match[0]) as { results?: { sceneIndex?: number; consistent?: boolean; note?: string }[] };
     const results = Array.isArray(parsed.results)

@@ -1,6 +1,7 @@
 import { logAiCall } from "./log-ai-call";
 import Anthropic from "@anthropic-ai/sdk";
-import { isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
+import { isAiTextModel, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
+import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "./claude-request";
 
 export const CHEAP_JSON_MODEL: AiTextModel = "gpt-5.4-nano";
 
@@ -81,16 +82,13 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
 
   try {
     const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model: args.model,
-      max_tokens: args.maxTokens,
+    const msg = await client.beta.messages.create({
+      ...claudeParams(args.model, args.maxTokens, "low"),
+      ...claudeFallback(args.model),
       system: args.system,
       messages: [{ role: "user", content: args.user }],
     });
-    const raw = msg.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("");
+    const raw = claudeText(msg);
 
     void logAiCall({
       route: args.route,
@@ -100,7 +98,11 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
       tool: args.tool,
     });
 
-    return { ok: true, raw, model: args.model };
+    const incomplete = claudeIncomplete(msg);
+    if (incomplete) return { ok: false, status: 502, error: incomplete };
+    // a classifier fallback may have answered: report the model that did (when it is one of ours)
+    const answered = msg.model.replace(/-\d{8}$/, "");
+    return { ok: true, raw, model: isAiTextModel(answered) ? answered : args.model };
   } catch (err) {
     return { ok: false, status: 502, error: err instanceof Error ? err.message : String(err) };
   }

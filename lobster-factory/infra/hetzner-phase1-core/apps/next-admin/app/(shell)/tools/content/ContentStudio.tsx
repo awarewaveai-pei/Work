@@ -13,7 +13,7 @@ import { markdownPreview } from "@/lib/content/client-markdown";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
-import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS } from "@/lib/ai/text-model-options";
+import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 
 // ─── Video config constants (mirrors VideoStudio) ────────────────────────────
 
@@ -459,7 +459,7 @@ const DEFAULT_FORM: GenerateForm = {
   keyword: "", title: "", language: "English", targetCountry: "全球（不指定）",
   articleType: "Pillar Article", articleSize: "medium", tone: "Friendly",
   pointOfView: "none", readability: "8th grade (recommended)",
-  removeAiWords: "none", model: "claude-sonnet-4-6",
+  removeAiWords: "none", model: DEFAULT_AI_TEXT_MODEL,
   details: "", nlpKeywords: "", outline: "", externalLinks: "",
   internalLinks: "", referenceUrls: "",
   structure: { ...DEFAULT_STRUCTURE },
@@ -798,7 +798,7 @@ export default function ContentStudio() {
   const [bulkSettings, setBulkSettings] = useState<BulkSettings>({
     language: "English", targetCountry: "全球（不指定）", articleType: "Pillar Article",
     articleSize: "medium", tone: "Friendly", pointOfView: "none",
-    readability: "8th grade (recommended)", removeAiWords: "none", model: "claude-sonnet-4-6",
+    readability: "8th grade (recommended)", removeAiWords: "none", model: DEFAULT_AI_TEXT_MODEL,
     details: "", externalLinks: "",
     structure: { ...DEFAULT_STRUCTURE },
     introHookBrief: "", introHookType: "",

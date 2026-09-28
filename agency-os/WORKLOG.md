@@ -1,4 +1,25 @@
 ﻿# Worklog
+## 2026-09-29（續3）全 repo Claude 呼叫遷移到 claude-opus-5-5（Haiku 路由保留）；未上線
+- [操作者] `/claude-api migrate this project to claude-opus-5-5` → 範圍問題被關掉後說「去處理好」→ 範圍取全 repo 的 Anthropic 呼叫點；OpenAI 路徑不動。
+- [決策] Haiku 4.5 路由（title／keywords／outline 等約 12 條、500 token 級 JSON 小任務、CS classify/supervisor、video-service server.py、ops-inbox、outreach）保留：Opus 5.5 永遠會思考，500 token 上限會被 thinking 吃掉、延遲變長。其餘 Sonnet 4.6／Sonnet 5／Opus 4.8 預設全換 Opus 5.5；舊模型留在計價表／選單（仍在服務）。
+- [根因／不變量] Opus 5.5：thinking 永遠開且算進 max_tokens；回應開頭是 thinking block（`content[0]` 會拿錯）；effort 是唯一控制（API 預設 medium，明設）；Haiku 收 effort 會 400；非預設 temperature 400；classifier 拒答要處理。不變量：每個 app 只有一處知道「哪些模型會思考／收 effort／收 fallback」。
+- [改]
+  - C1 next-admin：SDK `@anthropic-ai/sdk` 0.69.0→0.128.0（0.69 無 output_config／fallbacks 型別）；新 `lib/ai/claude-request.ts`（claudeParams＝model＋max_tokens 思考預留 8000＋effort；claudeFallback＝beta server-side-fallback-2026-07-01＋fallbacks:"default"；claudeText 依 type 取字；claudeIncomplete 拒答／截斷）；DEFAULT_AI_TEXT_MODEL／FALLBACK_TEXT_MODEL＝opus-5-5；TEXT_RATES 加 opus-5-5（$4/$20、cache read 0.05x）與 opus-5（fallback 目標）；humanize、script-forge、visual-consistency（low）、command-plane（low）、article generate（計價改用實際回答的 finalMsg.model＋拒答標記）、spec-generator（generated_by 跟著模型）、image-edit-prompt（low）、product-copy、video-script-core（原 `content[0]`）、cheap-json Anthropic 分支（回報實際回答模型）、dossier 預設、CS generate（low effort；工具迴圈拒答→交真人）、Content/Banner Studio 預設。
+  - C2 COS：`provider.py` DEFAULT_MODEL＝opus-5-5；`_post` 單一入口：effort 明設（DEFAULT_EFFORT medium，Haiku 不送）、opus-5-5/opus-5/fable-5-1 加 fallback、`complete()` 也擋 refusal／max_tokens（原本只有 complete_json 擋）；EFFORTS 加 xhigh/max。`ai_execution/gateway.py` 不再把 temperature 送給 Anthropic（新模型 400）、`ai_coding.py` 紀錄只在 self-hosted 時寫 seed/temperature（prompt-audit F1）；interpret 提示刪兩處模型看不到的參照（F4）。
+  - C3 meeting-service：opus-5-5、串流＋get_final_message（32k 非串流會撞 SDK 10 分鐘保護）、effort、fallback、依 type 取字（原 `content[0].text` 在 thinking block 會 AttributeError）、拒答訊息、上限 32000+8000；秒數改在 normalize() 用 WPM_ZH 計算、刪 prompt 規則 7（prompt-audit F5）。
+  - C4 video-service `pipeline.py`＋`agency-os/docs/video_generator`（新單一入口 `claude_call.py`）：同上規則；requirements 釘 anthropic>=0.122.0；config 價格改 $4/$20。
+  - C5 ziwei：deep/premium＝opus-5-5，差異在 ANTHROPIC_EFFORT（medium/high）；思考預留；拒答／截斷丟 AiCallError。llm-mcp.mjs 預設（原 retired `claude-3-5-sonnet-latest`）、mcp.json.template／.codex example 的 claude-latest、`script_forge_video.jsx`。
+  - 測試：COS 新 RequestShapeTests（預設模型、fallback header、無 thinking/temperature、Haiku 不送 effort、complete() 拒答／截斷）；一個舊測試改（空內容＋stop_reason max_tokens 現在是 CUT_OFF，改用 end_turn 測 EMPTY）；next-admin 新 claude-request.test.ts；video-cost／cost-calculator 期望值依新價格更新（腳本步驟 +$0.0122）。
+- [剩]
+  - M1 上線 High-STOP：未部署。prod `cognitive-os-api` 容器 `COGNITIVE_OS_AI_MODEL=claude-sonnet-5`（`docker exec printenv` 實測），部署後 COS 仍跑 Sonnet 5，要改主機上的 deploy/.env；next-admin／video-service 容器無模型覆寫。
+  - M2 本機無 Anthropic key（user-env.ps1 刻意不放），沒有打真實 API；請求形狀由 SDK 型別（tsc）＋假 client 驗。
+  - m1 `mcp/claude-userlevel/settings.template.json` 的 `model: claude-sonnet-4-6` 是 Claude Code 本身的預設模型設定，不屬 API 呼叫，未動。
+  - m2 meeting-service `tests/test_vtt.py` 既有 import 錯誤（`fmt_vtt_ts`），與本次無關。
+- [Codex 5 項] F4（cheap-json 回報模型）、F5（meeting 思考預留）修；F1（COS 無預留：原本 Sonnet 5 就預設會思考，預算是在思考下量的，且截斷會重問）、F2（video：4000→16000 已含 12000 預留）、F3（CS 未加 fallback：型別化工具迴圈走非 beta，拒答→交真人／generateText 走 Gemini failover）核對後不改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=COS `python scripts/affected_tests.py --base HEAD --run`（634 tests，1 舊語義測試修正後 test_ai_gateway 45 passed）＋next-admin `npx tsc --noEmit` 0＋`npx vitest run` 217 檔 2034 passed＋ziwei tsc 0／vitest lib/ai 10 passed＋meeting／video_generator 假 client 實跑（thinking-first 取字、refusal、請求參數） | exit=0 | ms=474314
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/5m/0n（Codex scoped review，artifact agency-os/reports/oracle/2026-09-29-partialreview-b991b615.md；2 修 3 核對後不改）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects,mcp,mcp-local-wrappers,.claude/{commands,agents,skills}（rooted at D:\Work\.claude） | grep=`claude-sonnet-4-6|claude-opus-4-8|claude-3-5-sonnet` | hits=11（剩的都是計價表／選單舊模型、intake-form 註解、venv 內 SDK、COS pricing、Claude Code settings template）
+- ORACLE_WAIVED: 審查後的改動只有 Codex F4/F5 本身的修正（cheap-json 回報實際回答模型 3 行、meeting API_MAX_TOKENS 常數＋註解），修完重跑 tsc＋vitest 全綠；不另開審查輪
 ## 2026-09-29（續2）測試範圍定案（計畫 v1.56 §12.1 規則 11 唯一正本）：本機永不手動跑全套
 - [根因] v1.55 規則 11 同時寫「只跑受影響」與「正式站部署前跑全套」→ 兩個 session 照後者排全套 → 操作者「我真的不要動不動就跑全套」。
 - [定案] ① 每卡：`affected_tests.py --run`＋golden；② 部署前：`--base <最近全套綠 SHA>`＋golden＋`deploy.sh` 關卡（夜間 CI 上線前＝63e96ffe6）；③ 全套只在 GitHub CI（依賴／執行環境變更＋每晚），期末閘看 CI 結果。

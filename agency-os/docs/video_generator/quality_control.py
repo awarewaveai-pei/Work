@@ -6,6 +6,7 @@ quality_control.py
 import requests
 import anthropic
 from config import *
+from claude_call import claude_create, claude_text
 
 claude = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
 
@@ -35,15 +36,14 @@ def check_plagiarism(text):
 
 # ── 重寫文章 ──
 def rewrite_article(content, title):
-    response = claude.messages.create(
-        model="claude-sonnet-4-6",
+    response = claude_create(claude,
         max_tokens=2000,
         messages=[{
             "role": "user",
             "content": f"請將以下文章完全改寫，保留相同意思但用完全不同的表達方式，繁體中文，標題：{title}\n\n{content}"
         }]
     )
-    return response.content[0].text
+    return claude_text(response)
 
 # ── 自動內部連結 ──
 def add_internal_links(content, wp_url, article_title):
@@ -62,8 +62,7 @@ def add_internal_links(content, wp_url, article_title):
 
         # 用 Claude 找出最相關的文章並建議插入位置
         posts_list = "\n".join([f"- {p['title']['rendered']}：{p['link']}" for p in posts[:20]])
-        response = claude.messages.create(
-            model="claude-sonnet-4-6",
+        response = claude_create(claude,
             max_tokens=2000,
             messages=[{
                 "role": "user",
@@ -79,7 +78,7 @@ def add_internal_links(content, wp_url, article_title):
 """
             }]
         )
-        updated = response.content[0].text
+        updated = claude_text(response)
         print("   ✅ 內部連結：已插入")
         return updated
     except Exception as e:
@@ -89,8 +88,7 @@ def add_internal_links(content, wp_url, article_title):
 # ── 自動生成 FAQ ──
 def generate_faq(title, content):
     try:
-        response = claude.messages.create(
-            model="claude-sonnet-4-6",
+        response = claude_create(claude,
             max_tokens=1000,
             messages=[{
                 "role": "user",
@@ -107,7 +105,7 @@ A: 回答。
 """
             }]
         )
-        faq = response.content[0].text
+        faq = claude_text(response)
         print("   ✅ FAQ：已生成")
         return faq
     except Exception as e:
@@ -130,8 +128,7 @@ def generate_alt_tags(title, scene_descriptions):
 # ── A/B 測試標題 ──
 def generate_ab_titles(original_title, content_summary):
     try:
-        response = claude.messages.create(
-            model="claude-sonnet-4-6",
+        response = claude_create(claude,
             max_tokens=200,
             messages=[{
                 "role": "user",
@@ -144,7 +141,7 @@ def generate_ab_titles(original_title, content_summary):
 """
             }]
         )
-        title_b = response.content[0].text.strip()
+        title_b = claude_text(response).strip()
         print(f"   ✅ A/B標題：A={original_title[:30]}... | B={title_b[:30]}...")
         return original_title, title_b
     except Exception as e:

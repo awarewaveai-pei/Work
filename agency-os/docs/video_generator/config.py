@@ -27,10 +27,10 @@ def _env_list(name):
 # ═══════════════════════════════════════════
 CLAUDE_API_KEY  = _env("CLAUDE_API_KEY") or _env("ANTHROPIC_API_KEY")
 OPENAI_API_KEY  = _env("OPENAI_API_KEY")
-CLAUDE_MODEL    = _env("CLAUDE_MODEL", "claude-sonnet-4-6")
-# Claude 計價（USD / 1M tokens）→ 用於實際成本計算。預設為 Sonnet 參考價，可用 env 覆寫。
-CLAUDE_INPUT_PRICE  = float(_env("CLAUDE_INPUT_PRICE_PER_MTOK", "3"))
-CLAUDE_OUTPUT_PRICE = float(_env("CLAUDE_OUTPUT_PRICE_PER_MTOK", "15"))
+CLAUDE_MODEL    = _env("CLAUDE_MODEL", "claude-opus-5-5")
+# Claude 計價（USD / 1M tokens）→ 用於實際成本計算。預設為 claude-opus-5-5 定價，可用 env 覆寫。
+CLAUDE_INPUT_PRICE  = float(_env("CLAUDE_INPUT_PRICE_PER_MTOK", "4"))
+CLAUDE_OUTPUT_PRICE = float(_env("CLAUDE_OUTPUT_PRICE_PER_MTOK", "20"))
 
 # ═══════════════════════════════════════════
 # Supabase

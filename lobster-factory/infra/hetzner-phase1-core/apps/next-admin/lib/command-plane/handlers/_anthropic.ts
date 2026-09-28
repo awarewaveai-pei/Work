@@ -1,6 +1,6 @@
 // Shared Anthropic SDK wrapper for review handlers.
 // Uses prompt caching to keep system prompt warm across invocations.
-// Model defaults to claude-sonnet-4-6 (cost-effective for summarisation).
+// Model defaults to CLAUDE_DEFAULT_MODEL (lib/ai/claude-request.ts); ANTHROPIC_MODEL overrides.
 //
 // Error contract: generateSummary NEVER throws — all failure modes return a
 // human-readable string so callers always produce a completed command result
@@ -10,8 +10,9 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import * as Sentry from "@sentry/nextjs";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/claude-request";
 
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? CLAUDE_DEFAULT_MODEL;
 const SYSTEM_PROMPT = `You are an operations summary writer for the Lobster Factory / Agency OS platform.
 You receive a JSON payload of recent runs, incidents, and errors. Produce:
 1. A 2-3 sentence executive summary (high-signal, no filler).
@@ -45,9 +46,9 @@ export async function generateSummary(input: AnthropicSummaryInput): Promise<str
   const client = new Anthropic({ apiKey });
 
   try {
-    const response = await client.messages.create({
-      model: DEFAULT_MODEL,
-      max_tokens: 1024,
+    const response = await client.beta.messages.create({
+      ...claudeParams(DEFAULT_MODEL, 1024, "low"),
+      ...claudeFallback(DEFAULT_MODEL),
       system: [
         {
           type: "text",
@@ -63,11 +64,10 @@ export async function generateSummary(input: AnthropicSummaryInput): Promise<str
       ],
     });
 
-    const textBlock = response.content.find((c) => c.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      return "_AI summary returned empty response._";
-    }
-    return textBlock.text;
+    const incomplete = claudeIncomplete(response);
+    if (incomplete) return `_AI summary unavailable (${incomplete})._\n${rawFallback(input.payload)}`;
+    const text = claudeText(response);
+    return text || "_AI summary returned empty response._";
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       // authentication_error / permission_error → key is wrong or missing scope.

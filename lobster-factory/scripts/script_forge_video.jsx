@@ -18,7 +18,7 @@ function getHistory(){try{return JSON.parse(localStorage.getItem("sf_history")||
 /* ── CLAUDE API ── */
 const SYS=`你是世界頂級短影音腳本策略師、廣告創意總監與多語言內容專家。輸出必須是純JSON，不加任何markdown包裹或前言後記。台詞口語自然；畫面指令具體；字幕最多12字。`;
 async function claude(prompt,onChunk){
-  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:4000,stream:true,system:SYS,messages:[{role:"user",content:prompt}]})});
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-opus-5-5",max_tokens:12000,stream:true,system:SYS,messages:[{role:"user",content:prompt}]})});
   const reader=res.body.getReader();const dec=new TextDecoder();let full="";
   while(true){const{done,value}=await reader.read();if(done)break;for(const line of dec.decode(value).split("\n").filter(l=>l.startsWith("data: "))){try{const d=JSON.parse(line.slice(6));if(d.delta?.text){full+=d.delta.text;onChunk?.(full);}}catch{}}}
   return full;

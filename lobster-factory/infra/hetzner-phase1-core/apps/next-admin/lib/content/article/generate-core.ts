@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
 import { logAiCall } from "../../ai/log-ai-call";
+import { claudeFallback, claudeParams } from "../../ai/claude-request";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
@@ -694,11 +695,11 @@ export async function* streamArticleGeneration(
     return;
   }
   const client = new Anthropic({ apiKey });
-  let anthropicStream: ReturnType<typeof client.messages.stream> | null = null;
+  let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
   try {
-    anthropicStream = client.messages.stream({
-      model: config.model,
-      max_tokens: config.maxTokens,
+    anthropicStream = client.beta.messages.stream({
+      ...claudeParams(config.model, config.maxTokens),
+      ...claudeFallback(config.model),
       system: config.system,
       messages: [{ role: "user", content: config.userPrompt }],
     });
@@ -724,12 +725,15 @@ export async function* streamArticleGeneration(
       // Cost ledger: record exact token usage from the completed stream (best-effort, never throws).
       if (finalMsg) {
         void logAiCall({ route: "content/article-generate", response: finalMsg, jobId: config.jobId, tool: "content" });
-        const costUsd = textCallCostUsd({ model: config.model, inputTokens: finalMsg.usage.input_tokens, outputTokens: finalMsg.usage.output_tokens, cacheReadTokens: finalMsg.usage.cache_read_input_tokens, cacheWriteTokens: finalMsg.usage.cache_creation_input_tokens });
-        const { rate } = resolveTextRate(config.model);
+        const costUsd = textCallCostUsd({ model: finalMsg.model, inputTokens: finalMsg.usage.input_tokens, outputTokens: finalMsg.usage.output_tokens, cacheReadTokens: finalMsg.usage.cache_read_input_tokens, cacheWriteTokens: finalMsg.usage.cache_creation_input_tokens });
+        const { rate } = resolveTextRate(finalMsg.model);
         if (config.sourcesCostUsd) {
           yield `\n[COST_JSON]${JSON.stringify({ usd: config.sourcesCostUsd, model: "search", vendor: "Serper", route: "content/fetchRealSources" })}`;
         }
-        yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
+        yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: finalMsg.model, vendor: rate.vendor, route: "content/article-generate" })}`;
+      }
+      if (finalMsg?.stop_reason === "refusal") {
+        yield "\n\n<!-- GENERATION_ERROR: the model declined this request -->";
       }
       if (finalMsg?.stop_reason === "max_tokens") {
         yield "\n\n<!-- GENERATION_TRUNCATED: hit the output length limit; pick a shorter article size or split the topic -->";

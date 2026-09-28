@@ -26,7 +26,7 @@ def _bool(name: str, default: str = "false") -> bool:
 # AI — 腳本與圖片
 # ─────────────────────────────────────────
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
-CLAUDE_MODEL   = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
+CLAUDE_MODEL   = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")   # DALL-E 3 圖片生成
 IMAGE_MODEL    = os.getenv("IMAGE_MODEL", "dall-e-3")
 IMAGE_SIZE     = os.getenv("IMAGE_SIZE", "1792x1024")

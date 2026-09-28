@@ -12,14 +12,15 @@
  * self-contained answer capsule; bullets are discrete extractable units; the focus
  * keyword leads the meta title and appears in the first sentence + one bullet.
  *
- * Model: ANTHROPIC_MODEL (default claude-sonnet-4-6) — same client pattern as
+ * Model: ANTHROPIC_MODEL (default CLAUDE_DEFAULT_MODEL, lib/ai/claude-request.ts) — same client pattern as
  * lib/command-plane/handlers/_anthropic.ts.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { checkRankMath, type RankMathReport, type RankMathCheck } from "../seo/rankmath-checker";
 import { logAiCall } from "../ai/log-ai-call";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/claude-request";
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+const MODEL = process.env.ANTHROPIC_MODEL ?? CLAUDE_DEFAULT_MODEL;
 
 export interface ProductCopyInput {
   /** Free-text design description / prompt that produced the artwork. */
@@ -193,15 +194,16 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
   const client = new Anthropic({ apiKey });
   let text: string;
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1200,
+    const response = await client.beta.messages.create({
+      ...claudeParams(MODEL, 1200),
+      ...claudeFallback(MODEL),
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: userContent }],
     });
-    const block = response.content.find((c) => c.type === "text");
-    if (!block || block.type !== "text") return { ok: false, error: "empty_response" };
-    text = block.text;
+    const incomplete = claudeIncomplete(response);
+    if (incomplete) return { ok: false, error: incomplete };
+    text = claudeText(response);
+    if (!text) return { ok: false, error: "empty_response" };
     void logAiCall({ route: "lib/studio/product-copy", response });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {

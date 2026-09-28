@@ -124,8 +124,8 @@ class AIGateway:
         seed: int | None = None,
         temperature: float | None = None,
     ) -> GatewayResult:
-        """``seed``/``temperature`` make a second, independent pass reproducible (Ollama honours both; the
-        Anthropic API has no seed -- only temperature is forwarded there, and the caller's record must say so)."""
+        """``seed``/``temperature`` make a second, independent pass reproducible on Ollama, which honours both. Neither
+        is sent to the Anthropic API: it has no seed, and current Claude models reject a non-default temperature."""
         entry = self._entry(model_profile_id)
         provider = entry["provider"]
         if classification_tag == "Restricted" and provider in EXTERNAL_MODEL_PROVIDERS:
@@ -135,12 +135,12 @@ class AIGateway:
                 f"Select a non-external-model profile (provider='self-hosted') instead."
             )
         if provider == "anthropic":
-            return self._complete_anthropic(model_profile_id, entry, system=system, prompt=prompt, max_tokens=max_tokens, trace_id=trace_id, prompt_version=prompt_version, temperature=temperature)
+            return self._complete_anthropic(model_profile_id, entry, system=system, prompt=prompt, max_tokens=max_tokens, trace_id=trace_id, prompt_version=prompt_version)
         if provider == "self-hosted":
             return self._complete_ollama(model_profile_id, entry, system=system, prompt=prompt, trace_id=trace_id, prompt_version=prompt_version, seed=seed, temperature=temperature)
         raise InvariantViolation(f"PROVIDER_NOT_IMPLEMENTED: {provider!r} (model profile {model_profile_id!r}) -- this Gateway implements 'anthropic' and 'self-hosted' (Ollama) only")
 
-    def _complete_anthropic(self, model_profile_id: str, entry: dict[str, Any], *, system: str, prompt: str, max_tokens: int, trace_id: str | None, prompt_version: str | None, temperature: float | None = None) -> GatewayResult:
+    def _complete_anthropic(self, model_profile_id: str, entry: dict[str, Any], *, system: str, prompt: str, max_tokens: int, trace_id: str | None, prompt_version: str | None) -> GatewayResult:
         api_key = self._api_key
         if not api_key:
             raise AdapterUnavailable("ANTHROPIC_API_KEY_MISSING: construct AIGateway(..., api_key=...) with a caller-supplied key before selecting an 'anthropic' model profile -- this Gateway does not read ANTHROPIC_API_KEY from the environment (see module docstring)")
@@ -151,10 +151,7 @@ class AIGateway:
         client = anthropic.Anthropic(api_key=api_key)
         started = time.monotonic()
         try:
-            request_kwargs: dict[str, Any] = {"model": entry["model_identifier"], "max_tokens": max_tokens, "system": system, "messages": [{"role": "user", "content": prompt}]}
-            if temperature is not None:
-                request_kwargs["temperature"] = temperature
-            response = client.messages.create(**request_kwargs)
+            response = client.messages.create(model=entry["model_identifier"], max_tokens=max_tokens, system=system, messages=[{"role": "user", "content": prompt}])
         except anthropic.APIError as error:
             raise AdapterUnavailable(f"ANTHROPIC_CALL_FAILED: {error}") from error
         latency_ms = int((time.monotonic() - started) * 1000)

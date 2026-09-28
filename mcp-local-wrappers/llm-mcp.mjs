@@ -34,7 +34,9 @@ async function callOpenAI(prompt, model) {
 
 async function callAnthropic(prompt, model) {
   const apiKey = requiredEnv("ANTHROPIC_API_KEY");
-  const chosenModel = model || process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+  const chosenModel = model || process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
+  // claude-opus-5-5 always thinks (thinking counts toward max_tokens); Haiku rejects effort.
+  const alwaysThinks = /^claude-(opus-5|sonnet-5|fable-5|mythos-5)/.test(chosenModel);
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -45,7 +47,8 @@ async function callAnthropic(prompt, model) {
     },
     body: JSON.stringify({
       model: chosenModel,
-      max_tokens: 2048,
+      max_tokens: alwaysThinks ? 2048 + 8000 : 2048,
+      ...(chosenModel.startsWith("claude-haiku-") ? {} : { output_config: { effort: "medium" } }),
       messages: [{ role: "user", content: prompt }]
     })
   });

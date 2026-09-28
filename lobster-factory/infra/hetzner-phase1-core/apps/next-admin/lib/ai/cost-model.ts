@@ -41,6 +41,9 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "claude-haiku-4-5-20251001": { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
   "claude-haiku-4-5":          { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
   "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic" },
+  "claude-opus-5-5":           { inputPerM: 4, outputPerM: 20, cacheReadMult: 0.05, cacheWriteMult: 1.25, label: "Claude Opus 5.5", vendor: "Anthropic" },
+  // Opus 5 = a classifier-fallback target of Opus 5.5 (lib/ai/claude-request.ts); priced so a rescued call is not mispriced.
+  "claude-opus-5":             { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 5", vendor: "Anthropic" },
   "claude-opus-4-8":           { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 4.8", vendor: "Anthropic" },
   "claude-fable-5":            { inputPerM: 10, outputPerM: 50, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Fable 5", vendor: "Anthropic" },
   "gpt-5.5":                   { inputPerM: 5, outputPerM: 30, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.5", vendor: "OpenAI" },
@@ -54,8 +57,8 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "gemini-2.0-flash-lite":     { inputPerM: 0.1, outputPerM: 0.4, cacheReadMult: 0.25, cacheWriteMult: 1, label: "Gemini 2.0 Flash-Lite", vendor: "Google" },
 };
 
-/** Fallback when an unknown text model id is logged — Sonnet rate (the app default). */
-export const FALLBACK_TEXT_MODEL = "claude-sonnet-4-6";
+/** Fallback when an unknown text model id is logged — the app default model's rate. */
+export const FALLBACK_TEXT_MODEL = "claude-opus-5-5";
 
 /** Per-image price in USD. Keys = the app's image model ids (lib/tarot/image-gen.ts TAROT_MODELS). */
 export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: string }> = {
@@ -128,8 +131,8 @@ export interface FeatureProfile {
 }
 
 export const TEXT_FEATURES: FeatureProfile[] = [
-  { key: "article",     label: "文章生成 (Content Studio)", route: "/api/content/generate", model: "claude-sonnet-4-6", inputTok: 3500, outputTok: 8000, extraUsd: 0.006 },
-  { key: "humanize",    label: "AI 去味 / 人性化",          route: "/api/content/humanize", model: "claude-sonnet-4-6", inputTok: 4000, outputTok: 6000 },
+  { key: "article",     label: "文章生成 (Content Studio)", route: "/api/content/generate", model: "claude-opus-5-5", inputTok: 3500, outputTok: 8000, extraUsd: 0.006 },
+  { key: "humanize",    label: "AI 去味 / 人性化",          route: "/api/content/humanize", model: "claude-opus-5-5", inputTok: 4000, outputTok: 6000 },
   { key: "seo-fix",     label: "SEO 修正 (RankMath)",        route: "/api/content/seo-fix",  model: "claude-sonnet-4-6", inputTok: 4500, outputTok: 6000 },
   { key: "brand-voice", label: "品牌語氣擷取",               route: "/api/content/brand-voice", model: "claude-sonnet-4-6", inputTok: 3000, outputTok: 1500 },
   { key: "outline",     label: "大綱生成",                   route: "/api/content/outline",  model: "claude-haiku-4-5-20251001", inputTok: 400, outputTok: 700 },
@@ -138,8 +141,8 @@ export const TEXT_FEATURES: FeatureProfile[] = [
   { key: "hook-brief",  label: "Hook Brief 草稿（批次）",     route: "/api/content/hook-brief", model: "claude-haiku-4-5-20251001", inputTok: 600, outputTok: 500 },
   { key: "syndicate",   label: "社群多平台改寫",             route: "/api/content/syndicate", model: "claude-haiku-4-5-20251001", inputTok: 1500, outputTok: 2000 },
   { key: "tarot-prompt",label: "塔羅 prompt 建議",           route: "/api/tools/tarot/suggest-prompt", model: "claude-haiku-4-5-20251001", inputTok: 500, outputTok: 400 },
-  { key: "product-copy",label: "POD 商品文案 (SEO)",         route: "lib/studio/product-copy", model: "claude-sonnet-4-6", inputTok: 600, outputTok: 1000 },
-  { key: "video-script",label: "影片腳本生成 (6 場景)",       route: "lib/content/video/video-script-core", model: "claude-sonnet-4-6", inputTok: 1200, outputTok: 2200 },
+  { key: "product-copy",label: "POD 商品文案 (SEO)",         route: "lib/studio/product-copy", model: "claude-opus-5-5", inputTok: 600, outputTok: 1000 },
+  { key: "video-script",label: "影片腳本生成 (6 場景)",       route: "lib/content/video/video-script-core", model: "claude-opus-5-5", inputTok: 1200, outputTok: 2200 },
 ];
 
 /**

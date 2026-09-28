@@ -1,7 +1,7 @@
 # 全自動內容發佈系統 — Python 依賴
 # moviepy 鎖 1.x：本專案使用 1.x API（.set_duration/.resize/.crop）。2.x 會在執行期炸。
 moviepy==1.0.3
-anthropic>=0.39
+anthropic>=0.122.0
 openai>=1.40
 edge-tts>=6.1
 requests>=2.31

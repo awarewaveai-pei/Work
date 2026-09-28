@@ -19,10 +19,18 @@ from ai_lego.platform.net.egress import fetch_json
 
 API_KEY_ENV = "COGNITIVE_OS_ANTHROPIC_API_KEY"
 MODEL_ENV = "COGNITIVE_OS_AI_MODEL"
-DEFAULT_MODEL = "claude-sonnet-5"
+DEFAULT_MODEL = "claude-opus-5-5"
 ANTHROPIC_HOST = "api.anthropic.com"
 ANTHROPIC_MESSAGES_URL = f"https://{ANTHROPIC_HOST}/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
+# claude-opus-5-5 always thinks and effort is its only control; its API default is medium, set here explicitly.
+DEFAULT_EFFORT = "medium"
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+NO_EFFORT_MODEL_PREFIXES = ("claude-haiku-",)   # effort is a 400 there (COGNITIVE_OS_AI_MODEL may name one)
+# A safety-classifier decline is re-run by the API on the model it picks for that category (billed at that
+# model's rates; payload["model"] names who answered, which is what the meter prices).
+FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-1")
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
 DEFAULT_TIMEOUT_SECONDS = 60.0
 MAX_OUTPUT_TOKENS = 16384   # the gateway's ceiling per call; a caller picks its own limit under it (drafts 6000, interpretations 12288)
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -72,13 +80,35 @@ class AnthropicProvider:
         """The same key, model and transport with another per-request timeout (a background job that writes a long answer)."""
         return AnthropicProvider(self._api_key, self.model, fetch=self._fetch, timeout=timeout)
 
-    def complete(self, system: str, user: str, *, max_tokens: int = MAX_OUTPUT_TOKENS) -> AiCompletion:
+    def _post(self, body: dict[str, Any], *, max_tokens: int, effort: str | None) -> dict[str, Any]:
+        """One Messages call: the model, effort (unless the model rejects it) and the classifier fallback opt-in are
+        set here for every caller. A refusal the fallback could not rescue raises, like a cut-off."""
         if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or not 1 <= max_tokens <= MAX_OUTPUT_TOKENS:
             raise InvariantViolation(f"AI_MAX_TOKENS_INVALID: expected 1..{MAX_OUTPUT_TOKENS}, got {max_tokens!r}")
-        body = {"model": self.model, "max_tokens": max_tokens, "system": system, "messages": [{"role": "user", "content": user}]}
+        effort = DEFAULT_EFFORT if effort is None else effort
+        if effort not in EFFORTS:
+            raise InvariantViolation(f"AI_EFFORT_INVALID: {effort!r}")
+        body = {"model": self.model, "max_tokens": max_tokens, **body}
+        if not self.model.startswith(NO_EFFORT_MODEL_PREFIXES):
+            body["output_config"] = {"effort": effort}
         headers = {"x-api-key": self._api_key, "anthropic-version": ANTHROPIC_VERSION}
+        if self.model in FALLBACK_MODELS:
+            body["fallbacks"] = "default"
+            headers["anthropic-beta"] = FALLBACK_BETA
         payload = self._fetch(ANTHROPIC_MESSAGES_URL, self._timeout, method="POST", headers=headers, body=body, max_bytes=MAX_RESPONSE_BYTES, error_prefix="AI_PROVIDER")
-        content = self._content(payload)   # answered from here on: every refusal carries what the call cost
+        self._content(payload)   # answered from here on: every refusal carries what the call cost
+        stop = payload.get("stop_reason")
+        if stop == "max_tokens":   # a tool input or text cut off mid-way is never a whole answer
+            usage = self._usage(payload)
+            raise self._refused(payload, f"AI_PROVIDER_CUT_OFF: output_tokens={usage[1] if usage else '?'} reached max_tokens={max_tokens}", "cut_off")
+        if stop == "refusal":
+            category = (payload.get("stop_details") or {}).get("category") if isinstance(payload.get("stop_details"), dict) else None
+            raise self._refused(payload, f"AI_PROVIDER_REFUSAL: the model declined to answer (category={category!r})", "refusal")
+        return payload
+
+    def complete(self, system: str, user: str, *, max_tokens: int = MAX_OUTPUT_TOKENS, effort: str | None = None) -> AiCompletion:
+        payload = self._post({"system": system, "messages": [{"role": "user", "content": user}]}, max_tokens=max_tokens, effort=effort)
+        content = payload["content"]
         text = "".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and block.get("type") == "text")
         if not text.strip():
             raise self._refused(payload, f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={payload.get('stop_reason')!r}", "empty")
@@ -90,30 +120,16 @@ class AnthropicProvider:
         a stray quote in it (2026-09-27: a first answer refused as NOT_JSON at char 244 cost a whole retry). The tool
         is offered, not forced (forced tool use is rejected by some models); an answer that came back as text is
         returned as that text, for the caller's own parser. An answer cut off by max_tokens, refused or empty raises
-        ProviderCallError carrying what the call cost. ``effort`` (low|medium|high) bounds the model's thinking, which
-        counts against max_tokens and is billed as output (claude-sonnet-5 thinks at high by default; verified accepted
-        2026-09-28). ``input_schema`` is guidance for the object's shape; the caller's own gates stay the authority."""
-        if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or not 1 <= max_tokens <= MAX_OUTPUT_TOKENS:
-            raise InvariantViolation(f"AI_MAX_TOKENS_INVALID: expected 1..{MAX_OUTPUT_TOKENS}, got {max_tokens!r}")
-        body = {
-            "model": self.model, "max_tokens": max_tokens, "system": system,
+        ProviderCallError carrying what the call cost. ``effort`` (see ``EFFORTS``; ``DEFAULT_EFFORT`` when None) bounds
+        the model's thinking, which counts against max_tokens and is billed as output. ``input_schema`` is guidance for
+        the object's shape; the caller's own gates stay the authority."""
+        payload = self._post({
+            "system": system,
             "messages": [{"role": "user", "content": user + f"\n\nAnswer by calling the tool `{name}` with the JSON object as its input."}],
             "tools": [{"name": name, "description": description, "input_schema": input_schema or {"type": "object"}}],
             "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
-        }
-        if effort is not None:
-            if effort not in ("low", "medium", "high"):
-                raise InvariantViolation(f"AI_EFFORT_INVALID: {effort!r}")
-            body["output_config"] = {"effort": effort}
-        headers = {"x-api-key": self._api_key, "anthropic-version": ANTHROPIC_VERSION}
-        payload = self._fetch(ANTHROPIC_MESSAGES_URL, self._timeout, method="POST", headers=headers, body=body, max_bytes=MAX_RESPONSE_BYTES, error_prefix="AI_PROVIDER")
-        content = self._content(payload)
-        stop = payload.get("stop_reason")
-        if stop == "max_tokens":   # a tool input or text cut off mid-way is never a whole answer
-            usage = self._usage(payload)
-            raise self._refused(payload, f"AI_PROVIDER_CUT_OFF: output_tokens={usage[1] if usage else '?'} reached max_tokens={max_tokens}", "cut_off")
-        if stop == "refusal":
-            raise self._refused(payload, "AI_PROVIDER_REFUSAL: the model declined to answer", "refusal")
+        }, max_tokens=max_tokens, effort=effort)
+        content, stop = payload["content"], payload.get("stop_reason")
         call = next((block for block in content if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == name), None)
         if call is not None and isinstance(call.get("input"), dict):
             return self._completion(payload, json.dumps(call["input"], ensure_ascii=False))

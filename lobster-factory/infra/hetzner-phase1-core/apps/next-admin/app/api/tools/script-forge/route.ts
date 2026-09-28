@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { normalizeAiTextModel, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
+import { claudeFallback, claudeParams } from "@/lib/ai/claude-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export async function POST(req: Request): Promise<Response> {
   const prompt = (typeof body.prompt === "string" ? body.prompt : "").slice(0, MAX_PROMPT_CHARS).trim();
   if (!prompt) return new NextResponse("prompt required", { status: 400 });
 
-  // model 白名單化（非清單值 → 預設 claude-sonnet-4-6）。決定供應商與所需金鑰。
+  // model 白名單化（非清單值 → DEFAULT_AI_TEXT_MODEL）。決定供應商與所需金鑰。
   const model: AiTextModel = normalizeAiTextModel(body.model);
   const useOpenAi = isOpenAiTextModel(model);
 
@@ -103,8 +104,8 @@ async function streamAnthropic(
   signal: AbortSignal,
 ): Promise<void> {
   const client = new Anthropic({ apiKey });
-  const stream = await client.messages.create(
-    { model, max_tokens: MAX_TOKENS, system: SYS, messages: [{ role: "user", content: prompt }], stream: true },
+  const stream = await client.beta.messages.create(
+    { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system: SYS, messages: [{ role: "user", content: prompt }], stream: true },
     { signal },
   );
   for await (const event of stream) {

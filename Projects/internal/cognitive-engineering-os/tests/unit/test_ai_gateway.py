@@ -18,7 +18,7 @@ from ai_lego.errors import InvariantViolation
 from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.ai_gateway import draft as draft_mod
 from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs, draft_recipe_source, extract_json_object, method_input_spec, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, ProviderCallError, provider_from_env
+from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, DEFAULT_EFFORT, DEFAULT_MODEL, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, ProviderCallError, provider_from_env
 from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
 from tests.unit.thread_testkit import HANG_GUARD_S, join_all
@@ -92,7 +92,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual((completion.text, completion.model, completion.input_tokens, completion.output_tokens), ('{"ok": true}', "claude-real", 7, 3))
 
     def test_empty_or_malformed_provider_output_is_an_explicit_error(self):
-        provider = AnthropicProvider("sk-test", fetch=lambda *a, **k: {"content": [], "stop_reason": "max_tokens"})
+        provider = AnthropicProvider("sk-test", fetch=lambda *a, **k: {"content": [], "stop_reason": "end_turn"})
         with self.assertRaisesRegex(InvariantViolation, "AI_PROVIDER_EMPTY_RESPONSE"):
             provider.complete("s", "u", max_tokens=10)
         provider = AnthropicProvider("sk-test", fetch=lambda *a, **k: {"nope": 1})
@@ -520,14 +520,54 @@ class CompleteJsonTests(unittest.TestCase):
         self.assertEqual(seen["body"]["output_config"], {"effort": "medium"})
         self.assertEqual(seen["body"]["tools"][0]["input_schema"]["required"], ["a"])
         provider.complete_json("s", "u", max_tokens=10)
-        self.assertNotIn("output_config", seen["body"])
+        self.assertEqual(seen["body"]["output_config"], {"effort": DEFAULT_EFFORT})   # never left to the model's own default
         with self.assertRaisesRegex(InvariantViolation, "AI_EFFORT_INVALID"):
-            provider.complete_json("s", "u", max_tokens=10, effort="max")
+            provider.complete_json("s", "u", max_tokens=10, effort="extreme")
 
     def test_the_ceiling_still_applies(self):
         provider, _ = self._provider({})
         with self.assertRaisesRegex(InvariantViolation, "AI_MAX_TOKENS_INVALID"):
             provider.complete_json("s", "u", max_tokens=MAX_OUTPUT_TOKENS + 1)
+
+
+class RequestShapeTests(unittest.TestCase):
+    """What every call sends for the model it names: effort, and the classifier fallback opt-in on the models that take it."""
+
+    ANSWER = {"content": [{"type": "thinking", "thinking": ""}, {"type": "text", "text": "ok"}], "stop_reason": "end_turn", "model": "claude-opus-5-5", "usage": {"input_tokens": 1, "output_tokens": 1}}
+
+    def _call(self, model, payload=None):
+        seen = {}
+        def fake_fetch(url, timeout, *, method, headers, body, max_bytes, error_prefix):
+            seen.update(body=body, headers=headers)
+            return payload or self.ANSWER
+        return AnthropicProvider("sk-test", model, fetch=fake_fetch), seen
+
+    def test_the_default_model_is_opus_5_5_with_fallbacks_and_explicit_effort(self):
+        provider, seen = self._call(DEFAULT_MODEL)
+        completion = provider.complete("s", "u", max_tokens=10)
+        self.assertEqual(DEFAULT_MODEL, "claude-opus-5-5")
+        self.assertEqual(completion.text, "ok")   # a leading thinking block is not the answer
+        self.assertEqual(seen["body"]["fallbacks"], "default")
+        self.assertEqual(seen["headers"]["anthropic-beta"], "server-side-fallback-2026-07-01")
+        self.assertEqual(seen["body"]["output_config"], {"effort": "medium"})
+        self.assertNotIn("temperature", seen["body"])
+        self.assertNotIn("thinking", seen["body"])   # always on for this model; {"type": "disabled"} would be a 400
+
+    def test_a_model_without_effort_or_fallbacks_gets_neither(self):
+        provider, seen = self._call("claude-haiku-4-5")
+        provider.complete("s", "u", max_tokens=10, effort="high")
+        self.assertNotIn("output_config", seen["body"])
+        self.assertNotIn("fallbacks", seen["body"])
+        self.assertNotIn("anthropic-beta", seen["headers"])
+
+    def test_a_refusal_or_cut_off_plain_answer_raises_with_its_cost(self):
+        provider, _ = self._call(DEFAULT_MODEL, {"content": [{"type": "text", "text": "partial"}], "stop_reason": "refusal", "stop_details": {"type": "refusal", "category": "bio"}, "usage": {"input_tokens": 4, "output_tokens": 2}})
+        with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_REFUSAL.*bio") as caught:
+            provider.complete("s", "u", max_tokens=10)
+        self.assertEqual((caught.exception.reason, caught.exception.output_tokens), ("refusal", 2))
+        provider, _ = self._call(DEFAULT_MODEL, {"content": [{"type": "text", "text": "half an ans"}], "stop_reason": "max_tokens", "usage": {"input_tokens": 4, "output_tokens": 10}})
+        with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_CUT_OFF"):
+            provider.complete("s", "u", max_tokens=10)
 
 
 if __name__ == "__main__":

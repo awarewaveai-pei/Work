@@ -7,6 +7,7 @@ import {
   type AiTextModel,
 } from "../ai/text-model-options";
 import { logAiCall } from "../ai/log-ai-call";
+import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/claude-request";
 import { isStudioModel, type StudioModel } from "./model-options";
 import type { StyleAnchor } from "./style-design-workbench";
 
@@ -106,20 +107,17 @@ async function generateWithAnthropic(model: AiTextModel, userMessage: string, ac
 
   try {
     const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model,
-      max_tokens: 350,
+    const msg = await client.beta.messages.create({
+      ...claudeParams(model, 350, "low"),
+      ...claudeFallback(model),
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
     });
     void logAiCall({ route: "/api/tools/studio/edit-prompt", response: msg, actorRole });
 
-    const prompt = cleanPrompt(
-      msg.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join(""),
-    );
+    const incomplete = claudeIncomplete(msg);
+    if (incomplete) return { ok: false, status: 502, error: incomplete };
+    const prompt = cleanPrompt(claudeText(msg));
     if (!prompt) return { ok: false, status: 502, error: "empty_response" };
     return { ok: true, prompt };
   } catch (err) {

@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.69.0",
+    "@anthropic-ai/sdk": "^0.128.0",
     "@google/generative-ai": "^0.24.1",
     "@sentry/nextjs": "^9",
     "@supabase/ssr": "^0.10.3",

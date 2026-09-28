@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams } from "@/lib/ai/claude-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,15 +71,15 @@ TASK: Rewrite the provided content to:
 Output ONLY the rewritten content in Markdown format, no preamble or explanation.`;
 
   const client = new Anthropic({ apiKey });
-  let anthropicStream: ReturnType<typeof client.messages.stream> | null = null;
+  let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
 
   const readable = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       try {
-        anthropicStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 6144,
+        anthropicStream = client.beta.messages.stream({
+          ...claudeParams(CLAUDE_DEFAULT_MODEL, 6144),
+          ...claudeFallback(CLAUDE_DEFAULT_MODEL),
           system: systemPrompt,
           messages: [{ role: "user", content: inputText }],
         });
@@ -96,6 +97,7 @@ Output ONLY the rewritten content in Markdown format, no preamble or explanation
         // cost ledger. Best-effort: never blocks or breaks the already-streamed response.
         if (!req.signal.aborted) {
           const fm = await anthropicStream.finalMessage().catch(() => null);
+          if (fm && claudeIncomplete(fm)) controller.enqueue(encoder.encode("\n\n<!-- HUMANIZE_ERROR -->"));
           if (fm) {
             void logAiCall({ route: "/api/content/humanize", response: fm, actorRole: role });
             const costUsd = textCallCostUsd({ model: fm.model, inputTokens: fm.usage.input_tokens, outputTokens: fm.usage.output_tokens, cacheReadTokens: fm.usage.cache_read_input_tokens, cacheWriteTokens: fm.usage.cache_creation_input_tokens });

@@ -22,6 +22,7 @@ import requests
 import textwrap
 import subprocess
 import anthropic
+from claude_call import claude_create, claude_text
 from openai import OpenAI
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -63,13 +64,12 @@ def _claude_json(prompt, max_tokens=8000, retries=2):
     last_err = None
     cost = 0.0
     for attempt in range(retries):
-        r = claude_client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=max_tokens,
+        r = claude_create(claude_client, max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
         cost += _claude_cost(r.usage)
         try:
-            return _extract_json(r.content[0].text), cost
+            return _extract_json(claude_text(r)), cost
         except (json.JSONDecodeError, ValueError) as e:
             last_err = e
             prompt += "\n\n（上次輸出不是合法 JSON。請只輸出合法 JSON，不要任何前後說明或 code fence。）"

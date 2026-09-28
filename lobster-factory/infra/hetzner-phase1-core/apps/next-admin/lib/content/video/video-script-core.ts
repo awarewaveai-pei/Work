@@ -5,9 +5,10 @@
  * 不做 TTS、不做圖片生成、不做 render。
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../../ai/claude-request";
 
 /** 與 Python pipeline.py CLAUDE_MODEL 對齊（影片生成共用同一模型 ID）。 */
-const CLAUDE_MODEL = "claude-sonnet-4-6";
+const CLAUDE_MODEL = CLAUDE_DEFAULT_MODEL;
 
 /** 單場景資料（Claude 回傳後每個元素的形狀）。 */
 export interface VideoScene {
@@ -195,16 +196,16 @@ export async function generateVideoScript(
     `- description：SEO 影片描述（${lang}，50–120 字）\n\n` +
     `JSON 架構：\n${schemaExample(sceneCount)}`;
 
-  let response: Awaited<ReturnType<Anthropic["messages"]["create"]>>;
+  let response: Anthropic.Beta.Messages.BetaMessage;
   try {
     const client = new Anthropic({ apiKey });
     // max_tokens 隨場景數放大：6 場 ≈ 4096（沿用原值，無回歸）；場景數可達 20（場景總數滑桿上限）
     // → ~550 tokens/場（narration+image_prompt+broll+JSON 結構，含 160 字長旁白梯次的餘裕），上限 8192。
     // 固定 4096 在多場景時會截斷 JSON → parseScriptJson 失敗 502（2026-06-23 場景總數滑桿修復連帶處理）。
     const maxTokens = Math.min(8192, Math.max(4096, sceneCount * 550));
-    response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: maxTokens,
+    response = await client.beta.messages.create({
+      ...claudeParams(CLAUDE_MODEL, maxTokens),
+      ...claudeFallback(CLAUDE_MODEL),
       messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
     });
   } catch (e: unknown) {
@@ -212,18 +213,20 @@ export async function generateVideoScript(
     return { ok: false, status: 502, error: `Claude API 呼叫失敗：${msg}` };
   }
 
-  // 取出文字回應
-  const block = response.content[0];
-  if (!block || block.type !== "text") {
+  // 取出文字回應（Opus 5.5 開頭是 thinking block，依 type 取，不可用 content[0]）
+  const incomplete = claudeIncomplete(response);
+  if (incomplete) return { ok: false, status: 502, error: `Claude 未完成回答（${incomplete}）` };
+  const text = claudeText(response);
+  if (!text) {
     return { ok: false, status: 502, error: "Claude 回傳非文字內容" };
   }
 
-  const parsed = parseScriptJson(block.text);
+  const parsed = parseScriptJson(text);
   if (!parsed) {
     return {
       ok: false,
       status: 502,
-      error: `Claude 回傳 JSON 解析失敗（前 300 字：${block.text.slice(0, 300)}）`,
+      error: `Claude 回傳 JSON 解析失敗（前 300 字：${text.slice(0, 300)}）`,
     };
   }
 

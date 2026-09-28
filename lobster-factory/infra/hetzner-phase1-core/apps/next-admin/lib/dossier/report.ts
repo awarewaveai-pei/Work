@@ -23,7 +23,7 @@
 // tell those apart is exactly the failure the provenance vocabulary exists to prevent.
 
 import { generateCheapJsonText } from "@/lib/ai/cheap-json";
-import type { AiTextModel } from "@/lib/ai/text-model-options";
+import { DEFAULT_AI_TEXT_MODEL, type AiTextModel } from "@/lib/ai/text-model-options";
 
 /** One collected document, as the report generator needs it. */
 export interface DossierSource {
@@ -161,9 +161,9 @@ export function extractJsonObject(raw: string): string | null {
  * prevent.
  */
 export function defaultDossierModel(env: Record<string, string | undefined> = process.env): AiTextModel {
-  if (env.ANTHROPIC_API_KEY) return "claude-sonnet-4-6";
+  if (env.ANTHROPIC_API_KEY) return DEFAULT_AI_TEXT_MODEL;
   if (env.OPENAI_API_KEY) return "gpt-5.4";
-  return "claude-sonnet-4-6";
+  return DEFAULT_AI_TEXT_MODEL;
 }
 
 /**

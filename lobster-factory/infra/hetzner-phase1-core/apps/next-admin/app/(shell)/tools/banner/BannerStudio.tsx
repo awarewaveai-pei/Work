@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
+import { DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
@@ -1093,7 +1094,7 @@ export default function BannerStudio() {
       const res = await fetch("/api/tools/script-forge", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body: JSON.stringify({ prompt, model: "claude-sonnet-4-6" }),
+        body: JSON.stringify({ prompt, model: DEFAULT_AI_TEXT_MODEL }),
       });
       if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
       const reader = res.body.getReader();
@@ -1289,7 +1290,7 @@ export default function BannerStudio() {
       const res = await fetch("/api/tools/script-forge", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body:    JSON.stringify({ prompt: langified, model: "claude-sonnet-4-6" }),
+        body:    JSON.stringify({ prompt: langified, model: DEFAULT_AI_TEXT_MODEL }),
       });
       if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
       const reader = res.body.getReader();

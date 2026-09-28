@@ -10,6 +10,7 @@ import anthropic
 from datetime import datetime, timedelta
 from pathlib import Path
 from config import *
+from claude_call import claude_create, claude_text
 
 claude = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
 
@@ -35,12 +36,11 @@ def send_weekly_newsletter():
 
         # Claude 生成電子報內容
         post_list = "\n".join([f"- {p['title']['rendered']}：{p['link']}" for p in posts])
-        response = claude.messages.create(
-            model="claude-sonnet-4-6",
+        response = claude_create(claude,
             max_tokens=1000,
             messages=[{"role": "user", "content": f"根據以下本週文章列表，生成一封繁體中文電子報，吸引讀者點擊閱讀，約200字：\n{post_list}"}]
         )
-        newsletter_content = response.content[0].text
+        newsletter_content = claude_text(response)
 
         # 取得 Mailchimp server prefix
         dc = MAILCHIMP_API_KEY.split("-")[-1]
@@ -104,12 +104,11 @@ def update_old_articles():
             title = post["title"]["rendered"]
 
             # Claude 重新優化
-            response = claude.messages.create(
-                model="claude-sonnet-4-6",
+            response = claude_create(claude,
                 max_tokens=2000,
                 messages=[{"role": "user", "content": f"請更新以下舊文章，加入最新資訊、優化 SEO、改善可讀性，繁體中文，保留原有結構：\n標題：{title}\n內容：{old_content[:2000]}"}]
             )
-            new_content = response.content[0].text
+            new_content = claude_text(response)
 
             # 更新 WordPress
             requests.post(
@@ -152,12 +151,11 @@ def translate_article(article, target_lang):
     lang_map = {"en": "英文", "ja": "日文", "zh-CN": "簡體中文"}
     lang_name = lang_map.get(target_lang, target_lang)
     try:
-        response = claude.messages.create(
-            model="claude-sonnet-4-6",
+        response = claude_create(claude,
             max_tokens=2000,
             messages=[{"role": "user", "content": f"請將以下繁體中文文章翻譯成{lang_name}，保留 Markdown 格式：\n\n標題：{article['title']}\n\n{article['content'][:2000]}"}]
         )
-        translated_content = response.content[0].text
+        translated_content = claude_text(response)
         print(f"   ✅ 翻譯：{lang_name} 完成")
         return {**article, "content": translated_content, "lang": target_lang}
     except Exception as e:
@@ -219,12 +217,11 @@ def generate_ebook(category, output_path="ebook.pdf"):
             for p in posts
         ])
         # 用 Claude 整理成電子書格式
-        response = claude.messages.create(
-            model="claude-sonnet-4-6",
+        response = claude_create(claude,
             max_tokens=4000,
             messages=[{"role": "user", "content": f"請將以下文章整理成一本完整的電子書，加上目錄、前言、各章節標題，繁體中文：\n\n{combined[:5000]}"}]
         )
-        ebook_content = response.content[0].text
+        ebook_content = claude_text(response)
         # 存成 txt（之後可轉 PDF）
         with open(output_path.replace(".pdf", ".txt"), "w", encoding="utf-8") as f:
             f.write(ebook_content)

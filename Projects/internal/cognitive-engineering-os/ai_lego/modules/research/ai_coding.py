@@ -258,8 +258,7 @@ def apply_codebook(
             "model_profile_id": result.model_profile_id,
             "prompt_version": result.prompt_version,
             "trace_id": result.trace_id,
-            "seed": seed,
-            "temperature": 0.0,
+            **_sampling(result, seed),
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
             "latency_ms": result.latency_ms,
@@ -362,6 +361,12 @@ def validate_grouping_response(raw_text: str, group_key: str, members_key: str, 
     return {"groups": groups, "member_of": member_of, "rejected": rejected, "unassigned": unassigned}
 
 
+def _sampling(result: Any, seed: int) -> dict[str, Any]:
+    """Seed and temperature reach only a self-hosted model; for any other provider the record says None."""
+    local = result.provider == "self-hosted"
+    return {"seed": seed if local else None, "temperature": 0.0 if local else None}
+
+
 def _grouping_source(result: Any, *, classification_tag: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
         "provider": result.provider,
@@ -402,7 +407,7 @@ def suggest_categories(gateway: AIGateway, model_profile_id: str, codes: list[di
         "rejected": validated["rejected"],
         "unassigned": validated["unassigned"],
         "raw_text": result.text,
-        "suggestion_source": _grouping_source(result, classification_tag=classification_tag, extra={"seed": seed, "temperature": 0.0}),
+        "suggestion_source": _grouping_source(result, classification_tag=classification_tag, extra=_sampling(result, seed)),
     }
 
 
@@ -424,7 +429,7 @@ def suggest_themes(gateway: AIGateway, model_profile_id: str, categories: list[d
         "rejected": validated["rejected"],
         "unassigned": validated["unassigned"],
         "raw_text": result.text,
-        "suggestion_source": _grouping_source(result, classification_tag=classification_tag, extra={"seed": seed, "temperature": 0.0}),
+        "suggestion_source": _grouping_source(result, classification_tag=classification_tag, extra=_sampling(result, seed)),
     }
 
 

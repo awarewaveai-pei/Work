@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { CS_MODELS, CS_TIMEOUTS } from "@/lib/cs/config";
+import { claudeParams } from "@/lib/ai/claude-request";
 
 export interface ClaudeTurnInput {
   model: string;
@@ -29,8 +30,8 @@ export async function claudeTurn(input: ClaudeTurnInput): Promise<Anthropic.Mess
   try {
     const res = await client.messages.create(
       {
-        model: input.model,
-        max_tokens: input.maxTokens,
+        // low effort: customer-facing turns run under CS_TIMEOUTS.generateMs
+        ...claudeParams(input.model, input.maxTokens, "low"),
         system: input.system,
         messages: input.messages,
         ...(input.tools && input.tools.length ? { tools: input.tools } : {}),

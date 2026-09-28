@@ -23,8 +23,9 @@ const DEFAULTS: Record<AiProviderId, Record<AiTier, string>> = {
   },
   anthropic: {
     light: 'claude-haiku-4-5',
-    deep: 'claude-sonnet-4-6',
-    premium: 'claude-opus-4-8',
+    // deep 與 premium 同一模型,差異在 ANTHROPIC_EFFORT 與 token 預算(同 openai 的做法)
+    deep: 'claude-opus-5-5',
+    premium: 'claude-opus-5-5',
   },
 };
 
@@ -57,6 +58,20 @@ export function modelFor(provider: AiProviderId, tier: AiTier): string {
  *   三者皆 < 16K,故走非串流即可(避免 SDK HTTP timeout 的門檻 ~16K;萬字級串流
  *   輸出是後續增量,屆時加 interpretStream 而不動本接縫)。
  */
+/**
+ * Anthropic 各 tier 的 effort(claude-opus-5-5 永遠會思考,effort 是唯一控制;API 預設 medium)。
+ * light 走 Haiku:Haiku 收到 effort 會 400,故不送。
+ */
+export const ANTHROPIC_EFFORT: Record<AiTier, 'low' | 'medium' | 'high' | undefined> = {
+  light: undefined,
+  deep: 'medium',
+  premium: 'high',
+};
+
+/** 永遠會思考的模型:thinking 佔 max_tokens,需在答案預算外另加空間。 */
+export const THINKING_HEADROOM_TOKENS = 8000;
+export const ALWAYS_THINKS = /^claude-(opus-5|sonnet-5|fable-5|mythos-5)/;
+
 export const MAX_TOKENS: Record<AiTier, number> = {
   light: 1500,
   deep: 5000,
