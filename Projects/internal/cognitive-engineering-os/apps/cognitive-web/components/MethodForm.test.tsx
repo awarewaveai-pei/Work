@@ -53,4 +53,13 @@ describe("MethodForm", () => {
   it("a blank line in a text list is not an item", () => {
     expect(toPayload([{ key: "events", kind: "list", label: "事件" }], { events: ["  第一件 ", "", "   ", "第二件"] })).toEqual({ events: ["第一件", "第二件"] });
   });
+
+  it("marks a field the run page still needs with class need, on both a list and a plain field, until it is filled", () => {
+    const fields = [{ key: "events", kind: "list", label: "事件" }, { key: "objective", kind: "text", label: "目標" }];
+    const empty = renderToStaticMarkup(<MethodForm fields={fields} state={{ events: [], objective: "" }} onState={() => undefined} onSubmit={() => undefined} needs={["events", "objective"]} />);
+    expect(empty).toContain('<div class="field need">');
+    expect(empty).toContain('<label class="field need">');
+    const filled = renderToStaticMarkup(<MethodForm fields={fields} state={{ events: ["x"], objective: "y" }} onState={() => undefined} onSubmit={() => undefined} needs={["events", "objective"]} />);
+    expect(filled).not.toContain("need");
+  });
 });

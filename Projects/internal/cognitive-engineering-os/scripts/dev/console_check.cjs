@@ -1,7 +1,8 @@
 // Console errors/warnings on the new pages (local dev web). Credentials from mcp/user-env.ps1, never printed.
 const fs = require("fs");
+const path = require("path");
 const { chromium } = require("playwright");
-const env = fs.readFileSync("D:/Work/mcp/user-env.ps1", "utf8");
+const env = fs.readFileSync(path.resolve(__dirname, "../../../../../mcp/user-env.ps1"), "utf8");   // <repo>/mcp/user-env.ps1, from scripts/dev
 const val = (n) => { const m = env.match(new RegExp(`(?:\\$env:)?\\b${n}\\s*=\\s*['"]([^'"]+)['"]`)); if (!m) throw new Error(`${n} missing`); return m[1]; };
 const BASE = "http://localhost:3930";
 (async () => {

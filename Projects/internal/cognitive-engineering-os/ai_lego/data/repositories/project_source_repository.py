@@ -659,24 +659,33 @@ class ProjectSourceRepository:
         return projects
 
     # Tasks (⑦ 把行動計畫存成任務) and rerun reminders (到期重跑並比較) live in the project's event stream like everything else
-    # the project holds: created, then done/undone; scheduled, then fulfilled by the analysis that answered it.
-    TASK_EVENTS = ("TaskCreated", "TaskDone")
+    # the project holds: created, then done/undone or owner/due filled in later; scheduled, then fulfilled by the
+    # analysis that answered it.
+    TASK_EVENTS = ("TaskCreated", "TaskDone", "TaskUpdated")
     RERUN_EVENTS = ("RerunScheduled", "RerunFulfilled")
 
     def tasks(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
-        """project_id -> its tasks, oldest first: title, owner, due (YYYY-MM-DD), proof, target, the analysis it came
-        from, done (bool) and when it was last marked."""
+        """project_id -> its tasks, oldest first: title, owner, due (YYYY-MM-DD), proof, target, the option it was
+        saved under, the analysis it came from, done (bool) and when it was last marked."""
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
         for row in self._project_events(tenant_id, self.TASK_EVENTS, project_id):
             payload = json.loads(row["payload_json"])
             key = payload.get("task_id")
-            if row["event_type"] == "TaskCreated":
+            kind = row["event_type"]
+            if kind == "TaskCreated":
                 by_id[key] = {"task_id": key, "interpretation_id": payload.get("interpretation_id"), "title": payload.get("title"), "owner": payload.get("owner"), "due": payload.get("due"),
-                              "proof": payload.get("proof"), "target": payload.get("target"), "when": payload.get("when"), "created_at": row["occurred_at"], "done": False, "done_at": None}
+                              "proof": payload.get("proof"), "target": payload.get("target"), "when": payload.get("when"), "option": payload.get("option"), "created_at": row["occurred_at"], "done": False, "done_at": None}
                 projects.setdefault(row["aggregate_id"].removeprefix("project:"), []).append(by_id[key])
-            elif key in by_id:
+            elif key not in by_id:
+                continue
+            elif kind == "TaskDone":
                 by_id[key].update(done=bool(payload.get("done")), done_at=row["occurred_at"] if payload.get("done") else None)
+            else:   # TaskUpdated: owner and/or due filled in after the task was created (N-84)
+                if "owner" in payload:
+                    by_id[key]["owner"] = payload["owner"]
+                if "due" in payload:
+                    by_id[key]["due"] = payload["due"]
         return projects
 
     def reruns(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
@@ -787,3 +796,28 @@ class ProjectSourceRepository:
             counts = {"sources": len(source_ids), "blobs_unlinked": blobs_unlinked, "artifacts_deleted": artifacts_deleted, "events_deleted": events_deleted}
             self._append_event(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts})
         return counts
+
+    def erased_projects(self, tenant_id: str) -> list[dict[str, Any]]:
+        """Every ProjectErased tombstone for this tenant, newest first (N-66 已抹除): the Project row itself is
+        gone by design (erase_project deletes it); this event is what stays."""
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT occurred_at, payload_json FROM events WHERE tenant_id=? AND event_type='ProjectErased' ORDER BY rowid DESC",
+                (tenant_id,),
+            ).fetchall()
+        return [{"erased_at": row["occurred_at"], **json.loads(row["payload_json"])} for row in rows]
+
+    def rename_project(self, tenant_id: str, project_id: str, name: str) -> dict[str, Any]:
+        """UPDATE platform_projects.name in place (current-state row, like create_project's INSERT) + a
+        ProjectRenamed event; the UNIQUE(tenant_id, workspace_id, name) constraint refuses a duplicate the
+        same way create_project's INSERT does (caller turns that IntegrityError into a 409)."""
+        with self._connection() as connection:
+            cursor = connection.execute("UPDATE platform_projects SET name=? WHERE tenant_id=? AND project_id=?", (name, tenant_id, project_id))
+            if cursor.rowcount == 0:
+                raise InvariantViolation("PROJECT_NOT_FOUND")
+            self._append_event(connection, tenant_id, f"project:{project_id}", "ProjectRenamed", {"project_id": project_id, "name": name})
+            row = connection.execute(
+                "SELECT project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at FROM platform_projects WHERE tenant_id=? AND project_id=?",
+                (tenant_id, project_id),
+            ).fetchone()
+        return dict(row)

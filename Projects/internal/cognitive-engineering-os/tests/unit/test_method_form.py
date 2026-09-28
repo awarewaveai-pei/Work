@@ -228,6 +228,13 @@ class MethodFormStructureTests(unittest.TestCase):
         missing = {m: method_form(m)["unlabelled"] for m in _method_ids() if method_form(m)["unlabelled"]}
         self.assertEqual(missing, {}, f"{sum(len(v) for v in missing.values())} unlabelled keys; add them to methods/registry/method-input-forms.yaml")
 
+    def test_iceberg_fields_carry_the_mock_s_short_placeholder(self):
+        # I-09: the mock's short examples (not the long demo-scenario lines) go on the wire so MethodForm can show them.
+        fields = {field["key"]: field for field in method_form("systems.iceberg_model")["fields"]}
+        self.assertEqual(fields["events"]["placeholder"], "例：第 6 次 session，8 人只有 2 人主動分享；第 1 次是 6 人。")
+        for key in ("patterns", "structures", "mental_models"):
+            self.assertTrue(fields[key]["placeholder"].startswith("例："), key)
+
     def test_five_w_one_h_form_is_topic_plus_the_six_fixed_dimensions(self):
         form = method_form("framing.five_w_one_h")
         fields = {field["key"]: field for field in form["fields"]}
@@ -261,6 +268,18 @@ class MethodFormRoundTripTests(unittest.TestCase):
             if failed:
                 failures[method_id] = f"gates failed: {failed}"
         self.assertEqual(failures, {})
+
+    def test_every_domain_example_set_is_accepted_by_the_real_builder_and_gates(self):
+        """N-55: a lesson domain chip's 「那個例子，已填好」 is a real example, pushed through the builder like the default."""
+        from ai_lego.apps.api.method_form import load_examples
+        from ai_lego import resolve_spec_root
+        sets = load_examples(resolve_spec_root())["systems.iceberg_model"]["sets"]
+        self.assertEqual(sorted(sets), ["daily", "decision", "ecom", "partner"])
+        form = method_form("systems.iceberg_model")
+        for name, example in sets.items():
+            kwargs = serialize_fields(form["fields"], example["input"], {})
+            _, gates = invoke("systems.iceberg_model", kwargs)
+            self.assertTrue(all(g["status"] in ("PASS", "NOT_APPLICABLE") for g in gates), (name, gates))
 
     def test_an_unknown_dimension_never_sends_its_answer_even_if_one_was_typed(self):
         """5W1H refuses an UNKNOWN row carrying ``answer`` at all. A person who typed an answer and then

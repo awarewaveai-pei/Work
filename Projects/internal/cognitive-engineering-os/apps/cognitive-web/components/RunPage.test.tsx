@@ -6,7 +6,7 @@ import { RunPage } from "./RunPage";
 
 vi.mock("../lib/api", async (original) => ({ ...(await original<typeof import("../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-afterEach(() => { vi.resetAllMocks(); window.history.replaceState(null, "", "/"); });
+afterEach(() => { vi.resetAllMocks(); window.history.replaceState(null, "", "/"); sessionStorage.clear(); });
 
 const FORM = { display: { name_zh: "冰山模型", name_en: "Iceberg Model" }, form: { fields: [{ key: "events", kind: "list", label: "① 事件：發生了什麼？" }] } };
 const posts = (path: string) => vi.mocked(apiFetch).mock.calls.filter(([called, init]) => called === path && init?.method === "POST");
@@ -46,6 +46,20 @@ describe("run page", () => {
     await done();
   });
 
+  it("#demo=<domain> fills that lesson domain's example; plain #demo the default one (N-55)", async () => {
+    const form = { ...FORM, form: { ...FORM.form, example: { input: { events: ["預設例子"] }, sets: { partner: { input: { events: ["畫廊的例子"] } } } } } };
+    vi.mocked(apiFetch).mockImplementation(async (path) => (String(path).endsWith("/form") ? form : String(path) === "/projects" ? [] : {}) as never);
+    window.history.replaceState(null, "", "/methods/systems.iceberg_model/run#demo=partner");
+    const first = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} />);
+    expect(first.host.querySelector<HTMLTextAreaElement>("#f-events")!.value).toBe("畫廊的例子");   // the field, not the 懶人填寫 box
+    await first.done();
+    window.history.replaceState(null, "", "/methods/systems.iceberg_model/run#demo");
+    const second = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} />);
+    expect(second.host.querySelector<HTMLTextAreaElement>("#f-events")!.value).toBe("預設例子");
+    await second.done();
+    window.history.replaceState(null, "", "/");
+  });
+
   it("from a project page (?project=): the analysis goes into that project, no new one", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => {
       if (path === "/methods/systems.iceberg_model/form") return FORM as never;
@@ -80,6 +94,28 @@ describe("run page", () => {
     await done();
   });
 
+  it("carries a next-step prefill once, coerced to the field kind, marks what it still needs, and clears it only after a run launches", async () => {
+    const TWO_FIELDS = { display: { name_zh: "冰山模型", name_en: "Iceberg Model" }, form: { fields: [{ key: "events", kind: "list", label: "① 事件：發生了什麼？" }, { key: "patterns", kind: "list", label: "② 模式：以前發生過嗎？" }] } };
+    sessionStorage.setItem("cos:prefill:systems.iceberg_model", JSON.stringify({ values: { events: "一句話", bogus: "x" }, needs: ["patterns", "bogus"], from: { name: "冰山模型", approved: true } }));
+    vi.mocked(apiFetch).mockImplementation(async (path, init) => {
+      if (path === "/methods/systems.iceberg_model/form") return TWO_FIELDS as never;
+      if (path === "/projects" && init?.method === "POST") return { project_id: "P-NEW", name: JSON.parse(String(init.body)).name, created_at: "2026-09-26T15:51:00Z" } as never;
+      if (path === "/projects") return [] as never;
+      if (path === "/methods/systems.iceberg_model/interpret") return { interpretation_id: "INTERP-5", status: "PENDING" } as never;
+      throw new Error(`unexpected: ${path}`);
+    });
+    const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} />);
+    expect(host.querySelector<HTMLTextAreaElement>("#f-events")?.value).toBe("一句話");   // a plain string coerced into the list field (N-21)
+    expect(host.textContent).toContain("從「冰山模型分析」帶入 1 格");   // only the real field is counted; "bogus" is not (N-13)
+    expect(host.textContent).toContain("引用自已核准的版本");   // N-45
+    expect(host.querySelector<HTMLTextAreaElement>("#f-patterns")?.closest(".field")?.className).toContain("need");
+    expect(host.querySelector<HTMLTextAreaElement>("#f-events")?.closest(".field")?.className).not.toContain("need");
+    expect(sessionStorage.getItem("cos:prefill:systems.iceberg_model")).not.toBeNull();   // still there: no run launched yet
+    await run(host);
+    expect(sessionStorage.getItem("cos:prefill:systems.iceberg_model")).toBeNull();   // cleared only once the run actually launches (N-22)
+    await done();
+  });
+
   it("a saved analysis opens with its result, its project in the crumbs, its time, its judgment, and the fields refilled", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => {
       if (path === "/methods/systems.iceberg_model/form") return FORM as never;
@@ -111,7 +147,7 @@ describe("run page", () => {
     });
     const failure = { interpretation_id: "INTERP-8", status: "FAILED" as const, project_id: "P1", method_id: "systems.iceberg_model", error: "AI_PROVIDER_UNAVAILABLE" };
     const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="P1" analysis={failure} />);
-    expect(host.querySelector("#input .error")?.textContent).toBe("這次分析沒有完成：AI_PROVIDER_UNAVAILABLE。這次填的內容沒有存下來（只有分析完成才會存），要再分析請重新填格子。");
+    expect(host.querySelector("#input .error")?.textContent).toBe("這次分析沒有完成：AI 服務這次沒有給出可用的回答；再執行一次即可。這次填的內容沒有存下來（只有分析完成才會存），要再分析請重新填格子。");
     expect(host.querySelector<HTMLTextAreaElement>("#f-events")?.value).toBe("");
     expect(host.querySelector('[data-section="1"]')).toBeNull();
     expect(host.querySelector(".status .pill")?.textContent).toBe("上次分析沒有完成");

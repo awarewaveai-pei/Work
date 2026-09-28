@@ -13,6 +13,9 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(cost_usd("claude-opus-4-1-20250805", 1_000_000, 0, {}), 15.0)      # Opus 4.1, not the 4.5+ row
         self.assertEqual(cost_usd("claude-opus-4-20250514", 1_000_000, 0, {}), 15.0)
         self.assertEqual(cost_usd("claude-opus-4-5-20251101", 1_000_000, 0, {}), 5.0)
+        self.assertEqual(cost_usd("claude-opus-5-5", 0, 1_000_000, {}), 20.0)            # Opus 5.5 is not the Opus 5 row
+        self.assertEqual(cost_usd("claude-opus-5", 0, 1_000_000, {}), 25.0)
+        self.assertEqual(cost_usd("claude-fable-5-1", 1_000_000, 0, {}), 10.0)
         self.assertIsNone(cost_usd("test-interpret-model", 10, 10, {}))
 
     def test_the_env_extends_the_table_and_a_bad_env_is_refused_not_guessed(self):

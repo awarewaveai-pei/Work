@@ -96,6 +96,38 @@ class ProjectApiTests(ProjectSourceApiTestCase):
         self.assertEqual(response.status_code, 409, response.text)
         self.assertIn("PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE", response.json()["detail"])
 
+    def test_rename_project_then_a_duplicate_name_is_a_clean_409(self):
+        # N-83: projects were auto-named tool+time at creation with no way to fix a bad name afterwards.
+        self._login()
+        project = self._create_project(name="Old Name")
+        other = self._create_project(name="Other Name")
+        renamed = self.client.patch(f"/projects/{project['project_id']}", json={"name": "New Name"})
+        self.assertEqual(renamed.status_code, 200, renamed.text)
+        self.assertEqual(renamed.json()["name"], "New Name")
+        self.assertEqual(self.client.get(f"/projects/{project['project_id']}").json()["name"], "New Name")
+        clash = self.client.patch(f"/projects/{project['project_id']}", json={"name": "Other Name"})
+        self.assertEqual(clash.status_code, 409, clash.text)
+        self.assertIn("PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE", clash.json()["detail"])
+        self.assertEqual(self.client.get(f"/projects/{other['project_id']}").json()["name"], "Other Name")   # untouched
+        self.assertEqual(self.client.patch(f"/projects/{uuid.uuid4()}", json={"name": "x"}).status_code, 404)
+        self.assertEqual(self.client.patch(f"/projects/{project['project_id']}", json={"name": "  "}).status_code, 400)
+
+    def test_erased_projects_list_the_tombstone_after_the_row_is_gone(self):
+        # N-66: list_projects only ever returned live rows; a deleted project had nowhere to show it happened.
+        self._login()
+        project = self._create_project()
+        self.assertEqual(self.client.get("/projects/erased").json(), [])
+        erased = self.client.delete(f"/projects/{project['project_id']}")
+        self.assertEqual(erased.status_code, 200, erased.text)
+        self.assertEqual([p["project_id"] for p in self.client.get("/projects").json()], [])
+        tombstones = self.client.get("/projects/erased").json()
+        self.assertEqual(len(tombstones), 1)
+        self.assertEqual(tombstones[0]["project_id"], project["project_id"])
+        self.assertEqual(tombstones[0]["erased_by_identity_id"], self.identity["identity_id"])
+        self.assertIn("sources", tombstones[0])
+        self._login_as_a_different_tenant()
+        self.assertEqual(self.client.get("/projects/erased").json(), [], "a second tenant must not see the first tenant's tombstone")
+
     def test_workspace_required_message_distinguishes_zero_from_many(self):
         self._login()
         store = api_main.app.dependency_overrides[api_main.get_store]()

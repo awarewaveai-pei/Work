@@ -11,9 +11,20 @@ export type Rerun = { rerun_id: string; interpretation_id: string; method_id: st
 export type Project = {
   project_id: string; name: string; purpose?: string; created_at: string;
   updated_at?: string; analysis_count?: number; methods?: string[]; latest_analysis?: Analysis | null;
-  tasks?: { open: number; overdue: number; next_due: string | null }; reruns_due?: number;
+  tasks?: { open: number; overdue: number; due_today: number; next_due: string | null }; reruns_due?: number;
 };
-export type Estimate = { method_id: string; model: string; input_tokens: number; output_tokens: number; tokens: number; twd: number | null; based_on: number };
+// N-85: a project's sources, for ProjectPage's own Sources card (GET/POST /projects/{id}/sources).
+export type Source = { source_id: string; title: string; created_at: string };
+// N-66: what stays after DELETE /projects/{id} -- the row itself is gone (GET /projects/erased).
+export type ErasedProject = { project_id: string; erased_at: string; erased_by_identity_id: string; sources: number; blobs_unlinked: number; artifacts_deleted: number; events_deleted: number };
+export type Estimate = { method_id: string; model: string; input_tokens: number; output_tokens: number; tokens: number; twd: number | null; based_on: number; tokens_max?: number; twd_max?: number | null; seconds?: number };
+
+/** How long a run takes, from the tenant's own last runs (the API's estimate), in words: 約 2 分鐘. */
+export function runMinutes(estimate: Estimate | null | undefined): string {
+  const seconds = estimate?.seconds;
+  if (!seconds) return "約兩到三分鐘";
+  return seconds < 90 ? "約 1 分鐘" : `約 ${Math.round(seconds / 60)} 分鐘`;
+}
 
 export const STATUS: Record<Analysis["status"], string> = { DONE: "分析完成", PENDING: "分析中", FAILED: "分析沒有完成" };
 export const STANCE: Record<Stance, string> = { agree: "同意", partial: "部分同意", disagree: "不同意" };

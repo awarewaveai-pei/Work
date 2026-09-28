@@ -111,8 +111,14 @@ print('OK: all modules import cleanly')
 # -- 2. Test gate -- Phase 1 API-surface test files (the ~260 other tests/unit/* files are
 #    Method Atlas method-implementation tests, covered by their own CI path, not re-run here). --
 log "test-gate | running pytest for the Phase 1 test files"
-( cd "$PRODUCT_ROOT" && python3 -m pytest tests/unit/test_workspace_domain.py tests/unit/test_identity_domain.py tests/unit/test_identity_store.py tests/unit/test_entitlement_check.py tests/unit/test_api_dispatch.py tests/unit/test_api_main.py tests/unit/test_authenticate_timing.py tests/unit/test_ai_gateway.py -q ) \
+( cd "$PRODUCT_ROOT" && python3 -m pytest tests/unit/test_workspace_domain.py tests/unit/test_identity_domain.py tests/unit/test_identity_store.py tests/unit/test_entitlement_check.py tests/unit/test_api_dispatch.py tests/unit/test_api_main.py tests/unit/test_authenticate_timing.py tests/unit/test_ai_gateway.py \
+    tests/unit/test_interpret_method_record.py tests/unit/test_api_interpret.py tests/unit/test_project_source_api.py tests/unit/test_pricing.py -q ) \
   || { log "test-gate | FAIL"; notify "FAILED at test gate"; exit 1; }
+# the result page's pipeline and its API (interpretation, approval, tasks, reruns, estimate, prices) ship only with a green run (P-19)
+
+# -- 2b. Web gate: tsc + vitest (incl. the parity test against the mock) + the mock checker, in a throwaway container. --
+log "web-test | tsc + vitest + check-mocks (deploy/web_test.sh)"
+bash "$PRODUCT_ROOT/deploy/web_test.sh" >>"$LOG" 2>&1 || { log "web-test | FAIL (see $LOG)"; notify "FAILED at web test gate"; exit 1; }
 
 # -- Tag the currently-running image as :rollback BEFORE building the new one, so a failed
 #    deploy can restore the last-known-good image (mirrors oracle-web's own rollback recipe). --

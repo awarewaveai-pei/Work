@@ -11,7 +11,10 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.modules.research.interpret_method_record import (
     INTERPRET_MAX_TOKENS,
     build_prompt_manifest,
+    citation_problems,
     detail_problems,
+    normalize_manifest_ids,
+    move_unresolvable_prefills_to_needs_input,
     prefill_map,
     evaluate_interpretation_gates,
     record_leaf_paths,
@@ -64,7 +67,7 @@ class InterpretationTests(unittest.TestCase):
         self.assertIn("revision_conditions", shape["findings"][0])
         self.assertIn("est_cost", shape["next_steps"][0])
         self.assertEqual(set(shape["recommendations"][0]), {"level", "action", "expected", "citations"})
-        self.assertEqual(set(shape["gaps"][0]), {"text", "needed_evidence"})
+        self.assertEqual(set(shape["gaps"][0]), {"text", "needed_evidence", "path", "citations"})   # 1.3.0: the unit and lines a gap is about
         self.assertEqual(shape["visual"]["bindings"]["levels"][0]["path"], "r/events")
         self.assertEqual(provider.requests[0][2], INTERPRET_MAX_TOKENS)
         self.assertEqual(set(shape) >= {"summary", "units", "focus", "priority", "solutions", "loop", "trend"}, True)   # the result page's sections (schema 1.1.0)
@@ -74,6 +77,23 @@ class InterpretationTests(unittest.TestCase):
         prefill, needs_input = prefill_map({"properties": {"patterns": {"type": "array"}, "missing": {"type": "string"}}}, build_prompt_manifest(RECORD))
         self.assertEqual(prefill, {"patterns": "r/patterns"})
         self.assertEqual(needs_input, ["missing"])
+
+    def test_move_unresolvable_prefills_drops_a_key_that_is_not_a_real_target_field(self):
+        # N-13: the model's prefill key is a guess about the TARGET tool's field names. A key the target does not have is
+        # nothing the user can fill there either: it goes (it is not listed under 還要你填). A real target field whose value
+        # is no manifest line still needs the user. The model's own words in needs_input stay; a stray key of another
+        # tool (the iceberg's `structures`, seen on a real run 2026-09-28) goes.
+        interpretation = {"next_steps": [{"method_id": "systems.leverage_point_analysis", "prefill": {"patterns": "r/patterns", "objective": "r/patterns", "intervention_points": "r/nope"}, "needs_input": ["structures", "每個出手點的改變難度"]}]}
+        move_unresolvable_prefills_to_needs_input(interpretation, build_prompt_manifest(RECORD), lambda method_id: {"patterns", "intervention_points"})
+        step = interpretation["next_steps"][0]
+        self.assertEqual(step["prefill"], {"patterns": "r/patterns"})
+        self.assertEqual(step["needs_input"], ["每個出手點的改變難度", "intervention_points"])
+
+    def test_move_unresolvable_prefills_without_a_resolver_only_checks_manifest_ids(self):
+        # unable to resolve the target's own schema (resolver returns None, or none was given): unchanged, as before N-13
+        interpretation = {"next_steps": [{"method_id": "systems.leverage_point_analysis", "prefill": {"objective": "r/patterns"}, "needs_input": []}]}
+        move_unresolvable_prefills_to_needs_input(interpretation, build_prompt_manifest(RECORD), lambda method_id: None)
+        self.assertEqual(interpretation["next_steps"][0]["prefill"], {"objective": "r/patterns"})
     def test_record_hash_is_canonical(self):
         self.assertEqual(record_sha256({"b": 2, "a": 1}), record_sha256({"a": 1, "b": 2}))
 
@@ -85,6 +105,12 @@ class InterpretationTests(unittest.TestCase):
         manifest = build_prompt_manifest(RECORD, [{"source_id": "S1", "content_sha256": "abc"}])
         self.assertIn("r/patterns/0", {item["id"] for item in manifest})
         self.assertIn("source:S1", {item["id"] for item in manifest})
+
+    def test_manifest_project_source_carries_its_title(self):
+        # N-32/P-29: without this, the result page's ⑨ citation had nothing but the id and a sha256 to show.
+        manifest = build_prompt_manifest(RECORD, [{"source_id": "S1", "content_sha256": "abc", "title": "客戶訪談紀錄"}])
+        item = next(entry for entry in manifest if entry["id"] == "source:S1")
+        self.assertEqual((item["title"], item["value"]), ("客戶訪談紀錄", "客戶訪談紀錄"))
 
     def test_manifest_excludes_system_keys(self):
         manifest = build_prompt_manifest({**RECORD, "id": "x", "version": 1, "provenance": {}, "generated_by_method": "x"})
@@ -210,7 +236,7 @@ class InterpretationTests(unittest.TestCase):
         result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-TEST-001")
         self.assertEqual(provider.calls, 2)
         self.assertEqual(result["interpretation"]["interpretation_id"], "INTERP-TEST-001")
-        self.assertEqual([gate["status"] for gate in result["gate_results"]], ["PASS", "PASS", "PASS", "PASS"])
+        self.assertEqual([gate["status"] for gate in result["gate_results"]], ["PASS"] * 5)   # the four interpretation gates + no_preset_conclusion
         self.assertIsNone(result["error"])
         self.assertEqual((result["input_tokens"], result["output_tokens"]), (20, 40))
 
@@ -494,6 +520,35 @@ class GateGrainTests(unittest.TestCase):
         self.assertEqual(result["interpretation"]["units"][1]["leverage"], "mid")   # a synonym read as the enum value
         self.assertNotIn("solutions", result["gate_results"][3]["evidence"]["dropped"])
 
+    def test_a_manifest_id_in_another_notation_is_that_id_and_nothing_is_guessed(self):
+        """Run #14 (2026-09-28): citation_integrity refused twice; a notation is read, an id is never invented."""
+        manifest = build_prompt_manifest(RECORD)
+        body = {"findings": [{"id": "F1", "citations": ["patterns[0]", "r.events.0", "/r/patterns/0/", "r/nothing/9"]}],
+                "units": [{"path": "events/0", "citations": ["r/events[0]"], "meaning": "events/0"}],
+                "visual": {"bindings": {"levels": [{"label": "events[0]", "path": "events[0]"}]}},
+                "next_steps": [{"method_id": "systems.a", "prefill": {"events": "events[0]"}}],
+                "trend": {"series": [{"points": [{"citation": "patterns[0]"}]}]}}
+        repaired = normalize_manifest_ids(body, manifest)
+        self.assertEqual(body["findings"][0]["citations"], ["r/patterns/0", "r/events/0", "r/patterns/0", "r/nothing/9"])
+        self.assertEqual((body["units"][0]["path"], body["units"][0]["citations"], body["units"][0]["meaning"]), ("r/events/0", ["r/events/0"], "events/0"))
+        self.assertEqual(body["visual"]["bindings"]["levels"][0], {"label": "events[0]", "path": "r/events/0"})   # a label is text
+        self.assertEqual(body["next_steps"][0]["prefill"], {"events": "r/events/0"})
+        self.assertEqual(body["trend"]["series"][0]["points"][0]["citation"], "r/patterns/0")
+        self.assertEqual(set(repaired), {"findings", "units", "visual", "next_steps", "trend"})
+        self.assertIn("findings[0].citations[0] 'patterns[0]' -> 'r/patterns/0'", repaired["findings"])
+
+    def test_a_refused_citation_tells_the_retry_which_ids_to_fix(self):
+        wrong = json.loads(valid_response()); wrong["findings"][0]["citations"] = ["r/nothing/9"]
+        wrong["recommendations"] = [{"level": "now", "action": "先補數字", "expected": "x", "citations": []}]
+        provider = FakeProvider([json.dumps(wrong), valid_response()])
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-CITE-001")
+        self.assertIsNone(result["error"])
+        retry = provider.requests[1][1]
+        self.assertIn('citations not in MANIFEST: ["r/nothing/9"]', retry)
+        self.assertIn("cite only MANIFEST ids, copied exactly, e.g. [", retry)   # with examples of what an id looks like
+        self.assertEqual(citation_problems(wrong, build_prompt_manifest(RECORD)).count("recommendations[0]"), 1)
+        self.assertEqual(citation_problems(json.loads(valid_response()), build_prompt_manifest(RECORD)), "")
+
     def test_one_bad_next_step_goes_alone(self):
         steps = [{"method_id": m, "answers": "a", "deepens": "d", "prefill": {}, "needs_input": [], "yields": "y", "est_cost": "S"} for m in ("systems.a", "fake.none", "systems.b")]
         provider = FakeProvider([detailed_response(next_steps=steps, next_methods=["systems.a"])] * 2)
@@ -556,6 +611,62 @@ class GateGrainTests(unittest.TestCase):
         result = run_detail(FakeProvider([detailed_response(revision_conditions=[{"text": "x", "would_change": "y"}])]), "INTERP-GRAIN-009")
         self.assertIsNone(result["error"])
         self.assertNotIn("revision_conditions", result["interpretation"])
+
+
+class Contract13Tests(unittest.TestCase):
+    """Schema 1.3.0: the mock's remaining fields reach the page, each held to the manifest at its own grain."""
+
+    def full(self, **override) -> str:
+        body = json.loads(detailed_response())
+        body["units"][0]["thickness"] = {"verdict": "thin", "note": "沒有逐次數字", "fill_by": "systems.a"}
+        body["diagnosis"] = {"title": "問題在第 3 層，根在第 4 層", "text": "流程讓帶領者先講。", "citations": ["r/structures/0"]}
+        body["priority_short"] = "先第 3 層"
+        body["solutions"]["recommended"] = "乙"
+        body["loop"]["feeders"] = [{"id": "f1", "text": "紀錄表只問洞察", "citations": ["r/structures/0"], "to": "a"}]
+        body["next_methods"] = ["systems.a", "systems.b", "systems.c"]
+        body["next_steps"] = [{"method_id": m, "answers": "a", "deepens": "d", "prefill": {}, "needs_input": [], "yields": "y", "est_cost": "S", "short": "短", "on_path": True, "why": "因為"} for m in ("systems.a", "systems.b", "systems.c")]
+        body["gaps"] = [{"text": "缺逐次數字", "needed_evidence": "紀錄", "path": "r/events", "citations": ["r/events/0", "r/ghost"]}]
+        body.update(override)
+        return json.dumps(body, ensure_ascii=False)
+
+    def run_full(self, text: str, record=DETAIL_RECORD) -> dict:
+        return run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=record, sources=[], provider=FakeProvider([text] * 2), spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.a", "systems.b", "systems.c"}, interpretation_id="INTERP-13-001")
+
+    def test_the_new_fields_survive_and_are_repaired_at_their_own_grain(self):
+        result = self.run_full(self.full())
+        out = result["interpretation"]
+        self.assertIsNone(result["error"])
+        self.assertEqual(out["diagnosis"]["title"], "問題在第 3 層，根在第 4 層")   # layer ordinals are not claims
+        self.assertEqual(out["units"][0]["thickness"]["fill_by"], "systems.a")
+        self.assertEqual(out["solutions"]["recommended"], "乙")
+        self.assertEqual(out["loop"]["feeders"][0]["to"], "a")
+        self.assertEqual([s["on_path"] for s in out["next_steps"]], [True, True, False])   # at most two on the path
+        self.assertEqual(out["gaps"][0]["citations"], ["r/events/0"])                     # the unknown citation goes alone
+        self.assertEqual(out["priority_short"], "先第 3 層")
+
+    def test_a_bad_feeder_recommendation_or_fill_by_costs_only_itself(self):
+        body = json.loads(self.full())
+        body["loop"]["feeders"] = [{"id": "f1", "text": "x", "citations": ["r/ghost"], "to": "a"}, {"id": "f2", "text": "y", "citations": ["r/events/0"], "to": "zz"}]
+        body["solutions"]["recommended"] = "丁"
+        body["units"][0]["thickness"]["fill_by"] = "systems.zzz"
+        out = self.run_full(json.dumps(body, ensure_ascii=False))["interpretation"]
+        self.assertNotIn("feeders", out["loop"])
+        self.assertIn("nodes", out["loop"])
+        self.assertNotIn("recommended", out["solutions"])
+        self.assertNotIn("fill_by", out["units"][0]["thickness"])
+
+    def test_a_diagnosis_stating_an_unstated_number_is_dropped_alone(self):
+        result = self.run_full(self.full(diagnosis={"title": "少了 9 位", "text": "x", "citations": ["r/events/0"]}))
+        self.assertNotIn("diagnosis", result["interpretation"])
+        self.assertIn("diagnosis", result["gate_results"][3]["evidence"]["dropped"])
+        self.assertIn("summary", result["interpretation"])
+
+    def test_a_unit_left_blank_is_always_a_gap_with_its_path(self):
+        record = dict(DETAIL_RECORD, patterns=[])
+        result = self.run_full(self.full(), record=record)
+        paths = [g.get("path") for g in result["interpretation"]["gaps"]]
+        self.assertIn("r/patterns", paths)
+        self.assertEqual(paths.count("r/events"), 1)   # a unit the model already named is not repeated
 
 
 class ItemLevelIntegrityTests(unittest.TestCase):

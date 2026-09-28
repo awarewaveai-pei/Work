@@ -10,9 +10,9 @@ db = sqlite3.connect(f"file:{repo.db_path}?mode=ro", uri=True)
 tenants = [t for (t,) in db.execute("SELECT DISTINCT tenant_id FROM platform_projects ORDER BY tenant_id")]
 db.close()
 for tenant in tenants:
-    analyses, activity = repo.analyses(tenant), repo.last_activity(tenant)
+    analyses, activity, tasks, reruns = m._analyses(repo, tenant), repo.last_activity(tenant), repo.tasks(tenant), repo.reruns(tenant)   # as GET /projects reads them
     for project in repo.list_projects(tenant):
-        shown = m._project_with_activity(project, analyses, activity)
+        shown = m._project_with_activity(project, analyses, activity, tasks, reruns)
         latest = shown["latest_analysis"]
         print(json.dumps({
             "tenant": tenant[-8:], "name": shown["name"], "created": shown["created_at"], "updated": shown["updated_at"],

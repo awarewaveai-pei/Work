@@ -18,7 +18,7 @@ valid:
       provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
       model: "test-model"
       usage: {input_tokens: 10, output_tokens: 20}
-  - name: full_result_detail_1_1_0
+  - name: full_result_detail_1_3_0
     instance:
       interpretation_id: "INTERP-2026-09-26-010"
       method_id: "systems.iceberg_model"
@@ -32,15 +32,21 @@ valid:
       headline: "團體反思主動分享變少"
       summary: "分享變少是流程造成的。"
       units:
-        - {path: "r/events", brief: "8 人只有 2 人分享", meaning: "警訊", action: "開場鼓勵", step: "開場鼓勵、點名", effect: "當次", leverage: low, citations: ["r/events/0"]}
+        - {path: "r/events", brief: "8 人只有 2 人分享", meaning: "警訊", action: "開場鼓勵", step: "開場鼓勵、點名", effect: "當次", leverage: low, citations: ["r/events/0"], thickness: {verdict: thin, note: "沒有逐次數字", fill_by: "systems.causal_loop_diagram"}}
         - {path: "r/structures", meaning: "迴路", action: "改順序", effect: "持久", leverage: max, citations: ["r/events/0"]}
       focus: {path: "r/events", why: "最容易先動"}
       priority: "先改流程，再談角色。"
+      priority_short: "先第 3 層，同時準備第 4 層"
+      diagnosis: {title: "問題在第 3 層，根在第 4 層", text: "流程讓帶領者先講，參與者學會等答案。", citations: ["r/events/0"]}
+      next_steps:
+        - {method_id: "systems.causal_loop_diagram", answers: "迴路是否成立", deepens: "圖 B", prefill: {}, needs_input: [], yields: "正式迴路圖", est_cost: "S", short: "驗證迴路", on_path: true, why: "⑦ 的方案建立在這個迴路上"}
+      gaps: [{text: "沒有逐次分享人數", needed_evidence: "每次的人數紀錄", path: "r/patterns", citations: ["r/events/0"]}]
       solutions:
         options:
           - {name: "甲 只多鼓勵", what: "開場鼓勵", takes: "當次", cost: "低", durability: "低", risk: "更退縮", advice: "只當急救", paths: ["r/events"]}
           - {name: "乙 改流程", what: "參與者先說", takes: "1 期", cost: "中", durability: "高", risk: "被改回去", advice: "先做", paths: ["r/structures"]}
         first_step: "下次先讓參與者說 3 分鐘。"
+        recommended: "乙 改流程"
         horizon: "90 天"
         signoff: "帶領者團隊、課程設計"
         plan:
@@ -56,6 +62,7 @@ valid:
           - {id: "a", text: "帶領者先講", citations: ["r/events/0"]}
           - {id: "b", text: "參與者等答案", citations: ["r/events/0"]}
         edges: [{from: "a", to: "b"}, {from: "b", to: "a"}]
+        feeders: [{id: "f1", text: "紀錄表只問「達到洞察？」", citations: ["r/events/0"], to: "a"}]
       trend:
         question: "真的越來越安靜嗎？"
         reading: "人數一路掉"
@@ -110,7 +117,7 @@ invalid:
       usage: {input_tokens: 10, output_tokens: 20}
       units:
         - {path: "r/events", meaning: "x", action: "x", effect: "x", leverage: huge, citations: ["r/events/0"]}
-    reason: "units[].leverage is low, mid or high"
+    reason: "units[].leverage is low, mid, high or max"
   - name: solutions_with_one_option
     instance:
       interpretation_id: "INTERP-2026-09-26-012"
@@ -143,3 +150,94 @@ invalid:
         series:
           - {name: "x", unit: "人", points: [{label: "a", value: "6 人", citation: "r/events/0"}, {label: "b", value: 2, citation: "r/events/0"}]}
     reason: "trend points carry a number; the unit lives on the series"
+  - name: headline_too_long
+    instance:
+      interpretation_id: "INTERP-2026-09-28-014"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      headline: "這是一段明確超過四十個字的結果頁標題用來驗證契約長度上限是否真的生效並且不應該被錯誤接受"
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+    reason: "headline maxLength is 40"
+  - name: unit_brief_too_long
+    instance:
+      interpretation_id: "INTERP-2026-09-28-015"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      units: [{path: "r/events", brief: "這是一段明確超過四十個字的逐層摘要用來驗證契約長度上限是否真的生效並且不應該被錯誤接受", meaning: "x", action: "x", effect: "x", leverage: low, citations: ["r/events/0"]}]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+    reason: "units[].brief maxLength is 40"
+  - name: unit_step_too_long
+    instance:
+      interpretation_id: "INTERP-2026-09-28-016"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      units: [{path: "r/events", meaning: "x", action: "x", step: "這是一段明確超過三十個字的行動短句用來驗證契約長度上限是否真的生效", effect: "x", leverage: low, citations: ["r/events/0"]}]
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+    reason: "units[].step maxLength is 30"
+  - name: next_step_short_too_long
+    instance:
+      interpretation_id: "INTERP-2026-09-28-017"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      next_steps: [{method_id: "systems.causal_loop_diagram", answers: "x", deepens: "x", prefill: {}, needs_input: [], yields: "x", est_cost: "S", short: "這是一個超過十二個字的旅程短名稱"}]
+    reason: "next_steps[].short maxLength is 12"
+  - name: unit_thickness_verdict_outside_enum
+    instance:
+      interpretation_id: "INTERP-2026-09-28-018"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      units: [{path: "r/events", meaning: "x", action: "x", effect: "x", leverage: low, citations: ["r/events/0"], thickness: {verdict: "so-so"}}]
+    reason: "units[].thickness.verdict is enough, thin, thinnest or empty"
+  - name: loop_feeder_without_citation
+    instance:
+      interpretation_id: "INTERP-2026-09-28-019"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      loop: {kind: reinforcing, name: "x", reading: "x", nodes: [{id: "a", text: "x", citations: ["r/events/0"]}, {id: "b", text: "x", citations: ["r/events/0"]}], edges: [{from: "a", to: "b"}, {from: "b", to: "a"}], feeders: [{id: "f", text: "x", citations: [], to: "a"}]}
+    reason: "a loop feeder cites the record like every node"
+  - name: diagnosis_title_too_long
+    instance:
+      interpretation_id: "INTERP-2026-09-28-020"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      diagnosis: {title: "這是一個明確超過二十四個字的診斷標題用來驗證長度上限真的生效", text: "x", citations: ["r/events/0"]}
+    reason: "diagnosis.title maxLength is 24"

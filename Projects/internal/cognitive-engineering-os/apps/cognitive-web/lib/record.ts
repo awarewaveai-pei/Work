@@ -29,7 +29,10 @@ export function restoreState(fields: FormField[], record: Record<string, unknown
   return { state: initialState(fields, back), left };
 }
 
-/** An analysis made before schema 1.1.0: findings and next steps only, none of the result page's other sections. */
-export function isOldVersion(result: { summary?: unknown; units?: unknown; solutions?: unknown; loop?: unknown; trend?: unknown } | null | undefined): boolean {
-  return Boolean(result) && !result!.summary && !result!.units && !result!.solutions && !result!.loop && !result!.trend;
+/** An analysis made before schema 1.1.0: it carries no detail_integrity gate (1.1.0+ always does), or its stored schema
+ *  version says so. Not "sections missing" -- a 1.2.0 answer whose sections were all dropped is new, not old (P-15). */
+export function isOldVersion(result: unknown, gates: Array<{ gate_id: string }> | null | undefined, schemaVersion?: string | null): boolean {
+  if (!result) return false;
+  if (schemaVersion) return Number(schemaVersion.split(".")[0]) < 1 || (schemaVersion.startsWith("1.") && Number(schemaVersion.split(".")[1]) < 1);
+  return !(gates ?? []).some((gate) => gate.gate_id === "detail_integrity");
 }

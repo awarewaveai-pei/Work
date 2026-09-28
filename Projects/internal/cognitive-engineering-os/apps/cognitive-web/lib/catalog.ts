@@ -45,7 +45,8 @@ export function familyLabels(catalog: Catalog | null): Record<string, string> {
   return catalog ? Object.fromEntries(Object.keys(catalog.methods).flatMap((id) => { const label = familyLabel(catalog, id); return label ? [[id, label]] : []; })) : {};
 }
 
-export const toolHref = (id: string) => `/methods/${encodeURIComponent(id)}`;
+/** The tool's own page; with a project, its 開始 button carries the project through (N-22: 先看它做什麼 must not drop it). */
+export const toolHref = (id: string, project?: string) => `/methods/${encodeURIComponent(id)}${project ? `?project=${encodeURIComponent(project)}` : ""}`;
 /** The run page; with a project, the analysis goes into that project instead of a new one. */
 export const runHref = (id: string, project?: string) => `/methods/${encodeURIComponent(id)}/run${project ? `?project=${encodeURIComponent(project)}` : ""}`;
 export const projectHref = (id: string) => `/projects/${encodeURIComponent(id)}`;

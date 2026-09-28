@@ -40,7 +40,7 @@ function Iceberg({ units }: { units: Unit[] }) {
   const mapY = (y: number) => { const index = Math.min(3, Math.max(0, BANDS.findIndex(([, bottom]) => y < bottom) === -1 ? 3 : BANDS.findIndex(([, bottom]) => y < bottom))); const band = bands[index]; return band.top + ((y - band.oldTop) / band.oldH) * band.h; };
   const path = POINTS.map(([x, y], index) => `${index ? "L" : "M"}${x},${mapY(y)}`).join(" ") + " Z";
   const water = mapY(150), line1 = mapY(290), line2 = mapY(420);
-  const textTop = (index: number) => bands[index].top + (index === 0 ? 80 : 46);   // the mock's baselines (96/212/346/472) less the ascent; the first band starts under 看得見
+  const textTop = (index: number) => bands[index].top + [80, 46, 41, 37][index];   // the mock's baselines (96/212/346/472) less the ascent; the first band starts under 看得見
   return <>
     <svg viewBox={`0 0 1070 ${total}`} role="img" aria-label="冰山模型四層圖">
       <defs>

@@ -7,7 +7,8 @@ import { linesFor, lineHeight, textWidth, Wrap } from "./svgtext";
 // model's own leverage pattern -- method knowledge, never your data. No text in them is ever cut: it wraps and the
 // drawing grows (svgtext.tsx).
 export type TrendSeries = { name: string; unit: string; points: Array<{ label: string; value: number; citation: string }> };
-export type Loop = { kind: "reinforcing" | "balancing"; name: string; reading: string; nodes: Array<{ id: string; text: string; citations: string[] }>; edges: Array<{ from: string; to: string }> };
+export type Loop = { kind: "reinforcing" | "balancing"; name: string; reading: string; nodes: Array<{ id: string; text: string; citations: string[] }>; edges: Array<{ from: string; to: string }>;
+  feeders?: Array<{ id: string; text: string; citations: string[]; to: string }> };
 
 const COLOURS = ["#1f5fbf", "#b25e09"];
 const tidy = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -46,30 +47,58 @@ export function TrendChart({ series, cite }: { series: TrendSeries[]; cite: (id:
 
 // Box centres for a loop of n nodes: half a step off the clock positions, so four boxes sit at the corners (the mock)
 // and none sits at 3 or 9 o'clock beside the title. The ring widens with the boxes it has to hold.
-export function loopLayout(n: number, rx = 150, ry = 78, cx = 230, cy = 118): Array<{ cx: number; cy: number }> {
-  return Array.from({ length: n }, (_, index) => { const angle = (2 * Math.PI * index) / n + Math.PI / n; return { cx: cx + rx * Math.sin(angle), cy: cy - ry * Math.cos(angle) }; });
+/** Box centres on an ellipse, clockwise from the top-left (the mock's four-node loop: 95,52 / 365,52 / 365,172 / 95,172). */
+export function loopLayout(n: number, rx = 191, ry = 85, cx = 230, cy = 112): Array<{ cx: number; cy: number }> {
+  return Array.from({ length: n }, (_, index) => { const angle = (2 * Math.PI * index) / n - Math.PI / n; return { cx: cx + rx * Math.sin(angle), cy: cy - ry * Math.cos(angle) }; });
 }
 
-const BOX_W = 170, BOX_TEXT = 12.5;
+/** The nodes in the order the arrows go, from the first one: the ring reads clockwise the way the loop turns. */
+function ringOrder(loop: Loop): Loop["nodes"] {
+  const next = new Map(loop.edges.map((edge) => [edge.from, edge.to]));
+  const byId = new Map(loop.nodes.map((node) => [node.id, node]));
+  const order: Loop["nodes"] = [];
+  let id: string | undefined = loop.nodes[0]?.id;
+  while (id && byId.has(id) && !order.some((node) => node.id === id)) { order.push(byId.get(id)!); id = next.get(id); }
+  return [...order, ...loop.nodes.filter((node) => !order.includes(node))];   // a node off the walk keeps its place at the end
+}
+
+const BOX_TEXT = 12.5;
 
 export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; dashed?: Set<string> }) {
   const n = loop.nodes.length;   // 2-6 (schema)
+  const BOX_W = n > 4 ? 170 : 150;   // the mock's boxes are 150 wide; five or six need the wider ring anyway
   const lines = new Map(loop.nodes.map((node) => [node.id, linesFor(node.text, BOX_W - 16, BOX_TEXT) + (dashed.has(node.id) ? 1 : 0)]));   // a belief node carries its （信念層） line
-  const boxH = (id: string) => 14 + (lines.get(id) ?? 1) * lineHeight(BOX_TEXT);
+  const boxH = (id: string) => Math.max(44, 14 + (lines.get(id) ?? 1) * lineHeight(BOX_TEXT));   // the mock's 44 at least
   const tallest = Math.max(...loop.nodes.map((node) => boxH(node.id)));
-  const rx = n > 4 ? 230 : 190, ry = 78 + Math.max(0, tallest - 44) / 2 + (n > 4 ? 30 : 0);   // room in the middle for the title and its two notes
-  const width = 2 * rx + BOX_W + 30, cx = width / 2, cy = ry + tallest / 2 + 10;
-  const height = 2 * ry + tallest + 24;
-  const layout = loopLayout(n, rx, ry, cx, cy);
-  const where = new Map(loop.nodes.map((node, index) => [node.id, layout[index]]));
+  const rx = n > 4 ? 230 : 191, ry = 85 + Math.max(0, tallest - 44) / 2 + (n > 4 ? 30 : 0);   // room in the middle for the title and its two notes
+  const raw = loopLayout(n, rx, ry, 0, 0);
+  const minX = Math.min(...raw.map((p) => p.cx)), maxX = Math.max(...raw.map((p) => p.cx));
+  const minY = Math.min(...raw.map((p) => p.cy)), maxY = Math.max(...raw.map((p) => p.cy));
+  // the title sits in the ring only where no arrow crosses the centre (2 boxes side by side, the mock's 4-box square);
+  // with 3, 5 or 6 boxes the diagonals cut through it, so it gets a band of its own above the ring
+  const titleInside = n === 2 || n === 4;
+  const bandW = Math.max(460, maxX - minX + BOX_W + 40) - 40;
+  const bandTitle = `${loop.kind === "reinforcing" ? "R" : "B"} ${loop.name}（${loop.kind === "reinforcing" ? "自我加強" : "自我平衡"}）`;
+  const band = titleInside ? 0 : linesFor(bandTitle, bandW, 16) * lineHeight(16) + 2 * lineHeight(11) + 16;
+  const dx = 20 + BOX_W / 2 - minX, dy = 30 + band + tallest / 2 - minY;   // the mock's margins: 20 left, 30 top (below the title band when there is one)
+  const feeders = (loop.feeders ?? []).filter((feeder) => loop.nodes.some((node) => node.id === feeder.to));
+  const FEED_W = 170, feedH = (text: string) => Math.max(40, 14 + (linesFor(text, FEED_W - 16, 12) + 1) * lineHeight(12));   // + the （信念層） line
+  const feedRow = feeders.length ? Math.max(...feeders.map((feeder) => feedH(feeder.text))) + 12 : 0;
+  const width = Math.max(460, Math.round(maxX - minX + BOX_W + 40)), height = Math.round(maxY - minY + tallest + 56 + feedRow + band);
+  const cx = dx, cy = dy;
+  const layout = raw.map((p) => ({ cx: p.cx + dx, cy: p.cy + dy }));
+  const where = new Map(ringOrder(loop).map((node, index) => [node.id, layout[index]]));
   // When every box clears the central text band vertically (the four-node diamond), use the actual left/right centre
   // span. Other layouts retain the inner-edge width so a title can never grow into a box sitting beside it.
   const centreSpan = Math.max(...layout.map((point) => point.cx)) - Math.min(...layout.map((point) => point.cx)) - 20;
-  const centreW = layout.every((point) => Math.abs(point.cy - cy) > tallest / 2 + 34) ? centreSpan : 2 * rx - BOX_W - 20;
+  // the title band (about 80 px tall at the centre) is as wide as the nearest box beside it allows; with none beside it, the span
+  const beside = layout.filter((point) => Math.abs(point.cy - cy) < tallest / 2 + 34);
+  const centreW = beside.length ? Math.max(120, 2 * Math.min(...beside.map((point) => Math.abs(point.cx - cx) - BOX_W / 2 - 10))) : centreSpan;
+  const titleW = titleInside ? centreW : bandW, titleX = titleInside ? cx - centreW / 2 : 20;
   const title = `${loop.kind === "reinforcing" ? "R" : "B"} ${loop.name}（${loop.kind === "reinforcing" ? "自我加強" : "自我平衡"}）`;
   const note1 = "箭頭 = 前者讓後者更嚴重", note2 = loop.kind === "reinforcing" ? "轉一圈回到起點，所以越轉越強" : "轉一圈回到起點，會被拉回來";
-  const titleH = linesFor(title, centreW, 16) * lineHeight(16) + 2, noteH = (linesFor(note1, centreW, 11) + linesFor(note2, centreW, 11)) * lineHeight(11) + 2;
-  const titleTop = cy - (titleH + noteH) / 2;
+  const titleH = linesFor(title, titleW, 16) * lineHeight(16) + 2, noteH = (linesFor(note1, titleW, 11) + linesFor(note2, titleW, 11)) * lineHeight(11) + 2;
+  const titleTop = titleInside ? cy - (titleH + noteH) / 2 : 12;
   return <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${loop.name.replace(/迴路$/, "")}因果迴路`}>
     <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#245b8a" /></marker></defs>
     <g fill="none" stroke="#245b8a" strokeWidth="2" markerEnd="url(#arr)">{loop.edges.map((edge, index) => {
@@ -81,8 +110,17 @@ export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; da
       return <path key={index} d={`M${a.cx + ux * s},${a.cy + uy * s} L${b.cx - ux * t},${b.cy - uy * t}`} stroke={dashed.has(edge.from) ? "#b25e09" : undefined} />; })}</g>
     <g className="node" stroke="#5a93c4" strokeWidth="1.5">{loop.nodes.map((node) => { const p = where.get(node.id)!; return <rect key={node.id} x={p.cx - BOX_W / 2} y={p.cy - boxH(node.id) / 2} width={BOX_W} height={boxH(node.id)} rx="8" stroke={dashed.has(node.id) ? "#b25e09" : undefined} strokeDasharray={dashed.has(node.id) ? "5 3" : undefined} />; })}</g>
     {loop.nodes.map((node) => { const p = where.get(node.id)!; return <Wrap key={node.id} x={p.cx - BOX_W / 2 + 8} y={p.cy - boxH(node.id) / 2 + 7} width={BOX_W - 16} height={boxH(node.id) - 8} size={BOX_TEXT} align="center" className={dashed.has(node.id) ? "warn" : undefined}>{node.text}{dashed.has(node.id) ? <><br /><span style={{ fontSize: 10.5 }}>（信念層）</span></> : null}</Wrap>; })}
-    <Wrap x={cx - centreW / 2} y={titleTop} width={centreW} height={titleH} size={16} bold align="center" className="a">{title}</Wrap>
-    <Wrap x={cx - centreW / 2} y={titleTop + titleH} width={centreW} height={noteH} size={11} align="center" className="m">{note1}<br />{note2}</Wrap>
+    {feeders.map((feeder, index) => {   // below the ring, dashed, curving into the node it feeds
+      const h = feedH(feeder.text), fx = cx - (feeders.length * FEED_W + (feeders.length - 1) * 20) / 2 + index * (FEED_W + 20), fy = maxY + dy + tallest / 2 + 16;
+      const target = where.get(feeder.to)!, tx = target.cx + (target.cx < cx ? 0 : 0), ty = target.cy + boxH(feeder.to) / 2 + 2;
+      const sx = target.cx < fx + FEED_W / 2 ? fx : fx + FEED_W, sy = fy + h / 2;
+      return <g key={feeder.id}>
+        <rect x={fx} y={fy} width={FEED_W} height={h} rx="8" fill="none" stroke="#b25e09" strokeWidth="1.5" strokeDasharray="5 3" />
+        <Wrap x={fx + 8} y={fy + 6} width={FEED_W - 16} height={h - 8} size={12} align="center" className="warn">{feeder.text}<br /><span style={{ fontSize: 10.5 }}>（信念層）</span></Wrap>
+        <path d={`M${sx},${sy} Q${tx},${sy} ${tx},${ty}`} fill="none" stroke="#b25e09" strokeWidth="2" markerEnd="url(#arr)" />
+      </g>; })}
+    <Wrap x={titleX} y={titleTop} width={titleW} height={titleH} size={16} bold align="center" className="a">{title}</Wrap>
+    <Wrap x={titleX} y={titleTop + titleH} width={titleW} height={noteH} size={11} align="center" className="m">{note1}<br />{note2}</Wrap>
   </svg>;
 }
 

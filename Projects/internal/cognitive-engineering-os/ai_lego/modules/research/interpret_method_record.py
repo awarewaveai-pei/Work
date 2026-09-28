@@ -8,7 +8,7 @@ import json
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import yaml
 
@@ -70,7 +70,8 @@ def build_prompt_manifest(record: Mapping[str, Any], sources: list[Mapping[str, 
     for source in sources or []:
         source_id = source.get("source_id") or source.get("id")
         if isinstance(source_id, str) and source_id:
-            manifest.append({"id": f"source:{source_id}", "kind": "project_source", "source_id": source_id, "sha256": source.get("content_sha256") or source.get("sha256")})
+            title = source.get("title")
+            manifest.append({"id": f"source:{source_id}", "kind": "project_source", "source_id": source_id, "title": title, "value": title, "sha256": source.get("content_sha256") or source.get("sha256")})
     return manifest
 
 
@@ -114,17 +115,19 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
             "headline": "",
             "findings": [{"id": "F1", "title": "", "text": "", "citations": [example_path], "confidence": {"level": "mid", "reason": ""}, "revision_conditions": [{"text": "", "would_change": ""}]}],
             "visual": {"kind": kind, "bindings": binding_examples.get(kind, {})}, "next_methods": [],
-            "next_steps": [{"method_id": "", "answers": "", "deepens": "", "prefill": {}, "needs_input": [], "yields": "", "est_cost": "S"}],
+            "next_steps": [{"method_id": "", "answers": "", "deepens": "", "prefill": {}, "needs_input": [], "yields": "", "est_cost": "S", "short": "", "on_path": True, "why": ""}],
             "recommendations": [{"level": "now", "action": "", "expected": "", "citations": [example_path]}],
-            "gaps": [{"text": "", "needed_evidence": ""}],
+            "gaps": [{"text": "", "needed_evidence": "", "path": example_path, "citations": [example_path]}],
             "summary": "",
-            "units": [{"path": example_path, "brief": "", "meaning": "", "action": "", "step": "", "effect": "", "leverage": "mid", "citations": [example_path]}],
+            "units": [{"path": example_path, "brief": "", "meaning": "", "action": "", "step": "", "effect": "", "leverage": "mid", "citations": [example_path], "thickness": {"verdict": "thin", "note": "", "fill_by": ""}}],
+            "diagnosis": {"title": "", "text": "", "citations": [example_path]},
+            "priority_short": "",
             "focus": {"path": example_path, "why": ""},
             "priority": "",
             "solutions": {"options": [{"name": "", "what": "", "takes": "", "cost": "", "durability": "", "risk": "", "advice": "", "paths": [example_path]}],
-                          "first_step": "", "horizon": "", "plan": [{"when": "", "action": "", "owner": "", "proof": "", "target": ""}],
+                          "first_step": "", "recommended": "", "horizon": "", "plan": [{"when": "", "action": "", "owner": "", "proof": "", "target": ""}],
                           "metrics": [{"name": "", "now": "", "now_citation": example_path, "target": "", "when": ""}], "signoff": ""},
-            "loop": {"kind": "reinforcing", "name": "", "reading": "", "nodes": [{"id": "n1", "text": "", "citations": [example_path]}], "edges": [{"from": "n1", "to": "n2"}]},
+            "loop": {"kind": "reinforcing", "name": "", "reading": "", "nodes": [{"id": "n1", "text": "", "citations": [example_path]}], "edges": [{"from": "n1", "to": "n2"}], "feeders": [{"id": "f1", "text": "", "citations": [example_path], "to": "n1"}]},
             "trend": {"question": "", "reading": "", "series": [{"name": "", "unit": "", "points": [{"label": "", "value": 0, "citation": example_path}]}]},
         }, ensure_ascii=False),
         f"RULES: Write all narrative in {language}. The JSON shape is illustrative: omit optional arrays rather than emit empty-string examples. revision_conditions belongs inside each finding, never at the root. recommendations must contain objects, never bare strings, each citing the manifest; level = now|next|later (when to do it). next_steps objects require every shown key; est_cost = S|M|L (S = minutes of the user's time, M = an hour or two, L = days). Every finding and recommendation cites at least one manifest id; citations and every visual binding string must be a manifest id. confidence.level = high only when a SOURCE supports the finding; with the record alone it is at most mid. next_methods may only use exact AVAILABLE ACTIVE METHODS ids; every next_steps.method_id must also appear in next_methods (a step naming any other method is dropped), and every next_steps.prefill value must be a MANIFEST id. Never invent numbers or sources.",
@@ -136,6 +139,7 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "solutions: 2-3 options, name = a short name of at most 8 Chinese characters with no numbering or 甲乙丙 prefix (the page numbers them), paths = the units each acts on, compared by what, takes (time to effect), cost, durability, risk, advice; first_step = one thing doable tomorrow with no budget and no approval; "
         "horizon = the plan's span in 天 or 週 (for example 90 天); plan = at most 5 rows (when, action, owner, proof, target): when = the week numbers counted from the plan's start, digits only, like 1 到 2 / 3 到 4 / 5 (the table's first column is 週), owner and target are suggestions the user confirms; "
         "metrics = at most 3 (name, now, target, when): now may contain a number only when the record states it, with now_citation = the manifest id whose text states it, otherwise say it is not measured yet; target is a suggestion; "
+        "now and target are the bare value only, without the words 現在/目標 or （待確認） (the page adds those itself); "
         "signoff = who has to agree to what (in brackets) and which option cannot go ahead without them, at most two sentences. "
         "loop = the feedback loop the record shows - causes that come back around and feed themselves (usual in systems tools; omit only when the record shows none): 2-6 nodes, each citing the record, and edges that close the loop (every node has an arrow in and out); kind reinforcing|balancing. "
         "trend = only numbers written in the record: question = the question the chart answers (ends with ？); every point's value must appear in the text of the manifest id it cites; when the record states the same quantity at two or more times (第 1 次 6 位、第 6 次 2 位) the trend is required, one point per stated time; omit trend only when the record has fewer than two such numbers. "
@@ -143,6 +147,15 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "NUMBERS: headline, findings (title, text, confidence.reason), summary, priority, focus.why, units[].brief, units[].meaning, solutions.metrics[].name, loop (name, node texts, reading), trend (question, reading) and gaps[].text state only numbers written in the record, in digits or in words (四個人 is 4; no differences, sums or percentages you work out); layer and step ordinals (第 3 層) are not counted. Suggestions (actions, plan, targets) may propose numbers. "
         "LENGTH: the whole JSON must close well inside the output limit. At most 3 findings; a text field is at most three sentences (about 100 Chinese characters); at most 2 recommendations, 3 gaps, 5 plan rows, 5 loop nodes, 4 next_steps; no indentation or line breaks outside strings.",
     ]
+    lines.append(
+        "MORE OF THE PAGE (schema 1.3.0, each optional): diagnosis = where the problem sits and where its root is, title at most 24 Chinese characters "
+        "(問題在第 3 層，根在第 4 層), text one or two sentences, citations = manifest ids. priority_short = the order of action in at most 20 characters. "
+        "units[].thickness = how well the record covers that unit: verdict enough|thin|thinnest|empty (thinnest = the one thinnest unit; empty = the user left it blank), "
+        "note = why in at most 30 characters (沒有逐次數字), fill_by = the next_steps method that would fill it. gaps[].path = the unit a gap is about, "
+        "gaps[].citations = the lines it is about. solutions.recommended = the name of the option you recommend (one of options[].name). "
+        "next_steps[].short = the step in at most 12 characters for the journey row, on_path = true for the 1-2 steps on the recommended path (the others are "
+        "alternatives), why = why this step now, in one sentence. loop.feeders = at most 2 beliefs or rules that feed a loop node from outside the loop "
+        "(the mock's dashed box), each citing the record, to = the node it feeds; a feeder is not a loop node.")
     if feedback:
         lines.append("THE USER RETURNED THE PREVIOUS VERSION. Reason, in the user's words: " + feedback[:MAX_FEEDBACK_CHARS] + "\nPREVIOUS VERSION (headline, summary, findings): "
                      + json.dumps({key: (previous or {}).get(key) for key in ("headline", "summary", "findings")}, ensure_ascii=False)[:6000]
@@ -192,8 +205,15 @@ def _citation_ids(interpretation: Mapping[str, Any]) -> list[str]:
     return ids
 
 
-def move_unresolvable_prefills_to_needs_input(interpretation: dict[str, Any], manifest: list[Mapping[str, Any]]) -> None:
-    """Preserve a next step without claiming unsupported record data is prefilled."""
+def move_unresolvable_prefills_to_needs_input(
+    interpretation: dict[str, Any],
+    manifest: list[Mapping[str, Any]],
+    target_record_fields: "Callable[[str], set[str] | None] | None" = None,
+) -> None:
+    """Preserve a next step without claiming unsupported record data is prefilled. ``target_record_fields``
+    (method_id -> its record schema's top-level property names, or None when the target cannot be resolved):
+    a prefill key the model invented that is not a real field of the TARGET tool's own record is exactly as
+    unusable as a prefill value that is not a real manifest id (N-13) -- both go to needs_input instead."""
     manifest_ids = {str(item.get("id")) for item in manifest}
     steps = interpretation.get("next_steps")
     if not isinstance(steps, list):
@@ -205,11 +225,17 @@ def move_unresolvable_prefills_to_needs_input(interpretation: dict[str, Any], ma
             step["prefill"] = {}
         if not isinstance(step.get("needs_input"), list):
             step["needs_input"] = []
+        fields = target_record_fields(step["method_id"]) if target_record_fields and isinstance(step.get("method_id"), str) else None
+        not_target = [field for field in step["prefill"] if fields is not None and field not in fields]
+        for field in not_target:   # a key the target tool does not have is nothing the user can fill there either: it goes, not to needs
+            del step["prefill"][field]
         invalid_fields = [field for field, value in step["prefill"].items() if not isinstance(value, str) or value not in manifest_ids]
-        for field in invalid_fields:
+        for field in invalid_fields:   # a real target field whose value is no manifest line: the user fills it
             del step["prefill"][field]
             if isinstance(field, str) and field not in step["needs_input"]:
                 step["needs_input"].append(field)
+        if fields is not None:   # a needs entry is a target field or the model's own words; a stray key of another tool (structures) is neither
+            step["needs_input"] = [need for need in step["needs_input"] if not (isinstance(need, str) and re.fullmatch(r"[a-z_]+", need) and need not in fields)]
 
 
 def normalize_gaps_without_inventing_evidence(interpretation: dict[str, Any], language: str) -> None:
@@ -224,8 +250,26 @@ def normalize_gaps_without_inventing_evidence(interpretation: dict[str, Any], la
         if not isinstance(gap, Mapping) or not isinstance(gap.get("text"), str) or not gap["text"].strip():
             continue
         needed = gap.get("needed_evidence")
-        normalized.append({"text": gap["text"], "needed_evidence": needed if isinstance(needed, str) and needed.strip() else unspecified})
+        normalized.append({"text": gap["text"], "needed_evidence": needed if isinstance(needed, str) and needed.strip() else unspecified,
+                           **{key: gap[key] for key in ("path", "citations") if key in gap}})   # 1.3.0: what the gap is about
     interpretation["gaps"] = normalized
+
+
+def add_blank_unit_gaps(interpretation: dict[str, Any], manifest: list[Mapping[str, Any]], language: str) -> dict[str, list[str]]:
+    """Every unit of the record the user left blank is a gap, with its path so the page names the field (P-08: the page
+    said 空白，列成證據缺口 while no gap was listed). A gap the model already gave that path is not repeated."""
+    thickness = data_thickness_from_manifest(manifest)
+    gaps = interpretation.get("gaps") if isinstance(interpretation.get("gaps"), list) else []
+    covered = {gap.get("path") for gap in gaps if isinstance(gap, Mapping)}
+    zh = language.startswith("zh")
+    added = []
+    for unit, counts in thickness.items():
+        path = f"r/{unit}"
+        if counts.get("own_statements") == 0 and path not in covered:
+            gaps.append({"text": "這一層你沒有填" if zh else "You left this unit blank", "needed_evidence": "這一層的具體事實或紀錄" if zh else "Facts or records for this unit", "path": path})
+            added.append(path)
+    if added: interpretation["gaps"] = gaps
+    return {"gaps": [f"{path} left blank: listed as a gap" for path in added]} if added else {}
 
 
 def add_missing_source_gap(interpretation: dict[str, Any], manifest: list[Mapping[str, Any]], language: str) -> dict[str, list[str]]:
@@ -237,6 +281,65 @@ def add_missing_source_gap(interpretation: dict[str, Any], manifest: list[Mappin
     interpretation["gaps"] = [{"text": "本次沒有外部來源；結論只根據你填的內容" if zh else "No external source; the conclusions rest on your own words only",
                                "needed_evidence": "真實紀錄或外部資料（逐次數字、訪談、文件）" if zh else "Real records or outside data"}]
     return {"gaps": ["no gap listed and no external source: the missing-source gap added"]}
+
+
+_ID_KEYS = frozenset({"citations", "citation", "now_citation", "path", "paths"})
+
+
+def canonical_manifest_id(value: str, ids: set[str]) -> str | None:
+    """``value`` as the manifest id it spells in another notation (``events[0]``, ``r.events.0``, ``/r/events/0/``), or
+    None. Only an exact manifest id is ever returned: a notation is read, an id is never guessed."""
+    if value in ids:
+        return value
+    text = re.sub(r"\[(\d+)\]", r"/\1", value.strip()).replace(".", "/").strip("/")
+    for candidate in (text, f"r/{text}", f"r/{text.removeprefix('record/')}"):
+        if candidate in ids:
+            return candidate
+    return None
+
+
+def normalize_manifest_ids(interpretation: dict[str, Any], manifest: list[Mapping[str, Any]]) -> dict[str, list[str]]:
+    """Every field that holds a manifest id (citations, path(s), a trend point's citation, visual bindings except a
+    level's label, next-step prefill values) rewritten to the id it spells -> repaired, by section."""
+    ids = {str(item.get("id")) for item in manifest}
+    repaired: dict[str, list[str]] = {}
+    def fix(value: Any, where: str) -> Any:
+        if isinstance(value, str) and value not in ids and (canonical := canonical_manifest_id(value, ids)) is not None:
+            repaired.setdefault(re.split(r"[.\[]", where, maxsplit=1)[0], []).append(f"{where} {value!r} -> {canonical!r}")
+            return canonical
+        return value
+    def walk(node: Any, where: str, ids_here: bool = False) -> Any:
+        if isinstance(node, dict):
+            for key, child in node.items():
+                path = f"{where}.{key}" if where else str(key)
+                node[key] = walk(child, path, (ids_here or key in _ID_KEYS or key in ("bindings", "prefill")) and key != "label")
+            return node
+        if isinstance(node, list):
+            for index, child in enumerate(node):
+                node[index] = walk(child, f"{where}[{index}]", ids_here)
+            return node
+        return fix(node, where) if ids_here else node
+    walk(interpretation, "")
+    return repaired
+
+
+def citation_problems(interpretation: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> str:
+    """What citation_integrity refused, in words the retry can act on: the non-manifest ids and the uncited claims."""
+    ids = {str(item.get("id")) for item in manifest}
+    unknown = sorted({c for c in _citation_ids(interpretation) if c not in ids})
+    uncited = [f"{section}[{index}]" for section in ("findings", "recommendations") for index, claim in enumerate(interpretation.get(section) or [])
+               if isinstance(claim, Mapping) and (section == "findings" or claim.get("action")) and not (isinstance(claim.get("citations"), list) and claim["citations"])]
+    parts = []
+    if not interpretation.get("findings"):
+        parts.append("no findings")
+    if unknown:
+        parts.append("citations not in MANIFEST: " + json.dumps(unknown[:12], ensure_ascii=False))
+    if uncited:
+        parts.append("claims without citations: " + json.dumps(uncited, ensure_ascii=False))
+    if not parts:
+        return ""
+    example = json.dumps(sorted(ids)[:3], ensure_ascii=False)
+    return "; " + "; ".join(parts) + f" (cite only MANIFEST ids, copied exactly, e.g. {example})"
 
 
 def normalize_layered_visual_bindings(interpretation: dict[str, Any]) -> None:
@@ -257,7 +360,7 @@ def normalize_layered_visual_bindings(interpretation: dict[str, Any]) -> None:
 # unit, one trend point is repaired or removed alone (repair_details); a section goes only when the section itself
 # fails (a loop that does not close, a summary stating a number the record does not). Both are disclosed in the gate's
 # evidence (removed / dropped), never silently.
-DETAIL_KEYS = ("headline", "summary", "units", "focus", "priority", "solutions", "loop", "trend")
+DETAIL_KEYS = ("headline", "summary", "diagnosis", "units", "focus", "priority", "priority_short", "solutions", "loop", "trend")
 
 
 def _record_text(record: Mapping[str, Any], path: str) -> str:
@@ -354,7 +457,7 @@ ENUM_SYNONYMS: dict[str, str] = {
     "最高": "max", "高": "high", "低": "low", "reinforcing_loop": "reinforcing", "增強": "reinforcing", "自我加強": "reinforcing",
     "balancing_loop": "balancing", "平衡": "balancing", "自我平衡": "balancing",
 }
-CONFORM_KEYS = ("findings", "recommendations", "gaps", "next_steps", "headline", "summary", "units", "focus", "priority", "solutions", "loop", "trend")
+CONFORM_KEYS = ("findings", "recommendations", "gaps", "next_steps", "headline", "summary", "diagnosis", "units", "focus", "priority", "priority_short", "solutions", "loop", "trend")
 
 
 def load_interpretation_schema(spec_root: Path) -> dict[str, Any]:
@@ -577,6 +680,44 @@ def repair_details(interpretation: Mapping[str, Any], record: Mapping[str, Any],
             solutions["metrics"] = kept
             if not kept: del solutions["metrics"]
         fixed["solutions"] = solutions
+    loop = fixed.get("loop")
+    if isinstance(loop, Mapping) and isinstance(loop.get("feeders"), list):
+        loop = dict(loop)
+        node_ids = {node.get("id") for node in loop.get("nodes") or [] if isinstance(node, Mapping)}
+        kept_feeders = []
+        for index, feeder in enumerate(loop["feeders"]):
+            cites = feeder.get("citations") if isinstance(feeder, Mapping) else None
+            unstated = [n for n in _numbers(str(feeder.get("text", ""))) if n not in in_record] if isinstance(feeder, Mapping) else []
+            if not isinstance(feeder, Mapping) or not isinstance(cites, list) or not cites or any(c not in ids for c in cites):
+                note("loop", f"loop.feeders[{index}] does not cite the manifest; removed")
+            elif feeder.get("to") not in node_ids: note("loop", f"loop.feeders[{index}].to {feeder.get('to')!r} is not a loop node; removed")
+            elif unstated: note("loop", f"loop.feeders[{index}] states {unstated}, which the record does not; removed")
+            else: kept_feeders.append(dict(feeder))
+        if kept_feeders: loop["feeders"] = kept_feeders
+        else: loop.pop("feeders", None)
+        fixed["loop"] = loop
+    steps = fixed.get("next_steps") if isinstance(fixed.get("next_steps"), list) else []
+    step_methods = {step.get("method_id") for step in steps if isinstance(step, Mapping)}
+    for index, unit in enumerate(fixed.get("units") or []):
+        thickness = unit.get("thickness") if isinstance(unit, dict) else None
+        if isinstance(thickness, dict) and thickness.get("fill_by") is not None and thickness.get("fill_by") not in step_methods:
+            thickness.pop("fill_by"); repaired.setdefault("units", []).append(f"units[{index}].thickness.fill_by names no next step; left out")
+    solutions = fixed.get("solutions")
+    if isinstance(solutions, dict) and "recommended" in solutions:
+        names = {option.get("name") for option in solutions.get("options") or [] if isinstance(option, Mapping)}
+        if solutions["recommended"] not in names:
+            solutions.pop("recommended"); repaired.setdefault("solutions", []).append("solutions.recommended names no option; left out")
+    on_path = [step for step in steps if isinstance(step, dict) and step.get("on_path") is True]
+    for step in on_path[2:]:
+        step["on_path"] = False; repaired.setdefault("next_steps", []).append(f"{step.get('method_id')} on_path: at most two steps are on the path; set false")
+    for index, gap in enumerate(fixed.get("gaps") or []):
+        if not isinstance(gap, dict): continue
+        if "path" in gap and gap["path"] not in ids: gap.pop("path"); repaired.setdefault("gaps", []).append(f"gaps[{index}].path is not a manifest id; left out")
+        if isinstance(gap.get("citations"), list):
+            known = [c for c in gap["citations"] if c in ids]
+            if len(known) != len(gap["citations"]): repaired.setdefault("gaps", []).append(f"gaps[{index}] cited non-manifest ids; kept {known}")
+            if known: gap["citations"] = known
+            else: gap.pop("citations")
     trend = fixed.get("trend")
     if isinstance(trend, Mapping):
         trend = dict(trend)
@@ -612,6 +753,13 @@ def detail_problems(interpretation: Mapping[str, Any], record: Mapping[str, Any]
     facts("headline", "headline", interpretation.get("headline"))   # the page title: one bad number costs the title, not the answer (P-05)
     facts("summary", "summary", interpretation.get("summary"))
     facts("priority", "priority", interpretation.get("priority"))
+    facts("priority_short", "priority_short", interpretation.get("priority_short"))
+    diagnosis = interpretation.get("diagnosis")
+    if isinstance(diagnosis, Mapping):
+        facts("diagnosis", "diagnosis.title", diagnosis.get("title"))
+        facts("diagnosis", "diagnosis.text", diagnosis.get("text"))
+        unknown = [c for c in (diagnosis.get("citations") if isinstance(diagnosis.get("citations"), list) else []) if c not in ids]
+        if unknown: bad("diagnosis", f"diagnosis cites {unknown}, not manifest ids")
     def cites(section: str, where: str, citations: Any) -> None:
         unknown = [c for c in (citations if isinstance(citations, list) else []) if c not in ids]
         if unknown: bad(section, f"{where} cites {unknown}, not manifest ids")
@@ -621,6 +769,7 @@ def detail_problems(interpretation: Mapping[str, Any], record: Mapping[str, Any]
             cites("units", f"units[{index}]", unit.get("citations"))
             facts("units", f"units[{index}].meaning", unit.get("meaning"))
             facts("units", f"units[{index}].brief", unit.get("brief"))
+            if isinstance(unit.get("thickness"), Mapping): facts("units", f"units[{index}].thickness.note", unit["thickness"].get("note"))
     focus = interpretation.get("focus")
     if isinstance(focus, Mapping):
         if focus.get("path") not in ids: bad("focus", f"focus.path {focus.get('path')!r} is not a manifest id")
@@ -715,11 +864,21 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
     ]
 
 
+def no_preset_conclusion_gate(interpretation: Mapping[str, Any]) -> dict[str, Any]:
+    """無預設結論 (the mock's approve bar): what is stored is labelled the AI's inference and carries no judgment in the
+    user's name -- the judgment field stays the user's to fill (a model-written one is taken out before this runs)."""
+    provenance = interpretation.get("provenance") if isinstance(interpretation.get("provenance"), Mapping) else {}
+    ai_labelled = provenance.get("epistemic_type") == "AI_INFERENCE" and provenance.get("authorship_state") == "AI_GENERATED"
+    no_judgment = "judgment" not in interpretation
+    return {"gate_id": "no_preset_conclusion", "status": "PASS" if ai_labelled and no_judgment else "FAIL",
+            "evidence": {"ai_labelled": ai_labelled, "judgment_left_to_user": no_judgment}}
+
+
 def validate_interpretation(schema_contracts: SchemaContracts, interpretation: Mapping[str, Any]) -> None:
     schema_contracts.validate(INTERPRETATION_SCHEMA, dict(interpretation), "MethodInterpretation")
 
 
-def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None, target_record_fields: "Callable[[str], set[str] | None] | None" = None) -> dict[str, Any]:
     kind = visual_kind(spec_root, method_id, contract)
     manifest = build_prompt_manifest(record, sources)
     contract_schema = load_interpretation_schema(spec_root)
@@ -794,16 +953,19 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
             interpretation.update({"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record), "visual": {**supplied_visual, "kind": kind}, "data_thickness": data_thickness_from_manifest(manifest), "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}, "model": completion.model, "usage": {"input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens}})
             for key in DETAIL_KEYS:   # "trend": null means omitted, not a malformed section
                 if key in interpretation and interpretation[key] is None: del interpretation[key]
-            move_unresolvable_prefills_to_needs_input(interpretation, manifest)
+            model_judgment = interpretation.pop("judgment", None)   # the user's own field: never filled in their name (無預設結論)
+            ids_repaired = normalize_manifest_ids(interpretation, manifest)   # before anything reads an id
+            move_unresolvable_prefills_to_needs_input(interpretation, manifest, target_record_fields)
             normalize_gaps_without_inventing_evidence(interpretation, language)
             normalize_layered_visual_bindings(interpretation)
             steps_removed, steps_repaired = repair_next_steps(interpretation, active_method_ids)
             interpretation, schema_removed, schema_repaired = conform_to_schema(interpretation, contract_schema)
             claims_removed, claims_repaired = repair_claims(interpretation, record, manifest)
-            gaps_repaired = add_missing_source_gap(interpretation, manifest, language)
+            gaps_repaired = merge(add_blank_unit_gaps(interpretation, manifest, language), add_missing_source_gap(interpretation, manifest, language))
             interpretation, detail_removed, detail_repaired = repair_details(interpretation, record, manifest)
             removed = merge(steps_removed, schema_removed, claims_removed, detail_removed)
-            repaired = merge(steps_repaired, schema_repaired, claims_repaired, gaps_repaired, detail_repaired)
+            repaired = merge(ids_repaired, steps_repaired, schema_repaired, claims_repaired, gaps_repaired, detail_repaired,
+                             {"judgment": ["the model wrote a judgment; the judgment is the user's, left out"]} if model_judgment is not None else {})
             gates = evaluate_interpretation_gates(interpretation, record, manifest, active_method_ids)
             core_failed = [g["gate_id"] for g in gates[:3] if g["status"] != "PASS"]
             if core_failed:
@@ -816,10 +978,13 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
                         detail += "; next_steps.prefill_types=" + json.dumps([type(step.get("prefill")).__name__ for step in steps if isinstance(step, Mapping)])
                     detail += ". Use exact ACTIVE ids; every next_steps.method_id also in next_methods."
                 unstated = gates[0]["evidence"].get("unstated_numbers") if "citation_integrity" in core_failed else None
+                if "citation_integrity" in core_failed:
+                    detail += citation_problems(interpretation, manifest)
                 if unstated:
                     detail += "; findings/headline state numbers the record does not: " + json.dumps(unstated, ensure_ascii=False) + " (state only numbers written in the record)"
                 raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(core_failed) + detail)
             kept, settled = settle(interpretation, gates, removed, repaired)
+            settled = settled + [no_preset_conclusion_gate(kept)]
             kept["usage"] = {"input_tokens": total_input, "output_tokens": total_output}
             dropped = settled[3]["evidence"]["dropped"]
             if fallback is not None and score(fallback[0], fallback[1]) > score(kept, settled):   # the retry lost more than it gained (P-10)

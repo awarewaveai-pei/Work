@@ -51,6 +51,8 @@ export function LessonView({ html }: { html: string }) {
         const set = chip.getAttribute("data-set");
         root.querySelectorAll(".chip").forEach((c) => { c.classList.toggle("on", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
         root.querySelectorAll<HTMLElement>(".ex").forEach((el) => { el.hidden = el.getAttribute("data-set") !== set; });
+        // 用示範案例試一次 opens the chosen domain's example (the default set is the plain #demo) -- N-55
+        root.querySelectorAll<HTMLAnchorElement>('a[href*="#demo"]').forEach((link) => { link.href = link.href.replace(/#demo(=[a-z]+)?$/, set && set !== "edd" ? `#demo=${set}` : "#demo"); });
         return;
       }
       const tab = target.closest<HTMLElement>('.tabs [role="tab"]');

@@ -31,7 +31,7 @@ export function pickTools(catalog: Catalog, text: string, limit = 3): Pick[] {
     .slice(0, limit);
 }
 
-export function StuckBox({ catalog }: { catalog: Catalog }) {
+export function StuckBox({ catalog, project }: { catalog: Catalog; project?: string }) {
   const [text, setText] = useState("");
   const [asked, setAsked] = useState("");
   const picks = useMemo(() => (asked ? pickTools(catalog, asked) : []), [catalog, asked]);
@@ -53,7 +53,7 @@ export function StuckBox({ catalog }: { catalog: Catalog }) {
               <div className="mcard" key={p.id}>
                 <div><b>{i + 1} <Link href={toolHref(p.id)}>{m.name_zh}</Link></b><span className="tag">工具</span></div>
                 <div><span className="k">為什麼：</span>工具資料裡有「{p.hits.slice(0, 4).join("」「")}」；{m.blurb_zh}</div>
-                <div className="btns"><Link className="btn primary" href={runHref(p.id)}>開始 →</Link><Link className="btn" href={toolHref(p.id)}>看它做什麼</Link></div>
+                <div className="btns"><Link className="btn primary" href={runHref(p.id, project)}>開始 →</Link><Link className="btn" href={toolHref(p.id, project)}>看它做什麼</Link></div>
               </div>
             );
           })}

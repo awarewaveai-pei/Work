@@ -62,6 +62,14 @@ describe("LessonView", () => {
     expect(box.querySelector("#chip-b")!.getAttribute("aria-selected")).toBe("true");
   });
 
+  it("the demo link follows the chosen domain chip (N-55)", async () => {
+    const box = await mount("", HTML.replace('<a class="btn primary" href="/methods/x/run">開始 →</a>', '<a class="btn primary" href="/methods/x/run">開始 →</a><a class="btn" id="demo" href="/methods/x/run#demo">示範</a>'));
+    await click(box.querySelector("#chip-b"));
+    expect(box.querySelector<HTMLAnchorElement>("#demo")!.getAttribute("href")).toMatch(/#demo=b$/);
+    await click(box.querySelector("#chip-a"));
+    expect(box.querySelector<HTMLAnchorElement>("#demo")!.getAttribute("href")).toMatch(/#demo=a$/);
+  });
+
   it("a link into a hidden panel opens that tab and the fold its target sits in", async () => {
     const box = await mount();
     await click(box.querySelector("#to-q2"));

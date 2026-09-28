@@ -1,19 +1,44 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { LoopChart, TrendChart, loopLayout } from "./Charts";
+import { LoopChart, TrendChart } from "./Charts";
 
 describe("loop chart layout", () => {
-  it("no box (150x44) reaches the centre title band for 2 to 6 nodes, and all stay inside the 460x250 picture", () => {
-    const band = { x0: 230 - 60, x1: 230 + 60, y0: 104, y1: 146 };   // "R" + an 8-character name at 14px, and the short line under it
+  const loopOf = (n: number, text = (i: number) => `節點 ${i}`) => ({
+    kind: "reinforcing" as const, name: "等答案迴路", reading: "越轉越強",
+    nodes: Array.from({ length: n }, (_, i) => ({ id: `n${i}`, text: text(i), citations: [] })),
+    edges: Array.from({ length: n }, (_, i) => ({ from: `n${i}`, to: `n${(i + 1) % n}` })),
+  });
+  const boxes = (html: string) => [...html.matchAll(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" rx="8"/g)].map((m) => m.slice(1, 5).map(Number));
+  const viewBox = (html: string) => (html.match(/viewBox="0 0 ([^ ]+) ([^"]+)"/) ?? []).slice(1).map(Number);
+
+  it("the rendered loop (P-17): for 2 to 6 nodes, long texts too, no box overlaps another or the centre title, all inside the picture", () => {
     for (let n = 2; n <= 6; n += 1) {
-      for (const { cx, cy } of loopLayout(n)) {
-        const box = { x0: cx - 75, x1: cx + 75, y0: cy - 22, y1: cy + 22 };
-        const overlaps = box.x0 < band.x1 && box.x1 > band.x0 && box.y0 < band.y1 && box.y1 > band.y0;
-        expect(overlaps, `n=${n} box at ${Math.round(cx)},${Math.round(cy)}`).toBe(false);
-        expect(box.x0 >= 0 && box.x1 <= 460 && box.y0 >= 0 && box.y1 <= 250, `n=${n} inside`).toBe(true);
+      for (const text of [(i: number) => `節點 ${i}`, (i: number) => `帶領者先講作品的意義，參與者等答案 ${i}`]) {
+        const html = renderToStaticMarkup(<LoopChart loop={loopOf(n, text)} />);
+        const [w, h] = viewBox(html);
+        const rects = boxes(html);
+        expect(rects.length).toBe(n);
+        const titleBox = html.slice(html.lastIndexOf("<foreignObject", html.indexOf("R 等答案迴路")), html.indexOf("R 等答案迴路"));
+        const [tx, ty, tw] = ["x", "y", "width"].map((k) => Number(titleBox.match(new RegExp(` ${k}="([^"]+)"`))?.[1]));
+        for (const [x, y, bw, bh] of rects) {
+          expect(x >= 0 && y >= 0 && x + bw <= w && y + bh <= h, `n=${n} box inside`).toBe(true);
+          expect(x + bw <= tx || x >= tx + tw || y + bh <= ty || y >= ty + 22, `n=${n} box clear of the title`).toBe(true);
+        }
+        for (let a = 0; a < rects.length; a += 1) for (let b = a + 1; b < rects.length; b += 1) {
+          const [ax, ay, aw, ah] = rects[a], [bx, by, bw, bh] = rects[b];
+          expect(ax + aw <= bx || bx + bw <= ax || ay + ah <= by || by + bh <= ay, `n=${n} boxes ${a},${b} apart`).toBe(true);
+        }
       }
     }
+  });
+
+  it("the four-node loop is the mock's (C3-17): 460x250-ish, 150x44 boxes clockwise from the top-left in arrow order", () => {
+    const loop = loopOf(4);
+    loop.nodes = [loop.nodes[0], loop.nodes[2], loop.nodes[1], loop.nodes[3]];   // listed out of order: placed by the arrows
+    const html = renderToStaticMarkup(<LoopChart loop={loop} />);
+    expect(viewBox(html)[0]).toBe(460);
+    expect(boxes(html).map(([x, y, w, h]) => [Math.round(x), Math.round(y), w, h])).toEqual([[20, 30, 150, 44], [290, 150, 150, 44], [290, 30, 150, 44], [20, 150, 150, 44]]);
   });
 
   it("keeps the four-node loop title on one line by deriving its width from the rendered node centres", () => {

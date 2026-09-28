@@ -1,6 +1,6 @@
 """What a model call costs, for the pages that promise to say it before and after a run (mock: 約 6k tokens・≈ NT$1).
 
-List prices per million tokens in USD (Anthropic first-party rates, 2026-06-24) by model id prefix; a model with no row
+List prices per million tokens in USD (Anthropic first-party rates, checked 2026-09-28) by model id prefix; a model with no row
 gets no money figure (tokens only) rather than a guess. ``COGNITIVE_OS_AI_PRICES_JSON`` overrides or extends the table
 ({"claude-x": [input_usd_per_m, output_usd_per_m]}); ``COGNITIVE_OS_USD_TWD`` sets the exchange rate (default 32).
 """
@@ -16,6 +16,9 @@ PRICES_ENV = "COGNITIVE_OS_AI_PRICES_JSON"
 USD_TWD_ENV = "COGNITIVE_OS_USD_TWD"
 DEFAULT_USD_TWD = 32.0
 USD_PER_MILLION: dict[str, tuple[float, float]] = {
+    "claude-fable-5": (10.0, 50.0),         # rows checked against platform.claude.com/docs/en/about-claude/pricing 2026-09-28
+    "claude-mythos-5": (10.0, 50.0),
+    "claude-opus-5-5": (4.0, 20.0),
     "claude-opus-5": (5.0, 25.0),
     "claude-opus-4": (5.0, 25.0),           # 4.5 and later (claude-opus-4-5-…, 4-6, 4-7 …)
     "claude-opus-4-1": (15.0, 75.0),        # Opus 4.1 (claude-opus-4-1-20250805)

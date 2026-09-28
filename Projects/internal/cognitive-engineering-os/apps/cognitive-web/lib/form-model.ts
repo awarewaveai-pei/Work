@@ -5,6 +5,7 @@ export type FormField = {
   name?: string;
   label?: string;
   hint?: string;
+  placeholder?: string;
   kind?: string;
   required?: boolean;
   default?: unknown;

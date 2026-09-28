@@ -882,10 +882,10 @@ def check_web_result(path, lesson=None, parity=False, mock_path=None):
 # buttons and action links, and the structural pieces a card must carry. Model-written text is the one thing it skips.
 # Numbers and Chinese numerals read as N (三條路 = 兩條路). PARITY_ALIASES lists the deliberate differences in words.
 _NUMERAL_RE = re.compile(r"[0-9０-９]+|[一兩二三四五六七八九十]+(?=[個條層次張段天週步])")   # 步: 把建議的兩步／一步串成一條工作流 (⑧, count of next steps)
+_DURATION = re.compile(r"N\s*(?:天|週|周|個月)")
 PARITY_ALIASES = {
-    # the web schedules a rerun as a reminder (the rerun needs the numbers you bring), so it does not say 自動; without a
-    # horizon in days it says 到期
-    "N 天後自動重跑本分析並比較": {"N 天後重跑本分析並比較", "到期重跑本分析並比較"},
+    # without a horizon in days the web says 到期 (the mock's case has 90 天)
+    "N 天後重跑本分析並比較": {"到期重跑本分析並比較"},
     # with one next step the web says 下一步 where the mock's case had two
     "把建議的N步串成N條工作流,N次跑完每一步停下來給你確認,順序可以改": {"把建議的下N步串成N條工作流,N次跑完每一步停下來給你確認,順序可以改"},
 }
@@ -938,7 +938,7 @@ def _card_outline(card, key):
     heading = h.text() if h is not None else ""
     out["heading"] = _stem(heading, "：") if key in ("header",) else _norm(heading)
     how = next((n for n in card.walk() if n.has("how") and _shown(n)), None)
-    out["how"] = _norm(how.text()) if how is not None else ""
+    out["how"] = _DURATION.sub("N 期間", _norm(how.text())) if how is not None else ""   # a plan's length (90 天 / 12 週 / 3 個月) is the case's, not the layout's
     out["h3"] = sorted({m.group(0) for n in card.find(tag="h3") if _shown(n) for m in [re.match(r"^[A-C]\.|^第 N 層/N", _norm(n.text()))] if m})
     out["rows"] = sorted({_norm(b.text()) for r in card.find("row") if _shown(r) for b in r.elements()[:1] if b.tag == "b"})
     out["th"] = sorted({tuple(_norm(th.text()) for th in t.find(tag="th")) for t in card.find(tag="table") if _shown(t)})

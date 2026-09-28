@@ -6,8 +6,11 @@ import { lessonHref } from "../../lib/lessons";
 
 // Home (docs/mockups/home-mock.html section#home): the one sentence, 先說你卡在哪, the goal cards, the popular starts.
 // Same markup and classes as mockkit render_goals / render_featured (no rendered-HTML gate for this page yet: TASKS).
-export default async function HomePage() {
+// ?project=: a result page's ⑧ "不確定選哪個？" link (N-24) so a pick made here still saves into that project.
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ project?: string | string[] }> }) {
   const catalog = await loadCatalog();
+  const projectParam = (await searchParams).project;
+  const project = typeof projectParam === "string" ? projectParam : undefined;
   const { counts, goals, popular, methods, recipes, glyphs, shapes } = catalog;
   return (
     <section className="view" id="home">
@@ -18,7 +21,7 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <StuckBox catalog={catalog} />
+      <StuckBox catalog={catalog} project={project} />
 
       <div className="card" id="goals">
         <h2>按你想做的事找<small>{goals.length} 種你可能想做的事；每一種先給三個常用工具，全部 {counts.tools} 個工具都分在其中一種</small></h2>

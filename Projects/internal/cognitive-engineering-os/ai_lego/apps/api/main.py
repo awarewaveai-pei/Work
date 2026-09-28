@@ -79,7 +79,7 @@ from ai_lego.platform.ai_gateway.provider import DEFAULT_MODEL, AiProvider, Anth
 from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
-from ai_lego.core.domain._intake_validation import require_uuid
+from ai_lego.core.domain._intake_validation import require_text, require_uuid
 from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import TEXT_MEDIA_TYPES, source_record
 from ai_lego.core.domain.collection_run import MAX_FETCHES, MAX_SEEDS, collection_run_record
@@ -96,7 +96,7 @@ from ai_lego.platform.workflow.run_lock import RunLock, acquire_run_lock, lock_p
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
-from ai_lego.modules.research.interpret_method_record import INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, run_interpretation
+from ai_lego.modules.research.interpret_method_record import INTERPRET_MAX_TOKENS, INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, run_interpretation
 from ai_lego.modules.research.source_manifest import DEFAULT_MAX_CHARS
 from ai_lego.modules.research.synthesis import run_synthesis, validate_subject
 
@@ -1188,6 +1188,23 @@ class DraftRequest(BaseModel):
 
 _AI_BUDGET_LOCKS: dict[str, threading.Lock] = {}
 _AI_BUDGET_LOCKS_GUARD = threading.Lock()
+_AI_RESERVED: dict[str, int] = {}   # tokens of interpretation runs in flight, per tenant (one process: see _ai_budget_lock_for)
+INTERPRET_RESERVE_TOKENS = 12_000 + INTERPRET_MAX_TOKENS   # one call's worst case: the prompt plus the output ceiling
+
+
+def _reserve_ai_tokens(tenant_id: str, tokens: int) -> None:
+    """Add (or, negative, release) an in-flight reservation; the caller holds the tenant's budget lock."""
+    with _AI_BUDGET_LOCKS_GUARD:
+        left = _AI_RESERVED.get(tenant_id, 0) + tokens
+        if left > 0: _AI_RESERVED[tenant_id] = left
+        else: _AI_RESERVED.pop(tenant_id, None)
+
+
+def _interpretation_schema_version() -> str:
+    try:
+        return str((yaml.safe_load((resolve_spec_root() / "specs" / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml").read_text(encoding="utf-8")) or {}).get("version") or "")
+    except (OSError, yaml.YAMLError):
+        return ""
 
 
 def _ai_budget_lock_for(tenant_id: str) -> threading.Lock:
@@ -1222,7 +1239,7 @@ def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict
     except InvariantViolation as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     used = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
-    used_tokens = used["input_tokens"] + used["output_tokens"]
+    used_tokens = used["input_tokens"] + used["output_tokens"] + _AI_RESERVED.get(session["tenant_id"], 0)   # runs still in flight count
     if used_tokens >= budget:
         raise HTTPException(status_code=429, detail=f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: {used_tokens}/{budget} tokens used today (UTC); resets at midnight UTC")
     return provider
@@ -1402,22 +1419,73 @@ def _domain_error_status(error: InvariantViolation) -> int:
     return 404 if "NOT_FOUND" in str(error) else 400
 
 
+def _record_schema_properties(spec_root: Path, catalog: MethodCatalog, method_id: str) -> set[str] | None:
+    """Top-level field names of ``method_id``'s own output record schema, or None when it cannot be
+    resolved. Used to keep a next step's prefill/needs_input honest about the TARGET tool's real fields
+    (N-13): the model names the CURRENT method's manifest ids as prefill sources, but the field name it
+    proposes on the target side is a guess like any other and is checked the same way citations are."""
+    if not catalog.is_resolvable(method_id):
+        return None
+    contract = catalog.require(method_id)
+    contract_path = spec_root / contract["path"]
+    if not contract_path.is_file():
+        return None
+    schema_name = record_schema_name(spec_root, method_id, contract, contract_path.read_text(encoding="utf-8"))
+    schema_path = spec_root / TYPED_OBJECTS / schema_name if schema_name else None
+    if not schema_path or not schema_path.is_file():
+        return None
+    try:
+        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return None
+    properties = (doc or {}).get("properties") if isinstance(doc, dict) else None
+    return set(properties) if isinstance(properties, dict) else None
+
+
 def _run_interpretation(
     *, interpretation_id: str, method_id: str, project_id: str, session: dict[str, Any],
     record: dict[str, Any], contract: dict[str, Any], display: dict[str, Any] | None,
     sources: list[dict[str, Any]], catalog: MethodCatalog, provider: AiProvider,
     store: IdentityStore, repo: ProjectSourceRepository, artifact_store: JsonArtifactStore,
     feedback: str = "", previous: dict[str, Any] | None = None, rerun_id: str | None = None,
+    record_gates: list[dict[str, Any]] | None = None, lock: RunLock,
 ) -> None:
     """``feedback``/``previous``: the user returned an earlier version (退回並說原因) and this run redoes it; ``rerun_id``:
-    this run answers a due rerun reminder, fulfilled when the result is saved."""
+    this run answers a due rerun reminder, fulfilled when the result is saved; ``record_gates``: the method's own
+    gates on the record (層序…), stored with the analysis. The tenant's budget lock covers the check (with this run's
+    reservation) and the usage record, not the minutes the model takes (P-45: drafts used to wait behind it).
+    ``lock``: this Project's interpretation run lock, released only after the outcome is written (readers rely on it)."""
+    try:
+        _interpret_and_record(
+            interpretation_id=interpretation_id, method_id=method_id, project_id=project_id, session=session, record=record,
+            contract=contract, display=display, sources=sources, catalog=catalog, provider=provider, store=store, repo=repo,
+            artifact_store=artifact_store, feedback=feedback, previous=previous, rerun_id=rerun_id, record_gates=record_gates,
+        )
+    finally:
+        lock.release()
+
+
+def _interpret_and_record(
+    *, interpretation_id: str, method_id: str, project_id: str, session: dict[str, Any],
+    record: dict[str, Any], contract: dict[str, Any], display: dict[str, Any] | None,
+    sources: list[dict[str, Any]], catalog: MethodCatalog, provider: AiProvider,
+    store: IdentityStore, repo: ProjectSourceRepository, artifact_store: JsonArtifactStore,
+    feedback: str, previous: dict[str, Any] | None, rerun_id: str | None, record_gates: list[dict[str, Any]] | None,
+) -> None:
     tenant_id = session["tenant_id"]
     aggregate_id = f"project:{project_id}"
     outcome: dict[str, Any] | None = None
     error: str | None = None
-    with _ai_budget_lock_for(tenant_id):
-        try:
+    reserved = False
+    try:
+        with _ai_budget_lock_for(tenant_id):
             _require_ai(provider, store, session)
+            _reserve_ai_tokens(tenant_id, INTERPRET_RESERVE_TOKENS)
+            reserved = True
+    except HTTPException as failure:
+        error = str(failure.detail)
+    if reserved:
+        try:
             display_metadata = _method_display_metadata()
             spec_root = resolve_spec_root()
             contract_text = (spec_root / catalog.require(method_id)["path"]).read_text(encoding="utf-8")
@@ -1431,6 +1499,7 @@ def _run_interpretation(
                 catalog_lines=[f"{key} — {display_metadata.get(key, {}).get('name_zh', key)}" for key in sorted(catalog.contracts) if catalog.is_resolvable(key)],
                 record_schema_text=schema_path.read_text(encoding="utf-8") if schema_path and schema_path.exists() else "",
                 feedback=feedback, previous=previous,
+                target_record_fields=lambda target_id: _record_schema_properties(spec_root, catalog, target_id),
             )
             error = outcome["error"]
         except HTTPException as failure:
@@ -1438,15 +1507,17 @@ def _run_interpretation(
         except Exception as failure:
             error = str(failure)
         finally:
-            if outcome is not None:
-                try:
-                    store.record_ai_usage(
-                        tenant_id, session["identity_id"], f"interpret:{method_id}",
-                        outcome["model"], outcome["input_tokens"], outcome["output_tokens"],
-                    )
-                except Exception as usage_failure:
-                    usage_error = f"AI_USAGE_RECORD_FAILED: {type(usage_failure).__name__}"
-                    error = f"{error}; {usage_error}" if error else usage_error
+            with _ai_budget_lock_for(tenant_id):
+                _reserve_ai_tokens(tenant_id, -INTERPRET_RESERVE_TOKENS)
+                if outcome is not None:
+                    try:
+                        store.record_ai_usage(
+                            tenant_id, session["identity_id"], f"interpret:{method_id}",
+                            outcome["model"], outcome["input_tokens"], outcome["output_tokens"],
+                        )
+                    except Exception as usage_failure:
+                        usage_error = f"AI_USAGE_RECORD_FAILED: {type(usage_failure).__name__}"
+                        error = f"{error}; {usage_error}" if error else usage_error
     if repo.get_project(tenant_id, project_id) is None:   # erased while the model was answering: nothing to write to, not even a failure
         return
     if error is not None or outcome is None or outcome["interpretation"] is None:
@@ -1460,6 +1531,8 @@ def _run_interpretation(
             "record": record, "interpretation": outcome["interpretation"], "gate_results": outcome["gate_results"],
             "attempts": outcome.get("attempts", []),   # per model call: output size and why it was refused
             "prompt_manifest": build_prompt_manifest(record, sources),
+            "record_gate_results": record_gates or [],   # the method's own gates (層序…) for the approve bar
+            "schema_version": str(_interpretation_schema_version()),
         })
         repo.save_interpretation(
             tenant_id, project_id, interpretation_id, reference,
@@ -1469,6 +1542,36 @@ def _run_interpretation(
             repo.append_event(tenant_id, aggregate_id, "RerunFulfilled", {"rerun_id": rerun_id, "interpretation_id": interpretation_id})
     except Exception as failure:
         repo.append_event(tenant_id, aggregate_id, "InterpretationFailed", {"interpretation_id": interpretation_id, "error": str(failure)})
+
+
+RUNNER_LOST = "INTERPRETATION_RUNNER_LOST: the analysis stopped before it finished (the server restarted); run it again"
+
+
+def _interpretation_lock_path(tenant_id: str, interpretation_id: str) -> Path:
+    """Its runner's lock (plan P-k; one per run, like a workflow run's ``<run_id>.lock``, never deleted)."""
+    tenant_key = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
+    run_key = hashlib.sha256(interpretation_id.encode("utf-8")).hexdigest()[:32]
+    return PRODUCT_ROOT / ".runtime" / "interpretation" / tenant_key / f"{run_key}.lock"
+
+
+def _interpretation_running(tenant_id: str, interpretation_id: str) -> bool:
+    path = _interpretation_lock_path(tenant_id, interpretation_id)
+    return run_lock_state(path) == "held" and run_lock_tag(path) == interpretation_id
+
+
+def _analyses(repo: ProjectSourceRepository, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    """``repo.analyses`` with each PENDING whose runner is gone read as FAILED / RUNNER_LOST (N-64: a restart mid-run
+    left it PENDING forever and the Project undeletable). Probes first, then re-reads: a runner writes its outcome
+    before it lets go of the lock, so one that finished between the reads shows its real outcome."""
+    read = (lambda: repo.analyses(tenant_id, project_id)) if project_id else (lambda: repo.analyses(tenant_id))
+    lost = {item["interpretation_id"] for items in read().values() for item in items
+            if item["status"] == "PENDING" and not _interpretation_running(tenant_id, item["interpretation_id"])}
+    analyses = read()
+    for items in analyses.values():
+        for item in items:
+            if item["status"] == "PENDING" and item["interpretation_id"] in lost:
+                item.update(status="FAILED", error=RUNNER_LOST)
+    return analyses
 
 
 def _launch_interpretation(**kwargs: Any) -> None:
@@ -1494,7 +1597,7 @@ def interpret_method(
         raise HTTPException(status_code=400, detail="PROJECT_ID_REQUIRED: interpretation is project-bound")
     _project_or_404(repo, session["tenant_id"], project_id)
     revision, feedback, previous = _revision_of(body.get("revision"), repo, artifact_store, session["tenant_id"], project_id)
-    rerun_id = _open_rerun_of(body.get("rerun_id"), repo, session["tenant_id"], project_id)
+    rerun_id = _open_rerun_of(body.get("rerun_id"), method_id, repo, session["tenant_id"], project_id)
     builder_body = dict(body)
     for key in ("project_id", "revision", "rerun_id"):
         builder_body.pop(key, None)
@@ -1520,19 +1623,26 @@ def interpret_method(
         raise HTTPException(status_code=500, detail="METHOD_CONTRACT_INVALID")
     interpretation_id = f"INTERP-{uuid.uuid4().hex.upper()}"
     sources = repo.list_sources(session["tenant_id"], project_id)
-    repo.append_event(
-        session["tenant_id"], f"project:{project_id}", "InterpretationRequested",
-        {"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record),
-         **({"revision": revision} if revision else {}), **({"rerun_id": rerun_id} if rerun_id else {})},
-    )
-    worker_kwargs = {
-        "interpretation_id": interpretation_id, "method_id": method_id, "project_id": project_id,
-        "session": dict(session), "record": record, "contract": contract,
-        "display": _method_display_metadata().get(method_id), "sources": sources,
-        "catalog": catalog, "provider": provider, "store": store, "repo": repo, "artifact_store": artifact_store,
-        "feedback": feedback, "previous": previous, "rerun_id": rerun_id,
-    }
-    _launch_interpretation(**worker_kwargs)
+    lock = acquire_run_lock(_interpretation_lock_path(session["tenant_id"], interpretation_id), tag=interpretation_id)
+    if lock is None:   # a fresh id's lock is only ever held by a status probe, for an instant
+        raise HTTPException(status_code=409, detail="INTERPRETATION_IN_FLIGHT: the analysis could not start this instant; retry")
+    try:
+        repo.append_event(
+            session["tenant_id"], f"project:{project_id}", "InterpretationRequested",
+            {"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record),
+             **({"revision": revision} if revision else {}), **({"rerun_id": rerun_id} if rerun_id else {})},
+        )
+        worker_kwargs = {
+            "interpretation_id": interpretation_id, "method_id": method_id, "project_id": project_id,
+            "session": dict(session), "record": record, "contract": contract,
+            "display": _method_display_metadata().get(method_id), "sources": sources,
+            "catalog": catalog, "provider": provider, "store": store, "repo": repo, "artifact_store": artifact_store,
+            "feedback": feedback, "previous": previous, "rerun_id": rerun_id, "record_gates": gate_results, "lock": lock,
+        }
+        _launch_interpretation(**worker_kwargs)
+    except BaseException:
+        lock.release()   # the worker never started, so it cannot release
+        raise
     return {"interpretation_id": interpretation_id, "status": "PENDING", "project_id": project_id}
 
 
@@ -1551,7 +1661,12 @@ def get_interpretation(
     outcome = next((event for event in reversed(events) if event["event_type"] in ("InterpretationCreated", "InterpretationFailed")), None)
     shared = {"interpretation_id": interpretation_id, "project_id": project_id, "method_id": requested.get("method_id"), "revision": requested.get("revision"), "rerun_id": requested.get("rerun_id")}
     if outcome is None:
-        return {**shared, "status": "PENDING"}
+        if _interpretation_running(session["tenant_id"], interpretation_id):
+            return {**shared, "status": "PENDING"}
+        events = repo.interpretation_events(session["tenant_id"], interpretation_id)   # probe first: it may have just finished
+        outcome = next((event for event in reversed(events) if event["event_type"] in ("InterpretationCreated", "InterpretationFailed")), None)
+        if outcome is None:
+            return {**shared, "status": "FAILED", "error": RUNNER_LOST}
     if outcome["event_type"] == "InterpretationFailed":
         return {**shared, "status": "FAILED", "error": outcome["payload"]["error"]}
     stored = repo.get_interpretation(session["tenant_id"], interpretation_id)
@@ -1564,8 +1679,12 @@ def get_interpretation(
     judgment = next(({"stance": event["payload"]["stance"], "text": event["payload"]["text"]} for event in reversed(events) if event["event_type"] == "InterpretationJudged"), None)
     result = artifact["interpretation"]
     usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
+    # N-59/P-27: the analysis THIS one redoes via 到期重跑 (its own revision.of covers 依原因重做) -- a reload has no
+    # in-memory `previous`, so the run page's compare link is only recoverable by reading it back from here.
+    rerun_of = next((item["interpretation_id"] for item in repo.reruns(session["tenant_id"], project_id).get(project_id, []) if item["fulfilled_by"] == interpretation_id), None)
     return {**shared, "status": "DONE", "created_at": stored["created_at"], "record": artifact["record"], "result": result, "gate_results": artifact["gate_results"],
-            "manifest": artifact.get("prompt_manifest", build_prompt_manifest(artifact["record"])), "judgment": judgment, "approval": _latest_approval(events),
+            "record_gate_results": artifact.get("record_gate_results", []), "schema_version": artifact.get("schema_version"),
+            "manifest": artifact.get("prompt_manifest", build_prompt_manifest(artifact["record"])), "judgment": judgment, "approval": _latest_approval(events), "rerun_of": rerun_of,
             "cost_twd": _safe_cost_twd(str(result.get("model", "")), int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0))}
 
 
@@ -1599,12 +1718,13 @@ def _revision_of(revision: Any, repo: ProjectSourceRepository, artifact_store: J
     return {"of": revision["of"], "reason": reason}, reason, previous
 
 
-def _open_rerun_of(rerun_id: Any, repo: ProjectSourceRepository, tenant_id: str, project_id: str) -> str | None:
-    """The rerun reminder this run answers; it must be this project's and still open."""
+def _open_rerun_of(rerun_id: Any, method_id: str, repo: ProjectSourceRepository, tenant_id: str, project_id: str) -> str | None:
+    """The rerun reminder this run answers; it must be this project's, still open, and for this same method
+    (P-26: a stale ?rerun= link from a different tool's analysis must not silently attach)."""
     if rerun_id is None:
         return None
-    if not isinstance(rerun_id, str) or not any(item["rerun_id"] == rerun_id and item["fulfilled_by"] is None for item in repo.reruns(tenant_id, project_id).get(project_id, [])):
-        raise HTTPException(status_code=400, detail=f"RERUN_NOT_OPEN: {rerun_id!r} is not an open rerun reminder of this project")
+    if not isinstance(rerun_id, str) or not any(item["rerun_id"] == rerun_id and item["fulfilled_by"] is None and item["method_id"] in (None, method_id) for item in repo.reruns(tenant_id, project_id).get(project_id, [])):
+        raise HTTPException(status_code=400, detail=f"RERUN_NOT_OPEN: {rerun_id!r} is not an open rerun reminder of this project for {method_id!r}")
     return rerun_id
 
 
@@ -1629,7 +1749,8 @@ def judge_interpretation(
 
 
 MAX_APPROVAL_REASON_CHARS = 2000
-DEFAULT_ESTIMATE_TOKENS = (10_000, 5_000)   # input, output: a full result page before this tenant has run the tool
+DEFAULT_ESTIMATE_TOKENS = (11_000, 7_000)   # input, output: one iceberg result page measured 2026-09-28 (5.8k-7.5k out), before this tenant has run the tool
+DEFAULT_ESTIMATE_SECONDS = 150            # a run measured 79-160 s locally, 2026-09-28
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -1690,6 +1811,7 @@ def method_estimate(
     store: IdentityStore = Depends(get_store),
     catalog: MethodCatalog = Depends(get_catalog),
     provider: AiProvider | None = Depends(get_ai_provider),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
     """What one run of this tool is likely to cost (花錢前先講): the mean of the tenant's last runs of it, or a full
     result page's typical size before any; the money figure follows the price table (None for an unknown model)."""
@@ -1703,7 +1825,25 @@ def method_estimate(
     else:
         input_tokens, output_tokens = DEFAULT_ESTIMATE_TOKENS
         model = provider.model if provider is not None else DEFAULT_MODEL
-    return {"method_id": method_id, "model": model, "input_tokens": input_tokens, "output_tokens": output_tokens, "tokens": input_tokens + output_tokens, "twd": _safe_cost_twd(model, input_tokens, output_tokens), "based_on": len(recent)}
+    # the most a run can cost: two calls (one retry), each up to the output ceiling
+    upper_input, upper_output = 2 * max(input_tokens, DEFAULT_ESTIMATE_TOKENS[0]), 2 * INTERPRET_MAX_TOKENS
+    return {"method_id": method_id, "model": model, "input_tokens": input_tokens, "output_tokens": output_tokens, "tokens": input_tokens + output_tokens,
+            "twd": _safe_cost_twd(model, input_tokens, output_tokens), "based_on": len(recent),
+            "tokens_max": upper_input + upper_output, "twd_max": _safe_cost_twd(model, upper_input, upper_output),
+            "seconds": _typical_seconds(_analyses(repo, session["tenant_id"]), method_id)}
+
+
+def _typical_seconds(analyses: dict[str, list[dict[str, Any]]], method_id: str) -> int:
+    """How long this tool's last finished runs took for the tenant (mean of up to 5), or the measured default."""
+    spans = []
+    for item in sorted((a for runs in analyses.values() for a in runs if a.get("method_id") == method_id and a.get("status") == "DONE" and a.get("finished_at")), key=lambda a: a["finished_at"], reverse=True)[:5]:
+        try:
+            started = datetime.datetime.fromisoformat(item["requested_at"].replace("Z", "+00:00"))
+            finished = datetime.datetime.fromisoformat(item["finished_at"].replace("Z", "+00:00"))
+            spans.append(max(1, int((finished - started).total_seconds())))
+        except (KeyError, ValueError, AttributeError):
+            continue
+    return round(sum(spans) / len(spans)) if spans else DEFAULT_ESTIMATE_SECONDS
 
 
 class TaskRow(BaseModel):
@@ -1717,11 +1857,14 @@ class TaskRow(BaseModel):
 
 class CreateTasksRequest(BaseModel):
     interpretation_id: str | None = None
+    option: str | None = None
     tasks: list[TaskRow]
 
 
-class TaskDoneRequest(BaseModel):
-    done: bool
+class TaskUpdateRequest(BaseModel):
+    done: bool | None = None
+    owner: str | None = None
+    due: str | None = None
 
 
 @app.post("/projects/{project_id}/tasks")
@@ -1740,13 +1883,18 @@ def create_tasks(
         stored = repo.get_interpretation(tenant_id, payload.interpretation_id)
         if stored is None or stored["project_id"] != project_id:
             raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {payload.interpretation_id!r} is not a finished analysis of this project")
+        if any(task["interpretation_id"] == payload.interpretation_id for task in repo.tasks(tenant_id, project_id).get(project_id, [])):
+            raise HTTPException(status_code=409, detail=f"TASKS_ALREADY_SAVED: {payload.interpretation_id!r} already has tasks saved")
+    option = payload.option.strip()[:100] if isinstance(payload.option, str) and payload.option.strip() else None
     rows = []
     for task in payload.tasks:
         title = task.title.strip()
         if not title or len(title) > 300:
             raise HTTPException(status_code=400, detail="TASK_TITLE_INVALID: 1 to 300 characters")
-        rows.append({"task_id": str(uuid.uuid4()), "interpretation_id": payload.interpretation_id, "title": title, "owner": task.owner.strip()[:100], "due": _iso_date_or_400(task.due, "TASK_DUE") if task.due else "",
-                     "proof": task.proof.strip()[:300], "target": task.target.strip()[:300], "when": task.when.strip()[:100]})
+        if not task.due:
+            raise HTTPException(status_code=400, detail="TASK_DUE_REQUIRED: every task needs a due date")
+        rows.append({"task_id": str(uuid.uuid4()), "interpretation_id": payload.interpretation_id, "title": title, "owner": task.owner.strip()[:100], "due": _iso_date_or_400(task.due, "TASK_DUE"),
+                     "proof": task.proof.strip()[:300], "target": task.target.strip()[:300], "when": task.when.strip()[:100], "option": option})
     for row in rows:
         repo.append_event(tenant_id, f"project:{project_id}", "TaskCreated", row)
     return repo.tasks(tenant_id, project_id).get(project_id, [])
@@ -1766,15 +1914,25 @@ def list_tasks(
 def mark_task(
     project_id: str,
     task_id: str,
-    payload: TaskDoneRequest,
+    payload: TaskUpdateRequest,
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
+    """Toggle done (⑦ 存成任務 checklist) and/or fill in an owner/due the plan left blank (N-84: ProjectPage's
+    inline editor for a task whose owner or due is still empty)."""
     tenant_id = session["tenant_id"]
     _project_or_404(repo, tenant_id, project_id)
     if not any(task["task_id"] == task_id for task in repo.tasks(tenant_id, project_id).get(project_id, [])):
         raise HTTPException(status_code=404, detail=f"TASK_NOT_FOUND: {task_id!r}")
-    repo.append_event(tenant_id, f"project:{project_id}", "TaskDone", {"task_id": task_id, "done": payload.done})
+    if payload.done is not None:
+        repo.append_event(tenant_id, f"project:{project_id}", "TaskDone", {"task_id": task_id, "done": payload.done})
+    if payload.owner is not None or payload.due is not None:
+        update: dict[str, Any] = {"task_id": task_id}
+        if payload.owner is not None:
+            update["owner"] = payload.owner.strip()[:100]
+        if payload.due is not None:
+            update["due"] = _iso_date_or_400(payload.due, "TASK_DUE")
+        repo.append_event(tenant_id, f"project:{project_id}", "TaskUpdated", update)
     return next(task for task in repo.tasks(tenant_id, project_id)[project_id] if task["task_id"] == task_id)
 
 
@@ -1798,6 +1956,8 @@ def schedule_rerun(
     due = _iso_date_or_400(payload.due, "RERUN_DUE")
     if _date_has_passed(due):
         raise HTTPException(status_code=400, detail="RERUN_DUE_INVALID: the date has passed")
+    if any(item["interpretation_id"] == interpretation_id and item["fulfilled_by"] is None for item in repo.reruns(tenant_id, stored["project_id"]).get(stored["project_id"], [])):
+        raise HTTPException(status_code=409, detail=f"RERUN_ALREADY_SCHEDULED: {interpretation_id!r} already has an open rerun reminder")
     events = repo.interpretation_events(tenant_id, interpretation_id)
     method_id = next((event["payload"].get("method_id") for event in events if event["event_type"] == "InterpretationRequested"), None)
     rerun = {"rerun_id": str(uuid.uuid4()), "interpretation_id": interpretation_id, "method_id": method_id, "due": due}
@@ -2083,7 +2243,7 @@ def list_projects(
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> list[dict[str, Any]]:
     tenant_id = session["tenant_id"]
-    analyses, activity, tasks, reruns = repo.analyses(tenant_id), repo.last_activity(tenant_id), repo.tasks(tenant_id), repo.reruns(tenant_id)   # four event scans once, not per project
+    analyses, activity, tasks, reruns = _analyses(repo, tenant_id), repo.last_activity(tenant_id), repo.tasks(tenant_id), repo.reruns(tenant_id)   # four event scans once, not per project
     return [_project_with_activity(project, analyses, activity, tasks, reruns) for project in repo.list_projects(tenant_id, workspace_id)]
 
 
@@ -2097,7 +2257,7 @@ def _project_with_activity(project: dict[str, Any], analyses: dict[str, list[dic
     return {
         **project, "updated_at": activity.get(project["project_id"], project["created_at"]), "analysis_count": len(own),
         "methods": list(dict.fromkeys(item["method_id"] for item in own if item["method_id"])), "latest_analysis": own[-1] if own else None,
-        "tasks": {"open": len(open_tasks), "overdue": sum(1 for task in open_tasks if task["due"] and _date_has_passed(task["due"])), "next_due": due_dates[0] if due_dates else None},
+        "tasks": {"open": len(open_tasks), "overdue": sum(1 for task in open_tasks if task["due"] and _date_has_passed(task["due"])), "due_today": sum(1 for task in open_tasks if task["due"] == today), "next_due": due_dates[0] if due_dates else None},
         "reruns_due": sum(1 for item in reruns.get(project["project_id"], []) if item["fulfilled_by"] is None and item["due"] <= today),
     }
 
@@ -2110,7 +2270,20 @@ def project_analyses(
 ) -> list[dict[str, Any]]:
     """The Project's analyses, newest first (each opens with GET /interpretations/{interpretation_id})."""
     _project_or_404(repo, session["tenant_id"], project_id)
-    return list(reversed(repo.analyses(session["tenant_id"], project_id).get(project_id, [])))
+    return list(reversed(_analyses(repo, session["tenant_id"], project_id).get(project_id, [])))
+
+
+# IMPORTANT: this route must stay registered BEFORE /projects/{project_id} below -- same reason as
+# /projects/{project_id}/sources/brief above (a literal "erased" segment would otherwise be swallowed by
+# {project_id} and this route would never be reached).
+@app.get("/projects/erased")
+def list_erased_projects(
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> list[dict[str, Any]]:
+    """已抹除 (N-66): every deleted Project's tombstone -- the row and its content are already gone (erase_project),
+    only this ProjectErased event stays."""
+    return repo.erased_projects(session["tenant_id"])
 
 
 @app.get("/projects/{project_id}")
@@ -2121,7 +2294,35 @@ def get_project(
 ) -> dict[str, Any]:
     tenant_id = session["tenant_id"]
     project = _project_or_404(repo, tenant_id, project_id)
-    return _project_with_activity(project, repo.analyses(tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id))
+    return _project_with_activity(project, _analyses(repo, tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id))
+
+
+class RenameProjectRequest(BaseModel):
+    name: str
+
+
+@app.patch("/projects/{project_id}")
+def rename_project(
+    project_id: str,
+    payload: RenameProjectRequest,
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, Any]:
+    """N-83: 專案名稱 is editable after creation (create_project's own name stays a one-time default, not a
+    dead end)."""
+    tenant_id = session["tenant_id"]
+    if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
+    _project_or_404(repo, tenant_id, project_id)
+    try:
+        name = require_text("PROJECT", "name", payload.name, maximum=200)
+        project = repo.rename_project(tenant_id, project_id, name)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
+    except sqlite3.IntegrityError as error:
+        raise HTTPException(status_code=409, detail=f"PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: {payload.name!r}") from error
+    return _project_with_activity(project, _analyses(repo, tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id))
 
 
 @app.get("/projects/{project_id}/history")
@@ -2152,7 +2353,7 @@ def erase_project(
     if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
     _project_or_404(repo, tenant_id, project_id)
-    if any(item["status"] == "PENDING" for item in repo.analyses(tenant_id, project_id).get(project_id, [])):
+    if any(item["status"] == "PENDING" for item in _analyses(repo, tenant_id, project_id).get(project_id, [])):
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: an analysis is still running; wait for it to finish, then delete")
     store.close_collect_grants_for_project(tenant_id, project_id)
     artifacts = 0

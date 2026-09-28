@@ -235,15 +235,16 @@ class FormBuilder:
         return prop if isinstance(prop, dict) else {}, doc, external_ref, crossed
 
     # -- labels ----------------------------------------------------------------------------------------
-    def _label(self, path: str, key: str) -> tuple[str | None, str | None]:
+    def _label(self, path: str, key: str) -> tuple[str | None, str | None, str | None]:
         for entry in (self.method_labels.get(path), self.method_labels.get(key), self.glossary.get(key)):
             if isinstance(entry, str):
-                return entry, None
+                return entry, None, None
             if isinstance(entry, dict) and isinstance(entry.get("label"), str):
                 hint = entry.get("hint")
-                return entry["label"], hint if isinstance(hint, str) else None
+                placeholder = entry.get("placeholder")
+                return entry["label"], hint if isinstance(hint, str) else None, placeholder if isinstance(placeholder, str) else None
         self.unlabelled.append(path)
-        return None, None
+        return None, None, None
 
     def _option_label(self, path: str, key: str, value: Any) -> str | None:
         for table in (self.method_labels.get(f"{path}="), self.method_labels.get(f"{key}=")):
@@ -275,8 +276,10 @@ class FormBuilder:
                 node["epistemic_type"] = pinned["const"]
             return node
         recursion = next((name for name in crossed if (id(doc), name) in self._stack), None)
-        label, hint = self._label(path, key)
+        label, hint, placeholder = self._label(path, key)
         base: dict[str, Any] = {"key": key, "label": label, "hint": hint, "required": required}
+        if placeholder:
+            base["placeholder"] = placeholder
         if key.endswith("_ref") or key.endswith("_refs"):
             base["advanced"] = True
         if "default" in flat and isinstance(flat["default"], (str, int, float, bool)):
@@ -474,7 +477,7 @@ def _reference_variant(form: FormBuilder, spec_root: Path, spec: dict[str, Any])
             rows.append({"value": item[rows_spec["row_key"]], "label": str(item.get(rows_spec.get("row_label", ""), "")).strip() or None, "fields": [*constants, *editable], "conditions": {}})
         option_fields.append({"key": rows_spec["param"], "kind": "fixed_rows", "row_key": rows_spec["row_key"], "rows": rows, "label": form._label(rows_spec["param"], rows_spec["param"])[0], "hint": None, "required": True})
         options.append({"value": value, "label": str(entry.get(spec.get("option_label", ""), "")).strip() or None, "fields": option_fields, "conditions": {}})
-    label, hint = form._label(spec["discriminator"], spec["discriminator"])
+    label, hint, _ = form._label(spec["discriminator"], spec["discriminator"])
     node = {"key": spec["discriminator"], "label": label, "hint": hint, "required": True, "kind": "variant", "flatten": True, "discriminator": spec["discriminator"], "options": options}
     return node, {spec["discriminator"], rows_spec["param"], *(spec.get("constants") or {})}
 
@@ -542,7 +545,7 @@ def build_method_form(
         if upstream is None and name not in properties and not isinstance(override.get("schema"), dict):
             upstream = _upstream_method(name, contract, producers)
         if upstream is not None:
-            label, hint = form._label(name, name)
+            label, hint, _ = form._label(name, name)
             node: dict[str, Any] = {"key": name, "label": label, "hint": hint, "required": required, "kind": "upstream"}
             if isinstance(upstream, str):
                 node["method_id"] = upstream
@@ -558,7 +561,7 @@ def build_method_form(
         if prop is None and not isinstance(override.get("schema"), dict):
             prop, record_field = _nested_record_field(form, properties, doc, record_field)
         if prop is None:
-            label, hint = form._label(name, name)
+            label, hint, _ = form._label(name, name)
             fields.append({"key": name, "label": label, "hint": hint, "required": required, "kind": "json"})
             unrendered.append(name)
             continue
