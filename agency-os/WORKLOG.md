@@ -1,4 +1,34 @@
 ﻿# Worklog
+## 2026-09-28（續1）研究線 P2 第一波雲端合併：T28–T31（WC-P2-01～04）本機重驗、critic 兩輪＋Codex oracle 三輪、不變量分析後併入 main；第二波 T32／T33／T36 卡與 prompt
+- [操作者] 「fetch 四個分支重新驗證（T29 schema 決策證據、T30 spec-root 唯讀邊界、T31 案例覆蓋率），讀 commit message 的 root cause／verification 核對，再合併、重產 SPEC_QUICKREF，才寫 wave 2」；中途問「為什麼每次給雲端做都問題一堆？那還要雲端做？」。
+- [核對 commit 聲稱] T28 1310 tests OK 屬實；T29 決策只證了 golden runner，另以 runtime `SchemaContracts` 驗 19 fixture＋共用 `$defs` minItems 突變三檔同翻 → 成立；T30／T31 測試屬實，但卡片驗收 `… -q 2>&1 | tail -1` 在本機印 CLI 輸出而非 `OK`（雲端 stdout 不緩衝）；T31 陷阱四類屬實、`terms_of` 以 node 跑真 `StuckBox.tsx` 15 例 0 差異；T31 突變證明在本機是假綠（暫存副本 import 不到 ai_lego，未突變也 exit 1）。
+- [T30 唯讀邊界] runtime `registry.py` 無寫入、ai_lego 內無模組 import 離線 CLI、測試只寫暫存 root → 改 AST 測試守住；映像把 spec root COPY 進去（容器內寫入會在下次部署消失）→ CLI 只在 repo checkout 跑、git commit 為交易邊界。
+- [發現→修]（逐項見四則 commit message）
+  - C1 T30 v1 規則 7 要模型填 id 字串（與規則 1／P-K2／T28 resolver 矛盾）→ 整數 n
+  - M1 T31 突變證明假綠 → PYTHONPATH＋未突變對照組＋讀報告確認是目標指標 FAIL
+  - M2 T30 規則 5 把可疑頁送進 conflicts → gaps 不引用；規則 5 首句改為帶每次 prompt 的隨機碼（圍籬）
+  - M3 literature `studies[].source_id` 模型看不到 → runner 依唯一引註推導；`gates.synthesis_reference_errors`（id 唯一、證據至少綁一個選項或準則、對任何 JSON 不丟例外）
+  - M4 T30 ux-defaults 放門檻卻 R1 → R3
+  - M5 帳本：三輪各抓到一個實例（最後一列回退、同名比對循環、分叉帳本、只驗種子列）→ 不變量化：整本重播成鏈＋結尾＝champion 的版本與 `version_sha256`＋已裝版本位元組不得變；`ledger_errors` 單一定義（CLI 寫前、真 spec root 測試）；runtime `load_champion` 比對 sha fail-closed；LEDGER 加 `version_sha256` 欄
+  - M6 T28 uncited_sections 被做成未被引的來源 → 無引註段落標題（C4）
+  - M7 T31 golden 標題不在 T29 表、gate_results 與真閘不符 → 修正＋契約測試
+  - M8 harness：契約（schema 依 artifact 的 `prompt_version`、參照、`manifest_errors`、manifest_ref、閘結果）＋快照依已提交的 golden manifest（不看工作樹）；缺檔／壞 JSON 逐案 FAIL 不中止
+  - M9 圍籬：report.ts 固定標記可被來源偽造；改寫內容永遠差一個長得像的字 → 每 prompt 隨機碼，內容原樣
+  - m：Codex F1 版本名跳出 kind 目錄（`v<N>`）、F2 兩次寫入中斷、CRLF、批准者欄、畸形帳本列、門檻必須可能 FAIL、manifest 輸入不對靜默丟光、score 另寫一份 P-b、證據可被讀回成主張、非 list citations、`true` 當來源 1、fetched_at 標成「日期」、LEDGER 種子冒稱 operator、list_versions 字典序
+  - Codex 最終輪（同 reviewer 第三次碰 registry／CLI／manifest）：F1 manifest entry sha 任何非空字串都過 → builder＋`manifest_errors` 要 64 位小寫 hex（同 `core/domain/source.py`）、n 必為 int；F2 champion 的 kind 未比對 → `registry.read_champion` 為 runtime 與 CLI 唯一讀取點，kind 必等於所在目錄，版本檔自稱的 version／kind 不得與路徑矛盾；F3 kinds.yaml 條目非 mapping → CLI traceback、缺或拼錯 risk_tier 會被當成非 R3 而跳過 `--approved-by` → `known_kinds` 驗目錄名＋mapping＋R0–R4（測試釘住＝`risk-tier.schema.yaml` enum），CLI 回 exit 2。突變 10/10。
+- [不變量分析（AGENTS §4：同 reviewer 同段第二次以上回報）] 帳本＝重播結果必須等於 champion 且已記錄的位元組不變；圍籬＝來源內容無法產生邊界；harness＝每案都得到判定、快照來自已提交清單；門檻＝設了就必須可能 FAIL；spec root 文件＝只在單一讀取點驗形狀、不得與所在位置矛盾，sha 欄位一律 64 hex。先前各輪只修實例，改為單一檢查函式＋突變證明。
+- [延後→卡] WC-P2-04b（T36，09 取基準線前）：§3.7 期望發現三類＋critic M1 指標分不出好壞；WC-P2-05（T32）：user prompt 模板、P-c `prompt_version`／`latency_ms`、studies source_id 推導、每 prompt 一次 `new_fence_nonce()`、改 v1 須同時重算 LEDGER 種子列與 champion 的 sha；WC-P3-01（T33）：ux-defaults v1 只寫提案、晉升由操作者（R3）；WC-P2-08：recommendations `citations: []` 阻塞＋report_render 第二個 P-b 走訪；P-E 回滾欄改正（原寫「刪 champion 回硬編預設」與 P-g 矛盾）。
+- [觀察] 拋棄式 worktree 被當成 monorepo root：`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` `Resolve-MonorepoRootWithAoResume` 以 Test-Path 判 `.git`（linked worktree 的 `.git` 是檔案也成立）→ 每次 prompt 在 `D:\tmp\v-int2` 跑 AO-RESUME 與 `scripts/ensure-claude-junction.ps1`：兩次把 worktree 內 git 追蹤的 `.claude` 搬到 %TEMP%、換成指向 `~/.claude` 的 junction（以非遞迴 `Directory.Delete` 拆 junction＋`git checkout -- .claude` 還原；清 worktree 前先拆），先前報表與 WORKLOG 行寫進 v-int／v-int2 同源。風險：`git worktree remove --force` 可能經 junction 刪到 `~/.claude`。已開卡（hook 與 junction 腳本只作用於主 checkout）。
+- [回答操作者] 第一次核對的 7 項重大以上中 5 項源自卡片（語意只在 C4、無卡負責跨卡整合、rollback 語意未定、格式未要求類別與 user 模板），2 項是模型不照明文規則；本機 Codex 的 PI-a 也曾被退 → 第一版誰寫都有問題，關鍵在跨卡驗證。改法寫進計畫 §12.1 規則 14。
+- REALTEST_EVIDENCE: tool=Bash | cmd=D:\tmp\v-int2 最終碼：T28／T30／T31 驗收 unittest（43／41／57 OK）＋eval/run.py --golden＋eval/mutate.py（對照組 exit 0）＋run_golden_tests.py（4244）＋gen_spec_index.py --check；另 fc0f52238 上 25 模組 Ran 1521 OK（485s）；突變 65/65（T28 22／T30 25／T31 18，拔 guard→指名測試紅→還原位元組相同→綠） | exit=0 | ms=56000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/11m/18n
+- ORACLE_WAIVED: 操作者 2026-09-27「Codex 一直出錯 你就自己審核」 -- 最後一輪修正（manifest batches 缺漏／非整數不丟例外）改書面對抗自審（8 條攻擊逐條對碼）＋突變 65/65；其餘 86 檔已有當日 Codex artifact `agency-os/reports/oracle/2026-09-27-review-f96a8bfb.md`／`-369c3a83.md`（whole tree）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,.claude/{commands,agents,skills} | grep=`read_champion|known_kinds|manifest_errors|build_source_manifest|synthesis_reference_errors|iter_claims|new_fence_nonce|version_sha256|ledger_errors|artifact_contract_errors|case_snapshot|render_source_block|uncited_sections|RISK_TIERS` | hits=241
+  - 55 agency-os（SPEC 資料檔、WORKLOG 舊條目、當日 oracle artifact）＋186 COS；scripts／lobster-factory／.claude 0；COS 與 SPEC 之外無 call site，無過時呼叫形狀
+- [分工] 與 §12.8 產卡 session（同時在 v-p2 併 T28–T31＋T34）碰撞後協定：本 session 負責 01–04 上 main；該 session 負責 T32（WC-P2-05 runner，對齊 T28 API；v1.yaml 加 `user_intro`／`reduce_intro` 並重算 LEDGER＋champion sha）＋T34，rebase 到 01–04 之上再 push；本 session 之後不再碰 v1.yaml。P-j 依它的鍵名寫入計畫。
+- [落地] D:\Work 有網站 session 未提交的 SPEC_QUICKREF 等（約 3–4 小時後才 commit），cherry-pick T29 被擋；T28 已在 D:\Work 本地 main（449feb401，未 push）。改在 v-int2 以 origin/main 重建四個 commit 再驗（4 模組 unit OK、mutate、golden、spec index fresh）並 push；D:\Work 本地 449feb401 與上游 T28 同 patch，網站 session commit 前 `git pull --rebase` 會自動略過。
+- [卡片格式] 操作者問「其他問題要註記在計畫並給正確卡片語意／格式？」→ §12.1 規則 14＋§12.2 加「交界」欄（欄位語意＋可機器驗例子、讀者、跨卡契約檢查指令）與 exit code 驗收；紀錄一律極簡（AGENTS §9）。
+- [下一步] 操作者貼 T33／T36 prompt 開雲端（T32 段作廢）；本線 WC-P2-06 等 T32；`/clear`。
 ## 2026-09-27（續4）hooks 只作用 main checkout：linked worktree（`.git` 為檔案）不再被當 monorepo root；`ensure-claude-junction`／`sync-claude-userlevel` 拒絕 worktree（v-int2 junction 事故）
 
 - 症狀：cwd 在 `D:\tmp\v-int2`（`git worktree add --detach`）的 session，UserPromptSubmit hook 印 `ensure-claude-junction exit=2 … junction path : D:\tmp\v-int2\.claude → C:\Users\user1115\.claude verdict: repaired-with-warning`；同 session 較早 hook／機器工作把 state、reports 寫進 `D:\tmp\v-int`／`v-int2`。
