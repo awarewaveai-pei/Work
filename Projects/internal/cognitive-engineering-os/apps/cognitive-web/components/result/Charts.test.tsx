@@ -2,6 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { LoopChart, TrendChart } from "./Charts";
+import { lineHeight } from "./svgtext";
 
 describe("loop chart layout", () => {
   const loopOf = (n: number, text = (i: number) => `節點 ${i}`) => ({
@@ -30,6 +31,28 @@ describe("loop chart layout", () => {
           expect(ax + aw <= bx || bx + bw <= ax || ay + ah <= by || by + bh <= ay, `n=${n} boxes ${a},${b} apart`).toBe(true);
         }
       }
+    }
+  });
+
+  it("after mount a box is as tall as the browser wraps its text, not the estimate (P-16)", async () => {
+    const { createRoot } = await import("react-dom/client");
+    const { act } = await import("react");
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {   // the probe reports five wrapped lines
+      return this.getAttribute("aria-hidden") === "true" && this.parentElement === document.body ? ({ height: 5 * lineHeight(12.5) } as DOMRect) : original.call(this);
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => { root.render(<LoopChart loop={loopOf(4)} />); });
+      const heights = [...host.querySelectorAll("rect[rx='8']")].map((rect) => Number(rect.getAttribute("height")));
+      expect(heights).toEqual(Array(4).fill(14 + 5 * lineHeight(12.5)));   // the estimate for 「節點 0」 is one line (44)
+    } finally {
+      await act(async () => { root.unmount(); });
+      HTMLElement.prototype.getBoundingClientRect = original;
+      host.remove();
     }
   });
 

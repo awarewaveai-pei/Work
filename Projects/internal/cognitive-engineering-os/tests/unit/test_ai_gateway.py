@@ -99,6 +99,28 @@ class ProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, "AI_PROVIDER_MALFORMED_RESPONSE"):
             provider.complete("s", "u", max_tokens=10)
 
+    def test_an_answered_call_refused_by_the_provider_carries_what_it_cost(self):
+        """Codex r5: an empty or malformed answer is still billed; both calls report its usage so it is metered."""
+        usage = {"input_tokens": 7, "output_tokens": 3}
+        for payload, reason in (({"content": [], "stop_reason": "end_turn", "usage": usage}, "empty"), ({"usage": usage}, "malformed")):
+            provider = AnthropicProvider("sk-test", fetch=lambda *a, _payload=payload, **k: _payload)
+            for call in (lambda: provider.complete("s", "u", max_tokens=10), lambda: provider.complete_json("s", "u", max_tokens=10)):
+                with self.assertRaises(ProviderCallError) as caught:
+                    call()
+                self.assertEqual((caught.exception.reason, caught.exception.input_tokens, caught.exception.output_tokens), (reason, 7, 3))
+
+    def test_an_answer_whose_cost_cannot_be_read_is_a_provider_call_error(self):
+        for usage in ({"input_tokens": "unknown", "output_tokens": 3}, {"input_tokens": -1, "output_tokens": 3}, {"output_tokens": 3}, None):
+            payload = {"content": [{"type": "text", "text": "hi"}], **({"usage": usage} if usage is not None else {})}
+            provider = AnthropicProvider("sk-test", fetch=lambda *a, _p=payload, **k: _p)
+            with self.assertRaises(ProviderCallError) as caught:
+                provider.complete("s", "u", max_tokens=10)
+            self.assertEqual((caught.exception.reason, caught.exception.usage_known), ("usage_unreadable", False))
+        empty_without_usage = AnthropicProvider("sk-test", fetch=lambda *a, **k: {"content": [], "stop_reason": "end_turn"})
+        with self.assertRaises(ProviderCallError) as caught:
+            empty_without_usage.complete_json("s", "u", max_tokens=10)
+        self.assertEqual((caught.exception.reason, caught.exception.usage_known), ("empty", False))   # the reason stays, the cost is unknown
+
     def test_http_errors_never_echo_the_response_body(self):
         import io
         import urllib.error
@@ -324,7 +346,7 @@ class ApiRouteTests(ApiTestCase):
         self.assertEqual(body["usage"], {"input_tokens": 100, "output_tokens": 50})
         status = self.client.get("/ai/status").json()
         self.assertEqual(status["usage"], {"calls": 1, "input_tokens": 100, "output_tokens": 50})
-        self.assertEqual(status["budget"], {"daily_limit": DEFAULT_DAILY_TOKEN_BUDGET, "used_today": 150, "remaining_today": DEFAULT_DAILY_TOKEN_BUDGET - 150})
+        self.assertEqual(status["budget"], {"daily_limit": DEFAULT_DAILY_TOKEN_BUDGET, "used_today": 150, "reserved_in_flight": 0, "remaining_today": DEFAULT_DAILY_TOKEN_BUDGET - 150})
         invoked = self.client.post("/methods/systems.flowchart/invoke", json=body["draft"])
         self.assertEqual(invoked.status_code, 200, invoked.text)
         self.assertTrue(all(g["status"] == "PASS" for g in invoked.json()["gate_results"]))
@@ -334,11 +356,12 @@ class ApiRouteTests(ApiTestCase):
         ceiling is the only thing stopping a runaway loop from an unbounded Anthropic bill."""
         self._login()
         self._use(ScriptedProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False)))
-        with patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: "100"}):
+        worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS   # every call's worst case (a call starts only if it fits)
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 100)}):
             response = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
-            self.assertEqual(response.status_code, 200, response.text)  # 0 used before this call -> allowed
+            self.assertEqual(response.status_code, 200, response.text)  # 0 used + worst fits -> allowed
             status = self.client.get("/ai/status").json()
-            self.assertEqual(status["budget"], {"daily_limit": 100, "used_today": 150, "remaining_today": 0})
+            self.assertEqual(status["budget"], {"daily_limit": worst + 100, "used_today": 150, "reserved_in_flight": 0, "remaining_today": worst - 50})
             blocked = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
             self.assertEqual(blocked.status_code, 429, blocked.text)
             self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED", blocked.json()["detail"])
@@ -363,66 +386,42 @@ class ApiRouteTests(ApiTestCase):
                 self.assertEqual(response.status_code, 503, (bad, response.text))
                 self.assertIn("AI_DAILY_TOKEN_BUDGET_INVALID", response.json()["detail"])
 
-    def test_ai_budget_lock_serializes_concurrent_requests_for_the_same_tenant(self):
-        """Proof of the critic-found TOCTOU fix (2026-09-17): while the first request is inside the tenant's
-        check-budget/call-provider/record-usage section, a second request for the SAME tenant must not take
-        the tenant's lock. Observed inside the lock, with no timing window: the lock factory is wrapped, and
-        the request arriving while the first is in the provider first tries a non-blocking acquire -- it
-        must find the lock taken. Every wait is a hang guard (tests/unit/thread_testkit.py)."""
+    def test_a_call_in_flight_is_reserved_so_a_concurrent_one_cannot_pass_the_same_check(self):
+        """The TOCTOU race (critic 2026-09-17: two requests read the same pre-call total) is closed by the reservation,
+        not by holding the tenant's lock over the model call (P-45, Codex 2026-09-28): while the first draft is in the
+        provider the lock is free, its worst case is reserved, and a second draft that does not fit beside it is 429."""
         self._login()
-        first_in_provider = threading.Event()
-        second_at_lock = threading.Event()
-        contender_found_lock_free: list[bool] = []
-        release = threading.Event()
-        entered: list[int] = []
+        first_in_provider, release = threading.Event(), threading.Event()
+        seen: dict[str, object] = {}
 
         class BlockingProvider(ScriptedProvider):
             def complete(self, system, user, *, max_tokens):
-                entered.append(1)
                 first_in_provider.set()
                 release.wait(HANG_GUARD_S)
                 return super().complete(system, user, max_tokens=max_tokens)
 
-        real_lock_for = api_main._ai_budget_lock_for
-
-        class ObservedLock:
-            def __init__(self, lock):
-                self._lock = lock
-
-            def __enter__(self):
-                if first_in_provider.is_set() and not release.is_set():  # the second request
-                    took_it = self._lock.acquire(blocking=False)
-                    contender_found_lock_free.append(took_it)
-                    second_at_lock.set()
-                    if took_it:
-                        return self
-                self._lock.acquire()
-                return self
-
-            def __exit__(self, *exc):
-                self._lock.release()
-
-        self._use(BlockingProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False), json.dumps(flowchart_kwargs(), ensure_ascii=False)))
+        self._use(BlockingProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False)))
+        worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS
         results: dict[str, int] = {}
-
-        def call(key):
-            results[key] = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"}).status_code
-
-        first = threading.Thread(target=call, args=("first",), name="budget-lock-first")
-        second = threading.Thread(target=call, args=("second",), name="budget-lock-second")
-        with patch.object(api_main, "_ai_budget_lock_for", lambda tenant_id: ObservedLock(real_lock_for(tenant_id))):
+        first = threading.Thread(target=lambda: results.__setitem__("first", self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"}).status_code), name="reserve-first")
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + worst // 2)}):
             try:
                 first.start()
                 self.assertTrue(first_in_provider.wait(HANG_GUARD_S), "first request never reached the provider")
-                second.start()
-                self.assertTrue(second_at_lock.wait(HANG_GUARD_S), "second request never reached the tenant's budget lock")
-                self.assertEqual(contender_found_lock_free, [False], "second request found the tenant's budget lock free while the first was in the provider -- the TOCTOU race is back")
-                self.assertEqual(entered, [1])
+                lock = api_main._ai_budget_lock_for(self.tenant["tenant_id"])
+                seen["lock_free"] = lock.acquire(blocking=False)
+                if seen["lock_free"]: lock.release()
+                seen["reserved"] = api_main._AI_RESERVED.get(self.tenant["tenant_id"])
+                seen["status"] = self.client.get("/ai/status").json()["budget"]   # Codex r8: the remainder the check uses
+                seen["second"] = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"}).status_code
             finally:
                 release.set()
-                join_all(self, first, second)
-        self.assertEqual(results, {"first": 200, "second": 200})
-        self.assertEqual(entered, [1, 1])
+                join_all(self, first)
+        budget = worst + worst // 2
+        self.assertEqual(seen, {"lock_free": True, "reserved": worst, "second": 429,
+                                "status": {"daily_limit": budget, "used_today": 0, "reserved_in_flight": worst, "remaining_today": budget - worst}})
+        self.assertEqual(results, {"first": 200})
+        self.assertNotIn(self.tenant["tenant_id"], api_main._AI_RESERVED)
 
     def test_ai_budget_lock_does_not_serialize_different_tenants(self):
         self.assertIsNot(api_main._ai_budget_lock_for("tenant-a"), api_main._ai_budget_lock_for("tenant-b"))
@@ -444,6 +443,16 @@ class ApiRouteTests(ApiTestCase):
         self.assertEqual(response.status_code, 502)
         self.assertIn("AI_PROVIDER_UNAVAILABLE", response.json()["detail"])
         self.assertEqual(self.client.get("/ai/status").json()["usage"]["calls"], 1, "a failed call is still metered")
+
+    def test_a_budget_refusal_inside_a_recipe_draft_is_429_like_a_method_draft(self):
+        """Codex r6: the recipe draft wraps the method draft's error, so the refusal sat two causes deep and answered 502."""
+        self._login()
+        self._use(ScriptedProvider())
+        worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 100)}):
+            response = self.client.post("/ai/draft/recipe/art-therapy-unstick-v1", json={"brief": "x", "labels": ["visual_metaphor", "metaphor_dialogue"]})
+        self.assertEqual(response.status_code, 429, response.text)   # the first call (150 tokens) fits; the next one's worst does not
+        self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED", response.json()["detail"])
 
     def test_recipe_draft_requires_one_to_three_labels_per_request(self):
         self._login()

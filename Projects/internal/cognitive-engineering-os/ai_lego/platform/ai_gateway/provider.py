@@ -39,14 +39,16 @@ class AiCompletion:
 
 class ProviderCallError(InvariantViolation):
     """A call the API answered -- and billed -- without a usable answer: cut off at max_tokens (``AI_PROVIDER_CUT_OFF``),
-    refused (``AI_PROVIDER_REFUSAL``) or empty (``AI_PROVIDER_EMPTY_RESPONSE``). ``input_tokens``/``output_tokens`` are
+    refused (``AI_PROVIDER_REFUSAL``), empty (``AI_PROVIDER_EMPTY_RESPONSE``) or malformed (``AI_PROVIDER_MALFORMED_RESPONSE``; reason ``usage_unreadable``
+    when a usable answer's cost cannot be read); ``usage_known`` is False whenever the tokens are not the real ones. ``input_tokens``/``output_tokens`` are
     what it cost, so a caller can count it and decide whether one more try is worth it (only a cut-off is)."""
 
-    def __init__(self, message: str, *, reason: str, input_tokens: int = 0, output_tokens: int = 0):
+    def __init__(self, message: str, *, reason: str, input_tokens: int = 0, output_tokens: int = 0, usage_known: bool = True):
         super().__init__(message)
         self.reason = reason
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
+        self.usage_known = usage_known   # False: the answer's usage was missing or unreadable -- meter the worst case
 
 
 class AiProvider(Protocol):
@@ -76,12 +78,10 @@ class AnthropicProvider:
         body = {"model": self.model, "max_tokens": max_tokens, "system": system, "messages": [{"role": "user", "content": user}]}
         headers = {"x-api-key": self._api_key, "anthropic-version": ANTHROPIC_VERSION}
         payload = self._fetch(ANTHROPIC_MESSAGES_URL, self._timeout, method="POST", headers=headers, body=body, max_bytes=MAX_RESPONSE_BYTES, error_prefix="AI_PROVIDER")
-        content = payload.get("content")
-        if not isinstance(content, list):
-            raise InvariantViolation("AI_PROVIDER_MALFORMED_RESPONSE: content[] missing")
+        content = self._content(payload)   # answered from here on: every refusal carries what the call cost
         text = "".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and block.get("type") == "text")
         if not text.strip():
-            raise InvariantViolation(f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={payload.get('stop_reason')!r}")
+            raise self._refused(payload, f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={payload.get('stop_reason')!r}", "empty")
         return self._completion(payload, text)
 
     def complete_json(self, system: str, user: str, *, max_tokens: int = MAX_OUTPUT_TOKENS, name: str = "answer", description: str = "The answer, as the one JSON object the instructions describe.", effort: str | None = None, input_schema: dict[str, Any] | None = None) -> AiCompletion:
@@ -107,30 +107,50 @@ class AnthropicProvider:
             body["output_config"] = {"effort": effort}
         headers = {"x-api-key": self._api_key, "anthropic-version": ANTHROPIC_VERSION}
         payload = self._fetch(ANTHROPIC_MESSAGES_URL, self._timeout, method="POST", headers=headers, body=body, max_bytes=MAX_RESPONSE_BYTES, error_prefix="AI_PROVIDER")
-        content = payload.get("content")
-        if not isinstance(content, list):
-            raise InvariantViolation("AI_PROVIDER_MALFORMED_RESPONSE: content[] missing")
+        content = self._content(payload)
         stop = payload.get("stop_reason")
-        used = self._completion(payload, "")
         if stop == "max_tokens":   # a tool input or text cut off mid-way is never a whole answer
-            raise ProviderCallError(f"AI_PROVIDER_CUT_OFF: output_tokens={used.output_tokens} reached max_tokens={max_tokens}", reason="cut_off", input_tokens=used.input_tokens, output_tokens=used.output_tokens)
+            usage = self._usage(payload)
+            raise self._refused(payload, f"AI_PROVIDER_CUT_OFF: output_tokens={usage[1] if usage else '?'} reached max_tokens={max_tokens}", "cut_off")
         if stop == "refusal":
-            raise ProviderCallError("AI_PROVIDER_REFUSAL: the model declined to answer", reason="refusal", input_tokens=used.input_tokens, output_tokens=used.output_tokens)
+            raise self._refused(payload, "AI_PROVIDER_REFUSAL: the model declined to answer", "refusal")
         call = next((block for block in content if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == name), None)
         if call is not None and isinstance(call.get("input"), dict):
             return self._completion(payload, json.dumps(call["input"], ensure_ascii=False))
         text = "".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and block.get("type") == "text")
         if not text.strip():
-            raise ProviderCallError(f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={stop!r}", reason="empty", input_tokens=used.input_tokens, output_tokens=used.output_tokens)
+            raise self._refused(payload, f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={stop!r}", "empty")
         return self._completion(payload, text)
 
+    def _content(self, payload: dict[str, Any]) -> list[Any]:
+        """The answer's content blocks; an answer without them is still billed, so the refusal carries its usage."""
+        content = payload.get("content")
+        if not isinstance(content, list):
+            raise self._refused(payload, "AI_PROVIDER_MALFORMED_RESPONSE: content[] missing", "malformed")
+        return content
+
+    @staticmethod
+    def _usage(payload: dict[str, Any]) -> tuple[int, int] | None:
+        """(input, output) tokens the answer says it cost, or None when missing or unreadable (never guessed as 0)."""
+        usage = payload.get("usage")
+        values = [usage.get(key) for key in ("input_tokens", "output_tokens")] if isinstance(usage, dict) else [None, None]
+        if all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in values):
+            return values[0], values[1]
+        return None
+
+    def _refused(self, payload: dict[str, Any], message: str, reason: str) -> ProviderCallError:
+        usage = self._usage(payload)
+        return ProviderCallError(message, reason=reason, input_tokens=usage[0] if usage else 0, output_tokens=usage[1] if usage else 0, usage_known=usage is not None)
+
     def _completion(self, payload: dict[str, Any], text: str) -> AiCompletion:
-        usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
+        usage = self._usage(payload)
+        if usage is None:   # a usable answer whose cost cannot be read: the meter assumes the worst
+            raise self._refused(payload, "AI_PROVIDER_MALFORMED_RESPONSE: usage missing or unreadable", "usage_unreadable")
         return AiCompletion(
             text=text,
             model=str(payload.get("model") or self.model),
-            input_tokens=int(usage.get("input_tokens") or 0),
-            output_tokens=int(usage.get("output_tokens") or 0),
+            input_tokens=usage[0],
+            output_tokens=usage[1],
             stop_reason=str(payload.get("stop_reason") or ""),
         )
 

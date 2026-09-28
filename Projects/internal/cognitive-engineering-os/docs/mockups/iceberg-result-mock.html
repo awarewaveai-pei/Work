@@ -343,6 +343,16 @@
   <div class="card cta" id="input">
     <h2>你的案例：四個格子<small>從上往下填；填不出來的留白</small></h2>
     <div class="how"><b>怎麼讀</b>一格一層，每格一句提示；空的格子裡有例子。<b>你要做的</b>填好按「執行分析」；留白的層會列成證據缺口。</div>
+    <!-- I-15：輸入卡的其他部分（正式版照這裡做） -->
+    <details class="mb8"><summary>手邊有一段描述？貼上，系統先幫你填格子</summary>
+      <p class="sub">貼上「欄位: 值」，先免費比對；只有不完整時才請 AI 起草。</p>
+      <textarea rows="4" aria-label="貼上一段描述"></textarea>
+      <div class="btns mt6"><button type="button" class="btn" data-mock="正式版先把「欄位: 值」逐行免費對進格子；有格子對不到才請 AI 起草，起草的格子要你逐格確認後才能執行。">比對並填入</button></div>
+    </details>
+    <div class="how" hidden><b>AI 幫你填了</b>事件、模式；請逐格核對。<button type="button" class="btn" data-mock="正式版按下後，AI 起草的格子算你確認過，才能按「執行分析」。">我已確認這些格子</button></div><!-- AI 起草後出現；確認前不能執行 -->
+    <p class="sub mb8" data-when="result">存到：專案「<a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects">WuSheng 團體反思・第三期</a>」</p>
+    <p class="sub mb8" data-when="empty" hidden>存到：新專案，<label>名稱：<input type="text" aria-label="新專案名稱" placeholder="留白 = 冰山模型加上時間"></label>（按「執行分析」時建立）</p>
+    <details class="mb8" hidden><summary>改存到別的專案</summary><div class="btns mt6"><button type="button" class="btn ghost" aria-pressed="false">新專案</button></div></details><!-- 你有其他專案時才出現：後面接最近的專案各一個按鈕（最多 8 個，目前這個按下）；重做／到期重跑／分析中不顯示 -->
     <form class="runform" aria-label="冰山模型的四個格子">
       <div class="field layer l1">
         <label for="f-event">① 事件：發生了什麼？</label>
@@ -370,6 +380,11 @@
         <button type="button" class="btn ghost" data-clear>清空，填我自己的</button>
       </div>
     </form>
+    <!-- 按「執行分析」後：先講要花多少，按「確認執行」才開始 -->
+    <div class="finding warn" role="status" hidden><b>要花多少</b>約 6k tokens・≈ NT$1，最多約 4.3 萬 tokens（要重試一次時），約 3 分鐘；按「確認執行」才開始、才花錢。
+      <div class="btns mt6"><button type="button" class="btn primary big" data-mock="正式版按下才開始分析、才花錢；分析中格子鎖住，完成後結果出現在下面。">確認執行</button><button type="button" class="btn ghost" data-mock="正式版回到填寫，不花錢。">取消</button></div></div>
+    <!-- 確認後：分析中（格子鎖住） -->
+    <p role="status" class="sub mt10" hidden>正在分析，約 3 分鐘（整頁結果：結論、逐層解讀、圖、方案）；完成後結果會出現在下面。關掉這頁也會繼續，之後到「我的專案」打開。</p>
   </div>
 
   <!-- 還沒執行時：結果的位置 -->

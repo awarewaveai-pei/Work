@@ -10,7 +10,7 @@ import fixtureJson from "../../fixtures/iceberg-interpretation.json";
 import record from "../../fixtures/payload-systems.iceberg_model.json";
 import { apiFetch } from "../../lib/api";
 import { MethodForm } from "../MethodForm";
-import { RunInputCard } from "../RunPage";
+import { DescribeFirst, RunInputCard, SaveTo } from "../RunPage";
 import { ResultPage, withDefinitions } from "./ResultPage";
 
 vi.mock("../../lib/api", () => ({ apiFetch: vi.fn() }));
@@ -153,7 +153,7 @@ describe("ResultPage", () => {
                    { method_id: "root_cause.five_whys", answers: "驗證根因", deepens: "再問五次為什麼", prefill: {}, needs_input: ["why"], yields: "根因鏈", est_cost: "low" }],
     };
     // the run form the page keeps above the result (RunPage's input card), for the parity gate's input card
-    const inputCard = <RunInputCard numeral="四"><MethodForm fields={fields} state={{}} onState={() => undefined} onSubmit={() => undefined} onFill={() => undefined} onClear={() => undefined} /></RunInputCard>;
+    const inputCard = <RunInputCard numeral="四"><DescribeFirst methodId="systems.iceberg_model" fields={fields} state={{}} onState={() => undefined} /><SaveTo project={{ id: "P1", name: "WuSheng 團體反思・第三期" }} name="冰山模型" customName="" onName={() => undefined} /><MethodForm fields={fields} state={{}} onState={() => undefined} onSubmit={() => undefined} onFill={() => undefined} onClear={() => undefined} /></RunInputCard>;
     const html = renderToStaticMarkup(<ResultPage result={detailed as unknown as React.ComponentProps<typeof ResultPage>["result"]} project={{ id: "P1", name: "WuSheng 團體反思・第三期" }} record={rec} fields={fields} lesson="/learn/systems.iceberg_model" display={{ name_zh: "冰山模型", name_en: "Iceberg Model" }} lessons={{ "systems.leverage_point_analysis": "/learn/systems.leverage_point_analysis" }} names={{ "systems.leverage_point_analysis": "槓桿點分析", "root_cause.five_whys": "五個為什麼" }}>{inputCard}</ResultPage>);
     for (const text of ["<b>一句話：</b>分享變少是流程造成的。", '<b>這代表</b><span>等答案<dfn title="A 造成 B，B 又回頭讓 A 更嚴重">迴路</dfn>', '<span class="lever high">槓桿：高</span>', "<b>對應方案</b><span>⑦ 乙「改流程」★ 本次建議</span>",
       '<span style="display:inline-block"> ★ 建議先出手</span>', '<td>結構 ★</td><td>設計 Design</td><td>現在→未來</td>', 'aria-label="主動分享的變化"', 'aria-label="等答案因果迴路"', 'aria-label="四層改變難度與效果持久度對比"',

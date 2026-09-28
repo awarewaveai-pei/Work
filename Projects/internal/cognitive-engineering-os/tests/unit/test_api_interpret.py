@@ -67,6 +67,7 @@ class InterpretApiTests(ApiTestCase):
         ))
 
     def tearDown(self):
+        api_main._AI_RESERVED.pop(self.tenant["tenant_id"], None)   # a bill a test made unwritable stays reserved by design
         self._project_tmpdir.cleanup()
         super().tearDown()
 
@@ -273,12 +274,14 @@ class InterpretApiTests(ApiTestCase):
         self.assertGreaterEqual(self.client.get("/methods/systems.iceberg_model/estimate").json()["seconds"], 1)   # now from this tenant's own run
 
     def test_the_budget_lock_is_not_held_while_the_model_answers_but_the_run_is_reserved(self):
-        """P-45: drafts used to wait minutes behind an analysis; the budget still counts the run in flight."""
+        """P-45: drafts used to wait minutes behind an analysis; the budget still counts the run in flight. Waits are
+        hang guards only (tests/unit/thread_testkit.py): a loaded full run once failed on a 10 s join."""
         import threading
+        from tests.unit.thread_testkit import HANG_GUARD_S, join_all
         entered, release, free = threading.Event(), threading.Event(), []
         original = self.provider.complete
         def slow(system, user, *, max_tokens):
-            entered.set(); release.wait(5)
+            entered.set(); release.wait(HANG_GUARD_S)
             return original(system, user, max_tokens=max_tokens)
         tenant = self.tenant["tenant_id"]
         with patch.object(self.provider, "complete", side_effect=slow), patch("ai_lego.apps.api.main._launch_interpretation") as launch:
@@ -286,14 +289,107 @@ class InterpretApiTests(ApiTestCase):
             self.assertEqual(response.status_code, 202, response.text)
             worker = threading.Thread(target=api_main._run_interpretation, kwargs=launch.call_args.kwargs)
             worker.start()
-            self.assertTrue(entered.wait(5))
-            lock = api_main._ai_budget_lock_for(tenant)
-            free.append(lock.acquire(timeout=2))
-            if free[0]: lock.release()
-            self.assertEqual(api_main._AI_RESERVED.get(tenant), api_main.INTERPRET_RESERVE_TOKENS)
-            release.set(); worker.join(10)
+            try:
+                self.assertTrue(entered.wait(HANG_GUARD_S))
+                lock = api_main._ai_budget_lock_for(tenant)
+                free.append(lock.acquire(blocking=False))   # free while the model answers: no wait needed to see it
+                if free[0]: lock.release()
+                self.assertGreaterEqual(api_main._AI_RESERVED.get(tenant, 0), api_main.PROMPT_RESERVE_TOKENS + api_main.INTERPRET_MAX_TOKENS)   # this call's worst case
+            finally:   # a failed assertion still lets the worker finish before tearDown removes its files
+                release.set()
+                join_all(self, worker)
         self.assertEqual(free, [True])
         self.assertNotIn(tenant, api_main._AI_RESERVED)   # released when the run ends
+
+    def test_a_retry_is_checked_against_the_budget_like_the_first_call(self):
+        """Codex 2026-09-28 [high]: the run reserved one call and the retry went unchecked past the daily budget."""
+        from ai_lego.platform.ai_gateway.provider import DAILY_TOKEN_BUDGET_ENV
+        bad = AiCompletion(text="bad JSON", model=self.provider.model, input_tokens=20, output_tokens=20)
+        worst = 1_000_000 + api_main.INTERPRET_MAX_TOKENS   # every call's reservation (any prompt here is shorter)
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 30)}), \
+                patch.object(self.provider, "complete", return_value=bad) as calls, patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["x"], "patterns": [], "structures": [], "mental_models": []})
+            self.assertEqual(response.status_code, 202, response.text)
+            api_main._run_interpretation(**launch.call_args.kwargs)
+        self.assertEqual(calls.call_count, 1)   # the first fit (0 + worst <= budget); after its 40 tokens the retry's worst does not
+        failed = self.client.get(f"/interpretations/{response.json()['interpretation_id']}").json()
+        self.assertEqual(failed["status"], "FAILED")
+        self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED", failed["error"])
+        self.assertNotIn(self.tenant["tenant_id"], api_main._AI_RESERVED)
+
+    def test_a_call_whose_worst_case_does_not_fit_what_is_left_is_not_made(self):
+        """Codex r2: the check ignored the call's own reservation, so one call could pass a nearly spent budget."""
+        from ai_lego.platform.ai_gateway.provider import DAILY_TOKEN_BUDGET_ENV
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        session = {"tenant_id": self.tenant["tenant_id"], "identity_id": self.identity["identity_id"]}
+        metered = api_main._MeteredProvider(self.provider, store, session, "interpret:test")
+        with patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: "1000"}), self.assertRaises(api_main.InvariantViolation) as refused:
+            metered.complete("s", "u", max_tokens=10)   # 0 used, but this call may use 12,010
+        self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED", str(refused.exception))
+        self.assertEqual(self.provider.calls, 0)
+
+    def test_the_reservation_bounds_what_a_call_can_bill_in_bytes_and_counts_the_tool_schema(self):
+        """Codex r4: code points are not a token bound (an emoji is several tokens) and the tool schema is input too."""
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        session = {"tenant_id": self.tenant["tenant_id"], "identity_id": self.identity["identity_id"]}
+        seen = []
+        class Spy:
+            model = "spy"
+            def complete(self, system, user, *, max_tokens):
+                seen.append(api_main._AI_RESERVED.get(session["tenant_id"]))
+                return AiCompletion(text="{}", model=self.model, input_tokens=1, output_tokens=1)
+            def complete_json(self, system, user, *, max_tokens, **options):
+                return self.complete(system, user, max_tokens=max_tokens)
+        metered = api_main._MeteredProvider(Spy(), store, session, "interpret:test")
+        emoji = "\U0001F600" * 20_000   # 20,000 code points, 80,000 UTF-8 bytes
+        metered.complete("s", emoji, max_tokens=10)
+        schema = {"type": "object", "description": "x" * 30_000}
+        metered.complete_json("s", "u", max_tokens=10, input_schema=schema)
+        self.assertGreaterEqual(seen[0], 80_000 + api_main.FRAMING_RESERVE_TOKENS + 10)
+        self.assertGreaterEqual(seen[1], 30_000 + api_main.FRAMING_RESERVE_TOKENS + 10)
+
+    def test_a_bill_that_cannot_be_written_stays_reserved(self):
+        """Codex r7: the reservation was released before the usage row existed, so the next call saw an unspent budget."""
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        session = {"tenant_id": self.tenant["tenant_id"], "identity_id": self.identity["identity_id"]}
+        metered = api_main._MeteredProvider(self.provider, store, session, "interpret:test")
+        try:
+            with patch.object(store, "record_ai_usage", side_effect=RuntimeError("disk unavailable")), self.assertRaises(api_main.InvariantViolation):
+                metered.complete("s", "u", max_tokens=10)
+            self.assertEqual(api_main._AI_RESERVED.get(session["tenant_id"]), 11 + 23)   # FakeInterpretProvider's bill
+        finally:
+            api_main._AI_RESERVED.pop(session["tenant_id"], None)
+
+    def test_a_billed_failure_is_metered_and_its_reservation_released(self):
+        from ai_lego.platform.ai_gateway.provider import ProviderCallError
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        session = {"tenant_id": self.tenant["tenant_id"], "identity_id": self.identity["identity_id"]}
+        class CutOff:
+            model = "cut-model"
+            def complete(self, system, user, *, max_tokens):
+                raise ProviderCallError("AI_PROVIDER_CUT_OFF: x", reason="cut_off", input_tokens=5, output_tokens=7)
+        metered = api_main._MeteredProvider(CutOff(), store, session, "interpret:test")
+        before = store.ai_usage_totals(session["tenant_id"], since=api_main._today_utc_start_iso())
+        with self.assertRaises(ProviderCallError):
+            metered.complete("s", "u", max_tokens=10)
+        after = store.ai_usage_totals(session["tenant_id"], since=api_main._today_utc_start_iso())
+        self.assertEqual((after["input_tokens"] - before["input_tokens"], after["output_tokens"] - before["output_tokens"]), (5, 7))
+        self.assertNotIn(session["tenant_id"], api_main._AI_RESERVED)
+        self.assertFalse(hasattr(metered, "complete_json"))   # offered only when the wrapped provider has it
+
+    def test_an_answered_call_whose_cost_cannot_be_read_is_metered_at_its_worst_case(self):
+        from ai_lego.platform.ai_gateway.provider import ProviderCallError
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        session = {"tenant_id": self.tenant["tenant_id"], "identity_id": self.identity["identity_id"]}
+        class Unreadable:
+            model = "m"
+            def complete(self, system, user, *, max_tokens):
+                raise ProviderCallError("AI_PROVIDER_EMPTY_RESPONSE: x", reason="empty", usage_known=False)
+        before = store.ai_usage_totals(session["tenant_id"], since=api_main._today_utc_start_iso())
+        with self.assertRaises(ProviderCallError):
+            api_main._MeteredProvider(Unreadable(), store, session, "interpret:test").complete("s", "u", max_tokens=10)
+        after = store.ai_usage_totals(session["tenant_id"], since=api_main._today_utc_start_iso())
+        self.assertEqual((after["input_tokens"] - before["input_tokens"], after["output_tokens"] - before["output_tokens"]), (api_main.worst_input_tokens("s", "u"), 10))
 
     def test_plan_rows_become_the_projects_tasks_and_show_as_open_or_overdue(self):
         done = self._finished()
@@ -569,16 +665,14 @@ class InterpretApiTests(ApiTestCase):
             store = launch.call_args.kwargs["store"]
             with patch.object(store, "record_ai_usage", side_effect=RuntimeError("disk unavailable")):
                 api_main._run_interpretation(**launch.call_args.kwargs)
-        self.assertEqual(complete.call_count, 2)
+        self.assertEqual(complete.call_count, 1)   # a paid call that cannot be recorded stops the run: no second paid call
         fetched = self.client.get(f"/interpretations/{interpretation_id}")
         self.assertEqual(fetched.status_code, 200, fetched.text)
         self.assertEqual(fetched.json()["status"], "FAILED")
-        self.assertIn("NOT_JSON", fetched.json()["error"])
         self.assertIn("AI_USAGE_RECORD_FAILED", fetched.json()["error"])
         failure = [event for event in self.repo.list_events(self.tenant["tenant_id"], f"project:{self.project_id}") if event["event_type"] == "InterpretationFailed"][-1]
-        self.assertIn("NOT_JSON", failure["payload"]["error"])
         self.assertIn("AI_USAGE_RECORD_FAILED", failure["payload"]["error"])
-        self.assertEqual((failure["payload"]["input_tokens"], failure["payload"]["output_tokens"]), (22, 46))
+        self.assertEqual((failure["payload"]["input_tokens"], failure["payload"]["output_tokens"]), (11, 23))   # what was billed
 
     def test_interpret_is_pending_until_run(self):
         with patch("ai_lego.apps.api.main._launch_interpretation") as launch:

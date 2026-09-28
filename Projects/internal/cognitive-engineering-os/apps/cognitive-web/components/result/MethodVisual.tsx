@@ -1,5 +1,5 @@
 import React from "react";
-import { linesFor, lineHeight, Wrap } from "./svgtext";
+import { lineHeight, useLines, Wrap } from "./svgtext";
 
 type Bindings = Record<string, unknown>;
 // One unit of a layered picture: its name, what you filled in (and its short form, when the analysis wrote one), its [n],
@@ -24,13 +24,14 @@ const BANDS: Array<[number, number]> = [[0, 150], [150, 290], [290, 420], [420, 
 const LEFT_X = 30, LEFT_W = 370, RIGHT_X = 830, RIGHT_W = 220, Q_SIZE = 14.5, T_SIZE = 13;
 
 function Iceberg({ units }: { units: Unit[] }) {
+  const linesFor = useLines();
   const rows = ICEBERG_LAYERS.map((layer, index) => {
     const unit = units[index];
-    const question = `${"①②③④"[index]} ${layer.short}｜${layer.question}${unit?.focus ? " ★ 建議先出手" : ""}`;
+    const question = `${"①②③④"[index]} ${layer.short}｜${layer.question}`, tail = unit?.focus ? " ★ 建議先出手" : undefined;   // drawn as one inline-block
     const filled = unit ? `${unit.brief ?? unit.text}${unit.cite ? ` ［${unit.cite}］` : ""}` : "（沒填）";
     const act = `${unit?.step ?? layer.effect} → ${layer.lasting}`;
-    const qLines = linesFor(question, LEFT_W, Q_SIZE), tLines = linesFor(filled, LEFT_W, T_SIZE), aLines = linesFor(act, RIGHT_W, T_SIZE);
-    return { question, filled, act, qH: qLines * lineHeight(Q_SIZE), tH: tLines * lineHeight(T_SIZE), aH: aLines * lineHeight(T_SIZE) };
+    const qLines = linesFor(question, LEFT_W, Q_SIZE, { bold: true, tail }), tLines = linesFor(filled, LEFT_W, T_SIZE), aLines = linesFor(act, RIGHT_W, T_SIZE);
+    return { question, tail, filled, act, qH: qLines * lineHeight(Q_SIZE), tH: tLines * lineHeight(T_SIZE), aH: aLines * lineHeight(T_SIZE) };
   });
   // band i needs its two left blocks (and the right block) plus breathing room; the first band also holds the tip
   const need = rows.map((row, index) => Math.max(row.qH + row.tH, lineHeight(Q_SIZE) + row.aH) + (index === 0 ? 100 : 60));
@@ -57,7 +58,7 @@ function Iceberg({ units }: { units: Unit[] }) {
       <text x="30" y={bands[0].top + 62} fontSize="12" className="m">看得見 Visible</text>
       <text x="30" y={water + 22} fontSize="12" className="m">水面以下：看不見 Hidden</text>
       {rows.map((row, index) => <React.Fragment key={index}>
-        <Wrap x={LEFT_X} y={textTop(index)} width={LEFT_W} height={row.qH + 2} size={Q_SIZE} bold>{row.question.replace(" ★ 建議先出手", "")}{units[index]?.focus && <span style={{ display: "inline-block" }}> ★ 建議先出手</span>}</Wrap>
+        <Wrap x={LEFT_X} y={textTop(index)} width={LEFT_W} height={row.qH + 2} size={Q_SIZE} bold>{row.question}{row.tail && <span style={{ display: "inline-block" }}>{row.tail}</span>}</Wrap>
         <Wrap x={LEFT_X} y={textTop(index) + row.qH + 2} width={LEFT_W} height={row.tH + 2} size={T_SIZE} className="m">{row.filled}</Wrap>
         <Wrap x={RIGHT_X} y={textTop(index)} width={RIGHT_W} height={lineHeight(Q_SIZE) + 2} size={Q_SIZE} bold>{ICEBERG_LAYERS[index].mode}</Wrap>
         <Wrap x={RIGHT_X} y={textTop(index) + lineHeight(Q_SIZE) + 2} width={RIGHT_W} height={row.aH + 2} size={T_SIZE} className="m">{row.act}</Wrap>
@@ -70,6 +71,7 @@ function Iceberg({ units }: { units: Unit[] }) {
 
 // Any other layered tool: its own units, top to bottom, with what you filled in; each band as tall as its text.
 function Layers({ units, name }: { units: Unit[]; name: string }) {
+  const linesFor = useLines();
   const rows = units.map((unit) => { const text = `${unit.text}${unit.cite ? ` ［${unit.cite}］` : ""}`; return { text, h: 34 + linesFor(text, 1020, 13) * lineHeight(13) + 6 }; });
   const tops = rows.reduce<number[]>((acc, row) => [...acc, (acc[acc.length - 1] ?? 5) + (acc.length ? rows[acc.length - 1].h + 6 : 0)], []);
   const total = (tops[tops.length - 1] ?? 5) + (rows[rows.length - 1]?.h ?? 0) + 10;

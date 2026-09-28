@@ -24,6 +24,16 @@ import { ResultPage } from "./result/ResultPage";
 import { RunHeader } from "./RunHeader";
 
 type FormResponse = { method_id: string; display?: { name_zh?: string; name_en?: string; blurb_zh?: string }; form: { fields: FormField[]; example?: { scenario?: string; input?: Record<string, unknown>; sets?: Record<string, { scenario?: string; input?: Record<string, unknown> }> } } };
+/** The mock's 「手邊有一段描述？」 (I-15): paste a description, the fields are matched first and drafted only if needed. */
+export function DescribeFirst(props: React.ComponentProps<typeof LazyFill>) {
+  return <details className="mb8"><summary>手邊有一段描述？貼上，系統先幫你填格子</summary><LazyFill {...props} /></details>;
+}
+
+/** 存到 (I-15): the project this run is saved in, or a new one named here. */
+export function SaveTo({ project, name, customName, onName }: { project?: { id: string; name: string }; name: string; customName: string; onName: (value: string) => void }) {
+  return <p className="sub mb8">存到：{project ? <>專案「<Link href={projectHref(project.id)}>{project.name}</Link>」</> : <>新專案，<label>名稱：<input type="text" aria-label="新專案名稱" value={customName} onChange={(event) => onName(event.target.value)} placeholder={`留白 = ${name}加上時間`} /></label>（按「執行分析」時建立）</>}</p>;
+}
+
 export function RunInputCard({ numeral, children }: { numeral: string; children: React.ReactNode }) {
   return <div className="card cta" id="input">
     <h2>你的案例：{numeral}個格子<small>從上往下填；填不出來的留白</small></h2>
@@ -201,12 +211,12 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
   // ResultPage's own header replaces this one once there is a result.
   const inputCard = (
     <RunInputCard numeral={numeral}>
-      <details className="mb8"><summary>手邊有一段描述？貼上，系統先幫你填格子</summary><LazyFill methodId={methodId} fields={form.form.fields} state={state} onState={setState} onSuggested={setSuggested} /></details>
+      <DescribeFirst methodId={methodId} fields={form.form.fields} state={state} onState={setState} onSuggested={setSuggested} />
       {suggested.length > 0 && <div className="how"><b>AI 幫你填了</b>{suggested.join("、")}；請逐格核對。<button type="button" className="btn" onClick={() => setSuggested([])}>我已確認這些格子</button></div>}
       {left.length > 0 && <p className="sub">這次分析的「{left.join("、")}」沒辦法自動帶回格子；要再分析，請重新填這幾格。</p>}
       {revision && <p className="mocknote" role="status">依退回原因重做：「{revision.reason}」。改好格子按「執行分析」，AI 會依原因重做；退回的那一版保留。<button type="button" className="btn ghost" onClick={() => setRevision(null)}>不重做了</button></p>}
       {rerun && <p className="mocknote" role="status">到期重跑：更新格子裡的數字，按「執行分析」；跑完會和上一次並排比較。<button type="button" className="btn ghost" onClick={() => setRerun("")}>不重跑了</button></p>}
-      <p className="sub mb8">存到：{project ? <>專案「<Link href={projectHref(project.id)}>{project.name}</Link>」</> : <>新專案，<label>名稱：<input type="text" aria-label="新專案名稱" value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder={`留白 = ${name}加上時間`} /></label>（按「執行分析」時建立）</>}</p>
+      <SaveTo project={project} name={name} customName={customName} onName={setCustomName} />
       {projects && projects.length > 0 && !pendingId && !revision && !rerun && <details className="mb8"><summary>改存到別的專案</summary><div className="btns mt6">
         <button type="button" className={`btn${projectId ? " ghost" : " primary"}`} aria-pressed={!projectId} onClick={() => setProjectId("")}>新專案</button>
         {projects.slice(0, 8).map((item) => <button type="button" key={item.project_id} className={`btn${projectId === item.project_id ? " primary" : " ghost"}`} aria-pressed={projectId === item.project_id} onClick={() => setProjectId(item.project_id)}>{item.name}</button>)}

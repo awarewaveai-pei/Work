@@ -1,5 +1,5 @@
 import React from "react";
-import { linesFor, lineHeight, textWidth, Wrap } from "./svgtext";
+import { lineHeight, textWidth, useLines, Wrap } from "./svgtext";
 
 // ③ of docs/mockups/iceberg-result-mock.html: each chart answers one question and says how to read it, what it shows
 // and where it comes from. A: the numbers your record states (the interpretation's `trend`; its gate checks every value
@@ -14,6 +14,7 @@ const COLOURS = ["#1f5fbf", "#b25e09"];
 const tidy = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 export function TrendChart({ series, cite }: { series: TrendSeries[]; cite: (id: string) => string }) {
+  const linesFor = useLines();
   const labels = [...new Set(series.flatMap((line) => line.points.map((point) => point.label)))];
   const slot = labels.length > 1 ? 350 / (labels.length - 1) : 350;
   const x = (label: string) => 50 + (labels.length > 1 ? labels.indexOf(label) * slot : 175);
@@ -40,7 +41,7 @@ export function TrendChart({ series, cite }: { series: TrendSeries[]; cite: (id:
     {series.map((line, index) => <polyline key={line.name} points={line.points.map((point) => `${x(point.label)},${y(point.value, index)}`).join(" ")} fill="none" stroke={COLOURS[index]} strokeWidth="3" strokeDasharray={index ? "6 4" : undefined} />)}
     {series.map((line, index) => { const first = line.points[0], last = line.points[line.points.length - 1]; const text = `${line.name} ${tidy(first.value)} → ${tidy(last.value)} ${line.unit}`;
       const ax = Math.min(250, Math.max(55, x(last.label) - 130)), ay = Math.min(146, Math.max(20, y(last.value, index) + (index ? -34 : 8)));   // beside its own line's last point
-      return <Wrap key={line.name} x={ax} y={ay} width={200} height={linesFor(text, 200, 12) * lineHeight(12) + 2} size={12} bold className={index ? "warn" : "a"}>{text}</Wrap>; })}
+      return <Wrap key={line.name} x={ax} y={ay} width={200} height={linesFor(text, 200, 12, { bold: true }) * lineHeight(12) + 2} size={12} bold className={index ? "warn" : "a"}>{text}</Wrap>; })}
     <Wrap x={50} y={footTop} width={400} height={footLines * lineHeight(11) + 2} size={11} className="m">{foot}</Wrap>
   </svg>;
 }
@@ -65,6 +66,7 @@ function ringOrder(loop: Loop): Loop["nodes"] {
 const BOX_TEXT = 12.5;
 
 export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; dashed?: Set<string> }) {
+  const linesFor = useLines();
   const n = loop.nodes.length;   // 2-6 (schema)
   const BOX_W = n > 4 ? 170 : 150;   // the mock's boxes are 150 wide; five or six need the wider ring anyway
   const lines = new Map(loop.nodes.map((node) => [node.id, linesFor(node.text, BOX_W - 16, BOX_TEXT) + (dashed.has(node.id) ? 1 : 0)]));   // a belief node carries its （信念層） line
@@ -79,7 +81,7 @@ export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; da
   const titleInside = n === 2 || n === 4;
   const bandW = Math.max(460, maxX - minX + BOX_W + 40) - 40;
   const bandTitle = `${loop.kind === "reinforcing" ? "R" : "B"} ${loop.name}（${loop.kind === "reinforcing" ? "自我加強" : "自我平衡"}）`;
-  const band = titleInside ? 0 : linesFor(bandTitle, bandW, 16) * lineHeight(16) + 2 * lineHeight(11) + 16;
+  const band = titleInside ? 0 : linesFor(bandTitle, bandW, 16, { bold: true }) * lineHeight(16) + 2 * lineHeight(11) + 16;
   const dx = 20 + BOX_W / 2 - minX, dy = 30 + band + tallest / 2 - minY;   // the mock's margins: 20 left, 30 top (below the title band when there is one)
   const feeders = (loop.feeders ?? []).filter((feeder) => loop.nodes.some((node) => node.id === feeder.to));
   const FEED_W = 170, feedH = (text: string) => Math.max(40, 14 + (linesFor(text, FEED_W - 16, 12) + 1) * lineHeight(12));   // + the （信念層） line
@@ -97,7 +99,7 @@ export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; da
   const titleW = titleInside ? centreW : bandW, titleX = titleInside ? cx - centreW / 2 : 20;
   const title = `${loop.kind === "reinforcing" ? "R" : "B"} ${loop.name}（${loop.kind === "reinforcing" ? "自我加強" : "自我平衡"}）`;
   const note1 = "箭頭 = 前者讓後者更嚴重", note2 = loop.kind === "reinforcing" ? "轉一圈回到起點，所以越轉越強" : "轉一圈回到起點，會被拉回來";
-  const titleH = linesFor(title, titleW, 16) * lineHeight(16) + 2, noteH = (linesFor(note1, titleW, 11) + linesFor(note2, titleW, 11)) * lineHeight(11) + 2;
+  const titleH = linesFor(title, titleW, 16, { bold: true }) * lineHeight(16) + 2, noteH = (linesFor(note1, titleW, 11) + linesFor(note2, titleW, 11)) * lineHeight(11) + 2;
   const titleTop = titleInside ? cy - (titleH + noteH) / 2 : 12;
   return <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${loop.name.replace(/迴路$/, "")}因果迴路`}>
     <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#245b8a" /></marker></defs>

@@ -75,7 +75,7 @@ from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog,
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.pricing import cost_twd
-from ai_lego.platform.ai_gateway.provider import DEFAULT_MODEL, AiProvider, AnthropicProvider, daily_token_budget, provider_from_env
+from ai_lego.platform.ai_gateway.provider import DEFAULT_MODEL, AiProvider, AnthropicProvider, ProviderCallError, daily_token_budget, provider_from_env
 from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
@@ -1188,8 +1188,28 @@ class DraftRequest(BaseModel):
 
 _AI_BUDGET_LOCKS: dict[str, threading.Lock] = {}
 _AI_BUDGET_LOCKS_GUARD = threading.Lock()
-_AI_RESERVED: dict[str, int] = {}   # tokens of interpretation runs in flight, per tenant (one process: see _ai_budget_lock_for)
-INTERPRET_RESERVE_TOKENS = 12_000 + INTERPRET_MAX_TOKENS   # one call's worst case: the prompt plus the output ceiling
+_AI_RESERVED: dict[str, int] = {}   # worst case of the paid calls in flight, per tenant (one process: see _ai_budget_lock_for)
+PROMPT_RESERVE_TOKENS = 12_000   # the least a call's input reserves
+FRAMING_RESERVE_TOKENS = 1_000   # message and tool-use framing the API adds (its tool-use system prompt is ~350 tokens)
+
+
+def worst_input_tokens(*sent: str) -> int:
+    """An upper bound of the input tokens a call is billed for: a byte-level tokenizer makes at most one token per
+    UTF-8 byte of what is sent (a character is not a bound: one emoji is several tokens), plus the framing."""
+    return max(PROMPT_RESERVE_TOKENS, sum(len(text.encode("utf-8")) for text in sent) + FRAMING_RESERVE_TOKENS)
+
+
+class AiBudgetRefused(InvariantViolation):
+    """A metered call refused before it started: today's budget cannot hold its worst case (answered 429)."""
+
+
+def _budget_refused(error: BaseException | None) -> bool:
+    """Whether a budget refusal caused this error, however many runners wrapped it (a recipe draft wraps a method draft)."""
+    while error is not None:
+        if isinstance(error, AiBudgetRefused):
+            return True
+        error = error.__cause__
+    return False
 
 
 def _reserve_ai_tokens(tenant_id: str, tokens: int) -> None:
@@ -1229,7 +1249,8 @@ def _today_utc_start_iso() -> str:
     return now.strftime("%Y-%m-%dT00:00:00Z")
 
 
-def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> AiProvider:
+def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any], reserve: int = 0) -> AiProvider:
+    """``reserve``: the worst case of the call about to start; it must fit what is left today (a metered call's)."""
     if provider is None:
         raise HTTPException(status_code=503, detail="AI_PROVIDER_UNCONFIGURED: set COGNITIVE_OS_ANTHROPIC_API_KEY (deploy/.env) to enable AI drafting")
     if not check_entitlement(store, session["tenant_id"], AI_DRAFT_CAPABILITY):
@@ -1240,8 +1261,9 @@ def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict
         raise HTTPException(status_code=503, detail=str(error)) from error
     used = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
     used_tokens = used["input_tokens"] + used["output_tokens"] + _AI_RESERVED.get(session["tenant_id"], 0)   # runs still in flight count
-    if used_tokens >= budget:
-        raise HTTPException(status_code=429, detail=f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: {used_tokens}/{budget} tokens used today (UTC); resets at midnight UTC")
+    if used_tokens >= budget or used_tokens + reserve > budget:
+        needs = f"; this call may use up to {reserve}" if reserve else ""
+        raise HTTPException(status_code=429, detail=f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: {used_tokens}/{budget} tokens used today (UTC){needs}; resets at midnight UTC")
     return provider
 
 
@@ -1267,14 +1289,17 @@ def ai_status(session: dict[str, Any] = Depends(require_session), provider: AiPr
     except InvariantViolation:
         budget = None
     used_today = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
+    used = used_today["input_tokens"] + used_today["output_tokens"]
+    reserved = _AI_RESERVED.get(session["tenant_id"], 0)   # calls in flight count as _require_ai counts them
     return {
         "configured": provider is not None,
         "model": provider.model if provider else None,
         "usage": store.ai_usage_totals(session["tenant_id"]),
         "budget": {
             "daily_limit": budget,
-            "used_today": used_today["input_tokens"] + used_today["output_tokens"],
-            "remaining_today": None if budget is None else max(0, budget - used_today["input_tokens"] - used_today["output_tokens"]),
+            "used_today": used,
+            "reserved_in_flight": reserved,
+            "remaining_today": None if budget is None else max(0, budget - used - reserved),
         },
     }
 
@@ -1300,16 +1325,14 @@ def ai_draft_method(
 ) -> dict[str, Any]:
     if not catalog.is_resolvable(method_id):
         raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
-    with _ai_budget_lock_for(session["tenant_id"]):
-        active = _require_ai(provider, store, session)
-        try:
-            result = draft_method_kwargs(method_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog)
-        except AiDraftProviderError as error:
-            store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", active.model, error.input_tokens, error.output_tokens)
-            raise HTTPException(status_code=502, detail=str(error)) from error
-        except InvariantViolation as error:
-            raise HTTPException(status_code=400, detail=str(error)) from error
-        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft:{method_id}", result.model, result.input_tokens, result.output_tokens)
+    active = _require_ai(provider, store, session)   # 503 / 403 / 429 before anything is built
+    metered = _MeteredProvider(active, store, session, f"draft:{method_id}")   # every call, a repair round too, metered
+    try:
+        result = draft_method_kwargs(method_id, payload.brief, provider=metered, spec_root=resolve_spec_root(), catalog=catalog)
+    except AiDraftProviderError as error:
+        raise HTTPException(status_code=429 if _budget_refused(error) else 502, detail=str(error)) from error
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return result.as_dict()
 
 
@@ -1324,19 +1347,17 @@ def ai_draft_recipe(
 ) -> dict[str, Any]:
     if not payload.labels or len(payload.labels) > MAX_LABELS_PER_REQUEST:
         raise HTTPException(status_code=400, detail=f"AI_DRAFT_LABELS_REQUIRED: draft 1..{MAX_LABELS_PER_REQUEST} nodes per request (one model call each); the dashboard drafts node by node")
-    with _ai_budget_lock_for(session["tenant_id"]):
-        active = _require_ai(provider, store, session)
-        try:
-            result = draft_recipe_source(recipe_id, payload.brief, provider=active, spec_root=resolve_spec_root(), catalog=catalog, labels=payload.labels, source=payload.source)
-        except AiDraftProviderError as error:
-            store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", active.model, error.input_tokens, error.output_tokens)
-            raise HTTPException(status_code=502, detail=str(error)) from error
-        except InvariantViolation as error:
-            code = str(error)
-            if "RECIPE_NOT_FOUND" in code or "RECIPE_ID_MISMATCH" in code:
-                raise HTTPException(status_code=404, detail=code) from error
-            raise HTTPException(status_code=400, detail=code) from error
-        store.record_ai_usage(session["tenant_id"], session["identity_id"], f"draft-recipe:{recipe_id}", result["model"], result["usage"]["input_tokens"], result["usage"]["output_tokens"])
+    active = _require_ai(provider, store, session)   # 503 / 403 / 429 before anything is built
+    metered = _MeteredProvider(active, store, session, f"draft-recipe:{recipe_id}")   # every call, a repair round too, metered
+    try:
+        result = draft_recipe_source(recipe_id, payload.brief, provider=metered, spec_root=resolve_spec_root(), catalog=catalog, labels=payload.labels, source=payload.source)
+    except AiDraftProviderError as error:
+        raise HTTPException(status_code=429 if _budget_refused(error) else 502, detail=str(error)) from error
+    except InvariantViolation as error:
+        code = str(error)
+        if "RECIPE_NOT_FOUND" in code or "RECIPE_ID_MISMATCH" in code:
+            raise HTTPException(status_code=404, detail=code) from error
+        raise HTTPException(status_code=400, detail=code) from error
     return result
 
 
@@ -1452,8 +1473,8 @@ def _run_interpretation(
 ) -> None:
     """``feedback``/``previous``: the user returned an earlier version (退回並說原因) and this run redoes it; ``rerun_id``:
     this run answers a due rerun reminder, fulfilled when the result is saved; ``record_gates``: the method's own
-    gates on the record (層序…), stored with the analysis. The tenant's budget lock covers the check (with this run's
-    reservation) and the usage record, not the minutes the model takes (P-45: drafts used to wait behind it).
+    gates on the record (層序…), stored with the analysis. Every model call -- a retry too -- is metered by
+    ``_MeteredProvider`` (budget check + reservation before it, usage right after; P-45 and Codex 2026-09-28).
     ``lock``: this Project's interpretation run lock, released only after the outcome is written (readers rely on it)."""
     try:
         _interpret_and_record(
@@ -1476,54 +1497,34 @@ def _interpret_and_record(
     aggregate_id = f"project:{project_id}"
     outcome: dict[str, Any] | None = None
     error: str | None = None
-    reserved = False
+    metered = _MeteredProvider(provider, store, session, f"interpret:{method_id}")   # what was billed, call by call
     try:
-        with _ai_budget_lock_for(tenant_id):
-            _require_ai(provider, store, session)
-            _reserve_ai_tokens(tenant_id, INTERPRET_RESERVE_TOKENS)
-            reserved = True
+        display_metadata = _method_display_metadata()
+        spec_root = resolve_spec_root()
+        contract_text = (spec_root / catalog.require(method_id)["path"]).read_text(encoding="utf-8")
+        schema_name = record_schema_name(spec_root, method_id, contract, contract_text)
+        schema_path = spec_root / TYPED_OBJECTS / schema_name if schema_name else None
+        outcome = run_interpretation(
+            method_id=method_id, contract=contract, display=display, record=record,
+            sources=sources, provider=metered, spec_root=spec_root,
+            schema_contracts=SchemaContracts(spec_root),
+            active_method_ids={key for key in catalog.contracts if catalog.is_resolvable(key)}, interpretation_id=interpretation_id,
+            catalog_lines=[f"{key} — {display_metadata.get(key, {}).get('name_zh', key)}" for key in sorted(catalog.contracts) if catalog.is_resolvable(key)],
+            record_schema_text=schema_path.read_text(encoding="utf-8") if schema_path and schema_path.exists() else "",
+            feedback=feedback, previous=previous,
+            target_record_fields=lambda target_id: _record_schema_properties(spec_root, catalog, target_id),
+        )
+        error = outcome["error"]
     except HTTPException as failure:
         error = str(failure.detail)
-    if reserved:
-        try:
-            display_metadata = _method_display_metadata()
-            spec_root = resolve_spec_root()
-            contract_text = (spec_root / catalog.require(method_id)["path"]).read_text(encoding="utf-8")
-            schema_name = record_schema_name(spec_root, method_id, contract, contract_text)
-            schema_path = spec_root / TYPED_OBJECTS / schema_name if schema_name else None
-            outcome = run_interpretation(
-                method_id=method_id, contract=contract, display=display, record=record,
-                sources=sources, provider=provider, spec_root=spec_root,
-                schema_contracts=SchemaContracts(spec_root),
-                active_method_ids={key for key in catalog.contracts if catalog.is_resolvable(key)}, interpretation_id=interpretation_id,
-                catalog_lines=[f"{key} — {display_metadata.get(key, {}).get('name_zh', key)}" for key in sorted(catalog.contracts) if catalog.is_resolvable(key)],
-                record_schema_text=schema_path.read_text(encoding="utf-8") if schema_path and schema_path.exists() else "",
-                feedback=feedback, previous=previous,
-                target_record_fields=lambda target_id: _record_schema_properties(spec_root, catalog, target_id),
-            )
-            error = outcome["error"]
-        except HTTPException as failure:
-            error = str(failure.detail)
-        except Exception as failure:
-            error = str(failure)
-        finally:
-            with _ai_budget_lock_for(tenant_id):
-                _reserve_ai_tokens(tenant_id, -INTERPRET_RESERVE_TOKENS)
-                if outcome is not None:
-                    try:
-                        store.record_ai_usage(
-                            tenant_id, session["identity_id"], f"interpret:{method_id}",
-                            outcome["model"], outcome["input_tokens"], outcome["output_tokens"],
-                        )
-                    except Exception as usage_failure:
-                        usage_error = f"AI_USAGE_RECORD_FAILED: {type(usage_failure).__name__}"
-                        error = f"{error}; {usage_error}" if error else usage_error
+    except Exception as failure:
+        error = str(failure)
     if repo.get_project(tenant_id, project_id) is None:   # erased while the model was answering: nothing to write to, not even a failure
         return
     if error is not None or outcome is None or outcome["interpretation"] is None:
         failure = {"interpretation_id": interpretation_id, "error": error or "INTERPRETATION_FAILED"}
-        if outcome is not None:
-            failure.update({"input_tokens": outcome["input_tokens"], "output_tokens": outcome["output_tokens"]})
+        if metered.input_tokens or metered.output_tokens:
+            failure.update({"input_tokens": metered.input_tokens, "output_tokens": metered.output_tokens})
         repo.append_event(tenant_id, aggregate_id, "InterpretationFailed", failure)
         return
     try:
@@ -1998,32 +1999,60 @@ def _failure_code(failure: BaseException) -> str:
 
 
 class _MeteredProvider:
-    """One background run's provider, one paid call at a time under the tenant's AI lock: the day's budget is checked
-    right before each call and the call's tokens are recorded right after it. Metering therefore holds whatever the
-    caller does next -- raises, repairs, or makes one call per map batch -- and a run cannot outspend the budget by
-    more than one call. The runner reads a refusal as a provider error and returns what it has."""
+    """The one way the API pays for a model call (drafts, interpretation, synthesis -- tests/unit/test_every_paid_call_is_metered.py): EVERY paid call -- a retry or a repair too -- first
+    passes the day's budget check and reserves its worst case (prompt + output ceiling), so concurrent calls cannot all
+    pass one check; its tokens -- a billed failure's too -- are recorded right after it. The tenant lock covers the
+    check and the record, never the call (P-45: a draft does not wait minutes behind an analysis). A run can therefore
+    not outspend the budget (Codex 2026-09-28: a retry used to be
+    unchecked) -- and a call starts only if its worst case fits what is left today (Codex r2). The runner reads a
+    refusal as a provider error and keeps what it has."""
 
     def __init__(self, inner: AiProvider, store: IdentityStore, session: dict[str, Any], purpose: str) -> None:
         self._inner, self._store, self._session, self._purpose = inner, store, session, purpose
         self.model = inner.model
         self.input_tokens = 0
         self.output_tokens = 0
+        if callable(getattr(inner, "complete_json", None)):   # offered only when the wrapped provider has it
+            self.complete_json = lambda system, user, *, max_tokens, **options: self._metered(   # the tool definition is input too
+                (system, user, json.dumps(options, ensure_ascii=False, default=str)), max_tokens, lambda: inner.complete_json(system, user, max_tokens=max_tokens, **options))
 
     def complete(self, system: str, user: str, *, max_tokens: int) -> Any:
+        return self._metered((system, user), max_tokens, lambda: self._inner.complete(system, user, max_tokens=max_tokens))
+
+    def _metered(self, sent: tuple[str, ...], max_tokens: int, call: Callable[[], Any]) -> Any:
         tenant_id = self._session["tenant_id"]
+        reserve = worst_input_tokens(*sent) + max_tokens   # all this call can bill (output, thinking included, <= max_tokens)
         with _ai_budget_lock_for(tenant_id):
             try:
-                _require_ai(self._inner, self._store, self._session)
+                _require_ai(self._inner, self._store, self._session, reserve)
             except HTTPException as refusal:
-                raise InvariantViolation(str(refusal.detail)) from refusal
-            completion = self._inner.complete(system, user, max_tokens=max_tokens)
-            self.input_tokens += completion.input_tokens
-            self.output_tokens += completion.output_tokens
-            try:
-                self._store.record_ai_usage(tenant_id, self._session["identity_id"], self._purpose, completion.model, completion.input_tokens, completion.output_tokens)
-            except Exception as failure:
-                raise InvariantViolation("AI_USAGE_RECORD_FAILED") from failure
+                raise (AiBudgetRefused if refusal.status_code == 429 else InvariantViolation)(str(refusal.detail)) from refusal
+            _reserve_ai_tokens(tenant_id, reserve)
+        try:
+            completion = call()
+        except ProviderCallError as billed:
+            if not billed.usage_known:   # answered, cost unknown: count the worst this call could bill
+                self._settle(reserve, self.model, reserve - max_tokens, max_tokens)
+            else:
+                self._settle(reserve, self.model, billed.input_tokens, billed.output_tokens)
+            raise
+        except BaseException:
+            self._settle(reserve, self.model, 0, 0)
+            raise
+        self._settle(reserve, completion.model, completion.input_tokens, completion.output_tokens)
         return completion
+
+    def _settle(self, reserve: int, model: str, input_tokens: int, output_tokens: int) -> None:
+        tenant_id = self._session["tenant_id"]
+        with _ai_budget_lock_for(tenant_id):
+            self.input_tokens += input_tokens   # every call made is recorded, an unbilled failure as a 0-token call
+            self.output_tokens += output_tokens
+            try:
+                self._store.record_ai_usage(tenant_id, self._session["identity_id"], self._purpose, model, input_tokens, output_tokens)
+            except Exception as failure:   # the bill stays reserved (this process) instead of vanishing from the budget
+                _reserve_ai_tokens(tenant_id, -reserve + input_tokens + output_tokens)
+                raise InvariantViolation("AI_USAGE_RECORD_FAILED") from failure
+            _reserve_ai_tokens(tenant_id, -reserve)
 
 
 def _synthesis_lock_path(tenant_id: str, project_id: str) -> Path:

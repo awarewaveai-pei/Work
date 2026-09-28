@@ -4,7 +4,7 @@
 
 ## 0. 一句話
 
-正式站 `cognitive.aware-wave.com` 的結果頁與示意稿 `docs/mockups/iceberg-result-mock.html`（= 規格；線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）之間的 310 筆差異：**已修 306 筆，剩 2 筆做一半、1 筆流程**（§6、§7）。全部已 push 到 `origin/main`，**沒有上線**；上線是 High-STOP，要操作者說 go（§9）。
+正式站 `cognitive.aware-wave.com` 的結果頁與示意稿 `docs/mockups/iceberg-result-mock.html`（= 規格；線上 https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq ）之間的 310 筆差異：**310 筆全部修好**（§6）；剩上線（§7、§9）。全部已 push 到 `origin/main`，**沒有上線**；上線是 High-STOP，要操作者說 go（§9）。
 
 ## 1. 驗收基準（操作者原話）
 
@@ -44,30 +44,33 @@
 | `4fa192896` | 第一輪：契約 1.2.0、逐項修復閘、核准／任務／重跑／估價、確認執行、parity 閘、310 筆稽核與本報告 |
 | `e01fc7d49` `137186da4` `3199a4f9a` | Codex 三批 27 筆（checker 與 selftest、fixtures、e2e、顯示誠實化；§6 證據欄寫 Codex） |
 | `def7d7882` | 模型呼叫與閘：截斷重試一次並記帳、effort medium、item grain 的契約修整、第 N 層不算數字、中文數字、一句話標題只掉自己 |
-| 本批（見 git log） | 核准列四個真檢查、估價的時間與上限、預算鎖不包住模型呼叫；契約 1.3.0（診斷、短順序、每層厚度與誰能補、建議方案、迴路外的信念框、下一步的路徑與原因、缺口對應哪一層）；迴路圖照示意稿；三個 worker 的 ⑦ 任務／⑧ 帶入／錯誤與專案頁；免費示範專案；lesson 五個領域的示範案例；deploy 測試關卡加 web gate；示意稿對齊（重跑是提醒、專案頁用語與欄位）；分析的 run lock（行程死掉不再永遠「分析中」、專案刪得掉）；引註換寫法視為同一 id、拒收時重問訊息列出錯的 id；失敗原因顯示成人話 |
+| `c11d92618` | 核准列四個真檢查、估價的時間與上限、預算鎖不包住模型呼叫；契約 1.3.0（診斷、短順序、每層厚度與誰能補、建議方案、迴路外的信念框、下一步的路徑與原因、缺口對應哪一層）；迴路圖照示意稿；三個 worker 的 ⑦ 任務／⑧ 帶入／錯誤與專案頁；免費示範專案；lesson 五個領域的示範案例；deploy 測試關卡加 web gate；示意稿對齊（重跑是提醒、專案頁用語與欄位）；分析的 run lock（行程死掉不再永遠「分析中」、專案刪得掉）；引註換寫法視為同一 id、拒收時重問訊息列出錯的 id；失敗原因顯示成人話 |
+| 本批（見 git log） | P-43：Codex 審查 def7d7882..c11d92618 抓到重問時沒檢查每日額度 → `_MeteredProvider` 成為 API 唯一的計費路徑（起草、解讀、synthesis）：每次付費呼叫（含重問）先檢查＋保留最壞情況、之後記帳（計費的失敗也記），鎖不包住呼叫，且最壞情況要放得進今天剩下的額度才開始；P-16：圖內文字掛載後用瀏覽器實際換行算框高；I-15：輸入卡的其他部分寫進示意稿，懶人填寫說人話 |
 
 ## 5. 已驗證（機械證據，2026-09-28）
 
 | 項目 | 結果 |
 |---|---|
 | `npx tsc --noEmit` | exit 0 |
-| `npx vitest run` | 13 檔 94 tests 全過（含 parity 測試、示範專案、1.3.0 渲染、四個核准檢查） |
-| `pytest`（解讀、API、閘道、專案、價格、api_main、表單、run lock、synthesis、executor 共 13 檔） | 394 passed, 287 subtests（6 分 2 秒） |
+| `npx vitest run` | 14 檔 96 tests 全過（含 parity 測試、示範專案、1.3.0 渲染、四個核准檢查） |
+| `pytest`（解讀、API、閘道、專案、價格、api_main、表單、run lock、synthesis、executor 共 13 檔） | 14 檔 406 passed、287 subtests（6 分 41 秒） |
 | `check-mocks.py`／`run_golden_tests.py`／`gen_spec_index.py --check` | green／全過／fresh |
 | `deploy/web_test.sh`（容器內 tsc + vitest + check-mocks） | exit 0 |
 | `python docs/mockups/check-mocks-selftest.py` | 194 mutations, 194 caught（Codex e01fc7d49） |
-| 突變（丟棄式 worktree，拔掉 → 指名測試紅 → 還原綠） | repair_next_steps、add_blank_unit_gaps、_reserve_ai_tokens、引註寫法正規化、重問列出錯的 id、RUNNER_LOST 判讀、runner 放鎖：7/7 |
+| 突變（丟棄式 worktree，拔掉 → 指名測試紅 → 還原綠） | repair_next_steps、add_blank_unit_gaps、_reserve_ai_tokens、引註寫法正規化、重問列出錯的 id、RUNNER_LOST 判讀、runner 放鎖、每次呼叫的額度檢查、計費失敗記帳、掛載後量行數、懶人填寫不露代碼、draft 走計費、預算拒絕 429、最壞情況要放得下、保留量用位元組、tool schema 算進輸入、已回應的失敗帶用量（空、格式錯）、食譜起草的預算拒絕也是 429、讀不到用量按最壞情況記、沒有用量也不當 0、記帳失敗的帳留在保留裡、/ai/status 扣掉在途保留：24/24 |
+| Codex 交叉審查 | 第 1 輪（def7d7882..c11d92618）1 筆 high：重問沒檢查額度 → 已修；第 2 輪（修正）2 筆：呼叫本身的保留沒算進檢查 → 已修；量測用 CSS px → 實測否定（手機寬 390：370 單位的框排版寬 370、螢幕上 109 px）；第 3 輪 1 筆：`/ai/draft/*` 仍直接呼叫模型 → 已修＋AST 結構測試關掉整類（`test_every_paid_call_is_metered.py`）；第 4 輪 1 筆：字元數不是 token 上限、tool schema 沒算進輸入 → 已修（`worst_input_tokens` = 送出內容的 UTF-8 位元組＋框架）；第 5 輪 1 筆：已回應但空的答案記成 0 token → 已修（API 一回應，provider 丟的錯都是帶用量的 `ProviderCallError`，含 content 缺失）；第 6 輪 2 筆：食譜起草包兩層時預算拒絕變 502、usage 格式錯變 ValueError 記成 0 → 已修（沿 cause 鏈找拒絕；讀不到用量 = 按保留的最壞情況記）；第 7 輪 2 筆：回應沒有 usage 被當成 0、記帳失敗時保留先被放掉 → 已修（`usage_known=False` 一律按最壞情況；寫不進去的帳留在保留）；第 8 輪 2 筆：/ai/status 沒扣在途保留 → 已修；在途保留在行程記憶體、重啟會丟 → 早於本批、Phase 1 單行程的既定範圍，列 TASKS（DB 層保留）；第 9 輪見 WORKLOG |
+| 真實瀏覽器（Chromium，/projects/demo/iceberg，桌機＋手機） | 25 個圖內文字框 0 溢出、0 page error |
 | 稽核 → 驗證 | 4 份稽核 310 筆 → 2 個驗證者逐筆 Grep 工作樹（`verified_*.json`）；統計見 §6 |
-| 真模型整頁（本機 :3930→:8420，`scripts/dev/result_shots.cjs`） | result_shots13（2026-09-28）：11 段全出、0 error、0 溢出、1.3.0 欄位全出、五閘 PASS 0 dropped／removed、parity 0 finding，約 4.3 萬 tokens（≈NT$6）。result_shots14：citation_integrity 兩次拒收，當時重問訊息沒說哪個引註錯 → 已修（引註寫法正規化＋重問列出錯的 id；test_a_refused_citation_tells_the_retry_which_ids_to_fix）；修後未再真跑（付費呼叫待操作者同意） |
+| 真模型整頁（本機 :3930→:8420，`scripts/dev/result_shots.cjs`） | result_shots13（2026-09-28）：11 段全出、0 error、0 溢出、1.3.0 欄位全出、五閘 PASS 0 dropped／removed、parity 0 finding，約 4.3 萬 tokens（≈NT$6）。result_shots14：citation_integrity 兩次拒收 → 已修（引註寫法正規化＋重問列出錯的 id）；修後未再真跑（付費呼叫待操作者同意） |
 
 
 ## 6. 缺失總表（四份稽核 310 筆 → 兩個獨立驗證者逐筆對照工作樹）
 
 | 狀態 | 筆數 | 意義 |
 |---|---|---|
-| OPEN | 2 | 未做 |
-| PARTIAL | 2 | 做一半 |
-| FIXED_IN_TREE | 306 | 工作樹已修 |
+| OPEN | 0 | 未做 |
+| PARTIAL | 0 | 做一半 |
+| FIXED_IN_TREE | 310 | 工作樹已修 |
 | FALSE | 0 | 稽核誤報 |
 | UNVERIFIED | 0 | 未能驗證 |
 | 重複（dup_of） | 12 | 同一缺口兩份稽核都報，只留一列 |
@@ -78,7 +81,6 @@
 
 | id | 組 | 卡 | 嚴重 | 類 | 缺什麼 | 證據（file:line，2026-09-28 工作樹） | 改法 | 驗證 |
 |---|---|---|---|---|---|---|---|---|
-| P-43 | 管線＋流程 | process | major | 流程 | No WORKLOG entry, evidence lines or fresh oracle; TASKS stale | agency-os/reports/oracle newest 2026-09-27-partialreview-663040bd.md; agency-os/WORKLOG.md no hit for complete_json｜repair_details｜PROJECT_BUSY; agency-os/TASKS.md:122 ④ still '存成任務、到期重跑、核准存檔、匯出 PDF 未做' | After edits stop, write the WORKLOG entry via scripts/worklog-insert-entry.py with REALTEST/REVIEW/BUGHUNT lines, produce a 2026-09-28 codex-review artifact (or ORACLE_WAIVED with mutation evidence), and update TASKS.md:122 ④⑤ via git-partial-worktree-commit.py. | verify-closeout-completeness.ps1 passes; commit hooks pass |
 
 ### 6.2 未做（OPEN）— minor／suggestion
 
@@ -89,8 +91,6 @@
 
 | id | 組 | 卡 | 嚴重 | 類 | 缺什麼 | 證據（file:line，2026-09-28 工作樹） | 改法 | 驗證 |
 |---|---|---|---|---|---|---|---|---|
-| I-15 | 表頭–③ | input | minor | 操作者決定 | Web-only extras in the input card not in the mock; undefined mb10 class | mb10 gone: components/RunPage.tsx:150,155,156 use mb8 (design-system.css:233); extras still absent from iceberg-result-mock.html:343-373: LazyFill details :150, AI 幫你填了 :151, notes :152-154, 存到 :155, 改存到別的專案 :156, confirm box :166, pending :168 | The input card's conditional extras (AI 幫你填, 存到, 確認執行 box, 專案名稱) are not in the mock; parity only checks mock ⊆ page, so they pass. Add them to the mock with data-when if the operator wants them specified. | python docs/mockups/check-mocks.py green after the mock edit; grep -c mb10 apps/cognitive-web/components/RunPage.tsx == 0 |
-| P-16 | 管線＋流程 | tests | minor | code | foreignObject no longer clips, but estimate-sized boxes can overflow | components/result/svgtext.tsx:23 <foreignObject … style={{ overflow: 'visible' }}> (clipping gone); heights still from linesFor estimate (:8-16), no post-mount measurement or slack | foreignObject overflow is visible (never clipped) and boxes are sized by linesFor; no post-mount measurement. Three real runs showed 0 overflow. | Playwright: for each 'foreignObject > div', scrollHeight <= foreignObject height with long mixed-Latin texts |
 
 ### 6.4 工作樹已修（FIXED_IN_TREE）— 接手者只需在 commit 後複驗 `驗證` 欄
 
@@ -143,6 +143,7 @@
 | P-32 | 管線＋流程 | checker | major | code | 怎麼讀 strip compare checks only the bold labels | Codex e01fc7d49 (2026-09-28) |
 | P-36 | 管線＋流程 | checker | major | 測試 | Selftest never exercises --page result or --parity | Codex e01fc7d49 (2026-09-28) |
 | P-40 | 管線＋流程 | e2e | major | 測試 | e2e mock result is 1.0-shaped; new flows untested | Codex e01fc7d49 (2026-09-28) |
+| P-43 | 管線＋流程 | process | major | 流程 | No WORKLOG entry, evidence lines or fresh oracle; TASKS stale | 2026-09-28 session batch 4: WORKLOG 續11 + this batch's entry, TASKS.md:122; Codex oracle run on def7d7882..c11d92618 (1 finding: a retry was unchecked against the daily budget -> fixed: _MeteredProvider meters every call, a call starts only if its worst case fits) and twice on the fix (agency-os/reports/oracle/2026-09-28-*) |
 | M-05 | ④–⑦ | 4 | minor | code | Layer 2 h3 reads 模式 Patterns (mock: 模式與趨勢 Patterns & Trends) | components/result/MethodVisual.tsx:14 title: '模式與趨勢 Patterns & Trends' (name stays 模式 Patterns for the svg); ResultPage.tsx:140 uses .title |
 | M-06 | ④–⑦ | 4 | minor | code | Layer 3 h3 reads 結構 Structures | components/result/MethodVisual.tsx:15 title: '結構與流程 Structures & Processes' |
 | M-10 | ④–⑦ | 4 | minor | code | Layer 2 這層問 uses the ② wording | components/result/MethodVisual.tsx:14 ask4: '這段時間有什麼趨勢？哪些事件互相關聯？'; used at ResultPage.tsx:270 |
@@ -254,11 +255,13 @@
 | I-06 | 表頭–③ | input | minor | code | Required asterisk on iceberg layer labels (mock has none) | components/MethodForm.tsx:44 — {label}{field.required && !extra ? ' *' : ''} |
 | I-09 | 表頭–③ | input | minor | code | Placeholders are the long demo lines, not the mock's short examples; no name attr | 2026-09-28 session batch: worker 2 (prefill checked against the target record schema + coerced + needs marked; Chinese labels from the target form; toolHref keeps project and prefill; position line; approval carried; workflow button honest; short placeholders; 要提高 links #sources) |
 | I-12 | 表頭–③ | input | minor | code | Cost note sat between the form buttons | components/MethodForm.tsx:89 .btns = 執行分析 / 用示範案例填入 / 清空，填我自己的 only; props at :83 have no note |
+| I-15 | 表頭–③ | input | minor | 操作者決定 | Web-only extras in the input card not in the mock; undefined mb10 class | 2026-09-28 session batch 4: iceberg-result-mock.html input card now specifies 手邊有一段描述？ / AI 幫你填了 / 存到 (result｜empty) / 改存到別的專案 / 要花多少＋確認執行 / 正在分析; RunPage `DescribeFirst` + `SaveTo` shared with the parity test; LazyFill says words, not AI_SUGGESTED or String(error) (LazyFill.test.tsx) |
 | P-10 | 管線＋流程 | gate | minor | code | Retry keeps the second answer even if it lost more | 2026-09-28 session batch: def7d7882 (pipeline: ProviderCallError + one retry for a cut-off; effort medium; conform_to_schema item grain; repair_next_steps/repair_claims; headline a detail section; repaired vs removed; better-of-two) |
 | P-11 | 管線＋流程 | prompt | minor | code | Prompt contradicts tool call; r/foo example; undefined est_cost/level | 2026-09-28 session batch: def7d7882 (pipeline: ProviderCallError + one retry for a cut-off; effort medium; conform_to_schema item grain; repair_next_steps/repair_claims; headline a detail section; repaired vs removed; better-of-two) |
 | P-12 | 管線＋流程 | schema | minor | code | confidence.level 'medium' fails schema (no normalisation) | 2026-09-28 session batch: def7d7882 (pipeline: ProviderCallError + one retry for a cut-off; effort medium; conform_to_schema item grain; repair_next_steps/repair_claims; headline a detail section; repaired vs removed; better-of-two) |
 | P-13 | 管線＋流程 | gate | minor | code | Several fact fields escape the numbers check | 2026-09-28 session batch: def7d7882 (pipeline: ProviderCallError + one retry for a cut-off; effort medium; conform_to_schema item grain; repair_next_steps/repair_claims; headline a detail section; repaired vs removed; better-of-two) |
 | P-14 | 管線＋流程 | schema | minor | 契約 1.3.0 | Contract cannot express a loop feeder (mock 圖 B belief box) | 2026-09-28 session batch: contract 1.3.0 (next_steps short/on_path/why, diagnosis, priority_short, units.thickness, gaps path/citations, solutions.recommended, loop.feeders; add_blank_unit_gaps; page renders each) |
+| P-16 | 管線＋流程 | tests | minor | code | foreignObject no longer clips, but estimate-sized boxes can overflow | 2026-09-28 session batch 4: svgtext.tsx `useLines()` -- after mount the browser's own line count (hidden probe, same styles, drawing units) replaces the estimate in TrendChart/LoopChart/Iceberg/Layers; Charts.test.tsx P-16 test; Chromium on /projects/demo/iceberg desktop+phone: 25 foreignObjects, 0 overflow (layout width 370 = drawing units, 109 px on a phone screen) |
 | P-17 | 管線＋流程 | tests | minor | 測試 | Loop layout test checks stale default geometry | 2026-09-28 session batch: loop/deploy/dev (LoopChart mock geometry + ringOrder; iceberg baselines [80,46,41,37]; withDefinitions dfn; deploy.sh gate + deploy/web_test.sh; scripts/dev paths from the script; pricing rows checked against platform.claude.com) |
 | P-20 | 管線＋流程 | tests | minor | 測試 | cost_twd assertion can never fail | round 6 (2026-09-28): tests/unit/test_api_interpret.py:196 assertIsNone (fake model unpriced); tests/unit/test_pricing.py:25 exact NT$ with a priced model |
 | P-21 | 管線＋流程 | provider | minor | code | claude-opus-4 prefix priced $5/$25; no pricing tests | 2026-09-28 session batch: loop/deploy/dev (LoopChart mock geometry + ringOrder; iceberg baselines [80,46,41,37]; withDefinitions dfn; deploy.sh gate + deploy/web_test.sh; scripts/dev paths from the script; pricing rows checked against platform.claude.com) |
@@ -415,9 +418,7 @@
 
 | id | 狀態 | 要做什麼 |
 |---|---|---|
-| P-43 | 流程 | 本批的 WORKLOG 條目與 TASKS.md:122 已隨 commit 更新；Codex oracle 額度到 2026-09-29 01:51 才恢復，屆時對 `def7d7882..HEAD` 跑 `/codex-review` 補 artifact |
-| I-15 | 做一半（操作者） | 輸入卡在示意稿之外多了：懶人填寫、存到哪個專案＋名稱、確認執行的費用框。要不要把它們寫進示意稿（加 `data-when`），操作者決定 |
-| P-16 | 做一半 | 圖內文字 `overflow: visible` 永不裁切，框高用 `linesFor` 估算；沒有掛載後量測。三次真跑 0 溢出 |
+| （計費）DB 層保留 | 追蹤 | 在途保留存在 API 行程記憶體（`_AI_RESERVED`）：呼叫中行程被殺，那次的帳記不到。治本＝ai_usage 先寫「已保留」列（最壞情況）、呼叫後改成實際值，行程死掉時帳仍在（寧多不少），也能多行程。Codex 2026-09-28 第 8 輪；見 TASKS |
 | （上線） | High-STOP | §9；先確認正式站的 `COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET`：一次完整分析實測約 1.8–4.3 萬 tokens（含一次重問時） |
 
 ## 8. 已替操作者做的決定（可推翻，每條一行）
@@ -428,6 +429,7 @@
 4. **示範專案免費、唯讀**：`/projects/demo/iceberg`，資料是一次真實分析（`fixtures/demo-iceberg.json`，只能從真跑重產）。
 5. **課程五個領域都有真的示範案例**：`method-form-examples.yaml` 的 `sets`（畫廊延後付款、加開平日班、退貨率 12%、週日吵架），每個都經過真的 builder 與閘。
 6. **圖 A 漏畫時重問一次**＋1.3.0 其他欄位由模型自己交代；若要省那一次呼叫，改 `trend_candidates` 的觸發條件。
+7. **輸入卡的其他部分寫進示意稿（I-15）**：懶人填寫、AI 起草後的確認、存到、改存到別的專案、要花多少＋確認執行、正在分析；有條件才出現的用 `hidden`＋註解。
 
 ## 9. 上線程序（High-STOP；操作者 go 後逐步）
 
