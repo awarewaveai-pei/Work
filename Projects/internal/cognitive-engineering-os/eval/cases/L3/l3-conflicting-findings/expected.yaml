@@ -1,51 +1,28 @@
 findings:
 - id: shift_quality
+  category: claim
   terms:
-  - 睡眠
-  - 眠品
-  - 品質
-  - 而非
-  - 非單
-  - 單純
-  - 純時
-  - 時數
-  - 與隔
-  - 隔日
-  - 日反
-  - 反應
-  - 應時
-  - 時間
-  - 間有
-  - 有中
-  - 中度
-  - 度相
-  - 相關
+  - 睡眠品質
+  - 反應時間
   sources:
   - source:src:study_z
+- id: y_method
+  category: method
+  terms:
+  - 重複實驗
+  sources:
+  - source:src:study_y
+- id: y_limitation
+  category: limitation
+  terms:
+  - 咖啡因
+  sources:
+  - source:src:study_y
 conflicts:
 - id: conf-1
   terms:
-  - 未觀
-  - 觀察
-  - 察到
-  - 到睡
-  - 睡眠
-  - 眠時
-  - 時數
-  - 數與
-  - 與工
-  - 工作
-  - 作記
-  - 記憶
-  - 憶測
-  - 測驗
-  - 驗分
-  - 分數
-  - 數有
-  - 有顯
+  - '15'
   - 顯著
-  - 著關
-  - 關聯
   sources:
   - source:src:study_x
   - source:src:study_y
@@ -53,8 +30,6 @@ gaps:
 - id: gap-1
   terms:
   - 因果
-  - 果機
-  - 機制
 traps:
 - source: source:src:study_y
   kind: contradicting_sources

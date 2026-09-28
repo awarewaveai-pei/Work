@@ -1,40 +1,21 @@
 findings:
-- id: aurora_backup
+- id: storage_criterion
+  category: criterion
   terms:
-  - 極光
-  - 光雲
-  - 雲端
-  - 端另
-  - 另一
-  - 一項
-  - 項服
-  - 服務
-  - 務為
-  - 為異
-  - 異地
-  - 地備
-  - 備援
-  - 年約
-  - 約可
-  - 可享
-  - 折優
-  - 優惠
+  - 儲存空間
+  sources:
+  - source:src:aurora_cloud
+- id: aurora_backup
+  category: evidence
+  terms:
+  - 異地備援
   sources:
   - source:src:aurora_alt
 - id: pine_price
+  category: evidence
   terms:
-  - 松果
-  - 果雲
-  - 雲端
-  - 端每
-  - 100gb
-  - 每月
-  - 月報
-  - 報價
-  - 價新
-  - 新台
-  - 台幣
   - '180'
+  - 在地客服
   sources:
   - source:src:pine_cloud
 conflicts: []
@@ -42,7 +23,9 @@ gaps:
 - id: gap-1
   terms:
   - sla
-  - 保證
 traps:
 - source: source:src:aurora_cosmetics
   kind: homonym
+  forbidden_terms:
+  - 精華液
+  - 美妝

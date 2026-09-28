@@ -1,26 +1,16 @@
 findings:
 - id: founder_bg
+  category: fact
   terms:
-  - 陳曉
-  - 曉明
-  - 明是
-  - 晨曦
-  - 曦科
-  - 科技
-  - 的創
+  - 台北科技大學
   - 創辦
-  - 辦人
   sources:
   - source:src:bio_main
 - id: company_found
+  category: fact
   terms:
-  - 晨曦
-  - 曦科
-  - 科技
-  - 技成
-  - 成立
-  - 立於
-  - '2019'
+  - 晨曦雲倉
+  - '120'
   sources:
   - source:src:bio_main
   - source:src:company_overview
@@ -32,3 +22,6 @@ gaps:
 traps:
 - source: source:src:wrong_person
   kind: homonym
+  forbidden_terms:
+  - 主廚
+  - 壽司

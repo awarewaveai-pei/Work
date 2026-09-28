@@ -67,7 +67,7 @@
           "source:src:study_x",
           "source:src:study_y"
         ],
-        "text": "睡眠時數與工作記憶表現的關聯性研究結果矛盾：study_x 發現顯著下降，study_y 的重複實驗未觀察到睡眠時數與工作記憶測驗分數有顯著關聯。"
+        "text": "睡眠時數與工作記憶表現的關聯性研究結果矛盾：study_x 發現工作記憶測驗分數平均下降 15%，study_y 的重複實驗未觀察到睡眠時數與工作記憶測驗分數有顯著關聯。"
       }
     ],
     "gaps": [
@@ -124,7 +124,7 @@
         "limitations": [
           "可能受咖啡因攝取量干擾"
         ],
-        "method": "對照實驗",
+        "method": "重複實驗",
         "sample": "80 人",
         "source_id": "src:study_y",
         "study_id": "study_y"
@@ -143,8 +143,6 @@
     ],
     "summary": {
       "citations": [
-        "source:src:study_x",
-        "source:src:study_y",
         "source:src:study_z"
       ],
       "text": "study_z 發現睡眠品質（而非單純時數）與隔日反應時間有中度相關。。"

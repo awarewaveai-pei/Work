@@ -190,9 +190,7 @@
     "summary": {
       "citations": [
         "source:src:feature_list",
-        "source:src:harbor_review",
-        "source:src:partner_doc",
-        "source:src:pricing_page"
+        "source:src:harbor_review"
       ],
       "text": "潮汐支付支援信用卡、行動支付與跨境交易，並提供即時對帳 API。；港灣金流交易手續費統一為每筆 2.6%，不分商家規模。。"
     },

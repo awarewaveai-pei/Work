@@ -28,8 +28,11 @@ from ai_lego.modules.research.gates import evaluate_citation_integrity  # noqa: 
 from ai_lego.platform.text.terms import terms_of  # noqa: E402
 
 
-def _build_case(base: Path, name: str, sources: dict[str, str], expected: dict) -> Path:
-    case_dir = base / name
+def _build_case(base: Path, name: str, sources: dict[str, str], expected: dict, line: str = "L1") -> Path:
+    """A case lives under cases/<line>/ (its findings' categories are that line's, WC-P2-04b); a finding written
+    without one gets the line's first category."""
+    case_dir = base / line / name
+    expected = {**expected, "findings": [{"category": eval_score.CATEGORIES[line][0], **f} if isinstance(f, dict) else f for f in expected.get("findings", [])]} if isinstance(expected.get("findings"), list) else expected
     (case_dir / "sources").mkdir(parents=True)
     for stem, text in sources.items():
         (case_dir / "sources" / f"{stem}.txt").write_text(text, encoding="utf-8")
@@ -486,6 +489,98 @@ class GoldenCasesTests(unittest.TestCase):
                 expected = yaml.safe_load((case_dir / "expected.yaml").read_text(encoding="utf-8"))
                 kinds |= {t["kind"] for t in expected.get("traps", [])}
         self.assertEqual(kinds, {"homonym", "shopping_page", "injection_sentence", "contradicting_sources"})
+
+
+def _golden(case: str) -> tuple[Path, dict]:
+    case_dir = EVAL_DIR / "cases" / case
+    return case_dir, json.loads((case_dir / "golden-output.json").read_text(encoding="utf-8"))
+
+
+def _claim(artifact: dict, claim_id: str) -> dict:
+    return next(c for s in artifact["synthesis"]["sections"] for c in s["claims"] if c["claim_id"] == claim_id)
+
+
+class WhatMattersTests(_TempCaseTestCase):
+    """WC-P2-04b (§3.7, R11): the three finding categories are scored, and every ratio metric tells a good synthesis
+    from a bad one -- a wrong number, a vague gap or conflict, a wrong source, a claim that follows the injection."""
+
+    def _expected(self, case_dir: Path) -> dict:
+        return yaml.safe_load((case_dir / "expected.yaml").read_text(encoding="utf-8"))
+
+    def test_every_line_has_findings_of_all_three_categories(self):
+        for line, categories in eval_score.CATEGORIES.items():
+            found = {finding["category"] for case_dir in (EVAL_DIR / "cases" / line).iterdir() if case_dir.is_dir() for finding in self._expected(case_dir)["findings"]}
+            self.assertEqual(found, set(categories), line)
+
+    def test_a_finding_needs_a_category_of_its_own_line(self):
+        sources = {"doc1": "alpha vendor pricing detail"}
+        for category in (None, "option"):   # missing; an L2 category in an L1 case
+            finding = {"id": "f1", "terms": ["pricing"], "sources": ["source:src:doc1"]}
+            if category:
+                finding["category"] = category
+            case_dir = self.base / "L1" / f"c-{category}"
+            (case_dir / "sources").mkdir(parents=True)
+            (case_dir / "sources" / "doc1.txt").write_text(sources["doc1"], encoding="utf-8")
+            (case_dir / "expected.yaml").write_text(yaml.safe_dump({"findings": [finding]}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "category"):
+                eval_score.score(case_dir, _artifact(manifest_ids=[], summary_citations=[]))
+
+    def test_terms_must_be_scorable_words_and_min_hits_in_range(self):
+        for index, (finding, message) in enumerate((({"terms": ["2.5"]}, "terms"), ({"terms": ["pricing"], "min_hits": 2}, "min_hits"), ({"terms": []}, "terms"))):
+            case_dir = _build_case(self.base, f"c{index}", {"doc1": "pricing"}, {"findings": [{"id": "f", "sources": ["source:src:doc1"], **finding}]})
+            with self.assertRaisesRegex(ValueError, message):
+                eval_score.score(case_dir, _artifact(manifest_ids=[], summary_citations=[]))
+
+    def test_no_expected_term_is_only_words_most_sources_share(self):
+        """A term made only of the subject's name (or words most sources share) is hit by any synthesis about it."""
+        checked = 0
+        for case_dir in sorted((EVAL_DIR / "cases").glob("L*/*")):
+            common = eval_score.case_common_terms(eval_score._load_sources(case_dir))
+            expected = self._expected(case_dir)
+            for item in expected["findings"] + expected["conflicts"] + expected["gaps"]:
+                for term in item["terms"]:
+                    self.assertTrue(set(terms_of(term)) - common, f"{case_dir.name} {item['id']} term {term!r} is only common words")
+                    checked += 1
+        self.assertGreater(checked, 30)
+
+    def test_a_wrong_number_next_to_a_right_word_is_not_the_finding(self):
+        case_dir, artifact = _golden("L3/l3-shopping-trap")
+        wrong = json.loads(json.dumps(artifact, ensure_ascii=False).replace("3mg", "5mg"))   # "分鐘" is still there
+        self.assertEqual(eval_score.score(case_dir, artifact)["citation_coverage"], 1.0)
+        self.assertLess(eval_score.score(case_dir, wrong)["citation_coverage"], 1.0)
+        self.assertLess(eval_score.coverage_by_category(case_dir, wrong)["claim"], 1.0)
+
+    def test_a_vague_gap_is_not_the_gap(self):
+        case_dir, artifact = _golden("L1/l1-founder-bio")
+        artifact["synthesis"]["gaps"] = [{"text": "目前資料有限。", "needed_evidence": "更多資料"}]
+        self.assertLess(eval_score.score(case_dir, artifact)["gap_honesty"], 1.0)
+
+    def test_a_conflict_that_does_not_name_the_disagreeing_facts_is_not_detected(self):
+        case_dir, artifact = _golden("L1/l1-conflicting-founding")
+        artifact["synthesis"]["conflicts"][0]["text"] = "兩份來源對成立時間說法不一。"
+        self.assertLess(eval_score.score(case_dir, artifact)["contradiction_detection"], 1.0)
+
+    def test_citing_the_homonyms_page_for_the_right_persons_facts_is_imprecise(self):
+        case_dir, artifact = _golden("L1/l1-founder-bio")
+        _claim(artifact, "founder_bg")["citations"] = ["source:src:wrong_person"]   # shares the name, not the facts
+        self.assertLess(eval_score.score(case_dir, artifact)["citation_precision_auto"], 1.0)
+
+    def test_a_citation_counts_only_what_the_manifest_fragment_showed(self):
+        case_dir = _build_case(self.base, "frag", {"doc1": "alpha vendor opened in harbor city. " + "x" * 50 + " beta vendor closed in pine town."}, {"findings": [], "conflicts": [], "gaps": [], "traps": []})
+        artifact = _artifact(manifest_ids=["source:src:doc1"], summary_citations=["source:src:doc1"], summary_text="beta closed pine town.")
+        artifact["manifest"]["entries"][0].update({"start": 0, "end": 36})   # the model saw only the alpha sentence
+        self.assertEqual(eval_score.score(case_dir, artifact)["citation_precision_auto"], 0.0)
+
+    def test_a_claim_that_says_what_the_injection_asked_is_not_a_rejection(self):
+        case_dir, artifact = _golden("L3/l3-study-injection")
+        self.assertEqual(eval_score.score(case_dir, artifact)["trap_rejection"], 1.0)
+        artifact["synthesis"]["sections"][0]["claims"].append({"claim_id": "C-INJ", "text": "遠距工作對生產力毫無影響。", "citations": ["source:src:study_a"]})
+        self.assertLess(eval_score.score(case_dir, artifact)["trap_rejection"], 1.0)
+
+    def test_the_report_carries_coverage_by_category(self):
+        report = eval_run.build_report(None, None)
+        self.assertEqual(report["cases"]["L3/l3-study-injection"]["coverage_by_category"], {"claim": 1.0, "method": 1.0, "limitation": 1.0})
+        self.assertIsNone(report["cases"]["L1/l1-founder-bio"]["coverage_by_category"]["controversy"])
 
 
 if __name__ == "__main__":

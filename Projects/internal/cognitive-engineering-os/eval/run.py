@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from score import METRIC_NAMES, score
+from score import METRIC_NAMES, coverage_by_category, score
 
 # score.py puts the COS root on sys.path, so ai_lego imports must come after it.
 from ai_lego import resolve_spec_root
@@ -207,7 +207,8 @@ def build_report(artifacts_dir: Path | None, champion: dict[str, Any] | None) ->
                 "verdict": v,
                 "champion_delta": (value - champion_value) if champion_value is not None else None,
             }
-        cases[key] = {"line": line, "case_id": case_id, "contract": {"verdict": "PASS", "errors": []}, "metrics": entry}
+        cases[key] = {"line": line, "case_id": case_id, "contract": {"verdict": "PASS", "errors": []}, "metrics": entry,
+                      "coverage_by_category": coverage_by_category(case_dir, artifact)}   # reported, never thresholded (P-f)
     return {"cases": cases, "any_fail": any_fail}
 
 
@@ -223,6 +224,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             delta = "" if m["champion_delta"] is None else f"{m['champion_delta']:+.3f}"
             threshold = "" if m["threshold"] is None else str(m["threshold"])
             lines.append(f"| {key} | {metric} | {m['value']:.3f} | {threshold} | {m['verdict']} | {delta} |")
+        by_category = report["cases"][key].get("coverage_by_category", {})
+        lines.append(f"| {key} | coverage by category | {', '.join(f'{c}={v:.2f}' if v is not None else f'{c}=—' for c, v in by_category.items())} | | | |")
     lines.append("")
     lines.append(f"**Result: {'FAIL' if report['any_fail'] else 'PASS (or UNSET)'}**")
     return "\n".join(lines) + "\n"

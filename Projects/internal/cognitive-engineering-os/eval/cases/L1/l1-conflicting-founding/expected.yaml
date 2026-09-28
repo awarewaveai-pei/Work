@@ -1,41 +1,29 @@
 findings:
 - id: team_size
+  category: fact
   terms:
-  - 晴空
-  - 空數
-  - 數位
-  - 位目
-  - 目前
-  - 前團
-  - 團隊
-  - 隊約
   - '35'
+  - 點數
   sources:
   - source:src:team_page
+- id: founding_dispute
+  category: controversy
+  terms:
+  - '2017'
+  - 低調
+  sources:
+  - source:src:press_2020
 conflicts:
 - id: conf-1
   terms:
-  - 晴空
-  - 空數
-  - 數位
-  - 位其
-  - 其實
-  - 實是
-  - 是在
   - '2017'
-  - 年低
-  - 低調
-  - 調成
-  - 成立
+  - 官方網站
   sources:
   - source:src:site_official
   - source:src:press_2020
 gaps:
 - id: gap-1
   terms:
-  - 是否
-  - 否已
-  - 已獲
   - 獲利
 traps:
 - source: source:src:press_2020

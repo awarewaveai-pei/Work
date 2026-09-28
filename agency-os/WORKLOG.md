@@ -1,4 +1,19 @@
 ﻿# Worklog
+## 2026-09-28（續12）研究線 WC-P2-04b（原雲端 T36，未曾派出 → 本機做）：評分量得到好壞——三類期望發現、承載事實的詞、片段＋非共通詞引註精確率、陷阱禁詞
+- [範圍] worktree `D:\tmp\wt-p209`（detached，origin/main `c11d92618`）；fork session 確認 T36 從未送出、無人負責（續號由合併者重配）。§0 不改（§12.8「卡 commit 不改本檔，合併者回填」）。
+- [改] `eval/score.py`：`CATEGORIES`（L1 fact/controversy/related_party、L2 option/criterion/evidence、L3 claim/method/limitation）＋`_load_expected` 驗 category／terms／min_hits／forbidden_terms；`term_present`（P-i `terms_of` 詞全在＝命中；無 P-i 詞的 term 拒收）；`case_common_terms`（過半來源共有的詞，一處定義，terms 守門與 precision 共用）；precision 比被引來源 manifest `[start,end)` 片段且要命中主張的非共通詞；coverage／contradiction／gap 以 `min_hits`（預設全部）判；trap 加 `forbidden_terms`；`_content_text` 納入 relation／method／limitations；`coverage_by_category`。`eval/run.py` 報告每案 `coverage_by_category`（json＋md，不設門檻，P-f 八名不變）。9 案 `expected.yaml` 重寫；README。
+- [golden 修正]（新指標抓到的真引註問題，`gate_results` 以閘重算）：conflicting-founding 摘要只引 team_page、衝突句照官網原文「官方網站記載」；founder-bio `company_found` 只引 company_overview＋補 120 家、relation 改中文；shopping-noise 補總部新竹＋related_entities（多家創投）；pricing-conflict 摘要只引 feature_list／harbor_review；conflicting-findings 摘要只引 study_z、study_y method 照原文「重複實驗」、衝突句寫出 15%。
+- [計畫矛盾，本卡處置]
+  - C4 卡寫「terms 用數字、日期」vs P-i：單一數字／小數不是 `terms_of` 詞（`2.5%`、`8 分鐘`）→ 依規則 16 用 P-i，這類事實改用專有名詞或帶單位詞（`3mg`）；README 寫明。
+  - C5 卡突變「precision 改回整篇 → 引錯來源反例紅」：只限片段抓不到「引同名者頁面」→ 加非共通詞判準（同卡「過半來源」定義），突變拆兩個：整篇比對 → 片段反例紅；拔非共通詞 → 同名者反例紅。
+- P2_04b_TEST: PASS | cmd=`python -m unittest tests.unit.test_eval_harness -q; echo $?`／`python eval/run.py --golden --out $TEMP/evalrep; echo $?`／`python eval/mutate.py; echo $?` | out=0／0／0（68 tests；mutate 兩項 PASS）；`affected_tests.py --run` 68 OK；golden ALL PASSED；另補跑 `test_synthesis`＋`test_api_synthesis` OK
+- P2_04b_MUT: PASS | cmd=scratch `mutate_wc04b.py`（本 worktree，每次清 `__pycache__`） | out=5/5 RED：卡①刪 L3 method 期望發現 → 三類齊全案紅；卡②命中改回 1 詞 → 錯數字案紅；卡③整篇比對 → 片段案紅；拔非共通詞 → 同名者案紅；忽略 forbidden_terms → 照注入寫案紅；還原全綠
+- [發現] `scripts/affected_tests.py` 漏選以 `sys.path` 引 `eval/run.py` 的測試（`test_synthesis`、`test_api_synthesis`；只看 ai_lego import 圖）→ 規則 11 的選擇器對 eval/ 改動會少跑；本次手補。歸 TASKS 一行，不在本卡修。
+- [剩餘風險] precision 對「只用多數來源共有的詞重述事實」的正確引用判為未支持（README 寫明：主張用被引來源的用詞）；真模型輸出會因此偏低，基準線由 09 真跑後操作者定門檻，thresholds 仍全 null。
+- REALTEST_EVIDENCE: tool=Bash | cmd=三條卡驗收＋affected_tests＋golden＋突變 5 | exit=0 | ms=150000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0（Codex adversarial approve，`agency-os/reports/oracle/2026-09-28-review-7a4f734a.md`；其沙箱無可寫 temp 未跑 unit，unit 由本機跑）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`coverage_by_category|case_common_terms|term_present|forbidden_terms|_content_text` | hits=35（全在本卡改動檔＋計畫 04b 卡文）
+- [下一步] 合併者 cherry-pick；本線續 WC-P2-09（C1 recipe 改 `research-qualitative-v1`；C2 補 9 案真模型產 artifact 腳本；C3 三突變＝§5＋§6 聯集）。
 ## 2026-09-28（續11）Cognitive OS 結果頁第二輪：310 筆缺口已修 306、剩 3（核准列真檢查、契約 1.3.0、⑦⑧ 與專案頁、示範專案、五領域示範案例、deploy web gate、示意稿對齊、分析 run lock、引註正規化）；未上線
 - [操作者] 「我讓 Codex 完成這些，其他的你開始繼續做！直到完成」（Codex 三批 e01fc7d49／137186da4／3199a4f9a，27 筆）；拒絕再付費真跑診斷 → 選項 1（不呼叫模型，確定性修正後 commit）。
 - [根因] C1 核准列把四個解讀閘當 ✓ 標籤列出（detail_integrity 掉段也 ✓），方法自己的閘（層序）算完就丟，無預設結論沒有閘（N-39/40/42/43）。C2 契約 1.2.0 缺示意稿欄位：診斷、短順序、每層厚度與誰能補、建議方案、迴路外信念框、下一步路徑與原因、缺口對應哪層（→1.3.0）。C3 ⑦ 任務／提醒可重複建立、方案選了不存、目標不能確認（M-73/79/76/75）。C4 ⑧ 帶入欄位是模型猜的 key（N-13/14/20/21）。C5 錯誤直接顯示 API 409；專案不能改名、刪除只在結果頁、來源只有數字（N-63/83/65/85）。C6 課程五領域「用示範案例試一次」只有一個有資料（N-55）。C7 真跑才看到：⑧「還要你填」出現別的工具的 key；三框迴路標題被斜箭頭穿過。C8 真跑 #14：citation_integrity 兩次拒收，重問訊息只寫閘名不寫哪個引註錯（interpret_method_record.py 重試 detail 只補 next_methods／數字），模型重犯同一錯。C9 分析 PENDING 只由「沒有結果事件」推得：行程重啟＝永遠 PENDING＋專案永遠 409 PROJECT_BUSY 刪不掉（N-64 同類；peer 指出，plan P-k）。

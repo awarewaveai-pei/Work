@@ -1,63 +1,34 @@
 findings:
-- id: tide_features
+- id: harbor_option
+  category: option
   terms:
-  - 潮汐
-  - 汐支
-  - 支付
-  - 付支
-  - 支援
-  - 援信
-  - 信用
-  - 用卡
-  - 行動
-  - 動支
-  - 付與
-  - 與跨
-  - 跨境
-  - 境交
-  - 交易
+  - 港灣金流
+  sources:
+  - source:src:harbor_review
+- id: tide_features
+  category: evidence
+  terms:
+  - 即時對帳
+  - api
   sources:
   - source:src:feature_list
 - id: harbor_fee
+  category: evidence
   terms:
-  - 港灣
-  - 灣金
-  - 金流
-  - 流交
-  - 交易
-  - 易手
-  - 手續
-  - 續費
-  - 費統
-  - 統一
-  - 一為
-  - 為每
-  - 每筆
+  - 商家規模
   sources:
   - source:src:harbor_review
 conflicts:
 - id: conf-1
   terms:
-  - 標準
-  - 準交
-  - 交易
-  - 易手
-  - 手續
-  - 續費
-  - 費其
-  - 其實
-  - 實是
-  - 是每
-  - 每筆
+  - 官網
+  - 夥伴
   sources:
   - source:src:pricing_page
   - source:src:partner_doc
 gaps:
 - id: gap-1
   terms:
-  - 是否
-  - 否有
-  - 有月
   - 月費
 traps:
 - source: source:src:partner_doc

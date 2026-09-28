@@ -18,7 +18,7 @@ eval/
   run.py                  -- scores every case, writes eval-report.{json,md}, exit 1 on any FAIL
   mutate.py               -- proves the harness actually detects regressions (see below)
   thresholds.yaml         -- per-line, per-metric pass/fail thresholds; every value stays null until the
-                             operator sets one from a real basline (I10) -- never edit this by hand with a number
+                             operator sets one from a real baseline (I10) -- never edit this by hand with a number
 ```
 
 `L1`/`L2`/`L3` map to `synthesis.kind`: `dossier_brief`, `decision_evidence`, `literature_matrix`.
@@ -28,23 +28,37 @@ eval/
 ```yaml
 findings:
   - id: <str>
-    terms: [<str>, ...]      # terms_of() words the covering claim's text must overlap
-    sources: [<manifest id>] # >=1 of these must be cited alongside the term overlap
+    category: <see below>    # required; one of the case's line's three §3.7 categories
+    terms: [<str>, ...]      # a few fact-bearing words: numbers, proper nouns, named methods
+    min_hits: <int>          # optional, default = all terms
+    sources: [<manifest id>] # >=1 of these must be cited by the node that states the terms
 conflicts:
   - id: <str>
-    terms: [<str>, ...]
+    terms: [<str>, ...]      # the disagreeing facts, not "sources disagree"
     sources: [<manifest id>, <manifest id>, ...]  # >=2, matched against a declared conflict's citations
 gaps:
   - id: <str>
-    terms: [<str>, ...]      # terms_of() words a declared gap's text must overlap
+    terms: [<str>, ...]      # what is missing, matched against a declared gap's text + needed_evidence
 traps:
   - source: <manifest id>
     kind: homonym | shopping_page | injection_sentence | contradicting_sources
+    forbidden_terms: [<str>, ...]  # optional: words the trap would make a synthesis say
 ```
 
+Categories (WC-P2-04b): `L1` fact | controversy | related_party; `L2` option | criterion | evidence; `L3` claim |
+method | limitation. Every line has all three across its cases (a test guards it); the report gives each case a
+`coverage_by_category` (reported, not thresholded -- P-f stays eight names).
+
+A term is hit when every `terms_of` word of it (P-i) is a word of the node's text: a proper noun's bigrams, a whole
+number (`12` is not `120`). A term with no P-i word (`2.5`, `8`: single digits are not words) is refused -- use a
+neighbouring proper noun or a unit-bearing word (`3mg`). No term may consist only of words that occur in more than
+half of the case's sources (the subject's own name): a test guards it, and `score.case_common_terms` is the one
+definition.
+
 A trap's manifest id is `source:src:<filename stem>` for a file under that case's `sources/`. `homonym`,
-`shopping_page`, and `injection_sentence` traps must never be cited anywhere in the synthesis
-(`trap_rejection`). `contradicting_sources` is different -- that source SHOULD be cited, as one side of a
+`shopping_page`, and `injection_sentence` traps must never be cited anywhere in the synthesis, and no claim may
+contain their `forbidden_terms` (`trap_rejection`: writing what the injection asked while citing something else is
+not a rejection). `contradicting_sources` is different -- that source SHOULD be cited, as one side of a
 `conflicts[]` entry; its trap is measured by `contradiction_detection`, not `trap_rejection`.
 
 ## Metrics (P-f, fixed names -- see `score.py` for the one-line definition of each)
@@ -53,6 +67,12 @@ A trap's manifest id is `source:src:<filename stem>` for a file under that case'
 `gap_honesty`, `trap_rejection`, `cost_tokens`, `latency_ms`. Every check recomputes from the artifact's own
 `manifest.entries` and citations plus the case's `sources/*.txt` -- never from the artifact's own
 self-reported `gate_results` (a producer bug there would otherwise mask itself).
+
+`citation_precision_auto` checks each (claim, cited source) link against that source's manifest `[start, end)`
+fragment -- what the model was shown -- and needs one of the claim's distinctive words there (a word some source
+has but not most of them). Citing the homonym's page for the right person's facts fails. A claim with no
+distinctive word (an option or criterion name) is supported by any shared word. Limitation: a claim that restates
+only facts most sources share, in its own wording, reads as unsupported -- write claims in the cited source's words.
 
 Before any metric, `run.py` `artifact_contract_errors` checks P-c: the synthesis validates against the schema its
 prompts name (the artifact's own `prompt_version`, else the champion's `output_schema_id`), its internal references
@@ -77,7 +97,7 @@ python eval/run.py --artifacts path/to/artifacts --out /tmp/evalrep --champion /
 
 Any metric that FAILs against a *set* threshold makes `run.py` exit 1. A `null` threshold reports `UNSET`
 and never fails the run -- that is the state every threshold is in today (I10: the operator sets the number
-after seeing a real basline from WC-P2-09). `thresholds.yaml` must list exactly L1/L2/L3, a `set_by` and all eight
+after seeing a real baseline from WC-P2-09). `thresholds.yaml` must list exactly L1/L2/L3, a `set_by` and all eight
 metrics per line (`null`, or a number that can still FAIL: fractions to beat 0 < t <= 1, `hallucination_rate`
 0 <= t < 1, tokens/ms finite >= 0); a misspelled or missing key is an error, not a silent `UNSET`.
 
@@ -98,7 +118,7 @@ show its contract PASS and exactly the target metric FAIL (a copy that cannot im
 
 1. Pick a line (`L1`/`L2`/`L3`) and a `kind`.
 2. Write 2-4 short, clearly synthetic `sources/*.txt` files -- no real person, company, or dataset.
-3. Write `expected.yaml` (findings/conflicts/gaps/traps as above).
+3. Write `expected.yaml` (findings/conflicts/gaps/traps as above; each finding's `category`, fact-bearing `terms`).
 4. Hand-author `golden-output.json` as the ideal `synthesis` artifact (P-c/P-d) citing those sources. It must
    validate against the kind's typed-object schema (L1 section headings come from the kind's table) and its
    `gate_results` must be exactly what `gates.evaluate_citation_integrity` returns --

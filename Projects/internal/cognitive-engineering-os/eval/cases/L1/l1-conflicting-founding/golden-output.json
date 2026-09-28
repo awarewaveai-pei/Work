@@ -67,7 +67,7 @@
           "source:src:site_official",
           "source:src:press_2020"
         ],
-        "text": "成立年份說法不一：官網稱 2018 年成立；但 2020 年報導稱晴空數位其實是在 2017 年低調成立，2018 年才正式對外公開。"
+        "text": "成立年份說法不一：官方網站記載 2018 年成立；但 2020 年報導稱晴空數位其實是在 2017 年低調成立，2018 年才正式對外公開。"
       }
     ],
     "gaps": [
@@ -114,8 +114,6 @@
     },
     "summary": {
       "citations": [
-        "source:src:press_2020",
-        "source:src:site_official",
         "source:src:team_page"
       ],
       "text": "晴空數位目前團隊約 35 人，專注於零售業點數系統開發。。"

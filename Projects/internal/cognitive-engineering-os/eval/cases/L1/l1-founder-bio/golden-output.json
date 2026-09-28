@@ -88,7 +88,7 @@
           "source:src:bio_main"
         ],
         "name": "晨曦科技",
-        "relation": "founded"
+        "relation": "創辦"
       }
     ],
     "sections": [
@@ -108,11 +108,10 @@
         "claims": [
           {
             "citations": [
-              "source:src:bio_main",
               "source:src:company_overview"
             ],
             "claim_id": "company_found",
-            "text": "晨曦科技成立於 2019 年，主打雲端庫存管理系統「晨曦雲倉」。"
+            "text": "晨曦科技成立於 2019 年，主打雲端庫存管理系統「晨曦雲倉」，客戶約 120 家中小型零售商。"
           }
         ],
         "heading": "主要作品／貢獻"

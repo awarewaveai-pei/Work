@@ -2,7 +2,7 @@
   "gate_results": [
     {
       "evidence": {
-        "claims_total": 3,
+        "claims_total": 4,
         "conflicts_under_two": [],
         "out_of_manifest": [],
         "uncited_sections": [],
@@ -82,7 +82,15 @@
       "epistemic_type": "AI_INFERENCE",
       "locked": null
     },
-    "related_entities": [],
+    "related_entities": [
+      {
+        "citations": [
+          "source:src:funding"
+        ],
+        "name": "多家創投",
+        "relation": "A 輪投資人"
+      }
+    ],
     "sections": [
       {
         "claims": [
@@ -91,7 +99,7 @@
               "source:src:overview"
             ],
             "claim_id": "company_bg",
-            "text": "藍鯨雲端成立於 2021 年，提供中小企業數據分析 SaaS 平台。"
+            "text": "藍鯨雲端成立於 2021 年，提供中小企業數據分析 SaaS 平台，總部位於新竹。"
           }
         ],
         "heading": "公司概況"
