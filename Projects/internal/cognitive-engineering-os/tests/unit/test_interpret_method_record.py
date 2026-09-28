@@ -21,7 +21,7 @@ from ai_lego.modules.research.interpret_method_record import (
     repair_details,
     trend_candidates,
 )
-from ai_lego.platform.ai_gateway.provider import AiCompletion
+from ai_lego.platform.ai_gateway.provider import AiCompletion, ProviderCallError
 
 
 RECORD = {"events": ["release incidents"], "patterns": ["weekly spike"]}
@@ -133,7 +133,7 @@ class InterpretationTests(unittest.TestCase):
         result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-REPAIR-001")
         self.assertEqual(provider.calls, 2)
         self.assertIsNone(result["error"])
-        self.assertIn('next_steps.method_id=["fake.missing"]', provider.requests[1][1])
+        self.assertIn("'fake.missing' is not an active method; removed", provider.requests[1][1])   # the step goes alone, the answer stays (P-07)
         self.assertEqual((result["input_tokens"], result["output_tokens"]), (20, 40))
 
     def test_unresolvable_prefill_becomes_needs_input_without_loosening_gate(self):
@@ -264,7 +264,9 @@ class ResultPageDetailTests(unittest.TestCase):
     def test_a_supported_answer_has_no_problem_and_keeps_every_section(self):
         self.assertEqual(self.problems(), {})
         result = run_detail(FakeProvider([detailed_response()]), "INTERP-DETAIL-001")
-        self.assertEqual(result["gate_results"][3], {"gate_id": "detail_integrity", "status": "PASS", "evidence": {"problems": {}, "dropped": {}, "removed": {}}})
+        evidence = result["gate_results"][3]["evidence"]
+        self.assertEqual((evidence["problems"], evidence["dropped"], evidence["removed"]), ({}, {}, {}))
+        self.assertEqual(list(evidence["repaired"]), ["gaps"])   # no gap and no source: the missing-source gap is added (P-08)
         for key in ("summary", "units", "focus", "priority", "solutions", "loop", "trend"): self.assertIn(key, result["interpretation"])
 
     def test_a_number_the_record_does_not_state_is_refused(self):
@@ -375,18 +377,19 @@ class ResultPageDetailTests(unittest.TestCase):
         provider = FakeProvider([detailed_response(units=units, solutions=solutions)] * 2)
         result = run_detail(provider, "INTERP-DETAIL-004")
         self.assertIsNone(result["error"])
-        dropped = result["gate_results"][3]["evidence"]["dropped"]
-        self.assertEqual(sorted(dropped), ["solutions", "units"])
-        self.assertTrue(all(reason[0].startswith("schema: ") for reason in dropped.values()))
+        evidence = result["gate_results"][3]["evidence"]
+        self.assertEqual(sorted(evidence["dropped"]), ["solutions"])   # options left under minItems 2: the section goes
+        self.assertTrue(evidence["dropped"]["solutions"][0].startswith("schema: "))
+        self.assertIn("leverage", evidence["removed"]["units"][0])   # the bad unit goes alone (P-06), and with it the only unit
         for key in ("summary", "focus", "priority", "loop", "trend"): self.assertIn(key, result["interpretation"])   # the valid sections stay
         self.assertTrue(result["interpretation"]["findings"])
 
     def test_a_core_the_schema_refuses_is_not_trimmed_into_a_pass(self):
         body = json.loads(detailed_response())
-        body["findings"][0]["confidence"]["level"] = "certain"   # the core: the schema allows high|mid|low
+        body["findings"][0]["confidence"]["level"] = "certain"   # the core: the schema allows high|mid|low, and no synonym maps "certain"
         result = run_detail(FakeProvider([json.dumps(body, ensure_ascii=False)] * 2), "INTERP-DETAIL-006")
-        self.assertIsNone(result["interpretation"])
-        self.assertIn("SCHEMA_VALIDATION_FAILED", result["error"])
+        self.assertIsNone(result["interpretation"])   # the only finding goes at item grain; no finding left = the core refuses
+        self.assertIn("citation_integrity", result["error"])
 
 
 
@@ -413,7 +416,8 @@ class TrendRetryTests(unittest.TestCase):
         self.assertEqual(provider.calls, 2)
         self.assertIsNone(result["error"])
         self.assertNotIn("trend", result["interpretation"])
-        self.assertEqual(result["gate_results"][3]["evidence"], {"problems": {}, "dropped": {}, "removed": {}})
+        evidence = result["gate_results"][3]["evidence"]
+        self.assertEqual((evidence["dropped"], evidence["removed"]), ({}, {}))
 
     def test_a_record_measured_once_is_not_asked_again(self):
         provider = FakeProvider([detailed_response(trend=None)])
@@ -427,12 +431,140 @@ class TrendRetryTests(unittest.TestCase):
         self.assertIn("when = the week numbers counted from the plan's start, digits only, like 1 到 2 / 3 到 4 / 5", provider.requests[0][1])
 
 
+class CutOffProvider(FakeProvider):
+    """First call cut off at max_tokens (billed), then the scripted answers."""
+    def __init__(self, responses, reason="cut_off"):
+        super().__init__(responses); self.reason = reason; self.cut = False
+    def complete(self, system, user, *, max_tokens):
+        if not self.cut:
+            self.cut = True; self.requests.append((system, user, max_tokens))
+            raise ProviderCallError(f"AI_PROVIDER_{self.reason.upper()}: test", reason=self.reason, input_tokens=100, output_tokens=max_tokens)
+        return super().complete(system, user, max_tokens=max_tokens)
+
+
+class ModelCallTests(unittest.TestCase):
+    """P-01 / P-47: a cut-off answer is asked once more and what it cost is counted; a refusal is not retried."""
+
+    def test_a_cut_off_answer_is_asked_again_and_its_tokens_are_counted(self):
+        provider = CutOffProvider([detailed_response()])
+        result = run_detail(provider, "INTERP-CUT-001")
+        self.assertIsNone(result["error"])
+        self.assertEqual(len(provider.requests), 2)
+        self.assertEqual(result["attempts"][0]["stop_reason"], "cut_off")
+        self.assertIn("ANSWER_CUT_OFF", provider.requests[1][1])
+        self.assertEqual(result["output_tokens"], INTERPRET_MAX_TOKENS + 20)
+        self.assertEqual(result["input_tokens"], 110)
+
+    def test_a_refusal_is_not_retried_but_is_counted(self):
+        provider = CutOffProvider([detailed_response()], reason="refusal")
+        result = run_detail(provider, "INTERP-CUT-002")
+        self.assertIn("AI_PROVIDER_REFUSAL", result["error"])
+        self.assertEqual(len(provider.requests), 1)
+        self.assertEqual(result["output_tokens"], INTERPRET_MAX_TOKENS)
+
+
+class GateGrainTests(unittest.TestCase):
+    """Each problem costs the smallest thing that holds it, never the whole answer (P-03..P-13, N-33, N-39)."""
+
+    manifest = build_prompt_manifest(DETAIL_RECORD)
+
+    def test_layer_ordinals_and_section_marks_are_not_claims(self):
+        self.assertEqual(detail_problems(json.loads(detailed_response(summary="問題在第 3 層，⑦ 的方案先做。", priority="先第 3 層再第 4 層")), DETAIL_RECORD, self.manifest), {})
+        body = json.loads(detailed_response()); body["findings"][0]["title"] = "問題在第 3 層"
+        self.assertEqual(evaluate_interpretation_gates(body, DETAIL_RECORD, self.manifest, set())[0]["status"], "PASS")
+
+    def test_a_quantity_in_chinese_words_is_checked_like_digits(self):
+        body = json.loads(detailed_response()); body["findings"][0]["text"] = "少了四個人。"
+        gate = evaluate_interpretation_gates(body, DETAIL_RECORD, self.manifest, set())[0]
+        self.assertEqual((gate["status"], gate["evidence"]["unstated_numbers"]), ("FAIL", {"F1": ["4"]}))
+        worded = {"events": ["第 6 次只有兩位分享"]}
+        self.assertEqual(detail_problems({"summary": "只剩 2 位"}, worded, build_prompt_manifest(worded)), {})
+
+    def test_the_schema_refuses_one_item_and_that_item_goes_alone(self):
+        solutions = json.loads(detailed_response())["solutions"]
+        metric = solutions["metrics"][0]
+        solutions["metrics"] = [dict(metric, target=""), dict(metric), dict(metric), dict(metric), dict(metric)]
+        units = json.loads(detailed_response())["units"]
+        units[0]["brief"] = "很" * 45
+        units[1]["leverage"] = "medium"
+        result = run_detail(FakeProvider([detailed_response(solutions=solutions, units=units)] * 2), "INTERP-GRAIN-001")
+        self.assertIsNone(result["error"])
+        self.assertEqual(len(result["interpretation"]["solutions"]["metrics"]), 3)   # the empty one gone, then capped at 3
+        self.assertNotIn("brief", result["interpretation"]["units"][0])            # the over-long brief goes, the unit stays
+        self.assertEqual(result["interpretation"]["units"][1]["leverage"], "mid")   # a synonym read as the enum value
+        self.assertNotIn("solutions", result["gate_results"][3]["evidence"]["dropped"])
+
+    def test_one_bad_next_step_goes_alone(self):
+        steps = [{"method_id": m, "answers": "a", "deepens": "d", "prefill": {}, "needs_input": [], "yields": "y", "est_cost": "S"} for m in ("systems.a", "fake.none", "systems.b")]
+        provider = FakeProvider([detailed_response(next_steps=steps, next_methods=["systems.a"])] * 2)
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=DETAIL_RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.a", "systems.b"}, interpretation_id="INTERP-GRAIN-002")
+        self.assertIsNone(result["error"])
+        self.assertEqual([s["method_id"] for s in result["interpretation"]["next_steps"]], ["systems.a", "systems.b"])
+        self.assertEqual(result["interpretation"]["next_methods"], ["systems.a", "systems.b"])
+
+    def test_a_string_gap_is_kept_and_a_record_only_answer_always_lists_the_missing_source(self):
+        result = run_detail(FakeProvider([detailed_response(gaps=["缺逐次數字"])]), "INTERP-GRAIN-003")
+        self.assertEqual(result["interpretation"]["gaps"][0]["text"], "缺逐次數字")
+        result = run_detail(FakeProvider([detailed_response(gaps=[])]), "INTERP-GRAIN-004")
+        self.assertIn("沒有外部來源", result["interpretation"]["gaps"][0]["text"])
+
+    def test_a_repaired_citation_costs_no_retry(self):
+        solutions = json.loads(detailed_response())["solutions"]
+        solutions["metrics"][0]["now_citation"] = ""
+        provider = FakeProvider([detailed_response(solutions=solutions)])
+        result = run_detail(provider, "INTERP-GRAIN-005")
+        self.assertEqual(provider.calls, 1)
+        self.assertEqual(result["gate_results"][3]["evidence"]["removed"], {})
+
+    def test_a_worse_second_answer_does_not_replace_the_first(self):
+        bad_trend = {"reading": "x", "series": [{"name": "x", "unit": "位", "points": [{"label": "a", "value": 9, "citation": "r/events/0"}, {"label": "b", "value": 2, "citation": "r/events/0"}]}]}
+        solutions = json.loads(detailed_response())["solutions"]
+        for option in solutions["options"]: option.pop("advice")
+        open_loop = dict(json.loads(detailed_response())["loop"], edges=[{"from": "a", "to": "b"}])
+        provider = FakeProvider([detailed_response(trend=bad_trend), detailed_response(solutions=solutions, loop=open_loop)])
+        result = run_detail(provider, "INTERP-GRAIN-006")
+        self.assertEqual(provider.calls, 2)
+        self.assertIn("solutions", result["interpretation"])
+        self.assertIn("loop", result["interpretation"])
+        self.assertIn("KEPT_FIRST_ANSWER", result["attempts"][1]["refused"])
+
+    def test_more_fact_fields_are_checked(self):
+        body = json.loads(detailed_response())
+        body["loop"]["name"] = "9 人迴路"
+        self.assertIn("loop", detail_problems(body, DETAIL_RECORD, self.manifest))
+        body = json.loads(detailed_response()); body["trend"]["question"] = "從 9 位掉到幾位？"
+        self.assertIn("trend", detail_problems(body, DETAIL_RECORD, self.manifest))
+        body = json.loads(detailed_response()); body["findings"][0]["confidence"]["reason"] = "問過 9 位"
+        self.assertEqual(evaluate_interpretation_gates(body, DETAIL_RECORD, self.manifest, set())[0]["status"], "FAIL")
+        result = run_detail(FakeProvider([detailed_response(gaps=[{"text": "少了 9 位的紀錄", "needed_evidence": "x"}, {"text": "缺訪談", "needed_evidence": "x"}])] * 2), "INTERP-GRAIN-007")
+        self.assertEqual([g["text"] for g in result["interpretation"]["gaps"]], ["缺訪談"])
+
+    def test_every_claim_cites_and_confidence_stays_mid_without_a_source(self):
+        findings = json.loads(detailed_response())["findings"]
+        findings[0]["confidence"]["level"] = "high"
+        findings.append({"id": "F2", "title": "無出處", "text": "沒有引註。", "citations": [], "confidence": {"level": "low", "reason": "x"}})
+        recommendations = [{"level": "now", "action": "先做", "expected": "x", "citations": []}, {"level": "now", "action": "後做", "expected": "x", "citations": ["r/events/0"]}]
+        result = run_detail(FakeProvider([detailed_response(findings=findings, recommendations=recommendations)] * 2), "INTERP-GRAIN-008")
+        self.assertIsNone(result["error"])
+        self.assertEqual([f["id"] for f in result["interpretation"]["findings"]], ["F1"])
+        self.assertEqual(result["interpretation"]["findings"][0]["confidence"]["level"], "mid")
+        self.assertEqual([r["action"] for r in result["interpretation"]["recommendations"]], ["後做"])
+        gate = result["gate_results"][0]["evidence"]
+        self.assertEqual((gate["claims"], gate["unsupported"]), (2, 0))
+
+    def test_a_root_key_the_contract_does_not_have_is_left_out(self):
+        result = run_detail(FakeProvider([detailed_response(revision_conditions=[{"text": "x", "would_change": "y"}])]), "INTERP-GRAIN-009")
+        self.assertIsNone(result["error"])
+        self.assertNotIn("revision_conditions", result["interpretation"])
+
+
 class ItemLevelIntegrityTests(unittest.TestCase):
     """The invariant (nothing unverified is shown) at the smallest grain that keeps it: one metric, one path, one unit,
     one point goes alone; the section stays (2026-09-27: a whole ⑦ card was lost to one empty now_citation)."""
 
     def repaired(self, **override):
-        return repair_details(json.loads(detailed_response(**override)), DETAIL_RECORD, build_prompt_manifest(DETAIL_RECORD))
+        fixed, removed, self.last_repaired = repair_details(json.loads(detailed_response(**override)), DETAIL_RECORD, build_prompt_manifest(DETAIL_RECORD))
+        return fixed, removed
 
     def solutions(self, **override) -> dict:
         return json.loads(detailed_response())["solutions"] | override
@@ -440,7 +572,8 @@ class ItemLevelIntegrityTests(unittest.TestCase):
     def test_a_metric_with_an_empty_citation_gets_the_one_record_line_that_states_its_number(self):
         fixed, removed = self.repaired(solutions=self.solutions(metrics=[{"name": "主動分享人數", "now": "2 人", "now_citation": "", "target": "6", "when": "一期"}]))
         self.assertEqual(fixed["solutions"]["metrics"][0]["now_citation"], "r/events/0")
-        self.assertIn("so it was set", removed["solutions"][0])
+        self.assertIn("so it was set", self.last_repaired["solutions"][0])   # repaired, not removed: no paid retry, no 已拿掉 (P-09)
+        self.assertNotIn("solutions", removed)
         self.assertEqual(detail_problems(fixed, DETAIL_RECORD, build_prompt_manifest(DETAIL_RECORD)), {})
 
     def test_a_metric_no_record_line_states_goes_alone_and_the_section_stays(self):
@@ -475,23 +608,34 @@ class ItemLevelIntegrityTests(unittest.TestCase):
         result = run_detail(provider, "INTERP-ITEM-001")
         self.assertEqual(provider.calls, 2)
         self.assertIn('"removed"', provider.requests[1][1])
-        self.assertEqual(result["gate_results"][3]["evidence"], {"problems": {}, "dropped": {}, "removed": {}})
+        evidence = result["gate_results"][3]["evidence"]
+        self.assertEqual((evidence["dropped"], evidence["removed"]), ({}, {}))
         self.assertEqual(len(result["interpretation"]["solutions"]["metrics"]), 1)   # the second answer's own metric, cited
 
-    def test_an_unstated_number_in_the_headline_is_a_core_refusal(self):
+    def test_an_unstated_number_in_the_headline_costs_the_headline_not_the_answer(self):
         provider = FakeProvider([detailed_response(headline="從 6 人掉到 3 人")] * 2)
         result = run_detail(provider, "INTERP-ITEM-002")
-        self.assertIsNone(result["interpretation"])
-        self.assertIn("headline", result["error"])
+        self.assertIsNone(result["error"])   # P-05: the page title falls back to the tool's name
+        self.assertIn("headline", result["gate_results"][3]["evidence"]["dropped"])
+        self.assertNotIn("headline", result["interpretation"])
+        self.assertIn("summary", result["interpretation"])
 
     def test_complete_json_is_used_when_the_provider_offers_it_and_the_prompt_names_the_new_fields(self):
         class JsonProvider(FakeProvider):
-            def complete_json(self, system, user, *, max_tokens):
+            def complete_json(self, system, user, *, max_tokens, effort=None, input_schema=None):
                 self.json_calls = getattr(self, "json_calls", 0) + 1
+                self.json_kwargs = {"effort": effort, "input_schema": input_schema, "system": system}
                 return self.complete(system, user, max_tokens=max_tokens)
         provider = JsonProvider([detailed_response()])
         result = run_detail(provider, "INTERP-ITEM-003")
         self.assertEqual((provider.json_calls, result["error"]), (1, None))
+        self.assertEqual(provider.json_kwargs["effort"], "medium")   # thinking bounded (P-02)
+        schema = provider.json_kwargs["input_schema"]
+        self.assertIn("findings", schema["properties"])
+        self.assertNotIn("interpretation_id", schema["properties"])   # the server's keys are never asked of the model (P-48)
+        self.assertNotIn("interpretation_id", schema["required"])
+        self.assertIn("input of the tool call", provider.json_kwargs["system"])   # one instruction for the channel used (P-11)
+        self.assertNotIn("r/foo", provider.requests[0][1])
         shape = json.loads(provider.requests[0][1].split("OUTPUT JSON SHAPE: ", 1)[1].split("\n\nRULES:", 1)[0])
         self.assertIn("headline", shape)
         self.assertEqual(set(shape["units"][0]) >= {"brief", "step", "leverage"}, True)

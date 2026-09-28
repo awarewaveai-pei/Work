@@ -16,12 +16,19 @@ from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import canonical_json
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gateway.draft import extract_json_object
-from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS
+from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS, ProviderCallError
 
 INTERPRETATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
+INTERPRETATION_SCHEMA_FILE = Path("specs") / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml"
 _VISUAL_KINDS = {"layered", "quadrant", "table", "matrix", "graph", "tree", "timeline", "scorecard"}
-INTERPRET_MAX_TOKENS = min(12288, MAX_OUTPUT_TOKENS)   # the result page's sections (schema 1.2.0) plus the model's thinking; a cut-off answer is unparseable
-INTERPRET_TIMEOUT_SECONDS = 240.0                    # an answer that long takes 2-3 minutes; the interactive 60 s default would cut it off (the job runs in the background)
+# Thinking counts against max_tokens and is billed as output (claude-sonnet-5 thinks at effort=high by default). Measured
+# 2026-09-28 on the demo record (effort unset): one answer = 5.8k-7.5k output tokens; the ceiling leaves room for a long
+# record, and INTERPRET_EFFORT keeps the thinking share bounded. A cut-off answer is asked once more (run_interpretation).
+INTERPRET_MAX_TOKENS = min(16000, MAX_OUTPUT_TOKENS)
+INTERPRET_EFFORT = "medium"
+INTERPRET_TIMEOUT_SECONDS = 300.0                    # 16k tokens take up to ~4 minutes; the interactive 60 s default would cut it off (the job runs in the background)
+# keys the server writes after the model answers: never asked of the model
+SERVER_KEYS = ("interpretation_id", "method_id", "record_sha256", "data_thickness", "provenance", "model", "usage", "judgment")
 MAX_SCHEMA_CHARS = 12000
 MAX_FEEDBACK_CHARS = 2000
 
@@ -83,10 +90,12 @@ def visual_kind(spec_root: Path, method_id: str, contract: Mapping[str, Any]) ->
     return kind
 
 
-def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], manifest: list[Mapping[str, Any]], kind: str, *, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None) -> tuple[str, str]:
+def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], manifest: list[Mapping[str, Any]], kind: str, *, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None, via_tool: bool = False) -> tuple[str, str]:
     """``feedback`` = why the user returned the previous version (``previous`` = its summary and findings): the answer
-    corrects exactly that and keeps what was right (the result page's 退回並說原因)."""
-    system = "You interpret a validated Cognitive Engineering method record. Reply with exactly one JSON object, no markdown. Do not invent facts, coordinates, scores, or sources."
+    corrects exactly that and keeps what was right (the result page's 退回並說原因). ``via_tool``: the answer is the
+    input of the tool call (complete_json), so the system line says that and not "reply with text"."""
+    channel = "Answer with exactly one JSON object as the input of the tool call." if via_tool else "Reply with exactly one JSON object, no markdown."
+    system = f"You interpret a validated Cognitive Engineering method record. {channel} Do not invent facts, coordinates, scores, or sources."
     example_path = next((str(item["id"]) for item in manifest if item.get("kind") == "record"), "r/example")
     binding_examples: dict[str, dict[str, Any]] = {
         "layered": {"levels": [{"label": "record layer", "path": example_path}]},
@@ -103,10 +112,10 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "AVAILABLE ACTIVE METHODS:\n" + "\n".join(catalog_lines or []),
         "OUTPUT JSON SHAPE: " + json.dumps({
             "headline": "",
-            "findings": [{"id": "F1", "title": "", "text": "", "citations": ["r/foo"], "confidence": {"level": "mid", "reason": ""}, "revision_conditions": [{"text": "", "would_change": ""}]}],
+            "findings": [{"id": "F1", "title": "", "text": "", "citations": [example_path], "confidence": {"level": "mid", "reason": ""}, "revision_conditions": [{"text": "", "would_change": ""}]}],
             "visual": {"kind": kind, "bindings": binding_examples.get(kind, {})}, "next_methods": [],
-            "next_steps": [{"method_id": "", "answers": "", "deepens": "", "prefill": {}, "needs_input": [], "yields": "", "est_cost": ""}],
-            "recommendations": [{"level": "", "action": "", "expected": "", "citations": []}],
+            "next_steps": [{"method_id": "", "answers": "", "deepens": "", "prefill": {}, "needs_input": [], "yields": "", "est_cost": "S"}],
+            "recommendations": [{"level": "now", "action": "", "expected": "", "citations": [example_path]}],
             "gaps": [{"text": "", "needed_evidence": ""}],
             "summary": "",
             "units": [{"path": example_path, "brief": "", "meaning": "", "action": "", "step": "", "effect": "", "leverage": "mid", "citations": [example_path]}],
@@ -118,7 +127,7 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
             "loop": {"kind": "reinforcing", "name": "", "reading": "", "nodes": [{"id": "n1", "text": "", "citations": [example_path]}], "edges": [{"from": "n1", "to": "n2"}]},
             "trend": {"question": "", "reading": "", "series": [{"name": "", "unit": "", "points": [{"label": "", "value": 0, "citation": example_path}]}]},
         }, ensure_ascii=False),
-        f"RULES: Write all narrative in {language}. The JSON shape is illustrative: omit optional arrays rather than emit empty-string examples. revision_conditions belongs inside each finding, never at the root. recommendations must contain objects, never bare strings; next_steps objects require every shown key including est_cost. Citations and every visual binding string must be a manifest id. next_methods may only use exact AVAILABLE ACTIVE METHODS ids; every next_steps.method_id must also appear in next_methods, and every next_steps.prefill value must be a MANIFEST id. If unsure of a valid next method, set both next_methods and next_steps to []. Never invent numbers or sources.",
+        f"RULES: Write all narrative in {language}. The JSON shape is illustrative: omit optional arrays rather than emit empty-string examples. revision_conditions belongs inside each finding, never at the root. recommendations must contain objects, never bare strings, each citing the manifest; level = now|next|later (when to do it). next_steps objects require every shown key; est_cost = S|M|L (S = minutes of the user's time, M = an hour or two, L = days). Every finding and recommendation cites at least one manifest id; citations and every visual binding string must be a manifest id. confidence.level = high only when a SOURCE supports the finding; with the record alone it is at most mid. next_methods may only use exact AVAILABLE ACTIVE METHODS ids; every next_steps.method_id must also appear in next_methods (a step naming any other method is dropped), and every next_steps.prefill value must be a MANIFEST id. Never invent numbers or sources.",
         "RESULT PAGE SECTIONS (each optional; omit a section you cannot support from the record): headline = what happened in this case, at most 20 Chinese characters, like a newspaper headline (the page title). "
         "summary = one or two sentences saying what is really going on and what to change. "
         "units = one entry per unit of the picture (layered: one per level, path = that level's binding path): brief = what the user filled in for that unit, at most 16 Chinese characters, only words and numbers from the record; meaning = what the unit tells (two or three sentences); "
@@ -130,8 +139,8 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "signoff = who has to agree to what (in brackets) and which option cannot go ahead without them, at most two sentences. "
         "loop = the feedback loop the record shows - causes that come back around and feed themselves (usual in systems tools; omit only when the record shows none): 2-6 nodes, each citing the record, and edges that close the loop (every node has an arrow in and out); kind reinforcing|balancing. "
         "trend = only numbers written in the record: question = the question the chart answers (ends with ？); every point's value must appear in the text of the manifest id it cites; when the record states the same quantity at two or more times (第 1 次 6 位、第 6 次 2 位) the trend is required, one point per stated time; omit trend only when the record has fewer than two such numbers. "
-        "gaps = at least 1 (there is always evidence you did not have); a unit of the record the user left empty must be listed as a gap. next_steps = up to 4, the first being the one most worth doing next.",
-        "NUMBERS: headline, findings (title, text), summary, priority, focus.why, units[].brief, units[].meaning, solutions.metrics[].name, loop texts and trend.reading state only numbers written in the record (no differences, sums or percentages you work out); suggestions (actions, plan, targets) may propose numbers. "
+        "gaps = at least 1 (there is always evidence you did not have); a unit of the record the user left empty must be listed as a gap. next_steps = 2 to 4, the first being the one most worth doing next.",
+        "NUMBERS: headline, findings (title, text, confidence.reason), summary, priority, focus.why, units[].brief, units[].meaning, solutions.metrics[].name, loop (name, node texts, reading), trend (question, reading) and gaps[].text state only numbers written in the record, in digits or in words (四個人 is 4; no differences, sums or percentages you work out); layer and step ordinals (第 3 層) are not counted. Suggestions (actions, plan, targets) may propose numbers. "
         "LENGTH: the whole JSON must close well inside the output limit. At most 3 findings; a text field is at most three sentences (about 100 Chinese characters); at most 2 recommendations, 3 gaps, 5 plan rows, 5 loop nodes, 4 next_steps; no indentation or line breaks outside strings.",
     ]
     if feedback:
@@ -211,11 +220,23 @@ def normalize_gaps_without_inventing_evidence(interpretation: dict[str, Any], la
     unspecified = "未指定；需使用者補充證據" if language.startswith("zh") else "Not specified; user must supply evidence"
     normalized: list[dict[str, str]] = []
     for gap in gaps:
+        if isinstance(gap, str) and gap.strip(): gap = {"text": gap}   # a model's bare-string gap is still a gap (P-08)
         if not isinstance(gap, Mapping) or not isinstance(gap.get("text"), str) or not gap["text"].strip():
             continue
         needed = gap.get("needed_evidence")
         normalized.append({"text": gap["text"], "needed_evidence": needed if isinstance(needed, str) and needed.strip() else unspecified})
     interpretation["gaps"] = normalized
+
+
+def add_missing_source_gap(interpretation: dict[str, Any], manifest: list[Mapping[str, Any]], language: str) -> dict[str, list[str]]:
+    """No gap listed although nothing outside the user's own words was read: that absence is itself the gap (P-08: the
+    page must never say 沒有缺口 on a record-only analysis). -> repaired notes."""
+    if interpretation.get("gaps") or any(item.get("kind") == "project_source" for item in manifest):
+        return {}
+    zh = language.startswith("zh")
+    interpretation["gaps"] = [{"text": "本次沒有外部來源；結論只根據你填的內容" if zh else "No external source; the conclusions rest on your own words only",
+                               "needed_evidence": "真實紀錄或外部資料（逐次數字、訪談、文件）" if zh else "Real records or outside data"}]
+    return {"gaps": ["no gap listed and no external source: the missing-source gap added"]}
 
 
 def normalize_layered_visual_bindings(interpretation: dict[str, Any]) -> None:
@@ -236,7 +257,7 @@ def normalize_layered_visual_bindings(interpretation: dict[str, Any]) -> None:
 # unit, one trend point is repaired or removed alone (repair_details); a section goes only when the section itself
 # fails (a loop that does not close, a summary stating a number the record does not). Both are disclosed in the gate's
 # evidence (removed / dropped), never silently.
-DETAIL_KEYS = ("summary", "units", "focus", "priority", "solutions", "loop", "trend")
+DETAIL_KEYS = ("headline", "summary", "units", "focus", "priority", "solutions", "loop", "trend")
 
 
 def _record_text(record: Mapping[str, Any], path: str) -> str:
@@ -259,8 +280,34 @@ def _number_text(value: Any) -> str:
     return str(int(value)) if float(value).is_integer() else repr(float(value))
 
 
+_CIRCLED = re.compile("[\u2460-\u2473\u24eb-\u24f4\u2776-\u2793]")          # ①…⑳ section marks (NFKC would make ⑦ a 7)
+_ORDINAL = re.compile(r"第\s*[0-9一二兩三四五六七八九十]+\s*(?:層級|層|步)")      # 第 3 層: a layer of the method, not a fact of the case
+_CJK_COUNT = re.compile(r"([零〇一二兩三四五六七八九十百千萬]+)\s*(個人|位|人|名|成|倍)")   # 四個人, 兩位, 三成: a quantity in words
+_CJK_DIGIT = {"零": 0, "〇": 0, "一": 1, "二": 2, "兩": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+_CJK_UNIT = {"十": 10, "百": 100, "千": 1000}
+
+
+def _cjk_int(word: str) -> int | None:
+    total = section = digit = 0
+    for ch in word:
+        if ch in _CJK_DIGIT: digit = _CJK_DIGIT[ch]
+        elif ch in _CJK_UNIT: section += (digit or 1) * _CJK_UNIT[ch]; digit = 0
+        elif ch == "萬": total += (section + digit) * 10000; section = digit = 0
+        else: return None
+    return total + section + digit
+
+
+def _words_to_digits(match: "re.Match[str]") -> str:
+    value = _cjk_int(match.group(1))
+    if value is None: return match.group(0)
+    return f"{value * 10}%" if match.group(2) == "成" else f"{value}{match.group(2)}"
+
+
 def _numbers(text: str) -> list[str]:
-    normal = unicodedata.normalize("NFKC", text).replace("−", "-")
+    """Every number ``text`` states, one canonical text each. Digits (any width), and quantities in Chinese words with a
+    count word (四個人 -> 4, 三成 -> 30); ordinals of layers/steps and circled section marks are structure, not claims."""
+    normal = unicodedata.normalize("NFKC", _CIRCLED.sub(" ", text)).replace("−", "-")
+    normal = _CJK_COUNT.sub(_words_to_digits, _ORDINAL.sub(" ", normal))
     return [_number_text(float(match.group(0).replace(",", ""))) for match in _NUMBER.finditer(normal)]
 
 
@@ -301,14 +348,186 @@ def _lines_stating(record: Mapping[str, Any], manifest: list[Mapping[str, Any]],
     return [leaf for leaf in leaves if set(numbers) <= set(_numbers(_record_text(record, leaf)))]
 
 
-def repair_details(interpretation: Mapping[str, Any], record: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> tuple[dict[str, Any], dict[str, list[str]]]:
-    """The interpretation with every unverifiable item repaired or removed alone, and what was done, by section.
-    A metric whose current value has no citation gets the one record line that states its numbers, or goes; an
-    option's unknown paths go; a unit whose path or citations are not manifest ids, or whose meaning states an
-    unstated number, goes; a trend point not stated by the line it cites goes (a series left with one point, too)."""
+# Enum words a model writes for the contract's values (P-12: "medium" once refused a whole answer).
+ENUM_SYNONYMS: dict[str, str] = {
+    "medium": "mid", "moderate": "mid", "middle": "mid", "中": "mid", "中等": "mid", "中低": "mid", "very_high": "max", "highest": "max",
+    "最高": "max", "高": "high", "低": "low", "reinforcing_loop": "reinforcing", "增強": "reinforcing", "自我加強": "reinforcing",
+    "balancing_loop": "balancing", "平衡": "balancing", "自我平衡": "balancing",
+}
+CONFORM_KEYS = ("findings", "recommendations", "gaps", "next_steps", "headline", "summary", "units", "focus", "priority", "solutions", "loop", "trend")
+
+
+def load_interpretation_schema(spec_root: Path) -> dict[str, Any]:
+    value = yaml.safe_load((spec_root / INTERPRETATION_SCHEMA_FILE).read_text(encoding="utf-8"))
+    if not isinstance(value, dict): raise InvariantViolation("INTERPRETATION_SCHEMA_INVALID")
+    return value
+
+
+def conform_to_schema(interpretation: Mapping[str, Any], schema: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, list[str]], dict[str, list[str]]]:
+    """The model's answer brought inside the contract at the smallest grain (P-06: one empty field, one over-long brief or
+    one fourth metric used to cost a whole section): an array item the schema refuses goes alone; an optional field it
+    refuses goes alone; an array over maxItems keeps its first items; a known synonym becomes the enum value; a key the
+    contract does not have goes. What cannot be fixed at that grain -- a required field of a section, an array left under
+    minItems -- is left for ``settle`` to drop the section. -> (answer, removed, repaired), notes by top-level key."""
+    removed: dict[str, list[str]] = {}
+    repaired: dict[str, list[str]] = {}
+    def note(bucket: dict[str, list[str]], where: str, message: str) -> None: bucket.setdefault(where.split(".")[0].split("[")[0], []).append(f"{where}: {message}")
+
+    def fits(value: Any, node: Mapping[str, Any], where: str) -> tuple[Any, str]:
+        """(value, "") when it fits after item-grain repair; (value, why) when it does not."""
+        kind = node.get("type")
+        if "enum" in node and isinstance(value, str) and value not in node["enum"]:
+            synonym = ENUM_SYNONYMS.get(value.strip().lower(), ENUM_SYNONYMS.get(value.strip()))
+            if synonym in node["enum"]: note(repaired, where, f"{value!r} read as {synonym!r}"); value = synonym
+        if kind == "string":
+            if not isinstance(value, str): return value, "not a string"
+            if len(value.strip()) < int(node.get("minLength", 0)): return value, "empty"
+            if "maxLength" in node and len(value) > int(node["maxLength"]): return value, f"longer than {node['maxLength']} characters"
+            if "enum" in node and value not in node["enum"]: return value, f"{value!r} is not one of {node['enum']}"
+            return value, ""
+        if kind in ("number", "integer"):
+            if isinstance(value, str):
+                try: value = float(value.replace(",", "")); note(repaired, where, "a number written as text read as a number")
+                except ValueError: return value, "not a number"
+            if isinstance(value, bool) or not isinstance(value, (int, float)): return value, "not a number"
+            return (int(value) if kind == "integer" and float(value).is_integer() else value), ""
+        if kind == "object":
+            if not isinstance(value, Mapping): return value, "not an object"
+            properties = node.get("properties") or {}
+            required = set(node.get("required") or [])
+            out = dict(value)
+            if node.get("additionalProperties") is False and properties:
+                for key in [k for k in out if k not in properties]:
+                    del out[key]; note(repaired, where, f"{key!r} is not in the contract; left out")
+            for key, child in properties.items():
+                if key not in out or not isinstance(child, Mapping) or "$ref" in child or "oneOf" in child: continue
+                if out[key] is None and key not in required: del out[key]; continue
+                fixed, why = fits(out[key], child, f"{where}.{key}")
+                if not why: out[key] = fixed
+                elif key in required: return out, f"{key}: {why}"
+                elif why == "empty": del out[key]; note(repaired, f"{where}.{key}", "empty; left out")   # an empty optional field is an absent one, nothing lost
+                else: del out[key]; note(removed, f"{where}.{key}", f"{why}; removed")
+            missing = [key for key in required if key not in out]
+            return out, (f"missing {missing}" if missing else "")
+        if kind == "array":
+            if not isinstance(value, list): return value, "not an array"
+            item_node = node.get("items") if isinstance(node.get("items"), Mapping) else {}
+            kept = []
+            for index, item in enumerate(value):
+                fixed, why = fits(item, item_node, f"{where}[{index}]") if item_node else (item, "")
+                if why: note(removed, f"{where}[{index}]", f"{why}; removed")
+                else: kept.append(fixed)
+            if "maxItems" in node and len(kept) > int(node["maxItems"]):
+                note(removed, where, f"{len(kept)} items, the contract allows {node['maxItems']}; kept the first {node['maxItems']}")
+                kept = kept[: int(node["maxItems"])]
+            if len(kept) < int(node.get("minItems", 0)): return kept, f"fewer than {node['minItems']} items"
+            return kept, ""
+        return value, ""
+
+    out = copy.deepcopy(dict(interpretation))
+    properties = schema.get("properties") or {}
+    for key in [k for k in out if properties and k not in properties]:   # a root key the contract does not have (revision_conditions at the root) used to refuse the answer
+        del out[key]; note(repaired, key, "not in the contract; left out")
+    for key in CONFORM_KEYS:
+        if key not in out or key not in properties: continue
+        if out[key] is None: del out[key]; continue
+        fixed, why = fits(out[key], properties[key], key)
+        if not why: out[key] = fixed
+        elif key == "headline": del out[key]; note(removed, key, f"{why}; removed")   # the page title falls back to the tool's name
+        else: out[key] = fixed   # a section (or a core list) the item grain could not save: settle / the core gates decide
+    return out, removed, repaired
+
+
+def answer_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """The contract as the answer's JSON Schema for the tool call (P-48): standard keywords only, the server's keys out.
+    Guidance for the model; conform_to_schema and the gates stay the authority."""
+    keep = {"type", "properties", "required", "items", "enum", "minLength", "maxLength", "minItems", "maxItems", "additionalProperties", "const"}
+    def clean(node: Any) -> Any:
+        if not isinstance(node, Mapping): return node
+        if "$ref" in node: return {"type": "object"}
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            if key not in keep: continue
+            if key == "properties": out[key] = {name: clean(child) for name, child in value.items()}
+            elif key == "items": out[key] = clean(value)
+            else: out[key] = copy.deepcopy(value)
+        return out
+    result = clean(schema)
+    for key in SERVER_KEYS: result.get("properties", {}).pop(key, None)
+    result["required"] = [key for key in result.get("required", []) if key not in SERVER_KEYS]
+    result.setdefault("properties", {})["visual"] = {"type": "object", "required": ["kind", "bindings"], "properties": {"kind": {"type": "string"}, "bindings": {"type": "object"}}}
+    return result
+
+
+def repair_next_steps(interpretation: dict[str, Any], active_method_ids: set[str]) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """P-07: a step naming a method that is not active goes alone (it used to refuse the whole answer); next_methods keeps
+    only active ids and gains every kept step's method. -> (removed, repaired)."""
+    removed: dict[str, list[str]] = {}
+    repaired: dict[str, list[str]] = {}
+    steps = interpretation.get("next_steps")
+    methods = interpretation.get("next_methods")
+    methods = [m for m in methods if isinstance(m, str)] if isinstance(methods, list) else []
+    if isinstance(steps, list):
+        kept = []
+        for index, step in enumerate(steps):
+            if isinstance(step, Mapping) and step.get("method_id") in active_method_ids: kept.append(step)
+            else: removed.setdefault("next_steps", []).append(f"next_steps[{index}].method_id {step.get('method_id') if isinstance(step, Mapping) else step!r} is not an active method; removed")
+        interpretation["next_steps"] = kept
+        for step in kept:
+            if step["method_id"] not in methods: methods.append(step["method_id"]); repaired.setdefault("next_methods", []).append(f"{step['method_id']} added (a next step names it)")
+    unknown = [m for m in methods if m not in active_method_ids]
+    if unknown: removed.setdefault("next_methods", []).append(f"{unknown} are not active methods; removed")
+    interpretation["next_methods"] = [m for m in methods if m in active_method_ids]
+    return removed, repaired
+
+
+def repair_claims(interpretation: dict[str, Any], record: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Every claim cites the manifest (N-39): a finding or recommendation with no citation, or citing a non-manifest id, goes
+    alone while at least one finding stays (none left = the core gate refuses). A gap stating an unstated number goes
+    (P-13). With no external source a finding's confidence is at most mid (N-33). -> (removed, repaired)."""
+    ids = {str(item.get("id")) for item in manifest}
+    in_record = frozenset(_record_numbers(record, manifest))
+    removed: dict[str, list[str]] = {}
+    repaired: dict[str, list[str]] = {}
+    def supported(claim: Any) -> bool:
+        citations = claim.get("citations") if isinstance(claim, Mapping) else None
+        return isinstance(citations, list) and bool(citations) and all(isinstance(c, str) and c in ids for c in citations)
+    findings = interpretation.get("findings")
+    if isinstance(findings, list) and any(supported(f) for f in findings):
+        for index, finding in enumerate(findings):
+            if not supported(finding): removed.setdefault("findings", []).append(f"findings[{index}] cites no manifest id; removed")
+        interpretation["findings"] = [f for f in findings if supported(f)]
+    recommendations = interpretation.get("recommendations")
+    if isinstance(recommendations, list):
+        for index, item in enumerate(recommendations):
+            if not supported(item): removed.setdefault("recommendations", []).append(f"recommendations[{index}] cites no manifest id; removed")
+        interpretation["recommendations"] = [item for item in recommendations if supported(item)]
+    gaps = interpretation.get("gaps")
+    if isinstance(gaps, list):
+        kept = []
+        for index, gap in enumerate(gaps):
+            unstated = [n for n in _numbers(str(gap.get("text", ""))) if n not in in_record] if isinstance(gap, Mapping) else []
+            if unstated: removed.setdefault("gaps", []).append(f"gaps[{index}].text states {unstated}, which the record does not; removed")
+            else: kept.append(gap)
+        interpretation["gaps"] = kept
+    if not any(item.get("kind") == "project_source" for item in manifest):
+        for index, finding in enumerate(interpretation.get("findings") or []):
+            confidence = finding.get("confidence") if isinstance(finding, dict) else None
+            if isinstance(confidence, dict) and confidence.get("level") == "high":
+                confidence["level"] = "mid"; repaired.setdefault("findings", []).append(f"findings[{index}].confidence high -> mid (no external source)")
+    return removed, repaired
+
+
+def repair_details(interpretation: Mapping[str, Any], record: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> tuple[dict[str, Any], dict[str, list[str]], dict[str, list[str]]]:
+    """The interpretation with every unverifiable item repaired or removed alone -> (answer, removed, repaired), by section.
+    A metric whose current value has no citation gets the one record line that states its numbers (repaired), or goes
+    (removed); an option's unknown paths go; a unit whose path or citations are not manifest ids, or whose meaning states
+    an unstated number, goes; a trend point not stated by the line it cites goes (a series left with one point, too).
+    Only ``removed`` is worth asking the model again for (P-09: a repaired citation once cost a paid retry)."""
     ids = {str(item.get("id")) for item in manifest}
     in_record = frozenset(_record_numbers(record, manifest))
     done: dict[str, list[str]] = {}
+    repaired: dict[str, list[str]] = {}
     def note(section: str, message: str) -> None: done.setdefault(section, []).append(message)
     fixed = copy.deepcopy(dict(interpretation))
     units = fixed.get("units")
@@ -352,7 +571,7 @@ def repair_details(interpretation: Mapping[str, Any], record: Mapping[str, Any],
                 stating = _lines_stating(record, manifest, claimed)
                 if len(stating) == 1:
                     metric["now_citation"] = stating[0]; kept.append(metric)
-                    note("solutions", f"solutions.metrics[{index}].now_citation {cite!r} did not state {claimed}; {stating[0]} does, so it was set")
+                    repaired.setdefault("solutions", []).append(f"solutions.metrics[{index}].now_citation {cite!r} did not state {claimed}; {stating[0]} does, so it was set")
                 else:
                     note("solutions", f"solutions.metrics[{index}].now states {claimed} and no single record line states it (citation {cite!r}); removed")
             solutions["metrics"] = kept
@@ -376,7 +595,7 @@ def repair_details(interpretation: Mapping[str, Any], record: Mapping[str, Any],
         trend["series"] = series_kept
         if not series_kept: del fixed["trend"]; note("trend", "no series kept; trend removed")
         else: fixed["trend"] = trend
-    return fixed, done
+    return fixed, done, repaired
 
 
 def detail_problems(interpretation: Mapping[str, Any], record: Mapping[str, Any], manifest: list[Mapping[str, Any]]) -> dict[str, list[str]]:
@@ -390,6 +609,7 @@ def detail_problems(interpretation: Mapping[str, Any], record: Mapping[str, Any]
     def facts(section: str, where: str, text: Any) -> None:
         unknown = [n for n in _numbers(text) if n not in in_record] if isinstance(text, str) else []
         if unknown: bad(section, f"{where} states {unknown}, which the record does not (the record states {sorted(in_record, key=float)})")
+    facts("headline", "headline", interpretation.get("headline"))   # the page title: one bad number costs the title, not the answer (P-05)
     facts("summary", "summary", interpretation.get("summary"))
     facts("priority", "priority", interpretation.get("priority"))
     def cites(section: str, where: str, citations: Any) -> None:
@@ -426,12 +646,14 @@ def detail_problems(interpretation: Mapping[str, Any], record: Mapping[str, Any]
             cites("loop", f"loop.nodes[{index}]", node.get("citations"))
             facts("loop", f"loop.nodes[{index}].text", node.get("text"))
         facts("loop", "loop.reading", loop.get("reading"))
+        facts("loop", "loop.name", loop.get("name"))
         if len(node_ids) != len(nodes): bad("loop", "loop.nodes ids repeat")
         if any(edge.get("from") not in node_ids or edge.get("to") not in node_ids for edge in edges): bad("loop", "loop.edges name a node that does not exist")
         elif not (node_ids <= {edge.get("from") for edge in edges} and node_ids <= {edge.get("to") for edge in edges}): bad("loop", "loop does not close: every node needs an arrow in and out")
     trend = interpretation.get("trend")
     if isinstance(trend, Mapping):
         facts("trend", "trend.reading", trend.get("reading"))
+        facts("trend", "trend.question", trend.get("question"))
         for s_index, series in enumerate(trend.get("series") or []):
             for p_index, point in enumerate((series or {}).get("points") or [] if isinstance(series, Mapping) else []):
                 if not isinstance(point, Mapping): continue
@@ -450,11 +672,13 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
     detail = detail_problems(interpretation, record, manifest)
     citations = _citation_ids(interpretation)
     in_record = frozenset(_record_numbers(record, manifest))
+    def reason(finding: Mapping[str, Any]) -> str:
+        return str(finding.get("confidence", {}).get("reason", "")) if isinstance(finding.get("confidence"), Mapping) else ""
     unstated = {str(finding.get("id")): missing for finding in interpretation.get("findings", []) if isinstance(finding, Mapping)
-                for missing in [[n for field in ("title", "text") for n in _numbers(str(finding.get(field, ""))) if n not in in_record]] if missing}
-    headline_unstated = [n for n in _numbers(str(interpretation.get("headline") or "")) if n not in in_record]
-    if headline_unstated: unstated["headline"] = headline_unstated
-    citation_ok = bool(interpretation.get("findings")) and bool(citations) and all(c in manifest_ids for c in citations) and not unstated
+                for missing in [[n for text in (str(finding.get("title", "")), str(finding.get("text", "")), reason(finding)) for n in _numbers(text) if n not in in_record]] if missing}
+    claims = [c for c in interpretation.get("findings", []) if isinstance(c, Mapping)] + [r for r in interpretation.get("recommendations", []) if isinstance(r, Mapping) and r.get("action")]
+    cited = [c for c in claims if isinstance(c.get("citations"), list) and c["citations"] and all(isinstance(x, str) and x in manifest_ids for x in c["citations"])]
+    citation_ok = bool(interpretation.get("findings")) and bool(citations) and all(c in manifest_ids for c in citations) and not unstated and len(cited) == len(claims)
     visual = interpretation.get("visual")
     bindings = visual.get("bindings", {}) if isinstance(visual, Mapping) else {}
     is_layered = isinstance(visual, Mapping) and visual.get("kind") == "layered"
@@ -484,7 +708,7 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
                 next_ok = False
                 break
     return [
-        {"gate_id": "citation_integrity", "status": "PASS" if citation_ok else "FAIL", "evidence": {"citations": citations, "manifest_count": len(manifest), "unstated_numbers": unstated}},
+        {"gate_id": "citation_integrity", "status": "PASS" if citation_ok else "FAIL", "evidence": {"citations": citations, "manifest_count": len(manifest), "unstated_numbers": unstated, "claims": len(claims), "cited": len(cited), "unsupported": len(claims) - len(cited)}},
         {"gate_id": "visual_bindings_resolvable", "status": "PASS" if visual_ok else "FAIL", "evidence": {"paths": binding_paths}},
         {"gate_id": "next_methods_resolvable", "status": "PASS" if next_ok else "FAIL", "evidence": {"next_methods": next_methods}},
         {"gate_id": "detail_integrity", "status": "PASS" if not detail else "FAIL", "evidence": {"problems": detail}},
@@ -498,15 +722,20 @@ def validate_interpretation(schema_contracts: SchemaContracts, interpretation: M
 def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None) -> dict[str, Any]:
     kind = visual_kind(spec_root, method_id, contract)
     manifest = build_prompt_manifest(record, sources)
-    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind, language=language, catalog_lines=catalog_lines, record_schema_text=record_schema_text, feedback=feedback, previous=previous)
-    complete = getattr(provider, "complete_json", None) or provider.complete   # API-parsed JSON when the provider offers it; a fake's text otherwise
+    contract_schema = load_interpretation_schema(spec_root)
+    via_tool = callable(getattr(provider, "complete_json", None))
+    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind, language=language, catalog_lines=catalog_lines, record_schema_text=record_schema_text, feedback=feedback, previous=previous, via_tool=via_tool)
+    def complete(system: str, user: str) -> Any:   # API-parsed JSON with bounded thinking when the provider offers it; a fake's text otherwise
+        if via_tool:
+            return provider.complete_json(system, user, max_tokens=INTERPRET_MAX_TOKENS, effort=INTERPRET_EFFORT, input_schema=answer_schema(contract_schema))
+        return provider.complete(system, user, max_tokens=INTERPRET_MAX_TOKENS)
     total_input = total_output = 0
     previous_error = ""
     gates: list[dict[str, Any]] = []
     fallback: tuple[dict[str, Any], list[dict[str, Any]], str] | None = None   # an earlier answer whose core held, its failing detail dropped
     attempts: list[dict[str, Any]] = []   # per model call: output size and why it was refused (a retry is paid for twice)
 
-    def settle(interpretation: dict[str, Any], gates: list[dict[str, Any]], removed: dict[str, list[str]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    def settle(interpretation: dict[str, Any], gates: list[dict[str, Any]], removed: dict[str, list[str]], repaired: dict[str, list[str]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Drop the detail sections that failed their gate or the schema; the returned gates describe what is returned."""
         dropped: dict[str, list[str]] = dict(gates[3]["evidence"]["problems"])
         kept = without_sections(interpretation, set(dropped))
@@ -522,18 +751,43 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
                     dropped[key] = [f"schema: {error}"]
             kept = without_sections(kept, set(dropped))
             validate_interpretation(schema_contracts, kept)   # sections valid alone are valid together (the schema has no cross-section rule)
-        return kept, gates[:3] + [{"gate_id": "detail_integrity", "status": "PASS", "evidence": {"problems": {}, "dropped": dropped, "removed": removed}}]
+        return kept, gates[:3] + [{"gate_id": "detail_integrity", "status": "PASS", "evidence": {"problems": {}, "dropped": dropped, "removed": removed, "repaired": repaired}}]
+
+    def score(kept: Mapping[str, Any], settled: list[dict[str, Any]]) -> tuple[int, int, int]:
+        """More sections kept, then more findings, then fewer items removed: which of two answers the page is better with."""
+        evidence = settled[3]["evidence"]
+        return (sum(key in kept for key in DETAIL_KEYS), len(kept.get("findings") or []), -sum(len(v) for v in evidence["removed"].values()) - len(evidence["dropped"]))
+
+    def merge(*buckets: dict[str, list[str]]) -> dict[str, list[str]]:
+        out: dict[str, list[str]] = {}
+        for bucket in buckets:
+            for key, notes in bucket.items(): out.setdefault(key, []).extend(notes)
+        return out
 
     for attempt in range(2):
         retry_user = user if not previous_error else user + "\n\nPrevious response was refused. Correct exactly this failure: " + previous_error
         try:
-            completion = complete(system, retry_user, max_tokens=INTERPRET_MAX_TOKENS)
+            completion = complete(system, retry_user)
+        except ProviderCallError as error:   # billed without a usable answer: count it; only a cut-off is worth one more try
+            total_input += error.input_tokens
+            total_output += error.output_tokens
+            attempts.append({"output_tokens": error.output_tokens, "refused": str(error), "stop_reason": error.reason})
+            if error.reason == "cut_off" and attempt == 0:
+                previous_error = f"ANSWER_CUT_OFF at {error.output_tokens} output tokens before the answer closed; answer again far more briefly (see LENGTH)."
+                continue
+            if fallback is not None: break
+            return {"interpretation": None, "gate_results": gates, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output, "attempts": attempts}
         except InvariantViolation as error:
+            timed_out = "TimeoutError" in str(error) or "wall-clock deadline" in str(error)
+            attempts.append({"output_tokens": 0, "refused": str(error), "stop_reason": "timeout" if timed_out else "error"})
+            if timed_out and attempt == 0:   # a slow answer is asked once more; a configuration or HTTP error is not
+                previous_error = "ANSWER_TIMED_OUT: the previous answer took too long; answer again far more briefly (see LENGTH)."
+                continue
             if fallback is not None: break
             return {"interpretation": None, "gate_results": gates, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output, "attempts": attempts}
         total_input += completion.input_tokens
         total_output += completion.output_tokens
-        attempts.append({"output_tokens": completion.output_tokens, "refused": None})
+        attempts.append({"output_tokens": completion.output_tokens, "refused": None, "stop_reason": getattr(completion, "stop_reason", "")})
         try:
             interpretation = extract_json_object(completion.text)
             supplied_visual = interpretation.get("visual") if isinstance(interpretation.get("visual"), Mapping) else {}
@@ -543,7 +797,13 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
             move_unresolvable_prefills_to_needs_input(interpretation, manifest)
             normalize_gaps_without_inventing_evidence(interpretation, language)
             normalize_layered_visual_bindings(interpretation)
-            interpretation, removed = repair_details(interpretation, record, manifest)
+            steps_removed, steps_repaired = repair_next_steps(interpretation, active_method_ids)
+            interpretation, schema_removed, schema_repaired = conform_to_schema(interpretation, contract_schema)
+            claims_removed, claims_repaired = repair_claims(interpretation, record, manifest)
+            gaps_repaired = add_missing_source_gap(interpretation, manifest, language)
+            interpretation, detail_removed, detail_repaired = repair_details(interpretation, record, manifest)
+            removed = merge(steps_removed, schema_removed, claims_removed, detail_removed)
+            repaired = merge(steps_repaired, schema_repaired, claims_repaired, gaps_repaired, detail_repaired)
             gates = evaluate_interpretation_gates(interpretation, record, manifest, active_method_ids)
             core_failed = [g["gate_id"] for g in gates[:3] if g["status"] != "PASS"]
             if core_failed:
@@ -554,14 +814,17 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
                     detail = "; next_methods=" + json.dumps(interpretation.get("next_methods"), ensure_ascii=False) + "; next_steps.method_id=" + json.dumps(step_ids, ensure_ascii=False)
                     if isinstance(steps, list):
                         detail += "; next_steps.prefill_types=" + json.dumps([type(step.get("prefill")).__name__ for step in steps if isinstance(step, Mapping)])
-                    detail += ". Use exact ACTIVE ids and matching next_steps, or set both arrays to []."
+                    detail += ". Use exact ACTIVE ids; every next_steps.method_id also in next_methods."
                 unstated = gates[0]["evidence"].get("unstated_numbers") if "citation_integrity" in core_failed else None
                 if unstated:
                     detail += "; findings/headline state numbers the record does not: " + json.dumps(unstated, ensure_ascii=False) + " (state only numbers written in the record)"
                 raise InvariantViolation("INTERPRETATION_GATE_FAILED: " + "; ".join(core_failed) + detail)
-            kept, settled = settle(interpretation, gates, removed)
+            kept, settled = settle(interpretation, gates, removed, repaired)
             kept["usage"] = {"input_tokens": total_input, "output_tokens": total_output}
             dropped = settled[3]["evidence"]["dropped"]
+            if fallback is not None and score(fallback[0], fallback[1]) > score(kept, settled):   # the retry lost more than it gained (P-10)
+                attempts[-1]["refused"] = "KEPT_FIRST_ANSWER: the second answer kept less (sections, findings, removed items)"
+                break
             if (dropped or removed) and attempt == 0:   # the core holds; ask once more for what was dropped or removed, keep this answer if that fails
                 fallback = (kept, settled, completion.model)
                 previous_error = "DETAIL_INTEGRITY: " + json.dumps({"dropped": dropped, "removed": removed}, ensure_ascii=False)
@@ -578,7 +841,7 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
             return {"interpretation": kept, "gate_results": settled, "error": None, "model": completion.model, "input_tokens": total_input, "output_tokens": total_output, "attempts": attempts}
         except (InvariantViolation, KeyError, TypeError) as error:
             previous_error = str(error)
-            if completion.output_tokens >= INTERPRET_MAX_TOKENS:   # it ran into the ceiling: the JSON never closed
+            if completion.output_tokens >= INTERPRET_MAX_TOKENS:   # a text answer (fakes, a text fallback) ran into the ceiling: the JSON never closed
                 previous_error = f"ANSWER_CUT_OFF at {completion.output_tokens} output tokens before the JSON closed; answer again far more briefly (see LENGTH). Parser: {error}"
             attempts[-1]["refused"] = previous_error
     if fallback is not None:

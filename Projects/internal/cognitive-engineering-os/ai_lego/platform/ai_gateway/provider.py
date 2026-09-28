@@ -34,6 +34,19 @@ class AiCompletion:
     model: str
     input_tokens: int
     output_tokens: int
+    stop_reason: str = ""
+
+
+class ProviderCallError(InvariantViolation):
+    """A call the API answered -- and billed -- without a usable answer: cut off at max_tokens (``AI_PROVIDER_CUT_OFF``),
+    refused (``AI_PROVIDER_REFUSAL``) or empty (``AI_PROVIDER_EMPTY_RESPONSE``). ``input_tokens``/``output_tokens`` are
+    what it cost, so a caller can count it and decide whether one more try is worth it (only a cut-off is)."""
+
+    def __init__(self, message: str, *, reason: str, input_tokens: int = 0, output_tokens: int = 0):
+        super().__init__(message)
+        self.reason = reason
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
 
 
 class AiProvider(Protocol):
@@ -71,32 +84,44 @@ class AnthropicProvider:
             raise InvariantViolation(f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={payload.get('stop_reason')!r}")
         return self._completion(payload, text)
 
-    def complete_json(self, system: str, user: str, *, max_tokens: int = MAX_OUTPUT_TOKENS, name: str = "answer", description: str = "The answer, as the one JSON object the instructions describe.") -> AiCompletion:
+    def complete_json(self, system: str, user: str, *, max_tokens: int = MAX_OUTPUT_TOKENS, name: str = "answer", description: str = "The answer, as the one JSON object the instructions describe.", effort: str | None = None, input_schema: dict[str, Any] | None = None) -> AiCompletion:
         """One JSON object, parsed by the API: the answer is a tool call whose input is that object (an open schema, so
         the instructions stay the specification), and ``text`` is its serialization -- never text the model typed with
         a stray quote in it (2026-09-27: a first answer refused as NOT_JSON at char 244 cost a whole retry). The tool
         is offered, not forced (forced tool use is rejected by some models); an answer that came back as text is
-        returned as that text, for the caller's own parser. An answer cut off by max_tokens carries no usable tool
-        input and is reported like an empty one."""
+        returned as that text, for the caller's own parser. An answer cut off by max_tokens, refused or empty raises
+        ProviderCallError carrying what the call cost. ``effort`` (low|medium|high) bounds the model's thinking, which
+        counts against max_tokens and is billed as output (claude-sonnet-5 thinks at high by default; verified accepted
+        2026-09-28). ``input_schema`` is guidance for the object's shape; the caller's own gates stay the authority."""
         if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or not 1 <= max_tokens <= MAX_OUTPUT_TOKENS:
             raise InvariantViolation(f"AI_MAX_TOKENS_INVALID: expected 1..{MAX_OUTPUT_TOKENS}, got {max_tokens!r}")
         body = {
             "model": self.model, "max_tokens": max_tokens, "system": system,
             "messages": [{"role": "user", "content": user + f"\n\nAnswer by calling the tool `{name}` with the JSON object as its input."}],
-            "tools": [{"name": name, "description": description, "input_schema": {"type": "object"}}],
+            "tools": [{"name": name, "description": description, "input_schema": input_schema or {"type": "object"}}],
             "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
         }
+        if effort is not None:
+            if effort not in ("low", "medium", "high"):
+                raise InvariantViolation(f"AI_EFFORT_INVALID: {effort!r}")
+            body["output_config"] = {"effort": effort}
         headers = {"x-api-key": self._api_key, "anthropic-version": ANTHROPIC_VERSION}
         payload = self._fetch(ANTHROPIC_MESSAGES_URL, self._timeout, method="POST", headers=headers, body=body, max_bytes=MAX_RESPONSE_BYTES, error_prefix="AI_PROVIDER")
         content = payload.get("content")
         if not isinstance(content, list):
             raise InvariantViolation("AI_PROVIDER_MALFORMED_RESPONSE: content[] missing")
+        stop = payload.get("stop_reason")
+        used = self._completion(payload, "")
+        if stop == "max_tokens":   # a tool input or text cut off mid-way is never a whole answer
+            raise ProviderCallError(f"AI_PROVIDER_CUT_OFF: output_tokens={used.output_tokens} reached max_tokens={max_tokens}", reason="cut_off", input_tokens=used.input_tokens, output_tokens=used.output_tokens)
+        if stop == "refusal":
+            raise ProviderCallError("AI_PROVIDER_REFUSAL: the model declined to answer", reason="refusal", input_tokens=used.input_tokens, output_tokens=used.output_tokens)
         call = next((block for block in content if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == name), None)
-        if call is not None and isinstance(call.get("input"), dict) and payload.get("stop_reason") != "max_tokens":
+        if call is not None and isinstance(call.get("input"), dict):
             return self._completion(payload, json.dumps(call["input"], ensure_ascii=False))
         text = "".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and block.get("type") == "text")
         if not text.strip():
-            raise InvariantViolation(f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={payload.get('stop_reason')!r}")
+            raise ProviderCallError(f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={stop!r}", reason="empty", input_tokens=used.input_tokens, output_tokens=used.output_tokens)
         return self._completion(payload, text)
 
     def _completion(self, payload: dict[str, Any], text: str) -> AiCompletion:
@@ -106,6 +131,7 @@ class AnthropicProvider:
             model=str(payload.get("model") or self.model),
             input_tokens=int(usage.get("input_tokens") or 0),
             output_tokens=int(usage.get("output_tokens") or 0),
+            stop_reason=str(payload.get("stop_reason") or ""),
         )
 
 

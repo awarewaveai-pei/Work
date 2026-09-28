@@ -18,7 +18,7 @@ from ai_lego.errors import InvariantViolation
 from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.ai_gateway import draft as draft_mod
 from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs, draft_recipe_source, extract_json_object, method_input_spec, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, provider_from_env
+from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, ProviderCallError, provider_from_env
 from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
 from tests.unit.thread_testkit import HANG_GUARD_S, join_all
@@ -493,10 +493,29 @@ class CompleteJsonTests(unittest.TestCase):
         provider, _ = self._provider({"content": [{"type": "text", "text": "{\"ok\": true}"}], "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}})
         self.assertEqual(provider.complete_json("s", "u", max_tokens=10).text, "{\"ok\": true}")
 
-    def test_a_call_cut_off_by_max_tokens_is_not_trusted(self):
+    def test_a_call_cut_off_by_max_tokens_is_not_trusted_and_says_what_it_cost(self):
         provider, _ = self._provider({"content": [{"type": "tool_use", "name": "answer", "input": {"partial": True}}], "stop_reason": "max_tokens", "usage": {"input_tokens": 1, "output_tokens": 10}})
-        with self.assertRaisesRegex(InvariantViolation, "AI_PROVIDER_EMPTY_RESPONSE"):
+        with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_CUT_OFF") as caught:
             provider.complete_json("s", "u", max_tokens=10)
+        self.assertEqual((caught.exception.reason, caught.exception.input_tokens, caught.exception.output_tokens), ("cut_off", 1, 10))
+
+    def test_a_refusal_and_an_empty_answer_are_told_apart(self):
+        provider, _ = self._provider({"content": [], "stop_reason": "refusal", "usage": {"input_tokens": 2, "output_tokens": 3}})
+        with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_REFUSAL"):
+            provider.complete_json("s", "u", max_tokens=10)
+        provider, _ = self._provider({"content": [], "stop_reason": "end_turn", "usage": {"input_tokens": 2, "output_tokens": 3}})
+        with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_EMPTY_RESPONSE"):
+            provider.complete_json("s", "u", max_tokens=10)
+
+    def test_effort_and_the_answer_schema_are_sent_when_asked(self):
+        provider, seen = self._provider({"content": [{"type": "tool_use", "name": "answer", "input": {"a": 1}}], "stop_reason": "tool_use", "usage": {"input_tokens": 1, "output_tokens": 1}})
+        provider.complete_json("s", "u", max_tokens=10, effort="medium", input_schema={"type": "object", "required": ["a"]})
+        self.assertEqual(seen["body"]["output_config"], {"effort": "medium"})
+        self.assertEqual(seen["body"]["tools"][0]["input_schema"]["required"], ["a"])
+        provider.complete_json("s", "u", max_tokens=10)
+        self.assertNotIn("output_config", seen["body"])
+        with self.assertRaisesRegex(InvariantViolation, "AI_EFFORT_INVALID"):
+            provider.complete_json("s", "u", max_tokens=10, effort="max")
 
     def test_the_ceiling_still_applies(self):
         provider, _ = self._provider({})
