@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import fixture from "../../fixtures/iceberg-interpretation.json";
 import record from "../../fixtures/payload-systems.iceberg_model.json";
 import { apiFetch } from "../../lib/api";
+import { MethodForm } from "../MethodForm";
 import { ResultPage } from "./ResultPage";
 
 vi.mock("../../lib/api", () => ({ apiFetch: vi.fn() }));
@@ -54,8 +55,9 @@ describe("ResultPage", () => {
     expect(other).toContain(">增強迴路</text>");
     const fields = [{ key: "events", kind: "list", label: "① 事件：發生了什麼？" }, { key: "patterns", kind: "list", label: "② 模式：以前發生過嗎？" }];
     const berg = renderToStaticMarkup(<ResultPage result={fixture} record={{ ...record, patterns: ["每期第 4 次起下降", "線上更低"] }} fields={fields} />);
-    expect(berg).toContain(">① 事件｜發生了什麼？</text>");
-    expect(berg).toContain(">每期第 4 次起下降；線上更低</text>");   // an unbound layer still shows what you filled in
+    expect(berg).toContain("① 事件｜現在發生了什麼？");   // the layer's own question (the mock), wrapped text, never cut
+    expect(berg).toContain("每期第 4 次起下降；線上更低");   // an unbound layer still shows what you filled in
+    expect(berg).not.toMatch(/…/);
     const whole = renderToStaticMarkup(<ResultPage result={{ ...fixture, visual: { kind: "layered", bindings: { levels: [{ label: "事件", path: "r/events" }] } } }} record={{ events: ["第一件", "第二件"] }} fields={fields} />);
     expect(whole).toContain("第一件；第二件");   // a binding to a whole list reads as its items, never as JSON
     expect(whole).not.toContain('["第一件"');
@@ -78,26 +80,38 @@ describe("ResultPage", () => {
       units: [{ path: "r/structures", meaning: "等答案迴路", action: "參與者先說", effect: "持久", leverage: "high", citations: ["r/structures/0"] }],
       focus: { path: "r/structures", why: "切斷迴路第一環" }, priority: "先改流程，再談角色。",
       solutions: { options: [{ name: "甲 只多鼓勵", what: "開場鼓勵", takes: "當次", cost: "低", durability: "低", risk: "退縮", advice: "只當急救", paths: ["r/events"] }, { name: "乙 改流程", what: "參與者先說", takes: "一期", cost: "中", durability: "高", risk: "被改回", advice: "先做", paths: ["r/structures"] }],
-        first_step: "下次先讓參與者說 3 分鐘。", plan: [{ when: "第 1 週", action: "補數據", owner: "帶領者", proof: "有基準值", target: "第 2 週前" }],
+        first_step: "下次先讓參與者說 3 分鐘。", horizon: "90 天", signoff: "帶領者團隊", plan: [{ when: "第 1 週", action: "補數據", owner: "帶領者", proof: "有基準值", target: "第 2 週前" }],
         metrics: [{ name: "主動分享人數", now: "2 人", now_citation: "r/events/0", target: "6 人", when: "一期" }] },
       loop: { kind: "reinforcing", name: "等答案迴路", reading: "越轉越安靜", nodes: [{ id: "a", text: "帶領者先講", citations: ["r/structures/0"] }, { id: "b", text: "參與者等答案", citations: ["r/events/0"] }], edges: [{ from: "a", to: "b" }, { from: "b", to: "a" }] },
       trend: { reading: "人數一路掉", series: [{ name: "主動分享", unit: "人", points: [{ label: "第 1 次", value: 6, citation: "r/events/0" }, { label: "第 6 次", value: 2, citation: "r/events/0" }] }] },
       data_thickness: { events: { own_statements: 1, external_sources: 0 }, structures: { own_statements: 1, external_sources: 0 } },
+      headline: "團體反思主動分享變少", next_methods: ["systems.leverage_point_analysis", "root_cause.five_whys"],
+      next_steps: [{ method_id: "systems.leverage_point_analysis", answers: "算每個出手點的力道", deepens: "三個出手點的力道", prefill: { events: "r/events/0" }, needs_input: ["difficulty"], yields: "槓桿表", est_cost: "low" },
+                   { method_id: "root_cause.five_whys", answers: "驗證根因", deepens: "再問五次為什麼", prefill: {}, needs_input: ["why"], yields: "根因鏈", est_cost: "low" }],
     };
-    const html = renderToStaticMarkup(<ResultPage result={detailed as unknown as React.ComponentProps<typeof ResultPage>["result"]} record={rec} fields={fields} lesson="/learn/systems.iceberg_model" />);
-    for (const text of ["<b>一句話：</b>分享變少是流程造成的。", "<b>這代表</b><span>等答案迴路", '<span class="lever high">槓桿：高</span>', "<b>對應方案</b><span>⑦ 乙 改流程 ★ 本次建議</span>",
-      '<tspan class="a"> ★ 建議先出手</tspan>', '<td>結構 ★</td><td>設計 Design</td><td>現在→未來</td>', 'aria-label="主動分享的變化"', 'aria-label="等答案迴路因果迴路"', 'aria-label="四層改變難度與效果持久度對比"',
-      "<b>如果只做一件事，明天就做</b>下次先讓參與者說 3 分鐘。", '<span class="goal">目標 6 人（待你確認）</span>', "<b>建議順序</b>先改流程，再談角色。"]) expect(html).toContain(text);
+    // the run form the page keeps above the result (RunPage's input card), for the parity gate's input card
+    const inputCard = <div className="card cta" id="input"><h2>你的案例：四個格子<small>從上往下填；填不出來的留白</small></h2><div className="how"><b>怎麼讀</b>一格一層。<b>你要做的</b>填好按「執行分析」。</div><MethodForm fields={fields} state={{}} onState={() => undefined} onSubmit={() => undefined} onFill={() => undefined} onClear={() => undefined} /></div>;
+    const html = renderToStaticMarkup(<ResultPage result={detailed as unknown as React.ComponentProps<typeof ResultPage>["result"]} record={rec} fields={fields} lesson="/learn/systems.iceberg_model" display={{ name_zh: "冰山模型", name_en: "Iceberg Model" }} lessons={{ "systems.leverage_point_analysis": "/learn/systems.leverage_point_analysis" }} names={{ "systems.leverage_point_analysis": "槓桿點分析", "root_cause.five_whys": "五個為什麼" }}>{inputCard}</ResultPage>);
+    for (const text of ["<b>一句話：</b>分享變少是流程造成的。", "<b>這代表</b><span>等答案迴路", '<span class="lever high">槓桿：高</span>', "<b>對應方案</b><span>⑦ 乙「改流程」★ 本次建議</span>",
+      '<span style="display:inline-block"> ★ 建議先出手</span>', '<td>結構 ★</td><td>設計 Design</td><td>現在→未來</td>', 'aria-label="主動分享的變化"', 'aria-label="等答案因果迴路"', 'aria-label="四層改變難度與效果持久度對比"',
+      "<b>如果只做一件事，明天就做</b>下次先讓參與者說 3 分鐘。", '<span class="goal">目標 6 人（待你確認）</span>', "<b>建議順序：先第 3 層</b>先改流程，再談角色。"]) expect(html).toContain(text);
     expect(html).not.toContain("這次的分析沒有產出");   // every section is there
     const artifact = path.resolve(process.cwd(), ".artifacts/iceberg-detail.html");
     mkdirSync(path.dirname(artifact), { recursive: true });
     writeFileSync(artifact, html);
     const checker = path.resolve(process.cwd(), "../../docs/mockups/check-mocks.py");
-    expect(spawnSync("python", [checker, "--page", "result", artifact, "--lesson", "/learn/systems.iceberg_model"], { encoding: "utf8" }).stdout).toContain("green");
+    const parity = spawnSync("python", [checker, "--page", "result", artifact, "--lesson", "/learn/systems.iceberg_model", "--parity"], { encoding: "utf8" }).stdout;
+    expect(parity, parity).toContain("green");   // every heading, strip, label, caption and button of the mock is on the page
+    // and the gate sees a missing button or a changed heading (mutations: red)
+    for (const [what, mutate] of [["a missing button", (page: string) => page.replace(">匯出 PDF<", "><")], ["a changed heading", (page: string) => page.replace("⑧ 下一步：你在這條路的哪裡、接著做什麼", "⑧ 下一步")], ["a lost row label", (page: string) => page.replaceAll("<b>對應方案</b>", "<b>方案</b>")]] as const) {
+      const broken = path.resolve(process.cwd(), ".artifacts/iceberg-detail-broken.html");
+      writeFileSync(broken, mutate(html));
+      expect(spawnSync("python", [checker, "--page", "result", broken, "--lesson", "/learn/systems.iceberg_model", "--parity"], { encoding: "utf8" }).stdout, what).toContain("[parity]");
+    }
     // a section the gate dropped says so in plain words; one the model never produced says that instead
     const gates = [{ gate_id: "detail_integrity", status: "PASS", evidence: { problems: {}, dropped: { trend: ["trend value 7 is not stated in r/events/0"] } } }];
     const without = renderToStaticMarkup(<ResultPage result={{ ...detailed, trend: undefined, solutions: undefined } as unknown as React.ComponentProps<typeof ResultPage>["result"]} record={rec} fields={fields} gateResults={gates} />);
-    expect(without).toContain("趨勢圖：這次的趨勢圖有數字對不上你填的內容，所以不畫。");
+    expect(without).toContain("圖 A 趨勢：這次的趨勢圖有數字對不上你填的內容，所以不畫。");
     expect(without).toContain("這次的分析沒有產出方案比較與行動計畫。");
     expect(without).toContain("數字與環節都有出處 ✓");
   });
@@ -122,7 +136,7 @@ describe("ResultPage", () => {
   it("shows prefilled next-step count and marks missing fields", () => {
     const next = { ...fixture, next_steps: [{ method_id: "systems.leverage_point_analysis", prefill: { events: "r/events" }, needs_input: ["objective"], yields: "Leverage points" }] };
     const html = renderToStaticMarkup(<ResultPage result={next} record={record} />);
-    expect(html).toContain("已帶入 1 欄");
+    expect(html).toContain("自動填 1 個欄位");
     expect(html).toContain('<span class="need">還要你填 1 個</span>：objective');
     expect(html).toContain("Release incidents increased");
     expect(html).toContain('<a class="btn primary" href="/methods/systems.leverage_point_analysis/run">用這次的資料開始</a>');   // the run page reads the prefill

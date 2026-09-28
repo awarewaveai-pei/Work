@@ -18,6 +18,8 @@ from ai_lego.modules.research.interpret_method_record import (
     record_sha256,
     run_interpretation,
     visual_kind,
+    repair_details,
+    trend_candidates,
 )
 from ai_lego.platform.ai_gateway.provider import AiCompletion
 
@@ -262,16 +264,16 @@ class ResultPageDetailTests(unittest.TestCase):
     def test_a_supported_answer_has_no_problem_and_keeps_every_section(self):
         self.assertEqual(self.problems(), {})
         result = run_detail(FakeProvider([detailed_response()]), "INTERP-DETAIL-001")
-        self.assertEqual(result["gate_results"][3], {"gate_id": "detail_integrity", "status": "PASS", "evidence": {"problems": {}, "dropped": {}}})
+        self.assertEqual(result["gate_results"][3], {"gate_id": "detail_integrity", "status": "PASS", "evidence": {"problems": {}, "dropped": {}, "removed": {}}})
         for key in ("summary", "units", "focus", "priority", "solutions", "loop", "trend"): self.assertIn(key, result["interpretation"])
 
     def test_a_number_the_record_does_not_state_is_refused(self):
         trend = {"reading": "x", "series": [{"name": "x", "unit": "人", "points": [{"label": "a", "value": 7, "citation": "r/events/0"}, {"label": "b", "value": 2, "citation": "r/events/0"}]}]}
         self.assertIn("trend value 7 is not stated in r/events/0", self.problems(trend=trend)["trend"][0])
         metric = {"options": json.loads(detailed_response())["solutions"]["options"], "first_step": "x", "metrics": [{"name": "x", "now": "4 人", "now_citation": "r/events/0", "target": "6", "when": "x"}]}
-        self.assertIn("['4'] is not stated in r/events/0", self.problems(solutions=metric)["solutions"][0])
+        self.assertIn("['4'] without a record line that states it (now_citation 'r/events/0')", self.problems(solutions=metric)["solutions"][0])
         uncited = {"options": metric["options"], "first_step": "x", "metrics": [{"name": "x", "now": "2 人", "target": "6", "when": "x"}]}
-        self.assertIn("without now_citation", self.problems(solutions=uncited)["solutions"][0])
+        self.assertIn("without a record line that states it", self.problems(solutions=uncited)["solutions"][0])
         unmeasured = {"options": metric["options"], "first_step": "x", "metrics": [{"name": "x", "now": "未量測", "target": "每次", "when": "x"}]}
         self.assertEqual(self.problems(solutions=unmeasured), {})   # no number, no citation needed
 
@@ -311,7 +313,7 @@ class ResultPageDetailTests(unittest.TestCase):
         self.assertEqual(gates[0]["evidence"]["unstated_numbers"], {"F1": ["999"]})
         provider = FakeProvider([json.dumps(body, ensure_ascii=False), detailed_response()])
         result = run_detail(provider, "INTERP-DETAIL-007")
-        self.assertIn("findings state numbers the record does not", provider.requests[1][1])   # the retry is told what to fix
+        self.assertIn("state numbers the record does not", provider.requests[1][1])   # the retry is told what to fix
         self.assertIsNone(result["error"])
         self.assertEqual(result["gate_results"][0]["evidence"]["unstated_numbers"], {})
         body["findings"][0]["text"] = "第 1 次 6 位，第 6 次只剩 2 位。"   # numbers the record states pass
@@ -335,7 +337,10 @@ class ResultPageDetailTests(unittest.TestCase):
         self.assertIsNone(result["error"])
         self.assertNotIn("trend", result["interpretation"])
         self.assertIn("loop", result["interpretation"])   # only the failing section goes
-        self.assertEqual(list(result["gate_results"][3]["evidence"]["dropped"]), ["trend"])
+        evidence = result["gate_results"][3]["evidence"]
+        self.assertEqual(evidence["dropped"], {})   # the unstated point went alone; its series was left with one point, so the trend went too
+        self.assertEqual(list(evidence["removed"]), ["trend"])
+        self.assertIn("trend value 9 is not stated in r/events/0; point removed", evidence["removed"]["trend"][0])
         self.assertEqual((result["input_tokens"], result["output_tokens"]), (20, 40))
 
     def test_when_the_retry_breaks_the_core_the_first_answer_is_returned_without_its_failing_section(self):
@@ -382,6 +387,127 @@ class ResultPageDetailTests(unittest.TestCase):
         result = run_detail(FakeProvider([json.dumps(body, ensure_ascii=False)] * 2), "INTERP-DETAIL-006")
         self.assertIsNone(result["interpretation"])
         self.assertIn("SCHEMA_VALIDATION_FAILED", result["error"])
+
+
+
+
+class TrendRetryTests(unittest.TestCase):
+    """A record that measures the same thing twice (6 位 … 2 位) supports 圖 A; a first answer without it is asked once more
+    (2026-09-28 real run: the demo record states 第 1 次 6 位 and 第 6 次 2 位, the model omitted trend, nothing noticed)."""
+
+    def test_the_record_measured_twice_is_found_and_ordinals_are_not(self):
+        self.assertEqual(trend_candidates(DETAIL_RECORD), {"位": ["2", "6", "8"]})   # 第 6 次 / 第 1 次 are not measures; 35 分鐘 is stated once
+        self.assertEqual(trend_candidates({"events": ["第 3 次 session 有 4 人"]}), {})
+
+    def test_a_first_answer_without_trend_is_asked_once_more_and_the_second_with_trend_is_kept(self):
+        provider = FakeProvider([detailed_response(trend=None), detailed_response()])
+        result = run_detail(provider, "INTERP-TREND-001")
+        self.assertEqual(provider.calls, 2)
+        self.assertTrue(result["attempts"][0]["refused"].startswith("TREND_MISSING: trend was omitted but the record states 2 位, 6 位, 8 位"), result["attempts"])
+        self.assertIn("trend", result["interpretation"])
+        self.assertIsNone(result["error"])
+
+    def test_a_second_omission_keeps_the_first_answer_without_a_third_call(self):
+        provider = FakeProvider([detailed_response(trend=None), detailed_response(trend=None)])
+        result = run_detail(provider, "INTERP-TREND-002")
+        self.assertEqual(provider.calls, 2)
+        self.assertIsNone(result["error"])
+        self.assertNotIn("trend", result["interpretation"])
+        self.assertEqual(result["gate_results"][3]["evidence"], {"problems": {}, "dropped": {}, "removed": {}})
+
+    def test_a_record_measured_once_is_not_asked_again(self):
+        provider = FakeProvider([detailed_response(trend=None)])
+        result = run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record={"events": ["第 6 次 session 有 2 位分享"], "structures": ["說明佔 35 分鐘"]}, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids=set(), interpretation_id="INTERP-TREND-003")
+        self.assertEqual(provider.calls, 1)
+        self.assertIsNone(result["error"])
+
+    def test_the_prompt_lays_the_plan_out_in_weeks(self):
+        provider = FakeProvider([detailed_response()])
+        run_detail(provider, "INTERP-WEEKS-001")
+        self.assertIn("when = the week numbers counted from the plan's start, digits only, like 1 到 2 / 3 到 4 / 5", provider.requests[0][1])
+
+
+class ItemLevelIntegrityTests(unittest.TestCase):
+    """The invariant (nothing unverified is shown) at the smallest grain that keeps it: one metric, one path, one unit,
+    one point goes alone; the section stays (2026-09-27: a whole ⑦ card was lost to one empty now_citation)."""
+
+    def repaired(self, **override):
+        return repair_details(json.loads(detailed_response(**override)), DETAIL_RECORD, build_prompt_manifest(DETAIL_RECORD))
+
+    def solutions(self, **override) -> dict:
+        return json.loads(detailed_response())["solutions"] | override
+
+    def test_a_metric_with_an_empty_citation_gets_the_one_record_line_that_states_its_number(self):
+        fixed, removed = self.repaired(solutions=self.solutions(metrics=[{"name": "主動分享人數", "now": "2 人", "now_citation": "", "target": "6", "when": "一期"}]))
+        self.assertEqual(fixed["solutions"]["metrics"][0]["now_citation"], "r/events/0")
+        self.assertIn("so it was set", removed["solutions"][0])
+        self.assertEqual(detail_problems(fixed, DETAIL_RECORD, build_prompt_manifest(DETAIL_RECORD)), {})
+
+    def test_a_metric_no_record_line_states_goes_alone_and_the_section_stays(self):
+        fixed, removed = self.repaired(solutions=self.solutions(metrics=[{"name": "x", "now": "4 人", "now_citation": "", "target": "6", "when": "x"}, {"name": "y", "now": "未量測", "now_citation": "r/nope", "target": "每次", "when": "x"}]))
+        self.assertEqual([m["name"] for m in fixed["solutions"]["metrics"]], ["y"])
+        self.assertNotIn("now_citation", fixed["solutions"]["metrics"][0])   # not measured yet: no citation to keep
+        self.assertIn("removed", removed["solutions"][0])
+        self.assertIn("options", fixed["solutions"])
+
+    def test_an_options_unknown_path_goes_and_the_option_stays(self):
+        options = self.solutions()["options"]
+        options[0] = {**options[0], "paths": ["r/events", "r/ghost"]}
+        fixed, removed = self.repaired(solutions=self.solutions(options=options))
+        self.assertEqual(fixed["solutions"]["options"][0]["paths"], ["r/events"])
+        self.assertIn("r/ghost", removed["solutions"][0])
+
+    def test_a_unit_with_a_path_that_is_not_in_the_manifest_goes_and_the_others_stay(self):
+        units = json.loads(detailed_response())["units"] + [{"path": "r/ghost", "meaning": "x", "action": "x", "effect": "x", "leverage": "low", "citations": ["r/events/0"]}]
+        fixed, removed = self.repaired(units=units)
+        self.assertEqual([u["path"] for u in fixed["units"]], [u["path"] for u in units[:-1]])
+        self.assertIn("units[%d].path" % (len(units) - 1), removed["units"][0])
+
+    def test_a_trend_point_the_line_does_not_state_goes_and_a_series_with_two_left_stays(self):
+        series = [{"name": "x", "unit": "人", "points": [{"label": "a", "value": 6, "citation": "r/events/0"}, {"label": "b", "value": 9, "citation": "r/events/0"}, {"label": "c", "value": 2, "citation": "r/events/0"}]}]
+        fixed, removed = self.repaired(trend={"reading": "x", "series": series})
+        self.assertEqual([p["value"] for p in fixed["trend"]["series"][0]["points"]], [6, 2])
+        self.assertEqual(len(removed["trend"]), 1)
+
+    def test_the_run_retries_for_removed_items_and_reports_them(self):
+        bad_metric = self.solutions(metrics=[{"name": "x", "now": "4 人", "now_citation": "", "target": "6", "when": "x"}])
+        provider = FakeProvider([detailed_response(solutions=bad_metric), detailed_response()])
+        result = run_detail(provider, "INTERP-ITEM-001")
+        self.assertEqual(provider.calls, 2)
+        self.assertIn('"removed"', provider.requests[1][1])
+        self.assertEqual(result["gate_results"][3]["evidence"], {"problems": {}, "dropped": {}, "removed": {}})
+        self.assertEqual(len(result["interpretation"]["solutions"]["metrics"]), 1)   # the second answer's own metric, cited
+
+    def test_an_unstated_number_in_the_headline_is_a_core_refusal(self):
+        provider = FakeProvider([detailed_response(headline="從 6 人掉到 3 人")] * 2)
+        result = run_detail(provider, "INTERP-ITEM-002")
+        self.assertIsNone(result["interpretation"])
+        self.assertIn("headline", result["error"])
+
+    def test_complete_json_is_used_when_the_provider_offers_it_and_the_prompt_names_the_new_fields(self):
+        class JsonProvider(FakeProvider):
+            def complete_json(self, system, user, *, max_tokens):
+                self.json_calls = getattr(self, "json_calls", 0) + 1
+                return self.complete(system, user, max_tokens=max_tokens)
+        provider = JsonProvider([detailed_response()])
+        result = run_detail(provider, "INTERP-ITEM-003")
+        self.assertEqual((provider.json_calls, result["error"]), (1, None))
+        shape = json.loads(provider.requests[0][1].split("OUTPUT JSON SHAPE: ", 1)[1].split("\n\nRULES:", 1)[0])
+        self.assertIn("headline", shape)
+        self.assertEqual(set(shape["units"][0]) >= {"brief", "step", "leverage"}, True)
+        self.assertEqual(set(shape["solutions"]) >= {"horizon", "signoff"}, True)
+        self.assertIn("question", shape["trend"])
+        self.assertIn("gaps = at least 1", provider.requests[0][1])
+        self.assertNotIn("THE USER RETURNED", provider.requests[0][1])
+
+    def test_feedback_puts_the_reason_and_the_previous_version_in_the_prompt(self):
+        provider = FakeProvider([detailed_response()])
+        run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=DETAIL_RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids=set(), interpretation_id="INTERP-ITEM-004",
+                           feedback="第二個發現把線上場當成原因，資料沒有這樣說", previous={"headline": "舊標題", "summary": "舊的一句話", "findings": [{"id": "F1", "title": "舊發現"}]})
+        prompt = provider.requests[0][1]
+        self.assertIn("THE USER RETURNED THE PREVIOUS VERSION", prompt)
+        self.assertIn("第二個發現把線上場當成原因", prompt)
+        self.assertIn("舊發現", prompt)
 
 
 if __name__ == "__main__":

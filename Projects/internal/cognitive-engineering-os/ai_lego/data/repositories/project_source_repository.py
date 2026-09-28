@@ -595,43 +595,92 @@ class ProjectSourceRepository:
         with self._connection() as connection:
             self._append_event(connection, tenant_id, aggregate_id, event_type, payload)
 
+    # An interpretation's lifecycle, in the project's event stream: asked for, created or failed, judged (同意／部分／不同意),
+    # approved or returned (核准／退回). GET /interpretations/{id}, analyses() and the project summaries read the same list.
+    INTERPRETATION_EVENTS = ("InterpretationRequested", "InterpretationCreated", "InterpretationFailed", "InterpretationJudged", "InterpretationApproved", "InterpretationReturned")
+
     def interpretation_events(self, tenant_id: str, interpretation_id: str) -> list[dict[str, Any]]:
         """Read one interpretation's lifecycle from the tenant's project event stream."""
+        placeholders = ",".join("?" * len(self.INTERPRETATION_EVENTS))
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT aggregate_id, sequence, event_type, payload_json FROM events "
-                "WHERE tenant_id=? AND event_type IN ('InterpretationRequested', 'InterpretationCreated', 'InterpretationFailed', 'InterpretationJudged') "
+                "SELECT aggregate_id, sequence, event_type, occurred_at, payload_json FROM events "
+                f"WHERE tenant_id=? AND event_type IN ({placeholders}) "
                 "AND json_extract(payload_json, '$.interpretation_id')=? ORDER BY rowid",
-                (tenant_id, interpretation_id),
+                (tenant_id, *self.INTERPRETATION_EVENTS, interpretation_id),
             ).fetchall()
         return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
 
-    def analyses(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
-        """project_id -> its analyses, oldest first, read from the event stream (their one record): the tool, when it was
-        asked for and when it finished, PENDING / DONE / FAILED (GET /interpretations/{id} reads the same events), and
-        the user's latest judgment. ``project_id`` limits it to one Project."""
-        query = (
-            "SELECT aggregate_id, event_type, occurred_at, payload_json FROM events WHERE tenant_id=? "
-            "AND event_type IN ('InterpretationRequested', 'InterpretationCreated', 'InterpretationFailed', 'InterpretationJudged')"
-        )
-        parameters: tuple[Any, ...] = (tenant_id,)
+    def _project_events(self, tenant_id: str, event_types: tuple[str, ...], project_id: str | None) -> list[sqlite3.Row]:
+        placeholders = ",".join("?" * len(event_types))
+        query = f"SELECT aggregate_id, event_type, occurred_at, payload_json FROM events WHERE tenant_id=? AND event_type IN ({placeholders})"
+        parameters: tuple[Any, ...] = (tenant_id, *event_types)
         if project_id is not None:
             query += " AND aggregate_id=?"
             parameters += (f"project:{project_id}",)
         with self._connection() as connection:
-            rows = connection.execute(query + " ORDER BY rowid", parameters).fetchall()
+            return connection.execute(query + " ORDER BY rowid", parameters).fetchall()
+
+    def analyses(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+        """project_id -> its analyses, oldest first, read from the event stream (their one record): the tool, when it was
+        asked for and when it finished, PENDING / DONE / FAILED (GET /interpretations/{id} reads the same events), the
+        user's latest judgment, the latest approval decision, and the version it redoes (退回 → 依原因重做).
+        ``project_id`` limits it to one Project."""
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
-        for row in rows:
+        for row in self._project_events(tenant_id, self.INTERPRETATION_EVENTS, project_id):
             payload = json.loads(row["payload_json"])
             key = payload.get("interpretation_id")
-            if row["event_type"] == "InterpretationRequested":
-                by_id[key] = {"interpretation_id": key, "method_id": payload.get("method_id"), "status": "PENDING", "requested_at": row["occurred_at"], "finished_at": None, "error": None, "judgment": None}
+            kind = row["event_type"]
+            if kind == "InterpretationRequested":
+                revision = payload.get("revision") if isinstance(payload.get("revision"), dict) else None
+                by_id[key] = {"interpretation_id": key, "method_id": payload.get("method_id"), "status": "PENDING", "requested_at": row["occurred_at"], "finished_at": None, "error": None, "judgment": None, "approval": None,
+                              "revision_of": revision.get("of") if revision else None}
                 projects.setdefault(row["aggregate_id"].removeprefix("project:"), []).append(by_id[key])
-            elif key in by_id and row["event_type"] == "InterpretationJudged":
+            elif key not in by_id:
+                continue
+            elif kind == "InterpretationJudged":
                 by_id[key]["judgment"] = payload.get("stance")
+            elif kind in ("InterpretationApproved", "InterpretationReturned"):
+                by_id[key]["approval"] = {"decision": "approve" if kind == "InterpretationApproved" else "return", "at": row["occurred_at"], "by_name": payload.get("by_name"), "reason": payload.get("reason")}
+            else:
+                by_id[key].update(status="DONE" if kind == "InterpretationCreated" else "FAILED", finished_at=row["occurred_at"], error=payload.get("error"))
+        return projects
+
+    # Tasks (⑦ 把行動計畫存成任務) and rerun reminders (到期重跑並比較) live in the project's event stream like everything else
+    # the project holds: created, then done/undone; scheduled, then fulfilled by the analysis that answered it.
+    TASK_EVENTS = ("TaskCreated", "TaskDone")
+    RERUN_EVENTS = ("RerunScheduled", "RerunFulfilled")
+
+    def tasks(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+        """project_id -> its tasks, oldest first: title, owner, due (YYYY-MM-DD), proof, target, the analysis it came
+        from, done (bool) and when it was last marked."""
+        projects: dict[str, list[dict[str, Any]]] = {}
+        by_id: dict[str, dict[str, Any]] = {}
+        for row in self._project_events(tenant_id, self.TASK_EVENTS, project_id):
+            payload = json.loads(row["payload_json"])
+            key = payload.get("task_id")
+            if row["event_type"] == "TaskCreated":
+                by_id[key] = {"task_id": key, "interpretation_id": payload.get("interpretation_id"), "title": payload.get("title"), "owner": payload.get("owner"), "due": payload.get("due"),
+                              "proof": payload.get("proof"), "target": payload.get("target"), "when": payload.get("when"), "created_at": row["occurred_at"], "done": False, "done_at": None}
+                projects.setdefault(row["aggregate_id"].removeprefix("project:"), []).append(by_id[key])
             elif key in by_id:
-                by_id[key].update(status="DONE" if row["event_type"] == "InterpretationCreated" else "FAILED", finished_at=row["occurred_at"], error=payload.get("error"))
+                by_id[key].update(done=bool(payload.get("done")), done_at=row["occurred_at"] if payload.get("done") else None)
+        return projects
+
+    def reruns(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+        """project_id -> its rerun reminders, oldest first: the analysis to redo, when it is due, and the analysis that
+        fulfilled it (None while open)."""
+        projects: dict[str, list[dict[str, Any]]] = {}
+        by_id: dict[str, dict[str, Any]] = {}
+        for row in self._project_events(tenant_id, self.RERUN_EVENTS, project_id):
+            payload = json.loads(row["payload_json"])
+            key = payload.get("rerun_id")
+            if row["event_type"] == "RerunScheduled":
+                by_id[key] = {"rerun_id": key, "interpretation_id": payload.get("interpretation_id"), "method_id": payload.get("method_id"), "due": payload.get("due"), "scheduled_at": row["occurred_at"], "fulfilled_by": None, "fulfilled_at": None}
+                projects.setdefault(row["aggregate_id"].removeprefix("project:"), []).append(by_id[key])
+            elif key in by_id:
+                by_id[key].update(fulfilled_by=payload.get("interpretation_id"), fulfilled_at=row["occurred_at"])
         return projects
 
     def last_activity(self, tenant_id: str, project_id: str | None = None) -> dict[str, str]:

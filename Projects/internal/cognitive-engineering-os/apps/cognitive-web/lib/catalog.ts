@@ -6,9 +6,11 @@ export type Method = { name_zh: string; name_en: string; abbr?: string | null; b
 export type Goal = { id: string; title_zh: string; short_zh: string; blurb_zh: string; icon: string; families: string[]; featured: string[] };
 export type Popular = { id: string; shape: string; line_zh: string };
 export type Recipe = { id: string; name: string; steps: string[]; audience: "user" | "internal"; goal: string; name_zh: string; blurb_zh: string };
+export type Family = { name_zh: string; name_en: string; blurb_zh: string };
 export type Catalog = {
   counts: { tools: number; user_workflows: number; internal_workflows: number };
   methods: Record<string, Method>;
+  families: Record<string, Family>;
   goals: Goal[];
   popular: Popular[];
   prompts: string[];
@@ -31,11 +33,25 @@ export function toolNames(catalog: Catalog | null): Record<string, string> {
   return catalog ? Object.fromEntries(Object.entries(catalog.methods).map(([key, method]) => [key, method.name_zh])) : {};
 }
 
+export const ICEBERG_ID = "systems.iceberg_model";   // the one tool whose form fields are its layers (docs/mockups/iceberg-result-mock.html)
+
+/** The family a tool belongs to, as the mock's tool line writes it: 系統思考 Systems Thinking; null without a catalog. */
+export function familyLabel(catalog: Catalog | null, id: string): string | null {
+  const family = catalog?.families?.[id.split(".")[0]];
+  return family ? `${family.name_zh} ${family.name_en}` : null;
+}
+/** tool id -> its family label, for pages that learn the tool only in the browser. */
+export function familyLabels(catalog: Catalog | null): Record<string, string> {
+  return catalog ? Object.fromEntries(Object.keys(catalog.methods).flatMap((id) => { const label = familyLabel(catalog, id); return label ? [[id, label]] : []; })) : {};
+}
+
 export const toolHref = (id: string) => `/methods/${encodeURIComponent(id)}`;
 /** The run page; with a project, the analysis goes into that project instead of a new one. */
 export const runHref = (id: string, project?: string) => `/methods/${encodeURIComponent(id)}/run${project ? `?project=${encodeURIComponent(project)}` : ""}`;
 export const projectHref = (id: string) => `/projects/${encodeURIComponent(id)}`;
 export const analysisHref = (project: string, analysis: string) => `${projectHref(project)}/analyses/${encodeURIComponent(analysis)}`;
+/** Two analyses of one project side by side (到期重跑並比較). */
+export const compareHref = (project: string, a: string, b: string) => `${projectHref(project)}/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
 export const dirHref = (goalId: string) => `/methods#dir-${goalId}`;
 export const workflowHref = (id: string) => `/workflows#wf-${id}`;
 

@@ -8,6 +8,8 @@ test('login -> iceberg -> result page, cards in the mock order -> my projects ->
   const password = mockApi ? 'local-only' : process.env.COS_TEST_PASSWORD;
   test.skip(!mockApi && (!tenant || !email || !password), 'COS_TEST_TENANT_ID / COS_TEST_EMAIL / COS_TEST_PASSWORD missing');
   let created: Record<string, unknown> | null = null;
+  let tasks: Array<Record<string, unknown>> = [];
+  let approval: Record<string, unknown> | null = null;
   const analysis = { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', status: 'DONE', requested_at: '2026-09-26T15:51:00Z', finished_at: '2026-09-26T15:52:00Z', error: null, judgment: null };
   if (mockApi) {
     await page.route('**/api/**', async (route) => {
@@ -34,11 +36,23 @@ test('login -> iceberg -> result page, cards in the mock order -> my projects ->
         body = [analysis];
       } else if (path === '/projects/PROJECT-LOCAL/sources') {
         body = [];
+      } else if (path === '/projects/PROJECT-LOCAL/tasks' && method === 'POST') {
+        tasks = (JSON.parse(route.request().postData() ?? '{}').tasks as Array<Record<string, string>>).map((task, index) => ({ task_id: `T${index}`, interpretation_id: 'INTERP-LOCAL', ...task, created_at: '2026-09-27T00:00:00Z', done: false, done_at: null }));
+        body = tasks;
+      } else if (path === '/projects/PROJECT-LOCAL/tasks') {
+        body = tasks;
+      } else if (path === '/projects/PROJECT-LOCAL/reruns') {
+        body = [];
+      } else if (path === '/methods/systems.iceberg_model/estimate') {
+        body = { method_id: 'systems.iceberg_model', model: 'local-fixture', input_tokens: 10000, output_tokens: 5000, tokens: 15000, twd: 1, based_on: 0 };
+      } else if (path === '/interpretations/INTERP-LOCAL/approval' && method === 'POST') {
+        approval = { decision: JSON.parse(route.request().postData() ?? '{}').decision, at: '2026-09-27T00:05:00Z', by_name: 'local', reason: '' };
+        body = approval;
       } else if (path === '/methods/systems.iceberg_model/interpret' && method === 'POST') {
         status = 202;
         body = { interpretation_id: 'INTERP-LOCAL', status: 'PENDING' };
       } else if (path === '/interpretations/INTERP-LOCAL') {
-        body = { status: 'DONE', project_id: 'PROJECT-LOCAL', method_id: 'systems.iceberg_model', created_at: '2026-09-26T15:52:00Z', judgment: null, record: { events: ['release incidents'] }, manifest: [{ id: 'r/events/0', kind: 'record', path: 'r/events/0', value: 'release incidents' }], gate_results: [{ gate_id: 'citation_integrity', status: 'PASS' }], result: { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', summary: 'Recurring incident', findings: [{ id: 'F1', title: 'Visible event', text: 'Release incidents recur.', citations: ['r/events/0'], confidence: { level: 'mid', reason: 'record' } }], visual: { kind: 'layered', bindings: { levels: [{ label: 'r/events/0', path: 'r/events/0' }] } }, next_methods: [], next_steps: [], recommendations: [], gaps: [], model: 'local-fixture', usage: { input_tokens: 10, output_tokens: 20 }, provenance: { authorship_state: 'AI_GENERATED' } } };
+        body = { status: 'DONE', project_id: 'PROJECT-LOCAL', method_id: 'systems.iceberg_model', created_at: '2026-09-26T15:52:00Z', judgment: null, approval, cost_twd: 1, record: { events: ['release incidents'] }, manifest: [{ id: 'r/events/0', kind: 'record', path: 'r/events/0', value: 'release incidents' }], gate_results: [{ gate_id: 'citation_integrity', status: 'PASS' }], result: { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', summary: 'Recurring incident', findings: [{ id: 'F1', title: 'Visible event', text: 'Release incidents recur.', citations: ['r/events/0'], confidence: { level: 'mid', reason: 'record' } }], visual: { kind: 'layered', bindings: { levels: [{ label: 'r/events/0', path: 'r/events/0' }] } }, next_methods: [], next_steps: [], recommendations: [], gaps: [], model: 'local-fixture', usage: { input_tokens: 10, output_tokens: 20 }, provenance: { authorship_state: 'AI_GENERATED' } } };
       } else {
         status = 404;
         body = { detail: `Unexpected mock API request: ${method} ${path}` };
@@ -79,9 +93,17 @@ test('login -> iceberg -> result page, cards in the mock order -> my projects ->
     return (await response.json()).status === 'DONE';
   }, { timeout: 540_000 });
   await page.getByRole('button', { name: '執行分析' }).click();
+  await expect(page.locator('#input')).toContainText('要花多少');   // 花錢前先講: the cost, then a confirmation
+  await page.getByRole('button', { name: '確認執行' }).click();
   const completed = await (await doneResponse).json() as { result: { findings: Array<{ citations: string[] }> } };
   await expect(page.locator('[data-section="0"]')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('[data-section]')).toHaveCount(11);   // header, ① … ⑨, approve (docs/mockups/iceberg-result-mock.html)
+  // the approve card's buttons do what they say: 核准 marks the page approved (the pill and the source strip change)
+  await expect(page.locator('#approve .btns button', { hasText: '匯出 PDF' })).toBeVisible();
+  await page.locator('#approve .btns button', { hasText: '核准，存進專案' }).click();
+  await expect(page.locator('[data-section="0"] .pill')).toHaveText('已核准', { timeout: 30_000 });
+  await expect(page.locator('#approve .meta-bar')).toContainText('已核准');
+  await expect(page.locator('#approve .btns button', { hasText: '核准，存進專案' })).toBeDisabled();
   await expect(page.locator('[data-section="7"]')).toBeVisible();   // ⑦ 解決方案
   await expect(page.getByRole('img', { name: '冰山模型四層圖' })).toBeVisible();
   const citationLinks = page.locator('[data-section="1"] .finding a[href^="#citation-"]');   // the findings' own [n]

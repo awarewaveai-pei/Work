@@ -1,62 +1,88 @@
 import React from "react";
+import { linesFor, lineHeight, Wrap } from "./svgtext";
 
 // ③ of docs/mockups/iceberg-result-mock.html: each chart answers one question and says how to read it, what it shows
 // and where it comes from. A: the numbers your record states (the interpretation's `trend`; its gate checks every value
 // against the cited line). B: the feedback loop the interpretation found (`loop`, every node cited). C: the iceberg
-// model's own leverage pattern -- method knowledge, never your data.
+// model's own leverage pattern -- method knowledge, never your data. No text in them is ever cut: it wraps and the
+// drawing grows (svgtext.tsx).
 export type TrendSeries = { name: string; unit: string; points: Array<{ label: string; value: number; citation: string }> };
 export type Loop = { kind: "reinforcing" | "balancing"; name: string; reading: string; nodes: Array<{ id: string; text: string; citations: string[] }>; edges: Array<{ from: string; to: string }> };
 
-const cut = (text: string, max: number) => (Array.from(text).length > max ? Array.from(text).slice(0, max).join("") + "…" : text);
 const COLOURS = ["#1f5fbf", "#b25e09"];
+const tidy = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 export function TrendChart({ series, cite }: { series: TrendSeries[]; cite: (id: string) => string }) {
   const labels = [...new Set(series.flatMap((line) => line.points.map((point) => point.label)))];
-  const x = (label: string) => 50 + (labels.length > 1 ? (labels.indexOf(label) * 350) / (labels.length - 1) : 175);
-  // each series on its own scale from min(0, its lowest) to its highest: negatives stay inside the plot
+  const slot = labels.length > 1 ? 350 / (labels.length - 1) : 350;
+  const x = (label: string) => 50 + (labels.length > 1 ? labels.indexOf(label) * slot : 175);
+  // each series on its own axis (left: the first, right: the second) from min(0, its lowest) to its highest
   const low = series.map((line) => Math.min(0, ...line.points.map((point) => point.value)));
-  const top = series.map((line, index) => Math.max(...line.points.map((point) => point.value), low[index] + 1));
+  const nice = (value: number) => { if (value <= 0) return 1; const power = 10 ** Math.floor(Math.log10(value)); return ([1, 2, 4, 5, 8, 10].find((k) => k * power >= value) ?? 10) * power; };   // 6 -> 8, 35 -> 40: round ticks (the mock's 8 人 / 40 分)
+  const top = series.map((line, index) => nice(Math.max(...line.points.map((point) => point.value), low[index] + 1)));
   const y = (value: number, index: number) => 180 - ((value - low[index]) / (top[index] - low[index])) * 150;
-  return <svg viewBox="0 0 460 230" role="img" aria-label={`${series.map((line) => line.name).join("與")}的變化`}>
+  const labelLines = Math.max(...labels.map((label) => linesFor(label, Math.min(slot, 90), 11)));
+  const foot = `每個點都來自你填的內容 ${series.flatMap((line) => line.points.map((point) => cite(point.citation))).filter((v, i, all) => v && all.indexOf(v) === i).join("")}${series.length > 1 ? "；兩線同時變化不代表因果。" : ""}`;
+  const footLines = linesFor(foot, 400, 11);
+  const footTop = 186 + labelLines * lineHeight(11) + 6;
+  const height = footTop + footLines * lineHeight(11) + 8;
+  const ticks = (index: number) => [top[index], (top[index] + low[index]) / 2, low[index]];
+  return <svg viewBox={`0 0 460 ${height}`} role="img" aria-label={`${series.map((line) => line.name).join("與")}的變化`}>
     <line x1="50" y1="20" x2="50" y2="180" className="axis" /><line x1="50" y1="180" x2="420" y2="180" className="axis" />
     <g fontSize="11" className="m">
-      <text x="8" y="34">{top[0]} {series[0].unit}</text><text x="8" y="184">{low[0]}</text>
-      {series[1] && <text x="426" y="34">{top[1]} {series[1].unit}</text>}
-      {labels.map((label) => <text key={label} x={x(label) - 14} y="198">{cut(label, 5)}</text>)}
+      {ticks(0).map((value, index) => <text key={index} x="46" textAnchor="end" y={[24, 104, 184][index]}>{tidy(value)} {series[0].unit}</text>)}
+      {series[1] && ticks(1).map((value, index) => <text key={index} x="424" y={[24, 104, 184][index]}>{tidy(value)} {series[1].unit}</text>)}
     </g>
+    {labels.map((label) => <Wrap key={label} x={x(label) - Math.min(slot, 90) / 2} y={186} width={Math.min(slot, 90)} height={labelLines * lineHeight(11) + 2} size={11} className="m" align="center">{label}</Wrap>)}
     {series.map((line, index) => <polyline key={line.name} points={line.points.map((point) => `${x(point.label)},${y(point.value, index)}`).join(" ")} fill="none" stroke={COLOURS[index]} strokeWidth="3" strokeDasharray={index ? "6 4" : undefined} />)}
-    <g fontSize="12" fontWeight="700">{series.map((line, index) => { const first = line.points[0], last = line.points[line.points.length - 1];
-      return <text key={line.name} className={index ? "warn" : "a"} x={index ? 180 : 270} y={index ? 42 : 165}>{cut(line.name, 8)} {first.value} → {last.value} {line.unit}</text>; })}</g>
-    <text x="50" y="222" fontSize="11" className="m">每個點都來自你填的內容 {series.flatMap((line) => line.points.map((point) => cite(point.citation))).filter((v, i, all) => v && all.indexOf(v) === i).join("")}</text>
+    {series.map((line, index) => { const first = line.points[0], last = line.points[line.points.length - 1]; const text = `${line.name} ${tidy(first.value)} → ${tidy(last.value)} ${line.unit}`;
+      const ax = Math.min(250, Math.max(55, x(last.label) - 130)), ay = Math.min(146, Math.max(20, y(last.value, index) + (index ? -34 : 8)));   // beside its own line's last point
+      return <Wrap key={line.name} x={ax} y={ay} width={200} height={linesFor(text, 200, 12) * lineHeight(12) + 2} size={12} bold className={index ? "warn" : "a"}>{text}</Wrap>; })}
+    <Wrap x={50} y={footTop} width={400} height={footLines * lineHeight(11) + 2} size={11} className="m">{foot}</Wrap>
   </svg>;
 }
 
 // Box centres for a loop of n nodes: half a step off the clock positions, so four boxes sit at the corners (the mock)
-// and none sits at 3 or 9 o'clock beside the title.
-export function loopLayout(n: number): Array<{ cx: number; cy: number }> {
-  return Array.from({ length: n }, (_, index) => { const angle = (2 * Math.PI * index) / n + Math.PI / n; return { cx: 230 + 150 * Math.sin(angle), cy: 118 - 78 * Math.cos(angle) }; });
+// and none sits at 3 or 9 o'clock beside the title. The ring widens with the boxes it has to hold.
+export function loopLayout(n: number, rx = 150, ry = 78, cx = 230, cy = 118): Array<{ cx: number; cy: number }> {
+  return Array.from({ length: n }, (_, index) => { const angle = (2 * Math.PI * index) / n + Math.PI / n; return { cx: cx + rx * Math.sin(angle), cy: cy - ry * Math.cos(angle) }; });
 }
 
-export function LoopChart({ loop }: { loop: Loop }) {
-  const n = loop.nodes.length;   // 2-6 (schema); with the title at most 8 characters, no box reaches the centre band (Charts.test.tsx)
-  const layout = loopLayout(n);
+const BOX_W = 170, BOX_TEXT = 12.5;
+
+export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; dashed?: Set<string> }) {
+  const n = loop.nodes.length;   // 2-6 (schema)
+  const lines = new Map(loop.nodes.map((node) => [node.id, linesFor(node.text, BOX_W - 16, BOX_TEXT) + (dashed.has(node.id) ? 1 : 0)]));   // a belief node carries its （信念層） line
+  const boxH = (id: string) => 14 + (lines.get(id) ?? 1) * lineHeight(BOX_TEXT);
+  const tallest = Math.max(...loop.nodes.map((node) => boxH(node.id)));
+  const rx = n > 4 ? 230 : 190, ry = 78 + Math.max(0, tallest - 44) / 2 + (n > 4 ? 30 : 0);   // room in the middle for the title and its two notes
+  const width = 2 * rx + BOX_W + 30, cx = width / 2, cy = ry + tallest / 2 + 10;
+  const height = 2 * ry + tallest + 24;
+  const layout = loopLayout(n, rx, ry, cx, cy);
   const where = new Map(loop.nodes.map((node, index) => [node.id, layout[index]]));
-  return <svg viewBox="0 0 460 250" role="img" aria-label={`${loop.name}因果迴路`}>
+  const centreW = 2 * rx - BOX_W - 20;   // between the boxes' inner edges
+  const title = `${loop.kind === "reinforcing" ? "R" : "B"} ${loop.name}（${loop.kind === "reinforcing" ? "自我加強" : "自我平衡"}）`;
+  const note1 = "箭頭 = 前者讓後者更嚴重", note2 = loop.kind === "reinforcing" ? "轉一圈回到起點，所以越轉越強" : "轉一圈回到起點，會被拉回來";
+  const titleH = linesFor(title, centreW, 16) * lineHeight(16) + 2, noteH = (linesFor(note1, centreW, 11) + linesFor(note2, centreW, 11)) * lineHeight(11) + 2;
+  const titleTop = cy - (titleH + noteH) / 2;
+  return <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${loop.name.replace(/迴路$/, "")}因果迴路`}>
     <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#245b8a" /></marker></defs>
     <g fill="none" stroke="#245b8a" strokeWidth="2" markerEnd="url(#arr)">{loop.edges.map((edge, index) => {
       const a = where.get(edge.from)!, b = where.get(edge.to)!; const dx = b.cx - a.cx, dy = b.cy - a.cy, len = Math.hypot(dx, dy) || 1;
-      const pad = (ux: number, uy: number) => Math.min(Math.abs(75 / (ux || 1e-9)), Math.abs(22 / (uy || 1e-9))) + 4;   // leave the box before the arrow starts
-      const ux = dx / len, uy = dy / len, s = pad(ux, uy);
-      return <path key={index} d={`M${a.cx + ux * s},${a.cy + uy * s} L${b.cx - ux * s},${b.cy - uy * s}`} />; })}</g>
-    <g className="node" stroke="#5a93c4" strokeWidth="1.5">{loop.nodes.map((node) => { const p = where.get(node.id)!; return <rect key={node.id} x={p.cx - 75} y={p.cy - 22} width="150" height="44" rx="8" />; })}</g>
-    <g fontSize="12.5" textAnchor="middle">{loop.nodes.map((node) => { const p = where.get(node.id)!; return <text key={node.id} x={p.cx} y={p.cy + 5}>{cut(node.text, 11)}</text>; })}</g>
-    <text x="230" y="124" fontSize="14" fontWeight="700" textAnchor="middle" className="a">{loop.kind === "reinforcing" ? "R" : "B"} {cut(loop.name, 8)}</text>
-    <text x="230" y="141" fontSize="11" textAnchor="middle" className="m">{loop.kind === "reinforcing" ? "自我加強：越轉越強" : "自我平衡：會被拉回來"}</text>
+      const ux = dx / len, uy = dy / len;
+      // leave each box before the arrow starts / ends: the distance to its own edge along the arrow's direction
+      const pad = (id: string) => Math.min(Math.abs((BOX_W / 2) / (ux || 1e-9)), Math.abs((boxH(id) / 2) / (uy || 1e-9))) + 4;
+      const s = pad(edge.from), t = pad(edge.to);
+      return <path key={index} d={`M${a.cx + ux * s},${a.cy + uy * s} L${b.cx - ux * t},${b.cy - uy * t}`} stroke={dashed.has(edge.from) ? "#b25e09" : undefined} />; })}</g>
+    <g className="node" stroke="#5a93c4" strokeWidth="1.5">{loop.nodes.map((node) => { const p = where.get(node.id)!; return <rect key={node.id} x={p.cx - BOX_W / 2} y={p.cy - boxH(node.id) / 2} width={BOX_W} height={boxH(node.id)} rx="8" stroke={dashed.has(node.id) ? "#b25e09" : undefined} strokeDasharray={dashed.has(node.id) ? "5 3" : undefined} />; })}</g>
+    {loop.nodes.map((node) => { const p = where.get(node.id)!; return <Wrap key={node.id} x={p.cx - BOX_W / 2 + 8} y={p.cy - boxH(node.id) / 2 + 7} width={BOX_W - 16} height={boxH(node.id) - 8} size={BOX_TEXT} align="center" className={dashed.has(node.id) ? "warn" : undefined}>{node.text}{dashed.has(node.id) ? <><br /><span style={{ fontSize: 10.5 }}>（信念層）</span></> : null}</Wrap>; })}
+    <Wrap x={cx - centreW / 2} y={titleTop} width={centreW} height={titleH} size={16} bold align="center" className="a">{title}</Wrap>
+    <Wrap x={cx - centreW / 2} y={titleTop + titleH} width={centreW} height={noteH} size={11} align="center" className="m">{note1}<br />{note2}</Wrap>
   </svg>;
 }
 
 // The iceberg model's pattern (Anderson & Johnson): the deeper the layer, the harder to change and the longer it lasts.
-const LEVERAGE: Array<[string, number, number, string]> = [["事件", 60, 60, "當次有效"], ["模式", 120, 120, "提早看到"], ["結構", 180, 260, "改了就持久"], ["心智模型", 300, 330, "最難、最慢，但最根本"]];
+const LEVERAGE: Array<[string, number, number, string]> = [["事件", 60, 60, "當次有效"], ["模式", 120, 120, "提早看到"], ["結構", 180, 260, "切斷迴路，持久"], ["心智模型", 300, 330, "最難、最慢，但最根本"]];
 
 export function LeverageChart() {
   return <svg viewBox="0 0 460 210" role="img" aria-label="四層改變難度與效果持久度對比">

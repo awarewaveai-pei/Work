@@ -553,6 +553,16 @@ class IdentityStore:
                 (tenant_id, identity_id, purpose, model, int(input_tokens), int(output_tokens), _now_iso()),
             )
 
+    def ai_usage_recent(self, tenant_id: str, purpose: str, limit: int = 5) -> list[dict[str, int]]:
+        """The tenant's latest calls for one purpose (``interpret:<method_id>``), newest first: what a run of that tool
+        has cost lately, for the estimate shown before the next one."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT input_tokens, output_tokens, model FROM ai_usage WHERE tenant_id = ? AND purpose = ? ORDER BY id DESC LIMIT ?",
+                (tenant_id, purpose, max(1, int(limit))),
+            ).fetchall()
+        return [{"input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"]), "model": str(row["model"])} for row in rows]
+
     def ai_usage_totals(self, tenant_id: str, since: str | None = None) -> dict[str, int]:
         """``since``: an ISO8601 ``YYYY-MM-DDTHH:MM:SSZ`` lower bound (inclusive), matching ``_now_iso``'s own
         fixed-width format so a plain TEXT comparison in SQLite is correct -- no date parsing needed."""

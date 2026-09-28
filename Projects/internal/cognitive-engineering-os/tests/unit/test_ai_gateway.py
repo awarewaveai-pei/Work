@@ -18,7 +18,7 @@ from ai_lego.errors import InvariantViolation
 from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.ai_gateway import draft as draft_mod
 from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs, draft_recipe_source, extract_json_object, method_input_spec, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MODEL_ENV, AiCompletion, AnthropicProvider, provider_from_env
+from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, provider_from_env
 from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
 from tests.unit.thread_testkit import HANG_GUARD_S, join_all
@@ -465,6 +465,43 @@ class ApiRouteTests(ApiTestCase):
         self.assertEqual(response.json()["source"]["visual_metaphor"], {"a": 1})
         self.assertIs(response.json()["nodes"][0]["ok"], False)
         self.assertEqual(self.client.post("/ai/draft/recipe/nope", json={"brief": "x", "labels": ["a"]}).status_code, 404)
+
+
+
+
+class CompleteJsonTests(unittest.TestCase):
+    """complete_json: the answer is a tool call the API parsed; text is its serialization; a text answer is passed through."""
+
+    def _provider(self, payload):
+        seen = {}
+        def fake_fetch(url, timeout, *, method, headers, body, max_bytes, error_prefix):
+            seen.update(body=body)
+            return payload
+        return AnthropicProvider("sk-test", "claude-x", fetch=fake_fetch), seen
+
+    def test_a_tool_call_is_returned_as_its_serialized_input(self):
+        provider, seen = self._provider({"content": [{"type": "text", "text": "Here it is."}, {"type": "tool_use", "name": "answer", "input": {"summary": "x「y」", "n": 1}}], "stop_reason": "tool_use", "model": "claude-real", "usage": {"input_tokens": 5, "output_tokens": 6}})
+        completion = provider.complete_json("SYS", "USER", max_tokens=99)
+        self.assertEqual(json.loads(completion.text), {"summary": "x「y」", "n": 1})
+        self.assertEqual((completion.model, completion.input_tokens, completion.output_tokens), ("claude-real", 5, 6))
+        self.assertEqual(seen["body"]["tools"][0]["name"], "answer")
+        self.assertEqual(seen["body"]["tool_choice"]["type"], "auto")
+        self.assertIn("Answer by calling the tool `answer`", seen["body"]["messages"][0]["content"])
+        self.assertEqual(seen["body"]["max_tokens"], 99)
+
+    def test_a_text_answer_is_passed_through_for_the_callers_parser(self):
+        provider, _ = self._provider({"content": [{"type": "text", "text": "{\"ok\": true}"}], "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}})
+        self.assertEqual(provider.complete_json("s", "u", max_tokens=10).text, "{\"ok\": true}")
+
+    def test_a_call_cut_off_by_max_tokens_is_not_trusted(self):
+        provider, _ = self._provider({"content": [{"type": "tool_use", "name": "answer", "input": {"partial": True}}], "stop_reason": "max_tokens", "usage": {"input_tokens": 1, "output_tokens": 10}})
+        with self.assertRaisesRegex(InvariantViolation, "AI_PROVIDER_EMPTY_RESPONSE"):
+            provider.complete_json("s", "u", max_tokens=10)
+
+    def test_the_ceiling_still_applies(self):
+        provider, _ = self._provider({})
+        with self.assertRaisesRegex(InvariantViolation, "AI_MAX_TOKENS_INVALID"):
+            provider.complete_json("s", "u", max_tokens=MAX_OUTPUT_TOKENS + 1)
 
 
 if __name__ == "__main__":

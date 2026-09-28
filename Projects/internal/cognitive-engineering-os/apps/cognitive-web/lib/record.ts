@@ -28,3 +28,8 @@ export function restoreState(fields: FormField[], record: Record<string, unknown
   }
   return { state: initialState(fields, back), left };
 }
+
+/** An analysis made before schema 1.1.0: findings and next steps only, none of the result page's other sections. */
+export function isOldVersion(result: { summary?: unknown; units?: unknown; solutions?: unknown; loop?: unknown; trend?: unknown } | null | undefined): boolean {
+  return Boolean(result) && !result!.summary && !result!.units && !result!.solutions && !result!.loop && !result!.trend;
+}

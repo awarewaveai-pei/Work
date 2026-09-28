@@ -212,23 +212,29 @@ class Node:
 class Dom(html.parser.HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.root = Node("#root", {}, None, 0); self.cur = self.root; self.err = []; self.svg = 0
+        self.root = Node("#root", {}, None, 0); self.cur = self.root; self.err = []; self.svg = 0; self.foreign = 0
+
+    def _html(self):
+        """HTML rules apply outside svg and inside a foreignObject (a browser serializes <br> there without a slash)."""
+        return self.svg == 0 or self.foreign > 0
 
     def handle_starttag(self, tag, attrs):
         node = Node(tag, dict(attrs), self.cur, self.getpos()[0]); self.cur.children.append(node)
-        if tag in VOID and self.svg == 0: return
+        if tag in VOID and self._html(): return
         if tag == "svg": self.svg += 1
+        if tag == "foreignobject": self.foreign += 1
         self.cur = node
 
     def handle_startendtag(self, tag, attrs):
         node = Node(tag, dict(attrs), self.cur, self.getpos()[0]); self.cur.children.append(node)
-        if self.svg == 0 and tag not in VOID:
+        if self._html() and tag not in VOID:
             self.err.append(f"line {self.getpos()[0]}: <{tag}/> is not a void element; a browser ignores the slash")
 
     def handle_endtag(self, tag):
-        if tag in VOID and self.svg == 0: return
+        if tag in VOID and self._html(): return
         if self.cur.tag == tag:
             if tag == "svg": self.svg -= 1
+            if tag == "foreignobject": self.foreign -= 1
             self.cur = self.cur.parent
         else:
             self.err.append(f"line {self.getpos()[0]}: </{tag}> closes <{self.cur.tag}> opened at line {self.cur.line}")
@@ -831,8 +837,9 @@ class Checker:
 RESULT_SECTIONS = [str(n) for n in range(10)] + ["approve"]   # header, ① … ⑨, the approve card (mock order)
 
 
-def check_web_result(path, lesson=None):
-    """Apply the mock's result-page rules (check_result, lesson-aware) and its card order to rendered web HTML."""
+def check_web_result(path, lesson=None, parity=False):
+    """Apply the mock's result-page rules (check_result, lesson-aware) and its card order to rendered web HTML; with
+    ``parity`` (a full iceberg result), every card's headings, labels, captions and buttons against the mock's."""
     source = pathlib.Path(path)
     try:
         html = source.read_text(encoding="utf-8")
@@ -861,7 +868,105 @@ def check_web_result(path, lesson=None):
     for anchor in (node for node in nodes if node.tag == "a" and node.attrs.get("href", "").startswith("#citation-")):
         target = anchor.attrs["href"][1:]
         if not any(node.attrs.get("id") == target and node.attrs.get("data-source") for node in nodes): problems.append(f"{source}: [result-citation] {target} lacks manifest source")
+    if parity and card2 is not None and any(node.attrs.get("data-method") == "systems.iceberg_model" for node in card2.walk()):
+        problems.extend(f"{source}: [parity] {finding}" for finding in check_parity(mk.HERE / "iceberg-result-mock.html", dom.root))
     return problems
+
+
+# ---------------- parity: the mock's result page, card by card, against the rendered one ----------------
+# Operator 2026-09-27: hand-written comparisons kept missing things. This reads both pages and compares what does not
+# depend on the case: every card's heading, its 怎麼讀 strip, sub-headings, row labels, table headers, figure captions,
+# buttons and action links, and the structural pieces a card must carry. Model-written text is the one thing it skips.
+# Numbers and Chinese numerals read as N (三條路 = 兩條路). PARITY_ALIASES lists the deliberate differences in words.
+_NUMERAL_RE = re.compile(r"[0-9０-９]+|[一兩二三四五六七八九十]+(?=[個條層次張段天週步])")   # 步: 把建議的兩步／一步串成一條工作流 (⑧, count of next steps)
+PARITY_ALIASES = {
+    # the web schedules a rerun as a reminder (the rerun needs the numbers you bring), so it does not say 自動; without a
+    # horizon in days it says 到期
+    "N 天後自動重跑本分析並比較": {"N 天後重跑本分析並比較", "到期重跑本分析並比較"},
+    # with one next step the web says 下一步 where the mock's case had two
+    "把建議的N步串成N條工作流,N次跑完每一步停下來給你確認,順序可以改": {"把建議的下N步串成N條工作流,N次跑完每一步停下來給你確認,順序可以改"},
+}
+PARITY_CARDS = ["header", "input", "1", "2", "3", "4", "5", "6", "7", "8", "9", "approve"]   # the mock's order; the mock's empty-state card has no web twin with a result
+PARITY_MUST_HAVE = {   # class or tag a card must carry, beyond what the mock's text says
+    "header": ["status", "how"], "input": ["how", "runform"], "1": ["finding", "judge"], "2": ["thick", "legend"], "3": ["charts", "figure", "read"],
+    "4": ["layer", "head", "row"], "5": ["finding"], "6": ["table"], "7": ["table", "finding", "kpis", "kpi"], "8": ["journey", "mcards", "mcard"], "9": ["src"], "approve": ["meta-bar", "details", "pre"],
+}
+
+
+def _norm(text):
+    text = " ".join(unicodedata.normalize("NFKC", text).replace("↗", "").split())
+    return _NUMERAL_RE.sub("N", text)
+
+
+def _stem(text, cut="：（("):
+    """The text up to its first colon or bracket (a heading without its case-specific part)."""
+    text, cut = _norm(text), unicodedata.normalize("NFKC", cut)   # the page and the mock write ： and （ full-width; _norm folds them
+    cuts = [text.find(c) for c in cut if c in text]
+    stem = text[:min(cuts)].strip() if cuts else text
+    return stem or text   # a text that opens with a bracket (（示意）…) keeps its whole self rather than collapsing to ""
+
+
+def _parity_cards(root, web):
+    """The cards to compare, keyed as PARITY_CARDS: the mock's top-level result cards in order; the web's by data-section (input = #input)."""
+    if web:
+        cards = {n.attrs["data-section"]: n for n in root.walk() if "data-section" in n.attrs}
+        cards["header"] = cards.pop("0", None)
+        cards["input"] = next((n for n in root.walk() if n.attrs.get("id") == "input"), None)
+        return cards
+    tops = [n for n in root.walk() if n.has("card") and not n.has("layer") and not any(a.has("card") for a in _ancestors(n))]
+    tops = [n for n in tops if n.attrs.get("data-when") != "empty"]
+    return dict(zip(PARITY_CARDS, tops))
+
+
+def _ancestors(n):
+    while n.parent is not None:
+        n = n.parent
+        yield n
+
+
+def _shown(n):
+    return not any("hidden" in a.attrs for a in [n, *_ancestors(n)])
+
+
+def _card_outline(card, key):
+    """What must match: heading, 怎麼讀 strip, h3 stems, row labels, table headers, figure captions, buttons and action links."""
+    out = {}
+    h = next((n for n in card.walk() if n.tag in ("h1", "h2") and _shown(n)), None)
+    heading = h.text() if h is not None else ""
+    out["heading"] = _stem(heading, "：") if key in ("header",) else _norm(heading)
+    how = next((n for n in card.walk() if n.has("how") and _shown(n)), None)
+    out["how"] = sorted(_norm(b.text()) for b in (how.find(tag="b") if how is not None else []))
+    out["h3"] = sorted({m.group(0) for n in card.find(tag="h3") if _shown(n) for m in [re.match(r"^[A-C]\.|^第 N 層/N", _norm(n.text()))] if m})
+    out["rows"] = sorted({_norm(b.text()) for r in card.find("row") if _shown(r) for b in r.elements()[:1] if b.tag == "b"})
+    out["th"] = sorted({tuple(_norm(th.text()) for th in t.find(tag="th")) for t in card.find(tag="table") if _shown(t)})
+    out["figures"] = sorted({_stem(b.text(), "：") for f in card.find(tag="figcaption") if _shown(f) for b in f.find(tag="b")[:1]})
+    out["actions"] = sorted({_stem(n.text(), "？") for n in card.walk() if _shown(n) and (n.tag == "button" or (n.tag == "a" and n.has("btn")))})
+    return out
+
+
+def check_parity(mock_path, web_root):
+    """-> findings: every way the rendered page's cards differ from the mock's, by card; empty when they agree."""
+    try:
+        dom = Dom(); dom.feed(pathlib.Path(mock_path).read_text(encoding="utf-8")); dom.close()
+    except (OSError, UnicodeError, ValueError) as error:
+        return [f"mock unreadable: {error}"]
+    mock_cards, web_cards = _parity_cards(dom.root, False), _parity_cards(web_root, True)
+    findings = []
+    for key in PARITY_CARDS:
+        mock, web = mock_cards.get(key), web_cards.get(key)
+        if mock is None: findings.append(f"card {key}: missing in the mock"); continue
+        if web is None: findings.append(f"card {key}: missing on the page"); continue
+        a, b = _card_outline(mock, key), _card_outline(web, key)
+        if a["heading"] != b["heading"]: findings.append(f"card {key}: heading {b['heading']!r} != mock {a['heading']!r}")
+        if a["how"] != b["how"]: findings.append(f"card {key}: 怎麼讀 strip {b['how']} != mock {a['how']}")
+        for field, what in (("h3", "sub-heading"), ("rows", "row label"), ("figures", "figure caption")):
+            for item in sorted(set(a[field]) - set(b[field])): findings.append(f"card {key}: {what} {item!r} missing on the page")
+        for item in sorted(set(a["th"]) - set(b["th"])): findings.append(f"card {key}: table header {list(item)} missing on the page")
+        for item in sorted(set(a["actions"]) - set(b["actions"])):
+            if not (PARITY_ALIASES.get(item, set()) & set(b["actions"])): findings.append(f"card {key}: button/link {item!r} missing on the page")
+        for need in PARITY_MUST_HAVE.get(key, []):
+            if not any((n.has(need) or n.tag == need) and _shown(n) for n in web.walk()): findings.append(f"card {key}: .{need} missing on the page")
+    return findings
 
 
 def main(argv):
@@ -869,14 +974,16 @@ def main(argv):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+    parity = "--parity" in argv
+    argv = [a for a in argv if a != "--parity"]
     if len(argv) in (3, 5) and argv[:2] == ["--page", "result"] and (len(argv) == 3 or argv[3] == "--lesson"):
-        findings = check_web_result(argv[2], argv[4] if len(argv) == 5 else None)
+        findings = check_web_result(argv[2], argv[4] if len(argv) == 5 else None, parity=parity)
         if findings:
             print("\n".join(findings)); print(f"{len(findings)} finding(s)"); return 1
         print("check-mocks: rendered result page green"); return 0
     folder = mk.HERE
     if len(argv) == 2 and argv[0] == "--dir": folder = pathlib.Path(argv[1])
-    elif argv: print("usage: check-mocks.py [--dir <folder>] | --page result <html> [--lesson <path>]"); return 2
+    elif argv: print("usage: check-mocks.py [--dir <folder>] | --page result <html> [--lesson <path>] [--parity]"); return 2
     findings = Checker(folder).run()
     if findings:
         print("\n".join(findings)); print(f"{len(findings)} finding(s)"); return 1

@@ -18,6 +18,9 @@ async function mount(element: React.ReactElement) {
 }
 async function run(host: HTMLElement) {
   await act(async () => { host.querySelector<HTMLButtonElement>('button[type="submit"]')!.click(); });
+  expect(posts("/methods/systems.iceberg_model/interpret")).toHaveLength(0);   // 花錢前先講: nothing runs until 確認執行
+  expect(host.textContent).toContain("要花多少");
+  await act(async () => { [...host.querySelectorAll("button")].find((button) => button.textContent === "確認執行")!.click(); });
 }
 
 describe("run page", () => {

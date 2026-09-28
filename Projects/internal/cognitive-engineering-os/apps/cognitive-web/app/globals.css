@@ -8,3 +8,18 @@ input, textarea { font: inherit; }
 .muted { color: var(--muted); }
 .error { color: var(--bad); white-space: pre-wrap; }
 .field input, .field textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--card); color: var(--ink); }
+/* text inside a drawing (foreignObject, components/result/svgtext.tsx) is HTML: the svg text colours, as colours */
+foreignObject div { color: var(--ink); }
+foreignObject .m { color: var(--muted); }
+foreignObject .a { color: var(--accent); }
+foreignObject .warn { color: var(--warn); }
+/* 匯出 PDF = the browser's print: the result cards alone, no menu, no form, no buttons; folded expert mode stays folded */
+.print-only { display: none; }
+@media print {
+  .side, .runform, .btns, button, .judge textarea, .mocknote, #input, .howto, .crumbs, details:not([open]) > *:not(summary) { display: none !important; }
+  .print-only { display: block !important; }
+  .app { display: block; }
+  .wrap { max-width: none; padding: 0; }
+  .card { break-inside: avoid; border: 1px solid #999; }
+  a[href]::after { content: none; }
+}

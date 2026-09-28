@@ -9,6 +9,7 @@ Traps for future readers:
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
@@ -23,7 +24,7 @@ ANTHROPIC_HOST = "api.anthropic.com"
 ANTHROPIC_MESSAGES_URL = f"https://{ANTHROPIC_HOST}/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_TIMEOUT_SECONDS = 60.0
-MAX_OUTPUT_TOKENS = 8192
+MAX_OUTPUT_TOKENS = 16384   # the gateway's ceiling per call; a caller picks its own limit under it (drafts 6000, interpretations 12288)
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
 
@@ -68,6 +69,37 @@ class AnthropicProvider:
         text = "".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and block.get("type") == "text")
         if not text.strip():
             raise InvariantViolation(f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={payload.get('stop_reason')!r}")
+        return self._completion(payload, text)
+
+    def complete_json(self, system: str, user: str, *, max_tokens: int = MAX_OUTPUT_TOKENS, name: str = "answer", description: str = "The answer, as the one JSON object the instructions describe.") -> AiCompletion:
+        """One JSON object, parsed by the API: the answer is a tool call whose input is that object (an open schema, so
+        the instructions stay the specification), and ``text`` is its serialization -- never text the model typed with
+        a stray quote in it (2026-09-27: a first answer refused as NOT_JSON at char 244 cost a whole retry). The tool
+        is offered, not forced (forced tool use is rejected by some models); an answer that came back as text is
+        returned as that text, for the caller's own parser. An answer cut off by max_tokens carries no usable tool
+        input and is reported like an empty one."""
+        if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or not 1 <= max_tokens <= MAX_OUTPUT_TOKENS:
+            raise InvariantViolation(f"AI_MAX_TOKENS_INVALID: expected 1..{MAX_OUTPUT_TOKENS}, got {max_tokens!r}")
+        body = {
+            "model": self.model, "max_tokens": max_tokens, "system": system,
+            "messages": [{"role": "user", "content": user + f"\n\nAnswer by calling the tool `{name}` with the JSON object as its input."}],
+            "tools": [{"name": name, "description": description, "input_schema": {"type": "object"}}],
+            "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
+        }
+        headers = {"x-api-key": self._api_key, "anthropic-version": ANTHROPIC_VERSION}
+        payload = self._fetch(ANTHROPIC_MESSAGES_URL, self._timeout, method="POST", headers=headers, body=body, max_bytes=MAX_RESPONSE_BYTES, error_prefix="AI_PROVIDER")
+        content = payload.get("content")
+        if not isinstance(content, list):
+            raise InvariantViolation("AI_PROVIDER_MALFORMED_RESPONSE: content[] missing")
+        call = next((block for block in content if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == name), None)
+        if call is not None and isinstance(call.get("input"), dict) and payload.get("stop_reason") != "max_tokens":
+            return self._completion(payload, json.dumps(call["input"], ensure_ascii=False))
+        text = "".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and block.get("type") == "text")
+        if not text.strip():
+            raise InvariantViolation(f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={payload.get('stop_reason')!r}")
+        return self._completion(payload, text)
+
+    def _completion(self, payload: dict[str, Any], text: str) -> AiCompletion:
         usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
         return AiCompletion(
             text=text,

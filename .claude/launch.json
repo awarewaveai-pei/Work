@@ -54,6 +54,27 @@
         "& './scripts/secrets-vault.ps1' -Action run -Names @('ANTHROPIC_API_KEY') -Command \"& 'C:/Users/user1115/AppData/Local/Temp/claude/D--Work/2f650e6f-96de-4c7b-b073-0113183803d1/scratchpad/launch_cos.ps1'\""
       ],
       "port": 8420
+    },
+    {
+      "name": "cognitive-api-dev",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "& './scripts/secrets-vault.ps1' -Action run -Names @('ANTHROPIC_API_KEY') -Command \"& './Projects/internal/cognitive-engineering-os/scripts/dev/launch_cos_dev.ps1'\""
+      ],
+      "port": 8420
+    },
+    {
+      "name": "cognitive-web-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd Projects/internal/cognitive-engineering-os/apps/cognitive-web && npx next dev -p 3930"
+      ],
+      "port": 3930
     }
   ]
 }

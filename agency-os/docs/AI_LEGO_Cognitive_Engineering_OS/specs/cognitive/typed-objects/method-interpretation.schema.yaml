@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
 title: Method Interpretation
-version: "1.1.0"
+version: "1.2.0"
 status: ACTIVE
 description: >
   Versioned AI interpretation of one validated method record. Every finding
@@ -14,7 +14,9 @@ description: >
   a trend drawn only from numbers the record states. Every claim cites the
   manifest; interpret_method_record.detail_integrity enforces what a schema
   cannot (paths in the manifest, a number only with the record line that says
-  it, a loop that closes).
+  it, a loop that closes). 1.2.0 (additive, all optional): headline (the page
+  title), units[].brief and units[].step (the short forms pictures and tables
+  use), leverage max, solutions.horizon and .signoff, trend.question.
 source_of_truth_for:
   - "RESEARCH_LINES_MASTER_PLAN.md §3.4-C10 and WC-PIa-01"
   - "RESEARCH_LINES_MASTER_PLAN.md §3.10 result skeleton (0b one-line conclusion, (2) per-unit reading, (3) order of action, (5b) solutions)"
@@ -141,6 +143,7 @@ properties:
       properties:
         text: {type: string, minLength: 1}
         needed_evidence: {type: string, minLength: 1}
+  headline: {type: string, minLength: 1, maxLength: 40}
   summary: {type: string, minLength: 1}
   units:
     type: array
@@ -150,10 +153,12 @@ properties:
       required: [path, meaning, action, effect, leverage, citations]
       properties:
         path: {type: string, minLength: 1}
+        brief: {type: string, minLength: 1, maxLength: 40}
         meaning: {type: string, minLength: 1}
         action: {type: string, minLength: 1}
+        step: {type: string, minLength: 1, maxLength: 30}
         effect: {type: string, minLength: 1}
-        leverage: {type: string, enum: [low, mid, high]}
+        leverage: {type: string, enum: [low, mid, high, max]}
         citations: {type: array, minItems: 1, items: {type: string, minLength: 1}}
   focus:
     type: object
@@ -186,6 +191,8 @@ properties:
             advice: {type: string, minLength: 1}
             paths: {type: array, items: {type: string, minLength: 1}}
       first_step: {type: string, minLength: 1}
+      horizon: {type: string, minLength: 1}
+      signoff: {type: string, minLength: 1}
       plan:
         type: array
         maxItems: 6
@@ -247,6 +254,7 @@ properties:
     additionalProperties: false
     required: [reading, series]
     properties:
+      question: {type: string, minLength: 1}
       reading: {type: string, minLength: 1}
       series:
         type: array

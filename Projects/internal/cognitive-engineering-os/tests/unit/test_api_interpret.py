@@ -172,11 +172,118 @@ class InterpretApiTests(ApiTestCase):
         self.assertEqual((done["method_id"], done["created_at"]), ("systems.iceberg_model", analyses[2]["finished_at"]))
         self.assertEqual(self.client.get(f"/interpretations/{runs[2][0]}").json()["method_id"], "systems.iceberg_model")
 
+    def _finished(self, event: str = "release incidents") -> str:
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": [event], "patterns": [], "structures": [], "mental_models": []})
+        self.assertEqual(response.status_code, 202, response.text)
+        api_main._run_interpretation(**launch.call_args.kwargs)
+        return response.json()["interpretation_id"]
+
+    def test_approve_and_return_are_recorded_with_who_and_when_and_the_latest_stands(self):
+        """核准／退回: the decision, by whom, when; 退回 needs a reason; the list and the single read agree."""
+        done = self._finished()
+        self.assertEqual(self.client.get(f"/interpretations/{done}").json()["approval"], None)
+        approved = self.client.post(f"/interpretations/{done}/approval", json={"decision": "approve"})
+        self.assertEqual(approved.status_code, 200, approved.text)
+        self.assertEqual((approved.json()["decision"], approved.json()["by_name"]), ("approve", self.identity.get("display_name") or self.identity["email"]))
+        self.assertEqual(self.client.post(f"/interpretations/{done}/approval", json={"decision": "return", "reason": " "}).status_code, 400)
+        self.assertEqual(self.client.post(f"/interpretations/{done}/approval", json={"decision": "sign"}).status_code, 400)
+        self.assertEqual(self.client.post(f"/interpretations/{done}/approval", json={"decision": "return", "reason": "第二個發現不對"}).status_code, 200)
+        read = self.client.get(f"/interpretations/{done}").json()
+        self.assertEqual((read["approval"]["decision"], read["approval"]["reason"]), ("return", "第二個發現不對"))
+        self.assertEqual(self.client.get(f"/projects/{self.project_id}/analyses").json()[0]["approval"]["decision"], "return")
+        self.assertEqual(self.client.post(f"/interpretations/INTERP-NOPE/approval", json={"decision": "approve"}).status_code, 404)
+        self.assertIsNone(read["cost_twd"])   # the fake model has no price row: tokens only (a priced model: tests/unit/test_pricing.py)
+
+    def test_a_returned_analysis_is_redone_with_the_reason_in_the_prompt_and_linked_to_the_old_one(self):
+        done = self._finished()
+        self.client.post(f"/interpretations/{done}/approval", json={"decision": "return", "reason": "把線上場當成原因，資料沒這樣說"})
+        prompts = []
+        original = self.provider.complete
+        def spy(system, user, *, max_tokens):
+            prompts.append(user); return original(system, user, max_tokens=max_tokens)
+        with patch.object(self.provider, "complete", side_effect=spy), patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["release incidents"], "patterns": [], "structures": [], "mental_models": [], "revision": {"of": done, "reason": "把線上場當成原因，資料沒這樣說"}})
+            self.assertEqual(response.status_code, 202, response.text)
+            api_main._run_interpretation(**launch.call_args.kwargs)
+        self.assertIn("THE USER RETURNED THE PREVIOUS VERSION", prompts[0])
+        self.assertIn("把線上場當成原因", prompts[0])
+        redo = self.client.get(f"/interpretations/{response.json()['interpretation_id']}").json()
+        self.assertEqual((redo["status"], redo["revision"]), ("DONE", {"of": done, "reason": "把線上場當成原因，資料沒這樣說"}))
+        self.assertEqual([item["revision_of"] for item in self.client.get(f"/projects/{self.project_id}/analyses").json()], [done, None])
+        self.assertEqual(self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["x"], "revision": {"of": "INTERP-NOPE", "reason": "r"}}).status_code, 404)
+        self.assertEqual(self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["x"], "revision": {"of": done}}).status_code, 400)
+
+    def test_the_estimate_before_a_run_follows_this_tenants_last_runs_of_the_tool(self):
+        first = self.client.get("/methods/systems.iceberg_model/estimate")
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual((first.json()["based_on"], first.json()["tokens"]), (0, sum(api_main.DEFAULT_ESTIMATE_TOKENS)))
+        self._finished()
+        second = self.client.get("/methods/systems.iceberg_model/estimate").json()
+        self.assertEqual((second["based_on"], second["input_tokens"], second["output_tokens"], second["model"]), (1, 11, 23, "test-interpret-model"))
+        self.assertIsNone(second["twd"])   # the test model has no price; a priced model gives a number
+        self.assertEqual(self.client.get("/methods/unknown.nope/estimate").status_code, 404)
+        self.client.cookies.clear()
+        self.assertEqual(self.client.get("/methods/systems.iceberg_model/estimate").status_code, 401)
+
+    def test_plan_rows_become_the_projects_tasks_and_show_as_open_or_overdue(self):
+        done = self._finished()
+        created = self.client.post(f"/projects/{self.project_id}/tasks", json={"interpretation_id": done, "tasks": [
+            {"title": "補齊三項數據", "owner": "帶領者", "due": "2020-01-31", "proof": "有基準值", "target": "第 2 週前", "when": "1 到 2 週"},
+            {"title": "改流程順序", "owner": "", "due": "", "proof": "", "target": "", "when": "3 到 4 週"}]})
+        self.assertEqual(created.status_code, 200, created.text)
+        tasks = created.json()
+        self.assertEqual([(t["title"], t["owner"], t["due"], t["done"]) for t in tasks], [("補齊三項數據", "帶領者", "2020-01-31", False), ("改流程順序", "", "", False)])
+        project = self.client.get(f"/projects/{self.project_id}").json()
+        self.assertEqual(project["tasks"], {"open": 2, "overdue": 1, "next_due": "2020-01-31"})
+        marked = self.client.post(f"/projects/{self.project_id}/tasks/{tasks[0]['task_id']}", json={"done": True})
+        self.assertEqual((marked.status_code, marked.json()["done"]), (200, True))
+        self.assertEqual(self.client.get(f"/projects/{self.project_id}").json()["tasks"], {"open": 1, "overdue": 0, "next_due": None})
+        self.assertEqual(self.client.get(f"/projects/{self.project_id}/tasks").json()[0]["done"], True)
+        self.assertEqual(self.client.post(f"/projects/{self.project_id}/tasks", json={"tasks": [{"title": "x", "due": "2026-13-40"}]}).status_code, 400)
+        self.assertEqual(self.client.post(f"/projects/{self.project_id}/tasks", json={"tasks": []}).status_code, 400)
+        self.assertEqual(self.client.post(f"/projects/{self.project_id}/tasks/nope", json={"done": True}).status_code, 404)
+        self.assertEqual(self.client.get(f"/projects/{uuid.uuid4()}/tasks").status_code, 404)
+
+    def test_a_rerun_reminder_is_due_on_its_date_and_fulfilled_by_the_run_that_names_it(self):
+        done = self._finished()
+        self.assertEqual(self.client.post(f"/interpretations/{done}/rerun", json={"due": "2020-01-01"}).status_code, 400)   # passed
+        today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
+        scheduled = self.client.post(f"/interpretations/{done}/rerun", json={"due": today})
+        self.assertEqual(scheduled.status_code, 200, scheduled.text)
+        rerun = scheduled.json()
+        self.assertEqual((rerun["interpretation_id"], rerun["method_id"], rerun["fulfilled_by"]), (done, "systems.iceberg_model", None))
+        self.assertEqual(self.client.get(f"/projects/{self.project_id}").json()["reruns_due"], 1)
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["new numbers"], "patterns": [], "structures": [], "mental_models": [], "rerun_id": rerun["rerun_id"]})
+            self.assertEqual(response.status_code, 202, response.text)
+            api_main._run_interpretation(**launch.call_args.kwargs)
+        listed = self.client.get(f"/projects/{self.project_id}/reruns").json()
+        self.assertEqual(listed[0]["fulfilled_by"], response.json()["interpretation_id"])
+        self.assertEqual(self.client.get(f"/projects/{self.project_id}").json()["reruns_due"], 0)
+        self.assertEqual(self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["x"], "rerun_id": rerun["rerun_id"]}).status_code, 400)   # no longer open
+
+    def test_a_project_with_a_running_analysis_is_not_erased_and_a_late_result_writes_nothing(self):
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["release incidents"], "patterns": [], "structures": [], "mental_models": []})
+        self.assertEqual(response.status_code, 202, response.text)
+        refused = self.client.delete(f"/projects/{self.project_id}")
+        self.assertEqual(refused.status_code, 409, refused.text)
+        self.assertIn("PROJECT_BUSY", refused.json()["detail"])
+        # the project is erased between the request and the answer (the 409 is bypassed by going to the repository):
+        # the late answer, and a late failure, write nothing - not even InterpretationFailed on the erased aggregate
+        with tempfile.TemporaryDirectory() as cas_dir:
+            launch.call_args.kwargs["repo"].erase_project(self.tenant["tenant_id"], self.project_id, self.identity["identity_id"], TenantScopedCas(Path(cas_dir)), 0)
+        before = len(launch.call_args.kwargs["repo"].interpretation_events(self.tenant["tenant_id"], response.json()["interpretation_id"]))
+        api_main._run_interpretation(**launch.call_args.kwargs)
+        self.assertEqual(self.client.get(f"/interpretations/{response.json()['interpretation_id']}").status_code, 404)
+        self.assertEqual(len(launch.call_args.kwargs["repo"].interpretation_events(self.tenant["tenant_id"], response.json()["interpretation_id"])), before)
+
     def test_a_project_without_analyses_and_an_unknown_one(self):
         empty = self.repo.create_project(project_record(str(uuid.uuid4()), self.tenant["tenant_id"], self.workspace_id, "Empty", "Nothing yet.", "Confidential", self.identity["identity_id"], "2026-09-26T01:02:03Z"))
         self.assertEqual(self.client.get(f"/projects/{empty['project_id']}/analyses").json(), [])
         listed = [item for item in self.client.get("/projects").json() if item["project_id"] == empty["project_id"]][0]
-        self.assertEqual((listed["analysis_count"], listed["methods"], listed["latest_analysis"]), (0, [], None))
+        self.assertEqual((listed["analysis_count"], listed["methods"], listed["latest_analysis"], listed["tasks"], listed["reruns_due"]), (0, [], None, {"open": 0, "overdue": 0, "next_due": None}, 0))
         created_event = self.client.get(f"/projects/{empty['project_id']}/history").json()[0]
         self.assertEqual((created_event["event_type"], listed["updated_at"]), ("ProjectCreated", created_event["occurred_at"]))   # nothing since: the creation
         self.assertEqual(self.client.get(f"/projects/{uuid.uuid4()}/analyses").status_code, 404)

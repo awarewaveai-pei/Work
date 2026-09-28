@@ -29,9 +29,11 @@ valid:
       provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
       model: "test-model"
       usage: {input_tokens: 10, output_tokens: 20}
+      headline: "團體反思主動分享變少"
       summary: "分享變少是流程造成的。"
       units:
-        - {path: "r/events", meaning: "警訊", action: "開場鼓勵", effect: "當次", leverage: low, citations: ["r/events/0"]}
+        - {path: "r/events", brief: "8 人只有 2 人分享", meaning: "警訊", action: "開場鼓勵", step: "開場鼓勵、點名", effect: "當次", leverage: low, citations: ["r/events/0"]}
+        - {path: "r/structures", meaning: "迴路", action: "改順序", effect: "持久", leverage: max, citations: ["r/events/0"]}
       focus: {path: "r/events", why: "最容易先動"}
       priority: "先改流程，再談角色。"
       solutions:
@@ -39,6 +41,8 @@ valid:
           - {name: "甲 只多鼓勵", what: "開場鼓勵", takes: "當次", cost: "低", durability: "低", risk: "更退縮", advice: "只當急救", paths: ["r/events"]}
           - {name: "乙 改流程", what: "參與者先說", takes: "1 期", cost: "中", durability: "高", risk: "被改回去", advice: "先做", paths: ["r/structures"]}
         first_step: "下次先讓參與者說 3 分鐘。"
+        horizon: "90 天"
+        signoff: "帶領者團隊、課程設計"
         plan:
           - {when: "1 到 2 週", action: "補數據", owner: "帶領者", proof: "有基準值", target: "第 2 週前"}
         metrics:
@@ -53,6 +57,7 @@ valid:
           - {id: "b", text: "參與者等答案", citations: ["r/events/0"]}
         edges: [{from: "a", to: "b"}, {from: "b", to: "a"}]
       trend:
+        question: "真的越來越安靜嗎？"
         reading: "人數一路掉"
         series:
           - {name: "主動分享", unit: "人", points: [{label: "第 1 次", value: 6, citation: "r/events/0"}, {label: "第 6 次", value: 2, citation: "r/events/0"}]}
