@@ -345,7 +345,7 @@ class ApiRouteTests(ApiTestCase):
         self.assertTrue(body["validation"]["ok"])
         self.assertEqual(body["usage"], {"input_tokens": 100, "output_tokens": 50})
         status = self.client.get("/ai/status").json()
-        self.assertEqual(status["usage"], {"calls": 1, "input_tokens": 100, "output_tokens": 50})
+        self.assertEqual(status["usage"], {"calls": 1, "input_tokens": 100, "output_tokens": 50, "reserved": 0})
         self.assertEqual(status["budget"], {"daily_limit": DEFAULT_DAILY_TOKEN_BUDGET, "used_today": 150, "reserved_in_flight": 0, "remaining_today": DEFAULT_DAILY_TOKEN_BUDGET - 150})
         invoked = self.client.post("/methods/systems.flowchart/invoke", json=body["draft"])
         self.assertEqual(invoked.status_code, 200, invoked.text)
@@ -369,7 +369,8 @@ class ApiRouteTests(ApiTestCase):
     def test_daily_token_budget_only_counts_todays_usage(self):
         self._login()
         store = api_main.app.dependency_overrides[api_main.get_store]()
-        store.record_ai_usage(self.tenant["tenant_id"], self.identity["identity_id"], "draft:x", "m", 500, 500)  # unbounded timestamp -> "today"
+        usage_id, _ = store.reserve_ai_usage(self.tenant["tenant_id"], self.identity["identity_id"], "draft:x", "m", 500, 500, since="", fits=lambda used: True)
+        store.settle_ai_usage(usage_id, "m", 500, 500)   # written "today"; moved to 2000 below
         with store._connect() as conn:
             conn.execute("UPDATE ai_usage SET used_at = '2000-01-01T00:00:00Z'")
         with patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: "100"}):
@@ -387,9 +388,9 @@ class ApiRouteTests(ApiTestCase):
                 self.assertIn("AI_DAILY_TOKEN_BUDGET_INVALID", response.json()["detail"])
 
     def test_a_call_in_flight_is_reserved_so_a_concurrent_one_cannot_pass_the_same_check(self):
-        """The TOCTOU race (critic 2026-09-17: two requests read the same pre-call total) is closed by the reservation,
-        not by holding the tenant's lock over the model call (P-45, Codex 2026-09-28): while the first draft is in the
-        provider the lock is free, its worst case is reserved, and a second draft that does not fit beside it is 429."""
+        """The TOCTOU race (critic 2026-09-17: two requests read the same pre-call total) is closed by the reservation row,
+        written in the same database transaction as the check -- no lock spans the model call (P-45): while the first
+        draft is in the provider its worst case is reserved, and a second draft that does not fit beside it is 429."""
         self._login()
         first_in_provider, release = threading.Event(), threading.Event()
         seen: dict[str, object] = {}
@@ -408,24 +409,21 @@ class ApiRouteTests(ApiTestCase):
             try:
                 first.start()
                 self.assertTrue(first_in_provider.wait(HANG_GUARD_S), "first request never reached the provider")
-                lock = api_main._ai_budget_lock_for(self.tenant["tenant_id"])
-                seen["lock_free"] = lock.acquire(blocking=False)
-                if seen["lock_free"]: lock.release()
-                seen["reserved"] = api_main._AI_RESERVED.get(self.tenant["tenant_id"])
+                seen["reserved"] = self._reserved()   # the first call's row, written before the model was asked
                 seen["status"] = self.client.get("/ai/status").json()["budget"]   # Codex r8: the remainder the check uses
                 seen["second"] = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"}).status_code
             finally:
                 release.set()
                 join_all(self, first)
         budget = worst + worst // 2
-        self.assertEqual(seen, {"lock_free": True, "reserved": worst, "second": 429,
+        self.assertEqual(seen, {"reserved": worst, "second": 429,
                                 "status": {"daily_limit": budget, "used_today": 0, "reserved_in_flight": worst, "remaining_today": budget - worst}})
         self.assertEqual(results, {"first": 200})
-        self.assertNotIn(self.tenant["tenant_id"], api_main._AI_RESERVED)
+        self.assertEqual(self._reserved(), 0)   # settled: the row now holds what the call cost
 
-    def test_ai_budget_lock_does_not_serialize_different_tenants(self):
-        self.assertIsNot(api_main._ai_budget_lock_for("tenant-a"), api_main._ai_budget_lock_for("tenant-b"))
-        self.assertIs(api_main._ai_budget_lock_for("tenant-a"), api_main._ai_budget_lock_for("tenant-a"))
+    def _reserved(self) -> int:
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        return store.ai_usage_totals(self.tenant["tenant_id"], since=api_main._today_utc_start_iso())["reserved"]
 
     def test_unknown_method_is_404_and_provider_failures_are_502(self):
         self._login()

@@ -178,6 +178,17 @@ def daily_token_budget(environ: dict[str, str] | None = None) -> int:
     return value
 
 
+def fits_budget(used: int, reserve: int, budget: int) -> bool:
+    """The one budget rule: a call starts only if today's usage (reserved rows at their worst case included) is under
+    the budget and the call's own worst case still fits under it."""
+    return used < budget and used + reserve <= budget
+
+
+def budget_exceeded(used: int, budget: int, reserve: int = 0) -> str:
+    needs = f"; this call may use up to {reserve}" if reserve else ""
+    return f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: {used}/{budget} tokens used today (UTC){needs}; resets at midnight UTC"
+
+
 def provider_from_env(environ: dict[str, str] | None = None) -> AnthropicProvider | None:
     """``None`` when no key is configured -- the caller must answer "unconfigured", not fall back."""
     env = os.environ if environ is None else environ

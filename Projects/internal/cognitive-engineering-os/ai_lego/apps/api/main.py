@@ -75,7 +75,7 @@ from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog,
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.pricing import cost_twd
-from ai_lego.platform.ai_gateway.provider import DEFAULT_MODEL, AiProvider, AnthropicProvider, ProviderCallError, daily_token_budget, provider_from_env
+from ai_lego.platform.ai_gateway.provider import DEFAULT_MODEL, AiProvider, AnthropicProvider, ProviderCallError, budget_exceeded, daily_token_budget, fits_budget, provider_from_env
 from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
@@ -1186,9 +1186,6 @@ class DraftRequest(BaseModel):
     source: dict[str, Any] | None = None
 
 
-_AI_BUDGET_LOCKS: dict[str, threading.Lock] = {}
-_AI_BUDGET_LOCKS_GUARD = threading.Lock()
-_AI_RESERVED: dict[str, int] = {}   # worst case of the paid calls in flight, per tenant (one process: see _ai_budget_lock_for)
 PROMPT_RESERVE_TOKENS = 12_000   # the least a call's input reserves
 FRAMING_RESERVE_TOKENS = 1_000   # message and tool-use framing the API adds (its tool-use system prompt is ~350 tokens)
 
@@ -1212,14 +1209,6 @@ def _budget_refused(error: BaseException | None) -> bool:
     return False
 
 
-def _reserve_ai_tokens(tenant_id: str, tokens: int) -> None:
-    """Add (or, negative, release) an in-flight reservation; the caller holds the tenant's budget lock."""
-    with _AI_BUDGET_LOCKS_GUARD:
-        left = _AI_RESERVED.get(tenant_id, 0) + tokens
-        if left > 0: _AI_RESERVED[tenant_id] = left
-        else: _AI_RESERVED.pop(tenant_id, None)
-
-
 def _interpretation_schema_version() -> str:
     try:
         return str((yaml.safe_load((resolve_spec_root() / "specs" / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml").read_text(encoding="utf-8")) or {}).get("version") or "")
@@ -1227,43 +1216,31 @@ def _interpretation_schema_version() -> str:
         return ""
 
 
-def _ai_budget_lock_for(tenant_id: str) -> threading.Lock:
-    """One lock per tenant, created on first use. Serializing a tenant's OWN AI-draft requests end to end
-    (check budget -> call provider -> record usage) is what actually closes the TOCTOU race a plain
-    check-then-later-record sequence has: two concurrent requests for the SAME tenant would otherwise both
-    read the same pre-call usage total and both pass the check before either commits (critic finding,
-    2026-09-17). Different tenants never contend for the same lock. SCOPE: this closes the race for exactly
-    the deployment Phase 1 actually runs (``uvicorn`` with no ``--workers``, one process -- see Dockerfile
-    CMD) -- a future multi-process/multi-instance deployment would need a DB-level reservation instead of an
-    in-process lock; not attempted here (Phase 2 concern, tracked, not silently assumed away)."""
-    with _AI_BUDGET_LOCKS_GUARD:
-        lock = _AI_BUDGET_LOCKS.get(tenant_id)
-        if lock is None:
-            lock = threading.Lock()
-            _AI_BUDGET_LOCKS[tenant_id] = lock
-        return lock
-
-
 def _today_utc_start_iso() -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
     return now.strftime("%Y-%m-%dT00:00:00Z")
 
 
-def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any], reserve: int = 0) -> AiProvider:
-    """``reserve``: the worst case of the call about to start; it must fit what is left today (a metered call's)."""
+def _ai_budget(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> int:
+    """The tenant's daily budget, once the provider is configured and the tenant may use AI (503 / 403 otherwise)."""
     if provider is None:
         raise HTTPException(status_code=503, detail="AI_PROVIDER_UNCONFIGURED: set COGNITIVE_OS_ANTHROPIC_API_KEY (deploy/.env) to enable AI drafting")
     if not check_entitlement(store, session["tenant_id"], AI_DRAFT_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {AI_DRAFT_CAPABILITY!r}")
     try:
-        budget = daily_token_budget()
+        return daily_token_budget()
     except InvariantViolation as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
-    used = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
-    used_tokens = used["input_tokens"] + used["output_tokens"] + _AI_RESERVED.get(session["tenant_id"], 0)   # runs still in flight count
-    if used_tokens >= budget or used_tokens + reserve > budget:
-        needs = f"; this call may use up to {reserve}" if reserve else ""
-        raise HTTPException(status_code=429, detail=f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: {used_tokens}/{budget} tokens used today (UTC){needs}; resets at midnight UTC")
+
+
+def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> AiProvider:
+    """Refuse a request before any work when AI is off, not allowed, or today's budget is spent (429). Each paid call
+    is then checked again, atomically with its reservation, by _MeteredProvider."""
+    budget = _ai_budget(provider, store, session)
+    totals = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
+    used = totals["input_tokens"] + totals["output_tokens"]   # reserved rows (calls in flight) at their worst case
+    if not fits_budget(used, 0, budget):
+        raise HTTPException(status_code=429, detail=budget_exceeded(used, budget))
     return provider
 
 
@@ -1288,9 +1265,9 @@ def ai_status(session: dict[str, Any] = Depends(require_session), provider: AiPr
         budget = daily_token_budget()
     except InvariantViolation:
         budget = None
-    used_today = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
-    used = used_today["input_tokens"] + used_today["output_tokens"]
-    reserved = _AI_RESERVED.get(session["tenant_id"], 0)   # calls in flight count as _require_ai counts them
+    today = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
+    reserved = today["reserved"]   # calls in flight (or whose process died) at their worst case, as the check counts them
+    used = today["input_tokens"] + today["output_tokens"] - reserved
     return {
         "configured": provider is not None,
         "model": provider.model if provider else None,
@@ -1497,7 +1474,7 @@ def _interpret_and_record(
     aggregate_id = f"project:{project_id}"
     outcome: dict[str, Any] | None = None
     error: str | None = None
-    metered = _MeteredProvider(provider, store, session, f"interpret:{method_id}")   # what was billed, call by call
+    metered = _MeteredProvider(provider, store, session, f"interpret:{method_id}", run_id=interpretation_id)   # what was billed, call by call
     try:
         display_metadata = _method_display_metadata()
         spec_root = resolve_spec_root()
@@ -1999,16 +1976,16 @@ def _failure_code(failure: BaseException) -> str:
 
 
 class _MeteredProvider:
-    """The one way the API pays for a model call (drafts, interpretation, synthesis -- tests/unit/test_every_paid_call_is_metered.py): EVERY paid call -- a retry or a repair too -- first
-    passes the day's budget check and reserves its worst case (prompt + output ceiling), so concurrent calls cannot all
-    pass one check; its tokens -- a billed failure's too -- are recorded right after it. The tenant lock covers the
-    check and the record, never the call (P-45: a draft does not wait minutes behind an analysis). A run can therefore
-    not outspend the budget (Codex 2026-09-28: a retry used to be
-    unchecked) -- and a call starts only if its worst case fits what is left today (Codex r2). The runner reads a
-    refusal as a provider error and keeps what it has."""
+    """The one way the API pays for a model call (drafts, interpretation, synthesis -- tests/unit/test_every_paid_call_is_metered.py).
+    EVERY paid call -- a retry or a repair too -- first reserves its worst case (bytes sent + output ceiling) as an
+    ai_usage row, in the same database transaction that checks it fits today's budget (store.reserve_ai_usage:
+    no thread or process can pass the same check in between, and no lock spans the model call -- P-45). After the
+    call the row becomes what it cost (a billed failure too; its worst case when that cannot be read). A process
+    that dies mid-call, or a settle that fails, leaves the worst case counted -- nothing about spending lives in
+    memory. ``run_id`` groups a run's calls for the estimate. The runner reads a refusal as a provider error."""
 
-    def __init__(self, inner: AiProvider, store: IdentityStore, session: dict[str, Any], purpose: str) -> None:
-        self._inner, self._store, self._session, self._purpose = inner, store, session, purpose
+    def __init__(self, inner: AiProvider, store: IdentityStore, session: dict[str, Any], purpose: str, run_id: str | None = None) -> None:
+        self._inner, self._store, self._session, self._purpose, self._run_id = inner, store, session, purpose, run_id
         self.model = inner.model
         self.input_tokens = 0
         self.output_tokens = 0
@@ -2020,39 +1997,38 @@ class _MeteredProvider:
         return self._metered((system, user), max_tokens, lambda: self._inner.complete(system, user, max_tokens=max_tokens))
 
     def _metered(self, sent: tuple[str, ...], max_tokens: int, call: Callable[[], Any]) -> Any:
-        tenant_id = self._session["tenant_id"]
-        reserve = worst_input_tokens(*sent) + max_tokens   # all this call can bill (output, thinking included, <= max_tokens)
-        with _ai_budget_lock_for(tenant_id):
-            try:
-                _require_ai(self._inner, self._store, self._session, reserve)
-            except HTTPException as refusal:
-                raise (AiBudgetRefused if refusal.status_code == 429 else InvariantViolation)(str(refusal.detail)) from refusal
-            _reserve_ai_tokens(tenant_id, reserve)
+        worst_input = worst_input_tokens(*sent)   # all this call can bill: output (thinking included) <= max_tokens
+        try:
+            budget = _ai_budget(self._inner, self._store, self._session)
+        except HTTPException as refusal:
+            raise InvariantViolation(str(refusal.detail)) from refusal
+        usage_id, used = self._store.reserve_ai_usage(
+            self._session["tenant_id"], self._session["identity_id"], self._purpose, self.model, worst_input, max_tokens,
+            since=_today_utc_start_iso(), fits=lambda used: fits_budget(used, worst_input + max_tokens, budget), run_id=self._run_id,
+        )
+        if usage_id is None:
+            raise AiBudgetRefused(budget_exceeded(used, budget, worst_input + max_tokens))
         try:
             completion = call()
         except ProviderCallError as billed:
-            if not billed.usage_known:   # answered, cost unknown: count the worst this call could bill
-                self._settle(reserve, self.model, reserve - max_tokens, max_tokens)
-            else:
-                self._settle(reserve, self.model, billed.input_tokens, billed.output_tokens)
+            if billed.usage_known:
+                self._settle(usage_id, self.model, billed.input_tokens, billed.output_tokens)
+            else:   # answered, cost unknown: the worst case stands
+                self._settle(usage_id, self.model, worst_input, max_tokens)
             raise
         except BaseException:
-            self._settle(reserve, self.model, 0, 0)
+            self._settle(usage_id, self.model, 0, 0)
             raise
-        self._settle(reserve, completion.model, completion.input_tokens, completion.output_tokens)
+        self._settle(usage_id, completion.model, completion.input_tokens, completion.output_tokens)
         return completion
 
-    def _settle(self, reserve: int, model: str, input_tokens: int, output_tokens: int) -> None:
-        tenant_id = self._session["tenant_id"]
-        with _ai_budget_lock_for(tenant_id):
-            self.input_tokens += input_tokens   # every call made is recorded, an unbilled failure as a 0-token call
-            self.output_tokens += output_tokens
-            try:
-                self._store.record_ai_usage(tenant_id, self._session["identity_id"], self._purpose, model, input_tokens, output_tokens)
-            except Exception as failure:   # the bill stays reserved (this process) instead of vanishing from the budget
-                _reserve_ai_tokens(tenant_id, -reserve + input_tokens + output_tokens)
-                raise InvariantViolation("AI_USAGE_RECORD_FAILED") from failure
-            _reserve_ai_tokens(tenant_id, -reserve)
+    def _settle(self, usage_id: int, model: str, input_tokens: int, output_tokens: int) -> None:
+        self.input_tokens += input_tokens   # every call made is recorded, an unbilled failure as a 0-token call
+        self.output_tokens += output_tokens
+        try:
+            self._store.settle_ai_usage(usage_id, model, input_tokens, output_tokens)
+        except Exception as failure:   # the row stays reserved at its worst case: the budget never loses the bill
+            raise InvariantViolation("AI_USAGE_RECORD_FAILED") from failure
 
 
 def _synthesis_lock_path(tenant_id: str, project_id: str) -> Path:
@@ -2069,7 +2045,7 @@ def _run_synthesis(
 ) -> None:
     tenant_id = session["tenant_id"]
     aggregate_id = f"project:{project_id}"
-    metered = _MeteredProvider(provider, store, session, f"synthesis:{kind}")
+    metered = _MeteredProvider(provider, store, session, f"synthesis:{kind}", run_id=synthesis_id)
     try:
         try:
             spec_root = resolve_spec_root()

@@ -45,7 +45,8 @@
 | `e01fc7d49` `137186da4` `3199a4f9a` | Codex 三批 27 筆（checker 與 selftest、fixtures、e2e、顯示誠實化；§6 證據欄寫 Codex） |
 | `def7d7882` | 模型呼叫與閘：截斷重試一次並記帳、effort medium、item grain 的契約修整、第 N 層不算數字、中文數字、一句話標題只掉自己 |
 | `c11d92618` | 核准列四個真檢查、估價的時間與上限、預算鎖不包住模型呼叫；契約 1.3.0（診斷、短順序、每層厚度與誰能補、建議方案、迴路外的信念框、下一步的路徑與原因、缺口對應哪一層）；迴路圖照示意稿；三個 worker 的 ⑦ 任務／⑧ 帶入／錯誤與專案頁；免費示範專案；lesson 五個領域的示範案例；deploy 測試關卡加 web gate；示意稿對齊（重跑是提醒、專案頁用語與欄位）；分析的 run lock（行程死掉不再永遠「分析中」、專案刪得掉）；引註換寫法視為同一 id、拒收時重問訊息列出錯的 id；失敗原因顯示成人話 |
-| 本批（見 git log） | P-43：Codex 審查 def7d7882..c11d92618 抓到重問時沒檢查每日額度 → `_MeteredProvider` 成為 API 唯一的計費路徑（起草、解讀、synthesis）：每次付費呼叫（含重問）先檢查＋保留最壞情況、之後記帳（計費的失敗也記），鎖不包住呼叫，且最壞情況要放得進今天剩下的額度才開始；P-16：圖內文字掛載後用瀏覽器實際換行算框高；I-15：輸入卡的其他部分寫進示意稿，懶人填寫說人話 |
+| `a7713d61e` | P-43：Codex 審查 def7d7882..c11d92618 抓到重問時沒檢查每日額度 → `_MeteredProvider` 成為 API 唯一的計費路徑（起草、解讀、synthesis）：每次付費呼叫（含重問）先檢查＋保留最壞情況、之後記帳（計費的失敗也記），鎖不包住呼叫，且最壞情況要放得進今天剩下的額度才開始；P-16：圖內文字掛載後用瀏覽器實際換行算框高；I-15：輸入卡的其他部分寫進示意稿，懶人填寫說人話 |
+| 本批（見 git log） | AI 額度的保留改存資料庫：每次付費呼叫先在同一個 SQLite 交易裡檢查＋寫入最壞情況，呼叫後改成實際值；行程死掉或記帳失敗時帳仍在；多行程安全；估價以整次分析計；刪除行程記憶體的保留與鎖 |
 
 ## 5. 已驗證（機械證據，2026-09-28）
 
@@ -53,12 +54,12 @@
 |---|---|
 | `npx tsc --noEmit` | exit 0 |
 | `npx vitest run` | 14 檔 96 tests 全過（含 parity 測試、示範專案、1.3.0 渲染、四個核准檢查） |
-| `pytest`（解讀、API、閘道、專案、價格、api_main、表單、run lock、synthesis、executor 共 13 檔） | 14 檔 406 passed、287 subtests（6 分 41 秒） |
+| `pytest`（解讀、API、閘道、專案、價格、api_main、表單、run lock、synthesis、executor、計費保留、identity store 共 16 檔） | 16 檔 446 passed、287 subtests（6 分 30 秒） |
 | `check-mocks.py`／`run_golden_tests.py`／`gen_spec_index.py --check` | green／全過／fresh |
 | `deploy/web_test.sh`（容器內 tsc + vitest + check-mocks） | exit 0 |
 | `python docs/mockups/check-mocks-selftest.py` | 194 mutations, 194 caught（Codex e01fc7d49） |
-| 突變（丟棄式 worktree，拔掉 → 指名測試紅 → 還原綠） | repair_next_steps、add_blank_unit_gaps、_reserve_ai_tokens、引註寫法正規化、重問列出錯的 id、RUNNER_LOST 判讀、runner 放鎖、每次呼叫的額度檢查、計費失敗記帳、掛載後量行數、懶人填寫不露代碼、draft 走計費、預算拒絕 429、最壞情況要放得下、保留量用位元組、tool schema 算進輸入、已回應的失敗帶用量（空、格式錯）、食譜起草的預算拒絕也是 429、讀不到用量按最壞情況記、沒有用量也不當 0、記帳失敗的帳留在保留裡、/ai/status 扣掉在途保留：24/24 |
-| Codex 交叉審查 | 第 1 輪（def7d7882..c11d92618）1 筆 high：重問沒檢查額度 → 已修；第 2 輪（修正）2 筆：呼叫本身的保留沒算進檢查 → 已修；量測用 CSS px → 實測否定（手機寬 390：370 單位的框排版寬 370、螢幕上 109 px）；第 3 輪 1 筆：`/ai/draft/*` 仍直接呼叫模型 → 已修＋AST 結構測試關掉整類（`test_every_paid_call_is_metered.py`）；第 4 輪 1 筆：字元數不是 token 上限、tool schema 沒算進輸入 → 已修（`worst_input_tokens` = 送出內容的 UTF-8 位元組＋框架）；第 5 輪 1 筆：已回應但空的答案記成 0 token → 已修（API 一回應，provider 丟的錯都是帶用量的 `ProviderCallError`，含 content 缺失）；第 6 輪 2 筆：食譜起草包兩層時預算拒絕變 502、usage 格式錯變 ValueError 記成 0 → 已修（沿 cause 鏈找拒絕；讀不到用量 = 按保留的最壞情況記）；第 7 輪 2 筆：回應沒有 usage 被當成 0、記帳失敗時保留先被放掉 → 已修（`usage_known=False` 一律按最壞情況；寫不進去的帳留在保留）；第 8 輪 2 筆：/ai/status 沒扣在途保留 → 已修；在途保留在行程記憶體、重啟會丟 → 早於本批、Phase 1 單行程的既定範圍，列 TASKS（DB 層保留）；第 9 輪見 WORKLOG |
+| 突變（丟棄式 worktree，拔掉 → 指名測試紅 → 還原綠） | repair_next_steps、add_blank_unit_gaps、_reserve_ai_tokens、引註寫法正規化、重問列出錯的 id、RUNNER_LOST 判讀、runner 放鎖、每次呼叫的額度檢查、計費失敗記帳、掛載後量行數、懶人填寫不露代碼、draft 走計費、預算拒絕 429、最壞情況要放得下、保留量用位元組、tool schema 算進輸入、已回應的失敗帶用量（空、格式錯）、食譜起草的預算拒絕也是 429、讀不到用量按最壞情況記、沒有用量也不當 0、記帳失敗的帳留在保留裡、/ai/status 扣掉在途保留、保留在同一交易檢查（兩行程只一個過）、保留重啟後仍算、舊資料庫加欄位、估價以整次分析計、額度規則單一：29/29 |
+| Codex 交叉審查 | 第 1 輪（def7d7882..c11d92618）1 筆 high：重問沒檢查額度 → 已修；第 2 輪（修正）2 筆：呼叫本身的保留沒算進檢查 → 已修；量測用 CSS px → 實測否定（手機寬 390：370 單位的框排版寬 370、螢幕上 109 px）；第 3 輪 1 筆：`/ai/draft/*` 仍直接呼叫模型 → 已修＋AST 結構測試關掉整類（`test_every_paid_call_is_metered.py`）；第 4 輪 1 筆：字元數不是 token 上限、tool schema 沒算進輸入 → 已修（`worst_input_tokens` = 送出內容的 UTF-8 位元組＋框架）；第 5 輪 1 筆：已回應但空的答案記成 0 token → 已修（API 一回應，provider 丟的錯都是帶用量的 `ProviderCallError`，含 content 缺失）；第 6 輪 2 筆：食譜起草包兩層時預算拒絕變 502、usage 格式錯變 ValueError 記成 0 → 已修（沿 cause 鏈找拒絕；讀不到用量 = 按保留的最壞情況記）；第 7 輪 2 筆：回應沒有 usage 被當成 0、記帳失敗時保留先被放掉 → 已修（`usage_known=False` 一律按最壞情況；寫不進去的帳留在保留）；第 8 輪 2 筆：/ai/status 沒扣在途保留 → 已修；在途保留在行程記憶體、重啟會丟 → 2026-09-29 改成資料庫保留列（見本批）；第 9 輪 0 筆 |
 | 真實瀏覽器（Chromium，/projects/demo/iceberg，桌機＋手機） | 25 個圖內文字框 0 溢出、0 page error |
 | 稽核 → 驗證 | 4 份稽核 310 筆 → 2 個驗證者逐筆 Grep 工作樹（`verified_*.json`）；統計見 §6 |
 | 真模型整頁（本機 :3930→:8420，`scripts/dev/result_shots.cjs`） | result_shots13（2026-09-28）：11 段全出、0 error、0 溢出、1.3.0 欄位全出、五閘 PASS 0 dropped／removed、parity 0 finding，約 4.3 萬 tokens（≈NT$6）。result_shots14：citation_integrity 兩次拒收 → 已修（引註寫法正規化＋重問列出錯的 id）；修後未再真跑（付費呼叫待操作者同意） |
@@ -418,7 +419,6 @@
 
 | id | 狀態 | 要做什麼 |
 |---|---|---|
-| （計費）DB 層保留 | 追蹤 | 在途保留存在 API 行程記憶體（`_AI_RESERVED`）：呼叫中行程被殺，那次的帳記不到。治本＝ai_usage 先寫「已保留」列（最壞情況）、呼叫後改成實際值，行程死掉時帳仍在（寧多不少），也能多行程。Codex 2026-09-28 第 8 輪；見 TASKS |
 | （上線） | High-STOP | §9；先確認正式站的 `COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET`：一次完整分析實測約 1.8–4.3 萬 tokens（含一次重問時） |
 
 ## 8. 已替操作者做的決定（可推翻，每條一行）

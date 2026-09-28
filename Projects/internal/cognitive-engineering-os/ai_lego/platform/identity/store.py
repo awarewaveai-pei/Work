@@ -29,7 +29,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from ai_lego.core.domain.identity import identity_record
 from ai_lego.core.domain.workspace import workspace_record
@@ -137,9 +137,14 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     model TEXT NOT NULL,
     input_tokens INTEGER NOT NULL,
     output_tokens INTEGER NOT NULL,
-    used_at TEXT NOT NULL
+    used_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'settled',
+    run_id TEXT
 );
 """
+
+# Columns an older file gains on open (ADD COLUMN only): a row written before reservations existed is a settled one.
+_MIGRATION_COLUMNS = {"ai_usage": [("status", "TEXT NOT NULL DEFAULT 'settled'"), ("run_id", "TEXT")]}
 
 
 def _now_iso() -> str:
@@ -159,6 +164,11 @@ class IdentityStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
+            for table, columns in _MIGRATION_COLUMNS.items():
+                existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+                for column, column_type in columns:
+                    if column not in existing:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -544,33 +554,58 @@ class IdentityStore:
                 (tenant_id, capability_id, int(granted), _now_iso()),
             )
 
-    # -- AI gateway usage (Phase 2 credit metering reads this; Phase 1 only records) -----------
+    # -- AI gateway usage: one row per paid call, written BEFORE the call as a reservation ------------------------
+    # A row is 'reserved' (its worst case) from before the call until settle_ai_usage writes what it cost. Budget
+    # readers sum every row, so a call in flight, one whose process died and one whose settle failed all keep
+    # counting their worst case (never 0). The check and the reservation are one IMMEDIATE transaction, so no other
+    # thread or process can pass the same check in between.
 
-    def record_ai_usage(self, tenant_id: str, identity_id: str, purpose: str, model: str, input_tokens: int, output_tokens: int) -> None:
+    def reserve_ai_usage(self, tenant_id: str, identity_id: str, purpose: str, model: str, input_tokens: int, output_tokens: int,
+                         *, since: str, fits: Callable[[int], bool], run_id: str | None = None) -> tuple[int | None, int]:
+        """(row id, tokens used since ``since`` before it) -- id None when ``fits(used)`` refuses; nothing is written then."""
         with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO ai_usage (tenant_id, identity_id, purpose, model, input_tokens, output_tokens, used_at) VALUES (?,?,?,?,?,?,?)",
-                (tenant_id, identity_id, purpose, model, int(input_tokens), int(output_tokens), _now_iso()),
+            conn.execute("BEGIN IMMEDIATE")
+            used = int(conn.execute("SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM ai_usage WHERE tenant_id = ? AND used_at >= ?", (tenant_id, since)).fetchone()[0])
+            if not fits(used):
+                return None, used
+            cursor = conn.execute(
+                "INSERT INTO ai_usage (tenant_id, identity_id, purpose, model, input_tokens, output_tokens, used_at, status, run_id) VALUES (?,?,?,?,?,?,?,'reserved',?)",
+                (tenant_id, identity_id, purpose, model, int(input_tokens), int(output_tokens), _now_iso(), run_id),
             )
+            return int(cursor.lastrowid), used
+
+    def settle_ai_usage(self, usage_id: int, model: str, input_tokens: int, output_tokens: int) -> None:
+        """What the reserved call cost (a failed call: 0, or its worst case when its cost could not be read)."""
+        with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE ai_usage SET status = 'settled', model = ?, input_tokens = ?, output_tokens = ? WHERE id = ? AND status = 'reserved'",
+                (model, int(input_tokens), int(output_tokens), int(usage_id)),
+            ).rowcount
+        if updated != 1:
+            raise InvariantViolation(f"AI_USAGE_NOT_RESERVED: row {usage_id}")
 
     def ai_usage_recent(self, tenant_id: str, purpose: str, limit: int = 5) -> list[dict[str, int]]:
-        """The tenant's latest calls for one purpose (``interpret:<method_id>``), newest first: what a run of that tool
-        has cost lately, for the estimate shown before the next one."""
+        """The tenant's latest settled RUNS for one purpose (``interpret:<method_id>``), newest first, each the sum of its
+        calls (a retry is part of the run): what a run of that tool has cost lately, for the estimate before the next."""
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT input_tokens, output_tokens, model FROM ai_usage WHERE tenant_id = ? AND purpose = ? ORDER BY id DESC LIMIT ?",
+                "SELECT SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, MAX(id) AS last_id, model "   # SQLite: a bare column comes from the MAX(id) row
+                "FROM ai_usage WHERE tenant_id = ? AND purpose = ? AND status = 'settled' "
+                "GROUP BY COALESCE(run_id, 'call:' || id) ORDER BY last_id DESC LIMIT ?",
                 (tenant_id, purpose, max(1, int(limit))),
             ).fetchall()
         return [{"input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"]), "model": str(row["model"])} for row in rows]
 
     def ai_usage_totals(self, tenant_id: str, since: str | None = None) -> dict[str, int]:
-        """``since``: an ISO8601 ``YYYY-MM-DDTHH:MM:SSZ`` lower bound (inclusive), matching ``_now_iso``'s own
-        fixed-width format so a plain TEXT comparison in SQLite is correct -- no date parsing needed."""
-        query = "SELECT COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage WHERE tenant_id = ?"
+        """Every row (reserved ones at their worst case) and, apart, what is still reserved. ``since``: an ISO8601
+        ``YYYY-MM-DDTHH:MM:SSZ`` lower bound (inclusive), matching ``_now_iso``'s fixed-width format so a plain TEXT
+        comparison in SQLite is correct -- no date parsing needed."""
+        query = ("SELECT COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens, "
+                 "COALESCE(SUM(CASE WHEN status = 'reserved' THEN input_tokens + output_tokens ELSE 0 END),0) AS reserved FROM ai_usage WHERE tenant_id = ?")
         params: list[str] = [tenant_id]
         if since is not None:
             query += " AND used_at >= ?"
             params.append(since)
         with self._connect() as conn:
             row = conn.execute(query, params).fetchone()
-        return {"calls": int(row["calls"]), "input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"])}
+        return {"calls": int(row["calls"]), "input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"]), "reserved": int(row["reserved"])}

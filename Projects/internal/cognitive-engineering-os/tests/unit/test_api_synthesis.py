@@ -125,7 +125,7 @@ class SynthesisApiTests(ProjectSourceApiTestCase):
 
     def test_a_usage_write_failure_finishes_failed_not_done(self):
         response, launch = self._post()
-        with patch.object(launch.call_args.kwargs["store"], "record_ai_usage", side_effect=RuntimeError("disk")):
+        with patch.object(launch.call_args.kwargs["store"], "settle_ai_usage", side_effect=RuntimeError("disk")):
             api_main._run_synthesis(**launch.call_args.kwargs)
         failed = self._get(response.json()["synthesis_id"]).json()
         self.assertEqual((failed["status"], failed["error"]), ("FAILED", "AI_USAGE_RECORD_FAILED"))
