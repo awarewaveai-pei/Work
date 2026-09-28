@@ -15,6 +15,7 @@ a successful run, and one atomic journal claim shared by durable API/CLI entrypo
 from __future__ import annotations
 
 import os
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -179,6 +180,24 @@ def _node_ref(node: Mapping[str, Any]) -> str:
     return ref
 
 
+# Windows refuses to replace a file another handle has open (a status poll reading the journal at that instant:
+# WinError 5/32), so a checkpoint could fail a healthy run; POSIX renames over open files. Retried briefly there only.
+_REPLACE_RETRIES_ON_SHARING_VIOLATION = os.name == "nt"
+_REPLACE_RETRY_WINDOW_S = 2.0
+
+
+def _replace_journal(temporary: Path, path: Path) -> None:
+    deadline = time.monotonic() + _REPLACE_RETRY_WINDOW_S
+    while True:
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            if not _REPLACE_RETRIES_ON_SHARING_VIOLATION or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
+
+
 def _atomic_write_journal(path: Path, payload: dict[str, Any], *, create_only: bool = False) -> None:
     """Publish a journal atomically, optionally claiming a never-before-used path.
 
@@ -196,7 +215,7 @@ def _atomic_write_journal(path: Path, payload: dict[str, Any], *, create_only: b
             except FileExistsError as error:
                 raise InvariantViolation("WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME") from error
         else:
-            os.replace(temporary, path)
+            _replace_journal(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 

@@ -92,6 +92,7 @@ from ai_lego.platform.workflow.capability_adapters import CapabilityAdapterRegis
 from ai_lego.platform.workflow.journal_protection import CasJournalContextProtector, LocalDevJournalKeyProvider, ResolverJournalKeyProvider
 from ai_lego.platform.workflow.executor import execute_workflow_ir, missing_workflow_input_paths, _atomic_write_journal, _journal_record
 from ai_lego.platform.workflow.human_required import load_human_required, missing_human_required
+from ai_lego.platform.workflow.run_lock import RunLock, acquire_run_lock, lock_path_for, run_lock_state, run_lock_tag
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
@@ -653,31 +654,25 @@ def recipe_form(recipe_id: str) -> dict[str, Any]:
     return {"recipe_id": recipe_id, "workflow_id": workflow_ir["id"], "source_fields": list(fields.values()), "schema_source": "compiled_workflow_bindings"}
 
 
-# One (tenant, run_id) executes at most once at a time, sync or async (Codex oracle 2026-09-27/28): a second
-# submission on either path is refused instead of racing the first, and between "accepted" and "journal
-# written" the status endpoint answers RUNNING instead of 404. Process-local on purpose: once the journal
-# exists it, not this set, is the record; a run lost with the process leaves no journal and an honest 404.
-_RUNS_IN_FLIGHT: set[tuple[str, str]] = set()
-_RUNS_LOCK = threading.Lock()
+# One (tenant, run_id) executes at most once at a time, on either path and in any worker process: the runner
+# holds an OS lock on <run_id>.lock next to the journal for the whole run (platform/workflow/run_lock.py; Codex
+# oracle 2026-09-27/28, critic 2026-09-28). Status reads that lock: before the first journal record a held lock
+# is RUNNING and a free one is LOST; a RUNNING journal carries runner alive|lost. A lost run is recovered only by
+# an explicit resume that first takes the lock.
+def _acquire_run_lock(journal_path: Path, recipe_id: str) -> RunLock | None:
+    return acquire_run_lock(lock_path_for(journal_path), tag=recipe_id)
 
 
-def _mark_run_in_flight(tenant_id: str, run_id: str) -> bool:
-    key = (tenant_id, run_id)
-    with _RUNS_LOCK:
-        if key in _RUNS_IN_FLIGHT:
-            return False
-        _RUNS_IN_FLIGHT.add(key)
-        return True
+def _runner_alive(journal_path: Path) -> bool:
+    return run_lock_state(lock_path_for(journal_path)) == "held"
 
 
-def _clear_run_in_flight(tenant_id: str, run_id: str) -> None:
-    with _RUNS_LOCK:
-        _RUNS_IN_FLIGHT.discard((tenant_id, run_id))
-
-
-def _run_in_flight(tenant_id: str, run_id: str) -> bool:
-    with _RUNS_LOCK:
-        return (tenant_id, run_id) in _RUNS_IN_FLIGHT
+def _journal_status(journal_path: Path) -> str | None:
+    try:
+        record = read_json(journal_path)
+    except Exception:
+        return None  # unreadable: the executor's own restore answers it
+    return record.get("status") if isinstance(record, dict) else None
 
 
 # A drive-letter path (Windows) or a leading-slash path (POSIX) written into a journal's error text would
@@ -698,6 +693,7 @@ def _fail_recipe_journal(
     journal_context_projector: Callable[[dict[str, Any]], Any] | None,
     journal_context_protector: Any,
     error: BaseException,
+    label: str = "async-run",
 ) -> None:
     """Leave a readable FAILED journal after ``execute_workflow_ir`` raises past its own per-step handling.
 
@@ -714,7 +710,7 @@ def _fail_recipe_journal(
     # node_kind is schema-constrained to {method, capability} (specs/execution/workflow-journal.schema.yaml);
     # this synthetic marker step is neither, but "method" is the closest valid choice, and the label/ref/error
     # below make it unambiguous this came from the async wrapper rather than a real recipe node.
-    failed_step = {"index": 0, "label": "async-run", "node_kind": "method", "ref": "run_recipe", "status": "FAILED", "input_paths": [], "error": message}
+    failed_step = {"index": 0, "label": label, "node_kind": "method", "ref": "run_recipe", "status": "FAILED", "input_paths": [], "error": message}
     try:
         existing = read_json(journal_path) if journal_path.exists() else None
     except Exception:
@@ -733,7 +729,7 @@ def _fail_recipe_journal(
     _atomic_write_journal(journal_path, record)
 
 
-def _run_recipe_async(*, in_flight_key: tuple[str, str], **kwargs: Any) -> None:
+def _run_recipe_async(*, lease: RunLock, **kwargs: Any) -> None:
     """Background-thread target for ``async:true`` runs (template: ``_launch_interpretation``)."""
     fail_kwargs = {
         "journal_path": kwargs["journal_path"],
@@ -761,7 +757,7 @@ def _run_recipe_async(*, in_flight_key: tuple[str, str], **kwargs: Any) -> None:
         if not str(error).startswith("WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME"):
             _fail_recipe_journal(**fail_kwargs, error=error)
     finally:
-        _clear_run_in_flight(*in_flight_key)
+        lease.release()
 
 
 @app.post("/recipes/{recipe_id}/run")
@@ -914,20 +910,35 @@ def run_recipe(
         "journal_context_projector": None if journal_protector is not None else _api_journal_context,
         "journal_context_protector": journal_protector,
     }
-    if async_run:
-        # Same refusal the sync path gets from the executor, decided before the 202 so the caller hears it.
-        if journal.is_file() and not resume:
-            raise HTTPException(status_code=409, detail={"code": "WORKFLOW_RUN_EXISTS_REQUIRES_RESUME", "run_id": run_id})
-        if resume and not journal.is_file():
-            raise HTTPException(status_code=404, detail={"code": "WORKFLOW_RUN_NOT_FOUND", "run_id": run_id})
-    if not _mark_run_in_flight(session["tenant_id"], run_id):
+    # Every refusal happens before the run lock is taken: its file records "accepted" (a refused run_id must stay
+    # absent, not read back as LOST -- critic 2026-09-28 r2). The executor keeps the same checks as a backstop.
+    if journal.is_file() and not resume:
+        raise HTTPException(status_code=409, detail={"code": "WORKFLOW_RUN_EXISTS_REQUIRES_RESUME", "run_id": run_id})
+    if resume and not journal.is_file():
+        raise HTTPException(status_code=404, detail={"code": "WORKFLOW_RUN_NOT_FOUND", "run_id": run_id})
+    lease = _acquire_run_lock(journal, recipe_id)
+    if lease is None:
         raise HTTPException(status_code=409, detail={"code": "WORKFLOW_RUN_IN_FLIGHT", "run_id": run_id})
+    try:
+        if resume and _journal_status(journal) == "RUNNING":
+            # We hold the run lock, so no live runner owns this RUNNING journal: its runner died mid-run. Record
+            # that as the failure it is (keeps every completed checkpoint) so the executor resumes from next_index.
+            logging.getLogger(__name__).warning("recipe run %s: runner lost mid-run; recovering from its last checkpoint", run_id)
+            _fail_recipe_journal(
+                journal_path=journal,
+                workflow_ir=workflow_ir,
+                initial_context={"source": source},
+                journal_context_projector=execution_kwargs["journal_context_projector"],
+                journal_context_protector=journal_protector,
+                error=InvariantViolation("WORKFLOW_RUNNER_LOST: the previous runner stopped before finishing; resumed from its last completed step"),
+                label="runner-lost",
+            )
+        if async_run:
+            threading.Thread(target=_run_recipe_async, daemon=True, kwargs={**execution_kwargs, "lease": lease}).start()
+    except BaseException:
+        lease.release()  # no thread = nothing else will ever release it
+        raise
     if async_run:
-        try:
-            threading.Thread(target=_run_recipe_async, daemon=True, kwargs={**execution_kwargs, "in_flight_key": (session["tenant_id"], run_id)}).start()
-        except BaseException:
-            _clear_run_in_flight(session["tenant_id"], run_id)  # no thread = nothing will ever clear it
-            raise
         response.status_code = 202
         return {"status": "RUNNING", "run_id": run_id, "journal_ref": journal_ref}
 
@@ -952,7 +963,7 @@ def run_recipe(
             ) from error
         raise
     finally:
-        _clear_run_in_flight(session["tenant_id"], run_id)
+        lease.release()
     gates = {str(step.index): list(step.gates) for step in result.steps if step.gates is not None}
     workflow_gates = list(result.workflow_gates or [])
     if result.status != "SUCCEEDED":
@@ -967,22 +978,34 @@ def recipe_run_status(
     run_id: str,
     session: dict[str, Any] = Depends(require_session),
 ) -> dict[str, Any]:
-    """Return a tenant-scoped, metadata-only view of one durable Recipe run."""
+    """Return a tenant-scoped, metadata-only view of one durable Recipe run. A RUNNING run also carries
+    ``runner``: ``alive`` (its run lock is held) or ``lost`` (its runner died; ``resume:true`` recovers it). An
+    accepted run whose runner died before its first journal record is ``LOST`` (submit it again)."""
     tenant_id = session["tenant_id"]
     try:
-        journal_missing = not workflow_journal_path(tenant_id, run_id).is_file()
+        journal_path: Path | None = workflow_journal_path(tenant_id, run_id)
     except (KeyError, InvariantViolation):
-        journal_missing = False  # _load_recipe_journal below answers the 400
-    if journal_missing and _run_in_flight(tenant_id, run_id):
-        # Accepted with 202, executor has not written the first journal record yet: RUNNING, not "no such run".
-        return {"recipe_id": recipe_id, "run_id": run_id, "journal_ref": workflow_journal_ref(tenant_id, run_id), "status": "RUNNING", "steps": [], "workflow_gates": [], "journal_written": False}
+        journal_path = None  # _load_recipe_journal below answers the 400
+    if journal_path is not None and not journal_path.is_file():
+        state = run_lock_state(lock_path_for(journal_path))
+        if state != "absent" and run_lock_tag(lock_path_for(journal_path)) != recipe_id:
+            state = "absent"  # accepted for another recipe: this recipe has no such run (the 404 below)
+        if state != "absent" and not journal_path.is_file():  # re-check: the runner may have just written it
+            # Accepted, no journal record yet: its runner is either still starting (held) or died (free).
+            status, runner = ("RUNNING", "alive") if state == "held" else ("LOST", "lost")
+            return {"recipe_id": recipe_id, "run_id": run_id, "journal_ref": workflow_journal_ref(tenant_id, run_id), "status": status, "steps": [], "workflow_gates": [], "journal_written": False, "runner": runner}
     record = _load_recipe_journal(session, recipe_id, run_id)
-    return {
-        "recipe_id": recipe_id,
-        "run_id": run_id,
-        "journal_ref": workflow_journal_ref(tenant_id, run_id),
-        **_journal_run_summary(record),
-    }
+    summary = _journal_run_summary(record)
+    body = {"recipe_id": recipe_id, "run_id": run_id, "journal_ref": workflow_journal_ref(tenant_id, run_id), **summary}
+    if summary["status"] == "RUNNING" and journal_path is not None:
+        if _runner_alive(journal_path):
+            body["runner"] = "alive"
+        else:
+            # the runner may have finished between the journal read and the lock probe: re-read before saying lost
+            body = {"recipe_id": recipe_id, "run_id": run_id, "journal_ref": workflow_journal_ref(tenant_id, run_id), **_journal_run_summary(_load_recipe_journal(session, recipe_id, run_id))}
+            if body["status"] == "RUNNING":
+                body["runner"] = "lost"
+    return body
 
 
 @app.get("/recipes/{recipe_id}/runs/{run_id}/result")

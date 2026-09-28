@@ -1,0 +1,39 @@
+"""Plan P-k: "is this already running?" is answered by ai_lego.platform.workflow.run_lock, never by a registry in one
+process's memory (a second worker re-runs the work; a dead runner's entry is lost and its run stays RUNNING forever --
+Codex oracle 2026-09-28 r3 + critic). This test fails on a module-level name that looks like such a registry."""
+
+from __future__ import annotations
+
+import ast
+import re
+import unittest
+from pathlib import Path
+
+AI_LEGO = Path(__file__).resolve().parents[2] / "ai_lego"
+REGISTRY_NAME = re.compile(r"IN_FLIGHT|RUNNING|ACTIVE_RUN|INFLIGHT|_RUNS\b|_JOBS\b|_TASKS\b", re.IGNORECASE)
+MUTABLE = (ast.Set, ast.Dict, ast.List, ast.SetComp, ast.DictComp, ast.ListComp)
+
+
+def _registry_like(node: ast.AST) -> list[str]:
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+    value = getattr(node, "value", None)
+    mutable = isinstance(value, MUTABLE) or (isinstance(value, ast.Call) and getattr(value.func, "id", "") in {"set", "dict", "list", "defaultdict"})
+    return [t.id for t in targets if isinstance(t, ast.Name) and mutable and REGISTRY_NAME.search(t.id)]
+
+
+class NoProcessLocalRunRegistryTests(unittest.TestCase):
+    def test_no_module_level_running_work_registry(self):
+        found = []
+        for path in sorted(AI_LEGO.rglob("*.py")):
+            for node in ast.parse(path.read_text(encoding="utf-8"), filename=str(path)).body:
+                for name in _registry_like(node):
+                    found.append(f"{path.relative_to(AI_LEGO.parent)}:{node.lineno} {name}")
+        self.assertEqual(found, [], "use ai_lego.platform.workflow.run_lock (plan P-k), not a process-local registry")
+
+    def test_the_detector_sees_the_pattern_it_forbids(self):
+        tree = ast.parse("_RUNS_IN_FLIGHT: set[tuple[str, str]] = set()\n_ACTIVE_RUNS = {}\n_CATALOG_CACHE = {}\n")
+        self.assertEqual([name for node in tree.body for name in _registry_like(node)], ["_RUNS_IN_FLIGHT", "_ACTIVE_RUNS"])
+
+
+if __name__ == "__main__":
+    unittest.main()

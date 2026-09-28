@@ -1,4 +1,6 @@
 import unittest
+import json
+import os
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -346,6 +348,54 @@ class WorkflowExecutorTests(unittest.TestCase):
                 journal_context_projector=projector,
             )
             self.assertEqual(resumed.status, "SUCCEEDED")
+
+
+class JournalReplaceWhileReadTests(unittest.TestCase):
+    """A status poll reading the journal while the runner checkpoints must not fail the run (Windows sharing
+    violation, found 2026-09-28 as a FAILED async run: '[WinError 5] ... -> ...')."""
+
+    def test_a_checkpoint_waits_out_a_reader_instead_of_failing(self):
+        from ai_lego.platform.workflow import executor as ex
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "r.journal.json"
+            ex._atomic_write_journal(path, {"n": 0})
+            real_replace, calls = os.replace, []
+
+            def busy_twice(src, dst):
+                calls.append(dst)
+                if len(calls) < 3:
+                    raise PermissionError(13, "in use")
+                real_replace(src, dst)
+
+            with patch.object(ex.os, "replace", side_effect=busy_twice), patch.object(ex, "_REPLACE_RETRIES_ON_SHARING_VIOLATION", True):
+                ex._atomic_write_journal(path, {"n": 1})
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"n": 1})
+
+    def test_posix_never_retries(self):
+        from ai_lego.platform.workflow import executor as ex
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "r.journal.json"
+            ex._atomic_write_journal(path, {"n": 0})
+            with patch.object(ex.os, "replace", side_effect=PermissionError(13, "denied")), \
+                    patch.object(ex, "_REPLACE_RETRIES_ON_SHARING_VIOLATION", False), self.assertRaises(PermissionError):
+                ex._atomic_write_journal(path, {"n": 1})
+
+    @unittest.skipUnless(os.name == "nt", "the sharing violation only exists on Windows")
+    def test_real_reader_holding_the_journal_open(self):
+        from ai_lego.platform.workflow import executor as ex
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "r.journal.json"
+            ex._atomic_write_journal(path, {"n": 0})
+            handle = open(path, "rb")
+            releaser = threading.Timer(0.2, handle.close)
+            releaser.start()
+            try:
+                ex._atomic_write_journal(path, {"n": 1})
+            finally:
+                releaser.join()
+                handle.close()
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"n": 1})
 
 
 if __name__ == "__main__":
