@@ -23097,3 +23097,5 @@ WORKLOG_DONE: SITE_WATCH_MASTER_PLAN v2：補 watchdog／deploy smoke／登記�
 [rollback] `git revert e28b630ba` removes PI-a implementation; `git revert` this documentation commit restores the pointer. No production state changed.
 
 WORKLOG_DONE: PI-a 14/14 local implementation and period gate complete; waiting only for explicit per-card PI-b deployment go-ahead.
+## 2026-09-28
+- 01:07 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-28.md

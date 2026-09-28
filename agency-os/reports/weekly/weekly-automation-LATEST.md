@@ -1,156 +1,118 @@
-# Weekly Summary 2026-09-21
-
-**Generated**: 2026-09-21 (remote-weekly-agent)
-**Period**: 2026-09-15 to 2026-09-21
-**Prev report**: 2026-09-14 (covered 2026-09-08 to 2026-09-14)
-
----
+# Weekly Summary 2026-09-28
 
 ## Completed this week
 
-### 2026-09-15 to 2026-09-17 — HCI-30 collector + Cognitive OS major push
+### Cognitive OS — Major Feature Sprint
+- **Result page redesign** (2026-09-26 續61/62): Cards ①–⑨ + approve card; interpretation contract 1.1.0 (summary, units, focus, solutions, loop, trend); `detail_integrity` gate; deployed `1fbb021f` to prod.
+- **My Projects feature** (2026-09-27 續1/3): Click-through per-project; per-analysis row (status, time to minute, result/progress links); "execute in this project" via `?project=`; URL changes to analysis page on submit. Deployed `b6936ecc`.
+- **Research line P1 (WC-P1-01–14) all on prod** (2026-09-26 续52/54/55): COS journal key `local-dev`, COLLECT_RESEARCH tokens wired through compose + Trigger.
+- **Research line WC-P1-15 期末閘 8/9** (2026-09-26 续59): DOD ①–④ ⑥–⑨ PASS; ⑤ prod erasing not verified (R29, operator action).
+- **Research line WC-P2-07a merged** (2026-09-26 续63): `literature_search` returns project academic sources when project has them.
+- **Research line WC-P2-07b merged** (2026-09-27 续2): `run_recipe` passes `project_sources`; NA sink classifies academic collector as `source_class=academic`.
+- **Research line WC-P4-01 merged** (2026-09-26 续64): `render_research_report` pure function + `report_refs_resolvable` gate; all citations must resolve to manifest sha256; injection-proof via `_literal` + `_seal_section`.
+- **Research line P2 planning** (2026-09-26 续57/60): §12.8 v1.52 with K1–K8 decisions, interface P-a–P-i, cards WC-P2-01–09 + WC-P3-01; cloud T28–T31 parallel; cloud credit $60 allocated.
 
-| Area | Item |
-|------|------|
-| HCI-30 | Phase B final: DNS+TLS+public URL verified, 8/8 services live |
-| HCI-30 Collector | Task 2: migration 0020, DB schema laid |
-| HCI-30 Collector | Task 3: isolated fetch runner network layer (ADR-0029 first impl); 4 Major critic findings fixed |
-| HCI-30 Collector | Task 4+5: DNS-rebind protection, SSRF corpus, object storage client write path; 1 Critical + 2 Major fixed |
-| HCI-30 Collector | Task 6: Seed governance org entity whitelist; 1 Major (null-body crash) fixed |
-| HCI-30 Collector | Task 7: runner fetch+extract+untrusted content isolation; 3 Major + 2 self-caught bugs fixed |
-| Cognitive OS | Prod redeployment #2, #3, #4 (AI Gateway + gap closure + live content) |
-| Cognitive OS | AI Gateway: whiteboard description → AI draft → method gate validation; 42 /invoke 501 fixed |
-| Cognitive OS | `literature_search` removed (operator decision: duplicates /ops/collect) |
-| KB | K2h/K2i nested folders + paginated search; K2j card collapse by folder; migrations 0084/0085/0086 deployed |
-| Governance | WORKLOG.md NUL byte causing grep binary-match fallback — fixed |
+### Infrastructure / Security
+- **hooks linked-worktree junction fix** (2026-09-27 续4): `Resolve-MonorepoRootWithAoResume` now treats linked worktrees as non-root (`.git` is file → `$null`); `ensure-claude-junction.ps1` rejects worktree; `agent-dispatch-log.js` updated. Prevents `~/.claude` deletion via worktree rm. (v-int2 incident closed)
+- **POD order inbox sweep** (2026-09-26 续56): Trigger task `pod-order-inbox-sweep` every 10 min; `POD_INBOX_SWEEP_TOKEN` wired; smoke `pod_order_inbox` ok.
+- **T26 Printful/Woo mode gate** (2026-09-26 续51/53): Printful writes check system mode; Woo webhook always 2xx (deferred); sweep + retry backoff; deployed next-admin `2c0604708`.
+- **DB migration ledger** (completed earlier, 2026-09-26 续): `public.schema_migrations` table + `apply-db-migration.mjs`; 90 applied / 4 missing (0022/0024/0037/0057).
 
-### 2026-09-18 — Method enrichment complete + HCI-30 network fix
-
-| Area | Item |
-|------|------|
-| Cognitive OS | **285/285 methods fully enriched** (why/url/example): batches 14–25 across F02/F03/F06/F09/F13/F14/F15/F17/F19/F22 + art_therapy families |
-| HCI-30 bridge | `hci_not_configured` root cause: network topology error (bridge connects to hci-app, not hci-fetch-runner); fixed |
-| Perplexity | Chat default model sonar-pro → sonar (cost: $10/day spike on 2026-09-12 → reduced) |
-
-### 2026-09-19 — Cognitive OS architecture + Perplexity key rotation
-
-| Area | Item |
-|------|------|
-| Cognitive OS | 5W1H dashboard: `dimensions` structured array fixed (generic form generator was flattening it to bare JSON textarea) |
-| Cognitive OS | Import architecture: one folder = one Project (was: one org = one Project) |
-| Cognitive OS | Method count corrected from "250+" to exactly 266/285 (operator challenged accuracy) |
-| Cognitive OS | DISCOVERED source → case EVIDENCE manual promotion path (HCI-30) |
-| Perplexity | API key rotated: fWoh → Ztpe; sg-deploy next-admin deployed (smoke 5/5 OK) |
-| Governance | New task opened: bughunt-oracle only validates hits=0 claims, not hits=N completeness |
-| Governance | Root-caused Claude→Codex sync failure: bridge frozen + zero mechanical gates firing in Codex |
-
-### 2026-09-20 — Heavy engineering day (続85–続94)
-
-| Area | Item |
-|------|------|
-| Governance | Oracle packet pollution root cause fixed: `oracle-capture-policy.ps1` shared capture policy; `.claude/sessions/` excluded; 2MB hard cap added |
-| Infrastructure | docker-compose.yml repo/prod drift: 9 missing variables added; `composeVarDrift` field added to `check-deploy-drift.ps1`; `ao-close.ps1` + `system-health-check.ps1` wired as consumers |
-| Infrastructure | `safe-infra-patch.sh compose` used correctly (vs. the manual SSH bypass done earlier on 2026-09-20) |
-| Security | Auth timing test method fixed: interleaved sampling replacing batched runs; median statistic; mutant test proves detector still catches real constant-time violation |
-| Cognitive OS | 186 `why_en` entries rewritten (engineering jargon → plain language, matching updated Chinese versions); deployed to prod |
-| Background investigation | ADR-014: Entity dossier relevance axis — `entity.ts`, `relevance.ts`, `query-plan.ts`, `entity-dossier.ts`, new `lib/dossier/` layer |
-| Background investigation | `passing_mention` redesigned: peripheral sources kept but labelled, not discarded |
-| Background investigation | `enforceCitations()` added: hallucinated [n] references rewritten to [?]; zero-citation response rejected |
-| Background investigation | Migration 0090 (`collection_runs.off_entity` + `collection_issues.kind`) applied to prod |
-| Background investigation | next-admin deployed; prod runCollection verified: run report now writes to DB (was silently lost before migration) |
-| Background investigation | Language detection: Latin names → English-only queries (was producing CJK noise for Western targets) |
+### Security (prior week completions now in TASKS as [x])
+- Auto-Repair SSH target updated to ks-aw-01 (pinned host key + forced-command gate) — 2026-09-23
+- 4 live configs cleaned of retired IPs (CF whitelist×3, fail2ban ignoreip) — 2026-09-23
+- hosting-bridge key rotated (`HOSTING_BRIDGE_SSH_KEY_B64`) — 2026-09-24
+- SSH aliases for retired IPs removed from `~/.ssh/config` — 2026-09-24
+- `OPS_INBOX_INGEST_TOKEN` plaintext removed from crontab — 2026-09-24
+- Soulful wp-cron reconnection + nginx stale-while-revalidate + slow-request mu-plugin — 2026-09-24
+- `update-client-wp-plugins.ps1` config now points to correct live site — 2026-09-24
+- Smoke test extended to check `backup_script_probe.sg/eu` — 2026-09-24
 
 ---
 
 ## Open tasks
 
-### 🔴 Hard deadlines / P0 blockers
+### A. ⏰ Has external deadline
+- **Soulful 搬站 買機死線 2026-09-30 (TODAY)** — machine must be purchased or Soulful migration plan at risk
+- **🔴 Soulful 網站搬離 Hostinger 硬死線 2026-11-12** — main migration complete (2026-08-28), remaining: ③ domain to CF Registrar, ④ hosting expiry
+- **⚠️ 逾期 134 天｜Defender trojan `Trojan:Win32/PowhidSubExec.B`** — source investigation and remediation (originally due 2026-06-17)
+- **Codex stop-time review gate re-enable** — was disabled 2026-08-25; due date 2026-08-31 (OVERDUE)
 
-- **Soulful migration hard deadline 2026-11-12** (machine purchase deadline 9/30): sub-tasks EU①–⑥b + SG⑦–⑫ still open; main migration 2026-08-28 done; ③④ cleanup not done
-- **Security: HF_TOKEN明文 (2026-08-27)** — token not yet rotated
-- **Security: transcript credential leak (2026-08-15)** — 3 items not yet rotated
-- **`video/[id]` DELETE無引用檢查** — Soulful published article already has broken video (r2.dev/video/...16x9.mp4 → 404)
-- **Defender trojan Trojan:Win32/PowhidSubExec.B** — 69+ days overdue (original: 2026-06-17)
+### B. 🔒 Blocked on operator
+- **🔴 staging WP admin passwords in Trigger.dev run output** — 2 live sites need password rotation + 9 run redacts + deploy
+- **🔴 `HF_TOKEN` plaintext in conversation transcript** (2026-08-27) — rotation needed
+- **🔴 2026-08-15 transcript credential leaks** — 3 items pending rotation
+- **Codex `/hooks` trust not executed** — Codex side has zero mechanical gates until operator runs `/hooks` trust in Codex
+- **DMARC upgrade** (2026-09-28 trigger) — `p=none → p=quarantine;pct=25`; needs operator confirmation of rua reports
+- **Postiz Task 2 OAuth app review** — Meta IG+FB / Reddit / LinkedIn submissions needed
+- **Postiz draft cleanup** — delete test draft `cmqo1wijz0005p58ncl1mtssr`
+- **Postiz → ClientHub account link** — operator must link Bluesky integration in ops/clients
 
-### Background investigation (蒐集器)
+### C. 🔒 Blocked on external
+- **蒙古客戶 Cloudways 實際建站** — waiting for client payment
+- **Scenery Travel Mongolia new site** — waiting for client
 
-- **No render tier: most authoritative pages unreadable** (`scholars.latrobe.edu.au` etc. → `too_short`/JS-only); needs operator to choose vendor (Cloudflare Browser Rendering vs. Firecrawl)
-- `provenance`/`author` fields break at sink (C1 × KB, 2026-09-11)
-- density gate single-veto design question
-- 94 migrations without ledger — "what's applied on prod" can't be answered mechanically
+### D–G. Ready to execute
+- **MainWP E2E** — bridge fixed (2026-09-24), next-admin deployed `b8c191698`; need one real create-wp-site run to verify
+- **Research line WC-P1-15 ⑤** — prod data erasing (operator authorized; R29)
+- **Research line WC-P2-02–09** — per §12.8 plan; some cloud T28–T31 may be complete
+- **Cognitive OS remaining pages** — check-mocks.py `--page` missing for: home, tool catalog, tool page, workflow pages
+- **KB: `provenance` + `author`断 at sink** — `KnowledgeInput` missing fields; blocks §1.3b completion
+- **KB: per-model partial HNSW** — needs EXPLAIN with ~2000 rows; also `bm25_tsv` dead column
+- **KB migration 0076 deferred items** — 5 accepted non-blockers (see TASKS)
+- **`video/[id]` DELETE no reference check** — 🔴 client site already broken (Soulful post id 7393)
+- **4 DB migrations never applied to prod** — 0022/0024/0037/0057
+- **nginx hci.aware-wave.com block drift** — repo missing server block; risk: overwriting prod with repo file breaks hci site
+- **`git-align-main-aoresume-feature-*` swallows uncommitted edits**
+- **workflows package missing typecheck step**
+- **Woo reconciliation: webhook status + failure_count**
+- **10 staging orphans / ~2GB** — deprovision path ready, awaiting operator decision
+- **R2 remotion/ objects (~200MB) not covered by reconciliation**
 
-### Governance / infrastructure
-
-- **Codex `/hooks` trust not executed** — Codex side has zero mechanical gates; only 1 item left in `check-claude-codex-parity.ps1`
-- **Claude→Codex sync frozen** (bridge stopped) — Codex-led work gates can't fire
-- `bughunt-oracle.ps1` only verifies hits=0, not hits=N completeness
-- `cf-iprefresh` detector in error for 14+ days
-- Phase 4 Check 1/2 returning SKIP in cloud containers (no `gh`); 12 weeks of false PASSes prior
-- `cloudflare-realip.conf` static IP range list — no detector
-- `ao-resume-last.txt` anchor stuck at 2026-06-12 — AO-CLOSE window calculation distorted
-- CHANGE_IMPACT_MATRIX drift detector: 7 WARNs pending manual review
-
-### Product / client
-
-- **DMARC upgrade phase 1** trigger date: 2026-09-28 (p=none → p=quarantine;pct=25)
-- Soulful backup health: 5/10 recent failures (latest failure 2026-08-24) — must resolve before migration
-- Mockup Studio: operator symptoms still unconfirmed (server-side cleared 2026-06-16)
-- Canvas editor `/tools/canvas` browser e2e testing still pending (validation debt)
-- POD A1 e2e test + A2 confirm phase (🔴 payment gate)
-- Media Production LEGO Platform (P0/P1, 2026-09-05)
-- Postiz OAuth app review: Meta/Reddit/LinkedIn
-- Scenery Travel Mongolia: new site Day 1
-
-### Code quality / infra debt
-
-- next-admin no DOM test infrastructure — React wiring bugs invisible to current vitest suite
-- Staging orphans: 10 sites / ~1970 MB (decision pending)
-- `video/[id]` R2 remotion objects (8 objects ~200MB, outside reconcile scope)
-- R2 orphan `video/蒙古旅遊___...` 23MB — needs operator decision (keep/delete)
-- Video attribution: `outName → organization_id` persistent mapping (vs. current object-key reverse-parse)
-- EU origin not locked to Cloudflare (step A done, B pending)
-- HCI-30 C6 real login integration plan (planner output 2026-09-17, pending authorization)
-- `queryAsTenant()` SET ROLE without explicit transaction wrap
+### H. 🧊 Known risks / not processing
+- WPvivid Google Drive refresh_token in conversation history — operator decided not to process
+- Codex stop-time review gate disabled (2026-08-25) — waiting re-enable
 
 ---
 
 ## System health
 
-Source: `agency-os/reports/status/integrated-status-LATEST.md` (generated 2026-08-29; **may be stale**).
+Based on most recent smoke and status data (integrated-status-LATEST.md is stale — generated 2026-08-29; no fresh smoke in repo):
 
-No current smoke report available in this run. Based on WORKLOG:
+**Infrastructure**: Single host `ks-aw-01` (145.239.195.47, SSH -p 58122). SG+EU VPS fully merged 2026-08-31. No other hosts.
 
-| Service | Last known status |
-|---------|-------------------|
-| next-admin (app.aware-wave.com) | ✅ Deployed 2026-09-20, 5/5 smoke OK |
-| node-api (api.aware-wave.com) | ✅ 200 per last check |
-| Cognitive OS (cognitive.aware-wave.com) | ✅ Deployed 2026-09-20, public smoke PASS |
-| Supabase DB | ✅ Migration 0090 applied; queries verified |
-| Oracle packet capture | ✅ Fixed 2026-09-20; 2MB cap enforced |
-| check-deploy-drift | ✅ composeVarDrift=empty after 2026-09-20 sync |
-| Codex mechanical gates | ❌ ZERO triggers confirmed; hooks trust not done |
-| cf-iprefresh detector | ❌ Error for 14+ days |
-| Phase 4 cloud checks | ⚠️ SKIP (no `gh` in cloud container) |
+**Cognitive OS**: Running on prod; `b6936ecc` is latest. 3 SQLite databases healthy at last deploy.
+
+**lobster next-admin**: `b8c191698` on prod (DEPLOY_HOLD resolved 2026-09-26).
+
+**Trigger.dev**: v20260926.6 (16 tasks), self-hosted on ks-aw-01.
+
+**Known blind spots**: `integrated-status-LATEST.md` is 30 days stale. Fresh smoke was not run by this session (remote container, no SSH or pwsh access). Recommend running `/health` on next live session.
 
 ---
 
 ## Risks & blockers
 
-1. **🔴 Soulful hard deadline 2026-11-12** — machine purchase must happen by 9/30. If delayed, migration timeline collapses.
-2. **🔴 Background investigation 0% ingestion rate** — Firecrawl/Browser Rendering vendor decision is the single blocker. Current: `collected=correct, ingested≈0` (JS-rendered pages unreadable).
-3. **🔴 Security tokens not rotated** — HF_TOKEN and 3× transcript leaks from Aug. Rotation overdue.
-4. **Codex bridge frozen** — cross-model oracle path effectively unavailable; Claude reviews only.
-5. **Soulful backup reliability** — 50% failure rate on recent backups must be resolved before migrating client site.
-6. **Oracle capture regression risk** — shared policy is a denylist (fail-closed on unknown dirs); new runtime directories must be added to `RuntimePathPatterns`.
+| Severity | Item | Action needed |
+|---|---|---|
+| 🔴 BLOCKER | Soulful 買機死線 **2026-09-30 (today)** | Operator must purchase machine or extend plan |
+| 🔴 SECURITY | Staging WP admin passwords in Trigger run output | Operator: rotate 2 sites + redact 9 runs + deploy |
+| 🔴 SECURITY | HF_TOKEN + 2026-08-15 leaks | Operator: rotate tokens |
+| 🔴 CLIENT IMPACT | Soulful broken image (video/[id] DELETE no ref check) | Fix `video/[id]` route or restore R2 object |
+| 🔴 GOVERNANCE | Codex zero mechanical gates | Operator: run `/hooks` trust in Codex session |
+| ⚠️ OVERDUE | Defender trojan investigation (134 days) | Security review |
+| ⚠️ OVERDUE | Codex review gate still disabled (28 days past due) | Re-enable |
+| ⚠️ TECH DEBT | 4 DB migrations (0022/0024/0037/0057) never applied to prod | Apply with `apply-db-migration.mjs` |
+| ⚠️ DRIFT | nginx hci.aware-wave.com block missing from repo | Add to repo before any nginx overwrite |
 
 ---
 
 ## Memory highlights
 
-- **Single host**: Only `ks-aw-01` (145.239.195.47, SSH -p 58122). SG+EU consolidated 2026-08-31. No fallback hosts.
-- **ClickHouse locked at 25.7.x** — no upgrade.
-- **285/285 Cognitive OS methods now enriched** — milestone reached 2026-09-18.
-- **Two-track deployment architecture confirmed**: app code via `sg-deploy.sh`; nginx/compose changes ONLY via `safe-infra-patch.sh compose`.
-- **ADR-014 entity dossier**: `entity_passing_mention` redesigned — peripheral sources now kept and labelled, not discarded. True garbage (retail/social/aggregator) blocked at `source-class.ts` by URL before any fetch cost.
-- **Auth timing test**: interleaved A/B sampling with median statistic is the correct method for heterogeneous-core laptops. Batched sampling caused stable false positives.
-- **Oracle packet pollution (2026-09-20)**: root cause was `.claude/sessions/*.md` transcripts (~87 files) being inlined as "untracked source files". Fixed by shared capture policy with explicit runtime exclusions.
+- **Single-host era**: ks-aw-01 is the only prod host since 2026-08-31. All prior SG/EU IP references in scripts/config have been cleaned or flagged.
+- **Cognitive OS is the main product in active development**: Research line P1 complete (14 cards on prod); P2 work started with cloud parallel agents T28–T31.
+- **Interpretation contract 1.1.0** introduces structured output fields (summary, units, focus, solutions, loop, trend) with `detail_integrity` gate enforcing citation resolution and data provenance.
+- **hooks junction incident (v-int2, 2026-09-27)**: AO hooks could silently corrupt `~/.claude/` when run from a linked worktree. Fixed — `.git` file (not directory) = non-root, skip all junction/AO-RESUME side effects.
+- **Oracle review gate architecture**: Claude writes → Codex reviews; Codex writes → Claude reviews. Both use `agency-os/reports/oracle/` artifacts with date-based gates. `bughunt-oracle.ps1` verifies BUGHUNT_DONE `hits=0` claims against actual grep.
+- **AGENTS.md §5 session limit**: Max 2 sessions sharing working directory simultaneously (8-session incident burned 5h quota). Worktree-based parallel agents (in `D:\tmp\wt-*`) are exempt from this count.
+- **AO lifecycle**: `ao-resume-on-prompt.ps1` runs once per session; `ao-close.ps1` is pre-authorized at AO-CLOSE triggers. Linked worktrees now correctly skip AO-RESUME side effects.
