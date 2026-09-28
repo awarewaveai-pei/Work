@@ -6,10 +6,11 @@ import { createRoot } from "react-dom/client";
 import { act } from "react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import fixture from "../../fixtures/iceberg-interpretation.json";
+import fixtureJson from "../../fixtures/iceberg-interpretation.json";
 import record from "../../fixtures/payload-systems.iceberg_model.json";
 import { apiFetch } from "../../lib/api";
 import { MethodForm } from "../MethodForm";
+import { RunInputCard } from "../RunPage";
 import { ResultPage } from "./ResultPage";
 
 vi.mock("../../lib/api", () => ({ apiFetch: vi.fn() }));
@@ -17,6 +18,7 @@ vi.mock("../../lib/api", () => ({ apiFetch: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
 
 describe("ResultPage", () => {
+  const fixture = fixtureJson as unknown as React.ComponentProps<typeof ResultPage>["result"];
   it("renders the mock's cards in order and the checker accepts the actual HTML (with and without a lesson)", () => {
     const html = renderToStaticMarkup(<ResultPage result={fixture} record={record} />);
     expect([...html.matchAll(/data-section="([^"]+)"/g)].map((m) => m[1])).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "approve"]);
@@ -90,7 +92,7 @@ describe("ResultPage", () => {
                    { method_id: "root_cause.five_whys", answers: "驗證根因", deepens: "再問五次為什麼", prefill: {}, needs_input: ["why"], yields: "根因鏈", est_cost: "low" }],
     };
     // the run form the page keeps above the result (RunPage's input card), for the parity gate's input card
-    const inputCard = <div className="card cta" id="input"><h2>你的案例：四個格子<small>從上往下填；填不出來的留白</small></h2><div className="how"><b>怎麼讀</b>一格一層。<b>你要做的</b>填好按「執行分析」。</div><MethodForm fields={fields} state={{}} onState={() => undefined} onSubmit={() => undefined} onFill={() => undefined} onClear={() => undefined} /></div>;
+    const inputCard = <RunInputCard numeral="四"><MethodForm fields={fields} state={{}} onState={() => undefined} onSubmit={() => undefined} onFill={() => undefined} onClear={() => undefined} /></RunInputCard>;
     const html = renderToStaticMarkup(<ResultPage result={detailed as unknown as React.ComponentProps<typeof ResultPage>["result"]} record={rec} fields={fields} lesson="/learn/systems.iceberg_model" display={{ name_zh: "冰山模型", name_en: "Iceberg Model" }} lessons={{ "systems.leverage_point_analysis": "/learn/systems.leverage_point_analysis" }} names={{ "systems.leverage_point_analysis": "槓桿點分析", "root_cause.five_whys": "五個為什麼" }}>{inputCard}</ResultPage>);
     for (const text of ["<b>一句話：</b>分享變少是流程造成的。", "<b>這代表</b><span>等答案迴路", '<span class="lever high">槓桿：高</span>', "<b>對應方案</b><span>⑦ 乙「改流程」★ 本次建議</span>",
       '<span style="display:inline-block"> ★ 建議先出手</span>', '<td>結構 ★</td><td>設計 Design</td><td>現在→未來</td>', 'aria-label="主動分享的變化"', 'aria-label="等答案因果迴路"', 'aria-label="四層改變難度與效果持久度對比"',
@@ -115,8 +117,15 @@ describe("ResultPage", () => {
     expect(without).toContain("這次的分析沒有產出方案比較與行動計畫。");
     expect(without).toContain("數字與環節都有出處 ✓");
   });
+  it("shows a visible reason when saving tasks is unavailable and renders the gate table", () => {
+    const noProject = renderToStaticMarkup(<ResultPage result={{ ...fixture, solutions: { options: [], first_step: "x", plan: [] } } as any} />);
+    expect(noProject).toContain("先把分析存進專案，才能把行動計畫存成任務。");
+    const withGate = renderToStaticMarkup(<ResultPage result={fixture} gateResults={[{ gate_id: "citation_integrity", status: "PASS", evidence: { cited: 1 } }]} />);
+    expect(withGate).toContain("<th>閘門</th>");
+    expect(withGate).toContain("引註完整");
+  });
   it("shows three judgment labels and reports API failure", async () => {
-    vi.mocked(apiFetch).mockRejectedValueOnce(new Error("network down"));
+    vi.mocked(apiFetch).mockRejectedValue(new Error("network down"));
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
@@ -143,7 +152,7 @@ describe("ResultPage", () => {
   });
   it("with a lesson, the header opens it in a new tab; without one it opens the tool page", () => {
     const withLesson = renderToStaticMarkup(<ResultPage result={fixture} lesson="/learn/systems.iceberg_model" />);
-    expect(withLesson).toContain('<div class="top"><h1>systems.iceberg_model分析</h1><a class="howto" href="/learn/systems.iceberg_model" target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a></div>');
+    expect(withLesson).toContain('<div class="top"><h1>systems.iceberg_model分析<span>：Release incidents recur</span></h1><a class="howto" href="/learn/systems.iceberg_model" target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a></div>');
     expect(renderToStaticMarkup(<ResultPage result={fixture} />)).toContain('<a class="howto" href="/methods/systems.iceberg_model">它做什麼？</a>');
   });
   it("renders finding-level revision conditions from the typed contract", () => {

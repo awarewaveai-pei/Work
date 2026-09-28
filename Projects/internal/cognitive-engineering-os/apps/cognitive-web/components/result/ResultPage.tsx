@@ -333,7 +333,9 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
           <label className="sub">到期日 <input aria-label="重跑到期日" type="date" value={rerunDue} min={todayIso()} onChange={(event) => setRerunDue(event.target.value)} /></label>
           <div className="btns mt6"><button type="button" className="btn primary" onClick={scheduleRerun} disabled={!rerunDue}>排提醒</button><button type="button" className="btn ghost" onClick={() => setRerunDue(null)}>取消</button></div>
         </div>}
-        {planNote && <p className="mocknote" role="status">{planNote}{planNote.startsWith("案例庫") && <> <a className="btn ghost" href="#solution">回到 A 重選</a></>}</p>}
+        {planNote && <p className={planNote.startsWith("案例庫") ? "mocknote" : "finding ok mt10"} role="status">{planNote}{planNote.startsWith("案例庫") && <> <a className="btn ghost" href="#solution">回到 A 重選</a></>}</p>}
+        {!project && <p className="sub mb0">先把分析存進專案，才能把行動計畫存成任務。</p>}
+        {project && !(solutions.plan ?? []).length && <p className="sub mb0">這次沒有行動計畫，暫時沒有可存成任務的內容。</p>}
         {planError && <p className="error" role="alert">沒有成功：{planError}</p>}
         <p className="sub mt8 mb0">工具負責想清楚、排出來、盯著看；動手做事的是人。到期時系統提醒你用新資料重跑這一頁、把前後放在一起比較；目標數字由你定，AI 不替你定。</p>
       </> : <p className="sub mb0">{missing("solutions", "方案比較與行動計畫")}</p>}
@@ -395,7 +397,10 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       </div>}
       {approval?.decision === "return" && onRedo && <p className="mocknote" role="status">已退回：{approval.reason}　<button type="button" className="btn primary" onClick={() => onRedo(approval.reason ?? "")}>依原因重做</button></p>}
       {actionError && <p className="error" role="alert">沒有成功：{actionError}</p>}
-      <details className="mt10" id="expert"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary><pre>{JSON.stringify({ result, gateResults, manifest }, null, 2)}</pre></details>
+      <details className="mt10" id="expert"><summary>專家模式（今天你看到的那一層，收起來但還在）</summary>
+        <table><thead><tr><th>閘門</th><th>狀態</th><th>證據</th></tr></thead><tbody>{gateResults.map((gate) => <tr key={gate.gate_id}><td>{GATE_LABEL[gate.gate_id] ?? gate.gate_id}</td><td className={gate.status === "PASS" ? "ok" : "warn"}>{gate.status}</td><td><code>{JSON.stringify(gate.evidence ?? {})}</code></td></tr>)}</tbody></table>
+        <pre>{JSON.stringify({ result, gateResults, manifest }, null, 2)}</pre>
+      </details>
     </div>
     {project && <p className="sub mt8"><Link href={projectHref(project.id)}>← 回專案「{project.name}」</Link></p>}
   </div>;

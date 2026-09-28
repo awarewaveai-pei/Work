@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import resultFixture from '../../../../../../Projects/internal/cognitive-engineering-os/apps/cognitive-web/fixtures/iceberg-interpretation.json';
 
 test('login -> iceberg -> result page, cards in the mock order -> my projects -> the project -> the saved result', async ({ page }) => {
-  test.setTimeout(600_000);   // a full result page (schema 1.1.0) takes 2-3 minutes, and the analysis may retry once
+  test.setTimeout(600_000);   // live mode may take 2-3 minutes; mock mode serves the committed 1.2.0 fixture
   const mockApi = process.env.COS_TEST_MOCK_API === '1';
   const tenant = mockApi ? 'tenant-local' : process.env.COS_TEST_TENANT_ID;
   const email = mockApi ? 'local@example.test' : process.env.COS_TEST_EMAIL;
@@ -10,6 +11,8 @@ test('login -> iceberg -> result page, cards in the mock order -> my projects ->
   let created: Record<string, unknown> | null = null;
   let tasks: Array<Record<string, unknown>> = [];
   let approval: Record<string, unknown> | null = null;
+  let judgment: Record<string, unknown> | null = null;
+  let rerun: Record<string, unknown> | null = null;
   const analysis = { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', status: 'DONE', requested_at: '2026-09-26T15:51:00Z', finished_at: '2026-09-26T15:52:00Z', error: null, judgment: null };
   if (mockApi) {
     await page.route('**/api/**', async (route) => {
@@ -42,7 +45,13 @@ test('login -> iceberg -> result page, cards in the mock order -> my projects ->
       } else if (path === '/projects/PROJECT-LOCAL/tasks') {
         body = tasks;
       } else if (path === '/projects/PROJECT-LOCAL/reruns') {
-        body = [];
+        body = rerun ? [rerun] : [];
+      } else if (path === '/interpretations/INTERP-LOCAL/rerun' && method === 'POST') {
+        rerun = { rerun_id: 'RERUN-LOCAL', interpretation_id: 'INTERP-LOCAL', due: JSON.parse(route.request().postData() ?? '{}').due, fulfilled: false };
+        body = rerun;
+      } else if (path === '/interpretations/INTERP-LOCAL/judgment' && method === 'POST') {
+        judgment = JSON.parse(route.request().postData() ?? '{}');
+        body = judgment;
       } else if (path === '/methods/systems.iceberg_model/estimate') {
         body = { method_id: 'systems.iceberg_model', model: 'local-fixture', input_tokens: 10000, output_tokens: 5000, tokens: 15000, twd: 1, based_on: 0 };
       } else if (path === '/interpretations/INTERP-LOCAL/approval' && method === 'POST') {
@@ -52,7 +61,7 @@ test('login -> iceberg -> result page, cards in the mock order -> my projects ->
         status = 202;
         body = { interpretation_id: 'INTERP-LOCAL', status: 'PENDING' };
       } else if (path === '/interpretations/INTERP-LOCAL') {
-        body = { status: 'DONE', project_id: 'PROJECT-LOCAL', method_id: 'systems.iceberg_model', created_at: '2026-09-26T15:52:00Z', judgment: null, approval, cost_twd: 1, record: { events: ['release incidents'] }, manifest: [{ id: 'r/events/0', kind: 'record', path: 'r/events/0', value: 'release incidents' }], gate_results: [{ gate_id: 'citation_integrity', status: 'PASS' }], result: { interpretation_id: 'INTERP-LOCAL', method_id: 'systems.iceberg_model', summary: 'Recurring incident', findings: [{ id: 'F1', title: 'Visible event', text: 'Release incidents recur.', citations: ['r/events/0'], confidence: { level: 'mid', reason: 'record' } }], visual: { kind: 'layered', bindings: { levels: [{ label: 'r/events/0', path: 'r/events/0' }] } }, next_methods: [], next_steps: [], recommendations: [], gaps: [], model: 'local-fixture', usage: { input_tokens: 10, output_tokens: 20 }, provenance: { authorship_state: 'AI_GENERATED' } } };
+        body = { status: 'DONE', project_id: 'PROJECT-LOCAL', method_id: 'systems.iceberg_model', created_at: '2026-09-26T15:52:00Z', judgment, approval, cost_twd: 1, record: { events: ['release incidents'] }, manifest: [{ id: 'r/events/0', kind: 'record', path: 'r/events/0', value: 'release incidents' }], gate_results: [{ gate_id: 'citation_integrity', status: 'PASS', evidence: { cited: 1 } }], result: { ...resultFixture, interpretation_id: 'INTERP-LOCAL' } };
       } else {
         status = 404;
         body = { detail: `Unexpected mock API request: ${method} ${path}` };
@@ -100,10 +109,13 @@ test('login -> iceberg -> result page, cards in the mock order -> my projects ->
   await expect(page.locator('[data-section]')).toHaveCount(11);   // header, ① … ⑨, approve (docs/mockups/iceberg-result-mock.html)
   // the approve card's buttons do what they say: 核准 marks the page approved (the pill and the source strip change)
   await expect(page.locator('#approve .btns button', { hasText: '匯出 PDF' })).toBeVisible();
-  await page.locator('#approve .btns button', { hasText: '核准，存進專案' }).click();
-  await expect(page.locator('[data-section="0"] .pill')).toHaveText('已核准', { timeout: 30_000 });
-  await expect(page.locator('#approve .meta-bar')).toContainText('已核准');
-  await expect(page.locator('#approve .btns button', { hasText: '核准，存進專案' })).toBeDisabled();
+  if (mockApi) {
+    await page.locator('#approve .btns button', { hasText: '核准，存進專案' }).click();
+    await expect(page.locator('[data-section="0"] .pill')).toHaveText('已核准', { timeout: 30_000 });
+    await expect(page.locator('#approve .meta-bar')).toContainText('已核准');
+    await expect(page.locator('#approve .btns button', { hasText: '核准，存進專案' })).toBeDisabled();
+  }
+  await expect(page.locator('#expert table')).toContainText('閘門');
   await expect(page.locator('[data-section="7"]')).toBeVisible();   // ⑦ 解決方案
   await expect(page.getByRole('img', { name: '冰山模型四層圖' })).toBeVisible();
   const citationLinks = page.locator('[data-section="1"] .finding a[href^="#citation-"]');   // the findings' own [n]

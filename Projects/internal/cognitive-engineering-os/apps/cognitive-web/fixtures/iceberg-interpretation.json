@@ -1,15 +1,22 @@
 {
-  "interpretation_id": "int_fixture_iceberg",
+  "interpretation_id": "INTERP-fixture-iceberg",
   "method_id": "systems.iceberg_model",
-  "record_sha256": "a3f5f4c5a2c6f9c3d5a1e6f8b7c4d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5",
+  "record_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "visual": {
     "kind": "layered",
-    "bindings": {"levels": [{"label": "r/events/0", "path": "r/events/0"}]},
-    "payload": {"event": "release incidents"}
+    "bindings": {"levels": [{"label": "r/events/0", "path": "r/events/0"}]}
   },
-  "findings": [{"id": "finding-1", "title": "Visible event", "text": "Release incidents are recurring.", "citations": ["r/events/0"], "confidence": {"level": "medium", "reason": "fixture"}}],
+  "findings": [{"id": "finding-1", "title": "Visible event", "text": "Release incidents are recurring.", "citations": ["r/events/0"], "confidence": {"level": "mid", "reason": "fixture"}}],
+  "headline": "Release incidents recur",
   "summary": "The visible event indicates a deeper recurring system pattern.",
-  "recommendations": [{"action": "Map the reinforcing structure", "citations": ["r/events/0"]}],
+  "units": [{"path": "r/events", "brief": "Recurring incidents", "meaning": "A repeated event", "action": "Map the pattern", "step": "Collect two time points", "effect": "A clearer baseline", "leverage": "mid", "citations": ["r/events/0"]}],
+  "focus": {"path": "r/events", "why": "It is the only bound layer."},
+  "priority": "Start with the repeated event.",
+  "solutions": {"options": [{"name": "甲 Observe", "what": "Collect comparable events", "takes": "1 week", "cost": "low", "durability": "mid", "risk": "Incomplete history", "advice": "Start here", "paths": ["r/events"]}, {"name": "乙 Change flow", "what": "Change the release flow", "takes": "2 weeks", "cost": "mid", "durability": "high", "risk": "Adoption", "advice": "After baseline", "paths": ["r/events"]}], "first_step": "Collect two comparable time points.", "horizon": "2 weeks", "signoff": "Team", "plan": [{"when": "1 week", "action": "Collect baseline", "owner": "Team", "proof": "Two entries", "target": "2 entries"}], "metrics": [{"name": "Incident count", "now": "1", "now_citation": "r/events/0", "target": "0", "when": "2 weeks"}]},
+  "loop": {"kind": "reinforcing", "name": "Incident loop", "reading": "Repeated incidents reinforce the same response.", "nodes": [{"id": "a", "text": "Incident occurs", "citations": ["r/events/0"]}, {"id": "b", "text": "Response repeats", "citations": ["r/events/0"]}], "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "a"}]},
+  "trend": {"question": "Is it changing?", "reading": "The recorded incident count is stable in the available comparison.", "series": [{"name": "Incidents", "unit": "次", "points": [{"label": "Before", "value": 1, "citation": "r/events/0"}, {"label": "Now", "value": 1, "citation": "r/events/0"}]}]},
+  "next_steps": [{"method_id": "systems.leverage_point_analysis", "answers": "Find the leverage point", "deepens": "Test the response loop", "prefill": {"events": "r/events/0"}, "needs_input": ["objective"], "yields": "Leverage map", "est_cost": "low"}],
+  "recommendations": [{"level": "next", "action": "Map the reinforcing structure", "expected": "A clearer causal pattern", "citations": ["r/events/0"]}],
   "next_methods": ["systems.leverage_point_analysis"],
   "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": null},
   "model": "fixture",

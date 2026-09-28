@@ -2,7 +2,7 @@
 """Cross-page parity gate for the Cognitive OS mockups (plan I11: mocks = spec; U19 theme + palette; U20 layout;
 U21 domain list; U15/U18 lessons; U14/§3.10 result skeleton; U16 home; D18 continuity).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/check-mocks.py [--dir <folder>]
-      python …/check-mocks.py --page result <rendered.html> [--lesson <the tool's lesson path>]   (the web result page)
+      python …/check-mocks.py --page result <rendered.html> [--lesson <the tool's lesson path>] [--mock <mock.html>]   (the web result page)
 Exit 0 = the five pages obey the same design rules. Exit 1 = one line per finding (never a traceback: a page that
 cannot be parsed is itself a finding). --dir checks page copies in another folder, with that folder's own design-system.css and partials/;
 the registries come from SPEC (AI_LEGO_SPEC_ROOT overrides it; the self-test uses both). Self-test with mutations: check-mocks-selftest.py (must stay
@@ -837,7 +837,7 @@ class Checker:
 RESULT_SECTIONS = [str(n) for n in range(10)] + ["approve"]   # header, ① … ⑨, the approve card (mock order)
 
 
-def check_web_result(path, lesson=None, parity=False):
+def check_web_result(path, lesson=None, parity=False, mock_path=None):
     """Apply the mock's result-page rules (check_result, lesson-aware) and its card order to rendered web HTML; with
     ``parity`` (a full iceberg result), every card's headings, labels, captions and buttons against the mock's."""
     source = pathlib.Path(path)
@@ -868,8 +868,11 @@ def check_web_result(path, lesson=None, parity=False):
     for anchor in (node for node in nodes if node.tag == "a" and node.attrs.get("href", "").startswith("#citation-")):
         target = anchor.attrs["href"][1:]
         if not any(node.attrs.get("id") == target and node.attrs.get("data-source") for node in nodes): problems.append(f"{source}: [result-citation] {target} lacks manifest source")
-    if parity and card2 is not None and any(node.attrs.get("data-method") == "systems.iceberg_model" for node in card2.walk()):
-        problems.extend(f"{source}: [parity] {finding}" for finding in check_parity(mk.HERE / "iceberg-result-mock.html", dom.root))
+    if parity:
+        if card2 is None or not any(node.attrs.get("data-method") == "systems.iceberg_model" for node in card2.walk()):
+            problems.append(f"{source}: [parity] not applicable: rendered page is not systems.iceberg_model")
+        else:
+            problems.extend(f"{source}: [parity] {finding}" for finding in check_parity(mock_path or (mk.HERE / "iceberg-result-mock.html"), dom.root))
     return problems
 
 
@@ -935,7 +938,7 @@ def _card_outline(card, key):
     heading = h.text() if h is not None else ""
     out["heading"] = _stem(heading, "：") if key in ("header",) else _norm(heading)
     how = next((n for n in card.walk() if n.has("how") and _shown(n)), None)
-    out["how"] = sorted(_norm(b.text()) for b in (how.find(tag="b") if how is not None else []))
+    out["how"] = _norm(how.text()) if how is not None else ""
     out["h3"] = sorted({m.group(0) for n in card.find(tag="h3") if _shown(n) for m in [re.match(r"^[A-C]\.|^第 N 層/N", _norm(n.text()))] if m})
     out["rows"] = sorted({_norm(b.text()) for r in card.find("row") if _shown(r) for b in r.elements()[:1] if b.tag == "b"})
     out["th"] = sorted({tuple(_norm(th.text()) for th in t.find(tag="th")) for t in card.find(tag="table") if _shown(t)})
@@ -952,6 +955,10 @@ def check_parity(mock_path, web_root):
         return [f"mock unreadable: {error}"]
     mock_cards, web_cards = _parity_cards(dom.root, False), _parity_cards(web_root, True)
     findings = []
+    mock_tops = [n for n in dom.root.walk() if n.has("card") and not n.has("layer") and not any(a.has("card") for a in _ancestors(n))]
+    mock_tops = [n for n in mock_tops if n.attrs.get("data-when") != "empty"]
+    if len(mock_tops) != len(PARITY_CARDS):
+        findings.append(f"mock card count {len(mock_tops)} != expected {len(PARITY_CARDS)}")
     for key in PARITY_CARDS:
         mock, web = mock_cards.get(key), web_cards.get(key)
         if mock is None: findings.append(f"card {key}: missing in the mock"); continue
@@ -976,14 +983,21 @@ def main(argv):
         pass
     parity = "--parity" in argv
     argv = [a for a in argv if a != "--parity"]
+    mock_path = None
+    if "--mock" in argv:
+        index = argv.index("--mock")
+        if index + 1 >= len(argv):
+            print("usage: check-mocks.py [--dir <folder>] | --page result <html> [--lesson <path>] [--mock <mock.html>] [--parity]"); return 2
+        mock_path = argv[index + 1]
+        argv = argv[:index] + argv[index + 2:]
     if len(argv) in (3, 5) and argv[:2] == ["--page", "result"] and (len(argv) == 3 or argv[3] == "--lesson"):
-        findings = check_web_result(argv[2], argv[4] if len(argv) == 5 else None, parity=parity)
+        findings = check_web_result(argv[2], argv[4] if len(argv) == 5 else None, parity=parity, mock_path=mock_path)
         if findings:
             print("\n".join(findings)); print(f"{len(findings)} finding(s)"); return 1
         print("check-mocks: rendered result page green"); return 0
     folder = mk.HERE
     if len(argv) == 2 and argv[0] == "--dir": folder = pathlib.Path(argv[1])
-    elif argv: print("usage: check-mocks.py [--dir <folder>] | --page result <html> [--lesson <path>] [--parity]"); return 2
+    elif argv: print("usage: check-mocks.py [--dir <folder>] | --page result <html> [--lesson <path>] [--mock <mock.html>] [--parity]"); return 2
     findings = Checker(folder).run()
     if findings:
         print("\n".join(findings)); print(f"{len(findings)} finding(s)"); return 1

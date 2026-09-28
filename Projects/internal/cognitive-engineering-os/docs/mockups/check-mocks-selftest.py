@@ -18,6 +18,7 @@ CSS = mk.DESIGN_SYSTEM.name
 PAGE_MARK = "  /* == page-specific == */\n"
 ALL = "*"            # every page
 ALL_CSS = "*+css"    # every page AND the design-system.css copy (token rules must be proven without the "stylesheet differs" rule)
+PAGE_FIXTURE = HERE / "fixtures" / "result-page-iceberg-rendered.html"
 
 # (label, expected "tag" or "tag|message text", target file | ALL | ALL_CSS, kind, old, new)
 # kind: "str" exact-once replace | "strall" replace every occurrence (>= 1) | "re" first regex match | "reall" every regex match (>= 1)
@@ -226,6 +227,17 @@ CASES = [
     ("lesson iceberg polygon drifts from the result page's (ICEBERG_SHAPE)", "continuity|iceberg drawing", "iceberg-lesson-mock.html", "str", 'L420,290 Z" fill="url(#ice)"', 'L420,292 Z" fill="url(#ice)"'),
 ]
 
+# Result-page parity is a separate surface from the five mockup pages. Keep a committed rendered fixture so these
+# mutations prove the --page result --parity path in a clean checkout, including the configurable --mock path.
+PAGE_CASES = [
+    ("rendered result 怎麼讀 text drift", "card 6: 怎麼讀 strip", "page",
+     "一列一層，★ 是建議先出手的列。你要做的四列都要有人負責，填在 ⑦ B 表。",
+     "一列一層，★ 是建議先出手的列。你要做的四列都要有人負責，填在 ⑦ A 表。"),
+    ("mock result card count drift", "mock card count", "mock",
+     '<div class="card" data-when="empty" hidden>',
+     '<div class="card"><h2>額外卡片</h2></div>\n  <div class="card" data-when="empty" hidden>'),
+]
+
 
 # rules that have no mutation case yet (a substring of the rule's source in check-mocks.py). Shrink only: write the case,
 # then delete the entry (the run fails until you do). Filled from the first traced run on 2026-09-25.
@@ -245,6 +257,14 @@ ACCEPT = [
 def run_checker(folder, spec=None):
     r = subprocess.run([sys.executable, str(CHECK), "--dir", str(folder)], capture_output=True, text=True, encoding="utf-8", errors="replace",
                        env={**os.environ, "CHECK_MOCKS_TRACE": "1", **({"AI_LEGO_SPEC_ROOT": str(spec)} if spec else {})})
+    return r.returncode, (r.stdout or "") + (r.stderr or "")
+
+
+def run_page_checker(page, mock):
+    r = subprocess.run(
+        [sys.executable, str(CHECK), "--page", "result", str(page), "--lesson", "/learn/systems.iceberg_model", "--mock", str(mock), "--parity"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
@@ -313,6 +333,30 @@ def main():
             missed += 0 if ok else 1
             first = (hit or out.strip().splitlines() or [""])[0]
             print(("CAUGHT " if ok else "MISSED ") + f"{label} -> {first[:120]}")
+        page_missed = 0
+        page_tmp = tmp / "rendered-result.html"
+        mock_tmp = tmp / "result-mock.html"
+        shutil.copyfile(PAGE_FIXTURE, page_tmp)
+        shutil.copyfile(HERE / "iceberg-result-mock.html", mock_tmp)
+        rc, out = run_page_checker(page_tmp, mock_tmp)
+        if rc != 0:
+            print("baseline result parity is not green:\n" + out)
+            page_missed += 1
+        for label, expected, target, old, new in PAGE_CASES:
+            shutil.copyfile(PAGE_FIXTURE, page_tmp)
+            shutil.copyfile(HERE / "iceberg-result-mock.html", mock_tmp)
+            target_path = page_tmp if target == "page" else mock_tmp
+            content = target_path.read_text(encoding="utf-8")
+            if content.count(old) != 1:
+                print(f"MISSED {label}: anchor count {content.count(old)}")
+                page_missed += 1
+                continue
+            target_path.write_text(content.replace(old, new), encoding="utf-8", newline="\n")
+            rc, out = run_page_checker(page_tmp, mock_tmp)
+            ok = rc == 1 and "Traceback" not in out and expected in out
+            page_missed += 0 if ok else 1
+            print(("CAUGHT " if ok else "MISSED ") + f"{label} -> {(out.strip().splitlines() or [''])[0][:120]}")
+        print(f"page selftest: {len(PAGE_CASES)} mutations, {len(PAGE_CASES) - page_missed} caught, {page_missed} missed")
         for label, target, kind, old, new in ACCEPT:
             spec, setup_ok = mutate(tmp, label, target, kind, old, new)
             if not setup_ok: rejected += 1; continue
@@ -323,7 +367,7 @@ def main():
     print(f"selftest: {len(CASES)} mutations, {len(CASES) - missed} caught, {missed} missed; "
           f"{len(ACCEPT)} valid variants, {len(ACCEPT) - rejected} accepted, {rejected} rejected")
     gaps = coverage(covered)
-    return 0 if missed == 0 and rejected == 0 and not gaps else 1
+    return 0 if missed == 0 and rejected == 0 and page_missed == 0 and not gaps else 1
 
 
 def coverage(covered):

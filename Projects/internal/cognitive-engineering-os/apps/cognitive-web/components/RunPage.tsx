@@ -23,6 +23,13 @@ import { ResultPage } from "./result/ResultPage";
 import { RunHeader } from "./RunHeader";
 
 type FormResponse = { method_id: string; display?: { name_zh?: string; name_en?: string; blurb_zh?: string }; form: { fields: FormField[]; example?: { scenario?: string; input?: Record<string, unknown> } } };
+export function RunInputCard({ numeral, children }: { numeral: string; children: React.ReactNode }) {
+  return <div className="card cta" id="input">
+    <h2>你的案例：{numeral}個格子<small>從上往下填；填不出來的留白</small></h2>
+    <div className="how"><b>怎麼讀</b>一格一層，每格一句提示；空的格子裡有例子。<b>你要做的</b>填好按「執行分析」；留白的層會列成證據缺口。</div>
+    {children}
+  </div>;
+}
 export type InterpretationStatus = {
   interpretation_id?: string; status: "PENDING" | "FAILED" | "DONE"; project_id?: string; method_id?: string | null; created_at?: string;
   revision?: { of: string; reason: string } | null; rerun_id?: string | null;
@@ -144,9 +151,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
   };
   // ResultPage's own header replaces this one once there is a result.
   const inputCard = (
-    <div className="card cta" id="input">
-      <h2>你的案例：{numeral}個格子<small>從上往下填；填不出來的留白</small></h2>
-      <div className="how"><b>怎麼讀</b>一格一層，每格一句提示；空的格子裡有例子。<b>你要做的</b>填好按「執行分析」；留白的層會列成證據缺口。</div>
+    <RunInputCard numeral={numeral}>
       <details className="mb8"><summary>手邊有一段描述？貼上，系統先幫你填格子</summary><LazyFill methodId={methodId} fields={form.form.fields} state={state} onState={setState} onSuggested={setSuggested} /></details>
       {suggested.length > 0 && <div className="how"><b>AI 幫你填了</b>{suggested.join("、")}；請逐格核對。<button type="button" className="btn" onClick={() => setSuggested([])}>我已確認這些格子</button></div>}
       {left.length > 0 && <p className="sub">這次分析的「{left.join("、")}」沒辦法自動帶回格子；要再分析，請重新填這幾格。</p>}
@@ -166,7 +171,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
       {confirming && !pendingId && <div className="finding warn" role="status"><b>要花多少</b>{estimate ? `${costLine(estimate.tokens, estimate.twd)}${estimate.based_on ? `（依你最近 ${estimate.based_on} 次）` : "（第一次跑的估計）"}` : "估計還沒載入"}，約兩到三分鐘；按「確認執行」才開始、才花錢。
         <div className="btns mt6"><button type="button" className="btn primary big" disabled={starting} onClick={() => { const payload = confirming; setConfirming(null); void launch(payload); }}>確認執行</button><button type="button" className="btn ghost" onClick={() => setConfirming(null)}>取消</button></div></div>}
       {pendingId && <p role="status" className="sub mt10">正在分析，約兩到三分鐘（整頁結果：結論、逐層解讀、圖、方案）；完成後結果會出現在下面。關掉這頁也會繼續，之後到「我的專案」打開。</p>}{error && <p className="error">{error}</p>}
-    </div>
+    </RunInputCard>
   );
   if (completed?.result) return <ResultPage result={completed.result} record={completed.record} manifest={completed.manifest} gateResults={completed.gate_results} display={form.display} lesson={lesson} lessons={lessons} fields={form.form.fields} names={names} family={family} project={project} analyzedAt={completed.created_at} judgment={completed.judgment} approval={completed.approval} costTwd={completed.cost_twd} oldVersion={isOldVersion(completed.result)} compareWith={previous ?? completed.revision?.of ?? null} onRedo={redo}>{inputCard}</ResultPage>;
   return <>
