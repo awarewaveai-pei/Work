@@ -20,6 +20,7 @@ EVAL_DIR = COS_ROOT / "eval"
 sys.path.insert(0, str(EVAL_DIR))
 
 import mutate  # noqa: E402
+import produce  # noqa: E402
 import run as eval_run  # noqa: E402
 import score as eval_score  # noqa: E402
 from ai_lego import resolve_spec_root  # noqa: E402
@@ -581,6 +582,43 @@ class WhatMattersTests(_TempCaseTestCase):
         report = eval_run.build_report(None, None)
         self.assertEqual(report["cases"]["L3/l3-study-injection"]["coverage_by_category"], {"claim": 1.0, "method": 1.0, "limitation": 1.0})
         self.assertIsNone(report["cases"]["L1/l1-founder-bio"]["coverage_by_category"]["controversy"])
+
+
+class ProduceTests(unittest.TestCase):
+    """produce.py (WC-P2-09 ③) writes what run.py --artifacts scores: a provider that answers each case with its golden
+    content yields nine artifacts that pass the P-c contract and the case snapshot and score like the goldens."""
+
+    SERVER_FIELDS = {"synthesis_id", "project_id", "kind", "language", "manifest_ref", "provenance", "model", "usage", "uncited_sections", "subject"}
+
+    def test_golden_answers_produce_nine_scorable_artifacts(self):
+        from ai_lego.platform.ai_gateway.provider import AiCompletion
+        answers = []
+        for line, case_id, case_dir in eval_run.discover_cases():
+            synthesis = json.loads((case_dir / "golden-output.json").read_text(encoding="utf-8"))["synthesis"]
+            answers.append(json.dumps({k: v for k, v in synthesis.items() if k not in self.SERVER_FIELDS}, ensure_ascii=False))
+
+        class Scripted:
+            model = "scripted"
+            def complete(self, system, user, *, max_tokens):
+                return AiCompletion(text=answers.pop(0), model=self.model, input_tokens=10, output_tokens=5)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = produce.produce_all(Path(tmp), Scripted())
+            self.assertEqual([key for key, item in summary.items() if item["error"]], [])
+            report = eval_run.build_report(Path(tmp), None)
+        self.assertFalse(report["any_fail"])
+        self.assertEqual(sum(case["contract"]["verdict"] == "PASS" for case in report["cases"].values()), 9)
+        for key, case in report["cases"].items():
+            for metric in ("citation_precision_auto", "citation_coverage", "trap_rejection", "gap_honesty", "contradiction_detection"):
+                self.assertEqual(case["metrics"][metric]["value"], 1.0, f"{key} {metric}")
+
+    def test_every_case_has_an_input_the_runner_accepts(self):
+        for line, case_id, case_dir in eval_run.discover_cases():
+            self.assertTrue(produce.case_input(line, case_dir), case_id)
+
+    def test_no_key_is_exit_2_not_a_silent_empty_run(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(produce, "provider_from_env", return_value=None), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(produce.main(["--out", tmp]), 2)
 
 
 if __name__ == "__main__":

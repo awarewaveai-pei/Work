@@ -1,0 +1,56 @@
+name: Cognitive OS eval harness
+
+# Offline quality gate for the research synthesis (plan §3.7, WC-P2-09 ④): scorer tests, every golden case against
+# the P-c contract, and the harness's own mutation proofs. The command list lives in one place,
+# Projects/internal/cognitive-engineering-os/scripts/test-eval-harness.ps1 -- this file only installs and calls it.
+# No model call and no secret: eval/produce.py (the paid step) is never run here.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "Projects/internal/cognitive-engineering-os/eval/**"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/modules/research/**"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/platform/text/**"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/platform/evolution/**"
+      - "Projects/internal/cognitive-engineering-os/tests/unit/test_eval_harness.py"
+      - "Projects/internal/cognitive-engineering-os/scripts/test-eval-harness.ps1"
+      - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/evolution/**"
+      - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/cognitive/typed-objects/**"
+      - ".github/workflows/cognitive-os-eval.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Projects/internal/cognitive-engineering-os/eval/**"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/modules/research/**"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/platform/text/**"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/platform/evolution/**"
+      - "Projects/internal/cognitive-engineering-os/tests/unit/test_eval_harness.py"
+      - "Projects/internal/cognitive-engineering-os/scripts/test-eval-harness.ps1"
+      - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/evolution/**"
+      - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/cognitive/typed-objects/**"
+      - ".github/workflows/cognitive-os-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Cognitive OS
+        run: python -m pip install -e Projects/internal/cognitive-engineering-os
+
+      - name: Eval harness gate
+        shell: pwsh
+        run: ./Projects/internal/cognitive-engineering-os/scripts/test-eval-harness.ps1

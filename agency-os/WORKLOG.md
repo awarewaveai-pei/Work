@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-28（續14）研究線 WC-P2-09a 期末閘本機部分：9 案真模型產出器＋離線 CI 閘＋§6 P2 突變；部署與基準線待操作者 go（09b）
+- [範圍] worktree `D:\tmp\wt-p209`（在 `16b378722` 04b 之上）。09 拆兩個 commit（偏離 §12.1 規則 1，理由：③ 在主機跑，產出器必須先進 main 才能隨部署到主機）：09a 本機工具與證據；09b 部署後基準線、§0／§3.3／§5／§7 回填、P3 卡。
+- [09 卡矛盾處置] C1 ⑥ `edd-research-evidence-v1` → 依 P-K9 用 `research-qualitative-v1`（09b 改寫 §5 與卡文）；C2 ③ 無產出器 → 新 `eval/produce.py`；C3 ⑤「三突變」＝ §6 P2 兩項 ∪ §5「拔閘→幻覺率紅」。
+- [改] `eval/produce.py`（9 案 → `run_synthesis`（P-h）→ `<out>/<line>/<case>.json`＋`produce-summary.json`；來源＝golden manifest 快照（`run.case_snapshot`）、subject＝各案新 `input.yaml`（`validate_subject`，P-j）；無 key → exit 2；一案失敗不丟其他案）；`COS/scripts/test-eval-harness.ps1`（unittest＋`run.py --golden`＋`mutate.py`，CI 與本機同一份指令）；`.github/workflows/cognitive-os-eval.yml`（PR／push main、路徑過濾、pip install -e COS、pwsh 呼叫同一支腳本；不呼叫模型、無 secret）＋workflows README 一列；`test_eval_harness.py` +3（golden 答案經產出器 → 9 案過 P-c＋快照且分數同 golden；每案 input 可用；無 key exit 2）。
+- P2_DOD_4: PASS | cmd=`powershell -File COS/scripts/test-eval-harness.ps1` | out=exit 0（三步 PASS）；Linux `python:3.12` 容器模擬 CI：`python:3.12-slim` pip install -e COS → test_eval_harness 71 OK、run.py exit 0、mutate.py exit 0（`python:3.12` 首次拉取 EOF 中斷，換 slim）
+- P2_DOD_5: PASS | cmd=scratch `mutate_p2_gate.py`＋`python eval/mutate.py` | out=拔 runner 引註閘 → `test_synthesis` 兩案紅、還原綠；harness 刪期望來源 → coverage FAIL；注入越界引註 → hallucination_rate FAIL
+- P2_DOD_6: PASS | cmd=`python -m unittest tests.unit.test_api_main.<research_qualitative 帶專案> tests.unit.test_literature_search_v2 -q` | out=Ran 16 OK（RecipeRunTests 帶專案真端點引用專案學術來源＋test_literature_search_v2 完整 in-process 跑到 triangulation PASS）
+- [協調] 部署會帶上 main 上他線未上線 commit；fork：不部署、run lock／06／04b 可上；網站線：c11d92618 先不上，P-43（Codex）抓到每日預算可超支（interpret 重試、超大呼叫、`/ai/draft/*`）→ 改由 `_MeteredProvider` 統一計量，改動含本線 `test_api_synthesis` 一案，push 後再部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=test-eval-harness.ps1＋ProduceTests＋mutate_p2_gate＋⑥ 兩測試 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0（Codex adversarial approve，`agency-os/reports/oracle/2026-09-28-review-331a48a0.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,.github | grep=`produce_all|case_input|test-eval-harness|cognitive-os-eval` | hits=22（全在本次改動檔）
+- [下一步] 等網站線 P-43 push → 最終 HEAD 全套（規則 11 ①②）→ 操作者 go → ① 部署 → ② 正式專案 dossier → ③ 拋棄式容器 9 案真模型 → 基準線報告交操作者定門檻 → 09b。
+- [合併（續14 由 9ed2cb2ac 之後重編）] 合併者補 `.github/workflows/cognitive-os-eval.yml` 頂層 `permissions: contents: read`（repo 12 支 workflow 中 10 支同慣例，最小權限）；本機以新選擇器 `affected_tests.py --base 9ed2cb2ac --run`＋golden＋`test-eval-harness.ps1` 重驗。
 ## 2026-09-28（續13）研究線 WC-P2-04b 併入 main（16b378722，快轉）＋`affected_tests.py` 選擇器改成「照 Python 實際載入方式解析、漏選要嘛選到要嘛列出」
 - [04b 合併] 乾淨 worktree 重驗：`test_eval_harness`＋`test_synthesis`＋`test_api_synthesis` 111 OK、golden 4251 PASSED；`score.py` diff 抽查 OK；父 commit＝origin/main → 快轉，續12 沿用。雲端 T36 從未派出，不再開。
 - [根因] 續10 的選擇器只把 `ai_lego/`、`tests/` 當 import 圖（解析方式 ≠ Python 實際載入方式），同一類洞：C1 `sys.path.insert(eval)`＋`import run` 的測試選不到（04b 實例漏 `test_synthesis`／`test_api_synthesis`）；C2 不算途經的 package `__init__`；C3 遞迴 memo 遇 import 循環存殘缺閉包；C4 資料檔規則只認 SPEC yaml/json，COS 內 glob 讀的檔（`eval/cases/*/sources/*.txt`）選 0 個、SPEC 其他檔默默略過。
