@@ -1,4 +1,12 @@
 ﻿# Worklog
+## 2026-09-29（續6）研究線 WC-P2-09b：新測試閘第一次就抓到真洞——`anthropic` SDK 從未宣告；宣告為測試依賴，部署 2 重跑
+- [症狀] 部署 2（f42cee78e，`COS_GREEN_SHA=295c29d51`）主機閘 37 模組 842 tests `FAILED (errors=3)`，停在 build 前，正式站維持部署 1（健康）；同一 push 觸發的 GitHub 全套（規則 11 ③）14711 tests 同樣 3 errors：`tests/unit/test_gateway.py` 三案 `ModuleNotFoundError: No module named 'anthropic'`。eval／golden／web 三 job 綠。
+- [根因] `ai_lego/platform/ai_execution/gateway.py:148` Anthropic 路徑延遲 import `anthropic` SDK（本機 CLI：run_research_slice、run_coding_eval、modules/research/ai_coding），`test_gateway.py:57,66` `mock.patch("anthropic.Anthropic")` 需要套件存在；`pyproject.toml` 從未宣告。以前沒紅：舊部署閘只跑 12 檔、開發機剛好裝了（0.122.0）。正式 API 走 `ai_gateway/provider.py`（純 HTTP），不需要 SDK——正式容器 `import anthropic` 確實失敗、也不該有。
+- [改] `pyproject.toml` `test` extra 加 `anthropic>=0.40`（附原因註解）；`scripts/lock-deps.sh` 重產：`requirements-test.lock` +anthropic 1.9.0＋相依，`requirements.lock`（runtime）不變。不採「測試缺套件就 skip」：那是讓偵測器靜音。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker build --target test` + `docker run … python -m unittest tests.unit.test_gateway tests.unit.test_ai_gateway` | exit=0 | ms=8993（Ran 58 OK）
+- REVIEW_WAIVED: NA -- 只加一個測試依賴並重產 lock（runtime lock 零差異），證據＝原本紅的 3 案在 test image 內轉綠；GitHub 全套因 lock 變更自動重跑（規則 11 ③a）。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`import anthropic|anthropic\.Anthropic` | hits=3（gateway.py:148、test_gateway.py:57,66；ai_gateway/provider.py 只有字串 host，不 import）
+- [下一步] push → 主機 `COS_GREEN_SHA=295c29d51 deploy.sh`（部署 2 重跑）→ GitHub 全套綠 → 09b 第二部分。
 ## 2026-09-29（續5）部署 claude-opus-5-5 遷移（268f33478）：next-admin＋video-service 上線；部署中 sg-deploy 刪掉 video-service 的 .env.video → 由運行中容器還原（逐值一致）並修 sg-deploy 兩個不變量
 - [操作者] 「部署」（對 續3 的 High-STOP）。
 - [範圍] next-admin、video-service 在 prod 與 main 只差 268f33478 → 部署。COS 不部署：主機 deploy.log 顯示他線 09-28T17:01Z 起的部署停在 test-gate，且 main 上有他線標「上線 High-STOP」的 commit；prod `COGNITIVE_OS_AI_MODEL=claude-sonnet-5` 也未改。

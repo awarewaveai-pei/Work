@@ -19,9 +19,11 @@ dependencies = [
 # Real local speech-to-text path (Windows SAPI speech + cached faster-whisper Medium).
 # Never downloads a model; see ai_lego/modules/knowledge/ingest/transcription.py.
 offline-stt = ["faster-whisper>=1.0"]
-# Test-only: FastAPI TestClient needs httpx; pytest for local targeted runs. Pinned into
-# requirements-test.lock (scripts/lock-deps.sh), which the Dockerfile `test` target installs.
-test = ["httpx>=0.27", "pytest>=8.0"]
+# Test-only: FastAPI TestClient needs httpx; pytest for local targeted runs; anthropic because
+# tests/unit/test_gateway.py patches anthropic.Anthropic -- ai_lego/platform/ai_execution/gateway.py imports the SDK
+# lazily on its Anthropic path (local CLIs only; the API's provider.py speaks HTTP and needs no SDK, so the runtime
+# image does not carry it). Pinned into requirements-test.lock (scripts/lock-deps.sh), which the `test` target installs.
+test = ["httpx>=0.27", "pytest>=8.0", "anthropic>=0.40"]
 
 # The ranges above are inputs; what actually installs is requirements.lock / requirements-test.lock
 # (scripts/lock-deps.sh resolves them inside the Dockerfile's pinned base). Bump a range here, rerun
