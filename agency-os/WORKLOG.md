@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-28（續3）研究線 WC-P2-05（T32）併入 main：三線一支 synthesis runner；v1.yaml 補 P-j user_intro／reduce_intro
+- [來源] 本機背景 agent 初稿（對著合併前的 T28 API 寫）→ 合併者在 `D:\tmp\v-p2c` 依 278d1e69d 的 API 重寫：`build_source_manifest` 扁平 dict、每 prompt 一個 `new_fence_nonce`、模型只寫整數 n（`resolve_citation_numbers`）、`studies[].source_id` 伺服器依唯一 citation 填、`synthesis_reference_errors` 非空走修復。
+- [改] 新 `ai_lego/modules/research/synthesis.py` `run_synthesis`（P-h）：零來源 → `SYNTHESIS_NO_SOURCES` 不呼叫；dossier subject 伺服器定（`SYNTHESIS_SUBJECT_INVALID` 在呼叫前擋）；`uncited_sections` 直接取閘 evidence（P-K3，刪掉 runner 自己的定義）；>40 來源 map（每批一呼叫）→ reduce（FULL MANIFEST＋帶 fence code 的 MAP 區塊）；artifact `{synthesis, manifest, gate_results, prompt_version, latency_ms}`。
+- [改] `SPEC/evolution/synthesis-prompts/v1.yaml`：三 kind 加 `user_intro`／`reduce_intro`；dossier 加 `kind_labels`（report.ts:109）與 `anchors_line.present/absent`；dossier user_intro = report.ts:127-133 逐字，改兩處配 typed object（claims 留空＋gaps；無定位詞 → gaps 且不引用）。`version_sha256` 同 commit 重記於 `champion.yaml` 與 LEDGER 種子列（cefadc8c…）。`subject_name` = dossier name／decision、literature question。
+- Codex 2026-09-28 r2 m1：dossier `anchors:"abc"` 被迭代成 `["a","b","c"]`。修：anchors 必為非空字串 list（或缺），否則 `SYNTHESIS_SUBJECT_INVALID`（呼叫模型前）；prompt 的 SUBJECT 行改用驗證後的 subject（不帶請求多餘鍵）。
+- 契約描述同步：三份 `synthesis.*.capability.yaml` 原寫 runner「do not exist yet」→ 改指 `run_synthesis`（端點 WC-P2-06 仍未有，DRAFT 不變）。
+- 突變（`mut_t32d` 10 項＋`mut_t32e` 2 項，全紅→還原綠）：fence 碼固定、study source_id 不推導、reference errors 忽略、閘拔、token 不累計、user_intro 忽略、uncited 交給模型、MAP 無 fence 碼、anchors 變體忽略、question 不填 subject_name、anchors 不驗、prompt 用原始 subject。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd Projects/internal/cognitive-engineering-os && python -m unittest tests.unit.test_synthesis tests.unit.test_source_manifest tests.unit.test_citation_integrity tests.unit.test_eval_harness tests.unit.test_evolution_registry tests.unit.test_report_render | exit=0 | ms=135228
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/1n
+  - external oracle = Codex CLI（`codex-oracle.ps1` 三輪；`/codex-review` 在 worktree 被 policy 擋、零讀檔，不計）：r1 `reports/oracle/2026-09-28-review-c5d5c209.md` M（in-flight 只管 async）已修；r2 `2026-09-28-review-83b2ddce.md` m（anchors 字串被拆字）已修；r3 `2026-09-28-review-3895ca65.md` n（in-flight 為行程內，多 worker／行程死亡）= 設計邊界不修：部署單一行程（`Dockerfile:40` uvicorn 無 --workers；`main.py:1155` interpret 路徑同假設），行程死 → 無 journal → 誠實 404（`main.py:637-640` 註解），列剩餘風險
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=`run_synthesis|SYNTHESIS_NO_SOURCES|SYNTHESIS_SUBJECT_INVALID|user_intro|reduce_intro` | hits=63
+- [下一步] P1 session 可做 WC-P2-06（端點）；T33（route.method）、T35 由另一 session 派。
 ## 2026-09-28（續2）研究線 WC-P3-02（T34）併入 main：async recipe run＋human_required；一個 run_id 只對應一次 run
 - [來源] 雲端 `claude/cc-t34-recipe-async-human-required`（1654d178b）；合併者在 `D:\tmp\v-p2c`（base fb9587462）重驗，Codex 2026-09-27＋critic 發現後修，squash 成一個 commit。
 - [根因／修]
