@@ -9,9 +9,16 @@ changed file through the edges below; over-selecting is fine, a silent miss is t
 - A changed COS file selects the modules whose path expressions contain its constant run (``case_dir / "sources"``;
   ``root / DATA_DIR`` with ``DATA_DIR = "cases"``); a changed non-Python COS/SPEC file also selects the modules that
   name it (SPEC yaml/json: its stem too = schema/contract id). Non-Python files nothing names are listed.
-Outside the contract (the phase gate's full suite catches them): files outside COS and SPEC (not COS inputs), dynamic
-``importlib`` strings, paths computed at run time, SPEC path expressions (a few core loaders everyone imports read
-SPEC by glob; following them selected 359 of ~370 modules -- a SPEC file nothing names is listed instead).
+- ``importlib.import_module``: a constant name is an import. A computed name is built from data under a prefix the
+  file spells (dispatch: f"ai_lego.modules.{family}.{name}" from a method id; gates: a ref checked with
+  ``startswith("ai_lego.compute.")``), so a changed file under such a prefix selects the modules that spell its
+  dotted name or, below the prefix, its dotted id ("decision.rice") -- the data that makes it load. (A blanket edge
+  "dispatch depends on every method" selected 315 of 361 modules for a 9-file change.) A computed name with no
+  ``ai_lego.`` prefix loads a third-party package.
+- Any SPEC change also selects the test modules that glob SPEC themselves (they enumerate every contract/schema).
+Outside the contract: files outside COS and SPEC (not COS inputs); paths computed at run time; SPEC read through the
+core loaders everyone imports (following them selected 359 of ~370 modules) -- the golden run, which every gate runs,
+validates every SPEC file. A change to this file or to the runtime (lock, Dockerfile) = full suite (plan rule 11).
 
     python scripts/affected_tests.py                 # changes vs HEAD (staged + unstaged + untracked)
     python scripts/affected_tests.py --base origin/main --run
@@ -22,6 +29,7 @@ from __future__ import annotations
 import argparse
 import ast
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -31,6 +39,9 @@ COS = Path(__file__).resolve().parents[1]
 REPO = COS.parents[2]
 _SPEC_MARK = "AI_LEGO_Cognitive_Engineering_OS"
 _PATH_CALLS = {"Path", "PurePath", "PurePosixPath", "joinpath", "join"}
+_PKG_PREFIX = re.compile(r"^ai_lego(\.[A-Za-z_]\w*)*\.$")
+_GLOB = re.compile(r"\br?glob\(")
+_SPEC_REF = re.compile(r"resolve_spec_root|AI_LEGO_Cognitive_Engineering_OS|SPEC_ROOT|spec_root")
 
 
 def _git(*args: str) -> list[str]:
@@ -50,6 +61,8 @@ class _File:
     path_roots: list[PurePosixPath] = field(default_factory=list)  # COS-relative sys.path entries it adds
     opaque: bool = False  # changes sys.path in a way that is not statically known
     chains: set[tuple[str, ...]] = field(default_factory=set)  # constant runs of path expressions ("sources",)
+    dynamic: bool = False  # calls import_module with a computed name
+    prefixes: set[str] = field(default_factory=set)  # "ai_lego/compute" for a constant "ai_lego.compute."
     deps: set[str] = field(default_factory=set)
 
 
@@ -166,9 +179,17 @@ def _parse(cos_posix: PurePosixPath, rel: str, text: str) -> _File:
                     info.path_roots.append(PurePosixPath(root.relative_to(cos_posix).as_posix()))
                 except (AttributeError, ValueError):
                     pass  # unevaluable (already opaque) or outside COS: no graph file lives there
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and _PKG_PREFIX.match(node.value):
+            info.prefixes.add(node.value.rstrip(".").replace(".", "/"))
         elif isinstance(node, ast.Call):
             name = _call_name(node.func)
             info.opaque |= name == "addsitedir"
+            if name == "import_module" and node.args:
+                first = node.args[0]
+                if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                    info.imports.append((first.value, 0))
+                else:
+                    info.dynamic = True
             if name in _PATH_CALLS:
                 info.chains.update(_runs(list(node.args), assigns))
     return info
@@ -229,6 +250,9 @@ def affected_test_modules(files: list[str], cos: Path = COS, repo: Path = REPO) 
 
     changed = set(changed_py)
     unreferenced: list[str] = []
+    dyn_prefixes = {p for info in parsed.values() if info.dynamic for p in info.prefixes}
+    spec_globbers = {m for m, info in parsed.items() if m.startswith("tests/unit/test_")
+                     and _GLOB.search(info.text) and _SPEC_REF.search(info.text)}
     for rel in files:
         in_cos = rel.startswith(cos_rel + "/")
         in_spec = f"{_SPEC_MARK}/" in rel
@@ -236,10 +260,17 @@ def affected_test_modules(files: list[str], cos: Path = COS, repo: Path = REPO) 
             continue
         name = PurePosixPath(rel).name
         needles = set() if rel.endswith(".py") else {name}  # a .py name ("run.py", "main.py") is in every docstring
+        if in_cos and rel.endswith(".py"):
+            dotted = rel[len(cos_rel) + 1:-3].removesuffix("/__init__").replace("/", ".")
+            for prefix in dyn_prefixes:
+                below = dotted.removeprefix(prefix.replace("/", ".") + ".")
+                if below != dotted:
+                    needles |= {dotted} | ({below} if "." in below else set())
         if in_spec and rel.endswith((".yaml", ".yml", ".json")):
             needles.add(name.rsplit(".", 1)[0])
         parts = PurePosixPath(rel[len(cos_rel) + 1:]).parts if in_cos else ()
         hits = {m for m, info in parsed.items() if any(n in info.text for n in needles) or any(_contains(parts, c) for c in info.chains)}
+        hits |= spec_globbers if in_spec else set()
         changed |= hits
         if not hits and not (in_cos and rel.endswith(".py")):
             unreferenced.append(rel)

@@ -14,6 +14,7 @@ services:
     build:
       context: ../../..
       dockerfile: Projects/internal/cognitive-engineering-os/Dockerfile
+      target: runtime   # the Dockerfile's last stage is `test` (Docker's default); never ship that one
     image: cognitive-os-api:latest
     container_name: cognitive-os-api
     restart: unless-stopped

@@ -1,0 +1,85 @@
+name: Cognitive OS full suite
+
+# The full suite runs ONLY here, and only when something the per-change selector (scripts/affected_tests.py) cannot
+# see has changed: the dependency locks, pyproject, the Dockerfile/compose, the selector itself, the test-gate
+# script (plan §12.1 rule 11 ③). No schedule, no per-card or per-deploy run (operator 2026-09-29). It builds the
+# Dockerfile `test` target -- the layers that ship -- and runs `scripts/test-gate.sh --all` in it, plus
+# deploy/web_test.sh. workflow_dispatch exists for a rerun after a red.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "Projects/internal/cognitive-engineering-os/pyproject.toml"
+      - "Projects/internal/cognitive-engineering-os/requirements.lock"
+      - "Projects/internal/cognitive-engineering-os/requirements-test.lock"
+      - "Projects/internal/cognitive-engineering-os/Dockerfile"
+      - "Projects/internal/cognitive-engineering-os/docker-compose.yml"
+      - "Projects/internal/cognitive-engineering-os/scripts/affected_tests.py"
+      - "Projects/internal/cognitive-engineering-os/scripts/test-gate.sh"
+      - ".dockerignore"
+      - ".github/workflows/cognitive-os-full-suite.yml"
+
+concurrency:
+  group: cognitive-os-full-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  python:
+    name: full suite in the test image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the test image (runtime layers + tests)
+        run: docker build --target test -t cognitive-os-api:test -f Projects/internal/cognitive-engineering-os/Dockerfile .
+
+      - name: Full suite
+        run: |
+          set -o pipefail
+          docker run --rm -e COS_GIT_SHA="$GITHUB_SHA" cognitive-os-api:test bash scripts/test-gate.sh --all | tee full-suite.log
+
+      - name: Summary
+        if: always()
+        run: grep -E '^(git:|python:|Ran |OK|FAILED|TEST GATE)' full-suite.log >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: full-suite-${{ github.sha }}
+          path: full-suite.log
+          retention-days: 90
+
+  golden:
+    name: SPEC golden (on the checkout -- it cross-checks repo documents outside SPEC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned deps
+        run: |
+          python -m pip install --require-hashes -r Projects/internal/cognitive-engineering-os/requirements.lock
+          python -m pip install --no-deps -e Projects/internal/cognitive-engineering-os
+      - name: Golden
+        run: python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py
+
+  web:
+    name: web gate (tsc + vitest + check-mocks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: deploy/web_test.sh (throwaway node:22-alpine container)
+        run: bash Projects/internal/cognitive-engineering-os/deploy/web_test.sh

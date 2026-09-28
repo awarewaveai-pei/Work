@@ -136,6 +136,37 @@ class AffectedTestsTests(unittest.TestCase):
         self.assertEqual(self._select(spec_doc), ([], [spec_doc]))
         self.assertEqual(self._select("agency-os/WORKLOG.md"), ([], []))
 
+    def test_a_computed_import_module_selects_the_modules_that_spell_what_it_loads(self) -> None:
+        # dispatch: f"ai_lego.modules.{family}.{name}" from a method id; gates: a ref checked with startswith(...)
+        self._write("ai_lego/modules/__init__.py", "")
+        self._write("ai_lego/modules/fam/__init__.py", "")
+        self._write("ai_lego/modules/fam/meth.py", "")
+        self._write("ai_lego/compute/__init__.py", "")
+        self._write("ai_lego/compute/stats.py", "")
+        self._write("ai_lego/dispatch.py", 'import importlib\ndef load(f, n):\n    return importlib.import_module(f"ai_lego.modules.{f}.{n}")\n')
+        self._write("ai_lego/gates.py", 'import importlib\ndef ok(ref):\n    if ref.startswith("ai_lego.compute."):\n        return importlib.import_module(ref.rpartition(".")[0])\n')
+        self._write("ai_lego/builder.py", 'REF = "ai_lego.compute.stats.mean"\n')
+        self._write("ai_lego/const.py", 'import importlib\nM = importlib.import_module("ai_lego.pkg.leaf")\n')
+        self._write("ai_lego/third.py", 'import importlib\ndef opt(name):\n    return importlib.import_module(name)\n')
+        self._write("tests/unit/test_via_dispatch.py", 'import ai_lego.dispatch\nMETHOD = "fam.meth"\n')
+        self._write("tests/unit/test_other_method.py", 'import ai_lego.dispatch\nMETHOD = "fam.other"\n')
+        self._write("tests/unit/test_builder.py", "import ai_lego.builder\n")
+        self._write("tests/unit/test_gates_only.py", "import ai_lego.gates\n")
+        self._write("tests/unit/test_const.py", "import ai_lego.const\n")
+        self._write("tests/unit/test_third.py", "import ai_lego.third\n")
+        self.assertEqual(self._select(f"{COS_REL}/ai_lego/modules/fam/meth.py")[0], ["tests.unit.test_via_dispatch"])
+        self.assertEqual(self._select(f"{COS_REL}/ai_lego/compute/stats.py")[0], ["tests.unit.test_builder"])
+        leaf = self._select(f"{COS_REL}/ai_lego/pkg/leaf.py")[0]
+        self.assertIn("tests.unit.test_const", leaf)
+        self.assertNotIn("tests.unit.test_third", leaf)
+
+    def test_any_spec_change_selects_the_tests_that_glob_spec_themselves(self) -> None:
+        self._write("tests/unit/test_all_contracts.py", 'from ai_lego import resolve_spec_root\nFILES = sorted((resolve_spec_root() / "methods").glob("*.yaml"))\n')
+        self._write("tests/unit/test_globs_elsewhere.py", 'from pathlib import Path\nFILES = sorted(Path("x").glob("*.txt"))\n')
+        self._write("tests/unit/test_names_spec.py", 'SPEC_ROOT = "somewhere"\n')
+        tests, _ = self._select(f"{SPEC_REL}/methods/nobody-names-this.contract.yaml")
+        self.assertEqual(tests, ["tests.unit.test_all_contracts"])
+
     def test_the_real_tree_selects_every_eval_importer_for_an_eval_change(self) -> None:
         tests, _, _ = affected_tests.affected_test_modules([f"{affected_tests.COS.relative_to(affected_tests.REPO).as_posix()}/eval/run.py"])
         self.assertLessEqual({"tests.unit.test_eval_harness", "tests.unit.test_synthesis", "tests.unit.test_api_synthesis"}, set(tests))

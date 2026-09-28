@@ -1,0 +1,3 @@
+# host-local deploy state (deploy.sh): its log and the last SHA known all-green (plan rule 11)
+deploy.log
+.green-sha

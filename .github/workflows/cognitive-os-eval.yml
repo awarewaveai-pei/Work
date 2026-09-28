@@ -16,6 +16,8 @@ on:
       - "Projects/internal/cognitive-engineering-os/ai_lego/platform/evolution/**"
       - "Projects/internal/cognitive-engineering-os/tests/unit/test_eval_harness.py"
       - "Projects/internal/cognitive-engineering-os/scripts/test-eval-harness.ps1"
+      - "Projects/internal/cognitive-engineering-os/scripts/eval_gate.py"
+      - "Projects/internal/cognitive-engineering-os/requirements-test.lock"
       - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/evolution/**"
       - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/cognitive/typed-objects/**"
       - ".github/workflows/cognitive-os-eval.yml"
@@ -29,6 +31,8 @@ on:
       - "Projects/internal/cognitive-engineering-os/ai_lego/platform/evolution/**"
       - "Projects/internal/cognitive-engineering-os/tests/unit/test_eval_harness.py"
       - "Projects/internal/cognitive-engineering-os/scripts/test-eval-harness.ps1"
+      - "Projects/internal/cognitive-engineering-os/scripts/eval_gate.py"
+      - "Projects/internal/cognitive-engineering-os/requirements-test.lock"
       - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/evolution/**"
       - "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/specs/cognitive/typed-objects/**"
       - ".github/workflows/cognitive-os-eval.yml"
@@ -48,8 +52,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Cognitive OS
-        run: python -m pip install -e Projects/internal/cognitive-engineering-os
+      - name: Install Cognitive OS (pinned deps, plan rule 11)
+        run: |
+          python -m pip install --require-hashes -r Projects/internal/cognitive-engineering-os/requirements-test.lock
+          python -m pip install --no-deps -e Projects/internal/cognitive-engineering-os
 
       - name: Eval harness gate
         shell: pwsh

@@ -74,17 +74,10 @@ fi
 #    already been activated by hand). Assumes a dedicated per-product checkout (prod uses a
 #    sparse clone at /opt/cognitive-os) -- a shared monorepo checkout running this same pattern
 #    for a second product would collide on this directory name.
-#    No longer a "looks functional, skip reinstall" shortcut (root-cause fix, 2026-09-18): a prior
-#    version only checked `import fastapi, pytest` before deciding to skip `pip install` entirely,
-#    which passed even though a REAL, already-declared-in-pyproject.toml dependency
-#    (matplotlib, added by the chart-rendering feature) was missing from this already-bootstrapped
-#    venv -- first deploy attempt after that feature merged failed at the typecheck step below with
-#    `ModuleNotFoundError: matplotlib`. The check was approximating "is the venv correct" with two
-#    hardcoded names that can never track pyproject.toml's actual dependency list as it grows --
-#    the same failure shape as a hand-maintained allowlist drifting from its source of truth.
-#    Fix: always run `pip install -e ...[test]` (idempotent -- pip resolves against what's already
-#    satisfied and typically finishes in a couple seconds when nothing changed); only the expensive
-#    `python3 -m venv` creation step is skipped when the directory already exists.
+#    Always `pip install` (root-cause fix, 2026-09-18: a "looks functional, skip" check on two hardcoded
+#    module names missed a real declared dependency, matplotlib). Installs from requirements.lock with hashes --
+#    the same pins the image installs -- then the package itself without deps; only `python3 -m venv` is skipped
+#    when the directory exists. This venv serves the import-sanity step only; the tests run in the test image.
 DEPLOY_VENV="$REPO_ROOT/.deploy-venv"
 if [[ ! -x "$DEPLOY_VENV/bin/python3" ]]; then
   log "venv | $DEPLOY_VENV missing or incomplete (no executable bin/python3) -- creating"
@@ -93,8 +86,9 @@ fi
 # shellcheck disable=SC1091
 source "$DEPLOY_VENV/bin/activate"
 timeout 300 pip install --quiet --upgrade pip >>"$LOG" 2>&1 || log "venv | WARN: pip self-upgrade failed, continuing with bundled pip"
-log "venv | ensuring deps match pyproject.toml (pip install -e ...[test])"
-timeout 300 pip install --quiet -e "$PRODUCT_ROOT[test]" >>"$LOG" 2>&1 || { log "venv | FAIL: pip install (see $LOG for detail)"; notify "FAILED to install deploy-venv deps"; exit 1; }
+log "venv | pip install --require-hashes -r requirements.lock, then the package without deps"
+timeout 300 pip install --quiet --require-hashes -r "$PRODUCT_ROOT/requirements.lock" >>"$LOG" 2>&1 || { log "venv | FAIL: pip install requirements.lock (see $LOG for detail)"; notify "FAILED to install deploy-venv deps"; exit 1; }
+timeout 300 pip install --quiet --no-deps -e "$PRODUCT_ROOT" >>"$LOG" 2>&1 || { log "venv | FAIL: pip install -e (see $LOG for detail)"; notify "FAILED to install deploy-venv package"; exit 1; }
 log "venv | using $(command -v python3) ($(python3 --version))"
 
 # -- 1. Typecheck substitute (Python has no tsc; the closest real equivalent is "does every
@@ -108,13 +102,30 @@ for mod in ['ai_lego.apps.api.main', 'ai_lego.apps.api.dispatch', 'ai_lego.platf
 print('OK: all modules import cleanly')
 " ) || { log "typecheck | FAIL"; notify "FAILED at typecheck (import sanity)"; exit 1; }
 
-# -- 2. Test gate -- Phase 1 API-surface test files (the ~260 other tests/unit/* files are
-#    Method Atlas method-implementation tests, covered by their own CI path, not re-run here). --
-log "test-gate | running pytest for the Phase 1 test files"
-( cd "$PRODUCT_ROOT" && python3 -m pytest tests/unit/test_workspace_domain.py tests/unit/test_identity_domain.py tests/unit/test_identity_store.py tests/unit/test_entitlement_check.py tests/unit/test_api_dispatch.py tests/unit/test_api_main.py tests/unit/test_authenticate_timing.py tests/unit/test_ai_gateway.py \
-    tests/unit/test_interpret_method_record.py tests/unit/test_api_interpret.py tests/unit/test_project_source_api.py tests/unit/test_pricing.py -q ) \
-  || { log "test-gate | FAIL"; notify "FAILED at test gate"; exit 1; }
-# the result page's pipeline and its API (interpretation, approval, tasks, reruns, estimate, prices) ship only with a green run (P-19)
+# -- 2. Test gate (plan §12.1 rule 11 ②): the unit tests affected since the last SHA known all-green
+#    (scripts/affected_tests.py, transitive imports) + golden + eval gate, run in the `test` target of the image
+#    about to ship -- the runtime layers `docker compose build` below reuses. Never the full suite here (rule 11 ③:
+#    GitHub CI only). deploy/.green-sha holds the last all-green SHA and is rewritten on every successful deploy
+#    (affected tests green + the rest unaffected = all green). The first run with this gate has none: pass
+#    COS_GREEN_SHA=<sha> once (no silent fallback to "test everything" or "test nothing"). --
+GREEN_SHA_FILE="$PRODUCT_ROOT/deploy/.green-sha"
+HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+BASE_SHA="${COS_GREEN_SHA:-$(cat "$GREEN_SHA_FILE" 2>/dev/null || true)}"
+if [[ -z "$BASE_SHA" ]] || ! git -C "$REPO_ROOT" cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+  log "test-gate | FAIL: no all-green sha ('$BASE_SHA') -- rerun with COS_GREEN_SHA=<last all-green sha, plan rule 11>"
+  notify "FAILED at test gate: last all-green sha unknown"; exit 1
+fi
+MODULES="$(cd "$PRODUCT_ROOT" && python3 scripts/affected_tests.py --base "$BASE_SHA" 2>>"$LOG")" \
+  || { log "test-gate | FAIL: affected_tests.py (see $LOG)"; notify "FAILED at test selection"; exit 1; }
+log "test-gate | ${BASE_SHA:0:9}..${HEAD_SHA:0:9}: $(wc -w <<<"$MODULES") affected module(s) + golden + eval gate"
+( cd "$REPO_ROOT" && python3 agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py ) >>"$LOG" 2>&1 \
+  || { log "test-gate | FAIL at golden (see $LOG)"; notify "FAILED at golden"; exit 1; }
+docker build --target test -t cognitive-os-api:test -f "$PRODUCT_ROOT/Dockerfile" "$REPO_ROOT" >>"$LOG" 2>&1 \
+  || { log "test-gate | FAIL at docker build --target test (see $LOG)"; notify "FAILED at test image build"; exit 1; }
+# shellcheck disable=SC2086  # MODULES is a space-separated list of dotted module names
+docker run --rm -e COS_GIT_SHA="$HEAD_SHA" cognitive-os-api:test bash scripts/test-gate.sh $MODULES >>"$LOG" 2>&1 \
+  || { log "test-gate | FAIL (see $LOG, look for TEST GATE: FAIL)"; notify "FAILED at test gate"; exit 1; }
+log "test-gate | PASS"
 
 # -- 2b. Web gate: tsc + vitest (incl. the parity test against the mock) + the mock checker, in a throwaway container. --
 log "web-test | tsc + vitest + check-mocks (deploy/web_test.sh)"
@@ -190,5 +201,6 @@ else
 fi
 
 # -- 6. Notification (success). --
+echo "$HEAD_SHA" > "$GREEN_SHA_FILE"   # all green now: the next deploy tests only what changed after this
 notify "deployed successfully, local health OK"
 log "done"

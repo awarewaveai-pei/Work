@@ -1,0 +1,18 @@
+# Build context for Projects/internal/cognitive-engineering-os/Dockerfile, the only Dockerfile built from the
+# monorepo root (its docker-compose.yml: `context: ../../..`): send only what it COPYs. Without this the context is
+# the whole checkout (node_modules, .next, .git, ...) on every local or CI build.
+*
+!Projects/internal/cognitive-engineering-os/Dockerfile
+!Projects/internal/cognitive-engineering-os/pyproject.toml
+!Projects/internal/cognitive-engineering-os/docker-compose.yml
+!Projects/internal/cognitive-engineering-os/requirements.lock
+!Projects/internal/cognitive-engineering-os/requirements-test.lock
+!Projects/internal/cognitive-engineering-os/ai_lego
+!Projects/internal/cognitive-engineering-os/tests
+!Projects/internal/cognitive-engineering-os/eval
+!Projects/internal/cognitive-engineering-os/scripts
+!Projects/internal/cognitive-engineering-os/apps/cognitive-web/fixtures
+!agency-os/docs/AI_LEGO_Cognitive_Engineering_OS
+**/__pycache__
+**/*.pyc
+**/.runtime
