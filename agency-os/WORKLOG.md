@@ -1,4 +1,16 @@
 ﻿# Worklog
+## 2026-09-29（續9）WC-P2-09b part 2：無成本期末證據與計畫回填
+- [決策] 依 handoff：先完成無成本 ①／⑦／⑧；② dossier_brief 與③ 9-case baseline 暫不執行，因兩者會產生付費模型用量，且 handoff 要求在「等等」後重新確認。
+- P2_DOD_1: PASS — WORKLOG 2026-09-29（續8）已證明 prod `73b9ac8f8`、deploy.sh TEST GATE PASS、api/web healthy、公開 `/api/health` PASS、live smoke PASS。
+- P2_DOD_7: PASS — `RESEARCH_LINES_MASTER_PLAN.md` 升至 v1.58；§0 進度板、§2 I5、§3.3 synthesis 兩列、§5 P2 recipe／baseline 語意、§7 R33、TASKS 研究線指針已回填；P-K9／P-K10 事實與現行 code 對齊。
+- P2_DOD_8: PASS — 新增 §12.9，將 P3-01／02／03 收斂成一條 AI 可執行承接卡；讀回提交後確認 P3-02 已落地，P3-01／03 尚無現行程式檔，故卡片明確保留為待實作，不宣稱完成。
+- [未做] ②／③：未建立 identity session、未呼叫 synthesis、未跑真模型 baseline、未寫 thresholds；`thresholds.yaml` 應維持全 null，待操作者日後決定。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git log --oneline -10`＋`rg` 對 handoff／WORKLOG／plan／TASKS 的 anchors 與產物讀回驗證 | exit=0 | ms=0
+- REVIEW_WAIVED: DOC_ONLY -- 計畫、TASKS、WORKLOG 一致性回填；已讀回變更並做跨檔 anchor grep。
+- ORACLE_WAIVED: DOC_ONLY -- 無程式碼、schema、部署或資料狀態變更。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,.claude/{commands,agents,skills} | grep=`P2_DOD_[1-8]|edd-research-evidence-v1|research-qualitative-v1|P-K10|12\.9` | hits=155 hit-lines
+- [剩餘風險] ②／③ 的付費實測仍未完成；P2 驗收計數尚未達 8；P1 WC-15 ⑤ prod 抹除仍是獨立阻塞。
+- [rollback] 還原本次 plan／TASKS／WORKLOG 三份文件變更；不需回滾 prod 或資料庫。
 ## 2026-09-29（續8）Cognitive OS 正式站部署 `73b9ac8f8`：⑦ 五方案複選＋短期／長期計畫、⑧ 只推沒做過的工具、任務卡、專案歷程（續7）
 - [操作者] 「上線」。
 - [範圍] 正式站 `a4d992435`→`73b9ac8f8`，只有續7 一筆；無資料庫結構變更（新事件 TaskNoted、TaskUpdated.status 都寫進既有 events 表）。
