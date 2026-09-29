@@ -1,4 +1,8 @@
 ﻿# Worklog
+## 2026-09-30（續5）WC-P2-07a literature_search v2 重驗
+- [REALTEST] `python -m unittest tests.unit.test_literature_search_v2 tests.unit.test_chart_render tests.unit.test_research_evidence_chain -q` → 50/50 OK；`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` → 4261/4261 PASS。
+- [DOD] Existing `209b65221` covers active academic project Sources, superseded exclusion, fail-closed zero-source behavior, offline fallback when `project_sources=None`, PROJECT_SOURCE triangulation, stable citation fallback, and unchanged legacy callers; original commit evidence recorded 65 tests plus mutation cases.
+- [REVIEW] Local adapter-only verification; no `main.py`, recipe YAML, production state, Airtable, or network/model call changed.
 ## 2026-09-30（續4）WC-P2-06 synthesis endpoint 重驗
 - [REALTEST] `python -m unittest tests.unit.test_api_synthesis -q` → 17/17 OK；`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` → 4261/4261 PASS。
 - [DOD] Existing `63e96ffe6` implementation covers 202 POST + background worker, PENDING/DONE/FAILED polling, paid-call metering on success/failure, tenant isolation, zero-source refusal, artifact cleanup, and no-text event payloads; targeted tests include all boundaries.
