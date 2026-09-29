@@ -1,4 +1,10 @@
 ﻿# Worklog
+## 2026-09-29（續10）WC-P2-09b part 2：paid baseline 完成與 dossier blocker
+
+- P2_DOD_2: BLOCKED — prod `platform_projects` 查詢未找到 operator project `1c749cbf-7f53-43e1-a152-3d27b0d7c123`（目前列出的 8 個 project 均不符）；未建立替代 project、未發出猜測性 synthesis request。阻塞點是 live state 缺少 handoff 指定資源。
+- P2_DOD_3: PASS — 同一個 `cognitive-os-api:test` image `sha256:4ba4ab3fd818e940eadb714ab42677c0c0c7c4a2872ae52da28dc7c20a1f5286` 實跑 `eval/produce.py`：`produced 9/9; tokens in=19225 out=18838; failed: none`。因 `docker run --env-file` 不會帶入 compose `environment`，依 `Projects/internal/cognitive-engineering-os/docker-compose.yml:27` 明確補入既有 allowlist 單一 host `api.anthropic.com`；未放寬其他 egress。
+- P2_DOD_3 verification — 同 image 實跑 `eval/run.py --artifacts /out --out /out/report` exit=0；`/tmp/p2-baseline/report/eval-report.md` 產出 9 cases × 8 metrics（citation_precision_auto、citation_coverage、hallucination_rate、contradiction_detection、gap_honesty、trap_rejection、cost_tokens、latency_ms），結果 `PASS (or UNSET)`；`thresholds.yaml` 未修改、各 threshold 維持 UNSET/null。
+- REALTEST_EVIDENCE: host=ks-aw-01; image=`sha256:4ba4ab3fd818e940eadb714ab42677c0c0c7c4a2872ae52da28dc7c20a1f5286`; produce=9/9; score=exit 0; report=/tmp/p2-baseline/report/eval-report.md; no code change.
 ## 2026-09-29（續9）WC-P2-09b part 2：無成本期末證據與計畫回填
 - [決策] 依 handoff：先完成無成本 ①／⑦／⑧；② dossier_brief 與③ 9-case baseline 暫不執行，因兩者會產生付費模型用量，且 handoff 要求在「等等」後重新確認。
 - P2_DOD_1: PASS — WORKLOG 2026-09-29（續8）已證明 prod `73b9ac8f8`、deploy.sh TEST GATE PASS、api/web healthy、公開 `/api/health` PASS、live smoke PASS。
