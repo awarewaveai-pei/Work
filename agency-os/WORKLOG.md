@@ -18,7 +18,7 @@
 - [部署] ff-only＋`deploy.sh`：測試關卡 a4d992435..73b9ac8f8 34 模組 681 tests OK（skipped=1）＋eval 71 OK＋mutate 2/2＋golden → TEST GATE PASS；web 14 檔 106 passed；api 0 s／web 6 s healthy；本機兩項＋公開 `/api/health` PASS；`.green-sha` = 73b9ac8f8。
 - [事件] SSH 在測試關卡中途被主機重置（約 20 分鐘無輸出）；主機上的 deploy.sh 沒中斷、照常跑完。下次長時間步驟用 `-o ServerAliveInterval=15`。輪詢用的 `pgrep -f "deploy/deploy.sh"` 會比對到自己的 ssh 指令列，一直回 RUNNING（部署其實 04:02:23Z 已完成）；改看 deploy.log 的 `done`／`notify` 行。
 - [上線後] `live_check3.sh`：公開 14 路徑＋示範專案 `可複選`／`填入建議（之後可改）`＋`/projects/x` 前端程式含「現在重跑並比較」、分析頁含 `cos:prefill:`；無 cookie 307→/login；無 session `GET /api/projects/x/analyses`、`POST …/tasks/T/notes` 皆 401。三庫列數與部署前完全相同（identity 4、session 32、ai_usage 11、platform_projects 8、prov_sources 18、events 71、project_interpretations 6），integrity ok。
-- [清理] 驗證完刪本次備份與試跑樹（2534 檔／38M）。主機另有 `/home/ubuntu/cos-predeploy-20260928T164627Z`（非本 session 建立，未動）。
+- [清理] 驗證完刪本次備份與試跑樹（2534 檔／38M）。主機另有 `/home/ubuntu/cos-predeploy-20260928T164627Z`（部署 1 前的正式資料備份＋試跑樹，2543 檔／38M，含 identity.sqlite3；研究線 session 確認非其所建）→ 操作者「刪」→ 已刪，主機 `cos-predeploy-*` 剩 0。
 - [未驗] 正式站登入後的新畫面（正式站測試身分仍待操作者建）；同一份碼本機 Chromium 桌機／手機已看過（續7）。
 - 回滾：主機 `docker tag cognitive-os-api:rollback cognitive-os-api:latest`、`docker tag cognitive-os-web:rollback cognitive-os-web:latest`，再 `docker compose -f Projects/internal/cognitive-engineering-os/docker-compose.yml up -d`，並把 `.green-sha` 改回 a4d992435。1.4.0 契約是 additive，舊版讀新資料不會壞。
 - REALTEST_EVIDENCE: tool=SSH | cmd=cos_predeploy_trial3.sh（TRIAL PASS）＋deploy.sh（TEST GATE PASS 681＋71、web 106、healthy、smoke PASS）＋live_check3.sh（exit 0）＋cos_live_counts.sh（列數相同） | exit=0 | ms=1681000
