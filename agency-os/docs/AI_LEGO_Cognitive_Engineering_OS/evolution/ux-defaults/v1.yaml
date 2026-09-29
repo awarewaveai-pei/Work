@@ -1,0 +1,5 @@
+kind: ux-defaults
+version: v1
+set_by: operator
+route:
+  free_layer_min_confidence: 0.5

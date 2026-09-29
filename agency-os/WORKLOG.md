@@ -1,4 +1,9 @@
 ﻿# Worklog
+## 2026-09-29（續12）route.method P3-01
+- [REALTEST] `python -m unittest tests.unit.test_route_method tests.unit.test_evolution_registry -q` → 51/51 OK; `python tests/run_golden_tests.py` → 4257/4257 PASS; `gen_spec_index.py --check` PASS; py_compile PASS.
+- [REVIEW] 免費 catalog routing follows StuckBox term split/order; AI output is catalog-bound, max 3, citation-gated, and production ux-defaults champion is intentionally not promoted by this card.
+- [BUGHUNT] Hallucinated IDs are removed and `methods_resolvable` FAILs with repaired-id evidence; missing provider returns `needs_ai:true`; threshold is read from temporary champion in tests.
+- [DOD] Added `route_method.py`, 10 unit tests, method-route typed object, DRAFT capability contract, ux-defaults v1, and regenerated spec index. Endpoint/homepage wiring remains website-line scope.
 ## 2026-09-29（續11）WC-P2-08：interpret/report 共用 citation integrity gate
 
 - P2_DOD_8: PASS — `interpret_method_record.evaluate_interpretation_gates` 改呼叫共用 `gates.evaluate_citation_integrity`，保留 interpret 專屬 `unstated_numbers`、visual、next_methods、detail gates；`report_render._collect_citations` 改走共用 `iter_claims`。recommendations schema 的 citations 加 `minItems: 1`，不放寬 P-b。

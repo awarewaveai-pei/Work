@@ -1,0 +1,31 @@
+$id: ai-lego://capabilities/contracts/route.method.capability.yaml
+title: route.method -- Catalog-first method and recipe routing
+status: DRAFT
+description: >
+  Routes first-use text to up to three existing catalog methods or recipes. The
+  deterministic free layer runs first; the AI layer is used only below the
+  operator-owned ux-defaults threshold. Every AI rationale cites a catalog id,
+  and the output is checked for resolvability, citation integrity, and the
+  three-item limit. This is a side-effect-free capability contract; endpoint
+  and homepage wiring are intentionally outside this draft.
+source_of_truth_for:
+  - RESEARCH_LINES_MASTER_PLAN.md WC-P3-01
+decided_by: P3 WC-P3-01
+id: route.method
+version: 1.0.0
+input:
+  type: [HumanBrief]
+output:
+  type: [MethodRoute]
+preconditions:
+  - text is a non-empty string
+  - every catalog entry is loaded through the display catalog
+quality:
+  provenance_required: false
+  method_specific_gate_required: true
+security:
+  external_ai: policy_controlled
+rollback:
+  side_effect_free_preferred: true
+verification:
+  method: tests/unit/test_route_method.py and schema golden validation
