@@ -26,6 +26,7 @@ from typing import Any
 
 from ai_lego.core.support import canonical_json
 from ai_lego.errors import InvariantViolation
+from ai_lego.modules.research.gates import iter_claims
 
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 
@@ -83,27 +84,21 @@ def _collect_citations(node: Any, order: list[str], seen: set[str], malformed: l
     a candidate citation -- stringified into ``malformed`` and ALWAYS treated as unresolvable, even
     on the (coincidental) chance its string form happens to equal a real manifest id.
     """
-    if isinstance(node, dict):
-        if "citations" in node:
-            citations = node["citations"]
-            if isinstance(citations, list) and not citations:
-                if "[]" not in malformed:  # P-b: a citations key holds a NON-empty list
-                    malformed.append("[]")
-            elif isinstance(citations, list):
-                for cid in citations:
-                    if isinstance(cid, str):
-                        if cid not in seen:
-                            seen.add(cid)
-                            order.append(cid)
-                    elif str(cid) not in malformed:
-                        malformed.append(str(cid))
-            elif str(citations) not in malformed:  # null counts: P-b says a citations key holds a non-empty list
-                malformed.append(str(citations))
-        for value in node.values():
-            _collect_citations(value, order, seen, malformed)
-    elif isinstance(node, list):
-        for item in node:
-            _collect_citations(item, order, seen, malformed)
+    for _, claim, _ in iter_claims(node):
+        citations = claim["citations"]
+        if isinstance(citations, list) and not citations:
+            if "[]" not in malformed:  # P-b: a citations key holds a NON-empty list
+                malformed.append("[]")
+        elif isinstance(citations, list):
+            for cid in citations:
+                if isinstance(cid, str):
+                    if cid not in seen:
+                        seen.add(cid)
+                        order.append(cid)
+                elif str(cid) not in malformed:
+                    malformed.append(str(cid))
+        elif str(citations) not in malformed:  # null counts: P-b says a citations key holds a non-empty list
+            malformed.append(str(citations))
 
 
 def _citation_marks(citations: Any, resolvable_by_id: dict[str, dict[str, Any]]) -> str:

@@ -17,6 +17,7 @@ from ai_lego.core.support import canonical_json
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gateway.draft import extract_json_object
 from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS, ProviderCallError
+from ai_lego.modules.research.gates import evaluate_citation_integrity
 
 INTERPRETATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
 INTERPRETATION_SCHEMA_FILE = Path("specs") / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml"
@@ -860,8 +861,9 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
     unstated = {str(finding.get("id")): missing for finding in interpretation.get("findings", []) if isinstance(finding, Mapping)
                 for missing in [[n for text in (str(finding.get("title", "")), str(finding.get("text", "")), reason(finding)) for n in _numbers(text) if n not in in_record]] if missing}
     claims = [c for c in interpretation.get("findings", []) if isinstance(c, Mapping)] + [r for r in interpretation.get("recommendations", []) if isinstance(r, Mapping) and r.get("action")]
+    shared_citation_gate = evaluate_citation_integrity(interpretation, manifest_ids)
     cited = [c for c in claims if isinstance(c.get("citations"), list) and c["citations"] and all(isinstance(x, str) and x in manifest_ids for x in c["citations"])]
-    citation_ok = bool(interpretation.get("findings")) and bool(citations) and all(c in manifest_ids for c in citations) and not unstated and len(cited) == len(claims)
+    citation_ok = bool(interpretation.get("findings")) and shared_citation_gate["status"] == "PASS" and not unstated
     visual = interpretation.get("visual")
     bindings = visual.get("bindings", {}) if isinstance(visual, Mapping) else {}
     is_layered = isinstance(visual, Mapping) and visual.get("kind") == "layered"
@@ -891,7 +893,7 @@ def evaluate_interpretation_gates(interpretation: Mapping[str, Any], record: Map
                 next_ok = False
                 break
     return [
-        {"gate_id": "citation_integrity", "status": "PASS" if citation_ok else "FAIL", "evidence": {"citations": citations, "manifest_count": len(manifest), "unstated_numbers": unstated, "claims": len(claims), "cited": len(cited), "unsupported": len(claims) - len(cited)}},
+        {"gate_id": "citation_integrity", "status": "PASS" if citation_ok else "FAIL", "evidence": {**shared_citation_gate["evidence"], "citations": citations, "manifest_count": len(manifest), "unstated_numbers": unstated, "claims": len(claims), "cited": len(cited), "unsupported": len(claims) - len(cited)}},
         {"gate_id": "visual_bindings_resolvable", "status": "PASS" if visual_ok else "FAIL", "evidence": {"paths": binding_paths}},
         {"gate_id": "next_methods_resolvable", "status": "PASS" if next_ok else "FAIL", "evidence": {"next_methods": next_methods}},
         {"gate_id": "detail_integrity", "status": "PASS" if not detail else "FAIL", "evidence": {"problems": detail}},

@@ -654,6 +654,17 @@ class GateGrainTests(unittest.TestCase):
         gate = result["gate_results"][0]["evidence"]
         self.assertEqual((gate["claims"], gate["unsupported"]), (2, 0))
 
+    def test_citation_gate_covers_every_nested_citations_object(self):
+        interpretation = {
+            "findings": [{"id": "F1", "citations": ["r/events/0"]}],
+            "diagnosis": {"title": "x", "text": "x", "citations": []},
+            "visual": {"bindings": {}},
+            "next_methods": [],
+        }
+        result = evaluate_interpretation_gates(interpretation, DETAIL_RECORD, self.manifest, set())
+        self.assertEqual(result[0]["status"], "FAIL")
+        self.assertIn("$.diagnosis", [item["path"] for item in result[0]["evidence"]["zero_citation"]])
+
     def test_a_root_key_the_contract_does_not_have_is_left_out(self):
         result = run_detail(FakeProvider([detailed_response(revision_conditions=[{"text": "x", "would_change": "y"}])]), "INTERP-GRAIN-009")
         self.assertIsNone(result["error"])
