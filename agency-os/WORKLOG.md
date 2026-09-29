@@ -1,4 +1,10 @@
 ﻿# Worklog
+## 2026-09-29（續11）WC-P2-08：interpret/report 共用 citation integrity gate
+
+- P2_DOD_8: PASS — `interpret_method_record.evaluate_interpretation_gates` 改呼叫共用 `gates.evaluate_citation_integrity`，保留 interpret 專屬 `unstated_numbers`、visual、next_methods、detail gates；`report_render._collect_citations` 改走共用 `iter_claims`。recommendations schema 的 citations 加 `minItems: 1`，不放寬 P-b。
+- REALTEST_EVIDENCE: `python -m py_compile` 目標 Python 檔 PASS；定向 `test_interpret_method_record`＋`test_api_interpret`＋`test_report_render` = 147 OK；gate/report regression = 55 OK；golden = 4255 PASS；`gen_spec_index.py --check` = fresh；`git diff --check` PASS。
+- MUTATION_SENTINEL: 新增 nested `diagnosis.citations=[]` 案，證明移除共用 gate 會漏過結構欄位而測試變紅；既有 `unstated_numbers` 測試證明 interpret 專屬數字閘仍保留。
+- COMMIT: `b024d6474` pushed to `origin/main`; changed files=4; no executor、endpoint、deploy 或 production config 修改。
 ## 2026-09-29（續10）WC-P2-09b part 2：paid baseline 完成與 dossier blocker
 
 - P2_DOD_2: BLOCKED — prod `platform_projects` 查詢未找到 operator project `1c749cbf-7f53-43e1-a152-3d27b0d7c123`（目前列出的 8 個 project 均不符）；未建立替代 project、未發出猜測性 synthesis request。阻塞點是 live state 缺少 handoff 指定資源。
