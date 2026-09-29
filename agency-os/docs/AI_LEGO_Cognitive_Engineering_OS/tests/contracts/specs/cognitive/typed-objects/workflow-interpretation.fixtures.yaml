@@ -1,0 +1,40 @@
+schema_id: ai-lego://specs/cognitive/typed-objects/workflow-interpretation.schema.yaml
+target_ref: ""
+description: WorkflowInterpretation judgment ownership and nullable solution guards.
+valid:
+  - name: two_station_summary
+    instance:
+      workflow_id: WF-1
+      run_or_chain_id: RUN-1
+      interpretation_id: WFI-1
+      stations:
+        - {station_index: 0, method_id: systems.iceberg_model, interpretation_id: INTERP-1, one_liner: "站一", confidence: high, judgment: {stance: agree, text: "我同意"}}
+        - {station_index: 1, method_id: decision.eisenhower_matrix, interpretation_id: INTERP-2, one_liner: "站二", confidence: low, judgment: null}
+      summary: "跨站摘要"
+      final_recommendation: {text: "先處理急件", citations: [r/urgent]}
+      revision_conditions: [{text: "出現新證據", would_change: "改排優先序"}]
+      solution: null
+      citations_all: [r/visible, r/urgent]
+      usage_total: {input_tokens: 6, output_tokens: 8}
+      model: fake
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      gates:
+        stations_complete: {gate_id: stations_complete, status: PASS, evidence: {}}
+        citation_integrity: {gate_id: citation_integrity, status: PASS, evidence: {}}
+        no_preset_conclusion: {gate_id: no_preset_conclusion, status: PASS, evidence: {}}
+invalid:
+  - name: model_judgment_wrong_stance
+    instance:
+      workflow_id: WF-1
+      run_or_chain_id: RUN-1
+      interpretation_id: WFI-1
+      stations: [{station_index: 0, method_id: systems.iceberg_model, interpretation_id: INTERP-1, one_liner: "站一", confidence: high, judgment: {stance: maybe, text: "x"}}]
+      summary: "摘要"
+      final_recommendation: {text: "建議", citations: []}
+      revision_conditions: []
+      solution: null
+      citations_all: []
+      usage_total: {input_tokens: 0, output_tokens: 0}
+      model: fake
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      gates: {stations_complete: {gate_id: stations_complete, status: FAIL, evidence: {}}, citation_integrity: {gate_id: citation_integrity, status: FAIL, evidence: {}}, no_preset_conclusion: {gate_id: no_preset_conclusion, status: FAIL, evidence: {}}}

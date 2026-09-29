@@ -1,4 +1,9 @@
 ﻿# Worklog
+## 2026-09-30（續1）WorkflowInterpretation P3-03
+- [REALTEST] `python -m unittest tests.unit.test_workflow_interpretation tests.unit.test_route_method tests.unit.test_evolution_registry -q` → 62/62 OK; `python tests/run_golden_tests.py` → 4261/4261 PASS; `gen_spec_index.py --check` PASS; py_compile PASS; real SchemaContracts probe PASS.
+- [REVIEW] New pure module assembles server-owned station metadata, copies human judgment, preserves station citation order, and leaves solution null for P4; no endpoint, executor, interpret, or frontend changes.
+- [BUGHUNT] Cross-station citation test fails if only the last station manifest is used; model judgment is overwritten; forbidden conclusion and zero revision-condition sentinels FAIL; token usage accumulates across two attempts.
+- [DOD] Added `workflow_interpretation.py`, 11 unit tests, typed object schema, valid/invalid fixtures, regenerated spec index, and updated Master Plan progress. Revert commit restores prior P3-03 absence.
 ## 2026-09-29（續12）route.method P3-01
 - [REALTEST] `python -m unittest tests.unit.test_route_method tests.unit.test_evolution_registry -q` → 51/51 OK; `python tests/run_golden_tests.py` → 4257/4257 PASS; `gen_spec_index.py --check` PASS; py_compile PASS.
 - [REVIEW] 免費 catalog routing follows StuckBox term split/order; AI output is catalog-bound, max 3, citation-gated, and production ux-defaults champion is intentionally not promoted by this card.
