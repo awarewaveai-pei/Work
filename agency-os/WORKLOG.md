@@ -1,4 +1,17 @@
 ﻿# Worklog
+## 2026-09-29（續8）Cognitive OS 正式站部署 `73b9ac8f8`：⑦ 五方案複選＋短期／長期計畫、⑧ 只推沒做過的工具、任務卡、專案歷程（續7）
+- [操作者] 「上線」。
+- [範圍] 正式站 `a4d992435`→`73b9ac8f8`，只有續7 一筆；無資料庫結構變更（新事件 TaskNoted、TaskUpdated.status 都寫進既有 events 表）。
+- [備份＋試跑] `cos_predeploy_trial3.sh`：3 庫 SQLite backup API（integrity ok，33 檔）；目標 commit 的樹以副本開庫：列數 0 變動、無新表；8 專案＋18 來源讀回、6 次分析狀態與 GET /interpretations 判讀一致、5 個任務（磁碟上 TaskCreated 5＋舊 TaskDone 21）經新碼讀成四態且 done 與 status 一致、1 個重跑提醒、`/health` ok、`/catalog` 284/12/4 → TRIAL PASS。部署 venv 現只裝 runtime lock（無 httpx），試跑改直接呼叫 `health()`／`display_catalog()`，不用 TestClient。
+- [部署] ff-only＋`deploy.sh`：測試關卡 a4d992435..73b9ac8f8 34 模組 681 tests OK（skipped=1）＋eval 71 OK＋mutate 2/2＋golden → TEST GATE PASS；web 14 檔 106 passed；api 0 s／web 6 s healthy；本機兩項＋公開 `/api/health` PASS；`.green-sha` = 73b9ac8f8。
+- [事件] SSH 在測試關卡中途被主機重置（約 20 分鐘無輸出）；主機上的 deploy.sh 沒中斷、照常跑完。下次長時間步驟用 `-o ServerAliveInterval=15`。輪詢用的 `pgrep -f "deploy/deploy.sh"` 會比對到自己的 ssh 指令列，一直回 RUNNING（部署其實 04:02:23Z 已完成）；改看 deploy.log 的 `done`／`notify` 行。
+- [上線後] `live_check3.sh`：公開 14 路徑＋示範專案 `可複選`／`填入建議（之後可改）`＋`/projects/x` 前端程式含「現在重跑並比較」、分析頁含 `cos:prefill:`；無 cookie 307→/login；無 session `GET /api/projects/x/analyses`、`POST …/tasks/T/notes` 皆 401。三庫列數與部署前完全相同（identity 4、session 32、ai_usage 11、platform_projects 8、prov_sources 18、events 71、project_interpretations 6），integrity ok。
+- [清理] 驗證完刪本次備份與試跑樹（2534 檔／38M）。主機另有 `/home/ubuntu/cos-predeploy-20260928T164627Z`（非本 session 建立，未動）。
+- [未驗] 正式站登入後的新畫面（正式站測試身分仍待操作者建）；同一份碼本機 Chromium 桌機／手機已看過（續7）。
+- 回滾：主機 `docker tag cognitive-os-api:rollback cognitive-os-api:latest`、`docker tag cognitive-os-web:rollback cognitive-os-web:latest`，再 `docker compose -f Projects/internal/cognitive-engineering-os/docker-compose.yml up -d`，並把 `.green-sha` 改回 a4d992435。1.4.0 契約是 additive，舊版讀新資料不會壞。
+- REALTEST_EVIDENCE: tool=SSH | cmd=cos_predeploy_trial3.sh（TRIAL PASS）＋deploy.sh（TEST GATE PASS 681＋71、web 106、healthy、smoke PASS）＋live_check3.sh（exit 0）＋cos_live_counts.sh（列數相同） | exit=0 | ms=1681000
+- REVIEW_WAIVED: NA -- 部署與驗證，無新程式碼（程式已在續7 經 Codex 審查）
+- BUGHUNT_WAIVED: NA -- 無程式改動；部署範圍 `git log a4d992435..73b9ac8f8` 只有一筆
 ## 2026-09-29（續7）Cognitive OS 結果頁與專案頁（操作者逐圖審查）：⑦ 五方案複選＋短期／長期計畫＋填入建議、⑧ 只推還沒做過的工具並開新頁、任務卡（狀態／紀錄／實際數字／調整方案）、專案歷程、現在重跑；契約 1.4.0；未上線
 - [操作者] 八張截圖：⑦ 要 5 個方案可複選；計畫要短期＋長期（月／季／年，專案記歷程）、目標欄看不全、要有「填入建議」可改；⑧ 點進去 0 格且和 ③ 重疊、要開新頁；到期重跑要能隨時按；任務要卡片可記實際狀況與想法、調整方針。回答：計畫「短期＋長期，AI 先建議」；⑧「要推其他推薦工具（還沒做過的）」；任務卡「狀態＋每次紀錄、調整方針／新增方案、實際數字、其他你認為需要的」。
 - [根因] C1 契約 1.3.0 options 最多 3、計畫是一條週次表（schema maxItems 3／6），頁面只存一個選擇（M-76 的 chosenOption）。C2 ⑧ 的帶入只對「你填的格子」同名欄位；③ 已畫的迴路／趨勢／四層槓桿就是因果回饋圖／行為圖／槓桿點分析要的資料，模型卻一再推薦它們（沒有任何地方告訴它 ③ 已畫出、這個專案做過什麼）。C3 ⑧ 用 sessionStorage 交接帶入，開新分頁拿不到。C4 表格 `td:first-child{white-space:nowrap}`＋無固定欄寬，最後一欄被擠出卡片。C5 任務只有 TaskDone 勾選，沒有紀錄事件；重跑只能等提醒到期。
