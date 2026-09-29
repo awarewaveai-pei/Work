@@ -68,6 +68,29 @@ valid:
         reading: "人數一路掉"
         series:
           - {name: "主動分享", unit: "人", points: [{label: "第 1 次", value: 6, citation: "r/events/0"}, {label: "第 6 次", value: 2, citation: "r/events/0"}]}
+  - name: five_options_short_and_long_plan_1_4_0
+    instance:
+      interpretation_id: "INTERP-2026-09-29-001"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      solutions:
+        options:
+          - {name: "鼓勵", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "改流程", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "改紀錄表", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "改角色", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "改訓練", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+        first_step: "下次先讓參與者說 3 分鐘。"
+        long_horizon: quarter
+        plan:
+          - {when: "第 1 週", action: "試行新順序", owner: "帶領者", proof: "紀錄", target: "不低於上次", phase: short, options: ["改流程"]}
+          - {when: "第 2 季", action: "改訓練教材", owner: "訓練負責人", proof: "新教材", target: "定稿", phase: long, options: ["改角色", "改訓練"]}
 invalid:
   - name: findings_empty
     instance:
@@ -133,7 +156,65 @@ invalid:
         options:
           - {name: "甲", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
         first_step: "x"
-    reason: "solutions.options compares two or three paths (minItems: 2)"
+    reason: "solutions.options compares two to five paths (minItems: 2)"
+  - name: solutions_with_six_options
+    instance:
+      interpretation_id: "INTERP-2026-09-29-002"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      solutions:
+        options:
+          - {name: "一", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "二", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "三", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "四", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "五", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "六", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+        first_step: "x"
+    reason: "at most five options (maxItems: 5)"
+  - name: plan_phase_outside_enum
+    instance:
+      interpretation_id: "INTERP-2026-09-29-003"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      solutions:
+        options:
+          - {name: "甲", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "乙", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+        first_step: "x"
+        plan:
+          - {when: "第 1 週", action: "x", owner: "x", proof: "x", target: "x", phase: soon}
+    reason: "plan.phase is short or long"
+  - name: long_horizon_outside_enum
+    instance:
+      interpretation_id: "INTERP-2026-09-29-004"
+      method_id: "systems.iceberg_model"
+      record_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      findings: [{id: "F1", title: "x", text: "x", citations: ["r/events/0"], confidence: {level: mid, reason: "x"}}]
+      visual: {kind: layered, bindings: {levels: [{label: "事件", path: "r/events"}]}}
+      next_methods: []
+      provenance: {epistemic_type: AI_INFERENCE, authorship_state: AI_GENERATED, locked: null}
+      model: "test-model"
+      usage: {input_tokens: 10, output_tokens: 20}
+      solutions:
+        options:
+          - {name: "甲", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+          - {name: "乙", what: "x", takes: "x", cost: "x", durability: "x", risk: "x", advice: "x", paths: []}
+        first_step: "x"
+        long_horizon: decade
+    reason: "long_horizon is month, quarter or year"
   - name: trend_point_value_is_text
     instance:
       interpretation_id: "INTERP-2026-09-26-013"

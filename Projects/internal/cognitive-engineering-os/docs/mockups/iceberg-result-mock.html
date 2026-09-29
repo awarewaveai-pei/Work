@@ -242,9 +242,23 @@
   .mb12{margin-bottom:12px}
   .my6{margin:6px 0}
   .scroll-x{overflow-x:auto}
+  table.plan{table-layout:fixed;width:100%}   /* ⑦ B: every column fits the card; long text wraps, never cut */
+  table.plan th:nth-child(1){width:10%}table.plan th:nth-child(2){width:11%}table.plan th:nth-child(3){width:25%}table.plan th:nth-child(4),table.plan th:nth-child(5){width:13%}table.plan th:nth-child(6),table.plan th:nth-child(7){width:14%}
+  table.plan td,table.plan td:first-child{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+  table.plan input{width:100%;box-sizing:border-box;font:inherit}
+  table.plan tr.group td{background:var(--soft);font-weight:700}
   .warn{color:var(--warn)}
   .card.accent{border-left:6px solid var(--accent)}
   .card.okline{border-left:6px solid var(--ok)}
+  /* == task cards (任務卡): one per task, a child indented under its parent; a journal entry inside == */
+  .tasks{display:grid;grid-template-columns:1fr;gap:12px}
+  .tcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .tcard.child{margin-left:24px;border-left:3px solid var(--accent)}
+  .tcard .head{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;justify-content:space-between}
+  .tcard .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin:4px 0}
+  .tnotes{display:grid;grid-template-columns:1fr;gap:8px}
+  .tnote{border-top:1px dashed var(--line);padding-top:6px;font-size:13px}
+  .tnote b{color:var(--accent);margin-right:4px}
   /* == shared design system: end == */
   /* == page-specific == */
 </style>
@@ -608,34 +622,41 @@
     <p class="sub mt8 mb0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>
   </div>
 
-  <!-- 4.5 解決方案：從分析到行動 -->
+  <!-- 4.5 解決方案：從分析到行動（2026-09-29 操作者：五個方案可複選；短期＋長期；填入建議後可改） -->
   <div class="card okline" id="solution" data-when="result">
     <h2>⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）</h2>
-    <div class="how"><b>怎麼讀</b>A 選一條路、B 排成 90 天、C 三個數字盯著。<b>你要做的</b>選方案、填負責人和期限、確認目標數字。</div>
+    <div class="how"><b>怎麼讀</b>A 選方案（可複選）、B 短期一個月＋長期一季、C 三個數字盯著。<b>你要做的</b>選方案、按「填入建議」再改，存成任務。</div>
 
-    <h3 class="mt6 mb8">A. 選方案：三條路比一比</h3>
+    <h3 class="mt6 mb8">A. 選方案：五條路比一比（可複選）</h3>
     <div class="scroll-x">
     <table>
       <tr><th>方案</th><th>做什麼</th><th>見效</th><th>成本</th><th>持久度</th><th>風險</th><th>建議</th></tr>
-      <tr><td>甲 只多鼓勵</td><td>開場鼓勵、輪流點名說（第 1 層）</td><td>當次</td><td>低</td><td>低，下次又安靜</td><td>被點到的人更退縮</td><td>只當急救</td></tr>
-      <tr><td>乙 改流程</td><td>參與者先說；帶領者解讀之後才講並標為影響來源；紀錄表改量過程（第 3 層）</td><td>1 期（6 次）</td><td>中（重寫流程與紀錄表）</td><td>高</td><td>下一期帶領者又回到先講</td><td>先做</td></tr>
-      <tr><td>丙 改流程＋改角色</td><td>乙 ＋ 帶領者訓練與框架契約寫明「參與者是最終判斷者；帶領者與框架都在影響來源清單上」（第 3、4 層）</td><td>2 期</td><td>中</td><td>最高</td><td>帶領者團隊不認同</td><td><b>建議：乙先動，丙用乙的數字去談</b></td></tr>
+      <tr><td>甲 只多鼓勵<br><button type="button" class="btn mt4" aria-pressed="false">選這條</button></td><td>開場鼓勵、輪流點名說（第 1 層）</td><td>當次</td><td>低</td><td>低，下次又安靜</td><td>被點到的人更退縮</td><td>只當急救</td></tr>
+      <tr><td>乙 改流程<br><button type="button" class="btn mt4" aria-pressed="true">已選 ✓</button></td><td>參與者先說；帶領者解讀之後才講並標為影響來源（第 3 層）</td><td>1 期（6 次）</td><td>中</td><td>高</td><td>下一期帶領者又回到先講</td><td><b>先做</b></td></tr>
+      <tr><td>丙 改紀錄表<br><button type="button" class="btn mt4" aria-pressed="false">選這條</button></td><td>紀錄表改三欄：自己的判斷／影響來源／什麼證據會改變判斷（第 3 層）</td><td>下一次</td><td>低</td><td>中，要有人看</td><td>填了但沒人看</td><td>跟乙一起做</td></tr>
+      <tr><td>丁 改帶領者角色<br><button type="button" class="btn mt4" aria-pressed="true">已選 ✓</button></td><td>框架契約寫明「參與者是最終判斷者；帶領者也在影響來源清單上」（第 4 層）</td><td>2 期</td><td>中</td><td>最高</td><td>帶領者團隊不認同</td><td>用乙的數字去談</td></tr>
+      <tr><td>戊 改訓練教材<br><button type="button" class="btn mt4" aria-pressed="false">選這條</button></td><td>訓練從「怎麼解讀作品」改成「怎麼讓人自己看見」（第 4 層）</td><td>數月</td><td>中高</td><td>高</td><td>教材改了、帶法沒改</td><td>丁談定後再做</td></tr>
     </table>
     </div>
 
     <div class="finding mt12"><b>如果只做一件事，明天就做</b>下次 session 開始前跟帶領者約定：參與者先說 3 分鐘，帶領者的話後說。不用預算、不用誰點頭，也正好是乙的第一環。</div>
-    <h3 class="mt14 mb8">B. 90 天行動計畫（AI 起草；負責人與期限請你確認）</h3>
+    <h3 class="mt14 mb8">B. 行動計畫：短期一個月＋長期一季（AI 起草；負責人、期限、目標由你定）</h3>
+    <div class="btns mb8"><span class="sub">長期要看多久：</span><button type="button" class="btn" aria-pressed="false">一月</button><button type="button" class="btn" aria-pressed="true">一季（AI 建議）</button><button type="button" class="btn" aria-pressed="false">一年</button><button type="button" class="btn" data-mock="正式版把每一列的負責人、期限、目標填成 AI 的建議；每一格都還能改，改好才存成任務。">填入建議（之後可改）</button></div>
     <div class="scroll-x">
-    <table>
-      <tr><th>週</th><th>行動</th><th>負責<span class="sub">（待確認）</span></th><th>怎麼證明有效</th><th>目標<span class="sub">（待你確認）</span></th></tr>
-      <tr><td>1 到 2</td><td>補齊三項缺的數據：每次帶領者說明分鐘數、每人主動發言次數、參與者匿名一句話「為什麼沒說」</td><td>帶領者</td><td>三項數據有基準值</td><td>第 2 週前齊全</td></tr>
-      <tr><td>3 到 4</td><td>改流程順序；紀錄表改成三欄（自己的判斷／影響來源／什麼證據會改變判斷）</td><td>帶領者＋課程設計</td><td>新流程與新紀錄表上線</td><td>第 4 週上線</td></tr>
-      <tr><td>5 到 10</td><td>新一期團體用新流程跑完 6 次</td><td>帶領者</td><td>主動分享人數、說明分鐘數</td><td>第 6 次 ≥ 6 人、說明 ≤ 15 分</td></tr>
-      <tr><td>11 到 12</td><td>用第 5 到 10 週的數字，跟帶領者團隊談角色定義，寫進訓練教材與框架契約</td><td>課程負責人</td><td>訓練教材與契約改版</td><td>第 12 週前定稿</td></tr>
-      <tr><td>13</td><td>用新資料重跑本分析，比較前後</td><td>你＋系統提醒</td><td>下方三個指標</td><td>見 C</td></tr>
+    <table class="plan">
+      <tr><th>時間</th><th>方案</th><th>行動</th><th>負責人</th><th>期限</th><th>怎麼證明有效</th><th>目標</th></tr>
+      <tr class="group"><td colspan="7">短期：第一個月（每週一步）</td></tr>
+      <tr><td>第 1 週</td><td>乙 改流程</td><td>試行新順序：參與者先說 3 分鐘，帶領者後說</td><td><input aria-label="負責人：試行新順序：參與者先說 3 分鐘，帶領者後說" placeholder="建議：帶領者" value="帶領者"></td><td><input aria-label="期限：試行新順序：參與者先說 3 分鐘，帶領者後說" type="date" value="2026-10-06"></td><td>該次紀錄與觀察筆記</td><td><input aria-label="目標：試行新順序：參與者先說 3 分鐘，帶領者後說" placeholder="建議：分享人數不低於上次" value="分享人數不低於上次"></td></tr>
+      <tr><td>第 2 到 4 週</td><td>乙 改流程</td><td>每次記下主動分享人數與帶領者說明分鐘數</td><td><input aria-label="負責人：每次記下主動分享人數與帶領者說明分鐘數" placeholder="建議：帶領者" value="帶領者"></td><td><input aria-label="期限：每次記下主動分享人數與帶領者說明分鐘數" type="date" value="2026-10-27"></td><td>逐次的兩個數字</td><td><input aria-label="目標：每次記下主動分享人數與帶領者說明分鐘數" placeholder="建議：每次都有數字" value="每次都有數字"></td></tr>
+      <tr class="group"><td colspan="7">長期：之後一季</td></tr>
+      <tr><td>第 1 季（第 3 個月）</td><td>丁 改帶領者角色</td><td>用一個月的數字跟帶領者團隊談角色，寫進框架契約</td><td><input aria-label="負責人：用一個月的數字跟帶領者團隊談角色，寫進框架契約" placeholder="建議：課程負責人" value="課程負責人"></td><td><input aria-label="期限：用一個月的數字跟帶領者團隊談角色，寫進框架契約" type="date" value="2026-12-29"></td><td>契約改版</td><td><input aria-label="目標：用一個月的數字跟帶領者團隊談角色，寫進框架契約" placeholder="建議：第 1 季內定稿" value="第 1 季內定稿"></td></tr>
+      <tr><td>第 2 季（第 4 個月）</td><td>丁 改帶領者角色</td><td>新契約跑完一期，檢查主動分享人數</td><td><input aria-label="負責人：新契約跑完一期，檢查主動分享人數" placeholder="建議：專案負責人" value="專案負責人"></td><td><input aria-label="期限：新契約跑完一期，檢查主動分享人數" type="date" value="2027-01-29"></td><td>逐次比較表</td><td><input aria-label="目標：新契約跑完一期，檢查主動分享人數" placeholder="建議：第 6 次 ≥ 6 人" value="第 6 次 ≥ 6 人"></td></tr>
+      <tr class="group"><td colspan="7">追蹤：C 的指標</td></tr>
+      <tr><td>第 2 季（第 4 個月）</td><td>共用</td><td>追蹤：主動分享人數（8 人團體）</td><td><input aria-label="負責人：追蹤：主動分享人數（8 人團體）" placeholder="建議：專案負責人" value="專案負責人"></td><td><input aria-label="期限：追蹤：主動分享人數（8 人團體）" type="date" value="2027-01-29"></td><td>主動分享人數（8 人團體）</td><td><input aria-label="目標：追蹤：主動分享人數（8 人團體）" placeholder="建議：6 人" value="6 人"></td></tr>
+      <tr><td>第 2 季（第 4 個月）</td><td>全部</td><td>用新資料重跑本分析，比較前後（同一個專案）</td><td>你＋系統提醒</td><td>—</td><td>上面三個指標</td><td>見 C</td></tr>
     </table>
     </div>
-    <p class="sub mt6 mb0">需要誰點頭：帶領者團隊（角色定義）、課程設計（紀錄表）。這兩個沒點頭，乙做得成、丙做不成。</p>
+    <p class="sub mt6 mb0">需要誰點頭：帶領者團隊（角色定義）、課程設計（紀錄表）。這兩個沒點頭，乙做得成、丁做不成。</p>
 
     <h3 class="mt14 mb8">C. 追蹤驗證：三個指標，90 天後重跑並比較</h3>
     <div class="kpis">
@@ -644,57 +665,49 @@
       <div class="kpi"><b>影響來源清單含帶領者本身</b><span class="now">現在 未量測</span><span class="goal">每次 100%（待你確認）</span><span class="when">第 4 週起</span></div>
     </div>
     <div class="btns mt10">
-      <button type="button" class="btn primary" data-mock="正式版把行動計畫存成任務：負責人和期限要你填，到期會提醒你。">把行動計畫存成任務，設提醒</button>
-      <button type="button" class="btn" data-mock="正式版排一個 90 天後的提醒：到期時你帶新資料重跑這一頁，跑完和這次並排比較。">90 天後重跑本分析並比較</button>
+      <button type="button" class="btn primary" data-mock="正式版把上面每一列存成專案裡的任務卡：負責人、期限、目標是你填的；每張卡都能寫紀錄、記實際數字、調整方案。">把行動計畫存成任務，設提醒</button>
+      <button type="button" class="btn" data-mock="正式版排一個 90 天後的提醒：到期時你帶新資料重跑這一頁（同一個專案），跑完和這次並排比較。">90 天後重跑本分析並比較</button>
       <button type="button" class="btn" data-mock="正式版到期時問你改善了沒：改善了就記進案例庫，沒有就回到方案 A 重選。">改善了就記進案例庫；沒改善回到 A 重選</button>
     </div>
     <p class="sub mt8 mb0">工具負責想清楚、排出來、盯著看；動手做事的是人。到期時系統提醒你用新資料重跑這一頁、把前後放在一起比較；目標數字由你定，AI 不替你定。</p>
   </div>
 
-  <!-- 5. 下一步 -->
+  <!-- 5. 下一步（2026-09-29 操作者：③ 已經畫出的圖不再推薦；只推還沒做過的工具；開新頁） -->
   <div class="card" data-when="result">
     <h2>⑧ 下一步：你在這條路的哪裡、接著做什麼</h2>
     <div class="how"><b>怎麼讀</b>旅程列是你在哪；每張卡寫做了會得到什麼、要你再填什麼。<b>你要做的</b>選一張，或都不選。</div>
     <div class="journey">
       <span class="done">✓ 冰山模型：問題在第 3 層、根在第 4 層</span><i>→</i>
-      <span class="mcard">下一步：槓桿點分析（算每個出手點的力道）</span><i>→</i>
-      <span>之後：五個為什麼（驗證根因）</span><i>→</i>
+      <span class="mcard">下一步：五個為什麼（驗證根因）</span><i>→</i>
+      <span>之後：RACI 責任矩陣（誰改流程）</span><i>→</i>
       <span>最後：⑦ 解決方案定案與追蹤</span>
     </div>
-    <p class="lead mt6 mb0">你已經知道問題在第 3 層的迴路、根在第 4 層的信念。<b>最值得的下一步是算出三個出手點的力道</b>，因為 ⑦ 的甲乙丙現在只有排序、沒有數字。<b>不做下一步也可以</b>：⑦ 的方案已經能用，差別是有沒有數字撐它。</p>
+    <p class="lead mt6 mb0">你已經知道問題在第 3 層、根在第 4 層。<b>最值得的下一步是「五個為什麼」，因為第 4 層的信念是推論出來的，還沒被驗證</b>。<b>不做下一步也可以</b>：⑦ 的方案已經能用。</p>
 
     <div class="mcards">
       <div class="mcard now">
-        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.leverage_point_analysis">槓桿點分析</a></b><span class="tag">本工具建議的下一步</span></div>
-        <div><span class="k">回答什麼：</span>三個出手點（開場鼓勵／改流程順序／改帶領者角色）各自的力道與代價。</div>
-        <div><span class="k">帶入什麼：</span>你的四段輸入 <cite>[1]</cite>–<cite>[4]</cite> 與本次 3 個發現 → 自動填 5 個欄位；<span class="need">還要你填 1 個</span>：每個出手點你估的「改變難度」（1–5）。</div>
-        <div><span class="k">會得到：</span>槓桿表（出手點 × 難度 × 效果 × 持久），⑦ 的方案表自動更新。</div>
-        <div class="k">約 2 分鐘・約 NT$1</div>
-        <div class="btns"><button type="button" class="btn primary" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
-      </div>
-      <div class="mcard">
-        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.causal_loop_diagram">因果回饋圖</a></b></div>
-        <div><span class="k">回答什麼：</span>等答案迴路有沒有漏掉的環節、有沒有第二條迴路。</div>
-        <div><span class="k">帶入什麼：</span>第 3 層你填的 <cite>[3]</cite> 與發現 2 → 自動填 4 個節點；<span class="need">還要你填 0 個</span>。</div>
-        <div><span class="k">會得到：</span>正式的迴路圖（節點、箭頭、R／B 標記），取代圖 B 的示意。</div>
-        <div class="k">約 1 分鐘・約 NT$0.5</div>
-        <div class="btns"><button type="button" class="btn" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
-      </div>
-      <div class="mcard">
-        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.behavior_over_time">隨時間變化行為圖</a></b></div>
-        <div><span class="k">回答什麼：</span>分享人數與說明分鐘數六次的走勢，是不是真的在變。</div>
-        <div><span class="k">帶入什麼：</span><cite>[1]</cite><cite>[2]</cite> 的數字 → 自動建 2 條序列；<span class="need">還要你填 12 格</span>：六次 session 的實際數字（現在只有示意）。</div>
-        <div><span class="k">會得到：</span>正式的趨勢圖（取代圖 A）＋「同步不等於因果」的檢查。</div>
-        <div class="k">約 3 分鐘（要填數字）・約 NT$0.5</div>
-        <div class="btns"><button type="button" class="btn" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
-      </div>
-      <div class="mcard">
-        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-root_cause.five_whys">五個為什麼</a></b></div>
+        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-root_cause.five_whys">五個為什麼</a></b><span class="tag">本工具建議的下一步</span></div>
         <div><span class="k">回答什麼：</span>「參與者需要專家幫他們看見意義」再往下問五次為什麼，是不是真的根因。</div>
-        <div><span class="k">帶入什麼：</span>第 4 層 <cite>[4]</cite> 與發現 3 → 自動填第一個「為什麼」；<span class="need">還要你填 4 個</span>：後面的回答（可讓 AI 起草，你改）。</div>
+        <div><span class="k">帶入什麼：</span>你填的心智模型 <cite>[4]</cite> → 自動填 1 個欄位；<span class="need">還要你填 1 個</span>：後面的回答（可讓 AI 起草，你改）。</div>
         <div><span class="k">會得到：</span>根因鏈＋每一層的證據缺口。</div>
         <div class="k">約 3 分鐘・約 NT$1</div>
-        <div class="btns"><button type="button" class="btn" data-mock="正式版用這次的資料開始這個工具：能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，由工具資料產生；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課</button></div>
+        <div class="btns"><button type="button" class="btn primary" data-mock="正式版在新分頁開這個工具：這次能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始 ↗</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，在新分頁開；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課 ↗</button></div>
+      </div>
+      <div class="mcard">
+        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-stakeholders.raci">RACI 責任矩陣</a></b></div>
+        <div><span class="k">回答什麼：</span>改流程、改紀錄表、改角色，各由誰執行、誰拍板、誰要被告知。</div>
+        <div><span class="k">帶入什麼：</span>⑦ 的行動 → 自動填 2 個欄位；<span class="need">還要你填 1 個</span>：每一項的負責人。</div>
+        <div><span class="k">會得到：</span>一張責任表，⑦ 的負責人有依據。</div>
+        <div class="k">約 2 分鐘・約 NT$1</div>
+        <div class="btns"><button type="button" class="btn" data-mock="正式版在新分頁開這個工具：這次能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始 ↗</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，在新分頁開；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課 ↗</button></div>
+      </div>
+      <div class="mcard">
+        <div><b><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-root_cause.fishbone">魚骨圖（石川圖）</a></b></div>
+        <div><span class="k">回答什麼：</span>除了流程順序，還有哪些原因讓人不說（環境、人數、題目）。</div>
+        <div><span class="k">帶入什麼：</span>你填的事件 <cite>[1]</cite> → 自動填 1 個欄位；<span class="need">還要你填 0 個</span>。</div>
+        <div><span class="k">會得到：</span>六類原因的分支圖，看有沒有漏掉的原因。</div>
+        <div class="k">約 3 分鐘・約 NT$1</div>
+        <div class="btns"><button type="button" class="btn" data-mock="正式版在新分頁開這個工具：這次能帶的欄位自動填好，紅字的要你補，你確認才執行。">用這次的資料開始 ↗</button><button type="button" class="btn" data-mock="正式版每個工具都有一堂 5 分鐘的課，在新分頁開；示意稿只做了冰山模型這一堂。">第一次用？先看 5 分鐘的課 ↗</button></div>
       </div>
     </div>
 
@@ -704,7 +717,7 @@
       <a class="btn" href="#solution">分析已經夠了，直接去 ⑦ 解決方案</a>
       <a class="btn ghost" href="#approve">都不做，先核准存檔（⑨ 下方）</a>
     </div>
-    <p class="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去先開預填好的表單，你確認才執行、才花錢。</p>
+    <p class="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去在新分頁開預填好的表單，你確認才執行、才花錢。③ 已經畫出的圖（迴路、趨勢、四層槓桿）和這個專案做過的工具不再推薦。</p>
   </div>
 
   <!-- 6. 引註 -->

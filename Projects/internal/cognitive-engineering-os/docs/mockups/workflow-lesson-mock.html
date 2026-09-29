@@ -242,9 +242,23 @@
   .mb12{margin-bottom:12px}
   .my6{margin:6px 0}
   .scroll-x{overflow-x:auto}
+  table.plan{table-layout:fixed;width:100%}   /* ⑦ B: every column fits the card; long text wraps, never cut */
+  table.plan th:nth-child(1){width:10%}table.plan th:nth-child(2){width:11%}table.plan th:nth-child(3){width:25%}table.plan th:nth-child(4),table.plan th:nth-child(5){width:13%}table.plan th:nth-child(6),table.plan th:nth-child(7){width:14%}
+  table.plan td,table.plan td:first-child{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+  table.plan input{width:100%;box-sizing:border-box;font:inherit}
+  table.plan tr.group td{background:var(--soft);font-weight:700}
   .warn{color:var(--warn)}
   .card.accent{border-left:6px solid var(--accent)}
   .card.okline{border-left:6px solid var(--ok)}
+  /* == task cards (任務卡): one per task, a child indented under its parent; a journal entry inside == */
+  .tasks{display:grid;grid-template-columns:1fr;gap:12px}
+  .tcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .tcard.child{margin-left:24px;border-left:3px solid var(--accent)}
+  .tcard .head{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;justify-content:space-between}
+  .tcard .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin:4px 0}
+  .tnotes{display:grid;grid-template-columns:1fr;gap:8px}
+  .tnote{border-top:1px dashed var(--line);padding-top:6px;font-size:13px}
+  .tnote b{color:var(--accent);margin-right:4px}
   /* == shared design system: end == */
   /* == page-specific == */
 </style>

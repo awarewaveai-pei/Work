@@ -143,7 +143,9 @@ describe("ResultPage", () => {
       units: [{ path: "r/structures", meaning: "等答案迴路", action: "參與者先說", effect: "持久", leverage: "high", citations: ["r/structures/0"] }],
       focus: { path: "r/structures", why: "切斷迴路第一環" }, priority: "先改流程，再談角色。",
       solutions: { options: [{ name: "甲 只多鼓勵", what: "開場鼓勵", takes: "當次", cost: "低", durability: "低", risk: "退縮", advice: "只當急救", paths: ["r/events"] }, { name: "乙 改流程", what: "參與者先說", takes: "一期", cost: "中", durability: "高", risk: "被改回", advice: "先做", paths: ["r/structures"] }],
-        first_step: "下次先讓參與者說 3 分鐘。", horizon: "90 天", signoff: "帶領者團隊", plan: [{ when: "第 1 週", action: "補數據", owner: "帶領者", proof: "有基準值", target: "第 2 週前" }],
+        first_step: "下次先讓參與者說 3 分鐘。", horizon: "90 天", signoff: "帶領者團隊", recommended: "乙 改流程", long_horizon: "quarter",   // 1.4.0: a short and a long plan
+        plan: [{ when: "第 1 週", action: "補數據", owner: "帶領者", proof: "有基準值", target: "第 2 週前", phase: "short", options: ["乙 改流程"] },
+               { when: "第 2 季", action: "改角色定義", owner: "課程負責人", proof: "契約改版", target: "定稿", phase: "long", options: ["乙 改流程"] }],
         metrics: [{ name: "主動分享人數", now: "2 人", now_citation: "r/events/0", target: "6 人", when: "一期" }] },
       loop: { kind: "reinforcing", name: "等答案迴路", reading: "越轉越安靜", nodes: [{ id: "a", text: "帶領者先講", citations: ["r/structures/0"] }, { id: "b", text: "參與者等答案", citations: ["r/events/0"] }], edges: [{ from: "a", to: "b" }, { from: "b", to: "a" }] },
       trend: { reading: "人數一路掉", series: [{ name: "主動分享", unit: "人", points: [{ label: "第 1 次", value: 6, citation: "r/events/0" }, { label: "第 6 次", value: 2, citation: "r/events/0" }] }] },
@@ -302,29 +304,54 @@ describe("ResultPage", () => {
     expect(host.textContent).toContain("已排在 2030-02-01 重跑");
     await finish();
   });
-  it("⑦ the task editor adds one row per KPI metric, and saving sends the chosen option (M-75, M-76)", async () => {
+  it("⑦ options are picked several at once, 填入建議 fills every row it can, and saving sends the chosen options (M-75, M-76, operator 2026-09-29)", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path, init) => {
       if (init?.method === "POST" && path === "/projects/P1/tasks") return [{ task_id: "T1" }] as never;
-      return [] as never;   // GET tasks/reruns on mount, and the next-step estimates: nothing saved yet
+      return [] as never;   // GET tasks/reruns/analyses on mount, and the next-step estimates: nothing saved yet
     });
     const { host, done: finish } = await mount(<ResultPage result={fixture} project={{ id: "P1", name: "P" }} />);
-    const chooseButtons = [...host.querySelectorAll("button")].filter((b) => b.textContent === "選這條");
-    expect(chooseButtons).toHaveLength(2);
-    await act(async () => { chooseButtons[1].click(); });   // 選這條 on 乙 Change flow
-    await act(async () => { ([...host.querySelectorAll("button")].find((b) => b.textContent === "把行動計畫存成任務，設提醒") as HTMLButtonElement).click(); });
-    const rows = [...host.querySelectorAll("table")].flatMap((table) => [...table.querySelectorAll("tbody tr")]).filter((row) => row.querySelector('input[aria-label^="負責人"]'));
+    const choose = () => [...host.querySelectorAll("button")].filter((b) => b.textContent === "選這條" || b.textContent === "已選 ✓");
+    expect(choose()).toHaveLength(2);
+    await act(async () => { choose()[1].click(); });
+    await act(async () => { choose()[0].click(); });   // a second option: both stay chosen
+    expect(choose().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "true"]);
+    const save = () => [...host.querySelectorAll("button")].find((b) => b.textContent === "把行動計畫存成任務，設提醒") as HTMLButtonElement;
+    expect(save().disabled).toBe(true);   // owner, due and target are the user's: nothing is filled until asked
+    await act(async () => { ([...host.querySelectorAll("button")].find((b) => b.textContent === "填入建議（之後可改）") as HTMLButtonElement).click(); });
+    const rows = [...host.querySelectorAll("table.plan tbody tr")].filter((row) => row.querySelector('input[aria-label^="負責人"]'));
     expect(rows).toHaveLength(2);
     expect(rows[1].textContent).toContain("追蹤：Incident count");
-    // each field's onChange reads taskRows from the last render's closure, so every edit needs its own flush
-    // (React 18 batches same-tick setState calls; firing all six inside one act() would drop all but the last)
-    for (const row of rows) {
-      await act(async () => { setValue(row.querySelector('input[aria-label^="負責人"]') as HTMLInputElement, "Ops"); });
-      await act(async () => { setValue(row.querySelector('input[aria-label^="期限"]') as HTMLInputElement, "2030-01-01"); });
-      await act(async () => { setValue(row.querySelector('input[aria-label^="目標"]') as HTMLInputElement, "5"); });
-    }
-    await act(async () => { ([...host.querySelectorAll("button")].find((b) => b.textContent === "存進專案") as HTMLButtonElement).click(); });
+    expect((rows[0].querySelector('input[aria-label^="負責人"]') as HTMLInputElement).value).toBe("Team");   // the AI's suggestion, now editable
+    expect((rows[0].querySelector('input[aria-label^="期限"]') as HTMLInputElement).value).not.toBe("");
+    expect(save().disabled).toBe(true);   // the metric row has no suggested owner: still the user's to fill
+    await act(async () => { setValue(rows[1].querySelector('input[aria-label^="負責人"]') as HTMLInputElement, "Ops"); });
+    await act(async () => { setValue(rows[1].querySelector('input[aria-label^="期限"]') as HTMLInputElement, "2030-01-01"); });
+    await act(async () => { save().click(); });
     const [, init] = vi.mocked(apiFetch).mock.calls.find(([p, i]) => p === "/projects/P1/tasks" && i?.method === "POST")!;
-    expect(JSON.parse(String(init!.body)).option).toBe("Change flow");
+    const body = JSON.parse(String(init!.body));
+    expect(body.option).toBe("Observe、Change flow");
+    expect(body.tasks.map((task: { owner: string }) => task.owner)).toEqual(["Team", "Ops"]);
+    await finish();
+  });
+  it("⑦ B lists only the chosen options' steps, short then long, and the long plan follows the span the user picks (1.4.0)", async () => {
+    vi.mocked(apiFetch).mockResolvedValue([] as never);
+    const [first, second] = fixture.solutions!.options;
+    const phased = { ...fixture, solutions: { ...fixture.solutions!, long_horizon: "year" as const, plan: [
+      { when: "第 1 週", action: "試行新順序", owner: "帶領者", proof: "紀錄", target: "不低於上次", phase: "short" as const, options: [first.name] },
+      { when: "第 2 年", action: "改訓練教材", owner: "訓練負責人", proof: "新教材", target: "定稿", phase: "long" as const, options: [second.name] },
+    ] } };
+    const { host, done: finish } = await mount(<ResultPage result={phased} project={{ id: "P1", name: "P" }} />);
+    const plan = () => host.querySelector("table.plan")!.textContent ?? "";
+    expect(host.textContent).toContain("先在 A 選一條或幾條方案");
+    expect(plan()).not.toContain("試行新順序");
+    await act(async () => { ([...host.querySelectorAll("button")].filter((b) => b.textContent === "選這條")[1]).click(); });
+    expect(plan()).toContain("改訓練教材");
+    expect(plan()).not.toContain("試行新順序");   // an option not chosen keeps its steps out
+    expect(plan()).toContain("長期：之後一年");
+    expect(plan()).toContain("第 2 年（第 13 個月）");   // the unit the user picked, with the month (Codex 2026-09-29)
+    await act(async () => { ([...host.querySelectorAll("button")].find((b) => b.textContent === "一季") as HTMLButtonElement).click(); });
+    expect(plan()).toContain("第 2 季（第 4 個月）");
+    expect([...host.querySelectorAll("button")].find((b) => b.textContent?.startsWith("一年"))!.textContent).toBe("一年（AI 建議）");
     await finish();
   });
   it("judgment words with no stance are never silently dropped: a nudge on blur, a block on 核准, 已存 once a stance is chosen (C1-11, N-62)", async () => {
@@ -353,7 +380,7 @@ describe("ResultPage", () => {
     expect(html).toContain("自動填 1 個欄位");
     expect(html).toContain('<span class="need">還要你填 1 個</span>：objective');   // unknown target form: the old raw-key fallback
     expect(html).toContain("Release incidents increased");
-    expect(html).toContain('<a class="btn primary" href="/methods/systems.leverage_point_analysis/run">用這次的資料開始</a>');   // the run page reads the prefill
+    expect(html).toContain('<a class="btn primary" href="/methods/systems.leverage_point_analysis/run" target="_blank" rel="noopener">用這次的資料開始 ↗</a>');   // a new page; the run page reads the prefill
   });
   it("against the target's own form, resolves needs_input to its Chinese label and drops a prefill key that is not one of its real fields (N-13/N-14)", () => {
     const next = { ...fixture, next_steps: [{ method_id: "systems.leverage_point_analysis", prefill: { events: "r/events", bogus: "r/events" }, needs_input: ["objective"], yields: "Leverage points" }] };
@@ -378,7 +405,7 @@ describe("ResultPage", () => {
   });
   it("card 8's actions carry the project through, and the workflow-chaining button no longer claims to run it (N-22/N-23/N-24)", () => {
     const withProject = renderToStaticMarkup(<ResultPage result={fixture} record={record} project={{ id: "P1", name: "團體反思" }} />);
-    expect(withProject).toContain('href="/methods/systems.leverage_point_analysis?project=P1">第一次用？先看它做什麼');
+    expect(withProject).toContain('href="/methods/systems.leverage_point_analysis?project=P1" target="_blank" rel="noopener">第一次用？先看它做什麼 ↗');
     expect(withProject).toContain('href="/?project=P1#ask"');
     const noProject = renderToStaticMarkup(<ResultPage result={fixture} record={record} />);
     expect(noProject).toContain('href="/#ask"');
@@ -395,8 +422,16 @@ describe("ResultPage", () => {
     expect(html).toContain("或先在 ⑧ 用「槓桿點分析」往下挖");
     expect(html).not.toContain("或先在 ⑧ 用「五個為什麼」往下挖");
   });
-  it("carries the approval state into the ⑧ prefill it writes to sessionStorage (N-45)", async () => {
-    sessionStorage.clear();
+  it("⑧ says when this project already ran a tool, with a link to that result (operator 2026-09-29)", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path) => (path === "/projects/P1/analyses" ? [{ interpretation_id: "INTERP-OLD", method_id: "systems.leverage_point_analysis", status: "DONE" }] : []) as never);
+    const { host, done: finish } = await mount(<ResultPage result={fixture} record={record} project={{ id: "P1", name: "P" }} />);
+    const card = host.querySelector(".next-step")!;
+    expect(card.textContent).toContain("這個專案已經做過");
+    expect(card.querySelector('a[href="/projects/P1/analyses/INTERP-OLD"]')?.getAttribute("target")).toBe("_blank");
+    await finish();
+  });
+  it("carries the approval state into the ⑧ prefill it hands to the new page through localStorage (N-45)", async () => {
+    localStorage.clear();
     vi.mocked(apiFetch).mockRejectedValue(new Error("no estimate in this test"));
     const next = { ...fixture, next_steps: [{ method_id: "systems.leverage_point_analysis", prefill: { events: "r/events" }, needs_input: [], yields: "x" }] };
     const host = document.createElement("div");
@@ -406,12 +441,13 @@ describe("ResultPage", () => {
     const link = host.querySelector<HTMLAnchorElement>(".next-step a.btn.primary")!;
     link.addEventListener("click", (event) => event.preventDefault());   // jsdom would otherwise try (and fail) to follow the real href
     await act(async () => { link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); });
-    const stored = JSON.parse(sessionStorage.getItem("cos:prefill:systems.leverage_point_analysis")!);
+    const stored = JSON.parse(localStorage.getItem("cos:prefill:systems.leverage_point_analysis")!);
     expect(stored.from).toEqual({ name: "systems.iceberg_model", approved: true });
     expect(stored.values).toEqual({ events: ["Release incidents increased"] });
+    expect(typeof stored.at).toBe("number");   // the run page ignores a hand-over older than 10 minutes
     await act(async () => { root.unmount(); });
     host.remove();
-    sessionStorage.clear();
+    localStorage.clear();
   });
   it("with a lesson, the header opens it in a new tab; without one it opens the tool page", () => {
     const withLesson = renderToStaticMarkup(<ResultPage result={fixture} lesson="/learn/systems.iceberg_model" />);

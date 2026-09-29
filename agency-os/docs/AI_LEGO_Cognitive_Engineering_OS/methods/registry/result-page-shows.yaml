@@ -1,0 +1,7 @@
+# ③ of the result page (COS/docs/mockups/iceberg-result-mock.html) draws these tools' pictures from the analysis
+# itself, so ⑧ never recommends them as a next step (operator 2026-09-29: 「③ 已經有展示結果」「⑧ 要推其他推薦工具（還沒做過的）」).
+# Read by COS ai_lego/modules/research/interpret_method_record.py result_page_shows(); one list, no copy elsewhere.
+version: "1.0.0"
+every_method: [systems.causal_loop_diagram, systems.behavior_over_time]   # ③ 的迴路圖與趨勢圖
+by_method:
+  systems.iceberg_model: [systems.leverage_point_analysis]   # ③ 的四層改變難度與效果（槓桿）

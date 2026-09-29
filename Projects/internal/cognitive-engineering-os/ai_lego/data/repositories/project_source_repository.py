@@ -661,31 +661,48 @@ class ProjectSourceRepository:
     # Tasks (⑦ 把行動計畫存成任務) and rerun reminders (到期重跑並比較) live in the project's event stream like everything else
     # the project holds: created, then done/undone or owner/due filled in later; scheduled, then fulfilled by the
     # analysis that answered it.
-    TASK_EVENTS = ("TaskCreated", "TaskDone", "TaskUpdated")
+    TASK_EVENTS = ("TaskCreated", "TaskDone", "TaskUpdated", "TaskNoted")
     RERUN_EVENTS = ("RerunScheduled", "RerunFulfilled")
 
     def tasks(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """project_id -> its tasks, oldest first: title, owner, due (YYYY-MM-DD), proof, target, the option it was
-        saved under, the analysis it came from, done (bool) and when it was last marked."""
+        saved under, the analysis it came from, its parent_task_id/kind (a card-created task or plan_change; None/
+        "task" for a ⑦-saved plan row), its 4-state status (not_started/in_progress/done/on_hold -- done mirrors
+        status=="done", kept for old readers), and its journal (oldest first, TaskNoted) with next_check = the
+        latest entry's. TaskDone (old data) maps done=True -> status done, done=False -> in_progress if the task
+        already had a journal entry, else not_started."""
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
         for row in self._project_events(tenant_id, self.TASK_EVENTS, project_id):
             payload = json.loads(row["payload_json"])
             key = payload.get("task_id")
-            kind = row["event_type"]
-            if kind == "TaskCreated":
-                by_id[key] = {"task_id": key, "interpretation_id": payload.get("interpretation_id"), "title": payload.get("title"), "owner": payload.get("owner"), "due": payload.get("due"),
-                              "proof": payload.get("proof"), "target": payload.get("target"), "when": payload.get("when"), "option": payload.get("option"), "created_at": row["occurred_at"], "done": False, "done_at": None}
+            event_type = row["event_type"]
+            if event_type == "TaskCreated":
+                by_id[key] = {"task_id": key, "interpretation_id": payload.get("interpretation_id"), "parent_task_id": payload.get("parent_task_id"), "kind": payload.get("kind", "task"),
+                              "title": payload.get("title"), "owner": payload.get("owner"), "due": payload.get("due"), "proof": payload.get("proof"), "target": payload.get("target"),
+                              "when": payload.get("when"), "option": payload.get("option"), "created_at": row["occurred_at"],
+                              "status": "not_started", "done": False, "done_at": None, "notes": [], "next_check": None}
                 projects.setdefault(row["aggregate_id"].removeprefix("project:"), []).append(by_id[key])
             elif key not in by_id:
                 continue
-            elif kind == "TaskDone":
-                by_id[key].update(done=bool(payload.get("done")), done_at=row["occurred_at"] if payload.get("done") else None)
-            else:   # TaskUpdated: owner and/or due filled in after the task was created (N-84)
+            elif event_type == "TaskDone":
+                done = bool(payload.get("done"))
+                by_id[key]["status"] = "done" if done else ("in_progress" if by_id[key]["notes"] else "not_started")
+                by_id[key]["done_at"] = row["occurred_at"] if done else None
+            elif event_type == "TaskUpdated":   # owner and/or due filled in after creation (N-84); status = the 4-state board
                 if "owner" in payload:
                     by_id[key]["owner"] = payload["owner"]
                 if "due" in payload:
                     by_id[key]["due"] = payload["due"]
+                if "status" in payload:
+                    by_id[key]["status"] = payload["status"]
+                    by_id[key]["done_at"] = row["occurred_at"] if payload["status"] == "done" else None
+            else:   # TaskNoted: 實際狀況／想法／調整方針／卡住了／實際數字, at least one filled in
+                by_id[key]["notes"].append({"note_id": payload.get("note_id"), "happened": payload.get("happened"), "thoughts": payload.get("thoughts"),
+                                             "adjustment": payload.get("adjustment"), "blocker": payload.get("blocker"), "numbers": payload.get("numbers") or [],
+                                             "next_check": payload.get("next_check"), "at": row["occurred_at"]})
+                by_id[key]["next_check"] = payload.get("next_check")
+            by_id[key]["done"] = by_id[key]["status"] == "done"
         return projects
 
     def reruns(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:

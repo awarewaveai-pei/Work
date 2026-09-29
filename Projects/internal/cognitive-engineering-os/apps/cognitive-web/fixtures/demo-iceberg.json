@@ -1,5 +1,5 @@
 {
- "_about": "A real analysis of the demo case (claude-sonnet-5, 2026-09-28, local run result_shots12): the free read-only 示範專案 (gap report N-78). Regenerate from a real run, never hand-edit the result.",
+ "_about": "A real analysis of the demo case (claude-sonnet-5, 2026-09-28, local run result_shots12): the free read-only 示範專案 (gap report N-78). Regenerate from a real run, never hand-edit the result. 2026-09-29: ⑧ passed through repair_next_steps with result_page_shows() (③ draws the leverage chart), as the pipeline now does; no other change.",
  "display": {
   "name_en": "Iceberg Model",
   "abbr": "",
@@ -185,25 +185,8 @@
   },
   "method_id": "systems.iceberg_model",
   "model": "claude-sonnet-5",
-  "next_methods": [
-   "systems.leverage_point_analysis"
-  ],
-  "next_steps": [
-   {
-    "answers": "在冰山模型找到的心智模式與結構之間，哪個介入點最能改變下降型態",
-    "deepens": "從心智模式層往下找可施力的具體槓桿點",
-    "est_cost": "30 分鐘",
-    "method_id": "systems.leverage_point_analysis",
-    "needs_input": [
-     "候選介入點清單"
-    ],
-    "prefill": {
-     "mental_model": "r/mental_models/0",
-     "structure": "r/structures/0"
-    },
-    "yields": "依槓桿力排序的介入點清單"
-   }
-  ],
+  "next_methods": [],
+  "next_steps": [],
   "priority": "先從結構層（流程時間與記錄表）著手做立即可行的調整，同時啟動對心智模式層默認信念的檢視與訓練調整，兩者並行但心智模式層的改變才是持久解方。",
   "provenance": {
    "authorship_state": "AI_GENERATED",

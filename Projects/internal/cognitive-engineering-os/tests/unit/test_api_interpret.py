@@ -152,9 +152,9 @@ class InterpretApiTests(ApiTestCase):
         answer = {
             "findings": [{"id": "F1", "title": "Recurring event", "text": "Release incidents recur.", "citations": ["r/events/0"], "confidence": {"level": "mid", "reason": "one observed event"}}],
             "visual": {"kind": "layered", "bindings": {"levels": [{"label": "r/events/0", "path": "r/events/0"}]}},
-            "next_methods": ["systems.leverage_point_analysis"],
-            "next_steps": [{"method_id": "systems.leverage_point_analysis", "answers": "Find the leverage point", "deepens": "Test the response loop",
-                             "prefill": {"intervention_points": "r/events/0", "objective": "r/events/0"}, "needs_input": [], "yields": "Leverage map", "est_cost": "S"}],
+            "next_methods": ["root_cause.five_whys"],   # a tool ③ does not draw (leverage/loop/trend are excluded, 2026-09-29)
+            "next_steps": [{"method_id": "root_cause.five_whys", "answers": "Is it the root", "deepens": "Ask why five times",
+                             "prefill": {"why_chain": "r/events/0", "objective": "r/events/0"}, "needs_input": [], "yields": "Why chain", "est_cost": "S"}],
         }
 
         class Detailed:
@@ -172,7 +172,7 @@ class InterpretApiTests(ApiTestCase):
         fetched = self.client.get(f"/interpretations/{response.json()['interpretation_id']}").json()
         self.assertEqual(fetched["status"], "DONE", fetched)
         step = fetched["result"]["next_steps"][0]
-        self.assertEqual(step["prefill"], {"intervention_points": "r/events/0"})   # "intervention_points" is a real field of the target's own schema
+        self.assertEqual(step["prefill"], {"why_chain": "r/events/0"})   # "why_chain" is a real field of the target's own schema
         self.assertEqual(step["needs_input"], [])   # "objective" is not: neither carried nor asked for, since the target form has no such field
 
     def test_a_project_lists_its_analyses_and_each_one_opens(self):
@@ -304,6 +304,30 @@ class InterpretApiTests(ApiTestCase):
                 join_all(self, worker)
         self.assertGreaterEqual(reserved[0], api_main.PROMPT_RESERVE_TOKENS + api_main.INTERPRET_MAX_TOKENS)   # this call's worst case
         self.assertEqual(self._reserved(), 0)   # every call of the run settled
+
+    def test_the_next_run_in_a_project_is_not_offered_what_the_page_draws_or_the_project_ran(self):
+        """Operator 2026-09-29: ⑧ recommends tools new to this page and this project."""
+        self._finished()   # the project has run the iceberg once
+        prompts = []
+        original = self.provider.complete
+        def spy(system, user, *, max_tokens):
+            prompts.append(user)
+            return original(system, user, max_tokens=max_tokens)
+        with patch.object(self.provider, "complete", side_effect=spy):
+            self._finished("second run")
+        excluded = prompts[0].split("NOT FOR next_steps / next_methods (this page already draws them, or this project already ran them): ", 1)[1].split("\n", 1)[0]
+        for method_id, why in (("systems.causal_loop_diagram", "③ 已經畫出"), ("systems.leverage_point_analysis", "③ 已經畫出"), ("systems.iceberg_model", "就是這個工具")):
+            self.assertIn(f"{method_id} ({why})", excluded)
+        prompts.clear()   # another tool in the same project: the iceberg is now a tool the project already ran
+        with patch.object(self.provider, "complete", side_effect=spy), patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/decision.eisenhower_matrix/interpret", json={
+                "project_id": self.project_id, "subject": "x", "tasks": [{"id": "T1", "label": "y", "urgency": 8, "importance": 8}],
+                "urgency_scale": {"min": 0, "max": 10}, "importance_scale": {"min": 0, "max": 10}, "urgency_threshold": 5, "importance_threshold": 5})
+            self.assertEqual(response.status_code, 202, response.text)
+            api_main._run_interpretation(**launch.call_args.kwargs)
+        excluded = prompts[0].split("already ran them): ", 1)[1].split("\n", 1)[0]
+        self.assertIn("systems.iceberg_model (這個專案已經做過)", excluded)
+        self.assertNotIn("systems.leverage_point_analysis", excluded)   # only the iceberg's ③ draws the leverage chart
 
     def test_a_retry_is_checked_against_the_budget_like_the_first_call(self):
         """Codex 2026-09-28 [high]: the run reserved one call and the retry went unchecked past the daily budget."""
@@ -448,6 +472,75 @@ class InterpretApiTests(ApiTestCase):
         self.assertEqual(updated.status_code, 200, updated.text)
         self.assertEqual((updated.json()["owner"], updated.json()["due"]), ("A", "2026-10-01"))
         self.assertEqual(self.client.post(f"/projects/{self.project_id}/tasks/{task_id}", json={"due": "not-a-date"}).status_code, 400)
+
+    def test_task_status_is_a_four_state_board_and_done_stays_derived_from_it(self):
+        done = self._finished()
+        created = self.client.post(f"/projects/{self.project_id}/tasks", json={"interpretation_id": done, "tasks": [{"title": "x", "due": "2030-01-01"}]}).json()
+        task_id = created[0]["task_id"]
+        self.assertEqual(created[0]["status"], "not_started")
+        set_progress = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}", json={"status": "in_progress"})
+        self.assertEqual((set_progress.status_code, set_progress.json()["status"], set_progress.json()["done"]), (200, "in_progress", False))
+        set_done = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}", json={"status": "done"})
+        self.assertEqual((set_done.json()["status"], set_done.json()["done"]), ("done", True))
+        bad = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}", json={"status": "cancelled"})
+        self.assertEqual(bad.status_code, 400, bad.text)
+        self.assertIn("TASK_STATUS_INVALID", bad.json()["detail"])
+        # the legacy done boolean (old callers, old recorded events) still works, mapped onto the same status board
+        legacy_off = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}", json={"done": False})
+        self.assertEqual(legacy_off.json()["status"], "not_started")   # no journal entry yet
+        self.client.post(f"/projects/{self.project_id}/tasks/{task_id}/notes", json={"happened": "有進度了"})
+        legacy_off_again = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}", json={"done": False})
+        self.assertEqual(legacy_off_again.json()["status"], "in_progress")   # a journal entry exists now
+        legacy_on = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}", json={"done": True})
+        self.assertEqual((legacy_on.json()["status"], legacy_on.json()["done"]), ("done", True))
+
+    def test_a_task_journal_entry_needs_at_least_one_field_and_reads_back_oldest_first_with_the_latest_next_check(self):
+        done = self._finished()
+        created = self.client.post(f"/projects/{self.project_id}/tasks", json={"interpretation_id": done, "tasks": [{"title": "x", "due": "2030-01-01"}]}).json()
+        task_id = created[0]["task_id"]
+        empty = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}/notes", json={})
+        self.assertEqual(empty.status_code, 400, empty.text)
+        self.assertIn("TASK_NOTE_EMPTY", empty.json()["detail"])
+        first = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}/notes", json={"happened": "第一週訪談 5 人", "numbers": [{"name": "訪談人數", "value": 5, "unit": "人"}], "next_check": "2030-02-01"})
+        self.assertEqual(first.status_code, 200, first.text)
+        second = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}/notes", json={"thoughts": "比預期慢", "numbers": [{"name": "訪談人數", "value": 8, "unit": "人"}]})
+        self.assertEqual(second.status_code, 200, second.text)
+        notes = second.json()["notes"]
+        self.assertEqual(len(notes), 2)
+        self.assertEqual([note["happened"] for note in notes], ["第一週訪談 5 人", ""])   # oldest first
+        self.assertEqual([number["value"] for number in notes[1]["numbers"]], [8])
+        self.assertIsNone(second.json()["next_check"])   # the latest entry did not set one -- it clears the earlier one
+        too_many = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}/notes", json={"numbers": [{"name": f"m{i}", "value": i} for i in range(6)]})
+        self.assertEqual(too_many.status_code, 400, too_many.text)
+        self.assertIn("TASK_NOTE_NUMBERS_TOO_MANY", too_many.json()["detail"])
+        blank_name = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}/notes", json={"numbers": [{"name": "  ", "value": 1}]})
+        self.assertEqual(blank_name.status_code, 400, blank_name.text)
+        self.assertIn("TASK_NOTE_NUMBER_NAME_INVALID", blank_name.json()["detail"])
+        bad_date = self.client.post(f"/projects/{self.project_id}/tasks/{task_id}/notes", json={"happened": "x", "next_check": "not-a-date"})
+        self.assertEqual(bad_date.status_code, 400, bad_date.text)
+        self.assertIn("TASK_NOTE_NEXT_CHECK_INVALID", bad_date.json()["detail"])
+        self.assertEqual(self.client.post(f"/projects/{self.project_id}/tasks/nope/notes", json={"happened": "x"}).status_code, 404)
+
+    def test_a_child_task_from_a_card_inherits_its_parents_analysis_and_skips_the_already_saved_check(self):
+        done = self._finished()
+        parent = self.client.post(f"/projects/{self.project_id}/tasks", json={"interpretation_id": done, "tasks": [{"title": "父任務", "due": "2030-01-01"}]}).json()[0]
+        # the analysis already has a saved plan -- a second top-level save (⑦ again) is refused...
+        refused = self.client.post(f"/projects/{self.project_id}/tasks", json={"interpretation_id": done, "tasks": [{"title": "又存一次", "due": "2030-01-01"}]})
+        self.assertEqual(refused.status_code, 409, refused.text)
+        # ...but a card-created child is not that flow: it is allowed, and inherits the parent's interpretation_id
+        child = self.client.post(f"/projects/{self.project_id}/tasks", json={"parent_task_id": parent["task_id"], "tasks": [{"title": "子任務", "due": "2030-02-01"}]})
+        self.assertEqual(child.status_code, 200, child.text)
+        child_row = child.json()[-1]
+        self.assertEqual((child_row["parent_task_id"], child_row["interpretation_id"], child_row["kind"]), (parent["task_id"], done, "task"))
+        plan_change = self.client.post(f"/projects/{self.project_id}/tasks", json={"parent_task_id": parent["task_id"], "kind": "plan_change", "tasks": [{"title": "調整方案", "due": "2030-02-01"}]})
+        self.assertEqual(plan_change.status_code, 200, plan_change.text)
+        self.assertEqual(plan_change.json()[-1]["kind"], "plan_change")
+        bad_kind = self.client.post(f"/projects/{self.project_id}/tasks", json={"parent_task_id": parent["task_id"], "kind": "nope", "tasks": [{"title": "x", "due": "2030-02-01"}]})
+        self.assertEqual(bad_kind.status_code, 400, bad_kind.text)
+        self.assertIn("TASK_KIND_INVALID", bad_kind.json()["detail"])
+        bad_parent = self.client.post(f"/projects/{self.project_id}/tasks", json={"parent_task_id": "nope", "tasks": [{"title": "x", "due": "2030-02-01"}]})
+        self.assertEqual(bad_parent.status_code, 404, bad_parent.text)
+        self.assertIn("TASK_PARENT_NOT_FOUND", bad_parent.json()["detail"])
 
     def test_a_rerun_reminder_is_due_on_its_date_and_fulfilled_by_the_run_that_names_it(self):
         done = self._finished()

@@ -96,7 +96,7 @@ from ai_lego.platform.workflow.run_lock import RunLock, acquire_run_lock, lock_p
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
-from ai_lego.modules.research.interpret_method_record import INTERPRET_MAX_TOKENS, INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, run_interpretation
+from ai_lego.modules.research.interpret_method_record import INTERPRET_MAX_TOKENS, INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, result_page_shows, run_interpretation
 from ai_lego.modules.research.source_manifest import DEFAULT_MAX_CHARS
 from ai_lego.modules.research.synthesis import run_synthesis, validate_subject
 
@@ -1481,6 +1481,12 @@ def _interpret_and_record(
         contract_text = (spec_root / catalog.require(method_id)["path"]).read_text(encoding="utf-8")
         schema_name = record_schema_name(spec_root, method_id, contract, contract_text)
         schema_path = spec_root / TYPED_OBJECTS / schema_name if schema_name else None
+        # ⑧ recommends what is new to this page and this project (operator 2026-09-29): not what ③ draws, not this tool
+        # itself, not a tool the project already ran
+        excluded = {key: "③ 已經畫出" for key in result_page_shows(spec_root, method_id)}
+        excluded.update({item["method_id"]: "這個專案已經做過" for item in repo.analyses(tenant_id, project_id).get(project_id, [])
+                         if item["status"] == "DONE" and item.get("method_id")})
+        excluded[method_id] = "就是這個工具"
         outcome = run_interpretation(
             method_id=method_id, contract=contract, display=display, record=record,
             sources=sources, provider=metered, spec_root=spec_root,
@@ -1490,6 +1496,7 @@ def _interpret_and_record(
             record_schema_text=schema_path.read_text(encoding="utf-8") if schema_path and schema_path.exists() else "",
             feedback=feedback, previous=previous,
             target_record_fields=lambda target_id: _record_schema_properties(spec_root, catalog, target_id),
+            excluded_method_ids=excluded,
         )
         error = outcome["error"]
     except HTTPException as failure:
@@ -1833,9 +1840,15 @@ class TaskRow(BaseModel):
     when: str = ""
 
 
+TASK_STATUSES = ("not_started", "in_progress", "done", "on_hold")
+TASK_KINDS = ("task", "plan_change")
+
+
 class CreateTasksRequest(BaseModel):
     interpretation_id: str | None = None
     option: str | None = None
+    parent_task_id: str | None = None
+    kind: str = "task"
     tasks: list[TaskRow]
 
 
@@ -1843,6 +1856,7 @@ class TaskUpdateRequest(BaseModel):
     done: bool | None = None
     owner: str | None = None
     due: str | None = None
+    status: str | None = None
 
 
 @app.post("/projects/{project_id}/tasks")
@@ -1852,17 +1866,28 @@ def create_tasks(
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> list[dict[str, Any]]:
-    """⑦ 把行動計畫存成任務: the plan's rows as the project's tasks, with the owner and due date the user filled in."""
+    """⑦ 把行動計畫存成任務 (no ``parent_task_id``: TASKS_ALREADY_SAVED refuses saving the same analysis's plan twice),
+    or 從一張任務卡新增任務／調整方案 (``parent_task_id`` set: the new row inherits its parent's ``interpretation_id``
+    and skips that one-shot-per-analysis check, which is not what this is)."""
     tenant_id = session["tenant_id"]
     _project_or_404(repo, tenant_id, project_id)
     if not 1 <= len(payload.tasks) <= 20:
         raise HTTPException(status_code=400, detail="TASKS_COUNT_INVALID: 1 to 20 tasks per call")
-    if payload.interpretation_id is not None:
-        stored = repo.get_interpretation(tenant_id, payload.interpretation_id)
-        if stored is None or stored["project_id"] != project_id:
-            raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {payload.interpretation_id!r} is not a finished analysis of this project")
-        if any(task["interpretation_id"] == payload.interpretation_id for task in repo.tasks(tenant_id, project_id).get(project_id, [])):
-            raise HTTPException(status_code=409, detail=f"TASKS_ALREADY_SAVED: {payload.interpretation_id!r} already has tasks saved")
+    if payload.kind not in TASK_KINDS:
+        raise HTTPException(status_code=400, detail=f"TASK_KIND_INVALID: expected one of {TASK_KINDS}")
+    if payload.parent_task_id is not None:
+        parent = next((task for task in repo.tasks(tenant_id, project_id).get(project_id, []) if task["task_id"] == payload.parent_task_id), None)
+        if parent is None:
+            raise HTTPException(status_code=404, detail=f"TASK_PARENT_NOT_FOUND: {payload.parent_task_id!r}")
+        interpretation_id = parent["interpretation_id"]
+    else:
+        interpretation_id = payload.interpretation_id
+        if interpretation_id is not None:
+            stored = repo.get_interpretation(tenant_id, interpretation_id)
+            if stored is None or stored["project_id"] != project_id:
+                raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r} is not a finished analysis of this project")
+            if any(task["interpretation_id"] == interpretation_id for task in repo.tasks(tenant_id, project_id).get(project_id, [])):
+                raise HTTPException(status_code=409, detail=f"TASKS_ALREADY_SAVED: {interpretation_id!r} already has tasks saved")
     option = payload.option.strip()[:100] if isinstance(payload.option, str) and payload.option.strip() else None
     rows = []
     for task in payload.tasks:
@@ -1871,7 +1896,8 @@ def create_tasks(
             raise HTTPException(status_code=400, detail="TASK_TITLE_INVALID: 1 to 300 characters")
         if not task.due:
             raise HTTPException(status_code=400, detail="TASK_DUE_REQUIRED: every task needs a due date")
-        rows.append({"task_id": str(uuid.uuid4()), "interpretation_id": payload.interpretation_id, "title": title, "owner": task.owner.strip()[:100], "due": _iso_date_or_400(task.due, "TASK_DUE"),
+        rows.append({"task_id": str(uuid.uuid4()), "interpretation_id": interpretation_id, "parent_task_id": payload.parent_task_id, "kind": payload.kind,
+                     "title": title, "owner": task.owner.strip()[:100], "due": _iso_date_or_400(task.due, "TASK_DUE"),
                      "proof": task.proof.strip()[:300], "target": task.target.strip()[:300], "when": task.when.strip()[:100], "option": option})
     for row in rows:
         repo.append_event(tenant_id, f"project:{project_id}", "TaskCreated", row)
@@ -1896,21 +1922,75 @@ def mark_task(
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
-    """Toggle done (⑦ 存成任務 checklist) and/or fill in an owner/due the plan left blank (N-84: ProjectPage's
+    """Toggle done (kept for old callers; TaskDone still works, mapped to a status), set the 4-state board
+    (not_started/in_progress/done/on_hold) and/or fill in an owner/due the plan left blank (N-84: ProjectPage's
     inline editor for a task whose owner or due is still empty)."""
     tenant_id = session["tenant_id"]
     _project_or_404(repo, tenant_id, project_id)
     if not any(task["task_id"] == task_id for task in repo.tasks(tenant_id, project_id).get(project_id, [])):
         raise HTTPException(status_code=404, detail=f"TASK_NOT_FOUND: {task_id!r}")
+    if payload.status is not None and payload.status not in TASK_STATUSES:
+        raise HTTPException(status_code=400, detail=f"TASK_STATUS_INVALID: expected one of {TASK_STATUSES}")
     if payload.done is not None:
         repo.append_event(tenant_id, f"project:{project_id}", "TaskDone", {"task_id": task_id, "done": payload.done})
-    if payload.owner is not None or payload.due is not None:
+    if payload.owner is not None or payload.due is not None or payload.status is not None:
         update: dict[str, Any] = {"task_id": task_id}
         if payload.owner is not None:
             update["owner"] = payload.owner.strip()[:100]
         if payload.due is not None:
             update["due"] = _iso_date_or_400(payload.due, "TASK_DUE")
+        if payload.status is not None:
+            update["status"] = payload.status
         repo.append_event(tenant_id, f"project:{project_id}", "TaskUpdated", update)
+    return next(task for task in repo.tasks(tenant_id, project_id)[project_id] if task["task_id"] == task_id)
+
+
+class TaskNumberRow(BaseModel):
+    name: str
+    value: float
+    unit: str = ""
+
+
+class TaskNoteRequest(BaseModel):
+    happened: str = ""
+    thoughts: str = ""
+    adjustment: str = ""
+    blocker: str = ""
+    numbers: list[TaskNumberRow] = []
+    next_check: str | None = None
+
+
+@app.post("/projects/{project_id}/tasks/{task_id}/notes")
+def note_task(
+    project_id: str,
+    task_id: str,
+    payload: TaskNoteRequest,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+) -> dict[str, Any]:
+    """一筆任務紀錄 (任務卡的「寫一筆紀錄」): 實際狀況／想法／調整方針／卡住了／實際數字，至少填一項；
+    tasks() reads the task's journal back oldest first, with next_check = the latest entry's."""
+    tenant_id = session["tenant_id"]
+    _project_or_404(repo, tenant_id, project_id)
+    if not any(task["task_id"] == task_id for task in repo.tasks(tenant_id, project_id).get(project_id, [])):
+        raise HTTPException(status_code=404, detail=f"TASK_NOT_FOUND: {task_id!r}")
+    happened = payload.happened.strip()[:300]
+    thoughts = payload.thoughts.strip()[:300]
+    adjustment = payload.adjustment.strip()[:300]
+    blocker = payload.blocker.strip()[:300]
+    if len(payload.numbers) > 5:
+        raise HTTPException(status_code=400, detail="TASK_NOTE_NUMBERS_TOO_MANY: at most 5 numbers per note")
+    numbers = []
+    for row in payload.numbers:
+        name = row.name.strip()[:100]
+        if not name:
+            raise HTTPException(status_code=400, detail="TASK_NOTE_NUMBER_NAME_INVALID: 1 to 100 characters")
+        numbers.append({"name": name, "value": row.value, "unit": row.unit.strip()[:20]})
+    if not (happened or thoughts or adjustment or blocker or numbers):
+        raise HTTPException(status_code=400, detail="TASK_NOTE_EMPTY: fill in at least one of happened/thoughts/adjustment/blocker/numbers")
+    next_check = _iso_date_or_400(payload.next_check, "TASK_NOTE_NEXT_CHECK") if payload.next_check else None
+    note = {"task_id": task_id, "note_id": str(uuid.uuid4()), "happened": happened, "thoughts": thoughts, "adjustment": adjustment, "blocker": blocker, "numbers": numbers, "next_check": next_check}
+    repo.append_event(tenant_id, f"project:{project_id}", "TaskNoted", note)
     return next(task for task in repo.tasks(tenant_id, project_id)[project_id] if task["task_id"] == task_id)
 
 

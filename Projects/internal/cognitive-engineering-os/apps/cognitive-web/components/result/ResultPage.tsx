@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
-import { compareHref, projectHref, runHref, toolHref } from "../../lib/catalog";
+import { analysisHref, compareHref, projectHref, runHref, toolHref } from "../../lib/catalog";
 import { fieldKey, type FormField } from "../../lib/form-model";
 import { costLine, daysOf, plusDays, STANCE, todayIso, type Approval, type Estimate, type Rerun, type Stance, type Task, runMinutes } from "../../lib/projects";
 import { plain, recordValue } from "../../lib/record";
@@ -25,9 +25,27 @@ type Thickness = { verdict: "enough" | "thin" | "thinnest" | "empty"; note?: str
 type UnitReading = { path: string; brief?: string; meaning: string; action: string; step?: string; effect: string; leverage: "low" | "mid" | "high" | "max"; citations: string[]; thickness?: Thickness };
 type Solutions = {
   options: Array<{ name: string; what: string; takes: string; cost: string; durability: string; risk: string; advice: string; paths: string[] }>;
-  first_step: string; recommended?: string; horizon?: string; signoff?: string; plan?: Array<{ when: string; action: string; owner: string; proof: string; target: string }>;
+  first_step: string; recommended?: string; horizon?: string; long_horizon?: Span; signoff?: string;
+  plan?: Array<{ when: string; action: string; owner: string; proof: string; target: string; phase?: "short" | "long"; options?: string[] }>;
   metrics?: Array<{ name: string; now: string; now_citation?: string; target: string; when: string }>;
 };
+// ⑦ B (1.4.0): the long plan's span, the AI's suggestion first; the short plan is always the first month
+type Span = "month" | "quarter" | "year";
+const SPAN_MONTHS: Record<Span, number> = { month: 1, quarter: 3, year: 12 };
+const SPAN_LABEL: Record<Span, string> = { month: "月", quarter: "季", year: "年" };
+const OPTION_MARKS = "甲乙丙丁戊";
+/** The date `months` from today, YYYY-MM-DD (local), for a long plan row's suggested due date. */
+function plusMonths(months: number): string {
+  const date = new Date(); date.setMonth(date.getMonth() + months);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+/** A long-plan month in the unit the user picked, with the month itself: 4 in a quarter -> 第 2 季（第 4 個月）. */
+const spanLabel = (months: number, span: Span) => (span === "month" ? `第 ${months} 個月` : `第 ${Math.ceil(months / SPAN_MONTHS[span])} ${SPAN_LABEL[span]}（第 ${months} 個月）`);
+/** 「第 2 到 4 週」 -> 4: the week a short row ends in (null when it names no week). */
+const lastWeek = (when: string) => { const numbers = when.match(/\d+/g); return numbers ? Number(numbers[numbers.length - 1]) : null; };
+type PlanRow = { key: string; group: "short" | "long" | "track"; when: string; action: string; options: string[]; owner: string; due: string; proof: string; target: string };
+type PlanEdit = { owner?: string; due?: string; target?: string };
+
 type Interpretation = {
   interpretation_id: string; method_id: string; findings: Finding[]; visual: { kind: string; bindings: Record<string, unknown> };
   next_methods?: string[]; next_steps?: Step[]; recommendations?: Array<{ action?: string; expected?: string; citations?: string[] }>;
@@ -124,11 +142,13 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const [actionError, setActionError] = useState("");
   const [note, setNote] = useState("");
   const [planNote, setPlanNote] = useState("");
-  // the plan's rows as tasks: owner, due date and target are the user's to fill (D16: the AI's suggestions are placeholders, never values)
-  const [taskRows, setTaskRows] = useState<Array<{ when: string; title: string; owner: string; ownerHint: string; due: string; proof: string; target: string; targetHint: string }> | null>(null);
+  // ⑦ B: owner, due date and target are the user's (D16): the AI's suggestion is a placeholder until 「填入建議」 copies it in
+  const [planEdits, setPlanEdits] = useState<Record<string, PlanEdit>>({});
   const [planError, setPlanError] = useState("");
   const [rerunDue, setRerunDue] = useState<string | null>(null);
-  const [chosenOption, setChosenOption] = useState<number | null>(null);   // ⑦ A: which option (甲/乙/丙) the user picked (M-76)
+  const [chosen, setChosen] = useState<string[]>(() => (result.solutions?.recommended ? [result.solutions.recommended] : []));   // ⑦ A: options picked, several at once (M-76)
+  const [span, setSpan] = useState<Span>(() => result.solutions?.long_horizon ?? "quarter");   // ⑦ B: the long plan's span
+  const [projectAnalyses, setProjectAnalyses] = useState<Array<{ interpretation_id: string; method_id?: string | null; status: string }>>([]);   // ⑧: what the project already ran
   const [savedTasks, setSavedTasks] = useState<Task[] | null>(null);       // this project's tasks already on file, so ⑦ never saves the same plan twice (M-73)
   const [savedReruns, setSavedReruns] = useState<Rerun[] | null>(null);    // this project's rerun reminders already on file, so ⑦ never double-books one (M-79)
   const [estimates, setEstimates] = useState<Record<string, Estimate>>({});
@@ -178,8 +198,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   // an option belongs to the deepest layer it acts on (the mock names 丙 on layer 4, not on 3 and 4); options are labelled 甲乙丙 in order
   const optionHome = (option: { paths: string[] }) => Math.max(-1, ...option.paths.map(layerIndex));
   const optionsFor = (path: string) => (solutions?.options ?? []).filter((option) => optionHome(option) === layerIndex(path));
-  const optionName = (option: { name: string }) => option.name.replace(/^[甲乙丙]\s*/, "") || option.name;   // a bare 「乙」 keeps its name rather than none
-  const optionLabel = (option: { name: string }) => "甲乙丙"[(solutions?.options ?? []).indexOf(option as never)] ?? "";
+  const optionName = (option: { name: string }) => option.name.replace(/^[甲乙丙丁戊]\s*/, "") || option.name;   // a bare 「乙」 keeps its name rather than none
+  const optionLabel = (option: { name: string }) => OPTION_MARKS[(solutions?.options ?? []).indexOf(option as never)] ?? "";
   const optionTag = (option: { name: string }) => `${optionLabel(option)}「${optionName(option)}」`;
   const iceberg = result.method_id === "systems.iceberg_model";
   const icebergFacts = (path: string) => ICEBERG_LAYERS.find((layer) => layer.key === keyOf(path));
@@ -275,6 +295,9 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     Promise.all([apiFetch<Task[]>(`/projects/${encodeURIComponent(project.id)}/tasks`), apiFetch<Rerun[]>(`/projects/${encodeURIComponent(project.id)}/reruns`)])
       .then(([existingTasks, existingReruns]) => { if (active) { setSavedTasks(existingTasks); setSavedReruns(existingReruns); } })
       .catch(() => undefined);
+    apiFetch<Array<{ interpretation_id: string; method_id?: string | null; status: string }>>(`/projects/${encodeURIComponent(project.id)}/analyses`)
+      .then((list) => { if (active && Array.isArray(list)) setProjectAnalyses(list); })
+      .catch(() => undefined);
     return () => { active = false; };
   }, [project?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -283,7 +306,20 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const rerunLabel = `${horizonDays ? `${horizonDays} 天後` : "到期"}重跑本分析並比較`;
   const kpiNow = (now: string) => now.replace(/^現在\s*/, "");
   const kpiTarget = (target: string) => target.replace(/^目標\s*/, "").replace(/（待你?確認）$/, "");
-  const tasksReady = Boolean(taskRows?.length) && (taskRows ?? []).every((row) => row.owner.trim() && row.due && row.target.trim());
+  const phased = (solutions?.plan ?? []).some((row) => row.phase);
+  const serves = (row: { options?: string[] }) => !row.options?.length || row.options.some((name) => chosen.includes(name));   // a row naming no option serves every option
+  const shortRows = (solutions?.plan ?? []).filter((row) => (row.phase ?? "short") === "short" && serves(row));
+  const longRows = (solutions?.plan ?? []).filter((row) => row.phase === "long" && serves(row));
+  const planRows: PlanRow[] = [
+    ...shortRows.map((row, index) => ({ key: `s${(solutions?.plan ?? []).indexOf(row)}`, group: "short" as const, when: row.when, action: row.action, options: row.options ?? [], owner: row.owner, due: plusDays(7 * (lastWeek(row.when) ?? (phased ? 4 : index + 1))), proof: row.proof, target: kpiTarget(row.target) })),
+    ...longRows.map((row, index) => { const months = 1 + Math.round(((index + 1) * SPAN_MONTHS[span]) / longRows.length);
+      return { key: `l${(solutions?.plan ?? []).indexOf(row)}`, group: "long" as const, when: spanLabel(months, span), action: row.action, options: row.options ?? [], owner: row.owner, due: plusMonths(months), proof: row.proof, target: kpiTarget(row.target) }; }),
+    ...(solutions?.metrics ?? []).map((metric, index) => ({ key: `m${index}`, group: "track" as const, when: phased ? spanLabel(1 + SPAN_MONTHS[span], span) : metric.when, action: `追蹤：${metric.name}`, options: [], owner: "", due: phased ? plusMonths(1 + SPAN_MONTHS[span]) : "", proof: metric.name, target: kpiTarget(metric.target) })),
+  ];
+  const planValue = (row: PlanRow, field: keyof PlanEdit) => planEdits[row.key]?.[field] ?? "";
+  const editPlan = (row: PlanRow, field: keyof PlanEdit, value: string) => setPlanEdits((current) => ({ ...current, [row.key]: { ...current[row.key], [field]: value } }));
+  const fillSuggestions = () => setPlanEdits((current) => Object.fromEntries(planRows.map((row) => [row.key, { owner: current[row.key]?.owner || row.owner, due: current[row.key]?.due || row.due, target: current[row.key]?.target || row.target }])));
+  const tasksReady = planRows.length > 0 && planRows.every((row) => planValue(row, "owner").trim() && planValue(row, "due") && planValue(row, "target").trim());
   const decide = (decision: "approve" | "return", reason = "") => {
     setActionError("");
     if (judgmentText.trim() && !judgment) { setJudgmentStanceRequired(true); return undefined; }   // never silently drop the words (C1-11)
@@ -296,12 +332,12 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const savedTaskCount = (savedTasks ?? []).filter((task) => task.interpretation_id === result.interpretation_id).length;
   const openRerun = (savedReruns ?? []).find((item) => item.interpretation_id === result.interpretation_id && !item.fulfilled_by) ?? null;
   const saveTasks = () => plan(async () => {
-    if (!project || !taskRows || !tasksReady) return;
-    const tasks = taskRows.filter((row) => row.title.trim()).map(({ when, title, owner, due, proof, target }) => ({ when, title, owner, due, proof, target }));
-    const option = chosenOption !== null && solutions ? optionName(solutions.options[chosenOption]) : undefined;
+    if (!project || !tasksReady) return;
+    const tasks = planRows.map((row) => ({ when: row.when, title: row.action, owner: planValue(row, "owner").trim(), due: planValue(row, "due"), proof: row.proof, target: planValue(row, "target").trim() }));
+    const option = chosen.length && solutions ? solutions.options.filter((item) => chosen.includes(item.name)).map(optionName).join("、") : undefined;
     const saved = await apiFetch<Task[]>(`/projects/${encodeURIComponent(project.id)}/tasks`, { method: "POST", body: JSON.stringify({ interpretation_id: result.interpretation_id, option, tasks }) });
     setSavedTasks(saved);
-    setTaskRows(null); setPlanNote(`已存成 ${tasks.length} 個任務；到期會在專案頁和「我的專案」提醒你。`);
+    setPlanNote(`已存成 ${tasks.length} 個任務；到期會在專案頁和「我的專案」提醒你，每個任務都能寫紀錄。`);
   });
   const scheduleRerun = () => plan(async () => {
     if (!rerunDue) return;
@@ -413,20 +449,29 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       {iceberg && <p className="sub mt8 mb0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>}
     </Card>
 
-    <Card id="7" className="card okline" anchor="solution" title="⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）" read={`A 選一條路、B 排成${solutions?.horizon && solutions.horizon.length <= 6 ? ` ${solutions.horizon}` : "計畫"}、C ${solutions?.metrics?.length ? `${NUMERAL[solutions.metrics.length] ?? solutions.metrics.length}個數字盯著` : "這次沒有指標"}。`} act={solutions ? "選方案、填負責人和期限、確認目標數字。" : "這次沒有方案草稿；先用 ① 的建議和 ⑧ 的下一步。"}>
+    <Card id="7" className="card okline" anchor="solution" title="⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）" read={`A 選方案（可複選）、B 短期一個月＋長期一${SPAN_LABEL[span]}、C ${solutions?.metrics?.length ? `${NUMERAL[solutions.metrics.length] ?? solutions.metrics.length}個數字盯著` : "這次沒有指標"}。`} act={solutions ? "選方案、按「填入建議」再改，存成任務。" : "這次沒有方案草稿；先用 ① 的建議和 ⑧ 的下一步。"}>
       {solutions ? <>
-        <h3 className="mt6 mb8">A. 選方案：{NUMERAL[solutions.options.length] ?? solutions.options.length}條路比一比</h3>
+        <h3 className="mt6 mb8">A. 選方案：{NUMERAL[solutions.options.length] ?? solutions.options.length}條路比一比（可複選）</h3>
         <div className="scroll-x"><table>
           <thead><tr><th>方案</th><th>做什麼</th><th>見效</th><th>成本</th><th>持久度</th><th>風險</th><th>建議</th></tr></thead>
-          <tbody>{solutions.options.map((option, index) => <tr key={index}><td>{optionLabel(option)} {optionName(option)}<br /><button type="button" className="btn mt4" data-demo-ok aria-pressed={chosenOption === index} onClick={() => setChosenOption(index)}>{chosenOption === index ? "已選這條" : "選這條"}</button></td><td>{option.what}{option.paths.length ? `（第 ${layerNumbers(option.paths).join("、")} 層）` : ""}</td><td>{option.takes}</td><td>{option.cost}</td><td>{option.durability}</td><td>{option.risk}</td><td>{recommendedOption(option) ? <b>{option.advice}</b> : option.advice}</td></tr>)}</tbody>
+          <tbody>{solutions.options.map((option, index) => <tr key={index}><td>{optionLabel(option)} {optionName(option)}<br /><button type="button" className="btn mt4" data-demo-ok aria-pressed={chosen.includes(option.name)} onClick={() => setChosen((current) => (current.includes(option.name) ? current.filter((name) => name !== option.name) : [...current, option.name]))}>{chosen.includes(option.name) ? "已選 ✓" : "選這條"}</button></td><td>{option.what}{option.paths.length ? `（第 ${layerNumbers(option.paths).join("、")} 層）` : ""}</td><td>{option.takes}</td><td>{option.cost}</td><td>{option.durability}</td><td>{option.risk}</td><td>{recommendedOption(option) ? <b>{option.advice}</b> : option.advice}</td></tr>)}</tbody>
         </table></div>
         <div className="finding mt12"><b>如果只做一件事，明天就做</b>{solutions.first_step}</div>
         {(solutions.plan ?? []).length > 0 && <>
-          <h3 className="mt14 mb8">B. {solutions.horizon ?? ""}行動計畫（AI 起草；負責人與期限請你確認）</h3>
-          <div className="scroll-x"><table>
-            <thead><tr><th>{planInWeeks ? "週" : "時間"}</th><th>行動</th><th>負責<span className="sub">（待確認）</span></th><th>怎麼證明有效</th><th>目標<span className="sub">（待你確認）</span></th></tr></thead>
-            <tbody>{(solutions.plan ?? []).map((row, index) => <tr key={index}><td>{row.when}</td><td>{row.action}</td><td>{row.owner}</td><td>{row.proof}</td><td>{row.target}</td></tr>)}
-              <tr><td>{planInWeeks && horizonDays ? String(Math.ceil(horizonDays / 7)) : solutions.horizon ? "到期" : "之後"}</td><td>用新資料重跑本分析，比較前後</td><td>你＋系統提醒</td><td>{(solutions.metrics ?? []).length ? `下方${NUMERAL[(solutions.metrics ?? []).length] ?? (solutions.metrics ?? []).length}個指標` : "—"}</td><td>{(solutions.metrics ?? []).length ? "見 C" : "—"}</td></tr></tbody>
+          <h3 className="mt14 mb8">B. 行動計畫：短期一個月＋長期一{SPAN_LABEL[span]}（AI 起草；負責人、期限、目標由你定）</h3>
+          <div className="btns mb8"><span className="sub">長期要看多久：</span>{(["month", "quarter", "year"] as Span[]).map((choice) => <button type="button" key={choice} className="btn" data-demo-ok aria-pressed={span === choice} onClick={() => setSpan(choice)}>一{SPAN_LABEL[choice]}{solutions.long_horizon === choice ? "（AI 建議）" : ""}</button>)}<button type="button" className="btn" data-demo-ok onClick={fillSuggestions}>填入建議（之後可改）</button></div>
+          {!chosen.length && <p className="sub">先在 A 選一條或幾條方案；計畫只列你選的方案的步驟和共用的步驟。</p>}
+          <div className="scroll-x"><table className="plan">
+            <thead><tr><th>時間</th><th>方案</th><th>行動</th><th>負責人</th><th>期限</th><th>怎麼證明有效</th><th>目標</th></tr></thead>
+            <tbody>{(["short", "long", "track"] as const).map((group) => { const rows = planRows.filter((row) => row.group === group); return rows.length ? <React.Fragment key={group}>
+              <tr className="group"><td colSpan={7}>{group === "short" ? (phased ? "短期：第一個月（每週一步）" : `行動計畫${solutions.horizon ? `（${solutions.horizon}）` : ""}`) : group === "long" ? `長期：之後一${SPAN_LABEL[span]}` : "追蹤：C 的指標"}</td></tr>
+              {rows.map((row) => <tr key={row.key}><td>{row.when}</td><td>{row.options.length ? row.options.map((name) => { const option = solutions.options.find((item) => item.name === name); return option ? `${optionLabel(option)} ${optionName(option)}` : name; }).join("、") : "共用"}</td><td>{row.action}</td>
+                <td><input aria-label={`負責人：${row.action}`} value={planValue(row, "owner")} placeholder={row.owner ? `建議：${row.owner}` : "你填"} onChange={(event) => editPlan(row, "owner", event.target.value)} /></td>
+                <td><input aria-label={`期限：${row.action}`} type="date" value={planValue(row, "due")} min={todayIso()} title={row.due ? `建議：${row.due}` : undefined} onChange={(event) => editPlan(row, "due", event.target.value)} /></td>
+                <td>{row.proof}</td>
+                <td><input aria-label={`目標：${row.action}`} value={planValue(row, "target")} placeholder={row.target ? `建議：${row.target}` : "你填"} onChange={(event) => editPlan(row, "target", event.target.value)} /></td></tr>)}
+            </React.Fragment> : null; })}
+              <tr><td>{phased ? spanLabel(1 + SPAN_MONTHS[span], span) : horizonDays ? `${Math.ceil(horizonDays / 7)} 週` : solutions.horizon ? "到期" : "之後"}</td><td>全部</td><td>用新資料重跑本分析，比較前後（同一個專案）</td><td>你＋系統提醒</td><td>—</td><td>{(solutions.metrics ?? []).length ? `上面${NUMERAL[(solutions.metrics ?? []).length] ?? (solutions.metrics ?? []).length}個指標` : "—"}</td><td>{(solutions.metrics ?? []).length ? "見 C" : "—"}</td></tr></tbody>
           </table></div>
         </>}
         {solutions.signoff && <p className="sub mt6 mb0">需要誰點頭：{solutions.signoff}</p>}
@@ -439,27 +484,16 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
           {project && savedTaskCount > 0 ? (
             <Link className="btn" href={projectHref(project.id)}>已存成 {savedTaskCount} 個任務，到專案頁看</Link>
           ) : (
-            <button type="button" className="btn primary" title={!project ? "先把分析存進專案" : !(solutions.plan ?? []).length ? "這次沒有行動計畫" : undefined} onClick={() => { setPlanNote(""); setPlanError(""); setRerunDue(null); setTaskRows([
-              ...(solutions.plan ?? []).map((row) => ({ when: row.when, title: row.action, owner: "", ownerHint: row.owner, due: "", proof: row.proof, target: "", targetHint: kpiTarget(row.target) })),
-              ...(solutions.metrics ?? []).map((metric) => ({ when: metric.when, title: `追蹤：${metric.name}`, owner: "", ownerHint: "", due: "", proof: metric.name, target: "", targetHint: kpiTarget(metric.target) })),
-            ]); }} disabled={!project || !(solutions.plan ?? []).length}>把行動計畫存成任務，設提醒</button>
+            <button type="button" className="btn primary" title={!project ? "先把分析存進專案" : !planRows.length ? "這次沒有行動計畫" : undefined} onClick={saveTasks} disabled={!project || !tasksReady}>把行動計畫存成任務，設提醒</button>
           )}
           {openRerun ? (
             <span className="btn" aria-disabled="true">已排在 {openRerun.due} 重跑</span>
           ) : (
-            <button type="button" className="btn" onClick={() => { setPlanNote(""); setPlanError(""); setTaskRows(null); setRerunDue(horizonDays ? plusDays(horizonDays) : ""); }}>{rerunLabel}</button>
+            <button type="button" className="btn" onClick={() => { setPlanNote(""); setPlanError(""); setRerunDue(horizonDays ? plusDays(horizonDays) : ""); }}>{rerunLabel}</button>
           )}
           <button type="button" className="btn" onClick={() => setPlanNote(CASE_NOT_BUILT(rerunLabel))}>改善了就記進案例庫；沒改善回到 A 重選</button>
         </div>
-        {taskRows && <div className="mt10">
-          <p className="sub">每一列一個任務：負責人、期限、目標數字你填（AI 的建議是灰字提示），存進專案「{project?.name}」；到期會提醒你。</p>
-          <div className="scroll-x"><table>
-            <thead><tr><th>{planInWeeks ? "週" : "時間"}</th><th>任務</th><th>負責人</th><th>期限</th><th>目標</th></tr></thead>
-            <tbody>{taskRows.map((row, index) => <tr key={index}><td>{row.when}</td><td>{row.title}</td><td><input aria-label={`負責人 ${index + 1}`} value={row.owner} placeholder={row.ownerHint ? `建議：${row.ownerHint}` : ""} onChange={(event) => setTaskRows(taskRows.map((item, i) => (i === index ? { ...item, owner: event.target.value } : item)))} /></td><td><input aria-label={`期限 ${index + 1}`} type="date" value={row.due} min={todayIso()} onChange={(event) => setTaskRows(taskRows.map((item, i) => (i === index ? { ...item, due: event.target.value } : item)))} /></td><td><input aria-label={`目標 ${index + 1}`} value={row.target} placeholder={row.targetHint ? `建議：${row.targetHint}` : ""} onChange={(event) => setTaskRows(taskRows.map((item, i) => (i === index ? { ...item, target: event.target.value } : item)))} /></td></tr>)}</tbody>
-          </table></div>
-          <div className="btns mt6"><button type="button" className="btn primary" onClick={saveTasks} disabled={!tasksReady}>存進專案</button><button type="button" className="btn ghost" onClick={() => setTaskRows(null)}>取消</button></div>
-          {!tasksReady && <p className="sub mb0">每一列都填了負責人、期限、目標才能存。</p>}
-        </div>}
+        {project && !savedTaskCount && planRows.length > 0 && !tasksReady && <p className="sub mb0">每一列都要有負責人、期限、目標才能存成任務；按「填入建議」先帶入 AI 的建議，再改成你的。</p>}
         {rerunDue !== null && <div className="mt10">
           <label className="sub">到期日 <input aria-label="重跑到期日" type="date" value={rerunDue} min={todayIso()} onChange={(event) => setRerunDue(event.target.value)} /></label>
           <div className="btns mt6"><button type="button" className="btn primary" onClick={scheduleRerun} disabled={!rerunDue}>排提醒</button><button type="button" className="btn ghost" onClick={() => setRerunDue(null)}>取消</button></div>
@@ -485,14 +519,18 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         const lessonHref = lessons[step.method_id!];
         // N-20/N-21/N-45: the run page coerces `values` to each target field's kind and marks `needs` red until filled;
         // `from` says which analysis this came from and whether it was approved (核准 可被下一步引用)
-        const carryPrefill = () => sessionStorage.setItem(`cos:prefill:${step.method_id}`, JSON.stringify({ values, needs, from: { name, approved: approval?.decision === "approve" } }));
+        // a new page (operator 2026-09-29) has its own sessionStorage: the carry-over goes through localStorage, and the run
+        // page moves it into its own session at once (RunPage: stale after 10 minutes)
+        const carryPrefill = () => { try { localStorage.setItem(`cos:prefill:${step.method_id}`, JSON.stringify({ values, needs, from: { name, approved: approval?.decision === "approve" }, at: Date.now() })); } catch { /* private mode: the tool opens empty */ } };
+        const doneBefore = projectAnalyses.find((item) => item.method_id === step.method_id && item.status === "DONE" && item.interpretation_id !== result.interpretation_id);
         return <div className={`mcard next-step${index === 0 ? " now" : ""}`} key={index}>
           <div><b><Link href={toolHref(step.method_id!)}>{names[step.method_id!] ?? step.method_id}</Link></b>{index === 0 && <span className="tag">本工具建議的下一步</span>}</div>
           {step.answers && <div><span className="k">回答什麼：</span>{step.answers}</div>}
           <div><span className="k">帶入什麼：</span>{carried.length ? <>你填的{[...new Set(carried.map(inputName))].join("、")} {cites(carried)} → 自動填 {carried.length} 個欄位；</> : "沒有能帶入的欄位；"}<span className="need">還要你填 {needs.length} 個</span>{needs.length ? `：${needs.map((need) => stepFieldLabel(step.method_id!, need)).join("、")}` : ""}。</div>
           {step.yields && <div><span className="k">會得到：</span>{step.yields}</div>}
           <div className="k">{estimate ? `${runMinutes(estimate)}・${costLine(estimate.tokens, estimate.twd).replace(/^約 \S+ tokens・?/, "") || `約 ${Math.round(estimate.tokens / 1000)}k tokens`}` : step.est_cost ? `預估成本：${COST[step.est_cost] ?? step.est_cost}` : ""}</div>
-          <div className="btns"><a className={index === 0 ? "btn primary" : "btn"} href={runHref(step.method_id!, project?.id)} onClick={carryPrefill}>用這次的資料開始</a>{lessonHref ? <a className="btn" href={lessonHref} target="_blank" rel="noopener">第一次用？先看 5 分鐘的課 ↗</a> : <Link className="btn" href={toolHref(step.method_id!, project?.id)} onClick={carryPrefill}>第一次用？先看它做什麼</Link>}</div>
+          {doneBefore && project && <div className="k">這個專案已經做過：<a href={analysisHref(project.id, doneBefore.interpretation_id)} target="_blank" rel="noopener">看那次結果 ↗</a></div>}
+          <div className="btns"><a className={index === 0 ? "btn primary" : "btn"} href={runHref(step.method_id!, project?.id)} target="_blank" rel="noopener" onClick={carryPrefill}>用這次的資料開始 ↗</a>{lessonHref ? <a className="btn" href={lessonHref} target="_blank" rel="noopener">第一次用？先看 5 分鐘的課 ↗</a> : <a className="btn" href={toolHref(step.method_id!, project?.id)} target="_blank" rel="noopener" onClick={carryPrefill}>第一次用？先看它做什麼 ↗</a>}</div>
         </div>; })}</div>
       {!steps.length && <p className="mb0">這次沒有建議下一步；不繼續也可以。</p>}
       <div className="btns mt12">
@@ -502,7 +540,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         <a className="btn ghost" href="#approve">都不做，先核准存檔（⑨ 下方）</a>
       </div>
       {note && <p className="mocknote" role="status">{note}</p>}
-      <p className="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去先開預填好的表單，你確認才執行、才花錢。</p>
+      <p className="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去在新分頁開預填好的表單，你確認才執行、才花錢。③ 已經畫出的圖（迴路、趨勢、四層槓桿）和這個專案做過的工具不再推薦。</p>
     </Card>
 
     <Card id="9" title="⑨ 引註（每個 [n] 都指向一段可查的來源）" read="[n] 是那句話的來源。" act="引錯了，按下方「退回並說原因」。">

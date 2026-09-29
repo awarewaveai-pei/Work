@@ -94,6 +94,27 @@ describe("run page", () => {
     await done();
   });
 
+  it("opened in a new tab by ⑧, takes the hand-over from localStorage into its own session, and ignores a stale one (operator 2026-09-29)", async () => {
+    const ONE_FIELD = { display: { name_zh: "冰山模型", name_en: "Iceberg Model" }, form: { fields: [{ key: "events", kind: "list", label: "① 事件：發生了什麼？" }] } };
+    vi.mocked(apiFetch).mockImplementation(async (path) => {
+      if (path === "/methods/systems.iceberg_model/form") return ONE_FIELD as never;
+      if (path === "/projects") return [] as never;
+      throw new Error(`unexpected: ${path}`);
+    });
+    localStorage.setItem("cos:prefill:systems.iceberg_model", JSON.stringify({ values: { events: "新分頁帶來的" }, needs: [], from: { name: "冰山模型", approved: false }, at: Date.now() }));
+    const fresh = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} />);
+    expect(fresh.host.querySelector<HTMLTextAreaElement>("#f-events")?.value).toBe("新分頁帶來的");
+    expect(localStorage.getItem("cos:prefill:systems.iceberg_model")).toBeNull();   // taken once
+    expect(sessionStorage.getItem("cos:prefill:systems.iceberg_model")).not.toBeNull();   // kept for a reload until a run launches (N-22)
+    await fresh.done();
+    sessionStorage.clear();
+    localStorage.setItem("cos:prefill:systems.iceberg_model", JSON.stringify({ values: { events: "昨天的" }, needs: [], from: { name: "冰山模型" }, at: Date.now() - 11 * 60 * 1000 }));
+    const stale = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} />);
+    expect(stale.host.querySelector<HTMLTextAreaElement>("#f-events")?.value ?? "").not.toBe("昨天的");
+    expect(localStorage.getItem("cos:prefill:systems.iceberg_model")).toBeNull();
+    await stale.done();
+  });
+
   it("carries a next-step prefill once, coerced to the field kind, marks what it still needs, and clears it only after a run launches", async () => {
     const TWO_FIELDS = { display: { name_zh: "冰山模型", name_en: "Iceberg Model" }, form: { fields: [{ key: "events", kind: "list", label: "① 事件：發生了什麼？" }, { key: "patterns", kind: "list", label: "② 模式：以前發生過嗎？" }] } };
     sessionStorage.setItem("cos:prefill:systems.iceberg_model", JSON.stringify({ values: { events: "一句話", bogus: "x" }, needs: ["patterns", "bogus"], from: { name: "冰山模型", approved: true } }));

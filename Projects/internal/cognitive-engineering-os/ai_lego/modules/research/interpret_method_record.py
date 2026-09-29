@@ -91,10 +91,23 @@ def visual_kind(spec_root: Path, method_id: str, contract: Mapping[str, Any]) ->
     return kind
 
 
-def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], manifest: list[Mapping[str, Any]], kind: str, *, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None, via_tool: bool = False) -> tuple[str, str]:
+def result_page_shows(spec_root: Path, method_id: str) -> set[str]:
+    """The tools whose picture ③ of this method's result page already draws (methods/registry/result-page-shows.yaml)."""
+    try:
+        document = yaml.safe_load((spec_root / "methods" / "registry" / "result-page-shows.yaml").read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return set()
+    return {str(item) for item in [*(document.get("every_method") or []), *((document.get("by_method") or {}).get(method_id) or [])]}
+
+
+def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], manifest: list[Mapping[str, Any]], kind: str, *, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None, via_tool: bool = False, excluded_method_ids: Mapping[str, str] | None = None) -> tuple[str, str]:
     """``feedback`` = why the user returned the previous version (``previous`` = its summary and findings): the answer
     corrects exactly that and keeps what was right (the result page's 退回並說原因). ``via_tool``: the answer is the
-    input of the tool call (complete_json), so the system line says that and not "reply with text"."""
+    input of the tool call (complete_json), so the system line says that and not "reply with text".
+    ``excluded_method_ids``: tools ⑧ must not recommend (id -> why); they leave the catalog and the contract's list."""
+    excluded = dict(excluded_method_ids or {})
+    catalog_lines = [line for line in catalog_lines or [] if line.split(" ", 1)[0] not in excluded]
+    contract = {**contract, "recommended_next": [item for item in contract.get("recommended_next") or [] if item not in excluded]}
     channel = "Answer with exactly one JSON object as the input of the tool call." if via_tool else "Reply with exactly one JSON object, no markdown."
     system = f"You interpret a validated Cognitive Engineering method record. {channel} Do not invent facts, coordinates, scores, or sources."
     example_path = next((str(item["id"]) for item in manifest if item.get("kind") == "record"), "r/example")
@@ -111,6 +124,7 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "MANIFEST:\n" + "\n".join(f"[{item['id']}] {item.get('value', '')}" for item in manifest if item.get("kind") == "record"),
         "SOURCES:\n" + "\n".join(str(item["id"]) for item in manifest if item.get("kind") == "project_source"),
         "AVAILABLE ACTIVE METHODS:\n" + "\n".join(catalog_lines or []),
+        "NOT FOR next_steps / next_methods (this page already draws them, or this project already ran them): " + ", ".join(f"{key} ({why})" for key, why in sorted(excluded.items())),
         "OUTPUT JSON SHAPE: " + json.dumps({
             "headline": "",
             "findings": [{"id": "F1", "title": "", "text": "", "citations": [example_path], "confidence": {"level": "mid", "reason": ""}, "revision_conditions": [{"text": "", "would_change": ""}]}],
@@ -125,7 +139,7 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
             "focus": {"path": example_path, "why": ""},
             "priority": "",
             "solutions": {"options": [{"name": "", "what": "", "takes": "", "cost": "", "durability": "", "risk": "", "advice": "", "paths": [example_path]}],
-                          "first_step": "", "recommended": "", "horizon": "", "plan": [{"when": "", "action": "", "owner": "", "proof": "", "target": ""}],
+                          "first_step": "", "recommended": "", "horizon": "", "long_horizon": "quarter", "plan": [{"when": "", "action": "", "owner": "", "proof": "", "target": "", "phase": "short", "options": [""]}],
                           "metrics": [{"name": "", "now": "", "now_citation": example_path, "target": "", "when": ""}], "signoff": ""},
             "loop": {"kind": "reinforcing", "name": "", "reading": "", "nodes": [{"id": "n1", "text": "", "citations": [example_path]}], "edges": [{"from": "n1", "to": "n2"}], "feeders": [{"id": "f1", "text": "", "citations": [example_path], "to": "n1"}]},
             "trend": {"question": "", "reading": "", "series": [{"name": "", "unit": "", "points": [{"label": "", "value": 0, "citation": example_path}]}]},
@@ -136,8 +150,11 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "units = one entry per unit of the picture (layered: one per level, path = that level's binding path): brief = what the user filled in for that unit, at most 16 Chinese characters, only words and numbers from the record; meaning = what the unit tells (two or three sentences); "
         "action = how to act at that unit; step = that action in at most 12 Chinese characters; effect = what the action achieves and how long it lasts; leverage = low|mid|high|max (max = the deepest unit, hardest but most lasting); citations = manifest ids. "
         "focus = the units path to act on first, and why. priority = the order of action in one or two sentences. "
-        "solutions: 2-3 options, name = a short name of at most 8 Chinese characters with no numbering or 甲乙丙 prefix (the page numbers them), paths = the units each acts on, compared by what, takes (time to effect), cost, durability, risk, advice; first_step = one thing doable tomorrow with no budget and no approval; "
-        "horizon = the plan's span in 天 or 週 (for example 90 天); plan = at most 5 rows (when, action, owner, proof, target): when = the week numbers counted from the plan's start, digits only, like 1 到 2 / 3 到 4 / 5 (the table's first column is 週), owner and target are suggestions the user confirms; "
+        "solutions: 5 options (distinct paths, from quick relief to the deepest change; the user may pick several), name = a short name of at most 8 Chinese characters with no numbering or 甲乙丙 prefix (the page numbers them), paths = the units each acts on, compared by what, takes (time to effect), cost, durability, risk, advice; first_step = one thing doable tomorrow with no budget and no approval; "
+        "horizon = when to rerun this analysis and compare, in 天 or 週 (for example 90 天); plan = at most 12 rows (when, action, owner, proof, target, phase, options) in two phases: "
+        "phase short = the first month, when = 第 1 週 / 第 2 到 4 週 (weeks counted from the start); phase long = after the first month, when = 第 2 個月 / 第 2 季 / 第 2 年 in the unit of long_horizon; "
+        "long_horizon = month|quarter|year, how long the deepest recommended change takes to show; options = the option names (options[].name) a row serves, so every option has at least one short and one long row (a row serving several options lists them all); "
+        "owner and target are suggestions the user confirms; "
         "metrics = at most 3 (name, now, target, when): now may contain a number only when the record states it, with now_citation = the manifest id whose text states it, otherwise say it is not measured yet; target is a suggestion; "
         "now and target are the bare value only, without the words 現在/目標 or （待確認） (the page adds those itself); "
         "signoff = who has to agree to what (in brackets) and which option cannot go ahead without them, at most two sentences. "
@@ -145,7 +162,7 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "trend = only numbers written in the record: question = the question the chart answers (ends with ？); every point's value must appear in the text of the manifest id it cites; when the record states the same quantity at two or more times (第 1 次 6 位、第 6 次 2 位) the trend is required, one point per stated time; omit trend only when the record has fewer than two such numbers. "
         "gaps = at least 1 (there is always evidence you did not have); a unit of the record the user left empty must be listed as a gap. next_steps = 2 to 4, the first being the one most worth doing next.",
         "NUMBERS: headline, findings (title, text, confidence.reason), summary, priority, focus.why, units[].brief, units[].meaning, solutions.metrics[].name, loop (name, node texts, reading), trend (question, reading) and gaps[].text state only numbers written in the record, in digits or in words (四個人 is 4; no differences, sums or percentages you work out); layer and step ordinals (第 3 層) are not counted. Suggestions (actions, plan, targets) may propose numbers. "
-        "LENGTH: the whole JSON must close well inside the output limit. At most 3 findings; a text field is at most three sentences (about 100 Chinese characters); at most 2 recommendations, 3 gaps, 5 plan rows, 5 loop nodes, 4 next_steps; no indentation or line breaks outside strings.",
+        "LENGTH: the whole JSON must close well inside the output limit. At most 3 findings; a text field is at most three sentences (about 100 Chinese characters); at most 2 recommendations, 3 gaps, 12 plan rows, 5 loop nodes, 4 next_steps; no indentation or line breaks outside strings.",
     ]
     lines.append(
         "MORE OF THE PAGE (each optional): diagnosis = where the problem sits and where its root is, title at most 24 Chinese characters "
@@ -562,19 +579,27 @@ def answer_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def repair_next_steps(interpretation: dict[str, Any], active_method_ids: set[str]) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+def repair_next_steps(interpretation: dict[str, Any], active_method_ids: set[str], excluded_method_ids: Mapping[str, str] | None = None) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """P-07: a step naming a method that is not active goes alone (it used to refuse the whole answer); next_methods keeps
-    only active ids and gains every kept step's method. -> (removed, repaired)."""
+    only active ids and gains every kept step's method. A step naming an excluded tool (③ draws it, the project ran it)
+    goes too, as a repair -- the answer was right about the tool, only not new to this page. -> (removed, repaired)."""
     removed: dict[str, list[str]] = {}
     repaired: dict[str, list[str]] = {}
+    excluded = dict(excluded_method_ids or {})
     steps = interpretation.get("next_steps")
     methods = interpretation.get("next_methods")
     methods = [m for m in methods if isinstance(m, str)] if isinstance(methods, list) else []
+    left_out = [m for m in methods if m in excluded]
+    if left_out:
+        repaired.setdefault("next_methods", []).append(f"{left_out} left out ({', '.join(excluded[m] for m in left_out)})")
+    methods = [m for m in methods if m not in excluded]
     if isinstance(steps, list):
         kept = []
         for index, step in enumerate(steps):
-            if isinstance(step, Mapping) and step.get("method_id") in active_method_ids: kept.append(step)
-            else: removed.setdefault("next_steps", []).append(f"next_steps[{index}].method_id {step.get('method_id') if isinstance(step, Mapping) else step!r} is not an active method; removed")
+            method = step.get("method_id") if isinstance(step, Mapping) else None
+            if method in excluded: repaired.setdefault("next_steps", []).append(f"next_steps[{index}] {method} left out ({excluded[method]})")
+            elif isinstance(step, Mapping) and method in active_method_ids: kept.append(step)
+            else: removed.setdefault("next_steps", []).append(f"next_steps[{index}].method_id {method if isinstance(step, Mapping) else step!r} is not an active method; removed")
         interpretation["next_steps"] = kept
         for step in kept:
             if step["method_id"] not in methods: methods.append(step["method_id"]); repaired.setdefault("next_methods", []).append(f"{step['method_id']} added (a next step names it)")
@@ -707,6 +732,15 @@ def repair_details(interpretation: Mapping[str, Any], record: Mapping[str, Any],
         names = {option.get("name") for option in solutions.get("options") or [] if isinstance(option, Mapping)}
         if solutions["recommended"] not in names:
             solutions.pop("recommended"); repaired.setdefault("solutions", []).append("solutions.recommended names no option; left out")
+    if isinstance(solutions, dict) and isinstance(solutions.get("plan"), list):   # 1.4.0: a row serves options that exist
+        names = {option.get("name") for option in solutions.get("options") or [] if isinstance(option, Mapping)}
+        for index, row in enumerate(solutions["plan"]):
+            if isinstance(row, dict) and isinstance(row.get("options"), list):
+                unknown = [name for name in row["options"] if name not in names]
+                if unknown:
+                    row["options"] = [name for name in row["options"] if name in names]
+                    if not row["options"]: del row["options"]
+                    repaired.setdefault("solutions", []).append(f"solutions.plan[{index}].options {unknown} name no option; left out")
     on_path = [step for step in steps if isinstance(step, dict) and step.get("on_path") is True]
     for step in on_path[2:]:
         step["on_path"] = False; repaired.setdefault("next_steps", []).append(f"{step.get('method_id')} on_path: at most two steps are on the path; set false")
@@ -878,12 +912,12 @@ def validate_interpretation(schema_contracts: SchemaContracts, interpretation: M
     schema_contracts.validate(INTERPRETATION_SCHEMA, dict(interpretation), "MethodInterpretation")
 
 
-def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None, target_record_fields: "Callable[[str], set[str] | None] | None" = None) -> dict[str, Any]:
+def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: Mapping[str, Any] | None, record: Mapping[str, Any], sources: list[Mapping[str, Any]], provider: Any, spec_root: Path, schema_contracts: SchemaContracts, active_method_ids: set[str], interpretation_id: str, language: str = "zh-TW", catalog_lines: list[str] | None = None, record_schema_text: str = "", feedback: str = "", previous: Mapping[str, Any] | None = None, target_record_fields: "Callable[[str], set[str] | None] | None" = None, excluded_method_ids: Mapping[str, str] | None = None) -> dict[str, Any]:
     kind = visual_kind(spec_root, method_id, contract)
     manifest = build_prompt_manifest(record, sources)
     contract_schema = load_interpretation_schema(spec_root)
     via_tool = callable(getattr(provider, "complete_json", None))
-    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind, language=language, catalog_lines=catalog_lines, record_schema_text=record_schema_text, feedback=feedback, previous=previous, via_tool=via_tool)
+    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind, language=language, catalog_lines=catalog_lines, record_schema_text=record_schema_text, feedback=feedback, previous=previous, via_tool=via_tool, excluded_method_ids=excluded_method_ids)
     def complete(system: str, user: str) -> Any:   # API-parsed JSON with bounded thinking when the provider offers it; a fake's text otherwise
         if via_tool:
             return provider.complete_json(system, user, max_tokens=INTERPRET_MAX_TOKENS, effort=INTERPRET_EFFORT, input_schema=answer_schema(contract_schema))
@@ -958,7 +992,7 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
             move_unresolvable_prefills_to_needs_input(interpretation, manifest, target_record_fields)
             normalize_gaps_without_inventing_evidence(interpretation, language)
             normalize_layered_visual_bindings(interpretation)
-            steps_removed, steps_repaired = repair_next_steps(interpretation, active_method_ids)
+            steps_removed, steps_repaired = repair_next_steps(interpretation, active_method_ids, excluded_method_ids)
             interpretation, schema_removed, schema_repaired = conform_to_schema(interpretation, contract_schema)
             claims_removed, claims_repaired = repair_claims(interpretation, record, manifest)
             gaps_repaired = merge(add_blank_unit_gaps(interpretation, manifest, language), add_missing_source_gap(interpretation, manifest, language))

@@ -71,6 +71,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
   const [customName, setCustomName] = useState("");   // N-83: 專案名稱, typed before a new project exists; blank = the auto tool+time name
   const [prefillNotice, setPrefillNotice] = useState("");          // N-20: 從「X分析」帶入 N 格
   const [prefillNeeds, setPrefillNeeds] = useState<string[]>([]);  // N-20: which carried-from fields still need the user (MethodForm marks them .need)
+  const [recorded, setRecorded] = useState("");   // a rerun: the numbers the project's task cards recorded last (operator 2026-09-29)
   const [stepForms, setStepForms] = useState<Record<string, FormField[]>>({});   // a result's next steps' own target forms, for card ⑧ (N-13/N-14)
   const refill = useRef(Boolean(analysis) && !analysis?.record);   // opened while it runs: refill the fields when it lands
   const prefillKey = `cos:prefill:${methodId}`;   // sessionStorage entry a previous result's ⑧ card left for this run (cleared only once a run of it is launched)
@@ -87,6 +88,16 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
       const demoSet = /^#demo(?:=([a-z]+))?$/.exec(window.location.hash);   // #demo, or #demo=<lesson domain> (N-55)
       const example = response.form.example;
       const base = initialState(response.form.fields, demoSet ? (demoSet[1] ? example?.sets?.[demoSet[1]]?.input ?? example?.input : example?.input) : undefined);
+      // ⑧ opens this page in a new tab (its own sessionStorage): the carry-over arrives in localStorage, moves into this
+      // session at once (N-22 keeps it until a run launches) and is ignored once older than 10 minutes
+      try {
+        const handed = localStorage.getItem(prefillKey);
+        if (handed) {
+          localStorage.removeItem(prefillKey);
+          const at = (JSON.parse(handed) as { at?: number }).at ?? 0;
+          if (Date.now() - at < 10 * 60 * 1000) sessionStorage.setItem(prefillKey, handed);
+        }
+      } catch { /* storage unavailable: the form opens empty */ }
       const prefillText = sessionStorage.getItem(prefillKey);
       if (!prefillText) { setState(base); return; }
       try {
@@ -126,6 +137,19 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
     }).catch((reason) => { if (active) setError(String(reason)); });
     return () => { active = false; };
   }, [given]);
+
+  useEffect(() => {   // a rerun compares against what actually happened: the task cards' latest 實際數字, one per name
+    if (!rerunId || !given) return;
+    let active = true;
+    apiFetch<Array<{ notes?: Array<{ at?: string; numbers?: Array<{ name: string; value: number; unit?: string | null }> }> }>>(`/projects/${encodeURIComponent(given)}/tasks`).then((tasks) => {
+      if (!active || !Array.isArray(tasks)) return;
+      const latest = new Map<string, { value: number; unit: string; at: string }>();
+      const notes = tasks.flatMap((task) => task.notes ?? []).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+      for (const note of notes) for (const number of note.numbers ?? []) latest.set(number.name, { value: number.value, unit: number.unit ?? "", at: note.at ?? "" });
+      if (latest.size) setRecorded(`任務卡最近記錄的實際數字：${[...latest].map(([metric, item]) => `${metric} ${item.value}${item.unit}${item.at ? `（${formatTime(item.at).slice(0, 10)}）` : ""}`).join("、")}；把格子裡的數字改成最新的，再按「執行分析」。`);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [rerunId, given]);
 
   // N-60: a ?rerun= link stays in the address after the reminder is fulfilled or dropped elsewhere; a stale one
   // would otherwise be sent on every submit and refused every time (RERUN_NOT_OPEN). Drop it silently on load.
@@ -222,6 +246,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
         {projects.slice(0, 8).map((item) => <button type="button" key={item.project_id} className={`btn${projectId === item.project_id ? " primary" : " ghost"}`} aria-pressed={projectId === item.project_id} onClick={() => setProjectId(item.project_id)}>{item.name}</button>)}
       </div>{projects.length > 8 && <p className="sub mb0">更早的專案：到「我的專案」打開它，按「在這個專案再用「{name}」分析一次」。</p>}</details>}
       {prefillNotice && <p className="mocknote" role="status">{prefillNotice}</p>}
+      {recorded && rerun && <p className="mocknote" role="status">{recorded}</p>}
       <MethodForm fields={form.form.fields} state={state} onState={setState} example={example} onFill={fill} onClear={clear} label={`${name}的${numeral}個格子`} busy={Boolean(pendingId) || starting} layered={methodId === ICEBERG_ID} needs={prefillNeeds}
         onSubmit={async (payload) => {
         if (pendingId || starting) return;

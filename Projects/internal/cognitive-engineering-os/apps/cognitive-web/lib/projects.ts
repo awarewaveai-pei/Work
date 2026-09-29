@@ -6,7 +6,16 @@ export type Analysis = {
   interpretation_id: string; method_id: string | null; status: "PENDING" | "DONE" | "FAILED";
   requested_at: string; finished_at: string | null; error: string | null; judgment: Stance | null; approval?: Approval | null; revision_of?: string | null;
 };
-export type Task = { task_id: string; interpretation_id: string | null; title: string; owner: string; due: string; proof: string; target: string; when: string; created_at: string; done: boolean; done_at: string | null };
+export type TaskStatus = "not_started" | "in_progress" | "done" | "on_hold";
+export type TaskNumber = { name: string; value: number; unit: string };
+export type TaskNote = { note_id: string; happened: string; thoughts: string; adjustment: string; blocker: string; numbers: TaskNumber[]; next_check: string | null; at: string };
+export type Task = {
+  task_id: string; interpretation_id: string | null; parent_task_id?: string | null; kind?: "task" | "plan_change";
+  title: string; owner: string; due: string; proof: string; target: string; when: string; created_at: string;
+  status?: TaskStatus; done: boolean; done_at: string | null; notes?: TaskNote[]; next_check?: string | null;
+};
+// 任務卡的 4 個狀態，看得見的按鈕，不用下拉選單 (operator rule: no dropdowns).
+export const TASK_STATUS: Record<TaskStatus, string> = { not_started: "未開始", in_progress: "進行中", done: "完成", on_hold: "擱置" };
 export type Rerun = { rerun_id: string; interpretation_id: string; method_id: string | null; due: string; scheduled_at: string; fulfilled_by: string | null; fulfilled_at: string | null };
 export type Project = {
   project_id: string; name: string; purpose?: string; created_at: string;

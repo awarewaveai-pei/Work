@@ -19,6 +19,7 @@ from ai_lego.modules.research.interpret_method_record import (
     evaluate_interpretation_gates,
     record_leaf_paths,
     record_sha256,
+    result_page_shows,
     run_interpretation,
     visual_kind,
     repair_details,
@@ -281,6 +282,52 @@ def run_detail(provider: "FakeProvider", interpretation_id: str) -> dict:
     return run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=DETAIL_RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids=set(), interpretation_id=interpretation_id)
 
 
+class NewToThisPageTests(unittest.TestCase):
+    """Operator 2026-09-29: ⑧ recommends tools ③ does not already draw and the project has not run; 1.4.0 plan rows."""
+
+    STEP = {"answers": "a", "deepens": "d", "prefill": {}, "needs_input": [], "yields": "y", "est_cost": "S"}
+
+    def test_the_registry_names_what_the_page_draws(self):
+        self.assertEqual(result_page_shows(resolve_spec_root(), "systems.iceberg_model"),
+                         {"systems.causal_loop_diagram", "systems.behavior_over_time", "systems.leverage_point_analysis"})
+        self.assertEqual(result_page_shows(resolve_spec_root(), "root_cause.five_whys"), {"systems.causal_loop_diagram", "systems.behavior_over_time"})
+
+    def test_an_excluded_tool_leaves_the_prompt_and_a_step_naming_it_goes_as_a_repair_not_a_paid_retry(self):
+        steps = [dict(self.STEP, method_id="systems.causal_loop_diagram"), dict(self.STEP, method_id="root_cause.five_whys")]
+        provider = FakeProvider([detailed_response(next_steps=steps, next_methods=["systems.causal_loop_diagram", "root_cause.five_whys"])])
+        excluded = {"systems.causal_loop_diagram": "③ 已經畫出", "systems.iceberg_model": "就是這個工具"}
+        result = run_interpretation(method_id="systems.iceberg_model", contract=dict(CONTRACT, recommended_next=["systems.causal_loop_diagram", "root_cause.five_whys"]), display={}, record=DETAIL_RECORD, sources=[], provider=provider,
+                                    spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.causal_loop_diagram", "root_cause.five_whys"},
+                                    interpretation_id="INTERP-NEW-001", catalog_lines=["systems.causal_loop_diagram — 因果回饋圖", "root_cause.five_whys — 五個為什麼"], excluded_method_ids=excluded)
+        self.assertEqual(provider.calls, 1)   # a repair, never a second paid call
+        self.assertEqual([step["method_id"] for step in result["interpretation"]["next_steps"]], ["root_cause.five_whys"])
+        self.assertEqual(result["interpretation"]["next_methods"], ["root_cause.five_whys"])
+        prompt = provider.requests[0][1]
+        available = prompt.split("AVAILABLE ACTIVE METHODS:\n", 1)[1].split("\n\n", 1)[0]
+        self.assertNotIn("systems.causal_loop_diagram", available)
+        self.assertIn("systems.causal_loop_diagram (③ 已經畫出)", prompt)
+        self.assertNotIn("systems.causal_loop_diagram", prompt.split("CONTRACT: ", 1)[1].split("\n", 1)[0])
+        self.assertIn("next_steps", result["gate_results"][3]["evidence"]["repaired"])
+
+    def test_a_plan_row_serves_only_options_that_exist(self):
+        solutions = json.loads(detailed_response())["solutions"]
+        solutions["long_horizon"] = "quarter"
+        solutions["plan"] = [{"when": "第 1 週", "action": "補數據", "owner": "帶領者", "proof": "有基準值", "target": "第 2 週前", "phase": "short", "options": ["乙", "丁"]},
+                             {"when": "第 2 季", "action": "改訓練", "owner": "訓練負責人", "proof": "新教材", "target": "定稿", "phase": "long", "options": ["丁"]}]
+        result = run_detail(FakeProvider([detailed_response(solutions=solutions)]), "INTERP-NEW-002")
+        plan = result["interpretation"]["solutions"]["plan"]
+        self.assertEqual((plan[0]["options"], "options" in plan[1], plan[1]["phase"]), (["乙"], False, "long"))
+        self.assertEqual(result["interpretation"]["solutions"]["long_horizon"], "quarter")
+
+    def test_the_prompt_asks_for_five_options_and_a_short_and_a_long_plan(self):
+        provider = FakeProvider([valid_response()])
+        run_interpretation(method_id="systems.iceberg_model", contract=CONTRACT, display={}, record=RECORD, sources=[], provider=provider, spec_root=resolve_spec_root(), schema_contracts=SchemaContracts(resolve_spec_root()), active_method_ids={"systems.leverage_point_analysis"}, interpretation_id="INTERP-NEW-003")
+        prompt = provider.requests[0][1]
+        self.assertIn("solutions: 5 options", prompt)
+        self.assertIn("phase short = the first month", prompt)
+        self.assertIn("long_horizon = month|quarter|year", prompt)
+
+
 class ResultPageDetailTests(unittest.TestCase):
     """Schema 1.1.0 sections: every claim cites the record, numbers come from the line they cite, loops close."""
 
@@ -454,7 +501,7 @@ class TrendRetryTests(unittest.TestCase):
     def test_the_prompt_lays_the_plan_out_in_weeks(self):
         provider = FakeProvider([detailed_response()])
         run_detail(provider, "INTERP-WEEKS-001")
-        self.assertIn("when = the week numbers counted from the plan's start, digits only, like 1 到 2 / 3 到 4 / 5", provider.requests[0][1])
+        self.assertIn("phase short = the first month, when = 第 1 週 / 第 2 到 4 週 (weeks counted from the start)", provider.requests[0][1])
 
 
 class CutOffProvider(FakeProvider):
