@@ -1432,8 +1432,16 @@ Repair it first, then re-run:
                             if (Get-Command Invoke-SafeGitPush -ErrorAction SilentlyContinue) {
                                 Invoke-SafeGitPush -WorkRoot $WorkRoot -Branch $branch
                             } else {
-                                & git push origin $branch
-                                if ($LASTEXITCODE -ne 0) { $skeletonPushOk = $false }
+                                $savedSkeletonEAP = $ErrorActionPreference
+                                $ErrorActionPreference = 'Continue'
+                                try {
+                                    & git push origin $branch 2>&1 | Out-Host
+                                    $skeletonPushExit = $LASTEXITCODE
+                                }
+                                finally {
+                                    $ErrorActionPreference = $savedSkeletonEAP
+                                }
+                                if ($skeletonPushExit -ne 0) { $skeletonPushOk = $false }
                             }
                             if ($skeletonPushOk) {
                                 Write-Host "AO-CLOSE: report skeleton committed + pushed separately (see M2, WORKLOG 2026-09-03)." -ForegroundColor DarkGray

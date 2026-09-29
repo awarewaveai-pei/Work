@@ -2,6 +2,7 @@
 ## 2026-09-30（AO-CLOSE verify-recent）
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=git push origin $branch 2>&1|Invoke-SafeGitPush | hits=0 unsafe fallback captures; safe wrapper and unredirected fallback verified。
 - REALTEST_EVIDENCE: `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1` → health 100% (328/328), verify-build-gates ALL PASSED, push OK。
+- DESIGN_RESTORE: skeleton fallback restored to merge/forward Git stderr with `2>&1 | Out-Host`; added only the missing scoped EAP guard, preserving the original PowerShell 5.1 behavior。
 ## 2026-09-30（續8）P4 report API verification
 - REALTEST_EVIDENCE: `python -m py_compile ai_lego/apps/api/main.py ai_lego/data/repositories/project_source_repository.py tests/unit/test_api_report.py` exit=0; targeted 77/77 OK; golden 4261/4261 PASS。
 - REVIEW_DONE: self-review complete；transactional row/event writes, tenant-scoped CAS, failed-gate approval refusal, reject reason, stale CAS cleanup checked。
