@@ -1,4 +1,8 @@
 ﻿# Worklog
+## 2026-09-30（續4）WC-P2-06 synthesis endpoint 重驗
+- [REALTEST] `python -m unittest tests.unit.test_api_synthesis -q` → 17/17 OK；`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` → 4261/4261 PASS。
+- [DOD] Existing `63e96ffe6` implementation covers 202 POST + background worker, PENDING/DONE/FAILED polling, paid-call metering on success/failure, tenant isolation, zero-source refusal, artifact cleanup, and no-text event payloads; targeted tests include all boundaries.
+- [REVIEW] No code, schema, production state, or model call changed; Master Plan only reconciled to existing implementation evidence.
 ## 2026-09-30（續3）WC-P2-04b 評測 harness 重驗
 - [REALTEST] `python -m unittest tests.unit.test_eval_harness -q` → 71/71 OK；`python eval/run.py --golden --out <temp>` → exit 0；`python eval/mutate.py` → 2/2 PASS（control 0、mutated 1、contract PASS、目標 metric FAIL）。
 - [DOD] P2-04b 既有實作與 Master Plan DoD 對齊：三類 finding、fact-bearing terms/min_hits、fragment precision、forbidden trap terms、category coverage；`thresholds.yaml` 全 null，未改 operator-owned 基準線。
