@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-08-29 10:44:59
+- Generated: 2026-09-30 01:42:05
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -15,11 +15,22 @@
 - `LAST_SYSTEM_STATUS.md`, `WORKLOG.md`
 
 ## 1) TASKS.md - Next (unchecked)
+- [ ] **【研究線｜P1 01–14 上線；P2 WC-01–09 程式與部署前置完成；WC-15 ⑤ prod 抹除未驗】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流** — 現況與下一步只看計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0／§12.8／§12.9；P1 紀錄 WORKLOG 續37／41／52／54／55／59；P2 09b 目前只剩付費 DOD-2／DOD-3 與操作者門檻裁定；⑤ 見計畫 §7 R29（操作者）。
+- [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
+- [ ] **【Cognitive OS web】結果頁已照示意稿（已上線）；剩各頁渲染閘與示意稿裡還沒做的動作** — 已上正式站：外框／首頁／工具／工作流／專案（WORKLOG 續36）、填寫頁（續38）、兩堂課＋課程連結（續39），`79bf7cc5`（續40）。結果頁＝卡片①–⑨＋核准卡、解讀契約 1.1.0 與 detail_integrity 閘（續61），已上正式站 `1fbb021f`（續62）。我的專案：專案名點得進專案頁、每次分析一列且打得開、每次「執行分析」開自己的專案、建立／最後更新到分鐘（2026-09-27 續1），已上正式站 `b6936ecc`（續3）。剩：① `check-mocks.py --page` 只有 result，首頁／工具目錄／工具頁／工作流頁沒有渲染 HTML 閘；② 工作流逐站頁（P3）；③ 結果頁對示意稿 310 筆已全修（2026-09-28 續11＋續15，已 push，未上線），見 `Projects/internal/cognitive-engineering-os/docs/RESULT_PAGE_GAP_REPORT.md`；④ 上線 High-STOP（報告 §9），先定每租戶每日 token 額度（一次分析約 1.8–4.3 萬）。
+- [ ] **【蒐集｜設計問題，需判斷】density 是不是該有單獨否決權** — 同一批實測裡 `rusi.org/people/farrell`、`royalsoc.org.au/...`被 `low_text_density` 擋下，但那些頁面的抽取其實是對的：正文短、站本身 HTML 很重（605KB）。`MIN_DENSITY` 的用意是「抽到的是導覽列而不是正文」，可是對「短但完整的個人檔案頁」它會誤判，而個人檔案頁正是背景調查最需要的東西。可能的治本方向：density 改成第二訊號（只在 textBytes 貼近下限時才否決），與 soft-404 的 weak-marker 邏輯同構——但這會放寬所有來源的入庫條件，影響客戶 KB，**不是可以順手改的東西**。需要先蒐集實際 textBytes/density 分布再決定。
+- [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
+- [ ] **【資安｜待操作者】staging WP admin 密碼曾明文進 Trigger.dev run output：輪換 2 站 + redact 9 run + deploy**
+- [ ] **Codex `/hooks` trust 未執行，Codex 側等同零機械閘** — `check-claude-codex-parity.ps1` 444/446，唯二失敗就是這條（`0/8 hook handlers trusted` + 無 heartbeat）。2026-09-20 的共用資產成果（41 個 command wrapper、25 個 agent bridge、相對路徑、model 分層）在 Codex session 內全都沒有機械強制。**需操作者在 Codex 開 `D:\Work` 跑 `/hooks` 並 trust AwareWave hooks**，之後 `check-claude-codex-parity.ps1` 應轉 446/446。
+- [ ] **【2026-09-11 開出｜蒐集 C1 × KB】`provenance` 與 `author` 到 sink 就斷** — 蒐集端每份文件都蓋 `EVIDENCE`/`SOURCE_QUOTATION`（`lib/collect/provenance.ts`）並抓 byline，但 `KnowledgeInput`（`lib/kb/types.ts`）沒有這兩個欄位，`sink/kb` 只能丟掉。後果：客服 AI 從 KB 撈到爬來的廠商行銷文案時，沒有任何標記可據以包裝成 untrusted quote——正是 `DATA_COLLECTION_PLAN.md` §1.3b「傳遞」列要防的整條路徑。KB 側屬 K2e（三軸 + locked），本項在那之前不得宣稱 §1.3b 完成。
+- [ ] **【2026-09-11 開出｜KB K1】per-model partial HNSW 是否真的被用到，未經 EXPLAIN 證實** — 0072 加了 `idx_cs_chunks_hnsw_te3s`（`WHERE embed_model = 'text-embedding-3-small'`），0051 的全表 `idx_cs_chunks_embedding` 仍在，兩個 HNSW 同時維護 = 雙倍寫入成本；而 `p_model` 是 bind parameter，partial index 未必會被選中。塞 ~2000 列跑 `EXPLAIN (ANALYZE)` 確認後再決定刪哪一個。順帶：0051 的 `bm25_tsv` 欄與 `idx_cs_chunks_bm25` 至今無人寫也無人讀（死欄位＋死索引），一併處置。
+- [ ] **【2026-09-12 開出｜KB migration 0076】critic 覆審找到的五個延後項（皆非阻擋，已個別記在程式註解裡）**
+- [ ] **【2026-09-11 開出｜影片｜待查】`/api/video/regenerate-image` 502，與 remotion-render 502 不同根因，未修**
 - [ ] **【⚠️ 逾期 69 天｜原排 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
 - [ ] **【未開始｜2026-08-25 開｜到期日 2026-08-31】重新啟用 Codex stop-time review gate** — 2026-08-25 05:08 UTC **暫時停用**（`node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs setup --disable-review-gate`，走官方開關非改檔；已驗證 `stopReviewGate: True → False`）。
 - [ ] **🔴【資安】2026-08-27 `HF_TOKEN` 明文進入對話紀錄 — 待輪換** —— 驗證 WSL2 環境變數轉送時讀取 `/proc/<pid>/environ`，遮罩用的 `sed` 比對條件寫錯未生效，HuggingFace token 完整值印進 transcript。**與 2026-08-15 三項外洩同根因**（遮罩「輸出後才套用」而非「不讀取值」），第三次發生。
 - [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）**
-- [ ] **🔴【硬死線 2026-11-12】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）**
+- [ ] **【🔴 硬死線 2026-11-12｜②主體搬遷已完成 2026-08-28，③④收尾未做｜2026-08-30 稽核】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）** — **狀態更新（不要照下方 KS-6/買機日期等舊細節行動，那是原計畫，實際發生的不一樣）**：④步驟執行順序中的②「網站搬新購二手 dedicated 機」**已完成**——實際買的是 OVH SYS-GAME-2（不是原計畫的 KS-6/auction 機），2026-08-28 完成真流量切換到 `ks-aw-01`（見 WORKLOG「🎉 Soulful 正式切換完成」+ `AUTO_TASK_DONE: soulful-cutover-executed`）。**還沒做的只剩**：③ 網域轉 CF Registrar（原文自己就寫「建議搬站穩定後再做」，尚未執行）④ 讓 Hostinger hosting 自然到期於 2026-11-12（未到期，不用管）。舊站維持凍結當回滾路徑，觀察期滿（2026-09-04 起）才進入收尾，見本檔「⏭️ Soulful 搬站」大項 §157。
       - [ ] EU①Supabase（**High-risk，需操作者本人在線**，六服務中風險最高、放最後搬）
       - [ ] EU②Trigger.dev（含 ClickHouse——**搬前先確認 `override.xml` 產生源設定已生效**，2026-08-19 在原機實測過這個坑，同一套修法要複製過去）
       - [ ] EU③n8n
@@ -34,51 +45,47 @@
       - [ ] SG⑪Redis（共用快取層，隨最後一個依賴它的服務一起搬，不單獨排波；**檢查現況是否有密碼，新機多服務共用建議補上**）
       - [ ] SG⑫觀測堆疊（Loki/Grafana/Promtail；**✅ 2026-08-19 SSH 查證用途：SG 主機自己的日誌監控**，loopback-only + SSH tunnel 存取，有正式文件 [`OBSERVABILITY_P1_P2_ROLLOUT.md`](docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md)，為防過去 502 事故而建——**要搬，不是退役項**；搬遷後 SSH tunnel 指令要改指新機 IP）
       - [ ] 兩台雲端主機確認已無流量 → 安全關閉 → 帳單確認只剩一台在計費（呼應 Pre-mortem「切換 +120 天仍 &gt;1 台在跑」的預警指標）
-- [ ] **🔴【資安】2026-08-15 transcript 憑證外洩 — 三項待輪換**
+- [ ] **【2026-09-28 觸發】aware-wave.com DMARC 升級第一階段（p=none → p=quarantine;pct=25）** — 決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md)：機械分階段（pct=25→100→reject，各 14 天），前提是操作者查看 `peijingartstudio@gmail.com` 收到的 DMARC rua 聚合報表，確認 Cloudflare Email Routing／Amazon SES／Resend 三個已知寄件來源皆對齊、零未解釋失敗。任一階段出現未解釋失敗 → 凍結，不得跳過原因逕自往下推進。（2026-09-28：排程提醒已觸發，已推播通知操作者查信；本項尚未執行，等待操作者確認 rua 報表結果後續行動）
 - [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
-- [ ] **【人工｜Postiz 測試草稿清理】** 登入 `https://postiz.aware-wave.com` → Posts → Drafts → 刪 draft ID `cmqo1wijz0005p58ncl1mtssr`（Gate C 測試用，content 含「Delete this draft」）。
-- [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】** `app.aware-wave.com/ops/clients/[slug]` → 社群頻道 tab → 點「連結」→ 選 Bluesky integration（soulfulexpression.bsky.social）→ 儲存。完成後 ContentStudio 才能看到 channel selector 顯示帳號。
-- [ ] **既有站接手 Day 1（Soulful Expression）**
 - [ ] **【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀**：操作者回報 mockup 有問題未提供細節（2026-06-13）。MockupStudio.tsx 實走 `/api/tools/studio/generate`（nano-banana-2 + referenceImages）。
 - [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測** — 整個 PS 功能目錄已全部 build+deploy（HEAD 含 `09b81ee4`/`5b73b77d`，tsc 0+build 0+critic 過），但**使用者尚未瀏覽器實測**（Claude 無登入 session 無法測）。主檔 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/canvas/CanvasEditor.tsx`。待驗清單：
 - [ ] **【POD A1 已完工｜剩 e2e + A2】** A1（一鍵 native 建品）後端+UI+hardening 全 live。剩：
 - [ ] **【POD A2 confirm phase — 🔴 金流紅線，測試結束 + 操作者明示批准才做】** A2 draft-only 管線已上 prod dormant。真正「自動扣款 + 送印」需未來明確建 confirm step（目前 code 完全沒有）。
 - [ ] **【未開始｜待使用者明確下指令】會議服務網路版安裝** — 客戶筆電無 NVIDIA GPU（2026-08-20 確認），本機版 CPU 路線慢 20-27 倍不可用。
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
-- [ ] **【已知限制｜2026-08-25 開｜2026-08-31 自動解除】Codex 額度耗盡，跨模型 oracle 路徑不可用** — `codex exec` 直測回 `You've hit your usage limit ... try again at Aug 31st, 2026 12:41 PM`。影響：
-- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】** — 軟體層(cs-engine U0–U5 + widget U4)已上 prod 並 live 驗；只剩裝 Chatwoot + 接線（建 `app/api/cs/chatwoot-webhook` 呼叫 `handleInbound`、MockTransport 換 ChatwootTransport）。
-- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】**
-- [ ] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合
-- [ ] **新站建置（Scenery Travel Mongolia）**
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（~~兩案~~ → 僅剩 Scenery）**
-- [ ] `tenants/templates/` v2
-- [ ] **🟠 EU origin 仍未鎖 Cloudflare（步驟 A 已完成，B 待做）**
+- [ ] **【資安｜tarot】`BATCH_INTERNAL_SECRET` 經 Trigger run payload 傳遞（payload 會持久化、dashboard 看得到）**
+  - [ ] **【從舊 EU-origin 項拆出，仍待辦】`awmainwp` 帳號名已外洩（320 次針對性嘗試），改名或加 2FA** — 需操作者在 MainWP 後台執行，與主機拓樸無關。
 - [ ] **【2026-08-26 開出｜我自己留下的漂移風險】`cloudflare-realip.conf` 的網段清單是靜態的，無偵測器**
 - [ ] **【2026-08-26 開出｜🔴 客戶站已破圖｜刪影片會靜默弄破已發布的文章】`video/[id]` DELETE 無引用檢查** — **現行損害（實測）**：Soulful Expression 上線文章 `感恩日記：改變人生的五分鐘習慣`（post id 7393，`https://soulfulexpression.org/insights/general/...`）嵌著 `https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/感恩日記_改變人生的五分鐘習慣/16x9.mp4`，該物件 **HTTP 404**（陰性對照：仍存在的 `三個習慣_...` 回 200）。客戶頁面上是一個壞掉的影片。
-- [ ] **【2026-08-26 開出｜小】R2 裡 8 個 `remotion/` 物件（~200MB）從未被任何對帳涵蓋** — `reconcile.ts` 的 `FORMAT_SUFFIX_RE = /^video\/(.+)\/([^/]+)\.mp4$/` 只收 `video/` 前綴，而 remotion-service 寫的是 `remotion/YYYY-MM-DD/<uuid>.mp4`（`apps/remotion-service/src/server.ts:293`）。實測 R2 有 8 個此類物件（2026-06-24 五個、2026-07-02 三個，最大 113MB），**全部不在 media_assets、也不在任何清理排程**（`video/cleanup` 也只刪 media_assets 有列的）。等於一個持續長大且無人看管的儲存桶分區。**先決定要不要留**：remotion 產出目前有無使用者可見的入口？沒有的話直接刪比補對帳便宜。
-- [ ] **【2026-08-26 開出｜等一個決定】R2 `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4` 是真孤兒（23MB）** — 無 media_assets 列、目錄名無 org 前綴（2026-08-25 之前的格式）→ reconcile 一律 fail-closed 不猜擁有者。**告警上線後會持續報 `orphanUnattributable=1` 直到處理掉**（這是正確行為，它確實是孤兒）。選項：① 補記到某個 org（`organizations` 有 `d6d1e845 mongolia-03` 這個測試租戶，名稱吻合但**不可據此推定**）② 直接刪除物件。**需操作者判斷這支影片還要不要**。
-- [ ] **🔴 EU 的保留政策把「還原演練證明過的備份」刪掉了**
+- [ ] **【2026-09-05 開出｜P0/P1｜Media Production LEGO Platform】統一影片、短劇、字幕、實拍 QA 與網站／社群交付** — 正本：[`docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md`](docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md)。
 - [ ] **【2026-08-26 開出｜已知風險｜操作者決定不處理】WPvivid 的 Google Drive refresh_token 曾進入對話紀錄**
-- [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
 - [ ] **【2026-08-25 開出｜類別級重設計】影片歸屬改為持久化 `outName → organization_id` mapping，停止從 object key 反解** — critic（2026-08-25）指出 2026-08-25 那批修正裡的三條 finding（crafted legacy prefix / 大小寫不一致 / ctx 缺欄位 fallback）是
-- [ ] **【2026-08-25 開出｜critic Minor 7 條｜2026-08-26 部分結案】影片管線租戶邊界收尾** — 原 7 條逐條重驗結果如下（重驗而非沿用）：
-- [ ] **【2026-08-26 開出｜中】next-admin 沒有 DOM 測試基礎設施，接線層的 bug 測不到** — repo 無 `jsdom` / `happy-dom` / `@testing-library/react`，vitest 全域 `environment: "node"`。實證代價：同一天 Codex 三輪覆審抓到的 3 條 CONFIRMED finding **全部在 React 元件的接線層**（mount-only effect 讀 URL state、`if (sites.length)` 讓決策分支被跳過、`?? wpSites[0]` 靜默替換），而純函式測試對它們一律綠燈 —— 突變測試證實：把 `ContentStudio` 改回舊寫法完全繞過 `pickInitialSite`，5 個測試照樣全過。**決策點**：要不要引進 DOM 測試依賴。影響 `sg-deploy.sh` 的 `npm test` gate 與 57 個現有測試檔的執行環境，屬於操作者的決定，不該塞在功能 commit 裡。
 - [ ] **【2026-08-26 開出｜中】現存 10 個 staging 孤兒 / 1969.7 MB 待清理（拆除路徑已就緒，清理是決策）** — 見 `agency-os/reports/status/staging-orphans-LATEST.md`。**4 個 unregistered**（`fresh-brew-coffee-f2a3b4` 93MB、`green-valley-farm-28ba09` 217MB、`ssasd-8ebcd4` 306MB、`test-pilot` 93MB）有目錄有 DB 但從未進過 `wp_sites` —— 佈建 wiring 是 best-effort，失敗只回 WARN 不擋佈建。**3 個 complete 但已停用**（`e2e-verify-0704` 357MB、`mongolia-03` 549MB、`test-wp-webhook-co` 355MB），WP REST 實測 404。**6 個 db_only** 只剩資料庫沒有目錄，`deprovision-staging.sh` **刻意拆不動**（要求目錄存在且含 wp-config.php，否則無法證明要 DROP 哪一個），需人工確認後手動處理。SG 根磁碟 67%（48G/75G）。**注意 `test-pilot` 的 DB 叫 `wp_staging_testpilot`，命名規則與自動佈建不同，可能是更早的手工產物，不該和自動佈建的混在一起判斷。**
 - [ ] **【2026-08-26 開出｜中】手動新增的站拿不到租戶歸屬
 - [ ] **【2026-08-26 開出｜小｜跟著
+- [ ] **【2026-09-26 開出｜DB｜Medium】正式庫從未套用 4 個 migration** — ledger 補登時逐檔實測發現（WORKLOG 續48）：0022 build console 7 表＋`sites.apply_mode`（adopt-client-os／wp-install-plugins 會寫這些表，Profile C 目前在正式庫必失敗）；0037 派送 index（檔內 CONCURRENTLY，需非交易手動套）；0024 `tenant_integration_bindings_ws_idx`；0057 wp-update 目錄列（`lib/ops-actions/record.ts` 首次使用會自動 upsert，可只補帳）。0022 無自身 BEGIN/COMMIT、runner 會拒絕 → 需先補交易包裹（新號或原檔修正需決定）。套完以 `apply-db-migration.mjs --record-only` 補帳。
+- [ ] **【2026-09-26 開出｜小】workflows 套件沒有 typecheck 步驟** — `lobster-factory/packages/workflows` 無 tsconfig／typescript；Trigger build（esbuild）不做型別檢查。ad-hoc strict tsc 找到 3 個既有錯：`dispatch-action-run.ts:198`（captureWorkflowEvent 參數缺 workflowId）、`:213`（SentryContext 無 runId）、`hosting/providers/httpJsonStagingAdapter.ts:51`。WORKLOG 續43。
+- [ ] **【2026-09-26 開出｜POD｜Medium】Woo 端對帳：webhook 是否仍啟用、有無投遞失敗** — pod_order_inbox 只看得到「有送到」的訂單；WooCommerce 停用 webhook（>5 次失敗）或部署重啟時的單筆失敗，收件匣看不到。偵測：讀 soulful `wp_wc_webhooks`（delivery_url 含 `/api/webhooks/woo-order`）的 status＝active 且 failure_count＝0，沿用 `scripts/check-smoke-tests.ps1` client_mail 的 SOULFUL_DB_PROFILE 傳輸（Hostinger／ks-aw-01 切換期）。critic M2 延伸，WORKLOG 續51。
+- [ ] **【2026-09-26 開出｜小｜設定】env 設定的 WP 站與 bridge 站綁 org** — env 站（`lib/content/wp-sites.ts:42` organizationId null）只受 global 模式管、社群發文回 422；bridge 站以網址 host 對應 active wp_sites 列取 org（`lib/studio/wp-bridge-client.ts` bridgeSiteOrg），無列 = 只看 global。修：把這些站建成 wp_sites 列並填 organization_id。T18 critic M2＋m5，詳 WORKLOG 續26。
+- [ ] **【2026-09-26 開出｜資安｜小】app origin 的前端供應鏈與傳輸加固** — `public/vector-editor.html:7-13` 7 支 cdnjs／jsdelivr script 無 SRI（跑在 app origin、不受登入保護，session cookie httpOnly:false 可被讀）；live 無 HSTS header、cookie 無 Secure。修：加 `integrity`＋`crossorigin` 或自架；nginx 加 HSTS。 → SRI ✅ 2026-09-26 續47（T23，7 支 hash 與 CDN 官方值比對一致）；HSTS（host nginx）＋cookie Secure 仍待做。
+- [ ] **【2026-09-12 開出｜中優先】`git-align-main-aoresume-feature-*` 自動對齊腳本會吃掉未提交的編輯**
+- [ ] **【2026-09-28 開出｜Cognitive OS｜低優先】run_recipe_async 終態 FAILED flake：`test_async_run_reaches_a_terminal_state_via_the_existing_status_endpoint` 高負載下 async run 以 FAILED 收尾**
+- [ ] **【2026-09-11 開出｜HCI30｜低優先】mutation-check-wave1.ps1 的 `drop-all-subject-records-referencing-fks` 疑似 flaky**
+- [ ] **【2026-09-19 開出｜HCI30｜中】快照未存抓取時的 HTTP header charset** — 「採用為證據」從已存 bytes 重新擷取文字時只剩 BOM/`<meta>` 可判斷編碼；只在 header 宣告 Big5/GBK/Shift_JIS 的頁面會變亂碼證據（人工預覽看得到，append-only 無法事後改）。治本＝`hci.source_snapshots` 加 `content_charset`（migration，High）+ sink 寫入 + `/snapshot-text` 帶入 `detectHtmlEncoding`。來源：critic m2，WORKLOG 2026-09-19「HCI 採用為證據」。
+- [ ] **HCI-30 C6 真實登入串接計畫（2026-09-17 `planner` 產出，審閱中，未授權執行）** — 12 個 Task Prompt，Task 3/5/6/7/9 為 High-risk STOP。計畫：`Projects/internal/hci30/docs/HCI_C6_REAL_LOGIN_PLAN.md`。C6 仍為 DEFERRED，本項只記錄計畫已產出，不代表開工授權。**2026-09-18 補記（Task 10 critic 覆審 Major，未修，已追蹤）**：`app/server.mjs` 的既有「尚無 auth 層」缺口，因 Task 10 新增 `POST /api/hci/v1/seeds` 而具體化——該端點無 rate limit，由外部輸入 `targetUrl` 驅動後端對任意外部網址發真實 fetch，暴露前需先解決（rate limit 或本 C6 計畫其中之一）；目前僅本機單一受信任操作者使用，未對外暴露，非阻塞。詳見 WORKLOG 2026-09-18（續5）。
+- [ ] **已知債務追蹤：`queryAsTenant()`(`Projects/internal/hci30/app/server.mjs:79-88`) 的 `SET ROLE`/查詢/`RESET ROLE` 缺明確 transaction 包裹** — db-expert 2026-09-17 審查 C6 時發現（與 C6 本身無關的既存缺口）。今天安全只因 node-postgres `pool.connect()` 釘住單一實體連線；若未來加 PgBouncer 且用 transaction pooling mode，`SET ROLE` 可能落在不同 backend 連線上且不報錯，形同繞過 RLS。修法：包一層明確 `BEGIN...COMMIT`（低風險、無行為改變），或 Task 9 部署時確認絕不用 transaction pooling mode。觸碰身分/RLS 邊界程式碼，需操作者對此項單獨確認才動工。
+- [ ] **已知模式債務：`dev-db-init.ps1` 的「hardcode 最新 migration marker + loop bound」模式會在下個 migration 忘記同步時重演** — Task 8（2026-09-18）critic 覆審發現：這次的根因類型本身沒根治，只修了症狀（0019→0020）。根治需 migration 帳本表（記錄哪些 id 已套用，逐檔比對現有 migrations 目錄），非本次範圍。
+- [ ] **已知限制：`check-trigger-no-direct-fetch.ps1` 抓不到動態字串組出屬性名稱的 fetch 呼叫** — Task 9（2026-09-18）critic 覆審真實 PoC 證實：`globalThis['fe'+'tch'](...)` 這類手法因為原始碼裡從未出現完整的 "fetch" 字面 token，regex 掃描原理上抓不到，需要真正的 AST + scope resolution 或直譯器才能根治。這是 ADR-0029 gate 6 目前**唯一**的執行機制，非形式化證明過的完整方案。
+- [ ] **已知限制：`check-trigger-no-direct-fetch.ps1` 的 `$forbiddenImportPattern`／`$xhrPattern` 有 3 個真實繞過，未修**（Task 10 follow-up app/ 擴大掃描，2026-09-18，critic 覆審真跑 PoC 證實，皆為修改前既有文字，非當次改動引入）：(1) backtick 分隔的 module specifier `` require(`undici`) `` — 字元類別只認 `['"]`；(2) 字串串接 `require('und'+'ici')`；(3) `require` 本身取別名再呼叫 `const req=require; req('undici')` — 與今天已修的 `fetch` 別名繞過同一類手法，尚未同步套到 `require`。`$xhrPattern`（`\bnew\s+XMLHttpRequest\b`）也有同款別名繞過（`const XHR=XMLHttpRequest; new XHR()`），同樣尚未套用 `fetch` 那次已驗證的「裸識別符」修法。三者皆已用真實執行證實（非推論），列為獨立後續任務，不在本次 app/ 擴大掃描範圍內（該範圍只覆蓋 node_modules 排除／字串常值誤報／零容忍模式三項）。詳見 WORKLOG 2026-09-18。
+- [ ] **已知債務：runner 端寫入 MinIO 但 DB 列因輪詢階段失敗而遺失時的孤兒物件** — Task 9（2026-09-18）critic 覆審指出架構層級取捨：若失敗發生在輪詢階段（例如 runner 重啟導致 job 狀態遺失），runner 可能已把內容寫進 MinIO，但呼叫端重新 enqueue 後找不到對應 DB 列可參照，形成孤兒物件；`object-storage-client.mjs` 沒有 TTL/GC。與既有「`jobs` Map 無 TTL」債務同源，Task 9 真實流量接上前應一併處理。
+- [ ] **Bash 工具 wrapper 疑似壞掉，需獨立調查（間歇性，非持續）** — 2026-09-17 某 session 三種方式（裸指令、`.sh` 檔、`cmd.exe //c` .bat 檔）全部同樣失敗，錯誤與內容無關；同日兩個獨立 `fullstack-engineer` agent（做 Task 4/5，見上）也各自整個 session 100% 中招、從未找到解法。過去偶發同款症狀曾用「寫 script 檔另外呼叫」繞過，那次繞不過。**同日稍後另一個 session（本次，接手真跑 Task 4/5 驗證）Bash 全程正常**——`echo hi`、`node --test`、`powershell -File`（含 real-Docker/MinIO 跑約 5 分鐘）、`git`、`grep` 皆無異常，跨約 20 分鐘、數十次呼叫零故障。懷疑是特定 subagent 沙箱/session 才會中招，不是這台機器或這個 wrapper 全域持續壞掉；根因仍未定位，過去猜測（`bash -c` 呼叫前後被注入東西）未驗證。優先權降為中——不再擋住每個 session，但下次再中招時應保留完整錯誤輸出供比對。
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
-- [ ] **`claude_desktop_config.json` 至今無人治理，且正握著 6 把明文 API key**
-- [ ] **`codex-oracle.ps1 -Path` 一用就炸，等於大 repo 沒有可行的 review 路徑**
+- [ ] **【2026-09-19 開出｜bughunt-oracle 驗證缺口｜根因：為什麼 6/21 的修復沒擋住 9/19 的 sonar-pro 預設值】**`bughunt-oracle.ps1` 只驗 `hits=0` 的零命中宣告是否造假，不驗 `hits=N`（N>0）的清單是否完整。2026-06-21 那次 Perplexity 修復（WORKLOG-archive/2026-06.md:2777）宣告 `BUGHUNT_DONE: grep=PERPLEXITY_API_KEY | hits=3`，但同一個 scope（agency-os,scripts,lobster-factory）、同一個 pattern，2026-09-19 重跑立刻多出 `scripts/perplexity-cli.ps1:10,12,15` 三處命中——該檔案 2026-04-23 就存在，早於那次修復兩個月，理當被同一次 grep 掃到。這行記錄沒提到它，也沒有像 `trending-sources.ts`/`generate-core.ts` 那樣寫「不動理由」，代表不是刻意排除，是漏掉。這正是 `scripts/perplexity-cli.ps1` 的 sonar-pro 預設值沒被那次修復一併抓到、缺口留到今天的直接原因。詳見 WORKLOG 2026-09-19（續76）。**修法方向**：bughunt-oracle 對非零 hits 也該獨立重跑 grep 比對清單是否完整，不能只驗證「宣告的每一條是否真實存在」。
 - [ ] **Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」**
 - [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。
 - [ ] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」**
-- [ ] **Phase 4 雲端 routine 仍在解析已退役的 `restore_drill_due_after`**
-- [ ] **`check-backup-health.ps1` 把「無法證明可還原」當成健康**
+- [ ] **【🟡 邏輯已修，僅剩字面措辭未達完成定義｜2026-08-30 稽核確認】`check-backup-health.ps1` 把「無法證明可還原」當成健康** — 平行 session 已完成邏輯修正：`:264-269` 新增 `$sgVerifyDead/$euVerifyDead/$ksVerifyDead`（UNKNOWN 且 backup_age_days≥1 才判定），`:277` 折入 `$overall` 計算，UNKNOWN 已能正確升級 WARN（新鮮的 UNKNOWN 仍安靜，不會 false-alarm）。**未達成的只剩完成定義字面要求**：WARN 訊息目前只標 `(unknown)`，未寫出「無法證明可還原」這句話本身（`:312-313`）。不打勾，留給補一行文字。
 - [ ] **統一 TASKS 條目的標籤詞彙**
-- [ ] **【2026-08-26 開出｜🔴 交叉污染｜第 4 個 `git add -A`】AO-CLOSE 的 `git add -A` 會掃走其他 session 進行中的檔案**
-- [ ] **【2026-08-26 開出｜營運｜搬站前必處理】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — `agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json`：`last_failure` = **2026-08-24 Failed**（最新一次）；`backup_history_since_last_sync` 近 10 次為 F/S/F/F/S/S/S/F/S/F = **5 敗**。
-- [ ] **【2026-08-26 開出｜治理｜機械閘誤判】`verify-gate-commit.js` 對 Bash 指令做純文字比對，heredoc 內容含 `git commit` 就被 BLOCK** — 本 session 撰寫 routine prompt（內文本身就含 `git commit -m ...` 這一行指令範例）時，`python3 - <<'EOF'` 的 heredoc **內容**被當成「要執行 git commit」而 exit-2 擋下。閘沒有區分「要執行的指令」與「被當作資料寫入檔案的內容」。
+- [ ] **【2026-08-26 開出｜營運｜搬站前必處理｜⚠️ 2026-08-30 稽核：疑似 MOOT，需操作者確認】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗** — 現況查證：`BACKUP_AUTO_STATUS.json` 最新 3 筆已全部 `Succeeded`（2026-08-26 起），`last_failure`（2026-08-24）已不是最新事件，本項描述的即時狀態已經過期。**更根本的是**：這條追的是 Hostinger 時代 WPvivid→Google Drive 那條備份鏈；Soulful 已於 2026-08-28 正式切換 Hostinger→ks-aw-01（`WORKLOG.md` "🎉 Soulful 正式切換完成"），現行備份走全新的 `ks-aw-01-backup` 管線（已實測 PASS，見 WORKLOG 2026-08-27）。舊 WPvivid 鏈的失敗模式**很可能隨舊主機一起結束**，但 WPvivid 外掛在新機上是否還在跑、是否該完全停用，本次稽核未查證，故列 MOOT 疑似而非直接關閉——需操作者確認新機上是否還留著這條舊備份路徑。
 - [ ] **【2026-08-26 開出｜治理｜✅ 根因已定位 2026-08-26】廣域 `git add -A` 把別的 session 未驗證的工作掃進不相干的 commit**
 - [ ] **【2026-08-26 開出｜治理｜具名 add 也擋不住】兩個 session 編輯同一檔案時，`git add -- <file>` 一樣會帶走對方未提交的編輯**
 - [ ] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練** — 目前記錄一次演練要手寫兩處（frontmatter `restore_drills` + 敘述段落）。
@@ -88,7 +95,7 @@
 - [ ] **【2026-08-29 開出｜中】`system-health-check.ps1` 7)deploy-drift(:520) 與 9)cloudflare(:~610) 兩個 check 從未真正執行過** — 同一 session 修 CP950 第三 class 時發現：`$root` 恆等於 `agency-os`（`Resolve-WorkspaceRoot` 的 monorepo guardrail），但 `check-deploy-drift.ps1` / `check-cloudflare-security.ps1` 只存在於 monorepo-root `scripts/`，從未存在於 `agency-os/scripts/`，故這兩個 `Join-Path $root "scripts/..."` 恆指向不存在路徑，`Test-Path` 恆 false，兩個 check 永遠走 `Pass=$true "Skipped: ... not present"` 分支——跟 7b（CP950 parse-break）2026-05-30 上線後從未真正跑過是同一款缺陷，本次已修 7b/7c（改用 `$monoRoot`），這兩個刻意未動（不同 check，需各自驗證改用 `$monoRoot` 後的實際輸出是否正確，不能照搬 7b/7c 的 fail-closed 處理，因為這兩個目前是 informational/warn-only 不是 hard gate）。
 - [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。
 - [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
-- [ ] **smoke 04-onboard spec 補 app session 登入**：`95e80904` login hard-nav 後未登入導登入頁，spec 只帶 nginx basic-auth → 永久 fail。修法＝spec 加 app 登入步驟（Email/密碼從 env），或改用 `x-ops-sync-key` header。佐證 WORKLOG 2026-06-11 部署段。
+- [ ] **【未開始｜先預留】Composable AI Commerce OS** — 藍圖已吸收為參考素材（`agency-os/docs/Composable AI Commerce OS/`，含 Master Plan / Implementation Roadmap / LEGO Documentation Pack；absorbed via commit `97cdea3ed`）。操作者 2026-09-05 明示「之後要做，先預留」，**目前不動工**，勿主動排入排程；待操作者明示啟動再展開任務拆解。
 - [ ] **【進行中｜Phase 1 ungated 全完成，剩 T10 gated】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。
 - [ ] **【進行中｜軟體先行·U0–U5 + widget U4 完成並 prod live，剩 U6 gated】全自動客服系統**
 - [ ] **【進行中｜POD 一鍵自動上架】設計圖 → Woo + Printful 多款多色全自動** — 計畫 SSOT = `lobster-factory/docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md`（5 階段）。目標：操作者**只做設計圖**、一鍵自動 合成商品圖(白背/2模特/平拍,分長短袖,<100KB) + 建 3 款 Woo 草稿(Gildan 2400 **長袖** id57 / Stanley-Stella STTU169 id456 / Gildan 5000 id438，各 4 色 × S-2XL) + Printful native 建品綁設計稿。
@@ -103,11 +110,16 @@
 - [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem: onboarding+content；定位鎖定 Arts Practice for Self-Discovery / Arts-Based Reflective Pedagogy；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
 - [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
 - [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
+- [ ] **SearchContent vertical SC-Phase 1（Domain Foundation）：把 122 筆 PROPOSED registry 記錄逐一寫成 contract 並升入全域 registry**
+  - [ ] **【欠的 review｜2026-09-07 11:06 後才能做】** 對 commit `f2eb6cefa`（+ `e6f9e31a7`）補跑 `/codex-review`：2026-09-04 當天 critic 回 429 session limit、Codex 回 usage limit（reset 9/7 11:06），只做了書面自審 + 7 個突變（WORKLOG 2026-09-04 續2 `ORACLE_WAIVED`）。capture 檔在 `%TEMP%\oracle-capture-20260904-091506.diff`（含其他 session 的 62 檔改動，跑時要帶 scope 限制文字，或直接對 `git show f2eb6cefa` 的 26 檔審）。有 finding 才開新條目修。
+  - [ ] **【次要，db-expert 覆審發現，非阻塞】mutability matrix SSOT 漂移** — `0001_wave1_synthetic_up.sql:50-64` 的欄位可變性矩陣自稱是 triggers/grants 的 SSOT，但 `cases`/`source_snapshots`/`source_relationships`/`decisions` 四張後續 migration 加的表都不在表格裡，跟錯誤碼清單 2026-09-05 已經歷過的同款漂移（後來搬進 `ERROR_CODE_REGISTRY.md`）一樣。比照辦理：把矩陣搬進獨立檔案當真 SSOT，或至少補上四張表的列。
+  - [ ] **【次要，critic 覆審發現，非阻塞】`POST /api/hci/v1/cases`（`app/server.mjs`）的 active-authorization 檢查有 TOCTOU 窗口** — `hci.cases.tenant_authorization_id` 只有 FK 存在性檢查（`migrations/0002`），不像 `hci.research_workflows` 有 `hci.require_active_authorization()` trigger（`migrations/0001:110-123`）；本次新增的端點在**應用層**複製同一條規則（SELECT 找 ACTIVE+未過期授權 → INSERT），但兩條語句走 `queryAsTenant()` 各自獨立的連線（非同一 transaction），中間若授權被併發 REVOKE，新案子仍會綁到剛失效的授權上——正是該端點自己的註解說要防止的「schema 允許但語意錯誤」情況。單一操作者本機 demo 環境機率極低，故未阻斷本次功能上線。**治本方向**：比照 `hci.require_active_authorization()` 的既有模式，在 `hci.cases` 也加一個等價 trigger（新 migration，非 app 層 workaround），讓檢查與 INSERT 在同一陳述式內原子化；或至少把 app 層檢查改成單一 transaction 內 `SELECT ... FOR UPDATE`。**完成定義**：選定方案並落地，`POST /cases` 併發 REVOKE 情境不再可能建立引用已失效授權的案子。
+  - [ ] **【2026-09-06 HCI_CONFIDENCE_SPEC.md critic 覆審 C1 揭露；同日第八輪，操作者「你做最完美的決定」授權，兩問中的一問已解——「dimension 層 cross-method disagreement 該不該往上傳」仍 OPEN】disagreement flag 從 dimension 層傳到 domain 層的路徑** — 原文揭露兩個不同問題混在一起：①「domain 內兩個維度自己互相不同意」（inter-dimension spread）②「dimension 層的 cross-method disagreement 該不該往上傳」（`combineMethodFindings` 輸出的 `disagreement` 欄位餵進 `rollupTrustDomains` 會被靜默丟棄）。**①已解**：`rollupTrustDomains` 新增 `dimension_disagreement: boolean`（同日第八輪，`packages/intelligence/rollup-trust-domains.mjs`），比較該 domain 兩個已賦值維度自己的 rank spread（獨立命名常數 `DOMAIN_DIMENSION_SPREAD_THRESHOLD=2`，故意不跟 `combineMethodFindings` 共用同一常數——兩者比較的對象結構不同，`dimension-score.mjs` 已有「不強行共用巧合相似的比較」先例）；gate 4 白名單同步加欄位（第二次修訂 gate 4 契約，第一次是 `9888bd5d7` 的 ADR-0032 band 修正；`HCI_CONFIDENCE_SPEC.md` 原文預期的「不會再碰」已不成立，已在該檔更新揭露，同時修正該檔一處把此次誤算成「第三次」的筆誤）。coverage=PARTIAL（只有一個維度）時公式自然回傳 `false`，無需特判。**②仍 OPEN，未被①解答**：`dimension_disagreement` 純粹從兩個維度已賦值的**值**計算，對任一維度自己的值是否來自互相矛盾的 method findings零可見性——一個 `combineMethodFindings` 回傳 `disagreement=true` 的維度，仍可能 roll up 進一個 `dimension_disagreement=false` 的 domain（反之亦然）。真正的「flag 本身要不要往上傳」設計問題留給下一次真有 trust-read endpoint consumer 逼出決定時處理。驗證：154→161 Node assertion（詳見同日 WORKLOG），mutation-check-node-gates.ps1 24→27 全殺。
+  - [ ] **【2026-09-07 開，低優先，操作者決定】兩個未決**：① all-users Start Menu 捷徑（`%ProgramData%\...\Docker Desktop.lnk`）繞過守衛，需一次性 elevated session 手動 retarget（runbook 已附指令，非本次自動執行——腳本本身維持 unelevated）；② `run.socket-archive-*` 封存目錄保留政策（目前 rename-only 永不刪，已 5 個，各 0 bytes——維持或 14 天後清）。
+- [ ] **【site-watch｜客戶站】建 staging 會把客戶的正式網址蓋成 staging 網址 → site-watch 改巡 staging、正式站沒人看**
+- [ ] **【部署 env｜續110 延後 ①–③】Trigger 部署 env 三個殘留：`TRIGGER_*` 同步不到、`triggerUrl` 型別、可選值不隨輪替傳播**
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。
-- [ ] **既有站接手（Soulful Expression Art Therapy）**
 - [ ] `lobster-factory` A10-2 商業閉環實跑
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制**
-- [ ] **【2026-08-15 開出】SG dockerd/containerd 持續吃 CPU（2 核機器 load 3.2）**
 - [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 已完成（9f862d82）→ handoffs/2026-05-28-1807-batch-3-post-phase.md
 - [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
 - [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**：
@@ -115,11 +127,14 @@
 - [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】**
-- [ ] **【2026-08-29 開出，同日更正】nginx system-sites 三檔 drift（🟢 小，SG 那半已作廢，只剩 EU 兩檔待抄）**
+- [ ] **【2026-08-29 開出｜未開始｜Codex FINDING 3】`verify-closeout-completeness.ps1` 的 `REVIEW_DONE:`/`BUGHUNT_DONE:` 只 regex 比對前綴存在，不驗證內容是否真完成** — 本輪自己示範過一次：WORKLOG 曾寫 `REVIEW_DONE: ... 結果=待補（背景執行中）`，格式合法但實質未完成，若當下就 AO-CLOSE 會被機械閘放行。屬既有信任邊界（§已知信任邊界已記載「不驗內容真實」），Codex 覆審重新踩到同一個洞，值得補一條輕量檢查（例如 regex 額外擋 `待補|TBD|pending|背景執行中` 這類字樣出現在證據行本身）。**Medium risk**（動治理機械閘本體，需獨立評估，不可與其他基礎設施改動同批次做）。
+- [ ] **【2026-08-29 開出｜未開始】`status.aware-wave.com` = 現有 `uptime.aware-wave.com`（Uptime Kuma）對外開放 view** — 不重建，SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2。做法二選一：(a) Kuma 內建 public status page 功能開一個 group，另建 CNAME `status`→同一 Kuma；(b) 直接讓 `uptime.aware-wave.com` 兼公開用（需確認現有 dashboard 沒有機敏資訊外露）。
 - [ ] **【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證** — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。
 - [ ] **【已知缺陷｜第三方 plugin，不在本 repo｜2026-08-25 開】`stop-review-gate-hook.mjs` 的失敗訊息會遮住真正原因** — `~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/stop-review-gate-hook.mjs:121` 寫 `String(result.stderr || result.stdout || "")`。
+- [ ] **`decision.eisenhower_matrix` 內聯 provenance 正規化改呼叫共用函式**
 
 ## 2) TASKS.md - Backlog (unchecked)
+- [ ] **Cloudflare MCP 連線失敗（`insufficient scope: account:read`）待操作者在 Cloudflare dashboard 修 token permission** — 根因已診斷完成（`CLOUDFLARE_AUTH_BEARER_TOKEN` 缺 `Account Settings: Read`），修復動作屬修改外部帳號安全設定，非 Claude 可代做。步驟見 WORKLOG 2026-09-12（續13）。同條目另揭露：診斷過程誤將 6 把憑證明文印進 session transcript，建議操作者輪替。
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
@@ -154,6 +169,15 @@
 *Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
+
+### Today (2026-09-04) — Cognitive OS 切片變成全真堆疊（Ollama + 8420 語音 + 三階段模型 coding）
+
+- **一句話**：研究切片的每個 AI 步驟第一次真的由模型產生，且每步都有「不存在／不逐字就拒收」的 gate；真跑三次被 gate 擋下（模型抄 code 當分類、第二 coder 引用不逐字、THEMES_V11 隱藏假設），全部修不變量，沒有放寬 gate。六個 commit 在 origin（`cbccaf03d`…`8894b5158`）。
+- **基礎設施**：Ollama 0.33.3 + `gemma3:4b`（免費、本機）；`ai_lego/platform/ai_execution/gateway.py` 兩個 provider（self-hosted Ollama／Anthropic BYOK，key 由呼叫端傳，不讀 env——`user-env.ps1` 刻意留空避免撞 Claude Code 訂閱），egress 規則用 repo 既有四值詞彙（不是 GPT 文件的新詞彙）。
+- **8420 重用**：`MeetingServiceTranscriber` 以檔案路徑載入 8420 的 `lib/transcribe.py`／`lib/diarize.py`；發現 8420 自己在本機早壞（speechbrain 1.1.0 `endswith("/inspect.py")` 在 Windows 永不成立 → 強制載入 k2）→ 升 1.1.1 釘進 requirements。
+- **產品判斷（對話結論，未落 ADR）**：賣本機授權（資料不離機）＋線上版同一份 code 換 provider；Ollama 只在本機版有意義；線上主機 `ks-aw-01` 無 GPU → STT/LLM 走 API 或按次租 GPU；名稱不能含 LEGO；GPT 那份 Universal AI Foundry 文件只取三樣（敏感度路由、App 不直打 provider、每次呼叫記 model/prompt/trace），其餘不蓋第二套平台。
+- **治理同日**：AGENTS.md 瘦身、ADR-024 spec-on-demand、`oracle-quota.ps1` 斷路器、`repeat-failure-guard.js`、RUNNABLE_DEMOS 登記表。oracle 全天撞額度 → 書面自審＋突變測試。
+- **下一步**：eval dataset＋換大模型比較；`--review interactive` 真人審；多講者真音檔；抽共用 speech package；9/7 後補 `/codex-review`。詳 `memory/daily/2026-09-04.md`、TASKS ⑥、WORKLOG 續4–續9。
 
 ### Today (2026-03-30 晚) — Cursor 規則與外掛
 - 落地 **`00-CORE.md`（完整）+ `63.mdc`（精簡 alwaysApply）**；**`sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 掛入 **`verify-build-gates`** 與 **`doc-sync`**；health **343** 檔包含 monorepo 根 **`63–66`** SHA256 對齊。
@@ -347,175 +371,21 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-08-29.md
-# Daily Note - 2026-08-29
+## 5) memory/daily/2026-09-30.md
+# Daily Note - 2026-09-30
 
-## Done today
-(fill in at AO-CLOSE)
+## AO-CLOSE
 
-## Current state
-(fill in at AO-CLOSE)
-
-## Next steps
-(fill in at AO-CLOSE)
-
-## Open tasks (auto-generated at 08:00 TPE)
-- [ ] **【⚠️ 逾期 69 天｜原排 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
-- [ ] **【未開始｜2026-08-25 開｜到期日 2026-08-31】重新啟用 Codex stop-time review gate**
-- [ ] **🔴【資安】2026-08-27 `HF_TOKEN` 明文進入對話紀錄 — 待輪換**
-- [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）**
-- [ ] **🔴【硬死線 2026-11-12】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）**
-- [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交**
-- [ ] **【人工｜Postiz 測試草稿清理】**
-- [ ] **【操作者｜Postiz 帳號 → 客戶 Hub 連結】**
-- [ ] **既有站接手 Day 1（Soulful Expression）**
-- [ ] **【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀**
-- [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測**
-- [ ] **【POD A1 已完工｜剩 e2e + A2】**
-- [ ] **【POD A2 confirm phase — 🔴 金流紅線，測試結束 + 操作者明示批准才做】**
-- [ ] **【未開始｜待使用者明確下指令】會議服務網路版安裝**
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤**
-- [ ] **【已知限制｜2026-08-25 開｜2026-08-31 自動解除】Codex 額度耗盡，跨模型 oracle 路徑不可用**
-- [ ] **【gated｜8月｜等買二手機才繼續建 customer service U6 Chatwoot】**
-- [ ] **【gated｜8月｜EU→Dedicated 搬機 + 整併退雲端】**
-- [ ] **蒙古客戶 Cloudways 實際建站**：待客戶刷卡配合
-- [ ] **新站建置（Scenery Travel Mongolia）**
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（~~兩案~~ → 僅剩 Scenery）**
-- [ ] `tenants/templates/` v2
-- [ ] **🟠 EU origin 仍未鎖 Cloudflare（步驟 A 已完成，B 待做）**
-- [ ] **【2026-08-26 開出｜我自己留下的漂移風險】`cloudflare-realip.conf` 的網段清單是靜態的，無偵測器**
-- [ ] **【2026-08-26 開出｜🔴 客戶站已破圖｜刪影片會靜默弄破已發布的文章】`video/[id]` DELETE 無引用檢查**
-- [ ] **【2026-08-26 開出｜小】R2 裡 8 個 `remotion/` 物件（~200MB）從未被任何對帳涵蓋**
-- [ ] **【2026-08-26 開出｜等一個決定】R2 `video/蒙古旅遊___熱情分享型主持人稿/4x5.mp4` 是真孤兒（23MB）**
-- [ ] **🔴 EU 的保留政策把「還原演練證明過的備份」刪掉了**
-- [ ] **【2026-08-26 開出｜已知風險｜操作者決定不處理】WPvivid 的 Google Drive refresh_token 曾進入對話紀錄**
-- [ ] **`cf-iprefresh` 偵測器已 error 14 天，而且沒有任何讀者**
-- [ ] **【2026-08-25 開出｜類別級重設計】影片歸屬改為持久化 `outName → organization_id` mapping，停止從 object key 反解**
-- [ ] **【2026-08-25 開出｜critic Minor 7 條｜2026-08-26 部分結案】影片管線租戶邊界收尾**
-- [ ] **【2026-08-26 開出｜中】next-admin 沒有 DOM 測試基礎設施，接線層的 bug 測不到**
-- [ ] **【2026-08-26 開出｜中】現存 10 個 staging 孤兒 / 1969.7 MB 待清理（拆除路徑已就緒，清理是決策）**
-- [ ] **【2026-08-26 開出｜中】手動新增的站拿不到租戶歸屬**
-- [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
-- [ ] **`claude_desktop_config.json` 至今無人治理，且正握著 6 把明文 API key**
-- [ ] **`codex-oracle.ps1 -Path` 一用就炸，等於大 repo 沒有可行的 review 路徑**
-- [ ] **Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」**
-- [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`**
-- [ ] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」**
-- [ ] **Phase 4 雲端 routine 仍在解析已退役的 `restore_drill_due_after`**
-- [ ] **`check-backup-health.ps1` 把「無法證明可還原」當成健康**
-- [ ] **統一 TASKS 條目的標籤詞彙**
-- [ ] **【2026-08-26 開出｜🔴 交叉污染｜第 4 個 `git add -A`】AO-CLOSE 的 `git add -A` 會掃走其他 session 進行中的檔案**
-- [ ] **【2026-08-26 開出｜營運｜搬站前必處理】soulful 週備份近 10 次有 5 次失敗，最新一次就是失敗**
-- [ ] **【2026-08-26 開出｜治理｜機械閘誤判】`verify-gate-commit.js` 對 Bash 指令做純文字比對，heredoc 內容含 `git commit` 就被 BLOCK**
-- [ ] **【2026-08-26 開出｜治理｜✅ 根因已定位 2026-08-26】廣域 `git add -A` 把別的 session 未驗證的工作掃進不相干的 commit**
-- [ ] **【2026-08-26 開出｜治理｜具名 add 也擋不住】兩個 session 編輯同一檔案時，`git add -- <file>` 一樣會帶走對方未提交的編輯**
-- [ ] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練**
-- [ ] **【2026-08-25 開出｜小｜文件一致性】Soulful staging「abandon」決策未傳播到 3 份仍在宣告它的文件**
-- [ ] **【2026-08-25 開出】`ao-resume-last.txt` 錨點卡在 2026-06-12，AO-CLOSE 視窗計算長期失真**
-- [ ] **【2026-08-24 開出】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認**
-- [ ] **【2026-08-25 開出｜小】`scripts/rebuild-content-studio-4cards.ps1:185` CP950 parse-break**
-- [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法**
-- [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，R0 已批方案A）
-- [ ] **smoke 04-onboard spec 補 app session 登入**
-
-## Yesterday context
-最後 WORKLOG 記錄（2026-08-17）：自動週報代理生成 weekly summary，DOC_ONLY 操作，無程式碼改動。2026-08-28 daily note 含三筆 verify-recent --ack（ao-close-mem.py、netdata-close.py、dmarc-log.py、runbook-append-log.py scratchpad 一次性腳本，均執行成功）。
-
----
-<!-- preserved from previous session -->
-
-### verify-recent --ack (2026-08-28T16:43:39.9470212Z)
-
-**Reason**: scratchpad one-shot patchers, already executed successfully with printed ok + grep-verified output (ao-close-mem.py conversation memory prepend / netdata-close.py TASKS+WORKLOG patch)
-
-**Acknowledged unverified files** (count=2):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\ao-close-mem.py`
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\netdata-close.py`
-
-
-### verify-recent --ack (2026-08-28T16:47:02.1626466Z)
-
-**Reason**: one-shot WORKLOG patcher dmarc-log.py, executed successfully (ok printed)
-
-**Acknowledged unverified files** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\dmarc-log.py`
-
-
-### verify-recent --ack (2026-08-28T17:02:14.5567896Z)
-
-**Reason**: one-shot WORKLOG patcher runbook-append-log.py, executed successfully (ok printed)
-
-**Acknowledged unverified files** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\runbook-append-log.py`
-
-
-### verify-recent --ack (2026-08-29T00:20:56.9188451Z)
-
-**Reason**: one-shot TASKS.md patcher domain-note.py, executed successfully (ok printed)
-
-**Acknowledged unverified files** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\domain-note.py`
-
-
-### verify-recent --ack (2026-08-29T00:45:40.5856867Z)
-
-**Reason**: one-shot WORKLOG patcher studio-fix-log.py executed successfully (ok printed); runbook trap table edit is prose-only doc addition to an existing runbook, no logic change
-
-**Acknowledged unverified files** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\studio-fix-log.py`
-
-
-### verify-recent --ack (2026-08-29T01:10:59.1072082Z)
-
-**Reason**: one-shot WORKLOG patchers (runbook-selfcheck-log.py, cf-ratelimit-log.py) executed successfully (ok printed); runbook edits are prose-only doc additions
-
-**Acknowledged unverified files** (count=2):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\runbook-selfcheck-log.py`
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\cf-ratelimit-log.py`
-
-
-### verify-recent --ack (2026-08-29T01:37:20.1211936Z)
-
-**Reason**: one-shot WORKLOG patcher nginx-routing-fix-log.py + debug-headers.php (temp diagnostic, deleted from container after use) + nginx default.conf edits (real-tested via curl 5x + browser screenshot + full 12-endpoint regression sweep, documented above)
-
-**Acknowledged unverified files** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\nginx-routing-fix-log.py`
-
-**[!] HIGH-RISK acknowledged WITHOUT full verification** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\nginx-routing-fix-log.py` -- **infra (nginx)** (auth/payment/RLS/migration/deploy class -- full verify was skipped)
-
-
-### verify-recent --ack (2026-08-29T01:43:34.7068695Z)
-
-**Reason**: one-shot WORKLOG patcher executed successfully (ok printed); runbook edits are prose-only doc additions with self-verified cross-references
-
-**Acknowledged unverified files** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\runbook-nginx-fix-log.py`
-
-**[!] HIGH-RISK acknowledged WITHOUT full verification** (count=1):
-
-- `C:\Users\user1115\AppData\Local\Temp\claude\D--Work\4b82b3aa-3828-4251-9cd1-81fcad16e6ea\scratchpad\runbook-nginx-fix-log.py` -- **infra (nginx)** (auth/payment/RLS/migration/deploy class -- full verify was skipped)
-
-
-### verify-recent --ack (2026-08-29T02:10:32.1578516Z)
-
-_... 29 lines omitted._
+- Completed: Cognitive OS report API lifecycle and Markdown export were committed and pushed as `53dc77535`; local research-line status and remaining work were documented.
+- Verification: report API tests and the isolated cross-project source-search slice were run; the latter remains uncommitted in its managed worktree pending its own closeout.
+- Safety: shared dirty/staged files belonging to other work were preserved; no reset, clean, production write, or Airtable import was performed.
+- Open: P2-09 paid/operator gates, P1 WC-15 production verification, PI-b05/P-ARF-data, and remaining P4 exports/approval/recipe-binding work.
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-08-29 10:42:51`
+- Time: `2026-09-30 01:40:40`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -525,70 +395,70 @@ _... 29 lines omitted._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260829-104247.md`
-- Closeout: `reports/closeout/closeout-20260829-104251.md`
+- Health: `reports/health/health-20260930-014040.md`
+- Closeout: `reports/closeout/closeout-20260930-014019.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+[rollback] `git revert` 本 commit 即還原兩份舊檔與註解。
 
-**已修改**:
-- `app/api/content/social-publish/route.ts` — POST：`clientId`（org UUID → `social_postiz_connections.client_id`）加 `assertOrgAccess(req, clientId)` after role gate + string validate
-- `app/api/content/social-channels/route.ts` — GET：同樣呼叫 `listIntegrations(clientId)` → 加 `assertOrgAccess(req, clientId)` after query param validate
-- `app/api/content/social-admin/connections/route.ts` — POST + DELETE：`clientId`（same FK）→ 各加 `assertOrgAccess(req, clientId)`
-- `app/api/ops/integrations/route.ts` — POST：`organizationId` body param → 加 `assertOrgAccess(req, organizationId)` after `verifyOwnership`；PATCH：fetch record by `id` → 加 `assertOrgAccess(req, current.organization_id)` post-fetch
+（續）操作者問「動工用哪份、還能優化嗎」→ packet §5 依風險重排：① renderer 真實測試移到第 1 步（最大未知先殺）② 新增 RPC 契約靜態測試（`p_*` key vs 0091 簽名；今日 scratch 比對 16/16 一致；守 PGRST202 類）③ Trigger+env 合併為第 3 步、UI 卡拆 4a 最小／4b 證據 ④ 8b 註明 migration 必先於部署（`cleanup` route 不受 kill switch 保護）⑤ 8f 註明首次開啟全 target 立即跑一次 ⑥ 待決 D1：slice 1 visual 告警現況會進 Telegram（medium ≥ 預設 min medium），建議降 low 待遮罩 selector。
+WORKLOG_DONE: site-watch 交接包重擬為單一合規 packet（TASKS 已登記）、設計 glossary 進 0091 檔頭、程式註解不再依賴會被 prune 的 handoff
 
-**guard 語意**：
-- `staff`（`x-ops-user-kind` absent/staff）→ `assertOrgAccess` no-op，保持跨租戶管理能力
-- `client`（`x-ops-user-kind: client` + `x-ops-org-id: <uuid>`）→ `targetOrgId ≠ ctx.orgId` 時 throw OrgAccessError → 403
-- null/undefined targetOrgId 對 client fail-closed（`String(null)` = `"null"` ≠ real UUID）
+## 2026-09-23（續）site-watch 計畫改為單一 MASTER PLAN（操作者：「我要完整的，沒頭沒尾」）
+**根因**：計畫被我拆成三處——handoff packet（只講 slice 1 進度）、0091 檔頭（C1–C12 glossary）、被刪的 09-21 plan（唯一寫了 Slice 2／P2／P3 路線圖）。接手者拿到的是碎片，不是計畫。
+**修法**：新建 `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`（沿用 `APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`／`CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` 慣例；兩者皆未登記 DOCS_INDEX／CHANGE_IMPACT_MATRIX，本檔同）：§0 現況、§1 分期總表（Slice 1／2／P2／P3）、§2 操作者拍板、§3 架構（file:line）、§4 完整合約 I1–I3 + C1–C12（as implemented，含 Slice 2 的 C11）、§5 驗收矩陣 14 條各標驗於何處、§6 風險與待決 D1、§7 下一步 8 步、§8 Slice 2／P2／P3 設計備忘（含 `addSiteToMainWp` 正確位置 `packages/workflows/src/integrations/integration-steps.ts:371`，舊 plan 寫的 next-admin 路徑不存在）、§9 回滾、§10 文件關係。
+- 0091 檔頭：C1–C12 glossary 移出，改一行指回 MASTER PLAN §4；I1–I3 保留（schema 自述）。程式 4 處註解「glossary in 0091」經檔頭轉指，不再改。
+- `git rm handoffs/2026-09-23-1116-site-watch-slice1.md`（併入 §7；可自 `76a0a2e3f` 取回）；TASKS.md §I 列改指 MASTER PLAN §7，移除 `→ handoffs/` pointer（packet 已無）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/site-watch-local-verify.sh`（0091 檔頭改後 apply/down/re-apply） | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=for-loop `[ -e ]` 對 MASTER PLAN 引用的 20 個路徑 | exit=0 | ms=50（0 MISSING）
+- REVIEW_WAIVED: DOC_ONLY -- 新文件 + migration 註解 + TASKS 指針，無邏輯改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`site-watch-slice1.md|SITE_WATCH_MASTER_PLAN` | hits=3 files（MASTER PLAN 自身、TASKS.md、0091 檔頭；舊 packet 名僅存於本 WORKLOG）
+[剩餘風險] MASTER PLAN §3/§4 的 `:line` 以 2026-09-23 為準，程式改動後需同步；D1 仍待操作者。
+[rollback] `git revert` 本 commit。
 
-**驗證結果**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000 — 0 type errors
-- REALTEST_EVIDENCE: tool=Bash | cmd=npm test --run | exit=0 | ms=1710 — 568/568 pass
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 6 focus areas all clean: guard ordering correct in all 4 files, null-safe inputs, assertOrgAccess null targetOrgId fails-closed, PATCH TOCTOU safe (immutable PK), no role-gate bypass path, all routes covered by middleware matcher
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=listIntegrations,social_postiz_connections,tenant_integration_bindings | hits=1 new finding (social-channels was also calling listIntegrations with unguarded clientId → patched same batch; webhooks/tenant-integration has no clientId param — safe)
-- WORKLOG: 本條目
+WORKLOG_DONE: site-watch 計畫正本 = docs/operations/SITE_WATCH_MASTER_PLAN.md，一份到底（範圍／分期／合約／驗收／下一步／回滾）；handoff 與 0091 檔頭皆退為指針
 
----
+## 2026-09-23（續）SITE_WATCH_MASTER_PLAN v2 — 操作者問「完整嗎、有優化空間嗎」→ 稽核出 9 個缺口，補齊
+**稽核方法**：對照 AGENTS.md §0/§7 DoD、`runbooks/ADD-PERIODIC-HEALTH-CHECK.md`、`sg-deploy.sh` smoke 段、既有兩份 MASTER_PLAN 結構。**缺口（v1 皆無）**：
+- G1 監控者無人監控：heartbeat 停／renderer 死／通知卡住都不會浮現 → 新 §7 步 3：`site_watch_maintenance` 加 heartbeat 兩欄 + `site_watch_touch_heartbeat`（prod 未套 0091，直接改 0091）、`scripts/check-site-watch-health.ps1` 四探針（量機制不量事故，runbook addendum）掛 AO-RESUME、§5 #15、§6.1 故障模式表。
+- G2 部署 smoke 只打 `/render`（`sg-deploy.sh:476-491`），`/snapshot` 退化不會擋部署 → §7 步 4 加 `/snapshot` smoke（sg-deploy.sh 由 `:152` rsync 同步）。
+- G3 缺 RUNNABLE_DEMOS（AGENTS §7 Product DoD）與 MONITORING_SYSTEMS_INVENTORY 登記（新監控系統、與 Uptime Kuma 分工）→ §7 步 8。
+- G4 env 變數散落 → §3.4 表（誰讀／哪設／預設／缺了會怎樣）。
+- G5 無威脅模型 → §3.5 安全邊界。
+- G6 無操作手冊 → §11（每種 Telegram 訊息／watchdog 顏色 → 動作）。
+- G7 無決策紀錄 → §4.3（12 條決策／理由／放棄的替代）。
+- G8 分期無完成定義 → §1 表加欄。
+- G9 容量未估：snapshot 併發 1 ≈ 90 頁/小時上限 → R6 + §8 容量閘（Slice 2 hourly 多頁必備）。
+另：§7 Trigger fan-out 改 `batchTrigger`；§10 加維護規則（改程式必同步 §3/§4；`:line` 只在 §3.2／§3.4／§7）。TASKS §I 列步數同步（1–9 本機 → 10 prod）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=for-loop `[ -e ]` 對 v2 新增引用的 10 個路徑（runbook、check-*.ps1、ao-resume.ps1、entrypoint.sh、.env.example、RUNNABLE_DEMOS、MONITORING inventory、providers.ts、wiring.ts、secret-vault.ts） | exit=0 | ms=50（0 MISSING）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "check-backup-health\|check-ci-health" scripts/ao-resume.ps1`（:565／:653 = watchdog 掛點確存） | exit=0 | ms=20
+- REVIEW_WAIVED: DOC_ONLY -- 純計畫文件；程式未動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`SITE_WATCH_MASTER_PLAN` | hits=2 files（TASKS.md、0091 檔頭；本檔以「本檔」自稱不含檔名；TASKS 步數已同步）
+[剩餘風險] G1/G2 是新增的實作工作（步 3、步 4），會讓 Slice 1 多約半天；D1 仍待操作者。
+[rollback] `git revert` 本 commit（回 v1 `67e4db98d`）。
 
+（續 v2.1）操作者再問「只有這些嗎」→ 設計層對抗審查（fan-out→renderer→UI 走一遍）再抓 6 項：① Trigger child 無限流：N>20 同時打 renderer（`server.mjs:34 MAX_QUEUE=20`、`rendererClient.ts:29` client 150s）→ 503／client 先斷而 renderer 仍截沒人等的圖 → 步 4 加 `queue: { concurrencyLimit: 2 }`，R6 補機制、P3 候選 abort-on-disconnect；② 首次開啟無金絲雀 → 步 10f 改：先手動 `site_watch_sync_targets()`、卡片只留 1 個 target 開、全域開、驗 1 列後再放量（10h）；③ 備份邊界未寫 → R7；④ 客戶站可控字串（errors_sample／final_url）XSS 面未寫 → R8 + 步 5a 純文字；⑤ ops-inbox `ignored` 會被下一 episode 重開（`0056:67`）→ §11 說明永久靜音 = 卡片關掉；⑥ env 開關要重建容器 → §8 軟開關候選。migration 編號無碰撞（`ls migrations | grep -c ^0091_` = 1）。
+WORKLOG_DONE: SITE_WATCH_MASTER_PLAN v2：補 watchdog／deploy smoke／登記／env 表／安全邊界／故障模式／決策紀錄／操作手冊／分期 DoD／容量
 
-### Agent dispatch log
-- critic: Critic review hook runner v2
-- Explore: 調查三個 ops 頁面真實狀態
+## 2026-09-25（續）Cognitive OS PI-a WC-PIa-01～14 完成（僅本機，未部署）
+**任務**：在 Claude 額度耗盡後，完成 `RESEARCH_LINES_MASTER_PLAN.md` 的 PI-a 解讀層與新殼全部工作卡；PI-b nginx／正式部署保持 High-STOP，未執行。
 
-## Related Documents (Auto-Synced)
-- `.cursor/rules/00-session-bootstrap.mdc`
-- `.cursor/rules/20-doc-sync-closeout.mdc`
-- `.cursor/rules/30-resume-keyword.mdc`
-- `.cursor/rules/40-shutdown-closeout.mdc`
-- `docs/metrics/kpi-margin-dashboard-spec.md`
-- `docs/operations/airtable-to-supabase-migration-playbook.md`
-- `docs/operations/system-operation-sop.md`
-- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
-- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
-- `docs/releases/release-notes.md`
-- `tenants/NEW_TENANT_ONBOARDING_SOP.md`
+- `e28b630ba`：新增 `MethodInterpretation` typed object、fixtures、`interpret.method_record` capability contract；解讀模組從 validated record 生成 manifest／prompt、強制 schema + citation／visual binding／next method gates，修復回合後才儲存。
+- API：`POST /methods/{id}/interpret` 重新執行 builder + method gates、記錄 `InterpretationRequested`／`InterpretationCreated`／`InterpretationJudged` events、artifact CAS 與 `ai_usage`；`GET /interpretations/{id}` 與 judgment endpoint 均為 tenant/project scoped。
+- Web：新增 Next 15 standalone shell（login、method discovery、middleware）、受控表單與 LazyFill、demo、固定九段 result page + method-native layered/quadrant/table visual + judgment；無 `<select>`。
+- Runtime：compose 加 web service、web Dockerfile／`.dockerignore`、deploy multi-service rollback/health loop、Playwright `cognitive` project。Docker image build 成功；完整 local compose 啟動未能取得既有程序佔用的 `127.0.0.1:8420`，已 `docker compose down` 清除本次建立的 containers，未動既有 listener。
+- REALTEST_EVIDENCE: `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` → `PASSED: 4158`；final `python -m unittest discover -s tests -t . -q` → `Ran 14186 tests in 991.668s / OK`；`python -m unittest tests.unit.test_interpret_method_record tests.unit.test_api_interpret -q` → `Ran 16 tests / OK`；web `npm test -- --run && npm run typecheck && npm run build` → 3 tests / typecheck / production build OK；`docker compose build cognitive-os-web` → image built；`docker compose config --quiet && bash -n deploy/deploy.sh` → OK；Playwright cognitive listed and correctly skipped without required test credentials/project.
+- REVIEW_WAIVED: `/claude-review` attempted under `claude-oracle.ps1`; Claude returned invalid/incomplete review schema (exit 1), so no valid oracle artifact exists. Manual adversarial review + mutation evidence used instead.
+- BUGHUNT_DONE: schema mutation made an invalid `findings_empty` fixture unexpectedly valid → golden red; citation / visual bindings / next-method gates each temporarily removed → their named unit test red; family→kind override changed → visual-kind test red; endpoint pre-gate check removed → `test_gate_fail_returns_422_without_provider_call` red. Each mutation was restored and the relevant test re-green.
+[剩餘風險] Playwright full E2E needs `COS_TEST_TENANT_ID`／`COS_TEST_EMAIL`／`COS_TEST_PASSWORD`／`COS_TEST_PROJECT_ID`; PI-b is intentionally not started. Next 15.2.4 reports its upstream security advisory during npm install; version remains the plan-specified baseline and production must take a patched version decision during PI-b.
+[rollback] `git revert e28b630ba` removes PI-a implementation; `git revert` this documentation commit restores the pointer. No production state changed.
 
-_Last synced: 2026-08-24 19:21:02 UTC_
-
-## 2026-08-17
-- 自動週報代理：weekly summary 生成 → reports/weekly/weekly-summary-2026-08-17.md
-  - REALTEST_WAIVED: DOC_ONLY -- automated report generation, no code change
-  - REVIEW_WAIVED: DOC_ONLY -- report content verified against WORKLOG/TASKS source files
-  - BUGHUNT_WAIVED: DOC_ONLY -- no code change
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+WORKLOG_DONE: PI-a 14/14 local implementation and period gate complete; waiting only for explicit per-card PI-b deployment go-ahead.
+## 2026-09-28
+- 01:07 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-28.md
+- Cognitive OS result-page gap batch C1-10/C3-03/C3-26/M-74/M-86/N-49/P-32/P-33/P-35/P-36/P-37/P-38/P-39/P-40/P-41：修正可見文案、輸入卡元件共用、專家 gate 表、mock/page parity checker、1.2.0 fixture/schema/e2e mock routes；web typecheck + 51 tests、fixture schema、golden 4247、mock selftest 194+2 mutations 全通過；未部署，Playwright 因 registry EACCES/network 未執行。
+- REVIEW_WAIVED: Claude oracle quota available，但 `claude-oracle.ps1` 於 2026-09-28 連續兩次 exit 1／無有效 schema；操作者明確授權人工對抗審查取代。
+- BUGHUNT_DONE: scope=RunPage/ResultPage/check-mocks/fixture/e2e；確認 e2e 核准 POST 僅在 `mockApi`、fixture 由 SchemaContracts 驗證、parity 的 baseline／文字 drift／卡片數 drift 均可偵測；無新增 finding。
