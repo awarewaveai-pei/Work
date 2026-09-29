@@ -1,8 +1,15 @@
-﻿# Worklog
+# Worklog
+## 2026-09-30（AO-CLOSE verify-recent）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=git push origin $branch 2>&1|Invoke-SafeGitPush | hits=0 unsafe fallback captures; safe wrapper and unredirected fallback verified。
+- REALTEST_EVIDENCE: `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1` → health 100% (328/328), verify-build-gates ALL PASSED, push OK。
 ## 2026-09-30（續8）P4 report API verification
 - REALTEST_EVIDENCE: `python -m py_compile ai_lego/apps/api/main.py ai_lego/data/repositories/project_source_repository.py tests/unit/test_api_report.py` exit=0; targeted 77/77 OK; golden 4261/4261 PASS。
 - REVIEW_DONE: self-review complete；transactional row/event writes, tenant-scoped CAS, failed-gate approval refusal, reject reason, stale CAS cleanup checked。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=project_reports|ReportApproved|ReportRejected|render_research_report | hits=74
+## 2026-09-30（續7）P4 report API 第一切片
+- [REALTEST] `python -m unittest tests.unit.test_api_report tests.unit.test_report_render tests.unit.test_api_interpret -q` → 77/77 OK；`python tests/run_golden_tests.py` → 4261/4261 PASS；`git diff --check` PASS。
+- [DONE] 新增 project report CAS row + tenant-scoped artifact；POST/GET report、Markdown export、approve/reject；approve 僅允許 integrity gates 全 PASS，事件含 identity；reject 必須有理由；版本切換後回收舊 CAS。
+- [BOUNDARY] endpoint 目前只接受已投影 `run_results`；沒有 project-level run binding 時不宣稱 run ownership。PDF、C11、教材、跨專案搜尋仍待後續切片。
 ## 2026-09-30（續6）研究線安全本機項目全收斂
 - [REALTEST] `test_synthesis`＋`test_api_synthesis`＋`test_human_required`＋`test_run_recipe_async` → 79/79 OK；`powershell -File scripts/test-eval-harness.ps1` → exit 0；harness 71/71、golden、兩 mutation 全 PASS。
 - [DOD] P2-05 runner、P3-02 async/human_required、P2-09 本機 DOD-4/5/6 已有實作與既有 mutation evidence；本次只重驗，不改 runtime、schema、thresholds、prod 或 Airtable。
@@ -11145,6 +11152,11 @@ Read in full: `0008_*_up.sql`, `0008_*_down.sql`, `0001`, `0002`, `0005`, `0006`
 **[剩餘風險]**：Wave 1 之後（Wave 2-10：Postgres 物理隔離、金鑰輪替、AI credential 隔離、bulk-export 防護、fetch worker 隔離、entitlement 計費…）仍是 `SPECIFIED — RUNTIME OPEN`，application/API 層完全未動工，數月工程量誠實未壓縮成一次 session。M6 錯誤碼 registry 治理缺口獨立記錄未修。
 
 **[rollback]**：`git revert` 本 commit 即可；DB 層面 `0002_wave1_case_aggregate_down.sql` 已驗證可逆（byte-exact，db-expert `pg_dump -s` 比對）。
+
+## 2026-09-30
+
+### Daily
+- (TBD)
 
 ## 2026-09-05
 

@@ -1432,7 +1432,7 @@ Repair it first, then re-run:
                             if (Get-Command Invoke-SafeGitPush -ErrorAction SilentlyContinue) {
                                 Invoke-SafeGitPush -WorkRoot $WorkRoot -Branch $branch
                             } else {
-                                git push origin $branch 2>&1 | Out-Host
+                                & git push origin $branch
                                 if ($LASTEXITCODE -ne 0) { $skeletonPushOk = $false }
                             }
                             if ($skeletonPushOk) {
