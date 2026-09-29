@@ -1,4 +1,9 @@
 ﻿# Worklog
+## 2026-09-30（續2）P4-01 report renderer 重驗
+- [REALTEST] Existing commit `339f576e3` already contains P4-01; reran `python -m unittest tests.unit.test_report_render -q` → 33/33 OK; `python tests/run_golden_tests.py` → 4261/4261 PASS; `gen_spec_index.py --check` PASS; py_compile PASS.
+- [REVIEW] Renderer remains pure and bounded: no endpoint/PDF/approval mutation; existing implementation uses shared citation traversal and strict invalid reference evidence.
+- [BUGHUNT] Existing 33-case suite covers unresolved `[n]`, appendix-only cited sources, failed runs, markdown injection, malformed citations, manifest binding, and invalid report state; no new implementation was needed.
+- [DOD] Confirmed P4-01 complete at `339f576e3`; updated Master Plan only. Initial temporary test overwrite was restored exactly from HEAD and left no target diff.
 ## 2026-09-30（續1）WorkflowInterpretation P3-03
 - [REALTEST] `python -m unittest tests.unit.test_workflow_interpretation tests.unit.test_route_method tests.unit.test_evolution_registry -q` → 62/62 OK; `python tests/run_golden_tests.py` → 4261/4261 PASS; `gen_spec_index.py --check` PASS; py_compile PASS; real SchemaContracts probe PASS.
 - [REVIEW] New pure module assembles server-owned station metadata, copies human judgment, preserves station citation order, and leaves solution null for P4; no endpoint, executor, interpret, or frontend changes.
