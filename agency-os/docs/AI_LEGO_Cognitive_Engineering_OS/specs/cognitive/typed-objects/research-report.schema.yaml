@@ -10,12 +10,11 @@ description: >
   `report_refs_resolvable` gate, or the render records it in
   `problems.invalid_refs` instead of softening it away -- stricter than
   NA/lib/dossier/report.ts's `[?]` rewrite (RESEARCH_LINES_MASTER_PLAN.md
-  §2-I3). `report_state` starts AI_GENERATED; the HUMAN_APPROVED endpoint
-  and `ReportApproved` event are later P4 work, not built by this file's
-  producer (WC-P4-01, early).
+  §2-I3). `report_state` starts AI_GENERATED; the API may promote it only
+  after a human approval event and only when report integrity gates pass.
 source_of_truth_for:
   - "RESEARCH_LINES_MASTER_PLAN.md §3.4-C6, §2-I5 and WC-P4-01"
-decided_by: "P4 WC-P4-01 (early): report renderer typed object"
+decided_by: "P4 WC-P4-01 + local report API slice (2026-09-30)"
 type: object
 additionalProperties: false
 required: [report_id, project_id, version, report_state, synthesis_ref, run_refs, sections, sources_appendix, problems, markdown, provenance]

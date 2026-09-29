@@ -110,6 +110,16 @@ CREATE TABLE IF NOT EXISTS project_syntheses (
     FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
 );
 CREATE INDEX IF NOT EXISTS ix_project_syntheses_project ON project_syntheses (tenant_id, project_id, created_at);
+CREATE TABLE IF NOT EXISTS project_reports (
+    tenant_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    report_id TEXT NOT NULL,
+    artifact_reference_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, report_id),
+    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS ix_project_reports_project ON project_reports (tenant_id, project_id, created_at);
 CREATE TABLE IF NOT EXISTS collection_runs (
     tenant_id TEXT NOT NULL,
     project_id TEXT NOT NULL,
@@ -785,9 +795,41 @@ class ProjectSourceRepository:
         result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
         return result
 
+    def save_report(self, tenant_id: str, project_id: str, report_id: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
+        """Persist one immutable report artifact and its creation event atomically."""
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO project_reports (tenant_id, project_id, report_id, artifact_reference_json, created_at) VALUES (?,?,?,?,?)",
+                (tenant_id, project_id, report_id, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
+            )
+            self._append_event(connection, tenant_id, f"project:{project_id}", "ReportCreated", {"report_id": report_id, "artifact_reference": dict(artifact_reference)})
+
+    def get_report(self, tenant_id: str, project_id: str, report_id: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT project_id, report_id, artifact_reference_json, created_at FROM project_reports WHERE tenant_id=? AND project_id=? AND report_id=?",
+                (tenant_id, project_id, report_id),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
+        return result
+
+    def update_report_reference(self, tenant_id: str, project_id: str, report_id: str, artifact_reference: Mapping[str, Any], event_type: str, payload: Mapping[str, Any]) -> None:
+        """Replace a report's CAS pointer only together with its lifecycle event."""
+        with self._connection() as connection:
+            updated = connection.execute(
+                "UPDATE project_reports SET artifact_reference_json=? WHERE tenant_id=? AND project_id=? AND report_id=?",
+                (json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), tenant_id, project_id, report_id),
+            ).rowcount
+            if updated != 1:
+                raise InvariantViolation("REPORT_NOT_FOUND")
+            self._append_event(connection, tenant_id, f"project:{project_id}", event_type, dict(payload))
+
     # -- Project erasure (plan D10, K7) ---------------------------------------------------------------------------
 
-    _ARTIFACT_TABLES = ("project_interpretations", "project_syntheses")
+    _ARTIFACT_TABLES = ("project_interpretations", "project_syntheses", "project_reports")
 
     def project_artifact_references(self, tenant_id: str, project_id: str) -> list[dict[str, Any]]:
         """The Project's AI artifacts -- interpretations and syntheses (their own CAS, one per result, never shared)."""

@@ -57,8 +57,8 @@ from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel, ConfigDict
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from pydantic import BaseModel, ConfigDict, Field
 import yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
@@ -99,6 +99,7 @@ from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.modules.research.interpret_method_record import INTERPRET_MAX_TOKENS, INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, result_page_shows, run_interpretation
 from ai_lego.modules.research.source_manifest import DEFAULT_MAX_CHARS
 from ai_lego.modules.research.synthesis import run_synthesis, validate_subject
+from ai_lego.modules.research.report_render import render_research_report
 
 SESSION_COOKIE = "cognitive_os_session"
 DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
@@ -2256,6 +2257,127 @@ def get_synthesis(
         **base, "status": "DONE", "finished_at": stored["created_at"], "result": artifact["synthesis"], "gate_results": artifact["gate_results"],
         "manifest": artifact["manifest"], "prompt_version": artifact["prompt_version"], "latency_ms": artifact["latency_ms"],
     }
+
+
+class CreateReportRequest(BaseModel):
+    synthesis_id: str
+    run_results: list[dict[str, Any]] = Field(default_factory=list)
+
+
+def _read_report(repo: ProjectSourceRepository, artifact_store: JsonArtifactStore, tenant_id: str, project_id: str, report_id: str) -> dict[str, Any]:
+    stored = repo.get_report(tenant_id, project_id, report_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail=f"REPORT_NOT_FOUND: {report_id!r}")
+    try:
+        artifact = artifact_store.read(tenant_id, stored["artifact_reference"])
+    except InvariantViolation as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    return {"report": artifact["report"], "gate_results": artifact.get("gate_results", []), "created_at": stored["created_at"]}
+
+
+@app.post("/projects/{project_id}/reports", status_code=201)
+def create_report(
+    project_id: str,
+    payload: CreateReportRequest,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """Render and persist a project-bound report from an existing synthesis.
+
+    Recipe run results are accepted only as already projected result bodies; this endpoint does not
+    claim ownership of arbitrary run ids until the project-level run binding exists.
+    """
+    tenant_id = session["tenant_id"]
+    _project_or_404(repo, tenant_id, project_id)
+    synthesis = repo.get_synthesis(tenant_id, project_id, payload.synthesis_id)
+    if synthesis is None:
+        raise HTTPException(status_code=404, detail=f"SYNTHESIS_NOT_FOUND: {payload.synthesis_id!r}")
+    try:
+        synthesis_artifact = artifact_store.read(tenant_id, synthesis["artifact_reference"])
+        rendered = render_research_report(
+            report_id=f"RPT-{uuid.uuid4().hex.upper()}", project_id=project_id,
+            synthesis_artifact=synthesis_artifact, run_results=payload.run_results,
+        )
+    except InvariantViolation as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    report_id = rendered["report"]["report_id"]
+    reference = artifact_store.put(tenant_id, "ResearchReport", rendered)
+    try:
+        repo.save_report(tenant_id, project_id, report_id, reference, _now_iso())
+    except Exception:
+        artifact_store.delete_if_present(tenant_id, reference)
+        raise
+    return {"report_id": report_id, "project_id": project_id, "status": "AI_GENERATED", "gate_results": rendered["gate_results"], "report": rendered["report"]}
+
+
+@app.get("/projects/{project_id}/reports/{report_id}")
+def get_report(
+    project_id: str,
+    report_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    _project_or_404(repo, session["tenant_id"], project_id)
+    return _read_report(repo, artifact_store, session["tenant_id"], project_id, report_id)
+
+
+@app.get("/projects/{project_id}/reports/{report_id}/export", response_class=PlainTextResponse)
+def export_report_markdown(
+    project_id: str,
+    report_id: str,
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> PlainTextResponse:
+    _project_or_404(repo, session["tenant_id"], project_id)
+    result = _read_report(repo, artifact_store, session["tenant_id"], project_id, report_id)
+    return PlainTextResponse(result["report"]["markdown"], media_type="text/markdown; charset=utf-8")
+
+
+class ReportApprovalRequest(BaseModel):
+    decision: str
+    reason: str = ""
+
+
+@app.post("/projects/{project_id}/reports/{report_id}/approval")
+def approve_report(
+    project_id: str,
+    report_id: str,
+    payload: ReportApprovalRequest,
+    session: dict[str, Any] = Depends(require_session),
+    store: IdentityStore = Depends(get_store),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    tenant_id = session["tenant_id"]
+    _project_or_404(repo, tenant_id, project_id)
+    current = _read_report(repo, artifact_store, tenant_id, project_id, report_id)
+    if payload.decision not in {"approve", "reject"}:
+        raise HTTPException(status_code=400, detail="REPORT_APPROVAL_DECISION_INVALID: approve or reject")
+    reason = payload.reason.strip()
+    if payload.decision == "reject" and not reason:
+        raise HTTPException(status_code=400, detail="REPORT_REJECTION_REASON_REQUIRED")
+    if len(reason) > MAX_APPROVAL_REASON_CHARS:
+        raise HTTPException(status_code=400, detail=f"REPORT_APPROVAL_REASON_TOO_LONG: at most {MAX_APPROVAL_REASON_CHARS} characters")
+    if payload.decision == "approve" and any(g.get("status") == "FAIL" for g in current["gate_results"]):
+        raise HTTPException(status_code=409, detail="REPORT_GATE_FAILED: a report with failed integrity gates cannot be approved")
+    old_reference = repo.get_report(tenant_id, project_id, report_id)["artifact_reference"]
+    report = dict(current["report"])
+    report["report_state"] = "HUMAN_APPROVED" if payload.decision == "approve" else "AI_GENERATED"
+    report["approved_by"] = session["identity_id"] if payload.decision == "approve" else None
+    updated = {"report": report, "gate_results": current["gate_results"]}
+    reference = artifact_store.put(tenant_id, "ResearchReport", updated)
+    by_name = _by_name(store, session)
+    event_type = "ReportApproved" if payload.decision == "approve" else "ReportRejected"
+    try:
+        repo.update_report_reference(tenant_id, project_id, report_id, reference, event_type, {"report_id": report_id, "by": session["identity_id"], "by_name": by_name, "reason": reason})
+    except Exception:
+        artifact_store.delete_if_present(tenant_id, reference)
+        raise
+    artifact_store.delete_if_present(tenant_id, old_reference)
+    return {"report_id": report_id, "decision": payload.decision, "report_state": report["report_state"], "by_name": by_name, "reason": reason}
 
 
 # NOTE: `data_classification` values here (Public/Internal/Confidential/Restricted, defined by

@@ -1,4 +1,8 @@
 ﻿# Worklog
+## 2026-09-30（續8）P4 report API verification
+- REALTEST_EVIDENCE: `python -m py_compile ai_lego/apps/api/main.py ai_lego/data/repositories/project_source_repository.py tests/unit/test_api_report.py` exit=0; targeted 77/77 OK; golden 4261/4261 PASS。
+- REVIEW_DONE: self-review complete；transactional row/event writes, tenant-scoped CAS, failed-gate approval refusal, reject reason, stale CAS cleanup checked。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=project_reports|ReportApproved|ReportRejected|render_research_report | hits=74
 ## 2026-09-30（續6）研究線安全本機項目全收斂
 - [REALTEST] `test_synthesis`＋`test_api_synthesis`＋`test_human_required`＋`test_run_recipe_async` → 79/79 OK；`powershell -File scripts/test-eval-harness.ps1` → exit 0；harness 71/71、golden、兩 mutation 全 PASS。
 - [DOD] P2-05 runner、P3-02 async/human_required、P2-09 本機 DOD-4/5/6 已有實作與既有 mutation evidence；本次只重驗，不改 runtime、schema、thresholds、prod 或 Airtable。

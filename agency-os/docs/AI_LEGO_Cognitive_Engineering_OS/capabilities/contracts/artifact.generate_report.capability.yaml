@@ -9,13 +9,13 @@ description: >
   must resolve to a manifest source entry (id, sha256, url, fetched_at) via
   the `report_refs_resolvable` gate, or the report records the unresolved id
   in `problems.invalid_refs` instead of softening it away -- stricter than
-  NA/lib/dossier/report.ts's `[?]` rewrite (§2-I3). DRAFT: no HTTP endpoint,
-  no PDF export, and no `report_state` promotion to HUMAN_APPROVED in this
-  version -- that endpoint and its `ReportApproved` event are later P4 work
-  (WC-P4-01, early).
+  NA/lib/dossier/report.ts's `[?]` rewrite (§2-I3). The local API persists the
+  report as a tenant-scoped CAS artifact, exposes Markdown export, and
+  promotes a clean report to HUMAN_APPROVED only through an authenticated
+  human event. PDF export remains a later slice.
 source_of_truth_for:
   - "RESEARCH_LINES_MASTER_PLAN.md §3.4-C6, §2-I5 and WC-P4-01"
-decided_by: "P4 WC-P4-01 (early): report renderer context-bound capability"
+decided_by: "P4 WC-P4-01 + local report API slice (2026-09-30)"
 id: artifact.generate_report
 version: "1.0.0"
 input:
