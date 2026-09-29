@@ -1,4 +1,8 @@
 ﻿# Worklog
+## 2026-09-30（續6）研究線安全本機項目全收斂
+- [REALTEST] `test_synthesis`＋`test_api_synthesis`＋`test_human_required`＋`test_run_recipe_async` → 79/79 OK；`powershell -File scripts/test-eval-harness.ps1` → exit 0；harness 71/71、golden、兩 mutation 全 PASS。
+- [DOD] P2-05 runner、P3-02 async/human_required、P2-09 本機 DOD-4/5/6 已有實作與既有 mutation evidence；本次只重驗，不改 runtime、schema、thresholds、prod 或 Airtable。
+- [DOC] Master Plan v1.62 回填 P2-05、P3-02、P2-09 本機完成狀態；保留 P2-09 DOD-2 live-state blocker。
 ## 2026-09-30（續5）WC-P2-07a literature_search v2 重驗
 - [REALTEST] `python -m unittest tests.unit.test_literature_search_v2 tests.unit.test_chart_render tests.unit.test_research_evidence_chain -q` → 50/50 OK；`python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` → 4261/4261 PASS。
 - [DOD] Existing `209b65221` covers active academic project Sources, superseded exclusion, fail-closed zero-source behavior, offline fallback when `project_sources=None`, PROJECT_SOURCE triangulation, stable citation fallback, and unchanged legacy callers; original commit evidence recorded 65 tests plus mutation cases.
