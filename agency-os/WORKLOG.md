@@ -1,4 +1,9 @@
 ﻿# Worklog
+## 2026-09-30（續3）WC-P2-04b 評測 harness 重驗
+- [REALTEST] `python -m unittest tests.unit.test_eval_harness -q` → 71/71 OK；`python eval/run.py --golden --out <temp>` → exit 0；`python eval/mutate.py` → 2/2 PASS（control 0、mutated 1、contract PASS、目標 metric FAIL）。
+- [DOD] P2-04b 既有實作與 Master Plan DoD 對齊：三類 finding、fact-bearing terms/min_hits、fragment precision、forbidden trap terms、category coverage；`thresholds.yaml` 全 null，未改 operator-owned 基準線。
+- [REVIEW] 純本機離線驗證；未改程式、schema、thresholds、prod 或資料。
+- [DOC] Master Plan v1.59 回填 P2-04b 完成狀態。
 ## 2026-09-30（續2）P4-01 report renderer 重驗
 - [REALTEST] Existing commit `339f576e3` already contains P4-01; reran `python -m unittest tests.unit.test_report_render -q` → 33/33 OK; `python tests/run_golden_tests.py` → 4261/4261 PASS; `gen_spec_index.py --check` PASS; py_compile PASS.
 - [REVIEW] Renderer remains pure and bounded: no endpoint/PDF/approval mutation; existing implementation uses shared citation traversal and strict invalid reference evidence.
