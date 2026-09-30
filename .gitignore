@@ -192,3 +192,13 @@ agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generated/
 # here every time someone runs it -- runtime output, not source.
 agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/server.log
 agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/scripts/server.err.log
+
+# Runtime/stray output that kept the tree dirty (2026-09-30 dirty-tree cleanup)
+/.next/
+/_paid-plugins.zip
+/Temp/*.log
+/Temp/*.bak
+.claude/uploads/
+.claude/chrome/
+.claude/verify-gate-failures.log
+.claude/*.bak-*
