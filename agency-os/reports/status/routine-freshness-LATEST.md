@@ -1,8 +1,8 @@
 ﻿# Claude routine output freshness
-- generated: 2026-09-04 22:41 (local)
+- generated: 2026-09-30 10:20 (local)
 
-- OK    Phase 4 weekly: 0d old (max 8d)
-- OK    Weekly review: 4d old (max 9d)
-- OK    Monthly review: 23d old (max 35d)
+- OK    Phase 4 weekly: 4d old (max 8d)
+- OK    Weekly review: 1d old (max 9d)
+- WARN  Monthly review: 48d old (max 35d) -- routine AgencyOS-MonthlyReview may have stopped firing or its source drifted; check https://claude.ai/code/routines
 
-- overall: all fresh
+- overall: WARN (one or more routines stale/missing)

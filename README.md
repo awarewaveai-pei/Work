@@ -59,5 +59,5 @@ openapi/                     OpenAPI 3.1 contract (source of truth for the typed
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-09-23 03:45:07 UTC_
+_Last synced: 2026-09-23 14:30:03 UTC_
 

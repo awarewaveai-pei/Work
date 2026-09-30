@@ -467,5 +467,5 @@ Minor/suggestion findings also fixed in the same pass: m1 (`@()`-wrap `.Count` a
 ## Related Documents (Auto-Synced)
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 
-_Last synced: 2026-09-04 14:48:33 UTC_
+_Last synced: 2026-09-24 14:30:03 UTC_
 

@@ -1,24 +1,22 @@
 ﻿# staging 站三層對帳（SG 檔案 / MariaDB / Supabase wp_sites）
 
-- generated: 2026-09-03T16:52:27Z
-- verdict: **WARN**
-- staging 磁碟用量: 0 MB
-- 孤兒總數: 0（complete: 0）
-
-> **BLIND SPOT**: sg_parse_empty, eu_parse_empty
-> 這一輪有偵測器什麼都沒量到。未量到不等於健康，所以 verdict 一律 WARN 而非 OK。
+- generated: 2026-09-30T02:20:48Z
+- verdict: **OK**
+- staging 磁碟用量: 250.4 MB
+- 孤兒總數: 0（complete: 1）
 
 | slug | 分類 | 目錄 | 大小 | 資料庫 | wp_sites |
 |---|---|---|---|---|---|
+| e2e-verify-0704-6e2b91 | complete | V | 250 MB | wp_s_6e2b917e2efc46b89cdbcb | active=t |
 
 ## 清理方式
 
-唯讀報告。清理走 SG 上的 `deprovision-staging.sh`（先備份、有守衛、要 --confirm）：
+唯讀報告。清理走被探測那台主機上的 `deprovision-staging.sh`（先備份、有守衛、要 --confirm）：
 
 ```bash
-ssh hetzner-sg "/root/lobster-phase1/scripts/deprovision-staging.sh --slug <slug>"   # DRY RUN
-ssh hetzner-sg "/root/lobster-phase1/scripts/deprovision-staging.sh --slug <slug> --apply --confirm <slug>"
+ssh -i "C:\Users\user1115\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 "sudo /root/lobster-phase1/scripts/deprovision-staging.sh --slug <slug>"   # DRY RUN
+ssh -i "C:\Users\user1115\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 "sudo /root/lobster-phase1/scripts/deprovision-staging.sh --slug <slug> --apply --confirm <slug>"
+ssh -i "C:\Users\user1115\.ssh\id_ed25519" -p 58122 ubuntu@145.239.195.47 "sudo /root/lobster-phase1/scripts/deprovision-staging.sh --db <db> --apply --confirm <db>"   # db_only
 ```
 
-`db_only`（只剩資料庫、沒有目錄）那一類拆不動：腳本刻意要求目錄存在且含 wp-config.php，
-否則它無法證明自己要 DROP 的是哪一個資料庫。這一類請人工確認後手動處理。
+`db_only` 用 `--db`：只接受 staging 命名、不是主站 DB、且沒有任何 staging wp-config 指向它；先 dump 備份再 DROP（含同名帳號）。

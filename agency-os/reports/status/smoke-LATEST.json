@@ -1,18 +1,58 @@
 ﻿{
     "checks":  {
-                   "repair_center":  "ok",
-                   "n8n_mcp":  "ok",
-                   "client_mail":  "ok:no_failures_7d_last_send_4d",
-                   "client_sites":  "ok:5_active",
+                   "docker_watchdog":  "warn:shortcut_unguarded",
+                   "deploy_hold":  "ok:none",
+                   "pod_order_inbox_detail":  {
+                                                  "ok":  true,
+                                                  "deferred":  0,
+                                                  "oldestDeferredAgeSeconds":  null,
+                                                  "retrying":  0,
+                                                  "overdueRetries":  0,
+                                                  "gaveUp":  0,
+                                                  "stuckPending":  0,
+                                                  "capped":  false
+                                              },
+                   "client_mail":  "ok:no_failures_7d_last_send_2d",
+                   "nightly_health":  "ok",
+                   "codex_parity":  "ok:parity",
                    "n8n_failures":  "ok:none_24h",
+                   "pod_order_inbox":  "ok",
+                   "repair_center":  "ok",
+                   "ci_health":  "warn:fail_[FAIL]_CI:_\u0027HCI-30_—_Wave_1_cross-box_restore_drill_(P0-10)\u0027_has_been_failing_for_8_consecutive_run(",
+                   "client_sites":  "ok:6_active",
                    "repair_detail":  {
+                                         "github_app_status":  "unverified",
+                                         "auto_reboot":  {
+                                                             "enabled_policy":  true,
+                                                             "schedule_utc":  "20:00",
+                                                             "schedule_local_tpe":  "04:00",
+                                                             "ssot_path":  "lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf",
+                                                             "runbook_path":  "runbooks/VPS-AUTO-REBOOT-RUNBOOK.md",
+                                                             "sg":  "ok",
+                                                             "eu":  "ok"
+                                                         },
+                                         "github_repo_accessible":  true,
+                                         "github_configured":  true,
+                                         "backup_script_probe":  {
+                                                                     "sg":  "ok",
+                                                                     "eu":  "ok"
+                                                                 },
+                                         "probe_findings":  [
+
+                                                            ],
                                          "ok":  true,
                                          "system_mode":  "normal",
                                          "table_ok":  true
-                                     }
+                                     },
+                   "n8n_mcp":  "ok"
                },
-    "overall":  "PASS",
-    "generated":  "2026-09-04 22:42:11",
+    "overall":  "WARN",
+    "blockers":  [
+                     "[FAIL] CI: \u0027HCI-30 — Wave 1 cross-box restore drill (P0-10)\u0027 has been failing for 8 consecutive run(s) over 22 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/35340652567",
+                     "[FAIL] CI: \u0027Weekly workflows security audit\u0027 has been failing for 4 consecutive run(s) over 23 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/36390406303",
+                     "[WARN] Routine freshness: Monthly review: 48d old (max 35d) -- routine AgencyOS-MonthlyReview may have stopped firing or its source drifted; check https://claude.ai/code/routines"
+                 ],
+    "generated":  "2026-09-30 10:21:47",
     "blind_spots":  [
 
                     ]

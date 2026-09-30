@@ -1,6 +1,6 @@
 ﻿# Cloudflare security check
 
-- Generated: 2026-09-04 22:41:33
+- Generated: 2026-09-30 10:21:08
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
 - **Overall: PASS**
 
@@ -12,6 +12,7 @@
 | xmlrpc.php block rule | present |
 | Scanner flood rate-limit rule | enabled/block |
 | WP admin rate-limit carve-outs | present |
+| Released-address access rules | clean |
 | Origin lockdown (ks-aw-01 nginx guard) | active |
 | Direct-origin probe aware-wave (expect 403) | 403 |
 | Direct-origin probe soulful (expect 403) | 403 |

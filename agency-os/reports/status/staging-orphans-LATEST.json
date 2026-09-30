@@ -1,9 +1,8 @@
 ﻿{
-    "generated_utc":  "2026-09-03T16:52:27Z",
-    "overall":  "WARN",
+    "generated_utc":  "2026-09-30T02:20:48Z",
+    "overall":  "OK",
     "blind_spots":  [
-                        "sg_parse_empty",
-                        "eu_parse_empty"
+
                     ],
     "counts":  {
                    "unregistered":  0,
@@ -11,11 +10,21 @@
                    "db_only":  0,
                    "unknown":  0,
                    "row_only":  0,
-                   "complete":  0
+                   "complete":  1
                },
     "orphan_total":  0,
-    "staging_disk_mb":  0,
+    "staging_disk_mb":  250.4,
     "findings":  [
-
+                     {
+                         "slug":  "e2e-verify-0704-6e2b91",
+                         "class":  "complete",
+                         "dir":  true,
+                         "sizeKb":  256400,
+                         "db":  "wp_s_6e2b917e2efc46b89cdbcb",
+                         "dbPresent":  true,
+                         "row":  true,
+                         "active":  "t",
+                         "org":  "9e6e0993-d535-438b-a252-64cecdd91cca"
+                     }
                  ]
 }

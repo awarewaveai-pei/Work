@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-09-04T14:40:29.4345184Z",
+    "generatedAt":  "2026-09-30T02:19:14.9865267Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -12,12 +12,12 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "3.2G",
-               "latest_time":  "2026-09-04 02:00:01",
-               "oldest_time":  "2026-08-31 13:17:56",
+               "backup_size":  "2.6G",
+               "latest_time":  "2026-09-30 02:00:01",
+               "oldest_time":  "2026-09-23 02:00:02",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-09-04T02:30:16Z"
+               "verify_time":  "2026-09-29T02:30:05Z"
            },
     "eu":  {
                "host":  "145.239.195.47",
@@ -28,12 +28,12 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "5.3G",
-               "latest_time":  "2026-09-04 02:33:08",
-               "oldest_time":  "2026-08-31 13:39:52",
+               "backup_size":  "8.4G",
+               "latest_time":  "2026-09-29 02:33:40",
+               "oldest_time":  "2026-09-22 02:33:43",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-09-04T03:00:33Z"
+               "verify_time":  "2026-09-29T03:00:37Z"
            },
     "ks_aw_01":  {
                      "host":  "145.239.195.47",
@@ -44,12 +44,12 @@
                      "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin|15 2 * * * root /root/scripts/backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261|45 2 * * * root /root/scripts/verify-backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261",
                      "retention_days":  "7",
                      "retention_source":  "static",
-                     "backup_size":  "4.6G",
-                     "latest_time":  "2026-09-04 02:17:52",
-                     "oldest_time":  "2026-08-31 13:45:08",
+                     "backup_size":  "6.9G",
+                     "latest_time":  "2026-09-30 02:18:07",
+                     "oldest_time":  "2026-09-22 02:17:44",
                      "backup_age_days":  "0",
                      "verify_result":  "PASSED",
-                     "verify_time":  "2026-09-04T02:45:20Z"
+                     "verify_time":  "2026-09-29T02:45:22Z"
                  },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
 }
