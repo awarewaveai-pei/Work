@@ -1,0 +1,6 @@
+{"ts":"2026-09-24T06:15:31.058Z","task_id":"dlg-20260924-061531-8a7c","agent":"critic","description":"Review two new mock-gate scripts","result_snippet":"## Critic Report：check-mocks.py + build-artifact.py\n\n**結論：** 目前這版 checker 還不能當 plan I11 說的機械閘。現有樹跑 checker 是綠的，exit 0。我在副本上做了 27 個突變，23 個仍然 exit 0，3 個 crash（exit 1，但輸出是 traceback），1 個誤報紅。另外有一個錯誤就在現有的 …"}
+{"ts":"2026-09-24T06:52:58.175Z","task_id":"dlg-20260924-065258-0592","agent":"critic","description":"Review continuity rules + render script","result_snippet":"**Critic report: Cognitive OS mock gate, round 2 (continuity tables, 3 self-test cases, render-mocks.cjs)**\n\nVerdict: fail, with 0 critical, 2 major, 7 minor and 6 nits. The continuity tables are gree…"}
+{"ts":"2026-09-24T11:01:14.769Z","task_id":"dlg-20260924-110114-8e45","agent":"critic","description":"Review mock tooling changes","result_snippet":""}
+{"ts":"2026-09-24T12:18:38.166Z","task_id":"dlg-20260924-121838-1880","agent":"critic","description":"Review home catalogue generator","result_snippet":""}
+{"ts":"2026-09-24T14:02:23.562Z","task_id":"dlg-20260924-140223-baf8","agent":"critic","description":"Review home v4 generator and gate","result_snippet":""}
+{"ts":"2026-09-24T22:48:44.240Z","task_id":"dlg-20260924-224844-839a","agent":"critic","description":"Review home v5 app shell","result_snippet":""}

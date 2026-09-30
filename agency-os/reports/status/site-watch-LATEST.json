@@ -1,0 +1,47 @@
+{
+    "generatedAt":  "2026-09-30T02:20:43.7591292Z",
+    "overall":  "PASS",
+    "blind_spots":  [
+
+                    ],
+    "source":  "prod 145.239.195.47 supabase-db",
+    "probes":  {
+                   "migration":  {
+                                     "verdict":  "PASS",
+                                     "detail":  "0091 applied"
+                                 },
+                   "heartbeat":  {
+                                     "verdict":  "PASS",
+                                     "detail":  "last heartbeat 0.3h ago"
+                                 },
+                   "executor":  {
+                                    "verdict":  "PASS",
+                                    "detail":  "3 monitored target(s), none overdue; newest result: 4.3h ago"
+                                },
+                   "notifications":  {
+                                         "verdict":  "PASS",
+                                         "detail":  "0 owed right now (oldest -)"
+                                     }
+               },
+    "raw":  {
+                "hb_age_s":  "943",
+                "overdue_targets":  "0",
+                "stuck_notifications":  "0",
+                "enabled_hb_age_s":  "943",
+                "overdue_slugs":  "",
+                "monitored_targets":  "3",
+                "applied":  "true",
+                "oldest_owed_s":  "none",
+                "last_result_age_s":  "15324",
+                "owed_notifications":  "0"
+            },
+    "route_status":  null,
+    "thresholds":  {
+                       "heartbeat_warn_h":  2,
+                       "heartbeat_fail_h":  6,
+                       "enabled_recent_h":  2,
+                       "overdue_slack_h":  2,
+                       "notify_stuck_h":  3
+                   },
+    "reportPath":  "agency-os/reports/status/site-watch-LATEST.md"
+}

@@ -1,0 +1,8 @@
+{"ts":"2026-09-26T01:21:49.356Z","task_id":"dlg-20260926-012149-9acb","agent":"critic","description":"Security review of CSRF guard","result_snippet":""}
+{"ts":"2026-09-26T03:07:27.660Z","task_id":"dlg-20260926-030727-8fad","agent":"critic","description":"Critic review of T18 gate","result_snippet":""}
+{"ts":"2026-09-26T05:34:41.507Z","task_id":"dlg-20260926-053441-e489","agent":"critic","description":"Critic spot-check T18 local fixes","result_snippet":""}
+{"ts":"2026-09-26T05:59:46.320Z","task_id":"dlg-20260926-055946-a2b6","agent":"critic","description":"Critic quick-check shared 423 contract","result_snippet":""}
+{"ts":"2026-09-26T11:15:17.104Z","task_id":"dlg-20260926-111517-df1c","agent":"critic","description":"Critic: POD inbox + migration ledger","result_snippet":""}
+{"ts":"2026-09-26T14:41:33.033Z","task_id":"dlg-20260926-144133-29c0","agent":"fullstack-engineer","description":"L1: literature_search v2 adapter","result_snippet":""}
+{"ts":"2026-09-26T14:41:46.716Z","task_id":"dlg-20260926-144146-0398","agent":"fullstack-engineer","description":"L2: report renderer (P4-01 early)","result_snippet":""}
+{"ts":"2026-09-26T16:01:15.921Z","task_id":"dlg-20260926-160115-c334","agent":"fullstack-engineer","description":"L3: WC-P2-07b project sources + academic tagging","result_snippet":""}
