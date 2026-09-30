@@ -1,4 +1,15 @@
 # Worklog
+## 2026-09-30（續9）prompt-audit 收尾：H4 標題 prompt 重複 CRITICAL、H6 AGENTS.md Workflow 段縮一行
+- 根因：`/claude-api prompt-audit`（2026-09-29，報告在 session scratchpad）14 項中，H1/H2/H5 已由 268f33478 落地，H3 兩段 phantom reference 已被 73b9ac8f8 改寫掉；剩 H4/H6 未落地。
+- 改動：
+  - H4 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/title/route.ts`：刪掉常駐的 `- CRITICAL: titles must read as natural human writing — NEVER mechanically insert a comma-separated keyword string...`。多關鍵字時與 `keywordInstruction` 第 2 點（`:51-55`）重複；單一關鍵字時輸入沒有逗號，是空規則。每次呼叫送出一個 CRITICAL 會讓模型過度套用。
+  - H6 `agency-os/AGENTS.md:73`：Workflow tool 那段機制說明縮成一行。禁用已由 `permissions.deny` 強制、由 `tests/hooks/settings-deny-parity.test.mjs` 守；完整說明原本就在 `docs/operations/AGENTS_APPENDIX.md:631`，每輪注入只需要規則本身。
+- 未 commit：AGENTS.md 的 `_Last synced` 那一行屬於另一個 session 的改動。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit | exit=0 | ms=4517
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: `scripts/codex-oracle.ps1 -Mode review -Path <2 files>` 在 900s 後 timeout（log `%TEMP%/codex-oracle-log-165d7767.txt`）；改用書面對抗自審。變更是刪兩段 prompt/規則文字，沒有程式邏輯。兩段刪除文字的內容都有別處承接：標題規則在 `keywordInstruction`，Workflow 說明在 APPENDIX:631。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,tests,mcp | grep=mechanically insert a comma-separated|Workflow tool 已在 | hits=1（AGENTS_APPENDIX.md:631，是完整說明的正本，保留）
+- 避免再發生：prompt-audit 的 diff 產出後很快就會過時，因為並行 session 會先套用或改寫同一批檔。套用前先對每個檔跑 `git apply -R --check` / `--check`，分出「已套用 / 可套用 / 衝突」三類再動手。
 ## 2026-09-30（AO-CLOSE verify-recent）
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=git push origin $branch 2>&1|Invoke-SafeGitPush | hits=0 unsafe fallback captures; safe wrapper and unredirected fallback verified。
 - REALTEST_EVIDENCE: `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1` → health 100% (328/328), verify-build-gates ALL PASSED, push OK。
