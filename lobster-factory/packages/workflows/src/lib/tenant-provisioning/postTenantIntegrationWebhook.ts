@@ -1,3 +1,14 @@
+export const TENANT_INTEGRATION_PROVISIONING_SOURCES = [
+  "manual",
+  "n8n",
+  "trigger",
+  "build_console",
+  "cli",
+] as const;
+
+export type TenantIntegrationProvisioningSource =
+  (typeof TENANT_INTEGRATION_PROVISIONING_SOURCES)[number];
+
 export type BindingPayload = {
   organizationId: string;
   workspaceId?: string;
@@ -6,7 +17,7 @@ export type BindingPayload = {
   secretRef?: string;
   externalHint?: string;
   apiMetadata: Record<string, unknown>;
-  provisioningSource: "trigger";
+  provisioningSource: TenantIntegrationProvisioningSource;
   status: "pending" | "active" | "failed" | "revoked";
   lastError?: string;
 };

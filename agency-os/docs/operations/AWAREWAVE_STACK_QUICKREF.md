@@ -129,10 +129,12 @@
 
 ---
 
-## Cursor Rules
+## AI workflow governance
 
-- 正本: `agency-os/.cursor/rules/`
-- repo 根 `.cursor/rules/` 是 mirror，**不改正本**
+- Workflow SSOT: `CLAUDE.md` + `agency-os/AGENTS.md`.
+- Codex bridge/hooks: `AGENTS.md` + `mcp/claude-userlevel/`; MCP declarations: `mcp/registry.template.json`.
+- Project MCP: root `.mcp.json`; Codex managed config: `%USERPROFILE%/.codex/config.toml`.
+- Retired: `.cursor/` rules/config; do not recreate.
 
 ---
 

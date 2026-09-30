@@ -11,7 +11,7 @@
 >
 > 保留本文僅為歷史紀錄。若日後在**新主機**上要建 staging，步驟會完全不同（不再是 Hostinger 面板操作）。
 
-> **目標**：建立 `https://staging.soulfulexpression.org/`，內容從 production 複製，後台可登入，關鍵頁可開。
+> ~~**目標**：建立 `https://staging.soulfulexpression.org/`，內容從 production 複製，後台可登入，關鍵頁可開。~~ ⛔ 已取消。
 > **估時**：約 20–40 分鐘（視 All-in-One WP Migration 匯出速度而定）。
 > **前提**：已有 Hostinger 帳號登入權限。
 
@@ -30,7 +30,7 @@
 6. 按「**Create**」。
 7. 等 DNS 傳播（通常 1–5 分鐘；Hostinger 內部 DNS 很快）。
 
-> **驗證**：`nslookup staging.soulfulexpression.org` 應回傳 IP。
+> ~~**驗證**：`nslookup staging.soulfulexpression.org` 應回傳 IP。~~ ⛔ 已取消。
 
 ---
 
@@ -40,7 +40,7 @@
 
 1. hPanel → **Websites** → `soulfulexpression.org` → **Auto Installer**（或 WordPress）。
 2. 選「**Install WordPress**」（或「Add WordPress website」）。
-3. 選擇安裝位置：選 `staging.soulfulexpression.org`（若下拉沒有，輸入完整 URL）。
+3. ~~選擇安裝位置：選 `staging.soulfulexpression.org`（若下拉沒有，輸入完整 URL）。~~ ⛔ 已取消。
 4. 設定：
    - Site name：`Staging - Soulful Expression`
    - Admin user：建一個獨立帳號（例如 `staging-admin`）或使用現有帳號
@@ -68,7 +68,7 @@
 
 ## Step 4 — Staging 安裝 All-in-One WP Migration + 匯入
 
-1. 瀏覽器開 `https://staging.soulfulexpression.org/wp-admin` → 用 Step 2 設定的帳號登入。
+1. ~~瀏覽器開 `https://staging.soulfulexpression.org/wp-admin` → 用 Step 2 設定的帳號登入。~~ ⛔ 已取消。
 2. 左側 → **外掛** → **安裝外掛** → 搜尋「All-in-One WP Migration」。
 3. 安裝 + 啟用。
 4. 左側 → **All-in-One WP Migration** → **Import**。
@@ -83,7 +83,7 @@
 > **必做**，避免 staging 發出正式電郵/統計污染。
 
 1. **WP Admin → Settings → General**
-   - Site URL：確認是 `https://staging.soulfulexpression.org`（匯入後應自動更新）
+   - ~~Site URL：確認是 `https://staging.soulfulexpression.org`（匯入後應自動更新）~~ ⛔ 已取消。
    - Email：改成你自己的 email（不用客戶信箱）
 
 2. **關閉 LiteSpeed Cache 快取**：外掛 → LiteSpeed Cache → 停用（或 Settings → Turn Off Cache）。
@@ -103,8 +103,8 @@
 ## Step 6 — SSL 驗證
 
 1. Hostinger 通常會自動發 Let's Encrypt SSL 給新子網域（等 5–10 分鐘）。
-2. 瀏覽器開 `https://staging.soulfulexpression.org` → 確認出現鎖頭（無警告）。
-3. 若 SSL 未自動：hPanel → SSL → Let's Encrypt → 選 `staging.soulfulexpression.org` → 安裝。
+2. ~~瀏覽器開 `https://staging.soulfulexpression.org` → 確認出現鎖頭（無警告）。~~ ⛔ 已取消。
+3. ~~若 SSL 未自動：hPanel → SSL → Let's Encrypt → 選 `staging.soulfulexpression.org` → 安裝。~~ ⛔ 已取消。
 
 ---
 
@@ -114,7 +114,7 @@
 
 | 驗收項目 | 預期結果 | 結果 |
 |---|---|---|
-| `https://staging.soulfulexpression.org` | 首頁可開，樣式正確 | ☐ PASS / FAIL |
+| ~~`https://staging.soulfulexpression.org`~~ | ~~首頁可開，樣式正確~~ | ☐ **作廢** |
 | staging 後台登入 | `/wp-admin` 可登入（原 production admin 帳密） | ☐ PASS / FAIL |
 | 關鍵內頁可開 | 藝術療法、預約頁、聯絡頁 | ☐ PASS / FAIL |
 | 電郵不會送出 | FluentSMTP 停用（測試表單不發真信） | ☐ PASS / FAIL |

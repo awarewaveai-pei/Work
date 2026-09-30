@@ -1,4 +1,5 @@
-> **出處**：本檔原為 Cursor 本機計畫 `~/.cursor/plans/nextjs_console_30y_2eed035d.plan.md`。
+> **狀態**：歷史規劃副本；Cursor 已退場，現行執行以 repo SSOT 與現行 runbook 為準。
+> **出處（歷史）**：本檔原為 Cursor 本機計畫 `~/.cursor/plans/nextjs_console_30y_2eed035d.plan.md`。
 > Cursor 於 2026-08-26 退場，`~/.cursor/` 於 2026-08-28 整個刪除；此檔是該目錄中
 > **唯一沒有 repo 鏡像**的內容，故原樣收進 git 保存。
 >

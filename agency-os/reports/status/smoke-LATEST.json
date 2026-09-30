@@ -49,10 +49,11 @@
     "overall":  "WARN",
     "blockers":  [
                      "[FAIL] CI: \u0027HCI-30 — Wave 1 cross-box restore drill (P0-10)\u0027 has been failing for 8 consecutive run(s) over 22 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/35340652567",
+                     "[FAIL] CI: \u0027Perplexity Search-only guard\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/36659841748",
                      "[FAIL] CI: \u0027Weekly workflows security audit\u0027 has been failing for 4 consecutive run(s) over 23 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/36390406303",
                      "[WARN] Routine freshness: Monthly review: 48d old (max 35d) -- routine AgencyOS-MonthlyReview may have stopped firing or its source drifted; check https://claude.ai/code/routines"
                  ],
-    "generated":  "2026-09-30 10:21:47",
+    "generated":  "2026-09-30 10:30:14",
     "blind_spots":  [
 
                     ]

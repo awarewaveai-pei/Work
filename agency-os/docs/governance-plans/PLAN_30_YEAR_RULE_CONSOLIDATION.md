@@ -1,5 +1,6 @@
 > **Owner**：規則治理「收斂」視角與 DoD。對應舊 Cursor 檔名 **`30-year-rule-consolidation_*.plan.md`**。  
 > **與** [`PLAN_RULES_STABILITY_CONSOLIDATION.md`](PLAN_RULES_STABILITY_CONSOLIDATION.md) **同軌**；執行時以 [`rules-version-and-enforcement.md`](../operations/rules-version-and-enforcement.md) 為憲法正文。
+> **狀態**：歷史規劃副本；Cursor 已退場，現行執行以 `CLAUDE.md`、`agency-os/AGENTS.md` 與同步閘道為準。
 
 # 30 年穩定規則治理收斂計畫
 
@@ -19,7 +20,7 @@
 
 先處理「可執行運營層」：
 
-- `.cursor/rules/*`（根與 `agency-os`）
+- `.cursor/rules/*`（歷史退場輸入；根與 `agency-os`）
 - `scripts/ao-resume.ps1`、`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`
 - `scripts/system-health-check.ps1`、`scripts/verify-build-gates.ps1`
 - `AGENTS.md`、`README.md`、`docs/overview/REMOTE_WORKSTATION_STARTUP.md`

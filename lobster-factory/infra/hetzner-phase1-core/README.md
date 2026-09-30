@@ -27,10 +27,9 @@ COMPOSE_PROFILES=local-n8n docker compose --env-file .env up -d
 Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作步驟、SSL 模式與真實 IP 還原見：**[`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)**。本 compose 已掛載 **`nginx/cloudflare-real-ip.conf`**（`00-` 前綴確保先載入）。  
 **`api.aware-wave.com`／`node-api` 演進計畫與子網域統管入口**（**git 唯一正文**，勿與 `~/.cursor/plans/` 重複全文）：[`agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`](../../../agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md)。
 
-## 系統 Nginx 已佔用 80/443 時（實機常態）
+## 現役雙層 Nginx（ks-aw-01）
 
-若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（**`/` → WordPress**、**`/admin/` → Next**、`/api/`、`/n8n/`）：[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)（含 **`:80` 與 `:443` 兩段**，避免只改 HTTP、瀏覽器仍走舊 HTTPS 路由）與共用片段 [`nginx/system-sites/lobster-aware-wave-locations.inc`](./nginx/system-sites/lobster-aware-wave-locations.inc)（安裝路徑見 `aware-wave-phase1.conf` 檔首註解）。  
-**Cloudflare 子網域 `api` / `app`（同機）**：[`nginx/system-sites/aware-wave-app-api-subdomains.conf`](./nginx/system-sites/aware-wave-app-api-subdomains.conf) + [`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md) §子網域；**邊界與路線圖**見 [`agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](../../../agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)。
+host nginx 佔用 `:80/:443`、終結 TLS，正本是 [`nginx/system-sites/sg-stack.aware-wave.com.conf`](./nginx/system-sites/sg-stack.aware-wave.com.conf)；它只轉給 `127.0.0.1:8083`。lobster-nginx 的 [`nginx/default.conf`](./nginx/default.conf) 才負責各 hostname 的 app routing。`127.0.0.1:3002` 是 next-admin 的本機 health/deploy port，不是公開 TLS 路徑；`aware-wave-phase1.conf`、`aware-wave-app-api-subdomains.conf` 只保留歷史查證，不可部署。
 
 ## 安全（必讀）
 
@@ -49,7 +48,7 @@ docker compose --env-file .env build
 docker compose --env-file .env up -d
 ```
 
-**已上線主機（系統 Nginx 對外）**：依 `nginx/system-sites/aware-wave-phase1.conf` 檔首註解 **同時部署 `.inc` + `.conf`**；`nginx -t` 後 `systemctl reload nginx`。接著 **`WORDPRESS_PUBLIC_URL`** 改為 apex（無 `/wp`）、**`docker compose build next-admin && docker compose up -d next-admin`**。若仍「看起來沒變」，幾乎都是 **HTTPS 的 `server { listen 443 … }` 仍指向舊路由** — 請 **`sudo nginx -T | less`** 搜尋 `listen 443` 與 `location /`，確認根路徑已反代到 `127.0.0.1:8080`（WordPress），不是 `3002`（Next）。
+**現役 ks-aw-01 host nginx**：`nginx/system-sites/sg-stack.aware-wave.com.conf` 是外層 TLS vhost 正本，統一轉到 `127.0.0.1:8083` 的 lobster-nginx；只可用 `scripts/safe-infra-patch.sh host-nginx` 做 backup→apply→`nginx -t`→reload→HTTPS smoke→失敗回滾。`nginx/default.conf` 才是內層 app routing 正本。舊 `aware-wave-phase1.conf`／`aware-wave-app-api-subdomains.conf` 不可再部署。
 
 **變更 `NEXT_PUBLIC_*` 後**必須 **重建 next-admin**（建置期間 baked in）：
 

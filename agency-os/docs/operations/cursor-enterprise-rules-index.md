@@ -1,31 +1,31 @@
 ﻿# IDE 企業級規則索引（Cursor + Claude Code 並存）
 
-> **架構原則（30 年）**：本 repo 同時支援 **Cursor** 與 **Claude Code** 兩套 IDE，互不干擾，隨時可切換。  
-> 完整雙 IDE 並存說明：`docs/operations/dual-ide-coexistence-strategy.md`
+> **狀態**：Cursor 於 2026-08-26 退場；本檔保留歷史對照與遷移證據，不是現行操作入口。
+> **現行 SSOT**：`CLAUDE.md` + `agency-os/AGENTS.md` + `mcp/registry.template.json`。Cursor 段落僅保留歷史對照。
 
 ## § Claude Code 對應一覽
 
-| 機制 | Cursor | Claude Code |
+| 機制 | Cursor（歷史退場） | Claude Code（歷史對照） |
 |------|--------|------------|
-| 專案規則 | `agency-os/.cursor/rules/*.mdc` | `CLAUDE.md` + `@agency-os/AGENTS.md`（自動載入） |
-| Hook：AO-RESUME | `.cursor/hooks.json` `beforeSubmitPrompt` | `~/.claude/settings.json` `UserPromptSubmit` |
-| Hook 腳本 | `.cursor/hooks/run-ao-resume-on-prompt.ps1` | `~/.claude/hooks/ao-resume-on-prompt.ps1` |
-| MCP 伺服器 | `.cursor/mcp.json`（project-scoped） | `.mcp.json`（共用 SSOT，兩邊都讀） |
+| 專案規則 | `agency-os/.cursor/rules/*.mdc` | `CLAUDE.md` + `@agency-os/AGENTS.md`（自動載入） |（歷史退場對照）
+| Hook：AO-RESUME | `.cursor/hooks.json` `beforeSubmitPrompt` | `~/.claude/settings.json` `UserPromptSubmit` |（歷史退場對照）
+| Hook 腳本 | `.cursor/hooks/run-ao-resume-on-prompt.ps1` | `~/.claude/hooks/ao-resume-on-prompt.ps1` |（歷史退場對照）
+| MCP 伺服器 | `.cursor/mcp.json`（project-scoped） | `.mcp.json`（共用 SSOT，兩邊都讀） |（歷史退場對照）
 | Commit prefix | `[cursor]` | `[claude]` |
 | 狀態輸出 | `agency-os/.agency-state/ao-resume-hook-last.json` | **同一檔案**（共用，每 session 一次） |
 
 ---
 
-## § Cursor 企業級規則（原始正本）
+## § Cursor 企業級規則（歷史原始正本；已退場）
 
-整合多模型產出的 **IDE 行為規範**（身分、風險、架構面、MCP 路由、資料／狀態機紀律、Skill／可觀測性），**以本 repo 為單一真相**，與 **AO 關鍵字、收工閘道、龍蝦 Routing** 對齊，避免「Settings 貼一大段卻沒進 git」的交付風險。
+> 以下內容全部是 Cursor 退場前的歷史對照，不得作為現行操作指示。
 
 ## Settings 畫面 vs 版控（為什麼「沒有幫你填 Cursor 裡的列表」）
 
 | 你看到的 | 實際上是 | Agent 從對話能做的 |
 |----------|----------|-------------------|
-| **Settings → Rules, Skills, Subagents** 裡的條目（含 `10`–`50`、或 Cloudflare／Sentry 等） | 多半在 **本機／帳號／外掛市集**（使用者 rules、`~\.cursor\`、Plugin 自帶 **Skill**），**不會**因為改 repo 就自動變成你截圖上的每一列 | **無法**替你登入 Cursor 帳號、無法遠端點選 UI、也無法改外掛內建的描述文字（例如 Sentry 工具列上像 `name: actions` 的佔位說明常是 **套件自己带的**，不是要你在某表單「填好的欄位」）。 |
-| **`agency-os/.cursor/rules/*.mdc`**（含 `63`–`66`）與 **`00`／`30`／`40`** | **專案版控規則**：用 **monorepo 根或 `agency-os` 當工作區根** 開啟，並讓 Cursor **套用該資料夾的 Project Rules** 即會生效 | **可以**：在 git 裡維護、推送、`doc-sync` 連動（我們已做的是這一層）。 |
+| **Settings → Rules, Skills, Subagents** 裡的條目（含 `10`–`50`、或 Cloudflare／Sentry 等） | 多半在 **本機／帳號／外掛市集**（使用者 rules、`~\.cursor\`、Plugin 自帶 **Skill**），**不會**因為改 repo 就自動變成你截圖上的每一列 | **無法**替你登入 Cursor 帳號、無法遠端點選 UI、也無法改外掛內建的描述文字（例如 Sentry 工具列上像 `name: actions` 的佔位說明常是 **套件自己带的**，不是要你在某表單「填好的欄位」）。 |（歷史退場對照）
+| **`agency-os/.cursor/rules/*.mdc`**（含 `63`–`66`）與 **`00`／`30`／`40`** | **專案版控規則**：用 **monorepo 根或 `agency-os` 當工作區根** 開啟，並讓 Cursor **套用該資料夾的 Project Rules** 即會生效 | **可以**：在 git 裡維護、推送、`doc-sync` 連動（我們已做的是這一層）。 |（歷史退場對照）
 
 **若你希望「畫面上看到的」與公司交付一致**：請以 **開對資料夾**（建議 `Work-Monorepo.code-workspace` 或 repo 根）為主，並以本檔與 `README-部署說明.md` 的 **部署與正本**為準；帳號層全域 rules（截圖中 `30`／`40` 等）屬你本機／團隊同步策略，需在你方 Cursor 環境自行對齊或匯入，**不靠聊天自動完成**。
 
@@ -33,10 +33,10 @@
 
 | 位置 | 用途 |
 |---|---|
-| **`agency-os/.cursor/rules/63-cursor-core-identity-risk.mdc`** | **精簡強制條款**（每次載入）：身分、主動偵測、商業視角、溝通／衝突／情境、風險分級、輸出分工；**完整長文與十一段模板脈絡**在 **`../docs/spec/raw/Cursor  Rules for AI/00-CORE.md`**（**長文參考／溯源**，非全系統實情 SSOT；與 `00/30/40`／`AGENTS`／`TASKS`／路由規格衝突時以上位與營運 SSOT 為準） |
-| **`agency-os/.cursor/rules/64-architecture-mcp-routing.mdc`** | 架構分層、MCP／工具職責（**細節以下方 SSOT 為準**） |
-| **`agency-os/.cursor/rules/65-build-standards-data-state.mdc`** | DB／狀態機／專案結構（**僅在對應 globs 下啟用**） |
-| **`agency-os/.cursor/rules/66-skills-observability-protocol.mdc`** | Skill 協議、可觀測性與 Phase 節奏 |
+| **`agency-os/.cursor/rules/63-cursor-core-identity-risk.mdc`** | **精簡強制條款**（每次載入）：身分、主動偵測、商業視角、溝通／衝突／情境、風險分級、輸出分工；**完整長文與十一段模板脈絡**在 **`../docs/spec/raw/Cursor  Rules for AI/00-CORE.md`**（**長文參考／溯源**，非全系統實情 SSOT；與 `00/30/40`／`AGENTS`／`TASKS`／路由規格衝突時以上位與營運 SSOT 為準） |（歷史退場對照）
+| **`agency-os/.cursor/rules/64-architecture-mcp-routing.mdc`** | 架構分層、MCP／工具職責（**細節以下方 SSOT 為準**） |（歷史退場對照）
+| **`agency-os/.cursor/rules/65-build-standards-data-state.mdc`** | DB／狀態機／專案結構（**僅在對應 globs 下啟用**） |（歷史退場對照）
+| **`agency-os/.cursor/rules/66-skills-observability-protocol.mdc`** | Skill 協議、可觀測性與 Phase 節奏 |（歷史退場對照）
 | **`../docs/spec/raw/Cursor  Rules for AI/`**（monorepo 根下 `docs/spec/...`） | 拆檔溯源與歷史包；**部署時以 `agency-os/.mdc` 正本為準**（見該目錄 `README-部署說明.md`） |
 
 ## SSOT（權威文件）

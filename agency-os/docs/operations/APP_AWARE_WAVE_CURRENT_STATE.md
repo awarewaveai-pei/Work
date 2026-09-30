@@ -50,10 +50,10 @@ middleware `PUBLIC_API_PATHS` + 特殊規則放行（**仍會剝除 claim header
 > **改 matcher 或 PUBLIC_API_PATHS 時務必小心**：擴大 gate 會誤擋 server-to-server 端點（2026-06-05 大修時 critic 抓到 3 個此類 regression：Telegram 指令、probe 心跳、WP 自動化）。每次改 auth 後**必跑 server-to-server smoke**（見 §3.4）。
 
 ### 1.4 nginx（已移除 basic-auth）
-- 生效檔：`/etc/nginx/sites-enabled/app` → **symlink 到 `/etc/nginx/sites-available/aware-wave-app-api-subdomains.conf`**（**不是** `sites-available/app`，那是孤兒檔）。
+- 現役路徑：Cloudflare → ks-aw-01 host nginx `/etc/nginx/sites-enabled/sg-stack.aware-wave.com`（TLS）→ `127.0.0.1:8083` lobster-nginx → next-admin。
 - **HTTP Basic Auth 已於 2026-06-05 移除**（原 `.htpasswd_studio` 是舊臨時擋板，Supabase Auth 取代後變多餘，造成兩層登入）。backup：`<file>.bak-20260605-authcutover`。
 - nginx 仍注入 `proxy_set_header x-ops-claims-role admin/operator`（**已被 middleware 無條件剝除，無害但語意過時**，可後續清理）。
-- repo SSOT：`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`（與 live 有 drift，僅 auth_basic 已對齊）。
+- repo SSOT：外層 `nginx/system-sites/sg-stack.aware-wave.com.conf`；內層 `nginx/default.conf`。舊 `aware-wave-app-api-subdomains.conf` 已標示 retired，不再是部署來源。
 
 ### 1.5 關鍵檔案
 - `lib/supabase/ssr.ts` — browser + middleware Supabase client（與既有 `lib/supabase-server.ts` data client 分離）。
@@ -125,7 +125,7 @@ POST /api/ops/clients/<slug>/wp-report + Sec-Fetch-Site: same-site + x-ops-sync-
 
 | 項目 | 值 |
 |---|---|
-| 公開 URL | `https://app.aware-wave.com`（CF → host nginx :443 → next-admin :3002）|
+| 公開 URL | `https://app.aware-wave.com`（CF → host nginx :443 → lobster-nginx :8083 → next-admin :3002）|
 | Admin 帳號 | `awarewaveai@gmail.com`（owner）；密碼 vault `APP_AWARE_WAVE_ADMIN_PASSWORD` |
 | Auth / DB project | `supabase.aware-wave.com`（Studio `studio.aware-wave.com/project/default`）|
 | 容器 | ks-aw-01 `145.239.195.47` / `lobster-next-admin`（:3002）|

@@ -77,7 +77,7 @@ flowchart TB
 
 | 項目 | 狀態 |
 |------|------|
-| DNS / CF / Nginx `api` → 3001 | 你已架好；範本見 [`aware-wave-app-api-subdomains.conf`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf) |
+| DNS / CF / Nginx `api` → node-api | 已上線；現役兩層路徑為 host [`sg-stack.aware-wave.com.conf`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/sg-stack.aware-wave.com.conf) → lobster-nginx [`default.conf`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/default.conf) → node-api |
 | `GET /health` | 已存在；compose healthcheck 依賴此端點 |
 | `GET /rag/*` | 已存在（探測 OpenAI／Supabase）；偏 **營運／除錯**，不應無限制當「公開產品 API」 |
 | Redis `REDIS_URL` | compose 已注入；`index.js` **尚未使用**（預留 rate limit、idempotency、session 外掛） |

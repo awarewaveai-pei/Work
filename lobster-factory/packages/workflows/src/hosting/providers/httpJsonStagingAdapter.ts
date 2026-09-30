@@ -29,7 +29,7 @@ export async function provisionHttpJsonStaging(input: {
   if (!baseUrl) missing.push("LOBSTER_HOSTING_PROVIDER_BASE_URL");
   if (!token) missing.push("LOBSTER_HOSTING_API_TOKEN");
 
-  if (missing.length > 0) {
+  if (!baseUrl || !token) {
     return {
       outcome: "blocked",
       adapter: "http_json",

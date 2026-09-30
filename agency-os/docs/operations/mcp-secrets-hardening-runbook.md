@@ -4,7 +4,7 @@
 1. 打開檔案總管，進到 `D:\Work`
 2. 右鍵空白處選「在終端機中開啟」
 3. 貼上（把 mcp 裡的密鑰匯入保險箱）：  
-   `.\scripts\secrets-vault.ps1 -Action import-mcp -McpPath "D:\Work\mcp.json"`
+   `.scriptssync-mcp-config.ps1`
 4. 貼上（確認）：  
    `.\scripts\secrets-vault.ps1 -Action list`
 5. 若有 key 名稱清單，表示完成
@@ -14,7 +14,7 @@
 - Standardize laptop/desktop setup without committing secrets to git.
 
 ## Scope
-- Local Cursor MCP config: `C:\Users\USER\.cursor\mcp.json`
+- Project MCP config: repo root `.mcp.json`; Codex managed MCP block: `%USERPROFILE%\.codex\config.toml`
 - Local wrappers: `<WORK_ROOT>\mcp-local-wrappers\`
 
 ## Risk Level
@@ -32,7 +32,7 @@
 2. Use path-safe values for wrappers:
    - `C:\Users\USER\Work\mcp-local-wrappers\llm-mcp.mjs`
 3. After any path/token change:
-   - Reload Cursor window
+    - Restart Claude Code / Codex
    - Validate one tool call per server
 
 ## Phase 3 - Operational Guardrails
@@ -60,7 +60,7 @@
 
 ## Local Plaintext Scanner（每次 verify-build-gates 自動跑）
 
-**目的**：補上 `mcp/claude-userlevel/hooks/rules/commit-quality.js` 的盲區。那個 hook 只在 `git commit` 時掃 `.js/.ts/.py`；本機 gitignored 的 config（`.claude/settings.json`、`.cursor/mcp.json`、`mcp/user-env.ps1`）它看不到，但這些檔案會在磁碟上累積明文 secret。
+**目的**：補上 `mcp/claude-userlevel/hooks/rules/commit-quality.js` 的盲區。那個 hook 只在 `git commit` 時掃 `.js/.ts/.py`；本機 gitignored 的 config（`.claude/settings.json`、`.mcp.json`、`mcp/user-env.ps1`）它看不到，但這些檔案會在磁碟上累積明文 secret。
 
 ### 自動觸發
 
@@ -76,13 +76,13 @@
 
 ```powershell
 # 預設模式（gitignored secrets 只警告）
-powershell -ExecutionPolicy Bypass -File .scriptsscan-local-config-for-secrets.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\scan-local-config-for-secrets.ps1
 
 # 嚴格模式（gitignored secrets 也算 FAIL）
-powershell -ExecutionPolicy Bypass -File .scriptsscan-local-config-for-secrets.ps1 -Strict
+powershell -ExecutionPolicy Bypass -File .\scripts\scan-local-config-for-secrets.ps1 -Strict
 
 # 指定額外掃描路徑
-powershell -ExecutionPolicy Bypass -File .scriptsscan-local-config-for-secrets.ps1 -Path "extra/file.json","another/path.ps1"
+powershell -ExecutionPolicy Bypass -File .\scripts\scan-local-config-for-secrets.ps1 -Path "extra/file.json","another/path.ps1"
 ```
 
 ### 涵蓋的 token 類型（schema v1）
@@ -105,7 +105,7 @@ powershell -ExecutionPolicy Bypass -File .scriptsscan-local-config-for-secrets.p
 ```
 .claude/settings.json
 .claude/settings.local.json
-.cursor/mcp.json
+.mcp.json
 .mcp.json
 mcp/user-env.ps1
 ```
@@ -142,10 +142,10 @@ mcp/user-env.ps1
 
 不會阻擋，但建議定期清理：
 
-1. 把該 secret 移進 vault：`.scriptssecrets-vault.ps1 -Action set -Name FOO -Value <value>`
+1. 把該 secret 移進 vault：`.\scripts\secrets-vault.ps1 -Action set -Name FOO -Value <value>`
 2. 從本機檔案改用環境變數
-3. 跑 `.scriptssecrets-vault.ps1 -Action sync-mcp-user-env` 注入到 Windows User env
-4. **完全結束 Cursor / Claude Code 後重開**（讓新 env 生效）
+3. 跑 `.\scripts\secrets-vault.ps1 -Action sync-mcp-user-env` 注入到 Windows User env
+4. **完全結束 Claude Code / Codex 後重開**（讓新 env 生效）
 5. 再跑 scanner 確認
 
 ### Known-suppressed baseline (2026-06-12)

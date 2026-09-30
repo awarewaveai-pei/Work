@@ -1,5 +1,7 @@
 # Cloudflare 接入（Hetzner Phase 1 + 自架 Next.js）
 
+> **RETIRED TOPOLOGY（2026-08-31）— 不可照此檔執行。** 內文的 SG/EU 雙機、舊 IP 與 `aware-wave-app-api-subdomains.conf` 已失效；現役唯一拓樸正本是 [`AWAREWAVE_STACK_QUICKREF.md`](AWAREWAVE_STACK_QUICKREF.md)，外層 TLS vhost 正本是 `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/sg-stack.aware-wave.com.conf`。本檔只保留遷移前歷史。
+
 ## AwareWave：兩台 VPS 的 DNS 分工（勿刪 EU 記錄）
 
 | 指向 IP | 用途（對外 hostname 範例） | 備註 |

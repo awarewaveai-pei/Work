@@ -8,6 +8,7 @@ export default defineConfig({
   // LOBSTER_TRIGGER_DEPLOY_URL: override triggerUrl at deploy time to bypass Cloudflare
   // Bot Fight Mode (set to http://127.0.0.1:8030 in lobster-trigger-deploy.ps1).
   // Default is the public URL for development and manual deploy flows.
+  // @ts-expect-error Trigger SDK 4.5.10's public TriggerConfig omits this runtime-supported field.
   triggerUrl: process.env.LOBSTER_TRIGGER_DEPLOY_URL ?? "https://trigger.aware-wave.com",
   dirs: ["./src/trigger"],
   build: {

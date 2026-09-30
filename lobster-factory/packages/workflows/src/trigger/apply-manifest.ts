@@ -157,7 +157,13 @@ export const applyManifest = task({
       (process.env.LOBSTER_ENABLE_DB_WRITES || "").toLowerCase() === "true" ||
       (process.env.LOBSTER_ENABLE_DB_WRITES || "") === "1";
 
-    const dbWriteExecution =
+    type DbWriteExecution = {
+      enabled: true;
+      supabaseUrl: string;
+      serviceRoleKey: string;
+    };
+
+    const dbWriteExecution: DbWriteExecution | null =
       enableWrites
         ? (() => {
             const supabaseUrl = process.env.LOBSTER_SUPABASE_URL || "";
@@ -173,14 +179,21 @@ export const applyManifest = task({
               enabled: true as const,
             };
           })()
-        : { enabled: false as const };
+        : null;
+
+    const manifestCatalog = catalogIdsForManifest(manifestSlug);
+    if (dbWriteExecution && !manifestCatalog) {
+      throw new Error(
+        `Manifest "${manifestSlug}" is supported for staging execution but has no seeded DB catalog IDs; DB writes are blocked until its catalog migration exists.`
+      );
+    }
 
     const execMode = getManifestExecutionMode();
     const willRunShell = execMode !== "off";
     const initialWorkflowStatus =
-      enableWrites && willRunShell ? ("running" as const) : ("pending" as const);
+      dbWriteExecution && willRunShell ? ("running" as const) : ("pending" as const);
     const initialPackageStatus =
-      enableWrites && willRunShell ? ("running" as const) : ("pending" as const);
+      dbWriteExecution && willRunShell ? ("running" as const) : ("pending" as const);
 
     const workflowRunId = newUuid();
     const packageInstallRunId = newUuid();
@@ -214,28 +227,29 @@ export const applyManifest = task({
       artifacts: [],
     });
 
-    const manifestCatalog = catalogIdsForManifest(manifestSlug);
-    const dbPackageInstallRunInsert = buildPackageInstallRunInsertSql({
-      id: packageInstallRunId,
-      organizationId: input.organizationId,
-      workspaceId: input.workspaceId,
-      siteId: input.siteId,
-      environmentId: input.environmentId,
-      packageVersionId: manifestCatalog.packageVersionId,
-      manifestId: manifestCatalog.manifestId,
-      workflowRunId,
-      triggeredByUserId: null,
-      triggeredByAgentId: null,
-      status: initialPackageStatus,
-      resultSummary: {},
-      logsRef: null,
-      rollbackRunId: null,
-      metadata: {
-        manifestPath: input.manifestPath,
-        wpRootPath: input.wpRootPath,
-        environmentType: input.environmentType,
-      },
-    });
+    const dbPackageInstallRunInsert = manifestCatalog
+      ? buildPackageInstallRunInsertSql({
+          id: packageInstallRunId,
+          organizationId: input.organizationId,
+          workspaceId: input.workspaceId,
+          siteId: input.siteId,
+          environmentId: input.environmentId,
+          packageVersionId: manifestCatalog.packageVersionId,
+          manifestId: manifestCatalog.manifestId,
+          workflowRunId,
+          triggeredByUserId: null,
+          triggeredByAgentId: null,
+          status: initialPackageStatus,
+          resultSummary: {},
+          logsRef: null,
+          rollbackRunId: null,
+          metadata: {
+            manifestPath: input.manifestPath,
+            wpRootPath: input.wpRootPath,
+            environmentType: input.environmentType,
+          },
+        })
+      : null;
 
     // Use the already-validated, contained path from the MANIFESTS_BASE check above.
     const manifestAbsolutePath = resolvedManifestPath;
@@ -257,7 +271,10 @@ export const applyManifest = task({
     let executed = false;
     let patchedFinalStatus: "none" | "completed" | "failed" = "none";
 
-    if (enableWrites) {
+    if (dbWriteExecution) {
+      if (!dbPackageInstallRunInsert) {
+        throw new Error(`Manifest "${manifestSlug}" has no DB package catalog row`);
+      }
       const workflowRunRow = buildWorkflowRunRow(dbWorkflowRunInsert.spec);
       const packageInstallRunRow = buildPackageInstallRunRow(
         dbPackageInstallRunInsert.spec
@@ -335,7 +352,7 @@ export const applyManifest = task({
           }
         }
 
-        if (enableWrites) {
+        if (dbWriteExecution) {
           await supabaseRestPatch(
             { supabaseUrl: dbWriteExecution.supabaseUrl, serviceRoleKey: dbWriteExecution.serviceRoleKey },
             "workflow_runs",
@@ -401,7 +418,7 @@ export const applyManifest = task({
           }
         }
 
-        if (enableWrites) {
+        if (dbWriteExecution) {
           await supabaseRestPatch(
             { supabaseUrl: dbWriteExecution.supabaseUrl, serviceRoleKey: dbWriteExecution.serviceRoleKey },
             "workflow_runs",
@@ -471,10 +488,12 @@ export const applyManifest = task({
         workflowRunInsert: dbWorkflowRunInsert,
         packageInstallRunInsert: dbPackageInstallRunInsert,
         workflowRunRow: buildWorkflowRunRow(dbWorkflowRunInsert.spec),
-        packageInstallRunRow: buildPackageInstallRunRow(dbPackageInstallRunInsert.spec),
+        packageInstallRunRow: dbPackageInstallRunInsert
+          ? buildPackageInstallRunRow(dbPackageInstallRunInsert.spec)
+          : null,
         packageInstallRunWritePoint: "adapter optional (PostgREST insert) + status updates",
         writeExecution: {
-          enabled: enableWrites,
+          enabled: dbWriteExecution !== null,
           executed,
           insertedWorkflowRunId: workflowRunId,
           insertedPackageInstallRunId: packageInstallRunId,

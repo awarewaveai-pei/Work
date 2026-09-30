@@ -5,52 +5,52 @@
 
 ## 路徑原則（先讀這段）
 
-- **Cursor MCP（唯一 SSOT）**：**monorepo 根** **`.cursor/mcp.json`** 放 **完整** `mcpServers`（路徑 **`${workspaceFolder}/scripts/...`**，機密 **`${VAR}`**）；**勿**把明文 token 提交到 git。結構範本見 repo 根 **`mcp.json.template`**。  
-- **`%USERPROFILE%\.cursor\mcp.json`**：請維持 **`{"mcpServers":{}}`**，避免與專案檔 **合併** 後 **同一鍵重複**（UI 會像每個 MCP 出現兩次）。僅當某 MCP **絕不能進 repo** 時，才在使用者檔加入 **與專案不重複的鍵名**。  
-- **路徑**：LLM／Trigger／filesystem wrapper 等 **只** 寫在專案 **`.cursor/mcp.json`**，使用 **`${workspaceFolder}`**／**`${userHome}`**，禁止寫死 **`D:\Work\...`** 或 **`C:\Users\...\Work\...`**。  
-- **`${workspaceFolder}` 必須能錨定**：用 Cursor **開啟 monorepo 根**（含 **`scripts/`**、**`.cursor/mcp.json`** 的那一層）；**勿**只開子資料夾，否則插值指錯層級、`trigger`／`work-global` 等會失敗。  
+- **Claude Code project MCP**：根 `.mcp.json` 由 `mcp/registry.template.json` 同步產生；**不要手改生成檔**。共享 server、相對路徑與環境變數規則以 registry 為準；**勿**把明文 token 提交到 git。
+- **Codex MCP**：`%USERPROFILE%\.codex\config.toml` 的 managed block 由 `scripts\sync-mcp-config.ps1` 產生；其餘 user settings 保留。Claude Code 的 local/user scope 仍由 `~\.claude.json` 管理，`~\.claude\mcp.json` 必須維持空 server map。
+- **路徑**：LLM／Trigger／filesystem wrapper 等只在 `mcp/registry.template.json` 宣告，輸出到根 `.mcp.json` 與 Codex managed config；路徑用相對 repo root 或同步器可解析的環境變數，禁止寫死 `D:\Work\...` 或 `C:\Users\...`。
+- **monorepo root 必須能錨定**：在 Claude Code / Codex 開啟含 `scripts/`、`mcp-local-wrappers/` 與根 `.mcp.json` 的那一層；勿只開 `agency-os/`，否則相對路徑會指錯層級。
 - **Trigger.dev 自託管**：在 **`trigger`** 的 **`env`** 加上 **`TRIGGER_API_URL`**（公開 HTTPS 原點，例如 **`https://trigger.aware-wave.com`**，依你 Nginx／DNS 為準），並維持 vault 內 **`TRIGGER_ACCESS_TOKEN`**；`start-trigger-mcp.ps1` 會把此變數一併餵給內層 `npx … mcp`。  
 - **GitHub Copilot MCP**：`url` 建議 **`https://api.githubcopilot.com/mcp`**（**不要**結尾多一個 `/`）；Bearer 必須是 **Copilot MCP 允許的 GitHub token**（常見問題是拿一般 PAT 但帳號／權限不含 Copilot）。見 [GitHub 文件：Configure Copilot MCP](https://docs.github.com/en/copilot/how-tos/configure-personal-settings/configure-copilot-mcp)。
 
-## Claude Code、Codex、Copilot（與 Cursor 對齊）
+## Claude Code、Codex、Copilot（現行）
 
 | 工具 | 專案內設定檔 | 路徑／機密慣例 |
 |:---|:---|:---|
-| **Cursor** | `.cursor/mcp.json` | **`${workspaceFolder}`**／**`${userHome}`**；Copilot 標頭 **`Bearer ${env:COPILOT_MCP_BEARER_TOKEN}`**（請在使用者／系統環境變數設好 **`COPILOT_MCP_BEARER_TOKEN`**，常可與 GitHub PAT 相同，依 Copilot MCP 實際要求為準）。 |
-| **Claude Code** | monorepo 根 **`.mcp.json`** | 官方最新的 **project scope** 就是 **`.mcp.json`**；**local/user** scopes 則寫在 **`~/.claude.json`**，不是把 shared config 放在 `~/.claude/mcp.json`。與 Cursor 同樣的 server **名稱**；路徑走 **`scripts/run-llm-mcp.ps1`**（相對於專案根）。機密與路徑用 **`${VAR}`** 展開（見 [Claude MCP 說明](https://code.claude.com/docs/en/mcp)）。**`work-global`** 目前僅掛 **`${MONOREPO_ROOT}`** — 請在執行 Claude 的 shell 內 **`MONOREPO_ROOT`** 指向本 repo 根（例如 `C:\Users\你\Work`）。 |
-| **Codex CLI** | monorepo 根 **`.codex/config.toml`** | **`[mcp_servers.*]`**；HTTP MCP 用 **`bearer_token_env_var`**（例如 **`COPILOT_MCP_BEARER_TOKEN`**）。請在 **monorepo 根**執行 `codex`，讓 **`scripts/...`** 相對路徑正確。 |
+| **Cursor** | 已退場（2026-08-26） | 不得重建 `.cursor/` MCP 設定；現行流程看 Claude Code / Codex。 |
+| **Claude Code** | 根 `.mcp.json` | project scope 由 registry 產生；local/user scope 在 `~\.claude.json`；`~\.claude\mcp.json` 不承載 shared config。 |
+| **Codex CLI** | `%USERPROFILE%\.codex\config.toml` managed block | `[mcp_servers.*]`；由 `scripts\sync-mcp-config.ps1` 依 registry 產生；不要手改 managed block。 |
 
 **共用的本機啟動器**：`scripts/run-llm-mcp.ps1`（`chatgpt-*`／`claude-*`／`gemini-*` 皆呼叫同一支 **`mcp-local-wrappers/llm-mcp.mjs`**，模型由各自 `env` 的 `*_MODEL` 決定）。
 
 ## 小白快速版（去哪裡 -> 做什麼 -> 看到什麼）
 
-1. 用 Cursor **開啟 monorepo 根**（含 **`mcp-local-wrappers/`** 的那層）。**勿**只開子資料夾 `agency-os/`，否則 **`${workspaceFolder}`** 會指錯層級。  
-2. **伺服器清單** 只維護在 **monorepo 根** **`.cursor/mcp.json`**（已用 **`${workspaceFolder}`**，機密僅 **`${VAR}`**）。**`%USERPROFILE%\.cursor\mcp.json`** 設為 **`{"mcpServers":{}}`**，避免與專案 **重複合併**。  
-3. 若從零開始：以 repo 根 **`mcp.json.template`** 對照鍵名與 env，必要時合併進 **`.cursor/mcp.json`**；**勿**在 template 裡留下真 token 再提交。
+1. 在 Claude Code / Codex **開啟 monorepo 根**（含 **`mcp-local-wrappers/`**、`scripts/` 與根 **`.mcp.json`** 的那層）。**勿**只開子資料夾 `agency-os/`，否則相對路徑會指錯層級。
+2. **伺服器清單**只維護在 **`mcp/registry.template.json`**；在 monorepo 根執行同步器，產生根 **`.mcp.json`** 與 Codex managed block。機密只由 vault／環境變數提供。
+3. 若從零開始：以 repo 根 **`mcp/registry.template.json`** 對照鍵名與 env，必要時執行 **`.\scripts\sync-mcp-config.ps1`**；**勿**在 template 裡留下真 token 再提交。
 4. 在 **monorepo 根**開終端機（`scripts` 的上一層）。
-5. 貼上這行，按 Enter：  
-   `.\scripts\secrets-vault.ps1 -Action import-mcp`  
-   （會自動優先讀專案 **`.cursor/mcp.json`**，若無則讀 **`%USERPROFILE%\.cursor\mcp.json`**；若要指定檔案可加 `-McpPath "完整路徑"`）
-6. 看到 `Imported/updated secrets from mcp: ...` 代表已匯入成功
-7. 再貼這行，按 Enter：  
-   `.\scripts\secrets-vault.ps1 -Action list`
-8. 看到 key 名稱清單（不會顯示明文）就完成
+5. 貼上這行，按 Enter：
+   **`.\scripts\sync-mcp-config.ps1`**
+   （讀取 registry，產生根 `.mcp.json`、Codex managed block 與其他支援 client 的同步設定；不讀取或印出 secret 值。）
+6. 看到 `MCP sync complete` 代表結構同步成功
+7. 如需把 vault 內的 env 鍵同步到本機使用者環境，再執行：
+   **`.\scripts\secrets-vault.ps1 -Action sync-mcp-user-env`**
+8. 完全結束並重開 Claude Code / Codex，看到 MCP 能正常使用就完成
 
 ## 修復版（新增後連不上時）
 
 1. 在 monorepo 根開終端機
-2. 先重跑匯入：  
-   `.\scripts\secrets-vault.ps1 -Action import-mcp`
-3. 再檢查清單：  
-   `.\scripts\secrets-vault.ps1 -Action list`
-4. 關掉 Cursor 再重開
-5. 看到 MCP 能正常使用就完成；若仍失敗，檢查 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`）的 `url/command/args`，並確認沒有舊的 **`D:\Work\...`** 絕對路徑。
-5.1 **遠端 HTTP（`type: http`：Supabase / n8n / posthog / cloudflare 等）紅黃亂跳、或綠但寫 `No tools`**：專案 **`.cursor/mcp.json`** 已用 **`${env:變數名}`**（[Cursor 文件](https://cursor.com/docs/context/mcp) 用系統／使用者環境變數）。**`import-mcp` 只寫入 vault，不會讓 Cursor 讀到** — 在 monorepo 根執行：  
-   `.\scripts\secrets-vault.ps1 -Action sync-mcp-user-env`  
-   會掃描 **`.cursor/mcp.json`** 裡所有 **`${env:…}`**，把 vault 裡同名密鑰寫入 **Windows 使用者環境變數**，再 **完全結束並重開 Cursor**。缺哪個變數，腳本會列出；可用 **`secrets-vault.ps1 -Action set -Name … -Value …`** 補進 vault 後再跑一次 sync。
+2. 先重跑設定同步：
+   **`.\scripts\sync-mcp-config.ps1`**
+3. 若缺環境變數，再執行：
+   **`.\scripts\secrets-vault.ps1 -Action sync-mcp-user-env`**
+4. 完全結束 Claude Code / Codex 後重開
+5. 看到 MCP 能正常使用就完成；若仍失敗，檢查根 **`.mcp.json`**、**`mcp/registry.template.json`** 與 **`%USERPROFILE%\.codex\config.toml`** 的 managed block 是否同步，並確認沒有舊的 **`D:\Work\...`** 絕對路徑。
+5.1 **遠端 HTTP（`type: http`：Supabase / n8n / posthog / cloudflare 等）紅黃亂跳、或綠但寫 `No tools`**：先依 registry 與 `mcp/user-env.ps1` 驗證 URL／環境變數；再執行 **`.\scripts\sync-mcp-config.ps1`** 產生 client 設定。sync 只寫設定結構，不會把 secret 印出或寫入 repo。
+   **`.\scripts\secrets-vault.ps1 -Action sync-mcp-user-env`**
+   會把 vault 中需要的 env 鍵同步到本機使用者環境；完成後完全結束並重開 Claude Code / Codex。缺哪個變數，腳本會列出；可用 **`secrets-vault.ps1 -Action set -Name … -Value …`** 補進 vault 後再跑一次 sync。
 5.2 **`SUPABASE_*`／`CLOUDFLARE_*`／`POSTHOG_*`**：若 vault 根本沒有對應鍵名，請依各服後台填入真值 **`set`** 進 vault，勿把明文留在聊天。
 6. **`trigger` 仍紅**：在 monorepo 根執行 `.\scripts\secrets-vault.ps1 -Action list`，清單裡**必須**有 **`TRIGGER_ACCESS_TOKEN`**（Trigger 後台建立的 Personal Access Token，用 `set` 寫入 vault；`import-mcp` 不會憑空生出這一筆）。自託管另需 **`trigger.env.TRIGGER_API_URL`** 與 **`start-trigger-mcp.ps1 -ProjectRef`**／**`TRIGGER_PROJECT_REF`** 正確。
-7. **`copilot` 仍紅**：`https://api.githubcopilot.com/mcp` **不要**多尾階 `/`；Bearer 須符合 [GitHub：設定 Copilot MCP](https://docs.github.com/en/copilot/customizing-copilot/extending-copilot-chat-with-mcp)（常見為 **Copilot 訂閱／權限** 或 **PAT 類型／scope** 不符，一般 `github` MCP 能用的 token 未必能過 Copilot MCP）。建議 **`Authorization`: `Bearer ${env:COPILOT_MCP_BEARER_TOKEN}`**，再執行 **`.\scripts\secrets-vault.ps1 -Action sync-copilot-mcp-env`**（自 vault 的 **`COPILOT_AUTH_BEARER_TOKEN`** 寫入使用者環境變數），**完全結束 Cursor 後重開** 才會載入新的 User env。
+7. **`copilot` 仍紅**：先核對 URL／Bearer 權限與使用者環境變數，再執行 **`.\scripts\sync-mcp-config.ps1`**；完全結束並重開對應 client 後再測。
 
 ## 明文機密清理（舊機）
 
@@ -76,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 
 > **這張表在 2026-08-28 少了一列，而且不是因為問題消失。** `~/.cursor/mcp.json`（`cursor-mcp` / `prune-duplicate-json`）隨 Cursor 退場移除：目標檔已刪，prune helper 對「目標不存在」回報 `clean`，那條等於一個永遠不會變紅的偵測器。
 >
-> **仍然沒有任何條目管的是 `%APPDATA%\Claude\claude_desktop_config.json`**——它被 Claude 與 repo `.mcp.json` 合併載入，有 8 個與 repo 同名的 server、2 個（`perplexity` / `wordpress`）只存在於該檔，且**目前持有 6 把明文 API key**。它繼承了 `~/.cursor/mcp.json` 原本的角色卻沒有繼承治理。見 `TASKS.md`。
+> **仍然沒有任何條目管的是 `%APPDATA%\Claude\claude_desktop_config.json`**——它被 Claude 與 repo `.mcp.json` 合併載入，有 8 個與 repo 同名的 server、2 個（`perplexity` / `wordpress`）只存在於該檔，且**目前持有 6 把明文 API key**。它曾繼承 `~/.cursor/mcp.json` 的角色卻沒有繼承治理。見 `TASKS.md`。
 
 > **2026-08-25 之前這裡是錯的。** 本腳本當時自帶三份寫入邏輯，與本文件上方 §路徑原則 直接牴觸：把兩個 server 寫進規定應為 `{}` 的 `~/.claude/mcp.json`；把 repo `.mcp.json` 整份複製進 user-level Cursor 設定，親手製造 §路徑原則 要求避免的重複；而清 `~/.claude.json` 的實作用了 PowerShell 6 才有的 `-AsHashtable`，在 PS 5.1 上**從未真的執行過**。根因是同一個檔案有多個寫入者、各自帶著沒被交叉檢查的意圖。詳見 `WORKLOG.md` 2026-08-25。
 
@@ -86,17 +86,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 2. 在 monorepo 根開終端機
 3. 先初始化 vault：  
    `.\scripts\secrets-vault.ps1 -Action init`
-4. 編好 **monorepo 根** **`.cursor/mcp.json`**（專案 SSOT）後匯入：  
-   `.\scripts\secrets-vault.ps1 -Action import-mcp`
-5. 用 `list` 確認：  
-   `.\scripts\secrets-vault.ps1 -Action list`
-6. 重開 Cursor 後測一次 MCP，即完成
+4. 依 **`mcp/registry.template.json`** 產生 client 設定：
+   **`.\scripts\sync-mcp-config.ps1`**
+5. 用 `list` 或同步器輸出確認 server 名稱與 env 鍵存在：
+   **`.\scripts\secrets-vault.ps1 -Action list`**
+6. 完全結束並重開 Claude Code / Codex 後測一次 MCP，即完成
 
 ## 單一真相（registry → 同步）
 
-- **AwareWave 自託管 n8n／自架 Supabase／Cloudflare／PostHog MCP 的公開 URL** 寫在 **`mcp/registry.template.json`**；同步到 **`.cursor/mcp.json`** 與 **`.mcp.json`** 請在 monorepo 根執行：  
-  `.\scripts\sync-mcp-config.ps1`  
-  **勿**只手改 **`.cursor/mcp.json`** 而不同步 registry，否則下次 sync 會被覆蓋。
+- **AwareWave 自託管 n8n／自架 Supabase／Cloudflare／PostHog MCP 的公開 URL** 寫在 **`mcp/registry.template.json`**；同步到根 **`.mcp.json`**、Codex managed block 與其他 client 請在 monorepo 根執行：
+  **`.\scripts\sync-mcp-config.ps1`**
+  **勿**只手改生成的 **`.mcp.json`**；應修改 registry 後重跑同步，否則下次 sync 會被覆蓋。
 
 ## Hetzner：Cloud API vs SSH
 
@@ -105,23 +105,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 
 ## 入口（先記這幾個）
 
-- **`%USERPROFILE%\.cursor\mcp.json`**：Cursor 建議的**本機** MCP（含密鑰；**勿**提交）
-- **專案** `.cursor/mcp.json`：repo 內為 **`mcpServers` 空物件**（錨定 **`${workspaceFolder}`**）；密鑰仍放使用者檔
-- **`.mcp.json`**：Claude Code 專案 MCP（**`${VAR}`** 環境變數展開）
-- **`.codex/config.toml`**：Codex 專案 MCP（TOML **`[mcp_servers.*]`**）
-- **`mcp.json.template`**：對照範本（與本機 MCP 結構應一致）
-- **`scripts/run-llm-mcp.ps1`**：LLM stdio 啟動器（Cursor／Claude／Codex 共用）
+- **Claude Code project MCP**：根 **`.mcp.json`**（由 registry 同步；`~\.claude.json` 僅 local/user scope）
+- **Codex managed MCP**：**`%USERPROFILE%\.codex\config.toml`**（由 sync script 管理區塊）
+- **`mcp/registry.template.json`**：跨 client 的宣告 SSOT
+- **`.mcp.json`**：Claude Code project MCP（由 registry 生成）
+- **`scripts\run-llm-mcp.ps1`**：LLM stdio 啟動器（Claude／Codex 等共用）
+- **`scripts\secrets-vault.ps1`**：把機密進 vault 的工具
 - **`scripts/secrets-vault.ps1`**：把機密進 vault 的工具
 - **`docs/operations/local-secrets-vault-dpapi.md`**：完整建置/復原手冊
 
 ## 一鍵流程（每次新增 MCP 都照跑）
 
-1. 編輯 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`），新增 server 區塊
-2. 匯入機密到 vault：  
-   `.\scripts\secrets-vault.ps1 -Action import-mcp`
-3. 檢查機密 key 名稱：  
-   `.\scripts\secrets-vault.ps1 -Action list`
-4. Reload Cursor / 重新連線 MCP
+1. 編輯 **`mcp/registry.template.json`**（新增 server 宣告與 env 名稱；不要放 secret）
+2. 同步 client 設定：
+   **`.\scripts\sync-mcp-config.ps1`**
+3. 檢查機密 key 名稱：
+   **`.\scripts\secrets-vault.ps1 -Action list`**
+4. 重新連線 MCP，必要時完全重開 Claude Code / Codex
 5. 跑一次系統閘道：  
    `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1`
 
@@ -160,9 +160,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 ## 失敗時怎麼查
 
 - `import-mcp` 成功但找不到 key：
-  - 先檢查 **`.cursor/mcp.json`** 是否有 `env` 或 `Authorization: Bearer ...`
+   - 先檢查 **`mcp/registry.template.json`** 是否有 `env` 或 Authorization 的 env 參照（只允許 env 名稱，不得有明文值）
 - server 連不上：
-  - 先重開 Cursor，再看 **`.cursor/mcp.json`** 的 `url/command/args`；本機 **`node`／`npx`** 須在 PATH
+   - 先重跑同步器，再看根 **`.mcp.json`** 與 Codex managed block 的 `url/command/args`；本機 **`node`／`npx`** 須在 PATH
 - 憑證疑似外洩：
   - 先輪替 token，再重跑 `import-mcp`
 

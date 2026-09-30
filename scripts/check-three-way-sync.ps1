@@ -39,7 +39,8 @@ function Write-Result {
 }
 
 function Get-GitStashCount {
-    $list = @(git stash list 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $list = @((Invoke-SafeGitCapture -GitArgs @('stash', 'list')).Output |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     return $list.Count
 }
 
@@ -59,8 +60,8 @@ try {
     $savedEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
 
-    $null = git rev-parse --git-dir 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    $repoCheck = Invoke-SafeGitCapture -GitArgs @('rev-parse', '--git-dir')
+    if ($repoCheck.ExitCode -ne 0) {
         throw "Not a git repository: $WorkRoot"
     }
 
@@ -69,8 +70,9 @@ try {
     Write-Host ""
 
     function Get-AheadBehindOriginMain {
-        $line = (git rev-list --left-right --count HEAD...origin/main 2>$null | Select-Object -Last 1)
-        if ($line -match '^\s*(\d+)\s+(\d+)\s*$') {
+        $result = Invoke-SafeGitCapture -GitArgs @('rev-list', '--left-right', '--count', 'HEAD...origin/main')
+        $line = $result.Text.Trim()
+        if ($result.ExitCode -eq 0 -and $line -match '^\s*(\d+)\s+(\d+)\s*$') {
             return @{
                 Ahead  = [int]$Matches[1]
                 Behind = [int]$Matches[2]
@@ -87,7 +89,8 @@ try {
     )
 
     function Get-DirtyPaths {
-        $lines = @(git status --porcelain | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        $lines = @((Invoke-SafeGitCapture -GitArgs @('-c', 'core.quotepath=false', 'status', '--porcelain')).Output |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
         $paths = @()
         foreach ($line in $lines) {
             if ($line.Length -ge 4) {
@@ -104,14 +107,14 @@ try {
         Write-Result -Label "git fetch origin" -Pass $false -Detail "fetch failed (network/auth?)"
         exit 1
     }
-    git rev-parse --verify origin/main 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    $originMainCheck = Invoke-SafeGitCapture -GitArgs @('rev-parse', '--verify', 'origin/main')
+    if ($originMainCheck.ExitCode -ne 0) {
         Write-Result -Label "origin/main" -Pass $false -Detail "Missing origin/main after fetch."
         exit 1
     }
 
-    $head = (git rev-parse --short HEAD).Trim()
-    $remote = (git rev-parse --short origin/main).Trim()
+    $head = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'HEAD')).Text.Trim()
+    $remote = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'origin/main')).Text.Trim()
     $ab = Get-AheadBehindOriginMain
     $notBehindOrigin = ($ab.Behind -eq 0)
 
@@ -121,8 +124,8 @@ try {
             Write-Result -Label "git fetch (AutoFix)" -Pass $false -Detail "fetch failed"
             exit 1
         }
-        $head = (git rev-parse --short HEAD).Trim()
-        $remote = (git rev-parse --short origin/main).Trim()
+        $head = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'HEAD')).Text.Trim()
+        $remote = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'origin/main')).Text.Trim()
         $ab = Get-AheadBehindOriginMain
         $notBehindOrigin = ($ab.Behind -eq 0)
 
@@ -150,8 +153,8 @@ try {
             }
             Invoke-GitShown @("fetch","origin")
             if ($LASTEXITCODE -ne 0) { exit 1 }
-            $head = (git rev-parse --short HEAD).Trim()
-            $remote = (git rev-parse --short origin/main).Trim()
+            $head = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'HEAD')).Text.Trim()
+            $remote = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'origin/main')).Text.Trim()
             $ab = Get-AheadBehindOriginMain
             $notBehindOrigin = ($ab.Behind -eq 0)
         }
@@ -178,8 +181,8 @@ try {
 
         Invoke-GitShown @("fetch","origin")
         if ($LASTEXITCODE -ne 0) { exit 1 }
-        $head = (git rev-parse --short HEAD).Trim()
-        $remote = (git rev-parse --short origin/main).Trim()
+        $head = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'HEAD')).Text.Trim()
+        $remote = (Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'origin/main')).Text.Trim()
         $ab = Get-AheadBehindOriginMain
         $notBehindOrigin = ($ab.Behind -eq 0)
     }

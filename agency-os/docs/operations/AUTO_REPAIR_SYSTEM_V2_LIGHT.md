@@ -592,7 +592,7 @@ Please investigate and fix this production error.
 
 Rules:
 1. **Minimal change**：以最少行數為原則。
-2. **Forbidden files**：絕對不改 `.env`, `.env.local`, `secrets/`, `*.key`, `*.pem`, database migrations (`packages/db/migrations/*.sql`), `docker-compose.yml`, `nginx/*.conf`, `Dockerfile`, `.cursor/rules/*`, `mcp/registry.template.json`.
+2. **Forbidden files**：絕對不改 `.env`, `.env.local`, `secrets/`, `*.key`, `*.pem`, database migrations (`packages/db/migrations/*.sql`), `docker-compose.yml`, `nginx/*.conf`, `Dockerfile`, `.cursor/rules/*`（已退場路徑；不得重建）, `mcp/registry.template.json`.
 3. **Tests**：加或更新 test 覆蓋此 fix。
 4. **No swallow-catch**：禁止用 try/catch 吞錯誤當作修好。
 5. **PR 必含**:
@@ -735,7 +735,7 @@ PR description 必含：
 2. **不能改**：`packages/db/migrations/*.sql`（database migrations）
 3. **不能改**：auth、payment、user permission 邏輯
 4. **不能改**：`nginx/*.conf`, `Dockerfile`, `docker-compose.yml`
-5. **不能改**：`.cursor/rules/*`, `mcp/registry.template.json`, `agency-os/AGENTS.md`, `CLAUDE.md`
+5. **不能改**：`.cursor/rules/*`（已退場路徑；不得重建）, `mcp/registry.template.json`, `agency-os/AGENTS.md`, `CLAUDE.md`
 6. **不能改**：`.claude/skills/*`, `.claude/commands/*`, `.claude/agents/*`
 7. **不能執行**：破壞性指令（`rm -rf`, `DROP TABLE`, `TRUNCATE`, `DELETE` 無 `WHERE`）
 8. **不能用**：try/catch 吞掉錯誤當作修好

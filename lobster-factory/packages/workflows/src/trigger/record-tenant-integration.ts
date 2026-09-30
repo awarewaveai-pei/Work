@@ -5,7 +5,11 @@
 
 import { task, logger } from "@trigger.dev/sdk";
 import { z } from "zod";
-import { postTenantIntegrationWebhook } from "../lib/tenant-provisioning/postTenantIntegrationWebhook";
+import {
+  postTenantIntegrationWebhook,
+  TENANT_INTEGRATION_PROVISIONING_SOURCES,
+  type TenantIntegrationProvisioningSource,
+} from "../lib/tenant-provisioning/postTenantIntegrationWebhook";
 import { captureWorkflowException } from "../observability/sentry";
 
 const PROVIDER_RE = /^[a-z][a-z0-9_]{0,63}$/;
@@ -22,7 +26,7 @@ const PayloadSchema = z.object({
   secretRef: z.string().max(2048).optional(),
   externalHint: z.string().max(1024).optional(),
   apiMetadata: z.record(z.string(), z.unknown()).optional(),
-  provisioningSource: z.enum(["manual", "n8n", "trigger", "build_console", "cli"]).optional().default("trigger"),
+  provisioningSource: z.enum(TENANT_INTEGRATION_PROVISIONING_SOURCES).optional().default("trigger"),
   status: z.enum(["pending", "active", "failed", "revoked"]).optional().default("active"),
   lastError: z.string().optional(),
 });
@@ -32,6 +36,7 @@ export const recordTenantIntegration = task({
   run: async (payload: unknown) => {
     try {
       const input = PayloadSchema.parse(payload);
+      const provisioningSource: TenantIntegrationProvisioningSource = input.provisioningSource;
       const out = await postTenantIntegrationWebhook({
         organizationId: input.organizationId,
         workspaceId: input.workspaceId,
@@ -39,7 +44,7 @@ export const recordTenantIntegration = task({
         secretRef: input.secretRef,
         externalHint: input.externalHint,
         apiMetadata: input.apiMetadata ?? {},
-        provisioningSource: input.provisioningSource,
+        provisioningSource,
         status: input.status,
         lastError: input.lastError,
       });

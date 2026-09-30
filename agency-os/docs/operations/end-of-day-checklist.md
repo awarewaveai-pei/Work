@@ -2,12 +2,12 @@
 
 > 目的：每次關機前**逐項打勾**，確保不疏漏、不重工，並留下可追溯證據（reports + 進度文件）。
 
-**給操作者（最簡版）**：只打 **`AO-CLOSE`**；**不要**自己記 `-CompletenessGate` 等參數。由 **Cursor 代理**依 **`40-shutdown-closeout.mdc`** 代寫 **WORKLOG** 證據、代跑 **`ao-close.ps1`**、代處理被擋下的重跑。下列清單給**要手動逐步對照**的人用，與一鍵不衝突。
+**給操作者（最簡版）**：只打 **`AO-CLOSE`**；**不要**自己記 `-CompletenessGate` 等參數。由當日指定的 Claude Code / Codex 收關代理依 **`CLAUDE.md` + `agency-os/AGENTS.md`** 代寫 **WORKLOG** 證據、代跑 **`ao-close.ps1`**、代處理被擋下的重跑。下列清單給**要手動逐步對照**的人用，與一鍵不衝突。
 
 ## 0) 先決條件（遇到阻塞先停）
 - [ ] 若存在 `ALERT_REQUIRED.txt`：先處理/回報原因，**不可帶著 FAIL 收工**
 - [ ] **日內 Git（與 `REMOTE_WORKSTATION_STARTUP` §2.5 一致）**：開工後代理可能已代跑多顆**本機** checkpoint commit（未 push）；收工 `ao-close.ps1` 仍會做最後 **`git add`／`commit`／`push`**，把未推的 commits 一併送上（通過閘道後）。
-- [ ] **任務狀態**：`TASKS.md` 為真相；**預設 Autopilot** 由代理在 **`WORKLOG.md`** 寫 **`- AUTO_TASK_DONE:`** 後，**`ao-close`** 內 **`apply-closeout-task-checkmarks`** 套用打勾（見 **`.cursor/rules/40-shutdown-closeout.mdc`**）。手動改 `- [ ]`／`- [x]` 仍允許。
+- [ ] **任務狀態**：`TASKS.md` 為真相；**預設 Autopilot** 由代理在 **`WORKLOG.md`** 寫 **`- AUTO_TASK_DONE:`** 後，**`ao-close`** 內 **`apply-closeout-task-checkmarks`** 套用打勾（依 **`CLAUDE.md` + `agency-os/AGENTS.md`**）。手動改 `- [ ]`／`- [x]` 仍允許。
   - **`AUTO_TASK_DONE` 機讀格式（必守）**：須落在**與本機當日日曆一致**的 **`## yyyy-MM-dd`** 區塊內（腳本只掃「今日」該段）；單獨一行 **`- AUTO_TASK_DONE: <子字串>`**，**勿**用 `**…**` 包住該行（否則正則掃不到）；子字串須在**恰好一條**仍為 `- [ ]` 的 `TASKS` 行內可找到。
 - [ ] （可選）送 PR / 大改 docs 前：在 **monorepo 根** `<WORK_ROOT>` 跑 `.\scripts\verify-build-gates.ps1`（工程 + doc + 治理 health 一次完成）
 <!-- 週檢機器本地排程 (AgencyOS-WeeklySystemReview / AgencyOS-WeeklyAutomation) 已於 2026-05-30 退役 → GitHub Actions weekly-workflows-security-audit.yml；build gate 由 verify-build-gates.ps1 + CI 覆蓋。詳 agency-os/reports/weekly/README.md。 -->
@@ -18,22 +18,22 @@
 
 **建議協議（最省事）**：
 
-1. **指定唯一「收關代理」**（同一輪只由一個 Cursor／Claude 對話執行 **§2 的 `ao-close.ps1`**；其餘代理**不跑** `git push`／**不**對上述三檔做最終寫入）。
+1. **指定唯一「收關代理」**（同一輪只由一個 Claude Code / Codex 對話執行 **§2 的 `ao-close.ps1`**；其餘代理**不跑** `git push`／**不**對上述三檔做最終寫入）。
 2. **其他代理只交「素材」**：在 **`agency-os/.agency-state/closeout-inbox.md`**（**已納入版控**，可跟 `git pull` 同步）用 **`###` 區塊**條列；**`---` 之後、新區塊一律置頂**（**最新一則在最上**）。內容含對話 ID／完成項一句／相關 commit hash 或檔案路徑。**禁止**多人同時改 `WORKLOG` 當日區塊當「草稿本」。
 3. **Inbox → 進度檔**：**`ao-close.ps1`** 內 **`merge-closeout-inbox-into-progress.ps1`** 會將可匯區塊 **verbatim** 併入當日 **`WORKLOG`**／**`memory/daily`** 並自範本**重置 inbox**（不必手動清空）。收關代理仍須在**呼叫腳本前**補 **`AUTO_TASK_DONE:`**，並依 **rule 40／10** 更新 **`CONVERSATION_MEMORY.md`**（操作者不預設手寫長篇）。
 4. **分支策略（強烈建議）**：並行開發用**不同 branch** 或至少不同 prefix commit；收關前 **`git merge`** / PR 合進當日工作分支，再跑 **`ao-close.ps1`**，降低同檔二頭馬。
 5. **長 commit 訊息**：用 **`-CommitMessageFile path\to\msg.txt`**（UTF-8）取代一行 `-CommitMessage`；`ao-close.ps1` 會在 commit 前擋 **staged diff 含 `<<<<<<<` 衝突標記**。
-6. **協作 AI 規則（給 Codex／其他 Cursor／Claude）**：[collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md)（內含一鍵貼上區塊）。
+6. **協作 AI 規則（給 Codex／其他協作代理／Claude Code）**：[collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md)（內含一鍵貼上區塊）。
 7. **收件匣範本與初始化**：可版控範本 [closeout-inbox-TEMPLATE.md](closeout-inbox-TEMPLATE.md)；本機若尚無 `closeout-inbox.md`，在 monorepo 根執行 **`.\scripts\init-closeout-inbox.ps1`**。
 
 ## 1) 必跑三步（硬性 Gate）
 
 ### 1a) 一鍵收工 + 推 GitHub（推薦）
-在 **monorepo 根** `<WORK_ROOT>` 執行（**先**依 **`.cursor/rules/40-shutdown-closeout.mdc`** 更新 **`WORKLOG`／`memory/**`**；**`TASKS` 勾選**預設由腳本自 **`WORKLOG`** 的 **`AUTO_TASK_DONE`** 套用。**若記不得今天做了什麼**：腳本開頭會印 **今日 recap**）：
+在 **monorepo 根** `<WORK_ROOT>` 執行（**先**依 **`CLAUDE.md` + `agency-os/AGENTS.md`** 更新 **`WORKLOG`／`memory/**`**；**`TASKS` 勾選**預設由腳本自 **`WORKLOG`** 的 **`AUTO_TASK_DONE`** 套用。**若記不得今天做了什麼**：腳本開頭會印 **今日 recap**）：
 
-- **使用者**：在**收關** Cursor 對話打 **`AO-CLOSE`** 即可（與單代理相同）。**收關代理**須在執行腳本前完成 rule **第 1 步**（**含**：若存在協作收件匣，讀取並併入進度檔；**勿**僅留 inbox 不寫 WORKLOG／memory）。
+- **使用者**：在**收關** Claude Code / Codex 對話打 **`AO-CLOSE`** 即可（與單代理相同）。**收關代理**須在執行腳本前完成 rule **第 1 步**（**含**：若存在協作收件匣，讀取並併入進度檔；**勿**僅留 inbox 不寫 WORKLOG／memory）。
 - [ ] `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
-  - 預設順序（詳見腳本與 **`.cursor/rules/40-shutdown-closeout.mdc` 第 2 步**）：**`ensure-daily-progress-scaffold`** → **closeout inbox guard**（預設 **off**，2026-06-10；單 AI 下 closeout-inbox 為雙 IDE 遺留，merge 仍跑為無害 no-op）→ **prior-close archive report guard**（驗上一輪 AO-CLOSE 報告存在，缺則擋）→ **`merge-closeout-inbox-into-progress`**（verbatim 併入後重置 inbox）→ **`print-today-closeout-recap`** →（push 模式）**`git fetch`／落後攔截**→ **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → health **100%** 檢查 → **`apply-closeout-task-checkmarks`** → **`git add`** → **`verify-closeout-completeness`**（預設 **strict**）→ **`commit`／`push`** → **報告骨架機器寫入**（agent 覆寫成四段）
+  - 預設順序（詳見腳本與 **`CLAUDE.md` + `agency-os/AGENTS.md`** 第 2 步）：**`ensure-daily-progress-scaffold`** → **closeout inbox guard**（預設 **off**，2026-06-10；單 AI 下 closeout-inbox 為雙 IDE 遺留，merge 仍跑為無害 no-op）→ **prior-close archive report guard**（驗上一輪 AO-CLOSE 報告存在，缺則擋）→ **`merge-closeout-inbox-into-progress`**（verbatim 併入後重置 inbox）→ **`print-today-closeout-recap`** →（push 模式）**`git fetch`／落後攔截**→ **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → health **100%** 檢查 → **`apply-closeout-task-checkmarks`** → **`git add`** → **`verify-closeout-completeness`**（預設 **strict**）→ **`commit`／`push`** → **報告骨架機器寫入**（agent 覆寫成四段）
   - **全程 PASS**：推上後**公司機 `pull` 即完整**
   - **任一步 FAIL**：**不會 push**
   - 今夜不推遠端：`-SkipPush`（仍跑閘道與產報）
@@ -64,7 +64,7 @@
   - 若今天刻意不推：在 `WORKLOG.md` 寫一句原因（例如等待審查、只在私機）
 - [ ] 推送前快速掃描：diff 與暫存區**不得**含 token、私钥、還原後的 MCP/IDE 備份路徑內敏感檔
 
-> 與舊版「只做三步」相比：收工不僅要本機 PASS，還要**遠端有同款快照**；隔天或另一台在 Cursor 開 monorepo 根並送 **`AO-RESUME`**（hook 會跑 **`ao-resume.ps1 -FullMainlineParity`** 至 exit 0／或失敗依 **REMOTE 2.5.1** 修復），或手動 **`git pull`／`ao-resume.ps1`** 達成等價對齊，才不會斷線。若 `push` 被拒（遠端超前），請先 **`git pull --rebase origin main`** 解衝突再推。
+> 與舊版「只做三步」相比：收工不僅要本機 PASS，還要**遠端有同款快照**；隔天或另一台在 Claude Code / Codex 的 monorepo root 送 **`AO-RESUME`**（hook/bridge 會跑 **`ao-resume.ps1 -FullMainlineParity`** 至 exit 0／或失敗依 **REMOTE 2.5.1** 修復），或手動 **`git pull`／`ao-resume.ps1`** 達成等價對齊，才不會斷線。若 `push` 被拒（遠端超前），請先 **`git pull --rebase origin main`** 解衝突再推。
 
 ## 2) 四份文件必回寫（避免明天斷線）
 - [ ] `TASKS.md`

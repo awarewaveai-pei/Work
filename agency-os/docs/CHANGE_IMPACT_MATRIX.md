@@ -110,3 +110,9 @@
 
 _Last synced: 2026-09-29 14:30:03 UTC_
 
+# Maintenance note (2026-09-30): Cursor was retired on 2026-08-26. Historical
+# `.cursor/` and `Cursor  Rules for AI` paths remain below for traceability, but
+# `scripts/check-change-impact-matrix-drift.ps1` excludes them from live drift
+# verdicts and records each exclusion in the skipped section of its report. The
+# current workflow SSOT is `CLAUDE.md` + `agency-os/AGENTS.md`.
+

@@ -16,10 +16,10 @@
 
 - Startup event (`AO-RESUME`):
   - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
-  - `.cursor/rules/30-resume-keyword.mdc`
+  - `CLAUDE.md` + `agency-os/AGENTS.md`（AO-RESUME governance）
 - Shutdown event (`AO-CLOSE`):
   - `docs/operations/end-of-day-checklist.md`
-  - `.cursor/rules/40-shutdown-closeout.mdc`
+  - `CLAUDE.md` + `agency-os/AGENTS.md`（AO-CLOSE governance）
 
 All other docs should link to these event docs instead of duplicating full command blocks.
 

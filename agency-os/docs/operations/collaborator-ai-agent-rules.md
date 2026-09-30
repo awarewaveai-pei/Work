@@ -11,18 +11,18 @@
 本 repo 已有兩個**永久規則入口**，正常情況下應優先依這兩個入口自動載入，而不是每次手貼長提示：
 
 - **Claude Code**：repo 根 **`CLAUDE.md`**
-- **Cursor**：project rule **`.cursor/rules/67-shared-mcp-governance.mdc`**
+- **Codex**：user-level bridge 由 **`AGENTS.md`** + **`mcp/codex-userlevel/`** 提供；不再使用 Cursor project rules。
 
 也就是說：
 
-- **Claude** 進這個 repo 時，應以 **`CLAUDE.md`** + repo 根 **`.mcp.json`** 為專案真相
-- **Cursor** 進這個 repo 時，應以 **`.cursor/rules/`** + **`.cursor/mcp.json`** 為專案真相
+- **Claude Code** 進這個 repo 時，應以 **`CLAUDE.md`** + repo 根 **`.mcp.json`** 為專案真相
+- **Codex** 進這個 repo 時，應以 **`AGENTS.md`** + repo 根 **`.mcp.json`** + **`%USERPROFILE%\.codex\config.toml`** managed block 為準
 - 本檔的「一鍵貼給其他 AI」區塊，主要是給 **Codex／ChatGPT／臨時協作視窗／尚未吃到專案規則的外部 AI** 使用
 
-若 Claude / Cursor 的實際行為與上述永久入口衝突，以：
+若 Claude Code / Codex 的實際行為與上述永久入口衝突，以：
 
 1. `CLAUDE.md`
-2. `.cursor/rules/67-shared-mcp-governance.mdc`
+2. `agency-os/AGENTS.md`
 3. `mcp/registry.template.json`
 4. `scripts/sync-mcp-config.ps1`
 
@@ -43,7 +43,7 @@
 將下方整段複製到該工具的使用者規則／專案說明／第一則訊息（並把 `<AGENT_ID>` 改成可辨識名稱，例如 `Codex-A`、`Claude-B`）：
 
 ```text
-你是「協作代理」，不是「收關者」（收關者通常是另一個 Cursor 對話；由使用者指定）。
+你是「協作代理」，不是「收關者」（收關者通常是 Claude Code 對話；由使用者指定）。
 
 【禁止】
 - 不要編輯或定稿以下檔案的「當日收工內容」：WORKLOG.md（當日 ## yyyy-MM-dd 區塊）、memory/CONVERSATION_MEMORY.md、memory/daily/ 下當日檔、TASKS.md 的勾選定稿（不要與收關搶寫 AUTO_TASK_DONE 定稿）。
@@ -56,12 +56,12 @@
 - 區塊標題格式：### <AGENT_ID> <ISO 本地時間>
 - 區塊內必含：完成一句、動到的路徑或模組、若已 commit 則寫 hash；若對應 TASKS.md 某一條，貼該行「可唯一識別」的子字串（方便收關寫 AUTO_TASK_DONE）。
 - 可正常改程式、開 branch、commit；與其他代理並行時優先不同 branch，降低同檔衝突。
-- commit 後將 hash 寫入 closeout-inbox；**push 由收關者（Cursor）透過 `ao-close.ps1` 統一執行**，協作代理不自行 push。
+- commit 後將 hash 寫入 closeout-inbox；**push 由收關者（Claude Code）透過 `ao-close.ps1` 統一執行**，協作代理不自行 push。
 
 完整說明見 repo：agency-os/docs/operations/collaborator-ai-agent-rules.md
 ```
 
-### MCP 共用版（Claude / Cursor 建議再加貼這段）
+### MCP 共用版（Claude Code / Codex 建議再加貼這段）
 
 若該 AI 會使用 MCP，請在同一則規則或開場訊息後面再補這段：
 
@@ -69,10 +69,10 @@
 【MCP 共用規則】
 - 本 repo 的 MCP 單一真相是：`mcp/registry.template.json` + `scripts/sync-mcp-config.ps1`。
 - Claude Code 的 shared/project MCP 入口是 monorepo 根 `.mcp.json`。
-- Cursor 的 project MCP 入口是 `.cursor/mcp.json`；user/global MCP 是 `%USERPROFILE%\.cursor\mcp.json`。
+- Codex 的 managed MCP 入口是 `%USERPROFILE%\.codex\config.toml`；由 `scripts/sync-mcp-config.ps1` 產生 managed block。
 - 不要把 `~/.claude/mcp.json` 當成 shared 正本；Claude 官方最新 local/user scope 以 `~/.claude.json` 為準。
 - 不要自行發明第二套 MCP server 名稱、URL、路徑或認證格式；若需要新增或修改，先以 repo 內 shared registry / 文件為準。
-- 若看到本機 `Cursor` / `Claude` 有額外可用 MCP 設定，可以拿來「比對與收斂」，但不得直接把明文 token、API key、JWT、password 寫回 repo。
+- 若看到本機 `Claude Code` / `Codex` 有額外可用 MCP 設定，可以拿來「比對與收斂」，但不得直接把明文 token、API key、JWT、password 寫回 repo。
 - 需要調整 MCP 時，優先修改：
   1. `mcp/registry.template.json`
   2. `mcp/user-env.template.ps1`（若新增 env 名）
@@ -84,7 +84,7 @@
   - `%USERPROFILE%\.codex\config.toml`
   - `%USERPROFILE%\.copilot\mcp-config.json`
   - `%USERPROFILE%\.gemini\settings.json`
-- 若是 Cursor / Claude 本機私有設定，只能保留在使用者層設定檔或 env / vault；不要提交到 git。
+- 若是 Claude Code / Codex 本機私有設定，只能保留在使用者層設定檔或 env / vault；不要提交到 git。
 - 若發現 user-level MCP 檔含明文 secrets，應回報並建議收斂為 env / vault 引用。
 ```
 

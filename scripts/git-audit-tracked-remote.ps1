@@ -7,6 +7,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Canonical UTF-8-safe git wrappers. Every value below feeds a comparison,
+# count, path loop, or user-visible audit output, so bare native capture is unsafe on CP950 hosts.
+. (Join-Path $PSScriptRoot 'lib\git-safe-ops.ps1')
+
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } elseif ($PSScriptRoot) {
@@ -17,8 +21,8 @@ if ($WorkRoot) {
 
 Push-Location $WorkRoot
 try {
-    $null = git rev-parse --git-dir 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    $repoCheck = Invoke-SafeGitCapture -GitArgs @('rev-parse', '--git-dir')
+    if ($repoCheck.ExitCode -ne 0) {
         throw "Not a git repository: $WorkRoot"
     }
 
@@ -27,15 +31,20 @@ try {
     Write-Host ""
 
     if (-not $NoFetch) {
-        git fetch origin | Out-Null
+        Invoke-SafeGitFetch -WorkRoot $WorkRoot
         Write-Host "Fetched origin." -ForegroundColor DarkGray
     }
 
-    $head = (git rev-parse --short HEAD).Trim()
-    $remote = (git rev-parse --short origin/main 2>$null).Trim()
-    if (-not $remote) {
+    $headResult = Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'HEAD')
+    $remoteResult = Invoke-SafeGitCapture -GitArgs @('rev-parse', '--short', 'origin/main')
+    if ($headResult.ExitCode -ne 0) {
+        throw "Cannot resolve HEAD in $WorkRoot."
+    }
+    if ($remoteResult.ExitCode -ne 0) {
         throw "Missing origin/main. Add remote or fetch."
     }
+    $head = $headResult.Text.Trim()
+    $remote = $remoteResult.Text.Trim()
 
     $same = $head -eq $remote
     Write-Host ("HEAD:        {0}" -f $head)
@@ -43,7 +52,9 @@ try {
     Write-Host ("Aligned:     {0}" -f $(if ($same) { "YES" } else { "NO — pull/rebase 後會帶入遠端仍存在的路徑" }))
     Write-Host ""
 
-    $diff = @(git diff --name-status HEAD origin/main 2>$null)
+    $diffResult = Invoke-SafeGitCapture -GitArgs @('-c', 'core.quotepath=false', 'diff', '--name-status', 'HEAD', 'origin/main')
+    if ($diffResult.ExitCode -ne 0) { throw "git diff HEAD..origin/main failed (exit $($diffResult.ExitCode))." }
+    $diff = @($diffResult.Output)
     if ($diff.Count -eq 0) {
         Write-Host "Diff HEAD..origin/main: (none)" -ForegroundColor Green
     } else {
@@ -52,7 +63,9 @@ try {
     }
     Write-Host ""
 
-    $deletedOnDisk = @(git ls-files -d)
+    $deletedResult = Invoke-SafeGitCapture -GitArgs @('-c', 'core.quotepath=false', 'ls-files', '-d')
+    if ($deletedResult.ExitCode -ne 0) { throw "git ls-files -d failed (exit $($deletedResult.ExitCode))." }
+    $deletedOnDisk = @($deletedResult.Output)
     if ($deletedOnDisk.Count -eq 0) {
         Write-Host "Tracked files missing on disk (git ls-files -d): (none)" -ForegroundColor Green
     } else {
@@ -62,7 +75,9 @@ try {
     Write-Host ""
 
     Write-Host "Working tree (porcelain):" -ForegroundColor Cyan
-    $porcelain = @(git status --porcelain=v1)
+    $statusResult = Invoke-SafeGitCapture -GitArgs @('-c', 'core.quotepath=false', 'status', '--porcelain=v1')
+    if ($statusResult.ExitCode -ne 0) { throw "git status failed (exit $($statusResult.ExitCode))." }
+    $porcelain = @($statusResult.Output)
     if ($porcelain.Count -eq 0) {
         Write-Host "  (clean)" -ForegroundColor Green
     } else {
@@ -72,7 +87,9 @@ try {
 
     if ($Pattern) {
         Write-Host ("Paths on origin/main matching substring (case-insensitive): {0}" -f $Pattern) -ForegroundColor Cyan
-        $paths = @(git ls-tree -r origin/main --name-only)
+        $pathsResult = Invoke-SafeGitCapture -GitArgs @('-c', 'core.quotepath=false', 'ls-tree', '-r', 'origin/main', '--name-only')
+        if ($pathsResult.ExitCode -ne 0) { throw "git ls-tree origin/main failed (exit $($pathsResult.ExitCode))." }
+        $paths = @($pathsResult.Output)
         $hit = @($paths | Where-Object { $_.ToLowerInvariant().Contains($Pattern.ToLowerInvariant()) })
         if ($hit.Count -eq 0) {
             Write-Host "  (no matches — 遠端此關鍵字下沒有追蹤檔，pull 不會為了這串字長回檔案)" -ForegroundColor Green

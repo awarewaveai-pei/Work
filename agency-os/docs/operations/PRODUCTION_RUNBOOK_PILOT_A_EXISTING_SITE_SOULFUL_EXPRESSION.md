@@ -1,8 +1,9 @@
 # Production Runbook - Existing Site Handover (Soulful Expression Art Therapy)
 
 > 類型：既有網站接手（Production 已運行）  
-> 目標：在不影響現行營運前提下，建立 staging、完成首批受控變更、具備可回滾證據。  
-> 狀態：Execution Ready（可直接照單執行）
+> ~~目標：在不影響現行營運前提下，建立 staging、完成首批受控變更、具備可回滾證據。~~
+> ⛔ **staging 路線作廢（2026-08-16）**：Hostinger staging 不再建立；Soulful 已於 2026-08-28 切換至 `ks-aw-01`。現行主線請讀 `tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md` 與 `CUTOVER_RUNBOOK.md`。
+> 狀態：Historical / superseded
 
 ## 0) Go/No-Go 原則
 
@@ -30,9 +31,9 @@
 
 ## 2) Day 2：建立 Staging（必做）
 
-> **Repo 對齊（2026-05-07）**：canonical staging URL 已登記於 `tenants/company-soulful-expression/core/ENVIRONMENT_REGISTRY.md` — **`https://staging.soulfulexpression.org/`**，目前 **`lifecycle=provision_pending`**。下列為實作步驟；**驗收通過後**請於該檔將 lifecycle 改為 **`live`**，並回填 WP／PHP／備份等欄位（與 `SITES_INDEX.md` 同步）。
+> ~~**Repo 對齊（2026-05-07）**：canonical staging URL 已登記於 `tenants/company-soulful-expression/core/ENVIRONMENT_REGISTRY.md` — **`https://staging.soulfulexpression.org/`**，目前 **`lifecycle=provision_pending`**。下列為實作步驟；**驗收通過後**請於該檔將 lifecycle 改為 **`live`**，並回填 WP／PHP／備份等欄位（與 `SITES_INDEX.md` 同步）。~~ ⛔ 已作廢；以現行搬站主線為準。
 
-- [ ] 建立 staging 子網域（**應對齊 registry**：`staging.soulfulexpression.org`；若主機商限制再開 CR 修 registry／DNS）
+- ~~[ ] 建立 staging 子網域（**應對齊 registry**：`staging.soulfulexpression.org`；若主機商限制再開 CR 修 registry／DNS）~~ ⛔ 已取消，不得在 Hostinger 建置。
 - [ ] 由 production 複製內容到 staging
 - [ ] 啟用存取保護（密碼/白名單）
 - [ ] 關閉 staging 對正式分析/正式寄信污染

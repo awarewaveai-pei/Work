@@ -511,14 +511,10 @@ if (Test-Path $vaultHelper) {
 }
 
 # 7) Deploy drift (informational): SG production vs origin/main.
-# KNOWN GAP (found 2026-08-29 while wiring 7c below, not fixed here -- out of scope for the
-# CP950 raw-read audit task): check-deploy-drift.ps1 lives only under monorepo-root scripts/,
-# never agency-os/scripts/, so this $root-relative Join-Path silently resolves to a path that
-# doesn't exist and the check below always takes the "not present" skip branch. Same shape as
-# the 7b/7c fix just below (see $monoRoot) -- not applied here because this check's
-# correct behavior when actually enabled hasn't been verified in this session. Tracked:
-# TASKS.md "system-health-check.ps1 7)deploy-drift(:520) 與 9)cloudflare 兩個 check 從未真正執行過".
-$driftScript = Join-Path $root "scripts/check-deploy-drift.ps1"
+# The health script canonicalizes $root to agency-os, while these probes live under the
+# monorepo-level scripts directory. Resolve them from $monoRoot so they cannot silently
+# degrade into the "not present" skip branch.
+$driftScript = Join-Path $monoRoot "scripts/check-deploy-drift.ps1"
 if (Test-Path $driftScript) {
     try {
         $driftJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $driftScript -AppCodeOnly -SkipFetch -Json 2>&1 | Out-String
@@ -686,13 +682,12 @@ if (Test-Path -LiteralPath $releasedAddrScript) {
 }
 
 # 9) Cloudflare security posture (warn-only informational check).
-# KNOWN GAP (same shape as the 7) deploy-drift note above, found 2026-08-29, not fixed here):
-# check-cloudflare-security.ps1 also lives only under monorepo-root scripts/, so this
-# $root-relative Join-Path also silently resolves to a non-existent path and always skips.
-$cfScript = Join-Path $root "scripts/check-cloudflare-security.ps1"
+# The probe is also owned by the monorepo-level scripts directory. Pass the monorepo root
+# to its -WorkRoot parameter so its report and vault-helper paths resolve consistently.
+$cfScript = Join-Path $monoRoot "scripts/check-cloudflare-security.ps1"
 if (Test-Path $cfScript) {
     try {
-        $cfOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cfScript -WorkRoot $root 2>&1 | Out-String
+        $cfOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cfScript -WorkRoot $monoRoot 2>&1 | Out-String
         if ($cfOut -match "PASS") {
             $detail = ($cfOut -split "`n" | Where-Object { $_ -match "bot=" } | Select-Object -First 1).Trim()
             Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail $detail

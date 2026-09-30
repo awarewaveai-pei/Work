@@ -1,8 +1,8 @@
 # Claude Code 完整檔案參考清單
 
 > **用途**：列出 Claude Code（CLI / VSCode extension）在每次對話中**實際讀取、寫入、執行**的所有檔案。  
-> 此清單**不涵蓋 Cursor IDE**，兩套系統完全獨立，詳見底部「Cursor 對照」段。  
-> 架構 SSOT：`docs/operations/cursor-enterprise-rules-index.md`
+> 此清單只描述現行 Claude Code / Codex 相容工作流；Cursor 已於 2026-08-26 退場，底部內容僅保留為歷史對照。
+> 現行架構 SSOT：`CLAUDE.md` + `agency-os/AGENTS.md`；Codex bridge / hooks：`mcp/claude-userlevel/`。
 
 ---
 
@@ -11,9 +11,9 @@
 | IDE | 自動載入機制 | 規則/指令檔位置 |
 |-----|------------|--------------|
 | **Claude Code** | `CLAUDE.md` (`@-include`) + Auto Memory | `.claude/commands/` · `.claude/agents/` · `.claude/skills/` |
-| **Cursor** | `.mdc` 檔的 `alwaysApply: true` 旗標 | `agency-os/.cursor/rules/*.mdc`（SSOT）/ `.cursor/rules/*.mdc`（mirror）|
+| **Cursor** | 已退場（2026-08-26） | 不再載入或維護 `.cursor/rules/`；本表僅保留歷史對照。|
 
-**`.cursor/rules/*.mdc` 是 Cursor 專用，Claude Code 永遠不讀。**
+**歷史註記**：`.cursor/rules/*.mdc` 曾是 Cursor 專用，Claude Code 永遠不讀；現行 workflow 不再使用此樹。
 
 ---
 
@@ -208,33 +208,33 @@
 
 ---
 
-## Cursor IDE 自動載入（非 Claude Code）
+## 歷史附錄：Cursor IDE 自動載入（已退場）
 
-以下檔案由 **Cursor IDE** 透過 `alwaysApply: true` 自動注入，Claude Code 不讀：
+以下檔案曾由 **Cursor IDE** 透過 `alwaysApply: true` 自動注入；Cursor 已退場，Claude Code / Codex 不讀此歷史樹：
 
 | 正本位置 | Mirror | 說明 |
 |---------|--------|-----|
-| `agency-os/.cursor/rules/00-session-bootstrap.mdc` | `.cursor/rules/00-session-bootstrap.mdc` | Session 啟動 |
-| `agency-os/.cursor/rules/10-memory-maintenance.mdc` | `.cursor/rules/` | 記憶維護 |
-| `agency-os/.cursor/rules/20-doc-sync-closeout.mdc` | `.cursor/rules/` | Doc sync |
-| `agency-os/.cursor/rules/30-resume-keyword.mdc` | `.cursor/rules/` | AO-RESUME 關鍵字 + 七段格式 |
-| `agency-os/.cursor/rules/40-shutdown-closeout.mdc` | `.cursor/rules/` | AO-CLOSE 收工流程 |
-| `agency-os/.cursor/rules/50-operator-autopilot.mdc` | `.cursor/rules/` | Autopilot 模式 |
-| `agency-os/.cursor/rules/60-beginner-operation-format.mdc` | `.cursor/rules/` | 初階操作格式 |
-| `agency-os/.cursor/rules/62-progress-heartbeat-15min.mdc` | `.cursor/rules/` | 15 分鐘心跳 |
-| `agency-os/.cursor/rules/63-cursor-core-identity-risk.mdc` | `.cursor/rules/` | 身分 + 風險分級（精簡）|
-| `agency-os/.cursor/rules/64-architecture-mcp-routing.mdc` | `.cursor/rules/` | 架構 + MCP routing |
-| `agency-os/.cursor/rules/65-build-standards-data-state.mdc` | `.cursor/rules/` | 建置標準 + 狀態機 |
-| `agency-os/.cursor/rules/66-skills-observability-protocol.mdc` | `.cursor/rules/` | Skills + 可觀測性 |
-| `agency-os/.cursor/rules/67-shared-mcp-governance.mdc` | `.cursor/rules/` | 共用 MCP 治理 |
+| `agency-os/.cursor/rules/00-session-bootstrap.mdc` | `.cursor/rules/00-session-bootstrap.mdc` | Session 啟動 |（歷史退場）
+| `agency-os/.cursor/rules/10-memory-maintenance.mdc` | `.cursor/rules/` | 記憶維護 |（歷史退場）
+| `agency-os/.cursor/rules/20-doc-sync-closeout.mdc` | `.cursor/rules/` | Doc sync |（歷史退場）
+| `agency-os/.cursor/rules/30-resume-keyword.mdc` | `.cursor/rules/` | AO-RESUME 關鍵字 + 七段格式 |（歷史退場）
+| `agency-os/.cursor/rules/40-shutdown-closeout.mdc` | `.cursor/rules/` | AO-CLOSE 收工流程 |（歷史退場）
+| `agency-os/.cursor/rules/50-operator-autopilot.mdc` | `.cursor/rules/` | Autopilot 模式 |（歷史退場）
+| `agency-os/.cursor/rules/60-beginner-operation-format.mdc` | `.cursor/rules/` | 初階操作格式 |（歷史退場）
+| `agency-os/.cursor/rules/62-progress-heartbeat-15min.mdc` | `.cursor/rules/` | 15 分鐘心跳 |（歷史退場）
+| `agency-os/.cursor/rules/63-cursor-core-identity-risk.mdc` | `.cursor/rules/` | 身分 + 風險分級（精簡）|（歷史退場）
+| `agency-os/.cursor/rules/64-architecture-mcp-routing.mdc` | `.cursor/rules/` | 架構 + MCP routing |（歷史退場）
+| `agency-os/.cursor/rules/65-build-standards-data-state.mdc` | `.cursor/rules/` | 建置標準 + 狀態機 |（歷史退場）
+| `agency-os/.cursor/rules/66-skills-observability-protocol.mdc` | `.cursor/rules/` | Skills + 可觀測性 |（歷史退場）
+| `agency-os/.cursor/rules/67-shared-mcp-governance.mdc` | `.cursor/rules/` | 共用 MCP 治理 |（歷史退場）
 
-> 正本 SSOT：`agency-os/.cursor/rules/`。Mirror 由 `scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1` + `verify-build-gates.ps1` 自動同步。
+> **歷史 SSOT**：`agency-os/.cursor/rules/` 曾由同步腳本鏡像；現行 SSOT 請看 `CLAUDE.md`、`agency-os/AGENTS.md` 與 `mcp/claude-userlevel/`。
 
 ---
 
 ## Related Documents
 
-- [`docs/operations/cursor-enterprise-rules-index.md`](cursor-enterprise-rules-index.md) — IDE 規則索引（含 Cursor vs Claude Code 對照表）
+- [`docs/operations/cursor-enterprise-rules-index.md`](cursor-enterprise-rules-index.md) — **歷史** IDE 規則索引（Cursor vs Claude Code 對照表）
 - `CLAUDE.md` (repo root) — 專案指令 SSOT
 - `agency-os/AGENTS.md` — 全局 Agent 規則 SSOT
 - [`.claude/commands/ao-resume.md`](../../../.claude/commands/ao-resume.md) — AO-RESUME 執行 SSOT（含完整 Tier 1 讀檔清單）

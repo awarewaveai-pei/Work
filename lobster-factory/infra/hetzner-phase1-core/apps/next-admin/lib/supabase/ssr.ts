@@ -11,6 +11,7 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_AUTH_COOKIE_OPTIONS } from "./auth-cookie-options";
 
 // Public anon key + URL are safe in the browser bundle (NEXT_PUBLIC_*, baked at build time).
 // The session cookie — not the anon key — is what authenticates a user.
@@ -24,7 +25,9 @@ export function isSupabaseAuthConfigured(): boolean {
 
 /** Browser client for client components (the /login form). Manages the session via cookies. */
 export function createSupabaseBrowserClient(): SupabaseClient {
-  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookieOptions: SUPABASE_AUTH_COOKIE_OPTIONS,
+  });
 }
 
 export interface RefreshedCookie {
@@ -57,6 +60,7 @@ export function createSupabaseMiddlewareClient(request: NextRequest): {
   const refreshedCookies: RefreshedCookie[] = [];
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookieOptions: SUPABASE_AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return request.cookies.getAll();

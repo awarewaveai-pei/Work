@@ -20,7 +20,7 @@
 7. **客戶模組化**：客戶選用哪些能力模組（catalog/selection）可日後擴充；但交付/計價歸桶以固定矩陣為準，避免頻繁重排導致合約口徑漂移。
 
 ## 2. 工程層執行（Execution）
-1. **每日續接**：預設在 Cursor 開 monorepo 根並送 **`AO-RESUME`**；**hook** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（behind 時才 ff-only pull＋閘道＋Strict 稽核）再讀檔；髒樹／衝突時腳本會非 0，請先整理（見 **`REMOTE_WORKSTATION_STARTUP` 2.5.1**）。除錯時可改手動跑腳本。
+1. **每日續接**：預設在 Claude Code / Codex 的 monorepo root 送 **`AO-RESUME`**；**hook/bridge** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（behind 時才 ff-only pull＋閘道＋Strict 稽核）再讀檔；髒樹／衝突時腳本會非 0，請先整理（見 **`REMOTE_WORKSTATION_STARTUP` 2.5.1**）。除錯時可改手動跑腳本。
 2. **治理/文件連動**：任何改版涉及政策、文件連動與矩陣語意時，先跑 `doc-sync-automation.ps1 -AutoDetect`，並以 `docs/CHANGE_IMPACT_MATRIX.md` 為硬約束。
 3. **收工閘道**：預設入口為 `AO-CLOSE`；閘道通過後才允許 commit/push。
 4. **觀測與健康**：`system-health-check` Critical Gate 必須達標；未達不得宣告整庫正常。
@@ -54,7 +54,7 @@
 ### 4.3 禁止重工、矛盾與雙寫
 - **預設不新增檔**：見 `docs/operations/new-doc-linkage-checklist.md` 開頭「**預設：不要新增檔案**」——先 append Owner，禁止為偏好開平行長文檔。
 - **隊列**：`TASKS` 只保留 **一行**責任敘述 + **進度／下一步** + **連結到 Owner**；長細項不得堆在 `TASKS` 重複貼全文。
-- **細項與案例**：只在對應 **Owner 檔** 維護正文；他處 **一句摘要 + 連結**（見 `.cursor/rules/63-cursor-core-identity-risk.mdc` Single Owner）。
+- **細項與案例**：只在對應 **Owner 檔** 維護正文；他處 **一句摘要 + 連結**（見 `CLAUDE.md` / `agency-os/AGENTS.md` 的 Single Owner 原則）。
 - **租戶／試點**：事實以 `tenants/<company>/...` 該案檔為準（**環境 URL**：`core/ENVIRONMENT_REGISTRY.md`；**站點索引**：`SITES_INDEX.md`；若在 `sites/*/SITE_PROFILE.md` 的 **Staging URL** 列出 HTTPS，須與 registry 對齊——機械檢查見 `agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`）；與全局政策衝突時，先對照 ADR／Routing Spec／營運 SSOT，**禁止**在 tenant 內複製第二套長篇政策正文。
 
 ### 4.4 「三十年」的誠實範圍（安全、可演進）

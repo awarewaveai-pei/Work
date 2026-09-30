@@ -196,6 +196,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
       trigger_run_id: handle.id,
     });
     captureWorkflowEvent("dispatcher dispatched", {
+      workflowId: "dispatch-action-run",
       actionRunId: run.id,
       actionKey,
       taskId,

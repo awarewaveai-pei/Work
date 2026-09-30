@@ -1,4 +1,4 @@
-﻿# Global Task Board
+# Global Task Board
 
 
 
@@ -669,12 +669,12 @@
 - [x] **【2026-09-26 開出｜資安｜Medium，需 Trigger.dev 部署】建站派送不查系統模式** → 雲端 T19（2026-09-26 已發；合併後本機部署自架 Trigger） — `app/api/build/runs/route.ts:528` 寫 ops_action_runs＋`:600` kick 派送器，`packages/workflows/src/trigger/dispatch-action-run.ts:207`、`orchestrate-tenant-provisioning.ts:61` 執行前不查 system_modes（workflows 內 0 引用）→ 入列後切 emergency_stop 仍會建 repo／服務。修：入列前 gate＋派送器執行前再查（同 getActiveMode 語意）。T18 critic M4，詳 WORKLOG 續26。 → ✅ 2026-09-26 續43（雲端 T19＋本機：入列、派送、任務開跑三處查；擋下回終態不 throw）；部署見續51 待部署步驟。
 - [x] **【2026-09-26 開出｜資安｜Medium，已決策】Printful／Chatwoot 對外寫入不查系統模式** → 決策 `reports/decisions/2026-09-26-system-mode-inbound-events.md`（操作者全權委派）：操作者發起的 Printful 寫入照常 423；Woo 訂單一律 2xx、落 inbox、延後補做（WooCommerce 非 2xx 超過 5 次會停用 webhook）；Chatwoot 模式擋下 → 暫停 AI 轉真人。實作＝雲端 T26／T27。 — printful/sync、tools/publish link／pfcreate／pforder、webhooks/woo-order（自動 Printful 草稿單）、Chatwoot 回覆。決定點：woo-order 被 423 擋時 WooCommerce 重送有限，會不會丟單；維護模式下客服回覆要不要擋。T18 critic M5。 → ✅ 2026-09-26 續51（T26：Printful 過 gate；Woo 收件匣一律 2xx、回應後建草稿、10 分鐘 sweep）＋續50（T27：Chatwoot 暫停 AI 轉真人）；0093 已套。
 - [ ] **【2026-09-26 開出｜DB｜Medium】正式庫從未套用 4 個 migration** — ledger 補登時逐檔實測發現（WORKLOG 續48）：0022 build console 7 表＋`sites.apply_mode`（adopt-client-os／wp-install-plugins 會寫這些表，Profile C 目前在正式庫必失敗）；0037 派送 index（檔內 CONCURRENTLY，需非交易手動套）；0024 `tenant_integration_bindings_ws_idx`；0057 wp-update 目錄列（`lib/ops-actions/record.ts` 首次使用會自動 upsert，可只補帳）。0022 無自身 BEGIN/COMMIT、runner 會拒絕 → 需先補交易包裹（新號或原檔修正需決定）。套完以 `apply-db-migration.mjs --record-only` 補帳。
-- [ ] **【2026-09-26 開出｜小】workflows 套件沒有 typecheck 步驟** — `lobster-factory/packages/workflows` 無 tsconfig／typescript；Trigger build（esbuild）不做型別檢查。ad-hoc strict tsc 找到 3 個既有錯：`dispatch-action-run.ts:198`（captureWorkflowEvent 參數缺 workflowId）、`:213`（SentryContext 無 runId）、`hosting/providers/httpJsonStagingAdapter.ts:51`。WORKLOG 續43。
+- [x] **【2026-09-26 開出｜小】workflows 套件沒有 typecheck 步驟** — ✅ 2026-09-30 續10：新增 package-wide strict `typecheck`（source/config/tests）、修正原 3 項與完整 gate 揭露的 contract drift；`npm run typecheck` exit 0、22 files / 143 tests PASS，兩個 mutation sentinel 均會抓到回歸。未 deploy／未動 production、schema、資料或 credentials。
 - [ ] **【2026-09-26 開出｜POD｜Medium】Woo 端對帳：webhook 是否仍啟用、有無投遞失敗** — pod_order_inbox 只看得到「有送到」的訂單；WooCommerce 停用 webhook（>5 次失敗）或部署重啟時的單筆失敗，收件匣看不到。偵測：讀 soulful `wp_wc_webhooks`（delivery_url 含 `/api/webhooks/woo-order`）的 status＝active 且 failure_count＝0，沿用 `scripts/check-smoke-tests.ps1` client_mail 的 SOULFUL_DB_PROFILE 傳輸（Hostinger／ks-aw-01 切換期）。critic M2 延伸，WORKLOG 續51。
 - [ ] **【2026-09-26 開出｜小｜設定】env 設定的 WP 站與 bridge 站綁 org** — env 站（`lib/content/wp-sites.ts:42` organizationId null）只受 global 模式管、社群發文回 422；bridge 站以網址 host 對應 active wp_sites 列取 org（`lib/studio/wp-bridge-client.ts` bridgeSiteOrg），無列 = 只看 global。修：把這些站建成 wp_sites 列並填 organization_id。T18 critic M2＋m5，詳 WORKLOG 續26。
 - [x] **【2026-09-26 開出｜資安｜Medium，動到驗證先出計畫】`/api/ops/*` 非 GET 沒有 CSRF 防護** — staging 在 aware-wave.com 與 app 同站（SameSite=Lax cookie 會帶上），`middleware.ts` 無 Origin／Sec-Fetch-Site 檢查；客戶 staging WP 上的 JS 可用操作者身分 POST（T17 起 wp-update 不需 body）。修法：middleware 對非 GET、非 same-origin、無 sync-key／bearer 者拒絕。詳 WORKLOG 2026-09-26 續22。 → ✅ 2026-09-26 續24：middleware `isCrossSiteWrite`，只有同源正面證據才放行（範圍擴到全部 `/api/*`、`/portal/api/*`）；已部署 2026-09-26 `b8c191698`（WORKLOG 續30）。
 - [x] **【2026-09-26 開出｜資安｜Medium】有副作用的 GET 可被同站頁面觸發** — Lax cookie 在同站 subresource GET 也會帶上：`app/api/content/trending/route.ts:115-118`（`?type=suggest` 會呼叫付費 aiChat）、`app/api/video/status/route.ts:112-170`、`video/remotion-job-status/route.ts:21-31`（GET 會 finalize job／清檔）。治本＝這些改成 POST 或無副作用；或 middleware 加 Resource Isolation Policy（`sec-fetch-site` 為 same-site／cross-site 且非 navigate → 擋），但要先盤點合法跨站 GET（客戶站／Email 嵌入 app 圖片網址會被擋）。詳 WORKLOG 2026-09-26 續24。 → ✅ 2026-09-26 續44（雲端 T20＋本機）：三個 route 改 POST＋AST 結構測試。
-- [ ] **【2026-09-26 開出｜資安｜小】app origin 的前端供應鏈與傳輸加固** — `public/vector-editor.html:7-13` 7 支 cdnjs／jsdelivr script 無 SRI（跑在 app origin、不受登入保護，session cookie httpOnly:false 可被讀）；live 無 HSTS header、cookie 無 Secure。修：加 `integrity`＋`crossorigin` 或自架；nginx 加 HSTS。 → SRI ✅ 2026-09-26 續47（T23，7 支 hash 與 CDN 官方值比對一致）；HSTS（host nginx）＋cookie Secure 仍待做。
+- [ ] **【2026-09-26 開出｜資安｜小】app origin 的前端供應鏈與傳輸加固** — SRI ✅ 2026-09-26 續47。2026-09-30 續11 repo 已完成：三個 Supabase SSR client 共用 `Secure` cookie policy；依現役 ks-aw-01 雙層拓樸新增 host `sg-stack.aware-wave.com.conf`，HSTS 只作用於 app origin；真 nginx、typecheck、targeted/mutation 測試通過。**仍未完成＝production 尚未 rebuild/reload，live header 仍無 HSTS**；治理 hook 禁止遠端 sudo，部署驗收前不得勾選。
 - [x] **【2026-09-26 開出｜資安｜查證】CSRF 修補前是否被利用** — 到 ks-aw-01 nginx access log 撈 `POST /api/` 且 Referer 為 `aware-wave.com/staging` 的紀錄，往前推到 session cookie 成為唯一登入層（2026-06-05）。唯讀查詢。 → ✅ 2026-09-26 續30：nginx log 只留 14 天（9/12–9/26，更早已輪替，無從查）；期間 /api 寫入按 Referer 分：staging 路徑 0；aware-wave.com／www 共 63 筆全是 `POST /api/graphql` 404（掃描器）；studio.* 為 Supabase Studio 非 next-admin。未見利用跡象。
 - [x] **【2026-09-26 開出｜小｜工具】私有 index 提交不支援刪檔** — `mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js:391` 把已刪除的 own file 判成「own file missing」擋下；T17 只好拆成「改動」＋`git commit --only` 刪檔兩個 commit。修法：index 無此路徑且工作區也無 → 視為刪除放行（改 hook 後跑 `bash scripts/test-hooks.sh`）。 → ✅ 2026-09-26 續23：guard 放行刻意刪除、stage 印出 own deletions；已同步 live。
 - [x] **【2026-09-25 開出｜研究線前置】3 個 ACTIVE 工具缺 typed-object schema＋CLI slice** — decision.eisenhower_matrix、divergent.reverse_brainstorming、strategy.lean_canvas（`METHOD_ATLAS_SLICE_LEAN_STANDARD.md:14-19` 四檔）；未登記 contract-backlog → golden runner 紅，擋研究線 PI-a 卡。雲端 T12 補齊後登記。詳 WORKLOG 2026-09-25 續2。 → ✅ 2026-09-25 續6（雲端 T12）：schema＋CLI slice 補齊後登記，golden 全綠。
@@ -756,12 +756,12 @@
   - **VBC 核對（2026-08-30）**：本輪讀 `scripts/codex-oracle.ps1` 現行內容確認 `-Path` 收集處已包 `@(...)`（腳本內對應行的行號註解自述「Confirmed via isolated repro + critic cross-check, 2026-08-29」），任務描述的症狀已不存在。checkbox 之前忘了勾，本輪順手核對後補上，非重新修一次。
   - **2026-08-30 起同時降權**：`/codex:adversarial-review` 已取代 `codex-oracle.ps1` 成為主力 review 工具（見 `AGENTS.md` §跨模型 oracle），此腳本降級為備援，這個舊 bug 的影響範圍本來就縮小了。
 
-- [ ] **Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」**
+- [x] **Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」**
   - `🟢 小` · `2026-08-28 開出` · `可直接做`
   - **一句話**：Cursor 2026-08-26 退場，程式與設定面已清乾淨（見 commit 訊息），但把 Cursor 寫進操作步驟的散文沒清，照著做會找不到東西。
   - **已在 2026-08-28 清掉的**：只有「我這次改動使其成為假話」的那些 —— `.cursor/mcp.json` 產生器、`cursor-mcp` manifest 條目、`sanitize` 的檔案清單，以及 6 份文件裡對應的句子與表格列。
-  - **還沒清的**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`（約 20 處，且是開工 SSOT，值得單獨一輪）、`docs/operations/mcp-add-server-quickstart.md` §路徑原則、`docs/operations/n8n-self-hosted-mcp-troubleshooting.md` §Cursor MCP 狀態抖動、`docs/operations/dual-ide-coexistence-strategy.md`、`docs/operations/AWAREWAVE_STACK_QUICKREF.md:134-135`、`docs/operations/claude-code-file-reference.md`、`BOOTSTRAP.md:9`、`docs/operations/AUTO_REPAIR_SYSTEM_V2_LIGHT.md:595,738`
-  - **刻意不碰**：`docs/CHANGE_IMPACT_MATRIX.md` 的 `.cursor/rules/*` 各列 —— 同區已有「CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認」在管，兩邊同時改會打架。WORKLOG／memory／governance-plans 的歷史敘述**不改**（它們描述當時為真的事，AGENTS.md 明訂保留）。
+  - **本輪已清掉（2026-09-30）**：開工 SSOT、MCP quickstart、n8n、收工、雙機、dashboard、30 年 charter、hardening 與相關索引已改指 Claude Code / Codex；Cursor/.cursor 命中只保留退場／歷史／禁止重建說明。`BOOTSTRAP.md` 不存在，未為關閉舊規劃而虛構檔案。
+  - **刻意不碰**：`docs/CHANGE_IMPACT_MATRIX.md` 的 `.cursor/rules/*` 各列 —— 同區已有「CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認」在管，兩邊同時改會打架。WORKLOG／memory／governance-plans 的歷史正文**不重寫**；本輪只加退場／狀態標籤，避免把歷史規劃誤當現行做法。
   - **完成定義**：`grep -rnE '[\\/.]cursor[\\/]' --include=*.md` 在 `docs/` 與 `runbooks/` 下只剩歷史敘述與 CHANGE_IMPACT_MATRIX
 
 - [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。
@@ -859,7 +859,7 @@
 > 多半是「偵測器在說謊」或「閘沒接上」。修它們是為了讓其他事情的驗證可信。
 
 
-- [ ] **【2026-08-25 開出｜小｜文件一致性】Soulful staging「abandon」決策未傳播到 3 份仍在宣告它的文件** — 2026-08-16 已決議不在即將退場的 Hostinger 上建 staging，`ENVIRONMENT_REGISTRY.md` / `02_EXECUTION_PLAN.md` 均已加刪除線，但下列**仍以肯定語氣宣告要建 staging**，冷啟動的代理或操作者照著做就會白工：
+- [x] **【2026-08-25 開出｜小｜文件一致性】Soulful staging「abandon」決策未傳播到 3 份仍在宣告它的文件** — 2026-08-16 已決議不在即將退場的 Hostinger 上建 staging，`ENVIRONMENT_REGISTRY.md` / `02_EXECUTION_PLAN.md` 均已加刪除線，但下列**仍以肯定語氣宣告要建 staging**，冷啟動的代理或操作者照著做就會白工：
   - ① `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md:141`（「Canonical staging URL … https://staging.soulfulexpression.org/」）
   - ② `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md:33,35`（§Day 2「建立 staging 子網域」未標作廢）
   - ③ `tenants/company-soulful-expression/projects/2026-011-existing-site-handover-soulful/DAY2_STAGING_OPERATOR_GUIDE.md:14,33`（整份的「目標」就是建那個子網域）。
@@ -871,13 +871,13 @@
   - **根因待查**：`ao-resume.ps1` 只在「寫出真實 AO-RESUME 存檔」時推進 stamp，而 hook 自動觸發那輪印的是 `AO-RESUME stamp NOT advanced (auto-refresh / non-interactive)`代理事後補寫存檔時沒有回頭推進錨點。
   - **完成定義**：確認推進條件、補上代理寫完 archive 後推進 stamp 的路徑（或改由 `verify-aoresume-archive.ps1` 帶動），並讓 AO-CLOSE 視窗不再需要人工手選。（2026-08-25 Codex round-5 覆審抓到，經讀三個錨點檔實測確認）
 
-- [ ] **【2026-08-24 開出】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認** — `scripts/check-change-impact-matrix-drift.ps1` 2026-08-24 首次接進月度巡檢（`ao-resume.ps1` monthly check #5），真實跑出 7 對 WARN（全部是 `docs/operations/cursor-enterprise-rules-index.md` / `docs/operations/cursor-mcp-and-plugin-inventory.md` / `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` 宣告的 impacted，vs `.cursor/rules/64-architecture-mcp-routing.mdc` / `65-build-standards-data-state.mdc` / `66-skills-observability-protocol.mdc` 三個 `.mdc` 檔案，4 月未更新但主文件近期持續改動，drift 127-141 天）。
-  - 這是純資訊性快照非 build gate，**待下次月度巡檢時人工判斷**這三個 `.mdc` 是否真的過期需要更新，或只是穩定未變不需動。報告：`agency-os/reports/governance/impact-matrix-drift-LATEST.md`。
+- [x] **【2026-08-24 開出｜已關閉 2026-09-30｜舊 Cursor 規劃】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN** — 原 7 對 WARN 全部指向已退場的 `.cursor/` / `Cursor  Rules for AI` 資產；現行 workflow 已收斂至 `CLAUDE.md` + `agency-os/AGENTS.md`。已在 `scripts/check-change-impact-matrix-drift.ps1` 加入明確 retired-path 排除，保留歷史 matrix rows，並在 report `Skipped` 區記錄每筆排除，避免月度巡檢追蹤已不用的 IDE 鏡像。
+  - **證據**：`docs/operations/cursor-enterprise-rules-index.md:3-4` 明確標示 Cursor 退場；`reports/governance/impact-matrix-drift-LATEST.md:12-18` 的原 WARN 全為退場資產；不刪歷史文件、不修改現行 Claude/Codex SSOT。
 
 - [x] **【2026-08-25 開出｜小】~~`scripts/rebuild-content-studio-4cards.ps1:185` CP950 parse-break~~** — 🔴 FIXED 2026-08-29：加 UTF-8 BOM（內容為真實 CJK UI 文字，非裝飾字元，故走 BOM 而非 ASCII 化）。順手修，起因是同日另一個任務（CP950 audit 第三 class）修好 `system-health-check.ps1` 的 `$root` 解析後，7b 這個「hard gate」從上線以來第一次真正跑起來，立刻抓到這個已知項目。驗證：`Parser::ParseFile` OK + `audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` 與 `-RawReadOnly -Quiet` 均 scanned=167 clean=167 drift=0。
 
-- [ ] **【2026-08-29 開出｜中】`system-health-check.ps1` 7)deploy-drift(:520) 與 9)cloudflare(:~610) 兩個 check 從未真正執行過** — 同一 session 修 CP950 第三 class 時發現：`$root` 恆等於 `agency-os`（`Resolve-WorkspaceRoot` 的 monorepo guardrail），但 `check-deploy-drift.ps1` / `check-cloudflare-security.ps1` 只存在於 monorepo-root `scripts/`，從未存在於 `agency-os/scripts/`，故這兩個 `Join-Path $root "scripts/..."` 恆指向不存在路徑，`Test-Path` 恆 false，兩個 check 永遠走 `Pass=$true "Skipped: ... not present"` 分支——跟 7b（CP950 parse-break）2026-05-30 上線後從未真正跑過是同一款缺陷，本次已修 7b/7c（改用 `$monoRoot`），這兩個刻意未動（不同 check，需各自驗證改用 `$monoRoot` 後的實際輸出是否正確，不能照搬 7b/7c 的 fail-closed 處理，因為這兩個目前是 informational/warn-only 不是 hard gate）。
-  - **完成定義**：把 `Join-Path $root ...` 改成 `Join-Path $monoRoot ...`（比照 7b/7c），跑一次確認 deploy-drift／cloudflare 真的執行且輸出合理，才能判斷要不要也把它們升級成有意義的 gate（目前設計是 informational，維持原設計即可，只是要讓它真的跑）。
+- [x] **【2026-08-29 開出｜中｜已修 2026-09-30】`system-health-check.ps1` 7)deploy-drift(:520) 與 9)cloudflare(:~610) 兩個 check 從未真正執行過** — 根因是 `$root` 恆等於 `agency-os`，但兩支 probe 只存在於 monorepo-root `scripts/`；已改由 `$monoRoot` 解析，Cloudflare probe 同時傳入正確的 `-WorkRoot $monoRoot`，避免靜默走 `Skipped: not present`。實跑 `system-health-check.ps1 -WorkspaceRoot D:\Work`：`Score: 100% (328/328)`；JSON 證據：deploy drift `PASS at d48515e`、Cloudflare `PASS (bot=ON, rules=1, xmlrpc=True, lockdown=active)`。
+  - **完成定義**：✅ 已完成；兩支 check 均已實際執行並回傳合理結果，維持原本 informational/warn-only 設計，沒有擴大成不必要的 hard gate。
 
 - [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。
   - **`ao-close.ps1` 已無未知**：剩餘 17 個逐項列了消費端與判定在 `AUDIT_REGISTRY.md`。
@@ -1264,7 +1264,7 @@
 
 - [x] **【✅ MOOT，2026-08-30 稽核確認】~~nginx system-sites 三檔 drift（🟢 小，SG 那半已作廢，只剩 EU 兩檔待抄）~~** — SG 那半本來就已作廢；現在 **EU（`204.168.175.41`）也已於 2026-08-30 隨 SG 一併刪除退租**，「EU 兩檔待抄」的前提（有一台活的 EU 可以去抄現場最新文字）不再成立，沒有現場可回填了。依本項自己的完成定義「若決定純存查則此項關閉，不需動作」——現在連「決定要不要抄」都不用問了，直接存查關閉：`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` 這兩份 repo 檔案就是 2026-08-28 遷移前的最後快照，標註即可。
   - **一句話**：覆審「25 處疑似死檔」時發現 3 個 vhost SSOT 檔的 repo 版本跟現行部署對不上；當時誤判 SG 是「現行 production」，已於 WORKLOG 2026-08-29（續5）更正——**SG（5.223.93.113）容器全滅、host nginx 本機實測 502，是搬家後的廢棄機，不是現行服務**。
-  - **現在到哪**：~~`aware-wave-app-api-subdomains.conf` repo 領先 SG live，缺部署三項改善~~ → **作廢，不部署**（SG 已停用，任何改善應直接做在 ks-aw-01 現役的 `lobster-phase1/nginx/default.conf`，該檔今日已因 X-Forwarded-Proto bug 大改過）；`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` repo 落後 **EU** live 這半仍成立（EU 204.168.175.41 同樣容器全滅但 repo↔live 文字 drift 本身跟死活無關，純粹是歷史快照該不該回填的問題）。
+  - **現在到哪**：~~`aware-wave-app-api-subdomains.conf` repo 領先 SG live，缺部署三項改善~~ → **作廢，不部署**。2026-09-30 補正：ks-aw-01 的 app routing 由 `nginx/default.conf` 負責，但 TLS/HSTS 必須由外層 host vhost `nginx/system-sites/sg-stack.aware-wave.com.conf` 負責，兩者不可混為同一層；`mainwp-aware-wave.conf`／`awarewave-endpoint-alert.local.template` 是退役機歷史快照。
   - **下一步**：SG 那三項改善**不執行**；EU 兩份文件視保存價值決定要不要把現場最新文字抄回 repo（純文件動作，無風險），或直接標註「反映 2026-08-28 遷移前最後狀態」存查即可，不強制同步。
   - **完成定義**：EU 兩檔若要同步則 `diff` byte-identical；若決定純存查則此項關閉，不需動作。
   - **證據**：`agency-os/WORKLOG.md` 2026-08-29（續4）覆審 diff 表。
@@ -1908,5 +1908,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-09-23 14:30:03 UTC_
+_Last synced: 2026-09-29 14:30:03 UTC_
 

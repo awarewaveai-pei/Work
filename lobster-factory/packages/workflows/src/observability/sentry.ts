@@ -3,6 +3,8 @@ import * as Sentry from "@sentry/node";
 type SentryContext = {
   workflowId: string;
   route?: string;
+  runId?: string;
+  taskId?: string;
   payload?: unknown;
   tags?: Record<string, string>;
 };
@@ -44,6 +46,12 @@ export function captureWorkflowException(error: unknown, context: SentryContext)
     scope.setTag("workflow.id", context.workflowId);
     if (context.route) {
       scope.setTag("workflow.route", context.route);
+    }
+    if (context.runId) {
+      scope.setTag("run.id", context.runId);
+    }
+    if (context.taskId) {
+      scope.setTag("task.id", context.taskId);
     }
     if (context.tags) {
       for (const [k, v] of Object.entries(context.tags)) {

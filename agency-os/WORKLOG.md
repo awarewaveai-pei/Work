@@ -1,4 +1,44 @@
 # Worklog
+## 2026-09-30（續11）TASK #677：HSTS／cookie Secure repo 閉環，live 部署待操作者
+- RECONCILE: 舊 `aware-wave-app-api-subdomains.conf` 已非現役；production 唯讀實查為 ks-aw-01 host `sg-stack.aware-wave.com` TLS → `127.0.0.1:8083` lobster-nginx。已標 retired、修正 current-state／README／索引；舊 SG/EU Cloudflare runbook 加不可執行橫幅。證據：`APP_AWARE_WAVE_CURRENT_STATE.md:53-56`、`CLOUDFLARE_HETZNER_PHASE1.md:3`。
+- COOKIE_FIX: 新增單一 `SUPABASE_AUTH_COOKIE_OPTIONS={secure:true}`，browser login、middleware refresh、route user client 三個 `@supabase/ssr` client 共用。證據：`auth-cookie-options.ts:4`、`ssr.ts:28-29,62-63`、`route-client.ts:35-38`。
+- HSTS_FIX: 新增現役 host vhost repo SSOT；HSTS 只對 `app.aware-wave.com`，`max-age=31536000`，不含 includeSubDomains/preload；其他共用 host 不繼承。證據：`sg-stack.aware-wave.com.conf:9-11,32,35`。
+- LIVE_PRECHECK: `https://app.aware-wave.com/` 307、`/login` 200，兩者 `Strict-Transport-Security` 皆空；live vhost grep 無 HSTS。未部署後仍應如此，故 TASK 保持未勾選。
+- REALTEST_EVIDENCE: next-admin `npm run typecheck` exit 0；cookie targeted 2 files/3 tests PASS；排除兩個 Windows→WSL bash 既有環境套件後 217 files/2009 tests PASS、13 skipped；完整 suite 另有同兩檔 18 failures（exit 127/EPERM），不宣稱 full green。
+- NGINX_REALTEST: throwaway `nginx:alpine`：`nginx -t` PASS；app HSTS exact PASS；api 無 app HSTS PASS；HTTP same-host/path redirect PASS。WSL 首次因無 Docker integration 未執行 config，改由 Windows Docker 29.7.2 完成真測。
+- REVIEW_DONE: Standard adversarial self-review；找到並修正第三個 route client 未共用 policy、現行文件仍指向退役雙機拓樸；最終無未處理本範圍 finding。
+- MUTATION_SENTINEL: shared cookie policy 改 `secure:false` → 3/3 tests FAIL；HSTS host 錯改成 api → app=false/api=true 被真 nginx probe 抓到；兩者均還原後綠。
+- ORACLE_FAILED: 單一 Claude oracle 已限定 phase1-core，但回 invalid/incomplete schema；55,225-byte packet 且 `.conf` 被 capture policy 排除，沒有有效 artifact，不宣稱 oracle PASS。
+- BUGHUNT_DONE: scope=`agency-os,scripts,lobster-factory`；首輪 72 hits 逐類檢查，抓到 route-client 與退役文件入口並修正；WORKLOG/archive/history 命中保留，不回寫歷史。
+- BLOCKER/ROLLBACK: governance hook 禁止遠端 sudo，未 reload host nginx、未 rebuild/deploy next-admin。回滾只需還原本 entry 列出的 repo 檔；live 尚無本次變更可回滾。
+## 2026-09-30（續10）TASK #672：workflows strict typecheck 閉環
+- ROOT_CAUSE: `packages/workflows` 只有 Trigger/esbuild，沒有獨立 TypeScript gate；原有 3 個 strict error 之外，完整納入 config/tests 後另抓到 manifest catalog、租戶 webhook enum、SSH callback 與 Trigger mock 型別邊界漂移。
+- FIX: 新增 `typecheck` script、`tsconfig.typecheck.json`、TypeScript 5.9、`@types/ssh2`；修正原有 strict errors；catalog 對沒有 migration seed 的 `wp-tourism`/`wc-custom` fail-closed；共用 provisioning source contract；加入單一 test-only `runMockedTask` seam，typecheck 覆蓋 source/config/tests。
+- REALTEST_EVIDENCE: `npm run typecheck` exit=0；`npm test` = 22 files / 143 tests PASS；`git diff --check -- lobster-factory/packages/workflows` exit=0（僅既有 CRLF warning）。未 deploy、未改 production、schema、資料或 credentials。
+- REVIEW_DONE: Standard adversarial self-review PASS；發現首版 tsconfig 排除 tests，已改為納入全部測試並消除散落 cast；最終檢查未留未處理 finding。
+- MUTATION_SENTINEL: 移除 `dispatch-action-run` 的 `workflowId` 後 typecheck 必定以 TS2345 失敗；把 `wp-tourism` 錯映射到 `wp-basic` 後 catalog targeted test 必定失敗；兩個 mutation 均還原後完整 gate 全綠。
+- ORACLE_FAILED_OR_WAIVED: `scripts/claude-oracle.ps1` 已執行但因 dirty worktree 捕捉約 699 KB 無關內容，回傳 invalid/incomplete schema，沒有有效 Claude review artifact；依 `agency-os/AGENTS.md` 以書面對抗自審＋兩個 mutation sentinel 補足，未宣稱 oracle PASS。
+- BUGHUNT_DONE: scope=`agency-os,scripts,lobster-factory`；grep=`catalogIdsForManifest|TENANT_INTEGRATION_PROVISIONING_SOURCES|runMockedTask|tsconfig.typecheck.json|workflows 套件沒有 typecheck`；hits=33，逐筆檢查：現行碼/測試一致，舊未完成敘述只在 TASKS 主列、歷史 daily 與 generated status snapshots；歷史檔不回寫。
+- ROLLBACK: 還原本項列出的 workflows package/source/test/config/lockfile 變更；沒有 production 或 DB 回滾步驟。
+## 2026-09-30
+- AUTO_TASK_DONE_APPLIED (2026-09-30T13:24:15Z): system-health-check deploy-drift / Cloudflare probe path fixed from `$root` to `$monoRoot`; real run scored `100% (328/328)`, deploy drift `PASS at d48515e`, Cloudflare `PASS (bot=ON, rules=1, xmlrpc=True, lockdown=active)`; TASKS.md:879 checked.
+- AUTO_TASK_DONE_APPLIED (2026-09-30T13:31:00Z): CHANGE_IMPACT_MATRIX 7 WARN all resolved to retired Cursor assets; drift detector now excludes only `.cursor/` and `Cursor Rules for AI` paths with auditable Skipped reasons; historical matrix rows retained; TASKS.md:874 checked.
+- AUTO_TASK_DONE_APPLIED (2026-09-30T05:06:37Z): Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」
+- RECONCILE: 現行操作已收斂到 Claude Code / Codex、CLAUDE.md + agency-os/AGENTS.md、mcp/registry.template.json、根 .mcp.json 與 Codex managed config；已更新開工、收工、雙機、MCP、n8n、dashboard、30 年 charter 與 hardening 文件。
+- BUGHUNT_DONE: docs/runbooks 的 .cursor 命中只剩退場/歷史/禁止重建說明與 CHANGE_IMPACT_MATRIX；不存在的 BOOTSTRAP.md 未新建，避免用假檔案關閉舊規劃。
+- REVIEW_WAIVED: DOC_ONLY；未改 runtime、schema、production、credentials 或 deploy。
+- TASKS_SCAN: live `TASKS.md` = 117 open / 389 done；gitignored `open-tasks-snapshot.md` 生成於 2026-09-30T02:27:47Z、仍報 119，故以 live TASKS 為準，未批量勾選。
+- REALTEST_EVIDENCE: read-only staging DB trigger-output query = `taskrun_old_output=9`, `taskrun_redacted_output=0`; no live redaction or deploy performed, so TASKS.md:171 remains open.
+- RECONCILE: Soulful 舊 Hostinger staging 計畫與現行狀態衝突；三份文件已加作廢標記，改指向 `SITE_MIGRATION_RUNBOOK.md` / `CUTOVER_RUNBOOK.md`。現行拓樸證據：`AWAREWAVE_STACK_QUICKREF.md:3-15`。
+- REALTEST_EVIDENCE: `rg -n 'staging\\.soulfulexpression\\.org'` 逐檔讀回；三份舊文件的 staging 指令均已刪除線／作廢，未改 production。
+- AUTO_TASK_DONE_APPLIED (2026-09-30T04:25:19Z): Soulful staging「abandon」決策未傳播到 3 份仍在宣告它的文件
+- SECURITY_CLEANUP: `D:\tmp\realtest-reg.ps1` was removed after SHA256 `1D57CD353937BEEBEDFE37E40AAB987F14A8C1294FD9901D144F3E7E2D8C873D`; post-check `TEMP_EXISTS=false`.
+- REALTEST_EVIDENCE: `Get-MpThreat` summary `DEFENDER_COUNT=0 ACTIVE=0`; `AgencyOS-SystemGuard-Daily` `State=Ready`, execute `powershell.exe`, action points only to repo `scheduled-task-launcher.ps1` + `system-guard.ps1`, with hidden/non-interactive args.
+- SECURITY_GAP_CLOSED_IN_SOURCE: `mcp/claude-userlevel/hooks/rules/high-risk-bash-warn.js:31,102-106` now blocks ScheduledTask mutations, mutating `schtasks` verbs, and the SystemGuard registrar unless a leading high-risk ACK is present; `tests/hooks/runner-parity.test.mjs:53-70` covers block + ACK.
+- REALTEST_EVIDENCE: `node --check mcp/claude-userlevel/hooks/rules/high-risk-bash-warn.js` exit 0; targeted parity `scheduled-task mutation and SystemGuard registrar` 1/1 PASS; `sync-claude-userlevel.ps1 -Mode merge` RESULT PASS.
+- BUGHUNT_DONE: read-only command `Get-ScheduledTask` still passes; mutation samples block; leading ACK passes. Full `runner-parity` invocation produced no output beyond the timeout window and was stopped, so full-suite PASS is not claimed.
+- ORACLE_FAILED: `/claude-review` attempted twice; both `scripts/claude-oracle.ps1` runs exited 1 with invalid/incomplete review schema after existing workspace untracked/runtime files were captured. Defender task remains open pending cross-model review / full gate.
+- SECURITY_INCIDENT: During a length-only HF_TOKEN presence check, a PowerShell binding mistake emitted the current token value into the tool result. The value is not copied into repo files or any subsequent response; treat the token as exposed again and rotate/revoke it before closing TASKS.md:232.
 ## 2026-09-30（續9）prompt-audit 收尾：H4 標題 prompt 重複 CRITICAL、H6 AGENTS.md Workflow 段縮一行
 - 根因：`/claude-api prompt-audit`（2026-09-29，報告在 session scratchpad）14 項中，H1/H2/H5 已由 268f33478 落地，H3 兩段 phantom reference 已被 73b9ac8f8 改寫掉；剩 H4/H6 未落地。
 - 改動：

@@ -18,8 +18,8 @@
 | **`aware-wave.com` 底下每個子網域是什麼、給誰用、優先序** | [`PRODUCT_DOMAIN_IA_PLAN.md`](PRODUCT_DOMAIN_IA_PLAN.md) |
 | **API 要做什麼、P0～P4、與 Trigger／Supabase／Identity(JWT/OIDC) 邊界** | [`PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md) |
 | **Cloudflare DNS、`api`／`app` 表、TLS 驗收 curl** | [`../operations/CLOUDFLARE_HETZNER_PHASE1.md`](../operations/CLOUDFLARE_HETZNER_PHASE1.md) |
-| **系統 Nginx 範本（`api`→3001、`app`→302）** | [`../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf) |
-| **apex `aware-wave.com` 與 `/api/` 反代** | [`../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/lobster-aware-wave-locations.inc`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/lobster-aware-wave-locations.inc) |
+| **現役 host nginx（TLS → lobster-nginx :8083）** | [`../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/sg-stack.aware-wave.com.conf`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/sg-stack.aware-wave.com.conf) |
+| **現役 hostname/app routing** | [`../../../lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`](../../../lobster-factory/infra/hetzner-phase1-core/nginx/default.conf) |
 | **phase1 compose 與本機驗收** | [`../../../lobster-factory/infra/hetzner-phase1-core/README.md`](../../../lobster-factory/infra/hetzner-phase1-core/README.md) |
 | **龍蝦 MCP／工具路由（人讀矩陣）** | [`../../../lobster-factory/docs/ROUTING_MATRIX.md`](../../../lobster-factory/docs/ROUTING_MATRIX.md) |
 | **長期營運（RPO／備份／升級節奏）** | [`../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md) |

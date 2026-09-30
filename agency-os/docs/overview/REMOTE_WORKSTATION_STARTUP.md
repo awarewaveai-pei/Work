@@ -11,7 +11,7 @@
 
 - **Monorepo 根目錄**（含 `agency-os\`、`lobster-factory\`、根目錄 `scripts\`）：請整包 clone，不要只拷子資料夾。
 - **路徑可不同**（例如筆電 `D:\Work`、公司機 `C:\Users\USER\Work`），流程都用**相對路徑**執行，不綁磁碟代號。
-- **Cursor / IDE**：可開 repo 根或 `agency-os`；若規則/連動檢查找不到 `.cursor`，請先確認開啟位置與 `.cursor` 實際存在。**IDE 行為與 MCP 職責（版控正本）** 見 `docs/operations/cursor-enterprise-rules-index.md`。桌機正式開工：在 monorepo 根跑 **`scripts/ao-resume.ps1`（預設）**＝**behind 時**才 `pull --ff-only`＋閘道＋依賴＋Strict 稽核；髒樹／衝突時腳本會非 0，須先整理（見 **2.5.1**），**不必**與「先手動 pull」綁死。
+- **Claude Code / Codex**：請在 monorepo 根工作；現行 workflow SSOT 是 `CLAUDE.md` + `agency-os\AGENTS.md`，MCP 以根 `.mcp.json`、`mcp\registry.template.json` 與 Codex managed config 為準。桌機正式開工：在 monorepo 根跑 **`scripts/ao-resume.ps1`（預設）**＝**behind 時**才 `pull --ff-only`＋閘道＋依賴＋Strict 稽核；髒樹／衝突時腳本會非 0，須先整理（見 **2.5.1**），**不必**與「先手動 pull」綁死。
 
 ### 0.1 快速確認你在正確根目錄
 
@@ -127,11 +127,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 
 ### 1.5.2 AwareWave 自託管 Supabase：`supabase-awarewave-postgres`（EU SSH tunnel｜選用）
 
-> **適用**：要在 Cursor 使用 **`supabase-awarewave-postgres`**（`@modelcontextprotocol/server-postgres`）連 **EU**，路徑是 **SSH 區域轉發** 到本機 **`127.0.0.1:5432`**（常見版型下此埠為 **Supavisor**，非裸露 `postgres`）。
+> **適用**：要在 Claude Code / Codex 使用 **`supabase-awarewave-postgres`**（`@modelcontextprotocol/server-postgres`）連 **EU**，路徑是 **SSH 區域轉發** 到本機 **`127.0.0.1:5432`**（常見版型下此埠為 **Supavisor**，非裸露 `postgres`）。
 
 > **DSN（與 MCP 同源）**：`SUPABASE_AWAREWAVE_POSTGRES_DSN` 的使用者名多為 **`postgres.<POOLER_TENANT_ID>`**（對齊 VPS **`/root/supabase/.env`**）。完整說明、伺服器側 **`pgbouncer.get_auth`／`pg_shadow`** 修復見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`** §3.3–§3.4。（若你把 **`supabase-db` 僅對本機次要埠裸露並據此改 tunnel**，才可能用單純 **`postgres`／密碼** 形狀。）
 
-與 **`https://studio.aware-wave.com`**／REST（`SUPABASE_AWAREWAVE_URL`）**分工不同**——見該 **runbook**、`docs/operations/cursor-mcp-and-plugin-inventory.md`。
+與 **`https://studio.aware-wave.com`**／REST（`SUPABASE_AWAREWAVE_URL`）**分工不同**——見該 **runbook**、`mcp/README.md` 與 `docs/operations/mcp-add-server-quickstart.md`。
 
 **每台開發機**（monorepo 根；憑證只在 vault／`mcp/user-env.ps1`，**不入庫**）：
 
@@ -151,17 +151,17 @@ npm run smoke:supabase-tunnel -- --sql
 若第 3 步 **FAIL** 且 SSH／腳本訊息含 **`administratively prohibited`**：在 **EU VPS** 修正 **`sshd_config`**（`AllowTcpForwarding` / `PermitOpen` / `Match` 區塊），**不要**在客戶端硬繞；細節與 reload 指令見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`**。  
 可選 host／user／金鑰路徑：**環境變數** `SUPABASE_EU_SSH_HOST`、`SUPABASE_EU_SSH_USER`、`SUPABASE_EU_SSH_KEY`（見 **`scripts/open-supabase-ssh-tunnel.ps1`**）。
 
-**驗收（Cursor）**：tunnel + `SUPABASE_AWAREWAVE_POSTGRES_DSN` 正確時，設定裡 **`supabase-awarewave-postgres`** 應綠燈；並完成一次 MCP SQL／schema 操作或上述 **`--sql`** smoke。
+**驗收（Claude Code / Codex）**：tunnel + `SUPABASE_AWAREWAVE_POSTGRES_DSN` 正確時，MCP 清單裡 **`supabase-awarewave-postgres`** 應可用；並完成一次 MCP SQL／schema 操作或上述 **`--sql`** smoke。
 
 ### 憑證（無法一鍵複製：每台各做一次）
 
 - **DPAPI vault**（Trigger 等腳本用）：`scripts/secrets-vault.ps1` — 手冊 **`docs/operations/local-secrets-vault-dpapi.md`**。  
-- **Cursor MCP**：**版控正本**為 monorepo 根 **`.cursor/mcp.json`**（路徑用 **`${workspaceFolder}`**，值只含 **`${VAR}`**）；**`%USERPROFILE%\.cursor\mcp.json`** 維持 **`{"mcpServers":{}}`** 以免與專案合併重複。換機後 **`git pull`** 即得同一份結構，再依 **`docs/operations/mcp-add-server-quickstart.md`** 做 vault／環境變數；**勿**把明文 token 提交進 repo。
+- **MCP**：**版控正本**為 monorepo 根 **`.mcp.json`** 與 **`mcp\registry.template.json`**；Codex 的 managed project config 為 **`%USERPROFILE%\.codex\config.toml`**。換機後 **`git pull`** 即得專案結構，再依 **`docs/operations/mcp-add-server-quickstart.md`** 做 vault／環境變數；**勿**把明文 token 提交進 repo。
 
 ### 做完後
 
 1. 你已在上方跑過 **`verify-build-gates`** 與 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`ao-resume.ps1` 預設**內含步驟對齊；若略過 Strict，不應勾選 `TASKS` 雙機項）。  
-2. **下一趟起（日常）**：在 Cursor 開 monorepo 根工作區並送出 **`AO-RESUME`**；**`.cursor/hooks.json`** 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（與 **`30-resume-keyword.mdc`** 一致）。**Exit 0**＝未落後（必要時已 ff-only pull）＋閘道＋依賴＋Strict 無 WARN，**不必**為了「再對齊一次」重複手動 `pull`／閘道。**除錯／無 hook** 時才改在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設或 `-FullMainlineParity`）**。  
+2. **下一趟起（日常）**：在 Claude Code / Codex 的 monorepo 根工作區送出 **`AO-RESUME`**；現行 hook/bridge 依 `CLAUDE.md`、`agency-os\AGENTS.md` 與 `mcp\claude-userlevel\` 的治理流程執行 **`scripts/ao-resume.ps1 -FullMainlineParity`**。**Exit 0**＝未落後（必要時已 ff-only pull）＋閘道＋依賴＋Strict 無 WARN，**不必**為了「再對齊一次」重複手動 `pull`／閘道。**除錯／無 hook** 時才改在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設或 `-FullMainlineParity`）**。
 3. **人類掃一眼（可選）**：`agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md`。  
 4. **下一趟起**：換機以外的**日常開機**請改依 **§2**（不必重跑 §1.5 全段；除非重新 clone、換機、或依賴損毀需重建）。
 
@@ -169,7 +169,7 @@ npm run smoke:supabase-tunnel -- --sql
 
 ## 2) 開機後必做五件事（約 5–15 分鐘）
 
-> **捷徑（與關鍵字 `AO-RESUME` 對齊）**：在 Cursor 開 monorepo 根並**送出 `AO-RESUME`**，**`beforeSubmitPrompt` hook** 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**＝下列第 1、3～5 步的**機器裁決版**（fetch、behind 時 ff-only pull、`npm ci` 由腳本在需要時觸發、`verify-build-gates`、**`print-open-tasks`**、**`machine-environment-audit -FetchOrigin -Strict`**、**Claude user-level drift 偵測**）。代理再讀檔五段式即可。**第 2 步**（AI 工具對齊）若 drift WARN 出現則手動補跑；**除錯／理解內部**時才在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設）** 對照下列分步。
+> **捷徑（與關鍵字 `AO-RESUME` 對齊）**：在 Claude Code / Codex 的 monorepo 根**送出 `AO-RESUME`**，現行 hook/bridge 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**＝下列第 1、3～5 步的**機器裁決版**（fetch、behind 時 ff-only pull、`npm ci` 由腳本在需要時觸發、`verify-build-gates`、**`print-open-tasks`**、**`machine-environment-audit -FetchOrigin -Strict`**、**user-level drift 偵測**）。代理再讀檔五段式即可。**第 2 步**（AI 工具對齊）若 drift WARN 出現則手動補跑；**除錯／理解內部**時才在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設）** 對照下列分步。
 >
 > **與 §1.5 的關係**：若你為 **新機** 且尚未跑過 §1.5 的「工具與依賴」區塊，請 **先完成 §1.5**，再視 §2 為**之後每次**的節奏。若 `lobster-factory\packages\workflows\package-lock.json` 有更新，務必在該目錄 **再執行** `npm ci`（或由 **`ao-resume.ps1`** 偵測後代跑）。
 
@@ -221,19 +221,19 @@ npm run smoke:supabase-tunnel -- --sql
    須已安裝 **Node.js**（給 `lobster-factory` 的檢驗腳本用）。**Critical Gate 必須 PASS** 再開始改大範圍。
 
 5. **對話續接（擇一）**  
-   - **機器裁決（預設，與只打 `AO-RESUME` 一致）**：在 Cursor 送出 **`AO-RESUME`** 時，**專案 hook** 會先在 monorepo 根跑 **`.\scripts\ao-resume.ps1 -FullMainlineParity`**（**預設**即含 **`verify-build-gates` + 結尾 `machine-environment-audit -FetchOrigin -Strict`**）。**Exit 0**＝未落後遠端（必要時已 ff-only pull）+ 閘道 + 依賴檢查 + 嚴格環境稽核無 WARN；**不必**再開三件套 markdown 目視。代理依 **`30-resume-keyword.mdc`** 讀 **`ao-resume-hook-last.json`**／log 與快照，**不必**為形式再重跑同一輪腳本（見該規則「hook 去重」）。**除錯**時可改在終端手動跑 **`.\scripts\ao-resume.ps1`**。別名：**`.\scripts\align-workstation.ps1`**（與手動 `ao-resume` 無 `-FullMainlineParity` 時同行為）。  
+    - **機器裁決（預設，與只打 `AO-RESUME` 一致）**：在 Claude Code / Codex 送出 **`AO-RESUME`** 時，現行 **hook/bridge** 會先在 monorepo 根跑 **`.\scripts\ao-resume.ps1 -FullMainlineParity`**（**預設**即含 **`verify-build-gates` + 結尾 `machine-environment-audit -FetchOrigin -Strict`**）。**Exit 0**＝未落後遠端（必要時已 ff-only pull）+ 閘道 + 依賴檢查 + 嚴格環境稽核無 WARN；**不必**再開三件套 markdown 目視。代理依 **`CLAUDE.md` / `agency-os\AGENTS.md`** 讀 **`ao-resume-hook-last.json`**／log 與快照，**不必**為形式再重跑同一輪腳本。**除錯**時可改在終端手動跑 **`.\scripts\ao-resume.ps1`**。別名：**`.\scripts\align-workstation.ps1`**（與手動 `ao-resume` 無 `-FullMainlineParity` 時同行為）。
      **進階略過（非人類日常開工）**：**`-SkipStrictEnvironmentAudit`**（Autopilot 開機會加；並常搭配 **`-SkipVerify`**）；**不要**在桌機正式開工時隨意省略。  
      **做不到全自動的邊界**：`gh` 登入、DPAPI vault、`mcp.json` 等**不可進庫**，腳本只驗證「有／無」，缺了會 **Strict FAIL**——仍要你在該機做一次設定（見 **§1.5** 憑證段）。  
-   - **人類掃一眼（可選）**：讀 `agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md` 後，在 Cursor 送 **`AO-RESUME`** 即可（hook＋代理已銜接 **`ao-resume.ps1`**）。  
+    - **人類掃一眼（可選）**：讀 `agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md` 後，在 Claude Code / Codex 送 **`AO-RESUME`** 即可（hook＋代理已銜接 **`ao-resume.ps1`**）。
    > **重要**：`ao-resume`／`align-workstation` 會 `fetch`；**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only`**。**若落後且工作樹仍有未提交變更**，預設 **不**自動 stash（見 **2.5.1**）；Autopilot 路徑可鬆綁 stash（見 **AGENTS.md**）。
 
 ## 2.5 日內 Git 節奏（checkpoint 與收工）— **單一真相（人類可讀）**
 
-> **規則正本（少分叉）**：**日常改動**以 `agency-os/.cursor/rules/` 為準（含 **`00-session-bootstrap`**、**`30-resume-keyword`**、**`50-operator-autopilot`**、**63–66**）。repo 根 `.cursor/rules/` 由 **`verify-build-gates`** 內 **`sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 自動鏡像；其中 **`00`／`30`** 會套用 **monorepo 路徑轉換**（`docs/...` → `agency-os/docs/...`），**health gate** 以「轉換後內容」驗證 SHA 等價。代理細節見 **`50-operator-autopilot`** **§7**。
+> **規則正本（少分叉）**：日常 workflow 以 **`CLAUDE.md` + `agency-os\AGENTS.md`** 為準；Codex bridge 與 hooks 由 **`mcp\claude-userlevel\`** 產生/同步。MCP 宣告以 **`mcp\registry.template.json`**、根 **`.mcp.json`** 與 Codex managed config 為準；不要重建已退場的 `.cursor/` 規則鏡像。
 
 | 階段 | 誰做什麼 | Git |
 |------|-----------|-----|
-| **`AO-RESUME`（開工前檢）** | 你：在 Cursor **送出**關鍵字；**hook**：先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（完整：preflight 含 `verify-build-gates`、依賴、`print-open-tasks`、**結尾 `machine-environment-audit -FetchOrigin -Strict`**）；**代理**：讀 **`ao-resume-hook-last.json`**／log、`open-tasks-snapshot.md` 等並五段式（見 **`30-resume-keyword.mdc`**） | **不**為「開場」自動空 commit。進階略過：**`-SkipOpenTasksList`**、**`-SkipStrictEnvironmentAudit`**（與 Autopilot／輕量開機）；**勿**在正式開工隨意略過 Strict。 |
+| **`AO-RESUME`（開工前檢）** | 你：在 Claude Code / Codex **送出**關鍵字；**hook/bridge**：先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（完整：preflight 含 `verify-build-gates`、依賴、`print-open-tasks`、**結尾 `machine-environment-audit -FetchOrigin -Strict`**）；**代理**：讀 **`ao-resume-hook-last.json`**／log、`open-tasks-snapshot.md` 等並依 `CLAUDE.md` / `AGENTS.md` 接續 | **不**為「開場」自動空 commit。進階略過：**`-SkipOpenTasksList`**、**`-SkipStrictEnvironmentAudit`**（與 Autopilot／輕量開機）；**勿**在正式開工隨意略過 Strict。 |
 | **工作中（至收工前）** | 你：下任務；代理：實作與驗證 | 每完成一個**可敘述、已驗證**的里程碑：代理**應自動**在 monorepo 根執行 **`scripts/commit-checkpoint.ps1`**（**本機 commit**，**不 push**）。**你不必手動**跑該腳本。 |
 | **`AO-CLOSE`（收工）** | 你：關鍵字或明示收工；代理：更新 **`WORKLOG`**／`memory`（**不必手動勾 `TASKS`**）後跑 `ao-close.ps1` | **開頭** **`print-today-closeout-recap`**；閘道 **PASS** 後、**`git add` 前**：**`apply-closeout-task-checkmarks`** 讀取當日 **`WORKLOG`** 之 **`- AUTO_TASK_DONE: …`**（＋選用 **`pending-task-completions.txt`**）自動打勾 **`TASKS`**。略過：**`-SkipAutoTaskCheckmarks`**。其餘略過旗標見 **`end-of-day-checklist`**。再 **`git add` → `commit` → `git push`**。 |
 
@@ -254,7 +254,7 @@ npm run smoke:supabase-tunnel -- --sql
   - Pull 為 **`git pull --ff-only origin main`**；若失敗，代表與遠端 **非快轉關係**，請 `git status` 後 **rebase** 或依上文 **`reset --hard origin/main`**（以 GitHub 為準時）處理。
 - **`scripts/ao-close.ps1`**（**AO-CLOSE**）：預設先 **`print-today-closeout-recap`**；**`-SkipTodayRecap`** 可略過。在未加 **`-SkipPush`** 時，會先 **`git fetch`** 並檢查是否落後 **`origin/<同一分支>`**；若落後則 **中止**。僅在明示風險且必要時使用 **`-AllowPushWhileBehind`**。在 **`git add` 前**會執行 **`apply-closeout-task-checkmarks.ps1`**（自 **`WORKLOG` 當日 `## yyyy-MM-dd`** 區塊解析 **`- AUTO_TASK_DONE:`** 行，並合併選用之 **`pending-task-completions.txt`**；**`-SkipAutoTaskCheckmarks`** 可略過）。
 - **「整台電腦目錄」仍不可能與 GitHub 完全相同**：`node_modules`、本機 MCP／vault 等多為 **`.gitignore`**，兩台需各依 **1.5** 與 **6.2** 建置。
-- **主線對齊（預設 `main` 單一、不跑功能分支）+（可選、罕見）功能分支續作**：`reset --hard` **一次只能對一個 ref**；不要寫成 `origin/main,origin/fix/...`。Cursor **送出 `AO-RESUME`** 時，**hook** 會跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（規則見 **`.cursor/rules/30-resume-keyword.mdc`**）：內部先呼叫 **`git-align-main-aoresume-feature.ps1 -SkipAoResume`**（`fetch` → **`checkout main`** → **`reset --hard origin/main`**；**預設不帶**功能分支，**永遠停在 `main`**），再跑**同一支** `ao-resume.ps1` 的 preflight／閘道／Strict（**不重複**嵌套 `ao-resume`）。**代理**若見 **`ao-resume-hook-last.json` 新鮮**則依該檔去重、**勿**再開終端重跑同一輪。僅在**你明確要**舊的「切回某功能分支再 `merge origin/main`」時：加 **`-FullMainlineFeature`** **且** **`-FullMainlineFeatureBranch <name>`**（**無預設分支名**），可搭配 **`-FullMainlinePushFeature`**、**`-FullMainlineAllowStash`**；**`-FullMainlineRequireFeatureBranch`** 僅在需硬失敗時。Autopilot（**`-SkipStrictEnvironmentAudit`**）**不**跑主線 hard reset。仍可直接執行 **`scripts/git-align-main-aoresume-feature.ps1`** 作獨立維運（**預設同樣只對齊 `main`**，除非加 **`-ContinueWithFeatureBranch -FeatureBranch <name>`**）。
+- **主線對齊（預設 `main` 單一、不跑功能分支）+（可選、罕見）功能分支續作**：`reset --hard` **一次只能對一個 ref**；不要寫成 `origin/main,origin/fix/...`。Claude Code / Codex **送出 `AO-RESUME`** 時，**hook** 會跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（規則見 **`CLAUDE.md` / `agency-os\AGENTS.md`**）：內部先呼叫 **`git-align-main-aoresume-feature.ps1 -SkipAoResume`**（`fetch` → **`checkout main`** → **`reset --hard origin/main`**；**預設不帶**功能分支，**永遠停在 `main`**），再跑**同一支** `ao-resume.ps1` 的 preflight／閘道／Strict（**不重複**嵌套 `ao-resume`）。**代理**若見 **`ao-resume-hook-last.json` 新鮮**則依該檔去重、**勿**再開終端重跑同一輪。僅在**你明確要**舊的「切回某功能分支再 `merge origin/main`」時：加 **`-FullMainlineFeature`** **且** **`-FullMainlineFeatureBranch <name>`**（**無預設分支名**），可搭配 **`-FullMainlinePushFeature`**、**`-FullMainlineAllowStash`**；**`-FullMainlineRequireFeatureBranch`** 僅在需硬失敗時。Autopilot（**`-SkipStrictEnvironmentAudit`**）**不**跑主線 hard reset。仍可直接執行 **`scripts/git-align-main-aoresume-feature.ps1`** 作獨立維運（**預設同樣只對齊 `main`**，除非加 **`-ContinueWithFeatureBranch -FeatureBranch <name>`**）。
 - **未推送的 `main` 不可被靜默沖掉**：在 **`reset --hard origin/main`** 前，若本機 **`main` 超前 `origin/main`**（有尚未 push 的 commits），**`git-align-main-aoresume-feature.ps1` 預設會中止**並提示先 **`git push origin main`**。僅在**明確接受捨棄**那些 commits 時使用 **`-AllowResetAheadOfOrigin`**（對齊腳本）或 **`ao-resume.ps1 -FullMainlineAllowResetAheadOfOrigin`**。**dirty 樹觸發自動 checkpoint** 後，`ao-resume` 會嘗試 **`git push`** 再第二次對齊，以降低孤兒本地 commit；若 push 失敗，請修好網路／權限／upstream 後手動 **`git push`** 再重跑 **`AO-RESUME`**。
 
 ## 2.1 失敗處置（不要硬做）
@@ -302,9 +302,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
 1. 在 **monorepo 根** `<WORK_ROOT>` 開終端機（例：`C:\Users\USER\Work` 或 `D:\Work`）
 2. 貼上：`git status --short`
-3. 若只想暫停、不收工：可直接離開；（**回來後**在 Cursor 送 **`AO-RESUME`** 即可由 hook 跑 **`ao-resume.ps1 -FullMainlineParity`**；或 monorepo 根手動 **`scripts/ao-resume.ps1`**／`git pull --ff-only origin main` 後再續接）
+3. 若只想暫停、不收工：可直接離開；（**回來後**在 Claude Code / Codex 送 **`AO-RESUME`** 即可由 hook 跑 **`ao-resume.ps1 -FullMainlineParity`**；或 monorepo 根手動 **`scripts/ao-resume.ps1`**／`git pull --ff-only origin main` 後再續接）
 4. 若希望離開前做完整安全收工：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1 -SkipPush`
-5. 回來後在 **同一 repo 根**：桌機正式開工以 **Cursor 送 `AO-RESUME`**（hook 跑完整 **`ao-resume.ps1 -FullMainlineParity`**）為主；Autopilot 可選 `-AllowUnexpectedDirty` 等（見 **2.5.1**）。**Exit 0** 即表示已處理 fetch／必要時 ff-only pull／閘道／Strict（預設路徑）。
+5. 回來後在 **同一 repo 根**：桌機正式開工以 **Claude Code / Codex 送 `AO-RESUME`**（hook 跑完整 **`ao-resume.ps1 -FullMainlineParity`**）為主；Autopilot 可選 `-AllowUnexpectedDirty` 等（見 **2.5.1**）。**Exit 0** 即表示已處理 fetch／必要時 ff-only pull／閘道／Strict（預設路徑）。
 
 你會看到什麼（成功判斷）：
 - `ao-close`：會產生 closeout/health/guard 報告
@@ -321,14 +321,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
 - **勿**把 `.env`、API key、Claude OAuth 等放進 Git（見 `docs/operations/security-secrets-policy.md`）。
 - `.claude\`、`node_modules\` 已被 `.gitignore`；新機要**各自重新登入** Claude / MCP / GitHub（本機憑證管理員）。
-- MCP 路徑若失效：應先檢查是否開錯資料夾（必須 **monorepo 根**）、repo 內 **`.cursor/mcp.json`** 是否仍用 **`${workspaceFolder}`**；**勿**再寫死 `D:\`／`C:\Users\…`。不要把秘密值提交到 repo。
+- MCP 路徑若失效：應先檢查是否開錯資料夾（必須 **monorepo 根**）、根 **`.mcp.json`**、`mcp\registry.template.json` 與 Codex managed config 是否一致；**勿**再寫死 `D:\`／`C:\Users\…`。不要把秘密值提交到 repo。
 - 密鑰庫建置與復原手冊：`docs/operations/local-secrets-vault-dpapi.md`（換機時先照手冊重建 vault）
 - MCP 常用新增流程：`docs/operations/mcp-add-server-quickstart.md`
 
 ## 5) 與「重開機續接」的關係
 
 - 同一台電腦重開：見 repo 根的 **`RESUME_AFTER_REBOOT.md`**（貼 **`AO-RESUME`**）。  
-- **換電腦／新機**：先 **§1.5**，之後每次開工 **§2** 再在 Cursor 用 **`AO-RESUME`**。
+- **換電腦／新機**：先 **§1.5**，之後每次開工 **§2** 再在 Claude Code / Codex 用 **`AO-RESUME`**。
 
 ## 6) 開工完成判定（Definition of Ready）
 
@@ -351,7 +351,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 | **GitHub CLI** | `gh` 已安裝並 `gh auth login`（雙機各自一次）。 |
 | **乾淨工作樹** | `git status` 無未提交變更再宣告環境穩定（避免與 pull/rebase 拉扯）。 |
 | **DPAPI vault** | `%LOCALAPPDATA%\AgencyOS\secrets\vault.json` 已依手冊建立，且含腳本所需鍵名（見 `agency-os/docs/operations/local-secrets-vault-dpapi.md`）。 |
-| **Cursor MCP** | monorepo 根 **`.cursor/mcp.json`**（SSOT）存在且已 **`git pull`**；**`%USERPROFILE%\.cursor\mcp.json`** 可為空 **`{"mcpServers":{}}`**；token／OAuth 仅存本機／vault（見 `agency-os/docs/operations/mcp-add-server-quickstart.md`）。 |
+| **MCP** | monorepo 根 **`.mcp.json`** 與 **`mcp\registry.template.json`** 存在且已 **`git pull`**；Codex managed config 為 **`%USERPROFILE%\.codex\config.toml`**；token／OAuth 僅存本機／vault（見 `agency-os/docs/operations/mcp-add-server-quickstart.md`）。 |
 | **（僅 Windows）本機 WP 真路徑** | 若需與他機一致跑 **真 `wp`**：已依 **§1.5.1** 安裝 **MariaDB + PHP + WP-CLI**，並能成功執行 `bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；詳 `lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`（**與 Supabase 分工不同**）。 |
 
 **一鍵稽核**（不讀取密鑰內容；可加上 `-FetchOrigin` 讓 ahead/behind 較準）：

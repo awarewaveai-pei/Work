@@ -76,7 +76,7 @@
 ### 建議檔案改動
 - `scripts/ao-close.ps1`
 - `agency-os/docs/operations/end-of-day-checklist.md`
-- `.cursor/rules/40-shutdown-closeout.mdc`（只加軟提醒，不加硬阻擋）
+- `CLAUDE.md` + `agency-os/AGENTS.md`（同步收工治理；只加必要的軟提醒，不加硬阻擋）
 
 ### 驗收標準（DoD）
 - 任一 production 變更都有對應備份證據與 postcheck。
@@ -138,7 +138,7 @@
 - **客戶名稱**：Soulful Expression Art Therapy
 - **類型**：既有網站代操（Production 已運行）
 - **地理/營運**：台灣辦公，規劃跨國組織
-- **Canonical staging URL（repo／ENVIRONMENT_REGISTRY）**：**https://staging.soulfulexpression.org/** — **2026-05-07**：書面台帳與 lifecycle=`provision_pending` 已登記；**雲端實機**仍須操作者依 Pilot A Runbook §2 建立並驗收。
+- ~~**Canonical staging URL（repo／ENVIRONMENT_REGISTRY）**：**https://staging.soulfulexpression.org/** — **2026-05-07**：書面台帳與 lifecycle=`provision_pending` 已登記；**雲端實機**仍須操作者依 Pilot A Runbook §2 建立並驗收。~~ ⛔ **作廢（2026-08-16）**：Hostinger staging 決策已取消；Soulful 已於 2026-08-28 切換至 `ks-aw-01`。現行主線以 `tenants/company-soulful-expression/core/ENVIRONMENT_REGISTRY.md`、`SITE_MIGRATION_RUNBOOK.md` 為準。
 - **M1 首要動作**：
   1. 建立/確認雲端 `staging`（若 Hostinger 有 staging 功能優先使用）
   2. 盤點 production 版本與外掛，建立 baseline 台帳

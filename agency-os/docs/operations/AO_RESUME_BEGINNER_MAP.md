@@ -156,4 +156,4 @@
 
 ---
 
-_建立：2026-06-09。SSOT：本檔（系統地圖 + 詞典 + 控制台 + 急救 + 自動化清單）。報告格式 SSOT：`.claude/commands/ao-resume.md` + `.cursor/rules/30-resume-keyword.mdc`。指令/ runbook 變動時同 PR 更新本檔（R4）。_
+_建立：2026-06-09。SSOT：本檔（系統地圖 + 詞典 + 控制台 + 急救 + 自動化清單）。報告格式 SSOT：`CLAUDE.md` + `agency-os/AGENTS.md` 與現行 `ao-resume.ps1` 流程。指令/ runbook 變動時同 PR 更新本檔（R4）。_

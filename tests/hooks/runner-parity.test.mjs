@@ -50,6 +50,24 @@ test('parity: docker compose down → BLOCK', () => {
   assert.match(r.stderr, /HIGH-RISK OPERATION BLOCKED/);
 });
 
+test('parity: scheduled-task mutation and SystemGuard registrar → BLOCK; ACK → pass', () => {
+  for (const command of [
+    'Start-ScheduledTask -TaskName AgencyOS-SystemGuard-Daily',
+    'schtasks.exe /Run /TN AgencyOS-SystemGuard-Daily',
+    'powershell -NoProfile -ExecutionPolicy Bypass -File D:/Work/agency-os/automation/REGISTER_SYSTEM_GUARD_TASKS.ps1 -DailyTime 22:30',
+  ]) {
+    const blocked = run('PreToolUse', { session_id: freshSid('sched'), tool_name: 'Bash', tool_input: { command } });
+    assert.equal(blocked.status, 2, `should block: ${command}`);
+    assert.match(blocked.stderr, /HIGH-RISK OPERATION BLOCKED/);
+  }
+  const acknowledged = run('PreToolUse', {
+    session_id: freshSid('sched-ack'),
+    tool_name: 'Bash',
+    tool_input: { command: '# CONFIRMED-HIGH-RISK: deliberate scheduled-task change with rollback plan\nStart-ScheduledTask -TaskName AgencyOS-SystemGuard-Daily' },
+  });
+  assert.equal(acknowledged.status, 0);
+});
+
 test('parity: ACK first line → pass', () => {
   const r = run('PreToolUse', { session_id: freshSid('p'), tool_name: 'Bash', tool_input: { command: '# CONFIRMED-HIGH-RISK: t\ndocker compose down' } });
   assert.equal(r.status, 0);

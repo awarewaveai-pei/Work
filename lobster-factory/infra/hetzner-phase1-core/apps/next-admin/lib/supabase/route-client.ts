@@ -15,6 +15,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_AUTH_COOKIE_OPTIONS } from "./auth-cookie-options";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? "";
@@ -32,6 +33,9 @@ export async function createSupabaseUserClient(): Promise<SupabaseClient | null>
   const cookieStore = await cookies();
 
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    // setAll is intentionally a no-op today, but keep the transport policy attached to this
+    // client so a future route-level refresh cannot silently emit a non-Secure cookie.
+    cookieOptions: SUPABASE_AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return cookieStore.getAll();

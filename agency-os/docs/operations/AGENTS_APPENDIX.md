@@ -457,7 +457,7 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 
 > **Cursor 於 2026-08-26 退場**（操作者決定，單機單 IDE）。`.cursor/`、`agency-os/.cursor/`
 > 及三支 cursor 專用腳本已刪除；`ao-resume.ps1` 的 rules 鏡像一致性檢查與
-> `machine-environment-audit.ps1` 的 `.cursor/mcp.json` 檢查一併移除（否則會變成永久
+> Cursor 已退場；`machine-environment-audit.ps1` 的 `.cursor/mcp.json` 檢查一併移除（否則會變成永久
 > 警告——永久警告等於被忽略的偵測器）。歷史 WORKLOG 與 report 中的 Cursor 敘述保留，
 > 它們描述的是當時為真的事。
 
@@ -529,7 +529,7 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 #### 多機多 IDE
 
 **換機**：Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。本地 WP 棧（若需要）：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。  
-**雙 IDE**：架構詳見 `dual-ide-coexistence-strategy.md`。停 Cursor 時用同一組腳本（ao-resume / ao-close / verify），不重建第二套規則。
+**AI client**：架構詳見 `dual-ide-coexistence-strategy.md`。Cursor 已退場；Claude Code / Codex 共用同一組腳本（ao-resume / ao-close / verify），不重建第二套規則。
 
 #### 系統架構速查（Claude 必讀）
 

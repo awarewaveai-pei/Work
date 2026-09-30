@@ -5,6 +5,7 @@
 // object (exposing `.run` directly, no real Trigger.dev runtime needed); tasks.trigger is a spy.
 // Supabase access goes through global.fetch (supabaseRestQuery/Patch), stubbed per-test.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runMockedTask } from "../test-utils/runMockedTask";
 
 const tasksTrigger = vi.hoisted(() => vi.fn(async () => ({ id: "trigger-handle-1" })));
 vi.mock("@trigger.dev/sdk", () => ({
@@ -19,6 +20,7 @@ vi.mock("../observability/sentry", () => ({ captureWorkflowException: vi.fn() })
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const ACTION_ID = "22222222-2222-4222-8222-222222222222";
 const ORG_ID = "33333333-3333-4333-8333-333333333333";
+type DispatchResult = { dispatched: number; total?: number };
 
 function baseRun(overrides: Record<string, unknown> = {}) {
   return {
@@ -82,7 +84,7 @@ describe("dispatch-action-run -- system-mode gate", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const { dispatchActionRun } = await import("./dispatch-action-run");
-    const result = await dispatchActionRun.run({});
+    const result = await runMockedTask<DispatchResult>(dispatchActionRun, {});
 
     expect(result).toEqual({ dispatched: 1, total: 1 });
     expect(tasksTrigger).not.toHaveBeenCalled();
@@ -101,7 +103,7 @@ describe("dispatch-action-run -- system-mode gate", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const { dispatchActionRun } = await import("./dispatch-action-run");
-    const result = await dispatchActionRun.run({});
+    const result = await runMockedTask<DispatchResult>(dispatchActionRun, {});
 
     expect(result).toEqual({ dispatched: 1, total: 1 });
     expect(tasksTrigger).toHaveBeenCalledWith("ao-infrastructure-check", expect.objectContaining({ _dispatchedFromActionRunId: RUN_ID }));
@@ -118,7 +120,7 @@ describe("dispatch-action-run -- system-mode gate", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const { dispatchActionRun } = await import("./dispatch-action-run");
-    await dispatchActionRun.run({});
+    await runMockedTask<DispatchResult>(dispatchActionRun, {});
 
     expect(tasksTrigger).not.toHaveBeenCalled();
     const terminalPatch = patches.find((p) => p.body.status === "dispatch_failed");
@@ -135,7 +137,7 @@ describe("dispatch-action-run -- system-mode gate", () => {
     global.fetch = spy as unknown as typeof fetch;
 
     const { dispatchActionRun } = await import("./dispatch-action-run");
-    await dispatchActionRun.run({});
+    await runMockedTask<DispatchResult>(dispatchActionRun, {});
 
     const modeQuery = spy.mock.calls.map((c) => String(c[0])).find((u) => u.includes("/system_modes"));
     expect(modeQuery).toContain(otherOrg);

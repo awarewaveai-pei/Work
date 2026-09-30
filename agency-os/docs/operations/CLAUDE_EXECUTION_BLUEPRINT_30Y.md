@@ -299,7 +299,7 @@ Mandatory behavior:
    - No "Cursor-off special SOP" copy.
    - Update existing owner docs only.
 5. **Preserve reversibility**
-   - Do not delete `.cursor/*` rule/hook assets; keep them as dormant compatibility layer.
+    - Do not recreate the retired `.cursor/*` rule/hook paths; current governance lives in `CLAUDE.md`, `agency-os/AGENTS.md`, and generated bridge files.
 
 Outcome target: functionality parity with less tooling, zero governance drift.
 

@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-09-30T02:20:11.9164249Z",
+    "generatedAtUtc":  "2026-09-30T02:28:53.0238005Z",
     "branch":  "main",
     "runsPerWorkflow":  20,
     "probeOk":  true,
@@ -59,15 +59,15 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36455852195"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36659447018"
                       },
                       {
                           "name":  "Perplexity Search-only guard",
-                          "latest":  "success",
-                          "consecutiveFailures":  0,
-                          "failingSinceUtc":  "",
+                          "latest":  "failure",
+                          "consecutiveFailures":  1,
+                          "failingSinceUtc":  "2026-09-30T02:26:18Z",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36608414435"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36659841748"
                       },
                       {
                           "name":  "Release Gate (main)",
@@ -91,7 +91,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36608414943"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36659841767"
                       },
                       {
                           "name":  "Tenant staging SSOT",
@@ -107,7 +107,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36011128778"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/33858143879"
                       },
                       {
                           "name":  "Weekly workflows security audit",
@@ -130,6 +130,7 @@
     "verdictLabel":  "FAIL",
     "findings":  [
                      "\u0027HCI-30 — Wave 1 cross-box restore drill (P0-10)\u0027 has been failing for 8 consecutive run(s) over 22 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/35340652567",
+                     "\u0027Perplexity Search-only guard\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/36659841748",
                      "\u0027Weekly workflows security audit\u0027 has been failing for 4 consecutive run(s) over 23 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/36390406303"
                  ]
 }

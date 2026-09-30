@@ -34,7 +34,7 @@
 
 ## 7. 觀測性（剛剛好）
 
-- **先能查 log／報告／健康分數** 再談大規模 paging；與 `.cursor/rules/66-skills-observability-protocol.mdc` 對齊階段目標。
+- **先能查 log／報告／健康分數** 再談大規模 paging；與現行 `CLAUDE.md` / `agency-os/AGENTS.md` 的可觀測性與 hook 治理對齊階段目標。
 
 ## 8. 人類可續接（Bus factor）
 
@@ -67,7 +67,7 @@
 | **合併／收工前** | `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1` | 龍蝦 bootstrap、`verify-adr-index`、Agency `system-health-check` |
 | **跨平面或破壞性變更** | 新增／修訂 **ADR** + 更新 `docs/architecture/decisions/ADR_INDEX.md` 索引 | 同上閘道；見 `CHANGE_IMPACT_MATRIX` |
 | **客戶釋出或重大變更** | 依 `tenants/templates/core/RELEASE_GATES_CHECKLIST.md`；備份與還原證據 | `BACKUP_RESTORE_PROOF.md` 模板與實填 |
-| **每日開工／收工** | 開工：Cursor 送 **`AO-RESUME`** → **hook** 跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（Git、`verify-build-gates`、Strict 環境稽核）→ 代理讀檔；收工：**`scripts/ao-close.ps1`**（關鍵字 **`AO-CLOSE`**；含 recap／閘道／integrated status／預設 **push** `origin/main`） | `.cursor/hooks.json`、`.cursor/rules/30-resume-keyword.mdc`、`40-shutdown-closeout.mdc`、`end-of-day-checklist.md` |
+| **每日開工／收工** | 開工：Claude Code / Codex 送 **`AO-RESUME`** → **hook/bridge** 跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（Git、`verify-build-gates`、Strict 環境稽核）→ 代理讀檔；收工：**`scripts/ao-close.ps1`**（關鍵字 **`AO-CLOSE`**；含 recap／閘道／integrated status／預設 **push** `origin/main`） | `CLAUDE.md`、`agency-os/AGENTS.md`、`end-of-day-checklist.md` |
 | **新機／雙機** | `REMOTE_WORKSTATION_STARTUP` §1.5／§2；`machine-environment-audit.ps1 -FetchOrigin -Strict`（勾選 `TASKS` 雙機項前須無 WARN） | `TASKS.md` 一行隊列；細項 **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`** |
 | **依賴與 CVE** | 審閱 `npm audit`；**禁止**對 `lobster-factory/packages/workflows` 盲目 `npm audit fix --force` | `TASKS.md` Backlog（Trigger 傳遞依賴） |
 

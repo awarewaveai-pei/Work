@@ -1,20 +1,20 @@
 # 自託管 n8n：MCP（`/mcp-server/http`）連線與 404 排查
 
-> **適用**：Self-hosted n8n（非 n8n Cloud 專用路徑）；Cursor／Codex 等使用 **`mcp/registry.template.json`** 內 **`n8n`** → **`${env:N8N_MCP_URL}`**。  
+> **適用**：Self-hosted n8n（非 n8n Cloud 專用路徑）；Claude Code／Codex 等使用 **`mcp/registry.template.json`** 內 **`n8n`** → **`${env:N8N_MCP_URL}`**。
 > **勿**在 repo 寫入明文 token；本機填 **`mcp/user-env.ps1`**（由 **`user-env.template.ps1`** 複製）。
 
 ## 現象
 
 - 瀏覽器或 MCP 探測對 **`https://<host>/mcp-server/http`** 得到 **404**（有無 `Authorization` 皆然）。
-- Cursor **Settings → MCP → n8n** 顯示連線失敗或無工具。
+- Claude Code / Codex 的 n8n MCP client 顯示連線失敗或無工具。
 
-**含義**：多半是 **`N8N_PATH`／公開 URL 與 Cursor 設定的 MCP URL 不一致**、**n8n 未公開 MCP 路由**、**反向代理未轉發該路徑**、或 **版本過舊／已知問題**——不只是 token 錯誤（錯 token 較常見 **401**）。
+**含義**：多半是 **`N8N_PATH`／公開 URL 與 client 設定的 MCP URL 不一致**、**n8n 未公開 MCP 路由**、**反向代理未轉發該路徑**、或 **版本過舊／已知問題**——不只是 token 錯誤（錯 token 較常見 **401**）。
 
 ## N8N_PATH 與公開 MCP URL（對照表）
 
 **規則**：MCP 必須打在「與 n8n **對外 UI 相同網址階層**」底下的 **`…/mcp-server/http`**（見官方 [MCP server](https://docs.n8n.io/advanced-ai/mcp/accessing-n8n-mcp-server/)）。下列為本 monorepo **Hetzner Phase 1** 常見兩種合法組合（**勿混用**）。
 
-| 型態 | 容器 **`N8N_PATH`** | 範例公開 UI | **`N8N_MCP_URL`（Cursor／smoke）** |
+| 型態 | 容器 **`N8N_PATH`** | 範例公開 UI | **`N8N_MCP_URL`（client／smoke）** |
 |------|----------------------|---------------|-------------------------------------|
 | **Pattern A** — 主站子路徑 | **`/n8n/`** | `https://aware-wave.com/n8n/` | `https://aware-wave.com/n8n/mcp-server/http` |
 | **Pattern B** — 專用子網域根路徑 | **`/`** | `https://n8n.aware-wave.com/` | `https://n8n.aware-wave.com/mcp-server/http` |
@@ -100,17 +100,17 @@ npm run n8n:mcp-smoke
 
 升級完成後建議再跑本文件〈本機一鍵探測〉，確認 **`INIT_STATUS`**／**`TOOLS_COUNT`** 仍符合預期。
 
-## 客戶端（Cursor／環境）
+## 客戶端（Claude Code／Codex／環境）
 
 1. **`N8N_MCP_URL`**：完整 URL，結尾路徑須為 **`…/mcp-server/http`**（與官方自託管 MCP 文件一致）。  
 2. **`N8N_AUTH_BEARER_TOKEN`**：來自 n8n MCP **Connection details**，勿混用一般 API Key（除非文件指明相容）。  
-3. monorepo 根執行 **`.\scripts\sync-mcp-config.ps1`**，再 **完全重啟 Cursor**，讓 **`${env:…}`** 由使用者環境載入（見 **`mcp-add-server-quickstart.md`** **`sync-mcp-user-env`**／vault 流程）。
+3. monorepo 根執行 **`.\scripts\sync-mcp-config.ps1`**，再完全重啟 Claude Code / Codex，讓 **`${env:…}`** 由使用者環境載入（見 **`mcp-add-server-quickstart.md`** **`sync-mcp-user-env`**／vault 流程）。
 
 ---
 
-## Cursor MCP 狀態抖動（green→yellow→red、"No tools"）
+## 歷史附錄：Cursor MCP 狀態抖動（已退場 client）
 
-> **已知問題**：以 `transport: "http"` 連線時，Cursor MCP 客戶端在 POST initialize 後，會再對同一端點發 **GET 請求**嘗試建立 SSE 持久串流。n8n 的 `/mcp-server/http` **不支援 GET**（回 `404`），導致 Cursor 狀態持續抖動並顯示 "No tools"，即使後端完全正常。
+> **歷史（Cursor 已於 2026-08-26 退場）**：以 `transport: "http"` 連線時，Cursor MCP 客戶端在 POST initialize 後，會再對同一端點發 **GET 請求**嘗試建立 SSE 持久串流。n8n 的 `/mcp-server/http` **不支援 GET**（回 `404`），導致 Cursor 狀態持續抖動並顯示 "No tools"，即使後端完全正常。現行 client 已改走 registry 宣告的 stdio bridge。
 
 ### 根因
 
@@ -118,14 +118,14 @@ npm run n8n:mcp-smoke
 |------|------|
 | POST `/mcp-server/http` | n8n → `200 OK`（initialize 成功） |
 | GET `/mcp-server/http` | n8n → `404`（不支援） |
-| Cursor 收到 404 | 報錯、重連 → 迴圈 → 狀態不斷閃爍 |
+| 歷史行為：Cursor 收到 404 | 報錯、重連 → 迴圈 → 狀態不斷閃爍 |
 
 ### 修法（一次性、已套用）
 
 **`mcp/registry.template.json`** 的 `n8n` 條目從 `transport: "http"` 改為 **`transport: "stdio"`**，透過 **`scripts/run-n8n-mcp.mjs`** 橋接腳本轉發請求：
 
 ```
-Cursor stdin → run-n8n-mcp.mjs → POST /mcp-server/http → n8n
+Claude Code / Codex stdio → run-n8n-mcp.mjs → POST /mcp-server/http → n8n
 ```
 
 橋接腳本只使用 `POST`，完全迴避 GET 問題，並同時處理 n8n 可能回傳的 JSON 與 SSE 格式。
@@ -136,7 +136,7 @@ Cursor stdin → run-n8n-mcp.mjs → POST /mcp-server/http → n8n
 # 1. 確認 registry 已是 stdio 設定（正常已內含）
 # 2. 重新生成客戶端設定
 powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
-# 3. 重載 Cursor 視窗
+# 3. （歷史）重載 Cursor 視窗；現行請完全重啟 Claude Code / Codex
 # Ctrl+Shift+P → Developer: Reload Window
 ```
 
@@ -147,13 +147,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
 node .\scripts\n8n-mcp-smoke.mjs
 ```
 
-Cursor MCP 面板對 `n8n` 應穩定顯示綠燈，不再跳色。
+（歷史驗證）Cursor MCP 面板對 `n8n` 應穩定顯示綠燈，不再跳色；現行以 client 工具清單與 smoke 驗證。
 
 ### 判斷 GET vs 後端真正故障
 
 | 現象 | 原因 | 處置 |
 |------|------|------|
-| smoke 200、Cursor 紅燈閃爍、"No tools" | Cursor GET 被 n8n 拒 → 改 stdio 橋接（上述） |
+| 歷史現象：smoke 200、Cursor 紅燈閃爍、"No tools" | Cursor GET 被 n8n 拒 → 改 stdio 橋接（上述） |
 | smoke 404 | 路由/N8N_PATH/反代設定錯誤 → 見〈N8N_PATH 與公開 MCP URL〉 |
 | smoke 401 | Bearer token 無效或過期 → 從 n8n Connection details 重取 |
 | smoke 200 且 TOOLS_COUNT=0 | n8n 無 workflow 設為 MCP 可見 → 見〈伺服器端〉步驟 2 |

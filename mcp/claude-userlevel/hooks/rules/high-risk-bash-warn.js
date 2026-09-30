@@ -12,6 +12,7 @@
 const PROD_SSH_LINE_RE = /(?:^|&&|\|\||;|\||\(|\bthen\b|\bdo\b)\s*(?:(?:sudo|nohup|exec|command|time)\s+(?:-\S+\s+)*|timeout\s+(?:-\S+\s+)*\S+\s+)*ssh\b[^\n]*?(?:145\.239\.195\.47|ks-aw-01|5\.223\.93\.113|204\.168\.175\.41)/im;
 const PROD_MUTATING_VERB_RE = /systemctl\s+(?:restart|stop)|docker[\s-]+compose\s+(?:down|stop|restart)|\breboot\b|\bshutdown\b/i;
 const DEPLOY_SCRIPT_RE = /^(?:sg-deploy|rollback-phase1|auto-deploy-next-admin)(?:\.sh)?$/;
+const SCHEDULED_TASK_MUTATION_RE = /\b(?:Register|Unregister|Start|Stop|Enable|Disable)-ScheduledTask\b|\bschtasks(?:\.exe)?\s+\/(?:create|run|delete|change)\b|\b(?:REGISTER_SYSTEM_GUARD_TASKS|realtest-reg)\.ps1\b/i;
 // Words that run their operand as a command -> their options that take an argument.
 const EXEC_WRAPPERS = {
   sudo: ['-u', '-g', '-C', '-h', '-p', '-r', '-t', '-U', '-D', '-R'],
@@ -98,6 +99,10 @@ function executesDeployScript(remote) {
 }
 
 const HIGH_RISK_PATTERNS = [
+  {
+    re: SCHEDULED_TASK_MUTATION_RE,
+    label: 'scheduled-task mutation or SystemGuard registrar — may create hidden privileged persistence; operator ACK required',
+  },
   {
     re: /^\s*(?:sudo\s+)?docker[\s-]+compose\s+(?:down|stop\b|rm\b)/im,
     label: 'docker compose down/stop/rm — takes production services offline',

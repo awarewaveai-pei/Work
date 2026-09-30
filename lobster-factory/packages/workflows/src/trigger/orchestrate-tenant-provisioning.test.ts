@@ -3,6 +3,7 @@
 // directly); provider/webhook calls are spies so a blocked run can be proven to have reached none of
 // them. Supabase access goes through global.fetch (supabaseRestQuery), stubbed per-test.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runMockedTask } from "../test-utils/runMockedTask";
 
 vi.mock("@trigger.dev/sdk", () => ({ task: (def: unknown) => def, logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 const postWebhook = vi.hoisted(() => vi.fn(async () => undefined));
@@ -13,6 +14,11 @@ vi.mock("../observability/posthog", () => ({ captureWorkflowEvent: vi.fn() }));
 vi.mock("../observability/sentry", () => ({ captureWorkflowException: vi.fn() }));
 
 const ORG_ID = "33333333-3333-4333-8333-333333333333";
+type OrchestrationResult = {
+  results: Array<{ ok: boolean }>;
+  status?: string;
+  mode?: string;
+};
 process.env.LOBSTER_SUPABASE_URL = "https://x.supabase.co";
 process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY = "test-key";
 
@@ -44,7 +50,7 @@ describe("orchestrate-tenant-provisioning -- system-mode gate", () => {
     ]) as unknown as typeof fetch;
 
     const { orchestrateTenantProvisioning } = await import("./orchestrate-tenant-provisioning");
-    await expect(orchestrateTenantProvisioning.run(PAYLOAD)).resolves.toEqual({ status: "blocked_system_mode", mode: "emergency_stop", results: [] });
+    await expect(runMockedTask<OrchestrationResult>(orchestrateTenantProvisioning, PAYLOAD)).resolves.toEqual({ status: "blocked_system_mode", mode: "emergency_stop", results: [] });
     expect(runProviderStep).not.toHaveBeenCalled();
     expect(postWebhook).not.toHaveBeenCalled();
   });
@@ -55,7 +61,7 @@ describe("orchestrate-tenant-provisioning -- system-mode gate", () => {
     ]) as unknown as typeof fetch;
 
     const { orchestrateTenantProvisioning } = await import("./orchestrate-tenant-provisioning");
-    const result = await orchestrateTenantProvisioning.run(PAYLOAD);
+    const result = await runMockedTask<OrchestrationResult>(orchestrateTenantProvisioning, PAYLOAD);
     expect(runProviderStep).toHaveBeenCalled();
     expect(result.results[0].ok).toBe(true);
   });
@@ -63,7 +69,7 @@ describe("orchestrate-tenant-provisioning -- system-mode gate", () => {
   it("a system_modes read error also blocks (fail closed)", async () => {
     global.fetch = fetchReturningSystemModeRows(null, true) as unknown as typeof fetch;
     const { orchestrateTenantProvisioning } = await import("./orchestrate-tenant-provisioning");
-    await expect(orchestrateTenantProvisioning.run(PAYLOAD)).resolves.toMatchObject({ status: "blocked_system_mode", mode: "unavailable" });
+    await expect(runMockedTask<OrchestrationResult>(orchestrateTenantProvisioning, PAYLOAD)).resolves.toMatchObject({ status: "blocked_system_mode", mode: "unavailable" });
     expect(runProviderStep).not.toHaveBeenCalled();
   });
 
@@ -72,7 +78,7 @@ describe("orchestrate-tenant-provisioning -- system-mode gate", () => {
     global.fetch = spy as unknown as typeof fetch;
 
     const { orchestrateTenantProvisioning } = await import("./orchestrate-tenant-provisioning");
-    await orchestrateTenantProvisioning.run(PAYLOAD);
+    await runMockedTask<OrchestrationResult>(orchestrateTenantProvisioning, PAYLOAD);
 
     const modeQuery = spy.mock.calls.map((c) => String(c[0])).find((u) => u.includes("/system_modes"));
     expect(modeQuery).toContain(ORG_ID);

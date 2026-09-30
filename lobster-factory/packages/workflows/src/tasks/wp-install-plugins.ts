@@ -1,6 +1,6 @@
 import { task, logger } from "@trigger.dev/sdk";
 import { z } from "zod";
-import { Client } from "ssh2";
+import { Client, type ClientChannel } from "ssh2";
 import { newUuid } from "../utils/uid";
 import { buildPackageInstallRunInsertSql } from "../db/sql/packageInstallRunsSql";
 import { buildPackageInstallRunRow } from "../db/sql/packageInstallRunsSql";
@@ -89,7 +89,7 @@ async function sshExec(
     );
 
     conn.on("ready", () => {
-      conn.exec(command, (err, stream) => {
+      conn.exec(command, (err: Error | undefined, stream: ClientChannel) => {
         if (err) { settle({ exitCode: 1, stdout, stderr: err.message }); return; }
         stream.on("data", (d: Buffer) => { stdout += d.toString(); });
         stream.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
@@ -97,7 +97,7 @@ async function sshExec(
       });
     });
 
-    conn.on("error", (err) => settle({ exitCode: 1, stdout, stderr: err.message }));
+    conn.on("error", (err: Error) => settle({ exitCode: 1, stdout, stderr: err.message }));
 
     conn.connect({ host, port: 22, username: user, privateKey, readyTimeout: 15_000 });
   });

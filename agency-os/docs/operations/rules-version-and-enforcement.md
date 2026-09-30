@@ -1,7 +1,7 @@
 # Rules Version and Enforcement (SSOT)
 
 > Owner: this file is the single source of truth for runtime rule precedence, versioning, and hard-fail enforcement.
-> Scope: AO-RESUME/AO-CLOSE behavior and rule-mirror consistency across `agency-os/.cursor/rules` and monorepo root `.cursor/rules`.
+> Scope: AO-RESUME/AO-CLOSE behavior and generated Claude/Codex governance parity. Cursor rule mirrors are retired and out of scope.
 
 ## Version
 
@@ -11,7 +11,7 @@
 
 ## Commit subject line (tool attribution)
 
-- **SSOT（寫給代理）**：`agency-os/.cursor/rules/50-operator-autopilot.mdc` §7 — 所有 `git commit` 第一行須以 `[cursor]`、`[codex]`、`[claude]` 擇一為前缀，以便區分編輯／代理來源。
+- **SSOT（寫給代理）**：`CLAUDE.md` + `agency-os/AGENTS.md` — 所有 `git commit` 第一行須以 `[codex]` 或 `[claude]` 擇一為前缀，以便區分編輯／代理來源。
 
 ## Non-Negotiable Priority
 
@@ -27,7 +27,7 @@ If conflict exists, lower-priority behavior is invalid.
 The following conditions must be treated as failures (not style differences):
 
 - AO-RESUME report does not include all unchecked `- [ ]` lines from `TASKS.md` (or open-tasks snapshot when present).
-- Rule mirrors are inconsistent between `agency-os/.cursor/rules` and root `.cursor/rules` for required files.
+- Generated Claude/Codex governance artifacts drift from `CLAUDE.md` / `agency-os/AGENTS.md`.
 - AO preflight is reported as PASS while underlying script exits non-zero.
 
 ## Required Runtime Enforcement

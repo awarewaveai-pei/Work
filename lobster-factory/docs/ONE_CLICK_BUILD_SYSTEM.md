@@ -861,17 +861,17 @@ Deployment target:
 
 | Layer | Target |
 |---|---|
-| DNS | `app.aware-wave.com` -> SG phase1 host |
-| Reverse proxy | system Nginx or Apache vhost for `app.aware-wave.com` |
-| Access | protected tools host; unauthenticated requests may return `401` |
+| DNS | `app.aware-wave.com` → ks-aw-01（Cloudflare proxied） |
+| Reverse proxy | host nginx `sg-stack.aware-wave.com` → lobster-nginx `:8083` → next-admin |
+| Access | Supabase session gate；未登入回 `307 /login` |
 | Local port | `127.0.0.1:3002` |
 | Container | `lobster-next-admin` |
 | App | `infra/hetzner-phase1-core/apps/next-admin` |
 
 Repo evidence:
 
-- `infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`
-- `infra/hetzner-phase1-core/apache/sites-available/app.conf`
+- `infra/hetzner-phase1-core/nginx/system-sites/sg-stack.aware-wave.com.conf`
+- `infra/hetzner-phase1-core/nginx/default.conf`
 - `infra/hetzner-phase1-core/docker-compose.yml`
 
 Deploy only the Next tools app after code is merged:

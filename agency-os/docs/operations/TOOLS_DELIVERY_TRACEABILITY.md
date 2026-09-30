@@ -26,7 +26,7 @@
 | **`app.aware-wave.com`** | Next 工具總入口；Build Console 在 `/build` | [`CLOUDFLARE_HETZNER_PHASE1.md`](CLOUDFLARE_HETZNER_PHASE1.md) §子網域 | 同 API PLAN §1.2 |
 | **Hetzner / phase1 compose** | 自託管主機與堆疊 | [`hetzner-self-host-start-here.md`](hetzner-self-host-start-here.md)、[`../../../lobster-factory/infra/hetzner-phase1-core/README.md`](../../../lobster-factory/infra/hetzner-phase1-core/README.md) | [`LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md) |
 | **Cloudflare** | DNS、WAF、TLS 邊緣 | [`CLOUDFLARE_HETZNER_PHASE1.md`](CLOUDFLARE_HETZNER_PHASE1.md) | 本檔 P5；[`PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md) |
-| **Nginx（系統／容器）** | 反代、TLS、路由 | `lobster-factory/infra/hetzner-phase1-core/nginx/`、`aware-wave-app-api-subdomains.conf` | [`edge-and-domains/EDGE_DOMAINS_INDEX.md`](../edge-and-domains/EDGE_DOMAINS_INDEX.md) 快速導覽 |
+| **Nginx（系統／容器）** | 反代、TLS、路由 | host `nginx/system-sites/sg-stack.aware-wave.com.conf`；container `nginx/default.conf` | [`edge-and-domains/EDGE_DOMAINS_INDEX.md`](../edge-and-domains/EDGE_DOMAINS_INDEX.md) 快速導覽 |
 | **Sentry** | 錯誤與效能訊號 | [`SENTRY_ALERT_POLICY.md`](SENTRY_ALERT_POLICY.md)、[`tools-and-integrations.md`](tools-and-integrations.md) | [`PLAN_30Y_STABILITY_HARDENING.md`](../governance-plans/PLAN_30Y_STABILITY_HARDENING.md) Phase 1 |
 | **PostHog** | 產品分析／funnel | `hetzner-phase1-core/README`（`NEXT_PUBLIC_POSTHOG_*`）、[`ARCHITECTURE_SPEC.md`](ARCHITECTURE_SPEC.md) | 本檔 P4；[`PROGRAM_TIMELINE.md`](../overview/PROGRAM_TIMELINE.md) OP-6 |
 | **GitHub Actions** | CI、Trigger 部署等 | [`github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md) | 本檔「平台能力總表」列為已上線能力 |

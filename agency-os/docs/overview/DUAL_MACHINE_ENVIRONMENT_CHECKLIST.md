@@ -15,11 +15,11 @@
 
 ## 另一台實體機 — 執行順序（摘要）
 
-> **代理邊界**：Cursor 無法代替你在「不在此工作區的另一台電腦」上點擊或輸入密碼；該機須由**該機使用者**開終端機／Cursor 操作。下列為**最短鏈**；**可複製貼上的 PowerShell 區塊與段落標題**仍以 **`REMOTE_WORKSTATION_STARTUP.md` §1.5** 為**唯一長文正本**（本篇不重複貼全文，避免雙寫漂移）。
+> **代理邊界**：Claude Code / Codex 無法代替你在「不在此工作區的另一台電腦」上點擊或輸入密碼；該機須由**該機使用者**開終端機／執行同步流程。下列為**最短鏈**；**可複製貼上的 PowerShell 區塊與段落標題**仍以 **`REMOTE_WORKSTATION_STARTUP.md` §1.5** 為**唯一長文正本**（本篇不重複貼全文，避免雙寫漂移）。
 
 1. **取得 repo**：依 §1.5 **「從零 clone」**（`git clone` → `checkout main` → `pull --ff-only origin main`）。
 2. **工具與依賴**：依 §1.5 **「工具與依賴」**— `lobster-factory\packages\workflows` 下 **`npm ci`**、可選 **`mcp-local-wrappers`** 之 **`npm ci`**、**`verify-build-gates.ps1`**。
-3. **每台獨立憑證與 MCP**：依 §1.5 **「憑證（無法一鍵複製）」**— DPAPI vault、`mcp/user-env.ps1`（自 template）、monorepo 根 **`bootstrap-mcp-machine.ps1`**；細項見下方 Checklist。**禁止**整份複製他機 **`~/.cursor/mcp.json`**／明文 token。
+3. **每台獨立憑證與 MCP**：依 §1.5 **「憑證（無法一鍵複製）」**— DPAPI vault、`mcp/user-env.ps1`（自 template）、monorepo 根 **`bootstrap-mcp-machine.ps1`**；細項見下方 Checklist。**禁止**整份複製他機的 `.mcp.json`／Codex config／明文 token。
 4. **須與桌機同級「真 wp」時**：§**1.5.1** + **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**。
 5. **選用 EU Postgres MCP**：§**1.5.2**（tunnel／smoke；失敗時先看 **`SUPABASE_SELF_HOSTED_RUNBOOK.md`**）。
 6. **結案判定（該機）**：在該機 monorepo 根執行上方 DoD 指令；輸出結尾須為 **`== AUDIT RESULT: PASS (no warnings) ==`**。建議（可選）將終端最後 **30** 行貼入該機 **`agency-os/memory/daily/當日.md`** 或 **`WORKLOG.md`** 該日小節，利於雙機事後稽核。
@@ -31,11 +31,11 @@
 
 - **新機／筆電首次**：完成 Windows 本機 WordPress 相容層（MariaDB + PHP + WP-CLI + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`），此路徑與 Supabase／MCP 分列。
 
-- **之後每次開工**：在 Cursor 開 monorepo 根並送出 **`AO-RESUME`**（專案 **hook** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`** 至 exit 0／失敗則依 **REMOTE 2.5.1** 整理後重送）；除錯時可改在 monorepo 根手動跑同指令。
+- **之後每次開工**：在 Claude Code / Codex 的 monorepo root 送出 **`AO-RESUME`**（hook/bridge 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`** 至 exit 0／失敗則依 **REMOTE 2.5.1** 整理後重送）；除錯時可改在 monorepo 根手動跑同指令。
 
 - **筆電**：安裝並登入 GitHub CLI（`winget install --id GitHub.cli` + `gh auth login`），Node major 與桌機／CI 對齊；`secrets-vault` 與 `mcp.json` 皆為每台獨立設定。
 
-- **Shared MCP／AI 結構（固定）**：兩台共用 repo 內 **`mcp/registry.template.json`**、**`scripts/sync-mcp-config.ps1`**、**`CLAUDE.md`**、**`.cursor/rules/67-shared-mcp-governance.mdc`**；各自持有本機 env／vault／user-level config，**不得**直接複製另一台的明文 `~/.cursor/mcp.json`、`~/.claude.json`。
+- **Shared MCP／AI 結構（固定）**：兩台共用 repo 內 **`mcp/registry.template.json`**、**`scripts/sync-mcp-config.ps1`**、**`CLAUDE.md`**、根 **`.mcp.json`**；各自持有本機 env／vault／user-level config，**不得**直接複製另一台的明文 secrets。
 
 - **筆電全功能接線**：建立 `mcp/user-env.ps1`（依 `mcp/user-env.template.ps1` 補齊全部 env），在 monorepo 根執行 **`scripts/bootstrap-mcp-machine.ps1`**；若筆電曾有舊明文 MCP，再執行 **`scripts/sanitize-user-mcp-config.ps1`** 後重開 Claude Code／Claude Desktop。
 

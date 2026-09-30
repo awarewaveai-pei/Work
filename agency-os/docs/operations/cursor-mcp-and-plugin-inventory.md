@@ -1,17 +1,17 @@
 ﻿# MCP、外掛與工具分工（Agency OS + Monorepo）
 
-> **適用範圍**：**Cursor 與 Claude Code 均適用**。MCP 伺服器清單以 monorepo 根 **`.mcp.json`** 為共用 SSOT；本檔描述各 MCP 的建議用途與 IDE 設定對照。  
+> **適用範圍**：Claude Code、Codex 與其他目前支援的 MCP client。MCP 伺服器清單以 `mcp/registry.template.json` 為宣告 SSOT，輸出根 `.mcp.json` 與各 client managed config；本檔描述各 MCP 的建議用途與設定對照。
 > **職責邊界**：**龍蝦執行面**仍以 `[lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md)` 為 **強制規格**；本檔描述 **IDE 對話／本機代理** 可用的 MCP 及其**建議用途**，不作為略過 staging／核准的理由。  
 > **一頁追溯總表**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（工具分工 ↔ 強制路由 ↔ TASKS 對照）  
-> **雙 IDE 並存架構**：`docs/operations/dual-ide-coexistence-strategy.md`
+> **現行 AI client 架構**：`CLAUDE.md` + `agency-os/AGENTS.md` 是 workflow SSOT；`mcp/registry.template.json` + `scripts/sync-mcp-config.ps1` 是 MCP 同步 SSOT。
 
 ## 1) 憑證與設定（必讀）
 
-- **MCP 設定檔（Cursor / 長期 SSOT）**：**monorepo 根** **`.cursor/mcp.json`** 為 **唯一完整伺服器清單**（路徑一律 **`${workspaceFolder}/…`**／HTTP 標頭 **`Bearer ${VAR}`**，**勿**寫死 `D:\`／`C:\Users\…`）；**可**進版控；機密只出現在 **`${…}`** 名稱，不含明文。**`%USERPROFILE%\.cursor\mcp.json`** 請維持 **`{"mcpServers":{}}`**（空物件），避免與專案檔 **合併後同一鍵重複**、工具列表 **每個出現兩次**。若需「僅本機、不進 repo」的 MCP，才在使用者檔新增 **與專案不重複的鍵名**。**Claude Code** 用 monorepo 根 **`.mcp.json`**；**Codex** 用 monorepo 根 **`.codex/config.toml`**。結構範本見 repo 根 **`mcp.json.template`**。政策見 `**docs/operations/security-secrets-policy.md`**、`**docs/operations/local-secrets-vault-dpapi.md**`。
+- **MCP 設定檔（現行 SSOT）**：**`mcp/registry.template.json`** 宣告完整 server 清單，經同步器輸出根 **`.mcp.json`**、**`%USERPROFILE%\.codex\config.toml`** managed block 與其他 client 設定；路徑用可解析的相對路徑／環境變數，機密只出現在 env 名稱，不含明文。
 - 下表 **「設定鍵」** 指 `mcpServers` 裡的 **名稱**（須與實際 JSON 一致）；新增／改名 MCP 時請 **同步更新本檔**。
-- **Cursor 畫面 vs repo**：**Settings → MCP** 會合併 **使用者** `~/.cursor/mcp.json` 與 **專案** `.cursor/mcp.json`／外掛——故 **使用者檔必須空或僅含補充鍵**，否則與本 repo 的 SSOT 重疊會 **重複顯示**。路徑僅在 **專案** `.cursor/mcp.json` 使用 **`${workspaceFolder}`**／**`${userHome}`**（見 [Cursor MCP 文件](https://cursor.com/docs/context/mcp)）。
+- **Client 設定 vs repo**：Claude Code 讀根 `.mcp.json`；Codex 讀 **`%USERPROFILE%\.codex\config.toml`** 的 managed block；不要手改生成檔，也不要建立已退場的 `.cursor/` 設定。
 - **`supabase-awarewave-postgres`（stdio）**：由 **`run-postgres-mcp.ps1`** 啟動 **`mcp-local-wrappers/postgres-full-access-mcp.mjs`**，讀 **`SUPABASE_AWAREWAVE_POSTGRES_DSN`**（及既有 fallback）；**可執行完整 SQL**（非舊版 `npx @modelcontextprotocol/server-postgres` 之唯讀）。可選 **`POSTGRES_MCP_READ_ONLY=true`** 還原唯讀。需先於 **`mcp-local-wrappers/`** 執行 **`npm install`**。多數 MCP 主機不會在 `args` 內展開任意 **`${…}`**，仍須依賴腳本／環境注入 DSN。
-- **執行期備援（Agent 必讀）**：[`CURSOR_AGENT_RUNTIME_PLAYBOOK.md`](CURSOR_AGENT_RUNTIME_PLAYBOOK.md) — 先驗證本 runtime 暴露的工具；MCP 未綠燈則走 **SSH／API／CLI**；釐清 **Cursor vs Codex** 設定檔差異。
+- **執行期備援（Agent 必讀）**：先驗證本 runtime 暴露的工具；MCP 未可用則走 **SSH／API／CLI**；設定新增與 env/vault 流程見 [`mcp-add-server-quickstart.md`](mcp-add-server-quickstart.md)。
 
 ## 2) Monorepo `mcp.json`／自訂 MCP（設定鍵 → 建議分工）
 
@@ -20,7 +20,7 @@
 
 | 設定鍵                                   | 類型              | 建議負責的事                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | 與龍蝦 Routing 的關係                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **supabase**                          | HTTP（plugin／官方） | **平台（SoR）**：**Supabase = Postgres** 存放龍蝦與自動化要的**權威狀態**——多表關聯、欄位與狀態、**稽核與 workflow 紀錄**（如 `workflow_runs`、`approvals`、`incidents`、`artifacts` 等，以實際 migrations／spec 為準）、**Storage** 二進位物件（產物／附件）、**RLS** 列級權限、**Database Webhook** 對外觸發（通常接 **n8n** 或 **Trigger**）。 **Schema 變更**以 **repo migrations** 為準；生產寫入須走 **已核准路徑**，不可繞過 SoR。 **Supabase MCP**：同一設定鍵在 Cursor 裡多半是 **HTTP MCP**（含官方／Plugin OAuth），**僅**用於在 IDE 內 **查 schema、對照官方文件、除錯連線**；若端點宣告 `**read_only`** ，那只約束 **「經 MCP 這條管線」** 不得寫入，**不**代表整個 Supabase 專案只能讀——**業務寫入**仍透過 **應用 API、Edge Function、伺服器端 `service_role`（受控）、n8n、已核准的 Trigger 任務** 等，且須符合 RLS 與 staging／核准政策。環境變數與供應商帳密見 `**docs/operations/tools-and-integrations.md`**。 | **與 Routing 對齊**（摘自／呼應 spec）：**Trigger** 擁有長流程（如 `**site_provisioning`**、`**manifest_apply**`、`**deploy_production**` ……），這些步驟的**持久化與核准狀態**落在 **Supabase**。 **n8n** 只負責輕量膠水：`**webhook_ingress`**、`**crm_sync**`、`**notifications**` —— 可讀寫你為這些流程配置的**營運表**，**資料權威仍在 Postgres（SoR）**，n8n 不升格為控制面。 **GitHub** 管 CI／release gate；**WordPress** 管交付執行時。 **Supabase MCP** **不**對應任何 `task_type`，不能用它 **略過** Trigger、核准或龍蝦 gate。 |
+| **supabase**                          | HTTP（plugin／官方） | **平台（SoR）**：**Supabase = Postgres** 存放龍蝦與自動化要的**權威狀態**——多表關聯、欄位與狀態、**稽核與 workflow 紀錄**（如 `workflow_runs`、`approvals`、`incidents`、`artifacts` 等，以實際 migrations／spec 為準）、**Storage** 二進位物件（產物／附件）、**RLS** 列級權限、**Database Webhook** 對外觸發（通常接 **n8n** 或 **Trigger**）。 **Schema 變更**以 **repo migrations** 為準；生產寫入須走 **已核准路徑**，不可繞過 SoR。 **Supabase MCP**：同一設定鍵在 Claude Code / Codex client 裡多半是 **HTTP MCP**（含官方／Plugin OAuth），**僅**用於在 IDE 內 **查 schema、對照官方文件、除錯連線**；若端點宣告 `**read_only`** ，那只約束 **「經 MCP 這條管線」** 不得寫入，**不**代表整個 Supabase 專案只能讀——**業務寫入**仍透過 **應用 API、Edge Function、伺服器端 `service_role`（受控）、n8n、已核准的 Trigger 任務** 等，且須符合 RLS 與 staging／核准政策。環境變數與供應商帳密見 `**docs/operations/tools-and-integrations.md`**。 | **與 Routing 對齊**（摘自／呼應 spec）：**Trigger** 擁有長流程（如 `**site_provisioning`**、`**manifest_apply**`、`**deploy_production**` ……），這些步驟的**持久化與核准狀態**落在 **Supabase**。 **n8n** 只負責輕量膠水：`**webhook_ingress`**、`**crm_sync**`、`**notifications**` —— 可讀寫你為這些流程配置的**營運表**，**資料權威仍在 Postgres（SoR）**，n8n 不升格為控制面。 **GitHub** 管 CI／release gate；**WordPress** 管交付執行時。 **Supabase MCP** **不**對應任何 `task_type`，不能用它 **略過** Trigger、核准或龍蝦 gate。 |
 | **wordpress**                         | npx remote      | 官方 WP MCP：**已連線站點**內容／設定                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `**runtime_content_ops`**；高風險 = `**runtime_plugin_change**`                                                                                                                                                                                                                                                                                                                                                                 |
 | **replicate**                         | npx server      | **Replicate** 推論／影像                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | **不**在龍蝦關鍵路徑                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **n8n**                               | HTTP MCP        | 雲端 n8n 的 **MCP**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `**webhook_ingress`**、`**notifications**`、`**crm_sync**`                                                                                                                                                                                                                                                                                                                                                                    |
@@ -38,7 +38,7 @@
 
 **自託管 n8n**：**`N8N_MCP_URL` 路徑階層**須與 **`N8N_PATH`**／反代一致（見 **`docs/operations/n8n-self-hosted-mcp-troubleshooting.md`** 對照表）；HTTP **`…/mcp-server/http`** 若仍 **404**，再查 **Instance-level MCP**、workflow **Available in MCP**、反代 **buffering**、映像版本——同檔含 **升級** 與官方 npm／Docker 連結。
 
-### 2.1 可放在使用者層、且 **鍵名不得與專案 SSOT 重複**（本 monorepo 的「主表」在根目錄 `.cursor/mcp.json`）
+### 2.1 可放在使用者層、且 **鍵名不得與專案 SSOT 重複**（本 monorepo 的「主表」在 `mcp/registry.template.json`，輸出根 `.mcp.json`）
 
 
 | 設定鍵            | 建議負責的事  | 與龍蝦 Routing              |
@@ -64,7 +64,7 @@
 | 狀態        | 處理                        |
 | --------- | ------------------------- |
 | 綠         | 可用                        |
-| 黃 Loading | **Show Output**；重開 Cursor |
+| 黃 Loading | **Show Output**；重開 Claude Code / Codex |
 | 紅 Error   | 輪替憑證                      |
 | No tools  | 查 URL／JWT                 |
 
@@ -87,10 +87,10 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 | 龍蝦 Routing 機讀 | `../lobster-factory/workflow-risk-matrix.json`（`../lobster-factory/scripts/validate-workflow-routing-policy.mjs`） |
 | 工具／能力／TASKS 追溯 | `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` |
 | 編排邊界 ADR | `docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md` |
-| Cursor 企業規則索引 | `docs/operations/cursor-enterprise-rules-index.md` |
-| IDE 架構／MCP 行為 | `.cursor/rules/64-architecture-mcp-routing.mdc` |
+| AI client workflow 索引 | `CLAUDE.md`、`agency-os/AGENTS.md`、`mcp/README.md` |
+| MCP 架構／行為 | `mcp/registry.template.json`、`scripts/sync-mcp-config.ps1` |
 | 工具／env／供應商 | `docs/operations/tools-and-integrations.md` |
-| 本檔（MCP 鍵名） | `docs/operations/cursor-mcp-and-plugin-inventory.md` |
+| 本檔（MCP 鍵名） | `docs/operations/cursor-mcp-and-plugin-inventory.md`（歷史檔名，內容為現行 MCP inventory） |
 | AGENTS | `AGENTS.md` |
 | 新增 MCP 步驟 | `docs/operations/mcp-add-server-quickstart.md` |
 
@@ -105,11 +105,11 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 | **工作站台帳** | `docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5.1**（雙機／筆電對齊） |
 | **腳本** | `scripts/setup-wp-cli-windows.ps1`、`scripts/bootstrap-local-wordpress-windows.ps1`（repo 根） |
 
-## 8) `task_type` ↔ Cursor MCP 鍵（對照表；**非**強制路由本體）
+## 8) `task_type` ↔ MCP 鍵（對照表；**非**強制路由本體）
 
 > **強制路由**只看 `MCP_TOOL_ROUTING_SPEC.md` 表格。下表用來讓「IDE 裡點到的 MCP」與「規格裡的 `task_type`」不脫鉤。
 
-| `task_type`（spec） | `primary_tool` | 常見 Cursor `mcpServers` 鍵 | 備註 |
+| `task_type`（spec） | `primary_tool` | 常見 client MCP 鍵 | 備註 |
 |---------------------|----------------|------------------------------|------|
 | `client_onboarding` … `incident_repair`（凡列為 Trigger） | trigger | **trigger** | 長流程、核准等待、重試，狀態寫 SoR。 |
 | `webhook_ingress`, `crm_sync`, `notifications` | n8n | **n8n** | 膠水；不擁有關鍵 deploy 編排。 |

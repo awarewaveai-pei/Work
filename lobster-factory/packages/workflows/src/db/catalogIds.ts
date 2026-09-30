@@ -2,7 +2,12 @@
  * Deterministic catalog IDs — must match SQL seeds:
  * - `0006_seed_catalog.sql` (wc-core baseline)
  * - `0023_dispatcher_enum_and_catalog_seeds.sql` (wp-basic, wp-business, adopt-client-os, ao-infrastructure-check)
- * - `0024_wc_custom_catalog_seed.sql` (wc-custom — TODO: migration pending before LOBSTER_ENABLE_DB_WRITES=true)
+ * - `wc-custom` is reserved in code but still awaits a matching catalog migration before
+ *   LOBSTER_ENABLE_DB_WRITES=true.
+ *
+ * `wp-tourism` is a valid staging manifest, but it has no seeded package/version/manifest
+ * rows in the current database migrations. `catalogIdsForManifest` therefore returns null
+ * for it so callers can keep shell-only staging available while refusing DB writes.
  *
  * These IDs allow workflow_runs/package_install_runs to reference known workflow_versions/manifests
  * without having to query the catalog first.
@@ -32,14 +37,15 @@ export const LobsterCatalogIds = {
   },
 } as const;
 
-export type ManifestSlug = "wp-basic" | "wp-business" | "wc-core" | "wc-custom";
+export type ManifestSlug = "wp-basic" | "wp-business" | "wp-tourism" | "wc-core" | "wc-custom";
 
 export function catalogIdsForManifest(slug: ManifestSlug) {
   switch (slug) {
     case "wp-basic":    return LobsterCatalogIds.wpBasic;
     case "wp-business": return LobsterCatalogIds.wpBusiness;
+    case "wp-tourism":  return null;
     case "wc-core":     return LobsterCatalogIds.wcCore;
-    case "wc-custom":   return LobsterCatalogIds.wcCustom;
+    case "wc-custom":   return null;
     default: {
       const exhaustiveCheck: never = slug;
       throw new Error(`catalogIdsForManifest: unhandled manifest slug "${exhaustiveCheck}"`);

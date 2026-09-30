@@ -147,6 +147,25 @@ function Resolve-MatrixPath {
     return $resolved.Path
 }
 
+# Cursor was retired on 2026-08-26. Keep its historical rows in the matrix for
+# traceability, but do not treat retired Cursor assets as live synchronization
+# targets. They are recorded in the report's skipped section rather than silently
+# discarded, so retirement remains auditable and the current Claude Code/Codex SSOT
+# is not forced to chase an obsolete IDE mirror.
+$retiredMatrixPathPatterns = @(
+    '(^|/)\.cursor/',
+    '(^|/)docs/spec/raw/Cursor  Rules for AI/'
+)
+
+function Test-RetiredMatrixPath {
+    param([string]$RawPath)
+    $normalized = ($RawPath.Trim() -replace '\\', '/').ToLowerInvariant()
+    foreach ($pattern in $retiredMatrixPathPatterns) {
+        if ($normalized -match $pattern.ToLowerInvariant()) { return $true }
+    }
+    return $false
+}
+
 # ---------- Parse the matrix table ----------
 # Deliberately backtick-only extraction -- see script header for why. `[regex]::Matches`
 # on each column independently means a row's left column keeps only its FIRST backtick
@@ -185,6 +204,14 @@ foreach ($line in $matrixLines) {
     $mainMtime = (Get-Item -LiteralPath $mainResolved).LastWriteTimeUtc
 
     foreach ($impRaw in $impactedRaws) {
+        if ((Test-RetiredMatrixPath -RawPath $mainRaw) -or (Test-RetiredMatrixPath -RawPath $impRaw)) {
+            $skipped.Add([pscustomobject]@{
+                Main = $mainRaw
+                Impacted = $impRaw
+                Reason = 'retired Cursor asset; current SSOT is CLAUDE.md + agency-os/AGENTS.md'
+            }) | Out-Null
+            continue
+        }
         $impResolved = Resolve-MatrixPath -RawPath $impRaw -AgencyRoot $agencyRoot -RepoRoot $WorkRoot
         if (-not $impResolved) {
             $skipped.Add([pscustomobject]@{ Main = $mainRaw; Impacted = $impRaw; Reason = 'impacted path did not resolve to an existing file' }) | Out-Null

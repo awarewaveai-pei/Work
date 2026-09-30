@@ -1,5 +1,6 @@
 ﻿> **Owner**：規則整併「分階段執行」視角。對應舊 Cursor 檔名 **`rules-stability-consolidation_*.plan.md`**。  
 > **憲法正文**：[`rules-version-and-enforcement.md`](../operations/rules-version-and-enforcement.md)。**收斂目標與 DoD**見同軌 [`PLAN_30_YEAR_RULE_CONSOLIDATION.md`](PLAN_30_YEAR_RULE_CONSOLIDATION.md)。
+> **狀態**：歷史規劃副本；Cursor 已退場，現行執行以 `CLAUDE.md`、`agency-os/AGENTS.md` 與同步閘道為準。
 
 # Rules 長期穩定整併計畫
 
@@ -18,11 +19,11 @@
 - Owner 文件固定為：[`rules-version-and-enforcement.md`](../operations/rules-version-and-enforcement.md)
 - 只在索引層補入口，不新增第二套正文：
   - [`cursor-enterprise-rules-index.md`](../operations/cursor-enterprise-rules-index.md)
-  - `.cursor/rules/README.md`
-  - `agency-os/.cursor/rules/README.md`
+  - `.cursor/rules/README.md`（歷史退場輸入）
+  - `agency-os/.cursor/rules/README.md`（歷史退場輸入）
 - 將 AO-RESUME 的無效回覆判定明文化：
-  - `agency-os/.cursor/rules/30-resume-keyword.mdc`
-  - `.cursor/rules/30-resume-keyword.mdc`
+  - `agency-os/.cursor/rules/30-resume-keyword.mdc`（歷史退場輸入）
+  - `.cursor/rules/30-resume-keyword.mdc`（歷史退場輸入）
 
 **驗收**：「規則版本/優先級/Hard-fail」只有一份正文（Owner）；其他檔案只有摘要 + 連結，不複製正文。
 

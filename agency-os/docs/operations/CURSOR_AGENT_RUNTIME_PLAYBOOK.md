@@ -1,27 +1,27 @@
-# Cursor／Codex Agent：執行期工具與備援路線（Playbook）
+# AI Agent：執行期工具與備援路線（Legacy filename；現行 Claude Code / Codex）
 
 > **目的**：讓 Agent **先以「本條對話／本 runtime 實際可用能力」做事**，不要從另一個終端機的輸出或使用者口述設定**推測**自己已接上 MCP。  
 > **職責邊界**：本檔**不**取代 [`MCP_TOOL_ROUTING_SPEC.md`](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md) 的強制路由；**不**鼓勵用任何捷徑繞過核准／staging。  
-> **機密**：token 只放 **vault／環境變數／Cursor 使用者設定**，**不得**寫入 repo、`WORKLOG`、`memory` 或聊天；見 [`security-secrets-policy.md`](security-secrets-policy.md)。
+> **機密**：token 只放 **vault／環境變數／Claude Code / Codex user-level config**，**不得**寫入 repo、`WORKLOG`、`memory` 或聊天；見 [`security-secrets-policy.md`](security-secrets-policy.md)。
 
 ## 0) 三層能力模型（要配齊才算「真的能幫你營運」）
 
-**付費／訂閱本身不會**自動給 Cursor：本機檔案權限、SSH、Docker、各雲 API token。三層都要由**人＋本機設定**打通；Agent 只會在**已打通**的前提下使用它們。
+**付費／訂閱本身不會**自動給 Claude Code / Codex：本機檔案權限、SSH、Docker、各雲 API token。三層都要由**人＋本機設定**打通；Agent 只會在**已打通**的前提下使用它們。
 
 | 層級 | 是什麼 | 配齊的判斷（摘要） |
 |:---|:---|:---|
-| **1 — MCP** | Cursor／Codex 暴露的 MCP tools | IDE 裡 server **綠燈**、工具清單**真的出現**該名稱；見 §3。 |
+| **1 — MCP** | Claude Code／Codex 暴露的 MCP tools | IDE 裡 server **綠燈**、工具清單**真的出現**該名稱；見 §3。 |
 | **2 — 終端／SSH／Docker／CLI** | 整合終端能跑的指令 | **本機**：`git`、`powershell`、`npx`、`ssh` 客戶端等。**遠端 VPS（多為 Linux）**：經 `ssh user@host` 後才有 `docker`、`nginx -t`、`systemctl`（本機 Windows 未必裝 Docker／也沒有主機的 systemd）。 |
-| **3 — secrets／env** | 憑證與 token | 只存在 **環境變數、DPAPI vault、Cursor 本機 MCP env**；見 §0.2 與 [`local-secrets-vault-dpapi.md`](local-secrets-vault-dpapi.md)。 |
+| **3 — secrets／env** | 憑證與 token | 只存在 **環境變數、DPAPI vault、Claude Code / Codex user-level MCP env**；見 §0.2 與 [`local-secrets-vault-dpapi.md`](local-secrets-vault-dpapi.md)。 |
 
 ### 0.1 目標能力（對照「營運面」；不含 GUI 後台點按）
 
-在 §0 三層都成立時，Agent 合理目標包括：**讀寫 monorepo 根（你本機 clone 路徑；Cursor 以工作區根為準）**、經 MCP／API／CLI 操作 **GitHub、Supabase、WordPress、n8n、Trigger、Cloudflare、PostHog、Sentry**（及你另接的 **Canva** 等）、經 **SSH** 查 **Docker／Nginx／Redis／Uptime Kuma／Netdata** 等自託管元件，並以 **API／CLI** 補足沒有 MCP 的場景。  
+在 §0 三層都成立時，Agent 合理目標包括：**讀寫 monorepo 根（你本機 clone 路徑；Claude Code / Codex 以 monorepo root 為準）**、經 MCP／API／CLI 操作 **GitHub、Supabase、WordPress、n8n、Trigger、Cloudflare、PostHog、Sentry**（及你另接的 **Canva** 等）、經 **SSH** 查 **Docker／Nginx／Redis／Uptime Kuma／Netdata** 等自託管元件，並以 **API／CLI** 補足沒有 MCP 的場景。
 **不**承諾：替你登入 `…/admin` 類網頁並操作 UI（見 §1 原則 3）。
 
-### 0.2 Cursor MCP：建議至少涵蓋的設定鍵（名稱以 inventory／`mcp.json` 為準）
+### 0.2 Claude Code / Codex MCP：建議至少涵蓋的設定鍵（名稱以 registry 為準）
 
-以下為**常見**清單；實際套件名、HTTP URL、OAuth 以官方／Cursor 外掛為準，並與 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) 同步。
+以下為**常見**清單；實際套件名、HTTP URL、OAuth 以官方／client 官方整合為準，並與 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) 同步。
 
 | 建議鍵／前綴 | 用途（摘要） |
 |:---|:---|
@@ -34,7 +34,7 @@
 | **cloudflare-*** | 外掛常見前綴；DNS／Workers 等輔助 |
 | **posthog** | 外掛；產品分析輔助 |
 | **perplexity** | 查證／網搜 MCP |
-| **canva** | 設計類 MCP（若 Cursor 市集有對應 server） |
+| **canva** | 設計類 MCP（若 client 支援對應 server） |
 
 ### 0.3 終端「要通」的檢查順序（本機 vs SSH 後）
 
@@ -61,9 +61,9 @@
 | `SENTRY_AUTH_TOKEN` | `sentry-cli`／Sentry API |
 | `POSTHOG_API_KEY` | `scripts/posthog-api.ps1`、PostHog REST |
 | `CLOUDFLARE_API_TOKEN` | Wrangler／Cloudflare API |
-| `COPILOT_MCP_BEARER_TOKEN` | Cursor **copilot** HTTP MCP（`Authorization: Bearer ${env:…}`）；Claude／Codex 亦建議同名變數 |
+| `COPILOT_MCP_BEARER_TOKEN` | **copilot** HTTP MCP（`Authorization: Bearer ${env:…}`）；Claude／Codex 亦建議同名變數 |
 | `MONOREPO_ROOT` | Claude **work-global**（`.mcp.json`）與 Codex **`work-global`** 的 repo 根路徑（本機絕對路徑） |
-| `TRIGGER_PROJECT_REF` | **Codex／Claude** 的 `trigger` MCP（經 `start-trigger-mcp.ps1` 讀環境）；Cursor 仍以 **`-ProjectRef`** 或 **`TRIGGER_PROJECT_REF`** 環境為主 |
+| `TRIGGER_PROJECT_REF` | **Codex／Claude** 的 `trigger` MCP（經 `start-trigger-mcp.ps1` 讀環境）；統一以 registry／sync script 與 **`TRIGGER_PROJECT_REF`** 環境為準 |
 | `TRIGGER_API_URL` | **自託管 Trigger** 的公開原點（例如 **`https://trigger…`**）；寫在 **`trigger` MCP 的 `env`**，供 `npx trigger.dev … mcp` 連到自架而非雲端預設 |
 
 匯入／輪替流程：[`mcp-add-server-quickstart.md`](mcp-add-server-quickstart.md)、[`mcp-secrets-hardening-runbook.md`](mcp-secrets-hardening-runbook.md)。
@@ -80,22 +80,22 @@
    可宣稱可控：`VPS`、`docker compose`、`nginx` 設定檔、`app`／`api` **容器與部署**、公開 HTTP 探測。  
    **不可**宣稱：能替你**登入** `…/admin` 類網頁並點按 UI（除非另有瀏覽器自動化且不在本 playbook 範圍）。
 
-4. **Cursor 與 Codex 設定可能不同步**  
+4. **Claude Code 與 Codex 設定可能不同步**
    兩邊各自讀各自的設定；**一邊驗證過 ≠ 另一邊自動具備**。
 
 ## 2) 設定檔：誰讀哪裡
 
 | Runtime | 常見設定位置 | 說明 |
 |:---|:---|:---|
-| **Cursor（本 repo）** | **`%USERPROFILE%\.cursor\mcp.json`**（密鑰與 server 清單）+ 專案 **`.cursor/mcp.json`**（可為空 **`mcpServers`**，用於 **`${workspaceFolder}`** 錨定）+ 範本 **`mcp.json.template`** | Settings → MCP 合併；自架 **Trigger** 需 **`TRIGGER_API_URL`**；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
-| **Claude Code（本 repo）** | monorepo 根 **`.mcp.json`**（`${VAR}` 展開；LLM 經 **`scripts/run-llm-mcp.ps1`**） | 與 Cursor **server 名稱**對齊便於對照；見 [Claude MCP](https://code.claude.com/docs/en/mcp)。 |
+| **Cursor** | 已退場（2026-08-26） | 不再建立或維護 `.cursor/` MCP 設定；本列僅保留歷史相容性。 |
+| **Claude Code（本 repo）** | monorepo 根 **`.mcp.json`**（`${VAR}` 展開；LLM 經 **`scripts/run-llm-mcp.ps1`**） | 依 registry server 名稱同步；見 [Claude MCP](https://code.claude.com/docs/en/mcp)。 |
 | **Codex CLI（本 repo）** | monorepo 根 **`.codex/config.toml`**（合併於 **`%USERPROFILE%\.codex\config.toml`** 之上；以官方載入順序為準） | **`[mcp_servers.*]`**；HTTP 用 **`bearer_token_env_var`**；Windows stdio 維持 **`cmd /c`** 前綴；見 [Codex MCP](https://openai-codex.mintlify.app/configuration/mcp-servers)。 |
 
 **Agent 動作**：接到任務時，若需 MCP，先確認**當前** runtime 讀的是哪一個設定來源，再查該檔是否存在、鍵名是否與 inventory 一致。
 
 ## 3) 驗證 MCP（不要猜格式）
 
-- **Cursor**：以 IDE **MCP 面板狀態**為準（綠／紅／No tools）；新增流程見 [`mcp-add-server-quickstart.md`](mcp-add-server-quickstart.md)、機密匯入見 [`local-secrets-vault-dpapi.md`](local-secrets-vault-dpapi.md)。
+- **Claude Code / Codex**：以目前 runtime 的 MCP 工具清單與 smoke 結果為準；新增流程見 [`mcp-add-server-quickstart.md`](mcp-add-server-quickstart.md)。
 - **Codex**：以官方 CLI 為準（版本不同指令可能差異），典型順序：`codex mcp --help` → `codex mcp list`。
 
 **HTTP MCP（Codex TOML）**：優先使用 **`bearer_token_env_var`** 指向環境變數，避免把 Bearer 明文寫進 repo。
@@ -129,7 +129,7 @@
 
 ## 6) 何時才「補齊 MCP」
 
-當 **SSH／API／CLI** 已穩定可重複執行後，再把高頻操作補進 **Cursor／Codex MCP**，以降低每次手打指令的成本。  
+當 **SSH／API／CLI** 已穩定可重複執行後，再把高頻操作補進 **Claude Code／Codex MCP**，以降低每次手打指令的成本。
 **不要**把「MCP 尚未接上」當成無法交付的理由。
 
 ## 7) 與其他 SSOT 的關係
@@ -139,6 +139,6 @@
 | MCP 鍵名與 IDE 分工 | [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) |
 | 平台能力／P 階段／TASKS | [`TOOLS_DELIVERY_TRACEABILITY.md`](TOOLS_DELIVERY_TRACEABILITY.md) |
 | 強制編排路由 | [`MCP_TOOL_ROUTING_SPEC.md`](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md) |
-| 架構規則（含 MCP 摘要） | monorepo `.cursor/rules/64-architecture-mcp-routing.mdc` |
+| 架構規則（含 MCP 摘要） | `CLAUDE.md`、`agency-os/AGENTS.md`、`mcp/registry.template.json` |
 
 _Last updated: 2026-04-18_

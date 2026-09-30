@@ -1,6 +1,6 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-09-30 10:20:11
+- Generated: 2026-09-30 10:28:53
 - Overall: **🔴 FAIL**
 - Method: every workflow enumerated; last 20 run(s) of each inspected on `main`
 
@@ -15,7 +15,7 @@
 | HCI-30 — Wave 1 cross-box restore drill (P0-10) | failure | 8 | 22d |
 | Lobster workflows package — validate (main) | success | - | - |
 | next-admin — TypeScript typecheck | success | - | - |
-| Perplexity Search-only guard | success | - | - |
+| Perplexity Search-only guard | failure | 1 | 0d |
 | Release Gate (main) | none | - | - |
 | SG Deploy (self-hosted runner) | success | - | - |
 | Shared asset gates (Claude + Codex) | success | - | - |
@@ -27,6 +27,7 @@
 ## Findings
 
 - 'HCI-30 — Wave 1 cross-box restore drill (P0-10)' has been failing for 8 consecutive run(s) over 22 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/35340652567
+- 'Perplexity Search-only guard' latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/36659841748
 - 'Weekly workflows security audit' has been failing for 4 consecutive run(s) over 23 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/36390406303
 
 ## Why this check exists
