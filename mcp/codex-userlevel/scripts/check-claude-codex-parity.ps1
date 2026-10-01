@@ -259,14 +259,28 @@ $heartbeatPath = Join-Path $CodexHome 'awarewave-hook-heartbeat.json'
 if (Test-Path -LiteralPath $userHooks) {
   $hooksWritten = (Get-Item -LiteralPath $userHooks).LastWriteTimeUtc
   $sessionsDir = Join-Path $CodexHome 'sessions'
+  # Session start = the rollout's own first record (session_meta.timestamp). File CreationTime is
+  # reset when a rollout is re-created/copied (2026-10-01: a 09-30 session got today's birth time
+  # and read as a new session with no heartbeat). CreationTime only when the record is unreadable.
+  function Get-RolloutStartUtc {
+    param([System.IO.FileInfo]$File)
+    try {
+      $first = Get-Content -LiteralPath $File.FullName -TotalCount 1 -Encoding UTF8
+      $meta = $first | ConvertFrom-Json
+      $ts = if ($meta.payload.timestamp) { $meta.payload.timestamp } else { $meta.timestamp }
+      if ($ts) { return ([DateTime]::Parse($ts)).ToUniversalTime() }
+    } catch { }
+    return $File.CreationTimeUtc
+  }
   $newestRollout = if (Test-Path -LiteralPath $sessionsDir) {
     Get-ChildItem -LiteralPath $sessionsDir -Recurse -File -Filter 'rollout-*.jsonl' |
-      Where-Object { $_.CreationTimeUtc -gt $hooksWritten } | Sort-Object CreationTimeUtc -Descending | Select-Object -First 1
+      ForEach-Object { [pscustomobject]@{ File = $_; StartUtc = (Get-RolloutStartUtc -File $_) } } |
+      Where-Object { $_.StartUtc -gt $hooksWritten } | Sort-Object StartUtc -Descending | Select-Object -First 1
   }
   if ($newestRollout) {
     $state = $null
     if (Test-Path -LiteralPath $heartbeatPath) { try { $state = Get-Content -Raw -Encoding UTF8 -LiteralPath $heartbeatPath | ConvertFrom-Json } catch { $state = $null } }
-    $floor = $newestRollout.CreationTimeUtc.AddMinutes(-1)
+    $floor = $newestRollout.StartUtc.AddMinutes(-1)
     function Get-BeatUtc {
         param([object]$State, [string]$Event)
         try {
@@ -276,15 +290,15 @@ if (Test-Path -LiteralPath $userHooks) {
         return $null
     }
     $anyBeat = Get-BeatUtc -State $state -Event ''
-    Assert-Parity ($null -ne $anyBeat -and $anyBeat -ge $floor) "Codex session $($newestRollout.Name) ran after the hook file was written but no hook heartbeat followed: hooks were skipped (untrusted or stale trust). Run /hooks in Codex."
+    Assert-Parity ($null -ne $anyBeat -and $anyBeat -ge $floor) "Codex session $($newestRollout.File.Name) ran after the hook file was written but no hook heartbeat followed: hooks were skipped (untrusted or stale trust). Run /hooks in Codex."
     # Per-event proof: SessionStart alone can stay trusted while the only BLOCKING
     # event (PreToolUse) has a stale hash, so a tool-using session must show a
     # PreToolUse beat of its own.
     $usedTools = $false
-    try { $usedTools = [bool](Select-String -LiteralPath $newestRollout.FullName -Pattern '"(custom_tool_call|function_call|local_shell_call)"' -List -Quiet) } catch { $usedTools = $false }
+    try { $usedTools = [bool](Select-String -LiteralPath $newestRollout.File.FullName -Pattern '"(custom_tool_call|function_call|local_shell_call)"' -List -Quiet) } catch { $usedTools = $false }
     if ($usedTools) {
         $preBeat = Get-BeatUtc -State $state -Event 'PreToolUse'
-        Assert-Parity ($null -ne $preBeat -and $preBeat -ge $floor) "Codex session $($newestRollout.Name) made tool calls but left no PreToolUse heartbeat: the blocking gate did not run (stale hook trust). Run /hooks in Codex and re-check."
+        Assert-Parity ($null -ne $preBeat -and $preBeat -ge $floor) "Codex session $($newestRollout.File.Name) made tool calls but left no PreToolUse heartbeat: the blocking gate did not run (stale hook trust). Run /hooks in Codex and re-check."
     }
   } else {
     Write-Host "Note: no Codex session since the hook file was written; hook execution not yet proven by heartbeat." -ForegroundColor DarkYellow

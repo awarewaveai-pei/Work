@@ -1,6 +1,18 @@
 -- Build Console execution layer tables.
 -- Required for one-click deployment (Profile A / B / C) to move beyond plan_only.
 -- Safe to run multiple times (idempotent CREATE IF NOT EXISTS + ALTER IF NOT EXISTS).
+--
+-- 2026-10-01 corrected in place (never applied to production: the original could not apply --
+-- `where expires_at > now()` in an index predicate is rejected, now() is not IMMUTABLE; ledger is
+-- keyed by filename so production records this version). Also: own BEGIN/COMMIT (runner requires
+-- it); access = service_role only, matching 0092/0093 -- the original `using (true)` policies named
+-- no role and public's default ACL grants anon/authenticated all privileges, i.e. anon-key REST
+-- read/write. All writers use the service role (adopt-client-os.ts, wp-install-plugins.ts).
+-- Rollback (drops data written since): drop the 7 tables, `alter table public.sites drop column
+-- apply_mode`, delete this file's public.schema_migrations row, `notify pgrst, 'reload schema'`.
+
+begin;
+set local lock_timeout = '5s';  -- ALTER sites + 3 FKs: fail fast instead of queueing reads behind a held lock
 
 -- ─────────────────────────────────────────────
 -- 1. sites: add deployment classification columns
@@ -154,9 +166,11 @@ create table if not exists public.resource_locks (
   created_at      timestamptz not null default now()
 );
 
+-- One row per resource. An expired lock is taken over in place:
+--   insert ... on conflict (resource_type, resource_id) do update set ...
+--   where resource_locks.expires_at <= now();   -- 0 rows updated = still held
 create unique index if not exists resource_locks_unique_resource
-  on public.resource_locks(resource_type, resource_id)
-  where expires_at > now();
+  on public.resource_locks(resource_type, resource_id);
 
 -- ─────────────────────────────────────────────
 -- 8. idempotency_keys — prevent duplicate step execution
@@ -172,52 +186,27 @@ create table if not exists public.idempotency_keys (
 create index if not exists idempotency_keys_expires_idx on public.idempotency_keys(expires_at);
 
 -- ─────────────────────────────────────────────
--- RLS: all new tables follow organization_id tenant isolation
+-- Access: service_role only (0092/0093 convention). Old policy names dropped so a dev DB that ran
+-- the pre-2026-10-01 statements converges too.
 -- ─────────────────────────────────────────────
-alter table public.operator_tasks    enable row level security;
-alter table public.smoke_test_results enable row level security;
-alter table public.adopt_audits      enable row level security;
-alter table public.adopt_audit_items enable row level security;
-alter table public.handoff_reports   enable row level security;
-alter table public.resource_locks    enable row level security;
-alter table public.idempotency_keys  enable row level security;
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['operator_tasks', 'smoke_test_results', 'adopt_audits', 'adopt_audit_items',
+                           'handoff_reports', 'resource_locks', 'idempotency_keys'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || '_org_isolation', t);
+    execute format('drop policy if exists %I on public.%I', t || '_isolation', t);
+    execute format('drop policy if exists %I on public.%I', t || '_service_only', t);
+    execute format('drop policy if exists "service_role only" on public.%I', t);
+    execute format('create policy "service_role only" on public.%I to service_role using (true) with check (true)', t);
+    execute format('revoke all on public.%I from public, anon, authenticated', t);
+    execute format('grant all on public.%I to service_role', t);
+  end loop;
+end $$;
 
--- operator_tasks
-drop policy if exists operator_tasks_org_isolation on public.operator_tasks;
-create policy operator_tasks_org_isolation on public.operator_tasks
-  using (organization_id = current_setting('app.current_organization_id', true)::uuid);
+-- PostgREST does not reload its schema cache on DDL here (PGRST204, WORKLOG 2026-09-18 續29).
+notify pgrst, 'reload schema';
 
--- smoke_test_results
-drop policy if exists smoke_test_results_org_isolation on public.smoke_test_results;
-create policy smoke_test_results_org_isolation on public.smoke_test_results
-  using (organization_id = current_setting('app.current_organization_id', true)::uuid);
-
--- adopt_audits
-drop policy if exists adopt_audits_org_isolation on public.adopt_audits;
-create policy adopt_audits_org_isolation on public.adopt_audits
-  using (organization_id = current_setting('app.current_organization_id', true)::uuid);
-
--- adopt_audit_items (join through adopt_audits)
-drop policy if exists adopt_audit_items_isolation on public.adopt_audit_items;
-create policy adopt_audit_items_isolation on public.adopt_audit_items
-  using (
-    adopt_audit_id in (
-      select id from public.adopt_audits
-      where organization_id = current_setting('app.current_organization_id', true)::uuid
-    )
-  );
-
--- handoff_reports
-drop policy if exists handoff_reports_org_isolation on public.handoff_reports;
-create policy handoff_reports_org_isolation on public.handoff_reports
-  using (organization_id = current_setting('app.current_organization_id', true)::uuid);
-
--- resource_locks: service role only (no tenant filter)
-drop policy if exists resource_locks_service_only on public.resource_locks;
-create policy resource_locks_service_only on public.resource_locks
-  using (true);
-
--- idempotency_keys: service role only
-drop policy if exists idempotency_keys_service_only on public.idempotency_keys;
-create policy idempotency_keys_service_only on public.idempotency_keys
-  using (true);
+commit;

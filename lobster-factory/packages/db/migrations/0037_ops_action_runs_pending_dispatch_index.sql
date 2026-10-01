@@ -15,6 +15,9 @@
 -- runner wraps statements in a transaction, run this one out-of-band (psql, no -1) or strip
 -- CONCURRENTLY for the (small) current table size.
 
+-- A failed CONCURRENTLY build leaves an INVALID index that `if not exists` then skips: before
+-- recording this file, `select indisvalid from pg_index where indexrelid =
+-- 'public.idx_ops_action_runs_pending_dispatch'::regclass` must be true (else drop and rerun).
 create index concurrently if not exists idx_ops_action_runs_pending_dispatch
-  on ops_action_runs (started_at)
+  on public.ops_action_runs (started_at)
   where status = 'pending';

@@ -1,6 +1,10 @@
 -- Tenant tool bindings: single SoR for per-customer GitHub / n8n / Trigger / Supabase / Sentry / etc.
 -- Secrets: store vault pointers only in secret_ref — never raw tokens in api_metadata (enforce in app).
--- Idempotent.
+-- Idempotent. BEGIN/COMMIT added 2026-10-01 (runner requires it; production had the table and
+-- org index from an earlier path but not ws_idx, so this file never reached the ledger).
+
+begin;
+set local lock_timeout = '5s';
 
 create table if not exists public.tenant_integration_bindings (
   id uuid primary key default gen_random_uuid(),
@@ -29,3 +33,5 @@ alter table public.tenant_integration_bindings enable row level security;
 
 comment on table public.tenant_integration_bindings is
   'Per-tenant integration slots (GitHub, Sentry, …). Orchestrators (n8n/Trigger) POST via /api/webhooks/tenant-integration; secret_ref points to vault; api_metadata holds non-secret ids/urls.';
+
+commit;

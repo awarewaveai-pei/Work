@@ -3,9 +3,11 @@
 -- apps/next-admin/app/api/ops/clients/[slug]/wp-update/route.ts.
 -- The route self-seeds the same row (same values) if this migration has not
 -- been applied yet — keep both in sync.
--- Safe to run multiple times.
+-- Safe to run multiple times. BEGIN/COMMIT added 2026-10-01 (runner requires it).
 
-insert into ops_action_catalog (
+begin;
+
+insert into public.ops_action_catalog (
   action_key,
   display_name,
   risk_level,
@@ -29,3 +31,5 @@ set
   enabled = excluded.enabled,
   metadata = excluded.metadata,
   updated_at = now();
+
+commit;
