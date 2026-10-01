@@ -1,4 +1,41 @@
 # Worklog
+## 2026-10-01（續12）Cloudflare 522 間歇（09:53–09:58 UTC，SIN/HKG edge）：唯讀診斷，主機端原因全數排除，未重現
+
+- 症狀：操作者筆電經 CF SIN/HKG edge，`cognitive.aware-wave.com`／`app.aware-wave.com` 11 次請求約 4 次 522（約 19.5 s）。Ray `a43a94100ecff8ff`、`a43a95e98a7c110d`。
+- 結論：**主機端查不到原因，症狀已不重現**。失敗請求的 SYN 沒有到達 ks-aw-01 的 TCP 堆疊；同一時段經 AMS edge 的流量 100% 成功。剩餘假設＝CF 亞洲 edge → 主機機房之間的上游路徑（含機房商 anti-DDoS 層）短暫丟包。**未證實**：缺 CF edge 端資料（API token 無 `zone.analytics.read`）。
+- 重現（10:09–10:17 UTC，筆電）：
+  - R1 `curl` 30×2（`/api/health`、`/login`）→ 60/60 = 200，max 1.37 s，colo SIN 53／HKG 7。
+  - R2 第二輪 30×2（兩站 `/login`）→ 60/60 = 200，max 1.32 s。合計失敗率 0/120。
+  - R3 繞過 CF 直連 origin：v4 30/30、v6 5/5 皆回 403（cf-only guard 預期行為），connect ≤ 0.32 s。
+- 主機端排除項（SSH 唯讀，各附指令）：
+  - E1 conntrack：`sysctl net.netfilter.nf_conntrack_count/max` = 569／262144；`dmesg` 無 `table full`／`SYN flooding`／OOM。
+  - E2 listen／SYN queue：`nstat` ListenOverflows 0、ListenDrops 13（開機 6 天累計）、ReqQFullDrop 0、SyncookiesSent 0；netdata `ip.tcp_syn_queue`／`ip.tcp_accept_queue` 09:48–10:02 全 0。
+  - E3 **SYN-ACK 重傳**：netdata `ip.tcphandshake` SynRetrans 在 09:53–09:59 = 0（09:52 有 2）。SYN 若到達而回程丟失，kernel 會重傳 SYN-ACK 並計入此欄 → 失敗的 SYN 未到達主機。
+  - E4 NIC：`ip -s link` errors/dropped/missed 0；softnet drop 欄全 0；`sar -n EDEV` 全 0。
+  - E5 防火牆：UFW 80/443 `ALLOW Anywhere`（無 CF allowlist）；`iptables-save` 無針對來源 IP 的 DROP；fail2ban 僅 sshd、banned 0；09:30 後 `UFW BLOCK` DPT 80/443 = 0 筆。
+  - E6 CF 範圍清單：`/etc/nginx/conf.d/cf-edge-geo.conf`（2026-09-27 產生）對 `cloudflare.com/ips-v4`＋`ips-v6` 22/22 齊全；且該 guard 缺漏會回 403，不是 522。
+  - E7 IPv6 origin：CF DNS API `type=AAAA` = 0 筆；三個主機名皆只有 A `145.239.195.47` proxied。
+  - E8 host nginx：32 workers × `worker_connections 768`；`error.log` 最後寫入 07:53，事發時段無任何錯誤；access.log 09:40–10:10 每分鐘 18–40 筆無缺口，時段內狀態碼 200×229／401×30／404×4／307×3／403×1／301×1，無 499／5xx。
+  - E9 本機端口：`127.0.0.1:8420`／`8421`／`3002`／`8083` 各 30 次全成功，max 0.27 s；主機打自己公網 IP:443 30/30，connect < 1 ms。
+  - E10 資源：load 9／32 核、CPU idle 80%、記憶體 13G／125G、PSI 0；`capacity-LATEST.md`、`site-watch-LATEST.md` 皆 PASS。
+  - E11 Uptime Kuma（同機，經 CF AMS edge）：今日 12,831 筆 heartbeat 全 status=1；09:50–10:00 `app.aware-wave.com` 10/10、max 360 ms；近 7 天無任何 aware-wave 監控的 522／timeout。
+  - E12 事發時段 docker events 空；journal 僅 10:00:05 Trigger runner 容器正常起落。
+  - E13 SYN 抓包 75 s（10:14:49–10:16:04，`tcpdump` 只取 dst 443 的 SYN）：80 筆、重複 SYN 0。
+- 未解釋但無害：conntrack 連線數 09:51:30–09:54 由約 350 升到約 700（上限 262144）。
+- 旁支發現：
+  - m1 今日 06:19 `unattended-upgrade` 升 `libssl3t64`／`openssl` 時重啟了 host nginx（master 起於 06:19:24）與 systemd-networkd，無通知。與本次時間不符，另案評估。
+  - m2 監控盲區：Uptime Kuma 與主機同機、只走 AMS edge；endpoint-alert 只打本機端口。亞洲 edge → origin 的路徑沒有任何探針，本次 522 全程無告警。
+  - m3 `CLOUDFLARE_API_TOKEN` 無 analytics 讀取權，GraphQL `httpRequestsAdaptiveGroups` 被拒；cloudflare MCP 連線失敗（`Insufficient scope: required account:read`）。
+- 建議（皆未執行，等操作者決定）：
+  - P1 操作者在 CF dashboard 用兩個 Ray ID／Analytics 篩 `edgeResponseStatus=522` 看 colo 與時間分佈；確認是否僅亞洲 colo。
+  - P2 token 加 `Zone → Analytics: Read`（憑證變更＝High，操作者自行在 dashboard 做）；rollback＝移除該權限。
+  - P3 補一個主機外、非歐洲出口的公網探針（m2）；設計另開任務。
+  - P4 復發時先跑 E13 抓包＋E3 查詢，當場分辨「SYN 沒到」與「SYN-ACK 回不去」。
+- 未改動任何主機設定；未重啟、未部署。主機上唯一寫入＝`/tmp/syn443-diag.txt`（抓包暫存，已刪）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl 30x2 --max-time 30 https://cognitive.aware-wave.com/api/health + https://app.aware-wave.com/login（60/60=200），第二輪 60/60=200 | exit=0 | ms=48000
+- REVIEW_WAIVED: NA -- 唯讀診斷，無程式或設定產物可審
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks | grep=(Cloudflare|CF|HTTP|error|status)[ -]?522|origin connection timed out | hits=0（確認無既有 522 記錄或 runbook；`HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 只涵蓋 502／OOM）
+- ORACLE_WAIVED: 無 source 檔改動
 ## 2026-10-01（續11）AO-RESUME parity 文件過期主張修正（reset --hard → ff-only）
 
 - 根因：`d4d0eb700`（2026-09-23）已把自動 parity 改成 `Invoke-SharedWorktreeParity`（fetch + `merge --ff-only`，不 stash／reset），但 `scripts/ao-resume.ps1:11` 參數註解與 `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md:257` 仍寫「hook → git-align → `reset --hard origin/main`」＋舊「hook-last.json 新鮮去重」；讀者會誤以為 AO-RESUME 仍會沖掉別 session 的修改。
