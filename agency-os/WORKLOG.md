@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-01（續11）AO-RESUME parity 文件過期主張修正（reset --hard → ff-only）
+
+- 根因：`d4d0eb700`（2026-09-23）已把自動 parity 改成 `Invoke-SharedWorktreeParity`（fetch + `merge --ff-only`，不 stash／reset），但 `scripts/ao-resume.ps1:11` 參數註解與 `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md:257` 仍寫「hook → git-align → `reset --hard origin/main`」＋舊「hook-last.json 新鮮去重」；讀者會誤以為 AO-RESUME 仍會沖掉別 session 的修改。
+- 修改：兩處改寫為現行行為；reset 路徑只標在顯式 `-FullMainlineAllowStash`／`-FullMainlineFeature`／`-FullMainlineAllowResetAheadOfOrigin`（實作 `scripts/ao-resume.ps1:413`）；去重改述為 seen-session ledger。
+- 避免再發生：行為改動 commit 的 BUGHUNT 要 grep 舊行為的字串（此例 `reset --hard origin/main`）而非只 grep 新 symbol。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell Parser::ParseFile scripts/ao-resume.ps1 + node scripts/verify-governance-pointers.mjs | exit=0 | ms=4000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回兩處；switch 名對照 `scripts/ao-resume.ps1:18,413`；`git-safe-ops.ps1:319` 函式存在）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude/commands | grep=reset --hard origin/main | hits=7（現行行為主張僅 ao-resume.ps1:11、REMOTE_WORKSTATION_STARTUP.md:257 兩處過期已修；:254/:258 與 git-align-main-aoresume-feature.ps1:6,31 描述手動／顯式 git-align，仍正確）
+- ORACLE_WAIVED: 註解＋文件兩行，無可執行邏輯變更
 ## 2026-10-01（續10）觸發索引放回 AGENTS.md（由 TOOL_TRIGGER_MAP 產生、閘守一致）
 
 - 起因：操作者「AGENTS.md 好像少了很多重要的東西…我不要一個腦只有一半」。方法由我決定（操作者：「你才是應該知道的角色」）。

@@ -8,7 +8,7 @@
     [switch]$AllowPendingStash,
     [switch]$SkipWorkflowsDeps,
     [switch]$SkipOpenTasksList,
-    # 與 GitHub 主線對齊：`fetch` → `checkout main` → `reset --hard origin/main` →（**預設不切功能分支**；可選切回功能分支並 `merge origin/main`）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.claude/commands/ao-resume.md` 預設傳此旗標（Cursor 於 2026-08-26 退場）。
+    # 與 GitHub 主線對齊：預設 = `Invoke-SharedWorktreeParity`（`fetch` + `merge --ff-only`；不 stash／reset／checkout／push，dirty 檔由 git 拒絕並回報）。`reset --hard` 的 git-align 只在顯式 `-FullMainlineAllowStash`／`-FullMainlineFeature`／`-FullMainlineAllowResetAheadOfOrigin` 時走（見下方 2026-09-23 註解）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.claude/commands/ao-resume.md` 預設傳此旗標（Cursor 於 2026-08-26 退場）。
     [switch]$FullMainlineParity,
     [string]$FullMainlineFeatureBranch = "",
     [switch]$FullMainlinePushFeature,
