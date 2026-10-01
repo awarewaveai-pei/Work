@@ -5,6 +5,7 @@
 //   - Every spawn gets an ISOLATED HOME (tmp dir) so rules that write to
 //     ~/.claude (mcp-health, audit-log, session-summary, log-error) never touch
 //     the real user profile during tests.
+//   - file-claim-guard claims go to <HOME>/file-claims unless a test pins CLAUDE_FILE_CLAIMS_DIR.
 //   - session_id is randomized per test unless pinned, so flag-file rules
 //     (git-log-injector, auto-repair-guard, file-path-router) start fresh.
 //   - TMPDIR is NOT isolated by default (flag helpers use os.tmpdir()); tests
@@ -45,6 +46,8 @@ export function runNode(scriptPath, payload, { args = [], cwd = REPO_ROOT, env =
       // Never let ambient session vars leak into SID derivation during tests.
       CLAUDE_CODE_SESSION_ID: '',
       CLAUDE_SESSION_ID: '',
+      // file-claim-guard claims are machine-wide (tmpdir); a test Edit on a real repo file would block real sessions.
+      CLAUDE_FILE_CLAIMS_DIR: path.join(HOME, 'file-claims'),
       ...env,
     },
   });

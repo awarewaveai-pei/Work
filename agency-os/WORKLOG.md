@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-01（續8）file-claim-guard：同一個有未 commit 修改的檔，只能有一個寫入 session
+- ROOT_CAUSE: commit 時的閘（`git-commit-scope-guard.js`／`git-shared-file-guard.js`）都在兩個 session 的 hunk 已混進同一檔之後才看；git 以整檔 stage，具名 `git add -- f` 照樣帶走對方的行（`0b4057f7b`，WORKLOG 2026-08-26）。hunk 級提交只有 WORKLOG/TASKS 有，其他檔零防護（`b03985e02` 87 檔混合 commit；開工時工作區 62 個無主 dirty 檔）。
+- FIX: PreToolUse/PostToolUse/PostToolUseFailure Write|Edit 規則 `rules/file-claim-guard.js` + `lib/file-claims.js`（Codex `apply_patch` 經 codex-adapter 轉 Edit，同一條）。認領 = `<tmpdir>/claude-file-claims/<sha1(realpath)>.json`，兩個時鐘：pendingAt（寫入中，15 分鐘）、touchedAt（寫過；工作區或 index ≠ HEAD 且 4h 內寫過才算數）。commit／還原即自動失效，無釋放步驟。判斷在每檔鎖內（排序取鎖、git 狀態鎖外先算、鎖外快照後才出現的認領視為有效、過期鎖 rename+token 驗證）；多檔呼叫全有或全無；失敗的寫入立即釋放；寫入落在已被接手的檔 → Post exit 2；持有者下次寫前偵測檔案被外部改過（lastBlob）→ WARN。WORKLOG/TASKS 豁免（私有 index）；無真 session_id 不認領。CLI `node mcp/claude-userlevel/hooks/lib/file-claims.js list|release <path>`（release 僅限操作者指示）。
+- 測試汙染修正：`tests/hooks/helpers.mjs` runNode 預設 `CLAUDE_FILE_CLAIMS_DIR=<HOME>/file-claims`——上線後首輪全套測試在真 tmpdir 留下 3 筆假認領，其中一筆認領真 `D:\Work\README.md`（會擋真作者 4h）；已清除，重跑全套後真 tmpdir 零新增。
+- LIVE_EVIDENCE:
+  - `~/.claude/hooks` 即 repo hooks，規則落地即生效。
+  - 跨 session：以並行 session `ff5eea08` 對 `0094_public_tables_rls_default_deny.sql` 的真實認領副本（隔離目錄）對真檔跑 runner PreToolUse → exit 2 BLOCK，對方檔案未動。
+  - 自動釋放：該 session 與 `da5025a0` 之後各自 commit（`4be28c130`、`e51992c52`），兩筆認領隨即轉 stale，無人手動釋放。
+  - 同 session subagent（haiku）Edit 本 session 已認領的 `tests/hooks/helpers.mjs` → 成功，持有者仍為本 session sid（subagent 共用 session_id，實測）。
+- BOUNDARY_HIT（同日真實發生）：session `77dff2bb` 以 scratch `patch_citations.py`（Write 到 scratchpad、Bash 執行）改了本 session 認領中的 `scripts/test-hooks.sh`，閘看不到（其 transcript 2026-10-01T08:13:43Z）。scratch 腳本 patch 是本 repo 的慣用寫法，Bash 寫檔不是邊角而是主要路徑之一；本 commit 只做到持有者下次寫入時 WARN（lastBlob）。
+- COMMIT_SCOPE: `scripts/test-hooks.sh`、`TOOL_TRIGGER_MAP.md` 都與他人修改並存，經 `git-partial-worktree-commit.py stage --keep-re file-claim-guard` 只取本 session 的 hunk（`77dff2bb` 的 governance-pointers 註冊、他人的 doc-sync 時間戳留在工作區）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh（含 tests/hooks/file-claim-guard.test.mjs 21 例：真並行 6 process 搶同檔、快照競爭、junction 別名、autocrlf、staged-only、TTL/pending/NaN、失敗釋放、鎖逾時與過期鎖、Codex apply_patch）| exit=0 | ms=51039
+- MUTATION（全部在暫存副本上跑，不碰線上 hooks）: 21 突變 20 紅，還原 21/21、sha1 一致。存活 M9（WORKLOG 豁免改大小寫敏感）＝等價突變：Windows `realpathSync.native` 已還原檔案實際大小寫。早先兩輪 M1–M10 曾在線上檔原地跑（約 5 分鐘，可能短暫削弱其他 session 的閘）；事後查真實 claims 目錄無 WORKLOG/TASKS 認領、無非 UUID sid，之後改副本。
+- REVIEW_ROUNDS: Codex 4 輪，artifact `591ab639`／`6efde759`／`94065f87`／`22e5895e`。
+  - r1 6 項：F1「hash-object 不套 autocrlf」實測駁回（positional path 會套 filter，`422c2b7…` = HEAD），以測試釘住；F2–F6 修。
+  - r2 6 項：F1/F2/F4/F5 修；F3（Bash）、F6（無 session_id）＝宣告邊界。修前寫不變量分析（AGENTS §4，同 reviewer 第二次回報）：判斷未序列化是 F1/F2 同根 → 每檔鎖；「寫過」只靠 Post 不可靠 → baseBlob。
+  - r3 4 項全修：git 移出鎖、過期鎖 ABA、失敗釋放、權限等待超窗 → 事後雙方告知（不可預防：無限 pending 會讓被擋的呼叫卡住檔案）。
+  - r4 3 項：F2（鎖外快照期間 A 寫完 → B 以過期乾淨狀態接手）修——認領時鐘晚於本次快照即視為有效，上限 1 分鐘防時鐘跳動卡死；F1（被其他規則擋下的 Codex 呼叫留 pending）接受，上限 15 分鐘且 git-log 閘只擋每 session 每日第一次；F3（Codex `status:"failed"` 被當成功）未驗證：引用的是 OpenAI API apply_patch 文件，不是 Codex CLI hook payload，不依此改共用 codex-adapter（會動 repeat-failure-guard 計數）。依操作者裁示 r4 為最後一輪。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/19m/0n（Codex 4 輪 6/6/4/3：修 14、駁回 1、宣告邊界 2、接受上限 1、待驗證 1；未另派 critic subagent，Codex 即本 commit 的 critic）
+- ORACLE_WAIVED: r4 F2 修正（movedSince，rules/file-claim-guard.js）在 `22e5895e` 之後才改；書面自審抓到並修掉遠未來時鐘卡死，突變 M20/M21 各被指名測試抓到，21 突變 20 紅（M9 等價），全套 329/329。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=sensitive-file-block|file-claim|CLAUDE_FILE_CLAIMS_DIR | hits=31（規則列舉處 TOOL_TRIGGER_MAP.md、hooks README.md/README.zh-TW.md 已補；manifest；codex-adapter.test 只以規則名做 Bash 斷言不受影響；`.claude/{commands,agents,skills}` 另外以根目錄搜尋 0 hits；git-shared-file-guard `SHARED` 唯一新消費者即本規則）
+- FOLLOW_UP: ① Bash 寫檔納入（PreToolUse Bash 記 dirty 檔 blob、PostToolUse 比對 → 改到他人認領檔即 exit 2 並替本 session 認領）；② 實測 Codex CLI apply_patch 失敗時 hook tool_response 的真實形狀，再決定是否擴 codex-adapter failureText。
+- [rollback] manifest 刪三處 `"file-claim-guard"` 即停用；或 `git revert` 本 commit。認領在 tmpdir，刪 `claude-file-claims/` 無副作用。
 ## 2026-10-01（續7）P4 report API 修正 + 跨專案來源搜尋落地 + /codex-review 依檔數分流
 - 起因（審 Codex `53dc77535`）：C1 `POST /projects/{id}/reports` 收呼叫者自填 `run_results`，renderer 直接信其 gate 狀態，可偽造 PASS 後核准；M1 核准改指標無 CAS，並發互蓋；M2 已核准可重核；C2（oracle 第3輪＋自查）CAS content-addressed，相同位元組＝同 reference：stale loser 清理、以及「重複駁回」這種不改位元組的決定，會刪掉 live blob → GET 500（`53dc77535` 原有 bug，紅燈測試證實）。
 - [已修改]
