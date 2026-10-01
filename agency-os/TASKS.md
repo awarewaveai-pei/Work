@@ -699,6 +699,12 @@
 - [x] **【2026-09-12 開出｜低優先】`sg-deploy.sh` next-admin 兩個 smoke 探針硬編 host port，同款漂移風險已知但未動** → ✅ 2026-09-26 續49（雲端 T25）：`docker port lobster-next-admin 3000/tcp`，fallback 3002。
   - `🟡 未開始` · `2026-09-12 開出` · `不卡誰，目前 prod .env 未設 override 故未觸發`
   - **一句話**：修 node-api 健康探針打錯 nginx 層那次（見 WORKLOG 2026-09-12），critic 覆審抓到 `sg-deploy.sh:311-312` 的 `next-admin /login`／`/api/ops/summary` 兩個探針一樣硬編 `127.0.0.1:3002`，而 `docker-compose.yml:437` 該埠其實是 `${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000`——跟當時 node-api 那個已修掉的 bug 同一種脆弱（host port 可被 env var 覆寫，硬編值只是「今天 prod .env 剛好沒設」才沒事）。node-api 已改成 `docker port lobster-node-api 3001/tcp` runtime 解析；next-admin 這兩行維持原樣未動，因為不是本次事故的觸發點，屬於刻意劃定的範圍外項目，非遺漏。修法方向：套同一個 `docker port lobster-next-admin 3000/tcp` 解析。細節見 WORKLOG 2026-09-12。
+- [ ] **【2026-10-01 開出｜Cognitive OS｜低優先】渲染後的字級／行寬檢查（U22）還不是任何閘：`render-mocks.cjs` exit 4 只在手動跑時擋**
+  - `🟡 未開始` · `2026-10-01 開出` · `不卡誰`
+  - **一句話**：靜態 `check-mocks.py` 看不到層疊（更具體的覆蓋、繼承到 12px），渲染檢查看得到，但 `build-artifact.py:37` 與 `deploy/web_test.sh:22` 只跑靜態檢查；接上需在建置環境裝 Playwright（Codex 第 6 輪 `agency-os/reports/oracle/2026-10-01-partialreview-3e4ea501.md` F1）。正式站網頁本身（`apps/cognitive-web`）也未做渲染量測。細節 WORKLOG 2026-10-01 字級 U22 那筆。
+- [ ] **【2026-10-01 開出｜Cognitive OS｜低優先】結果頁快照 fixture 過期：`check-mocks-selftest.py` 的 page 突變 2/2 漏抓**
+  - `🟡 未開始` · `2026-10-01 開出` · `不卡部署（deploy/web_test.sh 與 CI 只跑 check-mocks.py）`
+  - **一句話**：`docs/mockups/fixtures/result-page-iceberg-rendered.html` 最後更新 e01fc7d49（09-28），mock 在 73b9ac8f8（09-29）改了 ⑥ 怎麼讀與 ⑦⑧⑨ 按鈕，fixture 沒重產 → `check-mocks.py --page result <fixture> --parity` 13 findings、自我測試 page 段永遠紅。重產：`scripts/dev/result_shots.cjs` 跑真頁存 HTML；細節 WORKLOG 2026-10-01 字級 U22 那筆。
 - [ ] **【2026-09-28 開出｜Cognitive OS｜低優先】run_recipe_async 終態 FAILED flake：`test_async_run_reaches_a_terminal_state_via_the_existing_status_endpoint` 高負載下 async run 以 FAILED 收尾**
   - `🟡 未開始` · `2026-09-28 開出` · `不卡誰`
   - **一句話**：全套 `pytest tests/unit` 14521 passed／1 failed，只有此測試；單獨重跑 HEAD 3/3、HEAD+diff 3/3 皆綠，耗時 39 s→176 s 隨負載上升。與 2026-09-28 續2 修過的 15 s 逾時 flake 不同型（這次是終態 FAILED，不是逾時）。

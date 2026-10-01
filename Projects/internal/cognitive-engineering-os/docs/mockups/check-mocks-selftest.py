@@ -17,7 +17,7 @@ FILES = mk.FILES
 CSS = mk.DESIGN_SYSTEM.name
 PAGE_MARK = "  /* == page-specific == */\n"
 ALL = "*"            # every page
-ALL_CSS = "*+css"    # every page AND the design-system.css copy (token rules must be proven without the "stylesheet differs" rule)
+ALL_CSS = "*+css"    # every page AND the design-system.css copy AND the web app's copy = a synced stylesheet edit (token rules must be proven without the "stylesheet differs" rule)
 PAGE_FIXTURE = HERE / "fixtures" / "result-page-iceberg-rendered.html"
 
 # (label, expected "tag" or "tag|message text", target file | ALL | ALL_CSS, kind, old, new)
@@ -48,6 +48,23 @@ CASES = [
     ("inline style attribute", "theme|inline style", "iceberg-result-mock.html", "str", '<h3 class="mt6 mb8">', '<h3 class="mt6 mb8" style="color:#ff0000">'),
     ("page-specific css present", "theme|page-specific CSS", "workflow-result-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .foo{margin:0}\n"),
     ("stylesheet edited in the mocks but not in design-system.css", "theme|stylesheet differs", ALL, "str", "  .mt8{margin-top:8px}\n", "  .mt8{margin-top:9px}\n"),
+    ("a font-size literal comes back", "U22|a size is one of the type tokens", ALL_CSS, "str", ".crumbs{font-size:var(--fs-tag);", ".crumbs{font-size:12.5px;"),
+    ("reading text set in the label size", "U22|never under 14", ALL_CSS, "str", ".how{font-size:var(--fs-small);", ".how{font-size:var(--fs-tag);"),
+    ("type token drifts", "U22|type token --fs-body", ALL_CSS, "str", "--fs-body:16px;", "--fs-body:15px;"),
+    ("prose loses the line width", "U22|prose without the line width", ALL_CSS, "str", "p,.lead,.how,", "p,.lead,"),
+    ("the mock note loses the line width", "U22|prose without the line width", ALL_CSS, "str", ".mocknote,.banner{max-width", ".banner{max-width"),
+    ("a type token that does not exist", "U22|a size is one of the type tokens", ALL_CSS, "str", ".crumbs{font-size:var(--fs-tag);", ".crumbs{font-size:var(--fs-ghost);"),
+    ("the label size through the font shorthand", "U22|the font shorthand is only body's", ALL_CSS, "str", ".read{font-size:var(--fs-small);", ".read{font:var(--fs-tag)/1.5 system-ui;"),
+    ("a size literal behind a weight in the font shorthand", "U22|the font shorthand is only body's", ALL_CSS, "str", ".read{font-size:var(--fs-small);", ".read{font:600 13px/1.5 system-ui;"),
+    ("a type token redefined on a component", "U22|type tokens live in the light :root block only", ALL_CSS, "str", ".how{font-size:var(--fs-small);", ".how{--fs-small:var(--fs-tag);font-size:var(--fs-small);"),
+    ("a type token redefined for phones", "U22|type tokens live in the light :root block only", ALL_CSS, "str", "  *{box-sizing:border-box}\n", "  @media (max-width:760px){:root{--fs-body:13px}}\n  *{box-sizing:border-box}\n"),
+    ("the width token used as a font size", "U22|a size is one of the type tokens", ALL_CSS, "str", ".read{font-size:var(--fs-small);", ".read{font-size:var(--measure);"),
+    ("a size literal inside @keyframes", "U22|@keyframes font-size:13px", ALL_CSS, "str", "  *{box-sizing:border-box}\n", "  @keyframes tiny{from{font-size:13px}to{opacity:1}}\n  *{box-sizing:border-box}\n"),
+    ("an upper-case size property", "U22|.read font-size:13px", ALL_CSS, "str", ".read{font-size:var(--fs-small);", ".read{FONT-SIZE:13px;"),
+    ("a size literal inside an upper-case @KEYFRAMES", "U22|@keyframes font-size:13px", ALL_CSS, "str", "  *{box-sizing:border-box}\n", "  @KEYFRAMES tiny{from{FONT-SIZE:13px}}\n  *{box-sizing:border-box}\n"),
+    ("a nested rule hides a size literal", "css|nested rule inside a rule", ALL_CSS, "str", "  *{box-sizing:border-box}\n", "  .future{color:var(--ink);& .body{font-size:13px}}\n  *{box-sizing:border-box}\n"),
+    ("a system font in the shorthand", "U22|the font shorthand is only body's", ALL_CSS, "str", ".read{font-size:var(--fs-small);", ".read{font:caption;"),
+    ("a size literal on a :root rule", "U22|a size is one of the type tokens", ALL_CSS, "str", "  *{box-sizing:border-box}\n", "  :root[lang]{font-size:13px}\n  *{box-sizing:border-box}\n"),
     ("unclosed rect inside svg", "html", "iceberg-result-mock.html", "str", '<rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55"/>', '<rect x="0" y="150" width="1070" height="425" class="water" opacity="0.55">'),
     ("self-closing non-void html", "html", "workflow-result-mock.html", "str", '<span class="tag">已完成</span>', '<span class="tag"/>已完成'),
     ("crlf", "eol", "workflow-result-mock.html", "bytes", b"\n", b"\r\n"),
@@ -159,7 +176,7 @@ CASES = [
     ("the page-specific marker removed", "shared|shared end / page-specific markers missing", "iceberg-result-mock.html", "str", PAGE_MARK, ""),
     ("CSS between the shared end and the page marker", "shared|CSS between", "iceberg-result-mock.html", "str", "  /* == shared design system: end == */\n", "  /* == shared design system: end == */\n  .x{color:var(--ink)}\n"),
     ("the folder's design-system.css missing", "theme|design-system.css missing", "design-system.css", "delete", "", ""),
-    ("the font stack drifts", "U19|font stack drifted", ALL_CSS, "str", "font:15px/1.65 system-ui", "font:16px/1.65 system-ui"),
+    ("the font stack drifts", "U19|font stack drifted", ALL_CSS, "str", "font:var(--fs-body)/1.65 system-ui", "font:var(--fs-small)/1.65 system-ui"),
     ("page CSS that does not parse", "css|", "workflow-lesson-mock.html", "str", PAGE_MARK, PAGE_MARK + "  .station{color:var(--ink)\n"),
     ("a partial marked twice", "partials|marked twice", "iceberg-lesson-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->\n  <!-- == partial: domain-chips: end == -->\n'),
     ("a fragment of a partial that does not exist", "partials|fragment nope has no", "iceberg-result-mock.html", "str", '<main class="wrap">\n', '<main class="wrap">\n  <!-- == partial: nope: start (verbatim from partials/nope.html via sync-design-system.py; check-mocks.py enforces) == -->\n  <!-- == partial: nope: end == -->\n'),
@@ -246,6 +263,9 @@ NO_CASE_YET = [
 
 # valid variants the checker must accept: (label, target, kind, old, new), same mutation format as CASES, run must exit 0
 ACCEPT = [
+    # 2026-10-01 (Codex round 3): var( --fs-tag ) is the same token with spaces; it was read as a literal
+    ("a type token written with spaces inside var()", ALL_CSS, "str", ".crumbs{font-size:var(--fs-tag);", ".crumbs{font-size:var( --fs-tag );"),
+    ("the line width written with spaces inside var()", ALL_CSS, "str", ".mocknote,.banner{max-width:var(--measure)}", ".mocknote,.banner{max-width:var( --measure )}"),
     # 2026-09-25: mockkit._yaml's duplicate-key loader crashed on `<<:` (same bug as the golden runner, 40366864a);
     # explicit name_zh/blurb_zh overriding the merged ones is merge precedence, not a duplicate
     ("a registry uses a YAML merge key", "spec:recipes/registry/recipe-display-metadata.yaml", "re",
@@ -285,7 +305,7 @@ def mutate(tmp, label, target, kind, old, new):
         if spec.exists(): shutil.rmtree(spec)
         for sub in ("methods", "recipes"): shutil.copytree(mk.SPEC / sub, spec / sub)
         target = "spec/" + target[len("spec:"):]
-    targets = FILES + [CSS] if target == ALL_CSS else FILES if target == ALL else [target]
+    targets = FILES + [CSS, "web-design-system.css"] if target == ALL_CSS else FILES if target == ALL else [target]
     for f in targets:
         p = tmp / f
         if kind == "delete":

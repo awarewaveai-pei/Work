@@ -15,12 +15,20 @@ from mockkit import HOME, RESULT, LESSON, FILES
 LINKS = {"home-mock.html": RESULT + LESSON,
          "iceberg-result-mock.html": ["iceberg-lesson-mock.html"], "iceberg-lesson-mock.html": ["iceberg-result-mock.html"],
          "workflow-result-mock.html": ["workflow-lesson-mock.html"], "workflow-lesson-mock.html": ["workflow-result-mock.html"]}
-# U19: HCI palette (hci30/app/public/index.html:15-19) + the custom dark set
-HCI_LIGHT = {"--bg": "#f6f2e9", "--card": "#fffdf8", "--ink": "#232019", "--muted": "#7a7261", "--line": "#e3dbc8",
+# U19: HCI palette (hci30/app/public/index.html:15-19) + the custom dark set. --muted departs from HCI's #7a7261
+# (operator 2026-10-01): that grey is 4.0–4.3:1 on --bg/--soft/--tag, under WCAG AA 4.5; #6f6757 is >= 4.7 on all four
+HCI_LIGHT = {"--bg": "#f6f2e9", "--card": "#fffdf8", "--ink": "#232019", "--muted": "#6f6757", "--line": "#e3dbc8",
              "--accent": "#0e5b50", "--ok": "#1f6b47", "--warn": "#a3611c", "--bad": "#a13328", "--tag": "#e2eeea", "--soft": "#f3efe4"}
 HCI_DARK = {"--bg": "#1c2b27", "--card": "#243530", "--ink": "#f3efe4", "--muted": "#a9beb6", "--line": "#3a4b45",
             "--accent": "#8fc7b0", "--tag": "#22403a", "--soft": "#2a3b36"}
-FONT = 'font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif'
+FONT = 'font:var(--fs-body)/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif'
+# U22 type scale (operator 2026-10-01): six sizes, all tokens; text you read is never under 14 (--fs-tag is for labels
+# you glance at); a prose line stops at 80 characters of its own size on a desktop, tables and pictures keep the column
+TYPE_TOKENS = {"--fs-h1": "28px", "--fs-h2": "20px", "--fs-h3": "18px", "--fs-body": "16px", "--fs-small": "14px", "--fs-tag": "12px", "--measure": "80em"}
+TAG_OK = {".side .brand small", ".navi small", ".navi", ".btn small", ".crumbs", ".tags span", "cite", "th", ".conf", "pre", ".layer .meta",
+          ".lever", ".kpi .when", ".mcard .k", ".mcard .tag", ".filled .lab", ".fam small", ".tool b small", "details.dir summary small", ".tab small"}
+PROSE = {"p", ".lead", ".how", ".sub", ".read", ".finding", ".station .why", ".mocknote", ".banner"}
+FS_VAR = re.compile(r"var\(\s*(--fs-[a-z0-9]+)\s*\)")
 # U20: one column by default; only "several methods side by side" may go 2-up, and only by container width
 CAPPED_2COL = "repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr))"
 TWO_COL_ALLOWED = {".mcards"}                                  # method / station / line cards, the only 2-up grid
@@ -352,8 +360,32 @@ class Checker:
                 if f in self.raw and piece not in self.raw[f]: self.bad(f, "continuity", f"iceberg drawing differs from the shared shape: {piece[:48]}…")
 
     # -- css helpers
+    def check_type(self, f, prelude, sels, k, v):
+        """U22: a size is a defined type token, and the label size --fs-tag only sits on TAG_OK selectors. Runs on :root
+        rules too: a literal there resizes every rem. The font shorthand is body's alone (FONT) or `inherit`: parsing it
+        (weights before the size, system fonts like `caption`, spaces in var()) let sizes through three times (Codex
+        2026-10-01), so the shorthand never sets a size anywhere else; font-size does."""
+        if k == "font":
+            if v != "inherit" and not (sels == ["body"] and f"font:{v}" == FONT):
+                self.bad(f, "U22", f"{prelude} font:{v}; the font shorthand is only body's ({FONT[:30]}…) or inherit: set the size with font-size and a type token")
+            return
+        if k != "font-size": return
+        m = FS_VAR.fullmatch(v)   # FS_VAR only matches --fs-*: --measure (also in TYPE_TOKENS) is a width, never a size
+        if v != "inherit" and (m is None or m.group(1) not in TYPE_TOKENS):
+            self.bad(f, "U22", f"{prelude} {k}:{v}; a size is one of the type tokens ({', '.join(t for t in TYPE_TOKENS if t.startswith('--fs-'))})")
+        elif m and m.group(1) == "--fs-tag" and not set(sels) <= TAG_OK:
+            self.bad(f, "U22", f"{prelude} uses --fs-tag (12px): text you read is never under 14; --fs-tag is only for {sorted(TAG_OK)}")
+
     def check_rule(self, f, where, media, prelude, body):
         sels = split_selectors(prelude)
+        if "{" in body:   # native CSS nesting: parse_css does not descend into it, so no rule here would see its declarations
+            self.bad(f, "css", f"{prelude}: nested rule inside a rule; write it as its own top-level rule")
+        for k, v in decls(body):
+            k = k.lower()   # property names are case-insensitive (FONT-SIZE is font-size)
+            self.check_type(f, prelude, sels, k, v)
+            # a type token has one definition (the light :root): `.how{--fs-small:var(--fs-tag)}` would shrink read text unseen
+            if k in TYPE_TOKENS and (media is not None or prelude != ":root"):
+                self.bad(f, "U22", f"{prelude} redefines {k}; the type tokens live in the light :root block only")
         if any(s.startswith(":root") for s in sels):
             if where == "page": self.bad(f, "shared", f"page CSS must not define tokens ({prelude})")
             return
@@ -391,6 +423,11 @@ class Checker:
         lt = tok(light[0][2], "light")
         for k, v in HCI_LIGHT.items():
             if lt.get(k) != v: self.bad(f, "U19", f"light token {k} = {lt.get(k)} (expected {v})")
+        for k, v in TYPE_TOKENS.items():
+            if lt.get(k) != v: self.bad(f, "U22", f"type token {k} = {lt.get(k)} (expected {v})")
+        measured = {sel for m, p, b in rules if m is None for sel in split_selectors(p)
+                    if any(k == "max-width" and re.fullmatch(r"var\(\s*--measure\s*\)", v) for k, v in decls(b))}
+        if PROSE - measured: self.bad(f, "U22", f"prose without the line width (max-width:var(--measure)): {sorted(PROSE - measured)}")
         if not dark_media or not dark_expl: return
         dm, de = tok(dark_media[0][2], "dark(media)"), tok(dark_expl[0][2], "dark(explicit)")
         for label, d in (("dark(media)", dm), ("dark(explicit)", de)):
@@ -451,6 +488,15 @@ class Checker:
         except CssError as e:
             self.bad(f, "css", str(e)); return
         self.check_tokens(f, shared_rules)
+        for css in (shared_css, page_css):   # parse_css drops @keyframes bodies whole; a size animated there is still a size
+            css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+            for km in re.finditer(r"@(?:-webkit-)?keyframes\b[^{]*\{", css, re.I):
+                try:
+                    body = css[km.end():_block_end(css, km.end() - 1) - 1]
+                except CssError:
+                    continue   # parse_css above already reported the unbalanced block
+                for fm in re.finditer(r"(?<![\w-])(font|font-size)\s*:\s*([^;}]+)", body, re.I):
+                    self.check_type(f, "@keyframes", ["@keyframes"], fm.group(1).lower(), fm.group(2).strip())
         shared_sels = {sel for _, prelude, _ in shared_rules for sel in split_selectors(prelude) if not sel.startswith(":root")}
         for m, prelude, body in shared_rules: self.check_rule(f, "shared", m, prelude, body)
         for m, prelude, body in page_rules:
@@ -981,6 +1027,10 @@ def main(argv):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+    if argv == ["--type-sets"]:   # render-mocks.cjs measures the rendered pages against the same sets (U22)
+        import json
+        print(json.dumps({"tag_ok": sorted(TAG_OK), "prose": sorted(PROSE), "min_read_px": int(TYPE_TOKENS["--fs-small"][:-2]),
+                          "measure_em": int(TYPE_TOKENS["--measure"][:-2])}, ensure_ascii=False)); return 0
     parity = "--parity" in argv
     argv = [a for a in argv if a != "--parity"]
     mock_path = None
