@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-01（續4）模型路由提醒機制＋AGENTS.md／CLAUDE.md 第四次瘦身
+
+- 根因：計畫已寫模型分工（`RESEARCH_LINES_MASTER_PLAN.md` §12.1 規則 9），但沒有任何機制在該換模型時通知操作者；session 不能改自己的模型，只能操作者在選單切 → 規則形同不存在。操作者原話：「所有的計畫都是 claude 做的，我根本不知道什麼時候可以用哪個模型」。
+- 改動：
+  - C1 `agency-os/AGENTS.md` §5：新增模型路由表（想→Fable 5.1／做→Opus 5.5，卡寫死則 Sonnet 5.5 或 Codex／填→Haiku 4.5）；不匹配時回覆首行 `⚠ 建議切 <模型>`。
+  - C2 `.claude/commands/ao-resume.md` §8：每個下一步行末附 `建議模型`，第一項與目前模型不同時加 `⚠ 先在模型選單切`。
+  - C3 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md`：§12.1 規則 9 `Sonnet 5`→`Sonnet 5.5`＋指向 AGENTS §5；規則 1 進度板「下一步」行末必附建議模型；§0 下一步行補上（整站設計討論＋產卡 = Fable 5.1，照卡執行 = Sonnet 5.5／Codex）。只 commit 自己的 3 個 hunk（行 16／345／353）；行 716 是另一 session 未 commit 的改動，未帶入。
+  - C4 `agency-os/AGENTS.md`、`CLAUDE.md` 重寫：去事故日期與背景敘事、§9 改條列、兩檔重複（Git 分支／AO 觸發語／單機現況）收斂到 AGENTS.md，CLAUDE.md 留一行指標。§0–§9 編號與 `## Related Documents (Auto-Synced)` 標記不動（他檔以編號引用、`doc-sync-automation.ps1:98` 以標記定位）。
+  - C5 舊版逐字存 `agency-os/docs/operations/AGENTS_APPENDIX.md`「AGENTS.md 第四次瘦身前全文存檔（2026-10-01）」＋「CLAUDE.md 第四次瘦身前全文存檔」。
+- 結果：AGENTS.md 21984→20766 bytes（-6%，已含新增路由表約 +0.9KB）；CLAUDE.md 4237→3615 bytes（-15%）。前三次已瘦過，剩下幾乎全是規則本體。
+- 驗證：
+  - HEAD 對 worktree 逐一比對 backtick code span：AGENTS.md 184 個零遺失（新增 2 個）；CLAUDE.md 少 3 個，皆為刻意：`LAPTOP-R7I86OR5`（改指 AGENTS §0）、`agency-os/.agency-state/ao-resume-hook-last.json`（AGENTS §8 已有）、`agency-os/TASKS.md`（2026-08-15 已結案的桌機憑證善後句，移入存檔）。
+  - 新增文字未引入任何新路徑；`node lobster-factory/scripts/validate-doc-integrity.mjs` PASSED；`scripts/doc-sync-automation.ps1 -AutoDetect` exit 0。
+- 避免再發生：路由表每輪注入 prompt；AO-RESUME 開工報告 §8 直接印建議模型；計畫進度板規則 1 要求每張卡 commit 同步更新。
+- 未做（操作者取捨）：再砍約 3KB 需把 §4 Codex 段、§6 Auto-Repair 段改成按需載入（APPENDIX＋一行指標），代價是非每輪可見。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/validate-doc-integrity.mjs | exit=0 | ms=4000
+- REVIEW_WAIVED: DOC_ONLY -- 只改 .md 治理文件與指令說明檔；以 HEAD↔worktree code-span 機械比對代替 critic
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude/commands,.claude/agents,.claude/skills,mcp,runbooks,Projects/internal/cognitive-engineering-os/docs | grep=Context 與 agent 用量|換機／雙 IDE|Sonnet 5／Codex|## AO 生命週期 | hits=2
+  - 2 筆為 `AO_RESUME_BEGINNER_MAP.md:59`、`TOOL_TRIGGER_MAP.md:153` 自己的同名小節標題，不是對 CLAUDE.md 舊段的引用，免改。
+
 ## 2026-10-01（續3）GPT 未完成清單查證＋4 migration 套正式庫＋HSTS 上線＋Codex parity 誤報根治；新發現 3 張無 RLS 表（0094 待 go）
 - [操作者] 「去查清楚」→ Codex /hooks「以前跑過已成功」、HF_TOKEN／staging WP 密碼「不用換」、部署＋HSTS「go」、4 migration「go」。
 - [VBC] C1 Cognitive OS 310 筆＋DB 層額度已含於 `73b9ac8f8`，2026-09-29 續8 已上線（GPT／TASKS「未上線」過期）；剩登入後驗證（需操作者建正式站測試身分）與研究線新 commit（他 session 進行中，不代部署）。C2 Secure cookie `b03985e02` 已於 2026-09-30 11:05Z 自動部署（`.deployed-commit`；middleware.js 含 `{secure:!0}`）。C3 MainWP 部署已於 09-26 完成，剩真建站 E2E。
