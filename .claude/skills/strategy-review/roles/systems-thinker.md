@@ -64,7 +64,7 @@ Beyond 30-year stability, certain decisions touch CLAUDE.md's "Risk-Tiered Confi
 | **Data system-of-record (SoR)** | Supabase, Postgres, n8n, WordPress as canonical, dual-write | Does this fork the SoR? Create dual-write race? Migration path documented for the *next* SoR shift? |
 | **Production deploy / destructive migration** | drop, truncate, schema breaking change, force push, cross-region failover | Is this reversible without data loss? What's the abort path mid-execution? |
 
-When ≥1 trigger is hit, treat the boundary risk as a **first-order finding** (not buried in `must_investigate`). Cross-ref: `CLAUDE.md` §"Risk-Tiered Confirmation"; `AGENTS.md` §"執行安全".
+When ≥1 trigger is hit, treat the boundary risk as a **first-order finding** (not buried in `must_investigate`). Cross-ref: `CLAUDE.md` §"Risk-Tiered Confirmation"; `AGENTS.md` §6 (執行安全).
 
 ## What you are NOT
 

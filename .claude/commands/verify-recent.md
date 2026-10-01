@@ -75,7 +75,7 @@ If critic reports 🔴 Critical or 🟠 Major → STOP, present findings, do NOT
 
 ## Step 2.5 — BUGHUNT (skip if --trivial)
 
-Execute per **AGENTS.md R0 §抓蟲** (single SSOT for scope, grep patterns, required roots). Then manually append one of the following to today's `agency-os/WORKLOG.md` before Step 3:
+Execute per **AGENTS.md §1 抓蟲** (single SSOT for scope, grep patterns, required roots). Then manually append one of the following to today's `agency-os/WORKLOG.md` before Step 3:
 
 ```
 - BUGHUNT_DONE: scope=<agency-os,scripts,...> | grep=<pattern> | hits=<N>
@@ -150,4 +150,4 @@ verify-recent: <mode>
 - Memory rules are soft. Hook + slash command + commit gate is the harness-enforced rule.
 - SSOT: `mcp/claude-userlevel/hooks/lib/shared.js` + `hooks/rules/{code-change-tracker,verify-gate-stop,verify-gate-commit}.js` + `.claude/commands/verify-recent.md` + `scripts/verify-recent-ack.ps1`.
 - Audit trail for failures: `~/.claude/verify-gate-failures.log` (one line per hook exception).
-- BUGHUNT spec lives in AGENTS.md R0 §抓蟲; required root list lives in `scripts/verify-closeout-completeness.ps1` `$bhRequiredRoots`. verify-recent only executes and records — no duplicate definitions here.
+- BUGHUNT spec lives in AGENTS.md §1 抓蟲; required root list lives in `scripts/verify-closeout-completeness.ps1` `$bhRequiredRoots`. verify-recent only executes and records — no duplicate definitions here.

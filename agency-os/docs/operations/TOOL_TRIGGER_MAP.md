@@ -355,7 +355,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 ## Runbooks（正本 = 上方 §問題症狀 → Runbook 路由表，2026-09-04）
 
-> 原本這裡的 12 列「Runbook | 查閱時機 | 觸發」表與 AGENTS.md 的 13 列「症狀 → Runbook」表是同一件事的兩份，2026-09-04 合併：症狀表為正本（多 `KS-AW-01-HOST-SWITCH-RUNBOOK.md` 一列），舊表逐字保留在 `AGENTS_APPENDIX.md` §舊 Runbooks 觸發表 供對照。
+> 原本這裡的 12 列「Runbook | 查閱時機 | 觸發」表與 AGENTS.md 的 13 列「症狀 → Runbook」表是同一件事的兩份，2026-09-04 合併：症狀表為正本（多 `KS-AW-01-HOST-SWITCH-RUNBOOK.md` 一列），舊表在 git 歷史（`git show cac6d8a0d:agency-os/docs/operations/AGENTS_APPENDIX.md`）。
 
 ## Hooks（runner v2 — 單一 runner + 純規則模組）
 
@@ -437,5 +437,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-09-23 19:16:21 UTC_
+_Last synced: 2026-10-01 08:17:19 UTC_
 

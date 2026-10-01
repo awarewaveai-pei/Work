@@ -7,7 +7,7 @@
 //   rollback  → best-effort undo (may be a documented no-op for idempotent
 //               actions like restart)
 //
-// Red lines (AGENTS.md §Auto-Repair): a remediation must never touch secrets /
+// Red lines (AGENTS.md §6 Auto-Repair): a remediation must never touch secrets /
 // auth / payment / DB migrations, and must never run without its precheck.
 // LLMs never execute these — they only recommend; execution is this catalog
 // or a human. This file is the B-orchestrator action-layer contract.

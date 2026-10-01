@@ -431,6 +431,38 @@ function assertCanonical() {
 }
 
 /** Long command lines duplicated across many files (潔癖提示) */
+/**
+ * Section pointers into the agent rule set (AGENTS.md -> appendix; hooks/scripts/commands -> AGENTS.md).
+ * The rule and its tests live at <workRoot>/scripts/verify-governance-pointers.mjs; it is run here so the
+ * health gate and `npm run validate:docs` see it.
+ */
+function assertGovernancePointers() {
+  const gate = path.join(workRoot, "scripts", "verify-governance-pointers.mjs");
+  if (!fs.existsSync(gate)) {
+    // Absent gate + absent rule files = a checkout that carries neither (lobster-factory on its own).
+    // Absent gate while either rule file exists = the check was deleted or renamed: fail, never skip.
+    const ruleFiles = [["agency-os", "AGENTS.md"], ["agency-os", "docs", "operations", "AGENTS_APPENDIX.md"]];
+    if (ruleFiles.some((parts) => fs.existsSync(path.join(workRoot, ...parts)))) {
+      broken.push({ type: "governance_pointer", detail: `gate script missing: ${gate} (the agent rule files exist, so their section pointers must be checked)` });
+    }
+    return;
+  }
+  scannedRoots.push("governance section pointers");
+  try {
+    const out = execFileSync(process.execPath, [gate, `--root=${workRoot}`], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    // Exit 0 is not enough: a truncated or emptied gate script also exits 0. Require its counted pass line.
+    const pass = /Governance pointers PASSED \((\d+) files scanned, (\d+) headings, (\d+) pointers resolved\)/.exec(out);
+    if (!pass || !(Number(pass[1]) > 0 && Number(pass[2]) > 0 && Number(pass[3]) > 0)) {
+      broken.push({ type: "governance_pointer", detail: `gate exited 0 without proving it verified anything: ${JSON.stringify(String(out).slice(0, 120))}` });
+    }
+  } catch (e) {
+    const lines = String((e && e.stderr) || (e && e.message) || e).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const issues = lines.slice(1);
+    if (issues.length === 0) issues.push(lines[0] || "gate failed without output");
+    for (const l of issues) broken.push({ type: "governance_pointer", detail: l });
+  }
+}
+
 function findDuplicateCommandLines() {
   const commandLike = /^\s*(node\s+|powershell\s+)/i;
   const minLen = 72;
@@ -490,6 +522,7 @@ if (commitRev) {
 
 assertCanonical();
 assertNonEmptyMarkdownTrees();
+assertGovernancePointers();
 
 for (const root of LINK_SCAN_ROOTS) {
   if (!fs.existsSync(root.dir)) continue;

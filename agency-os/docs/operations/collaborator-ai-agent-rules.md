@@ -188,7 +188,7 @@
 
 1. 協作代理整日／整輪 **只寫入** `closeout-inbox.md`（**`---` 之後、新區塊置頂**，**最新日期在上**）。  
 2. 收關前由使用者或代理把各 branch **合併**到當日工作線。  
-3. **收關 Claude Code**：使用者對 Claude Code 打 **`AO-CLOSE`**；Claude Code 讀 inbox + `git log` +（必要時）`scripts/print-today-closeout-recap.ps1`，依 `AGENTS.md` §40 **第 1 步**寫定 WORKLOG／memory／daily，必要時寫 `AUTO_TASK_DONE`，再執行 **第 2 步** `ao-close.ps1`（長訊息用 `-CommitMessageFile`）。  
+3. **收關 Claude Code**：使用者對 Claude Code 打 **`AO-CLOSE`**；Claude Code 讀 inbox + `git log` +（必要時）`scripts/print-today-closeout-recap.ps1`，依 `AGENTS.md` §8（AO-CLOSE）**第 1 步**寫定 WORKLOG／memory／daily，必要時寫 `AUTO_TASK_DONE`，再執行 **第 2 步** `ao-close.ps1`（長訊息用 `-CommitMessageFile`）。  
 4. **Push 成功後**收關者應**清空或刪除** `closeout-inbox.md`，避免隔天誤用。
 
 更細收工步驟：**[end-of-day-checklist.md](end-of-day-checklist.md)** §0.5、§1a。

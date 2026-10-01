@@ -135,7 +135,7 @@ const HIGH_RISK_PATTERNS = [
       }
       return false;
     },
-    label: 'remote deploy/restart on production VPS — deploy flow first: /check-drift → /verify → tsc (if .ts changed) → operator go-ahead (AGENTS.md §部署流程觸發)',
+    label: 'remote deploy/restart on production VPS — deploy flow first: /check-drift → /verify → tsc (if .ts changed) → operator go-ahead (TOOL_TRIGGER_MAP.md 部署流程觸發)',
   },
 ];
 

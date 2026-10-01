@@ -1,4 +1,38 @@
 # Worklog
+## 2026-10-01（續9）規則檔指標完整性：新閘 verify-governance-pointers＋附錄重建＋全 repo 過期引用清零＋subagent 章程補齊
+
+- 起因：操作者要求 AGENTS.md／CLAUDE.md／AGENTS_APPENDIX.md 達到「穩定、可驗證、可回滾、不用補丁」標準。稽核結果：未達標。
+- 根因（三個結構缺陷，都沒有任何閘在看）：
+  - C1 指標不受檢：AGENTS.md 12 個 `§名` 有 4 個對不到唯一標題；hooks／commands／runbooks／source 註解共 23 處引用已不存在的段名。
+  - C2 附錄 87% 是四份舊版全文（含我同日續4 加的第四份，方向錯）、18 個重複標題；現行細節與過期內容混在一個標示「仍為強制」的檔。
+  - C3 「每個 subagent 自動繼承身份」實際只繼承一部分：`mcp/claude-userlevel/SUBAGENT_CHARTER.md` 缺思維準則、補丁禁令、扇出禁令、極簡紀錄四項；思維準則五項本身在 2026-09-04 第二次瘦身時從 AGENTS.md 掉了。
+- 不變量：每個指向規則檔的段落指標剛好對到一個標題；附錄只放現行細節、一題一節；歷史在 git；閘沒驗到東西就不得報綠。
+- 改動：
+  - M1 新閘 `scripts/verify-governance-pointers.mjs`＋`tests/hooks/governance-pointers.test.mjs`（23 測試）。兩個規則檔內每一個 § 都要被歸類（解析成功／被別的檔名限定／反引號內的語法示意），否則報錯；名稱必須是完整標題＋分隔符，不做前綴比對；掃描範圍 = `git ls-files`（追蹤＋未追蹤未忽略）扣掉 `RECORD_PATHS`（WORKLOG／TASKS／reports／memory／handoffs／ADR／帶日期檔）；附錄不得含 AGENTS.md 的 60 字以上同文行。
+  - M2 接線：`lobster-factory/scripts/validate-doc-integrity.mjs`（健康閘＋`npm run validate:docs`；要求閘印出帶計數的 PASSED 行，規則檔在而閘腳本不在 = 紅）、`scripts/test-hooks.sh`（獨立一行，不擠共用指令列）、`.github/workflows/shared-asset-gates.yml`。
+  - M3 `agency-os/docs/operations/AGENTS_APPENDIX.md` 重建：111709→40494 bytes。保留段落由舊檔切片組成（未重打）；四份全文存檔移除，改列 git 取回指令（文末「歷史版本」）；Workflow 路徑 B 改為已關閉說明。
+  - M4 `agency-os/AGENTS.md`：§1 身份／目標／思維準則依操作者原文補回；檔頭改述附錄角色與閘；§8 補回三個被瘦掉的指標（8000 字濃縮、`REMOTE_WORKSTATION_STARTUP.md` §2.5、`LONG_TERM_OPERATING_DISCIPLINE.md`）。
+  - M5 過期引用改指現址：`mcp/claude-userlevel/hooks/rules/{file-path-router,high-risk-bash-warn,verify-gate-stop}.js`（訊息字串）、`scripts/verify-closeout-completeness.ps1`（註解）、`.claude/commands/{ao-close,ao-resume,verify-recent,audit-cross-machine-bom}.md`、`.claude/SKILL_AND_COMMAND_INDEX.md`、`.claude/skills/strategy-review/roles/systems-thinker.md`、`runbooks/{ADD-PERIODIC-HEALTH-CHECK,VPS-AUTO-REBOOT-RUNBOOK}.md`、`agency-os/docs/operations/{TOOL_TRIGGER_MAP,AO_RESUME_BEGINNER_MAP,AUTO_REPAIR_SYSTEM_V2_LIGHT,collaborator-ai-agent-rules}.md`、`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`、SPEC `policies/ai-execution/exception-policy.yaml`、next-admin `lib/repair-center/remediations/{engine,types}.ts`（註解）。
+  - M6 `mcp/claude-userlevel/SUBAGENT_CHARTER.md` 補四項，`sync-claude-userlevel.ps1 -Mode merge` 同步到 `~/.claude`。
+- 覆審（Codex，三輪，只審閘＋測試＋接線）：`reports/oracle/2026-10-01-partialreview-{9bd16565,79982e0c,c8ad097d}.md`，4＋8＋8 = 20 個發現，逐條對照程式碼皆成立。
+  - 第二輪後依規則先做不變量分析：20 個發現同屬一類「樣式沒預料到的輸入被默默跳過」→ 閘核心由樣式比對改寫為「逐一歸類、未歸類即錯」。
+  - 19 個已修，各有測試。1 個延後：`validate-doc-integrity.mjs --commit` 模式不跑本閘（破壞指標的 commit 要到 push CI／AO-CLOSE／test-hooks 才紅）——接法在 hook rule，同日另一 session 正在改 hooks，已開 TASKS（E 段）。
+  - 已知限制（寫在閘檔頭）：裸數字只做範圍檢查；Markdown 圍欄／清單巢狀是近似解析，不是完整 CommonMark。
+- 驗證：
+  - 閘對重建前現況：58 個問題（紅基準）→ 現在 `Governance pointers PASSED (5913 files scanned, 35 headings, 129 pointers resolved)`。
+  - 突變 19/19（副本上拔一個 guard → 指名測試紅 → 原版綠；不動共享工作區）。
+  - 接線兩條失敗路徑實測：規則檔在而閘腳本缺 → `gate script missing`；閘腳本為空檔 → `gate exited 0 without proving`。
+  - `bash scripts/test-hooks.sh` 23＋329 全過；`check-claude-codex-parity.ps1` 445 checks PASSED；`verify-asset-parity.mjs` OK；next-admin `npx tsc --noEmit` exit 0。
+  - 附錄重建無損檢查：舊附錄 405 個 code span 中 24 個不在現行規則集，逐一看過＝同義改寫、已關閉的 Workflow 路徑 B、或已補回 AGENTS.md §8 的兩個指標。
+- 剩餘風險：身份／扇出／極簡紀錄三條在主 agent 端仍靠每輪讀到，無機械閘；subagent 實際收到新章程未以真實 spawn 驗證（注入機制有測試）。
+- rollback：`git revert` 本 commit；附錄舊版 `git show cac6d8a0d:agency-os/docs/operations/AGENTS_APPENDIX.md`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=65000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/20m/0n
+  - external oracle = Codex CLI（`scripts/codex-oracle.ps1 -Mode review -Path …`，三輪）；19 修、1 延後入 TASKS。
+- ORACLE_WAIVED: 三份皆為 `-Path` 範圍審查（partialreview），依設計不滿足 ORACLE gate；無法做全樹審查，因工作區當時含其他 session 未 commit 的改動。最後一輪發現的修正（7 項）之後未再送審，以 23 測試＋19 突變為證。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,lobster-factory,runbooks,Projects | grep=AGENTS(\.md)? ?(R0 )?§ | hits=129
+  - 由閘本身全 repo 掃描（5913 檔）：129 個指標全部解析；另 15 處在 WORKLOG／WORKLOG-archive 為歷史紀錄，依 `RECORD_PATHS` 不檢。
+
 ## 2026-10-01（續8）file-claim-guard：同一個有未 commit 修改的檔，只能有一個寫入 session
 - ROOT_CAUSE: commit 時的閘（`git-commit-scope-guard.js`／`git-shared-file-guard.js`）都在兩個 session 的 hunk 已混進同一檔之後才看；git 以整檔 stage，具名 `git add -- f` 照樣帶走對方的行（`0b4057f7b`，WORKLOG 2026-08-26）。hunk 級提交只有 WORKLOG/TASKS 有，其他檔零防護（`b03985e02` 87 檔混合 commit；開工時工作區 62 個無主 dirty 檔）。
 - FIX: PreToolUse/PostToolUse/PostToolUseFailure Write|Edit 規則 `rules/file-claim-guard.js` + `lib/file-claims.js`（Codex `apply_patch` 經 codex-adapter 轉 Edit，同一條）。認領 = `<tmpdir>/claude-file-claims/<sha1(realpath)>.json`，兩個時鐘：pendingAt（寫入中，15 分鐘）、touchedAt（寫過；工作區或 index ≠ HEAD 且 4h 內寫過才算數）。commit／還原即自動失效，無釋放步驟。判斷在每檔鎖內（排序取鎖、git 狀態鎖外先算、鎖外快照後才出現的認領視為有效、過期鎖 rename+token 驗證）；多檔呼叫全有或全無；失敗的寫入立即釋放；寫入落在已被接手的檔 → Post exit 2；持有者下次寫前偵測檔案被外部改過（lastBlob）→ WARN。WORKLOG/TASKS 豁免（私有 index）；無真 session_id 不認領。CLI `node mcp/claude-userlevel/hooks/lib/file-claims.js list|release <path>`（release 僅限操作者指示）。

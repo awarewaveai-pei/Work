@@ -215,7 +215,7 @@ ssh -p "$SSH_PORT" "$SSH_TARGET" 'sudo rm /etc/apt/apt.conf.d/52awarewave-auto-r
 - 現役 apt conf：`lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf`
 - 現役開機回報：同目錄的 `ks-aw-01-boot-health-notify.sh` + `ks-aw-01-boot-notify.service`
 - 手動 runbook：`.claude/commands/ks-aw-01-reboot.md`
-- Trigger rule（AGENTS.md）：`agency-os/AGENTS.md` §代理自動工具使用規則 reboot 訊號分支
+- Trigger rule：`agency-os/docs/operations/TOOL_TRIGGER_MAP.md` §代理自動工具使用規則 reboot 訊號分支
 - 維護日曆：`lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`
 - 長期 ops 紀律：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`
 - WORKLOG 落地紀錄：`agency-os/WORKLOG.md` §2026-05-23 SG VPS reboot + B-Minimal

@@ -203,7 +203,7 @@ compilation_decisions:
     reasoning: >
       Inventing either number would violate this task's explicit
       instruction and this suite's R4 claim-before-verify discipline (see
-      `AGENTS.md` §R4: "驗前先讀歷史" / claim-before-verify). The corpus-wide
+      `AGENTS.md` §2 (R4 VBC: "驗前先讀歷史" / claim-before-verify). The corpus-wide
       absence (every analogous construct has the same gap, not just
       exceptions) is itself useful signal recorded in `open_questions` —
       it suggests an operator policy decision genuinely has not been made

@@ -236,6 +236,6 @@ rm agency-os/reports/status/<thing>-LATEST.*
 ## Related
 
 - Memory: `~/.claude/projects/d--Work/memory/feedback_operator_zero_memory_automation.md` — the design principle
-- AGENTS.md §代理自動工具使用規則 table — where trigger rows live
+- `agency-os/docs/operations/TOOL_TRIGGER_MAP.md` §代理自動工具使用規則 table — where trigger rows live
 - AUDIT_REGISTRY.md §CP950 — why ASCII-only in source
 - BUG_HUNT_PROTOCOL.md — bug-class audit framework (different scope, but related discipline)

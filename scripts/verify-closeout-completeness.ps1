@@ -451,14 +451,14 @@ try {
     }
 
     # BUGHUNT scope keyword gate: scope= must mention required root paths.
-    # SSOT for required roots lives here; AGENTS.md R0 §抓蟲 references these names.
-    # When repo root structure changes, update $bhRequiredRoots AND AGENTS.md §抓蟲 bullet (two files only).
+    # SSOT for required roots lives here; AGENTS.md §1 (抓蟲 row) references these names.
+    # When repo root structure changes, update $bhRequiredRoots AND the AGENTS.md §1 抓蟲 row (two files only).
     if ($hasBughuntEvidence) {
         $bhDoneLine = @(($section -split '\r?\n') | Where-Object { $_ -match '^\s*-\s*BUGHUNT_DONE:' }) | Select-Object -First 1
         $hasScopeNarrow = ($section -match '(?m)^\s*-\s*BUGHUNT_SCOPE_NARROW:')
         if ($bhDoneLine -and -not $hasScopeNarrow) {
             # Always-required roots (gate enforced). For .claude/ and lobster-factory/ add when relevant.
-            # SSOT: $bhRequiredRoots here; AGENTS.md R0 §抓蟲 references these names.
+            # SSOT: $bhRequiredRoots here; AGENTS.md §1 (抓蟲 row) references these names.
             $bhRequiredRoots = @('agency-os', 'scripts')
             # Extract only the scope= value (before next | field) to avoid matching grep= or hits= fields.
             $scopeVal = if ($bhDoneLine -match 'scope=([^|]+)') { $Matches[1] } else { '' }

@@ -7,7 +7,7 @@ Audit UTF-8 BOM compliance on all `.md` files that cross Google Drive sync. Repo
 
 Why this matters: PowerShell on Windows (Big5 locale) misreads UTF-8 `.md` files without BOM as Big5, garbling CJK on cross-machine sync. The export/import scripts now enforce BOM at the boundary, but drift can still appear (manual edits via VSCode that strip BOM, files imported before the BOM rule existed, etc.).
 
-Scope (per `agency-os/AGENTS.md` §跨機 .md 編碼紀律):
+Scope (per `agency-os/AGENTS.md` §8 編碼):
 - `~/.claude/projects/<key>/memory/MEMORY.md`
 - `~/.claude/projects/<key>/memory/*.md`
 - `$env:AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md` (if Drive mounted)

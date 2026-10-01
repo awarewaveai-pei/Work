@@ -6,7 +6,7 @@
 //   execute → healthcheck → rollback on healthcheck failure → audit
 //   (ops_action_runs + incident tag)
 //
-// Safety defaults (AGENTS.md §自動化安全預設):
+// Safety defaults (AGENTS.md §0 自動化預設 OFF):
 //   - AUTO_REMEDIATE_ENABLED defaults to OFF — auto mode does nothing until
 //     the operator explicitly turns it on. Manual mode (RBAC-gated route)
 //     works regardless, because a human already approved that click.

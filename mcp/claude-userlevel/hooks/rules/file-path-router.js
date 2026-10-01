@@ -67,7 +67,7 @@ const ROUTE_CATEGORIES = [
     label: 'TRIGGER.DEV path detected',
     actions: [
       'Spawn `trigger-deploy-agent` for deploy (uses tr_pat_* NOT tr_prod_*)',
-      'Ref: AGENTS.md §Trigger.dev 憑證',
+      'Ref: AGENTS.md §0 (Trigger.dev 憑證不可互換)',
     ],
   },
 ];

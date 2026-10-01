@@ -1027,7 +1027,7 @@ NETDATA_SECRET               # Netdata notification.conf 自訂
 新增此 owner doc 後須做：
 
 1. **`agency-os/docs/CHANGE_IMPACT_MATRIX.md`** 加一行：本檔 → 連動 `CLAUDE.md`「自動維修規則」+ `DEPLOY_ROLLBACK_RUNBOOK.md` §2.4 cron alert 章節
-2. **`agency-os/AGENTS.md`** §長期營運紀律 加一行指本檔
+2. **`agency-os/AGENTS.md`** §8（記憶與文件的長期紀律）加一行指本檔
 3. **`README.md`** 入口加一行（按 `docs/operations/new-doc-linkage-checklist.md`）
 4. **`scripts/register-new-governance-doc.ps1`** 跑：
    ```powershell

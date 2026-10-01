@@ -7,7 +7,7 @@ description: Run the AO-RESUME start-of-work report (sections 0-8) from the hook
 
 > **[CAVEMAN DEFAULT]** AO-RESUME 完成後，立即宣告：`🦴 Caveman mode ON — 本 session 全程壓縮回覆，直到你說 "stop caveman"。` 無需使用者觸發。
 
-Follow the AO-RESUME protocol (AGENTS.md §快速續接關鍵字).
+Follow the AO-RESUME protocol (AGENTS.md §8).
 
 ## Step 0-git — Git alignment pre-check (MANDATORY, runs before reading ANY state file)
 

@@ -16,7 +16,7 @@
 
 | 指令 | 描述 | 路徑 |
 |---|---|---|
-| `/ao-resume` | 開工：依 AGENTS.md §快速續接 跑 AO-RESUME，輸出 AO-RESUME 報告（§0–§8）摘要。 | [commands/ao-resume.md](commands/ao-resume.md) |
+| `/ao-resume` | 開工：依 AGENTS.md §8 跑 AO-RESUME，輸出 AO-RESUME 報告（§0–§8）摘要。 | [commands/ao-resume.md](commands/ao-resume.md) |
 | `/ao-close` | 收工：依 AGENTS.md + 40-shutdown-closeout.mdc 跑完整 AO-CLOSE（預授權）。 | [commands/ao-close.md](commands/ao-close.md) |
 | `/recap` | 收工前先看今日工作摘要再決定是否關機。 | [commands/recap.md](commands/recap.md) |
 | `/tasks` | 列出所有目前開著的待辦。 | [commands/tasks.md](commands/tasks.md) |
