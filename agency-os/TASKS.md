@@ -696,7 +696,8 @@
 - [ ] **【2026-09-28 開出｜Cognitive OS｜低優先】run_recipe_async 終態 FAILED flake：`test_async_run_reaches_a_terminal_state_via_the_existing_status_endpoint` 高負載下 async run 以 FAILED 收尾**
   - `🟡 未開始` · `2026-09-28 開出` · `不卡誰`
   - **一句話**：全套 `pytest tests/unit` 14521 passed／1 failed，只有此測試；單獨重跑 HEAD 3/3、HEAD+diff 3/3 皆綠，耗時 39 s→176 s 隨負載上升。與 2026-09-28 續2 修過的 15 s 逾時 flake 不同型（這次是終態 FAILED，不是逾時）。
-  - **下一步**：負載下重現時讀該 run journal 的 FAILED step `error`（`_fail_recipe_journal` 寫入），判斷是 runner 例外還是 run_lock 回收誤判。
+  - **2026-10-01 查證**：「高負載觸發」未成立——16 行程並行跑整個模組（每個約 180 s）16/16 綠，新 journal 的 FAILED 全是測試刻意注入；只見過 1 次，且只出現在全套跑。較可能是跨模組狀態干擾（journal 寫在真實 `PRODUCT_ROOT/.runtime/workflows`，`main.py:231`，不在 tmpdir）。原失敗 worktree 已刪，error 無存檔。
+  - **下一步**：本機不跑全套（`RESEARCH_LINES_MASTER_PLAN.md:355` 規則 11），等 GitHub CI 全套（`cognitive-os-full-suite.yml`）再遇到。先讓失敗自帶證據：該測試 `assertEqual(final.json()["status"], "SUCCEEDED")` 補 `final.json()` 當 msg，CI log 才看得到 FAILED step `error`；據此判斷是 runner 例外、run_lock 回收誤判，還是跨測試共用 `.runtime` 干擾。
   - **證據**：WORKLOG 2026-09-28 續7。
 - [ ] **【2026-09-11 開出｜HCI30｜低優先】mutation-check-wave1.ps1 的 `drop-all-subject-records-referencing-fks` 疑似 flaky**
   - `🟡 未開始` · `2026-09-11 開出` · `不卡誰`

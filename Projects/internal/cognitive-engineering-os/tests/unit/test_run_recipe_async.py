@@ -66,7 +66,7 @@ class RunRecipeAsyncTests(ApiTestCase):
         final = _poll_until_terminal(self.client, "life-decision-v1", run_id)
         self.assertIsNotNone(final)
         self.assertEqual(final.status_code, 200)
-        self.assertEqual(final.json()["status"], "SUCCEEDED")
+        self.assertEqual(final.json()["status"], "SUCCEEDED", final.json())
 
     def test_sync_path_behavior_and_return_shape_are_unchanged(self):
         response, run_id = self._post()  # no "async" key at all, same as before this card
@@ -116,7 +116,7 @@ class RunRecipeAsyncTests(ApiTestCase):
         finally:
             patcher.stop()
         self.assertIsNotNone(final)
-        self.assertEqual(final.json()["status"], "FAILED")
+        self.assertEqual(final.json()["status"], "FAILED", final.json())
         errors = [step.get("error", "") for step in final.json()["steps"]]
         self.assertTrue(any("boom-injected-for-test" in error for error in errors), final.json())
 
@@ -148,13 +148,13 @@ class RunRecipeAsyncTests(ApiTestCase):
         finally:
             release.set()
             patcher.stop()
-        self.assertEqual(final.json()["status"], "FAILED")
+        self.assertEqual(final.json()["status"], "FAILED", final.json())
 
     def test_resubmitting_a_finished_run_id_is_409_and_leaves_its_journal_untouched(self):
         response, run_id = self._post(**{"async": True})
         self.assertEqual(response.status_code, 202)
         final = _poll_until_terminal(self.client, "life-decision-v1", run_id)
-        self.assertEqual(final.json()["status"], "SUCCEEDED")
+        self.assertEqual(final.json()["status"], "SUCCEEDED", final.json())
         again, _ = self._post(**{"async": True, "run_id": run_id})
         self.assertEqual(again.status_code, 409)
         self.assertEqual(again.json()["detail"]["code"], "WORKFLOW_RUN_EXISTS_REQUIRES_RESUME")
@@ -176,7 +176,7 @@ class RunRecipeAsyncTests(ApiTestCase):
             self.assertEqual(response.status_code, 202)
             final = _poll_until_terminal(self.client, "life-decision-v1", run_id)
         self.assertIsNotNone(final)
-        self.assertEqual(final.json()["status"], "FAILED")
+        self.assertEqual(final.json()["status"], "FAILED", final.json())
         errors = [step.get("error", "") for step in final.json()["steps"]]
         self.assertTrue(any("boom while touching" in error for error in errors), final.json())
         self.assertFalse(any(str(journal_path) in error for error in errors), final.json())
@@ -287,7 +287,7 @@ class RunLockAcrossProcessesTests(ApiTestCase):
         self.assertEqual(response.status_code, 200)
         journal = self._journal(run_id)
         record = read_json(journal)
-        self.assertEqual(record["status"], "SUCCEEDED")
+        self.assertEqual(record["status"], "SUCCEEDED", record)
         self.assertGreater(len(record["steps"]), 1)
         first = dict(record["steps"][0])
         first["output"] = {**(first.get("output") or {}), "resume_probe": "restored-not-rerun"}
