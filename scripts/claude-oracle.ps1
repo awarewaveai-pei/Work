@@ -28,11 +28,16 @@ param(
     [string]$WorkRoot = '',
     # Escape hatch for a human running this by hand from a Claude terminal; it
     # still records reviewer=claude, so the artifact stays honest.
-    [switch]$AllowSameHost
+    [switch]$AllowSameHost,
+    # Scope the capture (same semantics as write-oracle-artifact.ps1): a whole dirty
+    # worktree can exceed what the reviewer returns valid JSON for (470KB, 2026-09-30).
+    [string]$DiffRef = '',
+    [string[]]$Path = @()
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$Path = @($Path | Where-Object { $_ })   # an empty -Path '' would be dropped by PS 5.1 native-arg passing
 
 if (-not $WorkRoot) { $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path }
 $quota = Join-Path $PSScriptRoot 'oracle-quota.ps1'
@@ -68,7 +73,10 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($settingsFile, '{"disableAllHooks": true}', $utf8)
 [IO.File]::WriteAllText($mcpFile, '{"mcpServers": {}}', $utf8)
 
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $writer -Mode capture -Out $diffFile -RepoRoot $WorkRoot
+$captureArgs = @('-Mode', 'capture', '-Out', $diffFile, '-RepoRoot', $WorkRoot)
+if ($DiffRef) { $captureArgs += @('-DiffRef', $DiffRef) }
+if ($Path.Count -gt 0) { $captureArgs += '-Path'; $captureArgs += ($Path -join ',') }
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $writer @captureArgs
 if ($LASTEXITCODE -eq 2) { Write-Host "claude-oracle: nothing to review." -ForegroundColor DarkGray; exit 2 }
 if ($LASTEXITCODE -ne 0) { Write-Host "claude-oracle: capture failed (exit $LASTEXITCODE)." -ForegroundColor Red; exit 1 }
 
@@ -115,6 +123,24 @@ $stderrText = if (Test-Path -LiteralPath $stderrFile) { (Get-Content -Raw -Encod
 # writer's JSON-first findings count works.
 $fence = [regex]::Match($answer, '(?s)```(?:json)?\s*(\{.*\})\s*```')
 if ($fence.Success) { $answer = $fence.Groups[1].Value }
+# The reviewer may put prose before/after the JSON (seen 2026-10-01, opus): keep the span
+# from the verdict object's opening brace to the last closing brace; parsing below still
+# decides validity, so a prose-only or malformed answer still fails closed.
+if ($answer -notmatch '^\s*\{') {
+    # The JSON must END the answer (quoted objects inside prose, e.g. echoed from the diff,
+    # are not accepted), and the first `{` whose slice parses with a verdict wins.
+    $close = $answer.LastIndexOf('}')
+    if ($close -ge 0 -and -not $answer.Substring($close + 1).Trim()) {
+        $open = $answer.IndexOf('{')
+        while ($open -ge 0 -and $open -lt $close) {
+            $slice = $answer.Substring($open, $close - $open + 1)
+            $sliceObj = $null
+            try { $sliceObj = $slice | ConvertFrom-Json -ErrorAction Stop } catch { $sliceObj = $null }
+            if ($sliceObj -and ($sliceObj.PSObject.Properties.Name -contains 'verdict')) { $answer = $slice; break }
+            $open = $answer.IndexOf('{', $open + 1)
+        }
+    }
+}
 $answerIsJson = $false
 $parsedAnswer = $null
 try {
@@ -149,7 +175,13 @@ if ($claudeExit -ne 0 -or -not $answer.Trim() -or -not $answerIsJson) {
 # -Context is operator text: strip quotes/newlines, because PS 5.1 passes native
 # arguments without escaping embedded quotes.
 $safeContext = ($Context -replace '"', "'" -replace '\r?\n', ' ')
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $writer -Mode review -Reviewer claude -ReviewedDiff $diffFile -Context $safeContext -AnswerFile $answerFile -RepoRoot $WorkRoot
+# Same scope as the capture: the writer labels the artifact `partialreview` (not accepted by
+# the ORACLE gate) only when it sees -DiffRef/-Path here; omitting them would record a
+# scoped review as a whole-repo one.
+$reviewArgs = @('-Mode', 'review', '-Reviewer', 'claude', '-ReviewedDiff', $diffFile, '-Context', $safeContext, '-AnswerFile', $answerFile, '-RepoRoot', $WorkRoot)
+if ($DiffRef) { $reviewArgs += @('-DiffRef', $DiffRef) }
+if ($Path.Count -gt 0) { $reviewArgs += '-Path'; $reviewArgs += ($Path -join ',') }
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $writer @reviewArgs
 if ($LASTEXITCODE -ne 0) { Write-Host "claude-oracle: artifact write failed (exit $LASTEXITCODE)." -ForegroundColor Red; exit 1 }
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $quota -Action clear -Tool critic | Out-Null
 

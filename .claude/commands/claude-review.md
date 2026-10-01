@@ -19,6 +19,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/oracle-quota.ps1 -Ac
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/claude-oracle.ps1 -Context "<what this change solves, one line>"
 ```
 
+Dirty tree > ~100KB or reviewing already-committed work: add `-DiffRef <A~1..B> -Path <file>` to scope the capture (a whole-worktree capture returned no valid JSON at 470KB).
+
 The script captures the diff BEFORE the review (same capture-then-review rule as `/codex-review` Step 1.5), runs `claude -p` read-only (Read/Grep/Glob, hooks and MCP off), then lands the ORACLE-gate artifact `agency-os/reports/oracle/<date>-review-*.md` with `reviewer: claude`.
 
 Exit codes: 0 artifact written · 2 nothing to review · 3 quota blocked (breaker already set; go to the Step 0 fallback) · 4 refused because this is a Claude session (Claude would be reviewing its own change) · 1 failure (read the message; a second failure → ask the operator one question).

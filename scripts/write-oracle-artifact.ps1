@@ -80,6 +80,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# `powershell -File ... -Path a,b` arrives as ONE string "a,b" (-File never builds arrays), so
+# callers that launch this script as a child join paths with commas; split them back here.
+$Path = @($Path | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+
 $encHelpers = Join-Path $PSScriptRoot '_console-encoding-helpers.ps1'
 if (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue) {
     # already loaded by a parent scope
