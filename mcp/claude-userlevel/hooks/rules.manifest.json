@@ -18,7 +18,8 @@
           "git-add-scope-tracker",
           "git-commit-scope-guard",
           "git-shared-file-guard",
-          "repeat-failure-guard"
+          "repeat-failure-guard",
+          "file-claim-guard"
         ]
       },
       {
@@ -73,7 +74,8 @@
           "git-add-scope-tracker",
           "git-commit-scope-guard",
           "repeat-failure-guard",
-          "doc-link-commit-check"
+          "doc-link-commit-check",
+          "file-claim-guard"
         ]
       },
       {
@@ -104,7 +106,8 @@
       {
         "matcher": "Bash",
         "rules": [
-          "repeat-failure-guard"
+          "repeat-failure-guard",
+          "file-claim-guard"
         ]
       },
       {

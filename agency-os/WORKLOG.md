@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-01（續13）file-claim-guard 納入 Bash 寫檔＋已 commit 的認領不再被下一個寫入者復活
+- ROOT_CAUSE: ① Bash 寫檔（scratch `patch_*.py`、`sed -i`、`git checkout`）沒有檔案清單，閘看不到；session `77dff2bb` 以 Bash 改了他人認領中的 `scripts/test-hooks.sh` 無任何提示（續8 BOUNDARY_HIT）。② 部署後實測抓到既有缺陷：`isLive` 只看「現在 dirty＋4h 內寫過」，commit 不結束認領——檔案一被別人再改髒，已 commit 的舊認領就復活。Edit 在寫入前（檔案還乾淨）判斷多半閃過；Bash 在寫入後判斷正面撞上（本 session 以 Bash 改 README 被誤報為改到 `3bf43b9b` 的檔）。
+- FIX（同一規則、同一 lib，非第二套機制）:
+  - `lib/file-claims.js`：Bash 快照 `repoAt`／`listedPaths`（`git --no-optional-locks status --porcelain=v1 -z -uall --no-renames`，不搶 index.lock）／`blobsOf`（`hash-object --stdin-paths` 一次批次、同 `blobOf` filter；size+mtime+ctime stat cache，2s 內變動的不入快取；> 32MB 只記 size+mtime）／`headBlobs`（`cat-file --batch-check`）／快照佇列 `saveSnapshot`／`takeSnapshot`（每次 Pre 一檔、Post 取最舊）／`bashInFlight`。認領新增寫入紀錄 `writes[]`（`{sid,from,to,at,end,overlap?}`，上限 16、24h）與 `writesExplain` → `recorded`／`in-flight`／null，只認定論證據。`isLive`：HEAD 的該檔 blob == 持有者 `lastBlob` → 已 commit，認領結束（用內容不用 commit 時間：先 stage 舊版、持有者寫入後才 commit 不可結束認領）；`stateOf` 多回傳 `head`。
+  - `rules/file-claim-guard.js`：PreToolUse Bash 存快照（key = session＋tool_use_id；Codex 無 tool_use_id 時 turn_id＋cwd＋command）。PostToolUse／PostToolUseFailure Bash 比對：mtime 晚於本 Post hook 行程啟動 → 指令結束後才寫的，不算；寫入紀錄 `recorded` → 跳過；`in-flight`（他人寫入進行中）→ WARN「無法判斷是誰的」；持有者的認領在**指令開始時**為 live、或指令期間寫過 → exit 2 指名檔案與持有者（`git checkout`／`stash` 還原他人檔另說明「已回到 HEAD」），寫入記入對方 `writes` 並附 overlap（同時段其他 session 的 Bash）；無人持有／過期／自己的 → 本 session 認領（更新 lastBlob，不再對自己誤報「changed outside」）。Edit post 也記入 `writes`。
+  - `rules.manifest.json`：Bash 的 PreToolUse／PostToolUse／PostToolUseFailure 群組加 `file-claim-guard`。
+  - 文件：hooks `README.md`／`README.zh-TW.md`、`TOOL_TRIGGER_MAP.md` 該列。
+- 邊界（已寫入 lib 註解）：cwd 所在 repo 以外的寫入；gitignored、assume-unchanged/skip-worktree 檔（D:\Work 0 個）；同一指令內改完又 commit；run_in_background 在 PostToolUse 後的寫入；指令結束到 Post hook 行程啟動之間的他人寫入；listed > 5000 檔 → 該次不追蹤＋WARN。兩個重疊的 Bash 無法以端點 blob 分辨 → 兩邊都被告知（不靜默）。無 `lastBlob` 的舊認領（續8 開發期間版本）無法以內容判斷 commit，保守視為 live 至 4h TTL（`3bf43b9b` 4 筆，約 12:10Z 過期；`file-claims.js` 這筆在本 session 每次 Bash 寫入時照實回報）。
+- LIVE_EVIDENCE:
+  - `~/.claude/hooks` 是 `scripts/sync-claude-userlevel.ps1 -Mode merge` 的鏡像，不是 repo 本身；每次部署前 `-Mode verify` 確認 settings governed keys 無 drift（dry-run 的 settings YES 是 PS5.1 序列化誤報），hooks 只更新本次檔案（備份 `agency-os/Backups/claude-userlevel-20261001-{173416,174343,180413,182424}`）。
+  - v1 部署後本 session 以 Bash 執行 scratch patch 改 3 份文件 → PostToolUse exit 2 指名 `3bf43b9b`（真實觸發；揭露缺陷②）→ v2 部署後 `file-claims.js list`：`3bf43b9b` 已 commit 的 rule/test 認領轉 stale；下一次 Bash 落地時輸出「took over … from a stale claim」，改由本 session 持有。
+  - 真實 tmpdir `claude-file-claims/bash/` 只剩當次呼叫自己的快照＋stat cache（Pre/Post key 在 Claude Code 真實 payload 一致、快照被消費；v2→r5 格式切換留下的 1 個自己的舊快照已刪）。
+- LATENCY（D:\Work，77 個 listed 檔，n=20，中位數；HEAD hooks vs 本版）：PreToolUse Bash 64→170 ms、PostToolUse Bash 62→124 ms，每次 Bash 約 +168 ms。主要成本 `git status -uall`（60–100 ms）＋ rev-parse；stat cache 命中時 hash ≈ 2 ms（冷 36 ms）。上限：MAX_LISTED 5000、MAX_HASH_BYTES 32MB、git 單次 timeout 10s。
+- MUTATION（scratch 副本，不碰 repo 與 `~/.claude/hooks`）: 31 突變 30 紅、還原 31/31 sha1 一致。存活 M7（stat cache 拿掉 mtime）＝等價：ctime 已涵蓋所有內容寫入。過程：M17 一度存活 → 補「同 session 兩個平行呼叫只報一次」；M5 在 FIFO 後存活 → 補「Post 亂序仍取自己的快照」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh（tests/hooks/file-claim-guard.test.mjs 47 例，新增 26：驗收 python -c 改他人認領檔 → exit 2、並行 Edit 不誤算（已持有／首次認領／寫入中→WARN）、並行 Edit 不掩蓋 B 的寫入、git checkout 還原、Bash 認領、自己的 Bash 寫入、PostToolUseFailure、唯讀／commit／autocrlf／index-only、同 session 平行與亂序、同尺寸重寫、mtime 還原重寫、Post 啟動後的寫入、> 32MB WARN、Codex exec_command 與同 key 佇列、同時段他人 Bash 雙方告知、from:null 非萬用、無 session_id、commit 結束認領、舊版 staged commit 不結束、指令開始時判斷、指令期間首次寫入）| exit=0 | ms=68242
+- REVIEW_ROUNDS: Codex 2 輪（`codex-oracle.ps1 -Path` 限定本次 7 檔，diff 內嵌）。
+  - r5（`2026-10-01-partialreview-484eef0f`）4 項全修：F1 Codex 同 key 快照互蓋 → key 加 cwd＋每次 Pre 一檔佇列；F2 同尺寸＋還原 mtime 騙過 stat cache → key 加 ctime；F3 指令結束後、Post 前他人寫入被算到本指令 → mtime 晚於 Post hook 行程啟動即不算（剩 exit→hook 啟動間隙）；F4 > 32MB 靜默跳過 → size+mtime 變動即 WARN。
+  - r6（`2026-10-01-partialreview-2005003a`）4 項；同 reviewer 第二次 → 修前不變量分析（AGENTS §4）：F1–F3 同一類＝以端點 blob 把變動歸給別人時，把不定論的證據當證明（寫入中的 Edit 解釋一切、`from:null` 萬用、重疊 Bash 的紀錄）。不變量：只有定論證據才能把變動歸給別人；不定論 → 告知（WARN 或雙方 exit 2），絕不靜默。修法：`writesExplain` 回 `recorded`／`in-flight`／null，`in-flight` 改 WARN；null 不萬用；Bash 紀錄帶 overlap，對重疊者不作證明。F4（assume-unchanged 不在 status）→ 宣告邊界，D:\Work 現有 0 個。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/8m/0n（Codex 2 輪 4/4：修 7、宣告邊界 1；未另派 critic subagent，Codex 即本 commit 的 critic）
+- ORACLE_WAIVED: r6 修正在 `2005003a` 之後；依前例 r6 為最後一輪，以不變量分析＋突變（M28–M31 各被指名測試抓到）＋全套 355/355 代替第三輪。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=file-claims|file-claim-guard|stateOf\(|isLive\(|CLAUDE_FILE_CLAIMS_DIR|Bash 寫檔不在範圍 | hits=15（排除 agency-os/Backups；程式消費者僅 rule＋測試；文件 3 份已改；oracle artifact／WORKLOG／dispatch log 為歷史記錄不改；`.claude/` 另以根目錄搜尋：僅 hooks 部署鏡像、transcript、session 筆記，commands/agents/skills 0 hits）
+- FOLLOW_UP: 續8 ① 完成；② Codex apply_patch 失敗 payload 形狀仍待實測（未動）。
+- [rollback] manifest 刪 Bash 三群組的 `"file-claim-guard"` 即停用 Bash 追蹤（Edit 路徑不受影響）；或 `git revert` 本 commit 後跑 `scripts/sync-claude-userlevel.ps1 -Mode merge`。tmpdir `claude-file-claims/bash/` 可直接刪。
 ## 2026-10-01（續12）Cloudflare 522 間歇（09:53–09:58 UTC，SIN/HKG edge）：唯讀診斷，主機端原因全數排除，未重現
 
 - 症狀：操作者筆電經 CF SIN/HKG edge，`cognitive.aware-wave.com`／`app.aware-wave.com` 11 次請求約 4 次 522（約 19.5 s）。Ray `a43a94100ecff8ff`、`a43a95e98a7c110d`。

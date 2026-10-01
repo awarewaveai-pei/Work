@@ -5,8 +5,9 @@
 // sessions' hunks are already mixed inside the same file -- git stages whole files, so a correctly NAMED
 // `git add -- f` still carries the other author's lines (WORKLOG 2026-08-26 `0b4057f7b`). Only WORKLOG/TASKS
 // got hunk-level commits (private index); every other file had no guard. Invariant enforced here instead: a
-// file with uncommitted changes has one writing session (among Write/Edit/apply_patch writers that carry a
-// real session id -- Bash writes have no file list, id-less payloads fail open like every gate).
+// file with uncommitted changes has one writing session (among writers that carry a real session id --
+// id-less payloads fail open like every gate). Write/Edit/apply_patch name their files; Bash does not, so its
+// writes are found by a before/after snapshot of the work tree (bottom of this file).
 //
 // A claim is <tmpdir>/claude-file-claims/<sha1(real path)>.json. "Claimed" is not "written" (codex r1), so:
 //   pendingAt -- PreToolUse; the write is in flight (permission prompt included) for PENDING_MS. A failed
@@ -15,8 +16,13 @@
 //                PostToolUse never confirmed it (hook crash/timeout -- codex r2).
 //   touchedAt -- PostToolUse; the write happened. lastBlob = the file right after it, so the holder's next
 //                write can tell that someone else (another session past PENDING_MS, or Bash) wrote in between.
-// A written claim holds while the file differs from HEAD (worktree or index) and the holder wrote it within
-// CLAIM_TTL_MS. No release step: commit or revert makes the file equal HEAD and the claim stops counting.
+//   writes    -- the last MAX_WRITES writes by ANY session, {sid, from, to, at, end} blobs and times: lets a Bash
+//                command that saw the file change tell its own write from one a concurrent Write/Edit made.
+// A written claim holds while the file differs from HEAD (worktree or index), the holder wrote it within
+// CLAIM_TTL_MS, and HEAD does not already hold the holder's last write (HEAD:file == lastBlob). No release
+// step: commit or revert makes the file equal HEAD and the claim stops counting; the lastBlob check keeps a
+// committed claim ended when someone else dirties the file again (found live 2026-10-01: the next writer
+// revived it). Content, not commit time: a commit of an older staged version must not end the claim.
 // Locking: every read-decide-write of claim JSON runs under a per-file lock (sorted order, no deadlock). Git
 // state is computed BEFORE taking the lock (stateOf), so a lock is held for milliseconds and LOCK_STALE_MS can
 // only mean a dead process (codex r3).
@@ -62,14 +68,20 @@ function claimPath(absFile) {
   return path.join(claimsDir(), crypto.createHash('sha1').update(normAbs(absFile)).digest('hex') + '.json');
 }
 
-function git(args, cwd) {
+// Raw stdout (untrimmed: porcelain lines start with a space), or null on any failure.
+function gitRaw(args, cwd, input) {
   try {
-    const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 10000 });
+    const r = spawnSync('git', args, { cwd, input, encoding: 'utf8', timeout: 10000, maxBuffer: 64 * 1024 * 1024 });
     if (r.error || typeof r.status !== 'number' || r.status !== 0) return null;
-    return String(r.stdout || '').trim();
+    return String(r.stdout || '');
   } catch (_) {
     return null;
   }
+}
+
+function git(args, cwd) {
+  const out = gitRaw(args, cwd);
+  return out === null ? null : out.trim();
 }
 
 // -> { root, rel } or null when the file is not inside a git work tree. Walks up to the nearest existing
@@ -96,7 +108,7 @@ function blobOf(repo) {
 }
 
 // Git facts about one file, computed outside any lock. dirty: worktree or index differs from HEAD (staged-only
-// included); null = cannot tell. blob: see blobOf.
+// included); null = cannot tell. blob: see blobOf. head: HEAD's blob of it (null = not in HEAD / cannot tell).
 function stateOf(repo) {
   const head = git(['rev-parse', '--verify', '-q', `HEAD:${repo.rel}`], repo.root);
   const idx = git(['rev-parse', '--verify', '-q', `:${repo.rel}`], repo.root);
@@ -106,7 +118,7 @@ function stateOf(repo) {
   else if (blob === '') dirty = head !== null; // deleted in the worktree = dirty; never existed = clean
   else if (blob === null) dirty = null;
   else dirty = blob !== head;
-  return { dirty, blob };
+  return { dirty, blob, head };
 }
 
 const isShared = (rel, list) => list.some((s) => (process.platform === 'win32' ? s.toLowerCase() === rel.toLowerCase() : s === rel));
@@ -120,12 +132,19 @@ function readClaim(absFile) {
   }
 }
 
-function writeClaim(absFile, claim) {
-  fs.mkdirSync(claimsDir(), { recursive: true });
-  const target = claimPath(absFile);
+function readJson(p) {
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_) { return null; }
+}
+
+function writeJsonAtomic(target, obj) {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
   const tmp = `${target}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(claim), 'utf8');
+  fs.writeFileSync(tmp, JSON.stringify(obj), 'utf8');
   fs.renameSync(tmp, target);
+}
+
+function writeClaim(absFile, claim) {
+  writeJsonAtomic(claimPath(absFile), claim);
 }
 
 function sleep(ms) {
@@ -199,6 +218,7 @@ function isLive(claim, state, now) {
       && state.blob !== null && state.blob !== claim.baseBlob) {
     writtenAt = claim.pendingAt; // wrote; PostToolUse never confirmed
   }
+  if (typeof claim.lastBlob === 'string' && state.head === claim.lastBlob) return false; // its last write is committed
   return ageOf(writtenAt, now) < CLAIM_TTL_MS && state.dirty === true;
 }
 
@@ -216,9 +236,174 @@ function listClaims() {
   return out;
 }
 
+// ---- write log -------------------------------------------------------------------------------------------
+const MAX_WRITES = 16;
+const WRITE_LOG_MS = 24 * 60 * 60 * 1000;
+
+function withWrite(writes, entry, now) {
+  const kept = (Array.isArray(writes) ? writes : []).filter((w) => w && ageOf(w.end, now) < WRITE_LOG_MS);
+  return [...kept, entry].slice(-MAX_WRITES);
+}
+
+// Do the claim's recorded writes account for the file going from p0 (seen at t0) to p1, as far as session sid
+// can tell? Walk the writes that finished at or after t0 in order, following each one that starts where the
+// walk stands; one that does not either landed before t0 or sits behind a write nobody recorded (Bash).
+// -> 'recorded' (the walk reaches p1), 'in-flight' (it reaches the base of another session's write still in
+// flight, which may or may not have produced p1), or null. Only conclusive evidence counts (codex r6): an
+// entry with an unknown start (from: null) matches nothing, and a Bash entry logged while sid's own Bash was
+// running (overlap) proves nothing against sid -- endpoint blobs cannot tell two overlapping writers apart.
+function writesExplain(claim, p0, p1, t0, now, sid) {
+  if (!claim) return null;
+  const ws = (Array.isArray(claim.writes) ? claim.writes : [])
+    .filter((w) => w && Number(w.end) >= t0 && !(Array.isArray(w.overlap) && w.overlap.includes(sid)))
+    .sort((a, b) => Number(a.end) - Number(b.end));
+  let cur = p0;
+  for (const w of ws) {
+    if (w.from != null && w.from === cur) cur = w.to;
+  }
+  if (cur === p1) return 'recorded';
+  if (claim.sid !== sid && ageOf(claim.pendingAt, now) < PENDING_MS && claim.baseBlob != null && claim.baseBlob === cur) return 'in-flight';
+  return null;
+}
+
+// ---- Bash writes ----------------------------------------------------------------------------------------
+// PreToolUse Bash records the blob of every file `git status` lists in the cwd's repo (modified, staged,
+// deleted, untracked); PostToolUse / PostToolUseFailure lists again and compares. A file that was clean before
+// is compared with its blob at the pre-command HEAD. A per-repo stat cache means only files whose size/mtime/
+// ctime moved are re-hashed (latency: WORKLOG 2026-10-01). Bounds: MAX_LISTED listed files (beyond it the
+// command is not tracked, with a WARN); files over MAX_HASH_BYTES are compared by size+mtime only (WARN).
+// Not seen: writes outside the cwd's repo, gitignored and assume-unchanged/skip-worktree files (git status
+// omits them; none in D:\Work 2026-10-01), a file changed and committed inside one command, and whatever a
+// run_in_background command writes after its PostToolUse.
+const MAX_LISTED = 5000;
+const MAX_HASH_BYTES = 32 * 1024 * 1024;
+const RACY_MS = 2000;
+const SNAPSHOT_KEEP_MS = 6 * 60 * 60 * 1000;
+
+const sha1 = (t) => crypto.createHash('sha1').update(String(t)).digest('hex');
+const bashDir = () => path.join(claimsDir(), 'bash');
+
+// -> { root, head } for the repo that contains cwd, or null. head is null on an unborn branch.
+function repoAt(cwd) {
+  const out = git(['rev-parse', '--show-toplevel', 'HEAD'], cwd);
+  if (out) {
+    const [root, head] = out.split(/\r?\n/);
+    return { root, head: head || null };
+  }
+  const root = git(['rev-parse', '--show-toplevel'], cwd);
+  return root ? { root, head: null } : null;
+}
+
+// Paths `git status` lists, relative to root. null = git failed. --no-optional-locks: a hook's status must
+// never take index.lock from under another session's git add / commit.
+function listedPaths(root) {
+  const out = gitRaw(['--no-optional-locks', 'status', '--porcelain=v1', '-z', '-uall', '--no-renames'], root);
+  if (out === null) return null;
+  const rels = [];
+  for (const entry of out.split('\0')) {
+    const rel = entry.slice(3);
+    if (rel && !rel.endsWith('/')) rels.push(rel); // a trailing slash = nested repo / submodule: not ours
+  }
+  return rels;
+}
+
+const cachePath = (root) => path.join(bashDir(), `cache-${sha1(normAbs(root))}.json`);
+
+// Worktree blob of each rel ('' absent, null cannot tell: not a regular file, too big, git failed), same
+// filters as blobOf. Files whose size+mtime+ctime match the cache are not re-hashed (ctime: a rewrite that
+// restores size and mtime -- cp -p, touch -r, os.utime -- still moves it, codex r5); a file changed within
+// RACY_MS of being hashed is never cached (a same-tick rewrite would keep its stat). statsOut, when given,
+// receives { size, mtimeMs, big } of every regular file (big = over MAX_HASH_BYTES, not hashed).
+function blobsOf(root, rels, statsOut) {
+  const cache = readJson(cachePath(root)) || {};
+  const out = {};
+  const stats = {};
+  const todo = [];
+  for (const rel of rels) {
+    let st;
+    try { st = fs.lstatSync(path.join(root, rel)); } catch (e) { out[rel] = e && e.code === 'ENOENT' ? '' : null; continue; }
+    if (!st.isFile() || /[\r\n]/.test(rel)) { out[rel] = null; continue; }
+    if (statsOut) statsOut[rel] = { size: st.size, mtimeMs: st.mtimeMs, big: st.size > MAX_HASH_BYTES };
+    if (st.size > MAX_HASH_BYTES) { out[rel] = null; continue; }
+    stats[rel] = [st.size, st.mtimeMs, st.ctimeMs];
+    const c = cache[rel];
+    if (Array.isArray(c) && c.length === 4 && c[0] === st.size && c[1] === st.mtimeMs && c[2] === st.ctimeMs && typeof c[3] === 'string') out[rel] = c[3];
+    else todo.push(rel);
+  }
+  if (todo.length) {
+    const res = gitRaw(['hash-object', '--stdin-paths'], root, `${todo.join('\n')}\n`);
+    const lines = res === null ? [] : res.split('\n').filter(Boolean);
+    if (lines.length === todo.length) todo.forEach((rel, i) => { out[rel] = lines[i]; });
+    else for (const rel of todo) out[rel] = blobOf({ root, rel }); // a file vanished mid-batch: one by one
+  }
+  const now = Date.now();
+  const next = {};
+  for (const [rel, st] of Object.entries(stats)) {
+    if (typeof out[rel] === 'string' && out[rel] && now - Math.max(st[1], st[2]) > RACY_MS) next[rel] = [...st, out[rel]];
+  }
+  try { writeJsonAtomic(cachePath(root), next); } catch (_) { /* only an optimization */ }
+  return out;
+}
+
+// Blob of each rel in commit `head` ('' = not in it, null = cannot tell).
+function headBlobs(root, head, rels) {
+  const out = {};
+  if (!head) { for (const r of rels) out[r] = ''; return out; }
+  if (!rels.length) return out;
+  const res = gitRaw(['cat-file', '--batch-check=%(objectname) %(objecttype)'], root, `${rels.map((r) => `${head}:${r}`).join('\n')}\n`);
+  const lines = res === null ? [] : res.split('\n').filter(Boolean);
+  rels.forEach((r, i) => {
+    const ln = lines.length === rels.length ? lines[i] : '';
+    out[r] = / blob$/.test(ln) ? ln.split(' ')[0] : (/ missing$/.test(ln) ? '' : null);
+  });
+  return out;
+}
+
+// One file per PreToolUse, queued under its key: two calls that share a key (Codex without tool_use_id, same
+// turn + cwd + command -- codex r5) each keep their snapshot; a PostToolUse takes the oldest. Taking the older
+// one of two identical calls only widens that call's window.
+const snapshotPrefix = (key) => `snap-${sha1(key)}-`;
+
+function saveSnapshot(key, snap) {
+  const name = `${snapshotPrefix(key)}${String(snap.t0).padStart(15, '0')}-${crypto.randomBytes(4).toString('hex')}.json`;
+  writeJsonAtomic(path.join(bashDir(), name), snap);
+}
+
+// Read and remove the oldest snapshot under key: one PostToolUse consumes one. null when there is none.
+// unlink decides who consumed it when two PostToolUse race for the same file.
+function takeSnapshot(key) {
+  let names = [];
+  try { names = fs.readdirSync(bashDir()).filter((n) => n.startsWith(snapshotPrefix(key)) && n.endsWith('.json')).sort(); } catch (_) { return null; }
+  for (const n of names) {
+    const p = path.join(bashDir(), n);
+    const s = readJson(p);
+    try { fs.unlinkSync(p); } catch (_) { continue; }
+    if (s && typeof s.root === 'string' && s.blobs && typeof s.blobs === 'object') return s;
+  }
+  return null;
+}
+
+// Other sessions' Bash commands still running in this repo (snapshot not consumed, younger than PENDING_MS).
+// Also drops snapshots older than SNAPSHOT_KEEP_MS: a call another rule blocked never consumes its own.
+function bashInFlight(root, sid, now) {
+  let names = [];
+  try { names = fs.readdirSync(bashDir()).filter((n) => n.startsWith('snap-') && n.endsWith('.json')); } catch (_) { return []; }
+  const want = normAbs(root);
+  const out = [];
+  for (const n of names) {
+    const p = path.join(bashDir(), n);
+    const s = readJson(p);
+    const age = ageOf(s && s.t0, now);
+    if (age > SNAPSHOT_KEEP_MS) { try { fs.unlinkSync(p); } catch (_) { /* gone */ } continue; }
+    if (s.sid !== sid && age < PENDING_MS && typeof s.root === 'string' && normAbs(s.root) === want) out.push(s);
+  }
+  return out;
+}
+
 module.exports = {
-  CLAIM_TTL_MS, PENDING_MS, LOCK_STALE_MS, claimsDir, claimPath, realAbs, normAbs, repoOf, blobOf, stateOf,
-  isShared, ageOf, readClaim, writeClaim, withLocks, breakStale, isLive, releaseClaim, listClaims,
+  CLAIM_TTL_MS, PENDING_MS, LOCK_STALE_MS, MAX_LISTED, claimsDir, claimPath, realAbs, normAbs, repoOf, blobOf,
+  stateOf, isShared, ageOf, readClaim, writeClaim, withLocks, breakStale, isLive, releaseClaim, listClaims,
+  withWrite, writesExplain, repoAt, listedPaths, blobsOf, headBlobs, saveSnapshot, takeSnapshot, bashInFlight,
 };
 
 // Operator CLI:  node file-claims.js list            -- every claim, with live/stale

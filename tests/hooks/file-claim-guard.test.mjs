@@ -299,3 +299,333 @@ test('Codex apply_patch meets the same claim: deny decision; release CLI frees t
   assert.doesNotMatch(again.stdout + again.stderr, CLAIMED);
   assert.match(again.stderr, /WARN: a\.txt already has uncommitted changes/);
 });
+
+// ---- Bash: PreToolUse snapshots the work tree, PostToolUse / PostToolUseFailure compares ----
+
+function bashHook(s, event, sid, id, { host = 'claude', command = `step ${id}` } = {}) {
+  const env = { CLAUDE_FILE_CLAIMS_DIR: s.claimsDir, CODEX_HOME: s.claimsDir };
+  if (host === 'codex') { // no tool_use_id: the key falls back to turn_id + command
+    return runNode(RUNNER, { session_id: sid, turn_id: id, cwd: s.dir, tool_name: 'exec_command', tool_input: { cmd: command } },
+      { args: [event, '--host=codex'], cwd: s.dir, env });
+  }
+  return runNode(RUNNER, { session_id: sid, tool_use_id: id, cwd: s.dir, tool_name: 'Bash', tool_input: { command } }, { args: [event], cwd: s.dir, env });
+}
+
+// A Bash call that runs `body` (a real process writing files) between its two hooks.
+function bashCall(s, sid, body, { event = 'PostToolUse', host } = {}) {
+  const id = freshSid('tu');
+  bashHook(s, 'PreToolUse', sid, id, { host });
+  body();
+  return bashHook(s, event, sid, id, { host });
+}
+
+const py = (s, code) => {
+  const r = spawnSync('python', ['-c', code], { cwd: s.dir, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+};
+const append = (s, f, text) => py(s, `open(${JSON.stringify(f)}, 'a', newline='').write(${JSON.stringify(text)})`);
+const holderOf = (s, f) => {
+  process.env.CLAUDE_FILE_CLAIMS_DIR = s.claimsDir;
+  try { const c = claims.readClaim(path.join(s.dir, f)); return c && c.sid; } finally { delete process.env.CLAUDE_FILE_CLAIMS_DIR; }
+};
+const CHANGED_HELD = /this command changed a\.txt, which another session is editing/;
+
+test('acceptance: B patches A\'s claimed dirty file via `python -c` -> exit 2 at B\'s PostToolUse naming file and holder; A keeps the claim', () => {
+  const s = setup();
+  const A = freshSid('A');
+  const B = freshSid('B');
+  written(s, A, 'a.txt', 'A edit\n');
+  const b = bashCall(s, B, () => append(s, 'a.txt', 'B via python\n'));
+  assert.equal(b.status, 2, b.stderr);
+  assert.match(b.stderr, new RegExp(`this command changed a\\.txt, which another session is editing \\(claude:${A.slice(0, 12)}`));
+  assert.equal(holderOf(s, 'a.txt'), A);
+  assert.match(pre(s, A, ['a.txt']).stderr, /WARN: a\.txt changed outside this session/, 'the holder hears it too');
+});
+
+test('acceptance: A\'s Edit landing during B\'s Bash call is not B\'s -- neither when A already held the file nor when A claims it then', () => {
+  const s = setup();
+  const A = freshSid('A');
+  const B = freshSid('B');
+  written(s, A, 'a.txt', 'A edit 1\n');
+  const held = bashCall(s, B, () => written(s, A, 'a.txt', 'A edit 1\nA edit 2\n'));
+  assert.equal(held.status, 0, held.stderr);
+  assert.doesNotMatch(held.stderr, /this command/);
+  const fresh = bashCall(s, B, () => written(s, A, 'b.txt', 'A first edit of b\n'));
+  assert.equal(fresh.status, 0, fresh.stderr);
+  assert.equal(holderOf(s, 'b.txt'), A, 'B did not take the file A wrote');
+});
+
+test('A\'s Edit still in flight (PostToolUse not yet run) when B\'s Bash call ends -> not B\'s', () => {
+  const s = setup();
+  const A = freshSid('A');
+  const B = freshSid('B');
+  written(s, A, 'a.txt', 'A edit 1\n');
+  const b = bashCall(s, B, () => { pre(s, A, ['a.txt']); fs.writeFileSync(path.join(s.dir, 'a.txt'), 'A edit 2\n'); });
+  assert.equal(b.status, 0, b.stderr);
+  assert.match(b.stderr, /WARN: a\.txt changed during this command while another session had a write to it in flight .*cannot tell whose change it is/, 'inconclusive -> told, not silenced (codex r6 F1)');
+  post(s, A, ['a.txt']);
+  assert.equal(holderOf(s, 'a.txt'), A);
+});
+
+test('B\'s write is not hidden by a concurrent Edit of A: the write log has a gap where B wrote', () => {
+  const s = setup();
+  const A = freshSid('A');
+  const B = freshSid('B');
+  written(s, A, 'a.txt', 'A edit 1\n');
+  const b = bashCall(s, B, () => {
+    written(s, A, 'a.txt', 'A edit 1\nA edit 2\n');
+    append(s, 'a.txt', 'B via python\n');
+  });
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, CHANGED_HELD);
+});
+
+test('B reverts A\'s claimed file with `git checkout` -> exit 2: A\'s work is gone from the work tree', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const b = bashCall(s, freshSid('B'), () => g(s.dir, ['checkout', '--', 'a.txt']));
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, /this command changed a\.txt, which another session is editing .*back at HEAD now/);
+});
+
+test('a file nobody held, written by Bash (modified or created) -> this session holds it; others are blocked; no false WARN for the holder', () => {
+  const s = setup();
+  const B = freshSid('B');
+  const b = bashCall(s, B, () => { append(s, 'a.txt', 'B via python\n'); py(s, "open('new.txt', 'w').write('new\\n')"); });
+  assert.equal(b.status, 0, b.stderr);
+  assert.equal(holderOf(s, 'a.txt'), B);
+  assert.equal(holderOf(s, 'new.txt'), B);
+  assert.match(pre(s, freshSid('C'), ['a.txt']).stderr, CLAIMED);
+  assert.match(pre(s, freshSid('C'), ['new.txt']).stderr, CLAIMED);
+  assert.doesNotMatch(pre(s, B, ['a.txt']).stderr, /changed outside this session/, 'its own Bash write moved lastBlob');
+  assert.equal(bashCall(s, B, () => append(s, 'agency-os/WORKLOG.md', 'B entry\n')).status, 0);
+  assert.equal(holderOf(s, 'agency-os/WORKLOG.md'), null, 'WORKLOG is never claimed through Bash either');
+});
+
+test('the holder\'s own Bash write keeps the claim and moves lastBlob (no "changed outside" WARN later)', () => {
+  const s = setup();
+  const A = freshSid('A');
+  written(s, A, 'a.txt', 'A edit\n');
+  const a = bashCall(s, A, () => append(s, 'a.txt', 'A via python\n'));
+  assert.equal(a.status, 0, a.stderr);
+  assert.doesNotMatch(pre(s, A, ['a.txt']).stderr, /changed outside this session/);
+});
+
+test('Bash writing a file that already had unclaimed changes -> held, with a WARN about the earlier changes', () => {
+  const s = setup();
+  fs.writeFileSync(path.join(s.dir, 'a.txt'), 'earlier, nobody claimed\n');
+  const B = freshSid('B');
+  const b = bashCall(s, B, () => append(s, 'a.txt', 'B via python\n'));
+  assert.equal(b.status, 0);
+  assert.match(b.stderr, /WARN: a\.txt already had uncommitted changes this session did not make/);
+  assert.equal(holderOf(s, 'a.txt'), B);
+});
+
+test('a failed command still wrote: PostToolUseFailure reports like PostToolUse', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const b = bashCall(s, freshSid('B'), () => append(s, 'a.txt', 'B, then the command failed\n'), { event: 'PostToolUseFailure' });
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, CHANGED_HELD);
+});
+
+test('read-only command, a commit of the file, a CRLF rewrite under autocrlf -> nothing changed; snapshots are consumed', () => {
+  const s = setup({ autocrlf: 'true' });
+  const A = freshSid('A');
+  written(s, A, 'a.txt', 'A edit\n');
+  const B = freshSid('B');
+  assert.equal(bashCall(s, B, () => g(s.dir, ['status'])).status, 0);
+  assert.equal(bashCall(s, B, () => fs.writeFileSync(path.join(s.dir, 'b.txt'), 'base\r\n')).status, 0, 'same content after the clean filter');
+  assert.equal(holderOf(s, 'b.txt'), null);
+  assert.equal(bashCall(s, B, () => g(s.dir, ['rm', '-q', '--cached', '--', 'b.txt'])).status, 0);
+  assert.equal(holderOf(s, 'b.txt'), null, 'index-only change: listed now, but its work-tree blob still equals the old HEAD blob');
+  const c = bashCall(s, B, () => g(s.dir, ['commit', '-q', '-m', 'B commits A\'s file', '--', 'a.txt']));
+  assert.doesNotMatch(c.stderr, /this command changed/, 'a commit does not change the work tree (commit scope is git-commit-scope-guard\'s job)');
+  assert.deepEqual(fs.readdirSync(path.join(s.claimsDir, 'bash')).filter((n) => n.startsWith('snap-')), []);
+});
+
+test('two Bash calls of one session in parallel, same command text, keep separate snapshots (tool_use_id)', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const B = freshSid('B');
+  const same = { command: 'npm test' };
+  bashHook(s, 'PreToolUse', B, 'one', same);
+  append(s, 'a.txt', 'written while only call one ran\n');
+  bashHook(s, 'PreToolUse', B, 'two', same);
+  const one = bashHook(s, 'PostToolUse', B, 'one', same);
+  assert.equal(one.status, 2, 'call one still has its own snapshot');
+  assert.doesNotMatch(one.stderr, /ran in this repo at the same time/, 'call two (same session, in flight) is not "another session"');
+  assert.equal(bashHook(s, 'PostToolUse', B, 'two', same).status, 0, 'call two started after the write');
+  assert.deepEqual(fs.readdirSync(path.join(s.claimsDir, 'bash')).filter((n) => n.startsWith('snap-')), [], 'both snapshots consumed');
+});
+
+test('a same-size rewrite of a file the stat cache already holds is still seen (cache keyed on size + mtime)', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const old = new Date(Date.now() - 3600000);
+  fs.utimesSync(path.join(s.dir, 'a.txt'), old, old); // old enough to be cached at B's PreToolUse
+  const b = bashCall(s, freshSid('B'), () => py(s, "open('a.txt', 'w', newline='').write('B edit\\n')"));
+  assert.equal(fs.readFileSync(path.join(s.dir, 'a.txt'), 'utf8'), 'B edit\n');
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, CHANGED_HELD);
+});
+
+test('another session\'s Bash running at the same time is named in the report', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const C = freshSid('C');
+  bashHook(s, 'PreToolUse', C, 'c-long');
+  const b = bashCall(s, freshSid('B'), () => append(s, 'a.txt', 'B or C?\n'));
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, new RegExp(`Bash of ${C.slice(0, 12)} ran in this repo at the same time`));
+  const c = bashHook(s, 'PostToolUse', C, 'c-long');
+  assert.equal(c.status, 2, 'codex r6 F3: B logged the write while C ran -- no proof against C, so C is told too');
+  assert.match(c.stderr, /this command changed a\.txt, which another session is editing/);
+  assert.match(c.stderr, /Bash of .* ran in this repo at the same time/, 'C learns that B overlapped');
+});
+
+test('one session, two parallel calls over the same write -> one report: its own logged entry is proof for itself', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const B = freshSid('B');
+  bashHook(s, 'PreToolUse', B, 'one');
+  bashHook(s, 'PreToolUse', B, 'two');
+  append(s, 'a.txt', 'B\n');
+  assert.equal(bashHook(s, 'PostToolUse', B, 'one').status, 2);
+  assert.equal(bashHook(s, 'PostToolUse', B, 'two').status, 0);
+});
+
+test('codex r6 F2: a logged write with an unknown start (from: null) is no proof -- the command is still reported', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const b = bashCall(s, freshSid('B'), () => {
+    append(s, 'a.txt', 'B via python\n');
+    const blob = g(s.dir, ['hash-object', 'a.txt']).out;
+    patchClaim(s, 'a.txt', { writes: [{ sid: 'late-edit', from: null, to: blob, at: Date.now(), end: Date.now() }] });
+  });
+  assert.equal(b.status, 2, b.stderr);
+  assert.match(b.stderr, CHANGED_HELD);
+});
+
+test('Codex shell call (no tool_use_id) meets the same rule: block decision at PostToolUse', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const cx = bashCall(s, freshSid('codex'), () => append(s, 'a.txt', 'codex via python\n'), { host: 'codex' });
+  const decision = JSON.parse(cx.stdout);
+  assert.equal(decision.decision, 'block');
+  assert.match(decision.reason, CHANGED_HELD);
+});
+
+test('no session id -> no snapshot, no claim', () => {
+  const s = setup();
+  const env = { CLAUDE_FILE_CLAIMS_DIR: s.claimsDir };
+  runNode(RUNNER, { tool_name: 'Bash', cwd: s.dir, tool_input: { command: 'x' } }, { args: ['PreToolUse'], cwd: s.dir, env });
+  append(s, 'a.txt', 'anonymous\n');
+  runNode(RUNNER, { tool_name: 'Bash', cwd: s.dir, tool_input: { command: 'x' } }, { args: ['PostToolUse'], cwd: s.dir, env });
+  assert.equal(fs.existsSync(path.join(s.claimsDir, 'bash')), false);
+  assert.equal(holderOf(s, 'a.txt'), null);
+});
+
+test('found live: a commit ends the claim -- the file dirtied again by a writer the hooks cannot see does not revive it', () => {
+  const s = setup();
+  const A = freshSid('A');
+  written(s, A, 'a.txt', 'A edit\n');
+  g(s.dir, ['commit', '-q', '-m', 'A', '--', 'a.txt']);
+  fs.writeFileSync(path.join(s.dir, 'a.txt'), 'the operator, in an editor\n');
+  assert.doesNotMatch(pre(s, freshSid('B'), ['a.txt']).stderr, CLAIMED);
+});
+
+test('a commit of an OLDER staged version after the holder wrote does not end the claim (content, not commit time)', () => {
+  const s = setup();
+  fs.writeFileSync(path.join(s.dir, 'a.txt'), 'staged earlier\n');
+  g(s.dir, ['add', '--', 'a.txt']);
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  g(s.dir, ['commit', '-q', '-m', 'commits the index, not the edit of A']);
+  assert.match(pre(s, freshSid('B'), ['a.txt']).stderr, CLAIMED);
+});
+
+test('Bash judges the holder\'s claim as of the command start: committed or reverted claims are not revived by the command\'s own write', () => {
+  const s = setup();
+  const A = freshSid('A');
+  written(s, A, 'a.txt', 'A edit\n');
+  written(s, A, 'b.txt', 'A edit\n');
+  g(s.dir, ['checkout', '--', 'a.txt']); // A reverted
+  g(s.dir, ['commit', '-q', '-m', 'A', '--', 'b.txt']); // A committed
+  const B = freshSid('B');
+  const b = bashCall(s, B, () => { append(s, 'a.txt', 'B\n'); append(s, 'b.txt', 'B\n'); });
+  assert.equal(b.status, 0, b.stderr);
+  assert.equal(holderOf(s, 'a.txt'), B);
+  assert.equal(holderOf(s, 'b.txt'), B);
+});
+
+test('a file clean when B\'s command started, first written by A\'s Edit during it, then by B -> exit 2 (A wrote during the command)', () => {
+  const s = setup();
+  const A = freshSid('A');
+  const b = bashCall(s, freshSid('B'), () => {
+    written(s, A, 'b.txt', 'A first edit of b\n');
+    append(s, 'b.txt', 'B via python, on top\n');
+  });
+  assert.equal(b.status, 2);
+  assert.match(b.stderr, /this command changed b\.txt, which another session is editing/);
+  assert.equal(holderOf(s, 'b.txt'), A);
+});
+
+test('codex r5 F1: two Codex calls sharing a key (no tool_use_id, same turn + cwd + command) keep separate snapshots', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const cx = freshSid('codex');
+  const o = { host: 'codex', command: 'npm test' };
+  bashHook(s, 'PreToolUse', cx, 't1', o);
+  append(s, 'a.txt', 'written while only the first call ran\n');
+  bashHook(s, 'PreToolUse', cx, 't1', o);
+  const first = bashHook(s, 'PostToolUse', cx, 't1', o);
+  assert.equal(JSON.parse(first.stdout).decision, 'block', first.stderr);
+  const second = bashHook(s, 'PostToolUse', cx, 't1', o);
+  assert.doesNotMatch(second.stdout, /block/, 'the second call started after the write');
+  assert.deepEqual(fs.readdirSync(path.join(s.claimsDir, 'bash')).filter((n) => n.startsWith('snap-')), []);
+});
+
+test('codex r5 F2: a same-size rewrite that restores the mtime is still seen (ctime is in the stat cache key)', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const old = new Date(Date.now() - 3600000);
+  fs.utimesSync(path.join(s.dir, 'a.txt'), old, old);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2300); // utimes moved ctime: wait out RACY_MS so it is cached
+  const b = bashCall(s, freshSid('B'), () => py(s, "import os; st = os.stat('a.txt'); open('a.txt', 'w', newline='').write('B edit\\n'); os.utime('a.txt', ns=(st.st_atime_ns, st.st_mtime_ns))"));
+  assert.equal(fs.statSync(path.join(s.dir, 'a.txt')).mtimeMs, old.getTime(), 'mtime restored');
+  assert.equal(b.status, 2, b.stderr);
+  assert.match(b.stderr, CHANGED_HELD);
+});
+
+test('codex r5 F3: a file written after the PostToolUse hook started is not the command\'s', () => {
+  const s = setup();
+  const b = bashCall(s, freshSid('B'), () => {
+    fs.writeFileSync(path.join(s.dir, 'a.txt'), 'another session, after this command ended\n');
+    const later = new Date(Date.now() + 60000); // stands in for "written after the hook process started"
+    fs.utimesSync(path.join(s.dir, 'a.txt'), later, later);
+  });
+  assert.equal(b.status, 0, b.stderr);
+  assert.equal(holderOf(s, 'a.txt'), null);
+});
+
+test('codex r5 F4: a file too big to hash that changed is named in a WARN; unchanged, it is not', () => {
+  const s = setup();
+  const big = path.join(s.dir, 'big.bin');
+  fs.writeFileSync(big, Buffer.alloc(33 * 1024 * 1024));
+  const B = freshSid('B');
+  assert.doesNotMatch(bashCall(s, B, () => {}).stderr, /too large/);
+  const b = bashCall(s, B, () => fs.appendFileSync(big, 'x'));
+  assert.match(b.stderr, /WARN: big\.bin changed during this command but is too large for file-claim-guard to compare/);
+});
+
+test('Posts arriving out of order still find their own snapshot (tool_use_id key, not the FIFO)', () => {
+  const s = setup();
+  written(s, freshSid('A'), 'a.txt', 'A edit\n');
+  const B = freshSid('B');
+  const same = { command: 'npm test' };
+  bashHook(s, 'PreToolUse', B, 'early', same);
+  append(s, 'a.txt', 'written while only the early call ran\n');
+  bashHook(s, 'PreToolUse', B, 'late', same);
+  assert.equal(bashHook(s, 'PostToolUse', B, 'late', same).status, 0, 'the late call started after the write');
+  assert.equal(bashHook(s, 'PostToolUse', B, 'early', same).status, 2);
+});
