@@ -590,6 +590,30 @@ class ProjectSourceRepository:
             ).fetchall()
         return [self._source_from_row(row) for row in rows]
 
+    def search_active_sources(self, tenant_id: str, query: str, limit: int = 50) -> tuple[list[dict[str, Any]], bool]:
+        """Search active Sources across this tenant's Projects without wildcard injection.
+        Returns ``(rows, truncated)``: ``truncated`` is True when more than ``limit`` Sources match (one extra row is
+        fetched to know), so a caller never mistakes the first ``limit`` rows for the whole match set."""
+        if not isinstance(query, str) or not query.strip():
+            raise InvariantViolation("SOURCE_SEARCH_QUERY_REQUIRED")
+        if not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise InvariantViolation("SOURCE_SEARCH_LIMIT_INVALID")
+        escaped = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        source_select = ", ".join(f"s.{column}" for column in _SOURCE_SELECT.split(", "))
+        with self._connection() as connection:
+            rows = connection.execute(
+                f"SELECT {source_select}, p.name AS project_name, p.purpose AS project_purpose "
+                "FROM prov_sources s JOIN platform_projects p ON p.tenant_id=s.tenant_id AND p.project_id=s.project_id "
+                "WHERE s.tenant_id=? AND s.status='active' AND "
+                "(s.source_id LIKE ? ESCAPE '\\' OR s.title LIKE ? ESCAPE '\\' OR COALESCE(s.doi,'') LIKE ? ESCAPE '\\' "
+                "OR COALESCE(s.canonical_url,'') LIKE ? ESCAPE '\\' OR COALESCE(s.source_uri,'') LIKE ? ESCAPE '\\') "
+                "ORDER BY s.created_at, s.project_id, s.source_id LIMIT ?",
+                (tenant_id, pattern, pattern, pattern, pattern, pattern, limit + 1),
+            ).fetchall()
+        found = [{**self._source_from_row(row), "project_name": row["project_name"], "project_purpose": row["project_purpose"]} for row in rows]
+        return found[:limit], len(found) > limit
+
     def get_source_content_reference(self, tenant_id: str, project_id: str, source_id: str) -> dict[str, str] | None:
         with self._connection() as connection:
             row = connection.execute(
@@ -816,15 +840,24 @@ class ProjectSourceRepository:
         result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
         return result
 
-    def update_report_reference(self, tenant_id: str, project_id: str, report_id: str, artifact_reference: Mapping[str, Any], event_type: str, payload: Mapping[str, Any]) -> None:
-        """Replace a report's CAS pointer only together with its lifecycle event."""
+    def update_report_reference(
+        self, tenant_id: str, project_id: str, report_id: str, expected_reference: Mapping[str, Any],
+        artifact_reference: Mapping[str, Any], event_type: str, payload: Mapping[str, Any],
+    ) -> None:
+        """Replace a report's CAS pointer only together with its lifecycle event, and only if the pointer is still
+        ``expected_reference`` (compare-and-swap): a concurrent decision makes this one fail ``REPORT_STALE``
+        instead of silently overwriting it."""
+        def encode(reference: Mapping[str, Any]) -> str:
+            return json.dumps(dict(reference), ensure_ascii=False, sort_keys=True)
+
         with self._connection() as connection:
             updated = connection.execute(
-                "UPDATE project_reports SET artifact_reference_json=? WHERE tenant_id=? AND project_id=? AND report_id=?",
-                (json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), tenant_id, project_id, report_id),
+                "UPDATE project_reports SET artifact_reference_json=? WHERE tenant_id=? AND project_id=? AND report_id=? AND artifact_reference_json=?",
+                (encode(artifact_reference), tenant_id, project_id, report_id, encode(expected_reference)),
             ).rowcount
             if updated != 1:
-                raise InvariantViolation("REPORT_NOT_FOUND")
+                exists = connection.execute("SELECT 1 FROM project_reports WHERE tenant_id=? AND project_id=? AND report_id=?", (tenant_id, project_id, report_id)).fetchone()
+                raise InvariantViolation("REPORT_STALE" if exists else "REPORT_NOT_FOUND")
             self._append_event(connection, tenant_id, f"project:{project_id}", event_type, dict(payload))
 
     # -- Project erasure (plan D10, K7) ---------------------------------------------------------------------------

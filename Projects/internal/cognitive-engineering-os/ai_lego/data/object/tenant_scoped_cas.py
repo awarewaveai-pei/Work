@@ -35,8 +35,10 @@ class TenantScopedCas:
         return (self.root / "objects" / tenant_id).resolve()
 
     def _resolve_owned(self, tenant_id: str, cas_path: dict[str, str]) -> Path:
-        if cas_path.get("tenant_segment") != tenant_id:
+        if not isinstance(cas_path, dict) or cas_path.get("tenant_segment") != tenant_id:
             raise InvariantViolation("CAS_TENANT_ACCESS_DENIED")
+        if not isinstance(cas_path.get("path"), str):
+            raise InvariantViolation("CAS_PATH_INVALID")
         target = (self.root / Path(cas_path["path"].lstrip("/"))).resolve()
         if self._tenant_root(tenant_id) not in target.parents:
             raise InvariantViolation("CAS_TENANT_ACCESS_DENIED")

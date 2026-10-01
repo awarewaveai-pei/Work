@@ -23,7 +23,11 @@ git diff --shortstat
 
 Treat untracked files as reviewable work even when the diff shortstat is empty. If nothing changed, report "No changes to review" and stop.
 
-If the change is clearly tiny (≈1-2 files, no sign of a broader change) run in the foreground (`--wait`). Otherwise run in the background (`--background`) and tell the user to check `/codex:status`.
+**Route by file count (2026-10-01).** Count the changed files above (staged + unstaged + untracked).
+- **≤ 2 files** → Steps 1.5–3 below (companion `adversarial-review`, foreground `--wait`).
+- **> 2 files** → skip Steps 1.5–3 and run `scripts/codex-oracle.ps1 -Mode review -Context "<one line>"` (background; it captures, inlines the diff, and writes its own artifact). Why: the companion inlines the diff only up to 2 files (`plugins/codex/scripts/lib/git.mjs:8` `DEFAULT_INLINE_DIFF_MAX_FILES = 2`); above that Codex must read the tree itself, and its managed shell rejects `git diff`/`Get-Content` outside `D:\Work` — on 2026-10-01 two of six rounds reviewed nothing, one of them returning a vacuous `approve`. `codex-oracle.ps1` always inlines (`:408`), so the reviewer never has to read files to see the change.
+
+A review whose output says it could not read the diff/files is **not a review**: never land it as an artifact, never count it toward `REVIEW_DONE`.
 
 ## Step 1.5 — Capture the diff BEFORE calling codex
 

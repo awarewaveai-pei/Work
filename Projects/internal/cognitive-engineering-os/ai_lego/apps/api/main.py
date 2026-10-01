@@ -55,7 +55,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal
 from urllib.parse import urlparse
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -97,6 +97,7 @@ from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.modules.research.interpret_method_record import INTERPRET_MAX_TOKENS, INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, result_page_shows, run_interpretation
+from ai_lego.modules.research.gates import claim_citations, iter_claims
 from ai_lego.modules.research.source_manifest import DEFAULT_MAX_CHARS
 from ai_lego.modules.research.synthesis import run_synthesis, validate_subject
 from ai_lego.modules.research.report_render import render_research_report
@@ -2265,6 +2266,8 @@ class CreateReportRequest(BaseModel):
 
 
 def _read_report(repo: ProjectSourceRepository, artifact_store: JsonArtifactStore, tenant_id: str, project_id: str, report_id: str) -> dict[str, Any]:
+    """One read of the report: its body plus the exact CAS reference that body came from, so a later
+    write can state which version it replaces."""
     stored = repo.get_report(tenant_id, project_id, report_id)
     if stored is None:
         raise HTTPException(status_code=404, detail=f"REPORT_NOT_FOUND: {report_id!r}")
@@ -2272,7 +2275,12 @@ def _read_report(repo: ProjectSourceRepository, artifact_store: JsonArtifactStor
         artifact = artifact_store.read(tenant_id, stored["artifact_reference"])
     except InvariantViolation as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
-    return {"report": artifact["report"], "gate_results": artifact.get("gate_results", []), "created_at": stored["created_at"]}
+    return {"report": artifact["report"], "gate_results": artifact.get("gate_results", []), "created_at": stored["created_at"],
+            "artifact_reference": stored["artifact_reference"]}
+
+
+def _public_report(result: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in result.items() if key != "artifact_reference"}
 
 
 @app.post("/projects/{project_id}/reports", status_code=201)
@@ -2285,9 +2293,11 @@ def create_report(
 ) -> dict[str, Any]:
     """Render and persist a project-bound report from an existing synthesis.
 
-    Recipe run results are accepted only as already projected result bodies; this endpoint does not
-    claim ownership of arbitrary run ids until the project-level run binding exists.
+    ``run_results`` must be empty: a caller-supplied run body would put unverifiable gate statuses into an
+    approvable report. It opens only once the project-level run binding can prove the run belongs to this Project.
     """
+    if payload.run_results:
+        raise HTTPException(status_code=422, detail="REPORT_RUN_RESULTS_UNBOUND: run results are not accepted until project-level run binding exists")
     tenant_id = session["tenant_id"]
     _project_or_404(repo, tenant_id, project_id)
     synthesis = repo.get_synthesis(tenant_id, project_id, payload.synthesis_id)
@@ -2320,7 +2330,7 @@ def get_report(
     artifact_store: JsonArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
     _project_or_404(repo, session["tenant_id"], project_id)
-    return _read_report(repo, artifact_store, session["tenant_id"], project_id, report_id)
+    return _public_report(_read_report(repo, artifact_store, session["tenant_id"], project_id, report_id))
 
 
 @app.get("/projects/{project_id}/reports/{report_id}/export", response_class=PlainTextResponse)
@@ -2361,18 +2371,31 @@ def approve_report(
         raise HTTPException(status_code=400, detail="REPORT_REJECTION_REASON_REQUIRED")
     if len(reason) > MAX_APPROVAL_REASON_CHARS:
         raise HTTPException(status_code=400, detail=f"REPORT_APPROVAL_REASON_TOO_LONG: at most {MAX_APPROVAL_REASON_CHARS} characters")
+    if payload.decision == "approve" and current["report"]["report_state"] == "HUMAN_APPROVED":
+        raise HTTPException(status_code=409, detail="REPORT_ALREADY_APPROVED")
     if payload.decision == "approve" and any(g.get("status") == "FAIL" for g in current["gate_results"]):
         raise HTTPException(status_code=409, detail="REPORT_GATE_FAILED: a report with failed integrity gates cannot be approved")
-    old_reference = repo.get_report(tenant_id, project_id, report_id)["artifact_reference"]
+    old_reference = current["artifact_reference"]
+    previous_state = current["report"]["report_state"]
     report = dict(current["report"])
     report["report_state"] = "HUMAN_APPROVED" if payload.decision == "approve" else "AI_GENERATED"
     report["approved_by"] = session["identity_id"] if payload.decision == "approve" else None
-    updated = {"report": report, "gate_results": current["gate_results"]}
+    # decision_id makes every report version's bytes unique: the CAS is content-addressed, so without it two versions
+    # (a repeated reject, a concurrent identical decision) share one blob and deleting the replaced/losing one deletes the live one.
+    updated = {"report": report, "gate_results": current["gate_results"], "decision_id": uuid.uuid4().hex}
     reference = artifact_store.put(tenant_id, "ResearchReport", updated)
     by_name = _by_name(store, session)
     event_type = "ReportApproved" if payload.decision == "approve" else "ReportRejected"
     try:
-        repo.update_report_reference(tenant_id, project_id, report_id, reference, event_type, {"report_id": report_id, "by": session["identity_id"], "by_name": by_name, "reason": reason})
+        repo.update_report_reference(
+            tenant_id, project_id, report_id, old_reference, reference, event_type,
+            {"report_id": report_id, "by": session["identity_id"], "by_name": by_name, "reason": reason, "previous_state": previous_state},
+        )
+    except InvariantViolation as error:
+        artifact_store.delete_if_present(tenant_id, reference)
+        if str(error) == "REPORT_STALE":
+            raise HTTPException(status_code=409, detail="REPORT_STALE: the report changed while this decision was being made; reload and decide again") from error
+        raise
     except Exception:
         artifact_store.delete_if_present(tenant_id, reference)
         raise
@@ -2633,6 +2656,83 @@ def list_sources(
 ) -> list[dict[str, Any]]:
     _project_or_404(repo, session["tenant_id"], project_id)
     return repo.list_sources(session["tenant_id"], project_id)
+
+
+# Hard cap on synthesis artifacts one search request may read (work bound independent of tenant size). Past it the
+# affected Projects are reported in ``incomplete`` -- the response never claims "no findings" for evidence it did not read.
+MAX_SEARCH_SYNTHESIS_READS = 200
+
+
+def _collect_cited_findings(synthesis: dict[str, Any], project_id: str, known: dict[str, list[dict[str, Any]]]) -> None:
+    """Append to ``known[source_id]`` only citation-backed synthesis claims; arbitrary prose is never a finding.
+    ``known`` holds one Project's matched Sources, so a citation can only land on a Source of the same Project.
+    Claims come from ``iter_claims`` -- the same walk the citation_integrity gate uses -- so a claim cited from
+    ``studies``/``options``/``criteria``/``evidence``/``related_entities``/``conflicts`` is found like a summary one."""
+    for path, claim, _ in iter_claims(synthesis):
+        top_level = path.removeprefix("$.").split(".")[0]
+        name, _, index = top_level.partition("[")
+        if name == "sections" and index.rstrip("]").isdigit():
+            section = (synthesis.get("sections") or [])[int(index.rstrip("]"))]
+            heading = str(section.get("heading") or "section") if isinstance(section, dict) else "section"
+        else:
+            heading = name
+        text = next((str(claim[key]) for key in ("text", "claim", "name") if claim.get(key)), "")
+        for citation in claim_citations(claim):
+            if not isinstance(citation, str) or not citation.startswith("source:"):
+                continue
+            source_id = citation.removeprefix("source:")
+            if source_id not in known:
+                continue
+            finding = {"heading": heading, "text": text, "citation": citation,
+                       "synthesis_id": synthesis.get("synthesis_id"), "project_id": project_id}
+            if finding not in known[source_id]:
+                known[source_id].append(finding)
+
+
+@app.get("/sources/search")
+def search_sources(
+    q: str = Query(..., min_length=1, max_length=200),
+    limit: int = Query(50, ge=1, le=100),
+    session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
+    artifact_store: JsonArtifactStore = Depends(get_artifact_store),
+) -> dict[str, Any]:
+    """Search only this tenant's active Sources and expose synthesis findings that cite each match."""
+    tenant_id = session["tenant_id"]
+    try:
+        matches, truncated = repo.search_active_sources(tenant_id, q, limit)
+    except InvariantViolation as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    findings: dict[tuple[str, str], list[dict[str, Any]]] = {(row["project_id"], row["source_id"]): [] for row in matches}
+    incomplete: dict[str, str] = {}   # project_id -> why its findings may be missing; never silently empty
+    budget = MAX_SEARCH_SYNTHESIS_READS
+    for project_id in dict.fromkeys(row["project_id"] for row in matches):   # only Projects that hold a match are opened
+        known = {source_id: items for (owner, source_id), items in findings.items() if owner == project_id}
+        for reference in repo.project_artifact_references(tenant_id, project_id):
+            if reference.get("artifact_type") not in {"LiteratureMatrix", "DossierBrief", "DecisionEvidenceBrief"}:
+                continue
+            if budget == 0:
+                incomplete.setdefault(project_id, "SEARCH_ARTIFACT_BUDGET_EXCEEDED")
+                break
+            budget -= 1
+            try:
+                artifact = artifact_store.read(tenant_id, reference)
+            except InvariantViolation as failure:
+                logging.getLogger(__name__).warning("source search: synthesis artifact unreadable in project %s (%s): %s", project_id, reference.get("content_sha256"), failure)
+                incomplete.setdefault(project_id, "ARTIFACT_UNREADABLE")
+                continue
+            synthesis = artifact.get("synthesis")
+            if not isinstance(synthesis, dict):
+                incomplete.setdefault(project_id, "ARTIFACT_MALFORMED")
+                continue
+            _collect_cited_findings(synthesis, project_id, known)
+    results = [
+        {"source": row, "project": {"project_id": row["project_id"], "name": row["project_name"], "purpose": row["project_purpose"]},
+         "findings": findings[(row["project_id"], row["source_id"])], "findings_complete": row["project_id"] not in incomplete}
+        for row in matches
+    ]
+    return {"query": q, "results": results, "truncated": truncated, "limit": limit,
+            "incomplete": [{"project_id": pid, "reason": reason} for pid, reason in incomplete.items()]}
 
 
 def _source_brief_block(source: dict[str, Any], content: str) -> str:

@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-01（續7）P4 report API 修正 + 跨專案來源搜尋落地 + /codex-review 依檔數分流
+- 起因（審 Codex `53dc77535`）：C1 `POST /projects/{id}/reports` 收呼叫者自填 `run_results`，renderer 直接信其 gate 狀態，可偽造 PASS 後核准；M1 核准改指標無 CAS，並發互蓋；M2 已核准可重核；C2（oracle 第3輪＋自查）CAS content-addressed，相同位元組＝同 reference：stale loser 清理、以及「重複駁回」這種不改位元組的決定，會刪掉 live blob → GET 500（`53dc77535` 原有 bug，紅燈測試證實）。
+- [已修改]
+  - `main.py`：非空 `run_results` → 422 `REPORT_RUN_RESULTS_UNBOUND`；`_read_report` 一次讀帶回 reference（GET 經 `_public_report` 去除）；已核准再核 409；CAS 敗 409 `REPORT_STALE`；事件加 `previous_state`；每次決定寫入的 artifact 帶 `decision_id`（uuid）→ 每個版本位元組唯一，兩個指標永不共用 blob，刪舊版／落敗版恆安全（關掉同類的 TOCTOU）。
+  - `project_source_repository.py`：`update_report_reference(..., expected_reference, ...)` UPDATE 加舊 reference 條件；`search_active_sources` 回 `(rows, truncated)`（多抓 1 列判斷）。
+  - 搜尋（Codex worktree 草稿收進後重寫）：只開有命中的 Project、鍵 (project_id, source_id)；claim 走 `gates.iter_claims`（studies/options/criteria/evidence/related_entities/conflicts 都算）；每請求讀 synthesis artifact 上限 `MAX_SEARCH_SYNTHESIS_READS`=200，讀不到／形狀損壞／超預算回 `incomplete[]`＋`findings_complete:false`；`truncated`/`limit` 回應欄位。
+  - `tenant_scoped_cas.py`：`cas_path` 非 dict 或缺 `path` → `InvariantViolation`（原為 KeyError→500）。
+  - `.claude/commands/codex-review.md` Step 1：>2 檔改走 `codex-oracle.ps1`（diff 內嵌）。根因：companion 只內嵌 ≤2 檔 diff（`plugins/codex/scripts/lib/git.mjs:8`），超過由 Codex 自讀，其 managed shell 擋 `git diff`/`Get-Content`（D:\Work 外），本次 6 輪有 2 輪沒讀到任何程式（含一次空洞 approve）。
+  - 計畫文件 WC-P4-01 狀態同步。
+- Oracle 處置：R1 citation 位置（採納）、R1/R2/R4 成本上界（不變量分析後採固定預算＋incomplete 標記；分頁／全文索引／限流列邊界，3 次重提不再追）、R2 讀錯靜默（採納）、R3 CAS 刪 live blob（採納，Critical）、R4 失敗 gate artifact 出 finding（駁回：`synthesis.py:268-269` gate 非 PASS 即 raise，不落地）、R4 截斷無標記（採納）；R4a／R5 讀不到 diff，不計；R6（codex-oracle 內嵌 diff）check-then-delete TOCTOU（採納，改以 decision_id 唯一化根治）、損壞 artifact 被當完整（採納）、損壞 cas_path → 500（採納，修在 CAS 邊界）。
+- [剩餘風險] `/approval` 無角色限制；搜尋無分頁／全文索引／限流（單租戶 SQLite 規模可接受）。
+- [rollback] revert 本 commit；`update_report_reference`／`search_active_sources` 各只有 `main.py` 一個 caller（grep）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_api_report tests.unit.test_project_source_repository tests.unit.test_project_source_api tests.unit.test_report_render tests.unit.test_api_interpret tests.unit.test_synthesis -q (+ 所有 TenantScopedCas 相關套件：420 OK)；golden 4261/4261 | exit=0 | ms=406360
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - external oracle = Codex CLI（codex-oracle.ps1，diff 內嵌）；artifacts `agency-os/reports/oracle/2026-10-01-review-c6f1ce4e.md`（R6，3 項全採納）、`2026-10-01-review-f9195658.md`（R7，1 項駁回：schema 驗證在寫入前 `synthesis.py:265`、讀取 sha256 比對 `json_artifact_store.py` HASH_MISMATCH，空 synthesis 無法落地）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=update_report_reference|search_active_sources|decision_id|CAS_PATH_INVALID|MAX_SEARCH_SYNTHESIS_READS|DEFAULT_INLINE_DIFF_MAX_FILES | hits=20
+- 突變證據（隔離 worktree，每次清 __pycache__）：拔 run_results 守衛／CAS where／已核准檢查／gate FAIL 檢查／搜尋 tenant 謂詞／LIKE 跳脫／iter_claims 範圍／unreadable 標記／預算檢查／decision_id／ARTIFACT_MALFORMED 標記／CAS_PATH_INVALID 檢查／truncated 旗標 → 各自指名測試紅，還原全綠。
 ## 2026-10-01（續6）Cognitive OS 相關 agent 指示檔稽核：一份過期 Codex 交接檔補「歷史、勿執行」標記
 
 - 起因：操作者問「cognitive 也有一個 agent」及這些檔是否需修正。repo 無 Cognitive OS 專屬 agent；逐一查了會被 AI 當指示讀的檔。
