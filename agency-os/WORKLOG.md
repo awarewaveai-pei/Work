@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-01（續6）Cognitive OS 相關 agent 指示檔稽核：一份過期 Codex 交接檔補「歷史、勿執行」標記
+
+- 起因：操作者問「cognitive 也有一個 agent」及這些檔是否需修正。repo 無 Cognitive OS 專屬 agent；逐一查了會被 AI 當指示讀的檔。
+- 結果：
+  - C1 `agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/.ai/CODEX_HANDOFF_PHASE5_2026-08-30.md`：全文讀起來是「Codex 可跨天自主執行」的現行指示，沒有任何完成標記；實際已依 `docs/adr/ADR-022-phase-5-runtime-landing.md`（ACCEPTED 2026-09-03）落地。檔頭加 HISTORICAL 標記＋指向 `RESEARCH_LINES_MASTER_PLAN.md` §0。唯一改動。
+  - 免改：`.ai/CODEX_HANDOFF_2026-08-30.md`（檔頭已自述 DONE／historical）；根 `AGENTS.md`（Codex 指標檔，parity 檢查的兩句斷言仍在）；`Projects/internal/ziwei-doushu/AGENTS.md`＋`CLAUDE.md`（Next.js 樣板，與 cognitive 無關、無衝突）；Execution Contract（無 AGENTS／CLAUDE／模型名引用）；`RESEARCH_LINES_MASTER_PLAN.md` 內 9 處 `AGENTS §0/1/3/4/5/6` 引用逐一對照續4 重寫後的內容，全部仍指到對的段。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File mcp/codex-userlevel/scripts/check-claude-codex-parity.ps1 | exit=0 | ms=9000
+  - 輸出 `Claude/Codex parity PASSED: 445 checks`（續4 重寫 CLAUDE.md／AGENTS.md 後首次跑）；`validate-doc-integrity.mjs` PASSED。
+- REVIEW_WAIVED: DOC_ONLY -- 單檔加 2 行狀態標記
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=CODEX_HANDOFF_PHASE5 | hits=5
+  - 5 筆 = ADR-018、ADR-022、ADR_INDEX、1 份 closeout 報告、1 份 oracle 報告；皆為歷史引用，標記不影響其連結。
+
 ## 2026-10-01（續5）git-log-injector 首次 Edit 注入 1389 行：AO-CLOSE 錨點窗＝兩次成功收工，不是一個 session
 - [症狀] 本 session 首次 Write 被 BLOCK，注入 `ao-close-prev→last`＝`2026-08-24T12:14Z→2026-09-29T17:42Z` 共 1389 行 commit（~160KB）。
 - [根因] 寫入端沒停擺：兩檔 mtime 同為 `2026-09-30 01:42:23.5576`，prev 確實在 09-29 那次收工被推進一次。真因是設計假設錯：`scripts/ao-close.ps1:1507-1512`（舊註解）宣稱 `[prev→last]`＝「上一個完整 work session」且「prev<last 恆成立、不需日期守衛」；實際 stamp 只在 ao-close.ps1 跑到結尾才寫（之前 25 個 `exit` 路徑都不寫），08-24→09-29 之間零次成功收工（`agency-os/reports/ao-close/` 只有 `2026-08-24-2014.md`、`2026-09-30-0142.md`；09-04 commit `aff7fa1c4` 明寫 "minimal close-out without ao-close.ps1"）。消費端 `git-log-injector.js:30-37`（舊）只驗 ISO 格式，窗多寬都照印、無上限。另 `scripts/import-cross-machine-memory.ps1:635-690` 只匯入 last 不動 prev（Codex F1），同類。

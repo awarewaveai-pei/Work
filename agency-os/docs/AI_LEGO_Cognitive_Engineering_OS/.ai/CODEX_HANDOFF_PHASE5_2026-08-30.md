@@ -1,5 +1,7 @@
 # Codex Handoff — Phase 5 MVP Vertical Slice prototype (autonomous, multi-day)
 
+> **HISTORICAL — do not execute.** This handoff was completed: the prototype was built and landed into the repo per `docs/adr/ADR-022-phase-5-runtime-landing.md` (ACCEPTED 2026-09-03). Current Cognitive OS work is driven by `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0. Kept only because ADR-018 / ADR-022 / ADR_INDEX cite it.
+
 Written by Claude 2026-08-30. Operator's Claude budget is nearly exhausted
 today; Codex has daily quota. This handoff is written so Codex can work
 **autonomously across multiple days without waiting for a Claude session
