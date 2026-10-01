@@ -17,7 +17,7 @@
 
 ## AGENTS.md 觸發與路由正本（2026-09-04 自 AGENTS.md 逐字搬入；AGENTS.md 只留指標）
 
-> 這一節是 `agency-os/AGENTS.md` 瘦身時搬出來的 5 張查表，內容逐字未改（含當時的日期與案例）。它們仍是**強制規則**：`AGENTS.md` 每輪都載入，這裡是「遇到情境才查」的正本。改這裡不必改 AGENTS.md；新增觸發語只在這裡加。
+> 這一節是 `agency-os/AGENTS.md` 瘦身時搬出來的 5 張查表，內容逐字未改（含當時的日期與案例）。它們仍是**強制規則**：`AGENTS.md` 每輪都載入，這裡是「遇到情境才查」的正本。新增或修改觸發語只在這裡做，改完跑 `node scripts/gen-trigger-index.mjs --write`：`AGENTS.md` §7 的「觸發索引」由這五張表產生（一列一行、每輪載入），`scripts/verify-governance-pointers.mjs` 會比對兩邊，不一致即紅。表頭那一列與 `### ` 表名是產生器的定位點，改名要同步改產生器。
 
 ### 問題症狀 → Runbook 路由表
 
@@ -70,7 +70,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | 要實作跨 3+ 模組 / 新功能設計 | 先召喚 `planner` agent 拆任務，再實作 |
 | 讀 code 時發現 bug / 異常行為 / 邏輯錯誤 | 召喚 `debugger` agent 系統性追根因 |
 | 改動 auth/RLS/金流、DB schema/migration、Supabase、n8n、nginx/docker-compose/Dockerfile、WP 外掛主題路徑 | **🔧 機械閘**：`hooks/rules/file-path-router.js` 按路徑自動 BLOCK 並指路（7 類別）。照閘指示召喚對應 agent；**不可省**：auth 類改完 `critic` → Critical/High 再 `vuln-verifier`；DB 改前 `db-expert`；nginx/docker 先讀 `safe-infra-patch.sh` + 改後立即 health check（§Auto-Repair 紅線）|
-| 改動 wp-bridge 外掛 code（`lobster-factory/packages/wp-bridge-plugin/`）並要讓操作者拿到 → bump `AWBRIDGE_VERSION`（header+define 兩處）+ 通過 R0 後 **自動跑 `bash scripts/release-wp-bridge.sh`**（無需詢問），回報 Release URL。**核心坑**：外掛發佈正本是 `awarewaveai-pei/aware-wave-wp-bridge`（push tag `v*` → Action 出 zip）**不是 Work**；只 push Work ≠ 發版。詳 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md` / `.claude/commands/wp-bridge-release.md` |
+| 改動 wp-bridge 外掛 code（`lobster-factory/packages/wp-bridge-plugin/`）並要讓操作者拿到 | bump `AWBRIDGE_VERSION`（header+define 兩處）+ 通過 R0 後 **自動跑 `bash scripts/release-wp-bridge.sh`**（無需詢問），回報 Release URL。**核心坑**：外掛發佈正本是 `awarewaveai-pei/aware-wave-wp-bridge`（push tag `v*` → Action 出 zip）**不是 Work**；只 push Work ≠ 發版。詳 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md` / `.claude/commands/wp-bridge-release.md` |
 | 改動 `.ts/.tsx` 任何檔案 | 完成前 `npx tsc --noEmit` 必綠（**🔧** `batch-format.js` Stop 時自動跑）；型別錯誤不得宣告完成 |
 | 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（**🔧** verify-gate 三件套硬擋未驗證 commit）|
 | critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
@@ -437,5 +437,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-10-01 08:17:19 UTC_
+_Last synced: 2026-10-01 09:07:42 UTC_
 

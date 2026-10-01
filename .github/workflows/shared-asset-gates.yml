@@ -21,6 +21,8 @@ name: Shared asset gates (Claude + Codex)
 #   3. Section pointers into the agent rule set. Hooks, scripts and commands cite AGENTS.md by
 #      section name; by 2026-10-01 nine of those names matched nothing and the appendix was 87%
 #      verbatim old copies. Local equivalent: node scripts/verify-governance-pointers.mjs
+#      The same gate checks that the trigger index in AGENTS.md equals what
+#      scripts/gen-trigger-index.mjs derives from TOOL_TRIGGER_MAP.md.
 
 on:
   pull_request:
@@ -53,4 +55,4 @@ jobs:
         run: node scripts/verify-governance-pointers.mjs
 
       - name: Rule-level tests for the gates
-        run: node --test tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/governance-pointers.test.mjs
+        run: node --test tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/governance-pointers.test.mjs tests/hooks/trigger-index.test.mjs

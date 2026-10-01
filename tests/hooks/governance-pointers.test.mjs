@@ -201,6 +201,18 @@ test('an unreadable rule file or a failed scan is an issue, not an empty check',
   assert.deepEqual(at(u), ['unreadable_source@scripts/locked.ps1']);
 });
 
+test('a trigger index that differs from the map, or is missing, is an issue', () => {
+  const t = cleanTree();
+  t.triggerIndex = { expected: 'BEGIN\n- a\nEND', have: 'BEGIN\n- a\nEND' };
+  assert.deepEqual(checkPointers(t), []);
+  t.triggerIndex.have = 'BEGIN\n- stale\nEND';
+  assert.deepEqual(at(t), ['trigger_index_stale@agency-os/AGENTS.md']);
+  t.triggerIndex.have = null;
+  const issues = checkPointers(t);
+  assert.deepEqual(issues.map((i) => i.type), ['trigger_index_stale']);
+  assert.match(issues[0].detail, /block is missing/);
+});
+
 test('records are skipped, live surfaces are not', () => {
   const skip = (p) => RECORD_PATHS.some((re) => re.test(p));
   for (const p of ['agency-os/WORKLOG.md', 'agency-os/WORKLOG-archive/2026-05.md', 'agency-os/reports/oracle/x.md', 'agency-os/docs/x/ADR-0030-y.md', 'agency-os/docs/CODEX_HANDOFF_2026-08-31.md']) {
@@ -227,6 +239,7 @@ test('the real tree is clean, scanned widely, and the CLI reports the counts', (
   assert.ok(tree.agents && tree.appendix, 'rule set files were read');
   assert.equal(parseHeadings(tree.appendix)[0]?.level, 1, 'the appendix title is a heading even when the file carries a BOM');
   assert.deepEqual(checkPointers(tree), []);
+  assert.ok(tree.triggerIndex && tree.triggerIndex.expected.split('\n').length > 30, 'the trigger index was derived from the real map');
   assert.ok(tree.scanned > 1000, `expected a repo-wide scan, got ${tree.scanned} files`);
   assert.ok(tree.resolved >= 60, `expected the known pointers to be resolved, got ${tree.resolved}`);
   const rels = new Set(tree.sources.map((s) => s.rel));

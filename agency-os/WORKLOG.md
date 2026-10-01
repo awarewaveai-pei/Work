@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-01（續10）觸發索引放回 AGENTS.md（由 TOOL_TRIGGER_MAP 產生、閘守一致）
+
+- 起因：操作者「AGENTS.md 好像少了很多重要的東西…我不要一個腦只有一半」。方法由我決定（操作者：「你才是應該知道的角色」）。
+- 查證（原始版 `git show bfa017bcc^:agency-os/AGENTS.md` 65941 bytes 對現行）：
+  - 沒有東西被刪；39% 仍每輪載入、57% 搬到按需檔、約 2% 為同義改寫。
+  - 問題在 2026-09-04 搬去 `TOOL_TRIGGER_MAP.md` 的 5 張查表（88 列）：AGENTS.md 只留一句「命中觸發語先照該表」，但表不在 context 就無從得知命中。88 列中 10 列有 hook、39 列對應的 command／agent／skill 說明每 session 載入、**39 列只有打開該檔才知道**。
+- 不變量：規則可以搬出每輪載入檔，但每輪載入檔必須留一行告訴 agent「這條存在、在哪」；那一行由正本產生，不手寫第二份。
+- 改動：
+  - M1 `scripts/gen-trigger-index.mjs`（新）：從原表產生一列一行索引（情境 → 先開的檔／先用的工具）。選列規則寫死在檔頭：runbook 表全列；自觸發表非 hook 列；預載表全列；觸發語表中非 hook、且第一個目標不是已載入工具的列；agent 路由表不列（各 agent 說明自帶）但必須存在。
+  - M2 `agency-os/AGENTS.md` §7：兩個 marker 之間為產生區塊（50 列）。AGENTS.md 21421→27387 bytes（原始的 41%）。
+  - M3 `scripts/verify-governance-pointers.mjs`：新增 `trigger_index_stale`（區塊 ≠ 產生器現算結果、區塊缺失或重複、產生器找不到段落／表 → 紅）。
+  - M4 `tests/hooks/trigger-index.test.mjs`（新，10 測試）；接進 `scripts/test-hooks.sh` 自己那一行與 `.github/workflows/shared-asset-gates.yml`。
+  - M5 `agency-os/docs/operations/TOOL_TRIGGER_MAP.md`：維護說明改為「改完跑 `--write`」；**修正 :73 wp-bridge 發版列**——該列少一個欄位分隔（觸發與動作黏成一格），舊寫法會被靜默跳過，嚴格解析後才現形。
+- 覆審（Codex 一輪，`reports/oracle/2026-10-01-partialreview-87e66c36.md`，6 個發現）：
+  - 修 5 個，各有測試：缺第五張表不報錯；重複區塊只看第一個；雙反引號 code span 內的 `|` 被當分隔；缺表頭時第一列資料被吃掉；無前導 `|` 的列被跳過（後三項改為「格式不對即報錯，不跳過」）。
+  - 不採納 1 個並記錄理由：「被截斷的列，截斷點之後的文字改了索引不變」——索引的不變量是「等於產生器輸出」，全文本來就在原表；不是漂移。
+- 驗證：
+  - `node scripts/gen-trigger-index.mjs --check` → `Trigger index up to date (50 rows)`；doc-sync 重寫 AGENTS.md（BOM＋CRLF）後仍通過。
+  - 記憶體內把區塊改一個字 → `trigger_index_stale @ agency-os/AGENTS.md`。
+  - 突變：索引 13/13、閘 19/19（皆在臨時副本）。
+  - `bash scripts/test-hooks.sh` 33＋329 全過；`validate-doc-integrity.mjs` PASSED；parity 445 checks。
+- 剩餘風險：索引讓我知道「該列存在、先開哪個檔」，細節仍要開檔才讀得到；「讀到索引後真的去開檔」靠紀律，無機械閘。每輪成本約多 1,900 token。
+- rollback：`git revert` 本 commit（AGENTS.md 回到 21.4KB、無索引）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=66000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n
+  - external oracle = Codex CLI（`scripts/codex-oracle.ps1 -Mode review -Path …`）；5 修、1 不採納（理由如上）。
+- ORACLE_WAIVED: `-Path` 範圍審查依設計不滿足 ORACLE gate（工作區含其他 session 未 commit 改動，無法全樹審）；審後修正以 10 測試＋13 突變為證，未再送審。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,lobster-factory,runbooks | grep=TRIGGER-INDEX|gen-trigger-index | hits=6
+  - 6 檔皆為本次新增或同步修改：`agency-os/AGENTS.md`、`TOOL_TRIGGER_MAP.md`、`scripts/gen-trigger-index.mjs`、`scripts/verify-governance-pointers.mjs`、`tests/hooks/trigger-index.test.mjs`、`.github/workflows/shared-asset-gates.yml`；無其他消費者。
+
 ## 2026-10-01（續9）規則檔指標完整性：新閘 verify-governance-pointers＋附錄重建＋全 repo 過期引用清零＋subagent 章程補齊
 
 - 起因：操作者要求 AGENTS.md／CLAUDE.md／AGENTS_APPENDIX.md 達到「穩定、可驗證、可回滾、不用補丁」標準。稽核結果：未達標。

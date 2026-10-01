@@ -29,6 +29,8 @@
 //   ambiguous_heading     one heading key is the start of another
 //   appendix_archive      the appendix holds a verbatim archive section
 //   duplicate_rule_text   a long line exists verbatim in both AGENTS.md and the appendix
+//   trigger_index_stale   the generated trigger index in AGENTS.md differs from TOOL_TRIGGER_MAP.md
+//                         (rule in scripts/gen-trigger-index.mjs; fix with its --write)
 //   missing_file / unreadable_source / scan_failed    something that had to be read was not
 //
 // Known limit: a bare number ("see section 6") is only range-checked against AGENTS.md's numbered
@@ -40,6 +42,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { expectedBlock, currentBlock, MAP_REL } from './gen-trigger-index.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const DEFAULT_ROOT = path.resolve(path.dirname(SELF), '..');
@@ -138,6 +141,15 @@ export function collectTree(root = DEFAULT_ROOT) {
       tree[slot] = readText(path.join(root, rel));
     } catch {
       /* reported as missing_file by checkPointers */
+    }
+  }
+  // The every-turn trigger index is derived from the map; a map the generator can no longer read
+  // (section or table renamed) is an issue, not an index that silently stays as it was.
+  if (tree.agents !== null) {
+    try {
+      tree.triggerIndex = { expected: expectedBlock(root), have: currentBlock(tree.agents) };
+    } catch (e) {
+      tree.scanIssues.push({ type: 'trigger_index_stale', where: MAP_REL, detail: String((e && e.message) || e).split('\n')[0] });
     }
   }
   let listed;
@@ -295,6 +307,17 @@ export function checkPointers(tree) {
       issues.push({ type: 'duplicate_rule_text', where: `${APPENDIX_REL}:${i + 1}`, detail: `same line as ${AGENTS_REL}:${agentLines.get(t)} -- "${t.slice(0, 50)}..."` });
     }
   });
+
+  // trigger_index_stale: the generated block must equal what the map yields right now
+  if (tree.triggerIndex && tree.triggerIndex.have !== tree.triggerIndex.expected) {
+    issues.push({
+      type: 'trigger_index_stale',
+      where: AGENTS_REL,
+      detail: tree.triggerIndex.have === null
+        ? 'the generated trigger index block is missing or duplicated -- keep exactly one BEGIN/END marker pair, then: node scripts/gen-trigger-index.mjs --write'
+        : `the trigger index differs from ${MAP_REL} -- run: node scripts/gen-trigger-index.mjs --write`,
+    });
+  }
 
   // pointers: every section sign in the two rule files, every AGENTS-qualified one elsewhere
   let resolved = 0;

@@ -19,6 +19,7 @@
 #   tests/hooks/asset-mcp-refs.test.mjs — every mcp__server__tool ref in the shared Claude+Codex assets names a reachable server
 #   tests/hooks/asset-parity.test.mjs — command/agent/skill parity across Claude+Codex plus index coverage
 #   tests/hooks/governance-pointers.test.mjs — every section pointer into AGENTS.md / its appendix lands on exactly one heading; no archive in the appendix
+#   tests/hooks/trigger-index.test.mjs — the every-turn trigger index in AGENTS.md is exactly what the generator derives from TOOL_TRIGGER_MAP.md
 #   tests/hooks/shared-file-guard.test.mjs — shared-file commit guard + private-index commits + WORKLOG 續N guard (real helper, scratch repo)
 #   tests/hooks/linked-worktree-root.test.mjs — root walk accepts only a .git DIRECTORY (linked worktree = not the root)
 #   tests/hooks/file-claim-guard.test.mjs — one writing session per dirty file (claim, release by commit/TTL, Codex apply_patch)
@@ -36,8 +37,8 @@ else
   echo "ERROR: Node.js >= 18 was not found (tried node, node.exe, and the standard WSL Windows install)." >&2
   exit 127
 fi
-# Section pointers into AGENTS.md / its appendix: own invocation, so the shared one-line command below
+# Section pointers into AGENTS.md / its appendix + the generated trigger index: own invocation, so the shared one-line command below
 # is not the place every new gate has to edit.
-"$NODE_BIN" --test tests/hooks/governance-pointers.test.mjs
+"$NODE_BIN" --test tests/hooks/governance-pointers.test.mjs tests/hooks/trigger-index.test.mjs
 
 "$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs tests/hooks/linked-worktree-root.test.mjs tests/hooks/file-claim-guard.test.mjs
