@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-01（續16）ks-aw-01 `/opt/cognitive-os`：git 遠端網址裡的 GitHub token 改為唯讀部署金鑰
+- ROOT_CAUSE: 2026-09-12 13:31 UTC 首次部署 COS（WORKLOG 2026-09-12 續12；session 2f650e6f，Sonnet 5）以 `git clone --filter=blob:none --sparse --no-checkout "https://<token>@github.com/awarewaveai-pei/Work.git"` 建 `/opt/cognitive-os`，git 把含 token 的 URL 明文存進 `.git/config`（664，ubuntu）。token＝筆電 `GITHUB_PERSONAL_ACCESS_TOKEN`／`COPILOT_MCP_BEARER_TOKEN`（`ghp_6uoP…`，sha256 前 12 碼比對相同）。repo 內無任何腳本這樣做，屬臨時指令；WORKLOG 當時未記。
+- FIX: 主機產生 ED25519 金鑰 `~/.ssh/cognitive-os-deploy`（SHA256:eFgNq+RHSXgpbXg45dnHaPSbCwNa0MI4RztsQbWLyEE）；`gh api POST repos/awarewaveai-pei/Work/keys read_only=true` → id 165068099；github.com ED25519 指紋與官方一致後寫入 known_hosts；repo `core.sshCommand` 指定金鑰；remote 改 `git@github.com:awarewaveai-pei/Work.git`。`scripts/dev/README.md` 部署段加一行（金鑰位置＋禁止 token 進 URL）。資料記入操作者本機筆記 `AWARE_WAVE_CREDENTIALS.md`（操作者指定）。
+- 掃描（主機 /home /root /opt /etc /srv /var/log，值一律遮罩）：`/opt/cognitive-os/.git` 已無 token；完整 token 仍在 `/root/Work/lobster-factory/infra/hetzner-phase1-core/.env`＋2 份 `.env.bak*` 第 104–105 行（`GITHUB_PERSONAL_ACCESS_TOKEN`、`COPILOT_MCP_BEARER_TOKEN`），無容器環境變數使用；`auth.log`、`WORKLOG-archive/2026-05.md` 只有 8 碼前綴；本機 repo 所有 commit 0 次完整 token。筆電兩份 Claude 對話紀錄（2f650e6f、本 session）含明文。
+- [操作者] token 輪換：先不換（評估：主機副本已移除；`.env` 依 AGENTS §6 不由 agent 改）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=git -C /opt/cognitive-os fetch origin main（改用金鑰後）＋ grep .git/{config,FETCH_HEAD,packed-refs,logs} | exit=0 | ms=4000
+- REVIEW_WAIVED: NA -- 主機設定變更＋一行文件，無程式碼
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory,runbooks | grep=git clone[^\n]*(GITHUB|TOKEN|PAT|@github\.com|x-access-token) | hits=0
+- rollback: `git -C /opt/cognitive-os remote set-url origin https://github.com/awarewaveai-pei/Work.git` 需另給驗證；金鑰撤銷＝GitHub 刪 id 165068099。
 ## 2026-10-01（續15）Cognitive OS 部署 b51095cbf（字級 U22 ＋ 73b9ac8f8 之後累積的 6 個後端提交）
 - [操作者] 「部署」；告知部署會一併帶上 73b9ac8f8..b51095cbf 的報告 API／Markdown 匯出（53dc77535）、route.method（2d6ddbbda）、WorkflowInterpretation（2dd6c6aab）、引用完整性（b024d6474）、報告核准修正（ee1729223，「核准限角色」仍待操作者決定，TASKS）與新表 `project_reports` 後，選「全部一起上（照標準流程）」。
 - [試跑] `scripts/dev/cos_predeploy_trial.sh b51095cbf`：3 庫 SQLite backup API 備份 integrity ok；副本上新程式開庫：既有表列數全不變、新增 `project_reports`、8 專案 18 來源讀回、6 次分析狀態一致、/health 200、/catalog 284 工具 → TRIAL PASS。

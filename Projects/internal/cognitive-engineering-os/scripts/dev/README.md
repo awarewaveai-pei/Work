@@ -23,3 +23,6 @@ Local stack: API on :8420 (this repo, `.runtime/` SQLite with the COS_TEST ident
 Deploy (High risk, operator go-ahead each time): trial → `git merge --ff-only <sha>` on the host in `/opt/cognitive-os` →
 `bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh` (test gate, build, healthcheck, smoke, rollback tag) →
 `live_check.sh` + `cos_live_counts.sh` + `prod_interpret_check.py` → delete the backup folder (`find … -delete`, no `rm -rf`).
+The host checkout fetches over SSH with a read-only deploy key (`~/.ssh/cognitive-os-deploy`, repo `core.sshCommand`, GitHub
+deploy key id 165068099, 2026-10-01). Never put a token in a remote URL: git stores it in `.git/config` in clear text (the
+2026-09-12 clone did, with the account's main personal token).
